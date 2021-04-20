@@ -599,6 +599,7 @@ data StgPass
   | CodeGen
   | InferTags
   | Tagged
+  | TaggedSimon
 
 -- | Determines if this StgApp expression enters the "function"
 data AppEnters = NoEnter  -- ^ For tagged and evaluated lifted values

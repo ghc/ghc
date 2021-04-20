@@ -235,6 +235,11 @@ import Data.Bifunctor (first, bimap)
 import System.CPUTime
 import GHC.Stg.Utils (seqTopBinds)
 import GHC.Stg.InferTags
+import GHC.Stg.InferTags.Rewrite
+import GHC.Types.Unique.Supply
+import GHC.Stg.DepAnal
+import GHC.Driver.Ppr
+
 #include "HsVersions.h"
 
 -- In ms
@@ -1769,16 +1774,27 @@ doCodeGen hsc_env this_mod denv data_tycons
     let tmpfs  = hsc_tmpfs hsc_env
     let platform = targetPlatform dflags
 
+    dumpIfSet_dyn logger dflags Opt_D_dump_stg_final "CodeGenInput STG:" FormatSTG (pprGenStgTopBindings (initStgPprOpts dflags) stg_binds)
+
+
     -- return $! seqTopBinds stg_binds
     -- let stg_binds_w_fvs = annTopBindingsFreeVars stg_binds
 
     !start <- getTime
 
-    let (!stg_binds_w_tags, _exports) = {-# SCC "StgTagFields" #-}
-                                        findTags logger dflags this_mod stg_binds
+    -- let (!stg_binds_w_tags, _exports) = {-# SCC "StgTagFields" #-}
+    --                                     findTags logger dflags this_mod stg_binds
+
+    let (!stg_binds_w_tags) = {-# SCC "StgTagFields" #-}
+                                        inferTags $ depSortStgPgm this_mod stg_binds
+
+    dumpIfSet_dyn logger dflags Opt_D_dump_stg_final "CodeGenAnal STG:" FormatSTG (pprGenStgTopBindings (initStgPprOpts dflags) stg_binds_w_tags)
+
+    us_t <- mkSplitUniqSupply 't'
+    let sfi_seqd_binds = rewriteTopBinds this_mod us_t stg_binds_w_tags :: [TgStgTopBinding]
     !end <- getTime
     putStrLn $! "Time(ms) taken by findTags:" ++ (show $ end - start)
-    let stg_binds_w_fvs = annTopBindingsFreeVars stg_binds_w_tags
+    let stg_binds_w_fvs = annTopBindingsFreeVars sfi_seqd_binds
 
     dumpIfSet_dyn logger dflags Opt_D_dump_stg_final "Final STG:" FormatSTG (pprGenStgTopBindings (initStgPprOpts dflags) stg_binds_w_fvs)
 

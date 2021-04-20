@@ -33,7 +33,8 @@
 {-# OPTIONS_GHC -Wno-missing-fields #-}
 -- #endif
 
-module GHC.Stg.InferTags.Rewrite
+{-# OPTIONS_GHC -Wno-unused-imports #-}
+module GHC.Stg.InferTags.Rewrite (rewriteTopBinds)
 where
 
 #include "HsVersions.h"
@@ -61,11 +62,23 @@ import GHC.Utils.Panic
 
 import Control.Monad
 
-import GHC.Stg.InferTags.Types
+import GHC.Stg.InferTags -- .Types
 
 import GHC.Driver.Ppr
 import GHC.Utils.Outputable
 
+import GHC.Utils.Monad.State
+import GHC.Utils.Misc
+import GHC.Types.Unique.FM
+import GHC.Types.Name
+
+import GHC.Stg.InferTags.Types
+import GHC.Stg.DepAnal
+import GHC.Unit.Types (Module)
+import GHC.StgToCmm.Types
+import GHC.Types.Var.Set
+
+type RM = State (UniqFM Id TagSig, UniqSupply, Module)
 ------------------------------------------------------------
 -- Add cases around strict fields where required.
 ------------------------------------------------------------
@@ -80,36 +93,149 @@ The idea is simple:
 
 -}
 
-rewriteTopBinds :: [InferStgTopBinding] -> AM [TgStgTopBinding]
-rewriteTopBinds binds = mapM (rewriteTop) binds
 
-rewriteTop :: InferStgTopBinding -> AM TgStgTopBinding
+--------------------------------
+-- Utilities
+--------------------------------
+
+instance MonadUnique RM where
+    getUniqueSupplyM = do
+        (m, us, mod) <- get
+        let (us1, us2) = splitUniqSupply us
+        put (m,us2,mod)
+        return us1
+
+type TaggedSet = VarSet
+
+getMap :: RM (UniqFM Id TagSig)
+getMap = fstOf3 <$> get
+
+setMap :: (UniqFM Id TagSig) -> RM ()
+setMap m = do
+    (_,us,mod) <- get
+    put (m, us,mod)
+
+getMod :: RM Module
+getMod = thdOf3 <$> get
+
+addBind :: GenStgBinding 'TaggedSimon -> RM ()
+addBind (StgNonRec (id, tag) _) = do
+    s <- getMap
+    -- pprTraceM "AddBind" (ppr id)
+    setMap $ addToUFM s id tag
+    return ()
+addBind (StgRec binds) = do
+    let (bnds,_rhss) = unzip binds
+    s <- getMap
+    -- pprTraceM "AddBinds" (ppr $ map fst bnds)
+    setMap $ addListToUFM s bnds
+
+addBinder :: (Id,TagSig) -> RM ()
+addBinder (id,sig) = do
+    s <- getMap
+    setMap $ addToUFM s id sig
+    return ()
+
+addArg :: StgArg -> RM ()
+addArg (StgLitArg _) = return ()
+addArg (StgVarArg v) = do
+    s <- getMap
+    setMap $ addToUFM s v (TagSig 0 TagDunno)
+    return ()
+
+isTagged :: Id -> RM Bool
+isTagged v = do
+    this_mod <- getMod
+    case nameIsLocalOrFrom this_mod (idName v) of
+        True
+            | isUnliftedType (idType v)
+            -> return True
+            | otherwise -> do -- Local binding
+                s <- getMap
+                let !sig = lookupWithDefaultUFM s (pprPanic "unknown Id:" (ppr v)) v
+                return $ case sig of
+                    TagSig _arity info ->
+                        case info of
+                            TagDunno -> False
+                            TagProper -> True
+                            TagTuple _ -> True -- Consider unboxed tuples tagged
+        False -- Imported
+            | Just con <- (isDataConWorkId_maybe v)
+            , isNullaryRepDataCon con
+            -> return True
+            | Just lf_info <- idLFInfo_maybe v
+            -> return $ case lf_info of
+                    -- Function, applied not entered.
+                    LFReEntrant {}
+                        -> True
+                    -- Thunks need to be entered.
+                    LFThunk {}
+                        -> False
+                    -- Constructors, already tagged.
+                    LFCon {}
+                        -- If we ever bind the fields we can infer the tags
+                        -- based on the fields strictness. So a flat lattice
+                        -- is fine.
+                        -> True
+                    LFUnknown {}
+                        -> False
+                    LFUnlifted {}
+                        -> True
+                    -- Shouldn't be possible. I don't think we can export letNoEscapes
+                    LFLetNoEscape {}
+                        -> True
+
+            | otherwise
+            -> return False
+
+
+isArgTagged :: StgArg -> RM Bool
+isArgTagged (StgLitArg _) = return True
+isArgTagged (StgVarArg v) = isTagged v
+
+mkLocalArgId :: Id -> RM Id
+mkLocalArgId id = do
+    u <- getUniqueM
+    return $! setIdUnique (localiseId id) u
+
+---------------------------
+-- Actual rewrite pass
+---------------------------
+
+
+rewriteTopBinds :: Module -> UniqSupply -> [GenStgTopBinding 'TaggedSimon] -> [TgStgTopBinding]
+rewriteTopBinds mod us binds =
+    evalState   (mapM (rewriteTop) $ binds)
+                (mempty, us, mod)
+
+rewriteTop :: InferStgTopBinding -> RM TgStgTopBinding
 rewriteTop (StgTopStringLit v s) = return $! (StgTopStringLit v s)
 rewriteTop      (StgTopLifted bind)  = do
+    addBind bind
     (StgTopLifted . fst) <$!> (rewriteBinds bind)
 
--- For bot level binds, the wrapper is guaranteed to be `id`
-rewriteBinds :: InferStgBinding -> AM (TgStgBinding, TgStgExpr -> TgStgExpr)
-rewriteBinds (StgNonRec v rhs) = do
+-- For top level binds, the wrapper is guaranteed to be `id`
+rewriteBinds :: InferStgBinding -> RM (TgStgBinding, TgStgExpr -> TgStgExpr)
+rewriteBinds b@(StgNonRec v rhs) = do
         (!rhs, wrapper) <-  rewriteRhs v rhs
-        return $! (StgNonRec v rhs, wrapper)
-rewriteBinds (StgRec binds) =do
+        return $! (StgNonRec (fst v) rhs, wrapper)
+rewriteBinds b@(StgRec binds) = do
+        addBind b
         (rhss, wrappers) <- unzip <$> mapM (uncurry rewriteRhs) binds
         let wrapper = foldl1 (.) wrappers
         return $! (mkRec rhss, wrapper)
   where
     mkRec :: [TgStgRhs] -> TgStgBinding
-    mkRec rhss = StgRec (zip (map fst binds) rhss)
+    mkRec rhss = StgRec (zip (map (fst . fst) binds) rhss)
 
 -- Rewrite a RHS, the rewriteFlag tells us weither or not the RHS is in a context in which
 -- we can avoid turning the RhsCon into a closure. (e.g. for top level bindings)
-rewriteRhs :: Id -> InferStgRhs -> AM (TgStgRhs, TgStgExpr -> TgStgExpr)
-rewriteRhs _binding (StgRhsCon (node_id,rewriteFlag) ccs con cn ticks args) = {-# SCC rewriteRhs_ #-} do
-    node <- getNode node_id
-
+rewriteRhs :: (Id,TagSig) -> InferStgRhs -> RM (TgStgRhs, TgStgExpr -> TgStgExpr)
+rewriteRhs (_id, tagSig) (StgRhsCon (node_id) ccs con cn ticks args) = {-# SCC rewriteRhs_ #-} do
+    -- node <- getNode node_id
 
     -- Look up the nodes representing the constructor arguments.
-    fieldInfos <- mapM lookupNodeResult (node_inputs node)
+    fieldInfos <- mapM isArgTagged args
     -- tagInfo <- lookupNodeResult node_id
     -- pprTraceM "rewriteRhsCon" $ ppr _binding <+> ppr tagInfo
     -- pprTraceM "rewriteConApp" $ ppr con <+> vcat [
@@ -123,17 +249,17 @@ rewriteRhs _binding (StgRhsCon (node_id,rewriteFlag) ccs con cn ticks args) = {-
 
     -- Filter out non-strict fields.
     let strictFields =
-            getStrictConArgs con (zip args fieldInfos) :: [(StgArg,EnterLattice)] -- (nth-argument, tagInfo)
+            getStrictConArgs con (zip args fieldInfos) :: [(StgArg,Bool)] -- (nth-argument, tagInfo)
     -- Filter out already tagged arguments.
     let needsEval = map fst . --get the actual argument
-                        filter (not . hasOuterTag . snd) $ -- arg known-tagged
+                        filter (not . snd) $ -- Keep untagged (False) elements.
                         strictFields :: [StgArg]
     let evalArgs = [v | StgVarArg v <- needsEval] :: [Id]
 
     if (null evalArgs)
         then return $! (StgRhsCon noExtFieldSilent ccs con cn ticks args, id)
         else do
-            pprTraceM "CreatingSeqs for " $ ppr _binding <+> ppr node_id
+            pprTraceM "CreatingSeqs for " $ ppr _id <+> ppr node_id
 
             evaldArgs <- mapM mkLocalArgId evalArgs -- Create case binders
             let varMap = zip evalArgs evaldArgs -- Match them up with original ids
@@ -144,11 +270,11 @@ rewriteRhs _binding (StgRhsCon (node_id,rewriteFlag) ccs con cn ticks args) = {-
                     | otherwise = StgVarArg v
             let evaldConArgs = map updateArg args
             -- At this point iff we have:
-            -- * possibly untagged arguments to strict fields
-            -- * maybeClosure as flag
+            --  * possibly untagged arguments to strict fields
+            --  * and Dunno as tag signature
             -- Then we return a RhsClosure, otherwise we return a wrapper
             -- which will evaluate the arguments first when applied to an expression.
-            if rewriteFlag == MaybeClosure
+            if isDunnoSig tagSig --rewriteFlag == MaybeClosure
                 then do
                     conExpr <- mkSeqs evalArgs con cn args (panic "mkSeqs should not need to provide types")
                     return $! (StgRhsClosure noExtFieldSilent ccs ReEntrant [] $! conExpr, id)
@@ -156,13 +282,14 @@ rewriteRhs _binding (StgRhsCon (node_id,rewriteFlag) ccs con cn ticks args) = {-
                     let evalExpr expr = foldr (\(v, vEvald) e -> mkSeq v vEvald e) expr varMap
                     return $! ((StgRhsCon noExtFieldSilent ccs con cn ticks evaldConArgs), evalExpr)
 rewriteRhs _binding (StgRhsClosure ext ccs flag args body) = do
+    mapM_ addBinder  args
     pure (,) <*>
-        (StgRhsClosure ext ccs flag args <$> rewriteExpr False body) <*>
+        (StgRhsClosure ext ccs flag (map fst args) <$> rewriteExpr False body) <*>
         pure id
 
 type IsScrut = Bool
 
-rewriteExpr :: IsScrut -> InferStgExpr -> AM TgStgExpr
+rewriteExpr :: IsScrut -> InferStgExpr -> RM TgStgExpr
 rewriteExpr _ (e@StgCase {})          = rewriteCase e
 rewriteExpr _ (e@StgLet {})           = rewriteLet e
 rewriteExpr _ (e@StgLetNoEscape {})   = rewriteLetNoEscape e
@@ -173,43 +300,47 @@ rewriteExpr isScrut e@(StgApp {})     = rewriteApp isScrut e
 rewriteExpr _ (StgLit lit)           = return $! (StgLit lit)
 rewriteExpr _ (StgOpApp op args res_ty) = return $! (StgOpApp op args res_ty)
 
-rewriteCase :: InferStgExpr -> AM TgStgExpr
-rewriteCase (StgCase scrut bndr alt_type alts) =
+rewriteCase :: InferStgExpr -> RM TgStgExpr
+rewriteCase (StgCase scrut bndr alt_type alts) = do
+    addBinder bndr
     pure StgCase <*>
         rewriteExpr True scrut <*>
-        pure bndr <*>
+        pure (fst bndr) <*>
         pure alt_type <*>
         mapM rewriteAlt alts
 
 rewriteCase _ = panic "Impossible: nodeCase"
 
-rewriteAlt :: InferStgAlt -> AM TgStgAlt
+rewriteAlt :: InferStgAlt -> RM TgStgAlt
 rewriteAlt (altCon, bndrs, rhs) = do
+    mapM_ addBinder bndrs
     !rhs' <- rewriteExpr False rhs
-    return $! (altCon, bndrs, rhs')
+    return $! (altCon, map fst bndrs, rhs')
 
-rewriteLet :: InferStgExpr -> AM TgStgExpr
+rewriteLet :: InferStgExpr -> RM TgStgExpr
 rewriteLet (StgLet xt bind expr) = do
     (!bind', !wrapper) <- rewriteBinds bind
+    addBind bind
     !expr' <- rewriteExpr False expr
     return $! wrapper (StgLet xt bind' expr')
 rewriteLet _ = panic "Impossible"
 
-rewriteLetNoEscape :: InferStgExpr -> AM TgStgExpr
+rewriteLetNoEscape :: InferStgExpr -> RM TgStgExpr
 rewriteLetNoEscape (StgLetNoEscape xt bind expr) = do
     (!bind', wrapper) <- rewriteBinds bind
+    addBind bind
     !expr' <- rewriteExpr False expr
     return $! wrapper (StgLetNoEscape xt bind' expr')
 rewriteLetNoEscape _ = panic "Impossible"
 
-rewriteConApp :: InferStgExpr -> AM TgStgExpr
+rewriteConApp :: InferStgExpr -> RM TgStgExpr
 rewriteConApp (StgConApp nodeId con cn args tys) = do
-    node <- getNode nodeId
+    -- node <- getNode nodeId
     -- We look at the INPUT because the output of this node will always have tagged
     -- strict fields in the end.
-    fieldInfos <- mapM lookupNodeResult (node_inputs node)
-    let strictIndices = getStrictConArgs con (zip fieldInfos args) :: [(EnterLattice, StgArg)]
-    let needsEval = map snd . filter (not . hasOuterTag . fst) $ strictIndices :: [StgArg]
+    fieldInfos <- mapM isArgTagged args
+    let strictIndices = getStrictConArgs con (zip fieldInfos args) :: [(Bool, StgArg)]
+    let needsEval = map snd . filter (not . fst) $ strictIndices :: [StgArg]
     let evalArgs = [v | StgVarArg v <- needsEval] :: [Id]
     if (not $ null evalArgs)
         then do
@@ -219,43 +350,25 @@ rewriteConApp (StgConApp nodeId con cn args tys) = do
 
 rewriteConApp _ = panic "Impossible"
 
-rewriteApp :: IsScrut -> InferStgExpr -> AM TgStgExpr
-rewriteApp True (StgApp nodeId f args)
+rewriteApp :: IsScrut -> InferStgExpr -> RM TgStgExpr
+rewriteApp True (StgApp _nodeId f args)
     | null args = do
-    tagInfo <- lookupNodeResult nodeId
-    let !enter = (extInfo $ enterInfo tagInfo)
-    return $! StgApp enter f args
+        tagInfo <- isTagged f
+        let !enter = (extInfo $ tagInfo)
+        return $! StgApp enter f args
   where
-    extInfo AlwaysEnter       = -- pprTrace "alwaysEnter" (ppr f)
-                                --   StgSyn.AlwaysEnter
-                                -- Reenters evaluated closures too often
-                                  StgSyn.MayEnter
-    extInfo NeverEnter        = StgSyn.NoEnter
-    extInfo MaybeEnter        = StgSyn.MayEnter
-    extInfo NoValue          = StgSyn.MayEnter
-    extInfo UndetEnterInfo    = StgSyn.MayEnter
+    extInfo True        = StgSyn.NoEnter
+    extInfo False       = StgSyn.MayEnter
+    -- extInfo MaybeEnter        = StgSyn.MayEnter
+    -- extInfo NoValue          = StgSyn.MayEnter
+    -- extInfo UndetEnterInfo    = StgSyn.MayEnter
 
-rewriteApp _ (StgApp _ f args) = return $ StgApp MayEnter f args -- TODO? Also apply here?
+rewriteApp _ (StgApp _ f args) = return $ StgApp MayEnter f args
 rewriteApp _ _ = panic "Impossible"
 
-----------------------------------------------
--- Deal with exporting tagging information
-
-_exportTaggedness :: [(Id,NodeId)] -> AM [(Id, EnterLattice)]
-_exportTaggedness xs = mapMaybeM export xs
-    where
-        export (v,nid)
-            | isInternalName (idName v)
-            = return Nothing
-            | isUnliftedType (idType v)
-            = return Nothing
-            | otherwise
-            = do
-                !res <- lookupNodeResult nid
-                return $ Just (v,res)
 
 -- We would ideally replace ALL references to the evaluatee with the evaluted binding.
--- But for now we don't.
+-- But for now we don't bother.
 mkSeq :: Id -> Id -> TgStgExpr -> TgStgExpr
 mkSeq id bndr !expr =
     -- pprTrace "mkSeq" (ppr (id,bndr)) $
@@ -264,9 +377,9 @@ mkSeq id bndr !expr =
     StgCase (StgApp MayEnter id []) bndr altTy [(DEFAULT, [], expr)]
 
 -- Create a ConApp which is guaranteed to evaluate the given ids.
-mkSeqs :: [Id] -> DataCon -> ConstructorNumber -> [StgArg] -> [Type] -> AM TgStgExpr
+mkSeqs :: [Id] -> DataCon -> ConstructorNumber -> [StgArg] -> [Type] -> RM TgStgExpr
 mkSeqs untaggedIds con cn args tys = do
-    argMap <- mapM (\arg -> (arg,) <$> mkLocalArgId arg ) untaggedIds :: AM [(InId, OutId)]
+    argMap <- mapM (\arg -> (arg,) <$> mkLocalArgId arg ) untaggedIds :: RM [(InId, OutId)]
     -- mapM_ (pprTraceM "Forcing strict args before allocation:" . ppr) argMap
     let taggedArgs
             = map   (\v -> case v of
@@ -278,8 +391,8 @@ mkSeqs untaggedIds con cn args tys = do
     let body = foldr (\(v,bndr) expr -> mkSeq v bndr expr) conBody argMap
     return $! body
 
-mkLocalArgId :: Id -> AM Id
-mkLocalArgId id = do
-    u <- getUniqueM
-    return $! setIdUnique (localiseId id) u
+-- mkLocalArgId :: Id -> RM Id
+-- mkLocalArgId id = do
+--     u <- getUniqueM
+--     return $! setIdUnique (localiseId id) u
 
