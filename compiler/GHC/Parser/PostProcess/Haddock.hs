@@ -63,7 +63,7 @@ import Data.Foldable
 import Data.Traversable
 import Data.Maybe
 import Control.Monad
-import GHC.Utils.Monad.State.Strict.Strict
+import GHC.Utils.Monad.State.Strict
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Writer
 import Data.Functor.Identity

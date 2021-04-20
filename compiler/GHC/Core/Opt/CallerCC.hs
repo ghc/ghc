@@ -20,7 +20,7 @@ import Data.Maybe
 import qualified Text.Parsec as P
 
 import Control.Applicative
-import GHC.Utils.Monad.State.Strict.Strict
+import GHC.Utils.Monad.State.Strict
 import Data.Either
 import Control.Monad
 

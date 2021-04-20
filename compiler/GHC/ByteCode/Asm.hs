@@ -47,7 +47,7 @@ import GHC.Platform.Profile
 import Control.Monad
 import Control.Monad.ST ( runST )
 import Control.Monad.Trans.Class
-import GHC.Utils.Monad.State.Strict.Strict
+import GHC.Utils.Monad.State.Strict
 
 import Data.Array.MArray
 

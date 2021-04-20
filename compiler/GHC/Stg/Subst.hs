@@ -8,7 +8,7 @@ import GHC.Prelude
 
 import GHC.Types.Id
 import GHC.Types.Var.Env
-import GHC.Utils.Monad.State.Strict.Strict
+import GHC.Utils.Monad.State.Strict
 
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
