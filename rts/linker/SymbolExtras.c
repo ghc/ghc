@@ -182,9 +182,11 @@ SymbolExtra* makeSymbolExtra( ObjectCode const* oc,
 #if defined(x86_64_HOST_ARCH)
     // jmp *-14(%rip)
     // 0xFF 25 is opcode + ModRM of near absolute indirect jump
-    static uint8_t jmp[] = { 0xFF, 0x25, 0xF2, 0xFF, 0xFF, 0xFF };
+    // Two bytes trailing padding, needed for TLSGD GOT entries
+    // See Note [TLSGD relocation] in elf_tlsgd.c
+    static uint8_t jmp[] = { 0xFF, 0x25, 0xF2, 0xFF, 0xFF, 0xFF, 0x00, 0x00 };
     extra->addr = target;
-    memcpy(extra->jumpIsland, jmp, 6);
+    memcpy(extra->jumpIsland, jmp, 8);
 #endif /* x86_64_HOST_ARCH */
 
     return extra;
