@@ -87,7 +87,7 @@ import GHC.Core.FamInstEnv
 import Control.Applicative ((<|>))
 import Control.Monad (foldM, forM, guard, mzero, when, filterM)
 import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.State.Strict
+import GHC.Utils.Monad.State.Strict.Strict
 import Data.Coerce
 import Data.Either   (partitionEithers)
 import Data.Foldable (foldlM, minimumBy, toList)

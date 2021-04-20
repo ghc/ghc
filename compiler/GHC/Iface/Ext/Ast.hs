@@ -74,7 +74,7 @@ import qualified Data.Set as S
 import Data.Data                  ( Data, Typeable )
 import Data.Void                  ( Void, absurd )
 import Control.Monad              ( forM_ )
-import Control.Monad.Trans.State.Strict
+import GHC.Utils.Monad.State.Strict.Strict
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Class  ( lift )
 import GHC.HsToCore.Types
