@@ -19,7 +19,7 @@ import GHC.Prelude
 import Data.Typeable
 import GHC.Types.Error
 
-import GHC.Parser.Errors       ( PsErrorDesc, PsHint )
+import GHC.Parser.Errors       ( PsErrorDesc )
 import GHC.Parser.Errors.Types ( PsMessage )
 import GHC.Tc.Errors.Types     ( TcRnMessage )
 import GHC.HsToCore.Errors.Types ( DsMessage )
@@ -110,7 +110,7 @@ data DriverMessage
   = DriverUnknownMessage !DiagnosticMessage
   -- ^ Simply rewraps a generic 'DiagnosticMessage'. More
   -- constructors will be added in the future (#18516).
-  | DriverPsHeaderMessage !PsErrorDesc ![PsHint]
+  | DriverPsHeaderMessage !PsErrorDesc ![Hint PsMessage]
   -- ^ A parse error in parsing a Haskell file header during dependency
   -- analysis
 

@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -8,6 +9,7 @@ module GHC.Parser.Errors.Ppr
    ( mkParserWarn
    , mkParserErr
    , pprPsError
+   , Hint(..)
    )
 where
 
@@ -32,14 +34,19 @@ import GHC.Driver.Session (DynFlags)
 import GHC.Utils.Error (diagReasonSeverity)
 
 instance Diagnostic PsMessage where
+  newtype Hint PsMessage = MkPsHint PsHint -- Unfortunate newtype wrapper to avoid circular deps
   diagnosticMessage (PsUnknownMessage m) = diagnosticMessage m
   diagnosticReason  (PsUnknownMessage m) = diagnosticReason m
+  diagnosticHints   (PsUnknownMessage m) = rewrapHints (MkPsHint . PsUnknownHint) (diagnosticHints m)
 
-mk_parser_err :: SrcSpan -> SDoc -> MsgEnvelope PsMessage
-mk_parser_err span doc = MsgEnvelope
+mk_parser_err :: [PsHint] -> SrcSpan -> SDoc -> MsgEnvelope PsMessage
+mk_parser_err hints span doc = MsgEnvelope
    { errMsgSpan        = span
    , errMsgContext     = alwaysQualify
-   , errMsgDiagnostic  = PsUnknownMessage $ DiagnosticMessage (mkDecorated [doc]) ErrorWithoutFlag
+   , errMsgDiagnostic  =
+       PsUnknownMessage $ (mkPlainError doc) {
+           diagHints = map (mkDiagnosticHint . mkSimpleDecorated . pp_hint . MkPsHint) hints
+           }
    , errMsgSeverity    = SevError
    }
 
@@ -47,7 +54,7 @@ mk_parser_warn :: DynFlags -> WarningFlag -> SrcSpan -> SDoc -> MsgEnvelope PsMe
 mk_parser_warn df flag span doc = MsgEnvelope
    { errMsgSpan        = span
    , errMsgContext     = alwaysQualify
-   , errMsgDiagnostic  = PsUnknownMessage $ DiagnosticMessage (mkDecorated [doc]) reason
+   , errMsgDiagnostic  = PsUnknownMessage $ mkPlainDiagnostic reason doc
    , errMsgSeverity    = diagReasonSeverity df reason
    }
   where
@@ -141,11 +148,11 @@ mkParserWarn df = \case
            OperatorWhitespaceOccurrence_TightInfix -> mk_msg "tight infix"
 
 mkParserErr :: PsError -> MsgEnvelope PsMessage
-mkParserErr err = mk_parser_err (errLoc err) $
-                  pprPsError (errDesc err) (errHints err)
+mkParserErr err = mk_parser_err (errHints err) (errLoc err) $
+                  pprPsError (errDesc err) (MkPsHint <$> errHints err)
 
 -- | Render a 'PsErrorDesc' into an 'SDoc', with its 'PsHint's.
-pprPsError :: PsErrorDesc -> [PsHint] -> SDoc
+pprPsError :: PsErrorDesc -> [Hint PsMessage] -> SDoc
 pprPsError desc hints = vcat (pp_err desc : map pp_hint hints)
 
 pp_err :: PsErrorDesc -> SDoc
@@ -611,8 +618,9 @@ pp_unexpected_fun_app e a =
     $$ text "You could write it with parentheses"
     $$ text "Or perhaps you meant to enable BlockArguments?"
 
-pp_hint :: PsHint -> SDoc
-pp_hint = \case
+pp_hint :: Hint PsMessage -> SDoc
+pp_hint (MkPsHint hint) = case hint of
+   PsUnknownHint dec      -> ppr $ unDecorated dec
    SuggestTH              -> text "Perhaps you intended to use TemplateHaskell"
    SuggestDo              -> text "Perhaps this statement should be within a 'do' block?"
    SuggestMissingDo       -> text "Possibly caused by a missing 'do'?"
