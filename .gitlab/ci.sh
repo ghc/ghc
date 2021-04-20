@@ -578,8 +578,8 @@ if [ "${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-}" == "wip/marge_bot_batch_merge_jo
     echo "Ignoring perf failures"
   fi
 fi
-echo "CI_COMMIT_BRANCH: $CI_COMMIT_BRANCH"
-echo "CI_PROJECT_PATH: $CI_PROJECT_PATH"
+echo "CI_COMMIT_BRANCH: ${CI_COMMIT_BRANCH:-}"
+echo "CI_PROJECT_PATH: ${CI_PROJECT_PATH:-}"
 if [ "${CI_COMMIT_BRANCH:-}" == "master" ] &&  [ "${CI_PROJECT_PATH:-}" == "ghc/ghc" ]; then
   if [ -z "${IGNORE_PERF_FAILURES:-}" ]; then
     IGNORE_PERF_FAILURES="decreases"
