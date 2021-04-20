@@ -34,19 +34,19 @@ import GHC.Utils.Panic
 import GHC.Utils.Logger
 import Control.Monad
 import Control.Monad.IO.Class
-import GHC.Utils.Monad.State.Strict
+import Control.Monad.Trans.Reader
 
-newtype StgM a = StgM { _unStgM :: StateT Char IO a }
+newtype StgM a = StgM { _unStgM :: ReaderT Char IO a }
   deriving (Functor, Applicative, Monad, MonadIO)
 
 instance MonadUnique StgM where
-  getUniqueSupplyM = StgM $ do { mask <- get
+  getUniqueSupplyM = StgM $ do { mask <- ask
                                ; liftIO $! mkSplitUniqSupply mask}
-  getUniqueM = StgM $ do { mask <- get
+  getUniqueM = StgM $ do { mask <- ask
                          ; liftIO $! uniqFromMask mask}
 
 runStgM :: Char -> StgM a -> IO a
-runStgM mask (StgM m) = evalStateT m mask
+runStgM mask (StgM m) = runReaderT m mask
 
 stg2stg :: Logger
         -> DynFlags                  -- includes spec of what stg-to-stg passes to do
