@@ -1086,7 +1086,8 @@ mkStableIdFromString :: String -> Type -> SrcSpan -> (OccName -> OccName) -> TcM
 mkStableIdFromString str sig_ty loc occ_wrapper = do
     uniq <- newUnique
     mod <- getModule
-    name <- mkWrapperName "stable" str
+    nextWrapperNum <- tcg_next_wrapper_num <$> getGblEnv
+    name <- mkWrapperName nextWrapperNum "stable" str
     let occ = mkVarOccFS name :: OccName
         gnm = mkExternalName uniq mod (occ_wrapper occ) loc :: Name
         id  = mkExportedVanillaId gnm sig_ty :: Id
@@ -1095,14 +1096,14 @@ mkStableIdFromString str sig_ty loc occ_wrapper = do
 mkStableIdFromName :: Name -> Type -> SrcSpan -> (OccName -> OccName) -> TcM TcId
 mkStableIdFromName nm = mkStableIdFromString (getOccString nm)
 
-mkWrapperName :: (MonadIO m, HasDynFlags m, HasModule m)
-              => String -> String -> m FastString
-mkWrapperName what nameBase
-    = do dflags <- getDynFlags
-         thisMod <- getModule
-         let -- Note [Generating fresh names for ccall wrapper]
-             wrapperRef = nextWrapperNum dflags
-             pkg = unitString  (moduleUnit thisMod)
+mkWrapperName :: (MonadIO m, HasModule m)
+              => IORef (ModuleEnv Int) -> String -> String -> m FastString
+-- ^ @mkWrapperName ref what nameBase@
+--
+-- See Note [Generating fresh names for ccall wrapper] for @ref@'s purpose.
+mkWrapperName wrapperRef what nameBase
+    = do thisMod <- getModule
+         let pkg = unitString  (moduleUnit thisMod)
              mod = moduleNameString (moduleName      thisMod)
          wrapperNum <- liftIO $ atomicModifyIORef' wrapperRef $ \mod_env ->
              let num = lookupWithDefaultModuleEnv mod_env 0 thisMod
