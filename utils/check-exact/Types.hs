@@ -17,7 +17,6 @@ import GHC.Driver.Ppr
 import Data.Data (Data, toConstr,cast)
 
 import qualified Data.Map as Map
-import qualified Data.Set as Set
 
 -- ---------------------------------------------------------------------
 -- | This structure holds a complete set of annotations for an AST
@@ -63,14 +62,10 @@ mkAnnKey ld =
 
 type Pos = (Int,Int)
 
-deltaRow, deltaColumn :: DeltaPos -> Int
-deltaRow (DP r _) = r
-deltaColumn (DP _ c) = c
-
 -- ---------------------------------------------------------------------
 
 annNone :: Annotation
-annNone = Ann (DP 0 0) [] [] [] Nothing Nothing
+annNone = Ann (SameLine 0) [] [] [] Nothing Nothing
 
 data Annotation = Ann
   {
@@ -130,132 +125,9 @@ declFun f (L l de) =
 
 -- ---------------------------------------------------------------------
 
-data ACS' a = ACS
-  { acs :: !(Map.Map a Int) -- ^ how many levels each AstContext should
-                            -- propagate down the AST. Removed when it hits zero
-  } deriving (Show)
-
-instance Semigroup (ACS' AstContext) where
-  ACS a <> ACS b = ACS (Map.unionWith max a b)
-  -- For Data.Map, mappend == union, which is a left-biased replace
-  -- for key collisions
-
-instance Monoid (ACS' AstContext) where
-  mempty = ACS mempty
-
-type AstContextSet = ACS' AstContext
--- data AstContextSet = ACS
---   { acs :: !(Map.Map AstContext Int) -- ^ how many levels each AstContext should
---                                      -- propagate down the AST. Removed when it
---                                      -- hits zero
---   } deriving (Show)
-
-defaultACS :: AstContextSet
-defaultACS = ACS Map.empty
-
--- instance Outputable AstContextSet where
-instance (Show a) => Outputable (ACS' a) where
-  ppr x = text $ show x
-
-data AstContext = -- LambdaExpr
-                  CaseAlt
-                | NoPrecedingSpace
-                | HasHiding
-                | AdvanceLine
-                | NoAdvanceLine
-                | Intercalate -- This item may have a list separator following
-                | InIE -- possible 'type' or 'pattern'
-                | PrefixOp
-                | PrefixOpDollar
-                | InfixOp -- RdrName may be used as an infix operator
-                | ListStart -- Identifies first element of a list in layout, so its indentation can me managed differently
-                | ListItem -- Identifies subsequent elements of a list in layout
-                | TopLevelDecl -- top level declaration
-                | NoDarrow
-                | AddVbar
-                | Deriving
-                | Parens -- TODO: Not currently used?
-                | ExplicitNeverActive
-                | InGadt
-                | InRecCon
-                | InClassDecl
-                | InSpliceDecl
-                | LeftMost -- Is this the leftmost operator in a chain of OpApps?
-                | InTypeApp -- HsTyVar in a TYPEAPP context. Has AnnAt
-                          -- TODO:AZ: do we actually need this?
-
-                -- Next four used to identify current list context
-                | CtxOnly
-                | CtxFirst
-                | CtxMiddle
-                | CtxLast
-                | CtxPos Int -- 0 for first, increasing for subsequent
-
-                -- Next are used in tellContext to push context up the tree
-                | FollowingLine
-                deriving (Eq, Ord, Show)
-
-
-data ListContexts = LC { lcOnly,lcInitial,lcMiddle,lcLast :: !(Set.Set AstContext) }
-  deriving (Eq,Show)
-
--- ---------------------------------------------------------------------
-
 data Rigidity = NormalLayout | RigidLayout deriving (Eq, Ord, Show)
 
--- -- ---------------------------------------------------------------------
--- -- | This structure holds a complete set of annotations for an AST
--- type Anns = Map.Map AnnKey Annotation
 
--- emptyAnns :: Anns
--- emptyAnns = Map.empty
-
--- -- | For every @Located a@, use the @SrcSpan@ and constructor name of
--- -- a as the key, to store the standard annotation.
--- -- These are used to maintain context in the AP and EP monads
--- data AnnKey   = AnnKey SrcSpan AnnConName
---                   deriving (Eq, Data, Ord)
--- deriving instance Ord SrcSpan
-
--- -- More compact Show instance
--- instance Show AnnKey where
---   show (AnnKey ss cn) = "AnnKey " ++ showPprUnsafe ss ++ " " ++ show cn
-
--- mkAnnKeyPrim :: (Data a) => Located a -> AnnKey
--- mkAnnKeyPrim (L l a) = AnnKey l (annGetConstr a)
-
--- mkAnnKeyPrimA :: (Data a) => LocatedA a -> AnnKey
--- mkAnnKeyPrimA (L l a) = AnnKey (locA l) (annGetConstr a)
-
--- -- Holds the name of a constructor
--- data AnnConName = CN { unConName :: String }
---                  deriving (Eq, Ord, Data)
-
--- -- More compact show instance
--- instance Show AnnConName where
---   show (CN s) = "CN " ++ show s
-
--- annGetConstr :: (Data a) => a -> AnnConName
--- annGetConstr a = CN (show $ toConstr a)
-
--- -- |Make an unwrapped @AnnKey@ for the @LHsDecl@ case, a normal one otherwise.
--- mkAnnKey :: (Data a) => Located a -> AnnKey
--- mkAnnKey ld =
---   case cast ld :: Maybe (LHsDecl GhcPs) of
---     Just d -> declFun mkAnnKeyPrimA d
---     Nothing -> mkAnnKeyPrim ld
-
-
--- type Pos = (Int,Int)
-
--- -- | A relative positions, row then column
--- newtype DeltaPos = DP (Int,Int) deriving (Show,Eq,Ord,Data)
-
--- deltaRow, deltaColumn :: DeltaPos -> Int
--- deltaRow (DP (r, _)) = r
--- deltaColumn (DP (_, c)) = c
-
--- ---------------------------------------------------------------------
 
 -- | A Haskell comment. The @AnnKeywordId@ is present if it has been converted
 -- from an @AnnKeywordId@ because the annotation must be interleaved into the
