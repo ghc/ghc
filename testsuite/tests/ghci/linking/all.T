@@ -12,8 +12,8 @@ test('ghcilink002', [extra_files(['TestLink.hs', 'f.c']),
 
 test('ghcilink003',
      [unless(doing_ghci, skip),
-      # libstdc++ is named differently on FreeBSD
-      when(opsys('freebsd'), expect_broken(17739))],
+      # libstdc++ is GCC-specific on FreeBSD
+      when(opsys('freebsd'), fragile(17739))],
      makefile_test,
      ['ghcilink003'])
 
@@ -32,8 +32,8 @@ test('ghcilink005',
 
 test('ghcilink006',
      [unless(doing_ghci, skip),
-      # libstdc++ is named differently on FreeBSD
-      when(opsys('freebsd'), expect_broken(17739))],
+      # libstdc++ is GCC-specific on FreeBSD
+      when(opsys('freebsd'), fragile(17739))],
      makefile_test,
      ['ghcilink006'])
 
