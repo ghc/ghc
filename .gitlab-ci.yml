@@ -1233,8 +1233,9 @@ release-x86_64-windows:
   extends: .build-x86_64-windows-hadrian
   variables:
     BUILD_FLAVOUR: "perf"
-    IGNORE_PERF_FAILURES: "all"
     HADDOCK_HYPERLINKED_SOURCES: "yes"
+    # --skip-perf is incompatible with IGNORE_PERF_FAILURES.
+    IGNORE_PERF_FAILURES: ""
 
 release-x86_64-windows-integer-simple:
   <<: *release
@@ -1245,6 +1246,8 @@ release-x86_64-windows-integer-simple:
     IGNORE_PERF_FAILURES: "all"
     BUILD_FLAVOUR: "perf"
     BIN_DIST_NAME: "ghc-x86_64-mingw32-unknown-nogmp"
+    # --skip-perf is incompatible with IGNORE_PERF_FAILURES.
+    IGNORE_PERF_FAILURES: ""
 
 
 ############################################################
