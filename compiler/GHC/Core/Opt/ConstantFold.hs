@@ -37,7 +37,7 @@ import GHC.Prelude
 
 import GHC.Driver.Ppr
 
-import {-# SOURCE #-} GHC.Types.Id.Make ( mkPrimOpId, magicDictId, voidPrimId )
+import {-# SOURCE #-} GHC.Types.Id.Make ( mkPrimOpId, voidPrimId )
 
 import GHC.Core
 import GHC.Core.Make
@@ -49,11 +49,11 @@ import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim
 import GHC.Core.TyCon
    ( tyConDataCons_maybe, isAlgTyCon, isEnumerationTyCon
-   , isNewTyCon, unwrapNewTyCon_maybe, tyConDataCons
+   , isNewTyCon, tyConDataCons
    , tyConFamilySize )
 import GHC.Core.DataCon ( dataConTagZ, dataConTyCon, dataConWrapId, dataConWorkId )
 import GHC.Core.Utils  ( eqExpr, cheapEqExpr, exprIsHNF, exprType
-                       , stripTicksTop, stripTicksTopT, mkTicks, stripTicksE )
+                       , stripTicksTop, stripTicksTopT, mkTicks )
 import GHC.Core.Multiplicity
 import GHC.Core.FVs
 import GHC.Core.Type
@@ -70,7 +70,6 @@ import GHC.Types.Basic
 import GHC.Platform
 import GHC.Utils.Misc
 import GHC.Utils.Panic
-import GHC.Core.Coercion   (mkUnbranchedAxInstCo,mkSymCo,Role(..))
 
 import Control.Applicative ( Alternative(..) )
 
@@ -1739,8 +1738,6 @@ builtinRules
                    ru_nargs = 1, ru_try = match_cstring_length },
      BuiltinRule { ru_name = fsLit "Inline", ru_fn = inlineIdName,
                    ru_nargs = 2, ru_try = \_ _ _ -> match_inline },
-     BuiltinRule { ru_name = fsLit "MagicDict", ru_fn = idName magicDictId,
-                   ru_nargs = 4, ru_try = \_ _ _ -> match_magicDict },
 
      mkBasicRule unsafeEqualityProofName 3 unsafeEqualityProofRule,
 
@@ -2238,21 +2235,6 @@ match_inline (Type _ : e : _)
   = Just (mkApps unf args1)
 
 match_inline _ = Nothing
-
----------------------------------------------------
--- See Note [magicDictId magic] in "GHC.Types.Id.Make"
--- for a description of what is going on here.
-match_magicDict :: [Expr CoreBndr] -> Maybe (Expr CoreBndr)
-match_magicDict [Type _, (stripTicksE (const True) -> (Var wrap `App` Type a `App` Type _ `App` f)), x, y ]
-  | Just (_, fieldTy, _)  <- splitFunTy_maybe $ dropForAlls $ idType wrap
-  , Just (_, dictTy, _)   <- splitFunTy_maybe fieldTy
-  , Just dictTc           <- tyConAppTyCon_maybe dictTy
-  , Just (_,_,co)         <- unwrapNewTyCon_maybe dictTc
-  = Just
-  $ f `App` Cast x (mkSymCo (mkUnbranchedAxInstCo Representational co [a] []))
-      `App` y
-
-match_magicDict _ = Nothing
 
 --------------------------------------------------------
 -- Note [Constant folding through nested expressions]
