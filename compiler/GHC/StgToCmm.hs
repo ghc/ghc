@@ -20,7 +20,7 @@ import GHC.Prelude as Prelude
 import GHC.Driver.Backend
 import GHC.Driver.Session
 
-import GHC.StgToCmm.Prof (initInfoTableProv, initCostCentres, ldvEnter)
+import GHC.StgToCmm.Prof (initCostCentres, ldvEnter)
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Env
 import GHC.StgToCmm.Bind
@@ -49,7 +49,6 @@ import GHC.Types.Basic
 import GHC.Types.Var.Set ( isEmptyDVarSet )
 import GHC.Types.Unique.FM
 import GHC.Types.Name.Env
-import GHC.Types.ForeignStubs
 
 import GHC.Core.DataCon
 import GHC.Core.TyCon
@@ -72,11 +71,10 @@ import Control.Monad (when,void, forM_)
 import GHC.Utils.Misc
 import System.IO.Unsafe
 import qualified Data.ByteString as BS
-import Data.Maybe
 import Data.IORef
 
-data CodeGenState = CodeGenState { codegen_used_info :: !(OrdList CmmInfoTable)
-                                 , codegen_state :: !CgState }
+-- TODO: No record needed.
+data CodeGenState = CodeGenState { codegen_state :: !CgState }
 
 
 codeGen :: Logger
@@ -88,34 +86,30 @@ codeGen :: Logger
         -> CollectedCCs                -- (Local/global) cost-centres needing declaring/registering.
         -> [CgStgTopBinding]           -- Bindings to convert
         -> HpcInfo
-        -> Stream IO CmmGroup (CStub, ModuleLFInfos)       -- Output as a stream, so codegen can
+        -> Stream IO CmmGroup ModuleLFInfos       -- Output as a stream, so codegen can
                                        -- be interleaved with output
 
-codeGen logger tmpfs dflags this_mod ip_map@(InfoTableProvMap (UniqMap denv) _) data_tycons
+codeGen logger tmpfs dflags this_mod (InfoTableProvMap (UniqMap denv) _) data_tycons
         cost_centre_info stg_binds hpc_info
   = do  {     -- cg: run the code generator, and yield the resulting CmmGroup
               -- Using an IORef to store the state is a bit crude, but otherwise
               -- we would need to add a state monad layer which regresses
               -- allocations by 0.5-2%.
-        ; cgref <- liftIO $ initC >>= \s -> newIORef (CodeGenState mempty s)
+        ; cgref <- liftIO $ initC >>= \s -> newIORef (CodeGenState s)
         ; let cg :: FCode a -> Stream IO CmmGroup a
               cg fcode = do
                 (a, cmm) <- liftIO . withTimingSilent logger dflags (text "STG -> Cmm") (`seq` ()) $ do
-                         CodeGenState ts st <- readIORef cgref
+                         CodeGenState st <- readIORef cgref
                          let (a,st') = runC dflags this_mod st (getCmm fcode)
 
                          -- NB. stub-out cgs_tops and cgs_stmts.  This fixes
                          -- a big space leak.  DO NOT REMOVE!
                          -- This is observed by the #3294 test
-                         let !used_info
-                                | gopt Opt_InfoTableMap dflags = toOL (mapMaybe topInfoTable (snd a)) `mappend` ts
-                                | otherwise = mempty
                          writeIORef cgref $!
-                                    CodeGenState used_info
+                                    CodeGenState
                                       (st'{ cgs_tops = nilOL,
                                             cgs_stmts = mkNop
                                           })
-
                          return a
                 yield cmm
                 return a
@@ -147,9 +141,6 @@ codeGen logger tmpfs dflags this_mod ip_map@(InfoTableProvMap (UniqMap denv) _) 
 
         ; final_state <- liftIO (readIORef cgref)
         ; let cg_id_infos = cgs_binds . codegen_state $ final_state
-              used_info = fromOL . codegen_used_info $ final_state
-
-        ; !foreign_stub <- cg (initInfoTableProv used_info ip_map this_mod)
 
           -- See Note [Conveying CAF-info and LFInfo between modules] in
           -- GHC.StgToCmm.Types
@@ -164,7 +155,7 @@ codeGen logger tmpfs dflags this_mod ip_map@(InfoTableProvMap (UniqMap denv) _) 
                 | otherwise
                 = mkNameEnv (Prelude.map extractInfo (eltsUFM cg_id_infos))
 
-        ; return (foreign_stub, generatedInfo)
+        ; return generatedInfo
         }
 
 ---------------------------------------------------------------
