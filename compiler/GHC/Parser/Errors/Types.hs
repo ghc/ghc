@@ -359,7 +359,7 @@ data PsMessage
   | PsLexerError !LexErr !LexErrKind
 
      -- | Parse errors
-  | PsParseError !String
+  | PsParseError !String [PsHint]
 
      -- | Cmm lexer error
   | PsCmmLexerError
@@ -368,7 +368,7 @@ data PsMessage
   | PsCmmParserError !CmmParserError
 
      -- | Messages emitted in case of malformed expressions
-  | PsMalformedExpr !PsMalformedExprMessage
+  | PsMalformedExprMessage !PsMalformedExprMessage
 
 
 newtype StarIsType = StarIsType Bool
