@@ -13,6 +13,7 @@ module GHC.Driver.Pipeline.Monad (
 
 import GHC.Prelude
 
+import GHC.Utils.Fingerprint
 import GHC.Utils.Monad
 import GHC.Utils.Outputable
 import GHC.Utils.Logger
@@ -26,10 +27,14 @@ import GHC.Linker.Types
 
 import GHC.Utils.TmpFs (TempFileLifetime)
 
+import GHC.Types.Error
+
 import GHC.Unit.Module
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Module.Status
+
+import GHC.Tc.Types
 
 import Control.Monad
 
@@ -51,12 +56,16 @@ instance MonadIO CompPipeline where
     liftIO m = P $ \_env state -> do a <- m; return (state, a)
 
 data PhasePlus = RealPhase Phase
+               -- | Runs the pipeline post typechecking, till the end
+               | HscPostTc ModSummary FrontendResult WarningMessages (Maybe Fingerprint)
                -- | The backend phase runs the code-gen. This may be run twice in
                -- the case of -dynamic-too
                | HscBackend ModSummary HscBackendAction
 
+
 instance Outputable PhasePlus where
     ppr (RealPhase p) = ppr p
+    ppr (HscPostTc {}) = text "HscPostTc"
     ppr (HscBackend {}) = text "HscBackend"
 
 -- -----------------------------------------------------------------------------

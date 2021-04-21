@@ -1,12 +1,4 @@
 
-T9400.hs:13:9: warning: [-Woverlapping-patterns (in -Wdefault)]
-    Pattern match is redundant
-    In a case alternative: [] -> ...
-
-T9400.hs:18:9: warning: [-Woverlapping-patterns (in -Wdefault)]
-    Pattern match is redundant
-    In a case alternative: "" -> ...
-
 ==================== Tidy Core ====================
 Result size of Tidy Core
   = {terms: 38, types: 22, coercions: 0, joins: 0/0}
@@ -71,3 +63,11 @@ main
 
 
 
+
+T9400.hs:13:9: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In a case alternative: [] -> ...
+
+T9400.hs:18:9: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In a case alternative: "" -> ...

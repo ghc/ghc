@@ -52,11 +52,11 @@ module GHC.Driver.Main
     , hscRecompStatus
     , hscParse
     , hscTypecheckRename
+    , hscTypecheckAndGetWarnings
     , hscDesugar
     , makeSimpleDetails
     , hscSimplify -- ToDo, shouldn't really export this
     , hscDesugarAndSimplify
-    , hsc_typecheck
 
     -- * Safe Haskell
     , hscCheckSafe
@@ -516,6 +516,12 @@ hscTypecheckRename :: HscEnv -> ModSummary -> HsParsedModule
 hscTypecheckRename hsc_env mod_summary rdr_module = runHsc hsc_env $
     hsc_typecheck True mod_summary (Just rdr_module)
 
+-- | Do Typechecking without throwing SourceError exception with -Werror
+hscTypecheckAndGetWarnings :: HscEnv ->  ModSummary -> IO (FrontendResult, WarningMessages)
+hscTypecheckAndGetWarnings hsc_env summary = runHsc' hsc_env $ do
+  case hscFrontendHook (hsc_hooks hsc_env) of
+    Nothing -> FrontendTypecheck . fst <$> hsc_typecheck False summary Nothing
+    Just h  -> h summary
 
 -- | A bunch of logic piled around @tcRnModule'@, concerning a) backpack
 -- b) concerning dumping rename info and hie files. It would be nice to further
@@ -621,14 +627,9 @@ hscDesugar hsc_env mod_summary tc_result =
 hscDesugar' :: ModLocation -> TcGblEnv -> Hsc ModGuts
 hscDesugar' mod_location tc_result = do
     hsc_env <- getHscEnv
-    r <- ioMsgMaybe $
+    ioMsgMaybe $
       {-# SCC "deSugar" #-}
       deSugar hsc_env mod_location tc_result
-
-    -- always check -Werror after desugaring, this is the last opportunity for
-    -- warnings to arise before the backend.
-    handleWarnings
-    return r
 
 -- | Make a 'ModDetails' from the results of typechecking. Used when
 -- typechecking only, as opposed to full compilation.
@@ -681,6 +682,7 @@ This is the only thing that isn't caught by the type-system.
 
 type Messager = HscEnv -> (Int,Int) -> RecompileRequired -> ModuleGraphNode -> IO ()
 
+-- | Do the recompilation avoidance checks for both one-shot and --make modes
 hscRecompStatus :: Maybe Messager
                 -> HscEnv
                 -> ModSummary
