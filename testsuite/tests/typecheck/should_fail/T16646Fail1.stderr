@@ -1,0 +1,5 @@
+
+T16646Fail1.hs:12:5: error:
+    Invalid instantiation of ‘magicDict’ at type:
+    (dt => r) -> st -> r
+        ‘dt’ is not a class constraint

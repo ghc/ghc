@@ -1,6 +1,19 @@
 ## next (edit as necessary)
 
 - `magicDict` is now defined in `GHC.Magic.Dict` instead of `GHC.Prim`.
+  It now has the type:
+
+        magicDict :: forall {rr :: RuntimeRep} dt st (r :: TYPE rr). (dt => r) -> st -> r
+
+  `magicDict` can now be used without defining an intermediate data type. For example,
+  the `withTypeable` function from `base`'s `Data.Typeable` module can now be defined as:
+
+        withTypeable :: forall k (a :: k) rep (r :: TYPE rep). ()
+                     => TypeRep a -> (Typeable a => r) -> r
+        withTypeable rep k = magicDict @(Typeable a) k rep
+
+  Note that the explicit type application is required, as the call to
+  `magicDict` would be ambiguous otherwise.
 
 ## 0.8.0 (edit as necessary)
 
