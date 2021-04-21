@@ -116,6 +116,9 @@ data PsExtensionMessage
   | PsMultipleNamesInStandaloneKindSignature [LIdP GhcPs]
      -- ^ Multiple names in standalone kind signatures
 
+     -- ^ Explicit namespace keyword without 'ExplicitNamespaces'
+  | PsIllegalExplicitNamespace
+
 
 data PsMalformedExprMessage
   = -- | Missing block
@@ -311,9 +314,6 @@ data PsMalformedExprMessage
      -- | Invalid package name
   | PsInvalidPackageName !FastString
 
-     -- | Invalid rule activation marker
-  | PsInvalidRuleActivationMarker
-
 
 -- | Messages regarding the import section or the use of pragmas.
 data PsImportOrPragmaMessage
@@ -327,12 +327,17 @@ data PsImportOrPragmaMessage
      -- | Pre qualified import with 'WarnPrepositiveQualifiedModule' enabled
   | PsImportPreQualified
 
+     -- | Post qualified import without 'ImportQualifiedPost'
+  | PsImportPostQualified
+
      -- | Import: multiple occurrences of 'qualified'
   | PsImportQualifiedTwice
 
      -- | Illegal import bundle form
   | PsIllegalImportBundleForm
 
+     -- | Invalid rule activation marker
+  | PsInvalidRuleActivationMarker
 
 -- | A diagnostic message emitted during parsing.
 data PsMessage
@@ -359,7 +364,7 @@ data PsMessage
   | PsLexerError !LexErr !LexErrKind
 
      -- | Parse errors
-  | PsParseError !String
+  | PsParseError !String [PsHint]
 
      -- | Cmm lexer error
   | PsCmmLexerError
@@ -368,7 +373,7 @@ data PsMessage
   | PsCmmParserError !CmmParserError
 
      -- | Messages emitted in case of malformed expressions
-  | PsMalformedExpr !PsMalformedExprMessage
+  | PsMalformedExprMessage !PsMalformedExprMessage
 
 
 newtype StarIsType = StarIsType Bool
