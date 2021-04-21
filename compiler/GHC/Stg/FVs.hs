@@ -1,3 +1,6 @@
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE ConstraintKinds #-}
 {- |
 Non-global free variable analysis on STG terms. This pass annotates
 non-top-level closure bindings with captured variables. Global variables are not
@@ -39,7 +42,12 @@ variables are global.
 -}
 module GHC.Stg.FVs (
     annTopBindingsFreeVars,
-    annBindingFreeVars
+    annBindingFreeVars,
+
+    -- These are added in the case that a transformation needs to return to the
+    -- version of StgExpr used by the Stg Pipeline
+    unAnnTopBindingsFreeVars,
+    unAnnBindingFreeVars,
   ) where
 
 import GHC.Prelude
@@ -50,6 +58,7 @@ import GHC.Types.Var.Set
 import GHC.Core    ( Tickish(Breakpoint) )
 import GHC.Utils.Misc
 
+import Control.Arrow ( second )
 import Data.Maybe ( mapMaybe )
 
 newtype Env
@@ -169,3 +178,46 @@ alt env (con, bndrs, e) = ((con, bndrs, e'), fvs)
     -- See Note [Tracking local binders]
     (e', rhs_fvs) = expr (addLocals bndrs env) e
     fvs = delDVarSetList rhs_fvs bndrs
+
+
+type RemovableFVs pass = (XRhsClosure pass ~ DIdSet, BinderP pass ~ Id)
+
+unAnnTopBindingsFreeVars :: RemovableFVs pass
+                         => [GenStgTopBinding pass]
+                         -> [StgTopBinding]
+unAnnTopBindingsFreeVars = map go
+  where
+    go (StgTopStringLit id bs) = StgTopStringLit id bs
+    go (StgTopLifted bind)
+      = StgTopLifted (unAnnBindingFreeVars bind)
+
+unAnnBindingFreeVars :: RemovableFVs pass
+                     => GenStgBinding pass
+                     -> StgBinding
+unAnnBindingFreeVars (StgNonRec id rhs) = StgNonRec id (unRhs rhs)
+unAnnBindingFreeVars (StgRec bs) = StgRec (map (second unRhs) bs)
+
+unRhs :: RemovableFVs pass => GenStgRhs pass -> StgRhs
+unRhs (StgRhsClosure _ ccs uf bndrs body)
+  = StgRhsClosure noExtFieldSilent ccs uf bndrs (unExpr body)
+unRhs (StgRhsCon ccs dc as) = StgRhsCon ccs dc as
+unRhs (StgRhsEnv vars) = StgRhsEnv vars
+
+unExpr :: RemovableFVs pass => GenStgExpr pass -> StgExpr
+unExpr (StgApp id args) = StgApp id args
+unExpr (StgLit l) = StgLit l
+unExpr (StgConApp dc args tys) = StgConApp dc args tys
+unExpr (StgOpApp op args ty) = StgOpApp op args ty
+unExpr (StgCase e id alt_ty alts) =
+  StgCase (unExpr e) id alt_ty (map unAlt alts)
+unExpr (StgLet _ bind e) =
+  StgLet noExtFieldSilent (unAnnBindingFreeVars bind) (unExpr e)
+unExpr (StgLetNoEscape _ bind e) =
+  StgLetNoEscape noExtFieldSilent (unAnnBindingFreeVars bind) (unExpr e)
+unExpr (StgCaseEnv id vars e) =
+  StgCaseEnv id vars (unExpr e)
+unExpr (StgTick t e) =
+  StgTick t (unExpr e)
+
+unAlt :: RemovableFVs pass => GenStgAlt pass -> StgAlt
+unAlt (ac,bs,e) = (ac,bs,unExpr e)

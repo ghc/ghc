@@ -36,105 +36,75 @@ Transformation
 *************************************************************************
 -}
 
--- | We are sneaky (and inefficient) by annotating with free variables,
+-- | Top-level entry point for our transformation
+stgClosEnvShare :: UniqSupply -> [StgTopBinding] -> ([StgTopBinding],CesLog)
+stgClosEnvShare us binds =
+  first unAnnTopBindingsFreeVars
+        (stgClosEnvShare' us (annTopBindingsFreeVars binds))
+-- We are sneaky (and inefficient) by annotating with free variables,
 -- performing our transformation and then forgetting annotations here. This
 -- means that we *must* completely traverse every expression to rebuild it
 -- without the *Cg* part.
-stgClosEnvShare :: UniqSupply -> [StgTopBinding] -> ([StgTopBinding],CesLog)
-stgClosEnvShare us binds = stgClosEnvShare' us (annTopBindingsFreeVars binds)
 
-stgClosEnvShare' :: CesAble pass
-                 => UniqSupply
-                 -> [GenStgTopBinding pass]
-                 -> ([StgTopBinding],CesLog)
+stgClosEnvShare' :: UniqSupply
+                 -> [CgStgTopBinding]
+                 -> ([CesStgTopBinding],CesLog)
 stgClosEnvShare' us binds = runCesM us $ mapM stgCesTopBinding binds
 
-stgCesTopBinding :: CesAble pass
-                 => GenStgTopBinding pass -> CesM StgTopBinding
+stgCesTopBinding :: CgStgTopBinding -> CesM CesStgTopBinding
 stgCesTopBinding (StgTopLifted bind) = StgTopLifted <$> stgTopCesBinding' bind
 stgCesTopBinding (StgTopStringLit i bs) = return (StgTopStringLit i bs)
 
 -- | For now, do not mess with top level binders
-stgTopCesBinding' :: CesAble pass => GenStgBinding pass -> CesM StgBinding
+stgTopCesBinding' :: CgStgBinding -> CesM CesStgBinding
 stgTopCesBinding' (StgNonRec x rhs) = StgNonRec x <$> stgCesRhs rhs
 stgTopCesBinding' (StgRec bs)
   = StgRec <$> mapM (\(x,rhs) -> stgCesRhs rhs >>= \rhs' -> return (x,rhs')) bs
 
-stgCesBinding :: CesAble pass => GenStgBinding pass -> CesM StgBinding
+stgCesBinding :: CgStgBinding -> CesM CesStgBinding
 stgCesBinding (StgNonRec x rhs) = StgNonRec x <$> stgCesRhs rhs
 stgCesBinding (StgRec bs) =
   StgRec <$> mapM (\(x,rhs) -> (,) x <$> stgCesRhs rhs) bs
--- stgCesBinding (StgRec bs) =
---   do sharedEnvsData <- createSEDHorizontal bs
---      bs' <- forM bs $ \(x,rhs) ->
---               do rhs' <- stgCesRhs rhs
---                  let rhs'' = unpackSharedEnvs x rhs' sharedEnvsData
---                  return (x,rhs'')
---      return (StgRec bs', sharedEnvsData)
 
-stgCesRhs :: CesAble pass => GenStgRhs pass -> CesM StgRhs
-stgCesRhs (StgRhsClosure _ ccs u args body)
-  = StgRhsClosure noExtFieldSilent ccs u args <$> stgCesExpr body
+stgCesRhs :: CgStgRhs -> CesM CesStgRhs
+stgCesRhs (StgRhsClosure fvs ccs u args body)
+  = StgRhsClosure fvs ccs u args <$> stgCesExpr body
 stgCesRhs (StgRhsCon ccs dc args) = return (StgRhsCon ccs dc args)
 stgCesRhs (StgRhsEnv fvs) = return (StgRhsEnv fvs)
 
--- stgCesExpr :: CesAble pass => GenStgExpr pass -> CesM StgExpr
--- stgCesExpr expr =
---   case collectBinderChain expr of
---     [] -> stgCesExpr' expr
---     bs -> do sharedEnvsData <- createSEDShallow (collectBinderChain expr)
---              bindSharedEnvs sharedEnvsData <$> stgCesExpr' expr
---   where collectBinderChain e =
---           case e of
---             (StgLet _ (StgNonRec x rhs) e) -> (x,rhs):collectBinderChain e
---             (StgLet _ (StgRec bs) e)       -> bs ++ collectBinderChain e
---             _                              -> []
-
-{-
-TODO: I think that it is better that shared environments are introduced here at
-the beginning of the expression; so an expression can be converted into one that
-introduces a binding. This is different than the way I have it now wherein
-shared environments are pulled out of let-expressions.
--}
-
-stgCesExpr :: CesAble pass => GenStgExpr pass -> CesM StgExpr
-stgCesExpr (StgApp i args)          = return (StgApp i args)
-stgCesExpr (StgLit l)               = return (StgLit l)
-stgCesExpr (StgConApp dc args tys)  = return (StgConApp dc args tys)
-stgCesExpr (StgOpApp op args ty)    = return (StgOpApp op args ty)
+-- | In a bottom-up manner, we perform closure environment sharing analysis on
+-- binders and subexpressions and then add the new bindings recursively back
+-- down through the subexpressions. Naturally, all of the action is in the
+-- let-expression case.
+stgCesExpr :: CgStgExpr -> CesM CesStgExpr
 stgCesExpr (StgCase e id alt_ty alts) =
   do e' <- stgCesExpr e
      alts' <- mapM stgCesAlt alts
      return (StgCase e' id alt_ty alts')
-stgCesExpr (StgLet _ (StgNonRec x (StgRhsClosure fvs ccs u args body)) e) =
-  do body' <- stgCesExpr body
-     e' <- stgCesExpr e
-     env_id <- mkEnvId
-     let sed = SharedEnvData fvs env_id [x]
-     let clos' = StgRhsClosure noExtFieldSilent ccs u args
-                               (unpackSharedEnv sed body')
-     return (bindSharedEnv sed (StgLet noExtFieldSilent (StgNonRec x clos') e'))
-stgCesExpr (StgLet _ b e) =
+stgCesExpr (StgLet x b e) =
+  do { b' <- stgCesBinding b
+     ; e' <- stgCesExpr e
+     ; case b' of
+         (StgNonRec _ (StgRhsEnv _)) -> return (StgLet x b' e')
+         _ -> do { seds <- closEnvShareAnalyze b' e'
+                 ; let b'' = unpackSharedEnvsBind seds b'
+                       e'' = unpackSharedEnvsExpr seds e'
+                 ; return (bindSharedEnvs seds (StgLet x b'' e'')) }
+     }
+-- Since, non-escaping bindings are not going to return closures, we do not do
+-- any closure environment sharing here.
+stgCesExpr (StgLetNoEscape x b e) =
   do b' <- stgCesBinding b
      e' <- stgCesExpr e
-     return (StgLet noExtFieldSilent b' e')
-stgCesExpr (StgLetNoEscape _ b e) =
-  do b' <- stgCesBinding b
-     e' <- stgCesExpr e
-     return (StgLetNoEscape noExtFieldSilent b' e')
+     return (StgLetNoEscape x b' e')
 stgCesExpr (StgTick t e) = StgTick t <$> stgCesExpr e
 stgCesExpr (StgCaseEnv x args e) = StgCaseEnv x args <$> stgCesExpr e
+stgCesExpr (StgApp i args)          = return (StgApp i args)
+stgCesExpr (StgLit l)               = return (StgLit l)
+stgCesExpr (StgConApp dc args tys)  = return (StgConApp dc args tys)
+stgCesExpr (StgOpApp op args ty)    = return (StgOpApp op args ty)
 
-
--- collectBinderChain :: CesAble pass
---                    => GenStgExpr pass -> [(BinderP pass, GenStgRhs pass)]
--- collectBinderChain e =
---   case e of
---     (StgLet _ (StgNonRec x rhs) e) -> (x,rhs):collectBinderChain e
---     (StgLet _ (StgRec bs) e)       -> bs ++ collectBinderChain e
---     _                              -> []
-
-stgCesAlt :: CesAble pass => GenStgAlt pass -> CesM StgAlt
+stgCesAlt :: CgStgAlt -> CesM CesStgAlt
 stgCesAlt (acon,args,e) = stgCesExpr e >>= \e' -> return (acon,args,e')
 
 {-
@@ -145,7 +115,17 @@ Data and Monad for transformation and analysis
 *************************************************************************
 -}
 
-type CesAble pass = (XRhsClosure pass ~ DIdSet, BinderP pass ~ Id)
+newtype CesM a
+  = CesM { unwrapCesM :: WriterT CesLog UniqSM a }
+  deriving (Functor, Applicative, Monad)
+
+instance MonadUnique CesM where
+  getUniqueSupplyM = CesM (lift getUniqueSupplyM)
+  getUniqueM = CesM (lift getUniqueM)
+  getUniquesM = CesM (lift getUniquesM)
+
+runCesM :: UniqSupply -> CesM a -> (a,CesLog)
+runCesM us = initUs_ us . runWriterT . unwrapCesM
 
 data CesLog
   = CesLog
@@ -179,18 +159,18 @@ instance Semigroup CesLog where
 instance Monoid CesLog where
   mempty = CesLog 0 0 0
 
-newtype CesM a
-  = CesM { unwrapCesM :: WriterT CesLog UniqSM a }
-  deriving (Functor, Applicative, Monad)
+-- | We lie here about the type of environments, since we don't really have a
+-- type in GHC to express them. Note that STG is untyped so we do not really
+-- *need* to have a type, what is important here is that environments have the
+-- same representation as the type given (i.e. a function type) which states
+-- that it is represented by a pointer to a heap object.
+mkEnvId :: CesM Id
+mkEnvId = mkSysLocalM (mkFastString "env")
+                      Many
+                      (mkVisFunTyMany (mkNumLitTy 0) (mkNumLitTy 0))
 
-instance MonadUnique CesM where
-  getUniqueSupplyM = CesM (lift getUniqueSupplyM)
-  getUniqueM = CesM (lift getUniqueM)
-  getUniquesM = CesM (lift getUniquesM)
-
-runCesM :: UniqSupply -> CesM a -> (a,CesLog)
-runCesM us = initUs_ us . runWriterT . unwrapCesM
-
+-- | Closure environment sharing analyses will generate these data types which
+-- we can later decide to add to our program to share closures.
 data SharedEnvData
   = SharedEnvData
   { sed_se  :: DIdSet
@@ -198,24 +178,63 @@ data SharedEnvData
   , sed_binder :: Id
     -- ^ name of the shared environment in the heap
   , sed_rhs_ids :: [Id]
-    -- ^ the list of identifiers is the list of bindings must unpack the new
-    -- environment
+    -- ^ the list of identifiers is the list of bindings that must unpack the
+    -- new environment
   }
 
-bindSharedEnv :: SharedEnvData -> StgExpr -> StgExpr
+-- | Take some shared environments and add bindings to them; these are escaping,
+-- non-recursive let-bindings.
+bindSharedEnvs :: [SharedEnvData] -> CesStgExpr -> CesStgExpr
+bindSharedEnvs seds e = foldr bindSharedEnv e seds
+
+bindSharedEnv :: SharedEnvData -> CesStgExpr -> CesStgExpr
 bindSharedEnv sed e =
-  StgLet noExtFieldSilent (StgNonRec (sed_binder sed) (StgRhsEnv (sed_se sed))) e
+  StgLet noExtFieldSilent
+         (StgNonRec (sed_binder sed) (StgRhsEnv (sed_se sed)))
+         e
 
-bindSharedEnvs :: [SharedEnvData] -> StgExpr -> StgExpr
-bindSharedEnvs envs e = foldr bindSharedEnv e envs
+-- | Take a list of SharedEnvData and traverse a binding which will introduce
+-- CaseEnv expressions wherever a closure's free variables have become part of a
+-- shared environment.
+unpackSharedEnvsBind :: [SharedEnvData] -> CesStgBinding -> CesStgBinding
+unpackSharedEnvsBind seds (StgNonRec id rhs)
+  = StgNonRec id (unpackSharedEnvsRhs seds id rhs)
+unpackSharedEnvsBind seds (StgRec bs)
+  = StgRec (map (\(id,rhs) -> (id,unpackSharedEnvsRhs seds id rhs)) bs)
 
-mkEnvId :: CesM Id
-mkEnvId = mkSysLocalM (mkFastString "env") Many (mkVisFunTyMany (mkNumLitTy 0) (mkNumLitTy 0))
-  -- where s = "First class environments are untyped; this information should not be needed"
-  --       m = pprPanic "mkEnvId" $ text s
+-- Note that introducing a shared env will change the free variables. This is
+-- important to change since the ClosEnvShare algorithm is bottom up thereby
+-- making the new free variable here exposed to later analysis.
+unpackSharedEnvsRhs :: [SharedEnvData] -> Id -> CesStgRhs -> CesStgRhs
+unpackSharedEnvsRhs seds id (StgRhsClosure fvs ccs u args e) =
+  let (fvs',e') = foldr go (fvs,e) seds in
+    StgRhsClosure fvs' ccs u args e'
+  where go sed (fvs,e) =
+          if elem id (sed_rhs_ids sed)
+          then (fvs `minusDVarSet` sed_se sed
+               ,StgCaseEnv (sed_binder sed) (sed_se sed) e)
+          else (fvs,e)
+unpackSharedEnvsRhs _ _ rhs = rhs
 
-unpackSharedEnv :: SharedEnvData -> StgExpr -> StgExpr
-unpackSharedEnv sed = StgCaseEnv (sed_binder sed) (sed_se sed)
+unpackSharedEnvsExpr :: [SharedEnvData] -> CesStgExpr -> CesStgExpr
+unpackSharedEnvsExpr seds (StgLet x bind expr) =
+  StgLet x (unpackSharedEnvsBind seds bind) (unpackSharedEnvsExpr seds expr)
+unpackSharedEnvsExpr seds (StgLetNoEscape x bind expr) =
+  StgLetNoEscape x bind (unpackSharedEnvsExpr seds expr)
+unpackSharedEnvsExpr seds (StgCase scrut id ty alts) =
+  StgCase (unpackSharedEnvsExpr seds scrut)
+          id
+          ty
+          (map (unpackSharedEnvsAlt seds) alts)
+unpackSharedEnvsExpr seds (StgCaseEnv id fvs expr) =
+  StgCaseEnv id fvs (unpackSharedEnvsExpr seds expr)
+unpackSharedEnvsExpr seds (StgTick t expr) =
+  StgTick t (unpackSharedEnvsExpr seds expr)
+unpackSharedEnvsExpr _ expr = expr
+
+unpackSharedEnvsAlt :: [SharedEnvData] -> CesStgAlt -> CesStgAlt
+unpackSharedEnvsAlt seds (con,args,expr) =
+  (con,args,unpackSharedEnvsExpr seds expr)
 
 {-
 *************************************************************************
@@ -224,6 +243,19 @@ Analyses
 *                                                                      *
 *************************************************************************
 -}
+
+type SharingCandidate = (Id, DIdSet)
+
+-- | This is the top level function which sharing analysis
+closEnvShareAnalyze :: CesStgBinding -> CesStgExpr -> CesM [SharedEnvData]
+closEnvShareAnalyze (StgNonRec id (StgRhsClosure fvs _ _ _ _)) expr
+  | sizeDVarSet fvs > 2
+  -- Because of the info pointer in the shared env and the pointer to the shared
+  -- env in the new closure, we do not even try to share an environment unless
+  -- it contains more than 2 free variables
+  = shareEnvSupersets id fvs expr
+closEnvShareAnalyze _ _
+  = return []
 
 -- Note [let block environment sharing]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -250,25 +282,44 @@ Analyses
 --   ...
 -- @
 
-type SharingCandidate = (Id, DIdSet)
 
--- | Shallow refers to creating shared environments of a block of bindings;
--- this is in contrast with a depth analysis which looks to shared environments
--- of closures to be bound within closures
-createSEDShallow :: CesAble pass
-                    => [(BinderP pass,GenStgRhs pass)] -> CesM [SharedEnvData]
-createSEDShallow bs =
-  log_num_candidates (length sharingCandidates) >>
-     -- shareMinimalFVSetCover sharingCandidates
-     needlesslyShared sharingCandidates
-  where sharingCandidates = filter (isEmptyDVarSet . snd)
-                            . map (second getRhsEnv)
-                            $ bs
+-- | We look for closures in the expression that are supersets of this
+-- identifier set because it will not create a space leak (subsets will) and we
+-- can avoid allocating the elements in the closure twice.
+shareEnvSupersets :: Id -> DIdSet -> CesStgExpr -> CesM [SharedEnvData]
+shareEnvSupersets id cl_env expr =
+  case supersetEnvIdsExpr cl_env expr of
+    (x:xs) -> mkEnvId >>= \env_id ->
+                return [SharedEnvData cl_env env_id (id:x:xs)]
+    []     -> return []
 
-getRhsEnv :: CesAble pass => GenStgRhs pass -> DIdSet
-getRhsEnv (StgRhsClosure fvs _ _ _ _) = fvs
-getRhsEnv (StgRhsCon _ _ _) = emptyDVarSet
-getRhsEnv (StgRhsEnv _) = emptyDVarSet
+supersetEnvIdsExpr :: DIdSet -> CesStgExpr -> [Id]
+supersetEnvIdsExpr cl_env (StgLet _ bind expr) =
+  supersetEnvIdsBind cl_env bind ++ supersetEnvIdsExpr cl_env expr
+supersetEnvIdsExpr cl_env (StgLetNoEscape _ _ expr) =
+  supersetEnvIdsExpr cl_env expr
+supersetEnvIdsExpr cl_env (StgCase scrut id ty alts) =
+  supersetEnvIdsExpr cl_env scrut ++ concatMap (supersetEnvIdsAlt cl_env) alts
+supersetEnvIdsExpr cl_env (StgCaseEnv _ _ expr) =
+  supersetEnvIdsExpr cl_env expr
+supersetEnvIdsExpr cl_env (StgTick _ expr) =
+  supersetEnvIdsExpr cl_env expr
+supersetEnvIdsExpr _ _ = []
+
+supersetEnvIdsBind :: DIdSet -> CesStgBinding -> [Id]
+supersetEnvIdsBind cl_env (StgNonRec id rhs) =
+  supersetEnvIdsRhs cl_env id rhs
+supersetEnvIdsBind cl_env (StgRec bs) =
+  concatMap (uncurry (supersetEnvIdsRhs cl_env)) bs
+
+supersetEnvIdsRhs :: DIdSet -> Id -> CesStgRhs -> [Id]
+supersetEnvIdsRhs cl_env id (StgRhsClosure l_env _ _ _ body) =
+  (if cl_env `subDVarSet` l_env then [id] else []) ++
+  supersetEnvIdsExpr cl_env body
+supersetEnvIdsRhs _ _ _ = []
+
+supersetEnvIdsAlt :: DIdSet -> CesStgAlt -> [Id]
+supersetEnvIdsAlt cl_env (_,_,expr) = supersetEnvIdsExpr cl_env expr
 
 -- | shareMinimalFVSetCover finds the minimal amount of shared environments that
 -- cover all of the variables needed. Note that this produces a space
@@ -303,8 +354,12 @@ getRhsEnv (StgRhsEnv _) = emptyDVarSet
 --   x3 = { d, e, f }
 --   x4 = { z, a }
 shareMinimalFVSetCover :: [SharingCandidate] -> CesM [SharedEnvData]
-shareMinimalFVSetCover cds | length cds < 2 = log_env_too_small >> return []
-shareMinimalFVSetCover cds | otherwise      = concatMapM maybeMkSharedData covering
+shareMinimalFVSetCover cds
+  | length cds < 2
+  = log_env_too_small >> return []
+shareMinimalFVSetCover cds
+  | otherwise
+  = concatMapM maybeMkSharedData covering
   where fvSets   = map snd cds
         totalFVs = unionDVarSets fvSets
         covering = greedyCover totalFVs []
@@ -331,10 +386,12 @@ shareMinimalFVSetCover cds | otherwise      = concatMapM maybeMkSharedData cover
                       fvSets
             in greedyCover (left_to_cover_set `minusDVarSet` s) (s:out_sets)
 
--- | This isn't really shared closure analysis, rather it always creates a first
--- class environment. It is here to test the code generator
+-- | This isn't really shared closure analysis; it always creates a first class
+-- environment which is not shared with any other closure. It is here to test
+-- the code generator or to be a baseline of how bad adding non-shared, yet
+-- separate environment to a closure may be.
 needlesslyShared :: [SharingCandidate] -> CesM [SharedEnvData]
-needlesslyShared cds = mapM mkSed cds
+needlesslyShared = mapM mkSed . filter (not . isEmptyDVarSet . snd)
   where mkSed (id,fvs) =
           mkEnvId >>= \env_id ->
             log_shared_env_created >>

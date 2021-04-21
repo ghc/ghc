@@ -487,19 +487,23 @@ noExtFieldSilent = NoExtFieldSilent
 type family BinderP (pass :: StgPass)
 type instance BinderP 'Vanilla = Id
 type instance BinderP 'CodeGen = Id
+type instance BinderP 'ClosEnvShare = Id
 
 type family XRhsClosure (pass :: StgPass)
 type instance XRhsClosure 'Vanilla = NoExtFieldSilent
--- | Code gen needs to track non-global free vars
+-- | Code gen and ClosEnvShare needs to track non-global free vars
 type instance XRhsClosure 'CodeGen = DIdSet
+type instance XRhsClosure 'ClosEnvShare = DIdSet
 
 type family XLet (pass :: StgPass)
 type instance XLet 'Vanilla = NoExtFieldSilent
 type instance XLet 'CodeGen = NoExtFieldSilent
+type instance XLet 'ClosEnvShare = NoExtFieldSilent
 
 type family XLetNoEscape (pass :: StgPass)
 type instance XLetNoEscape 'Vanilla = NoExtFieldSilent
 type instance XLetNoEscape 'CodeGen = NoExtFieldSilent
+type instance XLetNoEscape 'ClosEnvShare = NoExtFieldSilent
 
 stgRhsArity :: StgRhs -> Int
 stgRhsArity (StgRhsClosure _ _ _ bndrs _)
