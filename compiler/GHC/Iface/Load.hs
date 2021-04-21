@@ -70,7 +70,7 @@ import GHC.Settings.Constants
 
 import GHC.Builtin.Names
 import GHC.Builtin.Utils
-import GHC.Builtin.PrimOps    ( allThePrimOps, primOpFixity, primOpOcc )
+import GHC.Builtin.PrimOps    ( allThePrimOps, primOpFixity, primOpOcc, primOpDeprecations )
 
 import GHC.Core.Rules
 import GHC.Core.TyCon
@@ -1007,8 +1007,12 @@ ghcPrimIface
         mi_exports  = ghcPrimExports,
         mi_decls    = [],
         mi_fixities = fixities,
-        mi_final_exts = (mi_final_exts empty_iface){ mi_fix_fn = mkIfaceFixCache fixities },
-        mi_decl_docs = ghcPrimDeclDocs -- See Note [GHC.Prim Docs]
+        mi_decl_docs = ghcPrimDeclDocs, -- See Note [GHC.Prim Docs]
+        mi_warns = warns,
+        mi_final_exts = (mi_final_exts empty_iface)
+          { mi_warn_fn = mkIfaceWarnCache warns
+          , mi_fix_fn = mkIfaceFixCache fixities
+          }
         }
   where
     empty_iface = emptyFullModIface gHC_PRIM
@@ -1018,7 +1022,19 @@ ghcPrimIface
     fixities = (getOccName seqId, Fixity NoSourceText 0 InfixR)
              : mapMaybe mkFixity allThePrimOps
     mkFixity op = (,) (primOpOcc op) <$> primOpFixity op
-
+    -- See Note [GHC.Prim deprecations] in genprimopcode's Main.hs
+    warns
+      | null primOpDeprecations
+      = NoWarnings
+      | otherwise
+      = WarnSome
+        [ (occ, warnTxt)
+        | (occ, deprMsg) <- primOpDeprecations
+        , let stxt = SourceText deprMsg
+              warnTxt = DeprecatedTxt
+                (noLoc stxt)
+                [noLoc $ StringLiteral stxt (fsLit deprMsg) Nothing]
+        ]
 {-
 *********************************************************
 *                                                      *
