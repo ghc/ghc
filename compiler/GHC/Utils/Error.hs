@@ -149,8 +149,7 @@ mkErrorMsgEnvelope :: Diagnostic e
                    -> PrintUnqualified
                    -> e
                    -> MsgEnvelope e
-mkErrorMsgEnvelope locn unqual msg =
-  mk_msg_envelope SevError locn unqual msg
+mkErrorMsgEnvelope = mk_msg_envelope SevError
 
 -- | Variant that doesn't care about qualified/unqualified names.
 mkPlainMsgEnvelope :: Diagnostic e
