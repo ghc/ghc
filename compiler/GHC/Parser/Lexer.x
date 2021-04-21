@@ -2936,15 +2936,15 @@ instance MonadP P where
 
 getCommentsFor :: (MonadP m) => SrcSpan -> m EpAnnComments
 getCommentsFor (RealSrcSpan l _) = allocateCommentsP l
-getCommentsFor _ = return noCom
+getCommentsFor _ = return emptyComments
 
 getPriorCommentsFor :: (MonadP m) => SrcSpan -> m EpAnnComments
 getPriorCommentsFor (RealSrcSpan l _) = allocatePriorCommentsP l
-getPriorCommentsFor _ = return noCom
+getPriorCommentsFor _ = return emptyComments
 
 getFinalCommentsFor :: (MonadP m) => SrcSpan -> m EpAnnComments
 getFinalCommentsFor (RealSrcSpan l _) = allocateFinalCommentsP l
-getFinalCommentsFor _ = return noCom
+getFinalCommentsFor _ = return emptyComments
 
 getEofPos :: P (Maybe (RealSrcSpan, RealSrcSpan))
 getEofPos = P $ \s@(PState { eof_pos = pos }) -> POk s pos
@@ -3439,7 +3439,7 @@ clean_pragma prag = canon_ws (map toLower (unprefix prag))
 -- and end of the span
 mkParensEpAnn :: SrcSpan -> [AddEpAnn]
 mkParensEpAnn (UnhelpfulSpan _)  = []
-mkParensEpAnn (RealSrcSpan ss _) = [AddEpAnn AnnOpenP (AR lo),AddEpAnn AnnCloseP (AR lc)]
+mkParensEpAnn (RealSrcSpan ss _) = [AddEpAnn AnnOpenP (EpaSpan lo),AddEpAnn AnnCloseP (EpaSpan lc)]
   where
     f = srcSpanFile ss
     sl = srcSpanStartLine ss
