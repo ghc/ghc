@@ -52,11 +52,11 @@ module GHC.Driver.Main
     , hscRecompStatus
     , hscParse
     , hscTypecheckRename
+    , hscTypecheckAndGetWarnings
     , hscDesugar
     , makeSimpleDetails
     , hscSimplify -- ToDo, shouldn't really export this
     , hscDesugarAndSimplify
-    , hsc_typecheck
 
     -- * Safe Haskell
     , hscCheckSafe
@@ -519,6 +519,12 @@ hscTypecheckRename :: HscEnv -> ModSummary -> HsParsedModule
 hscTypecheckRename hsc_env mod_summary rdr_module = runHsc hsc_env $
     hsc_typecheck True mod_summary (Just rdr_module)
 
+-- | Do Typechecking without throwing SourceError exception with -Werror
+hscTypecheckAndGetWarnings :: HscEnv ->  ModSummary -> IO (FrontendResult, WarningMessages)
+hscTypecheckAndGetWarnings hsc_env summary = runHsc' hsc_env $ do
+  case hscFrontendHook (hsc_hooks hsc_env) of
+    Nothing -> FrontendTypecheck . fst <$> hsc_typecheck False summary Nothing
+    Just h  -> h summary
 
 -- | A bunch of logic piled around @tcRnModule'@, concerning a) backpack
 -- b) concerning dumping rename info and hie files. It would be nice to further
@@ -628,14 +634,9 @@ hscDesugar hsc_env mod_summary tc_result =
 hscDesugar' :: ModLocation -> TcGblEnv -> Hsc ModGuts
 hscDesugar' mod_location tc_result = do
     hsc_env <- getHscEnv
-    r <- ioMsgMaybe $ hoistDsMessage $
-        {-# SCC "deSugar" #-}
-        deSugar hsc_env mod_location tc_result
-
-    -- always check -Werror after desugaring, this is the last opportunity for
-    -- warnings to arise before the backend.
-    handleWarnings
-    return r
+    ioMsgMaybe $ hoistDsMessage $
+      {-# SCC "deSugar" #-}
+      deSugar hsc_env mod_location tc_result
 
 -- | Make a 'ModDetails' from the results of typechecking. Used when
 -- typechecking only, as opposed to full compilation.
@@ -688,6 +689,7 @@ This is the only thing that isn't caught by the type-system.
 
 type Messager = HscEnv -> (Int,Int) -> RecompileRequired -> ModuleGraphNode -> IO ()
 
+-- | Do the recompilation avoidance checks for both one-shot and --make modes
 hscRecompStatus :: Maybe Messager
                 -> HscEnv
                 -> ModSummary
@@ -795,10 +797,11 @@ See !5492 and #13586
 -- when passed the result of the code generator. So all this can and is done at
 -- the call site of the backend code gen if it is run.
 hscDesugarAndSimplify :: ModSummary
-       -> TcGblEnv
+       -> FrontendResult
+       -> Messages GhcMessage
        -> Maybe Fingerprint
        -> Hsc HscBackendAction
-hscDesugarAndSimplify summary tc_result mb_old_hash = do
+hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_hash = do
   hsc_env <- getHscEnv
   dflags <- getDynFlags
   logger <- getLogger
@@ -815,6 +818,11 @@ hscDesugarAndSimplify summary tc_result mb_old_hash = do
       if ms_mod summary /= gHC_PRIM && hsc_src == HsSrcFile
       then Just <$> hscDesugar' (ms_location summary) tc_result
       else pure Nothing
+
+  -- Report the warnings from both typechecking and desugar together
+  w <- getDiagnostics
+  liftIO $ printOrThrowDiagnostics logger dflags (unionMessages tc_warnings w)
+  clearDiagnostics
 
   -- Simplify, if appropriate, and (whether we simplified or not) generate an
   -- interface file.
