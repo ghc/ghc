@@ -115,7 +115,10 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcInteger conflicts excl
                             ArchSPARC64   -> panic "trivColorable ArchSPARC64"
                             ArchPPC_64 _  -> 15
                             ArchARM _ _ _ -> panic "trivColorable ArchARM"
-                            ArchAArch64   -> panic "trivColorable ArchAArch64"
+                            -- We should be able to allocate *a lot* more in princple.
+                            -- essentially all 32 - SP, so 31, we'd trash the link reg
+                            -- as well as the platform and all others though.
+                            ArchAArch64   -> 18
                             ArchAlpha     -> panic "trivColorable ArchAlpha"
                             ArchMipseb    -> panic "trivColorable ArchMipseb"
                             ArchMipsel    -> panic "trivColorable ArchMipsel"
@@ -147,7 +150,10 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcFloat conflicts exclus
                             ArchSPARC64   -> panic "trivColorable ArchSPARC64"
                             ArchPPC_64 _  -> 0
                             ArchARM _ _ _ -> panic "trivColorable ArchARM"
-                            ArchAArch64   -> panic "trivColorable ArchAArch64"
+                            -- we can in princple address all the float regs as
+                            -- segments. So we could have 64 Float regs. Or
+                            -- 128 Half regs, or even 256 Byte regs.
+                            ArchAArch64   -> 0
                             ArchAlpha     -> panic "trivColorable ArchAlpha"
                             ArchMipseb    -> panic "trivColorable ArchMipseb"
                             ArchMipsel    -> panic "trivColorable ArchMipsel"
@@ -181,7 +187,7 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcDouble conflicts exclu
                             ArchSPARC64   -> panic "trivColorable ArchSPARC64"
                             ArchPPC_64 _  -> 20
                             ArchARM _ _ _ -> panic "trivColorable ArchARM"
-                            ArchAArch64   -> panic "trivColorable ArchAArch64"
+                            ArchAArch64   -> 32
                             ArchAlpha     -> panic "trivColorable ArchAlpha"
                             ArchMipseb    -> panic "trivColorable ArchMipseb"
                             ArchMipsel    -> panic "trivColorable ArchMipsel"
