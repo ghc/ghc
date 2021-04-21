@@ -21,7 +21,56 @@
 
 #include "BeginPrivate.h"
 
-/* Init hook: called from hs_init_ghc.
+#include "sm/GC.h" // for evac_fn
+
+
+/* The per-capability data structures belonging to the I/O manager.
+ *
+ * It can be accessed as cap->iomgr.
+ *
+ * The content of the structure is defined conditionally so it is different for
+ * each I/O manager implementation.
+ *
+ * TODO: once the content of this struct is genuinely private, and not shared
+ * with other parts of the RTS, then it can be made opaque, so the content is
+ * known only to the I/O manager and not the rest of the RTS.
+ */
+typedef struct {
+
+#if defined(THREADED_RTS)
+#if !defined(mingw32_HOST_OS)
+    /* Control FD for the MIO manager for this capability */
+    int control_fd;
+#endif
+#else // !defined(THREADED_RTS)
+    /* Thread queue for threads blocked on I/O completion.
+     * Used by the select() and Win32 MIO I/O managers. It is not used by
+     * the WinIO I/O manager, though it remains defined in this case.
+     */
+    StgTSO *blocked_queue_hd;
+    StgTSO *blocked_queue_tl;
+
+#if !defined(mingw32_HOST_OS)
+    /* Timeout queue, used for threads blocked on timeouts.
+     * Used by the select() I/O manager only. It is grossly inefficient, like
+     * everything else to do with the select() I/O manager.
+     */
+    StgTimeoutQueue *timeout_queue;
+#endif
+#endif
+
+} CapIOManager;
+
+
+/* Allocate and initialise the per-capability CapIOManager that lives in each
+ * Capability. It is called from initCapability, via initScheduler,
+ * via hs_init_ghc.
+ */
+void initCapabilityIOManager(CapIOManager **iomgr);
+
+
+/* Init hook: called from hs_init_ghc, very late in the startup after almost
+ * everything else is done.
  */
 void initIOManager(void);
 
@@ -66,6 +115,59 @@ void exitIOManager(bool wait_threads);
 void wakeupIOManager(void);
 
 
+/* GC hook: mark any per-capability GC roots the I/O manager uses.
+ */
+void markCapabilityIOManager(evac_fn evac, void *user, CapIOManager *iomgr);
+
+
+#if !defined(THREADED_RTS)
+/* Add a thread to the end of the queue of threads blocked on I/O.
+ *
+ * This is used by the select() and the Windows MIO non-threaded I/O manager
+ * implementation.
+ */
+void appendToIOBlockedQueue(Capability *cap, StgTSO *tso);
+
+/* Register a timout, to write to an MVar once the time expires.
+ *
+ * This is currently only supported by the select() I/O manager implementation.
+ * TODO: add support for the Windows non-threaded I/O manager(s).
+ *
+ * Defined in posix/Select.c
+ */
+void registerDelay(Capability *cap, StgMVar *mvar, HsInt usecs);
+#endif
+
+
+/* Check to see if there are any in-flight I/O operations with the I/O manager.
+ *
+ * This is used by the scheduler as part of deadlock-detection, and the
+ * "context switch as often as possible" test.
+ */
+INLINE_HEADER bool emptyPendingIO(CapIOManager *iomgr);
+
+/* Check to see if there are any pending timeouts with the I/O manager.
+ *
+ * This is used by the scheduler as part of deadlock-detection, and the
+ * "context switch as often as possible" test.
+ */
+INLINE_HEADER bool emptyPendingTimeouts(CapIOManager *iomgr);
+
+
+#if !defined(THREADED_RTS)
+/* Check whether there is any completed I/O or expired timers. If so,
+ * process the competions as appropriate, which will typically cause some
+ * waiting threads to be woken up.
+ *
+ * Called from schedule() both *before* and *after* scheduleDetectDeadlock().
+ *
+ * Defined in posix/Select.c
+ *         or win32/AwaitEvent.c
+ */
+void awaitEvent(Capability *cap, bool wait);
+#endif
+
+
 /* Pedantic warning cleanliness
  */
 #if !defined(THREADED_RTS) && defined(mingw32_HOST_OS)
@@ -74,11 +176,74 @@ void wakeupIOManager(void);
 #define USED_IF_NOT_THREADS_AND_MINGW32 STG_UNUSED
 #endif
 
+#if !defined(THREADED_RTS) && !defined(mingw32_HOST_OS)
+#define USED_IF_NOT_THREADS_AND_NOT_MINGW32
+#else
+#define USED_IF_NOT_THREADS_AND_NOT_MINGW32 STG_UNUSED
+#endif
+
 #if defined(THREADED_RTS) && !defined(mingw32_HOST_OS)
 #define USED_IF_THREADS_AND_NOT_MINGW32
 #else
 #define USED_IF_THREADS_AND_NOT_MINGW32 STG_UNUSED
 #endif
 
+
+/* -----------------------------------------------------------------------------
+ * INLINE functions... private from here on down.
+ *
+ * Some of these hooks are performance sensitive so parts of them are
+ * implemented here so they can be inlined.
+ * -----------------------------------------------------------------------------
+ */
+
+INLINE_HEADER bool emptyPendingIO(CapIOManager *iomgr USED_IF_NOT_THREADS)
+{
+#if defined(THREADED_RTS)
+    /* For the purpose of the scheduler, the threaded I/O managers never have
+       pending I/O. Of course in reality they do, but they're managed via other
+       primitives that the scheduler can see into (threads, MVars and foreign
+       blocking calls).
+     */
+    return true;
+#else
+#if defined(mingw32_HOST_OS)
+    /* The MIO I/O manager uses the blocked_queue, while the WinIO does not.
+       Note: the latter fact makes this test useless for the WinIO I/O manager,
+       and is the probable cause of the complication in the scheduler with
+       having to call awaitEvent in multiple places.
+     */
+    return (iomgr->blocked_queue_hd == END_TSO_QUEUE);
+#else
+    /* The select() I/O manager uses the blocked_queue.
+     */
+    return (iomgr->blocked_queue_hd == END_TSO_QUEUE);
+#endif
+#endif
+}
+
+INLINE_HEADER bool emptyPendingTimeouts(CapIOManager *iomgr
+                                          USED_IF_NOT_THREADS_AND_NOT_MINGW32)
+{
+#if defined(THREADED_RTS)
+    /* For the purpose of the scheduler, the threaded I/O managers never have
+       pending timers. Of course in reality they do, but they're managed via
+       other primitives that the scheduler can see into (threads, MVars and
+       foreign blocking calls).
+     */
+    return true;
+#else
+#if defined(mingw32_HOST_OS)
+    /* The Windows I/O managers track timeouts either via the blocked_queue
+     * (in the MIO case) or totally separately for WinIO. Timers/timeouts in
+     * the WinIO non-threaded case are not properly tracked here, which is
+     * almost certainly wrong.
+     */
+    return true;
+#else
+    return (iomgr->timeout_queue == (StgTimeoutQueue *)END_TSO_QUEUE);
+#endif
+#endif
+}
 
 #include "EndPrivate.h"
