@@ -39,7 +39,7 @@ import Data.Monoid
 import Data.List                  (find)
 import Data.Traversable           ( for )
 import Data.Coerce
-import Control.Monad.Trans.State.Strict hiding (get)
+import GHC.Utils.Monad.State.Strict hiding (get)
 import Control.Monad.Trans.Reader
 import qualified Data.Tree as Tree
 
@@ -186,7 +186,7 @@ initialHTS = HTS emptyTypeMap IM.empty 0
 freshTypeIndex :: State HieTypeState TypeIndex
 freshTypeIndex = do
   index <- gets freshIndex
-  modify' $ \hts -> hts { freshIndex = index+1 }
+  modify $ \hts -> hts { freshIndex = index+1 }
   return index
 
 compressTypes
@@ -216,7 +216,7 @@ getTypeIndex t
   where
     extendHTS t ht = do
       i <- freshTypeIndex
-      modify' $ \(HTS tm tt fi) ->
+      modify $ \(HTS tm tt fi) ->
         HTS (extendTypeMap tm t i) (IM.insert i ht tt) fi
       return i
 
