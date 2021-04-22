@@ -218,7 +218,7 @@ bindistRules = do
         top <- topDirectory
         copyFile (top -/- "hadrian" -/- "bindist" -/- "Makefile") makefilePath
 
-    root -/- "bindist" -/- "ghc-*" -/- "wrappers/*" %> \wrapperPath ->
+    root -/- "bindist" -/- "ghc-*" -/- "wrappers/*" %> \wrapperPath -> do
         content <- wrapper (takeFileName wrapperPath)
         writeFile' wrapperPath content
 
