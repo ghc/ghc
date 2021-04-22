@@ -9,12 +9,12 @@ import GHC.Driver.Session
 import GHC.Driver.Errors.Types
 import GHC.Data.Bag
 import GHC.Prelude
-import GHC.Parser.Errors ( PsError(..) )
+import GHC.Parser.Errors.Types
 import GHC.Types.SrcLoc
 import GHC.Types.SourceError
 import GHC.Types.Error
 import GHC.Utils.Error
-import GHC.Utils.Outputable ( text, withPprStyle, mkErrStyle )
+import GHC.Utils.Outputable ( alwaysQualify,  text, withPprStyle, mkErrStyle )
 import GHC.Utils.Logger
 import qualified GHC.Driver.CmdLine as CmdLine
 
@@ -56,7 +56,5 @@ printOrThrowDiagnostics logger dflags msgs
 -- for dealing with parse errors when the driver is doing dependency analysis.
 -- Defined here to avoid module loops between GHC.Driver.Error.Types and
 -- GHC.Driver.Error.Ppr
-mkDriverPsHeaderMessage :: PsError -> MsgEnvelope DriverMessage
-mkDriverPsHeaderMessage ps_err
-  = mkPlainErrorMsgEnvelope (errLoc ps_err) $
-    DriverPsHeaderMessage (errDesc ps_err) (errHints ps_err)
+mkDriverPsHeaderMessage :: SrcSpan -> PsMessage -> MsgEnvelope DriverMessage
+mkDriverPsHeaderMessage srcSpan = mkErrorMsgEnvelope srcSpan alwaysQualify .  DriverPsHeaderMessage

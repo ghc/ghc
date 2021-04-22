@@ -118,11 +118,13 @@ import GHC.Types.Name.Reader
 import GHC.Types.Name
 import GHC.Unit.Module (ModuleName)
 import GHC.Types.Basic
+import GHC.Types.Error
 import GHC.Types.Fixity
 import GHC.Types.SourceText
 import GHC.Parser.Types
 import GHC.Parser.Lexer
-import GHC.Parser.Errors
+import GHC.Parser.Errors.Types
+import GHC.Parser.Errors.Ppr
 import GHC.Utils.Lexeme ( isLexCon )
 import GHC.Types.TyThing
 import GHC.Core.Type    ( unrestrictedFunTyCon, Specificity(..) )
@@ -144,6 +146,7 @@ import Data.Foldable
 import GHC.Driver.Flags ( WarningFlag(..) )
 import qualified Data.Semigroup as Semi
 import GHC.Utils.Panic
+import GHC.LanguageExtensions (Extension(RecursiveDo))
 
 import Control.Monad
 import Text.ParserCombinators.ReadP as ReadP
@@ -1096,7 +1099,7 @@ checkPat loc (L l e@(PatBuilderVar (L ln c))) tyargs args
       add_hint TypeApplicationsInPatternsOnlyDataCons $
       patFail (locA l) (ppr e <+> hsep [text "@" <> ppr t | t <- tyargs])
   | not (null args) && patIsRec c =
-      add_hint SuggestRecursiveDo $
+      add_hint (SuggestExtension RecursiveDo) $
       patFail (locA l) (ppr e)
 checkPat loc (L _ (PatBuilderAppType f _ t)) tyargs args =
   checkPat loc f (t : tyargs) args
@@ -2719,8 +2722,8 @@ data PV_Context =
 
 data PV_Accum =
   PV_Accum
-    { pv_warnings        :: Bag PsWarning
-    , pv_errors          :: Bag PsError
+    { pv_warnings        :: Messages PsMessage
+    , pv_errors          :: Messages PsMessage
     , pv_header_comments :: Maybe [LEpaComment]
     , pv_comment_q       :: [LEpaComment]
     }
@@ -2900,7 +2903,7 @@ mkSumOrTupleExpr l Unboxed (Sum alt arity e barsp barsa) anns = do
     cs <- getCommentsFor (locA l)
     return $ L l (ExplicitSum (EpAnn (spanAsAnchor $ locA l) an cs) alt arity e)
 mkSumOrTupleExpr l Boxed a@Sum{} _ =
-    addFatalError $ PsError (PsErrUnsupportedBoxedSumExpr a) [] (locA l)
+    addFatalError $ makeParserError (locA l) $ PsMalformedExprMessage (PsErrUnsupportedBoxedSumExpr a)
 
 mkSumOrTuplePat
   :: SrcSpanAnnA -> Boxity -> SumOrTuple (PatBuilder GhcPs) -> [AddEpAnn]
@@ -2916,7 +2919,7 @@ mkSumOrTuplePat l boxity (Tuple ps) anns = do
     -- Ignore the element location so that the error message refers to the
     -- entire tuple. See #19504 (and the discussion) for details.
     toTupPat p = case p of
-      Left _ -> addFatalError $ PsError PsErrTupleSectionInPat [] (locA l)
+      Left _ -> addFatalError (locA l) $ PsMalformedExprMessage PsErrTupleSectionInPat
       Right p' -> checkLPat p'
 
 -- Sum
@@ -2926,7 +2929,7 @@ mkSumOrTuplePat l Unboxed (Sum alt arity p barsb barsa) anns = do
    let an = EpAnn (spanAsAnchor $ locA l) (EpAnnSumPat anns barsb barsa) cs
    return $ L l (PatBuilderPat (SumPat an p' alt arity))
 mkSumOrTuplePat l Boxed a@Sum{} _ =
-    addFatalError $ PsError (PsErrUnsupportedBoxedSumPat a) [] (locA l)
+    addFatalError $ mkParserErrorMessage (locA l) $ PsMalformedExprMessage (PsErrUnsupportedBoxedSumPat a)
 
 mkLHsOpTy :: LHsType GhcPs -> LocatedN RdrName -> LHsType GhcPs -> LHsType GhcPs
 mkLHsOpTy x op y =
