@@ -1,0 +1,5 @@
+
+NoShowContexts.hs:4:5: error:
+    • Couldn't match expected type ‘[Int]’
+                  with actual type ‘[a0] -> [a0]’
+    • Probable cause: ‘take’ is applied to too few arguments
