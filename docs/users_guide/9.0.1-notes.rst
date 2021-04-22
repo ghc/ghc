@@ -263,6 +263,13 @@ Compiler
   :ghc-flag:`-funfolding-use-threshold=⟨n⟩` or use :pragma:`INLINE` pragmas to
   more precisely force inlining.
 
+- The ``-funfolding-keeness-factor`` flag has been deprecated as its scaling
+  strategy resulted in unreasonably large discounts in some cases (see
+  :ghc-ticket:`15304`). Users who previously used this flag to suggest
+  more aggressive inlining are advised to look at
+  :ghc-flag:`-funfolding-use-threshold=⟨n⟩` or use :pragma:`INLINE` pragmas to
+  more precisely force inlining.
+
 GHCi
 ~~~~
 
