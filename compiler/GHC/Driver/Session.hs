@@ -641,8 +641,6 @@ data DynFlags = DynFlags {
 
   interactivePrint      :: Maybe String,
 
-  nextWrapperNum        :: IORef (ModuleEnv Int),
-
   -- | Machine dependent flags (-m\<blah> stuff)
   sseVersion            :: Maybe SseVersion,
   bmiVersion            :: Maybe BmiVersion,
@@ -985,9 +983,8 @@ positionIndependent dflags = gopt Opt_PIC dflags || gopt Opt_PIE dflags
 -- Core optimisation, then the backend (from Core to object code) is executed
 -- twice.
 --
--- The implementation is currently rather hacky: recompilation avoidance is
--- broken (#17968), we don't clearly separate non-dynamic and dynamic loaded
--- interfaces (#9176), etc.
+-- The implementation is currently rather hacky, for example, we don't clearly separate non-dynamic
+-- and dynamic loaded interfaces (#9176).
 --
 -- To make matters worse, we automatically enable -dynamic-too when some modules
 -- need Template-Haskell and GHC is dynamically linked (cf
@@ -1050,7 +1047,6 @@ initDynFlags dflags = do
  refDynamicTooFailed <- newIORef (not platformCanGenerateDynamicToo)
  refRtldInfo <- newIORef Nothing
  refRtccInfo <- newIORef Nothing
- wrapperNum <- newIORef emptyModuleEnv
  canUseUnicode <- do let enc = localeEncoding
                          str = "‘’"
                      (withCString enc str $ \cstr ->
@@ -1068,7 +1064,6 @@ initDynFlags dflags = do
        (useColor dflags, colScheme dflags)
  return dflags{
         dynamicTooFailed = refDynamicTooFailed,
-        nextWrapperNum = wrapperNum,
         useUnicode    = useUnicode',
         useColor      = useColor',
         canUseColor   = stderrSupportsAnsiColors,
@@ -1231,7 +1226,6 @@ defaultDynFlags mySettings llvmConfig =
         profAuto = NoProfAuto,
         callerCcFilters = [],
         interactivePrint = Nothing,
-        nextWrapperNum = panic "defaultDynFlags: No nextWrapperNum",
         sseVersion = Nothing,
         bmiVersion = Nothing,
         avx = False,
