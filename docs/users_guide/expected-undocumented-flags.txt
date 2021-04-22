@@ -82,7 +82,6 @@
 -fspecialize-aggressively
 -fth
 -ftype-function-depth
--funfolding-keeness-factor
 -fuse-rpaths
 -fversion-macros
 -fvia-c
