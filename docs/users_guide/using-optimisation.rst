@@ -1399,6 +1399,15 @@ by saying ``-fno-wombat``.
 
     How eager should the compiler be to inline functions?
 
+.. ghc-flag:: -funfolding-keeness-factor=⟨n⟩
+    :shortdesc: This has been deprecated in GHC 9.0.1.
+    :type: dynamic
+    :category:
+
+    This factor was deprecated in GHC 9.0.1. See :ghc-ticket:`15304` for
+    details. Users who need to control inlining should rather consider
+    :ghc-flag:`-funfolding-use-threshold=⟨n⟩`.
+
 .. ghc-flag:: -funfolding-use-threshold=⟨n⟩
     :shortdesc: *default: 80.* Tweak unfolding settings.
     :type: dynamic
