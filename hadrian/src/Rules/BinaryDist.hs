@@ -219,7 +219,8 @@ bindistRules = do
         copyFile (top -/- "hadrian" -/- "bindist" -/- "Makefile") makefilePath
 
     root -/- "bindist" -/- "ghc-*" -/- "wrappers/*" %> \wrapperPath ->
-        writeFile' wrapperPath $ wrapper (takeFileName wrapperPath)
+        content <- wrapper (takeFileName wrapperPath)
+        writeFile' wrapperPath content
 
     -- Copy various configure-related files needed for a working
     -- './configure [...] && make install' workflow
