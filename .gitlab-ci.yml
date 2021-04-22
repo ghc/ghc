@@ -536,6 +536,7 @@ validate-x86_64-darwin:
     LANG: "en_US.UTF-8"
     # WARNING: this is overridden in the shell.nix, see shell.nix!
     CONFIGURE_ARGS: "--with-intree-gmp"
+    HADRIAN_ARGS: "--docs=no-sphinx"
     TEST_ENV: "x86_64-darwin-hadrian"
     BIN_DIST_NAME: "ghc-amd64-apple-darwin"
     BUILD_FLAVOUR: "validate"
@@ -557,7 +558,7 @@ validate-x86_64-darwin:
         --pure \
         --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR \
         --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --keep PROJECT_DIR \
-        --keep CI_PROJECT_DIR --keep MAKE_ARGS \
+        --keep CI_PROJECT_DIR --keep MAKE_ARGS --keep HADRIAN_ARGS \
         --keep LANG --keep CONFIGURE_ARGS --keep TEST_ENV --keep BIN_DIST_NAME \
         --keep MACOSX_DEPLOYMENT_TARGET --keep ac_cv_func_clock_gettime --keep HACKAGE_INDEX_STATE \
         --run "$1" 2>&1
@@ -632,6 +633,7 @@ validate-aarch64-darwin:
     LANG: "en_US.UTF-8"
     # WARNING: this is overridden in the shell.nix, see shell.nix!
     CONFIGURE_ARGS: "--with-intree-gmp"
+    HADRIAN_ARGS: "--docs=no-sphinx"
     BIN_DIST_NAME: "ghc-arm64-apple-darwin"
     TEST_ENV: "aarch64-darwin-hadrian"
 
@@ -647,7 +649,7 @@ validate-aarch64-darwin:
         --pure \
         --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR \
         --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --keep PROJECT_DIR \
-        --keep CI_PROJECT_DIR --keep MAKE_ARGS \
+        --keep CI_PROJECT_DIR --keep MAKE_ARGS --keep HADRIAN_ARGS \
         --keep LANG --keep CONFIGURE_ARGS --keep TEST_ENV --keep BIN_DIST_NAME \
         --keep HACKAGE_INDEX_STATE \
         --run "$1" 2>&1
