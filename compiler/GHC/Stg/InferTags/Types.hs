@@ -73,6 +73,10 @@ data TagEnv p = TE { te_env :: TagSigEnv
                    , te_ext :: ExtEqEv (XStgConApp p) (XLet p)
                                        (XLetNoEscape p) (XRhsClosure p) }
 
+instance Outputable (TagEnv p) where
+    ppr te = ppr (te_env te)
+
+
 getBinderId :: TagEnv p -> BinderP p -> Id
 getBinderId = te_get
 
@@ -131,6 +135,9 @@ isDunnoSig (TagSig _ TagDunno) = True
 isDunnoSig (TagSig _ TagProper) = False
 isDunnoSig (TagSig _ TagTuple{}) = False
 
+isTaggedSig :: TagSig -> Bool
+isTaggedSig (TagSig _ TagProper) = True
+isTaggedSig _ = False
 
 extendSigEnv :: TagEnv p -> [(Id,TagSig)] -> TagEnv p
 extendSigEnv env@(TE { te_env = sig_env }) bndrs

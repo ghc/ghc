@@ -7,6 +7,7 @@
 
 
 {-# OPTIONS_GHC -Wno-unused-imports #-}
+{-# LANGUAGE FlexibleContexts #-}
 module GHC.Stg.InferTags ( inferTags ) where
 
 import GHC.Prelude
@@ -66,7 +67,8 @@ inferTagTopBind env (StgTopLifted bind)
 
 
 -----------------------
-inferTagExpr :: TagEnv p -> GenStgExpr p -> (TagInfo, GenStgExpr 'TaggedSimon)
+inferTagExpr :: Outputable (TagEnv p)
+  => TagEnv p -> GenStgExpr p -> (TagInfo, GenStgExpr 'TaggedSimon)
 inferTagExpr env (StgApp ext fun args)
   = (info, StgApp noEnterInfo fun args)
   where
@@ -145,7 +147,8 @@ addAltBndrInfo env (DataAlt con) bndrs
 addAltBndrInfo env _ bndrs = map (noSig env) bndrs
 
 -----------------------------
-inferTagBind :: TopLevelFlag -> TagEnv p -> GenStgBinding p -> (TagEnv p, GenStgBinding 'TaggedSimon)
+inferTagBind :: Outputable (TagEnv p)
+  => TopLevelFlag -> TagEnv p -> GenStgBinding p -> (TagEnv p, GenStgBinding 'TaggedSimon)
 inferTagBind top env (StgNonRec bndr rhs)
   = (env', StgNonRec (id, sig) rhs')
   where
@@ -164,6 +167,8 @@ inferTagBind top env (StgRec pairs)
     go :: forall q. TagEnv q -> [TagSig] -> [GenStgRhs q]
                  -> (TagSigEnv, [((Id,TagSig), GenStgRhs 'TaggedSimon)])
     go env sigs rhss
+      --  | pprTrace "go" (ppr ids $$ ppr sigs $$ ppr sigs') False
+      --  = undefined
        | sigs == sigs' = (te_env rhs_env, bndrs `zip` rhss')
        | otherwise     = go env' sigs' rhss'
        where
@@ -178,21 +183,29 @@ initSig StgRhsCon {}                = TagSig 0              TagProper
 initSig (StgRhsClosure _ _ _ bndrs _) = TagSig (length bndrs) TagProper
 
 -----------------------------
-inferTagRhs :: TopLevelFlag -- ^
+inferTagRhs :: Outputable (TagEnv p)
+  => TopLevelFlag -- ^
   -> [Id] -- ^ List of ids in the recursive group, or [] otherwise
   -> TagEnv p -- ^
   -> GenStgRhs p -- ^
   -> (TagSig, GenStgRhs 'TaggedSimon)
-inferTagRhs _top _rec env (StgRhsClosure ext cc upd bndrs body)
-  = (TagSig arity info', StgRhsClosure ext' cc upd bndrs' body')
+inferTagRhs _top _grp_ids env (StgRhsClosure ext cc upd bndrs body)
+  = --pprTrace "inferTagRhsClosure" (ppr (_top, _grp_ids, env,info')) $
+    (TagSig arity info', StgRhsClosure ext' cc upd bndrs' body')
   where
     ext' = case te_ext env of ExtEqEv -> ext
     (info, body') = inferTagExpr env body
     arity = length bndrs
     info'
-      | TagProper <- info :: TagInfo
-      , arity == 0
-      = TagDunno -- It's a thunk!
+      | arity == 0
+      = TagDunno
+      -- case info of
+      --     TagProper -> TagDunno
+      --     TagTuple fs -> TagTuple fs
+      --     TagDunno -> TagDunno
+      --       -- It's a thunk!
+            -- TODO: Preserve tuple fields
+
       | otherwise  = info
     bndrs' = map (noSig env) bndrs
 
@@ -200,7 +213,8 @@ inferTagRhs top grp_ids env (StgRhsCon ext cc con cn ticks args)
 -- Top level constructors, which have untagged arguments to strict fields
 -- become thunks. Same goes for rhs which are part of a recursive group.
 -- We encode this by giving changing RhsCon nodes the info TagDunno
-  = let
+  = --pprTrace "inferTagRhsCon" (ppr grp_ids) $
+    let
         strictArgs = getStrictConArgs con args
         strictUntaggedIds = [v | StgVarArg v <- strictArgs
                             , lookupInfo env (StgVarArg v) /= TagProper] :: [Id]

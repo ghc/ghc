@@ -1786,9 +1786,12 @@ doCodeGen hsc_env this_mod denv data_tycons
     --                                     findTags logger dflags this_mod stg_binds
 
     let (!stg_binds_w_tags) = {-# SCC "StgTagFields" #-}
-                                        inferTags $ depSortStgPgm this_mod stg_binds
+                                        inferTags stg_binds
 
+    pprTraceM "Dumping Stg" (ppr this_mod)
     dumpIfSet_dyn logger dflags Opt_D_dump_stg_final "CodeGenAnal STG:" FormatSTG (pprGenStgTopBindings (initStgPprOpts dflags) stg_binds_w_tags)
+    return $! seqTopBinds stg_binds_w_tags
+    pprTraceM "Dumped Stg" (ppr this_mod)
 
     us_t <- mkSplitUniqSupply 't'
     let sfi_seqd_binds = rewriteTopBinds this_mod us_t stg_binds_w_tags :: [TgStgTopBinding]

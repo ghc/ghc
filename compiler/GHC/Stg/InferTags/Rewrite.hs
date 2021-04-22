@@ -126,21 +126,21 @@ addBind (StgNonRec (id, tag) _) = do
     return ()
 addBind (StgRec binds) = do
     let (bnds,_rhss) = unzip binds
-    s <- getMap
+    !s <- getMap
     -- pprTraceM "AddBinds" (ppr $ map fst bnds)
-    setMap $ addListToUFM s bnds
+    setMap $! addListToUFM s bnds
 
 addBinder :: (Id,TagSig) -> RM ()
 addBinder (id,sig) = do
-    s <- getMap
+    !s <- getMap
     setMap $ addToUFM s id sig
     return ()
 
 addArg :: StgArg -> RM ()
 addArg (StgLitArg _) = return ()
 addArg (StgVarArg v) = do
-    s <- getMap
-    setMap $ addToUFM s v (TagSig 0 TagDunno)
+    !s <- getMap
+    setMap $! addToUFM s v (TagSig 0 TagDunno)
     return ()
 
 isTagged :: Id -> RM Bool
@@ -151,7 +151,7 @@ isTagged v = do
             | isUnliftedType (idType v)
             -> return True
             | otherwise -> do -- Local binding
-                s <- getMap
+                !s <- getMap
                 let !sig = lookupWithDefaultUFM s (pprPanic "unknown Id:" (ppr v)) v
                 return $ case sig of
                     TagSig _arity info ->
@@ -195,7 +195,7 @@ isArgTagged (StgVarArg v) = isTagged v
 
 mkLocalArgId :: Id -> RM Id
 mkLocalArgId id = do
-    u <- getUniqueM
+    !u <- getUniqueM
     return $! setIdUnique (localiseId id) u
 
 ---------------------------
@@ -232,20 +232,10 @@ rewriteBinds b@(StgRec binds) = do
 -- we can avoid turning the RhsCon into a closure. (e.g. for top level bindings)
 rewriteRhs :: (Id,TagSig) -> InferStgRhs -> RM (TgStgRhs, TgStgExpr -> TgStgExpr)
 rewriteRhs (_id, tagSig) (StgRhsCon (node_id) ccs con cn ticks args) = {-# SCC rewriteRhs_ #-} do
-    -- node <- getNode node_id
+    -- pprTraceM "rewriteRhs" (ppr _id)
 
     -- Look up the nodes representing the constructor arguments.
     fieldInfos <- mapM isArgTagged args
-    -- tagInfo <- lookupNodeResult node_id
-    -- pprTraceM "rewriteRhsCon" $ ppr _binding <+> ppr tagInfo
-    -- pprTraceM "rewriteConApp" $ ppr con <+> vcat [
-    --     text "args" <+> ppr args,
-    --     text "tagInfo" <+> ppr tagInfo,
-    --     text "fieldInfos" <+> ppr fieldInfos
-    --     -- text "strictIndices" <+> ppr strictIndices,
-    --     -- text "needsEval" <+> ppr needsEval,
-    --     -- text "evalArgs" <+> ppr evalArgs
-    --     ]
 
     -- Filter out non-strict fields.
     let strictFields =
@@ -274,11 +264,11 @@ rewriteRhs (_id, tagSig) (StgRhsCon (node_id) ccs con cn ticks args) = {-# SCC r
             --  * and Dunno as tag signature
             -- Then we return a RhsClosure, otherwise we return a wrapper
             -- which will evaluate the arguments first when applied to an expression.
-            if isDunnoSig tagSig --rewriteFlag == MaybeClosure
-                then do
+            if not (isTaggedSig tagSig) --rewriteFlag == MaybeClosure
+                then do -- Turn the rhs into a closure that evaluates the arguments to the strict fields
                     conExpr <- mkSeqs evalArgs con cn args (panic "mkSeqs should not need to provide types")
                     return $! (StgRhsClosure noExtFieldSilent ccs ReEntrant [] $! conExpr, id)
-                else do
+                else do -- Return a case expression that will evaluate the arguments.
                     let evalExpr expr = foldr (\(v, vEvald) e -> mkSeq v vEvald e) expr varMap
                     return $! ((StgRhsCon noExtFieldSilent ccs con cn ticks evaldConArgs), evalExpr)
 rewriteRhs _binding (StgRhsClosure ext ccs flag args body) = do

@@ -1322,7 +1322,7 @@ topNormaliseType_maybe env ty
           Just (co, rhs, res_co) -> NS_Step rec_nts rhs (co, res_co)
           _                      -> NS_Done
 
----------------
+-- ---------------
 normaliseTcApp :: FamInstEnvs -> Role -> TyCon -> [Type] -> (Coercion, Type)
 -- See comments on normaliseType for the arguments of this function
 normaliseTcApp env role tc tys
