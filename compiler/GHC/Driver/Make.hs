@@ -1684,7 +1684,25 @@ upsweep_mod :: HscEnv
             -> Int  -- index of module
             -> Int  -- total number of modules
             -> IO HomeModInfo
-upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_index nmods
+upsweep_mod hsc_env mHscMessage old_hpt stableModules summary mod_index nmods
+   = do
+        (summary', status) <- checkStableModules hsc_env old_hpt stableModules summary
+        case status of
+            Left hmi -> return hmi
+            Right (src_modified, mb_old_iface, mb_linkable) ->
+                compileOne' Nothing mHscMessage hsc_env summary' mod_index nmods
+                             mb_old_iface mb_linkable src_modified
+
+type CheckStableModulesResult = (ModSummary, Either HomeModInfo (SourceModified, Maybe ModIface, Maybe Linkable))
+
+-- | Check the StableModules and decide whether recompilation is necessary
+-- Also patches the ModSummary with corrected backend
+checkStableModules :: HscEnv
+                   -> HomePackageTable
+                   -> StableModules
+                   -> ModSummary
+                   -> IO CheckStableModulesResult
+checkStableModules hsc_env old_hpt (stable_obj, stable_bco) summary
    =    let
             this_mod_name = ms_mod_name summary
             this_mod    = ms_mod summary
@@ -1739,16 +1757,14 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
                                    where
                                      iface = hm_iface hm_info
 
-            compile_it :: Maybe Linkable -> SourceModified -> IO HomeModInfo
+            compile_it :: Maybe Linkable -> SourceModified -> IO CheckStableModulesResult
             compile_it  mb_linkable src_modified =
-                  compileOne' Nothing mHscMessage hsc_env summary' mod_index nmods
-                             mb_old_iface mb_linkable src_modified
+                return $ (summary', Right (src_modified, mb_old_iface, mb_linkable))
 
             compile_it_discard_iface :: Maybe Linkable -> SourceModified
-                                     -> IO HomeModInfo
+              -> IO CheckStableModulesResult
             compile_it_discard_iface mb_linkable  src_modified =
-                  compileOne' Nothing mHscMessage hsc_env summary' mod_index nmods
-                             Nothing mb_linkable src_modified
+                return $ (summary', Right (src_modified, Nothing, mb_linkable))
 
             -- With NoBackend we create empty linkables to avoid recompilation.
             -- We have to detect these to recompile anyway if the backend changed
@@ -1773,7 +1789,7 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
                 -- if it is *stable* (see checkStability).
           | is_stable_obj, Just hmi <- old_hmi -> do
                 debug_trace 5 (text "skipping stable obj mod:" <+> ppr this_mod_name)
-                return hmi
+                return $ (summary', Left hmi)
                 -- object is stable, and we have an entry in the
                 -- old HPT: nothing to do
 
@@ -1790,7 +1806,7 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
                 ASSERT(isJust old_hmi) -- must be in the old_hpt
                 let Just hmi = old_hmi in do
                 debug_trace 5 (text "skipping stable BCO mod:" <+> ppr this_mod_name)
-                return hmi
+                return $ (summary', Left hmi)
                 -- BCO is stable: nothing to do
 
           | not (backendProducesObject bcknd),
