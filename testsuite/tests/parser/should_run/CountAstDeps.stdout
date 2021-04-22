@@ -77,7 +77,6 @@ GHC.Data.OrdList
 GHC.Data.Pair
 GHC.Data.Stream
 GHC.Data.StringBuffer
-GHC.Data.STuple
 GHC.Data.Tainted
 GHC.Data.TrieMap
 GHC.Driver.Backend

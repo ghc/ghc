@@ -29,7 +29,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -}
 
-{-# LANGUAGE UnboxedSums #-}
+{-# OPTIONS_GHC -ddump-simpl -ddump-to-file #-}
 {-# LANGUAGE PatternSynonyms #-}
 
 -----------------------------------------------------------------------------
@@ -47,14 +47,15 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 module GHC.Data.Tainted
   ( Tainted(Dirty, Clean)
-  , forgetTaint, setIfClean
+  , dirtyIf, forgetTaint, setWhenClean, untaintPart
   , isClean, isDirty
   , cleans, dirtys, partitionTaints
   ) where
 
 import GHC.Prelude
 import GHC.Show (appPrec, appPrec1)
-import Data.Bifunctor (bimap)
+import GHC.Utils.Outputable
+import Data.Bifunctor (bimap, second)
 import Data.List (partition)
 import Data.Ord (comparing)
 import qualified Data.Semigroup as S
@@ -65,13 +66,20 @@ import qualified Data.Semigroup as S
 --
 -- The 'Tainted' type is also a monad. Once the \"dirty\" state has been
 -- reached, and clean operations performed themselves create a \"dirty\" value.
-data Tainted a = Tainted_ (# a | a #) -- internal data constructor
+data Tainted a
+  = Tainted_ !Bool a -- internal data constructor, only accessed by patsyns below
 
 pattern Dirty :: a -> Tainted a -- exported pattern synonyms
-pattern Dirty a = Tainted_ (# a | #)
+pattern Dirty a <- Tainted_ True !a where
+  Dirty a = Tainted_ True a
 pattern Clean :: a -> Tainted a
-pattern Clean a = Tainted_ (# | a #)
+pattern Clean a = Tainted_ False a
 {-# COMPLETE Dirty, Clean #-}
+
+-- | Mark the given value as 'Dirty' if the condition is 'True'.
+dirtyIf :: Bool -> a -> Tainted a
+dirtyIf True a = Dirty a
+dirtyIf _    a = Clean a
 
 -- | Forget whether a value is tainted and return the value.
 forgetTaint :: Tainted a -> a
@@ -95,6 +103,10 @@ instance Show a => Show (Tainted a) where
   showsPrec prec ta = showParen (prec > appPrec) $ case ta of
     Clean a -> showString "Clean " . showsPrec appPrec1 a
     Dirty a -> showString "Dirty " . showsPrec appPrec1 a
+
+instance Outputable a => Outputable (Tainted a) where
+  ppr (Clean a) = text "Clean " <> ppr a
+  ppr (Dirty a) = text "Dirty " <> ppr a
 
 instance Functor Tainted where
     fmap f (Dirty a) = Dirty (f a)
@@ -123,11 +135,17 @@ instance Monad Tainted where
 -- Example: Updating a key in a map that isn't present in the map. In that case,
 -- we can just re-use the old map. If @Map.update f k map@ would return a
 -- @Clean map@ if @k@ is not present, we could just call
--- @setIfClean map (Map.update f k map)@ and extract the original map with
+-- @setWhenClean map (Map.update f k map)@ and extract the original map with
 -- 'forgetTaint' afterwards.
-setIfClean :: a -> Tainted a -> Tainted a
-setIfClean a (Clean _) = Clean a
-setIfClean _ (Dirty a) = Dirty a
+setWhenClean :: a -> Tainted a -> Tainted a
+setWhenClean a (Clean _) = Clean a
+setWhenClean _ (Dirty a) = Dirty a
+
+-- | Untaints a part of the tainted value, as defined by the projection in left
+-- (untainted) and right (tainted) part.
+untaintPart :: (a -> (b, c)) -> Tainted a -> (b, Tainted c)
+untaintPart f (Dirty a) = second Dirty (f a)
+untaintPart f (Clean a) = second Clean (f a)
 
 -- | Returns 'True' iff its argument is of the form 'Clean _.
 isClean :: Tainted a -> Bool
