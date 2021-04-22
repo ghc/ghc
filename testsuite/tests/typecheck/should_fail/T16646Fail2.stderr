@@ -1,0 +1,5 @@
+
+T16646Fail2.hs:10:5: error:
+    Invalid instantiation of ‘magicDict’ at type:
+    (C a => r) -> Maybe a -> r
+        ‘C’ is not a class with exactly one method and no superclasses

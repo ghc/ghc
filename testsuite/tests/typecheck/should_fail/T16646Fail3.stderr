@@ -1,0 +1,7 @@
+
+T16646Fail3.hs:14:13: error:
+    Invalid instantiation of ‘magicDict’ at type:
+    (Reifies Any a => Proxy Any -> r) -> (Any -> a) -> Proxy Any -> r
+        ‘Any -> a’
+        is not equal to the class method type
+        ‘forall (proxy :: * -> *). proxy Any -> a’
