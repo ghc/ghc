@@ -112,7 +112,9 @@ module GHC.Types.Id (
         setIdLFInfo,
 
         setIdDemandInfo,
+        setIdDemandInfoTaint,
         setIdDmdSig,
+        setIdDmdSigTaint,
         setIdCprSig,
 
         idDemandInfo,
@@ -150,6 +152,7 @@ import GHC.Core.Class
 import {-# SOURCE #-} GHC.Builtin.PrimOps (PrimOp)
 import GHC.Types.ForeignCall
 import GHC.Data.Maybe
+import GHC.Data.Tainted
 import GHC.Types.SrcLoc
 import GHC.Types.Unique
 import GHC.Builtin.Uniques (mkBuiltinUnique)
@@ -177,7 +180,9 @@ infixl  1 `setIdUnfolding`,
           `idCafInfo`,
 
           `setIdDemandInfo`,
+          `setIdDemandInfoTaint`,
           `setIdDmdSig`,
+          `setIdDmdSigTaint`,
           `setIdCprSig`,
 
           `asJoinId`,
@@ -687,6 +692,11 @@ idDmdSig id = dmdSigInfo (idInfo id)
 setIdDmdSig :: Id -> DmdSig -> Id
 setIdDmdSig id sig = modifyIdInfo (`setDmdSigInfo` sig) id
 
+setIdDmdSigTaint :: Id -> DmdSig -> Tainted Id
+setIdDmdSigTaint id sig
+  | sig == dmdSigInfo (idInfo id) = Clean id
+  | otherwise                     = Dirty $ modifyIdInfo (`setDmdSigInfo` sig) id
+
 idCprSig :: Id -> CprSig
 idCprSig id = cprSigInfo (idInfo id)
 
@@ -732,6 +742,11 @@ idDemandInfo       id = demandInfo (idInfo id)
 
 setIdDemandInfo :: Id -> Demand -> Id
 setIdDemandInfo id dmd = modifyIdInfo (`setDemandInfo` dmd) id
+
+setIdDemandInfoTaint :: Id -> Demand -> Tainted Id
+setIdDemandInfoTaint id dmd
+  | dmd == demandInfo (idInfo id) = Clean id
+  | otherwise                     = Dirty $ modifyIdInfo (`setDemandInfo` dmd) id
 
 setCaseBndrEvald :: StrictnessMark -> Id -> Id
 -- Used for variables bound by a case expressions, both the case-binder
