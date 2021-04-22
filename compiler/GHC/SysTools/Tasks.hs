@@ -12,6 +12,7 @@ module GHC.SysTools.Tasks where
 import GHC.Prelude
 import GHC.Platform
 import GHC.ForeignSrcLang
+import GHC.IO (catchException)
 
 import GHC.CmmToLlvm.Base (LlvmVersion, llvmVersionStr, supportedLlvmVersionMin, supportedLlvmVersionMax, llvmVersionStr, parseLlvmVersion)
 
@@ -190,7 +191,7 @@ runClang logger dflags args = traceToolCommand logger dflags "clang" $ do
       args1 = map Option (getOpts dflags opt_a)
       args2 = args0 ++ args1 ++ args
   mb_env <- getGccEnv args2
-  catch
+  catchException
     (runSomethingFiltered logger dflags id "Clang (Assembler)" clang args2 Nothing mb_env)
     (\(err :: SomeException) -> do
         errorMsg logger dflags $

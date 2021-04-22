@@ -10,13 +10,14 @@ module GHC.Utils.Exception
 
 import GHC.Prelude
 
+import GHC.IO (catchException)
 import Control.Exception as CE
 import Control.Monad.IO.Class
 import Control.Monad.Catch
 
 -- Monomorphised versions of exception-handling utilities
 catchIO :: IO a -> (IOException -> IO a) -> IO a
-catchIO = CE.catch
+catchIO = catchException
 
 handleIO :: (IOException -> IO a) -> IO a -> IO a
 handleIO = flip catchIO
