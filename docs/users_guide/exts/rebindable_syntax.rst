@@ -131,7 +131,8 @@ Postfix operators
 
 The :extension:`PostfixOperators` extension enables a small extension to the syntax
 of left operator sections, which allows you to define postfix operators.
-The extension is this: the left section ::
+The extension is this: for any expression ``e`` and operator ``(!)``, the left
+section ::
 
       (e !)
 
@@ -140,8 +141,7 @@ execution) to the expression ::
 
       ((!) e)
 
-(for any expression ``e`` and operator ``(!)``. The strict Haskell 98
-interpretation is that the section is equivalent to ::
+The strict Haskell 98 interpretation is that the section is equivalent to ::
 
       (\y -> (!) e y)
 
