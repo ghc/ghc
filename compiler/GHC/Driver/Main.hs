@@ -229,7 +229,7 @@ import System.IO (fixIO)
 import qualified Data.Set as S
 import Data.Set (Set)
 import Data.Functor
-import Control.DeepSeq (force)
+import Control.DeepSeq (force, rnf)
 import Data.Bifunctor (first, bimap)
 
 #include "HsVersions.h"
@@ -518,10 +518,19 @@ hscTypecheckRename hsc_env mod_summary rdr_module = runHsc hsc_env $
 
 -- | Do Typechecking without throwing SourceError exception with -Werror
 hscTypecheckAndGetWarnings :: HscEnv ->  ModSummary -> IO (FrontendResult, WarningMessages)
-hscTypecheckAndGetWarnings hsc_env summary = runHsc' hsc_env $ do
-  case hscFrontendHook (hsc_hooks hsc_env) of
-    Nothing -> FrontendTypecheck . fst <$> hsc_typecheck False summary Nothing
-    Just h  -> h summary
+hscTypecheckAndGetWarnings hsc_env summary = do
+  (tc_result, warnings) <- runHsc' hsc_env $ do
+    case hscFrontendHook (hsc_hooks hsc_env) of
+      Nothing -> FrontendTypecheck . fst <$> hsc_typecheck False summary Nothing
+      Just h  -> h summary
+
+  -- Forcing the evaluation of warnings here is important
+  -- it saves about 11% in peak memory allocations with T15304
+  let forceEval = (foldl' (\_ w -> seqOne w) () warnings)
+      seqOne w = rnf (errMsgSpan w) `seq` errMsgDiagnostic w `seq`
+        errMsgSeverity `seq` errMsgContext w `seq` ()
+
+  return $ seq forceEval (tc_result, warnings)
 
 -- | A bunch of logic piled around @tcRnModule'@, concerning a) backpack
 -- b) concerning dumping rename info and hie files. It would be nice to further
