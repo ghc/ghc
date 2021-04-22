@@ -912,10 +912,10 @@ mkOneRecordSelector all_cons idDetails fl has_sel
     --    where cons_w_field = [C2,C7]
     sel_bind = mkTopFunBind Generated sel_lname alts
       where
-        alts | is_naughty = [mkSimpleMatch (mkPrefixFunRhs sel_lname)
+        alts | is_naughty = [mkSimpleMatch (mkPrefixFunRhs (mapLoc CtxIdName sel_lname))
                                            [] unit_rhs]
              | otherwise =  map mk_match cons_w_field ++ deflt
-    mk_match con = mkSimpleMatch (mkPrefixFunRhs sel_lname)
+    mk_match con = mkSimpleMatch (mkPrefixFunRhs (mapLoc CtxIdName sel_lname))
                                  [L loc' (mk_sel_pat con)]
                                  (L loc' (HsVar noExtField (L locn field_var)))
     mk_sel_pat con = ConPat NoExtField (L locn (getName con)) (RecCon rec_fields)
