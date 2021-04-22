@@ -1532,4 +1532,3 @@ by saying ``-fno-wombat``.
     is used. You can disable the second approach entirely by setting the
     threshold to 0.
 
-
