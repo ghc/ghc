@@ -6,6 +6,7 @@ Version 9.0.1
 The significant changes to the various parts of the compiler are listed in the
 following sections.
 
+The :ghc-flag:`LLVM backend <-fllvm>` of this release is to be used with LLVM 9.
 
 Highlights
 ----------
@@ -37,25 +38,33 @@ Highlights
       f True = 1
       f x    = ... case x of { False -> 2; True -> 3 } ...
 
-    GHC is now able to detect the case alt returning 3 as redundant.
+    GHC is now able to detect the case alternative returning ``3`` as redundant.
   - Some more performance improvements in edge cases.
 
-* Windows: Use the large address space allocator.
+* Windows: Use the large address-space allocator.
 
   This improves runtime but causes increased memory usage on Windows versions
   older than Win 8.1/Server 2012.
 
+* Windows: New IO Manager.
+
+  A new I/O manager (WinIO) is now available as a community technical preview which is designed to allow experimentation and
+  bootstrapping of third-party packages such as Network.   The new I/O manager is off by default and can be enabled with the
+  RTS flag ``--io-manager=native``.  Currently the I/O manager is *unoptimized* and is focused more on correctness.  There is also
+  no support for pipes and sockets.  These will be added in the next release.  `*see more* <https://www.youtube.com/watch?v=kgNh5mdZ1xw>`__.
+
 * Big-number support
 
-  - GHC now relies on a new "ghc-bignum" package to provide Integer/Natural
+  - GHC now relies on a new ``ghc-bignum`` package to provide Integer/Natural
     implementations. This package supports the following backends:
 
-    - gmp: adapted from integer-gmp package that was used before
-    - native: new Haskell implementation, faster than integer-simple which is
-      not used anymore
+      - gmp: adapted from integer-gmp package that was used before
+
+      - native: new Haskell implementation, faster than ``integer-simple`` which is
+        not used anymore
 
   - All backends now use the same representation for big numbers (the one that
-    was previously used only by integer-gmp). It led to several compiler
+    was previously used only by ``integer-gmp``). It led to several compiler
     simplifications, performance improvements and bug fixes (e.g.
     :ghc-ticket:`15262`, :ghc-ticket:`15286`).
 
@@ -63,10 +72,10 @@ Highlights
     deterministic results so that they can be tested one against the other (they
     can only differ in performance). As a consequence, some functions that were
     only provided by integer-gmp (prime test, secure powmod, etc.) are no longer
-    provided by ghc-bignum. Note that other packages (e.g. hgmp) provide these
+    provided by ghc-bignum. Note that other packages (e.g. ``hgmp``) provide these
     functions.
 
-  - For now GHC still doesn't allow dynamic selection of the ghc-bignum backend
+  - For now GHC still doesn't allow dynamic selection of the ``ghc-bignum`` backend
     to use.
 
 * Breaking change: Template Haskell splices now act as separation points
@@ -237,6 +246,10 @@ Language
   as ``f (-123)``, but ``x-123`` as ``(-) x 123``. Before this amendment,
   :extension:`NegativeLiterals` caused ``x-123`` to be parsed as ``x(-123)``.
 
+* GHC now requires whitespace between infix operators and their arguments in
+  some cases where it was not previously necessary as the result of the
+  :ref:`whitespace-sensitive operator parsing proposal <https://github.com/ghc-proposals/ghc-proposals/pull/229>`.
+
 Compiler
 ~~~~~~~~
 
@@ -257,6 +270,10 @@ Compiler
 
 GHCi
 ~~~~
+
+- GHCi prompt no longer lists loaded modules.
+  The previous behavior can be restored with ``:set prompt "%s> "``
+  and ``:set prompt-cont "%s| "``.
 
 - The ``:script`` command now allows for file names that contain spaces to
   passed as arguments: either by enclosing the file names in double quotes or by
