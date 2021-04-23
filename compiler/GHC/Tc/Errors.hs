@@ -3053,8 +3053,7 @@ discardMsg = text "(Some bindings suppressed;" <+>
 -----------------------
 warnDefaulting :: [Ct] -> Type -> TcM ()
 warnDefaulting wanteds default_ty
-  = do { warn_default <- woptM Opt_WarnTypeDefaults
-       ; env0 <- tcInitTidyEnv
+  = do { env0 <- tcInitTidyEnv
        ; let tidy_env = tidyFreeTyCoVars env0 $
                         tyCoVarsOfCtsList (listToBag wanteds)
              tidy_wanteds = map (tidyCt tidy_env) wanteds
@@ -3066,7 +3065,7 @@ warnDefaulting wanteds default_ty
                            , quotes (ppr default_ty) ])
                      2
                      ppr_wanteds
-       ; setCtLocM loc $ diagnosticTc (WarningWithFlag Opt_WarnTypeDefaults) warn_default warn_msg }
+       ; setCtLocM loc $ addDiagnosticTc (WarningWithFlag Opt_WarnTypeDefaults) warn_msg }
 
 {-
 Note [Runtime skolems]
