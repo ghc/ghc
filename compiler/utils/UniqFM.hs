@@ -56,6 +56,7 @@ module UniqFM (
         disjointUFM,
         equalKeysUFM,
         nonDetFoldUFM, foldUFM, nonDetFoldUFM_Directly,
+        nonDetStrictFoldUFM, nonDetStrictFoldUFM_Directly,
         anyUFM, allUFM, seqEltsUFM,
         mapUFM, mapUFM_Directly,
         elemUFM, elemUFM_Directly,
@@ -327,6 +328,20 @@ nonDetFoldUFM k z (UFM m) = M.foldr k z m
 -- nondeterminism.
 nonDetFoldUFM_Directly:: (Unique -> elt -> a -> a) -> a -> UniqFM elt -> a
 nonDetFoldUFM_Directly k z (UFM m) = M.foldrWithKey (k . getUnique) z m
+
+-- See Note [Deterministic UniqFM] to learn about nondeterminism.
+-- If you use this please provide a justification why it doesn't introduce
+-- nondeterminism.
+nonDetStrictFoldUFM :: (elt -> a -> a) -> a -> UniqFM elt -> a
+nonDetStrictFoldUFM k z (UFM m) = M.foldl' (flip k) z m
+{-# INLINE nonDetStrictFoldUFM #-}
+
+-- See Note [Deterministic UniqFM] to learn about nondeterminism.
+-- If you use this please provide a justification why it doesn't introduce
+-- nondeterminism.
+nonDetStrictFoldUFM_Directly:: (Unique -> elt -> a -> a) -> a -> UniqFM elt -> a
+nonDetStrictFoldUFM_Directly k z (UFM m) = M.foldlWithKey' (\z' i x -> k (getUnique i) x z') z m
+{-# INLINE nonDetStrictFoldUFM_Directly #-}
 
 -- See Note [Deterministic UniqFM] to learn about nondeterminism.
 -- If you use this please provide a justification why it doesn't introduce

@@ -159,8 +159,8 @@ import HsSyn
 import RdrName
 import Avail
 import Module
-import InstEnv          ( InstEnv, ClsInst, identicalClsInstHead )
 import FamInstEnv
+import InstEnv
 import CoreSyn          ( CoreProgram, RuleBase, CoreRule )
 import Name
 import NameEnv
@@ -671,13 +671,13 @@ hptCompleteSigs = hptAllThings  (md_complete_sigs . hm_details)
 -- the Home Package Table filtered by the provided predicate function.
 -- Used in @tcRnImports@, to select the instances that are in the
 -- transitive closure of imports from the currently compiled module.
-hptInstances :: HscEnv -> (ModuleName -> Bool) -> ([ClsInst], [FamInst])
+hptInstances :: HscEnv -> (ModuleName -> Bool) -> (InstEnv, [FamInst])
 hptInstances hsc_env want_this_module
   = let (insts, famInsts) = unzip $ flip hptAllThings hsc_env $ \mod_info -> do
                 guard (want_this_module (moduleName (mi_module (hm_iface mod_info))))
                 let details = hm_details mod_info
                 return (md_insts details, md_fam_insts details)
-    in (concat insts, concat famInsts)
+    in (foldl' unionInstEnv emptyInstEnv insts, concat famInsts)
 
 -- | Get rules from modules "below" this one (in the dependency sense)
 hptRules :: HscEnv -> [(ModuleName, IsBootInterface)] -> [CoreRule]
@@ -1233,7 +1233,7 @@ data ModDetails
         md_exports   :: [AvailInfo],
         md_types     :: !TypeEnv,       -- ^ Local type environment for this particular module
                                         -- Includes Ids, TyCons, PatSyns
-        md_insts     :: ![ClsInst],     -- ^ 'DFunId's for the instances in this module
+        md_insts     :: !InstEnv,       -- ^ 'DFunId's for the instances in this module
         md_fam_insts :: ![FamInst],
         md_rules     :: ![CoreRule],    -- ^ Domain may include 'Id's from other modules
         md_anns      :: ![Annotation],  -- ^ Annotations present in this module: currently
@@ -1247,7 +1247,7 @@ emptyModDetails :: ModDetails
 emptyModDetails
   = ModDetails { md_types     = emptyTypeEnv,
                  md_exports   = [],
-                 md_insts     = [],
+                 md_insts     = emptyInstEnv,
                  md_rules     = [],
                  md_fam_insts = [],
                  md_anns      = [],
@@ -1588,7 +1588,7 @@ data InteractiveContext
              -- It contains everything in scope at the command line,
              -- including everything in ic_tythings
 
-         ic_instances  :: ([ClsInst], [FamInst]),
+         ic_instances  :: (InstEnv, [FamInst]),
              -- ^ All instances and family instances created during
              -- this session.  These are grabbed en masse after each
              -- update to be sure that proper overlapping is retained.
@@ -1636,7 +1636,7 @@ emptyInteractiveContext dflags
        ic_rn_gbl_env = emptyGlobalRdrEnv,
        ic_mod_index  = 1,
        ic_tythings   = [],
-       ic_instances  = ([],[]),
+       ic_instances  = (emptyInstEnv,[]),
        ic_fix_env    = emptyNameEnv,
        ic_monad      = ioTyConName,  -- IO monad by default
        ic_int_print  = printName,    -- System.IO.print by default
@@ -1666,7 +1666,7 @@ icPrintUnqual dflags InteractiveContext{ ic_rn_gbl_env = grenv } =
 -- not clear whether removing them is even the appropriate behavior.
 extendInteractiveContext :: InteractiveContext
                          -> [TyThing]
-                         -> [ClsInst] -> [FamInst]
+                         -> InstEnv -> [FamInst]
                          -> Maybe [Type]
                          -> FixityEnv
                          -> InteractiveContext
@@ -1676,7 +1676,7 @@ extendInteractiveContext ictxt new_tythings new_cls_insts new_fam_insts defaults
                             -- a new mod_index (Trac #9426)
           , ic_tythings   = new_tythings ++ old_tythings
           , ic_rn_gbl_env = ic_rn_gbl_env ictxt `icExtendGblRdrEnv` new_tythings
-          , ic_instances  = ( new_cls_insts ++ old_cls_insts
+          , ic_instances  = ( new_cls_insts `unionInstEnv` old_cls_insts
                             , new_fam_insts ++ fam_insts )
                             -- we don't shadow old family instances (#7102),
                             -- so don't need to remove them here
@@ -1690,7 +1690,7 @@ extendInteractiveContext ictxt new_tythings new_cls_insts new_fam_insts defaults
     -- Discard old instances that have been fully overridden
     -- See Note [Override identical instances in GHCi]
     (cls_insts, fam_insts) = ic_instances ictxt
-    old_cls_insts = filterOut (\i -> any (identicalClsInstHead i) new_cls_insts) cls_insts
+    old_cls_insts = filterInstEnv (\i -> not $ anyInstEnv (identicalClsInstHead i) new_cls_insts) cls_insts
 
 extendInteractiveContextWithIds :: InteractiveContext -> [Id] -> InteractiveContext
 -- Just a specialised version

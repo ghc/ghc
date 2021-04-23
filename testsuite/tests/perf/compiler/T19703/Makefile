@@ -1,4 +1,4 @@
-TOP=/opt/exp/ghc/ghc-T19703/testsuite
+TOP=../../../../testsuite
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 

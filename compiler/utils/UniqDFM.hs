@@ -57,6 +57,7 @@ module UniqDFM (
         udfmToList,
         udfmToUfm,
         nonDetFoldUDFM,
+        nonDetStrictFoldUDFM,
         alwaysUnsafeUfmToUdfm,
     ) where
 
@@ -270,6 +271,9 @@ foldUDFM k z m = foldr k z (eltsUDFM m)
 -- nondeterminism.
 nonDetFoldUDFM :: (elt -> a -> a) -> a -> UniqDFM elt -> a
 nonDetFoldUDFM k z (UDFM m _i) = foldr k z $ map taggedFst $ M.elems m
+
+nonDetStrictFoldUDFM :: (elt -> a -> a) -> a -> UniqDFM elt -> a
+nonDetStrictFoldUDFM k z (UDFM m _i) = foldl' (flip k) z $ map taggedFst $ M.elems m
 
 eltsUDFM :: UniqDFM elt -> [elt]
 eltsUDFM (UDFM m _i) =

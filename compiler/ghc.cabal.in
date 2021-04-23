@@ -380,6 +380,7 @@ Library
         ErrUtils
         Finder
         GHC
+        RoughMap
         GhcMake
         GhcPlugins
         DynamicLoading

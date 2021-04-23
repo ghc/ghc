@@ -107,6 +107,7 @@ import Maybes
 import Binary
 import Fingerprint
 import Exception
+import RoughMap
 import UniqSet
 import Packages
 import ExtractDocs
@@ -271,7 +272,7 @@ mkIface_ hsc_env maybe_old_fingerprint
           -- See Note [Deterministic UniqFM] in UniqDFM for more details.
         warns       = src_warns
         iface_rules = map coreRuleToIfaceRule rules
-        iface_insts = map instanceToIfaceInst $ fixSafeInstances safe_mode insts
+        iface_insts = map instanceToIfaceInst $ fixSafeInstances safe_mode (instEnvElts insts)
         iface_fam_insts = map famInstToIfaceFamInst fam_insts
         trust_info  = setSafeMode safe_mode
         annotations = map mkIfaceAnnotation anns
@@ -2030,8 +2031,8 @@ instanceToIfaceInst (ClsInst { is_dfun = dfun_id, is_flag = oflag
                 ifInstTys = map do_rough mb_tcs,
                 ifInstOrph = orph }
   where
-    do_rough Nothing  = Nothing
-    do_rough (Just n) = Just (toIfaceTyCon_name n)
+    do_rough OtherTc     = Nothing
+    do_rough (KnownTc n) = Just (toIfaceTyCon_name n)
 
     dfun_name = idName dfun_id
 
@@ -2046,8 +2047,8 @@ famInstToIfaceFamInst (FamInst { fi_axiom    = axiom,
                  , ifFamInstTys      = map do_rough roughs
                  , ifFamInstOrph     = orph }
   where
-    do_rough Nothing  = Nothing
-    do_rough (Just n) = Just (toIfaceTyCon_name n)
+    do_rough OtherTc     = Nothing
+    do_rough (KnownTc n) = Just (toIfaceTyCon_name n)
 
     fam_decl = tyConName $ coAxiomTyCon axiom
     mod = ASSERT( isExternalName (coAxiomName axiom) )

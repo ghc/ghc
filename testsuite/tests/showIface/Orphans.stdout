@@ -1,5 +1,5 @@
-instance [orphan] GHC.Exts.IsList [GHC.Types.Bool] = $fIsListBool
-instance GHC.Exts.IsList [X] = $fIsListX
+instance [orphan] GHC.Exts.IsList [GHC.Exts.IsList, GHC.Types.Bool]
+instance GHC.Exts.IsList [GHC.Exts.IsList, X] = $fIsListX
 family instance GHC.Exts.Item [X] = D:R:ItemX
 family instance [orphan] GHC.Exts.Item [GHC.Types.Bool]
 "myrule1" [orphan] forall @ a.

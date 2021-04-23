@@ -177,7 +177,7 @@ mkBootModDetailsTc hsc_env
     final_tcs  = filterOut (isWiredInName . getName) tcs
                  -- See Note [Drop wired-in things]
     type_env1  = typeEnvFromEntities final_ids final_tcs fam_insts
-    insts'     = mkFinalClsInsts type_env1 insts
+    insts'     = mkFinalClsInsts type_env1 (mkInstEnv insts)
     pat_syns'  = mkFinalPatSyns  type_env1 pat_syns
     type_env'  = extendTypeEnvWithPatSyns pat_syns' type_env1
 
@@ -200,8 +200,8 @@ lookupFinalId type_env id
       Just (AnId id') -> id'
       _ -> pprPanic "lookup_final_id" (ppr id)
 
-mkFinalClsInsts :: TypeEnv -> [ClsInst] -> [ClsInst]
-mkFinalClsInsts env = map (updateClsInstDFun (lookupFinalId env))
+mkFinalClsInsts :: TypeEnv -> InstEnv -> InstEnv
+mkFinalClsInsts env = updateClsInstDFuns (lookupFinalId env)
 
 mkFinalPatSyns :: TypeEnv -> [PatSyn] -> [PatSyn]
 mkFinalPatSyns env = map (updatePatSynIds (lookupFinalId env))
@@ -391,7 +391,7 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
               ; final_tcs      = filterOut (isWiredInName . getName) tcs
                                  -- See Note [Drop wired-in things]
               ; type_env       = typeEnvFromEntities final_ids final_tcs fam_insts
-              ; tidy_cls_insts = mkFinalClsInsts type_env cls_insts
+              ; tidy_cls_insts = mkFinalClsInsts type_env (mkInstEnv cls_insts)
               ; tidy_patsyns   = mkFinalPatSyns  type_env patsyns
               ; tidy_type_env  = extendTypeEnvWithPatSyns tidy_patsyns type_env
               ; tidy_rules     = tidyRules tidy_env trimmed_rules

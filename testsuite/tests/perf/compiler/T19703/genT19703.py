@@ -22,17 +22,18 @@ def gen_join():
     '''))
 
 def gen_instances(mod_name: str, n: int):
-    write_file(f'{mod_name}.hs', dedent(f'''
+    out = dedent('''
             {{-# LANGUAGE TypeFamilies #-}}
             module {mod_name} where
             import Fam
-        ''') + '\n'.join(
-            dedent(f'''
+        '''.format(mod_name=mod_name))
+    out += '\n'.join(
+            dedent('''
             data T{i} = T{i}
             type instance Fam T{i} = Int
-            ''')
-            for i in range(n)
-        ))
+            ''').format(i=str(i))
+            for i in range(n))
+    write_file('{}.hs'.format(mod_name), out)
 
 gen_fam()
 gen_instances('A', n=5000)

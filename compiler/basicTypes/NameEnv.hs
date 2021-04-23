@@ -24,9 +24,13 @@ module NameEnv (
         DNameEnv,
 
         emptyDNameEnv,
+        isEmptyDNameEnv,
         lookupDNameEnv,
-        mapDNameEnv,
+        mapDNameEnv, eltsDNameEnv,
         alterDNameEnv,
+        plusDNameEnv_C,
+        foldDNameEnv,
+        nonDetStrictFoldDNameEnv,
         -- ** Dependency analysis
         depAnal
     ) where
@@ -144,11 +148,27 @@ type DNameEnv a = UniqDFM a
 emptyDNameEnv :: DNameEnv a
 emptyDNameEnv = emptyUDFM
 
+isEmptyDNameEnv :: DNameEnv a -> Bool
+isEmptyDNameEnv = isNullUDFM
+
 lookupDNameEnv :: DNameEnv a -> Name -> Maybe a
 lookupDNameEnv = lookupUDFM
 
 mapDNameEnv :: (a -> b) -> DNameEnv a -> DNameEnv b
 mapDNameEnv = mapUDFM
 
+eltsDNameEnv :: DNameEnv a -> [a]
+eltsDNameEnv = eltsUDFM
+
 alterDNameEnv :: (Maybe a -> Maybe a) -> DNameEnv a -> Name -> DNameEnv a
 alterDNameEnv = alterUDFM
+
+foldDNameEnv :: (a -> b -> b) -> b -> DNameEnv a -> b
+foldDNameEnv = foldUDFM
+
+plusDNameEnv_C :: (elt -> elt -> elt) -> DNameEnv elt -> DNameEnv elt -> DNameEnv elt
+plusDNameEnv_C = plusUDFM_C
+
+nonDetStrictFoldDNameEnv :: (a -> b -> b) -> b -> DNameEnv a -> b
+nonDetStrictFoldDNameEnv = nonDetStrictFoldUDFM
+
