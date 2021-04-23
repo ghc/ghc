@@ -607,7 +607,7 @@ data HsExpr p
   | HsPragE (XPragE p) (HsPragE p) (LHsExpr p)
 
   | XExpr       !(XXExpr p)
-  -- Note [Trees that Grow] extension constructor for the
+  -- Note [Trees That Grow] in Language.Haskell.Syntax.Extension for the
   -- general idea, and Note [Rebindable syntax and HsExpansion] in GHC.Hs.Expr
   -- for an example of how we use it.
 
@@ -661,7 +661,8 @@ type LHsTupArg id = XRec id (HsTupArg id)
 data HsTupArg id
   = Present (XPresent id) (LHsExpr id)     -- ^ The argument
   | Missing (XMissing id)    -- ^ The argument is missing, but this is its type
-  | XTupArg !(XXTupArg id)   -- ^ Note [Trees that Grow] extension point
+  | XTupArg !(XXTupArg id)   -- ^ Extension point; see Note [Trees That Grow]
+                             -- in Language.Haskell.Syntax.Extension
 
 {-
 Note [Parens in HsSyn]
@@ -933,7 +934,8 @@ data HsCmd id
 
     -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
 
-  | XCmd        !(XXCmd id)     -- Note [Trees that Grow] extension point
+  | XCmd        !(XXCmd id)     -- Extension point; see Note [Trees That Grow]
+                                -- in Language.Haskell.Syntax.Extension
 
 
 -- | Haskell Array Application Type
@@ -953,7 +955,8 @@ type LHsCmdTop p = XRec p (HsCmdTop p)
 data HsCmdTop p
   = HsCmdTop (XCmdTop p)
              (LHsCmd p)
-  | XCmdTop !(XXCmdTop p)        -- Note [Trees that Grow] extension point
+  | XCmdTop !(XXCmdTop p)        -- Extension point; see Note [Trees That Grow]
+                                 -- in Language.Haskell.Syntax.Extension
 
 -----------------------
 
@@ -1525,7 +1528,8 @@ data HsSplice id
         (XSpliced id)
         ThModFinalizers     -- TH finalizers produced by the splice.
         (HsSplicedThing id) -- The result of splicing
-   | XSplice !(XXSplice id) -- Note [Trees that Grow] extension point
+   | XSplice !(XXSplice id) -- Extension point; see Note [Trees That Grow]
+                            -- in Language.Haskell.Syntax.Extension
 
 -- | A splice can appear with various decorations wrapped around it. This data
 -- type captures explicitly how it was originally written, for use in the pretty
@@ -1587,7 +1591,8 @@ data HsBracket p
                                 -- True: 'x, False: ''T
                                 -- (The Bool flag is used only in pprHsBracket)
   | TExpBr (XTExpBr p) (LHsExpr p)    -- [||  expr  ||]
-  | XBracket !(XXBracket p)           -- Note [Trees that Grow] extension point
+  | XBracket !(XXBracket p)           -- Extension point; see Note [Trees That Grow]
+                                      -- in Language.Haskell.Syntax.Extension
 
 isTypedBracket :: HsBracket id -> Bool
 isTypedBracket (TExpBr {}) = True

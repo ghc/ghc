@@ -44,7 +44,8 @@ import Data.Data hiding ( Fixity )
 
 -- Note [Literal source text] in GHC.Types.Basic for SourceText fields in
 -- the following
--- Note [Trees that grow] in Language.Haskell.Syntax.Extension for the Xxxxx fields in the following
+-- Note [Trees That Grow] in Language.Haskell.Syntax.Extension for the Xxxxx
+-- fields in the following
 -- | Haskell Literal
 data HsLit x
   = HsChar (XHsChar x) {- SourceText -} Char
