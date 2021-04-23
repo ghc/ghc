@@ -14,9 +14,6 @@
 --
 -- This module is an extension of @HsSyn@ syntax, for use in the type checker.
 module GHC.Tc.Utils.Zonk (
-        -- * Extracting types from HsSyn
-        hsLitType, hsPatType, hsLPatType,
-
         -- * Other HsSyn functions
         mkHsDictLet, mkHsApp,
         mkHsAppTy, mkHsCaseAlt,
@@ -48,7 +45,6 @@ import GHC.Prelude
 import GHC.Platform
 
 import GHC.Builtin.Types
-import GHC.Builtin.Types.Prim
 import GHC.Builtin.Names
 
 import GHC.Hs
@@ -98,59 +94,6 @@ import GHC.Data.Bag
 import Control.Monad
 import Data.List  ( partition )
 import Control.Arrow ( second )
-
-{-
-************************************************************************
-*                                                                      *
-       Extracting the type from HsSyn
-*                                                                      *
-************************************************************************
-
--}
-
-hsLPatType :: LPat GhcTc -> Type
-hsLPatType (L _ p) = hsPatType p
-
-hsPatType :: Pat GhcTc -> Type
-hsPatType (ParPat _ _ pat _)            = hsLPatType pat
-hsPatType (WildPat ty)                  = ty
-hsPatType (VarPat _ lvar)               = idType (unLoc lvar)
-hsPatType (BangPat _ pat)               = hsLPatType pat
-hsPatType (LazyPat _ pat)               = hsLPatType pat
-hsPatType (LitPat _ lit)                = hsLitType lit
-hsPatType (AsPat _ var _)               = idType (unLoc var)
-hsPatType (ViewPat ty _ _)              = ty
-hsPatType (ListPat (ListPatTc ty Nothing) _)      = mkListTy ty
-hsPatType (ListPat (ListPatTc _ (Just (ty,_))) _) = ty
-hsPatType (TuplePat tys _ bx)           = mkTupleTy1 bx tys
-                  -- See Note [Don't flatten tuples from HsSyn] in GHC.Core.Make
-hsPatType (SumPat tys _ _ _ )           = mkSumTy tys
-hsPatType (ConPat { pat_con = lcon
-                  , pat_con_ext = ConPatTc
-                    { cpt_arg_tys = tys
-                    }
-                  })
-                                        = conLikeResTy (unLoc lcon) tys
-hsPatType (SigPat ty _ _)               = ty
-hsPatType (NPat ty _ _ _)               = ty
-hsPatType (NPlusKPat ty _ _ _ _ _)      = ty
-hsPatType (XPat (CoPat _ _ ty))         = ty
-hsPatType SplicePat{}                   = panic "hsPatType: SplicePat"
-
-hsLitType :: HsLit (GhcPass p) -> TcType
-hsLitType (HsChar _ _)       = charTy
-hsLitType (HsCharPrim _ _)   = charPrimTy
-hsLitType (HsString _ _)     = stringTy
-hsLitType (HsStringPrim _ _) = addrPrimTy
-hsLitType (HsInt _ _)        = intTy
-hsLitType (HsIntPrim _ _)    = intPrimTy
-hsLitType (HsWordPrim _ _)   = wordPrimTy
-hsLitType (HsInt64Prim _ _)  = int64PrimTy
-hsLitType (HsWord64Prim _ _) = word64PrimTy
-hsLitType (HsInteger _ _ ty) = ty
-hsLitType (HsRat _ _ ty)     = ty
-hsLitType (HsFloatPrim _ _)  = floatPrimTy
-hsLitType (HsDoublePrim _ _) = doublePrimTy
 
 {- *********************************************************************
 *                                                                      *
@@ -808,10 +751,9 @@ zonkExpr env (HsUnboundVar her occ)
 zonkExpr env (HsRecSel _ (FieldOcc v occ))
   = return (HsRecSel noExtField (FieldOcc (zonkIdOcc env v) occ))
 
-zonkExpr _ (HsIPVar x id)
-  = return (HsIPVar x id)
+zonkExpr _ (HsIPVar x _) = dataConCantHappen x
 
-zonkExpr _ e@HsOverLabel{} = return e
+zonkExpr _ (HsOverLabel x _) = dataConCantHappen x
 
 zonkExpr env (HsLit x (HsRat e f ty))
   = do new_ty <- zonkTcTypeToTypeX env ty
@@ -843,13 +785,13 @@ zonkExpr env (HsAppType ty e t)
        return (HsAppType new_ty new_e t)
        -- NB: the type is an HsType; can't zonk that!
 
-zonkExpr _ e@(HsRnBracketOut _ _ _)
-  = pprPanic "zonkExpr: HsRnBracketOut" (ppr e)
+zonkExpr _ (HsRnBracketOut x _ _) = dataConCantHappen x
 
-zonkExpr env (HsTcBracketOut x wrap body bs)
+zonkExpr env (HsTcBracketOut ty wrap body bs)
   = do wrap' <- traverse zonkQuoteWrap wrap
        bs' <- mapM (zonk_b env) bs
-       return (HsTcBracketOut x wrap' body bs')
+       new_ty <- zonkTcTypeToTypeX env ty
+       return (HsTcBracketOut new_ty wrap' body bs')
   where
     zonkQuoteWrap (QuoteWrapper ev ty) = do
         let ev' = zonkIdOcc env ev
@@ -864,11 +806,7 @@ zonkExpr env (HsSpliceE _ (XSplice (HsSplicedT s))) =
 
 zonkExpr _ e@(HsSpliceE _ _) = pprPanic "zonkExpr: HsSpliceE" (ppr e)
 
-zonkExpr env (OpApp fixity e1 op e2)
-  = do new_e1 <- zonkLExpr env e1
-       new_op <- zonkLExpr env op
-       new_e2 <- zonkLExpr env e2
-       return (OpApp fixity new_e1 new_op new_e2)
+zonkExpr _ (OpApp x _ _ _) = dataConCantHappen x
 
 zonkExpr env (NegApp x expr op)
   = do (env', new_op) <- zonkSyntaxExpr env op
@@ -879,16 +817,8 @@ zonkExpr env (HsPar x lpar e rpar)
   = do new_e <- zonkLExpr env e
        return (HsPar x lpar new_e rpar)
 
-zonkExpr env (SectionL x expr op)
-  = do new_expr <- zonkLExpr env expr
-       new_op   <- zonkLExpr env op
-       return (SectionL x new_expr new_op)
-
-zonkExpr env (SectionR x op expr)
-  = do new_op   <- zonkLExpr env op
-       new_expr <- zonkLExpr env expr
-       return (SectionR x new_op new_expr)
-
+zonkExpr _ (SectionL x _ _) = dataConCantHappen x
+zonkExpr _ (SectionR x _ _) = dataConCantHappen x
 zonkExpr env (ExplicitTuple x tup_args boxed)
   = do { new_tup_args <- mapM zonk_tup_arg tup_args
        ; return (ExplicitTuple x new_tup_args boxed) }
