@@ -185,7 +185,6 @@ data HsWrap hs_syn = HsWrap HsWrapper      -- the wrapper
 
 deriving instance (Data (hs_syn GhcTc), Typeable hs_syn) => Data (HsWrap hs_syn)
 
-type instance HsDoRn (GhcPass _) = GhcRn
 type instance HsBracketRn (GhcPass _) = GhcRn
 type instance PendingRnSplice' (GhcPass _) = PendingRnSplice
 type instance PendingTcSplice' (GhcPass _) = PendingTcSplice
@@ -577,7 +576,7 @@ ppr_expr (HsLet _ binds expr)
   = sep [hang (text "let") 2 (pprBinds binds),
          hang (text "in")  2 (ppr expr)]
 
-ppr_expr (HsDo _ do_or_list_comp (L _ stmts)) = pprDo do_or_list_comp stmts
+ppr_expr (HsDo _ do_or_list_comp (L _ stmts)) = pprDo (PsStmt do_or_list_comp) stmts
 
 ppr_expr (ExplicitList _ exprs)
   = brackets (pprDeeperList fsep (punctuate comma (map ppr_lexpr exprs)))
@@ -728,7 +727,7 @@ hsExprNeedsParens p = go
     go (HsMultiIf{})                  = p > topPrec
     go (HsLet{})                      = p > topPrec
     go (HsDo _ sc _)
-      | isComprehensionContext sc     = False
+      | isComprehensionContext (PsStmt sc)     = False
       | otherwise                     = p > topPrec
     go (ExplicitList{})               = False
     go (RecordUpd{})                  = False
@@ -1354,8 +1353,6 @@ type instance XApplicativeArgOne GhcTc = FailOperator GhcTc
 type instance XApplicativeArgMany (GhcPass _) = NoExtField
 type instance XXApplicativeArg    (GhcPass _) = NoExtCon
 
-type instance ApplicativeArgStmCtxPass _ = GhcRn
-
 instance (Outputable (StmtLR (GhcPass idL) (GhcPass idL) (LHsExpr (GhcPass idL))),
           Outputable (XXParStmtBlock (GhcPass idL) (GhcPass idR)))
         => Outputable (ParStmtBlock (GhcPass idL) (GhcPass idR)) where
@@ -1469,14 +1466,14 @@ pprDo :: (OutputableBndrId p, Outputable body,
                  Anno (StmtLR (GhcPass p) (GhcPass p) body) ~ SrcSpanAnnA
          )
       => HsStmtContext any -> [LStmt (GhcPass p) body] -> SDoc
-pprDo (DoExpr m)    stmts =
+pprDo (PsStmt (DoExpr m))    stmts =
   ppr_module_name_prefix m <> text "do"  <+> ppr_do_stmts stmts
-pprDo GhciStmtCtxt  stmts = text "do"  <+> ppr_do_stmts stmts
+pprDo (PsStmt GhciStmtCtxt)  stmts = text "do"  <+> ppr_do_stmts stmts
 pprDo ArrowExpr     stmts = text "do"  <+> ppr_do_stmts stmts
-pprDo (MDoExpr m)   stmts =
+pprDo (PsStmt (MDoExpr m))   stmts =
   ppr_module_name_prefix m <> text "mdo"  <+> ppr_do_stmts stmts
-pprDo ListComp      stmts = brackets    $ pprComp stmts
-pprDo MonadComp     stmts = brackets    $ pprComp stmts
+pprDo (PsStmt ListComp)      stmts = brackets    $ pprComp stmts
+pprDo (PsStmt MonadComp)     stmts = brackets    $ pprComp stmts
 pprDo _             _     = panic "pprDo" -- PatGuard, ParStmtCxt
 
 ppr_module_name_prefix :: Maybe ModuleName -> SDoc
@@ -1774,12 +1771,12 @@ matchContextErrString PatSyn                     = panic "matchContextErrString"
 matchContextErrString (StmtCtxt (ParStmtCtxt c))   = matchContextErrString (StmtCtxt c)
 matchContextErrString (StmtCtxt (TransStmtCtxt c)) = matchContextErrString (StmtCtxt c)
 matchContextErrString (StmtCtxt (PatGuard _))      = text "pattern guard"
-matchContextErrString (StmtCtxt GhciStmtCtxt)      = text "interactive GHCi command"
-matchContextErrString (StmtCtxt (DoExpr m))        = prependQualified m (text "'do' block")
+matchContextErrString (StmtCtxt (PsStmt GhciStmtCtxt))      = text "interactive GHCi command"
+matchContextErrString (StmtCtxt (PsStmt (DoExpr m)))        = prependQualified m (text "'do' block")
 matchContextErrString (StmtCtxt ArrowExpr)         = text "'do' block"
-matchContextErrString (StmtCtxt (MDoExpr m))       = prependQualified m (text "'mdo' block")
-matchContextErrString (StmtCtxt ListComp)          = text "list comprehension"
-matchContextErrString (StmtCtxt MonadComp)         = text "monad comprehension"
+matchContextErrString (StmtCtxt (PsStmt (MDoExpr m)))       = prependQualified m (text "'mdo' block")
+matchContextErrString (StmtCtxt (PsStmt ListComp))          = text "list comprehension"
+matchContextErrString (StmtCtxt (PsStmt MonadComp))         = text "monad comprehension"
 
 pprMatchInCtxt :: (OutputableBndrId idR, Outputable body)
                => Match (GhcPass idR) body -> SDoc
@@ -1789,9 +1786,10 @@ pprMatchInCtxt match  = hang (text "In" <+> pprMatchContext (m_ctxt match)
 
 pprStmtInCtxt :: (OutputableBndrId idL,
                   OutputableBndrId idR,
+                  OutputableBndrId idCtx,
                   Outputable body,
                  Anno (StmtLR (GhcPass idL) (GhcPass idR) body) ~ SrcSpanAnnA)
-              => HsStmtContext (GhcPass idL)
+              => HsStmtContext (GhcPass idCtx)
               -> StmtLR (GhcPass idL) (GhcPass idR) body
               -> SDoc
 pprStmtInCtxt ctxt (LastStmt _ e _ _)

@@ -176,7 +176,7 @@ mkSimpleMatch :: (Anno (Match (GhcPass p) (LocatedA (body (GhcPass p))))
                         ~ SrcSpanAnnA,
                   Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
                         ~ SrcSpan)
-              => HsMatchContext (NoGhcTc (GhcPass p))
+              => HsMatchContext (GhcPass p)
               -> [LPat (GhcPass p)] -> LocatedA (body (GhcPass p))
               -> LMatch (GhcPass p) (LocatedA (body (GhcPass p)))
 mkSimpleMatch ctxt pats rhs
@@ -304,11 +304,11 @@ nlParPat p = noLocA (ParPat noAnn p)
 mkHsIntegral   :: IntegralLit -> HsOverLit GhcPs
 mkHsFractional :: FractionalLit -> HsOverLit GhcPs
 mkHsIsString   :: SourceText -> FastString -> HsOverLit GhcPs
-mkHsDo         :: HsStmtContext GhcRn -> LocatedL [ExprLStmt GhcPs] -> HsExpr GhcPs
-mkHsDoAnns     :: HsStmtContext GhcRn -> LocatedL [ExprLStmt GhcPs] -> EpAnn AnnList -> HsExpr GhcPs
-mkHsComp       :: HsStmtContext GhcRn -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
+mkHsDo         :: HsPsStmtContext -> LocatedL [ExprLStmt GhcPs] -> HsExpr GhcPs
+mkHsDoAnns     :: HsPsStmtContext -> LocatedL [ExprLStmt GhcPs] -> EpAnn AnnList -> HsExpr GhcPs
+mkHsComp       :: HsPsStmtContext -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
                -> HsExpr GhcPs
-mkHsCompAnns   :: HsStmtContext GhcRn -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
+mkHsCompAnns   :: HsPsStmtContext -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
                -> EpAnn AnnList
                -> HsExpr GhcPs
 
@@ -578,7 +578,7 @@ nlWildPat  = noLocA (WildPat noExtField )
 nlWildPatName :: LPat GhcRn
 nlWildPatName  = noLocA (WildPat noExtField )
 
-nlHsDo :: HsStmtContext GhcRn -> [LStmt GhcPs (LHsExpr GhcPs)]
+nlHsDo :: HsPsStmtContext -> [LStmt GhcPs (LHsExpr GhcPs)]
        -> LHsExpr GhcPs
 nlHsDo ctxt stmts = noLocA (mkHsDo ctxt (noLocA stmts))
 
@@ -905,18 +905,18 @@ mkSimpleGeneratedFunBind :: SrcSpan -> RdrName -> [LPat GhcPs]
                 -> LHsExpr GhcPs -> LHsBind GhcPs
 mkSimpleGeneratedFunBind loc fun pats expr
   = L (noAnnSrcSpan loc) $ mkFunBind Generated (L (noAnnSrcSpan loc) fun)
-              [mkMatch (mkPrefixFunRhs (L (noAnnSrcSpan loc) fun)) pats expr
+              [mkMatch (mkPrefixFunRhs (L (noAnnSrcSpan loc) (CtxIdRdrName fun))) pats expr
                        emptyLocalBinds]
 
 -- | Make a prefix, non-strict function 'HsMatchContext'
-mkPrefixFunRhs :: LIdP p -> HsMatchContext p
+mkPrefixFunRhs :: XRec p (CtxIdP p) -> HsMatchContext p
 mkPrefixFunRhs n = FunRhs { mc_fun = n
                           , mc_fixity = Prefix
                           , mc_strictness = NoSrcStrict }
 
 ------------
 mkMatch :: forall p. IsPass p
-        => HsMatchContext (NoGhcTc (GhcPass p))
+        => HsMatchContext (GhcPass p)
         -> [LPat (GhcPass p)]
         -> LHsExpr (GhcPass p)
         -> HsLocalBinds (GhcPass p)
