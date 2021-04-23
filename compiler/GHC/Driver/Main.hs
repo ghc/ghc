@@ -1840,7 +1840,7 @@ doCodeGen hsc_env this_mod denv data_tycons
 
           sndOfTriple :: (a,b,c) -> b
           sndOfTriple (_,b,_) = b
-
+    -- TODO: Write a note: [Looking up CmmTickish for return frame info tables]
     lookupEstimatedTick:: CmmGroupSRTs -> Label -> Maybe CmmTickish
     lookupEstimatedTick cmmGroup infoTableLabel = do
       let blocks = concatMap toBlockList (graphs cmmGroup)
