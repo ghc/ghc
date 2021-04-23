@@ -109,7 +109,7 @@ data RecompileRequired
   = UpToDate
        -- ^ everything is up to date, recompilation is not required
   | MustCompile
-       -- ^ The .hs file has been touched, or the .o/.hi file does not exist
+       -- ^ The .hs file has been modified, or the .o/.hi file does not exist
   | RecompBecause String
        -- ^ The .o/.hi files are up to date, but something else has changed
        -- to force recompilation; the String says what (one-line summary)
@@ -368,16 +368,15 @@ checkHsig logger home_unit dflags mod_summary iface = do
 checkHie :: DynFlags -> ModSummary -> RecompileRequired
 checkHie dflags mod_summary =
     let hie_date_opt = ms_hie_date mod_summary
-        hs_date = ms_hs_date mod_summary
+        hi_date = ms_iface_date mod_summary
     in if not (gopt Opt_WriteHie dflags)
       then UpToDate
-      else case hie_date_opt of
-             Nothing -> RecompBecause "HIE file is missing"
-             Just hie_date
-                 | hie_date < hs_date
+      else case (hie_date_opt, hi_date) of
+             (Nothing, _) -> RecompBecause "HIE file is missing"
+             (Just hie_date, Just hi_date)
+                 | hie_date < hi_date
                  -> RecompBecause "HIE file is out of date"
-                 | otherwise
-                 -> UpToDate
+             _ -> UpToDate
 
 -- | Check the flags haven't changed
 checkFlagHash :: HscEnv -> ModIface -> IO RecompileRequired
@@ -1119,12 +1118,14 @@ addFingerprints hsc_env iface0
 
    -- The interface hash depends on:
    --   - the ABI hash, plus
+   --   - the source file hash,
    --   - the module level annotations,
    --   - usages
    --   - deps (home and external packages, dependent files)
    --   - hpc
    iface_hash <- computeFingerprint putNameLiterally
                       (mod_hash,
+                       mi_src_hash iface0,
                        ann_fn (mkVarOcc "module"),  -- See mkIfaceAnnCache
                        mi_usages iface0,
                        sorted_deps,
