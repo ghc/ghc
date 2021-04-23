@@ -1,8 +1,8 @@
 type A :: * -> * -> *
 type family A a b
   	-- Defined at T4175.hs:8:1
-type instance A (Maybe a) a = a 	-- Defined at T4175.hs:10:15
 type instance A Int Int = () 	-- Defined at T4175.hs:9:15
+type instance A (Maybe a) a = a 	-- Defined at T4175.hs:10:15
 type instance A (B a) b = () 	-- Defined at T4175.hs:11:15
 type B :: * -> *
 data family B a
@@ -15,8 +15,8 @@ class C a where
   type D :: * -> * -> *
   type family D a b
   	-- Defined at T4175.hs:17:5
-type instance D () () = Bool 	-- Defined at T4175.hs:23:10
 type instance D Int () = String 	-- Defined at T4175.hs:20:10
+type instance D () () = Bool 	-- Defined at T4175.hs:23:10
 type E :: * -> *
 type family E a where
     E () = Bool
@@ -35,8 +35,8 @@ instance Show () -- Defined in ‘GHC.Show’
 instance Read () -- Defined in ‘GHC.Read’
 instance Bounded () -- Defined in ‘GHC.Enum’
 data instance B () = MkB 	-- Defined at T4175.hs:14:15
-type instance D () () = Bool 	-- Defined at T4175.hs:23:10
 type instance D Int () = String 	-- Defined at T4175.hs:20:10
+type instance D () () = Bool 	-- Defined at T4175.hs:23:10
 type Maybe :: * -> *
 data Maybe a = Nothing | Just a
   	-- Defined in ‘GHC.Maybe’

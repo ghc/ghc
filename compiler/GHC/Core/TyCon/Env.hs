@@ -16,7 +16,7 @@ module GHC.Core.TyCon.Env (
         -- ** Manipulating these environments
         mkTyConEnv, mkTyConEnvWith,
         emptyTyConEnv, isEmptyTyConEnv,
-        unitTyConEnv, nameEnvElts,
+        unitTyConEnv, tyConEnvElts,
         extendTyConEnv_C, extendTyConEnv_Acc, extendTyConEnv,
         extendTyConEnvList, extendTyConEnvList_C,
         filterTyConEnv, anyTyConEnv,
@@ -58,7 +58,7 @@ emptyTyConEnv       :: TyConEnv a
 isEmptyTyConEnv     :: TyConEnv a -> Bool
 mkTyConEnv          :: [(TyCon,a)] -> TyConEnv a
 mkTyConEnvWith      :: (a -> TyCon) -> [a] -> TyConEnv a
-nameEnvElts        :: TyConEnv a -> [a]
+tyConEnvElts        :: TyConEnv a -> [a]
 alterTyConEnv       :: (Maybe a-> Maybe a) -> TyConEnv a -> TyCon -> TyConEnv a
 extendTyConEnv_C    :: (a->a->a) -> TyConEnv a -> TyCon -> a -> TyConEnv a
 extendTyConEnv_Acc  :: (a->b->b) -> (a->b) -> TyConEnv b -> TyCon -> a -> TyConEnv b
@@ -80,7 +80,7 @@ anyTyConEnv         :: (elt -> Bool) -> TyConEnv elt -> Bool
 mapTyConEnv         :: (elt1 -> elt2) -> TyConEnv elt1 -> TyConEnv elt2
 disjointTyConEnv    :: TyConEnv a -> TyConEnv a -> Bool
 
-nameEnvElts x         = eltsUFM x
+tyConEnvElts x         = eltsUFM x
 emptyTyConEnv          = emptyUFM
 isEmptyTyConEnv        = isNullUFM
 unitTyConEnv x y       = unitUFM x y

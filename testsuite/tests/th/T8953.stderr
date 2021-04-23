@@ -3,8 +3,8 @@ type instance forall (x_2 :: GHC.Types.Bool). T8953.Poly (x_2 :: GHC.Types.Bool)
 type instance forall (k_3 :: *)
                      (x_4 :: GHC.Maybe.Maybe k_3). T8953.Poly (x_4 :: GHC.Maybe.Maybe k_3) = GHC.Types.Double
 type family T8953.Silly :: k_0 -> *
-type instance T8953.Silly = (Data.Proxy.Proxy :: * -> *)
 type instance T8953.Silly = (Data.Proxy.Proxy :: (* -> *) -> *)
+type instance T8953.Silly = (Data.Proxy.Proxy :: * -> *)
 T8953.a :: Data.Proxy.Proxy (Data.Proxy.Proxy :: * -> *)
 T8953.b :: Data.Proxy.Proxy (Data.Proxy.Proxy :: (* -> *) -> *)
 type T8953.StarProxy (a_0 :: *) = Data.Proxy.Proxy a_0
