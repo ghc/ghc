@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE NondecreasingIndentation #-}
+{-# LANGUAGE GADTs #-}
 
 {-# OPTIONS_GHC -fprof-auto-top #-}
 
@@ -218,7 +219,7 @@ import qualified GHC.Data.Stream as Stream
 import GHC.Data.Stream (Stream)
 
 import Data.Data hiding (Fixity, TyCon)
-import Data.Maybe       ( fromJust, catMaybes )
+import Data.Maybe       ( fromJust, catMaybes, listToMaybe )
 import Data.List        ( nub, isPrefixOf, partition )
 import Control.Monad
 import Data.IORef
@@ -230,10 +231,15 @@ import Data.Set (Set)
 import Data.Functor
 import Control.DeepSeq (force)
 import Data.Bifunctor (first, bimap)
-import GHC.Cmm.Dataflow.Collections (mapElems)
+import GHC.Cmm.Dataflow.Collections (IsMap (mapToList))
 import GHC.StgToCmm.Prof (initInfoTableProv)
 import GHC.StgToCmm.Monad (runC, initC, getCmm)
 import GHC.Types.Name.Set (NonCaffySet)
+import GHC.Cmm.Utils (toBlockList)
+import GHC.Cmm.Dataflow (O, Block, C)
+import GHC.Cmm.Dataflow.Block (lastNode, blockToList, blockSplit)
+import GHC.Data.Maybe (firstJusts)
+import GHC.Cmm.Dataflow.Label (Label)
 
 #include "HsVersions.h"
 
@@ -335,7 +341,7 @@ ioMsgMaybe ioA = do
     logDiagnostics warns
     case mb_r of
         Nothing -> throwErrors errs
-        Just r  -> ASSERT( isEmptyBag errs ) return r
+        Just r  -> if debugIsOn && not ( isEmptyBag errs ) then (assertPanic "/run/user/1000/extra-dir-37036130960742/___GHCIDE_MAGIC___" 348) else return r
 
 -- | like ioMsgMaybe, except that we ignore error messages and return
 -- 'Nothing' instead.
@@ -539,7 +545,7 @@ hsc_typecheck keep_rn mod_summary mb_rdr_module = do
         src_filename  = ms_hspp_file mod_summary
         real_loc = realSrcLocSpan $ mkRealSrcLoc (mkFastString src_filename) 1 1
         keep_rn' = gopt Opt_WriteHie dflags || keep_rn
-    MASSERT( isHomeModule home_unit outer_mod )
+    if debugIsOn && not ( isHomeModule home_unit outer_mod ) then (assertPanic "/run/user/1000/extra-dir-37036130960742/___GHCIDE_MAGIC___" 552) else return ()
     tc_result <- if hsc_src == HsigFile && not (isHoleModule inner_mod)
         then ioMsgMaybe $ tcRnInstantiateSignature hsc_env outer_mod' real_loc
         else
@@ -1803,31 +1809,64 @@ doCodeGen hsc_env this_mod denv data_tycons
           unless (null a) $
             dumpIfSet_dyn logger dflags Opt_D_dump_cmm "Output Cmm" FormatCMM (pdoc platform a)
           return a
-    -- TODO: Do we have everything in pipeline_stream to emit (call initInfoTableProv)? This would be a good place...
 
     return $ generateCgIPEStub (Stream.mapM dump2 pipeline_stream)
   where
-    collectInfoTables:: CmmGroupSRTs -> [CmmInfoTable]
+    collectInfoTables:: CmmGroupSRTs -> [(Label, CmmInfoTable)]
     collectInfoTables gs = concat $ catMaybes $ map extractCmmInfoTable gs
       where
-        extractCmmInfoTable :: GenCmmDecl RawCmmStatics CmmTopInfo CmmGraph -> Maybe [CmmInfoTable]
-        extractCmmInfoTable (CmmProc h _ _ _) = Just $ mapElems $ info_tbls h
+        extractCmmInfoTable :: GenCmmDecl RawCmmStatics CmmTopInfo CmmGraph -> Maybe [(Label, CmmInfoTable)]
+        extractCmmInfoTable (CmmProc h _ _ _) = Just $ mapToList (info_tbls h)
         extractCmmInfoTable _ = Nothing
 
+    -- TODO: Does this check flag to see if IPE is wanted?
     generateCgIPEStub :: Stream IO CmmGroupSRTs (NonCaffySet, ModuleLFInfos) -> Stream IO CmmGroupSRTs CgInfos
     generateCgIPEStub s = do
         let dflags = hsc_dflags hsc_env
         cgState <- liftIO initC
-        (infoTables, (nonCaffySet, moduleLFInfos)) <- Stream.mapAccumL_ mappy [] s
-        let ((ipeStub, cmmGroup), _) = runC dflags this_mod cgState $ getCmm (initInfoTableProv infoTables denv this_mod)
+        (labeledInfoTablesWithTickishes, (nonCaffySet, moduleLFInfos)) <- Stream.mapAccumL_ mappy [] s
+        let denv' = denv {labeledInfoTablesWithTickishes = labeledInfoTablesWithTickishes}
+            ((ipeStub, cmmGroup), _) = runC dflags this_mod cgState $ getCmm (initInfoTableProv (map sndOfTriple labeledInfoTablesWithTickishes) denv' this_mod)
         (_, cmmGroupSRTs) <- liftIO $ cmmPipeline hsc_env (emptySRT this_mod) cmmGroup
         Stream.yield cmmGroupSRTs
         return CgInfos{ cgNonCafs = nonCaffySet, cgLFInfos = moduleLFInfos, cgIPEStub = ipeStub }
         where
-          mappy :: [CmmInfoTable] -> CmmGroupSRTs -> IO ([CmmInfoTable], CmmGroupSRTs)
+          -- TODO: `mappy` is a bad name
+          mappy :: [(Label, CmmInfoTable, Maybe CmmTickish)] -> CmmGroupSRTs -> IO ([(Label, CmmInfoTable, Maybe CmmTickish)], CmmGroupSRTs)
           mappy acc cmmGroupSRTs = do
-            let infoTables = collectInfoTables cmmGroupSRTs
-            return (acc ++ infoTables, cmmGroupSRTs)
+            let labelsToInfoTables = collectInfoTables cmmGroupSRTs
+                labelsToInfoTablesToTickishes = map (\(l, i) -> (l,i, lookupEstimatedTick cmmGroupSRTs l)) labelsToInfoTables
+            return (acc ++ labelsToInfoTablesToTickishes, cmmGroupSRTs)
+
+          sndOfTriple :: (a,b,c) -> b
+          sndOfTriple (_,b,_) = b
+
+    lookupEstimatedTick:: CmmGroupSRTs -> Label -> Maybe CmmTickish
+    lookupEstimatedTick cmmGroup infoTableLabel = do
+      let blocks = concatMap toBlockList (graphs cmmGroup)
+      -- TODO: Probably, it's not the Label but something else
+      firstJusts $ map (findCmmTickishForLabelInBlock infoTableLabel) blocks
+
+    graphs :: CmmGroupSRTs -> [CmmGraph]
+    graphs cmmGroup = foldl' go [] cmmGroup
+      where
+        go :: [CmmGraph] -> GenCmmDecl d h CmmGraph -> [CmmGraph]
+        go acc (CmmProc _ _ _ g) = g:acc
+        go acc _ = acc
+
+    findCmmTickishForLabelInBlock :: Label -> Block CmmNode C C -> Maybe CmmTickish
+    findCmmTickishForLabelInBlock label block = do
+        isCallWithReturnFrameLabel (lastNode block) label
+        let (_, middleBlock, _) = blockSplit block
+            middleBlockList = blockToList middleBlock
+
+        listToMaybe $ catMaybes $ map (\cmm -> case cmm of
+                            CmmTick t -> Just t
+                            _ -> Nothing) (reverse middleBlockList)
+        where
+          isCallWithReturnFrameLabel :: CmmNode O C -> Label -> Maybe ()
+          isCallWithReturnFrameLabel (CmmCall _ (Just l) _ _ _ _) clabel = if l == clabel then Just () else Nothing
+          isCallWithReturnFrameLabel _ _ = Nothing
 
 myCoreToStgExpr :: Logger -> DynFlags -> InteractiveContext
                 -> Module -> ModLocation -> CoreExpr

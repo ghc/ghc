@@ -175,6 +175,7 @@ data SMRep
   | RTSRep              -- The RTS needs to declare info tables with specific
         Int             -- type tags, so this form lets us override the default
         SMRep           -- tag for an SMRep.
+  deriving Eq
 
 -- | True \<=> This is a static closure.  Affects how we garbage-collect it.
 -- Static closure have an extra static link field at the end.
@@ -192,6 +193,7 @@ data ClosureTypeInfo
   | ThunkSelector SelectorOffset
   | BlackHole
   | IndStatic
+  deriving Eq
 
 type ConstrDescription = ByteString -- result of dataConIdentity
 type FunArity          = Int

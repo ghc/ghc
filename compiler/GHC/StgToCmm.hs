@@ -89,7 +89,7 @@ codeGen :: Logger
         -> Stream IO CmmGroup ModuleLFInfos       -- Output as a stream, so codegen can
                                        -- be interleaved with output
 
-codeGen logger tmpfs dflags this_mod (InfoTableProvMap (UniqMap denv) _) data_tycons
+codeGen logger tmpfs dflags this_mod (InfoTableProvMap (UniqMap denv) _ _) data_tycons
         cost_centre_info stg_binds hpc_info
   = do  {     -- cg: run the code generator, and yield the resulting CmmGroup
               -- Using an IORef to store the state is a bit crude, but otherwise

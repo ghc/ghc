@@ -91,6 +91,8 @@ import GHC.Core.DataCon
 import GHC.Types.Unique.FM
 import GHC.Data.Maybe
 import Control.Monad
+import GHC.Types.Tickish (GenTickish(SourceNote))
+import GHC.Types.SrcLoc (RealSrcSpan)
 
 --------------------------------------------------------------------------
 --
@@ -594,7 +596,7 @@ cmmInfoTableToInfoProvEnt this_mod cmit =
 -- | Convert source information collected about identifiers in 'GHC.STG.Debug'
 -- to entries suitable for placing into the info table provenenance table.
 convertInfoProvMap :: DynFlags -> [CmmInfoTable] -> Module -> InfoTableProvMap -> [InfoProvEnt]
-convertInfoProvMap dflags defns this_mod (InfoTableProvMap (UniqMap dcenv) denv) =
+convertInfoProvMap dflags defns this_mod (InfoTableProvMap (UniqMap dcenv) denv labeledInfoTablesWithTickishes) =
   map (\cmit ->
     let cl = cit_lbl cmit
         cn  = rtsClosureType (cit_rep cmit)
@@ -614,8 +616,18 @@ convertInfoProvMap dflags defns this_mod (InfoTableProvMap (UniqMap dcenv) denv)
             -- Lookup is linear but lists will be small (< 100)
             return $ InfoProvEnt cl cn (tyString (dataConTyCon dc)) this_mod (join $ lookup n (NE.toList ns))
 
+        lookupLabeledInfoTablesWithTickishes = do
+            (_, _, tickish) <- listToMaybe $ filter (\ (_,i,_) -> i == cmit) labeledInfoTablesWithTickishes
+            tickish' <- tickish
+            -- TODO: Fill infoTableType
+            return $ InfoProvEnt cl cn "" this_mod (infoTableProvFromTickish tickish')
+
         -- This catches things like prim closure types and anything else which doesn't have a
         -- source location
         simpleFallback = cmmInfoTableToInfoProvEnt this_mod cmit
 
-    in fromMaybe simpleFallback (lookupDataConMap `firstJust` lookupClosureMap)) defns
+    in fromMaybe simpleFallback (lookupDataConMap `firstJust` lookupClosureMap `firstJust` lookupLabeledInfoTablesWithTickishes)) defns
+  where
+    infoTableProvFromTickish :: CmmTickish -> (Maybe (RealSrcSpan, String))
+    infoTableProvFromTickish (SourceNote sourceSpan sourceName) = Just (sourceSpan, sourceName)
+    infoTableProvFromTickish _ = Nothing
