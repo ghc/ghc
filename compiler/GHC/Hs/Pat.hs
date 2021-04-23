@@ -82,6 +82,7 @@ import GHC.Types.Name (Name)
 import GHC.Driver.Session
 import qualified GHC.LanguageExtensions as LangExt
 import Data.Data
+import Data.Void
 
 
 data ListPatTc
@@ -132,7 +133,10 @@ type instance XViewPat GhcPs = EpAnn [AddEpAnn]
 type instance XViewPat GhcRn = NoExtField
 type instance XViewPat GhcTc = Type
 
-type instance XSplicePat (GhcPass _) = NoExtField
+type instance XSplicePat GhcPs = NoExtField
+type instance XSplicePat GhcRn = NoExtField
+type instance XSplicePat GhcTc = Void -- See Note [Constructor cannot occur]
+
 type instance XLitPat    (GhcPass _) = NoExtField
 
 type instance XNPat GhcPs = EpAnn [AddEpAnn]

@@ -414,6 +414,7 @@ Library
         GHC.Hs.Doc
         GHC.Hs.Dump
         GHC.Hs.Expr
+        GHC.Hs.Syn.Type
         GHC.Hs.Extension
         GHC.Hs.ImpExp
         GHC.Hs.Instances

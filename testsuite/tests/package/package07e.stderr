@@ -2,27 +2,28 @@
 package07e.hs:2:1: error:
     Could not find module ‘GHC.Hs.MyTypes’
     Perhaps you meant
-      GHC.Hs.Type (needs flag -package-id ghc-8.11.0.20200401)
-      GHC.Tc.Types (needs flag -package-id ghc-8.11.0.20200401)
+      GHC.Hs.Type (needs flag -package-id ghc-9.3)
+      GHC.Hs.Syn.Type (needs flag -package-id ghc-9.3)
+      GHC.Tc.Types (needs flag -package-id ghc-9.3)
     Use -v (or `:set -v` in ghci) to see a list of the files searched for.
 
 package07e.hs:3:1: error:
     Could not load module ‘GHC.Hs.Type’
-    It is a member of the hidden package ‘ghc-8.11.0.20200401’.
+    It is a member of the hidden package ‘ghc-9.3’.
     You can run ‘:set -package ghc’ to expose it.
     (Note: this unloads all the modules in the current scope.)
     Use -v (or `:set -v` in ghci) to see a list of the files searched for.
 
 package07e.hs:4:1: error:
     Could not load module ‘GHC.Hs.Utils’
-    It is a member of the hidden package ‘ghc-8.11.0.20200401’.
+    It is a member of the hidden package ‘ghc-9.3’.
     You can run ‘:set -package ghc’ to expose it.
     (Note: this unloads all the modules in the current scope.)
     Use -v (or `:set -v` in ghci) to see a list of the files searched for.
 
 package07e.hs:5:1: error:
     Could not load module ‘GHC.Types.Unique.FM’
-    It is a member of the hidden package ‘ghc-8.11.0.20200401’.
+    It is a member of the hidden package ‘ghc-9.3’.
     You can run ‘:set -package ghc’ to expose it.
     (Note: this unloads all the modules in the current scope.)
     Use -v (or `:set -v` in ghci) to see a list of the files searched for.
