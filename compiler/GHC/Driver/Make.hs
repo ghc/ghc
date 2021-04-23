@@ -2732,7 +2732,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
         when (pi_mod_name /= wanted_mod) $
                 throwE $ unitBag $ mkPlainErrorMsgEnvelope pi_mod_name_loc $
                               text "File name does not match module name:"
-                              $$ text "Saw:" <+> quotes (ppr pi_mod_name)
+                              $$ text "Saw:     " <+> quotes (ppr pi_mod_name)
                               $$ text "Expected:" <+> quotes (ppr wanted_mod)
 
         when (hsc_src == HsigFile && isNothing (lookup pi_mod_name (homeUnitInstantiations home_unit))) $
