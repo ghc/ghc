@@ -17,7 +17,7 @@ module GHC.Stack.CloneStack (
   ) where
 
 import GHC.Prim (StackSnapshot#, cloneMyStack#, ThreadId#, MutableArray#, sizeofMutableArray#, readArray#)
-import GHC.Exts (Int(I#), RealWorld, Ptr(..))
+import GHC.Exts (Int(I#), RealWorld)
 import Control.Concurrent.MVar
 import Control.Monad (forM)
 import GHC.Conc.Sync
@@ -50,6 +50,8 @@ A StackSnapshot# is really a pointer to an immutable StgStack closure with
 the invariant that stack->sp points to a valid frame.
 -}
 
+-- TODO: Add not: [Stack Decoding]
+
 -- | Clone the stack of the executing thread
 --
 -- @since 2.16.0.0
@@ -80,6 +82,8 @@ foreign import ccall "decodeClonedStack" decodeClonedStack:: StackSnapshot# -> M
 
 foreign import ccall "lookupIPE" lookupIPE:: Ptr Word -> IO (Ptr InfoProvEnt)
 
+-- TODO: Haddock
+-- TODO: Add test(s)
 decode :: StackSnapshot -> IO [[String]]
 decode (StackSnapshot stack) = let
     array = decodeClonedStack stack
@@ -88,7 +92,5 @@ decode (StackSnapshot stack) = let
     do
       forM [0 .. arraySize - 1] $ \(I# i) -> do
         v <- IO $ readArray# array i
-        print $ "StgInfoTable->code : " ++ show (I# i) ++ " -- " ++ show v
         ipe <- lookupIPE v
-        s <- (infoProvToStrings . ipeProv) ipe
-        return s
+        (infoProvToStrings . ipeProv) ipe
