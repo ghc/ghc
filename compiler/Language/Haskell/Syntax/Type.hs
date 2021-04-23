@@ -889,7 +889,7 @@ data HsType pass
 
       -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
 
-  -- For adding new constructors via Trees that Grow
+  -- Extension point; see Note [Trees That Grow] in Language.Haskell.Syntax.Extension
   | XHsType
       !(XXType pass)
 
