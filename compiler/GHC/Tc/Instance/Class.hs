@@ -172,12 +172,12 @@ matchInstEnv dflags short_cut_solver clas tys
         ; case (matches, unify, safeHaskFail) of
 
             -- Nothing matches
-            ([], [], _)
+            ([], NoUnifiers, _)
                 -> do { traceTc "matchClass not matching" (ppr pred)
                       ; return NoInstance }
 
             -- A single match (& no safe haskell failure)
-            ([(ispec, inst_tys)], [], False)
+            ([(ispec, inst_tys)], NoUnifiers, False)
                 | short_cut_solver      -- Called from the short-cut solver
                 , isOverlappable ispec
                 -- If the instance has OVERLAPPABLE or OVERLAPS or INCOHERENT

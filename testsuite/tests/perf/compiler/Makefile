@@ -28,3 +28,8 @@ MultiLayerModulesTH_Make_Prep:
 MultiLayerModulesTH_OneShot_Prep: MultiLayerModulesTH_Make_Prep
 	$(CP) MultiLayerModules.hs MultiLayerModulesTH_OneShot.hs
 
+# Type family skolems
+InstanceMatching:
+	./genMatchingTest 0
+	'$(TEST_HC)' $(TEST_HC_OPTS) -fno-code -fwrite-interface Defs.hs
+

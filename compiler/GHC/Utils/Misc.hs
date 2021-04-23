@@ -52,6 +52,10 @@ module GHC.Utils.Misc (
         mergeListsBy,
         isSortedBy,
 
+        -- Foldable generalised functions,
+
+        mapMaybe',
+
         -- * Tuples
         fstOf3, sndOf3, thdOf3,
         firstM, first3M, secondM,
@@ -1468,3 +1472,10 @@ type HasDebugCallStack = HasCallStack
 #else
 type HasDebugCallStack = (() :: Constraint)
 #endif
+
+mapMaybe' :: Foldable f => (a -> Maybe b) -> f a -> [b]
+mapMaybe' f = foldr g []
+  where
+    g x rest
+      | Just y <- f x = y : rest
+      | otherwise     = rest

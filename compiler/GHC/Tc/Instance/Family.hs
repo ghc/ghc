@@ -700,7 +700,7 @@ checkForConflicts :: FamInstEnvs -> FamInst -> TcM ()
 checkForConflicts inst_envs fam_inst
   = do { let conflicts = lookupFamInstEnvConflicts inst_envs fam_inst
        ; traceTc "checkForConflicts" $
-         vcat [ ppr (map fim_instance conflicts)
+         vcat [ ppr conflicts
               , ppr fam_inst
               -- , ppr inst_envs
          ]
@@ -991,20 +991,18 @@ buildInjectivityError :: (TyCon -> NonEmpty CoAxBranch -> TcRnMessage)
 buildInjectivityError mkErr fam_tc branches
   = ( coAxBranchSpan (NE.head branches), mkErr fam_tc branches )
 
-reportConflictInstErr :: FamInst -> [FamInstMatch] -> TcRn ()
+reportConflictInstErr :: FamInst -> [FamInst] -> TcRn ()
 reportConflictInstErr _ []
   = return ()  -- No conflicts
-reportConflictInstErr fam_inst (match1 : _)
-  | FamInstMatch { fim_instance = conf_inst } <- match1
-  , let sorted  = NE.sortBy (SrcLoc.leftmost_smallest `on` getSpan) (fam_inst NE.:| [conf_inst])
-        fi1     = NE.head sorted
-        span    = coAxBranchSpan (coAxiomSingleBranch (famInstAxiom fi1))
-  = setSrcSpan span $ addErr $ TcRnConflictingFamInstDecls sorted
- where
-   getSpan = getSrcSpan . famInstAxiom
+reportConflictInstErr fam_inst (conf_inst : _) =
    -- The sortBy just arranges that instances are displayed in order
    -- of source location, which reduced wobbling in error messages,
    -- and is better for users
+  let   sorted  = NE.sortBy (SrcLoc.leftmost_smallest `on` getSpan) (fam_inst NE.:| [conf_inst])
+        fi1     = NE.head sorted
+        span    = coAxBranchSpan (coAxiomSingleBranch (famInstAxiom fi1))
+        getSpan = getSrcSpan . famInstAxiom
+  in setSrcSpan span $ addErr $ TcRnConflictingFamInstDecls sorted
 
 tcGetFamInstEnvs :: TcM FamInstEnvs
 -- Gets both the external-package inst-env

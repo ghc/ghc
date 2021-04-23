@@ -37,7 +37,7 @@ do
   ty1 <- [t| C True |]
   ty2 <- [t| C 'False |]
   ClassI _ insts <- reify ''C
-  let [ty1', ty2'] = map getType insts
+  let [ty2', ty1'] = map getType insts
 
   when (ty1 /= ty1') $ failMsg "A" ty1 ty1'
   when (ty2 /= ty2') $ failMsg "B" ty2 ty2'

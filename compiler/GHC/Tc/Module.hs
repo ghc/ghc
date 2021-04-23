@@ -401,7 +401,7 @@ tcRnImports hsc_env import_decls
               tcg_rdr_env      = tcg_rdr_env gbl `plusGlobalRdrEnv` rdr_env,
               tcg_imports      = tcg_imports gbl `plusImportAvails` imports,
               tcg_rn_imports   = rn_imports,
-              tcg_inst_env     = extendInstEnvList (tcg_inst_env gbl) home_insts,
+              tcg_inst_env     = tcg_inst_env gbl `unionInstEnv` home_insts,
               tcg_fam_inst_env = extendFamInstEnvList (tcg_fam_inst_env gbl)
                                                       home_fam_insts,
               tcg_hpc          = hpc_info
@@ -1721,7 +1721,7 @@ tcMissingParentClassWarn warnFlag isName shouldName
            -- "<location>: Warning: <type> is an instance of <is> but not
            -- <should>" e.g. "Foo is an instance of Monad but not Applicative"
            ; let instLoc = srcLocSpan . nameSrcLoc $ getName isInst
-                 warnMsg (KnownTc name:_) =
+                 warnMsg (RM_KnownTc name:_) =
                       addDiagnosticAt instLoc $
                         TcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag warnFlag) noHints $
                            hsep [ (quotes . ppr . nameOccName) name
@@ -1734,7 +1734,7 @@ tcMissingParentClassWarn warnFlag isName shouldName
                            hsep [ text "This will become an error in"
                                 , text "a future release." ]
                  warnMsg _ = pure ()
-           ; when (null shouldInsts && null instanceMatches) $
+           ; when (nullUnifiers shouldInsts && null instanceMatches) $
                   warnMsg (is_tcs isInst)
            }
 
@@ -2041,7 +2041,7 @@ runTcInteractive hsc_env thing_inside
     withDefaultingPlugins hsc_env $ withHoleFitPlugins hsc_env $
     do { traceTc "setInteractiveContext" $
             vcat [ text "ic_tythings:" <+> vcat (map ppr (ic_tythings icxt))
-                 , text "ic_insts:" <+> vcat (map (pprBndr LetBind . instanceDFunId) ic_insts)
+                 , text "ic_insts:" <+> vcat (map (pprBndr LetBind . instanceDFunId) (instEnvElts ic_insts))
                  , text "icReaderEnv (LocalDef)" <+>
                       vcat (map ppr [ local_gres | gres <- nonDetOccEnvElts (icReaderEnv icxt)
                                                  , let local_gres = filter isLocalGRE gres
@@ -2064,13 +2064,12 @@ runTcInteractive hsc_env thing_inside
                where
                  gbl_env' = gbl_env { tcg_rdr_env      = icReaderEnv icxt
                                     , tcg_type_env     = type_env
-                                    , tcg_inst_env     = extendInstEnvList
-                                                          (extendInstEnvList (tcg_inst_env gbl_env) ic_insts)
-                                                          home_insts
+
+                                    , tcg_inst_env     = tcg_inst_env gbl_env `unionInstEnv` ic_insts `unionInstEnv` home_insts
                                     , tcg_fam_inst_env = extendFamInstEnvList
-                                                          (extendFamInstEnvList (tcg_fam_inst_env gbl_env)
-                                                                                ic_finsts)
-                                                          home_fam_insts
+                                               (extendFamInstEnvList (tcg_fam_inst_env gbl_env)
+                                                                     ic_finsts)
+                                               home_fam_insts
                                     , tcg_field_env    = mkNameEnv con_fields
                                          -- setting tcg_field_env is necessary
                                          -- to make RecordWildCards work (test: ghci049)
@@ -2103,7 +2102,7 @@ runTcInteractive hsc_env thing_inside
       = Right thing
 
     type_env1 = mkTypeEnvWithImplicits top_ty_things
-    type_env  = extendTypeEnvWithIds type_env1 (map instanceDFunId ic_insts)
+    type_env  = extendTypeEnvWithIds type_env1 (map instanceDFunId (instEnvElts ic_insts))
                 -- Putting the dfuns in the type_env
                 -- is just to keep Core Lint happy
 
