@@ -106,6 +106,7 @@ import GHC.Types.Var.Env
 import GHC.Types.SrcLoc
 import GHC.Types.Unique
 import GHC.Types.Unique.Supply
+import GHC.Types.Unique.DSet
 import GHC.Types.TyThing
 
 import GHC.Unit
@@ -1074,7 +1075,7 @@ getDictionaryBindings theta = do
 findMatchingInstances :: Type -> TcM [(ClsInst, [DFunInstType])]
 findMatchingInstances ty = do
   ies@(InstEnvs {ie_global = ie_global, ie_local = ie_local}) <- tcGetInstEnvs
-  let allClasses = instEnvClasses ie_global ++ instEnvClasses ie_local
+  let allClasses = uniqDSetToList $ instEnvClasses ie_global `unionUniqDSets` instEnvClasses ie_local
   return $ concatMap (try_cls ies) allClasses
   where
   {- Check that a class instance is well-kinded.

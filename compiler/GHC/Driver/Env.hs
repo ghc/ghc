@@ -53,7 +53,7 @@ import GHC.Unit.External
 
 import GHC.Core         ( CoreRule )
 import GHC.Core.FamInstEnv
-import GHC.Core.InstEnv ( ClsInst )
+import GHC.Core.InstEnv
 
 import GHC.Types.Annotations ( Annotation, AnnEnv, mkAnnEnv, plusAnnEnv )
 import GHC.Types.CompleteMatch
@@ -194,15 +194,15 @@ hptCompleteSigs = hptAllThings  (md_complete_matches . hm_details)
 -- the Home Package Table filtered by the provided predicate function.
 -- Used in @tcRnImports@, to select the instances that are in the
 -- transitive closure of imports from the currently compiled module.
-hptAllInstances :: HscEnv -> ([ClsInst], [FamInst])
+hptAllInstances :: HscEnv -> (InstEnv, [FamInst])
 hptAllInstances hsc_env
   = let (insts, famInsts) = unzip $ flip hptAllThings hsc_env $ \mod_info -> do
                 let details = hm_details mod_info
                 return (md_insts details, md_fam_insts details)
-    in (concat insts, concat famInsts)
+    in (foldl' unionInstEnv emptyInstEnv insts, concat famInsts)
 
 -- | Find instances visible from the given set of imports
-hptInstancesBelow :: HscEnv -> ModuleName -> Set ModuleNameWithIsBoot -> ([ClsInst], [FamInst])
+hptInstancesBelow :: HscEnv -> ModuleName -> Set ModuleNameWithIsBoot -> (InstEnv, [FamInst])
 hptInstancesBelow hsc_env mn mns =
   let (insts, famInsts) =
         unzip $ hptSomeThingsBelowUs (\mod_info ->
@@ -214,7 +214,7 @@ hptInstancesBelow hsc_env mn mns =
                              True -- Include -hi-boot
                              hsc_env
                              mns
-  in (concat insts, concat famInsts)
+  in (foldl' unionInstEnv emptyInstEnv insts, concat famInsts)
 
 -- | Get rules from modules "below" this one (in the dependency sense)
 hptRules :: HscEnv -> Set ModuleNameWithIsBoot -> [CoreRule]

@@ -17,7 +17,7 @@ module GHC.Core.FamInstEnv (
 
         -- * Family instance environment
         FamInstEnvs, FamInstEnv, emptyFamInstEnv, emptyFamInstEnvs,
-        extendFamInstEnv, extendFamInstEnvList,
+        unionFamInstEnv, extendFamInstEnv, extendFamInstEnvList,
         famInstEnvElts, famInstEnvSize, familyInstances,
 
         -- * CoAxioms
@@ -49,10 +49,10 @@ import GHC.Core.TyCon
 import GHC.Core.Coercion
 import GHC.Core.Coercion.Axiom
 import GHC.Core.Reduction
+import GHC.Core.RoughMap
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Name
-import GHC.Types.Unique.DFM
 import GHC.Data.Maybe
 import GHC.Types.Var
 import GHC.Types.SrcLoc
@@ -305,7 +305,12 @@ mkImportedFamInst fam mb_tcs axiom
 
 Note [FamInstEnv]
 ~~~~~~~~~~~~~~~~~
-A FamInstEnv maps a family name to the list of known instances for that family.
+A FamInstEnv is a RoughMap of instance heads. Specifically, the keys are formed
+by the family name and the instance arguments. That is, an instance:
+
+    type instance Fam (Maybe Int) a
+
+would give rise to a key of the form [KnownTc Fam, KnownTc Maybe, UnknownTc]
 
 The same FamInstEnv includes both 'data family' and 'type family' instances.
 Type families are reduced during type inference, but not data families;
@@ -353,30 +358,22 @@ UniqFM and UniqDFM.
 See Note [Deterministic UniqFM].
 -}
 
--- Internally we sometimes index by Name instead of TyCon despite
--- of what the type says. This is safe since
--- getUnique (tyCon) == getUniqe (tcName tyCon)
-type FamInstEnv = UniqDFM TyCon FamilyInstEnv  -- ^ Maps a family to its instances
-     -- See Note [FamInstEnv]
-     -- See Note [FamInstEnv determinism]
-
 type FamInstEnvs = (FamInstEnv, FamInstEnv)
      -- External package inst-env, Home-package inst-env
 
-newtype FamilyInstEnv
-  = FamIE [FamInst]     -- The instances for a particular family, in any order
+data FamInstEnv
+  = FamIE !Int !(RoughMap FamInst)
+     -- See Note [FamInstEnv]
+     -- See Note [FamInstEnv determinism]
 
-instance Outputable FamilyInstEnv where
-  ppr (FamIE fs) = text "FamIE" <+> vcat (map ppr fs)
 
--- | Index a 'FamInstEnv' by the name of the family.
-toNameInstEnv :: FamInstEnv -> UniqDFM Name FamilyInstEnv
-toNameInstEnv = unsafeCastUDFMKey
+instance Outputable FamInstEnv where
+  ppr (FamIE _ fs) = text "FamIE" <+> vcat (map ppr $ elemsRM fs)
+
+famInstEnvSize :: FamInstEnv -> Int
+famInstEnvSize (FamIE sz _) = sz
 
 -- | Create a 'FamInstEnv' from 'Name' indices.
-fromNameInstEnv :: UniqDFM Name FamilyInstEnv -> FamInstEnv
-fromNameInstEnv = unsafeCastUDFMKey
-
 -- INVARIANTS:
 --  * The fs_tvs are distinct in each FamInst
 --      of a range value of the map (so we can safely unify them)
@@ -385,14 +382,12 @@ emptyFamInstEnvs :: (FamInstEnv, FamInstEnv)
 emptyFamInstEnvs = (emptyFamInstEnv, emptyFamInstEnv)
 
 emptyFamInstEnv :: FamInstEnv
-emptyFamInstEnv = emptyUDFM
+emptyFamInstEnv = FamIE 0 emptyRM
 
 famInstEnvElts :: FamInstEnv -> [FamInst]
-famInstEnvElts fi = [elt | FamIE elts <- eltsUDFM fi, elt <- elts]
+famInstEnvElts (FamIE _ rm) = elemsRM rm
   -- See Note [FamInstEnv determinism]
 
-famInstEnvSize :: FamInstEnv -> Int
-famInstEnvSize = nonDetStrictFoldUDFM (\(FamIE elt) sum -> sum + length elt) 0
   -- It's OK to use nonDetStrictFoldUDFM here since we're just computing the
   -- size.
 
@@ -400,19 +395,23 @@ familyInstances :: (FamInstEnv, FamInstEnv) -> TyCon -> [FamInst]
 familyInstances (pkg_fie, home_fie) fam
   = get home_fie ++ get pkg_fie
   where
-    get env = case lookupUDFM env fam of
-                Just (FamIE insts) -> insts
-                Nothing                      -> []
+    get :: FamInstEnv -> [FamInst]
+    get (FamIE _ env) = lookupRM [KnownTc (tyConName fam)] env
+
+
+-- | Makes no particular effort to detect conflicts.
+unionFamInstEnv :: FamInstEnv -> FamInstEnv -> FamInstEnv
+unionFamInstEnv (FamIE sa a) (FamIE sb b) = FamIE (sa + sb) (a `unionRM` b)
 
 extendFamInstEnvList :: FamInstEnv -> [FamInst] -> FamInstEnv
 extendFamInstEnvList inst_env fis = foldl' extendFamInstEnv inst_env fis
 
 extendFamInstEnv :: FamInstEnv -> FamInst -> FamInstEnv
-extendFamInstEnv inst_env
+extendFamInstEnv (FamIE s inst_env)
                  ins_item@(FamInst {fi_fam = cls_nm})
-  = fromNameInstEnv $ addToUDFM_C add (toNameInstEnv inst_env) cls_nm (FamIE [ins_item])
+  = FamIE (s+1) $ insertRM rough_tmpl ins_item inst_env
   where
-    add (FamIE items) _ = FamIE (ins_item:items)
+    rough_tmpl = KnownTc cls_nm : fi_tcs ins_item
 
 {-
 ************************************************************************
@@ -777,9 +776,7 @@ lookupFamInstEnvByTyCon :: FamInstEnvs -> TyCon -> [FamInst]
 lookupFamInstEnvByTyCon (pkg_ie, home_ie) fam_tc
   = get pkg_ie ++ get home_ie
   where
-    get ie = case lookupUDFM ie fam_tc of
-               Nothing          -> []
-               Just (FamIE fis) -> fis
+    get (FamIE _ rm) = lookupRM [KnownTc (tyConName fam_tc)] rm
 
 -- | Look-up an instance for a type family applied to some types.
 lookupFamInstEnv
@@ -933,11 +930,17 @@ lookupFamInstEnvInjectivityConflicts
     ->  FamInstEnvs   -- all type instances seens so far
     ->  FamInst       -- new type instance that we're checking
     -> [CoAxBranch]   -- conflicting instance declarations
-lookupFamInstEnvInjectivityConflicts injList (pkg_ie, home_ie)
+lookupFamInstEnvInjectivityConflicts injList fam_inst_envs
                              fam_inst@(FamInst { fi_axiom = new_axiom })
+  | not $ isOpenFamilyTyCon fam
+  = []
+
+  | otherwise
   -- See Note [Verifying injectivity annotation]. This function implements
   -- check (1.B1) for open type families described there.
-  = lookup_inj_fam_conflicts home_ie ++ lookup_inj_fam_conflicts pkg_ie
+  = map (coAxiomSingleBranch . fi_axiom) $
+    filter isInjConflict $
+    familyInstances fam_inst_envs fam
     where
       fam        = famInstTyCon fam_inst
       new_branch = coAxiomSingleBranch new_axiom
@@ -949,12 +952,6 @@ lookupFamInstEnvInjectivityConflicts injList (pkg_ie, home_ie)
             injectiveBranches injList (coAxiomSingleBranch old_axiom) new_branch
           = False -- no conflict
           | otherwise = True
-
-      lookup_inj_fam_conflicts ie
-          | isOpenFamilyTyCon fam, Just (FamIE insts) <- lookupUDFM ie fam
-          = map (coAxiomSingleBranch . fi_axiom) $
-            filter isInjConflict insts
-          | otherwise = []
 
 
 --------------------------------------------------------------------------------
@@ -984,37 +981,47 @@ type MatchFun =  FamInst                -- The FamInst template
               -> [Type]                 -- Target to match against
               -> Maybe TCvSubst
 
+mapMaybe' :: Foldable f => (a -> Maybe b) -> f a -> [b]
+mapMaybe' f = foldr g []
+  where
+    g x rest
+      | Just y <- f x = y : rest
+      | otherwise     = rest
+
 lookup_fam_inst_env'          -- The worker, local to this module
     :: MatchFun
     -> FamInstEnv
     -> TyCon -> [Type]        -- What we are looking for
     -> [FamInstMatch]
-lookup_fam_inst_env' match_fun ie fam match_tys
+lookup_fam_inst_env' match_fun (FamIE _ ie) fam match_tys
   | isOpenFamilyTyCon fam
-  , Just (FamIE insts) <- lookupUDFM ie fam
-  = find insts    -- The common case
+  , let xs = (lookupRM' rough_tmpl ie)   -- The common case
+    -- Avoid doing any of the allocation below if there are no instances to look at.
+  , not $ null xs
+  = mapMaybe' f xs
   | otherwise = []
   where
+    rough_tmpl :: [RoughMatchTc]
+    rough_tmpl = KnownTc (tyConName fam) : map typeToRoughMatchTc match_tys
 
-    find [] = []
-    find (item@(FamInst { fi_tcs = mb_tcs, fi_tvs = tpl_tvs, fi_cvs = tpl_cvs
-                        , fi_tys = tpl_tys }) : rest)
+    f :: FamInst -> Maybe FamInstMatch
+    f item@(FamInst { fi_tcs = mb_tcs, fi_tvs = tpl_tvs, fi_cvs = tpl_cvs
+                        , fi_tys = tpl_tys })
         -- Fast check for no match, uses the "rough match" fields
       | instanceCantMatch rough_tcs mb_tcs
-      = find rest
+      = Nothing
 
         -- Proper check
       | Just subst <- match_fun item (mkVarSet tpl_tvs) tpl_tys match_tys1
-      = (FamInstMatch { fim_instance = item
-                      , fim_tys      = substTyVars subst tpl_tvs `chkAppend` match_tys2
-                      , fim_cos      = assert (all (isJust . lookupCoVar subst) tpl_cvs) $
-                                       substCoVars subst tpl_cvs
-                      })
-        : find rest
+      = Just (FamInstMatch { fim_instance = item
+                           , fim_tys      = substTyVars subst tpl_tvs `chkAppend` match_tys2
+                           , fim_cos      = assert (all (isJust . lookupCoVar subst) tpl_cvs) $
+                                            substCoVars subst tpl_cvs
+                           })
 
         -- No match => try next
       | otherwise
-      = find rest
+      = Nothing
       where
         (rough_tcs, match_tys1, match_tys2) = split_tys tpl_tys
 
