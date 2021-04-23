@@ -2322,6 +2322,62 @@ primop  CasAddrOp_Word "atomicCasWordAddr#" GenPrimOp
    with has_side_effects = True
         can_fail         = True
 
+primop  CasAddrOp_Word8 "atomicCasWord8Addr#" GenPrimOp
+   Addr# -> Word8# -> Word8# -> State# s -> (# State# s, Word8# #)
+   { Compare and swap on a 8 bit-sized and aligned memory location.
+
+     Use as: \s -> atomicCasWordAddr8# location expected desired s
+
+     This version always returns the old value read. This follows the normal
+     protocol for CAS operations (and matches the underlying instruction on
+     most architectures).
+
+     Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail         = True
+
+primop  CasAddrOp_Word16 "atomicCasWord16Addr#" GenPrimOp
+   Addr# -> Word16# -> Word16# -> State# s -> (# State# s, Word16# #)
+   { Compare and swap on a 16 bit-sized and aligned memory location.
+
+     Use as: \s -> atomicCasWordAddr16# location expected desired s
+
+     This version always returns the old value read. This follows the normal
+     protocol for CAS operations (and matches the underlying instruction on
+     most architectures).
+
+     Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail         = True
+
+primop  CasAddrOp_Word32 "atomicCasWord32Addr#" GenPrimOp
+   Addr# -> Word32# -> Word32# -> State# s -> (# State# s, Word32# #)
+   { Compare and swap on a 32 bit-sized and aligned memory location.
+
+     Use as: \s -> atomicCasWordAddr32# location expected desired s
+
+     This version always returns the old value read. This follows the normal
+     protocol for CAS operations (and matches the underlying instruction on
+     most architectures).
+
+     Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail         = True
+
+primop  CasAddrOp_Word64 "atomicCasWord64Addr#" GenPrimOp
+   Addr# -> WORD64 -> WORD64 -> State# s -> (# State# s, WORD64 #)
+   { Compare and swap on a 64 bit-sized and aligned memory location.
+
+     Use as: \s -> atomicCasWordAddr64# location expected desired s
+
+     This version always returns the old value read. This follows the normal
+     protocol for CAS operations (and matches the underlying instruction on
+     most architectures).
+
+     Implies a full memory barrier.}
+   with has_side_effects = True
+        can_fail         = True
+
 primop FetchAddAddrOp_Word "fetchAddWordAddr#" GenPrimOp
    Addr# -> Word# -> State# s -> (# State# s, Word# #)
    {Given an address, and a value to add,
