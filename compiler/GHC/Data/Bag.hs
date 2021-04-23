@@ -85,7 +85,7 @@ snocBag bag elt = bag `unionBags` (unitBag elt)
 
 isEmptyBag :: Bag a -> Bool
 isEmptyBag EmptyBag = True
-isEmptyBag _        = False -- NB invariants
+isEmptyBag _ = False
 
 isSingletonBag :: Bag a -> Bool
 isSingletonBag EmptyBag      = False

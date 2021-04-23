@@ -227,8 +227,9 @@ improveFromInstEnv inst_env mk_loc cls tys
   where
     (cls_tvs, cls_fds) = classTvsFds cls
     instances          = classInstances inst_env cls
-    rough_tcs          = roughMatchTcs tys
+    rough_tcs          = RM_KnownTc (className cls) : roughMatchTcs tys
     pred               = mkClassPred cls tys
+
 
 
 
@@ -673,8 +674,9 @@ trimRoughMatchTcs :: [TyVar] -> FunDep TyVar -> [RoughMatchTc] -> [RoughMatchTc]
 -- Hence, we Nothing-ise the tb and tc types right here
 --
 -- Result list is same length as input list, just with more Nothings
-trimRoughMatchTcs clas_tvs (ltvs, _) mb_tcs
-  = zipWith select clas_tvs mb_tcs
+trimRoughMatchTcs _clas_tvs _ [] = panic "trimRoughMatchTcs: nullary [RoughMatchTc]"
+trimRoughMatchTcs clas_tvs (ltvs, _) (cls:mb_tcs)
+  = cls : zipWith select clas_tvs mb_tcs
   where
     select clas_tv mb_tc | clas_tv `elem` ltvs = mb_tc
-                         | otherwise           = OtherTc
+                         | otherwise           = RM_WildCard

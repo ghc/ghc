@@ -15,7 +15,7 @@ module GHC.Core.FamInstEnv (
         mkImportedFamInst,
 
         FamInstEnvs, FamInstEnv, emptyFamInstEnv, emptyFamInstEnvs,
-        extendFamInstEnv, extendFamInstEnvList,
+        unionFamInstEnv, extendFamInstEnv, extendFamInstEnvList,
         famInstEnvElts, famInstEnvSize, familyInstances,
 
         -- * CoAxioms
@@ -46,10 +46,10 @@ import GHC.Core.TyCon
 import GHC.Core.Coercion
 import GHC.Core.Coercion.Axiom
 import GHC.Core.Reduction
+import GHC.Core.RoughMap
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Name
-import GHC.Types.Unique.DFM
 import GHC.Data.Maybe
 import GHC.Types.Var
 import GHC.Types.SrcLoc
@@ -61,6 +61,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
+import GHC.Data.Bag
 
 {-
 ************************************************************************
@@ -302,7 +303,17 @@ mkImportedFamInst fam mb_tcs axiom
 
 Note [FamInstEnv]
 ~~~~~~~~~~~~~~~~~
-A FamInstEnv maps a family name to the list of known instances for that family.
+A FamInstEnv is a RoughMap of instance heads. Specifically, the keys are formed
+by the family name and the instance arguments. That is, an instance:
+
+    type instance Fam (Maybe Int) a
+
+would insert into the instance environment an instance with a key of the form
+
+  [RM_KnownTc Fam, RM_KnownTc Maybe, RM_WildCard]
+
+See Note [RoughMap] in GHC.Core.RoughMap.
+
 
 The same FamInstEnv includes both 'data family' and 'type family' instances.
 Type families are reduced during type inference, but not data families;
@@ -350,30 +361,24 @@ UniqFM and UniqDFM.
 See Note [Deterministic UniqFM].
 -}
 
--- Internally we sometimes index by Name instead of TyCon despite
--- of what the type says. This is safe since
--- getUnique (tyCon) == getUniqe (tcName tyCon)
-type FamInstEnv = UniqDFM TyCon FamilyInstEnv  -- Maps a family to its instances
-     -- See Note [FamInstEnv]
-     -- See Note [FamInstEnv determinism]
-
 type FamInstEnvs = (FamInstEnv, FamInstEnv)
      -- External package inst-env, Home-package inst-env
 
-newtype FamilyInstEnv
-  = FamIE [FamInst]     -- The instances for a particular family, in any order
+data FamInstEnv
+  = FamIE !Int -- The number of instances, used to choose the smaller environment
+               -- when checking type family consistnecy of home modules.
+          !(RoughMap FamInst)
+     -- See Note [FamInstEnv]
+     -- See Note [FamInstEnv determinism]
 
-instance Outputable FamilyInstEnv where
-  ppr (FamIE fs) = text "FamIE" <+> vcat (map ppr fs)
 
--- | Index a FamInstEnv by the tyCons name.
-toNameInstEnv :: FamInstEnv -> UniqDFM Name FamilyInstEnv
-toNameInstEnv = unsafeCastUDFMKey
+instance Outputable FamInstEnv where
+  ppr (FamIE _ fs) = text "FamIE" <+> vcat (map ppr $ elemsRM fs)
 
--- | Create a FamInstEnv from Name indices.
-fromNameInstEnv :: UniqDFM Name FamilyInstEnv -> FamInstEnv
-fromNameInstEnv = unsafeCastUDFMKey
+famInstEnvSize :: FamInstEnv -> Int
+famInstEnvSize (FamIE sz _) = sz
 
+-- | Create a 'FamInstEnv' from 'Name' indices.
 -- INVARIANTS:
 --  * The fs_tvs are distinct in each FamInst
 --      of a range value of the map (so we can safely unify them)
@@ -382,14 +387,12 @@ emptyFamInstEnvs :: (FamInstEnv, FamInstEnv)
 emptyFamInstEnvs = (emptyFamInstEnv, emptyFamInstEnv)
 
 emptyFamInstEnv :: FamInstEnv
-emptyFamInstEnv = emptyUDFM
+emptyFamInstEnv = FamIE 0 emptyRM
 
 famInstEnvElts :: FamInstEnv -> [FamInst]
-famInstEnvElts fi = [elt | FamIE elts <- eltsUDFM fi, elt <- elts]
+famInstEnvElts (FamIE _ rm) = elemsRM rm
   -- See Note [FamInstEnv determinism]
 
-famInstEnvSize :: FamInstEnv -> Int
-famInstEnvSize = nonDetStrictFoldUDFM (\(FamIE elt) sum -> sum + length elt) 0
   -- It's OK to use nonDetStrictFoldUDFM here since we're just computing the
   -- size.
 
@@ -397,19 +400,23 @@ familyInstances :: (FamInstEnv, FamInstEnv) -> TyCon -> [FamInst]
 familyInstances (pkg_fie, home_fie) fam
   = get home_fie ++ get pkg_fie
   where
-    get env = case lookupUDFM env fam of
-                Just (FamIE insts) -> insts
-                Nothing                      -> []
+    get :: FamInstEnv -> [FamInst]
+    get (FamIE _ env) = lookupRM [RML_KnownTc (tyConName fam)] env
+
+
+-- | Makes no particular effort to detect conflicts.
+unionFamInstEnv :: FamInstEnv -> FamInstEnv -> FamInstEnv
+unionFamInstEnv (FamIE sa a) (FamIE sb b) = FamIE (sa + sb) (a `unionRM` b)
 
 extendFamInstEnvList :: FamInstEnv -> [FamInst] -> FamInstEnv
 extendFamInstEnvList inst_env fis = foldl' extendFamInstEnv inst_env fis
 
 extendFamInstEnv :: FamInstEnv -> FamInst -> FamInstEnv
-extendFamInstEnv inst_env
+extendFamInstEnv (FamIE s inst_env)
                  ins_item@(FamInst {fi_fam = cls_nm})
-  = fromNameInstEnv $ addToUDFM_C add (toNameInstEnv inst_env) cls_nm (FamIE [ins_item])
+  = FamIE (s+1) $ insertRM rough_tmpl ins_item inst_env
   where
-    add (FamIE items) _ = FamIE (ins_item:items)
+    rough_tmpl = RM_KnownTc cls_nm : fi_tcs ins_item
 
 {-
 ************************************************************************
@@ -774,9 +781,7 @@ lookupFamInstEnvByTyCon :: FamInstEnvs -> TyCon -> [FamInst]
 lookupFamInstEnvByTyCon (pkg_ie, home_ie) fam_tc
   = get pkg_ie ++ get home_ie
   where
-    get ie = case lookupUDFM ie fam_tc of
-               Nothing          -> []
-               Just (FamIE fis) -> fis
+    get (FamIE _ rm) = lookupRM [RML_KnownTc (tyConName fam_tc)] rm
 
 lookupFamInstEnv
     :: FamInstEnvs
@@ -785,14 +790,12 @@ lookupFamInstEnv
 -- Precondition: the tycon is saturated (or over-saturated)
 
 lookupFamInstEnv
-   = lookup_fam_inst_env match
-   where
-     match _ _ tpl_tys tys = tcMatchTys tpl_tys tys
+   = lookup_fam_inst_env WantMatches
 
 lookupFamInstEnvConflicts
     :: FamInstEnvs
     -> FamInst          -- Putative new instance
-    -> [FamInstMatch]   -- Conflicting matches (don't look at the fim_tys field)
+    -> [FamInst]   -- Conflicting matches (don't look at the fim_tys field)
 -- E.g. when we are about to add
 --    f : type instance F [a] = a->a
 -- we do (lookupFamInstConflicts f [b])
@@ -800,25 +803,10 @@ lookupFamInstEnvConflicts
 --
 -- Precondition: the tycon is saturated (or over-saturated)
 
-lookupFamInstEnvConflicts envs fam_inst@(FamInst { fi_axiom = new_axiom })
-  = lookup_fam_inst_env my_unify envs fam tys
+lookupFamInstEnvConflicts envs fam_inst
+  = lookup_fam_inst_env (WantConflicts fam_inst) envs fam tys
   where
     (fam, tys) = famInstSplitLHS fam_inst
-        -- In example above,   fam tys' = F [b]
-
-    my_unify (FamInst { fi_axiom = old_axiom }) tpl_tvs tpl_tys _
-       = assertPpr (tyCoVarsOfTypes tys `disjointVarSet` tpl_tvs)
-                   ((ppr fam <+> ppr tys) $$
-                    (ppr tpl_tvs <+> ppr tpl_tys)) $
-                -- Unification will break badly if the variables overlap
-                -- They shouldn't because we allocate separate uniques for them
-         if compatibleBranches (coAxiomSingleBranch old_axiom) new_branch
-           then Nothing
-           else Just noSubst
-      -- See Note [Family instance overlap conflicts]
-
-    noSubst = panic "lookupFamInstEnvConflicts noSubst"
-    new_branch = coAxiomSingleBranch new_axiom
 
 --------------------------------------------------------------------------------
 --                 Type family injectivity checking bits                      --
@@ -927,11 +915,17 @@ lookupFamInstEnvInjectivityConflicts
     ->  FamInstEnvs   -- all type instances seens so far
     ->  FamInst       -- new type instance that we're checking
     -> [CoAxBranch]   -- conflicting instance declarations
-lookupFamInstEnvInjectivityConflicts injList (pkg_ie, home_ie)
+lookupFamInstEnvInjectivityConflicts injList fam_inst_envs
                              fam_inst@(FamInst { fi_axiom = new_axiom })
+  | not $ isOpenFamilyTyCon fam
+  = []
+
+  | otherwise
   -- See Note [Verifying injectivity annotation]. This function implements
   -- check (1.B1) for open type families described there.
-  = lookup_inj_fam_conflicts home_ie ++ lookup_inj_fam_conflicts pkg_ie
+  = map (coAxiomSingleBranch . fi_axiom) $
+    filter isInjConflict $
+    familyInstances fam_inst_envs fam
     where
       fam        = famInstTyCon fam_inst
       new_branch = coAxiomSingleBranch new_axiom
@@ -943,12 +937,6 @@ lookupFamInstEnvInjectivityConflicts injList (pkg_ie, home_ie)
             injectiveBranches injList (coAxiomSingleBranch old_axiom) new_branch
           = False -- no conflict
           | otherwise = True
-
-      lookup_inj_fam_conflicts ie
-          | isOpenFamilyTyCon fam, Just (FamIE insts) <- lookupUDFM ie fam
-          = map (coAxiomSingleBranch . fi_axiom) $
-            filter isInjConflict insts
-          | otherwise = []
 
 
 --------------------------------------------------------------------------------
@@ -973,46 +961,61 @@ Note [Family instance overlap conflicts]
 
 ------------------------------------------------------------
 -- Might be a one-way match or a unifier
-type MatchFun =  FamInst                -- The FamInst template
-              -> TyVarSet -> [Type]     --   fi_tvs, fi_tys of that FamInst
-              -> [Type]                 -- Target to match against
-              -> Maybe TCvSubst
+data FamInstLookupMode a where
+  -- The FamInst we are trying to find conflicts against
+  WantConflicts :: FamInst -> FamInstLookupMode FamInst
+  WantMatches  :: FamInstLookupMode FamInstMatch
 
 lookup_fam_inst_env'          -- The worker, local to this module
-    :: MatchFun
+    :: forall a . FamInstLookupMode a
     -> FamInstEnv
     -> TyCon -> [Type]        -- What we are looking for
-    -> [FamInstMatch]
-lookup_fam_inst_env' match_fun ie fam match_tys
+    -> [a]
+lookup_fam_inst_env' lookup_mode (FamIE _ ie) fam match_tys
   | isOpenFamilyTyCon fam
-  , Just (FamIE insts) <- lookupUDFM ie fam
-  = find insts    -- The common case
+  , let xs = rm_fun (lookupRM' rough_tmpl ie)   -- The common case
+    -- Avoid doing any of the allocation below if there are no instances to look at.
+  , not $ null xs
+  = mapMaybe' check_fun xs
   | otherwise = []
   where
+    rough_tmpl :: [RoughMatchLookupTc]
+    rough_tmpl = RML_KnownTc (tyConName fam) : map typeToRoughMatchLookupTc match_tys
 
-    find [] = []
-    find (item@(FamInst { fi_tcs = mb_tcs, fi_tvs = tpl_tvs, fi_cvs = tpl_cvs
-                        , fi_tys = tpl_tys }) : rest)
-        -- Fast check for no match, uses the "rough match" fields
-      | instanceCantMatch rough_tcs mb_tcs
-      = find rest
+    rm_fun :: (Bag FamInst, [FamInst]) -> [FamInst]
+    (rm_fun, check_fun) = case lookup_mode of
+                            WantConflicts fam_inst -> (snd, unify_fun fam_inst)
+                            WantMatches -> (bagToList . fst, match_fun)
 
-        -- Proper check
-      | Just subst <- match_fun item (mkVarSet tpl_tvs) tpl_tys match_tys1
-      = (FamInstMatch { fim_instance = item
-                      , fim_tys      = substTyVars subst tpl_tvs `chkAppend` match_tys2
-                      , fim_cos      = assert (all (isJust . lookupCoVar subst) tpl_cvs) $
-                                       substCoVars subst tpl_cvs
-                      })
-        : find rest
+    -- Function used for finding unifiers
+    unify_fun orig_fam_inst item@(FamInst { fi_axiom = old_axiom, fi_tys = tpl_tys, fi_tvs = tpl_tvs })
 
-        -- No match => try next
-      | otherwise
-      = find rest
+       = assertPpr (tyCoVarsOfTypes tys `disjointVarSet` mkVarSet tpl_tvs)
+                   ((ppr fam <+> ppr tys) $$
+                    (ppr tpl_tvs <+> ppr tpl_tys)) $
+                -- Unification will break badly if the variables overlap
+                -- They shouldn't because we allocate separate uniques for them
+         if compatibleBranches (coAxiomSingleBranch old_axiom) new_branch
+           then Nothing
+           else Just item
+      -- See Note [Family instance overlap conflicts]
       where
-        (rough_tcs, match_tys1, match_tys2) = split_tys tpl_tys
+        new_branch = coAxiomSingleBranch (famInstAxiom orig_fam_inst)
+        (fam, tys) = famInstSplitLHS orig_fam_inst
 
-      -- Precondition: the tycon is saturated (or over-saturated)
+    -- Function used for checking matches
+    match_fun item@(FamInst { fi_tvs = tpl_tvs, fi_cvs = tpl_cvs
+                            , fi_tys = tpl_tys }) =  do
+      subst <- tcMatchTys tpl_tys match_tys1
+      return (FamInstMatch { fim_instance = item
+                             , fim_tys      = substTyVars subst tpl_tvs `chkAppend` match_tys2
+                             , fim_cos      = assert (all (isJust . lookupCoVar subst) tpl_cvs) $
+                                               substCoVars subst tpl_cvs
+                             })
+        where
+          (match_tys1, match_tys2) = split_tys tpl_tys
+
+    -- Precondition: the tycon is saturated (or over-saturated)
 
     -- Deal with over-saturation
     -- See Note [Over-saturated matches]
@@ -1022,18 +1025,17 @@ lookup_fam_inst_env' match_fun ie fam match_tys
 
       | otherwise
       = let (match_tys1, match_tys2) = splitAtList tpl_tys match_tys
-            rough_tcs = roughMatchTcs match_tys1
-        in (rough_tcs, match_tys1, match_tys2)
+        in (match_tys1, match_tys2)
 
     (pre_match_tys1, pre_match_tys2) = splitAt (tyConArity fam) match_tys
     pre_rough_split_tys
-      = (roughMatchTcs pre_match_tys1, pre_match_tys1, pre_match_tys2)
+      = (pre_match_tys1, pre_match_tys2)
 
 lookup_fam_inst_env           -- The worker, local to this module
-    :: MatchFun
+    :: FamInstLookupMode a
     -> FamInstEnvs
     -> TyCon -> [Type]        -- What we are looking for
-    -> [FamInstMatch]         -- Successful matches
+    -> [a]         -- Successful matches
 
 -- Precondition: the tycon is saturated (or over-saturated)
 

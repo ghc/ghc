@@ -1,4 +1,4 @@
-Found 285 GHC.Parser module dependencies
+Found 286 GHC.Parser module dependencies
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
 GHC.Builtin.PrimOps.Ids
@@ -43,6 +43,7 @@ GHC.Core.PatSyn
 GHC.Core.Ppr
 GHC.Core.Predicate
 GHC.Core.Reduction
+GHC.Core.RoughMap
 GHC.Core.Rules
 GHC.Core.Seq
 GHC.Core.SimpleOpt

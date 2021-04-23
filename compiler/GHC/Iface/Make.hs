@@ -282,7 +282,7 @@ mkIface_ hsc_env
           -- See Note [Deterministic UniqFM] in GHC.Types.Unique.DFM for more details.
         warns       = src_warns
         iface_rules = map coreRuleToIfaceRule rules
-        iface_insts = map instanceToIfaceInst $ fixSafeInstances safe_mode insts
+        iface_insts = map instanceToIfaceInst $ fixSafeInstances safe_mode (instEnvElts insts)
         iface_fam_insts = map famInstToIfaceFamInst fam_insts
         trust_info  = setSafeMode safe_mode
         annotations = map mkIfaceAnnotation anns
@@ -700,7 +700,9 @@ instanceToIfaceInst (ClsInst { is_dfun = dfun_id, is_flag = oflag
     IfaceClsInst { ifDFun     = idName dfun_id
                  , ifOFlag    = oflag
                  , ifInstCls  = cls_name
-                 , ifInstTys  = ifaceRoughMatchTcs rough_tcs
+                 , ifInstTys  = ifaceRoughMatchTcs $ tail rough_tcs
+                   -- N.B. Drop the class name from the rough match template
+                   --      It is put back by GHC.Core.InstEnv.mkImportedInstance
                  , ifInstOrph = orph }
 
 --------------------------
@@ -728,8 +730,8 @@ famInstToIfaceFamInst (FamInst { fi_axiom    = axiom,
 ifaceRoughMatchTcs :: [RoughMatchTc] -> [Maybe IfaceTyCon]
 ifaceRoughMatchTcs tcs = map do_rough tcs
   where
-    do_rough OtherTc     = Nothing
-    do_rough (KnownTc n) = Just (toIfaceTyCon_name n)
+    do_rough RM_WildCard     = Nothing
+    do_rough (RM_KnownTc n) = Just (toIfaceTyCon_name n)
 
 --------------------------
 coreRuleToIfaceRule :: CoreRule -> IfaceRule

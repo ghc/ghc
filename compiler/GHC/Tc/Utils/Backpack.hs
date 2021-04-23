@@ -146,7 +146,7 @@ checkHsigIface tcg_env gr sig_iface
                         tcg_fam_inst_env = emptyFamInstEnv,
                         tcg_insts = [],
                         tcg_fam_insts = [] } $ do
-    mapM_ check_inst sig_insts
+    mapM_ check_inst (instEnvElts sig_insts)
     failIfErrsM
   where
     -- NB: the Names in sig_type_env are bogus.  Let's say we have H.hsig
@@ -156,7 +156,7 @@ checkHsigIface tcg_env gr sig_iface
     sig_type_occ_env = mkOccEnv
                      . map (\t -> (nameOccName (getName t), t))
                      $ nonDetNameEnvElts sig_type_env
-    dfun_names = map getName sig_insts
+    dfun_names = map getName (instEnvElts sig_insts)
     check_export name
       -- Skip instances, we'll check them later
       -- TODO: Actually this should never happen, because DFuns are
@@ -865,7 +865,7 @@ mergeSignatures
                 = (inst:insts, extendInstEnv inst_env inst)
             (insts, inst_env) = foldl' merge_inst
                                     (tcg_insts tcg_env, tcg_inst_env tcg_env)
-                                    (md_insts details)
+                                    (instEnvElts $ md_insts details)
             -- This is a HACK to prevent calculateAvails from including imp_mod
             -- in the listing.  We don't want it because a module is NOT
             -- supposed to include itself in its dep_orphs/dep_finsts.  See #13214

@@ -21,6 +21,6 @@ annfail10.hs:9:11: error:
         instance Num Integer -- Defined in ‘GHC.Num’
         instance Num Double -- Defined in ‘GHC.Float’
         ...plus three others
-        ...plus 19 instances involving out-of-scope types
+        ...plus one instance involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the annotation: {-# ANN f 1 #-}

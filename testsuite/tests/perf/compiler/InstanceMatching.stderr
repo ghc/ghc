@@ -1,0 +1,5 @@
+
+Match.hs:1006:1: error:
+    • No instance for (Show (F001 a)) arising from a use of ‘showsPrec’
+    • In the first argument of ‘(.)’, namely ‘(showsPrec 11 b1)’
+      In the second argument of ‘(.)’, namely

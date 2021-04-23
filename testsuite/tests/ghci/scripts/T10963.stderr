@@ -7,6 +7,6 @@
         instance Num Integer -- Defined in ‘GHC.Num’
         instance Num Double -- Defined in ‘GHC.Float’
         ...plus three others
-        ...plus 8 instances involving out-of-scope types
+        ...plus one instance involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the expression: foo

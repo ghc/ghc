@@ -455,6 +455,7 @@ See also:
   type; but it too is eta-reduced.
 * Note [Implementing eta reduction for data families] in "GHC.Tc.TyCl.Instance". This
   describes the implementation details of this eta reduction happen.
+* Note [RoughMap and rm_empty] for how this complicates the RoughMap implementation slightly.
 -}
 
 instance Eq (CoAxiom br) where

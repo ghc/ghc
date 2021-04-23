@@ -116,9 +116,9 @@ import GHC.Unit.Env
 import GHC.Unit.Finder
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Module.ModIface
-import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module.Graph
 import GHC.Unit.Home.ModInfo
+import GHC.Unit.Module.ModDetails
 
 import Data.Either ( rights, partitionEithers, lefts )
 import qualified Data.Map as Map

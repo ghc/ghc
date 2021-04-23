@@ -1897,7 +1897,7 @@ mkDictErr ctxt cts
     is_no_inst (ct, (matches, unifiers, _))
       =  no_givens
       && null matches
-      && (null unifiers || all (not . isAmbiguousTyVar) (tyCoVarsOfCtList ct))
+      && (nullUnifiers unifiers || all (not . isAmbiguousTyVar) (tyCoVarsOfCtList ct))
 
     lookup_cls_inst inst_envs ct
       = (ct, lookupInstEnv True inst_envs clas tys)
@@ -1988,13 +1988,13 @@ mk_dict_err ctxt (ct, (matches, unifiers, unsafe_overlapped))
 
     cannot_resolve_msg :: Ct -> [ClsInst] -> RelevantBindings -> [ImportError] -> [GhcHint] -> TcReportMsg
     cannot_resolve_msg ct candidate_insts binds imp_errs field_suggestions
-      = CannotResolveInstance ct unifiers candidate_insts imp_errs field_suggestions binds
+      = CannotResolveInstance ct (getPotentialUnifiers unifiers) candidate_insts imp_errs field_suggestions binds
 
     -- Overlap errors.
     overlap_msg, safe_haskell_msg :: TcReportMsg
     -- Normal overlap error
     overlap_msg
-      = assert (not (null matches)) $ OverlappingInstances ct ispecs unifiers
+      = assert (not (null matches)) $ OverlappingInstances ct ispecs (getPotentialUnifiers unifiers)
 
     -- Overlap error because of Safe Haskell (first
     -- match should be the most specific match)

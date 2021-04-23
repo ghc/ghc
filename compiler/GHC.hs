@@ -1249,7 +1249,7 @@ typecheckModule pmod = do
            minf_type_env  = md_types details,
            minf_exports   = md_exports details,
            minf_rdr_env   = Just (tcg_rdr_env tc_gbl_env),
-           minf_instances = fixSafeInstances safe $ md_insts details,
+           minf_instances = fixSafeInstances safe $ instEnvElts $ md_insts details,
            minf_iface     = Nothing,
            minf_safe      = safe,
            minf_modBreaks = emptyModBreaks
@@ -1387,7 +1387,8 @@ getBindings = withSession $ \hsc_env ->
 -- | Return the instances for the current interactive session.
 getInsts :: GhcMonad m => m ([ClsInst], [FamInst])
 getInsts = withSession $ \hsc_env ->
-    return $ ic_instances (hsc_IC hsc_env)
+    let (inst_env, fam_env) = ic_instances (hsc_IC hsc_env)
+    in return (instEnvElts inst_env, fam_env)
 
 getPrintUnqual :: GhcMonad m => m PrintUnqualified
 getPrintUnqual = withSession $ \hsc_env -> do
@@ -1466,7 +1467,7 @@ getHomeModuleInfo hsc_env mdl =
                         minf_type_env  = md_types details,
                         minf_exports   = md_exports details,
                         minf_rdr_env   = mi_globals $! hm_iface hmi,
-                        minf_instances = md_insts details,
+                        minf_instances = instEnvElts $ md_insts details,
                         minf_iface     = Just iface,
                         minf_safe      = getSafeMode $ mi_trust iface
                        ,minf_modBreaks = getModBreaks hmi

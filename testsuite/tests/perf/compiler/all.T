@@ -282,6 +282,7 @@ test('MultiLayerModules',
      multimod_compile,
      ['MultiLayerModules', '-v0'])
 
+
 # MultiLayerModules flip flops by 2.5%, depending on the
 # number of modules within GHC (#19293). Just widen the
 # acceptance window until we figured out how to fix it.
@@ -333,6 +334,30 @@ test('MultiLayerModulesDefsGhci',
      ],
      ghci_script,
      ['MultiLayerModulesDefsGhci.script'])
+
+test('InstanceMatching',
+     [ collect_compiler_stats('bytes allocated',3),
+       pre_cmd('$MAKE -s --no-print-directory InstanceMatching'),
+       extra_files(['genMatchingTest']),
+       compile_timeout_multiplier(5),
+       grep_errmsg('F001')],
+     multimod_compile_fail,
+     ['Match', '-fno-code -fwrite-interface -v0'])
+
+# This module stresses the KnownTC and NoKnownTC (skolem variable) cases
+test('InstanceMatching1',
+     [ collect_compiler_stats('bytes allocated',3),
+       pre_cmd('./genMatchingTest 1'),
+       extra_files(['genMatchingTest']),
+       compile_timeout_multiplier(5)
+       # this is _a lot_
+       # but this test has been failing every now and then,
+       # especially on i386. Let's just give it some room
+       # to complete successfully reliably everywhere.
+     ],
+     multimod_compile,
+     ['Defs', '-fno-code -fwrite-interface -v0'])
+
 
 test('MultiLayerModulesNoCode',
      [ collect_compiler_residency(15),
@@ -558,7 +583,7 @@ test('hard_hole_fits', # Testing multiple hole-fits with lots in scope for #1687
 test('T16875',  # Testing one hole-fit with a lot in scope for #16875
      collect_compiler_stats('bytes allocated', 2),
      compile, ['-fdefer-type-errors -fno-max-valid-hole-fits -package ghc'])
-test ('T20261', 
+test ('T20261',
       [collect_compiler_stats('all')],
       compile,
       [''])

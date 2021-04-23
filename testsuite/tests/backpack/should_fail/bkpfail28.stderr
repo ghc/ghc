@@ -9,9 +9,9 @@
 bkpfail28.bkp:19:13: error:
     • Overlapping instances for Show (K a) arising from a use of ‘show’
       Matching instances:
-        instance [safe] Show a => Show (K a)
-          -- Defined at bkpfail28.bkp:12:18
         instance [safe] Read a => Show (K a)
+          -- Defined at bkpfail28.bkp:12:18
+        instance [safe] Show a => Show (K a)
           -- Defined at bkpfail28.bkp:12:18
     • In the expression: show
       In an equation for ‘f’: f = show
@@ -19,9 +19,9 @@ bkpfail28.bkp:19:13: error:
 bkpfail28.bkp:21:13: error:
     • Overlapping instances for Show (K a) arising from a use of ‘show’
       Matching instances:
-        instance [safe] Show a => Show (K a)
-          -- Defined at bkpfail28.bkp:12:18
         instance [safe] Read a => Show (K a)
+          -- Defined at bkpfail28.bkp:12:18
+        instance [safe] Show a => Show (K a)
           -- Defined at bkpfail28.bkp:12:18
     • In the expression: show
       In an equation for ‘g’: g = show
