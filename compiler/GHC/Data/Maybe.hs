@@ -26,10 +26,11 @@ module GHC.Data.Maybe (
     ) where
 
 import GHC.Prelude
+import GHC.IO (catchException)
 
 import Control.Monad
 import Control.Monad.Trans.Maybe
-import Control.Exception (catch, SomeException(..))
+import Control.Exception (SomeException(..))
 import Data.Maybe
 import Data.Foldable ( foldlM )
 import GHC.Utils.Misc (HasCallStack)
@@ -93,7 +94,7 @@ liftMaybeT act = MaybeT $ Just `liftM` act
 
 -- | Try performing an 'IO' action, failing on error.
 tryMaybeT :: IO a -> MaybeT IO a
-tryMaybeT action = MaybeT $ catch (Just `fmap` action) handler
+tryMaybeT action = MaybeT $ catchException (Just `fmap` action) handler
   where
     handler (SomeException _) = return Nothing
 
