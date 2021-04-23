@@ -869,6 +869,14 @@ emitPrimOp dflags primop = case primop of
     emitPrimCall [res] (MO_Cmpxchg (wordWidth platform)) [dst, expected, new]
   CasAddrOp_Word -> \[dst, expected, new] -> opIntoRegs $ \[res] ->
     emitPrimCall [res] (MO_Cmpxchg (wordWidth platform)) [dst, expected, new]
+  CasAddrOp_Word8 -> \[dst, expected, new] -> opIntoRegs $ \[res] ->
+    emitPrimCall [res] (MO_Cmpxchg W8) [dst, expected, new]
+  CasAddrOp_Word16 -> \[dst, expected, new] -> opIntoRegs $ \[res] ->
+    emitPrimCall [res] (MO_Cmpxchg W16) [dst, expected, new]
+  CasAddrOp_Word32 -> \[dst, expected, new] -> opIntoRegs $ \[res] ->
+    emitPrimCall [res] (MO_Cmpxchg W32) [dst, expected, new]
+  CasAddrOp_Word64 -> \[dst, expected, new] -> opIntoRegs $ \[res] ->
+    emitPrimCall [res] (MO_Cmpxchg W64) [dst, expected, new]
 
 -- SIMD primops
   (VecBroadcastOp vcat n w) -> \[e] -> opIntoRegs $ \[res] -> do
