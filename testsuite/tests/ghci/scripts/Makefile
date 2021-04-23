@@ -66,3 +66,7 @@ T11389:
 T12023:
 	-'$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) \
 	    -ghci-script T12023.script < /dev/null | grep -c -E '(~#|~R#|~P#)'
+
+.PHONY: T19650_setup
+T19650_setup:
+	'$(GHC_PKG)' latest base > my_package_env

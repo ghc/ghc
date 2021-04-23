@@ -536,6 +536,10 @@ or ``ghci`` that are local to a shell session or to some file system location.
 They are intended to be managed by build/package tools, to enable ``ghc`` and
 ``ghci`` to automatically use an environment created by the tool.
 
+In the case of ``ghci``, the environment file will be read once, during
+initialisation. If the file changes then you have to restart GHCi to reflect
+the updated file.
+
 The file contains package IDs and optionally package databases, one directive
 per line:
 

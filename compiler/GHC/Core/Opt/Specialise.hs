@@ -2528,7 +2528,7 @@ pragma made the program slower!  The reason was that the specialised
 function $sinsertWith arising from the pragma looked rather like `f`
 above, and failed to specialise a call in its body like wimwam.
 Without the pragma, the original call to `insertWith` was completely
-monomorpic, and speciased in one go.
+monomorphic, and specialised in one go.
 -}
 
 instance Outputable DictBind where

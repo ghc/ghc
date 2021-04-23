@@ -37,9 +37,8 @@ import qualified GHC.Types.Name.Occurrence as OccName (OccName(..),pprNameSpaceB
 import Control.Arrow
 
 import qualified Data.Map as Map
-import qualified Data.Set as Set
 import Data.Data hiding ( Fixity )
-import Data.List (foldl', sortBy, elemIndex)
+import Data.List (sortBy, elemIndex)
 
 import Debug.Trace
 import Types
@@ -82,7 +81,9 @@ warn c _ = c
 
 -- | A good delta has no negative values.
 isGoodDelta :: DeltaPos -> Bool
-isGoodDelta (DP ro co) = ro >= 0 && co >= 0
+isGoodDelta (SameLine co) = co >= 0
+isGoodDelta (DifferentLine ro co) = ro > 0 && co >= 0
+  -- Note: DifferentLine invariant is ro is nonzero and positive
 
 
 -- | Create a delta from the current position to the start of the given
@@ -116,7 +117,7 @@ ss2deltaStart rrs ss = ss2delta ref ss
 -- | Convert the start of the second @Pos@ to be an offset from the
 -- first. The assumption is the reference starts before the second @Pos@
 pos2delta :: Pos -> Pos -> DeltaPos
-pos2delta (refl,refc) (l,c) = DP lo co
+pos2delta (refl,refc) (l,c) = deltaPos lo co
   where
     lo = l - refl
     co = if lo == 0 then c - refc
@@ -125,14 +126,15 @@ pos2delta (refl,refc) (l,c) = DP lo co
 -- | Apply the delta to the current position, taking into account the
 -- current column offset if advancing to a new line
 undelta :: Pos -> DeltaPos -> LayoutStartCol -> Pos
-undelta (l,c) (DP dl dc) (LayoutStartCol co) = (fl,fc)
+undelta (l,c) (SameLine dc)         (LayoutStartCol _co) = (l, c + dc)
+undelta (l,_) (DifferentLine dl dc) (LayoutStartCol co) = (fl,fc)
   where
+    -- Note: invariant: dl > 0
     fl = l + dl
-    fc = if dl == 0 then c  + dc
-                    else co + dc
+    fc = co + dc
 
 undeltaSpan :: RealSrcSpan -> AnnKeywordId -> DeltaPos -> AddEpAnn
-undeltaSpan anchor kw dp = AddEpAnn kw (AR sp)
+undeltaSpan anchor kw dp = AddEpAnn kw (EpaSpan sp)
   where
     (l,c) = undelta (ss2pos anchor) dp (LayoutStartCol 0)
     len = length (keywordToString (G kw))
@@ -144,41 +146,16 @@ undeltaSpan anchor kw dp = AddEpAnn kw (AR sp)
 -- > DP (0, 9) `addDP` DP (1, 5) == DP (1, 5)
 -- > DP (1, 4) `addDP` DP (1, 3) == DP (2, 3)
 addDP :: DeltaPos -> DeltaPos -> DeltaPos
-addDP (DP a b) (DP c d) =
-  if c >= 1 then DP (a+c) d
-            else DP a     (b+d)
-
--- | "Subtract" two @DeltaPos@ from each other, in the sense of calculating the
--- remaining delta for the second after the first has been applied.
--- invariant : if c = a `addDP` b
---             then a `stepDP` c == b
---
--- Cases where first DP is <= than second
--- > DP (0, 1) `addDP` DP (0, 2) == DP (0, 1)
--- > DP (1, 1) `addDP` DP (2, 0) == DP (1, 0)
--- > DP (1, 3) `addDP` DP (1, 4) == DP (0, 1)
--- > DP (1, 4) `addDP` DP (1, 4) == DP (1, 4)
---
--- Cases where first DP is > than second
--- > DP (0,  3) `addDP` DP (0, 2) == DP (0,1)  -- advance one at least
--- > DP (3,  3) `addDP` DP (2, 4) == DP (1, 4) -- go one line forward and to expected col
--- > DP (3,  3) `addDP` DP (0, 4) == DP (0, 1) -- maintain col delta at least
--- > DP (1, 21) `addDP` DP (1, 4) == DP (1, 4) -- go one line forward and to expected col
-stepDP :: DeltaPos -> DeltaPos -> DeltaPos
-stepDP (DP a b) (DP c d)
-  | (a,b) == (c,d) = DP a b
-  | a == c = if b < d then DP 0 (d - b)
-                      else if d == 0
-                             then DP 1 0
-                             else DP c d
-  | a < c = DP (c - a) d
-  | otherwise = DP 1 d
+addDP dp (DifferentLine c d) = DifferentLine (getDeltaLine dp+c) d
+addDP (DifferentLine a b) (SameLine  d) = DifferentLine a (b+d)
+addDP (SameLine b)        (SameLine  d) = SameLine (b+d)
 
 -- ---------------------------------------------------------------------
 
 adjustDeltaForOffset :: Int -> LayoutStartCol -> DeltaPos -> DeltaPos
-adjustDeltaForOffset _ _colOffset                      dp@(DP 0 _) = dp -- same line
-adjustDeltaForOffset d (LayoutStartCol colOffset) (DP l c) = DP l (c - colOffset - d)
+adjustDeltaForOffset _ _colOffset                      dp@(SameLine _) = dp
+adjustDeltaForOffset d (LayoutStartCol colOffset) (DifferentLine l c)
+  = DifferentLine l (c - colOffset - d)
 
 -- ---------------------------------------------------------------------
 
@@ -283,10 +260,10 @@ normaliseCommentText ('\r':xs) = normaliseCommentText xs
 normaliseCommentText (x:xs) = x:normaliseCommentText xs
 
 -- | Makes a comment which originates from a specific keyword.
-mkKWComment :: AnnKeywordId -> EpaAnchor -> Comment
-mkKWComment kw (AR ss)
+mkKWComment :: AnnKeywordId -> EpaLocation -> Comment
+mkKWComment kw (EpaSpan ss)
   = Comment (keywordToString $ G kw) (Anchor ss UnchangedAnchor) (Just kw)
-mkKWComment kw (AD dp)
+mkKWComment kw (EpaDelta dp)
   = Comment (keywordToString $ G kw) (Anchor placeholderRealSpan (MovedAnchor dp)) (Just kw)
 
 comment2dp :: (Comment,  DeltaPos) -> (KeywordId, DeltaPos)
@@ -304,17 +281,8 @@ getAnnotationEP  la as =
 -- start of the current element.
 annTrueEntryDelta :: Annotation -> DeltaPos
 annTrueEntryDelta Ann{annEntryDelta, annPriorComments} =
-  foldr addDP (DP 0 0) (map (\(a, b) -> addDP b (dpFromString $ commentContents a)) annPriorComments )
+  foldr addDP (SameLine 0) (map (\(a, b) -> addDP b (dpFromString $ commentContents a)) annPriorComments )
     `addDP` annEntryDelta
-
--- | Take an annotation and a required "true entry" and calculate an equivalent
--- one relative to the last comment in the annPriorComments.
-annCommentEntryDelta :: Annotation -> DeltaPos -> DeltaPos
-annCommentEntryDelta Ann{annPriorComments} trueDP = dp
-  where
-    commentDP =
-      foldr addDP (DP 0 0) (map (\(a, b) -> addDP b (dpFromString $ commentContents a)) annPriorComments )
-    dp = stepDP commentDP trueDP
 
 -- | Return the DP of the first item that generates output, either a comment or the entry DP
 annLeadingCommentEntryDelta :: Annotation -> DeltaPos
@@ -329,7 +297,10 @@ annLeadingCommentEntryDelta Ann{annPriorComments,annEntryDelta} = dp
 dpFromString ::  String -> DeltaPos
 dpFromString xs = dpFromString' xs 0 0
   where
-    dpFromString' "" line col = DP line col
+    dpFromString' "" line col =
+      if line == 0
+        then SameLine col
+        else DifferentLine line col
     dpFromString' ('\n': cs) line _   = dpFromString' cs (line + 1) 0
     dpFromString' (_:cs)     line col = dpFromString' cs line       (col + 1)
 
@@ -355,56 +326,6 @@ name2String = showPprUnsafe
 
 -- ---------------------------------------------------------------------
 
--- | Put the provided context elements into the existing set with fresh level
--- counts
-setAcs :: Set.Set AstContext -> AstContextSet -> AstContextSet
-setAcs ctxt acs = setAcsWithLevel ctxt 3 acs
-
--- | Put the provided context elements into the existing set with given level
--- counts
--- setAcsWithLevel :: Set.Set AstContext -> Int -> AstContextSet -> AstContextSet
--- setAcsWithLevel ctxt level (ACS a) = ACS a'
---   where
---     upd s (k,v) = Map.insert k v s
---     a' = foldl' upd a $ zip (Set.toList ctxt) (repeat level)
-setAcsWithLevel :: (Ord a) => Set.Set a -> Int -> ACS' a -> ACS' a
-setAcsWithLevel ctxt level (ACS a) = ACS a'
-  where
-    upd s (k,v) = Map.insert k v s
-    a' = foldl' upd a $ zip (Set.toList ctxt) (repeat level)
-
--- ---------------------------------------------------------------------
--- | Remove the provided context element from the existing set
--- unsetAcs :: AstContext -> AstContextSet -> AstContextSet
-unsetAcs :: (Ord a) => a -> ACS' a -> ACS' a
-unsetAcs ctxt (ACS a) = ACS $ Map.delete ctxt a
-
--- ---------------------------------------------------------------------
-
--- | Are any of the contexts currently active?
--- inAcs :: Set.Set AstContext -> AstContextSet -> Bool
-inAcs :: (Ord a) => Set.Set a -> ACS' a -> Bool
-inAcs ctxt (ACS a) = not $ Set.null $ Set.intersection ctxt (Set.fromList $ Map.keys a)
-
--- | propagate the ACS down a level, dropping all values which hit zero
--- pushAcs :: AstContextSet -> AstContextSet
-pushAcs :: ACS' a -> ACS' a
-pushAcs (ACS a) = ACS $ Map.mapMaybe f a
-  where
-    f n
-      | n <= 1    = Nothing
-      | otherwise = Just (n - 1)
-
--- |Sometimes we have to pass the context down unchanged. Bump each count up by
--- one so that it is unchanged after a @pushAcs@ call.
--- bumpAcs :: AstContextSet -> AstContextSet
-bumpAcs :: ACS' a -> ACS' a
-bumpAcs (ACS a) = ACS $ Map.mapMaybe f a
-  where
-    f n = Just (n + 1)
-
--- ---------------------------------------------------------------------
-
 occAttributes :: OccName.OccName -> String
 occAttributes o = "(" ++ ns ++ vo ++ tv ++ tc ++ d ++ ds ++ s ++ v ++ ")"
   where
@@ -418,28 +339,11 @@ occAttributes o = "(" ++ ns ++ vo ++ tv ++ tc ++ d ++ ds ++ s ++ v ++ ")"
     s  = if isSymOcc     o then "Sym "     else ""
     v  = if isValOcc     o then "Val "     else ""
 
-{-
-data NameSpace = VarName        -- Variables, including "real" data constructors
-               | DataName       -- "Source" data constructors
-               | TvName         -- Type variables
-               | TcClsName      -- Type constructors and classes; Haskell has them
-                                -- in the same name space for now.
--}
-
  -- ---------------------------------------------------------------------
 
 locatedAnAnchor :: LocatedAn a t -> RealSrcSpan
 locatedAnAnchor (L (SrcSpanAnn EpAnnNotUsed l) _) = realSrcSpan l
 locatedAnAnchor (L (SrcSpanAnn (EpAnn a _ _) _) _) = anchor a
-
- -- ---------------------------------------------------------------------
-
--- showSDoc_ :: SDoc -> String
--- showSDoc_ = showSDoc unsafeGlobalDynFlags
-
--- showSDocDebug_ :: SDoc -> String
--- showSDocDebug_ = showSDocDebug unsafeGlobalDynFlags
-
 
  -- ---------------------------------------------------------------------
 

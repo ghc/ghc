@@ -579,7 +579,10 @@ data TcGblEnv
         tcg_complete_matches :: !CompleteMatches,
 
         -- ^ Tracking indices for cost centre annotations
-        tcg_cc_st   :: TcRef CostCentreState
+        tcg_cc_st   :: TcRef CostCentreState,
+
+        tcg_next_wrapper_num :: TcRef (ModuleEnv Int)
+        -- ^ See Note [Generating fresh names for FFI wrappers]
     }
 
 -- NB: topModIdentity, not topModSemantic!

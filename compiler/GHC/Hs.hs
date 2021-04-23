@@ -69,7 +69,7 @@ import Data.Data hiding ( Fixity )
 -- All we actually declare here is the top-level structure for a module.
 data HsModule
   = HsModule {
-      hsmodAnn :: EpAnn' AnnsModule,
+      hsmodAnn :: EpAnn AnnsModule,
       hsmodLayout :: LayoutInfo,
         -- ^ Layout info for the module.
         -- For incomplete modules (e.g. the output of parseHeader), it is NoLayoutInfo.

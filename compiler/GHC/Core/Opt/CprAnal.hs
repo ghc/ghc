@@ -24,16 +24,17 @@ import GHC.Types.Basic
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Core.DataCon
-import GHC.Core.Multiplicity
-import GHC.Core.Utils   ( exprIsHNF, dumpIdInfoOfProgram )
-import GHC.Core.Type
 import GHC.Core.FamInstEnv
+import GHC.Core.Multiplicity
 import GHC.Core.Opt.WorkWrap.Utils
+import GHC.Core.TyCon
+import GHC.Core.Type
+import GHC.Core.Utils   ( exprIsHNF, dumpIdInfoOfProgram, normSplitTyConApp_maybe )
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Logger  ( Logger, dumpIfSet_dyn, DumpFormat (..) )
 import GHC.Data.Graph.UnVar -- for UnVarSet
-import GHC.Data.Maybe   ( isNothing )
+import GHC.Data.Maybe   ( isJust )
 
 import Control.Monad ( guard )
 import Data.List ( mapAccumL )
@@ -319,10 +320,10 @@ cprAnalBind top_lvl env id rhs
     -- possibly trim thunk CPR info
     rhs_ty'
       -- See Note [CPR for thunks]
-      | stays_thunk = trimCprTy rhs_ty
+      | stays_thunk       = trimCprTy rhs_ty
       -- See Note [CPR for sum types]
-      | returns_sum = trimCprTy rhs_ty
-      | otherwise   = rhs_ty
+      | returns_local_sum = trimCprTy rhs_ty
+      | otherwise         = rhs_ty
     -- See Note [Arity trimming for CPR signatures]
     sig  = mkCprSigForArity (idArity id) rhs_ty'
     id'  = setIdCprSig id sig
@@ -334,8 +335,12 @@ cprAnalBind top_lvl env id rhs
     not_strict  = not (isStrUsedDmd (idDemandInfo id))
     -- See Note [CPR for sum types]
     (_, ret_ty) = splitPiTys (idType id)
-    not_a_prod  = isNothing (splitArgType_maybe (ae_fam_envs env) ret_ty)
-    returns_sum = not (isTopLevel top_lvl) && not_a_prod
+    returns_product
+      | Just (tc, _, _) <- normSplitTyConApp_maybe (ae_fam_envs env) ret_ty
+      = isJust (tyConSingleAlgDataCon_maybe tc)
+      | otherwise
+      = False
+    returns_local_sum = not (isTopLevel top_lvl) && not returns_product
 
 isDataStructure :: Id -> CoreExpr -> Bool
 -- See Note [CPR for data structures]
@@ -483,7 +488,7 @@ argCprType env arg_ty dmd = CprType 0 (go arg_ty dmd)
   where
     go ty dmd
       | Unbox (DataConPatContext { dcpc_dc = dc, dcpc_tc_args = tc_args }) ds
-          <- wantToUnbox (ae_fam_envs env) no_inlineable_prag ty dmd
+          <- wantToUnboxArg (ae_fam_envs env) MaybeArgOfInlineableFun ty dmd
       -- No existentials; see Note [Which types are unboxed?])
       -- Otherwise we'd need to call dataConRepInstPat here and thread a
       -- UniqSupply. So argCprType is a bit less aggressive than it could
@@ -493,11 +498,6 @@ argCprType env arg_ty dmd = CprType 0 (go arg_ty dmd)
       = ConCpr (dataConTag dc) (zipWith go arg_tys ds)
       | otherwise
       = topCpr
-    -- Rather than maintaining in AnalEnv whether we are in an INLINEABLE
-    -- function, we just assume that we aren't. That flag is only relevant
-    -- to Note [Do not unpack class dictionaries], the few unboxing
-    -- opportunities on dicts it prohibits are probably irrelevant to CPR.
-    no_inlineable_prag = False
 
 {- Note [Safe abortion in the fixed-point iteration]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -550,7 +550,7 @@ This is all done in 'extendSigEnvForArg'.
 
 Note that
 
-  * Whether or not something unboxes is decided by 'wantToUnbox', else we may
+  * Whether or not something unboxes is decided by 'wantToUnboxArg', else we may
     get over-optimistic CPR results (e.g., from \(x :: a) -> x!).
 
   * If the demand unboxes deeply, we can give the binder a /nested/ CPR

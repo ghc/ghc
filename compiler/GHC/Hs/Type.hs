@@ -151,7 +151,7 @@ type instance XHsForAllInvis (GhcPass _) = EpAnnForallTy
 
 type instance XXHsForAllTelescope (GhcPass _) = NoExtCon
 
-type EpAnnForallTy = EpAnn' (AddEpAnn, AddEpAnn)
+type EpAnnForallTy = EpAnn (AddEpAnn, AddEpAnn)
   -- ^ Location of 'forall' and '->' for HsForAllVis
   -- Location of 'forall' and '.' for HsForAllInvis
 
@@ -259,8 +259,8 @@ mkEmptyWildCardBndrs x = HsWC { hswc_body = x
 
 --------------------------------------------------
 
-type instance XUserTyVar    (GhcPass _) = EpAnn
-type instance XKindedTyVar  (GhcPass _) = EpAnn
+type instance XUserTyVar    (GhcPass _) = EpAnn [AddEpAnn]
+type instance XKindedTyVar  (GhcPass _) = EpAnn [AddEpAnn]
 
 type instance XXTyVarBndr   (GhcPass _) = NoExtCon
 
@@ -285,17 +285,17 @@ instance NamedThing (HsTyVarBndr flag GhcRn) where
 
 type instance XForAllTy        (GhcPass _) = NoExtField
 type instance XQualTy          (GhcPass _) = NoExtField
-type instance XTyVar           (GhcPass _) = EpAnn
+type instance XTyVar           (GhcPass _) = EpAnn [AddEpAnn]
 type instance XAppTy           (GhcPass _) = NoExtField
-type instance XFunTy           (GhcPass _) = EpAnn' TrailingAnn -- For the AnnRarrow or AnnLolly
-type instance XListTy          (GhcPass _) = EpAnn' AnnParen
-type instance XTupleTy         (GhcPass _) = EpAnn' AnnParen
-type instance XSumTy           (GhcPass _) = EpAnn' AnnParen
+type instance XFunTy           (GhcPass _) = EpAnn TrailingAnn -- For the AnnRarrow or AnnLolly
+type instance XListTy          (GhcPass _) = EpAnn AnnParen
+type instance XTupleTy         (GhcPass _) = EpAnn AnnParen
+type instance XSumTy           (GhcPass _) = EpAnn AnnParen
 type instance XOpTy            (GhcPass _) = NoExtField
-type instance XParTy           (GhcPass _) = EpAnn' AnnParen
-type instance XIParamTy        (GhcPass _) = EpAnn
+type instance XParTy           (GhcPass _) = EpAnn AnnParen
+type instance XIParamTy        (GhcPass _) = EpAnn [AddEpAnn]
 type instance XStarTy          (GhcPass _) = NoExtField
-type instance XKindSig         (GhcPass _) = EpAnn
+type instance XKindSig         (GhcPass _) = EpAnn [AddEpAnn]
 
 type instance XAppKindTy       (GhcPass _) = SrcSpan -- Where the `@` lives
 
@@ -303,18 +303,18 @@ type instance XSpliceTy        GhcPs = NoExtField
 type instance XSpliceTy        GhcRn = NoExtField
 type instance XSpliceTy        GhcTc = Kind
 
-type instance XDocTy           (GhcPass _) = EpAnn
-type instance XBangTy          (GhcPass _) = EpAnn
+type instance XDocTy           (GhcPass _) = EpAnn [AddEpAnn]
+type instance XBangTy          (GhcPass _) = EpAnn [AddEpAnn]
 
-type instance XRecTy           GhcPs = EpAnn' AnnList
+type instance XRecTy           GhcPs = EpAnn AnnList
 type instance XRecTy           GhcRn = NoExtField
 type instance XRecTy           GhcTc = NoExtField
 
-type instance XExplicitListTy  GhcPs = EpAnn
+type instance XExplicitListTy  GhcPs = EpAnn [AddEpAnn]
 type instance XExplicitListTy  GhcRn = NoExtField
 type instance XExplicitListTy  GhcTc = Kind
 
-type instance XExplicitTupleTy GhcPs = EpAnn
+type instance XExplicitTupleTy GhcPs = EpAnn [AddEpAnn]
 type instance XExplicitTupleTy GhcRn = NoExtField
 type instance XExplicitTupleTy GhcTc = [Kind]
 
@@ -354,7 +354,7 @@ pprHsArrow (HsUnrestrictedArrow _) = arrow
 pprHsArrow (HsLinearArrow _ _) = lollipop
 pprHsArrow (HsExplicitMult _ _ p) = (mulArrow (ppr p))
 
-type instance XConDeclField  (GhcPass _) = EpAnn
+type instance XConDeclField  (GhcPass _) = EpAnn [AddEpAnn]
 type instance XXConDeclField (GhcPass _) = NoExtCon
 
 instance OutputableBndrId p
@@ -494,7 +494,7 @@ splitHsFunType ty = go ty
         an' = addTrailingAnnToA l an cs a
         x' = L (SrcSpanAnn an' l) t
 
-    go other = ([], noCom, [], other)
+    go other = ([], emptyComments, [], other)
 
 -- | Retrieve the name of the \"head\" of a nested type application.
 -- This is somewhat like @GHC.Tc.Gen.HsType.splitHsAppTys@, but a little more

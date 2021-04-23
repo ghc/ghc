@@ -236,8 +236,10 @@ mkDsEnvsFromTcGbl hsc_env msg_var tcg_env
              complete_matches = hptCompleteSigs hsc_env         -- from the home package
                                 ++ tcg_complete_matches tcg_env -- from the current module
                                 ++ eps_complete_matches eps     -- from imports
+             -- re-use existing next_wrapper_num to ensure uniqueness
+             next_wrapper_num_var = tcg_next_wrapper_num tcg_env
        ; return $ mkDsEnvs unit_env this_mod rdr_env type_env fam_inst_env
-                           msg_var cc_st_var complete_matches
+                           msg_var cc_st_var next_wrapper_num_var complete_matches
        }
 
 runDs :: HscEnv -> (DsGblEnv, DsLclEnv) -> DsM a -> IO (Messages DiagnosticMessage, Maybe a)
@@ -261,6 +263,7 @@ initDsWithModGuts hsc_env (ModGuts { mg_module = this_mod, mg_binds = binds
                                    , mg_complete_matches = local_complete_matches
                           }) thing_inside
   = do { cc_st_var   <- newIORef newCostCentreState
+       ; next_wrapper_num <- newIORef emptyModuleEnv
        ; msg_var <- newIORef emptyMessages
        ; eps <- liftIO $ hscEPS hsc_env
        ; let unit_env = hsc_unit_env hsc_env
@@ -275,7 +278,7 @@ initDsWithModGuts hsc_env (ModGuts { mg_module = this_mod, mg_binds = binds
 
              envs  = mkDsEnvs unit_env this_mod rdr_env type_env
                               fam_inst_env msg_var cc_st_var
-                              complete_matches
+                              next_wrapper_num complete_matches
        ; runDs hsc_env envs thing_inside
        }
 
@@ -313,10 +316,11 @@ initTcDsForSolver thing_inside
            Nothing  -> pprPanic "initTcDsForSolver" (vcat $ pprMsgEnvelopeBagWithLoc (getErrorMessages msgs)) }
 
 mkDsEnvs :: UnitEnv -> Module -> GlobalRdrEnv -> TypeEnv -> FamInstEnv
-         -> IORef (Messages DiagnosticMessage) -> IORef CostCentreState -> CompleteMatches
+         -> IORef (Messages DiagnosticMessage) -> IORef CostCentreState
+         -> IORef (ModuleEnv Int) -> CompleteMatches
          -> (DsGblEnv, DsLclEnv)
 mkDsEnvs unit_env mod rdr_env type_env fam_inst_env msg_var cc_st_var
-         complete_matches
+         next_wrapper_num complete_matches
   = let if_genv = IfGblEnv { if_doc       = text "mkDsEnvs",
                              if_rec_types = Just (mod, return type_env) }
         if_lenv = mkIfLclEnv mod (text "GHC error in desugarer lookup in" <+> ppr mod)
@@ -330,6 +334,7 @@ mkDsEnvs unit_env mod rdr_env type_env fam_inst_env msg_var cc_st_var
                            , ds_msgs    = msg_var
                            , ds_complete_matches = complete_matches
                            , ds_cc_st   = cc_st_var
+                           , ds_next_wrapper_num = next_wrapper_num
                            }
         lcl_env = DsLclEnv { dsl_meta    = emptyNameEnv
                            , dsl_loc     = real_span

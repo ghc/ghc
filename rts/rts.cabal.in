@@ -508,6 +508,7 @@ library
                linker/elf_plt_arm.c
                linker/elf_reloc.c
                linker/elf_reloc_aarch64.c
+               linker/elf_tlsgd.c
                linker/elf_util.c
                sm/BlockAlloc.c
                sm/CNF.c

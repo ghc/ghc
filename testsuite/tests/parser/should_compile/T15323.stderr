@@ -9,8 +9,8 @@
     { T15323.hs:1:1 }
     (UnchangedAnchor))
    (AnnsModule
-    [(AddEpAnn AnnModule (AR { T15323.hs:3:1-6 }))
-    ,(AddEpAnn AnnWhere (AR { T15323.hs:3:15-19 }))]
+    [(AddEpAnn AnnModule (EpaSpan { T15323.hs:3:1-6 }))
+    ,(AddEpAnn AnnWhere (EpaSpan { T15323.hs:3:15-19 }))]
     (AnnList
      (Nothing)
      (Nothing)
@@ -50,8 +50,8 @@
        (Anchor
         { T15323.hs:(5,1)-(6,54) }
         (UnchangedAnchor))
-       [(AddEpAnn AnnData (AR { T15323.hs:5:1-4 }))
-       ,(AddEpAnn AnnWhere (AR { T15323.hs:5:21-25 }))]
+       [(AddEpAnn AnnData (EpaSpan { T15323.hs:5:1-4 }))
+       ,(AddEpAnn AnnWhere (EpaSpan { T15323.hs:5:21-25 }))]
        (EpaComments
         []))
       (L
@@ -81,8 +81,8 @@
         (Anchor
          { T15323.hs:(5,1)-(6,54) }
          (UnchangedAnchor))
-        [(AddEpAnn AnnData (AR { T15323.hs:5:1-4 }))
-        ,(AddEpAnn AnnWhere (AR { T15323.hs:5:21-25 }))]
+        [(AddEpAnn AnnData (EpaSpan { T15323.hs:5:1-4 }))
+        ,(AddEpAnn AnnWhere (EpaSpan { T15323.hs:5:21-25 }))]
         (EpaComments
          []))
        (DataType)
@@ -96,7 +96,7 @@
            (Anchor
             { T15323.hs:6:5-54 }
             (UnchangedAnchor))
-           [(AddEpAnn AnnDcolon (AR { T15323.hs:6:17-18 }))]
+           [(AddEpAnn AnnDcolon (EpaSpan { T15323.hs:6:17-18 }))]
            (EpaComments
             []))
           [(L
@@ -111,8 +111,8 @@
               { T15323.hs:6:20-25 }
               (UnchangedAnchor))
              ((,)
-              (AddEpAnn AnnForall (AR { T15323.hs:6:20-25 }))
-              (AddEpAnn AnnDot (AR { T15323.hs:6:29 })))
+              (AddEpAnn AnnForall (EpaSpan { T15323.hs:6:20-25 }))
+              (AddEpAnn AnnDot (EpaSpan { T15323.hs:6:29 })))
              (EpaComments
               []))
             [(L
@@ -140,7 +140,7 @@
                           (Just
                            ((,)
                             (NormalSyntax)
-                            (AR { T15323.hs:6:38-39 })))
+                            (EpaSpan { T15323.hs:6:38-39 })))
                           []
                           [])
                          (EpaComments
@@ -154,8 +154,8 @@
                  (UnchangedAnchor))
                 (AnnParen
                  (AnnParens)
-                 (AR { T15323.hs:6:31 })
-                 (AR { T15323.hs:6:36 }))
+                 (EpaSpan { T15323.hs:6:31 })
+                 (EpaSpan { T15323.hs:6:36 }))
                 (EpaComments
                  []))
                (L

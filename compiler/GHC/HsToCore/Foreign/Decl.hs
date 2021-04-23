@@ -23,6 +23,7 @@ import GHC.Core
 
 import GHC.HsToCore.Foreign.Call
 import GHC.HsToCore.Monad
+import GHC.HsToCore.Types (ds_next_wrapper_num)
 
 import GHC.Hs
 import GHC.Core.DataCon
@@ -229,12 +230,12 @@ dsFCall fn_id co fcall mDeclHeader = do
     ccall_uniq <- newUnique
     work_uniq  <- newUnique
 
-    dflags <- getDynFlags
     (fcall', cDoc) <-
               case fcall of
               CCall (CCallSpec (StaticTarget _ cName mUnitId isFun)
                                CApiConv safety) ->
-               do wrapperName <- mkWrapperName "ghc_wrapper" (unpackFS cName)
+               do nextWrapperNum <- ds_next_wrapper_num <$> getGblEnv
+                  wrapperName <- mkWrapperName nextWrapperNum "ghc_wrapper" (unpackFS cName)
                   let fcall' = CCall (CCallSpec
                                       (StaticTarget NoSourceText
                                                     wrapperName mUnitId
@@ -278,6 +279,7 @@ dsFCall fn_id co fcall mDeclHeader = do
                   return (fcall', c)
               _ ->
                   return (fcall, empty)
+    dflags <- getDynFlags
     let
         -- Build the worker
         worker_ty     = mkForAllTys tv_bndrs (mkVisFunTysMany (map idType work_arg_ids) ccall_result_ty)

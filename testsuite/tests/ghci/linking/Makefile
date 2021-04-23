@@ -24,6 +24,12 @@ else
 DLL = lib$1.so
 endif
 
+ifeq "$(FREEBSD)" "YES"
+LIBCXX=c++
+else
+LIBCXX=stdc++
+endif
+
 .PHONY: ghcilink002
 ghcilink002 :
 	$(RM) -rf dir002
@@ -38,7 +44,7 @@ ghcilink002 :
 
 .PHONY: ghcilink003
 ghcilink003 :
-	echo ":q" | "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -lstdc++
+	echo ":q" | "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -l$(LIBCXX)
 
 # Test 4:
 #   package P
@@ -115,7 +121,7 @@ ghcilink006 :
 ifeq "$(WINDOWS)" "YES"
 	echo "extra-libraries: stdc++-6" >>$(PKG006)
 else
-	echo "extra-libraries: stdc++" >>$(PKG006)
+	echo "extra-libraries: $(LIBCXX)" >>$(PKG006)
 endif
 	'$(GHC_PKG)' init $(LOCAL_PKGCONF006)
 	'$(GHC_PKG)' --no-user-package-db -f $(LOCAL_PKGCONF006) register $(PKG006) -v0
