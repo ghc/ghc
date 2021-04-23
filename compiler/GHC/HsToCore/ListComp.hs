@@ -17,7 +17,7 @@ import {-# SOURCE #-} GHC.HsToCore.Expr ( dsExpr, dsLExpr, dsLExprNoLP, dsLocalB
 
 import GHC.Hs
 import GHC.Tc.Errors.Types ( LevityCheckProvenance(..) )
-import GHC.Tc.Utils.Zonk
+import GHC.Hs.Syn.Type
 import GHC.Core
 import GHC.Core.Make
 
