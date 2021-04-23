@@ -44,7 +44,7 @@ import GHC.Unit.External
 
 import GHC.Core         ( CoreRule )
 import GHC.Core.FamInstEnv
-import GHC.Core.InstEnv ( ClsInst )
+import GHC.Core.InstEnv
 
 import GHC.Types.Annotations ( Annotation, AnnEnv, mkAnnEnv, plusAnnEnv )
 import GHC.Types.CompleteMatch
@@ -171,13 +171,13 @@ hptCompleteSigs = hptAllThings  (md_complete_matches . hm_details)
 -- the Home Package Table filtered by the provided predicate function.
 -- Used in @tcRnImports@, to select the instances that are in the
 -- transitive closure of imports from the currently compiled module.
-hptInstances :: HscEnv -> (ModuleName -> Bool) -> ([ClsInst], [FamInst])
+hptInstances :: HscEnv -> (ModuleName -> Bool) -> (InstEnv, [FamInst])
 hptInstances hsc_env want_this_module
   = let (insts, famInsts) = unzip $ flip hptAllThings hsc_env $ \mod_info -> do
                 guard (want_this_module (moduleName (mi_module (hm_iface mod_info))))
                 let details = hm_details mod_info
                 return (md_insts details, md_fam_insts details)
-    in (concat insts, concat famInsts)
+    in (foldl' unionInstEnv emptyInstEnv insts, concat famInsts)
 
 -- | Get rules from modules "below" this one (in the dependency sense)
 hptRules :: HscEnv -> [ModuleNameWithIsBoot] -> [CoreRule]

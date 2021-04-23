@@ -215,7 +215,7 @@ improveFromInstEnv inst_env mk_loc pred
                        getClassPredTys_maybe pred
   , let (cls_tvs, cls_fds) = classTvsFds cls
         instances          = classInstances inst_env cls
-        rough_tcs          = roughMatchTcs tys
+        rough_tcs          = KnownTc (className cls) : roughMatchTcs tys
   = [ FDEqn { fd_qtvs = meta_tvs, fd_eqs = eqs
             , fd_pred1 = p_inst, fd_pred2 = pred
             , fd_loc = mk_loc p_inst (getSrcSpan (is_dfun ispec)) }
@@ -232,6 +232,7 @@ improveFromInstEnv inst_env mk_loc pred
     , let p_inst = mkClassPred cls (is_tys ispec)
     ]
 improveFromInstEnv _ _ _ = []
+
 
 
 improveClsFD :: [TyVar] -> FunDep TyVar    -- One functional dependency from the class
@@ -675,8 +676,9 @@ trimRoughMatchTcs :: [TyVar] -> FunDep TyVar -> [RoughMatchTc] -> [RoughMatchTc]
 -- Hence, we Nothing-ise the tb and tc types right here
 --
 -- Result list is same length as input list, just with more Nothings
-trimRoughMatchTcs clas_tvs (ltvs, _) mb_tcs
-  = zipWith select clas_tvs mb_tcs
+trimRoughMatchTcs _clas_tvs _ [] = panic "trimRoughMatchTcs: nullary [RoughMatchTc]"
+trimRoughMatchTcs clas_tvs (ltvs, _) (cls:mb_tcs)
+  = cls : zipWith select clas_tvs mb_tcs
   where
     select clas_tv mb_tc | clas_tv `elem` ltvs = mb_tc
                          | otherwise           = OtherTc

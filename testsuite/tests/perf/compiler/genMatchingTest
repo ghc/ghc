@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Generate a module with N data types and instances
+DEFS=10000
+MATCHES=500
+echo "module Defs where" > Defs.hs;
+for i in $(seq -w 1 $DEFS); do
+  echo "data T$i = T$i deriving Show" >> Defs.hs;
+done
+
+echo "{-# LANGUAGE TypeFamilies #-}" > Match.hs
+echo "{-# LANGUAGE StandaloneDeriving #-}" >> Match.hs
+echo "module Match where" >> Match.hs
+echo "import Defs" >> Match.hs
+for i in $(seq -w 1 $MATCHES); do
+  echo "type family F$i a where" >> Match.hs;
+done
+echo "data T a = T" >> Match.hs
+for i in $(seq -w 1 $MATCHES); do
+  echo "       (F$i a)" >> Match.hs;
+done
+echo "deriving instance Show (T a)" >> Match.hs;
+

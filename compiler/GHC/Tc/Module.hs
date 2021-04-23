@@ -392,7 +392,7 @@ tcRnImports hsc_env import_decls
               tcg_rdr_env      = tcg_rdr_env gbl `plusGlobalRdrEnv` rdr_env,
               tcg_imports      = tcg_imports gbl `plusImportAvails` imports,
               tcg_rn_imports   = rn_imports,
-              tcg_inst_env     = extendInstEnvList (tcg_inst_env gbl) home_insts,
+              tcg_inst_env     = tcg_inst_env gbl `unionInstEnv` home_insts,
               tcg_fam_inst_env = extendFamInstEnvList (tcg_fam_inst_env gbl)
                                                       home_fam_insts,
               tcg_hpc          = hpc_info
@@ -2018,7 +2018,7 @@ runTcInteractive hsc_env thing_inside
   = initTcInteractive hsc_env $ withTcPlugins hsc_env $ withHoleFitPlugins hsc_env $
     do { traceTc "setInteractiveContext" $
             vcat [ text "ic_tythings:" <+> vcat (map ppr (ic_tythings icxt))
-                 , text "ic_insts:" <+> vcat (map (pprBndr LetBind . instanceDFunId) ic_insts)
+                 , text "ic_insts:" <+> vcat (map (pprBndr LetBind . instanceDFunId) (instEnvElts ic_insts))
                  , text "ic_rn_gbl_env (LocalDef)" <+>
                       vcat (map ppr [ local_gres | gres <- occEnvElts (ic_rn_gbl_env icxt)
                                                  , let local_gres = filter isLocalGRE gres
@@ -2044,9 +2044,7 @@ runTcInteractive hsc_env thing_inside
        ; let gbl_env' = gbl_env {
                            tcg_rdr_env      = ic_rn_gbl_env icxt
                          , tcg_type_env     = type_env
-                         , tcg_inst_env     = extendInstEnvList
-                                               (extendInstEnvList (tcg_inst_env gbl_env) ic_insts)
-                                               home_insts
+                         , tcg_inst_env     = tcg_inst_env gbl_env `unionInstEnv` ic_insts `unionInstEnv` home_insts
                          , tcg_fam_inst_env = extendFamInstEnvList
                                                (extendFamInstEnvList (tcg_fam_inst_env gbl_env)
                                                                      ic_finsts)
@@ -2084,7 +2082,7 @@ runTcInteractive hsc_env thing_inside
       = Right thing
 
     type_env1 = mkTypeEnvWithImplicits top_ty_things
-    type_env  = extendTypeEnvWithIds type_env1 (map instanceDFunId ic_insts)
+    type_env  = extendTypeEnvWithIds type_env1 (map instanceDFunId (instEnvElts ic_insts))
                 -- Putting the dfuns in the type_env
                 -- is just to keep Core Lint happy
 

@@ -1,4 +1,4 @@
-Found 243 Language.Haskell.Syntax module dependencies
+Found 244 Language.Haskell.Syntax module dependencies
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
 GHC.Builtin.Types
@@ -41,6 +41,7 @@ GHC.Core.Opt.OccurAnal
 GHC.Core.PatSyn
 GHC.Core.Ppr
 GHC.Core.Predicate
+GHC.Core.RoughMap
 GHC.Core.Seq
 GHC.Core.SimpleOpt
 GHC.Core.Stats

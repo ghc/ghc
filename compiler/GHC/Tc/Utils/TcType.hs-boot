@@ -10,3 +10,4 @@ pprTcTyVarDetails :: TcTyVarDetails -> SDoc
 vanillaSkolemTv :: TcTyVarDetails
 isMetaTyVar :: TcTyVar -> Bool
 isTyConableTyVar :: TcTyVar -> Bool
+isSkolemTyVar :: TcTyVar -> Bool

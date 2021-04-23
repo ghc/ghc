@@ -356,6 +356,7 @@ Library
         GHC.Core.TyCo.Subst
         GHC.Core.TyCo.Tidy
         GHC.Core.Type
+        GHC.Core.RoughMap
         GHC.Core.Unfold
         GHC.Core.Unfold.Make
         GHC.Core.Unify

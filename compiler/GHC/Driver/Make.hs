@@ -91,18 +91,18 @@ import GHC.Types.Target
 import GHC.Types.SourceFile
 import GHC.Types.SourceError
 import GHC.Types.SrcLoc
-import GHC.Types.Unique.FM
 import GHC.Types.Unique.DSet
 import GHC.Types.Unique.Set
 import GHC.Types.Name
 import GHC.Types.Name.Env
+import GHC.Unit.Module.ModDetails
+import GHC.Types.Unique.FM
 
 import GHC.Unit
 import GHC.Unit.State
 import GHC.Unit.Finder
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Module.ModIface
-import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module.Graph
 import GHC.Unit.Home.ModInfo
 
