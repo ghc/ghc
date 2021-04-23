@@ -172,10 +172,8 @@ void copyPtrsToArray(StgMutArrPtrs* arr, StgStack* stack) {
     StgPtr spBottom = last_stack->stack + last_stack->stack_size;
     for (; sp < spBottom; sp += stack_frame_sizeW((StgClosure *)sp)) {
       const StgInfoTable* infoTable = get_itbl((StgClosure *)sp);
-      debugBelch("infoTable %p \n", infoTable);
       // TODO: Explain why it's infoTable->code
       arr->payload[index] = createWordClosure(myTask()->cap, (StgAddr) infoTable->code);
-      debugBelch("Saved %p \n", arr->payload[index]);
       index++;
     }
 
@@ -192,11 +190,9 @@ void copyPtrsToArray(StgMutArrPtrs* arr, StgStack* stack) {
 }
 
 // TODO: Should use something better than a word for pointers
-StgClosure* createWordClosure (Capability *cap, StgAddr i)
-{
-  debugBelch("Add %p as Ptr.\n", i);
-  StgClosure *p = (StgClosure *)allocate(cap,CONSTR_sizeW(0,1));
+StgClosure* createWordClosure (Capability *cap, StgAddr i) {
+  StgClosure *p = (StgClosure *) allocate(cap, CONSTR_sizeW(0,1));
   SET_HDR(p, &base_GHCziPtr_Ptr_con_info, CCS_SYSTEM);
-  *(StgWord *)p->payload = i;
+  *(StgWord *) p->payload = i;
   return TAG_CLOSURE(1, p);
 }
