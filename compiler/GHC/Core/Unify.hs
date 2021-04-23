@@ -1,8 +1,8 @@
 -- (c) The University of Glasgow 2006
 
-{-# LANGUAGE ScopedTypeVariables, PatternSynonyms #-}
-
-{-# LANGUAGE DeriveFunctor, DeriveDataTypeable #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE DeriveFunctor #-}
 
 module GHC.Core.Unify (
         tcMatchTy, tcMatchTyKi,
@@ -39,6 +39,7 @@ import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs   ( tyCoVarsOfCoList, tyCoFVsOfTypes )
 import GHC.Core.TyCo.Subst ( mkTvSubst )
+import GHC.Core.RoughMap
 import GHC.Core.Map.Type
 import GHC.Utils.FV( FV, fvVarSet, fvVarList )
 import GHC.Utils.Misc
@@ -48,11 +49,9 @@ import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
 import GHC.Exts( oneShot )
-import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Data.FastString
 
-import Data.Data ( Data )
 import Data.List ( mapAccumL )
 import Control.Monad
 import qualified Data.Semigroup as S
@@ -290,27 +289,8 @@ But it is never
              albeit perhaps only after 'a' is instantiated.
 -}
 
-data RoughMatchTc
-  = KnownTc Name   -- INVARIANT: Name refers to a TyCon tc that responds
-                   -- true to `isGenerativeTyCon tc Nominal`. See
-                   -- Note [Rough matching in class and family instances]
-  | OtherTc        -- e.g. type variable at the head
-  deriving( Data )
-
-isRoughOtherTc :: RoughMatchTc -> Bool
-isRoughOtherTc OtherTc      = True
-isRoughOtherTc (KnownTc {}) = False
-
 roughMatchTcs :: [Type] -> [RoughMatchTc]
-roughMatchTcs tys = map rough tys
-  where
-    rough ty
-      | Just (ty', _) <- splitCastTy_maybe ty   = rough ty'
-      | Just (tc,_)   <- splitTyConApp_maybe ty
-      , not (isTypeFamilyTyCon tc)              = assertPpr (isGenerativeTyCon tc Nominal) (ppr tc) $
-                                                  KnownTc (tyConName tc)
-        -- See Note [Rough matching in class and family instances]
-      | otherwise                               = OtherTc
+roughMatchTcs tys = map typeToRoughMatchTc tys
 
 instanceCantMatch :: [RoughMatchTc] -> [RoughMatchTc] -> Bool
 -- (instanceCantMatch tcs1 tcs2) returns True if tcs1 cannot
