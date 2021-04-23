@@ -1,0 +1,8 @@
+ Identity function.
+
+ > id x = x
+ A state monad parameterized by the type @s@ of the state to carry.
+
+ The 'return' function leaves the state unchanged, while @>>=@ uses
+ the final state of the first computation as the initial state of
+ the second.
