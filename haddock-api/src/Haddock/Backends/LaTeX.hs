@@ -887,12 +887,12 @@ ppSideBySideConstr subdocs unicode leader (L _ con) =
 -- | Pretty-print a record field
 ppSideBySideField :: [(DocName, DocForDecl DocName)] -> Bool -> ConDeclField DocNameI ->  LaTeX
 ppSideBySideField subdocs unicode (ConDeclField _ names ltype _) =
-  decltt (cat (punctuate comma (map (ppBinder . rdrNameOcc . unLoc . rdrNameFieldOcc . unLoc) names))
+  decltt (cat (punctuate comma (map (ppBinder . rdrNameOcc . unLoc . foLabel . unLoc) names))
     <+> dcolon unicode <+> ppLType unicode ltype) <-> rDoc mbDoc
   where
     -- don't use cd_fld_doc for same reason we don't use con_doc above
     -- Where there is more than one name, they all have the same documentation
-    mbDoc = lookup (extFieldOcc $ unLoc $ head names) subdocs >>= fmap _doc . combineDocumentation . fst
+    mbDoc = lookup (foExt $ unLoc $ head names) subdocs >>= fmap _doc . combineDocumentation . fst
 
 
 -- | Pretty-print a bundled pattern synonym

@@ -1027,7 +1027,7 @@ ppSideBySideField :: [(DocName, DocForDecl DocName)] -> Unicode -> Qualification
 ppSideBySideField subdocs unicode qual (ConDeclField _ names ltype _) =
   ( hsep (punctuate comma [ ppBinder False (rdrNameOcc field)
                           | L _ name <- names
-                          , let field = (unLoc . rdrNameFieldOcc) name
+                          , let field = (unLoc . foLabel) name
                           ])
       <+> dcolon unicode
       <+> ppLType unicode qual HideEmptyContexts ltype
@@ -1037,12 +1037,12 @@ ppSideBySideField subdocs unicode qual (ConDeclField _ names ltype _) =
   where
     -- don't use cd_fld_doc for same reason we don't use con_doc above
     -- Where there is more than one name, they all have the same documentation
-    mbDoc = lookup (extFieldOcc $ unLoc $ head names) subdocs >>= combineDocumentation . fst
+    mbDoc = lookup (foExt $ unLoc $ head names) subdocs >>= combineDocumentation . fst
 
 
 ppShortField :: Bool -> Unicode -> Qualification -> ConDeclField DocNameI -> Html
 ppShortField summary unicode qual (ConDeclField _ names ltype _)
-  = hsep (punctuate comma (map ((ppBinder summary) . rdrNameOcc . unLoc . rdrNameFieldOcc . unLoc) names))
+  = hsep (punctuate comma (map ((ppBinder summary) . rdrNameOcc . unLoc . foLabel . unLoc) names))
     <+> dcolon unicode <+> ppLType unicode qual HideEmptyContexts ltype
 
 
