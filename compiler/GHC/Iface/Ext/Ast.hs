@@ -39,8 +39,7 @@ import GHC.Core.DataCon           ( dataConNonlinearType )
 import GHC.Types.FieldLabel
 import GHC.Hs
 import GHC.Hs.Expr.Type
-import GHC.Driver.Env
-import GHC.Utils.Monad            ( concatMapM, liftIO )
+import GHC.Utils.Monad            ( concatMapM, MonadIO(liftIO) )
 import GHC.Types.Id               ( isDataConId_maybe )
 import GHC.Types.Name             ( Name, nameSrcSpan, nameUnique )
 import GHC.Types.Name.Env         ( NameEnv, emptyNameEnv, extendNameEnv, lookupNameEnv )
@@ -71,13 +70,12 @@ import qualified Data.ByteString as BS
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Data                  ( Data, Typeable )
+import Data.Functor.Identity      ( Identity(..) )
 import Data.Void                  ( Void, absurd )
 import Control.Monad              ( forM_ )
 import Control.Monad.Trans.State.Strict
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Class  ( lift )
-import GHC.HsToCore.Types
-import GHC.HsToCore.Monad
 
 {- Note [Updating HieAst for changes in the GHC AST]
 
@@ -278,16 +276,17 @@ modifyState = foldr go id
       = addSubstitution mono poly . f
     go _ f = f
 
-type HieM = ReaderT NodeOrigin (StateT HieState DsM)
+type HieM = ReaderT NodeOrigin (State HieState)
 
 -- | Construct an 'HieFile' from the outputs of the typechecker.
-mkHieFile :: ModSummary
+mkHieFile :: MonadIO m
+          => ModSummary
           -> TcGblEnv
-          -> RenamedSource -> Hsc HieFile
+          -> RenamedSource -> m HieFile
 mkHieFile ms ts rs = do
   let src_file = expectJust "mkHieFile" (ml_hs_file $ ms_location ms)
   src <- liftIO $ BS.readFile src_file
-  mkHieFileWithSource src_file src ms ts rs
+  pure $ mkHieFileWithSource src_file src ms ts rs
 
 -- | Construct an 'HieFile' from the outputs of the typechecker but don't
 -- read the source file again from disk.
@@ -295,16 +294,14 @@ mkHieFileWithSource :: FilePath
                     -> BS.ByteString
                     -> ModSummary
                     -> TcGblEnv
-                    -> RenamedSource -> Hsc HieFile
-mkHieFileWithSource src_file src ms ts rs = do
+                    -> RenamedSource -> HieFile
+mkHieFileWithSource src_file src ms ts rs =
   let tc_binds = tcg_binds ts
       top_ev_binds = tcg_ev_binds ts
       insts = tcg_insts ts
       tcs = tcg_tcs ts
-  hsc_env <- Hsc $ \e w -> return (e, w)
-  (_msgs, res) <- liftIO $ initDs hsc_env ts $ getCompressedAsts tc_binds rs top_ev_binds insts tcs
-  let (asts',arr) = expectJust "mkHieFileWithSource" res
-  return $ HieFile
+      (asts',arr) = getCompressedAsts tc_binds rs top_ev_binds insts tcs in
+  HieFile
       { hie_hs_file = src_file
       , hie_module = ms_mod ms
       , hie_types = arr
@@ -315,15 +312,15 @@ mkHieFileWithSource src_file src ms ts rs = do
       }
 
 getCompressedAsts :: TypecheckedSource -> RenamedSource -> Bag EvBind -> [ClsInst] -> [TyCon]
-  -> DsM (HieASTs TypeIndex, A.Array TypeIndex HieTypeFlat)
-getCompressedAsts ts rs top_ev_binds insts tcs = do
-  asts <- enrichHie ts rs top_ev_binds insts tcs
-  return $ compressTypes asts
+  -> (HieASTs TypeIndex, A.Array TypeIndex HieTypeFlat)
+getCompressedAsts ts rs top_ev_binds insts tcs =
+  let asts = enrichHie ts rs top_ev_binds insts tcs in
+  compressTypes asts
 
 enrichHie :: TypecheckedSource -> RenamedSource -> Bag EvBind -> [ClsInst] -> [TyCon]
-  -> DsM (HieASTs Type)
+  -> HieASTs Type
 enrichHie ts (hsGrp, imports, exports, _) ev_bs insts tcs =
-  flip evalStateT initState $ flip runReaderT SourceInfo $ do
+  runIdentity $ flip evalStateT initState $ flip runReaderT SourceInfo $ do
     tasts <- toHie $ fmap (BC RegularBind ModuleScope) ts
     rasts <- processGrp hsGrp
     imps <- toHie $ filter (not . ideclImplicit . unLoc) imports
