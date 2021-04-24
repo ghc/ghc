@@ -287,7 +287,7 @@ data HsExpr p
                              -- HsVar for pretty printing
 
   | HsRecFld  (XRecFld p)
-              (AmbiguousFieldOcc p) -- ^ Variable pointing to record selector
+              (FieldOcc p) -- ^ Variable pointing to record selector
               -- The parser produces HsVars
               -- The renamer renames record-field selectors to HsRecFld
               -- The typechecker preserves HsRecFld
