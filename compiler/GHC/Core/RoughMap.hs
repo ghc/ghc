@@ -77,13 +77,21 @@ emptyRM = RMEmpty
 
 lookupRM :: [RoughMatchTc] -> RoughMap a -> [a]
 lookupRM _                  RMEmpty = []
-lookupRM []                 rm      = rm_empty rm
+lookupRM []                 rm      = elemsRM rm
 lookupRM (KnownTc tc : tcs) rm      = maybe [] (lookupRM tcs) (lookupNameEnv (rm_known rm) tc)
                                       ++ lookupRM tcs (rm_unknown rm)
+                                      ++ rm_empty rm
 lookupRM (OtherTc : tcs)    rm      = [ x 
                                       | m <- nameEnvElts (rm_known rm)
                                       , x <- lookupRM tcs m ]
                                       ++ lookupRM tcs (rm_unknown rm)
+                                      ++ rm_empty rm
+    -- TODO: Including rm_empty due to Note [Eta reduction for data families]
+    -- in GHC.Core.Coercion.Axiom. e.g., we may have an environment which includes
+    --     data instance Fam Int a = ...
+    -- which will result in `axiom ax :: Fam Int ~ FamInt` and an FamInst with
+    -- `fi_tcs = [Int]`, `fi_eta_tvs = [a]`. We need to make sure that this
+    -- instance matches when we are looking for an instance `Fam Int a`.
 
 insertRM :: [RoughMatchTc] -> a -> RoughMap a -> RoughMap a
 insertRM k v RMEmpty =
