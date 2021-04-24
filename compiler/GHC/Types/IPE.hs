@@ -10,6 +10,9 @@ import GHC.Core.DataCon
 import GHC.Types.Unique.Map
 import GHC.Core.Type
 import Data.List.NonEmpty
+import GHC.Cmm.Dataflow.Label (Label)
+import GHC.Cmm (CmmInfoTable)
+import GHC.Cmm.Node (CmmTickish)
 
 -- | A map from a 'Name' to the best approximate source position that
 -- name arose from.
@@ -30,7 +33,10 @@ type DCMap = UniqMap DataCon (NonEmpty (Int, Maybe (RealSrcSpan, String)))
 
 data InfoTableProvMap = InfoTableProvMap
                           { provDC :: DCMap
-                          , provClosure :: ClosureMap }
+                          , provClosure :: ClosureMap
+                          -- TODO: More efficient data structure for searching?
+                          , labeledInfoTablesWithTickishes :: [(Label, CmmInfoTable, Maybe CmmTickish)]
+                          }
 
 emptyInfoTableProvMap :: InfoTableProvMap
-emptyInfoTableProvMap = InfoTableProvMap emptyUniqMap emptyUniqMap
+emptyInfoTableProvMap = InfoTableProvMap emptyUniqMap emptyUniqMap []
