@@ -1375,7 +1375,7 @@ tcRecordUpd con_like arg_tys rbinds = fmap catMaybes $ mapM do_bind rbinds
                  return (Just
                          (L l (fld { hsRecFieldLbl
                                       = L loc (Unambiguous
-                                               (extFieldOcc (unLoc f'))
+                                               (foExt (unLoc f'))
                                                (L (noAnnSrcSpan loc) lbl))
                                    , hsRecFieldArg = rhs' }))) }
 
