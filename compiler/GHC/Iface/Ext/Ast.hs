@@ -741,23 +741,23 @@ instance HiePass p => HasType (LocatedA (HsExpr (GhcPass p))) where
           -- I have no idea. Perhaps wz1000 would know.
           skipDesugaring :: HsExpr GhcTc -> Bool
           skipDesugaring e = case e of
-            HsVar{}             -> False
-            HsConLikeOut{}      -> False
-            HsRecFld{}          -> False
-            HsOverLabel{}       -> False
-            HsIPVar{}           -> False
-            XExpr (WrapExpr {}) -> False
-            HsUnboundVar{}      -> False
-            HsLit{}             -> False
-            HsOverLit{}         -> False
-            HsLam{}             -> False
-            HsLamCase{}         -> False
-            HsCase{}            -> False
-            ExplicitList{}      -> False
-            ExplicitSum{}       -> False
-            HsDo{}              -> False
-            HsMultiIf{}         -> False
-            _                   -> True
+            HsVar{}                       -> False
+            HsConLikeOut{}                -> False
+            HsRecFld{}                    -> False
+            HsOverLabel{}                 -> False
+            HsIPVar{}                     -> False
+            XExpr (WrapExpr (HsWrap _ e)) -> skipDesugaring e
+            HsUnboundVar{}                -> False
+            HsLit{}                       -> False
+            HsOverLit{}                   -> False
+            HsLam{}                       -> False
+            HsLamCase{}                   -> False
+            HsCase{}                      -> False
+            ExplicitList{}                -> False
+            ExplicitSum{}                 -> False
+            HsDo{}                        -> False
+            HsMultiIf{}                   -> False
+            _                             -> True
 
 data HiePassEv p where
   HieRn :: HiePassEv 'Renamed
