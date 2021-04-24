@@ -385,6 +385,7 @@ Library
         GHC.Driver.Env.Types
         GHC.Driver.Errors
         GHC.Driver.Flags
+        GHC.Driver.GenerateCgIPEStub
         GHC.Driver.Hooks
         GHC.Driver.Main
         GHC.Driver.Make

@@ -219,7 +219,7 @@ import qualified GHC.Data.Stream as Stream
 import GHC.Data.Stream (Stream)
 
 import Data.Data hiding (Fixity, TyCon)
-import Data.Maybe       ( fromJust, catMaybes, listToMaybe )
+import Data.Maybe       ( fromJust )
 import Data.List        ( nub, isPrefixOf, partition )
 import Control.Monad
 import Data.IORef
@@ -231,15 +231,8 @@ import Data.Set (Set)
 import Data.Functor
 import Control.DeepSeq (force)
 import Data.Bifunctor (first, bimap)
-import GHC.Cmm.Dataflow.Collections (IsMap (mapToList))
-import GHC.StgToCmm.Prof (initInfoTableProv)
-import GHC.StgToCmm.Monad (runC, initC, getCmm)
 import GHC.Types.Name.Set (NonCaffySet)
-import GHC.Cmm.Utils (toBlockList)
-import GHC.Cmm.Dataflow (O, Block, C)
-import GHC.Cmm.Dataflow.Block (lastNode, blockToList, blockSplit)
-import GHC.Data.Maybe (firstJusts)
-import GHC.Cmm.Dataflow.Label (Label)
+import GHC.Driver.GenerateCgIPEStub (generateCgIPEStub)
 
 #include "HsVersions.h"
 
@@ -1810,63 +1803,7 @@ doCodeGen hsc_env this_mod denv data_tycons
             dumpIfSet_dyn logger dflags Opt_D_dump_cmm "Output Cmm" FormatCMM (pdoc platform a)
           return a
 
-    return $ generateCgIPEStub (Stream.mapM dump2 pipeline_stream)
-  where
-    collectInfoTables:: CmmGroupSRTs -> [(Label, CmmInfoTable)]
-    collectInfoTables gs = concat $ catMaybes $ map extractCmmInfoTable gs
-      where
-        extractCmmInfoTable :: GenCmmDecl RawCmmStatics CmmTopInfo CmmGraph -> Maybe [(Label, CmmInfoTable)]
-        extractCmmInfoTable (CmmProc h _ _ _) = Just $ mapToList (info_tbls h)
-        extractCmmInfoTable _ = Nothing
-
-    -- TODO: Does this check flag to see if IPE is wanted?
-    generateCgIPEStub :: Stream IO CmmGroupSRTs (NonCaffySet, ModuleLFInfos) -> Stream IO CmmGroupSRTs CgInfos
-    generateCgIPEStub s = do
-        let dflags = hsc_dflags hsc_env
-        cgState <- liftIO initC
-        (labeledInfoTablesWithTickishes, (nonCaffySet, moduleLFInfos)) <- Stream.mapAccumL_ mappy [] s
-        let denv' = denv {labeledInfoTablesWithTickishes = labeledInfoTablesWithTickishes}
-            ((ipeStub, cmmGroup), _) = runC dflags this_mod cgState $ getCmm (initInfoTableProv (map sndOfTriple labeledInfoTablesWithTickishes) denv' this_mod)
-        (_, cmmGroupSRTs) <- liftIO $ cmmPipeline hsc_env (emptySRT this_mod) cmmGroup
-        Stream.yield cmmGroupSRTs
-        return CgInfos{ cgNonCafs = nonCaffySet, cgLFInfos = moduleLFInfos, cgIPEStub = ipeStub }
-        where
-          -- TODO: `mappy` is a bad name
-          mappy :: [(Label, CmmInfoTable, Maybe CmmTickish)] -> CmmGroupSRTs -> IO ([(Label, CmmInfoTable, Maybe CmmTickish)], CmmGroupSRTs)
-          mappy acc cmmGroupSRTs = do
-            let labelsToInfoTables = collectInfoTables cmmGroupSRTs
-                labelsToInfoTablesToTickishes = map (\(l, i) -> (l,i, lookupEstimatedTick cmmGroupSRTs l)) labelsToInfoTables
-            return (acc ++ labelsToInfoTablesToTickishes, cmmGroupSRTs)
-
-          sndOfTriple :: (a,b,c) -> b
-          sndOfTriple (_,b,_) = b
-    -- TODO: Write a note: [Looking up CmmTickish for return frame info tables]
-    lookupEstimatedTick:: CmmGroupSRTs -> Label -> Maybe CmmTickish
-    lookupEstimatedTick cmmGroup infoTableLabel = do
-      let blocks = concatMap toBlockList (graphs cmmGroup)
-      -- TODO: Probably, it's not the Label but something else
-      firstJusts $ map (findCmmTickishForLabelInBlock infoTableLabel) blocks
-
-    graphs :: CmmGroupSRTs -> [CmmGraph]
-    graphs cmmGroup = foldl' go [] cmmGroup
-      where
-        go :: [CmmGraph] -> GenCmmDecl d h CmmGraph -> [CmmGraph]
-        go acc (CmmProc _ _ _ g) = g:acc
-        go acc _ = acc
-
-    findCmmTickishForLabelInBlock :: Label -> Block CmmNode C C -> Maybe CmmTickish
-    findCmmTickishForLabelInBlock label block = do
-        isCallWithReturnFrameLabel (lastNode block) label
-        let (_, middleBlock, _) = blockSplit block
-            middleBlockList = blockToList middleBlock
-
-        listToMaybe $ catMaybes $ map (\cmm -> case cmm of
-                            CmmTick t -> Just t
-                            _ -> Nothing) (reverse middleBlockList)
-        where
-          isCallWithReturnFrameLabel :: CmmNode O C -> Label -> Maybe ()
-          isCallWithReturnFrameLabel (CmmCall _ (Just l) _ _ _ _) clabel = if l == clabel then Just () else Nothing
-          isCallWithReturnFrameLabel _ _ = Nothing
+    return $ generateCgIPEStub hsc_env this_mod denv (Stream.mapM dump2 pipeline_stream)
 
 myCoreToStgExpr :: Logger -> DynFlags -> InteractiveContext
                 -> Module -> ModLocation -> CoreExpr
