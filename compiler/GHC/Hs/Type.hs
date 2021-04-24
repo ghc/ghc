@@ -804,6 +804,14 @@ type instance XCFieldOcc GhcTc = Id
 
 type instance XXFieldOcc (GhcPass _) = NoExtCon
 
+instance OutputableBndr (FieldOcc (GhcPass p)) where
+  pprInfixOcc  = pprInfixOcc . foLabel
+  pprPrefixOcc = pprPrefixOcc . foLabel
+
+instance OutputableBndr (GenLocated SrcSpan (FieldOcc (GhcPass p))) where
+  pprInfixOcc  = pprInfixOcc . unLoc
+  pprPrefixOcc = pprPrefixOcc . unLoc
+
 mkFieldOcc :: LocatedN RdrName -> FieldOcc GhcPs
 mkFieldOcc rdr = FieldOcc noExtField rdr
 

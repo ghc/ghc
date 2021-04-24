@@ -344,6 +344,9 @@ Specifically,
     it's just an error thunk
 -}
 
+instance Outputable (RecordPatSynField (GhcPass pass)) where
+    ppr (RecordPatSynField { recordPatSynField = v }) = ppr v
+
 instance (OutputableBndrId pl, OutputableBndrId pr)
         => Outputable (HsLocalBindsLR (GhcPass pl) (GhcPass pr)) where
   ppr (HsValBinds _ bs)   = ppr bs
