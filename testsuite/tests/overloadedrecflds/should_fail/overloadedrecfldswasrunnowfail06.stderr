@@ -1,12 +1,12 @@
 
- overloadedrecfldsfail13.hs:10:5:
+overloadedrecfldswasrunnowfail06.hs:11:11:
     Ambiguous field selector occurence: x
 
- overloadedrecfldsfail13.hs:12:5:
+overloadedrecfldswasrunnowfail06.hs:13:11:
     Ambiguous field selector occurence: x
 
- overloadedrecfldsfail13.hs:15:5:
+overloadedrecfldswasrunnowfail06.hs:15:13:
     Ambiguous field selector occurence: x
 
- overloadedrecfldsfail13.hs:18:5:
+overloadedrecfldswasrunnowfail06.hs:21:20:
     Ambiguous field selector occurence: x

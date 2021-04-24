@@ -41,6 +41,7 @@ import GHC.Rename.Utils ( HsDocContext(..), bindLocalNamesFV, checkDupNames
                         , bindLocalNames
                         , mapMaybeFvRn, mapFvRn
                         , warnUnusedLocalBinds, typeAppErr
+                        , ambiguousFieldOccErr
                         , checkUnusedRecordWildcard )
 import GHC.Rename.Unbound ( reportUnboundName )
 import GHC.Rename.Splice  ( rnBracket, rnSpliceExpr, checkThLocalName )
@@ -228,10 +229,13 @@ rnExpr (HsVar _ (L l v))
               -> finishHsVar (L (na2la l) name) ;
             Just (UnambiguousGre (FieldGreName fl)) ->
               let sel_name = flSelector fl in
-              return ( HsRecFld noExtField (Unambiguous sel_name (L l v) ), unitFV sel_name) ;
-            Just AmbiguousFields ->
-              return ( HsRecFld noExtField (Ambiguous noExtField (L l v) ), emptyFVs) } }
-
+              return ( HsRecSel noExtField (FieldOcc sel_name (L l v) ), unitFV sel_name) ;
+            Just AmbiguousFields -> do {
+                 addErr $ ambiguousFieldOccErr v
+               ; return (HsUnboundVar noExtField (rdrNameOcc v), emptyFVs)
+               }
+         }
+       }
 
 rnExpr (HsIPVar x v)
   = return (HsIPVar x v, emptyFVs)
@@ -293,7 +297,7 @@ rnExpr (OpApp _ e1 op e2)
         -- should prevent bad things happening.
         ; fixity <- case op' of
               L _ (HsVar _ (L _ n)) -> lookupFixityRn n
-              L _ (HsRecFld _ f)    -> lookupFieldFixityRn f
+              L _ (HsRecSel _ f)    -> lookupFieldFixityRn f
               _ -> return (Fixity NoSourceText minPrecedence InfixL)
                    -- c.f. lookupFixity for unbound
 
