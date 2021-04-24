@@ -742,7 +742,7 @@ instance HiePass p => HasType (LocatedA (HsExpr (GhcPass p))) where
             HsRecSel{}          -> False
             HsOverLabel{}       -> False
             HsIPVar{}           -> False
-            XExpr (WrapExpr {}) -> False
+            XExpr{}             -> False
             HsUnboundVar{}      -> False
             HsLit{}             -> False
             HsOverLit{}         -> False
