@@ -218,7 +218,13 @@ data EpAnnUnboundVar = EpAnnUnboundVar
      } deriving Data
 
 type instance XVar           (GhcPass _) = NoExtField
-type instance XRecFld        (GhcPass _) = NoExtField
+
+-- Record selectors at parse time are HsVar; they convert to HsRecSel
+-- on renaming.
+type instance XRecSel              GhcPs = Void
+type instance XRecSel              GhcRn = NoExtField
+type instance XRecSel              GhcTc = NoExtField
+
 type instance XLam           (GhcPass _) = NoExtField
 
 -- OverLabel not present in GhcTc pass; see GHC.Rename.Expr
@@ -239,7 +245,6 @@ type instance XUnboundVar    GhcTc = HoleExprRef
   -- Much, much easier just to define HoleExprRef with a Data instance and
   -- store the whole structure.
 
-type instance XRecFld        (GhcPass _) = NoExtField
 type instance XIPVar         (GhcPass _) = EpAnnCO
 type instance XOverLitE      (GhcPass _) = EpAnnCO
 type instance XLitE          (GhcPass _) = EpAnnCO
@@ -486,7 +491,7 @@ ppr_expr :: forall p. (OutputableBndrId p)
          => HsExpr (GhcPass p) -> SDoc
 ppr_expr (HsVar _ (L _ v))   = pprPrefixOcc v
 ppr_expr (HsUnboundVar _ uv) = pprPrefixOcc uv
-ppr_expr (HsRecFld _ f)      = pprPrefixOcc f
+ppr_expr (HsRecSel _ f)      = pprPrefixOcc f
 ppr_expr (HsIPVar _ v)       = ppr v
 ppr_expr (HsOverLabel _ l)   = char '#' <> ppr l
 ppr_expr (HsLit _ lit)       = ppr lit
@@ -683,7 +688,7 @@ instance Outputable XXExprGhcTc where
 
 ppr_infix_expr :: forall p. (OutputableBndrId p) => HsExpr (GhcPass p) -> Maybe SDoc
 ppr_infix_expr (HsVar _ (L _ v))    = Just (pprInfixOcc v)
-ppr_infix_expr (HsRecFld _ f)       = Just (pprInfixOcc f)
+ppr_infix_expr (HsRecSel _ f)       = Just (pprInfixOcc f)
 ppr_infix_expr (HsUnboundVar _ occ) = Just (pprInfixOcc occ)
 ppr_infix_expr (XExpr x)            = case ghcPass @p of
 #if __GLASGOW_HASKELL__ < 901
@@ -786,7 +791,7 @@ hsExprNeedsParens prec = go
     go (HsTick _ _ (L _ e))           = go e
     go (HsBinTick _ _ _ (L _ e))      = go e
     go (RecordCon{})                  = False
-    go (HsRecFld{})                   = False
+    go (HsRecSel{})                   = False
     go (HsProjection{})               = True
     go (HsGetField{})                 = False
     go (XExpr x) = case ghcPass @p of
@@ -828,7 +833,7 @@ isAtomicHsExpr (HsOverLit {})    = True
 isAtomicHsExpr (HsIPVar {})      = True
 isAtomicHsExpr (HsOverLabel {})  = True
 isAtomicHsExpr (HsUnboundVar {}) = True
-isAtomicHsExpr (HsRecFld{})      = True
+isAtomicHsExpr (HsRecSel{})      = True
 isAtomicHsExpr (XExpr x)
   | GhcTc <- ghcPass @p          = go_x_tc x
   | GhcRn <- ghcPass @p          = go_x_rn x

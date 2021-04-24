@@ -1342,7 +1342,7 @@ hsTyClForeignBinders tycl_decls foreign_decls
          foldMap (foldMap hsLInstDeclBinders . group_instds) tycl_decls)
   where
     getSelectorNames :: ([LocatedA Name], [LFieldOcc GhcRn]) -> [Name]
-    getSelectorNames (ns, fs) = map unLoc ns ++ map (extFieldOcc . unLoc) fs
+    getSelectorNames (ns, fs) = map unLoc ns ++ map (foExt . unLoc) fs
 
 -------------------
 hsLTyClDeclBinders :: IsPass p
@@ -1491,7 +1491,7 @@ hsConDeclsBinders cons
        where
           fld_names = remSeen (concatMap (cd_fld_names . unLoc) (unLoc flds))
           remSeen' = foldr (.) remSeen
-                               [deleteBy ((==) `on` unLoc . rdrNameFieldOcc . unLoc) v
+                               [deleteBy ((==) `on` unLoc . foLabel . unLoc) v
                                | v <- fld_names]
 
 {-

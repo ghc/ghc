@@ -30,14 +30,10 @@ import GHC.Types.SourceText
 import GHC.Types.SrcLoc
 
 import GHC.Utils.Outputable
-import GHC.Utils.Panic
 
 import GHC.Data.Maybe
 
 import GHC.Rename.Unbound
-
-import Data.List (groupBy)
-import Data.Function    ( on )
 
 {-
 *********************************************************
@@ -184,39 +180,10 @@ lookupFixityRn_help' name occ
 lookupTyFixityRn :: LocatedN Name -> RnM Fixity
 lookupTyFixityRn = lookupFixityRn . unLoc
 
--- | Look up the fixity of a (possibly ambiguous) occurrence of a record field
--- selector.  We use 'lookupFixityRn'' so that we can specify the 'OccName' as
--- the field label, which might be different to the 'OccName' of the selector
--- 'Name' if @DuplicateRecordFields@ is in use (#1173). If there are
--- multiple possible selectors with different fixities, generate an error.
-lookupFieldFixityRn :: AmbiguousFieldOcc GhcRn -> RnM Fixity
-lookupFieldFixityRn (Unambiguous n lrdr)
+-- | Look up the fixity of an occurrence of a record field selector.
+-- We use 'lookupFixityRn'' so that we can specify the 'OccName' as
+-- the field label, which might be different to the 'OccName' of the
+-- selector 'Name' if @DuplicateRecordFields@ is in use (#1173).
+lookupFieldFixityRn :: FieldOcc GhcRn -> RnM Fixity
+lookupFieldFixityRn (FieldOcc n lrdr)
   = lookupFixityRn' n (rdrNameOcc (unLoc lrdr))
-lookupFieldFixityRn (Ambiguous _ lrdr) = get_ambiguous_fixity (unLoc lrdr)
-  where
-    get_ambiguous_fixity :: RdrName -> RnM Fixity
-    get_ambiguous_fixity rdr_name = do
-      traceRn "get_ambiguous_fixity" (ppr rdr_name)
-      rdr_env <- getGlobalRdrEnv
-      let elts =  lookupGRE_RdrName rdr_name rdr_env
-
-      fixities <- groupBy ((==) `on` snd) . zip elts
-                  <$> mapM lookup_gre_fixity elts
-
-      case fixities of
-        -- There should always be at least one fixity.
-        -- Something's very wrong if there are no fixity candidates, so panic
-        [] -> panic "get_ambiguous_fixity: no candidates for a given RdrName"
-        [ (_, fix):_ ] -> return fix
-        ambigs -> addErr (ambiguous_fixity_err rdr_name ambigs)
-                  >> return (Fixity NoSourceText minPrecedence InfixL)
-
-    lookup_gre_fixity gre = lookupFixityRn' (greMangledName gre) (greOccName gre)
-
-    ambiguous_fixity_err rn ambigs
-      = vcat [ text "Ambiguous fixity for record field" <+> quotes (ppr rn)
-             , hang (text "Conflicts: ") 2 . vcat .
-               map format_ambig $ concat ambigs ]
-
-    format_ambig (elt, fix) = hang (ppr fix)
-                                 2 (pprNameProvenance elt)

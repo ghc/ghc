@@ -1,12 +1,12 @@
 [1 of 2] Compiling OverloadedRecFldsFail11_A ( OverloadedRecFldsFail11_A.hs, OverloadedRecFldsFail11_A.o )
 [2 of 2] Compiling Main             ( overloadedrecfldsfail11.hs, overloadedrecfldsfail11.o )
 
-overloadedrecfldsfail11.hs:5:15: error: [-Wambiguous-fields (in -Wdefault), -Werror=ambiguous-fields]
-    The field ‘foo’ belonging to type S is ambiguous.
-    This will not be supported by -XDuplicateRecordFields in future releases of GHC.
-    You can use a qualified import or explicit case analysis to resolve the ambiguity.
-
-overloadedrecfldsfail11.hs:5:15: error: [-Wdeprecations (in -Wdefault), -Werror=deprecations]
-    In the use of ‘foo’ (imported from OverloadedRecFldsFail11_A):
-    "Warning on a record field"
-
+overloadedrecfldsfail11.hs:5:15:
+    Ambiguous occurrence ‘foo’
+    It could refer to
+       either the field ‘foo’,
+              imported from ‘OverloadedRecFldsFail11_A’ at overloadedrecfldsfail11.hs:3:1-32
+              (and originally defined at OverloadedRecFldsFail11_A.hs:6:16-18)
+           or the field ‘foo’,
+              imported from ‘OverloadedRecFldsFail11_A’ at overloadedrecfldsfail11.hs:3:1-32
+              (and originally defined at OverloadedRecFldsFail11_A.hs:5:16-18)

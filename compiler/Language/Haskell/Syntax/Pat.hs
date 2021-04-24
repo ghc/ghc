@@ -344,7 +344,7 @@ hsRecFieldsArgs :: forall p arg. UnXRec p => HsRecFields p arg -> [arg]
 hsRecFieldsArgs rbinds = map (hfbRHS . unXRec @p) (rec_flds rbinds)
 
 hsRecFieldSel :: forall p arg. UnXRec p => HsRecField p arg -> XCFieldOcc p
-hsRecFieldSel = extFieldOcc . unXRec @p . hfbLHS
+hsRecFieldSel = foExt . unXRec @p . hfbLHS
 
 
 {-

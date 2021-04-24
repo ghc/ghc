@@ -805,10 +805,8 @@ zonkExpr env (HsUnboundVar her occ)
            ty'  <- zonkTcTypeToTypeX env ty
            return (HER ref ty' u)
 
-zonkExpr env (HsRecFld _ (Ambiguous v occ))
-  = return (HsRecFld noExtField (Ambiguous (zonkIdOcc env v) occ))
-zonkExpr env (HsRecFld _ (Unambiguous v occ))
-  = return (HsRecFld noExtField (Unambiguous (zonkIdOcc env v) occ))
+zonkExpr env (HsRecSel _ (FieldOcc v occ))
+  = return (HsRecSel noExtField (FieldOcc (zonkIdOcc env v) occ))
 
 zonkExpr _ (HsIPVar x id)
   = return (HsIPVar x id)

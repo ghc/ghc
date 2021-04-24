@@ -1,8 +1,7 @@
 
-DRFUnused.hs:10:16: error: [-Wunused-top-binds (in -Wextra, -Wunused-binds), -Werror=unused-top-binds]
-    Defined but not used: ‘foo’
-
-DRFUnused.hs:18:5: warning: [-Wambiguous-fields (in -Wdefault)]
-    The field ‘foo’ belonging to type U is ambiguous.
-    This will not be supported by -XDuplicateRecordFields in future releases of GHC.
-    You can use explicit case analysis to resolve the ambiguity.
+DRFUnused.hs:18:5:
+    Ambiguous occurrence ‘foo’
+    It could refer to
+       either the field ‘foo’, defined at DRFUnused.hs:12:16
+           or the field ‘foo’, defined at DRFUnused.hs:11:16
+           or the field ‘foo’, defined at DRFUnused.hs:10:16

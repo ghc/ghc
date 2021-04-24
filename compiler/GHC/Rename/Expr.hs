@@ -211,12 +211,11 @@ rnUnboundVar v =
 
 rnExpr (HsVar _ (L l v))
   = do { dflags <- getDynFlags
-       ; let dup_fields_ok = xopt_DuplicateRecordFields dflags
-       ; mb_name <- lookupExprOccRn dup_fields_ok v
+       ; mb_name <- lookupExprOccRn v
 
        ; case mb_name of {
            Nothing -> rnUnboundVar v ;
-           Just (UnambiguousGre (NormalGreName name))
+           Just (NormalGreName name)
               | name == nilDataConName -- Treat [] as an ExplicitList, so that
                                        -- OverloadedLists works correctly
                                        -- Note [Empty lists] in GHC.Hs.Expr
@@ -225,12 +224,11 @@ rnExpr (HsVar _ (L l v))
 
               | otherwise
               -> finishHsVar (L (na2la l) name) ;
-            Just (UnambiguousGre (FieldGreName fl)) ->
+            Just (FieldGreName fl) ->
               let sel_name = flSelector fl in
-              return ( HsRecFld noExtField (Unambiguous sel_name (L l v) ), unitFV sel_name) ;
-            Just AmbiguousFields ->
-              return ( HsRecFld noExtField (Ambiguous noExtField (L l v) ), emptyFVs) } }
-
+              return ( HsRecSel noExtField (FieldOcc sel_name (L l v) ), unitFV sel_name) ;
+         }
+       }
 
 rnExpr (HsIPVar x v)
   = return (HsIPVar x v, emptyFVs)
@@ -292,7 +290,7 @@ rnExpr (OpApp _ e1 op e2)
         -- should prevent bad things happening.
         ; fixity <- case op' of
               L _ (HsVar _ (L _ n)) -> lookupFixityRn n
-              L _ (HsRecFld _ f)    -> lookupFieldFixityRn f
+              L _ (HsRecSel _ f)    -> lookupFieldFixityRn f
               _ -> return (Fixity NoSourceText minPrecedence InfixL)
                    -- c.f. lookupFixity for unbound
 

@@ -284,7 +284,7 @@ repTopDs group@(HsGroup { hs_valds   = valds
                         , hs_docs    = docs })
  = do { let { bndrs  = hsScopedTvBinders valds
                        ++ hsGroupBinders group
-                       ++ map extFieldOcc (hsPatSynSelectors valds)
+                       ++ map foExt (hsPatSynSelectors valds)
             ; instds = tyclds >>= group_instds } ;
         ss <- mkGenSyms bndrs ;
 
@@ -1486,9 +1486,7 @@ repE (HsVar _ (L _ x)) =
 repE (HsIPVar _ n) = rep_implicit_param_name n >>= repImplicitParamVar
 repE (HsOverLabel _ s) = repOverLabel s
 
-repE e@(HsRecFld _ f) = case f of
-  Unambiguous x _ -> repE (HsVar noExtField (noLocA x))
-  Ambiguous{}     -> notHandled "Ambiguous record selectors" (ppr e)
+repE (HsRecSel _ (FieldOcc x _)) = repE (HsVar noExtField (noLocA x))
 
         -- Remember, we're desugaring renamer output here, so
         -- HsOverlit can definitely occur
@@ -1929,7 +1927,7 @@ rep_bind (L loc (PatSynBind _ (PSB { psb_id   = syn
     mkGenArgSyms (InfixCon arg1 arg2) = mkGenSyms [unLoc arg1, unLoc arg2]
     mkGenArgSyms (RecCon fields)
       = do { let pats = map (unLoc . recordPatSynPatVar) fields
-                 sels = map (extFieldOcc . recordPatSynField) fields
+                 sels = map (foExt . recordPatSynField) fields
            ; ss <- mkGenSyms sels
            ; return $ replaceNames (zip sels pats) ss }
 
@@ -1959,7 +1957,7 @@ repPatSynArgs (InfixCon arg1 arg2)
        ; arg2' <- lookupLOcc arg2
        ; repInfixPatSynArgs arg1' arg2' }
 repPatSynArgs (RecCon fields)
-  = do { sels' <- repList nameTyConName (lookupOcc . extFieldOcc) sels
+  = do { sels' <- repList nameTyConName (lookupOcc . foExt) sels
        ; repRecordPatSynArgs sels' }
   where sels = map recordPatSynField fields
 
@@ -2706,7 +2704,7 @@ repRecConArgs ips = do
       rep_ip (L _ ip) = mapM (rep_one_ip (cd_fld_type ip)) (cd_fld_names ip)
 
       rep_one_ip :: LBangType GhcRn -> LFieldOcc GhcRn -> MetaM (Core (M TH.VarBangType))
-      rep_one_ip t n = do { MkC v  <- lookupOcc (extFieldOcc $ unLoc n)
+      rep_one_ip t n = do { MkC v  <- lookupOcc (foExt $ unLoc n)
                           ; MkC ty <- repBangTy  t
                           ; rep2 varBangTypeName [v,ty] }
 
