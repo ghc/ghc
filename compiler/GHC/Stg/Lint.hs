@@ -33,7 +33,7 @@ basic properties listed above.
 -}
 
 {-# LANGUAGE ScopedTypeVariables, FlexibleContexts, TypeFamilies,
-  DeriveFunctor #-}
+   TypeOperators, DeriveFunctor #-}
 
 module GHC.Stg.Lint ( lintStgTopBindings ) where
 
