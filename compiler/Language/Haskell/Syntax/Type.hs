@@ -1248,29 +1248,23 @@ type LFieldOcc pass = XRec pass (FieldOcc pass)
 
 -- | Field Occurrence
 --
--- Represents an *occurrence* of an unambiguous field.  This may or may not be a
--- binding occurrence (e.g. this type is used in 'ConDeclField' and
--- 'RecordPatSynField' which bind their fields, but also in 'HsRecField' for
--- record construction and patterns, which do not).
---
--- We store both the 'RdrName' the user originally wrote, and after the renamer,
--- the selector function.
-data FieldOcc pass = FieldOcc { extFieldOcc     :: XCFieldOcc pass
-                              , rdrNameFieldOcc :: LocatedN RdrName
-                                 -- ^ See Note [Located RdrNames] in "GHC.Hs.Expr"
-                              }
-
-  | XFieldOcc
-      !(XXFieldOcc pass)
+-- This represents an occurence of a field name (which may be
+-- qualified, hence RdrName, and gets resolved by the renamer).
+data FieldOcc pass
+  = FieldOcc {
+        foExt :: XCFieldOcc pass
+      , foLabel :: XRec p RdrName -- See Note [Located RdrNames] below.
+      }
+  | XFieldOcc !(XXFieldOcc pass)
 
 deriving instance (Eq (XCFieldOcc pass), Eq (XXFieldOcc pass)) => Eq (FieldOcc pass)
 
 instance Outputable (FieldOcc pass) where
-  ppr = ppr . rdrNameFieldOcc
+  ppr = ppr . foLabel
 
 instance OutputableBndr (FieldOcc pass) where
-  pprInfixOcc  = pprInfixOcc . unLoc . rdrNameFieldOcc
-  pprPrefixOcc = pprPrefixOcc . unLoc . rdrNameFieldOcc
+  pprInfixOcc  = pprInfixOcc . unLoc . foLabel
+  pprPrefixOcc = pprPrefixOcc . unLoc . foLabel
 
 instance OutputableBndr (GenLocated SrcSpan (FieldOcc pass)) where
   pprInfixOcc  = pprInfixOcc . unLoc
