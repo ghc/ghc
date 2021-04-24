@@ -776,7 +776,7 @@ instance HiePass p => HasType (LocatedA (HsExpr (GhcPass p))) where
           skipDesugaring e = case e of
             HsVar{}             -> False
             HsConLikeOut{}      -> False
-            HsRecFld{}          -> False
+            HsRecSel{}          -> False
             HsOverLabel{}       -> False
             HsIPVar{}           -> False
             XExpr (WrapExpr {}) -> False
@@ -907,7 +907,7 @@ instance HiePass p => ToHie (Located (PatSynBind (GhcPass p) (GhcPass p))) where
             (InfixCon a b) -> combineScopes (mkLScopeN a) (mkLScopeN b)
             (RecCon r) -> foldr go NoScope r
           go (RecordPatSynField a b) c = combineScopes c
-            $ combineScopes (mkLScopeN (rdrNameFieldOcc a)) (mkLScopeN b)
+            $ combineScopes (mkLScopeN (foLabel a)) (mkLScopeN b)
           detSpan = case detScope of
             LocalScope a -> Just a
             _ -> Nothing
@@ -1090,7 +1090,7 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
       HsConLikeOut _ con ->
         [ toHie $ C Use $ L mspan $ conLikeName con
         ]
-      HsRecFld _ fld ->
+      HsRecSel _ fld ->
         [ toHie $ RFC RecFieldOcc Nothing (L (locA mspan) fld)
         ]
       HsOverLabel {} -> []
