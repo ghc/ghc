@@ -2433,7 +2433,7 @@ extendPatSynEnv dup_fields_ok has_sel val_decls local_fix_env thing = do {
                                        , psb_args = RecCon as }))) <- bind
       = do
           bnd_name <- newTopSrcBinder (L (l2l bind_loc) n)
-          let field_occs = map ((\ f -> L (getLocA (rdrNameFieldOcc f)) f) . recordPatSynField) as
+          let field_occs = map ((\ f -> L (getLocA (foLabel f)) f) . recordPatSynField) as
           flds <- mapM (newRecordSelector dup_fields_ok has_sel [bnd_name]) field_occs
           return ((bnd_name, flds): names)
       | L bind_loc (PatSynBind _ (PSB { psb_id = L _ n})) <- bind

@@ -261,6 +261,55 @@ is Less Cool because
     typecheck do-notation with (>>=) :: m1 a -> (a -> m2 b) -> m2 b.)
 -}
 
+{-
+Note [Record selectors in the AST]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Here is how record selectors are expressed in GHC's AST:
+
+Example data type
+  data T = MkT { size :: Int }
+
+Record selectors:
+                      |    GhcPs     |   GhcRn              |    GhcTc            |
+----------------------------------------------------------------------------------|
+size (assuming one    | HsVar        | HsRecSel             | HsRecSel            |
+     'size' in scope) |              |                      |                     |
+----------------------|--------------|----------------------|---------------------|
+.size (assuming       | HsProjection | getField @"size"     | getField @"size"    |
+ OverloadedRecordDot) |              |                      |                     |
+----------------------|--------------|----------------------|---------------------|
+e.size (assuming      | HsGetField   | getField @"size" e   | getField @"size" e  |
+ OverloadedRecordDot) |              |                      |                     |
+
+NB 1: DuplicateRecordFields makes no difference to the first row of
+this table, except that if 'size' is a field of more than one data
+type, then a naked use of the record selector 'size' may well be
+ambiguous. You have to use a qualified name. And there is no way to do
+this if both data types are declared in the same module.
+
+NB 2: The notation getField @"size" e is short for
+HsApp (HsAppType (HsVar "getField") (HsWC (HsTyLit (HsStrTy "size")) [])) e.
+We track the original parsed syntax via HsExpanded.
+
+-}
+
+{-
+Note [Non-overloaded record field selectors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+    data T = MkT { x,y :: Int }
+    f r x = x + y r
+
+This parses with HsVar for x, y, r on the RHS of f. Later, the renamer
+recognises that y in the RHS of f is really a record selector, and
+changes it to a HsRecSel. In contrast x is locally bound, shadowing
+the record selector, and stays as an HsVar.
+
+The renamer adds the Name of the record selector into the XCFieldOcc
+extension field, The typechecker keeps HsRecSel as HsRecSel, and
+transforms the record-selector Name to an Id.
+-}
+
 -- | A Haskell expression.
 data HsExpr p
   = HsVar     (XVar p)
@@ -279,11 +328,10 @@ data HsExpr p
                              --   solving. See Note [Holes] in GHC.Tc.Types.Constraint.
 
 
-  | HsRecFld  (XRecFld p)
-              (AmbiguousFieldOcc p) -- ^ Variable pointing to record selector
-              -- The parser produces HsVars
-              -- The renamer renames record-field selectors to HsRecFld
-              -- The typechecker preserves HsRecFld
+  | HsRecSel  (XRecSel p)
+              (FieldOcc p) -- ^ Variable pointing to record selector
+                           -- See Note [Non-overloaded record field selectors] and
+                           -- Note [Record selectors in the AST]
 
   | HsOverLabel (XOverLabel p) FastString
      -- ^ Overloaded label (Note [Overloaded labels] in GHC.OverloadedLabels)
@@ -328,7 +376,7 @@ data HsExpr p
   -- NB Bracketed ops such as (+) come out as Vars.
 
   -- NB Sadly, we need an expr for the operator in an OpApp/Section since
-  -- the renamer may turn a HsVar into HsRecFld or HsUnboundVar
+  -- the renamer may turn a HsVar into HsRecSel or HsUnboundVar
 
   | OpApp       (XOpApp p)
                 (LHsExpr p)       -- left operand
@@ -480,7 +528,7 @@ data HsExpr p
   --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnDot'
   --
   -- This case only arises when the OverloadedRecordDot langauge
-  -- extension is enabled.
+  -- extension is enabled. See Note [Record Selectors in the AST].
 
   | HsGetField {
         gf_ext :: XGetField p
@@ -494,7 +542,7 @@ data HsExpr p
   --         'GHC.Parser.Annotation.AnnDot', 'GHC.Parser.Annotation.AnnCloseP'
   --
   -- This case only arises when the OverloadedRecordDot langauge
-  -- extensions is enabled.
+  -- extensions is enabled. See Note [Record Selectors in the AST].
 
   | HsProjection {
         proj_ext :: XProjection p

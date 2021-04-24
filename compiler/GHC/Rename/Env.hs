@@ -1155,21 +1155,17 @@ lookupOccRn_maybe = lookupOccRnX_maybe lookupGlobalOccRn_maybe id
 --
 -- This may be a local variable, global variable, or one or more record selector
 -- functions.  It will not return record fields created with the
--- @NoFieldSelectors@ extension (see Note [NoFieldSelectors]).  The
--- 'DuplicateRecordFields' argument controls whether ambiguous fields will be
--- allowed (resulting in an 'AmbiguousFields' result being returned).
+-- @NoFieldSelectors@ extension (see Note [NoFieldSelectors]).
 --
 -- If the name is not in scope at the term level, but its promoted equivalent is
 -- in scope at the type level, the lookup will succeed (so that the type-checker
 -- can report a more informative error later).  See Note [Promotion].
 --
-lookupExprOccRn
-  :: DuplicateRecordFields -> RdrName
-  -> RnM (Maybe AmbiguousResult)
-lookupExprOccRn dup_fields_ok rdr_name
-  = do { mb_name <- lookupOccRnX_maybe global_lookup (UnambiguousGre . NormalGreName) rdr_name
+lookupExprOccRn :: RdrName -> RnM (Maybe GreName)
+lookupExprOccRn rdr_name
+  = do { mb_name <- lookupOccRnX_maybe global_lookup NormalGreName rdr_name
        ; case mb_name of
-           Nothing   -> fmap @Maybe (UnambiguousGre . NormalGreName) <$> lookup_promoted rdr_name
+           Nothing   -> fmap @Maybe NormalGreName <$> lookup_promoted rdr_name
                         -- See Note [Promotion].
                         -- We try looking up the name as a
                         -- type constructor or type variable, if
@@ -1177,8 +1173,14 @@ lookupExprOccRn dup_fields_ok rdr_name
            p         -> return p }
 
   where
-    global_lookup :: RdrName -> RnM (Maybe AmbiguousResult)
-    global_lookup = lookupGlobalOccRn_overloaded dup_fields_ok WantNormal
+    global_lookup :: RdrName -> RnM (Maybe GreName)
+    global_lookup  rdr_name =
+      do { mb_name <- lookupGlobalOccRn_overloaded NoDuplicateRecordFields WantNormal rdr_name
+         ; case mb_name of
+             Just (UnambiguousGre name) -> return (Just name)
+             Just _ -> panic "GHC.Rename.Env.global_lookup: The impossible happened!"
+             Nothing -> return Nothing
+         }
 
 lookupGlobalOccRn_maybe :: RdrName -> RnM (Maybe Name)
 -- Looks up a RdrName occurrence in the top-level

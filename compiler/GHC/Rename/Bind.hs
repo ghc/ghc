@@ -705,7 +705,7 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
                       ; return ( (pat', InfixCon name1 name2)
                                , mkFVs (map unLoc [name1, name2])) }
                RecCon vars ->
-                   do { checkDupRdrNames (map (rdrNameFieldOcc . recordPatSynField) vars)
+                   do { checkDupRdrNames (map (foLabel . recordPatSynField) vars)
                       ; fls <- lookupConstructorFields name
                       ; let fld_env = mkFsEnv [ (flLabel fl, fl) | fl <- fls ]
                       ; let rnRecordPatSynField
@@ -741,7 +741,7 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
                           , psb_ext = fvs' }
               selector_names = case details' of
                                  RecCon names ->
-                                  map (extFieldOcc . recordPatSynField) names
+                                  map (foExt . recordPatSynField) names
                                  _ -> []
 
         ; fvs' `seq` -- See Note [Free-variable space leak]
