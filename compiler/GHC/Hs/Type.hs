@@ -818,6 +818,14 @@ type instance XAmbiguous GhcTc = Id
 
 type instance XXAmbiguousFieldOcc (GhcPass _) = NoExtCon
 
+instance  OutputableBndr (FieldOcc (GhcPass p)) where
+  pprInfixOcc  = pprInfixOcc . unLoc . foLabel
+  pprPrefixOcc = pprPrefixOcc . unLoc . foLabel
+
+instance  OutputableBndr (GenLocated SrcSpan (FieldOcc (GhcPass p))) where
+  pprInfixOcc  = pprInfixOcc . unLoc
+  pprPrefixOcc = pprPrefixOcc . unLoc
+
 instance Outputable (AmbiguousFieldOcc (GhcPass p)) where
   ppr = ppr . rdrNameAmbiguousFieldOcc
 

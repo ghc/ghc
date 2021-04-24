@@ -1,6 +1,6 @@
 
-T13132_duplicaterecflds.hs:7:16:
+T11167_ambig.hs:10:13:
     Ambiguous field selector occurence: runContT
 
-T13132_duplicaterecflds.hs:9:12:
+T11167_ambig.hs:17:9:
     Ambiguous field selector occurence: runContT
