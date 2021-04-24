@@ -23,7 +23,6 @@ module GHC.Tc.Gen.Expr
          tcPolyExpr, tcExpr,
          tcSyntaxOp, tcSyntaxOpGen, SyntaxOpType(..), synKnownType,
          tcCheckId,
-         addAmbiguousNameErr,
          getFixedTyVars ) where
 
 #include "HsVersions.h"
