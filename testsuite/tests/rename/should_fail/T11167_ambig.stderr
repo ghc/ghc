@@ -1,0 +1,12 @@
+
+ T11167_ambig.hs:10:13:
+    Ambiguous occurrence ‘runContT’
+    It could refer to
+       either the field ‘runContT’, defined at T11167_ambig.hs:7:32
+           or the field ‘runContT’, defined at T11167_ambig.hs:6:30
+
+ T11167_ambig.hs:17:9:
+    Ambiguous occurrence ‘runContT’
+    It could refer to
+       either the field ‘runContT’, defined at T11167_ambig.hs:7:32
+           or the field ‘runContT’, defined at T11167_ambig.hs:6:30
