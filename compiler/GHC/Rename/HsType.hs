@@ -821,12 +821,11 @@ rnHsTyOp :: Outputable a
          => RnTyKiEnv -> a -> LocatedN RdrName
          -> RnM (LocatedN Name, FreeVars)
 rnHsTyOp env overall_ty (L loc op)
-  = do { ops_ok <- xoptM LangExt.TypeOperators
-       ; op' <- rnTyVar env op
-       ; unless (ops_ok || op' `hasKey` eqTyConKey) $
+  = do { op' <- rnTyVar env op
+       ; unless (op' `hasKey` eqTyConKey) $ -- TODO (int-index): update tests/submodules and drop this check
+         unlessXOptM LangExt.TypeOperators $
            addErr (opTyErr op overall_ty)
-       ; let l_op' = L loc op'
-       ; return (l_op', unitFV op') }
+       ; return (L loc op', unitFV op') }
 
 --------------
 notAllowed :: SDoc -> SDoc

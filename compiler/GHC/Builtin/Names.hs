@@ -2831,4 +2831,5 @@ pretendNameIsInScope n
     [ liftedTypeKindTyConKey, unliftedTypeKindTyConKey
     , liftedDataConKey, unliftedDataConKey
     , tYPETyConKey
-    , runtimeRepTyConKey, boxedRepDataConKey ]
+    , runtimeRepTyConKey, boxedRepDataConKey
+    , eqTyConKey ]

@@ -1,5 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE TypeOperators #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -159,6 +160,8 @@ module Prelude (
     -- ** Exception handling in the I\/O monad
     IOError, ioError, userError,
 
+    -- ** The equality types
+    type (~)
   ) where
 
 import Control.Monad
@@ -172,6 +175,7 @@ import Data.Functor     ( (<$>) )
 import Data.Maybe
 import Data.Traversable ( Traversable(..) )
 import Data.Tuple
+import Data.Type.Equality ( type (~) )
 
 import GHC.Base hiding ( foldr, mapM, sequence )
 import Text.Read
