@@ -24,7 +24,7 @@ module GHC.Tc.Gen.Head
 
        , tcInferAppHead, tcInferAppHead_maybe
        , tcInferId, tcCheckId
-       , obviousSig, addAmbiguousNameErr
+       , obviousSig
        , tyConOf, tyConOfET, lookupParents, fieldNotInType
        , notSelector, nonBidirectionalErr
 
@@ -41,11 +41,10 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Unify
 import GHC.Types.Basic
 import GHC.Tc.Utils.Instantiate
-import GHC.Tc.Instance.Family ( tcGetFamInstEnvs, tcLookupDataFamInst )
+import GHC.Tc.Instance.Family ( tcLookupDataFamInst )
 import GHC.Core.FamInstEnv    ( FamInstEnvs )
 import GHC.Core.UsageEnv      ( unitUE )
-import GHC.Rename.Env         ( addUsedGRE )
-import GHC.Rename.Utils       ( addNameClashErrRn, unknownSubordinateErr )
+import GHC.Rename.Utils       ( unknownSubordinateErr )
 import GHC.Tc.Solver          ( InferMode(..), simplifyInfer )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Zonk      ( hsLitType )
@@ -75,7 +74,6 @@ import GHC.Utils.Panic
 import Control.Monad
 
 import Data.Function
-import qualified Data.List.NonEmpty as NE
 
 #include "HsVersions.h"
 
@@ -540,18 +538,12 @@ non-obvious ways.
 See also Note [HsRecField and HsRecUpdField] in GHC.Hs.Pat.
 -}
 
-tcInferRecSelId :: AmbiguousFieldOcc GhcRn
+tcInferRecSelId :: FieldOcc GhcRn
                 -> [HsExprArg 'TcpRn] -> Maybe TcRhoType
                 -> TcM (HsExpr GhcTc, TcSigmaType)
-tcInferRecSelId (Unambiguous sel_name lbl) _args _mb_res_ty
+tcInferRecSelId (FieldOcc sel_name lbl) _args _mb_res_ty
    = do { sel_id <- tc_rec_sel_id lbl sel_name
-        ; let expr = HsRecFld noExtField (Unambiguous sel_id lbl)
-        ; return (expr, idType sel_id) }
-
-tcInferRecSelId (Ambiguous _ lbl) args mb_res_ty
-   = do { sel_name <- tcInferAmbiguousRecSelId lbl args mb_res_ty
-        ; sel_id   <- tc_rec_sel_id lbl sel_name
-        ; let expr = HsRecFld noExtField (Ambiguous sel_id lbl)
+        ; let expr = HsRecFld noExtField (FieldOcc sel_id lbl)
         ; return (expr, idType sel_id) }
 
 ------------------------
@@ -579,72 +571,6 @@ tc_rec_sel_id lbl sel_name
     occ = rdrNameOcc (unLoc lbl)
 
 ------------------------
-tcInferAmbiguousRecSelId :: LocatedN RdrName
-                         -> [HsExprArg 'TcpRn] -> Maybe TcRhoType
-                         -> TcM Name
--- Disgusting special case for ambiguous record selectors
--- Given a RdrName that refers to multiple record fields, and the type
--- of its argument, try to determine the name of the selector that is
--- meant.
--- See Note [Disambiguating record fields]
-tcInferAmbiguousRecSelId lbl args mb_res_ty
-  | arg1 : _ <- dropWhile (not . isVisibleArg) args -- A value arg is first
-  , EValArg { eva_arg = ValArg (L _ arg) } <- arg1
-  , Just sig_ty <- obviousSig arg  -- A type sig on the arg disambiguates
-  = do { sig_tc_ty <- tcHsSigWcType (ExprSigCtxt NoRRC) sig_ty
-       ; finish_ambiguous_selector lbl sig_tc_ty }
-
-  | Just res_ty <- mb_res_ty
-  , Just (arg_ty,_) <- tcSplitFunTy_maybe res_ty
-  = finish_ambiguous_selector lbl (scaledThing arg_ty)
-
-  | otherwise
-  = ambiguousSelector lbl
-
-finish_ambiguous_selector :: LocatedN RdrName -> Type -> TcM Name
-finish_ambiguous_selector lr@(L _ rdr) parent_type
- = do { fam_inst_envs <- tcGetFamInstEnvs
-      ; case tyConOf fam_inst_envs parent_type of {
-          Nothing -> ambiguousSelector lr ;
-          Just p  ->
-
-    do { xs <- lookupParents True rdr
-       ; let parent = RecSelData p
-       ; case lookup parent xs of {
-           Nothing  -> failWithTc (fieldNotInType parent rdr) ;
-           Just gre ->
-
-    -- See Note [Unused name reporting and HasField] in GHC.Tc.Instance.Class
-    do { addUsedGRE True gre
-       ; keepAlive (greMangledName gre)
-         -- See Note [Deprecating ambiguous fields]
-       ; warnIfFlag Opt_WarnAmbiguousFields True $
-          vcat [ text "The field" <+> quotes (ppr rdr)
-                   <+> text "belonging to type" <+> ppr parent_type
-                   <+> text "is ambiguous."
-               , text "This will not be supported by -XDuplicateRecordFields in future releases of GHC."
-               , if isLocalGRE gre
-                 then text "You can use explicit case analysis to resolve the ambiguity."
-                 else text "You can use a qualified import or explicit case analysis to resolve the ambiguity."
-               ]
-       ; return (greMangledName gre) } } } } }
-
--- This field name really is ambiguous, so add a suitable "ambiguous
--- occurrence" error, then give up.
-ambiguousSelector :: LocatedN RdrName -> TcM a
-ambiguousSelector (L _ rdr)
-  = do { addAmbiguousNameErr rdr
-       ; failM }
-
--- | This name really is ambiguous, so add a suitable "ambiguous
--- occurrence" error, then continue
-addAmbiguousNameErr :: RdrName -> TcM ()
-addAmbiguousNameErr rdr
-  = do { env <- getGlobalRdrEnv
-       ; let gres = lookupGRE_RdrName rdr env
-       ; case gres of
-         [] -> panic "addAmbiguousNameErr: not found"
-         gre : gres -> setErrCtxt [] $ addNameClashErrRn rdr $ gre NE.:| gres}
 
 -- A type signature on the argument of an ambiguous record selector or
 -- the record expression in an update must be "obvious", i.e. the
