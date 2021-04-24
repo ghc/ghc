@@ -1,24 +1,18 @@
 [1 of 2] Compiling OverloadedRecFldsFail12_A ( OverloadedRecFldsFail12_A.hs, OverloadedRecFldsFail12_A.o )
 [2 of 2] Compiling Main             ( overloadedrecfldsfail12.hs, overloadedrecfldsfail12.o )
 
-overloadedrecfldsfail12.hs:10:11: error: [-Wdeprecations (in -Wdefault), -Werror=deprecations]
-    In the use of ‘foo’ (imported from OverloadedRecFldsFail12_A):
-    "Deprecated foo"
+ overloadedrecfldsfail12.hs:13:5:
+    Ambiguous occurrence ‘foo’
+    It could refer to
+       either the field ‘foo’,
+              imported from ‘OverloadedRecFldsFail12_A’ at overloadedrecfldsfail12.hs:4:1-32
+              (and originally defined at OverloadedRecFldsFail12_A.hs:5:16-18)
+           or the field ‘foo’, defined at overloadedrecfldsfail12.hs:6:16
 
-overloadedrecfldsfail12.hs:10:20: error: [-Wdeprecations (in -Wdefault), -Werror=deprecations]
-    In the use of ‘bar’ (imported from OverloadedRecFldsFail12_A):
-    "Deprecated bar"
-
-overloadedrecfldsfail12.hs:13:5: error: [-Wambiguous-fields (in -Wdefault), -Werror=ambiguous-fields]
-    The field ‘foo’ belonging to type T is ambiguous.
-    This will not be supported by -XDuplicateRecordFields in future releases of GHC.
-    You can use a qualified import or explicit case analysis to resolve the ambiguity.
-
-overloadedrecfldsfail12.hs:13:5: error: [-Wdeprecations (in -Wdefault), -Werror=deprecations]
-    In the use of ‘foo’ (imported from OverloadedRecFldsFail12_A):
-    "Deprecated foo"
-
-overloadedrecfldsfail12.hs:16:5: error: [-Wambiguous-fields (in -Wdefault), -Werror=ambiguous-fields]
-    The field ‘foo’ belonging to type S is ambiguous.
-    This will not be supported by -XDuplicateRecordFields in future releases of GHC.
-    You can use explicit case analysis to resolve the ambiguity.
+ overloadedrecfldsfail12.hs:16:5:
+    Ambiguous occurrence ‘foo’
+    It could refer to
+       either the field ‘foo’,
+              imported from ‘OverloadedRecFldsFail12_A’ at overloadedrecfldsfail12.hs:4:1-32
+              (and originally defined at OverloadedRecFldsFail12_A.hs:5:16-18)
+           or the field ‘foo’, defined at overloadedrecfldsfail12.hs:6:16
