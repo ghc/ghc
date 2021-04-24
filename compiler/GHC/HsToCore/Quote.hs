@@ -1487,9 +1487,7 @@ repE (HsVar _ (L _ x)) =
 repE (HsIPVar _ n) = rep_implicit_param_name n >>= repImplicitParamVar
 repE (HsOverLabel _ s) = repOverLabel s
 
-repE e@(HsRecFld _ f) = case f of
-  Unambiguous x _ -> repE (HsVar noExtField (noLocA x))
-  Ambiguous{}     -> notHandled "Ambiguous record selectors" (ppr e)
+repE (HsRecFld _ (FieldOcc x _)) = repE (HsVar noExtField (noLocA x))
 
         -- Remember, we're desugaring renamer output here, so
         -- HsOverlit can definitely occur
