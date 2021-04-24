@@ -5,7 +5,6 @@ test('overloadedrecfldsrun02', [extra_files(['OverloadedRecFldsRun02_A.hs'])], m
 test('overloadedrecfldsrun03', normal, compile_and_run, [''])
 test('overloadedrecfldsrun04', omit_ways(prof_ways), compile_and_run, [''])
 test('overloadedrecfldsrun05', normal, compile_and_run, [''])
-test('overloadedrecfldsrun06', normal, compile_and_run, [''])
 test('overloadedrecfldsrun07', normal, compile_and_run, [''])
 test('overloadedrecflds_generics', normal, compile_and_run, [''])
 test('overloadedlabelsrun01', normal, compile_and_run, [''])
