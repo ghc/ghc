@@ -1222,9 +1222,14 @@ instance Binary a => Binary (LocatedL a) where
 instance (Outputable a) => Outputable (SrcSpanAnn' a) where
   ppr (SrcSpanAnn a l) = text "SrcSpanAnn" <+> ppr a <+> ppr l
 
-instance (Outputable a, Outputable e)
-     => Outputable (GenLocated (SrcSpanAnn' a) e) where
+instance (Outputable a, Outputable e) =>
+  Outputable (GenLocated (SrcSpanAnn' a) e) where
   ppr = pprLocated
+
+instance (Outputable a, OutputableBndr e) =>
+   OutputableBndr (GenLocated (SrcSpanAnn' a) e) where
+   pprInfixOcc = pprInfixOcc . unLoc
+   pprPrefixOcc = pprPrefixOcc . unLoc
 
 instance Outputable AnnListItem where
   ppr (AnnListItem ts) = text "AnnListItem" <+> ppr ts
