@@ -1392,11 +1392,10 @@ mkOpAppRn e1 op fix e2                  -- Default case, no rearrangment
 ----------------------------
 
 -- | Name of an operator in an operator application or section
-data OpName = NormalOp Name         -- ^ A normal identifier
-            | NegateOp              -- ^ Prefix negation
-            | UnboundOp OccName     -- ^ An unbound indentifier
-            | RecFldOp (AmbiguousFieldOcc GhcRn)
-              -- ^ A (possibly ambiguous) record field occurrence
+data OpName = NormalOp Name             -- ^ A normal identifier
+            | NegateOp                  -- ^ Prefix negation
+            | UnboundOp OccName         -- ^ An unbound indentifier
+            | RecFldOp (FieldOcc GhcRn) -- ^ A record field occurrence
 
 instance Outputable OpName where
   ppr (NormalOp n)   = ppr n
@@ -1409,7 +1408,7 @@ get_op :: LHsExpr GhcRn -> OpName
 -- See GHC.Rename.Expr.rnUnboundVar
 get_op (L _ (HsVar _ n))         = NormalOp (unLoc n)
 get_op (L _ (HsUnboundVar _ uv)) = UnboundOp uv
-get_op (L _ (HsRecFld _ fld))    = RecFldOp fld
+get_op (L _ (HsRecSel _ fld))    = RecFldOp fld
 get_op other                     = pprPanic "get_op" (ppr other)
 
 -- Parser left-associates everything, but
@@ -1573,8 +1572,7 @@ checkSectionPrec direction section op arg
                                  (arg_op, arg_fix) section)
 
 -- | Look up the fixity for an operator name.  Be careful to use
--- 'lookupFieldFixityRn' for (possibly ambiguous) record fields
--- (see #13132).
+-- 'lookupFieldFixityRn' for record fields (see #13132).
 lookupFixityOp :: OpName -> RnM Fixity
 lookupFixityOp (NormalOp n)  = lookupFixityRn n
 lookupFixityOp NegateOp      = lookupFixityRn negateName
