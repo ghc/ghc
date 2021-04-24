@@ -184,6 +184,7 @@ instance (Eq a) => Eq [a] where
     {-# SPECIALISE instance Eq [[Char]] #-}
     {-# SPECIALISE instance Eq [Char] #-}
     {-# SPECIALISE instance Eq [Int] #-}
+    {-# INLINEABLE (==) #-}
     []     == []     = True
     (x:xs) == (y:ys) = x == y && xs == ys
     _xs    == _ys    = False
@@ -394,6 +395,7 @@ instance (Ord a) => Ord [a] where
     {-# SPECIALISE instance Ord [[Char]] #-}
     {-# SPECIALISE instance Ord [Char] #-}
     {-# SPECIALISE instance Ord [Int] #-}
+    {-# INLINEABLE compare #-}
     compare []     []     = EQ
     compare []     (_:_)  = LT
     compare (_:_)  []     = GT
