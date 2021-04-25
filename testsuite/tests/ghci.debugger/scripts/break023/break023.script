@@ -13,6 +13,6 @@
 :! cp A1.hs A.hs
 :l C
 :break b  -- it works ok at this point
-:! touch A.hs
+:! echo >> A.hs
 :r
 :break b  -- it does not work anymore

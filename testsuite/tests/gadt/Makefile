@@ -19,9 +19,7 @@ T7321:
 gadt23:
 	$(RM) gadt23 gadt23.hi gadt23.o Gadt23_AST.hi Gadt23_AST.o
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make gadt23.hs
-	# We want to "touch gadt23.hs" really, but we then have issues with
-	# everything happening in the same second so the touch having no
-	# effect. Thus make gadt23.hi/o older instead.
-	touch -t 01010000 gadt23.hi gadt23.o
+	# Append a blank line to gadt23.hs to trigger a recompile
+	echo >> gadt23.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make gadt23.hs
 

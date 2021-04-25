@@ -17,7 +17,7 @@
 -- succeeds again to load module
 :reload!
 
--- also succeeds, because the module has not been touched since load
+-- also succeeds, because the module has not been changed since load
 :reload
 
 -- now, after modifying, reloading should fail

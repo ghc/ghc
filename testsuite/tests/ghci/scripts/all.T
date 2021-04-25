@@ -142,10 +142,10 @@ test('T5979',
      normalise_version("transformers")],
     ghci_script, ['T5979.script'])
 test('T5975a',
-     pre_cmd('touch föøbàr1.hs'),
+     pre_cmd('echo >> föøbàr1.hs'),
      ghci_script, ['T5975a.script'])
 test('T5975b',
-     [pre_cmd('touch föøbàr2.hs'), extra_hc_opts('föøbàr2.hs')],
+     [pre_cmd('echo >> föøbàr2.hs'), extra_hc_opts('föøbàr2.hs')],
      ghci_script, ['T5975b.script'])
 test('T6027ghci', normal, ghci_script, ['T6027ghci.script'])
 
