@@ -211,6 +211,8 @@ emitPrimOp dflags primop = case primop of
       -> opIntoRegs $ \ [res] -> emitCloneArray mkMAP_DIRTY_infoLabel res src src_off (fromInteger n)
     _ -> PrimopCmmEmit_External
 
+  AppendArrays -> const PrimopCmmEmit_External
+
   NewSmallArrayOp -> \case
     [(CmmLit (CmmInt n w)), init]
       | wordsToBytes platform (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags)
@@ -255,6 +257,8 @@ emitPrimOp dflags primop = case primop of
       | wordsToBytes platform (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags)
       -> opIntoRegs $ \ [res] -> emitCloneSmallArray mkSMAP_DIRTY_infoLabel res src src_off (fromInteger n)
     _ -> PrimopCmmEmit_External
+
+  AppendSmallArrays -> const PrimopCmmEmit_External
 
 -- First we handle various awkward cases specially.
 
