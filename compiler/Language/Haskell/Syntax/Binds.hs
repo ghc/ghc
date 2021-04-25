@@ -931,9 +931,6 @@ when we have a different name for the local and top-level binder,
 making the distinction between the two names clear.
 
 -}
-instance Outputable (RecordPatSynField a) where
-    ppr (RecordPatSynField { recordPatSynField = v }) = ppr v
-
 
 -- | Haskell Pattern Synonym Direction
 data HsPatSynDir id
