@@ -1169,9 +1169,6 @@ unload_wkr interp keep_linkables pls@LoaderState{..}  = do
   where
     unloadObjs :: Linkable -> IO ()
     unloadObjs lnk
-        -- The RTS's PEi386 linker currently doesn't support unloading.
-      | isWindowsHost = return ()
-
       | hostIsDynamic = return ()
         -- We don't do any cleanup when linking objects with the
         -- dynamic linker.  Doing so introduces extra complexity for
