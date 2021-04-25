@@ -16,6 +16,7 @@ module GHC.Core.RoughMap
   , emptyRM
   , lookupRM
   , insertRM
+  , filterRM
   , elemsRM
   , sizeRM
   ) where
@@ -107,6 +108,18 @@ insertRM (KnownTc k : ks) v rm@(RM {}) =
     f (Just m) = Just $ insertRM ks v m
 insertRM (OtherTc : ks) v rm@(RM {}) =
     rm { rm_unknown = insertRM ks v (rm_unknown rm) }
+
+filterRM :: (a -> Bool) -> RoughMap a -> RoughMap a
+filterRM _ RMEmpty = RMEmpty
+filterRM pred rm = norm $ RM { rm_empty = filter pred (rm_empty rm)
+                             , rm_known = mapNameEnv (filterRM pred) (rm_known rm)
+                             , rm_unknown = filterRM pred (rm_unknown rm)
+                             }
+  where
+    norm RMEmpty = RMEmpty
+    norm (RM [] known RMEmpty)
+      | isEmptyNameEnv known = RMEmpty
+    norm rm = rm
 
 elemsRM :: RoughMap a -> [a]
 elemsRM RMEmpty = []

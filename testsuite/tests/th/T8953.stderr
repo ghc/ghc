@@ -9,8 +9,8 @@ T8953.a :: Data.Proxy.Proxy (Data.Proxy.Proxy :: * -> *)
 T8953.b :: Data.Proxy.Proxy (Data.Proxy.Proxy :: (* -> *) -> *)
 type T8953.StarProxy (a_0 :: *) = Data.Proxy.Proxy a_0
 class T8953.PC (a_0 :: k_1)
-instance T8953.PC (a_2 :: *)
-instance T8953.PC (Data.Proxy.Proxy :: (k_3 -> *) -> *)
+instance T8953.PC (Data.Proxy.Proxy :: (k_2 -> *) -> *)
+instance T8953.PC (a_3 :: *)
 type family T8953.F (a_0 :: *) :: k_1
 type instance T8953.F GHC.Types.Char = T8953.G (T8953.T1 :: * ->
                                                             (* -> *) -> *)
