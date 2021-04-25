@@ -61,6 +61,12 @@ import GHC.Utils.Misc
 import Control.Arrow ( second )
 import Data.Maybe ( mapMaybe )
 
+type FreeVarAnn pass =
+  ( XRhsClosure pass ~ DIdSet
+  , BinderP pass ~ Id
+  , XLet pass ~ NoExtFieldSilent
+  , XLetNoEscape pass ~ NoExtFieldSilent )
+
 newtype Env
   = Env
   { locals :: IdSet
@@ -74,7 +80,8 @@ addLocals bndrs env
   = env { locals = extendVarSetList (locals env) bndrs }
 
 -- | Annotates a top-level STG binding group with its free variables.
-annTopBindingsFreeVars :: [StgTopBinding] -> [CgStgTopBinding]
+annTopBindingsFreeVars :: (FreeVarAnn pass)
+                       => [StgTopBinding] -> [GenStgTopBinding pass]
 annTopBindingsFreeVars = map go
   where
     go (StgTopStringLit id bs) = StgTopStringLit id bs
@@ -82,7 +89,7 @@ annTopBindingsFreeVars = map go
       = StgTopLifted (annBindingFreeVars bind)
 
 -- | Annotates an STG binding with its free variables.
-annBindingFreeVars :: StgBinding -> CgStgBinding
+annBindingFreeVars :: (FreeVarAnn pass) => StgBinding -> GenStgBinding pass
 annBindingFreeVars = fst . binding emptyEnv emptyDVarSet
 
 boundIds :: StgBinding -> [Id]
@@ -113,7 +120,8 @@ args env = mkFreeVarSet env . mapMaybe f
     f (StgVarArg occ) = Just occ
     f _               = Nothing
 
-binding :: Env -> DIdSet -> StgBinding -> (CgStgBinding, DIdSet)
+binding :: (FreeVarAnn pass)
+        => Env -> DIdSet -> StgBinding -> (GenStgBinding pass, DIdSet)
 binding env body_fv (StgNonRec bndr r) = (StgNonRec bndr r', fvs)
   where
     -- See Note [Tracking local binders]
@@ -127,7 +135,7 @@ binding env body_fv (StgRec pairs) = (StgRec pairs', fvs)
     pairs' = zip bndrs rhss
     fvs = delDVarSetList (unionDVarSets (body_fv:rhs_fvss)) bndrs
 
-expr :: Env -> StgExpr -> (CgStgExpr, DIdSet)
+expr :: (FreeVarAnn pass) => Env -> StgExpr -> (GenStgExpr pass, DIdSet)
 expr env = go
   where
     go (StgApp occ as)
@@ -162,7 +170,7 @@ expr env = go
         (body', body_fvs) = expr env' body
         (bind', fvs) = binding env' body_fvs bind
 
-rhs :: Env -> StgRhs -> (CgStgRhs, DIdSet)
+rhs :: (FreeVarAnn pass) => Env -> StgRhs -> (GenStgRhs pass, DIdSet)
 rhs env (StgRhsClosure _ ccs uf bndrs body)
   = (StgRhsClosure fvs ccs uf bndrs body', fvs)
   where
@@ -172,38 +180,34 @@ rhs env (StgRhsClosure _ ccs uf bndrs body)
 rhs env (StgRhsCon ccs dc as) = (StgRhsCon ccs dc as, args env as)
 rhs env (StgRhsEnv vars) = (StgRhsEnv vars, mkFreeVarSet env (dVarSetElems vars))
 
-alt :: Env -> StgAlt -> (CgStgAlt, DIdSet)
+alt :: (FreeVarAnn pass)
+    => Env -> StgAlt -> (GenStgAlt pass, DIdSet)
 alt env (con, bndrs, e) = ((con, bndrs, e'), fvs)
   where
     -- See Note [Tracking local binders]
     (e', rhs_fvs) = expr (addLocals bndrs env) e
     fvs = delDVarSetList rhs_fvs bndrs
 
-
-type RemovableFVs pass = (XRhsClosure pass ~ DIdSet, BinderP pass ~ Id)
-
-unAnnTopBindingsFreeVars :: RemovableFVs pass
-                         => [GenStgTopBinding pass]
-                         -> [StgTopBinding]
+unAnnTopBindingsFreeVars
+  :: (FreeVarAnn pass) => [GenStgTopBinding pass] -> [StgTopBinding]
 unAnnTopBindingsFreeVars = map go
   where
     go (StgTopStringLit id bs) = StgTopStringLit id bs
     go (StgTopLifted bind)
       = StgTopLifted (unAnnBindingFreeVars bind)
 
-unAnnBindingFreeVars :: RemovableFVs pass
-                     => GenStgBinding pass
-                     -> StgBinding
+unAnnBindingFreeVars
+  :: (FreeVarAnn pass) => GenStgBinding pass -> StgBinding
 unAnnBindingFreeVars (StgNonRec id rhs) = StgNonRec id (unRhs rhs)
 unAnnBindingFreeVars (StgRec bs) = StgRec (map (second unRhs) bs)
 
-unRhs :: RemovableFVs pass => GenStgRhs pass -> StgRhs
+unRhs :: (FreeVarAnn pass) => GenStgRhs pass -> StgRhs
 unRhs (StgRhsClosure _ ccs uf bndrs body)
   = StgRhsClosure noExtFieldSilent ccs uf bndrs (unExpr body)
 unRhs (StgRhsCon ccs dc as) = StgRhsCon ccs dc as
 unRhs (StgRhsEnv vars) = StgRhsEnv vars
 
-unExpr :: RemovableFVs pass => GenStgExpr pass -> StgExpr
+unExpr :: (FreeVarAnn pass) => GenStgExpr pass -> StgExpr
 unExpr (StgApp id args) = StgApp id args
 unExpr (StgLit l) = StgLit l
 unExpr (StgConApp dc args tys) = StgConApp dc args tys
@@ -219,5 +223,5 @@ unExpr (StgCaseEnv id vars e) =
 unExpr (StgTick t e) =
   StgTick t (unExpr e)
 
-unAlt :: RemovableFVs pass => GenStgAlt pass -> StgAlt
+unAlt :: (FreeVarAnn pass) => GenStgAlt pass -> StgAlt
 unAlt (ac,bs,e) = (ac,bs,unExpr e)
