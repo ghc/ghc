@@ -3,7 +3,7 @@
 module GHC.Driver.GenerateCgIPEStub (generateCgIPEStub) where
 
 import Data.Maybe (catMaybes, listToMaybe)
-import GHC.Cmm (CmmGraph, CmmGroupSRTs, CmmInfoTable, CmmNode (CmmCall, CmmTick), CmmTickish, CmmTopInfo (info_tbls), GenCmmDecl (CmmProc), RawCmmStatics)
+import GHC.Cmm (CmmGraph, CmmGroupSRTs, CmmInfoTable (cit_rep), CmmNode (CmmCall, CmmTick), CmmTickish, CmmTopInfo (info_tbls), GenCmmDecl (CmmProc), RawCmmStatics)
 import GHC.Cmm.Dataflow (Block, C, O)
 import GHC.Cmm.Dataflow.Block (blockSplit, blockToList)
 import GHC.Cmm.Dataflow.Collections (mapToList)
@@ -22,6 +22,7 @@ import GHC.StgToCmm.Prof (initInfoTableProv)
 import GHC.StgToCmm.Types (CgInfos (..), ModuleLFInfos)
 import GHC.Types.IPE (InfoTableProvMap (labeledInfoTablesWithTickishes))
 import GHC.Unit.Types (Module)
+import GHC.Runtime.Heap.Layout (isStackRep)
 
 -- TODO: Does this check flag to see if IPE is wanted?
 generateCgIPEStub :: HscEnv -> Module -> InfoTableProvMap -> Stream IO CmmGroupSRTs (NonCaffySet, ModuleLFInfos) -> Stream IO CmmGroupSRTs CgInfos
@@ -46,11 +47,13 @@ generateCgIPEStub hsc_env this_mod denv s = do
     sndOfTriple (_, b, _) = b
 
     collectInfoTables :: CmmGroupSRTs -> [(Label, CmmInfoTable)]
-    collectInfoTables gs = concat $ catMaybes $ map extractCmmInfoTable gs
+    collectInfoTables cmmGroup = concat $ catMaybes $ map extractReturnInfoTableCandidates cmmGroup
 
-    extractCmmInfoTable :: GenCmmDecl RawCmmStatics CmmTopInfo CmmGraph -> Maybe [(Label, CmmInfoTable)]
-    extractCmmInfoTable (CmmProc h _ _ _) = Just $ mapToList (info_tbls h)
-    extractCmmInfoTable _ = Nothing
+    -- All return frame info tables are stack represented, though not all stack represented info tables
+    -- have to be return frames.
+    extractReturnInfoTableCandidates :: GenCmmDecl RawCmmStatics CmmTopInfo CmmGraph -> Maybe [(Label, CmmInfoTable)]
+    extractReturnInfoTableCandidates (CmmProc h _ _ _) = Just $ filter (\(_, i) -> (isStackRep . cit_rep) i) $ mapToList (info_tbls h)
+    extractReturnInfoTableCandidates _ = Nothing
 
     -- TODO: Write a note: [Looking up CmmTickish for return frame info tables]
     lookupEstimatedTick :: CmmGroupSRTs -> Label -> Maybe CmmTickish
