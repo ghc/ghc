@@ -209,7 +209,7 @@ subordinates instMap decl = case decl of
                     , maybeToList $ fmap unLoc $ con_doc c
                     , conArgDocs c)
                   | c <- cons, cname <- getConNames c ]
-        fields  = [ (extFieldOcc n, maybeToList $ fmap unLoc doc, IM.empty)
+        fields  = [ (foExt n, maybeToList $ fmap unLoc doc, IM.empty)
                   | Just flds <- map getRecConArgs_maybe cons
                   , (L _ (ConDeclField _ ns _ doc)) <- (unLoc flds)
                   , (L _ n) <- ns ]

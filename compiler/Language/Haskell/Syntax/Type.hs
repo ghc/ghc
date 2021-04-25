@@ -1248,33 +1248,27 @@ type LFieldOcc pass = XRec pass (FieldOcc pass)
 
 -- | Field Occurrence
 --
--- Represents an *occurrence* of an unambiguous field.  This may or may not be a
+-- Represents an *occurrence* of a field. This may or may not be a
 -- binding occurrence (e.g. this type is used in 'ConDeclField' and
--- 'RecordPatSynField' which bind their fields, but also in 'HsRecField' for
--- record construction and patterns, which do not).
+-- 'RecordPatSynField' which bind their fields, but also in
+-- 'HsRecField' for record construction and patterns, which do not).
 --
--- We store both the 'RdrName' the user originally wrote, and after the renamer,
--- the selector function.
-data FieldOcc pass = FieldOcc { extFieldOcc     :: XCFieldOcc pass
-                              , rdrNameFieldOcc :: LocatedN RdrName
-                                 -- ^ See Note [Located RdrNames] in "GHC.Hs.Expr"
-                              }
+-- We store both the 'RdrName' the user originally wrote, and after
+-- the renamer, the selector function.
+data FieldOcc pass
+  = FieldOcc {
+        foExt :: XCFieldOcc pass
+      , foLabel :: XRec pass RdrName -- See Note [Located RdrNames] in Language.Haskell.Syntax.Expr
+      }
+  | XFieldOcc !(XXFieldOcc pass)
+deriving instance (
+    Eq (XRec pass RdrName)
+  , Eq (XCFieldOcc pass)
+  , Eq (XXFieldOcc pass)
+  ) => Eq (FieldOcc pass)
 
-  | XFieldOcc
-      !(XXFieldOcc pass)
-
-deriving instance (Eq (XCFieldOcc pass), Eq (XXFieldOcc pass)) => Eq (FieldOcc pass)
-
-instance Outputable (FieldOcc pass) where
-  ppr = ppr . rdrNameFieldOcc
-
-instance OutputableBndr (FieldOcc pass) where
-  pprInfixOcc  = pprInfixOcc . unLoc . rdrNameFieldOcc
-  pprPrefixOcc = pprPrefixOcc . unLoc . rdrNameFieldOcc
-
-instance OutputableBndr (GenLocated SrcSpan (FieldOcc pass)) where
-  pprInfixOcc  = pprInfixOcc . unLoc
-  pprPrefixOcc = pprPrefixOcc . unLoc
+instance Outputable (XRec pass RdrName) => Outputable (FieldOcc pass) where
+  ppr = ppr . foLabel
 
 -- | Ambiguous Field Occurrence
 --
