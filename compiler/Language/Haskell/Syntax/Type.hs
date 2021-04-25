@@ -1248,33 +1248,33 @@ type LFieldOcc pass = XRec pass (FieldOcc pass)
 
 -- | Field Occurrence
 --
--- Represents an *occurrence* of an unambiguous field.  This may or may not be a
--- binding occurrence (e.g. this type is used in 'ConDeclField' and
--- 'RecordPatSynField' which bind their fields, but also in 'HsRecField' for
--- record construction and patterns, which do not).
---
--- We store both the 'RdrName' the user originally wrote, and after the renamer,
--- the selector function.
-data FieldOcc pass = FieldOcc { extFieldOcc     :: XCFieldOcc pass
-                              , rdrNameFieldOcc :: LocatedN RdrName
-                                 -- ^ See Note [Located RdrNames] in "GHC.Hs.Expr"
-                              }
+-- This represents an occurence of a field name (which may be
+-- qualified, hence RdrName, and gets resolved by the renamer).
+data FieldOcc pass
+  = FieldOcc {
+        foExt :: XCFieldOcc pass
+      , foLabel :: XRec pass RdrName -- See Note [Located RdrNames] below.
+      }
+  | XFieldOcc !(XXFieldOcc pass)
 
-  | XFieldOcc
-      !(XXFieldOcc pass)
+deriving instance (
+    Eq (XRec pass RdrName)
+  , Eq (XCFieldOcc pass)
+  , Eq (XXFieldOcc pass)
+  ) => Eq (FieldOcc pass)
 
-deriving instance (Eq (XCFieldOcc pass), Eq (XXFieldOcc pass)) => Eq (FieldOcc pass)
+instance Outputable (XRec pass RdrName) => Outputable (FieldOcc pass) where
+  ppr = ppr . foLabel
 
-instance Outputable (FieldOcc pass) where
-  ppr = ppr . rdrNameFieldOcc
+{-
+instance OutputableBndr (XRec pass RdrName) => OutputableBndr (FieldOcc pass) where
+  pprInfixOcc  = pprInfixOcc . foLabel
+  pprPrefixOcc = pprPrefixOcc . foLabel
 
-instance OutputableBndr (FieldOcc pass) where
-  pprInfixOcc  = pprInfixOcc . unLoc . rdrNameFieldOcc
-  pprPrefixOcc = pprPrefixOcc . unLoc . rdrNameFieldOcc
-
-instance OutputableBndr (GenLocated SrcSpan (FieldOcc pass)) where
-  pprInfixOcc  = pprInfixOcc . unLoc
-  pprPrefixOcc = pprPrefixOcc . unLoc
+instance OutputableBndr (XRec pass RdrName) => OutputableBndr (GenLocated SrcSpan (FieldOcc pass)) where
+   pprInfixOcc  = pprInfixOcc . unLoc
+   pprPrefixOcc = pprPrefixOcc . unLoc
+-}
 
 -- | Ambiguous Field Occurrence
 --
