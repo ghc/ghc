@@ -1,5 +1,4 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 
 -- | 'RoughMap' is an approximate finite map data structure keyed on
@@ -64,14 +63,14 @@ typeToRoughMatchTc ty
   | otherwise                               = OtherTc
 
 -- trie of [RoughTc]
--- 
+--
 -- insert [UnknownTc] 1
 -- insert [UnknownTc] 2
 -- lookup [UnknownTc] == [1,2]
 data RoughMap a = RM { rm_empty   :: [a]
                      , rm_known   :: !(NameEnv (RoughMap a))
                      , rm_unknown :: !(RoughMap a) }
-                | RMEmpty -- an optimised (finite) form of emptyRM                
+                | RMEmpty -- an optimised (finite) form of emptyRM
 
 emptyRM :: RoughMap a
 emptyRM = RMEmpty
@@ -82,11 +81,20 @@ lookupRM []                 rm      = elemsRM rm
 lookupRM (KnownTc tc : tcs) rm      = maybe [] (lookupRM tcs) (lookupNameEnv (rm_known rm) tc)
                                       ++ lookupRM tcs (rm_unknown rm)
                                       ++ rm_empty rm
-lookupRM (OtherTc : tcs)    rm      = [ x 
+lookupRM (OtherTc : tcs)    rm      = [ x
                                       | m <- nameEnvElts (rm_known rm)
                                       , x <- lookupRM tcs m ]
                                       ++ lookupRM tcs (rm_unknown rm)
                                       ++ rm_empty rm
+
+{-
+Note [RoughMap]
+~~~~~~~~~~~~~~~
+RoughMap is a finite map keyed on the rough "shape" of a list of type
+applications. This allows efficient (yet approximate) instance look-up.
+
+-}
+
     -- TODO: Including rm_empty due to Note [Eta reduction for data families]
     -- in GHC.Core.Coercion.Axiom. e.g., we may have an environment which includes
     --     data instance Fam Int a = ...
@@ -130,11 +138,3 @@ sizeRM RMEmpty = 0
 sizeRM rm      = length (rm_empty rm)
                  + getSum (foldMap (Sum . sizeRM) (NonDetUniqFM $ rm_known rm))
                  + sizeRM (rm_unknown rm)
-
--- toListRM :: RoughMap a -> [([RoughMatchTc], a)]
--- toListRM = go []
---   where
---     go acc RMEmpty = []
---     go acc (RM empty known other) =
---       [ (acc, x) | x <- empty ] ++
---       [ ()]
