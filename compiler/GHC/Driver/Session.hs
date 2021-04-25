@@ -1717,6 +1717,7 @@ dopt f dflags = (f `EnumSet.member` dumpFlags dflags)
           enableIfVerbose Opt_D_dump_simpl_trace            = False
           enableIfVerbose Opt_D_dump_rtti                   = False
           enableIfVerbose Opt_D_dump_inlinings              = False
+          enableIfVerbose Opt_D_dump_verbose_inlinings      = False
           enableIfVerbose Opt_D_dump_core_stats             = False
           enableIfVerbose Opt_D_dump_asm_stats              = False
           enableIfVerbose Opt_D_dump_types                  = False
@@ -2698,6 +2699,8 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_foreign)
   , make_ord_flag defGhcFlag "ddump-inlinings"
         (setDumpFlag Opt_D_dump_inlinings)
+  , make_ord_flag defGhcFlag "ddump-verbose-inlinings"
+        (setDumpFlag Opt_D_dump_verbose_inlinings)
   , make_ord_flag defGhcFlag "ddump-rule-firings"
         (setDumpFlag Opt_D_dump_rule_firings)
   , make_ord_flag defGhcFlag "ddump-rule-rewrites"
