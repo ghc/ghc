@@ -1321,7 +1321,7 @@ traceInline dflags inline_id str doc result
   | otherwise = result
   where
     enable
-      | dopt Opt_D_dump_inlinings dflags && dopt Opt_D_verbose_core2core dflags
+      | dopt Opt_D_dump_verbose_inlinings dflags
       = True
       | Just prefix <- inlineCheck dflags
       = prefix `isPrefixOf` occNameString (getOccName inline_id)

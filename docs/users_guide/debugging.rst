@@ -325,13 +325,18 @@ subexpression elimination pass.
     Dump simplifier output (Core-to-Core passes)
 
 .. ghc-flag:: -ddump-inlinings
-    :shortdesc: Dump inlining info
+    :shortdesc: Dump inlinings performed by the simplifier.
     :type: dynamic
 
-    Dumps inlining info from the simplifier. Note that if used in
-    conjunction with :ghc-flag:`-dverbose-core2core` the compiler will
-    also dump the inlinings that it considers but passes up, along with
-    its rationale.
+    Dumps inlinings performed by the simplifier.
+
+.. ghc-flag:: -ddump-verbose-inlinings
+    :shortdesc: Dump all considered inlinings
+    :type: dynamic
+
+    Dumps all inlinings considered by the simplifier, even those ultimately not
+    performed. This output includes various information that the simplifier uses
+    to determine whether the inlining is beneficial.
 
 .. ghc-flag:: -ddump-stranal
     :shortdesc: Dump strictness analyser output
