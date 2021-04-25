@@ -6,6 +6,7 @@ module T11629 where
 
 import Control.Monad
 import Language.Haskell.TH
+import Data.List (sort)
 
 class C (a :: Bool)
 class D (a :: (Bool, Bool))
@@ -33,35 +34,40 @@ do
       withoutSig (SigT ty ki)         = withoutSig ty
       withoutSig ty                   = ty
 
-  -- test #1: type quotations and reified types should agree.
-  ty1 <- [t| C True |]
-  ty2 <- [t| C 'False |]
-  ClassI _ insts <- reify ''C
-  let [ty1', ty2'] = map getType insts
+      compareInstances :: String -> Name -> [Q Type] -> Q ()
+      compareInstances label cls expectedM = do
+        ClassI _ insts <- reify cls
+        -- N.B. Sort as the order of instances provided by TH is
+        -- non-deterministic.
+        let actual = sort $ map (withoutSig . getType) insts
+        expected <- sort <$> sequence expectedM
+        let check (a,e)
+              | a /= e = runIO $ print $ label ++ ": mismatch: " ++ show a ++ " /= " ++ show e
+              | otherwise = return ()
 
-  when (ty1 /= ty1') $ failMsg "A" ty1 ty1'
-  when (ty2 /= ty2') $ failMsg "B" ty2 ty2'
+        mapM_ check (zip actual expected)
+
+  -- test #1: type quotations and reified types should agree.
+  compareInstances "C" ''C
+    [ [t| C True |]
+    , [t| C 'False |]
+    ]
 
   -- test #2: type quotations and reified types should agree wrt
   -- promoted tuples.
-  ty3 <- [t| D '(True, False) |]
-  ty4 <- [t| D (False, True)  |]
-  ClassI _ insts <- reify ''D
-  let [ty3', ty4'] = map (withoutSig . getType) insts
+  compareInstances "D" ''D
+    [ [t| D '(True, False) |]
+    , [t| D (False, True)  |]
+    ]
 
-  when (ty3 /= ty3') $ failMsg "C" ty3 ty3'
   -- The following won't work. See https://ghc.haskell.org/trac/ghc/ticket/12853
   -- when (ty4 /= ty4') $ failMsg "D" ty4 ty4'
 
   -- test #3: type quotations and reified types should agree wrt to
   -- promoted lists.
-  ty5 <- [t| E '[True, False] |]
-  ty6 <- [t| E [False, True]  |]
-
-  ClassI _ insts <- reify ''E
-  let [ty5', ty6'] = map (withoutSig . getType) insts
-
-  when (ty5 /= ty5') $ failMsg "C" ty5 ty5'
-  when (ty6 /= ty6') $ failMsg "D" ty6 ty6'
+  compareInstances "E" ''E
+    [ [t| E '[True, False] |]
+    , [t| E [False, True]  |]
+    ]
 
   return []
