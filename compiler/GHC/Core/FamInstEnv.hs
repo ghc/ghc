@@ -424,7 +424,7 @@ extendFamInstEnv :: FamInstEnv -> FamInst -> FamInstEnv
 extendFamInstEnv inst_env
                  ins_item@(FamInst {fi_fam = cls_nm})
   = fromNameInstEnv
-    $ alterUDFM (Just . add . fromMaybe emptyFamilyInstEnv) (toNameInstEnv inst_env) cls_nm 
+    $ alterUDFM (Just . add . fromMaybe emptyFamilyInstEnv) (toNameInstEnv inst_env) cls_nm
   where
     add :: FamilyInstEnv -> FamilyInstEnv
     add (FamIE items) = FamIE $ insertRM (fi_tcs ins_item) ins_item items
