@@ -78,7 +78,11 @@ def lndir(srcdir: Path, dstdir: Path):
 
 # All possible test metric strings.
 def testing_metrics():
-    return ['bytes allocated', 'peak_megabytes_allocated', 'max_bytes_used']
+    return { 'bytes allocated', 'peak_megabytes_allocated', 'max_bytes_used' }
+
+# Metrics which are testing residency information
+def residency_testing_metrics():
+    return { 'peak_megabytes_allocated', 'max_bytes_used' }
 
 # On Windows, os.symlink is not defined with Python 2.7, but is in Python 3
 # when using msys2, as GHC does. Unfortunately, only Administrative users have
