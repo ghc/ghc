@@ -723,13 +723,13 @@ instance HiePass p => HasType (LocatedA (Pat (GhcPass p))) where
 --
 -- See #16233
 instance HiePass p => HasType (LocatedA (HsExpr (GhcPass p))) where
-  getTypeNode e@(L spn e') =
+  getTypeNode (L spn e) =
     case hiePass @p of
-      HieRn -> makeNodeA e' spn
-      HieTc | skipDesugaring e' -> fallback
-            | otherwise -> makeTypeNodeA e' spn . lhsExprType $ e
+      HieRn -> makeNodeA e spn
+      HieTc | skipDesugaring e -> fallback
+            | otherwise -> makeTypeNodeA e spn $! hsExprType e
         where
-          fallback = makeNodeA e' spn
+          fallback = makeNodeA e spn
 
           -- | Skip desugaring of these expressions for performance reasons.
           --
