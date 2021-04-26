@@ -41,6 +41,7 @@ module GHC.Types.Error
    , getCaretDiagnostic
    -- * Queries
    , isIntrinsicErrorMessage
+   , isExtrinsicErrorMessage
    , isWarningMessage
    , getErrorMessages
    , getWarningMessages
@@ -510,9 +511,12 @@ isWarningMessage = not . isIntrinsicErrorMessage
 errorsFound :: Diagnostic e => Messages e -> Bool
 errorsFound (Messages msgs) = any isIntrinsicErrorMessage msgs
 
+isExtrinsicErrorMessage :: MsgEnvelope e -> Bool
+isExtrinsicErrorMessage = (==) SevError . errMsgSeverity
+
 -- | Are there any errors or -Werror warnings here?
 errorsOrFatalWarningsFound :: Messages e -> Bool
-errorsOrFatalWarningsFound (Messages msgs) = any ((==) SevError . errMsgSeverity) msgs
+errorsOrFatalWarningsFound (Messages msgs) = any isExtrinsicErrorMessage msgs
 
 getWarningMessages :: Diagnostic e => Messages e -> Bag (MsgEnvelope e)
 getWarningMessages (Messages xs) = fst $ partitionBag isWarningMessage xs
