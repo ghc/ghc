@@ -110,7 +110,7 @@ test('T2452', [extra_hc_opts("-fno-implicit-import-qualified")],
     ghci_script, ['T2452.script'])
 test('T2766', normal, ghci_script, ['T2766.script'])
 
-test('T1914', [], ghci_script, ['T1914.script'])
+test('T1914', [extra_files(['../shell.hs'])], ghci_script, ['T1914.script'])
 
 test('T2182ghci', normal, ghci_script, ['T2182ghci.script'])
 test('T2182ghci2', [extra_hc_opts("-XNoImplicitPrelude")], ghci_script, ['T2182ghci2.script'])
