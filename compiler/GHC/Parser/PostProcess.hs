@@ -118,11 +118,13 @@ import GHC.Types.Name.Reader
 import GHC.Types.Name
 import GHC.Unit.Module (ModuleName)
 import GHC.Types.Basic
+import GHC.Types.Error
 import GHC.Types.Fixity
 import GHC.Types.SourceText
 import GHC.Parser.Types
 import GHC.Parser.Lexer
-import GHC.Parser.Errors
+import GHC.Parser.Errors.Types
+import GHC.Parser.Errors.Ppr
 import GHC.Utils.Lexeme ( isLexCon )
 import GHC.Types.TyThing
 import GHC.Core.Type    ( unrestrictedFunTyCon, Specificity(..) )
@@ -136,14 +138,13 @@ import GHC.Data.OrdList
 import GHC.Utils.Outputable as Outputable
 import GHC.Data.FastString
 import GHC.Data.Maybe
-import GHC.Data.Bag
 import GHC.Utils.Misc
 import Data.Either
 import Data.List        ( findIndex )
 import Data.Foldable
-import GHC.Driver.Flags ( WarningFlag(..) )
 import qualified Data.Semigroup as Semi
 import GHC.Utils.Panic
+import GHC.LanguageExtensions (Extension(RecursiveDo, OverloadedRecordUpdate))
 
 import Control.Monad
 import Text.ParserCombinators.ReadP as ReadP
@@ -273,12 +274,14 @@ mkStandaloneKindSig loc lhs rhs anns =
     check_lhs_name v@(unLoc->name) =
       if isUnqual name && isTcOcc (rdrNameOcc name)
       then return v
-      else addFatalError $ PsError (PsErrUnexpectedQualifiedConstructor (unLoc v)) [] (getLocA v)
+      else addFatalError $ mkParserErrorMessage (getLocA v) $
+             PsMalformedExprMessage (PsUnexpectedQualifiedConstructor (unLoc v))
     check_singular_lhs vs =
       case vs of
         [] -> panic "mkStandaloneKindSig: empty left-hand side"
         [v] -> return v
-        _ -> addFatalError $ PsError (PsErrMultipleNamesInStandaloneKindSignature vs) [] (getLoc lhs)
+        _ -> addFatalError $ mkParserErrorMessage (getLoc lhs) $
+               PsExtensionMessage (PsMultipleNamesInStandaloneKindSignature vs)
 
 mkTyFamInstEqn :: SrcSpan
                -> HsOuterFamEqnTyVarBndrs GhcPs
@@ -408,7 +411,8 @@ mkRoleAnnotDecl loc tycon roles anns
             let nearby = fuzzyLookup (unpackFS role)
                   (mapFst unpackFS possible_roles)
             in
-            addFatalError $ PsError (PsErrIllegalRoleName role nearby) [] loc_role
+            addFatalError $ mkParserErrorMessage loc_role $
+              PsMalformedExprMessage (PsIllegalRoleName role nearby)
 
 -- | Converts a list of 'LHsTyVarBndr's annotated with their 'Specificity' to
 -- binders without annotations. Only accepts specified variables, and errors if
@@ -428,7 +432,8 @@ fromSpecTyVarBndr bndr = case bndr of
   where
     check_spec :: Specificity -> SrcSpanAnnA -> P ()
     check_spec SpecifiedSpec _   = return ()
-    check_spec InferredSpec  loc = addFatalError $ PsError PsErrInferredTypeVarNotAllowed [] (locA loc)
+    check_spec InferredSpec  loc = addFatalError $ mkParserErrorMessage (locA loc) $
+                                     PsMalformedExprMessage PsInferredTypeVarNotAllowed
 
 -- | Add the annotation for a 'where' keyword to existing @HsLocalBinds@
 annBinds :: AddEpAnn -> HsLocalBinds GhcPs -> HsLocalBinds GhcPs
@@ -507,7 +512,7 @@ cvBindsAndSigs fb = do
     -- called on top-level declarations.
     drop_bad_decls [] = return []
     drop_bad_decls (L l (SpliceD _ d) : ds) = do
-      addError $ PsError (PsErrDeclSpliceNotAtTopLevel d) [] (locA l)
+      addError $ mkParserErrorMessage (locA l) $ PsExtensionMessage (PsDeclSpliceNotAtTopLevel d)
       drop_bad_decls ds
     drop_bad_decls (d:ds) = (d:) <$> drop_bad_decls ds
 
@@ -619,14 +624,14 @@ constructor, a type, or a context, we would need unlimited lookahead which
 -- | Reinterpret a type constructor, including type operators, as a data
 --   constructor.
 -- See Note [Parsing data constructors is hard]
-tyConToDataCon :: LocatedN RdrName -> Either PsError (LocatedN RdrName)
+tyConToDataCon :: LocatedN RdrName -> Either (MsgEnvelope PsMessage) (LocatedN RdrName)
 tyConToDataCon (L loc tc)
   | isTcOcc occ || isDataOcc occ
   , isLexCon (occNameFS occ)
   = return (L loc (setRdrNameSpace tc srcDataName))
 
   | otherwise
-  = Left $ PsError (PsErrNotADataCon tc) [] (locA loc)
+  = Left $ mkParserErrorMessage (locA loc) $ PsMalformedExprMessage (PsNotADataCon tc)
   where
     occ = rdrNameOcc tc
 
@@ -667,17 +672,21 @@ mkPatSynMatchGroup (L loc patsyn_name) (L ld decls) =
     fromDecl (L loc decl) = extraDeclErr (locA loc) decl
 
     extraDeclErr loc decl =
-        addFatalError $ PsError (PsErrNoSingleWhereBindInPatSynDecl patsyn_name decl) [] loc
+        addFatalError $ mkParserErrorMessage loc $
+          PsExtensionMessage (PsNoSingleWhereBindInPatSynDecl patsyn_name decl)
 
     wrongNameBindingErr loc decl =
-      addFatalError $ PsError (PsErrInvalidWhereBindInPatSynDecl patsyn_name decl) [] loc
+      addFatalError $ mkParserErrorMessage loc $
+          PsExtensionMessage (PsInvalidWhereBindInPatSynDecl patsyn_name decl)
 
     wrongNumberErr loc =
-      addFatalError $ PsError (PsErrEmptyWhereInPatSynDecl patsyn_name) [] loc
+      addFatalError $ mkParserErrorMessage loc $
+        PsExtensionMessage (PsEmptyWhereInPatSynDecl patsyn_name)
 
 recordPatSynErr :: SrcSpan -> LPat GhcPs -> P a
 recordPatSynErr loc pat =
-    addFatalError $ PsError (PsErrRecordSyntaxInPatSynDecl pat) [] loc
+    addFatalError $ mkParserErrorMessage loc $
+      PsExtensionMessage (PsRecordSyntaxInPatSynDecl pat)
 
 mkConDeclH98 :: EpAnn [AddEpAnn] -> LocatedN RdrName -> Maybe [LHsTyVarBndr Specificity GhcPs]
                 -> Maybe (LHsContext GhcPs) -> HsConDeclH98Details GhcPs
@@ -818,7 +827,7 @@ to make setRdrNameSpace partial, so we just make an Unqual name instead. It
 really doesn't matter!
 -}
 
-eitherToP :: MonadP m => Either PsError a -> m a
+eitherToP :: MonadP m => Either (MsgEnvelope PsMessage) a -> m a
 -- Adapts the Either monad to the P monad
 eitherToP (Left err)    = addFatalError err
 eitherToP (Right thing) = return thing
@@ -832,9 +841,11 @@ checkTyVars pp_what equals_or_where tc tparms
   = do { (tvs, anns) <- fmap unzip $ mapM check tparms
        ; return (mkHsQTvs tvs, concat anns) }
   where
-    check (HsTypeArg _ ki@(L loc _)) = addFatalError $ PsError (PsErrUnexpectedTypeAppInDecl ki pp_what (unLoc tc)) [] (locA loc)
+    check (HsTypeArg _ ki@(L loc _)) = addFatalError $ mkParserErrorMessage (locA loc) $
+                                         PsMalformedExprMessage (PsUnexpectedTypeAppInDecl ki pp_what (unLoc tc))
     check (HsValArg ty) = chkParens [] emptyComments ty
-    check (HsArgPar sp) = addFatalError $ PsError (PsErrMalformedDecl pp_what (unLoc tc)) [] sp
+    check (HsArgPar sp) = addFatalError $ mkParserErrorMessage sp $
+                            PsMalformedExprMessage (PsMalformedDecl pp_what (unLoc tc))
         -- Keep around an action for adjusting the annotations of extra parens
     chkParens :: [AddEpAnn] -> EpAnnComments -> LHsType GhcPs
               -> P (LHsTyVarBndr () GhcPs, [AddEpAnn])
@@ -854,7 +865,8 @@ checkTyVars pp_what equals_or_where tc tparms
         | isRdrTyVar tv    = return (L (widenLocatedAn l an)
                                      (UserTyVar (addAnns ann an cs) () (L ltv tv)))
     chk _ _ t@(L loc _)
-        = addFatalError $ PsError (PsErrUnexpectedTypeInDecl t pp_what (unLoc tc) tparms equals_or_where) [] (locA loc)
+        = addFatalError $ mkParserErrorMessage (locA loc) $
+            PsMalformedExprMessage (PsUnexpectedTypeInDecl t pp_what (unLoc tc) tparms equals_or_where)
 
 
 whereDots, equalsDots :: SDoc
@@ -866,7 +878,8 @@ checkDatatypeContext :: Maybe (LHsContext GhcPs) -> P ()
 checkDatatypeContext Nothing = return ()
 checkDatatypeContext (Just c)
     = do allowed <- getBit DatatypeContextsBit
-         unless allowed $ addError $ PsError (PsErrIllegalDataTypeContext c) [] (getLocA c)
+         unless allowed $ addError $ mkParserErrorMessage (getLocA c) $
+                                       PsMalformedExprMessage (PsIllegalDataTypeContext c)
 
 type LRuleTyTmVar = Located RuleTyTmVar
 data RuleTyTmVar = RuleTyTmVar (EpAnn [AddEpAnn]) (LocatedN RdrName) (Maybe (LHsType GhcPs))
@@ -896,13 +909,15 @@ checkRuleTyVarBndrNames = mapM_ (check . fmap hsTyVarName)
   where check (L loc (Unqual occ)) =
           -- TODO: don't use string here, OccName has a Unique/FastString
           when ((occNameString occ ==) `any` ["forall","family","role"])
-            (addFatalError $ PsError (PsErrParseErrorOnInput occ) [] (locA loc))
+            (addFatalError $ mkParserErrorMessage (locA loc) $
+               PsMalformedExprMessage (PsParseErrorOnInput occ))
         check _ = panic "checkRuleTyVarBndrNames"
 
 checkRecordSyntax :: (MonadP m, Outputable a) => LocatedA a -> m (LocatedA a)
 checkRecordSyntax lr@(L loc r)
     = do allowed <- getBit TraditionalRecordSyntaxBit
-         unless allowed $ addError $ PsError (PsErrIllegalTraditionalRecordSyntax (ppr r)) [] (locA loc)
+         unless allowed $ addError $ mkParserErrorMessage (locA loc) $
+                                       PsMalformedExprMessage (PsIllegalTraditionalRecordSyntax (ppr r))
          return lr
 
 -- | Check if the gadt_constrlist is empty. Only raise parse error for
@@ -911,7 +926,8 @@ checkEmptyGADTs :: Located ([AddEpAnn], [LConDecl GhcPs])
                 -> P (Located ([AddEpAnn], [LConDecl GhcPs]))
 checkEmptyGADTs gadts@(L span (_, []))           -- Empty GADT declaration.
     = do gadtSyntax <- getBit GadtSyntaxBit   -- GADTs implies GADTSyntax
-         unless gadtSyntax $ addError $ PsError PsErrIllegalWhereInDataDecl [] span
+         unless gadtSyntax $ addError $ mkParserErrorMessage span $
+                                          PsMalformedExprMessage PsIllegalWhereInDataDecl
          return gadts
 checkEmptyGADTs gadts = return gadts              -- Ordinary GADT declaration.
 
@@ -934,7 +950,7 @@ checkTyClHdr is_cls ty
 
     -- workaround to define '*' despite StarIsType
     go _ (HsParTy an (L l (HsStarTy _ isUni))) acc ann' fix
-      = do { addWarning Opt_WarnStarBinder (PsWarnStarBinder (locA l))
+      = do { addPsMessage (locA l) (PsExtensionMessage PsStarBinderWithStarIsType)
            ; let name = mkOccName tcClsName (starSym isUni)
            ; let a' = newAnns l an
            ; return (L a' (Unqual name), acc, fix
@@ -956,7 +972,8 @@ checkTyClHdr is_cls ty
                  | otherwise = getName (tupleTyCon Boxed arity)
           -- See Note [Unit tuples] in GHC.Hs.Type  (TODO: is this still relevant?)
     go l _ _ _ _
-      = addFatalError $ PsError (PsErrMalformedTyOrClDecl ty) [] l
+      = addFatalError $ mkParserErrorMessage l $
+          PsMalformedExprMessage (PsMalformedTyOrClDecl ty)
 
     -- Combine the annotations from the HsParTy and HsStarTy into a
     -- new one for the LocatedN RdrName
@@ -982,29 +999,29 @@ checkCmdBlockArguments :: LHsCmd GhcPs -> PV ()
   where
     checkExpr :: LHsExpr GhcPs -> PV ()
     checkExpr expr = case unLoc expr of
-      HsDo _ (DoExpr m) _  -> check (PsErrDoInFunAppExpr m)     expr
-      HsDo _ (MDoExpr m) _ -> check (PsErrMDoInFunAppExpr m)    expr
-      HsLam {}             -> check PsErrLambdaInFunAppExpr     expr
-      HsCase {}            -> check PsErrCaseInFunAppExpr       expr
-      HsLamCase {}         -> check PsErrLambdaCaseInFunAppExpr expr
-      HsLet {}             -> check PsErrLetInFunAppExpr        expr
-      HsIf {}              -> check PsErrIfInFunAppExpr         expr
-      HsProc {}            -> check PsErrProcInFunAppExpr       expr
+      HsDo _ (DoExpr m) _  -> check (PsMalformedExprMessage . PsDoInFunAppExpr m)     expr
+      HsDo _ (MDoExpr m) _ -> check (PsMalformedExprMessage . PsMDoInFunAppExpr m)    expr
+      HsLam {}             -> check (PsMalformedExprMessage . PsLambdaInFunAppExpr)     expr
+      HsCase {}            -> check (PsMalformedExprMessage . PsCaseInFunAppExpr)       expr
+      HsLamCase {}         -> check (PsMalformedExprMessage . PsLambdaCaseInFunAppExpr) expr
+      HsLet {}             -> check (PsMalformedExprMessage . PsLetInFunAppExpr)        expr
+      HsIf {}              -> check (PsMalformedExprMessage . PsIfInFunAppExpr)         expr
+      HsProc {}            -> check (PsMalformedExprMessage . PsProcInFunAppExpr)       expr
       _                    -> return ()
 
     checkCmd :: LHsCmd GhcPs -> PV ()
     checkCmd cmd = case unLoc cmd of
-      HsCmdLam {}  -> check PsErrLambdaCmdInFunAppCmd cmd
-      HsCmdCase {} -> check PsErrCaseCmdInFunAppCmd   cmd
-      HsCmdIf {}   -> check PsErrIfCmdInFunAppCmd     cmd
-      HsCmdLet {}  -> check PsErrLetCmdInFunAppCmd    cmd
-      HsCmdDo {}   -> check PsErrDoCmdInFunAppCmd     cmd
+      HsCmdLam {}  -> check (PsMalformedExprMessage . PsLambdaCmdInFunAppCmd) cmd
+      HsCmdCase {} -> check (PsMalformedExprMessage . PsCaseCmdInFunAppCmd)   cmd
+      HsCmdIf {}   -> check (PsMalformedExprMessage . PsIfCmdInFunAppCmd)     cmd
+      HsCmdLet {}  -> check (PsMalformedExprMessage . PsLetCmdInFunAppCmd)    cmd
+      HsCmdDo {}   -> check (PsMalformedExprMessage . PsDoCmdInFunAppCmd)     cmd
       _            -> return ()
 
     check err a = do
       blockArguments <- getBit BlockArgumentsBit
       unless blockArguments $
-        addError $ PsError (err a) [] (getLocA a)
+        addError $ mkParserErrorMessage (getLocA a) $ (err a)
 
 -- | Validate the context constraints and break up a context into a list
 -- of predicates.
@@ -1096,7 +1113,7 @@ checkPat loc (L l e@(PatBuilderVar (L ln c))) tyargs args
       add_hint TypeApplicationsInPatternsOnlyDataCons $
       patFail (locA l) (ppr e <+> hsep [text "@" <> ppr t | t <- tyargs])
   | not (null args) && patIsRec c =
-      add_hint SuggestRecursiveDo $
+      add_hint (SuggestExtension RecursiveDo) $
       patFail (locA l) (ppr e)
 checkPat loc (L _ (PatBuilderAppType f _ t)) tyargs args =
   checkPat loc f (t : tyargs) args
@@ -1131,7 +1148,7 @@ checkAPat loc e0 = do
 
    -- Improve error messages for the @-operator when the user meant an @-pattern
    PatBuilderOpApp _ op _ _ | opIsAt (unLoc op) -> do
-     addError $ PsError PsErrAtInPatPos [] (getLocA op)
+     addError $ mkParserErrorMessage (getLocA op) $ PsMalformedExprMessage PsAtInPatternPosition
      return (WildPat noExtField)
 
    PatBuilderOpApp l (L cl c) r anns
@@ -1167,7 +1184,7 @@ checkPatField (L l fld) = do p <- checkLPat (hsRecFieldArg fld)
                              return (L l (fld { hsRecFieldArg = p }))
 
 patFail :: SrcSpan -> SDoc -> PV a
-patFail loc e = addFatalError $ PsError (PsErrParseErrorInPat e) [] loc
+patFail loc e = addFatalError $ mkParserErrorMessage loc $ PsMalformedExprMessage (PsParseErrorInPat e)
 
 patIsRec :: RdrName -> Bool
 patIsRec e = e == mkUnqual varName (fsLit "rec")
@@ -1263,11 +1280,11 @@ checkValSigLhs (L _ (HsVar _ lrdr@(L _ v)))
   = return lrdr
 
 checkValSigLhs lhs@(L l _)
-  = addFatalError $ PsError (PsErrInvalidTypeSignature lhs) [] (locA l)
+  = addFatalError $ mkParserErrorMessage (locA l) $ PsMalformedExprMessage (PsInvalidTypeSignature lhs)
 
 checkDoAndIfThenElse
   :: (Outputable a, Outputable b, Outputable c)
-  => (a -> Bool -> b -> Bool -> c -> PsErrorDesc)
+  => (a -> Bool -> b -> Bool -> c -> PsMalformedExprMessage)
   -> LocatedA a -> Bool -> LocatedA b -> Bool -> LocatedA c -> PV ()
 checkDoAndIfThenElse err guardExpr semiThen thenExpr semiElse elseExpr
  | semiThen || semiElse = do
@@ -1277,7 +1294,7 @@ checkDoAndIfThenElse err guardExpr semiThen thenExpr semiElse elseExpr
                     semiElse (unLoc elseExpr)
           loc = combineLocs (reLoc guardExpr) (reLoc elseExpr)
 
-      unless doAndIfThenElse $ addError (PsError e [] loc)
+      unless doAndIfThenElse $ addError (mkParserErrorMessage loc $ PsMalformedExprMessage e)
   | otherwise = return ()
 
 isFunLhs :: LocatedA (PatBuilder GhcPs)
@@ -1393,7 +1410,7 @@ instance DisambInfixOp (HsExpr GhcPs) where
 instance DisambInfixOp RdrName where
   mkHsConOpPV (L l v) = return $ L l v
   mkHsVarOpPV (L l v) = return $ L l v
-  mkHsInfixHolePV l _ = addFatalError $ PsError PsErrInvalidInfixHole [] l
+  mkHsInfixHolePV l _ = addFatalError $ mkParserErrorMessage l $ PsLayoutMessage PsInvalidInfixHole
 
 type AnnoBody b
   = ( Anno (GRHS GhcPs (LocatedA (Body b GhcPs))) ~ SrcSpan
@@ -1557,7 +1574,8 @@ instance DisambECP (HsCmd GhcPs) where
   type Body (HsCmd GhcPs) = HsCmd
   ecpFromCmd' = return
   ecpFromExp' (L l e) = cmdFail (locA l) (ppr e)
-  mkHsProjUpdatePV l _ _ _ _ = addFatalError $ PsError PsErrOverloadedRecordDotInvalid [] l
+  mkHsProjUpdatePV l _ _ _ _ = addFatalError $ mkParserErrorMessage l $
+                                                 PsExtensionMessage PsOverloadedRecordDotInvalid
   mkHsLamPV l mg = do
     cs <- getCommentsFor l
     return $ L (noAnnSrcSpan l) (HsCmdLam NoExtField (mg cs))
@@ -1587,13 +1605,13 @@ instance DisambECP (HsCmd GhcPs) where
     return $ L l (HsCmdApp (comment (realSrcSpan $ locA l) cs) c e)
   mkHsAppTypePV l c _ t = cmdFail (locA l) (ppr c <+> text "@" <> ppr t)
   mkHsIfPV l c semi1 a semi2 b anns = do
-    checkDoAndIfThenElse PsErrSemiColonsInCondCmd c semi1 a semi2 b
+    checkDoAndIfThenElse PsSemiColonsInCondCmd c semi1 a semi2 b
     cs <- getCommentsFor l
     return $ L (noAnnSrcSpan l) (mkHsCmdIf c a b (EpAnn (spanAsAnchor l) anns cs))
   mkHsDoPV l Nothing stmts anns = do
     cs <- getCommentsFor l
     return $ L (noAnnSrcSpan l) (HsCmdDo (EpAnn (spanAsAnchor l) anns cs) stmts)
-  mkHsDoPV l (Just m)    _ _ = addFatalError $ PsError (PsErrQualifiedDoInCmd m) [] l
+  mkHsDoPV l (Just m)    _ _ = addFatalError $ mkParserErrorMessage l $ PsExtensionMessage (PsQualifiedDoInCmd m)
   mkHsParPV l c ann = do
     cs <- getCommentsFor l
     return $ L (noAnnSrcSpan l) (HsCmdPar (EpAnn (spanAsAnchor l) ann cs) c)
@@ -1608,7 +1626,7 @@ instance DisambECP (HsCmd GhcPs) where
   mkHsRecordPV _ l _ a (fbinds, ddLoc) _ = do
     let (fs, ps) = partitionEithers fbinds
     if not (null ps)
-      then addFatalError $ PsError PsErrOverloadedRecordDotInvalid [] l
+      then addFatalError $ mkParserErrorMessage l $ PsExtensionMessage PsOverloadedRecordDotInvalid
       else cmdFail l $ ppr a <+> ppr (mk_rec_fields fs ddLoc)
   mkHsNegAppPV l a _ = cmdFail l (text "-" <> ppr a)
   mkHsSectionR_PV l op c = cmdFail l $
@@ -1627,12 +1645,12 @@ instance DisambECP (HsCmd GhcPs) where
   rejectPragmaPV _ = return ()
 
 cmdFail :: SrcSpan -> SDoc -> PV a
-cmdFail loc e = addFatalError $ PsError (PsErrParseErrorInCmd e) [] loc
+cmdFail loc e = addFatalError $ mkParserErrorMessage loc $ PsMalformedExprMessage (PsParseErrorInCmd e)
 
 instance DisambECP (HsExpr GhcPs) where
   type Body (HsExpr GhcPs) = HsExpr
   ecpFromCmd' (L l c) = do
-    addError $ PsError (PsErrArrowCmdInExpr c) [] (locA l)
+    addError $ mkParserErrorMessage (locA l) $ PsMalformedExprMessage (PsArrowCmdInExpr c)
     return (L l (hsHoleExpr noAnn))
   ecpFromExp' = return
   mkHsProjUpdatePV l fields arg isPun anns = do
@@ -1668,7 +1686,7 @@ instance DisambECP (HsExpr GhcPs) where
     checkExpBlockArguments e
     return $ L l (HsAppType la e (mkHsWildCardBndrs t))
   mkHsIfPV l c semi1 a semi2 b anns = do
-    checkDoAndIfThenElse PsErrSemiColonsInCondExpr c semi1 a semi2 b
+    checkDoAndIfThenElse PsSemiColonsInCondExpr c semi1 a semi2 b
     cs <- getCommentsFor l
     return $ L (noAnnSrcSpan l) (mkHsIf c a b (EpAnn (spanAsAnchor l) anns cs))
   mkHsDoPV l mod stmts anns = do
@@ -1704,19 +1722,20 @@ instance DisambECP (HsExpr GhcPs) where
   mkHsSectionR_PV l op e = do
     cs <- getCommentsFor l
     return $ L l (SectionR (comment (realSrcSpan l) cs) op e)
-  mkHsViewPatPV l a b _ = addError (PsError (PsErrViewPatInExpr a b) [] l)
+  mkHsViewPatPV l a b _ = addError (mkParserErrorMessage l $ PsMalformedExprMessage (PsViewPatInExpr a b))
                           >> return (L (noAnnSrcSpan l) (hsHoleExpr noAnn))
-  mkHsAsPatPV l v e   _ = addError (PsError (PsErrTypeAppWithoutSpace (unLoc v) e) [] l)
+  mkHsAsPatPV l v e   _ = addError (mkParserErrorMessage l $ PsLayoutMessage (PsTypeAppWithoutSpace (unLoc v) e))
                           >> return (L (noAnnSrcSpan l) (hsHoleExpr noAnn))
-  mkHsLazyPatPV l e   _ = addError (PsError (PsErrLazyPatWithoutSpace e) [] l)
+  mkHsLazyPatPV l e   _ = addError (mkParserErrorMessage l $ PsLayoutMessage (PsLazyPatWithoutSpace e))
                           >> return (L (noAnnSrcSpan l) (hsHoleExpr noAnn))
-  mkHsBangPatPV l e   _ = addError (PsError (PsErrBangPatWithoutSpace e) [] l)
+  mkHsBangPatPV l e   _ = addError (mkParserErrorMessage l $ PsLayoutMessage (PsBangPatWithoutSpace e))
                           >> return (L (noAnnSrcSpan l) (hsHoleExpr noAnn))
   mkSumOrTuplePV = mkSumOrTupleExpr
   rejectPragmaPV (L _ (OpApp _ _ _ e)) =
     -- assuming left-associative parsing of operators
     rejectPragmaPV e
-  rejectPragmaPV (L l (HsPragE _ prag _)) = addError $ PsError (PsErrUnallowedPragma prag) [] (locA l)
+  rejectPragmaPV (L l (HsPragE _ prag _)) = addError $ mkParserErrorMessage (locA l) $
+                                                         PsImportOrPragmaMessage (PsUnallowedPragma prag)
   rejectPragmaPV _                        = return ()
 
 hsHoleExpr :: EpAnn EpAnnUnboundVar -> HsExpr GhcPs
@@ -1729,25 +1748,25 @@ type instance Anno (StmtLR GhcPs GhcPs (LocatedA (PatBuilder GhcPs))) = SrcSpanA
 
 instance DisambECP (PatBuilder GhcPs) where
   type Body (PatBuilder GhcPs) = PatBuilder
-  ecpFromCmd' (L l c)    = addFatalError $ PsError (PsErrArrowCmdInPat c) [] (locA l)
-  ecpFromExp' (L l e)    = addFatalError $ PsError (PsErrArrowExprInPat e) [] (locA l)
-  mkHsLamPV l _          = addFatalError $ PsError PsErrLambdaInPat [] l
-  mkHsLetPV l _ _ _      = addFatalError $ PsError PsErrLetInPat [] l
-  mkHsProjUpdatePV l _ _ _ _ = addFatalError $ PsError PsErrOverloadedRecordDotInvalid [] l
+  ecpFromCmd' (L l c)    = addFatalError $ mkParserErrorMessage (locA l) $ PsMalformedExprMessage (PsArrowCmdInPat c)
+  ecpFromExp' (L l e)    = addFatalError $ mkParserErrorMessage (locA l) $ PsMalformedExprMessage (PsArrowExprInPat e)
+  mkHsLamPV l _          = addFatalError $ mkParserErrorMessage l $ PsMalformedExprMessage PsLambdaInPat
+  mkHsLetPV l _ _ _      = addFatalError $ mkParserErrorMessage l $ PsMalformedExprMessage PsLetInPat
+  mkHsProjUpdatePV l _ _ _ _ = addFatalError $ mkParserErrorMessage l $ PsExtensionMessage PsOverloadedRecordDotInvalid
   type InfixOp (PatBuilder GhcPs) = RdrName
   superInfixOp m = m
   mkHsOpAppPV l p1 op p2 = do
     cs <- getCommentsFor l
     let anns = EpAnn (spanAsAnchor l) [] cs
     return $ L (noAnnSrcSpan l) $ PatBuilderOpApp p1 op p2 anns
-  mkHsCasePV l _ _ _     = addFatalError $ PsError PsErrCaseInPat [] l
-  mkHsLamCasePV l _ _    = addFatalError $ PsError PsErrLambdaCaseInPat [] l
+  mkHsCasePV l _ _ _     = addFatalError $ mkParserErrorMessage l $ PsMalformedExprMessage PsCaseInPat
+  mkHsLamCasePV l _ _    = addFatalError $ mkParserErrorMessage l $ PsMalformedExprMessage PsLambdaCaseInPat
   type FunArg (PatBuilder GhcPs) = PatBuilder GhcPs
   superFunArg m = m
   mkHsAppPV l p1 p2      = return $ L l (PatBuilderApp p1 p2)
   mkHsAppTypePV l p la t = return $ L l (PatBuilderAppType p la (mkHsPatSigType t))
-  mkHsIfPV l _ _ _ _ _ _ = addFatalError $ PsError PsErrIfTheElseInPat [] l
-  mkHsDoPV l _ _ _       = addFatalError $ PsError PsErrDoNotationInPat [] l
+  mkHsIfPV l _ _ _ _ _ _ = addFatalError $ mkParserErrorMessage l $ PsMalformedExprMessage PsIfThenElseInPat
+  mkHsDoPV l _ _ _       = addFatalError $ mkParserErrorMessage l $ PsMalformedExprMessage PsDoNotationInPat
   mkHsParPV l p an       = return $ L (noAnnSrcSpan l) (PatBuilderPar p an)
   mkHsVarPV v@(getLoc -> l) = return $ L (na2la l) (PatBuilderVar v)
   mkHsLitPV lit@(L l a) = do
@@ -1767,7 +1786,8 @@ instance DisambECP (PatBuilder GhcPs) where
   mkHsRecordPV _ l _ a (fbinds, ddLoc) anns = do
     let (fs, ps) = partitionEithers fbinds
     if not (null ps)
-     then addFatalError $ PsError PsErrOverloadedRecordDotInvalid [] l
+     then addFatalError $ mkParserErrorMessage l $
+                            PsExtensionMessage PsOverloadedRecordDotInvalid
      else do
        cs <- getCommentsFor l
        r <- mkPatRec a (mk_rec_fields fs ddLoc) (EpAnn (spanAsAnchor l) anns cs)
@@ -1805,7 +1825,8 @@ checkUnboxedStringLitPat :: Located (HsLit GhcPs) -> PV ()
 checkUnboxedStringLitPat (L loc lit) =
   case lit of
     HsStringPrim _ _  -- Trac #13260
-      -> addFatalError $ PsError (PsErrIllegalUnboxedStringInPat lit) [] loc
+      -> addFatalError $ mkParserErrorMessage loc $
+                           PsMalformedExprMessage (PsIllegalUnboxedStringInPat lit)
     _ -> return ()
 
 mkPatRec ::
@@ -1822,7 +1843,8 @@ mkPatRec (unLoc -> PatBuilderVar c) (HsRecFields fs dd) anns
          , pat_args = RecCon (HsRecFields fs dd)
          }
 mkPatRec p _ _ =
-  addFatalError $ PsError (PsErrInvalidRecordCon (unLoc p)) [] (getLocA p)
+  addFatalError $ mkParserErrorMessage (getLocA p) $
+                    PsMalformedExprMessage (PsInvalidRecordCon (unLoc p))
 
 -- | Disambiguate constructs that may appear when we do not know
 -- ahead of time whether we are parsing a type or a newtype/data constructor.
@@ -1885,7 +1907,8 @@ instance DisambTD DataConBuilder where
     panic "mkHsAppTyPV: InfixDataConBuilder"
 
   mkHsAppKindTyPV lhs l_at ki =
-    addFatalError $ PsError (PsErrUnexpectedKindAppInDataCon (unLoc lhs) (unLoc ki)) [] l_at
+    addFatalError $ mkParserErrorMessage l_at $
+                      PsMalformedExprMessage (PsUnexpectedKindAppInDataCon (unLoc lhs) (unLoc ki))
 
   mkHsOpTyPV lhs tc rhs = do
       check_no_ops (unLoc rhs)  -- check the RHS because parsing type operators is right-associative
@@ -1895,7 +1918,8 @@ instance DisambTD DataConBuilder where
       l = combineLocsA lhs rhs
       check_no_ops (HsBangTy _ _ t) = check_no_ops (unLoc t)
       check_no_ops (HsOpTy{}) =
-        addError $ PsError (PsErrInvalidInfixDataCon (unLoc lhs) (unLoc tc) (unLoc rhs)) [] (locA l)
+        addError $ mkParserErrorMessage (locA l) $
+                     PsMalformedExprMessage (PsInvalidInfixDataCon (unLoc lhs) (unLoc tc) (unLoc rhs))
       check_no_ops _ = return ()
 
   mkUnpackednessPV unpk constr_stuff
@@ -1906,7 +1930,8 @@ instance DisambTD DataConBuilder where
          let l = combineLocsA (reLocA unpk) constr_stuff
          return $ L l (InfixDataConBuilder lhs' data_con rhs)
     | otherwise =
-      do addError $ PsError PsErrUnpackDataCon [] (getLoc unpk)
+      do addError $ mkParserErrorMessage (getLoc unpk) $
+                      PsMalformedExprMessage PsUnpackDataCon
          return constr_stuff
 
 tyToDataConBuilder :: LHsType GhcPs -> PV (LocatedA DataConBuilder)
@@ -1917,7 +1942,8 @@ tyToDataConBuilder (L l (HsTupleTy _ HsBoxedOrConstraintTuple ts)) = do
   let data_con = L (l2l l) (getRdrName (tupleDataCon Boxed (length ts)))
   return $ L l (PrefixDataConBuilder (toOL ts) data_con)
 tyToDataConBuilder t =
-  addFatalError $ PsError (PsErrInvalidDataCon (unLoc t)) [] (getLocA t)
+  addFatalError $ mkParserErrorMessage (getLocA t) $
+                    PsMalformedExprMessage (PsInvalidDataCon (unLoc t))
 
 {- Note [Ambiguous syntactic categories]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2366,7 +2392,8 @@ checkPrecP
 checkPrecP (L l (_,i)) (L _ ol)
  | 0 <= i, i <= maxPrecedence = pure ()
  | all specialOp ol = pure ()
- | otherwise = addFatalError $ PsError (PsErrPrecedenceOutOfRange i) [] l
+ | otherwise = addFatalError $ mkParserErrorMessage l $
+                                 PsMalformedExprMessage (PsPrecedenceOutOfRange i)
   where
     -- If you change this, consider updating Note [Fixity of (->)] in GHC/Types.hs
     specialOp op = unLoc op `elem` [ eqTyCon_RDR
@@ -2384,10 +2411,12 @@ mkRecConstrOrUpdate _ (L _ (HsVar _ (L l c))) _lrec (fbinds,dd) anns
   = do
       let (fs, ps) = partitionEithers fbinds
       if not (null ps)
-        then addFatalError $ PsError PsErrOverloadedRecordDotInvalid [] (getLocA (head ps))
+        then addFatalError $ mkParserErrorMessage (getLocA (head ps)) $
+                               PsExtensionMessage PsOverloadedRecordDotInvalid
         else return (mkRdrRecordCon (L l c) (mk_rec_fields fs dd) anns)
 mkRecConstrOrUpdate overloaded_update exp _ (fs,dd) anns
-  | Just dd_loc <- dd = addFatalError $ PsError PsErrDotsInRecordUpdate [] dd_loc
+  | Just dd_loc <- dd = addFatalError $ mkParserErrorMessage dd_loc $
+                                          PsMalformedExprMessage PsDotsInRecordUpdate
   | otherwise = mkRdrRecordUpd overloaded_update exp fs anns
 
 mkRdrRecordUpd :: Bool -> LHsExpr GhcPs -> [Fbind (HsExpr GhcPs)] -> EpAnn [AddEpAnn] -> PV (HsExpr GhcPs)
@@ -2401,7 +2430,8 @@ mkRdrRecordUpd overloaded_on exp@(L loc _) fbinds anns = do
   case overloaded_on of
     False | not $ null ps ->
       -- A '.' was found in an update and OverloadedRecordUpdate isn't on.
-      addFatalError $ PsError PsErrOverloadedRecordUpdateNotEnabled [] (locA loc)
+      addFatalError $ mkParserErrorMessage (locA loc) $
+        PsExtensionMessage (PsSyntaxUsedButNotEnabled OverloadedRecordUpdate (SuggestExtension OverloadedRecordUpdate))
     False ->
       -- This is just a regular record update.
       return RecordUpd {
@@ -2415,7 +2445,8 @@ mkRdrRecordUpd overloaded_on exp@(L loc _) fbinds anns = do
             ]
       if not $ null qualifiedFields
         then
-          addFatalError $ PsError PsErrOverloadedRecordUpdateNoQualifiedFields [] (getLoc (head qualifiedFields))
+          addFatalError $ mkParserErrorMessage (getLoc (head qualifiedFields)) $
+            PsExtensionMessage PsOverloadedRecordUpdateNoQualifiedFields
         else -- This is a RecordDotSyntax update.
           return RecordUpd {
             rupd_ext = anns
@@ -2498,7 +2529,8 @@ mkImport cconv safety (L loc (StringLiteral esrc entity _), v, ty) =
     mkCImport = do
       let e = unpackFS entity
       case parseCImport cconv safety (mkExtName (unLoc v)) e (L loc esrc) of
-        Nothing         -> addFatalError $ PsError PsErrMalformedEntityString [] loc
+        Nothing         -> addFatalError $ mkParserErrorMessage loc $
+                             PsMalformedExprMessage PsMalformedEntityString
         Just importSpec -> returnSpec importSpec
 
     -- currently, all the other import conventions only support a symbol name in
@@ -2639,12 +2671,14 @@ mkModuleImpExp anns (L l specname) subs = do
             in (\newName
                         -> IEThingWith ann (L l newName) pos ies)
                <$> nameT
-          else addFatalError $ PsError PsErrIllegalPatSynExport [] (locA l)
+          else addFatalError $ mkParserErrorMessage (locA l) $
+                 PsExtensionMessage PsIllegalPatSynExport
   where
     name = ieNameVal specname
     nameT =
       if isVarNameSpace (rdrNameSpace name)
-        then addFatalError $ PsError (PsErrVarForTyCon name) [] (locA l)
+        then addFatalError $ mkParserErrorMessage (locA l) $
+               PsMalformedExprMessage (PsVarForTyCon name)
         else return $ ieNameFromSpec specname
 
     ieNameVal (ImpExpQcName ln)   = unLoc ln
@@ -2661,7 +2695,8 @@ mkTypeImpExp :: LocatedN RdrName   -- TcCls or Var name space
              -> P (LocatedN RdrName)
 mkTypeImpExp name =
   do allowed <- getBit ExplicitNamespacesBit
-     unless allowed $ addError $ PsError PsErrIllegalExplicitNamespace [] (getLocA name)
+     unless allowed $ addError $ mkParserErrorMessage (getLocA name) $
+                                   PsExtensionMessage PsIllegalExplicitNamespace
      return (fmap (`setRdrNameSpace` tcClsName) name)
 
 checkImportSpec :: LocatedL [LIE GhcPs] -> P (LocatedL [LIE GhcPs])
@@ -2671,7 +2706,7 @@ checkImportSpec ie@(L _ specs) =
       (l:_) -> importSpecError (locA l)
   where
     importSpecError l =
-      addFatalError $ PsError PsErrIllegalImportBundleForm [] l
+      addFatalError $ mkParserErrorMessage l $ PsImportOrPragmaMessage PsIllegalImportBundleForm
 
 -- In the correct order
 mkImpExpSubSpec :: [LocatedA ImpExpQcSpec] -> P ([AddEpAnn], ImpExpSubSpec)
@@ -2692,21 +2727,24 @@ isImpExpQcWildcard _                = False
 
 warnPrepositiveQualifiedModule :: SrcSpan -> P ()
 warnPrepositiveQualifiedModule span =
-  addWarning Opt_WarnPrepositiveQualifiedModule (PsWarnImportPreQualified span)
+  addPsMessage span (PsImportOrPragmaMessage PsImportPreQualified)
 
 failOpNotEnabledImportQualifiedPost :: SrcSpan -> P ()
-failOpNotEnabledImportQualifiedPost loc = addError $ PsError PsErrImportPostQualified [] loc
+failOpNotEnabledImportQualifiedPost loc =
+  addError $ mkParserErrorMessage loc $ PsImportOrPragmaMessage PsImportPostQualified
 
 failOpImportQualifiedTwice :: SrcSpan -> P ()
-failOpImportQualifiedTwice loc = addError $ PsError PsErrImportQualifiedTwice [] loc
+failOpImportQualifiedTwice loc =
+  addError $ mkParserErrorMessage loc $ PsImportOrPragmaMessage PsImportQualifiedTwice
 
 warnStarIsType :: SrcSpan -> P ()
-warnStarIsType span = addWarning Opt_WarnStarIsType (PsWarnStarIsType span)
+warnStarIsType span = addPsMessage span (PsExtensionMessage PsStarIsTypeWithoutExtension)
 
 failOpFewArgs :: MonadP m => LocatedN RdrName -> m a
 failOpFewArgs (L loc op) =
   do { star_is_type <- getBit StarIsTypeBit
-     ; addFatalError $ PsError (PsErrOpFewArgs (StarIsType star_is_type) op) [] (locA loc) }
+     ; addFatalError $ mkParserErrorMessage (locA loc) $
+         PsMalformedExprMessage (PsOpTooFewArgs (StarIsType star_is_type) op) }
 
 -----------------------------------------------------------------------------
 -- Misc utils
@@ -2719,8 +2757,8 @@ data PV_Context =
 
 data PV_Accum =
   PV_Accum
-    { pv_warnings        :: Bag PsWarning
-    , pv_errors          :: Bag PsError
+    { pv_warnings        :: Messages PsMessage
+    , pv_errors          :: Messages PsMessage
     , pv_header_comments :: Maybe [LEpaComment]
     , pv_comment_q       :: [LEpaComment]
     }
@@ -2791,16 +2829,13 @@ add_hint hint m =
   PV (\ctx acc -> unPV m (modifyHint ctx) acc)
 
 instance MonadP PV where
-  addError err@(PsError e hints loc) =
-    PV $ \ctx acc ->
-      let err' | null (pv_hints ctx) = err
-               | otherwise           = PsError e (hints ++ pv_hints ctx) loc
-      in PV_Ok acc{pv_errors = err' `consBag` pv_errors acc} ()
-  addWarning option w =
-    PV $ \ctx acc ->
-      if warnopt option (pv_options ctx)
-         then PV_Ok acc{pv_warnings= w `consBag` pv_warnings acc} ()
-         else PV_Ok acc ()
+  addError err = -- FIXME(adn) How to deal with accumulated hints?
+    PV $ \_ctx acc -> PV_Ok acc{pv_errors = err `addMessage` pv_errors acc} ()
+  addWarning w =
+    PV $ \_ctx acc ->
+      -- No need to check for the warning flag to be set, GHC will correctly discard suppressed
+      -- diagnostics.
+      PV_Ok acc{pv_warnings= w `addMessage` pv_warnings acc} ()
   addFatalError err =
     addError err >> PV (const PV_Failed)
   getBit ext =
@@ -2874,7 +2909,7 @@ hintBangPat :: SrcSpan -> Pat GhcPs -> PV ()
 hintBangPat span e = do
     bang_on <- getBit BangPatBit
     unless bang_on $
-      addError $ PsError (PsErrIllegalBangPattern e) [] span
+      addError $ mkParserErrorMessage span $ PsExtensionMessage (PsIllegalBangPattern e)
 
 mkSumOrTupleExpr :: SrcSpanAnnA -> Boxity -> SumOrTuple (HsExpr GhcPs)
                  -> [AddEpAnn]
@@ -2900,7 +2935,7 @@ mkSumOrTupleExpr l Unboxed (Sum alt arity e barsp barsa) anns = do
     cs <- getCommentsFor (locA l)
     return $ L l (ExplicitSum (EpAnn (spanAsAnchor $ locA l) an cs) alt arity e)
 mkSumOrTupleExpr l Boxed a@Sum{} _ =
-    addFatalError $ PsError (PsErrUnsupportedBoxedSumExpr a) [] (locA l)
+    addFatalError $ mkParserErrorMessage (locA l) $ PsMalformedExprMessage (PsUnsupportedBoxedSumExpr a)
 
 mkSumOrTuplePat
   :: SrcSpanAnnA -> Boxity -> SumOrTuple (PatBuilder GhcPs) -> [AddEpAnn]
@@ -2916,7 +2951,8 @@ mkSumOrTuplePat l boxity (Tuple ps) anns = do
     -- Ignore the element location so that the error message refers to the
     -- entire tuple. See #19504 (and the discussion) for details.
     toTupPat p = case p of
-      Left _ -> addFatalError $ PsError PsErrTupleSectionInPat [] (locA l)
+      Left _ -> addFatalError $
+                  mkParserErrorMessage (locA l) $ PsMalformedExprMessage PsTupleSectionInPattern
       Right p' -> checkLPat p'
 
 -- Sum
@@ -2926,7 +2962,8 @@ mkSumOrTuplePat l Unboxed (Sum alt arity p barsb barsa) anns = do
    let an = EpAnn (spanAsAnchor $ locA l) (EpAnnSumPat anns barsb barsa) cs
    return $ L l (PatBuilderPat (SumPat an p' alt arity))
 mkSumOrTuplePat l Boxed a@Sum{} _ =
-    addFatalError $ PsError (PsErrUnsupportedBoxedSumPat a) [] (locA l)
+    addFatalError $
+      mkParserErrorMessage (locA l) $ PsMalformedExprMessage (PsUnsupportedBoxedSumPattern a)
 
 mkLHsOpTy :: LHsType GhcPs -> LocatedN RdrName -> LHsType GhcPs -> LHsType GhcPs
 mkLHsOpTy x op y =
