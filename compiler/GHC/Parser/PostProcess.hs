@@ -1640,7 +1640,14 @@ instance DisambECP (HsExpr GhcPs) where
     return $ mkRdrProjUpdate (noAnnSrcSpan l) fields arg isPun (EpAnn (spanAsAnchor l) anns cs)
   mkHsLamPV l mg = do
     cs <- getCommentsFor l
-    return $ L (noAnnSrcSpan l) (HsLam NoExtField (mg cs))
+    let mg' = mg cs
+    case mg' of
+      MG { mg_alts = (L _ (matches:_))} -> do
+        when (null (hsLMatchPats matches)) $ addError $ PsError PsErrEmptyLambda [] l
+        noExtFieldPV l mg'
+      _ -> noExtFieldPV l mg'
+    where
+      noExtFieldPV loc mg = return $ L (noAnnSrcSpan loc) (HsLam NoExtField mg)
   mkHsLetPV l bs c anns = do
     cs <- getCommentsFor l
     return $ L (noAnnSrcSpan l) (HsLet (EpAnn (spanAsAnchor l) anns cs) bs c)
