@@ -30,7 +30,7 @@ import Data.Bifunctor
 type WarningMessages = Messages GhcMessage
 
 -- | A collection of error messages.
--- /INVARIANT/: Each 'GhcMessage' in the collection should have 'SevWarning' severity.
+-- /INVARIANT/: Each 'GhcMessage' in the collection should have 'SevError' severity.
 type ErrorMessages   = Messages GhcMessage
 
 -- | A single warning message.
