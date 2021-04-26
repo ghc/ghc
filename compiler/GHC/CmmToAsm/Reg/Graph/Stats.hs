@@ -38,7 +38,7 @@ import GHC.Platform.Reg.Class
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
 import GHC.Utils.Outputable
-import GHC.Utils.Monad.State
+import GHC.Utils.Monad.State.Strict
 
 -- | Holds interesting statistics from the register allocator.
 data RegAllocStats statics instr
