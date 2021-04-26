@@ -90,6 +90,9 @@ data PsErrorDesc
    = PsErrLambdaCase
       -- ^ LambdaCase syntax used without the extension enabled
 
+   | PsErrEmptyLambda
+      -- ^ A lambda requires at least one parameter
+
    | PsErrNumUnderscores !NumUnderscoreReason
       -- ^ Underscores in literals without the extension enabled
 
