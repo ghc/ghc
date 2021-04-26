@@ -635,7 +635,7 @@ pprImportedSymbol config importedLbl = case (arch,os) of
         | Just (SymbolPtr, lbl) <- dynamicLinkerLabelInfo importedLbl
         -> vcat [
                 text ".non_lazy_symbol_pointer",
-                text "L" <> ppr_lbl lbl <> text "$non_lazy_ptr:",
+                char 'L' <> ppr_lbl lbl <> text "$non_lazy_ptr:",
                 text "\t.indirect_symbol" <+> ppr_lbl lbl,
                 text "\t.long\t0"]
 
@@ -643,14 +643,6 @@ pprImportedSymbol config importedLbl = case (arch,os) of
         -> empty
 
    (ArchAArch64, OSDarwin)
-        -- | Just (SymbolPtr, lbl) <- dynamicLinkerLabelInfo importedLbl
-        -- -> vcat [
-        --         text ".non_lazy_symbol_pointer",
-        --         text "L" <> ppr_lbl lbl <> text "$non_lazy_ptr:",
-        --         text "\t.indirect_symbol" <+> ppr_lbl lbl,
-        --         text "\t.long\t0"]
-
-        -- | otherwise
         -> empty
 
 

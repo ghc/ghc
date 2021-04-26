@@ -425,6 +425,7 @@ data ForeignLabelSource
 
    deriving (Eq, Ord)
 
+
 -- | For debugging problems with the CLabel representation.
 --      We can't make a Show instance for CLabel because lots of its components don't have instances.
 --      The regular Outputable instance only shows the label name, and not its other info.
@@ -1537,19 +1538,15 @@ pprDynamicLinkerAsmLabel platform dllInfo ppLbl =
       OSDarwin
         | platformArch platform == ArchX86_64 ->
           case dllInfo of
-            CodeStub        -> text "L" <> ppLbl <> text "$stub"
-            SymbolPtr       -> text "L" <> ppLbl <> text "$non_lazy_ptr"
+            CodeStub        -> char 'L' <> ppLbl <> text "$stub"
+            SymbolPtr       -> char 'L' <> ppLbl <> text "$non_lazy_ptr"
             GotSymbolPtr    -> ppLbl <> text "@GOTPCREL"
             GotSymbolOffset -> ppLbl
         | platformArch platform == ArchAArch64 -> ppLbl
-        --   case dllInfo of
-        --     CodeStub        -> text "L" <> ppLbl <> text "$stub"
-        --     SymbolPtr       -> text "L" <> ppLbl <> text "$non_lazy_ptr"
-        --     _               -> ppLbl
         | otherwise ->
           case dllInfo of
-            CodeStub  -> text "L" <> ppLbl <> text "$stub"
-            SymbolPtr -> text "L" <> ppLbl <> text "$non_lazy_ptr"
+            CodeStub  -> char 'L' <> ppLbl <> text "$stub"
+            SymbolPtr -> char 'L' <> ppLbl <> text "$non_lazy_ptr"
             _         -> panic "pprDynamicLinkerAsmLabel"
 
       OSAIX ->

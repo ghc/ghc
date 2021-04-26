@@ -52,7 +52,6 @@ import GHC.Types.Unique
 import GHC.Types.Unique.Supply
 
 import Control.Monad (ap)
-import GHC.Stack
 
 type RA_Result freeRegs a = (# RA_State freeRegs, a #)
 
@@ -115,7 +114,7 @@ makeRAStats state
         , ra_fixupList          = ra_fixups state }
 
 
-spillR :: (HasCallStack, Instruction instr)
+spillR :: Instruction instr
        => Reg -> Unique -> RegM freeRegs ([instr], Int)
 
 spillR reg temp = RegM $ \s ->

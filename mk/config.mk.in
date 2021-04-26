@@ -173,19 +173,6 @@ endif
 #
 GhcUnregisterised=@Unregisterised@
 
-# Build a compiler with a native code generator backend
-# (as well as a C backend)
-#
-# Target platforms supported:
-#   i386, powerpc, powerpc64, sparc
-#   IOS is not supported
-ArchSupportsNCG=$(strip $(patsubst $(TargetArch_CPP), YES, $(findstring $(TargetArch_CPP), i386 x86_64 powerpc powerpc64 powerpc64le sparc aarch64)))
-OsSupportsNCG=$(strip $(patsubst $(TargetOS_CPP), YES, $(patsubst ios,,$(TargetOS_CPP))))
-
-GhcWithNativeCodeGen := $(strip\
-    $(if $(filter YESYESNO,\
-		  $(OsSupportsNCG)$(ArchSupportsNCG)$(GhcUnregisterised)),YES,NO))
-
 # ArchSupportsSMP should be set iff there is support for that arch in
 # includes/stg/SMP.h
 ifeq "$(TargetArch_CPP)" "arm"
