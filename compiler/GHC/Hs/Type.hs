@@ -37,7 +37,7 @@ module GHC.Hs.Type (
         HsContext, LHsContext, fromMaybeContext,
         HsTyLit(..),
         HsIPName(..), hsIPNameFS,
-        HsArg(..), numVisibleArgs,
+        HsArg(..), numVisibleArgs, pprHsArgsApp,
         LHsTypeArg, lhsTypeArgSrcSpan,
         OutputableBndrFlag,
 

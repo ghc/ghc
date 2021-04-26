@@ -8,6 +8,7 @@ module GHC.Types.Error
    , WarningMessages
    , ErrorMessages
    , mkMessages
+   , getMessages
    , emptyMessages
    , isEmptyMessages
    , addMessage
@@ -47,14 +48,13 @@ import GHC.Prelude
 import GHC.Driver.Flags
 
 import GHC.Data.Bag
+import GHC.IO (catchException)
 import GHC.Utils.Outputable as Outputable
 import qualified GHC.Utils.Ppr.Colour as Col
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Data.FastString (unpackFS)
 import GHC.Data.StringBuffer (atLine, hGetStringBuffer, len, lexemeToString)
 import GHC.Utils.Json
-
-import System.IO.Error  ( catchIOError )
 
 {-
 Note [Messages]
@@ -76,7 +76,7 @@ a bit more declarative) or removed altogether.
 
 -- | A collection of messages emitted by GHC during error reporting. A diagnostic message is typically
 -- a warning or an error. See Note [Messages].
-newtype Messages e = Messages (Bag (MsgEnvelope e))
+newtype Messages e = Messages { getMessages :: Bag (MsgEnvelope e) }
 
 instance Functor Messages where
   fmap f (Messages xs) = Messages (mapBag (fmap f) xs)
@@ -370,7 +370,7 @@ getCaretDiagnostic msg_class (RealSrcSpan span _) =
   where
     getSrcLine fn i =
       getLine i (unpackFS fn)
-        `catchIOError` \_ ->
+        `catchException` \(_ :: IOError) ->
           pure Nothing
 
     getLine i fn = do

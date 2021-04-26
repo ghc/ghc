@@ -27,7 +27,7 @@ import Data.Kind (Type)
 import GHC.Utils.Outputable
 
 {-
-Note [Trees that grow]
+Note [Trees That Grow]
 ~~~~~~~~~~~~~~~~~~~~~~
 
 See https://gitlab.haskell.org/ghc/ghc/wikis/implementing-trees-that-grow

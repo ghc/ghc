@@ -2116,7 +2116,8 @@ lintCoercion co@(UnivCo prov r ty1 ty2)
             ; checkWarnL (not lev_poly2)
                          (report "right-hand type is levity-polymorphic")
             ; when (not (lev_poly1 || lev_poly2)) $
-              do { checkWarnL (reps1 `equalLength` reps2)
+              do { checkWarnL (reps1 `equalLength` reps2 ||
+                               is_core_prep_prov prov)
                               (report "between values with different # of reps")
                  ; zipWithM_ validateCoercion reps1 reps2 }}
        where
@@ -2127,6 +2128,13 @@ lintCoercion co@(UnivCo prov r ty1 ty2)
          -- Otherwise, we get #13458
          reps1 = typePrimRep t1
          reps2 = typePrimRep t2
+
+     -- CorePrep deliberately makes ill-kinded casts
+     --  e.g (case error @Int "blah" of {}) :: Int#
+     --     ==> (error @Int "blah") |> Unsafe Int Int#
+     -- See Note [Unsafe coercions] in GHC.Core.CoreToStg.Prep
+     is_core_prep_prov CorePrepProv = True
+     is_core_prep_prov _            = False
 
      validateCoercion :: PrimRep -> PrimRep -> LintM ()
      validateCoercion rep1 rep2
@@ -2158,6 +2166,7 @@ lintCoercion co@(UnivCo prov r ty1 ty2)
             ; return (ProofIrrelProv kco') }
 
      lint_prov _ _ prov@(PluginProv _) = return prov
+     lint_prov _ _ prov@CorePrepProv   = return prov
 
      check_kinds kco k1 k2
        = do { let Pair k1' k2' = coercionKind kco
