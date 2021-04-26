@@ -12,6 +12,7 @@ import GHC.Driver.Session
 import GHC.Core.SimpleOpt
 import GHC.Core.Coercion.Opt
 import GHC.Parser.Lexer
+import GHC.Parser.Errors.Ppr
 
 -- | Initialise coercion optimiser configuration from DynFlags
 initOptCoercionOpts :: DynFlags -> OptCoercionOpts
@@ -32,6 +33,7 @@ initParserOpts =
   mkParserOpts
     <$> warningFlags
     <*> extensionFlags
+    <*> mkParserMessage
     <*> safeImportsOn
     <*> gopt Opt_Haddock
     <*> gopt Opt_KeepRawTokenStream

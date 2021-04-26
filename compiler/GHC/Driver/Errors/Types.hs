@@ -11,7 +11,6 @@ module GHC.Driver.Errors.Types (
   -- * Utility functions
   , hoistTcRnMessage
   , hoistDsMessage
-  , foldPsMessages
   ) where
 
 import GHC.Prelude
@@ -19,7 +18,6 @@ import GHC.Prelude
 import Data.Typeable
 import GHC.Types.Error
 
-import GHC.Parser.Errors       ( PsErrorDesc, PsHint )
 import GHC.Parser.Errors.Types ( PsMessage )
 import GHC.Tc.Errors.Types     ( TcRnMessage )
 import GHC.HsToCore.Errors.Types ( DsMessage )
@@ -87,14 +85,6 @@ data GhcMessage where
 ghcUnknownMessage :: (Diagnostic a, Typeable a) => a -> GhcMessage
 ghcUnknownMessage = GhcUnknownMessage
 
--- | Given a collection of @e@ wrapped in a 'Foldable' structure, converts it
--- into 'Messages' via the supplied transformation function.
-foldPsMessages :: Foldable f
-               => (e -> MsgEnvelope PsMessage)
-               -> f e
-               -> Messages GhcMessage
-foldPsMessages f = foldMap (singleMessage . fmap GhcPsMessage . f)
-
 -- | Abstracts away the frequent pattern where we are calling 'ioMsgMaybe' on
 -- the result of 'IO (Messages TcRnMessage, a)'.
 hoistTcRnMessage :: Monad m => m (Messages TcRnMessage, a) -> m (Messages GhcMessage, a)
@@ -110,7 +100,7 @@ data DriverMessage
   = DriverUnknownMessage !DiagnosticMessage
   -- ^ Simply rewraps a generic 'DiagnosticMessage'. More
   -- constructors will be added in the future (#18516).
-  | DriverPsHeaderMessage !PsErrorDesc ![PsHint]
+  | DriverPsHeaderMessage !PsMessage
   -- ^ A parse error in parsing a Haskell file header during dependency
   -- analysis
 

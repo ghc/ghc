@@ -82,7 +82,9 @@ import GHC.Parser.PostProcess
 import GHC.Parser.PostProcess.Haddock
 import GHC.Parser.Lexer
 import GHC.Parser.Annotation
-import GHC.Parser.Errors
+import GHC.Parser.Errors.Types
+import GHC.Parser.Errors.Ppr
+import GHC.LanguageExtensions.Type ( Extension(MultiWayIf, LinearTypes) )
 
 import GHC.Builtin.Types ( unitTyCon, unitDataCon, tupleTyCon, tupleDataCon, nilDataCon,
                            unboxedUnitTyCon, unboxedUnitDataCon,
@@ -807,7 +809,7 @@ HYPHEN :: { [AddEpAnn] }
       | PREFIX_MINUS { [mj AnnMinus $1 ] }
       | VARSYM  {% if (getVARSYM $1 == fsLit "-")
                    then return [mj AnnMinus $1]
-                   else do { addError $ PsError PsErrExpectedHyphen [] (getLoc $1)
+                   else do { addError $ mkParserErrorMessage (getLoc $1) $ PsLayoutMessage PsExpectedHyphen
                            ; return [] } }
 
 
@@ -1124,7 +1126,8 @@ maybe_safe :: { (Maybe EpaLocation,Bool) }
 maybe_pkg :: { (Maybe EpaLocation,Maybe StringLiteral) }
         : STRING  {% do { let { pkgFS = getSTRING $1 }
                         ; unless (looksLikePackageName (unpackFS pkgFS)) $
-                             addError $ PsError (PsErrInvalidPackageName pkgFS) [] (getLoc $1)
+                             addError $ mkParserErrorMessage (getLoc $1) $
+                               PsMalformedExprMessage (PsInvalidPackageName pkgFS)
                         ; return (Just (glAA $1), Just (StringLiteral (getSTRINGs $1) pkgFS Nothing)) } }
         | {- empty -}                           { (Nothing,Nothing) }
 
@@ -1855,7 +1858,8 @@ rule_activation_marker :: { [AddEpAnn] }
       : PREFIX_TILDE { [mj AnnTilde $1] }
       | VARSYM  {% if (getVARSYM $1 == fsLit "~")
                    then return [mj AnnTilde $1]
-                   else do { addError $ PsError PsErrInvalidRuleActivationMarker [] (getLoc $1)
+                   else do { addError $ mkParserErrorMessage (getLoc $1) $
+                               PsImportOrPragmaMessage PsInvalidRuleActivationMarker
                            ; return [] } }
 
 rule_explicit_activation :: { ([AddEpAnn]
@@ -3942,7 +3946,7 @@ getSCC :: Located Token -> P FastString
 getSCC lt = do let s = getSTRING lt
                -- We probably actually want to be more restrictive than this
                if ' ' `elem` unpackFS s
-                   then addFatalError $ PsError PsErrSpaceInSCC [] (getLoc lt)
+                   then addFatalError $ mkParserErrorMessage (getLoc lt) $ PsLayoutMessage PsSpaceInSCC
                    else return s
 
 -- Utilities for combining source spans
@@ -4083,7 +4087,8 @@ fileSrcSpan = do
 hintLinear :: MonadP m => SrcSpan -> m ()
 hintLinear span = do
   linearEnabled <- getBit LinearTypesBit
-  unless linearEnabled $ addError $ PsError PsErrLinearFunction [] span
+  unless linearEnabled $ addError $ mkParserErrorMessage span $
+    PsExtensionMessage (PsSyntaxUsedButNotEnabled LinearTypes (SuggestExtension LinearTypes))
 
 -- Does this look like (a %m)?
 looksLikeMult :: LHsType GhcPs -> LocatedN RdrName -> LHsType GhcPs -> Bool
@@ -4102,14 +4107,16 @@ looksLikeMult ty1 l_op ty2
 hintMultiWayIf :: SrcSpan -> P ()
 hintMultiWayIf span = do
   mwiEnabled <- getBit MultiWayIfBit
-  unless mwiEnabled $ addError $ PsError PsErrMultiWayIf [] span
+  unless mwiEnabled $ addError $ mkParserErrorMessage span $
+    PsExtensionMessage (PsSyntaxUsedButNotEnabled MultiWayIf (SuggestExtension MultiWayIf))
 
 -- Hint about explicit-forall
 hintExplicitForall :: Located Token -> P ()
 hintExplicitForall tok = do
     forall   <- getBit ExplicitForallBit
     rulePrag <- getBit InRulePragBit
-    unless (forall || rulePrag) $ addError $ PsError (PsErrExplicitForall (isUnicode tok)) [] (getLoc tok)
+    unless (forall || rulePrag) $ addError $ mkParserErrorMessage (getLoc tok) $
+      PsExtensionMessage (PsExplicitForallWithoutExtension (isUnicode tok))
 
 -- Hint about qualified-do
 hintQualifiedDo :: Located Token -> P ()
@@ -4117,7 +4124,8 @@ hintQualifiedDo tok = do
     qualifiedDo   <- getBit QualifiedDoBit
     case maybeQDoDoc of
       Just qdoDoc | not qualifiedDo ->
-        addError $ PsError (PsErrIllegalQualifiedDo qdoDoc) [] (getLoc tok)
+        addError $ mkParserErrorMessage (getLoc tok) $
+          PsExtensionMessage (PsIllegalQualifiedDoWithoutExtension qdoDoc)
       _ -> return ()
   where
     maybeQDoDoc = case unLoc tok of
@@ -4131,7 +4139,7 @@ hintQualifiedDo tok = do
 reportEmptyDoubleQuotes :: SrcSpan -> P a
 reportEmptyDoubleQuotes span = do
     thQuotes <- getBit ThQuotesBit
-    addFatalError $ PsError (PsErrEmptyDoubleQuotes thQuotes) [] span
+    addFatalError $ mkParserErrorMessage span $ PsLayoutMessage (PsEmptyDoubleQuotes thQuotes)
 
 {-
 %************************************************************************
