@@ -38,6 +38,12 @@
 #include "PosixSource.h"
 #include "Rts.h"
 
+#if defined(darwin_HOST_OS)
+/* Inclusion of system headers usually requires _DARWIN_C_SOURCE on Mac OS X
+ * because of some specific types like u_char, u_int, etc. */
+#define _DARWIN_C_SOURCE 1
+#endif
+
 #include "Ticker.h"
 #include "RtsUtils.h"
 #include "Proftimer.h"
