@@ -18,6 +18,27 @@
  */
 
 #include "PosixSource.h"
+
+/* We've defined _POSIX_SOURCE via "PosixSource.h", and yet still use
+   some non-POSIX features.  With _POSIX_SOURCE defined, visibility of
+   non-POSIX extension prototypes requires _DARWIN_C_SOURCE on Mac OS X and
+   __BSD_VISIBLE on FreeBSD and DragonflyBSD.  Otherwise, for example, code
+   using pthread_setname_np(3) and variants will not compile.  We must
+   therefore define the additional macros that expose non-POSIX APIs early,
+   before any of the relevant system headers are included via "Rts.h".
+
+   An alternative approach could be to write portable wrappers or stubs for all
+   the non-posix functions in a C-module that does not include "PosixSource.h",
+   and then use only POSIX features and the portable wrapper functions in all
+   other C-modules. */
+#include "ghcconfig.h"
+#if defined(freebsd_HOST_OS) || defined(dragonfly_HOST_OS)
+#define __BSD_VISIBLE   1
+#endif
+#if defined(darwin_HOST_OS)
+#define _DARWIN_C_SOURCE 1
+#endif
+
 #include "Rts.h"
 
 /*
