@@ -563,10 +563,17 @@ data TcGblEnv
                                              -- function, if this module is
                                              -- the main module.
 
-        tcg_safeInfer :: TcRef (Bool, Messages TcRnMessage),
-        -- ^ Has the typechecker inferred this module as -XSafe (Safe Haskell)
+        tcg_safe_infer :: TcRef Bool,
+        -- ^ Has the typechecker inferred this module as -XSafe (Safe Haskell)?
         -- See Note [Safe Haskell Overlapping Instances Implementation],
         -- although this is used for more than just that failure case.
+
+        tcg_safe_infer_reasons :: TcRef (Messages TcRnMessage),
+        -- ^ Unreported reasons why tcg_safe_infer is False.
+        -- INVARIANT: If this Messages is non-empty, then tcg_safe_infer is False.
+        -- It may be that tcg_safe_infer is False but this is empty, if no reasons
+        -- are supplied (#19714), or if those reasons have already been
+        -- reported by GHC.Driver.Main.markUnsafeInfer
 
         tcg_tc_plugins :: [TcPluginSolver],
         -- ^ A list of user-defined plugins for the constraint solver.

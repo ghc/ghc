@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -14,6 +15,7 @@ module GHC.Types.Error
    , singleMessage
    , addMessage
    , unionMessages
+   , unionManyMessages
    , MsgEnvelope (..)
 
    -- * Classifying Messages
@@ -65,6 +67,7 @@ import GHC.Data.StringBuffer (atLine, hGetStringBuffer, len, lexemeToString)
 import GHC.Utils.Json
 
 import Data.Bifunctor
+import Data.Foldable    ( fold )
 
 {-
 Note [Messages]
@@ -95,7 +98,7 @@ declarative) or removed altogether.
 -- 'mkMessages' will filter out any message which 'Severity' is 'SevIgnore'.
 newtype Messages e = Messages { getMessages :: Bag (MsgEnvelope e) }
   deriving newtype (Semigroup, Monoid)
-  deriving stock Functor
+  deriving stock (Functor, Foldable, Traversable)
 
 emptyMessages :: Messages e
 emptyMessages = Messages emptyBag
@@ -135,11 +138,15 @@ unionMessages :: Messages e -> Messages e -> Messages e
 unionMessages (Messages msgs1) (Messages msgs2) =
   Messages (msgs1 `unionBags` msgs2)
 
--- | A 'DecoratedSDoc' is isomorphic to a '[SDoc]' but it carries the invariant that the input '[SDoc]'
--- needs to be rendered /decorated/ into its final form, where the typical case would be adding bullets
--- between each elements of the list.
--- The type of decoration depends on the formatting function used, but in practice GHC uses the
--- 'formatBulleted'.
+-- | Joins many 'Messages's together
+unionManyMessages :: Foldable f => f (Messages e) -> Messages e
+unionManyMessages = fold
+
+-- | A 'DecoratedSDoc' is isomorphic to a '[SDoc]' but it carries the
+-- invariant that the input '[SDoc]' needs to be rendered /decorated/ into its
+-- final form, where the typical case would be adding bullets between each
+-- elements of the list. The type of decoration depends on the formatting
+-- function used, but in practice GHC uses the 'formatBulleted'.
 newtype DecoratedSDoc = Decorated { unDecorated :: [SDoc] }
 
 -- | Creates a new 'DecoratedSDoc' out of a list of 'SDoc'.
@@ -154,11 +161,13 @@ mkSimpleDecorated doc = Decorated [doc]
 Note [Rendering Messages]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Turning 'Messages' into something that renders nicely for the user is one of the last steps, and it
-happens typically at the application's boundaries (i.e. from the 'Driver' upwards).
+Turning 'Messages' into something that renders nicely for the user is one of
+the last steps, and it happens typically at the application's boundaries (i.e.
+from the 'Driver' upwards).
 
-For now (see #18516) this class has few instance, but the idea is that as
-the more domain-specific types are defined, the more instances we would get. For example, given something like:
+For now (see #18516) this class has few instance, but the idea is that as the
+more domain-specific types are defined, the more instances we would get. For
+example, given something like:
 
   data TcRnDiagnostic
     = TcRnOutOfScope ..
@@ -166,36 +175,40 @@ the more domain-specific types are defined, the more instances we would get. For
 
   newtype TcRnMessage = TcRnMessage (DiagnosticMessage TcRnDiagnostic)
 
-We could then define how a 'TcRnDiagnostic' is displayed to the user. Rather than scattering pieces of
-'SDoc' around the codebase, we would write once for all:
+We could then define how a 'TcRnDiagnostic' is displayed to the user. Rather
+than scattering pieces of 'SDoc' around the codebase, we would write once for
+all:
 
   instance Diagnostic TcRnDiagnostic where
     diagnosticMessage (TcRnMessage msg) = case diagMessage msg of
       TcRnOutOfScope .. -> Decorated [text "Out of scope error ..."]
       ...
 
-This way, we can easily write generic rendering functions for errors that all they care about is the
-knowledge that a given type 'e' has a 'Diagnostic' constraint.
+This way, we can easily write generic rendering functions for errors that all
+they care about is the knowledge that a given type 'e' has a 'Diagnostic'
+constraint.
 
 -}
 
 -- | A class identifying a diagnostic.
 -- Dictionary.com defines a diagnostic as:
 --
--- \"a message output by a computer diagnosing an error in a computer program, computer system,
--- or component device\".
+-- \"a message output by a computer diagnosing an error in a computer program,
+-- computer system, or component device\".
 --
--- A 'Diagnostic' carries the /actual/ description of the message (which, in GHC's case, it can be
--- an error or a warning) and the /reason/ why such message was generated in the first place.
--- See also Note [Rendering Messages].
+-- A 'Diagnostic' carries the /actual/ description of the message (which, in
+-- GHC's case, it can be an error or a warning) and the /reason/ why such
+-- message was generated in the first place. See also Note [Rendering
+-- Messages].
 class Diagnostic a where
   diagnosticMessage :: a -> DecoratedSDoc
   diagnosticReason  :: a -> DiagnosticReason
 
--- | A generic 'Diagnostic' message, without any further classification or provenance:
--- By looking at a 'DiagnosticMessage' we don't know neither /where/ it was generated nor how to
--- intepret its payload (as it's just a structured document). All we can do is to print it out and
--- look at its 'DiagnosticReason'.
+-- | A generic 'Diagnostic' message, without any further classification or
+-- provenance: By looking at a 'DiagnosticMessage' we don't know neither
+-- /where/ it was generated nor how to intepret its payload (as it's just a
+-- structured document). All we can do is to print it out and look at its
+-- 'DiagnosticReason'.
 data DiagnosticMessage = DiagnosticMessage
   { diagMessage :: !DecoratedSDoc
   , diagReason  :: !DiagnosticReason
@@ -224,13 +237,15 @@ mkDecoratedDiagnostic rea docs = DiagnosticMessage (mkDecorated docs) rea
 mkDecoratedError :: [SDoc] -> DiagnosticMessage
 mkDecoratedError docs = DiagnosticMessage (mkDecorated docs) ErrorWithoutFlag
 
--- | The reason /why/ a 'Diagnostic' was emitted in the first place. Diagnostic messages
--- are born within GHC with a very precise reason, which can be completely statically-computed
--- (i.e. this is an error or a warning no matter what), or influenced by the specific state
--- of the 'DynFlags' at the moment of the creation of a new 'Diagnostic'. For example, a parsing
--- error is /always/ going to be an error, whereas a 'WarningWithoutFlag Opt_WarnUnusedImports' might turn
--- into an error due to '-Werror' or '-Werror=warn-unused-imports'. Interpreting a 'DiagnosticReason'
--- together with its associated 'Severity' gives us the full picture.
+-- | The reason /why/ a 'Diagnostic' was emitted in the first place.
+-- Diagnostic messages are born within GHC with a very precise reason, which
+-- can be completely statically-computed (i.e. this is an error or a warning
+-- no matter what), or influenced by the specific state of the 'DynFlags' at
+-- the moment of the creation of a new 'Diagnostic'. For example, a parsing
+-- error is /always/ going to be an error, whereas a 'WarningWithoutFlag
+-- Opt_WarnUnusedImports' might turn into an error due to '-Werror' or
+-- '-Werror=warn-unused-imports'. Interpreting a 'DiagnosticReason' together
+-- with its associated 'Severity' gives us the full picture.
 data DiagnosticReason
   = WarningWithoutFlag
   -- ^ Born as a warning.
@@ -249,19 +264,22 @@ instance Outputable DiagnosticReason where
 -- | An envelope for GHC's facts about a running program, parameterised over the
 -- /domain-specific/ (i.e. parsing, typecheck-renaming, etc) diagnostics.
 --
--- To say things differently, GHC emits /diagnostics/ about the running program, each of which is wrapped
--- into a 'MsgEnvelope' that carries specific information like where the error happened, etc.
--- Finally, multiple 'MsgEnvelope's are aggregated into 'Messages' that are returned to the user.
+-- To say things differently, GHC emits /diagnostics/ about the running
+-- program, each of which is wrapped into a 'MsgEnvelope' that carries
+-- specific information like where the error happened, etc. Finally, multiple
+-- 'MsgEnvelope's are aggregated into 'Messages' that are returned to the
+-- user.
 data MsgEnvelope e = MsgEnvelope
    { errMsgSpan        :: SrcSpan
       -- ^ The SrcSpan is used for sorting errors into line-number order
    , errMsgContext     :: PrintUnqualified
    , errMsgDiagnostic  :: e
    , errMsgSeverity    :: Severity
-   } deriving Functor
+   } deriving (Functor, Foldable, Traversable)
 
--- | The class for a diagnostic message. The main purpose is to classify a message within GHC,
--- to distinguish it from a debug/dump message vs a proper diagnostic, for which we include a 'DiagnosticReason'.
+-- | The class for a diagnostic message. The main purpose is to classify a
+-- message within GHC, to distinguish it from a debug/dump message vs a proper
+-- diagnostic, for which we include a 'DiagnosticReason'.
 data MessageClass
   = MCOutput
   | MCFatal
@@ -276,33 +294,37 @@ data MessageClass
     -- No file\/line\/column stuff.
 
   | MCDiagnostic Severity DiagnosticReason
-    -- ^ Diagnostics from the compiler. This constructor
-    -- is very powerful as it allows the construction
-    -- of a 'MessageClass' with a completely arbitrary
-    -- permutation of 'Severity' and 'DiagnosticReason'. As such,
-    -- users are encouraged to use the 'mkMCDiagnostic' smart constructor instead.
-    -- Use this constructor directly only if you need to construct and manipulate diagnostic
-    -- messages directly, for example inside 'GHC.Utils.Error'. In all the other circumstances,
-    -- /especially/ when emitting compiler diagnostics, use the smart constructor.
+    -- ^ Diagnostics from the compiler. This constructor is very powerful as
+    -- it allows the construction of a 'MessageClass' with a completely
+    -- arbitrary permutation of 'Severity' and 'DiagnosticReason'. As such,
+    -- users are encouraged to use the 'mkMCDiagnostic' smart constructor
+    -- instead. Use this constructor directly only if you need to construct
+    -- and manipulate diagnostic messages directly, for example inside
+    -- 'GHC.Utils.Error'. In all the other circumstances, /especially/ when
+    -- emitting compiler diagnostics, use the smart constructor.
   deriving (Eq, Show)
 
 {- Note [Suppressing Messages]
 
-The 'SevIgnore' constructor is used to generate messages for diagnostics which are
-meant to be suppressed and not reported to the user: the classic example are warnings
-for which the user didn't enable the corresponding 'WarningFlag', so GHC shouldn't print them.
+The 'SevIgnore' constructor is used to generate messages for diagnostics which
+are meant to be suppressed and not reported to the user: the classic example
+are warnings for which the user didn't enable the corresponding 'WarningFlag',
+so GHC shouldn't print them.
 
-A different approach would be to extend the zoo of 'mkMsgEnvelope' functions to return
-a 'Maybe (MsgEnvelope e)', so that we won't need to even create the message to begin with.
-Both approaches have been evaluated, but we settled on the "SevIgnore one" for a number of reasons:
+A different approach would be to extend the zoo of 'mkMsgEnvelope' functions
+to return a 'Maybe (MsgEnvelope e)', so that we won't need to even create the
+message to begin with. Both approaches have been evaluated, but we settled on
+the "SevIgnore one" for a number of reasons:
 
 * It's less invasive to deal with;
-* It plays slightly better with deferred diagnostics (see 'GHC.Tc.Errors') as for those we need
-  to be able to /always/ produce a message (so that is reported at runtime);
-* It gives us more freedom: we can still decide to drop a 'SevIgnore' message at leisure, or we can
-  decide to keep it around until the last moment. Maybe in the future we would need to
-  turn a 'SevIgnore' into something else, for example to "unsuppress" diagnostics if a flag is
-  set: with this approach, we have more leeway to accommodate new features.
+* It plays slightly better with deferred diagnostics (see 'GHC.Tc.Errors') as
+  for those we need to be able to /always/ produce a message (so that is
+  reported at runtime);
+* It gives us more freedom: we can still decide to drop a 'SevIgnore' message
+  at leisure, or we can decide to keep it around until the last moment. Maybe
+  in the future we would need to turn a 'SevIgnore' into something else, for
+  example to "unsuppress" diagnostics if a flag is set: with this approach, we
+  have more leeway to accommodate new features.
 
 -}
 
@@ -511,6 +533,8 @@ isWarningMessage = not . isIntrinsicErrorMessage
 errorsFound :: Diagnostic e => Messages e -> Bool
 errorsFound (Messages msgs) = any isIntrinsicErrorMessage msgs
 
+-- | Returns 'True' if the envelope contains a message that will stop
+-- compilation: either an intrinsic error or a fatal (-Werror) warning
 isExtrinsicErrorMessage :: MsgEnvelope e -> Bool
 isExtrinsicErrorMessage = (==) SevError . errMsgSeverity
 

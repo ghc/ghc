@@ -116,3 +116,5 @@ data DriverMessage
 
 -- | A collection of driver messages
 type DriverMessages = Messages DriverMessage
+
+-- | A message about Safe Haskell.

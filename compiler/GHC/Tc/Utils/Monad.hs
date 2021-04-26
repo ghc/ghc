@@ -244,7 +244,8 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
         used_gre_var <- newIORef [] ;
         th_var       <- newIORef False ;
         th_splice_var<- newIORef False ;
-        infer_var    <- newIORef (True, emptyMessages) ;
+        infer_var    <- newIORef True ;
+        infer_reasons_var <- newIORef emptyMessages ;
         dfun_n_var   <- newIORef emptyOccSet ;
         type_env_var <- case hsc_type_env_var hsc_env of {
                            Just (_mod, te_var) -> return te_var ;
@@ -342,7 +343,8 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_hpc            = False,
                 tcg_main           = Nothing,
                 tcg_self_boot      = NoSelfBoot,
-                tcg_safeInfer      = infer_var,
+                tcg_safe_infer     = infer_var,
+                tcg_safe_infer_reasons = infer_reasons_var,
                 tcg_dependent_files = dependent_files_var,
                 tcg_tc_plugins     = [],
                 tcg_hf_plugins     = [],
@@ -1987,12 +1989,13 @@ addModFinalizersWithLclEnv mod_finalizers
 -- although this is used for more than just that failure case.
 recordUnsafeInfer :: Messages TcRnMessage -> TcM ()
 recordUnsafeInfer msgs =
-    getGblEnv >>= \env -> writeTcRef (tcg_safeInfer env) (False, msgs)
+    getGblEnv >>= \env -> do writeTcRef (tcg_safe_infer env) False
+                             writeTcRef (tcg_safe_infer_reasons env) msgs
 
 -- | Figure out the final correct safe haskell mode
 finalSafeMode :: DynFlags -> TcGblEnv -> IO SafeHaskellMode
 finalSafeMode dflags tcg_env = do
-    safeInf <- fst <$> readIORef (tcg_safeInfer tcg_env)
+    safeInf <- readIORef (tcg_safe_infer tcg_env)
     return $ case safeHaskell dflags of
         Sf_None | safeInferOn dflags && safeInf -> Sf_SafeInferred
                 | otherwise                     -> Sf_None

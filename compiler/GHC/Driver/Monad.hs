@@ -241,8 +241,8 @@ instance ExceptionMonad m => GhcMonad (GhcT m) where
   setSession s' = GhcT $ \(Session r) -> liftIO $ writeIORef r s'
 
 
--- | Print the error message and all diagnostics.  Useful inside exception
---   handlers.  Clears diagnostics after printing.
+-- | Print the all diagnostics in a 'SourceError'.  Useful inside exception
+--   handlers.
 printException :: GhcMonad m => SourceError -> m ()
 printException err = do
   dflags <- getSessionDynFlags
@@ -255,4 +255,3 @@ type WarnErrLogger = forall m. GhcMonad m => Maybe SourceError -> m ()
 defaultWarnErrLogger :: WarnErrLogger
 defaultWarnErrLogger Nothing  = return ()
 defaultWarnErrLogger (Just e) = printException e
-

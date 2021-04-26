@@ -149,7 +149,6 @@ import GHC.Parser.Errors.Types
 import GHC.Parser
 import GHC.Parser.Lexer as Lexer
 
-import GHC.Tc.Errors.Types
 import GHC.Tc.Module
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Zonk    ( ZonkFlexi (DefaultFlexi) )
@@ -572,7 +571,7 @@ tcRnModule' sum save_rn_syntax mod = do
           && wopt Opt_WarnMissingSafeHaskellMode dflags) $
         logDiagnostics $ singleMessage $
         mkPlainMsgEnvelope dflags (getLoc (hpm_module mod)) $
-        GhcTcRnMessage $ TcRnUnknownMessage $
+        GhcDriverMessage $ DriverUnknownMessage $
         mkPlainDiagnostic reason warnMissingSafeHaskellMode
 
     tcg_res <- {-# SCC "Typecheck-Rename" #-}
@@ -582,7 +581,8 @@ tcRnModule' sum save_rn_syntax mod = do
 
     -- See Note [Safe Haskell Overlapping Instances Implementation]
     -- although this is used for more than just that failure case.
-    (tcSafeOK, whyUnsafe) <- liftIO $ readIORef (tcg_safeInfer tcg_res)
+    tcSafeOK <- liftIO $ readIORef (tcg_safe_infer tcg_res)
+    whyUnsafe <- liftIO $ readIORef (tcg_safe_infer_reasons tcg_res)
     let allSafeOK = safeInferred dflags && tcSafeOK
 
     -- end of the safe haskell line, how to respond to user?
@@ -594,21 +594,21 @@ tcRnModule' sum save_rn_syntax mod = do
       -- module (could be) safe, throw warning if needed
       else do
           tcg_res' <- hscCheckSafeImports tcg_res
-          safe <- liftIO $ fst <$> readIORef (tcg_safeInfer tcg_res')
+          safe <- liftIO $ readIORef (tcg_safe_infer tcg_res')
           when safe $
             case wopt Opt_WarnSafe dflags of
               True
                 | safeHaskell dflags == Sf_Safe -> return ()
                 | otherwise -> (logDiagnostics $ singleMessage $
                        mkPlainMsgEnvelope dflags (warnSafeOnLoc dflags) $
-                       GhcTcRnMessage $ TcRnUnknownMessage $
+                       GhcDriverMessage $ DriverUnknownMessage $
                        mkPlainDiagnostic (WarningWithFlag Opt_WarnSafe) $
                        errSafe tcg_res')
               False | safeHaskell dflags == Sf_Trustworthy &&
                       wopt Opt_WarnTrustworthySafe dflags ->
                       (logDiagnostics $ singleMessage $
                        mkPlainMsgEnvelope dflags (trustworthyOnLoc dflags) $
-                       GhcTcRnMessage $ TcRnUnknownMessage $
+                       GhcDriverMessage $ DriverUnknownMessage $
                        mkPlainDiagnostic (WarningWithFlag Opt_WarnTrustworthySafe) $
                        errTwthySafe tcg_res')
               False -> return ()
@@ -1186,7 +1186,7 @@ hscCheckSafeImports tcg_env = do
       case safeLanguageOn dflags of
           True -> do
               -- XSafe: we nuke user written RULES
-              logDiagnostics $ fmap GhcTcRnMessage $ warns dflags (tcg_rules tcg_env')
+              logDiagnostics $ fmap GhcDriverMessage $ warns dflags (tcg_rules tcg_env')
               return tcg_env' { tcg_rules = [] }
           False
                 -- SafeInferred: user defined RULES, so not safe
@@ -1199,10 +1199,10 @@ hscCheckSafeImports tcg_env = do
 
     warns dflags rules = mkMessages $ listToBag $ map (warnRules dflags) rules
 
-    warnRules :: DynFlags -> LRuleDecl GhcTc -> MsgEnvelope TcRnMessage
+    warnRules :: DynFlags -> LRuleDecl GhcTc -> MsgEnvelope DriverMessage
     warnRules df (L loc (HsRule { rd_name = n })) =
         mkPlainMsgEnvelope df (locA loc) $
-        TcRnUnknownMessage $
+        DriverUnknownMessage $
         mkPlainDiagnostic WarningWithoutFlag $
             text "Rule \"" <> ftext (snd $ unLoc n) <> text "\" ignored" $+$
             text "User defined rules are disabled under Safe Haskell"
@@ -1257,12 +1257,7 @@ checkSafeImports tcg_env
           True -> do
             let infPassed = isEmptyMessages infErrs
             tcg_env' <- case (not infPassed) of
-              True  ->
-                let castMsg m = TcRnUnknownMessage
-                              $ DiagnosticMessage (diagnosticMessage m) (diagnosticReason m)
-                -- NOTE(adinapoli) This is /extremely/ unfortunate. We have
-                -- to cast everything to be a 'TcRnMessage'!
-                in markUnsafeInfer tcg_env (castMsg <$> infErrs)
+              True  -> markUnsafeInfer tcg_env infErrs
               False -> return tcg_env
             when (packageTrustOn dflags) $ checkPkgTrust pkgReqs
             let newTrust = pkgTrustReqs dflags safePkgs infPkgs infPassed
@@ -1286,7 +1281,7 @@ checkSafeImports tcg_env
         | imv_is_safe v1 /= imv_is_safe v2
         = throwOneError $
             mkPlainErrorMsgEnvelope (imv_span v1) $
-            GhcTcRnMessage $ TcRnUnknownMessage $ mkPlainError $
+            GhcDriverMessage $ DriverUnknownMessage $ mkPlainError $
               text "Module" <+> ppr (imv_name v1) <+>
                (text $ "is imported both as a safe and unsafe import!")
         | otherwise
@@ -1356,7 +1351,7 @@ hscCheckSafe' m l = do
             -- can't load iface to check trust!
             Nothing -> throwOneError $
                          mkPlainErrorMsgEnvelope l $
-                         GhcTcRnMessage $ TcRnUnknownMessage $ mkPlainError $
+                         GhcDriverMessage $ DriverUnknownMessage $ mkPlainError $
                            text "Can't load the interface file for" <+> ppr m
                              <> text ", to check that it can be safely imported"
 
@@ -1390,7 +1385,7 @@ hscCheckSafe' m l = do
                     state = hsc_units hsc_env
                     inferredImportWarn dflags = singleMessage
                         $ mkMsgEnvelope dflags l (pkgQual state)
-                        $ GhcTcRnMessage $ TcRnUnknownMessage
+                        $ GhcDriverMessage $ DriverUnknownMessage
                         $ mkPlainDiagnostic (WarningWithFlag Opt_WarnInferredSafeImports)
                         $ sep
                             [ text "Importing Safe-Inferred module "
@@ -1399,7 +1394,7 @@ hscCheckSafe' m l = do
                             ]
                     pkgTrustErr = singleMessage
                       $ mkErrorMsgEnvelope l (pkgQual state)
-                      $ GhcTcRnMessage $ TcRnUnknownMessage
+                      $ GhcDriverMessage $ DriverUnknownMessage
                       $ mkPlainError
                       $ sep [ ppr (moduleName m)
                                 <> text ": Can't be safely imported!"
@@ -1409,7 +1404,7 @@ hscCheckSafe' m l = do
                             ]
                     modTrustErr = singleMessage
                       $ mkErrorMsgEnvelope l (pkgQual state)
-                      $ GhcTcRnMessage $ TcRnUnknownMessage
+                      $ GhcDriverMessage $ DriverUnknownMessage
                       $ mkPlainError
                       $ sep [ ppr (moduleName m)
                                 <> text ": Can't be safely imported!"
@@ -1479,7 +1474,7 @@ checkPkgTrust pkgs = do
 -- may call it on modules using Trustworthy or Unsafe flags so as to allow
 -- warning flags for safety to function correctly. See Note [Safe Haskell
 -- Inference].
-markUnsafeInfer :: TcGblEnv -> Messages TcRnMessage -> Hsc TcGblEnv
+markUnsafeInfer :: Diagnostic e => TcGblEnv -> Messages e -> Hsc TcGblEnv
 markUnsafeInfer tcg_env whyUnsafe = do
     dflags <- getDynFlags
 
@@ -1487,11 +1482,12 @@ markUnsafeInfer tcg_env whyUnsafe = do
     when (wopt Opt_WarnUnsafe dflags)
          (logDiagnostics $ singleMessage $
              mkPlainMsgEnvelope dflags (warnUnsafeOnLoc dflags) $
-             GhcTcRnMessage $ TcRnUnknownMessage $
+             GhcDriverMessage $ DriverUnknownMessage $
              mkPlainDiagnostic reason $
              whyUnsafe' dflags)
 
-    liftIO $ writeIORef (tcg_safeInfer tcg_env) (False, whyUnsafe)
+    liftIO $ writeIORef (tcg_safe_infer tcg_env) False
+    liftIO $ writeIORef (tcg_safe_infer_reasons tcg_env) emptyMessages
     -- NOTE: Only wipe trust when not in an explicitly safe haskell mode. Other
     -- times inference may be on but we are in Trustworthy mode -- so we want
     -- to record safe-inference failed but not wipe the trust dependencies.
