@@ -4,12 +4,13 @@ module GHC.Driver.Env.Types
   , HscEnv(..)
   ) where
 
+import GHC.Driver.Errors.Types ( GhcMessage )
 import {-# SOURCE #-} GHC.Driver.Hooks
 import GHC.Driver.Session ( DynFlags, HasDynFlags(..) )
 import GHC.Prelude
 import GHC.Runtime.Context
 import GHC.Runtime.Interpreter.Types ( Interp )
-import GHC.Types.Error ( WarningMessages )
+import GHC.Types.Error ( Messages )
 import GHC.Types.Name.Cache
 import GHC.Types.Target
 import GHC.Types.TypeEnv
@@ -25,8 +26,8 @@ import Control.Monad ( ap )
 import Control.Monad.IO.Class
 import Data.IORef
 
--- | The Hsc monad: Passing an environment and warning state
-newtype Hsc a = Hsc (HscEnv -> WarningMessages -> IO (a, WarningMessages))
+-- | The Hsc monad: Passing an environment and diagnostic state
+newtype Hsc a = Hsc (HscEnv -> Messages GhcMessage -> IO (a, Messages GhcMessage))
     deriving (Functor)
 
 instance Applicative Hsc where
