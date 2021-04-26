@@ -21,7 +21,7 @@ import subprocess
 from testglobals import config, ghc_env, default_testopts, brokens, t, \
                         TestRun, TestResult, TestOptions, PerfMetric
 from testutil import strip_quotes, lndir, link_or_copy_file, passed, \
-                     failBecause, testing_metrics, \
+                     failBecause, testing_metrics, residency_testing_metrics, \
                      PassFail, badResult, memoize
 from term_color import Color, colored
 import testutil
@@ -442,7 +442,7 @@ def _extra_files(name, opts, files):
 # metric can be either:
 #     - 'all', in which case all 3 possible metrics are collected and compared.
 #     - The specific metric one wants to use in the test.
-#     - A list of the metrics one wants to use in the test.
+#     - A set of the metrics one wants to use in the test.
 #
 # Deviation defaults to 20% because the goal is correctness over performance.
 # The testsuite should avoid breaking when there is not an actual error.
@@ -472,7 +472,7 @@ def _collect_stats(name: TestName, opts, metrics, deviation, is_compiler_stats_t
         if metrics == 'all':
             metrics = testing_metrics()
         else:
-            metrics = [metrics]
+            metrics = { metrics }
 
     opts.is_stats_test = True
     if is_compiler_stats_test:
@@ -485,6 +485,16 @@ def _collect_stats(name: TestName, opts, metrics, deviation, is_compiler_stats_t
     # useless and confusing. Therefore, skip if debugging is on.
     if config.compiler_debugged and is_compiler_stats_test:
         opts.skip = True
+
+    # If there are any residency testing metrics then turn on RESIDENCY_OPTS and
+    # omit nonmoving GC ways, which don't support profiling.
+    if residency_testing_metrics() & metrics:
+        if is_compiler_stats_test:
+            _extra_hc_opts(name, opts, RESIDENCY_OPTS)
+        else:
+            _extra_run_opts(name, opts, RESIDENCY_OPTS)
+        # The nonmoving collector does not support -G1
+        _omit_ways(name, opts, [WayName(name) for name in ['nonmoving', 'nonmoving_thr', 'nonmoving_thr_ghc']])
 
     for metric_name in metrics:
         metric = '{}/{}'.format(tag, metric_name)
@@ -619,25 +629,32 @@ def have_thread_sanitizer( ) -> bool:
 #    libraries to get a heap profile).
 #  * view the heap profiles, read off the maximum residency.  If it has
 #    really changed, then you know there's an issue.
+#
+# As an example how much of a difference passing these flags make, here's
+# an excerpt from CI metrics from the i386 job of !5604. Note that patch
+# only passes RESIDENCY_OPTS to a couple more tests, which to be greatly
+# affected:
+#
+#            Test   Metric         value     New value Change
+# ----------------------------------------------------------------
+#  T11545(normal) ghc/peak          68.2          56.0 -17.9% GOOD
+#  T15304(normal) ghc/peak          40.0          42.0  +5.0%
+#  T15630(normal) ghc/peak          16.0          15.0  -6.2%
+#  T15304(normal) ghc/max     14177634.7    16174668.0 +14.1% BAD
+#  T15630(normal) ghc/max      4583039.1     5457248.0 +19.1%
 
 RESIDENCY_OPTS = '+RTS -A256k -i0 -hT -RTS'
 
 # See Note [Measuring residency].
 def collect_runtime_residency(tolerance_pct: float):
     return [
-        collect_stats(['peak_megabytes_allocated', 'max_bytes_used'], tolerance_pct),
-        extra_run_opts(RESIDENCY_OPTS),
-        # The nonmoving collector does not support -G1
-        omit_ways([WayName(name) for name in ['nonmoving', 'nonmoving_thr', 'nonmoving_thr_ghc']])
+        collect_stats(residency_testing_metrics(), tolerance_pct),
     ]
 
 # See Note [Measuring residency].
 def collect_compiler_residency(tolerance_pct: float):
     return [
-        collect_compiler_stats(['peak_megabytes_allocated', 'max_bytes_used'], tolerance_pct),
-        extra_hc_opts(RESIDENCY_OPTS),
-        # The nonmoving collector does not support -G1
-        omit_ways([WayName('nonmoving_thr_ghc')])
+        collect_compiler_stats(residency_testing_metrics(), tolerance_pct)
     ]
 
 # ---
