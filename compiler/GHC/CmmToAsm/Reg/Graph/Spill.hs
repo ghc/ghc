@@ -18,7 +18,7 @@ import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Collections
 
 import GHC.Utils.Monad
-import GHC.Utils.Monad.State
+import GHC.Utils.Monad.State.Strict
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
