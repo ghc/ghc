@@ -141,6 +141,9 @@ pp_err = \case
    PsErrLambdaCase
       -> text "Illegal lambda-case (use LambdaCase)"
 
+   PsErrEmptyLambda
+      -> text "A lambda requires at least one parameter"
+
    PsErrNumUnderscores reason
       -> text $ case reason of
             NumUnderscore_Integral -> "Use NumericUnderscores to allow underscores in integer literals"
