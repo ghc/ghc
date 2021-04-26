@@ -1629,6 +1629,11 @@ instance DisambECP (HsCmd GhcPs) where
 cmdFail :: SrcSpan -> SDoc -> PV a
 cmdFail loc e = addFatalError $ PsError (PsErrParseErrorInCmd e) [] loc
 
+checkLamMatchGroup :: SrcSpan -> MatchGroup GhcPs (LHsExpr GhcPs) -> PV ()
+checkLamMatchGroup l (MG { mg_alts = (L _ (matches:_))}) = do
+  when (null (hsLMatchPats matches)) $ addError $ PsError PsErrEmptyLambda [] l
+checkLamMatchGroup _ _ = return ()
+
 instance DisambECP (HsExpr GhcPs) where
   type Body (HsExpr GhcPs) = HsExpr
   ecpFromCmd' (L l c) = do
@@ -1640,7 +1645,9 @@ instance DisambECP (HsExpr GhcPs) where
     return $ mkRdrProjUpdate (noAnnSrcSpan l) fields arg isPun (EpAnn (spanAsAnchor l) anns cs)
   mkHsLamPV l mg = do
     cs <- getCommentsFor l
-    return $ L (noAnnSrcSpan l) (HsLam NoExtField (mg cs))
+    let mg' = mg cs
+    checkLamMatchGroup l mg'
+    return $ L (noAnnSrcSpan l) (HsLam NoExtField mg')
   mkHsLetPV l bs c anns = do
     cs <- getCommentsFor l
     return $ L (noAnnSrcSpan l) (HsLet (EpAnn (spanAsAnchor l) anns cs) bs c)
