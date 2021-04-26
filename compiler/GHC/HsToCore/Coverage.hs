@@ -518,8 +518,7 @@ addBinTickLHsExpr boxLabel (L pos e0)
 addTickHsExpr :: HsExpr GhcTc -> TM (HsExpr GhcTc)
 addTickHsExpr e@(HsVar _ (L _ id))  = do freeVar id; return e
 addTickHsExpr e@(HsUnboundVar {})   = return e
-addTickHsExpr e@(HsRecFld _ (Ambiguous id _))   = do freeVar id; return e
-addTickHsExpr e@(HsRecFld _ (Unambiguous id _)) = do freeVar id; return e
+addTickHsExpr e@(HsRecFld _ (FieldOcc id _))   = do freeVar id; return e
 
 addTickHsExpr e@(HsConLikeOut {}) = return e
   -- We used to do a freeVar on a pat-syn builder, but actually
