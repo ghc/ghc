@@ -12,9 +12,10 @@ import qualified Data.ByteString as BS
 
 import GHC.Types.SourceText
 import GHC.Driver.Session
-import GHC.Utils.Error     ( pprLocMsgEnvelope )
+import GHC.Utils.Error     ( mkPlainMsgEnvelope, pprLocMsgEnvelope )
 import GHC.Data.FastString ( mkFastString )
-import GHC.Parser.Errors.Ppr ( mkParserErr )
+import GHC.Parser.Errors.Ppr ()
+import qualified GHC.Types.Error as E
 import GHC.Parser.Lexer    as Lexer
                            ( P(..), ParseResult(..), PState(..), Token(..)
                            , initParserState, lexer, mkParserOpts, getErrorMessages)
@@ -40,7 +41,7 @@ parse
 parse dflags fpath bs = case unP (go False []) initState of
     POk _ toks -> reverse toks
     PFailed pst ->
-      let err:_ = bagToList (fmap mkParserErr (getErrorMessages pst)) in
+      let err:_ = bagToList (E.getMessages $ getErrorMessages pst) in
       panic $ showSDoc dflags $
         text "Hyperlinker parse error:" $$ pprLocMsgEnvelope err
   where
@@ -50,6 +51,7 @@ parse dflags fpath bs = case unP (go False []) initState of
     start = mkRealSrcLoc (mkFastString fpath) 1 1
     pflags = mkParserOpts   (warningFlags dflags)
                             (extensionFlags dflags)
+                            (mkPlainMsgEnvelope dflags)
                             (safeImportsOn dflags)
                             False -- lex Haddocks as comment tokens
                             True  -- produce comment tokens
