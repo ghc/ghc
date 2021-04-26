@@ -133,11 +133,7 @@ preprocess :: HscEnv
            -> Maybe Phase -- ^ starting phase
            -> IO (Either DriverMessages (DynFlags, FilePath))
 preprocess hsc_env input_fn mb_input_buf mb_phase =
-  handleSourceError (\err -> pprPanic "SourceError in preprocessor"
-                                      (vcat $
-                                       pprMsgEnvelopeBagWithLoc $
-                                       getMessages $
-                                       srcErrorMessages err)) $
+  handleSourceError (\err -> return $ Left $ to_driver_messages $ srcErrorMessages err) $
   MC.handle handler $
   fmap Right $ do
   MASSERT2(isJust mb_phase || isHaskellSrcFilename input_fn, text input_fn)
@@ -158,6 +154,15 @@ preprocess hsc_env input_fn mb_input_buf mb_phase =
         mkPlainErrorMsgEnvelope srcspan $
         DriverUnknownMessage $ mkPlainError $ text msg
     handler ex = throwGhcExceptionIO ex
+
+    to_driver_messages :: Messages GhcMessage -> Messages DriverMessage
+    to_driver_messages msgs = case traverse to_driver_message msgs of
+      Nothing    -> pprPanic "non-driver message in preprocess"
+                             (vcat $ pprMsgEnvelopeBagWithLoc (getMessages msgs))
+      Just msgs' -> msgs'
+
+    to_driver_message (GhcDriverMessage msg) = Just msg
+    to_driver_message _other                 = Nothing
 
 -- ---------------------------------------------------------------------------
 
