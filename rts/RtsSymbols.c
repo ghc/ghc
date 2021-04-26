@@ -548,6 +548,15 @@
 #define RTS_PROF_SYMBOLS /* empty */
 #endif
 
+#if RTS_LINKER_USE_MMAP
+#define RTS_LINKER_USE_MMAP_SYMBOLS \
+      SymI_HasProto(allocateWrite)                                      \
+      SymI_HasProto(markExec)                                           \
+      SymI_HasProto(freeWrite)
+#else
+#define RTS_LINKER_USE_MMAP_SYMBOLS /* empty */
+#endif
+
 #define RTS_SYMBOLS                                                     \
       Maybe_Stable_Names                                                \
       RTS_TICKY_SYMBOLS                                                 \
@@ -1008,6 +1017,7 @@
       SymI_HasProto(registerInfoProvList)                               \
       SymI_HasProto(lookupIPE)                                          \
       RTS_USER_SIGNALS_SYMBOLS                                          \
+      RTS_LINKER_USE_MMAP_SYMBOLS                                       \
       RTS_INTCHAR_SYMBOLS
 
 
