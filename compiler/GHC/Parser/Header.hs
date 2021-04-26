@@ -314,10 +314,10 @@ getOptions' dflags toks
 checkProcessArgsResult :: MonadIO m => [Located String] -> m ()
 checkProcessArgsResult flags
   = when (notNull flags) $
-      liftIO $ throwErrors $ foldl' (\acc m -> addMessage (mkMsg m) acc) emptyMessages flags
+      liftIO $ throwErrors $ foldMap (singleMessage . mkMsg) flags
     where mkMsg (L loc flag)
               = mkPlainErrorMsgEnvelope loc $
-                GhcPsMessage $ PsUnknownMessage $ mkPlainError $
+                GhcDriverMessage $ DriverUnknownMessage $ mkPlainError $
                   text "unknown flag in  {-# OPTIONS_GHC #-} pragma:" <+>
                   text flag
 

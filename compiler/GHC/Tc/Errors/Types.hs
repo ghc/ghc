@@ -9,4 +9,4 @@ import GHC.Types.Error
 data TcRnMessage
   = TcRnUnknownMessage !DiagnosticMessage
   -- ^ Simply rewraps a generic 'DiagnosticMessage'. More
-  -- instances will be added in the future (#18516).
+  -- constructors will be added in the future (#18516).

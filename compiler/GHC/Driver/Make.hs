@@ -230,7 +230,7 @@ depanalPartial excluded_mods allow_dup_roots = do
       (errs, mod_summaries) = partitionEithers mod_summariesE
       mod_graph = mkModuleGraph' $
         fmap ModuleNode mod_summaries ++ instantiationNodes (hsc_units hsc_env)
-    return (foldl' unionMessages emptyMessages errs, mod_graph)
+    return (unionManyMessages errs, mod_graph)
 
 -- | Collect the instantiations of dependencies to create 'InstantiationNode' work graph nodes.
 -- These are used to represent the type checking that is done after
