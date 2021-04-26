@@ -19,7 +19,7 @@ recomp004:
 	$(CP) c2.c c.c
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -c c.c -o c.o
 	# Hack to make sure c.o is really newer
-	touch -t 01010000 MainX.hs MainX.hi MainX.o c.c $(EXECUTABLE)
+	touch -t 01010000 MainX.hi MainX.o c.c $(EXECUTABLE)
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make MainX.hs c.o -o $(EXECUTABLE)
 	./$(EXECUTABLE)
 
