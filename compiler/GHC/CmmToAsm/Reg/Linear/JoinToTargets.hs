@@ -31,8 +31,6 @@ import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
 
-import GHC.Stack
-
 -- | For a jump instruction at the end of a block, generate fixup code so its
 --      vregs are in the correct regs for its destination.
 --
@@ -300,7 +298,7 @@ expandNode vreg src dst
 --      cycles in expandNode above.
 --
 handleComponent
-        :: (HasCallStack, Instruction instr)
+        :: Instruction instr
         => Int -> instr -> SCC (Node Loc Unique)
         -> RegM freeRegs [instr]
 
@@ -352,7 +350,7 @@ handleComponent _ _ (CyclicSCC _)
 -- | Move a vreg between these two locations.
 --
 makeMove
-    :: (HasCallStack, Instruction instr)
+    :: Instruction instr
     => Int      -- ^ current C stack delta.
     -> Unique   -- ^ unique of the vreg that we're moving.
     -> Loc      -- ^ source location.

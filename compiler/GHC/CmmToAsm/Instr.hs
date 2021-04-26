@@ -16,8 +16,6 @@ import GHC.Cmm.BlockId
 
 import GHC.CmmToAsm.Config
 
-import GHC.Stack
-
 -- | Holds a list of source and destination registers used by a
 --      particular instruction.
 --
@@ -89,8 +87,7 @@ class Instruction instr where
 
         -- | An instruction to spill a register into a spill slot.
         mkSpillInstr
-                :: HasCallStack
-                => NCGConfig
+                :: NCGConfig
                 -> Reg          -- ^ the reg to spill
                 -> Int          -- ^ the current stack delta
                 -> Int          -- ^ spill slot to use
@@ -99,8 +96,7 @@ class Instruction instr where
 
         -- | An instruction to reload a register from a spill slot.
         mkLoadInstr
-                :: HasCallStack
-                => NCGConfig
+                :: NCGConfig
                 -> Reg          -- ^ the reg to reload.
                 -> Int          -- ^ the current stack delta
                 -> Int          -- ^ the spill slot to use

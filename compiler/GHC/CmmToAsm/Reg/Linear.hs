@@ -150,7 +150,7 @@ import Control.Applicative
 
 -- Allocate registers
 regAlloc
-        :: (Instruction instr)
+        :: Instruction instr
         => NCGConfig
         -> LiveCmmDecl statics instr
         -> UniqSM ( NatCmmDecl statics instr
@@ -261,7 +261,7 @@ linearRegAlloc' config initFreeRegs entry_ids block_live sccs
         return  (blocks, stats, getStackUse stack)
 
 
-linearRA_SCCs :: (OutputableRegConstraint freeRegs instr)
+linearRA_SCCs :: OutputableRegConstraint freeRegs instr
               => [BlockId]
               -> BlockMap RegSet
               -> [NatBasicBlock instr]
@@ -336,7 +336,7 @@ process entry_ids block_live =
 -- | Do register allocation on this basic block
 --
 processBlock
-        :: (OutputableRegConstraint freeRegs instr)
+        :: OutputableRegConstraint freeRegs instr
         => BlockMap RegSet              -- ^ live regs on entry to each basic block
         -> LiveBasicBlock instr         -- ^ block to do register allocation on
         -> RegM freeRegs [NatBasicBlock instr]   -- ^ block with registers allocated
@@ -408,7 +408,7 @@ linearRA block_live block_id = go [] []
 
 -- | Do allocation for a single instruction.
 raInsn
-        :: (OutputableRegConstraint freeRegs instr)
+        :: OutputableRegConstraint freeRegs instr
         => BlockMap RegSet                      -- ^ map of what vregs are love on entry to each block.
         -> [instr]                              -- ^ accumulator for instructions already processed.
         -> BlockId                              -- ^ the id of the current block, for debugging
@@ -502,7 +502,7 @@ genRaInsn :: forall freeRegs instr.
           -> RegM freeRegs ([instr], [NatBasicBlock instr])
 
 genRaInsn block_live new_instrs block_id instr r_dying w_dying = do
---  pprTraceM "genRaInsn" $ ppr (block_id, instr)
+-- pprTraceM "genRaInsn" $ ppr (block_id, instr)
   platform <- getPlatform
   case regUsageOfInstr platform instr of { RU read written ->
     do

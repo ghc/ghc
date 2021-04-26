@@ -16,7 +16,6 @@ data JumpDest = DestBlockId BlockId
 -- Debug Instance
 instance Outputable JumpDest where
   ppr (DestBlockId bid) = text "jd<blk>:" <> ppr bid
---   ppr (DestImm _imm)    = text "jd<imm>:noShow"
 
 -- XXX: documen what this does.
 getJumpDestBlockId :: JumpDest -> Maybe BlockId
