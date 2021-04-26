@@ -523,6 +523,7 @@ Library
         GHC.Settings.Config
         GHC.Settings.Constants
         GHC.Settings.IO
+        GHC.Stg.ClosEnvShare
         GHC.Stg.CSE
         GHC.Stg.DepAnal
         GHC.Stg.FVs
@@ -544,7 +545,6 @@ Library
         GHC.StgToCmm.Expr
         GHC.StgToCmm.ExtCode
         GHC.StgToCmm.Foreign
-        GHC.StgToCmm.FirstClassEnv
         GHC.StgToCmm.Heap
         GHC.StgToCmm.Hpc
         GHC.StgToCmm.Layout
