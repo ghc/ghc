@@ -210,7 +210,7 @@ data Pat p
 
     -- ^ Pattern with a type signature
 
-  -- | Trees that Grow extension point for new constructors
+  -- Extension point; see Note [Trees That Grow] in Language.Haskell.Syntax.Extension
   | XPat
       !(XXPat p)
 
