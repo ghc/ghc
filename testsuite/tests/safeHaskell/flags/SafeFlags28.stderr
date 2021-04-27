@@ -1,13 +1,13 @@
 
-SafeFlags28.hs:1:16:
-    unknown flag in  {-# OPTIONS_GHC #-} pragma: bytestring
-
-SafeFlags28.hs:1:16:
+SafeFlags28.hs:1:17:
     unknown flag in  {-# OPTIONS_GHC #-} pragma: -trust
 
-SafeFlags28.hs:1:16:
+SafeFlags28.hs:1:24:
     unknown flag in  {-# OPTIONS_GHC #-} pragma: base,
 
-SafeFlags28.hs:1:16:
+SafeFlags28.hs:1:30:
     unknown flag in  {-# OPTIONS_GHC #-} pragma: -trust
+
+SafeFlags28.hs:1:37:
+    unknown flag in  {-# OPTIONS_GHC #-} pragma: bytestring
 

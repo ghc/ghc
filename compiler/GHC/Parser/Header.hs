@@ -61,6 +61,7 @@ import Control.Monad
 import System.IO
 import System.IO.Unsafe
 import Data.List (partition)
+import Data.Char
 
 ------------------------------------------------------------------------------
 
@@ -261,10 +262,10 @@ getOptions' dflags toks
           parseToks (open:close:xs)
               | IToptions_prag str <- unLoc open
               , ITclose_prag       <- unLoc close
-              = case toArgs str of
+              = case toLocatedArgs (getLoc open) str of
                   Left _err -> optionsParseError str $   -- #15053
                                  combineSrcSpans (getLoc open) (getLoc close)
-                  Right args -> map (L (getLoc open)) args ++ parseToks xs
+                  Right args -> args ++ parseToks xs
           parseToks (open:close:xs)
               | ITinclude_prag str <- unLoc open
               , ITclose_prag       <- unLoc close
@@ -304,6 +305,47 @@ getOptions' dflags toks
               (ITdocCommentNamed {}) -> True
               (ITdocSection {})      -> True
               _                      -> False
+
+
+-- | Given an input 'String' which represents the content of a
+-- \"OPTIONS_GHC\" pragma, 'toLocatedArgs' returns the parsed options
+-- together with location information, computed from the input 'SrcSpan'.
+--
+-- /NOTA BENE/: This function is defined here to avoid cyclic imports in
+-- GHC.Utils.Misc.
+toLocatedArgs :: SrcSpan -> String -> Either String [Located String]
+toLocatedArgs sspan str =
+  case sspan of
+    -- Nothing we can do in case of an UnhelpfulSpan, we default back
+    -- to the stock 'toArgs' behaviour.
+    UnhelpfulSpan{}        -> map (L sspan) <$> toArgs str
+    RealSrcSpan startLoc _ -> go (realSrcSpanStart startLoc) str <$> toArgs str
+  where
+    go :: RealSrcLoc -> String -> [String] -> [Located String]
+    go _ []  _  = []
+    go _ _ []   = []
+    go !realLoc (c:cs) acc@(x:xs) =
+      -- If we hit a ASCII char which is not a whitespace, it means
+      -- we found an option: we embellish it with the location info,
+      -- we increment the 'RealSrcLoc' columns by the length of the
+      -- option and we keep going.
+      if isAscii c && not (isSpace c)
+        then let mkLoc  = advanceSrcLocByCols realLoc
+                 newLoc = mkLoc (length x + 1) -- we need to advance to the next character position
+                 curLoc = mkLoc (length x)
+             in mkLocatedArg realLoc curLoc x : go newLoc cs xs
+        else go (advanceSrcLoc realLoc c) cs acc
+
+    -- Move the 'RealSrcLoc' column by the given number.
+    advanceSrcLocByCols :: RealSrcLoc -> Int -> RealSrcLoc
+    advanceSrcLocByCols srcLoc num =
+      mkRealSrcLoc (srcLocFile srcLoc)
+                   (srcLocLine srcLoc)
+                   (srcLocCol srcLoc + num)
+
+    mkLocatedArg :: RealSrcLoc -> RealSrcLoc -> String -> Located String
+    mkLocatedArg beginning end s =
+      L (RealSrcSpan (mkRealSrcSpan beginning end) Nothing) s
 
 -----------------------------------------------------------------------------
 
