@@ -330,6 +330,8 @@ instance Ord CLabel where
   compare (CmmLabel a1 b1 c1 d1) (CmmLabel a2 b2 c2 d2) =
     compare a1 a2 `thenCmp`
     compare b1 b2 `thenCmp`
+    -- This non-determinism is "safe" in the sense that it only affects object code,
+    -- which is currently not covered by GHC's determinism guarantees. See #12935.
     uniqCompareFS c1 c2 `thenCmp`
     compare d1 d2
   compare (RtsLabel a1) (RtsLabel a2) = compare a1 a2
@@ -342,7 +344,7 @@ instance Ord CLabel where
   compare (AsmTempLabel u1) (AsmTempLabel u2) = nonDetCmpUnique u1 u2
   compare (AsmTempDerivedLabel a1 b1) (AsmTempDerivedLabel a2 b2) =
     compare a1 a2 `thenCmp`
-    uniqCompareFS b1 b2
+    lexicalCompareFS b1 b2
   compare (StringLitLabel u1) (StringLitLabel u2) =
     nonDetCmpUnique u1 u2
   compare (CC_Label a1) (CC_Label a2) =
