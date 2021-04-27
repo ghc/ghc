@@ -3,7 +3,7 @@ test('space_leak_001',
      # This could potentially be replaced with
      # collect_stats('all',5) to test all 3 with
      # 5% possible deviation.
-     [ collect_stats(['bytes allocated'],5),
+     [ collect_stats('bytes allocated',5),
       collect_runtime_residency(15),
       omit_ways(['profasm','profthreaded','threaded1','threaded2','nonmoving_thr'])
       ],
