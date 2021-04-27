@@ -340,6 +340,12 @@ WARNING_OPTS += -Wredundant-decls
 # Some gccs annoyingly enable this archaic specimen by default
 WARNING_OPTS += -Wno-aggregate-return
 
+ifeq "$(TargetOS_CPP)" "darwin"
+# clang and macOS fun stuff
+WARNING_OPTS += -Wno-nullability-completeness
+WARNING_OPTS += -Wno-availability
+endif
+
 # These ones are hard to avoid:
 #WARNING_OPTS += -Wconversion
 #WARNING_OPTS += -Wbad-function-cast
