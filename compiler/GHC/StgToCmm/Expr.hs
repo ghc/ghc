@@ -1,5 +1,3 @@
-{-# LANGUAGE CPP, BangPatterns #-}
-
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeFamilies #-}

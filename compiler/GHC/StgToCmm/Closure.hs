@@ -4,8 +4,6 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
 
-{-# LANGUAGE CPP, RecordWildCards, ScopedTypeVariables #-}
-
 -----------------------------------------------------------------------------
 --
 -- Stg to C-- code generation:
