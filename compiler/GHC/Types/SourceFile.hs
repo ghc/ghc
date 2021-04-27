@@ -1,6 +1,7 @@
 module GHC.Types.SourceFile
    ( HscSource(..)
    , SourceModified (..)
+   , hscSourceToIsBoot
    , isHsBootOrSig
    , isHsigFile
    , hscSourceString
@@ -9,6 +10,7 @@ where
 
 import GHC.Prelude
 import GHC.Utils.Binary
+import GHC.Unit.Types
 
 -- Note [HscSource types]
 -- ~~~~~~~~~~~~~~~~~~~~~~
@@ -48,6 +50,14 @@ data HscSource
    | HsBootFile -- ^ .hs-boot file
    | HsigFile   -- ^ .hsig file
    deriving (Eq, Ord, Show)
+
+-- | Tests if an 'HscSource' is a boot file, primarily for constructing elements
+-- of 'BuildModule'. We conflate signatures and modules because they are bound
+-- in the same namespace; only boot interfaces can be disambiguated with
+-- `import {-# SOURCE #-}`.
+hscSourceToIsBoot :: HscSource -> IsBootInterface
+hscSourceToIsBoot HsBootFile = IsBoot
+hscSourceToIsBoot _ = NotBoot
 
 instance Binary HscSource where
     put_ bh HsSrcFile = putByte bh 0

@@ -169,7 +169,7 @@ data ModIface_ (phase :: ModIfacePhase)
                 -- exported by this module, and the 'OccName's of those things
 
 
-        mi_used_th  :: !Bool,
+        mi_used_th  :: !(Maybe Fingerprint),
                 -- ^ Module required TH splices when it was compiled.
                 -- This disables recompilation avoidance (see #481).
 
@@ -464,7 +464,7 @@ emptyPartialModIface mod
                mi_deps        = noDependencies,
                mi_usages      = [],
                mi_exports     = [],
-               mi_used_th     = False,
+               mi_used_th     = Nothing,
                mi_fixities    = [],
                mi_warns       = NoWarnings,
                mi_anns        = [],

@@ -56,7 +56,7 @@ module GHC (
         SuccessFlag(..), succeeded, failed,
         defaultWarnErrLogger, WarnErrLogger,
         workingDirectoryChanged,
-        parseModule, typecheckModule, desugarModule, loadModule,
+        parseModule, typecheckModule, desugarModule,
         ParsedModule(..), TypecheckedModule(..), DesugaredModule(..),
         TypecheckedSource, ParsedSource, RenamedSource,   -- ditto
         TypecheckedMod, ParsedMod,
@@ -315,7 +315,7 @@ import GHC.Driver.Config
 import GHC.Driver.Main
 import GHC.Driver.Make
 import GHC.Driver.Hooks
-import GHC.Driver.Pipeline   ( compileOne', doesIfaceHashMatch )
+import GHC.Driver.Pipeline   ( compileOne' )
 import GHC.Driver.Monad
 import GHC.Driver.Ppr
 
@@ -1209,8 +1209,8 @@ loadModule tcm = do
       case (ms_iface_date ms, ms_obj_date ms) of
           -- See Note [When source is considered modified]
           (Just hi_date, Just obj_date) | obj_date >= hi_date -> liftIO $ do
-              prev_hash_matches <- doesIfaceHashMatch hsc_env ms
-              if prev_hash_matches
+--              prev_hash_matches <- doesIfaceHashMatch hsc_env ms
+              if False
                   then fmap Just $ findObjectLinkable
                                           (ms_mod ms)
                                           (ml_obj_file loc)
@@ -1225,7 +1225,6 @@ loadModule tcm = do
    -- compile doesn't change the session
    mod_info <- liftIO $ compileOne' (Just tcg) Nothing
                                     hsc_env ms 1 1 Nothing mb_linkable
-                                    source_modified
 
    modifySession $ hscUpdateHPT (\hpt -> addToHpt hpt mod mod_info)
    return tcm

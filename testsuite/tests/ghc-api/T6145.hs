@@ -30,8 +30,7 @@ main = do
                         p <- parseModule modSum
                         t <- typecheckModule p
                         d <- desugarModule t
-                        l <- loadModule d
-                        let ts=typecheckedSource l
+                        let ts=typecheckedSource d
 --                        liftIO (putStr (showSDocDebug (ppr ts)))
                         let fs=filterBag isDataCon ts
                         return $ not $ isEmptyBag fs

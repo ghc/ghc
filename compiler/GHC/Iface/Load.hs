@@ -25,7 +25,7 @@ module GHC.Iface.Load (
         -- IfM functions
         loadInterface,
         loadSysInterface, loadUserInterface, loadPluginInterface,
-        findAndReadIface, readIface, readIfaceSourceHash, writeIface,
+        findAndReadIface, readIface, writeIface,
         moduleFreeHolesPrecise,
         needWiredInHomeIface, loadWiredInHomeIface,
 
@@ -65,7 +65,6 @@ import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
 import GHC.Utils.Logger
-import GHC.Utils.Fingerprint
 
 import GHC.Settings.Constants
 
@@ -992,22 +991,6 @@ readIface dflags name_cache wanted_mod file_path = do
           err = hiModuleNameMismatchWarn wanted_mod actual_mod
 
     Left exn    -> return (Failed (text (showException exn)))
-
--- | Like @readIface@, but just get the source file hash out of it if it
--- exists, and don't bother returning the error otherwise.
-readIfaceSourceHash
-  :: DynFlags
-  -> NameCache
-  -> FilePath
-  -> IO (Maybe Fingerprint)
-readIfaceSourceHash dflags name_cache file_path = do
-    let profile = targetProfile dflags
-    res <- tryMost $ readBinIfaceHeader profile name_cache CheckHiWay QuietBinIFace file_path
-    case res of
-      Right (src_hash, _) ->
-        return $ Just src_hash
-      Left _ ->
-        return Nothing
 
 {-
 *********************************************************
