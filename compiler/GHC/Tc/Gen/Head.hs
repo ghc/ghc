@@ -245,7 +245,7 @@ splitHsApps :: HsExpr GhcRn
 -- See Note [splitHsApps]
 splitHsApps e = go e (top_ctxt 0 e) []
   where
-    top_ctxt n (HsPar _ fun)               = top_lctxt n fun
+    top_ctxt n (HsPar _ _ fun _)           = top_lctxt n fun
     top_ctxt n (HsPragE _ _ fun)           = top_lctxt n fun
     top_ctxt n (HsAppType _ fun _)         = top_lctxt (n+1) fun
     top_ctxt n (HsApp _ fun _)             = top_lctxt (n+1) fun
@@ -256,7 +256,7 @@ splitHsApps e = go e (top_ctxt 0 e) []
 
     go :: HsExpr GhcRn -> AppCtxt -> [HsExprArg 'TcpRn]
        -> ((HsExpr GhcRn, AppCtxt), [HsExprArg 'TcpRn])
-    go (HsPar _     (L l fun))    ctxt args = go fun (set l ctxt) (EWrap (EPar ctxt)   : args)
+    go (HsPar _ _ (L l fun) _)    ctxt args = go fun (set l ctxt) (EWrap (EPar ctxt)   : args)
     go (HsPragE _ p (L l fun))    ctxt args = go fun (set l ctxt) (EPrag      ctxt p   : args)
     go (HsAppType _ (L l fun) ty) ctxt args = go fun (dec l ctxt) (mkETypeArg ctxt ty  : args)
     go (HsApp _ (L l fun) arg)    ctxt args = go fun (dec l ctxt) (mkEValArg  ctxt arg : args)
@@ -294,7 +294,7 @@ rebuildHsApps fun ctxt (arg : args)
       EPrag ctxt' p
         -> rebuildHsApps (HsPragE noExtField p lfun) ctxt' args
       EWrap (EPar ctxt')
-        -> rebuildHsApps (HsPar noAnn lfun) ctxt' args
+        -> rebuildHsApps (gHsPar lfun) ctxt' args
       EWrap (EExpand orig)
         -> rebuildHsApps (XExpr (ExpansionExpr (HsExpanded orig fun))) ctxt args
       EWrap (EHsWrap wrap)
@@ -651,7 +651,7 @@ addAmbiguousNameErr rdr
 -- outermost constructor ignoring parentheses.
 obviousSig :: HsExpr GhcRn -> Maybe (LHsSigWcType GhcRn)
 obviousSig (ExprWithTySig _ _ ty) = Just ty
-obviousSig (HsPar _ p)            = obviousSig (unLoc p)
+obviousSig (HsPar _ _ p _)        = obviousSig (unLoc p)
 obviousSig (HsPragE _ _ p)        = obviousSig (unLoc p)
 obviousSig _                      = Nothing
 

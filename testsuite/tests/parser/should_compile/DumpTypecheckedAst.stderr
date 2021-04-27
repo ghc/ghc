@@ -106,6 +106,9 @@
            (HsPar
             (EpAnnNotUsed)
             (L
+             (EpAnnNotUsed)
+             (HsTok))
+            (L
              (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
              (HsApp
               (EpAnn
@@ -132,7 +135,10 @@
                   []))
                 (HsStringPrim
                  (NoSourceText)
-                 "T")))))))))
+                 "T")))))
+            (L
+             (EpAnnNotUsed)
+             (HsTok))))))
         (L
          (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
          (HsLit
@@ -256,6 +262,9 @@
            (HsPar
             (EpAnnNotUsed)
             (L
+             (EpAnnNotUsed)
+             (HsTok))
+            (L
              (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
              (HsApp
               (EpAnn
@@ -282,7 +291,10 @@
                   []))
                 (HsStringPrim
                  (NoSourceText)
-                 "'MkT")))))))))
+                 "'MkT")))))
+            (L
+             (EpAnnNotUsed)
+             (HsTok))))))
         (L
          (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
          (HsLit
@@ -406,6 +418,9 @@
            (HsPar
             (EpAnnNotUsed)
             (L
+             (EpAnnNotUsed)
+             (HsTok))
+            (L
              (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
              (HsApp
               (EpAnn
@@ -432,7 +447,10 @@
                   []))
                 (HsStringPrim
                  (NoSourceText)
-                 "Peano")))))))))
+                 "Peano")))))
+            (L
+             (EpAnnNotUsed)
+             (HsTok))))))
         (L
          (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
          (HsLit
@@ -556,6 +574,9 @@
            (HsPar
             (EpAnnNotUsed)
             (L
+             (EpAnnNotUsed)
+             (HsTok))
+            (L
              (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
              (HsApp
               (EpAnn
@@ -582,7 +603,10 @@
                   []))
                 (HsStringPrim
                  (NoSourceText)
-                 "'Zero")))))))))
+                 "'Zero")))))
+            (L
+             (EpAnnNotUsed)
+             (HsTok))))))
         (L
          (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
          (HsLit
@@ -706,6 +730,9 @@
            (HsPar
             (EpAnnNotUsed)
             (L
+             (EpAnnNotUsed)
+             (HsTok))
+            (L
              (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
              (HsApp
               (EpAnn
@@ -732,7 +759,10 @@
                   []))
                 (HsStringPrim
                  (NoSourceText)
-                 "'Succ")))))))))
+                 "'Succ")))))
+            (L
+             (EpAnnNotUsed)
+             (HsTok))))))
         (L
          (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
          (HsLit
@@ -1122,6 +1152,9 @@
        (HsPar
         (EpAnnNotUsed)
         (L
+         (EpAnnNotUsed)
+         (HsTok))
+        (L
          (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
          (HsApp
           (EpAnn
@@ -1165,6 +1198,9 @@
            (HsPar
             (EpAnnNotUsed)
             (L
+             (EpAnnNotUsed)
+             (HsTok))
+            (L
              (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
              (HsApp
               (EpAnn
@@ -1207,6 +1243,9 @@
                (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
                (HsPar
                 (EpAnnNotUsed)
+                (L
+                 (EpAnnNotUsed)
+                 (HsTok))
                 (L
                  (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
                  (HsApp
@@ -1257,7 +1296,16 @@
                         []))
                       (HsConLikeOut
                        (NoExtField)
-                       ({abstract:ConLike}))))))))))))))))))))))
+                       ({abstract:ConLike}))))))))
+                (L
+                 (EpAnnNotUsed)
+                 (HsTok))))))
+            (L
+             (EpAnnNotUsed)
+             (HsTok))))))
+        (L
+         (EpAnnNotUsed)
+         (HsTok))))))))
  ,(L
    (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
    (VarBind
@@ -1342,6 +1390,9 @@
          (HsPar
           (EpAnnNotUsed)
           (L
+           (EpAnnNotUsed)
+           (HsTok))
+          (L
            (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
            (HsApp
             (EpAnn
@@ -1368,11 +1419,17 @@
                 []))
               (HsStringPrim
                (NoSourceText)
-               "main")))))))))
+               "main")))))
+          (L
+           (EpAnnNotUsed)
+           (HsTok))))))
       (L
        (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
        (HsPar
         (EpAnnNotUsed)
+        (L
+         (EpAnnNotUsed)
+         (HsTok))
         (L
          (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
          (HsApp
@@ -1400,7 +1457,10 @@
               []))
             (HsStringPrim
              (NoSourceText)
-             "DumpTypecheckedAst")))))))))))
+             "DumpTypecheckedAst")))))
+        (L
+         (EpAnnNotUsed)
+         (HsTok))))))))
  ,(L
    (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:19:1-23 })
    (AbsBinds
@@ -1487,3 +1547,5 @@
          (FromSource))
         []))]}
     (False)))]}
+
+

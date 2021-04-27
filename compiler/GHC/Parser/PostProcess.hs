@@ -7,6 +7,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE DataKinds #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -1144,11 +1145,10 @@ checkAPat loc e0 = do
            , pat_args = InfixCon l r
            }
 
-   PatBuilderPar e an@(AnnParen pt o c) -> do
-     (L l p) <- checkLPat e
-     let aa = [AddEpAnn ai o, AddEpAnn ac c]
-         (ai,ac) = parenTypeKws pt
-     return (ParPat (EpAnn (spanAsAnchor $ (widenSpan (locA l) aa)) an emptyComments) (L l p))
+   PatBuilderPar lpar e rpar -> do
+     p <- checkLPat e
+     return (ParPat (EpAnn (spanAsAnchor (locA loc)) NoEpAnns emptyComments) lpar p rpar)
+
    _           -> patFail (locA loc) (ppr e0)
 
 placeHolderPunRhs :: DisambECP b => PV (LocatedA b)
@@ -1290,7 +1290,7 @@ isFunLhs e = go e [] []
    go (L _ (PatBuilderVar (L loc f))) es ann
        | not (isRdrDataCon f)        = return (Just (L loc f, Prefix, es, ann))
    go (L _ (PatBuilderApp f e)) es       ann = go f (e:es) ann
-   go (L l (PatBuilderPar e _an)) es@(_:_) ann
+   go (L l (PatBuilderPar _ e _)) es@(_:_) ann
                                       = go e es (ann ++ mkParensEpAnn (locA l))
    go (L loc (PatBuilderOpApp l (L loc' op) r (EpAnn loca anns cs))) es ann
         | not (isRdrDataCon op)         -- We have found the function!
@@ -1463,7 +1463,7 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
     AnnList ->
     PV (LocatedA b)
   -- | Disambiguate "( ... )" (parentheses)
-  mkHsParPV :: SrcSpan -> LocatedA b -> AnnParen -> PV (LocatedA b)
+  mkHsParPV :: SrcSpan -> LHsToken "(" GhcPs -> LocatedA b -> LHsToken ")" GhcPs -> PV (LocatedA b)
   -- | Disambiguate a variable "f" or a data constructor "MkF".
   mkHsVarPV :: LocatedN RdrName -> PV (LocatedA b)
   -- | Disambiguate a monomorphic literal
@@ -1594,9 +1594,9 @@ instance DisambECP (HsCmd GhcPs) where
     cs <- getCommentsFor l
     return $ L (noAnnSrcSpan l) (HsCmdDo (EpAnn (spanAsAnchor l) anns cs) stmts)
   mkHsDoPV l (Just m)    _ _ = addFatalError $ PsError (PsErrQualifiedDoInCmd m) [] l
-  mkHsParPV l c ann = do
+  mkHsParPV l lpar c rpar = do
     cs <- getCommentsFor l
-    return $ L (noAnnSrcSpan l) (HsCmdPar (EpAnn (spanAsAnchor l) ann cs) c)
+    return $ L (noAnnSrcSpan l) (HsCmdPar (EpAnn (spanAsAnchor l) NoEpAnns cs) lpar c rpar)
   mkHsVarPV (L l v) = cmdFail (locA l) (ppr v)
   mkHsLitPV (L l a) = cmdFail l (ppr a)
   mkHsOverLitPV (L l a) = cmdFail l (ppr a)
@@ -1674,9 +1674,9 @@ instance DisambECP (HsExpr GhcPs) where
   mkHsDoPV l mod stmts anns = do
     cs <- getCommentsFor l
     return $ L (noAnnSrcSpan l) (HsDo (EpAnn (spanAsAnchor l) anns cs) (DoExpr mod) stmts)
-  mkHsParPV l e ann = do
+  mkHsParPV l lpar e rpar = do
     cs <- getCommentsFor l
-    return $ L (noAnnSrcSpan l) (HsPar (EpAnn (spanAsAnchor l) ann cs) e)
+    return $ L (noAnnSrcSpan l) (HsPar (EpAnn (spanAsAnchor l) NoEpAnns cs) lpar e rpar)
   mkHsVarPV v@(L l _) = return $ L (na2la l) (HsVar noExtField v)
   mkHsLitPV (L l a) = do
     cs <- getCommentsFor l
@@ -1748,7 +1748,7 @@ instance DisambECP (PatBuilder GhcPs) where
   mkHsAppTypePV l p la t = return $ L l (PatBuilderAppType p la (mkHsPatSigType t))
   mkHsIfPV l _ _ _ _ _ _ = addFatalError $ PsError PsErrIfTheElseInPat [] l
   mkHsDoPV l _ _ _       = addFatalError $ PsError PsErrDoNotationInPat [] l
-  mkHsParPV l p an       = return $ L (noAnnSrcSpan l) (PatBuilderPar p an)
+  mkHsParPV l lpar p rpar   = return $ L (noAnnSrcSpan l) (PatBuilderPar lpar p rpar)
   mkHsVarPV v@(getLoc -> l) = return $ L (na2la l) (PatBuilderVar v)
   mkHsLitPV lit@(L l a) = do
     checkUnboxedStringLitPat lit
