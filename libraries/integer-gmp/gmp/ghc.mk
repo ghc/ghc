@@ -129,9 +129,12 @@ libraries/integer-gmp/gmp/libgmp.a libraries/integer-gmp/gmp/gmp.h:
 	# Note: We must pass `TARGETPLATFORM` to the `--host` argument of GMP's
 	#       `./configure`, not `HOSTPLATFORM`: the 'host' on which GMP will
 	#       run is the 'target' platform of the compiler we're building.
+	# Note2: we pass --with-readline=no, to prevent getting an indirect
+	#        dependency on ncurses through gmp.  readline is only relevant
+	#        for gmp test programs. (See gmp's configure)
 	cd libraries/integer-gmp/gmp/gmpbuild; \
 	    CC=$(CCX) CXX=$(CCX) NM=$(NM) AR=$(AR_STAGE1) ./configure \
-	          --enable-shared=no --with-pic=yes \
+	          --enable-shared=no --with-pic=yes --with-readline=no \
 	          --host=$(TARGETPLATFORM) --build=$(BUILDPLATFORM)
 	$(MAKE) -C libraries/integer-gmp/gmp/gmpbuild MAKEFLAGS=
 	$(CP) libraries/integer-gmp/gmp/gmpbuild/gmp.h libraries/integer-gmp/gmp/
