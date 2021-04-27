@@ -55,6 +55,7 @@ data DumpFlag
    | Opt_D_dump_ds_preopt
    | Opt_D_dump_foreign
    | Opt_D_dump_inlinings
+   | Opt_D_dump_verbose_inlinings
    | Opt_D_dump_rule_firings
    | Opt_D_dump_rule_rewrites
    | Opt_D_dump_simpl_trace
