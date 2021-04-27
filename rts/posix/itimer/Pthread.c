@@ -38,6 +38,13 @@
 #include "PosixSource.h"
 #include "Rts.h"
 
+#if defined(darwin_HOST_OS)
+/* Visibility of non-POSIX extension prototypes requires _DARWIN_C_SOURCE on
+ * Mac OS X.  Here, we need pthread_setname_np(3), which is otherwise hidden
+ * from strict POSIX source files */
+#define _DARWIN_C_SOURCE 1
+#endif
+
 #include "Ticker.h"
 #include "Proftimer.h"
 #include "Schedule.h"
