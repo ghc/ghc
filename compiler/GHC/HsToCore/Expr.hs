@@ -206,7 +206,7 @@ dsUnliftedBind (FunBind { fun_id = L l fun
                         , fun_tick = tick }) body
                -- Can't be a bang pattern (that looks like a PatBind)
                -- so must be simply unboxed
-  = do { (args, rhs) <- matchWrapper (mkPrefixFunRhs (L l $ idName fun))
+  = do { (args, rhs) <- matchWrapper (mkPrefixFunRhs (L l (CtxIdName (idName fun))))
                                      Nothing matches
        ; MASSERT( null args ) -- Functions aren't lifted
        ; MASSERT( isIdHsWrapper co_fn )
@@ -929,7 +929,7 @@ handled in GHC.HsToCore.ListComp).  Basically does the translation given in the
 Haskell 98 report:
 -}
 
-dsDo :: HsStmtContext GhcRn -> [ExprLStmt GhcTc] -> DsM CoreExpr
+dsDo :: HsPsStmtContext -> [ExprLStmt GhcTc] -> DsM CoreExpr
 dsDo ctx stmts
   = goL stmts
   where
@@ -954,9 +954,9 @@ dsDo ctx stmts
       = do  { body     <- goL stmts
             ; rhs'     <- dsLExpr rhs
             ; var   <- selectSimpleMatchVarL (xbstc_boundResultMult xbs) pat
-            ; match <- matchSinglePatVar var Nothing (StmtCtxt ctx) pat
+            ; match <- matchSinglePatVar var Nothing (StmtCtxt $ PsStmt ctx) pat
                          (xbstc_boundResultType xbs) (cantFailMatchResult body)
-            ; match_code <- dsHandleMonadicFailure ctx pat match (xbstc_failOp xbs)
+            ; match_code <- dsHandleMonadicFailure (PsStmt ctx) pat match (xbstc_failOp xbs)
             ; dsSyntaxExpr (xbstc_bindOp xbs) [rhs', Lam var match_code] }
 
     go _ (ApplicativeStmt body_ty args mb_join) stmts
@@ -975,9 +975,9 @@ dsDo ctx stmts
 
            ; let match_args (pat, fail_op) (vs,body)
                    = do { var   <- selectSimpleMatchVarL Many pat
-                        ; match <- matchSinglePatVar var Nothing (StmtCtxt ctx) pat
+                        ; match <- matchSinglePatVar var Nothing (StmtCtxt $ PsStmt ctx) pat
                                    body_ty (cantFailMatchResult body)
-                        ; match_code <- dsHandleMonadicFailure ctx pat match fail_op
+                        ; match_code <- dsHandleMonadicFailure (PsStmt ctx) pat match fail_op
                         ; return (var:vs, match_code)
                         }
 
