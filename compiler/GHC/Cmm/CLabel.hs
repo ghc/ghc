@@ -330,19 +330,19 @@ instance Ord CLabel where
   compare (CmmLabel a1 b1 c1 d1) (CmmLabel a2 b2 c2 d2) =
     compare a1 a2 `thenCmp`
     compare b1 b2 `thenCmp`
-    uniqCompareFS c1 c2 `thenCmp`
+    lexicalCompareFS c1 c2 `thenCmp`
     compare d1 d2
   compare (RtsLabel a1) (RtsLabel a2) = compare a1 a2
   compare (LocalBlockLabel u1) (LocalBlockLabel u2) = nonDetCmpUnique u1 u2
   compare (ForeignLabel a1 b1 c1 d1) (ForeignLabel a2 b2 c2 d2) =
-    uniqCompareFS a1 a2 `thenCmp`
+    lexicalCompareFS a1 a2 `thenCmp`
     compare b1 b2 `thenCmp`
     compare c1 c2 `thenCmp`
     compare d1 d2
   compare (AsmTempLabel u1) (AsmTempLabel u2) = nonDetCmpUnique u1 u2
   compare (AsmTempDerivedLabel a1 b1) (AsmTempDerivedLabel a2 b2) =
     compare a1 a2 `thenCmp`
-    uniqCompareFS b1 b2
+    lexicalCompareFS b1 b2
   compare (StringLitLabel u1) (StringLitLabel u2) =
     nonDetCmpUnique u1 u2
   compare (CC_Label a1) (CC_Label a2) =

@@ -215,10 +215,8 @@ data FastString = FastString {
 instance Eq FastString where
   f1 == f2  =  uniq f1 == uniq f2
 
--- We don't provide any "Ord FastString" instance to force you to think about
--- which ordering you want:
---    * lexical:   deterministic,     O(n). Cf lexicalCompareFS and LexicalFastString.
---    * by unique: non-deterministic, O(1). Cf uniqCompareFS    and NonDetFastString.
+instance Ord FastString where
+   compare fs1 fs2 = lexicalCompareFS fs1 fs2
 
 instance IsString FastString where
     fromString = fsLit
