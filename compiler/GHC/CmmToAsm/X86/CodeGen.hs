@@ -3411,7 +3411,9 @@ outOfLineCmmOp bid mop res args
               MO_AtomicRMW _ _ -> fsLit "atomicrmw"
               MO_AtomicRead _  -> fsLit "atomicread"
               MO_AtomicWrite _ -> fsLit "atomicwrite"
-              MO_Cmpxchg _     -> fsLit "cmpxchg"
+              MO_Cmpxchg w     -> fsLit $ cmpxchgLabel w -- for W64 on 32-bit
+                                                         -- TODO: implement
+                                                         -- cmpxchg8b instr
               MO_Xchg _        -> should_be_inline
 
               MO_UF_Conv _ -> unsupported
