@@ -37,6 +37,8 @@ n = 123_456
 
 s = "hello ωorld"#   -- note the omega
 
+lam = \ -> 0
+
 -- a fatal error.
 k = let
 
