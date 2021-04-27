@@ -105,20 +105,34 @@ hsTupArgType :: HsTupArg GhcTc -> Type
 hsTupArgType (Present _ e)           = lhsExprType e
 hsTupArgType (Missing (Scaled _ ty)) = ty
 
+
+-- | The PRType (ty, tas) is short for (piResultTys ty (reverse tas))
+type PRType = (Type, [Type])
+
+prTypeType :: PRType -> Type
+prTypeType (ty, tys)
+  | null tys  = ty
+  | otherwise = piResultTys ty (reverse tys)
+
+liftPRType :: (Type -> Type) -> PRType -> PRType
+liftPRType f pty = (f (prTypeType pty), [])
+
 hsWrapperType :: HsWrapper -> Type -> Type
-hsWrapperType WpHole              = id
-hsWrapperType (w1 `WpCompose` w2) = hsWrapperType w1 . hsWrapperType w2
-hsWrapperType (WpFun _ w2 (Scaled m exp_arg) _) = \t ->
-  let act_res = funResultTy t
-      exp_res = hsWrapperType w2 act_res
-  in mkFunctionType m exp_arg exp_res
-hsWrapperType (WpCast co)         = \_ -> coercionRKind co
-hsWrapperType (WpEvLam v)         = mkInvisFunTyMany (idType v)
-hsWrapperType (WpEvApp _)         = funResultTy
-hsWrapperType (WpTyLam tv)        = mkForAllTy tv Inferred
-hsWrapperType (WpTyApp t)         = (`piResultTy` t)
-hsWrapperType (WpLet _)           = id
-hsWrapperType (WpMultCoercion _)  = id
+hsWrapperType wrap ty = prTypeType $ go wrap (ty,[])
+  where
+    go WpHole              = id
+    go (w1 `WpCompose` w2) = go w1 . go w2
+    go (WpFun _ w2 (Scaled m exp_arg) _) = liftPRType $ \t ->
+      let act_res = funResultTy t
+          exp_res = hsWrapperType w2 act_res
+      in mkFunctionType m exp_arg exp_res
+    go (WpCast co)        = liftPRType $ \_ -> coercionRKind co
+    go (WpEvLam v)        = liftPRType $ mkInvisFunTyMany (idType v)
+    go (WpEvApp _)        = liftPRType $ funResultTy
+    go (WpTyLam tv)       = liftPRType $ mkForAllTy tv Inferred
+    go (WpTyApp ta)       = \(ty,tas) -> (ty, ta:tas)
+    go (WpLet _)          = id
+    go (WpMultCoercion _) = id
 
 lhsCmdTopType :: LHsCmdTop GhcTc -> Type
 lhsCmdTopType (L _ (HsCmdTop (CmdTopTc _ ret_ty _) _)) = ret_ty
