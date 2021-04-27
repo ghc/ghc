@@ -16,6 +16,17 @@
    - `extend{Int,Word}<N>#` -> `extend<N>To{Int,Word}#`
    - `narrow{Int,Word}<N>#` -> `intTo{Int,Word}<N>#`
 
+- Add primops for atomic compare and swap for sizes other that wordsize:
+
+   	casInt8Array# :: MutableByteArray# s -> Int# -> Int8# -> Int8# -> State# s -> (# State# s, Int8# #)
+	casInt16Array# :: MutableByteArray# s -> Int# -> Int16# -> Int16# -> State# s -> (# State# s, Int16# #)
+	casInt32Array# :: MutableByteArray# s -> Int# -> Int32# -> Int32# -> State# s -> (# State# s, Int32# #)
+	casInt64Array# :: MutableByteArray# s -> Int# -> Int64# -> Int64# -> State# s -> (# State# s, Int64# #)
+	atomicCasWord8Addr# :: Addr# -> Word8# -> Word8# -> State# s -> (# State# s, Word8# #)
+	atomicCasWord16Addr# :: Addr# -> Word16# -> Word16# -> State# s -> (# State# s, Word16# #)
+	atomicCasWord32Addr# :: Addr# -> Word32# -> Word32# -> State# s -> (# State# s, Word32# #)
+	atomicCasWord64Addr# :: Addr# -> WORD64 -> WORD64 -> State# s -> (# State# s, WORD64 #)
+
 ## 0.7.0 (edit as necessary)
 
 - Shipped with GHC 9.0.1
@@ -23,7 +34,7 @@
 - Add known-key `cstringLength#` to `GHC.CString`. This is just the
   C function `strlen`, but a built-in rewrite rule allows GHC to
   compute the result at compile time when the argument is known.
-  
+
 - In order to support unicode better the following functions in `GHC.CString`
   gained UTF8 counterparts:
 
@@ -47,7 +58,7 @@
         atomicCasAddrAddr# :: Addr# -> Addr# -> Addr# -> State# s -> (# State# s, Addr# #)
         atomicCasWordAddr# :: Addr# -> Word# -> Word# -> State# s -> (# State# s, Word# #)
 
-- Add an explicit fixity for `(~)` and `(~~)`: 
+- Add an explicit fixity for `(~)` and `(~~)`:
 
         infix 4 ~, ~~
 
