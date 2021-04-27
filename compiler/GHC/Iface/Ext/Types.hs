@@ -305,7 +305,7 @@ data NodeAnnotation = NodeAnnotation
 
 instance Ord NodeAnnotation where
    compare (NodeAnnotation c0 t0) (NodeAnnotation c1 t1)
-      = mconcat [uniqCompareFS c0 c1, uniqCompareFS t0 t1]
+      = mconcat [lexicalCompareFS c0 c1, lexicalCompareFS t0 t1]
 
 instance Outputable NodeAnnotation where
    ppr (NodeAnnotation c t) = ppr (c,t)
