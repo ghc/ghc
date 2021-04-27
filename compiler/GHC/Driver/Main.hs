@@ -237,7 +237,7 @@ import GHC.Stg.Utils (seqTopBinds)
 import GHC.Stg.InferTags
 import GHC.Stg.InferTags.Rewrite
 import GHC.Types.Unique.Supply
-import GHC.Stg.DepAnal
+-- import GHC.Stg.DepAnal
 import GHC.Driver.Ppr
 
 #include "HsVersions.h"
