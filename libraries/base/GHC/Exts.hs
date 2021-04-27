@@ -149,6 +149,11 @@ the []            = errorWithoutStackTrace "GHC.Exts.the: empty list"
 
 -- | The 'sortWith' function sorts a list of elements using the
 -- user supplied function to project something out of each element
+--
+-- In general if the user supplied function is expensive to compute then
+-- you should probably be using 'Data.List.sortOn', as it only needs
+-- to compute it once for each element. 'sortWith', on the other hand
+-- must compute the mapping function for every comparison that it performs.
 sortWith :: Ord b => (a -> b) -> [a] -> [a]
 sortWith f = sortBy (\x y -> compare (f x) (f y))
 
