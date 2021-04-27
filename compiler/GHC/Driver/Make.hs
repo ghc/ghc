@@ -1538,7 +1538,7 @@ upsweep mHscMessage old_hpt stable_mods sccs = do
     when (not $ null dropped_ms) $ do
         dflags <- getSessionDynFlags
         logger <- getLogger
-        liftIO $ fatalErrorMsg logger dflags (keepGoingPruneErr $ dropped_ms)
+        liftIO $ debugTraceMsg logger dflags 2 (keepGoingPruneErr dropped_ms)
     (_, done') <- upsweep' old_hpt done mods' (mod_index+1) nmods'
     return (Failed, done')
 
