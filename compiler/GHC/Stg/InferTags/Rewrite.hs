@@ -249,7 +249,7 @@ rewriteRhs (_id, tagSig) (StgRhsCon (node_id) ccs con cn ticks args) = {-# SCC r
     if (null evalArgs)
         then return $! (StgRhsCon noExtFieldSilent ccs con cn ticks args, id)
         else do
-            pprTraceM "CreatingSeqs for " $ ppr _id <+> ppr node_id
+            -- pprTraceM "CreatingSeqs for " $ ppr _id <+> ppr node_id
 
             evaldArgs <- mapM mkLocalArgId evalArgs -- Create case binders
             let varMap = zip evalArgs evaldArgs -- Match them up with original ids

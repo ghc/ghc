@@ -1788,15 +1788,15 @@ doCodeGen hsc_env this_mod denv data_tycons
     let (!stg_binds_w_tags) = {-# SCC "StgTagFields" #-}
                                         inferTags stg_binds
 
-    pprTraceM "Dumping Stg" (ppr this_mod)
+    -- pprTraceM "Dumping Stg" (ppr this_mod)
     dumpIfSet_dyn logger dflags Opt_D_dump_stg_final "CodeGenAnal STG:" FormatSTG (pprGenStgTopBindings (initStgPprOpts dflags) stg_binds_w_tags)
     return $! seqTopBinds stg_binds_w_tags
-    pprTraceM "Dumped Stg" (ppr this_mod)
+    -- pprTraceM "Dumped Stg" (ppr this_mod)
 
     us_t <- mkSplitUniqSupply 't'
     let sfi_seqd_binds = rewriteTopBinds this_mod us_t stg_binds_w_tags :: [TgStgTopBinding]
     !end <- getTime
-    putStrLn $! "Time(ms) taken by findTags:" ++ (show $ end - start)
+    -- putStrLn $! "Time(ms) taken by findTags:" ++ (show $ end - start)
     let stg_binds_w_fvs = annTopBindingsFreeVars sfi_seqd_binds
 
     dumpIfSet_dyn logger dflags Opt_D_dump_stg_final "Final STG:" FormatSTG (pprGenStgTopBindings (initStgPprOpts dflags) stg_binds_w_fvs)
