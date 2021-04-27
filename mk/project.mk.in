@@ -143,6 +143,13 @@ else
 Windows_Host=NO
 endif
 
+# Darwin_Host=YES if on a Darwin platform
+ifneq "$(findstring $(HostOS_CPP), darwin)" ""
+Darwin_Host=YES
+else
+Darwin_Host=NO
+endif
+
 # Windows_Target=YES if we are targeting a Windows platform
 ifneq "$(findstring $(TargetOS_CPP), mingw32)" ""
 Windows_Target=YES
