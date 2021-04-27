@@ -33,11 +33,12 @@ module GHC.Magic.Dict (withDict) where
 import GHC.Prim.Panic (panicError)
 import GHC.Types (RuntimeRep, TYPE)
 
--- | 'withDict' is a special-purpose placeholder value.
--- It is used internally by modules such as "GHC.TypeNats" to cast a typeclass
--- dictionary with a single method. It is eliminated in the desugarer during
--- compilation. For the details, see @Note [withDict]@ in "GHC.HsToCore.Expr"
--- in GHC.
+-- | @'withDict' d f@ provides a way to call a type-class–overloaded function
+-- @f@ by applying it to the supplied dictionary @d@.
+--
+-- 'withDict' can only be used if the type class has a single method with no
+-- superclasses. For more (important) details on how this works, see
+-- @Note [withDict]@ in "GHC.HsToCore.Expr" in GHC.
 withDict :: forall {rr :: RuntimeRep} st dt (r :: TYPE rr). st -> (dt => r) -> r
 {-# NOINLINE withDict #-}
 withDict = panicError "Non-rewritten withDict"#

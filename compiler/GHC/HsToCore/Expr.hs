@@ -1230,8 +1230,8 @@ like this:
      f :: T a
 
 We can use `withDict`, in conjunction with a special case in the desugarer, to
-cast values of type `T a` into dictionaries for `C a`. To do this, we can a
-function like this in the library:
+cast values of type `T a` into dictionaries for `C a`. To do this, we can
+define a function like this in the library:
 
   withT :: T a -> (C a => b) -> b
   withT t k = withDict @(T a) @(C a) t k
@@ -1274,6 +1274,8 @@ Where:
   the fact that C is a class with exactly one method and no superclasses, so it
   is treated like a newtype when compiled to Core.
 
+These requirements are implemented in the guards in ds_withDict's definition.
+
 Some further observations about `withDict`:
 
 * Every use of `withDict` must be instantiated at a /particular/ class C.
@@ -1285,6 +1287,9 @@ Some further observations about `withDict`:
 * The `dt` in the type of withDict must be explicitly instantiated with
   visible type application, as invoking `withDict` would be ambiguous
   otherwise.
+
+* For examples of how `withDict` is used in the `base` library, see `withSNat`
+  in GHC.TypeNats, as well as `withSChar` and `withSSymbol` n GHC.TypeLits.
 
 * The `r` is levity polymorphic to support things like `withTypeable` in
   `Data.Typeable.Internal`.
@@ -1304,7 +1309,24 @@ Some further observations about `withDict`:
   base:GHC.TypeNats.
 
 * The only valid way to apply `withDict` is as described above. Applying
-  `withDict` in any other way will result in an error during desugaring.
+  `withDict` in any other way will result in a non-recoverable error during
+  desugaring. In other words, GHC will never execute the `withDict` function
+  in compiled code.
+
+  In theory, this means that we don't need to define a binding for `withDict`
+  in GHC.Magic.Dict. In practice, we define a binding anyway, for two reasons:
+
+    - To give it Haddocks, and
+    - To define the type of `withDict`, which GHC can find in
+      GHC.Magic.Dict.hi.
+
+  Because we define a binding for `withDict`, we have to provide a right-hand
+  side for its definition. We somewhat arbitrarily choose:
+
+    withDict = panicError "Non rewritten withDict"#
+
+  This should never be reachable anyway, but just in case ds_withDict fails
+  to rewrite away `withDict`, this ensures that the program won't get very far.
 
 * One could conceivably implement this special case for `withDict` as a
   constant-folding rule instead of during desugaring. We choose not to do so
