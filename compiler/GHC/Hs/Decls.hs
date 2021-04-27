@@ -810,17 +810,7 @@ pprHsFamInstLHS :: (OutputableBndrId p)
 pprHsFamInstLHS thing bndrs typats fixity mb_ctxt
    = hsep [ pprHsOuterFamEqnTyVarBndrs bndrs
           , pprLHsContext mb_ctxt
-          , pp_pats typats ]
-   where
-     pp_pats (patl:patr:pats)
-       | Infix <- fixity
-       = let pp_op_app = hsep [ ppr patl, pprInfixOcc thing, ppr patr ] in
-         case pats of
-           [] -> pp_op_app
-           _  -> hsep (parens pp_op_app : map ppr pats)
-
-     pp_pats pats = hsep [ pprPrefixOcc thing
-                         , hsep (map ppr pats)]
+          , pprHsArgsApp thing fixity typats ]
 
 instance OutputableBndrId p
        => Outputable (ClsInstDecl (GhcPass p)) where
