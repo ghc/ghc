@@ -17,9 +17,8 @@
 -- make sure `main' works
 main
 
--- touch a module + recompile
-:shell sleep 1
-:shell touch C.hs
+-- change a module + recompile
+:shell echo >> C.hs
 :reload
 
 -- make sure `main' still works
