@@ -1910,7 +1910,7 @@ extractDataDefnKindVars (HsDataDefn { dd_kindSig = ksig })
   = maybe [] extractHsTyRdrTyVars ksig
 
 extract_lctxt :: Maybe (LHsContext GhcPs) -> FreeKiTyVars -> FreeKiTyVars
-extract_lctxt Nothing     = const []
+extract_lctxt Nothing     = id
 extract_lctxt (Just ctxt) = extract_ltys (unLoc ctxt)
 
 extract_scaled_ltys :: [HsScaled GhcPs (LHsType GhcPs)]
