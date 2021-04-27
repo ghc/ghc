@@ -152,17 +152,6 @@ mkdir -p "$TOP/tmp"
 export TMP="$TOP/tmp"
 export TEMP="$TOP/tmp"
 
-function darwin_setup() {
-  # It looks like we already have python2 here and just installing python3
-  # does not work.
-  brew upgrade python
-  brew install ghc cabal-install ncurses gmp
-
-  pip3 install sphinx
-  # PDF documentation disabled as MacTeX apparently doesn't include xelatex.
-  #brew cask install mactex
-}
-
 function show_tool() {
   local tool="$1"
   info "$tool = ${!tool}"
@@ -215,10 +204,6 @@ function setup() {
   if [[ "$needs_toolchain" = "1" ]]; then
     setup_toolchain
   fi
-  case "$(uname)" in
-    Darwin) darwin_setup ;;
-    *) ;;
-  esac
 
   # Make sure that git works
   git config user.email "ghc-ci@gitlab-haskell.org"
