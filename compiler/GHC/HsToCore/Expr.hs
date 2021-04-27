@@ -44,8 +44,9 @@ import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Utils.Monad
 import GHC.Core.Type
+import GHC.Core.TyCo.Rep
 import GHC.Core.Multiplicity
-import GHC.Core.Coercion( Coercion )
+import GHC.Core.Coercion( instNewTyCon_maybe, mkSymCo )
 import GHC.Core
 import GHC.Core.Utils
 import GHC.Core.Make
@@ -1169,10 +1170,11 @@ dsHsWrapped orig_hs_expr
     go_l wrap (L _ hs_e) = go wrap hs_e
 
     go_head wrap var
-      = do { let wrapped_e  = wrap (Var var)
-                 wrapped_ty = exprType wrapped_e
+      | var `hasKey` magicDictKey
+      = ds_magicDict wrapped_ty
 
-           ; checkLevPolyFunction (ppr orig_hs_expr) var wrapped_ty
+      | otherwise
+      = do { checkLevPolyFunction (ppr orig_hs_expr) var wrapped_ty
              -- See Note [Checking for levity-polymorphic functions]
              -- Pass orig_hs_expr, so that the user can see entire
              -- expression with -fprint-typechecker-elaboration
@@ -1181,7 +1183,142 @@ dsHsWrapped orig_hs_expr
            ; warnAboutIdentities dflags var wrapped_ty
 
            ; return wrapped_e }
+      where
+        wrapped_e  = wrap (Var var)
+        wrapped_ty = exprType wrapped_e
 
+-- See Note [magicDict]
+ds_magicDict :: Type -> DsM CoreExpr
+ds_magicDict wrapped_ty
+    -- Check that magicDict is of the type `(dt => r) -> st -> r`.
+  | Just (Anon VisArg   (Scaled mult1 dt_fun), res1) <- splitPiTy_maybe wrapped_ty
+  , Just (Anon InvisArg (Scaled _ dt),         _)    <- splitPiTy_maybe dt_fun
+  , Just (Anon VisArg   (Scaled mult2 st),     _)    <- splitPiTy_maybe res1
+    -- Check that dt is a class constraint `C t_1 ... t_n`, where
+    -- `dict_tc = C` and `dict_args = t_1 ... t_n`.
+  , Just (dict_tc, dict_args) <- splitTyConApp_maybe dt
+    -- Check that C is a class of the form
+    -- `class C a_1 ... a_n where op :: meth_ty`, where
+    -- `meth_tvs = a_1 ... a_n` and `co` is a newtype coercion between
+    -- `C` and `meth_ty`.
+  , Just (inst_meth_ty, co) <- instNewTyCon_maybe dict_tc dict_args
+    -- Check that `st` is equal to `meth_ty[t_i/a_i]`.
+  , st `eqType` inst_meth_ty
+  = let k  = mkScaledTemplateLocal 1 $ mkScaled mult1 dt_fun
+        sv = mkScaledTemplateLocal 2 $ mkScaled mult2 st in
+    pure $ mkLams [k, sv] $ Var k `App` Cast (Var sv) (mkSymCo co)
+
+  | otherwise
+  = errDsCoreExpr $ hang (text "Invalid instantiation of" <+>
+                          quotes (ppr magicDictName) <+> text "at type:")
+                       4 (ppr wrapped_ty)
+
+{-
+Note [magicDict]
+~~~~~~~~~~~~~~~~
+The identifier `magicDict` is just a place-holder, which is used to
+implement a primitive that we cannot define in Haskell but we can write
+in Core.  It is declared with a place-holder type:
+
+    magicDict :: forall {rr :: RuntimeRep} dt st (r :: TYPE rr). (dt => r) -> st -> r
+
+The intention is that the identifier will be used in a very specific way,
+to create dictionaries for classes with a single method.  Consider a class
+like this:
+
+   class C a where
+     f :: T a
+
+We can use `magicDict`, in conjunction with a special case in the desugarer, to
+cast values of type `T a` into dictionaries for `C a`. To do this, we can a
+function like this in the library:
+
+  withT :: (C a => b) -> T a -> b
+  withT f x y = magicDict @(C a) x y
+
+Here:
+
+* The `dt` in `magicDict` (short for "dictionary type") is instantiated to
+  `C a`.
+
+* The `st` in `magicDict` (short for "singleton type") is instantiated to
+  `T a`. The definition of `T` itself is irrelevant, only that `C a` is a class
+  with a single method of type `T a`.
+
+* The `r` in `magicDict` is instantiated to `b`.
+
+There is a special case in dsHsWrapped.go_head which will replace the RHS
+of this definition to an appropriate definition in Core. The special case
+rewrites applications of `magicDict` as follows:
+
+  magicDict @{rr} @(C t_1 ... t_n) @mtype @r
+---->
+  \(k :: C t_1 ... t_n => r) (sv :: mtype) -> k (sv |> sym (co t_1 ... t_n))
+
+Where:
+
+* The `C t_1 ... t_n` argument to magicDict is a class constraint.
+
+* C must be defined as:
+
+    class C a_1 ... a_n where
+      op :: meth_type
+
+  That is, C must be a class with exactly one method and no superclasses.
+
+* The `mtype` argument to magicDict must be equal to `meth_type[t_i/a_i]`,
+  which is instantied type of C's method.
+
+* `co` is a newtype coercion that, when applied to `t_1 ... t_n`, coerces from
+  `C t_1 ... t_n` to `mtype`. This coercion is guaranteed to exist by virtue of
+  the fact that C is a class with exactly one method and no superclasses, so it
+  is treated like a newtype when compiled to Core.
+
+Some further observations about `magicDict`:
+
+* Every use of `magicDict` must be instantiated at a /particular/ class C.
+  It's a bit like levity polymorphism: we don't allow class-polymorphic
+  calls of `magicDict`.   We check this in the desugarer -- and then we
+  can immediately replace this invocation of `magicDict` with appropriate
+  class-specific Core code.
+
+* The `dt` in the type of magicDict must be explicitly instantiated with
+  visible type application, as invoking `magicDict` would be ambiguous
+  otherwise.
+
+* The `r` is levity polymorphic to support things like `withTypeable` in
+  `Data.Typeable.Internal`.
+
+* As an alternative to `magicDict`, one could define functions like `withT`
+  above in terms of `unsafeCoerce`. This is more error-prone, however.
+
+* In order to define things like `reifySymbol` below:
+
+    reifySymbol :: forall r. String -> (forall (n :: Symbol). KnownSymbol n => r) -> r
+
+  `magicDict` needs to be instantiated with `Any`, like so:
+
+    reifySymbol n k = magicDict @(KnownSymbol Any) @String @r (k @Any) n
+
+  The use of `Any` is explained in Note [NOINLINE someNatVal] in
+  base:GHC.TypeNats.
+
+* The only valid way to apply `magicDict` is as described above. Applying
+  `magicDict` in any other way will result in an error during desugaring.
+
+* One could conceivably implement this special case for `magicDict` as a
+  constant-folding rule instead of during desugaring. We choose not to do so
+  for the following reasons:
+
+  - Having a constant-folding rule would require that `magicDict`'s definition
+    be wired in to the compiler so as to prevent `magicDict` from inlining too
+    early. Implementing the special case in the desugarer, on the other hand,
+    only requires that `magicDict` be known-key.
+
+  - If the constant-folding rule were to fail, we want to throw a compile-time
+    error, which is trickier to do with the way that GHC.Core.Opt.ConstantFold
+    is set up.
+-}
 
 -- | Takes a (pretty-printed) expression, a function, and its
 -- instantiated type.  If the function is a hasNoBinding op, and the
