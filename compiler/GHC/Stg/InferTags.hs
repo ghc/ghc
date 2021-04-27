@@ -125,7 +125,7 @@ inferTagExpr env (StgCase scrut bndr ty alts)
   = (info, StgCase scrut' (noSig env bndr) ty [(DataAlt con, bndrs', rhs')])
 
   | otherwise
-  = ( foldr combineAltInfo TagProper infos
+  = ( foldr combineAltInfo TagProper infos -- TODO: Empty case?
     , StgCase scrut' bndr' ty alts')
   where
     (scrut_info, scrut') = inferTagExpr env scrut
