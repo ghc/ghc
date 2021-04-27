@@ -76,6 +76,9 @@ module GHC.Exts
         -- * Running 'RealWorld' state thread
         runRW#,
 
+        -- * Casting class dictionaries with single methods
+        withDict,
+
         -- * Safe coercions
         --
         -- | These are available from the /Trustworthy/ module "Data.Coerce" as well

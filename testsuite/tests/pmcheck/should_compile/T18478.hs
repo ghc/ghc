@@ -99,7 +99,7 @@ import Data.Type.Coercion
 import GHC.TypeLits (ErrorMessage(..), TypeError)
 import Data.Typeable
 import GHC.Generics
-import GHC.Exts
+import GHC.Exts hiding (withDict)
 import Data.Kind
 
 data T =
