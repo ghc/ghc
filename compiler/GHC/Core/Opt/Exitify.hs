@@ -41,7 +41,7 @@ import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Core
 import GHC.Core.Utils
-import GHC.Utils.Monad.State
+import GHC.Utils.Monad.State.Strict
 import GHC.Builtin.Uniques
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
