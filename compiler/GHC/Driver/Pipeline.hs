@@ -209,7 +209,9 @@ compileOne' m_tc_result mHscMessage
             source_modified0
  = do
 
-   debugTraceMsg logger dflags1 2 (text "compile: input file" <+> text input_fnpp)
+   debugTraceMsg logger dflags0 2 (text "compile: input file" <+> text input_fnpp)
+
+   let (hsc_env, source_modified) = fixHscEnv hsc_env0 summary source_modified0
 
    let flags = hsc_dflags hsc_env0
      in do unless (gopt Opt_KeepHiFiles flags) $
@@ -222,6 +224,9 @@ compileOne' m_tc_result mHscMessage
    plugin_hsc_env <- initializePlugins hsc_env
 
    let runPostTc = compileOnePostTc plugin_hsc_env summary
+       always_do_basic_recompilation_check = case (backend $ hsc_dflags hsc_env) of
+                                             Interpreter -> True
+                                             _ -> False
 
    case m_tc_result of
      Just tc_result
@@ -233,7 +238,7 @@ compileOne' m_tc_result mHscMessage
 
        case status of
          HscUpToDate iface -> do
-           MASSERT( isJust mb_old_linkable || isNoLink (ghcLink dflags) )
+           MASSERT( isJust mb_old_linkable || isNoLink (ghcLink $ hsc_dflags hsc_env) )
            -- See Note [ModDetails and --make mode]
            details <- initModDetails plugin_hsc_env summary iface
            return $! HomeModInfo iface details mb_old_linkable
@@ -242,17 +247,25 @@ compileOne' m_tc_result mHscMessage
            runPostTc tc_result warnings mb_old_hash
 
  where dflags0     = ms_hspp_opts summary
+       input_fnpp  = ms_hspp_file summary
+       logger = hsc_logger hsc_env0
+       tmpfs  = hsc_tmpfs hsc_env0
+
+
+-- | Modifies the dflags in HscEnv with the current module's, and collection of
+-- various other fixes needed before beginning the compilation
+fixHscEnv :: HscEnv -> ModSummary -> SourceModified -> (HscEnv, SourceModified)
+fixHscEnv
+  hsc_env0 summary source_modified0
+  = (hsc_env, source_modified)
+ where dflags0     = ms_hspp_opts summary
        location    = ms_location summary
        input_fn    = expectJust "compile:hs" (ml_hs_file location)
-       input_fnpp  = ms_hspp_file summary
        mod_graph   = hsc_mod_graph hsc_env0
        needsLinker = needsTemplateHaskellOrQQ mod_graph
        isDynWay    = any (== WayDyn) (ways dflags0)
        isProfWay   = any (== WayProf) (ways dflags0)
        internalInterpreter = not (gopt Opt_ExternalInterpreter dflags0)
-
-       logger = hsc_logger hsc_env0
-       tmpfs  = hsc_tmpfs hsc_env0
 
        -- #8180 - when using TemplateHaskell, switch on -dynamic-too so
        -- the linker can correctly load the object files.  This isn't necessary
@@ -282,15 +295,15 @@ compileOne' m_tc_result mHscMessage
          = True
          | otherwise = False
        -- Figure out which backend we're using
-       (bcknd, dflags3)
+       dflags3
          -- #8042: When module was loaded with `*` prefix in ghci, but DynFlags
          -- suggest to generate object code (which may happen in case -fobject-code
          -- was set), force it to generate byte-code. This is NOT transitive and
          -- only applies to direct targets.
          | loadAsByteCode
-         = (Interpreter, dflags2 { backend = Interpreter })
+         = dflags2 { backend = Interpreter }
          | otherwise
-         = (backend dflags, dflags2)
+         = dflags2
        dflags  = dflags3 { includePaths = addQuoteInclude old_paths [current_dir] }
        hsc_env = hsc_env0 {hsc_dflags = dflags}
 
@@ -303,9 +316,6 @@ compileOne' m_tc_result mHscMessage
          | force_recomp || loadAsByteCode = SourceModified
          | otherwise = source_modified0
 
-       always_do_basic_recompilation_check = case bcknd of
-                                             Interpreter -> True
-                                             _ -> False
 
 -- | Do the post typechecking compilation of a module in the --make mode
 compileOnePostTc
