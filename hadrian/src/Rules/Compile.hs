@@ -58,22 +58,7 @@ compilePackage rs = do
         &%> \ [dyn_o, _dyn_hi] -> do
           p <- platformSupportsSharedLibs
           if p
-            then do
-               -- We `need` ".o/.hi" because GHC is called with `-dynamic-too`
-               -- and builds ".dyn_o/.dyn_hi" too.
-               changed <- needHasChanged [dyn_o -<.> "o", dyn_o -<.> "hi"]
-
-               -- If for some reason a previous Hadrian execution has been
-               -- interrupted after the rule for .o/.hi generation has completed
-               -- but before the current rule for .dyn_o/.dyn_hi has completed,
-               -- or if some of the dynamic artifacts have been removed by the
-               -- user, "needing" the non dynamic artifacts is not enough as
-               -- Shake won't execute the associated action. Hence we detect
-               -- this case and we explicitly build the dynamic artifacts here:
-               case changed of
-                  [] -> compileHsObjectAndHi rs dyn_o
-                  _  -> pure ()
-
+            then need [dyn_o -<.> "o", dyn_o -<.> "hi"]
             else compileHsObjectAndHi rs dyn_o
 
       forM_ ((,) <$> hsExts <*> wayPats) $ \ ((oExt, hiExt), wayPat) ->
