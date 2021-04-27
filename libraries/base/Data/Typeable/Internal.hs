@@ -495,7 +495,7 @@ splitApp (TrTyCon{trTyCon = con, trKindVars = kinds})
 -- | Use a 'TypeRep' as 'Typeable' evidence.
 withTypeable :: forall k (a :: k) rep (r :: TYPE rep). ()
              => TypeRep a -> (Typeable a => r) -> r
-withTypeable rep k = magicDict @(Typeable a) k rep
+withTypeable rep k = withDict @(TypeRep a) @(Typeable a) rep k
 
 -- | Pattern match on a type constructor
 pattern Con :: forall k (a :: k). ()

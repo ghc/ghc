@@ -77,7 +77,7 @@ module GHC.Exts
         runRW#,
 
         -- * Casting class dictionaries with single methods
-        magicDict,
+        withDict,
 
         -- * Safe coercions
         --

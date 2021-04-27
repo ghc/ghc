@@ -225,7 +225,7 @@ basicKnownKeyNames
         ioTyConName, ioDataConName,
         runMainIOName,
         runRWName,
-        magicDictName,
+        withDictName,
 
         -- Type representation types
         trModuleTyConName, trModuleDataConName,
@@ -961,10 +961,10 @@ and it's convenient to write them all down in one place.
 wildCardName :: Name
 wildCardName = mkSystemVarName wildCardKey (fsLit "wild")
 
-runMainIOName, runRWName, magicDictName :: Name
+runMainIOName, runRWName, withDictName :: Name
 runMainIOName = varQual gHC_TOP_HANDLER (fsLit "runMainIO") runMainKey
 runRWName     = varQual gHC_MAGIC       (fsLit "runRW#")    runRWKey
-magicDictName = varQual gHC_MAGIC_DICT  (fsLit "magicDict") magicDictKey
+withDictName  = varQual gHC_MAGIC_DICT  (fsLit "withDict")  withDictKey
 
 orderingTyConName, ordLTDataConName, ordEQDataConName, ordGTDataConName :: Name
 orderingTyConName = tcQual  gHC_TYPES (fsLit "Ordering") orderingTyConKey
@@ -2397,8 +2397,8 @@ rationalToFloatIdKey, rationalToDoubleIdKey :: Unique
 rationalToFloatIdKey   = mkPreludeMiscIdUnique 130
 rationalToDoubleIdKey  = mkPreludeMiscIdUnique 131
 
-magicDictKey :: Unique
-magicDictKey                  = mkPreludeMiscIdUnique 156
+withDictKey :: Unique
+withDictKey                   = mkPreludeMiscIdUnique 156
 
 coerceKey :: Unique
 coerceKey                     = mkPreludeMiscIdUnique 157

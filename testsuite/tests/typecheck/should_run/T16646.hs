@@ -6,7 +6,7 @@ module Main where
 
 import Data.Kind (Type)
 import Data.Proxy (Proxy(..))
-import GHC.Exts (Any, magicDict)
+import GHC.Exts (Any, withDict)
 import GHC.TypeLits
 import Type.Reflection (TypeRep, typeRep, withTypeable)
 
@@ -22,9 +22,9 @@ instance KnownNat n => Reifies n Integer where
 
 reify :: forall a r. a -> (forall (s :: Type). Reifies s a => Proxy s -> r) -> r
 {-# NOINLINE reify #-} -- See Note [NOINLINE someNatVal] in GHC.TypeNats
-reify a k = magicDict @(Reifies (Any @Type) a)
-                      @(forall (proxy :: Type -> Type). proxy Any -> a)
-                      (k @Any) (const a) Proxy
+reify a k = withDict @(forall (proxy :: Type -> Type). proxy Any -> a)
+                     @(Reifies (Any @Type) a)
+                     (const a) (k @Any) Proxy
 
 class Given a where
   given :: a
@@ -32,7 +32,7 @@ class Given a where
 withGift :: forall a b.
             (Given a => Proxy a -> b)
          ->        a -> Proxy a -> b
-withGift f x y = magicDict @(Given a) f x y
+withGift f x y = withDict @a @(Given a) x f y
 
 give :: forall a r. a -> (Given a => r) -> r
 give a k = withGift (\_ -> k) a Proxy
@@ -62,7 +62,7 @@ singInstance :: forall k (a :: k). Sing a -> SingInstance a
 singInstance s = with_sing_i SingInstance
   where
     with_sing_i :: (SingI a => SingInstance a) -> SingInstance a
-    with_sing_i si = magicDict @(SingI a) si s
+    with_sing_i si = withDict @(Sing a) @(SingI a) s si
 
 withSingI :: Sing n -> (SingI n => r) -> r
 withSingI sn r =

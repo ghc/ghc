@@ -59,7 +59,7 @@ module GHC.TypeLits
 
   ) where
 
-import GHC.Base(Eq(..), Ord(..), Ordering(..), String, magicDict, otherwise)
+import GHC.Base(Eq(..), Ord(..), Ordering(..), String, otherwise, withDict)
 import GHC.Types(Symbol, Char)
 import GHC.Num(Integer, fromInteger)
 import GHC.Show(Show(..))
@@ -307,16 +307,16 @@ cmpChar x y = case compare (charVal x) (charVal y) of
 
 newtype SSymbol (s :: Symbol) = SSymbol String
 
--- See Note [magicDict] in "GHC.HsToCore.Expr" in GHC
+-- See Note [withDict] in "GHC.HsToCore.Expr" in GHC
 withSSymbol :: forall a b.
                (KnownSymbol a => Proxy a -> b)
             -> SSymbol a      -> Proxy a -> b
-withSSymbol f x y = magicDict @(KnownSymbol a) f x y
+withSSymbol f x y = withDict @(SSymbol a) @(KnownSymbol a) x f y
 
 newtype SChar (s :: Char) = SChar Char
 
--- See Note [magicDict] in "GHC.HsToCore.Expr" in GHC
+-- See Note [withDict] in "GHC.HsToCore.Expr" in GHC
 withSChar :: forall a b.
              (KnownChar a => Proxy a -> b)
             -> SChar a      -> Proxy a -> b
-withSChar f x y = magicDict @(KnownChar a) f x y
+withSChar f x y = withDict @(SChar a) @(KnownChar a) x f y

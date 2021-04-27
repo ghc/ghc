@@ -1,11 +1,11 @@
 
 T16646Fail.hs:16:5: error:
-    Invalid instantiation of ‘magicDict’ at type: (dt => r) -> st -> r
+    Invalid instantiation of ‘withDict’ at type: st -> (dt => r) -> r
 
 T16646Fail.hs:22:5: error:
-    Invalid instantiation of ‘magicDict’ at type:
-        (C a => r) -> Maybe a -> r
+    Invalid instantiation of ‘withDict’ at type:
+        Maybe a -> (C a => r) -> r
 
 T16646Fail.hs:28:13: error:
-    Invalid instantiation of ‘magicDict’ at type:
-        (Reifies Any a => Proxy Any -> r) -> (Any -> a) -> Proxy Any -> r
+    Invalid instantiation of ‘withDict’ at type:
+        (Any -> a) -> (Reifies Any a => Proxy Any -> r) -> Proxy Any -> r
