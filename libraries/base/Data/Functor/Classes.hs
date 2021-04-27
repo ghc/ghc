@@ -879,6 +879,14 @@ instance Eq1 Fixed where
 instance Ord1 Fixed where
     liftCompare _cmp (MkFixed x) (MkFixed y) = compare x y
 
+-- | @since 4.16.0.0
+instance Eq1 Fixed where
+    liftEq _eq (MkFixed x) (MkFixed y) = x == y
+
+-- | @since 4.16.0.0
+instance Ord1 Fixed where
+    liftCompare _cmp (MkFixed x) (MkFixed y) = compare x y
+
 -- Building blocks
 
 -- | @'readsData' p d@ is a parser for datatypes where each alternative
