@@ -106,9 +106,9 @@ For layout of a sum type,
 
 For example, say we have (# (# Int#, Char #) | (# Int#, Int# #) | Int# #)
 
-  - Layouts of alternatives: [ [Word, Ptr], [Word, Word], [Word] ]
-  - Sorted: [ [Ptr, Word], [Word, Word], [Word] ]
-  - Merge all alternatives together: [ Ptr, Word, Word ]
+  - Layouts of alternatives: [ [Word, LiftedPtr], [Word, Word], [Word] ]
+  - Sorted: [ [LiftedPtr, Word], [Word, Word], [Word] ]
+  - Merge all alternatives together: [ LiftedPtr, Word, Word ]
 
 We add a slot for the tag to the first position. So our tuple type is
 
@@ -129,6 +129,44 @@ Another example using the same type: (# | (# 2#, 3# #) | #). 2# fits in Word#,
 3# fits in Word #, so we get:
 
   (# 2#, rubbish, 2#, 3# #).
+
+
+Note [Don't merge lifted and unlifted slots]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When merging slots, one might be tempted to collapse lifted and unlifted
+pointers. However, as seen in #19645, this is wrong. Imagine that you have
+the program:
+
+  test :: (# Char | ByteArray# #) -> ByteArray#
+  test (# c | #) = doSomething c
+  test (# | ba #) = ba
+
+Collapsing the Char and ByteArray# slots would produce STG like:
+
+  test :: forall {t}. (# t | GHC.Prim.ByteArray# #) -> GHC.Prim.ByteArray#
+    = {} \r [ (tag :: Int#) (slot0 :: (Any :: Type)) ]
+          case tag of tag'
+            1# -> doSomething slot0
+            2# -> slot0;
+
+Note how `slot0` has a lifted type, despite being bound to an unlifted
+ByteArray# in the 2# alternative. This liftedness would cause the code generator to
+attempt to enter it upon returning. As unlifted objects do not have entry code,
+this causes a runtime crash.
+
+For this reason, Unarise treats unlifted and lifted things as distinct slot
+types, despite both being GC pointers. This approach is a slight pessimisation
+(since we need to pass more arguments) but appears to be the simplest way to
+avoid #19645. Other alternatives considered include:
+
+ a. Giving unlifted objects "trivial" entry code. However, we ultimately
+    concluded that the value of the "unlifted things are never entered" invariant
+    outweighed the simplicity of this approach.
+
+ b. Annotating occurrences with calling convention information instead of
+    relying on the binder's type. This seemed like a very complicated
+    way to fix what is ultimately a corner-case.
+
 
 Note [Types in StgConApp]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -616,7 +654,8 @@ mkUbxSum dc ty_args args0
 -- See Note [aBSENT_SUM_FIELD_ERROR_ID] in "GHC.Core.Make"
 --
 ubxSumRubbishArg :: SlotTy -> StgArg
-ubxSumRubbishArg PtrSlot    = StgVarArg aBSENT_SUM_FIELD_ERROR_ID
+ubxSumRubbishArg PtrLiftedSlot    = StgVarArg aBSENT_SUM_FIELD_ERROR_ID
+ubxSumRubbishArg PtrUnliftedSlot  = StgVarArg aBSENT_SUM_FIELD_ERROR_ID
 ubxSumRubbishArg WordSlot   = StgLitArg (LitNumber LitNumWord 0)
 ubxSumRubbishArg Word64Slot = StgLitArg (LitNumber LitNumWord64 0)
 ubxSumRubbishArg FloatSlot  = StgLitArg (LitFloat 0)
