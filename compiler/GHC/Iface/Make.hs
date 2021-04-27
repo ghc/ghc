@@ -99,6 +99,8 @@ import Data.List ( findIndex, mapAccumL, sortBy )
 import Data.Ord
 import Data.IORef
 
+import GHC.Fingerprint
+
 {-
 ************************************************************************
 *                                                                      *
@@ -286,6 +288,7 @@ mkIface_ hsc_env
         trust_info  = setSafeMode safe_mode
         annotations = map mkIfaceAnnotation anns
         icomplete_matches = map mkIfaceCompleteMatch complete_matches
+        used_th_hash = if used_th then Just fingerprint0 else Nothing
 
     ModIface {
           mi_module      = this_mod,
@@ -309,7 +312,7 @@ mkIface_ hsc_env
           mi_warns       = warns,
           mi_anns        = annotations,
           mi_globals     = maybeGlobalRdrEnv rdr_env,
-          mi_used_th     = used_th,
+          mi_used_th     = used_th_hash,
           mi_decls       = decls,
           mi_hpc         = isHpcUsed hpc_info,
           mi_trust       = trust_info,

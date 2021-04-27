@@ -125,7 +125,7 @@ import qualified Control.Monad.Catch as MC
 import Data.IORef
 import Data.List (nub, sort, sortBy, partition)
 import qualified Data.List as List
-import Data.Foldable (toList, foldlM)
+import Data.Foldable (toList)
 import Data.Maybe
 import Data.Ord ( comparing )
 import Data.Time
@@ -477,8 +477,7 @@ load' how_much mHscMessage mod_graph = do
     warnUnnecessarySourceImports mg2_with_srcimps
 
     -- check the stability property for each module.
-    stable_mods@(stable_obj,stable_bco) <-
-        liftIO $ checkStability hsc_env hpt1 mg2_with_srcimps all_home_mods
+    let stable_mods = (emptyUniqSet, emptyUniqSet)
 
     let
         -- prune bits of the HPT which are definitely redundant now,
@@ -494,19 +493,9 @@ load' how_much mHscMessage mod_graph = do
     -- write the pruned HPT to allow the old HPT to be GC'd.
     setSession $ discardIC $ hscUpdateHPT (const pruned_hpt) hsc_env
 
-    liftIO $ debugTraceMsg logger dflags 2 (text "Stable obj:" <+> ppr stable_obj $$
-                            text "Stable BCO:" <+> ppr stable_bco)
+    -- Unload everything
+    liftIO $ unload interp hsc_env []
 
-    -- Unload any modules which are going to be re-linked this time around.
-    let stable_linkables = [ linkable
-                           | m <- nonDetEltsUniqSet stable_obj ++
-                                  nonDetEltsUniqSet stable_bco,
-                             -- It's OK to use nonDetEltsUniqSet here
-                             -- because it only affects linking. Besides
-                             -- this list only serves as a poor man's set.
-                             Just hmi <- [lookupHpt pruned_hpt m],
-                             Just linkable <- [hm_linkable hmi] ]
-    liftIO $ unload interp hsc_env stable_linkables
 
     -- We could at this point detect cycles which aren't broken by
     -- a source-import, and complain immediately, but it seems better
@@ -524,9 +513,7 @@ load' how_much mHscMessage mod_graph = do
     -- This graph should be cycle-free.
     -- If we're restricting the upsweep to a portion of the graph, we
     -- also want to retain everything that is still stable.
-    let full_mg, partial_mg0, partial_mg, unstable_mg :: [SCC ModuleGraphNode]
-        stable_mg :: [SCC ExtendedModSummary]
-        full_mg    = topSortModuleGraph False mod_graph Nothing
+    let partial_mg0, partial_mg:: [SCC ModuleGraphNode]
 
         maybe_top_mod = case how_much of
                             LoadUpTo m           -> Just m
@@ -546,27 +533,7 @@ load' how_much mHscMessage mod_graph = do
             | otherwise
             = partial_mg0
 
-        stable_mg =
-            [ AcyclicSCC ems
-            | AcyclicSCC (ModuleNode ems@(ExtendedModSummary ms _)) <- full_mg
-            , stable_mod_summary ms
-            ]
-
-        stable_mod_summary ms =
-          ms_mod_name ms `elementOfUniqSet` stable_obj ||
-          ms_mod_name ms `elementOfUniqSet` stable_bco
-
-        -- the modules from partial_mg that are not also stable
-        -- NB. also keep cycles, we need to emit an error message later
-        unstable_mg = filter not_stable partial_mg
-          where not_stable (CyclicSCC _) = True
-                not_stable (AcyclicSCC (InstantiationNode _)) = True
-                not_stable (AcyclicSCC (ModuleNode (ExtendedModSummary ms _)))
-                   = not $ stable_mod_summary ms
-
-        -- Load all the stable modules first, before attempting to load
-        -- an unstable module (#7231).
-        mg = fmap (fmap ModuleNode) stable_mg ++ unstable_mg
+        mg = partial_mg
 
     liftIO $ debugTraceMsg logger dflags 2 (hang (text "Ready for upsweep")
                                2 (ppr mg))
@@ -579,7 +546,7 @@ load' how_much mHscMessage mod_graph = do
 
     setSession $ hscUpdateHPT (const emptyHomePackageTable) hsc_env
     (upsweep_ok, modsUpswept) <- withDeferredDiagnostics $
-      upsweep_fn mHscMessage pruned_hpt stable_mods mg
+      upsweep_fn mHscMessage pruned_hpt mg
 
     -- Make modsDone be the summaries for each home module now
     -- available; this should equal the domain of hpt3.
@@ -913,76 +880,6 @@ type StableModules =
   )
 
 
-checkStability
-        :: HscEnv
-        -> HomePackageTable   -- HPT from last compilation
-        -> [SCC ModSummary]   -- current module graph (cyclic)
-        -> UniqSet ModuleName -- all home modules
-        -> IO StableModules
-
-checkStability hsc_env hpt sccs all_home_mods =
-  foldlM checkSCC (emptyUniqSet, emptyUniqSet) sccs
-  where
-   checkSCC :: StableModules -> SCC ModSummary -> IO StableModules
-   checkSCC (!stable_obj, !stable_bco) scc0 = do
-       stableObjects <- checkStableObjects
-       return $ case () of
-        _ | stableObjects -> (addListToUniqSet stable_obj scc_mods, stable_bco)
-          | stableBCOs    -> (stable_obj, addListToUniqSet stable_bco scc_mods)
-          | otherwise     -> (stable_obj, stable_bco)
-     where
-        scc = flattenSCC scc0
-        scc_mods = map ms_mod_name scc
-        home_module m =
-          m `elementOfUniqSet` all_home_mods && m `notElem` scc_mods
-
-        scc_allimps = nub (filter home_module (concatMap ms_home_allimps scc))
-            -- all imports outside the current SCC, but in the home pkg
-
-        stable_obj_imps = map (`elementOfUniqSet` stable_obj) scc_allimps
-        stable_bco_imps = map (`elementOfUniqSet` stable_bco) scc_allimps
-
-        checkStableObjects = do
-           if and stable_obj_imps
-              then allM object_ok scc
-              else return False
-
-        stableBCOs =
-           and (zipWith (||) stable_obj_imps stable_bco_imps)
-           && all bco_ok scc
-
-        object_ok ms
-          | gopt Opt_ForceRecomp (ms_hspp_opts ms) = return False
-          | Just obj_date <- ms_obj_date ms
-          , Just hi_date <- ms_iface_date ms
-          , obj_date >= hi_date = do
-                mb_hi_hash <- readIfaceSourceHash' hsc_env ms
-                case mb_hi_hash of
-                    Nothing -> return False
-                    Just hi_hash -> return $
-                        hi_hash == ms_hs_hash ms &&
-                        same_as_prev obj_date
-          | otherwise = return False
-          where
-             same_as_prev t = case lookupHpt hpt (ms_mod_name ms) of
-                Just hmi  | Just l <- hm_linkable hmi ->
-                              isObjectLinkable l &&
-                              t == linkableTime l
-                _other  -> True
-
-        bco_ok ms
-          | gopt Opt_ForceRecomp (ms_hspp_opts ms) = False
-          | otherwise = case lookupHpt hpt (ms_mod_name ms) of
-                Just hmi  | Just l <- hm_linkable hmi ->
-                              not (isObjectLinkable l) &&
-                              -- We check the hash from the HomeModInfo here
-                              -- instead of the linkableTime, because if we got
-                              -- here then the linkable doesn't represent a
-                              -- file on disk and the time is therefore mostly
-                              -- meaningless
-                              mi_src_hash (hm_iface hmi) == ms_hs_hash ms
-                _other  -> False
-
 {- Parallel Upsweep
  -
  - The parallel upsweep attempts to concurrently compile the modules in the
@@ -1040,13 +937,6 @@ buildCompGraph (scc:sccs) = case scc of
 data BuildModule = BuildModule_Unit {-# UNPACK #-} !InstantiatedUnit | BuildModule_Module {-# UNPACK #-} !ModuleWithIsBoot
   deriving (Eq, Ord)
 
--- | Tests if an 'HscSource' is a boot file, primarily for constructing elements
--- of 'BuildModule'. We conflate signatures and modules because they are bound
--- in the same namespace; only boot interfaces can be disambiguated with
--- `import {-# SOURCE #-}`.
-hscSourceToIsBoot :: HscSource -> IsBootInterface
-hscSourceToIsBoot HsBootFile = IsBoot
-hscSourceToIsBoot _ = NotBoot
 
 mkBuildModule :: ModuleGraphNode -> BuildModule
 mkBuildModule = \case
@@ -1079,11 +969,10 @@ parUpsweep
     -- ^ The number of workers we wish to run in parallel
     -> Maybe Messager
     -> HomePackageTable
-    -> StableModules
     -> [SCC ModuleGraphNode]
     -> m (SuccessFlag,
           [ModuleGraphNode])
-parUpsweep n_jobs mHscMessage old_hpt stable_mods sccs = do
+parUpsweep n_jobs mHscMessage old_hpt sccs = do
     hsc_env <- getSession
     let dflags = hsc_dflags hsc_env
     let logger = hsc_logger hsc_env
@@ -1208,7 +1097,7 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods sccs = do
                                      lcl_logger lcl_tmpfs dflags (hsc_home_unit hsc_env)
                                      mHscMessage
                                      par_sem hsc_env_var old_hpt_var
-                                     stable_mods mod_idx (length sccs)
+                                     mod_idx (length sccs)
 
                 res <- case m_res of
                     Right flag -> return flag
@@ -1317,8 +1206,6 @@ parUpsweep_one
     -- ^ The MVar that synchronizes updates to the global HscEnv
     -> IORef HomePackageTable
     -- ^ The old HPT
-    -> StableModules
-    -- ^ Sets of stable objects and BCOs
     -> Int
     -- ^ The index of this module
     -> Int
@@ -1326,7 +1213,7 @@ parUpsweep_one
     -> IO SuccessFlag
     -- ^ The result of this compile
 parUpsweep_one mod home_mod_map comp_graph_loops lcl_logger lcl_tmpfs lcl_dflags home_unit mHscMessage par_sem
-               hsc_env_var old_hpt_var stable_mods mod_index num_mods = do
+               hsc_env_var old_hpt_var mod_index num_mods = do
 
     let this_build_mod = mkBuildModule0 mod
 
@@ -1456,7 +1343,7 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_logger lcl_tmpfs lcl_dflags
                                  map (moduleName . gwib_mod) loop
 
                 -- Compile the module.
-                mod_info <- upsweep_mod lcl_hsc_env'' mHscMessage old_hpt stable_mods
+                mod_info <- upsweep_mod lcl_hsc_env'' mHscMessage old_hpt
                                         mod mod_index num_mods
                 return (Just mod_info)
 
@@ -1510,7 +1397,6 @@ upsweep
     .  GhcMonad m
     => Maybe Messager
     -> HomePackageTable            -- ^ HPT from last time round (pruned)
-    -> StableModules               -- ^ stable modules (see checkStability)
     -> [SCC ModuleGraphNode]       -- ^ Mods to do (the worklist)
     -> m (SuccessFlag,
           [ModuleGraphNode])
@@ -1520,7 +1406,7 @@ upsweep
        --  2. The 'HscEnv' in the monad has an updated HPT
        --  3. A list of modules which succeeded loading.
 
-upsweep mHscMessage old_hpt stable_mods sccs = do
+upsweep mHscMessage old_hpt sccs = do
    (res, done) <- upsweep' old_hpt emptyMG sccs 1 (length sccs)
    return (res, reverse $ mgModSummaries' done)
  where
@@ -1609,7 +1495,7 @@ upsweep mHscMessage old_hpt stable_mods sccs = do
         mb_mod_info
             <- handleSourceError
                    (\err -> do logg mod (Just err); return Nothing) $ do
-                 mod_info <- liftIO $ upsweep_mod hsc_env2 mHscMessage old_hpt stable_mods
+                 mod_info <- liftIO $ upsweep_mod hsc_env2 mHscMessage old_hpt
                                                   mod mod_index nmods
                  logg mod Nothing -- log warnings
                  return (Just mod_info)
@@ -1680,21 +1566,13 @@ upsweep_inst hsc_env mHscMessage mod_index nmods iuid = do
 upsweep_mod :: HscEnv
             -> Maybe Messager
             -> HomePackageTable
-            -> StableModules
             -> ModSummary
             -> Int  -- index of module
             -> Int  -- total number of modules
             -> IO HomeModInfo
-upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_index nmods
+upsweep_mod hsc_env mHscMessage old_hpt summary mod_index nmods
    =    let
             this_mod_name = ms_mod_name summary
-            this_mod    = ms_mod summary
-            mb_obj_date = ms_obj_date summary
-            mb_if_date  = ms_iface_date summary
-            obj_fn      = ml_obj_file (ms_location summary)
-
-            is_stable_obj = this_mod_name `elementOfUniqSet` stable_obj
-            is_stable_bco = this_mod_name `elementOfUniqSet` stable_bco
 
             old_hmi = lookupHpt old_hpt this_mod_name
 
@@ -1739,111 +1617,13 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
                                    where
                                      iface = hm_iface hm_info
 
-            compile_it :: Maybe Linkable -> SourceModified -> IO HomeModInfo
-            compile_it  mb_linkable src_modified =
+            compile_it :: Maybe Linkable -> IO HomeModInfo
+            compile_it  mb_linkable =
                   compileOne' Nothing mHscMessage hsc_env summary' mod_index nmods
-                             mb_old_iface mb_linkable src_modified
-
-            compile_it_discard_iface :: Maybe Linkable -> SourceModified
-                                     -> IO HomeModInfo
-            compile_it_discard_iface mb_linkable  src_modified =
-                  compileOne' Nothing mHscMessage hsc_env summary' mod_index nmods
-                             Nothing mb_linkable src_modified
-
-            -- With NoBackend we create empty linkables to avoid recompilation.
-            -- We have to detect these to recompile anyway if the backend changed
-            -- since the last compile.
-            is_fake_linkable
-               | Just hmi <- old_hmi, Just l <- hm_linkable hmi =
-                  null (linkableUnlinked l)
-               | otherwise =
-                   -- we have no linkable, so it cannot be fake
-                   False
-
-            implies False _ = True
-            implies True x  = x
-
-            debug_trace n t = liftIO $ debugTraceMsg (hsc_logger hsc_env) (hsc_dflags hsc_env) n t
+                             mb_old_iface mb_linkable
 
         in
-        case () of
-         _
-                -- Regardless of whether we're generating object code or
-                -- byte code, we can always use an existing object file
-                -- if it is *stable* (see checkStability).
-          | is_stable_obj, Just hmi <- old_hmi -> do
-                debug_trace 5 (text "skipping stable obj mod:" <+> ppr this_mod_name)
-                return hmi
-                -- object is stable, and we have an entry in the
-                -- old HPT: nothing to do
-
-          | is_stable_obj, isNothing old_hmi -> do
-                debug_trace 5 (text "compiling stable on-disk mod:" <+> ppr this_mod_name)
-                linkable <- findObjectLinkable this_mod obj_fn
-                                (expectJust "upsweep1" mb_obj_date)
-                compile_it (Just linkable) SourceUnmodifiedAndStable
-                -- object is stable, but we need to load the interface
-                -- off disk to make a HMI.
-
-          | not (backendProducesObject bcknd), is_stable_bco,
-            (bcknd /= NoBackend) `implies` not is_fake_linkable ->
-                ASSERT(isJust old_hmi) -- must be in the old_hpt
-                let Just hmi = old_hmi in do
-                debug_trace 5 (text "skipping stable BCO mod:" <+> ppr this_mod_name)
-                return hmi
-                -- BCO is stable: nothing to do
-
-          | not (backendProducesObject bcknd),
-            Just hmi <- old_hmi,
-            Just l <- hm_linkable hmi,
-            not (isObjectLinkable l),
-            (bcknd /= NoBackend) `implies` not is_fake_linkable,
-            mi_src_hash (hm_iface hmi) == ms_hs_hash summary -> do
-                debug_trace 5 (text "compiling non-stable BCO mod:" <+> ppr this_mod_name)
-                compile_it (Just l) SourceUnmodified
-                -- we have an old BCO that is up to date with respect
-                -- to the source: do a recompilation check as normal.
-
-          -- When generating object code, if there's an up-to-date
-          -- object file on the disk, then we can use it.
-          -- However, if the object file is new (compared to any
-          -- linkable we had from a previous compilation), then we
-          -- must discard any in-memory interface, because this
-          -- means the user has compiled the source file
-          -- separately and generated a new interface, that we must
-          -- read from the disk. See Note [When source is considered modified]
-          | backendProducesObject bcknd,
-            Just obj_date <- mb_obj_date,
-            Just if_date <- mb_if_date,
-            obj_date >= if_date -> do
-                prev_hash_matches <- doesIfaceHashMatch hsc_env summary
-                if prev_hash_matches
-                    then case old_hmi of
-                        Just hmi
-                          | Just l <- hm_linkable hmi,
-                            isObjectLinkable l && linkableTime l == obj_date -> do
-                                debug_trace 5 (text "compiling mod with new on-disk obj:" <+> ppr this_mod_name)
-                                compile_it (Just l) SourceUnmodified
-                        _otherwise -> do
-                                debug_trace 5 (text "compiling mod with new on-disk obj2:" <+> ppr this_mod_name)
-                                linkable <- findObjectLinkable this_mod obj_fn obj_date
-                                compile_it_discard_iface (Just linkable) SourceUnmodified
-                    else compile_it Nothing SourceModified
-
-          -- See Note [When source is considered modified]
-          | writeInterfaceOnlyMode lcl_dflags -> do
-                prev_hash_matches <- doesIfaceHashMatch hsc_env summary
-                if prev_hash_matches
-                    then do
-                        debug_trace 5 (text "skipping tc'd mod:" <+> ppr this_mod_name)
-                        compile_it Nothing SourceUnmodified
-                    else do
-                        debug_trace 5 (text "re-tc'ing mod with new on-disk source:" <+> ppr this_mod_name)
-                        compile_it Nothing SourceModified
-
-         _otherwise -> do
-                debug_trace 5 (text "compiling mod:" <+> ppr this_mod_name)
-                compile_it Nothing SourceModified
+          compile_it (old_hmi >>= hm_linkable)
 
 
 {- Note [-fno-code mode]
@@ -2865,11 +2645,15 @@ makeNewModSummary hsc_env MakeNewModSummary{..} = do
     , emsInstantiatedUnits = inst_deps
     }
 
+
+-- This function used to return Nothing for hs-boot.. not sure why..
+-- 19519dc35bad5649226a9f7015eaabb154722e54
+-- This causes hs-boot files to always be recompiled, they should obey the
+-- same recompilation discipline as normal source files.
 getObjTimestamp :: ModLocation -> IsBootInterface -> IO (Maybe UTCTime)
 getObjTimestamp location is_boot
   = case is_boot of
-      IsBoot -> return Nothing
-      NotBoot -> modificationTimeIfExists (ml_obj_file location)
+      _ -> modificationTimeIfExists (ml_obj_file location)
 
 data PreprocessedImports
   = PreprocessedImports

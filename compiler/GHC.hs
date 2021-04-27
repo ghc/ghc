@@ -56,7 +56,7 @@ module GHC (
         SuccessFlag(..), succeeded, failed,
         defaultWarnErrLogger, WarnErrLogger,
         workingDirectoryChanged,
-        parseModule, typecheckModule, desugarModule, loadModule,
+        parseModule, typecheckModule, desugarModule,
         ParsedModule(..), TypecheckedModule(..), DesugaredModule(..),
         TypecheckedSource, ParsedSource, RenamedSource,   -- ditto
         TypecheckedMod, ParsedMod,
@@ -315,7 +315,6 @@ import GHC.Driver.Config
 import GHC.Driver.Main
 import GHC.Driver.Make
 import GHC.Driver.Hooks
-import GHC.Driver.Pipeline   ( compileOne', doesIfaceHashMatch )
 import GHC.Driver.Monad
 import GHC.Driver.Ppr
 
@@ -390,7 +389,6 @@ import GHC.Types.TyThing
 import GHC.Types.Name.Env
 import GHC.Types.Name.Ppr
 import GHC.Types.TypeEnv
-import GHC.Types.SourceFile
 import GHC.Types.Error ( DiagnosticMessage )
 
 import GHC.Unit
@@ -1188,47 +1186,6 @@ desugarModule tcm = do
        dm_core_module        = guts
      }
 
--- | Load a module.  Input doesn't need to be desugared.
---
--- A module must be loaded before dependent modules can be typechecked.  This
--- always includes generating a 'ModIface' and, depending on the
--- @DynFlags@\'s 'GHC.Driver.Session.backend', may also include code generation.
---
--- This function will always cause recompilation and will always overwrite
--- previous compilation results (potentially files on disk).
---
-loadModule :: (TypecheckedMod mod, GhcMonad m) => mod -> m mod
-loadModule tcm = do
-   let ms = modSummary tcm
-   let mod = ms_mod_name ms
-   let loc = ms_location ms
-   let (tcg, _details) = tm_internals tcm
-
-   hsc_env <- getSession
-   mb_linkable <-
-      case (ms_iface_date ms, ms_obj_date ms) of
-          -- See Note [When source is considered modified]
-          (Just hi_date, Just obj_date) | obj_date >= hi_date -> liftIO $ do
-              prev_hash_matches <- doesIfaceHashMatch hsc_env ms
-              if prev_hash_matches
-                  then fmap Just $ findObjectLinkable
-                                          (ms_mod ms)
-                                          (ml_obj_file loc)
-                                          obj_date
-                  else return Nothing
-          _ -> return Nothing
-
-   let source_modified | isNothing mb_linkable = SourceModified
-                       | otherwise             = SourceUnmodified
-                       -- we can't determine stability here
-
-   -- compile doesn't change the session
-   mod_info <- liftIO $ compileOne' (Just tcg) Nothing
-                                    hsc_env ms 1 1 Nothing mb_linkable
-                                    source_modified
-
-   modifySession $ hscUpdateHPT (\hpt -> addToHpt hpt mod mod_info)
-   return tcm
 
 
 -- %************************************************************************

@@ -31,7 +31,6 @@ module GHC.Driver.Pipeline (
    phaseOutputFilename, getOutputFilename, getPipeState, getPipeEnv,
    hscPostBackendPhase, getLocation, setModLocation, setDynFlags,
    runPhase,
-   readIfaceSourceHash', doesIfaceHashMatch,
    doCpp,
    linkingNeeded, checkLinkInfo, writeInterfaceOnlyMode
   ) where
@@ -89,7 +88,7 @@ import GHC.Data.StringBuffer   ( hGetStringBuffer, hPutStringBuffer )
 import GHC.Data.Maybe          ( expectJust )
 
 import GHC.Iface.Make          ( mkFullIface )
-import GHC.Iface.Load
+
 
 import GHC.Types.Basic       ( SuccessFlag(..) )
 import GHC.Types.Target
@@ -175,7 +174,6 @@ compileOne :: HscEnv
            -> Int             -- ^ ... of M
            -> Maybe ModIface  -- ^ old interface, if we have one
            -> Maybe Linkable  -- ^ old linkable, if we have one
-           -> SourceModified
            -> IO HomeModInfo   -- ^ the complete HomeModInfo, if successful
 
 compileOne = compileOne' Nothing (Just batchMsg)
@@ -188,12 +186,10 @@ compileOne' :: Maybe TcGblEnv
             -> Int             -- ^ ... of M
             -> Maybe ModIface  -- ^ old interface, if we have one
             -> Maybe Linkable  -- ^ old linkable, if we have one
-            -> SourceModified
             -> IO HomeModInfo   -- ^ the complete HomeModInfo, if successful
 
 compileOne' m_tc_result mHscMessage
             hsc_env0 summary mod_index nmods mb_old_iface mb_old_linkable
-            source_modified0
  = do
 
    let logger = hsc_logger hsc_env0
@@ -204,7 +200,7 @@ compileOne' m_tc_result mHscMessage
    (status, plugin_hsc_env) <- hscIncrementalCompile
                         always_do_basic_recompilation_check
                         m_tc_result mHscMessage
-                        hsc_env summary source_modified mb_old_iface (mod_index, nmods)
+                        hsc_env summary source_modified mb_old_linkable mb_old_iface (mod_index, nmods)
    -- Use an HscEnv updated with the plugin info
    let hsc_env' = plugin_hsc_env
 
@@ -217,17 +213,17 @@ compileOne' m_tc_result mHscMessage
                    [ml_obj_file $ ms_location summary]
 
    case (status, bcknd) of
-        (HscUpToDate iface hmi_details, _) ->
+        (HscUpToDate hmi, _) ->
             -- TODO recomp014 triggers this assert. What's going on?!
             -- ASSERT( isJust mb_old_linkable || isNoLink (ghcLink dflags) )
-            return $! HomeModInfo iface hmi_details mb_old_linkable
-        (HscNotGeneratingCode iface hmi_details, NoBackend) -> do
-            unlinked_time <- getCurrentTime
-            let mb_linkable = if isHsBootOrSig src_flavour
-                                then Nothing
-                                else Just (LM unlinked_time this_mod [])
-            return $! HomeModInfo iface hmi_details mb_linkable
-        (HscNotGeneratingCode _ _, _) -> panic "compileOne HscNotGeneratingCode"
+            return $! hmi
+        (HscNotGeneratingCode hmi, NoBackend) -> do
+--            unlinked_time <- getCurrentTime
+--            let mb_linkable = if isHsBootOrSig src_flavour
+--                                then Nothing
+--                                else Just (LM unlinked_time this_mod [])
+            return $! hmi
+        (HscNotGeneratingCode _, _) -> panic "compileOne HscNotGeneratingCode"
         (_, NoBackend) -> panic "compileOne NoBackend"
         (HscUpdateBoot iface hmi_details, Interpreter) ->
             return $! HomeModInfo iface hmi_details Nothing
@@ -367,7 +363,7 @@ compileOne' m_tc_result mHscMessage
          -- if available. So, if the "*" prefix was used, force recompilation
          -- to make sure byte-code is loaded.
          | force_recomp || loadAsByteCode = SourceModified
-         | otherwise = source_modified0
+         | otherwise = SourceUnmodified
 
        always_do_basic_recompilation_check = case bcknd of
                                              Interpreter -> True
@@ -1298,6 +1294,8 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
           let fc        = hsc_FC hsc_env'
           addHomeModuleToFinder fc home_unit mod_name location
 
+
+        o_mod <- liftIO $ getModTime o_file
   -- Make the ModSummary to hand to hscMain
         let
             mod_summary = ModSummary {  ms_mod       = mod,
@@ -1307,7 +1305,7 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
                                         ms_hspp_buf  = hspp_buf,
                                         ms_location  = location,
                                         ms_hs_hash   = src_hash,
-                                        ms_obj_date  = Nothing,
+                                        ms_obj_date  = o_mod,
                                         ms_parsed_mod   = Nothing,
                                         ms_iface_date   = hi_date,
                                         ms_hie_date     = Nothing,
@@ -1323,8 +1321,8 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
           -- Note [When source is considered modified]
           ; if isNothing hi_date then return SourceModified else do {
           ; hi_timestamp <- getModificationUTCTime hi_file
-          ; prev_hash_matches <- doesIfaceHashMatch hsc_env' mod_summary
-          ; if not prev_hash_matches then return SourceModified else do {
+--          ; prev_hash_matches <- doesIfaceHashMatch hsc_env' mod_summary
+--          ; if not prev_hash_matches then return SourceModified else do {
           ; o_file_mod <- if writeInterfaceOnlyMode dflags
                             then return False
                             else sourceModified o_file hi_timestamp
@@ -1336,13 +1334,13 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
                               else pure False
           ; if hie_file_mod then return SourceModified else do {
           ; return SourceUnmodified
-          }}}}}}}
+          }}}}}}
 
   -- run the compiler!
         let msg hsc_env _ what _ = oneShotMsg hsc_env what
         (result, plugin_hsc_env) <-
           liftIO $ hscIncrementalCompile True Nothing (Just msg) hsc_env'
-                            mod_summary source_unchanged Nothing (1,1)
+                            mod_summary source_unchanged Nothing Nothing (1,1)
 
         -- In the rest of the pipeline use the loaded plugins
         setPlugins (hsc_plugins        plugin_hsc_env)
@@ -1363,10 +1361,10 @@ runPhase (HscOut src_flavour mod_name result) _ = do
             next_phase = hscPostBackendPhase src_flavour (backend dflags)
 
         case result of
-            HscNotGeneratingCode _ _ ->
+            HscNotGeneratingCode _ ->
                 return (RealPhase StopLn,
                         panic "No output filename from Hsc when no-code")
-            HscUpToDate _ _ ->
+            HscUpToDate _ ->
                 do liftIO $ touchObjectFile logger dflags o_file
                    -- The .o file must have a later modification date
                    -- than the source file (else we wouldn't get Nothing)
@@ -1796,24 +1794,6 @@ runPhase (RealPhase MergeForeign) input_fn = do
 runPhase (RealPhase other) _input_fn =
    panic ("runPhase: don't know how to run phase " ++ show other)
 
--- | Read the previously recorded hash from a module's iface file, if any.
-readIfaceSourceHash' :: HscEnv -> ModSummary -> IO (Maybe Fingerprint)
-readIfaceSourceHash' hsc_env ms =
-    readIfaceSourceHash
-        (hsc_dflags hsc_env)
-        (hsc_NC hsc_env)
-        (ml_hi_file (ms_location ms))
-
--- | Check whether a module's current hash matches the previously recorded hash
--- in its .hi file, if any. If this function returns False then the module will
--- need recompiling.
-doesIfaceHashMatch :: HscEnv -> ModSummary -> IO Bool
-doesIfaceHashMatch hsc_env ms = do
-    mb_iface_hash <- readIfaceSourceHash' hsc_env ms
-    case mb_iface_hash of
-        Just hash -> return $ hash == ms_hs_hash ms
-        Nothing -> return False
-
 maybeMergeForeign :: CompPipeline Phase
 maybeMergeForeign
  = do
@@ -2130,10 +2110,6 @@ joinObjectFiles logger tmpfs dflags o_files output_fn = do
 -- -----------------------------------------------------------------------------
 -- Misc.
 
-writeInterfaceOnlyMode :: DynFlags -> Bool
-writeInterfaceOnlyMode dflags =
- gopt Opt_WriteInterface dflags &&
- NoBackend == backend dflags
 
 -- | Figure out if the .hi file was modified after some other output file
 -- corresponding to that source file (or if we anyways need to consider the
@@ -2151,6 +2127,15 @@ sourceModified dest_file hi_timestamp = do
     then return True       -- Need to recompile
      else do t2 <- getModificationUTCTime dest_file
              return (t2 < hi_timestamp)
+
+getModTime :: FilePath -> IO (Maybe UTCTime)
+getModTime dest_file = do
+  dest_file_exists <- doesFileExist dest_file
+  if not dest_file_exists
+    then return Nothing
+     else do t2 <- getModificationUTCTime dest_file
+             return (Just t2)
+
 
 -- | What phase to run after one of the backend code generators has run
 hscPostBackendPhase :: HscSource -> Backend -> Phase

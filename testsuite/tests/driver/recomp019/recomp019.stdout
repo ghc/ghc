@@ -6,6 +6,6 @@ Linking Main ...
 5
 [1 of 1] Compiling B                ( B.hs, nothing )
 second run
-[2 of 3] Compiling B                ( B.hs, B.o )
+[1 of 3] Compiling B                ( B.hs, B.o )
 Linking Main ...
 15

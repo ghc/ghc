@@ -61,6 +61,7 @@ import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Module.Warnings
 import GHC.Unit.Module.Deps
+import GHC.Unit.Home.ModInfo
 
 import Control.Monad
 import Data.Function
@@ -113,7 +114,7 @@ data RecompileRequired
   | RecompBecause String
        -- ^ The .o/.hi files are up to date, but something else has changed
        -- to force recompilation; the String says what (one-line summary)
-   deriving Eq
+   deriving (Eq, Show)
 
 instance Semigroup RecompileRequired where
   UpToDate <> r = r
@@ -237,6 +238,8 @@ checkVersions hsc_env mod_summary iface
        -- but we ALSO must make sure the instantiation matches up.  See
        -- test case bkpcabal04!
        ; hsc_env <- getTopEnv
+       ; if mi_src_hash iface /= ms_hs_hash mod_summary
+            then return (MustCompile, Nothing) else do {
        ; if not (isHomeModule home_unit (mi_module iface))
             then return (RecompBecause "-this-unit-id changed", Nothing) else do {
        ; recomp <- liftIO $ checkFlagHash hsc_env iface
@@ -254,6 +257,8 @@ checkVersions hsc_env mod_summary iface
        ; recomp <- checkDependencies hsc_env mod_summary iface
        ; if recompileRequired recomp then return (recomp, Just iface) else do {
        ; recomp <- checkPlugins hsc_env iface
+       ; if recompileRequired recomp then return (recomp, Nothing) else do {
+       ; recomp <- checkSources hsc_env iface
        ; if recompileRequired recomp then return (recomp, Nothing) else do {
 
 
@@ -274,7 +279,7 @@ checkVersions hsc_env mod_summary iface
        ; recomp <- checkList [checkModUsage (homeUnitAsUnit home_unit) u
                              | u <- mi_usages iface]
        ; return (recomp, Just iface)
-    }}}}}}}}}}
+    }}}}}}}}}}}}
   where
     logger = hsc_logger hsc_env
     dflags = hsc_dflags hsc_env
@@ -282,6 +287,7 @@ checkVersions hsc_env mod_summary iface
     -- This is a bit of a hack really
     mod_deps :: ModuleNameEnv ModuleNameWithIsBoot
     mod_deps = mkModDeps (dep_mods (mi_deps iface))
+
 
 -- | Check if any plugins are requesting recompilation
 checkPlugins :: HscEnv -> ModIface -> IfG RecompileRequired
@@ -1105,6 +1111,8 @@ addFingerprints hsc_env iface0
 
    plugin_hash <- fingerprintPlugins hsc_env
 
+   let th_hash = fingerprintSources hsc_env (mi_deps iface0) <$ mi_used_th iface0
+
    -- the ABI hash depends on:
    --   - decls
    --   - export list
@@ -1150,7 +1158,7 @@ addFingerprints hsc_env iface0
       , mi_fix_fn      = fix_fn
       , mi_hash_fn     = lookupOccEnv local_env
       }
-    final_iface = iface0 { mi_decls = sorted_decls, mi_final_exts = final_iface_exts }
+    final_iface = iface0 { mi_used_th = th_hash, mi_decls = sorted_decls, mi_final_exts = final_iface_exts }
    --
    return final_iface
 
@@ -1162,6 +1170,39 @@ addFingerprints hsc_env iface0
     (non_orph_rules, orph_rules) = mkOrphMap ifRuleOrph    (mi_rules iface0)
     (non_orph_fis,   orph_fis)   = mkOrphMap ifFamInstOrph (mi_fam_insts iface0)
     ann_fn = mkIfaceAnnCache (mi_anns iface0)
+
+
+-- | Combine source fingerprints of all transitively imported modules
+-- Used for the stability check for modules which use TH
+fingerprintSources :: HscEnv -> Dependencies -> Fingerprint
+fingerprintSources hsc_env deps =
+  let mod_hashes = map (mi_src_hash . hm_iface) $ mapMaybe (lookupHpt (hsc_HPT hsc_env). gwib_mod) (dep_mods deps)
+  in fingerprintFingerprints mod_hashes
+
+
+                    -- If the module used TH splices when it was last
+                    -- compiled, then the recompilation check is not
+                    -- accurate enough (#481) and we must ignore
+                    -- it.  However, if the module is stable (none of
+                    -- the modules it depends on, directly or
+                    -- indirectly, changed), then we *can* skip
+                    -- recompilation. This is why the SourceModified
+                    -- type contains SourceUnmodifiedAndStable, and
+                    -- it's pretty important: otherwise ghc --make
+                    -- would always recompile TH modules, even if
+                    -- nothing at all has changed. Stability is just
+                    -- the same check that make is doing for us in
+                    -- one-shot mode.
+
+-- | Check if the source hash is still accurate
+checkSources :: HscEnv -> ModIface -> IfG RecompileRequired
+checkSources hsc_env iface = do
+  case mi_used_th iface of
+    Just old_fingerprint -> do
+      if old_fingerprint == fingerprintSources hsc_env (mi_deps iface)
+        then return UpToDate
+        else return (RecompBecause "TH")
+    Nothing -> return UpToDate
 
 -- | Retrieve the orphan hashes 'mi_orphan_hash' for a list of modules
 -- (in particular, the orphan modules which are transitively imported by the
