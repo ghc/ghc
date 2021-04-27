@@ -21,6 +21,10 @@
    We must do this, because these libs are only compiled once, but
    must work in both single-threaded and multi-threaded programs. */
 #define _REENTRANT 1
+#if defined(darwin_HOST_OS)
+#include <Availability.h>
+#include <TargetConditionals.h>
+#endif
 
 #include "HsFFI.h"
 
