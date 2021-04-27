@@ -1532,31 +1532,37 @@ splitCastTy_maybe ty
 -- Coercion for reflexivity, dropping it if it's reflexive.
 -- See Note [Respecting definitional equality] in "GHC.Core.TyCo.Rep"
 mkCastTy :: Type -> Coercion -> Type
-mkCastTy ty co | isReflexiveCo co = ty  -- (EQ2) from the Note
+mkCastTy orig_ty co | isReflexiveCo co = orig_ty  -- (EQ2) from the Note
 -- NB: Do the slow check here. This is important to keep the splitXXX
 -- functions working properly. Otherwise, we may end up with something
 -- like (((->) |> something_reflexive_but_not_obviously_so) biz baz)
 -- fails under splitFunTy_maybe. This happened with the cheaper check
 -- in test dependent/should_compile/dynamic-paper.
 
-mkCastTy (CastTy ty co1) co2
-  -- (EQ3) from the Note
-  = mkCastTy ty (co1 `mkTransCo` co2)
-      -- call mkCastTy again for the reflexivity check
+mkCastTy orig_ty co = go orig_ty
+  where
+    go :: Type -> Type
+    go ty | Just ty' <- coreView ty = go ty'
 
-mkCastTy (ForAllTy (Bndr tv vis) inner_ty) co
-  -- (EQ4) from the Note
-  -- See Note [Weird typing rule for ForAllTy] in GHC.Core.TyCo.Rep.
-  | isTyVar tv
-  , let fvs = tyCoVarsOfCo co
-  = -- have to make sure that pushing the co in doesn't capture the bound var!
-    if tv `elemVarSet` fvs
-    then let empty_subst = mkEmptyTCvSubst (mkInScopeSet fvs)
-             (subst, tv') = substVarBndr empty_subst tv
-         in ForAllTy (Bndr tv' vis) (substTy subst inner_ty `mkCastTy` co)
-    else ForAllTy (Bndr tv vis) (inner_ty `mkCastTy` co)
+    go (CastTy ty co1)
+      -- (EQ3) from the Note
+      = let co2 = co in
+        mkCastTy ty (co1 `mkTransCo` co2)
+          -- call mkCastTy again for the reflexivity check
 
-mkCastTy ty co = CastTy ty co
+    go (ForAllTy (Bndr tv vis) inner_ty)
+      -- (EQ4) from the Note
+      -- See Note [Weird typing rule for ForAllTy] in GHC.Core.TyCo.Rep.
+      | isTyVar tv
+      , let fvs = tyCoVarsOfCo co
+      = -- have to make sure that pushing the co in doesn't capture the bound var!
+        if tv `elemVarSet` fvs
+        then let empty_subst = mkEmptyTCvSubst (mkInScopeSet fvs)
+                 (subst, tv') = substVarBndr empty_subst tv
+             in ForAllTy (Bndr tv' vis) (go (substTy subst inner_ty))
+        else ForAllTy (Bndr tv vis) (go inner_ty)
+
+    go _ = CastTy orig_ty co -- NB: orig_ty: preserve synonyms if possible
 
 tyConBindersTyCoBinders :: [TyConBinder] -> [TyCoBinder]
 -- Return the tyConBinders in TyCoBinder form
