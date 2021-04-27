@@ -25,13 +25,16 @@
   '';
 
   nativeBuildInputs = (with pkgs; [
+    # This needs to come *before* ghc,
+    # otherwise we migth end up with the clang from
+    # the bootstrap GHC in PATH with higher priority.
+    clang_11
+    llvm_11
+
     haskell.compiler.${compiler}
     haskell.packages.${compiler}.cabal-install
     haskell.packages.${compiler}.alex
     haskell.packages.${compiler}.happy # _1_19_12 is needed for older GHCs.
-
-    clang_11
-    llvm_11
 
     automake
     autoconf
