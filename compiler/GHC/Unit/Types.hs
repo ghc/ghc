@@ -290,7 +290,7 @@ instance Eq (GenInstantiatedUnit unit) where
   u1 == u2 = instUnitKey u1 == instUnitKey u2
 
 instance Ord (GenInstantiatedUnit unit) where
-  u1 `compare` u2 = instUnitFS u1 `uniqCompareFS` instUnitFS u2
+  u1 `compare` u2 = instUnitFS u1 `lexicalCompareFS` instUnitFS u2
 
 instance Binary InstantiatedUnit where
   put_ bh indef = do
