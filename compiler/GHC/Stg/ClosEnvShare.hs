@@ -5,15 +5,11 @@
 
 module GHC.Stg.ClosEnvShare ( stgClosEnvShare, CesLog ) where
 
-import Control.Arrow hiding ((<+>))
-import Data.Semigroup
-import Control.Monad
-import Control.Monad.Trans.Class
-import Control.Monad.Trans.Writer.CPS
-
 import GHC.Prelude
 
+import GHC.Builtin.Types.Prim
 import GHC.Core.Multiplicity
+import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Data.FastString
 import GHC.Types.Basic
@@ -27,6 +23,12 @@ import GHC.Stg.Syntax
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Monad
+
+import Control.Arrow hiding ((<+>))
+import Data.Semigroup
+import Control.Monad
+import Control.Monad.Trans.Class
+import Control.Monad.Trans.Writer.CPS
 
 {-
 *************************************************************************
@@ -356,9 +358,13 @@ instance Monoid CesLog where
 -- same representation as the type given (i.e. a function type) which states
 -- that it is represented by a pointer to a heap object.
 mkEnvId :: CesM Id
-mkEnvId = mkSysLocalM (mkFastString "env")
-                      Many
-                      (mkVisFunTyMany (mkNumLitTy 0) (mkNumLitTy 0))
+mkEnvId = getUniqueM >>= \u ->
+            mkSysLocalM (mkFastString "env") Many (mkEnvTy u)
+  where
+    mkEnvTy u    = mkTyConTy (mkEnvTyCon u)
+    mkEnvTyCon u = mkPrimTyCon (ty_name u) [] res_kind []
+    ty_name u    = mkSystemVarName u (mkFastString "Env")
+    res_kind     = tYPE (primRepToRuntimeRep UnliftedRep)
 
 -- | Closure environment sharing analyses will generate these data types which
 -- we can later decide to add to our program to share closures.
