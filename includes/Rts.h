@@ -188,7 +188,10 @@ void _assertFail(const char *filename, unsigned int linenum)
  * functions which may only be defined after register variables have
  * been declared.
  */
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wall"
 #include <stdlib.h>
+#pragma clang diagnostic pop
 
 #include "rts/Config.h"
 
