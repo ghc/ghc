@@ -137,9 +137,10 @@ Note [magicIds]
 ~~~~~~~~~~~~~~~
 The magicIds
 
-  * Are exported from GHC.Magic
+  * Are exported from GHC.Magic and GHC.Magic.Dict. (The former is
+    Trustworthy, while the latter is unsafe.)
 
-  * Can be defined in Haskell (and are, in ghc-prim:GHC/Magic.hs).
+  * Can be defined in Haskell (and are, in ghc-prim:GHC/Magic{/Dict}.hs).
     This definition at least generates Haddock documentation for them.
 
   * May or may not have a CompulsoryUnfolding.
@@ -165,7 +166,7 @@ wiredInIds
   ++ errorIds           -- Defined in GHC.Core.Make
 
 magicIds :: [Id]    -- See Note [magicIds]
-magicIds = [lazyId, oneShotId, noinlineId]
+magicIds = [lazyId, oneShotId, noinlineId, magicDictId]
 
 ghcPrimIds :: [Id]  -- See Note [ghcPrimIds (aka pseudoops)]
 ghcPrimIds
@@ -173,7 +174,6 @@ ghcPrimIds
     , voidPrimId
     , nullAddrId
     , seqId
-    , magicDictId
     , coerceId
     , proxyHashId
     , leftSectionId
@@ -1436,7 +1436,6 @@ seqName           = mkWiredInIdName gHC_PRIM  (fsLit "seq")            seqIdKey 
 realWorldName     = mkWiredInIdName gHC_PRIM  (fsLit "realWorld#")     realWorldPrimIdKey realWorldPrimId
 voidPrimIdName    = mkWiredInIdName gHC_PRIM  (fsLit "void#")          voidPrimIdKey      voidPrimId
 coercionTokenName = mkWiredInIdName gHC_PRIM  (fsLit "coercionToken#") coercionTokenIdKey coercionTokenId
-magicDictName     = mkWiredInIdName gHC_PRIM  (fsLit "magicDict")      magicDictKey       magicDictId
 coerceName        = mkWiredInIdName gHC_PRIM  (fsLit "coerce")         coerceKey          coerceId
 proxyName         = mkWiredInIdName gHC_PRIM  (fsLit "proxy#")         proxyHashKey       proxyHashId
 leftSectionName   = mkWiredInIdName gHC_PRIM  (fsLit "leftSection")    leftSectionKey     leftSectionId
@@ -1447,6 +1446,7 @@ lazyIdName, oneShotName, noinlineIdName :: Name
 lazyIdName        = mkWiredInIdName gHC_MAGIC (fsLit "lazy")           lazyIdKey          lazyId
 oneShotName       = mkWiredInIdName gHC_MAGIC (fsLit "oneShot")        oneShotKey         oneShotId
 noinlineIdName    = mkWiredInIdName gHC_MAGIC (fsLit "noinline")       noinlineIdKey      noinlineId
+magicDictName     = mkWiredInIdName gHC_MAGIC_DICT (fsLit "magicDict") magicDictKey       magicDictId
 
 ------------------------------------------------
 proxyHashId :: Id
@@ -1602,8 +1602,11 @@ magicDictId :: Id  -- See Note [magicDictId magic]
 magicDictId = pcMiscPrelId magicDictName ty info
   where
   info = noCafIdInfo `setInlinePragInfo` neverInlinePragma
-                     `setNeverLevPoly`   ty
-  ty   = mkSpecForAllTys [alphaTyVar] alphaTy
+  ty   = mkInfForAllTy runtimeRep2TyVar $
+         mkSpecForAllTys [constraintKindedTyVar, alphaTyVar, openBetaTyVar] $
+         mkVisFunTysMany [ mkInvisFunTyMany (mkTyVarTy constraintKindedTyVar)
+                                            openBetaTy
+                         , alphaTy ] openBetaTy
 
 --------------------------------------------------------------------------------
 
@@ -1807,7 +1810,7 @@ The identifier `magicDict` is just a place-holder, which is used to
 implement a primitive that we cannot define in Haskell but we can write
 in Core.  It is declared with a place-holder type:
 
-    magicDict :: forall a. a
+    magicDict :: forall {rr :: RuntimeRep} dt st (r :: TYPE rr). (dt => r) -> st -> r
 
 The intention is that the identifier will be used in a very specific way,
 to create dictionaries for classes with a single method.  Consider a class
@@ -1820,34 +1823,82 @@ We are going to use `magicDict`, in conjunction with a built-in Prelude
 rule, to cast values of type `T a` into dictionaries for `C a`.  To do
 this, we define a function like this in the library:
 
-  data WrapC a b = WrapC (C a => Proxy a -> b)
+  withT :: (C a => b) -> T a -> b
+  withT f x y = magicDict @(C a) x y
 
-  withT :: (C a => Proxy a -> b)
-        ->  T a -> Proxy a -> b
-  withT f x y = magicDict (WrapC f) x y
+Here:
 
-The purpose of `WrapC` is to avoid having `f` instantiated.
-Also, it avoids impredicativity, because `magicDict`'s type
-cannot be instantiated with a forall.  The field of `WrapC` contains
-a `Proxy` parameter which is used to link the type of the constraint,
-`C a`, with the type of the `Wrap` value being made.
+* The `dt` in `magicDict` (short for "dictionary type") is instantiated to
+  `C a`.
+
+* The `st` in `magicDict` (short for "singleton type") is instantiated to
+  `T a`. The definition of `T` itself is irrelevant, only that `C a` is a class
+  with a single method of type `T a`.
+
+* The `r` in `magicDict` is instantiated to `b`.
 
 Next, we add a built-in Prelude rule (see GHC.Core.Opt.ConstantFold),
 which will replace the RHS of this definition with the appropriate
 definition in Core.  The rewrite rule works as follows:
 
-  magicDict @t (wrap @a @b f) x y
+  magicDict @{rr} @(C t_1 ... t_n) @mtype @r k sv
 ---->
-  f (x `cast` co a) y
+  k (sv |> sym (co t_1 ... t_n))
 
-The `co` coercion is the newtype-coercion extracted from the type-class.
-The type class is obtained by looking at the type of wrap.
+Where:
 
-In the constant folding rule it's very import to make sure to strip all ticks
-from the expression as if there's an occurence of
-magicDict we *must* convert it for correctness. See #19667 for where this went
-wrong in GHCi.
+* The `C t_1 ... t_n` argument to magicDict is a class constraint.
 
+* C must be defined as:
+
+    class C a_1 ... a_n where
+      op :: meth_type
+
+  That is, C must be a class with exactly one method and no superclasses.
+
+* The `mtype` argument to magicDict must be equal to `meth_type[t_i/a_i]`,
+  which is instantied type of C's method.
+
+* `co` is a newtype coercion that, when applied to `t_1 ... t_n`, coerces from
+  `C t_1 ... t_n` to `mtype`. This coercion is guaranteed to exist by virtue of
+  the fact that C is a class with exactly one method and no superclasses, so it
+  is treated like a newtype when compiled to Core.
+
+Some further observations about `magicDict`:
+
+* The `dt` in the type of magicDict must be explicitly instantiated with
+  visible type application, as invoking `magicDict` would be ambiguous
+  otherwise.
+
+* The `r` is levity polymorphic to support things like `withTypeable` in
+  `Data.Typeable.Internal`.
+
+* As an alternative to `magicDict`, one could define functions like `withT`
+  above in terms of `unsafeCoerce`. This is more error-prone, however.
+
+* In order to define things like `reifySymbol` below:
+
+    reifySymbol :: forall r. String -> (forall (n :: Symbol). KnownSymbol n => r) -> r
+
+  `magicDict` needs to be instantiated with `Any`, like so:
+
+    reifySymbol n k = magicDict @(KnownSymbol Any) @String @r (k @Any) n
+
+  The use of `Any` is explained in Note [NOINLINE someNatVal] in
+  base:GHC.TypeNats.
+
+* The only valid way to apply `magicDict` is as described in the rewrite rule
+  above. If a user applies `magicDict` in an invalid way, we want to make this
+  obvious. To that end, GHC will signal about invalid uses of `magicDict` like
+  so:
+
+  - If -dcore-lint is enabled, then any applications of `magicDict` that do not
+    satisfy the conditions described in the rewrite rule above will trigger a
+    Core Lint error.
+
+  - If -dcore-lint is not enabled, then as a last resort, we define `magicDict`
+    such that it panics at runtime. That way, any non-rewritten occurrences of
+    `magicDict` will crash the program.
 
 -------------------------------------------------------------
 @realWorld#@ used to be a magic literal, \tr{void#}.  If things get
