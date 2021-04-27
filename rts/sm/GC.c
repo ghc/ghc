@@ -159,23 +159,36 @@ StgWord8 the_gc_thread[sizeof(gc_thread) + 64 * sizeof(gen_workspace)]
 
 /* Note [n_gc_threads]
 This is a global variable that originally tracked the number of threads
-participating in the current gc. It's meaing has diverged from this somewhate.
-In practise, it now takes one of the values {1, n_capabilities}. Don't be
-tricked into thinking this means garbage collections must have 1 or
-n_capabilities participating: idle capabilities (idle_cap[cap->no]) are included
-in the n_gc_thread count.
+participating in the current gc. It's meaning has diverged from this somewhat,
+as it does not distinguish betweeen idle and non-idle threads. An idle thread
+is a thread i where `idle[i]` is true, using the idle array passed to
+GarbageCollect.
+
+In practice, it now takes one of the values {1, n_capabilities}, when a SYNC_GC_SEQ
+is requested it takes 1, when a SYNC_GC_PAR is requested it takes n_capabilities.
 
 Clearly this is in need of some tidying up, but for now we tread carefully. We
-check n_gc_threads > 1 to see whether we are in a parallel or sequential. We
-ensure n_gc_threads > 1 before iterating over gc_threads a la:
-
-for(i=0;i<n_gc_threads;++i) { foo(gc_thread[i]; )}
+call is_par_gc() to see whether we are in a parallel or sequential collection.
+Of course this is valid only inside GarbageCollect ().
 
 Omitting this check has led to issues such as #19147.
 */
+
+static bool is_par_gc(void);
+
 uint32_t n_gc_threads;
 static uint32_t n_gc_idle_threads;
 bool work_stealing;
+
+static bool is_par_gc() {
+#if defined(THREADED_RTS)
+    if(n_gc_threads == 1) { return false; }
+    ASSERT(n_gc_threads > n_gc_idle_threads);
+    return n_gc_threads - n_gc_idle_threads > 1;
+#else
+    return false;
+#endif
+}
 
 // For stats:
 static long copied;        // *words* copied & scavenged during this GC
@@ -393,10 +406,7 @@ GarbageCollect (uint32_t collect_gen,
   }
   work_stealing = RtsFlags.ParFlags.parGcLoadBalancingEnabled &&
       N >= RtsFlags.ParFlags.parGcLoadBalancingGen &&
-      (gc_type == SYNC_GC_PAR) &&
-      (n_gc_threads - n_gc_idle_threads) > 1;
-      // ^ if we are the only non-idle gc thread, turn off work stealing
-      //
+      is_par_gc();
       // It's not always a good idea to do load balancing in parallel
       // GC.  In particular, for a parallel program we don't want to
       // lose locality by moving cached data into another CPU's cache
@@ -408,8 +418,8 @@ GarbageCollect (uint32_t collect_gen,
       // a flag.
 #else
   n_gc_threads = 1;
-  n_gc_idle_threads = 0;
   work_stealing = false;
+  n_gc_idle_threads = 0;
 #endif
 
   SEQ_CST_STORE(&gc_running_threads, 0);
@@ -484,7 +494,7 @@ GarbageCollect (uint32_t collect_gen,
   // of markSomeCapabilities() because markSomeCapabilities() can only
   // call back into the GC via mark_root() (due to the gct register
   // variable).
-  if (n_gc_threads == 1) {
+  if (!is_par_gc()) {
       for (n = 0; n < n_capabilities; n++) {
 #if defined(THREADED_RTS)
           scavenge_capability_mut_Lists1(capabilities[n]);
@@ -509,7 +519,7 @@ GarbageCollect (uint32_t collect_gen,
 
   // follow all the roots that the application knows about.
   gct->evac_gen_no = 0;
-  if (n_gc_threads == 1) {
+  if (!is_par_gc()) {
       for (n = 0; n < n_capabilities; n++) {
           markCapability(mark_root, gct, capabilities[n],
                          true/*don't mark sparks*/);
@@ -554,7 +564,7 @@ GarbageCollect (uint32_t collect_gen,
   gcStableNameTable();
 
 #if defined(THREADED_RTS)
-  if (n_gc_threads == 1) {
+  if (!is_par_gc()) {
       for (n = 0; n < n_capabilities; n++) {
           pruneSparkQueue(false, capabilities[n]);
       }
@@ -602,11 +612,16 @@ GarbageCollect (uint32_t collect_gen,
       const gc_thread* thread;
 
       // see Note [n_gc_threads]
-      if (n_gc_threads > 1) {
+      if (is_par_gc()) {
+          int other_active_threads = n_gc_threads - n_gc_idle_threads - 1;
+          ASSERT(other_active_threads > 0);
+
           for (i=0; i < n_gc_threads; i++) {
+              if(idle_cap[i]) { continue; }
               copied += RELAXED_LOAD(&gc_threads[i]->copied);
           }
           for (i=0; i < n_gc_threads; i++) {
+              if(idle_cap[i]) { continue; }
               thread = gc_threads[i];
               debugTrace(DEBUG_gc,"thread %d:", i);
               debugTrace(DEBUG_gc,"   copied           %ld",
@@ -624,13 +639,13 @@ GarbageCollect (uint32_t collect_gen,
 
               par_max_copied = stg_max(RELAXED_LOAD(&thread->copied), par_max_copied);
               par_balanced_copied_acc +=
-                  stg_min(n_gc_threads * RELAXED_LOAD(&thread->copied), copied);
+                  stg_min((other_active_threads + 1) * RELAXED_LOAD(&thread->copied), copied);
           }
+
           // See Note [Work Balance] for an explanation of this computation
           par_balanced_copied =
-              (par_balanced_copied_acc - copied + (n_gc_threads - 1) / 2) /
-              (n_gc_threads - 1);
-      } else {
+              (par_balanced_copied_acc - copied + other_active_threads / 2) /
+              other_active_threads;
           copied += gct->copied;
       }
   }
@@ -649,7 +664,7 @@ GarbageCollect (uint32_t collect_gen,
 
     if (g == N) {
       generations[g].collections++; // for stats
-      if (n_gc_threads > 1) generations[g].par_collections++;
+      if (is_par_gc()) generations[g].par_collections++;
     }
 
     // Count the mutable list as bytes "copied" for the purposes of
@@ -1227,7 +1242,6 @@ inc_running (void)
     // See Note [Synchronising work stealing]
     StgWord new;
     new = atomic_inc(&gc_running_threads, 1);
-    ASSERT(new <= n_gc_threads);
     return new;
 }
 
@@ -1289,7 +1303,7 @@ scavenge_until_all_done (void)
 
     for(;;) {
 #if defined(THREADED_RTS)
-        if (n_gc_threads > 1) {
+        if (is_par_gc()) {
             scavenge_loop();
         } else {
             scavenge_loop1();
@@ -1313,7 +1327,7 @@ scavenge_until_all_done (void)
         // If there's no hope of stealing more work, then there's nowhere else
         // work can come from and we are finished
 #if defined(THREADED_RTS)
-        if(n_gc_threads > 1 && work_stealing && r != 0) {
+        if(is_par_gc() && work_stealing && r != 0) {
             NONATOMIC_ADD(&gct->any_work, 1);
             ACQUIRE_LOCK(&gc_running_mutex);
             // this is SEQ_CST because I haven't considered if it could be
@@ -1480,7 +1494,7 @@ wakeup_gc_threads (uint32_t me USED_IF_THREADS,
 #if defined(THREADED_RTS)
     uint32_t i;
 
-    if (n_gc_threads == 1) return;
+    if (!is_par_gc()) return;
 
 #if defined(DEBUG)
     StgWord num_idle = 0;
@@ -1516,7 +1530,7 @@ shutdown_gc_threads (uint32_t me USED_IF_THREADS USED_IF_DEBUG,
 {
 #if defined(THREADED_RTS)
 
-    if (n_gc_threads == 1) return;
+    if (!is_par_gc()) return;
 
     // we need to wait for `n_threads` threads. -1 because that's ourself
     StgInt n_threads = (StgInt)n_gc_threads - 1 - (StgInt)n_gc_idle_threads;
