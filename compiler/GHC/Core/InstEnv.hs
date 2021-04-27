@@ -36,6 +36,7 @@ import GHC.Prelude
 import GHC.Tc.Utils.TcType -- InstEnv is really part of the type checker,
               -- and depends on TcType in many ways
 import GHC.Core ( IsOrphan(..), isOrphan, chooseOrphanAnchor )
+import GHC.Core.RoughMap
 import GHC.Unit.Module.Env
 import GHC.Unit.Types
 import GHC.Core.Class
@@ -49,7 +50,7 @@ import GHC.Types.Basic
 import GHC.Types.Unique.DFM
 import GHC.Types.Id
 import Data.Data        ( Data )
-import Data.Maybe       ( isJust )
+import Data.Maybe       ( isJust, fromMaybe )
 
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
@@ -408,16 +409,19 @@ data InstEnvs = InstEnvs {
 type VisibleOrphanModules = ModuleSet
 
 newtype ClsInstEnv
-  = ClsIE [ClsInst]    -- The instances for a particular class, in any order
+  = ClsIE (RoughMap ClsInst)    -- The instances for a particular class, in any order
 
 instance Outputable ClsInstEnv where
-  ppr (ClsIE is) = pprInstances is
+  ppr (ClsIE is) = pprInstances $ elemsRM is
+
+emptyClsInstEnv :: ClsInstEnv
+emptyClsInstEnv = ClsIE emptyRM
 
 -- INVARIANTS:
 --  * The is_tvs are distinct in each ClsInst
 --      of a ClsInstEnv (so we can safely unify them)
 
--- Thus, the @ClassInstEnv@ for @Eq@ might contain the following entry:
+-- Thus, the @ClsInstEnv@ for @Eq@ might contain the following entry:
 --      [a] ===> dfun_Eq_List :: forall a. Eq a => Eq [a]
 -- The "a" in the pattern must be one of the forall'd variables in
 -- the dfun type.
@@ -425,12 +429,15 @@ instance Outputable ClsInstEnv where
 emptyInstEnv :: InstEnv
 emptyInstEnv = emptyUDFM
 
+clsInstEnvElts :: ClsInstEnv -> [ClsInst]
+clsInstEnvElts (ClsIE rm) = elemsRM rm
+
 instEnvElts :: InstEnv -> [ClsInst]
-instEnvElts ie = [elt | ClsIE elts <- eltsUDFM ie, elt <- elts]
+instEnvElts ie = [elt | elts <- eltsUDFM ie, elt <- clsInstEnvElts elts]
   -- See Note [InstEnv determinism]
 
 instEnvClasses :: InstEnv -> [Class]
-instEnvClasses ie = [is_cls e | ClsIE (e : _) <- eltsUDFM ie]
+instEnvClasses ie = [is_cls e | e : _ <- map clsInstEnvElts $ eltsUDFM ie]
 
 -- | Test if an instance is visible, by checking that its origin module
 -- is in 'VisibleOrphanModules'.
@@ -450,15 +457,16 @@ classInstances :: InstEnvs -> Class -> [ClsInst]
 classInstances (InstEnvs { ie_global = pkg_ie, ie_local = home_ie, ie_visible = vis_mods }) cls
   = get home_ie ++ get pkg_ie
   where
+    get :: InstEnv -> [ClsInst]
     get env = case lookupUDFM env cls of
-                Just (ClsIE insts) -> filter (instIsVisible vis_mods) insts
-                Nothing            -> []
+                Just cie -> filter (instIsVisible vis_mods) (clsInstEnvElts cie)
+                Nothing  -> []
 
 -- | Checks for an exact match of ClsInst in the instance environment.
 -- We use this when we do signature checking in "GHC.Tc.Module"
 memberInstEnv :: InstEnv -> ClsInst -> Bool
 memberInstEnv inst_env ins_item@(ClsInst { is_cls_nm = cls_nm } ) =
-    maybe False (\(ClsIE items) -> any (identicalDFunType ins_item) items)
+    maybe False (any (identicalDFunType ins_item) . clsInstEnvElts)
           (lookupUDFM_Directly inst_env (getUnique cls_nm))
  where
   identicalDFunType cls1 cls2 =
@@ -469,15 +477,16 @@ extendInstEnvList inst_env ispecs = foldl' extendInstEnv inst_env ispecs
 
 extendInstEnv :: InstEnv -> ClsInst -> InstEnv
 extendInstEnv inst_env ins_item@(ClsInst { is_cls_nm = cls_nm })
-  = addToUDFM_C_Directly add inst_env (getUnique cls_nm) (ClsIE [ins_item])
+  = unsafeCastUDFMKey $ alterUDFM (Just . add . fromMaybe emptyClsInstEnv) (unsafeCastUDFMKey inst_env) (getUnique cls_nm)
   where
-    add (ClsIE cur_insts) _ = ClsIE (ins_item : cur_insts)
+    add :: ClsInstEnv -> ClsInstEnv
+    add (ClsIE cur_insts) = ClsIE $ insertRM (instanceRoughTcs ins_item) ins_item cur_insts
 
 deleteFromInstEnv :: InstEnv -> ClsInst -> InstEnv
 deleteFromInstEnv inst_env ins_item@(ClsInst { is_cls_nm = cls_nm })
   = adjustUDFM_Directly adjust inst_env (getUnique cls_nm)
   where
-    adjust (ClsIE items) = ClsIE (filterOut (identicalClsInstHead ins_item) items)
+    adjust (ClsIE items) = ClsIE (filterRM (not . identicalClsInstHead ins_item) items)
 
 deleteDFunFromInstEnv :: InstEnv -> DFunId -> InstEnv
 -- Delete a specific instance fron an InstEnv
@@ -485,7 +494,7 @@ deleteDFunFromInstEnv inst_env dfun
   = adjustUDFM adjust inst_env cls
   where
     (_, _, cls, _) = tcSplitDFunTy (idType dfun)
-    adjust (ClsIE items) = ClsIE (filterOut same_dfun items)
+    adjust (ClsIE items) = ClsIE (filterRM (not . same_dfun) items)
     same_dfun (ClsInst { is_dfun = dfun' }) = dfun == dfun'
 
 identicalClsInstHead :: ClsInst -> ClsInst -> Bool
@@ -836,18 +845,13 @@ lookupInstEnv' ie vis_mods cls tys
     --------------
     lookup env = case lookupUDFM env cls of
                    Nothing -> ([],[])   -- No instances for this class
-                   Just (ClsIE insts) -> find [] [] insts
+                   Just (ClsIE insts) -> find [] [] (lookupRM rough_tcs insts)
 
     --------------
     find ms us [] = (ms, us)
-    find ms us (item@(ClsInst { is_tcs = mb_tcs, is_tvs = tpl_tvs
-                              , is_tys = tpl_tys }) : rest)
+    find ms us (item@(ClsInst { is_tvs = tpl_tvs, is_tys = tpl_tys }) : rest)
       | not (instIsVisible vis_mods item)
       = find ms us rest  -- See Note [Instance lookup and orphan instances]
-
-        -- Fast check for no match, uses the "rough match" fields
-      | instanceCantMatch rough_tcs mb_tcs
-      = find ms us rest
 
       | Just subst <- tcMatchTys tpl_tys tys
       = find ((item, map (lookupTyVar subst) tpl_tvs) : ms) us rest
