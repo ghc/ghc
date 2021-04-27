@@ -12,6 +12,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE TypeApplications #-}
 
 {-| This module is an internal GHC module.  It declares the constants used
 in the implementation of type-level natural numbers.  The programmer interface
@@ -38,12 +39,12 @@ module GHC.TypeNats
 
   ) where
 
-import GHC.Base(Eq(..), Ord(..), otherwise)
+import GHC.Base(Eq(..), Ord(..), otherwise, withDict)
 import GHC.Types
 import GHC.Num.Natural(Natural)
 import GHC.Show(Show(..))
 import GHC.Read(Read(..))
-import GHC.Prim(magicDict, Proxy#)
+import GHC.Prim(Proxy#)
 import Data.Maybe(Maybe(..))
 import Data.Proxy (Proxy(..))
 import Data.Type.Equality((:~:)(Refl))
@@ -121,7 +122,7 @@ After inlining and simplification, this ends up looking something like this:
     where type T = Any Nat
 
 `KnownNat` is the constructor for dictionaries for the class `KnownNat`.
-See Note [magicDictId magic] in "basicType/MkId.hs" for details on how
+See Note [withDict] in "GHC.HsToCore.Expr" for details on how
 we actually construct the dictionary.
 
 Note that using `Any Nat` is not really correct, as multilple calls to
@@ -240,9 +241,8 @@ cmpNat x y = case compare (natVal x) (natVal y) of
 
 newtype SNat    (n :: Nat)    = SNat    Natural
 
-data WrapN a b = WrapN (KnownNat    a => Proxy a -> b)
-
--- See Note [magicDictId magic] in "basicType/MkId.hs"
-withSNat :: (KnownNat a => Proxy a -> b)
+-- See Note [withDict] in "GHC.HsToCore.Expr" in GHC
+withSNat :: forall a b.
+            (KnownNat a => Proxy a -> b)
          -> SNat a      -> Proxy a -> b
-withSNat f x y = magicDict (WrapN f) x y
+withSNat f x y = withDict @(SNat a) @(KnownNat a) x f y
