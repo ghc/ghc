@@ -3,8 +3,8 @@
 Test.$tc'MkT:
 Test.$tcT:
 Test.$trModule:
-Test.t: <1P(L)><1P(L)>
-Test.t2: <1P(L)><1P(L)>
+Test.t: <1!L><1!L>
+Test.t2: <1!L><1!L>
 
 
 
@@ -21,7 +21,7 @@ Test.t2: 1
 Test.$tc'MkT:
 Test.$tcT:
 Test.$trModule:
-Test.t: <1P(L)><1P(L)>
-Test.t2: <1P(L)><1P(L)>
+Test.t: <1!L><1!L>
+Test.t2: <1!L><1!L>
 
 
