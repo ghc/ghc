@@ -1784,8 +1784,8 @@ calcSpecStrictness fn qvars pats
     go env _      _                = env
 
     go_one :: DmdEnv -> Demand -> CoreExpr -> DmdEnv
-    go_one env d          (Var v) = extendVarEnv_C plusDmd env v d
-    go_one env (_n :* cd) e -- NB: _n does not have to be strict
+    go_one env d            (Var v) = extendVarEnv_C plusDmd env v d
+    go_one env (D _n _b cd) e -- NB: _n does not have to be strict TODO: We may want to look at boxity _b, though...
       | (Var _, args) <- collectArgs e
       , Just ds <- viewProd (length args) cd
       = go env ds args

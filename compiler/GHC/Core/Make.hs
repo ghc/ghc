@@ -66,7 +66,6 @@ import GHC.Types.Cpr
 import GHC.Types.Name      hiding ( varName )
 import GHC.Types.Literal
 import GHC.Types.Unique.Supply
-import GHC.Types.Basic
 
 import GHC.Core
 import GHC.Core.Utils ( exprType, needsCaseBinding, mkSingleAltCase, bindNonRec )

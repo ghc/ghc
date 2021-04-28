@@ -42,7 +42,6 @@ import GHC.Core.Predicate ( isClassPred )
 import GHC.Types.RepType  ( isVoidTy, typeMonoPrimRep_maybe )
 import GHC.Core.Coercion
 import GHC.Core.FamInstEnv
-import GHC.Types.Basic       ( Boxity(..) )
 import GHC.Core.TyCon
 import GHC.Core.TyCon.RecWalk
 import GHC.Types.Unique.Supply
@@ -594,16 +593,18 @@ data ArgOfInlineableFun
 -- | Unboxing strategy for strict arguments.
 wantToUnboxArg :: FamInstEnvs -> ArgOfInlineableFun -> Type -> Demand -> UnboxingDecision Demand
 -- See Note [Which types are unboxed?]
-wantToUnboxArg fam_envs inlineable_flag ty dmd
-  | isAbsDmd dmd
+wantToUnboxArg fam_envs inlineable_flag ty (D n b sd)
+  | isAbs n
   = DropAbsent
 
-  | isStrUsedDmd dmd
+  | isStrict n
+  , Unboxed <- b
+  -- See Note [Unpacking arguments with product and polymorphic demands]
+  -- TODO fixup if we see that unboxing around error is still a problem
   , Just (tc, tc_args, co) <- normSplitTyConApp_maybe fam_envs ty
   , Just dc <- tyConSingleAlgDataCon_maybe tc
   , let arity = dataConRepArity dc
-  -- See Note [Unpacking arguments with product and polymorphic demands]
-  , Just cs <- split_prod_dmd_arity dmd arity
+  , Just cs <- viewProd arity sd
   -- See Note [Do not unpack class dictionaries]
   , inlineable_flag == NotArgOfInlineableFun || not (isClassPred ty)
   -- See Note [mkWWstr and unsafeCoerce]
@@ -614,14 +615,6 @@ wantToUnboxArg fam_envs inlineable_flag ty dmd
 
   | otherwise
   = StopUnboxing
-
-  where
-    split_prod_dmd_arity dmd arity
-      -- For seqDmd, it should behave like <S(AAAA)>, for some
-      -- suitable arity
-      | isSeqDmd dmd        = Just (replicate arity absDmd)
-      | _ :* Prod ds <- dmd = Just ds
-      | otherwise           = Nothing
 
 addDataConStrictness :: DataCon -> [Demand] -> [Demand]
 -- See Note [Add demands for strict constructors]

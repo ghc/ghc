@@ -15,7 +15,7 @@
 -- Lays out the abstract domain for "GHC.Core.Opt.DmdAnal".
 module GHC.Types.Demand (
     -- * Demands
-    Card(..), Demand(..), SubDemand(Prod), mkProd, viewProd,
+    Boxity(..), Card(..), Demand(..), SubDemand(Prod), mkProd, viewProd,
     -- ** Algebra
     absDmd, topDmd, botDmd, seqDmd, topSubDmd,
     -- *** Least upper bound
@@ -101,6 +101,78 @@ import GHC.Utils.Panic
 {-
 ************************************************************************
 *                                                                      *
+           Boxity: Whether the box of something is used
+*                                                                      *
+************************************************************************
+-}
+
+{- Note [Boxity analysis]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+We perform a simple syntactic boxity analysis alongside demand analysis in order
+to determine whether the box of an argument is always discarded, in which case
+we can pass it unboxed if it is also used strict. Note that "used strict" does
+not imply "box is never used". TODO improve
+
+The lattice structure we impose is Unboxed < Boxed (a total order, even).
+
+  * Boxed means we can't discard the box, because it is used somewhere.
+    Top element of the lattice.
+  * Unboxed means we can discard the box, because the thing is always used
+    unboxed. Bottom element of the lattice.
+
+See also Note [Boxed should win].
+
+-}
+
+-- | Top element of Boxity analysis lattice. See Note [Boxity analysis].
+topBoxity :: Boxity
+topBoxity = Boxed
+
+-- | Bottom element of Boxity analysis lattice. See Note [Boxity analysis].
+botBoxity :: Boxity
+botBoxity = Unboxed
+
+lubBoxity :: Boxity -> Boxity -> Boxity
+lubBoxity Unboxed Unboxed = Unboxed
+lubBoxity _       !_      = Boxed -- See Note [Boxed should win]
+
+plusBoxity :: Boxity -> Boxity -> Boxity
+-- Boxity is a syntactic property, so the semantic distinction of lub vs. plus
+-- is irrelevant. If we use a box somewhere in the program, then we better not
+-- unbox! See also Note [Boxed should win].
+plusBoxity = lubBoxity
+
+{-
+Note [Boxed should win]
+~~~~~~~~~~~~~~~~~~~~~~~
+Both in 'lubDmd' and 'plusDmd' we want 'Boxed' to win over Unboxed.
+Why? Because 'Boxed' carries the implication the whole thing is used, box and
+all, so we don't want to unbox it in w/w.
+If we use it both boxed and unboxed, then we are definitely using the box,
+and so we are quite likely to pay a reboxing cost. So we make Boxed win here.
+
+Example is in the Buffer argument of GHC.IO.Handle.Internals.writeCharBuffer
+
+Some measurements from pre-2013, but boxity analysis worked quite different back
+then:
+
+Baseline: (A) Not making Boxed win (Unboxed wins)
+Compare with: (B) making Boxed win for lub and both
+
+            Min          -0.3%     -5.6%    -10.7%    -11.0%    -33.3%
+            Max          +0.3%    +45.6%    +11.5%    +11.5%     +6.9%
+ Geometric Mean          -0.0%     +0.5%     +0.3%     +0.2%     -0.8%
+
+Baseline: (B) Making Boxed win for both lub and both
+Compare with: (C) making Boxed win for plus, but Unboxed win for lub
+
+            Min          -0.1%     -0.3%     -7.9%     -8.0%     -6.5%
+            Max          +0.1%     +1.0%    +21.0%    +21.0%     +0.5%
+ Geometric Mean          +0.0%     +0.0%     -0.0%     -0.1%     -0.1%
+
+
+************************************************************************
+*                                                                      *
            Card: Combining Strictness and Usage
 *                                                                      *
 ************************************************************************
@@ -143,8 +215,9 @@ data Card
   | C_10 -- ^ {}      The empty interval; the bottom element of the lattice.
   deriving Eq
 
-_botCard, topCard :: Card
-_botCard = C_10
+botCard, absCard, topCard :: Card
+botCard = C_10
+absCard = C_00
 topCard = C_0N
 
 -- | True <=> lower bound is 1.
@@ -265,7 +338,7 @@ multCard _    _    = C_0N
 -- by 'Card', which is an /interval/ on 'Multiplicity', the upper bound of
 -- which could be used to infer uniqueness types.
 data Demand
-  = !Card :* !SubDemand
+  = D !Card !Boxity !SubDemand
   deriving Eq
 
 -- | A sub-demand describes an /evaluation context/, e.g. how deep the
@@ -313,7 +386,7 @@ data SubDemand
   deriving Eq
 
 poly00, poly01, poly0N, poly11, poly1N, poly10 :: SubDemand
-topSubDmd, botSubDmd, seqSubDmd :: SubDemand
+topSubDmd, botSubDmd, absSubDmd :: SubDemand
 poly00 = Poly C_00
 poly01 = Poly C_01
 poly0N = Poly C_0N
@@ -322,31 +395,24 @@ poly1N = Poly C_1N
 poly10 = Poly C_10
 topSubDmd = poly0N
 botSubDmd = poly10
-seqSubDmd = poly00
+absSubDmd = poly00
 
 polyDmd :: Card -> Demand
-polyDmd C_00 = C_00 :* poly00
-polyDmd C_01 = C_01 :* poly01
-polyDmd C_0N = C_0N :* poly0N
-polyDmd C_11 = C_11 :* poly11
-polyDmd C_1N = C_1N :* poly1N
-polyDmd C_10 = C_10 :* poly10
+polyDmd C_00 = D C_00 Boxed poly00
+polyDmd C_01 = D C_01 Boxed poly01
+polyDmd C_0N = D C_0N Boxed poly0N
+polyDmd C_11 = D C_11 Boxed poly11
+polyDmd C_1N = D C_1N Boxed poly1N
+polyDmd C_10 = D C_10 Boxed poly10
 
 -- | A smart constructor for 'Prod', applying rewrite rules along the semantic
 -- equality @Prod [polyDmd n, ...] === polyDmd n@, simplifying to 'Poly'
--- 'SubDemand's when possible. Note that this degrades boxity information! E.g. a
--- polymorphic demand will never unbox.
+-- 'SubDemand's when possible.
 mkProd :: [Demand] -> SubDemand
-mkProd [] = seqSubDmd
-mkProd ds@(n:*sd : _)
-  | want_to_simplify n, all (== polyDmd n) ds = sd
-  | otherwise                                 = Prod ds
-  where
-    -- We only want to simplify absent and bottom demands and unbox the others.
-    -- See also Note [L should win] and Note [Don't optimise LP(L,L,...) to L].
-    want_to_simplify C_00 = True
-    want_to_simplify C_10 = True
-    want_to_simplify _    = False
+mkProd []                 = botSubDmd -- any would do, so we pick the most useful
+mkProd ds@(D n _ sd : _)
+  | all (== polyDmd n) ds = sd -- sd is Poly n
+mkProd ds                 = Prod ds
 
 -- | @viewProd n sd@ interprets @sd@ as a 'Prod' of arity @n@, expanding 'Poly'
 -- demands as necessary.
@@ -377,10 +443,10 @@ viewCall sd@(Poly card) = Just (card, sd)
 viewCall _              = Nothing
 
 topDmd, absDmd, botDmd, seqDmd :: Demand
-topDmd = polyDmd C_0N
-absDmd = polyDmd C_00
-botDmd = polyDmd C_10
-seqDmd = C_11 :* seqSubDmd
+topDmd = D topCard topBoxity topSubDmd
+absDmd = D absCard Unboxed   absSubDmd
+botDmd = D botCard botBoxity botSubDmd
+seqDmd = D C_11    Unboxed   absSubDmd
 
 -- | Denotes '∪' on 'SubDemand'.
 lubSubDmd :: SubDemand -> SubDemand -> SubDemand
@@ -402,7 +468,8 @@ lubSubDmd _          _         = topSubDmd
 
 -- | Denotes '∪' on 'Demand'.
 lubDmd :: Demand -> Demand -> Demand
-lubDmd (n1 :* sd1) (n2 :* sd2) = lubCard n1 n2 :* lubSubDmd sd1 sd2
+lubDmd (D n1 b1 sd1) (D n2 b2 sd2)
+  = D (lubCard n1 n2) (lubBoxity b1 b2) (lubSubDmd sd1 sd2)
 
 -- | Denotes '+' on 'SubDemand'.
 plusSubDmd :: SubDemand -> SubDemand -> SubDemand
@@ -424,7 +491,8 @@ plusSubDmd _          _         = topSubDmd
 
 -- | Denotes '+' on 'Demand'.
 plusDmd :: Demand -> Demand -> Demand
-plusDmd (n1 :* sd1) (n2 :* sd2) = plusCard n1 n2 :* plusSubDmd sd1 sd2
+plusDmd (D n1 b1 sd1) (D n2 b2 sd2)
+  = D (plusCard n1 n2) (plusBoxity b1 b2) (plusSubDmd sd1 sd2)
 
 -- | The trivial cases of the @mult*@ functions.
 -- If @multTrivial n abs a = ma@, we have the following outcomes
@@ -441,103 +509,98 @@ multTrivial _    _   _           = Nothing
 
 multSubDmd :: Card -> SubDemand -> SubDemand
 multSubDmd n sd
-  | Just sd' <- multTrivial n seqSubDmd sd = sd'
+  | Just sd' <- multTrivial n absSubDmd sd = sd'
 multSubDmd n (Poly n')    = Poly (multCard n n')
 multSubDmd n (Call n' sd) = mkCall (multCard n n') sd -- See Note [Call demands are relative]
 multSubDmd n (Prod ds)    = Prod (map (multDmd n) ds)
 
 multDmd :: Card -> Demand -> Demand
-multDmd n    dmd
+multDmd n dmd
   | Just dmd' <- multTrivial n absDmd dmd = dmd'
-multDmd n (m :* dmd) = multCard n m :* multSubDmd n dmd
+multDmd n (D m b sd) = D (multCard n m) b (multSubDmd n sd)
 
 -- | Used to suppress pretty-printing of an uninformative demand
 isTopDmd :: Demand -> Bool
 isTopDmd dmd = dmd == topDmd
 
 isAbsDmd :: Demand -> Bool
-isAbsDmd (n :* _) = isAbs n
+isAbsDmd (D n _ _) = isAbs n
 
 -- | Contrast with isStrictUsedDmd. See Note [Strict demands]
 isStrictDmd :: Demand -> Bool
-isStrictDmd (n :* _) = isStrict n
+isStrictDmd (D n _ _) = isStrict n
 
 -- | Not absent and used strictly. See Note [Strict demands]
 isStrUsedDmd :: Demand -> Bool
-isStrUsedDmd (n :* _) = isStrict n && not (isAbs n)
+isStrUsedDmd (D n _ _) = isStrict n && not (isAbs n)
 
 isSeqDmd :: Demand -> Bool
-isSeqDmd (C_11 :* sd) = sd == seqSubDmd
-isSeqDmd (C_1N :* sd) = sd == seqSubDmd -- I wonder if we need this case.
-isSeqDmd _            = False
+isSeqDmd (D C_11 _ sd) = sd == absSubDmd
+isSeqDmd (D C_1N _ sd) = sd == absSubDmd
+isSeqDmd _             = False
 
 -- | Is the value used at most once?
 isUsedOnceDmd :: Demand -> Bool
-isUsedOnceDmd (n :* _) = isUsedOnce n
+isUsedOnceDmd (D n _ _) = isUsedOnce n
 
 -- | We try to avoid tracking weak free variable demands in strictness
 -- signatures for analysis performance reasons.
 -- See Note [Lazy and unleashable free variables] in "GHC.Core.Opt.DmdAnal".
 isWeakDmd :: Demand -> Bool
-isWeakDmd dmd@(n :* _) = not (isStrict n) && is_plus_idem_dmd dmd
+isWeakDmd dmd@(D n _ _) = not (isStrict n) && is_plus_idem_dmd dmd
   where
     -- @is_plus_idem_* thing@ checks whether @thing `plus` thing = thing@,
     -- e.g. if @thing@ is idempotent wrt. to @plus@.
     is_plus_idem_card c = plusCard c c == c
     -- is_plus_idem_dmd dmd = plusDmd dmd dmd == dmd
-    is_plus_idem_dmd (n :* sd) = is_plus_idem_card n && is_plus_idem_sub_dmd sd
+    is_plus_idem_dmd (D n _ sd) = is_plus_idem_card n && is_plus_idem_sub_dmd sd
     -- is_plus_idem_sub_dmd sd = plusSubDmd sd sd == sd
     is_plus_idem_sub_dmd (Poly n)   = is_plus_idem_card n
     is_plus_idem_sub_dmd (Prod ds)  = all is_plus_idem_dmd ds
     is_plus_idem_sub_dmd (Call n _) = is_plus_idem_card n -- See Note [Call demands are relative]
 
 evalDmd :: Demand
-evalDmd = C_1N :* topSubDmd
+evalDmd = D C_1N Boxed topSubDmd
 
 -- | First argument of 'GHC.Exts.maskAsyncExceptions#': @1C1(L)@.
 -- Called exactly once.
 strictOnceApply1Dmd :: Demand
-strictOnceApply1Dmd = C_11 :* mkCall C_11 topSubDmd
+strictOnceApply1Dmd = D C_11 Boxed (mkCall C_11 topSubDmd)
 
 -- | First argument of 'GHC.Exts.atomically#': @SCS(L)@.
 -- Called at least once, possibly many times.
 strictManyApply1Dmd :: Demand
-strictManyApply1Dmd = C_1N :* mkCall C_1N topSubDmd
+strictManyApply1Dmd = D C_1N Boxed (mkCall C_1N topSubDmd)
 
 -- | First argument of catch#: @MCM(L)@.
 -- Evaluates its arg lazily, but then applies it exactly once to one argument.
 lazyApply1Dmd :: Demand
-lazyApply1Dmd = C_01 :* mkCall C_01 topSubDmd
+lazyApply1Dmd = D C_01 Boxed (mkCall C_01 topSubDmd)
 
 -- | Second argument of catch#: @MCM(C1(L))@.
 -- Calls its arg lazily, but then applies it exactly once to an additional argument.
 lazyApply2Dmd :: Demand
-lazyApply2Dmd = C_01 :* mkCall C_01 (mkCall C_11 topSubDmd)
+lazyApply2Dmd = D C_01 Boxed (mkCall C_01 (mkCall C_11 topSubDmd))
 
 -- | Make a 'Demand' evaluated at-most-once.
 oneifyDmd :: Demand -> Demand
-oneifyDmd (n :* sd) = oneifyCard n :* sd
+oneifyDmd (D n b sd) = D (oneifyCard n) b sd
 
 -- | Make a 'Demand' evaluated at-least-once (e.g. strict).
 strictifyDmd :: Demand -> Demand
-strictifyDmd (n :* sd) = plusCard C_10 n :* sd
+strictifyDmd (D n b sd) = D (plusCard C_10 n) b sd
 
 -- | If the argument is a used non-newtype dictionary, give it strict demand.
 -- Also split the product type & demand and recur in order to similarly
 -- strictify the argument's contained used non-newtype superclass dictionaries.
 -- We use the demand as our recursive measure to guarantee termination.
 strictifyDictDmd :: Type -> Demand -> Demand
-strictifyDictDmd ty (n :* Prod ds)
+strictifyDictDmd ty (D n b (Prod ds))
   | not (isAbs n)
   , Just field_tys <- as_non_newtype_dict ty
-  = C_1N :* -- main idea: ensure it's strict
-      if all (not . isAbsDmd) ds
-        then topSubDmd -- abstract to strict w/ arbitrary component use,
-                         -- since this smells like reboxing; results in CBV
-                         -- boxed
-                         --
-                         -- TODO revisit this if we ever do boxity analysis
-        else Prod (zipWith strictifyDictDmd field_tys ds)
+  = D C_1N -- main idea: ensure it's strict
+      b $
+      Prod (zipWith strictifyDictDmd field_tys ds)
   where
     -- | Return a TyCon and a list of field types if the given
     -- type is a non-newtype dictionary type
@@ -576,7 +639,7 @@ peelManyCalls _ _                          = C_0N
 
 -- See Note [Demand on the worker] in GHC.Core.Opt.WorkWrap
 mkWorkerDemand :: Int -> Demand
-mkWorkerDemand n = C_01 :* go n
+mkWorkerDemand n = D C_01 Boxed (go n)
   where go 0 = topSubDmd
         go n = Call C_01 $ go (n-1)
 
@@ -584,7 +647,7 @@ addCaseBndrDmd :: SubDemand -- On the case binder
                -> [Demand]  -- On the components of the constructor
                -> [Demand]  -- Final demands for the components of the constructor
 addCaseBndrDmd (Poly n) alt_dmds
-  | isAbs n   = alt_dmds
+  | isAbs n = alt_dmds
 -- See Note [Demand on case-alternative binders]
 addCaseBndrDmd sd       alt_dmds = zipWith plusDmd ds alt_dmds -- fuse ds!
   where
@@ -608,7 +671,7 @@ argsOneShots (DmdSig (DmdType _ arg_ds _)) n_val_args
 argOneShots :: Demand          -- ^ depending on saturation
             -> [OneShotInfo]
 -- ^ See Note [Computing one-shot info]
-argOneShots (_ :* sd) = go sd -- See Note [Call demands are relative]
+argOneShots (D _ _ sd) = go sd -- See Note [Call demands are relative]
   where
     go (Call n sd)
       | isUsedOnce n = OneShotLam    : go sd
@@ -621,7 +684,7 @@ argOneShots (_ :* sd) = go sd -- See Note [Call demands are relative]
 -- There are at least n nested CM(..) calls.
 -- See Note [Demand on the worker] in GHC.Core.Opt.WorkWrap
 saturatedByOneShots :: Int -> Demand -> Bool
-saturatedByOneShots n (_ :* sd) = isUsedOnce (peelManyCalls n sd)
+saturatedByOneShots n (D _ _ sd) = isUsedOnce (peelManyCalls n sd)
 
 {- Note [Strict demands]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -709,47 +772,61 @@ consequences play out.
 This is needed even for non-product types, in case the case-binder
 is used but the components of the case alternative are not.
 
-Note [Don't optimise LP(L,L,...) to L]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-These two SubDemands:
-   LP(L,L) (@Prod [topDmd, topDmd]@)   and   L (@topSubDmd@)
-are semantically equivalent, but we do not turn the former into
-the latter, for a regrettable-subtle reason.  Consider
-  f p1@(x,y) = (y,x)
-  g h p2@(_,_) = h p
-We want to unbox @p1@ of @f@, but not @p2@ of @g@, because @g@ only uses
-@p2@ boxed and we'd have to rebox. So we give @p1@ demand LP(L,L) and @p2@
-demand @L@ to inform 'GHC.Core.Opt.WorkWrap.Utils.wantToUnboxArg', which will
-say "unbox" for @p1@ and "don't unbox" for @p2@.
+Note [Discard boxity when summarising inside boxed demands]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
 
-So the solution is: don't aggressively collapse @Prod [topDmd, topDmd]@ to
-@topSubDmd@; instead leave it as-is. In effect we are using the UseDmd to do a
-little bit of boxity analysis.  Not very nice.
+  foo x y = bar (x, y)
+  bar p@(!x,y) = p
 
-Note [L should win]
-~~~~~~~~~~~~~~~~~~~
-Both in 'lubSubDmd' and 'plusSubDmd' we want @L `plusSubDmd` LP(..))@ to be @L@.
-Why?  Because U carries the implication the whole thing is used, box and all,
-so we don't want to w/w it, cf. Note [Don't optimise LP(L,L,...) to L].
-If we use it both boxed and unboxed, then we are definitely using the box,
-and so we are quite likely to pay a reboxing cost. So we make U win here.
-TODO: Investigate why since 2013, we don't.
+`bar` puts a demand of `SP(S!L,L)` on `p`. If that demand ends up in `bar`'s
+signature, it looks as if `foo` puts demand `S!L` on `x`, and we'll unbox `x` to
+get
 
-Example is in the Buffer argument of GHC.IO.Handle.Internals.writeCharBuffer
+  $wfoo x# x = bar (I# x#, y) b
+  bar ... -- as before
 
-Baseline: (A) Not making Used win (LP(..) wins)
-Compare with: (B) making Used win for lub and both
+But now we $wfoo has to rebox `x`. So, better prune any nested Unboxed boxities
+inside a Boxed Prod, so that we'll give `bar` a signature of `<SP(SL,L)>`.
 
-            Min          -0.3%     -5.6%    -10.7%    -11.0%    -33.3%
-            Max          +0.3%    +45.6%    +11.5%    +11.5%     +6.9%
- Geometric Mean          -0.0%     +0.5%     +0.3%     +0.2%     -0.8%
+Note [Discard boxity when summarising lazy demands]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider T19407:
 
-Baseline: (B) Making L win for both lub and both
-Compare with: (C) making L win for plus, but LP(..) win for lub
+  data Huge = Huge Bool () ... () -- think: DynFlags
+  data T = T { h :: Huge, n :: Int }
+  f t@(T h _) = g h t
+  g (H b _ ... _) t = if b then 1 else n t
 
-            Min          -0.1%     -0.3%     -7.9%     -8.0%     -6.5%
-            Max          +0.1%     +1.0%    +21.0%    +21.0%     +0.5%
- Geometric Mean          +0.0%     +0.0%     -0.0%     -0.1%     -0.1%
+The body of `g` puts (approx.) demand `L!P(A,1)` on `t`. But we better not put
+that demand in `g`'s signature! If we do, then `f` puts demand
+`S!P(1!P(1L,A,..),ML)` on `t` and we get
+
+  f (T (H b _ ... _) n) = $wf b n
+  $wf b n = $wg b (T (H b x ... x) n)
+  $wg = ...
+
+Massive reboxing in `$wf`! Solution: The signature of `g` should better say
+`LP(A,1)`, that is, "don't unbox `t`". Then `f`'s signature says
+`SP(1P(1L,M,..),ML)` and we will not even unbox `t`.
+
+So should we forbid a demand like `L!P(..)`? No, because such a demand is
+occassionally useful. See Note [Lazy, unboxed demands are useful].
+
+Note [Lazy, unboxed demands are useful]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Discard boxity when summarising lazy demands] might lead you to question
+whether lazy, unboxed demands like `L!P(..)` should generally be forbidden.
+They should not, as the following example should convince you of:
+
+  foo !h n
+    | n == 0    = case h of Huge b _ ... _ -> b
+    | otherwise = False
+
+Here we'd like to unbox `h`. But just before considering the bang, we only have
+a lazy demand `L!P(L,A,...)` on `h`. After considering the bang, we get
+`S!P(L,A,...)` and may unbox. Hooray! So lazy, unboxed demands are only
+problematic when they end up in demand signatures.
 
 Note [Computing one-shot info]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1436,11 +1513,33 @@ newtype DmdSig
   deriving Eq
 
 -- | Turns a 'DmdType' computed for the particular 'Arity' into a 'DmdSig'
--- unleashable at that arity. See Note [Understanding DmdType and DmdSig]
+-- unleashable at that arity. See Note [Understanding DmdType and DmdSig].
 mkDmdSigForArity :: Arity -> DmdType -> DmdSig
 mkDmdSigForArity arity dmd_ty@(DmdType fvs args div)
-  | arity < dmdTypeDepth dmd_ty = DmdSig (DmdType fvs (take arity args) div)
-  | otherwise                   = DmdSig (etaExpandDmdType arity dmd_ty)
+  | arity < dmdTypeDepth dmd_ty = DmdSig dmd_ty'
+  | otherwise                   = DmdSig (etaExpandDmdType arity dmd_ty')
+  where
+    -- See Note [Discard boxity when summarising inside boxed demands]
+    -- and Note [Discard boxity when summarising lazy demands]
+    args' = map keepOnlyStrictUnboxedBoxity args
+    !dmd_ty' = DmdType fvs (take arity args') div
+
+-- | Keeps recursive Boxity info as long as we follow a chain of strict and
+-- 'Unboxed' demands. Corollary: Replaces topdown all Boxity with 'Boxed' as
+-- soon as we hit the first lazy or 'Boxed' occurrence.
+--
+-- Examples:
+-- > kosub "L!P(..)" == "LP(..)"
+-- > kosub "LP(S!P(S!P(..)))" == "LP(SP(SP(..)))"
+-- > kosub "SP(S!P(..))" == "SP(SP(..))"
+keepOnlyStrictUnboxedBoxity :: Demand -> Demand
+keepOnlyStrictUnboxedBoxity = go_dmd True
+  where
+    go_dmd try_unboxing (D n b sd)
+      | try_unboxing, isStrict n, Unboxed <- b = D n b     (go_sd True  sd)
+      | otherwise                              = D n Boxed (go_sd False sd)
+    go_sd try_unboxing (Prod ds) = Prod (strictMap (go_dmd try_unboxing) ds)
+    go_sd _            sd        = sd -- the other subdemands don't have Boxity
 
 mkClosedDmdSig :: [Demand] -> Divergence -> DmdSig
 mkClosedDmdSig ds res = mkDmdSigForArity (length ds) (DmdType emptyDmdEnv ds res)
@@ -1550,16 +1649,16 @@ dmdTransformDataConSig arity sd = case go arity sd of
 dmdTransformDictSelSig :: DmdSig -> DmdTransformer
 -- NB: This currently doesn't handle newtype dictionaries and it's unclear how
 -- it could without additional parameters.
-dmdTransformDictSelSig (DmdSig (DmdType _ [(_ :* sig_sd)] _)) call_sd
+dmdTransformDictSelSig (DmdSig (DmdType _ [D _ b prod] _)) call_sd
    | (n, sd') <- peelCallDmd call_sd
-   , Prod sig_ds  <- sig_sd
+   , Prod sig_ds <- prod
    = multDmdType n $
-     DmdType emptyDmdEnv [C_11 :* Prod (map (enhance sd') sig_ds)] topDiv
+     DmdType emptyDmdEnv [D C_11 b (Prod (map (enhance sd') sig_ds))] topDiv
    | otherwise
    = nopDmdType -- See Note [Demand transformer for a dictionary selector]
   where
-    enhance sd old | isAbsDmd old = old
-                   | otherwise    = C_11 :* sd  -- This is the one!
+    enhance sd old@(D n b _) | isAbs n   = old
+                             | otherwise = D n b sd  -- This is the one!
 
 dmdTransformDictSelSig sig sd = pprPanic "dmdTransformDictSelSig: no args" (ppr sig $$ ppr sd)
 
@@ -1682,7 +1781,7 @@ kill_usage_card kfs C_11 | kf_used_once kfs = C_1N
 kill_usage_card _   n                       = n
 
 kill_usage :: KillFlags -> Demand -> Demand
-kill_usage kfs (n :* sd) = kill_usage_card kfs n :* kill_usage_sd kfs sd
+kill_usage kfs (D n b sd) = D (kill_usage_card kfs n) b (kill_usage_sd kfs sd)
 
 kill_usage_sd :: KillFlags -> SubDemand -> SubDemand
 kill_usage_sd kfs (Call n sd)
@@ -1706,8 +1805,8 @@ data TypeShape -- See Note [Trimming a demand to a type]
 
 trimToType :: Demand -> TypeShape -> Demand
 -- See Note [Trimming a demand to a type] in GHC.Core.Opt.DmdAnal
-trimToType (n :* sd) ts
-  = n :* go sd ts
+trimToType (D n b sd) ts
+  = D n b (go sd ts)
   where
     go (Prod ds)   (TsProd tss)
       | equalLength ds tss    = Prod (zipWith trimToType ds tss)
@@ -1724,7 +1823,7 @@ trimToType (n :* sd) ts
 -}
 
 seqDemand :: Demand -> ()
-seqDemand (_ :* sd) = seqSubDemand sd
+seqDemand (D _ _ sd) = seqSubDemand sd
 
 seqSubDemand :: SubDemand -> ()
 seqSubDemand (Prod ds)   = seqDemandList ds
@@ -1812,10 +1911,13 @@ instance Outputable Card where
 
 -- | See Note [Demand notation]
 instance Outputable Demand where
-  ppr dmd@(n :* sd)
-    | isAbs n          = ppr n   -- If absent, sd is arbitrary
+  ppr dmd@(D n b sd)
+    | isAbs n          = ppr n   -- If absent, sd is arbitrary and b is irrelevant
     | dmd == polyDmd n = ppr n   -- Print UU as just U
-    | otherwise        = ppr n <> ppr sd
+    | otherwise        = ppr n <> pp_boxity b <> ppr sd
+    where
+      pp_boxity Unboxed = char '!'
+      pp_boxity _       = empty
 
 -- | See Note [Demand notation]
 instance Outputable SubDemand where
@@ -1870,8 +1972,8 @@ instance Binary Card where
       _ -> pprPanic "Binary:Card" (ppr (fromIntegral h :: Int))
 
 instance Binary Demand where
-  put_ bh (n :* sd) = put_ bh n *> put_ bh sd
-  get bh = (:*) <$> get bh <*> get bh
+  put_ bh (D n b sd) = put_ bh n *> put_ bh b *> put_ bh sd
+  get bh = D <$> get bh <*> get bh <*> get bh
 
 instance Binary SubDemand where
   put_ bh (Poly sd)   = putByte bh 0 *> put_ bh sd

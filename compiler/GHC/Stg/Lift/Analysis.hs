@@ -333,7 +333,7 @@ rhsCard bndr
   where
     is_thunk = idArity bndr == 0
     -- Let's pray idDemandInfo is still OK after unarise...
-    n :* cd = idDemandInfo bndr
+    D n _boxity cd = idDemandInfo bndr
 
 tagSkeletonAlt :: CgStgAlt -> (Skeleton, IdSet, LlStgAlt)
 tagSkeletonAlt (con, bndrs, rhs)
