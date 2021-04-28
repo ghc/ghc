@@ -291,4 +291,9 @@ DARWIN = YES
 else
 DARWIN = NO
 endif
+ifeq "$(HostOS)" "freebsd"
+FREEBSD = YES
+else
+FREEBSD = NO
+endif
 
