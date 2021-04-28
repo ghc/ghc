@@ -66,6 +66,7 @@ import GHC.Utils.Misc
 
 import Control.Monad    ( guard )
 import Data.IORef
+import qualified Data.Set as Set
 
 runHsc :: HscEnv -> Hsc a -> IO a
 runHsc hsc_env (Hsc hsc) = do
@@ -200,10 +201,27 @@ hptAnns hsc_env Nothing = hptAllThings (md_anns . hm_details) hsc_env
 hptAllThings :: (HomeModInfo -> [a]) -> HscEnv -> [a]
 hptAllThings extract hsc_env = concatMap extract (eltsHpt (hsc_HPT hsc_env))
 
+hptModulesBelow :: Bool -> HscEnv -> [ModuleNameWithIsBoot] -> Set.Set ModuleNameWithIsBoot
+hptModulesBelow include_boot hsc_env mn = go mn Set.empty
+  where
+    hpt = hsc_HPT hsc_env
+
+    go [] seen = seen
+    go (mn:mns) seen
+      | mn `Set.member` seen = go mns seen
+      | otherwise =
+          case lookupHpt hpt (gwib_mod mn) of
+              -- Not a home module
+              Nothing -> Set.empty
+              Just hmi
+                | include_boot || (gwib_isBoot mn == NotBoot) ->
+                  go (dep_direct_mods (mi_deps (hm_iface hmi)) ++ mns) (Set.insert mn seen)
+                | otherwise -> go (dep_direct_mods (mi_deps (hm_iface hmi)) ++ mns) seen
+
 -- | Get things from modules "below" this one (in the dependency sense)
 -- C.f Inst.hptInstances
 hptSomeThingsBelowUs :: (HomeModInfo -> [a]) -> Bool -> HscEnv -> [ModuleNameWithIsBoot] -> [a]
-hptSomeThingsBelowUs extract include_hi_boot hsc_env deps
+hptSomeThingsBelowUs extract include_hi_boot hsc_env mod
   | isOneShot (ghcMode (hsc_dflags hsc_env)) = []
 
   | otherwise
@@ -211,7 +229,7 @@ hptSomeThingsBelowUs extract include_hi_boot hsc_env deps
     in
     [ thing
     |   -- Find each non-hi-boot module below me
-      GWIB { gwib_mod = mod, gwib_isBoot = is_boot } <- deps
+      GWIB { gwib_mod = mod, gwib_isBoot = is_boot } <- Set.toList (hptModulesBelow include_hi_boot hsc_env mod)
     , include_hi_boot || (is_boot == NotBoot)
 
         -- unsavoury: when compiling the base package with --make, we
@@ -242,7 +260,7 @@ prepareAnnotations hsc_env mb_guts = do
         -- Extract dependencies of the module if we are supplied one,
         -- otherwise load annotations from all home package table
         -- entries regardless of dependency ordering.
-        home_pkg_anns  = (mkAnnEnv . hptAnns hsc_env) $ fmap (dep_mods . mg_deps) mb_guts
+        home_pkg_anns  = (mkAnnEnv . hptAnns hsc_env) $ fmap (dep_direct_mods . mg_deps) mb_guts
         other_pkg_anns = eps_ann_env eps
         ann_env        = foldl1' plusAnnEnv $ catMaybes [mb_this_module_anns,
                                                          Just home_pkg_anns,
