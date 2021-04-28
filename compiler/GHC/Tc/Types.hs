@@ -81,7 +81,10 @@ module GHC.Tc.Types(
         lookupRoleAnnot, getRoleAnnots,
 
         -- Linting
-        lintGblEnv
+        lintGblEnv,
+
+        -- Diagnostics
+        TcRnMessage
   ) where
 
 #include "HsVersions.h"
@@ -100,6 +103,7 @@ import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Evidence
 import {-# SOURCE #-} GHC.Tc.Errors.Hole.FitTypes ( HoleFitPlugin )
+import GHC.Tc.Errors.Types
 
 import GHC.Core.Type
 import GHC.Core.TyCon  ( TyCon, tyConKind )
@@ -130,7 +134,6 @@ import GHC.Types.Unique.FM
 import GHC.Types.Basic
 import GHC.Types.CostCentre.State
 import GHC.Types.HpcInfo
-import GHC.Types.Error ( DiagnosticMessage )
 
 import GHC.Data.IOEnv
 import GHC.Data.Bag
@@ -560,10 +563,17 @@ data TcGblEnv
                                              -- function, if this module is
                                              -- the main module.
 
-        tcg_safeInfer :: TcRef (Bool, WarningMessages),
-        -- ^ Has the typechecker inferred this module as -XSafe (Safe Haskell)
+        tcg_safe_infer :: TcRef Bool,
+        -- ^ Has the typechecker inferred this module as -XSafe (Safe Haskell)?
         -- See Note [Safe Haskell Overlapping Instances Implementation],
         -- although this is used for more than just that failure case.
+
+        tcg_safe_infer_reasons :: TcRef (Messages TcRnMessage),
+        -- ^ Unreported reasons why tcg_safe_infer is False.
+        -- INVARIANT: If this Messages is non-empty, then tcg_safe_infer is False.
+        -- It may be that tcg_safe_infer is False but this is empty, if no reasons
+        -- are supplied (#19714), or if those reasons have already been
+        -- reported by GHC.Driver.Main.markUnsafeInfer
 
         tcg_tc_plugins :: [TcPluginSolver],
         -- ^ A list of user-defined plugins for the constraint solver.
@@ -769,7 +779,7 @@ data TcLclEnv           -- Changes as we move inside an expression
                                       -- and for tidying types
 
         tcl_lie  :: TcRef WantedConstraints,    -- Place to accumulate type constraints
-        tcl_errs :: TcRef (Messages DiagnosticMessage)     -- Place to accumulate errors
+        tcl_errs :: TcRef (Messages TcRnMessage)     -- Place to accumulate diagnostics
     }
 
 setLclEnvTcLevel :: TcLclEnv -> TcLevel -> TcLclEnv
