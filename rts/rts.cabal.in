@@ -135,7 +135,7 @@ library
 
     include-dirs: build ../includes includes
                   includes/dist-derivedconstants/header @FFIIncludeDir@
-                  @LibdwIncludeDir@
+                  @LibdwIncludeDir@ @LibsystemtapIncludeDir@
     includes: Stg.h
     install-includes: Cmm.h HsFFI.h MachDeps.h Rts.h RtsAPI.h Stg.h
                       ghcautoconf.h ghcconfig.h ghcplatform.h ghcversion.h
