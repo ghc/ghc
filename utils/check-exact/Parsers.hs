@@ -54,6 +54,7 @@ import qualified Control.Monad.IO.Class as GHC
 import qualified GHC.Data.FastString    as GHC
 import qualified GHC.Data.StringBuffer  as GHC
 import qualified GHC.Driver.Config      as GHC
+import qualified GHC.Driver.Errors.Types as GHC
 import qualified GHC.Driver.Session     as GHC
 import qualified GHC.Parser             as GHC
 import qualified GHC.Parser.Header      as GHC
@@ -61,7 +62,6 @@ import qualified GHC.Parser.Lexer       as GHC
 import qualified GHC.Parser.PostProcess as GHC
 import qualified GHC.Parser.Errors.Ppr  as GHC
 import qualified GHC.Types.SrcLoc       as GHC
-import qualified GHC.Utils.Error        as GHC
 
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -79,8 +79,10 @@ parseWith :: GHC.DynFlags
           -> ParseResult w
 parseWith dflags fileName parser s =
   case runParser parser dflags fileName s of
-    GHC.PFailed pst                     -> Left (fmap GHC.mkParserErr $ GHC.getErrorMessages pst)
-    GHC.POk _ pmod -> Right pmod
+    GHC.PFailed pst
+      -> Left (GHC.foldPsMessages GHC.mkParserErr (GHC.getErrorMessages pst))
+    GHC.POk _ pmod
+      -> Right pmod
 
 
 parseWithECP :: (GHC.DisambECP w)
@@ -91,8 +93,10 @@ parseWithECP :: (GHC.DisambECP w)
           -> ParseResult (GHC.LocatedA w)
 parseWithECP dflags fileName parser s =
     case runParser (parser >>= \p -> GHC.runPV $ GHC.unECP p) dflags fileName s of
-      GHC.PFailed pst                     -> Left (fmap GHC.mkParserErr $ GHC.getErrorMessages pst)
-      GHC.POk _ pmod -> Right pmod
+      GHC.PFailed pst
+        -> Left (GHC.foldPsMessages GHC.mkParserErr (GHC.getErrorMessages pst))
+      GHC.POk _ pmod
+        -> Right pmod
 
 -- ---------------------------------------------------------------------
 
@@ -182,8 +186,10 @@ parseModuleFromStringInternal :: Parser GHC.ParsedSource
 parseModuleFromStringInternal dflags fileName str =
   let (str1, lp) = stripLinePragmas str
       res        = case runParser GHC.parseModule dflags fileName str1 of
-        GHC.PFailed pst     -> Left (fmap GHC.mkParserErr $ GHC.getErrorMessages pst)
-        GHC.POk     _  pmod -> Right (lp, dflags, pmod)
+        GHC.PFailed pst
+          -> Left (GHC.foldPsMessages GHC.mkParserErr (GHC.getErrorMessages pst))
+        GHC.POk     _  pmod
+          -> Right (lp, dflags, pmod)
   in  postParseTransform res
 
 parseModuleWithOptions :: FilePath -- ^ GHC libdir
@@ -253,9 +259,10 @@ parseModuleEpAnnsWithCppInternal cppOptions dflags file = do
         return (contents1,lp,dflags)
   return $
     case parseFile dflags' file fileContents of
-      GHC.PFailed pst -> Left (fmap GHC.mkParserErr $ GHC.getErrorMessages pst)
-      GHC.POk _ pmod  ->
-        Right $ (injectedComments, dflags', pmod)
+      GHC.PFailed pst
+        -> Left (GHC.foldPsMessages GHC.mkParserErr (GHC.getErrorMessages pst))
+      GHC.POk _ pmod
+        -> Right $ (injectedComments, dflags', pmod)
 
 -- | Internal function. Exposed if you want to muck with DynFlags
 -- before parsing. Or after parsing.
