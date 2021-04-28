@@ -32,7 +32,8 @@ import GHC.Core.Utils
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.FVs      ( rulesRhsFreeIds, bndrRuleAndUnfoldingIds )
-import GHC.Core.Coercion ( Coercion, coVarsOfCo )
+import GHC.Core.Coercion ( Coercion )
+import GHC.Core.TyCo.FVs ( coVarsOfCos )
 import GHC.Core.FamInstEnv
 import GHC.Core.Opt.Arity ( typeArity )
 import GHC.Utils.Misc
@@ -276,8 +277,10 @@ dmdAnalBindLetUp top_lvl env id rhs anal_body = WithDmdType final_ty (R (NonRec 
   where
     WithDmdType body_ty body'   = anal_body env
     WithDmdType body_ty' id_dmd = findBndrDmd env body_ty id
-    !id'                = setBindIdDemandInfo top_lvl id id_dmd
-    (rhs_ty, rhs')     = dmdAnalStar env (dmdTransformThunkDmd rhs id_dmd) rhs
+    -- See Note [Demand signature and worker/wrapper should agree on Boxity]
+    id_dmd'            = finaliseBoxity (ae_fam_envs env) (idType id) id_dmd
+    !id'               = setBindIdDemandInfo top_lvl id id_dmd'
+    (rhs_ty, rhs')     = dmdAnalStar env (dmdTransformThunkDmd rhs id_dmd') rhs
 
     -- See Note [Absence analysis for stable unfoldings and RULES]
     rule_fvs           = bndrRuleAndUnfoldingIds id
@@ -427,8 +430,11 @@ dmdAnal' env dmd (Case scrut case_bndr ty [Alt alt bndrs rhs])
         WithDmdType rhs_ty rhs'           = dmdAnal env dmd rhs
         WithDmdType alt_ty1 dmds          = findBndrsDmds env rhs_ty bndrs
         WithDmdType alt_ty2 case_bndr_dmd = findBndrDmd env alt_ty1 case_bndr
+        !case_bndr'                       = setIdDemandInfo case_bndr case_bndr_dmd
         -- Evaluation cardinality on the case binder is irrelevant and a no-op.
         -- What matters is its nested sub-demand!
+        -- NB: If case_bndr_dmd is absDmd, boxity will say Unboxed, which is
+        -- what we want, because then `seq` will put a `seqDmd` on its scrut.
         (_ :* case_bndr_sd) = case_bndr_dmd
         -- Compute demand on the scrutinee
         -- FORCE the result, otherwise thunks will end up retaining the
@@ -436,9 +442,9 @@ dmdAnal' env dmd (Case scrut case_bndr ty [Alt alt bndrs rhs])
         !(!bndrs', !scrut_sd)
           | DataAlt _ <- alt
           , id_dmds <- addCaseBndrDmd case_bndr_sd dmds
-          -- See Note [Demand on scrutinee of a product case]
+          -- See Note [Demand on the scrutinee of a product case]
           = let !new_info = setBndrsDemandInfo bndrs id_dmds
-                !new_prod = mkProd id_dmds
+                !new_prod = mkProd Unboxed id_dmds
             in (new_info, new_prod)
           | otherwise
           -- __DEFAULT and literal alts. Simply add demands and discard the
@@ -454,7 +460,6 @@ dmdAnal' env dmd (Case scrut case_bndr ty [Alt alt bndrs rhs])
 
         WithDmdType scrut_ty scrut' = dmdAnal env scrut_sd scrut
         res_ty             = alt_ty3 `plusDmdType` toPlusDmdArg scrut_ty
-        !case_bndr'        = setIdDemandInfo case_bndr case_bndr_dmd
     in
 --    pprTrace "dmdAnal:Case1" (vcat [ text "scrut" <+> ppr scrut
 --                                   , text "dmd" <+> ppr dmd
@@ -482,8 +487,9 @@ dmdAnal' env dmd (Case scrut case_bndr ty alts)
             WithDmdType rest_ty as' = combineAltDmds as
           in WithDmdType (lubDmdType cur_ty rest_ty) (a':as')
 
-        WithDmdType scrut_ty scrut'   = dmdAnal env topSubDmd scrut
-        WithDmdType alt_ty1 case_bndr' = annotateBndr env alt_ty case_bndr
+        WithDmdType alt_ty1 case_bndr_dmd = findBndrDmd env alt_ty case_bndr
+        !case_bndr'                       = setIdDemandInfo case_bndr case_bndr_dmd
+        WithDmdType scrut_ty scrut'       = dmdAnal env topSubDmd scrut
                                -- NB: Base case is botDmdType, for empty case alternatives
                                --     This is a unit for lubDmdType, and the right result
                                --     when there really are no alternatives
@@ -725,43 +731,42 @@ strict in |y|.
 ************************************************************************
 -}
 
-dmdTransform :: AnalEnv         -- ^ The strictness environment
-             -> Id              -- ^ The function
-             -> SubDemand       -- ^ The demand on the function
-             -> DmdType         -- ^ The demand type of the function in this context
-                                -- Returned DmdEnv includes the demand on
-                                -- this function plus demand on its free variables
-
+dmdTransform :: AnalEnv   -- ^ The analysis environment
+             -> Id        -- ^ The variable
+             -> SubDemand -- ^ The evaluation context of the var
+             -> DmdType   -- ^ The demand type unleashed by the variable in this
+                          -- context. The returned DmdEnv includes the demand on
+                          -- this function plus demand on its free variables
 -- See Note [What are demand signatures?] in "GHC.Types.Demand"
-dmdTransform env var dmd
+dmdTransform env var sd
   -- Data constructors
   | isDataConWorkId var
-  = dmdTransformDataConSig (idArity var) dmd
+  = dmdTransformDataConSig (idArity var) sd
   -- Dictionary component selectors
   -- Used to be controlled by a flag.
   -- See #18429 for some perf measurements.
   | Just _ <- isClassOpId_maybe var
-  = -- pprTrace "dmdTransform:DictSel" (ppr var $$ ppr dmd) $
-    dmdTransformDictSelSig (idDmdSig var) dmd
+  = -- pprTrace "dmdTransform:DictSel" (ppr var $$ ppr (idDmdSig var) $$ ppr sd) $
+    dmdTransformDictSelSig (idDmdSig var) sd
   -- Imported functions
   | isGlobalId var
-  , let res = dmdTransformSig (idDmdSig var) dmd
-  = -- pprTrace "dmdTransform:import" (vcat [ppr var, ppr (idDmdSig var), ppr dmd, ppr res])
+  , let res = dmdTransformSig (idDmdSig var) sd
+  = -- pprTrace "dmdTransform:import" (vcat [ppr var, ppr (idDmdSig var), ppr sd, ppr res])
     res
   -- Top-level or local let-bound thing for which we use LetDown ('useLetUp').
   -- In that case, we have a strictness signature to unleash in our AnalEnv.
   | Just (sig, top_lvl) <- lookupSigEnv env var
-  , let fn_ty = dmdTransformSig sig dmd
-  = -- pprTrace "dmdTransform:LetDown" (vcat [ppr var, ppr sig, ppr dmd, ppr fn_ty]) $
+  , let fn_ty = dmdTransformSig sig sd
+  = -- pprTrace "dmdTransform:LetDown" (vcat [ppr var, ppr sig, ppr sd, ppr fn_ty]) $
     case top_lvl of
-      NotTopLevel -> addVarDmd fn_ty var (C_11 :* dmd)
+      NotTopLevel -> addVarDmd fn_ty var (C_11 :* sd)
       TopLevel
         | isInterestingTopLevelFn var
         -- Top-level things will be used multiple times or not at
         -- all anyway, hence the multDmd below: It means we don't
         -- have to track whether @var@ is used strictly or at most
         -- once, because ultimately it never will.
-        -> addVarDmd fn_ty var (C_0N `multDmd` (C_11 :* dmd)) -- discard strictness
+        -> addVarDmd fn_ty var (C_0N `multDmd` (C_11 :* sd)) -- discard strictness
         | otherwise
         -> fn_ty -- don't bother tracking; just annotate with 'topDmd' later
   -- Everything else:
@@ -769,8 +774,8 @@ dmdTransform env var dmd
   --   * Lambda binders
   --   * Case and constructor field binders
   | otherwise
-  = -- pprTrace "dmdTransform:other" (vcat [ppr var, ppr sig, ppr dmd, ppr res]) $
-    unitDmdType (unitVarEnv var (C_11 :* dmd))
+  = -- pprTrace "dmdTransform:other" (vcat [ppr var, ppr boxity, ppr sd]) $
+    unitDmdType (unitVarEnv var (C_11 :* sd))
 
 {- *********************************************************************
 *                                                                      *
@@ -805,10 +810,11 @@ dmdAnalRhsSig top_lvl rec_flag env let_dmd id rhs
     rhs_dmd -- See Note [Demand analysis for join points]
             -- See Note [Invariants on join points] invariant 2b, in GHC.Core
             --     rhs_arity matches the join arity of the join point
+            -- See Note [Unboxed demands on recursive function bodies]
             | isJoinId id
-            = mkCalledOnceDmds rhs_arity let_dmd
+            = mkCalledOnceDmds rhs_arity (unboxedWhenRec rec_flag let_dmd)
             | otherwise
-            = mkCalledOnceDmds rhs_arity topSubDmd
+            = mkCalledOnceDmds rhs_arity (unboxedWhenRec rec_flag topSubDmd)
 
     WithDmdType rhs_dmd_ty rhs' = dmdAnal env rhs_dmd rhs
     DmdType rhs_fv rhs_dmds rhs_div = rhs_dmd_ty
@@ -829,6 +835,7 @@ dmdAnalRhsSig top_lvl rec_flag env let_dmd id rhs
     --        might turn into used-many even if the signature was stable and
     --        we'd have to do an additional iteration. reuseEnv makes sure that
     --        we never get used-once info for FVs of recursive functions.
+    --        See #14816 where we try to get rid of reuseEnv.
     rhs_fv1 = case rec_flag of
                 Recursive    -> reuseEnv rhs_fv
                 NonRecursive -> rhs_fv
@@ -838,6 +845,10 @@ dmdAnalRhsSig top_lvl rec_flag env let_dmd id rhs
 
     -- See Note [Lazy and unleashable free variables]
     !(!lazy_fv, !sig_fv) = partitionVarEnv isWeakDmd rhs_fv2
+
+unboxedWhenRec :: RecFlag -> SubDemand -> SubDemand
+-- See Note [Unboxed demands on recursive function bodies]
+unboxedWhenRec rec_flag = applyWhen (isRec rec_flag) unboxSubDemand
 
 -- | If given the (local, non-recursive) let-bound 'Id', 'useLetUp' determines
 -- whether we should process the binding up (body before rhs) or down (rhs
@@ -1057,9 +1068,14 @@ Now f's optimised RHS will be \x.a, but if we change g to (error "..")
 disaster.  But regardless, #18638 was a more complicated version of
 this, that actually happened in practice.
 
-Historical Note [Product demands for function body]
+Note [Unboxed demands on recursive function bodies]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In 2013 I spotted this example, in shootout/binary_trees:
+Bottom line here is that we analyse recursive function bodies with an unboxing
+demand (optimistically!), but non-recursive ones with a boxed demand (the proper
+conservative thing), because it simultaneously satisfies #17932 and #4267.
+Here is a bit more background:
+
+In 2013, SPJ spotted this example, in shootout/binary_trees:
 
     Main.check' = \ b z ds. case z of z' { I# ip ->
                                 case ds_d13s of
@@ -1075,15 +1091,37 @@ In 2013 I spotted this example, in shootout/binary_trees:
                                      s14m   }   }   }
 
 Here we *really* want to unbox z, even though it appears to be used boxed in
-the Nil case.  Partly the Nil case is not a hot path.  But more specifically,
+the Nil case.  Partly the Nil case is not a hot path. But more specifically,
 the whole function gets the CPR property if we do.
 
 That motivated using a demand of C1(C1(C1(P(L,L)))) for the RHS, where
 (solely because the result was a product) we used a product demand
-(albeit with lazy components) for the body. But that gives very silly
-behaviour -- see #17932.   Happily it turns out now to be entirely
-unnecessary: we get good results with C1(C1(C1(L))).   So I simply
-deleted the special case.
+(albeit with lazy components) for the body. But that gave very silly
+behaviour for non-recursive functions -- see #17932. After deletion, it turned
+out that we get good results with just C1(C1(C1(L))) most of the time.
+
+But there were casualties: #4267 regressed. While implementing a proper boxity
+analysis (#19871), we also noticed that testcases join004 and join007 regress
+because we were inferring a boxity that was too optimistic before.
+These examples are directly contradicting #17932, which strives for less
+unboxing. But there's a crucial difference: All examples that benefit are
+*recursive* functions that can discount the potential O(1) reboxing cost in the
+exit (Nil) case with O(1) less allocations in the inductive (Node) case, which
+means an O(n) reduction for n iterations of the loop are taken.
+One the other hand, T17932 defines a *non-recursive* function where no such
+discount applies.
+Keeping track of those discounts is a challenging analysis in itself; the simple
+thing for now is to put an unboxing demand on *all* recursive function bodies,
+whether they can offset reboxing or not, and a conservative boxed demand on
+nonrec ones. It's quite simple to come up with recursive functions the body of
+which we rather shouldn't analyse with an unboxing demand. We could simply make
+the offending function from T17932 recursive:
+
+  flags 0 (Options f x) = <huge> `seq` f
+  flags n o             = flags (n-1) o
+
+We will unbox f here when we better should not. But it appears those functions
+are rare in practice, so we pretend it doesn't happen.
 -}
 
 {- *********************************************************************
@@ -1231,8 +1269,11 @@ unitDmdType :: DmdEnv -> DmdType
 unitDmdType dmd_env = DmdType dmd_env [] topDiv
 
 coercionDmdEnv :: Coercion -> DmdEnv
-coercionDmdEnv co = mapVarEnv (const topDmd) (getUniqSet $ coVarsOfCo co)
-                    -- The VarSet from coVarsOfCo is really a VarEnv Var
+coercionDmdEnv co = coercionsDmdEnv [co]
+
+coercionsDmdEnv :: [Coercion] -> DmdEnv
+coercionsDmdEnv cos = mapVarEnv (const topDmd) (getUniqSet $ coVarsOfCos cos)
+                      -- The VarSet from coVarsOfCos is really a VarEnv Var
 
 addVarDmd :: DmdType -> Var -> Demand -> DmdType
 addVarDmd (DmdType fv ds res) var dmd
@@ -1283,18 +1324,6 @@ setBndrsDemandInfo (b:bs) (d:ds) =
 setBndrsDemandInfo [] ds = assert (null ds) []
 setBndrsDemandInfo bs _  = pprPanic "setBndrsDemandInfo" (ppr bs)
 
-annotateBndr :: AnalEnv -> DmdType -> Var -> WithDmdType Var
--- The returned env has the var deleted
--- The returned var is annotated with demand info
--- according to the result demand of the provided demand type
--- No effect on the argument demands
-annotateBndr env dmd_ty var
-  | isId var  = WithDmdType dmd_ty' new_id
-  | otherwise = WithDmdType dmd_ty  var
-  where
-    new_id = setIdDemandInfo var dmd
-    WithDmdType dmd_ty' dmd = findBndrDmd env dmd_ty var
-
 annotateLamIdBndr :: AnalEnv
                   -> DmdType    -- Demand type of body
                   -> Id         -- Lambda binder
@@ -1308,8 +1337,10 @@ annotateLamIdBndr env dmd_ty id
     -- pprTrace "annLamBndr" (vcat [ppr id, ppr dmd_ty, ppr final_ty]) $
     WithDmdType main_ty new_id
   where
-    new_id  = setIdDemandInfo id dmd
-    main_ty = addDemand dmd dmd_ty'
+    -- See Note [Demand signature and worker/wrapper should agree on Boxity]
+    dmd'    = finaliseBoxity (ae_fam_envs env) (idType id) dmd
+    new_id  = setIdDemandInfo id dmd'
+    main_ty = addDemand dmd' dmd_ty'
     WithDmdType dmd_ty' dmd = findBndrDmd env dmd_ty id
 
 {- Note [NOINLINE and strictness]
@@ -1378,6 +1409,32 @@ we do when aborting a fixed-point iteration? The we risk losing the information
 that the strict variables are being used. In that case, we take all free variables
 mentioned in the (unsound) strictness signature, conservatively approximate the
 demand put on them (topDmd), and add that to the "lazy_fv" returned by "dmdFix".
+
+Note [Demand signature and worker/wrapper should agree on Boxity]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider T19407:
+
+  data Huge = Huge Bool () ... () -- think: DynFlags
+  data T = T { h :: Huge, n :: Int }
+  f t@(T h _) = g h t
+  g (H b _ ... _) t = if b then 1 else n t
+
+The body of `g` puts (approx.) demand `L!P(A,1)` on `t`. But we better
+not put that demand in `g`'s signature, because worker/wrapper will not
+in general unbox a demand like `L!P(..)`.
+(The exception are known-to-be-evaluated arguments like strict fields,
+see Note [Unbox evaluated arguments].)
+
+The program above is an example where disagreement between W/W and DmdAnal
+is particularly egregious. If we give `g` that signature, then `f` puts demand
+`S!P(1!P(1L,A,..),ML)` on `t` and we get
+
+  f (T (H b _ ... _) n) = $wf b n
+  $wf b n = $wg b (T (H b x ... x) n)
+  $wg = ...
+
+Massive reboxing in `$wf`! Solution: Run every demand through 'wantToUnboxArg',
+which is done by 'finaliseBoxity'.
 
 
 ************************************************************************
@@ -1474,7 +1531,7 @@ findBndrDmd env dmd_ty id
       -- See Note [Making dictionaries strict]
       | ae_strict_dicts env
              -- We never want to strictify a recursive let. At the moment
-             -- annotateBndr is only call for non-recursive lets; if that
+             -- findBndrDmd is never called for recursive lets; if that
              -- changes, we need a RecFlag parameter and another guard here.
       = strictifyDictDmd id_ty dmd
       | otherwise
