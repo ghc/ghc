@@ -1,0 +1,72 @@
+
+==================== Strictness signatures ====================
+T19871.$tc'Huge:
+T19871.$tcHuge:
+T19871.$trModule:
+T19871.absent: <1!P(1L,ML,A,A,A,A,A,A,A,A,A,A)>
+T19871.ann: <1P(SL,L,L,L,L,L,L,L,L,L,L,L)>
+T19871.f1: <1!P(1L,A,A,A,A,A,A,A,A,A,A,A)>
+T19871.f10: <1!P(A,A,A,A,A,A,A,A,A,1L,A,A)>
+T19871.f11: <1!P(A,A,A,A,A,A,A,A,A,A,1L,A)>
+T19871.f12: <1!P(A,A,A,A,A,A,A,A,A,A,A,1L)>
+T19871.f2: <1!P(A,1L,A,A,A,A,A,A,A,A,A,A)>
+T19871.f3: <1!P(A,A,1L,A,A,A,A,A,A,A,A,A)>
+T19871.f4: <1!P(A,A,A,1L,A,A,A,A,A,A,A,A)>
+T19871.f5: <1!P(A,A,A,A,1L,A,A,A,A,A,A,A)>
+T19871.f6: <1!P(A,A,A,A,A,1L,A,A,A,A,A,A)>
+T19871.f7: <1!P(A,A,A,A,A,A,1L,A,A,A,A,A)>
+T19871.f8: <1!P(A,A,A,A,A,A,A,1L,A,A,A,A)>
+T19871.f9: <1!P(A,A,A,A,A,A,A,A,1L,A,A,A)>
+T19871.guarded: <MCM(L)><1!P(SL,L,L,L,L,L,L,L,L,L,L,L)>
+T19871.sumIO: <1!P(1L)><1!L><L>
+T19871.update: <1!P(SL,L,L,L,L,L,L,L,L,L,L,L)>
+
+
+
+==================== Cpr signatures ====================
+T19871.$tc'Huge:
+T19871.$tcHuge:
+T19871.$trModule:
+T19871.absent: 1
+T19871.ann: 1
+T19871.f1:
+T19871.f10:
+T19871.f11:
+T19871.f12:
+T19871.f2:
+T19871.f3:
+T19871.f4:
+T19871.f5:
+T19871.f6:
+T19871.f7:
+T19871.f8:
+T19871.f9:
+T19871.guarded:
+T19871.sumIO: 1(, 1)
+T19871.update: 1
+
+
+
+==================== Strictness signatures ====================
+T19871.$tc'Huge:
+T19871.$tcHuge:
+T19871.$trModule:
+T19871.absent: <1!P(1L,ML,A,A,A,A,A,A,A,A,A,A)>
+T19871.ann: <1P(SL,L,L,L,L,L,L,L,L,L,L,L)>
+T19871.f1: <1!P(1L,A,A,A,A,A,A,A,A,A,A,A)>
+T19871.f10: <1!P(A,A,A,A,A,A,A,A,A,1L,A,A)>
+T19871.f11: <1!P(A,A,A,A,A,A,A,A,A,A,1L,A)>
+T19871.f12: <1!P(A,A,A,A,A,A,A,A,A,A,A,1L)>
+T19871.f2: <1!P(A,1L,A,A,A,A,A,A,A,A,A,A)>
+T19871.f3: <1!P(A,A,1L,A,A,A,A,A,A,A,A,A)>
+T19871.f4: <1!P(A,A,A,1L,A,A,A,A,A,A,A,A)>
+T19871.f5: <1!P(A,A,A,A,1L,A,A,A,A,A,A,A)>
+T19871.f6: <1!P(A,A,A,A,A,1L,A,A,A,A,A,A)>
+T19871.f7: <1!P(A,A,A,A,A,A,1L,A,A,A,A,A)>
+T19871.f8: <1!P(A,A,A,A,A,A,A,1L,A,A,A,A)>
+T19871.f9: <1!P(A,A,A,A,A,A,A,A,1L,A,A,A)>
+T19871.guarded: <MCM(L)><1!P(SL,L,L,L,L,L,L,L,L,L,L,L)>
+T19871.sumIO: <1!P(1L)><1!L><L>
+T19871.update: <1!P(SL,L,L,L,L,L,L,L,L,L,L,L)>
+
+

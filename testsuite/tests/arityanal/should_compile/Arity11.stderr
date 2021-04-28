@@ -73,7 +73,7 @@ F11.$wfib
 fib [InlPrag=[2]] :: forall {t} {a}. (Eq t, Num t, Num a) => t -> a
 [GblId,
  Arity=4,
- Str=<1P(SCS(C1(L)),A)><LP(A,LCL(C1(L)),A,A,A,A,L)><LP(LCL(C1(L)),A,A,A,A,A,L)><L>,
+ Str=<1!P(SCS(C1(L)),A)><LP(A,LCL(C1(L)),A,A,A,A,L)><LP(LCL(C1(L)),A,A,A,A,A,L)><L>,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=4,unsat_ok=True,boring_ok=False)
          Tmpl= \ (@t) (@a) (w [Occ=Once1!] :: Eq t) (w1 [Occ=Once1] :: Num t) (w2 [Occ=Once1] :: Num a) (w3 [Occ=Once1] :: t) -> case w of { GHC.Classes.C:Eq ww [Occ=Once1] _ [Occ=Dead] -> F11.$wfib @t @a ww w1 w2 w3 }}]
 fib = \ (@t) (@a) (w :: Eq t) (w1 :: Num t) (w2 :: Num a) (w3 :: t) -> case w of { GHC.Classes.C:Eq ww ww1 -> F11.$wfib @t @a ww w1 w2 w3 }

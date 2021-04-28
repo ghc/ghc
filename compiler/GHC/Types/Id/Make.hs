@@ -516,9 +516,12 @@ mkDictSelId name clas
 
     strict_sig = mkClosedDmdSig [arg_dmd] topDiv
     arg_dmd | new_tycon = evalDmd
-            | otherwise = C_1N :*
-                          Prod [ if name == sel_name then evalDmd else absDmd
-                               | sel_name <- sel_names ]
+            | otherwise = C_1N :* mkProd Unboxed dict_field_dmds
+            where
+              -- The evalDmd below is just a placeholder and will be replaced in
+              -- GHC.Types.Demand.dmdTransformDictSel
+              dict_field_dmds = [ if name == sel_name then evalDmd else absDmd
+                                | sel_name <- sel_names ]
 
 mkDictSelRhs :: Class
              -> Int         -- 0-indexed selector among (superclasses ++ methods)

@@ -1,0 +1,33 @@
+
+==================== Strictness signatures ====================
+T18907.$tc'H:
+T18907.$tcHuge:
+T18907.$trModule:
+T18907.f: <1!L>
+T18907.g: <1P(SL,L,L,L,L)>
+T18907.h: <1!A><1L>
+T18907.m: <1!B>b
+
+
+
+==================== Cpr signatures ====================
+T18907.$tc'H:
+T18907.$tcHuge:
+T18907.$trModule:
+T18907.f: 1
+T18907.g:
+T18907.h:
+T18907.m: b
+
+
+
+==================== Strictness signatures ====================
+T18907.$tc'H:
+T18907.$tcHuge:
+T18907.$trModule:
+T18907.f: <1!L>
+T18907.g: <1P(SL,L,L,L,L)>
+T18907.h: <1!A><1L>
+T18907.m: <1!B>b
+
+

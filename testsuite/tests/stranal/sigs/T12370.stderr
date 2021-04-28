@@ -1,8 +1,8 @@
 
 ==================== Strictness signatures ====================
 T12370.$trModule:
-T12370.bar: <1P(L)><1P(L)>
-T12370.foo: <1P(1P(L),1P(L))>
+T12370.bar: <1!L><1!L>
+T12370.foo: <1!P(1!L,1!L)>
 
 
 
@@ -15,7 +15,7 @@ T12370.foo: 1
 
 ==================== Strictness signatures ====================
 T12370.$trModule:
-T12370.bar: <1P(L)><1P(L)>
-T12370.foo: <1P(1P(L),1P(L))>
+T12370.bar: <1!L><1!L>
+T12370.foo: <1!P(1!L,1!L)>
 
 

@@ -734,8 +734,6 @@ splitFun ww_opts fn_id rhs
     uf_opts = so_uf_opts (wo_simple_opts ww_opts)
     fn_info = idInfo fn_id
     (arg_vars, body) = collectBinders rhs
-            -- collectBinders was not enough for GHC.Event.IntTable.insertWith
-            -- last time I checked, where manifest lambdas were wrapped in casts
 
     (wrap_dmds, div) = splitDmdSig (dmdSigInfo fn_info)
 
@@ -978,8 +976,7 @@ splitThunk :: WwOpts -> RecFlag -> Var -> Expr Var -> UniqSM [(Var, Expr Var)]
 splitThunk ww_opts is_rec x rhs
   = assert (not (isJoinId x)) $
     do { let x' = localiseId x -- See comment above
-       ; (useful,_, wrap_fn, fn_arg)
-           <- mkWWstr_one ww_opts NotArgOfInlineableFun x'
+       ; (useful,_, wrap_fn, fn_arg) <- mkWWstr_one ww_opts x'
        ; let res = [ (x, Let (NonRec x' rhs) (wrap_fn fn_arg)) ]
        ; if useful then assertPpr (isNonRec is_rec) (ppr x) -- The thunk must be non-recursive
                    return res

@@ -21,14 +21,13 @@ import GHC.Types.Id.Info
 import GHC.Types.Demand
 import GHC.Types.Cpr
 
-import GHC.Core.DataCon
 import GHC.Core.FamInstEnv
-import GHC.Core.Multiplicity
-import GHC.Core.Opt.WorkWrap.Utils
+import GHC.Core.DataCon
 import GHC.Core.Type
 import GHC.Core.Utils
 import GHC.Core
 import GHC.Core.Seq
+import GHC.Core.Opt.WorkWrap.Utils
 
 import GHC.Data.Graph.UnVar -- for UnVarSet
 
@@ -639,30 +638,23 @@ nonVirgin env = env { ae_virgin = False }
 -- See Note [CPR for binders that will be unboxed].
 extendSigEnvForArg :: AnalEnv -> Id -> AnalEnv
 extendSigEnvForArg env id
-  = extendSigEnv env id (CprSig (argCprType env (idType id) (idDemandInfo id)))
+  = extendSigEnv env id (CprSig (argCprType (idDemandInfo id)))
 
 -- | Produces a 'CprType' according to how a strict argument will be unboxed.
 -- Examples:
 --
---   * A head-strict demand @1L@ on @Int@ would translate to @1@
---   * A product demand @1P(1L,L)@ on @(Int, Bool)@ would translate to @1(1,)@
---   * A product demand @1P(1L,L)@ on @(a , Bool)@ would translate to @1(,)@,
---     because the unboxing strategy would not unbox the @a@.
-argCprType :: AnalEnv -> Type -> Demand -> CprType
-argCprType env arg_ty dmd = CprType 0 (go arg_ty dmd)
+--   * A head-strict demand @1!L@ would translate to @1@
+--   * A product demand @1!P(1!L,L)@ would translate to @1(1,)@
+--   * A product demand @1!P(1L,L)@ would translate to @1(,)@,
+--     because the first field will not be unboxed.
+argCprType :: Demand -> CprType
+argCprType dmd = CprType 0 (go dmd)
   where
-    go ty dmd
-      | Unbox (DataConPatContext { dcpc_dc = dc, dcpc_tc_args = tc_args }) ds
-          <- wantToUnboxArg (ae_fam_envs env) MaybeArgOfInlineableFun ty dmd
-      -- No existentials; see Note [Which types are unboxed?])
-      -- Otherwise we'd need to call dataConRepInstPat here and thread a
-      -- UniqSupply. So argCprType is a bit less aggressive than it could
-      -- be, for the sake of coding convenience.
-      , null (dataConExTyCoVars dc)
-      , let arg_tys = map scaledThing (dataConInstArgTys dc tc_args)
-      = ConCpr (dataConTag dc) (zipWith go arg_tys ds)
-      | otherwise
-      = topCpr
+    go (n :* sd)
+      | isAbs n               = topCpr
+      | Prod Unboxed ds <- sd = ConCpr fIRST_TAG (strictMap go ds)
+      | Poly Unboxed _  <- sd = ConCpr fIRST_TAG []
+      | otherwise             = topCpr
 
 {- Note [Safe abortion in the fixed-point iteration]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

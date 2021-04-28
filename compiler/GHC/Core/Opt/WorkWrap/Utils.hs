@@ -10,8 +10,9 @@ A library for the ``worker\/wrapper'' back-end to the strictness analyser
 module GHC.Core.Opt.WorkWrap.Utils
    ( WwOpts(..), initWwOpts, mkWwBodies, mkWWstr, mkWWstr_one, mkWorkerArgs
    , DataConPatContext(..)
-   , UnboxingDecision(..), ArgOfInlineableFun(..), wantToUnboxArg
-   , findTypeShape, mkAbsentFiller, IsRecDataConResult(..), isRecDataCon
+   , UnboxingDecision(..), InsideInlineableFun(..), wantToUnboxArg
+   , findTypeShape, IsRecDataConResult(..), isRecDataCon, finaliseBoxity
+   , mkAbsentFiller
    , isWorkerSmallEnough
    )
 where
@@ -229,7 +230,7 @@ mkWwBodies opts fun_id arg_vars res_ty demands res_cpr
               res_ty' = GHC.Core.Subst.substTy subst res_ty
 
         ; (useful1, work_args, wrap_fn_str, fn_args)
-             <- mkWWstr opts inlineable_flag cloned_arg_vars
+             <- mkWWstr opts cloned_arg_vars
 
         -- Do CPR w/w.  See Note [Always do CPR w/w]
         ; (useful2, wrap_fn_cpr, work_fn_cpr, cpr_res_ty)
@@ -265,9 +266,6 @@ mkWwBodies opts fun_id arg_vars res_ty demands res_cpr
       = info `setOccInfo`       noOccInfo
 
     mb_join_arity = isJoinId_maybe fun_id
-    inlineable_flag -- See Note [Do not unpack class dictionaries]
-      | isStableUnfolding (realIdUnfolding fun_id) = MaybeArgOfInlineableFun
-      | otherwise                                  = NotArgOfInlineableFun
 
     -- Note [Do not split void functions]
     only_one_void_argument
@@ -562,58 +560,29 @@ data UnboxingDecision s
   -- The @[s]@ carries the bits of information with which we can continue
   -- unboxing, e.g. @s@ will be 'Demand' or 'Cpr'.
 
--- | A specialised Bool for an argument to 'wantToUnboxArg'.
--- See Note [Do not unpack class dictionaries].
-data ArgOfInlineableFun
-  = NotArgOfInlineableFun   -- ^ Definitely not in an inlineable fun.
-  | MaybeArgOfInlineableFun -- ^ We might be in an inlineable fun, so we won't
-                            -- unbox dictionary args.
-  deriving Eq
-
--- | Unboxing strategy for strict arguments.
-wantToUnboxArg :: FamInstEnvs -> ArgOfInlineableFun -> Type -> Demand -> UnboxingDecision Demand
+-- | Unwraps the 'Boxity' decision encoded in the given 'SubDemand' and returns
+-- a 'DataConPatContext' as well the nested demands on fields of the 'DataCon'
+-- to unbox.
+wantToUnboxArg
+  :: FamInstEnvs
+  -> Type                -- ^ Type of the argument
+  -> Demand              -- ^ How the arg was used
+  -> UnboxingDecision Demand
 -- See Note [Which types are unboxed?]
-wantToUnboxArg fam_envs inlineable_flag ty dmd
-  | isAbsDmd dmd
+wantToUnboxArg fam_envs ty (n :* sd)
+  | isAbs n
   = DropAbsent
 
-  | isStrUsedDmd dmd
-  , Just (tc, tc_args, co) <- normSplitTyConApp_maybe fam_envs ty
+  | Just (tc, tc_args, co) <- normSplitTyConApp_maybe fam_envs ty
   , Just dc <- tyConSingleAlgDataCon_maybe tc
   , let arity = dataConRepArity dc
-  -- See Note [Unpacking arguments with product and polymorphic demands]
-  , Just cs <- split_prod_dmd_arity dmd arity
-  -- See Note [Do not unpack class dictionaries]
-  , inlineable_flag == NotArgOfInlineableFun || not (isClassPred ty)
-  -- See Note [mkWWstr and unsafeCoerce]
-  , cs `lengthIs` arity
-  -- See Note [Add demands for strict constructors]
-  , let cs' = addDataConStrictness dc cs
-  = Unbox (DataConPatContext dc tc_args co) cs'
+  , Just (Unboxed, ds) <- viewProd arity sd -- See Note [Boxity Analysis]
+  -- NB: No strictness or evaluatedness checks here. That is done by
+  -- 'finaliseBoxity'!
+  = Unbox (DataConPatContext dc tc_args co) ds
 
   | otherwise
   = StopUnboxing
-
-  where
-    split_prod_dmd_arity dmd arity
-      -- For seqDmd, it should behave like <S(AAAA)>, for some
-      -- suitable arity
-      | isSeqDmd dmd        = Just (replicate arity absDmd)
-      | _ :* Prod ds <- dmd = Just ds
-      | otherwise           = Nothing
-
-addDataConStrictness :: DataCon -> [Demand] -> [Demand]
--- See Note [Add demands for strict constructors]
-addDataConStrictness con ds
-  | Nothing <- dataConWrapId_maybe con
-  -- DataCon worker=wrapper. Implies no strict fields, so nothing to do
-  = ds
-addDataConStrictness con ds
-  = zipWithEqual "addDataConStrictness" add ds strs
-  where
-    strs = dataConRepStrictness con
-    add dmd str | isMarkedStrict str = strictifyDmd dmd
-                | otherwise          = dmd
 
 
 -- | Unboxing strategy for constructed results.
@@ -688,35 +657,8 @@ Note that the data constructor /can/ have evidence arguments: equality
 constraints, type classes etc.  So it can be GADT.  These evidence
 arguments are simply value arguments, and should not get in the way.
 
-Note [Unpacking arguments with product and polymorphic demands]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The argument is unpacked in a case if it has a product type and has a
-strict *and* used demand put on it. I.e., arguments, with demands such
-as the following ones:
-
-   <S,U(U, L)>
-   <S(L,S),U>
-
-will be unpacked, but
-
-   <S,U> or <B,U>
-
-will not, because the pieces aren't used. This is quite important otherwise
-we end up unpacking massive tuples passed to the bottoming function. Example:
-
-        f :: ((Int,Int) -> String) -> (Int,Int) -> a
-        f g pr = error (g pr)
-
-        main = print (f fst (1, error "no"))
-
-Does 'main' print "error 1" or "error no"?  We don't really want 'f'
-to unbox its second argument.  This actually happened in GHC's onwn
-source code, in Packages.applyPackageFlag, which ended up un-boxing
-the enormous DynFlags tuple, and being strict in the
-as-yet-un-filled-in unitState files.
-
-Note [Do not unpack class dictionaries]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Do not unbox class dictionaries]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If we have
    f :: Ord a => [a] -> Int -> a
    {-# INLINABLE f #-}
@@ -729,11 +671,18 @@ BUT if f is strict in the Ord dictionary, we might unpack it, to get
    fw :: (a->a->Bool) -> [a] -> Int# -> a
 and the type-class specialiser can't specialise that. An example is #6056.
 
-But in any other situation a dictionary is just an ordinary value,
-and can be unpacked.  So we track the INLINABLE pragma, and switch
-off the unpacking in mkWWstr_one (see the isClassPred test).
+But in any other situation, a dictionary is just an ordinary value,
+and can be unpacked.  So we track the INLINABLE pragma, and discard the boxity
+flag in finaliseBoxity (see the isClassPred test).
 
 Historical note: #14955 describes how I got this fix wrong the first time.
+
+Note that the simplicity of this fix implies that INLINE functions (such as
+wrapper functions after the WW run) will never say that they unbox class
+dictionaries. That's not ideal, but not worth losing sleep over, as INLINE
+functions will have been inlined by the time we run demand analysis so we'll
+see the unboxing around the worker in client modules. I got aware of the issue
+in T5075 by the change in boxity of loop between demand analysis runs.
 
 Note [mkWWstr and unsafeCoerce]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -742,14 +691,14 @@ match the number of constructor arguments; this happened in #8037.
 If so, the worker/wrapper split doesn't work right and we get a Core Lint
 bug.  The fix here is simply to decline to do w/w if that happens.
 
-Note [Add demands for strict constructors]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Unboxing evaluated arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this program (due to Roman):
 
     data X a = X !a
 
     foo :: X Int -> Int -> Int
-    foo (X a) n = go 0
+    foo x@(X a) n = go 0
      where
        go i | i < n     = a + go (i+1)
             | otherwise = 0
@@ -758,12 +707,12 @@ We want the worker for 'foo' too look like this:
 
     $wfoo :: Int# -> Int# -> Int#
 
-with the first argument unboxed, so that it is not eval'd each time
-around the 'go' loop (which would otherwise happen, since 'foo' is not
-strict in 'a').  It is sound for the wrapper to pass an unboxed arg
-because X is strict, so its argument must be evaluated.  And if we
-*don't* pass an unboxed argument, we can't even repair it by adding a
-`seq` thus:
+with the first argument unboxed, so that it is not eval'd each time around the
+'go' loop (which would otherwise happen, since 'foo' is not strict in 'a'). It
+is sound for the wrapper to pass an unboxed arg because X is strict
+(see Note [Strictness and Unboxing] in "GHC.Core.Opt.DmdAnal"), so its argument
+must be evaluated. And if we *don't* pass an unboxed argument, we can't even
+repair it by adding a `seq` thus:
 
     foo (X a) n = a `seq` go 0
 
@@ -771,34 +720,38 @@ because the seq is discarded (very early) since X is strict!
 
 So here's what we do
 
-* We leave the demand-analysis alone.  The demand on 'a' in the
-  definition of 'foo' is <L, U(U)>; the strictness info is Lazy
-  because foo's body may or may not evaluate 'a'; but the usage info
-  says that 'a' is unpacked and its content is used.
+* Since this has nothing to do with how 'foo' uses 'a', we leave demand analysis
+  alone, but account for the additional evaluatedness when annotating the binder
+  in 'annotateLamIdBndr' via 'finaliseBoxity', which will retain the Unboxed boxity
+  on 'a' in the definition of 'foo' in the demand 'L!P(L)'; meaning it's used
+  lazily but unboxed nonetheless. This seems to contradict
+  Note [No lazy, Unboxed demands in demand signature], but we know that 'a' is
+  evaluated and thus can be unboxed.
 
-* During worker/wrapper, if we unpack a strict constructor (as we do
-  for 'foo'), we use 'addDataConStrictness' to bump up the strictness on
-  the strict arguments of the data constructor.
+* When 'finaliseBoxity' decides to unbox a record, it will zip the field demands
+  together with the respective 'StrictnessMark'. In case of 'x', it will pair
+  up the lazy field demand 'L!P(L)' on 'a' with 'MarkedStrict' to account for
+  the strict field.
 
-* That in turn means that, if the usage info supports doing so
-  (i.e. splitProdDmd_maybe returns Just), we will unpack that argument
-  -- even though the original demand (e.g. on 'a') was lazy.
+* Said 'StrictnessMark' is passed to the recursive invocation of
+  'finaliseBoxity' when deciding whether to unbox 'a'. 'a' was used lazily, but
+  since it also says 'MarkedStrict', we'll retain the 'Unboxed' boxity on 'a'.
 
-* What does "bump up the strictness" mean?  Just add a head-strict
-  demand to the strictness!  Even for a demand like <L,A> we can
-  safely turn it into <S,A>; remember case (1) of
-  Note [Worker/wrapper for Strictness and Absence].
+* Worker/wrapper will consult 'wantToUnboxArg' for its unboxing decision. It will
+  /not/ look at the strictness bits of the demand, only at Boxity flags. As such,
+  it will happily unbox 'a' despite the lazy demand on it.
 
-The net effect is that the w/w transformation is more aggressive about
-unpacking the strict arguments of a data constructor, when that
-eagerness is supported by the usage info.
+The net effect is that boxity analysis and the w/w transformation are more
+aggressive about unboxing the strict arguments of a data constructor than when
+looking at strictness info exclusively. It is very much like (Nested) CPR, which
+needs its nested fields to be evaluated in order for it to unbox nestedly.
 
 There is the usual danger of reboxing, which as usual we ignore. But
 if X is monomorphic, and has an UNPACK pragma, then this optimisation
 is even more important.  We don't want the wrapper to rebox an unboxed
 argument, and pass an Int to $wfoo!
 
-This works in nested situations like
+This works in nested situations like T10482
 
     data family Bar a
     data instance Bar (a, b) = BarPair !(Bar a) !(Bar b)
@@ -863,6 +816,68 @@ applying the strictness demands to the final result of DmdAnal. The result is
 that we get the strict demand signature we wanted even if we can't float
 the case on `x` up through the case on `burble`.
 
+Note [No nested Unboxed inside Boxed in demand signature]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+```
+f p@(x,y)
+  | even (x+y) = []
+  | otherwise  = [p]
+```
+Demand analysis will infer that the function body puts a demand of `1P(1!L,1!L)`
+on 'p', e.g., Boxed on the outside but Unboxed on the inside. But worker/wrapper
+can't unbox the pair components without unboxing the pair! So we better say
+`1P(1L,1L)` in the demand signature in order not to spread wrong Boxity info.
+That happens in 'finaliseBoxity'.
+
+Note [No lazy, Unboxed demands in demand signature]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider T19407:
+
+  data Huge = Huge Bool () ... () -- think: DynFlags
+  data T = T { h :: Huge, n :: Int }
+  f t@(T h _) = g h t
+  g (H b _ ... _) t = if b then 1 else n t
+
+The body of `g` puts (approx.) demand `L!P(A,1)` on `t`. But we better
+not put that demand in `g`'s demand signature, because worker/wrapper will not
+in general unbox a lazy-and-unboxed demand like `L!P(..)`.
+(The exception are known-to-be-evaluated arguments like strict fields,
+see Note [Unboxing evaluated arguments].)
+
+The program above is an example where spreading misinformed boxity through the
+signature is particularly egregious. If we give `g` that signature, then `f`
+puts demand `S!P(1!P(1L,A,..),ML)` on `t`. Now we will unbox `t` in `f` it and
+we get
+
+  f (T (H b _ ... _) n) = $wf b n
+  $wf b n = $wg b (T (H b x ... x) n)
+  $wg = ...
+
+Massive reboxing in `$wf`! Solution: Trim boxity on lazy demands in
+'finaliseBoxity', modulo Note [Unboxing evaluated arguments].
+
+Note [Finalising boxity for demand signature]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The worker/wrapper pass must strictly adhere to the boxity decisions encoded
+in the demand signature, because that is the information that demand analysis
+propagates throughout the program. Failing to implement the strategy laid out
+in the signature can result in reboxing in unexpected places. Hence, we must
+completely anticipate unboxing decisions during demand analysis and reflect
+these decicions in demand annotations. That is the job of 'finaliseBoxity',
+which is defined here and called from demand analysis.
+
+Here is a list of different Notes it has to take care of:
+
+  * Note [No lazy, Unboxed demands in demand signature] such as `L!P(L)` in
+    general, but still allow Note [Unboxing evaluated arguments]
+  * Note [No nested Unboxed inside Boxed in demand signature] such as `1P(1!L)`
+  * Implement fixes for corner cases Note [Do not unbox class dictionaries]
+    and Note [mkWWstr and unsafeCoerce]
+
+Then, in worker/wrapper blindly trusts the boxity info in the demand signature
+and will not look at strictness info *at all*, in 'wantToUnboxArg'.
+
 Note [non-algebraic or open body type warning]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 There are a few cases where the W/W transformation is told that something
@@ -894,7 +909,6 @@ way to express existential types in the worker's type signature.
 -}
 
 mkWWstr :: WwOpts
-        -> ArgOfInlineableFun            -- See Note [Do not unpack class dictionaries]
         -> [Var]                         -- Wrapper args; have their demand info on them
                                          --  *Includes type variables*
         -> UniqSM (Bool,                 -- Is this useful
@@ -905,10 +919,10 @@ mkWWstr :: WwOpts
                    [CoreExpr])           -- Reboxed args for the call to the
                                          -- original RHS. Corresponds one-to-one
                                          -- with the wrapper arg vars
-mkWWstr opts inlineable_flag args
+mkWWstr opts args
   = go args
   where
-    go_one arg = mkWWstr_one opts inlineable_flag arg
+    go_one arg = mkWWstr_one opts arg
 
     go []           = return (False, [], nop_fn, [])
     go (arg : args) = do { (useful1, args1, wrap_fn1, wrap_arg)  <- go_one arg
@@ -925,12 +939,9 @@ mkWWstr opts inlineable_flag args
 --   * wrap_arg assumes work_args are in scope, and builds a ConApp that
 --        reconstructs the RHS of wrap_var that we pass to the original RHS
 -- See Note [Worker/wrapper for Strictness and Absence]
-mkWWstr_one :: WwOpts
-            -> ArgOfInlineableFun -- See Note [Do not unpack class dictionaries]
-            -> Var
-            -> UniqSM (Bool, [Var], CoreExpr -> CoreExpr, CoreExpr)
-mkWWstr_one opts inlineable_flag arg =
-  case wantToUnboxArg fam_envs inlineable_flag arg_ty arg_dmd of
+mkWWstr_one :: WwOpts -> Var -> UniqSM (Bool, [Var], CoreExpr -> CoreExpr, CoreExpr)
+mkWWstr_one opts arg =
+  case wantToUnboxArg fam_envs arg_ty arg_dmd of
     _ | isTyVar arg -> do_nothing
 
     DropAbsent
@@ -940,7 +951,7 @@ mkWWstr_one opts inlineable_flag arg =
          -- (that's what mkAbsentFiller does)
       -> return (True, [], nop_fn, absent_filler)
 
-    Unbox dcpc cs -> unbox_one_arg opts arg cs dcpc
+    Unbox dcpc ds -> unbox_one_arg opts arg ds dcpc
 
     _ -> do_nothing -- Other cases, like StopUnboxing
 
@@ -955,17 +966,17 @@ unbox_one_arg :: WwOpts
           -> [Demand]
           -> DataConPatContext
           -> UniqSM (Bool, [Var], CoreExpr -> CoreExpr, CoreExpr)
-unbox_one_arg opts arg_var cs
+unbox_one_arg opts arg_var ds
           DataConPatContext { dcpc_dc = dc, dcpc_tc_args = tc_args
                             , dcpc_co = co }
   = do { pat_bndrs_uniqs <- getUniquesM
        ; let ex_name_fss = map getOccFS $ dataConExTyCoVars dc
              (ex_tvs', arg_ids) =
                dataConRepFSInstPat (ex_name_fss ++ repeat ww_prefix) pat_bndrs_uniqs (idMult arg_var) dc tc_args
-             arg_ids' = zipWithEqual "unbox_one_arg" setIdDemandInfo arg_ids cs
+             arg_ids' = zipWithEqual "unbox_one_arg" setIdDemandInfo arg_ids ds
              unbox_fn = mkUnpackCase (Var arg_var) co (idMult arg_var)
                                      dc (ex_tvs' ++ arg_ids')
-       ; (_, worker_args, wrap_fn, wrap_args) <- mkWWstr opts NotArgOfInlineableFun (ex_tvs' ++ arg_ids')
+       ; (_, worker_args, wrap_fn, wrap_args) <- mkWWstr opts (ex_tvs' ++ arg_ids')
        ; let wrap_arg = mkConApp dc (map Type tc_args ++ wrap_args) `mkCast` mkSymCo co
        ; return (True, worker_args, unbox_fn . wrap_fn, wrap_arg) }
                           -- Don't pass the arg, rebox instead
@@ -1009,42 +1020,45 @@ mkAbsentFiller opts arg
 
 {- Note [Worker/wrapper for Strictness and Absence]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The worker/wrapper transformation, mkWWstr_one, takes into account
-several possibilities to decide if the function is worthy for
-splitting:
+The worker/wrapper transformation, mkWWstr_one, takes concrete action
+based on the 'UnboxingDescision' returned by 'wantToUnboxArg'.
+The latter takes into account several possibilities to decide if the
+function is worthy for splitting:
 
 1. If an argument is absent, it would be silly to pass it to
-   the worker.  Hence the isAbsDmd case.  This case must come
-   first because a demand like <S,A> or <B,A> is possible.
-   E.g. <B,A> comes from a function like
+   the worker.  Hence the DropAbsent case.  This case must come
+   first because the bottom demand B is also strict.
+   E.g. B comes from a function like
        f x = error "urk"
-   and <S,A> can come from Note [Add demands for strict constructors]
+   and the absent demand A can come from Note [Unboxing evaluated arguments]
 
-2. If the argument is evaluated strictly, and we can split the
-   product demand (splitProdDmd_maybe), then unbox it and w/w its
-   pieces.  For example
+2. If the argument is evaluated strictly (or known to be eval'd),
+   we can take a view into the product demand ('viewProd'). In accordance
+   with Note [Boxity analysis], 'wantToUnboxArg' will say 'Unbox'.
+   'mkWWstr_one' then follows suit it and recurses into the fields of the
+   product demand. For example
 
-    f :: (Int, Int) -> Int
-    f p = (case p of (a,b) -> a) + 1
-  is split to
-    f :: (Int, Int) -> Int
-    f p = case p of (a,b) -> $wf a
+     f :: (Int, Int) -> Int
+     f p = (case p of (a,b) -> a) + 1
+   is split to
+     f :: (Int, Int) -> Int
+     f p = case p of (a,b) -> $wf a
 
-    $wf :: Int -> Int
-    $wf a = a + 1
+     $wf :: Int -> Int
+     $wf a = a + 1
 
-  and
-    g :: Bool -> (Int, Int) -> Int
-    g c p = case p of (a,b) ->
-               if c then a else b
-  is split to
-   g c p = case p of (a,b) -> $gw c a b
-   $gw c a b = if c then a else b
+   and
+     g :: Bool -> (Int, Int) -> Int
+     g c p = case p of (a,b) ->
+                if c then a else b
+   is split to
+     g c p = case p of (a,b) -> $gw c a b
+     $gw c a b = if c then a else b
 
-2a But do /not/ split if the components are not used; that is, the
-   usage is just 'Used' rather than 'UProd'. In this case
-   splitProdDmd_maybe returns Nothing.  Otherwise we risk decomposing
-   a massive tuple which is barely used.  Example:
+2a But do /not/ split if Boxity Analysis said "Boxed".
+   In this case, 'wantToUnboxArg' returns 'StopUnboxing'.
+   Otherwise we risk decomposing and reboxing a massive
+   tuple which is barely used. Example:
 
         f :: ((Int,Int) -> String) -> (Int,Int) -> a
         f g pr = error (g pr)
@@ -1055,10 +1069,11 @@ splitting:
    Imagine that it had millions of fields. This actually happened
    in GHC itself where the tuple was DynFlags
 
-3. A plain 'seqDmd', which is head-strict with usage UHead, can't
-   be split by splitProdDmd_maybe.  But we want it to behave just
-   like U(AAAA) for suitable number of absent demands. So we have
-   a special case for it, with arity coming from the data constructor.
+3. In all other cases (e.g., lazy, used demand and not eval'd),
+   'finaliseBoxity' will have cleared the Boxity flag to 'Boxed'
+   (see Note [Finalising boxity for demand signature]) and
+   'wantToUnboxArg' returns 'StopUnboxing' so that 'mkWWstr_one'
+   stops unboxing.
 
 Note [Worker/wrapper for bottoming functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1162,7 +1177,7 @@ Needless to say, there are some wrinkles:
      Ideally, we'd just look at the 'StrictnessMark' of the DataCon's field, but
      it's quite nasty to thread the marks though 'mkWWstr' and 'mkWWstr_one'.
      So we rather look out for a necessary condition for strict fields:
-     Note [Add demands for strict constructors] makes it so that the demand on
+     Note [Unboxing evaluated arguments] makes it so that the demand on
      'zs' is absent and /strict/: It will get cardinality 'C_10', the empty
      interval, rather than 'C_00'. Hence the 'isStrictDmd' check: It guarantees
      we never fill in an error-thunk for an absent strict field.
@@ -1394,6 +1409,56 @@ isRecDataCon fam_envs fuel dc
             | let dcs = expectJust "isRecDataCon:go_tc_app" $ tyConDataCons_maybe tc
             -> combineIRDCRs (map (\dc -> go_dc (subWithInf fuel 1) rec_tc' dc) dcs)
                 -- See Note [Detecting recursive data constructors], point (4)
+
+-- | A specialised Bool for an argument to 'finaliseBoxity'.
+-- See Note [Do not unbox class dictionaries].
+data InsideInlineableFun
+  = NotInsideInlineableFun -- ^ Not in an inlineable fun.
+  | InsideInlineableFun    -- ^ We are in an inlineable fun, so we won't
+                           -- unbox dictionary args.
+  deriving Eq
+
+-- | This function makes sure that the demand only says 'Unboxed' where
+-- worker/wrapper should actually unbox and trims any boxity beyond that.
+-- Called for every demand annotation during DmdAnal.
+--
+-- > data T a = T !a
+-- > f :: (T (Int,Int), Int) -> ()
+-- > f p = ... -- demand on p: 1!P(L!P(L!P(L), L!P(L)), L!P(L))
+--
+-- 'finaliseBoxity' will trim the demand on 'p' to 1!P(L!P(LP(L), LP(L)), LP(L)).
+-- This is done when annotating lambdas and thunk bindings.
+-- See Note [Finalising boxity for demand signature]
+finaliseBoxity
+  :: FamInstEnvs
+  -> InsideInlineableFun    -- ^ See the haddocks on 'InsideInlineableFun'
+  -> Type                   -- ^ Type of the argument
+  -> Demand                 -- ^ How the arg was used
+  -> Demand
+finaliseBoxity env in_inl_fun ty dmd = go NotMarkedStrict ty dmd
+  where
+    go mark ty dmd@(n :* _) =
+      case wantToUnboxArg env ty dmd of
+        DropAbsent -> dmd
+        Unbox DataConPatContext{dcpc_dc=dc, dcpc_tc_args=tc_args} ds
+          -- See Note [No lazy, Unboxed demands in demand signature]
+          -- See Note [Unboxing evaluated arguments]
+          | isStrict n || isMarkedStrict mark
+          -- See Note [Do not unbox class dictionaries]
+          , in_inl_fun == NotInsideInlineableFun || not (isClassPred ty)
+          -- See Note [mkWWstr and unsafeCoerce]
+          , ds `lengthIs` dataConRepArity dc
+          , let arg_tys = dubiousDataConInstArgTys dc tc_args
+          -> -- pprTrace "finaliseBoxity:Unbox" (ppr ty $$ ppr dmd $$ ppr ds) $
+             n :* (mkProd Unboxed $! zip_go_with_marks dc arg_tys ds)
+        -- See Note [No nested Unboxed inside Boxed in demand signature]
+        _ -> trimBoxity dmd
+
+    -- See Note [Unboxing evaluated arguments]
+    zip_go_with_marks dc arg_tys ds = case dataConWrapId_maybe dc of
+      Nothing -> strictZipWith  (go NotMarkedStrict)          arg_tys ds
+                    -- Shortcut when DataCon worker=wrapper
+      Just _  -> strictZipWith3 go  (dataConRepStrictness dc) arg_tys ds
 
 {-
 ************************************************************************

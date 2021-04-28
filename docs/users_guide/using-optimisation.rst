@@ -816,6 +816,20 @@ by saying ``-fno-wombat``.
     more detailed list. Usually that identifies the loop quite
     accurately, because some numbers are very large.
 
+.. ghc-flag:: -fdmd-unbox-width=⟨n⟩
+    :shortdesc: *default: 3.* Boxity analysis pretends that returned records
+                              with this many fields can be unboxed.
+    :type: dynamic
+    :category:
+
+    :default: 3
+
+    Boxity analysis optimistically pretends that a function returning a record
+    with at most ``-fdmd-unbox-width`` fields has only call sites that don't
+    need the box of the returned record. That may in turn allow more argument
+    unboxing to happen. Set to 0 to be completely conservative (which guarantees
+    that no reboxing will happen due to this mechanism).
+
 .. ghc-flag:: -fspec-constr
     :shortdesc: Turn on the SpecConstr transformation. Implied by :ghc-flag:`-O2`.
     :type: dynamic
