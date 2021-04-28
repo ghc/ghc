@@ -188,10 +188,7 @@ void _assertFail(const char *filename, unsigned int linenum)
  * functions which may only be defined after register variables have
  * been declared.
  */
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wall"
 #include <stdlib.h>
-#pragma GCC diagnostic pop
 
 #include "rts/Config.h"
 
