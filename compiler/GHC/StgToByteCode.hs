@@ -576,7 +576,7 @@ fvsToEnv _ _ = []
 -- -----------------------------------------------------------------------------
 -- schemeE
 
--- Returning an unlifted value.
+-- Returning an unboxed value.
 -- Heave it on the stack, SLIDE, and RETURN.
 returnUnboxedAtom
     :: StackDepth
@@ -648,7 +648,9 @@ schemeE
     :: StackDepth -> Sequel -> BCEnv -> CgStgExpr -> BcM BCInstrList
 schemeE d s p (StgLit lit) = returnUnboxedAtom d s p (StgLitArg lit)
 schemeE d s p (StgApp x [])
-   | isUnliftedType (idType x) = returnUnboxedAtom d s p (StgVarArg x)
+   | isUnboxedTupleType (idType x) ||
+     isUnboxedSumType (idType x) ||
+     not (isAlgType (idType x)) = returnUnboxedAtom d s p (StgVarArg x)
 -- Delegate tail-calls to schemeT.
 schemeE d s p e@(StgApp {}) = schemeT d s p e
 schemeE d s p e@(StgConApp {}) = schemeT d s p e
@@ -1048,12 +1050,12 @@ doCase d s p scrut bndr alts
                           not ubx_tuple_frame = 2 * wordSize platform
                         | otherwise = 0
 
-        -- An unlifted value gets an extra info table pushed on top
+        -- An unboxed value gets an extra info table pushed on top
         -- when it is returned.
-        unlifted_itbl_size_b :: StackDepth
-        unlifted_itbl_size_b | isAlgCase       = 0
-                             | ubx_tuple_frame = 3 * wordSize platform
-                             | otherwise       = wordSize platform
+        unboxed_itbl_size_b :: StackDepth
+        unboxed_itbl_size_b | ubx_tuple_frame     = 3 * wordSize platform
+                            | isAlgCase           = 0
+                            | otherwise           = wordSize platform
 
         (bndr_size, tuple_info, args_offsets)
            | ubx_tuple_frame =
@@ -1077,14 +1079,16 @@ doCase d s p scrut bndr alts
         -- depth of stack after the extra info table for an unboxed return
         -- has been pushed, if any.  This is the stack depth at the
         -- continuation.
-        d_alts = d + ret_frame_size_b + bndr_size + unlifted_itbl_size_b
+        d_alts = d + ret_frame_size_b + bndr_size + unboxed_itbl_size_b
 
         -- Env in which to compile the alts, not including
         -- any vars bound by the alts themselves
         p_alts = Map.insert bndr d_bndr p
 
         bndr_ty = idType bndr
-        isAlgCase = not (isUnliftedType bndr_ty)
+        isAlgCase = isAlgType bndr_ty &&
+                    not (isUnboxedSumType bndr_ty) &&
+                    not (isUnboxedTupleType bndr_ty)
 
         -- given an alt, return a discr and code for it.
         codeAlt (DEFAULT, _, rhs)
@@ -1229,12 +1233,12 @@ doCase d s p scrut bndr alts
                   | isAlgCase
                   = PUSH_ALTS alt_bco'
                   | otherwise
-                  = let unlifted_rep =
+                  = let unboxed_rep =
                           case non_void_arg_reps of
                             []    -> V
                             [rep] -> rep
                             _     -> panic "schemeE(StgCase).push_alts"
-                    in PUSH_ALTS_UNLIFTED alt_bco' unlifted_rep
+                    in PUSH_ALTS_UNBOXED alt_bco' unboxed_rep
             in return (push_alts `consOL` scrut_code)
 
 
