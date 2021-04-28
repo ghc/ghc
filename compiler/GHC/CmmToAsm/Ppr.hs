@@ -24,7 +24,6 @@ import GHC.Utils.Asm
 import GHC.Cmm.CLabel
 import GHC.Cmm
 import GHC.CmmToAsm.Config
-import GHC.Data.FastString
 import GHC.Utils.Outputable as SDoc
 import qualified GHC.Utils.Ppr as Pretty
 import GHC.Utils.Panic
@@ -243,26 +242,23 @@ pprGNUSectionHeader config t suffix =
 -- XCOFF doesn't support relocating label-differences, so we place all
 -- RO sections into .text[PR] sections
 pprXcoffSectionHeader :: SectionType -> SDoc
-pprXcoffSectionHeader t = text $ case t of
-     Text                    -> ".csect .text[PR]"
-     Data                    -> ".csect .data[RW]"
-     ReadOnlyData            -> ".csect .text[PR] # ReadOnlyData"
-     RelocatableReadOnlyData -> ".csect .text[PR] # RelocatableReadOnlyData"
-     ReadOnlyData16          -> ".csect .text[PR] # ReadOnlyData16"
-     CString                 -> ".csect .text[PR] # CString"
-     UninitialisedData       -> ".csect .data[BS]"
-     OtherSection _          ->
-       panic "PprBase.pprXcoffSectionHeader: unknown section type"
+pprXcoffSectionHeader t = case t of
+  Text                    -> text ".csect .text[PR]"
+  Data                    -> text ".csect .data[RW]"
+  ReadOnlyData            -> text ".csect .text[PR] # ReadOnlyData"
+  RelocatableReadOnlyData -> text ".csect .text[PR] # RelocatableReadOnlyData"
+  ReadOnlyData16          -> text ".csect .text[PR] # ReadOnlyData16"
+  CString                 -> text ".csect .text[PR] # CString"
+  UninitialisedData       -> text ".csect .data[BS]"
+  OtherSection _          -> panic "pprXcoffSectionHeader: unknown section type"
 
 pprDarwinSectionHeader :: SectionType -> SDoc
-pprDarwinSectionHeader t =
-  ptext $ case t of
-     Text -> sLit ".text"
-     Data -> sLit ".data"
-     ReadOnlyData -> sLit ".const"
-     RelocatableReadOnlyData -> sLit ".const_data"
-     UninitialisedData -> sLit ".data"
-     ReadOnlyData16 -> sLit ".const"
-     CString -> sLit ".section\t__TEXT,__cstring,cstring_literals"
-     OtherSection _ ->
-       panic "PprBase.pprDarwinSectionHeader: unknown section type"
+pprDarwinSectionHeader t = case t of
+  Text                    -> text ".text"
+  Data                    -> text ".data"
+  ReadOnlyData            -> text ".const"
+  RelocatableReadOnlyData -> text ".const_data"
+  UninitialisedData       -> text ".data"
+  ReadOnlyData16          -> text ".const"
+  CString                 -> text ".section\t__TEXT,__cstring,cstring_literals"
+  OtherSection _          -> panic "pprDarwinSectionHeader: unknown section type"

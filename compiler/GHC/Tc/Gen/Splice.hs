@@ -34,6 +34,7 @@ module GHC.Tc.Gen.Splice(
 
 import GHC.Prelude
 
+import GHC.Driver.Errors
 import GHC.Driver.Plugins
 import GHC.Driver.Main
 import GHC.Driver.Session
@@ -42,6 +43,7 @@ import GHC.Driver.Hooks
 
 import GHC.Hs
 
+import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Gen.Expr
@@ -917,6 +919,48 @@ runMetaD :: LHsExpr GhcTc          -- Of type Q [Dec]
          -> TcM [LHsDecl GhcPs]
 runMetaD = runMeta metaRequestD
 
+{- Note [Errors in desugaring a splice]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+What should we do if there are errors when desugaring a splice? We should
+abort. There are several cases to consider:
+
+(a) The desugarer hits an unrecoverable error and fails in the monad.
+(b) The desugarer hits a recoverable error, reports it, and continues.
+(c) The desugarer reports a fatal warning (with -Werror), reports it, and continues.
+(d) The desugarer reports a non-fatal warning, and continues.
+
+Each case is tested in th/T19709[abcd].
+
+General principle: we wish to report all messages from dealing with a splice
+eagerly, as these messages arise during an earlier stage than type-checking
+generally. It's also likely that a compile-time warning from spliced code
+will be easier to understand then an error that arises from processing the
+code the splice produces. (Rationale: the warning will be about the code the
+user actually wrote, not what is generated.)
+
+Case (a): We have no choice but to abort here, but we must make sure that
+the messages are printed or logged before aborting. Logging them is annoying,
+because we're in the type-checker, and the messages are DsMessages, from the
+desugarer. So we report and then fail in the monad. This case is detected
+by the fact that initDsTc returns Nothing.
+
+Case (b): We detect this case by looking for errors in the messages returned
+from initDsTc and aborting if we spot any (after printing, of course). Note
+that initDsTc will return a Just ds_expr in this case, but we don't wish to
+use the (likely very bogus) expression.
+
+Case (c): This is functionally the same as (b), except that the expression
+isn't bogus. We still don't wish to use it, as the user's request for -Werror
+tells us not to.
+
+Case (d): We report the warnings and then carry on with the expression.
+This might result in warnings printed out of source order, but this is
+appropriate, as the warnings from the splice arise from an earlier stage
+of compilation.
+
+Previously, we failed to abort in cases (b) and (c), leading to #19709.
+-}
+
 ---------------
 runMeta' :: Bool                 -- Whether code should be printed in the exception message
          -> (hs_syn -> SDoc)                                    -- how to print the code
@@ -932,11 +976,11 @@ runMeta' show_code ppr_hs run_and_convert expr
         -- Check that we've had no errors of any sort so far.
         -- For example, if we found an error in an earlier defn f, but
         -- recovered giving it type f :: forall a.a, it'd be very dodgy
-        -- to carry ont.  Mind you, the staging restrictions mean we won't
+        -- to carry on.  Mind you, the staging restrictions mean we won't
         -- actually run f, but it still seems wrong. And, more concretely,
         -- see #5358 for an example that fell over when trying to
         -- reify a function with a "?" kind in it.  (These don't occur
-        -- in type-correct programs.
+        -- in type-correct programs.)
         ; failIfErrsM
 
         -- run plugins
@@ -944,7 +988,23 @@ runMeta' show_code ppr_hs run_and_convert expr
         ; expr' <- withPlugins hsc_env spliceRunAction expr
 
         -- Desugar
-        ; ds_expr <- initDsTc (dsLExpr expr')
+        ; (ds_msgs, mb_ds_expr) <- initDsTc (dsLExpr expr')
+
+        -- Print any messages (even warnings) eagerly: they might be helpful if anything
+        -- goes wrong. See Note [Errors in desugaring a splice]. This happens in all
+        -- cases.
+        ; logger <- getLogger
+        ; dflags <- getDynFlags
+        ; liftIO $ printMessages logger dflags ds_msgs
+
+        ; ds_expr <- case mb_ds_expr of
+            Nothing      -> failM   -- Case (a) from Note [Errors in desugaring a splice]
+            Just ds_expr ->  -- There still might be a fatal warning or recoverable
+                             -- Cases (b) and (c) from Note [Errors in desugaring a splice]
+              do { when (errorsOrFatalWarningsFound ds_msgs)
+                     failM
+                 ; return ds_expr }
+
         -- Compile and link it; might fail if linking fails
         ; src_span <- getSrcSpanM
         ; traceTc "About to run (desugared)" (ppr ds_expr)
@@ -1182,7 +1242,7 @@ instance TH.Quasi TcM where
 
       bindName name =
           addErr $
-          hang (text "The binder" <+> quotes (ppr name) <+> ptext (sLit "is not a NameU."))
+          hang (text "The binder" <+> quotes (ppr name) <+> text "is not a NameU.")
              2 (text "Probable cause: you used mkName instead of newName to generate a binding.")
 
   qAddForeignFilePath lang fp = do
@@ -1442,7 +1502,7 @@ runTH ty fhv = do
 -- See Note [Remote Template Haskell] in libraries/ghci/GHCi/TH.hs.
 runRemoteTH
   :: IServInstance
-  -> [Messages DiagnosticMessage]   --  saved from nested calls to qRecover
+  -> [Messages TcRnMessage]   --  saved from nested calls to qRecover
   -> TcM ()
 runRemoteTH iserv recovers = do
   THMsg msg <- liftIO $ readIServ iserv getTHMessage
@@ -2298,11 +2358,11 @@ reifyType ty@(FunTy { ft_af = af, ft_mult = Many, ft_arg = t1, ft_res = t2 })
   | otherwise      = do { [r1,r2] <- reifyTypes [t1,t2]
                         ; return (TH.ArrowT `TH.AppT` r1 `TH.AppT` r2) }
 reifyType ty@(FunTy { ft_af = af, ft_mult = tm, ft_arg = t1, ft_res = t2 })
-  | InvisArg <- af = noTH (sLit "linear invisible argument") (ppr ty)
+  | InvisArg <- af = noTH (text "linear invisible argument") (ppr ty)
   | otherwise      = do { [rm,r1,r2] <- reifyTypes [tm,t1,t2]
                         ; return (TH.MulArrowT `TH.AppT` rm `TH.AppT` r1 `TH.AppT` r2) }
 reifyType (CastTy t _)      = reifyType t -- Casts are ignored in TH
-reifyType ty@(CoercionTy {})= noTH (sLit "coercions in types") (ppr ty)
+reifyType ty@(CoercionTy {})= noTH (text "coercions in types") (ppr ty)
 
 reify_for_all :: TyCoRep.ArgFlag -> TyCoRep.Type -> TcM TH.Type
 -- Arg of reify_for_all is always ForAllTy or a predicate FunTy
@@ -2557,8 +2617,8 @@ reifyModule (TH.Module (TH.PkgName pkgString) (TH.ModName mString)) = do
 mkThAppTs :: TH.Type -> [TH.Type] -> TH.Type
 mkThAppTs fun_ty arg_tys = foldl' TH.AppT fun_ty arg_tys
 
-noTH :: PtrString -> SDoc -> TcM a
-noTH s d = failWithTc (hsep [text "Can't represent" <+> ptext s <+>
+noTH :: SDoc -> SDoc -> TcM a
+noTH s d = failWithTc (hsep [text "Can't represent" <+> s <+>
                                 text "in Template Haskell:",
                              nest 2 d])
 

@@ -1111,8 +1111,8 @@ data Call = Call Id [CoreArg] ValueEnv
 
 instance Outputable ScUsage where
   ppr (SCU { scu_calls = calls, scu_occs = occs })
-    = text "SCU" <+> braces (sep [ ptext (sLit "calls =") <+> ppr calls
-                                         , text "occs =" <+> ppr occs ])
+    = text "SCU" <+> braces (sep [ text "calls =" <+> ppr calls
+                                 , text "occs =" <+> ppr occs ])
 
 instance Outputable Call where
   ppr (Call fn args _) = ppr fn <+> fsep (map pprParendExpr args)

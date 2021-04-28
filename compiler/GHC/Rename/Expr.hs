@@ -2360,7 +2360,7 @@ checkStmt ctxt (L _ stmt)
            IsValid        -> return ()
            NotValid extra -> addErr (msg $$ extra) }
   where
-   msg = sep [ text "Unexpected" <+> pprStmtCat stmt <+> ptext (sLit "statement")
+   msg = sep [ text "Unexpected" <+> pprStmtCat stmt <+> text "statement"
              , text "in" <+> pprAStmtContext ctxt ]
 
 pprStmtCat :: Stmt (GhcPass a) body -> SDoc
