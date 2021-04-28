@@ -588,6 +588,7 @@ mergeSignatures
     let dflags     = hsc_dflags hsc_env
     let logger     = hsc_logger hsc_env
     let hooks      = hsc_hooks hsc_env
+    dt            <- dynamicTooState hsc_env
 
     -- STEP 1: Figure out all of the external signature interfaces
     -- we are going to merge in.
@@ -600,10 +601,11 @@ mergeSignatures
         let m = mkModule (VirtUnit iuid) mod_name
             im = fst (getModuleInstantiation m)
             ctx = initSDocContext dflags defaultUserStyle
-        fmap fst
-         . withException ctx
-         $ findAndReadIface logger nc fc hooks unit_state home_unit dflags
+        (iface0, _path, dt_fail) <- withException ctx
+         $ findAndReadIface logger nc fc hooks unit_state home_unit dflags dt
                             (text "mergeSignatures") im m NotBoot
+        updateDynamicTooFailed dt_fail hsc_env
+        pure iface0
 
     -- STEP 3: Get the unrenamed exports of all these interfaces,
     -- thin it according to the export list, and do shaping on them.
@@ -1020,12 +1022,20 @@ checkImplements impl_mod req_mod@(Module uid mod_name) = do
     let dflags    = hsc_dflags hsc_env
     let logger    = hsc_logger hsc_env
     let hooks     = hsc_hooks hsc_env
-    mb_isig_iface <- liftIO $ findAndReadIface logger nc fc hooks units home_unit dflags
+    dt <- dynamicTooState hsc_env
+    mb_isig_iface <- liftIO $ findAndReadIface logger nc fc hooks units home_unit dflags dt
                                                (text "checkImplements 2")
                                                isig_mod sig_mod NotBoot
     isig_iface <- case mb_isig_iface of
+<<<<<<< HEAD
         Succeeded (iface, _) -> return iface
         Failed err -> failWithTc $ TcRnUnknownMessage $ mkPlainError noHints $
+=======
+        Succeeded (iface, _, dt_fail) -> do
+            updateDynamicTooFailed dt_fail hsc_env
+            return iface
+        Failed err -> failWithTc $
+>>>>>>> b6f8a58131... Move dynamicToo IORef to HscEnv to avoid global state
             hang (text "Could not find hi interface for signature" <+>
                   quotes (ppr isig_mod) <> colon) 4 err
 

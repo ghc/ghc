@@ -236,6 +236,7 @@ import Data.Set (Set)
 import Data.Functor
 import Control.DeepSeq (force)
 import Data.Bifunctor (first)
+import GHC.Platform (platformOS, OS (OSMinGW32))
 
 {- **********************************************************************
 %*                                                                      *
@@ -250,6 +251,12 @@ newHscEnv dflags = do
     logger  <- initLogger
     tmpfs   <- initTmpFs
     unit_env <- initUnitEnv (ghcNameVersion dflags) (targetPlatform dflags)
+    let -- We can't build with dynamic-too on Windows, as labels before
+     -- the fork point are different depending on whether we are
+     -- building dynamically or not.
+      platformCanGenerateDynamicToo
+         = platformOS (targetPlatform dflags) /= OSMinGW32
+    refDynamicTooFailed <- newIORef (not platformCanGenerateDynamicToo)
     return HscEnv {  hsc_dflags         = dflags
                   ,  hsc_logger         = setLogFlags logger (initLogFlags dflags)
                   ,  hsc_targets        = []
@@ -264,6 +271,7 @@ newHscEnv dflags = do
                   ,  hsc_static_plugins = []
                   ,  hsc_hooks          = emptyHooks
                   ,  hsc_tmpfs          = tmpfs
+                  ,  hsc_dynamicTooFailed = refDynamicTooFailed
                   }
 
 -- -----------------------------------------------------------------------------
@@ -721,9 +729,9 @@ hscRecompStatus
               res <- liftIO $ checkByteCode old_linkable
               case res of
                 (_, Just{}) -> return res
-                _ -> liftIO $ checkObjects lcl_dflags old_linkable mod_summary
+                _ -> liftIO $ checkObjects hsc_env old_linkable mod_summary
           -- Need object files for making object files
-          | backendProducesObject (backend lcl_dflags) -> liftIO $ checkObjects lcl_dflags old_linkable mod_summary
+          | backendProducesObject (backend lcl_dflags) -> liftIO $ checkObjects hsc_env old_linkable mod_summary
           | otherwise -> pprPanic "hscRecompStatus" (text $ show $ backend lcl_dflags)
     let recomp_reqd = recomp_iface_reqd `mappend` recomp_obj_reqd
     -- save the interface that comes back from checkOldIface.
@@ -739,9 +747,9 @@ hscRecompStatus
 
 -- | Check that the .o files produced by compilation are already up-to-date
 -- or not.
-checkObjects :: DynFlags -> Maybe Linkable -> ModSummary -> IO (RecompileRequired, Maybe Linkable)
-checkObjects dflags mb_old_linkable summary = do
-  dt_state <- dynamicTooState dflags
+checkObjects :: HscEnv -> Maybe Linkable -> ModSummary -> IO (RecompileRequired, Maybe Linkable)
+checkObjects hsc_env mb_old_linkable summary = do
+  dt_state <- dynamicTooState hsc_env
   let
     this_mod    = ms_mod summary
     mb_obj_date = ms_obj_date summary
@@ -912,8 +920,9 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
       _ -> do
         (iface, mb_old_iface_hash, _details) <- liftIO $
           hscSimpleIface hsc_env tc_result summary mb_old_hash
+        dt <- dynamicTooState hsc_env
 
-        liftIO $ hscMaybeWriteIface logger dflags True iface mb_old_iface_hash (ms_location summary)
+        liftIO $ hscMaybeWriteIface logger dflags dt True iface mb_old_iface_hash (ms_location summary)
 
         return $ HscUpdate iface
 
@@ -962,8 +971,8 @@ suffixes. The interface file name can be overloaded with "-ohi", except when
 -}
 
 -- | Write interface files
-hscMaybeWriteIface :: Logger -> DynFlags -> Bool -> ModIface -> Maybe Fingerprint -> ModLocation -> IO ()
-hscMaybeWriteIface logger dflags is_simple iface old_iface mod_location = do
+hscMaybeWriteIface :: Logger -> DynFlags -> DynamicTooState -> Bool -> ModIface -> Maybe Fingerprint -> ModLocation -> IO ()
+hscMaybeWriteIface logger dflags dynamic_too_state is_simple iface old_iface mod_location = do
     let force_write_interface = gopt Opt_WriteInterface dflags
         write_interface = case backend dflags of
                             NoBackend    -> False
@@ -1013,18 +1022,18 @@ hscMaybeWriteIface logger dflags is_simple iface old_iface mod_location = do
         hang (text "Writing interface(s):") 2 $ vcat
          [ text "Kind:" <+> if is_simple then text "simple" else text "full"
          , text "Hash change:" <+> ppr (not no_change)
-         , text "DynamicToo state:" <+> text (show dt)
+         , text "DynamicToo state:" <+> text (show dynamic_too_state)
          ]
 
       if is_simple
          then unless no_change $ do -- FIXME: see no_change' comment above
             write_iface dflags iface
-            case dt of
+            case dynamic_too_state of
                DT_Dont   -> return ()
                DT_Failed -> return ()
                DT_Dyn    -> panic "Unexpected DT_Dyn state when writing simple interface"
                DT_OK     -> write_iface (setDynamicNow dflags) iface
-         else case dt of
+         else case dynamic_too_state of
                DT_Dont | not no_change             -> write_iface dflags iface
                DT_OK   | not no_change             -> write_iface dflags iface
                -- FIXME: see no_change' comment above
