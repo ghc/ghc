@@ -1,30 +1,34 @@
 {-# LANGUAGE ForeignFunctionInterface #-}
-{-# LANGUAGE MagicHash        #-}
+{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE UnboxedTuples #-}
-{-# LANGUAGE UnliftedFFITypes#-}
+{-# LANGUAGE UnliftedFFITypes #-}
 
 -- |
 -- This module exposes an interface for capturing the state of a thread's
 -- execution stack for diagnostics purposes.
 --
 -- @since 2.16.0.0
-module GHC.Stack.CloneStack (
-  StackSnapshot(..),
-  cloneMyStack,
-  cloneThreadStack,
-  decode
-  ) where
+module GHC.Stack.CloneStack
+  ( StackSnapshot (..),
+    cloneMyStack,
+    cloneThreadStack,
+    decode,
+    StackEntry (..),
+  )
+where
 
-import GHC.Prim (StackSnapshot#, cloneMyStack#, ThreadId#, MutableArray#, sizeofMutableArray#, readArray#)
-import GHC.Exts (Int(I#), RealWorld)
 import Control.Concurrent.MVar
 import Control.Monad (forM)
+-- Foreign.Ptr
+
+import Data.Maybe (catMaybes)
+import Foreign
 import GHC.Conc.Sync
-import GHC.Stable
-import GHC.IO (IO(..))
-import Foreign -- Foreign.Ptr
-import GHC.Stack.CCS (InfoProvEnt, ipeProv, infoProvToStrings)
+import GHC.Exts (Int (I#), RealWorld)
+import GHC.IO (IO (..))
+import GHC.Prim (MutableArray#, StackSnapshot#, ThreadId#, cloneMyStack#, readArray#, sizeofMutableArray#)
+import GHC.Stack.CCS (InfoProv (..), InfoProvEnt, ipeProv, peekInfoProv)
 
 -- | A frozen snapshot of the state of an execution stack.
 --
@@ -57,7 +61,7 @@ the invariant that stack->sp points to a valid frame.
 -- @since 2.16.0.0
 cloneMyStack :: IO StackSnapshot
 cloneMyStack = IO $ \s ->
-   case (cloneMyStack# s) of (# s1, stack #) -> (# s1, StackSnapshot stack #)
+  case (cloneMyStack# s) of (# s1, stack #) -> (# s1, StackSnapshot stack #)
 
 foreign import ccall "sendCloneStackMessage" sendCloneStackMessage :: ThreadId# -> StablePtr PrimMVar -> IO ()
 
@@ -78,19 +82,49 @@ cloneThreadStack (ThreadId tid#) = do
 -- TODO: Cannot use `import GHC.Exts.Heap (StgInfoTable(..))` -> hidden package
 type InfoTableCode = Word
 
-foreign import ccall "decodeClonedStack" decodeClonedStack:: StackSnapshot# -> MutableArray# RealWorld (Ptr InfoTableCode)
+foreign import ccall "decodeClonedStack" decodeClonedStack :: StackSnapshot# -> MutableArray# RealWorld (Ptr InfoTableCode)
 
-foreign import ccall "lookupIPE" lookupIPE:: Ptr Word -> IO (Ptr InfoProvEnt)
+foreign import ccall "lookupIPE" lookupIPE :: Ptr Word -> IO (Ptr InfoProvEnt)
 
 -- TODO: Haddock
 -- TODO: Add test(s)
-decode :: StackSnapshot -> IO [[String]]
-decode (StackSnapshot stack) = let
-    array = decodeClonedStack stack
-    arraySize = I# (sizeofMutableArray# array)
-  in
-    do
-      forM [0 .. arraySize - 1] $ \(I# i) -> do
-        v <- IO $ readArray# array i
-        ipe <- lookupIPE v
-        (infoProvToStrings . ipeProv) ipe
+data StackEntry = StackEntry
+  { functionName :: String,
+    moduleName :: String,
+    srcLoc :: String,
+    closureType :: Word
+  }
+  deriving (Show, Eq)
+
+-- | Decode a 'StackSnapshot' to a stacktrace (a list of 'StackEntry').
+-- The stacktrace is created from return frames with according 'InfoProv'
+-- entries. To generate them, use the GHC flag @-finfo-table-map@. If there are
+-- no 'InfoProv' entries, an empty list is returned.
+--
+-- @since 2.16.0.0
+decode :: StackSnapshot -> IO [StackEntry]
+decode (StackSnapshot stack) =
+  let array = decodeClonedStack stack
+      arraySize = I# (sizeofMutableArray# array)
+   in do
+        result <- forM [0 .. arraySize - 1] $ \(I# i) -> do
+          v <- IO $ readArray# array i
+          ipe <- lookupIPE v
+          if ipe == nullPtr
+            then -- TODO: Test this case
+              pure Nothing
+            else do
+              infoProv <- (peekInfoProv . ipeProv) ipe
+              pure $ Just (toStackEntry infoProv)
+
+        return $ catMaybes result
+  where
+    toStackEntry :: InfoProv -> StackEntry
+    toStackEntry infoProv =
+      StackEntry
+        { functionName = ipLabel infoProv,
+          moduleName = ipMod infoProv,
+          srcLoc = ipLoc infoProv,
+          -- read looks dangerous, be we can trust that the closure type is always there.
+          closureType = read . ipDesc $ infoProv
+        }
