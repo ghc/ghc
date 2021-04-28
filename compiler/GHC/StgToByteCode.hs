@@ -648,7 +648,9 @@ schemeE
     :: StackDepth -> Sequel -> BCEnv -> CgStgExpr -> BcM BCInstrList
 schemeE d s p (StgLit lit) = returnUnboxedAtom d s p (StgLitArg lit)
 schemeE d s p (StgApp x [])
-   | not (isBoxedType (idType x)) = returnUnboxedAtom d s p (StgVarArg x)
+   | isUnboxedTupleType (idType x) ||
+     isUnboxedSumType (idType x) ||
+     not (isAlgType (idType x)) = returnUnboxedAtom d s p (StgVarArg x)
 -- Delegate tail-calls to schemeT.
 schemeE d s p e@(StgApp {}) = schemeT d s p e
 schemeE d s p e@(StgConApp {}) = schemeT d s p e
@@ -1051,8 +1053,8 @@ doCase d s p scrut bndr alts
         -- An unboxed value gets an extra info table pushed on top
         -- when it is returned.
         unboxed_itbl_size_b :: StackDepth
-        unboxed_itbl_size_b | isBoxedType bndr_ty = 0
-                            | ubx_tuple_frame     = 3 * wordSize platform
+        unboxed_itbl_size_b | ubx_tuple_frame     = 3 * wordSize platform
+                            | isAlgCase           = 0
                             | otherwise           = wordSize platform
 
         (bndr_size, tuple_info, args_offsets)
@@ -1084,7 +1086,9 @@ doCase d s p scrut bndr alts
         p_alts = Map.insert bndr d_bndr p
 
         bndr_ty = idType bndr
-        isAlgCase = isAlgType bndr_ty
+        isAlgCase = isAlgType bndr_ty &&
+                    not (isUnboxedSumType bndr_ty) &&
+                    not (isUnboxedTupleType bndr_ty)
 
         -- given an alt, return a discr and code for it.
         codeAlt (DEFAULT, _, rhs)
