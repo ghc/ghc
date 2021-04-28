@@ -11,6 +11,7 @@ module GHC.Runtime.Interpreter
   ( module GHC.Runtime.Interpreter.Types
 
   -- * High-level interface to the interpreter
+  , BCOOpts (..)
   , evalStmt, EvalStatus_(..), EvalStatus, EvalResult(..), EvalExpr(..)
   , resumeStmt
   , abandonStmt
@@ -53,7 +54,6 @@ module GHC.Runtime.Interpreter
   , freeHValueRefs
   , mkFinalizedHValue
   , wormhole, wormholeRef
-  , mkEvalOpts
   , fromEvalResult
   ) where
 
@@ -62,7 +62,6 @@ import GHC.Prelude
 import GHC.IO (catchException)
 import GHC.Driver.Ppr (showSDoc)
 import GHC.Driver.Env
-import GHC.Driver.Session
 
 import GHC.Runtime.Interpreter.Types
 import GHCi.Message
@@ -120,7 +119,7 @@ import System.Posix as Posix
 #endif
 import System.Directory
 import System.Process
-import GHC.Conc (getNumProcessors, pseq, par)
+import GHC.Conc (pseq, par)
 
 {- Note [Remote GHCi]
 
@@ -261,13 +260,12 @@ withIServ_ conf iserv action = withIServ conf iserv $ \inst ->
 -- each of the results.
 evalStmt
   :: Interp
-  -> DynFlags -- used by mkEvalOpts
-  -> Bool     -- "step" for mkEvalOpts
+  -> EvalOpts
   -> EvalExpr ForeignHValue
   -> IO (EvalStatus_ [ForeignHValue] [HValueRef])
-evalStmt interp dflags step foreign_expr = do
+evalStmt interp opts foreign_expr = do
   status <- withExpr foreign_expr $ \expr ->
-    interpCmd interp (EvalStmt (mkEvalOpts dflags step) expr)
+    interpCmd interp (EvalStmt opts expr)
   handleEvalStatus interp status
  where
   withExpr :: EvalExpr ForeignHValue -> (EvalExpr HValueRef -> IO a) -> IO a
@@ -280,13 +278,12 @@ evalStmt interp dflags step foreign_expr = do
 
 resumeStmt
   :: Interp
-  -> DynFlags -- used by mkEvalOpts
-  -> Bool     -- "step" for mkEvalOpts
+  -> EvalOpts
   -> ForeignRef (ResumeContext [HValueRef])
   -> IO (EvalStatus_ [ForeignHValue] [HValueRef])
-resumeStmt interp dflags step resume_ctxt = do
+resumeStmt interp opts resume_ctxt = do
   status <- withForeignRef resume_ctxt $ \rhv ->
-    interpCmd interp (ResumeStmt (mkEvalOpts dflags step) rhv)
+    interpCmd interp (ResumeStmt opts rhv)
   handleEvalStatus interp status
 
 abandonStmt :: Interp -> ForeignRef (ResumeContext [HValueRef]) -> IO ()
@@ -336,18 +333,18 @@ mkCostCentres :: Interp -> String -> [(String,String)] -> IO [RemotePtr CostCent
 mkCostCentres interp mod ccs =
   interpCmd interp (MkCostCentres mod ccs)
 
+newtype BCOOpts = BCOOpts
+  { bco_n_jobs :: Int -- ^ Number of parallel jobs doing BCO serialization
+  }
+
 -- | Create a set of BCOs that may be mutually recursive.
-createBCOs :: Interp -> DynFlags -> [ResolvedBCO] -> IO [HValueRef]
-createBCOs interp dflags rbcos = do
-  n_jobs <- case parMakeCount dflags of
-              Nothing -> liftIO getNumProcessors
-              Just n  -> return n
-  -- Serializing ResolvedBCO is expensive, so if we're in parallel mode
-  -- (-j<n>) parallelise the serialization.
+createBCOs :: Interp -> BCOOpts -> [ResolvedBCO] -> IO [HValueRef]
+createBCOs interp opts rbcos = do
+  let n_jobs = bco_n_jobs opts
+  -- Serializing ResolvedBCO is expensive, so if we support doing it in parallel
   if (n_jobs == 1)
     then
       interpCmd interp (CreateBCOs [runPut (put rbcos)])
-
     else do
       old_caps <- getNumCapabilities
       if old_caps == n_jobs
@@ -728,14 +725,6 @@ wormholeRef interp _r = case interpInstance interp of
 
 -- -----------------------------------------------------------------------------
 -- Misc utils
-
-mkEvalOpts :: DynFlags -> Bool -> EvalOpts
-mkEvalOpts dflags step =
-  EvalOpts
-    { useSandboxThread = gopt Opt_GhciSandbox dflags
-    , singleStep = step
-    , breakOnException = gopt Opt_BreakOnException dflags
-    , breakOnError = gopt Opt_BreakOnError dflags }
 
 fromEvalResult :: EvalResult a -> IO a
 fromEvalResult (EvalException e) = throwIO (fromSerializableException e)
