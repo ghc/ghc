@@ -320,6 +320,7 @@ toArgs :: RealSrcLoc
 toArgs starting_loc str
     = let (after_spaces_loc, after_spaces_str) = consume_spaces starting_loc str in
       case after_spaces_str of
+      "[]" -> Right []
       '[':after_bracket -> readAsList (advanceSrcLoc after_spaces_loc '[')
                                       after_bracket
 
@@ -360,12 +361,12 @@ toArgs starting_loc str
       [] -> Right []
       '"' : _ -> do
         -- readAsString removes outer quotes
-        (arg, new_loc, rest) <- readAsString after_spaces_loc after_spaces_str
+        (arg, new_loc, rest) <- readAsString after_spaces_loc after_spaces_str stringLexemePred
         (locate after_spaces_loc new_loc arg:)
           `fmap` toArgs' new_loc rest
       _ -> case break_with_loc (isSpace <||> (== '"')) after_spaces_loc after_spaces_str of
             (argPart1, loc2, s''@('"':_)) -> do
-                (argPart2, loc3, rest) <- readAsString loc2 s''
+                (argPart2, loc3, rest) <- readAsString loc2 s'' stringLexemePred
                 -- show argPart2 to keep inner quotes
                 (locate after_spaces_loc loc3 (argPart1 ++ show argPart2):)
                   `fmap` toArgs' loc3 rest
@@ -377,11 +378,21 @@ toArgs starting_loc str
                         -- ((consumed string, parsed result), remainder of input)
   reads_with_consumed = readP_to_S (gather (readPrec_to_P readPrec 0))
 
-  readAsString :: RealSrcLoc -> String -> Either String (String, RealSrcLoc, String)
-  readAsString loc s = case reads_with_consumed s of
+  stringLexemePred :: String -> Bool
+  stringLexemePred = all isSpace . take 1
+
+  listElemPred :: String -> Bool
+  listElemPred = all (\c -> isSpace c || isClosingBracket c || isComma c) . take 1
+
+  readAsString :: RealSrcLoc
+               -> String
+               -> (String -> Bool)
+               -> Either String (String, RealSrcLoc, String)
+  readAsString loc s restPredicate = case reads_with_consumed s of
                 [((consumed, arg), rest)]
+                    -- See Note [readAsString rest]
                     -- rest must either be [] or start with a space
-                    | all isSpace (take 1 rest) ->
+                    | restPredicate rest ->
                     Right (arg, advance_src_loc_many loc consumed, rest)
                 _ ->
                     Left ("Couldn't read " ++ show s ++ " as String")
@@ -390,7 +401,7 @@ toArgs starting_loc str
   readAsList :: RealSrcLoc -> String -> Either String [Located String]
   readAsList loc s = do
     let (after_spaces_loc, after_spaces_str) = consume_spaces loc s
-    (arg, after_arg_loc, after_arg_str) <- readAsString after_spaces_loc after_spaces_str
+    (arg, after_arg_loc, after_arg_str) <- readAsString after_spaces_loc after_spaces_str listElemPred
     let (after_arg_spaces_loc, after_arg_spaces_str)
           = consume_spaces after_arg_loc after_arg_str
     (locate after_spaces_loc after_arg_loc arg :) <$>
@@ -399,7 +410,44 @@ toArgs starting_loc str
         ']':after_bracket
           | all isSpace after_bracket
           -> Right []
-        _ -> Left ("Couldn't read " ++ show s ++ " as [String]")
+        _ -> Left ("Couldn't read " ++ show ('[' : s) ++ " as [String]") -- reinsert missing '[' for clarity.
+
+  isClosingBracket :: Char -> Bool
+  isClosingBracket = (==) ']'
+
+  isComma :: Char -> Bool
+  isComma = (==) ','
+
+{- NOTE [readAsList rest]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+(Outer quotes have been stripped to keep the output more readable).
+
+@readAsList@ uses @readAsString@ under the hook, but the latter is used in two places:
+
+1. In the call to @readAsList@ to parse individual string elements;
+2. In the call to @toArgs'@ to strip outer quotes;
+
+This means that @readAsString@ must be supplied a different predicate on the rest of
+the unparsed string, for reasons explained below.
+
+Let's imagine readAsList receives as input "1"] (the outer bracket has been stripped).
+Calling reads_with_consumed correctly parses "1", returning:
+
+[((""1"","1"),"]")]
+
+In this case, @rest@ needs to account for the closing bracket ], but /only/ if we are
+parsing a list, as it would be wrong to check for the presence of ']' in case of @toArgs'@.
+
+Example 2: Consider @readAsList@ being called on ""1", "2"". Now when we parse we get:
+
+
+[((""1"","1"),", "2" ]")]
+
+Here it would be wrong to check for just spaces in the remainder, as we found another element,
+because we encountered a comma.
+
+-}
 
 -----------------------------------------------------------------------------
 
