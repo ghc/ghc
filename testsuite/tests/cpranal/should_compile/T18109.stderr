@@ -1,51 +1,51 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 78, types: 81, coercions: 0, joins: 0/1}
+Result size of Tidy Core = {terms: 79, types: 81, coercions: 0, joins: 0/1}
 
 -- RHS size: {terms: 6, types: 4, coercions: 0, joins: 0/0}
 T18109.$WU :: [Int] %1 -> U
-T18109.$WU = \ (dt_aDr :: [Int]) -> case dt_aDr of dt_X0 { __DEFAULT -> T18109.U dt_X0 }
+T18109.$WU = \ (dt_aDm :: [Int]) -> case dt_aDm of dt_X0 { __DEFAULT -> T18109.U dt_X0 }
 
--- RHS size: {terms: 6, types: 12, coercions: 0, joins: 0/0}
-T18109.$wg :: (Int, Int) -> (# (Int, Int) #)
-T18109.$wg = \ (ww_sKr :: (Int, Int)) -> case ww_sKr of p_X2 { (ipv_sIU, ipv1_sIV) -> (# p_X2 #) }
+-- RHS size: {terms: 6, types: 8, coercions: 0, joins: 0/0}
+T18109.$wg :: Int -> Int -> (# (Int, Int) #)
+T18109.$wg = \ (ww_sKp :: Int) (ww1_sKq :: Int) -> (# (ww_sKp, ww1_sKq) #)
 
--- RHS size: {terms: 10, types: 13, coercions: 0, joins: 0/0}
-g :: T -> T
-g = \ (w_sKp :: T) -> case w_sKp of { T ww_sKr -> case T18109.$wg ww_sKr of { (# ww1_sKJ #) -> T18109.T ww1_sKJ } }
+-- RHS size: {terms: 11, types: 16, coercions: 0, joins: 0/0}
+g :: (Int, Int) -> T
+g = \ (w_sKn :: (Int, Int)) -> case w_sKn of { (ww_sKp, ww1_sKq) -> case T18109.$wg ww_sKp ww1_sKq of { (# ww2_sKI #) -> T18109.T ww2_sKI } }
 
 -- RHS size: {terms: 6, types: 5, coercions: 0, joins: 0/0}
 T18109.$wf :: Int -> (# Int -> Int #)
-T18109.$wf = \ (w_sKw :: Int) -> (# \ (v_B2 :: Int) -> GHC.Num.$fNumInt_$c+ v_B2 w_sKw #)
+T18109.$wf = \ (w_sKv :: Int) -> (# \ (v_B2 :: Int) -> GHC.Num.$fNumInt_$c+ v_B2 w_sKv #)
 
 -- RHS size: {terms: 7, types: 7, coercions: 0, joins: 0/0}
 f :: Int -> F
-f = \ (w_sKw :: Int) -> case T18109.$wf w_sKw of { (# ww_sKL #) -> T18109.F ww_sKL }
+f = \ (w_sKv :: Int) -> case T18109.$wf w_sKv of { (# ww_sKK #) -> T18109.F ww_sKK }
 
 -- RHS size: {terms: 26, types: 10, coercions: 0, joins: 0/1}
 T18109.$wh :: GHC.Prim.Int# -> [Int]
 T18109.$wh
-  = \ (ww_sKE :: GHC.Prim.Int#) ->
-      case GHC.Prim.># 0# ww_sKE of {
+  = \ (ww_sKD :: GHC.Prim.Int#) ->
+      case GHC.Prim.># 0# ww_sKD of {
         __DEFAULT ->
           letrec {
-            go3_aKm :: GHC.Prim.Int# -> [Int]
-            go3_aKm
-              = \ (x_aKn :: GHC.Prim.Int#) ->
+            go3_aKk :: GHC.Prim.Int# -> [Int]
+            go3_aKk
+              = \ (x_aKl :: GHC.Prim.Int#) ->
                   GHC.Types.:
                     @Int
-                    (GHC.Types.I# x_aKn)
-                    (case GHC.Prim.==# x_aKn ww_sKE of {
-                       __DEFAULT -> go3_aKm (GHC.Prim.+# x_aKn 1#);
+                    (GHC.Types.I# x_aKl)
+                    (case GHC.Prim.==# x_aKl ww_sKD of {
+                       __DEFAULT -> go3_aKk (GHC.Prim.+# x_aKl 1#);
                        1# -> GHC.Types.[] @Int
                      }); } in
-          go3_aKm 0#;
+          go3_aKk 0#;
         1# -> GHC.Types.[] @Int
       }
 
 -- RHS size: {terms: 10, types: 5, coercions: 0, joins: 0/0}
 h :: Int -> U
-h = \ (w_sKC :: Int) -> case w_sKC of { GHC.Types.I# ww_sKE -> case T18109.$wh ww_sKE of ww1_sKN { __DEFAULT -> T18109.U ww1_sKN } }
+h = \ (w_sKB :: Int) -> case w_sKB of { GHC.Types.I# ww_sKD -> case T18109.$wh ww_sKD of ww1_sKM { __DEFAULT -> T18109.U ww1_sKM } }
 
 
 
