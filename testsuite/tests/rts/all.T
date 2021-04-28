@@ -438,4 +438,6 @@ test('cloneMyStack', [extra_files(['cloneStackLib.c'])], compile_and_run, ['clon
 test('cloneMyStack2', ignore_stdout, compile_and_run, [''])
 test('cloneMyStack_retBigStackFrame', [extra_files(['cloneStackLib.c']), ignore_stdout], compile_and_run, ['cloneStackLib.c'])
 test('cloneThreadStack', [only_ways(['threaded1']), extra_ways(['threaded1']), extra_files(['cloneStackLib.c'])], compile_and_run, ['cloneStackLib.c -threaded'])
-test('decodeMyStack', [ignore_stdout, ignore_stderr], compile_and_run, ['-O0 -finfo-table-map'])
+test('decodeMyStack', [ignore_stdout, ignore_stderr], compile_and_run, ['-finfo-table-map'])
+# -finfo-table-map intentionally missing
+test('decodeMyStack_emptyListForMissingFlag', [ignore_stdout, ignore_stderr], compile_and_run, [''])
