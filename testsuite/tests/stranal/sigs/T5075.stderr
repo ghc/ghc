@@ -1,7 +1,7 @@
 
 ==================== Strictness signatures ====================
 T5075.$trModule:
-T5075.loop: <SP(A,A,SCS(C1(L)),A,A,A,A,A)><LP(A,A,LCL(C1(L)),A,A,A,L)><L>
+T5075.loop: <SP(A,A,SCS(C1(L)),A,A,A,A,A)><LP(M,M,LCL(C1(L)),M,M,M,L)><L>
 
 
 
@@ -13,6 +13,6 @@ T5075.loop:
 
 ==================== Strictness signatures ====================
 T5075.$trModule:
-T5075.loop: <1P(A,A,SCS(C1(L)),A,A,A,A,A)><LP(A,A,LCL(C1(L)),A,A,A,L)><L>
+T5075.loop: <1P(A,A,SCS(C1(L)),A,A,A,A,A)><LP(L,L,LCL(C1(L)),L,L,L,L)><L>
 
 
