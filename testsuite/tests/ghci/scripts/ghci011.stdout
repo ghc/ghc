@@ -1,44 +1,44 @@
 type [] :: * -> *
 data [] a = [] | a : [a]
   	-- Defined in ‘GHC.Types’
-instance Applicative [] -- Defined in ‘GHC.Base’
-instance Eq a => Eq [a] -- Defined in ‘GHC.Classes’
-instance Functor [] -- Defined in ‘GHC.Base’
-instance Monad [] -- Defined in ‘GHC.Base’
 instance Monoid [a] -- Defined in ‘GHC.Base’
-instance Ord a => Ord [a] -- Defined in ‘GHC.Classes’
 instance Semigroup [a] -- Defined in ‘GHC.Base’
-instance Show a => Show [a] -- Defined in ‘GHC.Show’
-instance MonadFail [] -- Defined in ‘Control.Monad.Fail’
-instance Read a => Read [a] -- Defined in ‘GHC.Read’
 instance Foldable [] -- Defined in ‘Data.Foldable’
 instance Traversable [] -- Defined in ‘Data.Traversable’
+instance Read a => Read [a] -- Defined in ‘GHC.Read’
+instance Show a => Show [a] -- Defined in ‘GHC.Show’
+instance Applicative [] -- Defined in ‘GHC.Base’
+instance Functor [] -- Defined in ‘GHC.Base’
+instance MonadFail [] -- Defined in ‘Control.Monad.Fail’
+instance Monad [] -- Defined in ‘GHC.Base’
+instance Eq a => Eq [a] -- Defined in ‘GHC.Classes’
+instance Ord a => Ord [a] -- Defined in ‘GHC.Classes’
 type () :: *
 data () = ()
   	-- Defined in ‘GHC.Tuple’
-instance Eq () -- Defined in ‘GHC.Classes’
 instance Monoid () -- Defined in ‘GHC.Base’
-instance Ord () -- Defined in ‘GHC.Classes’
 instance Semigroup () -- Defined in ‘GHC.Base’
-instance Enum () -- Defined in ‘GHC.Enum’
-instance Show () -- Defined in ‘GHC.Show’
 instance Read () -- Defined in ‘GHC.Read’
 instance Bounded () -- Defined in ‘GHC.Enum’
+instance Enum () -- Defined in ‘GHC.Enum’
+instance Ord () -- Defined in ‘GHC.Classes’
+instance Show () -- Defined in ‘GHC.Show’
+instance Eq () -- Defined in ‘GHC.Classes’
 type (,) :: * -> * -> *
 data (,) a b = (,) a b
   	-- Defined in ‘GHC.Tuple’
-instance Monoid a => Applicative ((,) a) -- Defined in ‘GHC.Base’
-instance (Eq a, Eq b) => Eq (a, b) -- Defined in ‘GHC.Classes’
-instance Functor ((,) a) -- Defined in ‘GHC.Base’
-instance Monoid a => Monad ((,) a) -- Defined in ‘GHC.Base’
+instance Traversable ((,) a) -- Defined in ‘Data.Traversable’
 instance (Monoid a, Monoid b) => Monoid (a, b)
   -- Defined in ‘GHC.Base’
-instance (Ord a, Ord b) => Ord (a, b) -- Defined in ‘GHC.Classes’
 instance (Semigroup a, Semigroup b) => Semigroup (a, b)
   -- Defined in ‘GHC.Base’
-instance (Show a, Show b) => Show (a, b) -- Defined in ‘GHC.Show’
-instance (Read a, Read b) => Read (a, b) -- Defined in ‘GHC.Read’
 instance Foldable ((,) a) -- Defined in ‘Data.Foldable’
-instance Traversable ((,) a) -- Defined in ‘Data.Traversable’
 instance (Bounded a, Bounded b) => Bounded (a, b)
   -- Defined in ‘GHC.Enum’
+instance (Eq a, Eq b) => Eq (a, b) -- Defined in ‘GHC.Classes’
+instance (Ord a, Ord b) => Ord (a, b) -- Defined in ‘GHC.Classes’
+instance (Read a, Read b) => Read (a, b) -- Defined in ‘GHC.Read’
+instance (Show a, Show b) => Show (a, b) -- Defined in ‘GHC.Show’
+instance Monoid a => Applicative ((,) a) -- Defined in ‘GHC.Base’
+instance Functor ((,) a) -- Defined in ‘GHC.Base’
+instance Monoid a => Monad ((,) a) -- Defined in ‘GHC.Base’
