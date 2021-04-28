@@ -1,8 +1,8 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 56, types: 81, coercions: 0, joins: 0/3}
+Result size of Tidy Core = {terms: 56, types: 87, coercions: 0, joins: 0/3}
 
--- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 3, types: 3, coercions: 0, joins: 0/0}
 F14.f1 :: forall {t}. t -> t
 [GblId,
  Arity=1,
@@ -16,9 +16,9 @@ F14.f2 :: Integer
 [GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 0}]
 F14.f2 = 1
 
--- RHS size: {terms: 35, types: 23, coercions: 0, joins: 0/3}
+-- RHS size: {terms: 35, types: 24, coercions: 0, joins: 0/3}
 F14.$wf14 [InlPrag=[2]] :: forall {t}. (t -> t -> Bool) -> Num t => t -> t -> t -> t
-[GblId, Arity=4, Str=<SCS(C1(L))><LP(LCL(C1(L)),A,A,A,A,A,MCM(L))><L><L>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [60 90 0 0] 300 0}]
+[GblId, Arity=4, Str=<SCS(C1(L))><LP(LCL(C1(L)),M,M,M,M,M,MCM(L))><L><L>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [60 90 0 0] 300 0}]
 F14.$wf14
   = \ (@t) (ww :: t -> t -> Bool) (w :: Num t) (w1 :: t) (w2 :: t) ->
       let {
@@ -41,14 +41,14 @@ F14.$wf14
               }; } in
       f3 w1 w2
 
--- RHS size: {terms: 13, types: 33, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 13, types: 34, coercions: 0, joins: 0/0}
 f14 [InlPrag=[2]] :: forall {t}. (Ord t, Num t) => t -> t -> t -> t
 [GblId,
  Arity=4,
- Str=<1P(A,A,SCS(C1(L)),A,A,A,A,A)><LP(LCL(C1(L)),A,A,A,A,A,L)><L><L>,
+ Str=<1P(A,A,SCS(C1(L)),A,A,A,A,A)><LP(LCL(C1(L)),L,L,L,L,L,L)><L><L>,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=4,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (@t) (w [Occ=Once1!] :: Ord t) (w1 [Occ=Once1] :: Num t) (w2 [Occ=Once1] :: t) (w3 [Occ=Once1] :: t) -> case w of { GHC.Classes.C:Ord _ [Occ=Dead] _ [Occ=Dead] ww3 [Occ=Once1] _ [Occ=Dead] _ [Occ=Dead] _ [Occ=Dead] _ [Occ=Dead] _ [Occ=Dead] -> F14.$wf14 @t ww3 w1 w2 w3 }}]
-f14 = \ (@t) (w :: Ord t) (w1 :: Num t) (w2 :: t) (w3 :: t) -> case w of { GHC.Classes.C:Ord ww1 ww2 ww3 ww4 ww5 ww6 ww7 ww8 -> F14.$wf14 @t ww3 w1 w2 w3 }
+         Tmpl= \ (@t) (w [Occ=Once1!] :: Ord t) (w1 [Occ=Once1] :: Num t) (w2 [Occ=Once1] :: t) (w3 [Occ=Once1] :: t) -> case w of { GHC.Classes.C:Ord _ [Occ=Dead] _ [Occ=Dead] ww2 [Occ=Once1] _ [Occ=Dead] _ [Occ=Dead] _ [Occ=Dead] _ [Occ=Dead] _ [Occ=Dead] -> F14.$wf14 @t ww2 w1 w2 w3 }}]
+f14 = \ (@t) (w :: Ord t) (w1 :: Num t) (w2 :: t) (w3 :: t) -> case w of { GHC.Classes.C:Ord ww ww1 ww2 ww3 ww4 ww5 ww6 ww7 -> F14.$wf14 @t ww2 w1 w2 w3 }
 
 
 

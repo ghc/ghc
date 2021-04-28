@@ -59,7 +59,7 @@ end Rec }
 T4908.$wf [InlPrag=[2]] :: Int# -> (Int, Int) -> Bool
 [GblId,
  Arity=2,
- Str=<1L><MP(A,MP(ML))>,
+ Str=<1L><MP(M,MP(ML))>,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [30 20] 101 20}]
 T4908.$wf
@@ -81,7 +81,7 @@ T4908.$wf
 f [InlPrag=[2]] :: Int -> (Int, Int) -> Bool
 [GblId,
  Arity=2,
- Str=<1P(1L)><MP(A,MP(ML))>,
+ Str=<1P(1L)><MP(M,MP(ML))>,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
