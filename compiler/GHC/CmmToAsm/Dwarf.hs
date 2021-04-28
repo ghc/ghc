@@ -51,8 +51,8 @@ dwarfGen config modLoc us blocks = do
         , dwName = fromMaybe "" (ml_hs_file modLoc)
         , dwCompDir = addTrailingPathSeparator compPath
         , dwProducer = cProjectName ++ " " ++ cProjectVersion
-        , dwLowLabel = lowLabel
-        , dwHighLabel = highLabel
+        , dwLowLabel = pdoc platform lowLabel
+        , dwHighLabel = pdoc platform highLabel
         , dwLineLabel = dwarfLineLabel
         }
 
@@ -69,7 +69,7 @@ dwarfGen config modLoc us blocks = do
   -- .debug_info section: Information records on procedures and blocks
   let -- unique to identify start and end compilation unit .debug_inf
       (unitU, us') = takeUniqFromSupply us
-      infoSct = vcat [ ptext dwarfInfoLabel <> colon
+      infoSct = vcat [ dwarfInfoLabel <> colon
                      , dwarfInfoSection platform
                      , compileUnitHeader platform unitU
                      , pprDwarfInfo platform haveSrc dwarfUnit
@@ -79,12 +79,12 @@ dwarfGen config modLoc us blocks = do
   -- .debug_line section: Generated mainly by the assembler, but we
   -- need to label it
   let lineSct = dwarfLineSection platform $$
-                ptext dwarfLineLabel <> colon
+                dwarfLineLabel <> colon
 
   -- .debug_frame section: Information about the layout of the GHC stack
   let (framesU, us'') = takeUniqFromSupply us'
       frameSct = dwarfFrameSection platform $$
-                 ptext dwarfFrameLabel <> colon $$
+                 dwarfFrameLabel <> colon $$
                  pprDwarfFrame platform (debugFrame framesU procs)
 
   -- .aranges section: Information about the bounds of compilation units
@@ -114,7 +114,7 @@ compileUnitHeader platform unitU =
   in vcat [ pdoc platform cuLabel <> colon
           , text "\t.long " <> length  -- compilation unit size
           , pprHalf 3                          -- DWARF version
-          , sectionOffset platform (ptext dwarfAbbrevLabel) (ptext dwarfAbbrevLabel)
+          , sectionOffset platform dwarfAbbrevLabel dwarfAbbrevLabel
                                                -- abbrevs offset
           , text "\t.byte " <> ppr (platformWordSizeInBytes platform) -- word size
           ]
