@@ -29,37 +29,39 @@ generateCgIPEStub :: HscEnv -> Module -> InfoTableProvMap -> Stream IO CmmGroupS
 generateCgIPEStub hsc_env this_mod denv s = do
   let dflags = hsc_dflags hsc_env
   cgState <- liftIO initC
-  (labeledInfoTablesWithTickishes, (nonCaffySet, moduleLFInfos)) <- Stream.mapAccumL_ mappy [] s
+  (labeledInfoTablesWithTickishes, (nonCaffySet, moduleLFInfos)) <- Stream.mapAccumL_ collect [] s
   let denv' = denv {labeledInfoTablesWithTickishes = labeledInfoTablesWithTickishes}
       ((ipeStub, cmmGroup), _) = runC dflags this_mod cgState $ getCmm (initInfoTableProv (map sndOfTriple labeledInfoTablesWithTickishes) denv' this_mod)
   (_, cmmGroupSRTs) <- liftIO $ cmmPipeline hsc_env (emptySRT this_mod) cmmGroup
   Stream.yield cmmGroupSRTs
   return CgInfos {cgNonCafs = nonCaffySet, cgLFInfos = moduleLFInfos, cgIPEStub = ipeStub}
   where
-    -- TODO: `mappy` is a bad name
-    mappy :: [(Label, CmmInfoTable, Maybe CmmTickish)] -> CmmGroupSRTs -> IO ([(Label, CmmInfoTable, Maybe CmmTickish)], CmmGroupSRTs)
-    mappy acc cmmGroupSRTs = do
+    collect :: [(Label, CmmInfoTable, Maybe CmmTickish)] -> CmmGroupSRTs -> IO ([(Label, CmmInfoTable, Maybe CmmTickish)], CmmGroupSRTs)
+    collect acc cmmGroupSRTs = do
       let labelsToInfoTables = collectInfoTables cmmGroupSRTs
-          labelsToInfoTablesToTickishes = map (\(l, i) -> (l, i, lookupEstimatedTick cmmGroupSRTs l)) labelsToInfoTables
+          labelsToInfoTablesToTickishes = map (\(l, i) -> (l, i, lookupEstimatedTick cmmGroupSRTs l i)) labelsToInfoTables
       return (acc ++ labelsToInfoTablesToTickishes, cmmGroupSRTs)
 
     sndOfTriple :: (a, b, c) -> b
     sndOfTriple (_, b, _) = b
 
     collectInfoTables :: CmmGroupSRTs -> [(Label, CmmInfoTable)]
-    collectInfoTables cmmGroup = concat $ catMaybes $ map extractReturnInfoTableCandidates cmmGroup
+    collectInfoTables cmmGroup = concat $ catMaybes $ map extractInfoTables cmmGroup
 
     -- All return frame info tables are stack represented, though not all stack represented info tables
     -- have to be return frames.
-    extractReturnInfoTableCandidates :: GenCmmDecl RawCmmStatics CmmTopInfo CmmGraph -> Maybe [(Label, CmmInfoTable)]
-    extractReturnInfoTableCandidates (CmmProc h _ _ _) = Just $ filter (\(_, i) -> (isStackRep . cit_rep) i) $ mapToList (info_tbls h)
-    extractReturnInfoTableCandidates _ = Nothing
+    extractInfoTables :: GenCmmDecl RawCmmStatics CmmTopInfo CmmGraph -> Maybe [(Label, CmmInfoTable)]
+    extractInfoTables (CmmProc h _ _ _) = Just $ mapToList (info_tbls h)
+    extractInfoTables _ = Nothing
 
     -- TODO: Write a note: [Looking up CmmTickish for return frame info tables]
-    lookupEstimatedTick :: CmmGroupSRTs -> Label -> Maybe CmmTickish
-    lookupEstimatedTick cmmGroup infoTableLabel = do
-      let blocks = concatMap toBlockList (graphs cmmGroup)
-      firstJusts $ map (findCmmTickishForLabelInBlock infoTableLabel) blocks
+    lookupEstimatedTick :: CmmGroupSRTs -> Label -> CmmInfoTable -> Maybe CmmTickish
+    lookupEstimatedTick cmmGroup infoTableLabel infoTable = do
+      if(isStackRep . cit_rep) infoTable then do
+        let blocks = concatMap toBlockList (graphs cmmGroup)
+        firstJusts $ map (findCmmTickishForLabelInBlock infoTableLabel) blocks
+      else
+        Nothing
 
     graphs :: CmmGroupSRTs -> [CmmGraph]
     graphs = foldl' go []
