@@ -53,6 +53,7 @@ import GHC.Driver.Main
 import GHC.Driver.Env
 import GHC.Driver.Session
 import GHC.Driver.Ppr
+import GHC.Driver.Config
 
 import GHC.Runtime.Eval.Types
 import GHC.Runtime.Interpreter as GHCi
@@ -227,8 +228,9 @@ execStmt' stmt stmt_text ExecOptions{..} = do
 
         status <-
           withVirtualCWD $
-            liftIO $
-              evalStmt interp idflags' (isStep execSingleStep) (execWrap hval)
+            liftIO $ do
+              let eval_opts = initEvalOpts idflags' (isStep execSingleStep)
+              evalStmt interp eval_opts (execWrap hval)
 
         let ic = hsc_IC hsc_env
             bindings = (ic_tythings ic, ic_rn_gbl_env ic)
@@ -308,7 +310,7 @@ emptyHistory :: Int -> BoundedList History
 emptyHistory size = nilBL size
 
 handleRunStatus :: GhcMonad m
-                => SingleStep -> String-> ([TyThing],GlobalRdrEnv) -> [Id]
+                => SingleStep -> String -> ([TyThing],GlobalRdrEnv) -> [Id]
                 -> EvalStatus_ [ForeignHValue] [HValueRef]
                 -> BoundedList History
                 -> m ExecResult
@@ -342,7 +344,8 @@ handleRunStatus step expr bindings final_ids status history
                !history' = mkHistory hsc_env apStack_fhv bi `consBL` history
                  -- history is strict, otherwise our BoundedList is pointless.
            fhv <- liftIO $ mkFinalizedHValue interp resume_ctxt
-           status <- liftIO $ GHCi.resumeStmt interp dflags True fhv
+           let eval_opts = initEvalOpts dflags True
+           status <- liftIO $ GHCi.resumeStmt interp eval_opts fhv
            handleRunStatus RunAndLogSteps expr bindings final_ids
                            status history'
     | otherwise
@@ -442,7 +445,8 @@ resumeExec canLogSpan step mbCnt
                   setupBreakpoint hsc_env (fromJust mb_brkpt) (fromJust mbCnt)
                     -- When the user specified a break ignore count, set it
                     -- in the interpreter
-                status <- liftIO $ GHCi.resumeStmt interp dflags (isStep step) fhv
+                let eval_opts = initEvalOpts dflags (isStep step)
+                status <- liftIO $ GHCi.resumeStmt interp eval_opts fhv
                 let prevHistoryLst = fromListBL 50 hist
                     hist' = case mb_brkpt of
                        Nothing -> prevHistoryLst
@@ -1211,7 +1215,8 @@ compileParsedExprRemote expr@(L loc _) = withSession $ \hsc_env -> do
         _ -> panic "compileParsedExprRemote"
 
   updateFixityEnv fix_env
-  status <- liftIO $ evalStmt interp dflags False (EvalThis hvals_io)
+  let eval_opts = initEvalOpts dflags False
+  status <- liftIO $ evalStmt interp eval_opts (EvalThis hvals_io)
   case status of
     EvalComplete _ (EvalSuccess [hval]) -> return hval
     EvalComplete _ (EvalException e) ->
