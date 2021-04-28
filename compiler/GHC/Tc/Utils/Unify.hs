@@ -1478,7 +1478,7 @@ canSolveByUnification :: MetaInfo -> TcType -> Bool
 -- See Note [Unification preconditions, (TYVAR-TV)]
 canSolveByUnification info xi
   = case info of
-      CycleBreakerTv -> False
+      CycleBreakerGivenTv -> False
       TyVarTv -> case tcGetTyVar_maybe xi of
                    Nothing -> False
                    Just tv -> case tcTyVarDetails tv of
@@ -1528,10 +1528,11 @@ lhsPriority tv
       RuntimeUnk  -> 0
       SkolemTv {} -> 0
       MetaTv { mtv_info = info } -> case info of
-                                     CycleBreakerTv -> 0
-                                     TyVarTv        -> 1
-                                     TauTv          -> 2
-                                     RuntimeUnkTv   -> 3
+                                     CycleBreakerGivenTv  -> 0
+                                     TyVarTv              -> 1
+                                     TauTv                -> 2
+                                     CycleBreakerWantedTv -> 2
+                                     RuntimeUnkTv         -> 3
 
 {- Note [Unification preconditions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1569,7 +1570,7 @@ There are three reasons not to unify:
    Exactly what is a "given equality" for the purpose of (UNTOUCHABLE)?
    Answer: see Note [Tracking Given equalities] in GHC.Tc.Solver.Monad
 
-3. (TYVAR-TV) Unifying TyVarTvs and CycleBreakerTvs
+3. (TYVAR-TV) Unifying TyVarTvs and CycleBreakerGivenTvs
    This precondition looks at the MetaInfo of the unification variable:
 
    * TyVarTv: When considering alpha{tyv} ~ ty, if alpha{tyv} is a
@@ -1577,7 +1578,7 @@ There are three reasons not to unify:
      structured type.  So if 'ty' is a structured type, such as (Maybe x),
      don't unify.
 
-   * CycleBreakerTv: never unified, except by restoreTyVarCycles.
+   * CycleBreakerGivenTv: never unified, except by restoreTyVarCycles.
 
 
 Needless to say, all three have wrinkles:
@@ -1646,7 +1647,7 @@ So we look for a positive reason to swap, using a three-step test:
         looks for meta tyvars on the left
 
   Tie-breaking rules for MetaTvs:
-  - CycleBreakerTv: This is essentially a stand-in for another type;
+  - CycleBreakerGivenTv: This is essentially a stand-in for another type;
        it's untouchable and should have the same priority as a skolem: 0.
 
   - TyVarTv: These can unify only with another tyvar, but we can't unify
@@ -1655,6 +1656,8 @@ So we look for a positive reason to swap, using a three-step test:
 
   - TauTv: This is the common case; we want these on the left so that they
        can be written to: 2.
+
+  - CycleBreakerWantedTv: Just like TauTv.
 
   - RuntimeUnkTv: These aren't really meta-variables used in type inference,
        but just a convenience in the implementation of the GHCi debugger.

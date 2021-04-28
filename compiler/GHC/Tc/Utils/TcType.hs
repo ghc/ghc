@@ -42,7 +42,7 @@ module GHC.Tc.Utils.TcType (
   MetaDetails(Flexi, Indirect), MetaInfo(..),
   isImmutableTyVar, isSkolemTyVar, isMetaTyVar,  isMetaTyVarTy, isTyVarTy,
   tcIsTcTyVar, isTyVarTyVar, isOverlappableTyVar,  isTyConableTyVar,
-  isAmbiguousTyVar, isCycleBreakerTyVar, metaTyVarRef, metaTyVarInfo,
+  isAmbiguousTyVar, isCycleBreakerGivenTyVar, metaTyVarRef, metaTyVarInfo,
   isFlexi, isIndirect, isRuntimeUnkSkol,
   metaTyVarTcLevel, setMetaTyVarTcLevel, metaTyVarTcLevel_maybe,
   isTouchableMetaTyVar, isPromotableMetaTyVar,
@@ -532,19 +532,24 @@ data MetaInfo
    | RuntimeUnkTv  -- A unification variable used in the GHCi debugger.
                    -- It /is/ allowed to unify with a polytype, unlike TauTv
 
-   | CycleBreakerTv  -- Used to fix occurs-check problems in Givens
-                     -- See Note [Type variable cycles] in
-                     -- GHC.Tc.Solver.Canonical
+   | CycleBreakerGivenTv  -- Used to fix occurs-check problems in Givens
+                          -- See Note [Type variable cycles] in
+                          -- GHC.Tc.Solver.Canonical
+
+   | CycleBreakerWantedTv -- Used to fix occurs-check problems in Wanted/Deriveds
+                          -- See Note [Type variable cycles] in
+                          -- GHC.Tc.Solver.Canonical
 
 instance Outputable MetaDetails where
   ppr Flexi         = text "Flexi"
   ppr (Indirect ty) = text "Indirect" <+> ppr ty
 
 instance Outputable MetaInfo where
-  ppr TauTv          = text "tau"
-  ppr TyVarTv        = text "tyv"
-  ppr RuntimeUnkTv   = text "rutv"
-  ppr CycleBreakerTv = text "cbv"
+  ppr TauTv                = text "tau"
+  ppr TyVarTv              = text "tyv"
+  ppr RuntimeUnkTv         = text "rutv"
+  ppr CycleBreakerGivenTv  = text "gcbv"
+  ppr CycleBreakerWantedTv = text "wcbv"
 
 {- *********************************************************************
 *                                                                      *
@@ -1006,7 +1011,7 @@ isImmutableTyVar :: TyVar -> Bool
 isImmutableTyVar tv = isSkolemTyVar tv
 
 isTyConableTyVar, isSkolemTyVar, isOverlappableTyVar,
-  isMetaTyVar, isAmbiguousTyVar, isCycleBreakerTyVar :: TcTyVar -> Bool
+  isMetaTyVar, isAmbiguousTyVar, isCycleBreakerGivenTyVar :: TcTyVar -> Bool
 
 isTyConableTyVar tv
         -- True of a meta-type variable that can be filled in
@@ -1051,9 +1056,9 @@ isAmbiguousTyVar tv
         _             -> False
   | otherwise = False
 
-isCycleBreakerTyVar tv
+isCycleBreakerGivenTyVar tv
   | isTyVar tv -- See Note [Coercion variables in free variable lists]
-  , MetaTv { mtv_info = CycleBreakerTv } <- tcTyVarDetails tv
+  , MetaTv { mtv_info = CycleBreakerGivenTv } <- tcTyVarDetails tv
   = True
 
   | otherwise
@@ -1071,8 +1076,8 @@ metaTyVarInfo tv
 
 isTouchableInfo :: MetaInfo -> Bool
 isTouchableInfo info
-  | CycleBreakerTv <- info = False
-  | otherwise              = True
+  | CycleBreakerGivenTv <- info = False
+  | otherwise                   = True
 
 metaTyVarTcLevel :: TcTyVar -> TcLevel
 metaTyVarTcLevel tv

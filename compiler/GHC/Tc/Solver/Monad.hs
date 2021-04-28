@@ -395,7 +395,7 @@ data InertSet
               -- Sometimes called "the inert set"
 
        , inert_cycle_breakers :: [(TcTyVar, TcType)]
-              -- a list of CycleBreakerTv / original family applications
+              -- a list of CycleBreakerGivenTv / original family applications
               -- used to undo the cycle-breaking needed to handle
               -- Note [Type variable cycles] in GHC.Tc.Solver.Canonical
 
@@ -2382,7 +2382,7 @@ mightEqualLater (IS { inert_cycle_breakers = cbvs })
     bind_fun tv rhs_ty
       | isMetaTyVar tv
       , can_unify tv (metaTyVarInfo tv) rhs_ty
-         -- this checks for CycleBreakerTvs and TyVarTvs; forgetting
+         -- this checks for CycleBreakerGivenTvs and TyVarTvs; forgetting
          -- the latter was #19106.
       = BindMe
 
@@ -2396,13 +2396,13 @@ mightEqualLater (IS { inert_cycle_breakers = cbvs })
 
     -- True for TauTv and TyVarTv (and RuntimeUnkTv) meta-tyvars
     -- (as they can be unified)
-    -- and also for CycleBreakerTvs that mentions meta-tyvars
+    -- and also for CycleBreakerGivenTvs that mentions meta-tyvars
     mentions_meta_ty_var :: TyVar -> Bool
     mentions_meta_ty_var tv
       | isMetaTyVar tv
       = case metaTyVarInfo tv of
           -- See Examples 8 and 9 in the Note
-          CycleBreakerTv
+          CycleBreakerGivenTv
             | Just tyfam_app <- lookup tv cbvs
             -> anyFreeVarsOfType mentions_meta_ty_var tyfam_app
             | otherwise
@@ -3929,23 +3929,23 @@ instance Outputable BreakTyVarCyclesHow where
 -- should we break the cycles? See Note [Type variable cycles]
 -- in GHC.Tc.Solver.Canonical
 shouldBreakCycle :: CtFlavour   -- of the equality
-                 -> CtLoc       -- of the equality
                  -> TcTyVar     -- the LHS
                  -> TcType      -- the RHS
                  -> TcS (Maybe BreakTyVarCyclesHow)
-shouldBreakCycle Given _loc lhs_tv _rhs
-  | not (isCycleBreakerTyVar lhs_tv)  -- See Detail (7) of Note
+shouldBreakCycle Given lhs_tv _rhs
+  | not (isCycleBreakerGivenTyVar lhs_tv)  -- See Detail (7) of Note
   = return $ Just BTVC_Given
-shouldBreakCycle flav loc lhs_tv rhs
+shouldBreakCycle flav lhs_tv rhs
   | ctFlavourContainsDerived flav
      -- See Detail (7) of Note
-  , case ctLocOrigin loc of CycleBreakerOrigin _ -> False
-                            _                    -> True
+  , isMetaTyVar lhs_tv
+{-  , case metaTyVarInfo lhs_tv of CycleBreakerWantedTv -> False
+                                 _                    -> True -}
   = do { result <- unifyTest Derived lhs_tv rhs
        ; return $ case result of
            NoUnify -> Nothing
            _       -> Just BTVC_Derived }
-shouldBreakCycle _ _ _ _ = return Nothing
+shouldBreakCycle _ _ _ = return Nothing
 
 -- | Replace all type family applications in the RHS with fresh variables,
 -- emitting givens that relate the type family application to the variable.
@@ -4002,7 +4002,7 @@ breakTyVarCycle how loc = go
               -> TcS (CoercionN, TcType)  -- rewritten type (the fresh tyvar)
     emit_work fun_app_kind fun_app = case how of
       BTVC_Given   ->
-        do { new_tv <- wrapTcS (TcM.newCycleBreakerTyVar fun_app_kind)
+        do { new_tv <- wrapTcS (TcM.newCycleBreakerGivenTyVar fun_app_kind)
            ; let new_ty     = mkTyVarTy new_tv
                  given_pred = mkHeteroPrimEqPred fun_app_kind fun_app_kind
                                                  fun_app new_ty
@@ -4017,14 +4017,12 @@ breakTyVarCycle how loc = go
                 -- Why reflexive? See Detail (4) of the Note
 
       BTVC_Derived ->
-        do { new_tv <- wrapTcS (TcM.newFlexiTyVar fun_app_kind)
+        do { new_tv <- wrapTcS (TcM.newCycleBreakerWantedTyVar fun_app_kind)
            ; let new_ty = mkTyVarTy new_tv
-                 new_loc = updateCtLocOrigin loc CycleBreakerOrigin
-                   -- See Detail (7) of the Note
-           ; co <- emitNewWantedEq new_loc Nominal new_ty fun_app
+           ; co <- emitNewWantedEq loc Nominal new_ty fun_app
            ; return (co, new_ty) }
 
--- | Fill in CycleBreakerTvs with the variables they stand for.
+-- | Fill in CycleBreakerGivenTvs with the variables they stand for.
 -- See Note [Type variable cycles] in GHC.Tc.Solver.Canonical.
 restoreTyVarCycles :: InertSet -> TcM ()
 restoreTyVarCycles is

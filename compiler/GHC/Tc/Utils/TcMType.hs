@@ -26,7 +26,7 @@ module GHC.Tc.Utils.TcMType (
   newOpenBoxedTypeKind,
   newMetaKindVar, newMetaKindVars, newMetaTyVarTyAtLevel,
   newAnonMetaTyVar, cloneMetaTyVar,
-  newCycleBreakerTyVar,
+  newCycleBreakerGivenTyVar, newCycleBreakerWantedTyVar,
 
   newMultiplicityVar,
   readMetaTyVar, writeMetaTyVar, writeMetaTyVarRef,
@@ -815,7 +815,8 @@ metaInfoToTyVarName  meta_info =
        TauTv          -> fsLit "t"
        TyVarTv        -> fsLit "a"
        RuntimeUnkTv   -> fsLit "r"
-       CycleBreakerTv -> fsLit "b"
+       CycleBreakerGivenTv  -> fsLit "b"
+       CycleBreakerWantedTv -> fsLit "v"
 
 newAnonMetaTyVar :: MetaInfo -> Kind -> TcM TcTyVar
 newAnonMetaTyVar mi = newNamedAnonMetaTyVar (metaInfoToTyVarName mi) mi
@@ -881,11 +882,19 @@ cloneAnonMetaTyVar info tv kind
         ; traceTc "cloneAnonMetaTyVar" (ppr tyvar <+> dcolon <+> ppr (tyVarKind tyvar))
         ; return tyvar }
 
--- Make a new CycleBreakerTv. See Note [Type variable cycles]
+-- Make a new CycleBreakerGivenTv. See Note [Type variable cycles]
 -- in GHC.Tc.Solver.Canonical.
-newCycleBreakerTyVar :: TcKind -> TcM TcTyVar
-newCycleBreakerTyVar kind
-  = do { details <- newMetaDetails CycleBreakerTv
+newCycleBreakerGivenTyVar :: TcKind -> TcM TcTyVar
+newCycleBreakerGivenTyVar kind
+  = do { details <- newMetaDetails CycleBreakerGivenTv
+       ; name <- newMetaTyVarName (fsLit "cbv")
+       ; return (mkTcTyVar name kind details) }
+
+-- Make a new CycleBreakerWantedTv. See Note [Type variable cycles]
+-- in GHC.Tc.Solver.Canonical.
+newCycleBreakerWantedTyVar :: TcKind -> TcM TcTyVar
+newCycleBreakerWantedTyVar kind
+  = do { details <- newMetaDetails CycleBreakerWantedTv
        ; name <- newMetaTyVarName (fsLit "cbv")
        ; return (mkTcTyVar name kind details) }
 
