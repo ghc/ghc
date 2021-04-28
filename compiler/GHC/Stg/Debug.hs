@@ -197,11 +197,12 @@ depending on the location indicated by the surrounding SourceNote.
 The functions which add information to the map are `recordStgIdPosition` and
 `numberDataCon`.
 
-When the -fdistinct-constructor-tables` flag is turned on then every
+When the `-fdistinct-constructor-tables` flag is turned on then every
 usage of a data constructor gets its own distinct info table. This is orchestrated
 in `collectExpr` where an incrementing number is used to distinguish each
 occurrence of a data constructor.
 
+TODO: This is outdated. Update this section.
 -- StgToCmm
 
 The info tables which are actually used in the generated program are recorded during the
