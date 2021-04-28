@@ -36,11 +36,14 @@ main = do
       StackEntry
         { functionName = "assertEqual",
           moduleName = "Main",
-          srcLoc = "decodeMyStack.hs:46:27",
+          srcLoc = "decodeMyStack.hs:47:11",
           closureType = 53
         }
     ]
   return ()
 
 assertEqual :: (Eq a, Show a) => a -> a -> IO ()
-assertEqual x y = if x == y then return () else error $ "assertEqual: " ++ show x ++ " /= " ++ show y
+assertEqual x y =
+  if x == y
+    then return ()
+    else error $ "assertEqual: " ++ show x ++ " /= " ++ show y
