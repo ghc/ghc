@@ -6,8 +6,8 @@ Result size of Tidy Core = {terms: 39, types: 24, coercions: 0, joins: 0/0}
 f4g :: Int -> Int
 [GblId,
  Arity=1,
- Str=<1P(L)>,
- Cpr=m1,
+ Str=<1!P(L)>,
+ Cpr=1,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (y [Occ=Once1!] :: Int) -> case y of { GHC.Types.I# x [Occ=Once1] -> GHC.Types.I# (GHC.Prim.+# x 1#) }}]
 f4g = \ (y :: Int) -> case y of { GHC.Types.I# x -> GHC.Types.I# (GHC.Prim.+# x 1#) }
@@ -22,10 +22,10 @@ Rec {
 F4.$wf4h [InlPrag=[2], Occ=LoopBreaker] :: (Int -> Int) -> GHC.Prim.Int# -> Int
 [GblId, Arity=2, Str=<1C1(L)><1L>, Unf=OtherCon []]
 F4.$wf4h
-  = \ (w :: Int -> Int) (ww :: GHC.Prim.Int#) ->
+  = \ (f :: Int -> Int) (ww :: GHC.Prim.Int#) ->
       case ww of wild {
-        __DEFAULT -> F4.$wf4h w (GHC.Prim.-# wild 1#);
-        0# -> w lvl
+        __DEFAULT -> F4.$wf4h f (GHC.Prim.-# wild 1#);
+        0# -> f lvl
       }
 end Rec }
 
@@ -33,10 +33,10 @@ end Rec }
 f4h [InlPrag=[2]] :: (Int -> Int) -> Int -> Int
 [GblId,
  Arity=2,
- Str=<1C1(L)><1P(1L)>,
+ Str=<1C1(L)><1!P(1L)>,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (w [Occ=Once1] :: Int -> Int) (w1 [Occ=Once1!] :: Int) -> case w1 of { GHC.Types.I# ww1 [Occ=Once1] -> F4.$wf4h w ww1 }}]
-f4h = \ (w :: Int -> Int) (w1 :: Int) -> case w1 of { GHC.Types.I# ww1 -> F4.$wf4h w ww1 }
+         Tmpl= \ (f [Occ=Once1] :: Int -> Int) (x [Occ=Once1!] :: Int) -> case x of { GHC.Types.I# ww [Occ=Once1] -> F4.$wf4h f ww }}]
+f4h = \ (f :: Int -> Int) (x :: Int) -> case x of { GHC.Types.I# ww -> F4.$wf4h f ww }
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 f4 :: Int

@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# OPTIONS_GHC -fdmd-unbox-width=0 #-} -- otherwise we'll optimistically unbox the arg to c
 
 module T19398 where
 
@@ -24,9 +25,3 @@ a n
 -- unsound.
 c :: (Int, Int) -> Int
 c (x,_) = x
-
--- | An interesting artifact is that the following function has the Nested CPR
--- property, and we could in theory exploit that:
-g :: (Int, Int) -> (Int, Int)
-g p@(!x, !y) | x == y = error "blah"
-g p                   = p

@@ -138,7 +138,7 @@ mapMaybeRule [InlPrag=[2]]
   :: forall a b. Rule IO a b -> Rule IO (Maybe a) (Maybe b)
 [GblId,
  Arity=1,
- Str=<1P(L,LCL(C1(C1(P(L,1P(L,L))))))>,
+ Str=<1!P(L,LCL(C1(C1(P(L,1L)))))>,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)

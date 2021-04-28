@@ -478,6 +478,9 @@ data DynFlags = DynFlags {
                                         --   a pattern against. A safe guard
                                         --   against exponential blow-up.
   simplTickFactor       :: Int,         -- ^ Multiplier for simplifier ticks
+  dmdUnboxWidth         :: !Int,        -- ^ Whether DmdAnal should optimistically put an
+                                        --   Unboxed demand on returned products with at most
+                                        --   this number of fields
   specConstrThreshold   :: Maybe Int,   -- ^ Threshold for SpecConstr
   specConstrCount       :: Maybe Int,   -- ^ Max number of specialisations for any one function
   specConstrRecursive   :: Int,         -- ^ Max number of specialisations for recursive types
@@ -1100,6 +1103,7 @@ defaultDynFlags mySettings llvmConfig =
         maxUncoveredPatterns    = 4,
         maxPmCheckModels        = 30,
         simplTickFactor         = 100,
+        dmdUnboxWidth           = 3,      -- Default: Assume an unboxed demand on function bodies returning a triple
         specConstrThreshold     = Just 2000,
         specConstrCount         = Just 3,
         specConstrRecursive     = 3,
@@ -2656,6 +2660,8 @@ dynamic_flags_deps = [
           ; return d })))
   , make_ord_flag defFlag "fsimpl-tick-factor"
       (intSuffix (\n d -> d { simplTickFactor = n }))
+  , make_ord_flag defFlag "fdmd-unbox-width"
+      (intSuffix (\n d -> d { dmdUnboxWidth = n }))
   , make_ord_flag defFlag "fspec-constr-threshold"
       (intSuffix (\n d -> d { specConstrThreshold = Just n }))
   , make_ord_flag defFlag "fno-spec-constr-threshold"

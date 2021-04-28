@@ -14,8 +14,8 @@ f n = F (+n)
 
 data T = T (Int, Int)
 
-g :: T -> T
-g t@(T p) = p `seq` t
+g :: (Int, Int) -> T
+g p = p `seq` T p
 {-# NOINLINE g #-}
 
 data U = U ![Int]

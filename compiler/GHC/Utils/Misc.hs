@@ -79,7 +79,7 @@ module GHC.Utils.Misc (
         transitiveClosure,
 
         -- * Strictness
-        seqList, strictMap, strictZipWith,
+        seqList, strictMap, strictZipWith, strictZipWith3,
 
         -- * Module names
         looksLikeModuleName,
@@ -991,8 +991,8 @@ seqList [] b = b
 seqList (x:xs) b = x `seq` seqList xs b
 
 strictMap :: (a -> b) -> [a] -> [b]
-strictMap _ [] = []
-strictMap f (x : xs) =
+strictMap _ []     = []
+strictMap f (x:xs) =
   let
     !x' = f x
     !xs' = strictMap f xs
@@ -1000,12 +1000,23 @@ strictMap f (x : xs) =
     x' : xs'
 
 strictZipWith :: (a -> b -> c) -> [a] -> [b] -> [c]
-strictZipWith _ [] _ = []
-strictZipWith _ _ [] = []
-strictZipWith f (x : xs) (y: ys) =
+strictZipWith _ []     _      = []
+strictZipWith _ _      []     = []
+strictZipWith f (x:xs) (y:ys) =
   let
     !x' = f x y
     !xs' = strictZipWith f xs ys
+  in
+    x' : xs'
+
+strictZipWith3 :: (a -> b -> c -> d) -> [a] -> [b] -> [c] -> [d]
+strictZipWith3 _ []     _      _      = []
+strictZipWith3 _ _      []     _      = []
+strictZipWith3 _ _      _      []     = []
+strictZipWith3 f (x:xs) (y:ys) (z:zs) =
+  let
+    !x' = f x y z
+    !xs' = strictZipWith3 f xs ys zs
   in
     x' : xs'
 

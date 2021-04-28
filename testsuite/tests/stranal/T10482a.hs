@@ -22,7 +22,7 @@ f1 x = case h x x of
 
 
 ------- f2 -----------
--- We used to unbox x here and rebox it in the wrapper. After #17932, we don't.
+-- We used to unbox x here and rebox it in the wrapper.
 -- After #17932, we don't.
 -- Historical comment:
 -- x is a strict field of MkT2, so we'll pass it unboxed

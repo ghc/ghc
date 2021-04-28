@@ -1,0 +1,27 @@
+
+==================== Strictness signatures ====================
+T13331.$tc'Bin:
+T13331.$tc'Tip:
+T13331.$tcMap:
+T13331.$trModule:
+T13331.naiveInsertInt: <1L><L><1L>
+
+
+
+==================== Cpr signatures ====================
+T13331.$tc'Bin:
+T13331.$tc'Tip:
+T13331.$tcMap:
+T13331.$trModule:
+T13331.naiveInsertInt:
+
+
+
+==================== Strictness signatures ====================
+T13331.$tc'Bin:
+T13331.$tc'Tip:
+T13331.$tcMap:
+T13331.$trModule:
+T13331.naiveInsertInt: <1L><L><1L>
+
+

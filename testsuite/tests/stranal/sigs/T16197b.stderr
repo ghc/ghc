@@ -1,0 +1,30 @@
+
+==================== Strictness signatures ====================
+T16197b.$tc'Box:
+T16197b.$tc'T:
+T16197b.$tcBox:
+T16197b.$tcT:
+T16197b.$trModule:
+T16197b.f: <1!L>
+
+
+
+==================== Cpr signatures ====================
+T16197b.$tc'Box:
+T16197b.$tc'T:
+T16197b.$tcBox:
+T16197b.$tcT:
+T16197b.$trModule:
+T16197b.f: 1
+
+
+
+==================== Strictness signatures ====================
+T16197b.$tc'Box:
+T16197b.$tc'T:
+T16197b.$tcBox:
+T16197b.$tcT:
+T16197b.$trModule:
+T16197b.f: <1!L>
+
+

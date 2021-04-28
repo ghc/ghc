@@ -503,6 +503,12 @@ instance Outputable Boxity where
   ppr Boxed   = text "Boxed"
   ppr Unboxed = text "Unboxed"
 
+instance Binary Boxity where -- implemented via isBoxed-isomorphism to Bool
+  put_ bh = put_ bh . isBoxed
+  get bh  = do
+    b <- get bh
+    pure $ if b then Boxed else Unboxed
+
 {-
 ************************************************************************
 *                                                                      *
