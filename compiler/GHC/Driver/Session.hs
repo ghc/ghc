@@ -38,7 +38,7 @@ module GHC.Driver.Session (
         xopt_DuplicateRecordFields,
         xopt_FieldSelectors,
         lang_set,
-        DynamicTooState(..), dynamicTooState, setDynamicNow, setDynamicTooFailed,
+        setDynamicNow,
         dynamicOutputFile,
         sccProfilingEnabled,
         DynFlags(..),
@@ -502,7 +502,6 @@ data DynFlags = DynFlags {
   hiSuf_                :: String,
   hieSuf                :: String,
 
-  dynamicTooFailed      :: IORef Bool,
   dynObjectSuf_         :: String,
   dynHiSuf_             :: String,
 
@@ -975,58 +974,12 @@ data RtsOptsEnabled
 positionIndependent :: DynFlags -> Bool
 positionIndependent dflags = gopt Opt_PIC dflags || gopt Opt_PIE dflags
 
--- Note [-dynamic-too business]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
--- With -dynamic-too flag, we try to build both the non-dynamic and dynamic
--- objects in a single run of the compiler: the pipeline is the same down to
--- Core optimisation, then the backend (from Core to object code) is executed
--- twice.
---
--- The implementation is currently rather hacky, for example, we don't clearly separate non-dynamic
--- and dynamic loaded interfaces (#9176).
---
--- To make matters worse, we automatically enable -dynamic-too when some modules
--- need Template-Haskell and GHC is dynamically linked (cf
--- GHC.Driver.Pipeline.compileOne').
---
--- This somewhat explains why we have "dynamicTooFailed :: IORef Bool" in
--- DynFlags: when -dynamic-too is enabled, we try to build the dynamic objects,
--- but we may fail and we shouldn't abort the whole compilation because the user
--- may not even have asked for -dynamic-too in the first place. So instead we
--- use this global variable to indicate that we can't build dynamic objects and
--- compilation continues to build non-dynamic objects only. At the end of the
--- non-dynamic pipeline, if this value indicates that the dynamic compilation
--- failed, we run the whole pipeline again for the dynamic way (except on
--- Windows...). See GHC.Driver.Pipeline.runPipeline.
-
-data DynamicTooState
-   = DT_Dont    -- ^ Don't try to build dynamic objects too
-   | DT_Failed  -- ^ Won't try to generate dynamic objects for some reason
-   | DT_OK      -- ^ Will still try to generate dynamic objects
-   | DT_Dyn     -- ^ Currently generating dynamic objects (in the backend)
-   deriving (Eq,Show,Ord)
-
-dynamicTooState :: MonadIO m => DynFlags -> m DynamicTooState
-dynamicTooState dflags
-   | not (gopt Opt_BuildDynamicToo dflags) = return DT_Dont
-   | otherwise = do
-      failed <- liftIO $ readIORef (dynamicTooFailed dflags)
-      if failed
-         then return DT_Failed
-         else if dynamicNow dflags
-               then return DT_Dyn
-               else return DT_OK
 
 setDynamicNow :: DynFlags -> DynFlags
 setDynamicNow dflags0 =
    dflags0
       { dynamicNow = True
       }
-
-setDynamicTooFailed :: MonadIO m => DynFlags -> m ()
-setDynamicTooFailed dflags =
-   liftIO $ writeIORef (dynamicTooFailed dflags) True
 
 -- | Compute the path of the dynamic object corresponding to an object file.
 dynamicOutputFile :: DynFlags -> FilePath -> FilePath
@@ -1039,12 +992,6 @@ dynamicOutputFile dflags outputFile = dynOut outputFile
 -- | Used by 'GHC.runGhc' to partially initialize a new 'DynFlags' value
 initDynFlags :: DynFlags -> IO DynFlags
 initDynFlags dflags = do
- let -- We can't build with dynamic-too on Windows, as labels before
-     -- the fork point are different depending on whether we are
-     -- building dynamically or not.
-     platformCanGenerateDynamicToo
-         = platformOS (targetPlatform dflags) /= OSMinGW32
- refDynamicTooFailed <- newIORef (not platformCanGenerateDynamicToo)
  refRtldInfo <- newIORef Nothing
  refRtccInfo <- newIORef Nothing
  canUseUnicode <- do let enc = localeEncoding
@@ -1063,7 +1010,6 @@ initDynFlags dflags = do
        (adjustCols maybeGhcColoursEnv . adjustCols maybeGhcColorsEnv)
        (useColor dflags, colScheme dflags)
  return dflags{
-        dynamicTooFailed = refDynamicTooFailed,
         useUnicode    = useUnicode',
         useColor      = useColor',
         canUseColor   = stderrSupportsAnsiColors,
@@ -1136,7 +1082,6 @@ defaultDynFlags mySettings llvmConfig =
         hiSuf_                  = "hi",
         hieSuf                  = "hie",
 
-        dynamicTooFailed        = panic "defaultDynFlags: No dynamicTooFailed",
         dynObjectSuf_           = "dyn_" ++ phaseInputExt StopLn,
         dynHiSuf_               = "dyn_hi",
         dynamicNow              = False,

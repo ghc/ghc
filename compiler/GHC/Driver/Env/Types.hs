@@ -120,5 +120,6 @@ data HscEnv
 
         , hsc_tmpfs :: !TmpFs
                 -- ^ Temporary files
+        , hsc_dynamicTooFailed :: IORef Bool
+                -- ^ See Note [-dynamic-too business]
  }
-
