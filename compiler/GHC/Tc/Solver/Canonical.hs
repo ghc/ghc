@@ -2352,7 +2352,7 @@ canEqCanLHSFinish ev eq_rel swapped lhs rhs
              | SolubleOccursCheckCIS <- status
              , TyVarLHS lhs_tv <- lhs
              , NomEq <- eq_rel
-             -> do { m_break_how <- shouldBreakCycle (ctEvFlavour ev) lhs_tv rhs
+             -> do { m_break_how <- shouldBreakCycle (ctEvFlavour ev) loc lhs_tv rhs
                    ; case m_break_how of
                      { Nothing ->
                          do { traceTcS "Decided against breaking tyvar cycle" empty
@@ -2360,7 +2360,7 @@ canEqCanLHSFinish ev eq_rel swapped lhs rhs
                      ; Just how ->
                 do { traceTcS "canEqCanLHSFinish breaking a cycle" $
                               ppr how $$ ppr lhs $$ ppr rhs
-                   ; (co, new_rhs) <- breakTyVarCycle how loc rhs
+                   ; (co, new_rhs) <- breakTyVarCycle how (ctEvLoc ev) rhs
                    ; traceTcS "new RHS:" (ppr new_rhs)
 
                      -- This check is Detail (1) in the Note
@@ -2712,10 +2712,9 @@ Given
 -----
 
 We emit a new Given, [G] F a ~ cbv, equating the type family application to
-our new cbv, whose MetaInfo is CycleBreakerGivenTv.
-Note its orientation: The type family ends up on the left; see
+our new cbv. Note its orientation: The type family ends up on the left; see
 commentary on canEqTyVarFunEq, which decides how to orient such cases. No
-special treatment for CycleBreakerGivenTvs is necessary. This scenario is now
+special treatment for CycleBreakerTvs is necessary. This scenario is now
 easily soluble, by using the first Given to rewrite the Wanted, which can now
 be solved.
 
@@ -2941,7 +2940,7 @@ Details:
      evidence itself. This is done by the call to rewriteEqEvidence
      in canEqCanLHSFinish.
 
- (7) We don't wish to apply this magic to CycleBreakerGivenTvs themselves.
+ (7) We don't wish to apply this magic to CycleBreakerTvs themselves.
      Consider this, from typecheck/should_compile/ContextStack2:
 
        type instance TF (a, b) = (TF a, TF b)
@@ -2972,15 +2971,18 @@ Details:
      unchecked, this will end up breaking cycles again, looping ad
      infinitum (and resulting in a context-stack reduction error,
      not an outright loop). The solution is easy: don't break cycles
-     if the var is already a CycleBreakerGivenTv. Instead, we mark this
+     if the var is already a CycleBreakerTv. Instead, we mark this
      final Given as a CIrredCan with a SolubleOccursCheckCIS status.
 
      Though this example works with Givens, a similar problem can
      arise with Wanteds, as we see in typecheck/should_fail/T17139.
-     However, because wanted cycle-breaker variables *do* unify,
-     we have to have yet another MetaInfo: it is CycleBreakerWantedTv.
-     A CycleBreakerWantedTv behaves like a TauTv in all respects
-     except that we do not break a cycle involving a CycleBreakerWantedTv.
+     With Givens, we detect the cycle-breaker by looking at the
+     MetaInfo on the tyvar. Because the tyvars invented for breaking
+     cycles in Wanteds are like TauTvs in all other respects, we do
+     not create a new MetaInfo for Wanted cycle-breaker vars. Instead,
+     we use a CycleBreakerOrigin for the new equalities emitted during
+     cycle-breaking, and we refuse to break cycles in CycleBreakerOrigin
+     equalities.
 
  (8) We really want to do this all only when there is an occurs-check
      failure, not when other problems arise (such as an impredicative
