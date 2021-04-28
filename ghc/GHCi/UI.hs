@@ -77,6 +77,7 @@ import GHC.Builtin.Types( stringTyCon_RDR )
 import GHC.Types.Name.Reader as RdrName ( getGRE_NameQualifier_maybes, getRdrName )
 import GHC.Types.SrcLoc as SrcLoc
 import qualified GHC.Parser.Lexer as Lexer
+import GHC.Parser.Header ( toArgs )
 
 import GHC.Unit
 import GHC.Unit.State
@@ -293,7 +294,7 @@ keepGoing' a str = a str >> return False
 
 keepGoingPaths :: ([FilePath] -> InputT GHCi ()) -> (String -> InputT GHCi Bool)
 keepGoingPaths a str
- = do case toArgs str of
+ = do case toArgsNoLoc str of
           Left err -> liftIO $ hPutStrLn stderr err
           Right args -> a args
       return False
@@ -1562,7 +1563,7 @@ pprInfo (thing, fixity, cls_insts, fam_insts, docs)
 -- :main
 
 runMain :: GhciMonad m => String -> m ()
-runMain s = case toArgs s of
+runMain s = case toArgsNoLoc s of
             Left err   -> liftIO (hPutStrLn stderr err)
             Right args ->
                 do dflags <- getDynFlags
@@ -1582,6 +1583,33 @@ runRun s = case toCmdArgs s of
 doWithArgs :: GhciMonad m => [String] -> String -> m ()
 doWithArgs args cmd = enqueueCommands ["System.Environment.withArgs " ++
                                        show args ++ " (" ++ cmd ++ ")"]
+
+{-
+Akin to @Prelude.words@, but acts like the Bourne shell, treating
+quoted strings as Haskell Strings, and also parses Haskell [String]
+syntax.
+-}
+
+getCmd :: String -> Either String             -- Error
+                           (String, String) -- (Cmd, Rest)
+getCmd s = case break isSpace $ dropWhile isSpace s of
+           ([], _) -> Left ("Couldn't find command in " ++ show s)
+           res -> Right res
+
+toCmdArgs :: String -> Either String             -- Error
+                              (String, [String]) -- (Cmd, Args)
+toCmdArgs s = case getCmd s of
+              Left err -> Left err
+              Right (cmd, s') -> case toArgsNoLoc s' of
+                                 Left err -> Left err
+                                 Right args -> Right (cmd, args)
+
+-- wrapper around GHC.Parser.Header.toArgs, but without locations
+toArgsNoLoc :: String -> Either String [String]
+toArgsNoLoc str = map unLoc <$> toArgs fake_loc str
+  where
+    fake_loc = mkRealSrcLoc (fsLit "<interactive>") 1 1
+    -- this should never be seen, because it's discarded with the `map unLoc`
 
 -----------------------------------------------------------------------------
 -- :cd
@@ -2854,11 +2882,11 @@ setCmd "-a" = showOptions True
 setCmd str
   = case getCmd str of
     Right ("args",    rest) ->
-        case toArgs rest of
+        case toArgsNoLoc rest of
             Left err -> liftIO (hPutStrLn stderr err)
             Right args -> setArgs args
     Right ("prog",    rest) ->
-        case toArgs rest of
+        case toArgsNoLoc rest of
             Right [prog] -> setProg prog
             _ -> liftIO (hPutStrLn stderr "syntax: :set prog <progname>")
 
@@ -2877,7 +2905,7 @@ setCmd str
     Right ("stop",    rest) -> setStop    $ dropWhile isSpace rest
     Right ("local-config", rest) ->
         setLocalConfigBehaviour $ dropWhile isSpace rest
-    _ -> case toArgs str of
+    _ -> case toArgsNoLoc str of
          Left err -> liftIO (hPutStrLn stderr err)
          Right wds -> setOptions wds
 
@@ -2885,7 +2913,7 @@ setiCmd :: GhciMonad m => String -> m ()
 setiCmd ""   = GHC.getInteractiveDynFlags >>= liftIO . showDynFlags False
 setiCmd "-a" = GHC.getInteractiveDynFlags >>= liftIO . showDynFlags True
 setiCmd str  =
-  case toArgs str of
+  case toArgsNoLoc str of
     Left err -> liftIO (hPutStrLn stderr err)
     Right wds -> newDynFlags True wds
 
