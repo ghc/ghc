@@ -101,7 +101,7 @@ import GHC.Driver.Config
 import GHC.Driver.Hooks
 
 import GHC.Runtime.Context
-import GHC.Runtime.Interpreter ( addSptEntry, hscInterp )
+import GHC.Runtime.Interpreter ( addSptEntry )
 import GHC.Runtime.Loader      ( initializePlugins )
 import GHCi.RemoteTypes        ( ForeignHValue )
 import GHC.ByteCode.Types
