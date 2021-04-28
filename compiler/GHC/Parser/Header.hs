@@ -415,37 +415,6 @@ toArgs starting_loc orig_str
         _ -> Left ("Couldn't read " ++ show ('[' : s) ++ " as [String]")
              -- reinsert missing '[' for clarity.
 
-{- Note [readAsString rest]
-~~~~~~~~~~~~~~~~~~~~~~~~~
-
-(Outer quotes have been stripped to keep the output more readable).
-
-@readAsList@ uses @readAsString@ under the hook, but the latter is used in two places:
-
-1. In the call to @readAsList@ to parse individual string elements;
-2. In the call to @toArgs'@ to strip outer quotes;
-
-This means that @readAsString@ must be supplied a different predicate on the rest of
-the unparsed string, for reasons explained below.
-
-Let's imagine readAsList receives as input "1"] (the outer bracket has been stripped).
-Calling reads_with_consumed correctly parses "1", returning:
-
-[((""1"","1"),"]")]
-
-In this case, @rest@ needs to account for the closing bracket ], but /only/ if we are
-parsing a list, as it would be wrong to check for the presence of ']' in case of @toArgs'@.
-
-Example 2: Consider @readAsList@ being called on ""1", "2"". Now when we parse we get:
-
-
-[((""1"","1"),", "2" ]")]
-
-Here it would be wrong to check for just spaces in the remainder, as we found another element,
-because we encountered a comma.
-
--}
-
 -----------------------------------------------------------------------------
 
 -- | Complain about non-dynamic flags in OPTIONS pragmas.
