@@ -48,7 +48,7 @@ module GHC.Runtime.Interpreter
 
   -- * Lower-level API using messages
   , interpCmd, Message(..), withIServ, withIServ_
-  , hscInterp, stopInterp
+  , stopInterp
   , iservCall, readIServ, writeIServ
   , purgeLookupSymbolCache
   , freeHValueRefs
@@ -60,8 +60,6 @@ module GHC.Runtime.Interpreter
 import GHC.Prelude
 
 import GHC.IO (catchException)
-import GHC.Driver.Ppr (showSDoc)
-import GHC.Driver.Env
 
 import GHC.Runtime.Interpreter.Types
 import GHCi.Message
@@ -83,13 +81,14 @@ import GHC.Types.Basic
 
 import GHC.Utils.Panic
 import GHC.Utils.Exception as Ex
-import GHC.Utils.Outputable(brackets, ppr)
+import GHC.Utils.Outputable(brackets, ppr, showSDocUnsafe)
 import GHC.Utils.Fingerprint
 import GHC.Utils.Misc
 
 import GHC.Unit.Module
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Home.ModInfo
+import GHC.Unit.Env
 
 #if defined(HAVE_INTERNAL_INTERPRETER)
 import GHCi.Run
@@ -199,14 +198,6 @@ interpCmd interp msg = case interpInstance interp of
     uninterruptibleMask_ $ -- Note [uninterruptibleMask_]
       iservCall iserv msg
 
-
--- | Retrieve the target code interpreter
---
--- Fails if no target code interpreter is available
-hscInterp :: HscEnv -> Interp
-hscInterp hsc_env = case hsc_interp hsc_env of
-   Nothing -> throw (InstallationError "Couldn't find a target code interpreter. Try with -fexternal-interpreter")
-   Just i  -> i
 
 -- Note [uninterruptibleMask_ and interpCmd]
 --
@@ -402,33 +393,33 @@ getClosure interp ref =
     mapM (mkFinalizedHValue interp) mb
 
 -- | Send a Seq message to the iserv process to force a value      #2950
-seqHValue :: Interp -> HscEnv -> ForeignHValue -> IO (EvalResult ())
-seqHValue interp hsc_env ref =
+seqHValue :: Interp -> UnitEnv -> ForeignHValue -> IO (EvalResult ())
+seqHValue interp unit_env ref =
   withForeignRef ref $ \hval -> do
     status <- interpCmd interp (Seq hval)
-    handleSeqHValueStatus interp hsc_env status
+    handleSeqHValueStatus interp unit_env status
 
 -- | Process the result of a Seq or ResumeSeq message.             #2950
-handleSeqHValueStatus :: Interp -> HscEnv -> EvalStatus () -> IO (EvalResult ())
-handleSeqHValueStatus interp hsc_env eval_status =
+handleSeqHValueStatus :: Interp -> UnitEnv -> EvalStatus () -> IO (EvalResult ())
+handleSeqHValueStatus interp unit_env eval_status =
   case eval_status of
     (EvalBreak is_exception _ ix mod_uniq resume_ctxt _) -> do
       -- A breakpoint was hit; inform the user and tell them
       -- which breakpoint was hit.
       resume_ctxt_fhv <- liftIO $ mkFinalizedHValue interp resume_ctxt
       let hmi = expectJust "handleRunStatus" $
-                  lookupHptDirectly (hsc_HPT hsc_env)
+                  lookupHptDirectly (ue_hpt unit_env)
                     (mkUniqueGrimily mod_uniq)
           modl = mi_module (hm_iface hmi)
           bp | is_exception = Nothing
              | otherwise = Just (BreakInfo modl ix)
           sdocBpLoc = brackets . ppr . getSeqBpSpan
       putStrLn ("*** Ignoring breakpoint " ++
-            (showSDoc (hsc_dflags hsc_env) $ sdocBpLoc bp))
+            (showSDocUnsafe $ sdocBpLoc bp))
       -- resume the seq (:force) processing in the iserv process
       withForeignRef resume_ctxt_fhv $ \hval -> do
         status <- interpCmd interp (ResumeSeq hval)
-        handleSeqHValueStatus interp hsc_env status
+        handleSeqHValueStatus interp unit_env status
     (EvalComplete _ r) -> return r
   where
     getSeqBpSpan :: Maybe BreakInfo -> SrcSpan
@@ -440,7 +431,7 @@ handleSeqHValueStatus interp hsc_env eval_status =
     -- Reason: Setting of flags in libraries/ghci/GHCi/Run.hs:evalOptsSeq
     getSeqBpSpan Nothing = mkGeneralSrcSpan (fsLit "<unknown>")
     breaks mod = getModBreaks $ expectJust "getSeqBpSpan" $
-      lookupHpt (hsc_HPT hsc_env) (moduleName mod)
+      lookupHpt (ue_hpt unit_env) (moduleName mod)
 
 
 -- -----------------------------------------------------------------------------
