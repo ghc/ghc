@@ -11,4 +11,4 @@ foo !f k =
   if k == 0 then 0
   else if even k then foo f (k-1)
   else case f of
-    FooPair (FooPair (Foo n) _) _ -> n
+    FooPair (FooPair (Foo n) _) _ -> n+1 -- +1 so that we'll unbox
