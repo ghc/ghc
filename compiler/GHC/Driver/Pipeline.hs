@@ -766,7 +766,7 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_input_buf, mb_phase)
 
          let dflags = hsc_dflags hsc_env
          when isHaskellishFile $
-           dynamicTooState dflags >>= \case
+           dynamicTooState hsc_env >>= \case
                DT_Dont   -> return ()
                DT_Dyn    -> return ()
                DT_OK     -> return ()
@@ -839,6 +839,7 @@ runPipeline' start_phase hsc_env env input_fn
 pipeLoop :: PhasePlus -> FilePath -> CompPipeline FilePath
 pipeLoop phase input_fn = do
   env <- getPipeEnv
+  hsc_env <- getPipeSession
   dflags <- getDynFlags
   logger <- getLogger
   -- See Note [Partial ordering on phases]
@@ -898,7 +899,7 @@ pipeLoop phase input_fn = do
                           -- we must check the dynamic-too state again, because
                           -- we may have failed to load a dynamic interface in
                           -- the backend.
-                          dynamicTooState dflags >>= \case
+                          dynamicTooState hsc_env >>= \case
                             DT_OK -> do
                                 let dflags' = setDynamicNow dflags -- set "dynamicNow"
                                 setDynFlags dflags'
@@ -910,7 +911,7 @@ pipeLoop phase input_fn = do
                                 return r
                             _ -> return r
 
-                   dynamicTooState dflags >>= \case
+                   dynamicTooState hsc_env >>= \case
                      DT_Dont   -> noDynToo
                      DT_Failed -> noDynToo
                      DT_OK     -> dynToo
@@ -1381,7 +1382,8 @@ runPhase (HscBackend mod_summary result) _ = do
                     -- In interpreted mode the regular codeGen backend is not run so we
                     -- generate a interface without codeGen info.
                     final_iface <- liftIO $ mkFullIface hsc_env' partial_iface Nothing
-                    liftIO $ hscMaybeWriteIface logger dflags True final_iface mb_old_iface_hash location
+                    dt <- dynamicTooState =<< getPipeSession
+                    liftIO $ hscMaybeWriteIface logger dflags dt True final_iface mb_old_iface_hash location
 
                     (hasStub, comp_bc, spt_entries) <- liftIO $ hscInteractive hsc_env' cgguts mod_location
 
@@ -1414,11 +1416,12 @@ runPhase (HscBackend mod_summary result) _ = do
                       hscGenHardCode hsc_env' cgguts mod_location output_fn
 
                     let dflags = hsc_dflags hsc_env'
+                    dt <- dynamicTooState hsc_env'
                     final_iface <- liftIO (mkFullIface hsc_env' partial_iface (Just cg_infos))
                     setIface final_iface
 
                     -- See Note [Writing interface files]
-                    liftIO $ hscMaybeWriteIface logger dflags False final_iface mb_old_iface_hash mod_location
+                    liftIO $ hscMaybeWriteIface logger dflags dt False final_iface mb_old_iface_hash mod_location
 
                     stub_o <- liftIO (mapM (compileStub hsc_env') mStub)
                     foreign_os <- liftIO $
