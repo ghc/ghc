@@ -1934,11 +1934,17 @@ data CheckTyEqResult
   | CTE_Bad          -- Forall, predicate, or type family
   | CTE_HoleBlocker  -- Blocking coercion hole
         -- See Note [Equalities with incompatible kinds] in "GHC.Tc.Solver.Canonical"
-  | CTE_Occurs
+  | CTE_Occurs  -- occurs check (with no other problem)
 
 instance S.Semigroup CheckTyEqResult where
-  CTE_OK <> x = x
-  x      <> _ = x
+  -- See Detail (8) of Note [Type variable cycles] in GHC.Tc.Solver.Canonical.
+  CTE_OK     <> x               = x
+
+  CTE_Occurs <> CTE_OK          = CTE_Occurs
+  CTE_Occurs <> CTE_HoleBlocker = CTE_HoleBlocker
+  CTE_Occurs <> CTE_Bad         = CTE_Bad
+
+  x          <> _               = x
 
 instance Monoid CheckTyEqResult where
   mempty = CTE_OK
