@@ -2697,8 +2697,8 @@ or
 
   instance C (a -> b)
   [WD] alpha ~ (cbv1 -> cbv2)
-  [WD] cbv1 ~ Arg alpha
-  [WD] cbv2 ~ Res alpha
+  [WD] Arg alpha ~ cbv1
+  [WD] Res alpha ~ cbv2
   [W] C alpha
 
 This transformation (creating the new types and emitting new equality
@@ -2711,15 +2711,15 @@ are not used for rewriting.)
 Given
 -----
 
-We emit a new Given equating the type family application to our new
-cbv. Note its orientation: The type family ends up
-on the left; see commentary on canEqTyVarFunEq, which decides how to
-orient such cases. No special treatment for CycleBreakerTvs is
-necessary. This scenario is now easily soluble, by using the first
-Given to rewrite the Wanted, which can now be solved.
+We emit a new Given, [G] F a ~ cbv, equating the type family application to
+our new cbv. Note its orientation: The type family ends up on the left; see
+commentary on canEqTyVarFunEq, which decides how to orient such cases. No
+special treatment for CycleBreakerTvs is necessary. This scenario is now
+easily soluble, by using the first Given to rewrite the Wanted, which can now
+be solved.
 
-(The first Given actually also rewrites the second one. This causes
-no trouble.)
+(The first Given actually also rewrites the second one, giving
+[G] F (Maybe cbv) ~ cbv, but this causes no trouble.)
 
 Of course, we don't want our fresh variables leaking into e.g. error messages.
 So we fill in the metavariables with their original type family applications
@@ -2753,30 +2753,104 @@ Note that
 Wanted/Derived
 --------------
 
-The fresh variables here must actually be normal, touchable metavariables.
-That is, they are TauTvs. Nothing at all unusual. This is done because we
-might eventually learn more about what the cycle-breaker vars should be
-(and, thus, the original variable on the left-hand side of the constraint
-we started with). We thus emit new WD constraints relating the fresh variables
-to their type family applications.
+The fresh cycle-breaker variables here must actually be normal, touchable
+metavariables. That is, they are TauTvs. Nothing at all unusual. This is done
+because we might eventually learn more about what the cycle-breaker vars
+should be (and, thus, the original variable on the left-hand side of the
+constraint we started with); see T19682 drawn-out example below.
+We thus emit new WD constraints relating the
+fresh variables to their type family applications.
 
 Critically, we do *not* call unifyWanted. This is because we want the current
 (starred) constraint to be fully processed before processing the new ones.
 Let's revisit the example above, after calling breakTyVarCycle:
 
   [WD] alpha ~ (cbv1 -> cbv2)
-  [WD] cbv1 ~ Arg alpha
-  [WD] cbv2 ~ Res alpha
+  [WD] Arg alpha ~ cbv1
+  [WD] Res alpha ~ cbv2
 
 Here, cbv1 and cbv2 are just TauTvs (as is alpha). If we see either of the
-last two constraints first, we'll unify a cbv variable and end up back
-where we started. This is bad. Instead, we put these constraints on the
-work list and continue processing that first constraint. There is now
-no occurs-check failure, and so we can write alpha := cbv1 -> cbv2 and
-make forward progress.
+last two constraints first, we'll unify a cbv variable and end up back where
+we started. This is bad. Instead, we put these constraints on the work list
+and continue processing that first constraint. There is now no occurs-check
+failure (and shouldBreakCycle, which decides whether to apply this logic, goes
+to pains to make sure unification will succeed in this case), and so we can
+write alpha := cbv1 -> cbv2 and make forward progress, leading to (recalling
+the fuller example from above):
 
-Both
-----
+  instance C (a -> b)
+  [WD] Arg (cbv1 -> cbv2) ~ cbv1
+  [WD] Res (cbv1 -> cbv2) ~ cbv2
+  [W] C (cbv1 -> cbv2)
+
+The first two WD constraints reduce to reflexivity and are discarded,
+and the last is easily soluble.
+
+Let's look at another example (typecheck/should_compile/T19682) where we need
+to unify the cbvs:
+
+  class    (AllEqF xs ys, SameShapeAs xs ys) => AllEq xs ys
+  instance (AllEqF xs ys, SameShapeAs xs ys) => AllEq xs ys
+
+  type family SameShapeAs xs ys :: Constraint where
+    SameShapeAs '[] ys      = (ys ~ '[])
+    SameShapeAs (x : xs) ys = (ys ~ (Head ys : Tail ys))
+
+  type family AllEqF xs ys :: Constraint where
+    AllEqF '[]      '[]      = ()
+    AllEqF (x : xs) (y : ys) = (x ~ y, AllEq xs ys)
+
+  [WD] t0 ~ (Head t0 : Tail t0)
+  [WD] AllEqF '[Bool] t0
+
+Here, t0 is a unification variable. Without the logic detailed in this Note,
+we're stuck here, as AllEqF cannot reduce and t0 cannot unify. However, let's
+apply our cycle-breaker approach. We thus rewrite the first constraint to get
+
+  [WD] t0 ~ (cbv1 : cbv2)
+  [WD] Head t0 ~ cbv1
+  [WD] Tail t0 ~ cbv2
+  [WD] AllEqF '[Bool] t0
+
+The first WD can now unify t0 := cbv1 : cbv2, yielding (after zonking)
+
+  [WD] Head (cbv1 : cbv2) ~ cbv1
+  [WD] Tail (cbv1 : cbv2) ~ cbv2
+  [WD] AllEqF '[Bool] (cbv1 : cbv2)
+
+The first two WD constraints simplify to reflexivity and are discarded.
+But the last reduces:
+
+  [WD] Bool ~ cbv1
+  [WD] AllEq '[] cbv2
+
+The first of these is solved by unification: cbv1 := Bool. The second
+is solved by the instance to become
+
+  [WD] AllEqF '[] cbv2
+  [WD] SameShapeAs '[] cbv2
+
+While the first of these is stuck, the second makes progress, to lead to
+
+  [WD] AllEqF '[] cbv2
+  [WD] cbv2 ~ '[]
+
+This second constraint is solved by unification: cbv2 := '[]. We now
+have
+
+  [WD] AllEqF '[] '[]
+
+which reduces to
+
+  [WD] ()
+
+which is trivially satisfiable. Hooray!
+
+Note that we need to unify the cbvs here; if we did not, there would be
+no way to solve those constraints that were solved by unification.
+
+In all cases
+------------
 
 We detect this scenario by the following characteristics:
  - a constraint with a tyvar on its LHS
@@ -2813,12 +2887,12 @@ Details:
      been substituted away.
 
      However, we still must check to make sure that breakTyVarCycle actually
-     succeeds in getting rid of all occurrences of the offending variable.
-     If one is hidden under a forall, this won't be true. A similar problem
-     can happen if the variable appears only in a kind. So we perform
-     an additional check after performing the substitution. It is tiresome
-     to re-run all of checkTyVarEq here, but reimplementing just the occurs-check
-     is even more tiresome.
+     succeeds in getting rid of all occurrences of the offending variable. If
+     one is hidden under a forall, this won't be true. A similar problem can
+     happen if the variable appears only in a kind
+     (e.g. k ~ ... (a :: k) ...). So we perform an additional check after
+     performing the substitution. It is tiresome to re-run all of checkTyVarEq
+     here, but reimplementing just the occurs-check is even more tiresome.
 
      Skipping this check causes typecheck/should_fail/GivenForallLoop and
      polykinds/T18451 to loop.
