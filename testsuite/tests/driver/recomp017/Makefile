@@ -16,6 +16,5 @@ recomp017: clean
 	# A simple 'cp' would overwrite the original file,
 	# pointed to by the symlink
 	mv -f C2.hs C.hs
-	touch C.hs
 	echo 'second run'
 	! '$(TEST_HC)' $(TEST_HC_OPTS) --make E.hs
