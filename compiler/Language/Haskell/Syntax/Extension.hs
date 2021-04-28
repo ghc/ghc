@@ -4,6 +4,7 @@
 {-# LANGUAGE DeriveDataTypeable      #-}
 {-# LANGUAGE EmptyCase               #-}
 {-# LANGUAGE EmptyDataDeriving       #-}
+{-# LANGUAGE StandaloneDeriving      #-}
 {-# LANGUAGE FlexibleContexts        #-}
 {-# LANGUAGE FlexibleInstances       #-}
 {-# LANGUAGE GADTs                   #-}
@@ -22,6 +23,7 @@ module Language.Haskell.Syntax.Extension where
 
 import GHC.Prelude
 
+import GHC.TypeLits (Symbol, KnownSymbol)
 import Data.Data hiding ( Fixity )
 import Data.Kind (Type)
 import GHC.Utils.Outputable
@@ -694,3 +696,14 @@ type family NoGhcTc (p :: Type)
 -- =====================================================================
 -- End of Type family definitions
 -- =====================================================================
+
+
+
+-- =====================================================================
+-- Token information
+
+type LHsToken tok p = XRec p (HsToken tok)
+
+data HsToken (tok :: Symbol) = HsTok
+
+deriving instance KnownSymbol tok => Data (HsToken tok)

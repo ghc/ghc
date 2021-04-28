@@ -966,7 +966,7 @@ instance HiePass p => ToHie (PScoped (LocatedA (Pat (GhcPass p)))) where
                     lname
         , toHie $ PS rsp scope pscope pat
         ]
-      ParPat _ pat ->
+      ParPat _ _ pat _ ->
         [ toHie $ PS rsp scope pscope pat
         ]
       BangPat _ pat ->
@@ -1119,7 +1119,7 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
       NegApp _ a _ ->
         [ toHie a
         ]
-      HsPar _ a ->
+      HsPar _ _ a _ ->
         [ toHie a
         ]
       SectionL _ a b ->
@@ -1422,7 +1422,7 @@ instance HiePass p => ToHie (LocatedA (HsCmd (GhcPass p))) where
       HsCmdLam _ mg ->
         [ toHie mg
         ]
-      HsCmdPar _ a ->
+      HsCmdPar _ _ a _ ->
         [ toHie a
         ]
       HsCmdCase _ expr alts ->
