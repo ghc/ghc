@@ -469,6 +469,7 @@ isGivenOrigin :: CtOrigin -> Bool
 isGivenOrigin (GivenOrigin {})              = True
 isGivenOrigin (FunDepOrigin1 _ o1 _ _ o2 _) = isGivenOrigin o1 && isGivenOrigin o2
 isGivenOrigin (FunDepOrigin2 _ o1 _ _)      = isGivenOrigin o1
+isGivenOrigin (CycleBreakerOrigin o)        = isGivenOrigin o
 isGivenOrigin _                             = False
 
 instance Outputable CtOrigin where

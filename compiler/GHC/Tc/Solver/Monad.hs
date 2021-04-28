@@ -6,6 +6,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ViewPatterns #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates -Wno-incomplete-uni-patterns #-}
 
@@ -3933,14 +3934,13 @@ shouldBreakCycle :: CtFlavour   -- of the equality
                  -> TcTyVar     -- the LHS
                  -> TcType      -- the RHS
                  -> TcS (Maybe BreakTyVarCyclesHow)
-shouldBreakCycle Given _loc lhs_tv _rhs
-  | not (isCycleBreakerTyVar lhs_tv)  -- See Detail (7) of Note
+shouldBreakCycle _ (ctLocOrigin -> CycleBreakerOrigin _) _ _ = return Nothing
+  -- see Detail (7) of Note
+
+shouldBreakCycle Given _loc _lhs_tv _rhs
   = return $ Just BTVC_Given
-shouldBreakCycle flav loc lhs_tv rhs
+shouldBreakCycle flav _loc lhs_tv rhs
   | ctFlavourContainsDerived flav
-     -- See Detail (7) of Note
-  , case ctLocOrigin loc of CycleBreakerOrigin _ -> False
-                            _                    -> True
   = do { result <- unifyTest Derived lhs_tv rhs
        ; return $ case result of
            NoUnify -> Nothing
@@ -4007,7 +4007,7 @@ breakTyVarCycle how loc = go
                  given_pred = mkHeteroPrimEqPred fun_app_kind fun_app_kind
                                                  fun_app new_ty
                  given_term = evCoercion $ mkNomReflCo new_ty  -- See Detail (4) of Note
-           ; new_given <- newGivenEvVar loc (given_pred, given_term)
+           ; new_given <- newGivenEvVar new_loc (given_pred, given_term)
            ; traceTcS "breakTyVarCycle replacing type family in Given" (ppr new_given)
            ; emitWorkNC [new_given]
            ; updInertTcS $ \is ->
@@ -4019,10 +4019,11 @@ breakTyVarCycle how loc = go
       BTVC_Derived ->
         do { new_tv <- wrapTcS (TcM.newFlexiTyVar fun_app_kind)
            ; let new_ty = mkTyVarTy new_tv
-                 new_loc = updateCtLocOrigin loc CycleBreakerOrigin
-                   -- See Detail (7) of the Note
            ; co <- emitNewWantedEq new_loc Nominal new_ty fun_app
            ; return (co, new_ty) }
+
+      -- See Detail (7) of the Note
+    new_loc = updateCtLocOrigin loc CycleBreakerOrigin
 
 -- | Fill in CycleBreakerTvs with the variables they stand for.
 -- See Note [Type variable cycles] in GHC.Tc.Solver.Canonical.
