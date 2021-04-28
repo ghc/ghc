@@ -44,6 +44,7 @@ import GHC.Driver.Phases
 import GHC.Driver.Env
 import GHC.Driver.Session
 import GHC.Driver.Ppr
+import GHC.Driver.Config
 
 import GHC.Tc.Utils.Monad
 
@@ -565,11 +566,11 @@ loadExpr interp hsc_env span root_ul_bco = do
         let nobreakarray = error "no break array"
             bco_ix = mkNameEnv [(unlinkedBCOName root_ul_bco, 0)]
         resolved <- linkBCO interp ie ce bco_ix nobreakarray root_ul_bco
-        [root_hvref] <- createBCOs interp dflags [resolved]
+        bco_opts <- initBCOOpts (hsc_dflags hsc_env)
+        [root_hvref] <- createBCOs interp bco_opts [resolved]
         fhv <- mkFinalizedHValue interp root_hvref
         return (pls, fhv)
   where
-     dflags = hsc_dflags hsc_env
      free_names = uniqDSetToList (bcoFreeNames root_ul_bco)
 
      needed_mods :: [Module]
@@ -794,13 +795,13 @@ loadDecls interp hsc_env span cbc@CompiledByteCode{..} = do
               ce = closure_env pls
 
           -- Link the necessary packages and linkables
-          new_bindings <- linkSomeBCOs dflags interp ie ce [cbc]
+          bco_opts <- initBCOOpts (hsc_dflags hsc_env)
+          new_bindings <- linkSomeBCOs bco_opts interp ie ce [cbc]
           nms_fhvs <- makeForeignNamedHValueRefs interp new_bindings
           let pls2 = pls { closure_env = extendClosureEnv ce nms_fhvs
                          , itbl_env    = ie }
           return pls2
   where
-    dflags = hsc_dflags hsc_env
     free_names = uniqDSetToList $
       foldr (unionUniqDSets . bcoFreeNames) emptyUniqDSet bc_bcos
 
@@ -843,7 +844,7 @@ loadModules interp hsc_env pls linkables
 
         let (objs, bcos) = partition isObjectLinkable
                               (concatMap partitionLinkable linkables)
-        let dflags = hsc_dflags hsc_env
+        bco_opts <- initBCOOpts (hsc_dflags hsc_env)
 
                 -- Load objects first; they can't depend on BCOs
         (pls1, ok_flag) <- loadObjects interp hsc_env pls objs
@@ -851,7 +852,7 @@ loadModules interp hsc_env pls linkables
         if failed ok_flag then
                 return (pls1, Failed)
           else do
-                pls2 <- dynLinkBCOs dflags interp pls1 bcos
+                pls2 <- dynLinkBCOs bco_opts interp pls1 bcos
                 return (pls2, Succeeded)
 
 
@@ -1008,8 +1009,8 @@ rmDupLinkables already ls
   ********************************************************************* -}
 
 
-dynLinkBCOs :: DynFlags -> Interp -> LoaderState -> [Linkable] -> IO LoaderState
-dynLinkBCOs dflags interp pls bcos = do
+dynLinkBCOs :: BCOOpts -> Interp -> LoaderState -> [Linkable] -> IO LoaderState
+dynLinkBCOs bco_opts interp pls bcos = do
 
         let (bcos_loaded', new_bcos) = rmDupLinkables (bcos_loaded pls) bcos
             pls1                     = pls { bcos_loaded = bcos_loaded' }
@@ -1024,7 +1025,7 @@ dynLinkBCOs dflags interp pls bcos = do
             gce       = closure_env pls
             final_ie  = foldr plusNameEnv (itbl_env pls) ies
 
-        names_and_refs <- linkSomeBCOs dflags interp final_ie gce cbcs
+        names_and_refs <- linkSomeBCOs bco_opts interp final_ie gce cbcs
 
         -- We only want to add the external ones to the ClosureEnv
         let (to_add, to_drop) = partition (isExternalName.fst) names_and_refs
@@ -1038,7 +1039,7 @@ dynLinkBCOs dflags interp pls bcos = do
                       itbl_env    = final_ie }
 
 -- Link a bunch of BCOs and return references to their values
-linkSomeBCOs :: DynFlags
+linkSomeBCOs :: BCOOpts
              -> Interp
              -> ItblEnv
              -> ClosureEnv
@@ -1048,7 +1049,7 @@ linkSomeBCOs :: DynFlags
                         -- the incoming unlinked BCOs.  Each gives the
                         -- value of the corresponding unlinked BCO
 
-linkSomeBCOs dflags interp ie ce mods = foldr fun do_link mods []
+linkSomeBCOs bco_opts interp ie ce mods = foldr fun do_link mods []
  where
   fun CompiledByteCode{..} inner accum =
     case bc_breaks of
@@ -1063,7 +1064,7 @@ linkSomeBCOs dflags interp ie ce mods = foldr fun do_link mods []
         bco_ix = mkNameEnv (zip names [0..])
     resolved <- sequence [ linkBCO interp ie ce bco_ix breakarray bco
                          | (breakarray, bco) <- flat ]
-    hvrefs <- createBCOs interp dflags resolved
+    hvrefs <- createBCOs interp bco_opts resolved
     return (zip names hvrefs)
 
 -- | Useful to apply to the result of 'linkSomeBCOs'
