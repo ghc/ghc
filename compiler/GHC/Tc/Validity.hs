@@ -1184,14 +1184,6 @@ check_pred_help under_syn env dflags ctxt pred
       ForAllPred _ theta head -> check_quant_pred env dflags ctxt pred theta head
       IrredPred {}            -> check_irred_pred under_syn env dflags pred
 
-check_eq_pred :: TidyEnv -> DynFlags -> PredType -> TcM ()
-check_eq_pred env dflags pred
-  =         -- Equational constraints are valid in all contexts if type
-            -- families are permitted
-    checkTcM (xopt LangExt.TypeFamilies dflags
-              || xopt LangExt.GADTs dflags)
-             (eqPredTyErr env pred)
-
 check_quant_pred :: TidyEnv -> DynFlags -> UserTypeCtxt
                  -> PredType -> ThetaType -> PredType -> TcM ()
 check_quant_pred env dflags ctxt pred theta head_pred
@@ -1251,10 +1243,9 @@ e.g.   module A where
 check_class_pred :: TidyEnv -> DynFlags -> UserTypeCtxt
                  -> PredType -> Class -> [TcType] -> TcM ()
 check_class_pred env dflags ctxt pred cls tys
-  | isEqPredClass cls    -- (~) and (~~) are classified as classes,
-                         -- but here we want to treat them as equalities
-  = check_eq_pred env dflags pred
-
+  | isEqPredClass cls    -- We used to require TypeFamilies/GADTs for equality constraints,
+                         -- but not anymore (GHC Proposal #371)
+  = return ()
   | isIPClass cls
   = do { check_arity
        ; checkTcM (okIPCtxt ctxt) (badIPPred env pred) }
@@ -1404,16 +1395,12 @@ checkThetaCtxt ctxt theta env
            , vcat [ text "In the context:" <+> pprTheta (tidyTypes env theta)
                   , text "While checking" <+> pprUserTypeCtxt ctxt ] )
 
-eqPredTyErr, predTupleErr, predIrredErr,
+predTupleErr, predIrredErr,
    badQuantHeadErr :: TidyEnv -> PredType -> (TidyEnv, SDoc)
 badQuantHeadErr env pred
   = ( env
     , hang (text "Quantified predicate must have a class or type variable head:")
          2 (ppr_tidy env pred) )
-eqPredTyErr  env pred
-  = ( env
-    , text "Illegal equational constraint" <+> ppr_tidy env pred $$
-      parens (text "Use GADTs or TypeFamilies to permit this") )
 predTupleErr env pred
   = ( env
     , hang (text "Illegal tuple constraint:" <+> ppr_tidy env pred)
