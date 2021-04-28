@@ -27,6 +27,7 @@ data Dependencies = Deps
       -- ^ All home-package modules transitively below this one
       -- I.e. modules that this one imports, or that are in the
       --      dep_mods of those directly-imported modules
+   , dep_direct_mods :: [ModuleNameWithIsBoot]
 
    , dep_pkgs   :: [(UnitId, Bool)]
       -- ^ All packages transitively below this module
@@ -62,21 +63,24 @@ data Dependencies = Deps
 
 instance Binary Dependencies where
     put_ bh deps = do put_ bh (dep_mods deps)
+                      put_ bh (dep_direct_mods deps)
                       put_ bh (dep_pkgs deps)
                       put_ bh (dep_orphs deps)
                       put_ bh (dep_finsts deps)
                       put_ bh (dep_plgins deps)
 
     get bh = do ms <- get bh
+                dms <- get bh
                 ps <- get bh
                 os <- get bh
                 fis <- get bh
                 pl <- get bh
-                return (Deps { dep_mods = ms, dep_pkgs = ps, dep_orphs = os,
+                return (Deps { dep_mods = ms, dep_direct_mods = dms, dep_pkgs = ps, dep_orphs = os,
                                dep_finsts = fis, dep_plgins = pl })
 
 noDependencies :: Dependencies
-noDependencies = Deps [] [] [] [] []
+noDependencies = Deps [] [] [] [] [] []
+
 
 -- | Records modules for which changes may force recompilation of this module
 -- See wiki: https://gitlab.haskell.org/ghc/ghc/wikis/commentary/compiler/recompilation-avoidance

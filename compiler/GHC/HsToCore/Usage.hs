@@ -84,6 +84,8 @@ mkDependencies iuid pluginModules
       th_used <- readIORef th_var
       let dep_mods = modDepsElts (delFromUFM (imp_dep_mods imports)
                                              (moduleName mod))
+
+          direct_mods = filter (\x -> gwib_mod x `elem` (map moduleName $ moduleEnvKeys $ imp_mods imports)) dep_mods
                 -- M.hi-boot can be in the imp_dep_mods, but we must remove
                 -- it before recording the modules on which this one depends!
                 -- (We want to retain M.hi-boot in imp_dep_mods so that
@@ -107,6 +109,7 @@ mkDependencies iuid pluginModules
           dep_pkgs'   = map (\x -> (x, x `Set.member` trust_pkgs)) sorted_pkgs
 
       return Deps { dep_mods   = dep_mods,
+                    dep_direct_mods = direct_mods,
                     dep_pkgs   = dep_pkgs',
                     dep_orphs  = dep_orphs,
                     dep_plgins = dep_plgins,

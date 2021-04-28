@@ -1256,6 +1256,7 @@ getOrphanHashes hsc_env mods = do
 sortDependencies :: Dependencies -> Dependencies
 sortDependencies d
  = Deps { dep_mods   = sortBy (lexicalCompareFS `on` (moduleNameFS . gwib_mod)) (dep_mods d),
+          dep_direct_mods = sortBy (lexicalCompareFS `on` (moduleNameFS . gwib_mod)) (dep_direct_mods d),
           dep_pkgs   = sortBy (compare `on` fst) (dep_pkgs d),
           dep_orphs  = sortBy stableModuleCmp (dep_orphs d),
           dep_finsts = sortBy stableModuleCmp (dep_finsts d),
