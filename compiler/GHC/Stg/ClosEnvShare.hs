@@ -12,16 +12,13 @@ import GHC.Core.Multiplicity
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Data.FastString
-import GHC.Types.Basic
 import GHC.Types.Id
 import GHC.Types.Name
-import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Unique.Supply
 import GHC.Stg.FVs
 import GHC.Stg.Syntax
 import GHC.Utils.Outputable
-import GHC.Utils.Panic
 import GHC.Utils.Monad
 
 import Control.Arrow hiding ((<+>))
@@ -97,12 +94,12 @@ stgCesExpr (StgLetNoEscape x b e) =
   do b' <- stgCesBinding b
      e' <- stgCesExpr e
      return (StgLetNoEscape x b' e')
-stgCesExpr (StgTick t e) = StgTick t <$> stgCesExpr e
-stgCesExpr (StgCaseEnv i args e) = StgCaseEnv i args <$> stgCesExpr e
-stgCesExpr (StgApp i args)          = return (StgApp i args)
-stgCesExpr (StgLit l)               = return (StgLit l)
-stgCesExpr (StgConApp dc args tys)  = return (StgConApp dc args tys)
-stgCesExpr (StgOpApp op args ty)    = return (StgOpApp op args ty)
+stgCesExpr (StgTick t e)           = StgTick t <$> stgCesExpr e
+stgCesExpr (StgCaseEnv i args e)   = StgCaseEnv i args <$> stgCesExpr e
+stgCesExpr (StgApp i args)         = return (StgApp i args)
+stgCesExpr (StgLit l)              = return (StgLit l)
+stgCesExpr (StgConApp dc args tys) = return (StgConApp dc args tys)
+stgCesExpr (StgOpApp op args ty)   = return (StgOpApp op args ty)
 
 stgCesAlt :: CgStgAlt -> CesM CesStgAlt
 stgCesAlt (acon,args,e) = stgCesExpr e >>= \e' -> return (acon,args,e')
@@ -151,9 +148,12 @@ closEnvShareAnalyze' id fvs body expr
   -- it contains more than 2 free variables
   = shareEnvSupersets id fvs body expr >>= \msed ->
     case msed of
-      Just sed -> return [sed]
+      Just sed ->
+        log_shared_env_created sed >> return [sed]
       Nothing  -> return []
-closEnvShareAnalyze' _ _ _ _ | otherwise = return []
+closEnvShareAnalyze' _ _ _ _
+  | otherwise
+  = log_env_too_small >> return []
 
 -- Note [let block environment sharing]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -191,37 +191,43 @@ shareEnvSupersets
   -> CesStgExpr
   -> CesM (Maybe SharedEnvData)
 shareEnvSupersets id cl_env body expr =
-  case supersetEnvIdsExpr cl_env body ++ supersetEnvIdsExpr cl_env expr of
-    (x:xs) -> mkEnvId >>= \env_id ->
-                return $ Just (SharedEnvData cl_env env_id (id:x:xs))
-    []     -> return Nothing
+  let sharers = dVarSetElems $ unionDVarSets [ unitDVarSet id
+                                             , supersetEnvIdsExpr cl_env body
+                                             , supersetEnvIdsExpr cl_env expr ]
+  in
+    if length sharers > 1
+    then mkEnvId >>= \env_id ->
+           return . Just $ SharedEnvData cl_env env_id sharers
+    else return Nothing
 
-supersetEnvIdsExpr :: DIdSet -> CesStgExpr -> [Id]
+supersetEnvIdsExpr :: DIdSet -> CesStgExpr -> DIdSet
 supersetEnvIdsExpr cl_env (StgLet _ bind expr) =
-  supersetEnvIdsBind cl_env bind ++ supersetEnvIdsExpr cl_env expr
+  supersetEnvIdsBind cl_env bind `unionDVarSet` supersetEnvIdsExpr cl_env expr
 supersetEnvIdsExpr cl_env (StgLetNoEscape _ _ expr) =
   supersetEnvIdsExpr cl_env expr
-supersetEnvIdsExpr cl_env (StgCase scrut id ty alts) =
-  supersetEnvIdsExpr cl_env scrut ++ concatMap (supersetEnvIdsAlt cl_env) alts
+supersetEnvIdsExpr cl_env (StgCase scrut _ _ alts) =
+  supersetEnvIdsExpr cl_env scrut `unionDVarSet`
+  (unionDVarSets . map (supersetEnvIdsAlt cl_env) $ alts)
 supersetEnvIdsExpr cl_env (StgCaseEnv _ _ expr) =
   supersetEnvIdsExpr cl_env expr
 supersetEnvIdsExpr cl_env (StgTick _ expr) =
   supersetEnvIdsExpr cl_env expr
-supersetEnvIdsExpr _ _ = []
+supersetEnvIdsExpr _ _ = emptyDVarSet
 
-supersetEnvIdsBind :: DIdSet -> CesStgBinding -> [Id]
+supersetEnvIdsBind :: DIdSet -> CesStgBinding -> DIdSet
 supersetEnvIdsBind cl_env (StgNonRec id rhs) =
   supersetEnvIdsRhs cl_env id rhs
 supersetEnvIdsBind cl_env (StgRec bs) =
-  concatMap (uncurry (supersetEnvIdsRhs cl_env)) bs
+  unionDVarSets . map (uncurry (supersetEnvIdsRhs cl_env)) $ bs
 
-supersetEnvIdsRhs :: DIdSet -> Id -> CesStgRhs -> [Id]
+supersetEnvIdsRhs :: DIdSet -> Id -> CesStgRhs -> DIdSet
 supersetEnvIdsRhs cl_env id (StgRhsClosure l_env _ _ _ body) =
-  (if cl_env `subDVarSet` l_env then [id] else []) ++
-  supersetEnvIdsExpr cl_env body
-supersetEnvIdsRhs _ _ _ = []
+  (if cl_env `subDVarSet` l_env
+   then unitDVarSet id
+   else emptyDVarSet) `unionDVarSet` supersetEnvIdsExpr cl_env body
+supersetEnvIdsRhs _ _ _ = emptyDVarSet
 
-supersetEnvIdsAlt :: DIdSet -> CesStgAlt -> [Id]
+supersetEnvIdsAlt :: DIdSet -> CesStgAlt -> DIdSet
 supersetEnvIdsAlt cl_env (_,_,expr) = supersetEnvIdsExpr cl_env expr
 
 -- | shareMinimalFVSetCover finds the minimal amount of shared environments that
@@ -270,7 +276,6 @@ shareMinimalFVSetCover cds
           let sharers = filter (\cd -> subDVarSet (snd cd) fvSet) cds in
             if length sharers > 1
             then mkEnvId >>= \env_id ->
-                   log_shared_env_created >>
                    return [SharedEnvData fvSet env_id (map fst sharers)]
             else return []
 
@@ -297,7 +302,6 @@ needlesslyShared :: [SharingCandidate] -> CesM [SharedEnvData]
 needlesslyShared = mapM mkSed . filter (not . isEmptyDVarSet . snd)
   where mkSed (id,fvs) =
           mkEnvId >>= \env_id ->
-            log_shared_env_created >>
             return (SharedEnvData fvs env_id [id])
 
 {-
@@ -323,7 +327,7 @@ runCesM us = initUs_ us . runWriterT . unwrapCesM
 data CesLog
   = CesLog
   { num_candidates :: Int
-  , num_shared_env_created :: Int
+  , shared_envs_created :: [SharedEnvData]
   , num_env_too_small_to_share :: Int
   }
 
@@ -331,8 +335,8 @@ instance Outputable CesLog where
   ppr log = vcat
     [ text "Number of sharing candidates (i.e. rhs-closures):"
       <+> ppr (num_candidates log)
-    , text "Number of shared environments created:"
-      <+> ppr (num_shared_env_created log)
+    , text "Shared environments created:"
+      $$ nest 1 (vcat . map ppr . shared_envs_created $ log)
     , text "Number of environments too small to share:"
       <+> ppr (num_env_too_small_to_share log)
     ]
@@ -340,23 +344,24 @@ instance Outputable CesLog where
 log_num_candidates :: Int -> CesM ()
 log_num_candidates n = CesM . tell $ mempty { num_candidates = n }
 
-log_shared_env_created :: CesM ()
-log_shared_env_created = CesM . tell $ mempty { num_shared_env_created = 1 }
+log_shared_env_created :: SharedEnvData -> CesM ()
+log_shared_env_created sed =
+  CesM . tell $ mempty { shared_envs_created = [sed] }
 
 log_env_too_small :: CesM ()
 log_env_too_small = CesM . tell $ mempty { num_env_too_small_to_share = 1 }
 
 instance Semigroup CesLog where
-  (CesLog x0 x1 x2) <> (CesLog y0 y1 y2) = CesLog (x0+y0) (x1+y1) (x2+y2)
+  (CesLog x0 x1 x2) <> (CesLog y0 y1 y2) = CesLog (x0+y0) (x1++y1) (x2+y2)
 
 instance Monoid CesLog where
-  mempty = CesLog 0 0 0
+  mempty = CesLog 0 [] 0
 
--- | We lie here about the type of environments, since we don't really have a
--- type in GHC to express them. Note that STG is untyped so we do not really
--- *need* to have a type, what is important here is that environments have the
--- same representation as the type given (i.e. a function type) which states
--- that it is represented by a pointer to a heap object.
+-- | Generate a fresh identifier for a first class environment. Note that STG is
+-- untyped so we do not really *need* to have a type, what is important here is
+-- that environments have the same representation as the type given (i.e. a
+-- function type) which states that it is represented by a pointer to a heap
+-- object.
 mkEnvId :: CesM Id
 mkEnvId = getUniqueM >>= \u ->
             mkSysLocalM (mkFastString "env") Many (mkEnvTy u)
@@ -382,6 +387,12 @@ data SharedEnvData
 instance Ord SharedEnvData where
   compare a b = compare (sharedVars a) (sharedVars b)
     where sharedVars x = sizeDVarSet (sed_se x) * length (sed_rhs_ids x)
+
+instance Outputable SharedEnvData where
+  ppr (SharedEnvData se binder rhs_ids) =
+    hsep [ quotes (ppr binder)
+         , text "shared by", ppr rhs_ids
+         , text "containing", ppr se ]
 
 -- | Take some shared environments and add bindings to them; these are escaping,
 -- non-recursive let-bindings.
@@ -411,8 +422,10 @@ unpackSharedEnvsBind seds (StgRec bs)
 --    {a,b,c,d} \n [x] -> M   ====> {e,d} \n [x] -> case-env e of {a,b,c} -> M
 unpackSharedEnvsRhs :: [SharedEnvData] -> Id -> CesStgRhs -> CesStgRhs
 unpackSharedEnvsRhs seds id (StgRhsClosure fvs ccs u args e) =
-  let (fvs',e') = foldr go (fvs,e) seds in
-    StgRhsClosure fvs' ccs u args e'
+  let e' = unpackSharedEnvsExpr seds e
+      (fvs',e'') = foldr go (fvs,e') seds
+  in
+    StgRhsClosure fvs' ccs u args e''
   where go sed (fvs,e) =
           if elem id (sed_rhs_ids sed)
           then ( (fvs `minusDVarSet` sed_se sed)
