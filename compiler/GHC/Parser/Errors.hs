@@ -9,7 +9,7 @@ module GHC.Parser.Errors
    , LexErr(..)
    , CmmParserError(..)
    , LexErrKind(..)
-   , Hint(..)
+   , PsHint(..)
    , StarIsType (..)
    )
 where
@@ -82,8 +82,8 @@ data TransLayoutReason
 
 data PsError = PsError
    { errDesc  :: !PsErrorDesc   -- ^ Error description
-   , errHints :: ![Hint]      -- ^ Hints
-   , errLoc   :: !SrcSpan     -- ^ Error position
+   , errHints :: ![PsHint]      -- ^ Hints
+   , errLoc   :: !SrcSpan       -- ^ Error position
    }
 
 data PsErrorDesc
@@ -396,7 +396,7 @@ data NumUnderscoreReason
    | NumUnderscore_Float
    deriving (Show,Eq,Ord)
 
-data Hint
+data PsHint
    = SuggestTH
    | SuggestRecursiveDo
    | SuggestDo
