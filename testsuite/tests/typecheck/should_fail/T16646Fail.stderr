@@ -1,0 +1,11 @@
+
+T16646Fail.hs:16:5: error:
+    Invalid instantiation of ‘withDict’ at type: st -> (dt => r) -> r
+
+T16646Fail.hs:22:5: error:
+    Invalid instantiation of ‘withDict’ at type:
+        Maybe a -> (C a => r) -> r
+
+T16646Fail.hs:28:13: error:
+    Invalid instantiation of ‘withDict’ at type:
+        (Any -> a) -> (Reifies Any a => Proxy Any -> r) -> Proxy Any -> r
