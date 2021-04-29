@@ -731,6 +731,7 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
    return term
     where
   interp = hscInterp hsc_env
+  unit_env = hsc_unit_env hsc_env
 
   go :: Int -> Type -> Type -> ForeignHValue -> TcM Term
    -- I believe that my_ty should not have any enclosing
@@ -753,7 +754,7 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
 -- Thunks we may want to force
       t | isThunk t && force -> do
          traceTR (text "Forcing a " <> text (show (fmap (const ()) t)))
-         evalRslt <- liftIO $ GHCi.seqHValue interp hsc_env a
+         evalRslt <- liftIO $ GHCi.seqHValue interp unit_env a
          case evalRslt of                                            -- #2950
            EvalSuccess _ -> go (pred max_depth) my_ty old_ty a
            EvalException ex -> do
