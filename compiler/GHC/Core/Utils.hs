@@ -306,7 +306,7 @@ applyTypeToArgs e op_ty args
 mkCast :: CoreExpr -> CoercionR -> CoreExpr
 mkCast e co
   | ASSERT2( coercionRole co == Representational
-           , text "coercion" <+> ppr co <+> ptext (sLit "passed to mkCast")
+           , text "coercion" <+> ppr co <+> text "passed to mkCast"
              <+> ppr e <+> text "has wrong role" <+> ppr (coercionRole co) )
     isReflCo co
   = e

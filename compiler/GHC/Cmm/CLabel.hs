@@ -1334,7 +1334,7 @@ pprCLabel !platform !sty lbl = -- see Note [Bangs in CLabel]
 
     tempLabelPrefixOrUnderscore :: Platform -> SDoc
     tempLabelPrefixOrUnderscore platform = case sty of
-      AsmStyle -> ptext (asmTempLabelPrefix platform)
+      AsmStyle -> asmTempLabelPrefix platform
       CStyle   -> char '_'
 
 
@@ -1347,7 +1347,7 @@ pprCLabel !platform !sty lbl = -- see Note [Bangs in CLabel]
       -> tempLabelPrefixOrUnderscore platform <> pprUniqueAlways u
 
    AsmTempDerivedLabel l suf
-      -> ptext (asmTempLabelPrefix platform)
+      -> asmTempLabelPrefix platform
          <> case l of AsmTempLabel u    -> pprUniqueAlways u
                       LocalBlockLabel u -> pprUniqueAlways u
                       _other            -> pprCLabel platform sty l
@@ -1370,7 +1370,7 @@ pprCLabel !platform !sty lbl = -- see Note [Bangs in CLabel]
       maybe_underscore $ text "dsp_" <> pprCLabel platform sty lbl <> text "_dsp"
 
    StringLitLabel u
-      -> maybe_underscore $ pprUniqueAlways u <> ptext (sLit "_str")
+      -> maybe_underscore $ pprUniqueAlways u <> text "_str"
 
    ForeignLabel fs (Just sz) _ _
       | AsmStyle <- sty
@@ -1389,7 +1389,7 @@ pprCLabel !platform !sty lbl = -- see Note [Bangs in CLabel]
                       isRandomGenerated = not (isExternalName name)
                       internalNamePrefix =
                          if isRandomGenerated
-                            then ptext (asmTempLabelPrefix platform)
+                            then asmTempLabelPrefix platform
                             else empty
       CStyle   -> ppr name <> ppIdFlavor flavor
 
@@ -1400,38 +1400,38 @@ pprCLabel !platform !sty lbl = -- see Note [Bangs in CLabel]
       -> maybe_underscore $ ftext str <> text "_fast"
 
    RtsLabel (RtsSelectorInfoTable upd_reqd offset)
-      -> maybe_underscore $ hcat [text "stg_sel_", text (show offset),
-                                  ptext (if upd_reqd
-                                         then (sLit "_upd_info")
-                                         else (sLit "_noupd_info"))
+      -> maybe_underscore $ hcat [ text "stg_sel_", text (show offset)
+                                 , if upd_reqd
+                                    then text "_upd_info"
+                                    else text "_noupd_info"
                                  ]
 
    RtsLabel (RtsSelectorEntry upd_reqd offset)
-      -> maybe_underscore $ hcat [text "stg_sel_", text (show offset),
-                                        ptext (if upd_reqd
-                                                then (sLit "_upd_entry")
-                                                else (sLit "_noupd_entry"))
+      -> maybe_underscore $ hcat [ text "stg_sel_", text (show offset)
+                                 , if upd_reqd
+                                    then text "_upd_entry"
+                                    else text "_noupd_entry"
                                  ]
 
    RtsLabel (RtsApInfoTable upd_reqd arity)
-      -> maybe_underscore $ hcat [text "stg_ap_", text (show arity),
-                                        ptext (if upd_reqd
-                                                then (sLit "_upd_info")
-                                                else (sLit "_noupd_info"))
+      -> maybe_underscore $ hcat [ text "stg_ap_", text (show arity)
+                                 , if upd_reqd
+                                    then text "_upd_info"
+                                    else text "_noupd_info"
                                  ]
 
    RtsLabel (RtsApEntry upd_reqd arity)
-      -> maybe_underscore $ hcat [text "stg_ap_", text (show arity),
-                                        ptext (if upd_reqd
-                                                then (sLit "_upd_entry")
-                                                else (sLit "_noupd_entry"))
+      -> maybe_underscore $ hcat [ text "stg_ap_", text (show arity)
+                                 , if upd_reqd
+                                    then text "_upd_entry"
+                                    else text "_noupd_entry"
                                  ]
 
    RtsLabel (RtsPrimOp primop)
       -> maybe_underscore $ text "stg_" <> ppr primop
 
    RtsLabel (RtsSlowFastTickyCtr pat)
-      -> maybe_underscore $ text "SLOW_CALL_fast_" <> text pat <> ptext (sLit "_ctr")
+      -> maybe_underscore $ text "SLOW_CALL_fast_" <> text pat <> text "_ctr"
 
    LargeBitmapLabel u
       -> maybe_underscore $ tempLabelPrefixOrUnderscore platform
@@ -1441,7 +1441,7 @@ pprCLabel !platform !sty lbl = -- see Note [Bangs in CLabel]
                             -- with a letter so the label will be legal assembly code.
 
    HpcTicksLabel mod
-      -> maybe_underscore $ text "_hpc_tickboxes_"  <> ppr mod <> ptext (sLit "_hpc")
+      -> maybe_underscore $ text "_hpc_tickboxes_"  <> ppr mod <> text "_hpc"
 
    CC_Label cc   -> maybe_underscore $ ppr cc
    CCS_Label ccs -> maybe_underscore $ ppr ccs
@@ -1528,11 +1528,11 @@ instance Outputable ForeignLabelSource where
 -- -----------------------------------------------------------------------------
 -- Machine-dependent knowledge about labels.
 
-asmTempLabelPrefix :: Platform -> PtrString  -- for formatting labels
+asmTempLabelPrefix :: Platform -> SDoc  -- for formatting labels
 asmTempLabelPrefix !platform = case platformOS platform of
-    OSDarwin -> sLit "L"
-    OSAIX    -> sLit "__L" -- follow IBM XL C's convention
-    _        -> sLit ".L"
+    OSDarwin -> text "L"
+    OSAIX    -> text "__L" -- follow IBM XL C's convention
+    _        -> text ".L"
 
 pprDynamicLinkerAsmLabel :: Platform -> DynamicLinkerLabelInfo -> SDoc -> SDoc
 pprDynamicLinkerAsmLabel !platform dllInfo ppLbl =
