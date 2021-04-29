@@ -12,7 +12,8 @@
 
   # we need to inject ncurses into --with-curses-libraries.
   # the real fix is to teach terminfo to use libcurses on macOS.
-  CONFIGURE_ARGS = "--with-intree-gmp --with-curses-libraries=${pkgs.ncurses.out}/lib";
+  # CONFIGURE_ARGS = "--with-intree-gmp --with-curses-libraries=${pkgs.ncurses.out}/lib";
+  CONFIGURE_ARGS = "--with-intree-gmp --with-curses-libraries=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib --with-iconv-includes=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include --with-iconv-libraries=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib"
 
   # magic speedup pony :facepalm:
   #
@@ -25,21 +26,24 @@
   '';
 
   nativeBuildInputs = (with pkgs; [
+    # This needs to come *before* ghc,
+    # otherwise we migth end up with the clang from
+    # the bootstrap GHC in PATH with higher priority.
+    clang_11
+    llvm_11
+
     haskell.compiler.${compiler}
     haskell.packages.${compiler}.cabal-install
     haskell.packages.${compiler}.alex
     haskell.packages.${compiler}.happy # _1_19_12 is needed for older GHCs.
-
-    clang_11
-    llvm_11
 
     automake
     autoconf
     m4
 
     gmp
-    ncurses
-    libiconv
+    # ncurses
+    # libiconv
     zlib.out
     zlib.dev
     glibcLocales
