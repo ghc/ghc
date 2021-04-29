@@ -648,9 +648,9 @@ schemeE
     :: StackDepth -> Sequel -> BCEnv -> CgStgExpr -> BcM BCInstrList
 schemeE d s p (StgLit lit) = returnUnboxedAtom d s p (StgLitArg lit)
 schemeE d s p (StgApp x [])
-   | isUnboxedTupleType (idType x) ||
-     isUnboxedSumType (idType x) ||
-     not (isAlgType (idType x)) = returnUnboxedAtom d s p (StgVarArg x)
+   | not (isBoxedType (idType x) &&
+          not (isPrimitiveType (idType x)))
+     = returnUnboxedAtom d s p (StgVarArg x)
 -- Delegate tail-calls to schemeT.
 schemeE d s p e@(StgApp {}) = schemeT d s p e
 schemeE d s p e@(StgConApp {}) = schemeT d s p e
@@ -1086,9 +1086,8 @@ doCase d s p scrut bndr alts
         p_alts = Map.insert bndr d_bndr p
 
         bndr_ty = idType bndr
-        isAlgCase = isAlgType bndr_ty &&
-                    not (isUnboxedSumType bndr_ty) &&
-                    not (isUnboxedTupleType bndr_ty)
+        isAlgCase = isBoxedType bndr_ty &&
+                    not (isPrimitiveType bndr_ty)
 
         -- given an alt, return a discr and code for it.
         codeAlt (DEFAULT, _, rhs)
