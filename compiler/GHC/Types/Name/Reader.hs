@@ -817,7 +817,7 @@ instance Outputable GlobalRdrElt where
 
 pprGlobalRdrEnv :: Bool -> GlobalRdrEnv -> SDoc
 pprGlobalRdrEnv locals_only env
-  = vcat [ text "GlobalRdrEnv" <+> ppWhen locals_only (ptext (sLit "(locals only)"))
+  = vcat [ text "GlobalRdrEnv" <+> ppWhen locals_only (text "(locals only)")
              <+> lbrace
          , nest 2 (vcat [ pp (remove_locals gre_list) | gre_list <- occEnvElts env ]
              <+> rbrace) ]

@@ -217,24 +217,24 @@ pprReg r
 
 pprFormat :: Format -> SDoc
 pprFormat x
- = ptext (case x of
-                II8  -> sLit "b"
-                II16 -> sLit "h"
-                II32 -> sLit "w"
-                II64 -> sLit "d"
-                FF32 -> sLit "fs"
-                FF64 -> sLit "fd")
+ = case x of
+                II8  -> text "b"
+                II16 -> text "h"
+                II32 -> text "w"
+                II64 -> text "d"
+                FF32 -> text "fs"
+                FF64 -> text "fd"
 
 
 pprCond :: Cond -> SDoc
 pprCond c
- = ptext (case c of {
-                ALWAYS  -> sLit "";
-                EQQ     -> sLit "eq";  NE    -> sLit "ne";
-                LTT     -> sLit "lt";  GE    -> sLit "ge";
-                GTT     -> sLit "gt";  LE    -> sLit "le";
-                LU      -> sLit "lt";  GEU   -> sLit "ge";
-                GU      -> sLit "gt";  LEU   -> sLit "le"; })
+ = case c of {
+                ALWAYS  -> text "";
+                EQQ     -> text "eq";  NE    -> text "ne";
+                LTT     -> text "lt";  GE    -> text "ge";
+                GTT     -> text "gt";  LE    -> text "le";
+                LU      -> text "lt";  GEU   -> text "ge";
+                GU      -> text "gt";  LEU   -> text "le"; }
 
 
 pprImm :: Platform -> Imm -> SDoc
@@ -284,26 +284,26 @@ pprSectionAlign config sec@(Section seg _) =
 pprAlignForSection :: Platform -> SectionType -> SDoc
 pprAlignForSection platform seg =
  let ppc64    = not $ target32Bit platform
- in ptext $ case seg of
-       Text              -> sLit ".align 2"
+ in case seg of
+       Text              -> text ".align 2"
        Data
-        | ppc64          -> sLit ".align 3"
-        | otherwise      -> sLit ".align 2"
+        | ppc64          -> text ".align 3"
+        | otherwise      -> text ".align 2"
        ReadOnlyData
-        | ppc64          -> sLit ".align 3"
-        | otherwise      -> sLit ".align 2"
+        | ppc64          -> text ".align 3"
+        | otherwise      -> text ".align 2"
        RelocatableReadOnlyData
-        | ppc64          -> sLit ".align 3"
-        | otherwise      -> sLit ".align 2"
+        | ppc64          -> text ".align 3"
+        | otherwise      -> text ".align 2"
        UninitialisedData
-        | ppc64          -> sLit ".align 3"
-        | otherwise      -> sLit ".align 2"
-       ReadOnlyData16    -> sLit ".align 4"
+        | ppc64          -> text ".align 3"
+        | otherwise      -> text ".align 2"
+       ReadOnlyData16    -> text ".align 4"
        -- TODO: This is copied from the ReadOnlyData case, but it can likely be
        -- made more efficient.
        CString
-        | ppc64          -> sLit ".align 3"
-        | otherwise      -> sLit ".align 2"
+        | ppc64          -> text ".align 3"
+        | otherwise      -> text ".align 2"
        OtherSection _    -> panic "PprMach.pprSectionAlign: unknown section"
 
 pprDataItem :: Platform -> CmmLit -> SDoc
@@ -380,13 +380,13 @@ pprInstr platform instr = case instr of
       -> hcat [
            char '\t',
            text "l",
-           ptext (case fmt of
-               II8  -> sLit "bz"
-               II16 -> sLit "hz"
-               II32 -> sLit "wz"
-               II64 -> sLit "d"
-               FF32 -> sLit "fs"
-               FF64 -> sLit "fd"
+           (case fmt of
+               II8  -> text "bz"
+               II16 -> text "hz"
+               II32 -> text "wz"
+               II64 -> text "d"
+               FF32 -> text "fs"
+               FF64 -> text "fd"
                ),
            case addr of AddrRegImm _ _ -> empty
                         AddrRegReg _ _ -> char 'x',
@@ -422,13 +422,13 @@ pprInstr platform instr = case instr of
       -> hcat [
            char '\t',
            text "l",
-           ptext (case fmt of
-               II8  -> sLit "ba"
-               II16 -> sLit "ha"
-               II32 -> sLit "wa"
-               II64 -> sLit "d"
-               FF32 -> sLit "fs"
-               FF64 -> sLit "fd"
+           (case fmt of
+               II8  -> text "ba"
+               II16 -> text "ha"
+               II32 -> text "wa"
+               II64 -> text "d"
+               FF32 -> text "fs"
+               FF64 -> text "fd"
                ),
            case addr of AddrRegImm _ _ -> empty
                         AddrRegReg _ _ -> char 'x',
@@ -643,7 +643,7 @@ pprInstr platform instr = case instr of
          ]
 
    ADD reg1 reg2 ri
-      -> pprLogic platform (sLit "add") reg1 reg2 ri
+      -> pprLogic platform (text "add") reg1 reg2 ri
 
    ADDIS reg1 reg2 imm
       -> hcat [
@@ -658,22 +658,22 @@ pprInstr platform instr = case instr of
            ]
 
    ADDO reg1 reg2 reg3
-      -> pprLogic platform (sLit "addo") reg1 reg2 (RIReg reg3)
+      -> pprLogic platform (text "addo") reg1 reg2 (RIReg reg3)
 
    ADDC reg1 reg2 reg3
-      -> pprLogic platform (sLit "addc") reg1 reg2 (RIReg reg3)
+      -> pprLogic platform (text "addc") reg1 reg2 (RIReg reg3)
 
    ADDE reg1 reg2 reg3
-      -> pprLogic platform (sLit "adde") reg1 reg2 (RIReg reg3)
+      -> pprLogic platform (text "adde") reg1 reg2 (RIReg reg3)
 
    ADDZE reg1 reg2
-      -> pprUnary (sLit "addze") reg1 reg2
+      -> pprUnary (text "addze") reg1 reg2
 
    SUBF reg1 reg2 reg3
-      -> pprLogic platform (sLit "subf") reg1 reg2 (RIReg reg3)
+      -> pprLogic platform (text "subf") reg1 reg2 (RIReg reg3)
 
    SUBFO reg1 reg2 reg3
-      -> pprLogic platform (sLit "subfo") reg1 reg2 (RIReg reg3)
+      -> pprLogic platform (text "subfo") reg1 reg2 (RIReg reg3)
 
    SUBFC reg1 reg2 ri
       -> hcat [
@@ -691,7 +691,7 @@ pprInstr platform instr = case instr of
            ]
 
    SUBFE reg1 reg2 reg3
-      -> pprLogic platform (sLit "subfe") reg1 reg2 (RIReg reg3)
+      -> pprLogic platform (text "subfe") reg1 reg2 (RIReg reg3)
 
    MULL fmt reg1 reg2 ri
       -> pprMul platform fmt reg1 reg2 ri
@@ -773,19 +773,19 @@ pprInstr platform instr = case instr of
         ]
 
    AND reg1 reg2 ri
-      -> pprLogic platform (sLit "and") reg1 reg2 ri
+      -> pprLogic platform (text "and") reg1 reg2 ri
 
    ANDC reg1 reg2 reg3
-      -> pprLogic platform (sLit "andc") reg1 reg2 (RIReg reg3)
+      -> pprLogic platform (text "andc") reg1 reg2 (RIReg reg3)
 
    NAND reg1 reg2 reg3
-      -> pprLogic platform (sLit "nand") reg1 reg2 (RIReg reg3)
+      -> pprLogic platform (text "nand") reg1 reg2 (RIReg reg3)
 
    OR reg1 reg2 ri
-      -> pprLogic platform (sLit "or") reg1 reg2 ri
+      -> pprLogic platform (text "or") reg1 reg2 ri
 
    XOR reg1 reg2 ri
-      -> pprLogic platform (sLit "xor") reg1 reg2 ri
+      -> pprLogic platform (text "xor") reg1 reg2 ri
 
    ORIS reg1 reg2 imm
       -> hcat [
@@ -837,10 +837,10 @@ pprInstr platform instr = case instr of
          ]
 
    NEG reg1 reg2
-      -> pprUnary (sLit "neg") reg1 reg2
+      -> pprUnary (text "neg") reg1 reg2
 
    NOT reg1 reg2
-      -> pprUnary (sLit "not") reg1 reg2
+      -> pprUnary (text "not") reg1 reg2
 
    SR II32 reg1 reg2 (RIImm (ImmInt i))
     -- Handle the case where we are asked to shift a 32 bit register by
@@ -864,24 +864,24 @@ pprInstr platform instr = case instr of
 
    SL fmt reg1 reg2 ri
       -> let op = case fmt of
-                       II32 -> "slw"
-                       II64 -> "sld"
+                       II32 -> text "slw"
+                       II64 -> text "sld"
                        _    -> panic "PPC.Ppr.pprInstr: shift illegal size"
-         in pprLogic platform (sLit op) reg1 reg2 (limitShiftRI fmt ri)
+         in pprLogic platform op reg1 reg2 (limitShiftRI fmt ri)
 
    SR fmt reg1 reg2 ri
       -> let op = case fmt of
-                       II32 -> "srw"
-                       II64 -> "srd"
+                       II32 -> text "srw"
+                       II64 -> text "srd"
                        _    -> panic "PPC.Ppr.pprInstr: shift illegal size"
-         in pprLogic platform (sLit op) reg1 reg2 (limitShiftRI fmt ri)
+         in pprLogic platform op reg1 reg2 (limitShiftRI fmt ri)
 
    SRA fmt reg1 reg2 ri
       -> let op = case fmt of
-                       II32 -> "sraw"
-                       II64 -> "srad"
+                       II32 -> text "sraw"
+                       II64 -> text "srad"
                        _    -> panic "PPC.Ppr.pprInstr: shift illegal size"
-         in pprLogic platform (sLit op) reg1 reg2 (limitShiftRI fmt ri)
+         in pprLogic platform op reg1 reg2 (limitShiftRI fmt ri)
 
    RLWINM reg1 reg2 sh mb me
       -> hcat [
@@ -922,22 +922,22 @@ pprInstr platform instr = case instr of
         ]
 
    FADD fmt reg1 reg2 reg3
-      -> pprBinaryF (sLit "fadd") fmt reg1 reg2 reg3
+      -> pprBinaryF (text "fadd") fmt reg1 reg2 reg3
 
    FSUB fmt reg1 reg2 reg3
-      -> pprBinaryF (sLit "fsub") fmt reg1 reg2 reg3
+      -> pprBinaryF (text "fsub") fmt reg1 reg2 reg3
 
    FMUL fmt reg1 reg2 reg3
-      -> pprBinaryF (sLit "fmul") fmt reg1 reg2 reg3
+      -> pprBinaryF (text "fmul") fmt reg1 reg2 reg3
 
    FDIV fmt reg1 reg2 reg3
-      -> pprBinaryF (sLit "fdiv") fmt reg1 reg2 reg3
+      -> pprBinaryF (text "fdiv") fmt reg1 reg2 reg3
 
    FABS reg1 reg2
-      -> pprUnary (sLit "fabs") reg1 reg2
+      -> pprUnary (text "fabs") reg1 reg2
 
    FNEG reg1 reg2
-      -> pprUnary (sLit "fneg") reg1 reg2
+      -> pprUnary (text "fneg") reg1 reg2
 
    FCMP reg1 reg2
       -> hcat [
@@ -956,16 +956,16 @@ pprInstr platform instr = case instr of
          ]
 
    FCTIWZ reg1 reg2
-      -> pprUnary (sLit "fctiwz") reg1 reg2
+      -> pprUnary (text "fctiwz") reg1 reg2
 
    FCTIDZ reg1 reg2
-      -> pprUnary (sLit "fctidz") reg1 reg2
+      -> pprUnary (text "fctidz") reg1 reg2
 
    FCFID reg1 reg2
-      -> pprUnary (sLit "fcfid") reg1 reg2
+      -> pprUnary (text "fcfid") reg1 reg2
 
    FRSP reg1 reg2
-      -> pprUnary (sLit "frsp") reg1 reg2
+      -> pprUnary (text "frsp") reg1 reg2
 
    CRNOR dst src1 src2
       -> hcat [
@@ -1011,10 +1011,10 @@ pprInstr platform instr = case instr of
    NOP
       -> text "\tnop"
 
-pprLogic :: Platform -> PtrString -> Reg -> Reg -> RI -> SDoc
+pprLogic :: Platform -> SDoc -> Reg -> Reg -> RI -> SDoc
 pprLogic platform op reg1 reg2 ri = hcat [
         char '\t',
-        ptext op,
+        op,
         case ri of
             RIReg _ -> empty
             RIImm _ -> char 'i',
@@ -1064,10 +1064,10 @@ pprDiv fmt sgn reg1 reg2 reg3 = hcat [
     ]
 
 
-pprUnary :: PtrString -> Reg -> Reg -> SDoc
+pprUnary :: SDoc -> Reg -> Reg -> SDoc
 pprUnary op reg1 reg2 = hcat [
         char '\t',
-        ptext op,
+        op,
         char '\t',
         pprReg reg1,
         text ", ",
@@ -1075,10 +1075,10 @@ pprUnary op reg1 reg2 = hcat [
     ]
 
 
-pprBinaryF :: PtrString -> Format -> Reg -> Reg -> Reg -> SDoc
+pprBinaryF :: SDoc -> Format -> Reg -> Reg -> Reg -> SDoc
 pprBinaryF op fmt reg1 reg2 reg3 = hcat [
         char '\t',
-        ptext op,
+        op,
         pprFFormat fmt,
         char '\t',
         pprReg reg1,
