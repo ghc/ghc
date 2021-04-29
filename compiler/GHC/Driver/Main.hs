@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE NondecreasingIndentation #-}
+{-# LANGUAGE GADTs #-}
 
 {-# OPTIONS_GHC -fprof-auto-top #-}
 
@@ -230,6 +231,8 @@ import Data.Set (Set)
 import Data.Functor
 import Control.DeepSeq (force)
 import Data.Bifunctor (first, bimap)
+import GHC.Types.Name.Set (NonCaffySet)
+import GHC.Driver.GenerateCgIPEStub (generateCgIPEStub)
 
 #include "HsVersions.h"
 
@@ -331,7 +334,7 @@ ioMsgMaybe ioA = do
     logDiagnostics warns
     case mb_r of
         Nothing -> throwErrors errs
-        Just r  -> ASSERT( isEmptyBag errs ) return r
+        Just r  -> if debugIsOn && not ( isEmptyBag errs ) then (assertPanic "/run/user/1000/extra-dir-37036130960742/___GHCIDE_MAGIC___" 348) else return r
 
 -- | like ioMsgMaybe, except that we ignore error messages and return
 -- 'Nothing' instead.
@@ -535,7 +538,7 @@ hsc_typecheck keep_rn mod_summary mb_rdr_module = do
         src_filename  = ms_hspp_file mod_summary
         real_loc = realSrcLocSpan $ mkRealSrcLoc (mkFastString src_filename) 1 1
         keep_rn' = gopt Opt_WriteHie dflags || keep_rn
-    MASSERT( isHomeModule home_unit outer_mod )
+    if debugIsOn && not ( isHomeModule home_unit outer_mod ) then (assertPanic "/run/user/1000/extra-dir-37036130960742/___GHCIDE_MAGIC___" 552) else return ()
     tc_result <- if hsc_src == HsigFile && not (isHoleModule inner_mod)
         then ioMsgMaybe $ tcRnInstantiateSignature hsc_env outer_mod' real_loc
         else
@@ -1768,7 +1771,7 @@ doCodeGen hsc_env this_mod denv data_tycons
                         Nothing -> StgToCmm.codeGen logger tmpfs
                         Just h  -> h
 
-    let cmm_stream :: Stream IO CmmGroup (CStub, ModuleLFInfos)
+    let cmm_stream :: Stream IO CmmGroup ModuleLFInfos
         -- See Note [Forcing of stg_binds]
         cmm_stream = stg_binds_w_fvs `seqList` {-# SCC "StgToCmm" #-}
             stg_to_cmm dflags this_mod denv data_tycons cost_centre_info stg_binds_w_fvs hpc_info
@@ -1786,21 +1789,21 @@ doCodeGen hsc_env this_mod denv data_tycons
 
         ppr_stream1 = Stream.mapM dump1 cmm_stream
 
-        pipeline_stream :: Stream IO CmmGroupSRTs CgInfos
+        pipeline_stream :: Stream IO CmmGroupSRTs (NonCaffySet, ModuleLFInfos)
         pipeline_stream = do
-          (non_cafs, (used_info, lf_infos)) <-
+          (non_cafs,  lf_infos) <-
             {-# SCC "cmmPipeline" #-}
             Stream.mapAccumL_ (cmmPipeline hsc_env) (emptySRT this_mod) ppr_stream1
               <&> first (srtMapNonCAFs . moduleSRTMap)
 
-          return CgInfos{ cgNonCafs = non_cafs, cgLFInfos = lf_infos, cgIPEStub = used_info }
+          return (non_cafs, lf_infos)
 
         dump2 a = do
           unless (null a) $
             dumpIfSet_dyn logger dflags Opt_D_dump_cmm "Output Cmm" FormatCMM (pdoc platform a)
           return a
 
-    return (Stream.mapM dump2 pipeline_stream)
+    return $ generateCgIPEStub hsc_env this_mod denv (Stream.mapM dump2 pipeline_stream)
 
 myCoreToStgExpr :: Logger -> DynFlags -> InteractiveContext
                 -> Module -> ModLocation -> CoreExpr

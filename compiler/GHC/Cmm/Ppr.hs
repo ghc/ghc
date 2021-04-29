@@ -64,6 +64,8 @@ import GHC.Cmm.Dataflow.Graph
 
 -------------------------------------------------
 -- Outputable instances
+instance OutputableP Platform InfoProvEnt where
+  pdoc platform (InfoProvEnt clabel _ _ _ _) = pdoc platform clabel
 
 instance Outputable CmmStackInfo where
     ppr = pprStackInfo
