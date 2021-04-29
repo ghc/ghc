@@ -70,7 +70,7 @@ import GHC.Utils.Panic
 --   GenCmmDecl d h g = CmmProc h CLabel [GlobalReg] g
 --                    | CmmData Section d
 --
--- As a result we want to ransform this to a list of @NatCmmDecl@, which is
+-- As a result we want to transform this to a list of @NatCmmDecl@, which is
 -- defined @GHC.CmmToAsm.Instr@ as
 --
 --   type NatCmmDecl statics instr
@@ -320,8 +320,8 @@ getRegisterReg platform (CmmGlobal mid)
         Nothing  -> pprPanic "getRegisterReg-memory" (ppr $ CmmGlobal mid)
         -- By this stage, the only MagicIds remaining should be the
         -- ones which map to a real machine register on this
-        -- platform.  Hence ...
-
+        -- platform.  Hence if it's not mapped to a registers something
+        -- went wrong earlier in the pipeline.
 -- | Convert a BlockId to some CmmStatic data
 -- XXX: Add JumpTable Logic
 -- jumpTableEntry :: NCGConfig -> Maybe BlockId -> CmmStatic
@@ -433,7 +433,7 @@ getRegister' config plat expr
     CmmLit lit
       -> case lit of
 
-        -- XXX hand CmmInt 0 special, use wzr or xzr.
+        -- XXX handle CmmInt 0 specially, use wzr or xzr.
 
         CmmInt i W8  -> do
           return (Any (intFormat W8) (\dst -> unitOL $ ANN (text $ show expr) (MOV (OpReg W8 dst) (OpImm (ImmInteger (narrowS W8 i))))))
@@ -442,7 +442,8 @@ getRegister' config plat expr
 
         -- We need to be careful to not shorten this for negative literals.
         -- Those need the upper bits set. We'd either have to explicitly sign
-        -- or figure out something smarter. MNV dst XZR
+        -- or figure out something smarter. Lowered to
+        -- `MOV dst XZR`
         CmmInt i w | is16bit i, i >= 0 -> do
           return (Any (intFormat w) (\dst -> unitOL $ ANN (text $ show expr) (MOV (OpReg W16 dst) (OpImm (ImmInteger i)))))
         CmmInt i w | is32bit i, i >= 0 -> do
@@ -1012,6 +1013,7 @@ genCondBranch _ true false expr = do
 -- We need to make sure we preserve x9-x15, don't want to touch x16, x17.
 
 -- Note [PLT vs GOT relocations]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- When linking objects together, we may need to lookup foreign references. That
 -- is symbolic references to functions or values in other objects. When
 -- compiling the object, we can not know where those elements will end up in
