@@ -1530,33 +1530,64 @@ splitCastTy_maybe ty
 
 -- | Make a 'CastTy'. The Coercion must be nominal. Checks the
 -- Coercion for reflexivity, dropping it if it's reflexive.
--- See Note [Respecting definitional equality] in "GHC.Core.TyCo.Rep"
+-- See @Note [Respecting definitional equality]@ in "GHC.Core.TyCo.Rep"
 mkCastTy :: Type -> Coercion -> Type
-mkCastTy ty co | isReflexiveCo co = ty  -- (EQ2) from the Note
+mkCastTy orig_ty co | isReflexiveCo co = orig_ty  -- (EQ2) from the Note
 -- NB: Do the slow check here. This is important to keep the splitXXX
 -- functions working properly. Otherwise, we may end up with something
 -- like (((->) |> something_reflexive_but_not_obviously_so) biz baz)
 -- fails under splitFunTy_maybe. This happened with the cheaper check
 -- in test dependent/should_compile/dynamic-paper.
+mkCastTy orig_ty co = mk_cast_ty orig_ty co
 
-mkCastTy (CastTy ty co1) co2
-  -- (EQ3) from the Note
-  = mkCastTy ty (co1 `mkTransCo` co2)
-      -- call mkCastTy again for the reflexivity check
+-- | Like 'mkCastTy', but avoids checking the coercion for reflexivity,
+-- as that can be expensive.
+mk_cast_ty :: Type -> Coercion -> Type
+mk_cast_ty orig_ty co = go orig_ty
+  where
+    go :: Type -> Type
+    -- See Note [Using coreView in mk_cast_ty]
+    go ty | Just ty' <- coreView ty = go ty'
 
-mkCastTy (ForAllTy (Bndr tv vis) inner_ty) co
-  -- (EQ4) from the Note
-  -- See Note [Weird typing rule for ForAllTy] in GHC.Core.TyCo.Rep.
-  | isTyVar tv
-  , let fvs = tyCoVarsOfCo co
-  = -- have to make sure that pushing the co in doesn't capture the bound var!
-    if tv `elemVarSet` fvs
-    then let empty_subst = mkEmptyTCvSubst (mkInScopeSet fvs)
-             (subst, tv') = substVarBndr empty_subst tv
-         in ForAllTy (Bndr tv' vis) (substTy subst inner_ty `mkCastTy` co)
-    else ForAllTy (Bndr tv vis) (inner_ty `mkCastTy` co)
+    go (CastTy ty co1)
+      -- (EQ3) from the Note
+      = mkCastTy ty (co1 `mkTransCo` co)
+          -- call mkCastTy again for the reflexivity check
 
-mkCastTy ty co = CastTy ty co
+    go (ForAllTy (Bndr tv vis) inner_ty)
+      -- (EQ4) from the Note
+      -- See Note [Weird typing rule for ForAllTy] in GHC.Core.TyCo.Rep.
+      | isTyVar tv
+      , let fvs = tyCoVarsOfCo co
+      = -- have to make sure that pushing the co in doesn't capture the bound var!
+        if tv `elemVarSet` fvs
+        then let empty_subst = mkEmptyTCvSubst (mkInScopeSet fvs)
+                 (subst, tv') = substVarBndr empty_subst tv
+             in ForAllTy (Bndr tv' vis) (substTy subst inner_ty `mk_cast_ty` co)
+        else ForAllTy (Bndr tv vis) (inner_ty `mk_cast_ty` co)
+
+    go _ = CastTy orig_ty co -- NB: orig_ty: preserve synonyms if possible
+
+{-
+Note [Using coreView in mk_cast_ty]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Invariants (EQ3) and (EQ4) of Note [Respecting definitional equality] in
+GHC.Core.TyCo.Rep must apply regardless of type synonyms. For instance,
+consider this example (#19742):
+
+   type EqSameNat = () |> co
+   useNatEq :: EqSameNat |> sym co
+
+(Those casts aren't visible in the user-source code, of course; see #19742 for
+what the user might write.)
+
+The type `EqSameNat |> sym co` looks as if it satisfies (EQ3), as it has no
+nested casts, but if we expand EqSameNat, we see that it doesn't.
+And then Bad Things happen.
+
+The solution is easy: just use `coreView` when establishing (EQ3) and (EQ4) in
+`mk_cast_ty`.
+-}
 
 tyConBindersTyCoBinders :: [TyConBinder] -> [TyCoBinder]
 -- Return the tyConBinders in TyCoBinder form
