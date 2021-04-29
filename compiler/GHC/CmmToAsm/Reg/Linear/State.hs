@@ -115,7 +115,7 @@ makeRAStats state
 
 
 spillR :: Instruction instr
-       => Reg -> Unique -> RegM freeRegs (instr, Int)
+       => Reg -> Unique -> RegM freeRegs ([instr], Int)
 
 spillR reg temp = RegM $ \s ->
   let (stack1,slot) = getStackSlotFor (ra_stack s) temp
@@ -125,7 +125,7 @@ spillR reg temp = RegM $ \s ->
 
 
 loadR :: Instruction instr
-      => Reg -> Int -> RegM freeRegs instr
+      => Reg -> Int -> RegM freeRegs [instr]
 
 loadR reg slot = RegM $ \s ->
   RA_Result s (mkLoadInstr (ra_config s) reg (ra_delta s) slot)
