@@ -152,7 +152,7 @@ simplifyTop wanteds
 
            ; whyUnsafe <- getWarningMessages <$> TcM.readTcRef errs_var
            ; TcM.writeTcRef errs_var saved_msg
-           ; recordUnsafeInfer whyUnsafe
+           ; recordUnsafeInfer (mkMessages whyUnsafe)
            }
        ; traceTc "reportUnsolved (unsafe overlapping) }" empty
 
@@ -708,10 +708,10 @@ How is this implemented? It's complicated! So we'll step through it all:
     available and how they overlap. So we once again call `lookupInstEnv` to
     figure that out so we can generate a helpful error message.
 
- 6) `GHC.Tc.Utils.Monad.recordUnsafeInfer` -- Save the unsafe result and reason in an
-      IORef called `tcg_safeInfer`.
+ 6) `GHC.Tc.Utils.Monad.recordUnsafeInfer` -- Save the unsafe result and reason in
+      IORefs called `tcg_safe_infer` and `tcg_safe_infer_reason`.
 
- 7) `GHC.Driver.Main.tcRnModule'` -- Reads `tcg_safeInfer` after type-checking, calling
+ 7) `GHC.Driver.Main.tcRnModule'` -- Reads `tcg_safe_infer` after type-checking, calling
     `GHC.Driver.Main.markUnsafeInfer` (passing the reason along) when safe-inferrence
     failed.
 

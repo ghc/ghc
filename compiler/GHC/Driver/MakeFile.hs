@@ -23,6 +23,7 @@ import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Utils.Misc
 import GHC.Driver.Env
+import GHC.Driver.Errors.Types
 import qualified GHC.SysTools as SysTools
 import GHC.Data.Graph.Directed ( SCC(..) )
 import GHC.Utils.Outputable
@@ -305,7 +306,9 @@ findDependency hsc_env srcloc pkg imp is_boot include_pkg_deps = do
         -> return Nothing
 
     fail ->
-        throwOneError $ mkPlainErrorMsgEnvelope srcloc $
+        throwOneError $
+          mkPlainErrorMsgEnvelope srcloc $
+          GhcDriverMessage $ DriverUnknownMessage $ mkPlainError $
              cannotFindModule hsc_env imp fail
 
 -----------------------------
@@ -402,7 +405,7 @@ dumpModCycles logger dflags module_graph
     cycles =
       [ c | CyclicSCC c <- topoSort ]
 
-    pp_cycles = vcat [ (text "---------- Cycle" <+> int n <+> ptext (sLit "----------"))
+    pp_cycles = vcat [ (text "---------- Cycle" <+> int n <+> text "----------")
                         $$ pprCycle c $$ blankLine
                      | (n,c) <- [1..] `zip` cycles ]
 
@@ -454,4 +457,3 @@ pprCycle summaries = pp_group (CyclicSCC summaries)
 depStartMarker, depEndMarker :: String
 depStartMarker = "# DO NOT DELETE: Beginning of Haskell dependencies"
 depEndMarker   = "# DO NOT DELETE: End of Haskell dependencies"
-
