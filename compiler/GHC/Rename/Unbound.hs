@@ -417,7 +417,7 @@ there are 2 cases, where we hide the last "no module is imported" line:
 
 exactNameErr :: Name -> SDoc
 exactNameErr name =
-  hang (text "The exact Name" <+> quotes (ppr name) <+> ptext (sLit "is not in scope"))
+  hang (text "The exact Name" <+> quotes (ppr name) <+> text "is not in scope")
     2 (vcat [ text "Probable cause: you used a unique Template Haskell name (NameU), "
             , text "perhaps via newName, but did not bind it"
             , text "If that's it, then -ddump-splices might be useful" ])

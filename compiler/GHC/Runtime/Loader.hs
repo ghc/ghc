@@ -60,8 +60,6 @@ import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Exception
 
-import GHC.Data.FastString
-
 import Control.Monad     ( unless )
 import Data.Maybe        ( mapMaybe )
 import Unsafe.Coerce     ( unsafeCoerce )
@@ -289,10 +287,10 @@ lookupRdrNameInModuleForPlugins hsc_env mod_name rdr_name = do
     doc = text "contains a name used in an invocation of lookupRdrNameInModule"
 
 wrongTyThingError :: Name -> TyThing -> SDoc
-wrongTyThingError name got_thing = hsep [text "The name", ppr name, ptext (sLit "is not that of a value but rather a"), pprTyThingCategory got_thing]
+wrongTyThingError name got_thing = hsep [text "The name", ppr name, text "is not that of a value but rather a", pprTyThingCategory got_thing]
 
 missingTyThingError :: Name -> SDoc
-missingTyThingError name = hsep [text "The name", ppr name, ptext (sLit "is not in the type environment: are you sure it exists?")]
+missingTyThingError name = hsep [text "The name", ppr name, text "is not in the type environment: are you sure it exists?"]
 
 throwCmdLineErrorS :: DynFlags -> SDoc -> IO a
 throwCmdLineErrorS dflags = throwCmdLineError . showSDoc dflags

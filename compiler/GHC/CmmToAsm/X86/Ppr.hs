@@ -45,7 +45,6 @@ import GHC.Cmm.CLabel
 import GHC.Types.Basic (Alignment, mkAlignment, alignmentBytes)
 import GHC.Types.Unique ( pprUniqueAlways )
 
-import GHC.Data.FastString
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
@@ -100,7 +99,7 @@ pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
       pprProcAlignment config $$
       pprProcLabel config lbl $$
       (if platformHasSubsectionsViaSymbols platform
-          then pdoc platform (mkDeadStripPreventer info_lbl) <> char ':'
+          then pdoc platform (mkDeadStripPreventer info_lbl) <> colon
           else empty) $$
       vcat (map (pprBasicBlock config top_info) blocks) $$
       ppWhen (ncgDwarfEnabled config) (pprProcEndLabel platform info_lbl) $$
@@ -120,25 +119,25 @@ pprProcLabel :: NCGConfig -> CLabel -> SDoc
 pprProcLabel config lbl
   | ncgExposeInternalSymbols config
   , Just lbl' <- ppInternalProcLabel (ncgThisModule config) lbl
-  = lbl' <> char ':'
+  = lbl' <> colon
   | otherwise
   = empty
 
 pprProcEndLabel :: Platform -> CLabel -- ^ Procedure name
                 -> SDoc
 pprProcEndLabel platform lbl =
-    pdoc platform (mkAsmTempProcEndLabel lbl) <> char ':'
+    pdoc platform (mkAsmTempProcEndLabel lbl) <> colon
 
 pprBlockEndLabel :: Platform -> CLabel -- ^ Block name
                  -> SDoc
 pprBlockEndLabel platform lbl =
-    pdoc platform (mkAsmTempEndLabel lbl) <> char ':'
+    pdoc platform (mkAsmTempEndLabel lbl) <> colon
 
 -- | Output the ELF .size directive.
 pprSizeDecl :: Platform -> CLabel -> SDoc
 pprSizeDecl platform lbl
  = if osElfTarget (platformOS platform)
-   then text "\t.size" <+> pdoc platform lbl <> ptext (sLit ", .-") <> pdoc platform lbl
+   then text "\t.size" <+> pdoc platform lbl <> text ", .-" <> pdoc platform lbl
    else empty
 
 pprBasicBlock :: NCGConfig -> LabelMap RawCmmStatics -> NatBasicBlock Instr -> SDoc
@@ -163,7 +162,7 @@ pprBasicBlock config info_env (BasicBlock blockid instrs)
            vcat (map (pprData config) info) $$
            pprLabel platform infoLbl $$
            c $$
-           ppWhen (ncgDwarfEnabled config) (pdoc platform (mkAsmTempEndLabel infoLbl) <> char ':')
+           ppWhen (ncgDwarfEnabled config) (pdoc platform (mkAsmTempEndLabel infoLbl) <> colon)
 
     -- Make sure the info table has the right .loc for the block
     -- coming right after it. See [Note: Info Offset]
@@ -267,14 +266,14 @@ pprLabelType' platform lbl =
 pprTypeDecl :: Platform -> CLabel -> SDoc
 pprTypeDecl platform lbl
     = if osElfTarget (platformOS platform) && externallyVisibleCLabel lbl
-      then text ".type " <> pdoc platform lbl <> ptext (sLit  ", ") <> pprLabelType' platform lbl
+      then text ".type " <> pdoc platform lbl <> text ", " <> pprLabelType' platform lbl
       else empty
 
 pprLabel :: Platform -> CLabel -> SDoc
 pprLabel platform lbl =
    pprGloblDecl platform lbl
    $$ pprTypeDecl platform lbl
-   $$ (pdoc platform lbl <> char ':')
+   $$ (pdoc platform lbl <> colon)
 
 pprAlign :: Platform -> Alignment -> SDoc
 pprAlign platform alignment
@@ -310,30 +309,30 @@ pprReg platform f r
     ppr32_reg_no II16  = ppr32_reg_word
     ppr32_reg_no _     = ppr32_reg_long
 
-    ppr32_reg_byte i = ptext
-      (case i of {
-         0 -> sLit "%al";     1 -> sLit "%bl";
-         2 -> sLit "%cl";     3 -> sLit "%dl";
-        _  -> sLit $ "very naughty I386 byte register: " ++ show i
-      })
+    ppr32_reg_byte i =
+      case i of {
+         0 -> text "%al";     1 -> text "%bl";
+         2 -> text "%cl";     3 -> text "%dl";
+        _  -> text "very naughty I386 byte register: " <> int i
+      }
 
-    ppr32_reg_word i = ptext
-      (case i of {
-         0 -> sLit "%ax";     1 -> sLit "%bx";
-         2 -> sLit "%cx";     3 -> sLit "%dx";
-         4 -> sLit "%si";     5 -> sLit "%di";
-         6 -> sLit "%bp";     7 -> sLit "%sp";
-        _  -> sLit "very naughty I386 word register"
-      })
+    ppr32_reg_word i =
+      case i of {
+         0 -> text "%ax";     1 -> text "%bx";
+         2 -> text "%cx";     3 -> text "%dx";
+         4 -> text "%si";     5 -> text "%di";
+         6 -> text "%bp";     7 -> text "%sp";
+        _  -> text "very naughty I386 word register"
+      }
 
-    ppr32_reg_long i = ptext
-      (case i of {
-         0 -> sLit "%eax";    1 -> sLit "%ebx";
-         2 -> sLit "%ecx";    3 -> sLit "%edx";
-         4 -> sLit "%esi";    5 -> sLit "%edi";
-         6 -> sLit "%ebp";    7 -> sLit "%esp";
+    ppr32_reg_long i =
+      case i of {
+         0 -> text "%eax";    1 -> text "%ebx";
+         2 -> text "%ecx";    3 -> text "%edx";
+         4 -> text "%esi";    5 -> text "%edi";
+         6 -> text "%ebp";    7 -> text "%esp";
          _  -> ppr_reg_float i
-      })
+      }
 
     ppr64_reg_no :: Format -> Int -> SDoc
     ppr64_reg_no II8   = ppr64_reg_byte
@@ -341,101 +340,97 @@ pprReg platform f r
     ppr64_reg_no II32  = ppr64_reg_long
     ppr64_reg_no _     = ppr64_reg_quad
 
-    ppr64_reg_byte i = ptext
-      (case i of {
-         0 -> sLit "%al";     1 -> sLit "%bl";
-         2 -> sLit "%cl";     3 -> sLit "%dl";
-         4 -> sLit "%sil";    5 -> sLit "%dil"; -- new 8-bit regs!
-         6 -> sLit "%bpl";    7 -> sLit "%spl";
-         8 -> sLit "%r8b";    9  -> sLit "%r9b";
-        10 -> sLit "%r10b";   11 -> sLit "%r11b";
-        12 -> sLit "%r12b";   13 -> sLit "%r13b";
-        14 -> sLit "%r14b";   15 -> sLit "%r15b";
-        _  -> sLit $ "very naughty x86_64 byte register: " ++ show i
-      })
+    ppr64_reg_byte i =
+      case i of {
+         0 -> text "%al";      1 -> text "%bl";
+         2 -> text "%cl";      3 -> text "%dl";
+         4 -> text "%sil";     5 -> text "%dil"; -- new 8-bit regs!
+         6 -> text "%bpl";     7 -> text "%spl";
+         8 -> text "%r8b";     9 -> text "%r9b";
+        10 -> text "%r10b";   11 -> text "%r11b";
+        12 -> text "%r12b";   13 -> text "%r13b";
+        14 -> text "%r14b";   15 -> text "%r15b";
+        _  -> text "very naughty x86_64 byte register: " <> int i
+      }
 
-    ppr64_reg_word i = ptext
-      (case i of {
-         0 -> sLit "%ax";     1 -> sLit "%bx";
-         2 -> sLit "%cx";     3 -> sLit "%dx";
-         4 -> sLit "%si";     5 -> sLit "%di";
-         6 -> sLit "%bp";     7 -> sLit "%sp";
-         8 -> sLit "%r8w";    9  -> sLit "%r9w";
-        10 -> sLit "%r10w";   11 -> sLit "%r11w";
-        12 -> sLit "%r12w";   13 -> sLit "%r13w";
-        14 -> sLit "%r14w";   15 -> sLit "%r15w";
-        _  -> sLit "very naughty x86_64 word register"
-      })
+    ppr64_reg_word i =
+      case i of {
+         0 -> text "%ax";      1 -> text "%bx";
+         2 -> text "%cx";      3 -> text "%dx";
+         4 -> text "%si";      5 -> text "%di";
+         6 -> text "%bp";      7 -> text "%sp";
+         8 -> text "%r8w";     9 -> text "%r9w";
+        10 -> text "%r10w";   11 -> text "%r11w";
+        12 -> text "%r12w";   13 -> text "%r13w";
+        14 -> text "%r14w";   15 -> text "%r15w";
+        _  -> text "very naughty x86_64 word register"
+      }
 
-    ppr64_reg_long i = ptext
-      (case i of {
-         0 -> sLit "%eax";    1  -> sLit "%ebx";
-         2 -> sLit "%ecx";    3  -> sLit "%edx";
-         4 -> sLit "%esi";    5  -> sLit "%edi";
-         6 -> sLit "%ebp";    7  -> sLit "%esp";
-         8 -> sLit "%r8d";    9  -> sLit "%r9d";
-        10 -> sLit "%r10d";   11 -> sLit "%r11d";
-        12 -> sLit "%r12d";   13 -> sLit "%r13d";
-        14 -> sLit "%r14d";   15 -> sLit "%r15d";
-        _  -> sLit "very naughty x86_64 register"
-      })
+    ppr64_reg_long i =
+      case i of {
+         0 -> text "%eax";    1  -> text "%ebx";
+         2 -> text "%ecx";    3  -> text "%edx";
+         4 -> text "%esi";    5  -> text "%edi";
+         6 -> text "%ebp";    7  -> text "%esp";
+         8 -> text "%r8d";    9  -> text "%r9d";
+        10 -> text "%r10d";   11 -> text "%r11d";
+        12 -> text "%r12d";   13 -> text "%r13d";
+        14 -> text "%r14d";   15 -> text "%r15d";
+        _  -> text "very naughty x86_64 register"
+      }
 
-    ppr64_reg_quad i = ptext
-      (case i of {
-         0 -> sLit "%rax";      1 -> sLit "%rbx";
-         2 -> sLit "%rcx";      3 -> sLit "%rdx";
-         4 -> sLit "%rsi";      5 -> sLit "%rdi";
-         6 -> sLit "%rbp";      7 -> sLit "%rsp";
-         8 -> sLit "%r8";       9 -> sLit "%r9";
-        10 -> sLit "%r10";    11 -> sLit "%r11";
-        12 -> sLit "%r12";    13 -> sLit "%r13";
-        14 -> sLit "%r14";    15 -> sLit "%r15";
+    ppr64_reg_quad i =
+      case i of {
+         0 -> text "%rax";     1 -> text "%rbx";
+         2 -> text "%rcx";     3 -> text "%rdx";
+         4 -> text "%rsi";     5 -> text "%rdi";
+         6 -> text "%rbp";     7 -> text "%rsp";
+         8 -> text "%r8";      9 -> text "%r9";
+        10 -> text "%r10";    11 -> text "%r11";
+        12 -> text "%r12";    13 -> text "%r13";
+        14 -> text "%r14";    15 -> text "%r15";
         _  -> ppr_reg_float i
-      })
+      }
 
-ppr_reg_float :: Int -> PtrString
+ppr_reg_float :: Int -> SDoc
 ppr_reg_float i = case i of
-        16 -> sLit "%xmm0" ;   17 -> sLit "%xmm1"
-        18 -> sLit "%xmm2" ;   19 -> sLit "%xmm3"
-        20 -> sLit "%xmm4" ;   21 -> sLit "%xmm5"
-        22 -> sLit "%xmm6" ;   23 -> sLit "%xmm7"
-        24 -> sLit "%xmm8" ;   25 -> sLit "%xmm9"
-        26 -> sLit "%xmm10";   27 -> sLit "%xmm11"
-        28 -> sLit "%xmm12";   29 -> sLit "%xmm13"
-        30 -> sLit "%xmm14";   31 -> sLit "%xmm15"
-        _  -> sLit "very naughty x86 register"
+        16 -> text "%xmm0" ;   17 -> text "%xmm1"
+        18 -> text "%xmm2" ;   19 -> text "%xmm3"
+        20 -> text "%xmm4" ;   21 -> text "%xmm5"
+        22 -> text "%xmm6" ;   23 -> text "%xmm7"
+        24 -> text "%xmm8" ;   25 -> text "%xmm9"
+        26 -> text "%xmm10";   27 -> text "%xmm11"
+        28 -> text "%xmm12";   29 -> text "%xmm13"
+        30 -> text "%xmm14";   31 -> text "%xmm15"
+        _  -> text "very naughty x86 register"
 
 pprFormat :: Format -> SDoc
-pprFormat x
- = ptext (case x of
-                II8   -> sLit "b"
-                II16  -> sLit "w"
-                II32  -> sLit "l"
-                II64  -> sLit "q"
-                FF32  -> sLit "ss"      -- "scalar single-precision float" (SSE2)
-                FF64  -> sLit "sd"      -- "scalar double-precision float" (SSE2)
-                )
+pprFormat x = case x of
+  II8   -> text "b"
+  II16  -> text "w"
+  II32  -> text "l"
+  II64  -> text "q"
+  FF32  -> text "ss"      -- "scalar single-precision float" (SSE2)
+  FF64  -> text "sd"      -- "scalar double-precision float" (SSE2)
 
 pprFormat_x87 :: Format -> SDoc
-pprFormat_x87 x
-  = ptext $ case x of
-                FF32  -> sLit "s"
-                FF64  -> sLit "l"
-                _     -> panic "X86.Ppr.pprFormat_x87"
+pprFormat_x87 x = case x of
+  FF32  -> text "s"
+  FF64  -> text "l"
+  _     -> panic "X86.Ppr.pprFormat_x87"
 
 
 pprCond :: Cond -> SDoc
-pprCond c
- = ptext (case c of {
-                GEU     -> sLit "ae";   LU    -> sLit "b";
-                EQQ     -> sLit "e";    GTT   -> sLit "g";
-                GE      -> sLit "ge";   GU    -> sLit "a";
-                LTT     -> sLit "l";    LE    -> sLit "le";
-                LEU     -> sLit "be";   NE    -> sLit "ne";
-                NEG     -> sLit "s";    POS   -> sLit "ns";
-                CARRY   -> sLit "c";   OFLO  -> sLit "o";
-                PARITY  -> sLit "p";   NOTPARITY -> sLit "np";
-                ALWAYS  -> sLit "mp"})
+pprCond c = case c of {
+  GEU     -> text "ae";   LU   -> text "b";
+  EQQ     -> text "e";    GTT  -> text "g";
+  GE      -> text "ge";   GU   -> text "a";
+  LTT     -> text "l";    LE   -> text "le";
+  LEU     -> text "be";   NE   -> text "ne";
+  NEG     -> text "s";    POS  -> text "ns";
+  CARRY   -> text "c";   OFLO  -> text "o";
+  PARITY  -> text "p";   NOTPARITY -> text "np";
+  ALWAYS  -> text "mp"}
 
 
 pprImm :: Platform -> Imm -> SDoc
@@ -624,70 +619,70 @@ pprInstr platform i = case i of
                 _    -> format
 
    MOV format src dst
-     -> pprFormatOpOp (sLit "mov") format src dst
+     -> pprFormatOpOp (text "mov") format src dst
 
    CMOV cc format src dst
-     -> pprCondOpReg (sLit "cmov") format cc src dst
+     -> pprCondOpReg (text "cmov") format cc src dst
 
    MOVZxL II32 src dst
-      -> pprFormatOpOp (sLit "mov") II32 src dst
+      -> pprFormatOpOp (text "mov") II32 src dst
         -- 32-to-64 bit zero extension on x86_64 is accomplished by a simple
         -- movl.  But we represent it as a MOVZxL instruction, because
         -- the reg alloc would tend to throw away a plain reg-to-reg
         -- move, and we still want it to do that.
 
    MOVZxL formats src dst
-      -> pprFormatOpOpCoerce (sLit "movz") formats II32 src dst
+      -> pprFormatOpOpCoerce (text "movz") formats II32 src dst
         -- zero-extension only needs to extend to 32 bits: on x86_64,
         -- the remaining zero-extension to 64 bits is automatic, and the 32-bit
         -- instruction is shorter.
 
    MOVSxL formats src dst
-      -> pprFormatOpOpCoerce (sLit "movs") formats (archWordFormat (target32Bit platform)) src dst
+      -> pprFormatOpOpCoerce (text "movs") formats (archWordFormat (target32Bit platform)) src dst
 
    -- here we do some patching, since the physical registers are only set late
    -- in the code generation.
    LEA format (OpAddr (AddrBaseIndex (EABaseReg reg1) (EAIndex reg2 1) (ImmInt 0))) dst@(OpReg reg3)
       | reg1 == reg3
-      -> pprFormatOpOp (sLit "add") format (OpReg reg2) dst
+      -> pprFormatOpOp (text "add") format (OpReg reg2) dst
 
    LEA format (OpAddr (AddrBaseIndex (EABaseReg reg1) (EAIndex reg2 1) (ImmInt 0))) dst@(OpReg reg3)
       | reg2 == reg3
-      -> pprFormatOpOp (sLit "add") format (OpReg reg1) dst
+      -> pprFormatOpOp (text "add") format (OpReg reg1) dst
 
    LEA format (OpAddr (AddrBaseIndex (EABaseReg reg1) EAIndexNone displ)) dst@(OpReg reg3)
       | reg1 == reg3
       -> pprInstr platform (ADD format (OpImm displ) dst)
 
    LEA format src dst
-      -> pprFormatOpOp (sLit "lea") format src dst
+      -> pprFormatOpOp (text "lea") format src dst
 
    ADD format (OpImm (ImmInt (-1))) dst
-      -> pprFormatOp (sLit "dec") format dst
+      -> pprFormatOp (text "dec") format dst
 
    ADD format (OpImm (ImmInt 1)) dst
-      -> pprFormatOp (sLit "inc") format dst
+      -> pprFormatOp (text "inc") format dst
 
    ADD format src dst
-      -> pprFormatOpOp (sLit "add") format src dst
+      -> pprFormatOpOp (text "add") format src dst
 
    ADC format src dst
-      -> pprFormatOpOp (sLit "adc") format src dst
+      -> pprFormatOpOp (text "adc") format src dst
 
    SUB format src dst
-      -> pprFormatOpOp (sLit "sub") format src dst
+      -> pprFormatOpOp (text "sub") format src dst
 
    SBB format src dst
-      -> pprFormatOpOp (sLit "sbb") format src dst
+      -> pprFormatOpOp (text "sbb") format src dst
 
    IMUL format op1 op2
-      -> pprFormatOpOp (sLit "imul") format op1 op2
+      -> pprFormatOpOp (text "imul") format op1 op2
 
    ADD_CC format src dst
-      -> pprFormatOpOp (sLit "add") format src dst
+      -> pprFormatOpOp (text "add") format src dst
 
    SUB_CC format src dst
-      -> pprFormatOpOp (sLit "sub") format src dst
+      -> pprFormatOpOp (text "sub") format src dst
 
    -- Use a 32-bit instruction when possible as it saves a byte.
    -- Notably, extracting the tag bits of a pointer has this form.
@@ -698,86 +693,86 @@ pprInstr platform i = case i of
       -> pprInstr platform (AND II32 src dst)
 
    AND FF32 src dst
-      -> pprOpOp (sLit "andps") FF32 src dst
+      -> pprOpOp (text "andps") FF32 src dst
 
    AND FF64 src dst
-      -> pprOpOp (sLit "andpd") FF64 src dst
+      -> pprOpOp (text "andpd") FF64 src dst
 
    AND format src dst
-      -> pprFormatOpOp (sLit "and") format src dst
+      -> pprFormatOpOp (text "and") format src dst
 
    OR  format src dst
-      -> pprFormatOpOp (sLit "or")  format src dst
+      -> pprFormatOpOp (text "or")  format src dst
 
    XOR FF32 src dst
-      -> pprOpOp (sLit "xorps") FF32 src dst
+      -> pprOpOp (text "xorps") FF32 src dst
 
    XOR FF64 src dst
-      ->  pprOpOp (sLit "xorpd") FF64 src dst
+      ->  pprOpOp (text "xorpd") FF64 src dst
 
    XOR format src dst
-      -> pprFormatOpOp (sLit "xor") format src dst
+      -> pprFormatOpOp (text "xor") format src dst
 
    POPCNT format src dst
-      -> pprOpOp (sLit "popcnt") format src (OpReg dst)
+      -> pprOpOp (text "popcnt") format src (OpReg dst)
 
    LZCNT format src dst
-      ->  pprOpOp (sLit "lzcnt") format src (OpReg dst)
+      ->  pprOpOp (text "lzcnt") format src (OpReg dst)
 
    TZCNT format src dst
-      -> pprOpOp (sLit "tzcnt") format src (OpReg dst)
+      -> pprOpOp (text "tzcnt") format src (OpReg dst)
 
    BSF format src dst
-      -> pprOpOp (sLit "bsf") format src (OpReg dst)
+      -> pprOpOp (text "bsf") format src (OpReg dst)
 
    BSR format src dst
-      -> pprOpOp (sLit "bsr") format src (OpReg dst)
+      -> pprOpOp (text "bsr") format src (OpReg dst)
 
    PDEP format src mask dst
-      -> pprFormatOpOpReg (sLit "pdep") format src mask dst
+      -> pprFormatOpOpReg (text "pdep") format src mask dst
 
    PEXT format src mask dst
-      -> pprFormatOpOpReg (sLit "pext") format src mask dst
+      -> pprFormatOpOpReg (text "pext") format src mask dst
 
    PREFETCH NTA format src
-      -> pprFormatOp_ (sLit "prefetchnta") format src
+      -> pprFormatOp_ (text "prefetchnta") format src
 
    PREFETCH Lvl0 format src
-      -> pprFormatOp_ (sLit "prefetcht0") format src
+      -> pprFormatOp_ (text "prefetcht0") format src
 
    PREFETCH Lvl1 format src
-      -> pprFormatOp_ (sLit "prefetcht1") format src
+      -> pprFormatOp_ (text "prefetcht1") format src
 
    PREFETCH Lvl2 format src
-      -> pprFormatOp_ (sLit "prefetcht2") format src
+      -> pprFormatOp_ (text "prefetcht2") format src
 
    NOT format op
-      -> pprFormatOp (sLit "not") format op
+      -> pprFormatOp (text "not") format op
 
    BSWAP format op
-      -> pprFormatOp (sLit "bswap") format (OpReg op)
+      -> pprFormatOp (text "bswap") format (OpReg op)
 
    NEGI format op
-      -> pprFormatOp (sLit "neg") format op
+      -> pprFormatOp (text "neg") format op
 
    SHL format src dst
-      -> pprShift (sLit "shl") format src dst
+      -> pprShift (text "shl") format src dst
 
    SAR format src dst
-      -> pprShift (sLit "sar") format src dst
+      -> pprShift (text "sar") format src dst
 
    SHR format src dst
-      -> pprShift (sLit "shr") format src dst
+      -> pprShift (text "shr") format src dst
 
    BT format imm src
-      -> pprFormatImmOp (sLit "bt") format imm src
+      -> pprFormatImmOp (text "bt") format imm src
 
    CMP format src dst
-     | isFloatFormat format -> pprFormatOpOp (sLit "ucomi") format src dst -- SSE2
-     | otherwise            -> pprFormatOpOp (sLit "cmp")   format src dst
+     | isFloatFormat format -> pprFormatOpOp (text "ucomi") format src dst -- SSE2
+     | otherwise            -> pprFormatOpOp (text "cmp")   format src dst
 
    TEST format src dst
-      -> pprFormatOpOp (sLit "test") format' src dst
+      -> pprFormatOpOp (text "test") format' src dst
          where
         -- Match instructions like 'test $0x3,%esi' or 'test $0x7,%rbx'.
         -- We can replace them by equivalent, but smaller instructions
@@ -800,10 +795,10 @@ pprInstr platform i = case i of
           minSizeOfReg _ _ = format                 -- other
 
    PUSH format op
-      -> pprFormatOp (sLit "push") format op
+      -> pprFormatOp (text "push") format op
 
    POP format op
-      -> pprFormatOp (sLit "pop") format op
+      -> pprFormatOp (text "pop") format op
 
 -- both unused (SDM):
 -- PUSHA -> text "\tpushal"
@@ -828,17 +823,17 @@ pprInstr platform i = case i of
       -> panic $ "pprInstr: CLTD " ++ show x
 
    SETCC cond op
-      -> pprCondInstr (sLit "set") cond (pprOperand platform II8 op)
+      -> pprCondInstr (text "set") cond (pprOperand platform II8 op)
 
    XCHG format src val
-      -> pprFormatOpReg (sLit "xchg") format src val
+      -> pprFormatOpReg (text "xchg") format src val
 
    JXX cond blockid
-      -> pprCondInstr (sLit "j") cond (pdoc platform lab)
+      -> pprCondInstr (text "j") cond (pdoc platform lab)
          where lab = blockLbl blockid
 
    JXX_GBL cond imm
-      -> pprCondInstr (sLit "j") cond (pprImm platform imm)
+      -> pprCondInstr (text "j") cond (pprImm platform imm)
 
    JMP (OpImm imm) _
       -> text "\tjmp " <> pprImm platform imm
@@ -856,44 +851,44 @@ pprInstr platform i = case i of
       -> text "\tcall *" <> pprReg platform (archWordFormat (target32Bit platform)) reg
 
    IDIV fmt op
-      -> pprFormatOp (sLit "idiv") fmt op
+      -> pprFormatOp (text "idiv") fmt op
 
    DIV fmt op
-      -> pprFormatOp (sLit "div")  fmt op
+      -> pprFormatOp (text "div")  fmt op
 
    IMUL2 fmt op
-      -> pprFormatOp (sLit "imul") fmt op
+      -> pprFormatOp (text "imul") fmt op
 
    -- x86_64 only
    MUL format op1 op2
-      -> pprFormatOpOp (sLit "mul") format op1 op2
+      -> pprFormatOpOp (text "mul") format op1 op2
 
    MUL2 format op
-      -> pprFormatOp (sLit "mul") format op
+      -> pprFormatOp (text "mul") format op
 
    FDIV format op1 op2
-      -> pprFormatOpOp (sLit "div") format op1 op2
+      -> pprFormatOpOp (text "div") format op1 op2
 
    SQRT format op1 op2
-      -> pprFormatOpReg (sLit "sqrt") format op1 op2
+      -> pprFormatOpReg (text "sqrt") format op1 op2
 
    CVTSS2SD from to
-      -> pprRegReg (sLit "cvtss2sd") from to
+      -> pprRegReg (text "cvtss2sd") from to
 
    CVTSD2SS from to
-      -> pprRegReg (sLit "cvtsd2ss") from to
+      -> pprRegReg (text "cvtsd2ss") from to
 
    CVTTSS2SIQ fmt from to
-      -> pprFormatFormatOpReg (sLit "cvttss2si") FF32 fmt from to
+      -> pprFormatFormatOpReg (text "cvttss2si") FF32 fmt from to
 
    CVTTSD2SIQ fmt from to
-      -> pprFormatFormatOpReg (sLit "cvttsd2si") FF64 fmt from to
+      -> pprFormatFormatOpReg (text "cvttsd2si") FF64 fmt from to
 
    CVTSI2SS fmt from to
-      -> pprFormatOpReg (sLit "cvtsi2ss") fmt from to
+      -> pprFormatOpReg (text "cvtsi2ss") fmt from to
 
    CVTSI2SD fmt from to
-      -> pprFormatOpReg (sLit "cvtsi2sd") fmt from to
+      -> pprFormatOpReg (text "cvtsi2sd") fmt from to
 
        -- FETCHGOT for PIC on ELF platforms
    FETCHGOT reg
@@ -925,10 +920,10 @@ pprInstr platform i = case i of
       -> text "\tmfence"
 
    XADD format src dst
-      -> pprFormatOpOp (sLit "xadd") format src dst
+      -> pprFormatOpOp (text "xadd") format src dst
 
    CMPXCHG format src dst
-      -> pprFormatOpOp (sLit "cmpxchg") format src dst
+      -> pprFormatOpOp (text "cmpxchg") format src dst
 
 
   where
@@ -945,7 +940,7 @@ pprInstr platform i = case i of
       = (char '#' <> pprX87Instr fake) $$ actual
 
    pprX87Instr :: Instr -> SDoc
-   pprX87Instr (X87Store fmt dst) = pprFormatAddr (sLit "gst") fmt dst
+   pprX87Instr (X87Store fmt dst) = pprFormatAddr (text "gst") fmt dst
    pprX87Instr _ = panic "X86.Ppr.pprX87Instr: no match"
 
    pprDollImm :: Imm -> SDoc
@@ -959,17 +954,17 @@ pprInstr platform i = case i of
       OpAddr ea -> pprAddr platform ea
 
 
-   pprMnemonic_  :: PtrString -> SDoc
+   pprMnemonic_  :: SDoc -> SDoc
    pprMnemonic_ name =
-      char '\t' <> ptext name <> space
+      char '\t' <> name <> space
 
 
-   pprMnemonic  :: PtrString -> Format -> SDoc
+   pprMnemonic  :: SDoc -> Format -> SDoc
    pprMnemonic name format =
-      char '\t' <> ptext name <> pprFormat format <> space
+      char '\t' <> name <> pprFormat format <> space
 
 
-   pprFormatImmOp :: PtrString -> Format -> Imm -> Operand -> SDoc
+   pprFormatImmOp :: SDoc -> Format -> Imm -> Operand -> SDoc
    pprFormatImmOp name format imm op1
      = hcat [
            pprMnemonic name format,
@@ -980,14 +975,14 @@ pprInstr platform i = case i of
        ]
 
 
-   pprFormatOp_ :: PtrString -> Format -> Operand -> SDoc
+   pprFormatOp_ :: SDoc -> Format -> Operand -> SDoc
    pprFormatOp_ name format op1
      = hcat [
            pprMnemonic_ name ,
            pprOperand platform format op1
        ]
 
-   pprFormatOp :: PtrString -> Format -> Operand -> SDoc
+   pprFormatOp :: SDoc -> Format -> Operand -> SDoc
    pprFormatOp name format op1
      = hcat [
            pprMnemonic name format,
@@ -995,7 +990,7 @@ pprInstr platform i = case i of
        ]
 
 
-   pprFormatOpOp :: PtrString -> Format -> Operand -> Operand -> SDoc
+   pprFormatOpOp :: SDoc -> Format -> Operand -> Operand -> SDoc
    pprFormatOpOp name format op1 op2
      = hcat [
            pprMnemonic name format,
@@ -1005,7 +1000,7 @@ pprInstr platform i = case i of
        ]
 
 
-   pprOpOp :: PtrString -> Format -> Operand -> Operand -> SDoc
+   pprOpOp :: SDoc -> Format -> Operand -> Operand -> SDoc
    pprOpOp name format op1 op2
      = hcat [
            pprMnemonic_ name,
@@ -1014,7 +1009,7 @@ pprInstr platform i = case i of
            pprOperand platform format op2
        ]
 
-   pprRegReg :: PtrString -> Reg -> Reg -> SDoc
+   pprRegReg :: SDoc -> Reg -> Reg -> SDoc
    pprRegReg name reg1 reg2
      = hcat [
            pprMnemonic_ name,
@@ -1024,7 +1019,7 @@ pprInstr platform i = case i of
        ]
 
 
-   pprFormatOpReg :: PtrString -> Format -> Operand -> Reg -> SDoc
+   pprFormatOpReg :: SDoc -> Format -> Operand -> Reg -> SDoc
    pprFormatOpReg name format op1 reg2
      = hcat [
            pprMnemonic name format,
@@ -1033,11 +1028,11 @@ pprInstr platform i = case i of
            pprReg platform (archWordFormat (target32Bit platform)) reg2
        ]
 
-   pprCondOpReg :: PtrString -> Format -> Cond -> Operand -> Reg -> SDoc
+   pprCondOpReg :: SDoc -> Format -> Cond -> Operand -> Reg -> SDoc
    pprCondOpReg name format cond op1 reg2
      = hcat [
            char '\t',
-           ptext name,
+           name,
            pprCond cond,
            space,
            pprOperand platform format op1,
@@ -1045,7 +1040,7 @@ pprInstr platform i = case i of
            pprReg platform format reg2
        ]
 
-   pprFormatFormatOpReg :: PtrString -> Format -> Format -> Operand -> Reg -> SDoc
+   pprFormatFormatOpReg :: SDoc -> Format -> Format -> Operand -> Reg -> SDoc
    pprFormatFormatOpReg name format1 format2 op1 reg2
      = hcat [
            pprMnemonic name format2,
@@ -1054,7 +1049,7 @@ pprInstr platform i = case i of
            pprReg platform format2 reg2
        ]
 
-   pprFormatOpOpReg :: PtrString -> Format -> Operand -> Operand -> Reg -> SDoc
+   pprFormatOpOpReg :: SDoc -> Format -> Operand -> Operand -> Reg -> SDoc
    pprFormatOpOpReg name format op1 op2 reg3
      = hcat [
            pprMnemonic name format,
@@ -1067,7 +1062,7 @@ pprInstr platform i = case i of
 
 
 
-   pprFormatAddr :: PtrString -> Format -> AddrMode -> SDoc
+   pprFormatAddr :: SDoc -> Format -> AddrMode -> SDoc
    pprFormatAddr name format  op
      = hcat [
            pprMnemonic name format,
@@ -1075,7 +1070,7 @@ pprInstr platform i = case i of
            pprAddr platform op
        ]
 
-   pprShift :: PtrString -> Format -> Operand -> Operand -> SDoc
+   pprShift :: SDoc -> Format -> Operand -> Operand -> SDoc
    pprShift name format src dest
      = hcat [
            pprMnemonic name format,
@@ -1085,15 +1080,15 @@ pprInstr platform i = case i of
        ]
 
 
-   pprFormatOpOpCoerce :: PtrString -> Format -> Format -> Operand -> Operand -> SDoc
+   pprFormatOpOpCoerce :: SDoc -> Format -> Format -> Operand -> Operand -> SDoc
    pprFormatOpOpCoerce name format1 format2 op1 op2
-     = hcat [ char '\t', ptext name, pprFormat format1, pprFormat format2, space,
+     = hcat [ char '\t', name, pprFormat format1, pprFormat format2, space,
            pprOperand platform format1 op1,
            comma,
            pprOperand platform format2 op2
        ]
 
 
-   pprCondInstr :: PtrString -> Cond -> SDoc -> SDoc
+   pprCondInstr :: SDoc -> Cond -> SDoc -> SDoc
    pprCondInstr name cond arg
-     = hcat [ char '\t', ptext name, pprCond cond, space, arg]
+     = hcat [ char '\t', name, pprCond cond, space, arg]
