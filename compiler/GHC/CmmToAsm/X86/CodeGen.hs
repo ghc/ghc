@@ -2598,7 +2598,8 @@ genCCall' _ _ (PrimTarget (MO_AtomicWrite width)) [] [addr, val] _ = do
     code <- assignMem_IntCode (intFormat width) addr val
     return $ code `snocOL` MFENCE
 
-genCCall' _ is32Bit (PrimTarget (MO_Cmpxchg width)) [dst] [addr, old, new] _ = do
+genCCall' _ is32Bit (PrimTarget (MO_Cmpxchg width)) [dst] [addr, old, new] _
+  | not (is32Bit && width == W64) = do
     -- On x86 we don't have enough registers to use cmpxchg with a
     -- complicated addressing mode, so on that architecture we
     -- pre-compute the address first.
@@ -3411,7 +3412,9 @@ outOfLineCmmOp bid mop res args
               MO_AtomicRMW _ _ -> fsLit "atomicrmw"
               MO_AtomicRead _  -> fsLit "atomicread"
               MO_AtomicWrite _ -> fsLit "atomicwrite"
-              MO_Cmpxchg _     -> fsLit "cmpxchg"
+              MO_Cmpxchg w     -> fsLit $ cmpxchgLabel w -- for W64 on 32-bit
+                                                         -- TODO: implement
+                                                         -- cmpxchg8b instr
               MO_Xchg _        -> should_be_inline
 
               MO_UF_Conv _ -> unsupported
