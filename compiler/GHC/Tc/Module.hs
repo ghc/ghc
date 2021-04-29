@@ -75,6 +75,7 @@ import GHC.Tc.Gen.Default
 import GHC.Tc.Utils.Env
 import GHC.Tc.Gen.Rule
 import GHC.Tc.Gen.Foreign
+import GHC.Tc.TyCl.Class ( ClassScopedTVEnv )
 import GHC.Tc.TyCl.Instance
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
@@ -699,7 +700,7 @@ tcRnHsBootDecls hsc_src decls
 
                 -- Typecheck type/class/instance decls
         ; traceTc "Tc2 (boot)" empty
-        ; (tcg_env, inst_infos, _deriv_binds)
+        ; (tcg_env, inst_infos, _deriv_binds, _class_scoped_tv_env)
              <- tcTyClsInstDecls tycl_decls deriv_decls val_binds
         ; setGblEnv tcg_env     $ do {
 
@@ -1456,7 +1457,8 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
                 -- Source-language instances, including derivings,
                 -- and import the supporting declarations
         traceTc "Tc3" empty ;
-        (tcg_env, inst_infos, XValBindsLR (NValBinds deriv_binds deriv_sigs))
+        (tcg_env, inst_infos, class_scoped_tv_env,
+         XValBindsLR (NValBinds deriv_binds deriv_sigs))
             <- tcTyClsInstDecls tycl_decls deriv_decls val_binds ;
 
         setGblEnv tcg_env       $ do {
@@ -1497,7 +1499,8 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
                 -- Second pass over class and instance declarations,
                 -- now using the kind-checked decls
         traceTc "Tc6" empty ;
-        inst_binds <- tcInstDecls2 (tyClGroupTyClDecls tycl_decls) inst_infos ;
+        inst_binds <- tcInstDecls2 (tyClGroupTyClDecls tycl_decls)
+                                   inst_infos class_scoped_tv_env ;
 
                 -- Foreign exports
         traceTc "Tc7" empty ;
@@ -1733,13 +1736,14 @@ tcTyClsInstDecls :: [TyClGroup GhcRn]
                          [InstInfo GhcRn],    -- Source-code instance decls to
                                               -- process; contains all dfuns for
                                               -- this module
+                          ClassScopedTVEnv,   -- Class scoped type variables
                           HsValBinds GhcRn)   -- Supporting bindings for derived
                                               -- instances
 
 tcTyClsInstDecls tycl_decls deriv_decls binds
  = tcAddDataFamConPlaceholders (tycl_decls >>= group_instds) $
    tcAddPatSynPlaceholders (getPatSynBinds binds) $
-   do { (tcg_env, inst_info, deriv_info)
+   do { (tcg_env, inst_info, deriv_info, class_scoped_tv_env)
           <- tcTyAndClassDecls tycl_decls ;
       ; setGblEnv tcg_env $ do {
           -- With the @TyClDecl@s and @InstDecl@s checked we're ready to
@@ -1753,7 +1757,8 @@ tcTyClsInstDecls tycl_decls deriv_decls binds
               <- tcInstDeclsDeriv deriv_info deriv_decls
           ; setGblEnv tcg_env' $ do {
                 failIfErrsM
-              ; pure (tcg_env', inst_info' ++ inst_info, val_binds)
+              ; pure ( tcg_env', inst_info' ++ inst_info
+                     , class_scoped_tv_env, val_binds )
       }}}
 
 {- *********************************************************************
