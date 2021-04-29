@@ -568,6 +568,68 @@ This works even if there's no explicit signature and the type or kind is inferre
 reifyType :: Name -> Q Type
 reifyType nm = Q (qReifyType nm)
 
+{- | @reifyTypeMaybe str@ first performs a lookup for the type in GHC's
+environment. If
+-}
+reifyTypeMaybe :: String -> Q (Maybe Info)
+reifyTypeMaybe str = do
+    mtyp <- lookupTypeName str
+    traverse reify mtyp
+
+{- | Template Haskell is capable of reifying information about types and
+terms defined in previous declaration groups. Top-level splices break up
+declaration groups.
+
+For an example, consider this  code block. We define a datatype @X@ and
+then try to call 'reify' on the datatype.
+
+@
+module Check where
+
+data X = X
+    deriving Eq
+
+$(do
+    info <- reify ''X
+    runIO $ print info
+ )
+@
+
+This code fails to compile, noting that @X@ is not in scope at the site of 'reify'. We can fix this by creating a new declaration group using an empty top-level splice:
+
+@
+data X = X
+    deriving Eq
+
+$(pure [])
+
+$(do
+    info <- reify ''X
+    runIO $ print info
+ )
+@
+
+We provide 'newDeclarationGroup' as a means of documenting this behavior
+and providing a name for the pattern.
+
+Since top level splices infer the presence of the @$( ... )@ brackets, we can also write:
+
+@
+data X = X
+    deriving Eq
+
+newDeclarationGroup
+
+$(do
+    info <- reify ''X
+    runIO $ print info
+ )
+@
+
+-}
+newDeclarationGroup :: Q [Dec]
+newDeclarationGroup = pure []
+
 {- | @reifyInstances nm tys@ returns a list of visible instances of @nm tys@. That is,
 if @nm@ is the name of a type class, then all instances of this class at the types @tys@
 are returned. Alternatively, if @nm@ is the name of a data family or type family,
@@ -585,6 +647,10 @@ instance heads which unify with @nm tys@, they need not actually be satisfiable.
 
 There is one edge case: @reifyInstances ''Typeable tys@ currently always
 produces an empty list (no matter what @tys@ are given).
+
+An instance is visible if it is imported or defined in a prior top-level
+declaration group. See the documentation for 'newDeclarationGroup' for more details.
+
 -}
 reifyInstances :: Name -> [Type] -> Q [InstanceDec]
 reifyInstances cls tys = Q (qReifyInstances cls tys)
@@ -625,6 +691,10 @@ reifyConStrictness :: Name -> Q [DecidedStrictness]
 reifyConStrictness n = Q (qReifyConStrictness n)
 
 -- | Is the list of instances returned by 'reifyInstances' nonempty?
+--
+-- If you're confused by an instance not being visible despite being
+-- defined in the same module and above the splice in question, see the
+-- docs for 'newDeclarationGroup' for a possible explanation.
 isInstance :: Name -> [Type] -> Q Bool
 isInstance nm tys = do { decs <- reifyInstances nm tys
                        ; return (not (null decs)) }
