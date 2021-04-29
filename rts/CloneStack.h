@@ -25,6 +25,6 @@ void handleCloneStackMessage(MessageCloneStack *msg);
 StgWord getStackClosureCount(StgStack* stack);
 StgWord getStackChunkClosureCount(StgStack* stack);
 void copyPtrsToArray(StgMutArrPtrs* arr, StgStack* stack);
-StgClosure* createWordClosure (Capability *cap, StgAddr i);
+StgClosure* createWordClosure (Capability* cap, StgClosure* i);
 
 #include "EndPrivate.h"
