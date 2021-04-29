@@ -27,7 +27,7 @@ import GHC.Hs
 import GHC.Tc.Gen.Bind
 import GHC.Tc.TyCl
 import GHC.Tc.TyCl.Utils ( addTyConsToGblEnv )
-import GHC.Tc.TyCl.Class ( tcClassDecl2, tcATDefault,
+import GHC.Tc.TyCl.Class ( tcClassDecl2, ClassScopedTVEnv, tcATDefault,
                            HsSigFun, mkHsSigFun, badMethodErr,
                            findMethodBind, instantiateMethod )
 import GHC.Tc.Solver( pushLevelAndSolveEqualitiesX, reportUnsolvedEqualities )
@@ -1143,17 +1143,17 @@ takes a slightly different approach.
 *                                                                      *
 ********************************************************************* -}
 
-tcInstDecls2 :: [LTyClDecl GhcRn] -> [InstInfo GhcRn]
+tcInstDecls2 :: [LTyClDecl GhcRn] -> [InstInfo GhcRn] -> ClassScopedTVEnv
              -> TcM (LHsBinds GhcTc)
 -- (a) From each class declaration,
 --      generate any default-method bindings
 -- (b) From each instance decl
 --      generate the dfun binding
 
-tcInstDecls2 tycl_decls inst_decls
+tcInstDecls2 tycl_decls inst_decls class_scoped_tv_env
   = do  { -- (a) Default methods from class decls
           let class_decls = filter (isClassDecl . unLoc) tycl_decls
-        ; dm_binds_s <- mapM tcClassDecl2 class_decls
+        ; dm_binds_s <- mapM (tcClassDecl2 class_scoped_tv_env) class_decls
         ; let dm_binds = unionManyBags dm_binds_s
 
           -- (b) instance declarations
