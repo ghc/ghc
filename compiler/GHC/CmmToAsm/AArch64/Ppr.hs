@@ -183,7 +183,7 @@ pprBasicBlock config info_env (BasicBlock blockid instrs)
       _other             -> empty
 
 pprDatas :: NCGConfig -> RawCmmStatics -> SDoc
--- See note [emit-time elimination of static indirections] in "GHC.Cmm.CLabel".
+-- See Note [emit-time elimination of static indirections] in "GHC.Cmm.CLabel".
 pprDatas config (CmmStaticsRaw alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
   | lbl == mkIndStaticInfoLabel
   , let labelInd (CmmLabelOff l _) = Just l
