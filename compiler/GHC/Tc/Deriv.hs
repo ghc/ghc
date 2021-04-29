@@ -170,6 +170,8 @@ data DerivInfo = DerivInfo { di_rep_tc  :: TyCon
                              -- or the *representation* tycon for data families
                            , di_scoped_tvs :: ![(Name,TyVar)]
                              -- ^ Variables that scope over the deriving clause.
+                             -- See @Note [Scoped tyvars in a TcTyCon]@ in
+                             -- "GHC.Core.TyCon".
                            , di_clauses :: [LHsDerivingClause GhcRn]
                            , di_ctxt    :: SDoc -- ^ error context
                            }

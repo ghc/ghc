@@ -976,6 +976,36 @@ where
    * required_tvs the same as tyConTyVars
    * tyConArity = length required_tvs
 
+There are some situations where we need to keep the tcTyConScopedTyVars around
+for later use, even after the TcTyCon has been zonked away:
+
+* When typechecking `deriving` clauses for top-level data declarations, the
+  tcTyConScopedTyVars are brought into scope in through the `di_scoped_tvs`
+  field of GHC.Tc.Deriv.DerivInfo. Example (#16731):
+
+    class C x1 x2
+
+    type T :: a -> Type
+    data T (x :: z) deriving (C z)
+
+  When typechecking `C z`, we want `z` to map to `a`, which is exactly what the
+  tcTyConScopedTyVars for T give us.
+
+* Similarly, when typechecking default definitions for class methods, the
+  tcTyConScopedTyVars ought to be brought into scope. Example (#19738):
+
+    type P :: k -> Type
+    data P a = MkP
+
+    type T :: k -> Constraint
+    class T (a :: j) where
+      f :: P a
+      f = MkP @j @a
+
+  We pass the tcTyConScopedTyVars to GHC.Tc.TyCl.Class.tcClassDecl2, the
+  function responsible for typechecking the default definition of `f`, by way
+  of a ClassScopedTVEnv, which maps each class name to its scoped tyvars.
+
 See also Note [How TcTyCons work] in GHC.Tc.TyCl
 
 Note [Promoted GADT data constructors]
