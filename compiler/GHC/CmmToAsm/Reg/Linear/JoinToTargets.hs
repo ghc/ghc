@@ -26,6 +26,7 @@ import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Collections
 import GHC.Data.Graph.Directed
 import GHC.Utils.Panic
+import GHC.Utils.Monad (concatMapM)
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
@@ -306,7 +307,7 @@ handleComponent
 --      go via a spill slot.
 --
 handleComponent delta _  (AcyclicSCC (DigraphNode vreg src dsts))
-        = mapM (makeMove delta vreg src) dsts
+        = concatMapM (makeMove delta vreg src) dsts
 
 
 -- Handle some cyclic moves.
@@ -340,7 +341,7 @@ handleComponent delta instr
 
         -- make sure to do all the reloads after all the spills,
         --      so we don't end up clobbering the source values.
-        return ([instrSpill] ++ concat remainingFixUps ++ [instrLoad])
+        return (instrSpill ++ concat remainingFixUps ++ instrLoad)
 
 handleComponent _ _ (CyclicSCC _)
  = panic "Register Allocator: handleComponent cyclic"
@@ -354,7 +355,7 @@ makeMove
     -> Unique   -- ^ unique of the vreg that we're moving.
     -> Loc      -- ^ source location.
     -> Loc      -- ^ destination location.
-    -> RegM freeRegs instr  -- ^ move instruction.
+    -> RegM freeRegs [instr]  -- ^ move instruction.
 
 makeMove delta vreg src dst
  = do config <- getConfig
@@ -363,7 +364,7 @@ makeMove delta vreg src dst
       case (src, dst) of
           (InReg s, InReg d) ->
               do recordSpill (SpillJoinRR vreg)
-                 return $ mkRegRegMoveInstr platform (RegReal s) (RegReal d)
+                 return $ [mkRegRegMoveInstr platform (RegReal s) (RegReal d)]
           (InMem s, InReg d) ->
               do recordSpill (SpillJoinRM vreg)
                  return $ mkLoadInstr config (RegReal d) delta s
@@ -377,4 +378,3 @@ makeMove delta vreg src dst
               panic ("makeMove " ++ show vreg ++ " (" ++ show src ++ ") ("
                   ++ show dst ++ ")"
                   ++ " we don't handle mem->mem moves.")
-
