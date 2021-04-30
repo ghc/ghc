@@ -10,7 +10,7 @@ import Parser
 import Syntax
 
 import Data.Char
-import Data.List
+import Data.List (union, intersperse, intercalate, nub)
 import Data.Maybe ( catMaybes )
 import System.Environment ( getArgs )
 
