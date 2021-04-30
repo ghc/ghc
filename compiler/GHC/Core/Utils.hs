@@ -1633,7 +1633,7 @@ app_ok primop_ok fun args
                 -- to take the arguments into account
 
       PrimOpId op
-        | isDivOp op
+        | primOpIsDiv op
         , [arg1, Lit lit] <- args
         -> not (isZeroLit lit) && expr_ok primop_ok arg1
               -- Special case for dividing operations that fail
@@ -1685,19 +1685,6 @@ altsAreExhaustive (Alt con1 _ _ : alts)
       -- enumerate all constructors, notably in a GADT match, but
       -- we behave conservatively here -- I don't think it's important
       -- enough to deserve special treatment
-
--- | True of dyadic operators that can fail only if the second arg is zero!
-isDivOp :: PrimOp -> Bool
--- This function probably belongs in GHC.Builtin.PrimOps, or even in
--- an automagically generated file.. but it's such a
--- special case I thought I'd leave it here for now.
-isDivOp IntQuotOp        = True
-isDivOp IntRemOp         = True
-isDivOp WordQuotOp       = True
-isDivOp WordRemOp        = True
-isDivOp FloatDivOp       = True
-isDivOp DoubleDivOp      = True
-isDivOp _                = False
 
 {- Note [exprOkForSpeculation: case expressions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
