@@ -528,12 +528,11 @@ cmmNativeGen logger dflags modLoc ncgImpl us fileIds dbgMap cmm count
                 (vcat $ map (pprLiveCmmDecl platform) withLiveness)
 
         -- Perform SSA construction & destruction to renumber disjoint webs
-        (renumberedCode, ppr_ssaStats, usSsa) <-
+        (renumberedCode, ppr_ssaStats) <-
          case (gopt Opt_SsaTransform dflags, livenessCfg) of
                 (True, Just cfg) -> do
-                        let (ssaRes, usSsa) = {-# SCC "prunedSSA-Construction" #-}
-                                               initUs usLive
-                                               $ mapM (SSA.prunedSSAFromLiveCmmDecl platform cfg) withLiveness
+                        let ssaRes = {-# SCC "prunedSSA-Construction" #-}
+                                                map (SSA.prunedSSAFromLiveCmmDecl platform cfg) withLiveness
                         let (ssaLive, ssaBeforeStats) = unzip ssaRes
 
                         dumpIfSet_dyn logger dflags
@@ -557,9 +556,9 @@ cmmNativeGen logger dflags modLoc ncgImpl us fileIds dbgMap cmm count
 
                         mSsaStats `seq` return ()
 
-                        return (renumberedCode, mSsaStats, usSsa)
+                        return (renumberedCode, mSsaStats)
 
-                _                -> return (withLiveness, Nothing, usLive)
+                _                -> return (withLiveness, Nothing)
 
         -- allocate registers
         (alloced, usAlloc, ppr_raStatsColor, ppr_raStatsLinear, raStats, stack_updt_blks) <-
@@ -576,7 +575,7 @@ cmmNativeGen logger dflags modLoc ncgImpl us fileIds dbgMap cmm count
                 -- do the graph coloring register allocation
                 let ((alloced, maybe_more_stack, regAllocStats), usAlloc)
                         = {-# SCC "RegAlloc-color" #-}
-                          initUs usSsa
+                          initUs usLive
                           $ Color.regAlloc
                                 config
                                 alloc_regs
@@ -636,7 +635,7 @@ cmmNativeGen logger dflags modLoc ncgImpl us fileIds dbgMap cmm count
 
                 let ((alloced, regAllocStats, stack_updt_blks), usAlloc)
                         = {-# SCC "RegAlloc-linear" #-}
-                          initUs usSsa
+                          initUs usLive
                           $ liftM unzip3
                           $ mapM reg_alloc renumberedCode
 

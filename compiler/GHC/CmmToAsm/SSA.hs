@@ -59,7 +59,6 @@ import GHC.Types.Unique.DFM
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.SDFM
 import GHC.Types.Unique.Set
-import GHC.Types.Unique.Supply (UniqSM, UniqSupply, takeUniqFromSupply, getUniqueSupplyM)
 
 import GHC.Utils.Misc (HasDebugCallStack)
 import GHC.Utils.Monad.State
@@ -223,19 +222,17 @@ prunedSSAFromLiveCmmDecl
         => Platform
         -> CFG
         -> LiveCmmDecl statics instr
-        -> UniqSM (SsaLiveCmmDecl statics instr,
+        -> (SsaLiveCmmDecl statics instr,
                    SsaStats)
 
 prunedSSAFromLiveCmmDecl platform cfg liveCmmDecl
- = do
-        -- Grab the unique supply from the monad.
-        us              <- getUniqueSupplyM
-        let (ssaCmmDecl, state)  =
+ = let
+        (ssaCmmDecl, state)  =
                 runState (constructPrunedSSA platform cfg liveCmmDecl)
-                         (initRenameS us)
-        let stats = SsaStats (stateOriginalNames state) 0
+                         initRenameS
+        stats = SsaStats (stateOriginalNames state) 0
 
-        return (ssaCmmDecl, stats)
+   in   (ssaCmmDecl, stats)
 
 
 ------- SSA construction ----------------------------------
@@ -806,8 +803,8 @@ type RenameM a
 -- | SSA Renamer code generator state.
 data RenameS
         = RenameS
-        { -- | Unique supply for generating fresh vregs.
-          stateUS            :: UniqSupply
+        { -- | Current unique for new vreg names.
+          stateUnique        :: Unique
 
           -- | Current new name for original vreg
         , stateReachingDef   :: !(UniqFM RegId [RegId])
@@ -820,10 +817,10 @@ data RenameS
 
 
 -- | Create a new renamer state.
-initRenameS :: UniqSupply -> RenameS
-initRenameS uniqueSupply
+initRenameS :: RenameS
+initRenameS
         = RenameS
-        { stateUS            = uniqueSupply
+        { stateUnique        = mkUnique 'o' 0
         , stateReachingDef   = emptyUFM
         , stateScopedDefs    = []
         , stateOriginalNames = 0 }
@@ -832,11 +829,9 @@ initRenameS uniqueSupply
 -- | Allocate a new unique in the renamer monad.
 newUnique :: RenameM Unique
 newUnique
- = do   us      <- gets stateUS
-        case takeUniqFromSupply us of
-         (uniq, us')
-          -> do modify $ \s -> s { stateUS = us' }
-                return uniq
+ = do   u      <- gets stateUnique
+        modify $ \s -> s { stateUnique = incrUnique u }
+        return u
 
 
 -- | Create a new name for a definition with given old RegId
