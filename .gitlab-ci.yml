@@ -967,9 +967,19 @@ release-x86_64-linux-deb8:
     when: always
     expire_in: 2 week
 
-release-x86_64-linux-alpine:
-  <<: *release
-  extends: .build-x86_64-linux-alpine-hadrian
+release-x86_64-linux-alpine-integer-simple:
+  extends:
+    - .build-x86_64-linux-alpine-hadrian
+    - .release
+  variables:
+    BIGNUM_BACKEND: native
+
+release-x86_64-linux-alpine-integer-gmp:
+  extends:
+    - .build-x86_64-linux-alpine-hadrian
+    - .release
+  variables:
+    BIGNUM_BACKEND: gmp
 
 nightly-x86_64-linux-alpine:
   <<: *nightly
