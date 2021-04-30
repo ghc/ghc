@@ -33,7 +33,6 @@ module GHC.Tc.Gen.Head
 import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcExpr, tcCheckMonoExprNC, tcCheckPolyExprNC )
 
 import GHC.Tc.Gen.HsType
-import GHC.Tc.Gen.Pat
 import GHC.Tc.Gen.Bind( chooseInferredQuantifiers )
 import GHC.Tc.Gen.Sig( tcUserTypeSig, tcInstSig, lhsSigWcTypeContextSpan )
 import GHC.Tc.TyCl.PatSyn( patSynBuilderOcc )
@@ -55,7 +54,8 @@ import GHC.Tc.Utils.TcType as TcType
 import GHC.Hs
 import GHC.Types.Id
 import GHC.Types.Id.Info
-import GHC.Core.ConLike
+import GHC.Core.PatSyn( PatSyn )
+import GHC.Core.ConLike( ConLike(..) )
 import GHC.Core.DataCon
 import GHC.Types.Name
 import GHC.Types.Name.Reader
@@ -897,12 +897,8 @@ tc_infer_id id_name
                -- Hence no checkTh stuff here
 
              AGlobal (AConLike cl) -> case cl of
-                 RealDataCon con -> return_data_con con
-                 PatSynCon ps
-                   | Just (expr, ty) <- patSynBuilderOcc ps
-                   -> return (expr, ty)
-                   | otherwise
-                   -> failWithTc (nonBidirectionalErr id_name)
+                 RealDataCon con -> tcInferDataCon con
+                 PatSynCon ps    -> tcInferPatSyn id_name ps
 
              AGlobal (ATyCon ty_con)
                -> fail_tycon global_env ty_con
@@ -931,49 +927,6 @@ tc_infer_id id_name
 
     return_id id = return (HsVar noExtField (noLocA id), idType id)
 
-    return_data_con con
-      = do { let tvs = dataConUserTyVarBinders con
-                 theta = dataConOtherTheta con
-                 args = dataConOrigArgTys con
-                 res = dataConOrigResTy con
-
-           -- See Note [Linear fields generalization]
-           ; mul_vars <- newFlexiTyVarTys (length args) multiplicityTy
-           ; let scaleArgs args' = zipWithEqual "return_data_con" combine mul_vars args'
-                 combine var (Scaled One ty) = Scaled var ty
-                 combine _   scaled_ty       = scaled_ty
-                   -- The combine function implements the fact that, as
-                   -- described in Note [Linear fields generalization], if a
-                   -- field is not linear (last line) it isn't made polymorphic.
-
-                 etaWrapper arg_tys = foldr (\scaled_ty wr -> WpFun WpHole wr scaled_ty empty) WpHole arg_tys
-
-           -- See Note [Instantiating stupid theta]
-           ; let shouldInstantiate = (not (null (dataConStupidTheta con)) ||
-                                      isKindLevPoly (tyConResKind (dataConTyCon con)))
-           ; case shouldInstantiate of
-               True -> do { (subst, tvs') <- newMetaTyVars (binderVars tvs)
-                           ; let tys'   = mkTyVarTys tvs'
-                                 theta' = substTheta subst theta
-                                 args'  = substScaledTys subst args
-                                 res'   = substTy subst res
-                           ; wrap <- instCall (OccurrenceOf id_name) tys' theta'
-                           ; let scaled_arg_tys = scaleArgs args'
-                                 eta_wrap = etaWrapper scaled_arg_tys
-                           ; addDataConStupidTheta con tys'
-                           ; return ( mkHsWrap (eta_wrap <.> wrap)
-                                               (HsConLikeOut noExtField (RealDataCon con))
-                                    , mkVisFunTys scaled_arg_tys res')
-                           }
-               False -> let scaled_arg_tys = scaleArgs args
-                            wrap1 = mkWpTyApps (mkTyVarTys $ binderVars tvs)
-                            eta_wrap = etaWrapper (map unrestricted theta ++ scaled_arg_tys)
-                            wrap2 = mkWpTyLams $ binderVars tvs
-                        in return ( mkHsWrap (wrap2 <.> eta_wrap <.> wrap1)
-                                             (HsConLikeOut noExtField (RealDataCon con))
-                                  , mkInvisForAllTys tvs $ mkInvisFunTysMany theta $ mkVisFunTys scaled_arg_tys res)
-           }
-
 check_local_id :: Id -> TcM ()
 check_local_id id
   = do { checkThLocalId id
@@ -984,47 +937,77 @@ check_naughty lbl id
   | isNaughtyRecordSelector id = failWithTc (naughtyRecordSel lbl)
   | otherwise                  = return ()
 
+tcInferDataCon :: DataCon -> TcM (HsExpr GhcTc, TcSigmaType)
+-- See Note [Typechecking data constructors]
+tcInferDataCon con
+  = do { let tvs   = dataConUserTyVarBinders con
+             theta = dataConOtherTheta con
+             args  = dataConOrigArgTys con
+             res   = dataConOrigResTy con
+             stupid_theta = dataConStupidTheta con
+
+       ; scaled_arg_tys <- mapM linear_to_poly args
+
+       ; let full_theta  = stupid_theta ++ theta
+             all_arg_tys = map unrestricted full_theta ++ scaled_arg_tys
+                -- stupid-theta must come first
+                -- See Note [Instantiating stupid theta]
+
+       ; return ( XExpr (ConLikeTc (RealDataCon con) tvs all_arg_tys)
+                , mkInvisForAllTys tvs $ mkPhiTy full_theta $
+                  mkVisFunTys scaled_arg_tys res ) }
+  where
+    linear_to_poly :: Scaled Type -> TcM (Scaled Type)
+    -- linear_to_poly implements point (3,4)
+    -- of Note [Typechecking data constructors]
+    linear_to_poly (Scaled One ty) = do { mul_var <- newFlexiTyVarTy multiplicityTy
+                                        ; return (Scaled mul_var ty) }
+    linear_to_poly scaled_ty       = return scaled_ty
+
+tcInferPatSyn :: Name -> PatSyn -> TcM (HsExpr GhcTc, TcSigmaType)
+tcInferPatSyn id_name ps
+  = case patSynBuilderOcc ps of
+       Just (expr,ty) -> return (expr,ty)
+       Nothing        -> failWithTc (nonBidirectionalErr id_name)
+
 nonBidirectionalErr :: Outputable name => name -> SDoc
 nonBidirectionalErr name = text "non-bidirectional pattern synonym"
                            <+> quotes (ppr name) <+> text "used in an expression"
 
-{-
-Note [Linear fields generalization]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-As per Note [Polymorphisation of linear fields], linear field of data
-constructors get a polymorphic type when the data constructor is used as a term.
+{- Note [Typechecking data constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+As per Note [Polymorphisation of linear fields] in GHC.Core.Multiplicity,
+linear field of data constructors get a polymorphic type when the data
+constructor is used as a term:
 
-    Just :: forall {p} a. a #p-> Maybe a
+    Just :: forall {p} a. a %p -> Maybe a
 
-This rule is known only to the typechecker: Just keeps its linear type in Core.
+So at an occurrence of a data constructor we do the following,
+mostly in tcInferDataCon:
 
-In order to desugar this generalised typing rule, we simply eta-expand:
+1. Get its type, say
+    K :: forall (r :: RuntimeRep) (a :: TYPE r). a %1 -> T r a
+   Note the %1: it is linear
 
-    \a (x # p :: a) -> Just @a x
+2. We are going to return a ConLikeTc, thus:
+     XExpr (ConLikeTc K [r,a] [Scaled p a])
+      :: forall (r :: RuntimeRep) (a :: Type r). a #p -> T r a
+   where 'p' is a fresh multiplicity unification variable.
 
-has the appropriate type. We insert these eta-expansion with WpFun wrappers.
+3. To get the returned ConLikeTc, we allocate a fresh multiplicity
+   variable for each linear argument, and store the type, scaled by
+   the fresh multiplicity variable in the ConLikeTc; along with
+   the type of the ConLikeTc. This is done by linear_to_poly.
 
-A small hitch: if the constructor is levity-polymorphic (unboxed tuples, sums,
-certain newtypes with -XUnliftedNewtypes) then this strategy produces
+4. If the arguent is not linear, don't bother with this.  It might come
+   from a data type that was compiled without -XLinearTypes
 
-    \r1 r2 a b (x # p :: a) (y # q :: b) -> (# a, b #)
+5. The (ConLikeTc K [r,a] [Scaled p a]) is later desugared by
+   GHC.HsToCore.Expr.dsConLike to:
+     (/\r a. \(x %p :: a). K @r @a x)
+   which has the desired type given in the previous bullet
 
-Which has type
-
-    forall r1 r2 a b. a #p-> b #q-> (# a, b #)
-
-Which violates the levity-polymorphism restriction see Note [Levity polymorphism
-checking] in DsMonad.
-
-So we really must instantiate r1 and r2 rather than quantify over them.  For
-simplicity, we just instantiate the entire type, as described in Note
-[Instantiating stupid theta]. It breaks visible type application with unboxed
-tuples, sums and levity-polymorphic newtypes, but this doesn't appear to be used
-anywhere.
-
-A better plan: let's force all representation variable to be *inferred*, so that
-they are not subject to visible type applications. Then we can instantiate
-inferred argument eagerly.
+See Note [Instantiating stupid theta] for an extra wrinkle
 
 Note [Adding the implicit parameter to 'assert']
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1037,15 +1020,31 @@ being able to reconstruct the exact original program.
 
 Note [Instantiating stupid theta]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Normally, when we infer the type of an Id, we don't instantiate,
-because we wish to allow for visible type application later on.
-But if a datacon has a stupid theta, we're a bit stuck. We need
-to emit the stupid theta constraints with instantiated types. It's
-difficult to defer this to the lazy instantiation, because a stupid
-theta has no spot to put it in a type. So we just instantiate eagerly
-in this case. Thus, users cannot use visible type application with
-a data constructor sporting a stupid theta. I won't feel so bad for
-the users that complain.
+Consider a data type with a "stupid theta":
+  data Ord a => T a = MkT (Maybe a)
+
+We want to generate an Ord constraint for every use of MkT; but
+we also want to allow visible type application, such as
+   MkT @Int
+
+So we generate (ConLikeTc MkT [a] [Ord a, Maybe a]), with type
+   forall a. Ord a => Maybe a -> T a
+
+Now visible type application will work fine. But we desugar the
+ConLikeTc to
+   /\a \(d:Ord a) (x:Maybe a). MkT x
+Notice that 'd' is dropped in this desugaring. We don't need it;
+it was only there to generate a Wanted constraint. (That is why
+it is stupid.)  To achieve this:
+
+* We put the stupid-thata at the front of the list of argument
+  types in ConLikeTc
+
+* GHC.HsToCore.Expr.dsConLike generates /lambdas/ for all the
+  arguments, but drops the stupid-theta arguments when building the
+  /application/.
+
+Nice.
 -}
 
 {-
