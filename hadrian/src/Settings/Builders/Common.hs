@@ -56,6 +56,7 @@ cWarnings :: Args
 cWarnings = mconcat
     [ arg "-Wall"
     , flag CcLlvmBackend ? arg "-Wno-unknown-pragmas"
+    , flag CcLlvmBackend ? arg "-Wno-error=unused-command-line-argument"
     , notM (flag CcLlvmBackend) ? not windowsHost ? arg "-Werror=unused-but-set-variable"
     , notM (flag CcLlvmBackend) ? arg "-Wno-error=inline" ]
 
