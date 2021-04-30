@@ -576,7 +576,7 @@ opt_univ env sym prov role oty1 oty2
 #endif
       ProofIrrelProv kco -> ProofIrrelProv $ opt_co4_wrap env sym False Nominal kco
       PluginProv _       -> prov
-      CorePrepProv       -> prov
+      CorePrepProv _     -> prov
 
 -------------
 opt_transList :: HasDebugCallStack => InScopeSet -> [NormalCo] -> [NormalCo] -> [NormalCo]

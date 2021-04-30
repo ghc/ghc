@@ -250,7 +250,7 @@ tidyCo env@(_, subst) co
     go_prov (PhantomProv co)    = PhantomProv $! go co
     go_prov (ProofIrrelProv co) = ProofIrrelProv $! go co
     go_prov p@(PluginProv _)    = p
-    go_prov p@CorePrepProv      = p
+    go_prov p@(CorePrepProv _)  = p
 
 tidyCos :: TidyEnv -> [Coercion] -> [Coercion]
 tidyCos env = strictMap (tidyCo env)

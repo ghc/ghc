@@ -164,32 +164,32 @@ Note [Unsafe coercions]
 ~~~~~~~~~~~~~~~~~~~~~~~
 CorePrep does these two transformations:
 
-* Convert empty case to cast with an unsafe coercion
+1. Convert empty case to cast with an unsafe coercion
           (case e of {}) ===>  e |> unsafe-co
-  See Note [Empty case alternatives] in GHC.Core: if the case
-  alternatives are empty, the scrutinee must diverge or raise an
-  exception, so we can just dive into it.
+   See Note [Empty case alternatives] in GHC.Core: if the case
+   alternatives are empty, the scrutinee must diverge or raise an
+   exception, so we can just dive into it.
 
-  Of course, if the scrutinee *does* return, we may get a seg-fault.
-  A belt-and-braces approach would be to persist empty-alternative
-  cases to code generator, and put a return point anyway that calls a
-  runtime system error function.
+   Of course, if the scrutinee *does* return, we may get a seg-fault.
+   A belt-and-braces approach would be to persist empty-alternative
+   cases to code generator, and put a return point anyway that calls a
+   runtime system error function.
 
-  Notice that eliminating empty case can lead to an ill-kinded coercion
-      case error @Int "foo" of {}  :: Int#
-      ===> error @Int "foo" |> unsafe-co
-      where unsafe-co :: Int ~ Int#
-  But that's fine because the expression diverges anyway. And it's
-  no different to what happened before.
+   Notice that eliminating empty case can lead to an ill-kinded coercion
+       case error @Int "foo" of {}  :: Int#
+       ===> error @Int "foo" |> unsafe-co
+       where unsafe-co :: Int ~ Int#
+   But that's fine because the expression diverges anyway. And it's
+   no different to what happened before.
 
-* Eliminate unsafeEqualityProof in favour of an unsafe coercion
-          case unsafeEqualityProof of UnsafeRefl g -> e
-          ===>  e[unsafe-co/g]
-  See (U2) in Note [Implementing unsafeCoerce] in base:Unsafe.Coerce
+2. Eliminate unsafeEqualityProof in favour of an unsafe coercion
+           case unsafeEqualityProof of UnsafeRefl g -> e
+           ===>  e[unsafe-co/g]
+   See (U2) in Note [Implementing unsafeCoerce] in base:Unsafe.Coerce
 
-  Note that this requiresuse ot substitute 'unsafe-co' for 'g', and
-  that is the main (current) reason for cpe_tyco_env in CorePrepEnv.
-  Tiresome, but not difficult.
+   Note that this requires us to substitute 'unsafe-co' for 'g', and
+   that is the main (current) reason for cpe_tyco_env in CorePrepEnv.
+   Tiresome, but not difficult.
 
 These transformations get rid of "case clutter", leaving only casts.
 We are doing no further significant tranformations, so the reasons
@@ -197,7 +197,10 @@ for the case forms have disappeared. And it is extremely helpful for
 the ANF-ery, CoreToStg, and backends, if trivial expressions really do
 look trivial. #19700 was an example.
 
-In both cases, the "unsafe-co" is just (UnivCo ty1 ty2 CorePrepProv).
+In both cases, the "unsafe-co" is just (UnivCo ty1 ty2 (CorePrepProv b)),
+The boolean 'b' says whether the unsafe coercion is supposed to be
+kind-homogeneous (yes for (2), no for (1).  This information is used
+/only/ by Lint.
 
 Note [CorePrep invariants]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -827,8 +830,14 @@ cpeRhsE env expr@(Lam {})
 -- See Note [Unsafe coercions]
 cpeRhsE env (Case scrut _ ty [])
   = do { (floats, scrut') <- cpeRhsE env scrut
-       ; let ty' = cpSubstTy env ty
-             co' = mkUnsafeCo Representational (exprType scrut') ty'
+       ; let ty'       = cpSubstTy env ty
+             scrut_ty' = exprType scrut'
+             co'       = mkUnivCo prov Representational scrut_ty' ty'
+             prov      = CorePrepProv False
+               -- False says that the kinds of two types may differ
+               -- E.g. we might cast Int to Int#.  This is fine
+               -- because the scrutinee is guaranteed to diverge
+
        ; return (floats, Cast scrut' co') }
    -- This can give rise to
    --   Warning: Unsafe coercion: between unboxed and boxed value
@@ -842,7 +851,8 @@ cpeRhsE env (Case scrut bndr _ alts)
                       -- is dead.  It usually is, but see #18227
   , [Alt _ [co_var] rhs] <- alts
   , let Pair ty1 ty2 = coVarTypes co_var
-        the_co = mkUnsafeCo Nominal (cpSubstTy env ty1) (cpSubstTy env ty2)
+        the_co = mkUnivCo prov Nominal (cpSubstTy env ty1) (cpSubstTy env ty2)
+        prov   = CorePrepProv True  -- True <=> kind homogeneous
         env'   = extendCoVarEnv env co_var the_co
   = cpeRhsE env' rhs
 
@@ -1363,9 +1373,6 @@ would like to just float the literal to the top level as suggested in #11312,
 However, until then we simply add a special case excluding literals from the
 floating done by cpeArg.
 -}
-
-mkUnsafeCo :: Role -> Type -> Type -> Coercion
-mkUnsafeCo role ty1 ty2 = mkUnivCo CorePrepProv role ty1 ty2
 
 -- | Is an argument okay to CPE?
 okCpeArg :: CoreExpr -> Bool

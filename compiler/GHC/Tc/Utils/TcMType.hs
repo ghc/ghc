@@ -1531,7 +1531,7 @@ collect_cand_qtvs_co orig_ty bound = go_co
     go_prov dv (PhantomProv co)    = go_co dv co
     go_prov dv (ProofIrrelProv co) = go_co dv co
     go_prov dv (PluginProv _)      = return dv
-    go_prov dv CorePrepProv        = return dv
+    go_prov dv (CorePrepProv _)    = return dv
 
     go_cv :: CandidatesQTvs -> CoVar -> TcM CandidatesQTvs
     go_cv dv@(DV { dv_cvs = cvs }) cv
