@@ -17,6 +17,7 @@ module GHC.Builtin.PrimOps (
         primOpOutOfLine, primOpCodeSize,
         primOpOkForSpeculation, primOpOkForSideEffects,
         primOpIsCheap, primOpFixity, primOpDocs,
+        primOpIsDiv,
 
         getPrimOpResultInfo,  isComparisonPrimOp, PrimOpResultInfo(..),
 
@@ -524,6 +525,51 @@ primOpIsCheap op = primOpOkForSpeculation op
 -- were we don't want to inline x. But primopIsCheap doesn't control
 -- that (it's exprIsDupable that does) so the problem doesn't occur
 -- even if primOpIsCheap sometimes says 'True'.
+
+
+-- | True of dyadic operators that can fail only if the second arg is zero!
+--
+-- This function probably belongs in an automagically generated file.. but it's
+-- such a special case I thought I'd leave it here for now.
+primOpIsDiv :: PrimOp -> Bool
+primOpIsDiv op = case op of
+
+  -- TODO: quotRemWord2, Int64, Word64
+  IntQuotOp       -> True
+  Int8QuotOp      -> True
+  Int16QuotOp     -> True
+  Int32QuotOp     -> True
+
+  IntRemOp        -> True
+  Int8RemOp       -> True
+  Int16RemOp      -> True
+  Int32RemOp      -> True
+
+  IntQuotRemOp    -> True
+  Int8QuotRemOp   -> True
+  Int16QuotRemOp  -> True
+  Int32QuotRemOp  -> True
+
+  WordQuotOp      -> True
+  Word8QuotOp     -> True
+  Word16QuotOp    -> True
+  Word32QuotOp    -> True
+
+  WordRemOp       -> True
+  Word8RemOp      -> True
+  Word16RemOp     -> True
+  Word32RemOp     -> True
+
+  WordQuotRemOp   -> True
+  Word8QuotRemOp  -> True
+  Word16QuotRemOp -> True
+  Word32QuotRemOp -> True
+
+  FloatDivOp      -> True
+  DoubleDivOp     -> True
+  _               -> False
+
+
 
 {-
 ************************************************************************

@@ -28,7 +28,7 @@ import GHC.Driver.Hooks
 import GHC.Driver.Plugins
 
 import GHC.Linker.Loader       ( loadModule, loadName )
-import GHC.Runtime.Interpreter ( wormhole, hscInterp )
+import GHC.Runtime.Interpreter ( wormhole )
 import GHC.Runtime.Interpreter.Types
 
 import GHC.Tc.Utils.Monad      ( initTcInteractive, initIfaceTcRn )

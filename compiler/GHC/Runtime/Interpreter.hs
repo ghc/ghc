@@ -11,6 +11,7 @@ module GHC.Runtime.Interpreter
   ( module GHC.Runtime.Interpreter.Types
 
   -- * High-level interface to the interpreter
+  , BCOOpts (..)
   , evalStmt, EvalStatus_(..), EvalStatus, EvalResult(..), EvalExpr(..)
   , resumeStmt
   , abandonStmt
@@ -47,22 +48,18 @@ module GHC.Runtime.Interpreter
 
   -- * Lower-level API using messages
   , interpCmd, Message(..), withIServ, withIServ_
-  , hscInterp, stopInterp
+  , stopInterp
   , iservCall, readIServ, writeIServ
   , purgeLookupSymbolCache
   , freeHValueRefs
   , mkFinalizedHValue
   , wormhole, wormholeRef
-  , mkEvalOpts
   , fromEvalResult
   ) where
 
 import GHC.Prelude
 
 import GHC.IO (catchException)
-import GHC.Driver.Ppr (showSDoc)
-import GHC.Driver.Env
-import GHC.Driver.Session
 
 import GHC.Runtime.Interpreter.Types
 import GHCi.Message
@@ -84,13 +81,14 @@ import GHC.Types.Basic
 
 import GHC.Utils.Panic
 import GHC.Utils.Exception as Ex
-import GHC.Utils.Outputable(brackets, ppr)
+import GHC.Utils.Outputable(brackets, ppr, showSDocUnsafe)
 import GHC.Utils.Fingerprint
 import GHC.Utils.Misc
 
 import GHC.Unit.Module
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Home.ModInfo
+import GHC.Unit.Env
 
 #if defined(HAVE_INTERNAL_INTERPRETER)
 import GHCi.Run
@@ -120,7 +118,7 @@ import System.Posix as Posix
 #endif
 import System.Directory
 import System.Process
-import GHC.Conc (getNumProcessors, pseq, par)
+import GHC.Conc (pseq, par)
 
 {- Note [Remote GHCi]
 
@@ -201,14 +199,6 @@ interpCmd interp msg = case interpInstance interp of
       iservCall iserv msg
 
 
--- | Retrieve the target code interpreter
---
--- Fails if no target code interpreter is available
-hscInterp :: HscEnv -> Interp
-hscInterp hsc_env = case hsc_interp hsc_env of
-   Nothing -> throw (InstallationError "Couldn't find a target code interpreter. Try with -fexternal-interpreter")
-   Just i  -> i
-
 -- Note [uninterruptibleMask_ and interpCmd]
 --
 -- If we receive an async exception, such as ^C, while communicating
@@ -261,13 +251,12 @@ withIServ_ conf iserv action = withIServ conf iserv $ \inst ->
 -- each of the results.
 evalStmt
   :: Interp
-  -> DynFlags -- used by mkEvalOpts
-  -> Bool     -- "step" for mkEvalOpts
+  -> EvalOpts
   -> EvalExpr ForeignHValue
   -> IO (EvalStatus_ [ForeignHValue] [HValueRef])
-evalStmt interp dflags step foreign_expr = do
+evalStmt interp opts foreign_expr = do
   status <- withExpr foreign_expr $ \expr ->
-    interpCmd interp (EvalStmt (mkEvalOpts dflags step) expr)
+    interpCmd interp (EvalStmt opts expr)
   handleEvalStatus interp status
  where
   withExpr :: EvalExpr ForeignHValue -> (EvalExpr HValueRef -> IO a) -> IO a
@@ -280,13 +269,12 @@ evalStmt interp dflags step foreign_expr = do
 
 resumeStmt
   :: Interp
-  -> DynFlags -- used by mkEvalOpts
-  -> Bool     -- "step" for mkEvalOpts
+  -> EvalOpts
   -> ForeignRef (ResumeContext [HValueRef])
   -> IO (EvalStatus_ [ForeignHValue] [HValueRef])
-resumeStmt interp dflags step resume_ctxt = do
+resumeStmt interp opts resume_ctxt = do
   status <- withForeignRef resume_ctxt $ \rhv ->
-    interpCmd interp (ResumeStmt (mkEvalOpts dflags step) rhv)
+    interpCmd interp (ResumeStmt opts rhv)
   handleEvalStatus interp status
 
 abandonStmt :: Interp -> ForeignRef (ResumeContext [HValueRef]) -> IO ()
@@ -336,18 +324,18 @@ mkCostCentres :: Interp -> String -> [(String,String)] -> IO [RemotePtr CostCent
 mkCostCentres interp mod ccs =
   interpCmd interp (MkCostCentres mod ccs)
 
+newtype BCOOpts = BCOOpts
+  { bco_n_jobs :: Int -- ^ Number of parallel jobs doing BCO serialization
+  }
+
 -- | Create a set of BCOs that may be mutually recursive.
-createBCOs :: Interp -> DynFlags -> [ResolvedBCO] -> IO [HValueRef]
-createBCOs interp dflags rbcos = do
-  n_jobs <- case parMakeCount dflags of
-              Nothing -> liftIO getNumProcessors
-              Just n  -> return n
-  -- Serializing ResolvedBCO is expensive, so if we're in parallel mode
-  -- (-j<n>) parallelise the serialization.
+createBCOs :: Interp -> BCOOpts -> [ResolvedBCO] -> IO [HValueRef]
+createBCOs interp opts rbcos = do
+  let n_jobs = bco_n_jobs opts
+  -- Serializing ResolvedBCO is expensive, so if we support doing it in parallel
   if (n_jobs == 1)
     then
       interpCmd interp (CreateBCOs [runPut (put rbcos)])
-
     else do
       old_caps <- getNumCapabilities
       if old_caps == n_jobs
@@ -405,33 +393,33 @@ getClosure interp ref =
     mapM (mkFinalizedHValue interp) mb
 
 -- | Send a Seq message to the iserv process to force a value      #2950
-seqHValue :: Interp -> HscEnv -> ForeignHValue -> IO (EvalResult ())
-seqHValue interp hsc_env ref =
+seqHValue :: Interp -> UnitEnv -> ForeignHValue -> IO (EvalResult ())
+seqHValue interp unit_env ref =
   withForeignRef ref $ \hval -> do
     status <- interpCmd interp (Seq hval)
-    handleSeqHValueStatus interp hsc_env status
+    handleSeqHValueStatus interp unit_env status
 
 -- | Process the result of a Seq or ResumeSeq message.             #2950
-handleSeqHValueStatus :: Interp -> HscEnv -> EvalStatus () -> IO (EvalResult ())
-handleSeqHValueStatus interp hsc_env eval_status =
+handleSeqHValueStatus :: Interp -> UnitEnv -> EvalStatus () -> IO (EvalResult ())
+handleSeqHValueStatus interp unit_env eval_status =
   case eval_status of
     (EvalBreak is_exception _ ix mod_uniq resume_ctxt _) -> do
       -- A breakpoint was hit; inform the user and tell them
       -- which breakpoint was hit.
       resume_ctxt_fhv <- liftIO $ mkFinalizedHValue interp resume_ctxt
       let hmi = expectJust "handleRunStatus" $
-                  lookupHptDirectly (hsc_HPT hsc_env)
+                  lookupHptDirectly (ue_hpt unit_env)
                     (mkUniqueGrimily mod_uniq)
           modl = mi_module (hm_iface hmi)
           bp | is_exception = Nothing
              | otherwise = Just (BreakInfo modl ix)
           sdocBpLoc = brackets . ppr . getSeqBpSpan
       putStrLn ("*** Ignoring breakpoint " ++
-            (showSDoc (hsc_dflags hsc_env) $ sdocBpLoc bp))
+            (showSDocUnsafe $ sdocBpLoc bp))
       -- resume the seq (:force) processing in the iserv process
       withForeignRef resume_ctxt_fhv $ \hval -> do
         status <- interpCmd interp (ResumeSeq hval)
-        handleSeqHValueStatus interp hsc_env status
+        handleSeqHValueStatus interp unit_env status
     (EvalComplete _ r) -> return r
   where
     getSeqBpSpan :: Maybe BreakInfo -> SrcSpan
@@ -443,7 +431,7 @@ handleSeqHValueStatus interp hsc_env eval_status =
     -- Reason: Setting of flags in libraries/ghci/GHCi/Run.hs:evalOptsSeq
     getSeqBpSpan Nothing = mkGeneralSrcSpan (fsLit "<unknown>")
     breaks mod = getModBreaks $ expectJust "getSeqBpSpan" $
-      lookupHpt (hsc_HPT hsc_env) (moduleName mod)
+      lookupHpt (ue_hpt unit_env) (moduleName mod)
 
 
 -- -----------------------------------------------------------------------------
@@ -728,14 +716,6 @@ wormholeRef interp _r = case interpInstance interp of
 
 -- -----------------------------------------------------------------------------
 -- Misc utils
-
-mkEvalOpts :: DynFlags -> Bool -> EvalOpts
-mkEvalOpts dflags step =
-  EvalOpts
-    { useSandboxThread = gopt Opt_GhciSandbox dflags
-    , singleStep = step
-    , breakOnException = gopt Opt_BreakOnException dflags
-    , breakOnError = gopt Opt_BreakOnError dflags }
 
 fromEvalResult :: EvalResult a -> IO a
 fromEvalResult (EvalException e) = throwIO (fromSerializableException e)
