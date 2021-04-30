@@ -178,6 +178,12 @@ typedef struct StgTSO_ {
 #endif
 #if defined(PROFILING)
     StgTSOProfInfo prof;
+
+    /*
+    * Follows the global backtrace_request, with cost center based stack of
+    * this thread dumped at each update
+    */
+    StgWord backtrace_response;
 #endif
 #if defined(mingw32_HOST_OS)
     StgWord32 saved_winerror;
