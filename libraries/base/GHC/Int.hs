@@ -27,6 +27,8 @@
 module GHC.Int (
         Int(..), Int8(..), Int16(..), Int32(..), Int64(..),
         uncheckedIShiftL64#, uncheckedIShiftRA64#,
+        shiftRLInt8#, shiftRLInt16#, shiftRLInt32#,
+
         -- * Equality operators
         -- | See GHC.Classes#matching_overloaded_methods_in_rules
         eqInt, neInt, gtInt, geInt, ltInt, leInt,
@@ -34,6 +36,7 @@ module GHC.Int (
         eqInt16, neInt16, gtInt16, geInt16, ltInt16, leInt16,
         eqInt32, neInt32, gtInt32, geInt32, ltInt32, leInt32,
         eqInt64, neInt64, gtInt64, geInt64, ltInt64, leInt64
+
     ) where
 
 import Data.Bits
@@ -1299,3 +1302,47 @@ so the
     y == (-1) && x == minBound
 order gives us better code in the common case.
 -}
+
+shiftRLInt8# :: Int8# -> Int# -> Int8#
+a `shiftRLInt8#` b | isTrue# (b >=# 8#) = intToInt8# 0#
+                   | otherwise          = a `uncheckedShiftRLInt8#` b
+
+shiftRLInt16# :: Int16# -> Int# -> Int16#
+a `shiftRLInt16#` b | isTrue# (b >=# 16#) = intToInt16# 0#
+                    | otherwise           = a `uncheckedShiftRLInt16#` b
+
+shiftRLInt32# :: Int32# -> Int# -> Int32#
+a `shiftRLInt32#` b | isTrue# (b >=# 32#) = intToInt32# 0#
+                    | otherwise           = a `uncheckedShiftRLInt32#` b
+
+shiftLInt8# :: Int8# -> Int# -> Int8#
+a `shiftLInt8#` b | isTrue# (b >=# 8#) = intToInt8# 0#
+                  | otherwise          = a `uncheckedShiftLInt8#` b
+
+shiftLInt16# :: Int16# -> Int# -> Int16#
+a `shiftLInt16#` b | isTrue# (b >=# 16#) = intToInt16# 0#
+                   | otherwise           = a `uncheckedShiftLInt16#` b
+
+shiftLInt32# :: Int32# -> Int# -> Int32#
+a `shiftLInt32#` b | isTrue# (b >=# 32#) = intToInt32# 0#
+                   | otherwise           = a `uncheckedShiftLInt32#` b
+
+
+shiftRAInt8# :: Int8# -> Int# -> Int8#
+a `shiftRAInt8#` b | isTrue# (b >=# 8#) = if isTrue# (a `ltInt8#` (intToInt8# 0#))
+                                             then intToInt8# (-1#)
+                                             else intToInt8# 0#
+                   | otherwise          = a `uncheckedShiftRAInt8#` b
+
+shiftRAInt16# :: Int16# -> Int# -> Int16#
+a `shiftRAInt16#` b | isTrue# (b >=# 16#) = if isTrue# (a `ltInt16#` (intToInt16# 0#))
+                                               then intToInt16# (-1#)
+                                               else intToInt16# 0#
+                    | otherwise           = a `uncheckedShiftRAInt16#` b
+
+shiftRAInt32# :: Int32# -> Int# -> Int32#
+a `shiftRAInt32#` b | isTrue# (b >=# 32#) = if isTrue# (a `ltInt32#` (intToInt32# 0#))
+                                               then intToInt32# (-1#)
+                                               else intToInt32# 0#
+                    | otherwise           = a `uncheckedShiftRAInt32#` b
+
