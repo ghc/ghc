@@ -2155,7 +2155,9 @@ checkTypeEq dflags lhs ty
       -- just look at arguments, not the tycon itself
     go_tc_args :: TyCon -> [TcType] -> CheckTyEqResult
     go_tc_args tc tys | isGenerativeTyCon tc Nominal = foldMap go tys
-                      | otherwise                    = cterNotInsoluble (foldMap go tys)
+                      | otherwise
+                      = let (tf_args, non_tf_args) = splitAt (tyConArity tc) tys in
+                        cterNotInsoluble (foldMap go tf_args) S.<> foldMap go non_tf_args
 
      -- no bother about impredicativity in coercions, as they're
      -- inferred
