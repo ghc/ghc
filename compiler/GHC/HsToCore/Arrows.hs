@@ -553,8 +553,8 @@ dsCmd ids local_vars stack_ty res_ty
     left_con <- dsLookupDataCon leftDataConName
     right_con <- dsLookupDataCon rightDataConName
     let
-        left_id  = HsConLikeOut noExtField (RealDataCon left_con)
-        right_id = HsConLikeOut noExtField (RealDataCon right_con)
+        left_id  = mkConLikeTc (RealDataCon left_con)
+        right_id = mkConLikeTc (RealDataCon right_con)
         left_expr  ty1 ty2 e = noLocA $ HsApp noComments
                            (noLocA $ mkHsWrap (mkWpTyApps [ty1, ty2]) left_id ) e
         right_expr ty1 ty2 e = noLocA $ HsApp noComments

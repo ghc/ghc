@@ -44,7 +44,6 @@ import GHC.Types.Fixity
 import GHC.Types.SourceText
 import GHC.Types.SrcLoc
 import GHC.Types.Tickish
-import GHC.Core.ConLike
 import GHC.Unit.Module (ModuleName)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -282,9 +281,6 @@ data HsExpr p
                              --   erroring expression will be written after
                              --   solving. See Note [Holes] in GHC.Tc.Types.Constraint.
 
-  | HsConLikeOut (XConLikeOut p)
-                 ConLike     -- ^ After typechecker only; must be different
-                             -- HsVar for pretty printing
 
   | HsRecFld  (XRecFld p)
               (AmbiguousFieldOcc p) -- ^ Variable pointing to record selector
