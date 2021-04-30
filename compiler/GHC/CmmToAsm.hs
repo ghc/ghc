@@ -111,6 +111,8 @@ import GHC.CmmToAsm.Dwarf
 import GHC.CmmToAsm.Config
 import GHC.CmmToAsm.Types
 import GHC.Cmm.DebugBlock
+import qualified GHC.CmmToAsm.SSA       as SSA
+import qualified GHC.CmmToAsm.SSA.Stats as SSA
 
 import GHC.Cmm.BlockId
 import GHC.StgToCmm.CgUtils ( fixStgRegisters )
@@ -187,6 +189,7 @@ data NativeGenAcc statics instr
              -- required.
         , ngs_colorStats  :: ![[Color.RegAllocStats statics instr]]
         , ngs_linearStats :: ![[Linear.RegAllocStats]]
+        , ngs_ssaStats    :: ![[SSA.SsaStats]]
         , ngs_labels      :: ![Label]
         , ngs_debug       :: ![DebugBlock]
         , ngs_dwarfFiles  :: !DwarfFiles
@@ -236,7 +239,7 @@ nativeCodeGen' logger dflags config modLoc ncgImpl h us cmms
         -- Pretty if it weren't for the fact that we do lots of little
         -- printDocs here (in order to do codegen in constant space).
         bufh <- newBufHandle h
-        let ngs0 = NGS [] [] [] [] [] [] emptyUFM mapEmpty
+        let ngs0 = NGS [] [] [] [] [] [] [] emptyUFM mapEmpty
         (ngs, us', a) <- cmmNativeGenStream logger dflags config modLoc ncgImpl bufh us
                                          cmms ngs0
         _ <- finishNativeGen logger dflags config modLoc bufh us' ngs
@@ -262,6 +265,12 @@ finishNativeGen logger dflags config modLoc bufh@(BufHandle _ _ h) us ngs
                      return us'
         bFlush bufh
 
+        -- SSA transformation stats
+        let ssaStats = concat (ngs_ssaStats ngs)
+        let ssaSdoc  = if null ssaStats
+                        then empty
+                        else SSA.pprSsaStats ssaStats
+
         -- dump global NCG stats for graph coloring allocator
         let stats = concat (ngs_colorStats ngs)
         unless (null stats) $ do
@@ -272,7 +281,7 @@ finishNativeGen logger dflags config modLoc bufh@(BufHandle _ _ h) us ngs
                   $ [ Color.raGraph stat
                           | stat@Color.RegAllocStatsStart{} <- stats]
 
-          dump_stats (Color.pprStats stats graphGlobal)
+          dump_stats $ ssaSdoc $$ (Color.pprStats stats graphGlobal)
 
           let platform = ncgPlatform config
           dumpIfSet_dyn logger dflags
@@ -289,7 +298,7 @@ finishNativeGen logger dflags config modLoc bufh@(BufHandle _ _ h) us ngs
         -- dump global NCG stats for linear allocator
         let linearStats = concat (ngs_linearStats ngs)
         unless (null linearStats) $
-          dump_stats (Linear.pprStats (concat (ngs_natives ngs)) linearStats)
+          dump_stats $ ssaSdoc $$ (Linear.pprStats (concat (ngs_natives ngs)) linearStats)
 
         -- write out the imports
         let ctx = ncgAsmContext config
@@ -389,7 +398,7 @@ cmmNativeGens logger dflags config modLoc ncgImpl h dbgMap = go
 
     go us (cmm : cmms) ngs count = do
         let fileIds = ngs_dwarfFiles ngs
-        (us', fileIds', native, imports, colorStats, linearStats, unwinds)
+        (us', fileIds', native, imports, colorStats, linearStats, ssaStats, unwinds)
           <- {-# SCC "cmmNativeGen" #-}
              cmmNativeGen logger dflags modLoc ncgImpl us fileIds dbgMap
                           cmm count
@@ -421,6 +430,7 @@ cmmNativeGens logger dflags config modLoc ncgImpl h dbgMap = go
                       , ngs_natives     = natives'
                       , ngs_colorStats  = colorStats `mCon` ngs_colorStats ngs
                       , ngs_linearStats = linearStats `mCon` ngs_linearStats ngs
+                      , ngs_ssaStats    = ssaStats `mCon` ngs_ssaStats ngs
                       , ngs_labels      = ngs_labels ngs ++ labels'
                       , ngs_dwarfFiles  = fileIds'
                       , ngs_unwinds     = ngs_unwinds ngs `mapUnion` unwinds
@@ -459,6 +469,7 @@ cmmNativeGen
                 , [CLabel]                                  -- things imported by this cmm
                 , Maybe [Color.RegAllocStats statics instr] -- stats for the coloring register allocator
                 , Maybe [Linear.RegAllocStats]              -- stats for the linear register allocators
+                , Maybe [SSA.SsaStats]                      -- stats for SSA transformation
                 , LabelMap [UnwindPoint]                    -- unwinding information for blocks
                 )
 
@@ -508,6 +519,7 @@ cmmNativeGen logger dflags modLoc ncgImpl us fileIds dbgMap cmm count
         let livenessCfg = if backendMaintainsCfg platform
                                 then Just nativeCfgWeights
                                 else Nothing
+
         let (withLiveness, usLive) =
                 {-# SCC "regLiveness" #-}
                 initUs usGen
@@ -517,6 +529,40 @@ cmmNativeGen logger dflags modLoc ncgImpl us fileIds dbgMap cmm count
                 Opt_D_dump_asm_liveness "Liveness annotations added"
                 FormatCMM
                 (vcat $ map (pprLiveCmmDecl platform) withLiveness)
+
+        -- Perform SSA construction & destruction to renumber disjoint webs
+        (renumberedCode, ppr_ssaStats, usSsa) <-
+         case (gopt Opt_SsaTransform dflags, livenessCfg) of
+                (True, Just cfg) -> do
+                        let (ssaRes, usSsa) = {-# SCC "prunedSSA-Construction" #-}
+                                               initUs usLive
+                                               $ mapM (SSA.prunedSSAFromLiveCmmDecl platform cfg) withLiveness
+                        let (ssaLive, ssaBeforeStats) = unzip ssaRes
+
+                        dumpIfSet_dyn logger dflags
+                                Opt_D_dump_asm_ssa "Pruned SSA Constructed"
+                                FormatCMM
+                                (vcat $ map (SSA.pprSsaLiveCmmDecl platform) ssaLive)
+
+                        let renumberedCode = {-# SCC "ssa-destruction" #-}
+                                             map (SSA.cssaToLiveCmmDecl platform) ssaLive
+
+                        dumpIfSet_dyn logger dflags
+                                Opt_D_dump_asm_out_of_ssa "After SSA Destruction"
+                                FormatCMM
+                                (vcat $ map (pprLiveCmmDecl platform) renumberedCode)
+
+                        let mSsaStats = if dopt Opt_D_dump_asm_stats dflags
+                                then Just $ zipWith
+                                        (\stat code -> stat {SSA.ssasUniqueNamesAfter = SSA.countUniqueNames code})
+                                        ssaBeforeStats renumberedCode
+                                else Nothing
+
+                        mSsaStats `seq` return ()
+
+                        return (renumberedCode, mSsaStats, usSsa)
+
+                _                -> return (withLiveness, Nothing, usLive)
 
         -- allocate registers
         (alloced, usAlloc, ppr_raStatsColor, ppr_raStatsLinear, raStats, stack_updt_blks) <-
@@ -533,13 +579,13 @@ cmmNativeGen logger dflags modLoc ncgImpl us fileIds dbgMap cmm count
                 -- do the graph coloring register allocation
                 let ((alloced, maybe_more_stack, regAllocStats), usAlloc)
                         = {-# SCC "RegAlloc-color" #-}
-                          initUs usLive
+                          initUs usSsa
                           $ Color.regAlloc
                                 config
                                 alloc_regs
                                 (mkUniqSet [0 .. maxSpillSlots ncgImpl])
                                 (maxSpillSlots ncgImpl)
-                                withLiveness
+                                renumberedCode
                                 livenessCfg
 
                 let ((alloced', stack_updt_blks), usAlloc')
@@ -593,9 +639,9 @@ cmmNativeGen logger dflags modLoc ncgImpl us fileIds dbgMap cmm count
 
                 let ((alloced, regAllocStats, stack_updt_blks), usAlloc)
                         = {-# SCC "RegAlloc-linear" #-}
-                          initUs usLive
+                          initUs usSsa
                           $ liftM unzip3
-                          $ mapM reg_alloc withLiveness
+                          $ mapM reg_alloc renumberedCode
 
                 dumpIfSet_dyn logger dflags
                         Opt_D_dump_asm_regalloc "Registers allocated"
@@ -708,6 +754,7 @@ cmmNativeGen logger dflags modLoc ncgImpl us fileIds dbgMap cmm count
                 , lastMinuteImports ++ imports
                 , ppr_raStatsColor
                 , ppr_raStatsLinear
+                , ppr_ssaStats
                 , unwinds )
 
 maybeDumpCfg :: Logger -> DynFlags -> Maybe CFG -> String -> SDoc -> IO ()
@@ -1160,6 +1207,7 @@ initNCGConfig dflags this_mod = NCGConfig
    , ncgInlineThresholdMemset = fromIntegral $ maxInlineMemsetInsns dflags
    , ncgSplitSections         = gopt Opt_SplitSections dflags
    , ncgRegsIterative         = gopt Opt_RegsIterative dflags
+   , ncgRegsGraphChaitin      = gopt Opt_RegsGraphChaitin dflags
    , ncgAsmLinting            = gopt Opt_DoAsmLinting dflags
    , ncgCfgWeights            = cfgWeights dflags
    , ncgCfgBlockLayout        = gopt Opt_CfgBlocklayout dflags
