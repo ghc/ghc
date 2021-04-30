@@ -925,6 +925,9 @@ zapIdUsedOnceInfo = zapInfo zapUsedOnceInfo
 zapIdTailCallInfo :: Id -> Id
 zapIdTailCallInfo = zapInfo zapTailCallInfo
 
+-- | Remove stable unfoldings from ids completely.
+-- Note that this also wipes the evaluatedness of the
+-- binding.
 zapStableUnfolding :: Id -> Id
 zapStableUnfolding id
  | isStableUnfolding (realIdUnfolding id) = setIdUnfolding id NoUnfolding
