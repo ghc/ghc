@@ -2979,11 +2979,11 @@ Details:
      CycleBreakerOrigin. This works for both Givens and WDs, as
      we need the logic in the WD case for e.g. typecheck/should_fail/T17139.
 
- (8) We really want to do this all only when there is an occurs-check
+ (8) We really want to do this all only when there is a soluble occurs-check
      failure, not when other problems arise (such as an impredicative
      equality like alpha ~ forall a. a -> a). In checkTypeEq (which looks
-     for the occurs-check), we prioritize all other errors over occurs-check
-     ones. We thus know that, when checkTypeEq says there is an occurs-check
+     for the occurs-check), we prioritize all other errors over soluble occurs-check
+     ones. We thus know that, when checkTypeEq says there is a soluble occurs-check
      error, that's the only problem, and the approach outlined in this
      Note is appropriate to apply.
 
