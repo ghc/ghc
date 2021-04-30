@@ -58,8 +58,9 @@ import GHC.Data.OrdList
 import GHC.Data.List.SetOps
 
 import Control.Applicative ( (<|>) )
-import Control.Monad ( zipWithM )
-import Data.List ( unzip4 )
+import Control.Monad ( zipWithM, join )
+import Data.List ( unzip4, uncons )
+import Data.Maybe ( fromMaybe )
 
 {-
 ************************************************************************
@@ -163,6 +164,7 @@ mkWwBodies :: WwOpts
            -> Id             -- The original function
            -> [Demand]       -- Strictness of original function
            -> Cpr            -- Info about function result
+           -> Maybe [Unfolding] -- Unfolding info for join point binders
            -> UniqSM (Maybe WwResult)
 
 -- wrap_fn_args E       = \x y -> E
@@ -176,12 +178,12 @@ mkWwBodies :: WwOpts
 --                        let x = (a,b) in
 --                        E
 
-mkWwBodies opts rhs_fvs fun_id demands cpr_info
+mkWwBodies opts rhs_fvs fun_id demands cpr_info join_arg_unfs
   = do  { let empty_subst = mkEmptyTCvSubst (mkInScopeSet rhs_fvs)
                 -- See Note [Freshen WW arguments]
 
         ; (wrap_args, wrap_fn_args, work_fn_args, res_ty)
-             <- mkWWargs empty_subst fun_ty demands
+             <- mkWWargs empty_subst fun_ty demands join_arg_unfs
         ; (useful1, work_args, wrap_fn_str, work_fn_str)
              <- mkWWstr opts inlineable_flag wrap_args
 
@@ -445,22 +447,26 @@ mkWWargs :: TCvSubst            -- Freshening substitution to apply to the type
                                 --   See Note [Freshen WW arguments]
          -> Type                -- The type of the function
          -> [Demand]     -- Demands and one-shot info for value arguments
+         -> Maybe [Unfolding]
          -> UniqSM  ([Var],            -- Wrapper args
                      CoreExpr -> CoreExpr,      -- Wrapper fn
                      CoreExpr -> CoreExpr,      -- Worker fn
                      Type)                      -- Type of wrapper body
 
-mkWWargs subst fun_ty demands
+mkWWargs subst fun_ty demands join_unfolds
   | null demands
   = return ([], nop_fn, nop_fn, substTy subst fun_ty)
 
   | (dmd:demands') <- demands
+  , split_unfs <- join (uncons <$> join_unfolds)
+  , unf <- fst <$> split_unfs
+  , join_unfolds' <- snd <$> split_unfs
   , Just (mult, arg_ty, fun_ty') <- splitFunTy_maybe fun_ty
   = do  { uniq <- getUniqueM
         ; let arg_ty' = substScaledTy subst (Scaled mult arg_ty)
-              id = mk_wrap_arg uniq arg_ty' dmd
+              id = mk_wrap_arg uniq arg_ty' dmd unf
         ; (wrap_args, wrap_fn_args, work_fn_args, res_ty)
-              <- mkWWargs subst fun_ty' demands'
+              <- mkWWargs subst fun_ty' demands' join_unfolds'
         ; return (id : wrap_args,
                   Lam id . wrap_fn_args,
                   apply_or_bind_then work_fn_args (varToCoreExpr id),
@@ -471,7 +477,7 @@ mkWWargs subst fun_ty demands
         ; let (subst', tv') = cloneTyVarBndr subst tv uniq
                 -- See Note [Freshen WW arguments]
         ; (wrap_args, wrap_fn_args, work_fn_args, res_ty)
-             <- mkWWargs subst' fun_ty' demands
+             <- mkWWargs subst' fun_ty' demands join_unfolds
         ; return (tv' : wrap_args,
                   Lam tv' . wrap_fn_args,
                   apply_or_bind_then work_fn_args (mkTyArg (mkTyVarTy tv')),
@@ -487,7 +493,7 @@ mkWWargs subst fun_ty demands
         -- simply coerces.
 
   = do { (wrap_args, wrap_fn_args, work_fn_args, res_ty)
-            <-  mkWWargs subst rep_ty demands
+            <-  mkWWargs subst rep_ty demands join_unfolds
        ; let co' = substCo subst co
        ; return (wrap_args,
                   \e -> Cast (wrap_fn_args e) (mkSymCo co'),
@@ -507,14 +513,17 @@ mkWWargs subst fun_ty demands
 applyToVars :: [Var] -> CoreExpr -> CoreExpr
 applyToVars vars fn = mkVarApps fn vars
 
-mk_wrap_arg :: Unique -> Scaled Type -> Demand -> Id
-mk_wrap_arg uniq (Scaled w ty) dmd
-  = mkSysLocalOrCoVar (fsLit "w") uniq w ty
+mk_wrap_arg :: Unique -> Scaled Type -> Demand -> Maybe Unfolding -> Id
+mk_wrap_arg uniq (Scaled w ty) dmd unf
+  = -- (\x -> pprTrace "mk_wrap_arg" (ppr x <+> ppr unf) x) $
+    mkSysLocalOrCoVar (fsLit "w") uniq w ty
        `setIdDemandInfo` dmd
+       `setIdUnfolding` (zapUnfolding unf) -- Only retain evaluatedness
+
 
 {- Note [Freshen WW arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Wen we do a worker/wrapper split, we must not in-scope names as the arguments
+Wen we do a worker/wrapper split, we must not use in-scope names as the arguments
 of the worker, else we'll get name capture.  E.g.
 
    -- y1 is in scope from further out
@@ -953,7 +962,14 @@ mkWWstr_one :: WwOpts
             -> UniqSM (Bool, [Var], CoreExpr -> CoreExpr, CoreExpr -> CoreExpr)
 mkWWstr_one opts inlineable_flag arg =
   case wantToUnboxArg fam_envs inlineable_flag arg_ty arg_dmd of
-    _ | isTyVar arg -> do_nothing
+    _x | isTyVar arg -> do_nothing
+       | DropAbsent <- _x
+       , pprTrace "mkWWstr_one" (text "DropAbsent" <+> ppr arg) False
+       -> undefined
+       | Unbox {} <- _x
+       , pprTrace "mkWWstr_one" (text "Unbox" <+> ppr arg) False
+       -> undefined
+
 
     DropAbsent
       | Just work_fn <- mk_absent_let opts arg
@@ -1006,7 +1022,11 @@ mk_absent_let opts arg
   -- The lifted case: Bind 'absentError' for a nice panic message if we are
   -- wrong (like we were in #11126). See (1) in Note [Absent fillers]
   | Just [LiftedRep] <- mb_mono_prim_reps
-  , not (isStrictDmd (idDemandInfo arg)) -- See (2) in Note [Absent fillers]
+  , pprTrace "mk_absent_let" (ppr arg $$
+      ppr (idUnfolding arg) $$
+      ppr (not (isStrictDmd (idDemandInfo arg) || evald_arg))
+      ) True
+  , not (isStrictDmd (idDemandInfo arg) || evald_arg) -- See (2) in Note [Absent fillers]
   = Just (Let (NonRec arg panic_rhs))
 
   -- The default case for mono rep: Bind @RUBBISH[prim_reps] \@arg_ty@
@@ -1020,6 +1040,10 @@ mk_absent_let opts arg
   = WARN( True, text "No absent value for" <+> ppr arg_ty )
     Nothing
   where
+    evald_arg = isEvaldUnfolding . idUnfolding $ arg
+
+
+
     arg_ty = idType arg
     mb_mono_prim_reps = typeMonoPrimRep_maybe arg_ty
 
