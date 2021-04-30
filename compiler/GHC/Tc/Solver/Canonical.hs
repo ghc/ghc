@@ -2282,9 +2282,9 @@ canEqTyVarFunEq :: CtEvidence               -- :: lhs ~ (rhs |> mco)
                 -> MCoercion                -- :: kind(rhs) ~N kind(lhs)
                 -> TcS (StopOrContinue Ct)
 canEqTyVarFunEq ev eq_rel swapped tv1 ps_xi1 fun_tc2 fun_args2 ps_xi2 mco
-  = do { can_unify <- unifyTest (ctEvFlavour ev) tv1 rhs
-       ; dflags    <- getDynFlags
-       ; if | case can_unify of { NoUnify -> False; _ -> True }
+  = do { is_touchable <- touchabilityTest (ctEvFlavour ev) tv1 rhs
+       ; dflags       <- getDynFlags
+       ; if | case is_touchable of { Untouchable -> False; _ -> True }
             , cterHasNoProblem $
                 checkTyVarEq dflags tv1 rhs `cterRemoveProblem` cteTypeFamily
             -> canEqCanLHSFinish ev eq_rel swapped (TyVarLHS tv1) rhs

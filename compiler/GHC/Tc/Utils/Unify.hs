@@ -1619,7 +1619,7 @@ Needless to say, all three have wrinkles:
     isTouchableMetaTyVar.
 
   * In the constraint solver, we track where Given equalities occur
-    and use that to guard unification in GHC.Tc.Solver.Canonical.unifyTest
+    and use that to guard unification in GHC.Tc.Solver.Canonical.touchabilityTest
     More details in Note [Tracking Given equalities] in GHC.Tc.Solver.Monad
 
     Historical note: in the olden days (pre 2021) the constraint solver

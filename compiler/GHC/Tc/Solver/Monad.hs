@@ -49,7 +49,7 @@ module GHC.Tc.Solver.Monad (
     newWantedNC, newWantedEvVarNC,
     newDerivedNC,
     newBoundEvVarId,
-    unifyTyVar, reportUnifications, unifyTest, UnifyTestResult(..),
+    unifyTyVar, reportUnifications, touchabilityTest, TouchabilityTestResult(..),
     setEvBind, setWantedEq,
     setWantedEvTerm, setEvBindIfWanted,
     newEvVar, newGivenEvVar, newGivenEvVars,
@@ -3343,25 +3343,25 @@ reportUnifications (TcS thing_inside)
        ; TcM.updTcRef (tcs_unified env) (+ n_unifs)
        ; return (n_unifs, res) }
 
-data UnifyTestResult
+data TouchabilityTestResult
   -- See Note [Solve by unification] in GHC.Tc.Solver.Interact
-  -- which points out that having UnifySameLevel is just an optimisation;
-  -- we could manage with UnifyOuterLevel alone (suitably renamed)
-  = UnifySameLevel
-  | UnifyOuterLevel [TcTyVar]   -- Promote these
-                    TcLevel     -- ..to this level
-  | NoUnify
+  -- which points out that having TouchableSameLevel is just an optimisation;
+  -- we could manage with TouchableOuterLevel alone (suitably renamed)
+  = TouchableSameLevel
+  | TouchableOuterLevel [TcTyVar]   -- Promote these
+                        TcLevel     -- ..to this level
+  | Untouchable
 
-instance Outputable UnifyTestResult where
-  ppr UnifySameLevel            = text "UnifySameLevel"
-  ppr (UnifyOuterLevel tvs lvl) = text "UnifyOuterLevel" <> parens (ppr lvl <+> ppr tvs)
-  ppr NoUnify                   = text "NoUnify"
+instance Outputable TouchabilityTestResult where
+  ppr TouchableSameLevel            = text "TouchableSameLevel"
+  ppr (TouchableOuterLevel tvs lvl) = text "TouchableOuterLevel" <> parens (ppr lvl <+> ppr tvs)
+  ppr Untouchable                   = text "Untouchable"
 
-unifyTest :: CtFlavour -> TcTyVar -> TcType -> TcS UnifyTestResult
+touchabilityTest :: CtFlavour -> TcTyVar -> TcType -> TcS TouchabilityTestResult
 -- This is the key test for untouchability:
 -- See Note [Unification preconditions] in GHC.Tc.Utils.Unify
 -- and Note [Solve by unification] in GHC.Tc.Solver.Interact
-unifyTest flav tv1 rhs
+touchabilityTest flav tv1 rhs
   | flav /= Given  -- See Note [Do not unify Givens]
   , MetaTv { mtv_tclvl = tv_lvl, mtv_info = info } <- tcTyVarDetails tv1
   , canSolveByUnification info rhs
@@ -3369,16 +3369,16 @@ unifyTest flav tv1 rhs
        ; given_eq_lvl <- getInnermostGivenEqLevel
 
        ; if | tv_lvl `sameDepthAs` ambient_lvl
-            -> return UnifySameLevel
+            -> return TouchableSameLevel
 
             | tv_lvl `deeperThanOrSame` given_eq_lvl   -- No intervening given equalities
             , all (does_not_escape tv_lvl) free_skols  -- No skolem escapes
-            -> return (UnifyOuterLevel free_metas tv_lvl)
+            -> return (TouchableOuterLevel free_metas tv_lvl)
 
             | otherwise
-            -> return NoUnify }
+            -> return Untouchable }
   | otherwise
-  = return NoUnify
+  = return Untouchable
   where
      (free_metas, free_skols) = partition isPromotableMetaTyVar $
                                 nonDetEltsUniqSet               $
@@ -3949,10 +3949,10 @@ breakTyVarCycle_maybe ev SolubleOccursCheckCIS (TyVarLHS lhs_tv) rhs
       | Given <- flavour
       = return True
       | ctFlavourContainsDerived flavour
-      = do { result <- unifyTest Derived lhs_tv rhs
+      = do { result <- touchabilityTest Derived lhs_tv rhs
            ; return $ case result of
-               NoUnify -> False
-               _       -> True }
+               Untouchable -> False
+               _           -> True }
       | otherwise
       = return False
 
