@@ -8,6 +8,8 @@
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
+{-# OPTIONS_GHC -ddump-simpl -ddump-to-file -dverbose-core2core -ddump-stg-final -dsuppress-coercions -ddump-occur-anal #-}
+{-# OPTIONS_GHC -dsuppress-ticks -fforce-recomp -ddump-stranal #-}
 
 {-
 %
