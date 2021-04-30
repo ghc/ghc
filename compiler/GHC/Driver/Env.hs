@@ -21,6 +21,12 @@ module GHC.Driver.Env
    , lookupType
    , lookupIfaceByModule
    , mainModIs
+   , DynamicTooState(..)
+   , dynamicTooState
+   , setDynamicTooFailed
+   , addDynamicNow
+   , FailDynamicToo(..)
+   , updateDynamicTooFailed
    )
 where
 
@@ -293,3 +299,69 @@ lookupIfaceByModule hpt pit mod
 
 mainModIs :: HscEnv -> Module
 mainModIs hsc_env = mkHomeModule (hsc_home_unit hsc_env) (mainModuleNameIs (hsc_dflags hsc_env))
+
+-- Note [-dynamic-too business]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- With -dynamic-too flag, we try to build both the non-dynamic and dynamic
+-- objects in a single run of the compiler: the pipeline is the same down to
+-- Core optimisation, then the backend (from Core to object code) is executed
+-- twice.
+--
+-- The implementation is currently rather hacky, for example, we don't clearly separate non-dynamic
+-- and dynamic loaded interfaces (#9176).
+--
+-- To make matters worse, we automatically enable -dynamic-too when some modules
+-- need Template-Haskell and GHC is dynamically linked (cf
+-- GHC.Driver.Pipeline.compileOne').
+--
+-- This somewhat explains why we have "hsc_dynamicTooFailed :: IORef Bool" in
+-- HscEnv: when -dynamic-too is enabled, we try to build the dynamic objects,
+-- but we may fail and we shouldn't abort the whole compilation because the user
+-- may not even have asked for -dynamic-too in the first place. So instead we
+-- use this global variable to indicate that we can't build dynamic objects and
+-- compilation continues to build non-dynamic objects only. At the end of the
+-- non-dynamic pipeline, if this value indicates that the dynamic compilation
+-- failed, we run the whole pipeline again for the dynamic way (except on
+-- Windows...). See GHC.Driver.Pipeline.runPipeline.
+
+data DynamicTooState
+   = DT_Dont    -- ^ Don't try to build dynamic objects too
+   | DT_Failed  -- ^ Won't try to generate dynamic objects for some reason
+   | DT_OK      -- ^ Will still try to generate dynamic objects
+   | DT_Dyn     -- ^ Currently generating dynamic objects (in the backend)
+   deriving (Eq,Show,Ord)
+
+-- | Datatype indicating whether the 'hsc_dynamicToo' variable
+-- needs to be updated, e.g. marked as failed.
+--
+-- See Note [-dynamic-too business] for why we need this.
+data FailDynamicToo
+    = DT_Fail -- ^ DynamicToo did fail! Call 'updateDynamicTooFailed' immediately!
+    | DT_NoFail -- ^ Dynamic Too did not fail, no action required.
+   deriving (Eq, Show, Ord)
+
+dynamicTooState :: MonadIO m => HscEnv -> m DynamicTooState
+dynamicTooState hsc_env
+   | not (gopt Opt_BuildDynamicToo dflags) = return DT_Dont
+   | otherwise = do
+      failed <- liftIO $ readIORef (hsc_dynamicTooFailed hsc_env)
+      if failed
+         then return DT_Failed
+         else if dynamicNow dflags
+               then return DT_Dyn
+               else return DT_OK
+  where
+    dflags = hsc_dflags hsc_env
+
+setDynamicTooFailed :: MonadIO m => HscEnv -> m ()
+setDynamicTooFailed hsc_env =
+   liftIO $ writeIORef (hsc_dynamicTooFailed hsc_env) True
+
+updateDynamicTooFailed :: MonadIO m => FailDynamicToo ->  HscEnv -> m ()
+updateDynamicTooFailed DT_Fail = setDynamicTooFailed
+updateDynamicTooFailed _ = const $ pure ()
+
+addDynamicNow :: DynamicTooState -> DynamicTooState
+addDynamicNow DT_OK = DT_Dyn
+addDynamicNow dynamic_too_state = dynamic_too_state

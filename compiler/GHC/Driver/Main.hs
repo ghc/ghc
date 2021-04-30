@@ -232,6 +232,7 @@ import Data.Set (Set)
 import Data.Functor
 import Control.DeepSeq (force)
 import Data.Bifunctor (first, bimap)
+import GHC.Platform (platformOS, OS (OSMinGW32))
 
 #include "HsVersions.h"
 
@@ -249,6 +250,12 @@ newHscEnv dflags = do
     logger  <- initLogger
     tmpfs   <- initTmpFs
     unit_env <- initUnitEnv (ghcNameVersion dflags) (targetPlatform dflags)
+    let -- We can't build with dynamic-too on Windows, as labels before
+     -- the fork point are different depending on whether we are
+     -- building dynamically or not.
+      platformCanGenerateDynamicToo
+         = platformOS (targetPlatform dflags) /= OSMinGW32
+    refDynamicTooFailed <- newIORef (not platformCanGenerateDynamicToo)
     return HscEnv {  hsc_dflags         = dflags
                   ,  hsc_logger         = logger
                   ,  hsc_targets        = []
@@ -263,6 +270,7 @@ newHscEnv dflags = do
                   ,  hsc_static_plugins = []
                   ,  hsc_hooks          = emptyHooks
                   ,  hsc_tmpfs          = tmpfs
+                  ,  hsc_dynamicTooFailed = refDynamicTooFailed
                   }
 
 -- -----------------------------------------------------------------------------
@@ -944,8 +952,8 @@ finish summary tc_result mb_old_hash = do
       _ -> do
         (iface, mb_old_iface_hash, details) <- liftIO $
           hscSimpleIface hsc_env tc_result mb_old_hash
-
-        liftIO $ hscMaybeWriteIface logger dflags True iface mb_old_iface_hash (ms_location summary)
+        dt <- dynamicTooState hsc_env
+        liftIO $ hscMaybeWriteIface logger dflags dt True iface mb_old_iface_hash (ms_location summary)
 
         return $ case bcknd of
           NoBackend -> HscNotGeneratingCode iface details
@@ -999,8 +1007,8 @@ suffixes. The interface file name can be overloaded with "-ohi", except when
 -}
 
 -- | Write interface files
-hscMaybeWriteIface :: Logger -> DynFlags -> Bool -> ModIface -> Maybe Fingerprint -> ModLocation -> IO ()
-hscMaybeWriteIface logger dflags is_simple iface old_iface mod_location = do
+hscMaybeWriteIface :: Logger -> DynFlags -> DynamicTooState -> Bool -> ModIface -> Maybe Fingerprint -> ModLocation -> IO ()
+hscMaybeWriteIface logger dflags dynamic_too_state is_simple iface old_iface mod_location = do
     let force_write_interface = gopt Opt_WriteInterface dflags
         write_interface = case backend dflags of
                             NoBackend    -> False
@@ -1043,24 +1051,22 @@ hscMaybeWriteIface logger dflags is_simple iface old_iface mod_location = do
       --
       let no_change = old_iface == Just (mi_iface_hash (mi_final_exts iface))
 
-      dt <- dynamicTooState dflags
-
       when (dopt Opt_D_dump_if_trace dflags) $ putMsg logger dflags $
         hang (text "Writing interface(s):") 2 $ vcat
          [ text "Kind:" <+> if is_simple then text "simple" else text "full"
          , text "Hash change:" <+> ppr (not no_change)
-         , text "DynamicToo state:" <+> text (show dt)
+         , text "DynamicToo state:" <+> text (show dynamic_too_state)
          ]
 
       if is_simple
          then unless no_change $ do -- FIXME: see no_change' comment above
             write_iface dflags iface
-            case dt of
+            case dynamic_too_state of
                DT_Dont   -> return ()
                DT_Failed -> return ()
                DT_Dyn    -> panic "Unexpected DT_Dyn state when writing simple interface"
                DT_OK     -> write_iface (setDynamicNow dflags) iface
-         else case dt of
+         else case dynamic_too_state of
                DT_Dont | not no_change             -> write_iface dflags iface
                DT_OK   | not no_change             -> write_iface dflags iface
                -- FIXME: see no_change' comment above
