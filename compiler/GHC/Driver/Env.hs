@@ -11,6 +11,7 @@ module GHC.Driver.Env
    , mkInteractiveHscEnv
    , runInteractiveHsc
    , hscEPS
+   , hscInterp
    , hptCompleteSigs
    , hptInstances
    , hptAnns
@@ -33,6 +34,7 @@ import GHC.Driver.Session
 import GHC.Driver.Errors ( printOrThrowDiagnostics )
 
 import GHC.Runtime.Context
+import GHC.Runtime.Interpreter.Types (Interp)
 import GHC.Driver.Env.Types ( Hsc(..), HscEnv(..) )
 
 import GHC.Unit
@@ -59,6 +61,7 @@ import GHC.Builtin.Names ( gHC_PRIM )
 
 import GHC.Data.Maybe
 
+import GHC.Utils.Exception as Ex
 import GHC.Utils.Outputable
 import GHC.Utils.Monad
 import GHC.Utils.Panic
@@ -293,3 +296,11 @@ lookupIfaceByModule hpt pit mod
 
 mainModIs :: HscEnv -> Module
 mainModIs hsc_env = mkHomeModule (hsc_home_unit hsc_env) (mainModuleNameIs (hsc_dflags hsc_env))
+
+-- | Retrieve the target code interpreter
+--
+-- Fails if no target code interpreter is available
+hscInterp :: HscEnv -> Interp
+hscInterp hsc_env = case hsc_interp hsc_env of
+   Nothing -> throw (InstallationError "Couldn't find a target code interpreter. Try with -fexternal-interpreter")
+   Just i  -> i
