@@ -451,11 +451,11 @@ rnSpliceExpr splice
                 runRnSplice UntypedExpSplice runMetaE ppr rn_splice
            ; (lexpr3, fvs) <- checkNoErrs (rnLExpr rn_expr)
              -- See Note [Delaying modFinalizers in untyped splices].
-           ; return ( HsPar noAnn $ HsSpliceE noAnn
-                            . HsSpliced noExtField (ThModFinalizers mod_finalizers)
-                            . HsSplicedExpr <$>
-                            lexpr3
-                    , fvs)
+           ; let e =  HsSpliceE noAnn
+                    . HsSpliced noExtField (ThModFinalizers mod_finalizers)
+                    . HsSplicedExpr
+                        <$> lexpr3
+           ; return (gHsPar e, fvs)
            }
 
 {- Note [Running splices in the Renamer]
@@ -695,12 +695,11 @@ rnSplicePat splice
            ; (pat, mod_finalizers) <-
                 runRnSplice UntypedPatSplice runMetaP ppr rn_splice
              -- See Note [Delaying modFinalizers in untyped splices].
-           ; return ( Left $ ParPat noAnn $ ((SplicePat noExtField)
-                              . HsSpliced noExtField (ThModFinalizers mod_finalizers)
-                              . HsSplicedPat)  `mapLoc`
-                              pat
-                    , emptyFVs
-                    ) }
+           ; let p =  SplicePat noExtField
+                    . HsSpliced noExtField (ThModFinalizers mod_finalizers)
+                    . HsSplicedPat
+                        <$> pat
+           ; return (Left $ gParPat p, emptyFVs) }
               -- Wrap the result of the quasi-quoter in parens so that we don't
               -- lose the outermost location set by runQuasiQuote (#7918)
 
