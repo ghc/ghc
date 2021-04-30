@@ -716,7 +716,7 @@ These two SubDemands:
 are semantically equivalent, but we do not turn the former into
 the latter, for a regrettable-subtle reason.  Consider
   f p1@(x,y) = (y,x)
-  g h p2@(_,_) = h p
+  g h p2@(_,_) = h p2
 We want to unbox @p1@ of @f@, but not @p2@ of @g@, because @g@ only uses
 @p2@ boxed and we'd have to rebox. So we give @p1@ demand LP(L,L) and @p2@
 demand @L@ to inform 'GHC.Core.Opt.WorkWrap.Utils.wantToUnboxArg', which will
@@ -729,7 +729,7 @@ little bit of boxity analysis.  Not very nice.
 Note [L should win]
 ~~~~~~~~~~~~~~~~~~~
 Both in 'lubSubDmd' and 'plusSubDmd' we want @L `plusSubDmd` LP(..))@ to be @L@.
-Why?  Because U carries the implication the whole thing is used, box and all,
+Why?  Because L carries the implication the whole thing is used, box and all,
 so we don't want to w/w it, cf. Note [Don't optimise LP(L,L,...) to L].
 If we use it both boxed and unboxed, then we are definitely using the box,
 and so we are quite likely to pay a reboxing cost. So we make U win here.
@@ -750,6 +750,31 @@ Compare with: (C) making L win for plus, but LP(..) win for lub
             Min          -0.1%     -0.3%     -7.9%     -8.0%     -6.5%
             Max          +0.1%     +1.0%    +21.0%    +21.0%     +0.5%
  Geometric Mean          +0.0%     +0.0%     -0.0%     -0.1%     -0.1%
+
+Note [Turn LP(A) into LP(M) in signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider T19407:
+
+  data Huge = Huge Bool () ... () -- think: DynFlags
+  data T = T { h :: Huge, n :: Int }
+  f t@(T h _) = g h t
+  g (H b _ ... _) t = if b then 1 else n t
+
+The body of `g` puts (approx.) demand `LP(A,1)` on `t`. But we better not put
+that demand in `g`'s signature! If we do, then `f` puts demand
+`SP(1P(1L,A,..),ML)` on `t` and we get
+
+  f (T (H b _ ... _) n) = $wf b n
+  $wf b n = $wg b (T (H b x ... x) n)
+  $wg = ...
+
+Massive reboxing in `$wf`! Solution: The signature of `g` should better say
+`LP(M,1)`, then `f`'s signature says `SP(1P(1L,M,..),ML)` and `h` will not be
+reboxed because passing all fields of `h` to `$wf` would run beyond the arg
+limit in W/W. Which in turn means that `f` will not be W/W'd *at all*!
+So this solution is quite unsatisfying as then `f`'s signature lies, probably
+incurring reboxing at its call sites... I can think of no fix other than a =
+proper boxity analysis.
 
 Note [Computing one-shot info]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1436,11 +1461,25 @@ newtype DmdSig
   deriving Eq
 
 -- | Turns a 'DmdType' computed for the particular 'Arity' into a 'DmdSig'
--- unleashable at that arity. See Note [Understanding DmdType and DmdSig]
+-- unleashable at that arity. See Note [Understanding DmdType and DmdSig].
 mkDmdSigForArity :: Arity -> DmdType -> DmdSig
 mkDmdSigForArity arity dmd_ty@(DmdType fvs args div)
-  | arity < dmdTypeDepth dmd_ty = DmdSig (DmdType fvs (take arity args) div)
-  | otherwise                   = DmdSig (etaExpandDmdType arity dmd_ty)
+  | arity < dmdTypeDepth dmd_ty = DmdSig dmd_ty'
+  | otherwise                   = DmdSig (etaExpandDmdType arity dmd_ty')
+  where
+    -- See Note [Turn LP(A) into LP(M) in signatures]
+    args' = map forgetAbsentInLazyProd args
+    !dmd_ty' = DmdType fvs (take arity args') div
+
+forgetAbsentInLazyProd :: Demand -> Demand
+forgetAbsentInLazyProd (n :* Prod ds)
+  | isStrict n = n :* Prod (map forgetAbsentInLazyProd ds)
+  | otherwise  = n :* Prod (map abs_to_once ds)
+  where
+    abs_to_once d@(n :* _)
+      | isAbs n   = polyDmd C_01
+      | otherwise = d
+forgetAbsentInLazyProd d  = d
 
 mkClosedDmdSig :: [Demand] -> Divergence -> DmdSig
 mkClosedDmdSig ds res = mkDmdSigForArity (length ds) (DmdType emptyDmdEnv ds res)
