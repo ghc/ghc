@@ -2687,7 +2687,7 @@ or
   [W] C alpha
 
 This transformation (creating the new types and emitting new equality
-constraints) is done in breakTyVarCycle.
+constraints) is done in breakTyVarCycle_maybe.
 
 The details depend on whether we're working with a Given or a Derived.
 (Note that the Wanteds are really WDs, above. This is because Wanteds
@@ -2710,7 +2710,7 @@ Of course, we don't want our fresh variables leaking into e.g. error messages.
 So we fill in the metavariables with their original type family applications
 after we're done running the solver (in nestImplicTcS and runTcSWithEvBinds).
 This is done by restoreTyVarCycles, which uses the inert_cycle_breakers field in
-InertSet, which contains the pairings invented in breakTyVarCycle.
+InertSet, which contains the pairings invented in breakTyVarCycle_maybe.
 
 That is:
 
@@ -2752,14 +2752,13 @@ and we turn this into
 where cbv1 and cbv2 are fresh TauTvs. Why TauTvs? See [Why TauTvs] below.
 
 Critically, we emit the constraint directly instead of calling unifyWanted.
-Next, we unify alpha := cbv1 -> cbv2, having eliminated the occurs check.
-This unification happens in the course of normal behavior of top-level
-interactions, later in the solver pipeline.
-We know this unification will indeed happen, because
-shouldBreakCycle, which decides whether to apply this logic, goes
-to pains to make sure unification will succeed. Now, we're here
-(including further context from our original example, from the top
-of the Note):
+Next, we unify alpha := cbv1 -> cbv2, having eliminated the occurs check. This
+unification happens in the course of normal behavior of top-level
+interactions, later in the solver pipeline. We know this unification will
+indeed happen, because breakTyVarCycle_maybe, which decides whether to apply
+this logic, goes to pains to make sure unification will succeed. Now, we're
+here (including further context from our original example, from the top of the
+Note):
 
   instance C (a -> b)
   [WD] Arg (cbv1 -> cbv2) ~ cbv1
@@ -2865,7 +2864,7 @@ Details:
      type family, or that outer type family application would already have
      been substituted away.
 
-     However, we still must check to make sure that breakTyVarCycle actually
+     However, we still must check to make sure that breakTyVarCycle_maybe actually
      succeeds in getting rid of all occurrences of the offending variable. If
      one is hidden under a forall, this won't be true. A similar problem can
      happen if the variable appears only in a kind
