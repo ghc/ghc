@@ -132,7 +132,7 @@ module GHC.Tc.Solver.Monad (
                                              -- if the whole instance matcher simply belongs
                                              -- here
 
-    shouldBreakCycle, BreakTyVarCyclesHow(..), breakTyVarCycle, rewriterView
+    breakTyVarCycle_maybe, rewriterView
 ) where
 
 #include "HsVersions.h"
@@ -3918,46 +3918,45 @@ See GHC.Tc.Solver.Monad.deferTcSForAllEq
 ************************************************************************
 -}
 
--- | Are we breaking tyvar cycles in a Given or a Derived?
-data BreakTyVarCyclesHow = BTVC_Given
-                         | BTVC_Derived
-
-instance Outputable BreakTyVarCyclesHow where
-  ppr BTVC_Given   = text "BTVC_Given"
-  ppr BTVC_Derived = text "BTVC_Derived"
-
--- | Should we break cycles in the given constraint? And, if so, how
--- should we break the cycles? See Note [Type variable cycles]
--- in GHC.Tc.Solver.Canonical
-shouldBreakCycle :: CtFlavour   -- of the equality
-                 -> CtLoc       -- of the equality
-                 -> TcTyVar     -- the LHS
-                 -> TcType      -- the RHS
-                 -> TcS (Maybe BreakTyVarCyclesHow)
-shouldBreakCycle _ (ctLocOrigin -> CycleBreakerOrigin _) _ _ = return Nothing
+-- | Conditionally replace all type family applications in the RHS with fresh
+-- variables, emitting givens that relate the type family application to the
+-- variable. See Note [Type variable cycles] in GHC.Tc.Solver.Canonical.
+-- This only works under conditions as described in the Note; otherwise, returns
+-- Nothing.
+breakTyVarCycle_maybe :: CtEvidence
+                      -> CtIrredStatus   -- result of canEqOK
+                      -> CanEqLHS
+                      -> TcType     -- RHS
+                      -> TcS (Maybe (TcTyVar, CoercionN, TcType))
+                         -- new RHS that doesn't have any type families
+                         -- co :: new type ~N old type
+                         -- TcTyVar is the LHS tv; convenient for the caller
+breakTyVarCycle_maybe (ctLocOrigin . ctEvLoc -> CycleBreakerOrigin _) _ _ _
   -- see Detail (7) of Note
+  = return Nothing
 
-shouldBreakCycle Given _loc _lhs_tv _rhs
-  = return $ Just BTVC_Given
-shouldBreakCycle flav _loc lhs_tv rhs
-  | ctFlavourContainsDerived flav
-  = do { result <- unifyTest Derived lhs_tv rhs
-       ; return $ case result of
-           NoUnify -> Nothing
-           _       -> Just BTVC_Derived }
-shouldBreakCycle _ _ _ _ = return Nothing
-
--- | Replace all type family applications in the RHS with fresh variables,
--- emitting givens that relate the type family application to the variable.
--- See Note [Type variable cycles] in GHC.Tc.Solver.Canonical.
-breakTyVarCycle :: BreakTyVarCyclesHow
-                -> CtLoc
-                -> TcType                   -- the RHS
-                -> TcS (CoercionN, TcType)  -- new RHS that doesn't have any type families
-                  -- co :: new type ~N old type
--- This could be considerably more efficient. See Detail (5) of Note.
-breakTyVarCycle how loc = go
+breakTyVarCycle_maybe ev SolubleOccursCheckCIS (TyVarLHS lhs_tv) rhs
+  | NomEq <- eq_rel
+  = do { should_break <- final_check
+       ; if should_break then do { (co, new_rhs) <- go rhs
+                                 ; return (Just (lhs_tv, co, new_rhs)) }
+                         else return Nothing }
   where
+    flavour = ctEvFlavour ev
+    eq_rel  = ctEvEqRel ev
+
+    final_check
+      | Given <- flavour
+      = return True
+      | ctFlavourContainsDerived flavour
+      = do { result <- unifyTest Derived lhs_tv rhs
+           ; return $ case result of
+               NoUnify -> False
+               _       -> True }
+      | otherwise
+      = return False
+
+    -- This could be considerably more efficient. See Detail (5) of Note.
     go :: TcType -> TcS (CoercionN, TcType)
     go ty | Just ty' <- rewriterView ty = go ty'
     go (Rep.TyConApp tc tys)
@@ -4001,8 +4000,8 @@ breakTyVarCycle how loc = go
     emit_work :: TcKind                   -- of the function application
               -> TcType                   -- original function application
               -> TcS (CoercionN, TcType)  -- rewritten type (the fresh tyvar)
-    emit_work fun_app_kind fun_app = case how of
-      BTVC_Given   ->
+    emit_work fun_app_kind fun_app = case flavour of
+      Given ->
         do { new_tv <- wrapTcS (TcM.newCycleBreakerTyVar fun_app_kind)
            ; let new_ty     = mkTyVarTy new_tv
                  given_pred = mkHeteroPrimEqPred fun_app_kind fun_app_kind
@@ -4017,14 +4016,17 @@ breakTyVarCycle how loc = go
            ; return (mkNomReflCo new_ty, new_ty) }
                 -- Why reflexive? See Detail (4) of the Note
 
-      BTVC_Derived ->
+      _derived_or_wd ->
         do { new_tv <- wrapTcS (TcM.newFlexiTyVar fun_app_kind)
            ; let new_ty = mkTyVarTy new_tv
            ; co <- emitNewWantedEq new_loc Nominal new_ty fun_app
            ; return (co, new_ty) }
 
       -- See Detail (7) of the Note
-    new_loc = updateCtLocOrigin loc CycleBreakerOrigin
+    new_loc = updateCtLocOrigin (ctEvLoc ev) CycleBreakerOrigin
+
+-- does not fit scenario from Note
+breakTyVarCycle_maybe _ _ _ _ = return Nothing
 
 -- | Fill in CycleBreakerTvs with the variables they stand for.
 -- See Note [Type variable cycles] in GHC.Tc.Solver.Canonical.

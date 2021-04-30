@@ -2333,19 +2333,15 @@ canEqCanLHSFinish ev eq_rel swapped lhs rhs
        -- occurs-check for a function application, which seems awkward.
 
            CanEqNotOK status
-                -- See Note [Type variable cycles]
-             | SolubleOccursCheckCIS <- status
-             , TyVarLHS lhs_tv <- lhs
-             , NomEq <- eq_rel
-             -> do { m_break_how <- shouldBreakCycle (ctEvFlavour ev) loc lhs_tv rhs
-                   ; case m_break_how of
+             -> do { m_stuff <- breakTyVarCycle_maybe ev status lhs rhs
+                   ; case m_stuff of
                      { Nothing ->
-                         do { traceTcS "Decided against breaking tyvar cycle" empty
+                         do { traceTcS "canEqCanLHSFinish can't make a canonical"
+                                       (ppr lhs $$ ppr rhs)
                             ; continueWith (mkIrredCt status new_ev) }
-                     ; Just how ->
+                     ; Just (lhs_tv, co, new_rhs) ->
                 do { traceTcS "canEqCanLHSFinish breaking a cycle" $
-                              ppr how $$ ppr lhs $$ ppr rhs
-                   ; (co, new_rhs) <- breakTyVarCycle how (ctEvLoc ev) rhs
+                              ppr lhs $$ ppr rhs
                    ; traceTcS "new RHS:" (ppr new_rhs)
 
                      -- This check is Detail (1) in the Note
@@ -2363,14 +2359,8 @@ canEqCanLHSFinish ev eq_rel swapped lhs rhs
                              ; continueWith (CEqCan { cc_ev = new_new_ev
                                                     , cc_lhs = lhs
                                                     , cc_rhs = new_rhs
-                                                    , cc_eq_rel = eq_rel }) }}}}
-
-               -- We must not use it for further rewriting!
-             | otherwise
-             -> do { traceTcS "canEqCanLHSFinish can't make a canonical" (ppr lhs $$ ppr rhs)
-                   ; continueWith (mkIrredCt status new_ev) } }
+                                                    , cc_eq_rel = eq_rel }) }}}}}
   where
-    loc  = ctEvLoc ev
     role = eqRelRole eq_rel
 
     lhs_ty = canEqLHSType lhs
