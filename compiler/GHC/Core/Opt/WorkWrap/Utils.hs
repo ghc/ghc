@@ -1006,7 +1006,6 @@ mk_absent_let opts arg
   -- The lifted case: Bind 'absentError' for a nice panic message if we are
   -- wrong (like we were in #11126). See (1) in Note [Absent fillers]
   | Just [LiftedRep] <- mb_mono_prim_reps
-  , pprTrace "mk_absent_let" (ppr arg <+> ppr (idDemandInfo arg)) False
   , not (isStrictDmd (idDemandInfo arg)) -- See (2) in Note [Absent fillers]
   = Just (Let (NonRec arg panic_rhs))
 
