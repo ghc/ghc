@@ -13,11 +13,6 @@
 #include "linker/M32Alloc.h"
 
 #if RTS_LINKER_USE_MMAP
-#if defined(ios_HOST_OS) || defined(darwin_HOST_OS)
-/* Inclusion of system headers usually requires _DARWIN_C_SOURCE on Mac OS X
- * because of some specific defines like MMAP_ANON, MMAP_ANONYMOUS. */
-#define _DARWIN_C_SOURCE 1
-#endif
 #include <sys/mman.h>
 #endif
 
@@ -195,7 +190,8 @@ typedef struct {
     } jumpIsland;
 #elif defined(x86_64_HOST_ARCH)
     uint64_t    addr;
-    uint8_t     jumpIsland[6];
+    // See Note [TLSGD relocation] in elf_tlsgd.c
+    uint8_t     jumpIsland[8];
 #elif defined(arm_HOST_ARCH)
     uint8_t     jumpIsland[16];
 #endif
@@ -399,6 +395,10 @@ int ghciInsertSymbolTable(
 /* Lock-free version of lookupSymbol. When 'dependent' is not NULL, adds it as a
  * dependent to the owner of the symbol. */
 SymbolAddr* lookupDependentSymbol (SymbolName* lbl, ObjectCode *dependent);
+
+/* Perform TLSGD symbol lookup returning the address of the resulting GOT entry,
+ * which in this case holds the module id and the symbol offset. */
+StgInt64 lookupTlsgdSymbol(const char *, unsigned long, ObjectCode *);
 
 extern StrHashTable *symhash;
 
