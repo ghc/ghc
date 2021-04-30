@@ -1537,7 +1537,6 @@ mkTyVarEqErr' dflags ctxt report ct tv1 ty2
     -- We report an "occurs check" even for  a ~ F t a, where F is a type
     -- function; it's not insoluble (because in principle F could reduce)
     -- but we have certainly been unable to solve it
-    -- See Note [Occurs check error] in GHC.Tc.Solver.Canonical
   = let extra2   = mkEqInfoMsg ct ty1 ty2
 
         interesting_tyvars = filter (not . noFreeVarsOfType . tyVarKind) $
@@ -1633,7 +1632,7 @@ mkTyVarEqErr' dflags ctxt report ct tv1 ty2
 
     ty1 = mkTyVarTy tv1
     occ_check_expand       = occCheckForErrors dflags tv1 ty2
-    insoluble_occurs_check = isInsolubleOccursCheck (ctEqRel ct) tv1 ty2
+    insoluble_occurs_check = occ_check_expand `cterHasProblem` cteInsolubleOccurs
 
     what = text $ levelString $
            ctLocTypeOrKind_maybe (ctLoc ct) `orElse` TypeLevel
@@ -2051,8 +2050,6 @@ pprWithExplicitKindsWhenMismatch ty1 ty2 ct
                  -- True when the visible bit of the types look the same,
                  -- so we want to show the kinds in the displayed type
 
-
-
 {- Note [Insoluble occurs check]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider [G] a ~ [a],  [W] a ~ [a] (#13674).  The Given is insoluble
@@ -2063,7 +2060,7 @@ we don't solve it from the Given.  It's very confusing to say
 And indeed even thinking about the Givens is silly; [W] a ~ [a] is
 just as insoluble as Int ~ Bool.
 
-Conclusion: if there's an insoluble occurs check (isInsolubleOccursCheck)
+Conclusion: if there's an insoluble occurs check (cteInsolubleOccurs)
 then report it directly, not in the "cannot deduce X from Y" form.
 This is done in misMatchOrCND (via the insoluble_occurs_check arg)
 

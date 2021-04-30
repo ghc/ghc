@@ -2014,22 +2014,6 @@ and the Id newtype is unwrapped. This is assured by requiring only rewritten
 types in canEqCanLHS *and* having the newtype-unwrapping check above
 the tyvar check in can_eq_nc.
 
-Note [Occurs check error]
-~~~~~~~~~~~~~~~~~~~~~~~~~
-If we have an occurs check error, are we necessarily hosed? Say our
-tyvar is tv1 and the type it appears in is xi2. Because xi2 is function
-free, then if we're computing w.r.t. nominal equality, then, yes, we're
-hosed. Nothing good can come from (a ~ [a]). If we're computing w.r.t.
-representational equality, this is a little subtler. Once again, (a ~R [a])
-is a bad thing, but (a ~R N a) for a newtype N might be just fine. This
-means also that (a ~ b a) might be fine, because `b` might become a newtype.
-
-So, we must check: does tv1 appear in xi2 under any type constructor
-that is generative w.r.t. representational equality? That's what
-isInsolubleOccursCheck does.
-
-See also #10715, which induced this addition.
-
 Note [Put touchable variables on the left]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Ticket #10009, a very nasty example:
