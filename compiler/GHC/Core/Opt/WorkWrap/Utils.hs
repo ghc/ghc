@@ -10,7 +10,7 @@ A library for the ``worker\/wrapper'' back-end to the strictness analyser
 module GHC.Core.Opt.WorkWrap.Utils
    ( WwOpts(..), initWwOpts, mkWwBodies, mkWWstr, mkWorkerArgs
    , DataConPatContext(..)
-   , UnboxingDecision(..), ArgOfInlineableFun(..), wantToUnboxArg
+   , UnboxingDecision(..), ArgOfInlineableFun(..), ArgUnfoldings, wantToUnboxArg
    , findTypeShape
    , isWorkerSmallEnough
    )
@@ -25,7 +25,8 @@ import GHC.Core.Utils   ( exprType, mkCast, mkDefaultCase, mkSingleAltCase
                         , bindNonRec, dataConRepFSInstPat
                         , normSplitTyConApp_maybe, exprIsHNF )
 import GHC.Types.Id
-import GHC.Types.Id.Info ( JoinArity )
+import GHC.Types.Id.Info ( JoinArity, zapUnfolding )
+
 import GHC.Core.DataCon
 import GHC.Types.Demand
 import GHC.Types.Cpr
@@ -120,6 +121,56 @@ probably slightly paranoid, but OK in practice.)  If it isn't the
 same, we ``revise'' the strictness info, so that we won't propagate
 the unusable strictness-info into the interfaces.
 
+Note [Overview over the Implementation of WW]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The implementation of WW is not quite trivial to understand as the actual
+logic is pretty scattered.
+
+In order to make it easer to grok for the next person to come along here
+is a high level overview for how functions are processed.
+
+The entry point is tryWW which:
+* Checks a few simple conditions to see if a function is suitable for WW.
+* Does some zapping on the functions id that's really unrelated to WW.
+* Passes the (unzapped) idInfo along. (Maybe this should be the zapped one?)
+* Invokes WW proper either via splitThunk or splitFun. These will return
+  an expression/id to use instead of the original function.
+
+We ignore splitThunk here since it does strictly less than splitFun. So if you understand
+splitFun splitThunk also becomes easy to understand.
+
+We then continue into splitFun. It does a bit of book keeping before:
+* Calling mkWwBodies which will return ways to construct the wrapper/worker.
+  See WwResult along with some extra information about the worker.
+* The result of mkWwBodies is passed on to mkWWBindPair which will instantiate
+  the worker/wrapper and produce the actual bindings.
+
+mkWWBindPair does the "boring" work of setting up the idInfo for worker
+and wrapper. As well as instantiating the worker/wrapper by applying the
+Id/Rhs that is missing from the result of mkWwBodies.
+
+mkWwBodies once again does it's work by calling onto a number of other
+functions:
+* We start by calling mkWWargs. This will produce:
+  + A list of wrapper arguments (ids).
+  + A wrapper function, that will bring in scope all wrapper arguments via lambdas.
+  + A worker function, that will bring into scope all wrapper arguments via lets.
+* We then feed this into mkWWstr which will add unpacking. It does so by calling mkWWstr_one for each argument.
+  Note that the arguments it works on are (initially) the *wrapper* arguments created by mkWWargs. But it can
+  add new arguments as it goes if an argument ends up getting unpacked.
+  It produces:
+  + A list of *worker* arguments.
+  + A function that will bring into scope all the worker arguments via cases. eg. (f e = case x of I# w_x -> e)
+  + A function that will bring into scope all wrapper arguments into scope based on lets. This is done via lets which
+    use the worker arguments.
+  + It also inserts absent bindings for absent arguments.
+* We then call mkWWcpr_entry which deals with CPRing the worker/wrapper, similar to mkWWstr it also works by returning
+  functions which need to be applied to the RHS/original function. The details for this are in Note [Worker/wrapper for CPR]
+* The results of the above steps are then combined into a `WwResult` if WW is deemed beneficial, and the result returned to mkWWBindPair.
+
+Inside mkWWBindPair we then call these functions to construct the *actual* RHS's of the worker/wrapper which we return if we performed WW.
+If not we simple return the original binding.
 
 ************************************************************************
 *                                                                      *
@@ -154,6 +205,9 @@ type WwResult
      Id -> CoreExpr,        -- Wrapper body, lacking only the worker Id
      CoreExpr -> CoreExpr)  -- Worker body, lacking the original function rhs
 
+type ArgUnfoldings = Maybe [Unfolding]
+
+-- | Really just `id`
 nop_fn :: CoreExpr -> CoreExpr
 nop_fn body = body
 
@@ -163,6 +217,7 @@ mkWwBodies :: WwOpts
            -> Id             -- The original function
            -> [Demand]       -- Strictness of original function
            -> Cpr            -- Info about function result
+           -> ArgUnfoldings  -- Unfolding info for value arguments
            -> UniqSM (Maybe WwResult)
 
 -- wrap_fn_args E       = \x y -> E
@@ -176,12 +231,12 @@ mkWwBodies :: WwOpts
 --                        let x = (a,b) in
 --                        E
 
-mkWwBodies opts rhs_fvs fun_id demands cpr_info
+mkWwBodies opts rhs_fvs fun_id demands cpr_info join_arg_unfs
   = do  { let empty_subst = mkEmptyTCvSubst (mkInScopeSet rhs_fvs)
                 -- See Note [Freshen WW arguments]
 
         ; (wrap_args, wrap_fn_args, work_fn_args, res_ty)
-             <- mkWWargs empty_subst fun_ty demands
+             <- mkWWargs empty_subst fun_ty demands join_arg_unfs
         ; (useful1, work_args, wrap_fn_str, work_fn_str)
              <- mkWWstr opts inlineable_flag wrap_args
 
@@ -445,22 +500,24 @@ mkWWargs :: TCvSubst            -- Freshening substitution to apply to the type
                                 --   See Note [Freshen WW arguments]
          -> Type                -- The type of the function
          -> [Demand]     -- Demands and one-shot info for value arguments
+         -> ArgUnfoldings -- Unfolding info for value arguments
          -> UniqSM  ([Var],            -- Wrapper args
                      CoreExpr -> CoreExpr,      -- Wrapper fn
                      CoreExpr -> CoreExpr,      -- Worker fn
                      Type)                      -- Type of wrapper body
 
-mkWWargs subst fun_ty demands
+mkWWargs subst fun_ty demands join_unfolds
   | null demands
   = return ([], nop_fn, nop_fn, substTy subst fun_ty)
 
   | (dmd:demands') <- demands
+  , (unf, join_unfolds') <- split_argUnfolds join_unfolds
   , Just (mult, arg_ty, fun_ty') <- splitFunTy_maybe fun_ty
   = do  { uniq <- getUniqueM
         ; let arg_ty' = substScaledTy subst (Scaled mult arg_ty)
-              id = mk_wrap_arg uniq arg_ty' dmd
+              id = mk_wrap_arg uniq arg_ty' dmd unf
         ; (wrap_args, wrap_fn_args, work_fn_args, res_ty)
-              <- mkWWargs subst fun_ty' demands'
+              <- mkWWargs subst fun_ty' demands' join_unfolds'
         ; return (id : wrap_args,
                   Lam id . wrap_fn_args,
                   apply_or_bind_then work_fn_args (varToCoreExpr id),
@@ -471,7 +528,7 @@ mkWWargs subst fun_ty demands
         ; let (subst', tv') = cloneTyVarBndr subst tv uniq
                 -- See Note [Freshen WW arguments]
         ; (wrap_args, wrap_fn_args, work_fn_args, res_ty)
-             <- mkWWargs subst' fun_ty' demands
+             <- mkWWargs subst' fun_ty' demands join_unfolds
         ; return (tv' : wrap_args,
                   Lam tv' . wrap_fn_args,
                   apply_or_bind_then work_fn_args (mkTyArg (mkTyVarTy tv')),
@@ -487,7 +544,7 @@ mkWWargs subst fun_ty demands
         -- simply coerces.
 
   = do { (wrap_args, wrap_fn_args, work_fn_args, res_ty)
-            <-  mkWWargs subst rep_ty demands
+            <-  mkWWargs subst rep_ty demands join_unfolds
        ; let co' = substCo subst co
        ; return (wrap_args,
                   \e -> Cast (wrap_fn_args e) (mkSymCo co'),
@@ -504,17 +561,29 @@ mkWWargs subst fun_ty demands
     apply_or_bind_then k arg fun
       = k $ mkCoreApp (text "mkWWargs") fun arg
 
+    -- Split of the unfolding of the first argument if possible
+    split_argUnfolds :: ArgUnfoldings -> (Maybe Unfolding, ArgUnfoldings)
+    split_argUnfolds Nothing = (Nothing, Nothing)
+    split_argUnfolds (Just []) = (Nothing, Just [])
+    split_argUnfolds (Just (x:xs)) = (Just x, Just xs)
+
 applyToVars :: [Var] -> CoreExpr -> CoreExpr
 applyToVars vars fn = mkVarApps fn vars
 
-mk_wrap_arg :: Unique -> Scaled Type -> Demand -> Id
-mk_wrap_arg uniq (Scaled w ty) dmd
-  = mkSysLocalOrCoVar (fsLit "w") uniq w ty
-       `setIdDemandInfo` dmd
+mk_wrap_arg :: Unique -> Scaled Type -> Demand -> Maybe Unfolding -> Id
+mk_wrap_arg uniq (Scaled w ty) dmd unf
+  = -- (\x -> pprTrace "mk_wrap_arg" (ppr x <+> ppr unf <+> ppr dmd) x) $
+    (mkSysLocalOrCoVar (fsLit "w") uniq w ty)
+        `setIdDemandInfo` dmd
+        -- Only retain evaluatedness
+        -- See Note [Absent fillers] point 2(.2)
+        `setIdUnfolding` (maybe noUnfolding (zapUnfolding) unf)
+
+
 
 {- Note [Freshen WW arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Wen we do a worker/wrapper split, we must not in-scope names as the arguments
+Wen we do a worker/wrapper split, we must not use in-scope names as the arguments
 of the worker, else we'll get name capture.  E.g.
 
    -- y1 is in scope from further out
@@ -984,15 +1053,20 @@ unbox_one_arg opts arg cs
        ; let ex_name_fss     = map getOccFS $ dataConExTyCoVars dc
              (ex_tvs', arg_ids) =
                dataConRepFSInstPat (ex_name_fss ++ repeat ww_prefix) pat_bndrs_uniqs (idMult arg) dc tc_args
+             str_marks = dataConRepStrictness dc
+             markStrict v MarkedStrict = v `setIdUnfolding` evaldUnfolding
+             markStrict v NotMarkedStrict = v
              arg_ids'  = zipWithEqual "unbox_one_arg" setIdDemandInfo arg_ids cs
+             arg_ids'' = zipWithEqual "unbox_one_arg" markStrict arg_ids' str_marks
              unbox_fn  = mkUnpackCase (Var arg) co (idMult arg)
-                                      dc (ex_tvs' ++ arg_ids')
-             arg_no_unf = zapStableUnfolding arg
+                                      dc (ex_tvs' ++ arg_ids'')
+             arg_no_unf = -- zapStableUnfolding arg
+                          setIdUnfolding arg evaldUnfolding
                           -- See Note [Zap unfolding when beta-reducing]
                           -- in GHC.Core.Opt.Simplify; and see #13890
              rebox_fn   = Let (NonRec arg_no_unf con_app)
-             con_app    = mkConApp2 dc tc_args (ex_tvs' ++ arg_ids') `mkCast` mkSymCo co
-       ; (_, worker_args, wrap_fn, work_fn) <- mkWWstr opts NotArgOfInlineableFun (ex_tvs' ++ arg_ids')
+             con_app    = mkConApp2 dc tc_args (ex_tvs' ++ arg_ids'') `mkCast` mkSymCo co
+       ; (_, worker_args, wrap_fn, work_fn) <- mkWWstr opts NotArgOfInlineableFun (ex_tvs' ++ arg_ids'')
        ; return (True, worker_args, unbox_fn . wrap_fn, work_fn . rebox_fn) }
                           -- Don't pass the arg, rebox instead
 
@@ -1006,7 +1080,7 @@ mk_absent_let opts arg
   -- The lifted case: Bind 'absentError' for a nice panic message if we are
   -- wrong (like we were in #11126). See (1) in Note [Absent fillers]
   | Just [LiftedRep] <- mb_mono_prim_reps
-  , not (isStrictDmd (idDemandInfo arg)) -- See (2) in Note [Absent fillers]
+  , not (isStrictDmd (idDemandInfo arg) || evald_arg) -- See (2) in Note [Absent fillers]
   = Just (Let (NonRec arg panic_rhs))
 
   -- The default case for mono rep: Bind @RUBBISH[prim_reps] \@arg_ty@
@@ -1020,6 +1094,10 @@ mk_absent_let opts arg
   = WARN( True, text "No absent value for" <+> ppr arg_ty )
     Nothing
   where
+    evald_arg = isEvaldUnfolding . idUnfolding $ arg
+
+
+
     arg_ty = idType arg
     mb_mono_prim_reps = typeMonoPrimRep_maybe arg_ty
 
@@ -1195,14 +1273,79 @@ Needless to say, there are some wrinkles:
      How do we detect when we are about to put an error-thunk in a strict field?
      Ideally, we'd just look at the 'StrictnessMark' of the DataCon's field, but
      it's quite nasty to thread the marks though 'mkWWstr' and 'mkWWstr_one'.
-     So we rather look out for a necessary condition for strict fields:
+
+     We now perform two checks, each one implying we can't use an error thunk.
+
+   2.1 We look out for a common condition for strict fields:
      Note [Add demands for strict constructors] makes it so that the demand on
      'zs' is absent and /strict/: It will get cardinality 'C_10', the empty
      interval, rather than 'C_00'. Hence the 'isStrictDmd' check: It guarantees
-     we never fill in an error-thunk for an absent strict field.
-     But that also means we emit a rubbish lit for other args that have
-     cardinality 'C_10' (say, the arg to a bottoming function) where we could've
-     used an error-thunk, but that's a small price to pay for simplicity.
+     we never fill in an error-thunk for an absent strict field if it's demanded.
+
+   2.2. However 2.1 turned out to be insufficient in certain situations.
+      In #19766 we had a situation where a join point argument (arg1) was used only in
+      the *unfolding* of another argument (arg2) to the same join point. arg2
+      was used lazily, which prevents us from giving a strict demand to arg1.
+      This caused the check described in 2.1 to fall apart.
+
+      The problem here boils down to:
+      * We binder getting W/Wed
+      * We rebox a value inside the worker
+      * When reboxing we replace an absent argument with an absentError that goes into
+        a strict field.
+
+      For a better example imagine starting out with something along these lines:
+
+          join foo arg1 tuple@(ST x _y) =
+              ... x ...
+              ... g arg1 tuple ...
+          in
+          ... jump foo arg1 (strict_tuple)
+
+      With `g` being:
+        * lazy in it's tuple argument
+        * Having an absent demand the second component (_y) of the tuple.
+
+      Before we run WW on foo we already transformed this into:
+
+          join foo arg1 x[Dmd=.., Unf=OtherCon[]] _y[Dmd=A, Unf=OtherCon[]] tuple[Dmd=LP(.., A), Unf = ST x _y] =
+              ... x ...
+              ... g arg1 tuple ...
+          in
+            ... case strict_tuple of strict_tuple'
+                ST x y -> jump foo arg1 x y strict_tuple'
+
+      Now WW has a go at foo. It get's rid of the absent argument leaving us with:
+
+          join foo w_arg1 x w_x w_tuple[Dmd=LP(.., A)] =
+              let w__y[Dmd=A] = <mk_absent_let>
+                  arg1 = w_arg1
+                  x[Dmd=.., Unf=OtherCon[]] = w_x
+                  _y[Dmd=A, Unf=OtherCon[]] = w__y
+                  tuple[Dmd=LP(..,A), Unf = ST x _y] = w_tuple
+              in
+              ... x ...
+              ... g arg1 tuple ...
+          in ...
+
+      _y *is* absent. We eventually replace tuple by it's unfolding, do some inlining and end up
+      with code like ... g arg1 (ST x <mk_absent_let>) ...
+
+      If <mk_absent_let> gives us a RubbishLit this is fine. But mk_absent_let only looks at the variable it's
+      initially bound to (w__y) to determine what RHS to produce. Which is absent so we produce an
+      absentError that ends up in a strict field. Because of #16970 we don't ever want to put an
+      error thunk into a strict field.
+
+      So we don't only transfer strictness but also evaluatedness to unfoldings of the w_* arguments. Then
+      mk_absent_let can look at the evaluatedness and will produce RubbishLit if it's bound to an Id which
+      should be evaluated.
+
+      This no doubt means we sometimes end up with a RubbishLit when an absentError
+      could have been used. But in absence of compiler bugs that's not a problem and
+      it's a small price to pay for simplicity.
+
+      We hope one or both of these checks can go away with #17530, in particular 2.2.
+      So if you read this and #17530 has been resolved please give this a try.
 
   3. We can only emit a RubbishLit if the arg's type @arg_ty@ is mono-rep, e.g.
      of the form @TYPE rep@ where @rep@ is not (and doesn't contain) a variable.

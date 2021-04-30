@@ -358,3 +358,4 @@ test('T13873',  [ grep_errmsg(r'SPEC') ], compile, ['-O -ddump-rules'])
 
 # Look for a specialisation rule for wimwam
 test('T19672', normal, compile, ['-O2 -ddump-rules'])
+test('T19766', [ only_ways(['optasm']), grep_errmsg(r'absentError') ], compile, ['-ddump-worker-wrapper'])
