@@ -1105,3 +1105,28 @@ bitReverse64 (W64# w#) = W64# (bitReverse# w#)
     fromIntegral = naturalFromWord . (fromIntegral :: Word64 -> Word)
   #-}
 #endif
+
+shiftRLWord8# :: Word8# -> Int# -> Word8#
+a `shiftRLWord8#` b | isTrue# (b >=# 8#) = wordToWord8# 0##
+                    | otherwise          = a `uncheckedShiftRLWord8#` b
+
+shiftRLWord16# :: Word16# -> Int# -> Word16#
+a `shiftRLWord16#` b | isTrue# (b >=# 16#) = wordToWord16# 0##
+                     | otherwise           = a `uncheckedShiftRLWord16#` b
+
+shiftRLWord32# :: Word32# -> Int# -> Word32#
+a `shiftRLWord32#` b | isTrue# (b >=# 32#) = wordToWord32# 0##
+                     | otherwise           = a `uncheckedShiftRLWord32#` b
+
+shiftLWord8# :: Word8# -> Int# -> Word8#
+a `shiftLWord8#` b | isTrue# (b >=# 8#) = wordToWord8# 0##
+                   | otherwise          = a `uncheckedShiftLWord8#` b
+
+shiftLWord16# :: Word16# -> Int# -> Word16#
+a `shiftLWord16#` b | isTrue# (b >=# 16#) = wordToWord16# 0##
+                    | otherwise           = a `uncheckedShiftLWord16#` b
+
+shiftLWord32# :: Word32# -> Int# -> Word32#
+a `shiftLWord32#` b | isTrue# (b >=# 32#) = wordToWord32# 0##
+                    | otherwise           = a `uncheckedShiftLWord32#` b
+
