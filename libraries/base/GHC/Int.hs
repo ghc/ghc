@@ -222,8 +222,8 @@ instance Bits Int8 where
     bitSize i                 = finiteBitSize i
     isSigned _                = True
     popCount (I8# x#)         = I# (word2Int# (popCnt8# (int2Word# (int8ToInt# x#))))
-    bit                       = bitDefault
-    testBit                   = testBitDefault
+    bit i                     = bitDefault i
+    testBit a i               = testBitDefault a i
 
 -- | @since 4.6.0.0
 instance FiniteBits Int8 where
@@ -433,8 +433,8 @@ instance Bits Int16 where
     bitSize i                  = finiteBitSize i
     isSigned _                 = True
     popCount (I16# x#)         = I# (word2Int# (popCnt16# (int2Word# (int16ToInt# x#))))
-    bit                        = bitDefault
-    testBit                    = testBitDefault
+    bit i                      = bitDefault i
+    testBit a i                = testBitDefault a i
 
 -- | @since 4.6.0.0
 instance FiniteBits Int16 where
@@ -631,8 +631,8 @@ instance Bits Int32 where
     bitSize i                  = finiteBitSize i
     isSigned _                 = True
     popCount (I32# x#)         = I# (word2Int# (popCnt32# (int2Word# (int32ToInt# x#))))
-    bit                        = bitDefault
-    testBit                    = testBitDefault
+    bit i                      = bitDefault i
+    testBit a i                = testBitDefault a i
 
 -- | @since 4.6.0.0
 instance FiniteBits Int32 where
@@ -865,14 +865,14 @@ instance Bits Int64 where
     (I64# x#) `xor` (I64# y#)  = I64# (word64ToInt64# (int64ToWord64# x# `xor64#` int64ToWord64# y#))
     complement (I64# x#)       = I64# (word64ToInt64# (not64# (int64ToWord64# x#)))
     (I64# x#) `shift` (I# i#)
-        | isTrue# (i# >=# 0#)  = I64# (x# `iShiftL64#` i#)
-        | otherwise            = I64# (x# `iShiftRA64#` negateInt# i#)
+        | isTrue# (i# >=# 0#)  = I64# (x# `shiftLInt64#` i#)
+        | otherwise            = I64# (x# `shiftRAInt64#` negateInt# i#)
     (I64# x#) `shiftL` (I# i#)
-        | isTrue# (i# >=# 0#)  = I64# (x# `iShiftL64#` i#)
+        | isTrue# (i# >=# 0#)  = I64# (x# `shiftLInt64#` i#)
         | otherwise            = overflowError
     (I64# x#) `unsafeShiftL` (I# i#) = I64# (x# `uncheckedIShiftL64#` i#)
     (I64# x#) `shiftR` (I# i#)
-        | isTrue# (i# >=# 0#)  = I64# (x# `iShiftRA64#` i#)
+        | isTrue# (i# >=# 0#)  = I64# (x# `shiftRAInt64#` i#)
         | otherwise            = overflowError
     (I64# x#) `unsafeShiftR` (I# i#) = I64# (x# `uncheckedIShiftRA64#` i#)
     (I64# x#) `rotate` (I# i#)
@@ -889,23 +889,8 @@ instance Bits Int64 where
     isSigned _                 = True
     popCount (I64# x#)         =
         I# (word2Int# (popCnt64# (int64ToWord64# x#)))
-    bit                        = bitDefault
-    testBit                    = testBitDefault
-
--- give the 64-bit shift operations the same treatment as the 32-bit
--- ones (see GHC.Base), namely we wrap them in tests to catch the
--- cases when we're shifting more than 64 bits to avoid unspecified
--- behaviour in the C shift operations.
-
-iShiftL64#, iShiftRA64# :: Int64# -> Int# -> Int64#
-
-a `iShiftL64#` b  | isTrue# (b >=# 64#) = intToInt64# 0#
-                  | otherwise           = a `uncheckedIShiftL64#` b
-
-a `iShiftRA64#` b | isTrue# (b >=# 64#) = if isTrue# (a `ltInt64#` (intToInt64# 0#))
-                                          then intToInt64# (-1#)
-                                          else intToInt64# 0#
-                  | otherwise = a `uncheckedIShiftRA64#` b
+    bit i                      = bitDefault i
+    testBit a i                = testBitDefault a i
 
 -- No RULES for RealFrac methods if Int is smaller than Int64, we can't
 -- go through Int and whether going through Integer is faster is uncertain.
@@ -1090,46 +1075,63 @@ so the
 order gives us better code in the common case.
 -}
 
+-------------------------------------------------------------------------------
+
+-- unchecked shift primops may be lowered into C shift operations which have
+-- unspecified behaviour if the amount of bits to shift is greater or equal to the word
+-- size in bits.
+-- The following safe shift operations wrap unchecked primops to take this into
+-- account: 0 is consistently returned when the shift amount is too big.
+
 shiftRLInt8# :: Int8# -> Int# -> Int8#
-a `shiftRLInt8#` b | isTrue# (b >=# 8#) = intToInt8# 0#
-                   | otherwise          = a `uncheckedShiftRLInt8#` b
+a `shiftRLInt8#` b = uncheckedShiftRLInt8# a b `andInt8#` intToInt8# (shift_mask 8# b)
 
 shiftRLInt16# :: Int16# -> Int# -> Int16#
-a `shiftRLInt16#` b | isTrue# (b >=# 16#) = intToInt16# 0#
-                    | otherwise           = a `uncheckedShiftRLInt16#` b
+a `shiftRLInt16#` b = uncheckedShiftRLInt16# a b `andInt16#` intToInt16# (shift_mask 16# b)
 
 shiftRLInt32# :: Int32# -> Int# -> Int32#
-a `shiftRLInt32#` b | isTrue# (b >=# 32#) = intToInt32# 0#
-                    | otherwise           = a `uncheckedShiftRLInt32#` b
+a `shiftRLInt32#` b = uncheckedShiftRLInt32# a b `andInt32#` intToInt32# (shift_mask 32# b)
+
+
 
 shiftLInt8# :: Int8# -> Int# -> Int8#
-a `shiftLInt8#` b | isTrue# (b >=# 8#) = intToInt8# 0#
-                  | otherwise          = a `uncheckedShiftLInt8#` b
+a `shiftLInt8#` b = uncheckedShiftLInt8# a b `andInt8#` intToInt8# (shift_mask 8# b)
 
 shiftLInt16# :: Int16# -> Int# -> Int16#
-a `shiftLInt16#` b | isTrue# (b >=# 16#) = intToInt16# 0#
-                   | otherwise           = a `uncheckedShiftLInt16#` b
+a `shiftLInt16#` b = uncheckedShiftLInt16# a b `andInt16#` intToInt16# (shift_mask 16# b)
 
 shiftLInt32# :: Int32# -> Int# -> Int32#
-a `shiftLInt32#` b | isTrue# (b >=# 32#) = intToInt32# 0#
-                   | otherwise           = a `uncheckedShiftLInt32#` b
+a `shiftLInt32#` b = uncheckedShiftLInt32# a b `andInt32#` intToInt32# (shift_mask 32# b)
+
+shiftLInt64# :: Int64# -> Int# -> Int64#
+a `shiftLInt64#` b  = uncheckedIShiftL64# a b `andInt64#` intToInt64# (shift_mask 64# b)
 
 
 shiftRAInt8# :: Int8# -> Int# -> Int8#
-a `shiftRAInt8#` b | isTrue# (b >=# 8#) = if isTrue# (a `ltInt8#` (intToInt8# 0#))
-                                             then intToInt8# (-1#)
-                                             else intToInt8# 0#
+a `shiftRAInt8#` b | isTrue# (b >=# 8#) = intToInt8# (negateInt# (a `ltInt8#` (intToInt8# 0#)))
                    | otherwise          = a `uncheckedShiftRAInt8#` b
 
 shiftRAInt16# :: Int16# -> Int# -> Int16#
-a `shiftRAInt16#` b | isTrue# (b >=# 16#) = if isTrue# (a `ltInt16#` (intToInt16# 0#))
-                                               then intToInt16# (-1#)
-                                               else intToInt16# 0#
+a `shiftRAInt16#` b | isTrue# (b >=# 16#) = intToInt16# (negateInt# (a `ltInt16#` (intToInt16# 0#)))
                     | otherwise           = a `uncheckedShiftRAInt16#` b
 
 shiftRAInt32# :: Int32# -> Int# -> Int32#
-a `shiftRAInt32#` b | isTrue# (b >=# 32#) = if isTrue# (a `ltInt32#` (intToInt32# 0#))
-                                               then intToInt32# (-1#)
-                                               else intToInt32# 0#
+a `shiftRAInt32#` b | isTrue# (b >=# 32#) = intToInt32# (negateInt# (a `ltInt32#` (intToInt32# 0#)))
                     | otherwise           = a `uncheckedShiftRAInt32#` b
 
+shiftRAInt64# :: Int64# -> Int# -> Int64#
+a `shiftRAInt64#` b | isTrue# (b >=# 64#) = intToInt64# (negateInt# (a `ltInt64#` (intToInt64# 0#)))
+                    | otherwise           = a `uncheckedIShiftRA64#` b
+
+
+andInt8# :: Int8# -> Int8# -> Int8#
+x `andInt8#` y = word8ToInt8# (int8ToWord8# x `andWord8#` int8ToWord8# y)
+
+andInt16# :: Int16# -> Int16# -> Int16#
+x `andInt16#` y = word16ToInt16# (int16ToWord16# x `andWord16#` int16ToWord16# y)
+
+andInt32# :: Int32# -> Int32# -> Int32#
+x `andInt32#` y = word32ToInt32# (int32ToWord32# x `andWord32#` int32ToWord32# y)
+
+andInt64# :: Int64# -> Int64# -> Int64#
+x `andInt64#` y = word64ToInt64# (int64ToWord64# x `and64#` int64ToWord64# y)

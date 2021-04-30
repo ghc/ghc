@@ -1664,41 +1664,48 @@ split again.
 -- Note that these wrappers still produce undefined results when the
 -- second argument (the shift amount) is negative.
 
+-- | This function is used to implement branchless shifts. If the number of bits
+-- to shift is greater than or equal to the type size in bits, then the shift
+-- must return 0.  Instead of doing a test, we use a mask obtained via this
+-- function which is branchless too.
+--
+--    shift_mask m b
+--      | b < m     = 0xFF..FF
+--      | otherwise = 0
+--
+shift_mask :: Int# -> Int# -> Int#
+{-# INLINE shift_mask #-}
+shift_mask m b = negateInt# (b <# m)
+
 -- | Shift the argument left by the specified number of bits
 -- (which must be non-negative).
 shiftL# :: Word# -> Int# -> Word#
-a `shiftL#` b   | isTrue# (b >=# WORD_SIZE_IN_BITS#) = 0##
-                | otherwise                          = a `uncheckedShiftL#` b
+a `shiftL#` b = (a `uncheckedShiftL#` b) `and#` int2Word# (shift_mask WORD_SIZE_IN_BITS# b)
 
 -- | Shift the argument right by the specified number of bits
 -- (which must be non-negative).
 -- The "RL" means "right, logical" (as opposed to RA for arithmetic)
 -- (although an arithmetic right shift wouldn't make sense for Word#)
 shiftRL# :: Word# -> Int# -> Word#
-a `shiftRL#` b  | isTrue# (b >=# WORD_SIZE_IN_BITS#) = 0##
-                | otherwise                          = a `uncheckedShiftRL#` b
+a `shiftRL#` b = (a `uncheckedShiftRL#` b) `and#` int2Word# (shift_mask WORD_SIZE_IN_BITS# b)
 
 -- | Shift the argument left by the specified number of bits
 -- (which must be non-negative).
 iShiftL# :: Int# -> Int# -> Int#
-a `iShiftL#` b  | isTrue# (b >=# WORD_SIZE_IN_BITS#) = 0#
-                | otherwise                          = a `uncheckedIShiftL#` b
+a `iShiftL#` b = (a `uncheckedIShiftL#` b) `andI#` shift_mask WORD_SIZE_IN_BITS# b
 
 -- | Shift the argument right (signed) by the specified number of bits
 -- (which must be non-negative).
 -- The "RA" means "right, arithmetic" (as opposed to RL for logical)
 iShiftRA# :: Int# -> Int# -> Int#
-a `iShiftRA#` b | isTrue# (b >=# WORD_SIZE_IN_BITS#) = if isTrue# (a <# 0#)
-                                                          then (-1#)
-                                                          else 0#
+a `iShiftRA#` b | isTrue# (b >=# WORD_SIZE_IN_BITS#) = negateInt# (a <# 0#)
                 | otherwise                          = a `uncheckedIShiftRA#` b
 
 -- | Shift the argument right (unsigned) by the specified number of bits
 -- (which must be non-negative).
 -- The "RL" means "right, logical" (as opposed to RA for arithmetic)
 iShiftRL# :: Int# -> Int# -> Int#
-a `iShiftRL#` b | isTrue# (b >=# WORD_SIZE_IN_BITS#) = 0#
-                | otherwise                          = a `uncheckedIShiftRL#` b
+a `iShiftRL#` b = (a `uncheckedIShiftRL#` b) `andI#` shift_mask WORD_SIZE_IN_BITS# b
 
 -- Rules for C strings (the functions themselves are now in GHC.CString)
 {-# RULES
