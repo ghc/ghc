@@ -500,9 +500,10 @@ tryWW dflags fam_envs is_rec fn_id rhs
         -- See Note [Don't w/w inline small non-loop-breaker things]
 
   | is_fun && is_eta_exp
-  = splitFun dflags fam_envs new_fn_id fn_info wrap_dmds div cpr rhs
+  = splitFun dflags fam_envs new_fn_id fn_info wrap_dmds div cpr join_unfds rhs
 
-  | isNonRec is_rec, is_thunk                        -- See Note [Thunk splitting]
+  | isNonRec is_rec, is_thunk
+  -- See Note [Thunk splitting]
   = splitThunk dflags fam_envs is_rec new_fn_id rhs
 
   | otherwise
@@ -519,6 +520,12 @@ tryWW dflags fam_envs is_rec fn_id rhs
     cpr          = ASSERT2( isJoinId fn_id || cpr_ty == topCprType || ct_arty cpr_ty == arityInfo fn_info
                           , ppr fn_id <> colon <+> text "ct_arty:" <+> int (ct_arty cpr_ty) <+> text "arityInfo:" <+> ppr (arityInfo fn_info))
                    ct_cpr cpr_ty
+
+    join_unfds = case isJoinId_maybe fn_id of
+        Just j_arity ->
+          -- TODO: This also collects type arguments, is that right?
+          Just $ map idUnfolding . fst . collectNBinders j_arity $ rhs
+        Nothing -> Nothing
 
     new_fn_id = zapIdUsedOnceInfo (zapIdUsageEnvInfo fn_id)
         -- See Note [Zapping DmdEnv after Demand Analyzer] and
@@ -602,16 +609,19 @@ See https://gitlab.haskell.org/ghc/ghc/merge_requests/312#note_192064.
 
 
 ---------------------
-splitFun :: DynFlags -> FamInstEnvs -> Id -> IdInfo -> [Demand] -> Divergence -> Cpr -> CoreExpr
+splitFun :: DynFlags -> FamInstEnvs -> Id -> IdInfo -> [Demand] -> Divergence -> Cpr
+         -> Maybe [Unfolding]
+
+         -> CoreExpr
          -> UniqSM [(Id, CoreExpr)]
-splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
+splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr join_arg_unfs rhs
   | isRecordSelector fn_id  -- See Note [No worker/wrapper for record selectors]
   = return [ (fn_id, rhs ) ]
 
   | otherwise
   = WARN( not (wrap_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr cpr) )
           -- The arity should match the signature
-    do { mb_stuff <- mkWwBodies (initWwOpts dflags fam_envs) rhs_fvs fn_id wrap_dmds use_cpr_info
+    do { mb_stuff <- mkWwBodies (initWwOpts dflags fam_envs) rhs_fvs fn_id wrap_dmds use_cpr_info join_arg_unfs
        ; case mb_stuff of
             Nothing -> return [(fn_id, rhs)]
 
