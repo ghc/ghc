@@ -21,7 +21,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Types.Constraint
 import GHC.Core.Predicate
 import GHC.Tc.Utils.TcMType
-import GHC.Tc.Utils.Unify( occCheckForErrors, CheckTyEqResult(..) )
+import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Env( tcInitTidyEnv )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Origin
@@ -1554,7 +1554,7 @@ mkTyVarEqErr' dflags ctxt report ct tv1 ty2
             , report
             ]
 
-  | CTE_Occurs <- occ_check_expand
+  | cterHasOccursCheck occ_check_expand
     -- We report an "occurs check" even for  a ~ F t a, where F is a type
     -- function; it's not insoluble (because in principle F could reduce)
     -- but we have certainly been unable to solve it
@@ -1575,7 +1575,7 @@ mkTyVarEqErr' dflags ctxt report ct tv1 ty2
     in
     mconcat [headline_msg, extra2, extra3, report]
 
-  | CTE_Bad <- occ_check_expand
+  | occ_check_expand `cterHasProblem` cteImpredicative
   = let msg = vcat [ text "Cannot instantiate unification variable"
                      <+> quotes (ppr tv1)
                    , hang (text "with a" <+> what <+> text "involving polytypes:") 2 (ppr ty2) ]
