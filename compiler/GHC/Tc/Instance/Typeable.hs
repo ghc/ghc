@@ -47,7 +47,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Data.FastString ( FastString, mkFastString, fsLit )
 
-import Control.Monad.Trans.State
+import Control.Monad.Trans.State.Strict
 import Control.Monad.Trans.Class (lift)
 import Data.Maybe ( isJust )
 import Data.Word( Word64 )
