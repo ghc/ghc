@@ -2253,10 +2253,10 @@ canEqCanLHS2 ev eq_rel swapped lhs1 ps_xi1 lhs2 ps_xi2 mco
 
                -- If we have F a ~ F (F a), we want to swap.
              swap_for_occurs
-               | CTE_OK     <- checkTyFamEq dflags fun_tc2 fun_args2
-                                            (mkTyConApp fun_tc1 fun_args1)
-               , CTE_Occurs <- checkTyFamEq dflags fun_tc1 fun_args1
-                                            (mkTyConApp fun_tc2 fun_args2)
+               | cterHasNoProblem   $ checkTyFamEq dflags fun_tc2 fun_args2
+                                                   (mkTyConApp fun_tc1 fun_args1)
+               , cterHasOccursCheck $ checkTyFamEq dflags fun_tc1 fun_args1
+                                                   (mkTyConApp fun_tc2 fun_args2)
                = True
 
                | otherwise
@@ -2301,7 +2301,8 @@ canEqTyVarFunEq ev eq_rel swapped tv1 ps_xi1 fun_tc2 fun_args2 ps_xi2 mco
   = do { can_unify <- unifyTest (ctEvFlavour ev) tv1 rhs
        ; dflags    <- getDynFlags
        ; if | case can_unify of { NoUnify -> False; _ -> True }
-            , CTE_OK <- checkTyVarEq dflags YesTypeFamilies tv1 rhs
+            , cterHasNoProblem $
+                checkTyVarEq dflags tv1 rhs `cterRemoveProblem` cteTypeFamily
             -> canEqCanLHSFinish ev eq_rel swapped (TyVarLHS tv1) rhs
 
             | otherwise
@@ -2364,13 +2365,13 @@ canEqCanLHSFinish ev eq_rel swapped lhs rhs
                    ; traceTcS "new RHS:" (ppr new_rhs)
 
                      -- This check is Detail (1) in the Note
-                   ; case checkTyVarEq dflags YesTypeFamilies lhs_tv new_rhs of
-                       CTE_Occurs ->
-                          do { traceTcS "Note [Type variable cycles] Detail (1)"
+                   ; if cterHasOccursCheck (checkTyVarEq dflags lhs_tv new_rhs)
+
+                     then do { traceTcS "Note [Type variable cycles] Detail (1)"
                                         (ppr new_rhs)
                              ; continueWith (mkIrredCt status new_ev) }
-                       CTE_OK ->
-                         do { -- See Detail (6) of Note [Type variable cycles]
+
+                     else do { -- See Detail (6) of Note [Type variable cycles]
                                new_new_ev <- rewriteEqEvidence new_ev NotSwapped
                                                lhs_ty new_rhs
                                                (mkTcNomReflCo lhs_ty) co
@@ -2378,10 +2379,7 @@ canEqCanLHSFinish ev eq_rel swapped lhs rhs
                              ; continueWith (CEqCan { cc_ev = new_new_ev
                                                     , cc_lhs = lhs
                                                     , cc_rhs = new_rhs
-                                                    , cc_eq_rel = eq_rel }) }
-
-                       other -> pprPanic "cycle breaking introduced an error" $
-                                  ppr lhs_tv $$ ppr rhs $$ ppr new_rhs $$ ppr other }}}
+                                                    , cc_eq_rel = eq_rel }) }}}}
 
                -- We must not use it for further rewriting!
              | otherwise
@@ -2447,23 +2445,23 @@ instance Outputable CanEqOK where
 --   TyEq:H:  Checked here.
 canEqOK :: DynFlags -> EqRel -> CanEqLHS -> Xi -> CanEqOK
 canEqOK dflags eq_rel lhs rhs
-  = ASSERT( good_rhs )
-    case checkTypeEq dflags YesTypeFamilies lhs rhs of
-      CTE_OK  -> CanEqOK
-      CTE_Bad -> CanEqNotOK ImpredicativeCIS
-                 -- Violation of TyEq:F
 
-      CTE_HoleBlocker -> CanEqNotOK (BlockedCIS holes)
-        where holes = coercionHolesOfType rhs
+                 -- Violation of TyEq:F
+  | result `cterHasProblem` cteImpredicative
+  = CanEqNotOK ImpredicativeCIS
+
                  -- This is the case detailed in
                  -- Note [Equalities with incompatible kinds]
                  -- Violation of TyEq:H
+  | result `cterHasProblem` cteHoleBlocker
+  = CanEqNotOK (BlockedCIS holes)
 
-                 -- These are both a violation of TyEq:OC, but we
-                 -- want to differentiate for better production of
-                 -- error messages
-      CTE_Occurs | TyVarLHS tv <- lhs
-                  , isInsolubleOccursCheck eq_rel tv rhs -> CanEqNotOK InsolubleCIS
+  -- These are both a violation of TyEq:OC, but we
+  -- want to differentiate for better production of
+  -- error messages
+  | result `cterHasProblem` cteInsolubleOccurs
+  = case eq_rel of NomEq  -> CanEqNotOK InsolubleCIS
+                   ReprEq -> CanEqNotOK SolubleOccursCheckCIS
                  -- If we have a ~ [a], it is not canonical, and in particular
                  -- we don't want to rewrite existing inerts with it, otherwise
                  -- we'd risk divergence in the constraint solver
@@ -2471,7 +2469,8 @@ canEqOK dflags eq_rel lhs rhs
                  -- NB: no occCheckExpand here; see Note [Rewriting synonyms]
                  -- in GHC.Tc.Solver.Rewrite
 
-                  | otherwise                            -> CanEqNotOK SolubleOccursCheckCIS
+  | result `cterHasProblem` cteSolubleOccurs
+  = CanEqNotOK SolubleOccursCheckCIS
                  -- A representational equality with an occurs-check problem isn't
                  -- insoluble! For example:
                  --   a ~R b a
@@ -2482,7 +2481,17 @@ canEqOK dflags eq_rel lhs rhs
                  -- This case also include type family occurs-check errors, which
                  -- are not generally insoluble
 
+  | otherwise
+  = ASSERT( cterHasNoProblem result )
+    CanEqOK
+
   where
+    result      = ASSERT( good_rhs )
+                  checkTypeEq dflags lhs rhs `cterRemoveProblem` cteTypeFamily
+                     -- type families are OK here
+
+    holes       = coercionHolesOfType rhs
+
     good_rhs    = kinds_match && not bad_newtype
 
     lhs_kind    = canEqLHSKind lhs
@@ -2681,7 +2690,9 @@ or (typecheck/should_compile/T19682b):
 In order to solve the final Wanted, we must use the starred constraint
 for rewriting. But note that both starred constraints have occurs-check failures,
 and so we can't straightforwardly add these to the inert set and
-use them for rewriting.
+use them for rewriting. (NB: A rigid type constructor is at the
+top of both RHSs. If the type family were at the top, we'd just reorient
+in canEqTyVarFunEq.)
 
 The key idea is to replace the type family applications in the RHS of the
 starred constraints with a fresh variable, which we'll call a cycle-breaker
@@ -2752,31 +2763,29 @@ Note that
 
 Wanted/Derived
 --------------
-
 The fresh cycle-breaker variables here must actually be normal, touchable
-metavariables. That is, they are TauTvs. Nothing at all unusual. This is done
-because we might eventually learn more about what the cycle-breaker vars
-should be (and, thus, the original variable on the left-hand side of the
-constraint we started with); see T19682 drawn-out example below.
-We thus emit new WD constraints relating the
-fresh variables to their type family applications.
+metavariables. That is, they are TauTvs. Nothing at all unusual. Repeating
+the example from above, we have
 
-Critically, we do *not* call unifyWanted. This is because we want the current
-(starred) constraint to be fully processed before processing the new ones.
-Let's revisit the example above, after calling breakTyVarCycle:
+  *[WD] alpha ~ (Arg alpha -> Res alpha)
 
-  [WD] alpha ~ (cbv1 -> cbv2)
+and we turn this into
+
+  *[WD] alpha ~ (cbv1 -> cbv2)
   [WD] Arg alpha ~ cbv1
   [WD] Res alpha ~ cbv2
 
-Here, cbv1 and cbv2 are just TauTvs (as is alpha). If we see either of the
-last two constraints first, we'll unify a cbv variable and end up back where
-we started. This is bad. Instead, we put these constraints on the work list
-and continue processing that first constraint. There is now no occurs-check
-failure (and shouldBreakCycle, which decides whether to apply this logic, goes
-to pains to make sure unification will succeed in this case), and so we can
-write alpha := cbv1 -> cbv2 and make forward progress, leading to (recalling
-the fuller example from above):
+where cbv1 and cbv2 are fresh TauTvs. Why TauTvs? See [Why TauTvs] below.
+
+Critically, we emit the constraint directly instead of calling unifyWanted.
+Next, we unify alpha := cbv1 -> cbv2, having eliminated the occurs check.
+This unification happens in the course of normal behavior of top-level
+interactions, later in the solver pipeline.
+We know this unification will indeed happen, because
+shouldBreakCycle, which decides whether to apply this logic, goes
+to pains to make sure unification will succeed. Now, we're here
+(including further context from our original example, from the top
+of the Note):
 
   instance C (a -> b)
   [WD] Arg (cbv1 -> cbv2) ~ cbv1
@@ -2786,6 +2795,7 @@ the fuller example from above):
 The first two WD constraints reduce to reflexivity and are discarded,
 and the last is easily soluble.
 
+[Why TauTvs]:
 Let's look at another example (typecheck/should_compile/T19682) where we need
 to unify the cbvs:
 
@@ -2800,19 +2810,13 @@ to unify the cbvs:
     AllEqF '[]      '[]      = ()
     AllEqF (x : xs) (y : ys) = (x ~ y, AllEq xs ys)
 
-  [WD] t0 ~ (Head t0 : Tail t0)
-  [WD] AllEqF '[Bool] t0
+  [WD] alpha ~ (Head alpha : Tail alpha)
+  [WD] AllEqF '[Bool] alpha
 
-Here, t0 is a unification variable. Without the logic detailed in this Note,
-we're stuck here, as AllEqF cannot reduce and t0 cannot unify. However, let's
-apply our cycle-breaker approach. We thus rewrite the first constraint to get
-
-  [WD] t0 ~ (cbv1 : cbv2)
-  [WD] Head t0 ~ cbv1
-  [WD] Tail t0 ~ cbv2
-  [WD] AllEqF '[Bool] t0
-
-The first WD can now unify t0 := cbv1 : cbv2, yielding (after zonking)
+Without the logic detailed in this Note, we're stuck here, as AllEqF cannot
+reduce and alpha cannot unify. Let's instead apply our cycle-breaker approach,
+just as described above. We thus invent cbv1 and cbv2 and unify
+alpha := cbv1 -> cbv2, yielding (after zonking)
 
   [WD] Head (cbv1 : cbv2) ~ cbv1
   [WD] Tail (cbv1 : cbv2) ~ cbv2
@@ -2825,7 +2829,7 @@ But the last reduces:
   [WD] AllEq '[] cbv2
 
 The first of these is solved by unification: cbv1 := Bool. The second
-is solved by the instance to become
+is solved by the instance for AllEq to become
 
   [WD] AllEqF '[] cbv2
   [WD] SameShapeAs '[] cbv2
@@ -2847,7 +2851,8 @@ which reduces to
 which is trivially satisfiable. Hooray!
 
 Note that we need to unify the cbvs here; if we did not, there would be
-no way to solve those constraints that were solved by unification.
+no way to solve those constraints. That's why the cycle-breakers are
+ordinary TauTvs.
 
 In all cases
 ------------
@@ -2987,8 +2992,8 @@ Details:
      error, that's the only problem, and the approach outlined in this
      Note is appropriate to apply.
 
-     This prioritization is implemented in the Semigroup instance for
-     CheckTyEqResult.
+     This prioritization is implemented in the ordering of checks
+     in canEqOK.
 
 -}
 

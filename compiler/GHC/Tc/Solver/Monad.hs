@@ -3961,7 +3961,8 @@ breakTyVarCycle how loc = go
     go :: TcType -> TcS (CoercionN, TcType)
     go ty | Just ty' <- rewriterView ty = go ty'
     go (Rep.TyConApp tc tys)
-      | isTypeFamilyTyCon tc
+      | isTypeFamilyTyCon tc  -- worried about whether this type family is not actually
+                              -- causing trouble? See Detail (5) of Note.
       = do { let (fun_args, extra_args) = splitAt (tyConArity tc) tys
                  fun_app                = mkTyConApp tc fun_args
                  fun_app_kind           = tcTypeKind fun_app
