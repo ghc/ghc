@@ -45,7 +45,7 @@ import GHC.Builtin.PrimOps
 import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
 import GHC.Types.Unique.Set
 
--- import GHC.Driver.Ppr
+import GHC.Driver.Ppr
 
 {-
 ************************************************************************
@@ -412,9 +412,9 @@ dmdAnal' env dmd (Lam var body)
   | otherwise
   = let (n, body_dmd)    = peelCallDmd dmd
           -- body_dmd: a demand to analyze the body
-
         WithDmdType body_ty body' = dmdAnal env body_dmd body
-        WithDmdType lam_ty var'   = annotateLamIdBndr env notArgOfDfun body_ty var
+        body_ty' = body_ty `keepAliveDmdType` bndrRuleAndUnfoldingIds var
+        WithDmdType lam_ty var' = annotateLamIdBndr env notArgOfDfun body_ty' var
         new_dmd_type = multDmdType n lam_ty
     in
     WithDmdType new_dmd_type (Lam var' body')
@@ -788,7 +788,7 @@ dmdAnalRhsSig
 -- to the Id, and augment the environment with the signature as well.
 -- See Note [NOINLINE and strictness]
 dmdAnalRhsSig top_lvl rec_flag env let_dmd id rhs
-  = -- pprTrace "dmdAnalRhsSig" (ppr id $$ ppr let_dmd $$ ppr sig $$ ppr lazy_fv) $
+  = pprTrace "dmdAnalRhsSig" (ppr id $$ ppr let_dmd $$ ppr sig $$ ppr lazy_fv) $
     (env', lazy_fv, id', rhs')
   where
     rhs_arity = idArity id
@@ -1297,14 +1297,16 @@ annotateLamIdBndr env arg_of_dfun dmd_ty id
 -- For lambdas we add the demand to the argument demands
 -- Only called for Ids
   = ASSERT( isId id )
-    -- pprTrace "annLamBndr" (vcat [ppr id, ppr dmd_ty, ppr final_ty]) $
+    -- pprTrace "annLamBndr" (vcat [ppr id, ppr dmd_ty, ppr final_ty, unf_ty]) $
     WithDmdType final_ty new_id
   where
-    new_id = setIdDemandInfo id dmd
+    new_id = pprTrace "annLamBndr" (vcat [ppr id, ppr dmd_ty, ppr final_ty, ppr unf_ty2]) $
+             setIdDemandInfo id dmd
       -- Watch out!  See note [Lambda-bound unfoldings]
-    final_ty = case maybeUnfoldingTemplate (idUnfolding id) of
-                 Nothing  -> main_ty
-                 Just unf -> main_ty `plusDmdType` unf_ty
+    (final_ty,unf_ty2) = case maybeUnfoldingTemplate (idUnfolding id) of
+                 Nothing  -> (main_ty, Nothing)
+                 Just unf ->
+                    (main_ty `plusDmdType` unf_ty, Just unf_ty)
                           where
                              (unf_ty, _) = dmdAnalStar env dmd unf
 

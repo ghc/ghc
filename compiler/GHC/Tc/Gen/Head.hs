@@ -8,7 +8,8 @@
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
-
+{-# OPTIONS_GHC -ddump-simpl -ddump-to-file -dverbose-core2core -ddump-stg-final -dsuppress-coercions -ddump-occur-anal #-}
+{-# OPTIONS_GHC -dsuppress-ticks -fforce-recomp #-}
 {-
 %
 (c) The University of Glasgow 2006
@@ -81,7 +82,7 @@ import qualified Data.List.NonEmpty as NE
 
 import GHC.Prelude
 
-
+foo = 2
 {- *********************************************************************
 *                                                                      *
               HsExprArg: auxiliary data type
