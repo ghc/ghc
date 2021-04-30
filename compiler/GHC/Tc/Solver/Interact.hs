@@ -1583,7 +1583,7 @@ tryToSolveByUnification :: Ct -> CtEvidence
                         -> TcType    -- RHS
                         -> TcS (StopOrContinue Ct)
 tryToSolveByUnification work_item ev tv rhs
-  = do { can_unify <- unifyTest ev tv rhs
+  = do { can_unify <- unifyTest (ctEvFlavour ev) tv rhs
        ; traceTcS "tryToSolveByUnification" (vcat [ ppr tv <+> char '~' <+> ppr rhs
                                                   , ppr can_unify ])
 
