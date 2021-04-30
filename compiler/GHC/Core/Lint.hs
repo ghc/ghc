@@ -2133,8 +2133,8 @@ lintCoercion co@(UnivCo prov r ty1 ty2)
      --  e.g (case error @Int "blah" of {}) :: Int#
      --     ==> (error @Int "blah") |> Unsafe Int Int#
      -- See Note [Unsafe coercions] in GHC.Core.CoreToStg.Prep
-     is_core_prep_prov CorePrepProv = True
-     is_core_prep_prov _            = False
+     allow_ill_kinded_univ_co (CorePrepProv homo_kind) = not homo_kind
+     allow_ill_kinded_univ_co _                        = False
 
      validateCoercion :: PrimRep -> PrimRep -> LintM ()
      validateCoercion rep1 rep2
@@ -2165,8 +2165,8 @@ lintCoercion co@(UnivCo prov r ty1 ty2)
             ; check_kinds kco k1 k2
             ; return (ProofIrrelProv kco') }
 
-     lint_prov _ _ prov@(PluginProv _) = return prov
-     lint_prov _ _ prov@CorePrepProv   = return prov
+     lint_prov _ _ prov@(PluginProv _)   = return prov
+     lint_prov _ _ prov@(CorePrepProv _) = return prov
 
      check_kinds kco k1 k2
        = do { let Pair k1' k2' = coercionKind kco
