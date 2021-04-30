@@ -85,7 +85,7 @@ testRules = do
             dynPrograms <- dynamicGhcPrograms =<< flavour
             cmd [bindir </> "ghc" <.> exe] $
                 concatMap (\p -> ["-package", pkgName p]) depsPkgs ++
-                ["-o", top -/- path, top -/- sourcePath] ++
+                ["-Wall", "-Werror", "-o", top -/- path, top -/- sourcePath] ++
                 (maybe [] (\e -> [e]) mextra) ++
                 -- If GHC is build with debug options, then build check-ppr
                 -- also with debug options.  This allows, e.g., to print debug
