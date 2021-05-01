@@ -35,6 +35,7 @@ data InfoTableProvMap = InfoTableProvMap
                           { provDC :: DCMap
                           , provClosure :: ClosureMap
                           -- TODO: More efficient data structure for searching?
+                          -- Map from CmmInfoTable.CLabel to (RealSrcSpan, String)
                           , labeledInfoTablesWithTickishes :: [(Label, CmmInfoTable, Maybe CmmTickish)]
                           }
 

@@ -175,6 +175,7 @@ There are three parts to the implementation
 
 1. In GHC.Stg.Debug, the SourceNote information is used in order to give a source location to
 some specific closures.
+-- TODO: This is now outdated.
 2. In StgToCmm, the actually used info tables are recorded in an IORef, this
 is important as it's hard to predict beforehand what code generation will do
 and which ids will end up in the generated program.
