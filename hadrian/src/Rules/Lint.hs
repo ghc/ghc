@@ -13,7 +13,7 @@ lintRules = do
 
 lint :: Action () -> Action ()
 lint lintAction = do
-  isHlintPresent <- isJust <$> (liftIO $ findExecutable "hlint")
+  isHlintPresent <- isJust <$> liftIO (findExecutable "hlint")
   if isHlintPresent
   then do
     putBuild "| Running the linter…"
@@ -30,9 +30,10 @@ runHLint includeDirs defines dir = do
   threads <- shakeThreads <$> getShakeOptions
   hostArch <- (<> "_HOST_ARCH") <$> setting HostArch
   let hlintYaml = dir </> ".hlint.yaml"
-      defines' = [hostArch] ++ defines
+      defines' = hostArch : defines
       cmdLine = unwords $
         [ "hlint"
+        , "--colour=never"
         , "-j" <> show threads
         ] ++
         map ("--cpp-define=" <>) defines' ++
