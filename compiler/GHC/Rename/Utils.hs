@@ -18,6 +18,7 @@ module GHC.Rename.Utils (
         checkUnusedRecordWildcard,
         mkFieldEnv,
         unknownSubordinateErr, badQualBndrErr, typeAppErr,
+        ambiguousFieldOccErr,
         HsDocContext(..), pprHsDocContext,
         inHsDocContext, withHsDocContext,
 
@@ -604,6 +605,10 @@ dupNamesErr get_loc names
 badQualBndrErr :: RdrName -> SDoc
 badQualBndrErr rdr_name
   = text "Qualified name in binding position:" <+> ppr rdr_name
+
+ambiguousFieldOccErr :: RdrName -> SDoc
+ambiguousFieldOccErr rdr_name
+  = text "Ambiguous field selector occurence:" <+> ppr rdr_name
 
 typeAppErr :: String -> LHsType GhcPs -> SDoc
 typeAppErr what (L _ k)

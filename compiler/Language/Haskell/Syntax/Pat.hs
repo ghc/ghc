@@ -345,7 +345,7 @@ hsRecFieldsArgs :: forall p arg. UnXRec p => HsRecFields p arg -> [arg]
 hsRecFieldsArgs rbinds = map (hsRecFieldArg . unXRec @p) (rec_flds rbinds)
 
 hsRecFieldSel :: HsRecField pass arg -> Located (XCFieldOcc pass)
-hsRecFieldSel = fmap extFieldOcc . hsRecFieldLbl
+hsRecFieldSel = fmap foExt . hsRecFieldLbl
 
 
 {-
