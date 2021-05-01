@@ -35,7 +35,7 @@ import GHC.Rename.Utils ( HsDocContext(..), mapFvRn, bindLocalNames
                         , newLocalBndrsRn
                         , withHsDocContext, noNestedForallsContextsErr
                         , addNoNestedForallsContextsErr, checkInferredVars )
-import GHC.Rename.Unbound ( mkUnboundName, notInScopeErr )
+import GHC.Rename.Unbound ( mkUnboundName, notInScopeErr, WhereLooking(WL_Global) )
 import GHC.Rename.Names
 import GHC.Tc.Gen.Annotation ( annCtxt )
 import GHC.Tc.Utils.Monad
@@ -1347,7 +1347,7 @@ badRuleLhsErr name lhs bad_e
     text "LHS must be of form (f e1 .. en) where f is not forall'd"
   where
     err = case bad_e of
-            HsUnboundVar _ uv -> notInScopeErr (mkRdrUnqual uv)
+            HsUnboundVar _ uv -> notInScopeErr WL_Global (mkRdrUnqual uv)
             _                 -> text "Illegal expression:" <+> ppr bad_e
 
 {- **************************************************************

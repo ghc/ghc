@@ -72,7 +72,7 @@ unboundNameX :: WhereLooking -> RdrName -> SDoc -> RnM Name
 unboundNameX where_look rdr_name extra
   = do  { dflags <- getDynFlags
         ; let show_helpful_errors = gopt Opt_HelpfulErrors dflags
-              err = notInScopeErr rdr_name $$ extra
+              err = notInScopeErr where_look rdr_name $$ extra
         ; if not show_helpful_errors
           then addErr err
           else do { local_env  <- getLocalRdrEnv
@@ -86,12 +86,13 @@ unboundNameX where_look rdr_name extra
                   ; addErr (err $$ suggestions) }
         ; return (mkUnboundNameRdr rdr_name) }
 
-notInScopeErr :: RdrName -> SDoc
-notInScopeErr rdr_name
-  = case isExact_maybe rdr_name of
-      Just name -> exactNameErr name
-      Nothing -> hang (text "Not in scope:")
-                  2 (what <+> quotes (ppr rdr_name))
+notInScopeErr :: WhereLooking -> RdrName -> SDoc
+notInScopeErr where_look rdr_name
+  | Just name <- isExact_maybe rdr_name = exactNameErr name
+  | WL_LocalTop <- where_look = hang (text "No top-level binding for")
+      2 (what <+> quotes (ppr rdr_name) <+> text "in this module")
+  | otherwise = hang (text "Not in scope:")
+                 2 (what <+> quotes (ppr rdr_name))
   where
     what = pprNonVarNameSpace (occNameSpace (rdrNameOcc rdr_name))
 
@@ -250,6 +251,7 @@ importSuggestions :: WhereLooking
                   -> ImportAvails -> RdrName -> SDoc
 importSuggestions where_look global_env hpt currMod imports rdr_name
   | WL_LocalOnly <- where_look                 = Outputable.empty
+  | WL_LocalTop  <- where_look                 = Outputable.empty
   | not (isQual rdr_name || isUnqual rdr_name) = Outputable.empty
   | null interesting_imports
   , Just name <- mod_name

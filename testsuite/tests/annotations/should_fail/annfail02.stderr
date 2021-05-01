@@ -1,8 +1,10 @@
 
 annfail02.hs:6:9:
-    Not in scope: data constructor ‘Foo’
+    No top-level binding for
+      data constructor ‘Foo’ in this module
     In the annotation: {-# ANN Foo (1 :: Int) #-}
 
 annfail02.hs:7:14:
-    Not in scope: type constructor or class ‘Bar’
+    No top-level binding for
+      type constructor or class ‘Bar’ in this module
     In the annotation: {-# ANN type Bar (2 :: Int) #-}
