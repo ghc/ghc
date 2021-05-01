@@ -217,7 +217,7 @@ cas8Test = do
     tot <- race 0
         (\ mba -> loop iters $ add mba 0 1)
         (\ mba -> loop iters $ add mba 0 2)
-    assertEq ((3 * fromIntegral iters) `mod` 256) tot "cas8Test"
+    assertEq (fromIntegral ((3 * fromIntegral iters) :: Word8)) tot "cas8Test"
   where
     -- Fetch-and-add implemented using CAS.
     add :: MByteArray -> Int -> Int8 -> IO ()
@@ -231,7 +231,7 @@ cas16Test = do
     tot <- race 0
         (\ mba -> loop iters $ add mba 0 1)
         (\ mba -> loop iters $ add mba 0 2)
-    assertEq ((3 * fromIntegral iters) `mod` 65536) tot "cas16Test"
+    assertEq (fromIntegral ((3 * fromIntegral iters) :: Word16)) tot "cas16Test"
   where
     -- Fetch-and-add implemented using CAS.
     add :: MByteArray -> Int -> Int16 -> IO ()
@@ -245,7 +245,7 @@ cas32Test = do
     tot <- race 0
         (\ mba -> loop iters $ add mba 0 1)
         (\ mba -> loop iters $ add mba 0 2)
-    assertEq ((3 * fromIntegral iters) `mod` 2^32) tot "cas32Test"
+    assertEq (fromIntegral ((3 * fromIntegral iters) :: Word32)) tot "cas32Test"
   where
     -- Fetch-and-add implemented using CAS.
     add :: MByteArray -> Int -> Int32 -> IO ()
