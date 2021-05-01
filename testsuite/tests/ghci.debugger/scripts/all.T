@@ -113,6 +113,7 @@ test('getargs', extra_files(['../getargs.hs']), ghci_script, ['getargs.script'])
 test('T7386', normal, ghci_script, ['T7386.script'])
 test('T8487', normal, ghci_script, ['T8487.script'])
 test('T8557', normal, ghci_script, ['T8557.script'])
+test('T12449', normal, ghci_script, ['T12449.script'])
 test('T12458', normal, ghci_script, ['T12458.script'])
 test('T13825-debugger',
       [when(arch('powerpc64'), expect_broken(14455)),

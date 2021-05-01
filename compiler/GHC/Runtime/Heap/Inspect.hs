@@ -606,7 +606,8 @@ polytype (specifically, see ghci_tv in GHC.Tc.Utils.Unify.preCheck).
 This allows metavariables to unify with types that have
 nested (or higher-rank) `forall`s/`=>`s, which makes `:print fmap`
 display as
-`fmap = (_t1::forall a b. Functor f => (a -> b) -> f a -> f b)`, as expected.
+`fmap = (_t1::forall (f :: * -> *) a b. Functor f => (a -> b) -> f a -> f b)`,
+as expected.
 -}
 
 
@@ -690,13 +691,12 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
   -- we quantify existential tyvars as universal,
   -- as this is needed to be able to manipulate
   -- them properly
-   let quant_old_ty@(old_tvs, old_tau) = quantifyType old_ty
-       sigma_old_ty = mkInfForAllTys old_tvs old_tau
+   let quant_old_ty@(old_tvs, _) = quantifyType old_ty
    traceTR (text "Term reconstruction started with initial type " <> ppr old_ty)
    term <-
      if null old_tvs
       then do
-        term  <- go max_depth sigma_old_ty sigma_old_ty hval
+        term  <- go max_depth old_ty old_ty hval
         term' <- zonkTerm term
         return $ fixFunDictionaries $ expandNewtypes term'
       else do
@@ -704,7 +704,7 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
               my_ty <- newOpenVar
               when (check1 quant_old_ty) (traceTR (text "check1 passed") >>
                                           addConstraint my_ty old_ty')
-              term  <- go max_depth my_ty sigma_old_ty hval
+              term  <- go max_depth my_ty old_ty hval
               new_ty <- zonkTcType (termType term)
               if isMonomorphic new_ty || check2 (quantifyType new_ty) quant_old_ty
                  then do
@@ -734,10 +734,6 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
   unit_env = hsc_unit_env hsc_env
 
   go :: Int -> Type -> Type -> ForeignHValue -> TcM Term
-   -- I believe that my_ty should not have any enclosing
-   -- foralls, nor any free RuntimeUnk skolems;
-   -- that is partly what the quantifyType stuff achieved
-   --
    -- [SPJ May 11] I don't understand the difference between my_ty and old_ty
 
   go 0 my_ty _old_ty a = do
@@ -1080,8 +1076,6 @@ getDataConArgTys :: DataCon -> Type -> TR [Type]
 -- return the types of the arguments.  This is RTTI-land, so 'ty' might
 -- not be fully known.  Moreover, the arg types might involve existentials;
 -- if so, make up fresh RTTI type variables for them
---
--- I believe that con_app_ty should not have any enclosing foralls
 getDataConArgTys dc con_app_ty
   = do { let rep_con_app_ty = unwrapType con_app_ty
        ; traceTR (text "getDataConArgTys 1" <+> (ppr con_app_ty $$ ppr rep_con_app_ty
@@ -1384,18 +1378,12 @@ tyConPhantomTyVars _ = []
 
 type QuantifiedType = ([TyVar], Type)
    -- Make the free type variables explicit
-   -- The returned Type should have no top-level foralls (I believe)
 
 quantifyType :: Type -> QuantifiedType
--- Generalize the type: find all free and forall'd tyvars
--- and return them, together with the type inside, which
--- should not be a forall type.
---
--- Thus (quantifyType (forall a. a->[b]))
--- returns ([a,b], a -> [b])
-
+-- Find all free and forall'd tyvars and return them
+-- together with the unmodified input type.
 quantifyType ty = ( filter isTyVar $
                     tyCoVarsOfTypeWellScoped rho
-                  , rho)
+                  , ty)
   where
-    (_tvs, rho) = tcSplitForAllInvisTyVars ty
+    (_tvs, _, rho) = tcSplitNestedSigmaTys ty
