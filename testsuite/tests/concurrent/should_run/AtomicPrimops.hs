@@ -290,7 +290,8 @@ casAddr8Test = do
     tot <- race8Addr 0
         (\ addr -> loop iters $ add addr 1)
         (\ addr -> loop iters $ add addr 2)
-    assertEq (3 * iters `mod` 2^8) (fromIntegral tot) "casAddr8Test"
+    assertEq (fromIntegral (fromIntegral (3 * iters) :: Word8))
+             (fromIntegral tot) "casAddr8Test"
   where
     -- Fetch-and-add implemented using CAS.
     add :: Ptr Word8 -> Word8 -> IO ()
@@ -305,7 +306,8 @@ casAddr16Test = do
     tot <- race16Addr 0
         (\ addr -> loop iters $ add addr 1)
         (\ addr -> loop iters $ add addr 2)
-    assertEq (3 * iters `mod` 2^16) (fromIntegral tot) "casAddr16Test"
+    assertEq (fromIntegral (fromIntegral (3 * iters) :: Word16))
+             (fromIntegral tot) "casAddr16Test"
   where
     -- Fetch-and-add implemented using CAS.
     add :: Ptr Word16 -> Word16 -> IO ()
@@ -320,7 +322,8 @@ casAddr32Test = do
     tot <- race32Addr 0
         (\ addr -> loop iters $ add addr 1)
         (\ addr -> loop iters $ add addr 2)
-    assertEq (3 * iters `mod` 2^32) (fromIntegral tot) "casAddr32Test"
+    assertEq (fromIntegral (fromIntegral (3 * iters) :: Word32))
+             (fromIntegral tot) "casAddr32Test"
   where
     -- Fetch-and-add implemented using CAS.
     add :: Ptr Word32 -> Word32 -> IO ()
