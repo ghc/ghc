@@ -1803,7 +1803,7 @@ doCodeGen hsc_env this_mod denv data_tycons
             dumpIfSet_dyn logger dflags Opt_D_dump_cmm "Output Cmm" FormatCMM (pdoc platform a)
           return a
 
-    return $ generateCgIPEStub hsc_env this_mod denv (Stream.mapM dump2 pipeline_stream)
+    return $ generateCgIPEStub hsc_env this_mod denv $ Stream.mapM dump2 pipeline_stream
 
 myCoreToStgExpr :: Logger -> DynFlags -> InteractiveContext
                 -> Module -> ModLocation -> CoreExpr
