@@ -619,13 +619,13 @@ convertInfoProvMap dflags defns this_mod (InfoTableProvMap (UniqMap dcenv) denv 
         lookupLabeledInfoTablesWithTickishes = do
             (_, _, tickish) <- listToMaybe $ filter (\ (_,i,_) -> i == cmit) labeledInfoTablesWithTickishes
             tickish' <- tickish
-            -- TODO: Fill infoTableType
             return $ InfoProvEnt cl cn "" this_mod (infoTableProvFromTickish tickish')
 
         -- This catches things like prim closure types and anything else which doesn't have a
         -- source location
         simpleFallback = cmmInfoTableToInfoProvEnt this_mod cmit
 
+        -- TODO: Do not fallback for stack represented info tables?
     in fromMaybe simpleFallback (lookupDataConMap `firstJust` lookupClosureMap `firstJust` lookupLabeledInfoTablesWithTickishes)) defns
   where
     infoTableProvFromTickish :: CmmTickish -> (Maybe (RealSrcSpan, String))
