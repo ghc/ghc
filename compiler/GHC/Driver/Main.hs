@@ -604,8 +604,7 @@ tcRnModule' sum save_rn_syntax mod = do
                        GhcDriverMessage $ DriverUnknownMessage $
                        mkPlainDiagnostic (WarningWithFlag Opt_WarnSafe) $
                        errSafe tcg_res')
-              False | safeHaskell dflags == Sf_Trustworthy &&
-                      wopt Opt_WarnTrustworthySafe dflags ->
+              False | safeHaskell dflags == Sf_Trustworthy ->
                       (logDiagnostics $ singleMessage $
                        mkPlainMsgEnvelope dflags (trustworthyOnLoc dflags) $
                        GhcDriverMessage $ DriverUnknownMessage $
@@ -1366,8 +1365,7 @@ hscCheckSafe' m l = do
                     -- pkg trust reqs
                     pkgRs = S.fromList . map fst $ filter snd $ dep_pkgs $ mi_deps iface'
                     -- warn if Safe module imports Safe-Inferred module.
-                    warns = if wopt Opt_WarnInferredSafeImports dflags
-                                && safeLanguageOn dflags
+                    warns = if safeLanguageOn dflags
                                 && trust == Sf_SafeInferred
                                 then inferredImportWarn dflags
                                 else emptyMessages
@@ -1479,12 +1477,11 @@ markUnsafeInfer tcg_env whyUnsafe = do
     dflags <- getDynFlags
 
     let reason = WarningWithFlag Opt_WarnUnsafe
-    when (wopt Opt_WarnUnsafe dflags)
-         (logDiagnostics $ singleMessage $
-             mkPlainMsgEnvelope dflags (warnUnsafeOnLoc dflags) $
-             GhcDriverMessage $ DriverUnknownMessage $
-             mkPlainDiagnostic reason $
-             whyUnsafe' dflags)
+    logDiagnostics $ singleMessage $
+        mkPlainMsgEnvelope dflags (warnUnsafeOnLoc dflags) $
+        GhcDriverMessage $ DriverUnknownMessage $
+        mkPlainDiagnostic reason $
+        whyUnsafe' dflags
 
     liftIO $ writeIORef (tcg_safe_infer tcg_env) False
     liftIO $ writeIORef (tcg_safe_infer_reasons tcg_env) emptyMessages

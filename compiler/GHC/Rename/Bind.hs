@@ -487,8 +487,7 @@ rnBind _ bind@(PatBind { pat_lhs = pat
 
         -- Warn if the pattern binds no variables
         -- See Note [Pattern bindings that bind no variables]
-        ; whenWOptM Opt_WarnUnusedPatternBinds $
-          when (null bndrs && not ok_nobind_pat) $
+        ; when (null bndrs && not ok_nobind_pat) $
           addDiagnostic (WarningWithFlag Opt_WarnUnusedPatternBinds) $
           unusedPatBindWarn bind'
 
