@@ -1,14 +1,16 @@
 foldl :: Foldable t => (b -> a -> b) -> b -> t a -> b
-foldl = (_t1::forall b a.
+foldl = (_t1::forall (t :: * -> *) b a.
               Foldable t =>
               (b -> a -> b) -> b -> t a -> b)
 fmap :: Functor f => (a -> b) -> f a -> f b
-fmap = (_t2::forall a b. Functor f => (a -> b) -> f a -> f b)
+fmap = (_t2::forall (f :: * -> *) a b.
+             Functor f =>
+             (a -> b) -> f a -> f b)
 return :: Monad m => a -> m a
-return = (_t3::forall a. Monad m => a -> m a)
+return = (_t3::forall (m :: * -> *) a. Monad m => a -> m a)
 pure :: Applicative f => a -> f a
-pure = (_t4::forall a. Applicative f1 => a -> f1 a)
-mempty = (_t5::Monoid a => a)
-mappend = (_t6::Monoid a => a -> a -> a)
-foldl' = (_t7::(b -> a1 -> b) -> b -> [a1] -> b)
-f = (_t8::(forall a. a -> a) -> b1 -> b1)
+pure = (_t4::forall (f :: * -> *) a. Applicative f => a -> f a)
+mempty = (_t5::forall a. Monoid a => a)
+mappend = (_t6::forall a. Monoid a => a -> a -> a)
+foldl' = (_t7::forall a b. (b -> a -> b) -> b -> [a] -> b)
+f = (_t8::forall b. (forall a. a -> a) -> b -> b)
