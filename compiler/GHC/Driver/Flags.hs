@@ -511,7 +511,7 @@ data WarningFlag =
    | Opt_WarnAmbiguousFields                -- Since 9.2
    | Opt_WarnImplicitLift                 -- Since 9.2
    | Opt_WarnMissingKindSignatures        -- Since 9.2
-   deriving (Eq, Show, Enum)
+   deriving (Eq, Ord, Show, Enum)
 
 data Language = Haskell98 | Haskell2010 | GHC2021
    deriving (Eq, Enum, Show, Bounded)
