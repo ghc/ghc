@@ -175,9 +175,6 @@ Here is an extract from the `ToHie` instance for (LHsExpr (GhcPass p)):
         [ toHie $ C Use (L mspan var)
              -- Patch up var location since typechecker removes it
         ]
-      HsConLikeOut _ con ->
-        [ toHie $ C Use $ L mspan $ conLikeName con
-        ]
       ...
       HsApp _ a b ->
         [ toHie a
@@ -738,7 +735,7 @@ instance HiePass p => HasType (LocatedA (HsExpr (GhcPass p))) where
               HsLit _ l -> Just (hsLitType l)
               HsOverLit _ o -> Just (overLitType o)
 
-              HsConLikeOut _ (RealDataCon con) -> Just (dataConNonlinearType con)
+              XExpr (ConLikeTc (RealDataCon con) _ _) -> Just (dataConNonlinearType con)
 
               HsLam     _ (MG { mg_ext = groupTy }) -> Just (matchGroupType groupTy)
               HsLamCase _ (MG { mg_ext = groupTy }) -> Just (matchGroupType groupTy)
@@ -775,7 +772,6 @@ instance HiePass p => HasType (LocatedA (HsExpr (GhcPass p))) where
           skipDesugaring :: HsExpr GhcTc -> Bool
           skipDesugaring e = case e of
             HsVar{}             -> False
-            HsConLikeOut{}      -> False
             HsRecFld{}          -> False
             HsOverLabel{}       -> False
             HsIPVar{}           -> False
@@ -1087,9 +1083,6 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
              -- Patch up var location since typechecker removes it
         ]
       HsUnboundVar _ _ -> []  -- there is an unbound name here, but that causes trouble
-      HsConLikeOut _ con ->
-        [ toHie $ C Use $ L mspan $ conLikeName con
-        ]
       HsRecFld _ fld ->
         [ toHie $ RFC RecFieldOcc Nothing (L (locA mspan) fld)
         ]
@@ -1216,14 +1209,14 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
       HsProjection {} -> []
       XExpr x
         | GhcTc <- ghcPass @p
-        , WrapExpr (HsWrap w a) <- x
-        -> [ toHie $ L mspan a
-           , toHie (L mspan w)
-           ]
-        | GhcTc <- ghcPass @p
-        , ExpansionExpr (HsExpanded _ b) <- x
-        -> [ toHie (L mspan b)
-           ]
+        -> case x of
+             WrapExpr (HsWrap w a)
+               -> [ toHie $ L mspan a
+                  , toHie (L mspan w) ]
+             ExpansionExpr (HsExpanded _ b)
+               -> [ toHie (L mspan b) ]
+             ConLikeTc con _ _
+               -> [ toHie $ C Use $ L mspan $ conLikeName con ]
         | otherwise -> []
 
 -- NOTE: no longer have the location
