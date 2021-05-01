@@ -43,6 +43,7 @@ import GHC.Types.RepType  ( isVoidTy, typeMonoPrimRep_maybe )
 import GHC.Core.Coercion
 import GHC.Core.FamInstEnv
 import GHC.Types.Basic       ( Boxity(..) )
+import GHC.Types.Id.Info     ( zapUnfolding )
 import GHC.Core.TyCon
 import GHC.Core.TyCon.RecWalk
 import GHC.Types.Unique.Supply
@@ -58,8 +59,8 @@ import GHC.Data.OrdList
 import GHC.Data.List.SetOps
 
 import Control.Applicative ( (<|>) )
-import Control.Monad ( zipWithM )
-import Data.List ( unzip4 )
+import Control.Monad ( zipWithM, join )
+import Data.List ( unzip4, uncons )
 
 {-
 ************************************************************************
@@ -163,6 +164,7 @@ mkWwBodies :: WwOpts
            -> Id             -- The original function
            -> [Demand]       -- Strictness of original function
            -> Cpr            -- Info about function result
+           -> Maybe [Unfolding] -- Unfolding info for join point binders
            -> UniqSM (Maybe WwResult)
 
 -- wrap_fn_args E       = \x y -> E
@@ -176,12 +178,12 @@ mkWwBodies :: WwOpts
 --                        let x = (a,b) in
 --                        E
 
-mkWwBodies opts rhs_fvs fun_id demands cpr_info
+mkWwBodies opts rhs_fvs fun_id demands cpr_info join_arg_unfs
   = do  { let empty_subst = mkEmptyTCvSubst (mkInScopeSet rhs_fvs)
                 -- See Note [Freshen WW arguments]
 
         ; (wrap_args, wrap_fn_args, work_fn_args, res_ty)
-             <- mkWWargs empty_subst fun_ty demands
+             <- mkWWargs empty_subst fun_ty demands join_arg_unfs
         ; (useful1, work_args, wrap_fn_str, work_fn_str)
              <- mkWWstr opts inlineable_flag wrap_args
 
@@ -445,22 +447,26 @@ mkWWargs :: TCvSubst            -- Freshening substitution to apply to the type
                                 --   See Note [Freshen WW arguments]
          -> Type                -- The type of the function
          -> [Demand]     -- Demands and one-shot info for value arguments
+         -> Maybe [Unfolding]
          -> UniqSM  ([Var],            -- Wrapper args
                      CoreExpr -> CoreExpr,      -- Wrapper fn
                      CoreExpr -> CoreExpr,      -- Worker fn
                      Type)                      -- Type of wrapper body
 
-mkWWargs subst fun_ty demands
+mkWWargs subst fun_ty demands join_unfolds
   | null demands
   = return ([], nop_fn, nop_fn, substTy subst fun_ty)
 
   | (dmd:demands') <- demands
+  , split_unfs <- join (uncons <$> join_unfolds)
+  , unf <- fst <$> split_unfs
+  , join_unfolds' <- snd <$> split_unfs
   , Just (mult, arg_ty, fun_ty') <- splitFunTy_maybe fun_ty
   = do  { uniq <- getUniqueM
         ; let arg_ty' = substScaledTy subst (Scaled mult arg_ty)
-              id = mk_wrap_arg uniq arg_ty' dmd
+              id = mk_wrap_arg uniq arg_ty' dmd unf
         ; (wrap_args, wrap_fn_args, work_fn_args, res_ty)
-              <- mkWWargs subst fun_ty' demands'
+              <- mkWWargs subst fun_ty' demands' join_unfolds'
         ; return (id : wrap_args,
                   Lam id . wrap_fn_args,
                   apply_or_bind_then work_fn_args (varToCoreExpr id),
@@ -471,7 +477,7 @@ mkWWargs subst fun_ty demands
         ; let (subst', tv') = cloneTyVarBndr subst tv uniq
                 -- See Note [Freshen WW arguments]
         ; (wrap_args, wrap_fn_args, work_fn_args, res_ty)
-             <- mkWWargs subst' fun_ty' demands
+             <- mkWWargs subst' fun_ty' demands join_unfolds
         ; return (tv' : wrap_args,
                   Lam tv' . wrap_fn_args,
                   apply_or_bind_then work_fn_args (mkTyArg (mkTyVarTy tv')),
@@ -487,7 +493,7 @@ mkWWargs subst fun_ty demands
         -- simply coerces.
 
   = do { (wrap_args, wrap_fn_args, work_fn_args, res_ty)
-            <-  mkWWargs subst rep_ty demands
+            <-  mkWWargs subst rep_ty demands join_unfolds
        ; let co' = substCo subst co
        ; return (wrap_args,
                   \e -> Cast (wrap_fn_args e) (mkSymCo co'),
@@ -507,14 +513,19 @@ mkWWargs subst fun_ty demands
 applyToVars :: [Var] -> CoreExpr -> CoreExpr
 applyToVars vars fn = mkVarApps fn vars
 
-mk_wrap_arg :: Unique -> Scaled Type -> Demand -> Id
-mk_wrap_arg uniq (Scaled w ty) dmd
-  = mkSysLocalOrCoVar (fsLit "w") uniq w ty
+mk_wrap_arg :: Unique -> Scaled Type -> Demand -> Maybe Unfolding -> Id
+mk_wrap_arg uniq (Scaled w ty) dmd unf
+  = -- (\x -> pprTrace "mk_wrap_arg" (ppr x <+> ppr unf) x) $
+    mkSysLocalOrCoVar (fsLit "w") uniq w ty
        `setIdDemandInfo` dmd
+       -- Only retain evaluatedness
+       -- See Note [Absent fillers] point 2(.2)
+       `setIdUnfolding` (maybe noUnfolding zapUnfolding unf)
+
 
 {- Note [Freshen WW arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Wen we do a worker/wrapper split, we must not in-scope names as the arguments
+Wen we do a worker/wrapper split, we must not use in-scope names as the arguments
 of the worker, else we'll get name capture.  E.g.
 
    -- y1 is in scope from further out
@@ -953,7 +964,14 @@ mkWWstr_one :: WwOpts
             -> UniqSM (Bool, [Var], CoreExpr -> CoreExpr, CoreExpr -> CoreExpr)
 mkWWstr_one opts inlineable_flag arg =
   case wantToUnboxArg fam_envs inlineable_flag arg_ty arg_dmd of
-    _ | isTyVar arg -> do_nothing
+    _x | isTyVar arg -> do_nothing
+       | DropAbsent <- _x
+       , pprTrace "mkWWstr_one" (text "DropAbsent" <+> ppr arg) False
+       -> undefined
+       | Unbox {} <- _x
+       , pprTrace "mkWWstr_one" (text "Unbox" <+> ppr arg) False
+       -> undefined
+
 
     DropAbsent
       | Just work_fn <- mk_absent_let opts arg
@@ -1006,7 +1024,11 @@ mk_absent_let opts arg
   -- The lifted case: Bind 'absentError' for a nice panic message if we are
   -- wrong (like we were in #11126). See (1) in Note [Absent fillers]
   | Just [LiftedRep] <- mb_mono_prim_reps
-  , not (isStrictDmd (idDemandInfo arg)) -- See (2) in Note [Absent fillers]
+  , pprTrace "mk_absent_let" (ppr arg $$
+      ppr (idUnfolding arg) $$
+      ppr (not (isStrictDmd (idDemandInfo arg) || evald_arg))
+      ) True
+  , not (isStrictDmd (idDemandInfo arg) || evald_arg) -- See (2) in Note [Absent fillers]
   = Just (Let (NonRec arg panic_rhs))
 
   -- The default case for mono rep: Bind @RUBBISH[prim_reps] \@arg_ty@
@@ -1020,6 +1042,10 @@ mk_absent_let opts arg
   = WARN( True, text "No absent value for" <+> ppr arg_ty )
     Nothing
   where
+    evald_arg = isEvaldUnfolding . idUnfolding $ arg
+
+
+
     arg_ty = idType arg
     mb_mono_prim_reps = typeMonoPrimRep_maybe arg_ty
 
@@ -1192,17 +1218,41 @@ Needless to say, there are some wrinkles:
      a strict field. That's the reason why 'zs' binds a rubbish literal instead
      of an error-thunk, see #19133.
 
+     We used to only look at strictness to
+
      How do we detect when we are about to put an error-thunk in a strict field?
      Ideally, we'd just look at the 'StrictnessMark' of the DataCon's field, but
      it's quite nasty to thread the marks though 'mkWWstr' and 'mkWWstr_one'.
-     So we rather look out for a necessary condition for strict fields:
+
+     We now perform two checks, each one implying we can't use an error thunk.
+
+   2.1 We look out for a common condition for strict fields:
      Note [Add demands for strict constructors] makes it so that the demand on
      'zs' is absent and /strict/: It will get cardinality 'C_10', the empty
      interval, rather than 'C_00'. Hence the 'isStrictDmd' check: It guarantees
-     we never fill in an error-thunk for an absent strict field.
-     But that also means we emit a rubbish lit for other args that have
-     cardinality 'C_10' (say, the arg to a bottoming function) where we could've
-     used an error-thunk, but that's a small price to pay for simplicity.
+     we never fill in an error-thunk for an absent strict field if it's demanded.
+
+   2.2. However 2.1 turned out to be insufficient when dealing with join points.
+     In #19766 we had a situation where a join point argument was used only in
+     the *unfolding* of another argument to the same join point. The second argument
+     was used lazily, which prevents us from giving a strict demand to bindings
+     used in it's argument. Causing the check described in 2.1 to fall apart.
+
+     The problem here boils down to:
+     * We have a join point
+     * We rebox a value inside the join point.
+     * When reboxing we replace an absent argument with an absentError that goes into
+       a strict field.
+
+     The matching *unboxing* code should always mark arguments coming out of strict
+     fields as being evaluated. (Unf=OtherCon [])
+     So what we do now is we preserve not only the demands on the arguments, but also
+     their given evaluatedness.
+
+     This no doubt means we sometimes end up with a RubbishLit when an absentError
+     could have been used. But in absence of compiler bugs that's not a problem and
+     it's a small price to pay for simplicity.
+
 
   3. We can only emit a RubbishLit if the arg's type @arg_ty@ is mono-rep, e.g.
      of the form @TYPE rep@ where @rep@ is not (and doesn't contain) a variable.
