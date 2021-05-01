@@ -1080,7 +1080,7 @@ Residual implication looks like
 
 We do /not/ want to set the implication status to IC_Insoluble,
 because that'll suppress reports of [W] C b (f b).  But we
-may not report the insoluble [G] f b ~# b either (see Note [Given errors]
+may not report the insoluble [G] f b ~# b either (see Note [Given warnings]
 in GHC.Tc.Errors), so we may fail to report anything at all!  Yikes.
 
 The same applies to Derived constraints that /arise from/ Givens.
@@ -1128,12 +1128,6 @@ data Implication
 
       ic_given_eqs :: HasGivenEqs,  -- Are there Given equalities here?
 
-      ic_warn_inaccessible :: Bool,
-                                 -- True  <=> -Winaccessible-code is enabled
-                                 -- at construction. See
-                                 -- Note [Avoid -Winaccessible-code when deriving]
-                                 -- in GHC.Tc.TyCl.Instance
-
       ic_env   :: TcLclEnv,
                                  -- Records the TcLClEnv at the time of creation.
                                  --
@@ -1167,7 +1161,6 @@ implicationPrototype
             , ic_binds      = panic "newImplic:binds"
             , ic_info       = panic "newImplic:info"
             , ic_env        = panic "newImplic:env"
-            , ic_warn_inaccessible = panic "newImplic:warn_inaccessible"
 
               -- The rest have sensible default values
             , ic_skols      = []
