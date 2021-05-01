@@ -4,7 +4,7 @@ module Main where
 import Control.Concurrent
 import Foreign.C
 import GHC.Clock
-import GHC.Event
+import GHC.Event hiding (threadDelay)
 import System.CPUTime
 import System.Posix.Types
 import Control.Monad
