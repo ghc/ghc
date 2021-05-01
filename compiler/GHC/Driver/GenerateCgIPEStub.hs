@@ -4,6 +4,7 @@ module GHC.Driver.GenerateCgIPEStub (generateCgIPEStub) where
 
 import Data.Maybe (catMaybes, listToMaybe)
 import GHC.Cmm
+import GHC.Cmm.CLabel (CLabel)
 import GHC.Cmm.Dataflow (Block, C, O)
 import GHC.Cmm.Dataflow.Block (blockSplit, blockToList)
 import GHC.Cmm.Dataflow.Collections (mapToList)
@@ -16,34 +17,44 @@ import GHC.Data.Stream (Stream, liftIO)
 import qualified GHC.Data.Stream as Stream
 import GHC.Driver.Env (hsc_dflags)
 import GHC.Driver.Flags (GeneralFlag (Opt_InfoTableMap))
-import GHC.Driver.Session ( gopt, targetPlatform )
+import GHC.Driver.Session (gopt, targetPlatform)
 import GHC.Plugins (HscEnv, NonCaffySet)
 import GHC.Prelude
 import GHC.Runtime.Heap.Layout (isStackRep)
+import GHC.Settings (Platform, platformUnregisterised)
 import GHC.StgToCmm.Monad (getCmm, initC, runC)
 import GHC.StgToCmm.Prof (initInfoTableProv)
 import GHC.StgToCmm.Types (CgInfos (..), ModuleLFInfos)
 import GHC.Types.IPE (InfoTableProvMap (labeledInfoTablesWithTickishes))
 import GHC.Unit.Types (Module)
-import GHC.Settings (platformUnregisterised, Platform)
-import GHC.Cmm.CLabel (CLabel)
-
 
 {-
-  Note: [Stacktraces from Info Table Provenance Entries (IPE based stack unwinding) ]
+Note [Stacktraces from Info Table Provenance Entries (IPE based stack unwinding)]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-  Stacktraces can be created from return frames as they are pushed to stack for every case scrutinee.
-  But to make them readable / meaningful, one needs to know the source location of each return frame.
+Stacktraces can be created from return frames as they are pushed to stack for every case scrutinee.
+But to make them readable / meaningful, one needs to know the source location of each return frame.
 
-  Every return frame has a distinct info table and thus a distinct code pointer.
-  Info Table Provernance Entries (IPE) are searchable by this pointer and contain a source location.
+Every return frame has a distinct info table and thus a distinct code pointer (for tables next to
+code) or at least a distict address itself. Info Table Provernance Entries (IPE) are searchable by
+this pointer and contain a source location.
 
-  As return frames are stack represented, needed information can be provided by emitting an IPE
-  (containing a source location) for every stack represented info table.
+The info table / info table code pointer to source location map is described in:
+Note [Mapping Info Tables to Source Positions]
 
-  This leads to the question: How to figure out the source location of an return frame?
+As return frames are stack represented, needed information can be provided by emitting an IPE
+for every stack represented info table.
 
-  Let's consider this example:
+This leads to the question: How to figure out the source location of an return frame?
+
+The lookup algorithms for registerised and unregisterised builds differ in details, they have in
+common, that we want to lookup the `CmmNode.CmmTick` that is nearest (before) the usage of the
+return frame's label. (Which label and label type to use differs between these two use cases.)
+
+Registerised
+~~~~~~~~~~~~~
+
+Let's consider this example:
 ```
  Main.returnFrame_entry() { //  [R2]
          { info_tbls: [(c18g,
@@ -76,28 +87,86 @@ import GHC.Cmm.CLabel (CLabel)
                                R1) returns to c18g, args: 8, res: 8, upd: 8;
 ```
 
-  The return frame `block_c18g_info` has the label `c18g` which is used in the call to
-  `stg_ap_pp_fast` (`returns to c18g`). The source location we're after, is the nearest `//tick`
-  before the call (`//tick src<Main.hs:8:25-39>`).
+The return frame `block_c18g_info` has the label `c18g` which is used in the call to `stg_ap_pp_fast`
+(`returns to c18g`) as continuation (`cml_cont`). The source location we're after, is the nearest
+`//tick` before the call (`//tick src<Main.hs:8:25-39>`).
 
-  In code the Cmm programm is represented as Hoopl graph. Hoopl distinguishes nodes by defining, if
-  they are open or closed on entry (one can fallthrough to them from the previous instruction) and if
-  they are open or closed on exit (one can fallthrough from them to the next node).
+In code the Cmm programm is represented as Hoopl graph. Hoopl distinguishes nodes by defining, if they
+are open or closed on entry (one can fallthrough to them from the previous instruction) and if they are
+open or closed on exit (one can fallthrough from them to the next node).
 
-  Please refer to the paper "Hoopl: A Modular, Reusable Library forDataflow Analysis and Transformation"
-  for a detailed explanation.
+Please refer to the paper "Hoopl: A Modular, Reusable Library forDataflow Analysis and Transformation"
+for a detailed explanation.
 
-  Here we use the fact, that calls (represented by `CmmNode.CmmCall`) are always closed on exit
-  (`CmmNode O C`, `O` means open, `C` closed). In other words, they are always at the end of a block.
+Here we use the fact, that calls (represented by `CmmNode.CmmCall`) are always closed on exit
+(`CmmNode O C`, `O` means open, `C` closed). In other words, they are always at the end of a block.
 
-  So, given a stack represented info table (likely representing a return frame, but this isn't
-  completely sure as there are e.g. update frames) with it's label (c18g in the example above) and a `CmmGraph`:
-    - Look at the end of every block, if it's a `CmmNode.CmmCall`, returning to the continuation with the label
-      of the return frame.
-    - If there's such a call, lookup the nearest `CmmNode.CmmTick` by traversing the middle part of the block
-      backwards (from end to beginning). The tick contains
+So, given a stack represented info table (likely representing a return frame, but this isn't completely
+sure as there are e.g. update frames, too) with it's label (`c18g` in the example above) and a `CmmGraph`:
+  - Look at the end of every block, if it's a `CmmNode.CmmCall`, returning to the continuation with the label
+    of the return frame.
+  - If there's such a call, lookup the nearest `CmmNode.CmmTick` by traversing the middle part of the block
+    backwards (from end to beginning).
+  - Take the first `CmmNode.CmmTick` that contains a `Tickish.SourceNote`.
 
-  -- TODO: Finish - Add section about the unregisterised lookup.
+Unregisterised
+~~~~~~~~~~~~~
+
+In unregisterised builds there is no return frame / continuation label in calls. The contiuation (i.e. return
+frame) is set in an explicit Cmm assignment. Thus the tick lookup algorithm has to be slightly different.
+
+```
+ sat_s16G_entry() { //  [R1]
+         { info_tbls: [(c18O,
+                        label: sat_s16G_info
+                        rep: HeapRep { Thunk }
+                        srt: Just _u18Z_srt)]
+           stack_info: arg_space: 0
+         }
+     {offset
+       c18O: // global
+           _s16G::P64 = R1;
+           if ((Sp + 8) - 40 < SpLim) (likely: False) goto c18P; else goto c18Q;
+       c18P: // global
+           R1 = _s16G::P64;
+           call (stg_gc_enter_1)(R1) args: 8, res: 0, upd: 8;
+       c18Q: // global
+           I64[Sp - 16] = stg_upd_frame_info;
+           P64[Sp - 8] = _s16G::P64;
+           //tick src<Main.hs:20:9-13>
+           I64[Sp - 24] = block_c18M_info;
+           R1 = GHC.Show.$fShow[]_closure;
+           P64[Sp - 32] = GHC.Show.$fShowChar_closure;
+           Sp = Sp - 32;
+           call stg_ap_p_fast(R1) args: 16, res: 8, upd: 24;
+     }
+ },
+ _blk_c18M() { //  [R1]
+         { info_tbls: [(c18M,
+                        label: block_c18M_info
+                        rep: StackRep []
+                        srt: Just System.IO.print_closure)]
+           stack_info: arg_space: 0
+         }
+     {offset
+       c18M: // global
+           _s16F::P64 = R1;
+           R1 = System.IO.print_closure;
+           P64[Sp] = _s16F::P64;
+           call stg_ap_p_fast(R1) args: 32, res: 0, upd: 24;
+     }
+ },
+```
+
+In this example we have to lookup `//tick src<Main.hs:20:9-13>` for the return frame `c18M`.
+Notice, that this cannot be done with the `Label` `c18M`, but with the `CLabel` `block_c18M_info`
+(`label: block_c18M_info` is actually a `CLabel`).
+
+The find the tick:
+  - Every `Block` is checked from top (first) to bottom (last) node for an assignment like
+   `I64[Sp - 24] = block_c18M_info;`. The lefthand side is actually ignored.
+  - If such an assignment is found, the search is over, because the last visited tick is always
+    hold in a `Maybe`.
 -}
 
 generateCgIPEStub :: HscEnv -> Module -> InfoTableProvMap -> Stream IO CmmGroupSRTs (NonCaffySet, ModuleLFInfos) -> Stream IO CmmGroupSRTs CgInfos
@@ -112,6 +181,8 @@ generateCgIPEStub hsc_env this_mod denv s = do
 
   let denv' = denv {labeledInfoTablesWithTickishes = labeledInfoTablesWithTickishes}
       ((ipeStub, cmmGroup), _) = runC dflags this_mod cgState $ getCmm (initInfoTableProv (map sndOfTriple labeledInfoTablesWithTickishes) denv' this_mod)
+
+  -- TODO: Do we really need to run the `cmmPipeline` again? See Main:1792
   (_, cmmGroupSRTs) <- liftIO $ cmmPipeline hsc_env (emptySRT this_mod) cmmGroup
   Stream.yield cmmGroupSRTs
   return CgInfos {cgNonCafs = nonCaffySet, cgLFInfos = moduleLFInfos, cgIPEStub = ipeStub}
@@ -137,7 +208,6 @@ generateCgIPEStub hsc_env this_mod denv s = do
     extractInfoTables (CmmProc h _ _ _) = Just $ mapToList (info_tbls h)
     extractInfoTables _ = Nothing
 
--- platformUnregisterised
     lookupEstimatedTick :: Platform -> CmmGroupSRTs -> Label -> CmmInfoTable -> Maybe CmmTickish
     lookupEstimatedTick platform cmmGroup _ infoTable | platformUnregisterised platform = do
       if (isStackRep . cit_rep) infoTable
@@ -185,13 +255,13 @@ generateCgIPEStub hsc_env this_mod denv s = do
     -- TODO: This name is confusing - See findCmmTickishForLabelInBlock
     findCmmTickishForCLabelInBlock :: CLabel -> Block CmmNode C C -> Maybe CmmTickish
     findCmmTickishForCLabelInBlock cLabel block = do
-        let (_, middleBlock, _) = blockSplit block
-        find cLabel (blockToList middleBlock) Nothing
-        where
-          find :: CLabel -> [CmmNode O O] -> Maybe CmmTickish -> Maybe CmmTickish
-          find label (b:blocks) lastTick = case b of
-                                      -- TODO: Is this precise enough?
-                                      (CmmStore _ (CmmLit (CmmLabel l))) -> if label == l then lastTick else find label blocks lastTick
-                                      (CmmTick t) -> find label blocks $ Just t
-                                      _ -> find label blocks lastTick
-          find _ [] _ = Nothing
+      let (_, middleBlock, _) = blockSplit block
+      find cLabel (blockToList middleBlock) Nothing
+      where
+        find :: CLabel -> [CmmNode O O] -> Maybe CmmTickish -> Maybe CmmTickish
+        find label (b : blocks) lastTick = case b of
+          -- TODO: Is this precise enough?
+          (CmmStore _ (CmmLit (CmmLabel l))) -> if label == l then lastTick else find label blocks lastTick
+          (CmmTick t) -> find label blocks $ Just t
+          _ -> find label blocks lastTick
+        find _ [] _ = Nothing
