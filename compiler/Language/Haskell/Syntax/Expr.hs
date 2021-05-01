@@ -265,6 +265,24 @@ is Less Cool because
     typecheck do-notation with (>>=) :: m1 a -> (a -> m2 b) -> m2 b.)
 -}
 
+{-
+Note [Non-overloaded record field selectors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+    data T = MkT { x,y :: Int }
+    f r x = x + y r
+
+This parses with HsVar for x, y, r on the RHS of f. Then, if
+-XOverloadedRecordFields is /off/, the renamer recognises that y in
+the RHS of f is really a record selector, and changes it to a
+HsRecFld. In contrast x is locally bound, shadowing the record
+selector, and stay as an HsVar.
+
+The renamer adds the Name of the record selector into the XRecFld
+extension field, The typechecker keeps HsRecFld as HsRecFld, and
+transforms the record-selector Name to an Id.
+-}
+
 -- | A Haskell expression.
 data HsExpr p
   = HsVar     (XVar p)
@@ -287,10 +305,8 @@ data HsExpr p
                              -- HsVar for pretty printing
 
   | HsRecFld  (XRecFld p)
-              (AmbiguousFieldOcc p) -- ^ Variable pointing to record selector
-              -- The parser produces HsVars
-              -- The renamer renames record-field selectors to HsRecFld
-              -- The typechecker preserves HsRecFld
+              (FieldOcc p) -- ^ Variable pointing to record selector
+                           -- See Note [Non-overloaded record field selectors]
 
   | HsOverLabel (XOverLabel p) FastString
      -- ^ Overloaded label (Note [Overloaded labels] in GHC.OverloadedLabels)

@@ -23,7 +23,6 @@ module GHC.Tc.Gen.Expr
          tcPolyExpr, tcExpr,
          tcSyntaxOp, tcSyntaxOpGen, SyntaxOpType(..), synKnownType,
          tcCheckId,
-         addAmbiguousNameErr,
          getFixedTyVars ) where
 
 #include "HsVersions.h"
@@ -977,7 +976,7 @@ tcSyntaxOpGen :: CtOrigin
               -> ([TcSigmaType] -> [Mult] -> TcM a)
               -> TcM (a, SyntaxExprTc)
 tcSyntaxOpGen orig (SyntaxExprRn op) arg_tys res_ty thing_inside
-  = do { (expr, sigma) <- tcInferAppHead (op, VACall op 0 noSrcSpan) [] Nothing
+  = do { (expr, sigma) <- tcInferAppHead (op, VACall op 0 noSrcSpan) []
              -- Ugh!! But all this code is scheduled for demolition anyway
        ; traceTc "tcSyntaxOpGen" (ppr op $$ ppr expr $$ ppr sigma)
        ; (result, expr_wrap, arg_wraps, res_wrap)
@@ -1374,7 +1373,7 @@ tcRecordUpd con_like arg_tys rbinds = fmap catMaybes $ mapM do_bind rbinds
                  return (Just
                          (L l (fld { hsRecFieldLbl
                                       = L loc (Unambiguous
-                                               (extFieldOcc (unLoc f'))
+                                               (foExt (unLoc f'))
                                                (L (noAnnSrcSpan loc) lbl))
                                    , hsRecFieldArg = rhs' }))) }
 

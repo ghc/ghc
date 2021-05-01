@@ -1,0 +1,5 @@
+[1 of 3] Processing p
+  [1 of 2] Compiling A[sig]           ( p/A.hsig, nothing )
+  [2 of 2] Compiling P                ( p/P.hs, nothing )
+
+T13323.bkp:9:13: Ambiguous field selector occurence: foo

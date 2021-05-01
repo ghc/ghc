@@ -41,6 +41,7 @@ import GHC.Rename.Utils ( HsDocContext(..), bindLocalNamesFV, checkDupNames
                         , bindLocalNames
                         , mapMaybeFvRn, mapFvRn
                         , warnUnusedLocalBinds, typeAppErr
+                        , ambiguousFieldOccErr
                         , checkUnusedRecordWildcard )
 import GHC.Rename.Unbound ( reportUnboundName )
 import GHC.Rename.Splice  ( rnBracket, rnSpliceExpr, checkThLocalName )
@@ -228,10 +229,13 @@ rnExpr (HsVar _ (L l v))
               -> finishHsVar (L (na2la l) name) ;
             Just (UnambiguousGre (FieldGreName fl)) ->
               let sel_name = flSelector fl in
-              return ( HsRecFld noExtField (Unambiguous sel_name (L l v) ), unitFV sel_name) ;
-            Just AmbiguousFields ->
-              return ( HsRecFld noExtField (Ambiguous noExtField (L l v) ), emptyFVs) } }
-
+              return ( HsRecFld noExtField (FieldOcc sel_name (L l v) ), unitFV sel_name) ;
+            Just AmbiguousFields -> do {
+                 addErr $ ambiguousFieldOccErr v
+               ; return (HsUnboundVar noExtField (rdrNameOcc v), emptyFVs)
+               }
+         }
+       }
 
 rnExpr (HsIPVar x v)
   = return (HsIPVar x v, emptyFVs)
