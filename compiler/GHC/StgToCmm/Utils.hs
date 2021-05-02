@@ -595,7 +595,7 @@ cmmInfoTableToInfoProvEnt this_mod cmit =
 -- | Convert source information collected about identifiers in 'GHC.STG.Debug'
 -- to entries suitable for placing into the info table provenenance table.
 convertInfoProvMap :: DynFlags -> [CmmInfoTable] -> Module -> InfoTableProvMap -> [InfoProvEnt]
-convertInfoProvMap dflags defns this_mod (InfoTableProvMap (UniqMap dcenv) denv labeledInfoTablesWithTickishes) =
+convertInfoProvMap dflags defns this_mod (InfoTableProvMap (UniqMap dcenv) denv infoTableToSourceLocationMap) =
   map (\cmit ->
     let cl = cit_lbl cmit
         cn  = rtsClosureType (cit_rep cmit)
@@ -615,13 +615,16 @@ convertInfoProvMap dflags defns this_mod (InfoTableProvMap (UniqMap dcenv) denv 
             -- Lookup is linear but lists will be small (< 100)
             return $ InfoProvEnt cl cn (tyString (dataConTyCon dc)) this_mod (join $ lookup n (NE.toList ns))
 
-        lookupLabeledInfoTablesWithTickishes = do
-            sourceNote <- Map.lookup (cit_lbl cmit) labeledInfoTablesWithTickishes
+        lookupInfoTableToSourceLocation = do
+            sourceNote <- Map.lookup (cit_lbl cmit) infoTableToSourceLocationMap
             return $ InfoProvEnt cl cn "" this_mod sourceNote
 
         -- This catches things like prim closure types and anything else which doesn't have a
         -- source location
         simpleFallback = cmmInfoTableToInfoProvEnt this_mod cmit
 
-        -- TODO: Do not fallback for stack represented info tables?
-    in fromMaybe simpleFallback (lookupDataConMap `firstJust` lookupClosureMap `firstJust` lookupLabeledInfoTablesWithTickishes)) defns
+  in
+    if (isStackRep . cit_rep) cmit then
+      fromMaybe simpleFallback lookupInfoTableToSourceLocation
+    else
+      fromMaybe simpleFallback (lookupDataConMap `firstJust` lookupClosureMap)) defns
