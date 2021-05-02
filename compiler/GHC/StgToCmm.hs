@@ -73,10 +73,6 @@ import System.IO.Unsafe
 import qualified Data.ByteString as BS
 import Data.IORef
 
--- TODO: No record needed.
-data CodeGenState = CodeGenState { codegen_state :: !CgState }
-
-
 codeGen :: Logger
         -> TmpFs
         -> DynFlags
@@ -95,21 +91,17 @@ codeGen logger tmpfs dflags this_mod (InfoTableProvMap (UniqMap denv) _ _) data_
               -- Using an IORef to store the state is a bit crude, but otherwise
               -- we would need to add a state monad layer which regresses
               -- allocations by 0.5-2%.
-        ; cgref <- liftIO $ initC >>= \s -> newIORef (CodeGenState s)
+        ; cgref <- liftIO $ initC >>= \s -> newIORef s
         ; let cg :: FCode a -> Stream IO CmmGroup a
               cg fcode = do
                 (a, cmm) <- liftIO . withTimingSilent logger dflags (text "STG -> Cmm") (`seq` ()) $ do
-                         CodeGenState st <- readIORef cgref
+                         st <- readIORef cgref
                          let (a,st') = runC dflags this_mod st (getCmm fcode)
 
                          -- NB. stub-out cgs_tops and cgs_stmts.  This fixes
                          -- a big space leak.  DO NOT REMOVE!
                          -- This is observed by the #3294 test
-                         writeIORef cgref $!
-                                    CodeGenState
-                                      (st'{ cgs_tops = nilOL,
-                                            cgs_stmts = mkNop
-                                          })
+                         writeIORef cgref $! (st'{ cgs_tops = nilOL, cgs_stmts = mkNop })
                          return a
                 yield cmm
                 return a
@@ -140,7 +132,7 @@ codeGen logger tmpfs dflags this_mod (InfoTableProvMap (UniqMap denv) _ _) data_
         ; mapM_ (\(dc, ns) -> forM_ ns $ \(k, _ss) -> cg (cgDataCon (UsageSite this_mod k) dc)) (nonDetEltsUFM denv)
 
         ; final_state <- liftIO (readIORef cgref)
-        ; let cg_id_infos = cgs_binds . codegen_state $ final_state
+        ; let cg_id_infos = cgs_binds final_state
 
           -- See Note [Conveying CAF-info and LFInfo between modules] in
           -- GHC.StgToCmm.Types
