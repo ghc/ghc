@@ -1,9 +1,10 @@
 /* ---------------------------------------------------------------------------
  *
- * (c) The GHC Team, 2001-2021
+ * (c) The GHC Team, 2020-2021
  *
- * Stack snapshotting.
- */
+ * Stack snapshotting and decoding. (Cloning and unwinding.)
+ *
+ *---------------------------------------------------------------------------*/
 
 #pragma once
 
@@ -22,9 +23,10 @@ StgMutArrPtrs* decodeClonedStack(StgStack* stack);
 void handleCloneStackMessage(MessageCloneStack *msg);
 #endif
 
-StgWord getStackClosureCount(StgStack* stack);
+StgWord getStackFrameCount(StgStack* stack);
 StgWord getStackChunkClosureCount(StgStack* stack);
 void copyPtrsToArray(StgMutArrPtrs* arr, StgStack* stack);
-StgClosure* createWordClosure (Capability* cap, StgClosure* i);
+StgClosure* createPtrClosure(Capability* cap, StgClosure* c);
+StgMutArrPtrs* allocateMutableArray(StgWord size);
 
 #include "EndPrivate.h"
