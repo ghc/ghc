@@ -2,6 +2,7 @@
 
 module GHC.Driver.GenerateCgIPEStub (generateCgIPEStub) where
 
+import qualified Data.Map.Strict as Map
 import Data.Maybe (catMaybes, listToMaybe)
 import GHC.Cmm
 import GHC.Cmm.CLabel (CLabel)
@@ -25,7 +26,8 @@ import GHC.Settings (Platform, platformUnregisterised)
 import GHC.StgToCmm.Monad (getCmm, initC, runC)
 import GHC.StgToCmm.Prof (initInfoTableProv)
 import GHC.StgToCmm.Types (CgInfos (..), ModuleLFInfos)
-import GHC.Types.IPE (InfoTableProvMap (labeledInfoTablesWithTickishes))
+import GHC.Types.IPE (InfoTableProvMap (provInfoTables), IpeSourceLocation)
+import GHC.Types.Tickish (GenTickish (SourceNote))
 import GHC.Unit.Types (Module)
 
 {-
@@ -48,8 +50,9 @@ for every stack represented info table.
 This leads to the question: How to figure out the source location of an return frame?
 
 The lookup algorithms for registerised and unregisterised builds differ in details, they have in
-common, that we want to lookup the `CmmNode.CmmTick` that is nearest (before) the usage of the
-return frame's label. (Which label and label type to use differs between these two use cases.)
+common, that we want to lookup the `CmmNode.CmmTick` (containing a `SourceNote`) that is nearest
+(before) the usage of the return frame's label. (Which label and label type to use differs between
+these two use cases.)
 
 Registerised
 ~~~~~~~~~~~~~
@@ -107,7 +110,8 @@ sure as there are e.g. update frames, too) with it's label (`c18g` in the exampl
     of the return frame.
   - If there's such a call, lookup the nearest `CmmNode.CmmTick` by traversing the middle part of the block
     backwards (from end to beginning).
-  - Take the first `CmmNode.CmmTick` that contains a `Tickish.SourceNote`.
+  - Take the first `CmmNode.CmmTick` that contains a `Tickish.SourceNote` and return it's payload as
+    `IpeSourceLocation`.
 
 Unregisterised
 ~~~~~~~~~~~~~
@@ -165,8 +169,9 @@ Notice, that this cannot be done with the `Label` `c18M`, but with the `CLabel` 
 The find the tick:
   - Every `Block` is checked from top (first) to bottom (last) node for an assignment like
    `I64[Sp - 24] = block_c18M_info;`. The lefthand side is actually ignored.
-  - If such an assignment is found, the search is over, because the last visited tick is always
-    hold in a `Maybe`.
+  - If such an assignment is found, the search is over, because the payload (content of
+    `Tickish.SourceNote`, represented as `IpeSourceLocation`) of last visited tick is always
+    remembered in a `Maybe`.
 -}
 
 generateCgIPEStub :: HscEnv -> Module -> InfoTableProvMap -> Stream IO CmmGroupSRTs (NonCaffySet, ModuleLFInfos) -> Stream IO CmmGroupSRTs CgInfos
@@ -179,7 +184,7 @@ generateCgIPEStub hsc_env this_mod denv s = do
   let collectFun = if gopt Opt_InfoTableMap dflags then collect platform else collectNothing
   (labeledInfoTablesWithTickishes, (nonCaffySet, moduleLFInfos)) <- Stream.mapAccumL_ collectFun [] s
 
-  let denv' = denv {labeledInfoTablesWithTickishes = labeledInfoTablesWithTickishes}
+  let denv' = denv {provInfoTables = Map.fromList (map (\(_, i, t) -> (cit_lbl i, t)) labeledInfoTablesWithTickishes)}
       ((ipeStub, cmmGroup), _) = runC dflags this_mod cgState $ getCmm (initInfoTableProv (map sndOfTriple labeledInfoTablesWithTickishes) denv' this_mod)
 
   -- TODO: Do we really need to run the `cmmPipeline` again? See Main:1792
@@ -187,13 +192,13 @@ generateCgIPEStub hsc_env this_mod denv s = do
   Stream.yield cmmGroupSRTs
   return CgInfos {cgNonCafs = nonCaffySet, cgLFInfos = moduleLFInfos, cgIPEStub = ipeStub}
   where
-    collect :: Platform -> [(Label, CmmInfoTable, Maybe CmmTickish)] -> CmmGroupSRTs -> IO ([(Label, CmmInfoTable, Maybe CmmTickish)], CmmGroupSRTs)
+    collect :: Platform -> [(Label, CmmInfoTable, Maybe IpeSourceLocation)] -> CmmGroupSRTs -> IO ([(Label, CmmInfoTable, Maybe IpeSourceLocation)], CmmGroupSRTs)
     collect platform acc cmmGroupSRTs = do
       let labelsToInfoTables = collectInfoTables cmmGroupSRTs
           labelsToInfoTablesToTickishes = map (\(l, i) -> (l, i, lookupEstimatedTick platform cmmGroupSRTs l i)) labelsToInfoTables
       return (acc ++ labelsToInfoTablesToTickishes, cmmGroupSRTs)
 
-    collectNothing :: [(Label, CmmInfoTable, Maybe CmmTickish)] -> CmmGroupSRTs -> IO ([(Label, CmmInfoTable, Maybe CmmTickish)], CmmGroupSRTs)
+    collectNothing :: [a] -> CmmGroupSRTs -> IO ([a], CmmGroupSRTs)
     collectNothing _ cmmGroupSRTs = pure ([], cmmGroupSRTs)
 
     sndOfTriple :: (a, b, c) -> b
@@ -202,27 +207,23 @@ generateCgIPEStub hsc_env this_mod denv s = do
     collectInfoTables :: CmmGroupSRTs -> [(Label, CmmInfoTable)]
     collectInfoTables cmmGroup = concat $ catMaybes $ map extractInfoTables cmmGroup
 
-    -- All return frame info tables are stack represented, though not all stack represented info tables
-    -- have to be return frames.
     extractInfoTables :: GenCmmDecl RawCmmStatics CmmTopInfo CmmGraph -> Maybe [(Label, CmmInfoTable)]
     extractInfoTables (CmmProc h _ _ _) = Just $ mapToList (info_tbls h)
     extractInfoTables _ = Nothing
 
-    lookupEstimatedTick :: Platform -> CmmGroupSRTs -> Label -> CmmInfoTable -> Maybe CmmTickish
-    lookupEstimatedTick platform cmmGroup _ infoTable | platformUnregisterised platform = do
+    lookupEstimatedTick :: Platform -> CmmGroupSRTs -> Label -> CmmInfoTable -> Maybe IpeSourceLocation
+    lookupEstimatedTick platform cmmGroup infoTableLabel infoTable = do
+      -- All return frame info tables are stack represented, though not all stack represented info
+      -- tables have to be return frames.
       if (isStackRep . cit_rep) infoTable
         then do
-          let blocks = concatMap toBlockList (graphs cmmGroup)
-              cLabel = cit_lbl infoTable
-          firstJusts $ map (findCmmTickishForCLabelInBlock cLabel) blocks
+          let findFun =
+                if platformUnregisterised platform
+                  then findCmmTickishForForUnregistered (cit_lbl infoTable)
+                  else findCmmTickishForRegistered infoTableLabel
+              blocks = concatMap toBlockList (graphs cmmGroup)
+          firstJusts $ map findFun blocks
         else Nothing
-    lookupEstimatedTick _ cmmGroup infoTableLabel infoTable = do
-      if (isStackRep . cit_rep) infoTable
-        then do
-          let blocks = concatMap toBlockList (graphs cmmGroup)
-          firstJusts $ map (findCmmTickishForLabelInBlock infoTableLabel) blocks
-        else Nothing
-
     graphs :: CmmGroupSRTs -> [CmmGraph]
     graphs = foldl' go []
       where
@@ -230,8 +231,8 @@ generateCgIPEStub hsc_env this_mod denv s = do
         go acc (CmmProc _ _ _ g) = g : acc
         go acc _ = acc
 
-    findCmmTickishForLabelInBlock :: Label -> Block CmmNode C C -> Maybe CmmTickish
-    findCmmTickishForLabelInBlock label block = do
+    findCmmTickishForRegistered :: Label -> Block CmmNode C C -> Maybe IpeSourceLocation
+    findCmmTickishForRegistered label block = do
       let (_, middleBlock, endBlock) = blockSplit block
 
       isCallWithReturnFrameLabel endBlock label
@@ -246,22 +247,17 @@ generateCgIPEStub hsc_env this_mod denv s = do
             catMaybes $
               map maybeTick $ (reverse . blockToList) block
 
-        -- TODO: Check that the tick is a SourceLocation! (Otherwise -> Nothing)
-        -- TODO: Return the Source Location.
-        maybeTick :: CmmNode O O -> Maybe CmmTickish
-        maybeTick (CmmTick t) = Just t
+        maybeTick :: CmmNode O O -> Maybe IpeSourceLocation
+        maybeTick (CmmTick (SourceNote span name)) = Just (span, name)
         maybeTick _ = Nothing
-
-    -- TODO: This name is confusing - See findCmmTickishForLabelInBlock
-    findCmmTickishForCLabelInBlock :: CLabel -> Block CmmNode C C -> Maybe CmmTickish
-    findCmmTickishForCLabelInBlock cLabel block = do
+    findCmmTickishForForUnregistered :: CLabel -> Block CmmNode C C -> Maybe IpeSourceLocation
+    findCmmTickishForForUnregistered cLabel block = do
       let (_, middleBlock, _) = blockSplit block
       find cLabel (blockToList middleBlock) Nothing
       where
-        find :: CLabel -> [CmmNode O O] -> Maybe CmmTickish -> Maybe CmmTickish
+        find :: CLabel -> [CmmNode O O] -> Maybe IpeSourceLocation -> Maybe IpeSourceLocation
         find label (b : blocks) lastTick = case b of
-          -- TODO: Is this precise enough?
           (CmmStore _ (CmmLit (CmmLabel l))) -> if label == l then lastTick else find label blocks lastTick
-          (CmmTick t) -> find label blocks $ Just t
+          (CmmTick (SourceNote span name)) -> find label blocks $ Just (span, name)
           _ -> find label blocks lastTick
         find _ [] _ = Nothing
