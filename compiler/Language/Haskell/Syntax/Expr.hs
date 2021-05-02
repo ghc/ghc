@@ -144,19 +144,19 @@ values (see function @mkRdrRecordUpd@ in 'GHC.Parser.PostProcess').
 newtype FieldLabelStrings p =
   FieldLabelStrings [Located (HsFieldLabel p)]
 
-instance Outputable (FieldLabelStrings p) where
+instance Outputable (XRec p FieldLabelString) => Outputable (FieldLabelStrings p) where
   ppr (FieldLabelStrings flds) =
     hcat (punctuate dot (map (ppr . unLoc) flds))
 
-instance OutputableBndr (FieldLabelStrings p) where
+instance Outputable (XRec p FieldLabelString) => OutputableBndr (FieldLabelStrings p) where
   pprInfixOcc = pprFieldLabelStrings
   pprPrefixOcc = pprFieldLabelStrings
 
-pprFieldLabelStrings :: FieldLabelStrings p -> SDoc
+pprFieldLabelStrings :: Outputable (XRec p FieldLabelString) => FieldLabelStrings p -> SDoc
 pprFieldLabelStrings (FieldLabelStrings flds) =
     hcat (punctuate dot (map (ppr . unLoc) flds))
 
-instance Outputable (HsFieldLabel p) where
+instance Outputable(XRec p FieldLabelString) => Outputable (HsFieldLabel p) where
   ppr (HsFieldLabel _ s) = ppr s
   ppr XHsFieldLabel{} = text "XHsFieldLabel"
 
@@ -623,7 +623,7 @@ type family PendingTcSplice' p
 data HsFieldLabel p
   = HsFieldLabel
     { hflExt   :: XCHsFieldLabel p
-    , hflLabel :: Located FieldLabelString
+    , hflLabel :: XRec p FieldLabelString
     }
   | XHsFieldLabel !(XXHsFieldLabel p)
 
