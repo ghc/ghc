@@ -401,8 +401,8 @@ data AnnsIf
 type instance XSCC           (GhcPass _) = EpAnn AnnPragma
 type instance XXPragE        (GhcPass _) = NoExtCon
 
-type instance XCHsFieldLabel (GhcPass _) = EpAnn AnnFieldLabel
-type instance XXHsFieldLabel (GhcPass _) = NoExtCon
+type instance XCDotFieldOcc (GhcPass _) = EpAnn AnnFieldLabel
+type instance XXDotFieldOcc (GhcPass _) = NoExtCon
 
 type instance XPresent         (GhcPass _) = EpAnn [AddEpAnn]
 
@@ -1891,6 +1891,8 @@ type instance Anno (HsSplice (GhcPass p)) = SrcSpanAnnA
 
 type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsExpr (GhcPass pr))))] = SrcSpanAnnL
 type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsCmd  (GhcPass pr))))] = SrcSpanAnnL
+
+type instance Anno (DotFieldOcc (GhcPass p)) = SrcSpan
 
 instance (Anno a ~ SrcSpanAnn' (EpAnn an))
    => WrapXRec (GhcPass p) a where
