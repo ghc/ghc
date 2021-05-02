@@ -2228,7 +2228,7 @@ warnUnnecessarySourceImports sccs = do
         warn dflags (L loc mod) =
            mkPlainMsgEnvelope dflags loc $
            GhcDriverMessage $ DriverUnknownMessage $
-           mkPlainDiagnostic WarningWithoutFlag $
+           mkPlainDiagnostic (WarningWithFlag Opt_WarnUnusedImports) $
            text "{-# SOURCE #-} unnecessary in import of " <+> quotes (ppr mod)
 
 

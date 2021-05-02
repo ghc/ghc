@@ -1344,10 +1344,9 @@ decideMonoTyVars infer_mode name_taus psigs candidates
              mono_tvs = mono_tvs2 `unionVarSet` constrained_tvs
 
            -- Warn about the monomorphism restriction
-       ; when (case infer_mode of { ApplyMR -> True; _ -> False}) $
-         diagnosticTc (WarningWithFlag Opt_WarnMonomorphism)
-                      (constrained_tvs `intersectsVarSet` tyCoVarsOfTypes taus)
-                      mr_msg
+       ; when (case infer_mode of { ApplyMR -> True; _ -> False}
+               && constrained_tvs `intersectsVarSet` tyCoVarsOfTypes taus) $
+         addDiagnosticTc (WarningWithFlag Opt_WarnMonomorphism) mr_msg
 
        ; traceTc "decideMonoTyVars" $ vcat
            [ text "infer_mode =" <+> ppr infer_mode
