@@ -79,12 +79,3 @@ InfoProvEnt * lookupIPE(StgInfoTable *info)
     }
     return NULL;
 }
-
-// TODO: This is debugging code - Remove before merge.
-void belchAllIPE(void) {
-    InfoProvEnt *ip, *next;
-    for (ip = IPE_LIST; ip != NULL; ip = next) {
-        debugBelch("IPE: %p %s \n", ip->info, ip->prov.srcloc);
-        next = ip->link;
-    }
-}
