@@ -1,9 +1,24 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 2001,2019
+ * (c) The GHC Team, 2001,2019,2020
  * Author: Sungwoo Park, Daniel Gröber
  *
- * Generalised profiling heap traversal.
+ * Note [Generalised profiling heap traversal]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ *
+ * This module provides a visitor interface for depth first traversal of the
+ * graph underlying the live data on the Haskell heap.
+ *
+ * The overall worklow goes like this:
+ *
+ * - One or more closures are pushed onto the "traversal stack" using
+ *   traversePushRoot(),
+ *
+ * - traverseWorkStack() runs callbacks for each reachable closure in depth
+ *   first order,
+ *
+ * - Callbacks may use traverseSetClosureData/traverseGetClosureData to store
+ *   per-closure to do their jobs.
  *
  * ---------------------------------------------------------------------------*/
 
@@ -13,26 +28,11 @@
 #include "PosixSource.h"
 #include "Rts.h"
 #include "sm/Storage.h"
+#include "sm/HeapAlloc.h"
 
-#include "TraverseHeap.h"
+#include "rts/TraverseHeap.h"
 
 const stackData nullStackData;
-
-StgWord getTravData(const StgClosure *c)
-{
-    const StgWord hp_hdr = c->header.prof.hp.trav;
-    return hp_hdr & (STG_WORD_MAX ^ 1);
-}
-
-void setTravData(const traverseState *ts, StgClosure *c, StgWord w)
-{
-    c->header.prof.hp.trav = w | ts->flip;
-}
-
-bool isTravDataValid(const traverseState *ts, const StgClosure *c)
-{
-    return (c->header.prof.hp.trav & 1) == ts->flip;
-}
 
 #if defined(DEBUG)
 unsigned int g_traversalDebugLevel = 0;
@@ -85,14 +85,34 @@ returnToOldStack( traverseState *ts, bdescr *bd )
 }
 
 /**
+ * Given the list of static objects found during traversal invalidate thier heap
+ * profiling header. This ensures that when doing the actual traversal no static
+ * closures will seem to have been visited already because they were visited in
+ * the last pass.
+ */
+static void
+resetStaticObjects(traverseState *ts)
+{
+    StgClosure **p;
+    bdescr *bd = ts->firstStaticObjects;
+
+    while(bd) {
+        p = (StgClosure**)bd->start;
+        while(p < (StgClosure**)bd->free) {
+            (*p)->header.prof.hp = (union StgProfHeapHeader){};
+            p++;
+        }
+        bd = bd->link;
+    }
+}
+
+/**
  *  Initializes the traversal work-stack.
  */
 void
 initializeTraverseStack( traverseState *ts )
 {
-    if (ts->firstStack != NULL) {
-        freeChain(ts->firstStack);
-    }
+    ASSERT(ts->firstStack == NULL);
 
     ts->firstStack = allocGroup(BLOCKS_IN_STACK);
     ts->firstStack->link = NULL;
@@ -101,20 +121,25 @@ initializeTraverseStack( traverseState *ts )
     ts->stackSize = 0;
     ts->maxStackSize = 0;
 
+    ts->firstStaticObjects = NULL;
+    ts->staticObjects = NULL;
+
     newStackBlock(ts, ts->firstStack);
 }
 
-/**
- * Frees all the block groups in the traversal works-stack.
- *
- * Invariants:
- *   firstStack != NULL
- */
 void
 closeTraverseStack( traverseState *ts )
 {
+    ASSERT(ts->firstStack != NULL);
     freeChain(ts->firstStack);
     ts->firstStack = NULL;
+
+    if(ts->firstStaticObjects) {
+        resetStaticObjects(ts);
+        freeChain(ts->firstStaticObjects);
+    }
+    ts->firstStaticObjects = NULL;
+    ts->staticObjects = NULL;
 }
 
 /**
@@ -145,6 +170,9 @@ traverseWorkStackBlocks(traverseState *ts)
     W_ res = 0;
 
     for (bd = ts->firstStack; bd != NULL; bd = bd->link)
+      res += bd->blocks;
+
+    for (bd = ts->firstStaticObjects; bd != NULL; bd = bd->link)
       res += bd->blocks;
 
     return res;
@@ -187,9 +215,9 @@ init_srt_fun( stackPos *info, const StgFunInfoTable *infoTable )
 {
     info->type = posTypeSRT;
     if (infoTable->i.srt) {
-        info->next.srt.srt = (StgClosure*)GET_FUN_SRT(infoTable);
+        info->next.srt = (StgClosure*)GET_FUN_SRT(infoTable);
     } else {
-        info->next.srt.srt = NULL;
+        info->next.srt = NULL;
     }
 }
 
@@ -198,9 +226,9 @@ init_srt_thunk( stackPos *info, const StgThunkInfoTable *infoTable )
 {
     info->type = posTypeSRT;
     if (infoTable->i.srt) {
-        info->next.srt.srt = (StgClosure*)GET_SRT(infoTable);
+        info->next.srt = (StgClosure*)GET_SRT(infoTable);
     } else {
-        info->next.srt.srt = NULL;
+        info->next.srt = NULL;
     }
 }
 
@@ -212,8 +240,8 @@ find_srt( stackPos *info )
 {
     StgClosure *c;
     if (info->type == posTypeSRT) {
-        c = info->next.srt.srt;
-        info->next.srt.srt = NULL;
+        c = info->next.srt;
+        info->next.srt = NULL;
         return c;
     }
 
@@ -277,7 +305,7 @@ traversePushClosure(traverseState *ts, StgClosure *c, StgClosure *cp, stackEleme
     se.info.next.cp = cp;
     se.sep = sep;
     se.data = data;
-    se.accum = (stackAccum)(StgWord)0;
+    se.accum = (stackAccum){};
     se.info.type = posTypeFresh;
 
     pushStackElement(ts, se);
@@ -300,9 +328,10 @@ traversePushRoot(traverseState *ts, StgClosure *c, StgClosure *cp, stackData dat
  * When return_cb is NULL this function does nothing.
  */
 STATIC_INLINE stackElement *
-traversePushReturn(traverseState *ts, StgClosure *c, stackAccum acc, stackElement *sep)
+traversePushReturn(traverseState *ts, returnClosure_cb return_cb,
+                   StgClosure *c, stackAccum acc, stackElement *sep)
 {
-    if(!ts->return_cb)
+    if(!return_cb)
         return sep;
 
     stackElement se;
@@ -599,7 +628,7 @@ popStackElement(traverseState *ts) {
 }
 
 /**
- *  callReturnAndPopStackElement(): Call 'traversalState.return_cb' and remove a
+ *  callReturnAndPopStackElement(): Call 'return_cb' and remove a
  *  depleted stackElement from the top of the traversal work-stack.
  *
  *  Invariants:
@@ -607,20 +636,18 @@ popStackElement(traverseState *ts) {
  *    empty, in which case popStackElement() is not allowed.
  */
 static void
-callReturnAndPopStackElement(traverseState *ts)
+callReturnAndPopStackElement(traverseState *ts, returnClosure_cb return_cb)
 {
     stackElement *se = ts->stackTop;
 
-    if(ts->return_cb)
-        ts->return_cb(se->c, se->accum,
-                      se->sep->c, &se->sep->accum);
+    if(return_cb)
+        return_cb(se->c, se->accum, se->sep->c, &se->sep->accum);
 
     popStackElement(ts);
 }
 
 /**
- *  Finds the next object to be considered for retainer profiling and store
- *  its pointer to *c.
+ *  Finds the next object on the stack and store its pointer in *c.
  *
  *  If the unprocessed object was stored in the stack (posTypeFresh), the
  *  this object is returned as-is. Otherwise Test if the topmost stack
@@ -640,7 +667,9 @@ callReturnAndPopStackElement(traverseState *ts)
  *    It is okay to call this function even when the work-stack is empty.
  */
 STATIC_INLINE void
-traversePop(traverseState *ts, StgClosure **c, StgClosure **cp, stackData *data, stackElement **sep)
+traversePop(traverseState *ts, returnClosure_cb return_cb,
+            StgClosure **c, StgClosure **cp,
+            stackData *data, stackElement **sep)
 {
     stackElement *se;
 
@@ -672,7 +701,7 @@ traversePop(traverseState *ts, StgClosure **c, StgClosure **cp, stackData *data,
             popStackElement(ts);
             return;
         } else if (se->info.type == posTypeEmpty) {
-            callReturnAndPopStackElement(ts);
+            callReturnAndPopStackElement(ts, return_cb);
             continue;
         }
 
@@ -690,6 +719,7 @@ traversePop(traverseState *ts, StgClosure **c, StgClosure **cp, stackData *data,
             // need to push a stackElement
         case MVAR_CLEAN:
         case MVAR_DIRTY:
+            ASSERT(se->info.type == posTypeStep);
             if (se->info.next.step == 2) {
                 *c = (StgClosure *)((StgMVar *)se->c)->tail;
                 se->info.next.step++;             // move to the next step
@@ -702,6 +732,7 @@ traversePop(traverseState *ts, StgClosure **c, StgClosure **cp, stackData *data,
 
             // three children (fixed), no SRT
         case WEAK:
+            ASSERT(se->info.type == posTypeStep);
             if (se->info.next.step == 2) {
                 *c = ((StgWeak *)se->c)->value;
                 se->info.next.step++;
@@ -713,6 +744,8 @@ traversePop(traverseState *ts, StgClosure **c, StgClosure **cp, stackData *data,
             goto out;
 
         case TREC_CHUNK: {
+            ASSERT(se->info.type == posTypeStep);
+
             // These are pretty complicated: we have N entries, each
             // of which contains 3 fields that we want to follow.  So
             // we divide the step counter: the 2 low bits indicate
@@ -847,7 +880,7 @@ out:
     *data = se->data;
     *sep = se;
 
-    if(last && ts->return_cb)
+    if(last && return_cb)
         se->info.type = posTypeEmpty;
     else if(last)
         popStackElement(ts);
@@ -856,17 +889,11 @@ out:
 
 }
 
-/**
- * Make sure a closure's profiling data is initialized to zero if it does not
- * conform to the current value of the flip bit, returns true in this case.
- *
- * See Note [Profiling heap traversal visited bit].
- */
-bool
-traverseMaybeInitClosureData(const traverseState* ts, StgClosure *c)
+static bool
+traverseMaybeInitClosureData(StgClosure *c)
 {
-    if (!isTravDataValid(ts, c)) {
-        setTravData(ts, c, 0);
+    if (!traverseIsClosureDataValid(c)) {
+        traverseSetClosureData(c, 0);
         return true;
     }
     return false;
@@ -917,7 +944,7 @@ traverseSmallBitmap (traverseState *ts, StgPtr p, uint32_t size, StgWord bitmap,
 /**
  *  traversePushStack(ts, cp, data, stackStart, stackEnd) pushes all the objects
  *  in the STG stack-chunk from stackStart to stackEnd onto the traversal
- *  work-stack with 'c' and 'data' being their parent and associated data,
+ *  work-stack with 'cp' and 'data' being their parent and associated data,
  *  respectively.
  *
  *  Invariants:
@@ -1080,37 +1107,29 @@ traversePAP (traverseState *ts,
 }
 
 static void
-resetMutableObjects(traverseState* ts)
+appendStaticObject(traverseState *ts, StgClosure *p)
 {
-    uint32_t g, n;
-    bdescr *bd;
-    StgPtr ml;
-
-    // The following code resets the 'trav' field of each unvisited mutable
-    // object.
-    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-        // NOT true: even G0 has a block on its mutable list
-        // ASSERT(g != 0 || (generations[g].mut_list == NULL));
-
-        // Traversing through mut_list is necessary
-        // because we can find MUT_VAR objects which have not been
-        // visited during heap traversal.
-        for (n = 0; n < n_capabilities; n++) {
-          for (bd = capabilities[n]->mut_lists[g]; bd != NULL; bd = bd->link) {
-            for (ml = bd->start; ml < bd->free; ml++) {
-                traverseMaybeInitClosureData(ts, (StgClosure *)*ml);
-            }
-          }
+    bdescr *bd = ts->staticObjects;
+    bdescr *nbd;
+    if(!bd || bd->free >= bd->start + bd->blocks * BLOCK_SIZE_W)
+    {
+        nbd = allocGroup(1);
+        nbd->link = NULL;
+        if(ts->staticObjects) {
+            ts->staticObjects->link = nbd;
+        } else {
+            ts->firstStaticObjects = nbd;
         }
+        ts->staticObjects = nbd;
     }
+
+    *ts->staticObjects->free++ = (StgWord)p;
 }
 
-/**
- * Traverse all closures on the traversal work-stack, calling 'visit_cb' on each
- * closure. See 'visitClosure_cb' for details.
- */
 void
-traverseWorkStack(traverseState *ts, visitClosure_cb visit_cb)
+traverseWorkStack(traverseState *ts,
+                  visitClosure_cb visit_cb,
+                  returnClosure_cb return_cb)
 {
     // first_child = first child of c
     StgClosure *c, *cp, *first_child;
@@ -1125,7 +1144,7 @@ traverseWorkStack(traverseState *ts, visitClosure_cb visit_cb)
     // child_data = data to associate with current closure's children
 
 loop:
-    traversePop(ts, &c, &cp, &data, &sep);
+    traversePop(ts, return_cb, &c, &cp, &data, &sep);
 
     if (c == NULL) {
         debug("maxStackSize= %d\n", ts->maxStackSize);
@@ -1182,10 +1201,9 @@ inner_loop:
             //
             // But what about CONSTR?  Surely these may be able
             // to appear, and they don't have SRTs, so we can't
-            // check.  So for now, we're calling
-            // resetStaticObjectForProfiling() from the
-            // garbage collector to reset the retainer sets in all the
-            // reachable static objects.
+            // check.  So for now, we're using resetStaticObjects()
+            // to reset the traversal data in all the reachable static
+            // objects.
             goto loop;
         }
         /* fall-thru */
@@ -1206,11 +1224,21 @@ inner_loop:
     stackAccum accum = {};
 
     // If this is the first visit to c, initialize its data.
-    bool first_visit = traverseMaybeInitClosureData(ts, c);
+    bool first_visit = traverseMaybeInitClosureData(c);
     bool traverse_children = first_visit;
     if(visit_cb)
         traverse_children = visit_cb(c, cp, data, first_visit,
                                      &accum, &child_data);
+
+    if(first_visit && !HEAP_ALLOCED(c)) {
+        // So in principle the GC already produces the scavenged_static_objects
+        // which we can use, but it doesn't put absolutely all static objects on
+        // it. Only certain ones that actually participate in GC. Thus we have
+        // to keep our own list of objects in order to reset their heap
+        // profiling header.
+        appendStaticObject(ts, c);
+    }
+
     if(!traverse_children)
         goto loop;
 
@@ -1221,7 +1249,7 @@ inner_loop:
     // would be hard.
     switch (typeOfc) {
     case STACK:
-        sep = traversePushReturn(ts, c, accum, sep);
+        sep = traversePushReturn(ts, return_cb, c, accum, sep);
         traversePushStack(ts, c, sep, child_data,
                     ((StgStack *)c)->sp,
                     ((StgStack *)c)->stack + ((StgStack *)c)->stack_size);
@@ -1231,7 +1259,7 @@ inner_loop:
     {
         StgTSO *tso = (StgTSO *)c;
 
-        sep = traversePushReturn(ts, c, accum, sep);
+        sep = traversePushReturn(ts, return_cb, c, accum, sep);
 
         traversePushClosure(ts, (StgClosure *) tso->stackobj, c, sep, child_data);
         traversePushClosure(ts, (StgClosure *) tso->blocked_exceptions, c, sep, child_data);
@@ -1252,7 +1280,7 @@ inner_loop:
     {
         StgBlockingQueue *bq = (StgBlockingQueue *)c;
 
-        sep = traversePushReturn(ts, c, accum, sep);
+        sep = traversePushReturn(ts, return_cb, c, accum, sep);
 
         traversePushClosure(ts, (StgClosure *) bq->link, c, sep, child_data);
         traversePushClosure(ts, (StgClosure *) bq->bh, c, sep, child_data);
@@ -1264,7 +1292,7 @@ inner_loop:
     {
         StgPAP *pap = (StgPAP *)c;
 
-        sep = traversePushReturn(ts, c, accum, sep);
+        sep = traversePushReturn(ts, return_cb, c, accum, sep);
 
         traversePAP(ts, c, sep, child_data, pap->fun, pap->payload, pap->n_args);
         goto loop;
@@ -1274,14 +1302,14 @@ inner_loop:
     {
         StgAP *ap = (StgAP *)c;
 
-        sep = traversePushReturn(ts, c, accum, sep);
+        sep = traversePushReturn(ts, return_cb, c, accum, sep);
 
         traversePAP(ts, c, sep, child_data, ap->fun, ap->payload, ap->n_args);
         goto loop;
     }
 
     case AP_STACK:
-        sep = traversePushReturn(ts, c, accum, sep);
+        sep = traversePushReturn(ts, return_cb, c, accum, sep);
 
         traversePushClosure(ts, ((StgAP_STACK *)c)->fun, c, sep, child_data);
         traversePushStack(ts, c, sep, child_data,
@@ -1297,12 +1325,12 @@ inner_loop:
     // If first_child is null, c has no child.
     // If first_child is not null, the top stack element points to the next
     // object.
-    if(first_child == NULL && ts->return_cb) { // no children
+    if(first_child == NULL && return_cb) { // no children
         // This is only true when we're pushing additional return frames onto
         // the stack due to return_cb, so don't get any funny ideas about
         // replacing 'cp' by sep.
         ASSERT(sep->c == cp);
-        ts->return_cb(c, accum, cp, &sep->accum);
+        return_cb(c, accum, cp, &sep->accum);
         goto loop;
     } else if (first_child == NULL) { // no children
         goto loop;
@@ -1315,7 +1343,7 @@ inner_loop:
         // See Haskell model code here:
         //
         //     https://gitlab.haskell.org/ghc/ghc/snippets/1461
-        sep = traversePushReturn(ts, c, accum, sep);
+        sep = traversePushReturn(ts, return_cb, c, accum, sep);
     } else {                          // many children
         se.sep = sep;
         se.data = child_data;
@@ -1329,84 +1357,6 @@ inner_loop:
     cp = c;
     c = first_child;
     goto inner_loop;
-}
-
-/**
- * This function flips the 'flip' bit and hence every closure's profiling data
- * will be reset to zero upon visiting. See Note [Profiling heap traversal
- * visited bit].
- */
-void
-traverseInvalidateClosureData(traverseState* ts)
-{
-    // First make sure any unvisited mutable objects are valid so they're
-    // invalidated by the flip below
-    resetMutableObjects(ts);
-
-    // Then flip the flip bit, invalidating all closures.
-    ts->flip = ts->flip ^ 1;
-}
-
-/**
- * Traverse all static objects and invalidate their traversal-data. This ensures
- * that when doing the actual traversal no static closures will seem to have
- * been visited already because they weren't visited in the last run.
- *
- * This function must be called before zeroing all objects reachable from
- * scavenged_static_objects in the case of major garbage collections. See
- * GarbageCollect() in GC.c.
- *
- * Note:
- *
- *   The mut_once_list of the oldest generation must also be traversed?
- *
- *   Why? Because if the evacuation of an object pointed to by a static
- *   indirection object fails, it is put back to the mut_once_list of the oldest
- *   generation.
- *
- *   However, this is not necessary because any static indirection objects are
- *   just traversed through to reach dynamic objects. In other words, they are
- *   never visited during traversal.
- */
-void
-resetStaticObjectForProfiling( const traverseState *ts, StgClosure *static_objects )
-{
-    uint32_t count = 0;
-    StgClosure *p;
-
-    p = static_objects;
-    while (p != END_OF_STATIC_OBJECT_LIST) {
-        p = UNTAG_STATIC_LIST_PTR(p);
-        count++;
-
-        switch (get_itbl(p)->type) {
-        case IND_STATIC:
-            // Since we do not compute the retainer set of any
-            // IND_STATIC object, we don't have to reset its retainer
-            // field.
-            p = (StgClosure*)*IND_STATIC_LINK(p);
-            break;
-        case THUNK_STATIC:
-            traverseMaybeInitClosureData(ts, p);
-            p = (StgClosure*)*THUNK_STATIC_LINK(p);
-            break;
-        case FUN_STATIC:
-        case CONSTR:
-        case CONSTR_1_0:
-        case CONSTR_2_0:
-        case CONSTR_1_1:
-        case CONSTR_NOCAF:
-            traverseMaybeInitClosureData(ts, p);
-            p = (StgClosure*)*STATIC_LINK(get_itbl(p), p);
-            break;
-        default:
-            barf("resetStaticObjectForProfiling: %p (%lu)",
-                 p, (unsigned long)get_itbl(p)->type);
-            break;
-        }
-    }
-
-    debug("count in scavenged_static_objects = %d\n", count);
 }
 
 #endif /* PROFILING */
