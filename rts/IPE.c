@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 1998-2000
+ * (c) The GHC Team, 1998-2021
  *
  * Support for mapping info table pointers to source locations
  *
@@ -78,4 +78,13 @@ InfoProvEnt * lookupIPE(StgInfoTable *info)
         next = ip->link;
     }
     return NULL;
+}
+
+// TODO: This is debugging code - Remove before merge.
+void belchAllIPE(void) {
+    InfoProvEnt *ip, *next;
+    for (ip = IPE_LIST; ip != NULL; ip = next) {
+        debugBelch("IPE: %p %s \n", ip->info, ip->prov.srcloc);
+        next = ip->link;
+    }
 }
