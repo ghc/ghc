@@ -543,7 +543,7 @@ hsc_typecheck keep_rn mod_summary mb_rdr_module = do
         src_filename  = ms_hspp_file mod_summary
         real_loc = realSrcLocSpan $ mkRealSrcLoc (mkFastString src_filename) 1 1
         keep_rn' = gopt Opt_WriteHie dflags || keep_rn
-    if debugIsOn && not ( isHomeModule home_unit outer_mod ) then (assertPanic "/run/user/1000/extra-dir-37036130960742/___GHCIDE_MAGIC___" 552) else return ()
+    MASSERT( isHomeModule home_unit outer_mod )
     tc_result <- if hsc_src == HsigFile && not (isHoleModule inner_mod)
         then ioMsgMaybe $ hoistTcRnMessage $ tcRnInstantiateSignature hsc_env outer_mod' real_loc
         else
