@@ -90,12 +90,13 @@ cloneThreadStack (ThreadId tid#) = do
   freeStablePtr ptr
   takeMVar resultVar
 
--- TODO: Cannot use `import GHC.Exts.Heap (StgInfoTable(..))` -> hidden package
-type InfoTableCode = Word
+-- | Represents an Info Table in the RTS.
+-- It cannot be instantiated because it's only used as a token.
+data InfoTable
 
-foreign import ccall "decodeClonedStack" decodeClonedStack :: StackSnapshot# -> MutableArray# RealWorld (Ptr InfoTableCode)
+foreign import ccall "decodeClonedStack" decodeClonedStack :: StackSnapshot# -> MutableArray# RealWorld (Ptr InfoTable)
 
-foreign import ccall "lookupIPE" lookupIPE :: Ptr Word -> IO (Ptr InfoProvEnt)
+foreign import ccall "lookupIPE" lookupIPE :: Ptr InfoTable -> IO (Ptr InfoProvEnt)
 
 -- | Represetation for the source location where a return frame was pushed on the stack.
 -- This happens every time when a @case ... of@ scrutinee is evaluated.
