@@ -32,8 +32,8 @@ rts_mkChar (Capability *cap, HsChar c)
 {
   StgClosure *p;
   // See Note [Precomputed static closures]
-  if (c <= MAX_CHARLIKE) {
-    p = (StgClosure *)CHARLIKE_CLOSURE(c);
+  if (c <= MAX_STATIC_CHAR) {
+    p = (StgClosure *)STATIC_CHAR_CLOSURE(c);
   } else {
     p = (StgClosure *)allocate(cap, CONSTR_sizeW(0,1));
     SET_HDR(p, Czh_con_info, CCS_SYSTEM);
@@ -47,8 +47,8 @@ rts_mkInt (Capability *cap, HsInt i)
 {
   StgClosure *p;
   // See Note [Precomputed static closures]
-  if (i >= MIN_INTLIKE && i <= MAX_INTLIKE) {
-    p = (StgClosure *)INTLIKE_CLOSURE(i);
+  if (i >= MIN_STATIC_INT && i <= MAX_STATIC_INT) {
+    p = (StgClosure *)STATIC_INT_CLOSURE(i);
   } else {
     p = (StgClosure *)allocate(cap,CONSTR_sizeW(0,1));
     SET_HDR(p, Izh_con_info, CCS_SYSTEM);
