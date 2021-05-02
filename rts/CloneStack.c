@@ -112,11 +112,7 @@ void sendCloneStackMessage(StgTSO *tso STG_UNUSED, HsStablePtr mvar STG_UNUSED) 
 #define mutArrPtrsCardWords(n) ROUNDUP_BYTES_TO_WDS(mutArrPtrCardUp(n))
 #define BYTES_TO_WDS(n) ((n) / sizeof(StgWord))
 
-StgMutArrPtrs* decodeClonedStack(StgStack* stack){
-#if defined(DEBUG)
-  printStack(stack);
-#endif
-
+StgMutArrPtrs* decodeClonedStack(StgStack* stack) {
   StgWord closureCount = getStackClosureCount(stack);
 
   // Stolen from PrimOps.cmm:stg_newArrayzh()
