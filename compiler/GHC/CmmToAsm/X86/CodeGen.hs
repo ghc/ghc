@@ -2617,7 +2617,7 @@ genCCall' _ is32Bit (PrimTarget (MO_Cmpxchg width)) [dst] [addr, old, new] _
                , MOV II32 (OpReg eax) (OpReg dst_r_lo)
                , MOV II32 (OpReg edx) (OpReg dst_r_hi)
                ]
-    return $ addr_code `appOL` newval_code `appOL` oldval_code `appOL` code
+    return $ newval_code `appOL` oldval_code `appOL` addr_code `appOL` code
     -- On x86 we don't have enough registers to use cmpxchg with a
     -- complicated addressing mode, so on that architecture we
     -- pre-compute the address first.
@@ -2765,6 +2765,11 @@ genCCall' _ is32Bit target dest_regs args bid = do
                                ]
                return code
         _ -> panic "genCCall: Wrong number of arguments/results for imul2"
+    (PrimTarget (MO_Cmpxchg2 width), [res_lo, res_hi]) ->
+        case args of
+        [dst, old_lo, old_hi, new_lo, new_hi] ->
+            panic "MO_Cmpxchg2 not implemented"
+        _ -> panic "genCCall: Wrong number of arguments/results for cmpxchg(8|16)b"
 
     _ -> do
         (instrs0, args') <- evalArgs bid args
