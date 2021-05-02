@@ -1514,7 +1514,7 @@ repE (NegApp _ x _)      = do
                               a         <- repLE x
                               negateVar <- lookupOcc negateName >>= repVar
                               negateVar `repApp` a
-repE (HsPar _ x)            = repLE x
+repE (HsPar _ _ x _)        = repLE x
 repE (SectionL _ x y)       = do { a <- repLE x; b <- repLE y; repSectionL a b }
 repE (SectionR _ x y)       = do { a <- repLE x; b <- repLE y; repSectionR a b }
 repE (HsCase _ e (MG { mg_alts = (L _ ms) }))
@@ -2044,7 +2044,7 @@ repP (LazyPat _ p)      = do { p1 <- repLP p; repPtilde p1 }
 repP (BangPat _ p)      = do { p1 <- repLP p; repPbang p1 }
 repP (AsPat _ x p)      = do { x' <- lookupNBinder x; p1 <- repLP p
                              ; repPaspat x' p1 }
-repP (ParPat _ p)       = repLP p
+repP (ParPat _ _ p _)      = repLP p
 repP (ListPat Nothing ps)  = do { qs <- repLPs ps; repPlist qs }
 repP (ListPat (Just (SyntaxExprRn e)) ps) = do { p <- repP (ListPat Nothing ps)
                                                ; e' <- repE e

@@ -1025,7 +1025,7 @@ tcPatToExpr name args pat = go pat
         = return $ HsVar noExtField (L l var)
         | otherwise
         = Left (quotes (ppr var) <+> text "is not bound by the LHS of the pattern synonym")
-    go1 (ParPat _ pat)          = fmap (HsPar noAnn) $ go pat
+    go1 (ParPat _ lpar pat rpar) = fmap (\e -> HsPar noAnn lpar e rpar) $ go pat
     go1 p@(ListPat reb pats)
       | Nothing <- reb = do { exprs <- mapM go pats
                             ; return $ ExplicitList noExtField exprs }
@@ -1203,7 +1203,7 @@ tcCollectEx pat = go pat
     go1 :: Pat GhcTc -> ([TyVar], [EvVar])
     go1 (LazyPat _ p)      = go p
     go1 (AsPat _ _ p)      = go p
-    go1 (ParPat _ p)       = go p
+    go1 (ParPat _ _ p _)   = go p
     go1 (BangPat _ p)      = go p
     go1 (ListPat _ ps)     = mergeMany . map go $ ps
     go1 (TuplePat _ ps _)  = mergeMany . map go $ ps

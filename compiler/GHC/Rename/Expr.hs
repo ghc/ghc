@@ -336,17 +336,17 @@ rnExpr (HsSpliceE _ splice) = rnSpliceExpr splice
 ---------------------------------------------
 --      Sections
 -- See Note [Parsing sections] in GHC.Parser
-rnExpr (HsPar x (L loc (section@(SectionL {}))))
+rnExpr (HsPar x lpar (L loc (section@(SectionL {}))) rpar)
   = do  { (section', fvs) <- rnSection section
-        ; return (HsPar x (L loc section'), fvs) }
+        ; return (HsPar x lpar (L loc section') rpar, fvs) }
 
-rnExpr (HsPar x (L loc (section@(SectionR {}))))
+rnExpr (HsPar x lpar (L loc (section@(SectionR {}))) rpar)
   = do  { (section', fvs) <- rnSection section
-        ; return (HsPar x (L loc section'), fvs) }
+        ; return (HsPar x lpar (L loc section') rpar, fvs) }
 
-rnExpr (HsPar x e)
+rnExpr (HsPar x lpar e rpar)
   = do  { (e', fvs_e) <- rnLExpr e
-        ; return (HsPar x e', fvs_e) }
+        ; return (HsPar x lpar e' rpar, fvs_e) }
 
 rnExpr expr@(SectionL {})
   = do  { addErr (sectionErr expr); rnSection expr }
@@ -786,9 +786,9 @@ rnCmd (HsCmdLam _ matches)
   = do { (matches', fvMatch) <- rnMatchGroup LambdaExpr rnLCmd matches
        ; return (HsCmdLam noExtField matches', fvMatch) }
 
-rnCmd (HsCmdPar x e)
+rnCmd (HsCmdPar x lpar e rpar)
   = do  { (e', fvs_e) <- rnLCmd e
-        ; return (HsCmdPar x e', fvs_e) }
+        ; return (HsCmdPar x lpar e' rpar, fvs_e) }
 
 rnCmd (HsCmdCase _ expr matches)
   = do { (new_expr, e_fvs) <- rnLExpr expr
@@ -838,7 +838,7 @@ methodNamesCmd (HsCmdArrApp _ _arrow _arg HsHigherOrderApp _rtl)
   = unitFV appAName
 methodNamesCmd (HsCmdArrForm {}) = emptyFVs
 
-methodNamesCmd (HsCmdPar _ c) = methodNamesLCmd c
+methodNamesCmd (HsCmdPar _ _ c _) = methodNamesLCmd c
 
 methodNamesCmd (HsCmdIf _ _ _ c1 c2)
   = methodNamesLCmd c1 `plusFV` methodNamesLCmd c2 `addOneFV` choiceAName
@@ -2148,7 +2148,7 @@ isStrictPattern lpat =
     VarPat{}        -> False
     LazyPat{}       -> False
     AsPat _ _ p     -> isStrictPattern p
-    ParPat _ p      -> isStrictPattern p
+    ParPat _ _ p _  -> isStrictPattern p
     ViewPat _ _ p   -> isStrictPattern p
     SigPat _ p _    -> isStrictPattern p
     BangPat{}       -> True
@@ -2282,13 +2282,13 @@ needJoin _monad_names stmts = (True, stmts)
 isReturnApp :: MonadNames
             -> LHsExpr GhcRn
             -> Maybe (LHsExpr GhcRn, Bool)
-isReturnApp monad_names (L _ (HsPar _ expr)) = isReturnApp monad_names expr
+isReturnApp monad_names (L _ (HsPar _ _ expr _)) = isReturnApp monad_names expr
 isReturnApp monad_names (L _ e) = case e of
   OpApp _ l op r | is_return l, is_dollar op -> Just (r, True)
   HsApp _ f arg  | is_return f               -> Just (arg, False)
   _otherwise -> Nothing
  where
-  is_var f (L _ (HsPar _ e)) = is_var f e
+  is_var f (L _ (HsPar _ _ e _)) = is_var f e
   is_var f (L _ (HsAppType _ e _)) = is_var f e
   is_var f (L _ (HsVar _ (L _ r))) = f r
        -- TODO: I don't know how to get this right for rebindable syntax
