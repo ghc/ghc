@@ -919,7 +919,7 @@ generatePromptFunctionFromString promptS modules_names line =
         processString ('%':'s':xs) =
             liftM2 (<>) (return modules_list) (processString xs)
             where
-              modules_list = hsep $ map text modules_names
+              modules_list = hsep . map text . ordNub $ modules_names
         processString ('%':'l':xs) =
             liftM2 (<>) (return $ ppr line) (processString xs)
         processString ('%':'d':xs) =
