@@ -192,7 +192,7 @@ rnTopBindsBoot :: NameSet -> HsValBindsLR GhcRn GhcPs
 -- A hs-boot file has no bindings.
 -- Return a single HsBindGroup with empty binds and renamed signatures
 rnTopBindsBoot bound_names (ValBinds _ mbinds sigs)
-  = do  { checkErr (isEmptyLHsBinds mbinds) (bindsInHsBootFile mbinds)
+  = do  { mapM_ bindInHsBootFileErr mbinds
         ; (sigs', fvs) <- renameSigs (HsBootCtxt bound_names) sigs
         ; return (XValBindsLR (NValBinds [] sigs'), usesOnly fvs) }
 rnTopBindsBoot _ b = pprPanic "rnTopBindsBoot" (ppr b)
@@ -1322,10 +1322,10 @@ defaultSigErr sig = vcat [ hang (text "Unexpected default signature:")
                               2 (ppr sig)
                          , text "Use DefaultSignatures to enable default signatures" ]
 
-bindsInHsBootFile :: LHsBindsLR GhcRn GhcPs -> SDoc
-bindsInHsBootFile mbinds
-  = hang (text "Bindings in hs-boot files are not allowed")
-       2 (ppr mbinds)
+bindInHsBootFileErr :: LHsBindLR GhcRn GhcPs -> RnM ()
+bindInHsBootFileErr (L loc _)
+  = addErrAt (locA loc) $
+      vcat [ text "Bindings in hs-boot files are not allowed" ]
 
 nonStdGuardErr :: (Outputable body,
                    Anno (Stmt GhcRn body) ~ SrcSpanAnnA)
