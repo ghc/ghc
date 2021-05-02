@@ -91,8 +91,7 @@ import GHC.Core.DataCon
 import GHC.Types.Unique.FM
 import GHC.Data.Maybe
 import Control.Monad
-import GHC.Types.Tickish (GenTickish(SourceNote))
-import GHC.Types.SrcLoc (RealSrcSpan)
+import qualified Data.Map.Strict as Map
 
 --------------------------------------------------------------------------
 --
@@ -617,9 +616,8 @@ convertInfoProvMap dflags defns this_mod (InfoTableProvMap (UniqMap dcenv) denv 
             return $ InfoProvEnt cl cn (tyString (dataConTyCon dc)) this_mod (join $ lookup n (NE.toList ns))
 
         lookupLabeledInfoTablesWithTickishes = do
-            (_, _, tickish) <- listToMaybe $ filter (\ (_,i,_) -> i == cmit) labeledInfoTablesWithTickishes
-            tickish' <- tickish
-            return $ InfoProvEnt cl cn "" this_mod (infoTableProvFromTickish tickish')
+            sourceNote <- Map.lookup (cit_lbl cmit) labeledInfoTablesWithTickishes
+            return $ InfoProvEnt cl cn "" this_mod sourceNote
 
         -- This catches things like prim closure types and anything else which doesn't have a
         -- source location
@@ -627,7 +625,3 @@ convertInfoProvMap dflags defns this_mod (InfoTableProvMap (UniqMap dcenv) denv 
 
         -- TODO: Do not fallback for stack represented info tables?
     in fromMaybe simpleFallback (lookupDataConMap `firstJust` lookupClosureMap `firstJust` lookupLabeledInfoTablesWithTickishes)) defns
-  where
-    infoTableProvFromTickish :: CmmTickish -> (Maybe (RealSrcSpan, String))
-    infoTableProvFromTickish (SourceNote sourceSpan sourceName) = Just (sourceSpan, sourceName)
-    infoTableProvFromTickish _ = Nothing
