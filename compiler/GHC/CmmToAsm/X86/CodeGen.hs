@@ -2598,10 +2598,30 @@ genCCall' _ _ (PrimTarget (MO_AtomicWrite width)) [] [addr, val] _ = do
     code <- assignMem_IntCode (intFormat width) addr val
     return $ code `snocOL` MFENCE
 
-genCCall' _ is32Bit (PrimTarget (MO_Cmpxchg width)) [dst] [addr, old, new] _ = do
+genCCall' _ is32Bit (PrimTarget (MO_Cmpxchg width)) [dst] [addr, old, new] _
+  | is32Bit, width == W64 = do
+    Amode amode addr_code <- getSimpleAmode is32Bit addr
+    ChildCode64 newval_code newval_lo <- iselExpr64 new
+    ChildCode64 oldval_code oldval_lo <- iselExpr64 old
+    let newval_hi = getHiVRegFromLo newval_lo
+        oldval_hi = getHiVRegFromLo oldval_lo
+        (LocalReg u_dst _) = dst
+        dst_r_lo  = RegVirtual $ mkVirtualReg u_dst II32
+        dst_r_hi  = getHiVRegFromLo dst_r_lo
+        code = toOL
+               [ MOV II32 (OpReg oldval_lo) (OpReg eax)
+               , MOV II32 (OpReg oldval_hi) (OpReg edx)
+               , MOV II32 (OpReg newval_lo) (OpReg ebx)
+               , MOV II32 (OpReg newval_hi) (OpReg ecx)
+               , LOCK (CMPXCHG8B amode)
+               , MOV II32 (OpReg eax) (OpReg dst_r_lo)
+               , MOV II32 (OpReg edx) (OpReg dst_r_hi)
+               ]
+    return $ newval_code `appOL` oldval_code `appOL` addr_code `appOL` code
     -- On x86 we don't have enough registers to use cmpxchg with a
     -- complicated addressing mode, so on that architecture we
     -- pre-compute the address first.
+  | otherwise = do
     Amode amode addr_code <- getSimpleAmode is32Bit addr
     newval <- getNewRegNat format
     newval_code <- getAnyReg new
@@ -2745,6 +2765,11 @@ genCCall' _ is32Bit target dest_regs args bid = do
                                ]
                return code
         _ -> panic "genCCall: Wrong number of arguments/results for imul2"
+    (PrimTarget (MO_Cmpxchg2 width), [res_lo, res_hi]) ->
+        case args of
+        [dst, old_lo, old_hi, new_lo, new_hi] ->
+            panic "MO_Cmpxchg2 not implemented"
+        _ -> panic "genCCall: Wrong number of arguments/results for cmpxchg(8|16)b"
 
     _ -> do
         (instrs0, args') <- evalArgs bid args
@@ -3411,7 +3436,9 @@ outOfLineCmmOp bid mop res args
               MO_AtomicRMW _ _ -> fsLit "atomicrmw"
               MO_AtomicRead _  -> fsLit "atomicread"
               MO_AtomicWrite _ -> fsLit "atomicwrite"
-              MO_Cmpxchg _     -> fsLit "cmpxchg"
+              MO_Cmpxchg w     -> cmpxchgLabel w -- for W64 on 32-bit
+                                                 -- TODO: implement
+                                                 -- cmpxchg8b instr
               MO_Xchg _        -> should_be_inline
 
               MO_UF_Conv _ -> unsupported
