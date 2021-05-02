@@ -54,7 +54,18 @@ A StackSnapshot# is really a pointer to an immutable StgStack closure with
 the invariant that stack->sp points to a valid frame.
 -}
 
--- TODO: Add not: [Stack Decoding]
+{-
+Note [Stack Decoding]
+~~~~~~~~~~~~~~~~~~~~~
+A cloned stack is decoded (unwound) by looking up the Info Table Provenance
+Entries (IPE) for every stack frame with `lookupIPE` in the RTS.
+
+The relevant notes are:
+  - Note [Mapping Info Tables to Source Positions]
+  - Note [Stacktraces from Info Table Provenance Entries (IPE based stack unwinding)]
+
+The IPEs contain source locations and are here pulled from the RTS/C world into Haskell.
+-}
 
 -- | Clone the stack of the executing thread
 --
@@ -86,8 +97,8 @@ foreign import ccall "decodeClonedStack" decodeClonedStack :: StackSnapshot# -> 
 
 foreign import ccall "lookupIPE" lookupIPE :: Ptr Word -> IO (Ptr InfoProvEnt)
 
--- TODO: Haddock
--- TODO: Add test(s)
+-- | Represetation for the source location where a return frame was pushed on the stack.
+-- This happens every time when a @case ... of@ scrutinee is evaluated.
 data StackEntry = StackEntry
   { functionName :: String,
     moduleName :: String,
@@ -111,8 +122,7 @@ decode (StackSnapshot stack) =
           v <- IO $ readArray# array i
           ipe <- lookupIPE v
           if ipe == nullPtr
-            then -- TODO: Test this case
-              pure Nothing
+            then pure Nothing
             else do
               infoProv <- (peekInfoProv . ipeProv) ipe
               pure $ Just (toStackEntry infoProv)
