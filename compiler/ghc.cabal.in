@@ -536,10 +536,14 @@ Library
         GHC.Stg.Lift.Analysis
         GHC.Stg.Lift.Monad
         GHC.Stg.Lint
+        GHC.Stg.InferTags
+        GHC.Stg.InferTags.Rewrite
+        GHC.Stg.InferTags.Types
         GHC.Stg.Pipeline
         GHC.Stg.Stats
         GHC.Stg.Subst
         GHC.Stg.Syntax
+        GHC.Stg.Utils
         GHC.StgToByteCode
         GHC.StgToCmm
         GHC.StgToCmm.ArgRep
