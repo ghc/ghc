@@ -1,6 +1,11 @@
 # See Note [Order of warning flags].
 SRC_CC_OPTS     += -Wall $(WERROR)
 SRC_HC_OPTS     += -Wall
+
+ifeq "$(HostOS_CPP)" "darwin"
+SRC_CC_OPTS     += -include TargetConditionals.h
+endif
+
 # Don't add -Werror to SRC_HC_OPTS_STAGE0 (or SRC_HC_OPTS), because otherwise
 # validate may unnecessarily fail when booting with an older compiler.
 # It would be better to only exclude certain warnings from becoming errors
@@ -37,6 +42,11 @@ else
 # Don't warn about unknown GCC pragmas when using clang
 SRC_CC_WARNING_OPTS += -Wno-unknown-pragmas
 
+endif
+
+# since catalina system headers are a bit annoying on macOS
+ifeq "$(HostOS_CPP)" "darwin"
+SRC_CC_WARNING_OPTS += -Wno-nullability-completeness -Wno-availability -Wno-expansion-to-defined -Wno-builtin-requires-header
 endif
 
 SRC_HC_WARNING_OPTS_STAGE1 += -Wnoncanonical-monad-instances
