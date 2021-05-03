@@ -33,6 +33,7 @@ import GHC.Utils.Panic
 import GHC.Types.Name
 import GHC.Types.Name.Env
 
+import Control.Monad (join)
 import Data.Data (Data)
 
 {-
@@ -83,7 +84,7 @@ data RoughMap a = RM { rm_empty   :: [a]
 emptyRM :: RoughMap a
 emptyRM = RMEmpty
 
--- | Deterministic.
+-- | Order of result is deterministic.
 lookupRM :: [RoughMatchTc] -> RoughMap a -> [a]
 lookupRM _                  RMEmpty = []
 lookupRM []                 rm      = elemsRM rm
@@ -151,7 +152,7 @@ filterMatchingRM pred [] rm      = filterRM pred rm
 filterMatchingRM pred (KnownTc tc : tcs) rm =
     normalise $ RM {
       rm_empty = filter pred (rm_empty rm),
-      rm_known = alterDNameEnv (fmap $ filterMatchingRM pred tcs) (rm_known rm) tc,
+      rm_known = alterDNameEnv (join . fmap (dropEmpty . filterMatchingRM pred tcs)) (rm_known rm) tc,
       rm_unknown = filterMatchingRM pred tcs (rm_unknown rm)
     }
 filterMatchingRM pred (OtherTc : tcs) rm =
@@ -160,6 +161,10 @@ filterMatchingRM pred (OtherTc : tcs) rm =
       rm_known = mapDNameEnv (filterMatchingRM pred tcs) (rm_known rm),
       rm_unknown = filterMatchingRM pred tcs (rm_unknown rm)
     }
+
+dropEmpty :: RoughMap a -> Maybe (RoughMap a)
+dropEmpty RMEmpty = Nothing
+dropEmpty rm = Just rm
 
 elemsRM :: RoughMap a -> [a]
 elemsRM = foldRM (:) []

@@ -14,7 +14,7 @@ module GHC.Core.InstEnv (
         OverlapFlag(..), OverlapMode(..), setOverlapModeMaybe,
         ClsInst(..), DFunInstType, pprInstance, pprInstanceHdr, pprInstances,
         instanceHead, instanceSig, mkLocalInstance, mkImportedInstance,
-        instanceDFunId, updateClsInstDFun, instanceRoughTcs,
+        instanceDFunId, updateClsInstDFun,
         fuzzyClsInstCmp, orphNamesOfClsInst,
 
         InstEnvs(..), VisibleOrphanModules, InstEnv,
@@ -41,16 +41,15 @@ import GHC.Unit.Module.Env
 import GHC.Unit.Types
 import GHC.Core.Class
 import GHC.Types.Var
+import GHC.Types.Unique.DSet
 import GHC.Types.Var.Set
 import GHC.Types.Name
 import GHC.Types.Name.Set
-import GHC.Types.Unique (getUnique)
 import GHC.Core.Unify
 import GHC.Types.Basic
-import GHC.Types.Unique.DFM
 import GHC.Types.Id
 import Data.Data        ( Data )
-import Data.Maybe       ( isJust, fromMaybe )
+import Data.Maybe       ( isJust )
 
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
@@ -70,7 +69,7 @@ import GHC.Utils.Panic
 data ClsInst
   = ClsInst {   -- Used for "rough matching"; see
                 -- Note [ClsInst laziness and the rough-match fields]
-                -- INVARIANT: is_tcs = roughMatchTcs is_tys
+                -- INVARIANT: is_tcs = KnownTc is_cls_nm : roughMatchTcs is_tys
                is_cls_nm :: Name          -- ^ Class name
              , is_tcs  :: [RoughMatchTc]  -- ^ Top of type args
 
@@ -105,8 +104,7 @@ data ClsInst
 -- instances before displaying them to the user.
 fuzzyClsInstCmp :: ClsInst -> ClsInst -> Ordering
 fuzzyClsInstCmp x y =
-    stableNameCmp (is_cls_nm x) (is_cls_nm y) `mappend`
-    mconcat (map cmp (zip (is_tcs x) (is_tcs y)))
+    foldMap cmp (zip (is_tcs x) (is_tcs y))
   where
     cmp (OtherTc,   OtherTc)   = EQ
     cmp (OtherTc,   KnownTc _) = LT
@@ -198,9 +196,6 @@ updateClsInstDFun :: (DFunId -> DFunId) -> ClsInst -> ClsInst
 updateClsInstDFun tidy_dfun ispec
   = ispec { is_dfun = tidy_dfun (is_dfun ispec) }
 
-instanceRoughTcs :: ClsInst -> [RoughMatchTc]
-instanceRoughTcs = is_tcs
-
 instance NamedThing ClsInst where
    getName ispec = getName (is_dfun ispec)
 
@@ -261,7 +256,7 @@ mkLocalInstance dfun oflag tvs cls tys
             , is_tvs = tvs
             , is_dfun_name = dfun_name
             , is_cls = cls, is_cls_nm = cls_name
-            , is_tys = tys, is_tcs = roughMatchTcs tys
+            , is_tys = tys, is_tcs = KnownTc cls_name : roughMatchTcs tys
             , is_orphan = orph
             }
   where
@@ -292,7 +287,7 @@ mkLocalInstance dfun oflag tvs cls tys
     choose_one nss = chooseOrphanAnchor (unionNameSets nss)
 
 mkImportedInstance :: Name           -- ^ the name of the class
-                   -> [RoughMatchTc] -- ^ the types which the class was applied to
+                   -> [RoughMatchTc] -- ^ the rough match signature of the instance
                    -> Name           -- ^ the 'Name' of the dictionary binding
                    -> DFunId         -- ^ the 'Id' of the dictionary.
                    -> OverlapFlag    -- ^ may this instance overlap?
@@ -306,7 +301,7 @@ mkImportedInstance cls_nm mb_tcs dfun_name dfun oflag orphan
   = ClsInst { is_flag = oflag, is_dfun = dfun
             , is_tvs = tvs, is_tys = tys
             , is_dfun_name = dfun_name
-            , is_cls_nm = cls_nm, is_cls = cls, is_tcs = mb_tcs
+            , is_cls_nm = cls_nm, is_cls = cls, is_tcs = KnownTc cls_nm : mb_tcs
             , is_orphan = orphan }
   where
     (tvs, _, cls, tys) = tcSplitDFunTy (idType dfun)
@@ -388,8 +383,11 @@ UniqDFM. See also Note [Deterministic UniqFM]
 -- We still use Class as key type as it's both the common case
 -- and conveys the meaning better. But the implementation of
 --InstEnv is a bit more lax internally.
-type InstEnv = UniqDFM Class ClsInstEnv      -- Maps Class to instances for that class
+newtype InstEnv = InstEnv (RoughMap ClsInst)      -- Maps Class to instances for that class
   -- See Note [InstEnv determinism]
+
+instance Outputable InstEnv where
+  ppr (InstEnv rm) = pprInstances $ elemsRM rm
 
 -- | 'InstEnvs' represents the combination of the global type class instance
 -- environment, the local type class instance environment, and the set of
@@ -408,14 +406,6 @@ data InstEnvs = InstEnvs {
 -- transitively reachable orphan modules (modules that define orphan instances).
 type VisibleOrphanModules = ModuleSet
 
-newtype ClsInstEnv
-  = ClsIE (RoughMap ClsInst)    -- The instances for a particular class, in any order
-
-instance Outputable ClsInstEnv where
-  ppr (ClsIE is) = pprInstances $ elemsRM is
-
-emptyClsInstEnv :: ClsInstEnv
-emptyClsInstEnv = ClsIE emptyRM
 
 -- INVARIANTS:
 --  * The is_tvs are distinct in each ClsInst
@@ -427,17 +417,18 @@ emptyClsInstEnv = ClsIE emptyRM
 -- the dfun type.
 
 emptyInstEnv :: InstEnv
-emptyInstEnv = emptyUDFM
-
-clsInstEnvElts :: ClsInstEnv -> [ClsInst]
-clsInstEnvElts (ClsIE rm) = elemsRM rm
+emptyInstEnv = InstEnv emptyRM
 
 instEnvElts :: InstEnv -> [ClsInst]
-instEnvElts ie = [elt | elts <- eltsUDFM ie, elt <- clsInstEnvElts elts]
+instEnvElts (InstEnv rm) = elemsRM rm
   -- See Note [InstEnv determinism]
 
-instEnvClasses :: InstEnv -> [Class]
-instEnvClasses ie = [is_cls e | e : _ <- map clsInstEnvElts $ eltsUDFM ie]
+instEnvEltsForClass :: InstEnv -> Class -> [ClsInst]
+instEnvEltsForClass (InstEnv rm) cls = lookupRM [KnownTc (className cls)] rm
+
+-- N.B. this is not particularly efficient but used only by GHCi.
+instEnvClasses :: InstEnv -> UniqDSet Class
+instEnvClasses ie = mkUniqDSet $ map is_cls (instEnvElts ie)
 
 -- | Test if an instance is visible, by checking that its origin module
 -- is in 'VisibleOrphanModules'.
@@ -458,16 +449,13 @@ classInstances (InstEnvs { ie_global = pkg_ie, ie_local = home_ie, ie_visible = 
   = get home_ie ++ get pkg_ie
   where
     get :: InstEnv -> [ClsInst]
-    get env = case lookupUDFM env cls of
-                Just cie -> filter (instIsVisible vis_mods) (clsInstEnvElts cie)
-                Nothing  -> []
+    get ie = filter (instIsVisible vis_mods) (instEnvEltsForClass ie cls)
 
 -- | Checks for an exact match of ClsInst in the instance environment.
 -- We use this when we do signature checking in "GHC.Tc.Module"
 memberInstEnv :: InstEnv -> ClsInst -> Bool
-memberInstEnv inst_env ins_item@(ClsInst { is_cls_nm = cls_nm } ) =
-    maybe False (any (identicalDFunType ins_item) . clsInstEnvElts)
-          (lookupUDFM_Directly inst_env (getUnique cls_nm))
+memberInstEnv (InstEnv rm) ins_item@(ClsInst { is_tcs = tcs } ) =
+    any (identicalDFunType ins_item) (lookupRM tcs rm)
  where
   identicalDFunType cls1 cls2 =
     eqType (varType (is_dfun cls1)) (varType (is_dfun cls2))
@@ -476,25 +464,19 @@ extendInstEnvList :: InstEnv -> [ClsInst] -> InstEnv
 extendInstEnvList inst_env ispecs = foldl' extendInstEnv inst_env ispecs
 
 extendInstEnv :: InstEnv -> ClsInst -> InstEnv
-extendInstEnv inst_env ins_item@(ClsInst { is_cls_nm = cls_nm })
-  = unsafeCastUDFMKey $ alterUDFM (Just . add . fromMaybe emptyClsInstEnv) (unsafeCastUDFMKey inst_env) (getUnique cls_nm)
-  where
-    add :: ClsInstEnv -> ClsInstEnv
-    add (ClsIE cur_insts) = ClsIE $ insertRM (instanceRoughTcs ins_item) ins_item cur_insts
+extendInstEnv (InstEnv rm) ins_item@(ClsInst { is_tcs = tcs })
+  = InstEnv $ insertRM tcs ins_item rm
 
 deleteFromInstEnv :: InstEnv -> ClsInst -> InstEnv
-deleteFromInstEnv inst_env ins_item@(ClsInst { is_cls_nm = cls_nm })
-  = adjustUDFM_Directly adjust inst_env (getUnique cls_nm)
-  where
-    adjust (ClsIE items) = ClsIE (filterRM (not . identicalClsInstHead ins_item) items)
+deleteFromInstEnv (InstEnv rm) ins_item@(ClsInst { is_tcs = tcs })
+  = InstEnv $ filterMatchingRM (not . identicalClsInstHead ins_item) tcs rm
 
 deleteDFunFromInstEnv :: InstEnv -> DFunId -> InstEnv
 -- Delete a specific instance fron an InstEnv
-deleteDFunFromInstEnv inst_env dfun
-  = adjustUDFM adjust inst_env cls
+deleteDFunFromInstEnv (InstEnv rm) dfun
+  = InstEnv $ filterMatchingRM (not . same_dfun) [KnownTc (className cls)] rm
   where
     (_, _, cls, _) = tcSplitDFunTy (idType dfun)
-    adjust (ClsIE items) = ClsIE (filterRM (not . same_dfun) items)
     same_dfun (ClsInst { is_dfun = dfun' }) = dfun == dfun'
 
 identicalClsInstHead :: ClsInst -> ClsInst -> Bool
@@ -502,10 +484,10 @@ identicalClsInstHead :: ClsInst -> ClsInst -> Bool
 -- e.g.  both are   Eq [(a,b)]
 -- Used for overriding in GHCi
 -- Obviously should be insensitive to alpha-renaming
-identicalClsInstHead (ClsInst { is_cls_nm = cls_nm1, is_tcs = rough1, is_tys = tys1 })
-                     (ClsInst { is_cls_nm = cls_nm2, is_tcs = rough2, is_tys = tys2 })
-  =  cls_nm1 == cls_nm2
-  && not (instanceCantMatch rough1 rough2)  -- Fast check for no match, uses the "rough match" fields
+identicalClsInstHead (ClsInst { is_tcs = rough1, is_tys = tys1 })
+                     (ClsInst { is_tcs = rough2, is_tys = tys2 })
+  =  not (instanceCantMatch rough1 rough2)  -- Fast check for no match, uses the "rough match" fields;
+                                            -- also accounts for class name.
   && isJust (tcMatchTys tys1 tys2)
   && isJust (tcMatchTys tys2 tys1)
 
@@ -837,15 +819,10 @@ lookupInstEnv' :: InstEnv          -- InstEnv to look in
 -- but Foo [Int] is a unifier.  This gives the caller a better chance of
 -- giving a suitable error message
 
-lookupInstEnv' ie vis_mods cls tys
-  = lookup ie
+lookupInstEnv' (InstEnv rm) vis_mods cls tys
+  = find [] [] (lookupRM rough_tcs rm)
   where
-    rough_tcs  = roughMatchTcs tys
-
-    --------------
-    lookup env = case lookupUDFM env cls of
-                   Nothing -> ([],[])   -- No instances for this class
-                   Just (ClsIE insts) -> find [] [] (lookupRM rough_tcs insts)
+    rough_tcs  = KnownTc (className cls) : roughMatchTcs tys
 
     --------------
     find ms us [] = (ms, us)
@@ -897,8 +874,7 @@ lookupInstEnv check_overlap_safe
                         , ie_visible = vis_mods })
               cls
               tys
-  = -- pprTrace "lookupInstEnv" (ppr cls <+> ppr tys $$ ppr home_ie) $
-    (final_matches, final_unifs, unsafe_overlapped)
+  = (final_matches, final_unifs, unsafe_overlapped)
   where
     (home_matches, home_unifs) = lookupInstEnv' home_ie vis_mods cls tys
     (pkg_matches,  pkg_unifs)  = lookupInstEnv' pkg_ie  vis_mods cls tys
