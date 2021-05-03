@@ -232,7 +232,14 @@ lintAlt (DEFAULT, _, rhs) =
 lintAlt (LitAlt _, _, rhs) =
     lintStgExpr rhs
 
-lintAlt (DataAlt _, bndrs, rhs) = do
+lintAlt (DataAlt con, bndrs, rhs) = do
+    when (dataConRepArity con /= length bndrs) $ do
+      opts <- getStgPprOpts
+      addErrL (text "DataConRep arity doesn't match binder count!" $$
+               text "DataCon:" <> ppr con $$
+               text "Arity:" <> ppr (dataConRepArity con) $$
+               text "Binders:" <> ppr bndrs $$
+               text "RHS:" <> pprStgExpr opts rhs)
     mapM_ checkPostUnariseBndr bndrs
     addInScopeVars bndrs (lintStgExpr rhs)
 
