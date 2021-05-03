@@ -1,17 +1,19 @@
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-} -- instance Diagnostic {DriverMessage, GhcMessage}
+                                      -- instance RenderableMessage { DriverMessage, GhcMessage }
 
 module GHC.Driver.Errors.Ppr where
 
 import GHC.Prelude
 
-import GHC.Types.Error
 import GHC.Driver.Errors.Types
+import GHC.HsToCore.Errors.Ppr ()
 import GHC.Parser.Errors.Ppr
 import GHC.Tc.Errors.Ppr ()
-import GHC.HsToCore.Errors.Ppr ()
+import GHC.Types.Error
 
-instance Diagnostic GhcMessage where
+instance RenderableMessage GhcMessage where
   diagnosticMessage = \case
     GhcPsMessage m
       -> diagnosticMessage m
@@ -24,6 +26,7 @@ instance Diagnostic GhcMessage where
     GhcUnknownMessage m
       -> diagnosticMessage m
 
+instance Diagnostic GhcMessage where
   diagnosticReason = \case
     GhcPsMessage m
       -> diagnosticReason m
@@ -35,11 +38,26 @@ instance Diagnostic GhcMessage where
       -> diagnosticReason m
     GhcUnknownMessage m
       -> diagnosticReason m
+  diagnosticHints = \case
+    GhcPsMessage m
+      -> diagnosticHints m
+    GhcTcRnMessage m
+      -> diagnosticHints m
+    GhcDsMessage m
+      -> diagnosticHints m
+    GhcDriverMessage m
+      -> diagnosticHints m
+    GhcUnknownMessage m
+      -> diagnosticHints m
 
-instance Diagnostic DriverMessage where
+instance RenderableMessage DriverMessage where
   diagnosticMessage (DriverUnknownMessage m)  = diagnosticMessage m
   diagnosticMessage (DriverPsHeaderMessage desc hints)
     = mkSimpleDecorated $ pprPsError desc hints
 
+instance Diagnostic DriverMessage where
   diagnosticReason (DriverUnknownMessage m)   = diagnosticReason m
   diagnosticReason (DriverPsHeaderMessage {}) = ErrorWithoutFlag
+
+  diagnosticHints  (DriverUnknownMessage m) = diagnosticHints m
+  diagnosticHints (DriverPsHeaderMessage _ hints) = hints
