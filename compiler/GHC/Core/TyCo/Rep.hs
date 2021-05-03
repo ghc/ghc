@@ -1540,8 +1540,8 @@ data UnivCoProvenance
   | PluginProv String  -- ^ From a plugin, which asserts that this coercion
                        --   is sound. The string is for the use of the plugin.
 
-  | CorePrepProv       -- See Note [Unsafe coercions] in GHC.Core.CoreToStg.Pprep
-      Bool   -- True  <=> the UnivCo must be homogenously kinded
+  | CorePrepProv       -- See Note [Unsafe coercions] in GHC.Core.CoreToStg.Prep
+      Bool   -- True  <=> the UnivCo must be homogeneously kinded
              -- False <=> allow hetero-kinded, e.g. Int ~ Int#
 
   deriving Data.Data
