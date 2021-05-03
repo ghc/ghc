@@ -15,26 +15,10 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE GeneralisedNewtypeDeriving #-}
 
-{-# OPTIONS_GHC -O2 -ddump-simpl -ddump-to-file -ddump-stg -ddump-cmm -ddump-asm -ddump-stg-final #-}
-{-# OPTIONS_GHC -dsuppress-coercions -dno-suppress-type-signatures -dno-suppress-module-prefixes #-}
--- {-# OPTIONS_GHC -fprof-auto #-}
-{-# OPTIONS_GHC -ticky -ticky-allocd -ticky-dyn-thunk #-}
-{-# OPTIONS_GHC -dsuppress-ticks #-}
-
--- Node descriptions are not always present.
--- #if defined(DEBUG)
-{-# OPTIONS_GHC -Wno-missing-fields #-}
--- #endif
-
-{-# OPTIONS_GHC -Wno-unused-imports #-}
 module GHC.Stg.InferTags.Rewrite (rewriteTopBinds)
 where
 
 #include "HsVersions.h"
-
-#if defined(DEBUG)
-#define WITH_NODE_DESC
-#endif
 
 import GHC.Prelude
 
@@ -43,21 +27,17 @@ import GHC.Types.Name
 import GHC.Types.Unique.Supply
 
 import GHC.Core.DataCon
-import GHC.Core (AltCon(..), Alt(..), )
+import GHC.Core (AltCon(..) )
 import GHC.Core.Type
 
 import GHC.Stg.Utils
 import GHC.Stg.Syntax as StgSyn hiding (AlwaysEnter)
 
 import GHC.Data.Maybe
-import GHC.Utils.Monad
 import GHC.Utils.Panic
 
 import Control.Monad
 
-import GHC.Stg.InferTags -- .Types
-
-import GHC.Driver.Ppr
 import GHC.Utils.Outputable
 
 import GHC.Utils.Monad.State
@@ -65,11 +45,11 @@ import GHC.Utils.Misc
 import GHC.Types.Unique.FM
 
 import GHC.Stg.InferTags.Types
-import GHC.Stg.DepAnal
 import GHC.Unit.Types (Module)
 import GHC.StgToCmm.Types
-import GHC.Types.Var.Set
 import Data.Coerce
+
+-- import GHC.Driver.Ppr
 
 newtype RM a = RM { unRM :: (State (UniqFM Id TagSig, UniqSupply, Module) a) }
     deriving (Functor, Monad, Applicative)
@@ -84,6 +64,8 @@ The idea is simple:
 * For any strict field we check if the argument is known to be tagged.
 * If it's not, we wrap the whole thing in a case, which will force the
   argument before allocation.
+
+This is described in detail in Note [Strict field invariant].
 
 -}
 
