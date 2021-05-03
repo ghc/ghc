@@ -13,6 +13,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE GeneralisedNewtypeDeriving #-}
 
 {-# OPTIONS_GHC -O2 -ddump-simpl -ddump-to-file -ddump-stg -ddump-cmm -ddump-asm -ddump-stg-final #-}
 {-# OPTIONS_GHC -dsuppress-coercions -dno-suppress-type-signatures -dno-suppress-module-prefixes #-}
@@ -68,8 +69,10 @@ import GHC.Stg.DepAnal
 import GHC.Unit.Types (Module)
 import GHC.StgToCmm.Types
 import GHC.Types.Var.Set
+import Data.Coerce
 
-type RM = State (UniqFM Id TagSig, UniqSupply, Module)
+newtype RM a = RM { unRM :: (State (UniqFM Id TagSig, UniqSupply, Module) a) }
+    deriving (Functor, Monad, Applicative)
 ------------------------------------------------------------
 -- Add cases around strict fields where required.
 ------------------------------------------------------------
@@ -90,49 +93,84 @@ The idea is simple:
 --------------------------------
 
 instance MonadUnique RM where
-    getUniqueSupplyM = do
+    getUniqueSupplyM = RM $ do
         (m, us, mod) <- get
         let (us1, us2) = splitUniqSupply us
-        put (m,us2,mod)
+        (put) (m,us2,mod)
         return us1
 
-type TaggedSet = VarSet
+-- type TaggedSet = VarSet
 
 getMap :: RM (UniqFM Id TagSig)
-getMap = fstOf3 <$> get
+getMap = RM $ (fstOf3 <$> get)
 
 setMap :: (UniqFM Id TagSig) -> RM ()
-setMap m = do
+setMap m = RM $ do
     (_,us,mod) <- get
     put (m, us,mod)
 
 getMod :: RM Module
-getMod = thdOf3 <$> get
+getMod = RM $ (thdOf3 <$> get)
+
+withBind :: GenStgBinding 'TaggedSimon -> RM a -> RM a
+withBind (StgNonRec (id, tag) _) cont = coerce $ do
+    oldMap <- getMap
+    -- pprTraceM "AddBind" (ppr id)
+    setMap $ addToUFM oldMap id tag
+    a <- cont
+    setMap oldMap
+    return a
+withBind (StgRec binds) cont = coerce $ do
+    let (bnds,_rhss) = unzip binds
+    !oldMap <- getMap
+    -- pprTraceM "AddBinds" (ppr $ map fst bnds)
+    setMap $! addListToUFM oldMap bnds
+    a <- cont
+    setMap oldMap
+    return a
+
+
 
 addBind :: GenStgBinding 'TaggedSimon -> RM ()
-addBind (StgNonRec (id, tag) _) = do
+addBind (StgNonRec (id, tag) _) = coerce $ do
     s <- getMap
     -- pprTraceM "AddBind" (ppr id)
     setMap $ addToUFM s id tag
     return ()
-addBind (StgRec binds) = do
+addBind (StgRec binds) = coerce $ do
     let (bnds,_rhss) = unzip binds
     !s <- getMap
     -- pprTraceM "AddBinds" (ppr $ map fst bnds)
     setMap $! addListToUFM s bnds
 
-addBinder :: (Id,TagSig) -> RM ()
-addBinder (id,sig) = do
-    !s <- getMap
-    setMap $ addToUFM s id sig
-    return ()
+withBinder :: (Id, TagSig) -> RM a -> RM a
+withBinder (id,sig) cont = do
+    oldMap <- getMap
+    setMap $ addToUFM oldMap id sig
+    a <- cont
+    setMap oldMap
+    return a
 
-addArg :: StgArg -> RM ()
-addArg (StgLitArg _) = return ()
-addArg (StgVarArg v) = do
-    !s <- getMap
-    setMap $! addToUFM s v (TagSig 0 TagDunno)
-    return ()
+withBinders :: [(Id, TagSig)] -> RM a -> RM a
+withBinders sigs cont = do
+    oldMap <- getMap
+    setMap $ addListToUFM oldMap sigs
+    a <- cont
+    setMap oldMap
+    return a
+
+-- addBinder :: (Id,TagSig) -> RM ()
+-- addBinder (id,sig) = coerce $ do
+--     !s <- getMap
+--     setMap $ addToUFM s id sig
+--     return ()
+
+-- addArg :: StgArg -> RM ()
+-- addArg (StgLitArg _) = return ()
+-- addArg (StgVarArg v) = coerce $ do
+--     !s <- getMap
+--     setMap $! addToUFM s v (TagSig 0 TagDunno)
+--     return ()
 
 isTagged :: Id -> RM Bool
 isTagged v = do
@@ -196,33 +234,36 @@ mkLocalArgId id = do
 
 rewriteTopBinds :: Module -> UniqSupply -> [GenStgTopBinding 'TaggedSimon] -> [TgStgTopBinding]
 rewriteTopBinds mod us binds =
-    evalState   (mapM (rewriteTop) $ binds)
-                (mempty, us, mod)
+    let doBinds = mapM rewriteTop binds
+
+    in evalState (unRM doBinds) (mempty, us, mod)
 
 rewriteTop :: InferStgTopBinding -> RM TgStgTopBinding
 rewriteTop (StgTopStringLit v s) = return $! (StgTopStringLit v s)
-rewriteTop      (StgTopLifted bind)  = do
+rewriteTop (StgTopLifted bind)   = do
+    -- Top level bindings can, and must remain in scope
     addBind bind
     (StgTopLifted . fst) <$!> (rewriteBinds bind)
 
 -- For top level binds, the wrapper is guaranteed to be `id`
 rewriteBinds :: InferStgBinding -> RM (TgStgBinding, TgStgExpr -> TgStgExpr)
-rewriteBinds b@(StgNonRec v rhs) = do
+rewriteBinds (StgNonRec v rhs) = do
         (!rhs, wrapper) <-  rewriteRhs v rhs
         return $! (StgNonRec (fst v) rhs, wrapper)
-rewriteBinds b@(StgRec binds) = do
-        addBind b
+rewriteBinds b@(StgRec binds) =
+    -- Bring sigs of binds into scope for all rhss
+    withBind b $ do
         (rhss, wrappers) <- unzip <$> mapM (uncurry rewriteRhs) binds
         let wrapper = foldl1 (.) wrappers
         return $! (mkRec rhss, wrapper)
-  where
-    mkRec :: [TgStgRhs] -> TgStgBinding
-    mkRec rhss = StgRec (zip (map (fst . fst) binds) rhss)
+        where
+            mkRec :: [TgStgRhs] -> TgStgBinding
+            mkRec rhss = StgRec (zip (map (fst . fst) binds) rhss)
 
 -- Rewrite a RHS, the rewriteFlag tells us weither or not the RHS is in a context in which
 -- we can avoid turning the RhsCon into a closure. (e.g. for top level bindings)
 rewriteRhs :: (Id,TagSig) -> InferStgRhs -> RM (TgStgRhs, TgStgExpr -> TgStgExpr)
-rewriteRhs (_id, tagSig) (StgRhsCon (node_id) ccs con cn ticks args) = {-# SCC rewriteRhs_ #-} do
+rewriteRhs (_id, tagSig) (StgRhsCon (_node_id) ccs con cn ticks args) = {-# SCC rewriteRhs_ #-} do
     -- pprTraceM "rewriteRhs" (ppr _id)
 
     -- Look up the nodes representing the constructor arguments.
@@ -263,10 +304,10 @@ rewriteRhs (_id, tagSig) (StgRhsCon (node_id) ccs con cn ticks args) = {-# SCC r
                     let evalExpr expr = foldr (\(v, vEvald) e -> mkSeq v vEvald e) expr varMap
                     return $! ((StgRhsCon noExtFieldSilent ccs con cn ticks evaldConArgs), evalExpr)
 rewriteRhs _binding (StgRhsClosure ext ccs flag args body) = do
-    mapM_ addBinder  args
-    pure (,) <*>
-        (StgRhsClosure ext ccs flag (map fst args) <$> rewriteExpr False body) <*>
-        pure id
+    -- mapM_ addBinder  args
+    withBinders args $ do
+        closure <- StgRhsClosure ext ccs flag (map fst args) <$> rewriteExpr False body
+        return (closure, id)
 
 type IsScrut = Bool
 
@@ -282,40 +323,40 @@ rewriteExpr _ (StgLit lit)           = return $! (StgLit lit)
 rewriteExpr _ (StgOpApp op args res_ty) = return $! (StgOpApp op args res_ty)
 
 rewriteCase :: InferStgExpr -> RM TgStgExpr
-rewriteCase (StgCase scrut bndr alt_type alts) = do
-    addBinder bndr
-    pure StgCase <*>
-        rewriteExpr True scrut <*>
-        pure (fst bndr) <*>
-        pure alt_type <*>
-        mapM rewriteAlt alts
+rewriteCase (StgCase scrut bndr alt_type alts) =
+    withBinder bndr $ do
+        pure StgCase <*>
+            rewriteExpr True scrut <*>
+            pure (fst bndr) <*>
+            pure alt_type <*>
+            mapM rewriteAlt alts
 
 rewriteCase _ = panic "Impossible: nodeCase"
 
 rewriteAlt :: InferStgAlt -> RM TgStgAlt
 rewriteAlt (altCon, bndrs, rhs) = do
-    mapM_ addBinder bndrs
-    !rhs' <- rewriteExpr False rhs
-    return $! (altCon, map fst bndrs, rhs')
+    withBinders bndrs $ do
+        !rhs' <- rewriteExpr False rhs
+        return $! (altCon, map fst bndrs, rhs')
 
 rewriteLet :: InferStgExpr -> RM TgStgExpr
 rewriteLet (StgLet xt bind expr) = do
     (!bind', !wrapper) <- rewriteBinds bind
-    addBind bind
-    !expr' <- rewriteExpr False expr
-    return $! wrapper (StgLet xt bind' expr')
+    withBind bind $ do
+        !expr' <- rewriteExpr False expr
+        return $! wrapper (StgLet xt bind' expr')
 rewriteLet _ = panic "Impossible"
 
 rewriteLetNoEscape :: InferStgExpr -> RM TgStgExpr
 rewriteLetNoEscape (StgLetNoEscape xt bind expr) = do
     (!bind', wrapper) <- rewriteBinds bind
-    addBind bind
-    !expr' <- rewriteExpr False expr
-    return $! wrapper (StgLetNoEscape xt bind' expr')
+    withBind bind $ do
+        !expr' <- rewriteExpr False expr
+        return $! wrapper (StgLetNoEscape xt bind' expr')
 rewriteLetNoEscape _ = panic "Impossible"
 
 rewriteConApp :: InferStgExpr -> RM TgStgExpr
-rewriteConApp (StgConApp nodeId con cn args tys) = do
+rewriteConApp (StgConApp _nodeId con cn args tys) = do
     -- node <- getNode nodeId
     -- We look at the INPUT because the output of this node will always have tagged
     -- strict fields in the end.

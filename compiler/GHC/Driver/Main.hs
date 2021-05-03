@@ -1821,7 +1821,7 @@ doCodeGen hsc_env this_mod denv data_tycons
 
     -- pprTraceM "Dumping Stg" (ppr this_mod)
     dumpIfSet_dyn logger dflags Opt_D_dump_stg_final "CodeGenAnal STG:" FormatSTG (pprGenStgTopBindings (initStgPprOpts dflags) stg_binds_w_tags)
-    return $! seqTopBinds stg_binds_w_tags
+    -- return $! seqTopBinds stg_binds_w_tags
     -- pprTraceM "Dumped Stg" (ppr this_mod)
 
     us_t <- mkSplitUniqSupply 't'
