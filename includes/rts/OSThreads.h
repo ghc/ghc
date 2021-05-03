@@ -26,14 +26,14 @@
 
 // when compiling with non-apple clang, but against apple SDKs
 // availability and expansion-to-defined will fail. Ignore them.
-#ifdef __clang__
+#if defined(__clang__)
 #pragma clang diagnostic push
 #pragma clang ignored "-Wall"
 #pragma clang ignored "-Wavailability"
 #pragma clang ignored "-Wexpansion-to-defined"
 #endif
 #include <pthread.h>
-#ifdef __clang__
+#if defined(__clang__)
 #pragma clang diagnostic pop
 #endif
 #include <errno.h>
