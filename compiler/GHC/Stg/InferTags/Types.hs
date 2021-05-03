@@ -111,14 +111,14 @@ lookupSig env fun = lookupVarEnv (te_env env) fun
 
 lookupInfo :: TagEnv p -> StgArg -> TagInfo
 lookupInfo env (StgVarArg var)
-  -- Variables in the environment
-  | Just (TagSig 0 info) <- lookupVarEnv (te_env env) var
-  = info
-
   -- Nullary data constructors like True, False
   | Just dc <- isDataConWorkId_maybe var
   , isNullaryRepDataCon dc
   = TagProper
+
+  -- Variables in the environment
+  | Just (TagSig 0 info) <- lookupVarEnv (te_env env) var
+  = info
 
   | otherwise
   = TagDunno
