@@ -1800,7 +1800,7 @@ doCodeGen hsc_env this_mod denv data_tycons
     -- Annotate binders with tag information.
     let (!stg_binds_w_tags) = {-# SCC "StgTagFields" #-}
                                         inferTags stg_binds
-    dumpIfSet_dyn logger dflags Opt_D_dump_stg_final "CodeGenAnal STG:" FormatSTG (pprGenStgTopBindings (initStgPprOpts dflags) stg_binds_w_tags)
+    dumpIfSet_dyn logger dflags Opt_D_dump_stg_tags "CodeGenAnal STG:" FormatSTG (pprGenStgTopBindings (initStgPprOpts dflags) stg_binds_w_tags)
 
     -- Rewrite STG to uphold the strict field invariant
     us_t <- mkSplitUniqSupply 't'

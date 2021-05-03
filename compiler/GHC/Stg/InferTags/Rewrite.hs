@@ -159,19 +159,6 @@ withBinders sigs cont = do
     setMap oldMap
     return a
 
--- addBinder :: (Id,TagSig) -> RM ()
--- addBinder (id,sig) = coerce $ do
---     !s <- getMap
---     setMap $ addToUFM s id sig
---     return ()
-
--- addArg :: StgArg -> RM ()
--- addArg (StgLitArg _) = return ()
--- addArg (StgVarArg v) = coerce $ do
---     !s <- getMap
---     setMap $! addToUFM s v (TagSig 0 TagDunno)
---     return ()
-
 isTagged :: Id -> RM Bool
 isTagged v = do
     this_mod <- getMod
@@ -412,9 +399,3 @@ mkSeqs untaggedIds con cn args tys = do
     let conBody = StgConApp noExtFieldSilent con cn taggedArgs tys
     let body = foldr (\(v,bndr) expr -> mkSeq v bndr expr) conBody argMap
     return $! body
-
--- mkLocalArgId :: Id -> RM Id
--- mkLocalArgId id = do
---     u <- getUniqueM
---     return $! setIdUnique (localiseId id) u
-

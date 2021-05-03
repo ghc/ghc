@@ -123,9 +123,10 @@ inferTagExpr env (StgCase scrut bndr ty alts)
         alt_env = extendSigEnv env bndrs'
         (info, rhs') = inferTagExpr alt_env rhs
   = (info, StgCase scrut' (noSig env bndr) ty [(DataAlt con, bndrs', rhs')])
-
+  | null alts -- Empty case, but I might just be paranoid.
+  = (TagDunno, StgCase scrut bndr ty alts)
   | otherwise
-  = ( foldr combineAltInfo TagProper infos -- TODO: Empty case?
+  = ( foldr combineAltInfo TagProper infos
     , StgCase scrut' bndr' ty alts')
   where
     (scrut_info, scrut') = inferTagExpr env scrut
@@ -159,7 +160,7 @@ inferTagBind top env (StgNonRec bndr rhs)
 inferTagBind top env (StgRec pairs)
   = (env { te_env = sig_env }, StgRec pairs')
   where
-    (bndrs, rhss)     = unzip pairs -- :: ([Id], [GenStgRhs 'Vanilla])
+    (bndrs, rhss)     = unzip pairs
     ids               = map (getBinderId env) bndrs
     init_sigs         = map initSig rhss
     (sig_env, pairs') = go env init_sigs rhss
@@ -174,7 +175,7 @@ inferTagBind top env (StgRec pairs)
        where
          bndrs = ids `zip` sigs
          rhs_env = extendSigEnv env bndrs
-         (sigs', rhss') = unzip (map (inferTagRhs top ids rhs_env) rhss) -- :: ([TagSig], [GenStgRhs 'InferTaggedBinders])
+         (sigs', rhss') = unzip (map (inferTagRhs top ids rhs_env) rhss)
          env' = makeTagged env
 
 initSig :: GenStgRhs p -> TagSig
@@ -199,12 +200,8 @@ inferTagRhs _top _grp_ids env (StgRhsClosure ext cc upd bndrs body)
     info'
       | arity == 0
       = TagDunno
-      -- case info of
-      --     TagProper -> TagDunno
-      --     TagTuple fs -> TagTuple fs
-      --     TagDunno -> TagDunno
-      --       -- It's a thunk!
-            -- TODO: Preserve tuple fields
+      -- TODO: We could preserve tuple fields for thunks
+      -- as well.
 
       | otherwise  = info
     bndrs' = map (noSig env) bndrs
@@ -221,7 +218,6 @@ inferTagRhs top grp_ids env (StgRhsCon _ext cc con cn ticks args)
 
         mkResult x = (TagSig 0 x, StgRhsCon noExtFieldSilent cc con cn ticks args)
     in case () of
-        -- _ -> mkResult TagProper
           -- All fields tagged or non-strict
         _ | null strictUntaggedIds -> mkResult TagProper
           -- Non-recursive local let
@@ -230,8 +226,6 @@ inferTagRhs top grp_ids env (StgRhsCon _ext cc con cn ticks args)
           -> mkResult TagProper
           -- Recursive local let, no bindings from grp in args
           | NotTopLevel <- top
-          -- Recursive groups can probably get large enough for us
-          -- to worry about doing union over lists.
           , mkVarSet grp_ids `disjointVarSet` mkVarSet strictUntaggedIds
           -> mkResult TagProper
           -- Otherwise we have a top level let with untagged args,

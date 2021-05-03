@@ -1,7 +1,6 @@
 {-# LANGUAGE MagicHash         #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE Trustworthy       #-}
-{-# OPTIONS -O1 #-}
 
 -----------------------------------------------------------------------------
 -- |

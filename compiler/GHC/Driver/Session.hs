@@ -2424,8 +2424,8 @@ dynamic_flags_deps = [
   , make_dep_flag defGhcFlag "ddump-stg"
         (setDumpFlag Opt_D_dump_stg_from_core)
         "Use `-ddump-stg-from-core` or `-ddump-stg-final` instead"
-  , make_ord_flag defGhcFlag "ddump-stg-tag-nodes"
-        (setDumpFlag Opt_D_dump_stg_tag_nodes)
+  , make_ord_flag defGhcFlag "ddump-stg-tags"
+        (setDumpFlag Opt_D_dump_stg_tags)
   , make_ord_flag defGhcFlag "ddump-call-arity"
         (setDumpFlag Opt_D_dump_call_arity)
   , make_ord_flag defGhcFlag "ddump-exitify"

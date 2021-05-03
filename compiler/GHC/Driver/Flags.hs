@@ -71,7 +71,7 @@ data DumpFlag
    | Opt_D_dump_stg_from_core -- ^ Initial STG (CoreToStg output)
    | Opt_D_dump_stg_unarised  -- ^ STG after unarise
    | Opt_D_dump_stg_final     -- ^ Final STG (after stg2stg)
-   | Opt_D_dump_stg_tag_nodes
+   | Opt_D_dump_stg_tags
    | Opt_D_dump_call_arity
    | Opt_D_dump_exitify
    | Opt_D_dump_stranal

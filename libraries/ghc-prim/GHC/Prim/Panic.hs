@@ -4,7 +4,6 @@
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE EmptyCase #-}
-{-# OPTIONS -O #-}
 
 -- | Primitive panics.
 module GHC.Prim.Panic
