@@ -1528,10 +1528,41 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
          S = 0;
       } else {
          Elf_Sym sym = stab[ELF_R_SYM(info)];
-         /* First see if it is a local symbol. */
-         if (ELF_ST_BIND(sym.st_info) == STB_LOCAL) {
-            /* Yes, so we can get the address directly from the ELF symbol
-               table. */
+         if (ELF_R_TYPE(info) == COMPAT_R_X86_64_TLSGD) {
+            /*
+             * No support for TLSGD variables *defined* by the object,
+             * only references to *external* TLS variables in already
+             * loaded shared objects (the executable, libc, ...) are
+             * supported.  See Note [TLSGD relocation] in elf_tlsgd.c.
+             */
+            symbol = sym.st_name == 0 ? "(noname)" : strtab+sym.st_name;
+            if (ELF_ST_BIND(sym.st_info) == STB_LOCAL
+                || sym.st_value != 0 || sym.st_name == 0) {
+                errorBelch("%s: unsupported internal ELF TLSGD relocation for"
+                           " symbol `%s'", oc->fileName, symbol);
+                return 0;
+            }
+#if defined(x86_64_HOST_ARCH) && defined(freebsd_HOST_OS)
+            S = lookupTlsgdSymbol(symbol, ELF_R_SYM(info), oc);
+#else
+            errorBelch("%s: ELF TLSGD relocation for symbol `%s'"
+                       " not supported on the target platform",
+                       oc->fileName, symbol);
+            return 0;
+#endif
+         } else if (ELF_ST_BIND(sym.st_info) == STB_LOCAL) {
+            /*
+             * For local symbols, we can get the address directly from the ELF
+             * symbol table.
+             *
+             * XXX: Is STB_LOCAL the right test here?  Should we instead be
+             * checking whether the symbol is *defined* by the current object?
+             * Defined globals also need relocation.  Perhaps the point is that
+             * conflicts are resolved in favour of any prior definition, so we
+             * must look at the accumulated symbol table instead (which has
+             * already been updated with our global symbols by the time we get
+             * here).
+             */
             symbol = sym.st_name==0 ? "(noname)" : strtab+sym.st_name;
             /* See Note [Many ELF Sections] */
             Elf_Word secno = sym.st_shndx;
@@ -1543,7 +1574,7 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
             S = (Elf_Addr)oc->sections[secno].start
                 + stab[ELF_R_SYM(info)].st_value;
          } else {
-            /* No, so look up the name in our global table. */
+            /* If not local, look up the name in our global table. */
             symbol = strtab + sym.st_name;
             S_tmp = lookupDependentSymbol( symbol, oc );
             S = (Elf_Addr)S_tmp;
@@ -1759,6 +1790,19 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
           if (off != (Elf64_Sword)off) {
               barf(
                   "COMPAT_R_X86_64_GOTPCREL relocation out of range: "
+                  "%s = %" PRIx64 " in %s.",
+                  symbol, off, oc->fileName);
+          }
+          Elf64_Sword payload = off;
+          memcpy((void*)P, &payload, sizeof(payload));
+          break;
+      }
+      case COMPAT_R_X86_64_TLSGD:
+      {
+          StgInt64 off = S + A - P;
+          if (off != (Elf64_Sword)off) {
+              barf(
+                  "COMPAT_R_X86_64_TLSGD relocation out of range: "
                   "%s = %" PRIx64 " in %s.",
                   symbol, off, oc->fileName);
           }
