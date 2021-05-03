@@ -21,4 +21,6 @@ loadPackages = do
                          , ghcLink = LinkInMemory }
     setSessionDynFlags dflags'
     hsc_env <- getSession
-    liftIO $ Loader.loadPackages (hscInterp hsc_env) hsc_env (preloadUnits (hsc_units hsc_env))
+    let interp = hscInterp hsc_env
+    liftIO $ Loader.initLoaderState interp hsc_env
+    liftIO $ Loader.loadPackages interp hsc_env (preloadUnits (hsc_units hsc_env))

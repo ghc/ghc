@@ -2021,6 +2021,7 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
                                 stg_binds data_tycons mod_breaks
 
     let src_span = srcLocSpan interactiveSrcLoc
+    liftIO $ initLoaderState interp hsc_env
     liftIO $ loadDecls interp hsc_env src_span cbc
 
     {- Load static pointer table entries -}
@@ -2052,6 +2053,7 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
 hscAddSptEntries :: HscEnv -> [SptEntry] -> IO ()
 hscAddSptEntries hsc_env entries = do
     let interp = hscInterp hsc_env
+    initLoaderState interp hsc_env
     let add_spt_entry :: SptEntry -> IO ()
         add_spt_entry (SptEntry i fpr) = do
             val <- loadName interp hsc_env (idName i)
@@ -2207,7 +2209,9 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr
                      stg_expr
 
            {- load it -}
-         ; loadExpr (hscInterp hsc_env) hsc_env srcspan bcos }
+         ; let interp = hscInterp hsc_env
+         ; initLoaderState interp hsc_env
+         ; loadExpr interp hsc_env srcspan bcos }
 
 
 {- **********************************************************************

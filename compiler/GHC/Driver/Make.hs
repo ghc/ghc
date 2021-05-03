@@ -851,8 +851,12 @@ findPartiallyCompletedCycles modsDone theGraph
 unload :: Interp -> HscEnv -> [Linkable] -> IO ()
 unload interp hsc_env stable_linkables -- Unload everything *except* 'stable_linkables'
   = case ghcLink (hsc_dflags hsc_env) of
-        LinkInMemory -> Linker.unload interp hsc_env stable_linkables
-        _other -> return ()
+        LinkInMemory -> do
+          let logger = hsc_logger hsc_env
+          let dflags = hsc_dflags hsc_env
+          Linker.initLoaderState interp hsc_env
+          Linker.unload logger interp dflags stable_linkables
+        _other       -> return ()
 
 -- -----------------------------------------------------------------------------
 {- |

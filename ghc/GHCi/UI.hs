@@ -3117,8 +3117,10 @@ newDynFlags interactive_only minus_opts = do
                          dflags2 { ldInputs = newLdInputs
                                  , cmdlineFrameworks = newCLFrameworks } }
 
-        when (not (null newLdInputs && null newCLFrameworks)) $
-          liftIO $ Loader.loadCmdLineLibs (hscInterp hsc_env') hsc_env'
+        when (not (null newLdInputs && null newCLFrameworks)) $ do
+          let interp = hscInterp hsc_env'
+          liftIO $ Loader.initLoaderState interp hsc_env'
+          liftIO $ Loader.loadCmdLineLibs interp hsc_env'
 
       return ()
 

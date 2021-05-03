@@ -167,7 +167,6 @@ deleteFromLoadedEnv interp to_remove =
 -- Throws a 'ProgramError' if loading fails or the name cannot be found.
 loadName :: Interp -> HscEnv -> Name -> IO ForeignHValue
 loadName interp hsc_env name = do
-  initLoaderState interp hsc_env
   modifyLoaderState interp $ \pls0 -> do
     pls <- if not (isExternalName name)
        then return pls0
@@ -196,7 +195,6 @@ loadDependencies
   -> SrcSpan -> [Module]
   -> IO (LoaderState, SuccessFlag)
 loadDependencies interp hsc_env pls span needed_mods = do
---   initLoaderState (hsc_dflags hsc_env) dl
    let hpt = hsc_HPT hsc_env
    let dflags = hsc_dflags hsc_env
    -- The interpreter and dynamic linker can only handle object code built
@@ -301,7 +299,6 @@ reallyInitLoaderState interp hsc_env = do
 
 loadCmdLineLibs :: Interp -> HscEnv -> IO ()
 loadCmdLineLibs interp hsc_env = do
-  initLoaderState interp hsc_env
   modifyLoaderState_ interp $ \pls ->
     loadCmdLineLibs' interp hsc_env pls
 
@@ -548,9 +545,6 @@ preloadLib interp hsc_env lib_paths framework_paths pls lib_spec = do
 --
 loadExpr :: Interp -> HscEnv -> SrcSpan -> UnlinkedBCO -> IO ForeignHValue
 loadExpr interp hsc_env span root_ul_bco = do
-  -- Initialise the linker (if it's not been done already)
-  initLoaderState interp hsc_env
-
   -- Take lock for the actual work.
   modifyLoaderState interp $ \pls0 -> do
     -- Load the packages and modules required
@@ -780,9 +774,6 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
 
 loadDecls :: Interp -> HscEnv -> SrcSpan -> CompiledByteCode -> IO ()
 loadDecls interp hsc_env span cbc@CompiledByteCode{..} = do
-    -- Initialise the linker (if it's not been done already)
-    initLoaderState interp hsc_env
-
     -- Take lock for the actual work.
     modifyLoaderState_ interp $ \pls0 -> do
       -- Link the packages and modules required
@@ -823,7 +814,6 @@ loadDecls interp hsc_env span cbc@CompiledByteCode{..} = do
 
 loadModule :: Interp -> HscEnv -> Module -> IO ()
 loadModule interp hsc_env mod = do
-  initLoaderState interp hsc_env
   modifyLoaderState_ interp $ \pls -> do
     (pls', ok) <- loadDependencies interp hsc_env pls noSrcSpan [mod]
     if failed ok
@@ -1094,23 +1084,19 @@ makeForeignNamedHValueRefs interp bindings =
 --   * we also implicitly unload all temporary bindings at this point.
 --
 unload
-  :: Interp
-  -> HscEnv
+  :: Logger
+  -> Interp
+  -> DynFlags
   -> [Linkable] -- ^ The linkables to *keep*.
   -> IO ()
-unload interp hsc_env linkables
+unload logger interp dflags linkables
   = mask_ $ do -- mask, so we're safe from Ctrl-C in here
-
-        -- Initialise the linker (if it's not been done already)
-        initLoaderState interp hsc_env
 
         new_pls
             <- modifyLoaderState interp $ \pls -> do
                  pls1 <- unload_wkr interp linkables pls
                  return (pls1, pls1)
 
-        let dflags = hsc_dflags hsc_env
-        let logger = hsc_logger hsc_env
         debugTraceMsg logger dflags 3 $
           text "unload: retaining objs" <+> ppr (objs_loaded new_pls)
         debugTraceMsg logger dflags 3 $
@@ -1256,7 +1242,6 @@ loadPackages :: Interp -> HscEnv -> [UnitId] -> IO ()
 loadPackages interp hsc_env new_pkgs = do
   -- It's probably not safe to try to load packages concurrently, so we take
   -- a lock.
-  initLoaderState interp hsc_env
   modifyLoaderState_ interp $ \pls ->
     loadPackages' interp hsc_env new_pkgs pls
 
