@@ -65,9 +65,9 @@ collectStgRhs bndr (StgRhsClosure ext cc us bs e)= do
   e' <- collectExpr e
   recordInfo bndr e'
   return $ StgRhsClosure ext cc us bs e'
-collectStgRhs _bndr (StgRhsCon cc dc _mn ticks args) = do
+collectStgRhs _bndr (StgRhsCon ext cc dc _mn ticks args) = do
   n' <- numberDataCon dc ticks
-  return (StgRhsCon cc dc n' ticks args)
+  return (StgRhsCon ext cc dc n' ticks args)
 
 
 recordInfo :: Id -> StgExpr -> M ()
@@ -85,11 +85,11 @@ recordInfo bndr new_rhs = do
 collectExpr :: StgExpr -> M StgExpr
 collectExpr = go
   where
-    go (StgApp occ as) = return $ StgApp occ as
+    go (StgApp ext occ as) = return $ StgApp ext occ as
     go (StgLit lit) = return $ StgLit lit
-    go (StgConApp dc _mn as tys) = do
+    go (StgConApp ext dc _mn as tys) = do
       n' <- numberDataCon dc []
-      return (StgConApp dc n' as tys)
+      return (StgConApp ext dc n' as tys)
     go (StgOpApp op as ty) = return (StgOpApp op as ty)
     go (StgCase scrut bndr ty alts) =
       StgCase <$> collectExpr scrut <*> pure bndr <*> pure ty <*> mapM collectAlt alts
