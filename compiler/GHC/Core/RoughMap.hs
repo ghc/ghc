@@ -16,6 +16,7 @@ module GHC.Core.RoughMap
   , lookupRM
   , insertRM
   , filterRM
+  , filterMatchingRM
   , elemsRM
   , sizeRM
   ) where
@@ -60,16 +61,20 @@ typeToRoughMatchTc ty
     -- See Note [Rough matching in class and family instances]
   | otherwise                               = OtherTc
 
--- trie of [RoughTc]
+-- | Trie of @[RoughMatchTc]@
 --
--- insert [UnknownTc] 1
--- insert [UnknownTc] 2
--- lookup [UnknownTc] == [1,2]
+-- *Examples*
+-- @
+-- insert [OtherTc] 1
+-- insert [OtherTc] 2
+-- lookup [OtherTc] == [1,2]
+-- @
 data RoughMap a = RM { rm_empty   :: [a]
                      , rm_known   :: !(DNameEnv (RoughMap a))
                         -- See Note [InstEnv determinism] in GHC.Core.InstEnv
                      , rm_unknown :: !(RoughMap a) }
                 | RMEmpty -- an optimised (finite) form of emptyRM
+                          -- invariant: Empty RoughMaps are always represented with RMEmpty
 
 emptyRM :: RoughMap a
 emptyRM = RMEmpty
@@ -119,15 +124,38 @@ insertRM (OtherTc : ks) v rm@(RM {}) =
 
 filterRM :: (a -> Bool) -> RoughMap a -> RoughMap a
 filterRM _ RMEmpty = RMEmpty
-filterRM pred rm = norm $ RM { rm_empty = filter pred (rm_empty rm)
-                             , rm_known = mapDNameEnv (filterRM pred) (rm_known rm)
-                             , rm_unknown = filterRM pred (rm_unknown rm)
-                             }
-  where
-    norm RMEmpty = RMEmpty
-    norm (RM [] known RMEmpty)
-      | isEmptyDNameEnv known = RMEmpty
-    norm rm = rm
+filterRM pred rm =
+    normalise $ RM {
+      rm_empty = filter pred (rm_empty rm),
+      rm_known = mapDNameEnv (filterRM pred) (rm_known rm),
+      rm_unknown = filterRM pred (rm_unknown rm)
+    }
+
+-- | Place a 'RoughMap' in normal form, turning all empty 'RM's into
+-- 'RMEmpty's. Necessary after removing items.
+normalise :: RoughMap a -> RoughMap a
+normalise RMEmpty = RMEmpty
+normalise (RM [] known RMEmpty)
+  | isEmptyDNameEnv known = RMEmpty
+normalise rm = rm
+
+-- | Filter all elements that might match a particular key with the given
+-- predicate.
+filterMatchingRM :: (a -> Bool) -> [RoughMatchTc] -> RoughMap a -> RoughMap a
+filterMatchingRM _    _  RMEmpty = RMEmpty
+filterMatchingRM pred [] rm      = filterRM pred rm
+filterMatchingRM pred (KnownTc tc : tcs) rm =
+    normalise $ RM {
+      rm_empty = filter pred (rm_empty rm),
+      rm_known = alterDNameEnv (fmap $ filterMatchingRM pred tcs) (rm_known rm) tc,
+      rm_unknown = filterMatchingRM pred tcs (rm_unknown rm)
+    }
+filterMatchingRM pred (OtherTc : tcs) rm =
+    normalise $ RM {
+      rm_empty = filter pred (rm_empty rm),
+      rm_known = mapDNameEnv (filterMatchingRM pred tcs) (rm_known rm),
+      rm_unknown = filterMatchingRM pred tcs (rm_unknown rm)
+    }
 
 elemsRM :: RoughMap a -> [a]
 elemsRM = foldRM (:) []
