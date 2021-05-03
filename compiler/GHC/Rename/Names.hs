@@ -471,6 +471,7 @@ calculateAvails home_unit iface mod_safe' want_boot imported_by =
          | isHomeUnit home_unit pkg =
             -- Imported module is from the home package
             -- Take its dependent modules and add imp_mod itself
+            -- TODO: This module is always just deleted from the set
             -- Take its dependent packages unchanged
             --
             -- NB: (dep_mods deps) might include a hi-boot file
@@ -498,7 +499,14 @@ calculateAvails home_unit iface mod_safe' want_boot imported_by =
           imp_orphs      = orphans,
           imp_finsts     = finsts,
           imp_dep_mods   = mkModDeps dependent_mods,
+          imp_direct_dep_mods = mkModDeps $ if isHomeUnit home_unit pkg
+                                  then [GWIB (moduleName imp_mod) want_boot]
+                                  else [],
           imp_dep_pkgs   = S.fromList . map fst $ dependent_pkgs,
+          imp_dep_direct_pkgs = if isHomeUnit home_unit pkg
+                                  then S.empty
+                                  else S.fromList [ipkg],
+
           -- Add in the imported modules trusted package
           -- requirements. ONLY do this though if we import the
           -- module as a safe import.

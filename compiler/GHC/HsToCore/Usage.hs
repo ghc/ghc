@@ -13,9 +13,7 @@ import GHC.Prelude
 
 import GHC.Driver.Env
 import GHC.Driver.Session
-
-import GHC.Platform
-import GHC.Platform.Ways
+import GHC.Driver.Dependencies
 
 import GHC.Tc.Types
 
@@ -31,22 +29,21 @@ import GHC.Types.Unique.FM
 
 import GHC.Unit
 import GHC.Unit.External
-import GHC.Unit.State
-import GHC.Unit.Finder
 import GHC.Unit.Module.Imported
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.Deps
 
 import GHC.Data.Maybe
 
-import Control.Monad (filterM)
-import Data.List (sort, sortBy, nub)
+import Data.List ( sortBy, sort )
 import Data.IORef
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import System.Directory
-import System.FilePath
+import GHC.Linker.Types
+import GHC.Types.SrcLoc
+import GHC.Utils.Monad
+import GHC.Driver.Ppr
 
 {- Note [Module self-dependency]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -85,7 +82,7 @@ mkDependencies iuid pluginModules
       let dep_mods = modDepsElts (delFromUFM (imp_dep_mods imports)
                                              (moduleName mod))
 
-          direct_mods = filter (\x -> gwib_mod x `elem` (map moduleName $ moduleEnvKeys $ imp_mods imports)) dep_mods
+          direct_mods = modDepsElts (delFromUFM (imp_direct_dep_mods imports) (moduleName mod))
                 -- M.hi-boot can be in the imp_dep_mods, but we must remove
                 -- it before recording the modules on which this one depends!
                 -- (We want to retain M.hi-boot in imp_dep_mods so that
@@ -98,6 +95,11 @@ mkDependencies iuid pluginModules
                 -- Note [Module self-dependency]
 
           raw_pkgs = foldr Set.insert (imp_dep_pkgs imports) plugin_dep_pkgs
+          direct_pkgs_0 = foldr Set.insert (imp_dep_direct_pkgs imports) plugin_dep_pkgs
+
+          direct_pkgs
+            | th_used = Set.insert thUnitId direct_pkgs_0
+            | otherwise = direct_pkgs_0
 
           pkgs | th_used   = Set.insert thUnitId raw_pkgs
                | otherwise = raw_pkgs
@@ -105,12 +107,15 @@ mkDependencies iuid pluginModules
           -- Set the packages required to be Safe according to Safe Haskell.
           -- See Note [Tracking Trust Transitively] in GHC.Rename.Names
           sorted_pkgs = sort (Set.toList pkgs)
+          sorted_direct_pkgs = sort (Set.toList direct_pkgs)
           trust_pkgs  = imp_trust_pkgs imports
           dep_pkgs'   = map (\x -> (x, x `Set.member` trust_pkgs)) sorted_pkgs
+          direct_dep_pkgs' = map (\x -> (x, x `Set.member` trust_pkgs)) sorted_direct_pkgs
 
       return Deps { dep_mods   = dep_mods,
                     dep_direct_mods = direct_mods,
                     dep_pkgs   = dep_pkgs',
+                    dep_direct_pkgs = direct_dep_pkgs',
                     dep_orphs  = dep_orphs,
                     dep_plgins = dep_plgins,
                     dep_finsts = sortBy stableModuleCmp (imp_finsts imports) }
@@ -127,7 +132,8 @@ mkUsageInfo hsc_env this_mod dir_imp_mods used_names dependent_files merged
   = do
     eps <- hscEPS hsc_env
     hashes <- mapM getFileHash dependent_files
-    plugin_usages <- mapM (mkPluginUsage hsc_env) pluginModules
+--    plugin_usages <- mapM (mkPluginUsage hsc_env) pluginModules
+    plugin_usages <- mapM (mkPluginUsage2 hsc_env) pluginModules
     let mod_usages = mk_mod_usage_info (eps_PIT eps) hsc_env this_mod
                                        dir_imp_mods used_names
         usages = mod_usages ++ [ UsageFile { usg_file_path = f
@@ -181,6 +187,34 @@ One way to improve this is to either:
     compare implementation hashes for recompilation. Creation of implementation
     hashes is however potentially expensive.
 -}
+
+mkPluginUsage2 :: HscEnv -> ModIface -> IO [Usage]
+mkPluginUsage2 hsc_env iface = do
+  (ls, us) <- getLinkDeps hsc_env (hsc_HPT hsc_env) ([], [], []) Nothing noSrcSpan
+                [mi_module iface]
+  ds <-
+    case hsc_interp hsc_env of
+      Just interp -> fst <$> computePackagesDeps interp hsc_env us
+      Nothing -> return []
+--  pprTraceM "mkPluginUsage2" (ppr ls $$ ppr us $$ ppr ds)
+
+  concat <$> sequence (map linkableToUsage ls ++ map librarySpecToUsage ds)
+
+  where
+    linkableToUsage (LM _ _ uls) = mapMaybeM unlinkedToUsage uls
+
+    fing = (\fn -> UsageFile fn <$> getFileHash fn)
+
+    unlinkedToUsage ul =
+      traverse fing  (nameOfObject_maybe ul)
+
+    librarySpecToUsage :: LibrarySpec -> IO [Usage]
+    librarySpecToUsage (Objects os) = traverse fing os
+    librarySpecToUsage (Archive fn) = traverse fing [fn]
+    librarySpecToUsage (DLLPath fn) = traverse fing [fn]
+    librarySpecToUsage _ = return []
+
+{-
 mkPluginUsage :: HscEnv -> ModIface -> IO [Usage]
 mkPluginUsage hsc_env pluginModule
   = case lookupPluginModuleWithSuggestions pkgs pNm Nothing of
@@ -260,6 +294,7 @@ mkPluginUsage hsc_env pluginModule
             h <- getFileHash f
             return (UsageFile f h)
          else pprPanic "mkPluginUsage: file not found" (ppr pNm <+> text f)
+         -}
 
 mk_mod_usage_info :: PackageIfaceTable
               -> HscEnv

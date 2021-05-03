@@ -15,6 +15,7 @@ where
 import GHC.Prelude
 
 import GHC.Driver.Backend
+import GHC.Driver.Dependencies
 import GHC.Driver.Env
 import GHC.Driver.Session
 import GHC.Driver.Ppr
@@ -65,9 +66,8 @@ import GHC.Unit.Home.ModInfo
 
 import Control.Monad
 import Data.Function
-import Data.List (find, sortBy, sort)
+import Data.List (sortBy, sort)
 import qualified Data.Map as Map
-import qualified Data.Set as Set
 import Data.Word (Word64)
 
 --Qualified import so we can define a Semigroup instance
@@ -275,7 +275,22 @@ checkVersions hsc_env mod_summary iface
        -- We do this regardless of compilation mode, although in --make mode
        -- all the dependent modules should be in the HPT already, so it's
        -- quite redundant
-       ; updateEps_ $ \eps  -> eps { eps_is_boot = mod_deps }
+
+       -- MP: A better strategy in the long term is to populate the HPT also in
+       -- oneshot mode. This section is now guarded by a check as it involves the
+       -- potentially expensive recursive exploration of all interface files
+       -- something which isn't necessary in --make mode.
+
+       -- This isn't any worse than before because checkDependencies used to do this
+       -- complete traversal anyway.
+
+       when (isOneShot (ghcMode (hsc_dflags hsc_env))) $ do {
+          ; home_mods <- liftIO $ findHomeModules hsc_env home_unit (dep_direct_mods (mi_deps iface))
+        --  ; pprTraceM "home_mods" (ppr home_mods)
+        --  ; pprTraceM "home_mods" (ppr (dep_mods (mi_deps iface)))
+        --  ; pprTraceM "home_mods" (ppr (Set.difference  (Set.fromList (eltsUFM home_mods)) (Set.fromList (dep_mods (mi_deps iface)))))
+          ; updateEps_ $ \eps  -> eps { eps_is_boot = home_mods }
+       }
        ; recomp <- checkList [checkModUsage (homeUnitAsUnit home_unit) u
                              | u <- mi_usages iface]
        ; return (recomp, Just iface)
@@ -284,9 +299,8 @@ checkVersions hsc_env mod_summary iface
     logger = hsc_logger hsc_env
     dflags = hsc_dflags hsc_env
     home_unit = hsc_home_unit hsc_env
-    -- This is a bit of a hack really
-    mod_deps :: ModuleNameEnv ModuleNameWithIsBoot
-    mod_deps = mkModDeps (dep_mods (mi_deps iface))
+
+
 
 
 -- | Check if any plugins are requesting recompilation
@@ -456,38 +470,19 @@ checkMergedSignatures hsc_env mod_summary iface = do
 --   - a new home module has been added that shadows a package module
 -- See bug #1372.
 --
--- In addition, we also check if the union of dependencies of the imported
--- modules has any difference to the previous set of dependencies. We would need
--- to recompile in that case also since the `mi_deps` field of ModIface needs
--- to be updated to match that information. This is one of the invariants
--- of interface files (see https://gitlab.haskell.org/ghc/ghc/wikis/commentary/compiler/recompilation-avoidance#interface-file-invariants).
--- See bug #16511.
---
 -- Returns (RecompBecause <textual reason>) if recompilation is required.
 checkDependencies :: HscEnv -> ModSummary -> ModIface -> IfG RecompileRequired
 checkDependencies hsc_env summary iface
- =
-   checkList $
-     [ liftIO $ checkList (map dep_missing (ms_imps summary ++ ms_srcimps summary))
-     , do
-         (recomp, mnames_seen) <- runUntilRecompRequired $ map
-           checkForNewHomeDependency
-           (ms_home_imps summary)
-         liftIO $ case recomp of
-           UpToDate -> do
-             let
-               seen_home_deps = Set.unions $ map Set.fromList mnames_seen
-             checkIfAllOldHomeDependenciesAreSeen seen_home_deps
-           _ -> return recomp]
+ = liftIO $ checkList (map dep_missing (ms_imps summary ++ ms_srcimps summary))
  where
    dflags        = hsc_dflags hsc_env
    logger        = hsc_logger hsc_env
    fc            = hsc_FC hsc_env
    home_unit     = hsc_home_unit hsc_env
    units         = hsc_units hsc_env
-   prev_dep_mods = dep_mods (mi_deps iface)
+   prev_dep_mods = dep_direct_mods (mi_deps iface)
    prev_dep_plgn = dep_plgins (mi_deps iface)
-   prev_dep_pkgs = dep_pkgs (mi_deps iface)
+   prev_dep_pkgs = dep_direct_pkgs (mi_deps iface)
 
    dep_missing (mb_pkg, L _ mod) = do
      find_res <- findImportedModule fc units home_unit dflags mod (mb_pkg)
@@ -513,58 +508,6 @@ checkDependencies hsc_env summary iface
                          return UpToDate
            where pkg = moduleUnit mod
         _otherwise  -> return (RecompBecause reason)
-
-   projectNonBootNames = map gwib_mod . filter ((== NotBoot) . gwib_isBoot)
-   old_deps = Set.fromList
-     $ projectNonBootNames prev_dep_mods
-   isOldHomeDeps = flip Set.member old_deps
-   checkForNewHomeDependency (L _ mname) = do
-     let
-       mod = mkHomeModule home_unit mname
-       str_mname = moduleNameString mname
-       reason = str_mname ++ " changed"
-     -- We only want to look at home modules to check if any new home dependency
-     -- pops in and thus here, skip modules that are not home. Checking
-     -- membership in old home dependencies suffice because the `dep_missing`
-     -- check already verified that all imported home modules are present there.
-     if not (isOldHomeDeps mname)
-       then return (UpToDate, [])
-       else do
-         mb_result <- getFromModIface "need mi_deps for" mod $ \imported_iface -> do
-           let mnames = mname:(map gwib_mod $ filter ((== NotBoot) . gwib_isBoot) $
-                 dep_mods $ mi_deps imported_iface)
-           case find (not . isOldHomeDeps) mnames of
-             Nothing -> return (UpToDate, mnames)
-             Just new_dep_mname -> do
-               trace_hi_diffs logger dflags $
-                 text "imported home module " <> quotes (ppr mod) <>
-                 text " has a new dependency " <> quotes (ppr new_dep_mname)
-               return (RecompBecause reason, [])
-         return $ fromMaybe (MustCompile, []) mb_result
-
-   -- Performs all recompilation checks in the list until a check that yields
-   -- recompile required is encountered. Returns the list of the results of
-   -- all UpToDate checks.
-   runUntilRecompRequired []             = return (UpToDate, [])
-   runUntilRecompRequired (check:checks) = do
-     (recompile, value) <- check
-     if recompileRequired recompile
-       then return (recompile, [])
-       else do
-         (recomp, values) <- runUntilRecompRequired checks
-         return (recomp, value:values)
-
-   checkIfAllOldHomeDependenciesAreSeen seen_deps = do
-     let unseen_old_deps = Set.difference
-          old_deps
-          seen_deps
-     if not (null unseen_old_deps)
-       then do
-         let missing_dep = Set.elemAt 0 unseen_old_deps
-         trace_hi_diffs logger dflags $
-           text "missing old home dependency " <> quotes (ppr missing_dep)
-         return $ RecompBecause "missing old dependency"
-       else return UpToDate
 
 needInterface :: Module -> (ModIface -> IO RecompileRequired)
              -> IfG RecompileRequired
@@ -1058,7 +1001,7 @@ addFingerprints hsc_env iface0
                       (mi_exports iface0,
                        orphan_hash,
                        dep_orphan_hashes,
-                       dep_pkgs (mi_deps iface0),
+                       dep_direct_pkgs (mi_deps iface0),
                        -- See Note [Export hash depends on non-orphan family instances]
                        dep_finsts (mi_deps iface0),
                         -- dep_pkgs: see "Package Version Changes" on
@@ -1258,6 +1201,7 @@ sortDependencies d
  = Deps { dep_mods   = sortBy (lexicalCompareFS `on` (moduleNameFS . gwib_mod)) (dep_mods d),
           dep_direct_mods = sortBy (lexicalCompareFS `on` (moduleNameFS . gwib_mod)) (dep_direct_mods d),
           dep_pkgs   = sortBy (compare `on` fst) (dep_pkgs d),
+          dep_direct_pkgs   = sort (dep_direct_pkgs d),
           dep_orphs  = sortBy stableModuleCmp (dep_orphs d),
           dep_finsts = sortBy stableModuleCmp (dep_finsts d),
           dep_plgins = sortBy (lexicalCompareFS `on` moduleNameFS) (dep_plgins d) }

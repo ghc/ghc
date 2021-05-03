@@ -285,7 +285,8 @@ mi_free_holes iface =
         -> renameFreeHoles (mkUniqDSet cands) (instUnitInsts (moduleUnit indef))
     _   -> emptyUniqDSet
   where
-    cands = map gwib_mod $ dep_mods $ mi_deps iface
+    -- TODO: This should be transitive, such is life
+    cands = map gwib_mod $ dep_direct_mods $ mi_deps iface
 
 -- | Given a set of free holes, and a unit identifier, rename
 -- the free holes according to the instantiation of the unit

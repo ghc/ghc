@@ -12,7 +12,8 @@ module GHC.Driver.Env
    , runInteractiveHsc
    , hscEPS
    , hptCompleteSigs
-   , hptInstances
+   , hptAllInstances
+   , hptInstancesBelow
    , hptAnns
    , hptAllThings
    , hptSomeThingsBelowUs
@@ -64,7 +65,6 @@ import GHC.Utils.Monad
 import GHC.Utils.Panic
 import GHC.Utils.Misc
 
-import Control.Monad    ( guard )
 import Data.IORef
 import qualified Data.Set as Set
 
@@ -180,13 +180,27 @@ hptCompleteSigs = hptAllThings  (md_complete_matches . hm_details)
 -- the Home Package Table filtered by the provided predicate function.
 -- Used in @tcRnImports@, to select the instances that are in the
 -- transitive closure of imports from the currently compiled module.
-hptInstances :: HscEnv -> (ModuleName -> Bool) -> ([ClsInst], [FamInst])
-hptInstances hsc_env want_this_module
+hptAllInstances :: HscEnv -> ([ClsInst], [FamInst])
+hptAllInstances hsc_env
   = let (insts, famInsts) = unzip $ flip hptAllThings hsc_env $ \mod_info -> do
-                guard (want_this_module (moduleName (mi_module (hm_iface mod_info))))
                 let details = hm_details mod_info
                 return (md_insts details, md_fam_insts details)
     in (concat insts, concat famInsts)
+
+-- | Find instances visible from the given set of imports
+hptInstancesBelow :: HscEnv -> ModuleName -> [ModuleNameWithIsBoot] -> ([ClsInst], [FamInst])
+hptInstancesBelow hsc_env mn mns =
+  let (insts, famInsts) =
+        unzip $ hptSomeThingsBelowUs (\mod_info ->
+                                     let details = hm_details mod_info
+                                     -- Don't include instances for the current module
+                                     in if moduleName (mi_module (hm_iface mod_info)) == mn
+                                          then []
+                                          else [(md_insts details, md_fam_insts details)])
+                             True -- Include -hi-boot
+                             hsc_env
+                             mns
+  in (concat insts, concat famInsts)
 
 -- | Get rules from modules "below" this one (in the dependency sense)
 hptRules :: HscEnv -> [ModuleNameWithIsBoot] -> [CoreRule]
@@ -212,7 +226,7 @@ hptModulesBelow include_boot hsc_env mn = go mn Set.empty
       | otherwise =
           case lookupHpt hpt (gwib_mod mn) of
               -- Not a home module
-              Nothing -> Set.empty
+              Nothing -> go mns seen
               Just hmi
                 | include_boot || (gwib_isBoot mn == NotBoot) ->
                   go (dep_direct_mods (mi_deps (hm_iface hmi)) ++ mns) (Set.insert mn seen)

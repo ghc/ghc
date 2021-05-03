@@ -30,7 +30,7 @@ module GHC.Iface.Load (
         needWiredInHomeIface, loadWiredInHomeIface,
 
         pprModIfaceSimple,
-        ifaceStats, pprModIface, showIface,
+        ifaceStats, pprModIface, showIface, computeInterface,
 
         module Iface_Errors -- avoids boot files in Ppr modules
    ) where
@@ -766,6 +766,58 @@ moduleFreeHolesPrecise doc_str mod
                 return (Succeeded (renameFreeHoles ifhs insts))
             Failed err -> return (Failed err)
 
+{-
+
+        case tryDepsCache eps imod insts of
+          Just r -> return (Succeeded r)
+          Nothing -> computeFreeHoles eps hpt imod insts
+
+    (_, Nothing) -> return (Succeeded emptyUniqDSet)
+  where
+    computeFreeHoles eps hpt imod insts =
+        case lookupEpsAndHpt eps hpt of
+          Just r -> findHolesAndCache imod insts (Succeeded r)
+          Nothing -> do
+             readIface imod >>= findHolesAndCache imod insts . fmap fst
+
+    lookupEpsAndHpt eps hpt = lookupIfaceByModule hpt (eps_PIT eps) mod
+    tryDepsCache eps imod insts =
+        case lookupInstalledModuleEnv (eps_free_holes eps) imod of
+            Just ifhs  -> Just (renameFreeHoles ifhs insts)
+            _otherwise -> Nothing
+    readIface imod = do
+        hsc_env <- getTopEnv
+        let nc        = hsc_NC hsc_env
+        let fc        = hsc_FC hsc_env
+        let home_unit = hsc_home_unit hsc_env
+        let units     = hsc_units hsc_env
+        let dflags    = hsc_dflags hsc_env
+        let logger    = hsc_logger hsc_env
+        let hooks     = hsc_hooks hsc_env
+        liftIO $ findAndReadIface logger nc fc hooks units home_unit dflags
+                                              (text "moduleFreeHolesPrecise" <+> doc_str)
+                                              imod mod NotBoot
+
+    findHolesAndCache imod insts mb_iface = do
+        case mb_iface of
+            Succeeded iface -> do
+                hsc_env <- getTopEnv
+                let home_unit = hsc_home_unit hsc_env
+                let homeMod = mkHomeModule home_unit
+                dep_ifhs <- mapM (moduleFreeHolesPrecise doc_str . homeMod . gwib_mod) (dep_direct_mods (mi_deps iface))
+                let ifhs_direct = renameFreeHoles (mkUniqDSet (map gwib_mod (dep_direct_mods (mi_deps iface)))) insts
+                let collect_results [] = Succeeded ifhs_direct
+                    collect_results ((Succeeded r):rs) = unionUniqDSets r <$> collect_results rs
+                    collect_results ((Failed r):_rs) = Failed r
+                case collect_results dep_ifhs of
+                  Failed r -> return $ Failed r
+                  Succeeded v -> do
+                    updateEps_ (\eps ->
+                        eps { eps_free_holes = extendInstalledModuleEnv (eps_free_holes eps) imod v })
+                    return (Succeeded (renameFreeHoles v insts))
+            Failed err -> return (Failed err)
+            -}
+
 wantHiBootFile :: HomeUnit -> ExternalPackageState -> Module -> WhereFrom
                -> MaybeErr SDoc IsBootInterface
 -- Figure out whether we want Foo.hi or Foo.hi-boot
@@ -1180,12 +1232,14 @@ pprUsageImport usage usg_mod'
 
 -- | Pretty-print unit dependencies
 pprDeps :: UnitState -> Dependencies -> SDoc
-pprDeps unit_state (Deps { dep_mods = mods, dep_pkgs = pkgs, dep_orphs = orphs,
-                           dep_finsts = finsts })
+pprDeps unit_state (Deps { dep_mods = mods, dep_direct_mods = dmods, dep_pkgs = pkgs, dep_orphs = orphs,
+                           dep_finsts = finsts, dep_plgins = plugins })
   = pprWithUnitState unit_state $
     vcat [text "module dependencies:" <+> fsep (map ppr_mod mods),
+          text "direct module dependencies:" <+> fsep (map ppr_mod dmods),
           text "package dependencies:" <+> fsep (map ppr_pkg pkgs),
           text "orphans:" <+> fsep (map ppr orphs),
+          text "plugins:" <+> fsep (map ppr plugins),
           text "family instance modules:" <+> fsep (map ppr finsts)
         ]
   where

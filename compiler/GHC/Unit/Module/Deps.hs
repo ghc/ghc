@@ -36,6 +36,7 @@ data Dependencies = Deps
       -- The bool indicates if the package is required to be
       -- trusted when the module is imported as a safe import
       -- (Safe Haskell). See Note [Tracking Trust Transitively] in GHC.Rename.Names
+   , dep_direct_pkgs :: [(UnitId, Bool)]
 
    , dep_orphs  :: [Module]
       -- ^ Transitive closure of orphan modules (whether
@@ -65,6 +66,7 @@ instance Binary Dependencies where
     put_ bh deps = do put_ bh (dep_mods deps)
                       put_ bh (dep_direct_mods deps)
                       put_ bh (dep_pkgs deps)
+                      put_ bh (dep_direct_pkgs deps)
                       put_ bh (dep_orphs deps)
                       put_ bh (dep_finsts deps)
                       put_ bh (dep_plgins deps)
@@ -72,14 +74,16 @@ instance Binary Dependencies where
     get bh = do ms <- get bh
                 dms <- get bh
                 ps <- get bh
+                dps <- get bh
                 os <- get bh
                 fis <- get bh
                 pl <- get bh
-                return (Deps { dep_mods = ms, dep_direct_mods = dms, dep_pkgs = ps, dep_orphs = os,
+                return (Deps { dep_mods = ms, dep_direct_mods = dms, dep_pkgs = ps, dep_direct_pkgs = dps, dep_orphs = os,
                                dep_finsts = fis, dep_plgins = pl })
 
 noDependencies :: Dependencies
-noDependencies = Deps [] [] [] [] [] []
+noDependencies = Deps [] [] [] [] [] [] []
+
 
 
 -- | Records modules for which changes may force recompilation of this module

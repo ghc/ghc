@@ -1338,6 +1338,7 @@ data ImportAvails
           -- different packages. (currently not the case, but might be in the
           -- future).
 
+        imp_direct_dep_mods :: ModuleNameEnv ModuleNameWithIsBoot,
         imp_dep_mods :: ModuleNameEnv ModuleNameWithIsBoot,
           -- ^ Home-package modules needed by the module being compiled
           --
@@ -1349,6 +1350,11 @@ data ImportAvails
           -- is still listed in M's dependencies.
 
         imp_dep_pkgs :: Set UnitId,
+          -- ^ Packages needed by the module being compiled, whether directly,
+          -- or via other modules in this package, or via modules imported
+          -- from other packages.
+
+        imp_dep_direct_pkgs :: Set UnitId,
           -- ^ Packages needed by the module being compiled, whether directly,
           -- or via other modules in this package, or via modules imported
           -- from other packages.
@@ -1395,7 +1401,9 @@ modDepsElts = sort . nonDetEltsUFM
 emptyImportAvails :: ImportAvails
 emptyImportAvails = ImportAvails { imp_mods          = emptyModuleEnv,
                                    imp_dep_mods      = emptyUFM,
+                                   imp_direct_dep_mods      = emptyUFM,
                                    imp_dep_pkgs      = S.empty,
+                                   imp_dep_direct_pkgs = S.empty,
                                    imp_trust_pkgs    = S.empty,
                                    imp_trust_own_pkg = False,
                                    imp_orphs         = [],
@@ -1409,16 +1417,20 @@ emptyImportAvails = ImportAvails { imp_mods          = emptyModuleEnv,
 plusImportAvails ::  ImportAvails ->  ImportAvails ->  ImportAvails
 plusImportAvails
   (ImportAvails { imp_mods = mods1,
-                  imp_dep_mods = dmods1, imp_dep_pkgs = dpkgs1,
+                  imp_dep_mods = dmods1, imp_direct_dep_mods = ddmods1, imp_dep_pkgs = dpkgs1,
+                  imp_dep_direct_pkgs = ddpkgs1,
                   imp_trust_pkgs = tpkgs1, imp_trust_own_pkg = tself1,
                   imp_orphs = orphs1, imp_finsts = finsts1 })
   (ImportAvails { imp_mods = mods2,
-                  imp_dep_mods = dmods2, imp_dep_pkgs = dpkgs2,
+                  imp_dep_mods = dmods2, imp_direct_dep_mods = ddmods2, imp_dep_pkgs = dpkgs2,
+                  imp_dep_direct_pkgs = ddpkgs2,
                   imp_trust_pkgs = tpkgs2, imp_trust_own_pkg = tself2,
                   imp_orphs = orphs2, imp_finsts = finsts2 })
   = ImportAvails { imp_mods          = plusModuleEnv_C (++) mods1 mods2,
                    imp_dep_mods      = plusUFM_C plus_mod_dep dmods1 dmods2,
+                   imp_direct_dep_mods = plusUFM_C plus_mod_dep ddmods1 ddmods2,
                    imp_dep_pkgs      = dpkgs1 `S.union` dpkgs2,
+                   imp_dep_direct_pkgs      = ddpkgs1 `S.union` ddpkgs2,
                    imp_trust_pkgs    = tpkgs1 `S.union` tpkgs2,
                    imp_trust_own_pkg = tself1 || tself2,
                    imp_orphs         = orphs1 `unionLists` orphs2,

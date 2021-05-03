@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP, TupleSections, RecordWildCards #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 --
 --  (c) The University of Glasgow 2002-2006
@@ -44,19 +45,19 @@ import GHC.Driver.Phases
 import GHC.Driver.Env
 import GHC.Driver.Session
 import GHC.Driver.Ppr
+import GHC.Driver.Dependencies
 
 import GHC.Tc.Utils.Monad
 
 import GHC.Runtime.Interpreter
 import GHCi.RemoteTypes
 
-import GHC.Iface.Load
 
 import GHC.ByteCode.Linker
 import GHC.ByteCode.Asm
 import GHC.ByteCode.Types
 
-import GHC.SysTools
+
 
 import GHC.Types.Basic
 import GHC.Types.Name
@@ -72,18 +73,11 @@ import GHC.Utils.Logger
 import GHC.Utils.TmpFs
 
 import GHC.Unit.Env
-import GHC.Unit.Finder
 import GHC.Unit.Module
-import GHC.Unit.Module.ModIface
-import GHC.Unit.Module.Deps
-import GHC.Unit.Home
-import GHC.Unit.Home.ModInfo
 import GHC.Unit.State as Packages
 
 import qualified GHC.Data.ShortText as ST
-import qualified GHC.Data.Maybe as Maybes
 import GHC.Data.FastString
-import GHC.Data.List.SetOps
 
 import GHC.Linker.MacOS
 import GHC.Linker.Dynamic
@@ -93,18 +87,13 @@ import GHC.Linker.Types
 import Control.Monad
 
 import qualified Data.Set as Set
-import Data.Char (isSpace)
-import Data.Function ((&))
-import Data.IORef
-import Data.List (intercalate, isPrefixOf, isSuffixOf, nub, partition)
+import Data.List ( partition, intercalate, nub )
 import Data.Maybe
 import Control.Concurrent.MVar
 import qualified Control.Monad.Catch as MC
 
 import System.FilePath
 import System.Directory
-import System.IO.Unsafe
-import System.Environment (lookupEnv)
 
 #if defined(mingw32_HOST_OS)
 import System.Win32.Info (getSystemDirectory)
@@ -205,7 +194,7 @@ loadDependencies interp hsc_env pls span needed_mods = do
    maybe_normal_osuf <- checkNonStdWay dflags interp span
 
    -- Find what packages and linkables are required
-   (lnks, pkgs) <- getLinkDeps hsc_env hpt pls
+   (lnks, pkgs) <- getLinkDeps hsc_env hpt (pkgs_loaded pls, objs_loaded pls, bcos_loaded pls)
                                maybe_normal_osuf span needed_mods
 
    -- Link the packages and modules required
@@ -629,146 +618,6 @@ failNonStd dflags srcspan = dieWith dflags srcspan $
             | hostIsProfiled = text "with -prof"
             | otherwise = text "the normal way"
 
-getLinkDeps :: HscEnv -> HomePackageTable
-            -> LoaderState
-            -> Maybe FilePath                   -- replace object suffices?
-            -> SrcSpan                          -- for error messages
-            -> [Module]                         -- If you need these
-            -> IO ([Linkable], [UnitId])     -- ... then link these first
--- Fails with an IO exception if it can't find enough files
-
-getLinkDeps hsc_env hpt pls replace_osuf span mods
--- Find all the packages and linkables that a set of modules depends on
- = do {
-        -- 1.  Find the dependent home-pkg-modules/packages from each iface
-        -- (omitting modules from the interactive package, which is already linked)
-      ; (mods_s, pkgs_s) <- follow_deps (filterOut isInteractiveModule mods)
-                                        emptyUniqDSet emptyUniqDSet;
-
-      ; let {
-        -- 2.  Exclude ones already linked
-        --      Main reason: avoid findModule calls in get_linkable
-            mods_needed = mods_s `minusList` linked_mods     ;
-            pkgs_needed = pkgs_s `minusList` pkgs_loaded pls ;
-
-            linked_mods = map (moduleName.linkableModule)
-                                (objs_loaded pls ++ bcos_loaded pls)  }
-
-        -- 3.  For each dependent module, find its linkable
-        --     This will either be in the HPT or (in the case of one-shot
-        --     compilation) we may need to use maybe_getFileLinkable
-      ; let { osuf = objectSuf dflags }
-      ; lnks_needed <- mapM (get_linkable osuf) mods_needed
-
-      ; return (lnks_needed, pkgs_needed) }
-  where
-    dflags = hsc_dflags hsc_env
-
-        -- The ModIface contains the transitive closure of the module dependencies
-        -- within the current package, *except* for boot modules: if we encounter
-        -- a boot module, we have to find its real interface and discover the
-        -- dependencies of that.  Hence we need to traverse the dependency
-        -- tree recursively.  See bug #936, testcase ghci/prog007.
-    follow_deps :: [Module]             -- modules to follow
-                -> UniqDSet ModuleName         -- accum. module dependencies
-                -> UniqDSet UnitId          -- accum. package dependencies
-                -> IO ([ModuleName], [UnitId]) -- result
-    follow_deps []     acc_mods acc_pkgs
-        = return (uniqDSetToList acc_mods, uniqDSetToList acc_pkgs)
-    follow_deps (mod:mods) acc_mods acc_pkgs
-        = do
-          mb_iface <- initIfaceCheck (text "getLinkDeps") hsc_env $
-                        loadInterface msg mod (ImportByUser NotBoot)
-          iface <- case mb_iface of
-                    Maybes.Failed err      -> throwGhcExceptionIO (ProgramError (showSDoc dflags err))
-                    Maybes.Succeeded iface -> return iface
-
-          when (mi_boot iface == IsBoot) $ link_boot_mod_error mod
-
-          let
-            pkg = moduleUnit mod
-            deps  = mi_deps iface
-            home_unit = hsc_home_unit hsc_env
-
-            pkg_deps = dep_pkgs deps
-            (boot_deps, mod_deps) = flip partitionWith (dep_direct_mods deps) $
-              \ (GWIB { gwib_mod = m, gwib_isBoot = is_boot }) ->
-                m & case is_boot of
-                  IsBoot -> Left
-                  NotBoot -> Right
-
-            --
-            mod_deps' = filter (not . (`elementOfUniqDSet` acc_mods)) (boot_deps ++ mod_deps)
-            acc_mods'  = addListToUniqDSet acc_mods (moduleName mod : mod_deps)
-            acc_pkgs'  = addListToUniqDSet acc_pkgs $ map fst pkg_deps
-          --
-          if not (isHomeUnit home_unit pkg)
-             then follow_deps mods acc_mods (addOneToUniqDSet acc_pkgs' (toUnitId pkg))
-             else follow_deps (map (mkHomeModule home_unit) mod_deps' ++ mods)
-                              acc_mods' acc_pkgs'
-        where
-            msg = text "need to link module" <+> ppr mod <+>
-                  text "due to use of Template Haskell"
-
-
-    link_boot_mod_error mod =
-        throwGhcExceptionIO (ProgramError (showSDoc dflags (
-            text "module" <+> ppr mod <+>
-            text "cannot be linked; it is only available as a boot module")))
-
-    no_obj :: Outputable a => a -> IO b
-    no_obj mod = dieWith dflags span $
-                     text "cannot find object file for module " <>
-                        quotes (ppr mod) $$
-                     while_linking_expr
-
-    while_linking_expr = text "while linking an interpreted expression"
-
-        -- This one is a build-system bug
-
-    get_linkable osuf mod_name      -- A home-package module
-        | Just mod_info <- lookupHpt hpt mod_name
-        = adjust_linkable (Maybes.expectJust "getLinkDeps" (hm_linkable mod_info))
-        | otherwise
-        = do    -- It's not in the HPT because we are in one shot mode,
-                -- so use the Finder to get a ModLocation...
-             let fc = hsc_FC hsc_env
-             let home_unit = hsc_home_unit hsc_env
-             let dflags = hsc_dflags hsc_env
-             mb_stuff <- findHomeModule fc home_unit dflags mod_name
-             case mb_stuff of
-                  Found loc mod -> found loc mod
-                  _ -> no_obj mod_name
-        where
-            found loc mod = do {
-                -- ...and then find the linkable for it
-               mb_lnk <- findObjectLinkableMaybe mod loc ;
-               case mb_lnk of {
-                  Nothing  -> no_obj mod ;
-                  Just lnk -> adjust_linkable lnk
-              }}
-
-            adjust_linkable lnk
-                | Just new_osuf <- replace_osuf = do
-                        new_uls <- mapM (adjust_ul new_osuf)
-                                        (linkableUnlinked lnk)
-                        return lnk{ linkableUnlinked=new_uls }
-                | otherwise =
-                        return lnk
-
-            adjust_ul new_osuf (DotO file) = do
-                MASSERT(osuf `isSuffixOf` file)
-                let file_base = fromJust (stripExtension osuf file)
-                    new_file = file_base <.> new_osuf
-                ok <- doesFileExist new_file
-                if (not ok)
-                   then dieWith dflags span $
-                          text "cannot find object file "
-                                <> quotes (text new_file) $$ while_linking_expr
-                   else return (DotO new_file)
-            adjust_ul _ (DotA fp) = panic ("adjust_ul DotA " ++ show fp)
-            adjust_ul _ (DotDLL fp) = panic ("adjust_ul DotDLL " ++ show fp)
-            adjust_ul _ l@(BCOs {}) = return l
 
 
 
@@ -1186,61 +1035,6 @@ unload_wkr interp keep_linkables pls@LoaderState{..}  = do
                 -- letting go of them (plus of course depopulating
                 -- the symbol table which is done in the main body)
 
-{- **********************************************************************
-
-                Loading packages
-
-  ********************************************************************* -}
-
-data LibrarySpec
-   = Objects [FilePath] -- Full path names of set of .o files, including trailing .o
-                        -- We allow batched loading to ensure that cyclic symbol
-                        -- references can be resolved (see #13786).
-                        -- For dynamic objects only, try to find the object
-                        -- file in all the directories specified in
-                        -- v_Library_paths before giving up.
-
-   | Archive FilePath   -- Full path name of a .a file, including trailing .a
-
-   | DLL String         -- "Unadorned" name of a .DLL/.so
-                        --  e.g.    On unix     "qt"  denotes "libqt.so"
-                        --          On Windows  "burble"  denotes "burble.DLL" or "libburble.dll"
-                        --  loadDLL is platform-specific and adds the lib/.so/.DLL
-                        --  suffixes platform-dependently
-
-   | DLLPath FilePath   -- Absolute or relative pathname to a dynamic library
-                        -- (ends with .dll or .so).
-
-   | Framework String   -- Only used for darwin, but does no harm
-
-instance Outputable LibrarySpec where
-  ppr (Objects objs) = text "Objects" <+> ppr objs
-  ppr (Archive a) = text "Archive" <+> text a
-  ppr (DLL s) = text "DLL" <+> text s
-  ppr (DLLPath f) = text "DLLPath" <+> text f
-  ppr (Framework s) = text "Framework" <+> text s
-
--- If this package is already part of the GHCi binary, we'll already
--- have the right DLLs for this package loaded, so don't try to
--- load them again.
---
--- But on Win32 we must load them 'again'; doing so is a harmless no-op
--- as far as the loader is concerned, but it does initialise the list
--- of DLL handles that rts/Linker.c maintains, and that in turn is
--- used by lookupSymbol.  So we must call addDLL for each library
--- just to get the DLL handle into the list.
-partOfGHCi :: [PackageName]
-partOfGHCi
- | isWindowsHost || isDarwinHost = []
- | otherwise = map (PackageName . mkFastString)
-                   ["base", "template-haskell", "editline"]
-
-showLS :: LibrarySpec -> String
-showLS (Objects nms)  = "(static) [" ++ intercalate ", " nms ++ "]"
-showLS (Archive nm)   = "(static archive) " ++ nm
-showLS (DLL nm)       = "(dynamic) " ++ nm
-showLS (DLLPath nm)   = "(dynamic) " ++ nm
-showLS (Framework nm) = "(framework) " ++ nm
 
 -- | Load exactly the specified packages, and their dependents (unless of
 -- course they are already loaded).  The dependents are loaded
@@ -1260,81 +1054,33 @@ loadPackages interp hsc_env new_pkgs = do
   -- It's probably not safe to try to load packages concurrently, so we take
   -- a lock.
   initLoaderState interp hsc_env
-  modifyLoaderState_ interp $ \pls ->
+  modifyLoaderState_ interp $ \pls -> do
     loadPackages' interp hsc_env new_pkgs pls
 
 loadPackages' :: Interp -> HscEnv -> [UnitId] -> LoaderState -> IO LoaderState
-loadPackages' interp hsc_env new_pks pls = do
-    pkgs' <- link (pkgs_loaded pls) new_pks
+loadPackages' interp hsc_env new_pkgs pls = do
+    (_, pkgs') <- loadPackagesX (loadPackage interp hsc_env) hsc_env new_pkgs (pkgs_loaded pls)
     return $! pls { pkgs_loaded = pkgs' }
-  where
-     link :: [UnitId] -> [UnitId] -> IO [UnitId]
-     link pkgs new_pkgs =
-         foldM link_one pkgs new_pkgs
 
-     link_one pkgs new_pkg
-        | new_pkg `elem` pkgs   -- Already linked
-        = return pkgs
 
-        | Just pkg_cfg <- lookupUnitId (hsc_units hsc_env) new_pkg
-        = do {  -- Link dependents first
-               pkgs' <- link pkgs (unitDepends pkg_cfg)
-                -- Now link the package itself
-             ; loadPackage interp hsc_env pkg_cfg
-             ; return (new_pkg : pkgs') }
 
-        | otherwise
-        = throwGhcExceptionIO (CmdLineError ("unknown package: " ++ unpackFS (unitIdFS new_pkg)))
 
 
 loadPackage :: Interp -> HscEnv -> UnitInfo -> IO ()
-loadPackage interp hsc_env pkg
-   = do
+loadPackage interp hsc_env pkg = do
         let dflags    = hsc_dflags hsc_env
         let logger    = hsc_logger hsc_env
             platform  = targetPlatform dflags
             is_dyn    = interpreterDynamic interp
             dirs | is_dyn    = map ST.unpack $ Packages.unitLibraryDynDirs pkg
                  | otherwise = map ST.unpack $ Packages.unitLibraryDirs pkg
-
-        let hs_libs   = map ST.unpack $ Packages.unitLibraries pkg
-            -- The FFI GHCi import lib isn't needed as
-            -- GHC.Linker.Loader + rts/Linker.c link the
-            -- interpreted references to FFI to the compiled FFI.
-            -- We therefore filter it out so that we don't get
-            -- duplicate symbol errors.
-            hs_libs'  =  filter ("HSffi" /=) hs_libs
-
-        -- Because of slight differences between the GHC dynamic linker and
-        -- the native system linker some packages have to link with a
-        -- different list of libraries when using GHCi. Examples include: libs
-        -- that are actually gnu ld scripts, and the possibility that the .a
-        -- libs do not exactly match the .so/.dll equivalents. So if the
-        -- package file provides an "extra-ghci-libraries" field then we use
-        -- that instead of the "extra-libraries" field.
-            extdeplibs = map ST.unpack (if null (Packages.unitExtDepLibsGhc pkg)
-                                      then Packages.unitExtDepLibsSys pkg
-                                      else Packages.unitExtDepLibsGhc pkg)
-            linkerlibs = [ lib | '-':'l':lib <- (map ST.unpack $ Packages.unitLinkerOptions pkg) ]
-            extra_libs = extdeplibs ++ linkerlibs
-
-        -- See Note [Fork/Exec Windows]
-        gcc_paths <- getGCCPaths logger dflags (platformOS platform)
-        dirs_env <- addEnvPaths "LIBRARY_PATH" dirs
-
-        hs_classifieds
-           <- mapM (locateLib interp hsc_env True  dirs_env gcc_paths) hs_libs'
-        extra_classifieds
-           <- mapM (locateLib interp hsc_env False dirs_env gcc_paths) extra_libs
-        let classifieds = hs_classifieds ++ extra_classifieds
-
+        classifieds <- computePackageDeps interp hsc_env pkg
         -- Complication: all the .so's must be loaded before any of the .o's.
         let known_dlls = [ dll  | DLLPath dll    <- classifieds ]
             dlls       = [ dll  | DLL dll        <- classifieds ]
             objs       = [ obj  | Objects objs    <- classifieds
                                 , obj <- objs ]
             archs      = [ arch | Archive arch   <- classifieds ]
-
         -- Add directories to library search paths
         let dll_paths  = map takeDirectory known_dlls
             all_paths  = nub $ map normalise $ dll_paths ++ dirs
@@ -1376,6 +1122,20 @@ loadPackage interp hsc_env pkg
                              <> pprUnitInfoForUser pkg <> text "'"
                  in throwGhcExceptionIO (InstallationError (showSDoc dflags errmsg))
 
+-- If this package is already part of the GHCi binary, we'll already
+-- have the right DLLs for this package loaded, so don't try to
+-- load them again.
+--
+-- But on Win32 we must load them 'again'; doing so is a harmless no-op
+-- as far as the loader is concerned, but it does initialise the list
+-- of DLL handles that rts/Linker.c maintains, and that in turn is
+-- used by lookupSymbol.  So we must call addDLL for each library
+-- just to get the DLL handle into the list.
+partOfGHCi :: [PackageName]
+partOfGHCi
+ | isWindowsHost || isDarwinHost = []
+ | otherwise = map (PackageName . mkFastString)
+                   ["base", "template-haskell", "editline"]
 {-
 Note [Crash early load_dyn and locateLib]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1458,265 +1218,6 @@ loadFrameworks interp platform pkg
                     Just err -> cmdLineErrorIO ("can't load framework: "
                                                 ++ fw ++ " (" ++ err ++ ")" )
 
--- Try to find an object file for a given library in the given paths.
--- If it isn't present, we assume that addDLL in the RTS can find it,
--- which generally means that it should be a dynamic library in the
--- standard system search path.
--- For GHCi we tend to prefer dynamic libraries over static ones as
--- they are easier to load and manage, have less overhead.
-locateLib
-  :: Interp
-  -> HscEnv
-  -> Bool
-  -> [FilePath]
-  -> [FilePath]
-  -> String
-  -> IO LibrarySpec
-locateLib interp hsc_env is_hs lib_dirs gcc_dirs lib
-  | not is_hs
-    -- For non-Haskell libraries (e.g. gmp, iconv):
-    --   first look in library-dirs for a dynamic library (on User paths only)
-    --   (libfoo.so)
-    --   then  try looking for import libraries on Windows (on User paths only)
-    --   (.dll.a, .lib)
-    --   first look in library-dirs for a dynamic library (on GCC paths only)
-    --   (libfoo.so)
-    --   then  check for system dynamic libraries (e.g. kernel32.dll on windows)
-    --   then  try looking for import libraries on Windows (on GCC paths only)
-    --   (.dll.a, .lib)
-    --   then  look in library-dirs for a static library (libfoo.a)
-    --   then look in library-dirs and inplace GCC for a dynamic library (libfoo.so)
-    --   then  try looking for import libraries on Windows (.dll.a, .lib)
-    --   then  look in library-dirs and inplace GCC for a static library (libfoo.a)
-    --   then  try "gcc --print-file-name" to search gcc's search path
-    --       for a dynamic library (#5289)
-    --   otherwise, assume loadDLL can find it
-    --
-    --   The logic is a bit complicated, but the rationale behind it is that
-    --   loading a shared library for us is O(1) while loading an archive is
-    --   O(n). Loading an import library is also O(n) so in general we prefer
-    --   shared libraries because they are simpler and faster.
-    --
-  =
-#if defined(CAN_LOAD_DLL)
-    findDll   user `orElse`
-#endif
-    tryImpLib user `orElse`
-#if defined(CAN_LOAD_DLL)
-    findDll   gcc  `orElse`
-    findSysDll     `orElse`
-#endif
-    tryImpLib gcc  `orElse`
-    findArchive    `orElse`
-    tryGcc         `orElse`
-    assumeDll
-
-  | loading_dynamic_hs_libs -- search for .so libraries first.
-  = findHSDll     `orElse`
-    findDynObject `orElse`
-    assumeDll
-
-  | otherwise
-    -- use HSfoo.{o,p_o} if it exists, otherwise fallback to libHSfoo{,_p}.a
-  = findObject  `orElse`
-    findArchive `orElse`
-    assumeDll
-
-   where
-     dflags = hsc_dflags hsc_env
-     logger = hsc_logger hsc_env
-     dirs   = lib_dirs ++ gcc_dirs
-     gcc    = False
-     user   = True
-
-     obj_file
-       | is_hs && loading_profiled_hs_libs = lib <.> "p_o"
-       | otherwise = lib <.> "o"
-     dyn_obj_file = lib <.> "dyn_o"
-     arch_files = [ "lib" ++ lib ++ lib_tag <.> "a"
-                  , lib <.> "a" -- native code has no lib_tag
-                  , "lib" ++ lib, lib
-                  ]
-     lib_tag = if is_hs && loading_profiled_hs_libs then "_p" else ""
-
-     loading_profiled_hs_libs = interpreterProfiled interp
-     loading_dynamic_hs_libs  = interpreterDynamic  interp
-
-     import_libs  = [ lib <.> "lib"           , "lib" ++ lib <.> "lib"
-                    , "lib" ++ lib <.> "dll.a", lib <.> "dll.a"
-                    ]
-
-     hs_dyn_lib_name = lib ++ dynLibSuffix (ghcNameVersion dflags)
-     hs_dyn_lib_file = platformHsSOName platform hs_dyn_lib_name
-
-     so_name     = platformSOName platform lib
-     lib_so_name = "lib" ++ so_name
-     dyn_lib_file = case (arch, os) of
-                             (ArchX86_64, OSSolaris2) -> "64" </> so_name
-                             _ -> so_name
-
-     findObject    = liftM (fmap $ Objects . (:[]))  $ findFile dirs obj_file
-     findDynObject = liftM (fmap $ Objects . (:[]))  $ findFile dirs dyn_obj_file
-     findArchive   = let local name = liftM (fmap Archive) $ findFile dirs name
-                     in  apply (map local arch_files)
-     findHSDll     = liftM (fmap DLLPath) $ findFile dirs hs_dyn_lib_file
-     findDll    re = let dirs' = if re == user then lib_dirs else gcc_dirs
-                     in liftM (fmap DLLPath) $ findFile dirs' dyn_lib_file
-     findSysDll    = fmap (fmap $ DLL . dropExtension . takeFileName) $
-                        findSystemLibrary interp so_name
-     tryGcc        = let search   = searchForLibUsingGcc logger dflags
-                         dllpath  = liftM (fmap DLLPath)
-                         short    = dllpath $ search so_name lib_dirs
-                         full     = dllpath $ search lib_so_name lib_dirs
-                         gcc name = liftM (fmap Archive) $ search name lib_dirs
-                         files    = import_libs ++ arch_files
-                         dlls     = [short, full]
-                         archives = map gcc files
-                     in apply $
-#if defined(CAN_LOAD_DLL)
-                          dlls ++
-#endif
-                          archives
-     tryImpLib re = case os of
-                       OSMinGW32 ->
-                        let dirs' = if re == user then lib_dirs else gcc_dirs
-                            implib name = liftM (fmap Archive) $
-                                            findFile dirs' name
-                        in apply (map implib import_libs)
-                       _         -> return Nothing
-
-     -- TH Makes use of the interpreter so this failure is not obvious.
-     -- So we are nice and warn/inform users why we fail before we do.
-     -- But only for haskell libraries, as C libraries don't have a
-     -- profiling/non-profiling distinction to begin with.
-     assumeDll
-      | is_hs
-      , not loading_dynamic_hs_libs
-      , interpreterProfiled interp
-      = do
-          warningMsg logger dflags
-            (text "Interpreter failed to load profiled static library" <+> text lib <> char '.' $$
-              text " \tTrying dynamic library instead. If this fails try to rebuild" <+>
-              text "libraries with profiling support.")
-          return (DLL lib)
-      | otherwise = return (DLL lib)
-     infixr `orElse`
-     f `orElse` g = f >>= maybe g return
-
-     apply :: [IO (Maybe a)] -> IO (Maybe a)
-     apply []     = return Nothing
-     apply (x:xs) = do x' <- x
-                       if isJust x'
-                          then return x'
-                          else apply xs
-
-     platform = targetPlatform dflags
-     arch = platformArch platform
-     os = platformOS platform
-
-searchForLibUsingGcc :: Logger -> DynFlags -> String -> [FilePath] -> IO (Maybe FilePath)
-searchForLibUsingGcc logger dflags so dirs = do
-   -- GCC does not seem to extend the library search path (using -L) when using
-   -- --print-file-name. So instead pass it a new base location.
-   str <- askLd logger dflags (map (FileOption "-B") dirs
-                          ++ [Option "--print-file-name", Option so])
-   let file = case lines str of
-                []  -> ""
-                l:_ -> l
-   if (file == so)
-      then return Nothing
-      else do b <- doesFileExist file -- file could be a folder (see #16063)
-              return (if b then Just file else Nothing)
-
--- | Retrieve the list of search directory GCC and the System use to find
---   libraries and components. See Note [Fork/Exec Windows].
-getGCCPaths :: Logger -> DynFlags -> OS -> IO [FilePath]
-getGCCPaths logger dflags os
-  = case os of
-      OSMinGW32 ->
-        do gcc_dirs <- getGccSearchDirectory logger dflags "libraries"
-           sys_dirs <- getSystemDirectories
-           return $ nub $ gcc_dirs ++ sys_dirs
-      _         -> return []
-
--- | Cache for the GCC search directories as this can't easily change
---   during an invocation of GHC. (Maybe with some env. variable but we'll)
---   deal with that highly unlikely scenario then.
-{-# NOINLINE gccSearchDirCache #-}
-gccSearchDirCache :: IORef [(String, [String])]
-gccSearchDirCache = unsafePerformIO $ newIORef []
-
--- Note [Fork/Exec Windows]
--- ~~~~~~~~~~~~~~~~~~~~~~~~
--- fork/exec is expensive on Windows, for each time we ask GCC for a library we
--- have to eat the cost of af least 3 of these: gcc -> real_gcc -> cc1.
--- So instead get a list of location that GCC would search and use findDirs
--- which hopefully is written in an optimized mannor to take advantage of
--- caching. At the very least we remove the overhead of the fork/exec and waits
--- which dominate a large percentage of startup time on Windows.
-getGccSearchDirectory :: Logger -> DynFlags -> String -> IO [FilePath]
-getGccSearchDirectory logger dflags key = do
-    cache <- readIORef gccSearchDirCache
-    case lookup key cache of
-      Just x  -> return x
-      Nothing -> do
-        str <- askLd logger dflags [Option "--print-search-dirs"]
-        let line = dropWhile isSpace str
-            name = key ++ ": ="
-        if null line
-          then return []
-          else do let val = split $ find name line
-                  dirs <- filterM doesDirectoryExist val
-                  modifyIORef' gccSearchDirCache ((key, dirs):)
-                  return val
-      where split :: FilePath -> [FilePath]
-            split r = case break (==';') r of
-                        (s, []    ) -> [s]
-                        (s, (_:xs)) -> s : split xs
-
-            find :: String -> String -> String
-            find r x = let lst = lines x
-                           val = filter (r `isPrefixOf`) lst
-                       in if null val
-                             then []
-                             else case break (=='=') (head val) of
-                                     (_ , [])    -> []
-                                     (_, (_:xs)) -> xs
-
--- | Get a list of system search directories, this to alleviate pressure on
--- the findSysDll function.
-getSystemDirectories :: IO [FilePath]
-#if defined(mingw32_HOST_OS)
-getSystemDirectories = fmap (:[]) getSystemDirectory
-#else
-getSystemDirectories = return []
-#endif
-
--- | Merge the given list of paths with those in the environment variable
---   given. If the variable does not exist then just return the identity.
-addEnvPaths :: String -> [String] -> IO [String]
-addEnvPaths name list
-  = do -- According to POSIX (chapter 8.3) a zero-length prefix means current
-       -- working directory. Replace empty strings in the env variable with
-       -- `working_dir` (see also #14695).
-       working_dir <- getCurrentDirectory
-       values <- lookupEnv name
-       case values of
-         Nothing  -> return list
-         Just arr -> return $ list ++ splitEnv working_dir arr
-    where
-      splitEnv :: FilePath -> String -> [String]
-      splitEnv working_dir value =
-        case break (== envListSep) value of
-          (x, []    ) ->
-            [if null x then working_dir else x]
-          (x, (_:xs)) ->
-            (if null x then working_dir else x) : splitEnv working_dir xs
-#if defined(mingw32_HOST_OS)
-      envListSep = ';'
-#else
-      envListSep = ':'
-#endif
 
 -- ----------------------------------------------------------------------------
 -- Loading a dynamic library (dlopen()-ish on Unix, LoadLibrary-ish on Win32)
