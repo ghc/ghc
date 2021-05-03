@@ -1327,7 +1327,7 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags home_unit mHscMessag
         old_hpt <- readIORef old_hpt_var
 
         withSem $ handleSourceError (\err -> do logg err; return (Failed, hsc_HPT hsc_env1)) $ do
-          mod_info <- do
+          res <- do
             -- Re-typecheck the loop
             -- This is necessary to make sure the knot is tied when
             -- we close a recursive module loop, see bug #12035.
@@ -1348,7 +1348,7 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags home_unit mHscMessag
             -- Compile the module.
             status <- checkStableModules hsc_env3 old_hpt stable_mods mod
             case status of
-              Stable hmi -> return hmi
+              Stable hmi -> return $ Left hmi
               NotStable src_modified mb_old_iface mb_old_linkable -> do
                 (plugin_hsc_env, source_modified) <- compileOneInit hsc_env3 mod src_modified
 
@@ -1360,16 +1360,20 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags home_unit mHscMessag
                     MASSERT( isJust mb_old_linkable || isNoLink (ghcLink $ hsc_dflags plugin_hsc_env) )
                     -- See Note [ModDetails and --make mode]
                     details <- initModDetails plugin_hsc_env mod iface
-                    return $! HomeModInfo iface details mb_old_linkable
+                    return $! Left $! HomeModInfo iface details mb_old_linkable
                   HscRecompNeeded mb_old_hash -> do
                     (tc_result, warnings) <- hscTypecheckAndGetWarnings plugin_hsc_env mod
-                    compileOnePostTc plugin_hsc_env mod tc_result warnings mb_old_hash
-
+                    return $ Right (plugin_hsc_env, tc_result, warnings, mb_old_hash)
 
           -- Prune the old HPT unless this is an hs-boot module.
           unless (isBootSummary mod == IsBoot) $
               atomicModifyIORef' old_hpt_var $ \old_hpt ->
                   (delFromHpt old_hpt this_mod, ())
+
+          mod_info <- case res of
+            Left hmi -> return hmi
+            Right (plugin_hsc_env, tc_result, warnings, mb_old_hash) ->
+              compileOnePostTc plugin_hsc_env mod tc_result warnings mb_old_hash
 
           hsc_env5 <- do
               let hsc_env4 = hscUpdateHPT (\hpt -> addToHpt hpt this_mod mod_info)
