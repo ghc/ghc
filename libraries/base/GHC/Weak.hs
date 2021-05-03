@@ -78,14 +78,13 @@ finalizer running earlier than you expected.  This is not a problem
 for caches and memo tables where early finalization is benign.
 
 Finalizers /can/ be used reliably for types that are created explicitly
-and have identity, such as @IORef@ and @MVar@.  However, to place a
-finalizer on one of these types, you should use the specific operation
-provided for that type, e.g. @mkWeakIORef@ and @addMVarFinalizer@
-respectively (the non-uniformity is accidental).  These operations
-attach the finalizer to the primitive object inside the box
-(e.g. @MutVar#@ in the case of @IORef@), because attaching the
-finalizer to the box itself fails when the outer box is optimised away
-by the compiler.
+and have identity, such as @IORef@, @MVar@, and @TVar@.  However, to
+place a finalizer on one of these types, you should use the specific
+operation provided for that type, e.g. @mkWeakIORef@, @mkWeakMVar@ and
+@mkWeakTVar@ respectively.  These operations attach the finalizer to
+the primitive object inside the box (e.g. @MutVar#@ in the case of
+@IORef@), because attaching the finalizer to the box itself fails when
+the outer box is optimised away by the compiler.
 
 -}
 data Weak v = Weak (Weak# v)
