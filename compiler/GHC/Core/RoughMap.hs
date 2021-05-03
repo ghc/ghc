@@ -48,6 +48,10 @@ data RoughMatchTc
   | OtherTc        -- e.g. type variable at the head
   deriving( Data )
 
+instance Outputable RoughMatchTc where
+    ppr (KnownTc nm) = text "KnownTc" <+> ppr nm
+    ppr OtherTc = text "OtherTc"
+
 isRoughOtherTc :: RoughMatchTc -> Bool
 isRoughOtherTc OtherTc      = True
 isRoughOtherTc (KnownTc {}) = False
