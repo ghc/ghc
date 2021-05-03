@@ -692,7 +692,6 @@ hscIncrementalFrontend :: Bool -- always do basic recompilation check?
                        -> Maybe TcGblEnv
                        -> Maybe Messager
                        -> ModSummary
-                       -> SourceModified
                        -> Maybe Linkable
                        -> Maybe ModIface  -- Old interface, if available
                        -> (Int,Int)       -- (i,n) = module i of n (for msgs)
@@ -700,7 +699,7 @@ hscIncrementalFrontend :: Bool -- always do basic recompilation check?
 
 hscIncrementalFrontend
   always_do_basic_recompilation_check m_tc_result
-  mHscMessage mod_summary source_modified old_linkable mb_old_iface mod_index
+  mHscMessage mod_summary old_linkable mb_old_iface mod_index
     = do
     hsc_env <- getHscEnv
 
@@ -733,8 +732,7 @@ hscIncrementalFrontend
             -- source file.
             (recomp_iface_reqd, mb_checked_iface)
                 <- {-# SCC "checkOldIface" #-}
-                   liftIO $ checkOldIface hsc_env mod_summary
-                                source_modified mb_old_iface
+                   liftIO $ checkOldIface hsc_env mod_summary mb_old_iface
 
             -- Check to see whether the expected build products already exist.
             -- If they don't exists then we trigger recompilation.
@@ -748,9 +746,9 @@ hscIncrementalFrontend
                       res <- liftIO $ checkByteCode old_linkable
                       case res of
                         (_, Just{}) -> return res
-                        _ -> liftIO $ checkObjects old_linkable mod_summary
+                        _ -> liftIO $ checkObjects lcl_dflags old_linkable mod_summary
                   -- Need object files for making object files
-                  | backendProducesObject (backend lcl_dflags) -> liftIO $ checkObjects old_linkable mod_summary
+                  | backendProducesObject (backend lcl_dflags) -> liftIO $ checkObjects lcl_dflags old_linkable mod_summary
                   | otherwise -> pprPanic "hscIncrementalFrontend" (text $ show $ backend lcl_dflags)
 
 
@@ -772,15 +770,21 @@ hscIncrementalFrontend
 
 -- | Check that the .o files produced by compilation are already up-to-date
 -- or not.
-checkObjects :: Maybe Linkable -> ModSummary -> IO (RecompileRequired, Maybe Linkable)
-checkObjects mb_old_linkable summary =
+checkObjects :: DynFlags -> Maybe Linkable -> ModSummary -> IO (RecompileRequired, Maybe Linkable)
+checkObjects dflags mb_old_linkable summary = do
+  dt_state <- dynamicTooState dflags
   let
     this_mod    = ms_mod summary
     mb_obj_date = ms_obj_date summary
     mb_if_date  = ms_iface_date summary
     obj_fn      = ml_obj_file (ms_location summary)
-  in do
-    case (,) <$> mb_obj_date <*> mb_if_date of
+    -- dynamic-too *also* produces the dyn_o_file, so have to check
+    -- that's there, and if it's not, regenerate both .o and
+    -- .dyn_o
+    dyn_o_file = case dt_state of
+                    DT_OK -> Just (dynamicOutputFile dflags obj_fn)
+                    _ -> Nothing
+  case (,) <$> mb_obj_date <*> mb_if_date of
       Just (obj_date, if_date)
         | obj_date >= if_date ->
             case mb_old_linkable of
@@ -801,6 +805,31 @@ checkByteCode mb_old_linkable =
       -> return $ (UpToDate, Just old_linkable)
     _ -> return $ (MustCompile, Nothing)
 
+{-
+        source_unchanged <- liftIO $ do {
+          -- SourceModified unconditionally if
+          --      (a) recompilation checker is off, or
+          --      (b) we aren't going all the way to .o file (e.g. ghc -S)
+          ; if not (isStopLn stop) then return SourceModified else do {
+          -- Otherwise look at timestamps and hashes. See
+          -- Note [When source is considered modified]
+          ; if isNothing hi_date then return SourceModified else do {
+          ; hi_timestamp <- getModificationUTCTime hi_file
+--          ; prev_hash_matches <- doesIfaceHashMatch hsc_env' mod_summary
+--          ; if not prev_hash_matches then return SourceModified else do {
+          ; o_file_mod <- if writeInterfaceOnlyMode dflags
+                            then return False
+                            else sourceModified o_file hi_timestamp
+          ; if o_file_mod then return SourceModified else do {
+          ; dyn_file_mod  <- traverse (flip sourceModified hi_timestamp) dyn_o_file
+          ; if fromMaybe False dyn_file_mod then return SourceModified else do {
+          ; hie_file_mod <- if gopt Opt_WriteHie dflags
+                              then sourceModified hie_file hi_timestamp
+                              else pure False
+          ; if hie_file_mod then return SourceModified else do {
+          ; return SourceUnmodified
+          }}}}}}
+          -}
 
 --------------------------------------------------------------
 -- Compilers
@@ -816,13 +845,12 @@ hscIncrementalCompile :: Bool
                       -> Maybe Messager
                       -> HscEnv
                       -> ModSummary
-                      -> SourceModified
                       -> Maybe Linkable
                       -> Maybe ModIface
                       -> (Int,Int)
                       -> IO (HscStatus, HscEnv)
 hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
-    mHscMessage hsc_env' mod_summary source_modified old_linkable mb_old_iface mod_index
+    mHscMessage hsc_env' mod_summary old_linkable mb_old_iface mod_index
   = do
     hsc_env'' <- initializePlugins hsc_env'
 
@@ -842,7 +870,7 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
     -- because the desugarer runs ioMsgMaybe.)
     runHsc hsc_env $ do
     e <- hscIncrementalFrontend always_do_basic_recompilation_check m_tc_result mHscMessage
-            mod_summary source_modified old_linkable mb_old_iface mod_index
+            mod_summary old_linkable mb_old_iface mod_index
     case e of
         -- We didn't need to do any typechecking; the old interface
         -- file on disk was good enough.

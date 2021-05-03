@@ -200,7 +200,7 @@ compileOne' m_tc_result mHscMessage
    (status, plugin_hsc_env) <- hscIncrementalCompile
                         always_do_basic_recompilation_check
                         m_tc_result mHscMessage
-                        hsc_env summary source_modified mb_old_linkable mb_old_iface (mod_index, nmods)
+                        hsc_env summary mb_old_linkable mb_old_iface (mod_index, nmods)
    -- Use an HscEnv updated with the plugin info
    let hsc_env' = plugin_hsc_env
 
@@ -350,20 +350,11 @@ compileOne' m_tc_result mHscMessage
          -- was set), force it to generate byte-code. This is NOT transitive and
          -- only applies to direct targets.
          | loadAsByteCode
-         = (Interpreter, dflags2 { backend = Interpreter })
+         = (Interpreter, gopt_set (dflags2 { backend = Interpreter }) Opt_ForceRecomp)
          | otherwise
          = (backend dflags, dflags2)
        dflags  = dflags3 { includePaths = addQuoteInclude old_paths [current_dir] }
        hsc_env = hsc_env0 {hsc_dflags = dflags}
-
-       -- -fforce-recomp should also work with --make
-       force_recomp = gopt Opt_ForceRecomp dflags
-       source_modified
-         -- #8042: Usually pre-compiled code is preferred to be loaded in ghci
-         -- if available. So, if the "*" prefix was used, force recompilation
-         -- to make sure byte-code is loaded.
-         | force_recomp || loadAsByteCode = SourceModified
-         | otherwise = SourceUnmodified
 
        always_do_basic_recompilation_check = case bcknd of
                                              Interpreter -> True
@@ -1263,16 +1254,7 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
   -- the object file for one module.)
   -- Note the nasty duplication with the same computation in compileFile above
         location <- getLocation src_flavour mod_name
-        dt_state <- dynamicTooState dflags
         let o_file = ml_obj_file location -- The real object file
-            -- dynamic-too *also* produces the dyn_o_file, so have to check
-            -- that's there, and if it's not, regenerate both .o and
-            -- .dyn_o
-            dyn_o_file = case dt_state of
-                           DT_OK
-                            | not (writeInterfaceOnlyMode dflags)
-                              -> Just (dynamicOutputFile dflags o_file)
-                           _ -> Nothing
             hi_file = ml_hi_file location
             hie_file = ml_hie_file location
 
@@ -1285,6 +1267,7 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
   -- date wrt M.hs (or M.o/dyn_o doesn't exist) so we must recompile regardless.
         src_hash <- liftIO $ getFileHash (basename <.> suff)
         hi_date <- liftIO $ modificationTimeIfExists hi_file
+        hie_date <- liftIO $ modificationTimeIfExists hie_file
 
         PipeState{hsc_env=hsc_env'} <- getPipeState
 
@@ -1308,39 +1291,16 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
                                         ms_obj_date  = o_mod,
                                         ms_parsed_mod   = Nothing,
                                         ms_iface_date   = hi_date,
-                                        ms_hie_date     = Nothing,
+                                        ms_hie_date     = hie_date,
                                         ms_textual_imps = imps,
                                         ms_srcimps      = src_imps }
 
-        source_unchanged <- liftIO $ do {
-          -- SourceModified unconditionally if
-          --      (a) recompilation checker is off, or
-          --      (b) we aren't going all the way to .o file (e.g. ghc -S)
-          ; if not (isStopLn stop) then return SourceModified else do {
-          -- Otherwise look at timestamps and hashes. See
-          -- Note [When source is considered modified]
-          ; if isNothing hi_date then return SourceModified else do {
-          ; hi_timestamp <- getModificationUTCTime hi_file
---          ; prev_hash_matches <- doesIfaceHashMatch hsc_env' mod_summary
---          ; if not prev_hash_matches then return SourceModified else do {
-          ; o_file_mod <- if writeInterfaceOnlyMode dflags
-                            then return False
-                            else sourceModified o_file hi_timestamp
-          ; if o_file_mod then return SourceModified else do {
-          ; dyn_file_mod  <- traverse (flip sourceModified hi_timestamp) dyn_o_file
-          ; if fromMaybe False dyn_file_mod then return SourceModified else do {
-          ; hie_file_mod <- if gopt Opt_WriteHie dflags
-                              then sourceModified hie_file hi_timestamp
-                              else pure False
-          ; if hie_file_mod then return SourceModified else do {
-          ; return SourceUnmodified
-          }}}}}}
 
   -- run the compiler!
         let msg hsc_env _ what _ = oneShotMsg hsc_env what
         (result, plugin_hsc_env) <-
           liftIO $ hscIncrementalCompile True Nothing (Just msg) hsc_env'
-                            mod_summary source_unchanged Nothing Nothing (1,1)
+                            mod_summary Nothing Nothing (1,1)
 
         -- In the rest of the pipeline use the loaded plugins
         setPlugins (hsc_plugins        plugin_hsc_env)
@@ -2110,23 +2070,6 @@ joinObjectFiles logger tmpfs dflags o_files output_fn = do
 -- -----------------------------------------------------------------------------
 -- Misc.
 
-
--- | Figure out if the .hi file was modified after some other output file
--- corresponding to that source file (or if we anyways need to consider the
--- source file modified since the output is gone).
--- Note that this function is making use of a couple of assumptions:
---  1. a .hi file is always written if any other output file is written
---  2. the .hi file for a particular module is always written before any other
---     output files (.o, .hie) for that module
-sourceModified :: FilePath -- ^ destination file we are looking for
-               -> UTCTime  -- ^ last time of modification of corresponding .hi file
-               -> IO Bool  -- ^ do we need to regenerate the output?
-sourceModified dest_file hi_timestamp = do
-  dest_file_exists <- doesFileExist dest_file
-  if not dest_file_exists
-    then return True       -- Need to recompile
-     else do t2 <- getModificationUTCTime dest_file
-             return (t2 < hi_timestamp)
 
 getModTime :: FilePath -> IO (Maybe UTCTime)
 getModTime dest_file = do

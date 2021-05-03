@@ -51,7 +51,6 @@ import GHC.Types.SrcLoc
 import GHC.Types.Unique
 import GHC.Types.Unique.Set
 import GHC.Types.Fixity.Env
-import GHC.Types.SourceFile
 
 import GHC.Unit.External
 import GHC.Unit.Finder
@@ -136,11 +135,10 @@ recompileRequired _ = True
 checkOldIface
   :: HscEnv
   -> ModSummary
-  -> SourceModified
   -> Maybe ModIface         -- Old interface from compilation manager, if any
   -> IO (RecompileRequired, Maybe ModIface)
 
-checkOldIface hsc_env mod_summary source_modified maybe_iface
+checkOldIface hsc_env mod_summary maybe_iface
   = do  let dflags = hsc_dflags hsc_env
         let logger = hsc_logger hsc_env
         showPass logger dflags $
@@ -148,16 +146,15 @@ checkOldIface hsc_env mod_summary source_modified maybe_iface
               (showPpr dflags $ ms_mod mod_summary) ++
               " (use -ddump-hi-diffs for more details)"
         initIfaceCheck (text "checkOldIface") hsc_env $
-            check_old_iface hsc_env mod_summary source_modified maybe_iface
+            check_old_iface hsc_env mod_summary maybe_iface
 
 check_old_iface
   :: HscEnv
   -> ModSummary
-  -> SourceModified
   -> Maybe ModIface
   -> IfG (RecompileRequired, Maybe ModIface)
 
-check_old_iface hsc_env mod_summary src_modified maybe_iface
+check_old_iface hsc_env mod_summary maybe_iface
   = let dflags = hsc_dflags hsc_env
         logger = hsc_logger hsc_env
         getIface =
@@ -183,7 +180,6 @@ check_old_iface hsc_env mod_summary src_modified maybe_iface
 
         src_changed
             | gopt Opt_ForceRecomp dflags    = True
-            | SourceModified <- src_modified = True
             | otherwise = False
     in do
         when src_changed $
