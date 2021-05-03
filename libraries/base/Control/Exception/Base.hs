@@ -105,9 +105,7 @@ import           GHC.Exception
 import           GHC.IO           hiding (bracket, finally, onException)
 import           GHC.IO.Exception
 import           GHC.Show
--- import GHC.Exception hiding ( Exception )
 import           GHC.Conc.Sync
-import           GHC.Magic
 
 import           Data.Either
 

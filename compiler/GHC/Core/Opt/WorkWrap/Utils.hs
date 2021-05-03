@@ -1006,7 +1006,6 @@ mk_absent_let opts arg
   -- The lifted case: Bind 'absentError' for a nice panic message if we are
   -- wrong (like we were in #11126). See (1) in Note [Absent fillers]
   | Just [LiftedRep] <- mb_mono_prim_reps
-  , pprTrace "mk_absent_let"
   , not (isStrictDmd (idDemandInfo arg)) -- See (2) in Note [Absent fillers]
   = Just (Let (NonRec arg panic_rhs))
 
@@ -1027,11 +1026,10 @@ mk_absent_let opts arg
     panic_rhs = mkAbsentErrorApp arg_ty msg
 
     msg = renderWithContext
-            (defaultSDocContext { sdocSuppressUniques = False })
+            (defaultSDocContext { sdocSuppressUniques = True })
             (vcat
               [ text "Arg:" <+> ppr arg
               , text "Type:" <+> ppr arg_ty
-              , text "Id:" <+> ppr arg
               , file_msg ])
               -- We need to suppress uniques here because otherwise they'd
               -- end up in the generated code as strings. This is bad for

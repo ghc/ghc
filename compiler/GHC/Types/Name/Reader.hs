@@ -4,7 +4,6 @@
 -}
 
 {-# LANGUAGE CPP, DeriveDataTypeable #-}
-{-# OPTIONS_GHC -ddump-simpl #-}
 
 -- |
 -- #name_types#
@@ -101,7 +100,6 @@ import GHC.Types.Name.Env
 import Data.Data
 import Data.List( sortBy )
 
-foo = undefined
 {-
 ************************************************************************
 *                                                                      *
