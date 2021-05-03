@@ -46,6 +46,7 @@ import GHC.Parser.Annotation
 
 -- others:
 import GHC.Tc.Types.Evidence
+import GHC.Core.DataCon (FieldLabelString)
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Basic
@@ -1837,6 +1838,8 @@ type instance Anno (HsSplice (GhcPass p)) = SrcSpanAnnA
 
 type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsExpr (GhcPass pr))))] = SrcSpanAnnL
 type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsCmd  (GhcPass pr))))] = SrcSpanAnnL
+
+type instance Anno FieldLabelString = SrcSpan
 
 instance (Anno a ~ SrcSpanAnn' (EpAnn an))
    => WrapXRec (GhcPass p) a where
