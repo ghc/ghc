@@ -207,7 +207,7 @@ cgRhs :: Id
                                   -- (see above)
                )
 
-cgRhs id (StgRhsCon _ext cc con mn _ts args)
+cgRhs id (StgRhsCon cc con mn _ts args)
   = withNewTickyCounterCon (idName id) con $
     buildDynCon id mn True cc con (assertNonVoidStgArgs args)
       -- con args are always non-void,

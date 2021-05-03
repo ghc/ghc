@@ -129,7 +129,7 @@ seqBinds (StgRec pairs)    = seqList (map (\v rhs -> v `seq` seqRhs rhs) pairs) 
 
 -- For top level lets we have to turn lets into closures.
 seqRhs :: GenStgRhs p -> ()
-seqRhs (StgRhsCon !_x !_ccs !_con !_n ticks args)   = seqArgs args `seq` seqList ticks ()
+seqRhs (StgRhsCon !_ccs !_con !_n ticks args)   = seqArgs args `seq` seqList ticks ()
 seqRhs (StgRhsClosure !_ext !_ccs !_flag args body) = seqExpr body `seq` seqList args ()
 
 seqExpr :: GenStgExpr p -> ()
@@ -137,7 +137,7 @@ seqExpr (StgCase scrut !_bndr !_ty alts) = seqList (map seqAlt alts) (seqExpr sc
 seqExpr (StgLet !_x binds body)         = (seqBinds binds) `seq` (seqExpr body)
 seqExpr (StgLetNoEscape !_x binds body) = (seqBinds binds) `seq` (seqExpr body)
 seqExpr (StgTick !_t e)                 = seqExpr e
-seqExpr (StgConApp !_x !_con !_n args _tys) = seqArgs args
+seqExpr (StgConApp !_con !_n args _tys) = seqArgs args
 
 seqExpr (StgApp !_x !_f args)           = seqArgs args
 seqExpr (StgLit !_lit)                  = ()

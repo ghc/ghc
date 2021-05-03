@@ -116,7 +116,7 @@ cgExpr (StgOpApp (StgPrimOp DataToTagOp) [StgVarArg a] _res_ty) = do
 
 
 cgExpr (StgOpApp op args ty) = cgOpApp op args ty
-cgExpr (StgConApp _ext con mn args _) = cgConApp con mn args
+cgExpr (StgConApp con mn args _) = cgConApp con mn args
 cgExpr (StgTick t e)         = cgTick t >> cgExpr e
 cgExpr (StgLit lit)          = do cmm_expr <- cgLit lit
                                   emitReturn [cmm_expr]
@@ -191,9 +191,9 @@ cgLetNoEscapeRhsBody
     -> FCode (CgIdInfo, FCode ())
 cgLetNoEscapeRhsBody local_cc bndr (StgRhsClosure _ cc _upd args body)
   = cgLetNoEscapeClosure bndr local_cc cc (nonVoidIds args) body
-cgLetNoEscapeRhsBody local_cc bndr (StgRhsCon ext cc con mn _ts args)
+cgLetNoEscapeRhsBody local_cc bndr (StgRhsCon cc con mn _ts args)
   = cgLetNoEscapeClosure bndr local_cc cc []
-      (StgConApp ext con mn args (pprPanic "cgLetNoEscapeRhsBody" $
+      (StgConApp con mn args (pprPanic "cgLetNoEscapeRhsBody" $
                            text "StgRhsCon doesn't have type args"))
         -- For a constructor RHS we want to generate a single chunk of
         -- code which can be jumped to from many places, which will

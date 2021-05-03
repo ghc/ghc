@@ -78,10 +78,9 @@ inferTagExpr env (StgApp _ext fun args)
          | otherwise
          = TagDunno
 
-inferTagExpr env (StgConApp ext con cn args tys)
-  = (info, StgConApp ext' con cn args tys)
+inferTagExpr env (StgConApp con cn args tys)
+  = (info, StgConApp con cn args tys)
   where
-    ext' = case te_ext env of ExtEqEv -> ext
     info | isUnboxedTupleDataCon con
          = TagTuple (map (lookupInfo env) args)
          | otherwise
@@ -124,7 +123,7 @@ inferTagExpr env (StgCase scrut bndr ty alts)
         (info, rhs') = inferTagExpr alt_env rhs
   = (info, StgCase scrut' (noSig env bndr) ty [(DataAlt con, bndrs', rhs')])
   | null alts -- Empty case, but I might just be paranoid.
-  = (TagDunno, StgCase scrut bndr ty alts)
+  = (TagDunno, StgCase scrut' bndr' ty [])
   | otherwise
   = ( foldr combineAltInfo TagProper infos
     , StgCase scrut' bndr' ty alts')
@@ -206,7 +205,7 @@ inferTagRhs _top _grp_ids env (StgRhsClosure ext cc upd bndrs body)
       | otherwise  = info
     bndrs' = map (noSig env) bndrs
 
-inferTagRhs top grp_ids env (StgRhsCon _ext cc con cn ticks args)
+inferTagRhs top grp_ids env (StgRhsCon cc con cn ticks args)
 -- Top level constructors, which have untagged arguments to strict fields
 -- become thunks. Same goes for rhs which are part of a recursive group.
 -- We encode this by giving changing RhsCon nodes the info TagDunno
@@ -216,7 +215,7 @@ inferTagRhs top grp_ids env (StgRhsCon _ext cc con cn ticks args)
         strictUntaggedIds = [v | StgVarArg v <- strictArgs
                             , lookupInfo env (StgVarArg v) /= TagProper] :: [Id]
 
-        mkResult x = (TagSig 0 x, StgRhsCon noExtFieldSilent cc con cn ticks args)
+        mkResult x = (TagSig 0 x, StgRhsCon cc con cn ticks args)
     in case () of
           -- All fields tagged or non-strict
         _ | null strictUntaggedIds -> mkResult TagProper

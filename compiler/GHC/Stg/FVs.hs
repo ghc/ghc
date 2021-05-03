@@ -84,12 +84,9 @@ type FVPass i o = (BinderP i ~ Id,
 
                    -- The RhsClosure extension will contain the free variables afterwards
                    XRhsClosure o ~ DIdSet,
-                   XRhsCon i ~ XRhsCon o,
                    XLet i ~ XLet o,
                    XLetNoEscape i ~ XLetNoEscape o,
-                   XStgConApp i ~ XStgConApp o,
-                  --  XStgCase i ~ XStgCase o,
-                  XStgApp i ~ XStgApp o
+                   XStgApp i ~ XStgApp o
                   )
 
 emptyEnv :: Env
@@ -159,7 +156,7 @@ expr env = go
     go (StgApp ext occ as)
       = (StgApp ext occ as, unionDVarSet (args env as) (mkFreeVarSet env [occ]))
     go (StgLit lit) = (StgLit lit, emptyDVarSet)
-    go (StgConApp ext dc n as tys) = (StgConApp ext dc n as tys, args env as)
+    go (StgConApp dc n as tys) = (StgConApp dc n as tys, args env as)
     go (StgOpApp op as ty) = (StgOpApp op as ty, args env as)
     go (StgCase scrut bndr ty alts) = (StgCase scrut' bndr ty alts', fvs)
       where
@@ -191,7 +188,7 @@ rhs env (StgRhsClosure _ ccs uf bndrs body)
     -- See Note [Tracking local binders]
     (body', body_fvs) = expr (addLocals bndrs env) body
     fvs = delDVarSetList body_fvs bndrs
-rhs env (StgRhsCon ext ccs dc mu ts as) = (StgRhsCon ext ccs dc mu ts as, args env as)
+rhs env (StgRhsCon ccs dc mu ts as) = (StgRhsCon ccs dc mu ts as, args env as)
 
 alt :: FVPass i o => Env -> GenStgAlt i -> (GenStgAlt o, DIdSet)
 alt env (con, bndrs, e) = ((con, bndrs, e'), fvs)

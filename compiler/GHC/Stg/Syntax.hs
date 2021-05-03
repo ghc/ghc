@@ -25,8 +25,7 @@ module GHC.Stg.Syntax (
         GenStgTopBinding(..), GenStgBinding(..), GenStgExpr(..), GenStgRhs(..),
         GenStgAlt, AltType(..),
 
-        StgPass(..), BinderP, XRhsClosure, XRhsCon, XLet, XLetNoEscape, XStgApp,
-        XStgConApp,
+        StgPass(..), BinderP, XRhsClosure, XLet, XLetNoEscape, XStgApp,
         NoExtFieldSilent, noExtFieldSilent, AppEnters(..), noEnterInfo,
 
         OutputablePass,
@@ -245,8 +244,7 @@ literals.
 
         -- StgConApp is vital for returning unboxed tuples or sums
         -- which can't be let-bound
-  | StgConApp   (XStgConApp pass)
-                DataCon
+  | StgConApp   DataCon
                 ConstructorNumber
                 [StgArg] -- Saturated
                 [Type]   -- See Note [Types in StgConApp] in GHC.Stg.Unarise
@@ -415,7 +413,6 @@ important):
 -}
 
   | StgRhsCon
-        (XRhsCon pass)
         CostCentreStack -- CCS to be attached (default is CurrentCCS).
                         -- Top-level (static) ones will end up with
                         -- DontCareCCS, because we don't count static
@@ -628,11 +625,6 @@ type instance XRhsClosure 'InferTagged = NoExtFieldSilent
 -- | Code gen needs to track non-global free vars
 type instance XRhsClosure 'CodeGen = DIdSet
 
-type family XRhsCon (pass :: StgPass)
-type instance XRhsCon 'Vanilla = NoExtFieldSilent
-type instance XRhsCon 'InferTagged = NoExtFieldSilent
-type instance XRhsCon 'CodeGen = NoExtFieldSilent
-
 type family XLet (pass :: StgPass)
 type instance XLet 'Vanilla = NoExtFieldSilent
 type instance XLet 'InferTagged = NoExtFieldSilent
@@ -649,13 +641,6 @@ type family XStgApp (pass :: StgPass)
 type instance XStgApp 'Vanilla = AppEnters
 type instance XStgApp 'InferTagged = AppEnters
 type instance XStgApp 'CodeGen = AppEnters
-
-type family XStgConApp (pass :: StgPass)
-type instance XStgConApp 'Vanilla = NoExtFieldSilent
-type instance XStgConApp 'InferTagged = NoExtFieldSilent
-type instance XStgConApp 'CodeGen = NoExtFieldSilent
-
-
 
 {-
 
@@ -723,10 +708,8 @@ type OutputablePass pass =
   ( Outputable (XLet pass)
   , Outputable (XLetNoEscape pass)
   , Outputable (XRhsClosure pass)
-  , Outputable (XRhsCon pass)
   , OutputableBndr (BinderP pass)
   , Outputable (XStgApp pass)
-  , Outputable (XStgConApp pass)
   )
 
 -- | STG pretty-printing options
@@ -796,7 +779,7 @@ pprStgExpr opts e = case e of
    StgLit lit           -> ppr lit
                            -- general case
    StgApp ext func args     -> hang (ppr func <> ppr ext) 4 (interppSP args)
-   StgConApp ext con n args _ -> hsep [ ppr con, ppr ext, ppr n, brackets (interppSP args) ]
+   StgConApp con n args _ -> hsep [ ppr con, ppr n, brackets (interppSP args) ]
    StgOpApp op args _   -> hsep [ pprStgOp op, brackets (interppSP args)]
 
 -- special case: let v = <very specific thing>
@@ -900,8 +883,8 @@ pprStgRhs opts rhs = case rhs of
                     ])
               4 (pprStgExpr opts body)
 
-   StgRhsCon ext cc con mid _ticks args
-      -> hcat [ ppr cc, space, ppr ext, space
+   StgRhsCon cc con mid _ticks args
+      -> hcat [ ppr cc, space, space
               , case mid of
                   NoNumber -> empty
                   Numbered n -> hcat [ppr n, space]

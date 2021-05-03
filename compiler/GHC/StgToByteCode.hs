@@ -472,7 +472,7 @@ schemeR fvs (nm, rhs)
 
 collect :: CgStgRhs -> ([Var], CgStgExpr)
 collect (StgRhsClosure _ _ _ args body) = (args, body)
-collect (StgRhsCon ext _cc dc cnum _ticks args) = ([], StgConApp ext dc cnum args [])
+collect (StgRhsCon _cc dc cnum _ticks args) = ([], StgConApp dc cnum args [])
 
 schemeR_wrk
     :: [Id]
@@ -656,7 +656,7 @@ schemeE d s p e@(StgOpApp {}) = schemeT d s p e
 schemeE d s p (StgLetNoEscape xlet bnd body)
    = schemeE d s p (StgLet xlet bnd body)
 schemeE d s p (StgLet _xlet
-                      (StgNonRec x (StgRhsCon _ext _cc data_con _cnum _ticks args))
+                      (StgNonRec x (StgRhsCon _cc data_con _cnum _ticks args))
                       body)
    = do -- Special case for a non-recursive let whose RHS is a
         -- saturated constructor application.
@@ -876,7 +876,7 @@ schemeT _d _s _p (StgOpApp StgPrimCallOp{} _args _ty)
    = unsupportedCConvException
 
    -- Case 2: Unboxed tuple
-schemeT d s p (StgConApp _ext con _cn args _tys)
+schemeT d s p (StgConApp con _cn args _tys)
    | isUnboxedTupleDataCon con || isUnboxedSumDataCon con
    = returnUnboxedTuple d s p args
 

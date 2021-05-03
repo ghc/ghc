@@ -250,7 +250,7 @@ rewriteBinds b@(StgRec binds) =
 -- Rewrite a RHS, the rewriteFlag tells us weither or not the RHS is in a context in which
 -- we can avoid turning the RhsCon into a closure. (e.g. for top level bindings)
 rewriteRhs :: (Id,TagSig) -> InferStgRhs -> RM (TgStgRhs, TgStgExpr -> TgStgExpr)
-rewriteRhs (_id, tagSig) (StgRhsCon (_node_id) ccs con cn ticks args) = {-# SCC rewriteRhs_ #-} do
+rewriteRhs (_id, tagSig) (StgRhsCon ccs con cn ticks args) = {-# SCC rewriteRhs_ #-} do
     -- pprTraceM "rewriteRhs" (ppr _id)
 
     -- Look up the nodes representing the constructor arguments.
@@ -266,7 +266,7 @@ rewriteRhs (_id, tagSig) (StgRhsCon (_node_id) ccs con cn ticks args) = {-# SCC 
     let evalArgs = [v | StgVarArg v <- needsEval] :: [Id]
 
     if (null evalArgs)
-        then return $! (StgRhsCon noExtFieldSilent ccs con cn ticks args, id)
+        then return $! (StgRhsCon ccs con cn ticks args, id)
         else do
             -- pprTraceM "CreatingSeqs for " $ ppr _id <+> ppr node_id
 
@@ -289,7 +289,7 @@ rewriteRhs (_id, tagSig) (StgRhsCon (_node_id) ccs con cn ticks args) = {-# SCC 
                     return $! (StgRhsClosure noExtFieldSilent ccs ReEntrant [] $! conExpr, id)
                 else do -- Return a case expression that will evaluate the arguments.
                     let evalExpr expr = foldr (\(v, vEvald) e -> mkSeq v vEvald e) expr varMap
-                    return $! ((StgRhsCon noExtFieldSilent ccs con cn ticks evaldConArgs), evalExpr)
+                    return $! ((StgRhsCon ccs con cn ticks evaldConArgs), evalExpr)
 rewriteRhs _binding (StgRhsClosure ext ccs flag args body) = do
     -- mapM_ addBinder  args
     withBinders args $ do
@@ -343,10 +343,9 @@ rewriteLetNoEscape (StgLetNoEscape xt bind expr) = do
 rewriteLetNoEscape _ = panic "Impossible"
 
 rewriteConApp :: InferStgExpr -> RM TgStgExpr
-rewriteConApp (StgConApp _nodeId con cn args tys) = do
-    -- node <- getNode nodeId
-    -- We look at the INPUT because the output of this node will always have tagged
-    -- strict fields in the end.
+rewriteConApp (StgConApp con cn args tys) = do
+    -- We check if the strict field arguments are already known to be tagged.
+    -- If not we evaluate them first.
     fieldInfos <- mapM isArgTagged args
     let strictIndices = getStrictConArgs con (zip fieldInfos args) :: [(Bool, StgArg)]
     let needsEval = map snd . filter (not . fst) $ strictIndices :: [StgArg]
@@ -355,7 +354,7 @@ rewriteConApp (StgConApp _nodeId con cn args tys) = do
         then do
             -- pprTraceM "Creating conAppSeqs for " $ ppr nodeId <+> parens ( ppr evalArgs ) -- <+> parens ( ppr fieldInfos )
             mkSeqs evalArgs con cn args tys
-        else return $! (StgConApp noExtFieldSilent con cn args tys)
+        else return $! (StgConApp con cn args tys)
 
 rewriteConApp _ = panic "Impossible"
 
@@ -396,6 +395,6 @@ mkSeqs untaggedIds con cn args tys = do
                         lit -> lit)
                     args
 
-    let conBody = StgConApp noExtFieldSilent con cn taggedArgs tys
+    let conBody = StgConApp con cn taggedArgs tys
     let body = foldr (\(v,bndr) expr -> mkSeq v bndr expr) conBody argMap
     return $! body

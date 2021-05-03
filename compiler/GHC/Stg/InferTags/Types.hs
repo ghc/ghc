@@ -29,12 +29,10 @@ import GHC.Utils.Misc( zipWithEqual )
 ********************************************************************* -}
 
 type instance BinderP 'InferTaggedBinders = (Id, TagSig)
-type instance XStgConApp   'InferTaggedBinders = XStgConApp   'Vanilla
 type instance XLet         'InferTaggedBinders = XLet         'Vanilla
 type instance XLetNoEscape 'InferTaggedBinders = XLetNoEscape 'Vanilla
 type instance XRhsClosure  'InferTaggedBinders = XRhsClosure  'Vanilla
 type instance XStgApp      'InferTaggedBinders = XStgApp      'Vanilla
-type instance XRhsCon      'InferTaggedBinders = XRhsCon      'Vanilla
 
 type InferStgTopBinding = GenStgTopBinding 'InferTaggedBinders
 type InferStgBinding    = GenStgBinding    'InferTaggedBinders
@@ -68,7 +66,7 @@ combineAltInfo (TagTuple is1)   (TagTuple is2) = TagTuple (zipWithEqual "combine
 type TagSigEnv = IdEnv TagSig
 data TagEnv p = TE { te_env :: TagSigEnv
                    , te_get :: BinderP p -> Id
-                   , te_ext :: ExtEqEv (XStgConApp p) (XLet p)
+                   , te_ext :: ExtEqEv (XLet p)
                                        (XLetNoEscape p) (XRhsClosure p) }
 
 instance Outputable (TagEnv p) where
@@ -81,8 +79,8 @@ getBinderId = te_get
 -- This tiresome value is a proof that the extension fields
 -- have the same type in pass p as in pass Tagged
 -- ToDo: write a Note to explain properly
-data ExtEqEv a b c d where
-  ExtEqEv :: ExtEqEv (XStgConApp 'InferTaggedBinders) (XLet 'InferTaggedBinders)
+data ExtEqEv b c d where
+  ExtEqEv :: ExtEqEv (XLet 'InferTaggedBinders)
                      (XLetNoEscape 'InferTaggedBinders) (XRhsClosure 'InferTaggedBinders)
 
 initEnv :: TagEnv 'Vanilla
