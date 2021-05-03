@@ -209,6 +209,37 @@ compileOne' m_tc_result mHscMessage
             source_modified0
  = do
 
+   (plugin_hsc_env, source_modified) <- compileOneInit hsc_env0 summary source_modified0
+
+   let runPostTc = compileOnePostTc plugin_hsc_env summary
+       always_do_basic_recompilation_check = case (backend $ hsc_dflags plugin_hsc_env) of
+                                             Interpreter -> True
+                                             _ -> False
+
+   case m_tc_result of
+     Just tc_result
+       | not always_do_basic_recompilation_check -> do
+         runPostTc (FrontendTypecheck tc_result) emptyMessages Nothing
+     _ -> do
+       status <- hscRecompStatus mHscMessage plugin_hsc_env summary
+            source_modified mb_old_iface (mod_index, nmods)
+
+       case status of
+         HscUpToDate iface -> do
+           MASSERT( isJust mb_old_linkable || isNoLink (ghcLink $ hsc_dflags plugin_hsc_env) )
+           -- See Note [ModDetails and --make mode]
+           details <- initModDetails plugin_hsc_env summary iface
+           return $! HomeModInfo iface details mb_old_linkable
+         HscRecompNeeded mb_old_hash -> do
+           (tc_result, warnings) <- hscTypecheckAndGetWarnings plugin_hsc_env summary
+           runPostTc tc_result warnings mb_old_hash
+
+-- | Do the initialization steps needed before beginning the compilation
+compileOneInit :: HscEnv -> ModSummary -> SourceModified -> IO (HscEnv, SourceModified)
+compileOneInit
+  hsc_env0 summary source_modified0
+ = do
+
    debugTraceMsg logger dflags0 2 (text "compile: input file" <+> text input_fnpp)
 
    let (hsc_env, source_modified) = fixHscEnv hsc_env0 summary source_modified0
@@ -223,34 +254,12 @@ compileOne' m_tc_result mHscMessage
 
    plugin_hsc_env <- initializePlugins hsc_env
 
-   let runPostTc = compileOnePostTc plugin_hsc_env summary
-       always_do_basic_recompilation_check = case (backend $ hsc_dflags hsc_env) of
-                                             Interpreter -> True
-                                             _ -> False
-
-   case m_tc_result of
-     Just tc_result
-       | not always_do_basic_recompilation_check -> do
-         runPostTc (FrontendTypecheck tc_result) emptyMessages Nothing
-     _ -> do
-       status <- hscRecompStatus mHscMessage plugin_hsc_env summary
-            source_modified mb_old_iface (mod_index, nmods)
-
-       case status of
-         HscUpToDate iface -> do
-           MASSERT( isJust mb_old_linkable || isNoLink (ghcLink $ hsc_dflags hsc_env) )
-           -- See Note [ModDetails and --make mode]
-           details <- initModDetails plugin_hsc_env summary iface
-           return $! HomeModInfo iface details mb_old_linkable
-         HscRecompNeeded mb_old_hash -> do
-           (tc_result, warnings) <- hscTypecheckAndGetWarnings plugin_hsc_env summary
-           runPostTc tc_result warnings mb_old_hash
+   return (plugin_hsc_env, source_modified)
 
  where dflags0     = ms_hspp_opts summary
        input_fnpp  = ms_hspp_file summary
        logger = hsc_logger hsc_env0
        tmpfs  = hsc_tmpfs hsc_env0
-
 
 -- | Modifies the dflags in HscEnv with the current module's, and collection of
 -- various other fixes needed before beginning the compilation
