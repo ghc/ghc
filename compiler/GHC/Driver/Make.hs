@@ -1349,9 +1349,22 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags home_unit mHscMessag
             status <- checkStableModules hsc_env3 old_hpt stable_mods mod
             case status of
               Stable hmi -> return hmi
-              NotStable src_modified mb_old_iface mb_linkable ->
-                compileOne' Nothing mHscMessage hsc_env3 mod mod_index num_mods
-                             mb_old_iface mb_linkable src_modified
+              NotStable src_modified mb_old_iface mb_old_linkable -> do
+                (plugin_hsc_env, source_modified) <- compileOneInit hsc_env3 mod src_modified
+
+                status <- hscRecompStatus mHscMessage plugin_hsc_env mod
+                     source_modified mb_old_iface (mod_index, num_mods)
+
+                case status of
+                  HscUpToDate iface -> do
+                    MASSERT( isJust mb_old_linkable || isNoLink (ghcLink $ hsc_dflags plugin_hsc_env) )
+                    -- See Note [ModDetails and --make mode]
+                    details <- initModDetails plugin_hsc_env mod iface
+                    return $! HomeModInfo iface details mb_old_linkable
+                  HscRecompNeeded mb_old_hash -> do
+                    (tc_result, warnings) <- hscTypecheckAndGetWarnings plugin_hsc_env mod
+                    compileOnePostTc plugin_hsc_env mod tc_result warnings mb_old_hash
+
 
           -- Prune the old HPT unless this is an hs-boot module.
           unless (isBootSummary mod == IsBoot) $

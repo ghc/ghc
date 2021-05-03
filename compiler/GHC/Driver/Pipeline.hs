@@ -32,7 +32,8 @@ module GHC.Driver.Pipeline (
    hscPostBackendPhase, getLocation, setModLocation, setDynFlags,
    runPhase,
    doCpp,
-   linkingNeeded, checkLinkInfo, writeInterfaceOnlyMode
+   linkingNeeded, checkLinkInfo, writeInterfaceOnlyMode,
+   compileOneInit, compileOnePostTc
   ) where
 
 #include <ghcplatform.h>
