@@ -195,7 +195,7 @@ loadDependencies interp hsc_env pls span needed_mods = do
 
    -- Find what packages and linkables are required
    (lnks, pkgs) <- getLinkDeps hsc_env hpt (pkgs_loaded pls, objs_loaded pls, bcos_loaded pls)
-                               maybe_normal_osuf span needed_mods
+                               maybe_normal_osuf span needed_mods []
 
    -- Link the packages and modules required
    pls1 <- loadPackages' interp hsc_env pkgs pls

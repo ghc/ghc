@@ -114,14 +114,14 @@ mkUsedNames :: TcGblEnv -> NameSet
 mkUsedNames TcGblEnv{ tcg_dus = dus } = allUses dus
 
 mkUsageInfo :: HscEnv -> Module -> ImportedMods -> NameSet -> [FilePath]
-            -> [(Module, Fingerprint)] -> [ModIface] -> IO [Usage]
+            -> [(Module, Fingerprint)] -> [ModIface] -> [Module] -> [UnitId] ->  IO [Usage]
 mkUsageInfo hsc_env this_mod dir_imp_mods used_names dependent_files merged
-  pluginModules
+  pluginModules thModules thPackages
   = do
     eps <- hscEPS hsc_env
     hashes <- mapM getFileHash dependent_files
 --    plugin_usages <- mapM (mkPluginUsage hsc_env) pluginModules
-    plugin_usages <- mapM (mkPluginUsage2 hsc_env) pluginModules
+    plugin_usages <- mkPluginUsage2 hsc_env (map mi_module pluginModules ++ thModules) thPackages
     let mod_usages = mk_mod_usage_info (eps_PIT eps) hsc_env this_mod
                                        dir_imp_mods used_names
         usages = mod_usages ++ [ UsageFile { usg_file_path = f
@@ -132,7 +132,7 @@ mkUsageInfo hsc_env this_mod dir_imp_mods used_names dependent_files merged
                                       usg_mod_hash = hash
                                     }
                                | (mod, hash) <- merged ]
-                            ++ concat plugin_usages
+                            ++ plugin_usages
     usages `seqList` return usages
     -- seq the list of Usages returned: occasionally these
     -- don't get evaluated for a while and we can end up hanging on to
@@ -176,10 +176,9 @@ One way to improve this is to either:
     hashes is however potentially expensive.
 -}
 
-mkPluginUsage2 :: HscEnv -> ModIface -> IO [Usage]
-mkPluginUsage2 hsc_env iface = do
-  (ls, us) <- getLinkDeps hsc_env (hsc_HPT hsc_env) ([], [], []) Nothing noSrcSpan
-                [mi_module iface]
+mkPluginUsage2 :: HscEnv -> [Module] -> [UnitId] -> IO [Usage]
+mkPluginUsage2 hsc_env mods pkgs = do
+  (ls, us) <- getLinkDeps hsc_env (hsc_HPT hsc_env) ([], [], []) Nothing noSrcSpan mods pkgs
   ds <-
     case hsc_interp hsc_env of
       Just interp -> fst <$> computePackagesDeps interp hsc_env us

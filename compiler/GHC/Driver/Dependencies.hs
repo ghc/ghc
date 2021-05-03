@@ -105,11 +105,12 @@ getLinkDeps :: HscEnv
                , ([Linkable]))  -- BCOs
             -> Maybe FilePath                   -- replace object suffices?
             -> SrcSpan                          -- for error messages
-            -> [Module]                         -- If you need these
+            -> [Module]                         -- If you need these modules
+            -> [UnitId]                         -- and these packages
             -> IO ([Linkable], [UnitId])     -- ... then link these first
 -- Fails with an IO exception if it can't find enough files
 
-getLinkDeps hsc_env hpt (pkgs, objs, bcos) replace_osuf span mods
+getLinkDeps hsc_env hpt (loaded_pkgs, objs, bcos) replace_osuf span mods pkgs
 -- Find all the packages and linkables that a set of modules depends on
  = do {
         -- 1.  Find the dependent home-pkg-modules/packages from each iface
@@ -121,7 +122,7 @@ getLinkDeps hsc_env hpt (pkgs, objs, bcos) replace_osuf span mods
         -- 2.  Exclude ones already linked
         --      Main reason: avoid findModule calls in get_linkable
             mods_needed = mods_s `minusList` linked_mods     ;
-            pkgs_needed = pkgs_s `minusList` pkgs ;
+            pkgs_needed = (pkgs ++ pkgs_s) `minusList` loaded_pkgs ;
 
             linked_mods = map (moduleName.linkableModule)
                                 (objs ++ bcos )  }
