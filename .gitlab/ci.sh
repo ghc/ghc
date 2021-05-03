@@ -409,8 +409,6 @@ function build_make() {
     MAKE_ARGS="$MAKE_ARGS V=0"
   fi
 
-  echo "include mk/flavours/${BUILD_FLAVOUR}.mk" > mk/build.mk
-  echo 'GhcLibHcOpts+=-haddock' >> mk/build.mk
   run "$MAKE" -j"$cores" $MAKE_ARGS
   run "$MAKE" -j"$cores" binary-dist-prep TAR_COMP_OPTS=-1
   ls -lh "$BIN_DIST_PREP_TAR_COMP"
