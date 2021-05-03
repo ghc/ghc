@@ -126,7 +126,7 @@ libraries/ghc-bignum/gmp/libgmp.a libraries/ghc-bignum/gmp/gmp.h:
 	#       run is the 'target' platform of the compiler we're building.
 	cd libraries/ghc-bignum/gmp/gmpbuild; \
 	    CC=$(CCX) CXX=$(CCX) NM=$(NM) AR=$(AR_STAGE1) ./configure \
-	          --enable-shared=no --with-pic=yes \
+	          --enable-shared=no --with-pic=yes --with-readline=no \
 	          --host=$(TARGETPLATFORM) --build=$(BUILDPLATFORM)
 	$(MAKE) -C libraries/ghc-bignum/gmp/gmpbuild MAKEFLAGS=
 	$(CP) libraries/ghc-bignum/gmp/gmpbuild/gmp.h libraries/ghc-bignum/gmp/
