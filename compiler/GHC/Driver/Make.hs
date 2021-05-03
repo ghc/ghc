@@ -1189,13 +1189,18 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods sccs = do
                 -- deleting a simultaneous compile's important files.
                 lcl_tmpfs <- forkTmpFsFrom tmpfs
 
+                let localize_hsc_env hsc_env
+                        = hsc_env { hsc_logger = lcl_logger
+                                  , hsc_tmpfs  = lcl_tmpfs
+                                  }
                 -- Unmask asynchronous exceptions and perform the thread-local
                 -- work to compile the module (see parUpsweep_one).
                 m_res <- MC.try $ unmask $ prettyPrintGhcErrors dflags $
                   case mod of
                     InstantiationNode iuid -> do
-                      hsc_env <- readMVar hsc_env_var
-                      liftIO $ upsweep_inst hsc_env mHscMessage mod_idx (length sccs) iuid
+                      hsc_env' <- readMVar hsc_env_var
+                      let lcl_hsc_env = localize_hsc_env hsc_env'
+                      liftIO $ upsweep_inst lcl_hsc_env mHscMessage mod_idx (length sccs) iuid
                       pure Succeeded
                     ModuleNode ems ->
                       parUpsweep_one (emsModSummary ems) home_mod_map comp_graph_loops
