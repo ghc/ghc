@@ -1645,7 +1645,9 @@ primRepToFFIType platform r
      AddrRep     -> FFIPointer
      FloatRep    -> FFIFloat
      DoubleRep   -> FFIDouble
-     _           -> panic "primRepToFFIType"
+     LiftedRep   -> FFIPointer
+     UnliftedRep -> FFIPointer
+     _           -> pprPanic "primRepToFFIType" (ppr r)
   where
     (signed_word, unsigned_word) = case platformWordSize platform of
        PW4 -> (FFISInt32, FFIUInt32)
@@ -1656,19 +1658,21 @@ primRepToFFIType platform r
 mkDummyLiteral :: Platform -> PrimRep -> Literal
 mkDummyLiteral platform pr
    = case pr of
-        IntRep    -> mkLitInt  platform 0
-        WordRep   -> mkLitWord platform 0
-        Int8Rep   -> mkLitInt8 0
-        Word8Rep  -> mkLitWord8 0
-        Int16Rep  -> mkLitInt16 0
-        Word16Rep -> mkLitWord16 0
-        Int32Rep  -> mkLitInt32 0
-        Word32Rep -> mkLitWord32 0
-        Int64Rep  -> mkLitInt64 0
-        Word64Rep -> mkLitWord64 0
-        AddrRep   -> LitNullAddr
-        DoubleRep -> LitDouble 0
-        FloatRep  -> LitFloat 0
+        IntRep      -> mkLitInt  platform 0
+        WordRep     -> mkLitWord platform 0
+        Int8Rep     -> mkLitInt8 0
+        Word8Rep    -> mkLitWord8 0
+        Int16Rep    -> mkLitInt16 0
+        Word16Rep   -> mkLitWord16 0
+        Int32Rep    -> mkLitInt32 0
+        Word32Rep   -> mkLitWord32 0
+        Int64Rep    -> mkLitInt64 0
+        Word64Rep   -> mkLitWord64 0
+        AddrRep     -> LitNullAddr
+        DoubleRep   -> LitDouble 0
+        FloatRep    -> LitFloat 0
+        LiftedRep   -> LitNullAddr
+        UnliftedRep -> LitNullAddr
         _         -> pprPanic "mkDummyLiteral" (ppr pr)
 
 
@@ -1699,9 +1703,7 @@ maybe_getCCallReturnRep fn_ty
        case r_reps of
          []            -> panic "empty typePrimRepArgs"
          [VoidRep]     -> Nothing
-         [rep]
-           | isGcPtrRep rep -> blargh
-           | otherwise      -> Just rep
+         [rep]         -> Just rep
 
                  -- if it was, it would be impossible to create a
                  -- valid return value placeholder on the stack
