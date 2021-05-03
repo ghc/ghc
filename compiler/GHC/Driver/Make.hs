@@ -1326,12 +1326,8 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags home_unit mHscMessag
       else do
         old_hpt <- readIORef old_hpt_var
 
-        let logg err = printMessages lcl_logger lcl_dflags (srcErrorMessages err)
-
-        -- Limit the number of parallel compiles.
-        let withSem sem = MC.bracket_ (waitQSem sem) (signalQSem sem)
-        mb_mod_info <- withSem par_sem $
-            handleSourceError (\err -> do logg err; return Nothing) $ do
+        withSem $ handleSourceError (\err -> do logg err; return (Failed, hsc_HPT hsc_env1)) $ do
+          mb_mod_info <- do
                 -- Re-typecheck the loop
                 -- This is necessary to make sure the knot is tied when
                 -- we close a recursive module loop, see bug #12035.
@@ -1354,7 +1350,7 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags home_unit mHscMessag
                                         mod mod_index num_mods
                 return (Just mod_info)
 
-        case mb_mod_info of
+          case mb_mod_info of
             Nothing -> return (Failed, hsc_HPT hsc_env1)
             Just mod_info -> do
                 let this_mod = ms_mod_name mod
@@ -1396,6 +1392,12 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags home_unit mHscMessag
           _ -> addNewV
         where modName = moduleName $ mi_module $ hm_iface $ newV
               addNewV = addToHpt oldHpt modName newV
+
+    -- Limit the number of parallel compiles.
+    withSem :: IO a -> IO a
+    withSem = MC.bracket_ (waitQSem par_sem) (signalQSem par_sem)
+
+    logg err = printMessages lcl_logger lcl_dflags (srcErrorMessages err)
 
     this_build_mod = mkBuildModule0 mod
 
