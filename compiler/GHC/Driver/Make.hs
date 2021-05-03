@@ -1327,95 +1327,6 @@ parUpsweep_one
 parUpsweep_one mod home_mod_map comp_graph_loops lcl_logger lcl_tmpfs lcl_dflags home_unit mHscMessage par_sem
                hsc_env_var old_hpt_var stable_mods mod_index num_mods = do
 
-    let this_build_mod = mkBuildModule0 mod
-
-    let home_imps     = map unLoc $ ms_home_imps mod
-    let home_src_imps = map unLoc $ ms_home_srcimps mod
-
-    -- All the textual imports of this module.
-    let textual_deps = Set.fromList $
-            zipWith f home_imps     (repeat NotBoot) ++
-            zipWith f home_src_imps (repeat IsBoot)
-          where f mn isBoot = BuildModule_Module $ GWIB
-                  { gwib_mod = mkHomeModule home_unit mn
-                  , gwib_isBoot = isBoot
-                  }
-
-    -- Dealing with module loops
-    -- ~~~~~~~~~~~~~~~~~~~~~~~~~
-    --
-    -- Not only do we have to deal with explicit textual dependencies, we also
-    -- have to deal with implicit dependencies introduced by import cycles that
-    -- are broken by an hs-boot file. We have to ensure that:
-    --
-    -- 1. A module that breaks a loop must depend on all the modules in the
-    --    loop (transitively or otherwise). This is normally always fulfilled
-    --    by the module's textual dependencies except in degenerate loops,
-    --    e.g.:
-    --
-    --    A.hs imports B.hs-boot
-    --    B.hs doesn't import A.hs
-    --    C.hs imports A.hs, B.hs
-    --
-    --    In this scenario, getModLoop will detect the module loop [A,B] but
-    --    the loop finisher B doesn't depend on A. So we have to explicitly add
-    --    A in as a dependency of B when we are compiling B.
-    --
-    -- 2. A module that depends on a module in an external loop can't proceed
-    --    until the entire loop is re-typechecked.
-    --
-    -- These two invariants have to be maintained to correctly build a
-    -- compilation graph with one or more loops.
-
-
-    -- The loop that this module will finish. After this module successfully
-    -- compiles, this loop is going to get re-typechecked.
-    let finish_loop :: Maybe [ModuleWithIsBoot]
-        finish_loop = listToMaybe
-          [ flip mapMaybe (tail loop) $ \case
-              BuildModule_Unit _ -> Nothing
-              BuildModule_Module ms -> Just ms
-          | loop <- comp_graph_loops
-          , head loop == BuildModule_Module this_build_mod
-          ]
-
-    -- If this module finishes a loop then it must depend on all the other
-    -- modules in that loop because the entire module loop is going to be
-    -- re-typechecked once this module gets compiled. These extra dependencies
-    -- are this module's "internal" loop dependencies, because this module is
-    -- inside the loop in question.
-    let int_loop_deps :: Set.Set BuildModule
-        int_loop_deps = Set.fromList $
-            case finish_loop of
-                Nothing   -> []
-                Just loop -> BuildModule_Module <$> filter (/= this_build_mod) loop
-
-    -- If this module depends on a module within a loop then it must wait for
-    -- that loop to get re-typechecked, i.e. it must wait on the module that
-    -- finishes that loop. These extra dependencies are this module's
-    -- "external" loop dependencies, because this module is outside of the
-    -- loop(s) in question.
-    let ext_loop_deps :: Set.Set BuildModule
-        ext_loop_deps = Set.fromList
-            [ head loop | loop <- comp_graph_loops
-                        , any (`Set.member` textual_deps) loop
-                        , BuildModule_Module this_build_mod `notElem` loop ]
-
-
-    let all_deps = foldl1 Set.union [textual_deps, int_loop_deps, ext_loop_deps]
-
-    -- All of the module's home-module dependencies.
-    let home_deps_with_idx =
-            [ home_dep | dep <- Set.toList all_deps
-                       , Just home_dep <- [Map.lookup dep home_mod_map]
-                       ]
-
-    -- Sort the list of dependencies in reverse-topological order. This way, by
-    -- the time we get woken up by the result of an earlier dependency,
-    -- subsequent dependencies are more likely to have finished. This step
-    -- effectively reduces the number of MVars that each thread blocks on.
-    let home_deps = map fst $ sortBy (flip (comparing snd)) home_deps_with_idx
-
     -- Wait for the all the module's dependencies to finish building.
     deps_ok <- allM (fmap succeeded . readMVar) home_deps
 
@@ -1491,6 +1402,95 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_logger lcl_tmpfs lcl_dflags
                 return Succeeded
 
   where
+    this_build_mod = mkBuildModule0 mod
+
+    home_imps     = map unLoc $ ms_home_imps mod
+    home_src_imps = map unLoc $ ms_home_srcimps mod
+
+    -- All the textual imports of this module.
+    textual_deps = Set.fromList $
+        zipWith f home_imps     (repeat NotBoot) ++
+        zipWith f home_src_imps (repeat IsBoot)
+      where f mn isBoot = BuildModule_Module $ GWIB
+              { gwib_mod = mkHomeModule home_unit mn
+              , gwib_isBoot = isBoot
+              }
+
+    -- Dealing with module loops
+    -- ~~~~~~~~~~~~~~~~~~~~~~~~~
+    --
+    -- Not only do we have to deal with explicit textual dependencies, we also
+    -- have to deal with implicit dependencies introduced by import cycles that
+    -- are broken by an hs-boot file. We have to ensure that:
+    --
+    -- 1. A module that breaks a loop must depend on all the modules in the
+    --    loop (transitively or otherwise). This is normally always fulfilled
+    --    by the module's textual dependencies except in degenerate loops,
+    --    e.g.:
+    --
+    --    A.hs imports B.hs-boot
+    --    B.hs doesn't import A.hs
+    --    C.hs imports A.hs, B.hs
+    --
+    --    In this scenario, getModLoop will detect the module loop [A,B] but
+    --    the loop finisher B doesn't depend on A. So we have to explicitly add
+    --    A in as a dependency of B when we are compiling B.
+    --
+    -- 2. A module that depends on a module in an external loop can't proceed
+    --    until the entire loop is re-typechecked.
+    --
+    -- These two invariants have to be maintained to correctly build a
+    -- compilation graph with one or more loops.
+
+
+    -- The loop that this module will finish. After this module successfully
+    -- compiles, this loop is going to get re-typechecked.
+    finish_loop :: Maybe [ModuleWithIsBoot]
+    finish_loop = listToMaybe
+      [ flip mapMaybe (tail loop) $ \case
+          BuildModule_Unit _ -> Nothing
+          BuildModule_Module ms -> Just ms
+      | loop <- comp_graph_loops
+      , head loop == BuildModule_Module this_build_mod
+      ]
+
+    -- If this module finishes a loop then it must depend on all the other
+    -- modules in that loop because the entire module loop is going to be
+    -- re-typechecked once this module gets compiled. These extra dependencies
+    -- are this module's "internal" loop dependencies, because this module is
+    -- inside the loop in question.
+    int_loop_deps :: Set.Set BuildModule
+    int_loop_deps = Set.fromList $
+        case finish_loop of
+            Nothing   -> []
+            Just loop -> BuildModule_Module <$> filter (/= this_build_mod) loop
+
+    -- If this module depends on a module within a loop then it must wait for
+    -- that loop to get re-typechecked, i.e. it must wait on the module that
+    -- finishes that loop. These extra dependencies are this module's
+    -- "external" loop dependencies, because this module is outside of the
+    -- loop(s) in question.
+    ext_loop_deps :: Set.Set BuildModule
+    ext_loop_deps = Set.fromList
+        [ head loop | loop <- comp_graph_loops
+                    , any (`Set.member` textual_deps) loop
+                    , BuildModule_Module this_build_mod `notElem` loop ]
+
+
+    all_deps = foldl1 Set.union [textual_deps, int_loop_deps, ext_loop_deps]
+
+    -- All of the module's home-module dependencies.
+    home_deps_with_idx =
+        [ home_dep | dep <- Set.toList all_deps
+                   , Just home_dep <- [Map.lookup dep home_mod_map]
+                   ]
+
+    -- Sort the list of dependencies in reverse-topological order. This way, by
+    -- the time we get woken up by the result of an earlier dependency,
+    -- subsequent dependencies are more likely to have finished. This step
+    -- effectively reduces the number of MVars that each thread blocks on.
+    home_deps = map fst $ sortBy (flip (comparing snd)) home_deps_with_idx
+
     localize_hsc_env hsc_env
         = hsc_env { hsc_logger = lcl_logger
                   , hsc_tmpfs  = lcl_tmpfs
