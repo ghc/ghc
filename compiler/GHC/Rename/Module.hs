@@ -140,7 +140,12 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
    -- (D2) Rename the left-hand sides of the value bindings.
    --     This depends on everything from (B) being in scope.
    --     It uses the fixity env from (A) to bind fixities for view patterns.
-   new_lhs <- rnTopBindsLHS local_fix_env val_decls ;
+
+   -- We need to throw an error on such value bindings when in a boot file.
+   is_boot <- tcIsHsBootOrSig ;
+   new_lhs <- if is_boot
+    then rnTopBindsLHSBoot local_fix_env val_decls
+    else rnTopBindsLHS     local_fix_env val_decls ;
 
    -- Bind the LHSes (and their fixities) in the global rdr environment
    let { id_bndrs = collectHsIdBinders CollNoDictBinders new_lhs } ;
@@ -168,7 +173,6 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
    -- (F) Rename Value declarations right-hand sides
    traceRn "Start rnmono" empty ;
    let { val_bndr_set = mkNameSet id_bndrs `unionNameSet` mkNameSet pat_syn_bndrs } ;
-   is_boot <- tcIsHsBootOrSig ;
    (rn_val_decls, bind_dus) <- if is_boot
     -- For an hs-boot, use tc_bndrs (which collects how we're renamed
     -- signatures), since val_bndr_set is empty (there are no x = ...
