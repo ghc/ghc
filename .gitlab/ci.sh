@@ -282,19 +282,9 @@ function prepare_build_mk() {
   if [[ -z ${INTEGER_LIBRARY:-} ]]; then INTEGER_LIBRARY=integer-gmp; fi
 
   cat > mk/build.mk <<EOF
-V=1
-HADDOCK_DOCS=YES
-LATEX_DOCS=YES
-HSCOLOUR_SRCS=YES
-BUILD_SPHINX_HTML=$BUILD_SPHINX_HTML
-BUILD_SPHINX_PDF=$BUILD_SPHINX_PDF
-BeConservative=YES
 INTEGER_LIBRARY=$INTEGER_LIBRARY
-
 BuildFlavour=$BUILD_FLAVOUR
-ifneq "\$(BuildFlavour)" ""
-include mk/flavours/\$(BuildFlavour).mk
-endif
+include mk/flavours/${BUILD_FLAVOUR}.mk
 GhcLibHcOpts+=-haddock
 EOF
 
@@ -302,10 +292,6 @@ EOF
     echo "EXTRA_HADDOCK_OPTS += --hyperlinked-source --quickjump" >> mk/build.mk
   fi
 
-  case "$(uname)" in
-    Darwin) echo "libraries/integer-gmp_CONFIGURE_OPTS += --configure-option=--with-intree-gmp" >> mk/build.mk ;;
-    *) ;;
-  esac
 
   info "build.mk is:"
   cat mk/build.mk
@@ -344,9 +330,7 @@ function build_make() {
     MAKE_ARGS="${MAKE_ARGS:-} V=0"
   fi
 
-  echo "include mk/flavours/${BUILD_FLAVOUR}.mk" > mk/build.mk
-  echo 'GhcLibHcOpts+=-haddock' >> mk/build.mk
-  run "$MAKE" -j"$cores" $MAKE_ARGS
+  run "$MAKE" -j"$cores" "$MAKE_ARGS"
   run "$MAKE" -j"$cores" binary-dist-prep TAR_COMP_OPTS=-1
   ls -lh "$BIN_DIST_PREP_TAR_COMP"
 }
