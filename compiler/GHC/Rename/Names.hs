@@ -466,55 +466,32 @@ calculateAvails home_unit iface mod_safe' want_boot imported_by =
       -- Does this import mean we now require our own pkg
       -- to be trusted? See Note [Trust Own Package]
       ptrust = trust == Sf_Trustworthy || trust_pkg
+      pkg_trust_req 
+        | isHomeUnit home_unit pkg = ptrust
+        | otherwise = False
 
-      (dependent_mods, dependent_pkgs, pkg_trust_req)
-         | isHomeUnit home_unit pkg =
-            -- Imported module is from the home package
-            -- Take its dependent modules and add imp_mod itself
-            -- TODO: This module is always just deleted from the set
-            -- Take its dependent packages unchanged
-            --
-            -- NB: (dep_mods deps) might include a hi-boot file
-            -- for the module being compiled, CM. Do *not* filter
-            -- this out (as we used to), because when we've
-            -- finished dealing with the direct imports we want to
-            -- know if any of them depended on CM.hi-boot, in
-            -- which case we should do the hi-boot consistency
-            -- check.  See GHC.Iface.Load.loadHiBootInterface
-            ( GWIB { gwib_mod = moduleName imp_mod, gwib_isBoot = want_boot } : dep_mods deps
-            , dep_pkgs deps
-            , ptrust
-            )
+      dependent_pkgs = if isHomeUnit home_unit pkg
+                        then S.empty
+                        else S.fromList [ipkg]
 
-         | otherwise =
-            -- Imported module is from another package
-            -- Dump the dependent modules
-            -- Add the package imp_mod comes from to the dependent packages
-            ASSERT2( not (ipkg `elem` (map fst $ dep_pkgs deps))
-                   , ppr ipkg <+> ppr (dep_pkgs deps) )
-            ([], (ipkg, False) : dep_pkgs deps, False)
 
   in ImportAvails {
           imp_mods       = unitModuleEnv (mi_module iface) [imported_by],
           imp_orphs      = orphans,
           imp_finsts     = finsts,
-          imp_dep_mods   = mkModDeps dependent_mods,
           imp_direct_dep_mods = mkModDeps $ if isHomeUnit home_unit pkg
                                   then [GWIB (moduleName imp_mod) want_boot]
                                   else [],
-          imp_dep_pkgs   = S.fromList . map fst $ dependent_pkgs,
-          imp_dep_direct_pkgs = if isHomeUnit home_unit pkg
-                                  then S.empty
-                                  else S.fromList [ipkg],
+          imp_dep_direct_pkgs = dependent_pkgs,
 
           -- Add in the imported modules trusted package
           -- requirements. ONLY do this though if we import the
           -- module as a safe import.
           -- See Note [Tracking Trust Transitively]
           -- and Note [Trust Transitive Property]
-          imp_trust_pkgs = if mod_safe'
-                               then S.fromList . map fst $ filter snd dependent_pkgs
-                               else S.empty,
+          -- MP: This simplifies to [] for direct imports.. not sure that
+          -- was ever correct
+          imp_trust_pkgs = S.empty,
           -- Do we require our own pkg to be trusted?
           -- See Note [Trust Own Package]
           imp_trust_own_pkg = pkg_trust_req

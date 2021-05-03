@@ -23,20 +23,16 @@ import GHC.Utils.Binary
 --
 -- Invariant: none of the lists contain duplicates.
 data Dependencies = Deps
-   { dep_mods   :: [ModuleNameWithIsBoot]
-      -- ^ All home-package modules transitively below this one
-      -- I.e. modules that this one imports, or that are in the
-      --      dep_mods of those directly-imported modules
-   , dep_direct_mods :: [ModuleNameWithIsBoot]
+   { dep_direct_mods :: [ModuleNameWithIsBoot]
+      -- ^ All home-package modules which are below this one
+      -- I.e. modules that this one imports.
 
-   , dep_pkgs   :: [(UnitId, Bool)]
-      -- ^ All packages transitively below this module
-      -- I.e. packages to which this module's direct imports belong,
-      --      or that are in the dep_pkgs of those modules
+   , dep_direct_pkgs :: [(UnitId, Bool)]
+      -- ^ All packages directly imported by this module
+      -- I.e. packages to which this module's direct imports belong.
       -- The bool indicates if the package is required to be
       -- trusted when the module is imported as a safe import
       -- (Safe Haskell). See Note [Tracking Trust Transitively] in GHC.Rename.Names
-   , dep_direct_pkgs :: [(UnitId, Bool)]
 
    , dep_orphs  :: [Module]
       -- ^ Transitive closure of orphan modules (whether
@@ -63,26 +59,22 @@ data Dependencies = Deps
         -- See 'GHC.Tc.Utils.ImportAvails' for details on dependencies.
 
 instance Binary Dependencies where
-    put_ bh deps = do put_ bh (dep_mods deps)
-                      put_ bh (dep_direct_mods deps)
-                      put_ bh (dep_pkgs deps)
+    put_ bh deps = do put_ bh (dep_direct_mods deps)
                       put_ bh (dep_direct_pkgs deps)
                       put_ bh (dep_orphs deps)
                       put_ bh (dep_finsts deps)
                       put_ bh (dep_plgins deps)
 
-    get bh = do ms <- get bh
-                dms <- get bh
-                ps <- get bh
+    get bh = do dms <- get bh
                 dps <- get bh
                 os <- get bh
                 fis <- get bh
                 pl <- get bh
-                return (Deps { dep_mods = ms, dep_direct_mods = dms, dep_pkgs = ps, dep_direct_pkgs = dps, dep_orphs = os,
+                return (Deps { dep_direct_mods = dms, dep_direct_pkgs = dps, dep_orphs = os,
                                dep_finsts = fis, dep_plgins = pl })
 
 noDependencies :: Dependencies
-noDependencies = Deps [] [] [] [] [] [] []
+noDependencies = Deps [] [] [] [] []
 
 
 

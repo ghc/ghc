@@ -1232,12 +1232,14 @@ pprUsageImport usage usg_mod'
 
 -- | Pretty-print unit dependencies
 pprDeps :: UnitState -> Dependencies -> SDoc
-pprDeps unit_state (Deps { dep_mods = mods, dep_direct_mods = dmods, dep_pkgs = pkgs, dep_orphs = orphs,
-                           dep_finsts = finsts, dep_plgins = plugins })
+pprDeps unit_state (Deps { dep_direct_mods = dmods
+                         , dep_orphs = orphs
+                         , dep_direct_pkgs = pkgs
+                         , dep_finsts = finsts
+                         , dep_plgins = plugins })
   = pprWithUnitState unit_state $
-    vcat [text "module dependencies:" <+> fsep (map ppr_mod mods),
-          text "direct module dependencies:" <+> fsep (map ppr_mod dmods),
-          text "package dependencies:" <+> fsep (map ppr_pkg pkgs),
+    vcat [text "direct module dependencies:" <+> fsep (map ppr_mod dmods),
+          text "direct package dependencies:" <+> fsep (map ppr_pkg pkgs),
           text "orphans:" <+> fsep (map ppr orphs),
           text "plugins:" <+> fsep (map ppr plugins),
           text "family instance modules:" <+> fsep (map ppr finsts)

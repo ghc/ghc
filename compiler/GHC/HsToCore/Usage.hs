@@ -43,7 +43,6 @@ import qualified Data.Set as Set
 import GHC.Linker.Types
 import GHC.Types.SrcLoc
 import GHC.Utils.Monad
-import GHC.Driver.Ppr
 
 {- Note [Module self-dependency]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -79,10 +78,7 @@ mkDependencies iuid pluginModules
       let (dep_plgins, ms) = unzip [ (moduleName mn, mn) | mn <- pluginModules ]
           plugin_dep_pkgs = filter (/= iuid) (map (toUnitId . moduleUnit) ms)
       th_used <- readIORef th_var
-      let dep_mods = modDepsElts (delFromUFM (imp_dep_mods imports)
-                                             (moduleName mod))
-
-          direct_mods = modDepsElts (delFromUFM (imp_direct_dep_mods imports) (moduleName mod))
+      let direct_mods = modDepsElts (delFromUFM (imp_direct_dep_mods imports) (moduleName mod))
                 -- M.hi-boot can be in the imp_dep_mods, but we must remove
                 -- it before recording the modules on which this one depends!
                 -- (We want to retain M.hi-boot in imp_dep_mods so that
@@ -94,27 +90,19 @@ mkDependencies iuid pluginModules
                 -- We must also remove self-references from imp_orphs. See
                 -- Note [Module self-dependency]
 
-          raw_pkgs = foldr Set.insert (imp_dep_pkgs imports) plugin_dep_pkgs
           direct_pkgs_0 = foldr Set.insert (imp_dep_direct_pkgs imports) plugin_dep_pkgs
 
           direct_pkgs
             | th_used = Set.insert thUnitId direct_pkgs_0
             | otherwise = direct_pkgs_0
 
-          pkgs | th_used   = Set.insert thUnitId raw_pkgs
-               | otherwise = raw_pkgs
-
           -- Set the packages required to be Safe according to Safe Haskell.
           -- See Note [Tracking Trust Transitively] in GHC.Rename.Names
-          sorted_pkgs = sort (Set.toList pkgs)
           sorted_direct_pkgs = sort (Set.toList direct_pkgs)
           trust_pkgs  = imp_trust_pkgs imports
-          dep_pkgs'   = map (\x -> (x, x `Set.member` trust_pkgs)) sorted_pkgs
           direct_dep_pkgs' = map (\x -> (x, x `Set.member` trust_pkgs)) sorted_direct_pkgs
 
-      return Deps { dep_mods   = dep_mods,
-                    dep_direct_mods = direct_mods,
-                    dep_pkgs   = dep_pkgs',
+      return Deps { dep_direct_mods = direct_mods,
                     dep_direct_pkgs = direct_dep_pkgs',
                     dep_orphs  = dep_orphs,
                     dep_plgins = dep_plgins,

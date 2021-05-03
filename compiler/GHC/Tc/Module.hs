@@ -400,7 +400,7 @@ tcRnImports hsc_env import_decls
               tcg_hpc          = hpc_info
             }) $ do {
 
-        ; traceRn "rn1" (ppr (imp_dep_mods imports))
+        ; traceRn "rn1" (ppr (imp_direct_dep_mods imports))
                 -- Fail if there are any errors so far
                 -- The error printing (if needed) takes advantage
                 -- of the tcg_env we have now set
@@ -2951,9 +2951,7 @@ pprTcGblEnv (TcGblEnv { tcg_type_env  = type_env,
          , text "Dependent modules:" <+>
                 pprUFM (imp_direct_dep_mods imports) (ppr . sort)
          , text "Dependent packages:" <+>
-                ppr (S.toList $ imp_dep_pkgs imports)]
---         , text "Direct Dependent packages:" <+>
---                ppr (S.toList $ imp_dep_direct_pkgs imports)]
+                ppr (S.toList $ imp_dep_direct_pkgs imports)]
                 -- The use of sort is just to reduce unnecessary
                 -- wobbling in testsuite output
 

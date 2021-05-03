@@ -1119,7 +1119,8 @@ addFingerprints hsc_env iface0
 -- Used for the stability check for modules which use TH
 fingerprintSources :: HscEnv -> Dependencies -> Fingerprint
 fingerprintSources hsc_env deps =
-  let mod_hashes = map (mi_src_hash . hm_iface) $ mapMaybe (lookupHpt (hsc_HPT hsc_env). gwib_mod) (dep_mods deps)
+  -- TODO: MP
+  let mod_hashes = map (mi_src_hash . hm_iface) $ mapMaybe (lookupHpt (hsc_HPT hsc_env). gwib_mod) []
   in fingerprintFingerprints mod_hashes
 
 
@@ -1198,9 +1199,7 @@ getOrphanHashes hsc_env mods = do
 
 sortDependencies :: Dependencies -> Dependencies
 sortDependencies d
- = Deps { dep_mods   = sortBy (lexicalCompareFS `on` (moduleNameFS . gwib_mod)) (dep_mods d),
-          dep_direct_mods = sortBy (lexicalCompareFS `on` (moduleNameFS . gwib_mod)) (dep_direct_mods d),
-          dep_pkgs   = sortBy (compare `on` fst) (dep_pkgs d),
+ = Deps { dep_direct_mods = sortBy (lexicalCompareFS `on` (moduleNameFS . gwib_mod)) (dep_direct_mods d),
           dep_direct_pkgs   = sort (dep_direct_pkgs d),
           dep_orphs  = sortBy stableModuleCmp (dep_orphs d),
           dep_finsts = sortBy stableModuleCmp (dep_finsts d),
