@@ -1327,57 +1327,52 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags home_unit mHscMessag
         old_hpt <- readIORef old_hpt_var
 
         withSem $ handleSourceError (\err -> do logg err; return (Failed, hsc_HPT hsc_env1)) $ do
-          mb_mod_info <- do
-                -- Re-typecheck the loop
-                -- This is necessary to make sure the knot is tied when
-                -- we close a recursive module loop, see bug #12035.
-                type_env_var <- liftIO $ newIORef emptyNameEnv
-                let hsc_env2 = hsc_env1 { hsc_type_env_var =
-                                    Just (ms_mod mod, type_env_var) }
-                hsc_env3 <- case finish_loop of
-                    Nothing   -> return hsc_env2
-                    -- In the non-parallel case, the retypecheck prior to
-                    -- typechecking the loop closer includes all modules
-                    -- EXCEPT the loop closer.  However, our precomputed
-                    -- SCCs include the loop closer, so we have to filter
-                    -- it out.
-                    Just loop -> typecheckLoop lcl_dflags hsc_env2 $
-                                 filter (/= moduleName (gwib_mod this_build_mod)) $
-                                 map (moduleName . gwib_mod) loop
+          mod_info <- do
+            -- Re-typecheck the loop
+            -- This is necessary to make sure the knot is tied when
+            -- we close a recursive module loop, see bug #12035.
+            type_env_var <- liftIO $ newIORef emptyNameEnv
+            let hsc_env2 = hsc_env1 { hsc_type_env_var =
+                                Just (ms_mod mod, type_env_var) }
+            hsc_env3 <- case finish_loop of
+                Nothing   -> return hsc_env2
+                -- In the non-parallel case, the retypecheck prior to
+                -- typechecking the loop closer includes all modules
+                -- EXCEPT the loop closer.  However, our precomputed
+                -- SCCs include the loop closer, so we have to filter
+                -- it out.
+                Just loop -> typecheckLoop lcl_dflags hsc_env2 $
+                             filter (/= moduleName (gwib_mod this_build_mod)) $
+                             map (moduleName . gwib_mod) loop
 
-                -- Compile the module.
-                mod_info <- upsweep_mod hsc_env3 mHscMessage old_hpt stable_mods
-                                        mod mod_index num_mods
-                return (Just mod_info)
+            -- Compile the module.
+            upsweep_mod hsc_env3 mHscMessage old_hpt stable_mods
+                                    mod mod_index num_mods
 
-          case mb_mod_info of
-            Nothing -> return (Failed, hsc_HPT hsc_env1)
-            Just mod_info -> do
-                let this_mod = ms_mod_name mod
 
-                -- Prune the old HPT unless this is an hs-boot module.
-                unless (isBootSummary mod == IsBoot) $
-                    atomicModifyIORef' old_hpt_var $ \old_hpt ->
-                        (delFromHpt old_hpt this_mod, ())
+          -- Prune the old HPT unless this is an hs-boot module.
+          unless (isBootSummary mod == IsBoot) $
+              atomicModifyIORef' old_hpt_var $ \old_hpt ->
+                  (delFromHpt old_hpt this_mod, ())
 
-                hsc_env5 <- do
-                    let hsc_env4 = hscUpdateHPT (\hpt -> addToHpt hpt this_mod mod_info)
-                                                hsc_env1
+          hsc_env5 <- do
+              let hsc_env4 = hscUpdateHPT (\hpt -> addToHpt hpt this_mod mod_info)
+                                          hsc_env1
 
-                    -- We've finished typechecking the module, now we must
-                    -- retypecheck the loop AGAIN to ensure unfoldings are
-                    -- updated.  This time, however, we include the loop
-                    -- closer!
-                    case finish_loop of
-                        Nothing   -> return hsc_env4
-                        Just loop -> typecheckLoop lcl_dflags hsc_env4 $
-                                     map (moduleName . gwib_mod) loop
+              -- We've finished typechecking the module, now we must
+              -- retypecheck the loop AGAIN to ensure unfoldings are
+              -- updated.  This time, however, we include the loop
+              -- closer!
+              case finish_loop of
+                  Nothing   -> return hsc_env4
+                  Just loop -> typecheckLoop lcl_dflags hsc_env4 $
+                               map (moduleName . gwib_mod) loop
 
-                -- Clean up any intermediate files.
-                cleanCurrentModuleTempFiles (hsc_logger hsc_env5)
-                                            (hsc_tmpfs  hsc_env5)
-                                            (hsc_dflags hsc_env5)
-                return (Succeeded, hsc_HPT hsc_env5)
+          -- Clean up any intermediate files.
+          cleanCurrentModuleTempFiles (hsc_logger hsc_env5)
+                                      (hsc_tmpfs  hsc_env5)
+                                      (hsc_dflags hsc_env5)
+          return (Succeeded, hsc_HPT hsc_env5)
 
   where
     -- Update/merge the HPT, while avoiding the overwrite of HomeModeInfo of
@@ -1400,6 +1395,7 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags home_unit mHscMessag
     logg err = printMessages lcl_logger lcl_dflags (srcErrorMessages err)
 
     this_build_mod = mkBuildModule0 mod
+    this_mod = ms_mod_name mod
 
     home_imps     = map unLoc $ ms_home_imps mod
     home_src_imps = map unLoc $ ms_home_srcimps mod
