@@ -256,7 +256,7 @@ bcPrepExpr (StgTick bp@(Breakpoint tick_ty _ _) rhs)
                                             []
                                             expr'
                              )
-          letExp = StgLet noExtFieldSilent bnd (StgApp id [])
+          letExp = StgLet noExtFieldSilent bnd (StgApp MayEnter id [])
       pure letExp
   | otherwise = do
       id <- newId (mkVisFunTyMany realWorldStatePrimTy tick_ty)
@@ -269,7 +269,7 @@ bcPrepExpr (StgTick bp@(Breakpoint tick_ty _ _) rhs)
                                             [voidArgId]
                                             expr'
                              )
-      pure $ StgLet noExtFieldSilent bnd (StgApp id [StgVarArg st])
+      pure $ StgLet noExtFieldSilent bnd (StgApp MayEnter id [StgVarArg st])
 bcPrepExpr (StgTick tick rhs) =
   StgTick tick <$> bcPrepExpr rhs
 bcPrepExpr (StgLet xlet bnds expr) =
@@ -285,9 +285,9 @@ bcPrepExpr (StgCase expr bndr alt_type alts) =
           <*> mapM bcPrepAlt alts
 bcPrepExpr lit@StgLit{} = pure lit
 -- See Note [Not-necessarily-lifted join points], step 3.
-bcPrepExpr (StgApp x [])
+bcPrepExpr (StgApp _ext x [])
   | isNNLJoinPoint x = pure $
-      StgApp (protectNNLJoinPointId x) [StgVarArg voidPrimId]
+      StgApp MayEnter (protectNNLJoinPointId x) [StgVarArg voidPrimId]
 bcPrepExpr app@StgApp{} = pure app
 bcPrepExpr app@StgConApp{} = pure app
 bcPrepExpr app@StgOpApp{} = pure app
@@ -647,7 +647,7 @@ returnUnboxedTuple d s p es = do
 schemeE
     :: StackDepth -> Sequel -> BCEnv -> CgStgExpr -> BcM BCInstrList
 schemeE d s p (StgLit lit) = returnUnboxedAtom d s p (StgLitArg lit)
-schemeE d s p (StgApp x [])
+schemeE d s p (StgApp _ext x [])
    | isUnliftedType (idType x) = returnUnboxedAtom d s p (StgVarArg x)
 -- Delegate tail-calls to schemeT.
 schemeE d s p e@(StgApp {}) = schemeT d s p e
@@ -876,7 +876,7 @@ schemeT _d _s _p (StgOpApp StgPrimCallOp{} _args _ty)
    = unsupportedCConvException
 
    -- Case 2: Unboxed tuple
-schemeT d s p (StgConApp con _ext args _tys)
+schemeT d s p (StgConApp con _cn args _tys)
    | isUnboxedTupleDataCon con || isUnboxedSumDataCon con
    = returnUnboxedTuple d s p args
 
@@ -889,7 +889,7 @@ schemeT d s p (StgConApp con _ext args _tys)
                 ENTER)
 
    -- Case 4: Tail call of function
-schemeT d s p (StgApp fn args)
+schemeT d s p (StgApp _ext fn args)
    = doTailCall d s p fn (reverse args)
 
 schemeT _ _ _ e = pprPanic "GHC.StgToByteCode.schemeT"

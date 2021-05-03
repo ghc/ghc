@@ -2634,8 +2634,10 @@ dumpIdInfoOfProgram ppr_id_info binds = vcat (map printId ids)
   ids = sortBy (stableNameCmp `on` getName) (concatMap getIds binds)
   getIds (NonRec i _) = [ i ]
   getIds (Rec bs)     = map fst bs
-  printId id | isExportedId id = ppr id <> colon <+> (ppr_id_info (idInfo id))
-             | otherwise       = empty
+  printId id = ppr id <> colon <+> (ppr_id_info (idInfo id))
+
+  -- printId id | isExportedId id = ppr id <> colon <+> (ppr_id_info (idInfo id))
+  --            | otherwise       = empty
 
 
 {- *********************************************************************
