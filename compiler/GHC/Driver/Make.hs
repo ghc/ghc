@@ -78,7 +78,6 @@ import GHC.Data.StringBuffer
 import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Utils.Exception ( tryIO )
-import GHC.Utils.Monad     ( allM )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
@@ -92,6 +91,7 @@ import GHC.Types.Target
 import GHC.Types.SourceFile
 import GHC.Types.SourceError
 import GHC.Types.SrcLoc
+import GHC.Types.Unique.DFM
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DSet
 import GHC.Types.Unique.Set
@@ -1009,7 +1009,7 @@ data LogQueue = LogQueue !(IORef [Maybe (MessageClass, SrcSpan, SDoc)])
 
 -- | The graph of modules to compile and their corresponding result 'MVar' and
 -- 'LogQueue'.
-type CompilationGraph = [(ModuleGraphNode, MVar SuccessFlag, LogQueue)]
+type CompilationGraph = [(ModuleGraphNode, MVar (SuccessFlag, HomePackageTable), LogQueue)]
 
 -- | Build a 'CompilationGraph' out of a list of strongly-connected modules,
 -- also returning the first, if any, encountered module cycle.
@@ -1085,10 +1085,6 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods sccs = do
 
     -- The bits of shared state we'll be using:
 
-    -- The global HscEnv is updated with the module's HMI when a module
-    -- successfully compiles.
-    hsc_env_var <- liftIO $ newMVar hsc_env
-
     -- The old HPT is used for recompilation checking in upsweep_mod. When a
     -- module successfully gets compiled, its HMI is pruned from the old HPT.
     old_hpt_var <- liftIO $ newIORef old_hpt
@@ -1110,13 +1106,6 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods sccs = do
     let resetNumCapabilities orig_n = liftIO $ setNumCapabilities orig_n
 
     MC.bracket updNumCapabilities resetNumCapabilities $ \_ -> do
-
-    -- Sync the global session with the latest HscEnv once the upsweep ends.
-    let finallySyncSession io = io `MC.finally` do
-            hsc_env <- liftIO $ readMVar hsc_env_var
-            setSession hsc_env
-
-    finallySyncSession $ do
 
     -- Build the compilation graph out of the list of SCCs. Module cycles are
     -- handled at the very end, after some useful work gets done. Note that
@@ -1146,7 +1135,7 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods sccs = do
 
     -- Build a Map out of the compilation graph with which we can efficiently
     -- look up the result MVar associated with a particular home module.
-    let home_mod_map :: Map BuildModule (MVar SuccessFlag, Int)
+    let home_mod_map :: Map BuildModule (MVar (SuccessFlag, HomePackageTable), Int)
         home_mod_map =
             Map.fromList [ (mkBuildModule ms, (mvar, idx))
                          | ((ms,mvar,_),idx) <- comp_graph_w_idx ]
@@ -1189,24 +1178,21 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods sccs = do
                 -- deleting a simultaneous compile's important files.
                 lcl_tmpfs <- forkTmpFsFrom tmpfs
 
-                let localize_hsc_env hsc_env
-                        = hsc_env { hsc_logger = lcl_logger
-                                  , hsc_tmpfs  = lcl_tmpfs
-                                  }
+                let lcl_hsc_env = hsc_env { hsc_logger = lcl_logger
+                                          , hsc_tmpfs  = lcl_tmpfs
+                                          }
                 -- Unmask asynchronous exceptions and perform the thread-local
                 -- work to compile the module (see parUpsweep_one).
                 m_res <- MC.try $ unmask $ prettyPrintGhcErrors dflags $
                   case mod of
                     InstantiationNode iuid -> do
-                      hsc_env' <- readMVar hsc_env_var
-                      let lcl_hsc_env = localize_hsc_env hsc_env'
-                      liftIO $ upsweep_inst lcl_hsc_env mHscMessage mod_idx (length sccs) iuid
-                      pure Succeeded
+                      upsweep_inst lcl_hsc_env mHscMessage mod_idx (length sccs) iuid
+                      pure (Succeeded, hsc_HPT lcl_hsc_env)
                     ModuleNode ems ->
                       parUpsweep_one (emsModSummary ems) home_mod_map comp_graph_loops
-                                     lcl_logger lcl_tmpfs dflags (hsc_home_unit hsc_env)
+                                     dflags (hsc_home_unit hsc_env)
                                      mHscMessage
-                                     par_sem hsc_env_var old_hpt_var
+                                     par_sem lcl_hsc_env old_hpt_var
                                      stable_mods mod_idx (length sccs)
 
                 res <- case m_res of
@@ -1218,7 +1204,7 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods sccs = do
                         -- about that.
                         when (fromException exc /= Just ThreadKilled)
                              (errorMsg lcl_logger dflags (text (show exc)))
-                        return Failed
+                        return (Failed, hsc_HPT lcl_hsc_env)
 
                 -- Populate the result MVar.
                 putMVar mvar res
@@ -1244,13 +1230,19 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods sccs = do
         -- each message from its log_queue.
         forM comp_graph $ \(mod,mvar,log_queue) -> do
             printLogs logger dflags log_queue
-            result <- readMVar mvar
-            if succeeded result then return (Just mod) else return Nothing
+            (result, hpt) <- readMVar mvar
+            if succeeded result then return (Just (mod, hpt)) else return Nothing
 
 
     -- Collect and return the ModSummaries of all the successful compiles.
     -- NB: Reverse this list to maintain output parity with the sequential upsweep.
-    let ok_results = reverse (catMaybes results)
+    let ok_results = map fst ok_results'
+        ok_results' = reverse $ (catMaybes results)
+
+    -- Sync the global session with the last HomePackageTable once the upsweep ends.
+    case ok_results' of
+      [] -> return ()
+      ((_, new_hpt):_) -> setSession $ hscUpdateHPT (const new_hpt) hsc_env
 
     -- Handle any cycle in the original compilation graph and return the result
     -- of the upsweep.
@@ -1296,14 +1288,10 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods sccs = do
 parUpsweep_one
     :: ModSummary
     -- ^ The module we wish to compile
-    -> Map BuildModule (MVar SuccessFlag, Int)
+    -> Map BuildModule (MVar (SuccessFlag, HomePackageTable), Int)
     -- ^ The map of home modules and their result MVar
     -> [[BuildModule]]
     -- ^ The list of all module loops within the compilation graph.
-    -> Logger
-    -- ^ The thread-local Logger
-    -> TmpFs
-    -- ^ The thread-local TmpFs
     -> DynFlags
     -- ^ The thread-local DynFlags
     -> HomeUnit
@@ -1312,8 +1300,8 @@ parUpsweep_one
     -- ^ The messager
     -> QSem
     -- ^ The semaphore for limiting the number of simultaneous compiles
-    -> MVar HscEnv
-    -- ^ The MVar that synchronizes updates to the global HscEnv
+    -> HscEnv
+    -- ^ The global HscEnv, with an empty HomePackageTable
     -> IORef HomePackageTable
     -- ^ The old HPT
     -> StableModules
@@ -1322,21 +1310,20 @@ parUpsweep_one
     -- ^ The index of this module
     -> Int
     -- ^ The total number of modules
-    -> IO SuccessFlag
+    -> IO (SuccessFlag, HomePackageTable)
     -- ^ The result of this compile
-parUpsweep_one mod home_mod_map comp_graph_loops lcl_logger lcl_tmpfs lcl_dflags home_unit mHscMessage par_sem
-               hsc_env_var old_hpt_var stable_mods mod_index num_mods = do
+parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags home_unit mHscMessage par_sem
+               hsc_env0 old_hpt_var stable_mods mod_index num_mods = do
 
     -- Wait for the all the module's dependencies to finish building.
-    deps_ok <- allM (fmap succeeded . readMVar) home_deps
+    deps_res <- mapM readMVar home_deps
+
+    let hsc_env1 = foldr updateHPT hsc_env0 (map snd deps_res)
 
     -- We can't build this module if any of its dependencies failed to build.
-    if not deps_ok
-      then return Failed
+    if not (all (succeeded . fst) deps_res)
+      then return (Failed, hsc_HPT hsc_env1)
       else do
-        -- Any hsc_env at this point is OK to use since we only really require
-        -- that the HPT contains the HMIs of our dependencies.
-        hsc_env <- readMVar hsc_env_var
         old_hpt <- readIORef old_hpt_var
 
         let logg err = printMessages lcl_logger lcl_dflags (srcErrorMessages err)
@@ -1345,33 +1332,30 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_logger lcl_tmpfs lcl_dflags
         let withSem sem = MC.bracket_ (waitQSem sem) (signalQSem sem)
         mb_mod_info <- withSem par_sem $
             handleSourceError (\err -> do logg err; return Nothing) $ do
-                -- Have the HscEnv point to our local logger and tmpfs.
-                let lcl_hsc_env = localize_hsc_env hsc_env
-
                 -- Re-typecheck the loop
                 -- This is necessary to make sure the knot is tied when
                 -- we close a recursive module loop, see bug #12035.
                 type_env_var <- liftIO $ newIORef emptyNameEnv
-                let lcl_hsc_env' = lcl_hsc_env { hsc_type_env_var =
+                let hsc_env2 = hsc_env1 { hsc_type_env_var =
                                     Just (ms_mod mod, type_env_var) }
-                lcl_hsc_env'' <- case finish_loop of
-                    Nothing   -> return lcl_hsc_env'
+                hsc_env3 <- case finish_loop of
+                    Nothing   -> return hsc_env2
                     -- In the non-parallel case, the retypecheck prior to
                     -- typechecking the loop closer includes all modules
                     -- EXCEPT the loop closer.  However, our precomputed
                     -- SCCs include the loop closer, so we have to filter
                     -- it out.
-                    Just loop -> typecheckLoop lcl_dflags lcl_hsc_env' $
+                    Just loop -> typecheckLoop lcl_dflags hsc_env2 $
                                  filter (/= moduleName (gwib_mod this_build_mod)) $
                                  map (moduleName . gwib_mod) loop
 
                 -- Compile the module.
-                mod_info <- upsweep_mod lcl_hsc_env'' mHscMessage old_hpt stable_mods
+                mod_info <- upsweep_mod hsc_env3 mHscMessage old_hpt stable_mods
                                         mod mod_index num_mods
                 return (Just mod_info)
 
         case mb_mod_info of
-            Nothing -> return Failed
+            Nothing -> return (Failed, hsc_HPT hsc_env1)
             Just mod_info -> do
                 let this_mod = ms_mod_name mod
 
@@ -1380,28 +1364,39 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_logger lcl_tmpfs lcl_dflags
                     atomicModifyIORef' old_hpt_var $ \old_hpt ->
                         (delFromHpt old_hpt this_mod, ())
 
-                -- Update and fetch the global HscEnv.
-                lcl_hsc_env' <- modifyMVar hsc_env_var $ \hsc_env -> do
-                    let hsc_env' = hscUpdateHPT (\hpt -> addToHpt hpt this_mod mod_info)
-                                                hsc_env
+                hsc_env5 <- do
+                    let hsc_env4 = hscUpdateHPT (\hpt -> addToHpt hpt this_mod mod_info)
+                                                hsc_env1
 
                     -- We've finished typechecking the module, now we must
                     -- retypecheck the loop AGAIN to ensure unfoldings are
                     -- updated.  This time, however, we include the loop
                     -- closer!
-                    hsc_env'' <- case finish_loop of
-                        Nothing   -> return hsc_env'
-                        Just loop -> typecheckLoop lcl_dflags hsc_env' $
+                    case finish_loop of
+                        Nothing   -> return hsc_env4
+                        Just loop -> typecheckLoop lcl_dflags hsc_env4 $
                                      map (moduleName . gwib_mod) loop
-                    return (hsc_env'', localize_hsc_env hsc_env'')
 
                 -- Clean up any intermediate files.
-                cleanCurrentModuleTempFiles (hsc_logger lcl_hsc_env')
-                                            (hsc_tmpfs  lcl_hsc_env')
-                                            (hsc_dflags lcl_hsc_env')
-                return Succeeded
+                cleanCurrentModuleTempFiles (hsc_logger hsc_env5)
+                                            (hsc_tmpfs  hsc_env5)
+                                            (hsc_dflags hsc_env5)
+                return (Succeeded, hsc_HPT hsc_env5)
 
   where
+    -- Update/merge the HPT, while avoiding the overwrite of HomeModeInfo of
+    -- HsSrcFile by the HsBootFile
+    updateHPT :: HomePackageTable -> HscEnv -> HscEnv
+    updateHPT h = hscUpdateHPT (\hpt -> foldUDFM mergeHpts hpt h)
+      where
+      mergeHpts newV oldHpt = case lookupHpt oldHpt modName of
+        Nothing -> addNewV
+        Just _ -> case (mi_hsc_src $ hm_iface newV) of
+          HsBootFile -> oldHpt
+          _ -> addNewV
+        where modName = moduleName $ mi_module $ hm_iface $ newV
+              addNewV = addToHpt oldHpt modName newV
+
     this_build_mod = mkBuildModule0 mod
 
     home_imps     = map unLoc $ ms_home_imps mod
@@ -1491,10 +1486,7 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_logger lcl_tmpfs lcl_dflags
     -- effectively reduces the number of MVars that each thread blocks on.
     home_deps = map fst $ sortBy (flip (comparing snd)) home_deps_with_idx
 
-    localize_hsc_env hsc_env
-        = hsc_env { hsc_logger = lcl_logger
-                  , hsc_tmpfs  = lcl_tmpfs
-                  }
+    lcl_logger = hsc_logger hsc_env0
 
 -- -----------------------------------------------------------------------------
 --
