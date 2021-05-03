@@ -852,9 +852,11 @@ unload :: Interp -> HscEnv -> [Linkable] -> IO ()
 unload interp hsc_env stable_linkables -- Unload everything *except* 'stable_linkables'
   = case ghcLink (hsc_dflags hsc_env) of
         LinkInMemory -> do
-          let logger = hsc_logger hsc_env
-          let dflags = hsc_dflags hsc_env
-          Linker.initLoaderState interp hsc_env
+          let unit_env = hsc_unit_env hsc_env
+          let tmpfs    = hsc_tmpfs hsc_env
+          let dflags   = hsc_dflags hsc_env
+          let logger   = hsc_logger hsc_env
+          Linker.initLoaderState logger tmpfs interp dflags unit_env
           Linker.unload logger interp dflags stable_linkables
         _other       -> return ()
 
