@@ -225,3 +225,5 @@ test('test-hooks-plugin',
       ],
      compile_and_run,
      ['-package-db hooks-plugin/pkg.hooks-plugin/local.package.conf '+ config.plugin_way_flags])
+
+test('plugins-ghci', [extra_files(['HomePackagePlugin.hs']), only_ways(['ghci'])], compile_and_run, ['-package ghc'])
