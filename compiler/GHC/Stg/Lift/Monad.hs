@@ -194,9 +194,9 @@ removeRhsCCCS :: GenStgRhs pass -> GenStgRhs pass
 removeRhsCCCS (StgRhsClosure ext ccs upd bndrs body)
   | isCurrentCCS ccs
   = StgRhsClosure ext dontCareCCS upd bndrs body
-removeRhsCCCS (StgRhsCon ccs con mu ts args)
+removeRhsCCCS (StgRhsCon ext ccs con mu ts args)
   | isCurrentCCS ccs
-  = StgRhsCon dontCareCCS con mu ts args
+  = StgRhsCon ext dontCareCCS con mu ts args
 removeRhsCCCS rhs = rhs
 
 -- | The analysis monad consists of the following 'RWST' components:

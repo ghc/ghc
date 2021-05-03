@@ -233,8 +233,22 @@ import Data.Functor
 import Control.DeepSeq (force)
 import Data.Bifunctor (first, bimap)
 
+-- Tag infer perf debugging
+import System.CPUTime
+import GHC.Stg.Utils (seqTopBinds)
+import GHC.Stg.InferTags
+import GHC.Stg.InferTags.Rewrite
+import GHC.Types.Unique.Supply
+-- import GHC.Stg.DepAnal
+import GHC.Driver.Ppr
+
 #include "HsVersions.h"
 
+-- In ms
+getTime :: IO Double
+getTime = do
+    !time <- getCPUTime
+    return $! (fromIntegral time) / (1000000000 :: Double)
 
 {- **********************************************************************
 %*                                                                      *
@@ -1791,7 +1805,30 @@ doCodeGen hsc_env this_mod denv data_tycons
     let tmpfs  = hsc_tmpfs hsc_env
     let platform = targetPlatform dflags
 
-    let stg_binds_w_fvs = annTopBindingsFreeVars stg_binds
+    dumpIfSet_dyn logger dflags Opt_D_dump_stg_final "CodeGenInput STG:" FormatSTG (pprGenStgTopBindings (initStgPprOpts dflags) stg_binds)
+
+
+    -- return $! seqTopBinds stg_binds
+    -- let stg_binds_w_fvs = annTopBindingsFreeVars stg_binds
+
+    !start <- getTime
+
+    -- let (!stg_binds_w_tags, _exports) = {-# SCC "StgTagFields" #-}
+    --                                     findTags logger dflags this_mod stg_binds
+
+    let (!stg_binds_w_tags) = {-# SCC "StgTagFields" #-}
+                                        inferTags stg_binds
+
+    -- pprTraceM "Dumping Stg" (ppr this_mod)
+    dumpIfSet_dyn logger dflags Opt_D_dump_stg_final "CodeGenAnal STG:" FormatSTG (pprGenStgTopBindings (initStgPprOpts dflags) stg_binds_w_tags)
+    -- return $! seqTopBinds stg_binds_w_tags
+    -- pprTraceM "Dumped Stg" (ppr this_mod)
+
+    us_t <- mkSplitUniqSupply 't'
+    let sfi_seqd_binds = rewriteTopBinds this_mod us_t stg_binds_w_tags :: [TgStgTopBinding]
+    !end <- getTime
+    -- putStrLn $! "Time(ms) taken by findTags:" ++ (show $ end - start)
+    let stg_binds_w_fvs = annTopBindingsFreeVars sfi_seqd_binds
 
     dumpIfSet_dyn logger dflags Opt_D_dump_stg_final "Final STG:" FormatSTG (pprGenStgTopBindings (initStgPprOpts dflags) stg_binds_w_fvs)
 
