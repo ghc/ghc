@@ -1346,9 +1346,12 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags home_unit mHscMessag
                              map (moduleName . gwib_mod) loop
 
             -- Compile the module.
-            upsweep_mod hsc_env3 mHscMessage old_hpt stable_mods
-                                    mod mod_index num_mods
-
+            status <- checkStableModules hsc_env3 old_hpt stable_mods mod
+            case status of
+              Stable hmi -> return hmi
+              NotStable src_modified mb_old_iface mb_linkable ->
+                compileOne' Nothing mHscMessage hsc_env3 mod mod_index num_mods
+                             mb_old_iface mb_linkable src_modified
 
           -- Prune the old HPT unless this is an hs-boot module.
           unless (isBootSummary mod == IsBoot) $
