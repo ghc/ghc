@@ -72,7 +72,7 @@ module GHC.Core.Coercion (
         isReflCoVar_maybe, isGReflMCo, mkGReflLeftMCo, mkGReflRightMCo,
         mkCoherenceRightMCo,
 
-        coToMCo, mkTransMCo, mkTransMCoL, mkCastTyMCo, mkSymMCo, isReflMCo,
+        coToMCo, mkTransMCo, mkTransMCoL, mkTransMCoR, mkCastTyMCo, mkSymMCo, isReflMCo,
 
         -- ** Coercion variables
         mkCoVar, isCoVar, coVarName, setCoVarName, setCoVarUnique,
@@ -308,8 +308,8 @@ tidyCoAxBndrsForUser init_env tcvs
 coToMCo :: Coercion -> MCoercion
 -- Convert a coercion to a MCoercion,
 -- It's not clear whether or not isReflexiveCo would be better here
-coToMCo co | isReflCo co = MRefl
-           | otherwise   = MCo co
+coToMCo co | isReflexiveCo co = MRefl
+           | otherwise        = MCo co
 
 -- | Tests if this MCoercion is obviously generalized reflexive
 -- Guaranteed to work very quickly.
@@ -329,11 +329,15 @@ mkGReflCo r ty mco
 mkTransMCo :: MCoercion -> MCoercion -> MCoercion
 mkTransMCo MRefl     co2       = co2
 mkTransMCo co1       MRefl     = co1
-mkTransMCo (MCo co1) (MCo co2) = MCo (mkTransCo co1 co2)
+mkTransMCo (MCo co1) (MCo co2) = coToMCo (mkTransCo co1 co2)
 
 mkTransMCoL :: MCoercion -> Coercion -> MCoercion
 mkTransMCoL MRefl     co2 = MCo co2
-mkTransMCoL (MCo co1) co2 = MCo (mkTransCo co1 co2)
+mkTransMCoL (MCo co1) co2 = coToMCo (mkTransCo co1 co2)
+
+mkTransMCoR :: Coercion -> MCoercion -> MCoercion
+mkTransMCoR co1 MRefl     = MCo co1
+mkTransMCoR co1 (MCo co2) = coToMCo (mkTransCo co1 co2)
 
 -- | Get the reverse of an 'MCoercion'
 mkSymMCo :: MCoercion -> MCoercion
@@ -1352,7 +1356,7 @@ setNominalRole_maybe r co
       | case prov of PhantomProv _    -> False  -- should always be phantom
                      ProofIrrelProv _ -> True   -- it's always safe
                      PluginProv _     -> False  -- who knows? This choice is conservative.
-                     CorePrepProv     -> True
+                     CorePrepProv _   -> True
       = Just $ UnivCo prov Nominal co1 co2
     setNominalRole_maybe_helper _ = Nothing
 
@@ -1456,10 +1460,10 @@ promoteCoercion co = case co of
     AxiomInstCo {} -> mkKindCo co
     AxiomRuleCo {} -> mkKindCo co
 
-    UnivCo (PhantomProv kco) _ _ _    -> kco
+    UnivCo (PhantomProv kco)    _ _ _ -> kco
     UnivCo (ProofIrrelProv kco) _ _ _ -> kco
-    UnivCo (PluginProv _) _ _ _       -> mkKindCo co
-    UnivCo CorePrepProv _ _ _         -> mkKindCo co
+    UnivCo (PluginProv _)       _ _ _ -> mkKindCo co
+    UnivCo (CorePrepProv _)     _ _ _ -> mkKindCo co
 
     SymCo g
       -> mkSymCo (promoteCoercion g)
@@ -2283,7 +2287,7 @@ seqProv :: UnivCoProvenance -> ()
 seqProv (PhantomProv co)    = seqCo co
 seqProv (ProofIrrelProv co) = seqCo co
 seqProv (PluginProv _)      = ()
-seqProv CorePrepProv        = ()
+seqProv (CorePrepProv _)    = ()
 
 seqCos :: [Coercion] -> ()
 seqCos []       = ()
