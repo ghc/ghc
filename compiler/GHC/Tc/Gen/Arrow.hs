@@ -145,9 +145,9 @@ tcCmd env (L loc cmd) res_ty
         ; return (L loc cmd') }
 
 tc_cmd :: CmdEnv -> HsCmd GhcRn  -> CmdType -> TcM (HsCmd GhcTc)
-tc_cmd env (HsCmdPar x cmd) res_ty
+tc_cmd env (HsCmdPar x lpar cmd rpar) res_ty
   = do  { cmd' <- tcCmd env cmd res_ty
-        ; return (HsCmdPar x cmd') }
+        ; return (HsCmdPar x lpar cmd' rpar) }
 
 tc_cmd env (HsCmdLet x binds (L body_loc body)) res_ty
   = do  { (binds', body') <- tcLocalBinds binds         $
