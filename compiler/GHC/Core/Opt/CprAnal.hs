@@ -44,43 +44,80 @@ _ = pprTrace -- Tired of commenting out the import all the time
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The goal of Constructed Product Result analysis is to identify functions that
 surely return heap-allocated records on every code path, so that we can
-eliminate said heap allocation by performing a worker/wrapper split.
+eliminate said heap allocation by performing a worker/wrapper split
+(via 'GHC.Core.Opt.WorkWrap.Utils.mkWWcpr_entry').
 
-@swap@ below is such a function:
-
+`swap` below is such a function:
+```
   swap (a, b) = (b, a)
-
-A @case@ on an application of @swap@, like
-@case swap (10, 42) of (a, b) -> a + b@ could cancel away
-(by case-of-known-constructor) if we "inlined" @swap@ and simplified. We then
-say that @swap@ has the CPR property.
+```
+A `case` on an application of `swap`, like
+`case swap (10, 42) of (a, b) -> a + b` could cancel away
+(by case-of-known-constructor) if we \"inlined\" `swap` and simplified. We then
+say that `swap` has the CPR property.
 
 We can't inline recursive functions, but similar reasoning applies there:
-
+```
   f x n = case n of
     0 -> (x, 0)
     _ -> f (x+1) (n-1)
-
-Inductively, @case f 1 2 of (a, b) -> a + b@ could cancel away the constructed
-product with the case. So @f@, too, has the CPR property. But we can't really
-"inline" @f@, because it's recursive. Also, non-recursive functions like @swap@
+```
+Inductively, `case f 1 2 of (a, b) -> a + b` could cancel away the constructed
+product with the case. So `f`, too, has the CPR property. But we can't really
+"inline" `f`, because it's recursive. Also, non-recursive functions like `swap`
 might be too big to inline (or even marked NOINLINE). We still want to exploit
 the CPR property, and that is exactly what the worker/wrapper transformation
 can do for us:
-
+```
   $wf x n = case n of
     0 -> case (x, 0) of -> (a, b) -> (# a, b #)
     _ -> case f (x+1) (n-1) of (a, b) -> (# a, b #)
   f x n = case $wf x n of (# a, b #) -> (a, b)
-
-where $wf readily simplifies (by case-of-known-constructor and inlining @f@) to:
-
+```
+where $wf readily simplifies (by case-of-known-constructor and inlining `f`) to:
+```
   $wf x n = case n of
     0 -> (# x, 0 #)
     _ -> $wf (x+1) (n-1)
-
-Now, a call site like @case f 1 2 of (a, b) -> a + b@ can inline @f@ and
+```
+Now, a call site like `case f 1 2 of (a, b) -> a + b` can inline `f` and
 eliminate the heap-allocated pair constructor.
+
+Note [Nested CPR]
+~~~~~~~~~~~~~~~~~
+We can apply Note [Constructed Product Result] deeper than just the top-level
+result constructor of a function, e.g.,
+```
+  g x
+    | even x = (x+1,x+2) :: (Int, Int)
+    | odd  x = (x+2,x+3)
+```
+will get split as follows:
+```
+  $wg (x :: Int#)
+    | .. x .. = (# x +# 1#, x +# 2# #) :: (# Int#, Int# #)
+    | .. x .. = (# x +# 2#, x +# 3# #)
+  g (I# x) = case $wf x of (# y, z #) -> (I# y, I# z)
+```
+Note however that in the following we will only unbox the second component:
+```
+  h x
+    | even x = (x,  x+1)   :: (Int, Int)
+    | odd  x = (x+1,x+2)
+```
+Why? After all, `x` satisfies Note [CPR for binders that will be unboxed]!
+Here's a counter-example:
+```
+  j x = (let t = x+1 in t, 42)
+```
+Here, `t` is strictly used, *but only within its scope within the first pair
+component*. `t` also satisfies Note [CPR for binders that will be unboxed], but
+we may not unbox `j` deeply lest evaluation of `x` diverges!
+
+!1866 solves this through a nested termination analysis that tracks whether we
+may unbox a field (thus forcing it in the process). There are a couple of tests
+in T18174 that show case Nested CPR. Some of them only work with the termination
+analysis from !1866.
 
 Note [Phase ordering]
 ~~~~~~~~~~~~~~~~~~~~~
@@ -94,8 +131,7 @@ Ideally, we would want the following pipeline:
 4. worker/wrapper (for CPR)
 
 Currently, we omit 2. and anticipate the results of worker/wrapper.
-See Note [CPR for binders that will be unboxed]
-and Note [Optimistic field binder CPR].
+See Note [CPR for binders that will be unboxed].
 An additional w/w pass would simplify things, but probably add slight overhead.
 So currently we have
 
@@ -224,14 +260,24 @@ cprAnalAlt env scrut_ty (Alt con bndrs rhs)
 -- * CPR transformer
 --
 
-cprAnalApp :: AnalEnv -> CoreExpr -> [CoreArg] -> [CprType] -> (CprType, CoreExpr)
+data TermFlag -- Better than using a Bool
+  = Terminates
+  | MightDiverge
+
+exprTerminates :: CoreExpr -> TermFlag
+exprTerminates e
+  | exprIsHNF e = Terminates -- A /very/ simple termination analysis.
+  | otherwise   = MightDiverge
+
+cprAnalApp :: AnalEnv -> CoreExpr -> [CoreArg] -> [(TermFlag, CprType)] -> (CprType, CoreExpr)
 cprAnalApp env e args' arg_tys
   -- Collect CprTypes for (value) args (inlined collectArgs):
   | App fn arg <- e, isTypeArg arg -- Don't analyse Type args
   = cprAnalApp env fn (arg:args') arg_tys
   | App fn arg <- e
   , (arg_ty, arg') <- cprAnal env arg
-  = cprAnalApp env fn (arg':args') (arg_ty:arg_tys)
+  -- See Note [Nested CPR] on the need for termination analysis
+  = cprAnalApp env fn (arg':args') ((exprTerminates arg', arg_ty):arg_tys)
 
   | Var fn <- e
   = (cprTransform env fn arg_tys, mkApps e args')
@@ -240,10 +286,10 @@ cprAnalApp env e args' arg_tys
   , (e_ty, e') <- cprAnal env e
   = (applyCprTy e_ty (length arg_tys), mkApps e' args')
 
-cprTransform :: AnalEnv   -- ^ The analysis environment
-             -> Id        -- ^ The function
-             -> [CprType] -- ^ info about incoming /value/ arguments
-             -> CprType   -- ^ The demand type of the application
+cprTransform :: AnalEnv               -- ^ The analysis environment
+             -> Id                    -- ^ The function
+             -> [(TermFlag, CprType)] -- ^ info about incoming /value/ arguments
+             -> CprType               -- ^ The demand type of the application
 cprTransform env id args
   = -- pprTrace "cprTransform" (vcat [ppr id, ppr args, ppr sig])
     sig
@@ -258,21 +304,52 @@ cprTransform env id args
       -- See Note [CPR for data structures]
       | Just rhs <- cprDataStructureUnfolding_maybe id
       = fst $ cprAnal env rhs
-      -- Imported function or data con worker
+      -- See Note [CPR for DataCon wrappers]
+      | isDataConWrapId id, let rhs = uf_tmpl (realIdUnfolding id)
+      = fst $ cprAnal env rhs
+      -- DataCon worker
+      | Just con <- isDataConWorkId_maybe id
+      = cprTransformDataConWork con args
+      -- Imported function
       | isGlobalId id
       = applyCprTy (getCprSig (idCprSig id)) (length args)
       | otherwise
       = topCprType
 
 -- | CPR transformers for special Ids
-cprTransformSpecial :: Id -> [CprType] -> Maybe CprType
+cprTransformSpecial :: Id -> [(TermFlag, CprType)] -> Maybe CprType
 cprTransformSpecial id args
   -- See Note [Simplification of runRW#] in GHC.CoreToStg.Prep
   | idUnique id == runRWKey -- `runRW (\s -> e)`
-  , [arg] <- args           -- `\s -> e` has CPR type `arg` (e.g. `. -> 2`)
+  , [(_tf, arg)] <- args    -- `\s -> e` has CPR type `arg` (e.g. `. -> 2`)
   = Just $ applyCprTy arg 1 -- `e` has CPR type `2`
   | otherwise
   = Nothing
+
+-- | Get a 'CprType' for an application of a 'DataCon' worker, given a saturated
+-- number of 'CprType's for its fields.
+cprTransformDataConWork :: DataCon -> [(TermFlag, CprType)] -> CprType
+cprTransformDataConWork con args
+  | null (dataConExTyCoVars con)  -- No existentials
+  , wkr_arity <= mAX_CPR_SIZE -- See Note [Trimming to mAX_CPR_SIZE]
+  , args `lengthIs` wkr_arity
+  -- , pprTrace "cprTransformDataConWork" (ppr con <+> ppr wkr_arity <+> ppr args) True
+  = CprType 0 (ConCpr (dataConTag con) (strictZipWith extract_cpr args wkr_str_marks))
+  | otherwise
+  = topCprType
+  where
+    wkr_arity = dataConRepArity con
+    wkr_str_marks = dataConRepStrictness con
+    extract_cpr (tf, CprType n cpr) str
+      | n == 0, term_or_strict tf str = cpr -- doesn't terminate or intervening lambdas
+      | otherwise                     = topCpr
+    term_or_strict Terminates _            = True
+    term_or_strict _          MarkedStrict = True
+    term_or_strict _          _            = False
+
+-- | See Note [Trimming to mAX_CPR_SIZE].
+mAX_CPR_SIZE :: Arity
+mAX_CPR_SIZE = 10
 
 --
 -- * Bindings
@@ -405,6 +482,42 @@ from @f@'s, so it *will* be WW'd:
 
 And the case in @g@ can never cancel away, thus we introduced extra reboxing.
 Hence we always trim the CPR signature of a binding to idArity.
+
+Note [CPR for DataCon wrappers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We transform DataCon wrappers simply by analysing their unfolding. Why not
+analyse the unfolding once, upfront? A few reasons:
+
+  1. It's simpler to analyse the unfolding anew at every call site, and the
+     unfolding will be pretty cheap to analyse. Also they occur seldom enough
+     that performance-wise it doesn't matter.
+  2. 'GHC.Types.Id.Make' no longer gives DataCon *workers* the CPR property, so
+     neither should it give it to wrappers. Better keep it all in this module.
+  3. In the future, Nested CPR could take a better account of incoming args,
+     like !1866 did. If any of those args had the CPR property, then we'd even
+     get Nested CPR for DataCon wrapper calls, for free. Not so if we simply
+     give the wrapper a single CPR sig in 'GHC.Types.Id.Make.mkDataConRep'!
+
+Note [Trimming to mAX_CPR_SIZE]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We do not treat very big tuples as CPR-ish:
+
+  a) For a start, we get into trouble because there aren't
+     "enough" unboxed tuple types (a tiresome restriction,
+     but hard to fix),
+  b) More importantly, big unboxed tuples get returned mainly
+     on the stack, and are often then allocated in the heap
+     by the caller. So doing CPR for them may in fact make
+     things worse, especially if the wrapper doesn't cancel away
+     and we move to the stack in the worker and then to the heap
+     in the wrapper.
+
+So we (nested) CPR for functions that would otherwise pass more than than
+'mAX_CPR_SIZE' fields.
+That effect is exacerbated for the unregisterised backend, where we
+don't have any hardware registers to return the fields in. Returning
+everything on the stack results in much churn and increases compiler
+allocation by 15% for T15164 in a validate build.
 -}
 
 data AnalEnv
@@ -796,6 +909,9 @@ structure, and hence (see above) will not have a CPR signature. So instead, when
 transformer, 'cprTransform' instead tries to get its unfolding (via
 'cprDataStructureUnfolding_maybe'), and analyses that instead.
 
+Note that giving fac the CPR property means we potentially rebox lvl at call
+sites. See Note [CPR for data structures can destroy sharing].
+
 In practice, GHC generates a lot of (nested) TyCon and KindRep bindings, one
 for each data declaration. They should not have CPR signatures (blow up!).
 
@@ -818,6 +934,40 @@ we still give every function an every deepening CPR signature. But it's very
 uncommon to find code like this, whereas the long static data structures from
 the beginning of this Note are very common because of GHC's strategy of ANF'ing
 data structure RHSs.
+
+Note [CPR for data structures can destroy sharing]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In Note [CPR for data structures], we argued that giving data structure bindings
+the CPR property is useful to give functions like fac the CPR property:
+
+  lvl = I# 1#
+  fac 0 = lvl
+  fac n = n * fac (n-1)
+
+Worker/wrappering fac for its CPR property means we get a very fast worker
+function with type Int# -> Int#, without any heap allocation at all. But
+consider what happens if we call `map fac (replicate n 0)`, where the wrapper
+doesn't cancel away: Then we rebox the result of $wfac *on each call*, n times,
+instead of reusing the static thunk for 1, e.g. an asymptotic increase in
+allocations. If you twist it just right, you can actually write programs that
+that take O(n) space if you do CPR and O(1) if you don't:
+
+  fac :: Int -> Int
+  fac 0 = 1 -- this clause will trigger CPR and destroy sharing for O(n) space
+  -- fac 0 = lazy 1 -- this clause will prevent CPR and run in O(1) space
+  fac n = n * fac (n-1)
+
+  const0 :: Int -> Int
+  const0 n = signum n - 1 -- will return 0 for [1..n]
+  {-# NOINLINE const0 #-}
+
+  main = print $ foldl' (\acc n -> acc + lazy n) 0 $ map (fac . const0) [1..100000000]
+
+Generally, this kind of asymptotic increase in allocation can happen whenever we
+give a data structure the CPR property that is bound outside of a recursive
+function. So far we don't have a convincing remedy; giving fac the CPR property
+is just too attractive. #19309 documents a futile idea. #13331 tracks the
+general issue of CPR destroying sharing and also contains above reproducer.
 
 Note [CPR examples]
 ~~~~~~~~~~~~~~~~~~~~
