@@ -1,0 +1,26 @@
+
+==================== Cpr signatures ====================
+RecDataConCPR.blah: 1(1(, 1))
+RecDataConCPR.blub:
+RecDataConCPR.blub2:
+RecDataConCPR.bootNonRec: 1
+RecDataConCPR.bootRec: 1
+RecDataConCPR.f: 1
+RecDataConCPR.fixx:
+RecDataConCPR.g: 1
+RecDataConCPR.m:
+RecDataConCPR.myM: 1(, 1(1,))
+RecDataConCPR.n: 1
+RecDataConCPR.r: 1(1(1(1(1(1(1(1(1(1(2))))))))))
+RecDataConCPR.r2:
+RecDataConCPR.replicateOne:
+RecDataConCPR.s: 1(, 2)
+RecDataConCPR.t: 1(1(, 1))
+RecDataConCPR.u: 1
+RecDataConCPR.u2:
+
+
+
+==================== Cpr signatures ====================
+
+

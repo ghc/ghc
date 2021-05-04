@@ -33,6 +33,8 @@ data Cpr
   -- If all of them are top, better use 'FlatConCpr', as ensured by the pattern
   -- synonym 'ConCpr'.
   | FlatConCpr !ConTag
+  -- ^ @FlatConCpr tag@ is an efficient encoding for @'ConCpr_' tag [TopCpr..]@.
+  -- Purely for compiler perf. Can be constructed with 'ConCpr'.
   | TopCpr
   deriving Eq
 
@@ -169,12 +171,9 @@ newtype CprSig = CprSig { getCprSig :: CprType }
 -- unleashable at that arity. See Note [Understanding DmdType and DmdSig] in
 -- "GHC.Types.Demand"
 mkCprSigForArity :: Arity -> CprType -> CprSig
-mkCprSigForArity arty ty@(CprType n cpr)
-  | arty /= n         = topCprSig
-      -- Trim on arity mismatch
-  | ConCpr t _ <- cpr = CprSig (CprType n (flatConCpr t))
-      -- Flatten nested CPR info, we don't exploit it (yet)
-  | otherwise         = CprSig ty
+mkCprSigForArity arty ty@(CprType n _)
+  | arty /= n = topCprSig -- Trim on arity mismatch
+  | otherwise = CprSig ty
 
 topCprSig :: CprSig
 topCprSig = CprSig topCprType
@@ -189,14 +188,14 @@ seqCprSig :: CprSig -> ()
 seqCprSig (CprSig ty) = seqCprTy ty
 
 -- | BNF:
--- ```
---   cpr ::= ''                               -- TopCpr
---        |  n                                -- FlatConCpr n
---        |  n '(' cpr1 ',' cpr2 ',' ... ')'  -- ConCpr n [cpr1,cpr2,...]
---        |  'b'                              -- BotCpr
--- ```
+--
+-- > cpr ::= ''                               -- TopCpr
+-- >      |  n                                -- FlatConCpr n
+-- >      |  n '(' cpr1 ',' cpr2 ',' ... ')'  -- ConCpr n [cpr1,cpr2,...]
+-- >      |  'b'                              -- BotCpr
+--
 -- Examples:
---   * `f x = f x` has denotation `b`
+--   * `f x = f x` has result CPR `b`
 --   * `1(1,)` is a valid (nested) 'Cpr' denotation for `(I# 42#, f 42)`.
 instance Outputable Cpr where
   ppr TopCpr         = empty
@@ -204,8 +203,18 @@ instance Outputable Cpr where
   ppr (ConCpr n cs)  = int n <> parens (pprWithCommas ppr cs)
   ppr BotCpr         = char 'b'
 
+-- | BNF:
+--
+-- > cpr_ty ::= cpr               -- short form if arty == 0
+-- >         |  '\' arty '.' cpr  -- if arty > 0
+--
+-- Examples:
+--   * `f x y z = f x y z` has denotation `\3.b`
+--   * `g !x = (x+1, x+2)` has denotation `\1.1(1,1)`.
 instance Outputable CprType where
-  ppr (CprType arty res) = ppr arty <> ppr res
+  ppr (CprType arty res)
+    | 0 <- arty = ppr res
+    | otherwise = char '\\' <> ppr arty <> char '.' <> ppr res
 
 -- | Only print the CPR result
 instance Outputable CprSig where
