@@ -466,7 +466,7 @@ calculateAvails home_unit iface mod_safe' want_boot imported_by =
       -- Does this import mean we now require our own pkg
       -- to be trusted? See Note [Trust Own Package]
       ptrust = trust == Sf_Trustworthy || trust_pkg
-      pkg_trust_req 
+      pkg_trust_req
         | isHomeUnit home_unit pkg = ptrust
         | otherwise = False
 

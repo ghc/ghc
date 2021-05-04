@@ -61,7 +61,6 @@ import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Module.Warnings
 import GHC.Unit.Module.Deps
-import GHC.Unit.Home.ModInfo
 
 import Control.Monad
 import Data.Function
