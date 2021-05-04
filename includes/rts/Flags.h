@@ -13,9 +13,18 @@
 
 #pragma once
 
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wexpansion-to-defined"
+#pragma clang diagnostic ignored "-Wavailability"
+#pragma clang diagnostic ignored "-Wnullability-completeness"
+#endif
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#endif
 #include "stg/Types.h"
 #include "Time.h"
 
