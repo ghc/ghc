@@ -25,10 +25,14 @@ import GHC.Prelude
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Unique.Supply
+import GHC.Types.Unique.FM
+import GHC.Unit.Types (Module)
 
 import GHC.Core.DataCon
 import GHC.Core (AltCon(..) )
 import GHC.Core.Type
+
+import GHC.StgToCmm.Types
 
 import GHC.Stg.Utils
 import GHC.Stg.Syntax as StgSyn hiding (AlwaysEnter)
@@ -36,18 +40,15 @@ import GHC.Stg.Syntax as StgSyn hiding (AlwaysEnter)
 import GHC.Data.Maybe
 import GHC.Utils.Panic
 
-import Control.Monad
-
 import GHC.Utils.Outputable
-
 import GHC.Utils.Monad.State
 import GHC.Utils.Misc
-import GHC.Types.Unique.FM
 
 import GHC.Stg.InferTags.Types
-import GHC.Unit.Types (Module)
-import GHC.StgToCmm.Types
+
+import Control.Monad
 import Data.Coerce
+
 
 -- import GHC.Driver.Ppr
 
