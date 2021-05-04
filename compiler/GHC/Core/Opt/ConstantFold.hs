@@ -157,6 +157,7 @@ primOpRules nm = \case
    Word8AndOp  -> mkPrimOpRule nm 2 [ binaryLit (word8Op2 (.&.))
                                     , idempotent
                                     , zeroElem
+                                    , identity (mkLitWord8 0xFF)
                                     , sameArgIdempotentCommut Word8AndOp
                                     , andFoldingRules word8Ops
                                     ]
@@ -230,6 +231,7 @@ primOpRules nm = \case
    Word16AndOp -> mkPrimOpRule nm 2 [ binaryLit (word16Op2 (.&.))
                                     , idempotent
                                     , zeroElem
+                                    , identity (mkLitWord16 0xFFFF)
                                     , sameArgIdempotentCommut Word16AndOp
                                     , andFoldingRules word16Ops
                                     ]
@@ -303,6 +305,7 @@ primOpRules nm = \case
    Word32AndOp -> mkPrimOpRule nm 2 [ binaryLit (word32Op2 (.&.))
                                     , idempotent
                                     , zeroElem
+                                    , identity (mkLitWord32 0xFFFFFFFF)
                                     , sameArgIdempotentCommut Word32AndOp
                                     , andFoldingRules word32Ops
                                     ]
@@ -375,6 +378,7 @@ primOpRules nm = \case
    Word64AndOp -> mkPrimOpRule nm 2 [ binaryLit (word64Op2 (.&.))
                                     , idempotent
                                     , zeroElem
+                                    , identity (mkLitWord64 0xFFFFFFFFFFFFFFFF)
                                     , sameArgIdempotentCommut Word64AndOp
                                     , andFoldingRules word64Ops
                                     ]
@@ -456,6 +460,7 @@ primOpRules nm = \case
    IntAndOp    -> mkPrimOpRule nm 2 [ binaryLit (intOp2 (.&.))
                                     , idempotent
                                     , zeroElem
+                                    , identityPlatform (\p -> mkLitInt p (-1))
                                     , sameArgIdempotentCommut IntAndOp
                                     , andFoldingRules intOps
                                     ]
@@ -507,6 +512,7 @@ primOpRules nm = \case
    WordAndOp   -> mkPrimOpRule nm 2 [ binaryLit (wordOp2 (.&.))
                                     , idempotent
                                     , zeroElem
+                                    , identityPlatform (\p -> mkLitWord p (platformMaxWord p))
                                     , sameArgIdempotentCommut WordAndOp
                                     , andFoldingRules wordOps
                                     ]
