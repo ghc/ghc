@@ -771,8 +771,10 @@ mkStgRhs bndr (PreStgRhs bndrs rhs)
 
   -- After this point we know that `bndrs` is empty,
   -- so this is not a function binding
-  | isJoinId bndr -- must be a nullary join point
-  = ASSERT(idJoinArity bndr == 0)
+
+  | isJoinId bndr -- Must be a nullary join point
+  = -- It might have /type/ arguments (T18328),
+    -- so its JoinArity might be >0
     StgRhsClosure noExtFieldSilent
                   currentCCS
                   ReEntrant -- ignored for LNE
