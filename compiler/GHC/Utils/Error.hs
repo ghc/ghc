@@ -73,6 +73,7 @@ import GHC.Utils.Exception
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Logger
+import GHC.Utils.Validity
 import GHC.Types.Error
 import GHC.Types.SrcLoc as SrcLoc
 
@@ -170,31 +171,6 @@ mkPlainErrorMsgEnvelope :: Diagnostic e
                         -> MsgEnvelope e
 mkPlainErrorMsgEnvelope locn msg =
   mk_msg_envelope SevError locn alwaysQualify msg
-
--------------------------
-data Validity
-  = IsValid            -- ^ Everything is fine
-  | NotValid SDoc    -- ^ A problem, and some indication of why
-
-isValid :: Validity -> Bool
-isValid IsValid       = True
-isValid (NotValid {}) = False
-
-andValid :: Validity -> Validity -> Validity
-andValid IsValid v = v
-andValid v _       = v
-
--- | If they aren't all valid, return the first
-allValid :: [Validity] -> Validity
-allValid []       = IsValid
-allValid (v : vs) = v `andValid` allValid vs
-
-getInvalids :: [Validity] -> [SDoc]
-getInvalids vs = [d | NotValid d <- vs]
-
-orValid :: Validity -> Validity -> Validity
-orValid IsValid _ = IsValid
-orValid _       v = v
 
 -- -----------------------------------------------------------------------------
 -- Collecting up messages for later ordering and printing.

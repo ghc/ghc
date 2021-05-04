@@ -34,7 +34,7 @@ import GHC.Data.Bag
 import GHC.Types.SrcLoc
 import GHC.Utils.Json
 
-import GHC.Types.Error ( DiagnosticReason(..) )
+import GHC.Types.DiagnosticReason ( DiagnosticReason(..) )
 
 import Data.Function
 import Data.List (sortBy, intercalate, stripPrefix)

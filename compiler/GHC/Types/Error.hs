@@ -61,14 +61,12 @@ where
 
 import GHC.Prelude
 
-import GHC.Driver.Flags
-
 import GHC.Data.Bag
 import GHC.IO (catchException)
-import GHC.LanguageExtensions (Extension)
 import GHC.Utils.Outputable as Outputable
 import qualified GHC.Utils.Ppr.Colour as Col
-import GHC.Types.Name.Reader (RdrName)
+import GHC.Types.DiagnosticReason
+import GHC.Types.Hint
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Data.FastString (unpackFS)
 import GHC.Data.StringBuffer (atLine, hGetStringBuffer, len, lexemeToString)
@@ -76,7 +74,6 @@ import GHC.Utils.Json
 
 import Data.Bifunctor
 import Data.Foldable    ( fold )
-import Data.Typeable (Typeable)
 
 {-
 Note [Messages]
@@ -199,44 +196,6 @@ constraint.
 
 -}
 
--- | An /action/ which can be performed on an Haskell expression, typically
--- to transform it according to an 'Hint'.
-data Refactoring
-  = MkRefactoring SrcSpan      -- ^ where the current code to be replaced lives
-                  Replacement  -- ^ replacement for that code
-
-data Replacement
-{-
-  -- = ReplaceExpr (HsExpr GhcPs)
-  -- | ReplaceType (HsType GhcPs)
-  -- | ReplaceMatch (Match GhcPs (HsExpr GhcPs))
--}
-
--- | A typeclass for /hints/, emitted by GHC together with diagnostics. A /hint/
--- is a program transformation which suggests a possible way to deal with a particular
--- warning or error.
-class Outputable a => IsHint a where
-  hintRefactoring :: a -> Maybe Refactoring
-
--- | A type for hints emitted by GHC.
-data Hint where
-  -- | An \"unknown\" hint. This type constructor allows arbitrary
-  -- hints to be embedded. The typical use case would be GHC plugins
-  -- willing to emit hints alonside their custom diagnostics.
-  UnknownHint :: (IsHint a, Typeable a) => a -> Hint
-  -- | Suggests adding a particular language extension.
-  SuggestExtension :: !Extension -> Hint
-  -- | Suggests that a particular statement should be written within a \"do\"
-  -- block.
-  SuggestDo :: Hint
-  -- | Suggests that a missing \"do\" block.
-  SuggestMissingDo :: Hint
-  -- | Suggests that a \"let\" expression is needed in a \"do\" block.
-  SuggestLetInDo :: Hint
-  SuggestInfixBindMaybeAtPat :: !RdrName -> Hint
-  -- | Type applications in patterns are only allowed on data constructors
-  TypeApplicationsInPatternsOnlyDataCons :: Hint
-
 -- | A class identifying a diagnostic.
 -- Dictionary.com defines a diagnostic as:
 --
@@ -300,29 +259,6 @@ mkDecoratedDiagnostic rea docs = DiagnosticMessage (mkDecorated docs) rea []
 mkDecoratedError :: [SDoc] -> DiagnosticMessage
 mkDecoratedError docs = DiagnosticMessage (mkDecorated docs) ErrorWithoutFlag []
 
--- | The reason /why/ a 'Diagnostic' was emitted in the first place.
--- Diagnostic messages are born within GHC with a very precise reason, which
--- can be completely statically-computed (i.e. this is an error or a warning
--- no matter what), or influenced by the specific state of the 'DynFlags' at
--- the moment of the creation of a new 'Diagnostic'. For example, a parsing
--- error is /always/ going to be an error, whereas a 'WarningWithoutFlag
--- Opt_WarnUnusedImports' might turn into an error due to '-Werror' or
--- '-Werror=warn-unused-imports'. Interpreting a 'DiagnosticReason' together
--- with its associated 'Severity' gives us the full picture.
-data DiagnosticReason
-  = WarningWithoutFlag
-  -- ^ Born as a warning.
-  | WarningWithFlag !WarningFlag
-  -- ^ Warning was enabled with the flag.
-  | ErrorWithoutFlag
-  -- ^ Born as an error.
-  deriving (Eq, Show)
-
-instance Outputable DiagnosticReason where
-  ppr = \case
-    WarningWithoutFlag  -> text "WarningWithoutFlag"
-    WarningWithFlag wf  -> text ("WarningWithFlag " ++ show wf)
-    ErrorWithoutFlag    -> text "ErrorWithoutFlag"
 
 -- | An envelope for GHC's facts about a running program, parameterised over the
 -- /domain-specific/ (i.e. parsing, typecheck-renaming, etc) diagnostics.

@@ -1,11 +1,65 @@
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-} -- instance IsHint Hint, instance RenderableMessage Hint
 module GHC.Types.Hint where
 
+import Data.Typeable
+
+import GHC.Hs.Extension
+import GHC.LanguageExtensions
 import GHC.Prelude
-import GHC.Types.Error
-import GHC.Utils.Outputable
 import GHC.Types.Name.Reader
+import GHC.Types.SrcLoc
+import GHC.Utils.Outputable
+
+import Language.Haskell.Syntax.Expr
+import Language.Haskell.Syntax.Type
+
+
+--
+-- Types for hints and refactorings
+--
+
+-- | An /action/ which can be performed on an Haskell expression, typically
+-- to transform it according to an 'Hint'.
+data Refactoring
+  = MkRefactoring SrcSpan      -- ^ where the current code to be replaced lives
+                  Replacement  -- ^ replacement for that code
+
+-- | A mechanical transformation returned as part of a 'Refactoring',
+-- which can be applied to the AST.
+data Replacement
+  = ReplaceExpr (HsExpr GhcPs)
+  | ReplaceType (HsType GhcPs)
+  | ReplaceMatch (Match GhcPs (HsExpr GhcPs))
+
+-- | A typeclass for /hints/, emitted by GHC together with diagnostics. A /hint/
+-- is a program transformation which suggests a possible way to deal with a particular
+-- warning or error.
+class Outputable a => IsHint a where
+  hintRefactoring :: a -> Maybe Refactoring
+
+-- | A type for hints emitted by GHC.
+data Hint where
+  -- | An \"unknown\" hint. This type constructor allows arbitrary
+  -- hints to be embedded. The typical use case would be GHC plugins
+  -- willing to emit hints alonside their custom diagnostics.
+  UnknownHint :: (IsHint a, Typeable a) => a -> Hint
+  -- | Suggests adding a particular language extension.
+  SuggestExtension :: !Extension -> Hint
+  -- | Suggests that a particular statement should be written within a \"do\"
+  -- block.
+  SuggestDo :: Hint
+  -- | Suggests that a missing \"do\" block.
+  SuggestMissingDo :: Hint
+  -- | Suggests that a \"let\" expression is needed in a \"do\" block.
+  SuggestLetInDo :: Hint
+  SuggestInfixBindMaybeAtPat :: !RdrName -> Hint
+  -- | Type applications in patterns are only allowed on data constructors
+  TypeApplicationsInPatternsOnlyDataCons :: Hint
+
+--
+-- Instances
+--
 
 instance Outputable Hint where
   ppr = \case

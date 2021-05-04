@@ -1,4 +1,4 @@
-Found 256 Language.Haskell.Syntax module dependencies
+Found 258 Language.Haskell.Syntax module dependencies
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
 GHC.Builtin.Types
@@ -161,6 +161,7 @@ GHC.Types.CostCentre
 GHC.Types.CostCentre.State
 GHC.Types.Cpr
 GHC.Types.Demand
+GHC.Types.DiagnosticReason
 GHC.Types.Error
 GHC.Types.FieldLabel
 GHC.Types.Fixity
@@ -247,6 +248,7 @@ GHC.Utils.Panic.Plain
 GHC.Utils.Ppr
 GHC.Utils.Ppr.Colour
 GHC.Utils.TmpFs
+GHC.Utils.Validity
 Language.Haskell.Syntax
 Language.Haskell.Syntax.Binds
 Language.Haskell.Syntax.Decls
