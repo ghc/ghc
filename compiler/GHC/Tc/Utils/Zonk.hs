@@ -810,8 +810,6 @@ zonkExpr env (HsRecFld _ (Ambiguous v occ))
 zonkExpr env (HsRecFld _ (Unambiguous v occ))
   = return (HsRecFld noExtField (Unambiguous (zonkIdOcc env v) occ))
 
-zonkExpr _ e@(HsConLikeOut {}) = return e
-
 zonkExpr _ (HsIPVar x id)
   = return (HsIPVar x id)
 
@@ -1008,6 +1006,14 @@ zonkExpr env (XExpr (WrapExpr (HsWrap co_fn expr)))
 
 zonkExpr env (XExpr (ExpansionExpr (HsExpanded a b)))
   = XExpr . ExpansionExpr . HsExpanded a <$> zonkExpr env b
+
+zonkExpr env (XExpr (ConLikeTc con tvs tys))
+  = XExpr . ConLikeTc con tvs <$> mapM zonk_scale tys
+  where
+    zonk_scale (Scaled m ty) = Scaled <$> zonkTcTypeToTypeX env m <*> pure ty
+    -- Only the multiplicity can contain unification variables
+    -- The tvs come straight from the data-con, and so are strictly redundant
+    -- See Wrinkles of Note [Typechecking data constructors] in GHC.Tc.Gen.Head
 
 zonkExpr _ expr = pprPanic "zonkExpr" (ppr expr)
 

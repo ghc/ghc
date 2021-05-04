@@ -1770,7 +1770,6 @@ instance ExactPrint (GRHS GhcPs (LocatedA (HsCmd GhcPs))) where
 instance ExactPrint (HsExpr GhcPs) where
   getAnnotationEntry (HsVar{})                    = NoEntryVal
   getAnnotationEntry (HsUnboundVar an _)          = fromAnn an
-  getAnnotationEntry (HsConLikeOut{})             = NoEntryVal
   getAnnotationEntry (HsRecFld{})                 = NoEntryVal
   getAnnotationEntry (HsOverLabel an _)           = fromAnn an
   getAnnotationEntry (HsIPVar an _)               = fromAnn an
@@ -1818,7 +1817,6 @@ instance ExactPrint (HsExpr GhcPs) where
         printStringAtAA ob "`"
         printStringAtAA l  "_"
         printStringAtAA cb "`"
-  -- exact x@(HsConLikeOut{})             = withPpr x
   -- exact x@(HsRecFld{})                 = withPpr x
   -- exact x@(HsOverLabel ann _ _)        = withPpr x
   exact (HsIPVar _ (HsIPName n))
