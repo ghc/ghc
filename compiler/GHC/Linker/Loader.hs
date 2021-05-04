@@ -186,17 +186,11 @@ loadDependencies
 loadDependencies interp hsc_env pls span needed_mods = do
 --   initLoaderState (hsc_dflags hsc_env) dl
    let hpt = hsc_HPT hsc_env
-   let dflags = hsc_dflags hsc_env
-   -- The interpreter and dynamic linker can only handle object code built
-   -- the "normal" way, i.e. no non-std ways like profiling or ticky-ticky.
-   -- So here we check the build tag: if we're building a non-standard way
-   -- then we need to find & link object files built the "normal" way.
-   maybe_normal_osuf <- checkNonStdWay dflags interp span
 
    -- Find what packages and linkables are required
    -- (omitting modules from the interactive package, which is already linked)
-   (lnks, pkgs) <- getLinkDeps (text "linking") hsc_env hpt (pkgs_loaded pls, objs_loaded pls, bcos_loaded pls)
-                               maybe_normal_osuf span (filterOut isInteractiveModule needed_mods) []
+   (lnks, pkgs) <- getLinkDeps (text "linking") hsc_env interp hpt (pkgs_loaded pls, objs_loaded pls, bcos_loaded pls)
+                               span (filterOut isInteractiveModule needed_mods) []
 
    -- Link the packages and modules required
    pls1 <- loadPackages' interp hsc_env pkgs pls
@@ -571,55 +565,6 @@ loadExpr interp hsc_env span root_ul_bco = do
         -- their interface files, so getLinkDeps will fail
         -- All wired-in names are in the base package, which we link
         -- by default, so we can safely ignore them here.
-
-dieWith :: DynFlags -> SrcSpan -> SDoc -> IO a
-dieWith dflags span msg = throwGhcExceptionIO (ProgramError (showSDoc dflags (mkLocMessage MCFatal span msg)))
-
-
-checkNonStdWay :: DynFlags -> Interp -> SrcSpan -> IO (Maybe FilePath)
-checkNonStdWay dflags interp srcspan
-  | ExternalInterp {} <- interpInstance interp = return Nothing
-    -- with -fexternal-interpreter we load the .o files, whatever way
-    -- they were built.  If they were built for a non-std way, then
-    -- we will use the appropriate variant of the iserv binary to load them.
-
-  | hostFullWays == targetFullWays = return Nothing
-    -- Only if we are compiling with the same ways as GHC is built
-    -- with, can we dynamically load those object files. (see #3604)
-
-  | objectSuf dflags == normalObjectSuffix && not (null targetFullWays)
-  = failNonStd dflags srcspan
-
-  | otherwise = return (Just (hostWayTag ++ "o"))
-  where
-    targetFullWays = fullWays (ways dflags)
-    hostWayTag = case waysTag hostFullWays of
-                  "" -> ""
-                  tag -> tag ++ "_"
-
-normalObjectSuffix :: String
-normalObjectSuffix = phaseInputExt StopLn
-
-failNonStd :: DynFlags -> SrcSpan -> IO (Maybe FilePath)
-failNonStd dflags srcspan = dieWith dflags srcspan $
-  text "Cannot load" <+> compWay <+>
-     text "objects when GHC is built" <+> ghciWay $$
-  text "To fix this, either:" $$
-  text "  (1) Use -fexternal-interpreter, or" $$
-  text "  (2) Build the program twice: once" <+>
-                       ghciWay <> text ", and then" $$
-  text "      with" <+> compWay <+>
-     text "using -osuf to set a different object file suffix."
-    where compWay
-            | WayDyn `elem` ways dflags = text "-dynamic"
-            | WayProf `elem` ways dflags = text "-prof"
-            | otherwise = text "normal"
-          ghciWay
-            | hostIsDynamic = text "with -dynamic"
-            | hostIsProfiled = text "with -prof"
-            | otherwise = text "the normal way"
-
-
 
 
 {- **********************************************************************

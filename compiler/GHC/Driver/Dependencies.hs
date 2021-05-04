@@ -1,4 +1,6 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE TupleSections #-}
+
 -- | Functions for finding transitive dependencies of modules and packages
 module GHC.Driver.Dependencies (findHomeModules, getLinkDeps
                                , LibrarySpec(..)
@@ -64,6 +66,8 @@ import System.FilePath
 import System.Directory
 import GHC.Platform
 import Data.IORef
+import GHC.Platform.Ways
+import GHC.Driver.Phases
 
 
 -- | Used in OneShot mode to work out what the HPT looks like
@@ -99,21 +103,22 @@ findHomeModules hsc_env home_unit mns = go mns mempty
 -- interface file dependency calculation
 getLinkDeps :: SDoc
             -> HscEnv
+            -> Interp
             -> HomePackageTable
             -- Already loaded things.
             -> ([UnitId] -- Packages
                , ([Linkable]) -- Objects
                , ([Linkable]))  -- BCOs
-            -> Maybe FilePath                   -- replace object suffices?
             -> SrcSpan                          -- for error messages
             -> [Module]                         -- If you need these modules
             -> [UnitId]                         -- and these packages
             -> IO ([Linkable], [UnitId])     -- ... then link these first
 -- Fails with an IO exception if it can't find enough files
 
-getLinkDeps herald hsc_env hpt (loaded_pkgs, objs, bcos) replace_osuf span mods pkgs
+getLinkDeps herald hsc_env interp hpt (loaded_pkgs, objs, bcos) span mods pkgs
 -- Find all the packages and linkables that a set of modules depends on
  = do {
+        replace_osuf <- checkNonStdWay (hsc_dflags hsc_env) interp span
         -- 1.  Find the dependent home-pkg-modules/packages from each iface
       ; (mods_s, pkgs_s) <- follow_deps mods emptyUniqDSet emptyUniqDSet;
 
@@ -130,7 +135,7 @@ getLinkDeps herald hsc_env hpt (loaded_pkgs, objs, bcos) replace_osuf span mods 
         --     This will either be in the HPT or (in the case of one-shot
         --     compilation) we may need to use maybe_getFileLinkable
       ; let { osuf = objectSuf dflags }
-      ; lnks_needed <- mapM (get_linkable osuf) mods_needed
+      ; lnks_needed <- mapM (get_linkable replace_osuf osuf) mods_needed
 
       ; return (lnks_needed, pkgs_needed) }
   where
@@ -193,14 +198,12 @@ getLinkDeps herald hsc_env hpt (loaded_pkgs, objs, bcos) replace_osuf span mods 
                         quotes (ppr mod) $$
                      while_linking_expr
 
-    dieWith :: DynFlags -> SrcSpan -> SDoc -> IO a
-    dieWith dflags span msg = throwGhcExceptionIO (ProgramError (showSDoc dflags (mkLocMessage MCFatal span msg)))
 
     while_linking_expr = text "while finding linking dependencies for an expression"
 
         -- This one is a build-system bug
 
-    get_linkable osuf mod_name      -- A home-package module
+    get_linkable replace_osuf osuf mod_name      -- A home-package module
         | Just mod_info <- lookupHpt hpt mod_name
         = adjust_linkable (Maybes.expectJust "getLinkDeps" (hm_linkable mod_info))
         | otherwise
@@ -243,6 +246,57 @@ getLinkDeps herald hsc_env hpt (loaded_pkgs, objs, bcos) replace_osuf span mods 
             adjust_ul _ (DotA fp) = panic ("adjust_ul DotA " ++ show fp)
             adjust_ul _ (DotDLL fp) = panic ("adjust_ul DotDLL " ++ show fp)
             adjust_ul _ l@(BCOs {}) = return l
+
+
+dieWith :: DynFlags -> SrcSpan -> SDoc -> IO a
+dieWith dflags span msg = throwGhcExceptionIO (ProgramError (showSDoc dflags (mkLocMessage MCFatal span msg)))
+
+   -- The interpreter and dynamic linker can only handle object code built
+   -- the "normal" way, i.e. no non-std ways like profiling or ticky-ticky.
+   -- So here we check the build tag: if we're building a non-standard way
+   -- then we need to find & link object files built the "normal" way.
+
+checkNonStdWay :: DynFlags -> Interp -> SrcSpan -> IO (Maybe FilePath)
+checkNonStdWay dflags interp srcspan
+  | ExternalInterp {} <- interpInstance interp = return Nothing
+    -- with -fexternal-interpreter we load the .o files, whatever way
+    -- they were built.  If they were built for a non-std way, then
+    -- we will use the appropriate variant of the iserv binary to load them.
+
+  | hostFullWays == targetFullWays = return Nothing
+    -- Only if we are compiling with the same ways as GHC is built
+    -- with, can we dynamically load those object files. (see #3604)
+
+  | objectSuf dflags == normalObjectSuffix && not (null targetFullWays)
+  = failNonStd dflags srcspan
+
+  | otherwise = return (Just (hostWayTag ++ "o"))
+  where
+    targetFullWays = fullWays (ways dflags)
+    hostWayTag = case waysTag hostFullWays of
+                  "" -> ""
+                  tag -> tag ++ "_"
+normalObjectSuffix :: String
+normalObjectSuffix = phaseInputExt StopLn
+
+failNonStd :: DynFlags -> SrcSpan -> IO (Maybe FilePath)
+failNonStd dflags srcspan = dieWith dflags srcspan $
+  text "Cannot load" <+> compWay <+>
+     text "objects when GHC is built" <+> ghciWay $$
+  text "To fix this, either:" $$
+  text "  (1) Use -fexternal-interpreter, or" $$
+  text "  (2) Build the program twice: once" <+>
+                       ghciWay <> text ", and then" $$
+  text "      with" <+> compWay <+>
+     text "using -osuf to set a different object file suffix."
+    where compWay
+            | WayDyn `elem` ways dflags = text "-dynamic"
+            | WayProf `elem` ways dflags = text "-prof"
+            | otherwise = text "normal"
+          ghciWay
+            | hostIsDynamic = text "with -dynamic"
+            | hostIsProfiled = text "with -prof"
+            | otherwise = text "the normal way"
 
 loadPackagesX :: forall a . Monoid a => (UnitInfo -> IO a) -> HscEnv -> [UnitId] -> [UnitId] -> IO (a, [UnitId])
 loadPackagesX k hsc_env new_pks loaded_pkgs = link (mempty, loaded_pkgs) new_pks

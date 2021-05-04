@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE TupleSections #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-
 module GHC.HsToCore.Usage (
     -- * Dependency/fingerprinting code (used by GHC.Iface.Make)
     mkUsageInfo, mkUsedNames, mkDependencies
@@ -181,10 +181,11 @@ One way to improve this is to either:
 mkObjectUsage :: HscEnv -> [Module] -> [UnitId] -> IO [Usage]
 mkObjectUsage _ [] [] = return []
 mkObjectUsage hsc_env mods pkgs = do
-  (ls, us) <- getLinkDeps (text "usage") hsc_env (hsc_HPT hsc_env) ([], [], []) Nothing noSrcSpan mods pkgs
-  ds <-
+  (ls, ds) <-
     case hsc_interp hsc_env of
-      Just interp -> fst <$> computePackagesDeps interp hsc_env us
+      Just interp -> do
+        (ls, us) <- getLinkDeps (text "usage") hsc_env interp (hsc_HPT hsc_env) ([], [], []) noSrcSpan mods pkgs
+        (ls,) . fst <$> computePackagesDeps interp hsc_env us
       -- If we're using plugins or TH this case can never happen as the interpreter
       -- is needed for evaluating plugins/TH
       Nothing -> pprPanic "computeObjectDeps" (ppr mods $$ ppr pkgs)
