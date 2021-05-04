@@ -42,6 +42,103 @@ For example
 Here x will be properly tagged: it will point to the heap-allocated
 values for (Just y), and the tag-bits of the pointer will encode
 the tag for Just.
+
+We then take this information in GHC.Stg.InferTags.Rewrite to rewriteTopBinds
+
+Note [Strict field invariant]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+As part of tag inference we introduce the strict field invariant.
+Which consist of us saying that:
+
+* Pointers in strict fields must be save to re-evaluate and be
+  properly tagged.
+
+Why? Because if we have code like:
+
+case strictPair of
+  SP x y ->
+    case x of ...
+
+It allows us to safely omit the code to enter x and the check
+for the presence of a tag that goes along with it.
+However we might still branch on the tag as usual.
+
+This is enforced by the code GHC.Stg.InferTags.Rewrite
+where we:
+
+* Look at all constructor allocations.
+* Check if arguments to their strict fields are known to be properly tagged
+* If not we convert `StrictJust x` into `case x of x' -> StrictJust x'`
+
+However we try to push the case up the AST into the next closure.
+
+For a full example consider this code:
+
+foo ... = ...
+  let c = StrictJust x
+  in ...
+
+Naively we would rewrite `let c = StrictJust` into `let c = case x of x' -> StrictJust x'`
+However that is horrible! We would end up allocating a thunk for `c` first, which only when
+evaluated would allocate the constructor.
+
+So instead we try to push the case "up" into a surrounding closure context. So for this case
+we instead produce:
+
+  foo ... = ...
+    case x of x' ->
+      DEFAULT -> let c = StrictJust x'
+                in ...
+
+Which means c remains a regular constructor allocation and we avoid unneccesary overhead.
+The only problems to this approach are top level definitions and recursive bindings.
+
+For top level bindings we accept the fact that some constructor applications end up as thunks.
+It's a rare enough thing that it doesn't really matter and the computation will be shared anyway.
+
+For recursive bindings the isse arises if we have:
+
+  let rec {
+    x = e1 -- e1 mentioning y
+    y = StrictJust x
+  }
+
+We obviously can't wrap the case around the recursive group as `x` isn't in scope there.
+This means if we can't proof that the arguments to the strict fields (in this case `x`)
+are tagged we have to turn the above into:
+
+  let rec {
+    x = e1 -- e1 mentioning y
+    y = case x of x' -> StrictJust x'
+  }
+
+But this rarely happens so is not a reason for concern.
+
+Note [Tag inference passes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+SPJ posed the good question why we bother having two different pass
+parameterizations for tag inference. After all InferTaggedBinders
+already has put the needed information on the binders.
+
+Indeed we could the transformation described in Note [Strict field invariant]
+as part of the StgToCmm transformation. But it wouldn't work well with the way
+we currently produce Cmm code.
+
+In particular we would have to analyze rhss *before* we can determine
+if they should contain the required code for upholding the strict field
+invariant or if the code should be placed in front of the code of a given
+rhs. This means more dependencies between different parts of codeGen and
+more complexity in general so I decided to implement this as an STG transformation
+instead.
+
+This doesn't actually mean we *need* two different parameterizations. But since
+we already walk the whole AST I figured it would be more efficient to put the
+relevant tag information into the StgApp nodes during this pass as well.
+
+It avoid the awkward situation where codegeneration of the context of a let depends
+on the rhs of the let itself, avoids the need for all binders to be be tuples and
+seemed more efficient.
+
 -}
 
 {- *********************************************************************

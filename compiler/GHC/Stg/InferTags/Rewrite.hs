@@ -85,6 +85,8 @@ The idea is simple:
 * If it's not, we wrap the whole thing in a case, which will force the
   argument before allocation.
 
+This is described in detail in Note [Strict field invariant].
+
 -}
 
 

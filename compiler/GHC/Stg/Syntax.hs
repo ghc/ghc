@@ -594,8 +594,10 @@ StgPass data type indexes:
 data StgPass
   = Vanilla
   | LiftLams -- ^ Use internally by the lambda lifting pass
-  | InferTaggedBinders -- ^ Tag inference information on binders
+  | InferTaggedBinders -- ^ Tag inference information on binders.
+                       -- See Note [Tag inference passes] in GHC.Stg.InferTags
   | InferTagged -- ^ Tag inference information put on relevant StgApp nodes
+                -- See Note [Tag inference passes] in GHC.Stg.InferTags
   | CodeGen
 
 -- | Determines if this StgApp expression enters the "function"
