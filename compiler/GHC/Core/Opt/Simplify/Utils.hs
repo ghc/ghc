@@ -1583,6 +1583,7 @@ mkLam env bndrs body cont
       | not (contIsRhs cont)   -- See Note [Eta-expanding lambdas]
       , sm_eta_expand (getMode env)
       , any isRuntimeVar bndrs
+      , want_eta body
       , let body_arity = exprEtaExpandArity dflags body
       , expandableArityType body_arity
       = do { tick (EtaExpansion (head bndrs))
@@ -1690,14 +1691,15 @@ tryEtaExpandRhs mode bndr rhs
                  `maxWithArity` idCallArity bndr
     new_arity = arityTypeArity arity_type
 
-    -- See Note [Which RHSs do we eta-expand?]
-    want_eta (Cast e _)                  = want_eta e
-    want_eta (Tick _ e)                  = want_eta e
-    want_eta (Lam b e) | isTyVar b       = want_eta e
-    want_eta (App e a) | exprIsTrivial a = want_eta e
-    want_eta (Var {})                    = False
-    want_eta (Lit {})                    = False
-    want_eta _ = True
+-- See Note [Which RHSs do we eta-expand?]
+want_eta :: CoreExpr -> Bool
+want_eta (Cast e _)                  = want_eta e
+want_eta (Tick _ e)                  = want_eta e
+want_eta (Lam b e) {- | isTyVar b -}       = want_eta e
+want_eta (App e a) {- | exprIsTrivial a -} = want_eta e
+want_eta (Var {})                    = False
+want_eta (Lit {})                    = False
+want_eta _ = True
 {-
     want_eta _ = case arity_type of
                    ATop (os:_) -> isOneShotInfo os

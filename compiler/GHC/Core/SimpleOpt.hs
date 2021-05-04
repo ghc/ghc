@@ -338,11 +338,11 @@ simple_app env e@(Lam {}) as@(_:_)
   | (bndrs, body) <- collectBinders e
   , let zapped_bndrs = zapLamBndrs (length as) bndrs
     -- Be careful to zap the lambda binders if necessary
-    -- c.f. the Lam caes of simplExprF1 in GHC.Core.Opt.Simplify
+    -- c.f. the Lam case of simplExprF1 in GHC.Core.Opt.Simplify
     -- Lacking this zap caused #19347, when we had a redex
     --   (\ a b. K a b) e1 e2
     -- where (as it happens) the eta-expanded K is produced by
-    -- Note [Linear fields generalization] in GHC.Tc.Gen.Head
+    -- Note [Typechecking data constructors] in GHC.Tc.Gen.Head
   = do_beta env zapped_bndrs body as
   where
     do_beta env (b:bs) body (a:as)
