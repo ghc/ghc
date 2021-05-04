@@ -339,7 +339,7 @@ mkTransMCo co1       MRefl     = co1
 mkTransMCo (MCo co1) (MCo co2) = MCo (mkTransCo co1 co2)
 
 mkTransMCoL :: MCoercion -> Coercion -> MCoercion
-mkTransMCoL MRefl     co2 = MCo co2
+mkTransMCoL MRefl     co2 = coToMCo co2
 mkTransMCoL (MCo co1) co2 = MCo (mkTransCo co1 co2)
 
 mkTransMCoR :: Coercion -> MCoercion -> MCoercion

@@ -355,5 +355,5 @@ test('T20112',  normal, multimod_compile, ['T20112', '-O -v0 -g1'])
 # T19586 should not generate missed specialisation warnings
 test('T19586', normal, compile, [''])
 test('T20639', normal, compile, ['-O2'])
-
 test('T20894', normal, compile, ['-dcore-lint -O1 -ddebug-output'])
+test('T19790',  normal, compile, ['-O -ddump-rule-firings'])

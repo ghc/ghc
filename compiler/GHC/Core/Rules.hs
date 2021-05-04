@@ -40,11 +40,11 @@ import GHC.Core.FVs       ( exprFreeVars, exprsFreeVars, bindFreeVars
                           , rulesFreeVarsDSet, exprsOrphNames, exprFreeVarsList )
 import GHC.Core.Utils     ( exprType, eqExpr, mkTick, mkTicks
                           , stripTicksTopT, stripTicksTopE
-                          , isJoinBind )
+                          , isJoinBind, mkCastMCo )
 import GHC.Core.Ppr       ( pprRules )
 import GHC.Core.Type as Type
    ( Type, TCvSubst, extendTvSubst, extendCvSubst
-   , mkEmptyTCvSubst, substTy )
+   , mkEmptyTCvSubst, getTyVar_maybe, substTy )
 import GHC.Tc.Utils.TcType  ( tcSplitTyConApp_maybe )
 import GHC.Builtin.Types    ( anyTypeOfKind )
 import GHC.Core.Coercion as Coercion
@@ -384,7 +384,7 @@ lookupRule :: RuleOpts -> InScopeEnv
            -> Id -> [CoreExpr]
            -> [CoreRule] -> Maybe (CoreRule, CoreExpr)
 
--- See Note [Extra args in rule matching]
+-- See Note [Extra args in the target]
 -- See comments on matchRule
 lookupRule opts in_scope is_active fn args rules
   = -- pprTrace "matchRules" (ppr fn <+> ppr args $$ ppr rules ) $
@@ -463,22 +463,31 @@ isMoreSpecific (Rule { ru_bndrs = bndrs1, ru_args = args1 })
 noBlackList :: Activation -> Bool
 noBlackList _ = False           -- Nothing is black listed
 
-{-
-Note [Extra args in rule matching]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Extra args in the target]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If we find a matching rule, we return (Just (rule, rhs)),
-but the rule firing has only consumed as many of the input args
-as the ruleArity says.  It's up to the caller to keep track
-of any left-over args.  E.g. if you call
-        lookupRule ... f [e1, e2, e3]
-and it returns Just (r, rhs), where r has ruleArity 2
-then the real rewrite is
+/but/ the rule firing has only consumed as many of the input args
+as the ruleArity says.  The unused arguments are handled by the code in
+GHC.Core.Opt.Simplify.tryRules, using the arity of the returned rule.
+
+E.g. Rule "foo":  forall a b.  f p1 p2 = rhs
+     Target:      f e1 e2 e3
+
+Then lookupRule returns Just (Rule "foo", rhs), where Rule "foo"
+has ruleArity 2.  The real rewrite is
         f e1 e2 e3 ==> rhs e3
 
 You might think it'd be cleaner for lookupRule to deal with the
 leftover arguments, by applying 'rhs' to them, but the main call
 in the Simplifier works better as it is.  Reason: the 'args' passed
 to lookupRule are the result of a lazy substitution
+
+Historical note:
+
+At one stage I tried to match even if there are more args in the
+/template/ than the target.  I now think this is probably a bad idea.
+Should the template (map f xs) match (map g)?  I think not.  For a
+start, in general eta expansion wastes work.  SLPJ July 99
 -}
 
 ------------------------------------
@@ -542,10 +551,16 @@ matchN  :: InScopeEnv
         -> Maybe CoreExpr
 -- For a given match template and context, find bindings to wrap around
 -- the entire result and what should be substituted for each template variable.
--- Fail if there are two few actual arguments from the target to match the template
+--
+-- Fail if there are too few actual arguments from the target to match the template
+--
+-- See Note [Extra args in the target]
+-- If there are too /many/ actual arguments, we simply ignore the
+-- trailing ones, returning the result of applying the rule to a prefix
+-- of the actual arguments.
 
 matchN (in_scope, id_unf) rule_name tmpl_vars tmpl_es target_es rhs
-  = do  { rule_subst <- go init_menv emptyRuleSubst tmpl_es target_es
+  = do  { rule_subst <- match_exprs init_menv emptyRuleSubst tmpl_es target_es
         ; let (_, matched_es) = mapAccumL (lookup_tmpl rule_subst)
                                           (mkEmptyTCvSubst in_scope) $
                                 tmpl_vars `zip` tmpl_vars1
@@ -561,11 +576,6 @@ matchN (in_scope, id_unf) rule_name tmpl_vars tmpl_es target_es rhs
                    , rv_lcl   = init_rn_env
                    , rv_fltR  = mkEmptySubst (rnInScopeSet init_rn_env)
                    , rv_unf   = id_unf }
-
-    go _    subst []     _      = Just subst
-    go _    _     _      []     = Nothing       -- Fail if too few actual args
-    go menv subst (t:ts) (e:es) = do { subst1 <- match menv subst t e
-                                     ; go menv subst1 ts es }
 
     lookup_tmpl :: RuleSubst -> TCvSubst -> (InVar,OutVar) -> (TCvSubst, CoreExpr)
                    -- Need to return a RuleSubst solely for the benefit of mk_fake_ty
@@ -678,12 +688,6 @@ into a type variable, and then crashed when we wanted its idInfo.
 *                                                                      *
 ********************************************************************* -}
 
--- * The domain of the TvSubstEnv and IdSubstEnv are the template
---   variables passed into the match.
---
--- * The BindWrapper in a RuleSubst are the bindings floated out
---   from nested matches; see the Let case of match, below
---
 data RuleMatchEnv
   = RV { rv_lcl   :: RnEnv2          -- Renamings for *local bindings*
                                      --   (lambda/case)
@@ -695,9 +699,36 @@ data RuleMatchEnv
        , rv_unf :: IdUnfoldingFun
        }
 
+{- Note [rv_lcl in RuleMatchEnv]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider matching
+  Template: \x->f
+  Target:   \f->f
+
+where 'f' is free in the template. When we meet the lambdas we must
+remember to rename f :-> f' in the target, as well as x :-> f
+in the template.  The rv_lcl::RnEnv2 does that.
+
+Similarly, consider matching
+     Template: {a}  \b->b
+     Target:        \a->3
+We must rename the \a.  Otherwise when we meet the lambdas we might
+substitute [b :-> a] in the template, and then erroneously succeed in
+matching what looks like the template variable 'a' against 3.
+
+So we must add the template vars to the in-scope set before starting;
+see `init_menv` in `matchN`.
+-}
+
 rvInScopeEnv :: RuleMatchEnv -> InScopeEnv
 rvInScopeEnv renv = (rnInScopeSet (rv_lcl renv), rv_unf renv)
 
+-- * The domain of the TvSubstEnv and IdSubstEnv are the template
+--   variables passed into the match.
+--
+-- * The BindWrapper in a RuleSubst are the bindings floated out
+--   from nested matches; see the Let case of match, below
+--
 data RuleSubst = RS { rs_tv_subst :: TvSubstEnv   -- Range is the
                     , rs_id_subst :: IdSubstEnv   --   template variables
                     , rs_binds    :: BindWrapper  -- Floated bindings
@@ -712,55 +743,186 @@ emptyRuleSubst :: RuleSubst
 emptyRuleSubst = RS { rs_tv_subst = emptyVarEnv, rs_id_subst = emptyVarEnv
                     , rs_binds = \e -> e, rs_bndrs = [] }
 
---      At one stage I tried to match even if there are more
---      template args than real args.
+----------------------
+match_exprs :: RuleMatchEnv -> RuleSubst
+            -> [CoreExpr]       -- Templates
+            -> [CoreExpr]       -- Targets
+            -> Maybe RuleSubst
+-- If the targets are longer than templates, succeed, simply ignoring
+-- the leftover targets. This matters in the call in matchN.
+--
+-- Precondition: corresponding elements of es1 and es2 have the same
+--               type, assumuing earlier elements match
+-- Example:  f :: forall v. v -> blah
+--   match_exprs [Type a, y::a] [Type Int, 3]
+-- Then, after matching Type a against Type Int,
+-- the type of (y::a) matches that of (3::Int)
+match_exprs _ subst [] _
+  = Just subst
+match_exprs renv subst (e1:es1) (e2:es2)
+  = do { subst' <- match renv subst e1 e2 MRefl
+       ; match_exprs renv subst' es1 es2 }
+match_exprs _ _ _ _ = Nothing
 
 --      I now think this is probably a bad idea.
 --      Should the template (map f xs) match (map g)?  I think not.
 --      For a start, in general eta expansion wastes work.
 --      SLPJ July 99
 
+{- Note [Casts in the target]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+As far as possible we don't want casts in the target to get in the way of
+matching.  E.g.
+* (let bind in e)  |> co
+* (case e of alts) |> co
+* (\ a b. f a b)   |> co
+
+In the first two cases we want to float the cast inwards so we can match on
+the let/case.  This is not important in practice because the Simplifier does
+this anyway.
+
+But the third case /is/ important: we don't want the cast to get in the way
+of eta-reduction.  See Note [Cancel reflexive casts] for a real life example.
+
+The most convenient thing is to make 'match' take an MCoercion argument, thus:
+
+* The main matching function
+      match env subst template target mco
+  matches   template ~ (target |> mco)
+
+* Invariant: typeof( subst(template) ) = typeof( target |> mco )
+
+Note that for applications
+     (e1 e2) ~ (d1 d2) |> co
+where 'co' is non-reflexive, we simply fail.  You might wonder about
+     (e1 e2) ~ ((d1 |> co1) d2) |> co2
+but the Simplifer pushes the casts in an application to to the
+right, if it can, so this doesn't really arise.
+
+Note [Coercion arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+What if we have (f co) in the template, where the 'co' is a coercion
+argument to f?  Right now we have nothing in place to ensure that a
+coercion /argument/ in the template is a variable.  We really should,
+perhaps by abstracting over that variable.
+
+C.f. the treatment of dictionaries in GHC.HsToCore.Binds.decompseRuleLhs.
+
+For now, though, we simply behave badly, by failing in match_co.
+We really should never rely on matching the structure of a coercion
+(which is just a proof).
+
+Note [Casts in the template]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider the definition
+  f x = e,
+and SpecConstr on call pattern
+  f ((e1,e2) |> co)
+
+We'll make a RULE
+   RULE forall a,b,g.  f ((a,b)|> g) = $sf a b g
+   $sf a b g = e[ ((a,b)|> g) / x ]
+
+So here is the invariant:
+
+  In the template, in a cast (e |> co),
+  the cast `co` is always a /variable/.
+
+Matching should bind that variable to an actual coercion, so that we
+can use it in $sf.  So a Cast on the LHS (the template) calls
+match_co, which succeeds when the template cast is a variable -- which
+it always is.  That is why match_co has so few cases.
+
+See also
+* Note [Coercion arguments]
+* Note [Matching coercion variables] in GHC.Core.Unify.
+* Note [Cast swizzling on rule LHSs] in GHC.Core.Opt.Simplify.Utils:
+  sm_cast_swizzle is switched off in the template of a RULE
+-}
+
+----------------------
 match :: RuleMatchEnv
-      -> RuleSubst
+      -> RuleSubst              -- Substitution applies to template only
       -> CoreExpr               -- Template
       -> CoreExpr               -- Target
+      -> MCoercion
       -> Maybe RuleSubst
 
--- We look through certain ticks. See Note [Tick annotations in RULE matching]
-match renv subst e1 (Tick t e2)
-  | tickishFloatable t
-  = match renv subst' e1 e2
-  where subst' = subst { rs_binds = rs_binds subst . mkTick t }
-match renv subst (Tick t e1) e2
-  -- Ignore ticks in rule template.
-  | tickishFloatable t
-  =  match renv subst e1 e2
-match _ _ e@Tick{} _
-  = pprPanic "Tick in rule" (ppr e)
-
+-- Postcondition (TypeInv): if matching succeeds, then
+--                          typeof( subst(template) ) = typeof( target |> mco )
+--     But this is /not/ a pre-condition! The types of template and target
+--     may differ, see the (App e1 e2) case
+--
+-- Invariant (CoInv):   if mco :: ty ~ ty, then it is MRefl, not MCo co
+--                      See Note [Cancel reflexive casts]
+--
 -- See the notes with Unify.match, which matches types
 -- Everything is very similar for terms
 
--- Interesting examples:
--- Consider matching
---      \x->f      against    \f->f
--- When we meet the lambdas we must remember to rename f to f' in the
--- second expression.  The RnEnv2 does that.
---
--- Consider matching
---      forall a. \b->b    against   \a->3
--- We must rename the \a.  Otherwise when we meet the lambdas we
--- might substitute [a/b] in the template, and then erroneously
--- succeed in matching what looks like the template variable 'a' against 3.
 
+------------------------ Ticks ---------------------
+-- We look through certain ticks. See Note [Tick annotations in RULE matching]
+match renv subst e1 (Tick t e2) mco
+  | tickishFloatable t
+  = match renv subst' e1 e2 mco
+  | otherwise
+  = Nothing
+  where
+    subst' = subst { rs_binds = rs_binds subst . mkTick t }
+
+match renv subst e@(Tick t e1) e2 mco
+  | tickishFloatable t  -- Ignore floatable ticks in rule template.
+  =  match renv subst e1 e2 mco
+  | otherwise
+  = pprPanic "Tick in rule" (ppr e)
+
+------------------------ Types ---------------------
+match renv subst (Type ty1) (Type ty2) _mco
+  = match_ty renv subst ty1 ty2
+
+------------------------ Coercions ---------------------
+-- See Note [Coercion argument] for why this isn't really right
+match renv subst (Coercion co1) (Coercion co2) MRefl
+  = match_co renv subst co1 co2
+  -- The MCo case corresponds to matching  co ~ (co2 |> co3)
+  -- and I have no idea what to do there -- or even if it can occur
+  -- Failing seems the simplest thing to do; it's certainly safe.
+
+------------------------ Casts ---------------------
+-- See Note [Casts in the template]
+--     Note [Casts in the target]
+--     Note [Cancel reflexive casts]
+
+match renv subst e1 (Cast e2 co2) mco
+  = match renv subst e1 e2 (checkReflexiveMCo (mkTransMCoR co2 mco))
+    -- checkReflexiveMCo: cancel casts if possible
+    -- This is important: see Note [Cancel reflexive casts]
+
+match renv subst (Cast e1 co1) e2 mco
+  = -- See Note [Casts in the template]
+    do { let co2 = case mco of
+                     MRefl   -> mkRepReflCo (exprType e2)
+                     MCo co2 -> co2
+       ; subst1 <- match_co renv subst co1 co2
+         -- If match_co succeeds, then (exprType e1) = (exprType e2)
+         -- Hence the MRefl in the next line
+       ; match renv subst1 e1 e2 MRefl }
+
+------------------------ Literals ---------------------
+match _ subst (Lit lit1) (Lit lit2) mco
+  | lit1 == lit2
+  = ASSERT2(isReflMCo mco, ppr mco)
+    Just subst
+
+------------------------ Variables ---------------------
 -- The Var case follows closely what happens in GHC.Core.Unify.match
-match renv subst (Var v1) e2
-  = match_var renv subst v1 e2
+match renv subst (Var v1) e2 mco
+  = match_var renv subst v1 (mkCastMCo e2 mco)
 
-match renv subst e1 (Var v2)      -- Note [Expanding variables]
-  | not (inRnEnvR rn_env v2) -- Note [Do not expand locally-bound variables]
+match renv subst e1 (Var v2) mco  -- Note [Expanding variables]
+  | not (inRnEnvR rn_env v2)      -- Note [Do not expand locally-bound variables]
   , Just e2' <- expandUnfolding_maybe (rv_unf renv v2')
-  = match (renv { rv_lcl = nukeRnEnvR rn_env }) subst e1 e2'
+  = match (renv { rv_lcl = nukeRnEnvR rn_env }) subst e1 e2' mco
   where
     v2'    = lookupRnInScope rn_env v2
     rn_env = rv_lcl renv
@@ -769,7 +931,17 @@ match renv subst e1 (Var v2)      -- Note [Expanding variables]
         -- No need to apply any renaming first (hence no rnOccR)
         -- because of the not-inRnEnvR
 
-match renv subst e1 (Let bind e2)
+------------------------ Applications ---------------------
+-- Note the match on MRefl!  We fail if there is a cast in the target
+--     (e1 e2) ~ (d1 d2) |> co
+-- See Note [Cancel reflexive casts]: in the Cast equations for 'match'
+-- we agressively ensure that if MCo is reflective, it really is MRefl.
+match renv subst (App f1 a1) (App f2 a2) MRefl
+  = do  { subst' <- match renv subst f1 f2 MRefl
+        ; match renv subst' a1 a2 MRefl }
+
+------------------------ Float lets ---------------------
+match renv subst e1 (Let bind e2) mco
   | -- pprTrace "match:Let" (vcat [ppr bind, ppr $ okToFloat (rv_lcl renv) (bindFreeVars bind)]) $
     not (isJoinBind bind) -- can't float join point out of argument position
   , okToFloat (rv_lcl renv) (bindFreeVars bind) -- See Note [Matching lets]
@@ -780,11 +952,53 @@ match renv subst e1 (Let bind e2)
                 -- the in-scope set (#20200)
           (subst { rs_binds = rs_binds subst . Let bind'
                  , rs_bndrs = new_bndrs ++ rs_bndrs subst })
-          e1 e2
+          e1 e2 mco
+  | otherwise
+  = Nothing
   where
     (flt_subst', bind') = substBind (rv_fltR renv) bind
     new_bndrs           = bindersOf bind'
 
+------------------------  Lambdas ---------------------
+match renv subst (Lam x1 e1) e2 mco
+  | Just (x2, e2', ts) <- exprIsLambda_maybe (rvInScopeEnv renv) (mkCastMCo e2 mco)
+    -- See Note [Lambdas in the template]
+  = let renv'  = rnMatchBndr2 renv x1 x2
+        subst' = subst { rs_binds = rs_binds subst . flip (foldr mkTick) ts }
+    in  match renv' subst' e1 e2' MRefl
+
+match renv subst e1 e2@(Lam {}) mco
+  | Just (renv', e2') <- eta_reduce renv e2  -- See Note [Eta reduction in the target]
+  = match renv' subst e1 e2' mco
+
+{- Note [Lambdas in the template]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we match
+   Template:   (\x. blah_template)
+   Target:     (\y. blah_target)
+then we want to match inside the lambdas, using rv_lcl to match up
+x and y.
+
+But what about this?
+   Template   (\x. (blah1 |> cv))
+   Target     (\y. blah2) |> co
+
+This happens quite readily, because the Simplifier generally moves
+casts outside lambdas: see Note [Casts and lambdas] in
+GHC.Core.Opt.Simplify.Utils. So, tiresomely, we want to push `co`
+back inside, which is what `exprIsLambda_maybe` does.  But we've
+stripped off that cast, so now we need to put it back, hence mkCastMCo.
+
+Unlike the target, where we attempt eta-reduction, we do not attempt
+to eta-reduce the template, and may therefore fail on
+  Template:   \x. f True x
+  Target      f True
+
+It's not especially easy to deal with eta reducing the template,
+and never happens, because no one write eta-expanded left-hand-sides.
+-}
+
+------------------------ Case expression ---------------------
 {- Disabled: see Note [Matching cases] below
 match renv (tv_subst, id_subst, binds) e1
       (Case scrut case_bndr ty [(con, alt_bndrs, rhs)])
@@ -800,39 +1014,107 @@ match renv (tv_subst, id_subst, binds) e1
     case_wrap rhs' = Case scrut case_bndr ty [(con, alt_bndrs, rhs')]
 -}
 
-match _ subst (Lit lit1) (Lit lit2)
-  | lit1 == lit2
-  = Just subst
-
-match renv subst (App f1 a1) (App f2 a2)
-  = do  { subst' <- match renv subst f1 f2
-        ; match renv subst' a1 a2 }
-
-match renv subst (Lam x1 e1) e2
-  | Just (x2, e2, ts) <- exprIsLambda_maybe (rvInScopeEnv renv) e2
-  = let renv'  = rnMatchBndr2 renv x1 x2
-        subst' = subst { rs_binds = rs_binds subst . flip (foldr mkTick) ts }
-    in  match renv' subst' e1 e2
-
-match renv subst (Case e1 x1 ty1 alts1) (Case e2 x2 ty2 alts2)
+match renv subst (Case e1 x1 ty1 alts1) (Case e2 x2 ty2 alts2) mco
   = do  { subst1 <- match_ty renv subst ty1 ty2
-        ; subst2 <- match renv subst1 e1 e2
+        ; subst2 <- match renv subst1 e1 e2 MRefl
         ; let renv' = rnMatchBndr2 renv x1 x2
-        ; match_alts renv' subst2 alts1 alts2   -- Alts are both sorted
+        ; match_alts renv' subst2 alts1 alts2 mco   -- Alts are both sorted
         }
 
-match renv subst (Type ty1) (Type ty2)
-  = match_ty renv subst ty1 ty2
-match renv subst (Coercion co1) (Coercion co2)
-  = match_co renv subst co1 co2
-
-match renv subst (Cast e1 co1) (Cast e2 co2)
-  = do  { subst1 <- match_co renv subst co1 co2
-        ; match renv subst1 e1 e2 }
-
 -- Everything else fails
-match _ _ _e1 _e2 = -- pprTrace "Failing at" ((text "e1:" <+> ppr _e1) $$ (text "e2:" <+> ppr _e2)) $
-                    Nothing
+match _ _ _e1 _e2 _mco = -- pprTrace "Failing at" ((text "e1:" <+> ppr _e1) $$ (text "e2:" <+> ppr _e2)) $
+                         Nothing
+
+-------------
+eta_reduce :: RuleMatchEnv -> CoreExpr -> Maybe (RuleMatchEnv, CoreExpr)
+-- See Note [Eta reduction in the target]
+eta_reduce renv e@(Lam {})
+  = go renv id [] e
+  where
+    go :: RuleMatchEnv -> BindWrapper -> [Var] -> CoreExpr
+       -> Maybe (RuleMatchEnv, CoreExpr)
+    go renv bw vs (Let b e) = go renv (bw . Let b) vs e
+
+    go renv bw vs (Lam v e) = go renv' bw (v':vs) e
+      where
+         (rn_env', v') = rnBndrR (rv_lcl renv) v
+         renv' = renv { rv_lcl = rn_env' }
+
+    go renv bw (v:vs) (App f arg)
+      | Var a <- arg, v == rnOccR (rv_lcl renv) a
+      = go renv bw vs f
+
+      | Type ty <- arg, Just tv <- getTyVar_maybe ty
+      , v == rnOccR (rv_lcl renv) tv
+      = go renv bw vs f
+
+    go renv bw []    e = Just (renv, bw e)
+    go _    _  (_:_) _ = Nothing
+
+eta_reduce _ _ = Nothing
+
+{- Note [Eta reduction the target]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we are faced with this (#19790)
+   Template {x}  f x
+   Target        (\a b c. let blah in f x a b c)
+
+You might wonder why we have an eta-expanded target (see first subtle
+point below), but regardless of how it came about, we'd like
+eta-expansion not to impede matching.
+
+So eta_reduce does on-the-fly eta-reduction of the target expression.
+Given (\a b c. let blah in e a b c), it returns (let blah in e).
+
+Subtle points:
+* Consider a target:  \x. f <expensive> x
+  In the main eta-reducer we do not eta-reduce this, because doing so
+  might reduce the arity of the expression (from 1 to zero, because of
+  <expensive>).  But for rule-matching we /do/ want to match template
+  (f a) against target (\x. f <expensive> x), with a := <expensive>
+
+  This is a compelling reason for not relying on the Simplifier's
+  eta-reducer.
+
+* The Lam case of eta_reduce renames as it goes. Consider
+  (\x. \x. f x x).  We should not eta-reduce this.  As we go we rename
+  the first x to x1, and the second to x2; then both argument x's are x2.
+
+* eta_reduce does /not/ need to check that the bindings 'blah'
+  and expression 'e' don't mention a b c; but it /does/ extend the
+  rv_lcl RnEnv2 (see rn_bndr in eta_reduce).
+  * If 'blah' mentions the binders, the let-float rule won't
+    fire; and
+  * if 'e' mentions the binders we we'll also fail to match
+    e.g. because of the exprFreeVars test in match_tmpl_var.
+
+  Example: Template: {x}  f a         -- Some top-level 'a'
+           Target:   (\a b. f a a b)  -- The \a shadows top level 'a'
+  Then eta_reduce will /succeed/, with
+      (rnEnvR = [a :-> a'], f a)
+  The returned RnEnv will map [a :-> a'], where a' is fresh. (There is
+  no need to rename 'b' because (in this example) it is not in scope.
+  So it's as if we'd returned (f a') from eta_reduce; the renaming applied
+  to the target is simply deferred.
+
+Note [Cancel reflexive casts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Here is an example (from #19790) which we want to catch
+   (f x) ~ (\a b. (f x |> co) a b) |> sym co
+where
+   f :: Int -> Stream
+   co :: Stream ~ T1 -> T2 -> T3
+
+when we eta-reduce (\a b. blah a b) to 'blah', we'll get
+  (f x) ~ (f x) |> co |> sym co
+
+and we really want to spot that the co/sym-co cancels out.
+Hence
+  * We keep an invariant that the MCoercion is always MRefl
+    if the MCoercion is reflextve
+  * We maintain this invariant via the call to checkReflexiveMCo
+    in the Cast case of 'match'.
+-}
 
 -------------
 match_co :: RuleMatchEnv
@@ -840,44 +1122,28 @@ match_co :: RuleMatchEnv
          -> Coercion
          -> Coercion
          -> Maybe RuleSubst
+-- We only match if the template is a coercion variable or Refl:
+--   see Note [Casts in the template]
+-- Like 'match' it is /not/ guaranteed that
+--     coercionKind template  =  coercionKind target
+-- But if match_co succeeds, it /is/ guaranteed that
+--     coercionKind (subst template) = coercionKind target
+
 match_co renv subst co1 co2
   | Just cv <- getCoVar_maybe co1
   = match_var renv subst cv (Coercion co2)
+
   | Just (ty1, r1) <- isReflCo_maybe co1
   = do { (ty2, r2) <- isReflCo_maybe co2
        ; guard (r1 == r2)
        ; match_ty renv subst ty1 ty2 }
-match_co renv subst co1 co2
-  | Just (tc1, cos1) <- splitTyConAppCo_maybe co1
-  = case splitTyConAppCo_maybe co2 of
-      Just (tc2, cos2)
-        |  tc1 == tc2
-        -> match_cos renv subst cos1 cos2
-      _ -> Nothing
-match_co renv subst co1 co2
-  | Just (arg1, res1) <- splitFunCo_maybe co1
-  = case splitFunCo_maybe co2 of
-      Just (arg2, res2)
-        -> match_cos renv subst [arg1, res1] [arg2, res2]
-      _ -> Nothing
-match_co _ _ _co1 _co2
-    -- Currently just deals with CoVarCo, TyConAppCo and Refl
-#if defined(DEBUG)
-  = pprTrace "match_co: needs more cases" (ppr _co1 $$ ppr _co2) Nothing
-#else
-  = Nothing
-#endif
 
-match_cos :: RuleMatchEnv
-         -> RuleSubst
-         -> [Coercion]
-         -> [Coercion]
-         -> Maybe RuleSubst
-match_cos renv subst (co1:cos1) (co2:cos2) =
-  do { subst' <- match_co renv subst co1 co2
-     ; match_cos renv subst' cos1 cos2 }
-match_cos _ subst [] [] = Just subst
-match_cos _ _ cos1 cos2 = pprTrace "match_cos: not same length" (ppr cos1 $$ ppr cos2) Nothing
+  | debugIsOn
+  = pprTrace "match_co: needs more cases" (ppr co1 $$ ppr co2) Nothing
+    -- Currently just deals with CoVarCo and Refl
+
+  | otherwise
+  = Nothing
 
 -------------
 rnMatchBndr2 :: RuleMatchEnv -> Var -> Var -> RuleMatchEnv
@@ -889,20 +1155,20 @@ rnMatchBndr2 renv x1 x2
 ------------------------------------------
 match_alts :: RuleMatchEnv
            -> RuleSubst
-           -> [CoreAlt]         -- Template
-           -> [CoreAlt]         -- Target
+           -> [CoreAlt]                 -- Template
+           -> [CoreAlt] -> MCoercion    -- Target
            -> Maybe RuleSubst
-match_alts _ subst [] []
+match_alts _ subst [] [] _
   = return subst
-match_alts renv subst (Alt c1 vs1 r1:alts1) (Alt c2 vs2 r2:alts2)
+match_alts renv subst (Alt c1 vs1 r1:alts1) (Alt c2 vs2 r2:alts2) mco
   | c1 == c2
-  = do  { subst1 <- match renv' subst r1 r2
-        ; match_alts renv subst1 alts1 alts2 }
+  = do  { subst1 <- match renv' subst r1 r2 mco
+        ; match_alts renv subst1 alts1 alts2 mco }
   where
     renv' = foldl' mb renv (vs1 `zip` vs2)
     mb renv (v1,v2) = rnMatchBndr2 renv v1 v2
 
-match_alts _ _ _ _
+match_alts _ _ _ _ _
   = Nothing
 
 ------------------------------------------
@@ -915,8 +1181,8 @@ okToFloat rn_env bind_fvs
 ------------------------------------------
 match_var :: RuleMatchEnv
           -> RuleSubst
-          -> Var                -- Template
-          -> CoreExpr        -- Target
+          -> Var        -- Template
+          -> CoreExpr   -- Target
           -> Maybe RuleSubst
 match_var renv@(RV { rv_tmpls = tmpls, rv_lcl = rn_env, rv_fltR = flt_env })
           subst v1 e2
@@ -928,9 +1194,14 @@ match_var renv@(RV { rv_tmpls = tmpls, rv_lcl = rn_env, rv_fltR = flt_env })
        Var v2 | v1' == rnOccR rn_env v2
               -> Just subst
 
+              -- v2 is not bound nestedly; it is free
+              -- in the whole expression being matched
+              -- So it will be in the InScopeSet for flt_env (#20200)
               | Var v2' <- lookupIdSubst flt_env v2
               , v1' == v2'
               -> Just subst
+              | otherwise
+              -> Nothing
 
        _ -> Nothing
 
@@ -945,14 +1216,14 @@ match_var renv@(RV { rv_tmpls = tmpls, rv_lcl = rn_env, rv_fltR = flt_env })
 match_tmpl_var :: RuleMatchEnv
                -> RuleSubst
                -> Var                -- Template
-               -> CoreExpr              -- Target
+               -> CoreExpr           -- Target
                -> Maybe RuleSubst
 
 match_tmpl_var renv@(RV { rv_lcl = rn_env, rv_fltR = flt_env })
                subst@(RS { rs_id_subst = id_subst, rs_bndrs = let_bndrs })
                v1' e2
   | any (inRnEnvR rn_env) (exprFreeVarsList e2)
-  = Nothing     -- Occurs check failure
+  = Nothing     -- Skolem-escape failure
                 -- e.g. match forall a. (\x-> a x) against (\y. y y)
 
   | Just e1' <- lookupVarEnv id_subst v1'
@@ -960,18 +1231,8 @@ match_tmpl_var renv@(RV { rv_lcl = rn_env, rv_fltR = flt_env })
     then Just subst
     else Nothing
 
-  | otherwise
-  =             -- Note [Matching variable types]
-                -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-                -- However, we must match the *types*; e.g.
-                --   forall (c::Char->Int) (x::Char).
-                --      f (c x) = "RULE FIRED"
-                -- We must only match on args that have the right type
-                -- It's actually quite difficult to come up with an example that shows
-                -- you need type matching, esp since matching is left-to-right, so type
-                -- args get matched first.  But it's possible (e.g. simplrun008) and
-                -- this is the Right Thing to do
-    do { subst' <- match_ty renv subst (idType v1') (exprType e2)
+  | otherwise   -- See Note [Matching variable types]
+  = do { subst' <- match_ty renv subst (idType v1') (exprType e2)
        ; return (subst' { rs_id_subst = id_subst' }) }
   where
     -- e2' is the result of applying flt_env to e2
@@ -1001,7 +1262,30 @@ match_ty renv subst ty1 ty2
   where
     tv_subst = rs_tv_subst subst
 
-{-
+{- Note [Matching variable types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When matching x ~ e, where 'x' is a template variable, we must check that
+x's type matches e's type, to establish (TypeInv).  For example
+  forall (c::Char->Int) (x::Char).
+     f (c x) = "RULE FIRED"
+We must not match on, say (f (pred (3::Int))).
+
+It's actually quite difficult to come up with an example that shows
+you need type matching, esp since matching is left-to-right, so type
+args get matched first.  But it's possible (e.g. simplrun008) and this
+is the Right Thing to do.
+
+An alternative would be to make (TypeInf) into a /pre-condition/.  It
+is threatened only by the App rule.  So when matching an application
+(e1 e2) ~ (d1 d2) would be to collect args of the application chain,
+match the types of the head, then match arg-by-arg.
+
+However that alternative seems a bit more complicated.  And by
+matching types at variables we do one match_ty for each template
+variable, rather than one for each application chain.  Usually there are
+fewer template variables, although for simple rules it could be the other
+way around.
+
 Note [Expanding variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 Here is another Very Important rule: if the term being matched is a
@@ -1271,7 +1555,7 @@ ruleAppCheck_help env fn args rules
                               not (isJust (match_fn rule_arg arg))]
 
           lhs_fvs = exprsFreeVars rule_args     -- Includes template tyvars
-          match_fn rule_arg arg = match renv emptyRuleSubst rule_arg arg
+          match_fn rule_arg arg = match renv emptyRuleSubst rule_arg arg MRefl
                 where
                   in_scope = mkInScopeSet (lhs_fvs `unionVarSet` exprFreeVars arg)
                   renv = RV { rv_lcl   = mkRnEnv2 in_scope
