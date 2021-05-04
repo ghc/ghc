@@ -379,26 +379,13 @@ instance ExactPrint HsModule where
         debugM $ "HsModule.AnnWhere coming"
         setLayoutTopLevelP $ markEpAnn' an am_main AnnWhere
 
-    setLayoutTopLevelP $ mapM_ markAddEpAnn (al_open $ am_decls $ anns an)
 
-    -- markOptional GHC.AnnOpenC -- Possible '{'
-    -- markManyOptional GHC.AnnSemi -- possible leading semis
-    -- setContextLevel (Set.singleton TopLevel) 2 $ markListWithLayout imports
-    -- markListWithLayout imports
-    markTopLevelList imports
+    markAnnList' False (am_decls $ anns an) $ do
 
-    -- setContextLevel (Set.singleton TopLevel) 2 $ markListWithLayout decls
-    -- markListWithLayout decls
-    -- setLayoutTopLevelP $ markAnnotated decls
-    markTopLevelList decls
+      markTopLevelList imports
 
-    setLayoutTopLevelP $ mapM_ markAddEpAnn (al_close $ am_decls $ anns an)
-    -- markOptional GHC.AnnCloseC -- Possible '}'
+      markTopLevelList decls
 
-    -- markEOF
-    -- eof <- getEofPos
-    -- debugM $ "eof pos:" ++ show (rs2range eof)
-    -- setLayoutTopLevelP $ printStringAtKw' eof ""
 
 -- ---------------------------------------------------------------------
 
@@ -600,23 +587,22 @@ markKwA kw aa = printStringAtAA aa (keywordToString (G kw))
 
 -- ---------------------------------------------------------------------
 
-markAnnList :: EpAnn AnnList -> EPP () -> EPP ()
-markAnnList EpAnnNotUsed action = action
-markAnnList an@(EpAnn _ ann _) action = do
+markAnnList :: Bool -> EpAnn AnnList -> EPP () -> EPP ()
+markAnnList _ EpAnnNotUsed action = action
+markAnnList reallyTrail (EpAnn _ ann _) action = markAnnList' reallyTrail ann action
+
+markAnnList' :: Bool -> AnnList -> EPP () -> EPP ()
+markAnnList' reallyTrail ann action = do
   p <- getPosP
-  debugM $ "markAnnList : " ++ showPprUnsafe (p, an)
-  markLocatedMAA an al_open
+  debugM $ "markAnnList : " ++ showPprUnsafe (p, ann)
+  mapM_ markAddEpAnn (al_open ann)
+  unless reallyTrail $ markTrailing (al_trailing ann) -- Only makes sense for HsModule.
   action
-  markLocatedMAA an al_close
+  debugM $ "markAnnList: calling markAddEpAnn on:" ++ showPprUnsafe (al_close ann)
+  mapM_ markAddEpAnn (al_close ann)
   debugM $ "markAnnList: calling markTrailing with:" ++ showPprUnsafe (al_trailing ann)
-  markTrailing (al_trailing ann)
+  when reallyTrail $ markTrailing (al_trailing ann) -- normal case
 
--- ---------------------------------------------------------------------
-
--- printTrailingComments :: EPP ()
--- printTrailingComments = do
---   cs <- getUnallocatedComments
---   mapM_ printOneComment cs
 
 -- ---------------------------------------------------------------------
 
@@ -1451,7 +1437,7 @@ instance ExactPrint (HsLocalBinds GhcPs) where
     markAnnotatedWithLayout valbinds
 
   exact (HsIPBinds an bs)
-    = markAnnList an (markLocatedAAL an al_rest AnnWhere >> markAnnotated bs)
+    = markAnnList True an (markLocatedAAL an al_rest AnnWhere >> markAnnotated bs)
   exact (EmptyLocalBinds _) = return ()
 
 
@@ -1948,7 +1934,7 @@ instance ExactPrint (HsExpr GhcPs) where
 
   exact (HsDo an do_or_list_comp stmts) = do
     debugM $ "HsDo"
-    markAnnList an $ exactDo an do_or_list_comp stmts
+    markAnnList True an $ exactDo an do_or_list_comp stmts
 
   exact (ExplicitList an es) = do
     debugM $ "ExplicitList start"
@@ -3459,7 +3445,7 @@ instance ExactPrint (LocatedL [LocatedA (IE GhcPs)]) where
     markLocatedAAL ann al_rest AnnHiding
     p <- getPosP
     debugM $ "LocatedL [LIE:p=" ++ showPprUnsafe p
-    markAnnList ann (markAnnotated ies)
+    markAnnList True ann (markAnnotated ies)
 
 -- AZ:TODO: combine with next instance
 instance ExactPrint (LocatedL [LocatedA (Match GhcPs (LocatedA (HsExpr GhcPs)))]) where
@@ -3489,7 +3475,7 @@ instance ExactPrint (LocatedL [LocatedA (StmtLR GhcPs GhcPs (LocatedA (HsExpr Gh
   getAnnotationEntry = entryFromLocatedA
   exact (L (SrcSpanAnn an _) stmts) = do
     debugM $ "LocatedL [ExprLStmt"
-    markAnnList an $ do
+    markAnnList True an $ do
       -- markLocatedMAA an al_open
       case snocView stmts of
         Just (initStmts, ls@(L _ (LastStmt _ _body _ _))) -> do
@@ -3513,13 +3499,13 @@ instance ExactPrint (LocatedL [LocatedA (ConDeclField GhcPs)]) where
   getAnnotationEntry = entryFromLocatedA
   exact (L (SrcSpanAnn an _) fs) = do
     debugM $ "LocatedL [LConDeclField"
-    markAnnList an (mapM_ markAnnotated fs) -- AZ:TODO get rid of mapM_
+    markAnnList True an (mapM_ markAnnotated fs) -- AZ:TODO get rid of mapM_
 
 instance ExactPrint (LocatedL (BF.BooleanFormula (LocatedN RdrName))) where
   getAnnotationEntry = entryFromLocatedA
   exact (L (SrcSpanAnn an _) bf) = do
     debugM $ "LocatedL [LBooleanFormula"
-    markAnnList an (markAnnotated bf)
+    markAnnList True an (markAnnotated bf)
 
 -- ---------------------------------------------------------------------
 -- LocatedL instances end --
@@ -3638,7 +3624,7 @@ instance ExactPrint (Pat GhcPs) where
     markEpAnn an AnnBang
     markAnnotated pat
 
-  exact (ListPat an pats) = markAnnList an (markAnnotated pats)
+  exact (ListPat an pats) = markAnnList True an (markAnnotated pats)
 
   exact (TuplePat an pats boxity) = do
     case boxity of
