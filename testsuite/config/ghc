@@ -178,7 +178,7 @@ opt_ways      = [x[0] for x in config.way_flags.items()
                       if '-O' in x[1]]
 
 llvm_ways     = [x[0] for x in config.way_flags.items()
-                      if '-fflvm' in x[1]]
+                      if '-fllvm' in x[1]]
 
 
 def get_compiler_info():
