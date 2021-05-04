@@ -1305,7 +1305,7 @@ primop  SizeofMutableArrayOp "sizeofMutableArray#" GenPrimOp
    {Return the number of elements in the array.}
 
 primop  IndexArrayOp "indexArray#" GenPrimOp
-   Array# a -> Int# -> (# a #)
+   Array# v -> Int# -> (# v #)
    {Read from the specified index of an immutable array. The result is packaged
     into an unboxed unary tuple; the result itself is not yet
     evaluated. Pattern matching on the tuple forces the indexing of the
