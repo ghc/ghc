@@ -179,6 +179,7 @@ One way to improve this is to either:
 -- | Find object files corresponding to the transitive closure of given home
 -- modules and direct object files for pkg dependencies
 mkObjectUsage :: HscEnv -> [Module] -> [UnitId] -> IO [Usage]
+mkObjectUsage _ [] [] = return []
 mkObjectUsage hsc_env mods pkgs = do
   (ls, us) <- getLinkDeps (text "usage") hsc_env (hsc_HPT hsc_env) ([], [], []) Nothing noSrcSpan mods pkgs
   ds <-
