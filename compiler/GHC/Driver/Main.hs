@@ -82,7 +82,7 @@ module GHC.Driver.Main
       -- hsc_typecheck in client code
     , hscParse', hscSimplify', hscDesugar', tcRnModule', doCodeGen
     , getHscEnv
-    , hscSimpleIface'
+    , hscSimpleIface', hscSimpleIface
     , oneShotMsg
     , dumpIfaceStats
     , ioMsgMaybe
