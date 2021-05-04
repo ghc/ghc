@@ -53,6 +53,8 @@ module Data.Bits (
   popCountDefault,
   toIntegralSized,
   oneBits,
+  (.^.),
+  (.>>.), (.<<.), (!>>.), (!<<.),
   -- * Newtypes
   And(..), Ior(..), Xor(..), Iff(..)
  ) where
@@ -86,6 +88,46 @@ import GHC.Show
 oneBits :: (FiniteBits a) => a
 oneBits = complement zeroBits
 {-# INLINE oneBits #-}
+
+-- | Infix version of 'xor'.
+--
+-- @since 4.17
+(.^.) :: (Bits a) => a -> a -> a
+(.^.) = xor
+
+infixl 6 .^.
+
+-- | Infix version of 'shiftR'.
+--
+-- @since 4.17
+(.>>.) :: (Bits a) => a -> Int -> a
+(.>>.) = shiftR
+
+infixl 8 .>>.
+
+-- | Infix version of 'shiftL'.
+--
+-- @since 4.17
+(.<<.) :: (Bits a) => a -> Int -> a
+(.<<.) = shiftL
+
+infixl 8 .<<.
+
+-- | Infix version of 'unsafeShiftR'.
+--
+-- @since 4.17
+(!>>.) :: (Bits a) => a -> Int -> a
+(!>>.) = unsafeShiftR
+
+infixl 8 !>>.
+
+-- | Infix version of 'unsafeShiftL'.
+--
+-- @since 4.17
+(!<<.) :: (Bits a) => a -> Int -> a
+(!<<.) = unsafeShiftL
+
+infixl 8 !<<.
 
 -- | Monoid under bitwise AND.
 --
