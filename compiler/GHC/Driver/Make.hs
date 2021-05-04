@@ -2595,8 +2595,9 @@ data MakeNewModSummary
 makeNewModSummary :: HscEnv -> MakeNewModSummary -> IO ExtendedModSummary
 makeNewModSummary hsc_env MakeNewModSummary{..} = do
   let PreprocessedImports{..} = nms_preimps
-
+  let dflags = hsc_dflags hsc_env
   obj_timestamp <- modificationTimeIfExists (ml_obj_file nms_location)
+  dyn_obj_timestamp <- modificationTimeIfExists (dynamicOutputFile dflags (ml_obj_file nms_location))
   hi_timestamp <- modificationTimeIfExists (ml_hi_file nms_location)
   hie_timestamp <- modificationTimeIfExists (ml_hie_file nms_location)
 
@@ -2622,6 +2623,7 @@ makeNewModSummary hsc_env MakeNewModSummary{..} = do
         , ms_iface_date = hi_timestamp
         , ms_hie_date = hie_timestamp
         , ms_obj_date = obj_timestamp
+        , ms_dyn_obj_date = dyn_obj_timestamp
         }
     , emsInstantiatedUnits = inst_deps
     }

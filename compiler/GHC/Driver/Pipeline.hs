@@ -116,7 +116,7 @@ import Data.Maybe
 import Data.Version
 import Data.Either      ( partitionEithers )
 
-import Data.Time        ( UTCTime, getCurrentTime )
+import Data.Time        ( getCurrentTime )
 
 -- ---------------------------------------------------------------------------
 -- Pre-process
@@ -1257,11 +1257,13 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
         let o_file = ml_obj_file location -- The real object file
             hi_file = ml_hi_file location
             hie_file = ml_hie_file location
-            --dyn_o_file = dynamicOutputFile dflags o_file
+            dyn_o_file = dynamicOutputFile dflags o_file
 
         src_hash <- liftIO $ getFileHash (basename <.> suff)
         hi_date <- liftIO $ modificationTimeIfExists hi_file
         hie_date <- liftIO $ modificationTimeIfExists hie_file
+        o_mod <- liftIO $ modificationTimeIfExists o_file
+        dyn_o_mod <- liftIO $ modificationTimeIfExists dyn_o_file
 
         PipeState{hsc_env=hsc_env'} <- getPipeState
 
@@ -1272,7 +1274,6 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
           addHomeModuleToFinder fc home_unit mod_name location
 
 
-        o_mod <- liftIO $ getModTime o_file
   -- Make the ModSummary to hand to hscMain
         let
             mod_summary = ModSummary {  ms_mod       = mod,
@@ -1283,6 +1284,7 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
                                         ms_location  = location,
                                         ms_hs_hash   = src_hash,
                                         ms_obj_date  = o_mod,
+                                        ms_dyn_obj_date = dyn_o_mod,
                                         ms_parsed_mod   = Nothing,
                                         ms_iface_date   = hi_date,
                                         ms_hie_date     = hie_date,
@@ -2063,15 +2065,6 @@ joinObjectFiles logger tmpfs dflags o_files output_fn = do
 
 -- -----------------------------------------------------------------------------
 -- Misc.
-
-
-getModTime :: FilePath -> IO (Maybe UTCTime)
-getModTime dest_file = do
-  dest_file_exists <- doesFileExist dest_file
-  if not dest_file_exists
-    then return Nothing
-     else do t2 <- getModificationUTCTime dest_file
-             return (Just t2)
 
 
 -- | What phase to run after one of the backend code generators has run

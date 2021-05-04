@@ -776,15 +776,21 @@ checkObjects dflags mb_old_linkable summary = do
   let
     this_mod    = ms_mod summary
     mb_obj_date = ms_obj_date summary
+    mb_dyn_obj_date = ms_dyn_obj_date summary
     mb_if_date  = ms_iface_date summary
     obj_fn      = ml_obj_file (ms_location summary)
     -- dynamic-too *also* produces the dyn_o_file, so have to check
     -- that's there, and if it's not, regenerate both .o and
     -- .dyn_o
-    dyn_o_file = case dt_state of
-                    DT_OK -> Just (dynamicOutputFile dflags obj_fn)
-                    _ -> Nothing
-  case (,) <$> mb_obj_date <*> mb_if_date of
+    checkDynamicObj k = case dt_state of
+                          DT_OK -> case (>=) <$> mb_dyn_obj_date <*> mb_if_date of
+                                      Just True -> k
+                                      _ -> return (MustCompile, Nothing)
+                          -- Not in dynamic-too mode
+                          _ -> k
+
+  checkDynamicObj $
+    case (,) <$> mb_obj_date <*> mb_if_date of
       Just (obj_date, if_date)
         | obj_date >= if_date ->
             case mb_old_linkable of
