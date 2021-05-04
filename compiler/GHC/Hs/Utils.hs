@@ -170,7 +170,7 @@ just attach 'noSrcSpan' to everything.
 
 -- | @e => (e)@
 mkHsPar :: LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
-mkHsPar e = L (getLoc e) (HsPar noAnn e)
+mkHsPar e = L (getLoc e) (gHsPar e)
 
 mkSimpleMatch :: (Anno (Match (GhcPass p) (LocatedA (body (GhcPass p))))
                         ~ SrcSpanAnnA,
@@ -285,17 +285,13 @@ nlHsTyApps fun_id tys xs = foldl' nlHsApp (nlHsTyApp fun_id tys) xs
 -- | Wrap in parens if @'hsExprNeedsParens' appPrec@ says it needs them
 -- So @f x@ becomes @(f x)@, but @3@ stays as @3@.
 mkLHsPar :: IsPass id => LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
-mkLHsPar le@(L loc e)
-  | hsExprNeedsParens appPrec e = L loc (HsPar noAnn le)
-  | otherwise                   = le
+mkLHsPar = parenthesizeHsExpr appPrec
 
 mkParPat :: IsPass p => LPat (GhcPass p) -> LPat (GhcPass p)
-mkParPat lp@(L loc p)
-  | patNeedsParens appPrec p = L loc (ParPat noAnn lp)
-  | otherwise                = lp
+mkParPat = parenthesizePat appPrec
 
 nlParPat :: LPat (GhcPass name) -> LPat (GhcPass name)
-nlParPat p = noLocA (ParPat noAnn p)
+nlParPat p = noLocA (gParPat p)
 
 -------------------------------
 -- These are the bits of syntax that contain rebindable names
@@ -593,7 +589,7 @@ nlList   :: [LHsExpr GhcPs] -> LHsExpr GhcPs
 
 -- AZ:Is this used?
 nlHsLam match = noLocA (HsLam noExtField (mkMatchGroup Generated (noLocA [match])))
-nlHsPar e     = noLocA (HsPar noAnn e)
+nlHsPar e     = noLocA (gHsPar e)
 
 -- nlHsIf should generate if-expressions which are NOT subject to
 -- RebindableSyntax, so the first field of HsIf is False. (#12080)
@@ -794,7 +790,7 @@ mkLHsWrap co_fn (L loc e) = L loc (mkHsWrap co_fn e)
 mkHsWrap :: HsWrapper -> HsExpr GhcTc -> HsExpr GhcTc
 mkHsWrap co_fn e | isIdHsWrapper co_fn   = e
 mkHsWrap co_fn (XExpr (WrapExpr (HsWrap co_fn' e))) = mkHsWrap (co_fn <.> co_fn') e
-mkHsWrap co_fn (HsPar x (L l e))                = HsPar x (L l (mkHsWrap co_fn e))
+mkHsWrap co_fn (HsPar x lpar (L l e) rpar)      = HsPar x lpar (L l (mkHsWrap co_fn e)) rpar
 mkHsWrap co_fn e                                = XExpr (WrapExpr $ HsWrap co_fn e)
 
 mkHsWrapCo :: TcCoercionN   -- A Nominal coercion  a ~N b
@@ -924,13 +920,8 @@ mkMatch :: forall p. IsPass p
 mkMatch ctxt pats expr binds
   = noLocA (Match { m_ext   = noAnn
                   , m_ctxt  = ctxt
-                  , m_pats  = map paren pats
+                  , m_pats  = map mkParPat pats
                   , m_grhss = GRHSs noExtField (unguardedRHS noAnn noSrcSpan expr) binds })
-  where
-    paren :: LPat (GhcPass p) -> LPat (GhcPass p)
-    paren lp@(L l p)
-      | patNeedsParens appPrec p = L l (ParPat noAnn lp)
-      | otherwise                = lp
 
 {-
 ************************************************************************
@@ -1208,7 +1199,7 @@ collect_pat flag pat bndrs = case pat of
   BangPat _ pat         -> collect_lpat flag pat bndrs
   AsPat _ a pat         -> unXRec @p a : collect_lpat flag pat bndrs
   ViewPat _ _ pat       -> collect_lpat flag pat bndrs
-  ParPat _ pat          -> collect_lpat flag pat bndrs
+  ParPat _ _ pat _      -> collect_lpat flag pat bndrs
   ListPat _ pats        -> foldr (collect_lpat flag) bndrs pats
   TuplePat _ pats _     -> foldr (collect_lpat flag) bndrs pats
   SumPat _ pat _ _      -> collect_lpat flag pat bndrs
@@ -1583,7 +1574,7 @@ lPatImplicits = hs_lpat
     hs_pat (BangPat _ pat)      = hs_lpat pat
     hs_pat (AsPat _ _ pat)      = hs_lpat pat
     hs_pat (ViewPat _ _ pat)    = hs_lpat pat
-    hs_pat (ParPat _ pat)       = hs_lpat pat
+    hs_pat (ParPat _ _ pat _)   = hs_lpat pat
     hs_pat (ListPat _ pats)     = hs_lpats pats
     hs_pat (TuplePat _ pats _)  = hs_lpats pats
 
