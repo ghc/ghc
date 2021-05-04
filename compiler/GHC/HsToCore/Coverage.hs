@@ -521,10 +521,6 @@ addTickHsExpr e@(HsUnboundVar {})   = return e
 addTickHsExpr e@(HsRecFld _ (Ambiguous id _))   = do freeVar id; return e
 addTickHsExpr e@(HsRecFld _ (Unambiguous id _)) = do freeVar id; return e
 
-addTickHsExpr e@(HsConLikeOut {}) = return e
-  -- We used to do a freeVar on a pat-syn builder, but actually
-  -- such builders are never in the inScope env, which
-  -- doesn't include top level bindings
 addTickHsExpr e@(HsIPVar {})     = return e
 addTickHsExpr e@(HsOverLit {})   = return e
 addTickHsExpr e@(HsOverLabel{})  = return e
@@ -648,6 +644,11 @@ addTickHsExpr (XExpr (WrapExpr (HsWrap w e))) =
 addTickHsExpr (XExpr (ExpansionExpr (HsExpanded a b))) =
         liftM (XExpr . ExpansionExpr . HsExpanded a) $
               (addTickHsExpr b)
+
+addTickHsExpr e@(XExpr (ConLikeTc {})) = return e
+  -- We used to do a freeVar on a pat-syn builder, but actually
+  -- such builders are never in the inScope env, which
+  -- doesn't include top level bindings
 
 addTickTupArg :: HsTupArg GhcTc -> TM (HsTupArg GhcTc)
 addTickTupArg (Present x e)  = do { e' <- addTickLHsExpr e

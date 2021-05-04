@@ -385,7 +385,6 @@ type family XXInjectivityAnn  x
 
 type family XVar            x
 type family XUnboundVar     x
-type family XConLikeOut     x
 type family XRecFld         x
 type family XOverLabel      x
 type family XIPVar          x
