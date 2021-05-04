@@ -42,6 +42,7 @@ module GHC.Core.FamInstEnv (
 
 import GHC.Prelude
 
+import GHC.Core( IsOrphan )
 import GHC.Core.Unify
 import GHC.Core.Type as Type
 import GHC.Core.TyCo.Rep
@@ -120,6 +121,7 @@ data FamInst  -- See Note [FamInsts and CoAxioms]
             -- in GHC.Core.Coercion.Axiom
 
             , fi_rhs :: Type         --   the RHS, with its freshened vars
+            , fi_orphan :: IsOrphan
             }
 
 data FamFlavor
