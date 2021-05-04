@@ -1610,13 +1610,13 @@ specialise env bind_calls (RI { ri_fn = fn, ri_lam_bndrs = arg_bndrs
     do  { (boring_call, new_pats) <- callsToNewPats env fn spec_info arg_occs all_calls
 
         ; let n_pats = length new_pats
---        ; if (not (null new_pats) || isJust mb_unspec) then
---            pprTrace "specialise" (vcat [ ppr fn <+> text "with" <+> int n_pats <+> text "good patterns"
---                                        , text "mb_unspec" <+> ppr (isJust mb_unspec)
---                                        , text "arg_occs" <+> ppr arg_occs
---                                        , text "good pats" <+> ppr new_pats])  $
---               return ()
---          else return ()
+        ; if (not (null new_pats) || isJust mb_unspec) then
+            pprTrace "specialise" (vcat [ ppr fn <+> text "with" <+> int n_pats <+> text "good patterns"
+                                        , text "mb_unspec" <+> ppr (isJust mb_unspec)
+                                        , text "arg_occs" <+> ppr arg_occs
+                                        , text "good pats" <+> ppr new_pats])  $
+               return ()
+          else return ()
 
         ; let spec_env = decreaseSpecCount env n_pats
         ; (spec_usgs, new_specs) <- mapAndUnzipM (spec_one spec_env fn arg_bndrs body)
@@ -1634,11 +1634,11 @@ specialise env bind_calls (RI { ri_fn = fn, ri_lam_bndrs = arg_bndrs
                       Just rhs_usg | boring_call -> (spec_usg `combineUsage` rhs_usg, Nothing)
                       _                          -> (spec_usg,                      mb_unspec)
 
---        ; pprTrace "specialise return }"
---             (vcat [ ppr fn
---                   , text "boring_call:" <+> ppr boring_call
---                   , text "new calls:" <+> ppr (scu_calls new_usg)]) $
---          return ()
+        ; pprTrace "specialise return }"
+             (vcat [ ppr fn
+                   , text "boring_call:" <+> ppr boring_call
+                   , text "new calls:" <+> ppr (scu_calls new_usg)]) $
+          return ()
 
           ; return (new_usg, SI { si_specs = new_specs ++ specs
                                 , si_n_specs = spec_count + n_pats
@@ -1719,30 +1719,27 @@ spec_one env fn arg_bndrs body (call_pat, rule_number)
 
                 -- And build the results
         ; let spec_body_ty   = exprType spec_body
-              spec_lam_args1 = qvars ++ extra_bndrs
-              (spec_lam_args, spec_call_args) = mkWorkerArgs False
-                                                             spec_lam_args1 spec_body_ty
+
+              (spec_lam_args1, spec_sig, spec_arity, spec_join_arity)
+                  = calcSpecInfo fn qvars pats extra_bndrs
+                  -- Annotate the variables with the strictness information from
+                  -- the function (see Note [Strictness information in worker binders])
+
+              (spec_lam_args, spec_call_args) = mkWorkerArgs fn False
+                                                    spec_lam_args1 spec_body_ty
                 -- mkWorkerArgs: usual w/w hack to avoid generating
                 -- a spec_rhs of unlifted type and no args
 
-              spec_str          = calcSpecStrictness fn spec_lam_args pats
-              spec_lam_args_str = handOutStrictnessInformation spec_str spec_lam_args
-                -- Annotate the variables with the strictness information from
-                -- the function (see Note [Strictness information in worker binders])
-
-              spec_join_arity | isJoinId fn = Just (length spec_lam_args)
-                              | otherwise   = Nothing
               spec_id    = mkLocalId spec_name Many
                                      (mkLamTypes spec_lam_args spec_body_ty)
                              -- See Note [Transfer strictness]
-                             `setIdDmdSig` spec_str
-                             `setIdCprSig` topCprSig
-                             `setIdArity` count isId spec_lam_args
+                             `setIdDmdSig`    spec_sig
+                             `setIdCprSig`    topCprSig
+                             `setIdArity`     spec_arity
                              `asJoinId_maybe` spec_join_arity
 
-
                 -- Conditionally use result of new worker-wrapper transform
-              spec_rhs   = mkLams spec_lam_args_str spec_body
+              spec_rhs   = mkLams spec_lam_args spec_body
               rule_rhs   = mkVarApps (Var spec_id) $
                            dropTail (length extra_bndrs) spec_call_args
               inline_act = idInlineActivation fn
@@ -1755,31 +1752,46 @@ spec_one env fn arg_bndrs body (call_pat, rule_number)
                                , os_rhs = spec_rhs }) }
 
 
--- See Note [Strictness information in worker binders]
-handOutStrictnessInformation :: DmdSig -> [Var] -> [Var]
-handOutStrictnessInformation str vs
-  = go (fst (splitDmdSig str)) vs
-  where
-    go _ [] = []
-    go [] vs = vs
-    go (d:dmds) (v:vs) | isId v = setIdDemandInfo v d : go dmds vs
-    go dmds (v:vs) = v : go dmds vs
-
-calcSpecStrictness :: Id                     -- The original function
-                   -> [Var] -> [CoreExpr]    -- Call pattern
-                   -> DmdSig                 -- Strictness of specialised thing
+calcSpecInfo :: Id                     -- The original function
+             -> [Var] -> [CoreExpr]    -- Call pattern
+             -> [Var]                  -- Extra bndrs
+             -> ( [Var]                     -- Demand-decorated binders
+                , DmdSig                    -- Strictness of specialised thing
+                , Arity, Maybe JoinArity )  -- Arities of specialised thing
+-- Calcuate bits of IdInfo for the specialised function
 -- See Note [Transfer strictness]
-calcSpecStrictness fn qvars pats
-  = mkClosedDmdSig spec_dmds div
+-- See Note [Strictness information in worker binders]
+calcSpecInfo fn qvars pats extra_bndrs
+  | isJoinId fn    -- Join points have strictness and arity for LHS only
+  = ( bndrs_w_dmds
+    , mkClosedDmdSig qvar_dmds div
+    , count isId qvars
+    , Just (length qvars) )
+  | otherwise
+  = ( bndrs_w_dmds
+    , mkClosedDmdSig (qvar_dmds ++ extra_dmds) div
+    , count isId qvars + count isId extra_bndrs
+    , Nothing )
   where
-    spec_dmds = [ lookupVarEnv dmd_env qv `orElse` topDmd | qv <- qvars, isId qv ]
-    DmdSig (DmdType _ dmds div) = idDmdSig fn
+    DmdSig (DmdType _ fn_dmds div) = idDmdSig fn
 
-    dmd_env = go emptyVarEnv dmds pats
+    val_pats   = filterOut isTypeArg pats
+    qvar_dmds  = [ lookupVarEnv dmd_env qv `orElse` topDmd | qv <- qvars, isId qv ]
+    extra_dmds = dropList val_pats fn_dmds
+
+    bndrs_w_dmds =  set_dmds qvars       qvar_dmds
+                 ++ set_dmds extra_bndrs extra_dmds
+
+    set_dmds :: [Var] -> [Demand] -> [Var]
+    set_dmds [] _   = []
+    set_dmds vs  [] = vs  -- Run out of demands
+    set_dmds (v:vs) ds@(d:ds') | isTyVar v = v                   : set_dmds vs ds
+                               | otherwise = setIdDemandInfo v d : set_dmds vs ds'
+
+    dmd_env = go emptyVarEnv fn_dmds val_pats
 
     go :: DmdEnv -> [Demand] -> [CoreExpr] -> DmdEnv
-    go env ds (Type {} : pats)     = go env ds pats
-    go env ds (Coercion {} : pats) = go env ds pats
+    -- We've filtered out all the type patterns already
     go env (d:ds) (pat : pats)     = go (go_one env d pat) ds pats
     go env _      _                = env
 
@@ -1789,7 +1801,8 @@ calcSpecStrictness fn qvars pats
       | (Var _, args) <- collectArgs e
       , Just ds <- viewProd (length args) cd
       = go env ds args
-    go_one env _               _       = env
+    go_one env _  _ = env
+
 
 {-
 Note [spec_usg includes rhs_usg]
@@ -1847,12 +1860,12 @@ The function calcSpecStrictness performs the calculation.
 
 Note [Strictness information in worker binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 After having calculated the strictness annotation for the worker (see Note
 [Transfer strictness] above), we also want to have this information attached to
 the worker’s arguments, for the benefit of later passes. The function
 handOutStrictnessInformation decomposes the strictness annotation calculated by
 calcSpecStrictness and attaches them to the variables.
+
 
 ************************************************************************
 *                                                                      *
@@ -2041,10 +2054,10 @@ callsToNewPats env fn spec_info@(SI { si_specs = done_specs }) bndr_occs calls
                 -- Discard specialisations if there are too many of them
               (pats_were_discarded, trimmed_pats) = trim_pats env fn spec_info small_pats
 
---        ; pprTrace "callsToPats" (vcat [ text "calls to" <+> ppr fn <> colon <+> ppr calls
---                                       , text "done_specs:" <+> ppr (map os_pat done_specs)
---                                       , text "good_pats:" <+> ppr good_pats ]) $
---          return ()
+        ; pprTrace "callsToPats" (vcat [ text "calls to" <+> ppr fn <> colon <+> ppr calls
+                                       , text "done_specs:" <+> ppr (map os_pat done_specs)
+                                       , text "good_pats:" <+> ppr good_pats ]) $
+          return ()
 
         ; return (have_boring_call || pats_were_discarded, trimmed_pats) }
           -- If any of the calls does not give rise to a specialisation, either
@@ -2269,15 +2282,20 @@ argToPat env in_scope val_env arg arg_occ
 
   -- Check if the argument is a variable that
   --    (a) is used in an interesting way in the function body
+  ---       i.e. ScrutOcc. UnkOcc and NoOcc are not interesting
+  --        (NoOcc means we could drop the argument, but that's the
+  --         business of absence analysis, not SpecConstr.)
   --    (b) we know what its value is
   -- In that case it counts as "interesting"
 argToPat env in_scope val_env (Var v) arg_occ
-  | sc_force env || case arg_occ of { UnkOcc -> False; _other -> True }, -- (a)
-    is_value,                                                            -- (b)
+  | sc_force env || case arg_occ of { ScrutOcc {} -> True
+                                    ; UnkOcc      -> False
+                                    ; NoOcc       -> False } -- (a)
+  , is_value                                                 -- (b)
        -- Ignoring sc_keen here to avoid gratuitously incurring Note [Reboxing]
        -- So sc_keen focused just on f (I# x), where we have freshly-allocated
        -- box that we can eliminate in the caller
-    not (ignoreType env (varType v))
+  , not (ignoreType env (varType v))
   = return (True, Var v)
   where
     is_value

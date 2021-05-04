@@ -189,7 +189,8 @@ mkWwBodies opts rhs_fvs fun_id demands cpr_info
         ; (useful2, wrap_fn_cpr, work_fn_cpr, cpr_res_ty)
               <- mkWWcpr_entry opts res_ty cpr_info
 
-        ; let (work_lam_args, work_call_args) = mkWorkerArgs (wo_fun_to_thunk opts) work_args cpr_res_ty
+        ; let (work_lam_args, work_call_args) = mkWorkerArgs fun_id (wo_fun_to_thunk opts)
+                                                             work_args cpr_res_ty
               worker_args_dmds = [idDemandInfo v | v <- work_call_args, isId v]
               wrapper_body = wrap_fn_args . wrap_fn_cpr . wrap_fn_str . applyToVars work_call_args . Var
               worker_body = mkLams work_lam_args. work_fn_str . work_fn_cpr . work_fn_args
@@ -302,31 +303,39 @@ add a void argument.  E.g.
 We use the state-token type which generates no code.
 -}
 
-mkWorkerArgs :: Bool
+mkWorkerArgs :: Id      -- The wrapper Id
+             -> Bool
              -> [Var]
              -> Type    -- Type of body
              -> ([Var], -- Lambda bound args
                  [Var]) -- Args at call site
-mkWorkerArgs fun_to_thunk args res_ty
-    | any isId args || not needsAValueLambda
-    = (args, args)
-    | otherwise
+mkWorkerArgs wrap_id fun_to_thunk args res_ty
+    | not (isJoinId wrap_id) -- Join Ids never need an extra arg
+    , not (any isId args)    -- No existing value lambdas
+    , needs_a_value_lambda   -- and we need to add one
     = (args ++ [voidArgId], args ++ [voidPrimId])
+
+    | otherwise
+    = (args, args)
     where
-      -- See "Making wrapper args" section above
-      needsAValueLambda =
-        lifted
-        -- We may encounter a levity-polymorphic result, in which case we
-        -- conservatively assume that we have laziness that needs preservation.
-        -- See #15186.
-        || not fun_to_thunk
-           -- see Note [Protecting the last value argument]
+      -- If fun_to_thunk is False we always keep at least one value
+      --   argument: see Note [Protecting the last value argument]
+      -- If it is True, we only need to keep a value argument if
+      --   the result type is (or might be) unlifted, in which case
+      --   dropping the last arg would mean we wrongly used call-by-value
+      needs_a_value_lambda
+        = not fun_to_thunk
+          || might_be_unlifted
 
       -- Might the result be lifted?
-      lifted =
-        case isLiftedType_maybe res_ty of
-          Just lifted -> lifted
-          Nothing     -> True
+      --     False => definitely lifted
+      --     True  => might be unlifted
+      -- We may encounter a levity-polymorphic result, in which case we
+      -- conservatively assume that we have laziness that needs
+      -- preservation. See #15186.
+      might_be_unlifted = case isLiftedType_maybe res_ty of
+                            Just lifted -> not lifted
+                            Nothing     -> True
 
 {-
 Note [Protecting the last value argument]
@@ -344,7 +353,6 @@ so f can't be inlined *under a lambda*.
 
 Note [Join points and beta-redexes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 Originally, the worker would invoke the original function by calling it with
 arguments, thus producing a beta-redex for the simplifier to munch away:
 
@@ -375,7 +383,6 @@ worry about hygiene, but luckily wy is freshly generated.)
 
 Note [Join points returning functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 It is crucial that the arity of a join point depends on its *callers,* not its
 own syntax. What this means is that a join point can have "extra lambdas":
 
