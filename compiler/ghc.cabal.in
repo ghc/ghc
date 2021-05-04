@@ -719,7 +719,8 @@ Library
         GHC.Utils.Logger
         GHC.Utils.Misc
         GHC.Utils.Monad
-        GHC.Utils.Monad.State
+        GHC.Utils.Monad.State.Strict
+        GHC.Utils.Monad.State.Lazy
         GHC.Utils.Outputable
         GHC.Utils.Panic
         GHC.Utils.Panic.Plain
