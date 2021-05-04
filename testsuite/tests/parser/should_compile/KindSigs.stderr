@@ -841,7 +841,14 @@
        (L
         (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:23:1-12 })
         [(L
-          (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:23:1-12 })
+          (SrcSpanAnn (EpAnn
+                       (Anchor
+                        { KindSigs.hs:23:1-12 }
+                        (UnchangedAnchor))
+                       (AnnListItem
+                        [])
+                       (EpaComments
+                        [])) { KindSigs.hs:23:1-12 })
           (Match
            (EpAnn
             (Anchor
