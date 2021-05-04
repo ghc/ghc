@@ -233,8 +233,12 @@ import Data.Functor
 import Control.DeepSeq (force)
 import Data.Bifunctor (first, bimap)
 
-#include "HsVersions.h"
+import GHC.Stg.InferTags
+import GHC.Stg.InferTags.Rewrite
+import GHC.Types.Unique.Supply
+-- import GHC.Driver.Ppr
 
+#include "HsVersions.h"
 
 {- **********************************************************************
 %*                                                                      *
@@ -1791,8 +1795,18 @@ doCodeGen hsc_env this_mod denv data_tycons
     let tmpfs  = hsc_tmpfs hsc_env
     let platform = targetPlatform dflags
 
-    let stg_binds_w_fvs = annTopBindingsFreeVars stg_binds
+    dumpIfSet_dyn logger dflags Opt_D_dump_stg_final "CodeGenInput STG:" FormatSTG (pprGenStgTopBindings (initStgPprOpts dflags) stg_binds)
 
+    -- Annotate binders with tag information.
+    let (!stg_binds_w_tags) = {-# SCC "StgTagFields" #-}
+                                        inferTags stg_binds
+    dumpIfSet_dyn logger dflags Opt_D_dump_stg_tags "CodeGenAnal STG:" FormatSTG (pprGenStgTopBindings (initStgPprOpts dflags) stg_binds_w_tags)
+
+    -- Rewrite STG to uphold the strict field invariant
+    us_t <- mkSplitUniqSupply 't'
+    let sfi_seqd_binds = rewriteTopBinds this_mod us_t stg_binds_w_tags :: [TgStgTopBinding]
+
+    let stg_binds_w_fvs = annTopBindingsFreeVars sfi_seqd_binds
     dumpIfSet_dyn logger dflags Opt_D_dump_stg_final "Final STG:" FormatSTG (pprGenStgTopBindings (initStgPprOpts dflags) stg_binds_w_fvs)
 
     let stg_to_cmm = case stgToCmmHook hooks of
