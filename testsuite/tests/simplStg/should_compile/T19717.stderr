@@ -1,7 +1,7 @@
 
 ==================== Final STG: ====================
 Foo.f :: forall {a}. a -> [GHC.Maybe.Maybe a]
-[GblId, Arity=1, Str=<1L>, Cpr=2, Unf=OtherCon []] =
+[GblId, Arity=1, Str=<1L>, Unf=OtherCon []] =
     {} \r [x]
         case x of x1 {
         __DEFAULT ->

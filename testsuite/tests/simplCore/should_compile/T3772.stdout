@@ -1,7 +1,7 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 43, types: 18, coercions: 0, joins: 0/0}
+  = {terms: 46, types: 19, coercions: 0, joins: 0/0}
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T3772.$trModule4 :: GHC.Prim.Addr#
@@ -41,38 +41,44 @@ T3772.$trModule
 
 Rec {
 -- RHS size: {terms: 10, types: 2, coercions: 0, joins: 0/0}
-$wxs :: GHC.Prim.Int# -> ()
-[GblId, Arity=1, Str=<1L>, Unf=OtherCon []]
+$wxs :: GHC.Prim.Int# -> (# #)
+[GblId, Arity=1, Str=<1L>, Cpr=1, Unf=OtherCon []]
 $wxs
   = \ (ww :: GHC.Prim.Int#) ->
       case ww of ds1 {
         __DEFAULT -> $wxs (GHC.Prim.-# ds1 1#);
-        1# -> GHC.Tuple.()
+        1# -> GHC.Prim.(##)
       }
 end Rec }
 
 -- RHS size: {terms: 10, types: 2, coercions: 0, joins: 0/0}
-T3772.$wfoo [InlPrag=NOINLINE] :: GHC.Prim.Int# -> ()
+T3772.$wfoo [InlPrag=NOINLINE] :: GHC.Prim.Int# -> (# #)
 [GblId, Arity=1, Str=<L>, Unf=OtherCon []]
 T3772.$wfoo
   = \ (ww :: GHC.Prim.Int#) ->
       case GHC.Prim.<# 0# ww of {
-        __DEFAULT -> GHC.Tuple.();
+        __DEFAULT -> GHC.Prim.(##);
         1# -> $wxs ww
       }
 
--- RHS size: {terms: 6, types: 3, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 9, types: 4, coercions: 0, joins: 0/0}
 foo [InlPrag=[final]] :: Int -> ()
 [GblId,
  Arity=1,
  Str=<1P(L)>,
+ Cpr=1,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (n [Occ=Once1!] :: Int) ->
-                 case n of { GHC.Types.I# ww [Occ=Once1] -> T3772.$wfoo ww }}]
+                 case n of { GHC.Types.I# ww [Occ=Once1] ->
+                 case T3772.$wfoo ww of { (# #) -> GHC.Tuple.() }
+                 }}]
 foo
-  = \ (n :: Int) -> case n of { GHC.Types.I# ww -> T3772.$wfoo ww }
+  = \ (n :: Int) ->
+      case n of { GHC.Types.I# ww ->
+      case T3772.$wfoo ww of { (# #) -> GHC.Tuple.() }
+      }
 
 
 
