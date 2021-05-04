@@ -2,10 +2,12 @@ module GHC.Cmm.CallConv (
   ParamLocation(..),
   assignArgumentsPos,
   assignStack,
-  realArgRegsCover
+  realArgRegsCover,
+  tupleRegsCover
 ) where
 
 import GHC.Prelude
+import Data.List (nub)
 
 import GHC.Cmm.Expr
 import GHC.Runtime.Heap.Layout
@@ -219,3 +221,9 @@ realArgRegsCover platform
       realDoubleRegs platform ++
       realLongRegs   platform
       -- we don't save XMM registers if they are not used for parameter passing
+
+-- like realArgRegsCover but always includes the node. This covers the real
+-- and virtual registers used for unboxed tuples.
+tupleRegsCover :: Platform -> [GlobalReg]
+tupleRegsCover platform =
+  nub (VanillaReg 1 VGcPtr : realArgRegsCover platform)
