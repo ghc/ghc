@@ -230,7 +230,7 @@ import GHC.Data.List.SetOps ( getNth, findDupsEq )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Data.FastString
-import GHC.Utils.Error( Validity(..), isValid )
+import GHC.Utils.Validity ( Validity(..), isValid )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.List  ( mapAccumL )

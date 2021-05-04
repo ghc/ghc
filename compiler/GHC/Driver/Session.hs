@@ -243,7 +243,7 @@ import GHC.Utils.Misc
 import GHC.Utils.GlobalVars
 import GHC.Data.Maybe
 import GHC.Utils.Monad
-import GHC.Types.Error (DiagnosticReason(..))
+import GHC.Types.DiagnosticReason (DiagnosticReason(..))
 import GHC.Types.SrcLoc
 import GHC.Types.SafeHaskell
 import GHC.Types.Basic ( Alignment, alignmentOf, IntWithInf, treatZeroAsInf )
