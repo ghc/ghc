@@ -1222,8 +1222,8 @@ runPhase (RealPhase (HsPp sf)) input_fn = do
 runPhase (RealPhase (Hsc src_flavour)) input_fn
  = do   -- normal Hsc mode, not mkdependHS
         dflags0 <- getDynFlags
-
-        PipeEnv{ stop_phase=stop,
+        -- TODO: Account for stop MP
+        PipeEnv{ stop_phase=_stop,
                  src_basename=basename,
                  src_suffix=suff } <- getPipeEnv
 

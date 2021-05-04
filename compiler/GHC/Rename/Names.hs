@@ -417,7 +417,9 @@ calculateAvails :: HomeUnit
                 -> IsBootInterface
                 -> ImportedBy
                 -> ImportAvails
-calculateAvails home_unit iface mod_safe' want_boot imported_by =
+-- TODO: Account for safe import MP
+-- Existing logic was confusing (and wrong imo)
+calculateAvails home_unit iface _mod_safe' want_boot imported_by =
   let imp_mod    = mi_module iface
       imp_sem_mod= mi_semantic_module iface
       orph_iface = mi_orphan (mi_final_exts iface)
