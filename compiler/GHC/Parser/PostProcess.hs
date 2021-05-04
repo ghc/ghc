@@ -531,13 +531,11 @@ getMonoBind :: LHsBind GhcPs -> [LHsDecl GhcPs]
 
 getMonoBind (L loc1 (FunBind { fun_id = fun_id1@(L _ f1)
                              , fun_matches =
-                               MG { mg_alts = (L _ mtchs1) } }))
+                               MG { mg_alts = (L _ m1@[L _ mtchs1]) } }))
             binds
-  | has_args mtchs1
-  = go mtchs1 loc1 binds []
+  | has_args m1
+  = go [L (removeCommentsA loc1) mtchs1] (commentsOnlyA loc1) binds []
   where
-    -- TODO:AZ may have to preserve annotations. Although they should
-    -- only be AnnSemi, and meaningless in this context?
     go :: [LMatch GhcPs (LHsExpr GhcPs)] -> SrcSpanAnnA
        -> [LHsDecl GhcPs] -> [LHsDecl GhcPs]
        -> (LHsBind GhcPs,[LHsDecl GhcPs]) -- AZ
@@ -547,7 +545,7 @@ getMonoBind (L loc1 (FunBind { fun_id = fun_id1@(L _ f1)
                                     MG { mg_alts = (L _ [L lm2 mtchs2]) } })))
          : binds) _
         | f1 == f2 =
-          let (loc2', lm2') = transferComments loc2 lm2
+          let (loc2', lm2') = transferAnnsA loc2 lm2
           in go (L lm2' mtchs2 : mtchs)
                         (combineSrcSpansA loc loc2') binds []
     go mtchs loc (doc_decl@(L loc2 (DocD {})) : binds) doc_decls
@@ -1187,12 +1185,12 @@ checkValDef loc lhs (Just (sigAnn, sig)) grhss
                         >>= checkLPat
        checkPatBind loc [] lhs' grhss
 
-checkValDef loc lhs Nothing g@(L l grhss)
+checkValDef loc lhs Nothing g
   = do  { mb_fun <- isFunLhs lhs
         ; case mb_fun of
             Just (fun, is_infix, pats, ann) ->
-              checkFunBind NoSrcStrict loc ann (getLocA lhs)
-                           fun is_infix pats (L l grhss)
+              checkFunBind NoSrcStrict loc ann
+                           fun is_infix pats g
             Nothing -> do
               lhs' <- checkPattern lhs
               checkPatBind loc [] lhs' g }
@@ -1200,15 +1198,14 @@ checkValDef loc lhs Nothing g@(L l grhss)
 checkFunBind :: SrcStrictness
              -> SrcSpan
              -> [AddEpAnn]
-             -> SrcSpan
              -> LocatedN RdrName
              -> LexicalFixity
              -> [LocatedA (PatBuilder GhcPs)]
              -> Located (GRHSs GhcPs (LHsExpr GhcPs))
              -> P (HsBind GhcPs)
-checkFunBind strictness locF ann lhs_loc fun is_infix pats (L rhs_span grhss)
+checkFunBind strictness locF ann fun is_infix pats (L _ grhss)
   = do  ps <- runPV_hints param_hints (mapM checkLPat pats)
-        let match_span = noAnnSrcSpan $ combineSrcSpans lhs_loc rhs_span
+        let match_span = noAnnSrcSpan $ locF
         cs <- getCommentsFor locF
         return (makeFunBind fun (L (noAnnSrcSpan $ locA match_span)
                  [L match_span (Match { m_ext = EpAnn (spanAsAnchor locF) ann cs
