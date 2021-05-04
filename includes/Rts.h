@@ -33,6 +33,15 @@ extern "C" {
 /* Inclusion of system headers usually requires _DARWIN_C_SOURCE on Mac OS X
  * because of some specific defines like MMAP_ANON, MMAP_ANONYMOUS. */
 #define _DARWIN_C_SOURCE 1
+/* When using (upstream) clang, as opposed to apples custom clang, we'll see
+ * a lot of warnings, that can be relatively safely ignored.
+ */
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wundef-prefix"
+#pragma clang diagnostic ignored "-Wexpansion-to-defined"
+#pragma clang diagnostic ignored "-Wavailability"
+#pragma clang diagnostic ignored "-Wnullability-completeness"
+#endif
 #include <TargetConditionals.h>
 #include <Availability.h>
 #endif
