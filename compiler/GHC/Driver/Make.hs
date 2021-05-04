@@ -2115,21 +2115,19 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
 
         getRootSummary :: Target -> IO (Either ErrorMessages ExtendedModSummary)
         getRootSummary Target { targetId = TargetFile file mb_phase
-                              , targetAllowObjCode = obj_allowed
                               , targetContents = maybe_buf
                               }
            = do exists <- liftIO $ doesFileExist file
                 if exists || isJust maybe_buf
                     then summariseFile hsc_env old_summaries file mb_phase
-                                       obj_allowed maybe_buf
+                                       maybe_buf
                     else return $ Left $ unitBag $ mkPlainErrorMsgEnvelope noSrcSpan $
                            text "can't find file:" <+> text file
         getRootSummary Target { targetId = TargetModule modl
-                              , targetAllowObjCode = obj_allowed
                               , targetContents = maybe_buf
                               }
            = do maybe_summary <- summariseModule hsc_env old_summary_map NotBoot
-                                           (L rootLoc modl) obj_allowed
+                                           (L rootLoc modl)
                                            maybe_buf excl_mods
                 case maybe_summary of
                    Nothing -> return $ Left $ moduleNotFoundErr modl
@@ -2173,7 +2171,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
                    }
           | otherwise
           = do mb_s <- summariseModule hsc_env old_summary_map
-                                       is_boot wanted_mod True
+                                       is_boot wanted_mod
                                        Nothing excl_mods
                case mb_s of
                    Nothing -> loop ss done
@@ -2339,11 +2337,10 @@ summariseFile
         -> [ExtendedModSummary]         -- old summaries
         -> FilePath                     -- source file name
         -> Maybe Phase                  -- start phase
-        -> Bool                         -- object code allowed?
         -> Maybe (StringBuffer,UTCTime)
         -> IO (Either ErrorMessages ExtendedModSummary)
 
-summariseFile hsc_env old_summaries src_fn mb_phase obj_allowed maybe_buf
+summariseFile hsc_env old_summaries src_fn mb_phase maybe_buf
         -- we can use a cached summary if one is available and the
         -- source file hasn't changed,  But we have to look up the summary
         -- by source file, rather than module name as we do in summarise.
@@ -2359,7 +2356,7 @@ summariseFile hsc_env old_summaries src_fn mb_phase obj_allowed maybe_buf
 
                 -- return the cached summary if the source didn't change
         checkSummaryHash
-            hsc_env obj_allowed NotBoot (new_summary src_fn)
+            hsc_env (new_summary src_fn)
             old_summary location src_hash
 
    | otherwise
@@ -2397,7 +2394,6 @@ summariseFile hsc_env old_summaries src_fn mb_phase obj_allowed maybe_buf
                    else HsSrcFile
             , nms_location = location
             , nms_mod = mod
-            , nms_obj_allowed = obj_allowed
             , nms_preimps = preimps
             }
 
@@ -2414,22 +2410,18 @@ findSummaryBySourceFile summaries file = case
     (x:_) -> Just x
 
 checkSummaryHash
-    :: HscEnv -> Bool -> IsBootInterface
+    :: HscEnv
     -> (Fingerprint -> IO (Either e ExtendedModSummary))
     -> ExtendedModSummary -> ModLocation -> Fingerprint
     -> IO (Either e ExtendedModSummary)
 checkSummaryHash
-  hsc_env obj_allowed is_boot new_summary
+  hsc_env new_summary
   (ExtendedModSummary { emsModSummary = old_summary, emsInstantiatedUnits = bkp_deps})
   location src_hash
   | ms_hs_hash old_summary == src_hash &&
       not (gopt Opt_ForceRecomp (hsc_dflags hsc_env)) = do
            -- update the object-file timestamp
-           obj_timestamp <-
-             if backendProducesObject (backend (hsc_dflags hsc_env))
-                 || obj_allowed -- bug #1205
-                 then liftIO $ getObjTimestamp location is_boot
-                 else return Nothing
+           obj_timestamp <- modificationTimeIfExists (ml_obj_file location)
 
            -- We have to repopulate the Finder's cache for file targets
            -- because the file might not even be on the regular search path
@@ -2466,13 +2458,12 @@ summariseModule
           -- ^ Map of old summaries
           -> IsBootInterface    -- True <=> a {-# SOURCE #-} import
           -> Located ModuleName -- Imported module to be summarised
-          -> Bool               -- object code allowed?
           -> Maybe (StringBuffer, UTCTime)
           -> [ModuleName]               -- Modules to exclude
           -> IO (Maybe (Either ErrorMessages ExtendedModSummary))      -- Its new summary
 
 summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
-                obj_allowed maybe_buf excl_mods
+                maybe_buf excl_mods
   | wanted_mod `elem` excl_mods
   = return Nothing
 
@@ -2505,7 +2496,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
 
     check_hash old_summary location src_fn =
         checkSummaryHash
-          hsc_env obj_allowed is_boot
+          hsc_env
           (new_summary location (ms_mod $ emsModSummary old_summary) src_fn)
           old_summary location
 
@@ -2585,7 +2576,6 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
             , nms_hsc_src = hsc_src
             , nms_location = location
             , nms_mod = mod
-            , nms_obj_allowed = obj_allowed
             , nms_preimps = preimps
             }
 
@@ -2599,23 +2589,14 @@ data MakeNewModSummary
       , nms_hsc_src :: HscSource
       , nms_location :: ModLocation
       , nms_mod :: Module
-      , nms_obj_allowed :: Bool
       , nms_preimps :: PreprocessedImports
       }
 
 makeNewModSummary :: HscEnv -> MakeNewModSummary -> IO ExtendedModSummary
 makeNewModSummary hsc_env MakeNewModSummary{..} = do
   let PreprocessedImports{..} = nms_preimps
-  let dflags = hsc_dflags hsc_env
 
-  -- when the user asks to load a source file by name, we only
-  -- use an object file if -fobject-code is on.  See #1205.
-  obj_timestamp <- liftIO $
-      if backendProducesObject (backend dflags)
-         || nms_obj_allowed -- bug #1205
-          then getObjTimestamp nms_location nms_is_boot
-          else return Nothing
-
+  obj_timestamp <- modificationTimeIfExists (ml_obj_file nms_location)
   hi_timestamp <- modificationTimeIfExists (ml_hi_file nms_location)
   hie_timestamp <- modificationTimeIfExists (ml_hie_file nms_location)
 
@@ -2644,16 +2625,6 @@ makeNewModSummary hsc_env MakeNewModSummary{..} = do
         }
     , emsInstantiatedUnits = inst_deps
     }
-
-
--- This function used to return Nothing for hs-boot.. not sure why..
--- 19519dc35bad5649226a9f7015eaabb154722e54
--- This causes hs-boot files to always be recompiled, they should obey the
--- same recompilation discipline as normal source files.
-getObjTimestamp :: ModLocation -> IsBootInterface -> IO (Maybe UTCTime)
-getObjTimestamp location is_boot
-  = case is_boot of
-      _ -> modificationTimeIfExists (ml_obj_file location)
 
 data PreprocessedImports
   = PreprocessedImports

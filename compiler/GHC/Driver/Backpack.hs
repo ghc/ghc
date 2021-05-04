@@ -805,7 +805,6 @@ summariseDecl _pn hsc_src lmodname@(L loc modname) Nothing
                          emptyModNodeMap -- GHC API recomp not supported
                          (hscSourceToIsBoot hsc_src)
                          lmodname
-                         True -- Target lets you disallow, but not here
                          Nothing -- GHC API buffer support not supported
                          [] -- No exclusions
          case r of

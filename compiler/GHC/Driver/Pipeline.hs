@@ -1257,14 +1257,8 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
         let o_file = ml_obj_file location -- The real object file
             hi_file = ml_hi_file location
             hie_file = ml_hie_file location
+            --dyn_o_file = dynamicOutputFile dflags o_file
 
-  -- Figure out if the source has changed, for recompilation avoidance.
-  --
-  -- Setting source_unchanged to True means that M.o, M.dyn_o (or M.hie) seems
-  -- to be up to date wrt M.hs; so no need to recompile unless imports have
-  -- changed (which the compiler itself figures out).
-  -- Setting source_unchanged to False tells the compiler that M.o or M.dyn_o is out of
-  -- date wrt M.hs (or M.o/dyn_o doesn't exist) so we must recompile regardless.
         src_hash <- liftIO $ getFileHash (basename <.> suff)
         hi_date <- liftIO $ modificationTimeIfExists hi_file
         hie_date <- liftIO $ modificationTimeIfExists hie_file
