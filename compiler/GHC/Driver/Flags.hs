@@ -456,7 +456,9 @@ data WarningFlag =
    | Opt_WarnSemigroup -- since 8.0
    | Opt_WarnDodgyExports
    | Opt_WarnDodgyImports
-   | Opt_WarnOrphans
+   | Opt_WarnOrphansClass
+   | Opt_WarnOrphansData
+   | Opt_WarnOrphansType
    | Opt_WarnAutoOrphans
    | Opt_WarnIdentities
    | Opt_WarnTabs
