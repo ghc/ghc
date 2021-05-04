@@ -165,16 +165,17 @@ pprPassDetails _ = Outputable.empty
 
 data SimplMode             -- See comments in GHC.Core.Opt.Simplify.Monad
   = SimplMode
-        { sm_names      :: [String]       -- ^ Name(s) of the phase
-        , sm_phase      :: CompilerPhase
-        , sm_uf_opts    :: !UnfoldingOpts -- ^ Unfolding options
-        , sm_rules      :: !Bool          -- ^ Whether RULES are enabled
-        , sm_inline     :: !Bool          -- ^ Whether inlining is enabled
-        , sm_case_case  :: !Bool          -- ^ Whether case-of-case is enabled
-        , sm_eta_expand :: !Bool          -- ^ Whether eta-expansion is enabled
-        , sm_pre_inline :: !Bool          -- ^ Whether pre-inlining is enabled
-        , sm_logger     :: !Logger
-        , sm_dflags     :: DynFlags
+        { sm_names        :: [String]       -- ^ Name(s) of the phase
+        , sm_phase        :: CompilerPhase
+        , sm_uf_opts      :: !UnfoldingOpts -- ^ Unfolding options
+        , sm_rules        :: !Bool          -- ^ Whether RULES are enabled
+        , sm_inline       :: !Bool          -- ^ Whether inlining is enabled
+        , sm_case_case    :: !Bool          -- ^ Whether case-of-case is enabled
+        , sm_eta_expand   :: !Bool          -- ^ Whether eta-expansion is enabled
+        , sm_cast_swizzle :: !Bool          -- ^ Do we swizzle casts past lambdas?
+        , sm_pre_inline   :: !Bool          -- ^ Whether pre-inlining is enabled
+        , sm_logger       :: !Logger
+        , sm_dflags       :: DynFlags
             -- Just for convenient non-monadic access; we don't override these.
             --
             -- Used for:
@@ -187,6 +188,7 @@ data SimplMode             -- See comments in GHC.Core.Opt.Simplify.Monad
 instance Outputable SimplMode where
     ppr (SimplMode { sm_phase = p, sm_names = ss
                    , sm_rules = r, sm_inline = i
+                   , sm_cast_swizzle = cs
                    , sm_eta_expand = eta, sm_case_case = cc })
        = text "SimplMode" <+> braces (
          sep [ text "Phase =" <+> ppr p <+>
@@ -194,6 +196,7 @@ instance Outputable SimplMode where
              , pp_flag i   (text "inline") <> comma
              , pp_flag r   (text "rules") <> comma
              , pp_flag eta (text "eta-expand") <> comma
+             , pp_flag cs (text "cast-swizzle") <> comma
              , pp_flag cc  (text "case-of-case") ])
          where
            pp_flag f s = ppUnless f (text "no") <+> s

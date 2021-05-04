@@ -859,10 +859,10 @@ decomposeRuleLhs dflags orig_bndrs orig_lhs
   = Left (DsRuleIgnoredDueToConstructor con) -- See Note [No RULES on datacons]
   | Just (fn_id, args) <- decompose fun2 args2
   , let extra_bndrs = mk_extra_bndrs fn_id args
-  = -- pprTrace "decmposeRuleLhs" (vcat [ text "orig_bndrs:" <+> ppr orig_bndrs
+  = -- pprTrace "decomposeRuleLhs" (vcat [ text "orig_bndrs:" <+> ppr orig_bndrs
     --                                  , text "orig_lhs:" <+> ppr orig_lhs
     --                                  , text "lhs1:"     <+> ppr lhs1
-    --                                  , text "extra_dict_bndrs:" <+> ppr extra_dict_bndrs
+    --                                  , text "extra_bndrs:" <+> ppr extra_bndrs
     --                                  , text "fn_id:" <+> ppr fn_id
     --                                  , text "args:"   <+> ppr args]) $
     Right (orig_bndrs ++ extra_bndrs, fn_id, args)
