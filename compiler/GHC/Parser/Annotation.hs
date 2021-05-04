@@ -29,6 +29,7 @@ module GHC.Parser.Annotation (
   -- ** Annotations in 'GenLocated'
   LocatedA, LocatedL, LocatedC, LocatedN, LocatedAn, LocatedP,
   SrcSpanAnnA, SrcSpanAnnL, SrcSpanAnnP, SrcSpanAnnC, SrcSpanAnnN, SrcSpanAnn'(..),
+  SrcAnn,
 
   -- ** Annotation data types used in 'GenLocated'
 
@@ -76,7 +77,7 @@ module GHC.Parser.Annotation (
   -- ** Working with comments in annotations
   noComments, comment, addCommentsToSrcAnn, setCommentsSrcAnn,
   addCommentsToEpAnn, setCommentsEpAnn,
-  transferComments,
+  transferAnnsA, commentsOnlyA, removeCommentsA,
 
   placeholderRealSpan,
   ) where
@@ -1010,12 +1011,15 @@ mapLocA f (L l a) = L (noAnnSrcSpan l) (f a)
 
 -- AZ:TODO: move this somewhere sane
 
-combineLocsA :: Semigroup a => GenLocated (SrcSpanAnn' a) e1 -> GenLocated (SrcSpanAnn' a) e2 -> SrcSpanAnn' a
+combineLocsA :: Semigroup a => GenLocated (SrcAnn a) e1 -> GenLocated (SrcAnn a) e2 -> SrcAnn a
 combineLocsA (L a _) (L b _) = combineSrcSpansA a b
 
-combineSrcSpansA :: Semigroup a => SrcSpanAnn' a -> SrcSpanAnn' a -> SrcSpanAnn' a
+combineSrcSpansA :: Semigroup a => SrcAnn a -> SrcAnn a -> SrcAnn a
 combineSrcSpansA (SrcSpanAnn aa la) (SrcSpanAnn ab lb)
-  = SrcSpanAnn (aa <> ab) (combineSrcSpans la lb)
+  = case SrcSpanAnn (aa <> ab) (combineSrcSpans la lb) of
+      SrcSpanAnn EpAnnNotUsed l -> SrcSpanAnn EpAnnNotUsed l
+      SrcSpanAnn (EpAnn anc an cs) l ->
+        SrcSpanAnn (EpAnn (widenAnchorR anc (realSrcSpan l)) an cs) l
 
 -- | Combine locations from two 'Located' things and add them to a third thing
 addCLocA :: GenLocated (SrcSpanAnn' a) e1 -> GenLocated SrcSpan e2 -> e3 -> GenLocated (SrcAnn ann) e3
@@ -1096,14 +1100,30 @@ setCommentsEpAnn loc EpAnnNotUsed cs
   = EpAnn (Anchor (realSrcSpan loc) UnchangedAnchor) mempty cs
 setCommentsEpAnn _ (EpAnn a an _) cs = EpAnn a an cs
 
--- | Transfer comments from the annotations in one 'SrcAnn' to those
--- in another.  The originals are not changed.  This is used when
--- manipulating an AST prior to exact printing,
-transferComments :: (Monoid ann)
-  => SrcAnn ann -> SrcAnn ann -> (SrcAnn ann,  SrcAnn ann)
-transferComments from@(SrcSpanAnn EpAnnNotUsed _) to = (from, to)
-transferComments (SrcSpanAnn (EpAnn a an cs) l) to
-  = ((SrcSpanAnn (EpAnn a an emptyComments) l), addCommentsToSrcAnn to cs)
+-- | Transfer comments and trailing items from the annotations in the
+-- first 'SrcSpanAnnA' argument to those in the second.
+transferAnnsA :: SrcSpanAnnA -> SrcSpanAnnA -> (SrcSpanAnnA,  SrcSpanAnnA)
+transferAnnsA from@(SrcSpanAnn EpAnnNotUsed _) to = (from, to)
+transferAnnsA (SrcSpanAnn (EpAnn a an cs) l) to
+  = ((SrcSpanAnn (EpAnn a mempty emptyComments) l), to')
+  where
+    to' = case to of
+      (SrcSpanAnn EpAnnNotUsed loc)
+        ->  SrcSpanAnn (EpAnn (Anchor (realSrcSpan loc) UnchangedAnchor) an cs) loc
+      (SrcSpanAnn (EpAnn a an' cs') loc)
+        -> SrcSpanAnn (EpAnn a (an' <> an) (cs' <> cs)) loc
+
+-- | Remove the exact print annotations payload, leaving only the
+-- anchor and comments.
+commentsOnlyA :: Monoid ann => SrcAnn ann -> SrcAnn ann
+commentsOnlyA (SrcSpanAnn EpAnnNotUsed loc) = SrcSpanAnn EpAnnNotUsed loc
+commentsOnlyA (SrcSpanAnn (EpAnn a _ cs) loc) = (SrcSpanAnn (EpAnn a mempty cs) loc)
+
+-- | Remove the comments, leaving the exact print annotations payload
+removeCommentsA :: SrcAnn ann -> SrcAnn ann
+removeCommentsA (SrcSpanAnn EpAnnNotUsed loc) = SrcSpanAnn EpAnnNotUsed loc
+removeCommentsA (SrcSpanAnn (EpAnn a an _) loc)
+  = (SrcSpanAnn (EpAnn a an emptyComments) loc)
 
 -- ---------------------------------------------------------------------
 -- Semigroup instances, to allow easy combination of annotaion elements

@@ -557,3 +557,8 @@ CommentsTest:
 InTreeAnnotations1:
 	$(CHECK_PPR)   $(LIBDIR) InTreeAnnotations1.hs
 	$(CHECK_EXACT) $(LIBDIR) InTreeAnnotations1.hs
+
+.PHONY: Test19784
+Test19784:
+	$(CHECK_PPR)   $(LIBDIR) Test19784.hs
+	$(CHECK_EXACT) $(LIBDIR) Test19784.hs

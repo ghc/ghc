@@ -215,7 +215,8 @@ mkMatchGroup origin matches = MG { mg_ext = noExtField
                                  , mg_alts = matches
                                  , mg_origin = origin }
 
-mkLocatedList :: Semigroup a => [GenLocated (SrcSpanAnn' a) e2] -> LocatedAn an [GenLocated (SrcSpanAnn' a) e2]
+mkLocatedList :: Semigroup a
+  => [GenLocated (SrcAnn a) e2] -> LocatedAn an [GenLocated (SrcAnn a) e2]
 mkLocatedList [] = noLocA []
 mkLocatedList ms = L (noAnnSrcSpan $ locA $ combineLocsA (head ms) (last ms)) ms
 
