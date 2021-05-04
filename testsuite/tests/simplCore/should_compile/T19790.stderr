@@ -1,0 +1,7 @@
+Rule fired: Class op + (BUILTIN)
+Rule fired: Class op length (BUILTIN)
+Rule fired: map (GHC.Base)
+Rule fired: fold/build (GHC.Base)
+Rule fired: This rule should fire! (T19790)
+Rule fired: length (GHC.List)
+Rule fired: lengthList (GHC.List)

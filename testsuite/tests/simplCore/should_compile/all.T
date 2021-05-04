@@ -357,5 +357,5 @@ test('T19586', normal, compile, [''])
 test('T20639', normal, compile, ['-O2'])
 
 test('T20894', normal, compile, ['-dcore-lint -O1 -ddebug-output'])
+test('T19790',  normal, compile, ['-O -ddump-rule-firings'])
 test('T20200', normal, compile, [''])
-test('T20200a', normal, compile, ['-O2'])

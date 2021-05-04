@@ -873,6 +873,7 @@ simplEnvForGHCi logger dflags
                               -- unboxed tuple stuff that confuses the bytecode
                               -- interpreter
                            , sm_eta_expand = eta_expand_on
+                           , sm_cast_swizzle = True
                            , sm_case_case  = True
                            , sm_pre_inline = pre_inline_on
                            }
@@ -883,14 +884,14 @@ simplEnvForGHCi logger dflags
     uf_opts       = unfoldingOpts                 dflags
 
 updModeForStableUnfoldings :: Activation -> SimplMode -> SimplMode
--- See Note [Simplifying inside stable unfoldings]
 updModeForStableUnfoldings unf_act current_mode
   = current_mode { sm_phase      = phaseFromActivation unf_act
-                 , sm_inline     = True
-                 , sm_eta_expand = False }
-       -- sm_eta_expand: see Note [No eta expansion in stable unfoldings]
-       -- sm_rules: just inherit; sm_rules might be "off"
-       -- because of -fno-enable-rewrite-rules
+                 , sm_eta_expand = False
+                 , sm_inline     = True }
+    -- sm_phase: see Note [Simplifying inside stable unfoldings]
+    -- sm_eta_expand: see Note [Eta-expansion in stable unfoldings]
+    -- sm_rules: just inherit; sm_rules might be "off"
+    --           because of -fno-enable-rewrite-rules
   where
     phaseFromActivation (ActiveAfter _ n) = Phase n
     phaseFromActivation _                 = InitialPhase
@@ -898,10 +899,13 @@ updModeForStableUnfoldings unf_act current_mode
 updModeForRules :: SimplMode -> SimplMode
 -- See Note [Simplifying rules]
 updModeForRules current_mode
-  = current_mode { sm_phase      = InitialPhase
-                 , sm_inline     = False  -- See Note [Do not expose strictness if sm_inline=False]
-                 , sm_rules      = False
-                 , sm_eta_expand = False }
+  = current_mode { sm_phase        = InitialPhase
+                 , sm_inline       = False
+                      -- See Note [Do not expose strictness if sm_inline=False]
+                 , sm_rules        = False
+                 , sm_cast_swizzle = False
+                      -- See Note [Cast swizzling on rule LHSs]
+                 , sm_eta_expand   = False }
 
 {- Note [Simplifying rules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -931,24 +935,39 @@ postInlineUnconditionally substituted in a trivial expression that contains
 ticks. See Note [Tick annotations in RULE matching] in GHC.Core.Rules for
 details.
 
-Note [No eta expansion in stable unfoldings]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If we have a stable unfolding
+Note [Cast swizzling on rule LHSs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In the LHS of a RULE we may have
+       (\x. blah |> CoVar cv)
+where `cv` is a coercion variable.  Critically, we really only want
+coercion /variables/, not general coercions, on the LHS of a RULE.  So
+we don't want to swizzle this to
+      (\x. blah) |> (Refl xty `FunCo` CoVar cv)
+So we switch off cast swizzling in updModeForRules.
+
+Note [Eta-expansion in stable unfoldings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We don't do eta-expansion inside stable unfoldings.  It's extra work,
+and can be expensive (the bizarre T18223 is a case in point).
+
+See Note [Occurrence analysis for lambda binders] in GHC.Core.Opt.OccurAnal.
+
+Historical note. There was /previously/ another reason not to do eta
+expansion in stable unfoldings.  If we have a stable unfolding
 
   f :: Ord a => a -> IO ()
   -- Unfolding template
   --    = /\a \(d:Ord a) (x:a). bla
 
-we do not want to eta-expand to
+we previously did not want to eta-expand to
 
   f :: Ord a => a -> IO ()
   -- Unfolding template
   --    = (/\a \(d:Ord a) (x:a) (eta:State#). bla eta) |> co
 
-because not specialisation of the overloading doesn't work properly
-(see Note [Specialisation shape] in GHC.Core.Opt.Specialise), #9509.
+because not specialisation of the overloading didn't work properly (#9509).
+But now it does: see Note [Account for casts in binding] in GHC.Core.Opt.Specialise
 
-So we disable eta-expansion in stable unfoldings.
 
 Note [Inlining in gentle mode]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1558,16 +1577,9 @@ mkLam env bndrs body cont
   = do { dflags <- getDynFlags
        ; mkLam' dflags bndrs body }
   where
-    mkLam' :: DynFlags -> [OutBndr] -> OutExpr -> SimplM OutExpr
-    mkLam' dflags bndrs (Cast body co)
-      | not (any bad bndrs)
-        -- Note [Casts and lambdas]
-      = do { lam <- mkLam' dflags bndrs body
-           ; return (mkCast lam (mkPiCos Representational bndrs co)) }
-      where
-        co_vars  = tyCoVarsOfCo co
-        bad bndr = isCoVar bndr && bndr `elemVarSet` co_vars
+    mode = getMode env
 
+    mkLam' :: DynFlags -> [OutBndr] -> OutExpr -> SimplM OutExpr
     mkLam' dflags bndrs body@(Lam {})
       = mkLam' dflags (bndrs ++ bndrs1) body1
       where
@@ -1577,19 +1589,31 @@ mkLam env bndrs body cont
       | tickishFloatable t
       = mkTick t <$> mkLam' dflags bndrs expr
 
+    mkLam' dflags bndrs (Cast body co)
+      | -- Note [Casts and lambdas]
+        sm_cast_swizzle mode
+      , not (any bad bndrs)
+      = do { lam <- mkLam' dflags bndrs body
+           ; return (mkCast lam (mkPiCos Representational bndrs co)) }
+      where
+        co_vars  = tyCoVarsOfCo co
+        bad bndr = isCoVar bndr && bndr `elemVarSet` co_vars
+
     mkLam' dflags bndrs body
       | gopt Opt_DoEtaReduction dflags
-      , Just etad_lam <- tryEtaReduce bndrs body
+      , Just etad_lam <- {-# SCC "tryee" #-} tryEtaReduce bndrs body
       = do { tick (EtaReduction (head bndrs))
            ; return etad_lam }
 
       | not (contIsRhs cont)   -- See Note [Eta-expanding lambdas]
-      , sm_eta_expand (getMode env)
+      , sm_eta_expand mode
       , any isRuntimeVar bndrs
-      , let body_arity = exprEtaExpandArity dflags body
+      , let body_arity = {-# SCC "eta" #-} exprEtaExpandArity dflags body
       , expandableArityType body_arity
       = do { tick (EtaExpansion (head bndrs))
-           ; let res = mkLams bndrs (etaExpandAT body_arity body)
+           ; let res = {-# SCC "eta3" #-}
+                       mkLams bndrs $
+                       etaExpandAT body_arity body
            ; traceSmpl "eta expand" (vcat [text "before" <+> ppr (mkLams bndrs body)
                                           , text "after" <+> ppr res])
            ; return res }
@@ -1617,7 +1641,7 @@ bother to try expansion in mkLam in that case; hence the contIsRhs
 guard.
 
 NB: We check the SimplEnv (sm_eta_expand), not DynFlags.
-    See Note [No eta expansion in stable unfoldings]
+    See Note [Eta-expansion in stable unfoldings]
 
 Note [Casts and lambdas]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1637,19 +1661,25 @@ might meet and cancel with some other cast:
         /\g. e `cast` co  ===>   (/\g. e) `cast` (/\g. co)
                           (if not (g `in` co))
 
-Notice that it works regardless of 'e'.  Originally it worked only
-if 'e' was itself a lambda, but in some cases that resulted in
-fruitless iteration in the simplifier.  A good example was when
-compiling Text.ParserCombinators.ReadPrec, where we had a definition
-like    (\x. Get `cast` g)
-where Get is a constructor with nonzero arity.  Then mkLam eta-expanded
-the Get, and the next iteration eta-reduced it, and then eta-expanded
-it again.
+We call this "cast swizzling". It is controlled by sm_cast_swizzle.
+See also Note [Cast swizzling on rule LHSs]
 
-Note also the side condition for the case of coercion binders.
-It does not make sense to transform
-        /\g. e `cast` g  ==>  (/\g.e) `cast` (/\g.g)
-because the latter is not well-kinded.
+Wrinkles
+
+* Notice that it works regardless of 'e'.  Originally it worked only
+  if 'e' was itself a lambda, but in some cases that resulted in
+  fruitless iteration in the simplifier.  A good example was when
+  compiling Text.ParserCombinators.ReadPrec, where we had a definition
+  like    (\x. Get `cast` g)
+  where Get is a constructor with nonzero arity.  Then mkLam eta-expanded
+  the Get, and the next iteration eta-reduced it, and then eta-expanded
+  it again.
+
+* Note also the side condition for the case of coercion binders, namely
+  not (any bad bndrs).  It does not make sense to transform
+          /\g. e `cast` g  ==>  (/\g.e) `cast` (/\g.g)
+  because the latter is not well-kinded.
+
 
 ************************************************************************
 *                                                                      *

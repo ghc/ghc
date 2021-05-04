@@ -4062,9 +4062,14 @@ Generally, if we know that 'f' has arity N, it seems sensible to
 eta-expand the stable unfolding to arity N too. Simple and consistent.
 
 Wrinkles
+
+* See Note [Eta-expansion in stable unfoldings] in
+  GHC.Core.Opt.Simplify.Utils
+
 * Don't eta-expand a trivial expr, else each pass will eta-reduce it,
   and then eta-expand again. See Note [Do not eta-expand trivial expressions]
   in GHC.Core.Opt.Simplify.Utils.
+
 * Don't eta-expand join points; see Note [Do not eta-expand join points]
   in GHC.Core.Opt.Simplify.Utils.  We uphold this because the join-point
   case (mb_cont = Just _) doesn't use eta_expand.
