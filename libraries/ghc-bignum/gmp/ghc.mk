@@ -77,9 +77,11 @@ endif
 endif
 
 UseIntreeGmp = NO
+ifeq "$(GMP_ENABLED)" "YES"
 ifneq "$(HaveLibGmp)" "YES"
 ifneq "$(HaveFrameworkGMP)" "YES"
 UseIntreeGmp = YES
+endif
 endif
 endif
 
