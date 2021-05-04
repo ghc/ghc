@@ -329,10 +329,9 @@ tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
        ; let expr'       = ExplicitTuple x tup_args1 boxity
              missing_tys = [Scaled mult ty | (Missing (Scaled mult _), ty) <- zip tup_args1 arg_tys]
 
-             -- See Note [Linear fields generalization] in GHC.Tc.Gen.App
-             act_res_ty
-                 = mkVisFunTys missing_tys (mkTupleTy1 boxity arg_tys)
-                   -- See Note [Don't flatten tuples from HsSyn] in GHC.Core.Make
+             -- See Note [Typechecking data constructors] in GHC.Tc.Gen.Head
+             -- See Note [Don't flatten tuples from HsSyn] in GHC.Core.Make
+             act_res_ty = mkVisFunTys missing_tys (mkTupleTy1 boxity arg_tys)
 
        ; traceTc "ExplicitTuple" (ppr act_res_ty $$ ppr res_ty)
 
@@ -870,7 +869,6 @@ tcExpr e@(HsRnBracketOut _ brack ps) res_ty = tcUntypedBracket e brack ps res_ty
 ************************************************************************
 -}
 
-tcExpr (HsConLikeOut {})   ty = pprPanic "tcExpr:HsConLikeOut" (ppr ty)
 tcExpr (HsOverLabel {})    ty = pprPanic "tcExpr:HsOverLabel"  (ppr ty)
 tcExpr (SectionL {})       ty = pprPanic "tcExpr:SectionL"    (ppr ty)
 tcExpr (SectionR {})       ty = pprPanic "tcExpr:SectionR"    (ppr ty)
