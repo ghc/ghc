@@ -2,7 +2,7 @@ module T18793 where
 
 stuff :: Int -> [Int]
 {-# NOINLINE stuff #-}
-stuff i = [i,i+1,i+2]
+stuff !i = [i,i+1,i+2] -- The bang is so that we get a WW split
 
 f :: Int -> Int
 f = foldr k id (stuff 1)

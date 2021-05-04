@@ -36,54 +36,121 @@ import GHC.Data.Maybe   ( isJust )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
+import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Logger  ( Logger, putDumpFileMaybe, DumpFormat (..) )
---import GHC.Utils.Trace
 
-import Control.Monad ( guard )
 import Data.List ( mapAccumL )
 
 {- Note [Constructed Product Result]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The goal of Constructed Product Result analysis is to identify functions that
 surely return heap-allocated records on every code path, so that we can
-eliminate said heap allocation by performing a worker/wrapper split.
+eliminate said heap allocation by performing a worker/wrapper split
+(via 'GHC.Core.Opt.WorkWrap.Utils.mkWWcpr_entry').
 
-@swap@ below is such a function:
-
+`swap` below is such a function:
+```
   swap (a, b) = (b, a)
-
-A @case@ on an application of @swap@, like
-@case swap (10, 42) of (a, b) -> a + b@ could cancel away
-(by case-of-known-constructor) if we "inlined" @swap@ and simplified. We then
-say that @swap@ has the CPR property.
+```
+A `case` on an application of `swap`, like
+`case swap (10, 42) of (a, b) -> a + b` could cancel away
+(by case-of-known-constructor) if we \"inlined\" `swap` and simplified. We then
+say that `swap` has the CPR property.
 
 We can't inline recursive functions, but similar reasoning applies there:
-
+```
   f x n = case n of
     0 -> (x, 0)
     _ -> f (x+1) (n-1)
-
-Inductively, @case f 1 2 of (a, b) -> a + b@ could cancel away the constructed
-product with the case. So @f@, too, has the CPR property. But we can't really
-"inline" @f@, because it's recursive. Also, non-recursive functions like @swap@
+```
+Inductively, `case f 1 2 of (a, b) -> a + b` could cancel away the constructed
+product with the case. So `f`, too, has the CPR property. But we can't really
+"inline" `f`, because it's recursive. Also, non-recursive functions like `swap`
 might be too big to inline (or even marked NOINLINE). We still want to exploit
 the CPR property, and that is exactly what the worker/wrapper transformation
 can do for us:
-
+```
   $wf x n = case n of
     0 -> case (x, 0) of -> (a, b) -> (# a, b #)
     _ -> case f (x+1) (n-1) of (a, b) -> (# a, b #)
   f x n = case $wf x n of (# a, b #) -> (a, b)
-
-where $wf readily simplifies (by case-of-known-constructor and inlining @f@) to:
-
+```
+where $wf readily simplifies (by case-of-known-constructor and inlining `f`) to:
+```
   $wf x n = case n of
     0 -> (# x, 0 #)
     _ -> $wf (x+1) (n-1)
-
-Now, a call site like @case f 1 2 of (a, b) -> a + b@ can inline @f@ and
+```
+Now, a call site like `case f 1 2 of (a, b) -> a + b` can inline `f` and
 eliminate the heap-allocated pair constructor.
+
+Note [Nested CPR]
+~~~~~~~~~~~~~~~~~
+We can apply Note [Constructed Product Result] deeper than just the top-level
+result constructor of a function, e.g.,
+```
+  g x
+    | even x = (x+1,x+2) :: (Int, Int)
+    | odd  x = (x+2,x+3)
+```
+Not only does `g` return a constructed pair, the pair components /also/ have the
+CPR property. We can split `g` for its /nested/ CPR property, as follows:
+```
+  $wg (x :: Int#)
+    | .. x .. = (# x +# 1#, x +# 2# #) :: (# Int#, Int# #)
+    | .. x .. = (# x +# 2#, x +# 3# #)
+  g (I# x) = case $wf x of (# y, z #) -> (I# y, I# z)
+```
+Note however that in the following we will only unbox the second component,
+even if `foo` has the CPR property:
+```
+  h x
+    | even x = (foo x, x+2) :: (Int, Int)
+    | odd  x = (x+2,   x+3)
+    -- where `foo` has the CPR property
+```
+Why can't we also unbox `foo x`? Because in order to do so, we have to evaluate
+it and that might diverge, so we cannot give `h` the nested CPR property in the
+first component of the result.
+
+The Right Thing is to do a termination analysis, to see if we can guarantee that
+`foo` terminates quickly, in which case we can speculatively evaluate `foo x` and
+hence give `h` a nested CPR property.  That is done in !1866.  But for now we
+have an incredibly simple termination analysis; an expression terminates fast
+iff it is in HNF: see `exprTerminates`. We call `exprTerminates` in
+`cprTransformDataConWork`, which is the main function figuring out whether it's
+OK to propagate nested CPR info (in `extract_nested_cpr`).
+
+In addition to `exprTerminates`, `extract_nested_cpr` also looks at the
+`StrictnessMark` of the corresponding constructor field. Example:
+```
+  data T a = MkT !a
+  h2 x
+    | even x = MkT (foo x) :: T Int
+    | odd  x = MkT (x+2)
+    -- where `foo` has the CPR property
+```
+Regardless of whether or not `foo` terminates, we may unbox the strict field,
+because it has to be evaluated (the Core for `MkT (foo x)` will look more like
+`case foo x of y { __DEFAULT -> MkT y }`).
+
+Surprisingly, there are local binders with a strict demand that *do not*
+terminate quickly in a sense that is useful to us! The following function
+demonstrates that:
+```
+  j x = (let t = x+1 in t+t, 42)
+```
+Here, `t` is used strictly, *but only within its scope in the first pair
+component*. `t` satisfies Note [CPR for binders that will be unboxed], so it has
+the CPR property, nevertheless we may not unbox `j` deeply lest evaluation of
+`x` diverges. The termination analysis must say "Might diverge" for `t` and we
+won't unbox the first pair component.
+There are a couple of tests in T18174 that show case Nested CPR. Some of them
+only work with the termination analysis from !1866.
+
+Giving the (Nested) CPR property to deep data structures can lead to loss of
+sharing; see Note [CPR for data structures can destroy sharing].
 
 Note [Phase ordering]
 ~~~~~~~~~~~~~~~~~~~~~
@@ -97,8 +164,7 @@ Ideally, we would want the following pipeline:
 4. worker/wrapper (for CPR)
 
 Currently, we omit 2. and anticipate the results of worker/wrapper.
-See Note [CPR for binders that will be unboxed]
-and Note [Optimistic field binder CPR].
+See Note [CPR for binders that will be unboxed].
 An additional w/w pass would simplify things, but probably add slight overhead.
 So currently we have
 
@@ -163,9 +229,9 @@ cprAnal' env (Tick t e)
     (cpr_ty, e') = cprAnal env e
 
 cprAnal' env e@(Var{})
-  = cprAnalApp env e [] []
+  = cprAnalApp env e []
 cprAnal' env e@(App{})
-  = cprAnalApp env e [] []
+  = cprAnalApp env e []
 
 cprAnal' env (Lam var body)
   | isTyVar var
@@ -227,55 +293,102 @@ cprAnalAlt env scrut_ty (Alt con bndrs rhs)
 -- * CPR transformer
 --
 
-cprAnalApp :: AnalEnv -> CoreExpr -> [CoreArg] -> [CprType] -> (CprType, CoreExpr)
-cprAnalApp env e args' arg_tys
-  -- Collect CprTypes for (value) args (inlined collectArgs):
-  | App fn arg <- e, isTypeArg arg -- Don't analyse Type args
-  = cprAnalApp env fn (arg:args') arg_tys
-  | App fn arg <- e
-  , (arg_ty, arg') <- cprAnal env arg
-  = cprAnalApp env fn (arg':args') (arg_ty:arg_tys)
+data TermFlag -- Better than using a Bool
+  = Terminates
+  | MightDiverge
 
-  | Var fn <- e
-  = (cprTransform env fn arg_tys, mkApps e args')
+-- See Note [Nested CPR]
+exprTerminates :: CoreExpr -> TermFlag
+exprTerminates e
+  | exprIsHNF e = Terminates -- A /very/ simple termination analysis.
+  | otherwise   = MightDiverge
 
-  | otherwise -- e is not an App and not a Var
-  , (e_ty, e') <- cprAnal env e
-  = (applyCprTy e_ty (length arg_tys), mkApps e' args')
-
-cprTransform :: AnalEnv   -- ^ The analysis environment
-             -> Id        -- ^ The function
-             -> [CprType] -- ^ info about incoming /value/ arguments
-             -> CprType   -- ^ The demand type of the application
-cprTransform env id args
-  = -- pprTrace "cprTransform" (vcat [ppr id, ppr args, ppr sig])
-    sig
+cprAnalApp :: AnalEnv -> CoreExpr -> [(CprType, CoreArg)] -> (CprType, CoreExpr)
+-- Main function that takes care of /nested/ CPR. See Note [Nested CPR]
+cprAnalApp env e arg_infos = go e arg_infos []
   where
-    sig
-      -- Top-level binding, local let-binding, lambda arg or case binder
-      | Just sig <- lookupSigEnv env id
-      = applyCprTy (getCprSig sig) (length args)
-      -- CPR transformers for special Ids
-      | Just cpr_ty <- cprTransformSpecial id args
-      = cpr_ty
-      -- See Note [CPR for data structures]
-      | Just rhs <- cprDataStructureUnfolding_maybe id
-      = fst $ cprAnal env rhs
-      -- Imported function or data con worker
-      | isGlobalId id
-      = applyCprTy (getCprSig (idCprSig id)) (length args)
-      | otherwise
-      = topCprType
+    go e arg_infos args'
+      -- Collect CprTypes for (value) args (inlined collectArgs):
+      | App fn arg <- e, isTypeArg arg -- Don't analyse Type args
+      = go fn arg_infos (arg:args')
+      | App fn arg <- e
+      , arg_info@(_arg_ty, arg') <- cprAnal env arg
+      -- See Note [Nested CPR] on the need for termination analysis
+      = go fn (arg_info:arg_infos) (arg':args')
 
--- | CPR transformers for special Ids
-cprTransformSpecial :: Id -> [CprType] -> Maybe CprType
-cprTransformSpecial id args
+      | Var fn <- e
+      = (cprTransform env fn arg_infos, mkApps e args')
+
+      | (e_ty, e') <- cprAnal env e -- e is not an App and not a Var
+      = (applyCprTy e_ty (length arg_infos), mkApps e' args')
+
+cprTransform :: AnalEnv               -- ^ The analysis environment
+             -> Id                    -- ^ The function
+             -> [(CprType, CoreArg)]  -- ^ info about incoming /value/ arguments
+             -> CprType               -- ^ The demand type of the application
+cprTransform env id args
+  -- Any local binding, except for data structure bindings
+  -- See Note [Efficient Top sigs in SigEnv]
+  | Just sig <- lookupSigEnv env id
+  = applyCprTy (getCprSig sig) (length args)
+  -- See Note [CPR for data structures]
+  | Just rhs <- cprDataStructureUnfolding_maybe id
+  = fst $ cprAnal env rhs
+  -- Some (mostly global, known-key) Ids have bespoke CPR transformers
+  | Just cpr_ty <- cprTransformBespoke id args
+  = cpr_ty
+  -- Other local Ids that respond True to 'isDataStructure' but don't have an
+  -- expandable unfolding, such as NOINLINE bindings. They all get a top sig
+  | isLocalId id
+  = assertPpr (isDataStructure id) (ppr id) topCprType
+  -- See Note [CPR for DataCon wrappers]
+  | isDataConWrapId id, let rhs = uf_tmpl (realIdUnfolding id)
+  = fst $ cprAnalApp env rhs args
+  -- DataCon worker
+  | Just con <- isDataConWorkId_maybe id
+  = cprTransformDataConWork (ae_fam_envs env) con args
+  -- Imported function
+  | otherwise
+  = applyCprTy (getCprSig (idCprSig id)) (length args)
+
+-- | Precise, hand-written CPR transformers for select Ids
+cprTransformBespoke :: Id -> [(CprType, CoreArg)] -> Maybe CprType
+cprTransformBespoke id args
   -- See Note [Simplification of runRW#] in GHC.CoreToStg.Prep
-  | idUnique id == runRWKey -- `runRW (\s -> e)`
-  , [arg] <- args           -- `\s -> e` has CPR type `arg` (e.g. `. -> 2`)
-  = Just $ applyCprTy arg 1 -- `e` has CPR type `2`
+  | idUnique id == runRWKey    -- `runRW (\s -> e)`
+  , [(arg_ty, _arg)] <- args   -- `\s -> e` has CPR type `arg` (e.g. `. -> 2`)
+  = Just $ applyCprTy arg_ty 1 -- `e` has CPR type `2`
   | otherwise
   = Nothing
+
+-- | Get a (possibly nested) 'CprType' for an application of a 'DataCon' worker,
+-- given a saturated number of 'CprType's for its field expressions.
+-- Implements the Nested part of Note [Nested CPR].
+cprTransformDataConWork :: FamInstEnvs -> DataCon -> [(CprType, CoreArg)] -> CprType
+cprTransformDataConWork fam_envs con args
+  | null (dataConExTyCoVars con)  -- No existentials
+  , wkr_arity <= mAX_CPR_SIZE -- See Note [Trimming to mAX_CPR_SIZE]
+  , args `lengthIs` wkr_arity
+  , isRecDataCon fam_envs fuel con /= Just Recursive -- See Note [CPR for recursive data constructors]
+  -- , pprTrace "cprTransformDataConWork" (ppr con <+> ppr wkr_arity <+> ppr args) True
+  = CprType 0 (ConCpr (dataConTag con) (strictZipWith extract_nested_cpr args wkr_str_marks))
+  | otherwise
+  = topCprType
+  where
+    fuel = 3 -- If we can unbox more than 3 constructors to find a
+             -- recursive occurrence, then we can just as well unbox it
+             -- See Note [CPR for recursive data constructors], point (4)
+    wkr_arity = dataConRepArity con
+    wkr_str_marks = dataConRepStrictness con
+    -- See Note [Nested CPR]
+    extract_nested_cpr (CprType 0 cpr, arg) str
+      | MarkedStrict <- str              = cpr
+      | Terminates <- exprTerminates arg = cpr
+    extract_nested_cpr _ _               = topCpr -- intervening lambda or doesn't terminate
+
+-- | See Note [Trimming to mAX_CPR_SIZE].
+mAX_CPR_SIZE :: Arity
+mAX_CPR_SIZE = 10
 
 --
 -- * Bindings
@@ -289,13 +402,13 @@ cprFix :: TopLevelFlag
 cprFix top_lvl orig_env orig_pairs
   = loop 1 init_env init_pairs
   where
-    init_sig id rhs
+    init_sig id
       -- See Note [CPR for data structures]
-      | isDataStructure id rhs = topCprSig
-      | otherwise              = mkCprSig 0 botCpr
+      | isDataStructure id = topCprSig
+      | otherwise          = mkCprSig 0 botCpr
     -- See Note [Initialising strictness] in GHC.Core.Opt.DmdAnal
     orig_virgin = ae_virgin orig_env
-    init_pairs | orig_virgin  = [(setIdCprSig id (init_sig id rhs), rhs) | (id, rhs) <- orig_pairs ]
+    init_pairs | orig_virgin  = [(setIdCprSig id (init_sig id), rhs) | (id, rhs) <- orig_pairs ]
                | otherwise    = orig_pairs
     init_env = extendSigEnvFromIds orig_env (map fst init_pairs)
 
@@ -330,9 +443,11 @@ cprAnalBind
   -> CoreExpr
   -> (Id, CoreExpr, AnalEnv)
 cprAnalBind top_lvl env id rhs
+  | isDFunId id -- Never give DFuns the CPR property; we'll never save allocs.
+  = (id,  rhs,  extendSigEnv env id topCprSig)
   -- See Note [CPR for data structures]
-  | isDataStructure id rhs
-  = (id,  rhs,  env) -- Data structure => no code => need to analyse rhs
+  | isDataStructure id
+  = (id,  rhs,  env) -- Data structure => no code => no need to analyse rhs
   | otherwise
   = (id', rhs', env')
   where
@@ -362,21 +477,22 @@ cprAnalBind top_lvl env id rhs
       = False
     returns_local_sum = not (isTopLevel top_lvl) && not returns_product
 
-isDataStructure :: Id -> CoreExpr -> Bool
+isDataStructure :: Id -> Bool
 -- See Note [CPR for data structures]
-isDataStructure id rhs =
-  idArity id == 0 && exprIsHNF rhs
+isDataStructure id =
+  not (isJoinId id) && idArity id == 0 && isEvaldUnfolding (idUnfolding id)
 
 -- | Returns an expandable unfolding
 -- (See Note [exprIsExpandable] in "GHC.Core.Utils") that has
 -- So effectively is a constructor application.
 cprDataStructureUnfolding_maybe :: Id -> Maybe CoreExpr
-cprDataStructureUnfolding_maybe id = do
+cprDataStructureUnfolding_maybe id
   -- There are only FinalPhase Simplifier runs after CPR analysis
-  guard (activeInFinalPhase (idInlineActivation id))
-  unf <- expandUnfolding_maybe (idUnfolding id)
-  guard (isDataStructure id unf)
-  return unf
+  | activeInFinalPhase (idInlineActivation id)
+  , isDataStructure id
+  = expandUnfolding_maybe (idUnfolding id)
+  | otherwise
+  = Nothing
 
 {- Note [Arity trimming for CPR signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -408,6 +524,49 @@ from @f@'s, so it *will* be WW'd:
 
 And the case in @g@ can never cancel away, thus we introduced extra reboxing.
 Hence we always trim the CPR signature of a binding to idArity.
+
+Note [CPR for DataCon wrappers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We used to give DataCon wrappers a (necessarily flat) CPR signature in
+'GHC.Types.Id.Make.mkDataConRep'. Now we transform DataCon wrappers simply by
+analysing their unfolding. A few reasons for the change:
+
+  1. DataCon wrappers are generally inlined in the Final phase (so before CPR),
+     all leftover occurrences are in a boring context like `f x y = $WMkT y x`.
+     It's simpler to analyse the unfolding anew at every such call site, and the
+     unfolding will be pretty cheap to analyse. Also they occur seldom enough
+     that performance-wise it doesn't matter.
+  2. 'GHC.Types.Id.Make' no longer precomputes CPR signatures for DataCon
+     *workers*, because their transformers need to adapt to CPR for their
+     arguments in 'cprTransformDataConWork' to enable Note [Nested CPR].
+     Better keep it all in this module! The alternative would be that
+     'GHC.Types.Id.Make' depends on DmdAnal.
+  3. In the future, Nested CPR could take a better account of incoming args
+     in cprAnalApp and do some beta-reduction on the fly, like !1866 did. If
+     any of those args had the CPR property, then we'd even get Nested CPR for
+     DataCon wrapper calls, for free. Not so if we simply give the wrapper a
+     single CPR sig in 'GHC.Types.Id.Make.mkDataConRep'!
+
+Note [Trimming to mAX_CPR_SIZE]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We do not treat very big tuples as CPR-ish:
+
+  a) For a start, we get into trouble because there aren't
+     "enough" unboxed tuple types (a tiresome restriction,
+     but hard to fix),
+  b) More importantly, big unboxed tuples get returned mainly
+     on the stack, and are often then allocated in the heap
+     by the caller. So doing CPR for them may in fact make
+     things worse, especially if the wrapper doesn't cancel away
+     and we move to the stack in the worker and then to the heap
+     in the wrapper.
+
+So we (nested) CPR for functions that would otherwise pass more than than
+'mAX_CPR_SIZE' fields.
+That effect is exacerbated for the unregisterised backend, where we
+don't have any hardware registers to return the fields in. Returning
+everything on the stack results in much churn and increases compiler
+allocation by 15% for T15164 in a validate build.
 -}
 
 data AnalEnv
@@ -672,6 +831,14 @@ we did have available in boxed form.
 
 Note [CPR for sum types]
 ~~~~~~~~~~~~~~~~~~~~~~~~
+Aug 21: This Note is out of date. We have the tools to track join points today,
+yet the issue persists. It is tracked in #5075 and the ultimate reason is a bit
+unclear. All regressions involve CPR'ing functions returning lists, which are
+recursive data structures. Note [CPR for recursive data constructors] might fix
+it.
+
+Historical Note:
+
 At the moment we do not do CPR for let-bindings that
    * non-top level
    * bind a sum type
@@ -778,8 +945,9 @@ should not get CPR signatures (#18154), because they
 Hence we don't analyse or annotate data structures in 'cprAnalBind'. To
 implement this, the isDataStructure guard is triggered for bindings that satisfy
 
-  (1) idArity id == 0 (otherwise it's a function)
-  (2) exprIsHNF rhs   (otherwise it's a thunk, Note [CPR for thunks] applies)
+  (1) idArity id == 0    (otherwise it's a function)
+  (2) is eval'd          (otherwise it's a thunk, Note [CPR for thunks] applies)
+  (3) not (isJoinId id)  (otherwise it's a function)
 
 But we can't just stop giving DataCon application bindings the CPR *property*,
 for example
@@ -798,6 +966,9 @@ structure, and hence (see above) will not have a CPR signature. So instead, when
 'cprAnal' meets a variable lacking a CPR signature to extrapolate into a CPR
 transformer, 'cprTransform' instead tries to get its unfolding (via
 'cprDataStructureUnfolding_maybe'), and analyses that instead.
+
+Note that giving fac the CPR property means we potentially rebox lvl at call
+sites. See Note [CPR for data structures can destroy sharing].
 
 In practice, GHC generates a lot of (nested) TyCon and KindRep bindings, one
 for each data declaration. They should not have CPR signatures (blow up!).
@@ -821,6 +992,158 @@ we still give every function an every deepening CPR signature. But it's very
 uncommon to find code like this, whereas the long static data structures from
 the beginning of this Note are very common because of GHC's strategy of ANF'ing
 data structure RHSs.
+
+Note [CPR for data structures can destroy sharing]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In Note [CPR for data structures], we argued that giving data structure bindings
+the CPR property is useful to give functions like fac the CPR property:
+
+  lvl = I# 1#
+  fac 0 = lvl
+  fac n = n * fac (n-1)
+
+Worker/wrappering fac for its CPR property means we get a very fast worker
+function with type Int# -> Int#, without any heap allocation at all. But
+consider what happens if we call `map fac (replicate n 0)`, where the wrapper
+doesn't cancel away: Then we rebox the result of $wfac *on each call*, n times,
+instead of reusing the static thunk for 1, e.g. an asymptotic increase in
+allocations. If you twist it just right, you can actually write programs that
+that take O(n) space if you do CPR and O(1) if you don't:
+
+  fac :: Int -> Int
+  fac 0 = 1 -- this clause will trigger CPR and destroy sharing for O(n) space
+  -- fac 0 = lazy 1 -- this clause will prevent CPR and run in O(1) space
+  fac n = n * fac (n-1)
+
+  const0 :: Int -> Int
+  const0 n = signum n - 1 -- will return 0 for [1..n]
+  {-# NOINLINE const0 #-}
+
+  main = print $ foldl' (\acc n -> acc + lazy n) 0 $ map (fac . const0) [1..100000000]
+
+Generally, this kind of asymptotic increase in allocation can happen whenever we
+give a data structure the CPR property that is bound outside of a recursive
+function. So far we don't have a convincing remedy; giving fac the CPR property
+is just too attractive. #19309 documents a futile idea. #13331 tracks the
+general issue of WW destroying sharing and also contains above reproducer.
+#19326 is about CPR destroying sharing in particular.
+
+Note [CPR for recursive data constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [CPR for data structures can destroy sharing] gives good reasons not to
+give shared data structure bindings the CPR property. But we shouldn't even
+give *functions* that return recursive data constructor applications the CPR
+property. Here's an example for why:
+
+  c = C# 'a'
+  replicateC :: Int -> [Int]
+  replicateC 1 = [c]
+  replicateC n = c : replicateC (n-1)
+
+What happens if we give `replicateC` the (nested) CPR property? We get a WW
+split for 'replicateC', the wrapper of which is certain to inline. And then
+
+  * We *might* save allocation of one (of most likely several) (:) constructor
+    if it cancels away at the call site. Similarly for the 'C#' constructor.
+  * But we will never be able to cancel away *all* 'C#' constructors, unless we
+    unroll the whole loop. And that means we destroy sharing of the 'c' binding.
+    Yikes!
+  * We make all other call sites where the wrapper inlines a bit larger, most of
+    them for no gain. The case from the inlined wrapper can also float and
+    inhibit other useful optimisations like eta-expansion. Thus, not CPR'ing
+    works around the issue and avoids a 20% regression in reptile, the proper
+    fix of which is tracked in #19970.
+
+`replicateC` comes up in T5536, which regresses significantly if CPR'd nestedly.
+There is also Note [CPR for sum types], which tracks why local functions
+returning sum types are not CPR'd. With the plan above, we might have a shot at
+fixing the issue (#5075).
+
+What qualifies as a recursive data constructor? That is up to
+'GHC.Core.Opt.WorkWrapW.Utils.isRecDataCon' to decide. It does a DFS search over
+the field types of the DataCon and looks for term-level recursion into the data
+constructor's type constructor. A few perhaps surprising points:
+
+  1. It deems any function type as non-recursive, because it's unlikely that
+     a recursion through a function type builds up a recursive data structure.
+  2. It doesn't look into kinds or coercion types because there's nothing to unbox.
+     Same for promoted data constructors.
+  3. We don't care whether a NewTyCon or DataTyCon App is fully saturated or not;
+     we simply look at its definition/DataCons and its field tys. Any recursive arg
+     occs will have been detected before (see the invariant of 'go_tc_app').
+     This is so that we expand the `ST` in `StateT Int (ST s) a`.
+  4. We don't recurse deeper than 3 (at the moment of this writing) TyCons and
+     assume the DataCon is non-recursive after that. One reason is guaranteed
+     constant-time efficiency; the other is that it's fair to say that a recursion
+     over 3 or more TyCons doesn't really count as a list-like data structure
+     anymore and a bit of unboxing doesn't hurt much.
+  5. It checks TyConApps like `T <huge> <type>` by eagerly checking the
+     potentially huge argument types *before* it tries to expand the
+     DataCons/NewTyCon/TyFams/etc. so that it doesn't need to re-check those
+     argument types after having been substituted into every occurrence of
+     the the respective TyCon parameter binders. It's like call-by-value vs.
+     call-by-name: Eager checking of argument types means we only need to check
+     them exactly once.
+     There's one exception to that rule, namely when we are able to reduce a
+     TyFam by considering argument types. Then we pay the price of potentially
+     checking the same type arg twice (or more, if the TyFam is recursive).
+     It should hardly matter.
+  6. As a result of keeping the implementation simple, it says "recursive"
+     for `data T = MkT [T]`, even though we could argue that the inner recursion
+     (through the `[]` TyCon) by way of which `T` is recursive will already be
+     "broken" and thus never unboxed. Consequently, it might be OK to CPR a
+     function returning `T`. Lacking arguments for or against the current simple
+     behavior, we stick to it.
+  7. When the search hits an abstract TyCon (one without visible DataCons, e.g.,
+     from an .hs-boot file), it returns 'Nothing' for "inconclusive", the same
+     as when we run out of fuel. If there is ever a recursion through an
+     abstract TyCon, then it's not part of the same function we are looking at,
+     so we can treat it as if it wasn't recursive.
+
+Here are a few examples of data constructors or data types with a single data
+con and the answers of our function:
+
+  data T = T (Int, (Bool, Char))               NonRec
+  (:)                                          Rec
+  []                                           NonRec
+  data U = U [Int]                             NonRec
+  data U2 = U2 [U2]                            Rec     (see point (6))
+  data T1 = T1 T2; data T2 = T2 T1             Rec
+  newtype Fix f = Fix (f (Fix f))              Rec
+  data N = N (Fix (Either Int))                NonRec
+  data M = M (Fix (Either M))                  Rec
+  data F = F (F -> Int)                        NonRec  (see point (1))
+  data G = G (Int -> G)                        NonRec  (see point (1))
+  newtype MyM s a = MyM (StateT Int (ST s) a   NonRec
+  type S = (Int, Bool)                         NonRec
+
+  { type family E a where
+      E Int = Char
+      E (a,b) = (E a, E b)
+      E Char = Blub
+    data Blah = Blah (E (Int, (Int, Int)))     NonRec  (see point (5))
+    data Blub = Blub (E (Char, Int))           Rec
+    data Blub2 = Blub2 (E (Bool, Int))     }   Rec, because stuck
+
+  { data T1 = T1 T2; data T2 = T2 T3;
+    ... data T5 = T5 T1                    }   Nothing (out of fuel)  (see point (4))
+
+  { module A where -- A.hs-boot
+      data T
+    module B where
+      import {-# SOURCE #-} A
+      data U = MkU T
+      f :: T -> U
+      f t = MkU t                              Nothing (T is abstract)  (see point (7))
+    module A where -- A.hs
+      import B
+      data T = MkT U }
+
+These examples are tested by the testcase RecDataConCPR.
+
+I've played with the idea to make points (1) through (3) of 'isRecDataCon'
+configurable like (4) to enable more re-use throughout the compiler, but haven't
+found a killer app for that yet, so ultimately didn't do that.
 
 Note [CPR examples]
 ~~~~~~~~~~~~~~~~~~~~

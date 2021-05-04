@@ -1,6 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 
-module ManyQueue where 
+module ManyQueue where
 
 import Control.Concurrent
 import Control.Monad
@@ -23,17 +23,17 @@ readMQueue (MQueue (x:xs)) = do
   el <- takeMVar x
   return ((MQueue xs), el)
 
+elements :: [Int]
+elements = [0] ++ [1 .. iTERATIONS] -- workaround
+-- elements = [0 .. iTERATIONS] -- heap overflow
+
 testManyQueue'1P1C = do
   print "Test.ManyQueue.testManyQueue'1P1C"
   finished <- newEmptyMVar
 
   mq <- newMQueue bufferSize
-  
-  let 
---      elements = [0] ++ [1 .. iTERATIONS] -- workaround
-      elements = [0 .. iTERATIONS] -- heap overflow
-      
-      writer _ 0 = putMVar finished ()
+
+  let writer _ 0 = putMVar finished ()
       writer q x = do
                   q' <- writeMQueue q x
                   writer q' (x-1)
@@ -47,7 +47,7 @@ testManyQueue'1P1C = do
       reader q !acc n = do
                   (q', x) <- readMQueue q
                   reader q' (acc+x) (n-1)
-  
+
   --forkIO $ writer mq iTERATIONS
   forkIO $ writer' mq elements
   forkIO $ reader mq 0 iTERATIONS
@@ -61,10 +61,8 @@ testManyQueue'1P3C = do
   finished <- newEmptyMVar
 
   mqs <- replicateM tCount (newMQueue bufferSize)
-  
-  let elements = [0 .. iTERATIONS]
-      
-      writer _ [] = putMVar finished ()
+
+  let writer _ [] = putMVar finished ()
       writer qs (x:xs) = do
                   qs' <- mapM (\q -> writeMQueue q x) qs
                   writer qs' xs
@@ -73,7 +71,7 @@ testManyQueue'1P3C = do
       reader q !acc n = do
                   (q', x) <- readMQueue q
                   reader q' (acc+x) (n-1)
-  
+
   forkIO $ writer mqs elements
   mapM_ (\ mq -> forkIO $ reader mq 0 iTERATIONS) mqs
 
