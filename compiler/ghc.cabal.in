@@ -636,12 +636,14 @@ Library
         GHC.Types.CostCentre.State
         GHC.Types.Cpr
         GHC.Types.Demand
+        GHC.Types.DiagnosticReason
         GHC.Types.Error
         GHC.Types.FieldLabel
         GHC.Types.Fixity
         GHC.Types.Fixity.Env
         GHC.Types.ForeignCall
         GHC.Types.ForeignStubs
+        GHC.Types.Hint
         GHC.Types.HpcInfo
         GHC.Types.Id
         GHC.Types.IPE
@@ -726,6 +728,7 @@ Library
         GHC.Utils.Ppr
         GHC.Utils.Ppr.Colour
         GHC.Utils.TmpFs
+        GHC.Utils.Validity
 
         Language.Haskell.Syntax
         Language.Haskell.Syntax.Binds

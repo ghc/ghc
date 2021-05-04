@@ -1,3 +1,4 @@
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -30,6 +31,12 @@ module GHC.Types.Error
    , mkDecoratedDiagnostic
    , mkDecoratedError
 
+   -- * Hints and refactoring actions
+   , Hint (..)
+   , IsHint (..)
+   , Refactoring (..)
+   , noHints
+
     -- * Rendering Messages
 
    , SDoc
@@ -54,12 +61,12 @@ where
 
 import GHC.Prelude
 
-import GHC.Driver.Flags
-
 import GHC.Data.Bag
 import GHC.IO (catchException)
 import GHC.Utils.Outputable as Outputable
 import qualified GHC.Utils.Ppr.Colour as Col
+import GHC.Types.DiagnosticReason
+import GHC.Types.Hint
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Data.FastString (unpackFS)
 import GHC.Data.StringBuffer (atLine, hGetStringBuffer, len, lexemeToString)
@@ -202,6 +209,16 @@ constraint.
 class Diagnostic a where
   diagnosticMessage :: a -> DecoratedSDoc
   diagnosticReason  :: a -> DiagnosticReason
+  diagnosticHints   :: a -> [Hint]
+
+-- | A generic 'Hint' message, to be used with 'DiagnosticMessage'.
+data DiagnosticHint = DiagnosticHint !SDoc !Refactoring
+
+instance Outputable DiagnosticHint where
+  ppr (DiagnosticHint msg _) = msg
+
+instance IsHint DiagnosticHint where
+  hintRefactoring = const Nothing
 
 -- | A generic 'Diagnostic' message, without any further classification or
 -- provenance: By looking at a 'DiagnosticMessage' we don't know neither
@@ -211,54 +228,37 @@ class Diagnostic a where
 data DiagnosticMessage = DiagnosticMessage
   { diagMessage :: !DecoratedSDoc
   , diagReason  :: !DiagnosticReason
+  , diagHints   :: [Hint]
   }
 
 instance Diagnostic DiagnosticMessage where
   diagnosticMessage = diagMessage
   diagnosticReason  = diagReason
+  diagnosticHints   = diagHints
+
+-- | Helper function to use when no hints can be provided.
+noHints :: IsHint a => [a]
+noHints = mempty
 
 -- | Create a 'DiagnosticMessage' with a 'DiagnosticReason'
 mkDiagnosticMessage :: DecoratedSDoc -> DiagnosticReason -> DiagnosticMessage
-mkDiagnosticMessage = DiagnosticMessage
+mkDiagnosticMessage msg rea = DiagnosticMessage msg rea []
 
 mkPlainDiagnostic :: DiagnosticReason -> SDoc -> DiagnosticMessage
-mkPlainDiagnostic rea doc = DiagnosticMessage (mkSimpleDecorated doc) rea
+mkPlainDiagnostic rea doc = DiagnosticMessage (mkSimpleDecorated doc) rea []
 
 -- | Create an error 'DiagnosticMessage' holding just a single 'SDoc'
 mkPlainError :: SDoc -> DiagnosticMessage
-mkPlainError doc = DiagnosticMessage (mkSimpleDecorated doc) ErrorWithoutFlag
+mkPlainError doc = DiagnosticMessage (mkSimpleDecorated doc) ErrorWithoutFlag []
 
 -- | Create a 'DiagnosticMessage' from a list of bulleted SDocs and a 'DiagnosticReason'
 mkDecoratedDiagnostic :: DiagnosticReason -> [SDoc] -> DiagnosticMessage
-mkDecoratedDiagnostic rea docs = DiagnosticMessage (mkDecorated docs) rea
+mkDecoratedDiagnostic rea docs = DiagnosticMessage (mkDecorated docs) rea []
 
 -- | Create an error 'DiagnosticMessage' from a list of bulleted SDocs
 mkDecoratedError :: [SDoc] -> DiagnosticMessage
-mkDecoratedError docs = DiagnosticMessage (mkDecorated docs) ErrorWithoutFlag
+mkDecoratedError docs = DiagnosticMessage (mkDecorated docs) ErrorWithoutFlag []
 
--- | The reason /why/ a 'Diagnostic' was emitted in the first place.
--- Diagnostic messages are born within GHC with a very precise reason, which
--- can be completely statically-computed (i.e. this is an error or a warning
--- no matter what), or influenced by the specific state of the 'DynFlags' at
--- the moment of the creation of a new 'Diagnostic'. For example, a parsing
--- error is /always/ going to be an error, whereas a 'WarningWithoutFlag
--- Opt_WarnUnusedImports' might turn into an error due to '-Werror' or
--- '-Werror=warn-unused-imports'. Interpreting a 'DiagnosticReason' together
--- with its associated 'Severity' gives us the full picture.
-data DiagnosticReason
-  = WarningWithoutFlag
-  -- ^ Born as a warning.
-  | WarningWithFlag !WarningFlag
-  -- ^ Warning was enabled with the flag.
-  | ErrorWithoutFlag
-  -- ^ Born as an error.
-  deriving (Eq, Show)
-
-instance Outputable DiagnosticReason where
-  ppr = \case
-    WarningWithoutFlag  -> text "WarningWithoutFlag"
-    WarningWithFlag wf  -> text ("WarningWithFlag " ++ show wf)
-    ErrorWithoutFlag    -> text "ErrorWithoutFlag"
 
 -- | An envelope for GHC's facts about a running program, parameterised over the
 -- /domain-specific/ (i.e. parsing, typecheck-renaming, etc) diagnostics.
