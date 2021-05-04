@@ -55,7 +55,6 @@ import GHC.Builtin.Types.Prim
 import GHC.Utils.Misc (zipEqual)
 
 import Control.Monad
-import Data.Bits (shiftL)
 
 -----------------------------------------------------------------------------
 -- Code generation for Foreign Calls

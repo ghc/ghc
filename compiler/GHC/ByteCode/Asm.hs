@@ -42,7 +42,7 @@ import GHC.Data.SizedSeq
 
 import GHC.StgToCmm.Layout     ( ArgRep(..) )
 import GHC.Cmm.Expr
-import GHC.Cmm.CallConv        ( realArgRegsCover )
+import GHC.Cmm.CallConv        ( tupleRegsCover )
 import GHC.Platform
 import GHC.Platform.Profile
 
@@ -579,7 +579,7 @@ mkTupleInfoSig platform TupleInfo{..}
     reg_bit x (r, n)
       | r `elemRegSet` tupleRegs = x .|. 1 `shiftL` n
       | otherwise                = x
-    regs = realArgRegsCover platform
+    regs = tupleRegsCover platform
 
 mkTupleInfoLit :: Platform -> TupleInfo -> Literal
 mkTupleInfoLit platform tuple_info =
