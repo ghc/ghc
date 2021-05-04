@@ -6,6 +6,7 @@ setTestOpts(only_ways(['optasm']))
 setTestOpts(extra_hc_opts('-dno-typeable-binds -ddump-cpr-signatures'))
 
 test('CaseBinderCPR', normal, compile, [''])
+test('RecDataConCPR', normal, compile, [''])
 test('T19232', normal, compile, [''])
 test('T19398', normal, compile, [''])
 test('T19822', normal, compile, [''])
