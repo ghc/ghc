@@ -97,7 +97,8 @@ findHomeModules hsc_env home_unit mns = go mns mempty
 
 -- | Find all depedencies that we need to link, used for GHCi and
 -- interface file dependency calculation
-getLinkDeps :: HscEnv
+getLinkDeps :: SDoc
+            -> HscEnv
             -> HomePackageTable
             -- Already loaded things.
             -> ([UnitId] -- Packages
@@ -110,13 +111,11 @@ getLinkDeps :: HscEnv
             -> IO ([Linkable], [UnitId])     -- ... then link these first
 -- Fails with an IO exception if it can't find enough files
 
-getLinkDeps hsc_env hpt (loaded_pkgs, objs, bcos) replace_osuf span mods pkgs
+getLinkDeps herald hsc_env hpt (loaded_pkgs, objs, bcos) replace_osuf span mods pkgs
 -- Find all the packages and linkables that a set of modules depends on
  = do {
         -- 1.  Find the dependent home-pkg-modules/packages from each iface
-        -- (omitting modules from the interactive package, which is already linked)
-      ; (mods_s, pkgs_s) <- follow_deps (filterOut isInteractiveModule mods)
-                                        emptyUniqDSet emptyUniqDSet;
+      ; (mods_s, pkgs_s) <- follow_deps mods emptyUniqDSet emptyUniqDSet;
 
       ; let {
         -- 2.  Exclude ones already linked
@@ -137,11 +136,10 @@ getLinkDeps hsc_env hpt (loaded_pkgs, objs, bcos) replace_osuf span mods pkgs
   where
     dflags = hsc_dflags hsc_env
 
-        -- The ModIface contains the transitive closure of the module dependencies
-        -- within the current package, *except* for boot modules: if we encounter
-        -- a boot module, we have to find its real interface and discover the
-        -- dependencies of that.  Hence we need to traverse the dependency
-        -- tree recursively.  See bug #936, testcase ghci/prog007.
+        -- The ModIface only contains the direct module dependencies
+        -- within the current package so we have to recurse to find all
+        -- the transitive dependencies.
+        -- See bug #936, testcase ghci/prog007.
     follow_deps :: [Module]             -- modules to follow
                 -> UniqDSet ModuleName         -- accum. module dependencies
                 -> UniqDSet UnitId          -- accum. package dependencies
@@ -180,8 +178,8 @@ getLinkDeps hsc_env hpt (loaded_pkgs, objs, bcos) replace_osuf span mods pkgs
              else follow_deps (map (mkHomeModule home_unit) mod_deps' ++ mods)
                               acc_mods' acc_pkgs'
         where
-            msg = text "need to link module" <+> ppr mod <+>
-                  text "due to use of Template Haskell"
+            msg = text "need to find module dependencies" <+> ppr mod <+>
+                  text "due to" <+> herald
 
 
     link_boot_mod_error mod =
@@ -198,7 +196,7 @@ getLinkDeps hsc_env hpt (loaded_pkgs, objs, bcos) replace_osuf span mods pkgs
     dieWith :: DynFlags -> SrcSpan -> SDoc -> IO a
     dieWith dflags span msg = throwGhcExceptionIO (ProgramError (showSDoc dflags (mkLocMessage MCFatal span msg)))
 
-    while_linking_expr = text "while linking an interpreted expression"
+    while_linking_expr = text "while finding linking dependencies for an expression"
 
         -- This one is a build-system bug
 

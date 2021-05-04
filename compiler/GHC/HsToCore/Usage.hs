@@ -178,7 +178,7 @@ One way to improve this is to either:
 
 mkPluginUsage2 :: HscEnv -> [Module] -> [UnitId] -> IO [Usage]
 mkPluginUsage2 hsc_env mods pkgs = do
-  (ls, us) <- getLinkDeps hsc_env (hsc_HPT hsc_env) ([], [], []) Nothing noSrcSpan mods pkgs
+  (ls, us) <- getLinkDeps (text "usage") hsc_env (hsc_HPT hsc_env) ([], [], []) Nothing noSrcSpan mods pkgs
   ds <-
     case hsc_interp hsc_env of
       Just interp -> fst <$> computePackagesDeps interp hsc_env us
