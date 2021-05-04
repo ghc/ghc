@@ -120,8 +120,8 @@ mkUsageInfo hsc_env this_mod dir_imp_mods used_names dependent_files merged
   = do
     eps <- hscEPS hsc_env
     hashes <- mapM getFileHash dependent_files
---    plugin_usages <- mapM (mkPluginUsage hsc_env) pluginModules
-    plugin_usages <- mkPluginUsage2 hsc_env (map mi_module pluginModules ++ thModules) thPackages
+    -- Dependencies on object files due to TH and plugins
+    object_usages <- mkObjectUsage hsc_env (map mi_module pluginModules ++ thModules) thPackages
     let mod_usages = mk_mod_usage_info (eps_PIT eps) hsc_env this_mod
                                        dir_imp_mods used_names
         usages = mod_usages ++ [ UsageFile { usg_file_path = f
@@ -132,7 +132,7 @@ mkUsageInfo hsc_env this_mod dir_imp_mods used_names dependent_files merged
                                       usg_mod_hash = hash
                                     }
                                | (mod, hash) <- merged ]
-                            ++ plugin_usages
+                            ++ object_usages
     usages `seqList` return usages
     -- seq the list of Usages returned: occasionally these
     -- don't get evaluated for a while and we can end up hanging on to
@@ -176,14 +176,17 @@ One way to improve this is to either:
     hashes is however potentially expensive.
 -}
 
-mkPluginUsage2 :: HscEnv -> [Module] -> [UnitId] -> IO [Usage]
-mkPluginUsage2 hsc_env mods pkgs = do
+-- | Find object files corresponding to the transitive closure of given home
+-- modules and direct object files for pkg dependencies
+mkObjectUsage :: HscEnv -> [Module] -> [UnitId] -> IO [Usage]
+mkObjectUsage hsc_env mods pkgs = do
   (ls, us) <- getLinkDeps (text "usage") hsc_env (hsc_HPT hsc_env) ([], [], []) Nothing noSrcSpan mods pkgs
   ds <-
     case hsc_interp hsc_env of
       Just interp -> fst <$> computePackagesDeps interp hsc_env us
-      Nothing -> return []
---  pprTraceM "mkPluginUsage2" (ppr ls $$ ppr us $$ ppr ds)
+      -- If we're using plugins or TH this case can never happen as the interpreter
+      -- is needed for evaluating plugins/TH
+      Nothing -> pprPanic "computeObjectDeps" (ppr mods $$ ppr pkgs)
 
   concat <$> sequence (map linkableToUsage ls ++ map librarySpecToUsage ds)
 
@@ -200,88 +203,6 @@ mkPluginUsage2 hsc_env mods pkgs = do
     librarySpecToUsage (Archive fn) = traverse fing [fn]
     librarySpecToUsage (DLLPath fn) = traverse fing [fn]
     librarySpecToUsage _ = return []
-
-{-
-mkPluginUsage :: HscEnv -> ModIface -> IO [Usage]
-mkPluginUsage hsc_env pluginModule
-  = case lookupPluginModuleWithSuggestions pkgs pNm Nothing of
-    LookupFound _ pkg -> do
-    -- The plugin is from an external package:
-    -- search for the library files containing the plugin.
-      let searchPaths = collectLibraryDirs (ways dflags) [pkg]
-          useDyn = WayDyn `elem` ways dflags
-          suffix = if useDyn then platformSOExt platform else "a"
-          libLocs = [ searchPath </> "lib" ++ libLoc <.> suffix
-                    | searchPath <- searchPaths
-                    , libLoc     <- unitHsLibs (ghcNameVersion dflags) (ways dflags) pkg
-                    ]
-          -- we also try to find plugin library files by adding WayDyn way,
-          -- if it isn't already present (see trac #15492)
-          paths =
-            if useDyn
-              then libLocs
-              else
-                let dflags'  = dflags { targetWays_ = addWay WayDyn (targetWays_ dflags) }
-                    dlibLocs = [ searchPath </> platformHsSOName platform dlibLoc
-                               | searchPath <- searchPaths
-                               , dlibLoc    <- unitHsLibs (ghcNameVersion dflags') (ways dflags') pkg
-                               ]
-                in libLocs ++ dlibLocs
-      files <- filterM doesFileExist paths
-      case files of
-        [] ->
-          pprPanic
-             ( "mkPluginUsage: missing plugin library, tried:\n"
-              ++ unlines paths
-             )
-             (ppr pNm)
-        _  -> mapM hashFile (nub files)
-    _ -> do
-      let fc = hsc_FC hsc_env
-      let units = hsc_units hsc_env
-      let home_unit = hsc_home_unit hsc_env
-      let dflags = hsc_dflags hsc_env
-      foundM <- findPluginModule fc units home_unit dflags pNm
-      case foundM of
-      -- The plugin was built locally: look up the object file containing
-      -- the `plugin` binder, and all object files belong to modules that are
-      -- transitive dependencies of the plugin that belong to the same package.
-        Found ml _ -> do
-          pluginObject <- hashFile (ml_obj_file ml)
-          depObjects   <- catMaybes <$> mapM lookupObjectFile deps
-          return (nub (pluginObject : depObjects))
-        _ -> pprPanic "mkPluginUsage: no object file found" (ppr pNm)
-  where
-    dflags   = hsc_dflags hsc_env
-    fc       = hsc_FC hsc_env
-    home_unit = hsc_home_unit hsc_env
-    units    = hsc_units hsc_env
-    platform = targetPlatform dflags
-    pkgs     = hsc_units hsc_env
-    pNm      = moduleName $ mi_module pluginModule
-    pPkg     = moduleUnit $ mi_module pluginModule
-    deps     = map gwib_mod $
-      dep_mods $ mi_deps pluginModule
-
-    -- Lookup object file for a plugin dependency,
-    -- from the same package as the plugin.
-    lookupObjectFile nm = do
-      foundM <- findImportedModule fc units home_unit dflags nm Nothing
-      case foundM of
-        Found ml m
-          | moduleUnit m == pPkg -> Just <$> hashFile (ml_obj_file ml)
-          | otherwise              -> return Nothing
-        _ -> pprPanic "mkPluginUsage: no object for dependency"
-                      (ppr pNm <+> ppr nm)
-
-    hashFile f = do
-      fExist <- doesFileExist f
-      if fExist
-         then do
-            h <- getFileHash f
-            return (UsageFile f h)
-         else pprPanic "mkPluginUsage: file not found" (ppr pNm <+> text f)
-         -}
 
 mk_mod_usage_info :: PackageIfaceTable
               -> HscEnv
