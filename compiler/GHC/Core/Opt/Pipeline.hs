@@ -162,16 +162,17 @@ getCoreToDo logger dflags
     maybe_strictness_before _
       = CoreDoNothing
 
-    base_mode = SimplMode { sm_phase      = panic "base_mode"
-                          , sm_names      = []
-                          , sm_dflags     = dflags
-                          , sm_logger     = logger
-                          , sm_uf_opts    = unfoldingOpts dflags
-                          , sm_rules      = rules_on
-                          , sm_eta_expand = eta_expand_on
-                          , sm_inline     = True
-                          , sm_case_case  = True
-                          , sm_pre_inline = pre_inline_on
+    base_mode = SimplMode { sm_phase        = panic "base_mode"
+                          , sm_names        = []
+                          , sm_dflags       = dflags
+                          , sm_logger       = logger
+                          , sm_uf_opts      = unfoldingOpts dflags
+                          , sm_rules        = rules_on
+                          , sm_eta_expand   = eta_expand_on
+                          , sm_cast_swizzle = True
+                          , sm_inline       = True
+                          , sm_case_case    = True
+                          , sm_pre_inline   = pre_inline_on
                           }
 
     simpl_phase phase name iter

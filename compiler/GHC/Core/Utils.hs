@@ -266,13 +266,12 @@ mkPiMCo :: Var -> MCoercionR -> MCoercionR
 mkPiMCo _  MRefl   = MRefl
 mkPiMCo v (MCo co) = MCo (mkPiCo Representational v co)
 
-{-
-************************************************************************
+
+{- *********************************************************************
 *                                                                      *
-\subsection{Attaching notes}
+             Casts
 *                                                                      *
-************************************************************************
--}
+********************************************************************* -}
 
 -- | Wrap the given expression in the coercion safely, dropping
 -- identity coercions and coalescing nested coercions
@@ -312,6 +311,13 @@ mkCast expr co
           $$ ppr co $$ ppr (coercionType co)
           $$ callStackDoc) $
     (Cast expr co)
+
+
+{- *********************************************************************
+*                                                                      *
+             Attaching ticks
+*                                                                      *
+********************************************************************* -}
 
 -- | Wraps the given expression in the source annotation, dropping the
 -- annotation if possible.

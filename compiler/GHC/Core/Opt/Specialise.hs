@@ -2065,6 +2065,8 @@ then its body must look like
 Reason: when specialising the body for a call (f ty dexp), we want to
 substitute dexp for d, and pick up specialised calls in the body of f.
 
+We do allow casts, however; see Note [Account for casts in binding].
+
 This doesn't always work.  One example I came across was this:
         newtype Gen a = MkGen{ unGen :: Int -> a }
 
