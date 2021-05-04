@@ -198,8 +198,7 @@ newFamInst flavor axiom@(CoAxiom { co_ax_tc = fam_tc, co_ax_name = ax_name })
     is_local name = nameIsLocalOrFrom this_mod name
     orph | is_local fam_name = NotOrphan (nameOccName fam_name)
          | otherwise         = IsOrphan
-    CoAxBranch { cab_loc = loc
-               , cab_tvs = tvs
+    CoAxBranch { cab_tvs = tvs
                , cab_cvs = cvs
                , cab_lhs = lhs
                , cab_rhs = rhs } = coAxiomSingleBranch axiom
