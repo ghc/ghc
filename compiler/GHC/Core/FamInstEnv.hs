@@ -269,8 +269,9 @@ also.
 mkImportedFamInst :: Name               -- Name of the family
                   -> [RoughMatchTc]     -- Rough match info
                   -> CoAxiom Unbranched -- Axiom introduced
+                  -> IsOrphan           -- is this instance an orphan?
                   -> FamInst            -- Resulting family instance
-mkImportedFamInst fam mb_tcs axiom
+mkImportedFamInst fam mb_tcs axiom orph
   = FamInst {
       fi_fam    = fam,
       fi_tcs    = mb_tcs,
@@ -279,7 +280,8 @@ mkImportedFamInst fam mb_tcs axiom
       fi_tys    = tys,
       fi_rhs    = rhs,
       fi_axiom  = axiom,
-      fi_flavor = flavor }
+      fi_flavor = flavor,
+      fi_orphan = orph }
   where
      -- See Note [Lazy axiom match]
      ~(CoAxBranch { cab_lhs = tys
