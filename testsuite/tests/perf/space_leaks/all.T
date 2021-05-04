@@ -31,7 +31,7 @@ test('T4018',
      compile_and_run, ['-fno-state-hack'])
 
 test('T4029',
-     [collect_runtime_residency(10),
+     [copy_files, collect_runtime_residency(10),
       ],
      ghci_script,
      ['T4029.script'])
