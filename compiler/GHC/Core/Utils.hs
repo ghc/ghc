@@ -9,7 +9,7 @@ Utility functions on @Core@ syntax
 -- | Commonly useful utilities for manipulating the Core language
 module GHC.Core.Utils (
         -- * Constructing expressions
-        mkCast,
+        mkCast, mkCastMCo, mkPiMCo,
         mkTick, mkTicks, mkTickNoHNF, tickHNFArgs,
         bindNonRec, needsCaseBinding,
         mkAltExpr, mkDefaultCase, mkSingleAltCase,
@@ -296,13 +296,11 @@ applyTypeToArgs e op_ty args
                      , text "Args':" <+> ppr as ]
 
 
-{-
-************************************************************************
+{- *********************************************************************
 *                                                                      *
-\subsection{Attaching notes}
+             Casts
 *                                                                      *
-************************************************************************
--}
+********************************************************************* -}
 
 -- | Wrap the given expression in the coercion safely, dropping
 -- identity coercions and coalescing nested coercions
@@ -341,6 +339,23 @@ mkCast expr co
           $$ ppr co $$ ppr (coercionType co)
           $$ callStackDoc) $
     (Cast expr co)
+
+
+mkCastMCo :: CoreExpr -> MCoercionR -> CoreExpr
+mkCastMCo e MRefl    = e
+mkCastMCo e (MCo co) = Cast e co
+  -- We are careful to use (MCo co) only when co is not reflexive
+  -- Hence (Cast e co) rather than (mkCast e co)
+
+mkPiMCo :: Var -> MCoercionR -> MCoercionR
+mkPiMCo _  MRefl   = MRefl
+mkPiMCo v (MCo co) = MCo (mkPiCo Representational v co)
+
+{- *********************************************************************
+*                                                                      *
+             Attaching ticks
+*                                                                      *
+********************************************************************* -}
 
 -- | Wraps the given expression in the source annotation, dropping the
 -- annotation if possible.
