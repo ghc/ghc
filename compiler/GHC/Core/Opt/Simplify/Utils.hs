@@ -1565,15 +1565,6 @@ mkLam env bndrs body cont
        ; mkLam' dflags bndrs body }
   where
     mkLam' :: DynFlags -> [OutBndr] -> OutExpr -> SimplM OutExpr
-    mkLam' dflags bndrs (Cast body co)
-      | not (any bad bndrs)
-        -- Note [Casts and lambdas]
-      = do { lam <- mkLam' dflags bndrs body
-           ; return (mkCast lam (mkPiCos Representational bndrs co)) }
-      where
-        co_vars  = tyCoVarsOfCo co
-        bad bndr = isCoVar bndr && bndr `elemVarSet` co_vars
-
     mkLam' dflags bndrs body@(Lam {})
       = mkLam' dflags (bndrs ++ bndrs1) body1
       where
@@ -1582,6 +1573,16 @@ mkLam env bndrs body cont
     mkLam' dflags bndrs (Tick t expr)
       | tickishFloatable t
       = mkTick t <$> mkLam' dflags bndrs expr
+
+    mkLam' dflags bndrs (Cast body co)
+      | -- Note [Casts and lambdas]
+        sm_eta_expand (getMode env)
+      , not (any bad bndrs)
+      = do { lam <- mkLam' dflags bndrs body
+           ; return (mkCast lam (mkPiCos Representational bndrs co)) }
+      where
+        co_vars  = tyCoVarsOfCo co
+        bad bndr = isCoVar bndr && bndr `elemVarSet` co_vars
 
     mkLam' dflags bndrs body
       | gopt Opt_DoEtaReduction dflags
@@ -1643,19 +1644,32 @@ might meet and cancel with some other cast:
         /\g. e `cast` co  ===>   (/\g. e) `cast` (/\g. co)
                           (if not (g `in` co))
 
-Notice that it works regardless of 'e'.  Originally it worked only
-if 'e' was itself a lambda, but in some cases that resulted in
-fruitless iteration in the simplifier.  A good example was when
-compiling Text.ParserCombinators.ReadPrec, where we had a definition
-like    (\x. Get `cast` g)
-where Get is a constructor with nonzero arity.  Then mkLam eta-expanded
-the Get, and the next iteration eta-reduced it, and then eta-expanded
-it again.
+Wrinkles
 
-Note also the side condition for the case of coercion binders.
-It does not make sense to transform
-        /\g. e `cast` g  ==>  (/\g.e) `cast` (/\g.g)
-because the latter is not well-kinded.
+* We check sm_eta_expand, becuase this is a kind of eta-expansion.
+  The main reason is that on the LHS of a RULE we may have
+       (\x. blah |> CoVar cv)
+  where `cv` is a coercion variable.  We really only want coercion
+  variables, not general coercions, on the LHS of a RULE.  So we don't
+  want to swizzle this to
+      (\x. blah) |> (Refl xty `FunCo` CoVar cv)
+  And it happens that sm_eta_expand is off on RULE left hand sides;
+  see updModeForRules.
+
+* Notice that it works regardless of 'e'.  Originally it worked only
+  if 'e' was itself a lambda, but in some cases that resulted in
+  fruitless iteration in the simplifier.  A good example was when
+  compiling Text.ParserCombinators.ReadPrec, where we had a definition
+  like    (\x. Get `cast` g)
+  where Get is a constructor with nonzero arity.  Then mkLam eta-expanded
+  the Get, and the next iteration eta-reduced it, and then eta-expanded
+  it again.
+
+* Note also the side condition for the case of coercion binders, namel
+  not (any bad bndrs).  It does not make sense to transform
+          /\g. e `cast` g  ==>  (/\g.e) `cast` (/\g.g)
+  because the latter is not well-kinded.
+
 
 ************************************************************************
 *                                                                      *

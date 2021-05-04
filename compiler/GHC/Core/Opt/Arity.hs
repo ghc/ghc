@@ -1431,16 +1431,6 @@ getArg_maybe eis = go MRefl eis
       | otherwise
       = Nothing
 
-mkCastMCo :: CoreExpr -> MCoercionR -> CoreExpr
-mkCastMCo e MRefl    = e
-mkCastMCo e (MCo co) = Cast e co
-  -- We are careful to use (MCo co) only when co is not reflexive
-  -- Hence (Cast e co) rather than (mkCast e co)
-
-mkPiMCo :: Var -> MCoercionR -> MCoercionR
-mkPiMCo _  MRefl   = MRefl
-mkPiMCo v (MCo co) = MCo (mkPiCo Representational v co)
-
 --------------
 etaInfoAbs :: [EtaInfo] -> CoreExpr -> CoreExpr
 -- See Note [The EtaInfo mechanism]
