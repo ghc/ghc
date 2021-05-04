@@ -167,7 +167,6 @@ deleteFromLoadedEnv interp to_remove =
 -- Throws a 'ProgramError' if loading fails or the name cannot be found.
 loadName :: Interp -> HscEnv -> Name -> IO ForeignHValue
 loadName interp hsc_env name = do
-  initLoaderState interp hsc_env
   modifyLoaderState interp $ \pls0 -> do
     pls <- if not (isExternalName name)
        then return pls0
@@ -196,9 +195,11 @@ loadDependencies
   -> SrcSpan -> [Module]
   -> IO (LoaderState, SuccessFlag)
 loadDependencies interp hsc_env pls span needed_mods = do
---   initLoaderState (hsc_dflags hsc_env) dl
-   let hpt = hsc_HPT hsc_env
-   let dflags = hsc_dflags hsc_env
+   let dflags     = hsc_dflags hsc_env
+   let logger     = hsc_logger hsc_env
+   let unit_env   = hsc_unit_env hsc_env
+   let tmpfs      = hsc_tmpfs hsc_env
+   let fc         = hsc_FC hsc_env
    -- The interpreter and dynamic linker can only handle object code built
    -- the "normal" way, i.e. no non-std ways like profiling or ticky-ticky.
    -- So here we check the build tag: if we're building a non-standard way
@@ -206,12 +207,12 @@ loadDependencies interp hsc_env pls span needed_mods = do
    maybe_normal_osuf <- checkNonStdWay dflags interp span
 
    -- Find what packages and linkables are required
-   (lnks, pkgs) <- getLinkDeps hsc_env hpt pls
+   (lnks, pkgs) <- getLinkDeps hsc_env fc dflags unit_env pls
                                maybe_normal_osuf span needed_mods
 
    -- Link the packages and modules required
-   pls1 <- loadPackages' interp hsc_env pkgs pls
-   loadModules interp hsc_env pls1 lnks
+   pls1 <- loadPackages' logger interp unit_env dflags pkgs pls
+   loadModules logger tmpfs interp dflags unit_env pls1 lnks
 
 
 -- | Temporarily extend the loaded env.
@@ -277,15 +278,15 @@ showLoaderState interp = do
 -- nothing.  This is useful in Template Haskell, where we call it before
 -- trying to link.
 --
-initLoaderState :: Interp -> HscEnv -> IO ()
-initLoaderState interp hsc_env = do
+initLoaderState :: Logger -> TmpFs -> Interp -> DynFlags -> UnitEnv -> IO ()
+initLoaderState logger tmpfs interp dflags unit_env = do
   modifyMVar_ (loader_state (interpLoader interp)) $ \pls -> do
     case pls of
       Just  _ -> return pls
-      Nothing -> Just <$> reallyInitLoaderState interp hsc_env
+      Nothing -> Just <$> reallyInitLoaderState logger tmpfs interp unit_env dflags
 
-reallyInitLoaderState :: Interp -> HscEnv -> IO LoaderState
-reallyInitLoaderState interp hsc_env = do
+reallyInitLoaderState :: Logger -> TmpFs -> Interp -> UnitEnv -> DynFlags -> IO LoaderState
+reallyInitLoaderState logger tmpfs interp unit_env dflags = do
   -- Initialise the linker state
   let pls0 = emptyLoaderState
 
@@ -293,29 +294,30 @@ reallyInitLoaderState interp hsc_env = do
   initObjLinker interp
 
   -- (b) Load packages from the command-line (Note [preload packages])
-  pls <- loadPackages' interp hsc_env (preloadUnits (hsc_units hsc_env)) pls0
+  let unit_state = ue_units unit_env
+  pls <- loadPackages' logger interp unit_env dflags (preloadUnits unit_state) pls0
 
   -- steps (c), (d) and (e)
-  loadCmdLineLibs' interp hsc_env pls
+  loadCmdLineLibs' logger tmpfs interp dflags unit_env pls
 
 
-loadCmdLineLibs :: Interp -> HscEnv -> IO ()
-loadCmdLineLibs interp hsc_env = do
-  initLoaderState interp hsc_env
+loadCmdLineLibs :: Logger -> TmpFs -> Interp -> DynFlags -> UnitEnv -> IO ()
+loadCmdLineLibs logger tmpfs interp dflags unit_env = do
   modifyLoaderState_ interp $ \pls ->
-    loadCmdLineLibs' interp hsc_env pls
+    loadCmdLineLibs' logger tmpfs interp dflags unit_env pls
 
 loadCmdLineLibs'
-  :: Interp
-  -> HscEnv
+  :: Logger
+  -> TmpFs
+  -> Interp
+  -> DynFlags
+  -> UnitEnv
   -> LoaderState
   -> IO LoaderState
-loadCmdLineLibs' interp hsc_env pls =
+loadCmdLineLibs' logger tmpfs interp dflags unit_env pls =
   do
-      let dflags@(DynFlags { ldInputs = cmdline_ld_inputs
-                           , libraryPaths = lib_paths_base})
-            = hsc_dflags hsc_env
-      let logger = hsc_logger hsc_env
+      let cmdline_ld_inputs = ldInputs dflags
+      let lib_paths_base = libraryPaths dflags
 
       -- (c) Link libraries from the command-line
       let minus_ls_1 = [ lib | Option ('-':'l':lib) <- cmdline_ld_inputs ]
@@ -325,7 +327,7 @@ loadCmdLineLibs' interp hsc_env pls =
       -- need to defer this to the locateLib call so we can't initialize it
       -- inside of the rts. Instead we do it here to be able to find the
       -- import library for pthreads. See #13210.
-      let platform = targetPlatform dflags
+      let platform = ue_platform unit_env
           os       = platformOS platform
           minus_ls = case os of
                        OSMinGW32 -> "pthread" : minus_ls_1
@@ -341,18 +343,18 @@ loadCmdLineLibs' interp hsc_env pls =
       maybePutStr logger dflags (unlines $ map ("  "++) gcc_paths)
 
       libspecs
-        <- mapM (locateLib interp hsc_env False lib_paths_env gcc_paths) minus_ls
+        <- mapM (locateLib logger interp dflags False lib_paths_env gcc_paths) minus_ls
 
       -- (d) Link .o files from the command-line
-      classified_ld_inputs <- mapM (classifyLdInput logger dflags)
+      classified_ld_inputs <- mapM (classifyLdInput logger platform dflags)
                                 [ f | FileOption _ f <- cmdline_ld_inputs ]
 
       -- (e) Link any MacOS frameworks
-      let platform = targetPlatform dflags
-      let (framework_paths, frameworks) =
-            if platformUsesFrameworks platform
-             then (frameworkPaths dflags, cmdlineFrameworks dflags)
-              else ([],[])
+      let (framework_paths, frameworks)
+            | platformUsesFrameworks platform
+            = (frameworkPaths dflags, cmdlineFrameworks dflags)
+            | otherwise
+            = ([],[])
 
       -- Finally do (c),(d),(e)
       let cmdline_lib_specs = catMaybes classified_ld_inputs
@@ -373,7 +375,7 @@ loadCmdLineLibs' interp hsc_env pls =
            pathCache <- mapM (addLibrarySearchPath interp) all_paths_env
 
            let merged_specs = mergeStaticObjects cmdline_lib_specs
-           pls1 <- foldM (preloadLib interp hsc_env lib_paths framework_paths) pls
+           pls1 <- foldM (preloadLib logger tmpfs interp dflags unit_env lib_paths framework_paths) pls
                          merged_specs
 
            maybePutStr logger dflags "final link ... "
@@ -382,8 +384,9 @@ loadCmdLineLibs' interp hsc_env pls =
            -- DLLs are loaded, reset the search paths
            mapM_ (removeLibrarySearchPath interp) $ reverse pathCache
 
-           if succeeded ok then maybePutStrLn logger dflags "done"
-           else throwGhcExceptionIO (ProgramError "linking extra libraries/objects failed")
+           if succeeded ok
+             then maybePutStrLn logger dflags "done"
+             else throwGhcExceptionIO (ProgramError "linking extra libraries/objects failed")
 
            return pls1
 
@@ -425,8 +428,8 @@ package I want to link in eagerly". Would that be too complicated for
 users?
 -}
 
-classifyLdInput :: Logger -> DynFlags -> FilePath -> IO (Maybe LibrarySpec)
-classifyLdInput logger dflags f
+classifyLdInput :: Logger -> Platform -> DynFlags -> FilePath -> IO (Maybe LibrarySpec)
+classifyLdInput logger platform dflags f
   | isObjectFilename platform f = return (Just (Objects [f]))
   | isDynLibFilename platform f = return (Just (DLLPath f))
   | otherwise          = do
@@ -434,17 +437,19 @@ classifyLdInput logger dflags f
             $ withPprStyle defaultUserStyle
             (text ("Warning: ignoring unrecognised input `" ++ f ++ "'"))
         return Nothing
-    where platform = targetPlatform dflags
 
 preloadLib
-  :: Interp
-  -> HscEnv
+  :: Logger
+  -> TmpFs
+  -> Interp
+  -> DynFlags
+  -> UnitEnv
   -> [String]
   -> [String]
   -> LoaderState
   -> LibrarySpec
   -> IO LoaderState
-preloadLib interp hsc_env lib_paths framework_paths pls lib_spec = do
+preloadLib logger tmpfs interp dflags unit_env lib_paths framework_paths pls lib_spec = do
   maybePutStr logger dflags ("Loading object " ++ showLS lib_spec ++ " ... ")
   case lib_spec of
     Objects static_ishs -> do
@@ -491,10 +496,7 @@ preloadLib interp hsc_env lib_paths framework_paths pls lib_spec = do
       else throwGhcExceptionIO (ProgramError "preloadLib Framework")
 
   where
-    dflags = hsc_dflags hsc_env
-    logger = hsc_logger hsc_env
-
-    platform = targetPlatform dflags
+    platform = ue_platform unit_env
 
     preloadFailed :: String -> [String] -> LibrarySpec -> IO ()
     preloadFailed sys_errmsg paths spec
@@ -512,7 +514,7 @@ preloadLib interp hsc_env lib_paths framework_paths pls lib_spec = do
        = do b <- or <$> mapM doesFileExist names
             if not b then return (False, pls)
                      else if hostIsDynamic
-                             then  do pls1 <- dynLoadObjs interp hsc_env pls names
+                             then  do pls1 <- dynLoadObjs logger tmpfs interp dflags unit_env pls names
                                       return (True, pls1)
                              else  do mapM_ (loadObj interp) names
                                       return (True, pls)
@@ -548,9 +550,6 @@ preloadLib interp hsc_env lib_paths framework_paths pls lib_spec = do
 --
 loadExpr :: Interp -> HscEnv -> SrcSpan -> UnlinkedBCO -> IO ForeignHValue
 loadExpr interp hsc_env span root_ul_bco = do
-  -- Initialise the linker (if it's not been done already)
-  initLoaderState interp hsc_env
-
   -- Take lock for the actual work.
   modifyLoaderState interp $ \pls0 -> do
     -- Load the packages and modules required
@@ -630,15 +629,19 @@ failNonStd dflags srcspan = dieWith dflags srcspan $
             | hostIsProfiled = text "with -prof"
             | otherwise = text "the normal way"
 
-getLinkDeps :: HscEnv -> HomePackageTable
-            -> LoaderState
-            -> Maybe FilePath                   -- replace object suffices?
-            -> SrcSpan                          -- for error messages
-            -> [Module]                         -- If you need these
-            -> IO ([Linkable], [UnitId])     -- ... then link these first
+getLinkDeps
+  :: HscEnv
+  -> FinderCache
+  -> DynFlags
+  -> UnitEnv
+  -> LoaderState
+  -> Maybe FilePath                   -- replace object suffices?
+  -> SrcSpan                          -- for error messages
+  -> [Module]                         -- If you need these
+  -> IO ([Linkable], [UnitId])     -- ... then link these first
 -- Fails with an IO exception if it can't find enough files
 
-getLinkDeps hsc_env hpt pls replace_osuf span mods
+getLinkDeps hsc_env fc dflags unit_env pls replace_osuf span mods
 -- Find all the packages and linkables that a set of modules depends on
  = do {
         -- 1.  Find the dependent home-pkg-modules/packages from each iface
@@ -663,8 +666,7 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
 
       ; return (lnks_needed, pkgs_needed) }
   where
-    dflags = hsc_dflags hsc_env
-
+    hpt = ue_hpt unit_env
         -- The ModIface contains the transitive closure of the module dependencies
         -- within the current package, *except* for boot modules: if we encounter
         -- a boot module, we have to find its real interface and discover the
@@ -689,7 +691,7 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
           let
             pkg = moduleUnit mod
             deps  = mi_deps iface
-            home_unit = hsc_home_unit hsc_env
+            mhome_unit = ue_home_unit unit_env
 
             pkg_deps = dep_pkgs deps
             (boot_deps, mod_deps) = flip partitionWith (dep_mods deps) $
@@ -701,11 +703,13 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
             boot_deps' = filter (not . (`elementOfUniqDSet` acc_mods)) boot_deps
             acc_mods'  = addListToUniqDSet acc_mods (moduleName mod : mod_deps)
             acc_pkgs'  = addListToUniqDSet acc_pkgs $ map fst pkg_deps
-          --
-          if not (isHomeUnit home_unit pkg)
-             then follow_deps mods acc_mods (addOneToUniqDSet acc_pkgs' (toUnitId pkg))
-             else follow_deps (map (mkHomeModule home_unit) boot_deps' ++ mods)
-                              acc_mods' acc_pkgs'
+
+          case mhome_unit of
+            Just home_unit
+              | isHomeUnit home_unit pkg
+              -> follow_deps (map (mkHomeModule home_unit) boot_deps' ++ mods) acc_mods' acc_pkgs'
+            _ -> follow_deps mods acc_mods (addOneToUniqDSet acc_pkgs' (toUnitId pkg))
+
         where
             msg = text "need to link module" <+> ppr mod <+>
                   text "due to use of Template Haskell"
@@ -732,9 +736,7 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
         | otherwise
         = do    -- It's not in the HPT because we are in one shot mode,
                 -- so use the Finder to get a ModLocation...
-             let fc = hsc_FC hsc_env
-             let home_unit = hsc_home_unit hsc_env
-             let dflags = hsc_dflags hsc_env
+             let home_unit = Maybes.expectJust "get_linkable" (ue_home_unit unit_env)
              mb_stuff <- findHomeModule fc home_unit dflags mod_name
              case mb_stuff of
                   Found loc mod -> found loc mod
@@ -780,9 +782,6 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
 
 loadDecls :: Interp -> HscEnv -> SrcSpan -> CompiledByteCode -> IO ()
 loadDecls interp hsc_env span cbc@CompiledByteCode{..} = do
-    -- Initialise the linker (if it's not been done already)
-    initLoaderState interp hsc_env
-
     -- Take lock for the actual work.
     modifyLoaderState_ interp $ \pls0 -> do
       -- Link the packages and modules required
@@ -823,7 +822,6 @@ loadDecls interp hsc_env span cbc@CompiledByteCode{..} = do
 
 loadModule :: Interp -> HscEnv -> Module -> IO ()
 loadModule interp hsc_env mod = do
-  initLoaderState interp hsc_env
   modifyLoaderState_ interp $ \pls -> do
     (pls', ok) <- loadDependencies interp hsc_env pls noSrcSpan [mod]
     if failed ok
@@ -838,22 +836,31 @@ loadModule interp hsc_env mod = do
 
   ********************************************************************* -}
 
-loadModules :: Interp -> HscEnv -> LoaderState -> [Linkable] -> IO (LoaderState, SuccessFlag)
-loadModules interp hsc_env pls linkables
-  = mask_ $ do  -- don't want to be interrupted by ^C in here
+loadModules
+  :: Logger
+  -> TmpFs
+  -> Interp
+  -> DynFlags
+  -> UnitEnv
+  -> LoaderState
+  -> [Linkable]
+  -> IO (LoaderState, SuccessFlag)
+loadModules logger tmpfs interp dflags unit_env pls linkables =
+  mask_ $ do  -- don't want to be interrupted by ^C in here
 
-        let (objs, bcos) = partition isObjectLinkable
-                              (concatMap partitionLinkable linkables)
-        bco_opts <- initBCOOpts (hsc_dflags hsc_env)
+    bco_opts <- initBCOOpts dflags
 
-                -- Load objects first; they can't depend on BCOs
-        (pls1, ok_flag) <- loadObjects interp hsc_env pls objs
+    let (objs, bcos) = partition isObjectLinkable
+                          (concatMap partitionLinkable linkables)
 
-        if failed ok_flag then
-                return (pls1, Failed)
-          else do
-                pls2 <- dynLinkBCOs bco_opts interp pls1 bcos
-                return (pls2, Succeeded)
+    -- Load objects first; they can't depend on BCOs
+    (pls1, ok_flag) <- loadObjects logger tmpfs interp dflags unit_env pls objs
+
+    if failed ok_flag
+      then return (pls1, Failed)
+      else do
+            pls2 <- dynLinkBCOs bco_opts interp pls1 bcos
+            return (pls2, Succeeded)
 
 
 -- HACK to support f-x-dynamic in the interpreter; no other purpose
@@ -893,19 +900,22 @@ linkableInSet l objs_loaded =
 -- If the interpreter uses dynamic-linking, build a shared library and load it.
 -- Otherwise, use the RTS linker.
 loadObjects
-  :: Interp
-  -> HscEnv
+  :: Logger
+  -> TmpFs
+  -> Interp
+  -> DynFlags
+  -> UnitEnv
   -> LoaderState
   -> [Linkable]
   -> IO (LoaderState, SuccessFlag)
-loadObjects interp hsc_env pls objs = do
+loadObjects logger tmpfs interp dflags unit_env pls objs = do
         let (objs_loaded', new_objs) = rmDupLinkables (objs_loaded pls) objs
             pls1                     = pls { objs_loaded = objs_loaded' }
             unlinkeds                = concatMap linkableUnlinked new_objs
             wanted_objs              = map nameOfObject unlinkeds
 
         if interpreterDynamic interp
-            then do pls2 <- dynLoadObjs interp hsc_env pls1 wanted_objs
+            then do pls2 <- dynLoadObjs logger tmpfs interp dflags unit_env pls1 wanted_objs
                     return (pls2, Succeeded)
             else do mapM_ (loadObj interp) wanted_objs
 
@@ -922,13 +932,10 @@ loadObjects interp hsc_env pls objs = do
 
 
 -- | Create a shared library containing the given object files and load it.
-dynLoadObjs :: Interp -> HscEnv -> LoaderState -> [FilePath] -> IO LoaderState
-dynLoadObjs _      _       pls                           []   = return pls
-dynLoadObjs interp hsc_env pls@LoaderState{..} objs = do
-    let unit_env = hsc_unit_env hsc_env
-    let dflags   = hsc_dflags hsc_env
-    let logger   = hsc_logger hsc_env
-    let tmpfs    = hsc_tmpfs hsc_env
+dynLoadObjs :: Logger -> TmpFs -> Interp -> DynFlags -> UnitEnv -> LoaderState -> [FilePath] -> IO LoaderState
+dynLoadObjs logger tmpfs interp dflags unit_env pls@LoaderState{..} objs
+  | [] <- objs = return pls
+  | otherwise  = do
     let platform = ue_platform unit_env
     let minus_ls = [ lib | Option ('-':'l':lib) <- ldInputs dflags ]
     let minus_big_ls = [ lib | Option ('-':'L':lib) <- ldInputs dflags ]
@@ -1094,23 +1101,19 @@ makeForeignNamedHValueRefs interp bindings =
 --   * we also implicitly unload all temporary bindings at this point.
 --
 unload
-  :: Interp
-  -> HscEnv
+  :: Logger
+  -> Interp
+  -> DynFlags
   -> [Linkable] -- ^ The linkables to *keep*.
   -> IO ()
-unload interp hsc_env linkables
+unload logger interp dflags linkables
   = mask_ $ do -- mask, so we're safe from Ctrl-C in here
-
-        -- Initialise the linker (if it's not been done already)
-        initLoaderState interp hsc_env
 
         new_pls
             <- modifyLoaderState interp $ \pls -> do
                  pls1 <- unload_wkr interp linkables pls
                  return (pls1, pls1)
 
-        let dflags = hsc_dflags hsc_env
-        let logger = hsc_logger hsc_env
         debugTraceMsg logger dflags 3 $
           text "unload: retaining objs" <+> ppr (objs_loaded new_pls)
         debugTraceMsg logger dflags 3 $
@@ -1244,7 +1247,7 @@ showLS (Framework nm) = "(framework) " ++ nm
 -- automatically, and it doesn't matter what order you specify the input
 -- packages.
 --
-loadPackages :: Interp -> HscEnv -> [UnitId] -> IO ()
+loadPackages :: Logger -> Interp -> UnitEnv -> DynFlags -> [UnitId] -> IO ()
 -- NOTE: in fact, since each module tracks all the packages it depends on,
 --       we don't really need to use the package-config dependencies.
 --
@@ -1253,15 +1256,14 @@ loadPackages :: Interp -> HscEnv -> [UnitId] -> IO ()
 -- perhaps makes the error message a bit more localised if we get a link
 -- failure.  So the dependency walking code is still here.
 
-loadPackages interp hsc_env new_pkgs = do
+loadPackages logger interp unit_env dflags new_pkgs = do
   -- It's probably not safe to try to load packages concurrently, so we take
   -- a lock.
-  initLoaderState interp hsc_env
   modifyLoaderState_ interp $ \pls ->
-    loadPackages' interp hsc_env new_pkgs pls
+    loadPackages' logger interp unit_env dflags new_pkgs pls
 
-loadPackages' :: Interp -> HscEnv -> [UnitId] -> LoaderState -> IO LoaderState
-loadPackages' interp hsc_env new_pks pls = do
+loadPackages' :: Logger -> Interp -> UnitEnv -> DynFlags -> [UnitId] -> LoaderState -> IO LoaderState
+loadPackages' logger interp unit_env dflags new_pks pls = do
     pkgs' <- link (pkgs_loaded pls) new_pks
     return $! pls { pkgs_loaded = pkgs' }
   where
@@ -1273,24 +1275,22 @@ loadPackages' interp hsc_env new_pks pls = do
         | new_pkg `elem` pkgs   -- Already linked
         = return pkgs
 
-        | Just pkg_cfg <- lookupUnitId (hsc_units hsc_env) new_pkg
+        | Just pkg_cfg <- lookupUnitId (ue_units unit_env) new_pkg
         = do {  -- Link dependents first
                pkgs' <- link pkgs (unitDepends pkg_cfg)
                 -- Now link the package itself
-             ; loadPackage interp hsc_env pkg_cfg
+             ; loadPackage logger interp unit_env dflags pkg_cfg
              ; return (new_pkg : pkgs') }
 
         | otherwise
         = throwGhcExceptionIO (CmdLineError ("unknown package: " ++ unpackFS (unitIdFS new_pkg)))
 
 
-loadPackage :: Interp -> HscEnv -> UnitInfo -> IO ()
-loadPackage interp hsc_env pkg
+loadPackage :: Logger -> Interp -> UnitEnv -> DynFlags -> UnitInfo -> IO ()
+loadPackage logger interp unit_env dflags pkg
    = do
-        let dflags    = hsc_dflags hsc_env
-        let logger    = hsc_logger hsc_env
-            platform  = targetPlatform dflags
-            is_dyn    = interpreterDynamic interp
+        let platform = ue_platform unit_env
+            is_dyn   = interpreterDynamic interp
             dirs | is_dyn    = map ST.unpack $ Packages.unitLibraryDynDirs pkg
                  | otherwise = map ST.unpack $ Packages.unitLibraryDirs pkg
 
@@ -1320,9 +1320,9 @@ loadPackage interp hsc_env pkg
         dirs_env <- addEnvPaths "LIBRARY_PATH" dirs
 
         hs_classifieds
-           <- mapM (locateLib interp hsc_env True  dirs_env gcc_paths) hs_libs'
+           <- mapM (locateLib logger interp dflags True  dirs_env gcc_paths) hs_libs'
         extra_classifieds
-           <- mapM (locateLib interp hsc_env False dirs_env gcc_paths) extra_libs
+           <- mapM (locateLib logger interp dflags False dirs_env gcc_paths) extra_libs
         let classifieds = hs_classifieds ++ extra_classifieds
 
         -- Complication: all the .so's must be loaded before any of the .o's.
@@ -1347,10 +1347,10 @@ loadPackage interp hsc_env pkg
             loadFrameworks interp platform pkg
             -- See Note [Crash early load_dyn and locateLib]
             -- Crash early if can't load any of `known_dlls`
-            mapM_ (load_dyn interp hsc_env True) known_dlls
+            mapM_ (load_dyn logger interp dflags True) known_dlls
             -- For remaining `dlls` crash early only when there is surely
             -- no package's DLL around ... (not is_dyn)
-            mapM_ (load_dyn interp hsc_env (not is_dyn) . platformSOName platform) dlls
+            mapM_ (load_dyn logger interp dflags (not is_dyn) . platformSOName platform) dlls
 #endif
         -- After loading all the DLLs, we can load the static objects.
         -- Ordering isn't important here, because we do one final link
@@ -1420,8 +1420,8 @@ restriction very easily.
 -- can be passed directly to loadDLL.  They are either fully-qualified
 -- ("/usr/lib/libfoo.so"), or unqualified ("libfoo.so").  In the latter case,
 -- loadDLL is going to search the system paths to find the library.
-load_dyn :: Interp -> HscEnv -> Bool -> FilePath -> IO ()
-load_dyn interp hsc_env crash_early dll = do
+load_dyn :: Logger -> Interp -> DynFlags -> Bool -> FilePath -> IO ()
+load_dyn logger interp dflags crash_early dll = do
   r <- loadDLL interp dll
   case r of
     Nothing  -> return ()
@@ -1434,8 +1434,6 @@ load_dyn interp hsc_env crash_early dll = do
                 (mkMCDiagnostic dflags $ WarningWithFlag Opt_WarnMissedExtraSharedLib)
                   noSrcSpan $ withPprStyle defaultUserStyle (note err)
   where
-    dflags = hsc_dflags hsc_env
-    logger = hsc_logger hsc_env
     note err = vcat $ map text
       [ err
       , "It's OK if you don't want to use symbols from it directly."
@@ -1462,14 +1460,15 @@ loadFrameworks interp platform pkg
 -- For GHCi we tend to prefer dynamic libraries over static ones as
 -- they are easier to load and manage, have less overhead.
 locateLib
-  :: Interp
-  -> HscEnv
+  :: Logger
+  -> Interp
+  -> DynFlags
   -> Bool
   -> [FilePath]
   -> [FilePath]
   -> String
   -> IO LibrarySpec
-locateLib interp hsc_env is_hs lib_dirs gcc_dirs lib
+locateLib logger interp dflags is_hs lib_dirs gcc_dirs lib
   | not is_hs
     -- For non-Haskell libraries (e.g. gmp, iconv):
     --   first look in library-dirs for a dynamic library (on User paths only)
@@ -1520,8 +1519,6 @@ locateLib interp hsc_env is_hs lib_dirs gcc_dirs lib
     assumeDll
 
    where
-     dflags = hsc_dflags hsc_env
-     logger = hsc_logger hsc_env
      dirs   = lib_dirs ++ gcc_dirs
      gcc    = False
      user   = True
