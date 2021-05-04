@@ -10,6 +10,7 @@ import GHC.Prelude
 import GHC.Hs
 import GHC.Types.FieldLabel
 import GHC.Builtin.Names
+import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcType
@@ -394,8 +395,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
              addUsedKids (ieWrappedName rdr) gres
              when (null gres) $
                   if isTyConName name
-                  then addDiagnostic (WarningWithFlag Opt_WarnDodgyExports)
-                                     (dodgyExportWarn name)
+                  then addTcRnDiagnostic (TcRnDodgyExports name)
                   else -- This occurs when you export T(..), but
                        -- only import T abstractly, or T is a synonym.
                        addErr (exportItemErr ie)
@@ -758,10 +758,6 @@ missingModuleExportWarn mod
           quotes (text "module" <+> ppr mod),
           text "is missing an export list"]
 
-
-dodgyExportWarn :: Name -> SDoc
-dodgyExportWarn item
-  = dodgyMsg (text "export") item (dodgyMsgInsert item :: IE GhcRn)
 
 exportErrCtxt :: Outputable o => String -> o -> SDoc
 exportErrCtxt herald exp =
