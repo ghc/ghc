@@ -618,7 +618,7 @@ finish_ambiguous_selector lr@(L _ rdr) parent_type
     do { addUsedGRE True gre
        ; keepAlive (greMangledName gre)
          -- See Note [Deprecating ambiguous fields]
-       ; warnIfFlag Opt_WarnAmbiguousFields True $
+       ; addDiagnostic (WarningWithFlag Opt_WarnAmbiguousFields) $
           vcat [ text "The field" <+> quotes (ppr rdr)
                    <+> text "belonging to type" <+> ppr parent_type
                    <+> text "is ambiguous."
