@@ -45,7 +45,7 @@ module GHC.Driver.Make (
 import GHC.Prelude
 
 import GHC.Tc.Utils.Backpack
-import GHC.Tc.Utils.Monad  ( initIfaceCheck )
+import GHC.Tc.Utils.Monad  ( initIfaceCheck, FrontendResult (..) )
 
 import GHC.Runtime.Interpreter
 import qualified GHC.Linker.Loader as Linker
@@ -1009,7 +1009,13 @@ data LogQueue = LogQueue !(IORef [Maybe (MessageClass, SrcSpan, SDoc)])
 
 -- | The graph of modules to compile and their corresponding result 'MVar' and
 -- 'LogQueue'.
-type CompilationGraph = [(ModuleGraphNode, MVar (SuccessFlag, HomePackageTable), LogQueue)]
+type CompilationGraph = [(ModuleGraphNode, CompilationResultMVars, LogQueue)]
+
+-- | Result of a single module's compilation
+type CompilationResult = (SuccessFlag, HomePackageTable)
+
+-- | Results from type checking, and backend codegen respectively
+type CompilationResultMVars = (MVar CompilationResult, MVar CompilationResult)
 
 -- | Build a 'CompilationGraph' out of a list of strongly-connected modules,
 -- also returning the first, if any, encountered module cycle.
@@ -1018,12 +1024,13 @@ buildCompGraph [] = return ([], Nothing)
 buildCompGraph (scc:sccs) = case scc of
     AcyclicSCC ms -> do
         mvar <- newEmptyMVar
+        mvar2 <- newEmptyMVar
         log_queue <- do
             ref <- newIORef []
             sem <- newEmptyMVar
             return (LogQueue ref sem)
         (rest,cycle) <- buildCompGraph sccs
-        return ((ms,mvar,log_queue):rest, cycle)
+        return ((ms,(mvar, mvar2),log_queue):rest, cycle)
     CyclicSCC mss -> return ([], Just mss)
 
 -- | A Module and whether it is a boot module.
@@ -1135,10 +1142,10 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods sccs = do
 
     -- Build a Map out of the compilation graph with which we can efficiently
     -- look up the result MVar associated with a particular home module.
-    let home_mod_map :: Map BuildModule (MVar (SuccessFlag, HomePackageTable), Int)
+    let home_mod_map :: Map BuildModule (CompilationResultMVars, Int)
         home_mod_map =
-            Map.fromList [ (mkBuildModule ms, (mvar, idx))
-                         | ((ms,mvar,_),idx) <- comp_graph_w_idx ]
+            Map.fromList [ (mkBuildModule ms, (mvars, idx))
+                         | ((ms,mvars,_),idx) <- comp_graph_w_idx ]
 
 
     liftIO $ label_self "main --make thread"
@@ -1150,7 +1157,7 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods sccs = do
 
     -- For each module in the module graph, spawn a worker thread that will
     -- compile this module.
-    let { spawnWorkers = forM comp_graph_w_idx $ \((mod,!mvar,!log_queue),!mod_idx) ->
+    let { spawnWorkers = forM comp_graph_w_idx $ \((mod,!(mvar1, mvar2),!log_queue),!mod_idx) ->
             forkIOWithUnmask $ \unmask -> do
                 liftIO $ label_self $ unwords $ concat
                     [ [ "worker --make thread" ]
@@ -1189,7 +1196,7 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods sccs = do
                       upsweep_inst lcl_hsc_env mHscMessage mod_idx (length sccs) iuid
                       pure (Succeeded, hsc_HPT lcl_hsc_env)
                     ModuleNode ems ->
-                      parUpsweep_one (emsModSummary ems) home_mod_map comp_graph_loops
+                      parUpsweep_one (emsModSummary ems) home_mod_map mvar1 comp_graph_loops
                                      dflags (hsc_home_unit hsc_env)
                                      mHscMessage
                                      par_sem lcl_hsc_env old_hpt_var
@@ -1206,8 +1213,13 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods sccs = do
                              (errorMsg lcl_logger dflags (text (show exc)))
                         return (Failed, hsc_HPT lcl_hsc_env)
 
-                -- Populate the result MVar.
-                putMVar mvar res
+                -- Populate the result MVars.
+
+                -- In case of some exception this could be empty. Its better to
+                -- try fill this in as well.
+                _ <- tryPutMVar mvar1 res
+
+                putMVar mvar2 res
 
                 -- Write the end marker to the message queue, telling the main
                 -- thread that it can stop waiting for messages from this
@@ -1228,9 +1240,9 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods sccs = do
     results <- liftIO $ MC.bracket spawnWorkers killWorkers $ \_ ->
         -- Loop over each module in the compilation graph in order, printing
         -- each message from its log_queue.
-        forM comp_graph $ \(mod,mvar,log_queue) -> do
+        forM comp_graph $ \(mod,(_,mvar2),log_queue) -> do
             printLogs logger dflags log_queue
-            (result, hpt) <- readMVar mvar
+            (result, hpt) <- readMVar mvar2
             if succeeded result then return (Just (mod, hpt)) else return Nothing
 
 
@@ -1288,8 +1300,10 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods sccs = do
 parUpsweep_one
     :: ModSummary
     -- ^ The module we wish to compile
-    -> Map BuildModule (MVar (SuccessFlag, HomePackageTable), Int)
-    -- ^ The map of home modules and their result MVar
+    -> Map BuildModule (CompilationResultMVars, Int)
+    -- ^ The map of home modules and their result MVars
+    -> MVar CompilationResult
+    -- ^ Current module's typechecking result MVar
     -> [[BuildModule]]
     -- ^ The list of all module loops within the compilation graph.
     -> DynFlags
@@ -1310,89 +1324,115 @@ parUpsweep_one
     -- ^ The index of this module
     -> Int
     -- ^ The total number of modules
-    -> IO (SuccessFlag, HomePackageTable)
+    -> IO CompilationResult
     -- ^ The result of this compile
-parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags home_unit mHscMessage par_sem
+parUpsweep_one mod home_mod_map self_tc_res_mvar comp_graph_loops lcl_dflags home_unit mHscMessage par_sem
                hsc_env0 old_hpt_var stable_mods mod_index num_mods = do
 
     -- Wait for the all the module's dependencies to finish building.
-    deps_res <- mapM readMVar home_deps
+    deps_res1 <- mapM readMVar home_deps_mvars1
 
-    let hsc_env1 = foldr updateHPT hsc_env0 (map snd deps_res)
+    let hsc_env1 = foldr updateHPT hsc_env0 (map snd deps_res1)
 
     -- We can't build this module if any of its dependencies failed to build.
-    if not (all (succeeded . fst) deps_res)
-      then return (Failed, hsc_HPT hsc_env1)
+    if not (all (succeeded . fst) deps_res1)
+      then do
+        putMVar self_tc_res_mvar (Failed, hsc_HPT hsc_env1)
+        return (Failed, hsc_HPT hsc_env1)
       else do
         old_hpt <- readIORef old_hpt_var
 
-        withSem $ handleSourceError (\err -> do logg err; return (Failed, hsc_HPT hsc_env1)) $ do
-          res <- do
-            -- Re-typecheck the loop
-            -- This is necessary to make sure the knot is tied when
-            -- we close a recursive module loop, see bug #12035.
-            type_env_var <- liftIO $ newIORef emptyNameEnv
-            let hsc_env2 = hsc_env1 { hsc_type_env_var =
-                                Just (ms_mod mod, type_env_var) }
-            hsc_env3 <- case finish_loop of
-                Nothing   -> return hsc_env2
-                -- In the non-parallel case, the retypecheck prior to
-                -- typechecking the loop closer includes all modules
-                -- EXCEPT the loop closer.  However, our precomputed
-                -- SCCs include the loop closer, so we have to filter
-                -- it out.
-                Just loop -> typecheckLoop lcl_dflags hsc_env2 $
-                             filter (/= moduleName (gwib_mod this_build_mod)) $
-                             map (moduleName . gwib_mod) loop
+        let handleTcErrors = handleSourceError
+              (\err -> do logg err;
+                          putMVar self_tc_res_mvar (Failed, hsc_HPT hsc_env1);
+                          return Nothing)
 
-            -- Compile the module.
-            status <- checkStableModules hsc_env3 old_hpt stable_mods mod
-            case status of
-              Stable hmi -> return $ Left hmi
-              NotStable src_modified mb_old_iface mb_old_linkable -> do
-                (plugin_hsc_env, source_modified) <- compileOneInit hsc_env3 mod src_modified
+        mRes <- withSem $ handleTcErrors $ (Just <$>) $ do
+          -- Re-typecheck the loop
+          -- This is necessary to make sure the knot is tied when
+          -- we close a recursive module loop, see bug #12035.
+          type_env_var <- liftIO $ newIORef emptyNameEnv
+          let hsc_env2 = hsc_env1 { hsc_type_env_var =
+                              Just (ms_mod mod, type_env_var) }
+          hsc_env3 <- case finish_loop of
+              Nothing   -> return hsc_env2
+              -- In the non-parallel case, the retypecheck prior to
+              -- typechecking the loop closer includes all modules
+              -- EXCEPT the loop closer.  However, our precomputed
+              -- SCCs include the loop closer, so we have to filter
+              -- it out.
+              Just loop -> typecheckLoop lcl_dflags hsc_env2 $
+                           filter (/= moduleName (gwib_mod this_build_mod)) $
+                           map (moduleName . gwib_mod) loop
 
-                status <- hscRecompStatus mHscMessage plugin_hsc_env mod
-                     source_modified mb_old_iface (mod_index, num_mods)
+          -- Compile the module.
+          status <- checkStableModules hsc_env3 old_hpt stable_mods mod
+          res <- case status of
+            Stable hmi -> return $ Left hmi
+            NotStable src_modified mb_old_iface mb_old_linkable -> do
+              (plugin_hsc_env, source_modified) <- compileOneInit hsc_env3 mod src_modified
 
-                case status of
-                  HscUpToDate iface -> do
-                    MASSERT( isJust mb_old_linkable || isNoLink (ghcLink $ hsc_dflags plugin_hsc_env) )
-                    -- See Note [ModDetails and --make mode]
-                    details <- initModDetails plugin_hsc_env mod iface
-                    return $! Left $! HomeModInfo iface details mb_old_linkable
-                  HscRecompNeeded mb_old_hash -> do
-                    (tc_result, warnings) <- hscTypecheckAndGetWarnings plugin_hsc_env mod
-                    return $ Right (plugin_hsc_env, tc_result, warnings, mb_old_hash)
+              status <- hscRecompStatus mHscMessage plugin_hsc_env mod
+                   source_modified mb_old_iface (mod_index, num_mods)
+
+              case status of
+                HscUpToDate iface -> do
+                  MASSERT( isJust mb_old_linkable || isNoLink (ghcLink $ hsc_dflags plugin_hsc_env) )
+                  -- See Note [ModDetails and --make mode]
+                  details <- initModDetails plugin_hsc_env mod iface
+                  return $! Left $! HomeModInfo iface details mb_old_linkable
+                HscRecompNeeded mb_old_hash -> do
+                  (tc_result, warnings) <- hscTypecheckAndGetWarnings plugin_hsc_env mod
+                  let FrontendTypecheck tc_result' = tc_result
+                  (iface, _, details) <- hscSimpleIface plugin_hsc_env tc_result' Nothing
+                  let hmi = HomeModInfo iface details Nothing
+                  -- In the rest of the pipeline use the loaded plugins
+                  -- "driver" plugins may have modified the DynFlags so we update them
+                  let plugin_modifications = ( hsc_plugins plugin_hsc_env
+                                             , hsc_static_plugins plugin_hsc_env
+                                             , hsc_dflags plugin_hsc_env)
+                  return $ Right (plugin_modifications, tc_result, warnings, mb_old_hash, hmi)
 
           -- Prune the old HPT unless this is an hs-boot module.
           unless (isBootSummary mod == IsBoot) $
               atomicModifyIORef' old_hpt_var $ \old_hpt ->
                   (delFromHpt old_hpt this_mod, ())
 
-          mod_info <- case res of
-            Left hmi -> return hmi
-            Right (plugin_hsc_env, tc_result, warnings, mb_old_hash) ->
-              compileOnePostTc plugin_hsc_env mod tc_result warnings mb_old_hash
+          let mod_info = case res of
+                           Left hmi -> hmi
+                           Right (_,_,_,_, hmi) -> hmi
 
-          hsc_env5 <- do
-              let hsc_env4 = hscUpdateHPT (\hpt -> addToHpt hpt this_mod mod_info)
-                                          hsc_env1
+          hsc_env4 <- addModInfoAndTypecheckLoop hsc_env1 mod_info
 
-              -- We've finished typechecking the module, now we must
-              -- retypecheck the loop AGAIN to ensure unfoldings are
-              -- updated.  This time, however, we include the loop
-              -- closer!
-              case finish_loop of
-                  Nothing   -> return hsc_env4
-                  Just loop -> typecheckLoop lcl_dflags hsc_env4 $
-                               map (moduleName . gwib_mod) loop
+          putMVar self_tc_res_mvar (Succeeded, hsc_HPT hsc_env4)
 
-          -- Clean up any intermediate files.
-          cleanCurrentModuleTempFiles (hsc_logger hsc_env5)
-                                      (hsc_tmpfs  hsc_env5)
-                                      (hsc_dflags hsc_env5)
-          return (Succeeded, hsc_HPT hsc_env5)
+          return (res, hsc_env4)
+
+        case mRes of
+          Nothing -> return (Failed, hsc_HPT hsc_env1)
+          Just (res, hsc_env4) -> case res of
+            Left _ -> return (Succeeded, hsc_HPT hsc_env4)
+            Right (plugin_modifications, tc_result, warnings, mb_old_hash, _) -> do
+              deps_res2 <- mapM readMVar home_deps_mvars2
+
+              if not (all (succeeded . fst) deps_res2)
+                then return (Failed, hsc_HPT hsc_env4)
+                else withSem $ handleSourceError (\err -> do logg err; return (Failed, hsc_HPT hsc_env4)) $ do
+                  let hsc_env5' = foldr updateHPT hsc_env4 (map snd deps_res2)
+                      hsc_env5 = hsc_env5' { hsc_plugins        = fstOf3 plugin_modifications
+                                           , hsc_static_plugins = sndOf3 plugin_modifications
+                                           , hsc_dflags         = thdOf3 plugin_modifications
+                                           }
+
+                  mod_info <- compileOnePostTc hsc_env5 mod tc_result warnings mb_old_hash
+
+                  hsc_env6 <- addModInfoAndTypecheckLoop hsc_env5 mod_info
+
+                  -- Clean up any intermediate files.
+                  cleanCurrentModuleTempFiles (hsc_logger hsc_env6)
+                                              (hsc_tmpfs  hsc_env6)
+                                              (hsc_dflags hsc_env6)
+                  return (Succeeded, hsc_HPT hsc_env6)
 
   where
     -- Update/merge the HPT, while avoiding the overwrite of HomeModeInfo of
@@ -1407,6 +1447,20 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags home_unit mHscMessag
           _ -> addNewV
         where modName = moduleName $ mi_module $ hm_iface $ newV
               addNewV = addToHpt oldHpt modName newV
+
+    -- fixup our HomePackageTable after we've finished compiling
+    -- a mutually-recursive loop.  We have to do this again
+    -- to make sure we have the final unfoldings, which may
+    -- not have been computed accurately in the previous
+    -- retypecheck.
+    addModInfoAndTypecheckLoop hsc_env mod_info = do
+      let hsc_env' = hscUpdateHPT (\hpt -> addToHpt hpt this_mod mod_info)
+                              hsc_env
+
+      case finish_loop of
+          Nothing   -> return hsc_env'
+          Just loop -> typecheckLoop lcl_dflags hsc_env' $
+                       map (moduleName . gwib_mod) loop
 
     -- Limit the number of parallel compiles.
     withSem :: IO a -> IO a
@@ -1503,6 +1557,14 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags home_unit mHscMessag
     -- subsequent dependencies are more likely to have finished. This step
     -- effectively reduces the number of MVars that each thread blocks on.
     home_deps = map fst $ sortBy (flip (comparing snd)) home_deps_with_idx
+
+    -- First set of MVars are filled in after typechecking
+    home_deps_mvars1 = if isTemplateHaskellOrQQNonBoot mod
+      then home_deps_mvars2 -- with TH, wait for deps to complete codegen
+      else map fst home_deps
+
+    -- Second set of MVars are filled in after completing codegen
+    home_deps_mvars2 = map snd home_deps
 
     lcl_logger = hsc_logger hsc_env0
 
