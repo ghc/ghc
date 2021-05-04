@@ -40,12 +40,13 @@ import GHC.Core.FVs       ( exprFreeVars, exprsFreeVars, bindFreeVars
                           , rulesFreeVarsDSet, exprsOrphNames, exprFreeVarsList )
 import GHC.Core.Utils     ( exprType, eqExpr, mkTick, mkTicks
                           , stripTicksTopT, stripTicksTopE
-                          , isJoinBind )
+                          , isJoinBind, mkCastMCo )
 import GHC.Core.Ppr       ( pprRules )
 import GHC.Core.Type as Type
    ( Type, TCvSubst, extendTvSubst, extendCvSubst
-   , mkEmptyTCvSubst, substTy )
+   , mkEmptyTCvSubst, substTy, getTyVar_maybe )
 import GHC.Tc.Utils.TcType  ( tcSplitTyConApp_maybe )
+import GHC.Core.TyCo.Subst( mkTCvSubst )
 import GHC.Builtin.Types    ( anyTypeOfKind )
 import GHC.Core.Coercion as Coercion
 import GHC.Core.Tidy     ( tidyRules )
@@ -545,7 +546,7 @@ matchN  :: InScopeEnv
 -- Fail if there are two few actual arguments from the target to match the template
 
 matchN (in_scope, id_unf) rule_name tmpl_vars tmpl_es target_es rhs
-  = do  { rule_subst <- go init_menv emptyRuleSubst tmpl_es target_es
+  = do  { rule_subst <- match_exprs init_menv emptyRuleSubst tmpl_es target_es
         ; let (_, matched_es) = mapAccumL (lookup_tmpl rule_subst)
                                           (mkEmptyTCvSubst in_scope) $
                                 tmpl_vars `zip` tmpl_vars1
@@ -561,11 +562,6 @@ matchN (in_scope, id_unf) rule_name tmpl_vars tmpl_es target_es rhs
                    , rv_lcl   = init_rn_env
                    , rv_fltR  = mkEmptySubst (rnInScopeSet init_rn_env)
                    , rv_unf   = id_unf }
-
-    go _    subst []     _      = Just subst
-    go _    _     _      []     = Nothing       -- Fail if too few actual args
-    go menv subst (t:ts) (e:es) = do { subst1 <- match menv subst t e
-                                     ; go menv subst1 ts es }
 
     lookup_tmpl :: RuleSubst -> TCvSubst -> (InVar,OutVar) -> (TCvSubst, CoreExpr)
                    -- Need to return a RuleSubst solely for the benefit of mk_fake_ty
@@ -704,6 +700,10 @@ data RuleSubst = RS { rs_tv_subst :: TvSubstEnv   -- Range is the
                     , rs_bndrs    :: VarSet       -- Variables bound by floated lets
                     }
 
+matchTCvSubst :: RuleMatchEnv -> RuleSubst -> TCvSubst
+matchTCvSubst (RV { rv_lcl = rn_env }) (RS { rs_tv_subst = tv_subst })
+  = mkTCvSubst (rnInScopeSet rn_env) (tv_subst, emptyCvSubstEnv)
+
 type BindWrapper = CoreExpr -> CoreExpr
   -- See Notes [Matching lets] and [Matching cases]
   -- we represent the floated bindings as a core-to-core function
@@ -724,19 +724,29 @@ match :: RuleMatchEnv
       -> RuleSubst
       -> CoreExpr               -- Template
       -> CoreExpr               -- Target
+      -> MCoercion
       -> Maybe RuleSubst
+-- Invariant: typeof( subst(template) ) = typeof( target |> mco )
 
 -- We look through certain ticks. See Note [Tick annotations in RULE matching]
-match renv subst e1 (Tick t e2)
+match renv subst e1 (Tick t e2) mco
   | tickishFloatable t
-  = match renv subst' e1 e2
+  = match renv subst' e1 e2 mco
   where subst' = subst { rs_binds = rs_binds subst . mkTick t }
-match renv subst (Tick t e1) e2
+match renv subst (Tick t e1) e2 mco
   -- Ignore ticks in rule template.
   | tickishFloatable t
-  =  match renv subst e1 e2
-match _ _ e@Tick{} _
+  =  match renv subst e1 e2 mco
+match _ _ e@Tick{} _ _
   = pprPanic "Tick in rule" (ppr e)
+
+match renv subst e1 (Cast e2 co2) mco
+  = match renv subst e1 e2 (mkTransMCoR co2 mco)
+
+match renv subst (Cast e1 co1) e2 mco
+  = match renv subst e1 e2 (mkTransMCoL mco (mkSymCo co1'))
+  where
+    co1' = Coercion.substCo (matchTCvSubst renv subst) co1
 
 -- See the notes with Unify.match, which matches types
 -- Everything is very similar for terms
@@ -754,13 +764,13 @@ match _ _ e@Tick{} _
 -- succeed in matching what looks like the template variable 'a' against 3.
 
 -- The Var case follows closely what happens in GHC.Core.Unify.match
-match renv subst (Var v1) e2
-  = match_var renv subst v1 e2
+match renv subst (Var v1) e2 mco
+  = match_var renv subst v1 (mkCastMCo e2 mco)
 
-match renv subst e1 (Var v2)      -- Note [Expanding variables]
-  | not (inRnEnvR rn_env v2) -- Note [Do not expand locally-bound variables]
+match renv subst e1 (Var v2) mco  -- Note [Expanding variables]
+  | not (inRnEnvR rn_env v2)      -- Note [Do not expand locally-bound variables]
   , Just e2' <- expandUnfolding_maybe (rv_unf renv v2')
-  = match (renv { rv_lcl = nukeRnEnvR rn_env }) subst e1 e2'
+  = match (renv { rv_lcl = nukeRnEnvR rn_env }) subst e1 e2' mco
   where
     v2'    = lookupRnInScope rn_env v2
     rn_env = rv_lcl renv
@@ -769,14 +779,14 @@ match renv subst e1 (Var v2)      -- Note [Expanding variables]
         -- No need to apply any renaming first (hence no rnOccR)
         -- because of the not-inRnEnvR
 
-match renv subst e1 (Let bind e2)
+match renv subst e1 (Let bind e2) mco
   | -- pprTrace "match:Let" (vcat [ppr bind, ppr $ okToFloat (rv_lcl renv) (bindFreeVars bind)]) $
     not (isJoinBind bind) -- can't float join point out of argument position
   , okToFloat (rv_lcl renv) (bindFreeVars bind) -- See Note [Matching lets]
   = match (renv { rv_fltR = flt_subst' })
           (subst { rs_binds = rs_binds subst . Let bind'
                  , rs_bndrs = extendVarSetList (rs_bndrs subst) new_bndrs })
-          e1 e2
+          e1 e2 mco
   where
     flt_subst = addInScopeSet (rv_fltR renv) (rs_bndrs subst)
     (flt_subst', bind') = substBind flt_subst bind
@@ -797,40 +807,83 @@ match renv (tv_subst, id_subst, binds) e1
     case_wrap rhs' = Case scrut case_bndr ty [(con, alt_bndrs, rhs')]
 -}
 
-match _ subst (Lit lit1) (Lit lit2)
+match _ subst (Lit lit1) (Lit lit2) _mco
   | lit1 == lit2
   = Just subst
 
-match renv subst (App f1 a1) (App f2 a2)
-  = do  { subst' <- match renv subst f1 f2
-        ; match renv subst' a1 a2 }
+match renv subst (App f1 a1) e2 _mco
+  | Just (renv',f2,a2) <- split_app renv e2
+  = match_app renv' subst f1 [a1] f2 [a2]
 
-match renv subst (Lam x1 e1) e2
+match renv subst (Lam x1 e1) e2 MRefl
+  -- ToDo: improve the MRefl
   | Just (x2, e2, ts) <- exprIsLambda_maybe (rvInScopeEnv renv) e2
   = let renv' = renv { rv_lcl = rnBndr2 (rv_lcl renv) x1 x2
                      , rv_fltR = delBndr (rv_fltR renv) x2 }
         subst' = subst { rs_binds = rs_binds subst . flip (foldr mkTick) ts }
-    in  match renv' subst' e1 e2
+    in  match renv' subst' e1 e2 MRefl
 
-match renv subst (Case e1 x1 ty1 alts1) (Case e2 x2 ty2 alts2)
+match renv subst (Case e1 x1 ty1 alts1) (Case e2 x2 ty2 alts2) mco
   = do  { subst1 <- match_ty renv subst ty1 ty2
-        ; subst2 <- match renv subst1 e1 e2
+        ; subst2 <- match renv subst1 e1 e2 MRefl
         ; let renv' = rnMatchBndr2 renv subst x1 x2
-        ; match_alts renv' subst2 alts1 alts2   -- Alts are both sorted
+        ; match_alts renv' subst2 alts1 alts2 mco   -- Alts are both sorted
         }
 
-match renv subst (Type ty1) (Type ty2)
+match renv subst (Type ty1) (Type ty2) _mco
   = match_ty renv subst ty1 ty2
-match renv subst (Coercion co1) (Coercion co2)
+match renv subst (Coercion co1) (Coercion co2) _mco
   = match_co renv subst co1 co2
 
-match renv subst (Cast e1 co1) (Cast e2 co2)
-  = do  { subst1 <- match_co renv subst co1 co2
-        ; match renv subst1 e1 e2 }
-
 -- Everything else fails
-match _ _ _e1 _e2 = -- pprTrace "Failing at" ((text "e1:" <+> ppr _e1) $$ (text "e2:" <+> ppr _e2)) $
-                    Nothing
+match _ _ _e1 _e2 _mco = -- pprTrace "Failing at" ((text "e1:" <+> ppr _e1) $$ (text "e2:" <+> ppr _e2)) $
+                         Nothing
+
+match_app :: RuleMatchEnv -> RuleSubst
+          -> CoreExpr -> [CoreExpr]
+          -> CoreExpr -> [CoreExpr]
+          -> Maybe RuleSubst
+match_app renv subst (App f1 a1) as1 e2 as2
+  | Just (renv',f2,a2) <- split_app renv e2
+  = match_app renv' subst f1 (a1:as1) f2 (a2:as2)
+match_app renv subst f1 as1 f2 as2
+  = do { subst1 <- match_ty renv subst  (exprType f1) (exprType f2)
+       ; subst2 <- match    renv subst1 f1 f2 MRefl
+       ; match_exprs renv subst2 as1 as2 }
+
+split_app :: RuleMatchEnv -> CoreExpr
+          -> Maybe (RuleMatchEnv, CoreExpr, CoreExpr)
+
+split_app renv (App f a)  = Just (renv, f, a)
+split_app renv (Cast e _) = split_app renv e
+
+split_app renv (Lam v b)  = go renv [v] b
+  where
+    go renv vs (Lam v b) = go renv (v:vs) b
+    go renv [] e         = split_app renv e
+    go renv (v:vs) (App f arg)
+      | Var v' <- arg, v==v'
+      = go (rn_bndr renv v) vs f
+    go renv (v:vs) (App f (Type ty))
+      | Just tv <- getTyVar_maybe ty, v==tv
+      = go (rn_bndr renv v) vs f
+    go _ _ _ = Nothing
+
+    -- Ensure that there are no name clashes on v
+    rn_bndr renv v = renv { rv_lcl = fst (rnBndrR (rv_lcl renv) v) }
+
+split_app _ _ = Nothing
+
+match_exprs :: RuleMatchEnv -> RuleSubst
+            -> [CoreExpr]
+            -> [CoreExpr]
+            -> Maybe RuleSubst
+match_exprs _ subst [] []
+  = Just subst
+match_exprs renv subst (e1:es1) (e2:es2)
+  = do { subst' <- match renv subst e1 e2 MRefl
+       ; match_exprs renv subst' es1 es2 }
+match_exprs _ _ _ _ = Nothing
 
 -------------
 match_co :: RuleMatchEnv
@@ -890,20 +943,20 @@ rnMatchBndr2 renv subst x1 x2
 ------------------------------------------
 match_alts :: RuleMatchEnv
            -> RuleSubst
-           -> [CoreAlt]         -- Template
-           -> [CoreAlt]         -- Target
+           -> [CoreAlt]                 -- Template
+           -> [CoreAlt] -> MCoercion    -- Target
            -> Maybe RuleSubst
-match_alts _ subst [] []
+match_alts _ subst [] [] _
   = return subst
-match_alts renv subst (Alt c1 vs1 r1:alts1) (Alt c2 vs2 r2:alts2)
+match_alts renv subst (Alt c1 vs1 r1:alts1) (Alt c2 vs2 r2:alts2) mco
   | c1 == c2
-  = do  { subst1 <- match renv' subst r1 r2
-        ; match_alts renv subst1 alts1 alts2 }
+  = do  { subst1 <- match renv' subst r1 r2 mco
+        ; match_alts renv subst1 alts1 alts2 mco }
   where
     renv' = foldl' mb renv (vs1 `zip` vs2)
     mb renv (v1,v2) = rnMatchBndr2 renv subst v1 v2
 
-match_alts _ _ _ _
+match_alts _ _ _ _ _
   = Nothing
 
 ------------------------------------------
@@ -916,16 +969,16 @@ okToFloat rn_env bind_fvs
 ------------------------------------------
 match_var :: RuleMatchEnv
           -> RuleSubst
-          -> Var                -- Template
-          -> CoreExpr        -- Target
+          -> Var        -- Template
+          -> CoreExpr   -- Target
           -> Maybe RuleSubst
 match_var renv@(RV { rv_tmpls = tmpls, rv_lcl = rn_env, rv_fltR = flt_env })
           subst v1 e2
   | v1' `elemVarSet` tmpls
   = match_tmpl_var renv subst v1' e2
 
-  | otherwise   -- v1' is not a template variable; check for an exact match with e2
-  = case e2 of  -- Remember, envR of rn_env is disjoint from rv_fltR
+  | otherwise     -- v1' is not a template variable; check for an exact match with e2
+  = case e2 of    -- Remember, envR of rn_env is disjoint from rv_fltR
        Var v2 | v1' == rnOccR rn_env v2
               -> Just subst
 
@@ -946,7 +999,7 @@ match_var renv@(RV { rv_tmpls = tmpls, rv_lcl = rn_env, rv_fltR = flt_env })
 match_tmpl_var :: RuleMatchEnv
                -> RuleSubst
                -> Var                -- Template
-               -> CoreExpr              -- Target
+               -> CoreExpr           -- Target
                -> Maybe RuleSubst
 
 match_tmpl_var renv@(RV { rv_lcl = rn_env, rv_fltR = flt_env })
@@ -1272,7 +1325,7 @@ ruleAppCheck_help env fn args rules
                               not (isJust (match_fn rule_arg arg))]
 
           lhs_fvs = exprsFreeVars rule_args     -- Includes template tyvars
-          match_fn rule_arg arg = match renv emptyRuleSubst rule_arg arg
+          match_fn rule_arg arg = match renv emptyRuleSubst rule_arg arg MRefl
                 where
                   in_scope = mkInScopeSet (lhs_fvs `unionVarSet` exprFreeVars arg)
                   renv = RV { rv_lcl   = mkRnEnv2 in_scope
