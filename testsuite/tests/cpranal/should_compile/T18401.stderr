@@ -1,34 +1,34 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 54, types: 101, coercions: 0, joins: 0/0}
+Result size of Tidy Core = {terms: 52, types: 86, coercions: 0, joins: 0/0}
 
 Rec {
--- RHS size: {terms: 20, types: 31, coercions: 0, joins: 0/0}
-T18401.safeInit_$spoly_$wgo1 :: forall {a}. a -> [a] -> (# Bool, [a] #)
-T18401.safeInit_$spoly_$wgo1
-  = \ (@a_aO1) (sc_s17W :: a_aO1) (sc1_s17V :: [a_aO1]) ->
-      case sc1_s17V of {
-        [] -> (# GHC.Types.True, GHC.Types.[] @a_aO1 #);
-        : y_a158 ys_a159 -> (# GHC.Types.True, GHC.Types.: @a_aO1 sc_s17W (case T18401.safeInit_$spoly_$wgo1 @a_aO1 y_a158 ys_a159 of { (# ww_s17y, ww1_s17z #) -> ww1_s17z }) #)
+-- RHS size: {terms: 18, types: 24, coercions: 0, joins: 0/0}
+T18401.$w$spoly_$wgo1 :: forall {a}. a -> [a] -> (# [a] #)
+T18401.$w$spoly_$wgo1
+  = \ (@a_s18C) (w_s18D :: a_s18C) (w1_s18E :: [a_s18C]) ->
+      case w1_s18E of {
+        [] -> (# GHC.Types.[] @a_s18C #);
+        : y_a15b ys_a15c -> (# GHC.Types.: @a_s18C w_s18D (case T18401.$w$spoly_$wgo1 @a_s18C y_a15b ys_a15c of { (# ww_s18J #) -> ww_s18J }) #)
       }
 end Rec }
 
--- RHS size: {terms: 17, types: 25, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 17, types: 22, coercions: 0, joins: 0/0}
 si :: forall a. [a] -> (Bool, [a])
 si
-  = \ (@a_s17i) (w_s17j :: [a_s17i]) ->
-      case w_s17j of {
-        [] -> (GHC.Types.False, GHC.Types.[] @a_s17i);
-        : y_a158 ys_a159 -> (GHC.Types.True, case T18401.safeInit_$spoly_$wgo1 @a_s17i y_a158 ys_a159 of { (# ww_X3, ww1_X4 #) -> ww1_X4 })
+  = \ (@a_s17T) (w_s17U :: [a_s17T]) ->
+      case w_s17U of {
+        [] -> (GHC.Types.False, GHC.Types.[] @a_s17T);
+        : y_a15b ys_a15c -> (GHC.Types.True, case T18401.$w$spoly_$wgo1 @a_s17T y_a15b ys_a15c of { (# ww_s18J #) -> ww_s18J })
       }
 
--- RHS size: {terms: 14, types: 22, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 14, types: 19, coercions: 0, joins: 0/0}
 safeInit :: forall a. [a] -> Maybe [a]
 safeInit
-  = \ (@a_aO1) (xs_aus :: [a_aO1]) ->
-      case xs_aus of {
-        [] -> GHC.Maybe.Nothing @[a_aO1];
-        : y_a158 ys_a159 -> GHC.Maybe.Just @[a_aO1] (case T18401.safeInit_$spoly_$wgo1 @a_aO1 y_a158 ys_a159 of { (# ww_X3, ww1_X4 #) -> ww1_X4 })
+  = \ (@a_aPB) (xs_aut :: [a_aPB]) ->
+      case xs_aut of {
+        [] -> GHC.Maybe.Nothing @[a_aPB];
+        : y_a15b ys_a15c -> GHC.Maybe.Just @[a_aPB] (case T18401.$w$spoly_$wgo1 @a_aPB y_a15b ys_a15c of { (# ww_s18J #) -> ww_s18J })
       }
 
 
