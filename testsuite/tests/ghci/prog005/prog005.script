@@ -7,8 +7,7 @@
 -- eval something that isn't exported from B
 z
 
-:!sleep 1
-:!touch A.hs
+:!echo >> A.hs
 :reload
 
 -- A should be recompiled, B will be skipped.  We should still have
