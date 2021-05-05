@@ -34,8 +34,8 @@ pm [InlPrag=[final]] :: Int -> Int -> (Int, Int)
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
          Tmpl= \ (w [Occ=Once1] :: Int) (w1 [Occ=Once1] :: Int) ->
-                 case T10694.$wpm w w1 of { (# ww1 [Occ=Once1], ww2 [Occ=Once1] #) -> (ww1, ww2) }}]
-pm = \ (w :: Int) (w1 :: Int) -> case T10694.$wpm w w1 of { (# ww1, ww2 #) -> (ww1, ww2) }
+                 case T10694.$wpm w w1 of { (# ww [Occ=Once1], ww1 [Occ=Once1] #) -> (ww, ww1) }}]
+pm = \ (w :: Int) (w1 :: Int) -> case T10694.$wpm w w1 of { (# ww, ww1 #) -> (ww, ww1) }
 
 -- RHS size: {terms: 8, types: 9, coercions: 0, joins: 0/0}
 m :: Int -> Int -> Int
@@ -45,7 +45,7 @@ m :: Int -> Int -> Int
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
          Tmpl= \ (x [Occ=Once1] :: Int) (y [Occ=Once1] :: Int) -> case pm x y of { (_ [Occ=Dead], mr [Occ=Once1]) -> mr }}]
-m = \ (x :: Int) (y :: Int) -> case T10694.$wpm x y of { (# ww1, ww2 #) -> ww2 }
+m = \ (x :: Int) (y :: Int) -> case T10694.$wpm x y of { (# ww, ww1 #) -> ww1 }
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T10694.$trModule4 :: GHC.Prim.Addr#
