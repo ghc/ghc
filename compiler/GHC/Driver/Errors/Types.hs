@@ -3,6 +3,8 @@
 module GHC.Driver.Errors.Types (
     GhcMessage(..)
   , DriverMessage(..), DriverMessages
+  , BuildingCabalPackage(..)
+  , InstantiationSuggestion(..)
   , WarningMessages
   , ErrorMessages
   , WarnMsg
@@ -12,18 +14,22 @@ module GHC.Driver.Errors.Types (
   , hoistTcRnMessage
   , hoistDsMessage
   , foldPsMessages
+  , checkBuildingCabalPackage
   ) where
 
 import GHC.Prelude
 
+import Data.Bifunctor
 import Data.Typeable
+
+import GHC.Driver.Session
 import GHC.Types.Error
+import GHC.Unit.Module
 
 import GHC.Parser.Errors       ( PsErrorDesc, PsHint )
 import GHC.Parser.Errors.Types ( PsMessage )
 import GHC.Tc.Errors.Types     ( TcRnMessage )
 import GHC.HsToCore.Errors.Types ( DsMessage )
-import Data.Bifunctor
 
 -- | A collection of warning messages.
 -- /INVARIANT/: Each 'GhcMessage' in the collection should have 'SevWarning' severity.
@@ -105,16 +111,129 @@ hoistTcRnMessage = fmap (first (fmap GhcTcRnMessage))
 hoistDsMessage :: Monad m => m (Messages DsMessage, a) -> m (Messages GhcMessage, a)
 hoistDsMessage = fmap (first (fmap GhcDsMessage))
 
--- | A message from the driver.
-data DriverMessage
-  = DriverUnknownMessage !DiagnosticMessage
-  -- ^ Simply rewraps a generic 'DiagnosticMessage'. More
-  -- constructors will be added in the future (#18516).
-  | DriverPsHeaderMessage !PsErrorDesc ![PsHint]
-  -- ^ A parse error in parsing a Haskell file header during dependency
-  -- analysis
-
 -- | A collection of driver messages
 type DriverMessages = Messages DriverMessage
 
--- | A message about Safe Haskell.
+-- | A message from the driver.
+data DriverMessage where
+  -- | Simply wraps a generic 'DiagnosticMessage'.
+  DriverUnknownMessage :: (Diagnostic a, Typeable a) => a -> DriverMessage
+
+  -- | A parse error in parsing a Haskell file header during dependency
+  -- analysis
+  DriverPsHeaderMessage :: !PsErrorDesc -> ![PsHint] -> DriverMessage
+
+  {-| DriverMissingHomeModules is a warning (controlled with -Wmissing-home-modules) that
+      arises when running GHC in --make mode when some modules needed for compilation
+      are not included on the command line. For example, if A imports B, `ghc --make
+      A.hs` will cause this warning, while `ghc --make A.hs B.hs` will not.
+
+      Useful for cabal to ensure GHC won't pick up modules listed neither in
+      'exposed-modules' nor in 'other-modules'.
+
+      Test case: warnings/should_compile/MissingMod
+
+  -}
+  DriverMissingHomeModules :: [ModuleName] -> !BuildingCabalPackage -> DriverMessage
+
+  {-| DriverUnusedPackages occurs when when package is requested on command line,
+      but was never needed during compilation. Activated by -Wunused-packages.
+
+     Test cases: warnings/should_compile/UnusedPackages
+  -}
+  DriverUnusedPackages :: [PackageArg] -> DriverMessage
+
+  {-| DriverUnnecessarySourceImports (controlled with -Wunused-imports) occurs if there
+      are {-# SOURCE #-} imports which are not necessary. See 'warnUnnecessarySourceImports'
+      in 'GHC.Driver.Make'.
+
+     Test cases: warnings/should_compile/T10637
+  -}
+  DriverUnnecessarySourceImports :: !ModuleName -> DriverMessage
+
+  {-| DriverDuplicatedModuleDeclaration occurs if a module 'A' is declared in
+       multiple files.
+
+     Test cases: None.
+  -}
+  DriverDuplicatedModuleDeclaration :: !Module -> [FilePath] -> DriverMessage
+
+  {-| DriverModuleNotFound occurs if a module 'A' can't be found.
+
+     Test cases: None.
+  -}
+  DriverModuleNotFound :: !ModuleName -> DriverMessage
+
+  {-| DriverFileModuleNameMismatch occurs if a module 'A' is defined in a file with a different name.
+      The first field is the name written in the source code; the second argument is the name extracted
+      from the filename.
+
+     Test cases: module/mod178, /driver/bug1677
+  -}
+  DriverFileModuleNameMismatch :: !ModuleName -> !ModuleName -> DriverMessage
+
+  {-| DriverUnexpectedSignature occurs when GHC encounters a module 'A' that imports a signature
+      file which is neither in the 'signatures' section of a '.cabal' file nor in any package in
+      the home modules.
+
+      Example:
+
+      -- MyStr.hsig is defined, but not added to 'signatures' in the '.cabal' file.
+      signature MyStr where
+          data Str
+
+      -- A.hs, which tries to import the signature.
+      module A where
+      import MyStr
+
+
+     Test cases: driver/T12955
+  -}
+  DriverUnexpectedSignature :: !ModuleName -> !BuildingCabalPackage -> [InstantiationSuggestion] -> DriverMessage
+
+  {-| DriverFileNotFound occurs when the input file (e.g. given on the command line) can't be found.
+
+     Test cases: None.
+  -}
+  DriverFileNotFound :: !FilePath -> DriverMessage
+
+  {-| DriverStaticPointersNotSupported occurs when the 'StaticPointers' extension is used
+       in an interactive GHCi context.
+
+     Test cases: ghci/scripts/StaticPtr
+  -}
+  DriverStaticPointersNotSupported :: DriverMessage
+
+  {-| DriverBackpackModuleNotFound occurs when Backpack can't find a particular module
+      during its dependency analysis.
+
+     Test cases: -
+  -}
+  DriverBackpackModuleNotFound :: !ModuleName -> DriverMessage
+
+-- | An 'InstantiationSuggestion' for a '.hsig' file. This is generated
+-- by GHC in case of a 'DriverUnexpectedSignature' and suggests a way
+-- to instantiate a particular signature, where the first argument is
+-- the signature name and the second is the module where the signature
+-- was defined.
+-- Example:
+--
+-- src/MyStr.hsig:2:11: error:
+--     Unexpected signature: ‘MyStr’
+--     (Try passing -instantiated-with="MyStr=<MyStr>"
+--      replacing <MyStr> as necessary.)
+data InstantiationSuggestion = InstantiationSuggestion !ModuleName !Module
+
+-- | Pass to a 'DriverMessage' the information whether or not the
+-- '-fbuilding-cabal-package' flag is set.
+data BuildingCabalPackage
+  = YesBuildingCabalPackage
+  | NoBuildingCabalPackage
+  deriving Eq
+
+-- | Checks if we are building a cabal package by consulting the 'DynFlags'.
+checkBuildingCabalPackage :: DynFlags -> BuildingCabalPackage
+checkBuildingCabalPackage dflags =
+  if gopt Opt_BuildingCabalPackage dflags
+     then YesBuildingCabalPackage
+     else NoBuildingCabalPackage
