@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeFamilies #-}
 module Hadrian.Oracles.Path (
-    lookupInPath, bashPath, fixAbsolutePathOnWindows, pathOracle
+    lookupInPath, fixAbsolutePathOnWindows, pathOracle
     ) where
 
 import Control.Monad
@@ -19,10 +19,6 @@ lookupInPath :: FilePath -> Action FilePath
 lookupInPath name
     | name == takeFileName name = askOracle $ LookupInPath name
     | otherwise                 = return name
-
--- | Lookup the path to the @bash@ interpreter.
-bashPath :: Action FilePath
-bashPath = lookupInPath "bash"
 
 -- | Fix an absolute path on Windows:
 -- * "/c/" => "C:/"
