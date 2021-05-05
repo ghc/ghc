@@ -30,7 +30,7 @@ module GHC.Iface.Load (
         needWiredInHomeIface, loadWiredInHomeIface,
 
         pprModIfaceSimple,
-        ifaceStats, pprModIface, showIface,
+        ifaceStats, pprModIface, showIface, computeInterface,
 
         module Iface_Errors -- avoids boot files in Ppr modules
    ) where
@@ -91,7 +91,6 @@ import GHC.Types.SourceText
 import GHC.Types.SourceFile
 import GHC.Types.SafeHaskell
 import GHC.Types.TypeEnv
-import GHC.Types.Unique.FM
 import GHC.Types.Unique.DSet
 import GHC.Types.SrcLoc
 import GHC.Types.TyThing
@@ -112,6 +111,7 @@ import GHC.Data.FastString
 
 import Control.Monad
 import Data.Map ( toList )
+import qualified Data.Set as Set
 import System.FilePath
 import System.Directory
 
@@ -767,6 +767,7 @@ moduleFreeHolesPrecise doc_str mod
                 return (Succeeded (renameFreeHoles ifhs insts))
             Failed err -> return (Failed err)
 
+
 wantHiBootFile :: HomeUnit -> ExternalPackageState -> Module -> WhereFrom
                -> MaybeErr SDoc IsBootInterface
 -- Figure out whether we want Foo.hi or Foo.hi-boot
@@ -789,11 +790,9 @@ wantHiBootFile home_unit eps mod from
              -- We never import boot modules from other packages!
 
           | otherwise
-          -> case lookupUFM (eps_is_boot eps) (moduleName mod) of
-                Just (GWIB { gwib_isBoot = is_boot }) ->
-                  Succeeded is_boot
-                Nothing ->
-                  Succeeded NotBoot
+          -> if Set.member (moduleName mod) (eps_is_boot eps)
+                then Succeeded IsBoot
+                else Succeeded NotBoot
                      -- The boot-ness of the requested interface,
                      -- based on the dependencies in directly-imported modules
 
@@ -1180,18 +1179,25 @@ pprUsageImport usage usg_mod'
 
 -- | Pretty-print unit dependencies
 pprDeps :: UnitState -> Dependencies -> SDoc
-pprDeps unit_state (Deps { dep_mods = mods, dep_pkgs = pkgs, dep_orphs = orphs,
-                           dep_finsts = finsts })
+pprDeps unit_state (Deps { dep_direct_mods = dmods
+                         , dep_source_mods = smods
+                         , dep_orphs = orphs
+                         , dep_direct_pkgs = pkgs
+                         , dep_trusted_pkgs = tps
+                         , dep_finsts = finsts
+                         , dep_plgins = plugins })
   = pprWithUnitState unit_state $
-    vcat [text "module dependencies:" <+> fsep (map ppr_mod mods),
-          text "package dependencies:" <+> fsep (map ppr_pkg pkgs),
+    vcat [text "direct module dependencies:" <+> fsep (map ppr_mod dmods),
+          text "source module dependencies:" <+> fsep (map ppr smods),
+          text "direct package dependencies:" <+> fsep (map ppr_pkg pkgs),
+          if null tps then empty else text "trusted package dependencies:" <+> fsep (map ppr_pkg pkgs),
           text "orphans:" <+> fsep (map ppr orphs),
+          text "plugins:" <+> fsep (map ppr plugins),
           text "family instance modules:" <+> fsep (map ppr finsts)
         ]
   where
     ppr_mod (GWIB { gwib_mod = mod_name, gwib_isBoot = boot }) = ppr mod_name <+> ppr_boot boot
-    ppr_pkg (pkg,trust_req)  = ppr pkg <>
-                               (if trust_req then text "*" else Outputable.empty)
+    ppr_pkg pkg  = ppr pkg
     ppr_boot IsBoot  = text "[boot]"
     ppr_boot NotBoot = Outputable.empty
 
