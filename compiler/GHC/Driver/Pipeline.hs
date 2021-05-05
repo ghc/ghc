@@ -16,6 +16,7 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE TupleSections #-}
 module GHC.Driver.Pipeline (
         -- Run a series of compilation steps in a pipeline, for a
         -- collection of source files.
@@ -83,7 +84,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import GHC.Settings
 
 import GHC.Data.Bag            ( unitBag )
-import GHC.Data.FastString     ( mkFastString )
+import GHC.Data.FastString     ( mkFastString, FastString )
 import GHC.Data.StringBuffer   ( hGetStringBuffer, hPutStringBuffer )
 import GHC.Data.Maybe          ( expectJust )
 
@@ -117,6 +118,8 @@ import Data.Version
 import Data.Either      ( partitionEithers )
 
 import Data.Time        ( getCurrentTime )
+import GHC.Driver.Dependencies
+import GHC.Types.Unique.FM
 
 -- ---------------------------------------------------------------------------
 -- Pre-process
@@ -265,7 +268,7 @@ compileOne' m_tc_result mHscMessage
             final_iface <- mkFullIface hsc_env' partial_iface Nothing
             -- Reconstruct the `ModDetails` from the just-constructed `ModIface`
             -- See Note [ModDetails and --make mode]
-            hmi_details <- liftIO $ initModDetails hsc_env' summary final_iface
+            hmi_details <- liftIO $ initModDetails hsc_env' (ms_mod_name summary) final_iface
             liftIO $ hscMaybeWriteIface logger dflags True final_iface mb_old_iface_hash (ms_location summary)
 
             (hasStub, comp_bc, spt_entries) <- hscInteractive hsc_env' cgguts mod_location
@@ -297,7 +300,7 @@ compileOne' m_tc_result mHscMessage
             o_time <- getModificationUTCTime object_filename
             let !linkable = LM o_time this_mod [DotO object_filename]
             -- See Note [ModDetails and --make mode]
-            details <- initModDetails hsc_env' summary iface
+            details <- initModDetails hsc_env' (ms_mod_name summary) iface
             return $! HomeModInfo iface details (Just linkable)
 
  where dflags0     = ms_hspp_opts summary
@@ -1083,6 +1086,30 @@ llvmOptions dflags =
                 ArchRISCV64 -> "lp64d"
                 _           -> ""
 
+-- | Populate the HPT with the transively discovered interfaces from the imports
+-- given
+preloadInterfaces :: HscEnv -> [(Maybe FastString, ModuleNameWithIsBoot)] -> IO (HscEnv -> HscEnv)
+preloadInterfaces hsc_env imps = do
+  let fc = hsc_FC hsc_env
+  let dflags = hsc_dflags hsc_env
+  let units = hsc_units hsc_env
+  let home_unit = hsc_home_unit hsc_env
+  let find mod maybe_pkg = liftIO $ findImportedModule fc units home_unit dflags mod maybe_pkg
+  let do_one (mb_pkg, GWIB mod_name is_boot) = do
+        res <- find mod_name mb_pkg
+        case res of
+          Found _ m | isHomeModule home_unit m -> return $ Just $ GWIB mod_name is_boot
+          _ -> return Nothing
+      mk_hmi mod_iface mod_name = do
+        (gwib_mod mod_name,) . (\md -> HomeModInfo mod_iface md Nothing) <$> initModDetails hsc_env (gwib_mod mod_name) mod_iface
+  direct_home_mods <- mapMaybeM do_one imps
+  interfaces <- liftIO $ findHomeModules hsc_env (hsc_home_unit hsc_env) direct_home_mods
+  hmis <- liftIO $ mapM (uncurry mk_hmi) (eltsUFM interfaces)
+  let new_hpt = addListToHpt emptyHomePackageTable hmis
+  let upd = hscUpdateHPT (const new_hpt)
+  pprTraceM "preloadInterfaces" (ppr (fmap snd interfaces))
+  return upd
+
 -- -----------------------------------------------------------------------------
 -- | Each phase in the pipeline returns the next phase to execute, and the
 -- name of the file in which the output was placed.
@@ -1248,6 +1275,11 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
               Right (src_imps,imps,L _ mod_name) -> return
                   (Just buf, mod_name, imps, src_imps)
 
+        PipeState{hsc_env=hsc_env'} <- getPipeState
+        let mns = [(mb_pkg, GWIB (unLoc mn) NotBoot) | (mb_pkg, mn) <- imps]
+                  ++ [(mb_pkg, GWIB (unLoc mn) IsBoot) | (mb_pkg, mn) <- src_imps]
+        upd_hsc <- liftIO $ preloadInterfaces hsc_env' mns
+
   -- Take -o into account if present
   -- Very like -ohi, but we must *only* do this if we aren't linking
   -- (If we're linking then the -o applies to the linked thing, not to
@@ -1265,7 +1297,6 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
         o_mod <- liftIO $ modificationTimeIfExists o_file
         dyn_o_mod <- liftIO $ modificationTimeIfExists dyn_o_file
 
-        PipeState{hsc_env=hsc_env'} <- getPipeState
 
   -- Tell the finder cache about this module
         mod <- liftIO $ do
@@ -1295,7 +1326,7 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
   -- run the compiler!
         let msg hsc_env _ what _ = oneShotMsg hsc_env what
         (result, plugin_hsc_env) <-
-          liftIO $ hscIncrementalCompile True Nothing (Just msg) hsc_env'
+          liftIO $ hscIncrementalCompile True Nothing (Just msg) (upd_hsc hsc_env')
                             mod_summary Nothing Nothing (1,1)
 
         -- In the rest of the pipeline use the loaded plugins

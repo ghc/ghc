@@ -135,6 +135,7 @@ import System.FilePath
 import System.IO        ( fixIO )
 
 import GHC.Conc ( getNumProcessors, getNumCapabilities, setNumCapabilities )
+import GHC.Driver.Ppr
 
 label_self :: String -> IO ()
 label_self thread_name = do
@@ -936,6 +937,10 @@ buildCompGraph (scc:sccs) = case scc of
 -- equivalently.
 data BuildModule = BuildModule_Unit {-# UNPACK #-} !InstantiatedUnit | BuildModule_Module {-# UNPACK #-} !ModuleWithIsBoot
   deriving (Eq, Ord)
+
+instance Outputable BuildModule where
+  ppr (BuildModule_Unit u) = ppr u
+  ppr (BuildModule_Module m) = ppr m
 
 
 mkBuildModule :: ModuleGraphNode -> BuildModule

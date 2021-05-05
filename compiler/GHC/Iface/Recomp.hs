@@ -282,7 +282,7 @@ checkVersions hsc_env mod_summary iface
         --  ; pprTraceM "home_mods" (ppr home_mods)
         --  ; pprTraceM "home_mods" (ppr (dep_mods (mi_deps iface)))
         --  ; pprTraceM "home_mods" (ppr (Set.difference  (Set.fromList (eltsUFM home_mods)) (Set.fromList (dep_mods (mi_deps iface)))))
-          ; updateEps_ $ \eps  -> eps { eps_is_boot = home_mods }
+          ; updateEps_ $ \eps  -> eps { eps_is_boot = fmap snd $ home_mods }
        }
        ; recomp <- checkList [checkModUsage (homeUnitAsUnit home_unit) u
                              | u <- mi_usages iface]

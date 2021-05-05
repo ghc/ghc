@@ -30,6 +30,8 @@ import GHC.Types.Unique
 import GHC.Types.Unique.DFM
 
 import GHC.Utils.Outputable
+import GHC.Driver.Ppr
+import GHC.Data.Maybe
 
 -- | Information about modules in the package being compiled
 data HomeModInfo = HomeModInfo

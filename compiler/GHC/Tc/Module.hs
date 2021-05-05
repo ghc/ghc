@@ -18,6 +18,7 @@
 -- | Typechecking a whole module
 --
 -- https://gitlab.haskell.org/ghc/ghc/wikis/commentary/compiler/type-checker
+{-# LANGUAGE TupleSections #-}
 module GHC.Tc.Module (
         tcRnStmt, tcRnExpr, TcRnExprMode(..), tcRnType,
         tcRnImportDecls,
@@ -162,6 +163,7 @@ import GHC.Unit.Module.ModSummary
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module.Deps
+import GHC.Unit.Finder.Types
 
 import GHC.Data.FastString
 import GHC.Data.Maybe
@@ -176,6 +178,9 @@ import qualified Data.Set as S
 import Control.DeepSeq
 import Control.Monad
 import GHC.Driver.Dependencies
+import GHC.Unit.Finder
+import GHC.Driver.Ppr
+import GHC.Unit.Home.ModInfo
 
 #include "HsVersions.h"
 
@@ -347,6 +352,12 @@ tcRnModuleTcRnM hsc_env mod_sum
         }
       }
 
+
+modNameBootWithPackage :: LImportDecl GhcPs -> (Maybe FastString, ModuleNameWithIsBoot)
+modNameBootWithPackage (L _ decl) =
+  ( sl_fs <$> ideclPkgQual decl
+  , GWIB (unLoc $ ideclName decl) (ideclSource decl))
+
 implicitPreludeWarn :: SDoc
 implicitPreludeWarn
   = text "Module `Prelude' implicitly imported"
@@ -385,7 +396,7 @@ tcRnImports hsc_env import_decls
                 --  ; pprTraceM "home_mods" (ppr home_mods)
                 --  ; pprTraceM "home_mods" (ppr (dep_mods (mi_deps iface)))
                 --  ; pprTraceM "home_mods" (ppr (Set.difference  (Set.fromList (eltsUFM home_mods)) (Set.fromList (dep_mods (mi_deps iface)))))
-                  ; updateEps_ $ \eps  -> eps { eps_is_boot = home_mods }
+                  ; updateEps_ $ \eps  -> eps { eps_is_boot = fmap snd home_mods }
                }
 
                 -- Update the gbl env

@@ -268,7 +268,6 @@ Running generateModules from #14693 with DEPTH=16, WIDTH=30 finishes in
 -}
 
 
-
 -- | Given a located import declaration @decl@ from @this_mod@,
 -- calculate the following pieces of information:
 --

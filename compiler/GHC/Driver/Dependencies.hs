@@ -51,7 +51,7 @@ import GHC.Types.Unique.DSet
 import qualified GHC.Data.Maybe as Maybes
 import GHC.Linker.Types
 import GHC.Data.List.SetOps
-import Data.List ( isSuffixOf, nub, isPrefixOf, intercalate )
+import Data.List ( isSuffixOf, nub, isPrefixOf, intercalate, sortBy )
 import GHC.Runtime.Interpreter
 import qualified GHC.Data.ShortText as ST
 import qualified GHC.Unit as Packages
@@ -68,15 +68,16 @@ import GHC.Platform
 import Data.IORef
 import GHC.Platform.Ways
 import GHC.Driver.Phases
+import Data.Ord
 
 
 -- | Used in OneShot mode to work out what the HPT looks like
-findHomeModules :: HscEnv -> HomeUnit -> [ModuleNameWithIsBoot] -> IO (ModuleNameEnv ModuleNameWithIsBoot)
+findHomeModules :: HscEnv -> HomeUnit -> [ModuleNameWithIsBoot] -> IO (ModuleNameEnv (ModIface, ModuleNameWithIsBoot))
 findHomeModules hsc_env home_unit mns = go mns mempty
   where
     go [] seen = return seen
     go (mn:mods) seen
-      | Just mn' <- lookupUFM seen (gwib_mod mn)
+      | Just (_, mn') <- lookupUFM seen (gwib_mod mn)
         -- Already seen the module before
       , gwib_isBoot mn' == gwib_isBoot mn = go mods seen
       | otherwise = do
@@ -86,7 +87,7 @@ findHomeModules hsc_env home_unit mns = go mns mempty
          mb_iface <- computeInterface hsc_env (text "need mi_direct_deps for") (gwib_isBoot mn) mod
          -- loadInterface should work but if you load A.hi-boot before trying to load A.hi, then the A.hi-boot
          -- interface will be returned, which is not what you want.
-         --mb_iface <- loadInterface  (text "need mi_direct_deps for") mod (ImportByUser (gwib_isBoot mn))
+--         mb_iface <- loadInterface  (text "need mi_direct_deps for") mod (ImportByUser (gwib_isBoot mn))
          case mb_iface of
            -- This case should **never** happen because there has to already be
            -- interface files for all the dependencies already in OneShot mode.
@@ -94,10 +95,10 @@ findHomeModules hsc_env home_unit mns = go mns mempty
            Failed _err -> go mods seen
            Succeeded (imported_iface, _) ->
             let new_names = dep_direct_mods $ mi_deps imported_iface
-                comb m@(GWIB { gwib_isBoot = NotBoot }) _ = m
-                comb (GWIB { gwib_isBoot = IsBoot }) x  = x
+                comb m@(_, (GWIB { gwib_isBoot = NotBoot })) _ = m
+                comb (_, (GWIB { gwib_isBoot = IsBoot })) x  = x
             in go (new_names ++ mods)
-                  (addToUFM_C comb seen (gwib_mod mn) mn)
+                  (addToUFM_C comb seen (gwib_mod mn) (imported_iface, mn))
 
 -- | Find all depedencies that we need to link, used for GHCi and
 -- interface file dependency calculation

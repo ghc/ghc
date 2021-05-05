@@ -940,8 +940,7 @@ findAndReadIface logger name_cache fc hooks unit_state home_unit dflags doc_str 
                   -- Found file, so read it
                   let file_path = addBootSuffix_maybe hi_boot_file (ml_hi_file loc)
                   -- See Note [Home module load error]
-                  if isHomeInstalledModule home_unit mod &&
-                     not (isOneShot (ghcMode dflags))
+                  if isHomeInstalledModule home_unit mod
                       then return (Failed (homeModError mod loc))
                       else do
                         r <- read_file logger name_cache unit_state dflags wanted_mod file_path

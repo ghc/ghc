@@ -236,9 +236,6 @@ hptModulesBelow include_boot hsc_env mn = go mn Set.empty
 -- C.f Inst.hptInstances
 hptSomeThingsBelowUs :: (HomeModInfo -> [a]) -> Bool -> HscEnv -> [ModuleNameWithIsBoot] -> [a]
 hptSomeThingsBelowUs extract include_hi_boot hsc_env mod
-  | isOneShot (ghcMode (hsc_dflags hsc_env)) = []
-
-  | otherwise
   = let hpt = hsc_HPT hsc_env
     in
     [ thing
@@ -297,7 +294,7 @@ lookupType hsc_env name = do
                then mkHomeModule (hsc_home_unit hsc_env) (moduleName (nameModule name))
                else nameModule name
 
-       !ty = if isOneShot (ghcMode (hsc_dflags hsc_env))
+       !ty = if False -- isOneShot (ghcMode (hsc_dflags hsc_env))
                -- in one-shot, we don't use the HPT
                then lookupNameEnv pte name
                else case lookupHptByModule hpt mod of

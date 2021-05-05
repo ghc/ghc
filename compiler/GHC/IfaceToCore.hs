@@ -21,7 +21,8 @@ module GHC.IfaceToCore (
         tcIfaceAnnotations, tcIfaceCompleteMatches,
         tcIfaceExpr,    -- Desired by HERMIT (#7683)
         tcIfaceGlobal,
-        tcIfaceOneShot
+        tcIfaceOneShot,
+        initModDetails, genModDetails, dumpIfaceStats
  ) where
 
 #include "HsVersions.h"
@@ -56,7 +57,7 @@ import GHC.Core
 import GHC.Core.Unify( RoughMatchTc(..) )
 import GHC.Core.Utils
 import GHC.Core.Unfold.Make
-import GHC.Core.Lint
+import GHC.Core.Lint hiding (dumpIfSet)
 import GHC.Core.Make
 import GHC.Core.Class
 import GHC.Core.TyCon
@@ -108,6 +109,7 @@ import qualified GHC.Data.BooleanFormula as BF
 
 import Control.Monad
 import GHC.Parser.Annotation
+import System.IO
 
 {-
 This module takes
@@ -558,27 +560,9 @@ tcHiBootIface hsc_src mod
         ; case read_result of {
             Succeeded (iface, _path) -> do { tc_iface <- initIfaceTcRn $ typecheckIface iface
                                            ; mkSelfBootInfo iface tc_iface } ;
-            Failed err               ->
+            Failed err               -> return NoSelfBoot }
 
-        -- There was no hi-boot file. But if there is circularity in
-        -- the module graph, there really should have been one.
-        -- Since we've read all the direct imports by now,
-        -- eps_is_boot will record if any of our imports mention the
-        -- current module, which either means a module loop (not
-        -- a SOURCE import) or that our hi-boot file has mysteriously
-        -- disappeared.
-    do  { eps <- getEps
-        ; case lookupUFM (eps_is_boot eps) (moduleName mod) of
-            -- The typical case
-            Nothing -> return NoSelfBoot
-            -- error cases
-            Just (GWIB { gwib_isBoot = is_boot }) -> case is_boot of
-              IsBoot -> failWithTc (elaborate err)
-              -- The hi-boot file has mysteriously disappeared.
-              NotBoot -> failWithTc moduleLoop
-              -- Someone below us imported us!
-              -- This is a loop with no hi-boot in the way
-    }}}}
+    }}
   where
     need = text "Need the hi-boot interface for" <+> ppr mod
                  <+> text "to compare against the Real Thing"
@@ -612,6 +596,89 @@ mkSelfBootInfo iface mds
     isIfaceTyCon IfaceClass{}   = True
     isIfaceTyCon IfaceAxiom{}   = False
     isIfaceTyCon IfacePatSyn{}  = False
+
+-- Knot tying!  See Note [Knot-tying typecheckIface]
+-- See Note [ModDetails and --make mode]
+initModDetails :: HscEnv -> ModuleName -> ModIface -> IO ModDetails
+initModDetails hsc_env mod_name iface =
+  fixIO $ \details' -> do
+    let act hpt  = addToHpt hpt mod_name
+                                (HomeModInfo iface details' Nothing)
+    let hsc_env' = hscUpdateHPT act hsc_env
+    -- NB: This result is actually not that useful
+    -- in one-shot mode, since we're not going to do
+    -- any further typechecking.  It's much more useful
+    -- in make mode, since this HMI will go into the HPT.
+    genModDetails hsc_env' iface
+
+-- NB: this must be knot-tied appropriately, see hscIncrementalCompile
+genModDetails :: HscEnv -> ModIface -> IO ModDetails
+genModDetails hsc_env old_iface
+  = do
+    new_details <- {-# SCC "tcRnIface" #-}
+                   initIfaceLoad hsc_env (typecheckIface old_iface)
+    dumpIfaceStats hsc_env
+    return new_details
+
+{- **********************************************************************
+%*                                                                      *
+        Statistics on reading interfaces
+%*                                                                      *
+%********************************************************************* -}
+
+dumpIfaceStats :: HscEnv -> IO ()
+dumpIfaceStats hsc_env = do
+    eps <- hscEPS hsc_env
+    dumpIfSet logger dflags (dump_if_trace || dump_rn_stats)
+              "Interface statistics"
+              (ifaceStats eps)
+  where
+    dflags = hsc_dflags hsc_env
+    logger = hsc_logger hsc_env
+    dump_rn_stats = dopt Opt_D_dump_rn_stats dflags
+    dump_if_trace = dopt Opt_D_dump_if_trace dflags
+{-
+Note [ModDetails and --make mode]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+An interface file consists of two parts
+
+* The `ModIface` which ends up getting written to disk.
+  The `ModIface` is a completely acyclic tree, which can be serialised
+  and de-serialised completely straightforwardly.  The `ModIface` is
+  also the structure that is finger-printed for recompilation control.
+
+* The `ModDetails` which provides a more structured view that is suitable
+  for usage during compilation.  The `ModDetails` is heavily cyclic:
+  An `Id` contains a `Type`, which mentions a `TyCon` that contains kind
+  that mentions other `TyCons`; the `Id` also includes an unfolding that
+  in turn mentions more `Id`s;  And so on.
+
+The `ModIface` can be created from the `ModDetails` and the `ModDetails` from
+a `ModIface`.
+
+During tidying, just before interfaces are written to disk,
+the ModDetails is calculated and then converted into a ModIface (see GHC.Iface.Make.mkIface_).
+Then when GHC needs to restart typechecking from a certain point it can read the
+interface file, and regenerate the ModDetails from the ModIface (see GHC.IfaceToCore.typecheckIface).
+The key part about the loading is that the ModDetails is regenerated lazily
+from the ModIface, so that there's only a detailed in-memory representation
+for declarations which are actually used from the interface. This mode is
+also used when reading interface files from external packages.
+
+In the old --make mode implementation, the interface was written after compiling a module
+but the in-memory ModDetails which was used to compute the ModIface was retained.
+The result was that --make mode used much more memory than `-c` mode, because a large amount of
+information about a module would be kept in the ModDetails but never used.
+
+The new idea is that even in `--make` mode, when there is an in-memory `ModDetails`
+at hand, we re-create the `ModDetails` from the `ModIface`. Doing this means that
+we only have to keep the `ModIface` decls in memory and then lazily load
+detailed representations if needed. It turns out this makes a really big difference
+to memory usage, halving maximum memory used in some cases.
+
+See !5492 and #13586
+-}
 
 {-
 ************************************************************************

@@ -83,7 +83,6 @@ module GHC.Driver.Main
     , getHscEnv
     , hscSimpleIface'
     , oneShotMsg
-    , dumpIfaceStats
     , ioMsgMaybe
     , showModuleIndex
     , hscAddSptEntries
@@ -118,7 +117,7 @@ import GHC.HsToCore
 
 import GHC.StgToByteCode    ( byteCodeGen, stgExprToBCOs )
 
-import GHC.IfaceToCore  ( typecheckIface )
+import GHC.IfaceToCore  ( typecheckIface, initModDetails, dumpIfaceStats )
 
 import GHC.Iface.Load   ( ifaceStats, writeIface )
 import GHC.Iface.Make
@@ -881,7 +880,7 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
         -- We didn't need to do any typechecking; the old interface
         -- file on disk was good enough.
         Left (iface, linkable) -> do
-            details <- liftIO $ initModDetails hsc_env mod_summary iface
+            details <- liftIO $ initModDetails hsc_env (ms_mod_name mod_summary) iface
             return (HscUpToDate (HomeModInfo iface details linkable), hsc_env')
         -- We finished type checking.  (mb_old_hash is the hash of
         -- the interface that existed on disk; it's possible we had
@@ -891,63 +890,7 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
             status <- finish mod_summary tc_result mb_old_hash
             return (status, hsc_env)
 
--- Knot tying!  See Note [Knot-tying typecheckIface]
--- See Note [ModDetails and --make mode]
-initModDetails :: HscEnv -> ModSummary -> ModIface -> IO ModDetails
-initModDetails hsc_env mod_summary iface =
-  fixIO $ \details' -> do
-    let act hpt  = addToHpt hpt (ms_mod_name mod_summary)
-                                (HomeModInfo iface details' Nothing)
-    let hsc_env' = hscUpdateHPT act hsc_env
-    -- NB: This result is actually not that useful
-    -- in one-shot mode, since we're not going to do
-    -- any further typechecking.  It's much more useful
-    -- in make mode, since this HMI will go into the HPT.
-    genModDetails hsc_env' iface
 
-
-{-
-Note [ModDetails and --make mode]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-An interface file consists of two parts
-
-* The `ModIface` which ends up getting written to disk.
-  The `ModIface` is a completely acyclic tree, which can be serialised
-  and de-serialised completely straightforwardly.  The `ModIface` is
-  also the structure that is finger-printed for recompilation control.
-
-* The `ModDetails` which provides a more structured view that is suitable
-  for usage during compilation.  The `ModDetails` is heavily cyclic:
-  An `Id` contains a `Type`, which mentions a `TyCon` that contains kind
-  that mentions other `TyCons`; the `Id` also includes an unfolding that
-  in turn mentions more `Id`s;  And so on.
-
-The `ModIface` can be created from the `ModDetails` and the `ModDetails` from
-a `ModIface`.
-
-During tidying, just before interfaces are written to disk,
-the ModDetails is calculated and then converted into a ModIface (see GHC.Iface.Make.mkIface_).
-Then when GHC needs to restart typechecking from a certain point it can read the
-interface file, and regenerate the ModDetails from the ModIface (see GHC.IfaceToCore.typecheckIface).
-The key part about the loading is that the ModDetails is regenerated lazily
-from the ModIface, so that there's only a detailed in-memory representation
-for declarations which are actually used from the interface. This mode is
-also used when reading interface files from external packages.
-
-In the old --make mode implementation, the interface was written after compiling a module
-but the in-memory ModDetails which was used to compute the ModIface was retained.
-The result was that --make mode used much more memory than `-c` mode, because a large amount of
-information about a module would be kept in the ModDetails but never used.
-
-The new idea is that even in `--make` mode, when there is an in-memory `ModDetails`
-at hand, we re-create the `ModDetails` from the `ModIface`. Doing this means that
-we only have to keep the `ModIface` decls in memory and then lazily load
-detailed representations if needed. It turns out this makes a really big difference
-to memory usage, halving maximum memory used in some cases.
-
-See !5492 and #13586
--}
 
 -- Runs the post-typechecking frontend (desugar and simplify). We want to
 -- generate most of the interface as late as possible. This gets us up-to-date
@@ -1155,14 +1098,6 @@ hscMaybeWriteIface logger dflags is_simple iface old_iface mod_location = do
 -- NoRecomp handlers
 --------------------------------------------------------------
 
--- NB: this must be knot-tied appropriately, see hscIncrementalCompile
-genModDetails :: HscEnv -> ModIface -> IO ModDetails
-genModDetails hsc_env old_iface
-  = do
-    new_details <- {-# SCC "tcRnIface" #-}
-                   initIfaceLoad hsc_env (typecheckIface old_iface)
-    dumpIfaceStats hsc_env
-    return new_details
 
 --------------------------------------------------------------
 -- Progress displayers.
@@ -2273,23 +2208,6 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr
          ; loadExpr (hscInterp hsc_env) hsc_env srcspan bcos }
 
 
-{- **********************************************************************
-%*                                                                      *
-        Statistics on reading interfaces
-%*                                                                      *
-%********************************************************************* -}
-
-dumpIfaceStats :: HscEnv -> IO ()
-dumpIfaceStats hsc_env = do
-    eps <- hscEPS hsc_env
-    dumpIfSet logger dflags (dump_if_trace || dump_rn_stats)
-              "Interface statistics"
-              (ifaceStats eps)
-  where
-    dflags = hsc_dflags hsc_env
-    logger = hsc_logger hsc_env
-    dump_rn_stats = dopt Opt_D_dump_rn_stats dflags
-    dump_if_trace = dopt Opt_D_dump_if_trace dflags
 
 
 {- **********************************************************************
