@@ -592,6 +592,7 @@ data DynFlags = DynFlags {
   -- them.
   thOnLoc               :: SrcSpan,
   newDerivOnLoc         :: SrcSpan,
+  deriveViaOnLoc        :: SrcSpan,
   overlapInstLoc        :: SrcSpan,
   incoherentOnLoc       :: SrcSpan,
   pkgTrustOnLoc         :: SrcSpan,
@@ -1201,6 +1202,7 @@ defaultDynFlags mySettings llvmConfig =
         safeInferred = True,
         thOnLoc = noSrcSpan,
         newDerivOnLoc = noSrcSpan,
+        deriveViaOnLoc = noSrcSpan,
         overlapInstLoc = noSrcSpan,
         incoherentOnLoc = noSrcSpan,
         pkgTrustOnLoc = noSrcSpan,
@@ -1619,6 +1621,9 @@ unsafeFlags, unsafeFlagsForInfer
 unsafeFlags = [ ("-XGeneralizedNewtypeDeriving", newDerivOnLoc,
                     xopt LangExt.GeneralizedNewtypeDeriving,
                     flip xopt_unset LangExt.GeneralizedNewtypeDeriving)
+              , ("-XDerivingVia", deriveViaOnLoc,
+                    xopt LangExt.DerivingVia,
+                    flip xopt_unset LangExt.DerivingVia)
               , ("-XTemplateHaskell", thOnLoc,
                     xopt LangExt.TemplateHaskell,
                     flip xopt_unset LangExt.TemplateHaskell)
@@ -3494,7 +3499,8 @@ xFlagsDeps = [
   flagSpec "DeriveLift"                       LangExt.DeriveLift,
   flagSpec "DeriveTraversable"                LangExt.DeriveTraversable,
   flagSpec "DerivingStrategies"               LangExt.DerivingStrategies,
-  flagSpec "DerivingVia"                      LangExt.DerivingVia,
+  flagSpec' "DerivingVia"                     LangExt.DerivingVia
+                                              setDeriveVia,
   flagSpec "DisambiguateRecordFields"         LangExt.DisambiguateRecordFields,
   flagSpec "DoAndIfThenElse"                  LangExt.DoAndIfThenElse,
   flagSpec "BlockArguments"                   LangExt.BlockArguments,
@@ -4092,6 +4098,10 @@ setPackageTrust = do
 setGenDeriving :: TurnOnFlag -> DynP ()
 setGenDeriving True  = getCurLoc >>= \l -> upd (\d -> d { newDerivOnLoc = l })
 setGenDeriving False = return ()
+
+setDeriveVia :: TurnOnFlag -> DynP ()
+setDeriveVia True  = getCurLoc >>= \l -> upd (\d -> d { deriveViaOnLoc = l })
+setDeriveVia False = return ()
 
 setOverlappingInsts :: TurnOnFlag -> DynP ()
 setOverlappingInsts False = return ()
