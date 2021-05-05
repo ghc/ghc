@@ -1,6 +1,6 @@
 module GHC.Types.SourceFile
    ( HscSource(..)
-   , SourceModified (..)
+   , hscSourceToIsBoot
    , isHsBootOrSig
    , isHsigFile
    , hscSourceString
@@ -9,6 +9,7 @@ where
 
 import GHC.Prelude
 import GHC.Utils.Binary
+import GHC.Unit.Types
 
 -- Note [HscSource types]
 -- ~~~~~~~~~~~~~~~~~~~~~~
@@ -49,6 +50,14 @@ data HscSource
    | HsigFile   -- ^ .hsig file
    deriving (Eq, Ord, Show)
 
+-- | Tests if an 'HscSource' is a boot file, primarily for constructing elements
+-- of 'BuildModule'. We conflate signatures and modules because they are bound
+-- in the same namespace; only boot interfaces can be disambiguated with
+-- `import {-# SOURCE #-}`.
+hscSourceToIsBoot :: HscSource -> IsBootInterface
+hscSourceToIsBoot HsBootFile = IsBoot
+hscSourceToIsBoot _ = NotBoot
+
 instance Binary HscSource where
     put_ bh HsSrcFile = putByte bh 0
     put_ bh HsBootFile = putByte bh 1
@@ -74,21 +83,3 @@ isHsBootOrSig _          = False
 isHsigFile :: HscSource -> Bool
 isHsigFile HsigFile = True
 isHsigFile _        = False
-
--- | Indicates whether a given module's source has been modified since it
--- was last compiled.
-data SourceModified
-  = SourceModified
-       -- ^ the source has been modified
-  | SourceUnmodified
-       -- ^ the source has not been modified.  Compilation may or may
-       -- not be necessary, depending on whether any dependencies have
-       -- changed since we last compiled.
-  | SourceUnmodifiedAndStable
-       -- ^ the source has not been modified, and furthermore all of
-       -- its (transitive) dependencies are up to date; it definitely
-       -- does not need to be recompiled.  This is important for two
-       -- reasons: (a) we can omit the version check in checkOldIface,
-       -- and (b) if the module used TH splices we don't need to force
-       -- recompilation.
-

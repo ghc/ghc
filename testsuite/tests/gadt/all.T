@@ -27,7 +27,7 @@ test('gadt20', normal, compile, [''])
 test('gadt21', normal, compile_fail, [''])
 test('gadt22', normal, compile, [''])
 
-test('gadt23', [extra_files(['Gadt23_AST.hs'])], makefile_test, ['gadt23'])
+test('gadt23', [copy_files, extra_files(['Gadt23_AST.hs'])], makefile_test, ['gadt23'])
 
 test('gadt24', normal, compile, [''])
 

@@ -134,6 +134,8 @@ import Data.Graph (SCC(..))
 import Data.List (intersperse)
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NEL
+import Data.Time
+import Data.Time.Format.ISO8601
 
 import GHC.Fingerprint
 import GHC.Show         ( showMultiLineString )
@@ -917,6 +919,9 @@ instance Outputable Double where
 
 instance Outputable () where
     ppr _ = text "()"
+
+instance Outputable UTCTime where
+    ppr = text . formatShow iso8601Format
 
 instance (Outputable a) => Outputable [a] where
     ppr xs = brackets (fsep (punctuate comma (map ppr xs)))

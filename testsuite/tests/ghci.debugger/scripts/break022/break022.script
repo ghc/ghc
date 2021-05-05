@@ -1,3 +1,5 @@
+:l shell.hs
+:def shell (\s -> do shell s; return "")
 
 -- We have this structure of modules:
 
@@ -10,9 +12,9 @@
 -- But first we touch A, and reload. B.boot will be reloaded, but not B,  which will end up with an empty modbreaks. When we :step into B, ghci will die with an out of bounds access in B's break array.
 -- The effect we want is B.boot being reloaded while B is not.
 
-:! cp A1.hs A.hs
+:shell cp A1.hs A.hs
 :l C
-:! touch A.hs
+:shell echo >> A.hs
 :r
 :break a
 a ()

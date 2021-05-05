@@ -1,14 +1,16 @@
+:l shell.hs
+:def shell (\s -> do shell s; return "")
+
 :unset +s
 :unset +t
 
-:!cp A1.hs A.hs
+:shell cp A1.hs A.hs
 :load B
 
 -- eval something that isn't exported from B
 z
 
-:!sleep 1
-:!touch A.hs
+:shell echo >> A.hs
 :reload
 
 -- A should be recompiled, B will be skipped.  We should still have

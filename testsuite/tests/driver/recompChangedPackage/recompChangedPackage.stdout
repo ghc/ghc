@@ -1,0 +1,10 @@
+[1 of 2] Compiling PLib             ( PLib.hs, PLib.o )
+[2 of 2] Compiling Main             ( Main.hs, Main.o )
+Linking Main ...
+"q"
+tmp.d
+    q-0.1.0.0
+
+[1 of 1] Compiling Main             ( Main.hs, Main.o ) [PLib removed]
+Linking Main ...
+empty

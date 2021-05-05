@@ -10,11 +10,13 @@ import GHC.Unit.Module.ModGuts
 import GHC.Unit.Module.ModIface
 
 import GHC.Utils.Fingerprint
+import GHC.Linker.Types
+import GHC.Utils.Outputable
 
 -- | Status of a module in incremental compilation
 data HscRecompStatus
     -- | Nothing to do because code already exists.
-    = HscUpToDate ModIface
+    = HscUpToDate ModIface (Maybe Linkable)
     -- | Recompilation of module, or update of interface is required. Optionally
     -- pass the old interface hash to avoid updating the existing interface when
     -- it has not changed.
@@ -38,3 +40,8 @@ data HscBackendAction
           -- avoid updating the existing interface when the interface isn't
           -- changed.
         }
+
+
+instance Outputable HscBackendAction where
+  ppr (HscUpdate mi) = text "Update:" <+> (ppr (mi_module mi))
+  ppr (HscRecomp _ ml _mi _mf) = text "Recomp:" <+> ppr ml

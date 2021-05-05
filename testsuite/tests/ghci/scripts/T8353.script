@@ -1,3 +1,9 @@
+:l shell.hs
+:def shell (\s -> do shell s; return "")
+:l
+
+:shell cp Defer03_before.hs Defer03.hs
+
 -- Test :load! and :reload!
 
 -- main is independent of functions with type errors and thus
@@ -11,12 +17,14 @@
 -- succeeds again to load module
 :reload!
 
--- also succeeds, because the module has not been touched since load
+-- also succeeds, because the module has not been changed since load
 :reload
 
--- now, after touching, reloading should fail
-:! touch Defer03.hs
+-- now, after modifying, reloading should fail
+:shell echo "-- an extra comment so that the hash changes" >> Defer03.hs
 :reload
 
 -- using the deferred version of reload, loading should succeed again
 :reload!
+
+:shell rm Defer03.hs

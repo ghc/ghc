@@ -66,7 +66,7 @@ module GHC.Utils.Misc (
         dropTail, capitalise,
 
         -- * Sorting
-        sortWith, minWith, nubSort, ordNub,
+        sortWith, minWith, nubSort, ordNub, ordNubOn,
 
         -- * Comparisons
         isEqual, eqListBy, eqMaybeBy,
@@ -100,6 +100,7 @@ module GHC.Utils.Misc (
         doesDirNameExist,
         getModificationUTCTime,
         modificationTimeIfExists,
+        fileHashIfExists,
         withAtomicRename,
 
         -- * Filenames and paths
@@ -132,6 +133,7 @@ import GHC.Prelude
 import GHC.Utils.Exception
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Constants
+import GHC.Utils.Fingerprint
 
 import Data.Data
 import qualified Data.List as List
@@ -639,13 +641,18 @@ nubSort = Set.toAscList . Set.fromList
 -- | Remove duplicates but keep elements in order.
 --   O(n * log n)
 ordNub :: Ord a => [a] -> [a]
-ordNub xs
+ordNub xs = ordNubOn id xs
+
+-- | Remove duplicates but keep elements in order.
+--   O(n * log n)
+ordNubOn :: Ord b => (a -> b) -> [a] -> [a]
+ordNubOn f xs
   = go Set.empty xs
   where
     go _ [] = []
     go s (x:xs)
-      | Set.member x s = go s xs
-      | otherwise = x : go (Set.insert x s) xs
+      | Set.member (f x) s = go s xs
+      | otherwise = x : go (Set.insert (f x) s) xs
 
 
 {-
@@ -1287,6 +1294,16 @@ getModificationUTCTime = getModificationTime
 modificationTimeIfExists :: FilePath -> IO (Maybe UTCTime)
 modificationTimeIfExists f =
   (do t <- getModificationUTCTime f; return (Just t))
+        `catchIO` \e -> if isDoesNotExistError e
+                        then return Nothing
+                        else ioError e
+
+-- --------------------------------------------------------------
+-- check existence & hash at the same time
+
+fileHashIfExists :: FilePath -> IO (Maybe Fingerprint)
+fileHashIfExists f =
+  (do t <- getFileHash f; return (Just t))
         `catchIO` \e -> if isDoesNotExistError e
                         then return Nothing
                         else ioError e

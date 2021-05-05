@@ -4,8 +4,8 @@ first run
 [3 of 3] Compiling Main             ( Main.hs, Main.o )
 Linking Main ...
 5
-[1 of 1] Compiling B                ( B.hs, nothing )
+[1 of 1] Compiling B                ( B.hs, nothing ) [Source file changed]
 second run
-[2 of 3] Compiling B                ( B.hs, B.o )
+[1 of 3] Compiling B                ( B.hs, B.o ) [Missing object file]
 Linking Main ...
 15

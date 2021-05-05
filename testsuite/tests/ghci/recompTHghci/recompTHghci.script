@@ -1,0 +1,24 @@
+:unset +s
+
+:l shell.hs
+:def shell (\s -> do shell s; return "")
+
+-- first, tidy up:
+:shell rm -f *.hi *.o *~
+:shell cp B1.hs B.hs
+
+-- load the program (all interpreted)
+:load A.hs
+
+-- reloading should do nothing
+:reload
+
+-- make sure `main' works
+main
+
+-- change a module + recompile
+:shell cp B2.hs B.hs
+:reload
+
+-- make sure `main' still works
+main

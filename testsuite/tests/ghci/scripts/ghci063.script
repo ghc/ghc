@@ -1,5 +1,9 @@
-:! echo module A where {} >A.hs
-:! echo module B where { import A } >B.hs
+:l shell.hs
+:def shell (\s -> do shell s; return "")
+:l
+
+:shell echo module A where {} >A.hs
+:shell echo module B where { import A } >B.hs
 
 -- Workaround for #16201. We use "touch -r" to set modification
 -- timestamps, which leads to precision loss on Darwin. For example,
@@ -11,20 +15,21 @@
 -- by restoring its old timestamp, as we cannot faithfully restore all digits.
 --
 -- The solution is to nullify the insignificant digits before the first load.
-:! touch -r B.hs B.hs
+:shell touch -r B.hs B.hs
 
 :load B
 
 -- We're going to replace B.hs with an invalid module but without
--- changing its timestamp.  A :reload should *not* look at the
--- contents of the file, because the timestamp hasn't changed.
-:! cp B.hs B.hs-copy
-:! touch -r B.hs B.hs-copy
-:! echo "*** INVALID ***" >B.hs
-:! touch -r B.hs-copy B.hs
+-- changing its timestamp.  A :reload should look at the contents of the
+-- file, because the hash has changed. Note that this test previously tested
+-- for the opposite behaviour, but was changed as a result of #19439 / #16495.
+:shell cp B.hs B.hs-copy
+:shell touch -r B.hs B.hs-copy
+:shell echo "*** INVALID ***" >B.hs
+:shell touch -r B.hs-copy B.hs
 
 :reload
 
 -- Put the original file back, now it should work
-:! cp B.hs-copy B.hs
+:shell cp B.hs-copy B.hs
 :reload

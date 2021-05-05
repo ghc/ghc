@@ -1,5 +1,6 @@
 module GHC.Unit.Module.ModGuts
    ( ModGuts (..)
+   , mg_mnwib
    , CgGuts (..)
    )
 where
@@ -31,7 +32,7 @@ import GHC.Types.ForeignStubs
 import GHC.Types.HpcInfo
 import GHC.Types.Name.Reader
 import GHC.Types.SafeHaskell
-import GHC.Types.SourceFile ( HscSource(..) )
+import GHC.Types.SourceFile ( HscSource(..), hscSourceToIsBoot )
 import GHC.Types.SrcLoc
 
 
@@ -95,6 +96,9 @@ data ModGuts
         mg_decl_docs     :: !DeclDocMap,     -- ^ Docs on declarations.
         mg_arg_docs      :: !ArgDocMap       -- ^ Docs on arguments.
     }
+
+mg_mnwib :: ModGuts -> ModuleNameWithIsBoot
+mg_mnwib mg = GWIB (moduleName (mg_module mg)) (hscSourceToIsBoot (mg_hsc_src mg))
 
 -- The ModGuts takes on several slightly different forms:
 --
