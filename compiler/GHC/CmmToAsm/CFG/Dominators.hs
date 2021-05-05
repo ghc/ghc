@@ -104,7 +104,9 @@ pdomTree a@(r,_) =
 -- This Complexity bound assumes /O(1)/ indexing. Since we're
 -- using @IntMap@, it has an additional /lg |V|/ factor
 -- somewhere in there. I'm not sure where.
-idom :: Rooted -> [(Node,Node)]
+idom
+  :: Rooted         -- ^ Root of graph
+  -> [(Node,Node)]  -- ^ Pairs of node followed by its immediate dominator
 idom rg = runST (evalS idomM =<< initEnv (pruneReach rg))
 
 -- | /Immediate post-dominators/.

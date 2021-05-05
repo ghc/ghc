@@ -1,0 +1,11 @@
+# HLint configuration file
+# https://github.com/ndmitchell/hlint
+##########################
+
+- ignore: { name: Use camelCase }
+- ignore: { name: Move brackets to avoid $ }
+- ignore: { name: Use guards, within: [GHC.Data.Graph.Color] }
+- ignore: { name: Redundant bracket }
+- ignore: { name: Eta reduce }
+- warn: {name: Unused LANGUAGE pragma}
+- warn: {name: Use fewer LANGUAGE pragmas}
