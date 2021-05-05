@@ -763,10 +763,10 @@ rnFamEqn doc atfi extra_kvars
          -- See Note [Renaming associated types].
          -- Per that Note, the LHS type variables consist of:
          --
-         -- * The variables mentioned in the instance's type patterns
+         -- - The variables mentioned in the instance's type patterns
          --   (pat_fvs), and
          --
-         -- * The variables mentioned in an outermost kind signature on the
+         -- - The variables mentioned in an outermost kind signature on the
          --   RHS. This is a subset of `rhs_fvs`. To compute it, we look up
          --   each RdrName in `extra_kvars` to find its corresponding Name in
          --   the LocalRdrEnv.

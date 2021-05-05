@@ -2,7 +2,7 @@ TYPE SIGNATURES
   bar :: forall {t} {w}. t -> (t -> w) -> w
   foo :: forall {a}. (Show a, Enum a) => a -> String
 Dependent modules: []
-Dependent packages: [base-4.15.0.0, ghc-bignum-1.0, ghc-prim-0.7.0]
+Dependent packages: [base-4.16.0.0]
 
 WarningWildcardInstantiations.hs:5:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_a’ standing for ‘a’

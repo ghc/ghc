@@ -54,6 +54,7 @@ module GHC.Types.Unique.FM (
         plusUFM_C,
         plusUFM_CD,
         plusUFM_CD2,
+        mergeUFM,
         plusMaybeUFM_C,
         plusUFMList,
         minusUFM,
@@ -88,6 +89,7 @@ import qualified Data.IntSet as S
 import Data.Data
 import qualified Data.Semigroup as Semi
 import Data.Functor.Classes (Eq1 (..))
+import Data.Coerce
 
 -- | A finite map from @uniques@ of one type to
 -- elements in another type.
@@ -271,6 +273,20 @@ plusUFM_CD2 f (UFM xm) (UFM ym)
       (\_ x y -> Just (Just x `f` Just y))
       (MS.map (\x -> Just x `f` Nothing))
       (MS.map (\y -> Nothing `f` Just y))
+      xm ym
+
+mergeUFM
+  :: (elta -> eltb -> Maybe eltc)
+  -> (UniqFM key elta -> UniqFM key eltc)  -- map X
+  -> (UniqFM key eltb -> UniqFM key eltc) -- map Y
+  -> UniqFM key elta
+  -> UniqFM key eltb
+  -> UniqFM key eltc
+mergeUFM f g h (UFM xm) (UFM ym)
+  = UFM $ MS.mergeWithKey
+      (\_ x y -> (x `f` y))
+      (coerce g)
+      (coerce h)
       xm ym
 
 plusMaybeUFM_C :: (elt -> elt -> Maybe elt)

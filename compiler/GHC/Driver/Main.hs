@@ -1362,7 +1362,7 @@ hscCheckSafe' m l = do
                     -- check package is trusted
                     safeP = packageTrusted dflags (hsc_units hsc_env) home_unit trust trust_own_pkg m
                     -- pkg trust reqs
-                    pkgRs = S.fromList . map fst $ filter snd $ dep_pkgs $ mi_deps iface'
+                    pkgRs = S.fromList (dep_trusted_pkgs $ mi_deps iface')
                     -- warn if Safe module imports Safe-Inferred module.
                     warns = if wopt Opt_WarnInferredSafeImports dflags
                                 && safeLanguageOn dflags
@@ -1517,7 +1517,6 @@ markUnsafeInfer tcg_env whyUnsafe = do
                       ppr (overlapMode $ is_flag ins) <+>
                       text "overlap mode isn't allowed in Safe Haskell"]
                 | otherwise = []
-
 
 -- | Figure out the final correct safe haskell mode
 hscGetSafeMode :: TcGblEnv -> Hsc SafeHaskellMode
