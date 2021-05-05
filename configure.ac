@@ -88,6 +88,10 @@ dnl through command line options to the configure script or by
 dnl supplying defns in the build tree's mk/build.mk. Having the option to
 dnl use either is considered a Feature.
 
+AC_ARG_VAR(SH,[Use as the full path to a Bourne shell. [default=autodetect]])
+AC_PATH_PROG([SH],[sh bash])
+AC_SUBST([SH])
+
 dnl ** What command to use to compile compiler sources ?
 dnl --------------------------------------------------------------
 
