@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 
 {-# LANGUAGE NondecreasingIndentation #-}
+{-# LANGUAGE TupleSections #-}
 
 {-# OPTIONS_GHC -fprof-auto-top #-}
 
@@ -88,6 +89,7 @@ module GHC.Driver.Main
     , ioMsgMaybe
     , showModuleIndex
     , hscAddSptEntries
+    , writeInterfaceOnlyMode
     ) where
 
 import GHC.Prelude
@@ -220,6 +222,7 @@ import GHC.Data.Bag
 import GHC.Data.StringBuffer
 import qualified GHC.Data.Stream as Stream
 import GHC.Data.Stream (Stream)
+import qualified GHC.SysTools
 
 import Data.Data hiding (Fixity, TyCon)
 import Data.Maybe       ( fromJust )
@@ -554,7 +557,7 @@ hsc_typecheck keep_rn mod_summary mb_rdr_module = do
                     Nothing -> hscParse' mod_summary
             tc_result0 <- tcRnModule' mod_summary keep_rn' hpm
             if hsc_src == HsigFile
-                then do (iface, _, _) <- liftIO $ hscSimpleIface hsc_env tc_result0 Nothing
+                then do (iface, _, _) <- liftIO $ hscSimpleIface hsc_env tc_result0 mod_summary Nothing
                         ioMsgMaybe $ hoistTcRnMessage $
                             tcRnMergeSignatures hsc_env hpm tc_result0 iface
                 else return tc_result0
@@ -693,12 +696,12 @@ type Messager = HscEnv -> (Int,Int) -> RecompileRequired -> ModuleGraphNode -> I
 hscRecompStatus :: Maybe Messager
                 -> HscEnv
                 -> ModSummary
-                -> SourceModified
                 -> Maybe ModIface
+                -> Maybe Linkable
                 -> (Int,Int)
                 -> IO HscRecompStatus
 hscRecompStatus
-    mHscMessage hsc_env mod_summary source_modified mb_old_iface mod_index
+    mHscMessage hsc_env mod_summary mb_old_iface old_linkable mod_index
   = do
     let
         msg what = case mHscMessage of
@@ -706,6 +709,7 @@ hscRecompStatus
           Just hscMessage -> hscMessage hsc_env mod_index what (ModuleNode (extendModSummaryNoDeps mod_summary))
           Nothing -> return ()
 
+{-
     (recomp_reqd, mb_checked_iface)
         <- {-# SCC "checkOldIface" #-}
            liftIO $ checkOldIface hsc_env mod_summary
@@ -724,6 +728,90 @@ hscRecompStatus
         return $ HscUpToDate iface
 
       _ -> return $ HscRecompNeeded mb_old_hash
+      -}
+
+      -- First check to see if the interface file agrees with the
+      -- source file.
+    (recomp_iface_reqd, mb_checked_iface)
+          <- {-# SCC "checkOldIface" #-}
+             liftIO $ checkOldIface hsc_env mod_summary mb_old_iface
+      -- Check to see whether the expected build products already exist.
+      -- If they don't exists then we trigger recompilation.
+    let lcl_dflags = ms_hspp_opts mod_summary
+    (recomp_obj_reqd, mb_linkable) <-
+      case () of
+        -- No need for a linkable, we're good to go
+        _ | writeInterfaceOnlyMode lcl_dflags -> return (UpToDate, Nothing)
+          -- Interpreter can use either already loaded bytecode or loaded object code
+          | not (backendProducesObject (backend lcl_dflags)) -> do
+              res <- liftIO $ checkByteCode old_linkable
+              case res of
+                (_, Just{}) -> return res
+                _ -> liftIO $ checkObjects lcl_dflags old_linkable mod_summary
+          -- Need object files for making object files
+          | backendProducesObject (backend lcl_dflags) -> liftIO $ checkObjects lcl_dflags old_linkable mod_summary
+          | otherwise -> pprPanic "hscIncrementalFrontend" (text $ show $ backend lcl_dflags)
+    let recomp_reqd = recomp_iface_reqd `mappend` recomp_obj_reqd
+    -- save the interface that comes back from checkOldIface.
+    -- In one-shot mode we don't have the old iface until this
+    -- point, when checkOldIface reads it from the disk.
+    let mb_old_hash = fmap (mi_iface_hash . mi_final_exts) mb_checked_iface
+--    pprTraceM "iface" (text (show recomp_iface_reqd))
+--    pprTraceM "obj" (text (show  recomp_obj_reqd))
+    msg recomp_reqd
+    case mb_checked_iface of
+        Just iface | not (recompileRequired recomp_reqd) ->
+          return $ HscUpToDate iface mb_linkable
+        _ ->
+          return $ HscRecompNeeded mb_old_hash
+
+-- | Check that the .o files produced by compilation are already up-to-date
+-- or not.
+checkObjects :: DynFlags -> Maybe Linkable -> ModSummary -> IO (RecompileRequired, Maybe Linkable)
+checkObjects dflags mb_old_linkable summary = do
+  dt_state <- dynamicTooState dflags
+  let
+    this_mod    = ms_mod summary
+    mb_obj_date = ms_obj_date summary
+    mb_dyn_obj_date = ms_dyn_obj_date summary
+    mb_if_date  = ms_iface_date summary
+    obj_fn      = ml_obj_file (ms_location summary)
+    -- dynamic-too *also* produces the dyn_o_file, so have to check
+    -- that's there, and if it's not, regenerate both .o and
+    -- .dyn_o
+    checkDynamicObj k = case dt_state of
+                          DT_OK -> case (>=) <$> mb_dyn_obj_date <*> mb_if_date of
+                                      Just True -> k
+                                      _ -> return (MustCompile, Nothing)
+                          -- Not in dynamic-too mode
+                          _ -> k
+
+  checkDynamicObj $
+    case (,) <$> mb_obj_date <*> mb_if_date of
+      Just (obj_date, if_date)
+        | obj_date >= if_date ->
+            case mb_old_linkable of
+              Just old_linkable
+                | isObjectLinkable old_linkable, linkableTime old_linkable == obj_date
+                -> return $ (UpToDate, Just old_linkable)
+              _ -> (UpToDate,) . Just <$> findObjectLinkable this_mod obj_fn obj_date
+      _ -> return (MustCompile, Nothing)
+
+-- | Check to see if we can reuse the old linkable, by this point we will
+-- have just checked that the old interface matches up with the source hash, so
+-- no need to check that again here
+checkByteCode ::  Maybe Linkable -> IO (RecompileRequired, Maybe Linkable)
+checkByteCode mb_old_linkable =
+  case mb_old_linkable of
+    Just old_linkable
+      | not (isObjectLinkable old_linkable)
+      -> return $ (UpToDate, Just old_linkable)
+    _ -> return $ (MustCompile, Nothing)
+
+--------------------------------------------------------------
+-- Compilers
+--------------------------------------------------------------
+
 
 -- Knot tying!  See Note [Knot-tying typecheckIface]
 -- See Note [ModDetails and --make mode]
@@ -838,7 +926,7 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
                 {-# SCC "GHC.Driver.Main.mkPartialIface" #-}
                 -- This `force` saves 2M residency in test T10370
                 -- See Note [Avoiding space leaks in toIface*] for details.
-                force (mkPartialIface hsc_env details simplified_guts)
+                force (mkPartialIface hsc_env details summary simplified_guts)
 
           return HscRecomp { hscs_guts = cg_guts,
                              hscs_mod_location = ms_location summary,
@@ -849,12 +937,12 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
       -- We are not generating code, so we can skip simplification
       -- and generate a simple interface.
       _ -> do
-        (iface, mb_old_iface_hash, _details) <- liftIO $
-          hscSimpleIface hsc_env tc_result mb_old_hash
+        (iface, mb_old_iface_hash, details) <- liftIO $
+          hscSimpleIface hsc_env tc_result summary mb_old_hash
 
         liftIO $ hscMaybeWriteIface logger dflags True iface mb_old_iface_hash (ms_location summary)
 
-        return $ HscUpdate iface
+        return $ HscUpdate iface details
 
 {-
 Note [Writing interface files]
@@ -969,6 +1057,22 @@ hscMaybeWriteIface logger dflags is_simple iface old_iface mod_location = do
                DT_Dyn                              -> write_iface dflags iface
                DT_Failed | not (dynamicNow dflags) -> write_iface dflags iface
                _                                   -> return ()
+
+      when (gopt Opt_WriteHie dflags) $ do
+          -- This is slightly hacky. A hie file is considered to be up to date
+          -- if its modification time on disk is greater than or equal to that
+          -- of the .hi file (since we should always write a .hi file if we are
+          -- writing a .hie file). However, with the way this code is
+          -- structured at the moment, the .hie file is often written before
+          -- the .hi file; by touching the file here, we ensure that it is
+          -- correctly considered up-to-date.
+          --
+          -- The file should exist by the time we get here, but we check for
+          -- existence just in case, so that we don't accidentally create empty
+          -- .hie files.
+          let hie_file = ml_hie_file mod_location
+          whenM (doesFileExist hie_file) $
+            GHC.SysTools.touch logger dflags "Touching hie file" hie_file
 
 --------------------------------------------------------------
 -- NoRecomp handlers
@@ -1459,22 +1563,24 @@ hscSimplify' plugins ds_result = do
 -- generates interface files. See Note [simpleTidyPgm - mkBootModDetailsTc]
 hscSimpleIface :: HscEnv
                -> TcGblEnv
+               -> ModSummary
                -> Maybe Fingerprint
                -> IO (ModIface, Maybe Fingerprint, ModDetails)
-hscSimpleIface hsc_env tc_result mb_old_iface
-    = runHsc hsc_env $ hscSimpleIface' tc_result mb_old_iface
+hscSimpleIface hsc_env tc_result summary mb_old_iface
+    = runHsc hsc_env $ hscSimpleIface' tc_result summary mb_old_iface
 
 hscSimpleIface' :: TcGblEnv
+                -> ModSummary
                 -> Maybe Fingerprint
                 -> Hsc (ModIface, Maybe Fingerprint, ModDetails)
-hscSimpleIface' tc_result mb_old_iface = do
+hscSimpleIface' tc_result summary mb_old_iface = do
     hsc_env   <- getHscEnv
     details   <- liftIO $ mkBootModDetailsTc hsc_env tc_result
     safe_mode <- hscGetSafeMode tc_result
     new_iface
         <- {-# SCC "MkFinalIface" #-}
            liftIO $
-               mkIfaceTc hsc_env safe_mode details tc_result
+               mkIfaceTc hsc_env safe_mode details summary tc_result
     -- And the answer is ...
     liftIO $ dumpIfaceStats hsc_env
     return (new_iface, mb_old_iface, details)
@@ -2142,3 +2248,8 @@ showModuleIndex (i,n) = text "[" <> pad <> int i <> text " of " <> int n <> text
     -- compute the length of x > 0 in base 10
     len x = ceiling (logBase 10 (fromIntegral x+1) :: Float)
     pad = text (replicate (len n - len i) ' ') -- TODO: use GHC.Utils.Ppr.RStr
+
+writeInterfaceOnlyMode :: DynFlags -> Bool
+writeInterfaceOnlyMode dflags =
+ gopt Opt_WriteInterface dflags &&
+ NoBackend == backend dflags
