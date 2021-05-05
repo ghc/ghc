@@ -1,0 +1,22 @@
+abc {Cabal-3.5.0.0}
+abc {base}
+abc {base}
+Warning: -rtsopts and -with-rtsopts have no effect with -shared.
+    Call hs_init_ghc() from your main() function to set these options.
+abc {base}
+abc {q-0.1}
+abc {}
+abc {base}
+abc {base}
+abc {base}
+Warning: -rtsopts and -with-rtsopts have no effect with -shared.
+    Call hs_init_ghc() from your main() function to set these options.
+check_mods
+  []
+  [PLib]
+check_packages
+  [(Prelude, base), (QLib, q-0.1), (PLib, q-0.1)]
+  [base, q-0.1]
+abc {q-0.1}
+abc {q-0.1}
+abc {base}
