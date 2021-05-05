@@ -878,6 +878,13 @@ emitPrimOp dflags primop = case primop of
   CasAddrOp_Word64 -> \[dst, expected, new] -> opIntoRegs $ \[res] ->
     emitPrimCall [res] (MO_Cmpxchg W64) [dst, expected, new]
 
+  CasAddrOp2_Word32 -> \[dst, old_lo, old_hi, new_lo, new_hi] ->
+    opIntoRegs $ \[res_lo, res_hi] ->
+    emitPrimCall [res_lo, res_hi] (MO_Cmpxchg2 W32) [dst, old_lo, old_hi, new_lo, new_hi]
+  CasAddrOp2_Word64 -> \[dst, old_lo, old_hi, new_lo, new_hi] ->
+    opIntoRegs $ \[res_lo, res_hi] ->
+    emitPrimCall [res_lo, res_hi] (MO_Cmpxchg2 W64) [dst, old_lo, old_hi, new_lo, new_hi]
+
 -- SIMD primops
   (VecBroadcastOp vcat n w) -> \[e] -> opIntoRegs $ \[res] -> do
     checkVecCompatibility dflags vcat n w
