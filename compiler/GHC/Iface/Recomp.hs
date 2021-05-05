@@ -49,7 +49,6 @@ import GHC.Types.SrcLoc
 import GHC.Types.Unique
 import GHC.Types.Unique.Set
 import GHC.Types.Fixity.Env
-import GHC.Types.SourceFile
 
 import GHC.Unit.External
 import GHC.Unit.Finder
@@ -107,11 +106,11 @@ data RecompileRequired
   = UpToDate
        -- ^ everything is up to date, recompilation is not required
   | MustCompile
-       -- ^ The .hs file has been touched, or the .o/.hi file does not exist
+       -- ^ The .hs file has been modified, or the .o/.hi file does not exist
   | RecompBecause String
        -- ^ The .o/.hi files are up to date, but something else has changed
        -- to force recompilation; the String says what (one-line summary)
-   deriving Eq
+   deriving (Eq, Show)
 
 instance Semigroup RecompileRequired where
   UpToDate <> r = r
@@ -133,11 +132,10 @@ recompileRequired _ = True
 checkOldIface
   :: HscEnv
   -> ModSummary
-  -> SourceModified
   -> Maybe ModIface         -- Old interface from compilation manager, if any
   -> IO (RecompileRequired, Maybe ModIface)
 
-checkOldIface hsc_env mod_summary source_modified maybe_iface
+checkOldIface hsc_env mod_summary maybe_iface
   = do  let dflags = hsc_dflags hsc_env
         let logger = hsc_logger hsc_env
         showPass logger dflags $
@@ -145,16 +143,15 @@ checkOldIface hsc_env mod_summary source_modified maybe_iface
               (showPpr dflags $ ms_mod mod_summary) ++
               " (use -ddump-hi-diffs for more details)"
         initIfaceCheck (text "checkOldIface") hsc_env $
-            check_old_iface hsc_env mod_summary source_modified maybe_iface
+            check_old_iface hsc_env mod_summary maybe_iface
 
 check_old_iface
   :: HscEnv
   -> ModSummary
-  -> SourceModified
   -> Maybe ModIface
   -> IfG (RecompileRequired, Maybe ModIface)
 
-check_old_iface hsc_env mod_summary src_modified maybe_iface
+check_old_iface hsc_env mod_summary maybe_iface
   = let dflags = hsc_dflags hsc_env
         logger = hsc_logger hsc_env
         getIface =
@@ -180,7 +177,6 @@ check_old_iface hsc_env mod_summary src_modified maybe_iface
 
         src_changed
             | gopt Opt_ForceRecomp dflags    = True
-            | SourceModified <- src_modified = True
             | otherwise = False
     in do
         when src_changed $
@@ -235,6 +231,8 @@ checkVersions hsc_env mod_summary iface
        -- but we ALSO must make sure the instantiation matches up.  See
        -- test case bkpcabal04!
        ; hsc_env <- getTopEnv
+       ; if mi_src_hash iface /= ms_hs_hash mod_summary
+            then return (MustCompile, Nothing) else do {
        ; if not (isHomeModule home_unit (mi_module iface))
             then return (RecompBecause "-this-unit-id changed", Nothing) else do {
        ; recomp <- liftIO $ checkFlagHash hsc_env iface
@@ -365,16 +363,15 @@ checkHsig logger home_unit dflags mod_summary iface = do
 checkHie :: DynFlags -> ModSummary -> RecompileRequired
 checkHie dflags mod_summary =
     let hie_date_opt = ms_hie_date mod_summary
-        hs_date = ms_hs_date mod_summary
+        hi_date = ms_iface_date mod_summary
     in if not (gopt Opt_WriteHie dflags)
       then UpToDate
-      else case hie_date_opt of
-             Nothing -> RecompBecause "HIE file is missing"
-             Just hie_date
-                 | hie_date < hs_date
+      else case (hie_date_opt, hi_date) of
+             (Nothing, _) -> RecompBecause "HIE file is missing"
+             (Just hie_date, Just hi_date)
+                 | hie_date < hi_date
                  -> RecompBecause "HIE file is out of date"
-                 | otherwise
-                 -> UpToDate
+             _ -> UpToDate
 
 -- | Check the flags haven't changed
 checkFlagHash :: HscEnv -> ModIface -> IO RecompileRequired
@@ -1047,12 +1044,14 @@ addFingerprints hsc_env iface0
 
    -- The interface hash depends on:
    --   - the ABI hash, plus
+   --   - the source file hash,
    --   - the module level annotations,
    --   - usages
    --   - deps (home and external packages, dependent files)
    --   - hpc
    iface_hash <- computeFingerprint putNameLiterally
                       (mod_hash,
+                       mi_src_hash iface0,
                        ann_fn (mkVarOcc "module"),  -- See mkIfaceAnnCache
                        mi_usages iface0,
                        sorted_deps,
@@ -1077,7 +1076,7 @@ addFingerprints hsc_env iface0
       , mi_fix_fn      = fix_fn
       , mi_hash_fn     = lookupOccEnv local_env
       }
-    final_iface = iface0 { mi_decls = sorted_decls, mi_final_exts = final_iface_exts }
+    final_iface = iface0 { mi_used_th = Nothing, mi_decls = sorted_decls, mi_final_exts = final_iface_exts }
    --
    return final_iface
 

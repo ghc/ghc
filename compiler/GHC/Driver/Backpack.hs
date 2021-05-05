@@ -51,6 +51,7 @@ import GHC.Types.Unique.DFM
 import GHC.Types.Unique.DSet
 
 import GHC.Utils.Outputable
+import GHC.Utils.Fingerprint
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Error
@@ -334,7 +335,7 @@ buildUnit session cid insts lunit = do
             linkables = map (expectJust "bkp link" . hm_linkable)
                       . filter ((==HsSrcFile) . mi_hsc_src . hm_iface)
                       $ home_mod_infos
-            getOfiles (LM _ _ us) = map nameOfObject (filter isObject us)
+            getOfiles LM{ linkableUnlinked = us } = map nameOfObject (filter isObject us)
             obj_files = concatMap getOfiles linkables
             state     = hsc_units hsc_env
 
@@ -752,7 +753,7 @@ summariseRequirement pn mod_name = do
                  (unpackFS pn_fs </> moduleNameSlashes mod_name) "hsig"
 
     env <- getBkpEnv
-    time <- liftIO $ getModificationUTCTime (bkp_filename env)
+    src_hash <- liftIO $ getFileHash (bkp_filename env)
     hi_timestamp <- liftIO $ modificationTimeIfExists (ml_hi_file location)
     hie_timestamp <- liftIO $ modificationTimeIfExists (ml_hie_file location)
     let loc = srcLocSpan (mkSrcLoc (mkFastString (bkp_filename env)) 1 1)
@@ -766,7 +767,7 @@ summariseRequirement pn mod_name = do
         ms_mod = mod,
         ms_hsc_src = HsigFile,
         ms_location = location,
-        ms_hs_date = time,
+        ms_hs_hash = src_hash,
         ms_obj_date = Nothing,
         ms_iface_date = hi_timestamp,
         ms_hie_date = hie_timestamp,
@@ -803,7 +804,6 @@ summariseDecl _pn hsc_src lmodname@(L loc modname) Nothing
                          emptyModNodeMap -- GHC API recomp not supported
                          (hscSourceToIsBoot hsc_src)
                          lmodname
-                         True -- Target lets you disallow, but not here
                          Nothing -- GHC API buffer support not supported
                          [] -- No exclusions
          case r of
@@ -850,7 +850,7 @@ hsModuleToModSummary pn hsc_src modname
                         _ -> location0
     -- This duplicates a pile of logic in GHC.Driver.Make
     env <- getBkpEnv
-    time <- liftIO $ getModificationUTCTime (bkp_filename env)
+    src_hash <- liftIO $ getFileHash (bkp_filename env)
     hi_timestamp <- liftIO $ modificationTimeIfExists (ml_hi_file location)
     hie_timestamp <- liftIO $ modificationTimeIfExists (ml_hie_file location)
 
@@ -899,7 +899,7 @@ hsModuleToModSummary pn hsc_src modname
                     hpm_module = hsmod,
                     hpm_src_files = [] -- TODO if we preprocessed it
                 }),
-            ms_hs_date = time,
+            ms_hs_hash = src_hash,
             ms_obj_date = Nothing, -- TODO do this, but problem: hi_timestamp is BOGUS
             ms_iface_date = hi_timestamp,
             ms_hie_date = hie_timestamp

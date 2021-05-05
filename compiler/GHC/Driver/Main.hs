@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 
 {-# LANGUAGE NondecreasingIndentation #-}
+{-# LANGUAGE TupleSections #-}
 
 {-# OPTIONS_GHC -fprof-auto-top #-}
 
@@ -86,6 +87,7 @@ module GHC.Driver.Main
     , ioMsgMaybe
     , showModuleIndex
     , hscAddSptEntries
+    , writeInterfaceOnlyMode
     ) where
 
 import GHC.Prelude
@@ -219,6 +221,7 @@ import GHC.Data.Bag
 import GHC.Data.StringBuffer
 import qualified GHC.Data.Stream as Stream
 import GHC.Data.Stream (Stream)
+import qualified GHC.SysTools
 
 import Data.Data hiding (Fixity, TyCon)
 import Data.Maybe       ( fromJust )
@@ -547,8 +550,13 @@ hsc_typecheck keep_rn mod_summary mb_rdr_module = do
                     Nothing -> hscParse' mod_summary
             tc_result0 <- tcRnModule' mod_summary keep_rn' hpm
             if hsc_src == HsigFile
+<<<<<<< HEAD
                 then do (iface, _, _) <- liftIO $ hscSimpleIface hsc_env tc_result0 Nothing
                         ioMsgMaybe $ hoistTcRnMessage $
+=======
+                then do (iface, _, _) <- liftIO $ hscSimpleIface hsc_env tc_result0 mod_summary Nothing
+                        ioMsgMaybe $
+>>>>>>> d210a99746... Hash based builds
                             tcRnMergeSignatures hsc_env hpm tc_result0 iface
                 else return tc_result0
     -- TODO are we extracting anything when we merely instantiate a signature?
@@ -696,14 +704,14 @@ hscIncrementalFrontend :: Bool -- always do basic recompilation check?
                        -> Maybe TcGblEnv
                        -> Maybe Messager
                        -> ModSummary
-                       -> SourceModified
+                       -> Maybe Linkable
                        -> Maybe ModIface  -- Old interface, if available
                        -> (Int,Int)       -- (i,n) = module i of n (for msgs)
-                       -> Hsc (Either ModIface (FrontendResult, Maybe Fingerprint))
+                       -> Hsc (Either (ModIface, Maybe Linkable) (FrontendResult, Maybe Fingerprint))
 
 hscIncrementalFrontend
   always_do_basic_recompilation_check m_tc_result
-  mHscMessage mod_summary source_modified mb_old_iface mod_index
+  mHscMessage mod_summary old_linkable mb_old_iface mod_index
     = do
     hsc_env <- getHscEnv
 
@@ -723,19 +731,41 @@ hscIncrementalFrontend
               Just h  -> h mod_summary
             return $ Right (tc_result, mb_old_hash)
 
-        stable = case source_modified of
-                     SourceUnmodifiedAndStable -> True
-                     _                         -> False
 
     case m_tc_result of
+         -- This case only happens from loadModule, which is not used
+         -- anywhere
          Just tc_result
           | not always_do_basic_recompilation_check ->
              return $ Right (FrontendTypecheck tc_result, Nothing)
+
          _ -> do
-            (recomp_reqd, mb_checked_iface)
+            -- First check to see if the interface file agrees with the
+            -- source file.
+            (recomp_iface_reqd, mb_checked_iface)
                 <- {-# SCC "checkOldIface" #-}
-                   liftIO $ checkOldIface hsc_env mod_summary
-                                source_modified mb_old_iface
+                   liftIO $ checkOldIface hsc_env mod_summary mb_old_iface
+
+            -- Check to see whether the expected build products already exist.
+            -- If they don't exists then we trigger recompilation.
+            let lcl_dflags = ms_hspp_opts mod_summary
+            (recomp_obj_reqd, mb_linkable) <-
+              case () of
+                -- No need for a linkable, we're good to go
+                _ | writeInterfaceOnlyMode lcl_dflags -> return (UpToDate, Nothing)
+                  -- Interpreter can use either already loaded bytecode or loaded object code
+                  | not (backendProducesObject (backend lcl_dflags)) -> do
+                      res <- liftIO $ checkByteCode old_linkable
+                      case res of
+                        (_, Just{}) -> return res
+                        _ -> liftIO $ checkObjects lcl_dflags old_linkable mod_summary
+                  -- Need object files for making object files
+                  | backendProducesObject (backend lcl_dflags) -> liftIO $ checkObjects lcl_dflags old_linkable mod_summary
+                  | otherwise -> pprPanic "hscIncrementalFrontend" (text $ show $ backend lcl_dflags)
+
+
+            let recomp_reqd = recomp_iface_reqd `mappend` recomp_obj_reqd
+
             -- save the interface that comes back from checkOldIface.
             -- In one-shot mode we don't have the old iface until this
             -- point, when checkOldIface reads it from the disk.
@@ -743,30 +773,43 @@ hscIncrementalFrontend
 
             case mb_checked_iface of
                 Just iface | not (recompileRequired recomp_reqd) ->
-                    -- If the module used TH splices when it was last
-                    -- compiled, then the recompilation check is not
-                    -- accurate enough (#481) and we must ignore
-                    -- it.  However, if the module is stable (none of
-                    -- the modules it depends on, directly or
-                    -- indirectly, changed), then we *can* skip
-                    -- recompilation. This is why the SourceModified
-                    -- type contains SourceUnmodifiedAndStable, and
-                    -- it's pretty important: otherwise ghc --make
-                    -- would always recompile TH modules, even if
-                    -- nothing at all has changed. Stability is just
-                    -- the same check that make is doing for us in
-                    -- one-shot mode.
-                    case m_tc_result of
-                    Nothing
-                     | mi_used_th iface && not stable ->
-                        compile mb_old_hash (RecompBecause "TH")
-                    _ ->
-                        skip iface
+                  skip (iface, mb_linkable)
                 _ ->
-                    case m_tc_result of
+                  case m_tc_result of
                     Nothing -> compile mb_old_hash recomp_reqd
                     Just tc_result ->
                         return $ Right (FrontendTypecheck tc_result, mb_old_hash)
+
+-- | Check that the .o files produced by compilation are already up-to-date
+-- or not.
+checkObjects :: DynFlags -> Maybe Linkable -> ModSummary -> IO (RecompileRequired, Maybe Linkable)
+checkObjects dflags mb_old_linkable summary = do
+  dt_state <- dynamicTooState dflags
+  let
+    this_mod    = ms_mod summary
+    mb_obj_date = ms_obj_date summary
+    mb_if_date  = ms_iface_date summary
+    obj_fn      = ml_obj_file (ms_location summary)
+    case (,) <$> mb_obj_date <*> mb_if_date of
+      Just (obj_date, if_date)
+        | obj_date >= if_date ->
+            case mb_old_linkable of
+              Just old_linkable
+                | isObjectLinkable old_linkable, linkableTime old_linkable == obj_date
+                -> return $ (UpToDate, Just old_linkable)
+              _ -> (UpToDate,) . Just <$> findObjectLinkable this_mod obj_fn obj_date
+      _ -> return (MustCompile, Nothing)
+
+-- | Check to see if we can reuse the old linkable, by this point we will
+-- have just checked that the old interface matches up with the source hash, so
+-- no need to check that again here
+checkByteCode ::  Maybe Linkable -> IO (RecompileRequired, Maybe Linkable)
+checkByteCode mb_old_linkable =
+  case mb_old_linkable of
+    Just old_linkable
+      | not (isObjectLinkable old_linkable)
+      -> return $ (UpToDate, Just old_linkable)
+    _ -> return $ (MustCompile, Nothing)
 
 --------------------------------------------------------------
 -- Compilers
@@ -782,12 +825,12 @@ hscIncrementalCompile :: Bool
                       -> Maybe Messager
                       -> HscEnv
                       -> ModSummary
-                      -> SourceModified
+                      -> Maybe Linkable
                       -> Maybe ModIface
                       -> (Int,Int)
                       -> IO (HscStatus, HscEnv)
 hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
-    mHscMessage hsc_env' mod_summary source_modified mb_old_iface mod_index
+    mHscMessage hsc_env' mod_summary old_linkable mb_old_iface mod_index
   = do
     hsc_env'' <- initializePlugins hsc_env'
 
@@ -807,13 +850,13 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
     -- because the desugarer runs ioMsgMaybe.)
     runHsc hsc_env $ do
     e <- hscIncrementalFrontend always_do_basic_recompilation_check m_tc_result mHscMessage
-            mod_summary source_modified mb_old_iface mod_index
+            mod_summary old_linkable mb_old_iface mod_index
     case e of
         -- We didn't need to do any typechecking; the old interface
         -- file on disk was good enough.
-        Left iface -> do
+        Left (iface, linkable) -> do
             details <- liftIO $ initModDetails hsc_env mod_summary iface
-            return (HscUpToDate iface details, hsc_env')
+            return (HscUpToDate (HomeModInfo iface details linkable), hsc_env')
         -- We finished type checking.  (mb_old_hash is the hash of
         -- the interface that existed on disk; it's possible we had
         -- to retypecheck but the resulting interface is exactly
@@ -929,7 +972,7 @@ finish summary tc_result mb_old_hash = do
                 {-# SCC "GHC.Driver.Main.mkPartialIface" #-}
                 -- This `force` saves 2M residency in test T10370
                 -- See Note [Avoiding space leaks in toIface*] for details.
-                force (mkPartialIface hsc_env details simplified_guts)
+                force (mkPartialIface hsc_env details summary simplified_guts)
 
           return HscRecomp { hscs_guts = cg_guts,
                              hscs_mod_location = ms_location summary,
@@ -941,12 +984,12 @@ finish summary tc_result mb_old_hash = do
       -- and generate a simple interface.
       _ -> do
         (iface, mb_old_iface_hash, details) <- liftIO $
-          hscSimpleIface hsc_env tc_result mb_old_hash
+          hscSimpleIface hsc_env tc_result summary mb_old_hash
 
         liftIO $ hscMaybeWriteIface logger dflags True iface mb_old_iface_hash (ms_location summary)
 
         return $ case bcknd of
-          NoBackend -> HscNotGeneratingCode iface details
+          NoBackend -> HscNotGeneratingCode (HomeModInfo iface details Nothing)
           _         -> case hsc_src of
                         HsBootFile -> HscUpdateBoot iface details
                         HsigFile   -> HscUpdateSig iface details
@@ -1065,6 +1108,22 @@ hscMaybeWriteIface logger dflags is_simple iface old_iface mod_location = do
                DT_Dyn                              -> write_iface dflags iface
                DT_Failed | not (dynamicNow dflags) -> write_iface dflags iface
                _                                   -> return ()
+
+      when (gopt Opt_WriteHie dflags) $ do
+          -- This is slightly hacky. A hie file is considered to be up to date
+          -- if its modification time on disk is greater than or equal to that
+          -- of the .hi file (since we should always write a .hi file if we are
+          -- writing a .hie file). However, with the way this code is
+          -- structured at the moment, the .hie file is often written before
+          -- the .hi file; by touching the file here, we ensure that it is
+          -- correctly considered up-to-date.
+          --
+          -- The file should exist by the time we get here, but we check for
+          -- existence just in case, so that we don't accidentally create empty
+          -- .hie files.
+          let hie_file = ml_hie_file mod_location
+          whenM (doesFileExist hie_file) $
+            GHC.SysTools.touch logger dflags "Touching hie file" hie_file
 
 --------------------------------------------------------------
 -- NoRecomp handlers
@@ -1555,22 +1614,24 @@ hscSimplify' plugins ds_result = do
 -- generates interface files. See Note [simpleTidyPgm - mkBootModDetailsTc]
 hscSimpleIface :: HscEnv
                -> TcGblEnv
+               -> ModSummary
                -> Maybe Fingerprint
                -> IO (ModIface, Maybe Fingerprint, ModDetails)
-hscSimpleIface hsc_env tc_result mb_old_iface
-    = runHsc hsc_env $ hscSimpleIface' tc_result mb_old_iface
+hscSimpleIface hsc_env tc_result summary mb_old_iface
+    = runHsc hsc_env $ hscSimpleIface' tc_result summary mb_old_iface
 
 hscSimpleIface' :: TcGblEnv
+                -> ModSummary
                 -> Maybe Fingerprint
                 -> Hsc (ModIface, Maybe Fingerprint, ModDetails)
-hscSimpleIface' tc_result mb_old_iface = do
+hscSimpleIface' tc_result summary mb_old_iface = do
     hsc_env   <- getHscEnv
     details   <- liftIO $ mkBootModDetailsTc hsc_env tc_result
     safe_mode <- hscGetSafeMode tc_result
     new_iface
         <- {-# SCC "MkFinalIface" #-}
            liftIO $
-               mkIfaceTc hsc_env safe_mode details tc_result
+               mkIfaceTc hsc_env safe_mode details summary tc_result
     -- And the answer is ...
     liftIO $ dumpIfaceStats hsc_env
     return (new_iface, mb_old_iface, details)
@@ -2238,3 +2299,8 @@ showModuleIndex (i,n) = text "[" <> pad <> int i <> text " of " <> int n <> text
     -- compute the length of x > 0 in base 10
     len x = ceiling (logBase 10 (fromIntegral x+1) :: Float)
     pad = text (replicate (len n - len i) ' ') -- TODO: use GHC.Utils.Ppr.RStr
+
+writeInterfaceOnlyMode :: DynFlags -> Bool
+writeInterfaceOnlyMode dflags =
+ gopt Opt_WriteInterface dflags &&
+ NoBackend == backend dflags

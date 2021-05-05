@@ -89,12 +89,15 @@ import GHC.Unit.Module.Warnings
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module.ModGuts
+import GHC.Unit.Module.ModSummary
 import GHC.Unit.Module.Deps
 
 import Data.Function
 import Data.List ( findIndex, mapAccumL, sortBy )
 import Data.Ord
 import Data.IORef
+
+import GHC.Fingerprint
 
 {-
 ************************************************************************
@@ -106,9 +109,10 @@ import Data.IORef
 
 mkPartialIface :: HscEnv
                -> ModDetails
+               -> ModSummary
                -> ModGuts
                -> PartialModIface
-mkPartialIface hsc_env mod_details
+mkPartialIface hsc_env mod_details mod_summary
   ModGuts{ mg_module       = this_mod
          , mg_hsc_src      = hsc_src
          , mg_usages       = usages
@@ -125,7 +129,7 @@ mkPartialIface hsc_env mod_details
          , mg_arg_docs     = arg_docs
          }
   = mkIface_ hsc_env this_mod hsc_src used_th deps rdr_env fix_env warns hpc_info self_trust
-             safe_mode usages doc_hdr decl_docs arg_docs mod_details
+             safe_mode usages doc_hdr decl_docs arg_docs mod_summary mod_details
 
 -- | Fully instantiate an interface. Adds fingerprints and potentially code
 -- generator produced information.
@@ -177,9 +181,10 @@ updateDecl decls (Just CgInfos{ cgNonCafs = NonCaffySet non_cafs, cgLFInfos = lf
 mkIfaceTc :: HscEnv
           -> SafeHaskellMode    -- The safe haskell mode
           -> ModDetails         -- gotten from mkBootModDetails, probably
+          -> ModSummary
           -> TcGblEnv           -- Usages, deprecations, etc
           -> IO ModIface
-mkIfaceTc hsc_env safe_mode mod_details
+mkIfaceTc hsc_env safe_mode mod_details mod_summary
   tc_result@TcGblEnv{ tcg_mod = this_mod,
                       tcg_src = hsc_src,
                       tcg_imports = imports,
@@ -217,7 +222,7 @@ mkIfaceTc hsc_env safe_mode mod_details
                    used_th deps rdr_env
                    fix_env warns hpc_info
                    (imp_trust_own_pkg imports) safe_mode usages
-                   doc_hdr' doc_map arg_map
+                   doc_hdr' doc_map arg_map mod_summary
                    mod_details
 
           mkFullIface hsc_env partial_iface Nothing
@@ -231,12 +236,13 @@ mkIface_ :: HscEnv -> Module -> HscSource
          -> Maybe HsDocString
          -> DeclDocMap
          -> ArgDocMap
+         -> ModSummary
          -> ModDetails
          -> PartialModIface
 mkIface_ hsc_env
          this_mod hsc_src used_th deps rdr_env fix_env src_warns
          hpc_info pkg_trust_req safe_mode usages
-         doc_hdr decl_docs arg_docs
+         doc_hdr decl_docs arg_docs mod_summary
          ModDetails{  md_insts     = insts,
                       md_fam_insts = fam_insts,
                       md_rules     = rules,
@@ -313,7 +319,9 @@ mkIface_ hsc_env
           mi_decl_docs   = decl_docs,
           mi_arg_docs    = arg_docs,
           mi_final_exts  = (),
-          mi_ext_fields  = emptyExtensibleFields }
+          mi_ext_fields  = emptyExtensibleFields,
+          mi_src_hash = ms_hs_hash mod_summary
+          }
   where
      cmp_rule     = lexicalCompareFS `on` ifRuleName
      -- Compare these lexicographically by OccName, *not* by unique,
