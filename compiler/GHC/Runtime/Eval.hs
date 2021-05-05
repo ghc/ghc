@@ -1277,13 +1277,25 @@ obtainTermFromVal hsc_env _bound _force _ty _x = case interpInstance interp of
 
 obtainTermFromId :: HscEnv -> Int -> Bool -> Id -> IO Term
 obtainTermFromId hsc_env bound force id =  do
-  hv <- Loader.loadName (hscInterp hsc_env) hsc_env (varName id)
+  let interp   = hscInterp hsc_env
+  let unit_env = hsc_unit_env hsc_env
+  let tmpfs    = hsc_tmpfs hsc_env
+  let dflags   = hsc_dflags hsc_env
+  let logger   = hsc_logger hsc_env
+  initLoaderState logger tmpfs interp dflags unit_env
+  hv <- Loader.loadName interp hsc_env (varName id)
   cvObtainTerm hsc_env bound force (idType id) hv
 
 -- Uses RTTI to reconstruct the type of an Id, making it less polymorphic
 reconstructType :: HscEnv -> Int -> Id -> IO (Maybe Type)
 reconstructType hsc_env bound id = do
-  hv <- Loader.loadName (hscInterp hsc_env) hsc_env (varName id)
+  let interp   = hscInterp hsc_env
+  let unit_env = hsc_unit_env hsc_env
+  let tmpfs    = hsc_tmpfs hsc_env
+  let dflags   = hsc_dflags hsc_env
+  let logger   = hsc_logger hsc_env
+  initLoaderState logger tmpfs interp dflags unit_env
+  hv <- Loader.loadName interp hsc_env (varName id)
   cvReconstructType hsc_env bound (idType id) hv
 
 mkRuntimeUnkTyVar :: Name -> Kind -> TyVar
