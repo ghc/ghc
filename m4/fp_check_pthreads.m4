@@ -82,6 +82,23 @@ AC_DEFUN([FP_CHECK_PTHREADS],
     AC_MSG_RESULT(no)
   )
 
+  dnl NetBSD
+  AC_MSG_CHECKING([for pthread_setname_np (NetBSD)])
+  AC_LINK_IFELSE([
+    AC_LANG_PROGRAM(
+      [[
+      #include <pthread.h>
+      ]],
+      [[pthread_setname_np(pthread_self(), "%s", "name");]]
+    )],
+    [
+      AC_MSG_RESULT([yes])
+      AC_DEFINE([HAVE_PTHREAD_SETNAME_NP_NETBSD], [1],
+        [Define to 1 if you have the NetBSD version of pthread_setname_np])
+    ],
+    AC_MSG_RESULT([no])
+  )
+
   dnl FreeBSD
   AC_MSG_CHECKING([for pthread_set_name_np])
   AC_LINK_IFELSE([

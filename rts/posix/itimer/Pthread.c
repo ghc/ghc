@@ -212,6 +212,8 @@ initTicker (Time interval, TickProc handle_tick)
         pthread_setname_np(thread, "ghc_ticker");
 #elif defined(HAVE_PTHREAD_SETNAME_NP_DARWIN)
         pthread_setname_np("ghc_ticker");
+#elif defined(HAVE_PTHREAD_SETNAME_NP_NETBSD)
+        pthread_setname_np(thread, "%s", "ghc_ticker");
 #endif
     } else {
         barf("Itimer: Failed to spawn thread: %s", strerror(errno));
