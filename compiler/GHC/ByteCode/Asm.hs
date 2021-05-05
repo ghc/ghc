@@ -383,7 +383,7 @@ assembleI platform i = case i of
   PUSH_ALTS proto          -> do let ul_bco = assembleBCO platform proto
                                  p <- ioptr (liftM BCOPtrBCO ul_bco)
                                  emit bci_PUSH_ALTS [Op p]
-  PUSH_ALTS_UNLIFTED proto pk
+  PUSH_ALTS_UNBOXED proto pk
                            -> do let ul_bco = assembleBCO platform proto
                                  p <- ioptr (liftM BCOPtrBCO ul_bco)
                                  emit (push_alts pk) [Op p]

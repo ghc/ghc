@@ -87,11 +87,11 @@ data BCInstr
    | PUSH_BCO     (ProtoBCO Name)
 
    -- Push an alt continuation
-   | PUSH_ALTS          (ProtoBCO Name)
-   | PUSH_ALTS_UNLIFTED (ProtoBCO Name) ArgRep
-   | PUSH_ALTS_TUPLE    (ProtoBCO Name) -- continuation
-                        !TupleInfo
-                        (ProtoBCO Name) -- tuple return BCO
+   | PUSH_ALTS         (ProtoBCO Name)
+   | PUSH_ALTS_UNBOXED (ProtoBCO Name) ArgRep
+   | PUSH_ALTS_TUPLE   (ProtoBCO Name) -- continuation
+                       !TupleInfo
+                       (ProtoBCO Name) -- tuple return BCO
 
    -- Pushing 8, 16 and 32 bits of padding (for constructors).
    | PUSH_PAD8
@@ -175,7 +175,7 @@ data BCInstr
    -- To Infinity And Beyond
    | ENTER
    | RETURN            -- return a lifted value
-   | RETURN_UBX ArgRep -- return an unlifted value, here's its rep
+   | RETURN_UBX ArgRep -- return an unboxed value, here's its rep
    | RETURN_TUPLE      -- return an unboxed tuple (info already on stack)
 
    -- Breakpoints
@@ -252,7 +252,7 @@ instance Outputable BCInstr where
    ppr (PUSH_BCO bco)        = hang (text "PUSH_BCO") 2 (ppr bco)
 
    ppr (PUSH_ALTS bco)       = hang (text "PUSH_ALTS") 2 (ppr bco)
-   ppr (PUSH_ALTS_UNLIFTED bco pk) = hang (text "PUSH_ALTS_UNLIFTED" <+> ppr pk) 2 (ppr bco)
+   ppr (PUSH_ALTS_UNBOXED bco pk) = hang (text "PUSH_ALTS_UNBOXED" <+> ppr pk) 2 (ppr bco)
    ppr (PUSH_ALTS_TUPLE bco tuple_info tuple_bco) =
                                hang (text "PUSH_ALTS_TUPLE" <+> ppr tuple_info)
                                     2
@@ -347,8 +347,8 @@ bciStackUse PUSH_PRIMOP{}         = 1
 bciStackUse PUSH_BCO{}            = 1
 bciStackUse (PUSH_ALTS bco)       = 2 {- profiling only, restore CCCS -} +
                                     3 + protoBCOStackUse bco
-bciStackUse (PUSH_ALTS_UNLIFTED bco _) = 2 {- profiling only, restore CCCS -} +
-                                         4 + protoBCOStackUse bco
+bciStackUse (PUSH_ALTS_UNBOXED bco _) = 2 {- profiling only, restore CCCS -} +
+                                        4 + protoBCOStackUse bco
 bciStackUse (PUSH_ALTS_TUPLE bco info _) =
    -- (tuple_bco, tuple_info word, cont_bco, stg_ctoi_t)
    -- tuple
