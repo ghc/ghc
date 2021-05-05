@@ -2021,6 +2021,11 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
                                 stg_binds data_tycons mod_breaks
 
     let src_span = srcLocSpan interactiveSrcLoc
+    let unit_env = hsc_unit_env hsc_env
+    let tmpfs    = hsc_tmpfs hsc_env
+    let dflags   = hsc_dflags hsc_env
+    let logger   = hsc_logger hsc_env
+    liftIO $ initLoaderState logger tmpfs interp dflags unit_env
     liftIO $ loadDecls interp hsc_env src_span cbc
 
     {- Load static pointer table entries -}
@@ -2051,7 +2056,12 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
 -- See Note [Grand plan for static forms] in "GHC.Iface.Tidy.StaticPtrTable".
 hscAddSptEntries :: HscEnv -> [SptEntry] -> IO ()
 hscAddSptEntries hsc_env entries = do
-    let interp = hscInterp hsc_env
+    let interp   = hscInterp hsc_env
+    let unit_env = hsc_unit_env hsc_env
+    let tmpfs    = hsc_tmpfs hsc_env
+    let dflags   = hsc_dflags hsc_env
+    let logger   = hsc_logger hsc_env
+    initLoaderState logger tmpfs interp dflags unit_env
     let add_spt_entry :: SptEntry -> IO ()
         add_spt_entry (SptEntry i fpr) = do
             val <- loadName interp hsc_env (idName i)
@@ -2207,7 +2217,13 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr
                      stg_expr
 
            {- load it -}
-         ; loadExpr (hscInterp hsc_env) hsc_env srcspan bcos }
+         ; let interp   = hscInterp hsc_env
+         ; let unit_env = hsc_unit_env hsc_env
+         ; let tmpfs    = hsc_tmpfs hsc_env
+         ; let dflags   = hsc_dflags hsc_env
+         ; let logger   = hsc_logger hsc_env
+         ; initLoaderState logger tmpfs interp dflags unit_env
+         ; loadExpr interp hsc_env srcspan bcos }
 
 
 {- **********************************************************************

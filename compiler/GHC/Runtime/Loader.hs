@@ -27,7 +27,7 @@ import GHC.Driver.Ppr
 import GHC.Driver.Hooks
 import GHC.Driver.Plugins
 
-import GHC.Linker.Loader       ( loadModule, loadName )
+import GHC.Linker.Loader       ( initLoaderState, loadModule, loadName )
 import GHC.Runtime.Interpreter ( wormhole )
 import GHC.Runtime.Interpreter.Types
 
@@ -130,7 +130,13 @@ loadPlugin' occ_name plugin_name hsc_env mod_name
                           , ppr plugin_rdr_name ]) ;
             Just (name, mod_iface) ->
 
-     do { plugin_tycon <- forceLoadTyCon hsc_env plugin_name
+     do { let interp   = hscInterp hsc_env
+        ; let logger   = hsc_logger hsc_env
+        ; let tmpfs    = hsc_tmpfs hsc_env
+        ; let dflags   = hsc_dflags hsc_env
+        ; let unit_env = hsc_unit_env hsc_env
+        ; initLoaderState logger tmpfs interp dflags unit_env
+        ; plugin_tycon <- forceLoadTyCon hsc_env plugin_name
         ; mb_plugin <- getValueSafely hsc_env name (mkTyConTy plugin_tycon)
         ; case mb_plugin of
             Nothing ->
