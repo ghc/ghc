@@ -2598,6 +2598,11 @@ dynamic_flags_deps = [
   , make_ord_flag defFlag "Wno-extra"      (NoArg (mapM_
                                                    unSetWarningFlag minusWOpts))
 
+  , make_ord_flag defFlag "Worphans"       (NoArg (mapM_
+                                                     setWarningFlag minusWorphansOpts))
+  , make_ord_flag defFlag "Wno-orphans"    (NoArg (mapM_
+                                                   unSetWarningFlag minusWorphansOpts))
+
   , make_ord_flag defFlag "Wdefault"       (NoArg (mapM_
                                                setWarningFlag standardWarnings))
   , make_ord_flag defFlag "Wno-default"    (NoArg (mapM_
@@ -2822,6 +2827,8 @@ dynamic_flags_deps = [
   , make_ord_flag defHiddenFlag "fwarn-unused-binds" (NoArg enableUnusedBinds)
   , make_ord_flag defHiddenFlag "fno-warn-unused-binds" (NoArg
                                                             disableUnusedBinds)
+  , make_ord_flag defHiddenFlag "fno-warn-orphans" (NoArg
+                                                            (mapM_ unSetWarningFlag minusWorphansOpts))
 
         ------ Safe Haskell flags -------------------------------------------
   , make_ord_flag defFlag "fpackage-trust"   (NoArg setPackageTrust)
@@ -3134,7 +3141,9 @@ wWarningFlagsDeps = [
     "fail is no longer a method of Monad",
   flagSpec "noncanonical-monoid-instances"
                                          Opt_WarnNonCanonicalMonoidInstances,
-  flagSpec "orphans"                     Opt_WarnOrphans,
+  flagSpec "orphans-class"               Opt_WarnOrphansClass,
+  flagSpec "orphans-type"                Opt_WarnOrphansType,
+  flagSpec "orphans-data"                Opt_WarnOrphansData,
   flagSpec "overflowed-literals"         Opt_WarnOverflowedLiterals,
   flagSpec "overlapping-patterns"        Opt_WarnOverlappingPatterns,
   flagSpec "missed-specialisations"      Opt_WarnMissedSpecs,
@@ -3896,6 +3905,7 @@ warningGroups =
     , ("default",      standardWarnings)
     , ("extra",        minusWOpts)
     , ("all",          minusWallOpts)
+    , ("orphans",      minusWorphansOpts)
     , ("everything",   minusWeverythingOpts)
     ]
 
@@ -3990,7 +4000,7 @@ minusWallOpts
         Opt_WarnNameShadowing,
         Opt_WarnMissingSignatures,
         Opt_WarnHiShadows,
-        Opt_WarnOrphans,
+        Opt_WarnOrphansClass,
         Opt_WarnUnusedDoBind,
         Opt_WarnTrustworthySafe,
         Opt_WarnUntickedPromotedConstructors,
@@ -4000,6 +4010,14 @@ minusWallOpts
         Opt_WarnStarIsType,
         Opt_WarnIncompleteUniPatterns,
         Opt_WarnIncompletePatternsRecUpd
+      ]
+
+-- | Things you get with -Worphans
+minusWorphansOpts :: [WarningFlag]
+minusWorphansOpts
+    = [ Opt_WarnOrphansClass,
+        Opt_WarnOrphansData,
+        Opt_WarnOrphansType
       ]
 
 -- | Things you get with -Weverything, i.e. *all* known warnings flags

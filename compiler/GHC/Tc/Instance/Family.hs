@@ -17,6 +17,7 @@ import GHC.Prelude
 import GHC.Driver.Session
 import GHC.Driver.Env
 
+import GHC.Core( IsOrphan(..) )
 import GHC.Core.FamInstEnv
 import GHC.Core.InstEnv( roughMatchTcs )
 import GHC.Core.Coercion
@@ -173,7 +174,7 @@ addressed yet.
 
 newFamInst :: FamFlavor -> CoAxiom Unbranched -> TcM FamInst
 -- Freshen the type variables of the FamInst branches
-newFamInst flavor axiom@(CoAxiom { co_ax_tc = fam_tc })
+newFamInst flavor axiom@(CoAxiom { co_ax_tc = fam_tc, co_ax_name = ax_name })
   = do {
          -- Freshen the type variables
          (subst, tvs') <- freshenTyVarBndrs tvs
@@ -181,15 +182,22 @@ newFamInst flavor axiom@(CoAxiom { co_ax_tc = fam_tc })
        ; let lhs'     = substTys subst lhs
              rhs'     = substTy  subst rhs
 
-       ; return (FamInst { fi_fam      = tyConName fam_tc
+       ; return (FamInst { fi_fam      = fam_name
                          , fi_flavor   = flavor
                          , fi_tcs      = roughMatchTcs lhs
                          , fi_tvs      = tvs'
                          , fi_cvs      = cvs'
                          , fi_tys      = lhs'
                          , fi_rhs      = rhs'
-                         , fi_axiom    = axiom }) }
+                         , fi_axiom    = axiom
+                         , fi_orphan   = orph })
+       }
   where
+    fam_name = tyConName fam_tc
+    this_mod = ASSERT( isExternalName fam_name ) nameModule ax_name
+    is_local name = nameIsLocalOrFrom this_mod name
+    orph | is_local fam_name = NotOrphan (nameOccName fam_name)
+         | otherwise         = IsOrphan
     CoAxBranch { cab_tvs = tvs
                , cab_cvs = cvs
                , cab_lhs = lhs
