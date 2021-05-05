@@ -116,11 +116,12 @@ primRepCmmType _      DoubleRep        = f64
 primRepCmmType _      (VecRep len rep) = vec len (primElemRepCmmType rep)
 
 slotCmmType :: DynFlags -> SlotTy -> CmmType
-slotCmmType dflags PtrSlot    = gcWord dflags
-slotCmmType dflags WordSlot   = bWord dflags
-slotCmmType _      Word64Slot = b64
-slotCmmType _      FloatSlot  = f32
-slotCmmType _      DoubleSlot = f64
+slotCmmType dflags PtrLiftedSlot    = gcWord dflags
+slotCmmType dflags PtrUnliftedSlot  = gcWord dflags
+slotCmmType dflags WordSlot         = bWord dflags
+slotCmmType _      Word64Slot       = b64
+slotCmmType _      FloatSlot        = f32
+slotCmmType _      DoubleSlot       = f64
 
 primElemRepCmmType :: PrimElemRep -> CmmType
 primElemRepCmmType Int8ElemRep   = b8

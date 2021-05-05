@@ -1,5 +1,5 @@
-.. _release-8-10-4:
-Release notes for version 8.10.4
+.. _release-8-10-5:
+Release notes for version 8.10.5
 ================================
 
 The significant changes to the various parts of the compiler are listed in the
@@ -8,14 +8,57 @@ following sections.
 Like previous releases in the 8.10 series, the :ghc-flag:`LLVM backend <-fllvm>`
 of this release is to be used with LLVM 9.
 
-Bug Fixes
----------
+General bug fixes
+-----------------
 
-- Fix a linker hang triggered by dynamic code loading on Windows
-  (:ghc-ticket:`19155`)
+- First-class support for Apple M1 hardware using GHC's LLVM ARM backend
 
-- Fix a crash caused by inappropriate garbage of heap-allocated data reachable
-  from foreign exports (:ghc-tickets:`19149`).
+- Fix a bug where code may be unloaded prematurely when using the parallel
+  garbage collector (see #)
+
+- Fix a bug where the linker may during shutdown unload code before
+  libraries' ``atexit`` handlers have a chance to run (:ghc-ticket:`19297`).
+
+- Improve code layout by distiguishing conditional and unconditional branches
+  (:ghc-ticket:`18053`).
+
+- Add ``hs-boot`` file support for :ghc-flag:`-ddump-minimal-imports`
+  (:ghc-ticket:`18497`).
+
+- Fix a number of quirks in GC accounting (:ghc-ticket:`19147`)
+
+- Fix a code generation bug which could result in entry of unlifted objects
+  in some programs using unboxed sums (:ghc-ticket:`19645`).
+
+- Ensure that POSIX signals are not delivered to the ticker thread when using
+  the pthread itimer implementation.
+
+- Do not treat :ghc-flag:`-Winferred-safe-imports` warnings as errors.
+
+- Fix a bug where typechecker plugins could be run with an inconsistent
+  typechecker environment (:ghc-ticket:`19191`).
+
+Portability fixes
+-----------------
+
+- Fix a number of linking portability issues affecting Apple's macOS Big Sur.
+
+- Use the pthread-based itimer implemention under FreeBSD by default
+
+- Enable large-file support in ``base``\'s the OFD file locking
+  implementation, avoiding :ghc-ticket:`17950`.
+
+- Ensure that Darwin binary distributions do not depend upon ``utimensat``
+  (:ghc-ticket:`17895`).
+
+- Fix a specialiser bug which could result in the construction of
+  recursive dictionaries in some programs (:ghc-ticket:`17151`).
+
+- Bump ``containers`` to 0.6.4.1
+
+- Remove a number of older autoconf idioms from the ``configure`` script,
+  improving support in newer environments.
+
 
 Known issues
 ------------
@@ -81,5 +124,6 @@ for further change information.
     libraries/unix/unix.cabal:               Dependency of ``ghc`` library
     libraries/Win32/Win32.cabal:             Dependency of ``ghc`` library
     libraries/xhtml/xhtml.cabal:             Dependency of ``haddock`` executable
+
 
 
