@@ -1224,6 +1224,8 @@ dnl   because of the conditional visibility, we prefer the former.
 dnl * glibc supports pthread_setname_np
 dnl * Darwin supports pthread_setname_np but does not take a
 dnl   pthread_t argument.
+dnl * NetBSD supports pthread_setname_np but it expects a printf-style
+dnl   format string and a string argument.
 dnl
 AC_CHECK_HEADERS([pthread_np.h])
 
@@ -1263,6 +1265,23 @@ AC_LINK_IFELSE([
       [Define to 1 if you have the glibc version of pthread_setname_np])
   ],
   AC_MSG_RESULT(no)
+)
+
+dnl NetBSD
+AC_MSG_CHECKING([for pthread_setname_np (NetBSD)])
+AC_LINK_IFELSE([
+  AC_LANG_PROGRAM(
+    [[
+    #include <pthread.h>
+    ]],
+    [[pthread_setname_np(pthread_self(), "%s", "name");]]
+  )],
+  [
+    AC_MSG_RESULT([yes])
+    AC_DEFINE([HAVE_PTHREAD_SETNAME_NP_NETBSD], [1],
+      [Define to 1 if you have the NetBSD version of pthread_setname_np])
+  ],
+  AC_MSG_RESULT([no])
 )
 
 dnl FreeBSD
