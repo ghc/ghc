@@ -769,6 +769,7 @@ summariseRequirement pn mod_name = do
         ms_location = location,
         ms_hs_hash = src_hash,
         ms_obj_date = Nothing,
+        ms_dyn_obj_date = Nothing,
         ms_iface_date = hi_timestamp,
         ms_hie_date = hie_timestamp,
         ms_srcimps = [],
@@ -901,6 +902,7 @@ hsModuleToModSummary pn hsc_src modname
                 }),
             ms_hs_hash = src_hash,
             ms_obj_date = Nothing, -- TODO do this, but problem: hi_timestamp is BOGUS
+            ms_dyn_obj_date = Nothing, -- TODO do this, but problem: hi_timestamp is BOGUS
             ms_iface_date = hi_timestamp,
             ms_hie_date = hie_timestamp
           }

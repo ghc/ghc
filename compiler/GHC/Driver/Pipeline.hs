@@ -1269,11 +1269,13 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
         let o_file = ml_obj_file location -- The real object file
             hi_file = ml_hi_file location
             hie_file = ml_hie_file location
+            dyn_o_file = dynamicOutputFile dflags o_file
 
         src_hash <- liftIO $ getFileHash (basename <.> suff)
         hi_date <- liftIO $ modificationTimeIfExists hi_file
         hie_date <- liftIO $ modificationTimeIfExists hie_file
         o_mod <- liftIO $ modificationTimeIfExists o_file
+        dyn_o_mod <- liftIO $ modificationTimeIfExists dyn_o_file
 
         PipeState{hsc_env=hsc_env'} <- getPipeState
 
@@ -1293,11 +1295,13 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
                                         ms_location  = location,
                                         ms_hs_hash   = src_hash,
                                         ms_obj_date  = o_mod,
+                                        ms_dyn_obj_date = dyn_o_mod,
                                         ms_parsed_mod   = Nothing,
                                         ms_iface_date   = hi_date,
                                         ms_hie_date     = hie_date,
                                         ms_textual_imps = imps,
                                         ms_srcimps      = src_imps }
+
 
   -- run the compiler!
         let msg hsc_env _ what _ = oneShotMsg hsc_env what
