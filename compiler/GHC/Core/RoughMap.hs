@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE BangPatterns #-}
 
 -- | 'RoughMap' is an approximate finite map data structure keyed on
 -- @['RoughMatchTc']@. This is useful when keying maps on lists of 'Type's
@@ -170,28 +171,36 @@ elemsRM :: RoughMap a -> [a]
 elemsRM = foldRM (:) []
 
 foldRM :: (a -> b -> b) -> b -> RoughMap a -> b
-foldRM _ z RMEmpty = z
-foldRM f z rm@(RM{}) =
-  foldr
-    f
-    (foldDNameEnv
-       (flip $ foldRM f)
-       (foldRM f z (rm_unknown rm))
-       (rm_known rm)
-    )
-    (rm_empty rm)
+foldRM f = go
+  where
+    -- N.B. local worker ensures that the loop can be specialised to the fold
+    -- function.
+    go z RMEmpty = z
+    go z rm@(RM{}) =
+      foldr
+        f
+        (foldDNameEnv
+           (flip go)
+           (go z (rm_unknown rm))
+           (rm_known rm)
+        )
+        (rm_empty rm)
 
 nonDetStrictFoldRM :: (b -> a -> b) -> b -> RoughMap a -> b
-nonDetStrictFoldRM _ z RMEmpty = z
-nonDetStrictFoldRM f z rm@(RM{}) =
-  foldl'
-    f
-    (nonDetStrictFoldDNameEnv
-       (flip $ nonDetStrictFoldRM f)
-       (nonDetStrictFoldRM f z (rm_unknown rm))
-       (rm_known rm)
-    )
-    (rm_empty rm)
+nonDetStrictFoldRM f = go
+  where
+    -- N.B. local worker ensures that the loop can be specialised to the fold
+    -- function.
+    go !z RMEmpty = z
+    go  z rm@(RM{}) =
+      foldl'
+        f
+        (nonDetStrictFoldDNameEnv
+           (flip go)
+           (go z (rm_unknown rm))
+           (rm_known rm)
+        )
+        (rm_empty rm)
 
 sizeRM :: RoughMap a -> Int
 sizeRM = nonDetStrictFoldRM (\acc _ -> acc + 1) 0
