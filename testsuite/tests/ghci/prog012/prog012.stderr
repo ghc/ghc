@@ -1,2 +1,4 @@
 
 Bar.hs:3:7: error: Variable not in scope: nonexistent
+-fkeep-going in use, removing the following dependencies and continuing:
+      FooBar
