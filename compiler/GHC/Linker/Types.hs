@@ -17,13 +17,15 @@ module GHC.Linker.Types
    , linkableObjs
    , isObject
    , nameOfObject
+   , nameOfObject_maybe
    , isInterpretable
    , byteCodeOfObject
+   , LibrarySpec(..)
    )
 where
 
 import GHC.Prelude
-import GHC.Unit                ( UnitId, Module )
+import GHC.Unit                ( UnitId, Module, ModuleNameWithIsBoot )
 import GHC.ByteCode.Types      ( ItblEnv, CompiledByteCode )
 import GHC.Fingerprint.Type    ( Fingerprint )
 import GHCi.RemoteTypes        ( ForeignHValue )
@@ -37,6 +39,8 @@ import GHC.Utils.Panic
 
 import Control.Concurrent.MVar
 import Data.Time               ( UTCTime )
+import Data.Maybe
+import qualified Data.Map as M
 
 
 {- **********************************************************************
@@ -81,6 +85,9 @@ data LoaderState = LoaderState
         -- ^ The currently-loaded packages; always object code
         -- Held, as usual, in dependency order; though I am not sure if
         -- that is really important
+    , hs_objs_loaded :: ![LibrarySpec]
+    , non_hs_objs_loaded :: ![LibrarySpec]
+    , module_deps :: M.Map ModuleNameWithIsBoot [Linkable]
 
     , temp_sos :: ![(FilePath, String)]
         -- ^ We need to remember the name of previous temporary DLL/.so
@@ -102,10 +109,6 @@ data Linkable = LM {
     -- ^ Those files and chunks of code we have yet to link.
     --
     -- INVARIANT: A valid linkable always has at least one 'Unlinked' item.
-    -- If this list is empty, the Linkable represents a fake linkable, which
-    -- is generated with no backend is used to avoid recompiling modules.
-    --
-    -- ToDo: Do items get removed from this list when they get linked?
  }
 
 instance Outputable Linkable where
@@ -163,14 +166,51 @@ isObject _          = False
 isInterpretable :: Unlinked -> Bool
 isInterpretable = not . isObject
 
+nameOfObject_maybe :: Unlinked -> Maybe FilePath
+nameOfObject_maybe (DotO fn)   = Just fn
+nameOfObject_maybe (DotA fn)   = Just fn
+nameOfObject_maybe (DotDLL fn) = Just fn
+nameOfObject_maybe (BCOs {})   = Nothing
+
 -- | Retrieve the filename of the linkable if possible. Panic if it is a byte-code object
 nameOfObject :: Unlinked -> FilePath
-nameOfObject (DotO fn)   = fn
-nameOfObject (DotA fn)   = fn
-nameOfObject (DotDLL fn) = fn
-nameOfObject other       = pprPanic "nameOfObject" (ppr other)
+nameOfObject o = fromMaybe (pprPanic "nameOfObject" (ppr o)) (nameOfObject_maybe o)
 
 -- | Retrieve the compiled byte-code if possible. Panic if it is a file-based linkable
 byteCodeOfObject :: Unlinked -> CompiledByteCode
 byteCodeOfObject (BCOs bc _) = bc
 byteCodeOfObject other       = pprPanic "byteCodeOfObject" (ppr other)
+
+{- **********************************************************************
+
+                Loading packages
+
+  ********************************************************************* -}
+
+data LibrarySpec
+   = Objects [FilePath] -- Full path names of set of .o files, including trailing .o
+                        -- We allow batched loading to ensure that cyclic symbol
+                        -- references can be resolved (see #13786).
+                        -- For dynamic objects only, try to find the object
+                        -- file in all the directories specified in
+                        -- v_Library_paths before giving up.
+
+   | Archive FilePath   -- Full path name of a .a file, including trailing .a
+
+   | DLL String         -- "Unadorned" name of a .DLL/.so
+                        --  e.g.    On unix     "qt"  denotes "libqt.so"
+                        --          On Windows  "burble"  denotes "burble.DLL" or "libburble.dll"
+                        --  loadDLL is platform-specific and adds the lib/.so/.DLL
+                        --  suffixes platform-dependently
+
+   | DLLPath FilePath   -- Absolute or relative pathname to a dynamic library
+                        -- (ends with .dll or .so).
+
+   | Framework String   -- Only used for darwin, but does no harm
+
+instance Outputable LibrarySpec where
+  ppr (Objects objs) = text "Objects" <+> ppr objs
+  ppr (Archive a) = text "Archive" <+> text a
+  ppr (DLL s) = text "DLL" <+> text s
+  ppr (DLLPath f) = text "DLLPath" <+> text f
+  ppr (Framework s) = text "Framework" <+> text s
