@@ -17,6 +17,7 @@ module GHC.Linker.Types
    , linkableObjs
    , isObject
    , nameOfObject
+   , nameOfObject_maybe
    , isInterpretable
    , byteCodeOfObject
    )
@@ -37,6 +38,7 @@ import GHC.Utils.Panic
 
 import Control.Concurrent.MVar
 import Data.Time               ( UTCTime )
+import Data.Maybe
 
 
 {- **********************************************************************
@@ -163,12 +165,15 @@ isObject _          = False
 isInterpretable :: Unlinked -> Bool
 isInterpretable = not . isObject
 
+nameOfObject_maybe :: Unlinked -> Maybe FilePath
+nameOfObject_maybe (DotO fn)   = Just fn
+nameOfObject_maybe (DotA fn)   = Just fn
+nameOfObject_maybe (DotDLL fn) = Just fn
+nameOfObject_maybe (BCOs {})   = Nothing
+
 -- | Retrieve the filename of the linkable if possible. Panic if it is a byte-code object
 nameOfObject :: Unlinked -> FilePath
-nameOfObject (DotO fn)   = fn
-nameOfObject (DotA fn)   = fn
-nameOfObject (DotDLL fn) = fn
-nameOfObject other       = pprPanic "nameOfObject" (ppr other)
+nameOfObject o = fromMaybe (pprPanic "nameOfObject" (ppr o)) (nameOfObject_maybe o)
 
 -- | Retrieve the compiled byte-code if possible. Panic if it is a file-based linkable
 byteCodeOfObject :: Unlinked -> CompiledByteCode

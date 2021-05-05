@@ -1259,81 +1259,33 @@ loadPackages interp hsc_env new_pkgs = do
   -- It's probably not safe to try to load packages concurrently, so we take
   -- a lock.
   initLoaderState interp hsc_env
-  modifyLoaderState_ interp $ \pls ->
+  modifyLoaderState_ interp $ \pls -> do
     loadPackages' interp hsc_env new_pkgs pls
 
 loadPackages' :: Interp -> HscEnv -> [UnitId] -> LoaderState -> IO LoaderState
-loadPackages' interp hsc_env new_pks pls = do
-    pkgs' <- link (pkgs_loaded pls) new_pks
+loadPackages' interp hsc_env new_pkgs pls = do
+    (_, pkgs') <- loadPackagesX (loadPackage interp hsc_env) hsc_env new_pkgs (pkgs_loaded pls)
     return $! pls { pkgs_loaded = pkgs' }
-  where
-     link :: [UnitId] -> [UnitId] -> IO [UnitId]
-     link pkgs new_pkgs =
-         foldM link_one pkgs new_pkgs
 
-     link_one pkgs new_pkg
-        | new_pkg `elem` pkgs   -- Already linked
-        = return pkgs
 
-        | Just pkg_cfg <- lookupUnitId (hsc_units hsc_env) new_pkg
-        = do {  -- Link dependents first
-               pkgs' <- link pkgs (unitDepends pkg_cfg)
-                -- Now link the package itself
-             ; loadPackage interp hsc_env pkg_cfg
-             ; return (new_pkg : pkgs') }
 
-        | otherwise
-        = throwGhcExceptionIO (CmdLineError ("unknown package: " ++ unpackFS (unitIdFS new_pkg)))
 
 
 loadPackage :: Interp -> HscEnv -> UnitInfo -> IO ()
-loadPackage interp hsc_env pkg
-   = do
+loadPackage interp hsc_env pkg = do
         let dflags    = hsc_dflags hsc_env
         let logger    = hsc_logger hsc_env
             platform  = targetPlatform dflags
             is_dyn    = interpreterDynamic interp
             dirs | is_dyn    = map ST.unpack $ Packages.unitLibraryDynDirs pkg
                  | otherwise = map ST.unpack $ Packages.unitLibraryDirs pkg
-
-        let hs_libs   = map ST.unpack $ Packages.unitLibraries pkg
-            -- The FFI GHCi import lib isn't needed as
-            -- GHC.Linker.Loader + rts/Linker.c link the
-            -- interpreted references to FFI to the compiled FFI.
-            -- We therefore filter it out so that we don't get
-            -- duplicate symbol errors.
-            hs_libs'  =  filter ("HSffi" /=) hs_libs
-
-        -- Because of slight differences between the GHC dynamic linker and
-        -- the native system linker some packages have to link with a
-        -- different list of libraries when using GHCi. Examples include: libs
-        -- that are actually gnu ld scripts, and the possibility that the .a
-        -- libs do not exactly match the .so/.dll equivalents. So if the
-        -- package file provides an "extra-ghci-libraries" field then we use
-        -- that instead of the "extra-libraries" field.
-            extdeplibs = map ST.unpack (if null (Packages.unitExtDepLibsGhc pkg)
-                                      then Packages.unitExtDepLibsSys pkg
-                                      else Packages.unitExtDepLibsGhc pkg)
-            linkerlibs = [ lib | '-':'l':lib <- (map ST.unpack $ Packages.unitLinkerOptions pkg) ]
-            extra_libs = extdeplibs ++ linkerlibs
-
-        -- See Note [Fork/Exec Windows]
-        gcc_paths <- getGCCPaths logger dflags (platformOS platform)
-        dirs_env <- addEnvPaths "LIBRARY_PATH" dirs
-
-        hs_classifieds
-           <- mapM (locateLib interp hsc_env True  dirs_env gcc_paths) hs_libs'
-        extra_classifieds
-           <- mapM (locateLib interp hsc_env False dirs_env gcc_paths) extra_libs
-        let classifieds = hs_classifieds ++ extra_classifieds
-
+        classifieds <- computePackageDeps interp hsc_env pkg
         -- Complication: all the .so's must be loaded before any of the .o's.
         let known_dlls = [ dll  | DLLPath dll    <- classifieds ]
             dlls       = [ dll  | DLL dll        <- classifieds ]
             objs       = [ obj  | Objects objs    <- classifieds
                                 , obj <- objs ]
             archs      = [ arch | Archive arch   <- classifieds ]
-
         -- Add directories to library search paths
         let dll_paths  = map takeDirectory known_dlls
             all_paths  = nub $ map normalise $ dll_paths ++ dirs
