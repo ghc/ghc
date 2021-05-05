@@ -4254,8 +4254,9 @@ instance ExactPrint (ConDecl GhcPs) where
                      , con_names = cons
                      , con_dcolon = dcol
                      , con_bndrs = bndrs
-                     , con_mb_cxt = mcxt, con_g_args = args
-                     , con_res_ty = res_ty, con_doc = doc }) = do
+                     , con_mb_cxt = mcxt
+                     , con_body = body
+                     , con_doc = doc }) = do
     doc' <- mapM markAnnotated doc
     cons' <- mapM markAnnotated cons
     dcol' <- markUniToken dcol
@@ -4270,22 +4271,31 @@ instance ExactPrint (ConDecl GhcPs) where
     an2 <- if (isJust mcxt)
       then markEpAnnL an1 lidl AnnDarrow
       else return an1
-    args' <-
-      case args of
-          (PrefixConGADT args0) -> do
-            args0' <- mapM markAnnotated args0
-            return (PrefixConGADT args0')
-          (RecConGADT fields rarr) -> do
+    body' <-
+      case body of
+          (PrefixConGADT body') ->
+            PrefixConGADT <$> exact_prefix_con_gadt_sig_body body'
+          (RecConGADT fields rarr res_ty) -> do
             fields' <- markAnnotated fields
             rarr' <- markUniToken rarr
-            return (RecConGADT fields' rarr')
-    res_ty' <- markAnnotated res_ty
+            res_ty' <- markAnnotated res_ty
+            return (RecConGADT fields' rarr' res_ty')
     return (ConDeclGADT { con_g_ext = an2
                         , con_names = cons'
                         , con_dcolon = dcol'
                         , con_bndrs = bndrs'
-                        , con_mb_cxt = mcxt', con_g_args = args'
-                        , con_res_ty = res_ty', con_doc = doc' })
+                        , con_mb_cxt = mcxt'
+                        , con_body = body'
+                        , con_doc = doc' })
+
+exact_prefix_con_gadt_sig_body :: (Monad m, Monoid w)
+  => PrefixConGadtSigBody GhcPs -> EP w m (PrefixConGadtSigBody GhcPs)
+exact_prefix_con_gadt_sig_body (PCGSRes res_ty) =
+  PCGSRes <$> markAnnotated res_ty
+exact_prefix_con_gadt_sig_body (PCGSAnonArg arg_ty body) = do
+  arg_ty' <- markAnnotated arg_ty
+  body' <- exact_prefix_con_gadt_sig_body body
+  pure $ PCGSAnonArg arg_ty' body'
 
 -- ---------------------------------------------------------------------
 

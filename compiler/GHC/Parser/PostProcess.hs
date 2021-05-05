@@ -752,7 +752,8 @@ mkConDeclH98 ann name mb_forall mb_cxt args
 -- * This splits up the constructor type into its quantified type variables (if
 --   provided), context (if provided), argument types, and result type, and
 --   records whether this is a prefix or record GADT constructor. See
---   Note [GADT abstract syntax] in "GHC.Hs.Decls" for more details.
+--   @Note [GADT abstract syntax]@ in "Language.Haskell.Syntax.Decls" for more
+--   details.
 mkGadtDecl :: SrcSpan
            -> NonEmpty (LocatedN RdrName)
            -> LHsUniToken "::" "∷" GhcPs
@@ -762,7 +763,7 @@ mkGadtDecl loc names dcol ty = do
   cs <- getCommentsFor loc
   let l = noAnnSrcSpan loc
 
-  (args, res_ty, annsa, csa) <-
+  (body, annsa, csa) <-
     case body_ty of
      L ll (HsFunTy af hsArr (L loc' (HsRecTy an rf)) res_ty) -> do
        let an' = addCommentsToEpAnn (locA loc') an (comments af)
@@ -772,11 +773,11 @@ mkGadtDecl loc names dcol ty = do
                                  (PsErrIllegalGadtRecordMultiplicity hsArr)
                  return noHsUniTok
 
-       return ( RecConGADT (L (SrcSpanAnn an' (locA loc')) rf) arr, res_ty
+       return ( RecConGADT (L (SrcSpanAnn an' (locA loc')) rf) arr res_ty
               , [], epAnnComments (ann ll))
      _ -> do
-       let (anns, cs, arg_types, res_type) = splitHsFunType body_ty
-       return (PrefixConGADT arg_types, res_type, anns, cs)
+       let (anns, cs, prefix_body) = splitLHsPrefixGadtSigBody body_ty
+       return (PrefixConGADT prefix_body, anns, cs)
 
   let an = EpAnn (spanAsAnchor loc) annsa (cs Semi.<> csa)
 
@@ -786,8 +787,7 @@ mkGadtDecl loc names dcol ty = do
                      , con_dcolon = dcol
                      , con_bndrs  = L (getLoc ty) outer_bndrs
                      , con_mb_cxt = mcxt
-                     , con_g_args = args
-                     , con_res_ty = res_ty
+                     , con_body   = body
                      , con_doc    = Nothing }
   where
     (outer_bndrs, mcxt, body_ty) = splitLHsGadtTy ty

@@ -889,18 +889,17 @@ repC (L _ (ConDeclH98 { con_name = con
 repC (L _ (ConDeclGADT { con_names  = cons
                        , con_bndrs  = L _ outer_bndrs
                        , con_mb_cxt = mcxt
-                       , con_g_args = args
-                       , con_res_ty = res_ty }))
+                       , con_body   = body }))
   | null_outer_imp_tvs && null_outer_exp_tvs
                                  -- No implicit or explicit variables
   , Nothing <- mcxt              -- No context
                                  -- ==> no need for a forall
-  = repGadtDataCons cons args res_ty
+  = repGadtDataCons cons body
 
   | otherwise
   = addHsOuterSigTyVarBinds outer_bndrs $ \ outer_bndrs' ->
              -- See Note [Don't quantify implicit type variables in quotes]
-    do { c'    <- repGadtDataCons cons args res_ty
+    do { c'    <- repGadtDataCons cons body
        ; ctxt' <- repMbContext mcxt
        ; if null_outer_exp_tvs && isNothing mcxt
          then return c'
@@ -2743,21 +2742,39 @@ repH98DataCon con details
              rep2 recCName [unC con', unC arg_vtys]
 
 repGadtDataCons :: NonEmpty (LocatedN Name)
-                -> HsConDeclGADTDetails GhcRn
-                -> LHsType GhcRn
+                -> ConGadtSigBody GhcRn
                 -> MetaM (Core (M TH.Con))
-repGadtDataCons cons details res_ty
+repGadtDataCons cons body
     = do cons' <- mapM lookupLOcc cons -- See Note [Binders and occurrences]
-         case details of
-           PrefixConGADT ps -> do
-             arg_tys <- repPrefixConArgs ps
-             res_ty' <- repLTy res_ty
-             rep2 gadtCName [ unC (nonEmptyCoreList' cons'), unC arg_tys, unC res_ty']
-           RecConGADT ips _ -> do
+         case body of
+           PrefixConGADT prefix_body ->
+             repPrefixGadtDataCons cons' prefix_body
+           RecConGADT ips _ res_ty -> do
              arg_vtys <- repRecConArgs ips
              res_ty'  <- repLTy res_ty
              rep2 recGadtCName [unC (nonEmptyCoreList' cons'), unC arg_vtys,
                                 unC res_ty']
+
+repPrefixGadtDataCons :: NonEmpty (Core TH.Name)
+                      -> PrefixConGadtSigBody GhcRn
+                      -> MetaM (Core (M TH.Con))
+repPrefixGadtDataCons cons prefix_body = do
+  (arg_tys, core_arg_tys, core_res_ty) <- go prefix_body
+  verifyLinearFields arg_tys
+  core_arg_tys' <- coreListM bangTypeTyConName core_arg_tys
+  rep2 gadtCName [ unC (nonEmptyCoreList' cons), unC core_arg_tys', unC core_res_ty]
+  where
+    go :: PrefixConGadtSigBody GhcRn
+       -> MetaM ( [HsScaled GhcRn (LHsType GhcRn)]
+                , [Core (M TH.BangType)]
+                , Core (M TH.Type) )
+    go (PCGSRes res_ty) = do
+      core_res_ty <- repLTy res_ty
+      pure ([], [], core_res_ty)
+    go (PCGSAnonArg arg_ty body) = do
+      core_arg_ty <- repBangTy (hsScaledThing arg_ty)
+      (arg_tys, core_arg_tys, core_res_ty) <- go body
+      pure (arg_ty:arg_tys, core_arg_ty:core_arg_tys, core_res_ty)
 
 -- TH currently only supports linear constructors.
 -- We also accept the (->) arrow when -XLinearTypes is off, because this

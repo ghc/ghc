@@ -70,7 +70,9 @@ module Language.Haskell.Syntax.Decls (
   CImportSpec(..),
   -- ** Data-constructor declarations
   ConDecl(..), LConDecl,
-  HsConDeclH98Details, HsConDeclGADTDetails(..),
+  HsConDeclH98Details,
+  ConGadtSigBody(..), PrefixConGadtSigBody(..),
+  anonPrefixConGadtSigArgs, prefixConGadtSigRes,
   -- ** Document comments
   DocDecl(..), LDocDecl, docDeclDoc,
   -- ** Deprecations
@@ -1089,8 +1091,7 @@ data ConDecl pass
         --   implicit.  The 'XRec' is used to anchor exact print
         --   annotations, AnnForall and AnnDot.
       , con_mb_cxt  :: Maybe (LHsContext pass)   -- ^ User-written context (if any)
-      , con_g_args  :: HsConDeclGADTDetails pass -- ^ Arguments; never infix
-      , con_res_ty  :: LHsType pass              -- ^ Result type
+      , con_body    :: ConGadtSigBody pass       -- ^ The argument and result types
 
       , con_doc     :: Maybe (LHsDoc pass) -- ^ A possible Haddock
                                                  -- comment.
@@ -1135,17 +1136,17 @@ There are two broad ways to classify GADT constructors:
     data T a where
       K :: forall a. Ord a => [a] -> ... -> T a
 
-This distinction is recorded in the `con_args :: HsConDetails pass`, which
-tracks if we're dealing with a RecCon or PrefixCon. It is easy to distinguish
-the two in the AST since record GADT constructors use HsRecTy. This distinction
-is made in GHC.Parser.PostProcess.mkGadtDecl.
+This distinction is recorded in the `con_body :: ConGadtSigBody pass` field,
+which tracks if we're dealing with a RecConGADT or PrefixConGADT. It is easy to
+distinguish the two in the AST since record GADT constructors use HsRecTy. This
+distinction is made in GHC.Parser.PostProcess.mkGadtDecl.
 
 It is worth elaborating a bit more on the process of splitting the argument
 types of a GADT constructor, since there are some non-obvious details involved.
 While splitting the argument types of a record GADT constructor is easy (they
 are stored in an HsRecTy), splitting the arguments of a prefix GADT constructor
 is trickier. The basic idea is that we must split along the outermost function
-arrows ((->) and (%1 ->)) in the type, which GHC.Hs.Type.splitHsFunType
+arrows ((->) and (%1 ->)) in the type, which GHC.Hs.Type.splitLHsPrefixGadtSigBody
 accomplishes. But what about type operators? Consider:
 
   C :: a :*: b -> a :*: b -> a :+: b
@@ -1209,24 +1210,18 @@ or contexts in two parts:
 1. GHC, in the process of splitting apart a GADT's type,
    extracts out the leading `forall` and context (if they are provided). To
    accomplish this splitting, the renamer uses the
-   GHC.Hs.Type.splitLHsGADTPrefixTy function, which is careful not to remove
+   GHC.Hs.Type.splitLHsGadtTy function, which is careful not to remove
    parentheses surrounding the leading `forall` or context (as these
    parentheses can be syntactically significant). If the third result returned
-   by splitLHsGADTPrefixTy contains any `forall`s or contexts, then they must
-   be nested, so they will be rejected.
+   by splitLHsGadtTy contains any `forall`s or contexts, then they must
+   be nested, so they will be rejected later in the renamer.
 
    Note that this step applies to both prefix and record GADTs alike, as they
-   both have syntax which permits `forall`s and contexts. The difference is
-   where this step happens:
-
-   * For prefix GADTs, this happens in the renamer (in rnConDecl), as we cannot
-     split until after the type operator fixities have been resolved.
-   * For record GADTs, this happens in the parser (in mkGadtDecl).
-2. If the GADT type is prefix, the renamer (in the ConDeclGADTPrefixPs case of
-   rnConDecl) will then check for nested `forall`s/contexts in the body of a
-   prefix GADT type, after it has determined what all of the argument types are.
-   This step is necessary to catch examples like MkT4 above, where the nested
-   quantification occurs after a visible argument type.
+   both have syntax which permits `forall`s and contexts.
+2. The renamer (in GHC.Rename.Module.rnGADTResultTy) will then check for nested
+   `forall`s/contexts in the body of a GADT constructor type. This step is
+   necessary to catch examples like MkT4 above, where the nested quantification
+   occurs after a visible argument type.
 -}
 
 -- | The arguments in a Haskell98-style data constructor.
@@ -1235,15 +1230,43 @@ type HsConDeclH98Details pass
 -- The Void argument to HsConDetails here is a reflection of the fact that
 -- type applications are not allowed in data constructor declarations.
 
--- | The arguments in a GADT constructor. Unlike Haskell98-style constructors,
--- GADT constructors cannot be declared with infix syntax. As a result, we do
--- not use 'HsConDetails' here, as 'InfixCon' would be an unrepresentable
--- state. (There is a notion of infix GADT constructors for the purposes of
--- derived Show instances—see Note [Infix GADT constructors] in
--- GHC.Tc.TyCl—but that is an orthogonal concern.)
-data HsConDeclGADTDetails pass
-   = PrefixConGADT [HsScaled pass (LBangType pass)]
-   | RecConGADT (XRec pass [LConDeclField pass]) (LHsUniToken "->" "→" pass)
+-- | The argument and result types in a GADT constructor.
+-- See @Note [GADT abstract syntax]@.
+--
+-- Unlike Haskell98-style constructors, GADT constructors cannot be declared
+-- with infix syntax. As a result, we do not use 'HsConDetails' here, as
+-- 'InfixCon' would be an unrepresentable state. (There is a notion of infix
+-- GADT constructors for the purposes of derived 'Show' instances—see
+-- @Note [Infix GADT constructors]@ in "GHC.Tc.TyCl"—but that is an
+-- orthogonal concern.)
+data ConGadtSigBody pass
+   = PrefixConGADT (PrefixConGadtSigBody pass)
+   | RecConGADT (XRec pass [LConDeclField pass]) (LHsUniToken "->" "→" pass) (LHsType pass)
+
+-- | The argument and result types in a prefix GADT constructor. This closely
+-- resembles the structure of 'HsType', but with data constructor–specific
+-- tweaks. See @Note [GADT abstract syntax]@.
+data PrefixConGadtSigBody pass
+    -- | The result type.
+  = PCGSRes (LHsType pass)
+    -- | An argument followed by a function arrow (e.g., @MkT :: !Int -> ...@).
+    -- This is much like 'HsFunTy', except that 'PCGSAnonArg' uses an
+    -- 'LBangType' instead of an 'LHsType' to represent the argument.
+  | PCGSAnonArg (HsScaled pass (LBangType pass))
+                (PrefixConGadtSigBody pass)
+
+-- | Retrieve the visible, non-dependent arguments in a prefix GADT
+-- constructor type. Note that this takes O(/n/) time, where /n/ is the number
+-- of arguments.
+anonPrefixConGadtSigArgs :: PrefixConGadtSigBody pass -> [HsScaled pass (LBangType pass)]
+anonPrefixConGadtSigArgs (PCGSAnonArg arg body) = arg : anonPrefixConGadtSigArgs body
+anonPrefixConGadtSigArgs PCGSRes{}              = []
+
+-- | Retrieve the result type in a prefix GADT constructor type. Note that this
+-- takes O(/n/) time, where /n/ is the number of arguments.
+prefixConGadtSigRes :: PrefixConGadtSigBody pass -> LHsType pass
+prefixConGadtSigRes (PCGSAnonArg _ body) = prefixConGadtSigRes body
+prefixConGadtSigRes (PCGSRes res_ty)     = res_ty
 
 {-
 ************************************************************************

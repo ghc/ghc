@@ -74,7 +74,9 @@ module GHC.Hs.Decls (
   CImportSpec(..),
   -- ** Data-constructor declarations
   ConDecl(..), LConDecl,
-  HsConDeclH98Details, HsConDeclGADTDetails(..), hsConDeclTheta,
+  HsConDeclH98Details,
+  ConGadtSigBody(..), PrefixConGadtSigBody(..),
+  anonPrefixConGadtSigArgs, prefixConGadtSigRes, hsConDeclTheta,
   getConNames, getRecConArgs_maybe,
   -- ** Document comments
   DocDecl(..), LDocDecl, docDeclDoc,
@@ -679,9 +681,9 @@ getRecConArgs_maybe (ConDeclH98{con_args = args}) = case args of
   PrefixCon{} -> Nothing
   RecCon flds -> Just flds
   InfixCon{}  -> Nothing
-getRecConArgs_maybe (ConDeclGADT{con_g_args = args}) = case args of
-  PrefixConGADT{} -> Nothing
-  RecConGADT flds _ -> Just flds
+getRecConArgs_maybe (ConDeclGADT{con_body = body}) = case body of
+  PrefixConGADT{}     -> Nothing
+  RecConGADT flds _ _ -> Just flds
 
 hsConDeclTheta :: Maybe (LHsContext (GhcPass p)) -> [LHsType (GhcPass p)]
 hsConDeclTheta Nothing            = []
@@ -764,14 +766,20 @@ pprConDecl (ConDeclH98 { con_name = L _ con
                                  <+> pprConDeclFields (unLoc fields)
 
 pprConDecl (ConDeclGADT { con_names = cons, con_bndrs = L _ outer_bndrs
-                        , con_mb_cxt = mcxt, con_g_args = args
-                        , con_res_ty = res_ty, con_doc = doc })
+                        , con_mb_cxt = mcxt, con_body = body, con_doc = doc })
   = pprMaybeWithDoc doc $ ppr_con_names (toList cons) <+> dcolon
     <+> (sep [pprHsOuterSigTyVarBndrs outer_bndrs <+> pprLHsContext mcxt,
-              sep (ppr_args args ++ [ppr res_ty]) ])
+              ppr_body body ])
   where
-    ppr_args (PrefixConGADT args) = map (\(HsScaled arr t) -> ppr t <+> ppr_arr arr) args
-    ppr_args (RecConGADT fields _) = [pprConDeclFields (unLoc fields) <+> arrow]
+    ppr_body (PrefixConGADT args) = ppr_prefix_body args
+    ppr_body (RecConGADT fields _ res_ty) =
+      sep [ pprConDeclFields (unLoc fields)
+          , arrow <+> ppr res_ty ]
+
+    ppr_prefix_body (PCGSRes res_ty) = ppr res_ty
+    ppr_prefix_body (PCGSAnonArg (HsScaled arr arg) body') =
+      sep [ ppr arg
+          , ppr_arr arr <+> ppr_prefix_body body' ]
 
     -- Display linear arrows as unrestricted with -XNoLinearTypes
     -- (cf. dataConDisplayType in Note [Displaying linear fields] in GHC.Core.DataCon)

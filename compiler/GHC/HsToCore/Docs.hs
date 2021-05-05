@@ -406,8 +406,8 @@ subordinates env instMap decl = case decl of
 conArgDocs :: ConDecl GhcRn -> IntMap (HsDoc GhcRn)
 conArgDocs (ConDeclH98{con_args = args}) =
   h98ConArgDocs args
-conArgDocs (ConDeclGADT{con_g_args = args, con_res_ty = res_ty}) =
-  gadtConArgDocs args (unLoc res_ty)
+conArgDocs (ConDeclGADT{con_body = body}) =
+  gadtConSigBodyDocs body
 
 h98ConArgDocs :: HsConDeclH98Details GhcRn -> IntMap (HsDoc GhcRn)
 h98ConArgDocs con_args = case con_args of
@@ -416,10 +416,15 @@ h98ConArgDocs con_args = case con_args of
                                        , unLoc (hsScaledThing arg2) ]
   RecCon _           -> IM.empty
 
-gadtConArgDocs :: HsConDeclGADTDetails GhcRn -> HsType GhcRn -> IntMap (HsDoc GhcRn)
-gadtConArgDocs con_args res_ty = case con_args of
-  PrefixConGADT args -> con_arg_docs 0 $ map (unLoc . hsScaledThing) args ++ [res_ty]
-  RecConGADT _ _     -> con_arg_docs 1 [res_ty]
+gadtConSigBodyDocs :: ConGadtSigBody GhcRn -> IntMap (HsDoc GhcRn)
+gadtConSigBodyDocs body = case body of
+  PrefixConGADT body'   -> con_arg_docs 0 $ prefix_gadt_con_sig_body_tys body'
+  RecConGADT _ _ res_ty -> con_arg_docs 1 [unLoc res_ty]
+  where
+    prefix_gadt_con_sig_body_tys :: PrefixConGadtSigBody GhcRn -> [HsType GhcRn]
+    prefix_gadt_con_sig_body_tys (PCGSRes res_ty)        = [unLoc res_ty]
+    prefix_gadt_con_sig_body_tys (PCGSAnonArg arg body') =
+      unLoc (hsScaledThing arg):prefix_gadt_con_sig_body_tys body'
 
 con_arg_docs :: Int -> [HsType GhcRn] -> IntMap (HsDoc GhcRn)
 con_arg_docs n = IM.fromList . catMaybes . zipWith f [n..]

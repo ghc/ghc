@@ -1559,11 +1559,11 @@ hsConDeclsBinders cons = go emptyFieldIndices cons
       -- have a record of the full location of the field declaration anyway
       = let loc = getLoc r
         in case unLoc r of
-           ConDeclGADT { con_names = names, con_g_args = args }
+           ConDeclGADT { con_names = names, con_body = body }
              -> LConsWithFields (cons ++ ns) fs
              where
                 cons = map ( , con_flds ) $ toList (L loc . unLoc <$> names)
-                (con_flds, seen') = get_flds_gadt seen args
+                (con_flds, seen') = get_flds_gadt seen body
                 LConsWithFields ns fs = go seen' rs
 
            ConDeclH98 { con_name = name, con_args = args }
@@ -1578,10 +1578,10 @@ hsConDeclsBinders cons = go emptyFieldIndices cons
     get_flds_h98 seen (PrefixCon _ []) = (Just [], seen)
     get_flds_h98 seen _ = (Nothing, seen)
 
-    get_flds_gadt :: FieldIndices p -> HsConDeclGADTDetails (GhcPass p)
+    get_flds_gadt :: FieldIndices p -> ConGadtSigBody (GhcPass p)
                   -> (Maybe [Located Int], FieldIndices p)
-    get_flds_gadt seen (RecConGADT flds _) = first Just $ get_flds seen flds
-    get_flds_gadt seen (PrefixConGADT []) = (Just [], seen)
+    get_flds_gadt seen (RecConGADT flds _ _) = first Just $ get_flds seen flds
+    get_flds_gadt seen (PrefixConGADT (PCGSRes _)) = (Just [], seen)
     get_flds_gadt seen _ = (Nothing, seen)
 
     get_flds :: FieldIndices p -> LocatedL [LConDeclField (GhcPass p)]

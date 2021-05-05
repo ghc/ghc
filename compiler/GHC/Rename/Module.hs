@@ -1891,7 +1891,7 @@ rnDataDefn doc (HsDataDefn { dd_cType = cType, dd_ctxt = context, dd_cons = cond
                failWith $ TcRnTypeDataForbids TypeDataForbidsStrictnessAnnotations
            }
 
-    has_labelled_fields (ConDeclGADT { con_g_args = RecConGADT _ _ }) = True
+    has_labelled_fields (ConDeclGADT { con_body = RecConGADT _ _ _ }) = True
     has_labelled_fields (ConDeclH98 { con_args = RecCon rec })
       = not (null (unLoc rec))
     has_labelled_fields _ = False
@@ -1901,7 +1901,8 @@ rnDataDefn doc (HsDataDefn { dd_cType = cType, dd_ctxt = context, dd_cons = cond
 
     is_strict (HsSrcBang _ _ s) = isSrcStrict s
 
-    con_args (ConDeclGADT { con_g_args = PrefixConGADT args }) = args
+    con_args (ConDeclGADT { con_body = PrefixConGADT args })
+      = anonPrefixConGadtSigArgs args
     con_args (ConDeclH98 { con_args = PrefixCon _ args }) = args
     con_args (ConDeclH98 { con_args = InfixCon arg1 arg2 }) = [arg1, arg2]
     con_args _ = []
@@ -2397,8 +2398,7 @@ rnConDecl (ConDeclGADT { con_names   = names
                        , con_dcolon  = dcol
                        , con_bndrs   = L l outer_bndrs
                        , con_mb_cxt  = mcxt
-                       , con_g_args  = args
-                       , con_res_ty  = res_ty
+                       , con_body    = body
                        , con_doc     = mb_doc })
   = do  { mapM_ (addLocMA checkConName) names
         ; new_names <- mapM (lookupLocatedTopConstructorRnN) names
@@ -2411,23 +2411,15 @@ rnConDecl (ConDeclGADT { con_names   = names
               implicit_bndrs =
                 extractHsOuterTvBndrs outer_bndrs           $
                 extractHsTysRdrTyVars (hsConDeclTheta mcxt) $
-                extractConDeclGADTDetailsTyVars args        $
-                extractHsTysRdrTyVars [res_ty] []
+                extractConGadtSigBodyTyVars body
 
         ; let ctxt = ConDeclCtx (toList new_names)
 
         ; bindHsOuterTyVarBndrs ctxt Nothing implicit_bndrs outer_bndrs $ \outer_bndrs' ->
     do  { (new_cxt, fvs1)    <- rnMbContext ctxt mcxt
-        ; (new_args, fvs2)   <- rnConDeclGADTDetails (unLoc (head new_names)) ctxt args
-        ; (new_res_ty, fvs3) <- rnLHsType ctxt res_ty
+        ; (new_body, fvs2)   <- rnConGadtSigBody (unLoc (head new_names)) ctxt body
 
-         -- Ensure that there are no nested `forall`s or contexts, per
-         -- Note [GADT abstract syntax] (Wrinkle: No nested foralls or contexts)
-         -- in GHC.Hs.Type.
-       ; addNoNestedForallsContextsErr ctxt
-           NFC_GadtConSig new_res_ty
-
-        ; let all_fvs = fvs1 `plusFV` fvs2 `plusFV` fvs3
+        ; let all_fvs = fvs1 `plusFV` fvs2
 
         ; traceRn "rnConDecl (ConDeclGADT)"
             (ppr names $$ ppr outer_bndrs')
@@ -2435,8 +2427,7 @@ rnConDecl (ConDeclGADT { con_names   = names
         ; return (ConDeclGADT { con_g_ext = noAnn, con_names = new_names
                               , con_dcolon = dcol
                               , con_bndrs = L l outer_bndrs', con_mb_cxt = new_cxt
-                              , con_g_args = new_args, con_res_ty = new_res_ty
-                              , con_doc = new_mb_doc },
+                              , con_body = new_body, con_doc = new_mb_doc },
                   all_fvs) } }
 
 rnMbContext :: HsDocContext -> Maybe (LHsContext GhcPs)
@@ -2461,17 +2452,32 @@ rnConDeclH98Details con doc (RecCon flds)
   = do { (new_flds, fvs) <- rnRecConDeclFields con doc flds
        ; return (RecCon new_flds, fvs) }
 
-rnConDeclGADTDetails ::
+rnConGadtSigBody ::
       Name
    -> HsDocContext
-   -> HsConDeclGADTDetails GhcPs
-   -> RnM (HsConDeclGADTDetails GhcRn, FreeVars)
-rnConDeclGADTDetails _ doc (PrefixConGADT tys)
-  = do { (new_tys, fvs) <- mapFvRn (rnScaledLHsType doc) tys
-       ; return (PrefixConGADT new_tys, fvs) }
-rnConDeclGADTDetails con doc (RecConGADT flds arr)
-  = do { (new_flds, fvs) <- rnRecConDeclFields con doc flds
-       ; return (RecConGADT new_flds arr, fvs) }
+   -> ConGadtSigBody GhcPs
+   -> RnM (ConGadtSigBody GhcRn, FreeVars)
+rnConGadtSigBody _ doc (PrefixConGADT body)
+  = do { (new_body, fvs) <- rnPrefixConGadtSigBody doc body
+       ; return (PrefixConGADT new_body, fvs) }
+rnConGadtSigBody con doc (RecConGADT flds arr res_ty)
+  = do { (new_flds,   fvs1) <- rnRecConDeclFields con doc flds
+       ; (new_res_ty, fvs2) <- rnGADTResultTy doc res_ty
+       ; return (RecConGADT new_flds arr new_res_ty, fvs1 `plusFV` fvs2) }
+
+rnPrefixConGadtSigBody ::
+      HsDocContext
+   -> PrefixConGadtSigBody GhcPs
+   -> RnM (PrefixConGadtSigBody GhcRn, FreeVars)
+rnPrefixConGadtSigBody doc = go
+  where
+    go (PCGSRes res_ty) = do
+      (new_res_ty, fvs) <- rnGADTResultTy doc res_ty
+      pure (PCGSRes new_res_ty, fvs)
+    go (PCGSAnonArg arg_ty body) = do
+      (new_arg_ty, fvs1) <- rnScaledLHsType doc arg_ty
+      (new_body,   fvs2) <- go body
+      pure (PCGSAnonArg new_arg_ty new_body, fvs1 `plusFV` fvs2)
 
 rnRecConDeclFields ::
      Name
@@ -2484,6 +2490,19 @@ rnRecConDeclFields con doc (L l fields)
                 -- No need to check for duplicate fields
                 -- since that is done by GHC.Rename.Names.extendGlobalRdrEnvRn
         ; pure (L l new_fields, fvs) }
+
+rnGADTResultTy ::
+     HsDocContext
+  -> LHsType GhcPs
+  -> RnM (LHsType GhcRn, FreeVars)
+rnGADTResultTy doc res_ty
+  = do { (new_res_ty, fvs) <- rnLHsType doc res_ty
+         -- Ensure that there are no nested `forall`s or contexts, per
+         -- Note [GADT abstract syntax] (Wrinkle: No nested foralls or contexts)
+         -- in Language.Haskell.Syntax.Decls.
+       ; addNoNestedForallsContextsErr doc
+           NFC_GadtConSig new_res_ty
+       ; pure (new_res_ty, fvs) }
 
 -------------------------------------------------
 
