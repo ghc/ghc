@@ -51,7 +51,9 @@ module GHC.Classes(
     (&&), (||), not,
 
     -- * Integer arithmetic
-    divInt#, modInt#, divModInt#
+    divInt#, divInt8#, divInt16#, divInt32#,
+    modInt#, modInt8#, modInt16#, modInt32#,
+    divModInt#, divModInt8#, divModInt16#, divModInt32#
  ) where
 
 -- GHC.Magic is used in some derived instances
@@ -542,9 +544,6 @@ not False               =  True
 
 -- These functions have built-in rules.
 {-# INLINE [0] divInt# #-}
-{-# INLINE [0] modInt# #-}
-{-# INLINE [0] divModInt# #-}
-
 divInt# :: Int# -> Int# -> Int#
 x# `divInt#` y# = ((x# +# bias#) `quotInt#` y#) -# hard#
    where
@@ -555,30 +554,50 @@ x# `divInt#` y# = ((x# +# bias#) `quotInt#` y#) -# hard#
       !bias# = c0# -# c1#
       !hard# = c0# `orI#` c1#
 
-modInt# :: Int# -> Int# -> Int#
-x# `modInt#` y# = r# +# k#
-  where
-    -- See Note [modInt# implementation]
-    !yn# = y# <# 0#
-    !c0# = (x# <# 0#) `andI#` (notI# yn#)
-    !c1# = (x# ># 0#) `andI#` yn#
-    !s#  = 0# -# ((c0# `orI#` c1#) `andI#` (r# /=# 0#))
-    !k#  = s# `andI#` y#
-    !r#  = x# `remInt#` y#
+{-# INLINE [0] divInt8# #-}
+divInt8# :: Int8# -> Int8# -> Int8#
+x# `divInt8#` y# = ((x# `plusInt8#` bias#) `quotInt8#` y#) `subInt8#` hard#
+   where
+      zero# = intToInt8# 0#
+      x `andInt8#` y = word8ToInt8# (int8ToWord8# x `andWord8#` int8ToWord8# y)
+      x `orInt8#` y = word8ToInt8# (int8ToWord8# x `orWord8#` int8ToWord8# y)
+      notInt8# x = word8ToInt8# (notWord8# (int8ToWord8# x))
+      -- See Note [divInt# implementation]
+      !yn#   = intToInt8# (y# `ltInt8#` zero#)
+      !c0#   = intToInt8# (x# `ltInt8#` zero#) `andInt8#` (notInt8# yn#)
+      !c1#   = intToInt8# (x# `gtInt8#` zero#) `andInt8#` yn#
+      !bias# = c0# `subInt8#` c1#
+      !hard# = c0# `orInt8#` c1#
 
-divModInt# :: Int# -> Int# -> (# Int#, Int# #)
-x# `divModInt#` y# = case (x# +# bias#) `quotRemInt#` y# of
-  (# q#, r# #) -> (# q# -# hard#, r# +# k# #)
-  where
-    -- See Note [divModInt# implementation]
-    !yn#   = y# <# 0#
-    !c0#   = (x# <# 0#) `andI#` (notI# yn#)
-    !c1#   = (x# ># 0#) `andI#` yn#
-    !bias# = c0# -# c1#
-    !hard# = c0# `orI#` c1#
-    !s#    = 0# -# hard#
-    !k#    = (s# `andI#` y#) -# bias#
+{-# INLINE [0] divInt16# #-}
+divInt16# :: Int16# -> Int16# -> Int16#
+x# `divInt16#` y# = ((x# `plusInt16#` bias#) `quotInt16#` y#) `subInt16#` hard#
+   where
+      zero# = intToInt16# 0#
+      x `andInt16#` y = word16ToInt16# (int16ToWord16# x `andWord16#` int16ToWord16# y)
+      x `orInt16#` y = word16ToInt16# (int16ToWord16# x `orWord16#` int16ToWord16# y)
+      notInt16# x = word16ToInt16# (notWord16# (int16ToWord16# x))
+      -- See Note [divInt# implementation]
+      !yn#   = intToInt16# (y# `ltInt16#` zero#)
+      !c0#   = intToInt16# (x# `ltInt16#` zero#) `andInt16#` (notInt16# yn#)
+      !c1#   = intToInt16# (x# `gtInt16#` zero#) `andInt16#` yn#
+      !bias# = c0# `subInt16#` c1#
+      !hard# = c0# `orInt16#` c1#
 
+{-# INLINE [0] divInt32# #-}
+divInt32# :: Int32# -> Int32# -> Int32#
+x# `divInt32#` y# = ((x# `plusInt32#` bias#) `quotInt32#` y#) `subInt32#` hard#
+   where
+      zero# = intToInt32# 0#
+      x `andInt32#` y = word32ToInt32# (int32ToWord32# x `andWord32#` int32ToWord32# y)
+      x `orInt32#` y = word32ToInt32# (int32ToWord32# x `orWord32#` int32ToWord32# y)
+      notInt32# x = word32ToInt32# (notWord32# (int32ToWord32# x))
+      -- See Note [divInt# implementation]
+      !yn#   = intToInt32# (y# `ltInt32#` zero#)
+      !c0#   = intToInt32# (x# `ltInt32#` zero#) `andInt32#` (notInt32# yn#)
+      !c1#   = intToInt32# (x# `gtInt32#` zero#) `andInt32#` yn#
+      !bias# = c0# `subInt32#` c1#
+      !hard# = c0# `orInt32#` c1#
 
 -- See Note [divInt# implementation]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -638,6 +657,65 @@ x# `divModInt#` y# = case (x# +# bias#) `quotRemInt#` y# of
 --    | (x# ># 0#) && (y# <# 0#) = ((x# -# y#) -# 1#) `quotInt#` y#
 --    | (x# <# 0#) && (y# ># 0#) = ((x# -# y#) +# 1#) `quotInt#` y#
 
+{-# INLINE [0] modInt# #-}
+modInt# :: Int# -> Int# -> Int#
+x# `modInt#` y# = r# +# k#
+  where
+    -- See Note [modInt# implementation]
+    !yn# = y# <# 0#
+    !c0# = (x# <# 0#) `andI#` (notI# yn#)
+    !c1# = (x# ># 0#) `andI#` yn#
+    !s#  = 0# -# ((c0# `orI#` c1#) `andI#` (r# /=# 0#))
+    !k#  = s# `andI#` y#
+    !r#  = x# `remInt#` y#
+
+{-# INLINE [0] modInt8# #-}
+modInt8# :: Int8# -> Int8# -> Int8#
+x# `modInt8#` y# = r# `plusInt8#` k#
+  where
+    zero# = intToInt8# 0#
+    x `andInt8#` y = word8ToInt8# (int8ToWord8# x `andWord8#` int8ToWord8# y)
+    x `orInt8#` y = word8ToInt8# (int8ToWord8# x `orWord8#` int8ToWord8# y)
+    notInt8# x = word8ToInt8# (notWord8# (int8ToWord8# x))
+    -- See Note [modInt# implementation]
+    !yn# = intToInt8# (y# `ltInt8#` zero#)
+    !c0# = intToInt8# (x# `ltInt8#` zero#) `andInt8#` (notInt8# yn#)
+    !c1# = intToInt8# (x# `gtInt8#` zero#) `andInt8#` yn#
+    !s#  = zero# `subInt8#` ((c0# `orInt8#` c1#) `andInt8#` (intToInt8# (r# `neInt8#` zero#)))
+    !k#  = s# `andInt8#` y#
+    !r#  = x# `remInt8#` y#
+
+{-# INLINE [0] modInt16# #-}
+modInt16# :: Int16# -> Int16# -> Int16#
+x# `modInt16#` y# = r# `plusInt16#` k#
+  where
+    zero# = intToInt16# 0#
+    x `andInt16#` y = word16ToInt16# (int16ToWord16# x `andWord16#` int16ToWord16# y)
+    x `orInt16#` y = word16ToInt16# (int16ToWord16# x `orWord16#` int16ToWord16# y)
+    notInt16# x = word16ToInt16# (notWord16# (int16ToWord16# x))
+    -- See Note [modInt# implementation]
+    !yn# = intToInt16# (y# `ltInt16#` zero#)
+    !c0# = intToInt16# (x# `ltInt16#` zero#) `andInt16#` (notInt16# yn#)
+    !c1# = intToInt16# (x# `gtInt16#` zero#) `andInt16#` yn#
+    !s#  = zero# `subInt16#` ((c0# `orInt16#` c1#) `andInt16#` (intToInt16# (r# `neInt16#` zero#)))
+    !k#  = s# `andInt16#` y#
+    !r#  = x# `remInt16#` y#
+
+{-# INLINE [0] modInt32# #-}
+modInt32# :: Int32# -> Int32# -> Int32#
+x# `modInt32#` y# = r# `plusInt32#` k#
+  where
+    zero# = intToInt32# 0#
+    x `andInt32#` y = word32ToInt32# (int32ToWord32# x `andWord32#` int32ToWord32# y)
+    x `orInt32#` y = word32ToInt32# (int32ToWord32# x `orWord32#` int32ToWord32# y)
+    notInt32# x = word32ToInt32# (notWord32# (int32ToWord32# x))
+    -- See Note [modInt# implementation]
+    !yn# = intToInt32# (y# `ltInt32#` zero#)
+    !c0# = intToInt32# (x# `ltInt32#` zero#) `andInt32#` (notInt32# yn#)
+    !c1# = intToInt32# (x# `gtInt32#` zero#) `andInt32#` yn#
+    !s#  = zero# `subInt32#` ((c0# `orInt32#` c1#) `andInt32#` (intToInt32# (r# `neInt32#` zero#)))
+    !k#  = s# `andInt32#` y#
+    !r#  = x# `remInt32#` y#
 
 -- Note [modInt# implementation]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -688,6 +766,74 @@ x# `divModInt#` y# = case (x# +# bias#) `quotRemInt#` y# of
 --        s#  = 0# -# ((c0# ||# c1#) &&# (r# /=# 0#))
 --        k#  = s# &&# y#
 --        r#  = x# `remInt#` y#
+
+{-# INLINE [0] divModInt# #-}
+divModInt# :: Int# -> Int# -> (# Int#, Int# #)
+x# `divModInt#` y# = case (x# +# bias#) `quotRemInt#` y# of
+  (# q#, r# #) -> (# q# -# hard#, r# +# k# #)
+  where
+    -- See Note [divModInt# implementation]
+    !yn#   = y# <# 0#
+    !c0#   = (x# <# 0#) `andI#` (notI# yn#)
+    !c1#   = (x# ># 0#) `andI#` yn#
+    !bias# = c0# -# c1#
+    !hard# = c0# `orI#` c1#
+    !s#    = 0# -# hard#
+    !k#    = (s# `andI#` y#) -# bias#
+
+{-# INLINE [0] divModInt8# #-}
+divModInt8# :: Int8# -> Int8# -> (# Int8#, Int8# #)
+x# `divModInt8#` y# = case (x# `plusInt8#` bias#) `quotRemInt8#` y# of
+  (# q#, r# #) -> (# q# `subInt8#` hard#, r# `plusInt8#` k# #)
+  where
+    zero# = intToInt8# 0#
+    x `andInt8#` y = word8ToInt8# (int8ToWord8# x `andWord8#` int8ToWord8# y)
+    x `orInt8#` y = word8ToInt8# (int8ToWord8# x `orWord8#` int8ToWord8# y)
+    notInt8# x = word8ToInt8# (notWord8# (int8ToWord8# x))
+    -- See Note [divModInt# implementation]
+    !yn#   = intToInt8# (y# `ltInt8#` zero#)
+    !c0#   = intToInt8# (x# `ltInt8#` zero#) `andInt8#` (notInt8# yn#)
+    !c1#   = intToInt8# (x# `gtInt8#` zero#) `andInt8#` yn#
+    !bias# = c0# `subInt8#` c1#
+    !hard# = c0# `orInt8#` c1#
+    !s#    = zero# `subInt8#` hard#
+    !k#    = (s# `andInt8#` y#) `subInt8#` bias#
+
+{-# INLINE [0] divModInt16# #-}
+divModInt16# :: Int16# -> Int16# -> (# Int16#, Int16# #)
+x# `divModInt16#` y# = case (x# `plusInt16#` bias#) `quotRemInt16#` y# of
+  (# q#, r# #) -> (# q# `subInt16#` hard#, r# `plusInt16#` k# #)
+  where
+    zero# = intToInt16# 0#
+    x `andInt16#` y = word16ToInt16# (int16ToWord16# x `andWord16#` int16ToWord16# y)
+    x `orInt16#` y = word16ToInt16# (int16ToWord16# x `orWord16#` int16ToWord16# y)
+    notInt16# x = word16ToInt16# (notWord16# (int16ToWord16# x))
+    -- See Note [divModInt# implementation]
+    !yn#   = intToInt16# (y# `ltInt16#` zero#)
+    !c0#   = intToInt16# (x# `ltInt16#` zero#) `andInt16#` (notInt16# yn#)
+    !c1#   = intToInt16# (x# `gtInt16#` zero#) `andInt16#` yn#
+    !bias# = c0# `subInt16#` c1#
+    !hard# = c0# `orInt16#` c1#
+    !s#    = zero# `subInt16#` hard#
+    !k#    = (s# `andInt16#` y#) `subInt16#` bias#
+
+{-# INLINE [0] divModInt32# #-}
+divModInt32# :: Int32# -> Int32# -> (# Int32#, Int32# #)
+x# `divModInt32#` y# = case (x# `plusInt32#` bias#) `quotRemInt32#` y# of
+  (# q#, r# #) -> (# q# `subInt32#` hard#, r# `plusInt32#` k# #)
+  where
+    zero# = intToInt32# 0#
+    x `andInt32#` y = word32ToInt32# (int32ToWord32# x `andWord32#` int32ToWord32# y)
+    x `orInt32#` y = word32ToInt32# (int32ToWord32# x `orWord32#` int32ToWord32# y)
+    notInt32# x = word32ToInt32# (notWord32# (int32ToWord32# x))
+    -- See Note [divModInt# implementation]
+    !yn#   = intToInt32# (y# `ltInt32#` zero#)
+    !c0#   = intToInt32# (x# `ltInt32#` zero#) `andInt32#` (notInt32# yn#)
+    !c1#   = intToInt32# (x# `gtInt32#` zero#) `andInt32#` yn#
+    !bias# = c0# `subInt32#` c1#
+    !hard# = c0# `orInt32#` c1#
+    !s#    = zero# `subInt32#` hard#
+    !k#    = (s# `andInt32#` y#) `subInt32#` bias#
 
 -- Note [divModInt# implementation]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
