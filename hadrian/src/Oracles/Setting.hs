@@ -7,7 +7,7 @@ module Oracles.Setting (
 
     -- * Helpers
     ghcCanonVersion, cmdLineLengthLimit, hostSupportsRPaths, topDirectory,
-    libsuf, ghcVersionStage,
+    libsuf, ghcVersionStage, bashPath,
 
     -- ** Target platform things
     anyTargetPlatform, anyTargetOs, anyTargetArch, anyHostOs,
@@ -76,6 +76,7 @@ data Setting = BuildArch
              | TargetArchHaskell
              | TargetOsHaskell
              | TargetArmVersion
+             | BourneShell
 
 -- TODO: Reduce the variety of similar flags (e.g. CPP and non-CPP versions).
 -- | Each 'SettingList' comes from the file @hadrian/cfg/system.config@,
@@ -172,6 +173,7 @@ setting key = lookupValueOrError configFile $ case key of
     TargetVendor       -> "target-vendor"
     TargetArchHaskell  -> "target-arch-haskell"
     TargetOsHaskell    -> "target-os-haskell"
+    BourneShell        -> "bourne-shell"
 
 -- | Look up the value of a 'SettingList' in @cfg/system.config@, tracking the
 -- result.
@@ -216,6 +218,10 @@ settingsFileSetting key = lookupValueOrError configFile $ case key of
 -- tracking the result.
 getSetting :: Setting -> Expr c b String
 getSetting = expr . setting
+
+-- | The path to a Bourne shell interpreter.
+bashPath :: Action FilePath
+bashPath = setting BourneShell
 
 -- | An expression that looks up the value of a 'SettingList' in
 -- @cfg/system.config@, tracking the result.
