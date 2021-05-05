@@ -37,9 +37,6 @@ module GHC.Builtin.Utils (
         ghcPrimDeclDocs,
         primOpId,
 
-        -- * Random other things
-        maybeCharLikeCon, maybeIntLikeCon,
-
         -- * Class categories
         isNumericClass, isStandardClass
 
@@ -278,20 +275,6 @@ ghcPrimDeclDocs = DeclDocMap $ Map.fromList $ mapMaybe findName primOpDocs
       | Just name <- find ((nameStr ==) . getOccString) names
       = Just (name, mkHsDocString doc)
       | otherwise = Nothing
-
-{-
-************************************************************************
-*                                                                      *
-            Built-in keys
-*                                                                      *
-************************************************************************
-
-ToDo: make it do the ``like'' part properly (as in 0.26 and before).
--}
-
-maybeCharLikeCon, maybeIntLikeCon :: DataCon -> Bool
-maybeCharLikeCon con = con `hasKey` charDataConKey
-maybeIntLikeCon  con = con `hasKey` intDataConKey
 
 {-
 ************************************************************************
