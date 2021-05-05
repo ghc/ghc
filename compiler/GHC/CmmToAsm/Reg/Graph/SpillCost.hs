@@ -33,7 +33,7 @@ import GHC.Data.Graph.Directed          (flattenSCCs)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Platform
-import GHC.Utils.Monad.State
+import GHC.Utils.Monad.State.Strict
 import GHC.CmmToAsm.CFG
 
 import Data.List        (nub, minimumBy)
