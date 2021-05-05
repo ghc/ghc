@@ -172,6 +172,8 @@ createOSThread (OSThreadId* pId, char *name STG_UNUSED,
     pthread_setname_np(*pId, name);
 #elif defined(HAVE_PTHREAD_SETNAME_NP_DARWIN)
     pthread_setname_np(name);
+#elif defined(HAVE_PTHREAD_SETNAME_NP_NETBSD)
+    pthread_setname_np(*pId, "%s", name);
 #endif
   }
   return result;
