@@ -1006,9 +1006,10 @@ runMeta' show_code ppr_hs run_and_convert expr
 
         -- Compile and link it; might fail if linking fails
         ; src_span <- getSrcSpanM
+        ; mnwib <- getMnwib
         ; traceTc "About to run (desugared)" (ppr ds_expr)
         ; either_hval <- tryM $ liftIO $
-                         GHC.Driver.Main.hscCompileCoreExpr hsc_env src_span ds_expr
+                         GHC.Driver.Main.hscCompileCoreExpr hsc_env (src_span, Just mnwib) ds_expr
         ; case either_hval of {
             Left exn   -> fail_with_exn "compile and link" exn ;
             Right hval -> do
@@ -2611,6 +2612,7 @@ reifyModule (TH.Module (TH.PkgName pkgString) (TH.ModName mString)) = do
       usageToModule this_pkg (UsageHomeModule { usg_mod_name = mn }) = Just $ mkModule this_pkg mn
       usageToModule _ (UsagePackageModule { usg_mod = m }) = Just m
       usageToModule _ (UsageMergedRequirement { usg_mod = m }) = Just m
+      usageToModule this_pkg (UsageHomeModuleInterface { usg_mod_name = mn }) = Just $ mkModule this_pkg mn
 
 ------------------------------
 mkThAppTs :: TH.Type -> [TH.Type] -> TH.Type
