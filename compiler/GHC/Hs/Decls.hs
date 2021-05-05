@@ -76,7 +76,9 @@ module GHC.Hs.Decls (
   CImportSpec(..),
   -- ** Data-constructor declarations
   ConDecl(..), LConDecl,
-  HsConDeclH98Details, HsConDeclGADTDetails(..), hsConDeclTheta,
+  HsConDeclH98Details,
+  ConGADTBody(..), PrefixConGADTBody(..),
+  anonPrefixConGADTArgs, prefixConGADTResTy, hsConDeclTheta,
   getConNames, getRecConArgs_maybe,
   -- ** Document comments
   DocDecl(..), LDocDecl, docDeclDoc,
@@ -624,9 +626,9 @@ getRecConArgs_maybe (ConDeclH98{con_args = args}) = case args of
   PrefixCon{} -> Nothing
   RecCon flds -> Just flds
   InfixCon{}  -> Nothing
-getRecConArgs_maybe (ConDeclGADT{con_g_args = args}) = case args of
-  PrefixConGADT{} -> Nothing
-  RecConGADT flds -> Just flds
+getRecConArgs_maybe (ConDeclGADT{con_body = body}) = case body of
+  PrefixConGADT{}   -> Nothing
+  RecConGADT flds _ -> Just flds
 
 hsConDeclTheta :: Maybe (LHsContext (GhcPass p)) -> [LHsType (GhcPass p)]
 hsConDeclTheta Nothing            = []
@@ -701,17 +703,18 @@ pprConDecl (ConDeclH98 { con_name = L _ con
                                  <+> pprConDeclFields (unLoc fields)
 
 pprConDecl (ConDeclGADT { con_names = cons, con_bndrs = L _ outer_bndrs
-                        , con_mb_cxt = mcxt, con_g_args = args
-                        , con_res_ty = res_ty, con_doc = doc })
+                        , con_mb_cxt = mcxt, con_body = body, con_doc = doc })
   = ppr_mbDoc doc <+> ppr_con_names cons <+> dcolon
     <+> (sep [pprHsOuterSigTyVarBndrs outer_bndrs <+> pprLHsContext mcxt,
-              ppr_arrow_chain (get_args args ++ [ppr res_ty]) ])
+              ppr_body body ])
   where
-    get_args (PrefixConGADT args) = map ppr args
-    get_args (RecConGADT fields)  = [pprConDeclFields (unLoc fields)]
+    ppr_body (PrefixConGADT args)       = ppr_prefix_body args
+    ppr_body (RecConGADT fields res_ty) = sep [ pprConDeclFields (unLoc fields)
+                                              , arrow <+> ppr res_ty ]
 
-    ppr_arrow_chain (a:as) = sep (a : map (arrow <+>) as)
-    ppr_arrow_chain []     = empty
+    ppr_prefix_body (PCGResult res_ty)     = ppr res_ty
+    ppr_prefix_body (PCGAnonArg arg body') = sep [ ppr arg
+                                                 , arrow <+> ppr_prefix_body body' ]
 
 ppr_con_names :: (OutputableBndr a) => [GenLocated l a] -> SDoc
 ppr_con_names = pprWithCommas (pprPrefixOcc . unLoc)
