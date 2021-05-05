@@ -548,8 +548,9 @@ addTickHsExpr (NegApp x e neg) =
         liftM2 (NegApp x)
                 (addTickLHsExpr e)
                 (addTickSyntaxExpr hpcSrcSpan neg)
-addTickHsExpr (HsPar x e) =
-        liftM (HsPar x) (addTickLHsExprEvalInner e)
+addTickHsExpr (HsPar x lpar e rpar) = do
+        e' <- addTickLHsExprEvalInner e
+        return (HsPar x lpar e' rpar)
 addTickHsExpr (SectionL x e1 e2) =
         liftM2 (SectionL x)
                 (addTickLHsExpr e1)
@@ -869,7 +870,9 @@ addTickHsCmd (OpApp e1 c2 fix c3) =
                 (return fix)
                 (addTickLHsCmd c3)
 -}
-addTickHsCmd (HsCmdPar x e) = liftM (HsCmdPar x) (addTickLHsCmd e)
+addTickHsCmd (HsCmdPar x lpar e rpar) = do
+        e' <- addTickLHsCmd e
+        return (HsCmdPar x lpar e' rpar)
 addTickHsCmd (HsCmdCase x e mgs) =
         liftM2 (HsCmdCase x)
                 (addTickLHsExpr e)

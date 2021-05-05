@@ -364,9 +364,9 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
         ; pat_ty <- readExpType (scaledThing pat_ty)
         ; return (mkHsWrapPat (wrap <.> mult_wrap) (VarPat x (L l id)) pat_ty, res) }
 
-  ParPat x pat -> do
+  ParPat x lpar pat rpar -> do
         { (pat', res) <- tc_lpat pat_ty penv pat thing_inside
-        ; return (ParPat x pat', res) }
+        ; return (ParPat x lpar pat' rpar, res) }
 
   BangPat x pat -> do
         { (pat', res) <- tc_lpat pat_ty penv pat thing_inside
