@@ -109,7 +109,7 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
   where
     logger         = hsc_logger hsc_env
     dflags         = hsc_dflags hsc_env
-    home_pkg_rules = hptRules hsc_env (dep_mods deps)
+    home_pkg_rules = hptRules hsc_env (dep_direct_mods deps)
     hpt_rule_base  = mkRuleBase home_pkg_rules
     print_unqual   = mkPrintUnqualified (hsc_unit_env hsc_env) rdr_env
     -- mod: get the module out of the current HscEnv so we can retrieve it from the monad.

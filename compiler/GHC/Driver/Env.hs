@@ -13,7 +13,8 @@ module GHC.Driver.Env
    , hscEPS
    , hscInterp
    , hptCompleteSigs
-   , hptInstances
+   , hptAllInstances
+   , hptInstancesBelow
    , hptAnns
    , hptAllThings
    , hptSomeThingsBelowUs
@@ -64,9 +65,10 @@ import GHC.Utils.Outputable
 import GHC.Utils.Monad
 import GHC.Utils.Panic
 import GHC.Utils.Misc
+import GHC.Types.Unique.FM
 
-import Control.Monad    ( guard )
 import Data.IORef
+import qualified Data.Set as Set
 
 runHsc :: HscEnv -> Hsc a -> IO a
 runHsc hsc_env (Hsc hsc) = do
@@ -180,13 +182,27 @@ hptCompleteSigs = hptAllThings  (md_complete_matches . hm_details)
 -- the Home Package Table filtered by the provided predicate function.
 -- Used in @tcRnImports@, to select the instances that are in the
 -- transitive closure of imports from the currently compiled module.
-hptInstances :: HscEnv -> (ModuleName -> Bool) -> ([ClsInst], [FamInst])
-hptInstances hsc_env want_this_module
+hptAllInstances :: HscEnv -> ([ClsInst], [FamInst])
+hptAllInstances hsc_env
   = let (insts, famInsts) = unzip $ flip hptAllThings hsc_env $ \mod_info -> do
-                guard (want_this_module (moduleName (mi_module (hm_iface mod_info))))
                 let details = hm_details mod_info
                 return (md_insts details, md_fam_insts details)
     in (concat insts, concat famInsts)
+
+-- | Find instances visible from the given set of imports
+hptInstancesBelow :: HscEnv -> ModuleName -> [ModuleNameWithIsBoot] -> ([ClsInst], [FamInst])
+hptInstancesBelow hsc_env mn mns =
+  let (insts, famInsts) =
+        unzip $ hptSomeThingsBelowUs (\mod_info ->
+                                     let details = hm_details mod_info
+                                     -- Don't include instances for the current module
+                                     in if moduleName (mi_module (hm_iface mod_info)) == mn
+                                          then []
+                                          else [(md_insts details, md_fam_insts details)])
+                             True -- Include -hi-boot
+                             hsc_env
+                             mns
+  in (concat insts, concat famInsts)
 
 -- | Get rules from modules "below" this one (in the dependency sense)
 hptRules :: HscEnv -> [ModuleNameWithIsBoot] -> [CoreRule]
@@ -201,10 +217,33 @@ hptAnns hsc_env Nothing = hptAllThings (md_anns . hm_details) hsc_env
 hptAllThings :: (HomeModInfo -> [a]) -> HscEnv -> [a]
 hptAllThings extract hsc_env = concatMap extract (eltsHpt (hsc_HPT hsc_env))
 
+hptModulesBelow :: HscEnv -> [ModuleNameWithIsBoot] -> Set.Set ModuleNameWithIsBoot
+hptModulesBelow hsc_env mn = Set.fromList (eltsUFM $ go mn emptyUFM)
+  where
+    hpt = hsc_HPT hsc_env
+
+    go [] seen = seen
+    go (mn:mns) seen
+      | Just mn' <- lookupUFM seen (gwib_mod mn)
+        -- Already seen the module before
+      , gwib_isBoot mn' == gwib_isBoot mn = go mns seen
+      | otherwise =
+          case lookupHpt hpt (gwib_mod mn) of
+              -- Not a home module
+              Nothing -> go mns seen
+              Just hmi ->
+                let
+                  comb m@(GWIB { gwib_isBoot = NotBoot }) _ = m
+                  comb (GWIB { gwib_isBoot = IsBoot }) x  = x
+                in
+                  go (dep_direct_mods (mi_deps (hm_iface hmi)) ++ mns)
+                     (addToUFM_C comb seen (gwib_mod mn) mn)
+
+
 -- | Get things from modules "below" this one (in the dependency sense)
 -- C.f Inst.hptInstances
 hptSomeThingsBelowUs :: (HomeModInfo -> [a]) -> Bool -> HscEnv -> [ModuleNameWithIsBoot] -> [a]
-hptSomeThingsBelowUs extract include_hi_boot hsc_env deps
+hptSomeThingsBelowUs extract include_hi_boot hsc_env mod
   | isOneShot (ghcMode (hsc_dflags hsc_env)) = []
 
   | otherwise
@@ -212,7 +251,7 @@ hptSomeThingsBelowUs extract include_hi_boot hsc_env deps
     in
     [ thing
     |   -- Find each non-hi-boot module below me
-      GWIB { gwib_mod = mod, gwib_isBoot = is_boot } <- deps
+      GWIB { gwib_mod = mod, gwib_isBoot = is_boot } <- Set.toList (hptModulesBelow hsc_env mod)
     , include_hi_boot || (is_boot == NotBoot)
 
         -- unsavoury: when compiling the base package with --make, we
@@ -243,7 +282,7 @@ prepareAnnotations hsc_env mb_guts = do
         -- Extract dependencies of the module if we are supplied one,
         -- otherwise load annotations from all home package table
         -- entries regardless of dependency ordering.
-        home_pkg_anns  = (mkAnnEnv . hptAnns hsc_env) $ fmap (dep_mods . mg_deps) mb_guts
+        home_pkg_anns  = (mkAnnEnv . hptAnns hsc_env) $ fmap (dep_direct_mods . mg_deps) mb_guts
         other_pkg_anns = eps_ann_env eps
         ann_env        = foldl1' plusAnnEnv $ catMaybes [mb_this_module_anns,
                                                          Just home_pkg_anns,
