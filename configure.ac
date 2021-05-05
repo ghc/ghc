@@ -49,6 +49,7 @@ dnl ** which are needed by FP_SETUP_PROJECT_VERSION
 dnl ** Find find command (for Win32's benefit)
 FP_PROG_FIND
 FP_PROG_SORT
+FP_PROG_SH
 
 dnl ----------------------------------------------------------
 FP_SETUP_PROJECT_VERSION
