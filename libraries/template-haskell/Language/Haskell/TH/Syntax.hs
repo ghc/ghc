@@ -572,7 +572,7 @@ reifyType :: Name -> Q Type
 reifyType nm = Q (qReifyType nm)
 
 {- | Template Haskell is capable of reifying information about types and
-terms defined in previous declaration groups. Top-level splices break up
+terms defined in previous declaration groups. Top-level declaration splices break up
 declaration groups.
 
 For an example, consider this  code block. We define a datatype @X@ and
@@ -590,7 +590,7 @@ $(do
  )
 @
 
-This code fails to compile, noting that @X@ is not in scope at the site of 'reify'. We can fix this by creating a new declaration group using an empty top-level splice:
+This code fails to compile, noting that @X@ is not available for reification at the site of 'reify'. We can fix this by creating a new declaration group using an empty top-level splice:
 
 @
 data X = X
