@@ -532,7 +532,10 @@ Qualified names are also supported, like so:
 -}
 
 
-{- | 'reify' looks up information about the 'Name'.
+{- | 'reify' looks up information about the 'Name'. It will fail with
+a compile error if the 'Name' is not visible. A 'Name' is visible if it is
+imported or defined in a prior top-level declaration group. See the
+documentation for 'newDeclarationGroup' for more details.
 
 It is sometimes useful to construct the argument name using 'lookupTypeName' or 'lookupValueName'
 to ensure that we are reifying from the right namespace. For instance, in this context:
