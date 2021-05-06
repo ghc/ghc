@@ -123,3 +123,5 @@ test('PprRecordDotSyntax4', ignore_stderr, makefile_test, ['PprRecordDotSyntax4'
 test('PprRecordDotSyntaxA', ignore_stderr, makefile_test, ['PprRecordDotSyntaxA'])
 test('CommentsTest', ignore_stderr, makefile_test, ['CommentsTest'])
 test('InTreeAnnotations1', ignore_stderr, makefile_test, ['InTreeAnnotations1'])
+
+test('Test19784', ignore_stderr, makefile_test, ['Test19784'])
