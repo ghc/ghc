@@ -114,7 +114,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/exactprin
  -- "../../testsuite/tests/printer/Ppr026.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr027.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr028.hs" Nothing
- "../../testsuite/tests/printer/Ppr029.hs" Nothing
+ -- "../../testsuite/tests/printer/Ppr029.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr030.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr031.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr032.hs" Nothing
@@ -173,6 +173,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/exactprin
  -- "../../testsuite/tests/printer/Test16236.hs" Nothing
  -- "../../testsuite/tests/printer/Test17519.hs" Nothing
  -- "../../testsuite/tests/printer/InTreeAnnotations1.hs" Nothing
+ "../../testsuite/tests/printer/Test19798.hs" Nothing
 
  -- "../../testsuite/tests/qualifieddo/should_compile/qdocompile001.hs" Nothing
  -- "../../testsuite/tests/typecheck/should_fail/StrictBinds.hs" Nothing
