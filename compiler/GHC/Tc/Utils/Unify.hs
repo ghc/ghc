@@ -35,10 +35,7 @@ module GHC.Tc.Utils.Unify (
   matchExpectedFunKind,
   matchActualFunTySigma, matchActualFunTysRho,
 
-  occCheckForErrors, CheckTyEqResult,
-  cteOK, cteImpredicative, cteTypeFamily, cteHoleBlocker,
-  cteInsolubleOccurs, cteSolubleOccurs,
-  cterHasNoProblem, cterHasProblem, cterRemoveProblem, cterHasOccursCheck,
+  occCheckForErrors,
   checkTyVarEq, checkTyFamEq, checkTypeEq
 
   ) where
@@ -78,13 +75,7 @@ import GHC.Utils.Panic
 import GHC.Exts      ( inline )
 import Control.Monad
 import Control.Arrow ( second )
-import Data.List     ( intersperse )
-import qualified Data.Semigroup as S
-
--- these are for CheckTyEqResult
-import Data.Word  ( Word8 )
-import Data.Bits
-
+import qualified Data.Semigroup as S ( (<>) )
 
 {- *********************************************************************
 *                                                                      *
@@ -1939,88 +1930,6 @@ with (forall k. k->*)
 
 -}
 
--- | A set of problems in checking the validity of a type equality.
--- See 'checkTypeEq'.
-newtype CheckTyEqResult = CTER Word8
-
--- | No problems in checking the validity of a type equality.
-cteOK :: CheckTyEqResult
-cteOK = CTER zeroBits
-
--- | Check whether a 'CheckTyEqResult' is marked successful.
-cterHasNoProblem :: CheckTyEqResult -> Bool
-cterHasNoProblem (CTER 0) = True
-cterHasNoProblem _        = False
-
--- | An individual problem that might be logged in a 'CheckTyEqResult'
-newtype CheckTyEqProblem = CTEP Word8
-
-cteImpredicative, cteTypeFamily, cteHoleBlocker, cteInsolubleOccurs,
-  cteSolubleOccurs :: CheckTyEqProblem
-cteImpredicative   = CTEP (bit 0)   -- forall or (=>) encountered
-cteTypeFamily      = CTEP (bit 1)   -- type family encountered
-cteHoleBlocker     = CTEP (bit 2)   -- blocking coercion hole
-      -- See Note [Equalities with incompatible kinds] in GHC.Tc.Solver.Canonical
-cteInsolubleOccurs = CTEP (bit 3)   -- occurs-check
-cteSolubleOccurs   = CTEP (bit 4)   -- occurs-check under a type function or in a coercion
-                                    -- must be one bit to the left of cteInsolubleOccurs
--- See also Note [Insoluble occurs check] in GHC.Tc.Errors
-
-cteProblem :: CheckTyEqProblem -> CheckTyEqResult
-cteProblem (CTEP mask) = CTER mask
-
-occurs_mask :: Word8
-occurs_mask = insoluble_mask .|. soluble_mask
-  where
-    CTEP insoluble_mask = cteInsolubleOccurs
-    CTEP soluble_mask   = cteSolubleOccurs
-
--- | Check whether a 'CheckTyEqResult' has a 'CheckTyEqProblem'
-cterHasProblem :: CheckTyEqResult -> CheckTyEqProblem -> Bool
-CTER bits `cterHasProblem` CTEP mask = (bits .&. mask) /= 0
-
-cterRemoveProblem :: CheckTyEqResult -> CheckTyEqProblem -> CheckTyEqResult
-cterRemoveProblem (CTER bits) (CTEP mask) = CTER (bits .&. complement mask)
-
-cterHasOccursCheck :: CheckTyEqResult -> Bool
-cterHasOccursCheck (CTER bits) = (bits .&. occurs_mask) /= 0
-
-cterClearOccursCheck :: CheckTyEqResult -> CheckTyEqResult
-cterClearOccursCheck (CTER bits) = CTER (bits .&. complement occurs_mask)
-
--- | Mark a 'CheckTyEqResult' as not having an insoluble occurs-check: any occurs
--- check is soluble, after all.
-cterNotInsoluble :: CheckTyEqResult -> CheckTyEqResult
-cterNotInsoluble (CTER bits)
-  = CTER $ ((bits .&. insoluble_mask) `shift` 1) .|. (bits .&. complement insoluble_mask)
-  where
-    CTEP insoluble_mask = cteInsolubleOccurs
-
--- | Retain only information about occurs-check failures, because only that
--- matters after recurring into a kind.
-cterFromKind :: CheckTyEqResult -> CheckTyEqResult
-cterFromKind (CTER bits)
-  = CTER (bits .&. occurs_mask)
-
-instance S.Semigroup CheckTyEqResult where
-  CTER bits1 <> CTER bits2 = CTER (bits1 .|. bits2)
-instance Monoid CheckTyEqResult where
-  mempty = cteOK
-
-instance Outputable CheckTyEqResult where
-  ppr cter | cterHasNoProblem cter = text "cteOK"
-           | otherwise
-           = parens $ fcat $ intersperse vbar $ set_bits
-    where
-      all_bits = [ (cteImpredicative,   "cteImpredicative")
-                 , (cteTypeFamily,      "cteTypeFamily")
-                 , (cteHoleBlocker,     "cteHoleBlocker")
-                 , (cteInsolubleOccurs, "cteInsolubleOccurs")
-                 , (cteSolubleOccurs,   "cteSolubleOccurs") ]
-      set_bits = [ text str
-                 | (bitmask, str) <- all_bits
-                 , cter `cterHasProblem` bitmask ]
-
 occCheckForErrors :: DynFlags -> TcTyVar -> Type -> CheckTyEqResult
 -- Just for error-message generation; so we return CheckTyEqResult
 -- so the caller can report the right kind of error
@@ -2157,7 +2066,7 @@ checkTypeEq dflags lhs ty
     go_tc_args tc tys | isGenerativeTyCon tc Nominal = foldMap go tys
                       | otherwise
                       = let (tf_args, non_tf_args) = splitAt (tyConArity tc) tys in
-                        cterNotInsoluble (foldMap go tf_args) S.<> foldMap go non_tf_args
+                        cterSetOccursCheckSoluble (foldMap go tf_args) S.<> foldMap go non_tf_args
 
      -- no bother about impredicativity in coercions, as they're
      -- inferred

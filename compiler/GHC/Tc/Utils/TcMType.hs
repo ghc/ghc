@@ -2327,7 +2327,7 @@ zonkHole hole@(Hole { hole_ty = ty })
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 zonkCt tries to maintain the canonical form of a Ct.  For example,
   - a CDictCan should stay a CDictCan;
-  - a CIrredCan should stay a CIrredCan with its cc_status flag intact
+  - a CIrredCan should stay a CIrredCan with its cc_reason flag intact
 
 Why?, for example:
 - For CDictCan, the @GHC.Tc.Solver.expandSuperClasses@ step, which runs after the
@@ -2360,7 +2360,7 @@ zonkCt ct@(CDictCan { cc_ev = ev, cc_tyargs = args })
 zonkCt (CEqCan { cc_ev = ev })
   = mkNonCanonical <$> zonkCtEvidence ev
 
-zonkCt ct@(CIrredCan { cc_ev = ev }) -- Preserve the cc_status flag
+zonkCt ct@(CIrredCan { cc_ev = ev }) -- Preserve the cc_reason flag
   = do { ev' <- zonkCtEvidence ev
        ; return (ct { cc_ev = ev' }) }
 

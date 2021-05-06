@@ -663,8 +663,8 @@ once had done). This problem can be tickled by typecheck/should_compile/holes.
 -- mean that (ty1 ~ ty2)
 interactIrred :: InertCans -> Ct -> TcS (StopOrContinue Ct)
 
-interactIrred inerts workItem@(CIrredCan { cc_ev = ev_w, cc_status = status })
-  | InsolubleCIS <- status
+interactIrred inerts workItem@(CIrredCan { cc_ev = ev_w, cc_reason = reason })
+  | isInsolubleReason reason
                -- For insolubles, don't allow the constraint to be dropped
                -- which can happen with solveOneFromTheOther, so that
                -- we get distinct error messages with -fdefer-type-errors

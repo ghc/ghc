@@ -1088,7 +1088,7 @@ The idea is that
   with S(fw,_).
 
 * T3 is guaranteed by an occurs-check on the work item.
-  This is done during canonicalisation, in canEqOK and checkTypeEq; invariant
+  This is done during canonicalisation, in checkTypeEq; invariant
   (TyEq:OC) of CEqCan. See also Note [CEqCan occurs check] in GHC.Tc.Types.Constraint.
 
 * (K1-3) are the "kick-out" criteria.  (As stated, they are really the
@@ -2159,11 +2159,11 @@ kickOutAfterFillingCoercionHole hole filled_co
     kick_ct :: Ct -> Either Ct Ct
          -- Left: kick out; Right: keep. But even if we keep, we may need
          -- to update the set of blocking holes
-    kick_ct ct@(CIrredCan { cc_status = BlockedCIS holes })
+    kick_ct ct@(CIrredCan { cc_reason = HoleBlockerReason holes })
       | hole `elementOfUniqSet` holes
       = let new_holes = holes `delOneFromUniqSet` hole
                               `unionUniqSets` holes_of_co
-            updated_ct = ct { cc_status = BlockedCIS new_holes }
+            updated_ct = ct { cc_reason = HoleBlockerReason new_holes }
         in
         if isEmptyUniqSet new_holes
         then Left updated_ct
@@ -4080,7 +4080,7 @@ See GHC.Tc.Solver.Monad.deferTcSForAllEq
 -- This only works under conditions as described in the Note; otherwise, returns
 -- Nothing.
 breakTyVarCycle_maybe :: CtEvidence
-                      -> CtIrredStatus   -- result of canEqOK
+                      -> CheckTyEqResult   -- result of checkTypeEq
                       -> CanEqLHS
                       -> TcType     -- RHS
                       -> TcS (Maybe (TcTyVar, CoercionN, TcType))
@@ -4091,8 +4091,13 @@ breakTyVarCycle_maybe (ctLocOrigin . ctEvLoc -> CycleBreakerOrigin _) _ _ _
   -- see Detail (7) of Note
   = return Nothing
 
-breakTyVarCycle_maybe ev SolubleOccursCheckCIS (TyVarLHS lhs_tv) rhs
+breakTyVarCycle_maybe ev cte_result (TyVarLHS lhs_tv) rhs
   | NomEq <- eq_rel
+
+  , cte_result `cterHasOnlyProblem` cteSolubleOccurs
+     -- only do this if the only problem is a soluble occurs-check
+     -- See Detail (8) of the Note.
+
   = do { should_break <- final_check
        ; if should_break then do { (co, new_rhs) <- go rhs
                                  ; return (Just (lhs_tv, co, new_rhs)) }

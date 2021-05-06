@@ -599,10 +599,10 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics
               , ("Irreds",          is_irred,        False, mkGroupReporter mkIrredErr)
               , ("Dicts",           is_dict,         False, mkGroupReporter mkDictErr) ]
 
-    -- also checks to make sure the constraint isn't BlockedCIS
+    -- also checks to make sure the constraint isn't HoleBlockerReason
     -- See TcCanonical Note [Equalities with incompatible kinds], (4)
     unblocked :: (Ct -> Pred -> Bool) -> Ct -> Pred -> Bool
-    unblocked _ (CIrredCan { cc_status = BlockedCIS {}}) _ = False
+    unblocked _ (CIrredCan { cc_reason = HoleBlockerReason {}}) _ = False
     unblocked checker ct pred = checker ct pred
 
     -- rigid_nom_eq, rigid_nom_tv_eq,
