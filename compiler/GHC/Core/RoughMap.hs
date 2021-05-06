@@ -65,7 +65,7 @@ typeToRoughMatchTc ty
   | Just (ty', _) <- splitCastTy_maybe ty   = typeToRoughMatchTc ty'
   | Just (tc,_)   <- splitTyConApp_maybe ty
   , not (isTypeFamilyTyCon tc)              = ASSERT2( isGenerativeTyCon tc Nominal, ppr tc )
-                                              KnownTc (tyConName tc)
+                                              KnownTc $! tyConName tc
     -- See Note [Rough matching in class and family instances]
   | otherwise                               = OtherTc
 
