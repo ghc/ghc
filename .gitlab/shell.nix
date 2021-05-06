@@ -43,6 +43,10 @@
 
   # unconditionally add the MacOSX.sdk and TargetConditional.h
   export NIX_CFLAGS_COMPILE+=" -isystem /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include"
+
+  # Use an architecture specific home, so cabal for different architectures don't confuse each other.
+  export HOME="$HOME/$(uname -m)-home"
+  mkdir -p $HOME
   '';
 
   nativeBuildInputs = (with pkgs; [

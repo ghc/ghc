@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2230
+# shellcheck disable=SC1090
 
 # This is the primary driver of the GitLab CI infrastructure.
 # Run `ci.sh usage` for usage information.
@@ -15,7 +16,9 @@ if [ ! -d "$TOP/.gitlab" ]; then
   echo "This script expects to be run from the root of a ghc checkout"
 fi
 
-source $TOP/.gitlab/common.sh
+CABAL_CACHE="$TOP/${CABAL_CACHE:-cabal-cache}"
+
+source "$TOP/.gitlab/common.sh"
 
 function usage() {
   cat <<EOF
@@ -195,10 +198,10 @@ function set_toolchain_paths() {
 
 # Extract GHC toolchain
 function setup() {
-  if [ -d "$TOP/cabal-cache" ]; then
+  if [ -d "${CABAL_CACHE}" ]; then
       info "Extracting cabal cache..."
       mkdir -p "$cabal_dir"
-      cp -Rf cabal-cache/* "$cabal_dir"
+      cp -Rf "${CABAL_CACHE}"/* "$cabal_dir"
   fi
 
   if [[ "$needs_toolchain" = "1" ]]; then
@@ -370,16 +373,15 @@ function configure() {
   run python3 boot
   end_section "booting"
 
-  local target_args=""
+  read -r -a args <<< "${CONFIGURE_ARGS:-}"
   if [[ -n "${target_triple:-}" ]]; then
-    target_args="--target=$target_triple"
+    args+=("--target=$target_triple")
   fi
 
   start_section "configuring"
   run ./configure \
     --enable-tarballs-autodownload \
-    $target_args \
-    ${CONFIGURE_ARGS:-} \
+    "${args[@]}" \
     GHC="$GHC" \
     HAPPY="$HAPPY" \
     ALEX="$ALEX" \
@@ -400,7 +402,7 @@ function build_make() {
 
   echo "include mk/flavours/${BUILD_FLAVOUR}.mk" > mk/build.mk
   echo 'GhcLibHcOpts+=-haddock' >> mk/build.mk
-  run "$MAKE" -j"$cores" $MAKE_ARGS
+  run "$MAKE" -j"$cores" "$MAKE_ARGS"
   run "$MAKE" -j"$cores" binary-dist-prep TAR_COMP_OPTS=-1
   ls -lh "$BIN_DIST_PREP_TAR_COMP"
 }
@@ -423,7 +425,8 @@ function push_perf_notes() {
 # Figure out which commit should be used by the testsuite driver as a
 # performance baseline. See Note [The CI Story].
 function determine_metric_baseline() {
-  export PERF_BASELINE_COMMIT="$(git merge-base $CI_MERGE_REQUEST_TARGET_BRANCH_NAME HEAD)"
+  PERF_BASELINE_COMMIT="$(git merge-base "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" HEAD)"
+  export PERF_BASELINE_COMMIT
   info "Using $PERF_BASELINE_COMMIT for performance metric baseline..."
 }
 
@@ -447,7 +450,7 @@ function build_hadrian() {
 
   run_hadrian binary-dist
 
-  mv _build/bindist/ghc*.tar.xz $BIN_DIST_NAME.tar.xz
+  mv _build/bindist/ghc*.tar.xz "$BIN_DIST_NAME.tar.xz"
 }
 
 function test_hadrian() {
@@ -480,7 +483,7 @@ function cabal_test() {
     -ddump-to-file -dumpdir "$OUT/dumps" -ddump-timings \
     +RTS --machine-readable "-t$OUT/rts.log" -RTS \
     -package mtl -ilibraries/Cabal/Cabal libraries/Cabal/Cabal/Setup.hs \
-    $@
+    "$@"
   rm -Rf tmp
   end_section "Cabal test: $OUT"
 }
@@ -507,23 +510,24 @@ function run_hadrian() {
     fail "BUILD_FLAVOUR not set"
   fi
   if [ -z "${BIGNUM_BACKEND:-}" ]; then BIGNUM_BACKEND="gmp"; fi
-  if [ -n "${VERBOSE:-}" ]; then HADRIAN_ARGS="${HADRIAN_ARGS:-} -V"; fi
+  read -r -a args <<< "${HADRIAN_ARGS:-}"
+  if [ -n "${VERBOSE:-}" ]; then args+=("-V"); fi
   run hadrian/build-cabal \
     --flavour="$BUILD_FLAVOUR" \
     -j"$cores" \
     --broken-test="${BROKEN_TESTS:-}" \
     --bignum=$BIGNUM_BACKEND \
-    ${HADRIAN_ARGS:-} \
-    $@
+    "${args[@]}" \
+    "$@"
 }
 
 # A convenience function to allow debugging in the CI environment.
 function shell() {
-  local cmd=$@
+  local cmd="*@"
   if [ -z "$cmd" ]; then
     cmd="bash -i"
   fi
-  run $cmd
+  run "$cmd"
 }
 
 setup_locale
@@ -598,9 +602,9 @@ case $1 in
     test_hadrian || res=$?
     push_perf_notes
     exit $res ;;
-  run_hadrian) shift; run_hadrian $@ ;;
+  run_hadrian) shift; run_hadrian "$@" ;;
   perf_test) run_perf_test ;;
   clean) clean ;;
-  shell) shell $@ ;;
+  shell) shell "$@" ;;
   *) fail "unknown mode $1" ;;
 esac
