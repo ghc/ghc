@@ -27,10 +27,13 @@ module GHC.Types.Name.Env (
         DNameEnv,
 
         emptyDNameEnv,
+        isEmptyDNameEnv,
         lookupDNameEnv,
         delFromDNameEnv, filterDNameEnv,
-        mapDNameEnv,
+        mapDNameEnv, eltsDNameEnv,
         adjustDNameEnv, alterDNameEnv, extendDNameEnv,
+        foldDNameEnv,
+        nonDetStrictFoldDNameEnv,
         -- ** Dependency analysis
         depAnal
     ) where
@@ -158,6 +161,9 @@ type DNameEnv a = UniqDFM Name a
 emptyDNameEnv :: DNameEnv a
 emptyDNameEnv = emptyUDFM
 
+isEmptyDNameEnv :: DNameEnv a -> Bool
+isEmptyDNameEnv = isNullUDFM
+
 lookupDNameEnv :: DNameEnv a -> Name -> Maybe a
 lookupDNameEnv = lookupUDFM
 
@@ -170,6 +176,9 @@ filterDNameEnv = filterUDFM
 mapDNameEnv :: (a -> b) -> DNameEnv a -> DNameEnv b
 mapDNameEnv = mapUDFM
 
+eltsDNameEnv :: DNameEnv a -> [a]
+eltsDNameEnv = eltsUDFM
+
 adjustDNameEnv :: (a -> a) -> DNameEnv a -> Name -> DNameEnv a
 adjustDNameEnv = adjustUDFM
 
@@ -178,3 +187,10 @@ alterDNameEnv = alterUDFM
 
 extendDNameEnv :: DNameEnv a -> Name -> a -> DNameEnv a
 extendDNameEnv = addToUDFM
+
+foldDNameEnv :: (a -> b -> b) -> b -> DNameEnv a -> b
+foldDNameEnv = foldUDFM
+
+nonDetStrictFoldDNameEnv :: (a -> b -> b) -> b -> DNameEnv a -> b
+nonDetStrictFoldDNameEnv = nonDetStrictFoldUDFM
+
