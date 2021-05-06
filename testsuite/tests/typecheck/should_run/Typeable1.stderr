@@ -2,7 +2,7 @@
 Typeable1.hs:22:5: error: [-Winaccessible-code (in -Wdefault), -Werror=inaccessible-code]
     • Couldn't match type: ComposeK
                      with: a3 b3
-      Inaccessible code in
+      Unsatisfiable constraint a2 ~ a3 b3 in
         a pattern with pattern synonym:
           App :: forall k2 (t :: k2).
                  () =>
@@ -11,6 +11,7 @@ Typeable1.hs:22:5: error: [-Winaccessible-code (in -Wdefault), -Werror=inaccessi
                  TypeRep a -> TypeRep b -> TypeRep t,
         in a pattern binding in
              a 'do' block
+      This may result in inaccessible code.
     • In the pattern: App x y
       In a stmt of a 'do' block: App x y <- pure x
       In the expression:
