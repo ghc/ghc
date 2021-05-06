@@ -2469,7 +2469,8 @@ Wrinkles:
      must be sure to kick out any such CIrredCan constraints that mention coercion holes
      when those holes get filled in, so that the unification step can now proceed.
 
-     The kicking out is done in kickOutAfterFillingCoercionHole.
+     The kicking out is done in kickOutAfterFillingCoercionHole, and the inerts
+     are stored in the inert_blocked field of InertCans.
 
      However, we must be careful: we kick out only when no coercion holes are
      left. The holes in the type are stored in the HoleBlockerReason CtIrredReason.

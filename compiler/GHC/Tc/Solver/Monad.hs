@@ -434,7 +434,8 @@ emptyInertCans
        , inert_safehask     = emptyDicts
        , inert_funeqs       = emptyFunEqs
        , inert_insts        = []
-       , inert_irreds       = emptyCts }
+       , inert_irreds       = emptyCts
+       , inert_blocked      = emptyCts }
 
 emptyInert :: InertSet
 emptyInert
@@ -708,6 +709,14 @@ data InertCans   -- See Note [Detailed InertCans Invariants] for more
               -- Irreducible predicates that cannot be made canonical,
               --     and which don't interact with others (e.g.  (c a))
               -- and insoluble predicates (e.g.  Int ~ Bool, or a ~ [a])
+
+       , inert_blocked :: Cts
+              -- Equality predicates blocked on a coercion hole.
+              -- Each Ct is a CIrredCan with cc_reason = HoleBlockerReason
+              -- See Note [Equalities with incompatible kinds] in GHC.Tc.Solver.Canonical
+              -- wrinkle (2)
+              -- These are stored separately from inert_irreds because
+              -- they get kicked out for different reasons
 
        , inert_given_eq_lvl :: TcLevel
               -- The TcLevel of the innermost implication that has a Given
@@ -1319,8 +1328,11 @@ to be revisited, but we don't think that the end conclusion is wrong.
 
 instance Outputable InertCans where
   ppr (IC { inert_eqs = eqs
-          , inert_funeqs = funeqs, inert_dicts = dicts
-          , inert_safehask = safehask, inert_irreds = irreds
+          , inert_funeqs = funeqs
+          , inert_dicts = dicts
+          , inert_safehask = safehask
+          , inert_irreds = irreds
+          , inert_blocked = blocked
           , inert_given_eq_lvl = ge_lvl
           , inert_given_eqs = given_eqs
           , inert_insts = insts })
@@ -1337,6 +1349,8 @@ instance Outputable InertCans where
         text "Safe Haskell unsafe overlap =" <+> pprCts (dictsToBag safehask)
       , ppUnless (isEmptyCts irreds) $
         text "Irreds =" <+> pprCts irreds
+      , ppUnless (isEmptyCts blocked) $
+        text "Blocked =" <+> pprCts blocked
       , ppUnless (null insts) $
         text "Given instances =" <+> vcat (map ppr insts)
       , text "Innermost given equalities =" <+> ppr ge_lvl
@@ -1856,6 +1870,11 @@ add_item tc_lvl
        TyFamLHS tc tys -> ics { inert_funeqs = addCanFunEq funeqs tc tys item }
        TyVarLHS tv     -> ics { inert_eqs    = addTyEq eqs tv item }
 
+add_item tc_lvl ics@(IC { inert_blocked = blocked })
+         item@(CIrredCan { cc_reason = HoleBlockerReason {}})
+  = updateGivenEqs tc_lvl item $  -- this item is always an equality
+    ics { inert_blocked = blocked `Bag.snocBag` item }
+
 add_item tc_lvl ics@(IC { inert_irreds = irreds }) item@(CIrredCan {})
   = updateGivenEqs tc_lvl item $   -- An Irred might turn out to be an
                                  -- equality, so we play safe
@@ -2148,11 +2167,11 @@ kickOutAfterFillingCoercionHole hole filled_co
     holes_of_co = coercionHolesOfCo filled_co
 
     kick_out :: InertCans -> (WorkList, InertCans)
-    kick_out ics@(IC { inert_irreds = irreds })
-      = let (to_kick, to_keep) = partitionBagWith kick_ct irreds
+    kick_out ics@(IC { inert_blocked = blocked })
+      = let (to_kick, to_keep) = partitionBagWith kick_ct blocked
 
             kicked_out = extendWorkListCts (bagToList to_kick) emptyWorkList
-            ics'       = ics { inert_irreds = to_keep }
+            ics'       = ics { inert_blocked = to_keep }
         in
         (kicked_out, ics')
 
@@ -2168,7 +2187,11 @@ kickOutAfterFillingCoercionHole hole filled_co
         if isEmptyUniqSet new_holes
         then Left updated_ct
         else Right updated_ct
-    kick_ct other = Right other
+
+      | otherwise
+      = Right ct
+
+    kick_ct other = pprPanic "kickOutAfterFillingCoercionHole" (ppr other)
 
 {- Note [kickOutRewritable]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2402,17 +2425,21 @@ getUnsolvedInerts :: TcS ( Bag Implication
 --                     (because they come from the inert set)
 --                 the unsolved implics may not be
 getUnsolvedInerts
- = do { IC { inert_eqs    = tv_eqs
-           , inert_funeqs = fun_eqs
-           , inert_irreds = irreds
-           , inert_dicts  = idicts
+ = do { IC { inert_eqs     = tv_eqs
+           , inert_funeqs  = fun_eqs
+           , inert_irreds  = irreds
+           , inert_blocked = blocked
+           , inert_dicts   = idicts
            } <- getInertCans
 
       ; let unsolved_tv_eqs  = foldTyEqs add_if_unsolved tv_eqs emptyCts
             unsolved_fun_eqs = foldFunEqs add_if_unsolveds fun_eqs emptyCts
             unsolved_irreds  = Bag.filterBag is_unsolved irreds
+            unsolved_blocked = blocked  -- all blocked equalities are W/D
             unsolved_dicts   = foldDicts add_if_unsolved idicts emptyCts
-            unsolved_others  = unsolved_irreds `unionBags` unsolved_dicts
+            unsolved_others  = unionManyBags [ unsolved_irreds
+                                             , unsolved_dicts
+                                             , unsolved_blocked ]
 
       ; implics <- getWorkListImplics
 
