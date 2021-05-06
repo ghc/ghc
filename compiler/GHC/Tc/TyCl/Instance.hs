@@ -1054,6 +1054,21 @@ however, so this Note aims to describe these subtleties:
   themselves.  Heavy sigh.  But not truly hard; that's what tcbVisibilities
   does.
 
+* Happily, we don't need to worry about the possibility of
+  building an inhomogeneous axiom, described in GHC.Tc.TyCl.Build
+  Note [Newtype eta and homogeneous axioms].   For example
+     type F :: Type -> forall (a :: Type) -> Type
+     data family F a b
+     newtype instance F Int b = MkF (Proxy b)
+  we get a newtype, and a eta-reduced axiom connecting the data family
+  with the newtype:
+     newtype R:FIntb b = MkF (Proxy b)
+     axiom Foo.D:R:FIntb0 :: F Int = Foo.R:FIntb
+  Now the subtleties of Note [Newtype eta and homogeneous axioms] are
+  dealt with the the newtype (via mkNewTyConRhs called in tcDataFamInstDecl)
+  whiel the axiom connecting F Int ~ R:FIntb is eta-reduced, but has no
+  funny forall-quantifiers to complicate the picture.
+
 Note [Kind inference for data family instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this GADT-style data type declaration, where I have used
