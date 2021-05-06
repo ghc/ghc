@@ -450,7 +450,7 @@ loadInterface doc_str mod from
         ; dflags <- getDynFlags
         ; logger <- getLogger
 
-        ; liftIO $ trace_if logger dflags (text "Considering whether to load" <+> ppr mod <+> ppr from)
+        ; liftIO $ trace_if logger dflags (text "Considering whether to load" <+> ppr mod <+>  doc_str)
 
                 -- Check whether we have the interface already
         ; hsc_env <- getTopEnv
@@ -925,7 +925,7 @@ findAndReadIface logger name_cache fc hooks unit_state home_unit dflags doc_str 
                   -- Found file, so read it
                   let file_path = addBootSuffix_maybe hi_boot_file (ml_hi_file loc)
                   -- See Note [Home module load error]
-                  if isHomeInstalledModule home_unit mod
+                  if isHomeInstalledModule home_unit mod && False
                       then return (Failed (homeModError mod loc))
                       else do
                         r <- read_file logger name_cache unit_state dflags wanted_mod file_path

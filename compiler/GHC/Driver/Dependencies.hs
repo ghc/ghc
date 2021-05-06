@@ -92,7 +92,7 @@ findHomeModules hsc_env home_unit mns = go mns mempty
            -- This case should **never** happen because there has to already be
            -- interface files for all the dependencies already in OneShot mode.
            -- However, we don't panic so we might get a more civilised error later.
-           Failed _err -> go mods seen
+           Failed _err -> ASSERT2(True, ppr mn) (pprPanic "failed" _err)
            Succeeded (imported_iface, _) ->
             let new_names = dep_direct_mods $ mi_deps imported_iface
                 comb m@(_, (GWIB { gwib_isBoot = NotBoot })) _ = m

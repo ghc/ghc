@@ -8,7 +8,7 @@ module GHC.Driver.Pipeline.Monad (
   , PipeEnv(..), PipeState(..), PipelineOutput(..)
   , getPipeEnv, getPipeState, getPipeSession
   , setDynFlags, setModLocation, setForeignOs, setIface
-  , pipeStateDynFlags, pipeStateModIface, setPlugins
+  , pipeStateDynFlags, pipeStateModIface, setPlugins, setHPT
   ) where
 
 import GHC.Prelude
@@ -31,6 +31,7 @@ import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.Status
 
 import Control.Monad
+import GHC.Unit.Home.ModInfo
 
 newtype CompPipeline a = P { unP :: PipeEnv -> PipeState -> IO (PipeState, a) }
     deriving (Functor)
@@ -128,6 +129,11 @@ setDynFlags dflags = P $ \_env state ->
 setPlugins :: [LoadedPlugin] -> [StaticPlugin] -> CompPipeline ()
 setPlugins dyn static = P $ \_env state ->
   let hsc_env' = (hsc_env state){ hsc_plugins = dyn, hsc_static_plugins = static }
+  in return (state{hsc_env = hsc_env'}, ())
+
+setHPT :: HomePackageTable -> CompPipeline ()
+setHPT hpt = P $ \_env state ->
+  let hsc_env' = hscUpdateHPT (const hpt) $ hsc_env state
   in return (state{hsc_env = hsc_env'}, ())
 
 setModLocation :: ModLocation -> CompPipeline ()

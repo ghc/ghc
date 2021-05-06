@@ -1088,7 +1088,7 @@ llvmOptions dflags =
 
 -- | Populate the HPT with the transively discovered interfaces from the imports
 -- given
-preloadInterfaces :: HscEnv -> [(Maybe FastString, ModuleNameWithIsBoot)] -> IO (HscEnv -> HscEnv)
+preloadInterfaces :: HscEnv -> [(Maybe FastString, ModuleNameWithIsBoot)] -> IO HomePackageTable
 preloadInterfaces hsc_env imps = do
   let fc = hsc_FC hsc_env
   let dflags = hsc_dflags hsc_env
@@ -1106,9 +1106,8 @@ preloadInterfaces hsc_env imps = do
   interfaces <- liftIO $ findHomeModules hsc_env (hsc_home_unit hsc_env) direct_home_mods
   hmis <- liftIO $ mapM (uncurry mk_hmi) (eltsUFM interfaces)
   let new_hpt = addListToHpt emptyHomePackageTable hmis
-  let upd = hscUpdateHPT (const new_hpt)
-  pprTraceM "preloadInterfaces" (ppr (fmap snd interfaces))
-  return upd
+  --pprTraceM "preloadInterfaces" (ppr (fmap snd interfaces) $$ ppr direct_home_mods $$ ppr imps)
+  return new_hpt
 
 -- -----------------------------------------------------------------------------
 -- | Each phase in the pipeline returns the next phase to execute, and the
@@ -1278,7 +1277,9 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
         PipeState{hsc_env=hsc_env'} <- getPipeState
         let mns = [(mb_pkg, GWIB (unLoc mn) NotBoot) | (mb_pkg, mn) <- imps]
                   ++ [(mb_pkg, GWIB (unLoc mn) IsBoot) | (mb_pkg, mn) <- src_imps]
-        upd_hsc <- liftIO $ preloadInterfaces hsc_env' mns
+        new_hpt <- liftIO $ preloadInterfaces hsc_env' mns
+        setHPT new_hpt
+        PipeState{hsc_env=hsc_env'} <- getPipeState
 
   -- Take -o into account if present
   -- Very like -ohi, but we must *only* do this if we aren't linking
@@ -1326,7 +1327,7 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
   -- run the compiler!
         let msg hsc_env _ what _ = oneShotMsg hsc_env what
         (result, plugin_hsc_env) <-
-          liftIO $ hscIncrementalCompile True Nothing (Just msg) (upd_hsc hsc_env')
+          liftIO $ hscIncrementalCompile True Nothing (Just msg) hsc_env'
                             mod_summary Nothing Nothing (1,1)
 
         -- In the rest of the pipeline use the loaded plugins
