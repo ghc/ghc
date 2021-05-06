@@ -388,17 +388,6 @@ tcRnImports hsc_env import_decls
               ; (home_insts, home_fam_insts) = hptInstancesBelow hsc_env (moduleName this_mod) (eltsUFM dep_mods)
               } ;
 
-                -- Record boot-file info in the EPS, so that it's
-                -- visible to loadHiBootInterface in tcRnSrcDecls,
-                -- and any other incrementally-performed imports
-              ; when (isOneShot (ghcMode (hsc_dflags hsc_env))) $ do {
-                  ; home_mods <- liftIO $ findHomeModules hsc_env (hsc_home_unit hsc_env) (eltsUFM dep_mods)
-                --  ; pprTraceM "home_mods" (ppr home_mods)
-                --  ; pprTraceM "home_mods" (ppr (dep_mods (mi_deps iface)))
-                --  ; pprTraceM "home_mods" (ppr (Set.difference  (Set.fromList (eltsUFM home_mods)) (Set.fromList (dep_mods (mi_deps iface)))))
-                  ; updateEps_ $ \eps  -> eps { eps_is_boot = fmap snd home_mods }
-               }
-
                 -- Update the gbl env
         ; updGblEnv ( \ gbl ->
             gbl {

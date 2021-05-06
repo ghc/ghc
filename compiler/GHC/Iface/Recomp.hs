@@ -277,13 +277,6 @@ checkVersions hsc_env mod_summary iface
        -- This isn't any worse than before because checkDependencies used to do this
        -- complete traversal anyway.
 
-       when (isOneShot (ghcMode (hsc_dflags hsc_env))) $ do {
-          ; home_mods <- liftIO $ findHomeModules hsc_env home_unit (dep_direct_mods (mi_deps iface))
-        --  ; pprTraceM "home_mods" (ppr home_mods)
-        --  ; pprTraceM "home_mods" (ppr (dep_mods (mi_deps iface)))
-        --  ; pprTraceM "home_mods" (ppr (Set.difference  (Set.fromList (eltsUFM home_mods)) (Set.fromList (dep_mods (mi_deps iface)))))
-          ; updateEps_ $ \eps  -> eps { eps_is_boot = fmap snd $ home_mods }
-       }
        ; recomp <- checkList [checkModUsage (homeUnitAsUnit home_unit) u
                              | u <- mi_usages iface]
        ; return (recomp, Just iface)

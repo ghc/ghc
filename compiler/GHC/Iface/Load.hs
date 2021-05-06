@@ -831,22 +831,7 @@ wantHiBootFile home_unit eps mod from
        ImportByPlugin
           -> Succeeded NotBoot
 
-       ImportBySystem
-          | notHomeModule home_unit mod
-          -> Succeeded NotBoot
-             -- If the module to be imported is not from this package
-             -- don't look it up in eps_is_boot, because that is keyed
-             -- on the ModuleName of *home-package* modules only.
-             -- We never import boot modules from other packages!
-
-          | otherwise
-          -> case lookupUFM (eps_is_boot eps) (moduleName mod) of
-                Just (GWIB { gwib_isBoot = is_boot }) ->
-                  Succeeded is_boot
-                Nothing ->
-                  Succeeded NotBoot
-                     -- The boot-ness of the requested interface,
-                     -- based on the dependencies in directly-imported modules
+       ImportBySystem -> ASSERT(notHomeModule home_unit mod) Succeeded NotBoot
 
 badSourceImport :: Module -> SDoc
 badSourceImport mod
