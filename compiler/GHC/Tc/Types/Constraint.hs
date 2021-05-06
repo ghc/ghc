@@ -58,7 +58,7 @@ module GHC.Tc.Types.Constraint (
 
         wrapType,
 
-        CtFlavour(..), ShadowInfo(..), ctEvFlavour,
+        CtFlavour(..), ShadowInfo(..), ctFlavourContainsDerived, ctEvFlavour,
         CtFlavourRole, ctEvFlavourRole, ctFlavourRole,
         eqCanRewrite, eqCanRewriteFR, eqMayRewriteFR,
         eqCanDischargeFR,
@@ -312,12 +312,21 @@ data CtIrredStatus
                    -- same Note.
                    -- INVARIANT: A BlockedCIS is a homogeneous equality whose
                    --   left hand side can fit in a CanEqLHS.
-  | OtherCIS
+  | ImpredicativeCIS        -- equality between a tyvar and a polytype
+  | SolubleOccursCheckCIS   -- an occurs check that might be solved later
+                            -- (because it's representational or involves a type family)
+  | IrreducibleCIS    -- predicate has an inscrutable shape (like c x, where c is a var)
+  | ReprEqCIS         -- like (a b ~R Int), where a might yet be a newtype
+  | AbstractTyConCIS  -- like (T ~ Bool), where T is an abstract tycon in an hsig file
 
 instance Outputable CtIrredStatus where
-  ppr InsolubleCIS       = text "(insoluble)"
-  ppr (BlockedCIS holes) = parens (text "blocked on" <+> ppr holes)
-  ppr OtherCIS           = text "(soluble)"
+  ppr InsolubleCIS          = text "(insoluble)"
+  ppr (BlockedCIS holes)    = parens (text "blocked on" <+> ppr holes)
+  ppr ImpredicativeCIS      = text "(impredicative)"
+  ppr SolubleOccursCheckCIS = text "(soluble o-c)"
+  ppr IrreducibleCIS        = text "(irred)"
+  ppr ReprEqCIS             = text "(repr)"
+  ppr AbstractTyConCIS      = text "(abstract)"
 
 {- Note [CIrredCan constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1642,6 +1651,12 @@ instance Outputable CtFlavour where
   ppr (Wanted WDeriv) = text "[WD]"
   ppr (Wanted WOnly)  = text "[W]"
   ppr Derived         = text "[D]"
+
+-- | Does this 'CtFlavour' subsumed 'Derived'? True of @[WD]@ and @[D]@.
+ctFlavourContainsDerived :: CtFlavour -> Bool
+ctFlavourContainsDerived (Wanted WDeriv) = True
+ctFlavourContainsDerived Derived         = True
+ctFlavourContainsDerived _               = False
 
 ctEvFlavour :: CtEvidence -> CtFlavour
 ctEvFlavour (CtWanted { ctev_nosh = nosh }) = Wanted nosh
