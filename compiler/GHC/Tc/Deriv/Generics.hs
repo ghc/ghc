@@ -62,8 +62,6 @@ import Control.Monad (mplus)
 import Data.List (zip4, partition)
 import Data.Maybe (isJust)
 
-#include "HsVersions.h"
-
 {-
 ************************************************************************
 *                                                                      *

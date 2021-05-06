@@ -21,8 +21,6 @@ module GHC.Iface.Env (
         allocateGlobalBinder,
    ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Driver.Env

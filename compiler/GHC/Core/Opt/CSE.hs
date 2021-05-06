@@ -11,8 +11,6 @@
 
 module GHC.Core.Opt.CSE (cseProgram, cseOneExpr) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Core.Subst

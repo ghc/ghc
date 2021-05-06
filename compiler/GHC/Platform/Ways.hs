@@ -49,8 +49,6 @@ module GHC.Platform.Ways
    )
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 import GHC.Platform
 import GHC.Driver.Flags

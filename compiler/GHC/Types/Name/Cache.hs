@@ -31,8 +31,6 @@ import GHC.Utils.Panic
 import Control.Concurrent.MVar
 import Control.Monad
 
-#include "HsVersions.h"
-
 {-
 
 Note [The Name Cache]

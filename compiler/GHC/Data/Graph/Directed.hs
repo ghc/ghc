@@ -27,8 +27,6 @@ module GHC.Data.Graph.Directed (
         EdgeType(..), classifyEdges
     ) where
 
-#include "HsVersions.h"
-
 ------------------------------------------------------------------------------
 -- A version of the graph algorithms described in:
 --

@@ -33,8 +33,6 @@ module GHC.Core.TyCon.Env (
         adjustDTyConEnv, alterDTyConEnv, extendDTyConEnv, foldDTyConEnv
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Types.Unique.FM

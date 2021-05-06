@@ -14,8 +14,6 @@ module GHC.Tc.Deriv.Infer
    )
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Data.Bag

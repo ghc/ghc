@@ -41,8 +41,6 @@ module GHC.HsToCore.Pmc (
         addTyCs, addCoreScrutTmCs, addHsScrutTmCs
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.HsToCore.Pmc.Types

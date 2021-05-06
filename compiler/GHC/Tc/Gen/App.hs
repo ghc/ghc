@@ -54,8 +54,6 @@ import qualified GHC.LanguageExtensions as LangExt
 import Control.Monad
 import Data.Function
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 {- *********************************************************************

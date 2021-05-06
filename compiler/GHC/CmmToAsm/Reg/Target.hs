@@ -19,8 +19,6 @@ module GHC.CmmToAsm.Reg.Target (
 
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Platform.Reg

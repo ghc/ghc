@@ -56,8 +56,6 @@ import qualified Data.Data as Data
 import Data.Array
 import Data.List ( mapAccumL )
 
-#include "HsVersions.h"
-
 {-
 Note [Coercion axiom branches]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -27,8 +27,6 @@ module GHC.Core.Unify (
         flattenTys, flattenTysX
    ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Types.Var
