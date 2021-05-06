@@ -112,7 +112,8 @@ module GHC.Data.FastString
         lengthPS
        ) where
 
-#include "HsVersions.h"
+-- For GHC_STAGE
+#include "ghcplatform.h"
 
 import GHC.Prelude as Prelude
 
