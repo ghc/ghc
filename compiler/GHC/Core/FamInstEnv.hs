@@ -991,7 +991,10 @@ lookup_fam_inst_env'          -- The worker, local to this module
     -> [FamInstMatch]
 lookup_fam_inst_env' match_fun (FamIE ie) fam match_tys
   | isOpenFamilyTyCon fam
-  = mapMaybe' f (lookupRM' rough_tmpl ie)   -- The common case
+  , let xs = (lookupRM' rough_tmpl ie)   -- The common case
+    -- Avoid doing any of the allocation below if there are no instances to look at.
+  , not $ null xs 
+  = mapMaybe' f xs
   | otherwise = []
   where
     rough_tmpl :: [RoughMatchTc]
