@@ -23,6 +23,8 @@ module GHC.Types.Name.Env (
         plusNameEnv, plusNameEnv_C, plusNameEnv_CD, plusNameEnv_CD2, alterNameEnv,
         lookupNameEnv, lookupNameEnv_NF, delFromNameEnv, delListFromNameEnv,
         elemNameEnv, mapNameEnv, disjointNameEnv,
+        foldNameEnv,
+        nonDetStrictFoldNameEnv,
 
         DNameEnv,
 
@@ -151,6 +153,12 @@ anyNameEnv f x          = foldUFM ((||) . f) False x
 disjointNameEnv x y     = disjointUFM x y
 
 lookupNameEnv_NF env n = expectJust "lookupNameEnv_NF" (lookupNameEnv env n)
+
+foldNameEnv :: (a -> b -> b) -> b -> NameEnv a -> b
+foldNameEnv = foldUFM
+
+nonDetStrictFoldNameEnv :: (a -> b -> b) -> b -> NameEnv a -> b
+nonDetStrictFoldNameEnv = nonDetStrictFoldUFM
 
 -- | Deterministic Name Environment
 --
