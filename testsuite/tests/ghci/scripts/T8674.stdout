@@ -1,6 +1,6 @@
 type Sing :: forall k. k -> *
 data family Sing a
   	-- Defined at T8674.hs:4:1
-data instance Sing Bool = SBool 	-- Defined at T8674.hs:6:15
 data instance forall k (a :: [k]). Sing a = SNil
   	-- Defined at T8674.hs:5:15
+data instance Sing Bool = SBool 	-- Defined at T8674.hs:6:15
