@@ -29,8 +29,6 @@ module GHC.Core.InstEnv (
         isOverlappable, isOverlapping, isIncoherent
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Tc.Utils.TcType -- InstEnv is really part of the type checker,

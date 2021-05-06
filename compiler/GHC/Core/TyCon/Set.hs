@@ -18,8 +18,6 @@ module GHC.Core.TyCon.Set (
         nameSetAny, nameSetAll
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Types.Unique.Set

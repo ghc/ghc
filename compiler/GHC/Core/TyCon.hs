@@ -132,8 +132,6 @@ module GHC.Core.TyCon(
 
 ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 import GHC.Platform
 

@@ -13,8 +13,6 @@ module GHC.Iface.Tidy (
        mkBootModDetailsTc, tidyProgram
    ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Driver.Session
@@ -701,7 +699,7 @@ chooseExternalIds hsc_env mod omit_prags expose_all binds implicit_binds imp_id_
                 -- unfolding in the *definition*; so look up in binder_set
           refined_id = case lookupVarSet binder_set idocc of
                          Just id -> id
-                         Nothing -> WARN( True, ppr idocc ) idocc
+                         Nothing -> warnPprTrace True (ppr idocc) idocc
 
           unfold_env' = extendVarEnv unfold_env idocc (name',show_unfold)
           referrer' | isExportedId refined_id = refined_id
@@ -1218,7 +1216,7 @@ tidyTopIdInfo uf_opts rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold
 
     sig = dmdSigInfo idinfo
     final_sig | not $ isTopSig sig
-              = WARN( _bottom_hidden sig , ppr name ) sig
+              = warnPprTrace (_bottom_hidden sig) (ppr name) sig
               -- try a cheap-and-cheerful bottom analyser
               | Just (_, nsig) <- mb_bot_str = nsig
               | otherwise                    = sig

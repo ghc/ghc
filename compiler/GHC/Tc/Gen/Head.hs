@@ -78,8 +78,6 @@ import Control.Monad
 import Data.Function
 import qualified Data.List.NonEmpty as NE
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 

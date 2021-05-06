@@ -2,8 +2,6 @@
 
 module GHC.Stg.Subst where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Types.Id
@@ -57,8 +55,7 @@ lookupIdSubst id (Subst in_scope env)
   | not (isLocalId id) = id
   | Just id' <- lookupVarEnv env id = id'
   | Just id' <- lookupInScope in_scope id = id'
-  | otherwise = WARN( True, text "StgSubst.lookupIdSubst" <+> ppr id $$ ppr in_scope)
-                id
+  | otherwise = warnPprTrace True (text "StgSubst.lookupIdSubst" <+> ppr id $$ ppr in_scope) id
 
 -- | Substitutes an occurrence of an identifier for its counterpart recorded
 -- in the 'Subst'. Does not generate a debug warning if the identifier to

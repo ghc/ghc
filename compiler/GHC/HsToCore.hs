@@ -16,8 +16,6 @@ module GHC.HsToCore (
     deSugar, deSugarExpr
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Driver.Session

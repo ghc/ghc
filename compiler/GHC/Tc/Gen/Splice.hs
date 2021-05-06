@@ -30,8 +30,6 @@ module GHC.Tc.Gen.Splice(
      finishTH, runTopSplice
       ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Driver.Errors

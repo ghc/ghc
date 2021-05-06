@@ -10,8 +10,6 @@
 --
 -----------------------------------------------------------------------------
 
-#include "HsVersions.h"
-
 module GHC.CmmToAsm.PPC.Instr
    ( Instr(..)
    , RI(..)

@@ -102,9 +102,6 @@ module GHC.CmmToAsm.Reg.Linear (
         module  GHC.CmmToAsm.Reg.Linear.Stats
   ) where
 
-#include "HsVersions.h"
-
-
 import GHC.Prelude
 
 import GHC.CmmToAsm.Reg.Linear.State

@@ -13,8 +13,6 @@
 
 module GHC.StgToCmm ( codeGen ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude as Prelude
 
 import GHC.Driver.Backend

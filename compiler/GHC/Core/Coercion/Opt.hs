@@ -9,8 +9,6 @@ module GHC.Core.Coercion.Opt
    )
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Driver.Ppr
@@ -294,9 +292,9 @@ opt_co4 env sym rep r (CoVarCo cv)
 
     cv1 = case lookupInScope (lcInScopeSet env) cv of
              Just cv1 -> cv1
-             Nothing  -> WARN( True, text "opt_co: not in scope:"
-                                     <+> ppr cv $$ ppr env)
-                         cv
+             Nothing  -> warnPprTrace True
+                          (text "opt_co: not in scope:" <+> ppr cv $$ ppr env)
+                          cv
           -- cv1 might have a substituted kind!
 
 opt_co4 _ _ _ _ (HoleCo h)

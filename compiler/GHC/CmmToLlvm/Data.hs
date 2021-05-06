@@ -7,8 +7,6 @@ module GHC.CmmToLlvm.Data (
         genLlvmData, genData
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Llvm

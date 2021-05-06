@@ -296,8 +296,6 @@ module GHC (
   * inline bits of GHC.Driver.Main here to simplify layering: hscTcExpr, hscStmt.
 -}
 
-#include "HsVersions.h"
-
 import GHC.Prelude hiding (init)
 
 import GHC.Platform
