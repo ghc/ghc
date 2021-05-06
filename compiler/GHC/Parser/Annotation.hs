@@ -689,7 +689,9 @@ data AnnList
       al_open      :: Maybe AddEpAnn,
       al_close     :: Maybe AddEpAnn,
       al_rest      :: [AddEpAnn], -- ^ context, such as 'where' keyword
-      al_trailing  :: [TrailingAnn]
+      al_trailing  :: [TrailingAnn] -- ^ items appearing after the
+                                    -- list, such as '=>' for a
+                                    -- context
       } deriving (Data,Eq)
 
 -- ---------------------------------------------------------------------

@@ -597,6 +597,7 @@ markAnnList' reallyTrail ann action = do
   debugM $ "markAnnList : " ++ showPprUnsafe (p, ann)
   mapM_ markAddEpAnn (al_open ann)
   unless reallyTrail $ markTrailing (al_trailing ann) -- Only makes sense for HsModule.
+  mark (sort $ al_rest ann) AnnSemi
   action
   debugM $ "markAnnList: calling markAddEpAnn on:" ++ showPprUnsafe (al_close ann)
   mapM_ markAddEpAnn (al_close ann)
