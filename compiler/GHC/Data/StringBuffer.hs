@@ -52,14 +52,14 @@ module GHC.Data.StringBuffer
 
 import GHC.Prelude
 
-import GHC.Utils.Encoding
 import GHC.Data.FastString
+import GHC.Utils.Encoding
 import GHC.Utils.IO.Unsafe
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
+import GHC.Utils.Exception      ( bracket_ )
 
 import Data.Maybe
-import Control.Exception
 import System.IO
 import System.IO.Unsafe         ( unsafePerformIO )
 import GHC.IO.Encoding.UTF8     ( mkUTF8 )
