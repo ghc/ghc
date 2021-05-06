@@ -34,6 +34,7 @@ module GHC.CmmToAsm.PPC.Instr
    , regUsageOfInstr
    , isJumpishInstr
    , isMetaInstr
+   , isConditionalInstr
    )
 where
 
@@ -647,6 +648,15 @@ isMetaInstr instr
     NEWBLOCK{}  -> True
     DELTA{}     -> True
     _           -> False
+
+
+-- | Is this instruction conditionally executed?
+--      No conditional/predicated instructions on PPC
+isConditionalInstr
+    :: Instr
+    -> Bool
+
+isConditionalInstr _ = False
 
 
 -- | Copy the value in a register to another one.
