@@ -693,7 +693,8 @@ instanceToIfaceInst (ClsInst { is_dfun = dfun_id, is_flag = oflag
     IfaceClsInst { ifDFun     = idName dfun_id
                  , ifOFlag    = oflag
                  , ifInstCls  = cls_name
-                 , ifInstTys  = ifaceRoughMatchTcs rough_tcs
+                 , ifInstTys  = ifaceRoughMatchTcs $ tail rough_tcs
+                   -- N.B. Drop the class name from the rough match template
                  , ifInstOrph = orph }
 
 --------------------------
