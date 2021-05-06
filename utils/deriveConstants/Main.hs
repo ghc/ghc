@@ -625,11 +625,14 @@ wanteds os = concat
           -- header sizes)
           ,constantWord Haskell "MIN_PAYLOAD_SIZE" "MIN_PAYLOAD_SIZE"
 
-          ,constantInt  Haskell "MIN_INTLIKE" "MIN_INTLIKE"
-          ,constantWord Haskell "MAX_INTLIKE" "MAX_INTLIKE"
+          ,constantInt  Haskell "MIN_STATIC_INT" "MIN_STATIC_INT"
+          ,constantWord Haskell "MAX_STATIC_INT" "MAX_STATIC_INT"
 
-          ,constantWord Haskell "MIN_CHARLIKE" "MIN_CHARLIKE"
-          ,constantWord Haskell "MAX_CHARLIKE" "MAX_CHARLIKE"
+          ,constantWord Haskell "MIN_STATIC_CHAR" "MIN_STATIC_CHAR"
+          ,constantWord Haskell "MAX_STATIC_CHAR" "MAX_STATIC_CHAR"
+
+          ,constantWord Haskell "MIN_STATIC_WORD" "MIN_STATIC_WORD"
+          ,constantWord Haskell "MAX_STATIC_WORD" "MAX_STATIC_WORD"
 
           ,constantWord Haskell "MUT_ARR_PTRS_CARD_BITS" "MUT_ARR_PTRS_CARD_BITS"
 
