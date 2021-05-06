@@ -9,8 +9,6 @@ module GHC.Utils.IO.Unsafe
    )
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude ()
 
 import GHC.Exts

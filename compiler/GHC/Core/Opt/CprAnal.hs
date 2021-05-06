@@ -9,8 +9,6 @@
 -- See Note [Phase ordering].
 module GHC.Core.Opt.CprAnal ( cprAnalProgram ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Driver.Session

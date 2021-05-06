@@ -35,8 +35,6 @@ module GHC.Types.Name.Set (
         NonCaffySet(..)
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Types.Name

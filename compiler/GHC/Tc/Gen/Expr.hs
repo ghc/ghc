@@ -26,8 +26,6 @@ module GHC.Tc.Gen.Expr
          addAmbiguousNameErr,
          getFixedTyVars ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import {-# SOURCE #-}   GHC.Tc.Gen.Splice( tcSpliceExpr, tcTypedBracket, tcUntypedBracket )

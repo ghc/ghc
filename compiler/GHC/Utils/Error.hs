@@ -61,8 +61,6 @@ module GHC.Utils.Error (
         sortMsgBag
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Driver.Session

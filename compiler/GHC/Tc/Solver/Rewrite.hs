@@ -9,8 +9,6 @@ module GHC.Tc.Solver.Rewrite(
    rewriteType
  ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Core.TyCo.Ppr ( pprTyVar )

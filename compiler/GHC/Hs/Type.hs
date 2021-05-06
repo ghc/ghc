@@ -85,8 +85,6 @@ module GHC.Hs.Type (
         hsTypeNeedsParens, parenthesizeHsType, parenthesizeHsContext
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import Language.Haskell.Syntax.Type
