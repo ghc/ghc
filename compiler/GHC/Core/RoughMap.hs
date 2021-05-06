@@ -26,6 +26,7 @@ module GHC.Core.RoughMap
 
 import GHC.Prelude
 
+import GHC.Data.Bag
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Utils.Misc
@@ -87,16 +88,21 @@ emptyRM = RMEmpty
 
 -- | Order of result is deterministic.
 lookupRM :: [RoughMatchTc] -> RoughMap a -> [a]
-lookupRM _                  RMEmpty = []
-lookupRM []                 rm      = elemsRM rm
-lookupRM (KnownTc tc : tcs) rm      = maybe [] (lookupRM tcs) (lookupDNameEnv (rm_known rm) tc)
-                                      ++ lookupRM tcs (rm_unknown rm)
-                                      ++ rm_empty rm
-lookupRM (OtherTc : tcs)    rm      = [ x
-                                      | m <- eltsDNameEnv (rm_known rm)
-                                      , x <- lookupRM tcs m ]
-                                      ++ lookupRM tcs (rm_unknown rm)
-                                      ++ rm_empty rm
+lookupRM tcs rm = bagToList (lookupRM' tcs rm)
+
+lookupRM' :: [RoughMatchTc] -> RoughMap a -> Bag a
+lookupRM' _                  RMEmpty = mempty
+lookupRM' []                 rm      = listToBag $ elemsRM rm
+lookupRM' (KnownTc tc : tcs) rm      = unionManyBags
+                                       [ maybe mempty (lookupRM' tcs) (lookupDNameEnv (rm_known rm) tc)
+                                       , lookupRM' tcs (rm_unknown rm)
+                                       , listToBag $ rm_empty rm
+                                       ]
+lookupRM' (OtherTc : tcs)    rm      = unionManyBags
+                                       [ foldMap (lookupRM' tcs) (eltsDNameEnv (rm_known rm))
+                                       , lookupRM' tcs (rm_unknown rm)
+                                       , listToBag $ rm_empty rm
+                                       ]
 
 {-
 Note [RoughMap]
