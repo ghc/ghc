@@ -17,7 +17,7 @@ import GHC.Prelude
 import GHC.Driver.Session
 import GHC.Driver.Env
 
-import GHC.Core( IsOrphan(..) )
+import GHC.Core( IsOrphan(..), notOrphan, chooseOrphanAnchor )
 import GHC.Core.FamInstEnv
 import GHC.Core.InstEnv( roughMatchTcs )
 import GHC.Core.Coercion
@@ -27,6 +27,7 @@ import GHC.Core.DataCon ( dataConName )
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs
 import GHC.Core.TyCo.Ppr ( pprWithExplicitKindsWhen )
+import GHC.Core.FVs( orphNamesOfType )
 
 import GHC.Iface.Load
 
@@ -190,14 +191,22 @@ newFamInst flavor axiom@(CoAxiom { co_ax_tc = fam_tc, co_ax_name = ax_name })
                          , fi_tys      = lhs'
                          , fi_rhs      = rhs'
                          , fi_axiom    = axiom
-                         , fi_orphan   = orph })
+                         , fi_orphan   = orph lhs' rhs'
+                         })
        }
   where
     fam_name = tyConName fam_tc
     this_mod = ASSERT( isExternalName fam_name ) nameModule ax_name
     is_local name = nameIsLocalOrFrom this_mod name
-    orph | is_local fam_name = NotOrphan (nameOccName fam_name)
-         | otherwise         = IsOrphan
+    orph lhs' rhs'
+        | is_local fam_name  = NotOrphan (nameOccName fam_name)
+        | all notOrphan tyos = ASSERT( not (null tys) ) head tyos
+        | otherwise          = IsOrphan
+      where
+        tyos = map (chooseOrphanAnchor . orphNamesOfType) tys
+        tys | SynFamilyInst <- flavor = rhs' : lhs'
+            | otherwise               = lhs'
+    
     CoAxBranch { cab_tvs = tvs
                , cab_cvs = cvs
                , cab_lhs = lhs

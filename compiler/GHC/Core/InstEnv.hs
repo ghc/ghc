@@ -35,7 +35,7 @@ import GHC.Prelude
 
 import GHC.Tc.Utils.TcType -- InstEnv is really part of the type checker,
               -- and depends on TcType in many ways
-import GHC.Core ( IsOrphan(..), isOrphan, chooseOrphanAnchor )
+import GHC.Core ( IsOrphan(..), isOrphan, notOrphan, chooseOrphanAnchor )
 import GHC.Unit.Module.Env
 import GHC.Unit.Types
 import GHC.Core.Class
@@ -277,9 +277,6 @@ mkLocalInstance dfun oflag tvs cls tys
     orph | is_local cls_name = NotOrphan (nameOccName cls_name)
          | all notOrphan mb_ns  = ASSERT( not (null mb_ns) ) head mb_ns
          | otherwise         = IsOrphan
-
-    notOrphan NotOrphan{} = True
-    notOrphan _ = False
 
     mb_ns :: [IsOrphan]    -- One for each fundep; a locally-defined name
                            -- that is not in the "determined" arguments

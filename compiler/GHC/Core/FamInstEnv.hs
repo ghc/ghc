@@ -14,6 +14,7 @@ module GHC.Core.FamInstEnv (
         famInstsRepTyCons, famInstRepTyCon_maybe, dataFamInstRepTyCon,
         pprFamInst, pprFamInsts,
         mkImportedFamInst,
+        isTypeFamInst, isDataFamInst,
 
         FamInstEnvs, FamInstEnv, emptyFamInstEnv, emptyFamInstEnvs,
         extendFamInstEnv, extendFamInstEnvList,
@@ -205,6 +206,15 @@ dataFamInstRepTyCon fi
   = case fi_flavor fi of
        DataFamilyInst tycon -> tycon
        SynFamilyInst        -> pprPanic "dataFamInstRepTyCon" (ppr fi)
+
+
+isTypeFamInst, isDataFamInst :: FamInst -> Bool
+
+isTypeFamInst FamInst{ fi_flavor = SynFamilyInst } = True
+isTypeFamInst _ = False
+
+isDataFamInst FamInst{ fi_flavor = (DataFamilyInst _) } = True
+isDataFamInst _ = False
 
 {-
 ************************************************************************

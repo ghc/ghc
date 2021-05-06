@@ -790,7 +790,10 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
 
        ; fam_inst <- newFamInst (DataFamilyInst rep_tc) axiom
        ; warnIfFlag Opt_WarnOrphansData
-                    (isOrphan (fi_orphan fam_inst))
+                    (isDataFamInst fam_inst && isOrphan (fi_orphan fam_inst))
+                    (instOrphDataWarn fam_inst)
+       ; warnIfFlag Opt_WarnOrphansType
+                    (isTypeFamInst fam_inst && isOrphan (fi_orphan fam_inst))
                     (instOrphDataWarn fam_inst)
        ; return (fam_inst, m_deriv_info) }
   where
