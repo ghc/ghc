@@ -1,11 +1,6 @@
 [1 of 3] Processing p
   [1 of 2] Compiling A[sig]           ( p/A.hsig, nothing )
   [2 of 2] Compiling P                ( p/P.hs, nothing )
-
-T13323.bkp:9:13: warning: [-Wambiguous-fields (in -Wdefault)]
-    The field ‘foo’ belonging to type A is ambiguous.
-    This will not be supported by -XDuplicateRecordFields in future releases of GHC.
-    You can use a qualified import or explicit case analysis to resolve the ambiguity.
 [2 of 3] Processing q
   Instantiating q
   [1 of 1] Compiling A                ( q/A.hs, T13323.out/q/A.o )
@@ -15,10 +10,5 @@ T13323.bkp:9:13: warning: [-Wambiguous-fields (in -Wdefault)]
     Instantiating p[A=q:A]
     [1 of 2] Compiling A[sig]           ( p/A.hsig, T13323.out/p/p-HVmFlcYSefiK5n1aDP1v7x/A.o )
     [2 of 2] Compiling P                ( p/P.hs, T13323.out/p/p-HVmFlcYSefiK5n1aDP1v7x/P.o )
-
-T13323.bkp:9:13: warning: [-Wambiguous-fields (in -Wdefault)]
-    The field ‘foo’ belonging to type A is ambiguous.
-    This will not be supported by -XDuplicateRecordFields in future releases of GHC.
-    You can use a qualified import or explicit case analysis to resolve the ambiguity.
   [1 of 2] Compiling R                ( r/R.hs, T13323.out/r/R.o )
   [2 of 2] Instantiating p
