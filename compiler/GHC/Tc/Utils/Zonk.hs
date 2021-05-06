@@ -112,7 +112,7 @@ hsLPatType :: LPat GhcTc -> Type
 hsLPatType (L _ p) = hsPatType p
 
 hsPatType :: Pat GhcTc -> Type
-hsPatType (ParPat _ pat)                = hsLPatType pat
+hsPatType (ParPat _ _ pat _)            = hsLPatType pat
 hsPatType (WildPat ty)                  = ty
 hsPatType (VarPat _ lvar)               = idType (unLoc lvar)
 hsPatType (BangPat _ pat)               = hsLPatType pat
@@ -879,9 +879,9 @@ zonkExpr env (NegApp x expr op)
        new_expr <- zonkLExpr env' expr
        return (NegApp x new_expr new_op)
 
-zonkExpr env (HsPar x e)
+zonkExpr env (HsPar x lpar e rpar)
   = do new_e <- zonkLExpr env e
-       return (HsPar x new_e)
+       return (HsPar x lpar new_e rpar)
 
 zonkExpr env (SectionL x expr op)
   = do new_expr <- zonkLExpr env expr
@@ -1077,9 +1077,9 @@ zonkCmd env (HsCmdLam x matches)
   = do new_matches <- zonkMatchGroup env zonkLCmd matches
        return (HsCmdLam x new_matches)
 
-zonkCmd env (HsCmdPar x c)
+zonkCmd env (HsCmdPar x lpar c rpar)
   = do new_c <- zonkLCmd env c
-       return (HsCmdPar x new_c)
+       return (HsCmdPar x lpar new_c rpar)
 
 zonkCmd env (HsCmdCase x expr ms)
   = do new_expr <- zonkLExpr env expr
@@ -1408,9 +1408,9 @@ zonkPat :: ZonkEnv -> LPat GhcTc -> TcM (ZonkEnv, LPat GhcTc)
 zonkPat env pat = wrapLocSndMA (zonk_pat env) pat
 
 zonk_pat :: ZonkEnv -> Pat GhcTc -> TcM (ZonkEnv, Pat GhcTc)
-zonk_pat env (ParPat x p)
+zonk_pat env (ParPat x lpar p rpar)
   = do  { (env', p') <- zonkPat env p
-        ; return (env', ParPat x p') }
+        ; return (env', ParPat x lpar p' rpar) }
 
 zonk_pat env (WildPat ty)
   = do  { ty' <- zonkTcTypeToTypeX env ty

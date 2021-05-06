@@ -403,8 +403,9 @@ rnLPatAndThen nm lpat = wrapSrcSpanCps (rnPatAndThen nm) lpat
 
 rnPatAndThen :: NameMaker -> Pat GhcPs -> CpsRn (Pat GhcRn)
 rnPatAndThen _  (WildPat _)   = return (WildPat noExtField)
-rnPatAndThen mk (ParPat x pat)  = do { pat' <- rnLPatAndThen mk pat
-                                     ; return (ParPat x pat') }
+rnPatAndThen mk (ParPat x lpar pat rpar) =
+  do { pat' <- rnLPatAndThen mk pat
+     ; return (ParPat x lpar pat' rpar) }
 rnPatAndThen mk (LazyPat _ pat) = do { pat' <- rnLPatAndThen mk pat
                                      ; return (LazyPat noExtField pat') }
 rnPatAndThen mk (BangPat _ pat) = do { pat' <- rnLPatAndThen mk pat
