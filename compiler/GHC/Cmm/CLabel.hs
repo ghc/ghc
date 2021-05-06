@@ -26,6 +26,7 @@ module GHC.Cmm.CLabel (
         mkInfoTableLabel,
         mkEntryLabel,
         mkRednCountsLabel,
+        mkTagHitLabel,
         mkConInfoTableLabel,
         mkApEntryLabel,
         mkApInfoTableLabel,
@@ -296,7 +297,7 @@ isIdLabel _ = False
 -- Used in SRT analysis. See Note [Ticky labels in SRT analysis] in
 -- GHC.Cmm.Info.Build.
 isTickyLabel :: CLabel -> Bool
-isTickyLabel (IdLabel _ _ RednCounts) = True
+isTickyLabel (IdLabel _ _ IdTickyInfo{}) = True
 isTickyLabel _ = False
 
 -- | Indicate if "GHC.CmmToC" has to generate an extern declaration for the
@@ -442,6 +443,25 @@ pprDebugCLabel platform lbl = pprCLabel platform AsmStyle lbl <> parens extra
 
          _  -> text "other CLabel"
 
+-- Dynamic ticky info for the id.
+data TickyIdInfo
+  = TickyRednCounts           -- ^ Used for dynamic allocations
+  | TickyInferedTag !Unique    -- ^ Used to track dynamic hits of tag inference.
+  deriving (Eq,Show)
+
+instance Outputable TickyIdInfo where
+    ppr TickyRednCounts = text "ct_rdn"
+    ppr (TickyInferedTag unique) = text "ct_tag[" <> ppr unique <> char ']'
+
+-- No determinism in the ncg backend, so we use the unique for Ord.
+-- Even if it pains me slightly.
+instance Ord TickyIdInfo where
+    compare TickyRednCounts TickyRednCounts = EQ
+    compare TickyRednCounts _ = LT
+    compare _ TickyRednCounts = GT
+    compare (TickyInferedTag unique1) (TickyInferedTag unique2) =
+      nonDetCmpUnique unique1 unique2
+
 
 data IdLabelInfo
   = Closure             -- ^ Label for closure
@@ -451,6 +471,8 @@ data IdLabelInfo
 
   | LocalInfoTable      -- ^ Like InfoTable but not externally visible
   | LocalEntry          -- ^ Like Entry but not externally visible
+
+  | IdTickyInfo !TickyIdInfo -- ^ Label of place to keep Ticky-ticky  info for this Id
 
   | RednCounts          -- ^ Label of place to keep Ticky-ticky  info for this Id
 
@@ -506,6 +528,8 @@ instance Outputable IdLabelInfo where
   ppr Bytes        = text "Bytes"
   ppr BlockInfoTable  = text "BlockInfoTable"
 
+  ppr (IdTickyInfo info) = text "IdTickyInfo" <+> ppr info
+
 
 data RtsLabelInfo
   = RtsSelectorInfoTable Bool{-updatable-} Int{-offset-}  -- ^ Selector thunks
@@ -555,7 +579,10 @@ mkSRTLabel     :: Unique -> CLabel
 mkSRTLabel u = SRTLabel u
 
 mkRednCountsLabel :: Name -> CLabel
-mkRednCountsLabel name = IdLabel name NoCafRefs RednCounts  -- Note [ticky for LNE]
+mkRednCountsLabel name = IdLabel name NoCafRefs (IdTickyInfo TickyRednCounts)  -- Note [ticky for LNE]
+
+mkTagHitLabel :: Name -> Unique -> CLabel
+mkTagHitLabel name !uniq = IdLabel name NoCafRefs (IdTickyInfo (TickyInferedTag uniq))
 
 -- These have local & (possibly) external variants:
 mkLocalClosureLabel      :: Name -> CafInfo -> CLabel
@@ -884,7 +911,7 @@ hasIdLabelInfo _ = Nothing
 -- -----------------------------------------------------------------------------
 -- Does a CLabel's referent itself refer to a CAF?
 hasCAF :: CLabel -> Bool
-hasCAF (IdLabel _ _ RednCounts) = False -- Note [ticky for LNE]
+hasCAF (IdLabel _ _ (IdTickyInfo TickyRednCounts)) = False -- Note [ticky for LNE]
 hasCAF (IdLabel _ MayHaveCafRefs _) = True
 hasCAF _                            = False
 
@@ -1139,7 +1166,7 @@ idInfoLabelType info =
     Closure       -> GcPtrLabel
     ConInfoTable {} -> DataLabel
     ClosureTable  -> DataLabel
-    RednCounts    -> DataLabel
+    IdTickyInfo{} -> DataLabel
     Bytes         -> DataLabel
     _             -> CodeLabel
 
@@ -1512,6 +1539,10 @@ ppIdFlavor x = pp_cSEP <> case x of
       DefinitionSite -> text "con_info"
       UsageSite m n ->
         ppr m <> pp_cSEP <> ppr n <> pp_cSEP <> text "con_info"
+   IdTickyInfo TickyRednCounts
+      -> text "ct"
+   IdTickyInfo (TickyInferedTag unique)
+      -> text "ct_inf_tag" <> char '_' <> ppr unique
    ClosureTable     -> text "closure_tbl"
    Bytes            -> text "bytes"
    BlockInfoTable   -> text "info"
