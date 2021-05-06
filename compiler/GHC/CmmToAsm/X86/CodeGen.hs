@@ -79,7 +79,9 @@ import GHC.Types.SrcLoc  ( srcSpanFile, srcSpanStartLine, srcSpanStartCol )
 import GHC.Types.ForeignCall ( CCallConv(..) )
 import GHC.Data.OrdList
 import GHC.Utils.Outputable
+import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Data.FastString
 import GHC.Driver.Session
 import GHC.Utils.Misc
@@ -1268,7 +1270,7 @@ getAmode e = do
       -- what mangleIndexTree has just done.
       CmmMachOp (MO_Sub _rep) [x, CmmLit lit@(CmmInt i _)]
          | is32BitLit is32Bit lit
-         -- ASSERT(rep == II32)???
+         -- assert (rep == II32)???
          -> do
             (x_reg, x_code) <- getSomeReg x
             let off = ImmInt (-(fromInteger i))
@@ -1276,7 +1278,7 @@ getAmode e = do
 
       CmmMachOp (MO_Add _rep) [x, CmmLit lit]
          | is32BitLit is32Bit lit
-         -- ASSERT(rep == II32)???
+         -- assert (rep == II32)???
          -> do
             (x_reg, x_code) <- getSomeReg x
             let off = litToImm lit
@@ -1474,7 +1476,7 @@ addAlignmentCheck align reg =
   where
     check :: Format -> Reg -> InstrBlock
     check fmt reg =
-        ASSERT(not $ isFloatFormat fmt)
+        assert (not $ isFloatFormat fmt) $
         toOL [ TEST fmt (OpImm $ ImmInt $ align-1) (OpReg reg)
              , JXX_GBL NE $ ImmCLbl mkBadAlignmentLabel
              ]
@@ -1941,10 +1943,10 @@ genCondBranch' _ bid id false bool = do
                   -- Use ASSERT so we don't break releases if
                   -- LTT/LE creep in somehow.
                   LTT ->
-                    ASSERT2(False, ppr "Should have been turned into >")
+                    assertPpr False (ppr "Should have been turned into >")
                     and_ordered
                   LE  ->
-                    ASSERT2(False, ppr "Should have been turned into >=")
+                    assertPpr False (ppr "Should have been turned into >=")
                     and_ordered
                   _   -> and_ordered
 
@@ -2885,7 +2887,7 @@ evalArgs bid actuals
         lreg <- newLocalReg $ cmmExprType platform actual
         (instrs, bid1) <- stmtToInstrs bid $ CmmAssign (CmmLocal lreg) actual
         -- The above assignment shouldn't change the current block
-        MASSERT(isNothing bid1)
+        massert (isNothing bid1)
         return (instrs, CmmReg $ CmmLocal lreg)
 
     newLocalReg :: CmmType -> NatM LocalReg
@@ -2961,7 +2963,7 @@ genCCall32' target dest_regs args = do
                 -- Arguments can be smaller than 32-bit, but we still use @PUSH
                 -- II32@ - the usual calling conventions expect integers to be
                 -- 4-byte aligned.
-                ASSERT((typeWidth arg_ty) <= W32) return ()
+                massert ((typeWidth arg_ty) <= W32)
                 (operand, code) <- getOperand arg
                 delta <- getDeltaNat
                 setDeltaNat (delta-size)
@@ -2988,7 +2990,7 @@ genCCall32' target dest_regs args = do
 
         push_codes <- mapM push_arg (reverse prom_args)
         delta <- getDeltaNat
-        MASSERT(delta == delta0 - tot_arg_size)
+        massert (delta == delta0 - tot_arg_size)
 
         -- deal with static vs dynamic call targets
         (callinsns,cconv) <-
@@ -2999,8 +3001,8 @@ genCCall32' target dest_regs args = do
                where fn_imm = ImmCLbl lbl
             ForeignTarget expr conv
                -> do { (dyn_r, dyn_c) <- getSomeReg expr
-                     ; ASSERT( isWord32 (cmmExprType platform expr) )
-                       return (dyn_c `snocOL` CALL (Right dyn_r) [], conv) }
+                     ; massert (isWord32 (cmmExprType platform expr))
+                     ; return (dyn_c `snocOL` CALL (Right dyn_r) [], conv) }
             PrimTarget _
                 -> panic $ "genCCall: Can't handle PrimTarget call type here, error "
                             ++ "probably because too many return values."
@@ -3186,7 +3188,7 @@ genCCall64' target dest_regs args = do
              -- Arguments can be smaller than 64-bit, but we still use @PUSH
              -- II64@ - the usual calling conventions expect integers to be
              -- 8-byte aligned.
-             ASSERT(width <= W64) return ()
+             massert (width <= W64)
              (arg_op, arg_code) <- getOperand arg
              delta <- getDeltaNat
              setDeltaNat (delta-arg_size)
@@ -3620,9 +3622,9 @@ condFltReg is32Bit cond x y = condFltReg_sse2
                 GU  -> plain_test   dst
                 GEU -> plain_test   dst
                 -- Use ASSERT so we don't break releases if these creep in.
-                LTT -> ASSERT2(False, ppr "Should have been turned into >")
+                LTT -> assertPpr False (ppr "Should have been turned into >") $
                        and_ordered  dst
-                LE  -> ASSERT2(False, ppr "Should have been turned into >=")
+                LE  -> assertPpr False (ppr "Should have been turned into >=") $
                        and_ordered  dst
                 _   -> and_ordered  dst)
 

@@ -341,13 +341,13 @@ mkWpFun co1          co2          t1 _  d = WpFun co1 co2 t1 d
 mkWpCastR :: TcCoercionR -> HsWrapper
 mkWpCastR co
   | isTcReflCo co = WpHole
-  | otherwise     = ASSERT2(tcCoercionRole co == Representational, ppr co)
+  | otherwise     = assertPpr (tcCoercionRole co == Representational) (ppr co) $
                     WpCast co
 
 mkWpCastN :: TcCoercionN -> HsWrapper
 mkWpCastN co
   | isTcReflCo co = WpHole
-  | otherwise     = ASSERT2(tcCoercionRole co == Nominal, ppr co)
+  | otherwise     = assertPpr (tcCoercionRole co == Nominal) (ppr co) $
                     WpCast (mkTcSubCo co)
     -- The mkTcSubCo converts Nominal to Representational
 
@@ -866,8 +866,8 @@ Important Details:
 
 mkEvCast :: EvExpr -> TcCoercion -> EvTerm
 mkEvCast ev lco
-  | ASSERT2( tcCoercionRole lco == Representational
-           , (vcat [text "Coercion of wrong role passed to mkEvCast:", ppr ev, ppr lco]))
+  | assertPpr (tcCoercionRole lco == Representational)
+              (vcat [text "Coercion of wrong role passed to mkEvCast:", ppr ev, ppr lco]) $
     isTcReflCo lco = EvExpr ev
   | otherwise      = evCast ev lco
 

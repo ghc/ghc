@@ -62,6 +62,8 @@ import GHC.Types.Var.Env
 import GHC.Types.Var( EvVar )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
+import GHC.Utils.Constants (debugIsOn)
 import GHC.Unit.Module
 import GHC.Types.SrcLoc
 import GHC.Data.Maybe
@@ -98,7 +100,7 @@ dsTopLHsBinds binds
   = do { (force_vars, prs) <- dsLHsBinds binds
        ; when debugIsOn $
          do { xstrict <- xoptM LangExt.Strict
-            ; MASSERT2( null force_vars || xstrict, ppr binds $$ ppr force_vars ) }
+            ; massertPpr (null force_vars || xstrict) (ppr binds $$ ppr force_vars) }
               -- with -XStrict, even top-level vars are listed as force vars.
 
        ; return (toOL prs) }
@@ -1139,7 +1141,7 @@ dsHsWrapper (WpFun c1 c2 (Scaled w t1) doc)
                                    ; if ok
                                      then return (\e -> (Lam x (w2 (app e arg))))
                                      else return id }  -- this return is irrelevant
-dsHsWrapper (WpCast co)       = ASSERT(coercionRole co == Representational)
+dsHsWrapper (WpCast co)       = assert (coercionRole co == Representational) $
                                 return $ \e -> mkCastDs e co
 dsHsWrapper (WpEvApp tm)      = do { core_tm <- dsEvTerm tm
                                    ; return (\e -> App e core_tm) }
@@ -1150,7 +1152,7 @@ dsHsWrapper (WpMultCoercion co) = do { when (not (isReflexiveCo co)) $
 --------------------------------------
 dsTcEvBinds_s :: [TcEvBinds] -> DsM [CoreBind]
 dsTcEvBinds_s []       = return []
-dsTcEvBinds_s (b:rest) = ASSERT( null rest )  -- Zonker ensures null
+dsTcEvBinds_s (b:rest) = assert (null rest) $  -- Zonker ensures null
                          dsTcEvBinds b
 
 dsTcEvBinds :: TcEvBinds -> DsM [CoreBind]

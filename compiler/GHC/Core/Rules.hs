@@ -66,6 +66,7 @@ import GHC.Driver.Ppr
 import GHC.Driver.Flags
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Constants (debugIsOn)
 import GHC.Data.FastString
 import GHC.Data.Maybe
 import GHC.Data.Bag

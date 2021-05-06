@@ -73,6 +73,7 @@ import GHC.Data.Bag
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 
 import GHC.Exts      ( inline )
 import Control.Monad
@@ -107,7 +108,7 @@ matchActualFunTySigma
 -- and NB: res_ty is an (uninstantiated) SigmaType
 
 matchActualFunTySigma herald mb_thing err_info fun_ty
-  = ASSERT2( isRhoTy fun_ty, ppr fun_ty )
+  = assertPpr (isRhoTy fun_ty) (ppr fun_ty) $
     go fun_ty
   where
     -- Does not allocate unnecessary meta variables: if the input already is
@@ -122,7 +123,7 @@ matchActualFunTySigma herald mb_thing err_info fun_ty
     go ty | Just ty' <- tcView ty = go ty'
 
     go (FunTy { ft_af = af, ft_mult = w, ft_arg = arg_ty, ft_res = res_ty })
-      = ASSERT( af == VisArg )
+      = assert (af == VisArg) $
         return (idHsWrapper, Scaled w arg_ty, res_ty)
 
     go ty@(TyVarTy tv)
@@ -323,7 +324,7 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
       | Just ty' <- tcView ty = go acc_arg_tys n ty'
 
     go acc_arg_tys n (FunTy { ft_mult = mult, ft_af = af, ft_arg = arg_ty, ft_res = res_ty })
-      = ASSERT( af == VisArg )
+      = assert (af == VisArg) $
         do { (wrap_res, result) <- go ((Scaled mult $ mkCheckExpType arg_ty) : acc_arg_tys)
                                       (n-1) res_ty
            ; let fun_wrap = mkWpFun idHsWrapper wrap_res (Scaled mult arg_ty) res_ty doc
@@ -419,7 +420,7 @@ matchExpectedTyConApp :: TyCon                -- T :: forall kv1 ... kvm. k1 -> 
 -- Postcondition: (T k1 k2 k3 a b c) is well-kinded
 
 matchExpectedTyConApp tc orig_ty
-  = ASSERT(not $ isFunTyCon tc) go orig_ty
+  = assert (not $ isFunTyCon tc) $ go orig_ty
   where
     go ty
        | Just ty' <- tcView ty
@@ -542,7 +543,7 @@ tcWrapResultMono :: HsExpr GhcRn -> HsExpr GhcTc
 -- rho-type, so nothing to instantiate; just go straight to unify.
 -- It means we don't need to pass in a CtOrigin
 tcWrapResultMono rn_expr expr act_ty res_ty
-  = ASSERT2( isRhoTy act_ty, ppr act_ty $$ ppr rn_expr )
+  = assertPpr (isRhoTy act_ty) (ppr act_ty $$ ppr rn_expr) $
     do { co <- unifyExpectedType rn_expr act_ty res_ty
        ; return (mkHsWrapCo co expr) }
 
@@ -1014,7 +1015,7 @@ buildImplicationFor tclvl skol_info skol_tvs given wanted
   = return (emptyBag, emptyTcEvBinds)
 
   | otherwise
-  = ASSERT2( all (isSkolemTyVar <||> isTyVarTyVar) skol_tvs, ppr skol_tvs )
+  = assertPpr (all (isSkolemTyVar <||> isTyVarTyVar) skol_tvs) (ppr skol_tvs) $
       -- Why allow TyVarTvs? Because implicitly declared kind variables in
       -- non-CUSK type declarations are TyVarTvs, and we need to bring them
       -- into scope as a skolem in an implication. This is OK, though,
@@ -1225,7 +1226,7 @@ uType t_or_k origin orig_ty1 orig_ty2
     go (TyConApp tc1 tys1) (TyConApp tc2 tys2)
       -- See Note [Mismatched type lists and application decomposition]
       | tc1 == tc2, equalLength tys1 tys2
-      = ASSERT2( isGenerativeTyCon tc1 Nominal, ppr tc1 )
+      = assertPpr (isGenerativeTyCon tc1 Nominal) (ppr tc1) $
         do { cos <- zipWith3M (uType t_or_k) origins' tys1 tys2
            ; return $ mkTyConAppCo Nominal tc1 cos }
       where
@@ -1244,12 +1245,12 @@ uType t_or_k origin orig_ty1 orig_ty2
 
     go (AppTy s1 t1) (TyConApp tc2 ts2)
       | Just (ts2', t2') <- snocView ts2
-      = ASSERT( not (mustBeSaturated tc2) )
+      = assert (not (mustBeSaturated tc2)) $
         go_app (isNextTyConArgVisible tc2 ts2') s1 t1 (TyConApp tc2 ts2') t2'
 
     go (TyConApp tc1 ts1) (AppTy s2 t2)
       | Just (ts1', t1') <- snocView ts1
-      = ASSERT( not (mustBeSaturated tc1) )
+      = assert (not (mustBeSaturated tc1)) $
         go_app (isNextTyConArgVisible tc1 ts1') (TyConApp tc1 ts1') t1' s2 t2
 
     go (CoercionTy co1) (CoercionTy co2)
@@ -1523,7 +1524,7 @@ lhsPriority :: TcTyVar -> Int
 --        => more likely to be eliminated
 -- See Note [TyVar/TyVar orientation]
 lhsPriority tv
-  = ASSERT2( isTyVar tv, ppr tv)
+  = assertPpr (isTyVar tv) (ppr tv) $
     case tcTyVarDetails tv of
       RuntimeUnk  -> 0
       SkolemTv {} -> 0
