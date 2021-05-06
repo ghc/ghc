@@ -51,8 +51,6 @@ module GHC.Builtin.Uniques
 
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Builtin.Types

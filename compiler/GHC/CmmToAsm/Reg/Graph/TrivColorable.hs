@@ -6,8 +6,6 @@ module GHC.CmmToAsm.Reg.Graph.TrivColorable (
 
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Platform.Reg.Class

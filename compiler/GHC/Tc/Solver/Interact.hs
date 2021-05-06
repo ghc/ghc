@@ -8,8 +8,6 @@ module GHC.Tc.Solver.Interact (
      solveSimpleWanteds,  -- Solves Cts
   ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 import GHC.Types.Basic ( SwapFlag(..),
                          infinity, IntWithInf, intGtLimit )

@@ -22,8 +22,6 @@ module GHC.HsToCore.Binds
    )
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import {-# SOURCE #-}   GHC.HsToCore.Expr  ( dsLExpr )

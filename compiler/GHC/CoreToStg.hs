@@ -15,8 +15,6 @@
 
 module GHC.CoreToStg ( coreToStg ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Core
@@ -616,7 +614,7 @@ coreToStgArgs (arg : args) = do         -- Non-type argument
         stg_arg_rep = typePrimRep (stgArgType stg_arg)
         bad_args = not (primRepsCompatible platform arg_rep stg_arg_rep)
 
-    WARN( bad_args, text "Dangerous-looking argument. Probable cause: bad unsafeCoerce#" $$ ppr arg )
+    warnPprTrace bad_args (text "Dangerous-looking argument. Probable cause: bad unsafeCoerce#" $$ ppr arg) $
      return (stg_arg : stg_args, ticks ++ aticks)
 
 coreToStgTick :: Type -- type of the ticked expression

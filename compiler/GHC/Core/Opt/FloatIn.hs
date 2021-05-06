@@ -18,8 +18,6 @@ then discover that they aren't needed in the chosen branch.
 
 module GHC.Core.Opt.FloatIn ( floatInwards ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 import GHC.Platform
 

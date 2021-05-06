@@ -17,8 +17,6 @@ module GHC.CmmToAsm.SPARC.CodeGen (
 
 where
 
-#include "HsVersions.h"
-
 -- NCG stuff:
 import GHC.Prelude
 

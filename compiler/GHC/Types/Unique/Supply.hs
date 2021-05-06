@@ -50,7 +50,6 @@ import GHC.Utils.Misc
 import Foreign.Storable
 
 #include "Unique.h"
-#include "HsVersions.h"
 
 {-
 ************************************************************************

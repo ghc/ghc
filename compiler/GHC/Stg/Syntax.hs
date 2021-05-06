@@ -65,8 +65,6 @@ module GHC.Stg.Syntax (
         pprGenStgTopBindings, pprStgTopBindings
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Core     ( AltCon )
