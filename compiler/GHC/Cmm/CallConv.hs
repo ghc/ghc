@@ -222,8 +222,12 @@ realArgRegsCover platform
       realLongRegs   platform
       -- we don't save XMM registers if they are not used for parameter passing
 
--- like realArgRegsCover but always includes the node. This covers the real
+-- Like realArgRegsCover but always includes the node. This covers the real
 -- and virtual registers used for unboxed tuples.
+--
+-- Note: if anything changes in how registers for unboxed tuples overlap,
+--       make sure to also update GHC.StgToByteCode.layoutTuple.
+
 tupleRegsCover :: Platform -> [GlobalReg]
 tupleRegsCover platform =
   nub (VanillaReg 1 VGcPtr : realArgRegsCover platform)

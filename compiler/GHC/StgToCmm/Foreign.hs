@@ -15,8 +15,8 @@ module GHC.StgToCmm.Foreign (
   emitLoadThreadState,
   emitSaveRegs,
   emitRestoreRegs,
-  emitPushRegsBitmap,
-  emitPopRegsBitmap,
+  emitPushTupleRegs,
+  emitPopTupleRegs,
   loadThreadState,
   emitOpenNursery,
   emitCloseNursery,
@@ -357,10 +357,10 @@ emitRestoreRegs = do
 --
 -- See Note [GHCi tuple layout]
 
-emitPushRegsBitmap :: CmmExpr -> FCode ()
-emitPushRegsBitmap regs_live = do
+emitPushTupleRegs :: CmmExpr -> FCode ()
+emitPushTupleRegs regs_live = do
   platform <- getPlatform
-  let regs = zip (realArgRegsCover platform) [0..]
+  let regs = zip (tupleRegsCover platform) [0..]
       save_arg (reg, n) =
         let mask     = CmmLit (CmmInt (1 `shiftL` n) (wordWidth platform))
             live     = cmmAndWord platform regs_live mask
@@ -374,11 +374,11 @@ emitPushRegsBitmap regs_live = do
         in mkCmmIfThen cond $ catAGraphs [adj_sp, save_reg]
   emit . catAGraphs =<< mapM save_arg (reverse regs)
 
--- | Pop a subset of STG registers from the stack (see 'emitPushRegsBitmap')
-emitPopRegsBitmap :: CmmExpr -> FCode ()
-emitPopRegsBitmap regs_live = do
+-- | Pop a subset of STG registers from the stack (see 'emitPushTupleRegs')
+emitPopTupleRegs :: CmmExpr -> FCode ()
+emitPopTupleRegs regs_live = do
   platform <- getPlatform
-  let regs = zip (realArgRegsCover platform) [0..]
+  let regs = zip (tupleRegsCover platform) [0..]
       save_arg (reg, n) =
         let mask     = CmmLit (CmmInt (1 `shiftL` n) (wordWidth platform))
             live     = cmmAndWord platform regs_live mask

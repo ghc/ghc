@@ -116,7 +116,7 @@ instance Outputable TupleInfo where
   ppr TupleInfo{..} = text "<size" <+> ppr tupleSize <+>
                       text "stack" <+> ppr tupleNativeStackSize <+>
                       text "regs"  <+>
-                      ppr (map show $ regSetToList tupleRegs) <>
+                      ppr (map (text.show) $ regSetToList tupleRegs) <>
                       char '>'
 
 voidTupleInfo :: TupleInfo
