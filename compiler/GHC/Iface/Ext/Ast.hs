@@ -659,6 +659,12 @@ instance ToHie (Context (Located Name)) where
               []]
       _ -> pure []
 
+instance HiePass p => ToHie (Context (Located (CtxIdGhcP p))) where
+  toHie (C context (L l ctxid)) =
+    case (hiePass @p, ctxid) of
+      (HieRn, CtxIdName n) -> toHie (C context (L l n))
+      (HieTc, CtxIdName n) -> toHie (C context (L l n))
+
 evVarsOfTermList :: EvTerm -> [EvId]
 evVarsOfTermList (EvExpr e)         = exprSomeFreeVarsList isEvVar e
 evVarsOfTermList (EvTypeable _ ev)  =

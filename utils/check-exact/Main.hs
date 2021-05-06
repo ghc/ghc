@@ -1,3 +1,4 @@
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -396,7 +397,7 @@ changeRename2 _libdir parsed = return (rename "joe" [((2,1),(2,5))] parsed)
 
 rename :: (Data a) => String -> [(Pos, Pos)] -> a -> a
 rename newNameStr spans' a
-  = everywhere (mkT replaceRdr) a
+  = everywhere (mkT replaceCtxIdP . mkT replaceRdr) a
   where
     newName = mkRdrUnqual (mkVarOcc newNameStr)
 
@@ -408,16 +409,23 @@ rename newNameStr spans' a
         | cond (locA ln) = L ln newName
     replaceRdr x = x
 
+    replaceCtxIdP :: LocatedN (CtxIdP GhcPs) -> LocatedN (CtxIdP GhcPs)
+    replaceCtxIdP (L ln (CtxIdRdrName n)) = mapLoc CtxIdRdrName (replaceRdr (L ln n))
+    replaceCtxIdP a = a
+
 -- ---------------------------------------------------------------------
 
 changeWhereIn4 :: Changer
 changeWhereIn4 _libdir parsed
-  = return (everywhere (mkT replace) parsed)
+  = return (everywhere (mkT replaceCtxIdP . mkT replace) parsed)
   where
     replace :: LocatedN RdrName -> LocatedN RdrName
     replace (L ln _n)
       | ss2range (locA ln) == ((12,16),(12,17)) = L ln (mkRdrUnqual (mkVarOcc "p_2"))
     replace x = x
+    replaceCtxIdP :: LocatedN (CtxIdP GhcPs) -> LocatedN (CtxIdP GhcPs)
+    replaceCtxIdP (L ln (CtxIdRdrName n)) = mapLoc CtxIdRdrName (replace (L ln n))
+    replaceCtxIdP a = a
 
 -- ---------------------------------------------------------------------
 

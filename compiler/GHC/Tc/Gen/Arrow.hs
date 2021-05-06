@@ -282,7 +282,7 @@ tc_cmd env
              ; return (GRHSs x grhss' binds') }
 
     tc_grhs stk_ty res_ty (GRHS x guards body)
-        = do { (guards', rhs') <- tcStmtsAndThen pg_ctxt tcGuardStmt guards res_ty $
+        = do { (guards', rhs') <- tcStmtsAndThen (tcStmtCtxt pg_ctxt) tcGuardStmt guards res_ty $
                                   \ res_ty -> tcCmd env body
                                                 (stk_ty, checkingExpType "tc_grhs" res_ty)
              ; return (GRHS x guards' rhs') }

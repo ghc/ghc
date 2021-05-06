@@ -1447,7 +1447,8 @@
              (FunRhs
               (L
                (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:19:1-4 })
-               {Name: main})
+               (CtxIdName
+                {Name: main}))
               (Prefix)
               (NoSrcStrict))
              []

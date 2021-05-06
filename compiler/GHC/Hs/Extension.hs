@@ -100,6 +100,7 @@ type instance XRec (GhcPass p) a = GenLocated (Anno a) a
 type instance Anno RdrName = SrcSpanAnnN
 type instance Anno Name    = SrcSpanAnnN
 type instance Anno Id      = SrcSpanAnnN
+type instance Anno (CtxIdGhcP p) = SrcSpanAnnN
 
 type IsSrcSpanAnn p a = ( Anno (IdGhcP p) ~ SrcSpanAnn' (EpAnn a),
                           IsPass p)
@@ -189,11 +190,62 @@ instance IsPass 'Typechecked where
 
 type instance IdP (GhcPass p) = IdGhcP p
 
+type instance CtxIdP (GhcPass p) = CtxIdGhcP p
+
 -- | Maps the "normal" id type for a given GHC pass
 type family IdGhcP pass where
   IdGhcP 'Parsed      = RdrName
   IdGhcP 'Renamed     = Name
   IdGhcP 'Typechecked = Id
+
+data CtxIdGhcP pass where
+  CtxIdName :: Name -> CtxIdGhcP pass
+  CtxIdRdrName :: RdrName -> CtxIdGhcP 'Parsed
+
+instance (IsPass pass, Typeable pass) => Data (CtxIdGhcP pass) where
+  gfoldl k z c =
+    case c of
+      CtxIdName n -> k (z CtxIdName) n
+      CtxIdRdrName n -> k (z CtxIdRdrName) n
+  gunfold k z c =
+    case ghcPass @pass of
+      GhcPs ->
+        case constrIndex c of
+          1 -> k (z CtxIdName)
+          2 -> k (z CtxIdRdrName)
+          _ -> panic "Data CtxIdGhcP: invalid constrIndex"
+      _ ->
+        case constrIndex c of
+          1 -> k (z CtxIdName)
+          _ -> panic "Data CtxIdGhcP: invalid constrIndex"
+
+  toConstr c =
+    case c of
+      CtxIdName _ -> ctxIdGhcPConName
+      CtxIdRdrName _ -> ctxIdGhcPConRdrName
+
+  dataTypeOf _ = tyCtxIdGhcP
+
+ctxIdGhcPConName, ctxIdGhcPConRdrName :: Constr
+ctxIdGhcPConRdrName = mkConstr tyCtxIdGhcP "CtxIdRdrName" [] Prefix
+ctxIdGhcPConName = mkConstr tyCtxIdGhcP "CtxIdName" [] Prefix
+tyCtxIdGhcP :: DataType
+tyCtxIdGhcP = mkDataType "CtxIdGhcP" [ctxIdGhcPConRdrName, ctxIdGhcPConName]
+
+
+instance Outputable (CtxIdGhcP pass) where
+  ppr (CtxIdName name) = ppr name
+  ppr (CtxIdRdrName name) = ppr name
+
+instance OutputableBndr (CtxIdGhcP pass) where
+  pprBndr b (CtxIdName name) = pprBndr b name
+  pprBndr b (CtxIdRdrName name) = pprBndr b name
+
+  pprInfixOcc (CtxIdName name) = pprInfixOcc name
+  pprInfixOcc (CtxIdRdrName name) = pprInfixOcc name
+
+  pprPrefixOcc (CtxIdName name) = pprPrefixOcc name
+  pprPrefixOcc (CtxIdRdrName name) = pprPrefixOcc name
 
 -- | Marks that a field uses the GhcRn variant even when the pass
 -- parameter is GhcTc. Useful for storing HsTypes in GHC.Hs.Exprs, say, because
@@ -212,6 +264,7 @@ type family NoGhcTcPass (p :: Pass) :: Pass where
 type OutputableBndrId pass =
   ( OutputableBndr (IdGhcP pass)
   , OutputableBndr (IdGhcP (NoGhcTcPass pass))
+  , Outputable (GenLocated (Anno (CtxIdGhcP pass)) (CtxIdGhcP pass))
   , Outputable (GenLocated (Anno (IdGhcP pass)) (IdGhcP pass))
   , Outputable (GenLocated (Anno (IdGhcP (NoGhcTcPass pass))) (IdGhcP (NoGhcTcPass pass)))
   , IsPass pass

@@ -438,7 +438,7 @@ data HsExpr p
 
   -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
   | HsDo        (XDo p)                  -- Type of the whole expression
-                (HsStmtContext (HsDoRn p))
+                HsDoFlavour 
                 -- The parameterisation of the above is unimportant
                 -- because in this context we never use
                 -- the PatGuard or ParStmt variant
@@ -613,7 +613,6 @@ data HsExpr p
 
 -- | The AST used to hard-refer to GhcPass, which was a layer violation. For now,
 -- we paper it over with this new extension point.
-type family HsDoRn p
 type family HsBracketRn p
 type family PendingRnSplice' p
 type family PendingTcSplice' p
@@ -1017,7 +1016,7 @@ type LMatch id body = XRec id (Match id body)
 data Match p body
   = Match {
         m_ext :: XCMatch p body,
-        m_ctxt :: HsMatchContext (NoGhcTc p),
+        m_ctxt :: HsMatchContext p,
           -- See note [m_ctxt in Match]
         m_pats :: [LPat p], -- The patterns
         m_grhss :: (GRHSs p body)
@@ -1317,12 +1316,10 @@ data ApplicativeArg idL
     , app_stmts         :: [ExprLStmt idL] -- stmts
     , final_expr        :: HsExpr idL    -- return (v1,..,vn), or just (v1,..,vn)
     , bv_pattern        :: LPat idL      -- (v1,...,vn)
-    , stmt_context      :: HsStmtContext (ApplicativeArgStmCtxPass idL)
+    , stmt_context      :: HsStmtContext idL
       -- ^ context of the do expression, used in pprArg
     }
   | XApplicativeArg !(XXApplicativeArg idL)
-
-type family ApplicativeArgStmCtxPass idL
 
 {-
 Note [The type of bind in Stmts]
@@ -1631,7 +1628,7 @@ data ArithSeqInfo id
 -- Context of a pattern match. This is more subtle than it would seem. See Note
 -- [Varieties of pattern matches].
 data HsMatchContext p
-  = FunRhs { mc_fun        :: LIdP p    -- ^ function binder of @f@
+  = FunRhs { mc_fun        :: XRec p (CtxIdP p) -- ^ function binder of @f@
            , mc_fixity     :: LexicalFixity -- ^ fixing of @f@
            , mc_strictness :: SrcStrictness -- ^ was @f@ banged?
                                             -- See Note [FunBind vs PatBind]
@@ -1666,44 +1663,47 @@ isPatSynCtxt ctxt =
 
 -- | Haskell Statement Context.
 data HsStmtContext p
-  = ListComp
-  | MonadComp
+  = ArrowExpr                        -- ^do-notation in an arrow-command context
 
-  | DoExpr (Maybe ModuleName)        -- ^[ModuleName.]do { ... }
-  | MDoExpr (Maybe ModuleName)       -- ^[ModuleName.]mdo { ... }  ie recursive do-expression
-  | ArrowExpr                        -- ^do-notation in an arrow-command context
-
-  | GhciStmtCtxt                     -- ^A command-line Stmt in GHCi pat <- rhs
   | PatGuard (HsMatchContext p)      -- ^Pattern guard for specified thing
   | ParStmtCtxt (HsStmtContext p)    -- ^A branch of a parallel stmt
   | TransStmtCtxt (HsStmtContext p)  -- ^A branch of a transform stmt
+  | HsDoStmt HsDoFlavour 
+
+-- A subset of HsStmtContext that is only used during parsing.
+data HsDoFlavour 
+  = DoExpr (Maybe ModuleName)        -- ^[ModuleName.]do { ... }
+  | MDoExpr (Maybe ModuleName)       -- ^[ModuleName.]mdo { ... }  ie recursive do-expression
+  | ListComp
+  | MonadComp
+  | GhciStmtCtxt                     -- ^A command-line Stmt in GHCi pat <- rhs
 
 qualifiedDoModuleName_maybe :: HsStmtContext p -> Maybe ModuleName
 qualifiedDoModuleName_maybe ctxt = case ctxt of
-  DoExpr m -> m
-  MDoExpr m -> m
+  (HsDoStmt (DoExpr m)) -> m
+  (HsDoStmt (MDoExpr m)) -> m
   _ -> Nothing
 
 isComprehensionContext :: HsStmtContext id -> Bool
 -- Uses comprehension syntax [ e | quals ]
-isComprehensionContext ListComp          = True
-isComprehensionContext MonadComp         = True
-isComprehensionContext (ParStmtCtxt c)   = isComprehensionContext c
-isComprehensionContext (TransStmtCtxt c) = isComprehensionContext c
+isComprehensionContext (HsDoStmt ListComp)  = True
+isComprehensionContext (HsDoStmt MonadComp) = True
+isComprehensionContext (ParStmtCtxt c)    = isComprehensionContext c
+isComprehensionContext (TransStmtCtxt c)  = isComprehensionContext c
 isComprehensionContext _ = False
 
 -- | Is this a monadic context?
 isMonadStmtContext :: HsStmtContext id -> Bool
-isMonadStmtContext MonadComp            = True
-isMonadStmtContext DoExpr{}             = True
-isMonadStmtContext MDoExpr{}            = True
-isMonadStmtContext GhciStmtCtxt         = True
+isMonadStmtContext (HsDoStmt MonadComp)            = True
+isMonadStmtContext (HsDoStmt DoExpr{})             = True
+isMonadStmtContext (HsDoStmt MDoExpr{})            = True
+isMonadStmtContext (HsDoStmt GhciStmtCtxt)         = True
 isMonadStmtContext (ParStmtCtxt ctxt)   = isMonadStmtContext ctxt
 isMonadStmtContext (TransStmtCtxt ctxt) = isMonadStmtContext ctxt
 isMonadStmtContext _ = False -- ListComp, PatGuard, ArrowExpr
 
 isMonadCompContext :: HsStmtContext id -> Bool
-isMonadCompContext MonadComp = True
+isMonadCompContext (HsDoStmt MonadComp) = True
 isMonadCompContext _         = False
 
 matchSeparator :: HsMatchContext p -> SDoc
@@ -1721,7 +1721,7 @@ matchSeparator ThPatSplice  = panic "unused"
 matchSeparator ThPatQuote   = panic "unused"
 matchSeparator PatSyn       = panic "unused"
 
-pprMatchContext :: (Outputable (IdP p), UnXRec p)
+pprMatchContext :: (Outputable (CtxIdP p), UnXRec p)
                 => HsMatchContext p -> SDoc
 pprMatchContext ctxt
   | want_an ctxt = text "an" <+> pprMatchContextNoun ctxt
@@ -1731,7 +1731,7 @@ pprMatchContext ctxt
     want_an ProcExpr    = True
     want_an _           = False
 
-pprMatchContextNoun :: forall p. (Outputable (IdP p), UnXRec p)
+pprMatchContextNoun :: forall p. (Outputable (CtxIdP p), UnXRec p)
                     => HsMatchContext p -> SDoc
 pprMatchContextNoun (FunRhs {mc_fun=fun})
                                     = text "equation for"
@@ -1750,26 +1750,15 @@ pprMatchContextNoun (StmtCtxt ctxt) = text "pattern binding in"
 pprMatchContextNoun PatSyn          = text "pattern synonym declaration"
 
 -----------------
-pprAStmtContext, pprStmtContext :: (Outputable (IdP p), UnXRec p)
+pprAStmtContext, pprStmtContext :: (Outputable (CtxIdP p), UnXRec p)
                                 => HsStmtContext p -> SDoc
-pprAStmtContext ctxt = article <+> pprStmtContext ctxt
-  where
-    pp_an = text "an"
-    pp_a  = text "a"
-    article = case ctxt of
-                  MDoExpr Nothing -> pp_an
-                  GhciStmtCtxt  -> pp_an
-                  _             -> pp_a
-
+pprAStmtContext (HsDoStmt flavour) = pprAHsDoFlavour flavour 
+pprAStmtContext ctxt = text "a" <+> pprStmtContext ctxt
 
 -----------------
-pprStmtContext GhciStmtCtxt    = text "interactive GHCi command"
-pprStmtContext (DoExpr m)      = prependQualified m (text "'do' block")
-pprStmtContext (MDoExpr m)     = prependQualified m (text "'mdo' block")
 pprStmtContext ArrowExpr       = text "'do' block in an arrow command"
-pprStmtContext ListComp        = text "list comprehension"
-pprStmtContext MonadComp       = text "monad comprehension"
 pprStmtContext (PatGuard ctxt) = text "pattern guard for" $$ pprMatchContext ctxt
+pprStmtContext (HsDoStmt p)      = pprHsDoFlavour p
 
 -- Drop the inner contexts when reporting errors, else we get
 --     Unexpected transform statement
@@ -1782,6 +1771,21 @@ pprStmtContext (ParStmtCtxt c) =
 pprStmtContext (TransStmtCtxt c) =
   ifPprDebug (sep [text "transformed branch of", pprAStmtContext c])
              (pprStmtContext c)
+
+pprAHsDoFlavour, pprHsDoFlavour :: HsDoFlavour -> SDoc
+pprAHsDoFlavour flavour = article <+> pprHsDoFlavour flavour
+  where
+    pp_an = text "an"
+    pp_a  = text "a"
+    article = case flavour of
+                  (MDoExpr Nothing) -> pp_an
+                  GhciStmtCtxt  -> pp_an
+                  _             -> pp_a
+pprHsDoFlavour (DoExpr m)      = prependQualified m (text "'do' block")
+pprHsDoFlavour (MDoExpr m)     = prependQualified m (text "'mdo' block")
+pprHsDoFlavour ListComp        = text "list comprehension"
+pprHsDoFlavour MonadComp       = text "monad comprehension"
+pprHsDoFlavour GhciStmtCtxt    = text "interactive GHCi command"
 
 prependQualified :: Maybe ModuleName -> SDoc -> SDoc
 prependQualified Nothing  t = t

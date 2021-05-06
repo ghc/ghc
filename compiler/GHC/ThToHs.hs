@@ -180,7 +180,7 @@ cvtDec :: TH.Dec -> CvtM (Maybe (LHsDecl GhcPs))
 cvtDec (TH.ValD pat body ds)
   | TH.VarP s <- pat
   = do  { s' <- vNameN s
-        ; cl' <- cvtClause (mkPrefixFunRhs s') (Clause [] body ds)
+        ; cl' <- cvtClause (mkPrefixFunRhs (mapLoc CtxIdRdrName s')) (Clause [] body ds)
         ; th_origin <- getOrigin
         ; returnJustLA $ Hs.ValD noExtField $ mkFunBind th_origin s' [cl'] }
 
@@ -201,7 +201,7 @@ cvtDec (TH.FunD nm cls)
                  <+> text "has no equations")
   | otherwise
   = do  { nm' <- vNameN nm
-        ; cls' <- mapM (cvtClause (mkPrefixFunRhs nm')) cls
+        ; cls' <- mapM (cvtClause (mkPrefixFunRhs (mapLoc CtxIdRdrName nm'))) cls
         ; th_origin <- getOrigin
         ; returnJustLA $ Hs.ValD noExtField $ mkFunBind th_origin nm' cls' }
 
@@ -438,7 +438,7 @@ cvtDec (TH.PatSynD nm args dir pat)
     cvtDir _ Unidir          = return Unidirectional
     cvtDir _ ImplBidir       = return ImplicitBidirectional
     cvtDir n (ExplBidir cls) =
-      do { ms <- mapM (cvtClause (mkPrefixFunRhs n)) cls
+      do { ms <- mapM (cvtClause (mkPrefixFunRhs (mapLoc CtxIdRdrName n))) cls
          ; th_origin <- getOrigin
          ; return $ ExplicitBidirectional $ mkMatchGroup th_origin (noLocA ms) }
 
@@ -1170,7 +1170,7 @@ cvtOpApp x op y
 --      Do notation and statements
 -------------------------------------
 
-cvtHsDo :: HsStmtContext GhcRn -> [TH.Stmt] -> CvtM (HsExpr GhcPs)
+cvtHsDo :: HsDoFlavour -> [TH.Stmt] -> CvtM (HsExpr GhcPs)
 cvtHsDo do_or_lc stmts
   | null stmts = failWith (text "Empty stmt list in do-block")
   | otherwise
@@ -1184,7 +1184,7 @@ cvtHsDo do_or_lc stmts
 
         ; return $ HsDo noAnn do_or_lc (noLocA (stmts'' ++ [last''])) }
   where
-    bad_last stmt = vcat [ text "Illegal last statement of" <+> pprAStmtContext do_or_lc <> colon
+    bad_last stmt = vcat [ text "Illegal last statement of" <+> pprAHsDoFlavour do_or_lc <> colon
                          , nest 2 $ Outputable.ppr stmt
                          , text "(It should be an expression.)" ]
 

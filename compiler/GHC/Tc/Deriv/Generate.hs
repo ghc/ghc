@@ -1974,7 +1974,7 @@ gen_Newtype_binds loc' cls inst_tvs inst_tys rhs_ty
           --               @(a -> [T x]      -> c -> Int)
           --               op
           mkRdrFunBind loc_meth_RDR [mkSimpleMatch
-                                        (mkPrefixFunRhs loc_meth_RDR)
+                                        (mkPrefixFunRhs (mapLoc CtxIdRdrName loc_meth_RDR))
                                         [] rhs_expr]
         , -- The derived instance signature, e.g.,
           --
@@ -2245,7 +2245,7 @@ mkFunBindSE :: Arity -> SrcSpan -> RdrName
 mkFunBindSE arity loc fun pats_and_exprs
   = mkRdrFunBindSE arity (L (noAnnSrcSpan loc) fun) matches
   where
-    matches = [mkMatch (mkPrefixFunRhs (L (noAnnSrcSpan loc) fun))
+    matches = [mkMatch (mkPrefixFunRhs (L (noAnnSrcSpan loc) (CtxIdRdrName fun)))
                                (map (parenthesizePat appPrec) p) e
                                emptyLocalBinds
               | (p,e) <-pats_and_exprs]
@@ -2266,7 +2266,7 @@ mkFunBindEC :: Arity -> SrcSpan -> RdrName
 mkFunBindEC arity loc fun catch_all pats_and_exprs
   = mkRdrFunBindEC arity catch_all (L (noAnnSrcSpan loc) fun) matches
   where
-    matches = [ mkMatch (mkPrefixFunRhs (L (noAnnSrcSpan loc) fun))
+    matches = [ mkMatch (mkPrefixFunRhs (L (noAnnSrcSpan loc) (CtxIdRdrName fun)))
                                 (map (parenthesizePat appPrec) p) e
                                 emptyLocalBinds
               | (p,e) <- pats_and_exprs ]
@@ -2293,7 +2293,7 @@ mkRdrFunBindEC arity catch_all fun@(L loc _fun_rdr) matches
    -- which can happen with -XEmptyDataDecls
    -- See #4302
    matches' = if null matches
-              then [mkMatch (mkPrefixFunRhs fun)
+              then [mkMatch (mkPrefixFunRhs (mapLoc CtxIdRdrName fun))
                             (replicate (arity - 1) nlWildPat ++ [z_Pat])
                             (catch_all $ nlHsCase z_Expr [])
                             emptyLocalBinds]
@@ -2313,7 +2313,7 @@ mkRdrFunBindSE arity fun@(L loc fun_rdr) matches
    -- which can happen with -XEmptyDataDecls
    -- See #4302
    matches' = if null matches
-              then [mkMatch (mkPrefixFunRhs fun)
+              then [mkMatch (mkPrefixFunRhs (mapLoc CtxIdRdrName fun))
                             (replicate arity nlWildPat)
                             (error_Expr str) emptyLocalBinds]
               else matches
