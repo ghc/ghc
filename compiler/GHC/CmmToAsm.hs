@@ -136,6 +136,7 @@ import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Error
 import GHC.Utils.Exception (evaluate)
+import GHC.Utils.Constants (debugIsOn)
 
 import GHC.Data.FastString
 import GHC.Types.Unique.Set
@@ -725,8 +726,7 @@ maybeDumpCfg logger dflags (Just cfg) msg proc_name
 checkLayout :: [NatCmmDecl statics instr] -> [NatCmmDecl statics instr]
             -> [NatCmmDecl statics instr]
 checkLayout procsUnsequenced procsSequenced =
-        ASSERT2(setNull diff,
-                ppr "Block sequencing dropped blocks:" <> ppr diff)
+        assertPpr (setNull diff) (ppr "Block sequencing dropped blocks:" <> ppr diff)
         procsSequenced
   where
         blocks1 = foldl' (setUnion) setEmpty $

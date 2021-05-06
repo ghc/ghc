@@ -85,6 +85,7 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Utils.Misc
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Utils.Outputable
 
 import GHC.Unit.State
@@ -124,7 +125,7 @@ newMethodFromName origin name ty_args
 
        ; let ty = piResultTys (idType id) ty_args
              (theta, _caller_knows_this) = tcSplitPhiTy ty
-       ; wrap <- ASSERT( not (isForAllTy ty) && isSingleton theta )
+       ; wrap <- assert (not (isForAllTy ty) && isSingleton theta) $
                  instCall origin ty_args theta
 
        ; return (mkHsWrap wrap (HsVar noExtField (noLocA id))) }
@@ -397,7 +398,7 @@ tcInstInvisibleTyBinder subst (Anon af ty)
   | Just (mk, k1, k2) <- get_eq_tys_maybe (substTy subst (scaledThing ty))
     -- Equality is the *only* constraint currently handled in types.
     -- See Note [Constraints in kinds] in GHC.Core.TyCo.Rep
-  = ASSERT( af == InvisArg )
+  = assert (af == InvisArg) $
     do { co <- unifyKind Nothing k1 k2
        ; arg' <- mk co
        ; return (subst, arg') }

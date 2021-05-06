@@ -131,6 +131,7 @@ import GHC.Runtime.Context
 import GHC.Utils.Error
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 import GHC.Utils.Logger
 
@@ -977,7 +978,7 @@ checkBootDeclM is_boot boot_thing real_thing
 checkBootDecl :: Bool -> TyThing -> TyThing -> Maybe SDoc
 
 checkBootDecl _ (AnId id1) (AnId id2)
-  = ASSERT(id1 == id2)
+  = assert (id1 == id2) $
     check (idType id1 `eqType` idType id2)
           (text "The two types are different")
 
@@ -1117,7 +1118,7 @@ checkBootTyCon is_boot tc1 tc2
   | Just syn_rhs1 <- synTyConRhs_maybe tc1
   , Just syn_rhs2 <- synTyConRhs_maybe tc2
   , Just env <- eqVarBndrs emptyRnEnv2 (tyConTyVars tc1) (tyConTyVars tc2)
-  = ASSERT(tc1 == tc2)
+  = assert (tc1 == tc2) $
     checkRoles roles1 roles2 `andThenCheck`
     check (eqTypeX env syn_rhs1 syn_rhs2) empty   -- nothing interesting to say
   -- This allows abstract 'data T a' to be implemented using 'type T = ...'
@@ -1147,7 +1148,7 @@ checkBootTyCon is_boot tc1 tc2
 
   | Just fam_flav1 <- famTyConFlav_maybe tc1
   , Just fam_flav2 <- famTyConFlav_maybe tc2
-  = ASSERT(tc1 == tc2)
+  = assert (tc1 == tc2) $
     let eqFamFlav OpenSynFamilyTyCon   OpenSynFamilyTyCon = True
         eqFamFlav (DataFamilyTyCon {}) (DataFamilyTyCon {}) = True
         -- This case only happens for hsig merging:
@@ -1173,7 +1174,7 @@ checkBootTyCon is_boot tc1 tc2
 
   | isAlgTyCon tc1 && isAlgTyCon tc2
   , Just env <- eqVarBndrs emptyRnEnv2 (tyConTyVars tc1) (tyConTyVars tc2)
-  = ASSERT(tc1 == tc2)
+  = assert (tc1 == tc2) $
     checkRoles roles1 roles2 `andThenCheck`
     check (eqListBy (eqTypeX env)
                      (tyConStupidTheta tc1) (tyConStupidTheta tc2))
@@ -1282,7 +1283,7 @@ checkBootTyCon is_boot tc1 tc2
                 `andThenCheck`
         -- Don't report roles errors unless the type synonym is nullary
         checkUnless (not (null tvs)) $
-            ASSERT( null roles2 )
+            assert (null roles2) $
             -- If we have something like:
             --
             --  signature H where
@@ -1825,7 +1826,7 @@ checkMain explicit_mod_hdr export_ies
               generateMainBinding tcg_env main_name
 
            | otherwise
-           -> ASSERT( null exported_mains )
+           -> assert (null exported_mains) $
               -- A fully-checked export list can't contain more
               -- than one function with the same OccName
               do { complain_no_main dflags main_mod main_occ
@@ -2651,7 +2652,7 @@ tcRnType hsc_env flexi normalise rdr_type
 
        -- Since all the wanteds are equalities, the returned bindings will be empty
        ; empty_binds <- simplifyTop wanted
-       ; MASSERT2( isEmptyBag empty_binds, ppr empty_binds )
+       ; massertPpr (isEmptyBag empty_binds) (ppr empty_binds)
 
        -- Do kind generalisation; see Note [Kind-generalise in tcRnType]
        ; kvs <- kindGeneralizeAll kind

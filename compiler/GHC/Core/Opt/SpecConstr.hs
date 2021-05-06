@@ -57,7 +57,8 @@ import GHC.Utils.Misc
 import GHC.Data.Pair
 import GHC.Types.Unique.Supply
 import GHC.Utils.Outputable
-import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
+import GHC.Utils.Constants (debugIsOn)
 import GHC.Data.FastString
 import GHC.Types.Unique.FM
 import GHC.Utils.Monad
@@ -1342,7 +1343,7 @@ harmful.  I'm not sure.
 scApp :: ScEnv -> (InExpr, [InExpr]) -> UniqSM (ScUsage, CoreExpr)
 
 scApp env (Var fn, args)        -- Function is a variable
-  = ASSERT( not (null args) )
+  = assert (not (null args)) $
     do  { args_w_usgs <- mapM (scExpr env) args
         ; let (arg_usgs, args') = unzip args_w_usgs
               arg_usg = combineUsages arg_usgs

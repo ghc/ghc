@@ -808,7 +808,7 @@ check_syn_tc_app (ve@ValidityEnv{ ve_ctxt = ctxt, ve_expand = expand })
     check_args_only expand = mapM_ (check_arg expand) tys
 
     check_expansion_only expand
-      = ASSERT2( isTypeSynonymTyCon tc, ppr tc )
+      = assertPpr (isTypeSynonymTyCon tc) (ppr tc) $
         case tcView ty of
          Just ty' -> let err_ctxt = text "In the expansion of type synonym"
                                     <+> quotes (ppr tc)

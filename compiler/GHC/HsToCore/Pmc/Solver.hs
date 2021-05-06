@@ -47,6 +47,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Monad (allM)
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Data.Bag
 import GHC.Types.CompleteMatch
 import GHC.Types.Unique.Set
@@ -397,7 +398,7 @@ pmIsClosedType ty
   = case splitTyConApp_maybe ty of
       Just (tc, ty_args)
              | is_algebraic_like tc && not (isFamilyTyCon tc)
-             -> ASSERT2( ty_args `lengthIs` tyConArity tc, ppr ty ) True
+             -> assertPpr (ty_args `lengthIs` tyConArity tc) (ppr ty) True
       _other -> False
   where
     -- This returns True for TyCons which /act like/ algebraic types.
@@ -796,7 +797,7 @@ addNotConCt nabla x nalt = do
             -- See Note [Completeness checking with required Thetas]
             | hasRequiredTheta nalt  = neg
             | otherwise              = extendPmAltConSet neg nalt
-      MASSERT( isPmAltConMatchStrict nalt )
+      massert (isPmAltConMatchStrict nalt)
       let vi' = vi{ vi_neg = neg', vi_bot = IsNotBot }
       -- 3. Make sure there's at least one other possible constructor
       mb_rcm' <- lift (markMatched nalt rcm)
@@ -853,7 +854,7 @@ addConCt nabla@MkNabla{ nabla_tm_st = ts@TmSt{ ts_facts=env } } x alt tvs args =
             MaybeBot -> pure (nabla_with MaybeBot)
             IsBot    -> addBotCt (nabla_with MaybeBot) y
             IsNotBot -> addNotBotCt (nabla_with MaybeBot) y
-        _ -> ASSERT( isPmAltConMatchStrict alt )
+        _ -> assert (isPmAltConMatchStrict alt )
              pure (nabla_with IsNotBot) -- strict match ==> not ⊥
 
 equateTys :: [Type] -> [Type] -> [PhiCt]

@@ -149,8 +149,8 @@ specUnfolding :: SimpleOpts
 --
 specUnfolding opts spec_bndrs spec_app rule_lhs_args
               df@(DFunUnfolding { df_bndrs = old_bndrs, df_con = con, df_args = args })
-  = ASSERT2( rule_lhs_args `equalLength` old_bndrs
-           , ppr df $$ ppr rule_lhs_args )
+  = assertPpr (rule_lhs_args `equalLength` old_bndrs)
+              (ppr df $$ ppr rule_lhs_args) $
            -- For this ASSERT see Note [DFunUnfoldings] in GHC.Core.Opt.Specialise
     mkDFunUnfolding spec_bndrs con (map spec_arg args)
       -- For DFunUnfoldings we transform

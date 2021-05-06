@@ -54,6 +54,7 @@ import Data.Maybe       ( isJust )
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 
 {-
 ************************************************************************
@@ -266,7 +267,7 @@ mkLocalInstance dfun oflag tvs cls tys
   where
     cls_name = className cls
     dfun_name = idName dfun
-    this_mod = ASSERT( isExternalName dfun_name ) nameModule dfun_name
+    this_mod = assert (isExternalName dfun_name) $ nameModule dfun_name
     is_local name = nameIsLocalOrFrom this_mod name
 
         -- Compute orphanhood.  See Note [Orphans] in GHC.Core.InstEnv
@@ -274,9 +275,9 @@ mkLocalInstance dfun oflag tvs cls tys
     arg_names = [filterNameSet is_local (orphNamesOfType ty) | ty <- tys]
 
     -- See Note [When exactly is an instance decl an orphan?]
-    orph | is_local cls_name = NotOrphan (nameOccName cls_name)
-         | all notOrphan mb_ns  = ASSERT( not (null mb_ns) ) head mb_ns
-         | otherwise         = IsOrphan
+    orph | is_local cls_name   = NotOrphan (nameOccName cls_name)
+         | all notOrphan mb_ns = assert (not (null mb_ns)) $ head mb_ns
+         | otherwise           = IsOrphan
 
     notOrphan NotOrphan{} = True
     notOrphan _ = False
@@ -859,10 +860,9 @@ lookupInstEnv' ie vis_mods cls tys
       = find ms us rest
 
       | otherwise
-      = ASSERT2( tys_tv_set `disjointVarSet` tpl_tv_set,
-                 (ppr cls <+> ppr tys) $$
-                 (ppr tpl_tvs <+> ppr tpl_tys)
-                )
+      = assertPpr (tys_tv_set `disjointVarSet` tpl_tv_set)
+                  ((ppr cls <+> ppr tys) $$
+                   (ppr tpl_tvs <+> ppr tpl_tys)) $
                 -- Unification will break badly if the variables overlap
                 -- They shouldn't because we allocate separate uniques for them
                 -- See Note [Template tyvars are fresh]

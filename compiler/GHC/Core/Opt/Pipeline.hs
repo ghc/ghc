@@ -52,9 +52,9 @@ import GHC.Core.FamInstEnv
 import qualified GHC.Utils.Error as Err
 import GHC.Utils.Error  ( withTiming )
 import GHC.Utils.Logger as Logger
-import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Constants (debugIsOn)
 
 import GHC.Unit.External
 import GHC.Unit.Module.Env

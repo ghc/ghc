@@ -73,6 +73,8 @@ import GHC.Core.DataCon
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
+import GHC.Utils.Constants (debugIsOn)
 
 import GHC.Core.Multiplicity
 import GHC.Core
@@ -506,7 +508,7 @@ zonkTyBndrX :: ZonkEnv -> TcTyVar -> TcM (ZonkEnv, TyVar)
 -- as the old one.  This important when zonking the
 -- TyVarBndrs of a TyCon, whose Names may scope.
 zonkTyBndrX env tv
-  = ASSERT2( isImmutableTyVar tv, ppr tv <+> dcolon <+> ppr (tyVarKind tv) )
+  = assertPpr (isImmutableTyVar tv) (ppr tv <+> dcolon <+> ppr (tyVarKind tv)) $
     do { ki <- zonkTcTypeToTypeX env (tyVarKind tv)
                -- Internal names tidy up better, for iface files.
        ; let tv' = mkTyVar (tyVarName tv) ki
@@ -628,7 +630,7 @@ zonk_bind env (AbsBinds { abs_tvs = tyvars, abs_ev_vars = evs
                         , abs_exports = exports
                         , abs_binds = val_binds
                         , abs_sig = has_sig })
-  = ASSERT( all isImmutableTyVar tyvars )
+  = assert (all isImmutableTyVar tyvars) $
     do { (env0, new_tyvars) <- zonkTyBndrsX env tyvars
        ; (env1, new_evs) <- zonkEvBndrsX env0 evs
        ; (env2, new_ev_binds) <- zonkTcEvBinds_s env1 ev_binds
@@ -792,7 +794,7 @@ zonkLExprs env exprs = mapM (zonkLExpr env) exprs
 zonkLExpr  env expr  = wrapLocMA (zonkExpr env) expr
 
 zonkExpr env (HsVar x (L l id))
-  = ASSERT2( isNothing (isDataConId_maybe id), ppr id )
+  = assertPpr (isNothing (isDataConId_maybe id)) (ppr id) $
     return (HsVar x (L l (zonkIdOcc env id)))
 
 zonkExpr env (HsUnboundVar her occ)
@@ -1125,7 +1127,7 @@ zonk_cmd_top env (HsCmdTop (CmdTopTc stack_tys ty ids) cmd)
        new_ty <- zonkTcTypeToTypeX env ty
        new_ids <- mapSndM (zonkExpr env) ids
 
-       MASSERT( isLiftedTypeKind (tcTypeKind new_stack_tys) )
+       massert (isLiftedTypeKind (tcTypeKind new_stack_tys))
          -- desugarer assumes that this is not levity polymorphic...
          -- but indeed it should always be lifted due to the typing
          -- rules for arrows
@@ -1148,7 +1150,7 @@ zonkCoFn env (WpEvLam ev)   = do { (env', ev') <- zonkEvBndrX env ev
                                  ; return (env', WpEvLam ev') }
 zonkCoFn env (WpEvApp arg)  = do { arg' <- zonkEvTerm env arg
                                  ; return (env, WpEvApp arg') }
-zonkCoFn env (WpTyLam tv)   = ASSERT( isImmutableTyVar tv )
+zonkCoFn env (WpTyLam tv)   = assert (isImmutableTyVar tv) $
                               do { (env', tv') <- zonkTyBndrX env tv
                                  ; return (env', WpTyLam tv') }
 zonkCoFn env (WpTyApp ty)   = do { ty' <- zonkTcTypeToTypeX env ty
@@ -1479,7 +1481,7 @@ zonk_pat env p@(ConPat { pat_con = L _ con
                          , cpt_arg_tys = tys
                          })
                        })
-  = ASSERT( all isImmutableTyVar tyvars )
+  = assert (all isImmutableTyVar tyvars) $
     do  { new_tys <- mapM (zonkTcTypeToTypeX env) tys
 
           -- an unboxed tuple pattern (but only an unboxed tuple pattern)
@@ -1626,7 +1628,7 @@ zonkRule env rule@(HsRule { rd_tmvs = tm_bndrs{-::[RuleBndr TcId]-}
    zonk_it env v
      | isId v     = do { v' <- zonkIdBndr env v
                        ; return (extendIdZonkEnvRec env [v'], v') }
-     | otherwise  = ASSERT( isImmutableTyVar v)
+     | otherwise  = assert (isImmutableTyVar v)
                     zonkTyBndrX env v
                     -- DV: used to be return (env,v) but that is plain
                     -- wrong because we may need to go inside the kind
@@ -1960,9 +1962,9 @@ zonkCoHole env hole@(CoercionHole { ch_ref = ref, ch_co_var = cv })
            Nothing -> do { traceTc "Zonking unfilled coercion hole" (ppr hole)
                          ; when debugIsOn $
                            whenNoErrs $
-                           MASSERT2( False
-                                   , text "Type-correct unfilled coercion hole"
-                                     <+> ppr hole )
+                           massertPpr False
+                                      (text "Type-correct unfilled coercion hole"
+                                       <+> ppr hole)
                          ; cv' <- zonkCoVar cv
                          ; return $ mkCoVarCo cv' } }
                              -- This will be an out-of-scope variable, but keeping

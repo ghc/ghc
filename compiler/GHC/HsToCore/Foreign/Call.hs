@@ -46,8 +46,8 @@ import GHC.Types.Literal
 import GHC.Builtin.Names
 import GHC.Driver.Session
 import GHC.Utils.Outputable
-import GHC.Utils.Misc
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 
 import Data.Maybe
 
@@ -120,7 +120,7 @@ mkFCall :: DynFlags -> Unique -> ForeignCall
 --      (ccallid::(forall a b.  StablePtr (a -> b) -> Addr -> Char -> IO Addr))
 --                      a b s x c
 mkFCall dflags uniq the_fcall val_args res_ty
-  = ASSERT( all isTyVar tyvars )  -- this must be true because the type is top-level
+  = assert (all isTyVar tyvars) $ -- this must be true because the type is top-level
     mkApps (mkVarApps (Var the_fcall_id) tyvars) val_args
   where
     arg_tys = map exprType val_args
@@ -163,7 +163,7 @@ unboxArg arg
   -- Data types with a single constructor, which has a single, primitive-typed arg
   -- This deals with Int, Float etc; also Ptr, ForeignPtr
   | is_product_type && data_con_arity == 1
-  = ASSERT2(isUnliftedType data_con_arg_ty1, pprType arg_ty)
+  = assertPpr (isUnliftedType data_con_arg_ty1) (pprType arg_ty) $
                         -- Typechecker ensures this
     do case_bndr <- newSysLocalDs Many arg_ty
        prim_arg <- newSysLocalDs Many data_con_arg_ty1
@@ -289,7 +289,7 @@ mk_alt return_result (Nothing, wrap_result)
 
 mk_alt return_result (Just prim_res_ty, wrap_result)
   = -- The ccall returns a non-() value
-    ASSERT2( isPrimitiveType prim_res_ty, ppr prim_res_ty )
+    assertPpr (isPrimitiveType prim_res_ty) (ppr prim_res_ty) $
              -- True because resultWrapper ensures it is so
     do { result_id <- newSysLocalDs Many prim_res_ty
        ; state_id <- newSysLocalDs Many realWorldStatePrimTy

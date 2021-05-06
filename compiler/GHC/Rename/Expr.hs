@@ -61,6 +61,7 @@ import GHC.Utils.Misc
 import GHC.Data.List.SetOps ( removeDups )
 import GHC.Utils.Error
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Utils.Outputable as Outputable
 import GHC.Types.SrcLoc
 import GHC.Data.FastString
@@ -1670,7 +1671,7 @@ segsToStmts :: Stmt GhcRn (LocatedA (body GhcRn))
 
 segsToStmts _ [] fvs_later = ([], fvs_later)
 segsToStmts empty_rec_stmt ((defs, uses, fwds, ss) : segs) fvs_later
-  = ASSERT( not (null ss) )
+  = assert (not (null ss))
     (new_stmt : later_stmts, later_uses `plusFV` uses)
   where
     (later_stmts, later_uses) = segsToStmts empty_rec_stmt segs fvs_later
@@ -1903,8 +1904,8 @@ mkStmtTreeHeuristic stmts =
 -- using dynamic programming.  /O(n^3)/
 mkStmtTreeOptimal :: [(ExprLStmt GhcRn, FreeVars)] -> ExprStmtTree
 mkStmtTreeOptimal stmts =
-  ASSERT(not (null stmts)) -- the empty case is handled by the caller;
-                           -- we don't support empty StmtTrees.
+  assert (not (null stmts)) $ -- the empty case is handled by the caller;
+                              -- we don't support empty StmtTrees.
   fst (arr ! (0,n))
   where
     n = length stmts - 1

@@ -77,6 +77,7 @@ import GHC.Data.List.SetOps
 import GHC.Data.Maybe
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import Control.Monad
 import GHC.Core.Class(classTyCon)
 import GHC.Types.Unique.Set ( UniqSet, mkUniqSet, elementOfUniqSet, nonDetEltsUniqSet )
@@ -642,7 +643,7 @@ following.
 -- GHC.Hs.Expr. This is why we match on 'rupd_flds = Left rbnds' here
 -- and panic otherwise.
 tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = Left rbnds }) res_ty
-  = ASSERT( notNull rbnds )
+  = assert (notNull rbnds) $
     do  { -- STEP -2: typecheck the record_expr, the record to be updated
           (record_expr', record_rho) <- tcScalingUsage Many $ tcInferRho record_expr
             -- Record update drops some of the content of the record (namely the
@@ -679,7 +680,7 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = Left rbnds }) res_
         -- See note [Mixed Record Selectors]
         ; let (data_sels, pat_syn_sels) =
                 partition isDataConRecordSelector sel_ids
-        ; MASSERT( all isPatSynRecordSelector pat_syn_sels )
+        ; massert (all isPatSynRecordSelector pat_syn_sels)
         ; checkTc ( null data_sels || null pat_syn_sels )
                   ( mixedSelectors data_sels pat_syn_sels )
 
@@ -713,7 +714,7 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = Left rbnds }) res_
         ; checkTc (not (null relevant_cons)) (badFieldsUpd rbinds con_likes)
 
         -- Take apart a representative constructor
-        ; let con1 = ASSERT( not (null relevant_cons) ) head relevant_cons
+        ; let con1 = assert (not (null relevant_cons) ) head relevant_cons
               (con1_tvs, _, _, _prov_theta, req_theta, scaled_con1_arg_tys, _)
                  = conLikeFullSig con1
               con1_arg_tys = map scaledThing scaled_con1_arg_tys
@@ -940,7 +941,7 @@ arithSeqEltType (Just fl) res_ty
 ----------------
 tcTupArgs :: [HsTupArg GhcRn] -> [TcSigmaType] -> TcM [HsTupArg GhcTc]
 tcTupArgs args tys
-  = do MASSERT( equalLength args tys )
+  = do massert (equalLength args tys)
        checkTupSize (length args)
        mapM go (args `zip` tys)
   where
@@ -1036,11 +1037,11 @@ tcSynArgE orig sigma_ty syn_ty thing_inside
 
                          -- another nested arrow is too much for now,
                          -- but I bet we'll never need this
-                     ; MASSERT2( case arg_shape of
+                     ; massertPpr (case arg_shape of
                                    SynFun {} -> False;
-                                   _         -> True
-                               , text "Too many nested arrows in SyntaxOpType" $$
-                                 pprCtOrigin orig )
+                                   _         -> True)
+                                  (text "Too many nested arrows in SyntaxOpType" $$
+                                   pprCtOrigin orig)
 
                      ; let arg_mult = scaledMult arg_ty
                      ; tcSynArgA orig arg_tc_ty [] arg_shape $
@@ -1501,7 +1502,7 @@ badFieldsUpd rbinds data_cons
             -- are redundant and can be dropped.
             map (fst . head) $ groupBy ((==) `on` snd) growingSets
 
-    aMember = ASSERT( not (null members) ) fst (head members)
+    aMember = assert (not (null members) ) fst (head members)
     (members, nonMembers) = partition (or . snd) membership
 
     -- For each field, which constructors contain the field?

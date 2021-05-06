@@ -61,6 +61,7 @@ import GHC.Types.Var.Env
 import GHC.Types.SourceFile (HscSource(..))
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Types.SrcLoc
 import GHC.Core.TyCon
 import GHC.Data.Maybe
@@ -369,7 +370,7 @@ instantiateMethod :: Class -> TcId -> [TcType] -> TcType
 -- Return the "local method type":
 --      forall c. Ix x => (ty2,c) -> ty1
 instantiateMethod clas sel_id inst_tys
-  = ASSERT( ok_first_pred ) local_meth_ty
+  = assert ok_first_pred local_meth_ty
   where
     rho_ty = piResultTys (idType sel_id) inst_tys
     (first_pred, local_meth_ty) = tcSplitPredFunTy_maybe rho_ty
