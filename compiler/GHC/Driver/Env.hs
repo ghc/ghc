@@ -25,8 +25,6 @@ module GHC.Driver.Env
    )
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Driver.Ppr

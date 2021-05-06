@@ -70,8 +70,6 @@ module GHC.Tc.Utils.Env(
         mkWrapperName
   ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Driver.Env

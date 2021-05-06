@@ -11,8 +11,6 @@ module GHC.Types.Name.Shape
    )
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Driver.Env

@@ -7,8 +7,6 @@
 -- (c) The University of Glasgow 1993-2004
 --
 -----------------------------------------------------------------------------
-#include "HsVersions.h"
-
 module GHC.CmmToAsm.SPARC.Instr
    ( Instr(..)
    , RI(..)

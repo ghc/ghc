@@ -74,8 +74,6 @@ module GHC.Tc.Gen.HsType (
         funAppCtxt, addTyConFlavCtxt
    ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Hs

@@ -11,8 +11,6 @@ Desugaring list comprehensions, monad comprehensions and array comprehensions
 
 module GHC.HsToCore.ListComp ( dsListComp, dsMonadComp ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import {-# SOURCE #-} GHC.HsToCore.Expr ( dsExpr, dsLExpr, dsLExprNoLP, dsLocalBinds, dsSyntaxExpr )

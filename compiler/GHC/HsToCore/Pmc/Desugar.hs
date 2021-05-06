@@ -13,8 +13,6 @@ module GHC.HsToCore.Pmc.Desugar (
       desugarPatBind, desugarGRHSs, desugarMatches, desugarEmptyCase
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.HsToCore.Pmc.Types

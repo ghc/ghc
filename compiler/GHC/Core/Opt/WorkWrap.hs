@@ -36,8 +36,6 @@ import GHC.Utils.Panic.Plain
 import GHC.Core.FamInstEnv
 import GHC.Utils.Monad
 
-#include "HsVersions.h"
-
 {-
 We take Core bindings whose binders have:
 
@@ -636,7 +634,7 @@ See https://gitlab.haskell.org/ghc/ghc/merge_requests/312#note_192064.
 splitFun :: DynFlags -> FamInstEnvs -> Id -> IdInfo -> [Demand] -> Divergence -> Cpr -> CoreExpr
          -> UniqSM [(Id, CoreExpr)]
 splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
-  = WARN( not (wrap_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr cpr) )
+  = warnPprTrace (not (wrap_dmds `lengthIs` arity)) (ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr cpr)) $
           -- The arity should match the signature
     do { mb_stuff <- mkWwBodies (initWwOpts dflags fam_envs) rhs_fvs fn_id wrap_dmds use_cpr_info
        ; case mb_stuff of

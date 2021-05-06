@@ -56,8 +56,6 @@ module GHC.Core.FVs (
         freeVarsOfAnn
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Core

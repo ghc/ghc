@@ -11,8 +11,6 @@
 
 module GHC.Stg.Pipeline ( stg2stg ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Stg.Syntax

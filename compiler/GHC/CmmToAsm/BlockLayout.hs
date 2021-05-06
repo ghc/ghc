@@ -13,7 +13,6 @@ module GHC.CmmToAsm.BlockLayout
     ( sequenceTop, backendMaintainsCfg)
 where
 
-#include "HsVersions.h"
 import GHC.Prelude
 
 import GHC.Driver.Ppr     (pprTrace)

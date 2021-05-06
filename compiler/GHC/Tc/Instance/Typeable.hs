@@ -10,8 +10,6 @@
 
 module GHC.Tc.Instance.Typeable(mkTypeableBinds, tyConIsTypeable) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 import GHC.Platform
 

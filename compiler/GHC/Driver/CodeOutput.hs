@@ -14,8 +14,6 @@ module GHC.Driver.CodeOutput
    )
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 import GHC.Platform
 import GHC.ForeignSrcLang

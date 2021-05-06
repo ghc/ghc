@@ -7,8 +7,6 @@ module GHC.Settings.IO
  , initSettings
  ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Settings.Utils

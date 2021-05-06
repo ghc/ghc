@@ -30,8 +30,6 @@ module GHC.Core.Opt.Arity
    )
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Driver.Ppr
@@ -655,11 +653,10 @@ findRhsArity dflags bndr rhs old_arity
       | next_at == cur_at       = cur_at
       | otherwise               =
          -- Warn if more than 2 iterations. Why 2? See Note [Exciting arity]
-         WARN( debugIsOn && n > 2, text "Exciting arity"
-                                   $$ nest 2 (
-                                        ppr bndr <+> ppr cur_at <+> ppr next_at
-                                        $$ ppr rhs) )
-         go (n+1) next_at
+         warnPprTrace (debugIsOn && n > 2)
+            (text "Exciting arity" $$ nest 2
+              ( ppr bndr <+> ppr cur_at <+> ppr next_at $$ ppr rhs)) $
+            go (n+1) next_at
       where
         next_at = step cur_at
 
@@ -1556,7 +1553,7 @@ mkEtaWW orig_oss ppr_orig_expr in_scope orig_ty
        | otherwise       -- We have an expression of arity > 0,
                          -- but its type isn't a function, or a binder
                          -- is levity-polymorphic
-       = WARN( True, (ppr orig_oss <+> ppr orig_ty) $$ ppr_orig_expr )
+       = warnPprTrace True ((ppr orig_oss <+> ppr orig_ty) $$ ppr_orig_expr)
          (getTCvInScope subst, reverse eis)
         -- This *can* legitimately happen:
         -- e.g.  coerce Int (\x. x) Essentially the programmer is
@@ -1862,7 +1859,7 @@ etaExpandToJoinPoint join_arity expr
 
 etaExpandToJoinPointRule :: JoinArity -> CoreRule -> CoreRule
 etaExpandToJoinPointRule _ rule@(BuiltinRule {})
-  = WARN(True, (sep [text "Can't eta-expand built-in rule:", ppr rule]))
+  = warnPprTrace True (sep [text "Can't eta-expand built-in rule:", ppr rule])
       -- How did a local binding get a built-in rule anyway? Probably a plugin.
     rule
 etaExpandToJoinPointRule join_arity rule@(Rule { ru_bndrs = bndrs, ru_rhs = rhs

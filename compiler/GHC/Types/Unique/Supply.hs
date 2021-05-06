@@ -47,7 +47,6 @@ import GHC.Exts( Int(..), word2Int#, fetchAddWordAddr#, plusWord#, readWordOffAd
 import Foreign.Storable
 
 #include "Unique.h"
-#include "HsVersions.h"
 
 {-
 ************************************************************************

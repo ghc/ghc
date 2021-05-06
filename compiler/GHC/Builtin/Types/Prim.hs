@@ -94,8 +94,6 @@ module GHC.Builtin.Types.Prim(
 #include "primop-vector-tys-exports.hs-incl"
   ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Builtin.Types

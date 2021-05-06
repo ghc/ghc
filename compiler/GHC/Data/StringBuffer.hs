@@ -48,8 +48,6 @@ module GHC.Data.StringBuffer
         parseUnsignedInteger,
        ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Data.FastString

@@ -38,8 +38,6 @@ module GHC.Types.Id.Make (
         module GHC.Core.Opt.ConstantFold
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Builtin.Types.Prim

@@ -20,8 +20,6 @@ module GHC.Tc.Validity (
   allDistinctTyVars
   ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Data.Maybe

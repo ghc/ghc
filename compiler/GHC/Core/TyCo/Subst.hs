@@ -52,8 +52,6 @@ module GHC.Core.TyCo.Subst
         checkValidSubst, isValidTCvSubst,
   ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Core.Type

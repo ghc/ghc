@@ -9,8 +9,6 @@ module GHC.Tc.Instance.Class (
      AssocInstInfo(..), isNotAssociated
   ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Driver.Session

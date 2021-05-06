@@ -6,8 +6,6 @@
 --
 module GHC.CmmToLlvm.CodeGen ( genLlvmProc ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Driver.Session

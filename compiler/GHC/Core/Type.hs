@@ -235,8 +235,6 @@ module GHC.Core.Type (
         isKindLevPoly
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Types.Basic

@@ -68,8 +68,6 @@ module GHC.StgToCmm.Closure (
         staticClosureNeedsLink,
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 import GHC.Platform
 import GHC.Platform.Profile

@@ -216,8 +216,6 @@ module GHC.Driver.Session (
         initSDocContext, initDefaultSDocContext,
   ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Platform

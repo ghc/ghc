@@ -19,8 +19,6 @@
 Main functions for .hie file generation
 -}
 
-#include "HsVersions.h"
-
 module GHC.Iface.Ext.Ast ( mkHieFile, mkHieFileWithSource, getCompressedAsts, enrichHie) where
 
 import GHC.Utils.Outputable(ppr)

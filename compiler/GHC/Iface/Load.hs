@@ -35,8 +35,6 @@ module GHC.Iface.Load (
         module Iface_Errors -- avoids boot files in Ppr modules
    ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import {-# SOURCE #-} GHC.IfaceToCore
@@ -537,7 +535,7 @@ loadInterface doc_str mod from
                             -- of one's own boot file! (one-shot only)
                             -- See Note [Loading your own hi-boot file]
 
-        ; WARN( bad_boot, ppr mod )
+        ; warnPprTrace bad_boot (ppr mod) $
           updateEps_  $ \ eps ->
            if elemModuleEnv mod (eps_PIT eps) || is_external_sig home_unit iface
                 then eps

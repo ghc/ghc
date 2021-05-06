@@ -16,8 +16,6 @@ module GHC.Data.Pair
    )
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Utils.Outputable

@@ -37,8 +37,6 @@ module GHC.CmmToAsm.X86.Instr
    )
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.CmmToAsm.X86.Cond

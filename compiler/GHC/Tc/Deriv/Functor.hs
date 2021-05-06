@@ -22,8 +22,6 @@ module GHC.Tc.Deriv.Functor
    )
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Data.Bag

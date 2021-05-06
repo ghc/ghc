@@ -66,8 +66,6 @@ module GHC.Core.Utils (
         dumpIdInfoOfProgram
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 import GHC.Platform
 
@@ -321,12 +319,12 @@ mkCast (Coercion e_co) co
   = Coercion (mkCoCast e_co co)
 
 mkCast (Cast expr co2) co
-  = WARN(let { from_ty = coercionLKind co;
+  = warnPprTrace (let { from_ty = coercionLKind co;
                to_ty2  = coercionRKind co2 } in
-            not (from_ty `eqType` to_ty2),
-             vcat ([ text "expr:" <+> ppr expr
+            not (from_ty `eqType` to_ty2))
+             (vcat ([ text "expr:" <+> ppr expr
                    , text "co2:" <+> ppr co2
-                   , text "co:" <+> ppr co ]) )
+                   , text "co:" <+> ppr co ])) $
     mkCast expr (mkTransCo co2 co)
 
 mkCast (Tick t expr) co
@@ -334,11 +332,11 @@ mkCast (Tick t expr) co
 
 mkCast expr co
   = let from_ty = coercionLKind co in
-    WARN( not (from_ty `eqType` exprType expr),
-          text "Trying to coerce" <+> text "(" <> ppr expr
+    warnPprTrace (not (from_ty `eqType` exprType expr))
+          (text "Trying to coerce" <+> text "(" <> ppr expr
           $$ text "::" <+> ppr (exprType expr) <> text ")"
           $$ ppr co $$ ppr (coercionType co)
-          $$ callStackDoc )
+          $$ callStackDoc) $
     (Cast expr co)
 
 -- | Wraps the given expression in the source annotation, dropping the

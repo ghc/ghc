@@ -12,8 +12,6 @@ module GHC.Tc.Errors(
        solverDepthErrorTcS
   ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Tc.Types

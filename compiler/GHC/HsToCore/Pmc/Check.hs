@@ -22,8 +22,6 @@ module GHC.HsToCore.Pmc.Check (
         checkMatchGroup, checkGRHSs, checkPatBind, checkEmptyCase
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Builtin.Names ( hasKey, considerAccessibleIdKey, trueDataConKey )

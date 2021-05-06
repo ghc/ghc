@@ -138,8 +138,6 @@ Library
             if flag(stage3)
                 Include-Dirs: stage2
 
-    Install-Includes: HsVersions.h
-
     c-sources:
         cbits/cutils.c
         cbits/genSym.c

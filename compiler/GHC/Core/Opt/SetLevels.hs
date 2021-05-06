@@ -75,8 +75,6 @@ module GHC.Core.Opt.SetLevels (
         incMinorLvl, ltMajLvl, ltLvl, isTopLvl
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Driver.Ppr
@@ -1691,9 +1689,9 @@ abstractVars dest_lvl (LE { le_subst = subst, le_lvl_env = lvl_env }) in_fvs
 
         -- We are going to lambda-abstract, so nuke any IdInfo,
         -- and add the tyvars of the Id (if necessary)
-    zap v | isId v = WARN( isStableUnfolding (idUnfolding v) ||
-                           not (isEmptyRuleInfo (idSpecialisation v)),
-                           text "absVarsOf: discarding info on" <+> ppr v )
+    zap v | isId v = warnPprTrace (isStableUnfolding (idUnfolding v) ||
+                           not (isEmptyRuleInfo (idSpecialisation v)))
+                           (text "absVarsOf: discarding info on" <+> ppr v) $
                      setIdInfo v vanillaIdInfo
           | otherwise = v
 

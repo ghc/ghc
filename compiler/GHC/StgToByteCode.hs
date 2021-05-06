@@ -13,8 +13,6 @@
 -- | GHC.StgToByteCode: Generate bytecode from STG
 module GHC.StgToByteCode ( UnlinkedBCO, byteCodeGen, stgExprToBCOs ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Driver.Session

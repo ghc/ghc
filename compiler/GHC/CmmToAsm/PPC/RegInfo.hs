@@ -17,8 +17,6 @@ module GHC.CmmToAsm.PPC.RegInfo (
 
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.CmmToAsm.PPC.Instr

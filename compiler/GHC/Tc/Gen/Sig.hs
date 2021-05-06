@@ -24,8 +24,6 @@ module GHC.Tc.Gen.Sig(
        mkPragEnv, tcSpecPrags, tcSpecWrapper, tcImpPrags, addInlinePrags
    ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Hs
@@ -577,7 +575,7 @@ mkPragEnv sigs binds
         -- add arity only for real INLINE pragmas, not INLINABLE
       = case lookupNameEnv ar_env n of
           Just ar -> inl_prag { inl_sat = Just ar }
-          Nothing -> WARN( True, text "mkPragEnv no arity" <+> ppr n )
+          Nothing -> warnPprTrace True (text "mkPragEnv no arity" <+> ppr n) $
                      -- There really should be a binding for every INLINE pragma
                      inl_prag
       | otherwise

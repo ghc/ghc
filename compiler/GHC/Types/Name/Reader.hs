@@ -77,8 +77,6 @@ module GHC.Types.Name.Reader (
         opIsAt,
   ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Unit.Module

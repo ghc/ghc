@@ -132,8 +132,6 @@ module GHC.Cmm.CLabel (
         foreignLabelStdcallInfo
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Types.Id.Info

@@ -35,8 +35,6 @@ module GHC.Tc.Gen.Foreign
         , tcCheckFEType
         ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Hs

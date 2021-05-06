@@ -21,8 +21,6 @@ module GHC.Core.Class (
         isAbstractClass,
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Core.TyCon    ( TyCon )

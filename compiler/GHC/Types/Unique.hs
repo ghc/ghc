@@ -45,7 +45,6 @@ module GHC.Types.Unique (
         mkLocalUnique, minLocalUnique, maxLocalUnique,
     ) where
 
-#include "HsVersions.h"
 #include "Unique.h"
 
 import GHC.Prelude

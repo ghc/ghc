@@ -34,9 +34,6 @@ module GHC.Core.Subst (
 
     ) where
 
-#include "HsVersions.h"
-
-
 import GHC.Prelude
 
 import GHC.Driver.Ppr
@@ -257,8 +254,8 @@ lookupIdSubst (Subst in_scope ids _ _) v
   | Just e  <- lookupVarEnv ids       v = e
   | Just v' <- lookupInScope in_scope v = Var v'
         -- Vital! See Note [Extending the Subst]
-  | otherwise = WARN( True, text "GHC.Core.Subst.lookupIdSubst" <+> ppr v
-                            $$ ppr in_scope)
+  | otherwise = warnPprTrace True (text "GHC.Core.Subst.lookupIdSubst" <+> ppr v
+                            $$ ppr in_scope) $
                 Var v
 
 -- | Find the substitution for a 'TyVar' in the 'Subst'

@@ -29,8 +29,6 @@
 
 module GHC.HsToCore.Quote( dsBracket ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 import GHC.Platform
 

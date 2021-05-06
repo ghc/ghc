@@ -47,8 +47,6 @@ module GHC.CmmToAsm.X86.Regs (
 
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Platform.Regs

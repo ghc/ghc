@@ -89,8 +89,6 @@ import Data.List (find)
 
 import {-# SOURCE #-} GHC.Tc.Module
 
-#include "HsVersions.h"
-
 fixityMisMatch :: TyThing -> Fixity -> Fixity -> SDoc
 fixityMisMatch real_thing real_fixity sig_fixity =
     vcat [ppr real_thing <+> text "has conflicting fixities in the module",

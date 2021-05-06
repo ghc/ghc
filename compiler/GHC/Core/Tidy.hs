@@ -13,8 +13,6 @@ module GHC.Core.Tidy (
         tidyExpr, tidyRules, tidyUnfolding
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Core

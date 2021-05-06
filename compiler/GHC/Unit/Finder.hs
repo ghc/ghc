@@ -32,8 +32,6 @@ module GHC.Unit.Finder (
 
   ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Driver.Session

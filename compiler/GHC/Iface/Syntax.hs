@@ -41,8 +41,6 @@ module GHC.Iface.Syntax (
         AltPpr(..), ShowSub(..), ShowHowMuch(..), showToIface, showToHeader
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Builtin.Names ( unrestrictedFunTyConKey, liftedTypeKindTyConKey )

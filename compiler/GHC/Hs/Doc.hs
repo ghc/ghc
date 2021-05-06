@@ -23,8 +23,6 @@ module GHC.Hs.Doc
   , ExtractedTHDocs(..)
   ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Utils.Binary

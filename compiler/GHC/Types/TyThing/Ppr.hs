@@ -16,8 +16,6 @@ module GHC.Types.TyThing.Ppr (
         pprFamInst
   ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Driver.Ppr (warnPprTrace)
@@ -187,7 +185,7 @@ pprTyThing ss ty_thing
          = case nameModule_maybe name of
              Just mod -> Just $ \occ -> getPprStyle $ \sty ->
                pprModulePrefix sty mod occ <> ppr occ
-             Nothing  -> WARN( True, ppr name ) Nothing
+             Nothing  -> warnPprTrace True (ppr name) Nothing
              -- Nothing is unexpected here; TyThings have External names
 
 showWithLoc :: SDoc -> SDoc -> SDoc

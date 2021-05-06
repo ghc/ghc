@@ -28,8 +28,6 @@ module GHC.Hs.Expr
   , module GHC.Hs.Expr
   ) where
 
-#include "HsVersions.h"
-
 import Language.Haskell.Syntax.Expr
 
 -- friends:

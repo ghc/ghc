@@ -21,8 +21,6 @@ module GHC.StgToCmm.Env (
         maybeLetNoEscape,
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Platform

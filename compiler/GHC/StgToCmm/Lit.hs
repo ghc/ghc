@@ -13,8 +13,6 @@ module GHC.StgToCmm.Lit (
     newStringCLit, newByteStringCLit
   ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Platform

@@ -19,8 +19,6 @@ module GHC.HsToCore.Foreign.Call
    )
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Core

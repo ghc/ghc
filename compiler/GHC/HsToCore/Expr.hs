@@ -18,8 +18,6 @@ module GHC.HsToCore.Expr
    )
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.HsToCore.Match

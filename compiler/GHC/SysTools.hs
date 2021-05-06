@@ -28,8 +28,6 @@ module GHC.SysTools (
         expandTopDir,
  ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Settings.Utils

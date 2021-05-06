@@ -13,8 +13,6 @@
 -- | Handles @deriving@ clauses on @data@ declarations.
 module GHC.Tc.Deriv ( tcDeriving, DerivInfo(..) ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Hs

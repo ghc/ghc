@@ -8,8 +8,6 @@ module GHC.Linker.Dynamic
    )
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 import GHC.Platform
 import GHC.Platform.Ways

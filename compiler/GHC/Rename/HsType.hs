@@ -77,8 +77,6 @@ import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty (NonEmpty(..))
 import Control.Monad
 
-#include "HsVersions.h"
-
 {-
 These type renamers are in a separate module, rather than in (say) GHC.Rename.Module,
 to break several loops.

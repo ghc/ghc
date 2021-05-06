@@ -121,8 +121,6 @@ module GHC.Types.Id (
 
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Core ( CoreRule, isStableUnfolding, evaldUnfolding,
@@ -629,10 +627,10 @@ idJoinArity :: JoinId -> JoinArity
 idJoinArity id = isJoinId_maybe id `orElse` pprPanic "idJoinArity" (ppr id)
 
 asJoinId :: Id -> JoinArity -> JoinId
-asJoinId id arity = WARN(not (isLocalId id),
-                         text "global id being marked as join var:" <+> ppr id)
-                    WARN(not (is_vanilla_or_join id),
-                         ppr id <+> pprIdDetails (idDetails id))
+asJoinId id arity = warnPprTrace (not (isLocalId id))
+                         (text "global id being marked as join var:" <+> ppr id) $
+                    warnPprTrace (not (is_vanilla_or_join id))
+                         (ppr id <+> pprIdDetails (idDetails id)) $
                     id `setIdDetails` JoinId arity
   where
     is_vanilla_or_join id = case Var.idDetails id of

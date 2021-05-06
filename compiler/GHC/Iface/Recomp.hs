@@ -10,8 +10,6 @@ module GHC.Iface.Recomp
    )
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Driver.Backend

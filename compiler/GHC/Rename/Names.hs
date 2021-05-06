@@ -30,8 +30,6 @@ module GHC.Rename.Names (
         ImportDeclUsage
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Driver.Env
@@ -341,7 +339,7 @@ rnImportDecl this_mod
 
     -- Compiler sanity check: if the import didn't say
     -- {-# SOURCE #-} we should not get a hi-boot file
-    WARN( (want_boot == NotBoot) && (mi_boot iface == IsBoot), ppr imp_mod_name ) do
+    warnPprTrace ((want_boot == NotBoot) && (mi_boot iface == IsBoot)) (ppr imp_mod_name) $ do
 
     -- Issue a user warning for a redundant {- SOURCE -} import
     -- NB that we arrange to read all the ordinary imports before

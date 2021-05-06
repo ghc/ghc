@@ -38,8 +38,6 @@ module GHC.Driver.Phases (
    phaseForeignLanguage
  ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Platform

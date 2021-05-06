@@ -25,8 +25,6 @@ The program gather statistics about
 
 module GHC.Stg.Stats ( showStgStats ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Stg.Syntax

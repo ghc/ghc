@@ -9,8 +9,6 @@ module GHC.CmmToLlvm.Regs (
         stgTBAA, baseN, stackN, heapN, rxN, topN, tbaa, getTBAA
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Llvm

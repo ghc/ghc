@@ -31,8 +31,6 @@ module GHC.Linker.Loader
    )
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Settings

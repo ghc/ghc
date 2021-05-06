@@ -8,8 +8,6 @@ module GHC.Iface.Recomp.Binary
   , putNameLiterally
   ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Utils.Fingerprint

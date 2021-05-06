@@ -42,8 +42,6 @@ module GHC.Core.TyCo.FVs
         Endo(..), runTyCoVars
   ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Core.Type (coreView, partitionInvisibleTypes)

@@ -15,8 +15,6 @@ module GHC.Core.Opt.DmdAnal
    )
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Core.Opt.WorkWrap.Utils

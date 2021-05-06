@@ -23,8 +23,6 @@ module GHC.Driver.CmdLine
       EwM, runEwM, addErr, addWarn, addFlagWarn, getArg, getCurLoc, liftEwM
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Utils.Misc

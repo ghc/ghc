@@ -67,8 +67,6 @@ module GHC.Iface.Type (
         many_ty
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Builtin.Types

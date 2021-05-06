@@ -87,8 +87,6 @@ module GHC.Tc.Types(
         TcRnMessage
   ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 import GHC.Platform
 

@@ -25,8 +25,6 @@ module GHC.CmmToAsm.SPARC.Ppr (
 
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import Data.Word

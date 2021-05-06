@@ -19,8 +19,6 @@ module GHC.Core.Unfold.Make
    )
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 import GHC.Core
 import GHC.Core.Unfold

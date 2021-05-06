@@ -69,8 +69,6 @@ module GHC.Unit.State (
     )
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Driver.Session

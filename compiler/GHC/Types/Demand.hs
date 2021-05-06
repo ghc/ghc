@@ -77,8 +77,6 @@ module GHC.Types.Demand (
     zapUsageDemand, zapDmdEnvSig, zapUsedOnceDemand, zapUsedOnceSig
   ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Types.Var ( Var, Id )

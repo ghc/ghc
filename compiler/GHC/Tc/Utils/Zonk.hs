@@ -43,8 +43,6 @@ module GHC.Tc.Utils.Zonk (
         lookupTyVarOcc
   ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Platform

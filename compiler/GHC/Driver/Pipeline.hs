@@ -35,9 +35,7 @@ module GHC.Driver.Pipeline (
    linkingNeeded, checkLinkInfo, writeInterfaceOnlyMode
   ) where
 
-#include <ghcplatform.h>
-#include "HsVersions.h"
-
+#include "ghcplatform.h"
 import GHC.Prelude
 
 import GHC.Platform

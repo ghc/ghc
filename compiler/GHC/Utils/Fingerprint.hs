@@ -22,8 +22,6 @@ module GHC.Utils.Fingerprint (
         getFileHash
    ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import Foreign

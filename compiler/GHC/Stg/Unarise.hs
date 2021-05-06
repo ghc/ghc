@@ -241,8 +241,6 @@ STG programs after unarisation have these invariants:
 
 module GHC.Stg.Unarise (unarise) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Types.Basic

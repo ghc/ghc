@@ -13,8 +13,6 @@ Desugaring arrow commands
 
 module GHC.HsToCore.Arrows ( dsProcExpr ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.HsToCore.Match

@@ -26,8 +26,6 @@ module GHC.Utils.Panic.Plain
   , progName
   ) where
 
-#include "HsVersions.h"
-
 import GHC.Settings.Config
 import GHC.Utils.Constants
 import GHC.Utils.Exception as Exception

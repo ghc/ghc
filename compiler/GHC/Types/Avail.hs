@@ -4,8 +4,6 @@
 -- (c) The University of Glasgow
 --
 
-#include "HsVersions.h"
-
 module GHC.Types.Avail (
     Avails,
     AvailInfo(..),

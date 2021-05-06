@@ -7,8 +7,6 @@ module GHC.CmmToLlvm.Ppr (
         pprLlvmCmmDecl, pprLlvmData, infoSection
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Driver.Ppr

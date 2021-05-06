@@ -16,8 +16,6 @@ module GHC.Rename.Module (
         rnSrcDecls, addTcgDUs, findSplice
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Rename.Expr( rnLExpr )

@@ -34,8 +34,6 @@ module GHC.HsToCore.Pmc.Types (
 
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.HsToCore.Pmc.Solver.Types

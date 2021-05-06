@@ -193,8 +193,6 @@ module GHC.Tc.Utils.TcType (
 
   ) where
 
-#include "HsVersions.h"
-
 -- friends:
 import GHC.Prelude
 

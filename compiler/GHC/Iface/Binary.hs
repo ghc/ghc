@@ -30,8 +30,6 @@ module GHC.Iface.Binary (
         BinDictionary(..)
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Tc.Utils.Monad

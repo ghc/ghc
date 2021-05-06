@@ -18,8 +18,6 @@
 -- | Source-language literals
 module Language.Haskell.Syntax.Lit where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import {-# SOURCE #-} Language.Haskell.Syntax.Expr ( HsExpr )

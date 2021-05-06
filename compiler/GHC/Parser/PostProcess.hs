@@ -152,8 +152,6 @@ import Data.Char
 import Data.Data       ( dataTypeOf, fromConstr, dataTypeConstrs )
 import Data.Kind       ( Type )
 
-#include "HsVersions.h"
-
 {- **********************************************************************
 
   Construction functions for Rdr stuff

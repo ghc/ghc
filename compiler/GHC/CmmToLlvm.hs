@@ -11,8 +11,6 @@ module GHC.CmmToLlvm
    )
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Llvm

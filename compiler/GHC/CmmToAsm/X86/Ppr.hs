@@ -20,8 +20,6 @@ module GHC.CmmToAsm.X86.Ppr (
 
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Platform

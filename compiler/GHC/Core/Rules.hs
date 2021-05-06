@@ -26,8 +26,6 @@ module GHC.Core.Rules (
         lookupRule, mkRule, roughTopNames, initRuleOpts
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Core         -- All of it

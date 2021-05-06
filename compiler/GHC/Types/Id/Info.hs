@@ -87,8 +87,6 @@ module GHC.Types.Id.Info (
         isNeverLevPolyIdInfo
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Core hiding( hasCoreUnfolding )

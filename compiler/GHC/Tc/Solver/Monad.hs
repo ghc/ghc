@@ -133,8 +133,6 @@ module GHC.Tc.Solver.Monad (
     breakTyVarCycle, rewriterView
 ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Driver.Env

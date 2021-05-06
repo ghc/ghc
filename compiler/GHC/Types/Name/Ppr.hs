@@ -8,8 +8,6 @@ module GHC.Types.Name.Ppr
    )
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Unit

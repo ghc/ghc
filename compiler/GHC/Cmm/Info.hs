@@ -32,8 +32,6 @@ module GHC.Cmm.Info (
   stdPtrsOffset, stdNonPtrsOffset,
 ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Cmm

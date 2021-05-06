@@ -38,8 +38,6 @@ module GHC.Core.FamInstEnv (
         topReduceTyFamApp_maybe, reduceTyFamApp_maybe
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Core.Unify

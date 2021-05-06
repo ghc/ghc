@@ -41,8 +41,6 @@ module GHC.Tc.Utils.Unify (
 
   ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Hs

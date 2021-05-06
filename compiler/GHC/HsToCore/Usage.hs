@@ -7,8 +7,6 @@ module GHC.HsToCore.Usage (
     mkUsageInfo, mkUsedNames, mkDependencies
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Driver.Env

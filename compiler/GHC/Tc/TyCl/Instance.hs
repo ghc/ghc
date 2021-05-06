@@ -19,8 +19,6 @@ module GHC.Tc.TyCl.Instance
    )
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Hs

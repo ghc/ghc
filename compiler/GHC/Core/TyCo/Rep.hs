@@ -74,8 +74,6 @@ module GHC.Core.TyCo.Rep (
         Scaled(..), scaledMult, scaledThing, mapScaledType, Mult
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprType, pprCo, pprTyLit )

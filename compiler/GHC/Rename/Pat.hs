@@ -49,8 +49,6 @@ import GHC.Prelude
 import {-# SOURCE #-} GHC.Rename.Expr ( rnLExpr )
 import {-# SOURCE #-} GHC.Rename.Splice ( rnSplicePat )
 
-#include "HsVersions.h"
-
 import GHC.Hs
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Zonk   ( hsOverLitName )
