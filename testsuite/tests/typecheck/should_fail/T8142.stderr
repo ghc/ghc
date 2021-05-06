@@ -12,17 +12,15 @@ T8142.hs:6:10: error:
             where
                 h = (\ (_, b) -> ((outI . fmap h) b)) . out
     • Relevant bindings include
-        h :: Nu ((,) a0) -> Nu f0 (bound at T8142.hs:6:18)
         tracer :: (c -> f c) -> c -> f c (bound at T8142.hs:6:1)
 
 T8142.hs:6:57: error:
-    • Couldn't match type: Nu ((,) a0)
-                     with: f0 (Nu ((,) a0))
-      Expected: Nu ((,) a0) -> (a0, f0 (Nu ((,) a0)))
-        Actual: Nu ((,) a0) -> (a0, Nu ((,) a0))
-      The type variables ‘f0’, ‘a0’ are ambiguous
+    • Couldn't match type: Nu ((,) a)
+                     with: f1 (Nu ((,) a))
+      Expected: Nu ((,) a) -> (a, f1 (Nu ((,) a)))
+        Actual: Nu ((,) a) -> (a, Nu ((,) a))
     • In the second argument of ‘(.)’, namely ‘out’
       In the expression: (\ (_, b) -> ((outI . fmap h) b)) . out
       In an equation for ‘h’: h = (\ (_, b) -> ((outI . fmap h) b)) . out
     • Relevant bindings include
-        h :: Nu ((,) a0) -> Nu f0 (bound at T8142.hs:6:18)
+        h :: Nu ((,) a) -> Nu f1 (bound at T8142.hs:6:18)
