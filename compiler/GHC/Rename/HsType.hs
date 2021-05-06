@@ -68,6 +68,7 @@ import GHC.Types.Fixity ( compareFixity, negateFixity
 import GHC.Types.Basic  ( TypeOrKind(..) )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -1386,9 +1387,8 @@ mkOpAppRn e1 op1 fix1 e2@(L _ (NegApp {})) -- NegApp can occur on the right
 ---------------------------
 --      Default case
 mkOpAppRn e1 op fix e2                  -- Default case, no rearrangment
-  = ASSERT2( right_op_ok fix (unLoc e2),
-             ppr e1 $$ text "---" $$ ppr op $$ text "---" $$ ppr fix $$ text "---" $$ ppr e2
-    )
+  = assertPpr (right_op_ok fix (unLoc e2))
+              (ppr e1 $$ text "---" $$ ppr op $$ text "---" $$ ppr fix $$ text "---" $$ ppr e2) $
     return (OpApp fix e1 op e2)
 
 ----------------------------
@@ -1429,7 +1429,7 @@ right_op_ok _ _
 -- And "deriving" code should respect this (use HsPar if not)
 mkNegAppRn :: LHsExpr GhcRn -> SyntaxExpr GhcRn -> RnM (HsExpr GhcRn)
 mkNegAppRn neg_arg neg_name
-  = ASSERT( not_op_app (unLoc neg_arg) )
+  = assert (not_op_app (unLoc neg_arg)) $
     return (NegApp noExtField neg_arg neg_name)
 
 not_op_app :: HsExpr id -> Bool
@@ -1500,7 +1500,7 @@ mkConOpPatRn op2 fix2 p1@(L loc (ConPat NoExtField op1 (InfixCon p11 p12))) p2
         }
 
 mkConOpPatRn op _ p1 p2                         -- Default case, no rearrangment
-  = ASSERT( not_op_pat (unLoc p2) )
+  = assert (not_op_pat (unLoc p2)) $
     return $ ConPat
       { pat_con_ext = noExtField
       , pat_con = op

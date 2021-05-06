@@ -65,6 +65,7 @@ import GHC.Unit.Module
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 import GHC.Utils.Monad
 
@@ -128,7 +129,7 @@ mkMetaWrappers q@(QuoteWrapper quote_var_raw m_var) = do
                           mkInvisFunTyMany (mkClassPred cls (mkTyVarTys (binderVars tyvars)))
                                            (mkClassPred monad_cls (mkTyVarTys (binderVars tyvars)))
 
-      MASSERT2( idType monad_sel `eqType` expected_ty, ppr monad_sel $$ ppr expected_ty)
+      massertPpr (idType monad_sel `eqType` expected_ty) (ppr monad_sel $$ ppr expected_ty)
 
       let m_ty = Type m_var
           -- Construct the contents of MetaWrappers
@@ -1796,7 +1797,7 @@ repSts (stmt@RecStmt{} : ss)
        -- Bring all of binders in the recursive group into scope for the
        -- whole group.
        ; (ss1_other,rss) <- addBinds ss1 $ repSts (map unLoc (unLoc $ recS_stmts stmt))
-       ; MASSERT(sort ss1 == sort ss1_other)
+       ; massert (sort ss1 == sort ss1_other)
        ; z <- repRecSt (nonEmptyCoreList rss)
        ; (ss2,zs) <- addBinds ss1 (repSts ss)
        ; return (ss1++ss2, z : zs) }
@@ -2172,7 +2173,7 @@ globalVar name
         ; MkC uni <- coreIntegerLit (toInteger $ getKey (getUnique name))
         ; rep2_nwDsM mkNameLName [occ,uni] }
   where
-      mod = ASSERT( isExternalName name) nameModule name
+      mod = assert (isExternalName name) nameModule name
       name_mod = moduleNameString (moduleName mod)
       name_pkg = unitString (moduleUnit mod)
       name_occ = nameOccName name

@@ -96,6 +96,7 @@ import GHC.Types.RepType
 import GHC.Types.Basic
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 
 import Data.Coerce (coerce)
@@ -158,7 +159,7 @@ nonVoidIds ids = [NonVoid id | id <- ids, not (isVoidTy (idType id))]
 -- non-void; e.g. constructor field binders in case expressions.
 -- See Note [Post-unarisation invariants] in "GHC.Stg.Unarise".
 assertNonVoidIds :: [Id] -> [NonVoid Id]
-assertNonVoidIds ids = ASSERT(not (any (isVoidTy . idType) ids))
+assertNonVoidIds ids = assert (not (any (isVoidTy . idType) ids)) $
                        coerce ids
 
 nonVoidStgArgs :: [StgArg] -> [NonVoid StgArg]
@@ -168,7 +169,7 @@ nonVoidStgArgs args = [NonVoid arg | arg <- args, not (isVoidTy (stgArgType arg)
 -- non-void; e.g. constructor arguments.
 -- See Note [Post-unarisation invariants] in "GHC.Stg.Unarise".
 assertNonVoidStgArgs :: [StgArg] -> [NonVoid StgArg]
-assertNonVoidStgArgs args = ASSERT(not (any (isVoidTy . stgArgType) args))
+assertNonVoidStgArgs args = assert (not (any (isVoidTy . stgArgType) args)) $
                             coerce args
 
 
@@ -233,7 +234,7 @@ mkLFReEntrant top fvs args arg_descr
 -------------
 mkLFThunk :: Type -> TopLevelFlag -> [Id] -> UpdateFlag -> LambdaFormInfo
 mkLFThunk thunk_ty top fvs upd_flag
-  = ASSERT( not (isUpdatable upd_flag) || not (isUnliftedType thunk_ty) )
+  = assert (not (isUpdatable upd_flag) || not (isUnliftedType thunk_ty)) $
     LFThunk top (null fvs)
             (isUpdatable upd_flag)
             NonStandardThunk
@@ -529,15 +530,15 @@ getCallMethod opts name id (LFReEntrant _ arity _ _) n_args _v_args _cg_loc
   | n_args == 0 -- No args at all
   && not (profileIsProfiling (co_profile opts))
      -- See Note [Evaluating functions with profiling] in rts/Apply.cmm
-  = ASSERT( arity /= 0 ) ReturnIt
+  = assert (arity /= 0) ReturnIt
   | n_args < arity = SlowCall        -- Not enough args
   | otherwise      = DirectEntry (enterIdLabel (profilePlatform (co_profile opts)) name (idCafInfo id)) arity
 
 getCallMethod _ _name _ LFUnlifted n_args _v_args _cg_loc _self_loop_info
-  = ASSERT( n_args == 0 ) ReturnIt
+  = assert (n_args == 0) ReturnIt
 
 getCallMethod _ _name _ (LFCon _) n_args _v_args _cg_loc _self_loop_info
-  = ASSERT( n_args == 0 ) ReturnIt
+  = assert (n_args == 0) ReturnIt
     -- n_args=0 because it'd be ill-typed to apply a saturated
     --          constructor application to anything
 
@@ -561,7 +562,7 @@ getCallMethod opts name id (LFThunk _ _ updatable std_form_info is_fun)
   | SelectorThunk{} <- std_form_info
   = EnterIt
 
-    -- We used to have ASSERT( n_args == 0 ), but actually it is
+    -- We used to have assert (n_args == 0 ), but actually it is
     -- possible for the optimiser to generate
     --   let bot :: Int = error Int "urk"
     --   in (bot `cast` unsafeCoerce Int (Int -> Int)) 3
@@ -569,7 +570,7 @@ getCallMethod opts name id (LFThunk _ _ updatable std_form_info is_fun)
     -- So the right thing to do is just to enter the thing
 
   | otherwise        -- Jump direct to code for single-entry thunks
-  = ASSERT( n_args == 0 )
+  = assert (n_args == 0) $
     DirectEntry (thunkEntryLabel (profilePlatform (co_profile opts)) name (idCafInfo id) std_form_info
                 updatable) 0
 
@@ -577,7 +578,7 @@ getCallMethod _ _name _ (LFUnknown True) _n_arg _v_args _cg_locs _self_loop_info
   = SlowCall -- might be a function
 
 getCallMethod _ name _ (LFUnknown False) n_args _v_args _cg_loc _self_loop_info
-  = ASSERT2( n_args == 0, ppr name <+> ppr n_args )
+  = assertPpr (n_args == 0) (ppr name <+> ppr n_args)
     EnterIt -- Not a function
 
 getCallMethod _ _name _ LFLetNoEscape _n_args _v_args (LneLoc blk_id lne_regs)

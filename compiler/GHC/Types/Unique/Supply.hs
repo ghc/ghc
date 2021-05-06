@@ -241,7 +241,7 @@ genSym = do
 #if defined(DEBUG)
     -- Uh oh! We will overflow next time a unique is requested.
     -- (Note that if the increment isn't 1 we may miss this check)
-    MASSERT(u /= mask)
+    massert (u /= mask)
 #endif
     return u
 #endif

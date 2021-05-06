@@ -1,4 +1,4 @@
-Found 255 Language.Haskell.Syntax module dependencies
+Found 256 Language.Haskell.Syntax module dependencies
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
 GHC.Builtin.Types
@@ -229,6 +229,7 @@ GHC.Utils.Binary
 GHC.Utils.Binary.Typeable
 GHC.Utils.BufHandle
 GHC.Utils.CliOption
+GHC.Utils.Constants
 GHC.Utils.Error
 GHC.Utils.Exception
 GHC.Utils.FV
