@@ -554,8 +554,9 @@ validate-x86_64-darwin:
     BUILD_FLAVOUR: "validate"
     # Due to #19025
     IGNORE_PERF_FAILURES: "all"
+    CABAL_CACHE: "cabal-cache-amd64"
   after_script:
-    - cp -Rf $HOME/.cabal cabal-cache
+    - cp -Rf $HOME/.cabal cabal-cache-amd64
     - .gitlab/ci.sh clean
 
   # I wish we could just use the nix #! logic, but we can't --run and -i bash
@@ -570,7 +571,7 @@ validate-x86_64-darwin:
         --pure \
         --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR \
         --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --keep PROJECT_DIR \
-        --keep CI_PROJECT_DIR --keep MAKE_ARGS --keep HADRIAN_ARGS \
+        --keep CI_PROJECT_DIR --keep MAKE_ARGS --keep HADRIAN_ARGS --keep CABAL_CACHE \
         --keep LANG --keep CONFIGURE_ARGS --keep TEST_ENV --keep BIN_DIST_NAME \
         --keep MACOSX_DEPLOYMENT_TARGET --keep ac_cv_func_clock_gettime --keep HACKAGE_INDEX_STATE \
         --run "$1" 2>&1
@@ -619,7 +620,8 @@ validate-x86_64-darwin:
   cache:
     key: "darwin-x86_64-$GHC_VERSION"
     paths:
-      - cabal-cache
+      - cabal-cache-amd64
+      - cabal-cache-arm64
       - toolchain
 
 validate-aarch64-darwin:
@@ -648,6 +650,10 @@ validate-aarch64-darwin:
     HADRIAN_ARGS: "--docs=no-sphinx"
     BIN_DIST_NAME: "ghc-arm64-apple-darwin"
     TEST_ENV: "aarch64-darwin-hadrian"
+    CABAL_CACHE: "cabal-cache-arm64"
+  after_script:
+    - cp -Rf $HOME/.cabal cabal-cache-arm64
+    - .gitlab/ci.sh clean
 
   # I wish we could just use the nix #! logic, but we can't --run and -i bash
   # behave very differently. -i bash does not pass any nix related env vars
@@ -661,7 +667,7 @@ validate-aarch64-darwin:
         --pure \
         --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR \
         --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --keep PROJECT_DIR \
-        --keep CI_PROJECT_DIR --keep MAKE_ARGS --keep HADRIAN_ARGS \
+        --keep CI_PROJECT_DIR --keep MAKE_ARGS --keep HADRIAN_ARGS --keep CABAL_CACHE  \
         --keep LANG --keep CONFIGURE_ARGS --keep TEST_ENV --keep BIN_DIST_NAME \
         --keep HACKAGE_INDEX_STATE \
         --run "$1" 2>&1
@@ -709,7 +715,8 @@ validate-aarch64-darwin:
   cache:
     key: "darwin-aarch64-$GHC_VERSION"
     paths:
-      - cabal-cache
+      - cabal-cache-amd64
+      - cabal-cache-arm64
       - toolchain
 
 .validate-linux:
