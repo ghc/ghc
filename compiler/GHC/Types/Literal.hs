@@ -77,7 +77,6 @@ import GHC.Types.Basic
 import GHC.Utils.Binary
 import GHC.Settings.Constants
 import GHC.Platform
-import GHC.Utils.Misc
 import GHC.Utils.Panic
 
 import Data.ByteString (ByteString)
