@@ -7,8 +7,6 @@
 {-# LANGUAGE CPP #-}
 module GHC.Core.Opt.LiberateCase ( liberateCase ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Driver.Session

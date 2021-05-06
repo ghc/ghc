@@ -14,8 +14,6 @@ module GHC.Parser.CharClass
         , hexDigit, octDecDigit
         ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import Data.Char        ( ord, chr )

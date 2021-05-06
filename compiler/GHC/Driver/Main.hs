@@ -234,9 +234,6 @@ import Data.Functor
 import Control.DeepSeq (force)
 import Data.Bifunctor (first, bimap)
 
-#include "HsVersions.h"
-
-
 {- **********************************************************************
 %*                                                                      *
                 Initialisation

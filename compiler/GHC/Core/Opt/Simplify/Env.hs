@@ -43,8 +43,6 @@ module GHC.Core.Opt.Simplify.Env (
         wrapJoinFloats, wrapJoinFloatsX, unitJoinFloat, addJoinFlts
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Core.Opt.Simplify.Monad

@@ -48,8 +48,6 @@ module GHC.CmmToAsm.PPC.Regs (
 
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Platform.Reg

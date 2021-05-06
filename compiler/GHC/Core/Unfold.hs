@@ -37,8 +37,6 @@ module GHC.Core.Unfold (
         calcUnfoldingGuidance
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Driver.Session

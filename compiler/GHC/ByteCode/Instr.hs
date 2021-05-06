@@ -10,8 +10,6 @@ module GHC.ByteCode.Instr (
         BCInstr(..), ProtoBCO(..), bciStackUse, LocalLabel(..)
   ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.ByteCode.Types

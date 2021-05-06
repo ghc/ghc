@@ -32,8 +32,6 @@ module GHC.HsToCore.Pmc.Solver.Types (
 
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Data.Bag

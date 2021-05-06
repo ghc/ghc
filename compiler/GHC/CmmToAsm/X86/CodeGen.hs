@@ -28,8 +28,6 @@ module GHC.CmmToAsm.X86.CodeGen (
 
 where
 
-#include "HsVersions.h"
-
 -- NCG stuff:
 import GHC.Prelude
 

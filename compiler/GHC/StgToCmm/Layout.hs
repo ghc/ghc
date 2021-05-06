@@ -31,8 +31,6 @@ module GHC.StgToCmm.Layout (
   ) where
 
 
-#include "HsVersions.h"
-
 import GHC.Prelude hiding ((<*>))
 
 import GHC.Driver.Session

@@ -45,8 +45,6 @@ module GHC.StgToCmm.Utils (
         convertInfoProvMap, cmmInfoTableToInfoProvEnt
   ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Platform

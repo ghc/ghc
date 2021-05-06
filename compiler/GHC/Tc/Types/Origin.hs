@@ -22,8 +22,6 @@ module GHC.Tc.Types.Origin (
 
   ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Tc.Utils.TcType
@@ -287,7 +285,7 @@ pprSkolInfo RuntimeUnkSkol     = text "Unknown type from GHCi runtime"
 -- UnkSkol
 -- For type variables the others are dealt with by pprSkolTvBinding.
 -- For Insts, these cases should not happen
-pprSkolInfo UnkSkol = WARN( True, text "pprSkolInfo: UnkSkol" ) text "UnkSkol"
+pprSkolInfo UnkSkol = warnPprTrace True (text "pprSkolInfo: UnkSkol") $ text "UnkSkol"
 
 pprSigSkolInfo :: UserTypeCtxt -> TcType -> SDoc
 -- The type is already tidied

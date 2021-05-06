@@ -92,8 +92,6 @@ module GHC.Core (
         isBuiltinRule, isLocalRule, isAutoRule,
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 import GHC.Platform
 
@@ -1576,8 +1574,8 @@ cmpAltCon (DataAlt _)  DEFAULT      = GT
 cmpAltCon (LitAlt  l1) (LitAlt  l2) = l1 `compare` l2
 cmpAltCon (LitAlt _)   DEFAULT      = GT
 
-cmpAltCon con1 con2 = WARN( True, text "Comparing incomparable AltCons" <+>
-                                  ppr con1 <+> ppr con2 )
+cmpAltCon con1 con2 = warnPprTrace True (text "Comparing incomparable AltCons" <+>
+                                  ppr con1 <+> ppr con2) $
                       LT
 
 {-

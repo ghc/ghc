@@ -20,8 +20,6 @@ module GHC.Core.SimpleOpt (
 
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Core

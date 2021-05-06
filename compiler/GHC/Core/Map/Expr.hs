@@ -24,8 +24,6 @@ module GHC.Core.Map.Expr (
    (>.>), (|>), (|>>),
  ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Data.TrieMap

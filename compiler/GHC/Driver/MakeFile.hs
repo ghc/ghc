@@ -13,8 +13,6 @@ module GHC.Driver.MakeFile
    )
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import qualified GHC
