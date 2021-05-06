@@ -1337,7 +1337,7 @@ used to indicate if a closure has been updated but not yet entered. It
 is set when the closure is updated and cleared when subsequently
 entered.  \footnote{% NB: It is \emph{not} an ``entry count'', it is
 an ``entries-after-update count.''  The commoning up of @CONST@,
-@CHARLIKE@ and @INTLIKE@ closures is turned off(?) if this is
+@STATIC_CHAR@ and @STATIC_INT@ closures is turned off(?) if this is
 required. This has only been done for 2s collection.  }
 
 \end{itemize}
@@ -1901,12 +1901,12 @@ There are several different sorts of constructor:
 
 \item @CONSTR_@$p$@_@$np$: just like $@FUN_@p@_@np$.
 
-\item @CONSTR_INTLIKE@.  A dynamically-allocated heap object that
+\item @CONSTR_STATIC_INT@.  A dynamically-allocated heap object that
 looks just like an @Int@.  The garbage collector checks to see if it
 can common it up with one of a fixed set of static int-like closures,
 thus getting it out of the dynamic heap altogether.
 
-\item @CONSTR_CHARLIKE@:  same deal, but for @Char@.
+\item @CONSTR_STATIC_CHAR@:  same deal, but for @Char@.
 
 \item @CONSTR_STATIC@ is similar to @FUN_STATIC@, with the
 complication that the layout of the constructor must mimic that of a
@@ -4654,7 +4654,7 @@ We're nuking the following:
 \item
   Update in place
 
-  This lets us drop CONST closures and CHARLIKE closures (assuming we
+  This lets us drop CONST closures and STATIC_CHAR closures (assuming we
   don't support Unicode).  The only point of these closures was to 
   avoid updating with an indirection.
 
