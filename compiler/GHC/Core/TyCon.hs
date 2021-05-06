@@ -1337,17 +1337,22 @@ Note [Newtype eta]
 ~~~~~~~~~~~~~~~~~~
 Consider
         newtype Parser a = MkParser (IO a) deriving Monad
-Are these two types equal (that is, does a coercion exist between them)?
+Are these two types equal? That is, does a coercion exist between them?
         Monad Parser
         Monad IO
-which we need to make the derived instance for Monad Parser.
+(We need this coercion to make the derived instance for Monad Parser.)
 
 Well, yes.  But to see that easily we eta-reduce the RHS type of
-Parser, in this case to IO, so that even unsaturated applications
-of Parser will work right.  This eta reduction is done when the type
-constructor is built, and cached in NewTyCon.
+Parser, in this case to IO, so that even unsaturated applications of
+Parser will work right.  So instead of
+   axParser :: forall a. Parser a ~ IO a
+we generate an eta-reduced axiom
+   axParser :: Parser ~ IO
 
-Here's an example that I think showed up in practice
+This eta reduction is done when the type constructor is built, in
+GHC.Tc.TyCl.Build.mkNewTyConRhs, and cached in NewTyCon.
+
+Here's an example that I think showed up in practice.
 Source code:
         newtype T a = MkT [a]
         newtype Foo m = MkFoo (forall a. m a -> Int)
@@ -1359,14 +1364,15 @@ Source code:
         w2 = MkFoo (\(MkT x) -> case w1 of MkFoo f -> f x)
 
 After desugaring, and discarding the data constructors for the newtypes,
-we get:
-        w2 = w1 `cast` Foo CoT
-so the coercion tycon CoT must have
-        kind:    T ~ []
+we would like to get:
+        w2 = w1 `cast` Foo axT
+
+so that w2 and w1 share the same code. To do this, the coercion axiom
+axT must have
+        kind:    axT :: T ~ []
  and    arity:   0
 
-This eta-reduction is implemented in GHC.Tc.TyCl.Build.mkNewTyConRhs.
-
+See also Note [Newtype eta and homogeneous axioms] in GHC.Tc.TyCl.Build.
 
 ************************************************************************
 *                                                                      *
