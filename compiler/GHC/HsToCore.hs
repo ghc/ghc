@@ -65,7 +65,7 @@ import GHC.Data.OrdList
 
 import GHC.Utils.Error
 import GHC.Utils.Outputable
-import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 import GHC.Utils.Monad
 import GHC.Utils.Logger
@@ -211,7 +211,7 @@ deSugar hsc_env
         -- never desugared and compiled (there's no code!)
         -- Consequently, this should hold for any ModGuts that make
         -- past desugaring. See Note [Identity versus semantic module].
-        ; MASSERT( id_mod == mod )
+        ; massert (id_mod == mod)
 
         ; foreign_files <- readIORef th_foreign_files_var
 
@@ -298,7 +298,7 @@ deSugarExpr hsc_env tc_expr = do
                             initDsTc $
                             dsLExpr tc_expr
 
-    MASSERT( isEmptyMessages tc_msgs )  -- the type-checker isn't doing anything here
+    massert (isEmptyMessages tc_msgs)  -- the type-checker isn't doing anything here
 
       -- mb_result is Nothing only when a failure happens in the type-checker,
       -- but mb_core_expr is Nothing when a failure happens in the desugarer
@@ -698,8 +698,8 @@ patchMagicDefn orig_pair@(orig_id, orig_rhs)
   = do { magic_pair@(magic_id, _) <- mk_magic_pair orig_id orig_rhs
 
        -- Patching should not change the Name or the type of the Id
-       ; MASSERT( getUnique magic_id == getUnique orig_id )
-       ; MASSERT( varType magic_id `eqType` varType orig_id )
+       ; massert (getUnique magic_id == getUnique orig_id)
+       ; massert (varType magic_id `eqType` varType orig_id)
 
        ; return magic_pair }
   | otherwise

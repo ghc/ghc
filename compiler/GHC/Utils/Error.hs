@@ -72,8 +72,8 @@ import GHC.Data.Bag
 import GHC.Utils.Exception
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Utils.Logger
-import GHC.Utils.Misc ( debugIsOn )
 import GHC.Types.Error
 import GHC.Types.SrcLoc as SrcLoc
 
@@ -152,7 +152,7 @@ mkErrorMsgEnvelope :: Diagnostic e
                    -> e
                    -> MsgEnvelope e
 mkErrorMsgEnvelope locn unqual msg =
- ASSERT( diagnosticReason msg == ErrorWithoutFlag ) mk_msg_envelope SevError locn unqual msg
+ assert (diagnosticReason msg == ErrorWithoutFlag) $ mk_msg_envelope SevError locn unqual msg
 
 -- | Variant that doesn't care about qualified/unqualified names.
 mkPlainMsgEnvelope :: Diagnostic e

@@ -71,7 +71,7 @@ import GHC.Types.SourceText
 import GHC.Utils.Misc
 import GHC.Data.List.SetOps( removeDups )
 import GHC.Utils.Outputable
-import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Types.SrcLoc
 import GHC.Types.Literal   ( inCharRange )
 import GHC.Builtin.Types   ( nilDataCon )
@@ -691,7 +691,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                                 -- isn't in scope the constructor lookup will add
                                 -- an error but still return an unbound name. We
                                 -- don't want that to screw up the dot-dot fill-in stuff.
-      = ASSERT( flds `lengthIs` n )
+      = assert (flds `lengthIs` n) $
         do { dd_flag <- xoptM LangExt.RecordWildCards
            ; checkErr dd_flag (needFlagDotDot ctxt)
            ; (rdr_env, lcl_env) <- getRdrEnvs

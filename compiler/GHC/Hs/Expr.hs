@@ -58,6 +58,7 @@ import GHC.Unit.Module (ModuleName)
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Data.FastString
 import GHC.Core.Type
 import GHC.Builtin.Types (mkTupleStr)
@@ -1280,7 +1281,7 @@ pprMatch (Match { m_pats = pats, m_ctxt = ctxt, m_grhss = grhss })
         = case ctxt of
             FunRhs {mc_fun=L _ fun, mc_fixity=fixity, mc_strictness=strictness}
                 | SrcStrict <- strictness
-                -> ASSERT(null pats)     -- A strict variable binding
+                -> assert (null pats)     -- A strict variable binding
                    (char '!'<>pprPrefixOcc fun, pats)
 
                 | Prefix <- fixity

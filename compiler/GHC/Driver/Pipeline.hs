@@ -73,6 +73,7 @@ import GHC.Linker.Types
 import GHC.Utils.Outputable
 import GHC.Utils.Error
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 import GHC.Utils.Monad
 import GHC.Utils.Exception as Exception
@@ -136,7 +137,7 @@ preprocess hsc_env input_fn mb_input_buf mb_phase =
   handleSourceError (\err -> return $ Left $ to_driver_messages $ srcErrorMessages err) $
   MC.handle handler $
   fmap Right $ do
-  MASSERT2(isJust mb_phase || isHaskellSrcFilename input_fn, text input_fn)
+  massertPpr (isJust mb_phase || isHaskellSrcFilename input_fn) (text input_fn)
   (dflags, fp, mb_iface) <- runPipeline anyHsc hsc_env (input_fn, mb_input_buf, fmap RealPhase mb_phase)
         Nothing
         -- We keep the processed file for the whole session to save on
@@ -145,7 +146,7 @@ preprocess hsc_env input_fn mb_input_buf mb_phase =
         Nothing{-no ModLocation-}
         []{-no foreign objects-}
   -- We stop before Hsc phase so we shouldn't generate an interface
-  MASSERT(isNothing mb_iface)
+  massert (isNothing mb_iface)
   return (dflags, fp)
   where
     srcspan = srcLocSpan $ mkSrcLoc (mkFastString input_fn) 1 1
@@ -228,7 +229,7 @@ compileOne' m_tc_result mHscMessage
    case (status, bcknd) of
         (HscUpToDate iface hmi_details, _) ->
             -- TODO recomp014 triggers this assert. What's going on?!
-            -- ASSERT( isJust mb_old_linkable || isNoLink (ghcLink dflags) )
+            -- assert (isJust mb_old_linkable || isNoLink (ghcLink dflags) )
             return $! HomeModInfo iface hmi_details mb_old_linkable
         (HscNotGeneratingCode iface hmi_details, NoBackend) ->
             let mb_linkable = if isHsBootOrSig src_flavour

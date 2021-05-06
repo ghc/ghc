@@ -42,9 +42,9 @@ import GHC.Builtin.Types.Prim
 import GHC.Types.Unique.FM
 import GHC.Types.Var.Env
 
-import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 
 import GHC.Driver.Session
 
@@ -137,7 +137,7 @@ getCgIdInfo id
                       | isUnliftedType (idType id)
                           -- An unlifted external Id must refer to a top-level
                           -- string literal. See Note [Bytes label] in "GHC.Cmm.CLabel".
-                      = ASSERT( idType id `eqType` addrPrimTy )
+                      = assert (idType id `eqType` addrPrimTy) $
                         mkBytesLabel name
                       | otherwise
                       = pprPanic "GHC.StgToCmm.Env: label not found" (ppr id <+> dcolon <+> ppr (idType id))

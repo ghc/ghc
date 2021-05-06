@@ -51,6 +51,7 @@ import GHC.Types.Name ( getOccFS )
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Data.FastString
@@ -1372,8 +1373,8 @@ mkWWcpr _opts vars []   =
   return (False, toOL vars, nop_fn, nop_fn)
 mkWWcpr opts  vars cprs = do
   -- No existentials in 'vars'. 'wantToUnboxResult' should have checked that.
-  MASSERT2( not (any isTyVar vars), ppr vars $$ ppr cprs )
-  MASSERT2( equalLength vars cprs, ppr vars $$ ppr cprs )
+  massertPpr (not (any isTyVar vars)) (ppr vars $$ ppr cprs)
+  massertPpr (equalLength vars cprs) (ppr vars $$ ppr cprs)
   (usefuls, varss, wrap_build_ress, work_unpack_ress) <-
     unzip4 <$> zipWithM (mkWWcpr_one opts) vars cprs
   return ( or usefuls
@@ -1384,7 +1385,7 @@ mkWWcpr opts  vars cprs = do
 mkWWcpr_one :: WwOpts -> Id -> Cpr -> UniqSM CprWwResult
 -- ^ See if we want to unbox the result and hand off to 'unbox_one_result'.
 mkWWcpr_one opts res_bndr cpr
-  | ASSERT( not (isTyVar res_bndr) ) True
+  | assert (not (isTyVar res_bndr) ) True
   , Unbox dcpc arg_cprs <- wantToUnboxResult (wo_fam_envs opts) (idType res_bndr) cpr
   = unbox_one_result opts res_bndr arg_cprs dcpc
   | otherwise
@@ -1404,7 +1405,7 @@ unbox_one_result opts res_bndr arg_cprs
   pat_bndrs_uniqs <- getUniquesM
   let (_exs, arg_ids) =
         dataConRepFSInstPat (repeat ww_prefix) pat_bndrs_uniqs cprCaseBndrMult dc tc_args
-  MASSERT( null _exs ) -- Should have been caught by wantToUnboxResult
+  massert (null _exs) -- Should have been caught by wantToUnboxResult
 
   let -- con_app = (C a b |> sym co)
       con_app = mkConApp2 dc tc_args arg_ids `mkCast` mkSymCo co

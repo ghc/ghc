@@ -374,12 +374,12 @@ litNumCheckRange platform nt i = case nt of
 -- | Create a numeric 'Literal' of the given type
 mkLitNumber :: Platform -> LitNumType -> Integer -> Literal
 mkLitNumber platform nt i =
-  ASSERT2(litNumCheckRange platform nt i, integer i)
+  assertPpr (litNumCheckRange platform nt i) (integer i)
   (LitNumber nt i)
 
 -- | Creates a 'Literal' of type @Int#@
 mkLitInt :: Platform -> Integer -> Literal
-mkLitInt platform x = ASSERT2( platformInIntRange platform x,  integer x )
+mkLitInt platform x = assertPpr (platformInIntRange platform x) (integer x)
                        (mkLitIntUnchecked x)
 
 -- | Creates a 'Literal' of type @Int#@.
@@ -403,7 +403,7 @@ mkLitIntWrapC platform i = (n, i /= i')
 
 -- | Creates a 'Literal' of type @Word#@
 mkLitWord :: Platform -> Integer -> Literal
-mkLitWord platform x = ASSERT2( platformInWordRange platform x, integer x )
+mkLitWord platform x = assertPpr (platformInWordRange platform x) (integer x)
                         (mkLitWordUnchecked x)
 
 -- | Creates a 'Literal' of type @Word#@.
@@ -427,7 +427,7 @@ mkLitWordWrapC platform i = (n, i /= i')
 
 -- | Creates a 'Literal' of type @Int8#@
 mkLitInt8 :: Integer -> Literal
-mkLitInt8  x = ASSERT2( inBoundedRange @Int8 x, integer x ) (mkLitInt8Unchecked x)
+mkLitInt8  x = assertPpr (inBoundedRange @Int8 x) (integer x) (mkLitInt8Unchecked x)
 
 -- | Creates a 'Literal' of type @Int8#@.
 --   If the argument is out of the range, it is wrapped.
@@ -440,7 +440,7 @@ mkLitInt8Unchecked i = LitNumber LitNumInt8 i
 
 -- | Creates a 'Literal' of type @Word8#@
 mkLitWord8 :: Integer -> Literal
-mkLitWord8 x = ASSERT2( inBoundedRange @Word8 x, integer x ) (mkLitWord8Unchecked x)
+mkLitWord8 x = assertPpr (inBoundedRange @Word8 x) (integer x) (mkLitWord8Unchecked x)
 
 -- | Creates a 'Literal' of type @Word8#@.
 --   If the argument is out of the range, it is wrapped.
@@ -453,7 +453,7 @@ mkLitWord8Unchecked i = LitNumber LitNumWord8 i
 
 -- | Creates a 'Literal' of type @Int16#@
 mkLitInt16 :: Integer -> Literal
-mkLitInt16  x = ASSERT2( inBoundedRange @Int16 x, integer x ) (mkLitInt16Unchecked x)
+mkLitInt16  x = assertPpr (inBoundedRange @Int16 x) (integer x) (mkLitInt16Unchecked x)
 
 -- | Creates a 'Literal' of type @Int16#@.
 --   If the argument is out of the range, it is wrapped.
@@ -466,7 +466,7 @@ mkLitInt16Unchecked i = LitNumber LitNumInt16 i
 
 -- | Creates a 'Literal' of type @Word16#@
 mkLitWord16 :: Integer -> Literal
-mkLitWord16 x = ASSERT2( inBoundedRange @Word16 x, integer x ) (mkLitWord16Unchecked x)
+mkLitWord16 x = assertPpr (inBoundedRange @Word16 x) (integer x) (mkLitWord16Unchecked x)
 
 -- | Creates a 'Literal' of type @Word16#@.
 --   If the argument is out of the range, it is wrapped.
@@ -479,7 +479,7 @@ mkLitWord16Unchecked i = LitNumber LitNumWord16 i
 
 -- | Creates a 'Literal' of type @Int32#@
 mkLitInt32 :: Integer -> Literal
-mkLitInt32  x = ASSERT2( inBoundedRange @Int32 x, integer x ) (mkLitInt32Unchecked x)
+mkLitInt32  x = assertPpr (inBoundedRange @Int32 x) (integer x) (mkLitInt32Unchecked x)
 
 -- | Creates a 'Literal' of type @Int32#@.
 --   If the argument is out of the range, it is wrapped.
@@ -492,7 +492,7 @@ mkLitInt32Unchecked i = LitNumber LitNumInt32 i
 
 -- | Creates a 'Literal' of type @Word32#@
 mkLitWord32 :: Integer -> Literal
-mkLitWord32 x = ASSERT2( inBoundedRange @Word32 x, integer x ) (mkLitWord32Unchecked x)
+mkLitWord32 x = assertPpr (inBoundedRange @Word32 x) (integer x) (mkLitWord32Unchecked x)
 
 -- | Creates a 'Literal' of type @Word32#@.
 --   If the argument is out of the range, it is wrapped.
@@ -505,7 +505,7 @@ mkLitWord32Unchecked i = LitNumber LitNumWord32 i
 
 -- | Creates a 'Literal' of type @Int64#@
 mkLitInt64 :: Integer -> Literal
-mkLitInt64  x = ASSERT2( inBoundedRange @Int64 x, integer x ) (mkLitInt64Unchecked x)
+mkLitInt64  x = assertPpr (inBoundedRange @Int64 x) (integer x) (mkLitInt64Unchecked x)
 
 -- | Creates a 'Literal' of type @Int64#@.
 --   If the argument is out of the range, it is wrapped.
@@ -518,7 +518,7 @@ mkLitInt64Unchecked i = LitNumber LitNumInt64 i
 
 -- | Creates a 'Literal' of type @Word64#@
 mkLitWord64 :: Integer -> Literal
-mkLitWord64 x = ASSERT2( inBoundedRange @Word64 x, integer x ) (mkLitWord64Unchecked x)
+mkLitWord64 x = assertPpr (inBoundedRange @Word64 x) (integer x) (mkLitWord64Unchecked x)
 
 -- | Creates a 'Literal' of type @Word64#@.
 --   If the argument is out of the range, it is wrapped.
@@ -551,7 +551,7 @@ mkLitInteger :: Integer -> Literal
 mkLitInteger x = LitNumber LitNumInteger x
 
 mkLitNatural :: Integer -> Literal
-mkLitNatural x = ASSERT2( inNaturalRange x,  integer x )
+mkLitNatural x = assertPpr (inNaturalRange x) (integer x)
                     (LitNumber LitNumNatural x)
 
 -- | Create a rubbish literal of the given representation.

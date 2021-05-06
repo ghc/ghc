@@ -47,6 +47,7 @@ import GHC.Types.Var
 import GHC.Utils.Misc
 import GHC.Utils.Binary
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Data.Pair
 import GHC.Types.Basic
 import Data.Typeable ( Typeable )
@@ -143,7 +144,7 @@ newtype Branches (br :: BranchFlag)
 type role Branches nominal
 
 manyBranches :: [CoAxBranch] -> Branches Branched
-manyBranches brs = ASSERT( snd bnds >= fst bnds )
+manyBranches brs = assert (snd bnds >= fst bnds )
                    MkBranches (listArray bnds brs)
   where
     bnds = (0, length brs - 1)
@@ -155,7 +156,7 @@ toBranched :: Branches br -> Branches Branched
 toBranched = MkBranches . unMkBranches
 
 toUnbranched :: Branches br -> Branches Unbranched
-toUnbranched (MkBranches arr) = ASSERT( bounds arr == (0,0) )
+toUnbranched (MkBranches arr) = assert (bounds arr == (0,0) )
                                 MkBranches arr
 
 fromBranches :: Branches br -> [CoAxBranch]

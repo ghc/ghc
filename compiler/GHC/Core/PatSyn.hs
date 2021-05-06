@@ -473,8 +473,8 @@ patSynInstArgTys :: PatSyn -> [Type] -> [Type]
 patSynInstArgTys (MkPatSyn { psName = name, psUnivTyVars = univ_tvs
                            , psExTyVars = ex_tvs, psArgs = arg_tys })
                  inst_tys
-  = ASSERT2( tyvars `equalLength` inst_tys
-          , text "patSynInstArgTys" <+> ppr name $$ ppr tyvars $$ ppr inst_tys )
+  = assertPpr (tyvars `equalLength` inst_tys)
+              (text "patSynInstArgTys" <+> ppr name $$ ppr tyvars $$ ppr inst_tys) $
     map (substTyWith tyvars inst_tys) arg_tys
   where
     tyvars = binderVars (univ_tvs ++ ex_tvs)
@@ -488,8 +488,8 @@ patSynInstResTy :: PatSyn -> [Type] -> Type
 patSynInstResTy (MkPatSyn { psName = name, psUnivTyVars = univ_tvs
                           , psResultTy = res_ty })
                 inst_tys
-  = ASSERT2( univ_tvs `equalLength` inst_tys
-           , text "patSynInstResTy" <+> ppr name $$ ppr univ_tvs $$ ppr inst_tys )
+  = assertPpr (univ_tvs `equalLength` inst_tys)
+              (text "patSynInstResTy" <+> ppr name $$ ppr univ_tvs $$ ppr inst_tys) $
     substTyWith (binderVars univ_tvs) inst_tys res_ty
 
 -- | Print the type of a pattern synonym. The foralls are printed explicitly

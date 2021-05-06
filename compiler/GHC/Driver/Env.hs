@@ -263,7 +263,7 @@ lookupType hsc_env name = do
    let pte = eps_PTE eps
        hpt = hsc_HPT hsc_env
 
-       mod = ASSERT2( isExternalName name, ppr name )
+       mod = assertPpr (isExternalName name) (ppr name) $
              if isHoleName name
                then mkHomeModule (hsc_home_unit hsc_env) (moduleName (nameModule name))
                else nameModule name

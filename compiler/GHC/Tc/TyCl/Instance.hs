@@ -80,6 +80,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Types.SrcLoc
 import GHC.Utils.Misc
 import GHC.Data.BooleanFormula ( isUnsatisfied, pprBooleanFormulaNice )
@@ -748,7 +749,7 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
               ; axiom_name  <- newFamInstAxiomName lfam_name [pats]
               ; tc_rhs <- case new_or_data of
                      DataType -> return (mkDataTyConRhs data_cons)
-                     NewType  -> ASSERT( not (null data_cons) )
+                     NewType  -> assert (not (null data_cons)) $
                                  mkNewTyConRhs rep_tc_name rec_rep_tc (head data_cons)
 
               ; let ax_rhs = mkTyConApp rep_tc (mkTyVarTys post_eta_qtvs)

@@ -59,7 +59,7 @@ import GHC.Unit.Module
 
 import GHC.Utils.Error
 import GHC.Utils.Outputable
-import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Utils.Logger
 
 import GHC.Utils.TmpFs
@@ -224,7 +224,7 @@ cgTopRhs dflags _rec bndr (StgRhsCon _cc con mn _ts args)
       -- see Note [Post-unarisation invariants] in GHC.Stg.Unarise
 
 cgTopRhs dflags rec bndr (StgRhsClosure fvs cc upd_flag args body)
-  = ASSERT(isEmptyDVarSet fvs)    -- There should be no free variables
+  = assert (isEmptyDVarSet fvs)    -- There should be no free variables
     cgTopRhsClosure (targetPlatform dflags) rec bndr cc upd_flag args body
 
 
@@ -262,7 +262,7 @@ cgDataCon :: ConInfoTableLocation -> DataCon -> FCode ()
 -- Generate the entry code, info tables, and (for niladic constructor)
 -- the static closure, for a constructor.
 cgDataCon mn data_con
-  = do  { MASSERT( not (isUnboxedTupleDataCon data_con || isUnboxedSumDataCon data_con) )
+  = do  { massert (not (isUnboxedTupleDataCon data_con || isUnboxedSumDataCon data_con))
         ; profile <- getProfile
         ; platform <- getPlatform
         ; let

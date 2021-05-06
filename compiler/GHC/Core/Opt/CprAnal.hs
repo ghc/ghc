@@ -31,7 +31,7 @@ import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.Utils   ( exprIsHNF, dumpIdInfoOfProgram, normSplitTyConApp_maybe )
 import GHC.Utils.Misc
-import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Utils.Logger  ( Logger, dumpIfSet_dyn, DumpFormat (..) )
 import GHC.Data.Graph.UnVar -- for UnVarSet
 import GHC.Data.Maybe   ( isJust )
@@ -221,7 +221,7 @@ cprAnalAlt env scrut_ty (Alt con bndrs rhs)
       | DataAlt dc <- con
       , let ids = filter isId bndrs
       , CprType arity cpr <- scrut_ty
-      , ASSERT( arity == 0 ) True
+      , assert (arity == 0 ) True
       = case unpackConFieldsCpr dc cpr of
           AllFieldsSame field_cpr
             | let sig = mkCprSig 0 field_cpr

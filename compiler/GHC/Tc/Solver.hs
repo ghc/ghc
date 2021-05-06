@@ -120,7 +120,7 @@ simplifyTopImplic implics
   = do { empty_binds <- simplifyTop (mkImplicWC implics)
 
        -- Since all the inputs are implications the returned bindings will be empty
-       ; MASSERT2( isEmptyBag empty_binds, ppr empty_binds )
+       ; massertPpr (isEmptyBag empty_binds) (ppr empty_binds)
 
        ; return () }
 
@@ -1932,7 +1932,8 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
     -- remaining commented out for now.
     {-
     check_tc_level = do { cur_lvl <- TcS.getTcLevel
-                        ; MASSERT2( tclvl == pushTcLevel cur_lvl , text "Cur lvl =" <+> ppr cur_lvl $$ text "Imp lvl =" <+> ppr tclvl ) }
+                        ; massertPpr (tclvl == pushTcLevel cur_lvl)
+                                     (text "Cur lvl =" <+> ppr cur_lvl $$ text "Imp lvl =" <+> ppr tclvl) }
     -}
 
 ----------------------
@@ -1946,7 +1947,7 @@ setImplicationStatus implic@(Implic { ic_status     = status
                                     , ic_info       = info
                                     , ic_wanted     = wc
                                     , ic_given      = givens })
- | ASSERT2( not (isSolvedStatus status ), ppr info )
+ | assertPpr (not (isSolvedStatus status)) (ppr info) $
    -- Precondition: we only set the status if it is not already solved
    not (isSolvedWC pruned_wc)
  = do { traceTcS "setImplicationStatus(not-all-solved) {" (ppr implic)

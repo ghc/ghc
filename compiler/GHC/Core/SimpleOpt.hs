@@ -52,6 +52,7 @@ import GHC.Types.Basic
 import GHC.Unit.Module ( Module )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 import GHC.Data.Maybe       ( orElse )
 import GHC.Data.FastString
@@ -419,15 +420,15 @@ simple_bind_pair env@(SOE { soe_inl = inl_env, soe_subst = subst })
                  top_level
   | Type ty <- in_rhs        -- let a::* = TYPE ty in <body>
   , let out_ty = substTy (soe_subst rhs_env) ty
-  = ASSERT2( isTyVar in_bndr, ppr in_bndr $$ ppr in_rhs )
+  = assertPpr (isTyVar in_bndr) (ppr in_bndr $$ ppr in_rhs) $
     (env { soe_subst = extendTvSubst subst in_bndr out_ty }, Nothing)
 
   | Coercion co <- in_rhs
   , let out_co = optCoercion (soe_co_opt_opts env) (getTCvSubst (soe_subst rhs_env)) co
-  = ASSERT( isCoVar in_bndr )
+  = assert (isCoVar in_bndr)
     (env { soe_subst = extendCvSubst subst in_bndr out_co }, Nothing)
 
-  | ASSERT2( isNonCoVarId in_bndr, ppr in_bndr )
+  | assertPpr (isNonCoVarId in_bndr) (ppr in_bndr)
     -- The previous two guards got rid of tyvars and coercions
     -- See Note [Core type and coercion invariant] in GHC.Core
     pre_inline_unconditionally
@@ -477,11 +478,11 @@ simple_out_bind :: TopLevelFlag
                 -> (SimpleOptEnv, Maybe (OutVar, OutExpr))
 simple_out_bind top_level env@(SOE { soe_subst = subst }) (in_bndr, out_rhs)
   | Type out_ty <- out_rhs
-  = ASSERT2( isTyVar in_bndr, ppr in_bndr $$ ppr out_ty $$ ppr out_rhs )
+  = assertPpr (isTyVar in_bndr) (ppr in_bndr $$ ppr out_ty $$ ppr out_rhs)
     (env { soe_subst = extendTvSubst subst in_bndr out_ty }, Nothing)
 
   | Coercion out_co <- out_rhs
-  = ASSERT( isCoVar in_bndr )
+  = assert (isCoVar in_bndr)
     (env { soe_subst = extendCvSubst subst in_bndr out_co }, Nothing)
 
   | otherwise
@@ -495,7 +496,7 @@ simple_out_bind_pair :: SimpleOptEnv
                      -> (SimpleOptEnv, Maybe (OutVar, OutExpr))
 simple_out_bind_pair env in_bndr mb_out_bndr out_rhs
                      occ_info active stable_unf top_level
-  | ASSERT2( isNonCoVarId in_bndr, ppr in_bndr )
+  | assertPpr (isNonCoVarId in_bndr) (ppr in_bndr)
     -- Type and coercion bindings are caught earlier
     -- See Note [Core type and coercion invariant]
     post_inline_unconditionally
@@ -1342,7 +1343,7 @@ exprIsLambda_maybe (in_scope_set, id_unf) (Cast casted_e co)
     -- Only do value lambdas.
     -- this implies that x is not in scope in gamma (makes this code simpler)
     , not (isTyVar x) && not (isCoVar x)
-    , ASSERT( not $ x `elemVarSet` tyCoVarsOfCo co) True
+    , assert (not $ x `elemVarSet` tyCoVarsOfCo co) True
     , Just (x',e') <- pushCoercionIntoLambda in_scope_set x e co
     , let res = Just (x',e',ts)
     = --pprTrace "exprIsLambda_maybe:Cast" (vcat [ppr casted_e,ppr co,ppr res)])

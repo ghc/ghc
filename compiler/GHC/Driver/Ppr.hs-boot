@@ -6,4 +6,4 @@ import {-# SOURCE #-} GHC.Driver.Session
 import {-# SOURCE #-} GHC.Utils.Outputable
 
 showSDoc :: DynFlags -> SDoc -> String
-warnPprTrace :: HasCallStack => Bool -> String -> Int -> SDoc -> a -> a
+warnPprTrace :: HasCallStack => Bool -> SDoc -> a -> a

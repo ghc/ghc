@@ -188,6 +188,7 @@ import GHC.Data.Maybe
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Error
 import GHC.Utils.Panic
+import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Misc
 import GHC.Utils.Logger
 

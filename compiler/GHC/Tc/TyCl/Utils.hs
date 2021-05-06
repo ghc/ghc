@@ -55,6 +55,7 @@ import GHC.Core.Coercion ( ltRole )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 import GHC.Utils.FV as FV
 
@@ -715,21 +716,21 @@ runRoleM env thing = (env', update)
 
 setRoleInferenceTc :: Name -> RoleM a -> RoleM a
 setRoleInferenceTc name thing = RM $ \m_name vps nvps state ->
-                                ASSERT( isNothing m_name )
-                                ASSERT( isEmptyVarEnv vps )
-                                ASSERT( nvps == 0 )
+                                assert (isNothing m_name) $
+                                assert (isEmptyVarEnv vps) $
+                                assert (nvps == 0) $
                                 unRM thing (Just name) vps nvps state
 
 addRoleInferenceVar :: TyVar -> RoleM a -> RoleM a
 addRoleInferenceVar tv thing
   = RM $ \m_name vps nvps state ->
-    ASSERT( isJust m_name )
+    assert (isJust m_name) $
     unRM thing m_name (extendVarEnv vps tv nvps) (nvps+1) state
 
 setRoleInferenceVars :: [TyVar] -> RoleM a -> RoleM a
 setRoleInferenceVars tvs thing
   = RM $ \m_name _vps _nvps state ->
-    ASSERT( isJust m_name )
+    assert (isJust m_name) $
     unRM thing m_name (mkVarEnv (zip tvs [0..])) (panic "setRoleInferenceVars")
          state
 
@@ -888,7 +889,7 @@ mkOneRecordSelector all_cons idDetails fl has_sel
 
     -- Find a representative constructor, con1
     cons_w_field = conLikesWithFields all_cons [lbl]
-    con1 = ASSERT( not (null cons_w_field) ) head cons_w_field
+    con1 = assert (not (null cons_w_field)) $ head cons_w_field
 
     -- Selector type; Note [Polymorphic selectors]
     field_ty   = conLikeFieldType con1 lbl

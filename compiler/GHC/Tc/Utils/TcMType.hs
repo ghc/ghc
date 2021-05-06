@@ -127,6 +127,8 @@ import GHC.Types.Name.Env
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
+import GHC.Utils.Constants (debugIsOn)
 import GHC.Data.FastString
 import GHC.Data.Bag
 import GHC.Data.Pair
@@ -374,10 +376,10 @@ checkCoercionHole cv co
   = do { cv_ty <- zonkTcType (varType cv)
                   -- co is already zonked, but cv might not be
        ; return $
-         ASSERT2( ok cv_ty
-                , (text "Bad coercion hole" <+>
-                   ppr cv <> colon <+> vcat [ ppr t1, ppr t2, ppr role
-                                            , ppr cv_ty ]) )
+         assertPpr (ok cv_ty)
+                   (text "Bad coercion hole" <+>
+                    ppr cv <> colon <+> vcat [ ppr t1, ppr t2, ppr role
+                                             , ppr cv_ty ])
          co }
   | otherwise
   = return co
@@ -906,7 +908,7 @@ newTauTvDetailsAtLevel tclvl
 
 cloneMetaTyVar :: TcTyVar -> TcM TcTyVar
 cloneMetaTyVar tv
-  = ASSERT( isTcTyVar tv )
+  = assert (isTcTyVar tv) $
     do  { ref  <- newMutVar Flexi
         ; name' <- cloneMetaTyVarName (tyVarName tv)
         ; let details' = case tcTyVarDetails tv of
@@ -918,7 +920,7 @@ cloneMetaTyVar tv
 
 -- Works for both type and kind variables
 readMetaTyVar :: TyVar -> TcM MetaDetails
-readMetaTyVar tyvar = ASSERT2( isMetaTyVar tyvar, ppr tyvar )
+readMetaTyVar tyvar = assertPpr (isMetaTyVar tyvar) (ppr tyvar) $
                       readMutVar (metaTyVarRef tyvar)
 
 isFilledMetaTyVar_maybe :: TcTyVar -> TcM (Maybe Type)
@@ -955,15 +957,13 @@ writeMetaTyVar tyvar ty
 
 -- Everything from here on only happens if DEBUG is on
   | not (isTcTyVar tyvar)
-  = ASSERT2( False, text "Writing to non-tc tyvar" <+> ppr tyvar )
-    return ()
+  = massertPpr False (text "Writing to non-tc tyvar" <+> ppr tyvar)
 
   | MetaTv { mtv_ref = ref } <- tcTyVarDetails tyvar
   = writeMetaTyVarRef tyvar ref ty
 
   | otherwise
-  = ASSERT2( False, text "Writing to non-meta tyvar" <+> ppr tyvar )
-    return ()
+  = massertPpr False (text "Writing to non-meta tyvar" <+> ppr tyvar)
 
 --------------------
 writeMetaTyVarRef :: TcTyVar -> TcRef MetaDetails -> TcType -> TcM ()
@@ -1000,13 +1000,13 @@ writeMetaTyVarRef tyvar ref ty
        ; traceTc "writeMetaTyVar" (ppr tyvar <+> text ":=" <+> ppr ty)
 
        -- Check for double updates
-       ; MASSERT2( isFlexi meta_details, double_upd_msg meta_details )
+       ; massertPpr (isFlexi meta_details) (double_upd_msg meta_details)
 
        -- Check for level OK
-       ; MASSERT2( level_check_ok, level_check_msg )
+       ; massertPpr level_check_ok level_check_msg
 
        -- Check Kinds ok
-       ; MASSERT2( kind_check_ok, kind_msg )
+       ; massertPpr kind_check_ok kind_msg
 
        -- Do the write
        ; writeMutVar ref (Indirect ty) }
@@ -1714,7 +1714,7 @@ quantifyTyVars dvs
 
        -- We should never quantify over coercion variables; check this
        ; let co_vars = filter isCoVar final_qtvs
-       ; MASSERT2( null co_vars, ppr co_vars )
+       ; massertPpr (null co_vars) (ppr co_vars)
 
        ; return final_qtvs }
   where
@@ -1757,7 +1757,7 @@ zonkAndSkolemise tyvar
        ; skolemiseQuantifiedTyVar zonked_tyvar }
 
   | otherwise
-  = ASSERT2( isImmutableTyVar tyvar || isCoVar tyvar, pprTyVar tyvar )
+  = assertPpr (isImmutableTyVar tyvar || isCoVar tyvar) (pprTyVar tyvar) $
     zonkTyCoVarKind tyvar
 
 skolemiseQuantifiedTyVar :: TcTyVar -> TcM TcTyVar
@@ -1869,7 +1869,7 @@ skolemiseUnboundMetaTyVar :: TcTyVar -> TcM TyVar
 -- We create a skolem TcTyVar, not a regular TyVar
 --   See Note [Zonking to Skolem]
 skolemiseUnboundMetaTyVar tv
-  = ASSERT2( isMetaTyVar tv, ppr tv )
+  = assertPpr (isMetaTyVar tv) (ppr tv) $
     do  { when debugIsOn (check_empty tv)
         ; here <- getSrcSpanM    -- Get the location from "here"
                                  -- ie where we are generalising
@@ -2199,7 +2199,7 @@ promoteMetaTyVarTo :: TcLevel -> TcTyVar -> TcM Bool
 -- Also returns either the original tyvar (no promotion) or the new one
 -- See Note [Promoting unification variables]
 promoteMetaTyVarTo tclvl tv
-  | ASSERT2( isMetaTyVar tv, ppr tv )
+  | assertPpr (isMetaTyVar tv) (ppr tv) $
     tcTyVarLevel tv `strictlyDeeperThan` tclvl
   = do { cloned_tv <- cloneMetaTyVar tv
        ; let rhs_tv = setMetaTyVarTcLevel cloned_tv tclvl
@@ -2240,7 +2240,7 @@ zonkTyCoVar :: TyCoVar -> TcM TcType
 -- Works on TyVars and TcTyVars
 zonkTyCoVar tv | isTcTyVar tv = zonkTcTyVar tv
                | isTyVar   tv = mkTyVarTy <$> zonkTyCoVarKind tv
-               | otherwise    = ASSERT2( isCoVar tv, ppr tv )
+               | otherwise    = assertPpr (isCoVar tv) (ppr tv) $
                                 mkCoercionTy . mkCoVarCo <$> zonkTyCoVarKind tv
    -- Hackily, when typechecking type and class decls
    -- we have TyVars in scope added (only) in

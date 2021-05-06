@@ -54,6 +54,7 @@ import GHC.Utils.Misc
 import GHC.Data.Maybe( isJust )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import Data.List (mapAccumL, mapAccumR)
 
 {-
@@ -3020,7 +3021,7 @@ tagNonRecBinder lvl usage binder
      occ     = lookupDetails usage binder
      will_be_join = decideJoinPointHood lvl usage [binder]
      occ'    | will_be_join = -- must already be marked AlwaysTailCalled
-                              ASSERT(isAlwaysTailCalled occ) occ
+                              assert (isAlwaysTailCalled occ) occ
              | otherwise    = markNonTail occ
      binder' = setBinderOcc occ' binder
      usage'  = usage `delDetails` binder
@@ -3060,7 +3061,7 @@ tagRecBinders lvl body_uds triples
            , AlwaysTailCalled arity <- tailCallInfo occ
            = Just arity
            | otherwise
-           = ASSERT(not will_be_joins) -- Should be AlwaysTailCalled if
+           = assert (not will_be_joins) -- Should be AlwaysTailCalled if
              Nothing                   -- we are making join points!
 
      -- 3. Compute final usage details from adjusted RHS details
@@ -3205,7 +3206,7 @@ markNonTail occ     = occ { occ_tail = NoTailCallInfo }
 
 addOccInfo, orOccInfo :: OccInfo -> OccInfo -> OccInfo
 
-addOccInfo a1 a2  = ASSERT( not (isDeadOcc a1 || isDeadOcc a2) )
+addOccInfo a1 a2  = assert (not (isDeadOcc a1 || isDeadOcc a2)) $
                     ManyOccs { occ_tail = tailCallInfo a1 `andTailCallInfo`
                                           tailCallInfo a2 }
                                 -- Both branches are at least One
@@ -3227,7 +3228,7 @@ orOccInfo (OneOcc { occ_in_lam  = in_lam1
            , occ_int_cxt = int_cxt1 `mappend` int_cxt2
            , occ_tail    = tail1 `andTailCallInfo` tail2 }
 
-orOccInfo a1 a2 = ASSERT( not (isDeadOcc a1 || isDeadOcc a2) )
+orOccInfo a1 a2 = assert (not (isDeadOcc a1 || isDeadOcc a2)) $
                   ManyOccs { occ_tail = tailCallInfo a1 `andTailCallInfo`
                                         tailCallInfo a2 }
 

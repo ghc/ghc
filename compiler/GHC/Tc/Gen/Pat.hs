@@ -65,6 +65,7 @@ import GHC.Types.Var.Set
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import qualified GHC.LanguageExtensions as LangExt
 import Control.Arrow  ( second )
 import Control.Monad
@@ -221,7 +222,7 @@ tcPatBndr penv@(PE { pe_ctxt = LetPat { pc_lvl    = bind_lvl
   | otherwise                          -- No signature
   = do { (co, bndr_ty) <- case scaledThing exp_pat_ty of
              Check pat_ty    -> promoteTcType bind_lvl pat_ty
-             Infer infer_res -> ASSERT( bind_lvl == ir_lvl infer_res )
+             Infer infer_res -> assert (bind_lvl == ir_lvl infer_res) $
                                 -- If we were under a constructor that bumped the
                                 -- level, we'd be in checking mode (see tcConArg)
                                 -- hence this assertion
@@ -339,7 +340,7 @@ tc_lpat pat_ty penv (L span pat) thing_inside
 tc_lpats :: [Scaled ExpSigmaType]
          -> Checker [LPat GhcRn] [LPat GhcTc]
 tc_lpats tys penv pats
-  = ASSERT2( equalLength pats tys, ppr pats $$ ppr tys )
+  = assertPpr (equalLength pats tys) (ppr pats $$ ppr tys) $
     tcMultiple (\ penv' (p,t) -> tc_lpat t penv' p)
                penv
                (zipEqual "tc_lpats" pats tys)
@@ -536,8 +537,8 @@ Fortunately that's what matchExpectedFunTySigma returns anyway.
                 | otherwise        = unmangled_result
 
         ; pat_ty <- readExpType (scaledThing pat_ty)
-        ; ASSERT( con_arg_tys `equalLength` pats ) -- Syntactically enforced
-          return (mkHsWrapPat coi possibly_mangled_result pat_ty, res)
+        ; massert (con_arg_tys `equalLength` pats) -- Syntactically enforced
+        ; return (mkHsWrapPat coi possibly_mangled_result pat_ty, res)
         }
 
   SumPat _ pat alt arity  -> do
@@ -1271,7 +1272,7 @@ tcConArgs con_like arg_tys tenv penv con_args thing_inside = case con_args of
                 -- The normal case, when the field comes from the right constructor
            (pat_ty : extras) -> do
                 traceTc "find_field" (ppr pat_ty <+> ppr extras)
-                ASSERT( null extras ) (return pat_ty)
+                assert (null extras) (return pat_ty)
 
       field_tys :: [(FieldLabel, Scaled TcType)]
       field_tys = zip (conLikeFieldLabels con_like) arg_tys

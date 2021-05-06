@@ -81,6 +81,7 @@ import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Data.FastString
 import GHC.Data.List.SetOps
 import GHC.Types.Var (VarBndr(Bndr))
@@ -601,9 +602,8 @@ mkDataConWorkId wkr_name data_con
                   `setLevityInfoWithType` wkr_ty
     id_arg1      = mkScaledTemplateLocal 1 (head arg_tys)
     res_ty_args  = mkTyCoVarTys univ_tvs
-    newtype_unf  = ASSERT2( isVanillaDataCon data_con &&
-                            isSingleton arg_tys
-                          , ppr data_con  )
+    newtype_unf  = assertPpr (isVanillaDataCon data_con && isSingleton arg_tys)
+                             (ppr data_con) $
                               -- Note [Newtype datacons]
                    mkCompulsoryUnfolding defaultSimpleOpts $
                    mkLams univ_tvs $ Lam id_arg1 $
@@ -821,7 +821,7 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
                          ; (rep_ids, binds) <- go subst2 boxers term_vars
                          ; return (ex_vars ++ rep_ids, binds) } )
 
-    go _ [] src_vars = ASSERT2( null src_vars, ppr data_con ) return ([], [])
+    go _ [] src_vars = assertPpr (null src_vars) (ppr data_con) $ return ([], [])
     go subst (UnitBox : boxers) (src_var : src_vars)
       = do { (rep_ids2, binds) <- go subst boxers src_vars
            ; return (src_var : rep_ids2, binds) }
@@ -1110,7 +1110,7 @@ dataConArgUnpack (Scaled arg_mult arg_ty)
       -- A recursive newtype might mean that
       -- 'arg_ty' is a newtype
   , let rep_tys = map (scaleScaled arg_mult) $ dataConInstArgTys con tc_args
-  = ASSERT( null (dataConExTyCoVars con) )
+  = assert (null (dataConExTyCoVars con))
       -- Note [Unpacking GADTs and existentials]
     ( rep_tys `zip` dataConRepStrictness con
     ,( \ arg_id ->
@@ -1273,7 +1273,7 @@ wrapNewTypeBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
 -- it, otherwise the wrap/unwrap are both no-ops
 
 wrapNewTypeBody tycon args result_expr
-  = ASSERT( isNewTyCon tycon )
+  = assert (isNewTyCon tycon) $
     mkCast result_expr (mkSymCo co)
   where
     co = mkUnbranchedAxInstCo Representational (newTyConCo tycon) args []
@@ -1285,7 +1285,7 @@ wrapNewTypeBody tycon args result_expr
 
 unwrapNewTypeBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
 unwrapNewTypeBody tycon args result_expr
-  = ASSERT( isNewTyCon tycon )
+  = assert (isNewTyCon tycon) $
     mkCast result_expr (mkUnbranchedAxInstCo Representational (newTyConCo tycon) args [])
 
 -- If the type constructor is a representation type of a data instance, wrap
@@ -1347,7 +1347,7 @@ mkPrimOpId prim_op
 
 mkFCallId :: DynFlags -> Unique -> ForeignCall -> Type -> Id
 mkFCallId dflags uniq fcall ty
-  = ASSERT( noFreeVarsOfType ty )
+  = assert (noFreeVarsOfType ty) $
     -- A CCallOpId should have no free type variables;
     -- when doing substitutions won't substitute over it
     mkGlobalId (FCallId fcall) name ty info

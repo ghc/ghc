@@ -224,19 +224,19 @@ buildPatSyn src_name declared_infix matcher@(_, matcher_ty,_) builder
             pat_ty field_labels
   = -- The assertion checks that the matcher is
     -- compatible with the pattern synonym
-    ASSERT2((and [ univ_tvs `equalLength` univ_tvs1
-                 , ex_tvs `equalLength` ex_tvs1
-                 , pat_ty `eqType` substTy subst (scaledThing pat_ty1)
-                 , prov_theta `eqTypes` substTys subst prov_theta1
-                 , req_theta `eqTypes` substTys subst req_theta1
-                 , compareArgTys arg_tys (substTys subst (map scaledThing arg_tys1))
-                 ])
-            , (vcat [ ppr univ_tvs <+> twiddle <+> ppr univ_tvs1
+    assertPpr (and [ univ_tvs `equalLength` univ_tvs1
+                   , ex_tvs `equalLength` ex_tvs1
+                   , pat_ty `eqType` substTy subst (scaledThing pat_ty1)
+                   , prov_theta `eqTypes` substTys subst prov_theta1
+                   , req_theta `eqTypes` substTys subst req_theta1
+                   , compareArgTys arg_tys (substTys subst (map scaledThing arg_tys1))
+                   ])
+              (vcat [ ppr univ_tvs <+> twiddle <+> ppr univ_tvs1
                     , ppr ex_tvs <+> twiddle <+> ppr ex_tvs1
                     , ppr pat_ty <+> twiddle <+> ppr pat_ty1
                     , ppr prov_theta <+> twiddle <+> ppr prov_theta1
                     , ppr req_theta <+> twiddle <+> ppr req_theta1
-                    , ppr arg_tys <+> twiddle <+> ppr arg_tys1]))
+                    , ppr arg_tys <+> twiddle <+> ppr arg_tys1]) $
     mkPatSyn src_name declared_infix
              (univ_tvs, req_theta) (ex_tvs, prov_theta)
              arg_tys pat_ty

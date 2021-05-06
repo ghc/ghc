@@ -33,7 +33,6 @@ import GHC.Builtin.Names (rationalTyConName)
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Misc
 import GHC.Core.DataCon
 import GHC.Types.Var (EvVar)
 import GHC.Core.Coercion
@@ -405,7 +404,8 @@ desugarLocalBinds (HsValBinds _ (XValBindsLR (NValBinds binds _))) =
       let go_export :: ABExport GhcTc -> Maybe PmGrd
           go_export ABE{abe_poly = x, abe_mono = y, abe_wrap = wrap}
             | isIdHsWrapper wrap
-            = ASSERT2(idType x `eqType` idType y, ppr x $$ ppr (idType x) $$ ppr y $$ ppr (idType y))
+            = assertPpr (idType x `eqType` idType y)
+                        (ppr x $$ ppr (idType x) $$ ppr y $$ ppr (idType y)) $
               Just $ PmLet x (Var y)
             | otherwise
             = Nothing

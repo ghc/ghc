@@ -54,6 +54,7 @@ import GHC.Types.Var.Env
 import GHC.Types.Var.Set (elemVarSet)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Data.FastString
 import GHC.Utils.Misc
 
@@ -388,7 +389,7 @@ mkBindsRep dflags gk tycon = (binds, sigs)
         (from_alts, to_alts) = mkSum gk_ (1 :: US) datacons
           where gk_ = case gk of
                   Gen0 -> Gen0_
-                  Gen1 -> ASSERT(tyvars `lengthAtLeast` 1)
+                  Gen1 -> assert (tyvars `lengthAtLeast` 1) $
                           Gen1_ (last tyvars)
                     where tyvars = tyConTyVars tycon
 
@@ -439,7 +440,7 @@ tc_mkRepFamInsts gk tycon inst_tys =
      ; let -- `tyvars` = [a,b]
            (tyvars, gk_) = case gk of
              Gen0 -> (all_tyvars, Gen0_)
-             Gen1 -> ASSERT(not $ null all_tyvars)
+             Gen1 -> assert (not $ null all_tyvars)
                      (init all_tyvars, Gen1_ $ last all_tyvars)
              where all_tyvars = tyConTyVars tycon
 
@@ -618,7 +619,7 @@ tc_mkRepTy gk_ tycon k =
         -- The Bool is True if this constructor has labelled fields
         prod :: [Type] -> [HsSrcBang] -> [HsImplBang] -> [FieldLabel] -> Type
         prod l sb ib fl = foldBal mkProd (mkTyConApp u1 [k])
-                                  [ ASSERT(null fl || lengthExceeds fl j)
+                                  [ assert (null fl || lengthExceeds fl j) $
                                     arg t sb' ib' (if null fl
                                                       then Nothing
                                                       else Just (fl !! j))

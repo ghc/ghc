@@ -56,7 +56,6 @@ import GHC.Data.FastString
 import GHC.Utils.Encoding
 import GHC.Utils.IO.Unsafe
 import GHC.Utils.Panic.Plain
-import GHC.Utils.Misc
 import GHC.Utils.Exception      ( bracket_ )
 
 import Data.Maybe
@@ -150,7 +149,7 @@ skipBOM h size offset =
   if size > 0 && offset == 0
     then do
       -- Validate assumption that handle is in binary mode.
-      ASSERTM( hGetEncoding h >>= return . isNothing )
+      assertM (hGetEncoding h >>= return . isNothing)
       -- Temporarily select utf8 encoding with error ignoring,
       -- to make `hLookAhead` and `hGetChar` return full Unicode characters.
       bracket_ (hSetEncoding h safeEncoding) (hSetBinaryMode h True) $ do

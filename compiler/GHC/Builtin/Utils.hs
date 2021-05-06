@@ -76,6 +76,7 @@ import GHC.Types.Unique ( isValidKnownKeyUnique )
 import GHC.Utils.Outputable
 import GHC.Utils.Misc as Utils
 import GHC.Utils.Panic
+import GHC.Utils.Constants (debugIsOn)
 import GHC.Hs.Doc
 import GHC.Unit.Module.ModIface (IfaceExport)
 

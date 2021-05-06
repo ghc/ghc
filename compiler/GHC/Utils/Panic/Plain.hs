@@ -21,6 +21,7 @@ module GHC.Utils.Panic.Plain
   , panic, sorry, pgmError
   , cmdLineError, cmdLineErrorIO
   , assertPanic
+  , assert, assertM, massert
 
   , progName
   ) where
@@ -28,6 +29,7 @@ module GHC.Utils.Panic.Plain
 #include "HsVersions.h"
 
 import GHC.Settings.Config
+import GHC.Utils.Constants
 import GHC.Utils.Exception as Exception
 import GHC.Stack
 import GHC.Prelude
@@ -97,13 +99,13 @@ showPlainGhcException =
     sorryMsg :: ShowS -> ShowS
     sorryMsg s =
         showString "sorry! (unimplemented feature or known bug)\n"
-      . showString ("  (GHC version " ++ cProjectVersion ++ ":\n\t")
+      . showString ("  GHC version " ++ cProjectVersion ++ ":\n\t")
       . s . showString "\n"
 
     panicMsg :: ShowS -> ShowS
     panicMsg s =
         showString "panic! (the 'impossible' happened)\n"
-      . showString ("  (GHC version " ++ cProjectVersion ++ ":\n\t")
+      . showString ("  GHC version " ++ cProjectVersion ++ ":\n\t")
       . s . showString "\n\n"
       . showString "Please report this as a GHC bug:  https://www.haskell.org/ghc/reportabug\n"
 
@@ -136,3 +138,27 @@ assertPanic :: String -> Int -> a
 assertPanic file line =
   Exception.throw (Exception.AssertionFailed
            ("ASSERT failed! file " ++ file ++ ", line " ++ show line))
+
+
+assertPanic' :: HasCallStack => a
+assertPanic' =
+  let doc = unlines $ fmap ("  "++) $ lines (prettyCallStack callStack)
+  in
+  Exception.throw (Exception.AssertionFailed
+           ("ASSERT failed!\n"
+            ++ withFrozenCallStack doc))
+
+assert :: HasCallStack => Bool -> a -> a
+{-# INLINE assert #-}
+assert cond a =
+  if debugIsOn && not cond
+    then withFrozenCallStack assertPanic'
+    else a
+
+massert :: (HasCallStack, Applicative m) => Bool -> m ()
+{-# INLINE massert #-}
+massert cond = withFrozenCallStack (assert cond (pure ()))
+
+assertM :: (HasCallStack, Monad m) => m Bool -> m ()
+{-# INLINE assertM #-}
+assertM mcond = withFrozenCallStack (mcond >>= massert)

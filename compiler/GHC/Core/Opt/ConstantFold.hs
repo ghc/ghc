@@ -70,6 +70,7 @@ import GHC.Types.Basic
 import GHC.Platform
 import GHC.Utils.Misc
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 
 import Control.Applicative ( Alternative(..) )
 
@@ -1536,7 +1537,7 @@ tagToEnumRule = do
       let tag = fromInteger i
           correct_tag dc = (dataConTagZ dc) == tag
       (dc:rest) <- return $ filter correct_tag (tyConDataCons_maybe tycon `orElse` [])
-      ASSERT(null rest) return ()
+      massert (null rest)
       return $ mkTyApps (Var (dataConWorkId dc)) tc_args
 
     -- See Note [tagToEnum#]
@@ -1564,7 +1565,7 @@ dataToTagRule = a `mplus` b
       [_, val_arg] <- getArgs
       in_scope <- getInScopeEnv
       (_,floats, dc,_,_) <- liftMaybe $ exprIsConApp_maybe in_scope val_arg
-      ASSERT( not (isNewTyCon (dataConTyCon dc)) ) return ()
+      massert (not (isNewTyCon (dataConTyCon dc)))
       return $ wrapFloats floats (mkIntVal dflags (toInteger (dataConTagZ dc)))
 
 {- Note [dataToTag# magic]
@@ -2137,7 +2138,7 @@ match_append_lit foldVariant _ id_unf _
     in eqExpr freeVars c1 c2
   , (c1Ticks, c1') <- stripTicksTop tickishFloatable c1
   , c2Ticks <- stripTicksTopT tickishFloatable c2
-  = ASSERT( ty1 `eqType` ty2 )
+  = assert (ty1 `eqType` ty2) $
     Just $ mkTicks strTicks
          $ Var unpk `App` Type ty1
                     `App` Lit (LitString (s1 `BS.append` s2))
@@ -2337,7 +2338,7 @@ match_inline _ = Nothing
 
 addFoldingRules :: PrimOp -> NumOps -> RuleM CoreExpr
 addFoldingRules op num_ops = do
-   ASSERT(op == numAdd num_ops) return ()
+   massert (op == numAdd num_ops)
    env <- getEnv
    guard (roNumConstantFolding env)
    [arg1,arg2] <- getArgs
@@ -2349,7 +2350,7 @@ addFoldingRules op num_ops = do
 
 subFoldingRules :: PrimOp -> NumOps -> RuleM CoreExpr
 subFoldingRules op num_ops = do
-   ASSERT(op == numSub num_ops) return ()
+   massert (op == numSub num_ops)
    env <- getEnv
    guard (roNumConstantFolding env)
    [arg1,arg2] <- getArgs
@@ -2358,7 +2359,7 @@ subFoldingRules op num_ops = do
 
 mulFoldingRules :: PrimOp -> NumOps -> RuleM CoreExpr
 mulFoldingRules op num_ops = do
-   ASSERT(op == numMul num_ops) return ()
+   massert (op == numMul num_ops)
    env <- getEnv
    guard (roNumConstantFolding env)
    [arg1,arg2] <- getArgs

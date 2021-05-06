@@ -61,8 +61,10 @@ import GHC.Types.Basic
 import GHC.Types.Tickish
 import GHC.Builtin.Uniques
 import GHC.Driver.Session ( DynFlags, GeneralFlag(..), gopt )
+import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Data.FastString
 import GHC.Data.Pair
 import GHC.Utils.Misc
@@ -1622,7 +1624,7 @@ pushCoTyArg co ty
   = Just (ty, MRefl)
 
   | isForAllTy_ty tyL
-  = ASSERT2( isForAllTy_ty tyR, ppr co $$ ppr ty )
+  = assertPpr (isForAllTy_ty tyR) (ppr co $$ ppr ty) $
     Just (ty `mkCastTy` co1, MCo co2)
 
   | otherwise
@@ -1671,7 +1673,7 @@ pushCoValArg co
               -- If   co  :: (tyL1 -> tyL2) ~ (tyR1 -> tyR2)
               -- then co1 :: tyL1 ~ tyR1
               --      co2 :: tyL2 ~ tyR2
-  = ASSERT2( isFunTy tyR, ppr co $$ ppr arg )
+  = assertPpr (isFunTy tyR) (ppr co $$ ppr arg) $
     Just (coToMCo (mkSymCo co1), coToMCo co2)
     -- Critically, coToMCo to checks for ReflCo; the whole coercion may not
     -- be reflexive, but either of its components might be
@@ -1691,7 +1693,7 @@ pushCoercionIntoLambda
 -- ===>
 --    (\x'. e |> co')
 pushCoercionIntoLambda in_scope x e co
-    | ASSERT(not (isTyVar x) && not (isCoVar x)) True
+    | assert (not (isTyVar x) && not (isCoVar x)) True
     , Pair s1s2 t1t2 <- coercionKind co
     , Just (_, _s1,_s2) <- splitFunTy_maybe s1s2
     , Just (w1, t1,_t2) <- splitFunTy_maybe t1t2
@@ -1764,8 +1766,8 @@ pushCoDataCon dc dc_args co
                          ppr ex_args, ppr val_args, ppr co, ppr from_ty, ppr to_ty, ppr to_tc
                          , ppr $ mkTyConApp to_tc (map exprToType $ takeList dc_univ_tyvars dc_args) ]
     in
-    ASSERT2( eqType from_ty (mkTyConApp to_tc (map exprToType $ takeList dc_univ_tyvars dc_args)), dump_doc )
-    ASSERT2( equalLength val_args arg_tys, dump_doc )
+    assertPpr (eqType from_ty (mkTyConApp to_tc (map exprToType $ takeList dc_univ_tyvars dc_args))) dump_doc $
+    assertPpr (equalLength val_args arg_tys) dump_doc $
     Just (dc, to_tc_arg_tys, to_ex_args ++ new_val_args)
 
   | otherwise
@@ -1806,14 +1808,14 @@ collectBindersPushingCo e
     go_lam bs b e co
       | isTyVar b
       , let Pair tyL tyR = coercionKind co
-      , ASSERT( isForAllTy_ty tyL )
+      , assert (isForAllTy_ty tyL) $
         isForAllTy_ty tyR
       , isReflCo (mkNthCo Nominal 0 co)  -- See Note [collectBindersPushingCo]
       = go_c (b:bs) e (mkInstCo co (mkNomReflCo (mkTyVarTy b)))
 
       | isCoVar b
       , let Pair tyL tyR = coercionKind co
-      , ASSERT( isForAllTy_co tyL )
+      , assert (isForAllTy_co tyL) $
         isForAllTy_co tyR
       , isReflCo (mkNthCo Nominal 0 co)  -- See Note [collectBindersPushingCo]
       , let cov = mkCoVarCo b
@@ -1821,7 +1823,7 @@ collectBindersPushingCo e
 
       | isId b
       , let Pair tyL tyR = coercionKind co
-      , ASSERT( isFunTy tyL) isFunTy tyR
+      , assert (isFunTy tyL) $ isFunTy tyR
       , (co_mult, co_arg, co_res) <- decomposeFunCo Representational co
       , isReflCo co_mult -- See Note [collectBindersPushingCo]
       , isReflCo co_arg  -- See Note [collectBindersPushingCo]

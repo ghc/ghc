@@ -49,6 +49,7 @@ import GHC.Types.Var.Set
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Utils.FV
 
 import GHC.Data.Bag( Bag, unionBags, unitBag )
@@ -511,7 +512,7 @@ tcLookupDataFamInst_maybe fam_inst_envs tc tc_args
   , let rep_tc = dataFamInstRepTyCon rep_fam
         co     = mkUnbranchedAxInstCo Representational ax rep_args
                                       (mkCoVarCos cvs)
-  = ASSERT( null rep_cos ) -- See Note [Constrained family instances] in GHC.Core.FamInstEnv
+  = assert (null rep_cos) $ -- See Note [Constrained family instances] in GHC.Core.FamInstEnv
     Just (rep_tc, rep_args, co)
 
   | otherwise
@@ -752,7 +753,7 @@ reportInjectivityErrors
    -> [Bool]       -- ^ Injectivity annotation
    -> TcM ()
 reportInjectivityErrors dflags fi_ax axiom inj
-  = ASSERT2( any id inj, text "No injective type variables" )
+  = assertPpr (any id inj) (text "No injective type variables") $
     do let lhs             = coAxBranchLHS axiom
            rhs             = coAxBranchRHS axiom
            fam_tc          = coAxiomTyCon fi_ax

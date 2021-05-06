@@ -28,6 +28,7 @@ import GHC.Types.Var.Env
 import GHC.Driver.Session
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Tc.Solver.Monad as TcS
 
 import GHC.Utils.Misc
@@ -257,7 +258,7 @@ rewriteArgsNom ev tc tys
   = do { traceTcS "rewrite_args {" (vcat (map ppr tys))
        ; (tys', cos, kind_co)
            <- runRewriteCtEv ev (rewrite_args_tc tc Nothing tys)
-       ; MASSERT( isReflMCo kind_co )
+       ; massert (isReflMCo kind_co)
        ; traceTcS "rewrite }" (vcat (map ppr tys'))
        ; return (tys', cos) }
 
@@ -769,8 +770,8 @@ rewrite_fam_app :: TyCon -> [TcType] -> RewriteM (Xi, Coercion)
   --   rewrite_exact_fam_app      lifts out the application to top level
   -- Postcondition: Coercion :: Xi ~ F tys
 rewrite_fam_app tc tys  -- Can be over-saturated
-    = ASSERT2( tys `lengthAtLeast` tyConArity tc
-             , ppr tc $$ ppr (tyConArity tc) $$ ppr tys)
+    = assertPpr (tys `lengthAtLeast` tyConArity tc)
+                (ppr tc $$ ppr (tyConArity tc) $$ ppr tys) $
 
                  -- Type functions are saturated
                  -- The type function might be *over* saturated
@@ -968,7 +969,7 @@ rewrite_tyvar2 tv fr@(_, eq_rel)
                          ppr rhs_ty $$ ppr ctev)
                     ; let rewrite_co1 = mkSymCo (ctEvCoercion ctev)
                           rewrite_co  = case (ct_eq_rel, eq_rel) of
-                            (ReprEq, _rel)  -> ASSERT( _rel == ReprEq )
+                            (ReprEq, _rel)  -> assert (_rel == ReprEq )
                                     -- if this ASSERT fails, then
                                     -- eqCanRewriteFR answered incorrectly
                                                rewrite_co1

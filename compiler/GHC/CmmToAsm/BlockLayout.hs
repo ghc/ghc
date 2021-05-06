@@ -31,11 +31,12 @@ import GHC.Cmm.Dataflow.Label
 
 import GHC.Platform
 import GHC.Types.Unique.FM
-import GHC.Utils.Misc
 
 import GHC.Data.Graph.Directed
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
+import GHC.Utils.Misc
 import GHC.Data.Maybe
 
 -- DEBUGGING ONLY
@@ -312,7 +313,7 @@ instance Eq BlockChain where
 -- in the chain.
 instance Ord (BlockChain) where
    (BlockChain lbls1) `compare` (BlockChain lbls2)
-       = ASSERT(toList lbls1 /= toList lbls2 || lbls1 `strictlyEqOL` lbls2)
+       = assert (toList lbls1 /= toList lbls2 || lbls1 `strictlyEqOL` lbls2) $
          strictlyOrdOL lbls1 lbls2
 
 instance Outputable (BlockChain) where
@@ -719,7 +720,7 @@ sequenceChain  info weights     blocks@((BasicBlock entry _):_) =
             directEdges
 
         (neighbourChains, combined)
-            = ASSERT(noDups $ mapElems builtChains)
+            = assert (noDups $ mapElems builtChains) $
               {-# SCC "groupNeighbourChains" #-}
             --   pprTraceIt "NeighbourChains" $
               combineNeighbourhood rankedEdges (mapElems builtChains)
@@ -759,7 +760,7 @@ sequenceChain  info weights     blocks@((BasicBlock entry _):_) =
 #endif
 
         blockList
-            = ASSERT(noDups [masterChain])
+            = assert (noDups [masterChain])
               (concatMap fromOL $ map chainBlocks prepedChains)
 
         --chainPlaced = setFromList $ map blockId blockList :: LabelSet
@@ -773,14 +774,14 @@ sequenceChain  info weights     blocks@((BasicBlock entry _):_) =
             -- We want debug builds to catch this as it's a good indicator for
             -- issues with CFG invariants. But we don't want to blow up production
             -- builds if something slips through.
-            ASSERT(null unplaced)
+            assert (null unplaced) $
             --pprTraceIt "placedBlocks" $
             -- ++ [] is stil kinda expensive
             if null unplaced then blockList else blockList ++ unplaced
         getBlock bid = expectJust "Block placement" $ mapLookup bid blockMap
     in
         --Assert we placed all blocks given as input
-        ASSERT(all (\bid -> mapMember bid blockMap) placedBlocks)
+        assert (all (\bid -> mapMember bid blockMap) placedBlocks) $
         dropJumps info $ map getBlock placedBlocks
 
 {-# SCC dropJumps #-}

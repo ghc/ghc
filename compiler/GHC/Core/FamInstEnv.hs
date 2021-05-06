@@ -62,6 +62,7 @@ import Data.Array( Array, assocs )
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 
 {-
 ************************************************************************
@@ -808,9 +809,9 @@ lookupFamInstEnvConflicts envs fam_inst@(FamInst { fi_axiom = new_axiom })
         -- In example above,   fam tys' = F [b]
 
     my_unify (FamInst { fi_axiom = old_axiom }) tpl_tvs tpl_tys _
-       = ASSERT2( tyCoVarsOfTypes tys `disjointVarSet` tpl_tvs,
-                  (ppr fam <+> ppr tys) $$
-                  (ppr tpl_tvs <+> ppr tpl_tys) )
+       = assertPpr (tyCoVarsOfTypes tys `disjointVarSet` tpl_tvs)
+                   ((ppr fam <+> ppr tys) $$
+                    (ppr tpl_tvs <+> ppr tpl_tys)) $
                 -- Unification will break badly if the variables overlap
                 -- They shouldn't because we allocate separate uniques for them
          if compatibleBranches (coAxiomSingleBranch old_axiom) new_branch
@@ -1003,7 +1004,7 @@ lookup_fam_inst_env' match_fun ie fam match_tys
       | Just subst <- match_fun item (mkVarSet tpl_tvs) tpl_tys match_tys1
       = (FamInstMatch { fim_instance = item
                       , fim_tys      = substTyVars subst tpl_tvs `chkAppend` match_tys2
-                      , fim_cos      = ASSERT( all (isJust . lookupCoVar subst) tpl_cvs )
+                      , fim_cos      = assert (all (isJust . lookupCoVar subst) tpl_cvs) $
                                        substCoVars subst tpl_cvs
                       })
         : find rest
@@ -1186,7 +1187,7 @@ findBranch branches target_tys
           |  apartnessCheck flattened_target branch
           -> -- matching worked & we're apart from all incompatible branches.
              -- success
-             ASSERT( all (isJust . lookupCoVar subst) tpl_cvs )
+             assert (all (isJust . lookupCoVar subst) tpl_cvs) $
              Just (index, substTyVars subst tpl_tvs, substCoVars subst tpl_cvs)
 
         -- failure. keep looking
@@ -1509,7 +1510,7 @@ normalise_args fun_ki roles args
 
 normalise_tyvar :: TyVar -> NormM (Coercion, Type)
 normalise_tyvar tv
-  = ASSERT( isTyVar tv )
+  = assert (isTyVar tv) $
     do { lc <- getLC
        ; r  <- getRole
        ; return $ case liftCoSubstTyVar lc r tv of

@@ -78,6 +78,7 @@ import GHC.Builtin.Names
 import GHC.Types.Name( isInternalName )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Types.SrcLoc
 import GHC.Types.Tickish
 import GHC.Utils.Misc
@@ -144,7 +145,7 @@ selectMatchVar _w (VarPat _ var)  = return (localiseId (unLoc var))
                                   -- multiplicity stored within the variable
                                   -- itself. It's easier to pull it from the
                                   -- variable, so we ignore the multiplicity.
-selectMatchVar _w (AsPat _ var _) = ASSERT( isManyDataConTy _w ) (return (unLoc var))
+selectMatchVar _w (AsPat _ var _) = assert (isManyDataConTy _w ) (return (unLoc var))
 selectMatchVar w other_pat     = newSysLocalDsNoLP w (hsPatType other_pat)
 
 {- Note [Localise pattern binders]
@@ -198,7 +199,7 @@ worthy of a type synonym and a few handy functions.
 -}
 
 firstPat :: EquationInfo -> Pat GhcTc
-firstPat eqn = ASSERT( notNull (eqn_pats eqn) ) head (eqn_pats eqn)
+firstPat eqn = assert (notNull (eqn_pats eqn)) $ head (eqn_pats eqn)
 
 shiftEqns :: Functor f => f EquationInfo -> f EquationInfo
 -- Drop the first pattern in each equation
@@ -283,7 +284,7 @@ mkCoPrimCaseMatchResult var ty match_alts
 
     sorted_alts = sortWith fst match_alts       -- Right order for a Case
     mk_alt fail (lit, mr)
-       = ASSERT( not (litIsLifted lit) )
+       = assert (not (litIsLifted lit)) $
          do body <- runMatchResult fail mr
             return (Alt (LitAlt lit) [] body)
 
@@ -299,7 +300,7 @@ mkCoAlgCaseMatchResult
   -> MatchResult CoreExpr
 mkCoAlgCaseMatchResult var ty match_alts
   | isNewtype  -- Newtype case; use a let
-  = ASSERT( null match_alts_tail && null (tail arg_ids1) )
+  = assert (null match_alts_tail && null (tail arg_ids1)) $
     mkCoLetMatchResult (NonRec arg_id1 newtype_rhs) match_result1
 
   | otherwise
@@ -313,7 +314,7 @@ mkCoAlgCaseMatchResult var ty match_alts
     alt1@MkCaseAlt{ alt_bndrs = arg_ids1, alt_result = match_result1 } :| match_alts_tail
       = match_alts
     -- Stuff for newtype
-    arg_id1       = ASSERT( notNull arg_ids1 ) head arg_ids1
+    arg_id1       = assert (notNull arg_ids1) $ head arg_ids1
     var_ty        = idType var
     (tc, ty_args) = tcSplitTyConApp var_ty      -- Don't look through newtypes
                                                 -- (not that splitTyConApp does, these days)

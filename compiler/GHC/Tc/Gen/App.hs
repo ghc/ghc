@@ -991,7 +991,7 @@ qlUnify delta ty1 ty2
 
     ----------------
     go_kappa bvs kappa ty2
-      = ASSERT2( isMetaTyVar kappa, ppr kappa )
+      = assertPpr (isMetaTyVar kappa) (ppr kappa) $
         do { info <- readMetaTyVar kappa
            ; case info of
                Indirect ty1 -> go bvs ty1 ty2

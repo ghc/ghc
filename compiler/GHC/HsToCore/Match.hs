@@ -61,6 +61,7 @@ import GHC.Utils.Misc
 import GHC.Types.Name
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Data.FastString
 import GHC.Types.Unique
 import GHC.Types.Unique.DFM
@@ -184,15 +185,15 @@ match :: [MatchId]        -- ^ Variables rep\'ing the exprs we\'re matching with
       -> DsM (MatchResult CoreExpr) -- ^ Desugared result!
 
 match [] ty eqns
-  = ASSERT2( not (null eqns), ppr ty )
+  = assertPpr (not (null eqns)) (ppr ty) $
     return (foldr1 combineMatchResults match_results)
   where
-    match_results = [ ASSERT( null (eqn_pats eqn) )
+    match_results = [ assert (null (eqn_pats eqn)) $
                       eqn_rhs eqn
                     | eqn <- eqns ]
 
 match (v:vs) ty eqns    -- Eqns *can* be empty
-  = ASSERT2( all (isInternalName . idName) vars, ppr vars )
+  = assertPpr (all (isInternalName . idName) vars) (ppr vars) $
     do  { dflags <- getDynFlags
         ; let platform = targetPlatform dflags
                 -- Tidy the first pattern, generating
@@ -574,12 +575,12 @@ push_bang_into_newtype_arg :: SrcSpanAnnA
 -- See Note [Bang patterns and newtypes]
 -- We are transforming   !(N p)   into   (N !p)
 push_bang_into_newtype_arg l _ty (PrefixCon ts (arg:args))
-  = ASSERT( null args)
+  = assert (null args) $
     PrefixCon ts [L l (BangPat noExtField arg)]
 push_bang_into_newtype_arg l _ty (RecCon rf)
   | HsRecFields { rec_flds = L lf fld : flds } <- rf
   , HsRecField { hsRecFieldArg = arg } <- fld
-  = ASSERT( null flds)
+  = assert (null flds) $
     RecCon (rf { rec_flds = [L lf (fld { hsRecFieldArg
                                            = L l (BangPat noExtField arg) })] })
 push_bang_into_newtype_arg l ty (RecCon rf) -- If a user writes !(T {})
@@ -873,7 +874,7 @@ matchSinglePatVar :: Id   -- See Note [Match Ids]
                   -> HsMatchContext GhcRn -> LPat GhcTc
                   -> Type -> MatchResult CoreExpr -> DsM (MatchResult CoreExpr)
 matchSinglePatVar var mb_scrut ctx pat ty match_result
-  = ASSERT2( isInternalName (idName var), ppr var )
+  = assertPpr (isInternalName (idName var)) (ppr var) $
     do { dflags <- getDynFlags
        ; locn   <- getSrcSpanDs
        -- Pattern match check warnings
@@ -1171,7 +1172,7 @@ patGroup _ (NPat _ (L _ (OverLit {ol_val=oval})) mb_neg _) =
     (HsFractional f, is_neg)
       | is_neg    -> PgN $! negateFractionalLit f
       | otherwise -> PgN f
-    (HsIsString _ s, _) -> ASSERT(isNothing mb_neg)
+    (HsIsString _ s, _) -> assert (isNothing mb_neg) $
                             PgOverS s
 patGroup _ (NPlusKPat _ _ (L _ (OverLit {ol_val=oval})) _ _ _) =
   case oval of

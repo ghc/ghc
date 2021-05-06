@@ -76,6 +76,7 @@ import GHC.Driver.Session
 import GHC.Data.FastString
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Types.RepType
 import GHC.Types.CostCentre
 import GHC.Types.IPE
@@ -287,12 +288,12 @@ newUnboxedTupleRegs :: Type -> FCode ([LocalReg], [ForeignHint])
 -- the Sequel.  If the Sequel is a join point, using the
 -- regs it wants will save later assignments.
 newUnboxedTupleRegs res_ty
-  = ASSERT( isUnboxedTupleType res_ty )
+  = assert (isUnboxedTupleType res_ty) $
     do  { platform <- getPlatform
         ; sequel <- getSequel
         ; regs <- choose_regs platform sequel
-        ; ASSERT( regs `equalLength` reps )
-          return (regs, map primRepForeignHint reps) }
+        ; massert (regs `equalLength` reps)
+        ; return (regs, map primRepForeignHint reps) }
   where
     reps = typePrimRep res_ty
     choose_regs _ (AssignTo regs _) = return regs
@@ -323,7 +324,7 @@ emitMultiAssign []    []    = return ()
 emitMultiAssign [reg] [rhs] = emitAssign (CmmLocal reg) rhs
 emitMultiAssign regs rhss   = do
   platform <- getPlatform
-  ASSERT2( equalLength regs rhss, ppr regs $$ pdoc platform rhss )
+  assertPpr (equalLength regs rhss) (ppr regs $$ pdoc platform rhss) $
     unscramble platform ([1..] `zip` (regs `zip` rhss))
 
 unscramble :: Platform -> [Vrtx] -> FCode ()
@@ -411,7 +412,7 @@ mk_discrete_switch :: Bool -- ^ Use signed comparisons
 -- SINGLETON TAG RANGE: no case analysis to do
 mk_discrete_switch _ _tag_expr [(tag, lbl)] _ (lo_tag, hi_tag)
   | lo_tag == hi_tag
-  = ASSERT( tag == lo_tag )
+  = assert (tag == lo_tag) $
     mkBranch lbl
 
 -- SINGLETON BRANCH, NO DEFAULT: no case analysis to do

@@ -28,6 +28,7 @@ import qualified GHC.SysTools as SysTools
 import GHC.Data.Graph.Directed ( SCC(..) )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Types.SourceError
 import GHC.Types.SrcLoc
 import Data.List (partition)
@@ -418,7 +419,7 @@ pprCycle summaries = pp_group (CyclicSCC summaries)
 
     pp_group (AcyclicSCC ms) = pp_ms ms
     pp_group (CyclicSCC mss)
-        = ASSERT( not (null boot_only) )
+        = assert (not (null boot_only)) $
                 -- The boot-only list must be non-empty, else there would
                 -- be an infinite chain of non-boot imports, and we've
                 -- already checked for that in processModDeps

@@ -80,5 +80,5 @@ extendInScope id (Subst in_scope env) = Subst (in_scope `extendInScopeSet` id) e
 -- holds after extending the substitution like this.
 extendSubst :: Id -> Id -> Subst -> Subst
 extendSubst id new_id (Subst in_scope env)
-  = ASSERT2( new_id `elemInScopeSet` in_scope, ppr id <+> ppr new_id $$ ppr in_scope )
+  = assertPpr (new_id `elemInScopeSet` in_scope) (ppr id <+> ppr new_id $$ ppr in_scope) $
     Subst in_scope (extendVarEnv env id new_id)

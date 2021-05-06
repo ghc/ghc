@@ -59,6 +59,7 @@ import GHC.Utils.Misc
 import GHC.Data.FastString
 import GHC.Utils.Outputable as O
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Types.SrcLoc
 import GHC.Driver.Session
 import GHC.Driver.Ppr
@@ -555,7 +556,7 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics
          -- says to suppress
        ; let ctxt2 = ctxt { cec_suppress = cec_suppress ctxt || cec_suppress ctxt1 }
        ; (_, leftovers) <- tryReporters ctxt2 report2 cts1
-       ; MASSERT2( null leftovers, ppr leftovers )
+       ; massertPpr (null leftovers) (ppr leftovers)
 
             -- All the Derived ones have been filtered out of simples
             -- by the constraint solver. This is ok; we don't want
@@ -1629,8 +1630,8 @@ mkTyVarEqErr' dflags ctxt report ct tv1 ty2
   -- See Note [Error messages for untouchables]
   | (implic:_) <- cec_encl ctxt   -- Get the innermost context
   , Implic { ic_given = given, ic_tclvl = lvl, ic_info = skol_info } <- implic
-  = ASSERT2( not (isTouchableMetaTyVar lvl tv1)
-           , ppr tv1 $$ ppr lvl )  -- See Note [Error messages for untouchables]
+  = assertPpr (not (isTouchableMetaTyVar lvl tv1))
+              (ppr tv1 $$ ppr lvl) $  -- See Note [Error messages for untouchables]
     let msg         = misMatchMsg ctxt ct ty1 ty2
         tclvl_extra = important $
              nest 2 $
@@ -1800,7 +1801,7 @@ extraTyVarEqInfo ctxt tv1 ty2
 
 extraTyVarInfo :: ReportErrCtxt -> TcTyVar -> SDoc
 extraTyVarInfo ctxt tv
-  = ASSERT2( isTyVar tv, ppr tv )
+  = assertPpr (isTyVar tv) (ppr tv) $
     case tcTyVarDetails tv of
           SkolemTv {}   -> pprSkols ctxt [tv]
           RuntimeUnk {} -> quotes (ppr tv) <+> text "is an interactive-debugger skolem"
@@ -2344,7 +2345,7 @@ Warn of loopy local equalities that were dropped.
 
 mkDictErr :: ReportErrCtxt -> [Ct] -> TcM Report
 mkDictErr ctxt cts
-  = ASSERT( not (null cts) )
+  = assert (not (null cts)) $
     do { inst_envs <- tcGetInstEnvs
        ; let min_cts = elim_superclasses cts
              lookups = map (lookup_cls_inst inst_envs) min_cts
@@ -2518,7 +2519,7 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
 
     -- Normal overlap error
     overlap_msg
-      = ASSERT( not (null matches) )
+      = assert (not (null matches)) $
         vcat [  addArising orig (text "Overlapping instances for"
                                 <+> pprType (mkClassPred clas tys))
 
@@ -2571,7 +2572,7 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
     -- Overlap error because of Safe Haskell (first
     -- match should be the most specific match)
     safe_haskell_msg
-     = ASSERT( matches `lengthIs` 1 && not (null unsafe_ispecs) )
+     = assert (matches `lengthIs` 1 && not (null unsafe_ispecs)) $
        vcat [ addArising orig (text "Unsafe overlapping instances for"
                        <+> pprType (mkClassPred clas tys))
             , sep [text "The matching instance is:",

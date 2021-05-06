@@ -24,6 +24,9 @@ module GHC.Utils.Panic
    , pprPanic
    , assertPanic
    , assertPprPanic
+   , assertPpr
+   , assertPprM
+   , massertPpr
    , sorry
    , trace
    , panicDoc
@@ -48,6 +51,7 @@ import GHC.Stack
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic.Plain
+import GHC.Utils.Constants
 
 import GHC.Utils.Exception as Exception
 
@@ -295,6 +299,21 @@ callStackDoc =
 
 -- | Panic with an assertion failure, recording the given file and
 -- line number. Should typically be accessed with the ASSERT family of macros
-assertPprPanic :: HasCallStack => String -> Int -> SDoc -> a
-assertPprPanic _file _line msg
-  = pprPanic "ASSERT failed!" msg
+assertPprPanic :: HasCallStack => SDoc -> a
+assertPprPanic msg = withFrozenCallStack (pprPanic "ASSERT failed!" msg)
+
+
+assertPpr :: HasCallStack => Bool -> SDoc -> a -> a
+{-# INLINE assertPpr #-}
+assertPpr cond msg a =
+  if debugIsOn && not cond
+    then withFrozenCallStack (assertPprPanic msg)
+    else a
+
+massertPpr :: (HasCallStack, Applicative m) => Bool -> SDoc -> m ()
+{-# INLINE massertPpr #-}
+massertPpr cond msg = withFrozenCallStack (assertPpr cond msg (pure ()))
+
+assertPprM :: (HasCallStack, Monad m) => m Bool -> SDoc -> m ()
+{-# INLINE assertPprM #-}
+assertPprM mcond msg = withFrozenCallStack (mcond >>= \cond -> massertPpr cond msg)

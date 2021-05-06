@@ -56,6 +56,7 @@ import GHC.Utils.Outputable as Outputable
 import GHC.Driver.Session
 import GHC.Utils.Misc
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Data.FastString
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Core.FamInstEnv ( FamInstEnvs, normaliseType )
@@ -204,7 +205,7 @@ dsFractionalLitToRational fl@FL{ fl_signi = signi, fl_exp = exp, fl_exp_base = b
         !denom = mkIntegerExpr (denominator val)
         (ratio_data_con, integer_ty)
             = case tcSplitTyConApp ty of
-                    (tycon, [i_ty]) -> ASSERT(isIntegerTy i_ty && tycon `hasKey` ratioTyConKey)
+                    (tycon, [i_ty]) -> assert (isIntegerTy i_ty && tycon `hasKey` ratioTyConKey)
                                        (head (tyConDataCons tycon), i_ty)
                     x -> pprPanic "dsLit" (ppr x)
     in return $! (mkCoreConApps ratio_data_con [Type integer_ty, num, denom])

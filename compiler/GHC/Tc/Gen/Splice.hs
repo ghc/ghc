@@ -120,6 +120,7 @@ import GHC.Unit.Module.Deps
 
 import GHC.Utils.Misc
 import GHC.Utils.Panic as Panic
+import GHC.Utils.Panic.Plain
 import GHC.Utils.Lexeme
 import GHC.Utils.Outputable
 import GHC.Utils.Logger
@@ -238,7 +239,7 @@ tcUntypedBracket rn_expr brack ps res_ty
        -- we want to reflect that in the overall type of the bracket.
        ; ps' <- case quoteWrapperTyVarTy <$> brack_info of
                   Just m_var -> mapM (tcPendingSplice m_var) ps
-                  Nothing -> ASSERT(null ps) return []
+                  Nothing -> assert (null ps) $ return []
 
        ; traceTc "tc_bracket done untyped" (ppr expected_type)
 
@@ -2013,7 +2014,7 @@ reifyDataCon isGadtDataCon tys dc
                 -- constructors can be declared infix.
                 -- See Note [Infix GADT constructors] in GHC.Tc.TyCl.
               | dataConIsInfix dc && not isGadtDataCon ->
-                  ASSERT( r_arg_tys `lengthIs` 2 ) do
+                  assert (r_arg_tys `lengthIs` 2) $ do
                   { let [r_a1, r_a2] = r_arg_tys
                         [s1,   s2]   = dcdBangs
                   ; return $ TH.InfixC (s1,r_a1) name (s2,r_a2) }
@@ -2024,7 +2025,7 @@ reifyDataCon isGadtDataCon tys dc
                   return $ TH.NormalC name (dcdBangs `zip` r_arg_tys)
 
        ; let (ex_tvs', theta') | isGadtDataCon = (g_user_tvs, g_theta)
-                               | otherwise     = ASSERT( all isTyVar ex_tvs )
+                               | otherwise     = assert (all isTyVar ex_tvs)
                                                  -- no covars for haskell syntax
                                                  (map mk_specified ex_tvs, theta)
              ret_con | null ex_tvs' && null theta' = return main_con
@@ -2032,7 +2033,7 @@ reifyDataCon isGadtDataCon tys dc
                          { cxt <- reifyCxt theta'
                          ; ex_tvs'' <- reifyTyVarBndrs ex_tvs'
                          ; return (TH.ForallC ex_tvs'' cxt main_con) }
-       ; ASSERT( r_arg_tys `equalLength` dcdBangs )
+       ; assert (r_arg_tys `equalLength` dcdBangs)
          ret_con }
   where
     mk_specified tv = Bndr tv SpecifiedSpec
@@ -2493,7 +2494,7 @@ reifyName thing
         -- have free variables, we may need to generate NameL's for them.
   where
     name    = getName thing
-    mod     = ASSERT( isExternalName name ) nameModule name
+    mod     = assert (isExternalName name) $ nameModule name
     pkg_str = unitString (moduleUnit mod)
     mod_str = moduleNameString (moduleName mod)
     occ_str = occNameString occ
@@ -2511,7 +2512,7 @@ reifyFieldLabel fl
   | otherwise = TH.mkNameG_v pkg_str mod_str occ_str
   where
     name    = flSelector fl
-    mod     = ASSERT( isExternalName name ) nameModule name
+    mod     = assert (isExternalName name) $ nameModule name
     pkg_str = unitString (moduleUnit mod)
     mod_str = moduleNameString (moduleName mod)
     occ_str = unpackFS (flLabel fl)

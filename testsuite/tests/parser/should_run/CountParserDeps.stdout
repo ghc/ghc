@@ -1,4 +1,4 @@
-Found 261 GHC.Parser module dependencies
+Found 262 GHC.Parser module dependencies
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
 GHC.Builtin.Types
@@ -235,6 +235,7 @@ GHC.Utils.Binary
 GHC.Utils.Binary.Typeable
 GHC.Utils.BufHandle
 GHC.Utils.CliOption
+GHC.Utils.Constants
 GHC.Utils.Error
 GHC.Utils.Exception
 GHC.Utils.FV

@@ -32,6 +32,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Types.Unique
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Core.FamInstEnv
 import GHC.Utils.Monad
 
@@ -519,8 +520,9 @@ tryWW dflags fam_envs is_rec fn_id rhs
     cpr_ty       = getCprSig (cprSigInfo fn_info)
     -- Arity of the CPR sig should match idArity when it's not a join point.
     -- See Note [Arity trimming for CPR signatures] in GHC.Core.Opt.CprAnal
-    cpr          = ASSERT2( isJoinId fn_id || cpr_ty == topCprType || ct_arty cpr_ty == arityInfo fn_info
-                          , ppr fn_id <> colon <+> text "ct_arty:" <+> int (ct_arty cpr_ty) <+> text "arityInfo:" <+> ppr (arityInfo fn_info))
+    cpr          = assertPpr (isJoinId fn_id || cpr_ty == topCprType || ct_arty cpr_ty == arityInfo fn_info)
+                             (ppr fn_id <> colon <+> text "ct_arty:" <+> int (ct_arty cpr_ty)
+                              <+> text "arityInfo:" <+> ppr (arityInfo fn_info)) $
                    ct_cpr cpr_ty
 
     new_fn_id = zapIdUsedOnceInfo (zapIdUsageEnvInfo fn_id)
@@ -886,11 +888,11 @@ get around by localising the Id for the auxiliary bindings in 'splitThunk'.
 -- Note [Thunk splitting for top-level binders].
 splitThunk :: DynFlags -> FamInstEnvs -> RecFlag -> Var -> Expr Var -> UniqSM [(Var, Expr Var)]
 splitThunk dflags fam_envs is_rec x rhs
-  = ASSERT(not (isJoinId x))
+  = assert (not (isJoinId x)) $
     do { let x' = localiseId x -- See comment above
        ; (useful,_, wrap_fn, work_fn)
            <- mkWWstr (initWwOpts dflags fam_envs) NotArgOfInlineableFun [x']
        ; let res = [ (x, Let (NonRec x' rhs) (wrap_fn (work_fn (Var x')))) ]
-       ; if useful then ASSERT2( isNonRec is_rec, ppr x ) -- The thunk must be non-recursive
+       ; if useful then assertPpr (isNonRec is_rec) (ppr x) -- The thunk must be non-recursive
                    return res
                    else return [(x, rhs)] }

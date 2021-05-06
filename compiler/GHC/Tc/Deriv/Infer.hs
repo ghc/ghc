@@ -26,6 +26,7 @@ import GHC.Utils.Error
 import GHC.Tc.Utils.Instantiate
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Data.Pair
 import GHC.Builtin.Names
 import GHC.Tc.Deriv.Utils
@@ -113,12 +114,12 @@ inferConstraints mechanism
              -- Constraints arising from superclasses
              -- See Note [Superclasses of derived instance]
              cls_tvs  = classTyVars main_cls
-             sc_constraints = ASSERT2( equalLength cls_tvs inst_tys
-                                     , ppr main_cls <+> ppr inst_tys )
+             sc_constraints = assertPpr (equalLength cls_tvs inst_tys)
+                                        (ppr main_cls <+> ppr inst_tys)
                               [ mkThetaOrigin (mkDerivOrigin wildcard)
                                               TypeLevel [] [] [] $
                                 substTheta cls_subst (classSCTheta main_cls) ]
-             cls_subst = ASSERT( equalLength cls_tvs inst_tys )
+             cls_subst = assert (equalLength cls_tvs inst_tys) $
                          zipTvSubst cls_tvs inst_tys
 
        ; (inferred_constraints, tvs', inst_tys') <- infer_constraints
@@ -269,7 +270,7 @@ inferConstraintsStock (DerivInstTys { dit_cls_tys     = cls_tys
                  substTheta tc_subst (tyConStupidTheta rep_tc) ]
            tc_subst = -- See the comment with all_rep_tc_args for an
                       -- explanation of this assertion
-                      ASSERT( equalLength rep_tc_tvs all_rep_tc_args )
+                      assert (equalLength rep_tc_tvs all_rep_tc_args) $
                       zipTvSubst rep_tc_tvs all_rep_tc_args
 
            -- Extra Data constraints
@@ -308,9 +309,9 @@ inferConstraintsStock (DerivInstTys { dit_cls_tys     = cls_tys
              -- Generic1 needs Functor
              -- See Note [Getting base classes]
           |  is_generic1
-           -> ASSERT( rep_tc_tvs `lengthExceeds` 0 )
+           -> assert (rep_tc_tvs `lengthExceeds` 0) $
               -- Generic1 has a single kind variable
-              ASSERT( cls_tys `lengthIs` 1 )
+              assert (cls_tys `lengthIs` 1) $
               do { functorClass <- lift $ tcLookupClass functorClassName
                  ; pure $ con_arg_constraints
                         $ get_gen1_constraints functorClass }
@@ -319,9 +320,9 @@ inferConstraintsStock (DerivInstTys { dit_cls_tys     = cls_tys
           |  otherwise
            -> -- See the comment with all_rep_tc_args for an explanation of
               -- this assertion
-              ASSERT2( equalLength rep_tc_tvs all_rep_tc_args
-                     , ppr main_cls <+> ppr rep_tc
-                       $$ ppr rep_tc_tvs $$ ppr all_rep_tc_args )
+              assertPpr (equalLength rep_tc_tvs all_rep_tc_args)
+                        ( ppr main_cls <+> ppr rep_tc
+                          $$ ppr rep_tc_tvs $$ ppr all_rep_tc_args) $
                 do { let (arg_constraints, tvs', inst_tys')
                            = con_arg_constraints get_std_constrained_tys
                    ; lift $ traceTc "inferConstraintsStock" $ vcat

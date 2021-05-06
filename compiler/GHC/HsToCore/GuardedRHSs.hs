@@ -30,6 +30,7 @@ import GHC.Utils.Misc
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Core.Multiplicity
 import Control.Monad ( zipWithM )
 import Data.List.NonEmpty ( NonEmpty, toList )
@@ -63,8 +64,8 @@ dsGRHSs :: HsMatchContext GhcRn
                                        --   one for each GRHS.
         -> DsM (MatchResult CoreExpr)
 dsGRHSs hs_ctx (GRHSs _ grhss binds) rhs_ty rhss_nablas
-  = ASSERT( notNull grhss )
-    do { match_results <- ASSERT( length grhss == length rhss_nablas )
+  = assert (notNull grhss) $
+    do { match_results <- assert (length grhss == length rhss_nablas) $
                           zipWithM (dsGRHS hs_ctx rhs_ty) (toList rhss_nablas) grhss
        ; nablas <- getPmNablas
        -- We need to remember the Nablas from the particular match context we
