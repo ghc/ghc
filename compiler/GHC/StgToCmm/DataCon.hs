@@ -15,8 +15,6 @@ module GHC.StgToCmm.DataCon (
         cgTopRhsCon, buildDynCon, bindConArgs
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Platform

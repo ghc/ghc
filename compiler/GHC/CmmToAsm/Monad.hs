@@ -43,8 +43,6 @@ module GHC.CmmToAsm.Monad (
 
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Platform

@@ -16,8 +16,6 @@ module GHC.StgToCmm.Prim (
    shouldInlinePrimOp
  ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude hiding ((<*>))
 
 import GHC.Platform

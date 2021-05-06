@@ -39,8 +39,6 @@ module GHC.Tc.Deriv.Generate (
         getPossibleDataCons, tyConInstArgTys
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Tc.Utils.Monad

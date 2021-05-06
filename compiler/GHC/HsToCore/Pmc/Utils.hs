@@ -11,8 +11,6 @@ module GHC.HsToCore.Pmc.Utils (
 
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Types.Basic (Origin(..), isGenerated)

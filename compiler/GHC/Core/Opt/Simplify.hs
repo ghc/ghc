@@ -10,8 +10,6 @@
 {-# OPTIONS_GHC -Wno-incomplete-record-updates -Wno-incomplete-uni-patterns #-}
 module GHC.Core.Opt.Simplify ( simplTopBinds, simplExpr, simplRules ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Platform
@@ -3098,9 +3096,9 @@ addAltUnfoldings env scrut case_bndr con_app
 addBinderUnfolding :: SimplEnv -> Id -> Unfolding -> SimplEnv
 addBinderUnfolding env bndr unf
   | debugIsOn, Just tmpl <- maybeUnfoldingTemplate unf
-  = WARN( not (eqType (idType bndr) (exprType tmpl)),
-          ppr bndr $$ ppr (idType bndr) $$ ppr tmpl $$ ppr (exprType tmpl) )
-    modifyInScope env (bndr `setIdUnfolding` unf)
+  = warnPprTrace (not (eqType (idType bndr) (exprType tmpl)))
+          (ppr bndr $$ ppr (idType bndr) $$ ppr tmpl $$ ppr (exprType tmpl)) $
+          modifyInScope env (bndr `setIdUnfolding` unf)
 
   | otherwise
   = modifyInScope env (bndr `setIdUnfolding` unf)
@@ -3264,7 +3262,7 @@ missingAlt :: SimplEnv -> Id -> [InAlt] -> SimplCont
                 -- it "sees" that the entire branch of an outer case is
                 -- inaccessible.  So we simply put an error case here instead.
 missingAlt env case_bndr _ cont
-  = WARN( True, text "missingAlt" <+> ppr case_bndr )
+  = warnPprTrace True (text "missingAlt" <+> ppr case_bndr) $
     -- See Note [Avoiding space leaks in OutType]
     let cont_ty = contResultType cont
     in seqType cont_ty `seq`
@@ -3533,9 +3531,9 @@ mkDupableAlt platform case_bndr jfloats (Alt con bndrs' rhs')
                              unf = mkInlineUnfolding simpl_opts rhs
                              rhs = mkConApp2 dc (tyConAppArgs scrut_ty) bndrs'
 
-                      LitAlt {} -> WARN( True, text "mkDupableAlt"
-                                                <+> ppr case_bndr <+> ppr con )
-                                   case_bndr
+                      LitAlt {} -> warnPprTrace True
+                                    (text "mkDupableAlt" <+> ppr case_bndr <+> ppr con)
+                                    case_bndr
                            -- The case binder is alive but trivial, so why has
                            -- it not been substituted away?
 

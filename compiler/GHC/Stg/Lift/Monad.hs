@@ -20,8 +20,6 @@ module GHC.Stg.Lift.Monad (
     substOcc, isLifted, formerFreeVars, liftedIdsExpander
   ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Types.Basic

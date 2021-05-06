@@ -15,8 +15,6 @@ module GHC.Tc.TyCl.Build (
         newImplicitBinder, newTyConRepName
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Iface.Env

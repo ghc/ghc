@@ -23,8 +23,6 @@ module GHC.Runtime.Heap.Inspect(
      constrClosToName -- exported to use in test T4891
  ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 import GHC.Platform
 

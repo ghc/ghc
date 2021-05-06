@@ -46,8 +46,6 @@ module GHC.Types.Var.Set (
         dVarSetToVarSet,
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Types.Var      ( Var, TyVar, CoVar, TyCoVar, Id )

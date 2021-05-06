@@ -27,8 +27,6 @@ module GHC.Tc.TyCl.Utils(
         tcRecSelBinds, mkRecSelBinds, mkOneRecordSelector
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Tc.Utils.Monad

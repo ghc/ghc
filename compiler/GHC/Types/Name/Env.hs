@@ -35,8 +35,6 @@ module GHC.Types.Name.Env (
         depAnal
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Data.Graph.Directed

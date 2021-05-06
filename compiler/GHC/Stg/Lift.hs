@@ -15,8 +15,6 @@ module GHC.Stg.Lift
    )
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Types.Basic

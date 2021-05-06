@@ -17,8 +17,6 @@ module GHC.SysTools.BaseDir
   , tryFindTopDir
   ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 -- See note [Base Dir] for why some of this logic is shared with ghc-pkg.

@@ -74,8 +74,6 @@ import GHC.Utils.Panic
 import Data.List (mapAccumL)
 import GHC.Data.FastString
 
-#include "HsVersions.h"
-
 doStaticArgs :: UniqSupply -> CoreProgram -> CoreProgram
 doStaticArgs us binds = snd $ mapAccumL sat_bind_threaded_us us binds
   where

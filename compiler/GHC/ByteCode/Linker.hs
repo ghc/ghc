@@ -20,8 +20,6 @@ module GHC.ByteCode.Linker
   )
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Runtime.Interpreter

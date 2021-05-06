@@ -7,8 +7,6 @@
 
 module GHC.Llvm.Types where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import Data.Char

@@ -37,8 +37,6 @@ module GHC.Core.Opt.Simplify.Utils (
         isExitJoinId
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Core.Opt.Simplify.Env
@@ -564,8 +562,8 @@ mkArgInfo env fun rules n_val_args call_cont
                    else
                         demands ++ vanilla_dmds
                | otherwise
-               -> WARN( True, text "More demands than arity" <+> ppr fun <+> ppr (idArity fun)
-                                <+> ppr n_val_args <+> ppr demands )
+               -> warnPprTrace True (text "More demands than arity" <+> ppr fun <+> ppr (idArity fun)
+                                <+> ppr n_val_args <+> ppr demands) $
                   vanilla_dmds      -- Not enough args, or no strictness
 
     add_type_strictness :: Type -> [Demand] -> [Demand]

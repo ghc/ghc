@@ -21,8 +21,6 @@ module GHC.Types.RepType
     slotPrimRep, primRepSlot
   ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Types.Basic (Arity, RepArity)

@@ -25,8 +25,6 @@ module GHC.Rename.Expr (
         AnnoBody
    ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Rename.Bind ( rnLocalBindsAndThen, rnLocalValBindsLHS, rnLocalValBindsRHS

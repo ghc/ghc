@@ -16,8 +16,6 @@ module GHC.Core.TyCon.RecWalk (
 
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Core.TyCon
