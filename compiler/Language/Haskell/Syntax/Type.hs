@@ -54,8 +54,6 @@ module Language.Haskell.Syntax.Type (
         hsPatSigType,
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import {-# SOURCE #-} Language.Haskell.Syntax.Expr ( HsSplice )

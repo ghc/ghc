@@ -6,8 +6,6 @@ module GHC.CmmToAsm.X86.RegInfo (
 
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.CmmToAsm.Format

@@ -15,8 +15,6 @@ module GHC.ByteCode.Asm (
         mkTupleInfoLit
   ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.ByteCode.Instr

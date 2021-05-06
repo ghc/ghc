@@ -77,8 +77,6 @@ module GHC.Types.Unique.FM (
         pprUniqFM, pprUFM, pprUFMWithKeys, pluralUFM
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Types.Unique ( Uniquable(..), Unique, getKey )

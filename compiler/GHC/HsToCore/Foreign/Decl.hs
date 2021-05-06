@@ -14,7 +14,6 @@ Desugaring foreign declarations (see also GHC.HsToCore.Foreign.Call).
 
 module GHC.HsToCore.Foreign.Decl ( dsForeigns ) where
 
-#include "HsVersions.h"
 import GHC.Prelude
 
 import GHC.Tc.Utils.Monad        -- temp

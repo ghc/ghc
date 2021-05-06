@@ -13,8 +13,6 @@ Pattern-matching constructors
 
 module GHC.HsToCore.Match.Constructor ( matchConFamily, matchPatSyn ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import {-# SOURCE #-} GHC.HsToCore.Match ( match )

@@ -12,8 +12,6 @@
 
 module GHC.StgToCmm.Expr ( cgExpr, cgLit ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude hiding ((<*>))
 
 import {-# SOURCE #-} GHC.StgToCmm.Bind ( cgBind )

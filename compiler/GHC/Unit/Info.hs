@@ -29,8 +29,6 @@ module GHC.Unit.Info
    )
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 import GHC.Platform.Ways
 

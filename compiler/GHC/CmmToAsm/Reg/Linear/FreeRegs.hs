@@ -4,9 +4,6 @@ module GHC.CmmToAsm.Reg.Linear.FreeRegs (
     FR(..),
     maxSpillSlots
 )
-
-#include "HsVersions.h"
-
 where
 
 import GHC.Prelude

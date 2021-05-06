@@ -63,8 +63,6 @@ module GHC.Core.DataCon (
         promoteDataCon
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Types.Id.Make ( DataConBoxer )

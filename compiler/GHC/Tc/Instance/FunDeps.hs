@@ -21,8 +21,6 @@ module GHC.Tc.Instance.FunDeps
    )
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Types.Name

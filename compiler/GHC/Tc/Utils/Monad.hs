@@ -148,8 +148,6 @@ module GHC.Tc.Utils.Monad(
   module GHC.Data.IOEnv
   ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 

@@ -30,8 +30,6 @@ module GHC.Llvm.Ppr (
 
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Llvm.Syntax

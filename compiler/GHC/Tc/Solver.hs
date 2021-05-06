@@ -26,8 +26,6 @@ module GHC.Tc.Solver(
        approximateWC, runTcSDeriveds
   ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Data.Bag
