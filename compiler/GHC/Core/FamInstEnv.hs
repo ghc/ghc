@@ -14,6 +14,7 @@ module GHC.Core.FamInstEnv (
         famInstsRepTyCons, famInstRepTyCon_maybe, dataFamInstRepTyCon,
         pprFamInst, pprFamInsts,
         mkImportedFamInst,
+        isTypeFamInst, isDataFamInst,
 
         FamInstEnvs, FamInstEnv, emptyFamInstEnv, emptyFamInstEnvs,
         extendFamInstEnv, extendFamInstEnvList,
@@ -42,6 +43,7 @@ module GHC.Core.FamInstEnv (
 
 import GHC.Prelude
 
+import GHC.Core( IsOrphan )
 import GHC.Core.Unify
 import GHC.Core.Type as Type
 import GHC.Core.TyCo.Rep
@@ -120,6 +122,7 @@ data FamInst  -- See Note [FamInsts and CoAxioms]
             -- in GHC.Core.Coercion.Axiom
 
             , fi_rhs :: Type         --   the RHS, with its freshened vars
+            , fi_orphan :: IsOrphan
             }
 
 data FamFlavor
@@ -204,6 +207,15 @@ dataFamInstRepTyCon fi
        DataFamilyInst tycon -> tycon
        SynFamilyInst        -> pprPanic "dataFamInstRepTyCon" (ppr fi)
 
+
+isTypeFamInst, isDataFamInst :: FamInst -> Bool
+
+isTypeFamInst FamInst{ fi_flavor = SynFamilyInst } = True
+isTypeFamInst _ = False
+
+isDataFamInst FamInst{ fi_flavor = (DataFamilyInst _) } = True
+isDataFamInst _ = False
+
 {-
 ************************************************************************
 *                                                                      *
@@ -267,8 +279,9 @@ also.
 mkImportedFamInst :: Name               -- Name of the family
                   -> [RoughMatchTc]     -- Rough match info
                   -> CoAxiom Unbranched -- Axiom introduced
+                  -> IsOrphan           -- is this instance an orphan?
                   -> FamInst            -- Resulting family instance
-mkImportedFamInst fam mb_tcs axiom
+mkImportedFamInst fam mb_tcs axiom orph
   = FamInst {
       fi_fam    = fam,
       fi_tcs    = mb_tcs,
@@ -277,7 +290,8 @@ mkImportedFamInst fam mb_tcs axiom
       fi_tys    = tys,
       fi_rhs    = rhs,
       fi_axiom  = axiom,
-      fi_flavor = flavor }
+      fi_flavor = flavor,
+      fi_orphan = orph }
   where
      -- See Note [Lazy axiom match]
      ~(CoAxBranch { cab_lhs = tys

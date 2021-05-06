@@ -50,7 +50,7 @@ import GHC.Tc.Deriv
 import GHC.Tc.Utils.Env
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Utils.Unify
-import GHC.Core        ( Expr(..), mkApps, mkVarApps, mkLams )
+import GHC.Core        ( Expr(..), mkApps, mkVarApps, mkLams, isOrphan )
 import GHC.Core.Make   ( nO_METHOD_BINDING_ERROR_ID )
 import GHC.Core.Unfold.Make ( mkInlineUnfoldingWithArity, mkDFunUnfolding )
 import GHC.Core.Type
@@ -789,6 +789,12 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
                                   , di_ctxt    = tcMkDataFamInstCtxt decl }
 
        ; fam_inst <- newFamInst (DataFamilyInst rep_tc) axiom
+       ; warnIfFlag Opt_WarnOrphansData
+                    (isDataFamInst fam_inst && isOrphan (fi_orphan fam_inst))
+                    (instOrphDataWarn fam_inst)
+       ; warnIfFlag Opt_WarnOrphansType
+                    (isTypeFamInst fam_inst && isOrphan (fi_orphan fam_inst))
+                    (instOrphDataWarn fam_inst)
        ; return (fam_inst, m_deriv_info) }
   where
     eta_reduce :: TyCon -> [Type] -> ([Type], [TyConBinder])
@@ -822,6 +828,18 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
     mk_deriv_info_scoped_tv_pr tv =
       let n = lookupWithDefaultVarEnv tv_skol_env (tyVarName tv) tv
       in (n, tv)
+
+instOrphDataWarn :: FamInst -> SDoc
+instOrphDataWarn inst
+  = hang (text "Orphan instance:") 2 (pprFamInst inst)
+    $$ text "To avoid this"
+    $$ nest 4 (vcat possibilities)
+  where
+    possibilities =
+      text "move the instance declaration to the module of the class or of the type, or" :
+      text "wrap the type with a newtype and declare the instance on the new type." :
+      []
+
 
 {-
 Note [Associated data family instances and di_scoped_tvs]
