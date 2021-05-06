@@ -51,7 +51,6 @@ import GHC.Types.SrcLoc
 import GHC.Platform
 import GHC.Data.FastString
 import GHC.Settings.Constants
-import GHC.Utils.Misc
 
 import Data.Array
 import Data.Array.IO
@@ -300,7 +299,7 @@ getSymbolTable bh name_cache = do
 
 serialiseName :: BinHandle -> Name -> UniqFM key (Int,Name) -> IO ()
 serialiseName bh name _ = do
-    let mod = ASSERT2( isExternalName name, ppr name ) nameModule name
+    let mod = assertPpr (isExternalName name) (ppr name) (nameModule name)
     put_ bh (moduleUnit mod, moduleName mod, nameOccName name)
 
 
@@ -329,7 +328,7 @@ putName _dict BinSymbolTable{
         bh name
   | isKnownKeyName name
   , let (c, u) = unpkUnique (nameUnique name) -- INVARIANT: (ord c) fits in 8 bits
-  = -- ASSERT(u < 2^(22 :: Int))
+  = -- assert (u < 2^(22 :: Int))
     put_ bh (0x80000000
              .|. (fromIntegral (ord c) `shiftL` 22)
              .|. (fromIntegral u :: Word32))
@@ -340,7 +339,7 @@ putName _dict BinSymbolTable{
          Just (off,_) -> put_ bh (fromIntegral off :: Word32)
          Nothing -> do
             off <- readFastMutInt symtab_next
-            -- MASSERT(off < 2^(30 :: Int))
+            -- massert (off < 2^(30 :: Int))
             writeFastMutInt symtab_next (off+1)
             writeIORef symtab_map_ref
                 $! addToUFM symtab_map name (off,name)

@@ -53,6 +53,7 @@ import GHC.Utils.Misc
 import GHC.Data.FastString
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 
 import Control.Monad ( unless, void )
 import Control.Arrow ( first )
@@ -555,7 +556,7 @@ chooseReturnBndrs bndr (PrimAlt _) _alts
   = assertNonVoidIds [bndr]
 
 chooseReturnBndrs _bndr (MultiValAlt n) [(_, ids, _)]
-  = ASSERT2(ids `lengthIs` n, ppr n $$ ppr ids $$ ppr _bndr)
+  = assertPpr (ids `lengthIs` n) (ppr n $$ ppr ids $$ ppr _bndr) $
     assertNonVoidIds ids     -- 'bndr' is not assigned!
 
 chooseReturnBndrs bndr (AlgAlt _) _alts
@@ -872,7 +873,8 @@ cgConApp con mn stg_args
        ; emitReturn arg_exprs }
 
   | otherwise   --  Boxed constructors; allocate and return
-  = ASSERT2( stg_args `lengthIs` countConRepArgs con, ppr con <> parens (ppr (countConRepArgs con)) <+> ppr stg_args )
+  = assertPpr (stg_args `lengthIs` countConRepArgs con)
+              (ppr con <> parens (ppr (countConRepArgs con)) <+> ppr stg_args) $
     do  { (idinfo, fcode_init) <- buildDynCon (dataConWorkId con) mn False
                                      currentCCS con (assertNonVoidStgArgs stg_args)
                                      -- con args are always non-void,
@@ -904,7 +906,7 @@ cgIdApp fun_id args = do
           | otherwise                -> emitReturn [fun]
           -- ToDo: does ReturnIt guarantee tagged?
 
-        EnterIt -> ASSERT( null args )  -- Discarding arguments
+        EnterIt -> assert (null args) $  -- Discarding arguments
                    emitEnter fun
 
         SlowCall -> do      -- A slow function call via the RTS apply routines

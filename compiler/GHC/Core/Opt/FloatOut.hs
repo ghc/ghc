@@ -629,8 +629,8 @@ instance Outputable FloatBinds where
 
 flattenTopFloats :: FloatBinds -> Bag CoreBind
 flattenTopFloats (FB tops ceils defs)
-  = ASSERT2( isEmptyBag (flattenMajor defs), ppr defs )
-    ASSERT2( isEmptyBag ceils, ppr ceils )
+  = assertPpr (isEmptyBag (flattenMajor defs)) (ppr defs) $
+    assertPpr (isEmptyBag ceils) (ppr ceils)
     tops
 
 addTopFloatPairs :: Bag CoreBind -> [(Id,CoreExpr)] -> [(Id,CoreExpr)]

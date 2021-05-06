@@ -74,6 +74,8 @@ import GHC.Unit.Home.ModInfo
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
+import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Logger
 
 import GHC.Data.Bag
@@ -1557,12 +1559,12 @@ tcIfaceAlt :: CoreExpr -> Mult -> (TyCon, [Type])
            -> IfaceAlt
            -> IfL CoreAlt
 tcIfaceAlt _ _ _ (IfaceAlt IfaceDefault names rhs)
-  = ASSERT( null names ) do
+  = assert (null names) $ do
     rhs' <- tcIfaceExpr rhs
     return (Alt DEFAULT [] rhs')
 
 tcIfaceAlt _ _ _ (IfaceAlt (IfaceLitAlt lit) names rhs)
-  = ASSERT( null names ) do
+  = assert (null names) $ do
     lit' <- tcIfaceLit lit
     rhs' <- tcIfaceExpr rhs
     return (Alt (LitAlt lit') [] rhs')

@@ -86,7 +86,7 @@ import GHC.Types.Unique.Supply
 import GHC.Data.FastString
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Misc
+import GHC.Utils.Constants (debugIsOn)
 import GHC.Exts (oneShot)
 
 import Control.Monad

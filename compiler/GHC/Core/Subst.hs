@@ -67,6 +67,7 @@ import GHC.Data.Maybe
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import Data.List (mapAccumL)
 
 
@@ -191,13 +192,13 @@ zapSubstEnv (Subst in_scope _ _ _) = Subst in_scope emptyVarEnv emptyVarEnv empt
 extendIdSubst :: Subst -> Id -> CoreExpr -> Subst
 -- ToDo: add an ASSERT that fvs(subst-result) is already in the in-scope set
 extendIdSubst (Subst in_scope ids tvs cvs) v r
-  = ASSERT2( isNonCoVarId v, ppr v $$ ppr r )
+  = assertPpr (isNonCoVarId v) (ppr v $$ ppr r) $
     Subst in_scope (extendVarEnv ids v r) tvs cvs
 
 -- | Adds multiple 'Id' substitutions to the 'Subst': see also 'extendIdSubst'
 extendIdSubstList :: Subst -> [(Id, CoreExpr)] -> Subst
 extendIdSubstList (Subst in_scope ids tvs cvs) prs
-  = ASSERT( all (isNonCoVarId . fst) prs )
+  = assert (all (isNonCoVarId . fst) prs) $
     Subst in_scope (extendVarEnvList ids prs) tvs cvs
 
 -- | Add a substitution for a 'TyVar' to the 'Subst'
@@ -207,7 +208,7 @@ extendIdSubstList (Subst in_scope ids tvs cvs) prs
 -- after extending the substitution like this.
 extendTvSubst :: Subst -> TyVar -> Type -> Subst
 extendTvSubst (Subst in_scope ids tvs cvs) tv ty
-  = ASSERT( isTyVar tv )
+  = assert (isTyVar tv) $
     Subst in_scope ids (extendVarEnv tvs tv ty) cvs
 
 -- | Adds multiple 'TyVar' substitutions to the 'Subst': see also 'extendTvSubst'
@@ -223,7 +224,7 @@ extendTvSubstList subst vrs
 -- after extending the substitution like this
 extendCvSubst :: Subst -> CoVar -> Coercion -> Subst
 extendCvSubst (Subst in_scope ids tvs cvs) v r
-  = ASSERT( isCoVar v )
+  = assert (isCoVar v) $
     Subst in_scope ids tvs (extendVarEnv cvs v r)
 
 -- | Add a substitution appropriate to the thing being substituted
@@ -232,15 +233,15 @@ extendCvSubst (Subst in_scope ids tvs cvs) v r
 extendSubst :: Subst -> Var -> CoreArg -> Subst
 extendSubst subst var arg
   = case arg of
-      Type ty     -> ASSERT( isTyVar var ) extendTvSubst subst var ty
-      Coercion co -> ASSERT( isCoVar var ) extendCvSubst subst var co
-      _           -> ASSERT( isId    var ) extendIdSubst subst var arg
+      Type ty     -> assert (isTyVar var) $ extendTvSubst subst var ty
+      Coercion co -> assert (isCoVar var) $ extendCvSubst subst var co
+      _           -> assert (isId    var) $ extendIdSubst subst var arg
 
 extendSubstWithVar :: Subst -> Var -> Var -> Subst
 extendSubstWithVar subst v1 v2
-  | isTyVar v1 = ASSERT( isTyVar v2 ) extendTvSubst subst v1 (mkTyVarTy v2)
-  | isCoVar v1 = ASSERT( isCoVar v2 ) extendCvSubst subst v1 (mkCoVarCo v2)
-  | otherwise  = ASSERT( isId    v2 ) extendIdSubst subst v1 (Var v2)
+  | isTyVar v1 = assert (isTyVar v2) $ extendTvSubst subst v1 (mkTyVarTy v2)
+  | isCoVar v1 = assert (isCoVar v2) $ extendCvSubst subst v1 (mkCoVarCo v2)
+  | otherwise  = assert (isId    v2) $ extendIdSubst subst v1 (Var v2)
 
 -- | Add a substitution as appropriate to each of the terms being
 --   substituted (whether expressions, types, or coercions). See also

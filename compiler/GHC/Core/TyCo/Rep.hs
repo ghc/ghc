@@ -938,7 +938,7 @@ which in turn is imported by Type
 -}
 
 mkTyVarTy  :: TyVar   -> Type
-mkTyVarTy v = ASSERT2( isTyVar v, ppr v <+> dcolon <+> ppr (tyVarKind v) )
+mkTyVarTy v = assertPpr (isTyVar v) (ppr v <+> dcolon <+> ppr (tyVarKind v)) $
               TyVarTy v
 
 mkTyVarTys :: [TyVar] -> [Type]

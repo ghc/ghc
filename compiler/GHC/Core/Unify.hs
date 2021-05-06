@@ -51,6 +51,7 @@ import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
 import GHC.Exts( oneShot )
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Data.FastString
 
 import Data.Data ( Data )
@@ -308,7 +309,7 @@ roughMatchTcs tys = map rough tys
     rough ty
       | Just (ty', _) <- splitCastTy_maybe ty   = rough ty'
       | Just (tc,_)   <- splitTyConApp_maybe ty
-      , not (isTypeFamilyTyCon tc)              = ASSERT2( isGenerativeTyCon tc Nominal, ppr tc )
+      , not (isTypeFamilyTyCon tc)              = assertPpr (isGenerativeTyCon tc Nominal) (ppr tc) $
                                                   KnownTc (tyConName tc)
         -- See Note [Rough matching in class and family instances]
       | otherwise                               = OtherTc
@@ -2021,7 +2022,7 @@ coreFlattenTyFamApp tv_subst env fam_tc fam_args
   where
     arity = tyConArity fam_tc
     tcv_subst = TCvSubst (fe_in_scope env) tv_subst emptyVarEnv
-    (sat_fam_args, leftover_args) = ASSERT( arity <= length fam_args )
+    (sat_fam_args, leftover_args) = assert (arity <= length fam_args) $
                                     splitAt arity fam_args
     -- Apply the substitution before looking up an application in the
     -- environment. See Note [Flattening type-family applications when matching instances],

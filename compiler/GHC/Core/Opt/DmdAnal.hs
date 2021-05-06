@@ -40,6 +40,7 @@ import GHC.Core.FamInstEnv
 import GHC.Core.Opt.Arity ( typeArity )
 import GHC.Utils.Misc
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Data.Maybe         ( isJust )
 import GHC.Builtin.PrimOps
 import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
@@ -344,7 +345,7 @@ dmdAnalStar :: AnalEnv
             -> (PlusDmdArg, CoreExpr)
 dmdAnalStar env (n :* cd) e
   | WithDmdType dmd_ty e'    <- dmdAnal env cd e
-  = ASSERT2( not (isUnliftedType (exprType e)) || exprOkForSpeculation e, ppr e )
+  = assertPpr (not (isUnliftedType (exprType e)) || exprOkForSpeculation e) (ppr e)
     -- The argument 'e' should satisfy the let/app invariant
     -- See Note [Analysing with absent demand] in GHC.Types.Demand
     (toPlusDmdArg $ multDmdType n dmd_ty, e')
@@ -443,7 +444,7 @@ dmdAnal' env dmd (Case scrut case_bndr ty [Alt alt bndrs rhs])
           | otherwise
           -- __DEFAULT and literal alts. Simply add demands and discard the
           -- evaluation cardinality, as we evaluate the scrutinee exactly once.
-          = ASSERT( null bndrs ) (bndrs, case_bndr_sd)
+          = assert (null bndrs) (bndrs, case_bndr_sd)
         fam_envs                 = ae_fam_envs env
         alt_ty3
           -- See Note [Precise exceptions and strictness analysis] in "GHC.Types.Demand"
@@ -1271,7 +1272,7 @@ setBndrsDemandInfo (b:bs) (d:ds)
     let !new_info = setIdDemandInfo b d
         !vars = setBndrsDemandInfo bs ds
     in new_info : vars
-setBndrsDemandInfo [] ds = ASSERT( null ds ) []
+setBndrsDemandInfo [] ds = assert (null ds) []
 setBndrsDemandInfo bs _  = pprPanic "setBndrsDemandInfo" (ppr bs)
 
 annotateBndr :: AnalEnv -> DmdType -> Var -> WithDmdType Var
@@ -1296,7 +1297,7 @@ annotateLamIdBndr :: AnalEnv
 annotateLamIdBndr env arg_of_dfun dmd_ty id
 -- For lambdas we add the demand to the argument demands
 -- Only called for Ids
-  = ASSERT( isId id )
+  = assert (isId id) $
     -- pprTrace "annLamBndr" (vcat [ppr id, ppr dmd_ty, ppr final_ty]) $
     WithDmdType final_ty new_id
   where
