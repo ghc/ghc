@@ -35,7 +35,6 @@ module GHC.Tc.Utils.Unify (
   matchExpectedFunKind,
   matchActualFunTySigma, matchActualFunTysRho,
 
-  occCheckForErrors,
   checkTyVarEq, checkTyFamEq, checkTypeEq
 
   ) where
@@ -1929,25 +1928,6 @@ then this kind equality would rightly complain about unifying kappa
 with (forall k. k->*)
 
 -}
-
-occCheckForErrors :: DynFlags -> TcTyVar -> Type -> CheckTyEqResult
--- Just for error-message generation; so we return CheckTyEqResult
--- so the caller can report the right kind of error
--- Check whether
---   a) the given variable occurs in the given type.
---   b) there is a forall in the type (unless we have -XImpredicativeTypes)
-occCheckForErrors dflags tv ty
-  | cterHasOccursCheck result
-  , cterHasNoProblem (cterClearOccursCheck result)
-  = case occCheckExpand [tv] ty of
-      Nothing -> result
-      Just _  -> cteOK
-
-  | otherwise
-  = result
-
-  where
-    result = checkTyVarEq dflags tv ty
 
 ----------------
 {-# NOINLINE checkTyVarEq #-}  -- checkTyVarEq becomes big after the `inline` fires

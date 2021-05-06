@@ -21,7 +21,6 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Types.Constraint
 import GHC.Core.Predicate
 import GHC.Tc.Utils.TcMType
-import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Env( tcInitTidyEnv )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Origin
@@ -1537,12 +1536,11 @@ mkTyVarEqErr :: ReportErrCtxt -> Report -> Ct
 -- tv1 and ty2 are already tidied
 mkTyVarEqErr ctxt report ct tv1 ty2
   = do { traceTc "mkTyVarEqErr" (ppr ct $$ ppr tv1 $$ ppr ty2)
-       ; dflags <- getDynFlags
-       ; return $ mkTyVarEqErr' dflags ctxt report ct tv1 ty2 }
+       ; return $ mkTyVarEqErr' ctxt report ct tv1 ty2 }
 
-mkTyVarEqErr' :: DynFlags -> ReportErrCtxt -> Report -> Ct
+mkTyVarEqErr' :: ReportErrCtxt -> Report -> Ct
               -> TcTyVar -> TcType -> Report
-mkTyVarEqErr' dflags ctxt report ct tv1 ty2
+mkTyVarEqErr' ctxt report ct tv1 ty2
   | isSkolemTyVar tv1  -- ty2 won't be a meta-tyvar; we would have
                        -- swapped in Solver.Canonical.canEqTyVarHomo
     || isTyVarTyVar tv1 && not (isTyVarTy ty2)
@@ -1554,7 +1552,7 @@ mkTyVarEqErr' dflags ctxt report ct tv1 ty2
             , report
             ]
 
-  | cterHasOccursCheck occ_check_expand
+  | cterHasOccursCheck check_eq_result
     -- We report an "occurs check" even for  a ~ F t a, where F is a type
     -- function; it's not insoluble (because in principle F could reduce)
     -- but we have certainly been unable to solve it
@@ -1574,7 +1572,7 @@ mkTyVarEqErr' dflags ctxt report ct tv1 ty2
     in
     mconcat [headline_msg, extra2, extra3, report]
 
-  | occ_check_expand `cterHasProblem` cteImpredicative
+  | check_eq_result `cterHasProblem` cteImpredicative
   = let msg = vcat [ text "Cannot instantiate unification variable"
                      <+> quotes (ppr tv1)
                    , hang (text "with a" <+> what <+> text "involving polytypes:") 2 (ppr ty2) ]
@@ -1652,8 +1650,14 @@ mkTyVarEqErr' dflags ctxt report ct tv1 ty2
     headline_msg = misMatchOrCND insoluble_occurs_check ctxt ct ty1 ty2
 
     ty1 = mkTyVarTy tv1
-    occ_check_expand       = occCheckForErrors dflags tv1 ty2
-    insoluble_occurs_check = occ_check_expand `cterHasProblem` cteInsolubleOccurs
+
+    check_eq_result = case ct of
+      CIrredCan { cc_reason = NonCanonicalReason result } -> result
+      CIrredCan { cc_reason = HoleBlockerReason {} }      -> cteProblem cteHoleBlocker
+      CEqCan {}                                           -> cteOK
+      _ -> pprPanic "mkTyVarEqErr" (ppr ct)
+
+    insoluble_occurs_check = check_eq_result `cterHasProblem` cteInsolubleOccurs
 
     what = text $ levelString $
            ctLocTypeOrKind_maybe (ctLoc ct) `orElse` TypeLevel
