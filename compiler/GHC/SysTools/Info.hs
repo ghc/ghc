@@ -257,6 +257,7 @@ getCompilerInfo' logger dflags = do
                text (show err))
           errorMsg logger dflags $ hang (text "Warning:") 9 $
             text "Couldn't figure out C compiler information!" $$
-            text "Make sure you're using GNU gcc, or clang"
+            text "Make sure you're using GNU gcc, or clang" $$
+            hang (text "Got:") 3 (text (show err))
           return UnknownCC
       )
