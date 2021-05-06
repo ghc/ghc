@@ -237,9 +237,7 @@ Types don't match, we should get a type error. But this is legal Haskell 98
 code! Bad! Bad! Bad!
 
 It could be solved with subtyping, but subtyping doesn't combine well with
-polymorphism.
-
-Instead, we generalise the type of Just, when used as term:
+polymorphism. Instead, we generalise the type of Just, when used as term:
 
    Just :: forall {p}. a %p-> Just a
 
@@ -254,7 +252,8 @@ We only generalise linear fields this way: fields with multiplicity Many, or
 other multiplicity expressions are exclusive to -XLinearTypes, hence don't have
 backward compatibility implications.
 
-The implementation is described in Note [Linear fields generalization].
+The implementation is described in Note [Typechecking data constructors]
+in GHC.Tc.Gen.Head.
 
 More details in the proposal.
 -}

@@ -44,7 +44,7 @@ module GHC.Hs.Utils(
   mkHsDictLet, mkHsLams,
   mkHsOpApp, mkHsDo, mkHsDoAnns, mkHsComp, mkHsCompAnns, mkHsWrapPat, mkHsWrapPatCo,
   mkLHsPar, mkHsCmdWrap, mkLHsCmdWrap,
-  mkHsCmdIf,
+  mkHsCmdIf, mkConLikeTc,
 
   nlHsTyApp, nlHsTyApps, nlHsVar, nl_HsVar, nlHsDataCon,
   nlHsLit, nlHsApp, nlHsApps, nlHsSyntaxApps,
@@ -468,6 +468,8 @@ mkHsStringPrimLit fs = HsStringPrim NoSourceText (bytesFS fs)
 mkHsCharPrimLit :: Char -> HsLit (GhcPass p)
 mkHsCharPrimLit c = HsChar NoSourceText c
 
+mkConLikeTc :: ConLike -> HsExpr GhcTc
+mkConLikeTc con = XExpr (ConLikeTc con [] [])
 
 {-
 ************************************************************************
@@ -487,7 +489,7 @@ nl_HsVar n = HsVar noExtField (noLocA n)
 
 -- | NB: Only for 'LHsExpr' 'Id'.
 nlHsDataCon :: DataCon -> LHsExpr GhcTc
-nlHsDataCon con = noLocA (HsConLikeOut noExtField (RealDataCon con))
+nlHsDataCon con = noLocA (mkConLikeTc (RealDataCon con))
 
 nlHsLit :: HsLit (GhcPass p) -> LHsExpr (GhcPass p)
 nlHsLit n = noLocA (HsLit noComments n)
