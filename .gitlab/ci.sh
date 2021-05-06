@@ -195,10 +195,10 @@ function set_toolchain_paths() {
 
 # Extract GHC toolchain
 function setup() {
-  if [ -d "$TOP/cabal-cache" ]; then
+  if [ -d "$TOP/${CABAL_CACHE:-cabal-cache}" ]; then
       info "Extracting cabal cache..."
       mkdir -p "$cabal_dir"
-      cp -Rf cabal-cache/* "$cabal_dir"
+      cp -Rf "$TOP/${CABAL_CACHE:-cabal-cache}"/* "$cabal_dir"
   fi
 
   if [[ "$needs_toolchain" = "1" ]]; then
