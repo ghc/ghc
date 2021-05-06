@@ -1654,8 +1654,9 @@ mkTyVarEqErr' ctxt report ct tv1 ty2
     check_eq_result = case ct of
       CIrredCan { cc_reason = NonCanonicalReason result } -> result
       CIrredCan { cc_reason = HoleBlockerReason {} }      -> cteProblem cteHoleBlocker
-      CEqCan {}                                           -> cteOK
-      _ -> pprPanic "mkTyVarEqErr" (ppr ct)
+      _                                                   -> cteOK
+        -- these really should be CEqCans, but zonking constraints loses
+        -- the CEqCan status
 
     insoluble_occurs_check = check_eq_result `cterHasProblem` cteInsolubleOccurs
 
