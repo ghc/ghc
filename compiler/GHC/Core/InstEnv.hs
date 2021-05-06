@@ -455,7 +455,7 @@ classInstances (InstEnvs { ie_global = pkg_ie, ie_local = home_ie, ie_visible = 
 -- We use this when we do signature checking in "GHC.Tc.Module"
 memberInstEnv :: InstEnv -> ClsInst -> Bool
 memberInstEnv (InstEnv rm) ins_item@(ClsInst { is_tcs = tcs } ) =
-    any (identicalDFunType ins_item) (lookupRM tcs rm)
+    any (identicalDFunType ins_item) (lookupRM' tcs rm)
  where
   identicalDFunType cls1 cls2 =
     eqType (varType (is_dfun cls1)) (varType (is_dfun cls2))
@@ -820,24 +820,24 @@ lookupInstEnv' :: InstEnv          -- InstEnv to look in
 -- giving a suitable error message
 
 lookupInstEnv' (InstEnv rm) vis_mods cls tys
-  = find [] [] (lookupRM rough_tcs rm)
+  = foldl' f ([], []) (lookupRM' rough_tcs rm)
   where
     rough_tcs  = KnownTc (className cls) : roughMatchTcs tys
 
     --------------
-    find ms us [] = (ms, us)
-    find ms us (item@(ClsInst { is_tvs = tpl_tvs, is_tys = tpl_tys }) : rest)
+    f :: ([InstMatch], [ClsInst]) -> ClsInst -> ([InstMatch], [ClsInst])
+    f acc@(ms, us) item@(ClsInst { is_tvs = tpl_tvs, is_tys = tpl_tys })
       | not (instIsVisible vis_mods item)
-      = find ms us rest  -- See Note [Instance lookup and orphan instances]
+      = acc  -- See Note [Instance lookup and orphan instances]
 
       | Just subst <- tcMatchTys tpl_tys tys
-      = find ((item, map (lookupTyVar subst) tpl_tvs) : ms) us rest
+      = ((item, map (lookupTyVar subst) tpl_tvs) : ms, us)
 
         -- Does not match, so next check whether the things unify
         -- See Note [Overlapping instances]
         -- Ignore ones that are incoherent: Note [Incoherent instances]
       | isIncoherent item
-      = find ms us rest
+      = acc
 
       | otherwise
       = ASSERT2( tys_tv_set `disjointVarSet` tpl_tv_set,
@@ -851,10 +851,10 @@ lookupInstEnv' (InstEnv rm) vis_mods cls tys
           -- We consider MaybeApart to be a case where the instance might
           -- apply in the future. This covers an instance like C Int and
           -- a target like [W] C (F a), where F is a type family.
-            SurelyApart              -> find ms us        rest
+            SurelyApart              -> acc
               -- Note [Infinitary substitution in lookup]
-            MaybeApart MARInfinite _ -> find ms us        rest
-            _                        -> find ms (item:us) rest
+            MaybeApart MARInfinite _ -> acc
+            _                        -> (ms, item:us)
       where
         tpl_tv_set = mkVarSet tpl_tvs
         tys_tv_set = tyCoVarsOfTypes tys

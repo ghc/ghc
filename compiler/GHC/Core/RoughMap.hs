@@ -15,6 +15,7 @@ module GHC.Core.RoughMap
   , RoughMap
   , emptyRM
   , lookupRM
+  , lookupRM'
   , insertRM
   , filterRM
   , filterMatchingRM
@@ -90,6 +91,9 @@ emptyRM = RMEmpty
 lookupRM :: [RoughMatchTc] -> RoughMap a -> [a]
 lookupRM tcs rm = bagToList (lookupRM' tcs rm)
 
+-- | N.B. Returns a 'Bag', which allows us to avoid rebuilding all of the lists
+-- we find in 'rm_empty', which would otherwise be necessary due to '++' if we
+-- returned a list.
 lookupRM' :: [RoughMatchTc] -> RoughMap a -> Bag a
 lookupRM' _                  RMEmpty = mempty
 lookupRM' []                 rm      = listToBag $ elemsRM rm

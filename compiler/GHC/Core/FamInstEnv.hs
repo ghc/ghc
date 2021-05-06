@@ -977,6 +977,13 @@ type MatchFun =  FamInst                -- The FamInst template
               -> [Type]                 -- Target to match against
               -> Maybe TCvSubst
 
+mapMaybe' :: Foldable f => (a -> Maybe b) -> f a -> [b]
+mapMaybe' f = foldr g []
+  where
+    g x rest
+      | Just y <- f x = y : rest
+      | otherwise     = rest
+
 lookup_fam_inst_env'          -- The worker, local to this module
     :: MatchFun
     -> FamInstEnv
@@ -984,32 +991,30 @@ lookup_fam_inst_env'          -- The worker, local to this module
     -> [FamInstMatch]
 lookup_fam_inst_env' match_fun (FamIE ie) fam match_tys
   | isOpenFamilyTyCon fam
-  = find $ lookupRM rough_tmpl ie    -- The common case
+  = mapMaybe' f (lookupRM' rough_tmpl ie)   -- The common case
   | otherwise = []
   where
     rough_tmpl :: [RoughMatchTc]
     rough_tmpl = KnownTc (tyConName fam) : map typeToRoughMatchTc match_tys
 
-    find :: [FamInst] -> [FamInstMatch]
-    find [] = []
-    find (item@(FamInst { fi_tcs = mb_tcs, fi_tvs = tpl_tvs, fi_cvs = tpl_cvs
-                        , fi_tys = tpl_tys }) : rest)
+    f :: FamInst -> Maybe FamInstMatch
+    f item@(FamInst { fi_tcs = mb_tcs, fi_tvs = tpl_tvs, fi_cvs = tpl_cvs
+                        , fi_tys = tpl_tys })
         -- Fast check for no match, uses the "rough match" fields
       | instanceCantMatch rough_tcs mb_tcs
-      = find rest
+      = Nothing
 
         -- Proper check
       | Just subst <- match_fun item (mkVarSet tpl_tvs) tpl_tys match_tys1
-      = (FamInstMatch { fim_instance = item
-                      , fim_tys      = substTyVars subst tpl_tvs `chkAppend` match_tys2
-                      , fim_cos      = ASSERT( all (isJust . lookupCoVar subst) tpl_cvs )
-                                       substCoVars subst tpl_cvs
-                      })
-        : find rest
+      = Just (FamInstMatch { fim_instance = item
+                           , fim_tys      = substTyVars subst tpl_tvs `chkAppend` match_tys2
+                           , fim_cos      = ASSERT( all (isJust . lookupCoVar subst) tpl_cvs )
+                                            substCoVars subst tpl_cvs
+                           })
 
         -- No match => try next
       | otherwise
-      = find rest
+      = Nothing
       where
         (rough_tcs, match_tys1, match_tys2) = split_tys tpl_tys
 
