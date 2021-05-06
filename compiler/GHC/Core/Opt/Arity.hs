@@ -56,10 +56,9 @@ import GHC.Core.Type     as Type
 import GHC.Core.Coercion as Type
 
 import GHC.Core.DataCon
-import GHC.Core.Predicate ( isEvVar )
+import GHC.Core.Predicate ( isEvVar, isDictTy )
 import GHC.Core.TyCon     ( tyConArity )
 import GHC.Core.TyCon.RecWalk     ( initRecTc, checkRecTc )
-import GHC.Core.Predicate ( isDictTy )
 import GHC.Core.Multiplicity
 import GHC.Types.Var.Set
 import GHC.Types.Basic
