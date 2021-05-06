@@ -28,7 +28,6 @@ import GHC.Stg.Lift.Monad
 import GHC.Stg.Syntax
 import GHC.Utils.Outputable
 import GHC.Types.Unique.Supply
-import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Types.Var.Set
 import Control.Monad ( when )
@@ -200,7 +199,9 @@ liftRhs
   -> LlStgRhs
   -> LiftM OutStgRhs
 liftRhs mb_former_fvs rhs@(StgRhsCon ccs con mn ts args)
-  = ASSERT2(isNothing mb_former_fvs, text "Should never lift a constructor" $$ pprStgRhs panicStgPprOpts rhs)
+  = assertPpr (isNothing mb_former_fvs)
+              (text "Should never lift a constructor"
+               $$ pprStgRhs panicStgPprOpts rhs) $
     StgRhsCon ccs con mn ts <$> traverse liftArgs args
 liftRhs Nothing (StgRhsClosure _ ccs upd infos body) =
   -- This RHS wasn't lifted.
@@ -215,7 +216,7 @@ liftRhs (Just former_fvs) (StgRhsClosure _ ccs upd infos body) =
 liftArgs :: InStgArg -> LiftM OutStgArg
 liftArgs a@(StgLitArg _) = pure a
 liftArgs (StgVarArg occ) = do
-  ASSERTM2( not <$> isLifted occ, text "StgArgs should never be lifted" $$ ppr occ )
+  assertPprM (not <$> isLifted occ) (text "StgArgs should never be lifted" $$ ppr occ)
   StgVarArg <$> substOcc occ
 
 liftExpr :: LlStgExpr -> LiftM OutStgExpr

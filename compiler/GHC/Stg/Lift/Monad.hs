@@ -36,8 +36,8 @@ import GHC.Stg.Subst
 import GHC.Stg.Syntax
 import GHC.Core.Utils
 import GHC.Types.Unique.Supply
-import GHC.Utils.Misc
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Core.Multiplicity
@@ -183,7 +183,7 @@ collectFloats = go (0 :: Int) []
 
     map_rhss f = uncurry mkStgBinding . second (map (second f)) . decomposeStgBinding
     rm_cccs = map_rhss removeRhsCCCS
-    merge_binds binds = ASSERT( any is_rec binds )
+    merge_binds binds = assert (any is_rec binds) $
                         StgRec (concatMap (snd . decomposeStgBinding . rm_cccs) binds)
     is_rec StgRec{} = True
     is_rec _ = False

@@ -36,6 +36,7 @@ import GHC.Types.FieldLabel ( flSelector )
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import Control.Monad(liftM)
 import Data.List (groupBy)
 import Data.List.NonEmpty (NonEmpty(..))
@@ -133,10 +134,10 @@ matchOneConLike :: [Id]
                 -> NonEmpty EquationInfo
                 -> DsM (CaseAlt ConLike)
 matchOneConLike vars ty mult (eqn1 :| eqns)   -- All eqns for a single constructor
-  = do  { let inst_tys = ASSERT( all tcIsTcTyVar ex_tvs )
+  = do  { let inst_tys = assert (all tcIsTcTyVar ex_tvs) $
                            -- ex_tvs can only be tyvars as data types in source
                            -- Haskell cannot mention covar yet (Aug 2018).
-                         ASSERT( tvs1 `equalLength` ex_tvs )
+                         assert (tvs1 `equalLength` ex_tvs) $
                          arg_tys ++ mkTyVarTys tvs1
 
               val_arg_tys = conLikeInstOrigArgTys con1 inst_tys
@@ -147,7 +148,7 @@ matchOneConLike vars ty mult (eqn1 :| eqns)   -- All eqns for a single construct
                           -> [(ConArgPats, EquationInfo)] -> DsM (MatchResult CoreExpr)
               -- All members of the group have compatible ConArgPats
               match_group arg_vars arg_eqn_prs
-                = ASSERT( notNull arg_eqn_prs )
+                = assert (notNull arg_eqn_prs) $
                   do { (wraps, eqns') <- liftM unzip (mapM shift arg_eqn_prs)
                      ; let group_arg_vars = select_arg_vars arg_vars arg_eqn_prs
                      ; match_result <- match (group_arg_vars ++ vars) ty eqns'
@@ -216,8 +217,8 @@ matchOneConLike vars ty mult (eqn1 :| eqns)   -- All eqns for a single construct
       | RecCon flds <- arg_pats
       , let rpats = rec_flds flds
       , not (null rpats)     -- Treated specially; cf conArgPats
-      = ASSERT2( fields1 `equalLength` arg_vars,
-                 ppr con1 $$ ppr fields1 $$ ppr arg_vars )
+      = assertPpr (fields1 `equalLength` arg_vars)
+                  (ppr con1 $$ ppr fields1 $$ ppr arg_vars) $
         map lookup_fld rpats
       | otherwise
       = arg_vars

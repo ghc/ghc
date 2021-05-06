@@ -43,9 +43,6 @@ import Data.Char
 import GHC.Exts( Ptr(..), noDuplicate#, oneShot )
 #if MIN_VERSION_GLASGOW_HASKELL(9,1,0,0)
 import GHC.Exts( Int(..), word2Int#, fetchAddWordAddr#, plusWord#, readWordOffAddr# )
-#if defined(DEBUG)
-import GHC.Utils.Misc
-#endif
 #endif
 import Foreign.Storable
 
@@ -241,7 +238,7 @@ genSym = do
 #if defined(DEBUG)
     -- Uh oh! We will overflow next time a unique is requested.
     -- (Note that if the increment isn't 1 we may miss this check)
-    MASSERT(u /= mask)
+    massert (u /= mask)
 #endif
     return u
 #endif

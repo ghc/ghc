@@ -166,6 +166,7 @@ import GHC.Builtin.Names
 import GHC.Data.Maybe
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Data.FastString.Env
 import GHC.Types.FieldLabel
 import GHC.Settings.Constants
@@ -455,7 +456,7 @@ instance Outputable TyConBndrVis where
   ppr (AnonTCB af)    = text "AnonTCB"  <> ppr af
 
 mkAnonTyConBinder :: AnonArgFlag -> TyVar -> TyConBinder
-mkAnonTyConBinder af tv = ASSERT( isTyVar tv)
+mkAnonTyConBinder af tv = assert (isTyVar tv) $
                           Bndr tv (AnonTCB af)
 
 mkAnonTyConBinders :: AnonArgFlag -> [TyVar] -> [TyConBinder]
@@ -463,7 +464,7 @@ mkAnonTyConBinders af tvs = map (mkAnonTyConBinder af) tvs
 
 mkNamedTyConBinder :: ArgFlag -> TyVar -> TyConBinder
 -- The odd argument order supports currying
-mkNamedTyConBinder vis tv = ASSERT( isTyVar tv )
+mkNamedTyConBinder vis tv = assert (isTyVar tv) $
                             Bndr tv (NamedTCB vis)
 
 mkNamedTyConBinders :: ArgFlag -> [TyVar] -> [TyConBinder]
@@ -1752,7 +1753,7 @@ mkAlgTyCon name binders res_kind roles cType stupid rhs parent gadt_syn
               algTcStupidTheta = stupid,
               algTcRhs         = rhs,
               algTcFields      = fieldsOfAlgTcRhs rhs,
-              algTcParent      = ASSERT2( okParent name parent, ppr name $$ ppr parent ) parent,
+              algTcParent      = assertPpr (okParent name parent) (ppr name $$ ppr parent) parent,
               algTcGadtSyntax  = gadt_syn
           }
     in tc

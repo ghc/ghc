@@ -51,6 +51,7 @@ import GHC.Data.Maybe
 import GHC.Driver.Session
 import GHC.Utils.Error (withTimingSilent)
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Types.Unique.Supply
 import GHC.Utils.Logger
 import GHC.Utils.Monad
@@ -257,7 +258,7 @@ mkInfoTableContents dflags
         slow_entry = CmmLabel (toSlowEntryLbl platform info_lbl)
         srt_lit = case srt_label of
                     []          -> mkIntCLit platform 0
-                    (lit:_rest) -> ASSERT( null _rest ) lit
+                    (lit:_rest) -> assert (null _rest) lit
 
     mk_pieces other _ = pprPanic "mk_pieces" (ppr other)
 
