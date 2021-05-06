@@ -1,6 +1,8 @@
 
 UnliftedNewtypesLevityBinder.hs:16:7: error:
-    A levity-polymorphic type is not allowed here:
-      Type: a
-      Kind: TYPE r
-    When trying to create a variable of type: a
+    Cannot use function with levity-polymorphic arguments:
+      IdentC :: a -> Ident a
+    (Note that levity-polymorphic primops such as 'coerce' and unboxed tuples
+    are eta-expanded internally because they must occur fully saturated.
+    Use -fprint-typechecker-elaboration to display the full expression.)
+    Levity-polymorphic arguments: a :: TYPE r
