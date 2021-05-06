@@ -80,6 +80,11 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
         $4="$$4 -z noexecstack"
         ;;
 
+    aarch64*netbsd*)
+        $3="$$3 -Wl,-z,noexecstack"
+        $4="$$4 -z noexecstack"
+        ;;
+
     powerpc-ibm-aix*)
         # We need `-D_THREAD_SAFE` to unlock the thread-local `errno`.
         $2="$$2 -D_THREAD_SAFE"

@@ -108,6 +108,12 @@ TARGETS=(
     "armv7-unknown-freebsd-gnueabihf"
 
     #########################
+    # NetBSD
+    #########################
+
+    "aarch64-unknown-netbsd"
+
+    #########################
     # Other
     #########################
 
