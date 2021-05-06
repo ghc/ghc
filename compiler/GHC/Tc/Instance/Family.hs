@@ -27,7 +27,6 @@ import GHC.Core.DataCon ( dataConName )
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs
 import GHC.Core.TyCo.Ppr ( pprWithExplicitKindsWhen )
-import GHC.Core.FVs( orphNamesOfType )
 
 import GHC.Iface.Load
 
@@ -191,7 +190,7 @@ newFamInst flavor axiom@(CoAxiom { co_ax_tc = fam_tc, co_ax_name = ax_name })
                          , fi_tys      = lhs'
                          , fi_rhs      = rhs'
                          , fi_axiom    = axiom
-                         , fi_orphan   = orph lhs' rhs'
+                         , fi_orphan   = orph lhs rhs
                          })
        }
   where
