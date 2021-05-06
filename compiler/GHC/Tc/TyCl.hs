@@ -91,6 +91,8 @@ import GHC.Unit
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
+import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Misc
 
 import Control.Monad
@@ -1534,7 +1536,7 @@ getFamFlav mb_parent_tycon info =
   case info of
     DataFamily         -> DataFamilyFlavour mb_parent_tycon
     OpenTypeFamily     -> OpenTypeFamilyFlavour mb_parent_tycon
-    ClosedTypeFamily _ -> ASSERT( isNothing mb_parent_tycon ) -- See Note [Closed type family mb_parent_tycon]
+    ClosedTypeFamily _ -> assert (isNothing mb_parent_tycon) -- See Note [Closed type family mb_parent_tycon]
                           ClosedTypeFamilyFlavour
 
 {- Note [Closed type family mb_parent_tycon]
@@ -2377,7 +2379,7 @@ tcTyClDecl1 parent _roles_info (FamDecl { tcdFam = fd })
 tcTyClDecl1 _parent roles_info
             (SynDecl { tcdLName = L _ tc_name
                      , tcdRhs   = rhs })
-  = ASSERT( isNothing _parent )
+  = assert (isNothing _parent )
     fmap noDerivInfos $
     tcTySynRhs roles_info tc_name rhs
 
@@ -2385,7 +2387,7 @@ tcTyClDecl1 _parent roles_info
 tcTyClDecl1 _parent roles_info
             decl@(DataDecl { tcdLName = L _ tc_name
                            , tcdDataDefn = defn })
-  = ASSERT( isNothing _parent )
+  = assert (isNothing _parent) $
     tcDataDefn (tcMkDeclCtxt decl) roles_info tc_name defn
 
 tcTyClDecl1 _parent roles_info
@@ -2396,7 +2398,7 @@ tcTyClDecl1 _parent roles_info
                        , tcdSigs = sigs
                        , tcdATs = ats
                        , tcdATDefs = at_defs })
-  = ASSERT( isNothing _parent )
+  = assert (isNothing _parent) $
     do { clas <- tcClassDecl1 roles_info class_name hs_ctxt
                               meths fundeps sigs ats at_defs
        ; return (noDerivInfos (classTyCon clas)) }
@@ -2550,7 +2552,7 @@ tcDefaultAssocDecl fam_tc
              vis_pats  = numVisibleArgs hs_pats
 
        -- Kind of family check
-       ; ASSERT( fam_tc_name == tc_name )
+       ; assert (fam_tc_name == tc_name) $
          checkTc (isTypeFamilyTyCon fam_tc) (wrongKindOfFamily fam_tc)
 
        -- Arity check
@@ -2957,7 +2959,7 @@ tcDataDefn err_ctxt roles_info tc_name
     mk_tc_rhs _ tycon data_cons
       = case new_or_data of
           DataType -> return (mkDataTyConRhs data_cons)
-          NewType  -> ASSERT( not (null data_cons) )
+          NewType  -> assert (not (null data_cons)) $
                       mkNewTyConRhs tc_name tycon (head data_cons)
 
 
@@ -4303,7 +4305,7 @@ checkPartialRecordField all_cons fld
     has_field con = fld `elem` (dataConFieldLabels con)
     is_exhaustive = all (dataConCannotMatch inst_tys) cons_without_field
 
-    con1 = ASSERT( not (null cons_with_field) ) head cons_with_field
+    con1 = assert (not (null cons_with_field)) $ head cons_with_field
     (univ_tvs, _, eq_spec, _, _, _) = dataConFullSig con1
     eq_subst = mkTvSubstPrs (map eqSpecPair eq_spec)
     inst_tys = substTyVars eq_subst univ_tvs
@@ -4432,12 +4434,12 @@ checkValidDataCon dflags existential_ok tc con
                    user_tvbs_invariant
                      =    Set.fromList (filterEqSpec eq_spec univs ++ exs)
                        == Set.fromList user_tvs
-             ; MASSERT2( user_tvbs_invariant
-                       , vcat ([ ppr con
+             ; massertPpr user_tvbs_invariant
+                          $ vcat ([ ppr con
                                , ppr univs
                                , ppr exs
                                , ppr eq_spec
-                               , ppr user_tvs ])) }
+                               , ppr user_tvs ]) }
 
         ; traceTc "Done validity of data con" $
           vcat [ ppr con
@@ -5044,8 +5046,8 @@ addVDQNote :: TcTyCon -> TcM a -> TcM a
 -- See Note [Inferring visible dependent quantification]
 -- Only types without a signature (CUSK or SAK) here
 addVDQNote tycon thing_inside
-  | ASSERT2( isTcTyCon tycon, ppr tycon )
-    ASSERT2( not (tcTyConIsPoly tycon), ppr tycon $$ ppr tc_kind )
+  | assertPpr (isTcTyCon tycon) (ppr tycon) $
+    assertPpr (not (tcTyConIsPoly tycon)) (ppr tycon $$ ppr tc_kind)
     has_vdq
   = addLandmarkErrCtxt vdq_warning thing_inside
   | otherwise

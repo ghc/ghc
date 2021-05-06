@@ -60,6 +60,7 @@ import GHC.Builtin.Uniques
 import GHC.Builtin.Utils ( primOpId )
 import GHC.Data.FastString
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Utils.Exception (evaluate)
 import GHC.StgToCmm.Closure ( NonVoid(..), fromNonVoid, nonVoidIds )
 import GHC.StgToCmm.Layout
@@ -633,7 +634,7 @@ returnUnboxedTuple d s p es = do
         (tuple_info, tuple_components) = layoutTuple profile d arg_ty es
         go _   pushes [] = return (reverse pushes)
         go !dd pushes ((a, off):cs) = do (push, szb) <- pushAtom dd p a
-                                         MASSERT(off == dd + szb)
+                                         massert (off == dd + szb)
                                          go (dd + szb) (push:pushes) cs
     pushes <- go d [] tuple_components
     ret <- returnUnboxedReps d
@@ -760,7 +761,7 @@ isNNLJoinPoint x = isJoinId x &&
 -- See Note [Not-necessarily-lifted join points]
 protectNNLJoinPointId :: Id -> Id
 protectNNLJoinPointId x
-  = ASSERT( isNNLJoinPoint x )
+  = assert (isNNLJoinPoint x )
     updateIdTypeButNotMult (unboxedUnitTy `mkVisFunTyMany`) x
 
 {-
@@ -949,10 +950,10 @@ doTailCall init_d s p fn args = do
    do_pushes init_d args (map (atomRep platform) args)
   where
   do_pushes !d [] reps = do
-        ASSERT( null reps ) return ()
+        assert (null reps ) return ()
         (push_fn, sz) <- pushAtom d p (StgVarArg fn)
         platform <- profilePlatform <$> getProfile
-        ASSERT( sz == wordSize platform ) return ()
+        assert (sz == wordSize platform ) return ()
         let slide = mkSlideB platform (d - init_d + wordSize platform) (init_d - s)
         return (push_fn `appOL` (slide `appOL` unitOL ENTER))
   do_pushes !d args reps = do
@@ -1134,7 +1135,7 @@ doCase d s p scrut bndr alts
                         | (NonVoid arg, offset) <- args_offsets ]
                         p_alts
              in do
-             MASSERT(isAlgCase)
+             massert isAlgCase
              rhs_code <- schemeE stack_bot s p' rhs
              return (my_discr alt,
                      unitOL (UNPACK (trunc16W size)) `appOL` rhs_code)
@@ -1772,7 +1773,7 @@ implement_tagToId
     -> BcM BCInstrList
 -- See Note [Implementing tagToEnum#]
 implement_tagToId d s p arg names
-  = ASSERT( notNull names )
+  = assert (notNull names) $
     do (push_arg, arg_bytes) <- pushAtom d p (StgVarArg arg)
        labels <- getLabelsBc (genericLength names)
        label_fail <- getLabelBc
@@ -1865,7 +1866,7 @@ pushAtom d p (StgVarArg var)
               fromIntegral $ ptrToWordPtr $ fromRemotePtr ptr
             Nothing -> do
                 let sz = idSizeCon platform var
-                MASSERT( sz == wordSize platform )
+                massert (sz == wordSize platform)
                 return (unitOL (PUSH_G (getName var)), sz)
 
 

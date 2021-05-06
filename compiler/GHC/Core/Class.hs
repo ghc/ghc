@@ -34,6 +34,7 @@ import GHC.Types.Basic
 import GHC.Types.Unique
 import GHC.Utils.Misc
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Data.BooleanFormula (BooleanFormula, mkTrue)
@@ -254,20 +255,20 @@ classAllSelIds :: Class -> [Id]
 -- Both superclass-dictionary and method selectors
 classAllSelIds c@(Class { classBody = ConcreteClass { cls_sc_sel_ids = sc_sels }})
   = sc_sels ++ classMethods c
-classAllSelIds c = ASSERT( null (classMethods c) ) []
+classAllSelIds c = assert (null (classMethods c) ) []
 
 classSCSelIds :: Class -> [Id]
 -- Both superclass-dictionary and method selectors
 classSCSelIds (Class { classBody = ConcreteClass { cls_sc_sel_ids = sc_sels }})
   = sc_sels
-classSCSelIds c = ASSERT( null (classMethods c) ) []
+classSCSelIds c = assert (null (classMethods c) ) []
 
 classSCSelId :: Class -> Int -> Id
 -- Get the n'th superclass selector Id
 -- where n is 0-indexed, and counts
 --    *all* superclasses including equalities
 classSCSelId (Class { classBody = ConcreteClass { cls_sc_sel_ids = sc_sels } }) n
-  = ASSERT( n >= 0 && lengthExceeds sc_sels n )
+  = assert (n >= 0 && lengthExceeds sc_sels n )
     sc_sels !! n
 classSCSelId c n = pprPanic "classSCSelId" (ppr c <+> ppr n)
 

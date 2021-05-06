@@ -2353,7 +2353,7 @@ getPendingGivenScs = do { lvl <- getTcLevel
 
 get_sc_pending :: TcLevel -> InertCans -> ([Ct], InertCans)
 get_sc_pending this_lvl ic@(IC { inert_dicts = dicts, inert_insts = insts })
-  = ASSERT2( all isGivenCt sc_pending, ppr sc_pending )
+  = assertPpr (all isGivenCt sc_pending) (ppr sc_pending)
        -- When getPendingScDics is called,
        -- there are never any Wanteds in the inert set
     (sc_pending, ic { inert_dicts = dicts', inert_insts = insts' })
@@ -2470,7 +2470,7 @@ isOuterTyVar :: TcLevel -> TyCoVar -> Bool
 -- True of a type variable that comes from a
 -- shallower level than the ambient level (tclvl)
 isOuterTyVar tclvl tv
-  | isTyVar tv = ASSERT2( not (isTouchableMetaTyVar tclvl tv), ppr tv <+> ppr tclvl  )
+  | isTyVar tv = assertPpr (not (isTouchableMetaTyVar tclvl tv)) (ppr tv <+> ppr tclvl) $
                  tclvl `strictlyDeeperThan` tcTyVarLevel tv
     -- ASSERT: we are dealing with Givens here, and invariant (GivenInv) from
     -- Note Note [TcLevel invariants] in GHC.Tc.Utils.TcType ensures that there can't
@@ -3481,7 +3481,7 @@ unifyTyVar :: TcTyVar -> TcType -> TcS ()
 --
 -- We should never unify the same variable twice!
 unifyTyVar tv ty
-  = ASSERT2( isMetaTyVar tv, ppr tv )
+  = assertPpr (isMetaTyVar tv) (ppr tv) $
     TcS $ \ env ->
     do { TcM.traceTc "unifyTyVar" (ppr tv <+> text ":=" <+> ppr ty)
        ; TcM.writeMetaTyVar tv ty

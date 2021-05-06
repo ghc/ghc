@@ -60,6 +60,7 @@ import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Utils.Outputable as Ppr
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Char
 import GHC.Exts.Heap
 import GHC.Runtime.Heap.Layout ( roundUpTo )
@@ -277,7 +278,7 @@ ppr_termM1 NewtypeWrap{} = panic "ppr_termM1 - NewtypeWrap"
 
 pprNewtypeWrap y p NewtypeWrap{ty=ty, wrapped_term=t}
   | Just (tc,_) <- tcSplitTyConApp_maybe ty
-  , ASSERT(isNewTyCon tc) True
+  , assert (isNewTyCon tc) True
   , Just new_dc <- tyConSingleDataCon_maybe tc = do
              real_term <- y max_prec t
              return $ cparen (p >= app_prec) (ppr new_dc <+> real_term)
@@ -789,7 +790,7 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
                   -- MutVar# :: contents_ty -> MutVar# s contents_ty
          traceTR (text "Following a MutVar")
          contents_tv <- newVar liftedTypeKind
-         MASSERT(isUnliftedType my_ty)
+         massert (isUnliftedType my_ty)
          (mutvar_ty,_) <- instScheme $ quantifyType $ mkVisFunTyMany
                             contents_ty (mkTyConApp tycon [world,contents_ty])
          addConstraint (mkVisFunTyMany contents_tv my_ty) mutvar_ty
@@ -909,7 +910,7 @@ extractSubTerms recurse clos = liftM thdOf3 . go 0 0
                      [index size_b aligned_idx word_size endian]
                  | otherwise =
                      let (q, r) = size_b `quotRem` word_size
-                     in ASSERT( r == 0 )
+                     in assert (r == 0 )
                         [ array!!i
                         | o <- [0.. q - 1]
                         , let i = (aligned_idx `quot` word_size) + o
@@ -1080,7 +1081,7 @@ getDataConArgTys dc con_app_ty
   = do { let rep_con_app_ty = unwrapType con_app_ty
        ; traceTR (text "getDataConArgTys 1" <+> (ppr con_app_ty $$ ppr rep_con_app_ty
                    $$ ppr (tcSplitTyConApp_maybe rep_con_app_ty)))
-       ; ASSERT( all isTyVar ex_tvs ) return ()
+       ; assert (all isTyVar ex_tvs ) return ()
                  -- ex_tvs can only be tyvars as data types in source
                  -- Haskell cannot mention covar yet (Aug 2018)
        ; (subst, _) <- instTyVars (univ_tvs ++ ex_tvs)

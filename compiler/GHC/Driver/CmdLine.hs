@@ -30,6 +30,7 @@ import GHC.Prelude
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Data.Bag
 import GHC.Types.SrcLoc
 import GHC.Utils.Json
@@ -224,7 +225,7 @@ processOneArg opt_kind rest arg args
   = let dash_arg = '-' : arg
         rest_no_eq = dropEq rest
     in case opt_kind of
-        NoArg  a -> ASSERT(null rest) Right (a, args)
+        NoArg  a -> assert (null rest) Right (a, args)
 
         HasArg f | notNull rest_no_eq -> Right (f rest_no_eq, args)
                  | otherwise -> case args of
