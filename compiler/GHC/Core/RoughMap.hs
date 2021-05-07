@@ -35,6 +35,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Types.Name
 import GHC.Types.Name.Env
+import GHC.Types.Unique.FM (NonDetUniqFM(..))
 
 import Control.Monad (join)
 import Data.Data (Data)
@@ -103,7 +104,7 @@ lookupRM' (KnownTc tc : tcs) rm      = unionManyBags
                                        , listToBag $ rm_empty rm
                                        ]
 lookupRM' (OtherTc : tcs)    rm      = unionManyBags
-                                       [ foldMap (lookupRM' tcs) (nameEnvElts (rm_known rm))
+                                       [ foldMap (lookupRM' tcs) (NonDetUniqFM $ rm_known rm)
                                        , lookupRM' tcs (rm_unknown rm)
                                        , listToBag $ rm_empty rm
                                        ]
