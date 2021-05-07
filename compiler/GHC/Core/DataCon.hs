@@ -5,7 +5,7 @@
 \section[DataCon]{@DataCon@: Data Constructors}
 -}
 
-{-# LANGUAGE CPP, DeriveDataTypeable #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 
 module GHC.Core.DataCon (
         -- * Main data types
@@ -63,8 +63,6 @@ module GHC.Core.DataCon (
         promoteDataCon
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Types.Id.Make ( DataConBoxer )
@@ -92,6 +90,7 @@ import GHC.Builtin.Uniques( mkAlphaTyVarUnique )
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Builder as BSB
@@ -1406,9 +1405,9 @@ dataConInstArgTys :: DataCon    -- ^ A datacon with no existentials or equality 
                   -> [Scaled Type]
 dataConInstArgTys dc@(MkData {dcUnivTyVars = univ_tvs,
                               dcExTyCoVars = ex_tvs}) inst_tys
- = ASSERT2( univ_tvs `equalLength` inst_tys
-          , text "dataConInstArgTys" <+> ppr dc $$ ppr univ_tvs $$ ppr inst_tys)
-   ASSERT2( null ex_tvs, ppr dc )
+ = assertPpr (univ_tvs `equalLength` inst_tys)
+             (text "dataConInstArgTys" <+> ppr dc $$ ppr univ_tvs $$ ppr inst_tys) $
+   assertPpr (null ex_tvs) (ppr dc) $
    map (mapScaledType (substTyWith univ_tvs inst_tys)) (dataConRepArgTys dc)
 
 -- | Returns just the instantiated /value/ argument types of a 'DataCon',
@@ -1424,8 +1423,8 @@ dataConInstOrigArgTys
 dataConInstOrigArgTys dc@(MkData {dcOrigArgTys = arg_tys,
                                   dcUnivTyVars = univ_tvs,
                                   dcExTyCoVars = ex_tvs}) inst_tys
-  = ASSERT2( tyvars `equalLength` inst_tys
-           , text "dataConInstOrigArgTys" <+> ppr dc $$ ppr tyvars $$ ppr inst_tys )
+  = assertPpr (tyvars `equalLength` inst_tys)
+              (text "dataConInstOrigArgTys" <+> ppr dc $$ ppr tyvars $$ ppr inst_tys) $
     substScaledTys subst arg_tys
   where
     tyvars = univ_tvs ++ ex_tvs
@@ -1449,7 +1448,7 @@ dataConRepArgTys (MkData { dcRep = rep
                          , dcOtherTheta = theta
                          , dcOrigArgTys = orig_arg_tys })
   = case rep of
-      NoDataConRep -> ASSERT( null eq_spec ) (map unrestricted theta) ++ orig_arg_tys
+      NoDataConRep -> assert (null eq_spec) $ (map unrestricted theta) ++ orig_arg_tys
       DCR { dcr_arg_tys = arg_tys } -> arg_tys
 
 -- | The string @package:module.name@ identifying a constructor, which is attached
@@ -1467,7 +1466,7 @@ dataConIdentity dc = LBS.toStrict $ BSB.toLazyByteString $ mconcat
        occNameFS $ nameOccName name
    ]
   where name = dataConName dc
-        mod  = ASSERT( isExternalName name ) nameModule name
+        mod  = assert (isExternalName name) $ nameModule name
 
 isTupleDataCon :: DataCon -> Bool
 isTupleDataCon (MkData {dcRepTyCon = tc}) = isTupleTyCon tc
@@ -1496,7 +1495,7 @@ specialPromotedDc = isKindTyCon . dataConTyCon
 
 classDataCon :: Class -> DataCon
 classDataCon clas = case tyConDataCons (classTyCon clas) of
-                      (dict_constr:no_more) -> ASSERT( null no_more ) dict_constr
+                      (dict_constr:no_more) -> assert (null no_more) dict_constr
                       [] -> panic "classDataCon"
 
 dataConCannotMatch :: [Type] -> DataCon -> Bool

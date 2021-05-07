@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE BangPatterns #-}
 
@@ -42,8 +41,6 @@ module GHC.CmmToAsm.Monad (
 )
 
 where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 

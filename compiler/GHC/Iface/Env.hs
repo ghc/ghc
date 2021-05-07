@@ -1,6 +1,6 @@
 -- (c) The University of Glasgow 2002-2006
 
-{-# LANGUAGE CPP, RankNTypes #-}
+{-# LANGUAGE RankNTypes #-}
 
 module GHC.Iface.Env (
         newGlobalBinder, newInteractiveBinder,
@@ -20,8 +20,6 @@ module GHC.Iface.Env (
         -- Name-cache stuff
         allocateGlobalBinder,
    ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 

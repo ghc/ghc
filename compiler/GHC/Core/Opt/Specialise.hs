@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -9,8 +9,6 @@
 -}
 
 module GHC.Core.Opt.Specialise ( specProgram, specUnfolding ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -1406,8 +1404,8 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
     foldlM spec_call ([], [], emptyUDs) calls_for_me
 
   | otherwise   -- No calls or RHS doesn't fit our preconceptions
-  = WARN( not (exprIsTrivial rhs) && notNull calls_for_me,
-          text "Missed specialisation opportunity for" <+> ppr fn $$ _trace_doc )
+  = warnPprTrace (not (exprIsTrivial rhs) && notNull calls_for_me)
+          (text "Missed specialisation opportunity for" <+> ppr fn $$ _trace_doc) $
           -- Note [Specialisation shape]
     -- pprTrace "specDefn: none" (ppr fn <+> ppr calls_for_me) $
     return ([], [], emptyUDs)

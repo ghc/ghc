@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE MultiWayIf #-}
 
 -- | Module for detecting if recompilation is required
@@ -9,8 +8,6 @@ module GHC.Iface.Recomp
    , addFingerprints
    )
 where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -36,12 +33,14 @@ import GHC.Data.FastString
 
 import GHC.Utils.Error
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Misc as Utils hiding ( eqListBy )
 import GHC.Utils.Binary
 import GHC.Utils.Fingerprint
 import GHC.Utils.Exception
 import GHC.Utils.Logger
+import GHC.Utils.Constants (debugIsOn)
 
 import GHC.Types.Annotations
 import GHC.Types.Name
@@ -359,7 +358,7 @@ checkHsig :: Logger -> HomeUnit -> DynFlags -> ModSummary -> ModIface -> IO Reco
 checkHsig logger home_unit dflags mod_summary iface = do
     let outer_mod = ms_mod mod_summary
         inner_mod = homeModuleNameInstantiation home_unit (moduleName outer_mod)
-    MASSERT( isHomeModule home_unit outer_mod )
+    massert (isHomeModule home_unit outer_mod)
     case inner_mod == mi_semantic_module iface of
         True -> up_to_date logger dflags (text "implementing module unchanged")
         False -> return (RecompBecause "implementing module changed")
@@ -665,12 +664,9 @@ checkModUsage _this_pkg UsageFile{ usg_file_path = file,
          else return UpToDate
  where
    recomp  = RecompBecause (file ++ " changed")
-   handler =
-#if defined(DEBUG)
-       \e -> pprTrace "UsageFile" (text (show e)) $ return recomp
-#else
-       \_ -> return recomp -- if we can't find the file, just recompile, don't fail
-#endif
+   handler = if debugIsOn
+      then \e -> pprTrace "UsageFile" (text (show e)) $ return recomp
+      else \_ -> return recomp -- if we can't find the file, just recompile, don't fail
 
 ------------------------
 checkModuleFingerprint
@@ -882,7 +878,7 @@ addFingerprints hsc_env iface0
                , let out = localOccs $ freeNamesDeclABI abi
                ]
 
-       name_module n = ASSERT2( isExternalName n, ppr n ) nameModule n
+       name_module n = assertPpr (isExternalName n) (ppr n) (nameModule n)
        localOccs =
          map (getUnique . getParent . getOccName)
                         -- NB: names always use semantic module, so
@@ -925,7 +921,7 @@ addFingerprints hsc_env iface0
           | isWiredInName name  =  putNameLiterally bh name
            -- wired-in names don't have fingerprints
           | otherwise
-          = ASSERT2( isExternalName name, ppr name )
+          = assertPpr (isExternalName name) (ppr name) $
             let hash | nameModule name /= semantic_mod =  global_hash_fn name
                      -- Get it from the REAL interface!!
                      -- This will trigger when we compile an hsig file
@@ -1497,7 +1493,7 @@ mkHashFun hsc_env eps name
       occ = nameOccName name
       orig_mod = nameModule name
       lookup mod = do
-        MASSERT2( isExternalName name, ppr name )
+        massertPpr (isExternalName name) (ppr name)
         iface <- case lookupIfaceByModule hpt pit mod of
                   Just iface -> return iface
                   Nothing ->

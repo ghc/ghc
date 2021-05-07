@@ -5,7 +5,7 @@
 \section[TyConEnv]{@TyConEnv@: tyCon environments}
 -}
 
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE ScopedTypeVariables #-}
 
 
@@ -32,8 +32,6 @@ module GHC.Core.TyCon.Env (
         mapDTyConEnv, mapMaybeDTyConEnv,
         adjustDTyConEnv, alterDTyConEnv, extendDTyConEnv, foldDTyConEnv
     ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
