@@ -12,7 +12,7 @@ test('unsigned_reloc_macho_x64',
 test('section_alignment',
      [
          extra_files(['runner.c', 'section_alignment.c']),
-         unless(opsys('darwin') and arch('x86_64'), expect_broken(13624))
+         unless(opsys('darwin'), expect_broken(13624))
      ],
      run_command, ['$MAKE -s --no-print-directory section_alignment'])
 
