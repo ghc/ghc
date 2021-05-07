@@ -2746,6 +2746,11 @@ genCCall' _ is32Bit target dest_regs args bid = do
                                ]
                return code
         _ -> panic "genCCall: Wrong number of arguments/results for imul2"
+    (PrimTarget (MO_Cmpxchg2 width), [res_lo, res_hi]) ->
+        case args of
+        [dst, old_lo, old_hi, new_lo, new_hi] ->
+            panic "MO_Cmpxchg2 not implemented"
+        _ -> panic "genCCall: Wrong number of arguments/results for cmpxchg(8|16)b"
 
     _ -> do
         (instrs0, args') <- evalArgs bid args
