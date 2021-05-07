@@ -1,8 +1,7 @@
-[1 of 2] Compiling WorphansTypeDef  ( WorphansTypeDef.hs, WorphansTypeDef.o )
-[2 of 2] Compiling WorphansType     ( WorphansType.hs, WorphansType.o )
 
-WorphansType.hs:6:1: warning: [-Worphans-type (in -Wall, -Worphans)]
-    Orphan type family instance: type instance TypeFam ()
-    To avoid this
-        move the instance declaration to the module of the data family, or
-        wrap the type with a newtype and declare the data instance on the new type.
+WorphansType.hs:6:1: warning: [-Worphans-type (in -Worphans)]
+    Orphan type family instance:
+      type instance TypeFam () = () -- Defined at WorphansType.hs:6:15
+     To avoid this
+        move the instance declaration to the module of the type family, or
+        wrap the type with a newtype and declare the instance on the new type.

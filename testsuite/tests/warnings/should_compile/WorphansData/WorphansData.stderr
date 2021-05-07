@@ -1,8 +1,6 @@
-[1 of 2] Compiling WorphansDataDef  ( WorphansDataDef.hs, WorphansDataDef.o )
-[2 of 2] Compiling WorphansData     ( WorphansData.hs, WorphansData.o )
-
-WorphansData.hs:6:1: warning: [-Worphans-data (in -Wall, -Worphans)]
-    Orphan data instance: data instance DataFam ()
+WorphansData.hs:6:1: warning: [-Worphans-data (in -Worphans)]
+    Orphan data family instance:
+      data instance DataFam () -- Defined at WorphansData.hs:6:15
     To avoid this
         move the instance declaration to the module of the data family, or
-        wrap the type with a newtype and declare the data instance on the new type.
+        wrap the type with a newtype and declare the instance on the new type.

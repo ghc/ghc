@@ -190,7 +190,7 @@ newFamInst flavor axiom@(CoAxiom { co_ax_tc = fam_tc, co_ax_name = ax_name })
                          , fi_tys      = lhs'
                          , fi_rhs      = rhs'
                          , fi_axiom    = axiom
-                         , fi_orphan   = orph lhs rhs
+                         , fi_orphan   = orph lhs' rhs'
                          })
        }
   where

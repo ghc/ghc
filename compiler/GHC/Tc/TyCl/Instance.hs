@@ -604,7 +604,10 @@ tcTyFamInstDecl mb_clsinfo (L loc decl@(TyFamInstDecl { tfid_eqn = eqn }))
          -- (3) construct coercion axiom
        ; rep_tc_name <- newFamInstAxiomName fam_lname [coAxBranchLHS co_ax_branch]
        ; let axiom = mkUnbranchedCoAxiom rep_tc_name fam_tc co_ax_branch
-       ; newFamInst SynFamilyInst axiom }
+       ; fam_inst <- newFamInst SynFamilyInst axiom
+       ; warnIfInstTypeFamOrphan fam_inst
+       ; return fam_inst
+       }
 
 
 ---------------------
@@ -789,12 +792,7 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
                                   , di_ctxt    = tcMkDataFamInstCtxt decl }
 
        ; fam_inst <- newFamInst (DataFamilyInst rep_tc) axiom
-       ; warnIfFlag Opt_WarnOrphansData
-                    (isDataFamInst fam_inst && isOrphan (fi_orphan fam_inst))
-                    (instOrphDataWarn fam_inst)
-       ; warnIfFlag Opt_WarnOrphansType
-                    (isTypeFamInst fam_inst && isOrphan (fi_orphan fam_inst))
-                    (instOrphDataWarn fam_inst)
+       ; warnIfInstDataFamOrphan fam_inst
        ; return (fam_inst, m_deriv_info) }
   where
     eta_reduce :: TyCon -> [Type] -> ([Type], [TyConBinder])
@@ -829,14 +827,39 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
       let n = lookupWithDefaultVarEnv tv_skol_env (tyVarName tv) tv
       in (n, tv)
 
+warnIfInstFamOrphan :: FamInst -> TcM ()
+warnIfInstFamOrphan fam_inst
+    | SynFamilyInst <- fi_flavor fam_inst = warnIfInstDataFamOrphan fam_inst
+    | otherwise                           = warnIfInstTypeFamOrphan fam_inst
+warnIfInstDataFamOrphan, warnIfInstTypeFamOrphan :: FamInst -> TcM ()
+warnIfInstDataFamOrphan fam_inst
+  =  warnIfFlag Opt_WarnOrphansData
+                (isOrphan (fi_orphan fam_inst))
+                (instOrphDataWarn fam_inst)
+warnIfInstTypeFamOrphan fam_inst
+  =  warnIfFlag Opt_WarnOrphansType
+                (isOrphan (fi_orphan fam_inst))
+                (instOrphTypeWarn fam_inst)
+
 instOrphDataWarn :: FamInst -> SDoc
 instOrphDataWarn inst
-  = hang (text "Orphan instance:") 2 (pprFamInst inst)
+  = hang (text "Orphan data family instance:") 2 (ppr inst)
     $$ text "To avoid this"
     $$ nest 4 (vcat possibilities)
   where
     possibilities =
-      text "move the instance declaration to the module of the class or of the type, or" :
+      text "move the instance declaration to the module of the data family, or" :
+      text "wrap the type with a newtype and declare the instance on the new type." :
+      []
+
+instOrphTypeWarn :: FamInst -> SDoc
+instOrphTypeWarn inst
+  = hang (text "Orphan type family instance:") 2 (ppr inst)
+    $$ text "To avoid this"
+    $$ nest 4 (vcat possibilities)
+  where
+    possibilities =
+      text "move the instance declaration to the module of the type family, or" :
       text "wrap the type with a newtype and declare the instance on the new type." :
       []
 
