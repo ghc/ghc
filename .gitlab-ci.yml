@@ -803,7 +803,7 @@ nightly-i386-linux-deb9:
   variables:
     TEST_ENV: "x86_64-linux-deb9"
     BIN_DIST_PREP_TAR_COMP: "./ghc-x86_64-deb9-linux.tar.xz"
-    CONFIGURE_ARGS: ""
+    CONFIGURE_ARGS: "--disable-dtrace"
   cache:
     key: linux-x86_64-deb9-$CACHE_REV
 
@@ -906,7 +906,7 @@ validate-x86_64-linux-deb9-dwarf:
   variables:
     TEST_ENV: "x86_64-linux-deb10"
     BIN_DIST_PREP_TAR_COMP: "./ghc-x86_64-deb10-linux.tar.xz"
-    CONFIGURE_ARGS: ""
+    CONFIGURE_ARGS: "--disable-dtrace"
   cache:
     key: linux-x86_64-deb10-$CACHE_REV
 
@@ -1055,7 +1055,7 @@ nightly-x86_64-linux-alpine:
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-centos7-linux.tar.xz"
     # CentOS seems to default to ascii
     LANG: "en_US.UTF-8"
-    CONFIGURE_ARGS: ""
+    CONFIGURE_ARGS: "--disable-dtrace"
   cache:
     key: linux-x86_64-centos7-$CACHE_REV
 
@@ -1076,7 +1076,7 @@ release-x86_64-linux-centos7:
     LLC: /bin/false
     OPT: /bin/false
     TEST_ENV: "x86_64-linux-fedora27"
-    CONFIGURE_ARGS: ""
+    CONFIGURE_ARGS: "--disable-dtrace"
   cache:
     key: linux-x86_64-fedora27-$CACHE_REV
   artifacts:

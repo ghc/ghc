@@ -896,6 +896,15 @@ if test "x$EnableDtrace" = "xyes"; then
   fi
 fi
 
+if test "x$EnableDtrace" = "xyes" \
+  -a "x$HaveDtrace" = "xYES" \
+  -a "x$TargetOS_CPP-$TargetVendor_CPP" = "xlinux-unknown"; then
+  CHECK_FOR_GOLD_T27775([$LD])
+  if test "$result" = "1"; then
+    AC_MSG_WARN([ld.gold is affected by binutils bug 27775. The RTS dtrace probes will not work with statically linked executables. Use a different linker if you need this.])
+  fi
+fi
+
 AC_SUBST(HaveDtrace)
 
 dnl ** check for libsystemtap
