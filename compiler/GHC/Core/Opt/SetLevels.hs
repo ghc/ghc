@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP             #-}
+
 {-# LANGUAGE PatternSynonyms #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}

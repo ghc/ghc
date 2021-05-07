@@ -3,7 +3,7 @@
 --
 -- Type - public interface
 
-{-# LANGUAGE CPP, FlexibleContexts, PatternSynonyms, ViewPatterns, MultiWayIf #-}
+{-# LANGUAGE FlexibleContexts, PatternSynonyms, ViewPatterns, MultiWayIf #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 

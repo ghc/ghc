@@ -3,7 +3,7 @@
 
 -}
 
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
