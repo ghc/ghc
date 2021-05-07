@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP              #-}
+
 {-# LANGUAGE FlexibleContexts #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 --

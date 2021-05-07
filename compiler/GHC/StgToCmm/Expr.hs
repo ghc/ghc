@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, BangPatterns #-}
+{-# LANGUAGE BangPatterns #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 

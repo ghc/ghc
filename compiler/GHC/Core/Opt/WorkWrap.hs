@@ -4,7 +4,7 @@
 \section[WorkWrap]{Worker/wrapper-generating back-end of strictness analyser}
 -}
 
-{-# LANGUAGE CPP #-}
+
 module GHC.Core.Opt.WorkWrap ( wwTopBinds ) where
 
 import GHC.Prelude

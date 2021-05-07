@@ -6,7 +6,7 @@
 Utility functions on @Core@ syntax
 -}
 
-{-# LANGUAGE CPP #-}
+
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 module GHC.Core.Subst (
         -- * Main data types
