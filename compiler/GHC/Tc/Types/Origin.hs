@@ -464,6 +464,10 @@ data CtOrigin
   | NonLinearPatternOrigin
   | UsageEnvironmentOf Name
 
+  | CycleBreakerOrigin
+      CtOrigin   -- origin of the original constraint
+      -- See Detail (7) of Note [Type variable cycles] in GHC.Tc.Solver.Canonical
+
 -- An origin is visible if the place where the constraint arises is manifest
 -- in user code. Currently, all origins are visible except for invisible
 -- TypeEqOrigins. This is used when choosing which error of
@@ -483,6 +487,7 @@ isGivenOrigin :: CtOrigin -> Bool
 isGivenOrigin (GivenOrigin {})              = True
 isGivenOrigin (FunDepOrigin1 _ o1 _ _ o2 _) = isGivenOrigin o1 && isGivenOrigin o2
 isGivenOrigin (FunDepOrigin2 _ o1 _ _)      = isGivenOrigin o1
+isGivenOrigin (CycleBreakerOrigin o)        = isGivenOrigin o
 isGivenOrigin _                             = False
 
 instance Outputable CtOrigin where
@@ -629,6 +634,9 @@ pprCtOrigin (InstProvidedOrigin mod cls_inst)
   = vcat [ text "arising when attempting to show that"
          , ppr cls_inst
          , text "is provided by" <+> quotes (ppr mod)]
+
+pprCtOrigin (CycleBreakerOrigin orig)
+  = pprCtOrigin orig
 
 pprCtOrigin simple_origin
   = ctoHerald <+> pprCtO simple_origin
