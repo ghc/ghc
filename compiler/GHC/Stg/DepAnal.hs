@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 
 module GHC.Stg.DepAnal (depSortStgPgm) where
 

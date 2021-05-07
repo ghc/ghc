@@ -4,7 +4,7 @@
 
 -}
 
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE MultiWayIf #-}
 
 -- | Functions for inferring (and simplifying) the context for derived instances.

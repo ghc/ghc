@@ -1,5 +1,4 @@
 {-# LANGUAGE BangPatterns      #-}
-{-# LANGUAGE CPP               #-}
 {-# LANGUAGE ExplicitForAll    #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RecordWildCards   #-}

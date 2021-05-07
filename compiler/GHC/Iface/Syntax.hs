@@ -3,7 +3,7 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 -}
 
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE LambdaCase #-}
 
 module GHC.Iface.Syntax (

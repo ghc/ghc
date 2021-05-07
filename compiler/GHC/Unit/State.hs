@@ -1,6 +1,6 @@
 -- (c) The University of Glasgow, 2006
 
-{-# LANGUAGE CPP, ScopedTypeVariables, BangPatterns, FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables, BangPatterns, FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 
 -- | Unit manipulation

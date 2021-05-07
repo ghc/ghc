@@ -10,7 +10,7 @@ ToDo [Oct 2013]
 \section[SpecConstr]{Specialise over constructors}
 -}
 
-{-# LANGUAGE CPP #-}
+
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 

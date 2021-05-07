@@ -4,7 +4,7 @@
 \section[Simplify]{The main module of the simplifier}
 -}
 
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE TypeFamilies #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates -Wno-incomplete-uni-patterns #-}

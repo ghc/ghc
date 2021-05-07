@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP              #-}
+
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TupleSections    #-}
 

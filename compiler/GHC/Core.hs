@@ -3,7 +3,7 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 -}
 
-{-# LANGUAGE CPP, DeriveDataTypeable, FlexibleContexts #-}
+{-# LANGUAGE DeriveDataTypeable, FlexibleContexts #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE BangPatterns #-}
 

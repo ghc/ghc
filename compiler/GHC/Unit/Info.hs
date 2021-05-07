@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, RecordWildCards, FlexibleInstances, MultiParamTypeClasses #-}
+{-# LANGUAGE RecordWildCards, FlexibleInstances, MultiParamTypeClasses #-}
 
 -- | Info about installed units (compiled libraries)
 module GHC.Unit.Info

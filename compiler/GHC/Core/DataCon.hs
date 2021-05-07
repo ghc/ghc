@@ -5,7 +5,7 @@
 \section[DataCon]{@DataCon@: Data Constructors}
 -}
 
-{-# LANGUAGE CPP, DeriveDataTypeable #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 
 module GHC.Core.DataCon (
         -- * Main data types
