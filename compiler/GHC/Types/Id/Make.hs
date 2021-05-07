@@ -12,7 +12,7 @@ have a standard form, namely:
 - primitive operations
 -}
 
-{-# LANGUAGE CPP #-}
+
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 

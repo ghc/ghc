@@ -4,7 +4,7 @@
 \section{Code output phase}
 -}
 
-{-# LANGUAGE CPP #-}
+
 
 module GHC.Driver.CodeOutput
    ( codeOutput

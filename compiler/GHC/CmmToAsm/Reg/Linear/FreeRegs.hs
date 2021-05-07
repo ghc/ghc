@@ -1,5 +1,3 @@
-{-# LANGUAGE CPP #-}
-
 module GHC.CmmToAsm.Reg.Linear.FreeRegs (
     FR(..),
     maxSpillSlots

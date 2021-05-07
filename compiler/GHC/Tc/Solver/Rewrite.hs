@@ -1,5 +1,5 @@
 {-# LANGUAGE BangPatterns  #-}
-{-# LANGUAGE CPP           #-}
+
 {-# LANGUAGE DeriveFunctor #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}

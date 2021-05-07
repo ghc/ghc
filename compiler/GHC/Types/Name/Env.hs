@@ -5,7 +5,7 @@
 \section[NameEnv]{@NameEnv@: name environments}
 -}
 
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 

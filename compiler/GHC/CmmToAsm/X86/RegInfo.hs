@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 module GHC.CmmToAsm.X86.RegInfo (
         mkVirtualReg,
         regDotColor

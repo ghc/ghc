@@ -7,7 +7,6 @@
                         -----------------
 -}
 
-{-# LANGUAGE CPP #-}
 
 module GHC.Core.Opt.DmdAnal
    ( DmdAnalOpts(..)
