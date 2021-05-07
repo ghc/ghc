@@ -69,9 +69,11 @@
                   []))
                 (L
                  (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
-                 (HsConLikeOut
-                  (NoExtField)
-                  ({abstract:ConLike})))
+                 (XExpr
+                  (ConLikeTc
+                   ({abstract:ConLike})
+                   []
+                   [])))
                 (L
                  (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
                  (HsLit
@@ -117,9 +119,11 @@
                 []))
               (L
                (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
-               (HsConLikeOut
-                (NoExtField)
-                ({abstract:ConLike})))
+               (XExpr
+                (ConLikeTc
+                 ({abstract:ConLike})
+                 []
+                 [])))
               (L
                (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
                (HsLit
@@ -219,9 +223,11 @@
                   []))
                 (L
                  (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
-                 (HsConLikeOut
-                  (NoExtField)
-                  ({abstract:ConLike})))
+                 (XExpr
+                  (ConLikeTc
+                   ({abstract:ConLike})
+                   []
+                   [])))
                 (L
                  (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
                  (HsLit
@@ -267,9 +273,11 @@
                 []))
               (L
                (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
-               (HsConLikeOut
-                (NoExtField)
-                ({abstract:ConLike})))
+               (XExpr
+                (ConLikeTc
+                 ({abstract:ConLike})
+                 []
+                 [])))
               (L
                (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
                (HsLit
@@ -369,9 +377,11 @@
                   []))
                 (L
                  (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
-                 (HsConLikeOut
-                  (NoExtField)
-                  ({abstract:ConLike})))
+                 (XExpr
+                  (ConLikeTc
+                   ({abstract:ConLike})
+                   []
+                   [])))
                 (L
                  (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
                  (HsLit
@@ -417,9 +427,11 @@
                 []))
               (L
                (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
-               (HsConLikeOut
-                (NoExtField)
-                ({abstract:ConLike})))
+               (XExpr
+                (ConLikeTc
+                 ({abstract:ConLike})
+                 []
+                 [])))
               (L
                (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
                (HsLit
@@ -519,9 +531,11 @@
                   []))
                 (L
                  (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
-                 (HsConLikeOut
-                  (NoExtField)
-                  ({abstract:ConLike})))
+                 (XExpr
+                  (ConLikeTc
+                   ({abstract:ConLike})
+                   []
+                   [])))
                 (L
                  (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
                  (HsLit
@@ -567,9 +581,11 @@
                 []))
               (L
                (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
-               (HsConLikeOut
-                (NoExtField)
-                ({abstract:ConLike})))
+               (XExpr
+                (ConLikeTc
+                 ({abstract:ConLike})
+                 []
+                 [])))
               (L
                (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
                (HsLit
@@ -669,9 +685,11 @@
                   []))
                 (L
                  (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
-                 (HsConLikeOut
-                  (NoExtField)
-                  ({abstract:ConLike})))
+                 (XExpr
+                  (ConLikeTc
+                   ({abstract:ConLike})
+                   []
+                   [])))
                 (L
                  (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
                  (HsLit
@@ -717,9 +735,11 @@
                 []))
               (L
                (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
-               (HsConLikeOut
-                (NoExtField)
-                ({abstract:ConLike})))
+               (XExpr
+                (ConLikeTc
+                 ({abstract:ConLike})
+                 []
+                 [])))
               (L
                (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
                (HsLit
@@ -769,9 +789,11 @@
         []))
       (L
        (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
-       (HsConLikeOut
-        (NoExtField)
-        ({abstract:ConLike})))
+       (XExpr
+        (ConLikeTc
+         ({abstract:ConLike})
+         []
+         [])))
       (L
        (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
        (HsLit
@@ -805,9 +827,11 @@
         []))
       (L
        (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
-       (HsConLikeOut
-        (NoExtField)
-        ({abstract:ConLike})))
+       (XExpr
+        (ConLikeTc
+         ({abstract:ConLike})
+         []
+         [])))
       (L
        (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
        (HsLit
@@ -841,9 +865,11 @@
         []))
       (L
        (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
-       (HsConLikeOut
-        (NoExtField)
-        ({abstract:ConLike})))
+       (XExpr
+        (ConLikeTc
+         ({abstract:ConLike})
+         []
+         [])))
       (L
        (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
        (HsLit
@@ -887,9 +913,11 @@
           []))
         (L
          (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
-         (HsConLikeOut
-          (NoExtField)
-          ({abstract:ConLike})))
+         (XExpr
+          (ConLikeTc
+           ({abstract:ConLike})
+           []
+           [])))
         (L
          (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
          (HsVar
@@ -931,9 +959,11 @@
           []))
         (L
          (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
-         (HsConLikeOut
-          (NoExtField)
-          ({abstract:ConLike})))
+         (XExpr
+          (ConLikeTc
+           ({abstract:ConLike})
+           []
+           [])))
         (L
          (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
          (HsVar
@@ -975,9 +1005,11 @@
           []))
         (L
          (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
-         (HsConLikeOut
-          (NoExtField)
-          ({abstract:ConLike})))
+         (XExpr
+          (ConLikeTc
+           ({abstract:ConLike})
+           []
+           [])))
         (L
          (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
          (HsVar
@@ -1019,9 +1051,11 @@
           []))
         (L
          (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
-         (HsConLikeOut
-          (NoExtField)
-          ({abstract:ConLike})))
+         (XExpr
+          (ConLikeTc
+           ({abstract:ConLike})
+           []
+           [])))
         (L
          (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
          (HsVar
@@ -1063,9 +1097,11 @@
           []))
         (L
          (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
-         (HsConLikeOut
-          (NoExtField)
-          ({abstract:ConLike})))
+         (XExpr
+          (ConLikeTc
+           ({abstract:ConLike})
+           []
+           [])))
         (L
          (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
          (HsVar
@@ -1107,9 +1143,11 @@
           []))
         (L
          (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
-         (HsConLikeOut
-          (NoExtField)
-          ({abstract:ConLike})))
+         (XExpr
+          (ConLikeTc
+           ({abstract:ConLike})
+           []
+           [])))
         (L
          (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
          (HsVar
@@ -1150,9 +1188,11 @@
                  (TyConApp
                   ({abstract:TyCon})
                   []))
-                (HsConLikeOut
-                 (NoExtField)
-                 ({abstract:ConLike}))))))
+                (XExpr
+                 (ConLikeTc
+                  ({abstract:ConLike})
+                  []
+                  []))))))
             (L
              (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
              (HsVar
@@ -1193,9 +1233,11 @@
                      (TyConApp
                       ({abstract:TyCon})
                       []))
-                    (HsConLikeOut
-                     (NoExtField)
-                     ({abstract:ConLike}))))))
+                    (XExpr
+                     (ConLikeTc
+                      ({abstract:ConLike})
+                      []
+                      []))))))
                 (L
                  (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
                  (HsVar
@@ -1236,9 +1278,11 @@
                          (TyConApp
                           ({abstract:TyCon})
                           []))
-                        (HsConLikeOut
-                         (NoExtField)
-                         ({abstract:ConLike}))))))
+                        (XExpr
+                         (ConLikeTc
+                          ({abstract:ConLike})
+                          []
+                          []))))))
                     (L
                      (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
                      (HsVar
@@ -1255,9 +1299,11 @@
                        (TyConApp
                         ({abstract:TyCon})
                         []))
-                      (HsConLikeOut
-                       (NoExtField)
-                       ({abstract:ConLike}))))))))))))))))))))))
+                      (XExpr
+                       (ConLikeTc
+                        ({abstract:ConLike})
+                        []
+                        []))))))))))))))))))))))
  ,(L
    (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
    (VarBind
@@ -1285,9 +1331,11 @@
           []))
         (L
          (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
-         (HsConLikeOut
-          (NoExtField)
-          ({abstract:ConLike})))
+         (XExpr
+          (ConLikeTc
+           ({abstract:ConLike})
+           []
+           [])))
         (L
          (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
          (HsVar
@@ -1304,9 +1352,11 @@
            (TyConApp
             ({abstract:TyCon})
             []))
-          (HsConLikeOut
-           (NoExtField)
-           ({abstract:ConLike}))))))))))
+          (XExpr
+           (ConLikeTc
+            ({abstract:ConLike})
+            []
+            []))))))))))
  ,(L
    (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
    (VarBind
@@ -1334,9 +1384,11 @@
           []))
         (L
          (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
-         (HsConLikeOut
-          (NoExtField)
-          ({abstract:ConLike})))
+         (XExpr
+          (ConLikeTc
+           ({abstract:ConLike})
+           []
+           [])))
         (L
          (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
          (HsPar
@@ -1353,9 +1405,11 @@
               []))
             (L
              (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
-             (HsConLikeOut
-              (NoExtField)
-              ({abstract:ConLike})))
+             (XExpr
+              (ConLikeTc
+               ({abstract:ConLike})
+               []
+               [])))
             (L
              (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
              (HsLit
@@ -1385,9 +1439,11 @@
             []))
           (L
            (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
-           (HsConLikeOut
-            (NoExtField)
-            ({abstract:ConLike})))
+           (XExpr
+            (ConLikeTc
+             ({abstract:ConLike})
+             []
+             [])))
           (L
            (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
            (HsLit
@@ -1487,3 +1543,5 @@
          (FromSource))
         []))]}
     (False)))]}
+
+
