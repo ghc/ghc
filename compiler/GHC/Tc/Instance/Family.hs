@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, GADTs, ViewPatterns #-}
+{-# LANGUAGE GADTs, ViewPatterns #-}
 
 -- | The @FamInst@ type: family instance heads
 module GHC.Tc.Instance.Family (

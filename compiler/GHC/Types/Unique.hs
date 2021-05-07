@@ -17,7 +17,8 @@ Some of the other hair in this code is to be able to use a
 Haskell).
 -}
 
-{-# LANGUAGE CPP, BangPatterns, MagicHash #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE BangPatterns, MagicHash #-}
 
 module GHC.Types.Unique (
         -- * Main data types

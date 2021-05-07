@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP                 #-}
+
 {-# LANGUAGE ScopedTypeVariables #-}
 
 {-
