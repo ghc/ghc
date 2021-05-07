@@ -4,7 +4,7 @@
 
 -}
 
-{-# LANGUAGE CPP, BangPatterns, NondecreasingIndentation #-}
+{-# LANGUAGE BangPatterns, NondecreasingIndentation #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE FlexibleContexts #-}

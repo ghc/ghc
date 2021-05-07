@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 
 -- | Implements a selective lambda lifter, running late in the optimisation
 -- pipeline.

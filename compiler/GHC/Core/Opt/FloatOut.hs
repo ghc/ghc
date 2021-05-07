@@ -6,7 +6,7 @@
 ``Long-distance'' floating of bindings towards the top level.
 -}
 
-{-# LANGUAGE CPP #-}
+
 
 module GHC.Core.Opt.FloatOut ( floatOutwards ) where
 

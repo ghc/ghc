@@ -1,5 +1,5 @@
 {-# LANGUAGE ApplicativeDo       #-}
-{-# LANGUAGE CPP                 #-}
+
 {-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Domain types used in "GHC.HsToCore.Pmc.Solver".
