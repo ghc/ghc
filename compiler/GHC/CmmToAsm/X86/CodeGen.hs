@@ -2599,29 +2599,10 @@ genCCall' _ _ (PrimTarget (MO_AtomicWrite width)) [] [addr, val] _ = do
     return $ code `snocOL` MFENCE
 
 genCCall' _ is32Bit (PrimTarget (MO_Cmpxchg width)) [dst] [addr, old, new] _
-  | is32Bit, width == W64 = do
-    Amode amode addr_code <- getSimpleAmode is32Bit addr
-    ChildCode64 newval_code newval_lo <- iselExpr64 new
-    ChildCode64 oldval_code oldval_lo <- iselExpr64 old
-    let newval_hi = getHiVRegFromLo newval_lo
-        oldval_hi = getHiVRegFromLo oldval_lo
-        (LocalReg u_dst _) = dst
-        dst_r_lo  = RegVirtual $ mkVirtualReg u_dst II32
-        dst_r_hi  = getHiVRegFromLo dst_r_lo
-        code = toOL
-               [ MOV II32 (OpReg oldval_lo) (OpReg eax)
-               , MOV II32 (OpReg oldval_hi) (OpReg edx)
-               , MOV II32 (OpReg newval_lo) (OpReg ebx)
-               , MOV II32 (OpReg newval_hi) (OpReg ecx)
-               , LOCK (CMPXCHG8B amode)
-               , MOV II32 (OpReg eax) (OpReg dst_r_lo)
-               , MOV II32 (OpReg edx) (OpReg dst_r_hi)
-               ]
-    return $ newval_code `appOL` oldval_code `appOL` addr_code `appOL` code
     -- On x86 we don't have enough registers to use cmpxchg with a
     -- complicated addressing mode, so on that architecture we
     -- pre-compute the address first.
-  | otherwise = do
+  | not (is32Bit && width == W64) = do
     Amode amode addr_code <- getSimpleAmode is32Bit addr
     newval <- getNewRegNat format
     newval_code <- getAnyReg new
