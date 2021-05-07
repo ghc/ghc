@@ -959,7 +959,7 @@ tcPatSynBuilderBind prag_fn (PSB { psb_id = ps_lname@(L loc ps_name)
 patSynBuilderOcc :: PatSyn -> Maybe (HsExpr GhcTc, TcSigmaType)
 patSynBuilderOcc ps
   | Just (_, builder_ty, add_void_arg) <- patSynBuilder ps
-  , let builder_expr = HsConLikeOut noExtField (PatSynCon ps)
+  , let builder_expr = mkConLikeTc (PatSynCon ps)
   = Just $
     if add_void_arg
     then ( builder_expr   -- still just return builder_expr; the void# arg
