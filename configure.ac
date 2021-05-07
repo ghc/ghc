@@ -908,6 +908,11 @@ if test "x$EnableDtrace" = "xyes"; then
   fi
 fi
 
+if test "x$HaveDtrace" = "xYES" \
+  -a "x$TargetOS_CPP-$TargetVendor_CPP" = "xlinux-unknown"; then
+  CHECK_FOR_GOLD_T27775([$LD])
+fi
+
 AC_SUBST(HaveDtrace)
 
 dnl ** check for libsystemtap
