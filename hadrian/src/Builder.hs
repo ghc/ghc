@@ -27,6 +27,7 @@ import Hadrian.Builder.Tar
 import Hadrian.Oracles.Path
 import Hadrian.Oracles.TextFile
 import Hadrian.Utilities
+import Oracles.Setting (bashPath)
 import System.Exit
 import System.IO (stderr)
 
@@ -254,7 +255,9 @@ instance H.Builder Builder where
 
                 Ar Unpack _ -> cmd' echo [Cwd output] [path] buildArgs
 
-                Autoreconf dir -> cmd' echo [Cwd dir] ["sh", path] buildArgs
+                Autoreconf dir -> do
+                  bash <- bashPath
+                  cmd' echo [Cwd dir] [bash, path] buildArgs
 
                 Configure  dir -> do
                     -- Inject /bin/bash into `libtool`, instead of /bin/sh,
