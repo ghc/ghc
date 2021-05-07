@@ -5,7 +5,6 @@
 Taken quite directly from the Peyton Jones/Lester paper.
 -}
 
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeFamilies #-}
 
 -- | A module concerned with finding the free variables of an expression.

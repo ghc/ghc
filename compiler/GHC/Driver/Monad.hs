@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, DeriveFunctor, DerivingVia, RankNTypes #-}
+{-# LANGUAGE DeriveFunctor, DerivingVia, RankNTypes #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 -- -----------------------------------------------------------------------------
 --

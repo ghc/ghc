@@ -364,8 +364,7 @@ generateConfigHs = do
     cProjectName        <- getSetting ProjectName
     cBooterVersion      <- getSetting GhcVersion
     return $ unlines
-        [ "{-# LANGUAGE CPP #-}"
-        , "module GHC.Settings.Config"
+        [ "module GHC.Settings.Config"
         , "  ( module GHC.Version"
         , "  , cBuildPlatformString"
         , "  , cHostPlatformString"

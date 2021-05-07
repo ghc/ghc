@@ -1,5 +1,5 @@
 -- Character classification
-{-# LANGUAGE CPP #-}
+
 module GHC.Parser.CharClass
         ( is_ident      -- Char# -> Bool
         , is_symbol     -- Char# -> Bool

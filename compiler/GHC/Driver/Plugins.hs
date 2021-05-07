@@ -1,5 +1,5 @@
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE CPP #-}
+
 
 -- | Definitions for writing /plugins/ for GHC. Plugins can hook into
 -- several areas of the compiler. See the 'Plugin' type. These plugins

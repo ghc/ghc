@@ -15,7 +15,7 @@ literal'').  In the corner of a @CoreUnfolding@ unfolding, you will
 find, unsurprisingly, a Core expression.
 -}
 
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE BangPatterns #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}

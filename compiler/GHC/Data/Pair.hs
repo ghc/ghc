@@ -3,7 +3,7 @@ A simple homogeneous pair type with useful Functor, Applicative, and
 Traversable instances.
 -}
 
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE DeriveFunctor #-}
 
 module GHC.Data.Pair

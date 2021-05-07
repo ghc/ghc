@@ -7,7 +7,6 @@
 -}
 
 {-# LANGUAGE CPP #-}
-
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 -- | Arity and eta expansion

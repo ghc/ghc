@@ -4,7 +4,6 @@
 Wired-in knowledge about {\em non-primitive} types
 -}
 
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}

@@ -20,7 +20,7 @@ just attach noSrcSpan to everything.
 
 -}
 
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}

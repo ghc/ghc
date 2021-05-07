@@ -7,7 +7,7 @@ This module contains "tidying" code for *nested* expressions, bindings, rules.
 The code for *top-level* bindings is in GHC.Iface.Tidy.
 -}
 
-{-# LANGUAGE CPP #-}
+
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 module GHC.Core.Tidy (
         tidyExpr, tidyRules, tidyUnfolding

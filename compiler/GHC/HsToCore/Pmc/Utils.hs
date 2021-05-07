@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP                 #-}
+
 {-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Utility module for the pattern-match coverage checker.

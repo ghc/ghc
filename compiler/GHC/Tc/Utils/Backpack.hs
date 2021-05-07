@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP                      #-}
+
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE ScopedTypeVariables      #-}
 {-# LANGUAGE TypeFamilies             #-}

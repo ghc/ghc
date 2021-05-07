@@ -1,4 +1,5 @@
-{-# LANGUAGE CPP, NondecreasingIndentation, ScopedTypeVariables #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE NondecreasingIndentation, ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections, NamedFieldPuns #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TypeFamilies #-}

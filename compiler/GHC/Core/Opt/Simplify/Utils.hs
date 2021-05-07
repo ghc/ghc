@@ -4,7 +4,7 @@
 The simplifier utilities
 -}
 
-{-# LANGUAGE CPP #-}
+
 
 module GHC.Core.Opt.Simplify.Utils (
         -- Rebuilding

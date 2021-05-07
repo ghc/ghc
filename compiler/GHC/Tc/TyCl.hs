@@ -4,7 +4,8 @@
 
 -}
 
-{-# LANGUAGE CPP, TupleSections, ScopedTypeVariables, MultiWayIf #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE TupleSections, ScopedTypeVariables, MultiWayIf #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE LambdaCase #-}

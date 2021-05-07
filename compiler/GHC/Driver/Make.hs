@@ -1,5 +1,4 @@
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE NondecreasingIndentation #-}
@@ -85,6 +84,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Error
 import GHC.Utils.Logger
 import GHC.Utils.TmpFs
+import GHC.Utils.Constants (isWindowsHost)
 
 import GHC.Types.Basic
 import GHC.Types.Error
@@ -743,14 +743,12 @@ guessOutputFile = modifySession $ \env ->
         name = fmap dropExtension mainModuleSrcPath
 
         name_exe = do
-#if defined(mingw32_HOST_OS)
           -- we must add the .exe extension unconditionally here, otherwise
           -- when name has an extension of its own, the .exe extension will
           -- not be added by GHC.Driver.Pipeline.exeFileName.  See #2248
-          name' <- fmap (<.> "exe") name
-#else
-          name' <- name
-#endif
+          name' <- if isWindowsHost --FIXME: should be the target platform
+                    then fmap (<.> "exe") name
+                    else name
           mainModuleSrcPath' <- mainModuleSrcPath
           -- #9930: don't clobber input files (unless they ask for it)
           if name' == mainModuleSrcPath'

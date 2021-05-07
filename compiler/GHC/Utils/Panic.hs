@@ -4,7 +4,8 @@
 
 -}
 
-{-# LANGUAGE CPP, ScopedTypeVariables, LambdaCase #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE ScopedTypeVariables, LambdaCase #-}
 
 -- | Defines basic functions for printing error messages.
 --

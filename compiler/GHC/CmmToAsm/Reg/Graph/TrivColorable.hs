@@ -1,5 +1,3 @@
-{-# LANGUAGE CPP #-}
-
 module GHC.CmmToAsm.Reg.Graph.TrivColorable (
         trivColorable,
 )

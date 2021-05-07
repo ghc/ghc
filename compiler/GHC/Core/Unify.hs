@@ -1,7 +1,7 @@
 -- (c) The University of Glasgow 2006
 
 {-# LANGUAGE ScopedTypeVariables, PatternSynonyms #-}
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE DeriveFunctor, DeriveDataTypeable #-}
 
 module GHC.Core.Unify (

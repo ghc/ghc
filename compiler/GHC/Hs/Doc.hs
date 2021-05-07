@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE DeriveDataTypeable #-}
 
 module GHC.Hs.Doc

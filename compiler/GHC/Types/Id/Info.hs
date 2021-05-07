@@ -8,7 +8,7 @@
 Haskell. [WDP 94/11])
 -}
 
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE BinaryLiterals #-}
 

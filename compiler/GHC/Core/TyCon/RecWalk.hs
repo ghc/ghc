@@ -6,7 +6,7 @@ Check for recursive type constructors.
 
 -}
 
-{-# LANGUAGE CPP #-}
+
 
 module GHC.Core.TyCon.RecWalk (
 

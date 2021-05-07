@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP           #-}
+
 {-# LANGUAGE DeriveFunctor #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}

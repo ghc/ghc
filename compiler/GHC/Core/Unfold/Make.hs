@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 
 -- | Unfolding creation
 module GHC.Core.Unfold.Make

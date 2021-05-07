@@ -21,7 +21,7 @@ The program gather statistics about
 \end{enumerate}
 -}
 
-{-# LANGUAGE CPP #-}
+
 
 module GHC.Stg.Stats ( showStgStats ) where
 

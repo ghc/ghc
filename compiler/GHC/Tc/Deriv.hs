@@ -4,7 +4,7 @@
 
 -}
 
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE TypeFamilies #-}
 

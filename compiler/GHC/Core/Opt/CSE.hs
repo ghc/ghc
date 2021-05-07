@@ -4,7 +4,7 @@
 \section{Common subexpression}
 -}
 
-{-# LANGUAGE CPP #-}
+
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}

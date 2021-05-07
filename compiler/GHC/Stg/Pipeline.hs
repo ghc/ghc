@@ -4,7 +4,7 @@
 \section[SimplStg]{Driver for simplifying @STG@ programs}
 -}
 
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}

@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE MultiWayIf #-}
 
 -- | Module for detecting if recompilation is required
@@ -41,6 +40,7 @@ import GHC.Utils.Binary
 import GHC.Utils.Fingerprint
 import GHC.Utils.Exception
 import GHC.Utils.Logger
+import GHC.Utils.Constants (debugIsOn)
 
 import GHC.Types.Annotations
 import GHC.Types.Name
@@ -664,12 +664,9 @@ checkModUsage _this_pkg UsageFile{ usg_file_path = file,
          else return UpToDate
  where
    recomp  = RecompBecause (file ++ " changed")
-   handler =
-#if defined(DEBUG)
-       \e -> pprTrace "UsageFile" (text (show e)) $ return recomp
-#else
-       \_ -> return recomp -- if we can't find the file, just recompile, don't fail
-#endif
+   handler = if debugIsOn
+      then \e -> pprTrace "UsageFile" (text (show e)) $ return recomp
+      else \_ -> return recomp -- if we can't find the file, just recompile, don't fail
 
 ------------------------
 checkModuleFingerprint

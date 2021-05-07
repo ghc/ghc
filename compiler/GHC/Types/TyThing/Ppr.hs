@@ -6,7 +6,7 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE CPP #-}
+
 module GHC.Types.TyThing.Ppr (
         pprTyThing,
         pprTyThingInContext,

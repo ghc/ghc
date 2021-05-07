@@ -3,7 +3,7 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 -}
 
-{-# LANGUAGE CPP #-}
+
 
 module GHC.Types.Var.Set (
         -- * Var, Id and TyVar set types

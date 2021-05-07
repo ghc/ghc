@@ -5,7 +5,7 @@
 \section[ConLike]{@ConLike@: Constructor-like things}
 -}
 
-{-# LANGUAGE CPP #-}
+
 
 module GHC.Core.ConLike (
           ConLike(..)

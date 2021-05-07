@@ -4,7 +4,7 @@
 
 -}
 
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE TypeFamilies #-}
 
 module GHC.Tc.Gen.Sig(

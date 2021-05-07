@@ -5,7 +5,7 @@
 \section[TyConEnv]{@TyConEnv@: tyCon environments}
 -}
 
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE ScopedTypeVariables #-}
 
 

@@ -1,4 +1,5 @@
-{-# LANGUAGE CPP, TupleSections, RecordWildCards #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE TupleSections, RecordWildCards #-}
 {-# LANGUAGE BangPatterns #-}
 
 --

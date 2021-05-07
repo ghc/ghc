@@ -1,5 +1,4 @@
 {-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE CPP                 #-}
 {-# LANGUAGE DeriveFunctor       #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE RankNTypes          #-}

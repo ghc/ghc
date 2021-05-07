@@ -3,7 +3,7 @@
 --
 -- The @Class@ datatype
 
-{-# LANGUAGE CPP #-}
+
 
 module GHC.Core.Class (
         Class,

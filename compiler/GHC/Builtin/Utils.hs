@@ -3,7 +3,7 @@
 
 -}
 
-{-# LANGUAGE CPP #-}
+
 
 -- | The @GHC.Builtin.Utils@ interface to the compiler's prelude knowledge.
 --

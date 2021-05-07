@@ -1,4 +1,4 @@
-{-# LANGUAGE BinaryLiterals, CPP, ScopedTypeVariables, BangPatterns #-}
+{-# LANGUAGE BinaryLiterals, ScopedTypeVariables, BangPatterns #-}
 
 --
 --  (c) The University of Glasgow 2002-2006

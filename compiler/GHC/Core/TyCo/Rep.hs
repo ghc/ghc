@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP                #-}
+
 {-# LANGUAGE DeriveDataTypeable #-}
 
 {-# OPTIONS_HADDOCK not-home #-}

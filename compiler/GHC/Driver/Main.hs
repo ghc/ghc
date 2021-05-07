@@ -1,5 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE NondecreasingIndentation #-}
 
 {-# OPTIONS_GHC -fprof-auto-top #-}

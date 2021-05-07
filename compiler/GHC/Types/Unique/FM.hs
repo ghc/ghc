@@ -23,7 +23,7 @@ of arguments of combining function.
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE CPP #-}
+
 {-# OPTIONS_GHC -Wall #-}
 
 module GHC.Types.Unique.FM (

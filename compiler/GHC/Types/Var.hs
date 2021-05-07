@@ -5,7 +5,7 @@
 \section{@Vars@: Variables}
 -}
 
-{-# LANGUAGE CPP, FlexibleContexts, MultiWayIf, FlexibleInstances, DeriveDataTypeable,
+{-# LANGUAGE FlexibleContexts, MultiWayIf, FlexibleInstances, DeriveDataTypeable,
              PatternSynonyms, BangPatterns #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}

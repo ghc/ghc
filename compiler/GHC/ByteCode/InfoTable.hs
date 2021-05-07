@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP                 #-}
+
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -optc-DNON_POSIX_SOURCE #-}
 --

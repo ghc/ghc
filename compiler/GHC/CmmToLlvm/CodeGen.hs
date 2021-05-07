@@ -1,9 +1,9 @@
-{-# LANGUAGE CPP, GADTs, MultiWayIf #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE GADTs, MultiWayIf #-}
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
--- ----------------------------------------------------------------------------
+
 -- | Handle conversion of CmmProc to LLVM code.
---
 module GHC.CmmToLlvm.CodeGen ( genLlvmProc ) where
 
 import GHC.Prelude

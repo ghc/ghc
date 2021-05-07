@@ -1,5 +1,5 @@
 -- (c) The University of Glasgow 2006
-{-# LANGUAGE CPP, FlexibleInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}  -- instance MonadThings is necessarily an
                                        -- orphan

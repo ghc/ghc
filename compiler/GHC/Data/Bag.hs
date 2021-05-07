@@ -6,7 +6,7 @@
 Bag: an unordered collection with duplicates
 -}
 
-{-# LANGUAGE ScopedTypeVariables, CPP, DeriveFunctor, TypeFamilies #-}
+{-# LANGUAGE ScopedTypeVariables, DeriveFunctor, TypeFamilies #-}
 
 module GHC.Data.Bag (
         Bag, -- abstract type
