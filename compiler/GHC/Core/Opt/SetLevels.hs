@@ -75,8 +75,6 @@ module GHC.Core.Opt.SetLevels (
         incMinorLvl, ltMajLvl, ltLvl, isTopLvl
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Driver.Ppr
@@ -120,6 +118,7 @@ import GHC.Types.Unique.Supply
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Data.FastString
 import GHC.Types.Unique.DFM
 import GHC.Utils.FV
@@ -1052,7 +1051,7 @@ notWorthFloating e abs_vars
   = go e (count isId abs_vars)
   where
     go (Var {}) n    = n >= 0
-    go (Lit lit) n   = ASSERT( n==0 )
+    go (Lit lit) n   = assert (n==0) $
                        litIsTrivial lit   -- Note [Floating literals]
     go (Tick t e) n  = not (tickishIsCode t) && go e n
     go (Cast e _)  n = go e n
@@ -1690,9 +1689,9 @@ abstractVars dest_lvl (LE { le_subst = subst, le_lvl_env = lvl_env }) in_fvs
 
         -- We are going to lambda-abstract, so nuke any IdInfo,
         -- and add the tyvars of the Id (if necessary)
-    zap v | isId v = WARN( isStableUnfolding (idUnfolding v) ||
-                           not (isEmptyRuleInfo (idSpecialisation v)),
-                           text "absVarsOf: discarding info on" <+> ppr v )
+    zap v | isId v = warnPprTrace (isStableUnfolding (idUnfolding v) ||
+                           not (isEmptyRuleInfo (idSpecialisation v)))
+                           (text "absVarsOf: discarding info on" <+> ppr v) $
                      setIdInfo v vanillaIdInfo
           | otherwise = v
 
@@ -1708,7 +1707,7 @@ newPolyBndrs :: Level -> LevelEnv -> [OutVar] -> [InId]
 newPolyBndrs dest_lvl
              env@(LE { le_lvl_env = lvl_env, le_subst = subst, le_env = id_env })
              abs_vars bndrs
- = ASSERT( all (not . isCoVar) bndrs )   -- What would we add to the CoSubst in this case. No easy answer.
+ = assert (all (not . isCoVar) bndrs) $   -- What would we add to the CoSubst in this case. No easy answer.
    do { uniqs <- getUniquesM
       ; let new_bndrs = zipWith mk_poly_bndr bndrs uniqs
             bndr_prs  = bndrs `zip` new_bndrs
@@ -1807,7 +1806,7 @@ cloneLetVars is_rec
 add_id :: IdEnv ([Var], LevelledExpr) -> (Var, Var) -> IdEnv ([Var], LevelledExpr)
 add_id id_env (v, v1)
   | isTyVar v = delVarEnv    id_env v
-  | otherwise = extendVarEnv id_env v ([v1], ASSERT(not (isCoVar v1)) Var v1)
+  | otherwise = extendVarEnv id_env v ([v1], assert (not (isCoVar v1)) $ Var v1)
 
 {-
 Note [Zapping the demand info]

@@ -7,8 +7,6 @@ module GHC.HsToCore.Usage (
     mkUsageInfo, mkUsedNames, mkDependencies
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Driver.Env
@@ -289,7 +287,7 @@ mk_mod_usage_info pit hsc_env this_mod direct_imports used_names
         | isWiredInName name = mv_map  -- ignore wired-in names
         | otherwise
         = case nameModule_maybe name of
-             Nothing  -> ASSERT2( isSystemName name, ppr name ) mv_map
+             Nothing  -> assertPpr (isSystemName name) (ppr name) mv_map
                 -- See Note [Internal used_names]
 
              Just mod ->

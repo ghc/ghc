@@ -11,7 +11,7 @@ import System.Console.Terminfo (SetupTermError, Terminal, getCapability,
                                 setupTermFromEnv, termColors)
 import System.Posix (queryTerminal, stdError)
 #elif defined(mingw32_HOST_OS)
-import Control.Exception (try)
+import GHC.Utils.Exception (try)
 -- import Data.Bits ((.|.), (.&.))
 import Foreign (Ptr, peek, with)
 import qualified Graphics.Win32 as Win32

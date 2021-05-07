@@ -14,8 +14,6 @@ module GHC.Iface.Rename (
     tcRnModExports,
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Driver.Env
@@ -251,7 +249,8 @@ rnAvailInfo (AvailTC n ns) = do
     ns' <- mapM rnGreName ns
     case ns' of
         [] -> panic "rnAvailInfoEmpty AvailInfo"
-        (rep:rest) -> ASSERT2( all ((== childModule rep) . childModule) rest, ppr rep $$ hcat (map ppr rest) ) do
+        (rep:rest) -> assertPpr (all ((== childModule rep) . childModule) rest)
+                                (ppr rep $$ hcat (map ppr rest)) $ do
                          n' <- setNameModule (Just (childModule rep)) n
                          return (AvailTC n' ns')
   where
@@ -376,7 +375,7 @@ rnIfaceNeverExported name = do
     iface_semantic_mod <- fmap sh_if_semantic_module getGblEnv
     let m = renameHoleModule unit_state hmap $ nameModule name
     -- Doublecheck that this DFun/coercion axiom was, indeed, locally defined.
-    MASSERT2( iface_semantic_mod == m, ppr iface_semantic_mod <+> ppr m )
+    massertPpr (iface_semantic_mod == m) (ppr iface_semantic_mod <+> ppr m)
     setNameModule (Just m) name
 
 -- Note [rnIfaceNeverExported]

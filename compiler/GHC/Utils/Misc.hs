@@ -13,9 +13,11 @@
 -- | Highly random utility functions
 --
 module GHC.Utils.Misc (
-        -- * Flags dependent on the compiler build
-        ghciSupported, debugIsOn,
-        isWindowsHost, isDarwinHost,
+        -- TODO: remove them after CPP is gone!
+        debugIsOn
+       , ghciSupported
+       , isWindowsHost
+       , isDarwinHost,
 
         -- * Miscellaneous higher-order functions
         applyWhen, nTimes,
@@ -131,12 +133,11 @@ module GHC.Utils.Misc (
         overrideWith,
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Utils.Exception
 import GHC.Utils.Panic.Plain
+import GHC.Utils.Constants
 
 import Data.Data
 import qualified Data.List as List
@@ -170,50 +171,6 @@ import {-# SOURCE #-} GHC.Driver.Ppr ( warnPprTrace )
 
 infixr 9 `thenCmp`
 
-{-
-************************************************************************
-*                                                                      *
-\subsection{Is DEBUG on, are we on Windows, etc?}
-*                                                                      *
-************************************************************************
-
-These booleans are global constants, set by CPP flags.  They allow us to
-recompile a single module (this one) to change whether or not debug output
-appears. They sometimes let us avoid even running CPP elsewhere.
-
-It's important that the flags are literal constants (True/False). Then,
-with -0, tests of the flags in other modules will simplify to the correct
-branch of the conditional, thereby dropping debug code altogether when
-the flags are off.
--}
-
-ghciSupported :: Bool
-#if defined(HAVE_INTERNAL_INTERPRETER)
-ghciSupported = True
-#else
-ghciSupported = False
-#endif
-
-debugIsOn :: Bool
-#if defined(DEBUG)
-debugIsOn = True
-#else
-debugIsOn = False
-#endif
-
-isWindowsHost :: Bool
-#if defined(mingw32_HOST_OS)
-isWindowsHost = True
-#else
-isWindowsHost = False
-#endif
-
-isDarwinHost :: Bool
-#if defined(darwin_HOST_OS)
-isDarwinHost = True
-#else
-isDarwinHost = False
-#endif
 
 {-
 ************************************************************************
@@ -586,7 +543,7 @@ isIn msg x ys
     elem100 :: Eq a => Int -> a -> [a] -> Bool
     elem100 _ _ [] = False
     elem100 i x (y:ys)
-      | i > 100 = WARN(True, text ("Over-long elem in " ++ msg)) (x `elem` (y:ys))
+      | i > 100 = warnPprTrace True (text ("Over-long elem in " ++ msg)) (x `elem` (y:ys))
       | otherwise = x == y || elem100 (i + 1) x ys
 
 isn'tIn msg x ys
@@ -595,7 +552,7 @@ isn'tIn msg x ys
     notElem100 :: Eq a => Int -> a -> [a] -> Bool
     notElem100 _ _ [] =  True
     notElem100 i x (y:ys)
-      | i > 100 = WARN(True, text ("Over-long notElem in " ++ msg)) (x `notElem` (y:ys))
+      | i > 100 = warnPprTrace True (text ("Over-long notElem in " ++ msg)) (x `notElem` (y:ys))
       | otherwise = x /= y && notElem100 (i + 1) x ys
 # endif /* DEBUG */
 
@@ -679,7 +636,7 @@ isSortedBy cmp = sorted
 -}
 
 minWith :: Ord b => (a -> b) -> [a] -> a
-minWith get_key xs = ASSERT( not (null xs) )
+minWith get_key xs = assert (not (null xs) )
                      head (sortWith get_key xs)
 
 nubSort :: Ord a => [a] -> [a]

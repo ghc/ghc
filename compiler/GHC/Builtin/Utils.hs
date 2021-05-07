@@ -45,8 +45,6 @@ module GHC.Builtin.Utils (
 
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Builtin.Uniques

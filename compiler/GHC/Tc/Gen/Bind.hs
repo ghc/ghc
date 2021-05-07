@@ -79,8 +79,6 @@ import qualified GHC.LanguageExtensions as LangExt
 import Control.Monad
 import Data.Foldable (find)
 
-#include "HsVersions.h"
-
 {-
 ************************************************************************
 *                                                                      *

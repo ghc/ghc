@@ -25,8 +25,6 @@ module GHC.Core.Lint (
     dumpIfSet,
  ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Driver.Session
@@ -1525,7 +1523,7 @@ lintIdBndr :: TopLevelFlag -> BindingSite
 -- new type to the in-scope set of the second argument
 -- ToDo: lint its rules
 lintIdBndr top_lvl bind_site id thing_inside
-  = ASSERT2( isId id, ppr id )
+  = assertPpr (isId id) (ppr id) $
     do { flags <- getLintFlags
        ; checkL (not (lf_check_global_ids flags) || isLocalId id)
                 (text "Non-local Id binder" <+> ppr id)
@@ -2764,7 +2762,7 @@ addWarnL msg = LintM $ \ env (warns,errs) ->
 
 addMsg :: Bool -> LintEnv ->  Bag SDoc -> SDoc -> Bag SDoc
 addMsg is_error env msgs msg
-  = ASSERT2( notNull loc_msgs, msg )
+  = assertPpr (notNull loc_msgs) msg $
     msgs `snocBag` mk_msg msg
   where
    loc_msgs :: [(SrcLoc, SDoc)]  -- Innermost first

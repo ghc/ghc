@@ -25,14 +25,11 @@ import GHC.Types.Unique.Supply
 import GHC.Builtin.Types
 import GHC.Builtin.Names
 
-import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
 import Control.Concurrent.MVar
 import Control.Monad
-
-#include "HsVersions.h"
 
 {-
 
@@ -119,7 +116,7 @@ lookupOrigNameCache nc mod occ
 
 extendOrigNameCache' :: OrigNameCache -> Name -> OrigNameCache
 extendOrigNameCache' nc name
-  = ASSERT2( isExternalName name, ppr name )
+  = assertPpr (isExternalName name) (ppr name) $
     extendOrigNameCache nc (nameModule name) (nameOccName name) name
 
 extendOrigNameCache :: OrigNameCache -> Module -> OccName -> Name -> OrigNameCache

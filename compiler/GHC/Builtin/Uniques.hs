@@ -51,8 +51,6 @@ module GHC.Builtin.Uniques
 
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Builtin.Types
@@ -65,8 +63,8 @@ import GHC.Types.Unique
 import GHC.Data.FastString
 
 import GHC.Utils.Outputable
-import GHC.Utils.Misc
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 
 import Data.Maybe
 
@@ -113,8 +111,8 @@ TypeRep for sum DataCon of arity k and alternative n (zero-based):
 
 mkSumTyConUnique :: Arity -> Unique
 mkSumTyConUnique arity =
-    ASSERT(arity < 0x3f) -- 0x3f since we only have 6 bits to encode the
-                         -- alternative
+    assert (arity < 0x3f) $ -- 0x3f since we only have 6 bits to encode the
+                            -- alternative
     mkUnique 'z' (arity `shiftL` 8 .|. 0xfc)
 
 mkSumDataConUnique :: ConTagZ -> Arity -> Unique

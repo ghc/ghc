@@ -30,8 +30,6 @@ module GHCi.UI (
         ghciWelcomeMsg
     ) where
 
-#include "HsVersions.h"
-
 -- GHCi
 import qualified GHCi.UI.Monad as GhciMonad ( args, runStmt, runDecls' )
 import GHCi.UI.Monad hiding ( args, runStmt )
@@ -99,6 +97,7 @@ import qualified GHC.Linker.Loader as Loader
 import GHC.Data.Maybe ( orElse, expectJust )
 import GHC.Types.Name.Set
 import GHC.Utils.Panic hiding ( showException, try )
+import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Data.Bag (unitBag)
@@ -1833,7 +1832,7 @@ checkModule m = do
            case GHC.moduleInfo r of
              cm | Just scope <- GHC.modInfoTopLevelScope cm ->
                 let
-                    (loc, glob) = ASSERT( all isExternalName scope )
+                    (loc, glob) = assert (all isExternalName scope) $
                                   partition ((== modl) . GHC.moduleName . GHC.nameModule) scope
                 in
                         (text "global names: " <+> ppr glob) $$
@@ -2568,7 +2567,7 @@ browseModule bang modl exports_only = do
                 -- identifiers first. We would like to improve this; see #1799.
             sorted_names = loc_sort local ++ occ_sort external
                 where
-                (local,external) = ASSERT( all isExternalName names )
+                (local,external) = assert (all isExternalName names) $
                                    partition ((==modl) . nameModule) names
                 occ_sort = sortBy (compare `on` nameOccName)
                 -- try to sort by src location. If the first name in our list
@@ -3764,7 +3763,7 @@ enclosingTickSpan _ (UnhelpfulSpan _) = panic "enclosingTickSpan UnhelpfulSpan"
 enclosingTickSpan md (RealSrcSpan src _) = do
   ticks <- getTickArray md
   let line = srcSpanStartLine src
-  ASSERT(inRange (bounds ticks) line) do
+  massert (inRange (bounds ticks) line)
   let enclosing_spans = [ pan | (_,pan) <- ticks ! line
                                , realSrcSpanEnd pan >= realSrcSpanEnd src]
   return . head . sortBy leftmostLargestRealSrcSpan $ enclosing_spans
@@ -4250,7 +4249,7 @@ list2 [arg] = do
         let loc = GHC.srcSpanStart (GHC.nameSrcSpan name)
         case loc of
             RealSrcLoc l _ ->
-               do tickArray <- ASSERT( isExternalName name )
+               do tickArray <- assert (isExternalName name) $
                                getTickArray (GHC.nameModule name)
                   let mb_span = findBreakByCoord (Just (GHC.srcLocFile l))
                                         (GHC.srcLocLine l, GHC.srcLocCol l)
@@ -4552,7 +4551,7 @@ wantNameFromInterpretedModule noCanDo str and_then =
    case names of
       []    -> return ()
       (n:_) -> do
-            let modl = ASSERT( isExternalName n ) GHC.nameModule n
+            let modl = assert (isExternalName n) $ GHC.nameModule n
             if not (GHC.isExternalName n)
                then noCanDo n $ ppr n <>
                                 text " is not defined in an interpreted module"

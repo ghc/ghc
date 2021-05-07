@@ -74,8 +74,6 @@ module GHC.Tc.Gen.HsType (
         funAppCtxt, addTyConFlavCtxt
    ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Hs
@@ -119,6 +117,7 @@ import GHC.Utils.Misc
 import GHC.Types.Unique.Supply
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Data.FastString
 import GHC.Builtin.Names hiding ( wildCardName )
 import GHC.Driver.Session
@@ -1273,7 +1272,7 @@ tc_hs_type mode rn_ty@(HsExplicitTupleTy _ tys) exp_kind
 
 --------- Constraint types
 tc_hs_type mode rn_ty@(HsIParamTy _ (L _ n) ty) exp_kind
-  = do { MASSERT( isTypeLevel (mode_tyki mode) )
+  = do { massert (isTypeLevel (mode_tyki mode))
        ; ty' <- tc_lhs_type mode ty liftedTypeKind
        ; let n' = mkStrLitTy $ hsIPNameFS n
        ; ipClass <- tcLookupClass ipClassName
@@ -1755,8 +1754,8 @@ mkAppTyM subst fun (Named (Bndr tv _)) arg
 mk_app_ty :: TcType -> TcType -> TcType
 -- This function just adds an ASSERT for mkAppTyM's precondition
 mk_app_ty fun arg
-  = ASSERT2( isPiTy fun_kind
-           ,  ppr fun <+> dcolon <+> ppr fun_kind $$ ppr arg )
+  = assertPpr (isPiTy fun_kind)
+              (ppr fun <+> dcolon <+> ppr fun_kind $$ ppr arg) $
     mkAppTy fun arg
   where
     fun_kind = tcTypeKind fun
@@ -2662,7 +2661,7 @@ kcCheckDeclHeader_sig kisig name flav
     invis_to_tcb :: TyCoBinder -> TcM TyConBinder
     invis_to_tcb tb = do
       (tcb, stv) <- zipped_to_tcb (ZippedBinder tb Nothing)
-      MASSERT(null stv)
+      massert (null stv)
       return tcb
 
     -- Check that the inline kind annotation on a binder is valid

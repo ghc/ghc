@@ -10,8 +10,6 @@ module GHC.StgToCmm.Types
   , WordOff
   ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Types.Basic

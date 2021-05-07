@@ -111,8 +111,6 @@ module GHC.Hs.Utils(
   lStmtsImplicits, hsValBindsImplicits, lPatImplicits
   ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Hs.Decls

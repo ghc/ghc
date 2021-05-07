@@ -19,8 +19,6 @@ module GHC.Core.Opt.SpecConstr(
         SpecConstrAnnotation(..)
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Core
@@ -57,7 +55,7 @@ import GHC.Utils.Misc
 import GHC.Data.Pair
 import GHC.Types.Unique.Supply
 import GHC.Utils.Outputable
-import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Data.FastString
 import GHC.Types.Unique.FM
 import GHC.Utils.Monad
@@ -1342,7 +1340,7 @@ harmful.  I'm not sure.
 scApp :: ScEnv -> (InExpr, [InExpr]) -> UniqSM (ScUsage, CoreExpr)
 
 scApp env (Var fn, args)        -- Function is a variable
-  = ASSERT( not (null args) )
+  = assert (not (null args)) $
     do  { args_w_usgs <- mapM (scExpr env) args
         ; let (arg_usgs, args') = unzip args_w_usgs
               arg_usg = combineUsages arg_usgs
@@ -2164,9 +2162,9 @@ callToPats env bndr_occs call@(Call fn args con_env)
               bad_covar v = isId v && not (is_in_scope v)
 
         ; -- pprTrace "callToPats"  (ppr args $$ ppr bndr_occs) $
-          WARN( not (isEmptyVarSet bad_covars)
-              , text "SpecConstr: bad covars:" <+> ppr bad_covars
-                $$ ppr call )
+          warnPprTrace (not (isEmptyVarSet bad_covars))
+              ( text "SpecConstr: bad covars:" <+> ppr bad_covars
+                $$ ppr call) $
           if interesting && isEmptyVarSet bad_covars
           then return (Just (CP { cp_qvars = qvars', cp_args = pats }))
           else return Nothing }
@@ -2385,7 +2383,7 @@ samePat (CP { cp_qvars = vs1, cp_args = as1 })
     same e1 (Tick _ e2) = same e1 e2
     same e1 (Cast e2 _) = same e1 e2
 
-    same e1 e2 = WARN( bad e1 || bad e2, ppr e1 $$ ppr e2)
+    same e1 e2 = warnPprTrace (bad e1 || bad e2) (ppr e1 $$ ppr e2) $
                  False  -- Let, lambda, case should not occur
     bad (Case {}) = True
     bad (Let {})  = True

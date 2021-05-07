@@ -66,8 +66,6 @@ module GHC.Core.Utils (
         dumpIdInfoOfProgram
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 import GHC.Platform
 
@@ -98,6 +96,7 @@ import GHC.Core.Multiplicity
 import GHC.Types.Unique
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Data.FastString
 import GHC.Data.Maybe
 import GHC.Data.List.SetOps( minusList )
@@ -180,7 +179,7 @@ mkFunctionType :: Mult -> Type -> Type -> Type
 -- See GHC.Types.Var Note [AnonArgFlag]
 mkFunctionType mult arg_ty res_ty
    | isPredTy arg_ty -- See GHC.Types.Var Note [AnonArgFlag]
-   = ASSERT(eqType mult Many)
+   = assert (eqType mult Many) $
      mkInvisFunTy mult arg_ty res_ty
 
    | otherwise
@@ -305,9 +304,9 @@ applyTypeToArgs e op_ty args
 -- identity coercions and coalescing nested coercions
 mkCast :: CoreExpr -> CoercionR -> CoreExpr
 mkCast e co
-  | ASSERT2( coercionRole co == Representational
-           , text "coercion" <+> ppr co <+> text "passed to mkCast"
-             <+> ppr e <+> text "has wrong role" <+> ppr (coercionRole co) )
+  | assertPpr (coercionRole co == Representational)
+              (text "coercion" <+> ppr co <+> text "passed to mkCast"
+               <+> ppr e <+> text "has wrong role" <+> ppr (coercionRole co)) $
     isReflCo co
   = e
 
@@ -319,12 +318,12 @@ mkCast (Coercion e_co) co
   = Coercion (mkCoCast e_co co)
 
 mkCast (Cast expr co2) co
-  = WARN(let { from_ty = coercionLKind co;
+  = warnPprTrace (let { from_ty = coercionLKind co;
                to_ty2  = coercionRKind co2 } in
-            not (from_ty `eqType` to_ty2),
-             vcat ([ text "expr:" <+> ppr expr
+            not (from_ty `eqType` to_ty2))
+             (vcat ([ text "expr:" <+> ppr expr
                    , text "co2:" <+> ppr co2
-                   , text "co:" <+> ppr co ]) )
+                   , text "co:" <+> ppr co ])) $
     mkCast expr (mkTransCo co2 co)
 
 mkCast (Tick t expr) co
@@ -332,11 +331,11 @@ mkCast (Tick t expr) co
 
 mkCast expr co
   = let from_ty = coercionLKind co in
-    WARN( not (from_ty `eqType` exprType expr),
-          text "Trying to coerce" <+> text "(" <> ppr expr
+    warnPprTrace (not (from_ty `eqType` exprType expr))
+          (text "Trying to coerce" <+> text "(" <> ppr expr
           $$ text "::" <+> ppr (exprType expr) <> text ")"
           $$ ppr co $$ ppr (coercionType co)
-          $$ callStackDoc )
+          $$ callStackDoc) $
     (Cast expr co)
 
 -- | Wraps the given expression in the source annotation, dropping the
@@ -614,8 +613,8 @@ This makes it easy to find, though it makes matching marginally harder.
 
 -- | Extract the default case alternative
 findDefault :: [Alt b] -> ([Alt b], Maybe (Expr b))
-findDefault (Alt DEFAULT args rhs : alts) = ASSERT( null args ) (alts, Just rhs)
-findDefault alts                          =                     (alts, Nothing)
+findDefault (Alt DEFAULT args rhs : alts) = assert (null args) (alts, Just rhs)
+findDefault alts                          =                    (alts, Nothing)
 
 addDefault :: [Alt b] -> Maybe (Expr b) -> [Alt b]
 addDefault alts Nothing    = alts
@@ -640,7 +639,7 @@ findAlt con alts
       = case con `cmpAltCon` con1 of
           LT -> deflt   -- Missed it already; the alts are in increasing order
           EQ -> Just alt
-          GT -> ASSERT( not (con1 == DEFAULT) ) go alts deflt
+          GT -> assert (not (con1 == DEFAULT)) $ go alts deflt
 
 {- Note [Unreachable code]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -695,8 +694,8 @@ trimConArgs :: AltCon -> [CoreArg] -> [CoreArg]
 -- We want to drop the leading type argument of the scrutinee
 -- leaving the arguments to match against the pattern
 
-trimConArgs DEFAULT      args = ASSERT( null args ) []
-trimConArgs (LitAlt _)   args = ASSERT( null args ) []
+trimConArgs DEFAULT      args = assert (null args) []
+trimConArgs (LitAlt _)   args = assert (null args) []
 trimConArgs (DataAlt dc) args = dropList (dataConUnivTyVars dc) args
 
 filterAlts :: TyCon                -- ^ Type constructor of scrutinee's type (used to prune possibilities)
@@ -2027,7 +2026,7 @@ dataConInstPat :: [FastString]          -- A long enough list of FSs to use for 
 --  where the double-primed variables are created with the FastStrings and
 --  Uniques given as fss and us
 dataConInstPat fss uniqs mult con inst_tys
-  = ASSERT( univ_tvs `equalLength` inst_tys )
+  = assert (univ_tvs `equalLength` inst_tys) $
     (ex_bndrs, arg_ids)
   where
     univ_tvs = dataConUnivTyVars con

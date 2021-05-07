@@ -157,8 +157,6 @@ module GHC.Builtin.Types (
 
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Types.Id.Make ( mkDataConWorkId, mkDictSelId )
@@ -196,6 +194,7 @@ import GHC.Data.BooleanFormula ( mkAnd )
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 
 import qualified Data.ByteString.Char8 as BS
 
@@ -719,7 +718,7 @@ mkDataConWorkerName data_con wrk_key =
     mkWiredInName modu wrk_occ wrk_key
                   (AnId (dataConWorkId data_con)) UserSyntax
   where
-    modu     = ASSERT( isExternalName dc_name )
+    modu     = assert (isExternalName dc_name) $
                nameModule dc_name
     dc_name = dataConName data_con
     dc_occ  = nameOccName dc_name
@@ -993,7 +992,7 @@ cTupleTyConKeys = mkUniqSet $ map getUnique cTupleTyConNames
 
 isCTupleTyConName :: Name -> Bool
 isCTupleTyConName n
- = ASSERT2( isExternalName n, ppr n )
+ = assertPpr (isExternalName n) (ppr n) $
    getUnique n `elementOfUniqSet` cTupleTyConKeys
 
 -- | If the given name is that of a constraint tuple, return its arity.
@@ -2062,11 +2061,11 @@ extractPromotedList tys = go tys
   where
     go list_ty
       | Just (tc, [_k, t, ts]) <- splitTyConApp_maybe list_ty
-      = ASSERT( tc `hasKey` consDataConKey )
+      = assert (tc `hasKey` consDataConKey) $
         t : go ts
 
       | Just (tc, [_k]) <- splitTyConApp_maybe list_ty
-      = ASSERT( tc `hasKey` nilDataConKey )
+      = assert (tc `hasKey` nilDataConKey)
         []
 
       | otherwise

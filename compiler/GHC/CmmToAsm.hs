@@ -80,8 +80,6 @@ module GHC.CmmToAsm
    )
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import qualified GHC.CmmToAsm.X86   as X86
@@ -134,9 +132,11 @@ import qualified GHC.Utils.Ppr as Pretty
 import GHC.Utils.BufHandle
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Error
+import GHC.Utils.Exception (evaluate)
+
 import GHC.Data.FastString
 import GHC.Types.Unique.Set
-import GHC.Utils.Error
 import GHC.Unit
 import GHC.Data.Stream (Stream)
 import qualified GHC.Data.Stream as Stream
@@ -144,7 +144,6 @@ import qualified GHC.Data.Stream as Stream
 import Data.List (sortBy, groupBy)
 import Data.Maybe
 import Data.Ord         ( comparing )
-import Control.Exception
 import Control.Monad
 import System.IO
 
@@ -724,8 +723,7 @@ maybeDumpCfg logger dflags (Just cfg) msg proc_name
 checkLayout :: [NatCmmDecl statics instr] -> [NatCmmDecl statics instr]
             -> [NatCmmDecl statics instr]
 checkLayout procsUnsequenced procsSequenced =
-        ASSERT2(setNull diff,
-                ppr "Block sequencing dropped blocks:" <> ppr diff)
+        assertPpr (setNull diff) (ppr "Block sequencing dropped blocks:" <> ppr diff)
         procsSequenced
   where
         blocks1 = foldl' (setUnion) setEmpty $

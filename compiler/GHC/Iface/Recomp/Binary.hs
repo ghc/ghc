@@ -8,15 +8,12 @@ module GHC.Iface.Recomp.Binary
   , putNameLiterally
   ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Utils.Fingerprint
 import GHC.Utils.Binary
 import GHC.Types.Name
 import GHC.Utils.Panic.Plain
-import GHC.Utils.Misc
 
 fingerprintBinMem :: BinHandle -> IO Fingerprint
 fingerprintBinMem bh = withBinBuffer bh f
@@ -43,6 +40,6 @@ computeFingerprint put_nonbinding_name a = do
 -- | Used when we want to fingerprint a structure without depending on the
 -- fingerprints of external Names that it refers to.
 putNameLiterally :: BinHandle -> Name -> IO ()
-putNameLiterally bh name = ASSERT( isExternalName name ) do
+putNameLiterally bh name = assert (isExternalName name) $ do
     put_ bh $! nameModule name
     put_ bh $! nameOccName name

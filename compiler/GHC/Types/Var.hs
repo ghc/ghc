@@ -95,8 +95,6 @@ module GHC.Types.Var (
 
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import {-# SOURCE #-}   GHC.Core.TyCo.Rep( Type, Kind, Mult )
@@ -112,6 +110,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Binary
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 
 import Data.Data
 
@@ -409,13 +408,10 @@ setVarType id ty = id { varType = ty }
 -- abuse, ASSERTs that there is no multiplicity to update.
 updateVarType :: (Type -> Type) -> Var -> Var
 updateVarType upd var
-  | debugIsOn
   = case var of
-      Id { id_details = details } -> ASSERT( isCoVarDetails details )
+      Id { id_details = details } -> assert (isCoVarDetails details) $
                                      result
       _ -> result
-  | otherwise
-  = result
   where
     result = var { varType = upd (varType var) }
 
@@ -424,13 +420,10 @@ updateVarType upd var
 -- abuse, ASSERTs that there is no multiplicity to update.
 updateVarTypeM :: Monad m => (Type -> m Type) -> Var -> m Var
 updateVarTypeM upd var
-  | debugIsOn
   = case var of
-      Id { id_details = details } -> ASSERT( isCoVarDetails details )
+      Id { id_details = details } -> assert (isCoVarDetails details) $
                                      result
       _ -> result
-  | otherwise
-  = result
   where
     result = do { ty' <- upd (varType var)
                 ; return (var { varType = ty' }) }
@@ -683,7 +676,7 @@ mkTyCoVarBinder vis var = Bndr var vis
 -- 'var' should be a type variable
 mkTyVarBinder :: vis -> TyVar -> VarBndr TyVar vis
 mkTyVarBinder vis var
-  = ASSERT( isTyVar var )
+  = assert (isTyVar var) $
     Bndr var vis
 
 -- | Make many named binders
@@ -848,7 +841,7 @@ setIdExported tv                               = pprPanic "setIdExported" (ppr t
 
 setIdNotExported :: Id -> Id
 -- ^ We can only do this to LocalIds
-setIdNotExported id = ASSERT( isLocalId id )
+setIdNotExported id = assert (isLocalId id) $
                       id { idScope = LocalId NotExported }
 
 -----------------------

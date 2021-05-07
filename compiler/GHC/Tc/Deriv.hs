@@ -13,8 +13,6 @@
 -- | Handles @deriving@ clauses on @data@ declarations.
 module GHC.Tc.Deriv ( tcDeriving, DerivInfo(..) ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Hs
@@ -61,6 +59,7 @@ import GHC.Types.SrcLoc
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Utils.Logger
 import GHC.Data.Bag
 import GHC.Utils.FV as FV (fvVarList, unionFV, mkFVs)
@@ -1556,7 +1555,7 @@ mkNewTypeEqn newtype_strat dit@(DerivInstTys { dit_cls_tys     = cls_tys
            cant_derive_err = ppUnless eta_ok  eta_msg
            eta_msg = text "cannot eta-reduce the representation type enough"
 
-       MASSERT( cls_tys `lengthIs` (classArity cls - 1) )
+       massert (cls_tys `lengthIs` (classArity cls - 1))
        if newtype_strat
        then
            -- Since the user explicitly asked for GeneralizedNewtypeDeriving,
@@ -1962,7 +1961,7 @@ doDerivInstErrorChecks1 mechanism =
           at_last_cls_tv_in_kind kind
             = last_cls_tv `elemVarSet` exactTyCoVarsOfType kind
           at_tcs = classATs cls
-          last_cls_tv = ASSERT( notNull cls_tyvars )
+          last_cls_tv = assert (notNull cls_tyvars )
                         last cls_tyvars
 
           cant_derive_err
@@ -2056,8 +2055,8 @@ genDerivStuff mechanism loc clas inst_tys tyvars
         tyfam_insts <-
           -- canDeriveAnyClass should ensure that this code can't be reached
           -- unless -XDeriveAnyClass is enabled.
-          ASSERT2( isValid (canDeriveAnyClass dflags)
-                 , ppr "genDerivStuff: bad derived class" <+> ppr clas )
+          assertPpr (isValid (canDeriveAnyClass dflags))
+                    (ppr "genDerivStuff: bad derived class" <+> ppr clas) $
           mapM (tcATDefault loc mini_subst emptyNameSet)
                (classATItems clas)
         return ( emptyBag, [] -- No method bindings are needed...

@@ -19,8 +19,6 @@ core expression with (hopefully) improved usage information.
 
 module GHC.Core.Opt.OccurAnal ( occurAnalysePgm, occurAnalyseExpr ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Driver.Ppr
@@ -54,6 +52,7 @@ import GHC.Utils.Misc
 import GHC.Data.Maybe( isJust )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import Data.List (mapAccumL, mapAccumR)
 
 {-
@@ -81,8 +80,8 @@ occurAnalysePgm this_mod active_unf active_rule imp_rules binds
   = occ_anald_binds
 
   | otherwise   -- See Note [Glomming]
-  = WARN( True, hang (text "Glomming in" <+> ppr this_mod <> colon)
-                   2 (ppr final_usage ) )
+  = warnPprTrace True (hang (text "Glomming in" <+> ppr this_mod <> colon)
+                        2 (ppr final_usage))
     occ_anald_glommed_binds
   where
     init_env = initOccEnv { occ_rule_act = active_rule
@@ -3020,7 +3019,7 @@ tagNonRecBinder lvl usage binder
      occ     = lookupDetails usage binder
      will_be_join = decideJoinPointHood lvl usage [binder]
      occ'    | will_be_join = -- must already be marked AlwaysTailCalled
-                              ASSERT(isAlwaysTailCalled occ) occ
+                              assert (isAlwaysTailCalled occ) occ
              | otherwise    = markNonTail occ
      binder' = setBinderOcc occ' binder
      usage'  = usage `delDetails` binder
@@ -3060,7 +3059,7 @@ tagRecBinders lvl body_uds triples
            , AlwaysTailCalled arity <- tailCallInfo occ
            = Just arity
            | otherwise
-           = ASSERT(not will_be_joins) -- Should be AlwaysTailCalled if
+           = assert (not will_be_joins) -- Should be AlwaysTailCalled if
              Nothing                   -- we are making join points!
 
      -- 3. Compute final usage details from adjusted RHS details
@@ -3105,9 +3104,9 @@ decideJoinPointHood TopLevel _ _
   = False
 decideJoinPointHood NotTopLevel usage bndrs
   | isJoinId (head bndrs)
-  = WARN(not all_ok, text "OccurAnal failed to rediscover join point(s):" <+>
-                       ppr bndrs)
-    all_ok
+  = warnPprTrace (not all_ok)
+                 (text "OccurAnal failed to rediscover join point(s):" <+> ppr bndrs)
+                 all_ok
   | otherwise
   = all_ok
   where
@@ -3205,7 +3204,7 @@ markNonTail occ     = occ { occ_tail = NoTailCallInfo }
 
 addOccInfo, orOccInfo :: OccInfo -> OccInfo -> OccInfo
 
-addOccInfo a1 a2  = ASSERT( not (isDeadOcc a1 || isDeadOcc a2) )
+addOccInfo a1 a2  = assert (not (isDeadOcc a1 || isDeadOcc a2)) $
                     ManyOccs { occ_tail = tailCallInfo a1 `andTailCallInfo`
                                           tailCallInfo a2 }
                                 -- Both branches are at least One
@@ -3227,7 +3226,7 @@ orOccInfo (OneOcc { occ_in_lam  = in_lam1
            , occ_int_cxt = int_cxt1 `mappend` int_cxt2
            , occ_tail    = tail1 `andTailCallInfo` tail2 }
 
-orOccInfo a1 a2 = ASSERT( not (isDeadOcc a1 || isDeadOcc a2) )
+orOccInfo a1 a2 = assert (not (isDeadOcc a1 || isDeadOcc a2)) $
                   ManyOccs { occ_tail = tailCallInfo a1 `andTailCallInfo`
                                         tailCallInfo a2 }
 

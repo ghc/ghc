@@ -55,8 +55,6 @@ module GHC.Rename.Env (
 
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Iface.Load   ( loadInterfaceForName, loadSrcInterface_maybe )
@@ -1530,7 +1528,7 @@ warnIfDeprecated gre@(GRE { gre_imp = iss })
   where
     occ = greOccName gre
     name = greMangledName gre
-    name_mod = ASSERT2( isExternalName name, ppr name ) nameModule name
+    name_mod = assertPpr (isExternalName name) (ppr name) (nameModule name)
     doc = text "The name" <+> quotes (ppr occ) <+> text "is mentioned explicitly"
 
     mk_msg imp_spec txt

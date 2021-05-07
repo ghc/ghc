@@ -87,8 +87,6 @@ module GHC.Tc.Types(
         TcRnMessage
   ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 import GHC.Platform
 
@@ -1436,7 +1434,7 @@ plusImportAvails
   where
     plus_mod_dep r1@(GWIB { gwib_mod = m1, gwib_isBoot = boot1 })
                  r2@(GWIB {gwib_mod = m2, gwib_isBoot = boot2})
-      | ASSERT2( m1 == m2, (ppr m1 <+> ppr m2) $$ (ppr (boot1 == IsBoot) <+> ppr (boot2 == IsBoot)))
+      | assertPpr (m1 == m2) ((ppr m1 <+> ppr m2) $$ (ppr (boot1 == IsBoot) <+> ppr (boot2 == IsBoot))) $
         boot1 == IsBoot = r2
       | otherwise = r1
       -- If either side can "see" a non-hi-boot interface, use that

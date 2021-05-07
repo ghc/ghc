@@ -11,8 +11,6 @@ module GHC.Types.Name.Shape
    )
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Driver.Env
@@ -29,8 +27,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Iface.Env
 
 import GHC.Utils.Outputable
-import GHC.Utils.Misc
-import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 
 import Control.Monad
 
@@ -268,11 +265,11 @@ uName flexi subst n1 n2
 uHoleName :: ModuleName -> ShNameSubst -> Name {- hole name -} -> Name
           -> Either SDoc ShNameSubst
 uHoleName flexi subst h n =
-    ASSERT( isHoleName h )
+    assert (isHoleName h) $
     case lookupNameEnv subst h of
         Just n' -> uName flexi subst n' n
                 -- Do a quick check if the other name is substituted.
         Nothing | Just n' <- lookupNameEnv subst n ->
-                    ASSERT( isHoleName n ) uName flexi subst h n'
+                    assert (isHoleName n) $ uName flexi subst h n'
                 | otherwise ->
                     Right (extendNameEnv subst h n)

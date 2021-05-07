@@ -11,8 +11,6 @@ module GHC.Rename.Splice (
         , traceSplice, SpliceInfo(..)
   ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Types.Name

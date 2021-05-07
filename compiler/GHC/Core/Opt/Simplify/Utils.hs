@@ -37,8 +37,6 @@ module GHC.Core.Opt.Simplify.Utils (
         isExitJoinId
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Core.Opt.Simplify.Env
@@ -73,6 +71,7 @@ import GHC.Utils.Monad
 import GHC.Utils.Outputable
 import GHC.Utils.Logger
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Core.Opt.ConstantFold
 import GHC.Data.FastString ( fsLit )
 
@@ -563,8 +562,8 @@ mkArgInfo env fun rules n_val_args call_cont
                    else
                         demands ++ vanilla_dmds
                | otherwise
-               -> WARN( True, text "More demands than arity" <+> ppr fun <+> ppr (idArity fun)
-                                <+> ppr n_val_args <+> ppr demands )
+               -> warnPprTrace True (text "More demands than arity" <+> ppr fun <+> ppr (idArity fun)
+                                <+> ppr n_val_args <+> ppr demands) $
                   vanilla_dmds      -- Not enough args, or no strictness
 
     add_type_strictness :: Type -> [Demand] -> [Demand]
@@ -1928,8 +1927,8 @@ new binding is abstracted.  Note that
 abstractFloats :: UnfoldingOpts -> TopLevelFlag -> [OutTyVar] -> SimplFloats
               -> OutExpr -> SimplM ([OutBind], OutExpr)
 abstractFloats uf_opts top_lvl main_tvs floats body
-  = ASSERT( notNull body_floats )
-    ASSERT( isNilOL (sfJoinFloats floats) )
+  = assert (notNull body_floats) $
+    assert (isNilOL (sfJoinFloats floats)) $
     do  { (subst, float_binds) <- mapAccumLM abstract empty_subst body_floats
         ; return (float_binds, GHC.Core.Subst.substExpr subst body) }
   where
@@ -2252,7 +2251,7 @@ mkCase dflags scrut outer_bndr alts_ty (Alt DEFAULT _ deflt_rhs : outer_alts)
   , inner_scrut_var == outer_bndr
   = do  { tick (CaseMerge outer_bndr)
 
-        ; let wrap_alt (Alt con args rhs) = ASSERT( outer_bndr `notElem` args )
+        ; let wrap_alt (Alt con args rhs) = assert (outer_bndr `notElem` args)
                                             (Alt con args (wrap_rhs rhs))
                 -- Simplifier's no-shadowing invariant should ensure
                 -- that outer_bndr is not shadowed by the inner patterns

@@ -8,8 +8,6 @@ module GHC.HsToCore.Pmc.Ppr (
         pprUncovered
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Types.Basic
@@ -21,8 +19,8 @@ import GHC.Core.DataCon
 import GHC.Builtin.Types
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import Control.Monad.Trans.RWS.CPS
-import GHC.Utils.Misc
 import GHC.Data.Maybe
 import Data.List.NonEmpty (NonEmpty, nonEmpty, toList)
 
@@ -203,8 +201,8 @@ pmExprAsList nabla = go_con []
 
     go_con rev_pref (PmAltConLike (RealDataCon c)) es
       | c == nilDataCon
-      = ASSERT( null es ) Just (NilTerminated (reverse rev_pref))
+      = assert (null es) $ Just (NilTerminated (reverse rev_pref))
       | c == consDataCon
-      = ASSERT( length es == 2 ) go_var (es !! 0 : rev_pref) (es !! 1)
+      = assert (length es == 2) $ go_var (es !! 0 : rev_pref) (es !! 1)
     go_con _ _ _
       = Nothing

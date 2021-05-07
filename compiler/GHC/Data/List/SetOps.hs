@@ -23,8 +23,6 @@ module GHC.Data.List.SetOps (
         getNth
    ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Utils.Outputable
@@ -38,7 +36,7 @@ import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.Set as S
 
 getNth :: Outputable a => [a] -> Int -> a
-getNth xs n = ASSERT2( xs `lengthExceeds` n, ppr n $$ ppr xs )
+getNth xs n = assertPpr (xs `lengthExceeds` n) (ppr n $$ ppr xs) $
              xs !! n
 
 {-
@@ -63,7 +61,7 @@ unionLists xs [y]
   | isIn "unionLists" y xs = xs
   | otherwise = y:xs
 unionLists xs ys
-  = WARN(lengthExceeds xs 100 || lengthExceeds ys 100, ppr xs $$ ppr ys)
+  = warnPprTrace (lengthExceeds xs 100 || lengthExceeds ys 100) (ppr xs $$ ppr ys) $
     [x | x <- xs, isn'tIn "unionLists" x ys] ++ ys
 
 -- | Calculate the set difference of two lists. This is

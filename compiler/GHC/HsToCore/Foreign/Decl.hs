@@ -14,7 +14,6 @@ Desugaring foreign declarations (see also GHC.HsToCore.Foreign.Call).
 
 module GHC.HsToCore.Foreign.Decl ( dsForeigns ) where
 
-#include "HsVersions.h"
 import GHC.Prelude
 
 import GHC.Tc.Utils.Monad        -- temp
@@ -57,8 +56,8 @@ import GHC.Driver.Session
 import GHC.Driver.Config
 import GHC.Platform
 import GHC.Data.OrdList
-import GHC.Utils.Misc
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Driver.Hooks
 import GHC.Utils.Encoding
 
@@ -174,7 +173,7 @@ dsCImport id co (CLabel cid) cconv _ _ = do
                  IsFunction
              _ -> IsData
    (resTy, foRhs) <- resultWrapper ty
-   ASSERT(fromJust resTy `eqType` addrPrimTy)    -- typechecker ensures this
+   assert (fromJust resTy `eqType` addrPrimTy) $    -- typechecker ensures this
     let
         rhs = foRhs (Lit (LitLabel cid stdcall_info fod))
         rhs' = Cast rhs co
@@ -819,8 +818,8 @@ getPrimTyOf ty
   | otherwise =
   case splitDataProductType_maybe rep_ty of
      Just (_, _, data_con, [Scaled _ prim_ty]) ->
-        ASSERT(dataConSourceArity data_con == 1)
-        ASSERT2(isUnliftedType prim_ty, ppr prim_ty)
+        assert (dataConSourceArity data_con == 1) $
+        assertPpr (isUnliftedType prim_ty) (ppr prim_ty)
         prim_ty
      _other -> pprPanic "GHC.HsToCore.Foreign.Decl.getPrimTyOf" (ppr ty)
   where

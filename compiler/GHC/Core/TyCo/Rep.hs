@@ -74,8 +74,6 @@ module GHC.Core.TyCo.Rep (
         Scaled(..), scaledMult, scaledThing, mapScaledType, Mult
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprType, pprCo, pprTyLit )
@@ -938,7 +936,7 @@ which in turn is imported by Type
 -}
 
 mkTyVarTy  :: TyVar   -> Type
-mkTyVarTy v = ASSERT2( isTyVar v, ppr v <+> dcolon <+> ppr (tyVarKind v) )
+mkTyVarTy v = assertPpr (isTyVar v) (ppr v <+> dcolon <+> ppr (tyVarKind v)) $
               TyVarTy v
 
 mkTyVarTys :: [TyVar] -> [Type]

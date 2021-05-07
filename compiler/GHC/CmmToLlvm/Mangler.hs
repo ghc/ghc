@@ -18,8 +18,8 @@ import GHC.Platform ( platformArch, Arch(..) )
 import GHC.Utils.Error ( withTiming )
 import GHC.Utils.Outputable ( text )
 import GHC.Utils.Logger
+import GHC.Utils.Exception (try)
 
-import Control.Exception
 import qualified Data.ByteString.Char8 as B
 import System.IO
 

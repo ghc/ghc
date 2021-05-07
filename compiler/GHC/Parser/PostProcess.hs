@@ -144,14 +144,13 @@ import Data.Foldable
 import GHC.Driver.Flags ( WarningFlag(..) )
 import qualified Data.Semigroup as Semi
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 
 import Control.Monad
 import Text.ParserCombinators.ReadP as ReadP
 import Data.Char
 import Data.Data       ( dataTypeOf, fromConstr, dataTypeConstrs )
 import Data.Kind       ( Type )
-
-#include "HsVersions.h"
 
 {- **********************************************************************
 
@@ -478,8 +477,8 @@ cvBindGroup :: OrdList (LHsDecl GhcPs) -> P (HsValBinds GhcPs)
 cvBindGroup binding
   = do { (mbs, sigs, fam_ds, tfam_insts
          , dfam_insts, _) <- cvBindsAndSigs binding
-       ; ASSERT( null fam_ds && null tfam_insts && null dfam_insts)
-         return $ ValBinds NoAnnSortKey mbs sigs }
+       ; massert (null fam_ds && null tfam_insts && null dfam_insts)
+       ; return $ ValBinds NoAnnSortKey mbs sigs }
 
 cvBindsAndSigs :: OrdList (LHsDecl GhcPs)
   -> P (LHsBinds GhcPs, [LSig GhcPs], [LFamilyDecl GhcPs]
