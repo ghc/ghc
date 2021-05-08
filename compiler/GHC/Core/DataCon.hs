@@ -822,15 +822,30 @@ by MkId.mkDataConId) for two reasons:
 
         b) the constructor may store an unboxed version of a strict field.
 
-Here's an example illustrating both:
-        data Ord a => T a = MkT Int! a
+So whenever this module talks about the representation of a data constructor
+what it means is the DataCon with all Unpacking having been applied.
+We can think of this as the Core representation.
+
+Here's an example illustrating the Core representation:
+        data Ord a => T a = MkT Int! a Void#
 Here
-        T :: Ord a => Int -> a -> T a
+        T :: Ord a => Int -> a -> Void# -> T a
 but the rep type is
-        Trep :: Int# -> a -> T a
+        Trep :: Int# -> a -> Void# -> T a
 Actually, the unboxed part isn't implemented yet!
 
+Not that this representation is still *different* from runtime
+representation.
 
+This is how T would end up being used in STG post-unarise:
+
+  let x = T 1# y
+  in ...
+      case x of
+        T int a -> ...
+
+We also flatten out unboxed tuples in this process. See the unarise
+pass for details on how this is done.
 
 ************************************************************************
 *                                                                      *
