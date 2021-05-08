@@ -23,14 +23,19 @@ module GHC.Types.Name.Env (
         plusNameEnv, plusNameEnv_C, plusNameEnv_CD, plusNameEnv_CD2, alterNameEnv,
         lookupNameEnv, lookupNameEnv_NF, delFromNameEnv, delListFromNameEnv,
         elemNameEnv, mapNameEnv, disjointNameEnv,
+        foldNameEnv,
+        nonDetStrictFoldNameEnv,
 
         DNameEnv,
 
         emptyDNameEnv,
+        isEmptyDNameEnv,
         lookupDNameEnv,
         delFromDNameEnv, filterDNameEnv,
-        mapDNameEnv,
+        mapDNameEnv, eltsDNameEnv,
         adjustDNameEnv, alterDNameEnv, extendDNameEnv,
+        foldDNameEnv,
+        nonDetStrictFoldDNameEnv,
         -- ** Dependency analysis
         depAnal
     ) where
@@ -149,6 +154,12 @@ disjointNameEnv x y     = disjointUFM x y
 
 lookupNameEnv_NF env n = expectJust "lookupNameEnv_NF" (lookupNameEnv env n)
 
+foldNameEnv :: (a -> b -> b) -> b -> NameEnv a -> b
+foldNameEnv = foldUFM
+
+nonDetStrictFoldNameEnv :: (a -> b -> b) -> b -> NameEnv a -> b
+nonDetStrictFoldNameEnv = nonDetStrictFoldUFM
+
 -- | Deterministic Name Environment
 --
 -- See Note [Deterministic UniqFM] in "GHC.Types.Unique.DFM" for explanation why
@@ -157,6 +168,9 @@ type DNameEnv a = UniqDFM Name a
 
 emptyDNameEnv :: DNameEnv a
 emptyDNameEnv = emptyUDFM
+
+isEmptyDNameEnv :: DNameEnv a -> Bool
+isEmptyDNameEnv = isNullUDFM
 
 lookupDNameEnv :: DNameEnv a -> Name -> Maybe a
 lookupDNameEnv = lookupUDFM
@@ -170,6 +184,9 @@ filterDNameEnv = filterUDFM
 mapDNameEnv :: (a -> b) -> DNameEnv a -> DNameEnv b
 mapDNameEnv = mapUDFM
 
+eltsDNameEnv :: DNameEnv a -> [a]
+eltsDNameEnv = eltsUDFM
+
 adjustDNameEnv :: (a -> a) -> DNameEnv a -> Name -> DNameEnv a
 adjustDNameEnv = adjustUDFM
 
@@ -178,3 +195,10 @@ alterDNameEnv = alterUDFM
 
 extendDNameEnv :: DNameEnv a -> Name -> a -> DNameEnv a
 extendDNameEnv = addToUDFM
+
+foldDNameEnv :: (a -> b -> b) -> b -> DNameEnv a -> b
+foldDNameEnv = foldUDFM
+
+nonDetStrictFoldDNameEnv :: (a -> b -> b) -> b -> DNameEnv a -> b
+nonDetStrictFoldDNameEnv = nonDetStrictFoldUDFM
+
