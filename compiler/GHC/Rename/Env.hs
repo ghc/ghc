@@ -1390,8 +1390,9 @@ lookupGreRn_maybe fos rdr_name
       case res of
         OneNameMatch gre ->  return $ Just gre
         MultipleNames gres -> do
-          traceRn "lookupGreRn_maybe:NameClash" (ppr gres)
-          addNameClashErrRn rdr_name gres
+          unless (all isDuplicateRecFldGRE gres) $ do
+            traceRn "lookupGreRn_maybe:NameClash" (ppr gres)
+            addNameClashErrRn rdr_name gres
           return $ Just (NE.head gres)
         GreNotFound -> return Nothing
 
