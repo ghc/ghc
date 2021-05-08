@@ -165,7 +165,7 @@ pprTyThingInContextLoc tyThing
 -- | Pretty-prints a 'TyThing'.
 pprTyThing :: ShowSub -> TyThing -> SDoc
 -- We pretty-print 'TyThing' via 'IfaceDecl'
--- See Note [Pretty-printing TyThings]
+-- See Note [Pretty printing via Iface syntax]
 pprTyThing ss ty_thing
   = sdocOption sdocLinearTypes $ \show_linear_types ->
       pprIfaceDecl ss' (tyThingToIfaceDecl show_linear_types ty_thing)

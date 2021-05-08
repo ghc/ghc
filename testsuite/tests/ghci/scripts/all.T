@@ -328,6 +328,7 @@ test('T19197', normal, ghci_script, ['T19197.script'])
 test('T19158', normal, ghci_script, ['T19158.script'])
 test('T19279', normal, ghci_script, ['T19279.script'])
 test('T19310', normal, ghci_script, ['T19310.script'])
+test('T19462', normal, ghci_script, ['T19462.script'])
 test('T19667Ghci', extra_files(['T19667Ghci.hs']), ghci_script, ['T19667Ghci.script'])
 test('T19688', normal, ghci_script, ['T19688.script'])
 test('T19650',
