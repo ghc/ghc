@@ -5,6 +5,8 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+-- WW causes DynFlags to be reboxed (see #19407)
+{-# OPTIONS_GHC -fno-worker-wrapper #-}
 
 {-
 (c) The University of Glasgow 2006
