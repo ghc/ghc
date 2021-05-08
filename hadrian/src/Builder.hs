@@ -3,6 +3,7 @@ module Builder (
     -- * Data types
     ArMode (..), CcMode (..), ConfigurationInfo (..), GhcMode (..),
     GhcPkgMode (..), HaddockMode (..), SphinxMode (..), TarMode (..),
+    DtraceMode (..),
     Builder (..),
 
     -- * Builder properties
@@ -108,6 +109,23 @@ instance Binary   HaddockMode
 instance Hashable HaddockMode
 instance NFData   HaddockMode
 
+-- | Note [Dtrace probes]
+--
+-- We use Dtrace to define "User statically defined tracepoints" (USDTs) for
+-- the RTS. (See @rts/RtsProbes.d@ for the probe declarations.)
+--
+-- The Dtrace compiler reads the probe declaration and produces:
+--
+-- * A header file. Contains function like C-macros that you use to place the tracepoints.
+-- * A stub object. An object file containing implementation details
+--    for the probes, must be linked with the final executable or object. Not needed for the
+--    Macos implementation of dtrace.
+data DtraceMode = DtraceHeader | DtraceStub deriving (Eq, Generic, Show)
+
+instance Binary   DtraceMode
+instance Hashable DtraceMode
+instance NFData   DtraceMode
+
 -- | A 'Builder' is a (usually external) command invoked in a separate process
 -- via 'cmd'. Here are some examples:
 -- * 'Alex' is a lexical analyser generator that builds @Lexer.hs@ from @Lexer.x@.
@@ -123,6 +141,7 @@ data Builder = Alex
              | Cc CcMode Stage
              | Configure FilePath
              | DeriveConstants
+             | Dtrace DtraceMode
              | GenApply
              | GenPrimopCode
              | Ghc GhcMode Stage
@@ -313,6 +332,12 @@ instance H.Builder Builder where
                 -- Don't attempt to capture it.
                 RunTest -> cmd echo [path] buildArgs
 
+                Dtrace mode -> do
+                    let modeFlag = case mode of
+                            DtraceHeader -> "-h"
+                            DtraceStub -> "-G"
+                    cmd' echo [path] buildArgs modeFlag [ "-o", output ] [ "-s", input ]
+
                 _  -> cmd' echo [path] buildArgs
 
 -- TODO: Some builders are required only on certain platforms. For example,
@@ -337,6 +362,7 @@ systemBuilderPath builder = case builder of
     Configure _     -> return "configure"
     Ghc _  Stage0   -> fromKey "system-ghc"
     GhcPkg _ Stage0 -> fromKey "system-ghc-pkg"
+    Dtrace _        -> fromKey "dtrace"
     Happy           -> fromKey "happy"
     HsCpp           -> fromKey "hs-cpp"
     Ld _            -> fromKey "ld"
