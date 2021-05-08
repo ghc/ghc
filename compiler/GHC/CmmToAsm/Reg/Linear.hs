@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, CPP, ScopedTypeVariables #-}
+{-# LANGUAGE BangPatterns, ScopedTypeVariables #-}
 {-# LANGUAGE ConstraintKinds #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
@@ -101,9 +101,6 @@ module GHC.CmmToAsm.Reg.Linear (
         module  GHC.CmmToAsm.Reg.Linear.Base,
         module  GHC.CmmToAsm.Reg.Linear.Stats
   ) where
-
-#include "HsVersions.h"
-
 
 import GHC.Prelude
 

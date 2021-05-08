@@ -6,7 +6,7 @@
 This module defines interface types and binders
 -}
 
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE FlexibleInstances #-}
   -- FlexibleInstances for Binary (DefMethSpec IfaceType)
 {-# LANGUAGE BangPatterns #-}
@@ -66,8 +66,6 @@ module GHC.Iface.Type (
 
         many_ty
     ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 

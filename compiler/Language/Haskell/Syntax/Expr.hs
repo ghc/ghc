@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -23,9 +23,6 @@
 -- | Abstract Haskell syntax for expressions.
 module Language.Haskell.Syntax.Expr where
 
-#include "HsVersions.h"
-
--- friends:
 import GHC.Prelude
 
 import Language.Haskell.Syntax.Decls

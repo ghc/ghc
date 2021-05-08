@@ -5,7 +5,7 @@
 \section[Id]{@Ids@: Value and constructor identifiers}
 -}
 
-{-# LANGUAGE CPP #-}
+
 
 -- |
 -- #name_types#
@@ -120,8 +120,6 @@ module GHC.Types.Id (
 
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Core ( CoreRule, isStableUnfolding, evaldUnfolding,
@@ -161,6 +159,7 @@ import GHC.Core.Multiplicity
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Utils.GlobalVars
 
 import GHC.Driver.Ppr
@@ -238,7 +237,7 @@ localiseId :: Id -> Id
 -- Make an Id with the same unique and type as the
 -- incoming Id, but with an *Internal* Name and *LocalId* flavour
 localiseId id
-  | ASSERT( isId id ) isLocalId id && isInternalName name
+  | assert (isId id) $ isLocalId id && isInternalName name
   = id
   | otherwise
   = Var.mkLocalVar (idDetails id) (localiseName name) (Var.varMult id) (idType id) (idInfo id)
@@ -297,19 +296,19 @@ mkVanillaGlobalWithInfo = mkGlobalId VanillaId
 
 -- | For an explanation of global vs. local 'Id's, see "GHC.Types.Var#globalvslocal"
 mkLocalId :: HasDebugCallStack => Name -> Mult -> Type -> Id
-mkLocalId name w ty = ASSERT( not (isCoVarType ty) )
+mkLocalId name w ty = assert (not (isCoVarType ty)) $
                       mkLocalIdWithInfo name w ty vanillaIdInfo
 
 -- | Make a local CoVar
 mkLocalCoVar :: Name -> Type -> CoVar
 mkLocalCoVar name ty
-  = ASSERT( isCoVarType ty )
+  = assert (isCoVarType ty) $
     Var.mkLocalVar CoVarId name Many ty vanillaIdInfo
 
 -- | Like 'mkLocalId', but checks the type to see if it should make a covar
 mkLocalIdOrCoVar :: Name -> Mult -> Type -> Id
 mkLocalIdOrCoVar name w ty
-  -- We should ASSERT(eqType w Many) in the isCoVarType case.
+  -- We should assert (eqType w Many) in the isCoVarType case.
   -- However, currently this assertion does not hold.
   -- In tests with -fdefer-type-errors, such as T14584a,
   -- we create a linear 'case' where the scrutinee is a coercion
@@ -319,7 +318,7 @@ mkLocalIdOrCoVar name w ty
 
     -- proper ids only; no covars!
 mkLocalIdWithInfo :: HasDebugCallStack => Name -> Mult -> Type -> IdInfo -> Id
-mkLocalIdWithInfo name w ty info = ASSERT( not (isCoVarType ty) )
+mkLocalIdWithInfo name w ty info = assert (not (isCoVarType ty)) $
                                    Var.mkLocalVar VanillaId name w ty info
         -- Note [Free type variables]
 
@@ -338,7 +337,7 @@ mkExportedVanillaId name ty = Var.mkExportedLocalVar VanillaId name ty vanillaId
 -- | Create a system local 'Id'. These are local 'Id's (see "Var#globalvslocal")
 -- that are created by the compiler out of thin air
 mkSysLocal :: FastString -> Unique -> Mult -> Type -> Id
-mkSysLocal fs uniq w ty = ASSERT( not (isCoVarType ty) )
+mkSysLocal fs uniq w ty = assert (not (isCoVarType ty)) $
                         mkLocalId (mkSystemVarName uniq fs) w ty
 
 -- | Like 'mkSysLocal', but checks to see if we have a covar type
@@ -355,7 +354,7 @@ mkSysLocalOrCoVarM fs w ty
 
 -- | Create a user local 'Id'. These are local 'Id's (see "GHC.Types.Var#globalvslocal") with a name and location that the user might recognize
 mkUserLocal :: OccName -> Unique -> Mult -> Type -> SrcSpan -> Id
-mkUserLocal occ uniq w ty loc = ASSERT( not (isCoVarType ty) )
+mkUserLocal occ uniq w ty loc = assert (not (isCoVarType ty)) $
                                 mkLocalId (mkInternalName uniq occ loc) w ty
 
 -- | Like 'mkUserLocal', but checks if we have a coercion type
@@ -539,7 +538,7 @@ isJoinId id
 
 isJoinId_maybe :: Var -> Maybe JoinArity
 isJoinId_maybe id
- | isId id  = ASSERT2( isId id, ppr id )
+ | isId id  = assertPpr (isId id) (ppr id) $
               case Var.idDetails id of
                 JoinId arity -> Just arity
                 _            -> Nothing
@@ -622,10 +621,10 @@ idJoinArity :: JoinId -> JoinArity
 idJoinArity id = isJoinId_maybe id `orElse` pprPanic "idJoinArity" (ppr id)
 
 asJoinId :: Id -> JoinArity -> JoinId
-asJoinId id arity = WARN(not (isLocalId id),
-                         text "global id being marked as join var:" <+> ppr id)
-                    WARN(not (is_vanilla_or_join id),
-                         ppr id <+> pprIdDetails (idDetails id))
+asJoinId id arity = warnPprTrace (not (isLocalId id))
+                         (text "global id being marked as join var:" <+> ppr id) $
+                    warnPprTrace (not (is_vanilla_or_join id))
+                         (ppr id <+> pprIdDetails (idDetails id)) $
                     id `setIdDetails` JoinId arity
   where
     is_vanilla_or_join id = case Var.idDetails id of
@@ -700,7 +699,7 @@ zapIdDmdSig id = modifyIdInfo (`setDmdSigInfo` nopSig) id
 -- type, we still want @isStrictId id@ to be @True@.
 isStrictId :: Id -> Bool
 isStrictId id
-  | ASSERT2( isId id, text "isStrictId: not an id: " <+> ppr id )
+  | assertPpr (isId id) (text "isStrictId: not an id: " <+> ppr id) $
     isJoinId id = False
   | otherwise   = isStrictType (idType id) ||
                   isStrUsedDmd (idDemandInfo id)

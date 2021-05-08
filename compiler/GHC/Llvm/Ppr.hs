@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE LambdaCase #-}
 
 --------------------------------------------------------------------------------
@@ -29,8 +29,6 @@ module GHC.Llvm.Ppr (
     ppPlainName
 
     ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 

@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 -- ----------------------------------------------------------------------------
 -- | Handle conversion of CmmData to LLVM code.
 --
@@ -6,8 +6,6 @@
 module GHC.CmmToLlvm.Data (
         genLlvmData, genData
     ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 

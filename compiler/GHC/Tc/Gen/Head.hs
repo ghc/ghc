@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP                 #-}
+
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE GADTs               #-}
@@ -72,12 +72,11 @@ import GHC.Utils.Misc
 import GHC.Data.Maybe
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import Control.Monad
 
 import Data.Function
 import qualified Data.List.NonEmpty as NE
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -1206,7 +1205,7 @@ addFunResCtxt fun args fun_res_ty env_ty thing_inside
                            Just env_ty -> zonkTcType env_ty
                            Nothing     ->
                              do { dumping <- doptM Opt_D_dump_tc_trace
-                                ; MASSERT( dumping )
+                                ; massert dumping
                                 ; newFlexiTyVarTy liftedTypeKind }
            ; let -- See Note [Splitting nested sigma types in mismatched
                  --           function types]

@@ -3,7 +3,7 @@
 
 -}
 
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -21,8 +21,6 @@ module GHC.Tc.Deriv.Functor
    , gen_Traversable_binds
    )
 where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 

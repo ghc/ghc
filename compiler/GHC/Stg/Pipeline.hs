@@ -4,14 +4,12 @@
 \section[SimplStg]{Driver for simplifying @STG@ programs}
 -}
 
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 
 module GHC.Stg.Pipeline ( stg2stg ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 

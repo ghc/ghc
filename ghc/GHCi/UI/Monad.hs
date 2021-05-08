@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, FlexibleInstances, DeriveFunctor, DerivingVia #-}
+{-# LANGUAGE FlexibleInstances, DeriveFunctor, DerivingVia #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS -fno-warn-name-shadowing #-}
 
@@ -34,8 +34,6 @@ module GHCi.UI.Monad (
         runInternal,
         mkEvalWrapper
     ) where
-
-#include "HsVersions.h"
 
 import GHCi.UI.Info (ModInfo)
 import qualified GHC

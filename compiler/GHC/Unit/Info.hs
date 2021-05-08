@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, RecordWildCards, FlexibleInstances, MultiParamTypeClasses #-}
+{-# LANGUAGE RecordWildCards, FlexibleInstances, MultiParamTypeClasses #-}
 
 -- | Info about installed units (compiled libraries)
 module GHC.Unit.Info
@@ -28,8 +28,6 @@ module GHC.Unit.Info
    , unitHsLibs
    )
 where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 import GHC.Platform.Ways

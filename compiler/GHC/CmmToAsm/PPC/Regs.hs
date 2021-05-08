@@ -1,5 +1,3 @@
-{-# LANGUAGE CPP #-}
-
 -- -----------------------------------------------------------------------------
 --
 -- (c) The University of Glasgow 1994-2004
@@ -47,8 +45,6 @@ module GHC.CmmToAsm.PPC.Regs (
 )
 
 where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 

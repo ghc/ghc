@@ -5,7 +5,7 @@
 \section[NameEnv]{@NameEnv@: name environments}
 -}
 
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -34,8 +34,6 @@ module GHC.Types.Name.Env (
         -- ** Dependency analysis
         depAnal
     ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 

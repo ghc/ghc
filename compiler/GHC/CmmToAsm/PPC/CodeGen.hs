@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE GADTs #-}
 
 -----------------------------------------------------------------------------
@@ -20,8 +19,6 @@ module GHC.CmmToAsm.PPC.CodeGen (
 )
 
 where
-
-#include "HsVersions.h"
 
 -- NCG stuff:
 import GHC.Prelude
@@ -64,13 +61,13 @@ import GHC.Types.SrcLoc      ( srcSpanFile, srcSpanStartLine, srcSpanStartCol )
 import GHC.Data.OrdList
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 
 import Control.Monad    ( mapAndUnzipM, when )
 import Data.Word
 
 import GHC.Types.Basic
 import GHC.Data.FastString
-import GHC.Utils.Misc
 
 -- -----------------------------------------------------------------------------
 -- Top-level of the instruction selector
@@ -468,7 +465,7 @@ getRegister' _ platform (CmmMachOp (MO_SS_Conv W64 W32) [x])
 getRegister' _ platform (CmmLoad mem pk)
  | not (isWord64 pk) = do
         Amode addr addr_code <- getAmode D mem
-        let code dst = ASSERT((targetClassOfReg platform dst == RcDouble) == isFloatType pk)
+        let code dst = assert ((targetClassOfReg platform dst == RcDouble) == isFloatType pk) $
                        addr_code `snocOL` LD format dst addr
         return (Any format code)
  | not (target32Bit platform) = do

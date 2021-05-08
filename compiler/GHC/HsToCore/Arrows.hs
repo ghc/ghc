@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE TypeFamilies #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
@@ -12,8 +12,6 @@ Desugaring arrow commands
 -}
 
 module GHC.HsToCore.Arrows ( dsProcExpr ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
