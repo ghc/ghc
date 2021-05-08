@@ -1,0 +1,6 @@
+WorphansData.hs:6:1: warning: [-Worphans-data (in -Worphans)]
+    Orphan data family instance:
+      data instance DataFam () -- Defined at WorphansData.hs:6:15
+    To avoid this
+        move the instance declaration to the module of the data family, or
+        wrap the type with a newtype and declare the instance on the new type.
