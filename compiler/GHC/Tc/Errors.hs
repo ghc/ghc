@@ -21,7 +21,6 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Types.Constraint
 import GHC.Core.Predicate
 import GHC.Tc.Utils.TcMType
-import GHC.Tc.Utils.Unify( occCheckForErrors, CheckTyEqResult(..) )
 import GHC.Tc.Utils.Env( tcInitTidyEnv )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Origin
@@ -599,10 +598,10 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics
               , ("Irreds",          is_irred,        False, mkGroupReporter mkIrredErr)
               , ("Dicts",           is_dict,         False, mkGroupReporter mkDictErr) ]
 
-    -- also checks to make sure the constraint isn't BlockedCIS
+    -- also checks to make sure the constraint isn't HoleBlockerReason
     -- See TcCanonical Note [Equalities with incompatible kinds], (4)
     unblocked :: (Ct -> Pred -> Bool) -> Ct -> Pred -> Bool
-    unblocked _ (CIrredCan { cc_status = BlockedCIS {}}) _ = False
+    unblocked _ (CIrredCan { cc_reason = HoleBlockerReason {}}) _ = False
     unblocked checker ct pred = checker ct pred
 
     -- rigid_nom_eq, rigid_nom_tv_eq,
@@ -1537,12 +1536,11 @@ mkTyVarEqErr :: ReportErrCtxt -> Report -> Ct
 -- tv1 and ty2 are already tidied
 mkTyVarEqErr ctxt report ct tv1 ty2
   = do { traceTc "mkTyVarEqErr" (ppr ct $$ ppr tv1 $$ ppr ty2)
-       ; dflags <- getDynFlags
-       ; return $ mkTyVarEqErr' dflags ctxt report ct tv1 ty2 }
+       ; return $ mkTyVarEqErr' ctxt report ct tv1 ty2 }
 
-mkTyVarEqErr' :: DynFlags -> ReportErrCtxt -> Report -> Ct
+mkTyVarEqErr' :: ReportErrCtxt -> Report -> Ct
               -> TcTyVar -> TcType -> Report
-mkTyVarEqErr' dflags ctxt report ct tv1 ty2
+mkTyVarEqErr' ctxt report ct tv1 ty2
   | isSkolemTyVar tv1  -- ty2 won't be a meta-tyvar; we would have
                        -- swapped in Solver.Canonical.canEqTyVarHomo
     || isTyVarTyVar tv1 && not (isTyVarTy ty2)
@@ -1554,11 +1552,10 @@ mkTyVarEqErr' dflags ctxt report ct tv1 ty2
             , report
             ]
 
-  | CTE_Occurs <- occ_check_expand
+  | cterHasOccursCheck check_eq_result
     -- We report an "occurs check" even for  a ~ F t a, where F is a type
     -- function; it's not insoluble (because in principle F could reduce)
     -- but we have certainly been unable to solve it
-    -- See Note [Occurs check error] in GHC.Tc.Solver.Canonical
   = let extra2   = mkEqInfoMsg ct ty1 ty2
 
         interesting_tyvars = filter (not . noFreeVarsOfType . tyVarKind) $
@@ -1575,7 +1572,7 @@ mkTyVarEqErr' dflags ctxt report ct tv1 ty2
     in
     mconcat [headline_msg, extra2, extra3, report]
 
-  | CTE_Bad <- occ_check_expand
+  | check_eq_result `cterHasProblem` cteImpredicative
   = let msg = vcat [ text "Cannot instantiate unification variable"
                      <+> quotes (ppr tv1)
                    , hang (text "with a" <+> what <+> text "involving polytypes:") 2 (ppr ty2) ]
@@ -1653,8 +1650,15 @@ mkTyVarEqErr' dflags ctxt report ct tv1 ty2
     headline_msg = misMatchOrCND insoluble_occurs_check ctxt ct ty1 ty2
 
     ty1 = mkTyVarTy tv1
-    occ_check_expand       = occCheckForErrors dflags tv1 ty2
-    insoluble_occurs_check = isInsolubleOccursCheck (ctEqRel ct) tv1 ty2
+
+    check_eq_result = case ct of
+      CIrredCan { cc_reason = NonCanonicalReason result } -> result
+      CIrredCan { cc_reason = HoleBlockerReason {} }      -> cteProblem cteHoleBlocker
+      _                                                   -> cteOK
+        -- these really should be CEqCans, but zonking constraints loses
+        -- the CEqCan status
+
+    insoluble_occurs_check = check_eq_result `cterHasProblem` cteInsolubleOccurs
 
     what = text $ levelString $
            ctLocTypeOrKind_maybe (ctLoc ct) `orElse` TypeLevel
@@ -2072,8 +2076,6 @@ pprWithExplicitKindsWhenMismatch ty1 ty2 ct
                  -- True when the visible bit of the types look the same,
                  -- so we want to show the kinds in the displayed type
 
-
-
 {- Note [Insoluble occurs check]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider [G] a ~ [a],  [W] a ~ [a] (#13674).  The Given is insoluble
@@ -2084,7 +2086,7 @@ we don't solve it from the Given.  It's very confusing to say
 And indeed even thinking about the Givens is silly; [W] a ~ [a] is
 just as insoluble as Int ~ Bool.
 
-Conclusion: if there's an insoluble occurs check (isInsolubleOccursCheck)
+Conclusion: if there's an insoluble occurs check (cteInsolubleOccurs)
 then report it directly, not in the "cannot deduce X from Y" form.
 This is done in misMatchOrCND (via the insoluble_occurs_check arg)
 
