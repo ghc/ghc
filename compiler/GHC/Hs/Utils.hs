@@ -364,12 +364,12 @@ mkHsCompAnns ctxt stmts expr anns = mkHsDoAnns ctxt (mkLocatedList (stmts ++ [la
     last_stmt = L (noAnnSrcSpan $ getLocA expr) $ mkLastStmt expr
 
 -- restricted to GhcPs because other phases might need a SyntaxExpr
-mkHsIf :: LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs -> EpAnn [AddEpAnn]
+mkHsIf :: LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs -> EpAnn AnnsIf
        -> HsExpr GhcPs
 mkHsIf c a b anns = HsIf anns c a b
 
 -- restricted to GhcPs because other phases might need a SyntaxExpr
-mkHsCmdIf :: LHsExpr GhcPs -> LHsCmd GhcPs -> LHsCmd GhcPs -> EpAnn [AddEpAnn]
+mkHsCmdIf :: LHsExpr GhcPs -> LHsCmd GhcPs -> LHsCmd GhcPs -> EpAnn AnnsIf
        -> HsCmd GhcPs
 mkHsCmdIf c a b anns = HsCmdIf anns noSyntaxExpr c a b
 
