@@ -62,7 +62,7 @@ mkConsoleHandle dev filepath ha_type buffered mb_codec nl finalizer other_side
       case isTerm of
         True  -> mkHandle dev filepath ha_type buffered mb_codec nl finalizer
                           other_side
-        False -> mkHandle (Win.convertHandle dev) filepath ha_type buffered
+        False -> mkHandle (Win.convertHandle dev False) filepath ha_type buffered
                             mb_codec nl finalizer other_side
 
 -- | A handle managing input from the Haskell program's standard input channel.
