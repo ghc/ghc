@@ -1450,7 +1450,7 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
          -> LocatedA b
          -> Bool  -- semicolon?
          -> LocatedA b
-         -> [AddEpAnn]
+         -> AnnsIf
          -> PV (LocatedA b)
   -- | Disambiguate "do { ... }" (do notation)
   mkHsDoPV ::

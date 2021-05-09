@@ -289,7 +289,7 @@ type instance XCase          GhcPs = EpAnn EpAnnHsCase
 type instance XCase          GhcRn = NoExtField
 type instance XCase          GhcTc = NoExtField
 
-type instance XIf            GhcPs = EpAnn [AddEpAnn]
+type instance XIf            GhcPs = EpAnn AnnsIf
 type instance XIf            GhcRn = NoExtField
 type instance XIf            GhcTc = NoExtField
 
@@ -399,6 +399,15 @@ data AnnProjection
   = AnnProjection {
       apOpen  :: EpaLocation, -- ^ '('
       apClose :: EpaLocation  -- ^ ')'
+      } deriving Data
+
+data AnnsIf
+  = AnnsIf {
+      aiIf       :: EpaLocation,
+      aiThen     :: EpaLocation,
+      aiElse     :: EpaLocation,
+      aiThenSemi :: Maybe EpaLocation,
+      aiElseSemi :: Maybe EpaLocation
       } deriving Data
 
 -- ---------------------------------------------------------------------
@@ -999,7 +1008,7 @@ type instance XCmdCase    GhcTc = NoExtField
 
 type instance XCmdLamCase (GhcPass _) = EpAnn [AddEpAnn]
 
-type instance XCmdIf      GhcPs = EpAnn [AddEpAnn]
+type instance XCmdIf      GhcPs = EpAnn AnnsIf
 type instance XCmdIf      GhcRn = NoExtField
 type instance XCmdIf      GhcTc = NoExtField
 
