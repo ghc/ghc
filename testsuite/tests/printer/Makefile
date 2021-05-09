@@ -562,3 +562,8 @@ InTreeAnnotations1:
 Test19784:
 	$(CHECK_PPR)   $(LIBDIR) Test19784.hs
 	$(CHECK_EXACT) $(LIBDIR) Test19784.hs
+
+.PHONY: Test19813
+Test19813:
+	$(CHECK_PPR)   $(LIBDIR) Test19813.hs
+	$(CHECK_EXACT) $(LIBDIR) Test19813.hs
