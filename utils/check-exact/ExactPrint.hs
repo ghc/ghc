@@ -1435,7 +1435,7 @@ instance ExactPrint (HsLocalBinds GhcPs) where
         when (not $ isEmptyValBinds valbinds) $ setExtraDP (Just anc)
       _ -> return ()
 
-    markAnnotatedWithLayout valbinds
+    markAnnList True an $ markAnnotatedWithLayout valbinds
 
   exact (HsIPBinds an bs)
     = markAnnList True an (markLocatedAAL an al_rest AnnWhere >> markAnnotated bs)
