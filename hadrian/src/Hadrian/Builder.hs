@@ -19,11 +19,14 @@ module Hadrian.Builder (
 
 import Data.List
 import Development.Shake
+import Development.Shake.FilePath
 
 import Hadrian.Expression hiding (inputs, outputs)
 import Hadrian.Oracles.ArgsHash
 import Hadrian.Target
 import Hadrian.Utilities
+
+import Base
 
 -- | This data structure captures all information relevant to invoking a builder.
 data BuildInfo = BuildInfo {
@@ -67,7 +70,11 @@ needBuilder :: Builder b => b -> Action ()
 needBuilder builder = do
     path <- builderPath builder
     deps <- runtimeDependencies builder
-    need (path : deps)
+    -- so `path` might be just `gcc`, in which case
+    -- we won't issue a "need" on it.
+    when (path /= takeFileName path) $
+        need [path]
+    need deps
 
 -- | Run a builder with a specified list of command line arguments, reading a
 -- list of input files and writing a list of output files. A lightweight version
