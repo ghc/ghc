@@ -17,6 +17,7 @@ module Builder (
 import Control.Exception.Extra (Partial)
 import Development.Shake.Classes
 import Development.Shake.Command
+import Development.Shake.FilePath
 import GHC.Generics
 import qualified Hadrian.Builder as H
 import Hadrian.Builder hiding (Builder)
@@ -217,7 +218,12 @@ instance H.Builder Builder where
                 msgIn  = "[askBuilder] Exactly one input file expected."
             needBuilder builder
             path <- H.builderPath builder
-            need [path]
+            -- we do not depend on bare builders. E.g. we won't depend on `clang`
+            -- or `ld` or `ar`.  Unless they are provided with fully qualified paths
+            -- this is the job of the person invoking ./configure to pass e.g.
+            -- CC=$(which clang) if they want the fully qualified clang path!
+            when (path /= takeFileName path) $
+                need [path]
             Stdout stdout <- cmd' [path] ["--no-user-package-db", "field", input, "depends"]
             return stdout
         _ -> error $ "Builder " ++ show builder ++ " can not be asked!"
@@ -338,9 +344,15 @@ systemBuilderPath builder = case builder of
                 ++ quote key ++ " is not specified" ++ inCfg
             return "" -- TODO: Use a safe interface.
         else do
+            -- angerman: I find this lookupInPath rather questionable.
+            -- if we specify CC, LD, ... *without* a path, that is intentional
+            -- lookupInPath should be done by the person invoking the configure
+            -- script iif they want to have that full path, if they just want
+            -- some generic tool name (on purpose!) the build system should not
+            -- go behind their backs to add a path they likely never wanted.
             fullPath <- lookupInPath path
             case (windowsHost, hasExtension fullPath) of
-                (False, _    ) -> return fullPath
+                (False, _    ) -> return path
                 (True , True ) -> fixAbsolutePathOnWindows fullPath
                 (True , False) -> fixAbsolutePathOnWindows fullPath <&> (<.> exe)
 

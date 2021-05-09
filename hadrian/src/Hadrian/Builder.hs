@@ -19,11 +19,14 @@ module Hadrian.Builder (
 
 import Data.List
 import Development.Shake
+import Development.Shake.FilePath
 
 import Hadrian.Expression hiding (inputs, outputs)
 import Hadrian.Oracles.ArgsHash
 import Hadrian.Target
 import Hadrian.Utilities
+
+import Base
 
 -- | This data structure captures all information relevant to invoking a builder.
 data BuildInfo = BuildInfo {
@@ -67,7 +70,15 @@ needBuilder :: Builder b => b -> Action ()
 needBuilder builder = do
     path <- builderPath builder
     deps <- runtimeDependencies builder
-    need (path : deps)
+    -- so `path` might be just `gcc`, in which case we won't issue a "need" on
+    -- it.  If someone really wants the full qualified path, he ought to pass
+    -- CC=$(which gcc) to the configure script.  If CC=gcc was passed, we should
+    -- respect that choice and not resolve that via $PATH into a fully qualified
+    -- path.  We can only `need` fully qualified path's though, hence we won't
+    -- `need` bare tool names.
+    when (path /= takeFileName path) $
+        need [path]
+    need deps
 
 -- | Run a builder with a specified list of command line arguments, reading a
 -- list of input files and writing a list of output files. A lightweight version

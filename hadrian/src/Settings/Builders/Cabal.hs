@@ -1,5 +1,6 @@
 module Settings.Builders.Cabal (cabalBuilderArgs) where
 
+import Development.Shake.FilePath
 import Hadrian.Haskell.Cabal
 
 import Builder
@@ -181,7 +182,11 @@ with b = do
     if null path then mempty else do
         top <- expr topDirectory
         expr $ needBuilder b
-        arg  $ withBuilderKey b ++ unifyPath (top </> path)
+        -- Do not inject top, if we have a bare name. E.g. do not turn
+        -- `ar` into `$top/ar`. But let `ar` be `ar` as found on $PATH.
+        arg  $ withBuilderKey b ++ unifyPath (if path /= takeFileName path
+                                              then top </> path
+                                              else path)
 
 withStaged :: (Stage -> Builder) -> Args
 withStaged sb = with . sb =<< getStage
