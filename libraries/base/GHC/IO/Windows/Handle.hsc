@@ -36,6 +36,7 @@ module GHC.IO.Windows.Handle
    toHANDLE,
    fromHANDLE,
    handleToMode,
+   isAsynchronous,
    optimizeFileAccess,
 
    -- * Standard Handles
@@ -77,7 +78,7 @@ import GHC.IO.Windows.Encoding (withGhcInternalToUTF16, withUTF16ToGhcInternal)
 import GHC.IO.Windows.Paths (getDevicePath)
 import GHC.IO.Handle.Internals (debugIO)
 import GHC.IORef
-import GHC.Event.Windows (LPOVERLAPPED, withOverlapped, IOResult(..))
+import GHC.Event.Windows (LPOVERLAPPED, withOverlappedEx, IOResult(..))
 import Foreign.Ptr
 import Foreign.C
 import Foreign.Marshal.Array (pokeArray)
@@ -103,7 +104,12 @@ data ConsoleHandle
 --   We can't store it separately because we don't know when the handle will
 --   be destroyed or invalidated.
 data IoHandle a where
-  NativeHandle  :: { getNativeHandle  :: HANDLE } -> IoHandle NativeHandle
+  NativeHandle  :: { getNativeHandle  :: HANDLE
+                   -- In certain cases we have inherited a handle and the
+                   -- handle and it may not have been created for async
+                   -- access.  In those case we can't issue a completion
+                   -- request as it would never finish and we'd deadlock.
+                   , isAsynchronous :: Bool } -> IoHandle NativeHandle
   ConsoleHandle :: { getConsoleHandle :: HANDLE
                    , cookedHandle :: IORef Bool
                    } -> IoHandle ConsoleHandle
@@ -112,8 +118,10 @@ type Io a = IoHandle a
 
 -- | Convert a ConsoleHandle into a general FileHandle
 --   This will change which DeviceIO is used.
-convertHandle :: Io ConsoleHandle -> Io NativeHandle
-convertHandle = fromHANDLE . toHANDLE
+convertHandle :: Io ConsoleHandle -> Bool -> Io NativeHandle
+convertHandle io async
+  = let !hwnd = getConsoleHandle io
+    in NativeHandle hwnd async
 
 -- | @since 4.11.0.0
 instance Show (Io NativeHandle) where
@@ -148,7 +156,9 @@ class (GHC.IO.Device.RawIO a, IODevice a, BufferedIO a, Typeable a)
 
 instance RawHandle (Io NativeHandle) where
   toHANDLE     = getNativeHandle
-  fromHANDLE   = NativeHandle
+  -- In order to convert to a native handle we have to check to see
+  -- is the handle can be used async or not.
+  fromHANDLE   = flip NativeHandle True
   isLockable _ = True
   setCooked    = const . return
   isCooked   _ = return False
@@ -184,7 +194,7 @@ instance GHC.IO.Device.IODevice (Io NativeHandle) where
 -- | @since 4.11.0.0
 instance GHC.IO.Device.IODevice (Io ConsoleHandle) where
   ready      = handle_ready
-  close      = handle_close . convertHandle
+  close      = handle_close . flip convertHandle False
   isTerminal = handle_is_console
   isSeekable = handle_is_seekable
   seek       = handle_console_seek
@@ -420,9 +430,11 @@ type LPSECURITY_ATTRIBUTES = LPVOID
 -- am choosing never to let this block. But this can be easily accomplished by
 -- a getOverlappedResult call with True
 hwndRead :: Io NativeHandle -> Ptr Word8 -> Word64 -> Int -> IO Int
-hwndRead hwnd ptr offset bytes
-  = fmap fromIntegral $ Mgr.withException "hwndRead" $
-      withOverlapped "hwndRead" (toHANDLE hwnd) offset (startCB ptr) completionCB
+hwndRead hwnd ptr offset bytes = do
+  mngr <- Mgr.getSystemManager
+  fmap fromIntegral $ Mgr.withException "hwndRead" $
+     withOverlappedEx mngr "hwndRead" (toHANDLE hwnd) (isAsynchronous hwnd)
+                      offset (startCB ptr) completionCB
   where
     startCB outBuf lpOverlapped = do
       debugIO ":: hwndRead"
@@ -448,8 +460,10 @@ hwndRead hwnd ptr offset bytes
 hwndReadNonBlocking :: Io NativeHandle -> Ptr Word8 -> Word64 -> Int
                     -> IO (Maybe Int)
 hwndReadNonBlocking hwnd ptr offset bytes
-  = do val <- withOverlapped "hwndReadNonBlocking" (toHANDLE hwnd) offset
-                              (startCB ptr) completionCB
+  = do mngr <- Mgr.getSystemManager
+       val <- withOverlappedEx mngr "hwndReadNonBlocking" (toHANDLE hwnd)
+                               (isAsynchronous hwnd) offset (startCB ptr)
+                               completionCB
        return $ ioValue val
   where
     startCB inputBuf lpOverlapped = do
@@ -471,9 +485,11 @@ hwndReadNonBlocking hwnd ptr offset bytes
 
 hwndWrite :: Io NativeHandle -> Ptr Word8 -> Word64 -> Int -> IO ()
 hwndWrite hwnd ptr offset bytes
-  = do _ <- Mgr.withException "hwndWrite" $
-          withOverlapped "hwndWrite" (toHANDLE hwnd) offset (startCB ptr)
-                         completionCB
+  = do mngr <- Mgr.getSystemManager
+       _ <- Mgr.withException "hwndWrite" $
+          withOverlappedEx mngr "hwndWrite" (toHANDLE hwnd)
+                           (isAsynchronous hwnd) offset (startCB ptr)
+                           completionCB
        return ()
   where
     startCB outBuf lpOverlapped = do
@@ -490,8 +506,10 @@ hwndWrite hwnd ptr offset bytes
 
 hwndWriteNonBlocking :: Io NativeHandle -> Ptr Word8 -> Word64 -> Int -> IO Int
 hwndWriteNonBlocking hwnd ptr offset bytes
-  = do val <- withOverlapped "hwndReadNonBlocking" (toHANDLE hwnd) offset
-                             (startCB ptr) completionCB
+  = do mngr <- Mgr.getSystemManager
+       val <- withOverlappedEx mngr "hwndReadNonBlocking" (toHANDLE hwnd)
+                               (isAsynchronous hwnd) offset (startCB ptr)
+                               completionCB
        return $ fromIntegral $ ioValue val
   where
     startCB :: Ptr a -> LPOVERLAPPED -> IO (Mgr.CbResult a1)
