@@ -67,7 +67,11 @@ needBuilder :: Builder b => b -> Action ()
 needBuilder builder = do
     path <- builderPath builder
     deps <- runtimeDependencies builder
-    need (path : deps)
+    -- so `path` might be just `gcc`, in which case
+    -- we won't issue a "need" on it.
+    when (path /= takeFileName path) $
+        need [path]
+    need deps
 
 -- | Run a builder with a specified list of command line arguments, reading a
 -- list of input files and writing a list of output files. A lightweight version
