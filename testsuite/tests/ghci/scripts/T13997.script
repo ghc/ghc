@@ -1,0 +1,8 @@
+:set -v1
+System.IO.writeFile "Bug.hs" "module Bug where import Bug2; bug = bug2"
+System.IO.writeFile "Bug2.hs" "module Bug2 where bug2 = False"
+:load Bug
+System.IO.writeFile "New.hs" "module New where newFn = True"
+System.IO.writeFile "Bug2.hs" "module Bug2 where import New; bug2 = newFn; bug22 = ()"
+:reload
+bug
