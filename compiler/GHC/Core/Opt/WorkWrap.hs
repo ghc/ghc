@@ -209,7 +209,7 @@ unfolding to the *worker*.  So we will get something like this:
 How do we "transfer the unfolding"? Easy: by using the old one, wrapped
 in work_fn! See GHC.Core.Unfold.mkWorkerUnfolding.
 
-Note [No worker-wrapper for record selectors]
+Note [No worker/wrapper for record selectors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We sometimes generate a lot of record selectors, and generally the
 don't benefit from worker/wrapper.  Yes, mkWwBodies would find a w/w split,
@@ -499,6 +499,9 @@ tryWW dflags fam_envs is_rec fn_id rhs
         -- See Note [Don't w/w INLINE things]
         -- See Note [Don't w/w inline small non-loop-breaker things]
 
+  | isRecordSelector fn_id  -- See Note [No worker/wrapper for record selectors]
+  = return [ (fn_id, rhs ) ]
+
   | is_fun && is_eta_exp
   = splitFun dflags fam_envs new_fn_id fn_info wrap_dmds div cpr rhs
 
@@ -605,26 +608,15 @@ See https://gitlab.haskell.org/ghc/ghc/merge_requests/312#note_192064.
 splitFun :: DynFlags -> FamInstEnvs -> Id -> IdInfo -> [Demand] -> Divergence -> Cpr -> CoreExpr
          -> UniqSM [(Id, CoreExpr)]
 splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
-  | isRecordSelector fn_id  -- See Note [No worker/wrapper for record selectors]
-  = return [ (fn_id, rhs ) ]
-
-  | otherwise
   = WARN( not (wrap_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr cpr) )
           -- The arity should match the signature
     do { mb_stuff <- mkWwBodies (initWwOpts dflags fam_envs) rhs_fvs fn_id wrap_dmds use_cpr_info
        ; case mb_stuff of
             Nothing -> return [(fn_id, rhs)]
 
-            Just stuff
-              | Just stable_unf <- certainlyWillInline (unfoldingOpts dflags) fn_info
-              ->  return [ (fn_id `setIdUnfolding` stable_unf, rhs) ]
-                  -- See Note [Don't w/w INLINE things]
-                  -- See Note [Don't w/w inline small non-loop-breaker things]
-
-              | otherwise
-              -> do { work_uniq <- getUniqueM
-                    ; return (mkWWBindPair dflags fn_id fn_info arity rhs
-                                           work_uniq div cpr stuff) } }
+            Just stuff -> do { work_uniq <- getUniqueM
+                             ; return (mkWWBindPair dflags fn_id fn_info arity rhs
+                                                    work_uniq div cpr stuff) } }
   where
     rhs_fvs = exprFreeVars rhs
     arity   = arityInfo fn_info
