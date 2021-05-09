@@ -66,8 +66,6 @@
     m4
 
     gmp
-    # ncurses
-    # libiconv
     zlib.out
     zlib.dev
     glibcLocales
