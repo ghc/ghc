@@ -173,7 +173,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/exactprin
  -- "../../testsuite/tests/printer/Test16236.hs" Nothing
  -- "../../testsuite/tests/printer/Test17519.hs" Nothing
  -- "../../testsuite/tests/printer/InTreeAnnotations1.hs" Nothing
- "../../testsuite/tests/printer/Test19798.hs" Nothing
+ -- "../../testsuite/tests/printer/Test19798.hs" Nothing
 
  -- "../../testsuite/tests/qualifieddo/should_compile/qdocompile001.hs" Nothing
  -- "../../testsuite/tests/typecheck/should_fail/StrictBinds.hs" Nothing
@@ -185,6 +185,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/exactprin
  -- "../../testsuite/tests/ghc-api/exactprint/WhereIn3a.hs" Nothing
  -- "../../testsuite/tests/ghc-api/exactprint/Windows.hs" Nothing
  -- "../../testsuite/tests/printer/Test19784.hs" Nothing
+ "../../testsuite/tests/printer/Test19813.hs" Nothing
 
 -- cloneT does not need a test, function can be retired
 
