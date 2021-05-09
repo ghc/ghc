@@ -13,7 +13,7 @@
   # we need to inject ncurses into --with-curses-libraries.
   # the real fix is to teach terminfo to use libcurses on macOS.
   # CONFIGURE_ARGS = "--with-intree-gmp --with-curses-libraries=${pkgs.ncurses.out}/lib";
-  CONFIGURE_ARGS = "--with-intree-gmp --with-curses-libraries=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib --with-iconv-includes=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include --with-iconv-libraries=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib";
+  CONFIGURE_ARGS = "--with-intree-gmp --with-curses-libraries=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib --with-iconv-includes=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include --with-iconv-libraries=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib SH=/bin/bash";
 
   # magic speedup pony :facepalm:
   #
