@@ -820,6 +820,9 @@ install_mingw : $(INPLACE_MINGW)
 
 endif # Windows_Host
 
+# the following is the work around suggested by @carter in #17418 during install
+# time.  This should help us with code signing issues by removing extended
+# attribuets from all files.
 ifeq "$(Darwin_Host)" "YES"
 install : install_darwin
 .PHONY: install_darwin
