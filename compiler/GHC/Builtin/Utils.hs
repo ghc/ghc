@@ -3,7 +3,7 @@
 
 -}
 
-{-# LANGUAGE CPP #-}
+
 
 -- | The @GHC.Builtin.Utils@ interface to the compiler's prelude knowledge.
 --
@@ -45,8 +45,6 @@ module GHC.Builtin.Utils (
 
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Builtin.Uniques
@@ -76,6 +74,7 @@ import GHC.Types.Unique ( isValidKnownKeyUnique )
 import GHC.Utils.Outputable
 import GHC.Utils.Misc as Utils
 import GHC.Utils.Panic
+import GHC.Utils.Constants (debugIsOn)
 import GHC.Hs.Doc
 import GHC.Unit.Module.ModIface (IfaceExport)
 

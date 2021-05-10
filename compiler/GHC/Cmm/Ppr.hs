@@ -56,7 +56,7 @@ import GHC.Data.FastString
 import GHC.Utils.Outputable
 import GHC.Cmm.Ppr.Decl
 import GHC.Cmm.Ppr.Expr
-import GHC.Utils.Misc
+import GHC.Utils.Constants (debugIsOn)
 
 import GHC.Types.Basic
 import GHC.Cmm.Dataflow.Block

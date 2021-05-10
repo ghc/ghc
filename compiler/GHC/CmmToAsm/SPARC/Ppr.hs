@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -24,8 +23,6 @@ module GHC.CmmToAsm.SPARC.Ppr (
 )
 
 where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 

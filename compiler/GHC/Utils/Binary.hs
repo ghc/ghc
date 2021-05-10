@@ -1,3 +1,4 @@
+
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE PolyKinds #-}
@@ -71,8 +72,6 @@ module GHC.Utils.Binary
    newReadState, newWriteState,
    putDictionary, getDictionary, putFS,
   ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 

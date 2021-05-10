@@ -1,12 +1,10 @@
-{-# LANGUAGE CPP #-}
+
 module GHC.CmmToAsm.X86.RegInfo (
         mkVirtualReg,
         regDotColor
 )
 
 where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 

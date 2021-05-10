@@ -3,7 +3,7 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 -}
 
-{-# LANGUAGE CPP, DeriveDataTypeable, FlexibleContexts #-}
+{-# LANGUAGE DeriveDataTypeable, FlexibleContexts #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE BangPatterns #-}
 
@@ -92,8 +92,6 @@ module GHC.Core (
         isBuiltinRule, isLocalRule, isAutoRule,
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 import GHC.Platform
 
@@ -115,6 +113,7 @@ import GHC.Utils.Binary
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 
 import GHC.Driver.Ppr
 
@@ -300,7 +299,7 @@ data AltCon
 -- The instance adheres to the order described in [Core case invariants]
 instance Ord AltCon where
   compare (DataAlt con1) (DataAlt con2) =
-    ASSERT( dataConTyCon con1 == dataConTyCon con2 )
+    assert (dataConTyCon con1 == dataConTyCon con2) $
     compare (dataConTag con1) (dataConTag con2)
   compare (DataAlt _) _ = GT
   compare _ (DataAlt _) = LT
@@ -1575,8 +1574,8 @@ cmpAltCon (DataAlt _)  DEFAULT      = GT
 cmpAltCon (LitAlt  l1) (LitAlt  l2) = l1 `compare` l2
 cmpAltCon (LitAlt _)   DEFAULT      = GT
 
-cmpAltCon con1 con2 = WARN( True, text "Comparing incomparable AltCons" <+>
-                                  ppr con1 <+> ppr con2 )
+cmpAltCon con1 con2 = warnPprTrace True (text "Comparing incomparable AltCons" <+>
+                                  ppr con1 <+> ppr con2) $
                       LT
 
 {-
@@ -1803,7 +1802,7 @@ mkCoBind cv co      = NonRec cv (Coercion co)
 varToCoreExpr :: CoreBndr -> Expr b
 varToCoreExpr v | isTyVar v = Type (mkTyVarTy v)
                 | isCoVar v = Coercion (mkCoVarCo v)
-                | otherwise = ASSERT( isId v ) Var v
+                | otherwise = assert (isId v) $ Var v
 
 varsToCoreExprs :: [CoreBndr] -> [Expr b]
 varsToCoreExprs vs = map varToCoreExpr vs

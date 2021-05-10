@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, LambdaCase #-}
+{-# LANGUAGE LambdaCase #-}
 
 -----------------------------------------------------------------------------
 --
@@ -12,8 +12,6 @@ module GHC.StgToCmm.Lit (
     cgLit, mkSimpleLit,
     newStringCLit, newByteStringCLit
   ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 

@@ -1,4 +1,5 @@
-{-# LANGUAGE CPP, NondecreasingIndentation, ScopedTypeVariables #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE NondecreasingIndentation, ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections, NamedFieldPuns #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -295,8 +296,6 @@ module GHC (
 
   * inline bits of GHC.Driver.Main here to simplify layering: hscTcExpr, hscStmt.
 -}
-
-#include "HsVersions.h"
 
 import GHC.Prelude hiding (init)
 

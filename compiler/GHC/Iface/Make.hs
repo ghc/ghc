@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP                      #-}
+
 {-# LANGUAGE NondecreasingIndentation #-}
 
 {-
@@ -18,8 +18,6 @@ module GHC.Iface.Make
    , tyThingToIfaceDecl -- Converting things to their Iface equivalents
    )
 where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -76,7 +74,7 @@ import GHC.Types.HpcInfo
 import GHC.Types.CompleteMatch
 
 import GHC.Utils.Outputable
-import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc  hiding ( eqListBy )
 import GHC.Utils.Logger
 
@@ -161,7 +159,7 @@ updateDecl decls (Just CgInfos{ cgNonCafs = NonCaffySet non_cafs, cgLFInfos = lf
     update_decl (IfaceId nm ty details infos)
       | let not_caffy = elemNameSet nm non_cafs
       , let mb_lf_info = lookupNameEnv lf_infos nm
-      , WARN( isNothing mb_lf_info, text "Name without LFInfo:" <+> ppr nm ) True
+      , warnPprTrace (isNothing mb_lf_info) (text "Name without LFInfo:" <+> ppr nm) True
         -- Only allocate a new IfaceId if we're going to update the infos
       , isJust mb_lf_info || not_caffy
       = IfaceId nm ty details $
@@ -646,7 +644,7 @@ classToIfaceDecl env clas
         (env2, if_decl) = tyConToIfaceDecl env1 tc
 
     toIfaceClassOp (sel_id, def_meth)
-        = ASSERT( sel_tyvars == binderVars tc_binders )
+        = assert (sel_tyvars == binderVars tc_binders) $
           IfaceClassOp (getName sel_id)
                        (tidyToIfaceType env1 op_ty)
                        (fmap toDmSpec def_meth)
@@ -689,7 +687,7 @@ instanceToIfaceInst (ClsInst { is_dfun = dfun_id, is_flag = oflag
                              , is_cls_nm = cls_name, is_cls = cls
                              , is_tcs = rough_tcs
                              , is_orphan = orph })
-  = ASSERT( cls_name == className cls )
+  = assert (cls_name == className cls) $
     IfaceClsInst { ifDFun     = idName dfun_id
                  , ifOFlag    = oflag
                  , ifInstCls  = cls_name
@@ -707,7 +705,7 @@ famInstToIfaceFamInst (FamInst { fi_axiom    = axiom,
                  , ifFamInstOrph     = orph }
   where
     fam_decl = tyConName $ coAxiomTyCon axiom
-    mod = ASSERT( isExternalName (coAxiomName axiom) )
+    mod = assert (isExternalName (coAxiomName axiom)) $
           nameModule (coAxiomName axiom)
     is_local name = nameIsLocalOrFrom mod name
 

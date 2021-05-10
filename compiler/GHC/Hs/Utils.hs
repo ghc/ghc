@@ -20,7 +20,7 @@ just attach noSrcSpan to everything.
 
 -}
 
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -110,8 +110,6 @@ module GHC.Hs.Utils(
   -- * Collecting implicit binders
   lStmtsImplicits, hsValBindsImplicits, lPatImplicits
   ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 

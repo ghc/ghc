@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -53,8 +53,6 @@ module Language.Haskell.Syntax.Type (
         isHsKindedTyVar,
         hsPatSigType,
     ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 

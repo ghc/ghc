@@ -3,7 +3,8 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 -}
 
-{-# LANGUAGE CPP, DeriveDataTypeable #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 
 -- |
 -- #name_types#
@@ -76,8 +77,6 @@ module GHC.Types.Name.Reader (
         -- * Utils
         opIsAt,
   ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -1368,7 +1367,7 @@ ppr_defn_site imp_spec name
                 2 (pprLoc loc)
   where
     loc = nameSrcSpan name
-    defining_mod = ASSERT2( isExternalName name, ppr name ) nameModule name
+    defining_mod = assertPpr (isExternalName name) (ppr name) $ nameModule name
     same_module = importSpecModule imp_spec == moduleName defining_mod
     pp_mod | same_module = empty
            | otherwise   = text "in" <+> quotes (ppr defining_mod)

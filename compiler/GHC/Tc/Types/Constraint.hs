@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
@@ -69,8 +69,6 @@ module GHC.Tc.Types.Constraint (
 
   )
   where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 

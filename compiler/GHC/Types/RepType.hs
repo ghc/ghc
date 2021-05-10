@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE FlexibleContexts #-}
 
 module GHC.Types.RepType
@@ -21,8 +21,6 @@ module GHC.Types.RepType
     slotPrimRep, primRepSlot
   ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Types.Basic (Arity, RepArity)
@@ -39,6 +37,7 @@ import {-# SOURCE #-} GHC.Builtin.Types ( anyTypeOfKind, runtimeRepTy )
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 
 import Data.List (sort)
 import qualified Data.IntSet as IS
@@ -532,7 +531,7 @@ kindPrimRep doc ki
   | Just ki' <- coreView ki
   = kindPrimRep doc ki'
 kindPrimRep doc (TyConApp typ [runtime_rep])
-  = ASSERT( typ `hasKey` tYPETyConKey )
+  = assert (typ `hasKey` tYPETyConKey) $
     runtimeRepPrimRep doc runtime_rep
 kindPrimRep doc ki
   = pprPanic "kindPrimRep" (ppr ki $$ doc)
@@ -543,7 +542,7 @@ kindPrimRep doc ki
 runtimeRepMonoPrimRep_maybe :: HasDebugCallStack => Type -> Maybe [PrimRep]
 runtimeRepMonoPrimRep_maybe rr_ty
   | Just (rr_dc, args) <- splitTyConApp_maybe rr_ty
-  , ASSERT2( runtimeRepTy `eqType` typeKind rr_ty, ppr rr_ty ) True
+  , assertPpr (runtimeRepTy `eqType` typeKind rr_ty) (ppr rr_ty) True
   , RuntimeRep fun <- tyConRuntimeRepInfo rr_dc
   = Just (fun args)
   | otherwise

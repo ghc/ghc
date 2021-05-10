@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
@@ -7,8 +7,6 @@ module GHC.Tc.Solver.Interact (
      solveSimpleGivens,   -- Solves [Ct]
      solveSimpleWanteds,  -- Solves Cts
   ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 import GHC.Types.Basic ( SwapFlag(..),
@@ -33,6 +31,7 @@ import GHC.Core.Unify ( tcUnifyTyWithTFs, ruleMatchTyKiX )
 import GHC.Tc.Types.Evidence
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 
 import GHC.Tc.Types
 import GHC.Tc.Types.Constraint
@@ -1065,7 +1064,7 @@ shortCutSolver dflags ev_w ev_i
  -- Enabled by the -fsolve-constant-dicts flag
 
   = do { ev_binds_var <- getTcEvBindsVar
-       ; ev_binds <- ASSERT2( not (isCoEvBindsVar ev_binds_var ), ppr ev_w )
+       ; ev_binds <- assertPpr (not (isCoEvBindsVar ev_binds_var )) (ppr ev_w) $
                      getTcEvBindsMap ev_binds_var
        ; solved_dicts <- getSolvedDicts
 
@@ -1290,7 +1289,7 @@ improveLocalFunEqs :: CtEvidence -> InertCans -> TyCon -> [TcType] -> TcType
 -- See Note [FunDep and implicit parameter reactions]
 -- Precondition: isImprovable work_ev
 improveLocalFunEqs work_ev inerts fam_tc args rhs
-  = ASSERT( isImprovable work_ev )
+  = assert (isImprovable work_ev) $
     unless (null improvement_eqns) $
     do { traceTcS "interactFunEq improvements: " $
                    vcat [ text "Eqns:" <+> ppr improvement_eqns
@@ -2471,8 +2470,8 @@ matchLocalInst pred loc
       = (match:matches, unif)
 
       | otherwise
-      = ASSERT2( disjointVarSet qtv_set (tyCoVarsOfType pred)
-               , ppr qci $$ ppr pred )
+      = assertPpr (disjointVarSet qtv_set (tyCoVarsOfType pred))
+                  (ppr qci $$ ppr pred)
             -- ASSERT: unification relies on the
             -- quantified variables being fresh
         (matches, unif || this_unif)

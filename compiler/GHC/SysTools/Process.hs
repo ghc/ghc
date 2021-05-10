@@ -8,8 +8,6 @@
 -----------------------------------------------------------------------------
 module GHC.SysTools.Process where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Driver.Session

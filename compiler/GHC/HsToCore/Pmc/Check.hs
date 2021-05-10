@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP               #-}
+
 {-# LANGUAGE DeriveFunctor     #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs             #-}
@@ -21,8 +21,6 @@ module GHC.HsToCore.Pmc.Check (
         CheckAction(..),
         checkMatchGroup, checkGRHSs, checkPatBind, checkEmptyCase
     ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
