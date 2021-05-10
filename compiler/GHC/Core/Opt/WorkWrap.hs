@@ -495,7 +495,7 @@ tryWW dflags fam_envs is_rec fn_id rhs
   -- See Note [Worker/wrapper for NOINLINE functions]
 
   | Just stable_unf <- certainlyWillInline uf_opts fn_info
-  = return [ (fn_id `setIdUnfolding` stable_unf, rhs) ]
+  = return [ (new_fn_id `setIdUnfolding` stable_unf, rhs) ]
         -- See Note [Don't w/w INLINE things]
         -- See Note [Don't w/w inline small non-loop-breaker things]
 
