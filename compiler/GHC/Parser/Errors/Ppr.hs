@@ -95,9 +95,6 @@ instance Diagnostic PsMessage where
       -> mkSimpleDecorated $
             text "Found" <+> quotes (text "qualified")
              <+> text "in prepositive position"
-         $$ text "Suggested fix: place " <+> quotes (text "qualified")
-             <+> text "after the module name instead."
-         $$ text "To allow this, enable language extension 'ImportQualifiedPost'"
 
     PsErrLexer err kind
       -> mkSimpleDecorated $ hcat
@@ -166,7 +163,7 @@ instance Diagnostic PsMessage where
                      ]
 
     PsErrLambdaCase
-      -> mkSimpleDecorated $ text "Illegal lambda-case (use LambdaCase)"
+      -> mkSimpleDecorated $ text "Illegal lambda-case"
     PsErrEmptyLambda
        -> mkSimpleDecorated $ text "A lambda requires at least one parameter"
     PsErrLinearFunction
@@ -176,17 +173,17 @@ instance Diagnostic PsMessage where
     PsErrMultiWayIf
       -> mkSimpleDecorated $ text "Multi-way if-expressions need MultiWayIf turned on"
     PsErrNumUnderscores reason
-      -> mkSimpleDecorated $
-           text $ case reason of
-             NumUnderscore_Integral -> "Use NumericUnderscores to allow underscores in integer literals"
-             NumUnderscore_Float    -> "Use NumericUnderscores to allow underscores in floating literals"
+      -> let ty = case reason of
+                    NumUnderscore_Integral -> "integer"
+                    NumUnderscore_Float    -> "floating"
+         in mkSimpleDecorated $ text "Underscores not allowed in" <+> text ty <+> text "literals"
     PsErrIllegalBangPattern e
-      -> mkSimpleDecorated $ text "Illegal bang-pattern (use BangPatterns):" $$ ppr e
+      -> mkSimpleDecorated $ text "Illegal bang-pattern:" $$ ppr e
     PsErrOverloadedRecordDotInvalid
       -> mkSimpleDecorated $
            text "Use of OverloadedRecordDot '.' not valid ('.' isn't allowed when constructing records or in record patterns)"
     PsErrIllegalPatSynExport
-      -> mkSimpleDecorated $ text "Illegal export form (use PatternSynonyms to enable)"
+      -> mkSimpleDecorated $ text "Illegal export form"
     PsErrOverloadedRecordUpdateNoQualifiedFields
       -> mkSimpleDecorated $ text "Fields cannot be qualified when OverloadedRecordUpdate is enabled"
     PsErrExplicitForall is_unicode
@@ -200,10 +197,7 @@ instance Diagnostic PsMessage where
           forallSym True  = text "∀"
           forallSym False = text "forall"
     PsErrIllegalQualifiedDo qdoDoc
-      -> mkSimpleDecorated $ vcat
-           [ text "Illegal qualified" <+> quotes qdoDoc <+> text "block"
-           , text "Perhaps you intended to use QualifiedDo"
-           ]
+      -> mkSimpleDecorated $ text "Illegal qualified" <+> quotes qdoDoc <+> text "block"
     PsErrQualifiedDoInCmd m
       -> mkSimpleDecorated $
            hang (text "Parse error in command:") 2 $
@@ -239,7 +233,7 @@ instance Diagnostic PsMessage where
                 ]
     PsErrIllegalExplicitNamespace
       -> mkSimpleDecorated $
-           text "Illegal keyword 'type' (use ExplicitNamespaces to enable)"
+           text "Illegal keyword 'type'"
 
     PsErrUnallowedPragma prag
       -> mkSimpleDecorated $
@@ -376,7 +370,7 @@ instance Diagnostic PsMessage where
               ]
     PsErrIllegalDataTypeContext c
       -> mkSimpleDecorated $
-           text "Illegal datatype context (use DatatypeContexts):"
+           text "Illegal datatype context:"
              <+> pprLHsContext (Just c)
     PsErrPrimStringInvalidChar
       -> mkSimpleDecorated $ text "primitive string literal must contain only characters <= \'\\xFF\'"
@@ -389,7 +383,6 @@ instance Diagnostic PsMessage where
       -> mkSimpleDecorated $
            text "Unexpected semi-colons in conditional:"
            $$ nest 4 expr
-           $$ text "Perhaps you meant to use DoAndIfThenElse?"
          where
             pprOptSemi True  = semi
             pprOptSemi False = empty
@@ -400,7 +393,6 @@ instance Diagnostic PsMessage where
       -> mkSimpleDecorated $
            text "Unexpected semi-colons in conditional:"
            $$ nest 4 expr
-           $$ text "Perhaps you meant to use DoAndIfThenElse?"
          where
             pprOptSemi True  = semi
             pprOptSemi False = empty
@@ -433,7 +425,7 @@ instance Diagnostic PsMessage where
       -> mkSimpleDecorated $ text "Inferred type variables are not allowed here"
     PsErrIllegalTraditionalRecordSyntax s
       -> mkSimpleDecorated $
-           text "Illegal record syntax (use TraditionalRecordSyntax):" <+> s
+           text "Illegal record syntax:" <+> s
     PsErrParseErrorInCmd s
       -> mkSimpleDecorated $ hang (text "Parse error in command:") 2 s
     PsErrParseErrorInPat s PsParseErrorInPatDetails{..}
@@ -468,29 +460,6 @@ instance Diagnostic PsMessage where
            text "Invalid type signature:"
            <+> ppr lhs
            <+> text ":: ..."
-           $$ text hint
-         where
-         hint | foreign_RDR `looks_like` lhs
-              = "Perhaps you meant to use ForeignFunctionInterface?"
-              | default_RDR `looks_like` lhs
-              = "Perhaps you meant to use DefaultSignatures?"
-              | pattern_RDR `looks_like` lhs
-              = "Perhaps you meant to use PatternSynonyms?"
-              | otherwise
-              = "Should be of form <variable> :: <type>"
-
-         -- A common error is to forget the ForeignFunctionInterface flag
-         -- so check for that, and suggest.  cf #3805
-         -- Sadly 'foreign import' still barfs 'parse error' because
-         --  'import' is a keyword
-         -- looks_like :: RdrName -> LHsExpr GhcPsErr -> Bool -- AZ
-         looks_like s (L _ (HsVar _ (L _ v))) = v == s
-         looks_like s (L _ (HsApp _ lhs _))   = looks_like s lhs
-         looks_like _ _                       = False
-
-         foreign_RDR = mkUnqual varName (fsLit "foreign")
-         default_RDR = mkUnqual varName (fsLit "default")
-         pattern_RDR = mkUnqual varName (fsLit "pattern")
     PsErrUnexpectedTypeInDecl t what tc tparms equals_or_where
        -> mkSimpleDecorated $
             vcat [ text "Unexpected type" <+> quotes (ppr t)
@@ -635,7 +604,10 @@ instance Diagnostic PsMessage where
     PsWarnStarBinder                              -> noHints
     PsWarnStarIsType                              -> [SuggestUseDataKindType]
     PsWarnUnrecognisedPragma                      -> noHints
-    PsWarnImportPreQualified                      -> noHints
+    PsWarnImportPreQualified                      ->
+      [ SuggestAddQualifiedAfterModuleName
+      , SuggestExtension LangExt.ImportQualifiedPost
+      ]
     PsErrLexer{}                                  -> noHints
     PsErrCmmLexer                                 -> noHints
     PsErrCmmParser{}                              -> noHints
@@ -657,18 +629,18 @@ instance Diagnostic PsMessage where
     PsErrExpectedHyphen                           -> noHints
     PsErrSpaceInSCC                               -> noHints
     PsErrEmptyDoubleQuotes{}                      -> noHints
-    PsErrLambdaCase{}                             -> noHints
+    PsErrLambdaCase{}                             -> [SuggestExtension LangExt.LambdaCase]
     PsErrEmptyLambda{}                            -> noHints
-    PsErrLinearFunction{}                         -> noHints
-    PsErrMultiWayIf{}                             -> noHints
-    PsErrOverloadedRecordUpdateNotEnabled{}       -> noHints
-    PsErrNumUnderscores{}                         -> noHints
-    PsErrIllegalBangPattern{}                     -> noHints
+    PsErrLinearFunction{}                         -> [SuggestExtension LangExt.LinearTypes]
+    PsErrMultiWayIf{}                             -> [SuggestExtension LangExt.MultiWayIf]
+    PsErrOverloadedRecordUpdateNotEnabled{}       -> [SuggestExtension LangExt.OverloadedRecordUpdate]
+    PsErrNumUnderscores{}                         -> [SuggestExtension LangExt.NumericUnderscores]
+    PsErrIllegalBangPattern{}                     -> [SuggestExtension LangExt.BangPatterns]
     PsErrOverloadedRecordDotInvalid{}             -> noHints
-    PsErrIllegalPatSynExport                      -> noHints
+    PsErrIllegalPatSynExport                      -> [SuggestExtension LangExt.PatternSynonyms]
     PsErrOverloadedRecordUpdateNoQualifiedFields  -> noHints
     PsErrExplicitForall{}                         -> noHints
-    PsErrIllegalQualifiedDo{}                     -> noHints
+    PsErrIllegalQualifiedDo{}                     -> [SuggestExtension LangExt.QualifiedDo]
     PsErrQualifiedDoInCmd{}                       -> noHints
     PsErrRecordSyntaxInPatSynDecl{}               -> noHints
     PsErrEmptyWhereInPatSynDecl{}                 -> noHints
@@ -676,7 +648,7 @@ instance Diagnostic PsMessage where
     PsErrNoSingleWhereBindInPatSynDecl{}          -> noHints
     PsErrDeclSpliceNotAtTopLevel{}                -> noHints
     PsErrMultipleNamesInStandaloneKindSignature{} -> noHints
-    PsErrIllegalExplicitNamespace                 -> noHints
+    PsErrIllegalExplicitNamespace                 -> [SuggestExtension LangExt.ExplicitNamespaces]
     PsErrUnallowedPragma{}                        -> noHints
     PsErrImportPostQualified                      -> noHints
     PsErrImportQualifiedTwice                     -> noHints
@@ -722,19 +694,19 @@ instance Diagnostic PsMessage where
     PsErrProcInFunAppExpr{}                       -> suggestParensAndBlockArgs
     PsErrMalformedTyOrClDecl{}                    -> noHints
     PsErrIllegalWhereInDataDecl                   -> noHints
-    PsErrIllegalDataTypeContext{}                 -> noHints
+    PsErrIllegalDataTypeContext{}                 -> [SuggestExtension LangExt.DatatypeContexts]
     PsErrPrimStringInvalidChar                    -> noHints
     PsErrSuffixAT                                 -> noHints
     PsErrPrecedenceOutOfRange{}                   -> noHints
-    PsErrSemiColonsInCondExpr{}                   -> noHints
-    PsErrSemiColonsInCondCmd{}                    -> noHints
+    PsErrSemiColonsInCondExpr{}                   -> [SuggestExtension LangExt.DoAndIfThenElse]
+    PsErrSemiColonsInCondCmd{}                    -> [SuggestExtension LangExt.DoAndIfThenElse]
     PsErrAtInPatPos                               -> noHints
     PsErrParseErrorOnInput{}                      -> noHints
     PsErrMalformedDecl{}                          -> noHints
     PsErrUnexpectedTypeAppInDecl{}                -> noHints
     PsErrNotADataCon{}                            -> noHints
     PsErrInferredTypeVarNotAllowed                -> noHints
-    PsErrIllegalTraditionalRecordSyntax{}         -> noHints
+    PsErrIllegalTraditionalRecordSyntax{}         -> [SuggestExtension LangExt.TraditionalRecordSyntax]
     PsErrParseErrorInCmd{}                        -> noHints
     PsErrParseErrorInPat _ PsParseErrorInPatDetails{..} ->
       catMaybes [sug_recdo, sug_missingdo]
@@ -744,7 +716,29 @@ instance Diagnostic PsMessage where
         sug_missingdo = sug peipd_incomplete_do_block                 SuggestMissingDo
     PsErrParseRightOpSectionInPat{}               -> noHints
     PsErrIllegalRoleName{}                        -> noHints
-    PsErrInvalidTypeSignature{}                   -> noHints
+    PsErrInvalidTypeSignature lhs                 -> hints
+         where
+         hints | foreign_RDR `looks_like` lhs
+               = [SuggestExtension LangExt.ForeignFunctionInterface]
+               | default_RDR `looks_like` lhs
+               = [SuggestExtension LangExt.DefaultSignatures]
+               | pattern_RDR `looks_like` lhs
+               = [SuggestExtension LangExt.PatternSynonyms]
+               | otherwise
+               = [SuggestTypeSignatureDeclaration]
+
+         -- A common error is to forget the ForeignFunctionInterface flag
+         -- so check for that, and suggest.  cf #3805
+         -- Sadly 'foreign import' still barfs 'parse error' because
+         --  'import' is a keyword
+         -- looks_like :: RdrName -> LHsExpr GhcPsErr -> Bool -- AZ
+         looks_like s (L _ (HsVar _ (L _ v))) = v == s
+         looks_like s (L _ (HsApp _ lhs _))   = looks_like s lhs
+         looks_like _ _                       = False
+
+         foreign_RDR = mkUnqual varName (fsLit "foreign")
+         default_RDR = mkUnqual varName (fsLit "default")
+         pattern_RDR = mkUnqual varName (fsLit "pattern")
     PsErrUnexpectedTypeInDecl{}                   -> noHints
     PsErrInvalidPackageName{}                     -> noHints
 

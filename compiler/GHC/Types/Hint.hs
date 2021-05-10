@@ -37,7 +37,11 @@ data GhcHint where
   SuggestAddWhitespaceAround :: GhcHint
   -- | Suggests using 'Type' from 'Data.Kind' instead of \"*\".
   SuggestUseDataKindType :: GhcHint
-
+  -- | Suggests the correct syntax for a type signature declaration
+  SuggestTypeSignatureDeclaration :: GhcHint
+  -- | Suggests adding the \"qualified\" keyword in the correct position
+  -- when importing a module qualified.
+  SuggestAddQualifiedAfterModuleName :: GhcHint
 
 instance Outputable GhcHint where
   ppr = \case
@@ -75,6 +79,10 @@ instance Outputable GhcHint where
     SuggestUseDataKindType
       -> text "Use" <+> quotes (text "Type")
            <+> text "from" <+> quotes (text "Data.Kind") <+> text "instead."
+    SuggestTypeSignatureDeclaration
+      -> text "Try using the form <variable> :: <type>"
+    SuggestAddQualifiedAfterModuleName
+      -> text "Suggested fix: place " <+> quotes (text "qualified") <+> text "after the module name."
 
 -- | An 'InstantiationSuggestion' for a '.hsig' file. This is generated
 -- by GHC in case of a 'DriverUnexpectedSignature' and suggests a way
