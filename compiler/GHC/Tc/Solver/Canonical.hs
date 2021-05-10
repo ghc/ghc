@@ -935,10 +935,22 @@ It's as if we treat (->) and (=>) as different type constructors.
 
 canEqNC :: CtEvidence -> EqRel -> Type -> Type -> TcS (StopOrContinue Ct)
 canEqNC ev eq_rel ty1 ty2
+ = do { (ty1', co1) <- rewrite_shallow ev ty1
+      ; (ty2', co2) <- rewrite_shallow ev ty2
+        -- TODO: We are dropping the "pretty" type here...  and the rewritten
+        -- flag now indicates "deeply rewritten"; after deeply rewriting we
+        -- shouldn't need to retry the common-structure cases, but later we
+        -- might depend on having zonked/rewritten deeply.
+      ; new_ev <- rewriteEqEvidence ev NotSwapped ty1' ty2' co1 co2
+      ; can_eq_nc False new_ev eq_rel ty1' ty1' ty2' ty2'
+      }
+
+{-
   = do { result <- zonk_eq_types ty1 ty2
        ; case result of
            Left (Pair ty1' ty2') -> can_eq_nc False ev eq_rel ty1' ty1 ty2' ty2
            Right ty              -> canEqReflexive ev eq_rel ty }
+-}
 
 can_eq_nc
    :: Bool            -- True => both types are rewritten
@@ -978,9 +990,10 @@ can_eq_nc' rewritten rdr_env envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
 -- See Note [Eager reflexivity check]
 -- Check only when rewritten because the zonk_eq_types check in canEqNC takes
 -- care of the non-rewritten case.
-can_eq_nc' True _rdr_env _envs ev ReprEq ty1 _ ty2 _
+-- TODO: not any more!
+can_eq_nc' True _rdr_env _envs ev eq_rel ty1 _ ty2 _
   | ty1 `tcEqType` ty2
-  = canEqReflexive ev ReprEq ty1
+  = canEqReflexive ev eq_rel ty1
 
 -- When working with ReprEq, unwrap newtypes.
 -- See Note [Unwrap newtypes first]
