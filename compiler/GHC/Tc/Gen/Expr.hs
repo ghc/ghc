@@ -431,11 +431,8 @@ tcExpr (HsStatic fvs expr) res_ty
         ; mapM_ checkClosedInStaticForm $ nonDetEltsUniqSet fvs
 
         -- Require the type of the argument to be Typeable.
-        -- The evidence is not used, but asking the constraint ensures that
-        -- the current implementation is as restrictive as future versions
-        -- of the StaticPointers extension.
         ; typeableClass <- tcLookupClass typeableClassName
-        ; _ <- emitWantedEvVar StaticOrigin $
+        ; typeable_ev <- emitWantedEvVar StaticOrigin $
                   mkTyConApp (classTyCon typeableClass)
                              [liftedTypeKind, expr_ty]
 
@@ -446,7 +443,7 @@ tcExpr (HsStatic fvs expr) res_ty
         -- Wrap the static form with the 'fromStaticPtr' call.
         ; fromStaticPtr <- newMethodFromName StaticOrigin fromStaticPtrName
                                              [p_ty]
-        ; let wrap = mkWpTyApps [expr_ty]
+        ; let wrap = mkWpEvVarApps [typeable_ev] <.> mkWpTyApps [expr_ty]
         ; loc <- getSrcSpanM
         ; return $ mkHsWrapCo co $ HsApp noComments
                             (L (noAnnSrcSpan loc) $ mkHsWrap wrap fromStaticPtr)

@@ -61,7 +61,7 @@ Version 9.4.1
 
 - Added ``GHC.Exts.sameArray#``, ``GHC.Exts.sameSmallArray#``,
   ``GHC.Exts.sameByteArray#`` and ``GHC.Exts.sameArrayArray#``: ::
- 
+
         sameArray# :: Array# a -> Array# a -> Int#
         sameSmallArray# :: SmallArray# a -> SmallArray# a -> Int#
         sameByteArray# :: ByteArray# -> ByteArray# -> Int#
@@ -74,3 +74,8 @@ Version 9.4.1
   for computing the ``Type`` of an ``HsExpr GhcTc`` in a pure fashion.
   The ``hsLitType`` and ``hsPatType`` functions that previously lived in
   ``GHC.Tc.Utils.Zonk`` have been moved to this module.
+- A `Typeable` constraint has been added to `fromStaticPtr` in the
+  class `GHC.StaticPtr.IsStatic`. GHC automatically wraps each use of
+  the `static` keyword with `fromStaticPtr`. Because `static` requires
+  its argument to be an instance of `Typeable`, `fromStaticPtr` can
+  safely carry this constraint as well.

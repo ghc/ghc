@@ -15,6 +15,8 @@
 
 ## 4.16.0.0 *TBA*
 
+  * Add a `Typeable` constraint to `fromStaticPtr` in the class `GHC.StaticPtr.IsStatic`.
+
   * Make it possible to promote `Natural`s and remove the separate `Nat` kind.
     For backwards compatibility, `Nat` is now a type synonym for `Natural`.
     As a consequence, one must enable `TypeSynonymInstances`
