@@ -1079,7 +1079,7 @@ data RuntimeRepInfo
   | VecCount Int         -- ^ A constructor of @VecCount@
   | VecElem PrimElemRep  -- ^ A constructor of @VecElem@
   | RuntimeInfo ([Type] -> [PrimInfo])
-  | CallingConvInfo ([Type] -> [PrimConv])
+  | CallingConv ([Type] -> [PrimConv])
 
 -- | Extract those 'DataCon's that we are able to learn about.  Note
 -- that visibility in this sense does not correspond to visibility in

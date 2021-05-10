@@ -1036,9 +1036,31 @@ unboxedTupleSumKind :: TyCon -> [Type] -> Kind
 unboxedTupleSumKind tc rr_tys
   = tYPE $ mkTyConApp runtimeInfoDataConTyCon [(mkTyConApp tc [mkPromotedListTy runtimeRepTy rr_tys]), convEvalDataConTy]
 
+take2 :: [a] -> [(a,a)]
+take2 xs = case xs of
+    (x:y:xs) -> (x,y) : take2 xs  
+    _        -> []
+
+interleave (a1:a1s) (a2:a2s) = a1:a2:interleave a1s a2s
+interleave _ _ = []
+
+unboxedTupleSumKindRI :: TyCon -> [Type] -> Kind
+unboxedTupleSumKindRI tc ri_tys
+  -- = pprPanic "here" (ppr ty)
+   =  ty
+  where 
+    ty = tYPE $ mkTyConApp runtimeInfoDataConTyCon [(mkTyConApp tc [mkPromotedListTy runtimeRepTy rr_tys]), convEvalDataConTy]
+    rr_tys = map (\(r,c) -> r) (take2 ri_tys)
+
+unboxedTupleSumKindRI tc []
+  = tYPE $ mkTyConApp runtimeInfoDataConTyCon [(mkTyConApp tc [mkPromotedListTy runtimeRepTy []]), convEvalDataConTy]
+
 -- | Specialization of 'unboxedTupleSumKind' for tuples
 unboxedTupleKind :: [Type] -> Kind
 unboxedTupleKind = unboxedTupleSumKind tupleRepDataConTyCon
+
+unboxedTupleKindRI :: [Type] -> Kind
+unboxedTupleKindRI = unboxedTupleSumKindRI tupleRepDataConTyCon
 
 mk_tuple :: Boxity -> Int -> (TyCon,DataCon)
 mk_tuple Boxed arity = (tycon, tuple_con)
@@ -1064,23 +1086,32 @@ mk_tuple Boxed arity = (tycon, tuple_con)
     tc_uniq = mkTupleTyConUnique   boxity arity
     dc_uniq = mkTupleDataConUnique boxity arity
 
-mk_tuple Unboxed arity = (tycon, tuple_con)
+mk_tuple Unboxed arity = case arity of
+  0 ->  (tycon, tuple_con)
+  n -> pprPanic "here" (ppr $ (typeKind . mkTyConTy) tycon)
+  -- n -> pprPanic "here" (ppr $ ri_tys)
+
   where
     tycon = mkTupleTyCon tc_name tc_binders tc_res_kind tc_arity tuple_con
                          UnboxedTuple flavour
 
     -- See Note [Unboxed tuple RuntimeRep vars] in GHC.Core.TyCon
     -- Kind:  forall (k1:RuntimeRep) (k2:RuntimeRep). TYPE k1 -> TYPE k2 -> #
-    tc_binders = mkTemplateTyConBinders (replicate arity runtimeInfoTy)
-                                        (\ks -> map tYPE ks)
+    -- ri = rInfo runtimeRepTy callingConvTy
+    -- tc_binders = mkTemplateTyConBinders ris (\ris -> map tYPE ris)
+    rep_ar = replicate arity
 
-    tc_res_kind = unboxedTupleKind rr_tys
+    tc_binders = mkTemplateTyConBinders (interleave (rep_ar runtimeRepTy)  (rep_ar callingConvTy))
+                    (\ris -> map (\(r,c) -> tYPE $ rInfo r c) (take2 ris))
 
-    tc_arity    = arity * 2
+    tc_res_kind = unboxedTupleKindRI ri_tys
+
+
+    tc_arity    = arity * 3
     flavour     = UnboxedAlgTyCon $ Just (mkPrelTyConRepName tc_name)
 
     dc_tvs               = binderVars tc_binders
-    (rr_tys, dc_arg_tys) = splitAt arity (mkTyVarTys dc_tvs)
+    (ri_tys, dc_arg_tys) = splitAt (arity * 2) (mkTyVarTys dc_tvs)
     tuple_con            = pcDataCon dc_name dc_tvs dc_arg_tys tycon
 
     boxity  = Unboxed
@@ -1451,7 +1482,7 @@ tupleRepDataCon = pcSpecialDataCon tupleRepDataConName [ mkListTy runtimeRepTy ]
   where
     -- See Note [Getting from RuntimeRep to PrimRep] in GHC.Types.RepType
     prim_rep_fun [rr_ty_list]
-      = [RInfo (concatMap (runtimeRepPrimRep doc) rr_tys) ConvEval]
+      = (concatMap (runtimeRepPrimRep doc) rr_tys)
       where
         rr_tys = extractPromotedList rr_ty_list
         doc    = text "tupleRepDataCon" <+> ppr rr_tys
@@ -1463,11 +1494,11 @@ tupleRepDataConTyCon = promoteDataCon tupleRepDataCon
 
 sumRepDataCon :: DataCon
 sumRepDataCon = pcSpecialDataCon sumRepDataConName [ mkListTy runtimeRepTy ]
-                                 runtimeRepTyCon (RuntimeInfo prim_rep_fun)
+                                 runtimeRepTyCon (RuntimeRep prim_rep_fun)
   where
     -- See Note [Getting from RuntimeRep to PrimRep] in GHC.Types.RepType
     prim_rep_fun [rr_ty_list]
-      = [RInfo (map slotPrimRep (ubxSumRepType prim_repss)) ConvEval]
+      = (map slotPrimRep (ubxSumRepType prim_repss))
       where
         rr_tys     = extractPromotedList rr_ty_list
         doc        = text "sumRepDataCon" <+> ppr rr_tys
@@ -1495,7 +1526,7 @@ runtimeRepSimpleDataCons@(liftedRepDataCon : _)
     runtimeRepSimpleDataConNames
   where
     mk_runtime_rep_dc primrep name
-      = pcSpecialDataCon name [] runtimeRepTyCon (RuntimeInfo (\_ -> [RInfo [primrep] ConvEval]))
+      = pcSpecialDataCon name [] runtimeRepTyCon (RuntimeRep (\_ -> [primrep]))
 
 -- See Note [Wiring in RuntimeRep]
 liftedRepDataConTy, unliftedRepDataConTy,
@@ -1581,7 +1612,7 @@ convEvalDataConName  = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "ConvEva
 -- convCallDataConName  = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "ConvCall") convCallDataConKey convCallDataCon
 convCallDataConName = undefined
 
-convEvalDataCon = pcSpecialDataCon convEvalDataConName [] callingConvTyCon (CallingConvInfo $ \_ -> [ConvEval])
+convEvalDataCon = pcSpecialDataCon convEvalDataConName [] callingConvTyCon (CallingConv $ \_ -> [ConvEval])
 
 convEvalDataConTyCon :: TyCon
 convEvalDataConTyCon = promoteDataCon convEvalDataCon
@@ -1619,8 +1650,7 @@ runtimeInfoDataCon = pcSpecialDataCon runtimeInfoDataConName [ runtimeRepTy
   where
     -- See Note [Getting from RuntimeRep to PrimRep] in GHC.Types.RepType
     prim_info_fun tys@[rep, conv]
-      = pprPanic "here runtimeInfoDataCon" (ppr tys)
-        -- [RInfo (runtimeRepPrimRep doc rep)  ConvEval]
+      = [RInfo (runtimeRepPrimRep doc rep)  ConvEval]
         where doc = text "runtimeInfoDataCon" <+> ppr tys
     prim_info_fun args
       = pprPanic "runtimeInfoDataCon" (ppr args)
