@@ -179,7 +179,7 @@ cprAnalProgram logger fam_envs binds = do
   let env            = emptyAnalEnv fam_envs
   let binds_plus_cpr = snd $ mapAccumL cprAnalTopBind env binds
   putDumpFileMaybe logger Opt_D_dump_cpr_signatures "Cpr signatures" FormatText $
-    dumpIdInfoOfProgram (ppr . cprSigInfo) binds_plus_cpr
+    dumpIdInfoOfProgram False (ppr . cprSigInfo) binds_plus_cpr
   -- See Note [Stamp out space leaks in demand analysis] in GHC.Core.Opt.DmdAnal
   seqBinds binds_plus_cpr `seq` return binds_plus_cpr
 

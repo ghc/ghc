@@ -656,6 +656,11 @@ containers package we have a merge function with this specialization:
 
 We give sc_s5lZ and sc_s5m0 a evaluated unfolding since they come out of
 strict field fields in the Bin constructor.
+This is especially important since tag inference can then use this
+information to adjust the calling convention of
+`$wmerge0_s4UK` to enforce arguments being passed fully evaluated+tagged.
+See Note [Tag Inference], Note [Strict Worker Ids] for more information on
+how we can take advantage of this.
 
 -----------------------------------------------------
                 Stuff not yet handled
@@ -1771,11 +1776,15 @@ spec_one env fn arg_bndrs body (call_pat, rule_number)
                   -- Annotate the variables with the strictness information from
                   -- the function (see Note [Strictness information in worker binders])
 
-              (spec_lam_args, spec_call_args) = mkWorkerArgs fn False
-                                                    spec_lam_args1
+              (spec_lam_args, spec_call_args,_) = mkWorkerArgs fn False
+                                                    spec_lam_args1 []
                                                     spec_body_ty
                 -- mkWorkerArgs: usual w/w hack to avoid generating
                 -- a spec_rhs of unlifted type and no args.
+                -- Unlike W/W we don't turn functions into strict workers
+                -- immediately here instead letting tidy handle this.
+                -- For this reason we can ignore the cbv marks.
+                -- See Note [Strict Worker Ids]. See Note [Tag Inference].
 
               spec_id    = mkLocalId spec_name Many
                                      (mkLamTypes spec_lam_args spec_body_ty)

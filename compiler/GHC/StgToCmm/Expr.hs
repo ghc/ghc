@@ -1,6 +1,7 @@
-{-# LANGUAGE BangPatterns #-}
-
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -----------------------------------------------------------------------------
 --
@@ -25,6 +26,7 @@ import GHC.StgToCmm.Layout
 import GHC.StgToCmm.Lit
 import GHC.StgToCmm.Prim
 import GHC.StgToCmm.Hpc
+import GHC.StgToCmm.TagCheck
 import GHC.StgToCmm.Ticky
 import GHC.StgToCmm.Utils
 import GHC.StgToCmm.Closure
@@ -36,6 +38,7 @@ import GHC.Cmm.BlockId
 import GHC.Cmm hiding ( succ )
 import GHC.Cmm.Info
 import GHC.Cmm.Utils ( zeroExpr, cmmTagMask, mkWordCLit, mAX_PTR_TAG )
+import GHC.Cmm.Ppr
 import GHC.Core
 import GHC.Core.DataCon
 import GHC.Types.ForeignCall
@@ -56,6 +59,7 @@ import GHC.Utils.Panic.Plain
 import Control.Monad ( unless, void )
 import Control.Arrow ( first )
 import Data.List     ( partition )
+import GHC.Stg.InferTags.TagSig (isTaggedSig)
 
 ------------------------------------------------------------------------
 --              cgExpr: the main function
@@ -291,7 +295,7 @@ We adopt (b) because that is more likely to put the heap check at the
 entry to a function, when not many things are live.  After a bunch of
 single-branch cases, we may have lots of things live
 
-Hence: two basic plans for
+Hence: Two basic plans for
 
         case e of r { alts }
 
@@ -305,6 +309,13 @@ Hence: two basic plans for
         ...restore current cost centre...
         ...code for alts...
         ...alts do their own heap checks
+
+   When using GcInAlts the return point for heap checks and evaluating
+   the scrutinee is shared. This does mean we might execute the actual
+   branching code twice but it's rare enough to not matter.
+   The huge advantage of this pattern is that we do not require multiple
+   info tables for returning from gc as they can be shared between all
+   cases. Reducing code size nicely.
 
 ------ Plan B: special case when ---------
   (i)  e does not allocate or call GC
@@ -320,6 +331,80 @@ Hence: two basic plans for
 
         ...code for alts...
         ...no heap check...
+
+   There is a variant B.2 which we use if:
+
+  (i)   e is already evaluated+tagged
+  (ii)  We have multiple alternatives
+  (iii) and there is no upstream allocation.
+
+  Here we also place one heap check before the `case` which
+  branches on `e`. Hopefully to be absorbed by an already existing
+  heap check further up. However the big difference in this case is that
+  there is no code for e. So we are not guaranteed that the heap
+  checks of the alts will be combined with an heap check further up.
+
+  Very common example: Casing on strict fields.
+
+        ...heap check...
+        ...assign bindings...
+
+        ...code for alts...
+        ...no heap check...
+
+  -- Reasoning for Plan B.2:
+   Since the scrutinee is already evaluated there is no evaluation
+   call which would force a info table that we can use as a shared
+   return point.
+   This means currently if we were to do GcInAlts like in Plan A then
+   we would end up with one info table per alternative.
+
+   To avoid this we unconditionally do gc outside of the alts with all
+   the pros and cons described in Note [Compiling case expressions].
+   Rewriting the logic to generate a shared return point before the case
+   expression while keeping the heap checks in the alternatives would be
+   possible. But it's unclear to me that this would actually be an improvement.
+
+   This means if we have code along these lines:
+
+      g x y = case x of
+         True -> Left $ (y + 1,y,y-1)
+         False -> Right $! y - (2 :: Int)
+
+   We get these potential heap check placements:
+
+   f = ...
+      !max(L,R)!; -- Might be absorbed upstream.
+      case x of
+         True  -> !L!; ...L...
+         False -> !R!; ...R...
+
+   And we place a heap check at !max(L,R)!
+
+   The downsides of using !max(L,R)! are:
+
+   * If f is recursive, and the hot loop wouldn't allocate, but the exit branch does then we do
+   a redundant heap check.
+   * We use one more instruction to de-allocate the unused heap in the branch using less heap. (Neglible)
+   * A small risk of running gc slightly more often than needed especially if one branch allocates a lot.
+
+   The upsides are:
+   * May save a heap overflow test if there is an upstream check already.
+   * If the heap check is absorbed upstream we can also eliminate its info table.
+   * We generate at most one heap check (versus one per alt otherwise).
+   * No need to save volatile vars etc across heap checks in !L!, !R!
+   * We can use relative addressing from a single Hp to get at all the closures so allocated. (seems neglible)
+   * It fits neatly in the logic we already have for handling A/B
+
+   For containers:Data/Sequence/Internal/Sorting.o the difference is
+   about 10% in terms of code size compared to using Plan A for this case.
+   The main downside is we might put heap checks into loops, even if we
+   could avoid it (See Note [Compiling case expressions]).
+
+   Potential improvement: Investigate if heap checks in alts would be an
+   improvement if we generate and use a shared return point that is placed
+   in the common path for all alts.
+
 -}
 
 
@@ -461,11 +546,13 @@ cgCase scrut bndr alt_type alts
        ; up_hp_usg <- getVirtHp        -- Upstream heap usage
        ; let ret_bndrs = chooseReturnBndrs bndr alt_type alts
              alt_regs  = map (idToReg platform) ret_bndrs
+
        ; simple_scrut <- isSimpleScrut scrut alt_type
        ; let do_gc  | is_cmp_op scrut  = False  -- See Note [GC for conditionals]
                     | not simple_scrut = True
                     | isSingleton alts = False
                     | up_hp_usg > 0    = False
+                    | evaluatedScrut   = False
                     | otherwise        = True
                -- cf Note [Compiling case expressions]
              gc_plan = if do_gc then GcInAlts alt_regs else NoGcInAlts
@@ -481,6 +568,13 @@ cgCase scrut bndr alt_type alts
   where
     is_cmp_op (StgOpApp (StgPrimOp op) _ _) = isComparisonPrimOp op
     is_cmp_op _                             = False
+    evaluatedScrut
+      | (StgApp v []) <- scrut
+      , Just sig <- idTagSig_maybe v
+      , isTaggedSig sig = True
+      | otherwise = False
+
+
 
 {- Note [GC for conditionals]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -530,10 +624,13 @@ isSimpleScrut :: CgStgExpr -> AltType -> FCode Bool
 -- heap usage from alternatives into the stuff before the case
 -- NB: if you get this wrong, and claim that the expression doesn't allocate
 --     when it does, you'll deeply mess up allocation
-isSimpleScrut (StgOpApp op args _) _       = isSimpleOp op args
-isSimpleScrut (StgLit _)       _           = return True       -- case 1# of { 0# -> ..; ... }
-isSimpleScrut (StgApp _ [])    (PrimAlt _) = return True       -- case x# of { 0# -> ..; ... }
-isSimpleScrut _                _           = return False
+isSimpleScrut (StgOpApp op args _) _         = isSimpleOp op args
+isSimpleScrut (StgLit _)           _         = return True       -- case 1# of { 0# -> ..; ... }
+isSimpleScrut (StgApp _ [])    (PrimAlt _)   = return True       -- case x# of { 0# -> ..; ... }
+isSimpleScrut (StgApp f [])   _
+  | Just sig <- idTagSig_maybe f
+  = return $! isTaggedSig sig       -- case !x of { ... }
+isSimpleScrut _                    _         = return False
 
 isSimpleOp :: StgOp -> [StgArg] -> FCode Bool
 -- True iff the op cannot block or allocate
@@ -890,6 +987,7 @@ cgConApp con mn stg_args
 
 cgIdApp :: Id -> [StgArg] -> FCode ReturnKind
 cgIdApp fun_id args = do
+    platform       <- getPlatform
     fun_info       <- getCgIdInfo fun_id
     cfg            <- getStgToCmmConfig
     self_loop      <- getSelfLoop
@@ -904,8 +1002,26 @@ cgIdApp fun_id args = do
             -- A value in WHNF, so we can just return it.
         ReturnIt
           | isZeroBitTy (idType fun_id) -> emitReturn []
-          | otherwise                   -> emitReturn [fun]
-          -- ToDo: does ReturnIt guarantee tagged?
+          | otherwise                -> emitReturn [fun]
+
+        -- A value infered to be in WHNF, so we can just return it.
+        InferedReturnIt
+          | isZeroBitTy (idType fun_id) -> trace >> emitReturn []
+          | otherwise                   -> trace >> assertTag >>
+                                                    emitReturn [fun]
+            where
+              trace = do
+                tickyTagged
+                use_id <- newUnique
+                _lbl <- emitTickyCounterTag use_id (NonVoid fun_id)
+                tickyTagSkip use_id fun_id
+
+                -- pprTraceM "WHNF:" (ppr fun_id <+> ppr args )
+              assertTag = whenCheckTags $ do
+                  mod <- getModuleName
+                  emitTagAssertion (showPprUnsafe
+                      (text "TagCheck failed on entry in" <+> ppr mod <+> text "- value:" <> ppr fun_id <+> pprExpr platform fun))
+                      fun
 
         EnterIt -> assert (null args) $  -- Discarding arguments
                    emitEnter fun

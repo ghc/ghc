@@ -1618,6 +1618,7 @@ tcIfaceDataAlt mult con inst_tys arg_strs rhs
 
 tcIdDetails :: Type -> IfaceIdDetails -> IfL IdDetails
 tcIdDetails _  IfVanillaId = return VanillaId
+tcIdDetails _  (IfStrictWorkerId dmds) = return $ StrictWorkerId dmds
 tcIdDetails ty IfDFunId
   = return (DFunId (isNewTyCon (classTyCon cls)))
   where
@@ -1664,6 +1665,9 @@ tcIdInfo ignore_prags toplvl name ty info = do
     tcPrag info (HsLFInfo lf_info) = do
       lf_info <- tcLFInfo lf_info
       return (info `setLFInfo` lf_info)
+
+    tcPrag info (HsTagSig sig) = do
+      return (info `setTagSig` sig)
 
         -- The next two are lazy, so they don't transitively suck stuff in
     tcPrag info (HsUnfold lb if_unf)

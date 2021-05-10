@@ -30,6 +30,7 @@ import GHC.Core.DataCon
 
 import GHC.Stg.Syntax
 import GHC.Stg.Debug
+import GHC.Stg.Utils
 
 import GHC.Types.RepType
 import GHC.Types.Id.Make ( coercionTokenId )

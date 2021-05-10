@@ -246,6 +246,8 @@ import GHC.Driver.GenerateCgIPEStub (generateCgIPEStub)
 import Data.List.NonEmpty (NonEmpty ((:|)))
 
 
+import GHC.Stg.InferTags
+
 {- **********************************************************************
 %*                                                                      *
                 Initialisation
@@ -1801,7 +1803,15 @@ doCodeGen hsc_env this_mod denv data_tycons
         tmpfs      = hsc_tmpfs  hsc_env
         platform   = targetPlatform dflags
 
-    putDumpFileMaybe logger Opt_D_dump_stg_final "Final STG:" FormatSTG (pprGenStgTopBindings (initStgPprOpts dflags) stg_binds_w_fvs)
+    putDumpFileMaybe logger Opt_D_dump_stg_cg "CodeGenInput STG:" FormatSTG
+        (pprGenStgTopBindings (initStgPprOpts dflags) stg_binds_w_fvs)
+
+    -- Do tag inference on optimized STG
+    (!stg_post_infer,export_tag_info) <-
+        {-# SCC "StgTagFields" #-} inferTags dflags logger this_mod stg_binds_w_fvs
+
+    putDumpFileMaybe logger Opt_D_dump_stg_final "Final STG:" FormatSTG
+        (pprGenStgTopBindings (initStgPprOpts dflags) stg_post_infer)
 
     let stg_to_cmm dflags mod = case stgToCmmHook hooks of
                         Nothing -> StgToCmm.codeGen logger tmpfs (initStgToCmmConfig dflags mod)
@@ -1809,8 +1819,8 @@ doCodeGen hsc_env this_mod denv data_tycons
 
     let cmm_stream :: Stream IO CmmGroup ModuleLFInfos
         -- See Note [Forcing of stg_binds]
-        cmm_stream = stg_binds_w_fvs `seqList` {-# SCC "StgToCmm" #-}
-            stg_to_cmm dflags this_mod denv data_tycons cost_centre_info stg_binds_w_fvs hpc_info
+        cmm_stream = stg_post_infer `seqList` {-# SCC "StgToCmm" #-}
+            stg_to_cmm dflags this_mod denv data_tycons cost_centre_info stg_post_infer hpc_info
 
         -- codegen consumes a stream of CmmGroup, and produces a new
         -- stream of CmmGroup (not necessarily synchronised: one
@@ -1839,7 +1849,7 @@ doCodeGen hsc_env this_mod denv data_tycons
             putDumpFileMaybe logger Opt_D_dump_cmm "Output Cmm" FormatCMM (pdoc platform a)
           return a
 
-    return $ Stream.mapM dump2 $ generateCgIPEStub hsc_env this_mod denv pipeline_stream
+    return $ Stream.mapM dump2 $ generateCgIPEStub hsc_env this_mod denv export_tag_info pipeline_stream
 
 myCoreToStgExpr :: Logger -> DynFlags -> InteractiveContext
                 -> Bool

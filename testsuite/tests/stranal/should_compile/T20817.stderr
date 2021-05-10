@@ -237,7 +237,7 @@ $wg [InlPrag=[2],
      Dmd=LCL(C1(C1(C1(C1(C1(C1(!L)))))))]
   :: forall {a} {b} {c} {d} {e} {t} {t} {t}.
      Bool -> a -> b -> c -> t -> t -> t -> (# a, b, c, t, t, t #)
-[LclId,
+[LclId[StrictWorker([!, ~, ~, ~, ~, ~, ~])],
  Arity=7,
  Str=<1L><L><L><L><L><L><L>,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
@@ -252,7 +252,9 @@ $wg
       (@t)
       (@t)
       (@t)
-      (ds [Dmd=1L] :: Bool)
+      (ds [Dmd=1L]
+         :: Bool
+         Unf=OtherCon [])
       (ww :: a)
       (ww :: b)
       (ww :: c)

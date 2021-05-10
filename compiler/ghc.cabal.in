@@ -546,10 +546,15 @@ Library
         GHC.Stg.Lift.Config
         GHC.Stg.Lift.Monad
         GHC.Stg.Lint
+        GHC.Stg.InferTags
+        GHC.Stg.InferTags.Rewrite
+        GHC.Stg.InferTags.TagSig
+        GHC.Stg.InferTags.Types
         GHC.Stg.Pipeline
         GHC.Stg.Stats
         GHC.Stg.Subst
         GHC.Stg.Syntax
+        GHC.Stg.Utils
         GHC.StgToByteCode
         GHC.StgToCmm
         GHC.StgToCmm.ArgRep
@@ -570,6 +575,7 @@ Library
         GHC.StgToCmm.Prim
         GHC.StgToCmm.Prof
         GHC.StgToCmm.Sequel
+        GHC.StgToCmm.TagCheck
         GHC.StgToCmm.Ticky
         GHC.StgToCmm.Types
         GHC.StgToCmm.Utils

@@ -45,10 +45,10 @@ T16859.$tcName:
 T16859.$tcNameSort:
 T16859.$trModule:
 T16859.bar: <1!A><L>
-T16859.baz: <1L><1!L><1C1(L)>
+T16859.baz: <L><1!L><1C1(L)>
 T16859.buz: <1!L>
-T16859.foo: <1L><L>
-T16859.mkInternalName: <1!L><1L><1L>
+T16859.foo: <L><L>
+T16859.mkInternalName: <1!L><L><L>
 T16859.n_loc: <1!P(A,A,A,1L)>
 T16859.n_occ: <1!P(A,1!L,A,A)>
 T16859.n_sort: <1!P(1L,A,A,A)>

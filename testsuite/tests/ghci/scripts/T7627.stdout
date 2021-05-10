@@ -27,13 +27,13 @@ instance (Semigroup a, Semigroup b) => Semigroup (a, b)
 instance Foldable ((,) a) -- Defined in ‘Data.Foldable’
 instance (Bounded a, Bounded b) => Bounded (a, b)
   -- Defined in ‘GHC.Enum’
-instance (Eq a, Eq b) => Eq (a, b) -- Defined in ‘GHC.Classes’
-instance (Ord a, Ord b) => Ord (a, b) -- Defined in ‘GHC.Classes’
 instance (Read a, Read b) => Read (a, b) -- Defined in ‘GHC.Read’
-instance (Show a, Show b) => Show (a, b) -- Defined in ‘GHC.Show’
 instance Monoid a => Applicative ((,) a) -- Defined in ‘GHC.Base’
 instance Functor ((,) a) -- Defined in ‘GHC.Base’
 instance Monoid a => Monad ((,) a) -- Defined in ‘GHC.Base’
+instance (Eq a, Eq b) => Eq (a, b) -- Defined in ‘GHC.Classes’
+instance (Ord a, Ord b) => Ord (a, b) -- Defined in ‘GHC.Classes’
+instance (Show a, Show b) => Show (a, b) -- Defined in ‘GHC.Show’
 type (#,#) :: *
               -> *
               -> TYPE

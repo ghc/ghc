@@ -1,4 +1,4 @@
-Found 286 GHC.Parser module dependencies
+Found 287 GHC.Parser module dependencies
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
 GHC.Builtin.PrimOps.Ids
@@ -160,6 +160,7 @@ GHC.Runtime.Interpreter.Types
 GHC.Settings
 GHC.Settings.Config
 GHC.Settings.Constants
+GHC.Stg.InferTags.TagSig
 GHC.Stg.Syntax
 GHC.StgToCmm.Config
 GHC.StgToCmm.Types

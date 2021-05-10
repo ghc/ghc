@@ -6,6 +6,8 @@ import GHC.Utils.Outputable
 
 data TcLclEnv
 
+data SelfBootInfo
+
 data TcIdSigInfo
 instance Outputable TcIdSigInfo
 

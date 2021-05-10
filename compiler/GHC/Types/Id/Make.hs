@@ -491,6 +491,10 @@ mkDictSelId name clas
 
          | otherwise
          = base_info `setRuleInfo` mkRuleInfo [rule]
+                     `setInlinePragInfo` neverInlinePragma
+                     `setUnfoldingInfo`  mkInlineUnfoldingWithArity 1
+                                           defaultSimpleOpts
+                                           (mkDictSelRhs clas val_index)
                    -- Add a magic BuiltinRule, but no unfolding
                    -- so that the rule is always available to fire.
                    -- See Note [ClassOp/DFun selection] in GHC.Tc.TyCl.Instance

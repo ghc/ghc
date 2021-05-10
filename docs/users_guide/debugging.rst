@@ -457,6 +457,19 @@ These flags dump various phases of GHC's STG pipeline.
 
     Show the output of the unarise pass.
 
+.. ghc-flag:: -ddump-stg-cg
+    :shortdesc: Show output after Stg2Stg
+    :type: dynamic
+
+    Show the output of the STG after Stg2Stg. This is the result after
+    applying the Stg2Stg optimization passes.
+
+.. ghc-flag:: -ddump-stg-tags
+    :shortdesc: Show output of the tag inference pass.
+    :type: dynamic
+
+    Show the output of the tag inference pass.
+
 .. ghc-flag:: -ddump-stg-final
     :shortdesc: Show output of last STG pass.
     :type: dynamic
@@ -1060,3 +1073,13 @@ Other
     is useful when debugging because it gives smaller modules and dumps, but the
     compiler will panic if you try to use Typeable instances of things that you
     built with this flag.
+
+.. ghc-flag:: -dtag-inference-checks
+    :shortdesc: Affirm tag inference results are correct at runtime.
+    :type: dynamic
+
+    When tag inference tells as a specific value is supposed to be tagged then
+    generate code to check this at runtime. If the check fails the program will
+    be terminated. This helps narrowing down if an issue is due to tag inference
+    if things go wrong. Which would otherwise be quite difficult.
+

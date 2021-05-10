@@ -12,7 +12,8 @@ module GHC.StgToCmm.Utils (
         emitDataLits, emitRODataLits,
         emitDataCon,
         emitRtsCall, emitRtsCallWithResult, emitRtsCallGen,
-        assignTemp,
+        emitBarf,
+        assignTemp, newTemp,
 
         newUnboxedTupleRegs,
 
@@ -50,7 +51,7 @@ import GHC.Prelude
 import GHC.Platform
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Closure
-import GHC.StgToCmm.Lit (mkSimpleLit)
+import GHC.StgToCmm.Lit (mkSimpleLit, newStringCLit)
 import GHC.Cmm
 import GHC.Cmm.BlockId
 import GHC.Cmm.Graph as CmmGraph
@@ -156,6 +157,11 @@ tagToClosure platform tycon tag
 --      Conditionals and rts calls
 --
 -------------------------------------------------------------------------
+
+emitBarf :: String -> FCode ()
+emitBarf msg = do
+  strLbl <- newStringCLit msg
+  emitRtsCall rtsUnitId (fsLit "barf") [(CmmLit strLbl,AddrHint)] False
 
 emitRtsCall :: UnitId -> FastString -> [(CmmExpr,ForeignHint)] -> Bool -> FCode ()
 emitRtsCall pkg fun = emitRtsCallGen [] (mkCmmCodeLabel pkg fun)
@@ -298,8 +304,6 @@ newUnboxedTupleRegs res_ty
     reps = typePrimRep res_ty
     choose_regs _ (AssignTo regs _) = return regs
     choose_regs platform _          = mapM (newTemp . primRepCmmType platform) reps
-
-
 
 -------------------------------------------------------------------------
 --      emitMultiAssign

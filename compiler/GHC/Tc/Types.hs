@@ -50,7 +50,7 @@ module GHC.Tc.Types(
         PromotionErr(..),
         IdBindingInfo(..), ClosedTypeId, RhsNames,
         IsGroupClosed(..),
-        SelfBootInfo(..),
+        SelfBootInfo(..), bootExports,
         tcTyThingCategory, pprTcTyThingCategory,
         peCategory, pprPECategory,
         CompleteMatch, CompleteMatches,
@@ -695,6 +695,15 @@ data SelfBootInfo
        , sb_tcs :: NameSet }    -- defining these TyCons,
 -- What is sb_tcs used for?  See Note [Extra dependencies from .hs-boot files]
 -- in GHC.Rename.Module
+
+bootExports :: SelfBootInfo -> NameSet
+bootExports boot =
+  case boot of
+    NoSelfBoot -> emptyNameSet
+    SelfBoot { sb_mds = mds} ->
+      let exports = md_exports mds
+      in availsToNameSet exports
+
 
 
 {- Note [Tracking unused binding and imports]

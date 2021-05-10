@@ -11,7 +11,7 @@ lvl = GHC.Types.I# 28#
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 lvl1 :: Int
 [GblId, Unf=OtherCon []]
-lvl1 = GHC.Types.I# 6#
+lvl1 = GHC.Types.I# 8#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 lvl2 :: Int
@@ -113,9 +113,15 @@ Rec {
 -- RHS size: {terms: 44, types: 41, coercions: 21, joins: 0/0}
 T20103.$wfoo [InlPrag=[2], Occ=LoopBreaker]
   :: HasCallStack => GHC.Prim.Int# -> GHC.Prim.Int#
-[GblId, Arity=2, Str=<SL><1L>, Unf=OtherCon []]
+[GblId[StrictWorker([!, ~])],
+ Arity=2,
+ Str=<1L><1L>,
+ Unf=OtherCon []]
 T20103.$wfoo
-  = \ ($dIP :: HasCallStack) (ww :: GHC.Prim.Int#) ->
+  = \ ($dIP
+         :: HasCallStack
+         Unf=OtherCon [])
+      (ww :: GHC.Prim.Int#) ->
       case ww of ds {
         __DEFAULT ->
           case $dIP

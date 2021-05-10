@@ -1466,7 +1466,7 @@ finaliseArgBoxities env fn arity rhs
 
     go_arg :: Budgets -> (Type,StrictnessMark,Demand) -> (Budgets, Demand)
     go_arg bg@(MkB bg_top bg_inner) (ty, str_mark, dmd@(n :* _))
-      = case wantToUnboxArg fam_envs ty dmd of
+      = case wantToUnboxArg False fam_envs ty dmd of
           DropAbsent   -> (bg,                      dmd)
           StopUnboxing -> (MkB (bg_top-1) bg_inner, trimBoxity dmd)
 
@@ -1487,6 +1487,7 @@ finaliseArgBoxities env fn arity rhs
                   = (bg_inner', dmd')
                   | otherwise
                   = (bg_inner, trimBoxity dmd)
+          Unlift -> panic "No unlifting in DmdAnal"
 
     add_demands :: [Demand] -> CoreExpr -> CoreExpr
     -- Attach the demands to the outer lambdas of this expression
@@ -1509,7 +1510,7 @@ finaliseLetBoxity env ty dmd
   = go ty NotMarkedStrict dmd
   where
     go ty mark dmd@(n :* _) =
-      case wantToUnboxArg env ty dmd of
+      case wantToUnboxArg False env ty dmd of
         DropAbsent   -> dmd
         StopUnboxing -> trimBoxity dmd
         Unbox DataConPatContext{dcpc_dc=dc, dcpc_tc_args=tc_args} dmds
@@ -1520,6 +1521,7 @@ finaliseLetBoxity env ty dmd
           -> n :* (mkProd Unboxed $! dmds')
           | otherwise
           -> trimBoxity dmd
+        Unlift -> panic "No unlifting in DmdAnal"
 
 
 {- *********************************************************************

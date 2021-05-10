@@ -47,6 +47,7 @@ module GHC.Stg.FVs (
 import GHC.Prelude hiding (mod)
 
 import GHC.Stg.Syntax
+import GHC.Stg.Utils (bindersOf)
 import GHC.Types.Id
 import GHC.Types.Name (Name, nameIsLocalOrFrom)
 import GHC.Types.Tickish ( GenTickish(Breakpoint) )

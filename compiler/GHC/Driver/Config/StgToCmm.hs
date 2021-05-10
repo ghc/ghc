@@ -43,6 +43,7 @@ initStgToCmmConfig dflags mod = StgToCmmConfig
   , stgToCmmPIE           = gopt Opt_PIE                   dflags
   , stgToCmmExtDynRefs    = gopt Opt_ExternalDynamicRefs   dflags
   , stgToCmmDoBoundsCheck = gopt Opt_DoBoundsChecking      dflags
+  , stgToCmmDoTagCheck    = gopt Opt_DoTagInferenceChecks  dflags
   -- backend flags
   , stgToCmmAllowBigArith             = not ncg
   , stgToCmmAllowQuotRemInstr         = ncg  && (x86ish || ppc)

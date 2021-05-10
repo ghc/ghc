@@ -387,8 +387,10 @@ pprRuleBase rules = pprUFM rules $ \rss ->
 -- successful.
 lookupRule :: RuleOpts -> InScopeEnv
            -> (Activation -> Bool)      -- When rule is active
-           -> Id -> [CoreExpr]
-           -> [CoreRule] -> Maybe (CoreRule, CoreExpr)
+           -> Id -- Function head
+           -> [CoreExpr] -- Args
+           -> [CoreRule] -- Rules
+           -> Maybe (CoreRule, CoreExpr)
 
 -- See Note [Extra args in the target]
 -- See comments on matchRule

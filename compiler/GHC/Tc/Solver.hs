@@ -677,7 +677,7 @@ type-class or type defined in N.
 Secondly, when should these heuristics be enforced? We enforced them when the
 type-class method call site is in a module marked `-XSafe` or `-XTrustworthy`.
 This allows `-XUnsafe` modules to operate without restriction, and for Safe
-Haskell inferrence to infer modules with unsafe overlaps as unsafe.
+Haskell inference to infer modules with unsafe overlaps as unsafe.
 
 One alternative design would be to also consider if an instance was imported as
 a `safe` import or not and only apply the restriction to instances imported
@@ -745,7 +745,7 @@ How is this implemented? It's complicated! So we'll step through it all:
       IORefs called `tcg_safe_infer` and `tcg_safe_infer_reason`.
 
  7) `GHC.Driver.Main.tcRnModule'` -- Reads `tcg_safe_infer` after type-checking, calling
-    `GHC.Driver.Main.markUnsafeInfer` (passing the reason along) when safe-inferrence
+    `GHC.Driver.Main.markUnsafeInfer` (passing the reason along) when safe-inference
     failed.
 
 Note [No defaulting in the ambiguity check]

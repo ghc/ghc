@@ -71,6 +71,8 @@ cmmGlobalLiveness platform graph =
     analyzeCmmBwd liveLattice (xferLive platform) graph mapEmpty
 
 -- | On entry to the procedure, there had better not be any LocalReg's live-in.
+-- If you see this error it most likely means you are trying to use a variable
+-- without it being defined in the given scope.
 noLiveOnEntry :: BlockId -> CmmLive LocalReg -> a -> a
 noLiveOnEntry bid in_fact x =
   if nullRegSet in_fact then x

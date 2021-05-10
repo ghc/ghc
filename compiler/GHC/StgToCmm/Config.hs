@@ -52,6 +52,7 @@ data StgToCmmConfig = StgToCmmConfig
                                                  -- code for linking against dynamic libraries
   , stgToCmmDoBoundsCheck  :: !Bool              -- ^ decides whether to check array bounds in StgToCmm.Prim
                                                  -- or not
+  , stgToCmmDoTagCheck     :: !Bool              -- ^ Verify tag inference predictions.
   ------------------------------ Backend Flags ----------------------------------
   , stgToCmmAllowBigArith             :: !Bool   -- ^ Allowed to emit larger than native size arithmetic (only LLVM and C backends)
   , stgToCmmAllowQuotRemInstr         :: !Bool   -- ^ Allowed to generate QuotRem instructions

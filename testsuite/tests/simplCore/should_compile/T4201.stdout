@@ -1,4 +1,4 @@
   lift :: Foo -> T
-  [HasNoCafRefs, LambdaFormInfo: LFReEntrant 1, Arity: 1,
-   Strictness: <1!A>, CPR: 1,
+  [HasNoCafRefs, TagSig: <TagProper>, LambdaFormInfo: LFReEntrant 1,
+   Arity: 1, Strictness: <1!A>, CPR: 1,
    Unfolding: (bof `cast` (Sym (N:Foo[0]) %<'Many>_N ->_R <T>_R))]

@@ -64,6 +64,15 @@ the code generator as well as the RTS because:
 
   * someone else might know how to repair it!
 
+
+Note [Ticky counters are static]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Currently GHC only supports static ticky events. That is -ticky emits
+code containing labels containing counters which then get bumped at runtime.
+
+There are currently only *static* ticky counters. Either we bump one of the
+static counters included in the RTS. Or we emit StgEntCounter structures in
+the object code and bump these.
 -}
 
 module GHC.StgToCmm.Ticky (
@@ -72,6 +81,7 @@ module GHC.StgToCmm.Ticky (
   withNewTickyCounterThunk,
   withNewTickyCounterStdThunk,
   withNewTickyCounterCon,
+  emitTickyCounterTag,
 
   tickyDynAlloc,
   tickyAllocHeap,
@@ -97,7 +107,10 @@ module GHC.StgToCmm.Ticky (
   tickyUnboxedTupleReturn,
   tickyReturnOldCon, tickyReturnNewCon,
 
-  tickySlowCall
+  tickyKnownCallTooFewArgs, tickyKnownCallExact, tickyKnownCallExtraArgs,
+  tickySlowCall, tickySlowCallPat,
+
+  tickyTagged, tickyUntagged, tickyTagSkip
   ) where
 
 import GHC.Prelude
@@ -260,6 +273,93 @@ emitTickyCounter cloType name args
             ]
         }
 
+{- Note [TagSkip ticky counters]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+These counters keep track how often we execute code where we
+would have performed a tag check if we hadn't run tag inference.
+
+If we have some code of the form:
+    case v[tagged] of ...
+and we want to record how often we avoid a tag check on v
+through tag inference we have to emit a new StgEntCounter for
+each such case statement in order to record how often it's executed.
+
+In theory we could emit one per *binding*. But then we
+would have to either keep track of the bindings which
+already have a StgEntCounter associated with them in the
+code gen state or preallocate such a structure for each binding
+in the code unconditionally (since ticky-code can call non-ticky code)
+
+The first makes the compiler slower, even when ticky is not
+used (a big no no). The later is fairly complex but increases code size
+unconditionally. See also Note [Ticky counters are static].
+
+So instead we emit a new StgEntCounter for each use site of a binding
+where we infered a tag to be present. And increment the counter whenever
+this use site is executed.
+
+We use the fields as follows:
+
+entry_count: Entries avoided.
+str:       : Name of the id.
+
+We use emitTickyCounterTag to emit the counter.
+
+Unlike the closure counters each *use* site of v has it's own
+counter. So there is no need to keep track of the closure/case we are
+in.
+
+We also have to pass a unique for the counter. An Id might be
+scrutinized in more than one place, so the ID alone isn't enough
+to distinguish between use sites.
+-}
+
+emitTickyCounterTag :: Unique -> NonVoid Id -> FCode CLabel
+emitTickyCounterTag unique (NonVoid id) =
+  let name = idName id
+      ctr_lbl = mkTagHitLabel name unique in
+    (>> return ctr_lbl) $
+    ifTicky $ do
+        { platform <- getPlatform
+        ; parent <- getTickyCtrLabel
+        ; mod_name <- getModuleName
+
+          -- When printing the name of a thing in a ticky file, we
+          -- want to give the module name even for *local* things.  We
+          -- print just "x (M)" rather that "M.x" to distinguish them
+          -- from the global kind.
+        ; let ppr_for_ticky_name :: SDoc
+              ppr_for_ticky_name =
+                let n = ppr name
+                    ext = empty -- parens (text "tagged")
+                    p = case hasHaskellName parent of
+                            -- NB the default "top" ticky ctr does not
+                            -- have a Haskell name
+                          Just pname -> text "at" <+> ppr (nameSrcLoc pname) <+>
+                                          text "in" <+> pprNameUnqualified name
+                          _ -> empty
+                in if isInternalName name
+                   then n <+> parens (ppr mod_name) <+> ext <+> p
+                   else n <+> ext <+> p
+        ; sdoc_context <- stgToCmmContext <$> getStgToCmmConfig
+        ; fun_descr_lit <- newStringCLit $ renderWithContext sdoc_context ppr_for_ticky_name
+        ; arg_descr_lit <- newStringCLit $ "infer"
+        ; emitDataLits ctr_lbl
+        -- Must match layout of includes/rts/Ticky.h's StgEntCounter
+        --
+        -- krc: note that all the fields are I32 now; some were I16
+        -- before, but the code generator wasn't handling that
+        -- properly and it led to chaos, panic and disorder.
+            [ mkIntCLit platform 0,               -- registered?
+              mkIntCLit platform 0,   -- Arity
+              mkIntCLit platform 0,               -- Heap allocated for this thing
+              fun_descr_lit,
+              arg_descr_lit,
+              zeroCLit platform,          -- Entries into this thing
+              zeroCLit platform,          -- Heap allocated by this thing
+              zeroCLit platform           -- Link to next StgEntCounter
+            ]
+        }
 -- -----------------------------------------------------------------------------
 -- Ticky stack frames
 
@@ -560,6 +660,27 @@ tickyStackCheck :: FCode ()
 tickyStackCheck = ifTicky $ bumpTickyCounter (fsLit "STK_CHK_ctr")
 
 -- -----------------------------------------------------------------------------
+-- Ticky for tag inference characterisation
+
+-- | Predicted a pointer would be tagged correctly (GHC will crash if not so no miss case)
+tickyTagged :: FCode ()
+tickyTagged         = ifTicky $ bumpTickyCounter (fsLit "TAG_TAGGED_pred")
+
+-- | Pass a boolean expr indicating if tag was present.
+tickyUntagged :: CmmExpr -> FCode ()
+tickyUntagged e     = do
+    ifTicky $ bumpTickyCounter (fsLit "TAG_UNTAGGED_pred")
+    ifTicky $ bumpTickyCounterByE (fsLit "TAG_UNTAGGED_miss") e
+
+-- | Called when for `case v of ...` we can avoid entering v based on
+-- tag inference information.
+tickyTagSkip :: Unique -> Id -> FCode ()
+tickyTagSkip unique id = ifTicky $ do
+  let ctr_lbl = mkTagHitLabel (idName id) unique
+  registerTickyCtr ctr_lbl
+  bumpTickyTagSkip ctr_lbl
+
+-- -----------------------------------------------------------------------------
 -- Ticky utils
 
 isEnabled :: (StgToCmmConfig -> Bool) -> FCode Bool
@@ -597,7 +718,12 @@ bumpTickyEntryCount lbl = do
 bumpTickyAllocd :: CLabel -> Int -> FCode ()
 bumpTickyAllocd lbl bytes = do
   platform <- getPlatform
-  bumpTickyLitBy (cmmLabelOffB lbl (pc_OFFSET_StgEntCounter_allocd (platformConstants platform))) bytes
+  bumpTickyLitBy (cmmLabelOffB lbl (pc_OFFSET_StgEntCounter_entry_count (platformConstants platform))) bytes
+
+bumpTickyTagSkip :: CLabel -> FCode ()
+bumpTickyTagSkip lbl = do
+  platform <- getPlatform
+  bumpTickyLitBy (cmmLabelOffB lbl (pc_OFFSET_StgEntCounter_entry_count (platformConstants platform))) 1
 
 bumpTickyLbl :: CLabel -> FCode ()
 bumpTickyLbl lhs = bumpTickyLitBy (cmmLabelOffB lhs 0) 1

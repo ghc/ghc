@@ -215,6 +215,7 @@ newId :: FastString -> Mult -> Type -> SimplM Id
 newId fs w ty = do uniq <- getUniqueM
                    return (mkSysLocalOrCoVar fs uniq w ty)
 
+-- | Make a join id with given type and arity but without call-by-value annotations.
 newJoinId :: [Var] -> Type -> SimplM Id
 newJoinId bndrs body_ty
   = do { uniq <- getUniqueM
@@ -223,7 +224,7 @@ newJoinId bndrs body_ty
              arity      = count isId bndrs
              -- arity: See Note [Invariants on join points] invariant 2b, in GHC.Core
              join_arity = length bndrs
-             details    = JoinId join_arity
+             details    = JoinId join_arity Nothing
              id_info    = vanillaIdInfo `setArityInfo` arity
 --                                        `setOccInfo` strongLoopBreaker
 

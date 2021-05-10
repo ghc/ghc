@@ -1024,7 +1024,7 @@ cpeApp top_env expr
         go terminal as = (terminal, as)
 
     cpe_app :: CorePrepEnv
-            -> CoreExpr
+            -> CoreExpr -- The thing we are calling
             -> [ArgInfo]
             -> UniqSM (Floats, CpeRhs)
     cpe_app env (Var f) (CpeApp Type{} : CpeApp arg : args)
@@ -1170,7 +1170,7 @@ cpeApp top_env expr
     rebuild_app
         :: CorePrepEnv
         -> [ArgInfo]                  -- The arguments (inner to outer)
-        -> CpeApp
+        -> CpeApp                     -- The function
         -> Floats
         -> [Demand]
         -> Maybe Arity
@@ -1519,7 +1519,8 @@ Note [Eta expansion of hasNoBinding things in CorePrep]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 maybeSaturate deals with eta expanding to saturate things that can't deal with
 unsaturated applications (identified by 'hasNoBinding', currently just
-foreign calls and unboxed tuple/sum constructors).
+foreign calls, unboxed tuple/sum constructors and strict workers).
+See Note [Strict Worker Ids]
 
 Historical Note: Note that eta expansion in CorePrep used to be very fragile
 due to the "prediction" of CAFfyness that we used to make during tidying.
@@ -1533,14 +1534,27 @@ maybeSaturate fn expr n_args unsat_ticks
   | hasNoBinding fn        -- There's no binding
   = return $ wrapLamBody (\body -> foldr mkTick body unsat_ticks) sat_expr
 
+  | mark_arity > 0 -- A strict worker. See Note [Strict Worker Ids]
+  , not applied_marks
+  = assertPpr
+      ( not (isJoinId fn)) -- See Note [Do not eta-expand join points]
+      ( ppr fn $$ text "expr:" <+> ppr expr $$ text "n_args:" <+> ppr n_args $$
+          text "marks:" <+> ppr (idCbvMarks_maybe fn) $$
+          text "join_arity" <+> ppr (idJoinArity fn)
+       ) $
+    return sat_expr
+
   | otherwise
   = assert (null unsat_ticks) $
     return expr
   where
-    fn_arity     = idArity fn
-    excess_arity = fn_arity - n_args
-    sat_expr     = cpeEtaExpand excess_arity expr
-
+    mark_arity    = idCbvMarkArity fn
+    fn_arity      = idArity fn
+    excess_arity  = (max fn_arity mark_arity) - n_args
+    sat_expr      = cpeEtaExpand excess_arity expr
+    applied_marks = n_args >= (length . dropWhile (not . isMarkedCbv) . reverse . expectJust "maybeSaturate" $ (idCbvMarks_maybe fn))
+    -- For join points we never eta-expand (See Note [Do not eta-expand join points])
+    -- so we assert all arguments that need to be passed cbv are visible so that the backend can evalaute them if required..
 {-
 ************************************************************************
 *                                                                      *
@@ -1620,13 +1634,19 @@ tryEtaReducePrep bndrs expr@(App _ _)
   , not (any (`elemVarSet` fvs_remaining) bndrs)
   , exprIsHNF remaining_expr   -- Don't turn value into a non-value
                                -- else the behaviour with 'seq' changes
-  = Just remaining_expr
+  =
+    -- pprTrace "prep-reduce" (
+    --   text "reduced:" <> ppr remaining_expr $$
+    --   ppr (remaining_args)
+    --   ) $
+    Just remaining_expr
   where
     (f, args) = collectArgs expr
     remaining_expr = mkApps f remaining_args
     fvs_remaining = exprFreeVars remaining_expr
     (remaining_args, last_args) = splitAt n_remaining args
     n_remaining = length args - length bndrs
+    n_remaining_vals = length $ filter isRuntimeArg remaining_args
 
     ok bndr (Var arg) = bndr == arg
     ok _    _         = False
@@ -1634,9 +1654,11 @@ tryEtaReducePrep bndrs expr@(App _ _)
     -- We can't eta reduce something which must be saturated.
     ok_to_eta_reduce (Var f) =  not (hasNoBinding f) &&
                                 not (isLinearType (idType f)) && -- Unsure why this is unsafe.
-                                (not (isJoinId f) || idJoinArity f <= n_remaining)
+                                (not (isJoinId f) || idJoinArity f <= n_remaining) &&
                                 -- Don't undersaturate join points.
                                 -- See Note [Invariants on join points] in GHC.Core, and #20599
+                                (idCbvMarkArity f <= n_remaining_vals)
+                                -- Similar for StrictWorkerIds. See Note [Strict Worker Ids]
 
 
     ok_to_eta_reduce _       = False -- Safe. ToDo: generalise

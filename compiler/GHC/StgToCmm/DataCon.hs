@@ -52,6 +52,8 @@ import GHC.Utils.Monad (mapMaybeM)
 import Control.Monad
 import Data.Char
 import GHC.StgToCmm.Config (stgToCmmPlatform)
+import GHC.StgToCmm.TagCheck (checkConArgsStatic, checkConArgsDyn)
+import GHC.Utils.Outputable
 
 ---------------------------------------------------------------
 --      Top-level constructors
@@ -93,7 +95,7 @@ cgTopRhsCon cfg id con mn args
               -- Windows DLLs have a problem with static cross-DLL refs.
               massert (not (isDllConApp platform (stgToCmmExtDynRefs cfg) this_mod con (map fromNonVoid args)))
         ; assert (args `lengthIs` countConRepArgs con ) return ()
-
+        ; checkConArgsStatic (text "TagCheck failed - Top level con") con (map fromNonVoid args)
         -- LAY IT OUT
         ; let
             (tot_wds, --  #ptr_wds + #nonptr_wds
@@ -210,6 +212,7 @@ buildDynCon' binder mn actually_bound ccs con args
           ; let ticky_name | actually_bound = Just binder
                            | otherwise = Nothing
 
+          ; checkConArgsDyn (text "TagCheck failed - con_alloc:" <> ppr binder) con (map fromNonVoid args)
           ; hp_plus_n <- allocDynClosure ticky_name info_tbl lf_info
                                           use_cc blame_cc args_w_offsets
           ; return (mkRhsInit platform reg lf_info hp_plus_n) }

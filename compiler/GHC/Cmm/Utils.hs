@@ -48,7 +48,7 @@ module GHC.Cmm.Utils(
         currentTSOExpr, currentNurseryExpr, cccsExpr,
 
         -- Tagging
-        cmmTagMask, cmmPointerMask, cmmUntag, cmmIsTagged,
+        cmmTagMask, cmmPointerMask, cmmUntag, cmmIsTagged, cmmIsNotTagged,
         cmmConstrTag1, mAX_PTR_TAG, tAG_MASK,
 
         -- Overlap and usage
@@ -447,13 +447,14 @@ cmmPointerMask platform = mkIntExpr platform (complement (tAG_MASK platform))
 
 -- Used to untag a possibly tagged pointer
 -- A static label need not be untagged
-cmmUntag, cmmIsTagged, cmmConstrTag1 :: Platform -> CmmExpr -> CmmExpr
+cmmUntag, cmmIsTagged, cmmIsNotTagged, cmmConstrTag1 :: Platform -> CmmExpr -> CmmExpr
 cmmUntag _ e@(CmmLit (CmmLabel _)) = e
 -- Default case
 cmmUntag platform e = cmmAndWord platform e (cmmPointerMask platform)
 
--- Test if a closure pointer is untagged
+-- Test if a closure pointer is untagged/tagged.
 cmmIsTagged platform e = cmmNeWord platform (cmmAndWord platform e (cmmTagMask platform)) (zeroExpr platform)
+cmmIsNotTagged platform e = cmmEqWord platform (cmmAndWord platform e (cmmTagMask platform)) (zeroExpr platform)
 
 -- Get constructor tag, but one based.
 cmmConstrTag1 platform e = cmmAndWord platform e (cmmTagMask platform)

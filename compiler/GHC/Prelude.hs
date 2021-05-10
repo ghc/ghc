@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# OPTIONS_HADDOCK not-home #-}
+{-# OPTIONS_GHC -O2 #-} -- See Note [-O2 Prelude]
 
 -- | Custom GHC "Prelude"
 --
@@ -18,6 +19,17 @@ module GHC.Prelude
   ) where
 
 
+{- Note [-O2 Prelude]
+~~~~~~~~~~~~~~~~~~~~~
+There is some code in GHC that is *always* compiled with -O[2] because
+of it's impact on compile time performance. Some of this code might depend
+on the definitions like shiftL being defined here being performant.
+
+So we always compile this module with -O2. It's (currently) tiny so I
+have little reason to suspect this impacts overall GHC compile times
+negatively.
+
+-}
 -- We export the 'Semigroup' class but w/o the (<>) operator to avoid
 -- clashing with the (Outputable.<>) operator which is heavily used
 -- through GHC's code-base.

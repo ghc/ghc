@@ -65,6 +65,30 @@ Compiler
   that is used boxed in a hot path). Do post a bug report with your example!
   Then wrap the uses of the parameter in ``GHC.Exts.lazy`` for a short-term fix.
 
+- Tag inference has been implemented.
+
+  It's a new backend optimization pass aimed at avoiding
+  redundant evaluatedness checks. The basic pass is always enabled and not optional.
+  When using :ghc-flag:`-fworker-wrapper-cbv` it additionally will generate workers for functions
+  with strict arguments, pushing the evaluation+tagging of the arguments into the wrapper
+  and allowing the worker to simply assume all arguments are fully evaluated and properly
+  tagged. Usually the wrapper will then inline, and if the argument is known to be properly
+  tagged at the call site the wrapper will become a no-op. Giving us a more efficient
+  worker without adding any overhead. If the argument *isn't* known to be evaluated we
+  perform the same amount of work, but do it at call sites instead of inside the called
+  function.
+
+  In general :ghc-flag:`-fworker-wrapper-cbv` is very beneficial and can be safely enabled.
+  However sadly there are two exceptions. It can break rules for code which made assumptions about
+  which functions get a W/W split which now no longer hold.
+  See #20364 for the details. For this reason it isn't enabled by default.
+  For code which has the proper ``INLINABLE`` (:ref:`inlinable-pragma`) and ``INLINE`` (:ref:`inline-pragma`)
+  or that doesn't define any rule-relevant functions this shouldn't happen. The longterm fix here is to
+  apply the proper pragmas.
+  There is also a known issue where a function taking multiple unlifted arguments can cause excessive
+  spilling (#20334). This seems to be an edge case. But if you think you are hitting this case please
+  comment on the ticket so that we can prioritize it accordingly.
+
 - Support for Sun SPARC architecture has been dropped (:ghc-ticket:`16883`).
 
 - A fix for GHC's handling of the XDG Base Directory Specification

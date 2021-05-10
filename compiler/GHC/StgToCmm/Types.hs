@@ -19,6 +19,7 @@ import GHC.Types.ForeignStubs
 import GHC.Core.DataCon
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
+import GHC.Stg.InferTags.TagSig
 import GHC.Utils.Outputable
 
 
@@ -90,6 +91,7 @@ data CgInfos = CgInfos
       -- ^ LambdaFormInfos of exported closures in the current module.
   , cgIPEStub :: !CStub
       -- ^ The C stub which is used for IPE information
+  , cgTagSigs :: !(NameEnv TagSig)
   }
 
 --------------------------------------------------------------------------------

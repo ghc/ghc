@@ -67,6 +67,7 @@ import GHC.Types.Var( VarBndr(..), binderVar, tyVarSpecToBinders )
 import GHC.Core.TyCon ( Role (..), Injectivity(..), tyConBndrVisArgFlag )
 import GHC.Core.DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import GHC.Builtin.Types ( constraintKindTyConName )
+import GHC.Stg.InferTags.TagSig
 
 import GHC.Utils.Lexeme (isLexSym)
 import GHC.Utils.Fingerprint
@@ -352,6 +353,7 @@ data IfaceInfoItem
   | HsNoCafRefs
   | HsLevity                         -- Present <=> never representation-polymorphic
   | HsLFInfo        IfaceLFInfo
+  | HsTagSig        TagSig
 
 -- NB: Specialisations and rules come in separately and are
 -- only later attached to the Id.  Partial reason: some are orphans.
@@ -380,6 +382,7 @@ data IfaceUnfolding
 
 data IfaceIdDetails
   = IfVanillaId
+  | IfStrictWorkerId [CbvMark]
   | IfRecSelId (Either IfaceTyCon IfaceDecl) Bool
   | IfDFunId
 
@@ -1459,6 +1462,7 @@ instance Outputable IfaceConAlt where
 ------------------
 instance Outputable IfaceIdDetails where
   ppr IfVanillaId       = Outputable.empty
+  ppr (IfStrictWorkerId dmd) = text "StrWork" <> parens (ppr dmd)
   ppr (IfRecSelId tc b) = text "RecSel" <+> ppr tc
                           <+> if b
                                 then text "<naughty>"
@@ -1476,6 +1480,7 @@ instance Outputable IfaceInfoItem where
   ppr HsNoCafRefs           = text "HasNoCafRefs"
   ppr HsLevity              = text "Never levity-polymorphic"
   ppr (HsLFInfo lf_info)    = text "LambdaFormInfo:" <+> ppr lf_info
+  ppr (HsTagSig tag_sig)    = text "TagSig:" <+> ppr tag_sig
 
 instance Outputable IfaceJoinInfo where
   ppr IfaceNotJoinPoint   = empty
@@ -2223,12 +2228,14 @@ instance Binary IfaceAnnotation where
 instance Binary IfaceIdDetails where
     put_ bh IfVanillaId      = putByte bh 0
     put_ bh (IfRecSelId a b) = putByte bh 1 >> put_ bh a >> put_ bh b
-    put_ bh IfDFunId         = putByte bh 2
+    put_ bh (IfStrictWorkerId dmds) = putByte bh 2 >> put_ bh dmds
+    put_ bh IfDFunId         = putByte bh 3
     get bh = do
         h <- getByte bh
         case h of
             0 -> return IfVanillaId
             1 -> do { a <- get bh; b <- get bh; return (IfRecSelId a b) }
+            2 -> do { dmds <- get bh; return (IfStrictWorkerId dmds) }
             _ -> return IfDFunId
 
 instance Binary IfaceInfoItem where
@@ -2240,6 +2247,7 @@ instance Binary IfaceInfoItem where
     put_ bh HsLevity              = putByte bh 5
     put_ bh (HsCprSig cpr)        = putByte bh 6 >> put_ bh cpr
     put_ bh (HsLFInfo lf_info)    = putByte bh 7 >> put_ bh lf_info
+    put_ bh (HsTagSig sig)        = putByte bh 8 >> put_ bh sig
 
     get bh = do
         h <- getByte bh
@@ -2253,7 +2261,8 @@ instance Binary IfaceInfoItem where
             4 -> return HsNoCafRefs
             5 -> return HsLevity
             6 -> HsCprSig <$> get bh
-            _ -> HsLFInfo <$> get bh
+            7 -> HsLFInfo <$> get bh
+            _ -> HsTagSig <$> get bh
 
 instance Binary IfaceUnfolding where
     put_ bh (IfCoreUnfold s e) = do
@@ -2586,6 +2595,7 @@ instance NFData IfaceBang where
 instance NFData IfaceIdDetails where
   rnf = \case
     IfVanillaId -> ()
+    IfStrictWorkerId dmds -> dmds `seqList` ()
     IfRecSelId (Left tycon) b -> rnf tycon `seq` rnf b
     IfRecSelId (Right decl) b -> rnf decl `seq` rnf b
     IfDFunId -> ()
@@ -2600,6 +2610,7 @@ instance NFData IfaceInfoItem where
     HsLevity -> ()
     HsCprSig cpr -> cpr `seq` ()
     HsLFInfo lf_info -> lf_info `seq` () -- TODO: seq further?
+    HsTagSig sig -> sig `seq` ()
 
 instance NFData IfaceUnfolding where
   rnf = \case

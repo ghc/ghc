@@ -1,7 +1,7 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 116, types: 50, coercions: 0, joins: 0/0}
+  = {terms: 113, types: 49, coercions: 0, joins: 0/0}
 
 -- RHS size: {terms: 6, types: 3, coercions: 0, joins: 0/0}
 T7360.$WFoo3 [InlPrag=INLINE[final] CONLIKE] :: Int %1 -> Foo
@@ -20,17 +20,16 @@ T7360.$WFoo3
   = \ (conrep [Occ=Once1!] :: Int) ->
       case conrep of { GHC.Types.I# unbx [Occ=Once1] -> T7360.Foo3 unbx }
 
--- RHS size: {terms: 5, types: 2, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 2, types: 1, coercions: 0, joins: 0/0}
 T7360.$wfun1 [InlPrag=NOINLINE] :: Foo -> (# #)
-[GblId, Arity=1, Str=<1A>, Unf=OtherCon []]
-T7360.$wfun1
-  = \ (x :: Foo) -> case x of { __DEFAULT -> GHC.Prim.(##) }
+[GblId[StrictWorker([!])], Arity=1, Str=<A>, Unf=OtherCon []]
+T7360.$wfun1 = \ _ [Occ=Dead] -> GHC.Prim.(##)
 
 -- RHS size: {terms: 6, types: 2, coercions: 0, joins: 0/0}
 fun1 [InlPrag=[final]] :: Foo -> ()
 [GblId,
  Arity=1,
- Str=<1A>,
+ Str=<A>,
  Cpr=1,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,

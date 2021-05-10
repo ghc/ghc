@@ -30,7 +30,7 @@ module GHC.Utils.Misc (
         mapAndUnzip, mapAndUnzip3,
         filterOut, partitionWith,
 
-        dropWhileEndLE, spanEnd, last2, lastMaybe,
+        dropWhileEndLE, spanEnd, last2, lastMaybe, onJust,
 
         List.foldl1', foldl2, count, countWhile, all2,
 
@@ -763,6 +763,10 @@ last2 = List.foldl' (\(_,x2) x -> (x2,x)) (partialError,partialError)
 lastMaybe :: [a] -> Maybe a
 lastMaybe [] = Nothing
 lastMaybe xs = Just $ last xs
+
+-- | @onJust x m f@ applies f to the value inside the Just or returns the default.
+onJust :: b -> Maybe a -> (a->b) -> b
+onJust dflt = flip (maybe dflt)
 
 -- | Split a list into its last element and the initial part of the list.
 -- @snocView xs = Just (init xs, last xs)@ for non-empty lists.

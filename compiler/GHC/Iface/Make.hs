@@ -159,16 +159,19 @@ mkFullIface hsc_env partial_iface mb_cg_infos = do
 
 updateDecl :: [IfaceDecl] -> Maybe CgInfos -> [IfaceDecl]
 updateDecl decls Nothing = decls
-updateDecl decls (Just CgInfos{ cgNonCafs = NonCaffySet non_cafs, cgLFInfos = lf_infos }) = map update_decl decls
+updateDecl decls (Just CgInfos{ cgNonCafs = NonCaffySet non_cafs, cgLFInfos = lf_infos, cgTagSigs = tag_sigs })
+  = map update_decl decls
   where
     update_decl (IfaceId nm ty details infos)
       | let not_caffy = elemNameSet nm non_cafs
       , let mb_lf_info = lookupNameEnv lf_infos nm
-      , warnPprTrace (isNothing mb_lf_info) "Name without LFInfo" (ppr nm) True
+      , let sig = lookupNameEnv tag_sigs nm
+      , warnPprTrace (isNothing mb_lf_info) "updateDecl" (text "Name without LFInfo:" <+> ppr nm) True
         -- Only allocate a new IfaceId if we're going to update the infos
-      , isJust mb_lf_info || not_caffy
+      , isJust mb_lf_info || not_caffy || isJust sig
       = IfaceId nm ty details $
-          (if not_caffy then (HsNoCafRefs :) else id)
+          (if not_caffy then (HsNoCafRefs :) else id) $
+          (if isJust sig then (HsTagSig (fromJust sig):) else id) $
           (case mb_lf_info of
              Nothing -> infos -- LFInfos not available when building .cmm files
              Just lf_info -> HsLFInfo (toIfaceLFInfo nm lf_info) : infos)

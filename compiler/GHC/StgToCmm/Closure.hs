@@ -4,7 +4,6 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
 
-
 -----------------------------------------------------------------------------
 --
 -- Stg to C-- code generation:
@@ -101,6 +100,7 @@ import GHC.Utils.Misc
 import Data.Coerce (coerce)
 import qualified Data.ByteString.Char8 as BS8
 import GHC.StgToCmm.Config
+import GHC.Stg.InferTags.TagSig (isTaggedSig)
 
 -----------------------------------------------------------------------------
 --                Data types and synonyms
@@ -478,19 +478,37 @@ When black-holing, single-entry closures could also be entered via node
 (rather than directly) to catch double-entry. -}
 
 data CallMethod
-  = EnterIt             -- No args, not a function
+  = EnterIt             -- ^ No args, not a function
 
   | JumpToIt BlockId [LocalReg] -- A join point or a header of a local loop
 
   | ReturnIt            -- It's a value (function, unboxed value,
                         -- or constructor), so just return it.
 
-  | SlowCall                -- Unknown fun, or known fun with
+  | InferedReturnIt     -- A properly tagged value, as determined by tag inference.
+                        -- See Note [Tag Inference] and Note [Tag inference passes] in
+                        -- GHC.Stg.InferTags.
+                        -- It behaves /precisely/ like `ReturnIt`, except that when debugging is
+                        -- enabled we emit an extra assertion to check that the returned value is
+                        -- properly tagged.  We can use this as a check that tag inference is working
+                        -- correctly.
+                        -- TODO: SPJ suggested we could combine this with EnterIt, but for now I decided
+                        -- not to do so.
+
+  | SlowCall            -- Unknown fun, or known fun with
                         -- too few args.
 
   | DirectEntry         -- Jump directly, with args in regs
         CLabel          --   The code label
         RepArity        --   Its arity
+
+instance Outputable CallMethod where
+  ppr (EnterIt) = text "Enter"
+  ppr (JumpToIt {}) = text "JumpToIt"
+  ppr (ReturnIt ) = text "ReturnIt"
+  ppr (InferedReturnIt) = text "InferedReturnIt"
+  ppr (SlowCall ) = text "SlowCall"
+  ppr (DirectEntry {}) = text "DirectEntry"
 
 getCallMethod :: StgToCmmConfig
               -> Name           -- Function being applied
@@ -538,6 +556,12 @@ getCallMethod _ _name _ (LFCon _) n_args _v_args _cg_loc _self_loop_info
 
 getCallMethod cfg name id (LFThunk _ _ updatable std_form_info is_fun)
               n_args _v_args _cg_loc _self_loop_info
+
+  | Just sig <- idTagSig_maybe id
+  , isTaggedSig sig -- Infered to be already evaluated by Tag Inference
+  , n_args == 0     -- See Note [Tag Inference]
+  = InferedReturnIt
+
   | is_fun      -- it *might* be a function, so we must "call" it (which is always safe)
   = SlowCall    -- We cannot just enter it [in eval/apply, the entry code
                 -- is the fast-entry code]
@@ -568,12 +592,27 @@ getCallMethod cfg name id (LFThunk _ _ updatable std_form_info is_fun)
     DirectEntry (thunkEntryLabel (stgToCmmPlatform cfg) name (idCafInfo id) std_form_info
                 updatable) 0
 
-getCallMethod _ _name _ (LFUnknown True) _n_arg _v_args _cg_locs _self_loop_info
-  = SlowCall -- might be a function
+-- Imported(Unknown) Ids
+getCallMethod cfg name id (LFUnknown might_be_a_function) n_args _v_args _cg_locs _self_loop_info
+  | n_args == 0
+  , Just sig <- idTagSig_maybe id
+  , isTaggedSig sig -- Infered to be already evaluated by Tag Inference
+  -- When profiling we enter functions to update the SCC so we
+  -- can't use the infered enterInfo here.
+  -- See Note [Evaluating functions with profiling] in rts/Apply.cmm
+  , not (profileIsProfiling (stgToCmmProfile cfg) && might_be_a_function)
+  = InferedReturnIt -- See Note [Tag Inference]
 
-getCallMethod _ name _ (LFUnknown False) n_args _v_args _cg_loc _self_loop_info
-  = assertPpr (n_args == 0) (ppr name <+> ppr n_args)
-    EnterIt -- Not a function
+  | might_be_a_function = SlowCall
+
+  | otherwise =
+      assertPpr ( n_args == 0) ( ppr name <+> ppr n_args )
+      EnterIt   -- Not a function
+
+-- TODO: Redundant with above match?
+-- getCallMethod _ name _ (LFUnknown False) n_args _v_args _cg_loc _self_loop_info
+--   = assertPpr (n_args == 0) (ppr name <+> ppr n_args)
+--     EnterIt -- Not a function
 
 getCallMethod _ _name _ LFLetNoEscape _n_args _v_args (LneLoc blk_id lne_regs) _self_loop_info
   = JumpToIt blk_id lne_regs

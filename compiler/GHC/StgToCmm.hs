@@ -70,6 +70,7 @@ import GHC.Utils.Misc
 import System.IO.Unsafe
 import qualified Data.ByteString as BS
 import Data.IORef
+import GHC.Utils.Panic (assertPpr)
 
 codeGen :: Logger
         -> TmpFs
@@ -206,7 +207,7 @@ cgTopRhs cfg _rec bndr (StgRhsCon _cc con mn _ts args)
       -- see Note [Post-unarisation invariants] in GHC.Stg.Unarise
 
 cgTopRhs cfg rec bndr (StgRhsClosure fvs cc upd_flag args body)
-  = assert (isEmptyDVarSet fvs)    -- There should be no free variables
+  = assertPpr (isEmptyDVarSet fvs) (text "fvs:" <> ppr fvs) $   -- There should be no free variables
     cgTopRhsClosure (stgToCmmPlatform cfg) rec bndr cc upd_flag args body
 
 

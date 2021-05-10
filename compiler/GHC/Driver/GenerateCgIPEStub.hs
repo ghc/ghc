@@ -27,8 +27,10 @@ import GHC.Settings (Platform, platformUnregisterised)
 import GHC.StgToCmm.Monad (getCmm, initC, runC, initFCodeState)
 import GHC.StgToCmm.Prof (initInfoTableProv)
 import GHC.StgToCmm.Types (CgInfos (..), ModuleLFInfos)
+import GHC.Stg.InferTags.TagSig (TagSig)
 import GHC.Types.IPE (InfoTableProvMap (provInfoTables), IpeSourceLocation)
 import GHC.Types.Name.Set (NonCaffySet)
+import GHC.Types.Name.Env (NameEnv)
 import GHC.Types.Tickish (GenTickish (SourceNote))
 import GHC.Unit.Types (Module)
 import GHC.Utils.Misc
@@ -178,8 +180,8 @@ The find the tick:
     remembered in a `Maybe`.
 -}
 
-generateCgIPEStub :: HscEnv -> Module -> InfoTableProvMap -> Stream IO CmmGroupSRTs (NonCaffySet, ModuleLFInfos) -> Stream IO CmmGroupSRTs CgInfos
-generateCgIPEStub hsc_env this_mod denv s = do
+generateCgIPEStub :: HscEnv -> Module -> InfoTableProvMap -> NameEnv TagSig -> Stream IO CmmGroupSRTs (NonCaffySet, ModuleLFInfos) -> Stream IO CmmGroupSRTs CgInfos
+generateCgIPEStub hsc_env this_mod denv tag_sigs s = do
   let dflags   = hsc_dflags hsc_env
       platform = targetPlatform dflags
       fstate   = initFCodeState platform
@@ -196,7 +198,7 @@ generateCgIPEStub hsc_env this_mod denv s = do
   (_, ipeCmmGroupSRTs) <- liftIO $ cmmPipeline hsc_env (emptySRT this_mod) ipeCmmGroup
   Stream.yield ipeCmmGroupSRTs
 
-  return CgInfos {cgNonCafs = nonCaffySet, cgLFInfos = moduleLFInfos, cgIPEStub = ipeStub}
+  return CgInfos {cgNonCafs = nonCaffySet, cgLFInfos = moduleLFInfos, cgIPEStub = ipeStub, cgTagSigs = tag_sigs}
   where
     collect :: Platform -> [(Label, CmmInfoTable, Maybe IpeSourceLocation)] -> CmmGroupSRTs -> IO ([(Label, CmmInfoTable, Maybe IpeSourceLocation)], CmmGroupSRTs)
     collect platform acc cmmGroupSRTs = do

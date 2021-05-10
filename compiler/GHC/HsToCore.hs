@@ -133,7 +133,8 @@ deSugar hsc_env
                             tcg_insts        = insts,
                             tcg_fam_insts    = fam_insts,
                             tcg_hpc          = other_hpc_info,
-                            tcg_complete_matches = complete_matches
+                            tcg_complete_matches = complete_matches,
+                            tcg_self_boot    = self_boot
                             })
 
   = do { let dflags = hsc_dflags hsc_env
@@ -242,6 +243,7 @@ deSugar hsc_env
                 mg_fam_insts    = fam_insts,
                 mg_inst_env     = inst_env,
                 mg_fam_inst_env = fam_inst_env,
+                mg_boot_exports = bootExports self_boot,
                 mg_patsyns      = patsyns,
                 mg_rules        = ds_rules_for_imps,
                 mg_binds        = ds_binds,

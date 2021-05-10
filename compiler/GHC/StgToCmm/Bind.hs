@@ -32,6 +32,7 @@ import GHC.StgToCmm.DataCon
 import GHC.StgToCmm.Heap
 import GHC.StgToCmm.Prof (ldvEnterClosure, enterCostCentreFun, enterCostCentreThunk,
                    initUpdFrameProf)
+import GHC.StgToCmm.TagCheck
 import GHC.StgToCmm.Ticky
 import GHC.StgToCmm.Layout
 import GHC.StgToCmm.Utils
@@ -45,6 +46,7 @@ import GHC.Cmm.Info
 import GHC.Cmm.Utils
 import GHC.Cmm.CLabel
 
+import GHC.Stg.Utils
 import GHC.Types.CostCentre
 import GHC.Types.Id
 import GHC.Types.Id.Info
@@ -217,14 +219,19 @@ cgRhs id (StgRhsCon cc con mn _ts args)
 
 {- See Note [GC recovery] in "GHC.StgToCmm.Closure" -}
 cgRhs id (StgRhsClosure fvs cc upd_flag args body)
-  = do profile <- getProfile
-       mkRhsClosure profile id cc (nonVoidIds (dVarSetElems fvs)) upd_flag args body
+  = do
+    checkFunctionArgTags (text "TagCheck Failed: Rhs of" <> ppr id) id args
+    profile <- getProfile
+    check_tags <- stgToCmmDoTagCheck <$> getStgToCmmConfig
+    mkRhsClosure profile check_tags id cc (nonVoidIds (dVarSetElems fvs)) upd_flag args body
+
 
 ------------------------------------------------------------------------
 --              Non-constructor right hand sides
 ------------------------------------------------------------------------
 
-mkRhsClosure :: Profile -> Id -> CostCentreStack
+mkRhsClosure :: Profile -> Bool
+             -> Id -> CostCentreStack
              -> [NonVoid Id]                    -- Free vars
              -> UpdateFlag
              -> [Id]                            -- Args
@@ -267,7 +274,7 @@ for semi-obvious reasons.
 -}
 
 ---------- See Note [Selectors] ------------------
-mkRhsClosure    profile bndr _cc
+mkRhsClosure    profile _check_tags bndr _cc
                 [NonVoid the_fv]                -- Just one free var
                 upd_flag                -- Updatable thunk
                 []                      -- A thunk
@@ -300,7 +307,7 @@ mkRhsClosure    profile bndr _cc
     in cgRhsStdThunk bndr lf_info [StgVarArg the_fv]
 
 ---------- See Note [Ap thunks] ------------------
-mkRhsClosure    profile bndr _cc
+mkRhsClosure    profile check_tags bndr _cc
                 fvs
                 upd_flag
                 []                      -- No args; a thunk
@@ -321,8 +328,8 @@ mkRhsClosure    profile bndr _cc
                          -- lose information about this particular
                          -- thunk (e.g. its type) (#949)
   , idArity fun_id == unknownArity -- don't spoil a known call
-
           -- Ha! an Ap thunk
+  , not check_tags -- See Note [Tag inference debugging]
   = cgRhsStdThunk bndr lf_info payload
 
   where
@@ -333,7 +340,7 @@ mkRhsClosure    profile bndr _cc
     payload = StgVarArg fun_id : args
 
 ---------- Default case ------------------
-mkRhsClosure profile bndr cc fvs upd_flag args body
+mkRhsClosure profile _check_tags bndr cc fvs upd_flag args body
   = do  { let lf_info = mkClosureLFInfo (profilePlatform profile) bndr NotTopLevel fvs upd_flag args
         ; (id_info, reg) <- rhsIdInfo bndr lf_info
         ; return (id_info, gen_code lf_info reg) }
@@ -517,6 +524,7 @@ closureCodeBody top_lvl bndr cl_info cc args@(arg0:_) body fv_details
                 -- Load free vars out of closure *after*
                 -- heap check, to reduce live vars over check
                 ; when node_points $ load_fvs node lf_info fv_bindings
+                ; checkFunctionArgTags (text "TagCheck failed - Argument to local function:" <> ppr bndr) bndr (map fromNonVoid nv_args)
                 ; void $ cgExpr body
                 }}}
 

@@ -365,6 +365,7 @@ tidyProgram hsc_env  (ModGuts { mg_module           = mod
                               , mg_foreign_files    = foreign_files
                               , mg_hpc_info         = hpc_info
                               , mg_modBreaks        = modBreaks
+                              , mg_boot_exports     = boot_exports
                               })
 
   = Err.withTiming logger
@@ -384,7 +385,7 @@ tidyProgram hsc_env  (ModGuts { mg_module           = mod
 
         ; let uf_opts = unfoldingOpts dflags
         ; (tidy_env, tidy_binds)
-                 <- tidyTopBinds uf_opts unfold_env tidy_occ_env trimmed_binds
+                 <- tidyTopBinds uf_opts unfold_env boot_exports tidy_occ_env trimmed_binds
 
           -- See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable.
         ; (spt_entries, tidy_binds') <-
@@ -1180,39 +1181,41 @@ tidyTopName mod name_cache maybe_ref occ_env id
 
 tidyTopBinds :: UnfoldingOpts
              -> UnfoldEnv
+             -> NameSet
              -> TidyOccEnv
              -> CoreProgram
              -> IO (TidyEnv, CoreProgram)
 
-tidyTopBinds uf_opts unfold_env init_occ_env binds
+tidyTopBinds uf_opts unfold_env boot_exports init_occ_env binds
   = do let result = tidy init_env binds
        seqBinds (snd result) `seq` return result
        -- This seqBinds avoids a spike in space usage (see #13564)
   where
     init_env = (init_occ_env, emptyVarEnv)
 
-    tidy = mapAccumL (tidyTopBind uf_opts unfold_env)
+    tidy = mapAccumL (tidyTopBind uf_opts unfold_env boot_exports)
 
 ------------------------
 tidyTopBind  :: UnfoldingOpts
              -> UnfoldEnv
+             -> NameSet
              -> TidyEnv
              -> CoreBind
              -> (TidyEnv, CoreBind)
 
-tidyTopBind uf_opts unfold_env
+tidyTopBind uf_opts unfold_env boot_exports
             (occ_env,subst1) (NonRec bndr rhs)
   = (tidy_env2,  NonRec bndr' rhs')
   where
     Just (name',show_unfold) = lookupVarEnv unfold_env bndr
-    (bndr', rhs') = tidyTopPair uf_opts show_unfold tidy_env2 name' (bndr, rhs)
+    (bndr', rhs') = tidyTopPair uf_opts show_unfold boot_exports tidy_env2 name' (bndr, rhs)
     subst2        = extendVarEnv subst1 bndr bndr'
     tidy_env2     = (occ_env, subst2)
 
-tidyTopBind uf_opts unfold_env (occ_env, subst1) (Rec prs)
+tidyTopBind uf_opts unfold_env boot_exports (occ_env, subst1) (Rec prs)
   = (tidy_env2, Rec prs')
   where
-    prs' = [ tidyTopPair uf_opts show_unfold tidy_env2 name' (id,rhs)
+    prs' = [ tidyTopPair uf_opts show_unfold boot_exports tidy_env2 name' (id,rhs)
            | (id,rhs) <- prs,
              let (name',show_unfold) =
                     expectJust "tidyTopBind" $ lookupVarEnv unfold_env id
@@ -1226,6 +1229,7 @@ tidyTopBind uf_opts unfold_env (occ_env, subst1) (Rec prs)
 -----------------------------------------------------------
 tidyTopPair :: UnfoldingOpts
             -> Bool  -- show unfolding
+            -> NameSet
             -> TidyEnv  -- The TidyEnv is used to tidy the IdInfo
                         -- It is knot-tied: don't look at it!
             -> Name             -- New name
@@ -1237,14 +1241,17 @@ tidyTopPair :: UnfoldingOpts
         -- group, a variable late in the group might be mentioned
         -- in the IdInfo of one early in the group
 
-tidyTopPair uf_opts show_unfold rhs_tidy_env name' (bndr, rhs)
-  = (bndr1, rhs1)
+tidyTopPair uf_opts show_unfold boot_exports rhs_tidy_env name' (bndr, rhs)
+  = -- pprTrace "tidyTop" (ppr name' <+> ppr details <+> ppr rhs) $
+    (bndr1, rhs1)
+
   where
+    !cbv_bndr = tidyCbvInfoTop boot_exports bndr rhs
     bndr1    = mkGlobalId details name' ty' idinfo'
-    details  = idDetails bndr   -- Preserve the IdDetails
-    ty'      = tidyTopType (idType bndr)
+    details  = idDetails cbv_bndr -- Preserve the IdDetails
+    ty'      = tidyTopType (idType cbv_bndr)
     rhs1     = tidyExpr rhs_tidy_env rhs
-    idinfo'  = tidyTopIdInfo uf_opts rhs_tidy_env name' rhs rhs1 (idInfo bndr)
+    idinfo'  = tidyTopIdInfo uf_opts rhs_tidy_env name' rhs rhs1 (idInfo cbv_bndr)
                              show_unfold
 
 -- tidyTopIdInfo creates the final IdInfo for top-level

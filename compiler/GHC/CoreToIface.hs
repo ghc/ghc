@@ -441,6 +441,7 @@ toIfaceLetBndr id  = IfLetBndr (occNameFS (getOccName id))
 
 toIfaceIdDetails :: IdDetails -> IfaceIdDetails
 toIfaceIdDetails VanillaId                      = IfVanillaId
+toIfaceIdDetails (StrictWorkerId dmds)          = IfStrictWorkerId dmds
 toIfaceIdDetails (DFunId {})                    = IfDFunId
 toIfaceIdDetails (RecSelId { sel_naughty = n
                            , sel_tycon = tc })  =

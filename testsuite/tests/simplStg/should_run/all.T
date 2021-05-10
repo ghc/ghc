@@ -18,4 +18,4 @@ test('T13536a',
     compile_and_run,
     [''])
 
-
+test('inferTags001', normal, multimod_compile_and_run, ['inferTags001', 'inferTags001_a'])

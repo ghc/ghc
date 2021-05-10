@@ -92,7 +92,9 @@ data DumpFlag
    | Opt_D_dump_prep
    | Opt_D_dump_stg_from_core -- ^ Initial STG (CoreToStg output)
    | Opt_D_dump_stg_unarised  -- ^ STG after unarise
-   | Opt_D_dump_stg_final     -- ^ Final STG (after stg2stg)
+   | Opt_D_dump_stg_cg        -- ^ STG (after stg2stg)
+   | Opt_D_dump_stg_tags      -- ^ Result of tag inference analysis.
+   | Opt_D_dump_stg_final     -- ^ Final STG (before cmm gen)
    | Opt_D_dump_call_arity
    | Opt_D_dump_exitify
    | Opt_D_dump_stranal
@@ -224,12 +226,16 @@ data GeneralFlag
    | Opt_WeightlessBlocklayout         -- ^ Layout based on last instruction per block.
    | Opt_CprAnal
    | Opt_WorkerWrapper
+   | Opt_WorkerWrapperUnlift  -- ^ Do W/W split for unlifting even if we won't unbox anything.
    | Opt_SolveConstantDicts
    | Opt_AlignmentSanitisation
    | Opt_CatchNonexhaustiveCases
    | Opt_NumConstantFolding
    | Opt_CoreConstantFolding
    | Opt_FastPAPCalls                  -- #6084
+
+   -- Inference flags
+   | Opt_DoTagInferenceChecks
 
    -- PreInlining is on by default. The option is there just to see how
    -- bad things get if you turn it off!
@@ -443,6 +449,7 @@ optimisationFlags = EnumSet.fromList
    , Opt_WeightlessBlocklayout
    , Opt_CprAnal
    , Opt_WorkerWrapper
+   , Opt_WorkerWrapperUnlift
    , Opt_SolveConstantDicts
    , Opt_CatchNonexhaustiveCases
    , Opt_IgnoreAsserts

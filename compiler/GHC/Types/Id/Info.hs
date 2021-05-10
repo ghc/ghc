@@ -68,7 +68,7 @@ module GHC.Types.Id.Info (
         emptyRuleInfo,
         isEmptyRuleInfo, ruleInfoFreeVars,
         ruleInfoRules, setRuleInfoHead,
-        ruleInfo, setRuleInfo,
+        ruleInfo, setRuleInfo, tagSigInfo,
 
         -- ** The CAFInfo type
         CafInfo(..),
@@ -76,8 +76,10 @@ module GHC.Types.Id.Info (
         cafInfo, setCafInfo,
 
         -- ** The LambdaFormInfo type
-        LambdaFormInfo(..),
-        lfInfo, setLFInfo,
+        LambdaFormInfo,
+        lfInfo, setLFInfo, setTagSig,
+
+        tagSig,
 
         -- ** Tick-box Info
         TickBoxOp(..), TickBoxId,
@@ -108,10 +110,11 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
+import GHC.Stg.InferTags.TagSig
 
 import Data.Word
 
-import GHC.StgToCmm.Types (LambdaFormInfo (..))
+import GHC.StgToCmm.Types (LambdaFormInfo)
 
 -- infixl so you can say (id `set` a `set` b)
 infixl  1 `setRuleInfo`,
@@ -126,7 +129,6 @@ infixl  1 `setRuleInfo`,
           `setDemandInfo`,
           `setNeverRepPoly`,
           `setLevityInfoWithType`
-
 {-
 ************************************************************************
 *                                                                      *
@@ -173,8 +175,59 @@ data IdDetails
   | CoVarId    -- ^ A coercion variable
                -- This only covers /un-lifted/ coercions, of type
                -- (t1 ~# t2) or (t1 ~R# t2), not their lifted variants
-  | JoinId JoinArity           -- ^ An 'Id' for a join point taking n arguments
-       -- Note [Join points] in "GHC.Core"
+  | JoinId JoinArity (Maybe [CbvMark])
+        -- ^ An 'Id' for a join point taking n arguments
+        -- Note [Join points] in "GHC.Core"
+  | StrictWorkerId [CbvMark]
+        -- ^ An 'Id' for a worker function, which expects some arguments to be
+        -- passed both evaluated and tagged.
+        -- See Note [Strict Worker Ids]
+        -- See Note [Tag Inference]
+
+{- Note [Strict Worker Ids]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+StrictWorkerId essentially constrains the calling convention for the given Id.
+It requires arguments marked as tagged to be passed properly evaluated+*tagged*.
+
+While we were always able to express the fact that an argument is evaluated
+via attaching a evaldUnfolding to the functions arguments there used to be
+no way to express that an lifted argument is already properly tagged once we jump
+into the RHS.
+This means when branching on a value the RHS always needed to perform
+a tag check to ensure the argument wasn't an indirection (the evaldUnfolding
+already ruling out thunks).
+
+StrictWorkerIds give us this additional expressiveness which we use to improve
+runtime. This is all part of the TagInference work. See also Note [Tag Inference].
+
+What we do is:
+* If we think a function might benefit from passing certain arguments unlifted
+  for performance reasons we attach an evaldUnfolding to these arguments.
+* Either during W/W, but at latest during Tidy VanillaIds with arguments that
+  have evaldUnfoldings are turned into StrictWorkerIds.
+* During CorePrep calls to StrictWorkerIds are eta expanded.
+* During Stg CodeGen:
+  * When we call a binding that is a StrictWorkerId:
+    * We check if all arguments marked to be passed unlifted are already tagged.
+    * If they aren't we will wrap the call in case expressions which will evaluate+tag
+      these arguments before jumping to the function.
+* During Cmm codeGen:
+  * When generating code for the RHS of a StrictWorker binding
+    we omit tag checks when using arguments marked as tagged.
+
+We primarily use this for workers where we mark strictly demanded arguments
+and arguments representing strict fields as call-by-value during W/W. But we
+also check other functions during tidy and potentially turn some of them into
+strict workers and mark some of their arguments as call-by-value by looking at
+argument unfoldings.
+
+NB: I choose to put the information into a new Id constructor since these are loaded
+at all optimization levels. This makes it trivial to ensure the additional
+calling convention demands are available at all call sites. Putting it into
+IdInfo would require us at the very least to always decode the IdInfo
+just to decide if we need to throw it away or not after.
+
+-}
 
 -- | Recursive Selector Parent
 data RecSelParent = RecSelData TyCon | RecSelPatSyn PatSyn deriving Eq
@@ -198,8 +251,8 @@ isCoVarDetails :: IdDetails -> Bool
 isCoVarDetails CoVarId = True
 isCoVarDetails _       = False
 
-isJoinIdDetails_maybe :: IdDetails -> Maybe JoinArity
-isJoinIdDetails_maybe (JoinId join_arity) = Just join_arity
+isJoinIdDetails_maybe :: IdDetails -> Maybe (JoinArity, (Maybe [CbvMark]))
+isJoinIdDetails_maybe (JoinId join_arity marks) = Just (join_arity, marks)
 isJoinIdDetails_maybe _                   = Nothing
 
 instance Outputable IdDetails where
@@ -210,6 +263,7 @@ pprIdDetails VanillaId = empty
 pprIdDetails other     = brackets (pp other)
  where
    pp VanillaId               = panic "pprIdDetails"
+   pp (StrictWorkerId dmds)   = text "StrictWorker" <> parens (ppr dmds)
    pp (DataConWorkId _)       = text "DataCon"
    pp (DataConWrapId _)       = text "DataConWrapper"
    pp (ClassOpId {})          = text "ClassOp"
@@ -221,7 +275,7 @@ pprIdDetails other     = brackets (pp other)
                               = brackets $ text "RecSel" <>
                                            ppWhen is_naughty (text "(naughty)")
    pp CoVarId                 = text "CoVarId"
-   pp (JoinId arity)          = text "JoinId" <> parens (int arity)
+   pp (JoinId arity marks)    = text "JoinId" <> parens (int arity) <> parens (ppr marks)
 
 {-
 ************************************************************************
@@ -274,7 +328,10 @@ data IdInfo
         -- 4% in some programs. See #17497 and associated MR.
         --
         -- See documentation of the getters for what these packed fields mean.
-        lfInfo          :: !(Maybe LambdaFormInfo)
+        lfInfo          :: !(Maybe LambdaFormInfo),
+
+        -- See documentation of the getters for what these packed fields mean.
+        tagSig          :: !(Maybe TagSig)
     }
 
 -- | Encodes arities, OneShotInfo, CafInfo and LevityInfo.
@@ -365,6 +422,9 @@ cafInfo = bitfieldGetCafInfo . bitfield
 callArityInfo :: IdInfo -> ArityInfo
 callArityInfo = bitfieldGetCallArityInfo . bitfield
 
+tagSigInfo :: IdInfo -> Maybe TagSig
+tagSigInfo = tagSig
+
 -- Setters
 
 setRuleInfo :: IdInfo -> RuleInfo -> IdInfo
@@ -414,6 +474,9 @@ setCafInfo info caf =
 setLFInfo :: IdInfo -> LambdaFormInfo -> IdInfo
 setLFInfo info lf = info { lfInfo = Just lf }
 
+setTagSig :: IdInfo -> TagSig -> IdInfo
+setTagSig info sig = info { tagSig = Just sig }
+
 setOneShotInfo :: IdInfo -> OneShotInfo -> IdInfo
 setOneShotInfo info lb =
     info { bitfield = bitfieldSetOneShotInfo lb (bitfield info) }
@@ -444,7 +507,8 @@ vanillaIdInfo
                              bitfieldSetOneShotInfo NoOneShotInfo $
                              bitfieldSetLevityInfo NoLevityInfo $
                              emptyBitField,
-            lfInfo         = Nothing
+            lfInfo         = Nothing,
+            tagSig         = Nothing
            }
 
 -- | More informative 'IdInfo' we can use when we know the 'Id' has no CAF references

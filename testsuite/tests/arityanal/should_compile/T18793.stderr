@@ -10,9 +10,12 @@ stuff = \ (i :: Int) -> case i of i1 { GHC.Types.I# ipv -> GHC.Types.: @Int i1 (
 Rec {
 -- RHS size: {terms: 23, types: 11, coercions: 0, joins: 0/0}
 T18793.$wgo1 [InlPrag=[2], Occ=LoopBreaker] :: [Int] -> GHC.Prim.Int# -> GHC.Prim.Int#
-[GblId, Arity=2, Str=<1L><L>, Unf=OtherCon []]
+[GblId[StrictWorker([!, ~])], Arity=2, Str=<1L><L>, Unf=OtherCon []]
 T18793.$wgo1
-  = \ (ds :: [Int]) (ww :: GHC.Prim.Int#) ->
+  = \ (ds
+         :: [Int]
+         Unf=OtherCon [])
+      (ww :: GHC.Prim.Int#) ->
       case ds of {
         [] -> ww;
         : y ys ->

@@ -1611,6 +1611,32 @@ by saying ``-fno-wombat``.
     while demand analysis is disabled (by :ghc-flag:`-fno-strictness`)
     has no effect.
 
+.. ghc-flag:: -fworker-wrapper-cbv
+    :shortdesc: Enable w/w splits for wrappers whos sole purpose is evaluating arguments.
+    :type: dynamic
+    :category: optimization
+
+    Disabling this flag prevents a W/W split if the only benefit would be call-by-value
+    for some arguments.
+
+    Otherwise this exploits strictness information by passing strict value arguments
+    call-by-value to the functions worker. Even for functions who would
+    otherwise not get a worker.
+
+    This avoids (potentially repeated) checks for evaluatedness of arguments in
+    the rhs of the worker by pushing this check to the call site.
+    If the argument is statically visible to be a value at the call site the
+    overhead for the check disappears completely.
+
+    This can cause slight codesize increases. It will also cause many more functions
+    to get a worker/wrapper split which can play badly with rules (see Ticket #20364)
+    which is why it's currently disabled by default.
+    In particular if you depend on rules firing on functions marked as NOINLINE without
+    marking use sites of these functions as INLINE or INLINEABLE then things will break
+    unless this flag is disabled.
+
+    While WorkerWrapper is disabled this has no effect.
+
 .. ghc-flag:: -fbinary-blob-threshold=⟨n⟩
     :shortdesc: *default: 500K.* Tweak assembly generator for binary blobs.
     :type: dynamic

@@ -14,7 +14,8 @@ module GHC.Types.RepType
     typePrimRep, typePrimRep1, typeMonoPrimRep_maybe,
     runtimeRepPrimRep, typePrimRepArgs,
     PrimRep(..), primRepToType,
-    countFunRepArgs, countConRepArgs, tyConPrimRep, tyConPrimRep1,
+    countFunRepArgs, countConRepArgs, dataConRuntimeRepStrictness,
+    tyConPrimRep, tyConPrimRep1,
 
     -- * Unboxed sum representation type
     ubxSumRepType, layoutUbxSum, typeSlotTy, SlotTy (..),
@@ -127,8 +128,41 @@ countConRepArgs dc = go (dataConRepArity dc) (dataConRepType dc)
       | otherwise
       = pprPanic "countConRepArgs: arity greater than type can handle" (ppr (n, ty, typePrimRep ty))
 
+dataConRuntimeRepStrictness :: HasDebugCallStack => DataCon -> [StrictnessMark]
+-- ^ Give the demands on the arguments of a
+-- Core constructor application (Con dc args) at runtime.
+-- Assumes the constructor is not levity polymorphic. For example
+-- unboxed tuples won't work.
+dataConRuntimeRepStrictness dc =
+
+  -- pprTrace "dataConRuntimeRepStrictness" (ppr dc $$ ppr (dataConRepArgTys dc)) $
+
+  let repMarks = dataConRepStrictness dc
+      repTys = map irrelevantMult $ dataConRepArgTys dc
+  in -- todo: assert dc != unboxedTuple/unboxedSum
+     go repMarks repTys []
+  where
+    go (mark:marks) (ty:types) out_marks
+      -- Zero-width argument, mark is irrelevant at runtime.
+      |  -- pprTrace "VoidTy" (ppr ty) $
+        (isZeroBitTy ty)
+      = go marks types out_marks
+      -- Single rep argument, e.g. Int
+      -- Keep mark as-is
+      | [_] <- reps
+      = go marks types (mark:out_marks)
+      -- Multi-rep argument, e.g. (# Int, Bool #) or (# Int | Bool #)
+      -- Make up one non-strict mark per runtime argument.
+      | otherwise -- TODO: Assert real_reps /= null
+      = go marks types ((replicate (length real_reps) NotMarkedStrict)++out_marks)
+      where
+        reps = typePrimRep ty
+        real_reps = filter (not . isVoidRep) $ reps
+    go [] [] out_marks = reverse out_marks
+    go _m _t _o = pprPanic "dataConRuntimeRepStrictness2" (ppr dc $$ ppr _m $$ ppr _t $$ ppr _o)
+
 -- | True if the type has zero width.
-isZeroBitTy :: Type -> Bool
+isZeroBitTy :: HasDebugCallStack => Type -> Bool
 isZeroBitTy = null . typePrimRep
 
 

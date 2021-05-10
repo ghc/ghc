@@ -763,11 +763,12 @@ splitFun ww_opts fn_id rhs
 
 mkWWBindPair :: WwOpts -> Id -> IdInfo
              -> [Var] -> CoreExpr -> Unique -> Divergence
-             -> ([Demand], JoinArity, Id -> CoreExpr, Expr CoreBndr -> CoreExpr)
+             -> ([Demand],[CbvMark], JoinArity, Id -> CoreExpr, Expr CoreBndr -> CoreExpr)
              -> [(Id, CoreExpr)]
 mkWWBindPair ww_opts fn_id fn_info fn_args fn_body work_uniq div
-             (work_demands, join_arity, wrap_fn, work_fn)
-  = [(work_id, work_rhs), (wrap_id, wrap_rhs)]
+             (work_demands, cbv_marks :: [CbvMark], join_arity, wrap_fn, work_fn)
+  = -- pprTrace "mkWWBindPair" (ppr fn_id <+> ppr wrap_id <+> ppr work_id $$ ppr wrap_rhs) $
+    [(work_id, work_rhs), (wrap_id, wrap_rhs)]
      -- Worker first, because wrapper mentions it
   where
     arity = arityInfo fn_info
@@ -819,9 +820,13 @@ mkWWBindPair ww_opts fn_id fn_info fn_args fn_body work_uniq div
                         -- Set the arity so that the Core Lint check that the
                         -- arity is consistent with the demand type goes
                         -- through
-                `asJoinId_maybe` work_join_arity
 
-    work_arity = length work_demands
+                `setIdCbvMarks` cbv_marks
+
+                `asJoinId_maybe` work_join_arity
+                -- `setIdThing` (undefined cbv_marks)
+
+    work_arity = length work_demands :: Int
 
     -- See Note [Demand on the worker]
     single_call = saturatedByOneShots arity (demandInfo fn_info)
@@ -1014,7 +1019,8 @@ splitThunk :: WwOpts -> RecFlag -> Var -> Expr Var -> UniqSM [(Var, Expr Var)]
 splitThunk ww_opts is_rec x rhs
   = assert (not (isJoinId x)) $
     do { let x' = localiseId x -- See comment above
-       ; (useful,_, wrap_fn, fn_arg) <- mkWWstr_one ww_opts x'
+       ; (useful,_args, wrap_fn, fn_arg)
+           <- mkWWstr_one ww_opts x' NotMarkedCbv
        ; let res = [ (x, Let (NonRec x' rhs) (wrap_fn fn_arg)) ]
        ; if useful then assertPpr (isNonRec is_rec) (ppr x) -- The thunk must be non-recursive
                    return res

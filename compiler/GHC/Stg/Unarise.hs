@@ -258,6 +258,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Types.RepType
 import GHC.Stg.Syntax
+import GHC.Stg.Utils
 import GHC.Core.Type
 import GHC.Builtin.Types.Prim (intPrimTy)
 import GHC.Builtin.Types
@@ -802,10 +803,10 @@ unariseConArgBinder = unariseArgBinder True
 --------------------------------------------------------------------------------
 
 mkIds :: FastString -> [UnaryType] -> UniqSM [Id]
-mkIds fs tys = mapM (mkId fs) tys
+mkIds fs tys = mkUnarisedIds fs tys
 
 mkId :: FastString -> UnaryType -> UniqSM Id
-mkId s t = mkSysLocalM s Many t
+mkId s t = mkUnarisedId s t
 
 isMultiValBndr :: Id -> Bool
 isMultiValBndr id

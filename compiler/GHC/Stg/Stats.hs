@@ -146,7 +146,7 @@ statExpr :: StgExpr -> StatEnv
 
 statExpr (StgApp _ _)     = countOne Applications
 statExpr (StgLit _)       = countOne Literals
-statExpr (StgConApp _ _ _ _)= countOne ConstructorApps
+statExpr (StgConApp {})   = countOne ConstructorApps
 statExpr (StgOpApp _ _ _) = countOne PrimitiveApps
 statExpr (StgTick _ e)    = statExpr e
 

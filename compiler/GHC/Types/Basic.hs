@@ -45,6 +45,8 @@ module GHC.Types.Basic (
 
         Boxity(..), isBoxed,
 
+        CbvMark(..), isMarkedCbv,
+
         PprPrec(..), topPrec, sigPrec, opPrec, funPrec, starPrec, appPrec,
         maybeParen,
 
@@ -513,6 +515,37 @@ instance Binary Boxity where -- implemented via isBoxed-isomorphism to Bool
   get bh  = do
     b <- get bh
     pure $ if b then Boxed else Unboxed
+
+{-
+************************************************************************
+*                                                                      *
+                Call by value flag
+*                                                                      *
+************************************************************************
+-}
+
+-- | Should an argument be passed evaluated *and* tagged.
+data CbvMark = MarkedCbv | NotMarkedCbv
+    deriving Eq
+
+instance Outputable CbvMark where
+  ppr MarkedCbv    = text "!"
+  ppr NotMarkedCbv = text "~"
+
+instance Binary CbvMark where
+    put_ bh NotMarkedCbv = putByte bh 0
+    put_ bh MarkedCbv    = putByte bh 1
+    get bh =
+      do h <- getByte bh
+         case h of
+           0 -> return NotMarkedCbv
+           1 -> return MarkedCbv
+           _ -> panic "Invalid binary format"
+
+isMarkedCbv :: CbvMark -> Bool
+isMarkedCbv MarkedCbv = True
+isMarkedCbv NotMarkedCbv = False
+
 
 {-
 ************************************************************************

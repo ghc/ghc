@@ -56,6 +56,9 @@ module GHC.Core.Utils (
         -- * Join points
         isJoinBind,
 
+        -- * Tag inference
+        computeCbvInfo,
+
         -- * unsafeEqualityProof
         isUnsafeEqualityProof,
 
@@ -93,7 +96,7 @@ import GHC.Types.Tickish
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Unique
-import GHC.Types.Basic     ( Arity )
+import GHC.Types.Basic     ( Arity, CbvMark(..), isMarkedCbv )
 import GHC.Types.Unique.Set
 
 import GHC.Data.FastString
@@ -2443,7 +2446,11 @@ tryEtaReduce bndrs body
                     -- We always want args for join points so
                     -- we should never eta-reduce to a trivial expression.
                     -- See Note [Invariants on join points] in GHC.Core, and #20599
-                    not (isJoinId fun)
+                    not (isJoinId fun) &&
+                    -- And the function doesn't require visible arguments as part of
+                    -- it's calling convention. See Note [Strict Worker Ids]
+                    idCbvMarkArity fun == 0
+
 
     ---------------
     fun_arity fun             -- See Note [Arity care]
@@ -2591,14 +2598,88 @@ isJoinBind (NonRec b _)       = isJoinId b
 isJoinBind (Rec ((b, _) : _)) = isJoinId b
 isJoinBind _                  = False
 
-dumpIdInfoOfProgram :: (IdInfo -> SDoc) -> CoreProgram -> SDoc
-dumpIdInfoOfProgram ppr_id_info binds = vcat (map printId ids)
+dumpIdInfoOfProgram :: Bool -> (IdInfo -> SDoc) -> CoreProgram -> SDoc
+dumpIdInfoOfProgram dump_locals ppr_id_info binds = vcat (map printId ids)
   where
   ids = sortBy (stableNameCmp `on` getName) (concatMap getIds binds)
   getIds (NonRec i _) = [ i ]
   getIds (Rec bs)     = map fst bs
-  printId id | isExportedId id = ppr id <> colon <+> (ppr_id_info (idInfo id))
+  -- By default only include full info for exported ids, unless we run in the verbose
+  -- pprDebug mode.
+  printId id | isExportedId id || dump_locals = ppr id <> colon <+> (ppr_id_info (idInfo id))
              | otherwise       = empty
+
+{-
+************************************************************************
+*                                                                      *
+\subsection{Tag inference things}
+*                                                                      *
+************************************************************************
+-}
+
+-- | For a binding we:
+-- * Look at the args
+-- * Mark any with Unf=OtherCon[] as call-by-value, unless it's an unlifted type already.
+-- * Potentially combine it with existing call-by-value marks (from ww)
+-- * Update the id
+-- See Note [Attaching CBV Marks to ids].
+computeCbvInfo :: HasCallStack
+               => Id            -- The function
+               -> CoreExpr      -- It's RHS
+               -> Id
+computeCbvInfo id rhs =
+  -- pprTrace "computeCbv" (hang (ppr id) 2 (ppr dmd $$ ppr dmds)) $
+  -- TODO: For perf reasons we could skip looking at non VanillaId/StrictWorkerId/JoinId bindings
+  cbv_bndr
+  where
+    (_,val_args,_body) = collectTyAndValBinders rhs
+    new_marks = mkCbvMarks val_args
+    cbv_marks = assertPpr (checkMarks id new_marks)
+        (ppr id <+> ppr (idType id) $$ text "old:" <> ppr (idCbvMarks_maybe id) $$ text "new:" <> ppr new_marks $$ text "rhs:" <> ppr rhs)
+        new_marks
+    cbv_bndr
+        | valid_unlifted_worker val_args
+        -- Avoid retaining the original rhs
+        = cbv_marks `seqList` setIdCbvMarks id cbv_marks
+        | otherwise =
+          -- pprTraceDebug "tidyCbvInfo: Worker seems to take unboxed tuple/sum types!" (ppr id <+> ppr rhs)
+          id
+    -- We don't set CBV marks on workers which take unboxed tuples or sums as arguments.
+    -- Doing so would require us to compute the result of unarise here in order to properly determine
+    -- argument positions at runtime.
+    -- In practice this doesn't matter much. Most "interesting" functions will get a W/W split which will eliminate
+    -- unboxed tuple arguments, and unboxed sums are rarely used.
+    valid_unlifted_worker args =
+      -- pprTrace "valid_unlifted" (ppr id $$ ppr args) $
+      not $ (any (\arg -> isMultiValArg arg) args)
+    isMultiValArg id =
+      let ty = idType id
+      in not (isStateType ty) && (isUnboxedTupleType ty || isUnboxedSumType ty)
+    -- Only keep relevant marks. We *don't* have to cover all arguments. Only these
+    -- that we might want to pass call-by-value.
+    trimMarks :: [CbvMark] -> [Id] -> [CbvMark]
+    trimMarks marks val_args =
+        map fst .
+          -- Starting at the end, drop all non-cbv marks, and marks applied to unlifted types
+          dropWhileEndLE (\(m,v) -> not (isMarkedCbv m) || isUnliftedType (idType v)) $
+          zip marks val_args
+
+    mkCbvMarks :: ([Id]) -> [CbvMark]
+    mkCbvMarks = map mkMark
+      where
+        cbv_arg arg = isEvaldUnfolding (idUnfolding arg)
+        mkMark arg = if cbv_arg arg && (not $ isUnliftedType (idType arg))
+          then MarkedCbv
+          else NotMarkedCbv
+    -- If we determined earlier one an argument should be passed cbv it should
+    -- still be so here.
+    checkMarks id new_marks
+      | Just old_marks <- idCbvMarks_maybe id
+      = length (trimMarks old_marks val_args) <= length new_marks &&
+        and (zipWith checkNewMark old_marks new_marks)
+      | otherwise = True
+    checkNewMark old new =
+      isMarkedCbv new || (not $ isMarkedCbv old)
 
 
 {- *********************************************************************
