@@ -34,6 +34,7 @@ data GhcHint where
   SuggestUseSpaces :: GhcHint
   -- | Suggests wrapping an expression in parentheses
   SuggestParentheses :: GhcHint
+  SuggestAddWhitespaceAround :: GhcHint
 
 
 instance Outputable GhcHint where
@@ -67,6 +68,8 @@ instance Outputable GhcHint where
       -> text "Please use spaces instead."
     SuggestParentheses
       -> text "You could write it with parentheses"
+    SuggestAddWhitespaceAround
+      -> text "Add a whitespace around it."
 
 -- | An 'InstantiationSuggestion' for a '.hsig' file. This is generated
 -- by GHC in case of a 'DriverUnexpectedSignature' and suggests a way
