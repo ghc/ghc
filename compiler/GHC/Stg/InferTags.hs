@@ -18,10 +18,11 @@ import GHC.Stg.Syntax
 import GHC.Types.Basic ( Arity, TopLevelFlag(..), RecFlag(..) )
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
+import GHC.Types.RepType (dataConRuntimeRepStrictness)
 import GHC.Core (AltCon(..))
 import Data.List (mapAccumL)
 import GHC.Utils.Outputable
-import GHC.Utils.Misc( zipWithEqual )
+import GHC.Utils.Misc( zipWithEqual, zipEqual )
 
 import GHC.Stg.InferTags.Types
 import GHC.Driver.Ppr
@@ -236,12 +237,7 @@ inferTagExpr env (StgCase scrut bndr ty alts)
 
 addAltBndrInfo :: TagEnv p -> AltCon -> [BinderP p] -> [BinderP 'InferTaggedBinders]
 addAltBndrInfo env (DataAlt con) bndrs
-  -- Workaround for #19789
-  | length bndrs /= dataConRepArity con
-  = pprTraceDebug "RepArity doesn't match binder count" empty []
-  | otherwise
-  -- = zipWithEqual "inferTagAlt" mk_bndr bndrs (dataConRepStrictness con)
-  = zipWith mk_bndr bndrs (dataConRepStrictness con)
+  = zipWithEqual "inferTagAlt" mk_bndr bndrs (dataConRuntimeRepStrictness con)
   where
     mk_bndr bndr NotMarkedStrict = noSig env bndr
     mk_bndr bndr MarkedStrict    = (getBinderId env bndr, TagSig 0 TagProper)
@@ -313,8 +309,8 @@ inferTagRhs top grp_ids env (StgRhsCon cc con cn ticks args)
 -- We encode this by giving changing RhsCon nodes the info TagDunno
   = --pprTrace "inferTagRhsCon" (ppr grp_ids) $
     let
-        strictArgs = getStrictConArgs con args
-        strictUntaggedIds = [v | StgVarArg v <- strictArgs
+        strictArgs = zipEqual "inferTagRhs" args (dataConRuntimeRepStrictness con)
+        strictUntaggedIds = [v | (StgVarArg v, MarkedStrict) <- strictArgs
                             , lookupInfo env (StgVarArg v) /= TagProper] :: [Id]
 
         mkResult x = (TagSig 0 x, StgRhsCon cc con cn ticks args)
@@ -333,6 +329,3 @@ inferTagRhs top grp_ids env (StgRhsCon cc con cn ticks args)
           -- or a recursive group where a bindings of the group is
           -- passed into a strict field
           | otherwise -> mkResult TagDunno
-
-
-

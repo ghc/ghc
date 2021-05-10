@@ -14,7 +14,8 @@ module GHC.Types.RepType
     typePrimRep, typePrimRep1, typeMonoPrimRep_maybe,
     runtimeRepPrimRep, typePrimRepArgs,
     PrimRep(..), primRepToType,
-    countFunRepArgs, countConRepArgs, tyConPrimRep, tyConPrimRep1,
+    countFunRepArgs, countConRepArgs, dataConRuntimeRepStrictness,
+    tyConPrimRep, tyConPrimRep1,
 
     -- * Unboxed sum representation type
     ubxSumRepType, layoutUbxSum, typeSlotTy, SlotTy (..),
@@ -127,6 +128,32 @@ countConRepArgs dc = go (dataConRepArity dc) (dataConRepType dc)
       = length (typePrimRep arg) + go (n - 1) res
       | otherwise
       = pprPanic "countConRepArgs: arity greater than type can handle" (ppr (n, ty, typePrimRep ty))
+
+dataConRuntimeRepStrictness :: DataCon -> [StrictnessMark]
+-- ^ Give the demands on the arguments of a
+-- Core constructor application (Con dc args) at runtime.
+dataConRuntimeRepStrictness dc =
+  let repMarks = dataConRepStrictness dc
+      repTys = map irrelevantMult $ dataConRepArgTys dc
+  in go repMarks repTys []
+  where
+    go (mark:marks) (ty:types) out_marks
+      -- Zero-width argument, mark is irrelevant at runtime.
+      | (isVoidTy ty)
+      = go marks types out_marks
+      -- Single rep argument, e.g. Int
+      -- Keep mark as-is
+      | [_] <- reps
+      = go marks types (mark:out_marks)
+      -- Multi-rep argument, e.g. (# Int, Bool #) or (# Int | Bool #)
+      -- Make up one non-strict mark per runtime argument.
+      | otherwise -- TODO: Assert real_reps /= null
+      = go marks types ((replicate (length real_reps) NotMarkedStrict)++out_marks)
+      where
+        reps = typePrimRep ty
+        real_reps = filter (not . isVoidRep) $ reps
+    go [] [] out_marks = reverse out_marks
+    go _m _t _o = pprPanic "dataConRuntimeRepStrictness2" (ppr dc $$ ppr _m $$ ppr _t $$ ppr _o)
 
 -- | True if the type has zero width.
 isVoidTy :: Type -> Bool

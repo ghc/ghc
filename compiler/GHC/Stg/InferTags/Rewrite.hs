@@ -26,6 +26,7 @@ import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique.FM
+import GHC.Types.RepType
 import GHC.Unit.Types (Module)
 
 import GHC.Core.DataCon
@@ -381,3 +382,10 @@ mkSeqs untaggedIds con cn args tys = do
     let conBody = StgConApp con cn taggedArgs tys
     let body = foldr (\(v,bndr) expr -> mkSeq v bndr expr) conBody argMap
     return $! body
+
+-- Out of all arguments passed at runtime only return these ending up in a
+-- strict field
+getStrictConArgs :: DataCon -> [a] -> [a]
+getStrictConArgs con args =
+  [ arg |
+    (arg,MarkedStrict) <- zipEqual "getStrictConArgs" args (dataConRuntimeRepStrictness con)]
