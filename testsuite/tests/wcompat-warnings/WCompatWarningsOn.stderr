@@ -20,4 +20,4 @@ Template.hs:20:15: warning: [-Wstar-is-type (in -Wall, -Wcompat)]
     Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
     relies on the StarIsType extension, which will become
     deprecated in the future.
-    Suggested fix: use ‘Type’ from ‘Data.Kind’ instead.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.

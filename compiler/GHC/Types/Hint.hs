@@ -35,6 +35,8 @@ data GhcHint where
   -- | Suggests wrapping an expression in parentheses
   SuggestParentheses :: GhcHint
   SuggestAddWhitespaceAround :: GhcHint
+  -- | Suggests using 'Type' from 'Data.Kind' instead of \"*\".
+  SuggestUseDataKindType :: GhcHint
 
 
 instance Outputable GhcHint where
@@ -70,6 +72,9 @@ instance Outputable GhcHint where
       -> text "You could write it with parentheses"
     SuggestAddWhitespaceAround
       -> text "Add a whitespace around it."
+    SuggestUseDataKindType
+      -> text "Use" <+> quotes (text "Type")
+           <+> text "from" <+> quotes (text "Data.Kind") <+> text "instead."
 
 -- | An 'InstantiationSuggestion' for a '.hsig' file. This is generated
 -- by GHC in case of a 'DriverUnexpectedSignature' and suggests a way
