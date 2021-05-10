@@ -27,7 +27,8 @@ import Control.Monad
 
 import GHC.Driver.Session
 import GHC.Parser.Lexer
-import GHC.Parser.Errors
+import GHC.Parser.Errors.Types
+import GHC.Types.Error ( MsgEnvelope )
 import GHC.Types.SrcLoc
 import GHC.Unit.Types
 import GHC.Unit.Home
@@ -47,7 +48,7 @@ instance Monad PD where
 liftP :: P a -> PD a
 liftP (P f) = PD $ \_ _ s -> f s
 
-failMsgPD :: (SrcSpan -> PsError) -> PD a
+failMsgPD :: (SrcSpan -> MsgEnvelope PsMessage) -> PD a
 failMsgPD = liftP . failMsgP
 
 returnPD :: a -> PD a

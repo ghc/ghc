@@ -27,13 +27,15 @@ data GhcHint where
   -- | Suggests that a \"let\" expression is needed in a \"do\" block.
   SuggestLetInDo :: GhcHint
   SuggestInfixBindMaybeAtPat :: !RdrName -> GhcHint
-  -- | Type applications in patterns are only allowed on data constructors
-  TypeApplicationsInPatternsOnlyDataCons :: GhcHint
   -- | Suggests to add an \".hsig\" signature file to the Cabal manifest.
   SuggestAddSignatureCabalFile :: !ModuleName -> GhcHint
   -- | Suggests to explictly list the instantiations for the signatures in
   -- the GHC invocation command.
   SuggestSignatureInstantiations :: !ModuleName -> [InstantiationSuggestion] -> GhcHint
+  -- | Suggests to use spaces instead of tabs.
+  SuggestUseSpaces :: GhcHint
+  -- | Suggests wrapping an expression in parentheses
+  SuggestParentheses :: GhcHint
 
 
 instance Outputable GhcHint where
@@ -56,8 +58,6 @@ instance Outputable GhcHint where
            $$ if opIsAt fun
                  then perhapsAsPat
                  else empty
-    TypeApplicationsInPatternsOnlyDataCons
-      -> text "Type applications in patterns are only allowed on data constructors."
     SuggestAddSignatureCabalFile pi_mod_name
       -> text "Try adding" <+> quotes (ppr pi_mod_name)
            <+> text "to the"
@@ -72,6 +72,10 @@ instance Outputable GhcHint where
          in text "Try passing -instantiated-with=\"" <>
               suggested_instantiated_with <> text "\"" $$
                 text "replacing <" <> ppr pi_mod_name <> text "> as necessary."
+    SuggestUseSpaces
+      -> text "Please use spaces instead."
+    SuggestParentheses
+      -> text "You could write it with parentheses"
 
 perhapsAsPat :: SDoc
 perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"
