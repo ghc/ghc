@@ -2,6 +2,7 @@ module LinkerUnload (init) where
 
 import GHC
 import GHC.Unit.State
+import GHC.Unit.Env
 import GHC.Driver.Env
 import GHC.Driver.Session
 import GHC.Driver.Backend
@@ -21,4 +22,11 @@ loadPackages = do
                          , ghcLink = LinkInMemory }
     setSessionDynFlags dflags'
     hsc_env <- getSession
-    liftIO $ Loader.loadPackages (hscInterp hsc_env) hsc_env (preloadUnits (hsc_units hsc_env))
+    let logger     = hsc_logger hsc_env
+    let interp     = hscInterp hsc_env
+    let unit_env   = hsc_unit_env hsc_env
+    let unit_state = ue_units unit_env
+    let dflags     = hsc_dflags hsc_env
+    let tmpfs      = hsc_tmpfs hsc_env
+    liftIO $ Loader.initLoaderState logger tmpfs interp dflags unit_env
+    liftIO $ Loader.loadPackages logger interp unit_state dflags (preloadUnits unit_state)
