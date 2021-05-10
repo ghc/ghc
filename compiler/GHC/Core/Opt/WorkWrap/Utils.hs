@@ -1014,6 +1014,7 @@ mk_absent_let opts arg
   -- wrong (like we were in #11126). See (1) in Note [Absent fillers]
   | Just [LiftedRep] <- mb_mono_prim_reps
   , not (isStrictDmd (idDemandInfo arg)) -- See (2) in Note [Absent fillers]
+  , False -- TODO: Remove. This is just a dirty hack around #19766
   = Just (Let (NonRec arg panic_rhs))
 
   -- The default case for mono rep: Bind @RUBBISH[prim_reps] \@arg_ty@
