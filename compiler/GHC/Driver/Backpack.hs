@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE GADTs #-}
 
 
 -- | This is the driver for the 'ghc --backpack' mode, which
@@ -760,7 +761,7 @@ summariseRequirement pn mod_name = do
     let loc = srcLocSpan (mkSrcLoc (mkFastString (bkp_filename env)) 1 1)
 
     let fc = hsc_FC hsc_env
-    mod <- liftIO $ addHomeModuleToFinder fc home_unit mod_name location
+    mod <- liftIO $ addHomeModuleToFinder fc home_unit (GWIB mod_name NotBoot) location
 
     extra_sig_imports <- liftIO $ findExtraSigImports hsc_env HsigFile mod_name
 
@@ -809,10 +810,11 @@ summariseDecl _pn hsc_src lmodname@(L loc modname) Nothing
                          Nothing -- GHC API buffer support not supported
                          [] -- No exclusions
          case r of
-            Nothing -> throwOneError (mkPlainErrorMsgEnvelope loc
+            S_NotFound -> throwOneError (mkPlainErrorMsgEnvelope loc
                                      (text "module" <+> ppr modname <+> text "was not found"))
-            Just (Left err) -> throwErrors err
-            Just (Right summary) -> return summary
+            S_Err err -> throwErrors err
+            S_Src summary -> return summary
+            S_Interface {} -> pprPanic "interface not allowed" (ppr modname)
 
 -- | Up until now, GHC has assumed a single compilation target per source file.
 -- Backpack files with inline modules break this model, since a single file
@@ -877,7 +879,7 @@ hsModuleToModSummary pn hsc_src modname
     this_mod <- liftIO $ do
       let home_unit = hsc_home_unit hsc_env
       let fc        = hsc_FC hsc_env
-      addHomeModuleToFinder fc home_unit modname location
+      addHomeModuleToFinder fc home_unit (GWIB modname NotBoot) location
     return $ ExtendedModSummary
       { emsModSummary =
           ModSummary {

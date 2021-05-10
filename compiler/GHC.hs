@@ -69,7 +69,7 @@ module GHC (
 
         -- * Inspecting the module structure of the program
         ModuleGraph, emptyMG, mapMG, mkModuleGraph, mgModSummaries,
-        mgLookupModule,
+        mgLookupModuleFilePath,
         ModSummary(..), ms_mod_name, ModLocation(..),
         getModSummary,
         getModuleGraph,
@@ -1647,7 +1647,7 @@ findModule mod_name maybe_pkg = withSession $ \hsc_env -> do
   let dflags    = hsc_dflags hsc_env
   case maybe_pkg of
     Just pkg | not (isHomeUnit home_unit (fsToUnit pkg)) && pkg /= fsLit "this" -> liftIO $ do
-      res <- findImportedModule fc units home_unit dflags mod_name maybe_pkg
+      res <- findExposedPackageModule fc units dflags mod_name maybe_pkg
       case res of
         Found _ m -> return m
         err       -> throwOneError $ noModError hsc_env noSrcSpan mod_name err
@@ -1656,7 +1656,7 @@ findModule mod_name maybe_pkg = withSession $ \hsc_env -> do
       case home of
         Just m  -> return m
         Nothing -> liftIO $ do
-           res <- findImportedModule fc units home_unit dflags mod_name maybe_pkg
+           res <- findImportedModule fc units home_unit dflags mod_name NotBoot maybe_pkg
            case res of
              Found loc m | not (isHomeModule home_unit m) -> return m
                          | otherwise -> modNotLoadedError dflags m loc

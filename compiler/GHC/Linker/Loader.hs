@@ -15,6 +15,7 @@ module GHC.Linker.Loader
    , initLoaderState
    , uninitializedLoader
    , showLoaderState
+   , modifyLoaderState
    -- * Load & Unload
    , loadExpr
    , loadDecls

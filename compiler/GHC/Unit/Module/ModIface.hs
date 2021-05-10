@@ -18,6 +18,8 @@ module GHC.Unit.Module.ModIface
    , mi_fix
    , mi_semantic_module
    , mi_free_holes
+   , mi_mnib
+   , mi_mib
    , renameFreeHoles
    , emptyPartialModIface
    , emptyFullModIface
@@ -260,6 +262,12 @@ mi_boot :: ModIface -> IsBootInterface
 mi_boot iface = if mi_hsc_src iface == HsBootFile
     then IsBoot
     else NotBoot
+
+mi_mnib :: ModIface -> ModuleNameWithIsBoot
+mi_mnib iface = GWIB (moduleName $ mi_module iface) (mi_boot iface)
+
+mi_mib :: ModIface -> ModuleWithIsBoot
+mi_mib iface = GWIB (mi_module iface) (mi_boot iface)
 
 -- | Lookups up a (possibly cached) fixity from a 'ModIface'. If one cannot be
 -- found, 'defaultFixity' is returned instead.

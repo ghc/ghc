@@ -313,7 +313,7 @@ implicitRequirements' :: HscEnv
 implicitRequirements' hsc_env normal_imports
   = fmap concat $
     forM normal_imports $ \(mb_pkg, L _ imp) -> do
-        found <- findImportedModule fc units home_unit dflags imp mb_pkg
+        found <- findImportedModule fc units home_unit dflags imp NotBoot mb_pkg
         case found of
             Found _ mod | not (isHomeModule home_unit mod) ->
                 return (uniqDSetToList (moduleFreeHoles mod))
@@ -341,7 +341,7 @@ implicitRequirementsShallow hsc_env normal_imports = go ([], []) normal_imports
 
   go acc [] = pure acc
   go (accL, accR) ((mb_pkg, L _ imp):imports) = do
-    found <- findImportedModule fc units home_unit dflags imp mb_pkg
+    found <- findImportedModule fc units home_unit dflags imp NotBoot mb_pkg
     let acc' = case found of
           Found _ mod | not (isHomeModule home_unit mod) ->
               case moduleUnit mod of

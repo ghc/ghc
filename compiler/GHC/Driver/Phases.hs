@@ -22,6 +22,7 @@ module GHC.Driver.Phases (
    isDynLibSuffix,
    isHaskellUserSrcSuffix,
    isHaskellSigSuffix,
+   isHaskellBootSuffix,
    isSourceSuffix,
 
    isHaskellishTarget,
@@ -29,6 +30,7 @@ module GHC.Driver.Phases (
    isHaskellishFilename,
    isHaskellSrcFilename,
    isHaskellSigFilename,
+   isHaskellBootFilename,
    isObjectFilename,
    isCishFilename,
    isDynLibFilename,
@@ -231,7 +233,7 @@ phaseInputExt MergeForeign        = "o"
 phaseInputExt StopLn              = "o"
 
 haskellish_src_suffixes, backpackish_suffixes, haskellish_suffixes, cish_suffixes,
-    haskellish_user_src_suffixes, haskellish_sig_suffixes
+    haskellish_user_src_suffixes, haskellish_sig_suffixes, haskellish_boot_suffixes
  :: [String]
 -- When a file with an extension in the haskellish_src_suffixes group is
 -- loaded in --make mode, its imports will be loaded too.
@@ -243,7 +245,8 @@ cish_suffixes                = [ "c", "cpp", "C", "cc", "cxx", "s", "S", "ll", "
 
 -- Will not be deleted as temp files:
 haskellish_user_src_suffixes =
-  haskellish_sig_suffixes ++ [ "hs", "lhs", "hs-boot", "lhs-boot" ]
+  haskellish_sig_suffixes ++ [ "hs", "lhs" ] ++ haskellish_boot_suffixes
+haskellish_boot_suffixes = ["hs-boot", "lhs-boot" ]
 haskellish_sig_suffixes      = [ "hsig", "lhsig" ]
 backpackish_suffixes         = [ "bkp" ]
 
@@ -266,6 +269,7 @@ isHaskellishSuffix, isBackpackishSuffix, isHaskellSrcSuffix, isCishSuffix,
 isHaskellishSuffix     s = s `elem` haskellish_suffixes
 isBackpackishSuffix    s = s `elem` backpackish_suffixes
 isHaskellSigSuffix     s = s `elem` haskellish_sig_suffixes
+isHaskellBootSuffix    s = s `elem` haskellish_boot_suffixes
 isHaskellSrcSuffix     s = s `elem` haskellish_src_suffixes
 isCishSuffix           s = s `elem` cish_suffixes
 isHaskellUserSrcSuffix s = s `elem` haskellish_user_src_suffixes
@@ -297,7 +301,8 @@ isHaskellishTarget (_,Just phase) =
                   , StopLn]
 
 isHaskellishFilename, isHaskellSrcFilename, isCishFilename,
-    isHaskellUserSrcFilename, isSourceFilename, isHaskellSigFilename
+    isHaskellUserSrcFilename, isSourceFilename, isHaskellSigFilename,
+    isHaskellBootFilename
  :: FilePath -> Bool
 -- takeExtension return .foo, so we drop 1 to get rid of the .
 isHaskellishFilename     f = isHaskellishSuffix     (drop 1 $ takeExtension f)
@@ -306,6 +311,7 @@ isCishFilename           f = isCishSuffix           (drop 1 $ takeExtension f)
 isHaskellUserSrcFilename f = isHaskellUserSrcSuffix (drop 1 $ takeExtension f)
 isSourceFilename         f = isSourceSuffix         (drop 1 $ takeExtension f)
 isHaskellSigFilename     f = isHaskellSigSuffix     (drop 1 $ takeExtension f)
+isHaskellBootFilename    f = isHaskellBootSuffix    (drop 1 $ takeExtension f)
 
 isObjectFilename, isDynLibFilename :: Platform -> FilePath -> Bool
 isObjectFilename platform f = isObjectSuffix platform (drop 1 $ takeExtension f)

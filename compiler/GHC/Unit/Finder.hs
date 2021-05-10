@@ -63,6 +63,7 @@ import System.Directory
 import System.FilePath
 import Control.Monad
 import Data.Time
+import GHC.Driver.Ppr
 
 
 type FileExt = String   -- Filename extension
@@ -91,20 +92,20 @@ flushFinderCaches :: FinderCache -> HomeUnit -> IO ()
 flushFinderCaches (FinderCache ref) home_unit =
   atomicModifyIORef' ref $ \fm -> (filterInstalledModuleEnv is_ext fm, ())
  where
-  is_ext mod _ = not (isHomeInstalledModule home_unit mod)
+  is_ext (mod, _) _ = not (isHomeInstalledModule home_unit mod)
 
-addToFinderCache :: FinderCache -> InstalledModule -> InstalledFindResult -> IO ()
-addToFinderCache (FinderCache ref) key val =
-  atomicModifyIORef' ref $ \c -> (extendInstalledModuleEnv c key val, ())
+addToFinderCache :: FinderCache -> InstalledModule -> IsBootInterface -> InstalledFindResult -> IO ()
+addToFinderCache (FinderCache ref) key is_boot val =
+  atomicModifyIORef' ref $ \c -> (extendInstalledModuleEnv c key is_boot val, ())
 
-removeFromFinderCache :: FinderCache -> InstalledModule -> IO ()
-removeFromFinderCache (FinderCache ref) key =
-  atomicModifyIORef' ref $ \c -> (delInstalledModuleEnv c key, ())
+removeFromFinderCache :: FinderCache -> InstalledModule -> IsBootInterface -> IO ()
+removeFromFinderCache (FinderCache ref) key is_boot =
+  atomicModifyIORef' ref $ \c -> (delInstalledModuleEnv c key is_boot, ())
 
-lookupFinderCache :: FinderCache -> InstalledModule -> IO (Maybe InstalledFindResult)
-lookupFinderCache (FinderCache ref) key = do
+lookupFinderCache :: FinderCache -> InstalledModule -> IsBootInterface -> IO (Maybe InstalledFindResult)
+lookupFinderCache (FinderCache ref) key is_boot = do
    c <- readIORef ref
-   return $! lookupInstalledModuleEnv c key
+   return $! lookupInstalledModuleEnv c key is_boot
 
 -- -----------------------------------------------------------------------------
 -- The three external entry points
@@ -121,15 +122,16 @@ findImportedModule
   -> HomeUnit
   -> DynFlags
   -> ModuleName
+  -> IsBootInterface
   -> Maybe FastString
   -> IO FindResult
-findImportedModule fc units home_unit dflags mod_name mb_pkg =
+findImportedModule fc units home_unit dflags mod_name is_boot mb_pkg =
   case mb_pkg of
         Nothing                        -> unqual_import
         Just pkg | pkg == fsLit "this" -> home_import -- "this" is special
                  | otherwise           -> pkg_import
   where
-    home_import   = findHomeModule fc home_unit dflags mod_name
+    home_import   = findHomeModule fc home_unit dflags mod_name is_boot
 
     pkg_import    = findExposedPackageModule fc units dflags mod_name mb_pkg
 
@@ -143,7 +145,7 @@ findImportedModule fc units home_unit dflags mod_name mb_pkg =
 -- @-plugin-package@ are specified.
 findPluginModule :: FinderCache -> UnitState -> HomeUnit -> DynFlags -> ModuleName -> IO FindResult
 findPluginModule fc units home_unit dflags mod_name =
-  findHomeModule fc home_unit dflags mod_name
+  findHomeModule fc home_unit dflags mod_name NotBoot
   `orIfNotFound`
   findExposedPluginPackageModule fc units dflags mod_name
 
@@ -153,10 +155,10 @@ findPluginModule fc units home_unit dflags mod_name =
 -- reading the interface for a module mentioned by another interface,
 -- for example (a "system import").
 
-findExactModule :: FinderCache -> DynFlags -> UnitState -> HomeUnit -> InstalledModule -> IO InstalledFindResult
-findExactModule fc dflags unit_state home_unit mod = do
+findExactModule :: FinderCache -> DynFlags -> UnitState -> HomeUnit -> InstalledModule -> IsBootInterface -> IO InstalledFindResult
+findExactModule fc dflags unit_state home_unit mod is_boot = do
   if isHomeInstalledModule home_unit mod
-    then findInstalledHomeModule fc dflags home_unit (moduleName mod)
+    then findInstalledHomeModule fc dflags home_unit (moduleName mod) is_boot
     else findPackageModule fc unit_state dflags mod
 
 -- -----------------------------------------------------------------------------
@@ -192,10 +194,10 @@ orIfNotFound this or_this = do
 -- been done.  Otherwise, do the lookup (with the IO action) and save
 -- the result in the finder cache and the module location cache (if it
 -- was successful.)
-homeSearchCache :: FinderCache -> HomeUnit -> ModuleName -> IO InstalledFindResult -> IO InstalledFindResult
-homeSearchCache fc home_unit mod_name do_this = do
+homeSearchCache :: FinderCache -> HomeUnit -> ModuleNameWithIsBoot -> IO InstalledFindResult -> IO InstalledFindResult
+homeSearchCache fc home_unit (GWIB mod_name is_boot) do_this = do
   let mod = mkHomeInstalledModule home_unit mod_name
-  modLocationCache fc mod do_this
+  modLocationCache fc mod is_boot do_this
 
 findExposedPackageModule :: FinderCache -> UnitState -> DynFlags -> ModuleName -> Maybe FastString -> IO FindResult
 findExposedPackageModule fc units dflags mod_name mb_pkg =
@@ -252,35 +254,35 @@ findLookupResult fc dflags r = case r of
                        , fr_unusables = []
                        , fr_suggestions = suggest' })
 
-modLocationCache :: FinderCache -> InstalledModule -> IO InstalledFindResult -> IO InstalledFindResult
-modLocationCache fc mod do_this = do
-  m <- lookupFinderCache fc mod
+modLocationCache :: FinderCache -> InstalledModule -> IsBootInterface -> IO InstalledFindResult -> IO InstalledFindResult
+modLocationCache fc mod is_boot do_this = do
+  m <- lookupFinderCache fc mod is_boot
   case m of
     Just result -> return result
     Nothing     -> do
         result <- do_this
-        addToFinderCache fc mod result
+        addToFinderCache fc mod is_boot result
         return result
 
 -- This returns a module because it's more convenient for users
-addHomeModuleToFinder :: FinderCache -> HomeUnit -> ModuleName -> ModLocation -> IO Module
-addHomeModuleToFinder fc home_unit mod_name loc = do
+addHomeModuleToFinder :: FinderCache -> HomeUnit -> ModuleNameWithIsBoot -> ModLocation -> IO Module
+addHomeModuleToFinder fc home_unit (GWIB mod_name is_boot) loc = do
   let mod = mkHomeInstalledModule home_unit mod_name
-  addToFinderCache fc mod (InstalledFound loc mod)
+  addToFinderCache fc mod is_boot (InstalledFound loc mod)
   return (mkHomeModule home_unit mod_name)
 
-uncacheModule :: FinderCache -> HomeUnit -> ModuleName -> IO ()
-uncacheModule fc home_unit mod_name = do
+uncacheModule :: FinderCache -> HomeUnit -> ModuleNameWithIsBoot -> IO ()
+uncacheModule fc home_unit (GWIB mod_name is_boot) = do
   let mod = mkHomeInstalledModule home_unit mod_name
-  removeFromFinderCache fc mod
+  removeFromFinderCache fc mod is_boot
 
 -- -----------------------------------------------------------------------------
 --      The internal workers
 
-findHomeModule :: FinderCache -> HomeUnit -> DynFlags -> ModuleName -> IO FindResult
-findHomeModule fc home_unit dflags mod_name = do
+findHomeModule :: FinderCache -> HomeUnit -> DynFlags -> ModuleName -> IsBootInterface -> IO FindResult
+findHomeModule fc home_unit dflags mod_name is_boot = do
   let uid       = homeUnitAsUnit home_unit
-  r <- findInstalledHomeModule fc dflags home_unit mod_name
+  r <- findInstalledHomeModule fc dflags home_unit mod_name is_boot
   return $ case r of
     InstalledFound loc _ -> Found loc (mkHomeModule home_unit mod_name)
     InstalledNoPackage _ -> NoPackage uid -- impossible
@@ -309,9 +311,9 @@ findHomeModule fc home_unit dflags mod_name = do
 --
 --  4. Some special-case code in GHCi (ToDo: Figure out why that needs to
 --  call this.)
-findInstalledHomeModule :: FinderCache -> DynFlags -> HomeUnit -> ModuleName -> IO InstalledFindResult
-findInstalledHomeModule fc dflags home_unit mod_name = do
-  homeSearchCache fc home_unit mod_name $
+findInstalledHomeModule :: FinderCache -> DynFlags -> HomeUnit -> ModuleName -> IsBootInterface -> IO InstalledFindResult
+findInstalledHomeModule fc dflags home_unit mod_name is_boot = do
+  homeSearchCache fc home_unit (GWIB mod_name is_boot) $
    let
      home_path = importPaths dflags
      hisuf = hiSuf dflags
@@ -363,7 +365,7 @@ findPackageModule fc unit_state dflags mod = do
 findPackageModule_ :: FinderCache -> DynFlags -> InstalledModule -> UnitInfo -> IO InstalledFindResult
 findPackageModule_ fc dflags mod pkg_conf = do
   MASSERT2( moduleUnit mod == unitId pkg_conf, ppr (moduleUnit mod) <+> ppr (unitId pkg_conf) )
-  modLocationCache fc mod $
+  modLocationCache fc mod NotBoot $
 
     -- special case for GHC.Prim; we won't find it in the filesystem.
     if mod `installedModuleEq` gHC_PRIM
@@ -477,7 +479,11 @@ mkHomeModLocation2 :: DynFlags
 mkHomeModLocation2 dflags mod src_basename ext = do
    let mod_basename = moduleNameSlashes mod
 
-       obj_fn = mkObjPath  dflags src_basename mod_basename
+       obj_fn
+         -- When -no-link is passed the -o refers to name of object file
+         | ghcLink dflags == NoLink
+         , Just out_fn <- outputFile dflags = out_fn
+         | otherwise = mkObjPath  dflags src_basename mod_basename
        hi_fn  = mkHiPath   dflags src_basename mod_basename
        hie_fn = mkHiePath  dflags src_basename mod_basename
 

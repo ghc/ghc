@@ -232,6 +232,7 @@ import Data.Set (Set)
 import Data.Functor
 import Control.DeepSeq (force)
 import Data.Bifunctor (first, bimap)
+import GHC.Driver.Ppr
 
 #include "HsVersions.h"
 
@@ -864,8 +865,8 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
     -- See also Note [hsc_type_env_var hack]
     type_env_var <- newIORef emptyNameEnv
     let mod = ms_mod mod_summary
-        hsc_env | isOneShot (ghcMode (hsc_dflags hsc_env''))
-                = hsc_env'' { hsc_type_env_var = Just (mod, type_env_var) }
+        hsc_env -- | isOneShot (ghcMode (hsc_dflags hsc_env''))
+                -- = hsc_env'' { hsc_type_env_var = Just (mod, type_env_var) }
                 | otherwise
                 = hsc_env''
 

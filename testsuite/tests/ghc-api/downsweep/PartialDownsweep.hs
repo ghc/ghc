@@ -167,11 +167,11 @@ go label mods cnd =
     setTargets [tgt]
 
     hsc_env <- getSession
-    emss <- liftIO $ downsweep hsc_env [] [] False
+    (_errs, res) <- partitionSummaries <$> (liftIO $ downsweep hsc_env [] [] False)
     -- liftIO $ hPutStrLn stderr $ showSDoc (hsc_dflags hsc_env) $ ppr $ rights emss
     -- liftIO $ hPrint stderr $ bagToList $ unionManyBags $ lefts emss
 
-    it label $ cnd (map emsModSummary (rights emss))
+    it label $ cnd (map emsModSummary (rights res))
 
 
 writeMod :: [String] -> IO ()

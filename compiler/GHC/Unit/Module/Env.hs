@@ -205,21 +205,21 @@ type DModuleNameEnv elt = UniqDFM ModuleName elt
 --------------------------------------------------------------------
 
 -- | A map keyed off of 'InstalledModule'
-newtype InstalledModuleEnv elt = InstalledModuleEnv (Map InstalledModule elt)
+newtype InstalledModuleEnv elt = InstalledModuleEnv (Map (InstalledModule, IsBootInterface) elt)
 
 emptyInstalledModuleEnv :: InstalledModuleEnv a
 emptyInstalledModuleEnv = InstalledModuleEnv Map.empty
 
-lookupInstalledModuleEnv :: InstalledModuleEnv a -> InstalledModule -> Maybe a
-lookupInstalledModuleEnv (InstalledModuleEnv e) m = Map.lookup m e
+lookupInstalledModuleEnv :: InstalledModuleEnv a -> InstalledModule -> IsBootInterface -> Maybe a
+lookupInstalledModuleEnv (InstalledModuleEnv e) m is_boot = Map.lookup (m, is_boot) e
 
-extendInstalledModuleEnv :: InstalledModuleEnv a -> InstalledModule -> a -> InstalledModuleEnv a
-extendInstalledModuleEnv (InstalledModuleEnv e) m x = InstalledModuleEnv (Map.insert m x e)
+extendInstalledModuleEnv :: InstalledModuleEnv a -> InstalledModule -> IsBootInterface -> a -> InstalledModuleEnv a
+extendInstalledModuleEnv (InstalledModuleEnv e) m is_boot x = InstalledModuleEnv (Map.insert (m, is_boot) x e)
 
-filterInstalledModuleEnv :: (InstalledModule -> a -> Bool) -> InstalledModuleEnv a -> InstalledModuleEnv a
+filterInstalledModuleEnv :: ((InstalledModule, IsBootInterface) -> a -> Bool) -> InstalledModuleEnv a -> InstalledModuleEnv a
 filterInstalledModuleEnv f (InstalledModuleEnv e) =
   InstalledModuleEnv (Map.filterWithKey f e)
 
-delInstalledModuleEnv :: InstalledModuleEnv a -> InstalledModule -> InstalledModuleEnv a
-delInstalledModuleEnv (InstalledModuleEnv e) m = InstalledModuleEnv (Map.delete m e)
+delInstalledModuleEnv :: InstalledModuleEnv a -> InstalledModule ->  IsBootInterface -> InstalledModuleEnv a
+delInstalledModuleEnv (InstalledModuleEnv e) m is_boot = InstalledModuleEnv (Map.delete (m, is_boot) e)
 

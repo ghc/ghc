@@ -52,14 +52,14 @@ main = do
     createDirectoryIfMissing False "mydir"
     renameFile "B.hs" "mydir/B.hs"
 
-    emss <- downsweep hsc_env [] [] False
+    (_errs, res) <- partitionSummaries <$> downsweep hsc_env [] [] False
 
     -- If 'checkSummaryTimestamp' were to call 'addHomeModuleToFinder' with
     -- (ms_location old_summary) like summariseFile used to instead of
     -- using the 'location' parameter we'd end up using the old location of
     -- the "B" module in this test. Make sure that doesn't happen.
 
-    hPrint stderr $ sort (map (ml_hs_file . ms_location) (map emsModSummary (rights emss)))
+    hPrint stderr $ sort (map (ml_hs_file . ms_location) (map emsModSummary (rights res)))
 
 writeMod :: [String] -> IO ()
 writeMod src@(head -> stripPrefix "module " -> Just (takeWhile (/=' ') -> mod))

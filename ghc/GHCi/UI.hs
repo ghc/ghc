@@ -160,6 +160,7 @@ import GHC.IO.Handle ( hFlushAll )
 import GHC.TopHandler ( topHandler )
 
 import GHCi.Leak
+import Data.Either
 
 -----------------------------------------------------------------------------
 
@@ -1665,7 +1666,7 @@ chooseEditFile =
      graph <- GHC.getModuleGraph
      failed_graph <-
        GHC.mkModuleGraph . fmap extendModSummaryNoDeps <$> filterM hasFailed (GHC.mgModSummaries graph)
-     let order g  = flattenSCCs $ filterToposortToModules $
+     let order g  = lefts $ flattenSCCs $ filterToposortToModules $
            GHC.topSortModuleGraph True g Nothing
          pick xs  = case xs of
                       x : _ -> GHC.ml_hs_file (GHC.ms_location x)
@@ -2008,7 +2009,7 @@ addModule files = do
       let units     = hsc_units hsc_env
       let dflags    = hsc_dflags hsc_env
       result <- liftIO $
-        Finder.findImportedModule fc units home_unit dflags m (Just (fsLit "this"))
+        Finder.findImportedModule fc units home_unit dflags m NotBoot (Just (fsLit "this"))
       case result of
         Found _ _ -> return True
         _ -> (liftIO $ putStrLn $
@@ -2108,9 +2109,9 @@ setContextAfterLoad keep_ctxt ms = do
           let graph = GHC.mkModuleGraph $ extendModSummaryNoDeps <$> ms
               graph' = flattenSCCs $ filterToposortToModules $
                 GHC.topSortModuleGraph True graph Nothing
-          in load_this (last graph')
+          in load_this (either ms_mod GHC.mi_module (last graph'))
         (m:_) ->
-          load_this m
+          load_this (ms_mod m)
  where
    findTarget mds t
     = case filter (`matches` t) mds of
@@ -2124,7 +2125,7 @@ setContextAfterLoad keep_ctxt ms = do
    _ `matches` _
         = False
 
-   load_this summary | m <- GHC.ms_mod summary = do
+   load_this m = do
         is_interp <- GHC.moduleIsInterpreted m
         dflags <- getDynFlags
         let star_ok = is_interp && not (safeLanguageOn dflags)
@@ -4246,12 +4247,11 @@ list2  _other =
 listModuleLine :: GHC.GhcMonad m => Module -> Int -> m ()
 listModuleLine modl line = do
    graph <- GHC.getModuleGraph
-   let this = GHC.mgLookupModule graph modl
+   let this = GHC.mgLookupModuleFilePath graph modl
    case this of
      Nothing -> panic "listModuleLine"
-     Just summ -> do
-           let filename = expectJust "listModuleLine" (ml_hs_file (GHC.ms_location summ))
-               loc = mkRealSrcLoc (mkFastString (filename)) line 0
+     Just filename -> do
+           let loc = mkRealSrcLoc (mkFastString (filename)) line 0
            listAround (realSrcLocSpan loc) False
 
 -- | list a section of a source file around a particular SrcSpan.

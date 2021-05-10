@@ -52,6 +52,8 @@ import Control.Monad    ( when, forM_ )
 import Data.Maybe       ( isJust )
 import Data.IORef
 import qualified Data.Set as Set
+import GHC.Unit.Module.ModIface
+import Data.Either
 
 -----------------------------------------------------------------
 --
@@ -293,7 +295,7 @@ findDependency hsc_env srcloc pkg imp is_boot include_pkg_deps = do
   let dflags    = hsc_dflags hsc_env
   -- Find the module; this will be fast because
   -- we've done it once during downsweep
-  r <- findImportedModule fc units home_unit dflags imp pkg
+  r <- findImportedModule fc units home_unit dflags imp is_boot pkg
   case r of
     Found loc _
         -- Home package: just depend on the .hi or hi-boot file
@@ -398,7 +400,7 @@ dumpModCycles logger dflags module_graph
     topoSort = filterToposortToModules $
       GHC.topSortModuleGraph True module_graph Nothing
 
-    cycles :: [[ModSummary]]
+    cycles :: [[Either ModSummary ModIface]]
     cycles =
       [ c | CyclicSCC c <- topoSort ]
 
@@ -406,12 +408,12 @@ dumpModCycles logger dflags module_graph
                         $$ pprCycle c $$ blankLine
                      | (n,c) <- [1..] `zip` cycles ]
 
-pprCycle :: [ModSummary] -> SDoc
+pprCycle :: [Either ModSummary ModIface] -> SDoc
 -- Print a cycle, but show only the imports within the cycle
-pprCycle summaries = pp_group (CyclicSCC summaries)
+pprCycle summaries = pp_group (CyclicSCC (lefts summaries))
   where
     cycle_mods :: [ModuleName]  -- The modules in this cycle
-    cycle_mods = map (moduleName . ms_mod) summaries
+    cycle_mods = map (moduleName . ms_mod) (lefts summaries)
 
     pp_group (AcyclicSCC ms) = pp_ms ms
     pp_group (CyclicSCC mss)
@@ -428,7 +430,8 @@ pprCycle summaries = pp_group (CyclicSCC summaries)
 
           loop_breaker = head boot_only
           all_others   = tail boot_only ++ others
-          groups = filterToposortToModules $
+          -- TODO: MP
+          groups = undefined $ filterToposortToModules $
             GHC.topSortModuleGraph True (mkModuleGraph $ extendModSummaryNoDeps <$> all_others) Nothing
 
     pp_ms summary = text mod_str <> text (take (20 - length mod_str) (repeat ' '))

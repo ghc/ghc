@@ -459,7 +459,8 @@ checkMergedSignatures hsc_env mod_summary iface = do
 -- Returns (RecompBecause <textual reason>) if recompilation is required.
 checkDependencies :: HscEnv -> ModSummary -> ModIface -> IfG RecompileRequired
 checkDependencies hsc_env summary iface
- = liftIO $ checkList (map dep_missing (ms_imps summary ++ ms_srcimps summary))
+ = liftIO $ checkList (map (dep_missing NotBoot) (ms_imps summary)
+                       ++ (map (dep_missing IsBoot) (ms_srcimps summary)))
  where
    dflags        = hsc_dflags hsc_env
    logger        = hsc_logger hsc_env
@@ -470,8 +471,8 @@ checkDependencies hsc_env summary iface
    prev_dep_plgn = dep_plgins (mi_deps iface)
    prev_dep_pkgs = dep_direct_pkgs (mi_deps iface)
 
-   dep_missing (mb_pkg, L _ mod) = do
-     find_res <- findImportedModule fc units home_unit dflags mod (mb_pkg)
+   dep_missing is_boot (mb_pkg, L _ mod) = do
+     find_res <- findImportedModule fc units home_unit dflags mod is_boot (mb_pkg)
      let reason = moduleNameString mod ++ " changed"
      case find_res of
         Found _ mod

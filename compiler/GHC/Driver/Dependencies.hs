@@ -1,17 +1,13 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TupleSections #-}
 
 -- | Functions for finding transitive dependencies of modules and packages
-module GHC.Driver.Dependencies (findHomeModules, getLinkDeps
-                               , LibrarySpec(..)
-                               , loadPackagesX
-                               , getGCCPaths
-                               , locateLib
-                               , addEnvPaths
-                               , showLS
-                               , computePackagesDeps
-                               , computePackageDeps)
-                               where
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE RecordWildCards #-}
+module GHC.Driver.Dependencies where
 
 #include "HsVersions.h"
 
@@ -23,7 +19,7 @@ import GHC.Driver.Ppr
 
 import GHC.Iface.Load
 
-import GHC.Tc.Utils.Monad
+import GHC.Tc.Utils.Monad hiding (getImports)
 
 import GHC.Data.Maybe
 import GHC.Data.FastString
@@ -61,7 +57,7 @@ import GHC.IO.Unsafe
 import Data.Char
 import System.Environment
 import GHC.Platform.ArchOS
-import GHC.Types.SrcLoc (SrcSpan)
+import GHC.Types.SrcLoc (SrcSpan, Located, GenLocated (L))
 import System.FilePath
 import System.Directory
 import GHC.Platform
@@ -69,6 +65,105 @@ import Data.IORef
 import GHC.Platform.Ways
 import GHC.Driver.Phases
 import Data.Ord
+import GHC.Driver.Monad
+import GHC.Unit.Module.Graph
+import GHC.Types.Target
+import GHC.Data.Bag
+import GHC.Unit.Module.ModSummary
+import GHC.Driver.Backend
+import qualified Data.Map as Map
+import GHC.Utils.TmpFs
+
+import GHC.Prelude
+
+import GHC.Tc.Utils.Backpack
+import GHC.Tc.Utils.Monad  ( initIfaceCheck )
+
+import GHC.Runtime.Interpreter
+import GHC.Linker.Types
+
+import GHC.Runtime.Context
+
+import GHC.Driver.Config
+import GHC.Driver.Phases
+import GHC.Driver.Session
+import GHC.Driver.Backend
+import GHC.Driver.Monad
+import GHC.Driver.Env
+import GHC.Driver.Errors
+
+import GHC.Parser.Header
+import GHC.Parser.Errors.Ppr
+
+import GHC.Iface.Load      ( cannotFindModule, pprModIface )
+import GHC.IfaceToCore     ( typecheckIface )
+
+import GHC.Data.Bag        ( unitBag, listToBag, unionManyBags, isEmptyBag )
+import GHC.Data.Graph.Directed
+import GHC.Data.FastString
+import GHC.Data.Maybe      ( expectJust )
+import GHC.Data.StringBuffer
+import qualified GHC.LanguageExtensions as LangExt
+
+import GHC.Utils.Monad     ( allM )
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Utils.Misc
+import GHC.Utils.Error
+import GHC.Utils.Logger
+import GHC.Utils.Fingerprint
+import GHC.Utils.TmpFs
+
+import GHC.Types.Basic
+import GHC.Types.Error
+import GHC.Types.Target
+import GHC.Types.SourceFile
+import GHC.Types.SourceError
+import GHC.Types.SrcLoc
+import GHC.Types.Unique.FM
+import GHC.Types.Unique.DSet
+import GHC.Types.Unique.Set
+import GHC.Types.Name
+import GHC.Types.Name.Env
+
+import GHC.Unit
+import GHC.Unit.External
+import GHC.Unit.State
+import GHC.Unit.Finder
+import GHC.Unit.Module.ModSummary
+import GHC.Unit.Module.ModIface
+import GHC.Unit.Module.ModDetails
+import GHC.Unit.Module.Graph
+import GHC.Unit.Home.ModInfo
+
+import Data.Either ( rights, partitionEithers )
+import qualified Data.Map as Map
+import Data.Map (Map)
+import qualified Data.Set as Set
+import qualified GHC.Data.FiniteMap as Map ( insertListWith )
+
+import Control.Concurrent ( forkIOWithUnmask, killThread )
+import qualified GHC.Conc as CC
+import Control.Concurrent.MVar
+import Control.Concurrent.QSem
+import Control.Exception
+import Control.Monad
+import Control.Monad.Trans.Except ( ExceptT(..), runExceptT, throwE )
+import qualified Control.Monad.Catch as MC
+import Data.IORef
+import Data.List (nub, sort, sortBy, partition)
+import qualified Data.List as List
+import Data.Foldable (toList)
+import Data.Maybe
+import Data.Ord ( comparing )
+import Data.Time
+import Data.Bifunctor (first)
+import System.Directory
+import System.FilePath
+import System.IO        ( fixIO )
+
+import GHC.Conc ( getNumProcessors, getNumCapabilities, setNumCapabilities )
+import GHC.Driver.Ppr
 
 
 -- | Used in OneShot mode to work out what the HPT looks like
@@ -92,8 +187,8 @@ findHomeModules hsc_env home_unit mns = go mns mempty
            -- This case should **never** happen because there has to already be
            -- interface files for all the dependencies already in OneShot mode.
            -- However, we don't panic so we might get a more civilised error later.
-           Failed _err -> ASSERT2(True, ppr mn) (pprPanic "failed" _err)
-           Succeeded (imported_iface, _) ->
+           GHC.Data.Maybe.Failed _err -> ASSERT2(True, ppr mn) (pprPanic "failed" _err)
+           GHC.Data.Maybe.Succeeded (imported_iface, _) ->
             let new_names = dep_direct_mods $ mi_deps imported_iface
                 comb m@(_, (GWIB { gwib_isBoot = NotBoot })) _ = m
                 comb (_, (GWIB { gwib_isBoot = IsBoot })) x  = x
@@ -155,7 +250,7 @@ getLinkDeps herald hsc_env interp hpt (loaded_pkgs, objs, bcos) span mods pkgs
     follow_deps (mod:mods) acc_mods acc_pkgs
         = do
           mb_iface <- initIfaceCheck (text "getLinkDeps") hsc_env $
-                        loadInterface msg mod (ImportByUser NotBoot)
+                        loadInterface msg mod ImportBySystem
           iface <- case mb_iface of
                     Maybes.Failed err      -> throwGhcExceptionIO (ProgramError (showSDoc dflags err))
                     Maybes.Succeeded iface -> return iface
@@ -206,26 +301,11 @@ getLinkDeps herald hsc_env interp hpt (loaded_pkgs, objs, bcos) span mods pkgs
 
     get_linkable replace_osuf osuf mod_name      -- A home-package module
         | Just mod_info <- lookupHpt hpt mod_name
-        = adjust_linkable (Maybes.expectJust "getLinkDeps" (hm_linkable mod_info))
+        , Just linkable <- hm_linkable mod_info
+        = adjust_linkable linkable
         | otherwise
-        = do    -- It's not in the HPT because we are in one shot mode,
-                -- so use the Finder to get a ModLocation...
-             let fc = hsc_FC hsc_env
-             let home_unit = hsc_home_unit hsc_env
-             let dflags = hsc_dflags hsc_env
-             mb_stuff <- findHomeModule fc home_unit dflags mod_name
-             case mb_stuff of
-                  Found loc mod -> found loc mod
-                  _ -> no_obj mod_name
+        = no_obj mod_name
         where
-            found loc mod = do {
-                -- ...and then find the linkable for it
-               mb_lnk <- findObjectLinkableMaybe mod loc ;
-               case mb_lnk of {
-                  Nothing  -> no_obj mod ;
-                  Just lnk -> adjust_linkable lnk
-              }}
-
             adjust_linkable lnk
                 | Just new_osuf <- replace_osuf = do
                         new_uls <- mapM (adjust_ul new_osuf)

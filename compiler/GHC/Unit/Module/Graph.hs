@@ -2,7 +2,7 @@
 {-# LANGUAGE RecordWildCards #-}
 
 module GHC.Unit.Module.Graph
-   ( ModuleGraph
+   ( ModuleGraph(..)
    , ModuleGraphNode(..)
    , emptyMG
    , mkModuleGraph
@@ -16,7 +16,7 @@ module GHC.Unit.Module.Graph
    , mgModSummaries'
    , mgExtendedModSummaries
    , mgElemModule
-   , mgLookupModule
+   , mgLookupModuleFilePath
    , mgBootModules
    , needsTemplateHaskellOrQQ
    , isTemplateHaskellOrQQNonBoot
@@ -35,14 +35,18 @@ import GHC.Driver.Backend
 import GHC.Driver.Ppr
 import GHC.Driver.Session
 
-import GHC.Types.SourceFile ( hscSourceString )
+import GHC.Types.SourceFile
 
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Module.Env
 import GHC.Unit.Types
 import GHC.Utils.Outputable
+import GHC.Unit.Module.ModIface
+import Control.Monad
+import GHC.Unit.Module.Location
 
 import System.FilePath
+import GHC.Linker.Types
 
 -- | A '@ModuleGraphNode@' is a node in the '@ModuleGraph@'.
 -- Edges between nodes mark dependencies arising from module imports
@@ -53,11 +57,13 @@ data ModuleGraphNode
   = InstantiationNode InstantiatedUnit
   -- | There is a module summary node for each module, signature, and boot module being built.
   | ModuleNode ExtendedModSummary
+  | InterfaceNode (ModIface, Maybe Linkable)
 
 instance Outputable ModuleGraphNode where
   ppr = \case
     InstantiationNode iuid -> ppr iuid
     ModuleNode ems -> ppr ems
+    InterfaceNode mi -> ppr (mi_module (fst mi))
 
 -- | A '@ModuleGraph@' contains all the nodes from the home package (only). See
 -- '@ModuleGraphNode@' for information about the nodes.
@@ -72,7 +78,7 @@ instance Outputable ModuleGraphNode where
 -- 'GHC.topSortModuleGraph' and 'GHC.Data.Graph.Directed.flattenSCC' to achieve this.
 data ModuleGraph = ModuleGraph
   { mg_mss :: [ModuleGraphNode]
-  , mg_non_boot :: ModuleEnv ModSummary
+  , mg_non_boot :: ModuleEnv (Maybe FilePath)
     -- a map of all non-boot ModSummaries keyed by Modules
   , mg_boot :: ModuleSet
     -- a set of boot Modules
@@ -97,7 +103,7 @@ mapMG f mg@ModuleGraph{..} = mg
   { mg_mss = flip fmap mg_mss $ \case
       InstantiationNode iuid -> InstantiationNode iuid
       ModuleNode (ExtendedModSummary ms bds) -> ModuleNode (ExtendedModSummary (f ms) bds)
-  , mg_non_boot = mapModuleEnv f mg_non_boot
+      InterfaceNode i -> InterfaceNode i
   }
 
 mgBootModules :: ModuleGraph -> ModuleSet
@@ -116,8 +122,8 @@ mgElemModule :: ModuleGraph -> Module -> Bool
 mgElemModule ModuleGraph{..} m = elemModuleEnv m mg_non_boot
 
 -- | Look up a ModSummary in the ModuleGraph
-mgLookupModule :: ModuleGraph -> Module -> Maybe ModSummary
-mgLookupModule ModuleGraph{..} m = lookupModuleEnv mg_non_boot m
+mgLookupModuleFilePath :: ModuleGraph -> Module -> Maybe FilePath
+mgLookupModuleFilePath ModuleGraph{..} m = join $ lookupModuleEnv mg_non_boot m
 
 emptyMG :: ModuleGraph
 emptyMG = ModuleGraph [] emptyModuleEnv emptyModuleSet False
@@ -135,11 +141,23 @@ extendMG ModuleGraph{..} ems@(ExtendedModSummary ms _) = ModuleGraph
   { mg_mss = ModuleNode ems : mg_mss
   , mg_non_boot = case isBootSummary ms of
       IsBoot -> mg_non_boot
-      NotBoot -> extendModuleEnv mg_non_boot (ms_mod ms) ms
+      NotBoot -> extendModuleEnv mg_non_boot (ms_mod ms) (ml_hs_file (ms_location ms))
   , mg_boot = case isBootSummary ms of
       NotBoot -> mg_boot
       IsBoot -> extendModuleSet mg_boot (ms_mod ms)
   , mg_needs_th_or_qq = mg_needs_th_or_qq || isTemplateHaskellOrQQNonBoot ms
+  }
+
+extendMGIface :: ModuleGraph -> ModIface -> Maybe Linkable -> ModuleGraph
+extendMGIface ModuleGraph{..} miface linkable = ModuleGraph
+  { mg_mss = InterfaceNode (miface, linkable) : mg_mss
+  , mg_non_boot = case mi_boot miface of
+      NotBoot -> mg_non_boot
+      IsBoot -> extendModuleEnv mg_non_boot (mi_module miface) Nothing
+  , mg_boot = case mi_boot miface of
+      NotBoot -> mg_boot
+      IsBoot -> extendModuleSet mg_boot (mi_module miface)
+  , mg_needs_th_or_qq = False
   }
 
 extendMGInst :: ModuleGraph -> InstantiatedUnit -> ModuleGraph
@@ -151,6 +169,8 @@ extendMG' :: ModuleGraph -> ModuleGraphNode -> ModuleGraph
 extendMG' mg = \case
   InstantiationNode depUnitId -> extendMGInst mg depUnitId
   ModuleNode ems -> extendMG mg ems
+  InterfaceNode (iface, linkable) -> extendMGIface mg iface linkable
+
 
 mkModuleGraph :: [ExtendedModSummary] -> ModuleGraph
 mkModuleGraph = foldr (flip extendMG) emptyMG
@@ -163,10 +183,11 @@ mkModuleGraph' = foldr (flip extendMG') emptyMG
 -- may not really be strongly connected in a direct way, as instantiations have been
 -- removed. It would probably be best to eliminate uses of this function where possible.
 filterToposortToModules
-  :: [SCC ModuleGraphNode] -> [SCC ModSummary]
+  :: [SCC ModuleGraphNode] -> [SCC (Either ModSummary ModIface)]
 filterToposortToModules = mapMaybe $ mapMaybeSCC $ \case
   InstantiationNode _ -> Nothing
-  ModuleNode (ExtendedModSummary node _) -> Just node
+  ModuleNode (ExtendedModSummary node _) -> Just (Left node)
+  InterfaceNode (iface, _) -> Just (Right iface)
   where
     -- This higher order function is somewhat bogus,
     -- as the definition of "strongly connected component"

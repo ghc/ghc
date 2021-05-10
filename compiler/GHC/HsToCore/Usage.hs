@@ -43,6 +43,7 @@ import qualified Data.Set as Set
 import GHC.Linker.Types
 import GHC.Types.SrcLoc
 import GHC.Utils.Monad
+import GHC.Linker.Loader
 
 {- Note [Module self-dependency]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -184,7 +185,7 @@ mkObjectUsage hsc_env mods pkgs = do
   (ls, ds) <-
     case hsc_interp hsc_env of
       Just interp -> do
-        (ls, us) <- getLinkDeps (text "usage") hsc_env interp (hsc_HPT hsc_env) ([], [], []) noSrcSpan mods pkgs
+        (ls, us) <- modifyLoaderState interp (\ps -> return (ps, ((objs_loaded ps ++ bcos_loaded ps), pkgs_loaded ps))) --getLinkDeps (text "usage") hsc_env interp (hsc_HPT hsc_env) ([], [], []) noSrcSpan mods pkgs
         (ls,) . fst <$> computePackagesDeps interp hsc_env us
       -- If we're using plugins or TH this case can never happen as the interpreter
       -- is needed for evaluating plugins/TH

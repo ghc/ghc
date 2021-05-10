@@ -319,7 +319,7 @@ loadSrcInterface_maybe doc mod want_boot maybe_pkg
        let dflags = hsc_dflags hsc_env
        let units = hsc_units hsc_env
        let home_unit = hsc_home_unit hsc_env
-       res <- liftIO $ findImportedModule fc units home_unit dflags mod maybe_pkg
+       res <- liftIO $ findImportedModule fc units home_unit dflags mod want_boot maybe_pkg
        case res of
            Found _ mod -> initIfaceTcRn $ loadInterface doc mod (ImportByUser want_boot)
            -- TODO: Make sure this error message is good
@@ -742,7 +742,7 @@ moduleFreeHolesPrecise doc_str mod
     tryEpsAndHpt eps hpt =
         fmap mi_free_holes (lookupIfaceByModule hpt (eps_PIT eps) mod)
     tryDepsCache eps imod insts =
-        case lookupInstalledModuleEnv (eps_free_holes eps) imod of
+        case lookupInstalledModuleEnv (eps_free_holes eps) imod NotBoot of
             Just ifhs  -> Just (renameFreeHoles ifhs insts)
             _otherwise -> Nothing
     readAndCache imod insts = do
@@ -762,7 +762,7 @@ moduleFreeHolesPrecise doc_str mod
                 let ifhs = mi_free_holes iface
                 -- Cache it
                 updateEps_ (\eps ->
-                    eps { eps_free_holes = extendInstalledModuleEnv (eps_free_holes eps) imod ifhs })
+                    eps { eps_free_holes = extendInstalledModuleEnv (eps_free_holes eps) imod NotBoot ifhs })
                 return (Succeeded (renameFreeHoles ifhs insts))
             Failed err -> return (Failed err)
 
@@ -919,7 +919,7 @@ findAndReadIface logger name_cache fc hooks unit_state home_unit dflags doc_str 
           return (Succeeded (iface, "<built in interface for GHC.Prim>"))
       else do
           -- Look for the file
-          mb_found <- liftIO (findExactModule fc dflags unit_state home_unit mod)
+          mb_found <- liftIO (findExactModule fc dflags unit_state home_unit mod hi_boot_file)
           case mb_found of
               InstalledFound loc mod -> do
                   -- Found file, so read it

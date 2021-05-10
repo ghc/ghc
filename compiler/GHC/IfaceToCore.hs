@@ -523,7 +523,7 @@ tcHiBootIface hsc_src mod
   = do  { traceIf (text "loadHiBootInterface" <+> ppr mod)
 
         ; mode <- getGhcMode
-        ; if not (isOneShot mode)
+        ; if True
                 -- In --make and interactive mode, if this module has an hs-boot file
                 -- we'll have compiled it already, and it'll be in the HPT
                 --

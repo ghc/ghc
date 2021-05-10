@@ -102,7 +102,7 @@ findImportedModule mod_name mb_pkg = do
     let home_unit = hsc_home_unit hsc_env
     let units     = hsc_units hsc_env
     let dflags    = hsc_dflags hsc_env
-    tcPluginIO $ Finder.findImportedModule fc units home_unit dflags mod_name mb_pkg
+    tcPluginIO $ Finder.findImportedModule fc units home_unit dflags mod_name NotBoot mb_pkg
 
 lookupOrig :: Module -> OccName -> TcPluginM Name
 lookupOrig mod = unsafeTcPluginTcM . IfaceEnv.lookupOrig mod

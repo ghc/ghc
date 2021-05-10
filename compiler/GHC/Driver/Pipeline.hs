@@ -33,7 +33,7 @@ module GHC.Driver.Pipeline (
    hscPostBackendPhase, getLocation, setModLocation, setDynFlags,
    runPhase,
    doCpp,
-   linkingNeeded, checkLinkInfo, writeInterfaceOnlyMode
+   linkingNeeded, checkLinkInfo, writeInterfaceOnlyMode, preloadInterfaces, oneShotMsg
   ) where
 
 #include <ghcplatform.h>
@@ -120,6 +120,9 @@ import Data.Either      ( partitionEithers )
 import Data.Time        ( getCurrentTime )
 import GHC.Driver.Dependencies
 import GHC.Types.Unique.FM
+import GHC.IfaceToCore
+import Data.IORef
+import GHC.Types.Name.Env
 
 -- ---------------------------------------------------------------------------
 -- Pre-process
@@ -293,7 +296,7 @@ compileOne' m_tc_result mHscMessage
                                Nothing,
                                Just (HscOut src_flavour mod_name status))
                               (Just basename)
-                              Persistent
+                              output
                               (Just location)
                               []
                   -- The object filename comes from the ModLocation
@@ -362,6 +365,23 @@ compileOne' m_tc_result mHscMessage
        always_do_basic_recompilation_check = case bcknd of
                                              Interpreter -> True
                                              _ -> False
+
+
+       mb_o_file = outputFile dflags
+
+       ghc_link  = ghcLink dflags      -- Set by -c or -no-link
+       -- When linking, the -o argument refers to the linker's output.
+       -- otherwise, we use it as the name for the pipeline's output.
+       output
+        -- If we are doing -fno-code, then act as if the output is
+        -- 'Temporary'. This stops GHC trying to copy files to their
+        -- final location.
+        | NoBackend <- backend dflags = Temporary TFL_CurrentModule
+        | not (isNoLink ghc_link) = Persistent
+               -- -o foo applies to linker
+        | isJust mb_o_file = SpecificFile
+               -- -o foo applies to the file we are compiling now
+        | otherwise = Persistent
 
 -----------------------------------------------------------------------------
 -- stub .h and .c files (for foreign export support), and cc files.
@@ -1094,18 +1114,32 @@ preloadInterfaces hsc_env imps = do
   let dflags = hsc_dflags hsc_env
   let units = hsc_units hsc_env
   let home_unit = hsc_home_unit hsc_env
-  let find mod maybe_pkg = liftIO $ findImportedModule fc units home_unit dflags mod maybe_pkg
+  let find mod maybe_pkg = liftIO $ findImportedModule fc units home_unit dflags mod NotBoot maybe_pkg
+  let find_obj mod_name = do
+        fr <- liftIO $ findHomeModule fc home_unit dflags mod_name NotBoot
+        case fr of
+          Found ml m -> findObjectLinkableMaybe m ml
+          _ -> return Nothing
   let do_one (mb_pkg, GWIB mod_name is_boot) = do
         res <- find mod_name mb_pkg
         case res of
-          Found _ m | isHomeModule home_unit m -> return $ Just $ GWIB mod_name is_boot
+          Found _ m | isHomeModule home_unit m -> do
+            return $ Just (GWIB mod_name is_boot)
           _ -> return Nothing
       mk_hmi mod_iface mod_name = do
-        (gwib_mod mod_name,) . (\md -> HomeModInfo mod_iface md Nothing) <$> initModDetails hsc_env (gwib_mod mod_name) mod_iface
+        mlinkable <- liftIO $ find_obj (gwib_mod mod_name)
+        mod_details <- typecheckIface mod_iface
+        return (gwib_mod mod_name, HomeModInfo mod_iface mod_details mlinkable)
   direct_home_mods <- mapMaybeM do_one imps
   interfaces <- liftIO $ findHomeModules hsc_env (hsc_home_unit hsc_env) direct_home_mods
-  hmis <- liftIO $ mapM (uncurry mk_hmi) (eltsUFM interfaces)
-  let new_hpt = addListToHpt emptyHomePackageTable hmis
+
+  new_hpt <-
+    fixIO $ \new_hpt -> do
+      let new_hsc_env = hscUpdateHPT (const new_hpt) hsc_env
+      hmis <- initIfaceCheck (text "preloadIface") new_hsc_env $
+        mapM (uncurry mk_hmi) (eltsUFM interfaces)
+      let new_hpt = addListToHpt emptyHomePackageTable hmis
+      return new_hpt
   --pprTraceM "preloadInterfaces" (ppr (fmap snd interfaces) $$ ppr direct_home_mods $$ ppr imps)
   return new_hpt
 
@@ -1277,8 +1311,13 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
         PipeState{hsc_env=hsc_env'} <- getPipeState
         let mns = [(mb_pkg, GWIB (unLoc mn) NotBoot) | (mb_pkg, mn) <- imps]
                   ++ [(mb_pkg, GWIB (unLoc mn) IsBoot) | (mb_pkg, mn) <- src_imps]
-        new_hpt <- liftIO $ preloadInterfaces hsc_env' mns
+                  ++ [(mb_pkg, GWIB (unLoc mn) NotBoot) | (mb_pkg, mn) <- src_imps]
+                  ++ [(Nothing, GWIB mn NotBoot) | mn <- pluginModNames dflags]
+        type_env_var <- liftIO $ newIORef emptyNameEnv
+        let mod = mkHomeModule (hsc_home_unit hsc_env') mod_name
+        new_hpt <- liftIO $ preloadInterfaces (hsc_env' { hsc_type_env_var = Just (mod, type_env_var) }) mns
         setHPT new_hpt
+        setTyVar (Just (mod, type_env_var))
         PipeState{hsc_env=hsc_env'} <- getPipeState
 
   -- Take -o into account if present
@@ -1299,11 +1338,6 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
         dyn_o_mod <- liftIO $ modificationTimeIfExists dyn_o_file
 
 
-  -- Tell the finder cache about this module
-        mod <- liftIO $ do
-          let home_unit = hsc_home_unit hsc_env'
-          let fc        = hsc_FC hsc_env'
-          addHomeModuleToFinder fc home_unit mod_name location
 
 
   -- Make the ModSummary to hand to hscMain
@@ -1322,6 +1356,12 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
                                         ms_hie_date     = hie_date,
                                         ms_textual_imps = imps,
                                         ms_srcimps      = src_imps }
+
+  -- Tell the finder cache about this module
+        mod <- liftIO $ do
+          let home_unit = hsc_home_unit hsc_env'
+          let fc        = hsc_FC hsc_env'
+          addHomeModuleToFinder fc home_unit (GWIB mod_name (isBootSummary mod_summary)) location
 
 
   -- run the compiler!
@@ -1802,11 +1842,7 @@ getLocation src_flavour mod_name = do
         -- the .hi and .o filenames. If we already have a ModLocation
         -- then simply update the extensions of the interface and object
         -- files to match the DynFlags, otherwise use the logic in Finder.
-      Just l -> return $ l
-        { ml_hs_file = Just $ basename <.> suff
-        , ml_hi_file = ml_hi_file l -<.> hiSuf dflags
-        , ml_obj_file = ml_obj_file l -<.> objectSuf dflags
-        }
+      --Just l -> return $ l
       _ -> do
         location1 <- liftIO $ mkHomeModLocation2 dflags mod_name basename suff
 

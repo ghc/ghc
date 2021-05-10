@@ -25,7 +25,7 @@ import GHC.Driver.Errors
 import GHC.Driver.Phases
 import GHC.Driver.Session
 import GHC.Driver.Ppr
-import GHC.Driver.Pipeline  ( oneShot, compileFile )
+import GHC.Driver.Pipeline  ( oneShot, compileFile, preloadInterfaces )
 import GHC.Driver.MakeFile  ( doMkDependHS )
 import GHC.Driver.Backpack  ( doBackpack )
 import GHC.Driver.Plugins
@@ -84,6 +84,7 @@ import Data.List ( isPrefixOf, partition, intercalate )
 import qualified Data.Set as Set
 import Data.Maybe
 import Prelude
+import GHC.Unit.Types
 
 -----------------------------------------------------------------------------
 -- ToDo:
@@ -251,6 +252,7 @@ main' postLoadMode dflags0 args flagWarnings = do
                                                     f
        DoMake                 -> doMake srcs
        DoMkDependHS           -> doMkDependHS (map fst srcs)
+       StopBefore StopLn      -> doMake srcs
        StopBefore p           -> liftIO (oneShot hsc_env p srcs)
        DoInteractive          -> ghciUI srcs Nothing
        DoEval exprs           -> ghciUI srcs $ Just $ reverse exprs
@@ -808,7 +810,9 @@ dumpUnitsSimple hsc_env = putMsg (hsc_logger hsc_env) (hsc_dflags hsc_env) (pprU
 doFrontend :: ModuleName -> [(String, Maybe Phase)] -> Ghc ()
 doFrontend modname srcs = do
     hsc_env <- getSession
-    frontend_plugin <- liftIO $ loadFrontendPlugin hsc_env modname
+    hpt' <- liftIO $ preloadInterfaces hsc_env [(Nothing, GWIB modname NotBoot)]
+    let hsc_env' = hscUpdateHPT (const hpt') hsc_env
+    frontend_plugin <- liftIO $ loadFrontendPlugin hsc_env' modname
     frontend frontend_plugin
       (reverse $ frontendPluginOpts (hsc_dflags hsc_env)) srcs
 
@@ -846,7 +850,7 @@ abiHash strs = do
 
   let find_it str = do
          let modname = mkModuleName str
-         r <- findImportedModule fc units home_unit dflags modname Nothing
+         r <- findImportedModule fc units home_unit dflags modname NotBoot Nothing
          case r of
            Found _ m -> return m
            _error    -> throwGhcException $ CmdLineError $ showSDoc dflags $
