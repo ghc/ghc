@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 1998-2000
+ * (c) The GHC Team, 1998-2021
  *
  * Support for mapping info table pointers to source locations
  *
