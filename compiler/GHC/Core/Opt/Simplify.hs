@@ -1554,9 +1554,11 @@ simplLamBndr :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
 -- Used for lambda binders.  These sometimes have unfoldings added by
 -- the worker/wrapper pass that must be preserved, because they can't
 -- be reconstructed from context.  For example:
---      f x = case x of (a,b) -> fw a b x
---      fw a b x{=(a,b)} = ...
--- The "{=(a,b)}" is an unfolding we can't reconstruct otherwise.
+--      f x = case x of StrictPair a b -> fw a b x
+--      fw a{=OtherCon[]} b{=OtherCon[]} x{=(StrictPair a b)} = ...
+-- The "{=(StrictPair a b)}" is an unfolding we can't reconstruct otherwise.
+-- Since simplBinder already retains OtherCon bindings we only have to special
+-- case core unfoldings like the one for `x`.
 simplLamBndr env bndr
   | isId bndr && hasCoreUnfolding old_unf   -- Special case
   = do { (env1, bndr1) <- simplBinder env bndr
