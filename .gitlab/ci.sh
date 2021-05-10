@@ -511,13 +511,14 @@ function run_hadrian() {
     fail "BUILD_FLAVOUR not set"
   fi
   if [ -z "${BIGNUM_BACKEND:-}" ]; then BIGNUM_BACKEND="gmp"; fi
-  if [ -n "${VERBOSE:-}" ]; then HADRIAN_ARGS="${HADRIAN_ARGS:-} -V"; fi
+  read -r -a args <<< "$HADRIAN_ARGS"
+  if [ -n "${VERBOSE:-}" ]; then HADRIAN_ARGS+=("-V"); fi
   run hadrian/build-cabal \
     --flavour="$BUILD_FLAVOUR" \
     -j"$cores" \
     --broken-test="${BROKEN_TESTS:-}" \
     --bignum=$BIGNUM_BACKEND \
-    "${HADRIAN_ARGS:-}" \
+    "${args[@]}" \
     "$@"
 }
 
