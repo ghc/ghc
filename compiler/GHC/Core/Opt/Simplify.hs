@@ -1558,7 +1558,10 @@ simplLamBndr :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
 --      fw a b x{=(a,b)} = ...
 -- The "{=(a,b)}" is an unfolding we can't reconstruct otherwise.
 simplLamBndr env bndr
-  | isId bndr && hasCoreUnfolding old_unf   -- Special case
+  -- Special case
+  | isId bndr && (hasCoreUnfolding old_unf -- Reboxing unfolding
+                 || isEvaldUnfolding old_unf -- Things out of strict fields
+                 )
   = do { (env1, bndr1) <- simplBinder env bndr
        ; unf'          <- simplStableUnfolding env1 NotTopLevel Nothing bndr
                                       (idType bndr1) (idArityType bndr1) old_unf
