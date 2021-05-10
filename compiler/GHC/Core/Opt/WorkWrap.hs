@@ -521,12 +521,10 @@ tryWW dflags fam_envs is_rec fn_id rhs
                           , ppr fn_id <> colon <+> text "ct_arty:" <+> int (ct_arty cpr_ty) <+> text "arityInfo:" <+> ppr (arityInfo fn_info))
                    ct_cpr cpr_ty
 
-    join_unfds = case isJoinId_maybe fn_id of
-        Just _ ->
-          -- See Note [Keeping unfoldings for join points]
-          -- We take all value binders, but will only proccess up to (length wrap_dmds) many
-          Just $ map idUnfolding . sndOf3 . collectTyAndValBinders $ rhs
-        Nothing -> Nothing
+    join_unfds = -- See Note [Keeping unfoldings for lambda binders points]
+                 -- We take all value binders, but will only proccess up to (length wrap_dmds) many
+                 map idUnfolding . sndOf3 . collectTyAndValBinders $ rhs
+
 
     new_fn_id = zapIdUsedOnceInfo (zapIdUsageEnvInfo fn_id)
         -- See Note [Zapping DmdEnv after Demand Analyzer] and

@@ -205,7 +205,7 @@ type WwResult
      Id -> CoreExpr,        -- Wrapper body, lacking only the worker Id
      CoreExpr -> CoreExpr)  -- Worker body, lacking the original function rhs
 
-type ArgUnfoldings = Maybe [Unfolding]
+type ArgUnfoldings = [Unfolding]
 
 -- | Really just `id`
 nop_fn :: CoreExpr -> CoreExpr
@@ -563,9 +563,8 @@ mkWWargs subst fun_ty demands join_unfolds
 
     -- Split of the unfolding of the first argument if possible
     split_argUnfolds :: ArgUnfoldings -> (Maybe Unfolding, ArgUnfoldings)
-    split_argUnfolds Nothing = (Nothing, Nothing)
-    split_argUnfolds (Just []) = (Nothing, Just [])
-    split_argUnfolds (Just (x:xs)) = (Just x, Just xs)
+    split_argUnfolds [] = (Nothing, [])
+    split_argUnfolds (x:xs) = (Just x, xs)
 
 applyToVars :: [Var] -> CoreExpr -> CoreExpr
 applyToVars vars fn = mkVarApps fn vars
