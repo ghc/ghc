@@ -18,6 +18,7 @@ import GHC.Stg.Syntax
 import GHC.Types.Basic ( Arity, TopLevelFlag(..), RecFlag(..) )
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
+import GHC.Types.RepType (dataConRuntimeRepStrictness)
 import GHC.Core (AltCon(..))
 import Data.List (mapAccumL)
 import GHC.Utils.Outputable
@@ -236,12 +237,7 @@ inferTagExpr env (StgCase scrut bndr ty alts)
 
 addAltBndrInfo :: TagEnv p -> AltCon -> [BinderP p] -> [BinderP 'InferTaggedBinders]
 addAltBndrInfo env (DataAlt con) bndrs
-  -- Workaround for #19789
-  | length bndrs /= dataConRepArity con
-  = pprTraceDebug "RepArity doesn't match binder count" empty []
-  | otherwise
-  -- = zipWithEqual "inferTagAlt" mk_bndr bndrs (dataConRepStrictness con)
-  = zipWith mk_bndr bndrs (dataConRepStrictness con)
+  = zipWithEqual "inferTagAlt" mk_bndr bndrs (dataConRuntimeRepStrictness con)
   where
     mk_bndr bndr NotMarkedStrict = noSig env bndr
     mk_bndr bndr MarkedStrict    = (getBinderId env bndr, TagSig 0 TagProper)
