@@ -228,6 +228,10 @@ instance H.Builder Builder where
                 msgIn  = "[askBuilder] Exactly one input file expected."
             needBuilder builder
             path <- H.builderPath builder
+            -- we do not depend on bare builders. E.g. we won't depend on `clang`
+            -- or `ld` or `ar`.  Unless they are provided with fully qualified paths
+            -- this is the job of the person invoking ./configure to pass e.g.
+            -- CC=$(which clang) if they want the fully qualified clang path!
             when (path /= takeFileName path) $
                 need [path]
             Stdout stdout <- cmd' [path] ["--no-user-package-db", "field", input, "depends"]

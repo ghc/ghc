@@ -70,8 +70,12 @@ needBuilder :: Builder b => b -> Action ()
 needBuilder builder = do
     path <- builderPath builder
     deps <- runtimeDependencies builder
-    -- so `path` might be just `gcc`, in which case
-    -- we won't issue a "need" on it.
+    -- so `path` might be just `gcc`, in which case we won't issue a "need" on
+    -- it.  If someone really wants the full qualified path, he ought to pass
+    -- CC=$(which gcc) to the configure script.  If CC=gcc was passed, we should
+    -- respect that choice and not resolve that via $PATH into a fully qualified
+    -- path.  We can only `need` fully qualified path's though, hence we won't
+    -- `need` bare tool names.
     when (path /= takeFileName path) $
         need [path]
     need deps
