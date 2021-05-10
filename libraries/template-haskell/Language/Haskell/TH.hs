@@ -22,6 +22,7 @@ module Language.Haskell.TH(
         -- *** Reify
         reify,            -- :: Name -> Q Info
         reifyModule,
+        newDeclarationGroup,
         Info(..), ModuleInfo(..),
         InstanceDec,
         ParentName,
