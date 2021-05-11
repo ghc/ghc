@@ -237,10 +237,14 @@ inferTagExpr env (StgCase scrut bndr ty alts)
 
 addAltBndrInfo :: TagEnv p -> AltCon -> [BinderP p] -> [BinderP 'InferTaggedBinders]
 addAltBndrInfo env (DataAlt con) bndrs
-  = zipWithEqual "inferTagAlt" mk_bndr bndrs (dataConRuntimeRepStrictness con)
+  = zipWithEqual "inferTagAlt" mk_bndr bndrs marks
   where
     mk_bndr bndr NotMarkedStrict = noSig env bndr
     mk_bndr bndr MarkedStrict    = (getBinderId env bndr, TagSig 0 TagProper)
+    marks
+      | isUnboxedSumDataCon con || isUnboxedTupleDataCon con
+      = replicate (length bndrs) NotMarkedStrict
+      | otherwise = (dataConRuntimeRepStrictness con)
 
 addAltBndrInfo env _ bndrs = map (noSig env) bndrs
 
