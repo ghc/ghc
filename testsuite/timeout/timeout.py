@@ -1,33 +1,33 @@
 #!/usr/bin/env python
 
+import errno
+import os
+import signal
+import sys
+import time
+
+secs = int(sys.argv[1])
+cmd = sys.argv[2]
+
+def killProcess(pid):
+    os.killpg(pid, signal.SIGKILL)
+    for x in range(10):
+        try:
+            time.sleep(0.3)
+            r = os.waitpid(pid, os.WNOHANG)
+            if r == (0, 0):
+                os.killpg(pid, signal.SIGKILL)
+            else:
+                return
+        except OSError as e:
+            if e.errno == errno.ECHILD:
+                return
+            else:
+                raise e
+
+pid = os.fork()
+
 try:
-
-    import errno
-    import os
-    import signal
-    import sys
-    import time
-
-    secs = int(sys.argv[1])
-    cmd = sys.argv[2]
-
-    def killProcess(pid):
-        os.killpg(pid, signal.SIGKILL)
-        for x in range(10):
-            try:
-                time.sleep(0.3)
-                r = os.waitpid(pid, os.WNOHANG)
-                if r == (0, 0):
-                    os.killpg(pid, signal.SIGKILL)
-                else:
-                    return
-            except OSError as e:
-                if e.errno == errno.ECHILD:
-                    return
-                else:
-                    raise e
-
-    pid = os.fork()
     if pid == 0:
         # child
         os.setpgrp()
@@ -50,7 +50,12 @@ try:
             sys.exit(99)                # unexpected
 
 except KeyboardInterrupt:
+    killProcess(pid)
     sys.exit(98)
+except SystemExit:
+    raise
 except:
+    print("Unexpected error:", sys.exc_info()[0])
+    killProcess(pid)
     raise
 
