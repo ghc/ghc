@@ -67,6 +67,7 @@ import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.ConLike
 import GHC.Core.DataCon
+import GHC.HsToCore.Errors.Types
 
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
@@ -444,8 +445,7 @@ zonkIdOccs env ids = map (zonkIdOcc env) ids
 zonkIdBndr :: ZonkEnv -> TcId -> TcM Id
 zonkIdBndr env v
   = do Scaled w' ty' <- zonkScaledTcTypeToTypeX env (idScaledType v)
-       ensureNotLevPoly ty'
-         (text "In the type of binder" <+> quotes (ppr v))
+       ensureNotLevPoly ty' (LevityCheckInBinder v)
 
        return (modifyIdInfo (`setLevityInfoWithType` ty') (setIdMult (setIdType v ty') w'))
 
@@ -1420,8 +1420,7 @@ zonk_pat env (ParPat x p)
 
 zonk_pat env (WildPat ty)
   = do  { ty' <- zonkTcTypeToTypeX env ty
-        ; ensureNotLevPoly ty'
-            (text "In a wildcard pattern")
+        ; ensureNotLevPoly ty' LevityCheckInWildcardPattern
         ; return (env, WildPat ty') }
 
 zonk_pat env (VarPat x (L l v))
@@ -1487,7 +1486,7 @@ zonk_pat env p@(ConPat { pat_con = L _ con
         ; case con of
             RealDataCon dc
               | isUnboxedTupleTyCon (dataConTyCon dc)
-              -> mapM_ (checkForLevPoly doc) (dropRuntimeRepArgs new_tys)
+              -> mapM_ (checkForLevPoly (LevityCheckInUnboxedTuplePattern p)) (dropRuntimeRepArgs new_tys)
             _ -> return ()
 
         ; (env0, new_tyvars) <- zonkTyBndrsX env tyvars
@@ -1511,8 +1510,6 @@ zonk_pat env p@(ConPat { pat_con = L _ con
                  }
                )
         }
-  where
-    doc = text "In the type of an element of an unboxed tuple pattern:" $$ ppr p
 
 zonk_pat env (LitPat x lit) = return (env, LitPat x lit)
 
