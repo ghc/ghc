@@ -4,14 +4,12 @@
 \section{Common subexpression}
 -}
 
-{-# LANGUAGE CPP #-}
+
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 
 module GHC.Core.Opt.CSE (cseProgram, cseOneExpr) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -32,7 +30,7 @@ import GHC.Utils.Outputable
 import GHC.Types.Basic
 import GHC.Types.Tickish
 import GHC.Core.Map.Expr
-import GHC.Utils.Misc   ( filterOut, equalLength, debugIsOn )
+import GHC.Utils.Misc   ( filterOut, equalLength )
 import GHC.Utils.Panic
 import Data.List        ( mapAccumL )
 
@@ -693,7 +691,7 @@ combineAlts env alts
   , Alt _ bndrs1 rhs1 <- alt1
   , let filtered_alts = filterOut (identical_alt rhs1) rest_alts
   , not (equalLength rest_alts filtered_alts)
-  = ASSERT2( null bndrs1, ppr alts )
+  = assertPpr (null bndrs1) (ppr alts) $
     Alt DEFAULT [] rhs1 : filtered_alts
 
   | otherwise

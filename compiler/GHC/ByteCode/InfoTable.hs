@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP                 #-}
+
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -optc-DNON_POSIX_SOURCE #-}
 --
@@ -7,8 +7,6 @@
 
 -- | Generate infotables for interpreter-made bytecodes
 module GHC.ByteCode.InfoTable ( mkITbls ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 

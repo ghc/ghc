@@ -3,14 +3,12 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1999
 -}
 
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeFamilies #-}
 
 module GHC.Tc.Instance.Typeable(mkTypeableBinds, tyConIsTypeable) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 import GHC.Platform

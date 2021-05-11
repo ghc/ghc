@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, TypeFamilies, ViewPatterns, OverloadedStrings #-}
+{-# LANGUAGE TypeFamilies, ViewPatterns, OverloadedStrings #-}
 
 -- -----------------------------------------------------------------------------
 -- | This is the top-level module in the LLVM code generator.
@@ -10,8 +10,6 @@ module GHC.CmmToLlvm
    , llvmFixupAsm
    )
 where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 

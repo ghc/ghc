@@ -15,8 +15,6 @@ module GHC.Utils.Binary.Typeable
    )
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Utils.Binary

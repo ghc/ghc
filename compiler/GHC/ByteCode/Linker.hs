@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP                   #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MagicHash             #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -20,8 +19,6 @@ module GHC.ByteCode.Linker
   )
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Runtime.Interpreter
@@ -39,8 +36,8 @@ import GHC.Data.FastString
 import GHC.Data.SizedSeq
 
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Utils.Outputable
-import GHC.Utils.Misc
 
 import GHC.Types.Name
 import GHC.Types.Name.Env
@@ -150,7 +147,7 @@ resolvePtr interp ie ce bco_ix breakarray ptr = case ptr of
     -> return (ResolvedBCOPtr (unsafeForeignRefToRemoteRef rhv))
 
     | otherwise
-    -> ASSERT2(isExternalName nm, ppr nm)
+    -> assertPpr (isExternalName nm) (ppr nm) $
        do
           let sym_to_find = nameToCLabel nm "closure"
           m <- lookupSymbol interp sym_to_find
@@ -187,7 +184,7 @@ nameToCLabel :: Name -> String -> FastString
 nameToCLabel n suffix = mkFastString label
   where
     encodeZ = zString . zEncodeFS
-    (Module pkgKey modName) = ASSERT( isExternalName n ) nameModule n
+    (Module pkgKey modName) = assert (isExternalName n) $ nameModule n
     packagePart = encodeZ (unitFS pkgKey)
     modulePart  = encodeZ (moduleNameFS modName)
     occPart     = encodeZ (occNameFS (nameOccName n))

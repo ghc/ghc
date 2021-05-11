@@ -1,10 +1,8 @@
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE DeriveDataTypeable #-}
 --
 -- (c) The University of Glasgow
 --
-
-#include "HsVersions.h"
 
 module GHC.Types.Avail (
     Avails,
@@ -51,6 +49,7 @@ import GHC.Data.List.SetOps
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
+import GHC.Utils.Constants (debugIsOn)
 
 import Data.Data ( Data )
 import Data.Either ( partitionEithers )

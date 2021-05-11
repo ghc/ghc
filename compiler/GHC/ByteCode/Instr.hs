@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP              #-}
+
 {-# LANGUAGE FlexibleContexts #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 --
@@ -9,8 +9,6 @@
 module GHC.ByteCode.Instr (
         BCInstr(..), ProtoBCO(..), bciStackUse, LocalLabel(..)
   ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 

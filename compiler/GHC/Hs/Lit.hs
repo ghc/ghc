@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP                  #-}
 {-# LANGUAGE ConstraintKinds      #-}
 {-# LANGUAGE DeriveDataTypeable   #-}
 {-# LANGUAGE FlexibleContexts     #-}
@@ -20,8 +19,6 @@ module GHC.Hs.Lit
   ( module Language.Haskell.Syntax.Lit
   , module GHC.Hs.Lit
   ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 

@@ -6,7 +6,7 @@ Check for recursive type constructors.
 
 -}
 
-{-# LANGUAGE CPP #-}
+
 
 module GHC.Core.TyCon.RecWalk (
 
@@ -15,8 +15,6 @@ module GHC.Core.TyCon.RecWalk (
         setRecTcMaxBound, checkRecTc
 
     ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
