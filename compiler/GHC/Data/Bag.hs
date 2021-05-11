@@ -329,10 +329,13 @@ instance Foldable.Foldable Bag where
   foldl k z (TwoBags b1 b2) = foldl k (foldl k z b1) b2
   foldl k z (ListBag xs)    = foldl k z xs
 
-  foldl' _ z EmptyBag        = z
-  foldl' k z (UnitBag x)     = k z x
-  foldl' k z (TwoBags b1 b2) = let r1 = foldl' k z b1 in seq r1 $ foldl' k r1 b2
-  foldl' k z (ListBag xs)    = foldl' k z xs
+  foldl' k = go
+    where
+      go !z EmptyBag       = z
+      go z (UnitBag x)     = k z x
+      go z (TwoBags b1 b2) = let r1 = go z b1 in r1 `seq` go r1 b2
+      go z (ListBag xs)    = foldl' k z xs
+  {-# INLINEABLE foldl' #-}
 
 instance Traversable Bag where
   traverse _ EmptyBag        = pure EmptyBag

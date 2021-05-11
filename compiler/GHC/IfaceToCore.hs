@@ -215,7 +215,7 @@ typecheckIface iface
                          -- an example where this would cause non-termination.
                          text "Type envt:" <+> ppr (map fst names_w_things)])
         ; return $ ModDetails { md_types     = type_env
-                              , md_insts     = insts
+                              , md_insts     = mkInstEnv insts
                               , md_fam_insts = fam_insts
                               , md_rules     = rules
                               , md_anns      = anns
@@ -421,7 +421,7 @@ typecheckIfacesForMerging mod ifaces tc_env_var =
         exports   <- ifaceExportNames (mi_exports iface)
         complete_matches <- tcIfaceCompleteMatches (mi_complete_matches iface)
         return $ ModDetails { md_types     = type_env
-                            , md_insts     = insts
+                            , md_insts     = mkInstEnv insts
                             , md_fam_insts = fam_insts
                             , md_rules     = rules
                             , md_anns      = anns
@@ -460,7 +460,7 @@ typecheckIfaceForInstantiate nsubst iface =
     exports   <- ifaceExportNames (mi_exports iface)
     complete_matches <- tcIfaceCompleteMatches (mi_complete_matches iface)
     return $ ModDetails { md_types     = type_env
-                        , md_insts     = insts
+                        , md_insts     = mkInstEnv insts
                         , md_fam_insts = fam_insts
                         , md_rules     = rules
                         , md_anns      = anns

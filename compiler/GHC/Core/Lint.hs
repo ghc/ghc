@@ -77,7 +77,7 @@ import GHC.Builtin.Names
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
-import GHC.Core.InstEnv      ( instanceDFunId )
+import GHC.Core.InstEnv      ( instanceDFunId, instEnvElts )
 import GHC.Core.Coercion.Opt ( checkAxInstCo )
 import GHC.Core.Opt.Arity    ( typeArity )
 import GHC.Types.Demand      ( splitDmdSig, isDeadEndDiv )
@@ -459,7 +459,7 @@ interactiveInScope ictxt
     -- C.f. GHC.Tc.Module.setInteractiveContext, Desugar.deSugarExpr
     (cls_insts, _fam_insts) = ic_instances ictxt
     te1    = mkTypeEnvWithImplicits (ic_tythings ictxt)
-    te     = extendTypeEnvWithIds te1 (map instanceDFunId cls_insts)
+    te     = extendTypeEnvWithIds te1 (map instanceDFunId $ instEnvElts cls_insts)
     ids    = typeEnvIds te
     tyvars = tyCoVarsOfTypesList $ map idType ids
               -- Why the type variables?  How can the top level envt have free tyvars?

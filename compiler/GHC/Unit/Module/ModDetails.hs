@@ -6,7 +6,7 @@ where
 
 import GHC.Core         ( CoreRule )
 import GHC.Core.FamInstEnv
-import GHC.Core.InstEnv ( ClsInst )
+import GHC.Core.InstEnv ( InstEnv, emptyInstEnv )
 
 import GHC.Types.Avail
 import GHC.Types.CompleteMatch
@@ -23,7 +23,7 @@ data ModDetails = ModDetails
       -- ^ Local type environment for this particular module
       -- Includes Ids, TyCons, PatSyns
 
-   , md_insts     :: ![ClsInst]
+   , md_insts     :: InstEnv
       -- ^ 'DFunId's for the instances in this module
 
    , md_fam_insts :: ![FamInst]
@@ -43,7 +43,7 @@ emptyModDetails :: ModDetails
 emptyModDetails = ModDetails
    { md_types            = emptyTypeEnv
    , md_exports          = []
-   , md_insts            = []
+   , md_insts            = emptyInstEnv
    , md_rules            = []
    , md_fam_insts        = []
    , md_anns             = []
