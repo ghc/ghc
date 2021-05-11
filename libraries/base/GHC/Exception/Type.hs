@@ -19,11 +19,17 @@
 -----------------------------------------------------------------------------
 
 module GHC.Exception.Type
-       ( Exception(..)    -- Class
-       , SomeException(..), ArithException(..)
+       ( -- * Fundamentals
+         Exception(..)
+       , SomeException(..)
+       , pattern SomeException
+         -- * Concrete exception types
+       , ArithException(..)
        , divZeroException, overflowException, ratioZeroDenomException
        , underflowException
        ) where
+
+import {-# SOURCE #-} GHC.Exception.Backtrace (Backtrace)
 
 import Data.Maybe
 import Data.Typeable (Typeable, cast)
@@ -36,11 +42,23 @@ The @SomeException@ type is the root of the exception type hierarchy.
 When an exception of type @e@ is thrown, behind the scenes it is
 encapsulated in a @SomeException@.
 -}
-data SomeException = forall e . Exception e => SomeException e
+data SomeException = forall e. Exception e => SomeExceptionWithLocation (Maybe Backtrace) e
 
 -- | @since 3.0
 instance Show SomeException where
-    showsPrec p (SomeException e) = showsPrec p e
+        -- TODO: Should this obey the usual Show-is-Haskell invariant?
+    showsPrec p (SomeExceptionWithLocation mb_bt e) =
+        showsPrec p e <> backtrace
+      where
+        backtrace =
+          case mb_bt of
+            Nothing -> ""
+            Just bt -> "\nBacktrace:\n" <> show bt
+
+pattern SomeException e <- SomeExceptionWithLocation _ e
+  where
+    SomeException e = SomeExceptionWithLocation Nothing e
+
 
 {- |
 Any type that you wish to throw or catch as an exception must be an
