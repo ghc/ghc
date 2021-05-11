@@ -20,11 +20,12 @@ module GHC.CoreToStg ( coreToStg ) where
 import GHC.Prelude
 
 import GHC.Core
-import GHC.Core.Utils   ( exprType, findDefault, isJoinBind
-                        , exprIsTickedString_maybe )
+import GHC.Core.Utils   ( exprType, isJoinBind
+                        , exprIsTickedString_maybe, findDefault )
 import GHC.Core.Opt.Arity   ( manifestArity )
 import GHC.Stg.Syntax
 import GHC.Stg.Debug
+import GHC.Stg.Utils
 
 import GHC.Core.Type
 import GHC.Types.RepType
@@ -52,7 +53,7 @@ import GHC.Driver.Ppr
 import GHC.Types.ForeignCall
 import GHC.Types.IPE
 import GHC.Types.Demand    ( isUsedOnceDmd )
-import GHC.Builtin.PrimOps ( PrimCall(..) )
+import GHC.Builtin.PrimOps ( PrimCall(..), primOpWrapperId )
 import GHC.Types.SrcLoc    ( mkGeneralSrcSpan )
 
 import Control.Monad (ap)
@@ -375,7 +376,7 @@ coreToTopStgRhs dflags ccs this_mod (bndr, rhs)
 -- handle with the function coreToPreStgRhs.
 
 coreToStgExpr
-        :: CoreExpr
+        :: HasDebugCallStack => CoreExpr
         -> CtsM StgExpr
 
 -- The second and third components can be derived in a simple bottom up pass, not
@@ -396,9 +397,11 @@ coreToStgExpr (Coercion _)
   = coreToStgApp coercionTokenId [] []
 
 coreToStgExpr expr@(App _ _)
-  = coreToStgApp f args ticks
-  where
-    (f, args, ticks) = myCollectArgs expr
+  = case myCollectArgs expr of
+      -- Regular application
+      Right (f, args, ticks) -> coreToStgApp f args ticks
+      -- LitRubbish
+      Left lit -> return (StgLit lit)
 
 coreToStgExpr expr@(Lam _ _)
   = let
@@ -544,8 +547,9 @@ coreToStgApp f args ticks = do
                 -- Some primitive operator that might be implemented as a library call.
                 -- As noted by Note [Eta expanding primops] in GHC.Builtin.PrimOps
                 -- we require that primop applications be saturated.
-                PrimOpId op      -> ASSERT( saturated )
-                                    StgOpApp (StgPrimOp op) args' res_ty
+                PrimOpId op   -- TODO: Are calls guaranteed to be saturated already here?
+                  | saturated    -> StgOpApp (StgPrimOp op) args' res_ty
+                  | otherwise    -> StgApp MayEnter (primOpWrapperId op) args'
 
                 -- A call to some primitive Cmm function.
                 FCallId (CCall (CCallSpec (StaticTarget _ lbl (Just pkgId) True)
@@ -558,7 +562,7 @@ coreToStgApp f args ticks = do
                                     StgOpApp (StgFCallOp call (idType f)) args' res_ty
 
                 TickBoxOpId {}   -> pprPanic "coreToStg TickBox" $ ppr (f,args')
-                _other           -> StgApp f args'
+                _other           -> StgApp MayEnter f args'
 
         add_tick !t !e = StgTick t e
         tapp = foldr add_tick app (map (coreToStgTick res_ty) ticks ++ ticks')
@@ -596,7 +600,7 @@ coreToStgArgs (arg : args) = do         -- Non-type argument
     let
         (aticks, arg'') = stripStgTicksTop tickishFloatable arg'
         stg_arg = case arg'' of
-                       StgApp v []        -> StgVarArg v
+                       StgApp _ext v []        -> StgVarArg v
                        StgConApp con _ [] _ -> StgVarArg (dataConWorkId con)
                        StgLit lit         -> StgLitArg lit
                        _                  -> pprPanic "coreToStgArgs" (ppr arg)
@@ -692,7 +696,7 @@ data PreStgRhs = PreStgRhs [Id] StgExpr -- The [Id] is empty for thunks
 
 -- Convert the RHS of a binding from Core to STG. This is a wrapper around
 -- coreToStgExpr that can handle value lambdas.
-coreToPreStgRhs :: CoreExpr -> CtsM PreStgRhs
+coreToPreStgRhs :: HasDebugCallStack => CoreExpr -> CtsM PreStgRhs
 coreToPreStgRhs (Cast expr _) = coreToPreStgRhs expr
 coreToPreStgRhs expr@(Lam _ _) =
     let
@@ -953,11 +957,12 @@ myCollectBinders expr
 
 -- | Precondition: argument expression is an 'App', and there is a 'Var' at the
 -- head of the 'App' chain.
-myCollectArgs :: CoreExpr -> (Id, [CoreArg], [CoreTickish])
+myCollectArgs :: HasDebugCallStack => CoreExpr -> Either Literal (Id, [CoreArg], [CoreTickish])
 myCollectArgs expr
   = go expr [] []
   where
-    go (Var v)          as ts = (v, as, ts)
+    go :: CoreExpr -> [CoreArg] -> [CoreTickish] -> Either Literal (Id, [CoreArg], [CoreTickish])
+    go (Var v)          as ts = Right (v, as, ts)
     go (App f a)        as ts = go f (a:as) ts
     go (Tick t e)       as ts = ASSERT2( not (tickishIsCode t) || all isTypeArg as
                                        , ppr e $$ ppr as $$ ppr ts )
@@ -966,6 +971,7 @@ myCollectArgs expr
     go (Cast e _)       as ts = go e as ts
     go (Lam b e)        as ts
        | isTyVar b            = go e as ts -- Note [Collect args]
+    go (Lit l@LitRubbish{}) _as _ts = Left l
     go _                _  _  = pprPanic "CoreToStg.myCollectArgs" (ppr expr)
 
 {- Note [Collect args]

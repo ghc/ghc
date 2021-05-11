@@ -85,7 +85,7 @@ recordInfo bndr new_rhs = do
 collectExpr :: StgExpr -> M StgExpr
 collectExpr = go
   where
-    go (StgApp occ as) = return $ StgApp occ as
+    go (StgApp ext occ as) = return $ StgApp ext occ as
     go (StgLit lit) = return $ StgLit lit
     go (StgConApp dc _mn as tys) = do
       n' <- numberDataCon dc []
