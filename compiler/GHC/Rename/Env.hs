@@ -500,7 +500,11 @@ lookupRecFieldOcc mb_con rdr_name
   = do { flds <- lookupConstructorFields con
        ; env <- getGlobalRdrEnv
        ; let lbl      = occNameFS (rdrNameOcc rdr_name)
-             mb_field = do fl <- find ((== lbl) . flLabel) flds
+             -- When constructor does not have given field, we want to avoid
+             -- reporting 'ambiguous' error. So, compute it here and pass it
+             -- down to `lookupGreRn_maybe` (where we report name clash)
+             fld_here = find ((== lbl) . flLabel) flds
+             mb_field = do fl <- fld_here
                            -- We have the label, now check it is in scope.  If
                            -- there is a qualifier, use pickGREs to check that
                            -- the qualifier is correct, and return the filtered
@@ -513,12 +517,12 @@ lookupRecFieldOcc mb_con rdr_name
        ; case mb_field of
            Just (fl, gre) -> do { addUsedGRE True gre
                                 ; return (flSelector fl) }
-           Nothing        -> lookupGlobalOccRn' WantBoth rdr_name }
+           Nothing        -> lookupGlobalOccRn' (isJust fld_here) WantBoth rdr_name }
              -- See Note [Fall back on lookupGlobalOccRn in lookupRecFieldOcc]
   | otherwise
   -- This use of Global is right as we are looking up a selector which
   -- can only be defined at the top level.
-  = lookupGlobalOccRn' WantBoth rdr_name
+  = lookupGlobalOccRn' True WantBoth rdr_name
 
 -- | Look up an occurrence of a field in a record update, returning the selector
 -- name.
@@ -637,7 +641,7 @@ determine it.
 Note [Fall back on lookupGlobalOccRn in lookupRecFieldOcc]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Whenever we fail to find the field or it is not in scope, mb_field
-will be False, and we fall back on looking it up normally using
+will be Nothing, and we fall back on looking it up normally using
 lookupGlobalOccRn.  We don't report an error immediately because the
 actual problem might be located elsewhere.  For example (#9975):
 
@@ -835,7 +839,7 @@ lookupSubBndrOcc :: Bool
                  -> RdrName
                  -> RnM (Either SDoc Name)
 -- Find all the things the rdr-name maps to
--- and pick the one with the right parent namep
+-- and pick the one with the right parent name
 lookupSubBndrOcc warn_if_deprec the_parent doc rdr_name = do
   res <-
     lookupExactOrOrig rdr_name (FoundChild NoParent . NormalGreName) $
@@ -1190,7 +1194,7 @@ lookupGlobalOccRn_maybe :: RdrName -> RnM (Maybe Name)
 --
 -- Used directly only by getLocalNonValBinders (new_assoc).
 lookupGlobalOccRn_maybe rdr_name =
-  lookupExactOrOrig_maybe rdr_name id (lookupGlobalOccRn_base WantNormal rdr_name)
+  lookupExactOrOrig_maybe rdr_name id (lookupGlobalOccRn_base True WantNormal rdr_name)
 
 lookupGlobalOccRn :: RdrName -> RnM Name
 -- lookupGlobalOccRn is like lookupOccRn, except that it looks in the global
@@ -1199,12 +1203,12 @@ lookupGlobalOccRn :: RdrName -> RnM Name
 -- environment.
 --
 -- Used by exports_from_avail
-lookupGlobalOccRn = lookupGlobalOccRn' WantNormal
+lookupGlobalOccRn = lookupGlobalOccRn' True WantNormal
 
-lookupGlobalOccRn' :: FieldsOrSelectors -> RdrName -> RnM Name
-lookupGlobalOccRn' fos rdr_name =
+lookupGlobalOccRn' :: Bool -> FieldsOrSelectors -> RdrName -> RnM Name
+lookupGlobalOccRn' report_ambig fos rdr_name =
   lookupExactOrOrig rdr_name id $ do
-    mn <- lookupGlobalOccRn_base fos rdr_name
+    mn <- lookupGlobalOccRn_base report_ambig fos rdr_name
     case mn of
       Just n -> return n
       Nothing -> do { traceRn "lookupGlobalOccRn" (ppr rdr_name)
@@ -1214,10 +1218,10 @@ lookupGlobalOccRn' fos rdr_name =
 -- lookupQualifiedNameGHCi. Does not try to find an Exact or Orig name first.
 -- lookupQualifiedNameGHCi here is used when we're in GHCi and a name like
 -- 'Data.Map.elems' is typed, even if you didn't import Data.Map
-lookupGlobalOccRn_base :: FieldsOrSelectors -> RdrName -> RnM (Maybe Name)
-lookupGlobalOccRn_base fos rdr_name =
+lookupGlobalOccRn_base :: Bool -> FieldsOrSelectors -> RdrName -> RnM (Maybe Name)
+lookupGlobalOccRn_base report_ambig fos rdr_name =
   runMaybeT . msum . map MaybeT $
-    [ fmap greMangledName <$> lookupGreRn_maybe fos rdr_name
+    [ fmap greMangledName <$> lookupGreRn_maybe report_ambig fos rdr_name
     , fmap greNameMangledName <$> lookupOneQualifiedNameGHCi fos rdr_name ]
                       -- This test is not expensive,
                       -- and only happens for failed lookups
@@ -1376,19 +1380,19 @@ data GreLookupResult = GreNotFound
                      | OneNameMatch GlobalRdrElt
                      | MultipleNames (NE.NonEmpty GlobalRdrElt)
 
-lookupGreRn_maybe :: FieldsOrSelectors -> RdrName -> RnM (Maybe GlobalRdrElt)
+lookupGreRn_maybe :: Bool -> FieldsOrSelectors -> RdrName -> RnM (Maybe GlobalRdrElt)
 -- Look up the RdrName in the GlobalRdrEnv
 --   Exactly one binding: records it as "used", return (Just gre)
 --   No bindings:         return Nothing
 --   Many bindings:       report "ambiguous", return an arbitrary (Just gre)
 -- Uses addUsedRdrName to record use and deprecations
-lookupGreRn_maybe fos rdr_name
+lookupGreRn_maybe report_name_clash fos rdr_name
   = do
       res <- lookupGreRn_helper fos rdr_name
       case res of
         OneNameMatch gre ->  return $ Just gre
         MultipleNames gres -> do
-          unless (all isDuplicateRecFldGRE gres) $ do
+          when report_name_clash $ do
             traceRn "lookupGreRn_maybe:NameClash" (ppr gres)
             addNameClashErrRn rdr_name gres
           return $ Just (NE.head gres)
