@@ -6,9 +6,9 @@
  * ---------------------------------------------------------------------------*/
 
 /* A little bit of background...
-   
+
 An adjustor thunk is a dynamically allocated code snippet that allows
-Haskell closures to be viewed as C function pointers. 
+Haskell closures to be viewed as C function pointers.
 
 Stable pointers provide a way for the outside world to get access to,
 and evaluate, Haskell heap objects, with the RTS providing a small
@@ -17,7 +17,7 @@ our hand in C, we can jump into the Haskell world and evaluate a callback
 procedure, say. This works OK in some cases where callbacks are used, but
 does require the external code to know about stable pointers and how to deal
 with them. We'd like to hide the Haskell-nature of a callback and have it
-be invoked just like any other C function pointer. 
+be invoked just like any other C function pointer.
 
 Enter adjustor thunks. An adjustor thunk is a little piece of code
 that's generated on-the-fly (one per Haskell closure being exported)
@@ -59,7 +59,7 @@ extern void *adjustorCode;
 #if defined(USE_LIBFFI_FOR_ADJUSTORS)
 /* There are subtle differences between how libffi adjustors work on
  * different platforms, and the situation is a little complex.
- * 
+ *
  * HOW ADJUSTORS/CLOSURES WORK ON LIBFFI:
  * libffi's ffi_closure_alloc() function gives you two pointers to a closure,
  * 1. the writable pointer, and 2. the executable pointer. You write the
@@ -130,7 +130,7 @@ static ffi_type * char_to_ffi_type(char c)
 }
 
 void*
-createAdjustor (int cconv, 
+createAdjustor (int cconv,
                 StgStablePtr hptr,
                 StgFunPtr wptr,
                 char *typeString)
@@ -166,7 +166,7 @@ createAdjustor (int cconv,
 
     r = ffi_prep_cif(cif, abi, n_args, result_type, arg_types);
     if (r != FFI_OK) barf("ffi_prep_cif failed: %d", r);
-    
+
     cl = allocateExec(sizeof(ffi_closure), &code);
     if (cl == NULL) {
         barf("createAdjustor: failed to allocate memory");
@@ -190,12 +190,12 @@ createAdjustor (int cconv,
 
 #if defined(LEADING_UNDERSCORE)
 #define UNDERSCORE "_"
-#else 
+#else
 #define UNDERSCORE ""
 #endif
 
 #if defined(x86_64_HOST_ARCH)
-/* 
+/*
   Now here's something obscure for you:
 
   When generating an adjustor thunk that uses the C calling
@@ -206,7 +206,7 @@ createAdjustor (int cconv,
   freeHaskellFunctionPtr(). Hence, we better not return to
   the adjustor code on our way  out, since it could by then
   point to junk.
-  
+
   The fix is readily at hand, just include the opcodes
   for the C stack fixup code that we need to perform when
   returning in some static piece of memory and arrange
@@ -252,15 +252,15 @@ stgAllocStable(size_t size_in_bytes, StgStablePtr *stable)
 {
   StgArrBytes* arr;
   uint32_t data_size_in_words, total_size_in_words;
-  
+
   /* round up to a whole number of words */
   data_size_in_words  = ROUNDUP_BYTES_TO_WDS(size_in_bytes);
   total_size_in_words = sizeofW(StgArrBytes) + data_size_in_words;
-  
+
   /* allocate and fill it in */
   arr = (StgArrBytes *)allocate(total_size_in_words);
   SET_ARR_HDR(arr, &stg_ARR_WORDS_info, CCCS, size_in_bytes);
- 
+
   /* obtain a stable ptr */
   *stable = getStablePtr((StgPtr)arr);
 
@@ -409,29 +409,29 @@ createAdjustor(int cconv, StgStablePtr hptr,
         adjustor = adjustorStub;
 
         int sz = totalArgumentSize(typeString);
-        
+
         adjustorStub->call[0] = 0xe8;
         *(long*)&adjustorStub->call[1] = ((char*)&adjustorCode) - ((char*)code + 5);
         adjustorStub->hptr = hptr;
         adjustorStub->wptr = wptr;
-        
+
             // The adjustor puts the following things on the stack:
             // 1.) %ebp link
             // 2.) padding and (a copy of) the arguments
             // 3.) a dummy argument
             // 4.) hptr
             // 5.) return address (for returning to the adjustor)
-            // All these have to add up to a multiple of 16. 
+            // All these have to add up to a multiple of 16.
 
             // first, include everything in frame_size
         adjustorStub->frame_size = sz * 4 + 16;
             // align to 16 bytes
         adjustorStub->frame_size = (adjustorStub->frame_size + 15) & ~15;
             // only count 2.) and 3.) as part of frame_size
-        adjustorStub->frame_size -= 12; 
+        adjustorStub->frame_size -= 12;
         adjustorStub->argument_size = sz;
     }
-    
+
 #elif defined(x86_64_HOST_ARCH)
 
 # if defined(mingw32_HOST_OS)
@@ -512,7 +512,7 @@ createAdjustor(int cconv, StgStablePtr hptr,
   [...]
 
     */
-    {  
+    {
         StgWord8 *adj_code;
 
         // determine whether we have 4 or more integer arguments,
@@ -604,7 +604,7 @@ createAdjustor(int cconv, StgStablePtr hptr,
    c:   48 89 fe                mov    %rdi,%rsi
    f:   48 8b 3d 0a 00 00 00    mov    10(%rip),%rdi
   16:   ff 25 0c 00 00 00       jmpq   *12(%rip)
-  ... 
+  ...
   20: .quad 0  # aligned on 8-byte boundary
   28: .quad 0  # aligned on 8-byte boundary
 
@@ -626,7 +626,7 @@ createAdjustor(int cconv, StgStablePtr hptr,
   38: .quad 0  # aligned on 8-byte boundary
     */
 
-    {  
+    {
         int i = 0;
         char *c;
         StgWord8 *adj_code;
@@ -666,7 +666,7 @@ createAdjustor(int cconv, StgStablePtr hptr,
             *(StgInt32 *)(adj_code+0x18) = 0x00123d8b;
             *(StgInt32 *)(adj_code+0x1c) = 0x25ff0000;
             *(StgInt32 *)(adj_code+0x20) = 0x00000014;
-            
+
             *(StgInt64 *)(adj_code+0x28) = (StgInt64)obscure_ccall_ret_code;
             *(StgInt64 *)(adj_code+0x30) = (StgInt64)hptr;
             *(StgInt64 *)(adj_code+0x38) = (StgInt64)wptr;
@@ -807,7 +807,7 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
            We need to calculate all the details of the stack frame layout,
            taking into account the types of all the arguments, and then
            generate code on the fly. */
-    
+
         int src_gpr = 3, dst_gpr = 5;
         int fpr = 3;
         int src_offset = 0, dst_offset = 0;
@@ -815,7 +815,7 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
         int src_locs[n], dst_locs[n];
         int frameSize;
         unsigned *code;
-      
+
             /* Step 1:
                Calculate where the arguments should go.
                src_locs[] will contain the locations of the arguments in the
@@ -889,7 +889,7 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
                     // plus 14 more instructions.
         adjustor = allocateExec(4 * (4*n + 14),&code);
         code = (unsigned*)adjustor;
-        
+
         *code++ = 0x48000008; // b *+8
             // * Put the hptr in a place where freeHaskellFunctionPtr
             //   can get at it.
@@ -939,7 +939,7 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
                                 | ((-src_locs[i]+1) << 21)
                                 | (dst_locs[i] + 4);
                     }
-                    
+
                         // stw src, dst_offset(r1)
                     *code++ = 0x90010000
                             | ((-src_locs[i]) << 21)
@@ -1008,7 +1008,7 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
     }
 
 #elif defined(powerpc_HOST_ARCH) || defined(powerpc64_HOST_ARCH)
-        
+
 #define OP_LO(op,lo)  ((((unsigned)(op)) << 16) | (((unsigned)(lo)) & 0xFFFF))
 #define OP_HI(op,hi)  ((((unsigned)(op)) << 16) | (((unsigned)(hi)) >> 16))
     {
@@ -1040,7 +1040,7 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
         adjustorStub = allocateExec(sizeof(AdjustorStub),&code);
 #endif
         adjustor = adjustorStub;
-            
+
         adjustorStub->code = (void*) &adjustorCode;
 
 #if defined(FUNDESCS)
@@ -1083,7 +1083,7 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
 
             // Calculate the size of the stack frame, in words.
         sz = totalArgumentSize(typeString);
-        
+
             // The first eight words of the parameter area
             // are just "backing store" for the parameters passed in
             // the GPRs. extra_sz is the number of words beyond those first
@@ -1097,11 +1097,11 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
                   + 8 /* minimum parameter area */
                   + 2 /* two extra arguments */
                   + extra_sz)*sizeof(StgWord);
-       
+
             // align to 16 bytes.
             // AIX only requires 8 bytes, but who cares?
         total_sz = (total_sz+15) & ~0xF;
-       
+
             // Fill in the information that adjustorCode in AdjustorAsm.S
             // will use to create a new stack frame with the additional args.
         adjustorStub->hptr = hptr;
@@ -1118,7 +1118,7 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
     to save return address and previous function state - we need to come back
     here on the way out to restore the stack, so this is a real function
     rather than just a trampoline).
-    
+
     The function descriptor we create contains the gp of the target function
     so gp is already loaded correctly.
 
@@ -1203,7 +1203,7 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
     barf("adjustor creation not supported on this platform");
 #endif
     break;
-  
+
   default:
     ASSERT(0);
     break;
