@@ -16,6 +16,7 @@ import GHC.Prelude
 import {-# SOURCE #-} GHC.HsToCore.Expr ( dsExpr, dsLExpr, dsLExprNoLP, dsLocalBinds, dsSyntaxExpr )
 
 import GHC.Hs
+import GHC.Tc.Errors.Types ( LevityCheckProvenance(..) )
 import GHC.Tc.Utils.Zonk
 import GHC.Core
 import GHC.Core.Make
@@ -138,8 +139,7 @@ dsTransStmt (TransStmt { trS_form = form, trS_stmts = stmts, trS_bndrs = binderM
                 , Var unzip_fn'
                 , inner_list_expr' ]
 
-    dsNoLevPoly (tcFunResultTyN (length usingArgs') (exprType usingExpr'))
-      (text "In the result of a" <+> quotes (text "using") <+> text "function:" <+> ppr using)
+    dsNoLevPoly (tcFunResultTyN (length usingArgs') (exprType usingExpr')) (LevityCheckInFunUse using)
 
     -- Build a pattern that ensures the consumer binds into the NEW binders,
     -- which hold lists rather than single values

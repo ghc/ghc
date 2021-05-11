@@ -13,6 +13,7 @@ import GHC.Parser.Errors.Types
 import GHC.Parser.Types
 import GHC.Types.Basic
 import GHC.Types.Error
+import GHC.Types.Hint.Ppr (perhapsAsPat)
 import GHC.Types.SrcLoc
 import GHC.Types.Name.Reader (opIsAt, starInfo, rdrNameOcc, mkUnqual)
 import GHC.Types.Name.Occurrence (isSymOcc, occNameFS, varName)
@@ -774,6 +775,3 @@ pp_unexpected_fun_app e a =
 
 parse_error_in_pat :: SDoc
 parse_error_in_pat = text "Parse error in pattern:"
-
-perhapsAsPat :: SDoc
-perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"
