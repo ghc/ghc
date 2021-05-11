@@ -727,35 +727,35 @@ type instance Anno (HsOuterTyVarBndrs Specificity DocNameI) = SrcSpanAnnA
 type instance Anno (HsSigType DocNameI)                     = SrcSpanAnnA
 
 type XRecCond a
-  = ( XParTy a           ~ EpAnn AnnParen
+  = ( XParTy a           ~ EpAnn' AnnParen
     , NoGhcTc a ~ a
     , MapXRec a
     , UnXRec a
     , WrapXRec a (HsType a)
     )
 
-type instance XForAllTy        DocNameI = EpAnn [AddEpAnn]
-type instance XQualTy          DocNameI = EpAnn [AddEpAnn]
-type instance XTyVar           DocNameI = EpAnn [AddEpAnn]
-type instance XStarTy          DocNameI = EpAnn [AddEpAnn]
-type instance XAppTy           DocNameI = EpAnn [AddEpAnn]
-type instance XAppKindTy       DocNameI = EpAnn [AddEpAnn]
-type instance XFunTy           DocNameI = EpAnn [AddEpAnn]
-type instance XListTy          DocNameI = EpAnn AnnParen
-type instance XTupleTy         DocNameI = EpAnn AnnParen
-type instance XSumTy           DocNameI = EpAnn AnnParen
-type instance XOpTy            DocNameI = EpAnn [AddEpAnn]
-type instance XParTy           DocNameI = EpAnn AnnParen
-type instance XIParamTy        DocNameI = EpAnn [AddEpAnn]
-type instance XKindSig         DocNameI = EpAnn [AddEpAnn]
+type instance XForAllTy        DocNameI = EpAnn
+type instance XQualTy          DocNameI = EpAnn
+type instance XTyVar           DocNameI = EpAnn
+type instance XStarTy          DocNameI = EpAnn
+type instance XAppTy           DocNameI = EpAnn
+type instance XAppKindTy       DocNameI = EpAnn
+type instance XFunTy           DocNameI = EpAnn
+type instance XListTy          DocNameI = EpAnn' AnnParen
+type instance XTupleTy         DocNameI = EpAnn' AnnParen
+type instance XSumTy           DocNameI = EpAnn' AnnParen
+type instance XOpTy            DocNameI = EpAnn
+type instance XParTy           DocNameI = EpAnn' AnnParen
+type instance XIParamTy        DocNameI = EpAnn
+type instance XKindSig         DocNameI = EpAnn
 type instance XSpliceTy        DocNameI = Void       -- see `renameHsSpliceTy`
-type instance XDocTy           DocNameI = EpAnn [AddEpAnn]
-type instance XBangTy          DocNameI = EpAnn [AddEpAnn]
-type instance XRecTy           DocNameI = EpAnn [AddEpAnn]
-type instance XExplicitListTy  DocNameI = EpAnn [AddEpAnn]
-type instance XExplicitTupleTy DocNameI = EpAnn [AddEpAnn]
-type instance XTyLit           DocNameI = EpAnn [AddEpAnn]
-type instance XWildCardTy      DocNameI = EpAnn [AddEpAnn]
+type instance XDocTy           DocNameI = EpAnn
+type instance XBangTy          DocNameI = EpAnn
+type instance XRecTy           DocNameI = EpAnn
+type instance XExplicitListTy  DocNameI = EpAnn
+type instance XExplicitTupleTy DocNameI = EpAnn
+type instance XTyLit           DocNameI = EpAnn
+type instance XWildCardTy      DocNameI = EpAnn
 type instance XXType           DocNameI = HsCoreTy
 
 type instance XHsForAllVis        DocNameI = NoExtField

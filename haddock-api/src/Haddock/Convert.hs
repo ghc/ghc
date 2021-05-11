@@ -19,6 +19,8 @@ module Haddock.Convert (
   PrintRuntimeReps(..),
 ) where
 
+#include "HsVersions.h"
+
 import GHC.Data.Bag ( emptyBag )
 import GHC.Types.Basic ( TupleSort(..), PromotionFlag(..), DefMethSpec(..), TopLevelFlag(..) )
 import GHC.Types.SourceText (SourceText(..))
@@ -45,9 +47,9 @@ import GHC.Builtin.Types ( eqTyConName, listTyConName, liftedTypeKindTyConName
 import GHC.Builtin.Names ( hasKey, eqTyConKey, ipClassKey, tYPETyConKey
                  , liftedDataConKey, boxedRepDataConKey )
 import GHC.Types.Unique ( getUnique )
-import GHC.Utils.Misc ( chkAppend, dropList, equalLength
+import GHC.Utils.Misc ( chkAppend, debugIsOn, dropList, equalLength
                       , filterByList, filterOut )
-import GHC.Utils.Panic.Plain ( assert )
+import GHC.Utils.Panic ( assertPanic )
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.SrcLoc
@@ -931,8 +933,8 @@ tcSplitForAllTysReqPreserveSynonyms :: Type -> ([ReqTVBinder], Type)
 tcSplitForAllTysReqPreserveSynonyms ty =
   let (all_bndrs, body) = tcSplitSomeForAllTysPreserveSynonyms isVisibleArgFlag ty
       req_bndrs         = mapMaybe mk_req_bndr_maybe all_bndrs in
-  assert ( req_bndrs `equalLength` all_bndrs)
-    (req_bndrs, body)
+  ASSERT( req_bndrs `equalLength` all_bndrs )
+  (req_bndrs, body)
   where
     mk_req_bndr_maybe :: TyCoVarBinder -> Maybe ReqTVBinder
     mk_req_bndr_maybe (Bndr tv argf) = case argf of
@@ -944,8 +946,8 @@ tcSplitForAllTysInvisPreserveSynonyms :: Type -> ([InvisTVBinder], Type)
 tcSplitForAllTysInvisPreserveSynonyms ty =
   let (all_bndrs, body) = tcSplitSomeForAllTysPreserveSynonyms isInvisibleArgFlag ty
       inv_bndrs         = mapMaybe mk_inv_bndr_maybe all_bndrs in
-  assert ( inv_bndrs `equalLength` all_bndrs)
-    (inv_bndrs, body)
+  ASSERT( inv_bndrs `equalLength` all_bndrs )
+  (inv_bndrs, body)
   where
     mk_inv_bndr_maybe :: TyCoVarBinder -> Maybe InvisTVBinder
     mk_inv_bndr_maybe (Bndr tv argf) = case argf of
