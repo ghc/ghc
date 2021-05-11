@@ -93,7 +93,7 @@ module GHC.Tc.Utils.TcMType (
 
   ------------------------------
   -- Levity polymorphism
-  ensureNotLevPoly, checkForLevPoly, checkForLevPolyX, formatLevPolyErr
+  ensureNotLevPoly, checkForLevPoly, checkForLevPolyX,
   ) where
 
 -- friends:
@@ -111,6 +111,7 @@ import GHC.Core.Class
 import GHC.Types.Var
 import GHC.Core.Predicate
 import GHC.Tc.Types.Origin
+import GHC.HsToCore.Errors.Types
 
 -- others:
 import GHC.Tc.Utils.Monad        -- TcType, amongst others
@@ -2624,35 +2625,25 @@ See Note [Levity polymorphism checking] in GHC.HsToCore.Monad
 -- isn't really a compositional property of a type system, so it's
 -- not a terrible surprise that the check has to go in an awkward spot.
 ensureNotLevPoly :: Type  -- its zonked type
-                 -> SDoc  -- where this happened
+                 -> LevityCheckProvenance  -- where this happened
                  -> TcM ()
-ensureNotLevPoly ty doc
+ensureNotLevPoly ty provenance
   = whenNoErrs $   -- sometimes we end up zonking bogus definitions of type
                    -- forall a. a. See, for example, test ghci/scripts/T9140
-    checkForLevPoly doc ty
+    checkForLevPoly provenance ty
 
   -- See Note [Levity polymorphism checking] in GHC.HsToCore.Monad
-checkForLevPoly :: SDoc -> Type -> TcM ()
-checkForLevPoly = checkForLevPolyX addErr
+checkForLevPoly :: LevityCheckProvenance -> Type -> TcM ()
+checkForLevPoly = checkForLevPolyX (error "todo")
 
 checkForLevPolyX :: Monad m
-                 => (SDoc -> m ())  -- how to report an error
-                 -> SDoc -> Type -> m ()
-checkForLevPolyX add_err extra ty
+                 => (DsMessage -> m ())  -- how to report an error
+                 -> LevityCheckProvenance -> Type -> m ()
+checkForLevPolyX add_err provenance ty
   | isTypeLevPoly ty
-  = add_err (formatLevPolyErr ty $$ extra)
+  = add_err (DsLevityPolyInType ty provenance)
   | otherwise
   = return ()
-
-formatLevPolyErr :: Type  -- levity-polymorphic type
-                 -> SDoc
-formatLevPolyErr ty
-  = hang (text "A levity-polymorphic type is not allowed here:")
-       2 (vcat [ text "Type:" <+> pprWithTYPE tidy_ty
-               , text "Kind:" <+> pprWithTYPE tidy_ki ])
-  where
-    (tidy_env, tidy_ty) = tidyOpenType emptyTidyEnv ty
-    tidy_ki             = tidyType tidy_env (tcTypeKind ty)
 
 {-
 %************************************************************************

@@ -1,4 +1,5 @@
 {-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 module GHC.Types.Hint where
 
@@ -9,6 +10,11 @@ import GHC.Types.Name.Reader
 import GHC.LanguageExtensions
 import Data.Typeable
 import GHC.Unit.Module (ModuleName, Module)
+import GHC.Hs.Extension (GhcTc)
+import GHC.Types.Var (Var)
+import GHC.Types.Basic (Activation, RuleName)
+import GHC.Types.Id (idInlineActivation)
+import {-# SOURCE #-} Language.Haskell.Syntax.Expr
 
 -- | A type for hints emitted by GHC.
 -- A /hint/ suggests a possible way to deal with a particular warning or error.
@@ -75,14 +81,44 @@ data GhcHint
       Test case(s): driver/T12955
     -}
   | SuggestSignatureInstantiations !ModuleName [InstantiationSuggestion]
+    {-| Suggests to increase the -fmax-pmcheck-models limit for the pattern match checker.
 
+      Triggered by: 'GHC.HsToCore.Errors.Types.DsMaxPmCheckModelsReached'
+
+      Test case(s): pmcheck/should_compile/TooManyDeltas
+                    pmcheck/should_compile/TooManyDeltas
+                    pmcheck/should_compile/T11822
+    -}
+  | SuggestIncreaseMaxPmCheckModels
+    {-| Suggests adding a type signature, typically to resolve ambiguity or help GHC inferring types.
+
+    -}
+  | SuggestAddTypeSignature
+
+    {-| Suggests to explicitly discard the result of a monadic action by binding the result to
+        the '_' wilcard.
+
+        Example:
+           main = do
+             _ <- getCurrentTime
+
+    -}
+  | Outputable (LHsExpr GhcTc) => SuggestBindToWildcard !(LHsExpr GhcTc)
+  -- FIXME(adn) The constraint is not pretty, but it keeps circular imports at bay.
+
+  | SuggestAddInlineOrNoInlinePragma !Var !Activation
+
+  | SuggestAddPhaseToCompetingRule !RuleName
 
 instance Outputable GhcHint where
   ppr = \case
     UnknownHint m
       -> ppr m
     SuggestExtension ext
-      -> text "Perhaps you intended to use" <+> ppr ext
+      -> case ext of
+          NegativeLiterals
+            -> text "If you are trying to write a large negative literal, use NegativeLiterals"
+          _ -> text "Perhaps you intended to use" <+> ppr ext
     SuggestMissingDo
       -> text "Possibly caused by a missing 'do'?"
     SuggestLetInDo
@@ -111,6 +147,19 @@ instance Outputable GhcHint where
          in text "Try passing -instantiated-with=\"" <>
               suggested_instantiated_with <> text "\"" $$
                 text "replacing <" <> ppr pi_mod_name <> text "> as necessary."
+    SuggestIncreaseMaxPmCheckModels
+      -> text "Increase the limit or resolve the warnings to suppress this message."
+    SuggestAddTypeSignature
+      -> text "Add a type signature."
+    SuggestBindToWildcard rhs
+      -> hang (text "Suppress this warning by saying") 2 (quotes $ text "_ <-" <+> ppr rhs)
+    SuggestAddInlineOrNoInlinePragma lhs_id rule_act
+      -> vcat [ text "Probable fix: add an INLINE[n] or NOINLINE[n] pragma for" <+> quotes (ppr lhs_id)
+              , whenPprDebug (ppr (idInlineActivation lhs_id) $$ ppr rule_act)
+              ]
+    SuggestAddPhaseToCompetingRule bad_rule
+      -> vcat [ text "Probable fix: add phase [n] or [~n] to the competing rule"
+              , whenPprDebug (ppr bad_rule) ]
 
 perhapsAsPat :: SDoc
 perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"
