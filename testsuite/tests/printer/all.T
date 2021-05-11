@@ -131,3 +131,5 @@ test('Test19798', ignore_stderr, makefile_test, ['Test19798'])
 # disabled in the Makefile for this test.
 test('Test19813', ignore_stderr, makefile_test, ['Test19813'])
 test('Test19814', ignore_stderr, makefile_test, ['Test19814'])
+test('Test19821', ignore_stderr, makefile_test, ['Test19821'])
+

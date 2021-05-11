@@ -168,12 +168,12 @@
      [(L
        (SrcSpanAnn (EpAnn
                     (Anchor
-                     { DumpRenamedAst.hs:12:1-39 }
+                     { DumpRenamedAst.hs:(12,1)-(14,24) }
                      (UnchangedAnchor))
                     (AnnListItem
                      [])
                     (EpaComments
-                     [])) { DumpRenamedAst.hs:12:1-39 })
+                     [])) { DumpRenamedAst.hs:(12,1)-(14,24) })
        (FamDecl
         (NoExtField)
         (FamilyDecl
@@ -807,12 +807,12 @@
      [(L
        (SrcSpanAnn (EpAnn
                     (Anchor
-                     { DumpRenamedAst.hs:24:1-48 }
+                     { DumpRenamedAst.hs:(24,1)-(25,30) }
                      (UnchangedAnchor))
                     (AnnListItem
                      [])
                     (EpaComments
-                     [])) { DumpRenamedAst.hs:24:1-48 })
+                     [])) { DumpRenamedAst.hs:(24,1)-(25,30) })
        (FamDecl
         (NoExtField)
         (FamilyDecl
