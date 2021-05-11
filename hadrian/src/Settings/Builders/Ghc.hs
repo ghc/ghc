@@ -124,9 +124,8 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
         -- are not actually bundled with the rts. Perhaps ffi should be part of
         -- rts's extra libraries instead of extra bundled libraries in that
         -- case. Care should be take as to not break the make build.
-        rtsFfiArg = package rts ? not useSystemFfi ? mconcat
+        rtsFfiArg = package rts ? (not useSystemFfi && libffiName' `elem` libs) ? mconcat
             [ arg ("-L" ++ buildPath)
-            , arg ("-l" ++ libffiName')
             ]
 
         -- This is the -rpath argument that is required for the bindist scenario
