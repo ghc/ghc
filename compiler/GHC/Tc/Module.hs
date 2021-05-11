@@ -177,6 +177,7 @@ import Data.Data ( Data )
 import qualified Data.Set as S
 import Control.DeepSeq
 import Control.Monad
+import GHC.Driver.Dependencies
 
 #include "HsVersions.h"
 
@@ -367,7 +368,7 @@ tcRnImports hsc_env import_decls
 
         ; this_mod <- getModule
         ; let { dep_mods :: ModuleNameEnv ModuleNameWithIsBoot
-              ; dep_mods = imp_dep_mods imports
+              ; dep_mods = imp_direct_dep_mods imports
 
                 -- We want instance declarations from all home-package
                 -- modules below this one, including boot modules, except
@@ -376,17 +377,16 @@ tcRnImports hsc_env import_decls
                 -- filtering also ensures that we don't see instances from
                 -- modules batch (@--make@) compiled before this one, but
                 -- which are not below this one.
-              ; want_instances :: ModuleName -> Bool
-              ; want_instances mod = mod `elemUFM` dep_mods
-                                   && mod /= moduleName this_mod
-              ; (home_insts, home_fam_insts) = hptInstances hsc_env
-                                                            want_instances
+              ; (home_insts, home_fam_insts) = hptInstancesBelow hsc_env (moduleName this_mod) (eltsUFM dep_mods)
               } ;
 
                 -- Record boot-file info in the EPS, so that it's
                 -- visible to loadHiBootInterface in tcRnSrcDecls,
                 -- and any other incrementally-performed imports
-        ; updateEps_ (\eps -> eps { eps_is_boot = dep_mods }) ;
+              ; when (isOneShot (ghcMode (hsc_dflags hsc_env))) $ do {
+                  ; home_mods <- liftIO $ findHomeModules hsc_env (hsc_home_unit hsc_env) (eltsUFM dep_mods)
+                  ; updateEps_ $ \eps  -> eps { eps_is_boot = home_mods }
+               }
 
                 -- Update the gbl env
         ; updGblEnv ( \ gbl ->
@@ -400,7 +400,7 @@ tcRnImports hsc_env import_decls
               tcg_hpc          = hpc_info
             }) $ do {
 
-        ; traceRn "rn1" (ppr (imp_dep_mods imports))
+        ; traceRn "rn1" (ppr (imp_direct_dep_mods imports))
                 -- Fail if there are any errors so far
                 -- The error printing (if needed) takes advantage
                 -- of the tcg_env we have now set
@@ -2071,7 +2071,7 @@ runTcInteractive hsc_env thing_inside
 
        ; setEnvs (gbl_env', lcl_env') thing_inside }
   where
-    (home_insts, home_fam_insts) = hptInstances hsc_env (\_ -> True)
+    (home_insts, home_fam_insts) = hptAllInstances hsc_env
 
     icxt                     = hsc_IC hsc_env
     (ic_insts, ic_finsts)    = ic_instances icxt
@@ -2953,9 +2953,9 @@ pprTcGblEnv (TcGblEnv { tcg_type_env  = type_env,
          , ppr_fam_insts fam_insts
          , ppr_rules rules
          , text "Dependent modules:" <+>
-                pprUFM (imp_dep_mods imports) (ppr . sort)
+                pprUFM (imp_direct_dep_mods imports) (ppr . sort)
          , text "Dependent packages:" <+>
-                ppr (S.toList $ imp_dep_pkgs imports)]
+                ppr (S.toList $ imp_dep_direct_pkgs imports)]
                 -- The use of sort is just to reduce unnecessary
                 -- wobbling in testsuite output
 
