@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE LambdaCase #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
@@ -21,8 +21,6 @@ module GHC.Tc.Types.Origin (
   pprCtOrigin, isGivenOrigin
 
   ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -287,7 +285,7 @@ pprSkolInfo RuntimeUnkSkol     = text "Unknown type from GHCi runtime"
 -- UnkSkol
 -- For type variables the others are dealt with by pprSkolTvBinding.
 -- For Insts, these cases should not happen
-pprSkolInfo UnkSkol = WARN( True, text "pprSkolInfo: UnkSkol" ) text "UnkSkol"
+pprSkolInfo UnkSkol = warnPprTrace True (text "pprSkolInfo: UnkSkol") $ text "UnkSkol"
 
 pprSigSkolInfo :: UserTypeCtxt -> TcType -> SDoc
 -- The type is already tidied

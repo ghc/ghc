@@ -2,14 +2,12 @@
 (c) The University of Glasgow, 2000-2006
 -}
 
-{-# LANGUAGE CPP, MagicHash, UnboxedTuples #-}
+{-# LANGUAGE MagicHash, UnboxedTuples #-}
 
 module GHC.Utils.IO.Unsafe
    ( inlinePerformIO,
    )
 where
-
-#include "HsVersions.h"
 
 import GHC.Prelude ()
 

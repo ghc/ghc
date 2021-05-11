@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 
 --------------------------------------------------------------------------------
 -- | Deal with Cmm registers
@@ -8,8 +8,6 @@ module GHC.CmmToLlvm.Regs (
         lmGlobalRegArg, lmGlobalRegVar, alwaysLive,
         stgTBAA, baseN, stackN, heapN, rxN, topN, tbaa, getTBAA
     ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 

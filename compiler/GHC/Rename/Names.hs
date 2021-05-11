@@ -4,7 +4,7 @@
 Extracting imported and top-level names in scope
 -}
 
-{-# LANGUAGE CPP, NondecreasingIndentation #-}
+{-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -29,8 +29,6 @@ module GHC.Rename.Names (
         printMinimalImports,
         ImportDeclUsage
     ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -341,7 +339,7 @@ rnImportDecl this_mod
 
     -- Compiler sanity check: if the import didn't say
     -- {-# SOURCE #-} we should not get a hi-boot file
-    WARN( (want_boot == NotBoot) && (mi_boot iface == IsBoot), ppr imp_mod_name ) do
+    warnPprTrace ((want_boot == NotBoot) && (mi_boot iface == IsBoot)) (ppr imp_mod_name) $ do
 
     -- Issue a user warning for a redundant {- SOURCE -} import
     -- NB that we arrange to read all the ordinary imports before
@@ -451,11 +449,11 @@ calculateAvails home_unit iface mod_safe' want_boot imported_by =
       -- 'imp_finsts' if it defines an orphan or instance family; thus the
       -- orph_iface/has_iface tests.
 
-      orphans | orph_iface = ASSERT2( not (imp_sem_mod `elem` dep_orphs deps), ppr imp_sem_mod <+> ppr (dep_orphs deps) )
+      orphans | orph_iface = assertPpr (not (imp_sem_mod `elem` dep_orphs deps)) (ppr imp_sem_mod <+> ppr (dep_orphs deps)) $
                              imp_sem_mod : dep_orphs deps
               | otherwise  = dep_orphs deps
 
-      finsts | has_finsts = ASSERT2( not (imp_sem_mod `elem` dep_finsts deps), ppr imp_sem_mod <+> ppr (dep_orphs deps) )
+      finsts | has_finsts = assertPpr (not (imp_sem_mod `elem` dep_finsts deps)) (ppr imp_sem_mod <+> ppr (dep_orphs deps)) $
                             imp_sem_mod : dep_finsts deps
              | otherwise  = dep_finsts deps
 
@@ -488,8 +486,8 @@ calculateAvails home_unit iface mod_safe' want_boot imported_by =
             -- Imported module is from another package
             -- Dump the dependent modules
             -- Add the package imp_mod comes from to the dependent packages
-            ASSERT2( not (ipkg `elem` (map fst $ dep_pkgs deps))
-                   , ppr ipkg <+> ppr (dep_pkgs deps) )
+            assertPpr (not (ipkg `elem` (map fst $ dep_pkgs deps)))
+                      (ppr ipkg <+> ppr (dep_pkgs deps))
             ([], (ipkg, False) : dep_pkgs deps, False)
 
   in ImportAvails {
@@ -1127,16 +1125,16 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
             -> (GreName, AvailInfo, Maybe Name)
     combine (NormalGreName name1, a1@(AvailTC p1 _), mb1)
             (NormalGreName name2, a2@(AvailTC p2 _), mb2)
-      = ASSERT2( name1 == name2 && isNothing mb1 && isNothing mb2
-               , ppr name1 <+> ppr name2 <+> ppr mb1 <+> ppr mb2 )
+      = assertPpr (name1 == name2 && isNothing mb1 && isNothing mb2)
+                  (ppr name1 <+> ppr name2 <+> ppr mb1 <+> ppr mb2) $
         if p1 == name1 then (NormalGreName name1, a1, Just p2)
                        else (NormalGreName name1, a2, Just p1)
     -- 'combine' may also be called for pattern synonyms which appear both
     -- unassociated and associated (see Note [Importing PatternSynonyms]).
     combine (c1, a1, mb1) (c2, a2, mb2)
-      = ASSERT2( c1 == c2 && isNothing mb1 && isNothing mb2
-                          && (isAvailTC a1 || isAvailTC a2)
-               , ppr c1 <+> ppr c2 <+> ppr a1 <+> ppr a2 <+> ppr mb1 <+> ppr mb2 )
+      = assertPpr (c1 == c2 && isNothing mb1 && isNothing mb2
+                          && (isAvailTC a1 || isAvailTC a2))
+                  (ppr c1 <+> ppr c2 <+> ppr a1 <+> ppr a2 <+> ppr mb1 <+> ppr mb2) $
         if isAvailTC a1 then (c1, a1, Nothing)
                         else (c1, a2, Nothing)
 

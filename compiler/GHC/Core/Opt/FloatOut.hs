@@ -6,7 +6,7 @@
 ``Long-distance'' floating of bindings towards the top level.
 -}
 
-{-# LANGUAGE CPP #-}
+
 
 module GHC.Core.Opt.FloatOut ( floatOutwards ) where
 
@@ -34,8 +34,6 @@ import GHC.Core.Type
 import qualified Data.IntMap as M
 
 import Data.List        ( partition )
-
-#include "HsVersions.h"
 
 {-
         -----------------
@@ -629,8 +627,8 @@ instance Outputable FloatBinds where
 
 flattenTopFloats :: FloatBinds -> Bag CoreBind
 flattenTopFloats (FB tops ceils defs)
-  = ASSERT2( isEmptyBag (flattenMajor defs), ppr defs )
-    ASSERT2( isEmptyBag ceils, ppr ceils )
+  = assertPpr (isEmptyBag (flattenMajor defs)) (ppr defs) $
+    assertPpr (isEmptyBag ceils) (ppr ceils)
     tops
 
 addTopFloatPairs :: Bag CoreBind -> [(Id,CoreExpr)] -> [(Id,CoreExpr)]

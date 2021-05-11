@@ -1,5 +1,4 @@
 {-# LANGUAGE BangPatterns      #-}
-{-# LANGUAGE CPP               #-}
 {-# LANGUAGE ExplicitForAll    #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RecordWildCards   #-}
@@ -148,8 +147,6 @@ module GHC.Tc.Utils.Monad(
   module GHC.Data.IOEnv
   ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 
@@ -188,6 +185,7 @@ import GHC.Data.Maybe
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Error
 import GHC.Utils.Panic
+import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Misc
 import GHC.Utils.Logger
 
