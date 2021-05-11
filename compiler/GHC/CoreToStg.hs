@@ -376,7 +376,7 @@ coreToTopStgRhs dflags ccs this_mod (bndr, rhs)
 -- handle with the function coreToPreStgRhs.
 
 coreToStgExpr
-        :: CoreExpr
+        :: HasDebugCallStack => CoreExpr
         -> CtsM StgExpr
 
 -- The second and third components can be derived in a simple bottom up pass, not
@@ -397,9 +397,11 @@ coreToStgExpr (Coercion _)
   = coreToStgApp coercionTokenId [] []
 
 coreToStgExpr expr@(App _ _)
-  = coreToStgApp f args ticks
-  where
-    (f, args, ticks) = myCollectArgs expr
+  = case myCollectArgs expr of
+      -- Regular application
+      Right (f, args, ticks) -> coreToStgApp f args ticks
+      -- LitRubbish
+      Left lit -> return (StgLit lit)
 
 coreToStgExpr expr@(Lam _ _)
   = let
@@ -694,7 +696,7 @@ data PreStgRhs = PreStgRhs [Id] StgExpr -- The [Id] is empty for thunks
 
 -- Convert the RHS of a binding from Core to STG. This is a wrapper around
 -- coreToStgExpr that can handle value lambdas.
-coreToPreStgRhs :: CoreExpr -> CtsM PreStgRhs
+coreToPreStgRhs :: HasDebugCallStack => CoreExpr -> CtsM PreStgRhs
 coreToPreStgRhs (Cast expr _) = coreToPreStgRhs expr
 coreToPreStgRhs expr@(Lam _ _) =
     let
@@ -957,11 +959,12 @@ myCollectBinders expr
 
 -- | Precondition: argument expression is an 'App', and there is a 'Var' at the
 -- head of the 'App' chain.
-myCollectArgs :: CoreExpr -> (Id, [CoreArg], [CoreTickish])
+myCollectArgs :: HasDebugCallStack => CoreExpr -> Either Literal (Id, [CoreArg], [CoreTickish])
 myCollectArgs expr
   = go expr [] []
   where
-    go (Var v)          as ts = (v, as, ts)
+    go :: CoreExpr -> [CoreArg] -> [CoreTickish] -> Either Literal (Id, [CoreArg], [CoreTickish])
+    go (Var v)          as ts = Right (v, as, ts)
     go (App f a)        as ts = go f (a:as) ts
     go (Tick t e)       as ts = ASSERT2( not (tickishIsCode t) || all isTypeArg as
                                        , ppr e $$ ppr as $$ ppr ts )
@@ -970,6 +973,7 @@ myCollectArgs expr
     go (Cast e _)       as ts = go e as ts
     go (Lam b e)        as ts
        | isTyVar b            = go e as ts -- Note [Collect args]
+    go (Lit l@LitRubbish{}) _as _ts = Left l
     go _                _  _  = pprPanic "CoreToStg.myCollectArgs" (ppr expr)
 
 {- Note [Collect args]
