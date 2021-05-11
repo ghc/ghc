@@ -462,6 +462,8 @@ else:
                 break
             oneTest(watcher)
     except KeyboardInterrupt:
+        stopNow()
+        watcher.wait()
         pass
 
     # flush everything before we continue
