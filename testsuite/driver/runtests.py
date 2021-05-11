@@ -462,6 +462,11 @@ else:
                 break
             oneTest(watcher)
     except KeyboardInterrupt:
+        # Signal we are stopping
+        stopNow()
+        # Acquire all slots in the semaphore
+        acquire_all()
+        # Exit
         pass
 
     # flush everything before we continue
