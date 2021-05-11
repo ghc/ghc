@@ -26,10 +26,7 @@ typedef struct InfoProv_{
 typedef struct InfoProvEnt_ {
     StgInfoTable * info;
     InfoProv prov;
-    struct InfoProvEnt_ *link;
 } InfoProvEnt;
 
-extern InfoProvEnt * RTS_VAR(IPE_LIST);               // registered IP list
-
-void registerInfoProvList(InfoProvEnt **cc_list);
+void registerInfoProvEnt(InfoProvEnt *ipe);
 InfoProvEnt * lookupIPE(StgInfoTable *info);

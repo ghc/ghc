@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 1998-2005
+ * (c) The GHC Team, 1998-2021
  *
  * Support for IPE
  *
@@ -14,5 +14,9 @@
 #include "BeginPrivate.h"
 
 void dumpIPEToEventLog(void);
+
+#if defined(TRACING)
+void traceIPEFromHashTable(void *data, StgWord key, const void *value);
+#endif
 
 #include "EndPrivate.h"
