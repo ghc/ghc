@@ -106,8 +106,8 @@ packageRules = do
     -- classic concurrent read exclusive write (CREW) conflict.
     let maxConcurrentReaders = 1000
     packageDb <- newResource "package-db" maxConcurrentReaders
-    let readPackageDb  = [(packageDb, 1)]
-        writePackageDb = [(packageDb, maxConcurrentReaders)]
+    let readPackageDb  = [(packageDb, 1)]                    -- this is correct: take 1 slot to read
+        writePackageDb = [(packageDb, maxConcurrentReaders)] -- and all the slots to write
 
     Rules.Compile.compilePackage readPackageDb
     Rules.Dependencies.buildPackageDependencies readPackageDb
