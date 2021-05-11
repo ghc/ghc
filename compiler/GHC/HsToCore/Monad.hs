@@ -40,7 +40,7 @@ module GHC.HsToCore.Monad (
         dsGetCompleteMatches,
 
         -- Warnings and errors
-        DsWarning, diagnosticDs, warnIfSetDs, errDs, errDsCoreExpr,
+        DsWarning, diagnosticDs, errDsCoreExpr,
         failWithDs, failDs, discardWarningsDs,
         askNoErrsDs,
 
@@ -80,7 +80,7 @@ import GHC.Core.Multiplicity
 import GHC.IfaceToCore
 
 import GHC.Tc.Utils.Monad
-import GHC.Tc.Utils.TcMType ( checkForLevPolyX, formatLevPolyErr )
+import GHC.Tc.Utils.TcMType ( checkForLevPolyX )
 
 import GHC.Builtin.Names
 
@@ -430,9 +430,8 @@ newSysLocalsDsNoLP = mapM (\(Scaled w t) -> newSysLocalDsNoLP w t)
 newSysLocalsDs = mapM (\(Scaled w t) -> newSysLocalDs w t)
 
 mk_local :: FastString -> Mult -> Type -> DsM Id
-mk_local fs w ty = do { dsNoLevPoly ty (text "When trying to create a variable of type:" <+>
-                                        ppr ty)  -- could improve the msg with another
-                                                 -- parameter indicating context
+mk_local fs w ty = do { dsNoLevPoly ty LevityCheckInVarType -- could improve the msg with another
+                                                            -- parameter indicating context
                       ; mkSysLocalOrCoVarM fs w ty }
 
 {-
@@ -465,43 +464,27 @@ putSrcSpanDs (RealSrcSpan real_span _) thing_inside
 putSrcSpanDsA :: SrcSpanAnn' ann -> DsM a -> DsM a
 putSrcSpanDsA loc = putSrcSpanDs (locA loc)
 
--- | Emit a diagnostic for the current source location
--- NB: Warns whether or not -Wxyz is set
-diagnosticDs :: DiagnosticReason -> SDoc -> DsM ()
-diagnosticDs reason warn
+-- | Emit a diagnostic for the current source location. In case the diagnostic is a warning,
+-- the latter will be ignored and discarded if the relevant 'WarningFlag' is not set in the DynFlags.
+-- See Note [Discarding Messages] in 'GHC.Types.Error'.
+diagnosticDs :: DsMessage -> DsM ()
+diagnosticDs dsMessage
   = do { env <- getGblEnv
        ; loc <- getSrcSpanDs
        ; dflags <- getDynFlags
-       ; let msg = mkMsgEnvelope dflags loc (ds_unqual env) $
-                   DsUnknownMessage $
-                   mkPlainDiagnostic reason noHints warn
+       ; let msg = mkMsgEnvelope dflags loc (ds_unqual env) dsMessage
        ; updMutVar (ds_msgs env) (\ msgs -> msg `addMessage` msgs) }
-
--- | Emit a warning only if the correct WarningWithoutFlag is set in the DynFlags
-warnIfSetDs :: WarningFlag -> SDoc -> DsM ()
-warnIfSetDs flag warn
-  = whenWOptM flag $
-    diagnosticDs (WarningWithFlag flag) warn
-
-errDs :: SDoc -> DsM ()
-errDs err
-  = do  { env <- getGblEnv
-        ; loc <- getSrcSpanDs
-        ; let msg = mkErrorMsgEnvelope loc (ds_unqual env) $
-                    DsUnknownMessage $
-                    mkPlainError noHints err
-        ; updMutVar (ds_msgs env) (\ msgs -> msg `addMessage` msgs) }
 
 -- | Issue an error, but return the expression for (), so that we can continue
 -- reporting errors.
-errDsCoreExpr :: SDoc -> DsM CoreExpr
-errDsCoreExpr err
-  = do { errDs err
+errDsCoreExpr :: DsMessage -> DsM CoreExpr
+errDsCoreExpr msg
+  = do { diagnosticDs msg
        ; return unitExpr }
 
-failWithDs :: SDoc -> DsM a
-failWithDs err
-  = do  { errDs err
+failWithDs :: DsMessage -> DsM a
+failWithDs msg
+  = do  { diagnosticDs msg
         ; failM }
 
 failDs :: DsM a
@@ -603,16 +586,16 @@ discardWarningsDs thing_inside
         ; return result }
 
 -- | Fail with an error message if the type is levity polymorphic.
-dsNoLevPoly :: Type -> SDoc -> DsM ()
+dsNoLevPoly :: Type -> LevityCheckProvenance -> DsM ()
 -- See Note [Levity polymorphism checking]
-dsNoLevPoly ty doc = checkForLevPolyX failWithDs doc ty
+dsNoLevPoly ty provenance = checkForLevPolyX failWithDs provenance ty
 
 -- | Check an expression for levity polymorphism, failing if it is
 -- levity polymorphic.
-dsNoLevPolyExpr :: CoreExpr -> SDoc -> DsM ()
+dsNoLevPolyExpr :: CoreExpr -> LevityExprProvenance -> DsM ()
 -- See Note [Levity polymorphism checking]
-dsNoLevPolyExpr e doc
-  | isExprLevPoly e = errDs (formatLevPolyErr (exprType e) $$ doc)
+dsNoLevPolyExpr e provenance
+  | isExprLevPoly e = diagnosticDs (DsLevityPolyInExpr e provenance)
   | otherwise       = return ()
 
 -- | Runs the thing_inside. If there are no errors, then returns the expr

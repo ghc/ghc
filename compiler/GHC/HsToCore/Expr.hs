@@ -31,6 +31,7 @@ import GHC.HsToCore.Utils
 import GHC.HsToCore.Arrows
 import GHC.HsToCore.Monad
 import GHC.HsToCore.Pmc ( addTyCs, pmcGRHSs )
+import GHC.HsToCore.Errors.Types
 import GHC.Types.SourceText
 import GHC.Types.Name
 import GHC.Types.Name.Env
@@ -262,7 +263,7 @@ dsLExprNoLP :: LHsExpr GhcTc -> DsM CoreExpr
 dsLExprNoLP (L loc e)
   = putSrcSpanDsA loc $
     do { e' <- dsExpr e
-       ; dsNoLevPolyExpr e' (text "In the type of expression:" <+> ppr e)
+       ; dsNoLevPolyExpr e' (LevityCheckHsExpr e)
        ; return e' }
 
 dsExpr :: HsExpr GhcTc -> DsM CoreExpr

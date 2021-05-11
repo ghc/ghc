@@ -30,6 +30,7 @@ import {-# SOURCE #-}   GHC.HsToCore.Expr  ( dsLExpr )
 import {-# SOURCE #-}   GHC.HsToCore.Match ( matchWrapper )
 
 import GHC.HsToCore.Monad
+import GHC.HsToCore.Errors.Types
 import GHC.HsToCore.GuardedRHSs
 import GHC.HsToCore.Utils
 import GHC.HsToCore.Pmc ( addTyCs, pmcGRHSs )
@@ -90,8 +91,8 @@ dsTopLHsBinds :: LHsBinds GhcTc -> DsM (OrdList (Id,CoreExpr))
 dsTopLHsBinds binds
      -- see Note [Strict binds checks]
   | not (isEmptyBag unlifted_binds) || not (isEmptyBag bang_binds)
-  = do { mapBagM_ (top_level_err "bindings for unlifted types") unlifted_binds
-       ; mapBagM_ (top_level_err "strict bindings")             bang_binds
+  = do { mapBagM_ (top_level_err UnliftedTypeBinds) unlifted_binds
+       ; mapBagM_ (top_level_err StrictBinds)       bang_binds
        ; return nilOL }
 
   | otherwise
@@ -107,10 +108,9 @@ dsTopLHsBinds binds
     unlifted_binds = filterBag (isUnliftedHsBind . unLoc) binds
     bang_binds     = filterBag (isBangedHsBind   . unLoc) binds
 
-    top_level_err desc (L loc bind)
+    top_level_err bindsType (L loc bind)
       = putSrcSpanDs (locA loc) $
-        errDs (hang (text "Top-level" <+> text desc <+> text "aren't allowed:")
-                  2 (ppr bind))
+        diagnosticDs (DsTopLevelBindsNotAllowed bindsType bind)
 
 
 -- | Desugar all other kind of bindings, Ids of strict binds are returned to
@@ -665,16 +665,14 @@ dsSpec :: Maybe CoreExpr        -- Just rhs => RULE is for a local binding
 dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
   | isJust (isClassOpId_maybe poly_id)
   = putSrcSpanDs loc $
-    do { diagnosticDs WarningWithoutFlag (text "Ignoring useless SPECIALISE pragma for class method selector"
-                                  <+> quotes (ppr poly_id))
+    do { diagnosticDs (DsUselessSpecialiseForClassMethodSelector poly_id)
        ; return Nothing  }  -- There is no point in trying to specialise a class op
                             -- Moreover, classops don't (currently) have an inl_sat arity set
                             -- (it would be Just 0) and that in turn makes makeCorePair bleat
 
   | no_act_spec && isNeverActive rule_act
   = putSrcSpanDs loc $
-    do { diagnosticDs WarningWithoutFlag (text "Ignoring useless SPECIALISE pragma for NOINLINE function:"
-                                  <+> quotes (ppr poly_id))
+    do { diagnosticDs (DsUselessSpecialiseForNoInlineFunction poly_id)
        ; return Nothing  }  -- Function is NOINLINE, and the specialisation inherits that
                             -- See Note [Activation pragmas for SPECIALISE]
 
@@ -1135,7 +1133,7 @@ dsHsWrapper (WpFun c1 c2 (Scaled w t1) doc)
                                    ; w2 <- dsHsWrapper c2
                                    ; let app f a = mkCoreAppDs (text "dsHsWrapper") f a
                                          arg     = w1 (Var x)
-                                   ; (_, ok) <- askNoErrsDs $ dsNoLevPolyExpr arg doc
+                                   ; (_, ok) <- askNoErrsDs $ dsNoLevPolyExpr arg (LevityCheckWpFun doc)
                                    ; if ok
                                      then return (\e -> (Lam x (w2 (app e arg))))
                                      else return id }  -- this return is irrelevant
@@ -1145,7 +1143,7 @@ dsHsWrapper (WpEvApp tm)      = do { core_tm <- dsEvTerm tm
                                    ; return (\e -> App e core_tm) }
   -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
 dsHsWrapper (WpMultCoercion co) = do { when (not (isReflexiveCo co)) $
-                                         errDs (text "Multiplicity coercions are currently not supported")
+                                         diagnosticDs DsMultiplicityCoercionsNotSupported
                                      ; return $ \e -> e }
 --------------------------------------
 dsTcEvBinds_s :: [TcEvBinds] -> DsM [CoreBind]
