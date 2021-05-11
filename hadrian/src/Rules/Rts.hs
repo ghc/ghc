@@ -17,9 +17,11 @@ rtsRules = priority 3 $ do
       root -/- "**/libHSrts_*-ghc*.dylib",
       root -/- "**/libHSrts-ghc*.so",
       root -/- "**/libHSrts-ghc*.dylib"]
-      |%> \ rtsLibFilePath' -> createFileLink
-            (addRtsDummyVersion $ takeFileName rtsLibFilePath')
-            rtsLibFilePath'
+      |%> \ rtsLibFilePath' -> do
+            let (dir, name) = splitFileName rtsLibFilePath'
+            createFileLink
+              (dir -/- (addRtsDummyVersion name))
+              rtsLibFilePath'
 
     -- Libffi
     forM_ [Stage1 ..] $ \ stage -> do
@@ -63,7 +65,8 @@ copyLibffiStatic stage target = withLibffi stage $ \ libffiPath _ -> do
     vanillaLibFile <- rtsLibffiLibrary stage vanilla
     if target == vanillaLibFile
     then copyFile' (libffiPath -/- libffiLibrary) target
-    else createFileLink (takeFileName vanillaLibFile) target
+    else do
+      createFileLink (takeDirectory target -/- takeFileName vanillaLibFile) target
 
 
 -- | Copy a dynamic library file from the libffi build dir to the rts build dir.
@@ -88,7 +91,7 @@ copyLibffiDynamicUnix stage libSuf target = do
             , "-id", "@rpath/" ++ takeFileName target
             , target
             ]
-    else createFileLink versionlessSourceFileName target
+    else createFileLink (takeDirectory target -/- versionlessSourceFileName) target
 
 -- | Copy a dynamic library file from the libffi build dir to the rts build dir.
 copyLibffiDynamicWin :: Stage -> FilePath -> Action ()

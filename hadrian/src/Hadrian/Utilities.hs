@@ -295,23 +295,23 @@ isGeneratedSource file = buildRoot <&> (`isPrefixOf` file)
 -- missing.
 createFileLink :: FilePath -> FilePath -> Action ()
 createFileLink linkTarget link
-  | windowsHost = copyFile' source link
+  | windowsHost = copyFile' linkTarget link
   | otherwise   = do
     -- TODO `disableHistory` is a temporary fix (see issue #16866). Remove
     -- `disableHistory` when shake issue is fixed: https://github.com/ndmitchell/shake/issues/683.
     historyDisable
-
-    need [source]
+    need [linkTarget]
 
     liftIO $ IO.createDirectoryIfMissing True dir
     putProgressInfo =<< renderCreateFileLink linkTarget link
     quietly . liftIO $ do
         IO.removeFile link <|> return ()
-        IO.createFileLink linkTarget link
+        -- This should perhaps use top instead but that is tricky due to
+        -- module cycles
+        abs_target <- IO.canonicalizePath linkTarget
+        IO.createFileLink abs_target link
 
   where dir = takeDirectory link
-        source | isAbsolute linkTarget = linkTarget
-               | otherwise             = takeDirectory link -/- linkTarget
 
 -- | Copy a file tracking the source. Create the target directory if missing.
 copyFile :: FilePath -> FilePath -> Action ()
