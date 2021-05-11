@@ -349,3 +349,11 @@ instance Functor Bag where
 
 instance Foldable.Foldable Bag where
     foldr = foldrBag
+
+    foldl' k = go
+      where
+        go !z EmptyBag       = z
+        go z (UnitBag x)     = k z x
+        go z (TwoBags b1 b2) = let r1 = go z b1 in r1 `seq` go r1 b2
+        go z (ListBag xs)    = foldl' k z xs
+    {-# INLINEABLE foldl' #-}
