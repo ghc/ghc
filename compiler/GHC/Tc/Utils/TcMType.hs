@@ -365,7 +365,7 @@ unpackCoercionHole_maybe :: CoercionHole -> TcM (Maybe Coercion)
 unpackCoercionHole_maybe (CoercionHole { ch_ref = ref }) = readTcRef ref
 
 -- | Check that a coercion is appropriate for filling a hole. (The hole
--- itself is needed only for printing.
+-- itself is needed only for printing.)
 -- Always returns the checked coercion, but this return value is necessary
 -- so that the input coercion is forced only when the output is forced.
 checkCoercionHole :: CoVar -> Coercion -> TcM Coercion
@@ -881,7 +881,7 @@ cloneAnonMetaTyVar info tv kind
         ; traceTc "cloneAnonMetaTyVar" (ppr tyvar <+> dcolon <+> ppr (tyVarKind tyvar))
         ; return tyvar }
 
--- Make a new CycleBreakerTv. See Note [Type variable cycles in Givens]
+-- Make a new CycleBreakerTv. See Note [Type variable cycles]
 -- in GHC.Tc.Solver.Canonical.
 newCycleBreakerTyVar :: TcKind -> TcM TcTyVar
 newCycleBreakerTyVar kind
@@ -2327,7 +2327,7 @@ zonkHole hole@(Hole { hole_ty = ty })
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 zonkCt tries to maintain the canonical form of a Ct.  For example,
   - a CDictCan should stay a CDictCan;
-  - a CIrredCan should stay a CIrredCan with its cc_status flag intact
+  - a CIrredCan should stay a CIrredCan with its cc_reason flag intact
 
 Why?, for example:
 - For CDictCan, the @GHC.Tc.Solver.expandSuperClasses@ step, which runs after the
@@ -2360,7 +2360,7 @@ zonkCt ct@(CDictCan { cc_ev = ev, cc_tyargs = args })
 zonkCt (CEqCan { cc_ev = ev })
   = mkNonCanonical <$> zonkCtEvidence ev
 
-zonkCt ct@(CIrredCan { cc_ev = ev }) -- Preserve the cc_status flag
+zonkCt ct@(CIrredCan { cc_ev = ev }) -- Preserve the cc_reason flag
   = do { ev' <- zonkCtEvidence ev
        ; return (ct { cc_ev = ev' }) }
 
