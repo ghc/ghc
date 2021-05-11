@@ -89,10 +89,10 @@ instance Ord Int8 where
 {-# INLINE [1] ltInt8 #-}
 {-# INLINE [1] leInt8 #-}
 gtInt8, geInt8, ltInt8, leInt8 :: Int8 -> Int8 -> Bool
-(I8# x) `gtInt8` (I8# y) = isTrue# ((int8ToInt# x) >#  (int8ToInt# y))
-(I8# x) `geInt8` (I8# y) = isTrue# ((int8ToInt# x) >=# (int8ToInt# y))
-(I8# x) `ltInt8` (I8# y) = isTrue# ((int8ToInt# x) <#  (int8ToInt# y))
-(I8# x) `leInt8` (I8# y) = isTrue# ((int8ToInt# x) <=# (int8ToInt# y))
+(I8# x) `gtInt8` (I8# y) = isTrue# (x `gtInt8#` y)
+(I8# x) `geInt8` (I8# y) = isTrue# (x `geInt8#` y)
+(I8# x) `ltInt8` (I8# y) = isTrue# (x `ltInt8#` y)
+(I8# x) `leInt8` (I8# y) = isTrue# (x `leInt8#` y)
 
 -- | @since 2.01
 instance Show Int8 where
@@ -302,10 +302,10 @@ instance Ord Int16 where
 {-# INLINE [1] ltInt16 #-}
 {-# INLINE [1] leInt16 #-}
 gtInt16, geInt16, ltInt16, leInt16 :: Int16 -> Int16 -> Bool
-(I16# x) `gtInt16` (I16# y) = isTrue# ((int16ToInt# x) >#  (int16ToInt# y))
-(I16# x) `geInt16` (I16# y) = isTrue# ((int16ToInt# x) >=# (int16ToInt# y))
-(I16# x) `ltInt16` (I16# y) = isTrue# ((int16ToInt# x) <#  (int16ToInt# y))
-(I16# x) `leInt16` (I16# y) = isTrue# ((int16ToInt# x) <=# (int16ToInt# y))
+(I16# x) `gtInt16` (I16# y) = isTrue# (x `gtInt16#` y)
+(I16# x) `geInt16` (I16# y) = isTrue# (x `geInt16#` y)
+(I16# x) `ltInt16` (I16# y) = isTrue# (x `ltInt16#` y)
+(I16# x) `leInt16` (I16# y) = isTrue# (x `leInt16#` y)
 
 -- | @since 2.01
 instance Show Int16 where
@@ -520,10 +520,10 @@ instance Ord Int32 where
 {-# INLINE [1] ltInt32 #-}
 {-# INLINE [1] leInt32 #-}
 gtInt32, geInt32, ltInt32, leInt32 :: Int32 -> Int32 -> Bool
-(I32# x) `gtInt32` (I32# y) = isTrue# ((int32ToInt# x) >#  (int32ToInt# y))
-(I32# x) `geInt32` (I32# y) = isTrue# ((int32ToInt# x) >=# (int32ToInt# y))
-(I32# x) `ltInt32` (I32# y) = isTrue# ((int32ToInt# x) <#  (int32ToInt# y))
-(I32# x) `leInt32` (I32# y) = isTrue# ((int32ToInt# x) <=# (int32ToInt# y))
+(I32# x) `gtInt32` (I32# y) = isTrue# (x `gtInt32#` y)
+(I32# x) `geInt32` (I32# y) = isTrue# (x `geInt32#` y)
+(I32# x) `ltInt32` (I32# y) = isTrue# (x `ltInt32#` y)
+(I32# x) `leInt32` (I32# y) = isTrue# (x `leInt32#` y)
 
 -- | @since 2.01
 instance Show Int32 where
