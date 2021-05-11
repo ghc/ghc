@@ -62,29 +62,27 @@ testRules = do
             top <- topDirectory
             depsPkgs <- packageDependencies <$> readPackageData progPkg
 
-            -- when we're about to test an in-tree compiler, we make sure that
-            -- we have the corresponding GHC binary available, along with the
-            -- necessary libraries to build the check-* programs
-            when (testGhc `elem` ["stage1", "stage2", "stage3"]) $ do
+            -- when we're about to test an in-tree compiler, just build the package
+            -- normally, NOT stage3, as there are no rules for stage4 yet
+            if (testGhc `elem` ["stage1", "stage2"])
+              then do
                 let stg = stageOf testGhc
-                ghcPath <- programPath (Context stg ghc vanilla)
-                depsLibs <- traverse
-                  (\p -> pkgRegisteredLibraryFile (vanillaContext stg p))
-                  depsPkgs
-                need (ghcPath : depsLibs)
-
-            bindir <- getBinaryDirectory testGhc
-            debugged <- ghcDebugged <$> flavour
-            dynPrograms <- dynamicGhcPrograms =<< flavour
-            cmd [bindir </> "ghc" <.> exe] $
-                concatMap (\p -> ["-package", pkgName p]) depsPkgs ++
-                ["-o", top -/- path, top -/- sourcePath] ++
-                -- If GHC is build with debug options, then build check-ppr
-                -- also with debug options.  This allows, e.g., to print debug
-                -- messages of various RTS subsystems while using check-ppr.
-                if debugged then ["-debug"] else [] ++
-                -- If GHC is build dynamic, then build check-ppr also dynamic.
-                if dynPrograms then ["-dynamic"] else []
+                prog_path <- programPath =<< programContext stg progPkg
+                createFileLink prog_path path
+            -- otherwise, build it by directly invoking ghc
+              else do
+                bindir <- getBinaryDirectory testGhc
+                debugged <- ghcDebugged <$> flavour
+                dynPrograms <- dynamicGhcPrograms =<< flavour
+                cmd [bindir </> "ghc" <.> exe] $
+                    concatMap (\p -> ["-package", pkgName p]) depsPkgs ++
+                    ["-o", top -/- path, top -/- sourcePath] ++
+                    -- If GHC is build with debug options, then build check-ppr
+                    -- also with debug options.  This allows, e.g., to print debug
+                    -- messages of various RTS subsystems while using check-ppr.
+                    (if debugged then ["-debug"] else []) ++
+                    -- If GHC is build dynamic, then build check-ppr also dynamic.
+                    (if dynPrograms then ["-dynamic"] else [])
 
     root -/- ghcConfigPath %> \_ -> do
         args <- userSetting defaultTestArgs
