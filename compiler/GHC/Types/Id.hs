@@ -66,6 +66,7 @@ module GHC.Types.Id (
         isRecordSelector, isNaughtyRecordSelector,
         isPatSynRecordSelector,
         isDataConRecordSelector,
+        isClassOpId,
         isClassOpId_maybe, isDFunId,
         isPrimOpId, isPrimOpId_maybe,
         isFCallId, isFCallId_maybe,
@@ -458,6 +459,7 @@ isFCallId               :: Id -> Bool
 isDataConWorkId         :: Id -> Bool
 isDataConWrapId         :: Id -> Bool
 isDFunId                :: Id -> Bool
+isClassOpId             :: Id -> Bool
 
 isClassOpId_maybe       :: Id -> Maybe Class
 isPrimOpId_maybe        :: Id -> Maybe PrimOp
@@ -480,6 +482,10 @@ isPatSynRecordSelector id = case Var.idDetails id of
 isNaughtyRecordSelector id = case Var.idDetails id of
                         RecSelId { sel_naughty = n } -> n
                         _                               -> False
+
+isClassOpId id = case Var.idDetails id of
+                        ClassOpId _   -> True
+                        _other        -> False
 
 isClassOpId_maybe id = case Var.idDetails id of
                         ClassOpId cls -> Just cls
