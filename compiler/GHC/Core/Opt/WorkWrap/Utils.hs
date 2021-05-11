@@ -1007,6 +1007,7 @@ mk_absent_let opts arg
   -- wrong (like we were in #11126). See (1) in Note [Absent fillers]
   | Just [LiftedRep] <- mb_mono_prim_reps
   , not (isStrictDmd (idDemandInfo arg)) -- See (2) in Note [Absent fillers]
+  , False -- TODO: Remove. This is just a dirty hack around #19766
   = Just (Let (NonRec arg panic_rhs))
 
   -- The default case for mono rep: Bind @RUBBISH[prim_reps] \@arg_ty@
@@ -1247,7 +1248,8 @@ findTypeShape :: FamInstEnvs -> Type -> TypeShape
 -- The data type TypeShape is defined in GHC.Types.Demand
 -- See Note [Trimming a demand to a type] in GHC.Core.Opt.DmdAnal
 findTypeShape fam_envs ty
-  = go (setRecTcMaxBound 2 initRecTc) ty
+  = {-# SCC findTypeShape #-}
+    go (setRecTcMaxBound 2 initRecTc) ty
        -- You might think this bound of 2 is low, but actually
        -- I think even 1 would be fine.  This only bites for recursive
        -- product types, which are rare, and we really don't want
