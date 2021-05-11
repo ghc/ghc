@@ -495,12 +495,12 @@ tryWW dflags fam_envs is_rec fn_id rhs
   -- See Note [Worker/wrapper for NOINLINE functions]
 
   | Just stable_unf <- certainlyWillInline uf_opts fn_info
-  = return [ (fn_id `setIdUnfolding` stable_unf, rhs) ]
+  = return [ (new_fn_id `setIdUnfolding` stable_unf, rhs) ]
         -- See Note [Don't w/w INLINE things]
         -- See Note [Don't w/w inline small non-loop-breaker things]
 
   | isRecordSelector fn_id  -- See Note [No worker/wrapper for record selectors]
-  = return [ (fn_id, rhs ) ]
+  = return [ (new_fn_id, rhs ) ]
 
   | is_fun && is_eta_exp
   = splitFun dflags fam_envs new_fn_id fn_info wrap_dmds div cpr rhs
@@ -571,6 +571,32 @@ want to _keep_ the info for the code generator).
 
 We do not do it in the demand analyser for the same reasons outlined in
 Note [Zapping DmdEnv after Demand Analyzer] above.
+
+For example, consider
+  let y = factorial v in
+  let x = y in
+  x + x
+
+Demand analysis will conclude, correctly, that `y` is demanded once.  But if we inline `x` we get
+  let y = factorial v in
+  y + y
+
+Similarly for
+  f y = let x = y in x+x
+where we will put a used-once demand on y, and hence also in f's demand signature.
+
+And recursively
+  f y = case y of (p,q) -> let p2 = p in p2+p2
+ Here we'll get a used-once demand on p; but that is not robust to inlining p2.
+
+Conclusion: "demanded once" info is fragile.
+* We want it after the final immediately-before-code-gen demand analysis, so we can identify single-entry thunks.
+* But we don't want it otherwise because it is not robust.
+
+Conclusion: kill it during worker/wrapper, using `zapUsedOnceInfo`.  Both the *demand signature* of
+the binder, and the *demand-info* of the binder.  Moreover, do so recursively.
+
+(NB THE pre-code-gen demand analysis is not followed by worker/wrapper.)
 
 Note [Don't eta expand in w/w]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
