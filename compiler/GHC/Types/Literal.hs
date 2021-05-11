@@ -956,6 +956,20 @@ data type. Here are the moving parts:
        * The encoded @Type@ might be polymorphic and we can only emit code for
          monomorphic 'RuntimeRep's anyway.
 
+     During CoreToStg LitRubbish usually is used as a regular value, so we can translate
+     it as we would any other constructor/literal application. But in rare cases it might
+     end up replacing a *function*. That is we have an expression of the sort:
+
+        RUBBISH @Type foo bar
+
+     In these cases we replace the whole application with a simple LitRubbish value. After
+     all the whole expression shouldn't be used in any meaningful way.
+     So turning some form of rubbish into another kind of rubbish is fine.
+     The only invariant we have is that whatever we bind this expression to
+     should be save to seq. And that is still the case if we transform:
+     `RUBBISH @Type foo bar` into `RUBBISH @Type`.
+
+
   3. STG: The type app in @RUBBISH[IntRep] \@Int# :: Int#@ is erased and we get
      the (untyped) 'StgLit' @RUBBISH[IntRep] :: Int#@ in STG.
      It's treated mostly opaque, with the exception of the Unariser, where we

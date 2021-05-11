@@ -386,6 +386,13 @@ mkSeqs untaggedIds con cn args tys = do
 -- Out of all arguments passed at runtime only return these ending up in a
 -- strict field
 getStrictConArgs :: DataCon -> [a] -> [a]
-getStrictConArgs con args =
-  [ arg |
-    (arg,MarkedStrict) <- zipEqual "getStrictConArgs" args (dataConRuntimeRepStrictness con)]
+getStrictConArgs con args
+    -- These are always lazy in their arguments.
+    | isUnboxedTupleDataCon con = []
+    | isUnboxedSumDataCon con = []
+    -- For proper data cons we have to check.
+    | otherwise =
+        [ arg | (arg,MarkedStrict)
+                    <- zipEqual "getStrictConArgs"
+                                args
+                                (dataConRuntimeRepStrictness con)]

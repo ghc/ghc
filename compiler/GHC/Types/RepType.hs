@@ -41,6 +41,8 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
+import GHC.Driver.Ppr
+
 import Data.List (sort)
 import qualified Data.IntSet as IS
 
@@ -129,17 +131,22 @@ countConRepArgs dc = go (dataConRepArity dc) (dataConRepType dc)
       | otherwise
       = pprPanic "countConRepArgs: arity greater than type can handle" (ppr (n, ty, typePrimRep ty))
 
-dataConRuntimeRepStrictness :: DataCon -> [StrictnessMark]
+dataConRuntimeRepStrictness :: HasDebugCallStack => DataCon -> [StrictnessMark]
 -- ^ Give the demands on the arguments of a
 -- Core constructor application (Con dc args) at runtime.
+-- Assumes the constructor is not levity polymorphic. For example
+-- unboxed tuples won't work.
 dataConRuntimeRepStrictness dc =
+  -- pprTrace "dataConRuntimeRepStrictness" (ppr dc $$ ppr (dataConRepArgTys dc)) $
+
   let repMarks = dataConRepStrictness dc
       repTys = map irrelevantMult $ dataConRepArgTys dc
   in go repMarks repTys []
   where
     go (mark:marks) (ty:types) out_marks
       -- Zero-width argument, mark is irrelevant at runtime.
-      | (isVoidTy ty)
+      |  -- pprTrace "VoidTy" (ppr ty) $
+        (isVoidTy ty)
       = go marks types out_marks
       -- Single rep argument, e.g. Int
       -- Keep mark as-is
@@ -156,7 +163,7 @@ dataConRuntimeRepStrictness dc =
     go _m _t _o = pprPanic "dataConRuntimeRepStrictness2" (ppr dc $$ ppr _m $$ ppr _t $$ ppr _o)
 
 -- | True if the type has zero width.
-isVoidTy :: Type -> Bool
+isVoidTy :: HasDebugCallStack => Type -> Bool
 isVoidTy = null . typePrimRep
 
 
