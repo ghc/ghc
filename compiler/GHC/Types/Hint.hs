@@ -34,6 +34,8 @@ data GhcHint where
   -- | Suggests to explictly list the instantiations for the signatures in
   -- the GHC invocation command.
   SuggestSignatureInstantiations :: !ModuleName -> [InstantiationSuggestion] -> GhcHint
+  -- | Suggests to increase the value of -fmax-pmcheck-models
+  SuggestIncreaseMaxPmCheckModels :: GhcHint
 
 
 instance Outputable GhcHint where
@@ -41,7 +43,10 @@ instance Outputable GhcHint where
     UnknownHint m
       -> ppr m
     SuggestExtension ext
-      -> text "Perhaps you intended to use" <+> ppr ext
+      -> case ext of
+          NegativeLiterals
+            -> text "If you are trying to write a large negative literal, use NegativeLiterals"
+          _ -> text "Perhaps you intended to use" <+> ppr ext
     SuggestDo
       -> text "Perhaps this statement should be within a 'do' block?"
     SuggestMissingDo
@@ -72,6 +77,8 @@ instance Outputable GhcHint where
          in text "Try passing -instantiated-with=\"" <>
               suggested_instantiated_with <> text "\"" $$
                 text "replacing <" <> ppr pi_mod_name <> text "> as necessary."
+    SuggestIncreaseMaxPmCheckModels
+      -> text "Increase the limit or resolve the warnings to suppress this message."
 
 perhapsAsPat :: SDoc
 perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"
