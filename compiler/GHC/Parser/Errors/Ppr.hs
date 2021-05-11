@@ -18,8 +18,9 @@ import GHC.Parser.Errors.Types
 import GHC.Parser.Types
 import GHC.Types.Basic
 import GHC.Types.Error
+import GHC.Types.Hint (perhapsAsPat)
 import GHC.Types.SrcLoc
-import GHC.Types.Name.Reader (starInfo, rdrNameOcc, opIsAt, mkUnqual)
+import GHC.Types.Name.Reader (starInfo, rdrNameOcc, mkUnqual)
 import GHC.Types.Name.Occurrence (isSymOcc, occNameFS, varName)
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
@@ -34,12 +35,23 @@ import GHC.Utils.Error (diagReasonSeverity)
 instance Diagnostic PsMessage where
   diagnosticMessage (PsUnknownMessage m) = diagnosticMessage m
   diagnosticReason  (PsUnknownMessage m) = diagnosticReason m
+  -- FIXME(adinapoli) Fix it properly for #18516.
+  -- The reason why we temporarily set 'diagnosticHints' to be
+  -- the empty list is because currently the parser types does
+  -- not integrate tightly with the new diagnostic infrastructure
+  -- and as such hints and bundled together with the rendereded
+  -- diagnostic, and the same 'PsErrorDesc' is sometimes emitted
+  -- twice but with a different hint, which makes it hard to
+  -- untangle the two. Therefore, to smooth out the integration,
+  -- we provisionally tuck the hints directly into a 'PsUnknownMessage'
+  -- and we rendered them inside 'diagnosticMessage'.
+  diagnosticHints   (PsUnknownMessage _m) = []
 
-mk_parser_err :: SrcSpan -> SDoc -> MsgEnvelope PsMessage
-mk_parser_err span doc = MsgEnvelope
+mk_parser_err :: [GhcHint] -> SrcSpan -> SDoc -> MsgEnvelope PsMessage
+mk_parser_err hints span doc = MsgEnvelope
    { errMsgSpan        = span
    , errMsgContext     = alwaysQualify
-   , errMsgDiagnostic  = PsUnknownMessage $ DiagnosticMessage (mkDecorated [doc]) ErrorWithoutFlag
+   , errMsgDiagnostic  = PsUnknownMessage $ mkPlainError hints doc
    , errMsgSeverity    = SevError
    }
 
@@ -47,7 +59,7 @@ mk_parser_warn :: DynFlags -> WarningFlag -> SrcSpan -> SDoc -> MsgEnvelope PsMe
 mk_parser_warn df flag span doc = MsgEnvelope
    { errMsgSpan        = span
    , errMsgContext     = alwaysQualify
-   , errMsgDiagnostic  = PsUnknownMessage $ DiagnosticMessage (mkDecorated [doc]) reason
+   , errMsgDiagnostic  = PsUnknownMessage $ mkPlainDiagnostic reason noHints doc
    , errMsgSeverity    = diagReasonSeverity df reason
    }
   where
@@ -141,12 +153,12 @@ mkParserWarn df = \case
            OperatorWhitespaceOccurrence_TightInfix -> mk_msg "tight infix"
 
 mkParserErr :: PsError -> MsgEnvelope PsMessage
-mkParserErr err = mk_parser_err (errLoc err) $
+mkParserErr err = mk_parser_err (errHints err) (errLoc err) $
                   pprPsError (errDesc err) (errHints err)
 
--- | Render a 'PsErrorDesc' into an 'SDoc', with its 'PsHint's.
-pprPsError :: PsErrorDesc -> [PsHint] -> SDoc
-pprPsError desc hints = vcat (pp_err desc : map pp_hint hints)
+-- | Render a 'PsErrorDesc' into an 'SDoc', with its 'Hint's.
+pprPsError :: PsErrorDesc -> [GhcHint] -> SDoc
+pprPsError desc hints = vcat (pp_err desc : map ppr hints)
 
 pp_err :: PsErrorDesc -> SDoc
 pp_err = \case
@@ -384,7 +396,7 @@ pp_err = \case
       -> text "Found a binding for the"
          <+> quotes (text "@")
          <+> text "operator in a pattern position."
-         $$ perhaps_as_pat
+         $$ perhapsAsPat
 
    PsErrLambdaCmdInFunAppCmd a
       -> pp_unexpected_fun_app (text "lambda command") a
@@ -613,26 +625,3 @@ pp_unexpected_fun_app e a =
     $$ nest 4 (ppr a)
     $$ text "You could write it with parentheses"
     $$ text "Or perhaps you meant to enable BlockArguments?"
-
-pp_hint :: PsHint -> SDoc
-pp_hint = \case
-   SuggestTH              -> text "Perhaps you intended to use TemplateHaskell"
-   SuggestDo              -> text "Perhaps this statement should be within a 'do' block?"
-   SuggestMissingDo       -> text "Possibly caused by a missing 'do'?"
-   SuggestRecursiveDo     -> text "Perhaps you intended to use RecursiveDo"
-   SuggestLetInDo         -> text "Perhaps you need a 'let' in a 'do' block?"
-                             $$ text "e.g. 'let x = 5' instead of 'x = 5'"
-   SuggestPatternSynonyms -> text "Perhaps you intended to use PatternSynonyms"
-
-   SuggestInfixBindMaybeAtPat fun
-      -> text "In a function binding for the"
-            <+> quotes (ppr fun)
-            <+> text "operator."
-         $$ if opIsAt fun
-               then perhaps_as_pat
-               else empty
-   TypeApplicationsInPatternsOnlyDataCons ->
-     text "Type applications in patterns are only allowed on data constructors."
-
-perhaps_as_pat :: SDoc
-perhaps_as_pat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"
