@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE NondecreasingIndentation #-}
+{-# LANGUAGE GADTs #-}
 
 {-# OPTIONS_GHC -fprof-auto-top #-}
 
@@ -232,6 +233,8 @@ import Data.Set (Set)
 import Data.Functor
 import Control.DeepSeq (force)
 import Data.Bifunctor (first, bimap)
+import GHC.Types.Name.Set (NonCaffySet)
+import GHC.Driver.GenerateCgIPEStub (generateCgIPEStub)
 
 #include "HsVersions.h"
 
@@ -1799,7 +1802,7 @@ doCodeGen hsc_env this_mod denv data_tycons
                         Nothing -> StgToCmm.codeGen logger tmpfs
                         Just h  -> h
 
-    let cmm_stream :: Stream IO CmmGroup (CStub, ModuleLFInfos)
+    let cmm_stream :: Stream IO CmmGroup ModuleLFInfos
         -- See Note [Forcing of stg_binds]
         cmm_stream = stg_binds_w_fvs `seqList` {-# SCC "StgToCmm" #-}
             stg_to_cmm dflags this_mod denv data_tycons cost_centre_info stg_binds_w_fvs hpc_info
@@ -1817,21 +1820,21 @@ doCodeGen hsc_env this_mod denv data_tycons
 
         ppr_stream1 = Stream.mapM dump1 cmm_stream
 
-        pipeline_stream :: Stream IO CmmGroupSRTs CgInfos
+        pipeline_stream :: Stream IO CmmGroupSRTs (NonCaffySet, ModuleLFInfos)
         pipeline_stream = do
-          (non_cafs, (used_info, lf_infos)) <-
+          (non_cafs,  lf_infos) <-
             {-# SCC "cmmPipeline" #-}
             Stream.mapAccumL_ (cmmPipeline hsc_env) (emptySRT this_mod) ppr_stream1
               <&> first (srtMapNonCAFs . moduleSRTMap)
 
-          return CgInfos{ cgNonCafs = non_cafs, cgLFInfos = lf_infos, cgIPEStub = used_info }
+          return (non_cafs, lf_infos)
 
         dump2 a = do
           unless (null a) $
             dumpIfSet_dyn logger dflags Opt_D_dump_cmm "Output Cmm" FormatCMM (pdoc platform a)
           return a
 
-    return (Stream.mapM dump2 pipeline_stream)
+    return $ Stream.mapM dump2 $ generateCgIPEStub hsc_env this_mod denv pipeline_stream
 
 myCoreToStgExpr :: Logger -> DynFlags -> InteractiveContext
                 -> Module -> ModLocation -> CoreExpr
