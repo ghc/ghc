@@ -34,7 +34,11 @@ module GHC.Stack.CCS (
     ccModule,
     ccSrcSpan,
     ccsToStrings,
-    renderStack
+    renderStack,
+    ipeProv,
+    peekInfoProv,
+    InfoProv(..),
+    InfoProvEnt,
   ) where
 
 import Foreign
@@ -139,7 +143,14 @@ renderStack strs =
 
 -- Static Closure Information
 
-data InfoProv
+data InfoProv = InfoProv {
+  ipName :: String,
+  ipDesc :: String,
+  ipTyDesc :: String,
+  ipLabel :: String,
+  ipMod :: String,
+  ipLoc :: String
+}
 data InfoProvEnt
 
 getIPE :: a -> IO (Ptr InfoProvEnt)
@@ -150,23 +161,42 @@ getIPE obj = IO $ \s ->
 ipeProv :: Ptr InfoProvEnt -> Ptr InfoProv
 ipeProv p = (#ptr InfoProvEnt, prov) p
 
-ipName, ipDesc, ipLabel, ipModule, ipSrcLoc, ipTyDesc :: Ptr InfoProv -> IO CString
-ipName p   =  (# peek InfoProv, table_name) p
-ipDesc p   =  (# peek InfoProv, closure_desc) p
-ipLabel p  =  (# peek InfoProv, label) p
-ipModule p =  (# peek InfoProv, module) p
-ipSrcLoc p =  (# peek InfoProv, srcloc) p
-ipTyDesc p =  (# peek InfoProv, ty_desc) p
+peekIpName, peekIpDesc, peekIpLabel, peekIpModule, peekIpSrcLoc, peekIpTyDesc :: Ptr InfoProv -> IO CString
+peekIpName p   =  (# peek InfoProv, table_name) p
+peekIpDesc p   =  (# peek InfoProv, closure_desc) p
+peekIpLabel p  =  (# peek InfoProv, label) p
+peekIpModule p =  (# peek InfoProv, module) p
+peekIpSrcLoc p =  (# peek InfoProv, srcloc) p
+peekIpTyDesc p =  (# peek InfoProv, ty_desc) p
+
+peekInfoProv :: Ptr InfoProv -> IO InfoProv
+peekInfoProv infop = do
+  name <- GHC.peekCString utf8 =<< peekIpName infop
+  desc <- GHC.peekCString utf8 =<< peekIpDesc infop
+  tyDesc <- GHC.peekCString utf8 =<< peekIpTyDesc infop
+  label <- GHC.peekCString utf8 =<< peekIpLabel infop
+  mod <- GHC.peekCString utf8 =<< peekIpModule infop
+  loc <- GHC.peekCString utf8 =<< peekIpSrcLoc infop
+  return InfoProv {
+      ipName = name,
+      ipDesc = desc,
+      ipTyDesc = tyDesc,
+      ipLabel = label,
+      ipMod = mod,
+      ipLoc = loc
+    }
 
 infoProvToStrings :: Ptr InfoProv -> IO [String]
 infoProvToStrings infop = do
-  name <- GHC.peekCString utf8 =<< ipName infop
-  desc <- GHC.peekCString utf8 =<< ipDesc infop
-  ty_desc <- GHC.peekCString utf8 =<< ipTyDesc infop
-  label <- GHC.peekCString utf8 =<< ipLabel infop
-  mod <- GHC.peekCString utf8 =<< ipModule infop
-  loc <- GHC.peekCString utf8 =<< ipSrcLoc infop
-  return [name, desc, ty_desc, label, mod, loc]
+  infoProv <- peekInfoProv infop
+  return [
+      ipName infoProv,
+      ipDesc infoProv,
+      ipTyDesc infoProv,
+      ipLabel infoProv,
+      ipMod infoProv,
+      ipLoc infoProv
+    ]
 
 -- TODO: Add structured output of whereFrom
 -- | Get information about where a value originated from.
