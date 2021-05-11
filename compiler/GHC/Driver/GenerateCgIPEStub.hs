@@ -106,12 +106,13 @@ Here we use the fact, that calls (represented by `CmmNode.CmmCall`) are always c
 
 So, given a stack represented info table (likely representing a return frame, but this isn't completely
 sure as there are e.g. update frames, too) with it's label (`c18g` in the example above) and a `CmmGraph`:
-  - Look at the end of every block, if it's a `CmmNode.CmmCall`, returning to the continuation with the label
-    of the return frame.
+  - Look at the end of every block, if it's a `CmmNode.CmmCall` returning to the continuation with the
+    label of the return frame.
   - If there's such a call, lookup the nearest `CmmNode.CmmTick` by traversing the middle part of the block
     backwards (from end to beginning).
   - Take the first `CmmNode.CmmTick` that contains a `Tickish.SourceNote` and return it's payload as
-    `IpeSourceLocation`.
+    `IpeSourceLocation`. (There are other `Tickish` constructors like `ProfNote` or `HpcTick`, these are
+    ignored.)
 
 Unregisterised
 ~~~~~~~~~~~~~
@@ -169,7 +170,7 @@ Notice, that this cannot be done with the `Label` `c18M`, but with the `CLabel` 
 The find the tick:
   - Every `Block` is checked from top (first) to bottom (last) node for an assignment like
    `I64[Sp - 24] = block_c18M_info;`. The lefthand side is actually ignored.
-  - If such an assignment is found, the search is over, because the payload (content of
+  - If such an assignment is found the search is over, because the payload (content of
     `Tickish.SourceNote`, represented as `IpeSourceLocation`) of last visited tick is always
     remembered in a `Maybe`.
 -}
@@ -184,12 +185,13 @@ generateCgIPEStub hsc_env this_mod denv s = do
   let collectFun = if gopt Opt_InfoTableMap dflags then collect platform else collectNothing
   (labeledInfoTablesWithTickishes, (nonCaffySet, moduleLFInfos)) <- Stream.mapAccumL_ collectFun [] s
 
+  -- Yield Cmm for Info Table Provenance Entries (IPEs)
   let denv' = denv {provInfoTables = Map.fromList (map (\(_, i, t) -> (cit_lbl i, t)) labeledInfoTablesWithTickishes)}
-      ((ipeStub, cmmGroup), _) = runC dflags this_mod cgState $ getCmm (initInfoTableProv (map sndOfTriple labeledInfoTablesWithTickishes) denv' this_mod)
+      ((ipeStub, ipeCmmGroup), _) = runC dflags this_mod cgState $ getCmm (initInfoTableProv (map sndOfTriple labeledInfoTablesWithTickishes) denv' this_mod)
 
-  -- TODO: Do we really need to run the `cmmPipeline` again? See Main:1792
-  (_, cmmGroupSRTs) <- liftIO $ cmmPipeline hsc_env (emptySRT this_mod) cmmGroup
-  Stream.yield cmmGroupSRTs
+  (_, ipeCmmGroupSRTs) <- liftIO $ cmmPipeline hsc_env (emptySRT this_mod) ipeCmmGroup
+  Stream.yield ipeCmmGroupSRTs
+
   return CgInfos {cgNonCafs = nonCaffySet, cgLFInfos = moduleLFInfos, cgIPEStub = ipeStub}
   where
     collect :: Platform -> [(Label, CmmInfoTable, Maybe IpeSourceLocation)] -> CmmGroupSRTs -> IO ([(Label, CmmInfoTable, Maybe IpeSourceLocation)], CmmGroupSRTs)
@@ -250,6 +252,7 @@ generateCgIPEStub hsc_env this_mod denv s = do
         maybeTick :: CmmNode O O -> Maybe IpeSourceLocation
         maybeTick (CmmTick (SourceNote span name)) = Just (span, name)
         maybeTick _ = Nothing
+
     findCmmTickishForForUnregistered :: CLabel -> Block CmmNode C C -> Maybe IpeSourceLocation
     findCmmTickishForForUnregistered cLabel block = do
       let (_, middleBlock, _) = blockSplit block
