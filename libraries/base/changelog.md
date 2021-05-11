@@ -2,6 +2,11 @@
 
 ## 4.16.0.0 *TBA*
 
+  * Add `Generically` and `Generically1` to `GHC.Generics` for deriving generic
+    instances with `DerivingVia`. `Generically` instances include `Semigroup` and
+    `Monoid`. `Generically1` instances: `Functor`, `Applicative`, `Alternative`,
+    `Eq1` and `Ord1`.
+
   * Make it possible to promote `Natural`s and remove the separate `Nat` kind.
     For backwards compatibility, `Nat` is now a type synonym for `Natural`.
     As a consequence, one must enable `TypeSynonymInstances`
@@ -84,7 +89,7 @@
   * Add `MonadFix` and `MonadZip` instances for `Complex`
 
   * Add `Ix` instances for tuples of size 6 through 15
-   
+
   * Correct `Bounded` instance and remove `Enum` and `Integral` instances for
     `Data.Ord.Down`.
 
