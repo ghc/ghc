@@ -1672,11 +1672,9 @@ pushCoValArg co
               -- then co1 :: tyL1 ~ tyR1
               --      co2 :: tyL2 ~ tyR2
   = ASSERT2( isFunTy tyR, ppr co $$ ppr arg )
-    Just (coToMCo (mkSymCo co1), coToMCo co2)
-    -- Critically, coToMCo to checks for ReflCo; the whole coercion may not
-    -- be reflexive, but either of its components might be
-    -- We could use isReflexiveCo, but it's not clear if the benefit
-    -- is worth the cost, and it makes no difference in #18223
+    Just (mkMCo (mkSymCo co1), mkMCo co2)
+    -- Critically, mkMCo to checks for isReflexiveCo; the whole coercion
+    -- may not be reflexive, but either of its components might be
 
   | otherwise
   = Nothing
