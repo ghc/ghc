@@ -33,6 +33,7 @@ import {-# SOURCE #-} Language.Haskell.Syntax.Pat
 
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Type
+import GHC.Types.Name.Reader(RdrName)
 import GHC.Tc.Types.Evidence
 import GHC.Core.Type
 import GHC.Types.Basic
@@ -931,7 +932,7 @@ when we have a different name for the local and top-level binder,
 making the distinction between the two names clear.
 
 -}
-instance Outputable (RecordPatSynField a) where
+instance Outputable (XRec a RdrName) => Outputable (RecordPatSynField a) where
     ppr (RecordPatSynField { recordPatSynField = v }) = ppr v
 
 
