@@ -124,9 +124,9 @@ lubCprType ty1@(CprType n1 cpr1) ty2@(CprType n2 cpr2)
   | n1 == n2                   = CprType n1 (lubCpr cpr1 cpr2)
   | otherwise                  = topCprType
 
-applyCprTy :: CprType -> CprType
-applyCprTy (CprType n res)
-  | n > 0         = CprType (n-1) res
+applyCprTy :: CprType -> Arity -> CprType
+applyCprTy (CprType n res) k
+  | n >= k        = CprType (n-k) res
   | res == botCpr = botCprType
   | otherwise     = topCprType
 
@@ -169,12 +169,9 @@ newtype CprSig = CprSig { getCprSig :: CprType }
 -- unleashable at that arity. See Note [Understanding DmdType and DmdSig] in
 -- "GHC.Types.Demand"
 mkCprSigForArity :: Arity -> CprType -> CprSig
-mkCprSigForArity arty ty@(CprType n cpr)
-  | arty /= n         = topCprSig
-      -- Trim on arity mismatch
-  | ConCpr t _ <- cpr = CprSig (CprType n (flatConCpr t))
-      -- Flatten nested CPR info, we don't exploit it (yet)
-  | otherwise         = CprSig ty
+mkCprSigForArity arty ty@(CprType n _)
+  | arty /= n = topCprSig -- Trim on arity mismatch
+  | otherwise = CprSig ty
 
 topCprSig :: CprSig
 topCprSig = CprSig topCprType
