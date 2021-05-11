@@ -1,4 +1,5 @@
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE FlexibleContexts #-}
 module GHC.Tc.Errors.Types (
   -- * Main types
     TcRnMessage(..)
@@ -6,6 +7,7 @@ module GHC.Tc.Errors.Types (
   ) where
 
 import GHC.Hs
+import GHC.HsToCore.Errors.Types (DsMessage)
 import GHC.Types.Error
 import GHC.Types.Name (Name)
 import GHC.Types.Name.Reader
@@ -22,6 +24,15 @@ data TcRnMessage where
       to provide custom diagnostic messages originated during typechecking/renaming.
   -}
   TcRnUnknownMessage :: (Diagnostic a, Typeable a) => a -> TcRnMessage
+
+  {-| Wraps a message coming from the desugarer during the levity polymorphism checking.
+  -}
+  TcLevityCheckDsMessage :: Diagnostic DsMessage -- Avoids mutual dependency between the pretty-printers.
+                         => !DsMessage
+                         -> !ErrInfo -- Extra info accumulated in the TcM monad
+                         -> TcRnMessage
+
+
   {-| TcRnImplicitLift is a warning (controlled with -Wimplicit-lift) that occurs when
       a Template Haskell quote implicitly uses 'lift'.
 
