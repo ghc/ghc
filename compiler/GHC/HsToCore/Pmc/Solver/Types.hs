@@ -1,6 +1,6 @@
 {-# LANGUAGE ApplicativeDo       #-}
-
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ViewPatterns        #-}
 
 -- | Domain types used in "GHC.HsToCore.Pmc.Solver".
 -- The ultimate goal is to define 'Nabla', which models normalised refinement
@@ -11,6 +11,10 @@ module GHC.HsToCore.Pmc.Solver.Types (
         -- * Normalised refinement types
         BotInfo(..), PmAltConApp(..), VarInfo(..), TmState(..), TyState(..),
         Nabla(..), Nablas(..), initNablas,
+        lookupRefuts, lookupSolution,
+
+        -- ** Looking up 'VarInfo'
+        lookupVarInfo, lookupVarInfoNT, trvVarInfo,
 
         -- ** Caching residual COMPLETE sets
         CompleteMatch, ResidualCompleteMatches(..), getRcm, isRcmInitialised,
@@ -273,6 +277,77 @@ instance Outputable ResidualCompleteMatches where
   -- formats as "[{Nothing,Just},{P,Q}]"
   ppr rcm = ppr (getRcm rcm)
 
+-----------------------
+-- * Looking up VarInfo
+
+emptyRCM :: ResidualCompleteMatches
+emptyRCM = RCM Nothing Nothing
+
+emptyVarInfo :: Id -> VarInfo
+emptyVarInfo x
+  = VI
+  { vi_id = x
+  , vi_pos = []
+  , vi_neg = emptyPmAltConSet
+  -- Case (3) in Note [Strict fields and fields of unlifted type]
+  -- in GHC.HsToCore.Pmc.Solver
+  , vi_bot = if isUnliftedType (idType x) then IsNotBot else MaybeBot
+  , vi_rcm = emptyRCM
+  }
+
+lookupVarInfo :: TmState -> Id -> VarInfo
+-- (lookupVarInfo tms x) tells what we know about 'x'
+lookupVarInfo (TmSt env _ _) x = fromMaybe (emptyVarInfo x) (lookupUSDFM env x)
+
+-- | Like @lookupVarInfo ts x@, but @lookupVarInfo ts x = (y, vi)@ also looks
+-- through newtype constructors. We have @x ~ N1 (... (Nk y))@ such that the
+-- returned @y@ doesn't have a positive newtype constructor constraint
+-- associated with it (yet). The 'VarInfo' returned is that of @y@'s
+-- representative.
+--
+-- Careful, this means that @idType x@ might be different to @idType y@, even
+-- modulo type normalisation!
+--
+-- See also Note [Coverage checking Newtype matches] in GHC.HsToCore.Pmc.Solver.
+lookupVarInfoNT :: TmState -> Id -> (Id, VarInfo)
+lookupVarInfoNT ts x = case lookupVarInfo ts x of
+  VI{ vi_pos = as_newtype -> Just y } -> lookupVarInfoNT ts y
+  res                                 -> (x, res)
+  where
+    as_newtype = listToMaybe . mapMaybe go
+    go PACA{paca_con = PmAltConLike (RealDataCon dc), paca_ids = [y]}
+      | isNewDataCon dc = Just y
+    go _                = Nothing
+
+trvVarInfo :: Functor f => (VarInfo -> f (a, VarInfo)) -> Nabla -> Id -> f (a, Nabla)
+trvVarInfo f nabla@MkNabla{ nabla_tm_st = ts@TmSt{ts_facts = env} } x
+  = set_vi <$> f (lookupVarInfo ts x)
+  where
+    set_vi (a, vi') =
+      (a, nabla{ nabla_tm_st = ts{ ts_facts = addToUSDFM env (vi_id vi') vi' } })
+
+------------------------------------------------
+-- * Exported utility functions querying 'Nabla'
+
+lookupRefuts :: Nabla -> Id -> [PmAltCon]
+-- Unfortunately we need the extra bit of polymorphism and the unfortunate
+-- duplication of lookupVarInfo here.
+lookupRefuts MkNabla{ nabla_tm_st = ts } x =
+  pmAltConSetElems $ vi_neg $ lookupVarInfo ts x
+
+isDataConSolution :: PmAltConApp -> Bool
+isDataConSolution PACA{paca_con = PmAltConLike (RealDataCon _)} = True
+isDataConSolution _                                             = False
+
+-- @lookupSolution nabla x@ picks a single solution ('vi_pos') of @x@ from
+-- possibly many, preferring 'RealDataCon' solutions whenever possible.
+lookupSolution :: Nabla -> Id -> Maybe PmAltConApp
+lookupSolution nabla x = case vi_pos (lookupVarInfo (nabla_tm_st nabla) x) of
+  []                                         -> Nothing
+  pos
+    | Just sol <- find isDataConSolution pos -> Just sol
+    | otherwise                              -> Just (head pos)
+
 --------------------------------------------------------------------------------
 -- The rest is just providing an IR for (overloaded!) literals and AltCons that
 -- sits between Hs and Core. We need a reliable way to detect and determine
@@ -434,7 +509,7 @@ pmAltConType (PmAltConLike con) arg_tys  = conLikeResTy con arg_tys
 -- | Is a match on this constructor forcing the match variable?
 -- True of data constructors, literals and pattern synonyms (#17357), but not of
 -- newtypes.
--- See Note [Coverage checking Newtype matches] in "GHC.HsToCore.Pmc.Solver".
+-- See Note [Coverage checking Newtype matches] in GHC.HsToCore.Pmc.Solver.
 isPmAltConMatchStrict :: PmAltCon -> Bool
 isPmAltConMatchStrict PmAltLit{}                      = True
 isPmAltConMatchStrict (PmAltConLike PatSynCon{})      = True -- #17357
