@@ -43,12 +43,12 @@ module GHC.HsToCore.Pmc (
 
 import GHC.Prelude
 
+import GHC.HsToCore.Errors.Types
 import GHC.HsToCore.Pmc.Types
 import GHC.HsToCore.Pmc.Utils
 import GHC.HsToCore.Pmc.Desugar
 import GHC.HsToCore.Pmc.Check
 import GHC.HsToCore.Pmc.Solver
-import GHC.HsToCore.Pmc.Ppr
 import GHC.Types.Basic (Origin(..))
 import GHC.Core (CoreExpr)
 import GHC.Driver.Session
@@ -330,7 +330,7 @@ formatReportWarnings collect ctx vars cr@CheckResult { cr_ret = ann } = do
 -- | Issue all the warnings
 -- (redundancy, inaccessibility, exhaustiveness, redundant bangs).
 reportWarnings :: DynFlags -> DsMatchContext -> [Id] -> CheckResult CIRB -> DsM ()
-reportWarnings dflags ctx@(DsMatchContext kind loc) vars
+reportWarnings dflags (DsMatchContext kind loc) vars
   CheckResult { cr_ret    = CIRB { cirb_inacc = inaccessible_rhss
                                  , cirb_red   = redundant_rhss
                                  , cirb_bangs = redundant_bangs }
@@ -345,54 +345,25 @@ reportWarnings dflags ctx@(DsMatchContext kind loc) vars
           approx   = precision == Approximate
 
       when (approx && (exists_u || exists_i)) $
-        putSrcSpanDs loc (diagnosticDs WarningWithoutFlag approx_msg)
+        putSrcSpanDs loc (diagnosticDs (DsMaxPmCheckModelsReached (maxPmCheckModels dflags)))
 
       when exists_b $ forM_ redundant_bangs $ \(SrcInfo (L l q)) ->
-        putSrcSpanDs l (diagnosticDs (WarningWithFlag Opt_WarnRedundantBangPatterns)
-                                     (pprEqn q "has redundant bang"))
+        putSrcSpanDs l (diagnosticDs (DsRedundantBangPatterns kind q))
 
       when exists_r $ forM_ redundant_rhss $ \(SrcInfo (L l q)) ->
-        putSrcSpanDs l (diagnosticDs (WarningWithFlag Opt_WarnOverlappingPatterns)
-                                     (pprEqn q "is redundant"))
+        putSrcSpanDs l (diagnosticDs (DsOverlappingPatterns kind q))
       when exists_i $ forM_ inaccessible_rhss $ \(SrcInfo (L l q)) ->
-        putSrcSpanDs l (diagnosticDs (WarningWithFlag Opt_WarnOverlappingPatterns)
-                                     (pprEqn q "has inaccessible right hand side"))
+        putSrcSpanDs l (diagnosticDs (DsInaccessibleRhs kind q))
 
-      when exists_u $ putSrcSpanDs loc $ diagnosticDs flag_u_reason $
-        pprEqns vars unc_examples
+      when exists_u $
+        putSrcSpanDs loc (diagnosticDs (DsNonExhaustivePatterns kind check_type maxPatterns vars unc_examples))
   where
     flag_i = overlapping dflags kind
     flag_u = exhaustive dflags kind
     flag_b = redundantBang dflags
-    flag_u_reason = maybe WarningWithoutFlag WarningWithFlag (exhaustiveWarningFlag kind)
+    check_type = ExhaustivityCheckType (exhaustiveWarningFlag kind)
 
     maxPatterns = maxUncoveredPatterns dflags
-
-    -- Print a single clause (for redundant/with-inaccessible-rhs)
-    pprEqn q txt = pprContext True ctx (text txt) $ \f ->
-      f (q <+> matchSeparator kind <+> text "...")
-
-    -- Print several clauses (for uncovered clauses)
-    pprEqns vars nablas = pprContext False ctx (text "are non-exhaustive") $ \_ ->
-      case vars of -- See #11245
-           [] -> text "Guards do not cover entire pattern space"
-           _  -> let us = map (\nabla -> pprUncovered nabla vars) nablas
-                     pp_tys = pprQuotedList $ map idType vars
-                 in  hang
-                       (text "Patterns of type" <+> pp_tys <+> text "not matched:")
-                       4
-                       (vcat (take maxPatterns us) $$ dots maxPatterns us)
-
-    approx_msg = vcat
-      [ hang
-          (text "Pattern match checker ran into -fmax-pmcheck-models="
-            <> int (maxPmCheckModels dflags)
-            <> text " limit, so")
-          2
-          (  bullet <+> text "Redundant clauses might not be reported at all"
-          $$ bullet <+> text "Redundant clauses might be reported as inaccessible"
-          $$ bullet <+> text "Patterns reported as unmatched might actually be matched")
-      , text "Increase the limit or resolve the warnings to suppress this message." ]
 
 getNFirstUncovered :: [Id] -> Int -> Nablas -> DsM [Nabla]
 getNFirstUncovered vars n (MkNablas nablas) = go n (bagToList nablas)
@@ -403,26 +374,6 @@ getNFirstUncovered vars n (MkNablas nablas) = go n (bagToList nablas)
       front <- generateInhabitingPatterns vars n nabla
       back <- go (n - length front) nablas
       pure (front ++ back)
-
-dots :: Int -> [a] -> SDoc
-dots maxPatterns qs
-    | qs `lengthExceeds` maxPatterns = text "..."
-    | otherwise                      = empty
-
-pprContext :: Bool -> DsMatchContext -> SDoc -> ((SDoc -> SDoc) -> SDoc) -> SDoc
-pprContext singular (DsMatchContext kind _loc) msg rest_of_msg_fun
-  = vcat [text txt <+> msg,
-          sep [ text "In" <+> ppr_match <> char ':'
-              , nest 4 (rest_of_msg_fun pref)]]
-  where
-    txt | singular  = "Pattern match"
-        | otherwise = "Pattern match(es)"
-
-    (ppr_match, pref)
-        = case kind of
-             FunRhs { mc_fun = L _ fun }
-                  -> (pprMatchContext kind, \ pp -> ppr fun <+> pp)
-             _    -> (pprMatchContext kind, \ pp -> pp)
 
 --
 -- * Adding external long-distance information

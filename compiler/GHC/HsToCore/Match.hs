@@ -46,6 +46,7 @@ import GHC.Types.Id
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.PatSyn
+import GHC.HsToCore.Errors.Types
 import GHC.HsToCore.Match.Constructor
 import GHC.HsToCore.Match.Literal
 import GHC.Core.Type
@@ -247,10 +248,9 @@ match (v:vs) ty eqns    -- Eqns *can* be empty
                                            case p of PgView e _ -> e:acc
                                                      _ -> acc) [] group) eqns
             maybeWarn [] = return ()
-            maybeWarn l = diagnosticDs WarningWithoutFlag (vcat l)
+            maybeWarn l  = diagnosticDs (DsAggregatedViewExpressions l)
         in
-          maybeWarn $ (map (\g -> text "Putting these view expressions into the same case:" <+> (ppr g))
-                       (filter (not . null) gs))
+          maybeWarn $ filter (not . null) gs
 
 matchEmpty :: MatchId -> Type -> DsM (NonEmpty (MatchResult CoreExpr))
 -- See Note [Empty case expressions]
@@ -455,10 +455,7 @@ tidy1 v _ (LazyPat _ pat)
   = do  { let unlifted_bndrs = filter (isUnliftedType . idType) (collectPatBinders CollNoDictBinders pat)
         ; unless (null unlifted_bndrs) $
           putSrcSpanDs (getLocA pat) $
-          errDs (hang (text "A lazy (~) pattern cannot bind variables of unlifted type." $$
-                       text "Unlifted variables:")
-                    2 (vcat (map (\id -> ppr id <+> dcolon <+> ppr (idType id))
-                                 unlifted_bndrs)))
+          diagnosticDs (DsLazyPatCantBindVarsOfUnliftedType unlifted_bndrs)
 
         ; (_,sel_prs) <- mkSelectorBinds [] pat (Var v)
         ; let sel_binds =  [NonRec b rhs | (b,rhs) <- sel_prs]

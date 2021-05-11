@@ -23,7 +23,6 @@ Authors: George Karachalias <george.karachalias@cs.kuleuven.be>
 module GHC.HsToCore.Pmc.Solver (
 
         Nabla, Nablas(..), initNablas,
-        lookupRefuts, lookupSolution,
 
         PhiCt(..), PhiCts,
         addPhiCtNablas,
@@ -510,58 +509,9 @@ inhabitationCandidates, we'll mistakenly conclude that `f` is non-exhaustive.
 In order to avoid this pitfall, we need to normalise the type passed to
 pmTopNormaliseType, using the constraint solver to solve for any local
 equalities (such as i ~ Int) that may be in scope.
--}
 
------------------------
--- * Looking up VarInfo
-
-emptyRCM :: ResidualCompleteMatches
-emptyRCM = RCM Nothing Nothing
-
-emptyVarInfo :: Id -> VarInfo
-emptyVarInfo x
-  = VI
-  { vi_id = x
-  , vi_pos = []
-  , vi_neg = emptyPmAltConSet
-  -- Case (3) in Note [Strict fields and fields of unlifted type]
-  , vi_bot = if isUnliftedType (idType x) then IsNotBot else MaybeBot
-  , vi_rcm = emptyRCM
-  }
-
-lookupVarInfo :: TmState -> Id -> VarInfo
--- (lookupVarInfo tms x) tells what we know about 'x'
-lookupVarInfo (TmSt env _ _) x = fromMaybe (emptyVarInfo x) (lookupUSDFM env x)
-
--- | Like @lookupVarInfo ts x@, but @lookupVarInfo ts x = (y, vi)@ also looks
--- through newtype constructors. We have @x ~ N1 (... (Nk y))@ such that the
--- returned @y@ doesn't have a positive newtype constructor constraint
--- associated with it (yet). The 'VarInfo' returned is that of @y@'s
--- representative.
---
--- Careful, this means that @idType x@ might be different to @idType y@, even
--- modulo type normalisation!
---
--- See also Note [Coverage checking Newtype matches].
-lookupVarInfoNT :: TmState -> Id -> (Id, VarInfo)
-lookupVarInfoNT ts x = case lookupVarInfo ts x of
-  VI{ vi_pos = as_newtype -> Just y } -> lookupVarInfoNT ts y
-  res                                 -> (x, res)
-  where
-    as_newtype = listToMaybe . mapMaybe go
-    go PACA{paca_con = PmAltConLike (RealDataCon dc), paca_ids = [y]}
-      | isNewDataCon dc = Just y
-    go _                = Nothing
-
-trvVarInfo :: Functor f => (VarInfo -> f (a, VarInfo)) -> Nabla -> Id -> f (a, Nabla)
-trvVarInfo f nabla@MkNabla{ nabla_tm_st = ts@TmSt{ts_facts = env} } x
-  = set_vi <$> f (lookupVarInfo ts x)
-  where
-    set_vi (a, vi') =
-      (a, nabla{ nabla_tm_st = ts{ ts_facts = addToUSDFM env (vi_id vi') vi' } })
-
-{- Note [Coverage checking Newtype matches]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Coverage checking Newtype matches]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Newtypes have quite peculiar match semantics compared to ordinary DataCons. In a
 pattern-match, they behave like a irrefutable (lazy) match, but for inhabitation
 testing purposes (e.g. at construction sites), they behave rather like a DataCon
@@ -587,28 +537,6 @@ clause as redundant, which clearly is unsound. The solution:
 Handling of Newtypes is also described in the Appendix of the Lower Your Guards paper,
 where you can find the solution in a perhaps more digestible format.
 -}
-
-------------------------------------------------
--- * Exported utility functions querying 'Nabla'
-
-lookupRefuts :: Nabla -> Id -> [PmAltCon]
--- Unfortunately we need the extra bit of polymorphism and the unfortunate
--- duplication of lookupVarInfo here.
-lookupRefuts MkNabla{ nabla_tm_st = ts } x =
-  pmAltConSetElems $ vi_neg $ lookupVarInfo ts x
-
-isDataConSolution :: PmAltConApp -> Bool
-isDataConSolution PACA{paca_con = PmAltConLike (RealDataCon _)} = True
-isDataConSolution _                                             = False
-
--- @lookupSolution nabla x@ picks a single solution ('vi_pos') of @x@ from
--- possibly many, preferring 'RealDataCon' solutions whenever possible.
-lookupSolution :: Nabla -> Id -> Maybe PmAltConApp
-lookupSolution nabla x = case vi_pos (lookupVarInfo (nabla_tm_st nabla) x) of
-  []                                         -> Nothing
-  pos
-    | Just sol <- find isDataConSolution pos -> Just sol
-    | otherwise                              -> Just (head pos)
 
 -------------------------
 -- * Adding φ constraints
