@@ -60,7 +60,8 @@ module GHC.Core.DataCon (
         specialPromotedDc,
 
         -- ** Promotion related functions
-        promoteDataCon
+        promoteDataCon,
+
     ) where
 
 #include "HsVersions.h"
