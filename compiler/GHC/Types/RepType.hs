@@ -41,7 +41,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
-import GHC.Driver.Ppr
+-- import GHC.Driver.Ppr
 
 import Data.List (sort)
 import qualified Data.IntSet as IS
