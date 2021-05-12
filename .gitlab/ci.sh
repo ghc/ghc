@@ -569,7 +569,7 @@ if [ -n "${CROSS_TARGET:-}" ]; then
   target_triple="$CROSS_TARGET"
 fi
 
-echo "Branch name $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME"
+echo "Branch name ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-}"
 # Ignore performance improvements in @marge-bot batches.
 # See #19562.
 if [ "${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-}" == "wip/marge_bot_batch_merge_job" ]; then
