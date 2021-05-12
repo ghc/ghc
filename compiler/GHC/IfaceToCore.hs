@@ -108,6 +108,7 @@ import qualified GHC.Data.BooleanFormula as BF
 
 import Control.Monad
 import GHC.Parser.Annotation
+import qualified Data.Set as Set
 
 {-
 This module takes
@@ -568,23 +569,15 @@ tcHiBootIface hsc_src mod
         -- a SOURCE import) or that our hi-boot file has mysteriously
         -- disappeared.
     do  { eps <- getEps
-        ; case lookupUFM (eps_is_boot eps) (moduleName mod) of
+        ; case Set.member (moduleName mod) (eps_is_boot eps) of
             -- The typical case
-            Nothing -> return NoSelfBoot
-            -- error cases
-            Just (GWIB { gwib_isBoot = is_boot }) -> case is_boot of
-              IsBoot -> failWithTc (elaborate err)
-              -- The hi-boot file has mysteriously disappeared.
-              NotBoot -> failWithTc moduleLoop
-              -- Someone below us imported us!
-              -- This is a loop with no hi-boot in the way
+            False -> return NoSelfBoot
+            -- The hi-boot file has mysteriously disappeared.
+            True -> failWithTc (elaborate err)
     }}}}
   where
     need = text "Need the hi-boot interface for" <+> ppr mod
                  <+> text "to compare against the Real Thing"
-
-    moduleLoop = text "Circular imports: module" <+> quotes (ppr mod)
-                     <+> text "depends on itself"
 
     elaborate err = hang (text "Could not find hi-boot interface for" <+>
                           quotes (ppr mod) <> colon) 4 err

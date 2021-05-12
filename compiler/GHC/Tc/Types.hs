@@ -1348,37 +1348,31 @@ data ImportAvails
           -- different packages. (currently not the case, but might be in the
           -- future).
 
-        imp_dep_mods :: ModuleNameEnv ModuleNameWithIsBoot,
-          -- ^ Home-package modules needed by the module being compiled
-          --
-          -- It doesn't matter whether any of these dependencies
-          -- are actually /used/ when compiling the module; they
-          -- are listed if they are below it at all.  For
-          -- example, suppose M imports A which imports X.  Then
-          -- compiling M might not need to consult X.hi, but X
-          -- is still listed in M's dependencies.
+        imp_direct_dep_mods :: ModuleNameEnv ModuleNameWithIsBoot,
+          -- ^ Home-package modules directly imported by the module being compiled.
 
-        imp_dep_pkgs :: Set UnitId,
-          -- ^ Packages needed by the module being compiled, whether directly,
-          -- or via other modules in this package, or via modules imported
-          -- from other packages.
-
-        imp_trust_pkgs :: Set UnitId,
-          -- ^ This is strictly a subset of imp_dep_pkgs and records the
-          -- packages the current module needs to trust for Safe Haskell
-          -- compilation to succeed. A package is required to be trusted if
-          -- we are dependent on a trustworthy module in that package.
-          -- While perhaps making imp_dep_pkgs a tuple of (UnitId, Bool)
-          -- where True for the bool indicates the package is required to be
-          -- trusted is the more logical  design, doing so complicates a lot
-          -- of code not concerned with Safe Haskell.
-          -- See Note [Tracking Trust Transitively] in "GHC.Rename.Names"
+        imp_dep_direct_pkgs :: Set UnitId,
+          -- ^ Packages directly needed by the module being compiled
 
         imp_trust_own_pkg :: Bool,
           -- ^ Do we require that our own package is trusted?
           -- This is to handle efficiently the case where a Safe module imports
           -- a Trustworthy module that resides in the same package as it.
           -- See Note [Trust Own Package] in "GHC.Rename.Names"
+
+        -- Transitive information below here
+
+        imp_trust_pkgs :: Set UnitId,
+          -- ^ This records the
+          -- packages the current module needs to trust for Safe Haskell
+          -- compilation to succeed. A package is required to be trusted if
+          -- we are dependent on a trustworthy module in that package.
+          -- See Note [Tracking Trust Transitively] in "GHC.Rename.Names"
+
+        imp_source_mods :: [ModuleName],
+          -- ^ All the home modules below this where we should look for a hs-boot file
+          -- rather than a normal hs file. This is only used in one-shot
+          -- mode to populate the eps_is_boot field.
 
         imp_orphs :: [Module],
           -- ^ Orphan modules below us in the import tree (and maybe including
@@ -1404,10 +1398,11 @@ modDepsElts = sort . nonDetEltsUFM
 
 emptyImportAvails :: ImportAvails
 emptyImportAvails = ImportAvails { imp_mods          = emptyModuleEnv,
-                                   imp_dep_mods      = emptyUFM,
-                                   imp_dep_pkgs      = S.empty,
+                                   imp_direct_dep_mods = emptyUFM,
+                                   imp_dep_direct_pkgs = S.empty,
                                    imp_trust_pkgs    = S.empty,
                                    imp_trust_own_pkg = False,
+                                   imp_source_mods   = [],
                                    imp_orphs         = [],
                                    imp_finsts        = [] }
 
@@ -1419,18 +1414,23 @@ emptyImportAvails = ImportAvails { imp_mods          = emptyModuleEnv,
 plusImportAvails ::  ImportAvails ->  ImportAvails ->  ImportAvails
 plusImportAvails
   (ImportAvails { imp_mods = mods1,
-                  imp_dep_mods = dmods1, imp_dep_pkgs = dpkgs1,
+                  imp_direct_dep_mods = ddmods1,
+                  imp_dep_direct_pkgs = ddpkgs1,
+                  imp_source_mods = srs1,
                   imp_trust_pkgs = tpkgs1, imp_trust_own_pkg = tself1,
                   imp_orphs = orphs1, imp_finsts = finsts1 })
   (ImportAvails { imp_mods = mods2,
-                  imp_dep_mods = dmods2, imp_dep_pkgs = dpkgs2,
+                  imp_direct_dep_mods = ddmods2,
+                  imp_dep_direct_pkgs = ddpkgs2,
+                  imp_source_mods = srcs2,
                   imp_trust_pkgs = tpkgs2, imp_trust_own_pkg = tself2,
                   imp_orphs = orphs2, imp_finsts = finsts2 })
   = ImportAvails { imp_mods          = plusModuleEnv_C (++) mods1 mods2,
-                   imp_dep_mods      = plusUFM_C plus_mod_dep dmods1 dmods2,
-                   imp_dep_pkgs      = dpkgs1 `S.union` dpkgs2,
+                   imp_direct_dep_mods = plusUFM_C plus_mod_dep ddmods1 ddmods2,
+                   imp_dep_direct_pkgs      = ddpkgs1 `S.union` ddpkgs2,
                    imp_trust_pkgs    = tpkgs1 `S.union` tpkgs2,
                    imp_trust_own_pkg = tself1 || tself2,
+                   imp_source_mods   = srs1 `unionLists` srcs2,
                    imp_orphs         = orphs1 `unionLists` orphs2,
                    imp_finsts        = finsts1 `unionLists` finsts2 }
   where
