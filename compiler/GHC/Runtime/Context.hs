@@ -26,7 +26,7 @@ import GHC.Unit
 import GHC.Unit.Env
 
 import GHC.Core.FamInstEnv
-import GHC.Core.InstEnv ( ClsInst, identicalClsInstHead )
+import GHC.Core.InstEnv
 import GHC.Core.Type
 
 import GHC.Types.Avail
@@ -219,7 +219,7 @@ data InteractiveContext
              -- It contains everything in scope at the command line,
              -- including everything in ic_tythings
 
-         ic_instances  :: ([ClsInst], [FamInst]),
+         ic_instances  :: (InstEnv, [FamInst]),
              -- ^ All instances and family instances created during
              -- this session.  These are grabbed en masse after each
              -- update to be sure that proper overlapping is retained.
@@ -271,7 +271,7 @@ emptyInteractiveContext dflags
        ic_rn_gbl_env = emptyGlobalRdrEnv,
        ic_mod_index  = 1,
        ic_tythings   = [],
-       ic_instances  = ([],[]),
+       ic_instances  = (emptyInstEnv,[]),
        ic_fix_env    = emptyNameEnv,
        ic_monad      = ioTyConName,  -- IO monad by default
        ic_int_print  = printName,    -- System.IO.print by default
@@ -303,7 +303,7 @@ icPrintUnqual unit_env InteractiveContext{ ic_rn_gbl_env = grenv } =
 -- not clear whether removing them is even the appropriate behavior.
 extendInteractiveContext :: InteractiveContext
                          -> [TyThing]
-                         -> [ClsInst] -> [FamInst]
+                         -> InstEnv -> [FamInst]
                          -> Maybe [Type]
                          -> FixityEnv
                          -> InteractiveContext
@@ -313,7 +313,7 @@ extendInteractiveContext ictxt new_tythings new_cls_insts new_fam_insts defaults
                             -- a new mod_index (#9426)
           , ic_tythings   = new_tythings ++ old_tythings
           , ic_rn_gbl_env = ic_rn_gbl_env ictxt `icExtendGblRdrEnv` new_tythings
-          , ic_instances  = ( new_cls_insts ++ old_cls_insts
+          , ic_instances  = ( new_cls_insts `unionInstEnv` old_cls_insts
                             , new_fam_insts ++ fam_insts )
                             -- we don't shadow old family instances (#7102),
                             -- so don't need to remove them here
@@ -327,7 +327,7 @@ extendInteractiveContext ictxt new_tythings new_cls_insts new_fam_insts defaults
     -- Discard old instances that have been fully overridden
     -- See Note [Override identical instances in GHCi]
     (cls_insts, fam_insts) = ic_instances ictxt
-    old_cls_insts = filterOut (\i -> any (identicalClsInstHead i) new_cls_insts) cls_insts
+    old_cls_insts = filterInstEnv (\i -> not $ anyInstEnv (identicalClsInstHead i) new_cls_insts) cls_insts
 
 extendInteractiveContextWithIds :: InteractiveContext -> [Id] -> InteractiveContext
 -- Just a specialised version
