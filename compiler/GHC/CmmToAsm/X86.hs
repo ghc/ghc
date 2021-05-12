@@ -56,6 +56,7 @@ instance Instruction X86.Instr where
    mkLoadInstr             = X86.mkLoadInstr
    takeDeltaInstr          = X86.takeDeltaInstr
    isMetaInstr             = X86.isMetaInstr
+   isConditionalInstr      = X86.isConditionalInstr
    mkRegRegMoveInstr       = X86.mkRegRegMoveInstr
    takeRegRegMoveInstr     = X86.takeRegRegMoveInstr
    mkJumpInstr             = X86.mkJumpInstr
