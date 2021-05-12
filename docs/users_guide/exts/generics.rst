@@ -142,10 +142,10 @@ we show generic serialization: ::
       gput (L1 x) = O : gput x
       gput (R1 x) = I : gput x
 
-    instance (GSerialize a) => GSerialize (M1 i c a) where
+    instance GSerialize a => GSerialize (M1 i c a) where
       gput (M1 x) = gput x
 
-    instance (Serialize a) => GSerialize (K1 i a) where
+    instance Serialize a => GSerialize (K1 i a) where
       gput (K1 x) = put x
 
 A caveat: this encoding strategy may not be reliable across different versions
@@ -226,7 +226,7 @@ specify that the user does not have to provide an implementation for
 instantiate. For the ``UserTree`` type, for instance, the user can just
 write: ::
 
-    instance (Serialize a) => Serialize (UserTree a)
+    instance Serialize a => Serialize (UserTree a)
 
 The default method for ``put`` is then used, corresponding to the
 generic implementation of serialization. If you are using

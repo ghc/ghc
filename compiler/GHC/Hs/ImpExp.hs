@@ -400,15 +400,15 @@ instance OutputableBndrId p => Outputable (IE (GhcPass p)) where
     ppr (IEDoc _ doc)             = ppr doc
     ppr (IEDocNamed _ string)     = text ("<IEDocNamed: " ++ string ++ ">")
 
-instance (HasOccName name) => HasOccName (IEWrappedName name) where
+instance HasOccName name => HasOccName (IEWrappedName name) where
   occName w = occName (ieWrappedName w)
 
-instance (OutputableBndr name) => OutputableBndr (IEWrappedName name) where
+instance OutputableBndr name => OutputableBndr (IEWrappedName name) where
   pprBndr bs   w = pprBndr bs   (ieWrappedName w)
   pprPrefixOcc w = pprPrefixOcc (ieWrappedName w)
   pprInfixOcc  w = pprInfixOcc  (ieWrappedName w)
 
-instance (OutputableBndr name) => Outputable (IEWrappedName name) where
+instance OutputableBndr name => Outputable (IEWrappedName name) where
   ppr (IEName      n) = pprPrefixOcc (unLoc n)
   ppr (IEPattern _ n) = text "pattern" <+> pprPrefixOcc (unLoc n)
   ppr (IEType    _ n) = text "type"    <+> pprPrefixOcc (unLoc n)

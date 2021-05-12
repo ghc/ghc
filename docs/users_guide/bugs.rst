@@ -204,7 +204,7 @@ For example
 
 ::
 
-    mayFail :: (MonadIO m) => m ()
+    mayFail :: MonadIO m => m ()
     mayFail = do
       (Just value) <- fetchData
       putStrLn value

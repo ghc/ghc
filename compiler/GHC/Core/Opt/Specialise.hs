@@ -2120,15 +2120,15 @@ all they should be inlined, right?  Two reasons:
  * The RHS of an INLINE function might call another overloaded function,
    and we'd like to generate a specialised version of that function too.
    This actually happens a lot. Consider
-      replicateM_ :: (Monad m) => Int -> m a -> m ()
+      replicateM_ :: Monad m => Int -> m a -> m ()
       {-# INLINABLE replicateM_ #-}
       replicateM_ d x ma = ...
    The strictness analyser may transform to
-      replicateM_ :: (Monad m) => Int -> m a -> m ()
+      replicateM_ :: Monad m => Int -> m a -> m ()
       {-# INLINE replicateM_ #-}
       replicateM_ d x ma = case x of I# x' -> $wreplicateM_ d x' ma
 
-      $wreplicateM_ :: (Monad m) => Int# -> m a -> m ()
+      $wreplicateM_ :: Monad m => Int# -> m a -> m ()
       {-# INLINABLE $wreplicateM_ #-}
       $wreplicateM_ = ...
    Now an importing module has a specialised call to replicateM_, say

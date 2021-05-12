@@ -25,7 +25,7 @@ import GHC.Base (IO(), Monad, Functor(fmap), Applicative(..), (>>=), id, (.), ap
 
 -- | A monad that can execute GHCi statements by lifting them out of
 -- m into the IO monad. (e.g state monads)
-class (Monad m) => GHCiSandboxIO m where
+class Monad m => GHCiSandboxIO m where
     ghciStepIO :: m a -> IO a
 
 -- | @since 4.4.0.0

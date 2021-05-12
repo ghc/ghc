@@ -139,13 +139,13 @@ hook = return
 --  @THMessage@s go from the slave to ghc
 --    ghc <-- proxy --- slave               (@THMessage@)
 --
-fwdTHMsg :: (Binary a) => Pipe -> THMessage a -> IO a
+fwdTHMsg :: Binary a => Pipe -> THMessage a -> IO a
 fwdTHMsg local msg = do
   writePipe local (putTHMessage msg)
   readPipe local get
 
 -- | Fowarard a @Message@ call and handle @THMessages@.
-fwdTHCall :: (Binary a) => Bool -> Pipe -> Pipe -> Message a -> IO a
+fwdTHCall :: Binary a => Bool -> Pipe -> Pipe -> Message a -> IO a
 fwdTHCall verbose local remote msg = do
   when verbose $ trace ("fwdTHCall: " ++ show msg)
   writePipe remote (putMessage msg)
