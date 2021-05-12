@@ -51,7 +51,7 @@ import {-# SOURCE #-} GHC.HsToCore.Match ( matchSimply )
 import {-# SOURCE #-} GHC.HsToCore.Expr  ( dsLExpr, dsSyntaxExpr )
 
 import GHC.Hs
-import GHC.Tc.Utils.Zonk
+import GHC.Hs.Expr.Type
 import GHC.Tc.Utils.TcType( tcSplitTyConApp )
 import GHC.Core
 import GHC.HsToCore.Monad

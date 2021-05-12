@@ -42,7 +42,6 @@ import GHC.Types.Id               ( isDataConId_maybe )
 import GHC.Types.Name             ( Name, nameSrcSpan, nameUnique )
 import GHC.Types.Name.Env         ( NameEnv, emptyNameEnv, extendNameEnv, lookupNameEnv )
 import GHC.Types.SrcLoc
-import GHC.Tc.Utils.Zonk          ( hsPatType )
 import GHC.Core.Type              ( Type )
 import GHC.Core.Predicate
 import GHC.Core.InstEnv

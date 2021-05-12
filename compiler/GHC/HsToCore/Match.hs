@@ -29,7 +29,7 @@ import GHC.Types.Basic ( Origin(..), isGenerated, Boxity(..) )
 import GHC.Types.SourceText
 import GHC.Driver.Session
 import GHC.Hs
-import GHC.Tc.Utils.Zonk
+import GHC.Hs.Expr.Type
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Utils.Monad
 import GHC.HsToCore.Pmc
