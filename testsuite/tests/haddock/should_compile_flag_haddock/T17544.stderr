@@ -760,7 +760,14 @@
          (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:(24,3)-(25,18) })
          (DataFamInstDecl
           (FamEqn
-           (EpAnnNotUsed)
+           (EpAnn
+            (Anchor
+             { T17544.hs:(24,3)-(25,18) }
+             (UnchangedAnchor))
+            [(AddEpAnn AnnData (EpaSpan { T17544.hs:24:3-6 }))
+            ,(AddEpAnn AnnWhere (EpaSpan { T17544.hs:24:15-19 }))]
+            (EpaComments
+             []))
            (L
             (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:24:8-9 })
             (Unqual
@@ -785,14 +792,7 @@
                  {OccName: Int})))))]
            (Prefix)
            (HsDataDefn
-            (EpAnn
-             (Anchor
-              { T17544.hs:(24,3)-(25,18) }
-              (UnchangedAnchor))
-             [(AddEpAnn AnnData (EpaSpan { T17544.hs:24:3-6 }))
-             ,(AddEpAnn AnnWhere (EpaSpan { T17544.hs:24:15-19 }))]
-             (EpaComments
-              []))
+            (NoExtField)
             (DataType)
             (Nothing)
             (Nothing)
@@ -1020,7 +1020,14 @@
          (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:(30,3)-(31,18) })
          (DataFamInstDecl
           (FamEqn
-           (EpAnnNotUsed)
+           (EpAnn
+            (Anchor
+             { T17544.hs:(30,3)-(31,18) }
+             (UnchangedAnchor))
+            [(AddEpAnn AnnData (EpaSpan { T17544.hs:30:3-6 }))
+            ,(AddEpAnn AnnWhere (EpaSpan { T17544.hs:30:15-19 }))]
+            (EpaComments
+             []))
            (L
             (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:30:8-9 })
             (Unqual
@@ -1045,14 +1052,7 @@
                  {OccName: Int})))))]
            (Prefix)
            (HsDataDefn
-            (EpAnn
-             (Anchor
-              { T17544.hs:(30,3)-(31,18) }
-              (UnchangedAnchor))
-             [(AddEpAnn AnnData (EpaSpan { T17544.hs:30:3-6 }))
-             ,(AddEpAnn AnnWhere (EpaSpan { T17544.hs:30:15-19 }))]
-             (EpaComments
-              []))
+            (NoExtField)
             (DataType)
             (Nothing)
             (Nothing)
@@ -1280,7 +1280,14 @@
          (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:(36,3)-(37,18) })
          (DataFamInstDecl
           (FamEqn
-           (EpAnnNotUsed)
+           (EpAnn
+            (Anchor
+             { T17544.hs:(36,3)-(37,18) }
+             (UnchangedAnchor))
+            [(AddEpAnn AnnData (EpaSpan { T17544.hs:36:3-6 }))
+            ,(AddEpAnn AnnWhere (EpaSpan { T17544.hs:36:15-19 }))]
+            (EpaComments
+             []))
            (L
             (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:36:8-9 })
             (Unqual
@@ -1305,14 +1312,7 @@
                  {OccName: Int})))))]
            (Prefix)
            (HsDataDefn
-            (EpAnn
-             (Anchor
-              { T17544.hs:(36,3)-(37,18) }
-              (UnchangedAnchor))
-             [(AddEpAnn AnnData (EpaSpan { T17544.hs:36:3-6 }))
-             ,(AddEpAnn AnnWhere (EpaSpan { T17544.hs:36:15-19 }))]
-             (EpaComments
-              []))
+            (NoExtField)
             (DataType)
             (Nothing)
             (Nothing)
@@ -1540,7 +1540,14 @@
          (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:(42,3)-(43,18) })
          (DataFamInstDecl
           (FamEqn
-           (EpAnnNotUsed)
+           (EpAnn
+            (Anchor
+             { T17544.hs:(42,3)-(43,18) }
+             (UnchangedAnchor))
+            [(AddEpAnn AnnData (EpaSpan { T17544.hs:42:3-6 }))
+            ,(AddEpAnn AnnWhere (EpaSpan { T17544.hs:42:15-19 }))]
+            (EpaComments
+             []))
            (L
             (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:42:8-9 })
             (Unqual
@@ -1565,14 +1572,7 @@
                  {OccName: Int})))))]
            (Prefix)
            (HsDataDefn
-            (EpAnn
-             (Anchor
-              { T17544.hs:(42,3)-(43,18) }
-              (UnchangedAnchor))
-             [(AddEpAnn AnnData (EpaSpan { T17544.hs:42:3-6 }))
-             ,(AddEpAnn AnnWhere (EpaSpan { T17544.hs:42:15-19 }))]
-             (EpaComments
-              []))
+            (NoExtField)
             (DataType)
             (Nothing)
             (Nothing)
@@ -1800,7 +1800,14 @@
          (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:(48,3)-(49,18) })
          (DataFamInstDecl
           (FamEqn
-           (EpAnnNotUsed)
+           (EpAnn
+            (Anchor
+             { T17544.hs:(48,3)-(49,18) }
+             (UnchangedAnchor))
+            [(AddEpAnn AnnData (EpaSpan { T17544.hs:48:3-6 }))
+            ,(AddEpAnn AnnWhere (EpaSpan { T17544.hs:48:15-19 }))]
+            (EpaComments
+             []))
            (L
             (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:48:8-9 })
             (Unqual
@@ -1825,14 +1832,7 @@
                  {OccName: Int})))))]
            (Prefix)
            (HsDataDefn
-            (EpAnn
-             (Anchor
-              { T17544.hs:(48,3)-(49,18) }
-              (UnchangedAnchor))
-             [(AddEpAnn AnnData (EpaSpan { T17544.hs:48:3-6 }))
-             ,(AddEpAnn AnnWhere (EpaSpan { T17544.hs:48:15-19 }))]
-             (EpaComments
-              []))
+            (NoExtField)
             (DataType)
             (Nothing)
             (Nothing)
@@ -2060,7 +2060,14 @@
          (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:(54,3)-(55,20) })
          (DataFamInstDecl
           (FamEqn
-           (EpAnnNotUsed)
+           (EpAnn
+            (Anchor
+             { T17544.hs:(54,3)-(55,20) }
+             (UnchangedAnchor))
+            [(AddEpAnn AnnData (EpaSpan { T17544.hs:54:3-6 }))
+            ,(AddEpAnn AnnWhere (EpaSpan { T17544.hs:54:16-20 }))]
+            (EpaComments
+             []))
            (L
             (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:54:8-10 })
             (Unqual
@@ -2085,14 +2092,7 @@
                  {OccName: Int})))))]
            (Prefix)
            (HsDataDefn
-            (EpAnn
-             (Anchor
-              { T17544.hs:(54,3)-(55,20) }
-              (UnchangedAnchor))
-             [(AddEpAnn AnnData (EpaSpan { T17544.hs:54:3-6 }))
-             ,(AddEpAnn AnnWhere (EpaSpan { T17544.hs:54:16-20 }))]
-             (EpaComments
-              []))
+            (NoExtField)
             (DataType)
             (Nothing)
             (Nothing)

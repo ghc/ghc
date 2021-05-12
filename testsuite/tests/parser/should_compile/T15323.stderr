@@ -77,14 +77,7 @@
             {OccName: v}))))])
       (Prefix)
       (HsDataDefn
-       (EpAnn
-        (Anchor
-         { T15323.hs:(5,1)-(6,54) }
-         (UnchangedAnchor))
-        [(AddEpAnn AnnData (EpaSpan { T15323.hs:5:1-4 }))
-        ,(AddEpAnn AnnWhere (EpaSpan { T15323.hs:5:21-25 }))]
-        (EpaComments
-         []))
+       (NoExtField)
        (DataType)
        (Nothing)
        (Nothing)

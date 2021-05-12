@@ -188,8 +188,9 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/exactprin
  -- "../../testsuite/tests/printer/Test19813.hs" Nothing
  -- "../../testsuite/tests/printer/Test19814.hs" Nothing
  -- "../../testsuite/tests/printer/Test19821.hs" Nothing
+ "../../testsuite/tests/printer/Test19834.hs" Nothing
  -- "../../testsuite/tests/printer/Test19840.hs" Nothing
- "../../testsuite/tests/printer/Test19850.hs" Nothing
+ -- "../../testsuite/tests/printer/Test19850.hs" Nothing
 
 -- cloneT does not need a test, function can be retired
 

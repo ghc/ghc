@@ -253,7 +253,7 @@ cvtDec (DataD ctxt tc tvs ksig constrs derivs)
         ; ksig' <- cvtKind `traverse` ksig
         ; cons' <- mapM cvtConstr constrs
         ; derivs' <- cvtDerivs derivs
-        ; let defn = HsDataDefn { dd_ext = noAnn
+        ; let defn = HsDataDefn { dd_ext = noExtField
                                 , dd_ND = DataType, dd_cType = Nothing
                                 , dd_ctxt = Just ctxt'
                                 , dd_kindSig = ksig'
@@ -269,7 +269,7 @@ cvtDec (NewtypeD ctxt tc tvs ksig constr derivs)
         ; ksig' <- cvtKind `traverse` ksig
         ; con' <- cvtConstr constr
         ; derivs' <- cvtDerivs derivs
-        ; let defn = HsDataDefn { dd_ext = noAnn
+        ; let defn = HsDataDefn { dd_ext = noExtField
                                 , dd_ND = NewType, dd_cType = Nothing
                                 , dd_ctxt = Just ctxt'
                                 , dd_kindSig = ksig'
@@ -340,7 +340,7 @@ cvtDec (DataInstD ctxt bndrs tys ksig constrs derivs)
        ; ksig' <- cvtKind `traverse` ksig
        ; cons' <- mapM cvtConstr constrs
        ; derivs' <- cvtDerivs derivs
-       ; let defn = HsDataDefn { dd_ext = noAnn
+       ; let defn = HsDataDefn { dd_ext = noExtField
                                , dd_ND = DataType, dd_cType = Nothing
                                , dd_ctxt = Just ctxt'
                                , dd_kindSig = ksig'
@@ -361,7 +361,7 @@ cvtDec (NewtypeInstD ctxt bndrs tys ksig constr derivs)
        ; ksig' <- cvtKind `traverse` ksig
        ; con' <- cvtConstr constr
        ; derivs' <- cvtDerivs derivs
-       ; let defn = HsDataDefn { dd_ext = noAnn
+       ; let defn = HsDataDefn { dd_ext = noExtField
                                , dd_ND = NewType, dd_cType = Nothing
                                , dd_ctxt = Just ctxt'
                                , dd_kindSig = ksig'
