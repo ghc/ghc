@@ -242,7 +242,11 @@ type instance XUnboundVar    GhcTc = HoleExprRef
 
 type instance XConLikeOut    (GhcPass _) = NoExtField
 type instance XRecFld        (GhcPass _) = NoExtField
-type instance XIPVar         (GhcPass _) = EpAnnCO
+
+type instance XIPVar         GhcPs = EpAnnCO
+type instance XIPVar         GhcRn = EpAnnCO
+type instance XIPVar         GhcTc = Void -- See Note [Constructor cannot occur]
+
 type instance XOverLitE      (GhcPass _) = EpAnnCO
 type instance XLitE          (GhcPass _) = EpAnnCO
 
@@ -344,12 +348,16 @@ type instance XArithSeq      GhcPs = EpAnn [AddEpAnn]
 type instance XArithSeq      GhcRn = NoExtField
 type instance XArithSeq      GhcTc = PostTcExpr
 
-type instance XBracket       (GhcPass _) = EpAnn [AddEpAnn]
+type instance XBracket       GhcPs = EpAnn [AddEpAnn]
+type instance XBracket       GhcRn = EpAnn [AddEpAnn]
+type instance XBracket       GhcTc = Void -- See Note [Constructor cannot occur]
 
-type instance XRnBracketOut  (GhcPass _) = NoExtField
+type instance XRnBracketOut  GhcPs = Void -- See Note [Constructor cannot occur]
+type instance XRnBracketOut  GhcRn = NoExtField
+type instance XRnBracketOut  GhcTc = Void -- See Note [Constructor cannot occur]
 
-type instance XTcBracketOut  GhcPs = NoExtField
-type instance XTcBracketOut  GhcRn = NoExtField
+type instance XTcBracketOut  GhcPs = Void -- See Note [Constructor cannot occur]
+type instance XTcBracketOut  GhcRn = Void -- See Note [Constructor cannot occur]
 type instance XTcBracketOut  GhcTc = Type -- Type of the TcBracketOut
 
 type instance XSpliceE       (GhcPass _) = EpAnnCO
