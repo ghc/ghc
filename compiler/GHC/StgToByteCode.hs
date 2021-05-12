@@ -327,7 +327,8 @@ bytesToWords platform (ByteOff bytes) =
     let (q, r) = bytes `quotRem` (platformWordSizeInBytes platform)
     in if r == 0
            then fromIntegral q
-           else panic $ "GHC.StgToByteCode.bytesToWords: bytes=" ++ show bytes
+           else pprPanic "GHC.StgToByteCode.bytesToWords"
+                         (text "bytes=" <> ppr bytes)
 
 wordSize :: Platform -> ByteOff
 wordSize platform = ByteOff (platformWordSizeInBytes platform)
@@ -922,7 +923,7 @@ mkConAppCode orig_d _ p con args = app_code
 
             do_pushery !d (arg : args) = do
                 (push, arg_bytes) <- case arg of
-                    (Padding l _) -> return $! pushPadding l
+                    (Padding l _) -> return $! pushPadding (ByteOff l)
                     (FieldOff a _) -> pushConstrAtom d p (fromNonVoid a)
                 more_push_code <- do_pushery (d + arg_bytes) args
                 return (push `appOL` more_push_code)
@@ -1845,7 +1846,8 @@ pushAtom d p (StgVarArg var)
             _ -> do
                 let !szw = bytesToWords platform szb
                     !off_w = trunc16W $ bytesToWords platform (d - d_v) + szw - 1
-                return (toOL (genericReplicate szw (PUSH_L off_w)), szb)
+                return (toOL (genericReplicate szw (PUSH_L off_w)),
+                              wordsToBytes platform szw)
         -- d - d_v           offset from TOS to the first slot of the object
         --
         -- d - d_v + sz - 1  offset from the TOS of the last slot of the object
@@ -1864,15 +1866,31 @@ pushAtom d p (StgVarArg var)
                 MASSERT( sz == wordSize platform )
                 return (unitOL (PUSH_G (getName var)), sz)
 
-pushAtom _ _ (StgLitArg lit) = do
+
+pushAtom _ _ (StgLitArg lit) = pushLiteral True lit
+
+pushLiteral :: Bool -> Literal -> BcM (BCInstrList, ByteOff)
+pushLiteral padded lit =
+  do
      platform <- targetPlatform <$> getDynFlags
      let code :: PrimRep -> BcM (BCInstrList, ByteOff)
          code rep =
-            return (unitOL instr, size_bytes)
+            return (padding_instr `snocOL` instr, size_bytes + padding_bytes)
           where
             size_bytes = ByteOff $ primRepSizeB platform rep
+
             -- Here we handle the non-word-width cases specifically since we
             -- must emit different bytecode for them.
+
+            round_to_words (ByteOff bytes) =
+              ByteOff (roundUpToWords platform bytes)
+
+            padding_bytes
+                | padded    = round_to_words size_bytes - size_bytes
+                | otherwise = 0
+
+            (padding_instr, _) = pushPadding padding_bytes
+
             instr =
               case size_bytes of
                 1  -> PUSH_UBX8 lit
@@ -1910,8 +1928,7 @@ pushAtom _ _ (StgLitArg lit) = do
 -- packing constructor fields. See also @mkConAppCode@ and @pushPadding@.
 pushConstrAtom
     :: StackDepth -> BCEnv -> StgArg -> BcM (BCInstrList, ByteOff)
-pushConstrAtom _ _ (StgLitArg lit@(LitFloat _)) =
-    return (unitOL (PUSH_UBX32 lit), 4)
+pushConstrAtom _ _ (StgLitArg lit) = pushLiteral False lit
 
 pushConstrAtom d p va@(StgVarArg v)
     | Just d_v <- lookupBCEnv_maybe v p = do  -- v is a local variable
@@ -1928,8 +1945,8 @@ pushConstrAtom d p va@(StgVarArg v)
 
 pushConstrAtom d p expr = pushAtom d p expr
 
-pushPadding :: Int -> (BCInstrList, ByteOff)
-pushPadding !n = go n (nilOL, 0)
+pushPadding :: ByteOff -> (BCInstrList, ByteOff)
+pushPadding (ByteOff n) = go n (nilOL, 0)
   where
     go n acc@(!instrs, !off) = case n of
         0 -> acc
