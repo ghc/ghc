@@ -474,7 +474,7 @@ Moreover, if we /don't/ inline it, we may be left with
 which will build a thunk -- bad, bad, bad.
 
 Conclusion: we really want inlineBoringOk to be True of the RHS of
-unsafeCoerce.  This is (U4a) in Note [Implementing unsafeCoerce].
+unsafeCoerce.  This is (U4) in Note [Implementing unsafeCoerce].
 
 Note [Computing the size of an expression]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1321,7 +1321,7 @@ traceInline dflags inline_id str doc result
   | otherwise = result
   where
     enable
-      | dopt Opt_D_dump_inlinings dflags && dopt Opt_D_verbose_core2core dflags
+      | dopt Opt_D_dump_verbose_inlinings dflags
       = True
       | Just prefix <- inlineCheck dflags
       = prefix `isPrefixOf` occNameString (getOccName inline_id)
