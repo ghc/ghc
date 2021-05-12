@@ -140,20 +140,20 @@ and @('>=')@ for the types in "GHC.Word" and "GHC.Int".
 --
 -- Minimal complete definition: either '==' or '/='.
 --
-class  Eq a  where
-    (==), (/=)           :: a -> a -> Bool
+class Eq a where
+    (==), (/=) :: a -> a -> Bool
 
     {-# INLINE (/=) #-}
     {-# INLINE (==) #-}
-    x /= y               = not (x == y)
-    x == y               = not (x /= y)
+    x /= y = not (x == y)
+    x == y = not (x /= y)
     {-# MINIMAL (==) | (/=) #-}
 
 deriving instance Eq ()
-deriving instance (Eq  a, Eq  b) => Eq  (a, b)
-deriving instance (Eq  a, Eq  b, Eq  c) => Eq  (a, b, c)
-deriving instance (Eq  a, Eq  b, Eq  c, Eq  d) => Eq  (a, b, c, d)
-deriving instance (Eq  a, Eq  b, Eq  c, Eq  d, Eq  e) => Eq  (a, b, c, d, e)
+deriving instance (Eq a, Eq b) => Eq (a, b)
+deriving instance (Eq a, Eq b, Eq c) => Eq (a, b, c)
+deriving instance (Eq a, Eq b, Eq c, Eq d) => Eq (a, b, c, d)
+deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e) => Eq (a, b, c, d, e)
 deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f)
                => Eq (a, b, c, d, e, f)
 deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g)
@@ -183,7 +183,7 @@ deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g,
                    Eq h, Eq i, Eq j, Eq k, Eq l, Eq m, Eq n, Eq o)
                => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o)
 
-instance (Eq a) => Eq [a] where
+instance Eq a => Eq [a] where
     {-# SPECIALISE instance Eq [[Char]] #-}
     {-# SPECIALISE instance Eq [Char] #-}
     {-# SPECIALISE instance Eq [Int] #-}
@@ -336,7 +336,7 @@ instance Ord TyCon where
 -- Minimal complete definition: either 'compare' or '<='.
 -- Using 'compare' can be more efficient for complex types.
 --
-class  (Eq a) => Ord a  where
+class Eq a => Ord a where
     compare              :: a -> a -> Ordering
     (<), (<=), (>), (>=) :: a -> a -> Bool
     max, min             :: a -> a -> a
@@ -393,7 +393,7 @@ deriving instance (Ord a, Ord b, Ord c, Ord d, Ord e, Ord f, Ord g,
                    Ord h, Ord i, Ord j, Ord k, Ord l, Ord m, Ord n, Ord o)
                => Ord (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o)
 
-instance (Ord a) => Ord [a] where
+instance Ord a => Ord [a] where
     {-# SPECIALISE instance Ord [[Char]] #-}
     {-# SPECIALISE instance Ord [Char] #-}
     {-# SPECIALISE instance Ord [Int] #-}

@@ -713,7 +713,7 @@ pprGenStgBinding opts b = case b of
                              = hang (hsep [pprBndr LetBind bndr, equals])
                                     4 (pprStgRhs opts expr <> semi)
 
-pprGenStgTopBindings :: (OutputablePass pass) => StgPprOpts -> [GenStgTopBinding pass] -> SDoc
+pprGenStgTopBindings :: OutputablePass pass => StgPprOpts -> [GenStgTopBinding pass] -> SDoc
 pprGenStgTopBindings opts binds
   = vcat $ intersperse blankLine (map (pprGenStgTopBinding opts) binds)
 

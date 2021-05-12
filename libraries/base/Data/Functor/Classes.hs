@@ -16,10 +16,10 @@
 -- transformers in portable Haskell.  Thus for a new transformer @T@,
 -- one might write instances like
 --
--- > instance (Eq1 f) => Eq1 (T f) where ...
--- > instance (Ord1 f) => Ord1 (T f) where ...
--- > instance (Read1 f) => Read1 (T f) where ...
--- > instance (Show1 f) => Show1 (T f) where ...
+-- > instance Eq1 f => Eq1 (T f) where ...
+-- > instance Ord1 f => Ord1 (T f) where ...
+-- > instance Read1 f => Read1 (T f) where ...
+-- > instance Show1 f => Show1 (T f) where ...
 --
 -- If these instances can be defined, defining instances of the base
 -- classes is mechanical:
@@ -109,7 +109,7 @@ eq1 = liftEq (==)
 -- | Lifting of the 'Ord' class to unary type constructors.
 --
 -- @since 4.9.0.0
-class (Eq1 f) => Ord1 f where
+class Eq1 f => Ord1 f where
     -- | Lift a 'compare' function through the type constructor.
     --
     -- The function will usually be applied to a comparison function,
@@ -265,7 +265,7 @@ eq2 = liftEq2 (==) (==)
 -- | Lifting of the 'Ord' class to binary type constructors.
 --
 -- @since 4.9.0.0
-class (Eq2 f) => Ord2 f where
+class Eq2 f => Ord2 f where
     -- | Lift 'compare' functions through the type constructor.
     --
     -- The function will usually be applied to comparison functions,
@@ -513,7 +513,7 @@ instance Eq1 Solo where
   liftEq eq (Solo a) (Solo b) = a `eq` b
 
 -- | @since 4.9.0.0
-instance (Eq a) => Eq1 ((,) a) where
+instance Eq a => Eq1 ((,) a) where
     liftEq = liftEq2 (==)
 
 -- | @since 4.15
@@ -521,7 +521,7 @@ instance Ord1 Solo where
   liftCompare cmp (Solo a) (Solo b) = cmp a b
 
 -- | @since 4.9.0.0
-instance (Ord a) => Ord1 ((,) a) where
+instance Ord a => Ord1 ((,) a) where
     liftCompare = liftCompare2 compare
 
 -- | @since 4.15
@@ -532,7 +532,7 @@ instance Read1 Solo where
     liftReadList     = liftReadListDefault
 
 -- | @since 4.9.0.0
-instance (Read a) => Read1 ((,) a) where
+instance Read a => Read1 ((,) a) where
     liftReadPrec = liftReadPrec2 readPrec readListPrec
 
     liftReadListPrec = liftReadListPrecDefault
@@ -543,7 +543,7 @@ instance Show1 Solo where
     liftShowsPrec sp _ d (Solo x) = showsUnaryWith sp "Solo" d x
 
 -- | @since 4.9.0.0
-instance (Show a) => Show1 ((,) a) where
+instance Show a => Show1 ((,) a) where
     liftShowsPrec = liftShowsPrec2 showsPrec showList
 
 
@@ -718,22 +718,22 @@ instance Show2 Either where
     liftShowsPrec2 _ _ sp2 _ d (Right x) = showsUnaryWith sp2 "Right" d x
 
 -- | @since 4.9.0.0
-instance (Eq a) => Eq1 (Either a) where
+instance Eq a => Eq1 (Either a) where
     liftEq = liftEq2 (==)
 
 -- | @since 4.9.0.0
-instance (Ord a) => Ord1 (Either a) where
+instance Ord a => Ord1 (Either a) where
     liftCompare = liftCompare2 compare
 
 -- | @since 4.9.0.0
-instance (Read a) => Read1 (Either a) where
+instance Read a => Read1 (Either a) where
     liftReadPrec = liftReadPrec2 readPrec readListPrec
 
     liftReadListPrec = liftReadListPrecDefault
     liftReadList     = liftReadListDefault
 
 -- | @since 4.9.0.0
-instance (Show a) => Show1 (Either a) where
+instance Show a => Show1 (Either a) where
     liftShowsPrec = liftShowsPrec2 showsPrec showList
 
 -- Instances for other functors defined in the base package
@@ -779,19 +779,19 @@ instance Show2 Const where
     liftShowsPrec2 sp _ _ _ d (Const x) = showsUnaryWith sp "Const" d x
 
 -- | @since 4.9.0.0
-instance (Eq a) => Eq1 (Const a) where
+instance Eq a => Eq1 (Const a) where
     liftEq = liftEq2 (==)
 -- | @since 4.9.0.0
-instance (Ord a) => Ord1 (Const a) where
+instance Ord a => Ord1 (Const a) where
     liftCompare = liftCompare2 compare
 -- | @since 4.9.0.0
-instance (Read a) => Read1 (Const a) where
+instance Read a => Read1 (Const a) where
     liftReadPrec = liftReadPrec2 readPrec readListPrec
 
     liftReadListPrec = liftReadListPrecDefault
     liftReadList     = liftReadListDefault
 -- | @since 4.9.0.0
-instance (Show a) => Show1 (Const a) where
+instance Show a => Show1 (Const a) where
     liftShowsPrec = liftShowsPrec2 showsPrec showList
 
 -- Proxy unfortunately imports this module, hence these instances are placed
@@ -969,7 +969,7 @@ showsBinaryWith sp1 sp2 name d x y = showParen (d > 10) $
 --
 -- @since 4.9.0.0
 {-# DEPRECATED readsUnary "Use 'readsUnaryWith' to define 'liftReadsPrec'" #-}
-readsUnary :: (Read a) => String -> (a -> t) -> String -> ReadS t
+readsUnary :: Read a => String -> (a -> t) -> String -> ReadS t
 readsUnary name cons kw s =
     [(cons x,t) | kw == name, (x,t) <- readsPrec 11 s]
 
@@ -999,7 +999,7 @@ readsBinary1 name cons kw s =
 --
 -- @since 4.9.0.0
 {-# DEPRECATED showsUnary "Use 'showsUnaryWith' to define 'liftShowsPrec'" #-}
-showsUnary :: (Show a) => String -> Int -> a -> ShowS
+showsUnary :: Show a => String -> Int -> a -> ShowS
 showsUnary name d x = showParen (d > 10) $
     showString name . showChar ' ' . showsPrec 11 x
 
@@ -1033,7 +1033,7 @@ new algebraic types.  For example, given the definition
 
 a standard 'Read1' instance may be defined as
 
-> instance (Read1 f) => Read1 (T f) where
+> instance Read1 f => Read1 (T f) where
 >     liftReadPrec rp rl = readData $
 >         readUnaryWith rp "Zero" Zero <|>
 >         readUnaryWith (liftReadPrec rp rl) "One" One <|>
@@ -1042,7 +1042,7 @@ a standard 'Read1' instance may be defined as
 
 and the corresponding 'Show1' instance as
 
-> instance (Show1 f) => Show1 (T f) where
+> instance Show1 f => Show1 (T f) where
 >     liftShowsPrec sp _ d (Zero x) =
 >         showsUnaryWith sp "Zero" d x
 >     liftShowsPrec sp sl d (One x) =

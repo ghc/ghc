@@ -18,7 +18,7 @@ Functional dependencies are implemented as described by Mark Jones in
 Functional dependencies are introduced by a vertical bar in the syntax
 of a class declaration; e.g. ::
 
-      class (Monad m) => MonadState s m | m -> s where ...
+      class Monad m => MonadState s m | m -> s where ...
 
       class Foo a b c | a b -> c where ...
 
@@ -150,7 +150,7 @@ empty has type ``Collects e c => c e``, which is not ambiguous.
 
 The function ``f`` from the previous section has a more accurate type: ::
 
-       f :: (Collects e c) => e -> e -> c e -> c e
+       f :: Collects e c => e -> e -> c e -> c e
 
 The function ``g`` from the previous section is now rejected with a type
 error as we would hope because the type of ``f`` does not allow the two
@@ -292,7 +292,7 @@ can deduce that ``a`` and ``b`` must be equal because they both appear as the
 second parameter in a ``Collects`` constraint with the same first parameter
 ``c``. Hence we can infer a shorter and more accurate type for ``f``: ::
 
-       f :: (Collects a c) => a -> a -> c -> c
+       f :: Collects a c => a -> a -> c -> c
 
 In a similar way, the earlier definition of ``g`` will now be flagged as a
 type error.

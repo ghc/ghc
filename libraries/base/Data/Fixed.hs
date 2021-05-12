@@ -56,7 +56,7 @@ divMod' n d = (f,n - (fromIntegral f) * d) where
     f = div' n d
 
 -- | Generalisation of 'mod' to any instance of 'Real'
-mod' :: (Real a) => a -> a -> a
+mod' :: Real a => a -> a -> a
 mod' n d = n - (fromInteger f) * d where
     f = div' n d
 
@@ -90,7 +90,7 @@ instance KnownNat n => HasResolution n where
 withType :: (Proxy a -> f a) -> f a
 withType foo = foo Proxy
 
-withResolution :: (HasResolution a) => (Integer -> f a) -> f a
+withResolution :: HasResolution a => (Integer -> f a) -> f a
 withResolution foo = withType (foo . resolution)
 
 -- | @since 2.01
@@ -163,7 +163,7 @@ instance Enum (Fixed a) where
     enumFromThenTo (MkFixed a) (MkFixed b) (MkFixed c) = fmap MkFixed (enumFromThenTo a b c)
 
 -- | @since 2.01
-instance (HasResolution a) => Num (Fixed a) where
+instance HasResolution a => Num (Fixed a) where
     (MkFixed a) + (MkFixed b) = MkFixed (a + b)
     (MkFixed a) - (MkFixed b) = MkFixed (a - b)
     fa@(MkFixed a) * (MkFixed b) = MkFixed (div (a * b) (resolution fa))
@@ -173,18 +173,18 @@ instance (HasResolution a) => Num (Fixed a) where
     fromInteger i = withResolution (\res -> MkFixed (i * res))
 
 -- | @since 2.01
-instance (HasResolution a) => Real (Fixed a) where
+instance HasResolution a => Real (Fixed a) where
     toRational fa@(MkFixed a) = (toRational a) / (toRational (resolution fa))
 
 -- | @since 2.01
-instance (HasResolution a) => Fractional (Fixed a) where
+instance HasResolution a => Fractional (Fixed a) where
     fa@(MkFixed a) / (MkFixed b) = MkFixed (div (a * (resolution fa)) b)
     recip fa@(MkFixed a) = MkFixed (div (res * res) a) where
         res = resolution fa
     fromRational r = withResolution (\res -> MkFixed (floor (r * (toRational res))))
 
 -- | @since 2.01
-instance (HasResolution a) => RealFrac (Fixed a) where
+instance HasResolution a => RealFrac (Fixed a) where
     properFraction a = (i,a - (fromIntegral i)) where
         i = truncate a
     truncate f = truncate (toRational f)
@@ -209,7 +209,7 @@ withDot "" = ""
 withDot s = '.':s
 
 -- | First arg is whether to chop off trailing zeros
-showFixed :: (HasResolution a) => Bool -> Fixed a -> String
+showFixed :: HasResolution a => Bool -> Fixed a -> String
 showFixed chopTrailingZeros fa@(MkFixed a) | a < 0 = "-" ++ (showFixed chopTrailingZeros (asTypeOf (MkFixed (negate a)) fa))
 showFixed chopTrailingZeros fa@(MkFixed a) = (show i) ++ (withDot (showIntegerZeros chopTrailingZeros digits fracNum)) where
     res = resolution fa
@@ -222,11 +222,11 @@ showFixed chopTrailingZeros fa@(MkFixed a) = (show i) ++ (withDot (showIntegerZe
     divCeil x y = (x + y - 1) `div` y
 
 -- | @since 2.01
-instance (HasResolution a) => Show (Fixed a) where
+instance HasResolution a => Show (Fixed a) where
     showsPrec p n = showParen (p > 6 && n < 0) $ showString $ showFixed False n
 
 -- | @since 4.3.0.0
-instance (HasResolution a) => Read (Fixed a) where
+instance HasResolution a => Read (Fixed a) where
     readPrec     = readNumber convertFixed
     readListPrec = readListPrecDefault
     readList     = readListDefault

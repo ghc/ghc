@@ -811,8 +811,8 @@ ppFloat platform = ppDouble platform . widenFp
 -- * Misc functions
 --------------------------------------------------------------------------------
 
-ppCommaJoin :: (Outputable a) => [a] -> SDoc
+ppCommaJoin :: Outputable a => [a] -> SDoc
 ppCommaJoin strs = hsep $ punctuate comma (map ppr strs)
 
-ppSpaceJoin :: (Outputable a) => [a] -> SDoc
+ppSpaceJoin :: Outputable a => [a] -> SDoc
 ppSpaceJoin strs = hsep (map ppr strs)

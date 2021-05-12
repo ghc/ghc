@@ -585,13 +585,13 @@ class HasType a where
 instance ToHie Void where
   toHie v = absurd v
 
-instance (ToHie a) => ToHie [a] where
+instance ToHie a => ToHie [a] where
   toHie = concatMapM toHie
 
-instance (ToHie a) => ToHie (Bag a) where
+instance ToHie a => ToHie (Bag a) where
   toHie = toHie . bagToList
 
-instance (ToHie a) => ToHie (Maybe a) where
+instance ToHie a => ToHie (Maybe a) where
   toHie = maybe (pure []) toHie
 
 instance ToHie (IEContext (Located ModuleName)) where

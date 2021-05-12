@@ -186,12 +186,12 @@ depend on GHC.Tuple, and everything else depends on GHC.Base or Prelude.
 
 #if 0
 -- for use when compiling GHC.Base itself doesn't work
-data  Bool  =  False | True
+data Bool = False | True
 data Ordering = LT | EQ | GT
 data Char = C# Char#
-type  String = [Char]
+type String = [Char]
 data Int = I# Int#
-data  ()  =  ()
+data () = ()
 data [] a = MkNil
 
 not True = False
@@ -573,14 +573,14 @@ class Functor f where
     -- >>> fmap even ("hello", 1.0, 4)
     -- ("hello",1.0,True)
 
-    fmap        :: (a -> b) -> f a -> f b
+    fmap :: (a -> b) -> f a -> f b
 
     -- | Replace all locations in the input with the same value.
     -- The default definition is @'fmap' . 'const'@, but this may be
     -- overridden with a more efficient version.
     --
-    (<$)        :: a -> f b -> f a
-    (<$)        =  fmap . const
+    (<$) :: a -> f b -> f a
+    (<$) = fmap . const
 
 -- | A functor with application, providing operations to
 --
@@ -808,8 +808,8 @@ liftA3 f a b c = liftA2 f a b <*> c
 --
 -- to run an 'GHC.Conc.STM' transaction and the 'IO' action it
 -- returns.
-join              :: (Monad m) => m (m a) -> m a
-join x            =  x >>= id
+join :: Monad m => m (m a) -> m a
+join x = x >>= id
 
 {- | The 'Monad' class defines the basic operations over a /monad/,
 a concept from a branch of mathematics known as /category theory/.
@@ -849,7 +849,7 @@ class Applicative m => Monad m where
     -- do a <- as
     --    bs a
     -- @
-    (>>=)       :: forall a b. m a -> (a -> m b) -> m b
+    (>>=) :: forall a b. m a -> (a -> m b) -> m b
 
     -- | Sequentially compose two actions, discarding any value produced
     -- by the first, like sequencing operators (such as the semicolon)
@@ -861,13 +861,13 @@ class Applicative m => Monad m where
     -- do as
     --    bs
     -- @
-    (>>)        :: forall a b. m a -> m b -> m b
+    (>>) :: forall a b. m a -> m b -> m b
     m >> k = m >>= \_ -> k -- See Note [Recursive bindings for Applicative/Monad]
     {-# INLINE (>>) #-}
 
     -- | Inject a value into the monadic type.
-    return      :: a -> m a
-    return      = pure
+    return :: a -> m a
+    return = pure
 
 {- Note [Recursive bindings for Applicative/Monad]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -893,8 +893,8 @@ original default.
 
 -- | Same as '>>=', but with the arguments interchanged.
 {-# SPECIALISE (=<<) :: (a -> [b]) -> [a] -> [b] #-}
-(=<<)           :: Monad m => (a -> m b) -> m a -> m b
-f =<< x         = x >>= f
+(=<<) :: Monad m => (a -> m b) -> m a -> m b
+f =<< x  = x >>= f
 
 -- | Conditional execution of 'Applicative' expressions. For example,
 --
@@ -902,11 +902,11 @@ f =<< x         = x >>= f
 --
 -- will output the string @Debugging@ if the Boolean value @debug@
 -- is 'True', and otherwise do nothing.
-when      :: (Applicative f) => Bool -> f () -> f ()
+when :: Applicative f => Bool -> f () -> f ()
 {-# INLINABLE when #-}
 {-# SPECIALISE when :: Bool -> IO () -> IO () #-}
 {-# SPECIALISE when :: Bool -> Maybe () -> Maybe () #-}
-when p s  = if p then s else pure ()
+when p s = if p then s else pure ()
 
 -- | Evaluate each action in the sequence from left to right,
 -- and collect the results.
@@ -940,8 +940,8 @@ similar problems in nofib.
 -}
 
 -- | Promote a function to a monad.
-liftM   :: (Monad m) => (a1 -> r) -> m a1 -> m r
-liftM f m1              = do { x1 <- m1; return (f x1) }
+liftM :: Monad m => (a1 -> r) -> m a1 -> m r
+liftM f m1 = do { x1 <- m1; return (f x1) }
 
 -- | Promote a function to a monad, scanning the monadic arguments from
 -- left to right.  For example,
@@ -949,24 +949,24 @@ liftM f m1              = do { x1 <- m1; return (f x1) }
 -- > liftM2 (+) [0,1] [0,2] = [0,2,1,3]
 -- > liftM2 (+) (Just 1) Nothing = Nothing
 --
-liftM2  :: (Monad m) => (a1 -> a2 -> r) -> m a1 -> m a2 -> m r
-liftM2 f m1 m2          = do { x1 <- m1; x2 <- m2; return (f x1 x2) }
+liftM2 :: Monad m => (a1 -> a2 -> r) -> m a1 -> m a2 -> m r
+liftM2 f m1 m2 = do { x1 <- m1; x2 <- m2; return (f x1 x2) }
 -- Caution: since this may be used for `liftA2`, we can't use the obvious
 -- definition of liftM2 = liftA2.
 
 -- | Promote a function to a monad, scanning the monadic arguments from
 -- left to right (cf. 'liftM2').
-liftM3  :: (Monad m) => (a1 -> a2 -> a3 -> r) -> m a1 -> m a2 -> m a3 -> m r
-liftM3 f m1 m2 m3       = do { x1 <- m1; x2 <- m2; x3 <- m3; return (f x1 x2 x3) }
+liftM3  :: Monad m => (a1 -> a2 -> a3 -> r) -> m a1 -> m a2 -> m a3 -> m r
+liftM3 f m1 m2 m3 = do { x1 <- m1; x2 <- m2; x3 <- m3; return (f x1 x2 x3) }
 
 -- | Promote a function to a monad, scanning the monadic arguments from
 -- left to right (cf. 'liftM2').
-liftM4  :: (Monad m) => (a1 -> a2 -> a3 -> a4 -> r) -> m a1 -> m a2 -> m a3 -> m a4 -> m r
-liftM4 f m1 m2 m3 m4    = do { x1 <- m1; x2 <- m2; x3 <- m3; x4 <- m4; return (f x1 x2 x3 x4) }
+liftM4  :: Monad m => (a1 -> a2 -> a3 -> a4 -> r) -> m a1 -> m a2 -> m a3 -> m a4 -> m r
+liftM4 f m1 m2 m3 m4 = do { x1 <- m1; x2 <- m2; x3 <- m3; x4 <- m4; return (f x1 x2 x3 x4) }
 
 -- | Promote a function to a monad, scanning the monadic arguments from
 -- left to right (cf. 'liftM2').
-liftM5  :: (Monad m) => (a1 -> a2 -> a3 -> a4 -> a5 -> r) -> m a1 -> m a2 -> m a3 -> m a4 -> m a5 -> m r
+liftM5  :: Monad m => (a1 -> a2 -> a3 -> a4 -> a5 -> r) -> m a1 -> m a2 -> m a3 -> m a4 -> m a5 -> m r
 liftM5 f m1 m2 m3 m4 m5 = do { x1 <- m1; x2 <- m2; x3 <- m3; x4 <- m4; x5 <- m5; return (f x1 x2 x3 x4 x5) }
 
 {-# INLINABLE liftM #-}
@@ -996,8 +996,8 @@ is equivalent to
 
 -}
 
-ap                :: (Monad m) => m (a -> b) -> m a -> m b
-ap m1 m2          = do { x1 <- m1; x2 <- m2; return (x1 x2) }
+ap :: Monad m => m (a -> b) -> m a -> m b
+ap m1 m2 = do { x1 <- m1; x2 <- m2; return (x1 x2) }
 -- Since many Applicative instances define (<*>) = ap, we
 -- cannot define ap = (<*>)
 {-# INLINABLE ap #-}
@@ -1180,7 +1180,7 @@ instance Applicative [] where
 
 -- See Note: [List comprehensions and inlining]
 -- | @since 2.01
-instance Monad []  where
+instance Monad [] where
     {-# INLINE (>>=) #-}
     xs >>= f             = [y | x <- xs, y <- f x]
     {-# INLINE (>>) #-}
@@ -1209,7 +1209,7 @@ The rest of the prelude list functions are in GHC.List.
 --
 -- > foldr f z [x1, x2, ..., xn] == x1 `f` (x2 `f` ... (xn `f` z)...)
 
-foldr            :: (a -> b -> b) -> b -> [a] -> b
+foldr :: (a -> b -> b) -> b -> [a] -> b
 -- foldr _ z []     =  z
 -- foldr f z (x:xs) =  f x (foldr f z xs)
 {-# INLINE [0] foldr #-}
@@ -1230,7 +1230,7 @@ foldr k z = go
 -- @'foldr' k z ('build' g)@, which may arise after inlining, to @g k z@,
 -- which avoids producing an intermediate list.
 
-build   :: forall a. (forall b. (a -> b -> b) -> b -> b) -> [a]
+build :: forall a. (forall b. (a -> b -> b) -> b -> b) -> [a]
 {-# INLINE [1] build #-}
         -- The INLINE is important, even though build is tiny,
         -- because it prevents [] getting inlined in the version that
@@ -1311,7 +1311,7 @@ map _ []     = []
 map f (x:xs) = f x : map f xs
 
 -- Note eta expanded
-mapFB ::  (elt -> lst -> lst) -> (a -> elt) -> a -> lst -> lst
+mapFB :: (elt -> lst -> lst) -> (a -> elt) -> a -> lst -> lst
 {-# INLINE [0] mapFB #-} -- See Note [Inline FB functions] in GHC.List
 mapFB c f = \x ys -> c (f x) ys
 
@@ -1392,8 +1392,8 @@ The rules for map work like this.
 --
 -- >  f x | x < 0     = ...
 -- >      | otherwise = ...
-otherwise               :: Bool
-otherwise               =  True
+otherwise :: Bool
+otherwise = True
 
 ----------------------------------------------
 -- Type Char and String
@@ -1432,14 +1432,14 @@ maxInt, minInt :: Int
 
 {- Seems clumsy. Should perhaps put minInt and MaxInt directly into MachDeps.h -}
 #if WORD_SIZE_IN_BITS == 31
-minInt  = I# (-0x40000000#)
-maxInt  = I# 0x3FFFFFFF#
+minInt = I# (-0x40000000#)
+maxInt = I# 0x3FFFFFFF#
 #elif WORD_SIZE_IN_BITS == 32
-minInt  = I# (-0x80000000#)
-maxInt  = I# 0x7FFFFFFF#
+minInt = I# (-0x80000000#)
+maxInt = I# 0x7FFFFFFF#
 #else
-minInt  = I# (-0x8000000000000000#)
-maxInt  = I# 0x7FFFFFFFFFFFFFFF#
+minInt = I# (-0x8000000000000000#)
+maxInt = I# 0x7FFFFFFFFFFFFFFF#
 #endif
 
 ----------------------------------------------
@@ -1449,8 +1449,8 @@ maxInt  = I# 0x7FFFFFFFFFFFFFFF#
 -- | Identity function.
 --
 -- > id x = x
-id                      :: a -> a
-id x                    =  x
+id :: a -> a
+id x = x
 
 -- Assertion function.  This simply ignores its boolean argument.
 -- The compiler may rewrite it to @('assertError' line)@.
@@ -1487,22 +1487,22 @@ data Opaque = forall a. O a
 --
 -- >>> map (const 42) [0..3]
 -- [42,42,42,42]
-const                   :: a -> b -> a
-const x _               =  x
+const :: a -> b -> a
+const x _ = x
 
 -- | Function composition.
 {-# INLINE (.) #-}
 -- Make sure it has TWO args only on the left, so that it inlines
 -- when applied to two functions, even if there is no final argument
-(.)    :: (b -> c) -> (a -> b) -> a -> c
+(.) :: (b -> c) -> (a -> b) -> a -> c
 (.) f g = \x -> f (g x)
 
 -- | @'flip' f@ takes its (first) two arguments in the reverse order of @f@.
 --
 -- >>> flip (++) "hello" "world"
 -- "worldhello"
-flip                    :: (a -> b -> c) -> b -> a -> c
-flip f x y              =  f y x
+flip :: (a -> b -> c) -> b -> a -> c
+flip f x y = f y x
 
 -- | Application operator.  This operator is redundant, since ordinary
 -- application @(f x)@ means the same as @(f '$' x)@. However, '$' has
@@ -1529,7 +1529,7 @@ f $ x =  f x
 f $! x = let !vx = x in f vx  -- see #2273
 
 -- | @'until' p f@ yields the result of applying @f@ until @p@ holds.
-until                   :: (a -> Bool) -> (a -> a) -> a -> a
+until :: (a -> Bool) -> (a -> a) -> a -> a
 until p f = go
   where
     go x | p x          = x
@@ -1538,15 +1538,15 @@ until p f = go
 -- | 'asTypeOf' is a type-restricted version of 'const'.  It is usually
 -- used as an infix operator, and its typing forces its first argument
 -- (which is usually overloaded) to have the same type as the second.
-asTypeOf                :: a -> a -> a
-asTypeOf                =  const
+asTypeOf :: a -> a -> a
+asTypeOf = const
 
 ----------------------------------------------
 -- Functor/Applicative/Monad instances for IO
 ----------------------------------------------
 
 -- | @since 2.01
-instance  Functor IO where
+instance Functor IO where
    fmap f x = x >>= (pure . f)
 
 -- | @since 2.01
@@ -1554,17 +1554,17 @@ instance Applicative IO where
     {-# INLINE pure #-}
     {-# INLINE (*>) #-}
     {-# INLINE liftA2 #-}
-    pure  = returnIO
-    (*>)  = thenIO
-    (<*>) = ap
+    pure   = returnIO
+    (*>)   = thenIO
+    (<*>)  = ap
     liftA2 = liftM2
 
 -- | @since 2.01
-instance  Monad IO  where
+instance Monad IO where
     {-# INLINE (>>)   #-}
     {-# INLINE (>>=)  #-}
-    (>>)      = (*>)
-    (>>=)     = bindIO
+    (>>)  = (*>)
+    (>>=) = bindIO
 
 -- | @since 4.9.0.0
 instance Alternative IO where
@@ -1617,10 +1617,10 @@ getTag x = dataToTag# x
 {-# INLINE divModInt #-}
 
 quotInt, remInt, divInt, modInt :: Int -> Int -> Int
-(I# x) `quotInt`  (I# y) = I# (x `quotInt#` y)
-(I# x) `remInt`   (I# y) = I# (x `remInt#`  y)
-(I# x) `divInt`   (I# y) = I# (x `divInt#`  y)
-(I# x) `modInt`   (I# y) = I# (x `modInt#`  y)
+(I# x) `quotInt` (I# y) = I# (x `quotInt#` y)
+(I# x) `remInt`  (I# y) = I# (x `remInt#`  y)
+(I# x) `divInt`  (I# y) = I# (x `divInt#`  y)
+(I# x) `modInt`  (I# y) = I# (x `modInt#`  y)
 
 quotRemInt :: Int -> Int -> (Int, Int)
 (I# x) `quotRemInt` (I# y) = case x `quotRemInt#` y of
@@ -1653,22 +1653,22 @@ split again.
 -- | Shift the argument left by the specified number of bits
 -- (which must be non-negative).
 shiftL# :: Word# -> Int# -> Word#
-a `shiftL#` b   | isTrue# (b >=# WORD_SIZE_IN_BITS#) = 0##
-                | otherwise                          = a `uncheckedShiftL#` b
+a `shiftL#` b | isTrue# (b >=# WORD_SIZE_IN_BITS#) = 0##
+              | otherwise                          = a `uncheckedShiftL#` b
 
 -- | Shift the argument right by the specified number of bits
 -- (which must be non-negative).
 -- The "RL" means "right, logical" (as opposed to RA for arithmetic)
 -- (although an arithmetic right shift wouldn't make sense for Word#)
 shiftRL# :: Word# -> Int# -> Word#
-a `shiftRL#` b  | isTrue# (b >=# WORD_SIZE_IN_BITS#) = 0##
-                | otherwise                          = a `uncheckedShiftRL#` b
+a `shiftRL#` b | isTrue# (b >=# WORD_SIZE_IN_BITS#) = 0##
+               | otherwise                          = a `uncheckedShiftRL#` b
 
 -- | Shift the argument left by the specified number of bits
 -- (which must be non-negative).
 iShiftL# :: Int# -> Int# -> Int#
-a `iShiftL#` b  | isTrue# (b >=# WORD_SIZE_IN_BITS#) = 0#
-                | otherwise                          = a `uncheckedIShiftL#` b
+a `iShiftL#` b | isTrue# (b >=# WORD_SIZE_IN_BITS#) = 0#
+               | otherwise                          = a `uncheckedIShiftL#` b
 
 -- | Shift the argument right (signed) by the specified number of bits
 -- (which must be non-negative).

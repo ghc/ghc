@@ -452,10 +452,10 @@ Class methods can generate
          { AbsBinds [tvs] [dicts] ...blah }
 So the overloading is in the nested AbsBinds. A good example is in GHC.Float:
 
-  class  (Real a, Fractional a) => RealFrac a  where
-    round :: (Integral b) => a -> b
+  class (Real a, Fractional a) => RealFrac a where
+    round :: Integral b => a -> b
 
-  instance  RealFrac Float  where
+  instance RealFrac Float where
     {-# SPECIALIZE round :: Float -> Int #-}
 
 The top-level AbsBinds for $cround has no tyvars or dicts (because the
@@ -1012,7 +1012,7 @@ drop_dicts drops dictionary bindings on the LHS where possible.
    NB 1: We can only drop the binding if the RHS doesn't bind
          one of the orig_bndrs, which we assume occur on RHS.
          Example
-            f :: (Eq a) => b -> a -> a
+            f :: Eq a => b -> a -> a
             {-# SPECIALISE f :: Eq a => b -> [a] -> [a] #-}
          Here we want to end up with
             RULE forall d:Eq a.  f ($dfEqList d) = f_spec d
@@ -1049,7 +1049,7 @@ The drop_dicts algorithm is based on these observations:
 
   * The "needed variables" are simply the orig_bndrs.  Consider
        f :: (Eq a, Show b) => a -> b -> String
-       ... SPECIALISE f :: (Show b) => Int -> b -> String ...
+       ... SPECIALISE f :: Show b => Int -> b -> String ...
     Then orig_bndrs includes the *quantified* dictionaries of the type
     namely (dsb::Show b), but not the one for Eq Int
 

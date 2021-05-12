@@ -48,7 +48,7 @@ default ()              -- Double isn't available yet
 -- 'Bounded' may also be derived for single-constructor datatypes whose
 -- constituent types are in 'Bounded'.
 
-class  Bounded a  where
+class Bounded a where
     minBound, maxBound :: a
 
 -- | Class 'Enum' defines operations on sequentially ordered types.
@@ -80,7 +80,7 @@ class  Bounded a  where
 -- >        bound | fromEnum y >= fromEnum x = maxBound
 -- >              | otherwise                = minBound
 --
-class  Enum a   where
+class Enum a where
     -- | the successor of a value.  For numeric types, 'succ' adds 1.
     succ                :: a -> a
     -- | the predecessor of a value.  For numeric types, 'pred' subtracts 1.
@@ -188,7 +188,7 @@ unfoldings in the interface file so we can do list fusion at usage sites.
 ------------------------------------------------------------------------
 
 {-# NOINLINE toEnumError #-}
-toEnumError :: (Show a) => String -> Int -> (a,a) -> b
+toEnumError :: Show a => String -> Int -> (a,a) -> b
 toEnumError inst_ty i bnds =
     errorWithoutStackTrace $ "Enum.toEnum{" ++ inst_ty ++ "}: tag (" ++
             show i ++
@@ -196,7 +196,7 @@ toEnumError inst_ty i bnds =
             show bnds
 
 {-# NOINLINE fromEnumError #-}
-fromEnumError :: (Show a) => String -> a -> b
+fromEnumError :: Show a => String -> a -> b
 fromEnumError inst_ty x =
     errorWithoutStackTrace $ "Enum.fromEnum{" ++ inst_ty ++ "}: value (" ++
             show x ++

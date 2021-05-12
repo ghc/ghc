@@ -1257,7 +1257,7 @@ instance (Data a, Data b, Ix a) => Data (Array a b)
 -- Data instance for Proxy
 
 -- | @since 4.7.0.0
-deriving instance (Data t) => Data (Proxy t)
+deriving instance Data t => Data (Proxy t)
 
 -- | @since 4.7.0.0
 deriving instance (a ~ b, Data a) => Data (a :~: b)

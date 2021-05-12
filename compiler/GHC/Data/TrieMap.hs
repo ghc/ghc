@@ -191,10 +191,10 @@ the compiler has to make an arbitrary choice. Consider:
   class T a b where
     go :: a -> b -> String
 
-  instance (Show b) => T Int b where
+  instance Show b => T Int b where
     go a b = show a ++ show b
 
-  instance (Show a) => T a Bool where
+  instance Show a => T a Bool where
     go a b = show a ++ show b
 
   f = go 10 True

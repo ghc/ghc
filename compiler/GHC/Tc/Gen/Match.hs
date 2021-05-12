@@ -137,7 +137,7 @@ tcMatchesFun fn@(L _ fun_name) matches exp_ty
 parser guarantees that each equation has exactly one argument.
 -}
 
-tcMatchesCase :: (AnnoBody body) =>
+tcMatchesCase :: AnnoBody body =>
                 TcMatchCtxt body                         -- Case context
              -> Scaled TcSigmaType                       -- Type of scrutinee
              -> MatchGroup GhcRn (LocatedA (body GhcRn)) -- The case alternatives
@@ -205,7 +205,7 @@ type AnnoBody body
     )
 
 -- | Type-check a MatchGroup.
-tcMatches :: (AnnoBody body ) => TcMatchCtxt body
+tcMatches :: AnnoBody body => TcMatchCtxt body
           -> [Scaled ExpSigmaType]      -- Expected pattern types
           -> ExpRhoType          -- Expected result-type of the Match.
           -> MatchGroup GhcRn (LocatedA (body GhcRn))
@@ -235,7 +235,7 @@ tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
                     , mg_origin = origin }) }
 
 -------------
-tcMatch :: (AnnoBody body) => TcMatchCtxt body
+tcMatch :: AnnoBody body => TcMatchCtxt body
         -> [Scaled ExpSigmaType]        -- Expected pattern types
         -> ExpRhoType            -- Expected result-type of the Match.
         -> LMatch GhcRn (LocatedA (body GhcRn))
@@ -352,7 +352,7 @@ type TcStmtChecker body rho_type
                 -> (rho_type -> TcM thing)  -- Checker for what follows the stmt
                 -> TcM (Stmt GhcTc (LocatedA (body GhcTc)), thing)
 
-tcStmts :: (AnnoBody body) => HsStmtContext GhcRn
+tcStmts :: AnnoBody body => HsStmtContext GhcRn
         -> TcStmtChecker body rho_type   -- NB: higher-rank type
         -> [LStmt GhcRn (LocatedA (body GhcRn))]
         -> rho_type
@@ -362,7 +362,7 @@ tcStmts ctxt stmt_chk stmts res_ty
                         const (return ())
        ; return stmts' }
 
-tcStmtsAndThen :: (AnnoBody body) => HsStmtContext GhcRn
+tcStmtsAndThen :: AnnoBody body => HsStmtContext GhcRn
                -> TcStmtChecker body rho_type    -- NB: higher-rank type
                -> [LStmt GhcRn (LocatedA (body GhcRn))]
                -> rho_type

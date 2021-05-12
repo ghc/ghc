@@ -1260,7 +1260,7 @@ Previously, GHC computed the number of argument types through tcSplitSigmaTy.
 This is incorrect in the face of nested foralls, however!
 This caused Ticket #13311, for instance:
 
-  f :: forall a. (Monoid a) => forall b. (Monoid b) => Maybe a -> Maybe b
+  f :: forall a. Monoid a => forall b. Monoid b => Maybe a -> Maybe b
 
 If one uses `f` like so:
 
