@@ -36,6 +36,7 @@ import GHC.Platform
 
 import GHC.Driver.Session
 
+import GHC.HsToCore.Errors.Types
 import {-# SOURCE #-} GHC.HsToCore.Expr ( dsExpr )
 import GHC.HsToCore.Match.Literal
 import GHC.HsToCore.Monad
@@ -531,9 +532,7 @@ repDataDefn tc opts
                                    ; ksig' <- repMaybeLTy ksig
                                    ; repNewtype cxt1 tc opts ksig' con'
                                                 derivs1 }
-           (NewType, _) -> lift $ failWithDs (text "Multiple constructors for newtype:"
-                                       <+> pprQuotedList
-                                       (getConNames $ unLoc $ head cons))
+           (NewType, _) -> lift $ failWithDs (DsMultipleConForNewtype (getConNames $ unLoc $ head cons))
            (DataType, _) -> do { ksig' <- repMaybeLTy ksig
                                ; consL <- mapM repC cons
                                ; cons1 <- coreListM conTyConName consL
