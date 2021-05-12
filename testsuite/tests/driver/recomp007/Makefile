@@ -17,10 +17,12 @@ recomp007:
 	"$(TEST_HC)" -v0 --make Setup.hs
 	$(MAKE) -s --no-print-directory prep.a1
 	$(MAKE) -s --no-print-directory prep.b
+	./b/dist/build/test/test
 	"$(GHC_PKG)" unregister --package-db=$(LOCAL_PKGCONF) a-1.0
 	$(MAKE) -s --no-print-directory prep.a2
 	cd b && ../Setup configure -v0 --with-compiler="$(TEST_HC)" --with-hc-pkg="$(GHC_PKG)" --package-db=../$(LOCAL_PKGCONF)
 	cd b && ../Setup build
+	./b/dist/build/test/test
 
 prep.%:
 	cd $* && ../Setup configure -v0 --with-compiler="$(TEST_HC)" --with-hc-pkg="$(GHC_PKG)" --package-db=../$(LOCAL_PKGCONF)
