@@ -764,7 +764,7 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
     tycon        = dataConTyCon data_con       -- The representation TyCon (not family)
     wrap_ty      = dataConWrapperType data_con
     ev_tys       = eqSpecPreds eq_spec ++ theta
-    all_arg_tys  = (map unrestricted ev_tys) ++ orig_arg_tys
+    all_arg_tys  = map unrestricted ev_tys ++ orig_arg_tys
     ev_ibangs    = map (const HsLazy) ev_tys
     orig_bangs   = dataConSrcBangs data_con
 
@@ -1842,6 +1842,11 @@ definition in Core.  The rewrite rule works as follows:
 
 The `co` coercion is the newtype-coercion extracted from the type-class.
 The type class is obtained by looking at the type of wrap.
+
+In the constant folding rule it's very import to make sure to strip all ticks
+from the expression as if there's an occurence of
+magicDict we *must* convert it for correctness. See #19667 for where this went
+wrong in GHCi.
 
 
 -------------------------------------------------------------

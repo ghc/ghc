@@ -579,13 +579,13 @@ cloneTyVarBndr (Subst in_scope id_env tv_env cv_env) tv uniq
         (TCvSubst in_scope' tv_env' cv_env', tv')
            -> (Subst in_scope' id_env tv_env' cv_env', tv')
 
-substCoVarBndr :: Subst -> TyVar -> (Subst, TyVar)
+substCoVarBndr :: Subst -> CoVar -> (Subst, CoVar)
 substCoVarBndr (Subst in_scope id_env tv_env cv_env) cv
   = case Coercion.substCoVarBndr (TCvSubst in_scope tv_env cv_env) cv of
         (TCvSubst in_scope' tv_env' cv_env', cv')
            -> (Subst in_scope' id_env tv_env' cv_env', cv')
 
--- | See 'Type.substTy'
+-- | See 'GHC.Core.Type.substTy'.
 substTy :: Subst -> Type -> Type
 substTy subst ty = Type.substTyUnchecked (getTCvSubst subst) ty
 

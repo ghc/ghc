@@ -581,6 +581,7 @@ expandTypeSynonyms ty
     go_prov subst (PhantomProv co)    = PhantomProv (go_co subst co)
     go_prov subst (ProofIrrelProv co) = ProofIrrelProv (go_co subst co)
     go_prov _     p@(PluginProv _)    = p
+    go_prov _     p@CorePrepProv      = p
 
       -- the "False" and "const" are to accommodate the type of
       -- substForAllCoBndrUsing, which is general enough to
@@ -914,6 +915,7 @@ mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
     go_prov env (PhantomProv co)    = PhantomProv <$> go_co env co
     go_prov env (ProofIrrelProv co) = ProofIrrelProv <$> go_co env co
     go_prov _   p@(PluginProv _)    = return p
+    go_prov _   p@CorePrepProv      = return p
 
 
 {-
@@ -3107,6 +3109,7 @@ occCheckExpand vs_to_avoid ty
     go_prov cxt (PhantomProv co)    = PhantomProv <$> go_co cxt co
     go_prov cxt (ProofIrrelProv co) = ProofIrrelProv <$> go_co cxt co
     go_prov _   p@(PluginProv _)    = return p
+    go_prov _   p@CorePrepProv      = return p
 
 
 {-
@@ -3161,6 +3164,7 @@ tyConsOfType ty
      go_prov (PhantomProv co)    = go_co co
      go_prov (ProofIrrelProv co) = go_co co
      go_prov (PluginProv _)      = emptyUniqSet
+     go_prov CorePrepProv        = emptyUniqSet
         -- this last case can happen from the tyConsOfType used from
         -- checkTauTvUpdate
 

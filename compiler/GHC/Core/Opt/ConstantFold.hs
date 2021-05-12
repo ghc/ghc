@@ -53,7 +53,7 @@ import GHC.Core.TyCon
    , tyConFamilySize )
 import GHC.Core.DataCon ( dataConTagZ, dataConTyCon, dataConWrapId, dataConWorkId )
 import GHC.Core.Utils  ( eqExpr, cheapEqExpr, exprIsHNF, exprType
-                       , stripTicksTop, stripTicksTopT, mkTicks )
+                       , stripTicksTop, stripTicksTopT, mkTicks, stripTicksE )
 import GHC.Core.Multiplicity
 import GHC.Core.FVs
 import GHC.Core.Type
@@ -2188,7 +2188,7 @@ match_inline _ = Nothing
 -- See Note [magicDictId magic] in "GHC.Types.Id.Make"
 -- for a description of what is going on here.
 match_magicDict :: [Expr CoreBndr] -> Maybe (Expr CoreBndr)
-match_magicDict [Type _, Var wrap `App` Type a `App` Type _ `App` f, x, y ]
+match_magicDict [Type _, (stripTicksE (const True) -> (Var wrap `App` Type a `App` Type _ `App` f)), x, y ]
   | Just (_, fieldTy, _)  <- splitFunTy_maybe $ dropForAlls $ idType wrap
   , Just (_, dictTy, _)   <- splitFunTy_maybe fieldTy
   , Just dictTc           <- tyConAppTyCon_maybe dictTy
