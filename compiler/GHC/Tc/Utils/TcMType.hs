@@ -131,7 +131,6 @@ import GHC.Data.FastString
 import GHC.Data.Bag
 import GHC.Data.Pair
 import GHC.Types.Unique.Set
-import GHC.Driver.Session
 import GHC.Driver.Ppr
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Types.Basic ( TypeOrKind(..) )
@@ -311,14 +310,11 @@ predTypeOccName ty = case classifyPredType ty of
 -- after creation.
 --
 -- This is monadic to look up the 'TcLclEnv', which is used to initialize
--- 'ic_env', and to set the -Winaccessible-code flag. See
--- Note [Avoid -Winaccessible-code when deriving] in "GHC.Tc.TyCl.Instance".
+-- 'ic_env'.
 newImplication :: TcM Implication
 newImplication
   = do env <- getLclEnv
-       warn_inaccessible <- woptM Opt_WarnInaccessibleCode
-       return (implicationPrototype { ic_env = env
-                                    , ic_warn_inaccessible = warn_inaccessible })
+       return (implicationPrototype { ic_env = env })
 
 {-
 ************************************************************************
