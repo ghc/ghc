@@ -133,9 +133,7 @@ hsExprType e@(HsBracket{}) = pprPanic "hsExprType: Unexpected HsBracket"
                                       (ppr e)
 hsExprType e@(HsRnBracketOut{}) = pprPanic "hsExprType: Unexpected HsRnBracketOut"
                                            (ppr e)
--- TODO RGS: How should this work? There's a brackTy function in GHC.Tc.Gen.Splice
--- that *almost* does what we want, but it's monadic...
-hsExprType (HsTcBracketOut _a _wrap _bracket _pending) = undefined
+hsExprType (HsTcBracketOut ty _wrap _bracket _pending) = ty
 hsExprType e@(HsSpliceE{}) = pprPanic "hsExprType: Unexpected HsSpliceE"
                                       (ppr e)
 hsExprType (HsProc _ _ lcmd_top) = lhsCmdTopType lcmd_top
