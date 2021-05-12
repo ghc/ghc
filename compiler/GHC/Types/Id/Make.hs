@@ -1029,29 +1029,13 @@ dataConSrcToImplBang dflags fam_envs arg_ty
                      -- Unwrap type families and newtypes
         arg_ty' = case mb_co of { Just (_,ty) -> scaledSet arg_ty ty; Nothing -> arg_ty }
   , all (not . isNewTyCon . fst) (splitTyConApp_maybe $ scaledThing arg_ty')
-  , isUnpackableType dflags fam_envs (scaledThing arg_ty')
-  , doUnpacking dflags unpk_prag arg_ty'
+  , isUnpackableType dflags unpk_prag fam_envs arg_ty'
   = case mb_co of
       Nothing     -> HsUnpack Nothing
       Just (co,_) -> HsUnpack (Just co)
 
   | otherwise -- Record the strict-but-no-unpack decision
   = HsStrict
-
--- | Determine whether we ought to unpack a field based on user annotations if present and heuristics if not.
-doUnpacking :: DynFlags -> SrcUnpackedness -> Scaled Type -> Bool
-doUnpacking dflags prag arg_ty =
-  case prag of
-    SrcNoUnpack -> False -- {-# NOUNPACK #-}
-    SrcUnpack   -> True  -- {-# UNPACK #-}
-    NoSrcUnpack -- No explicit unpack pragma, so use heuristics
-      | Just (_:_:_) <- unpackable_type_datacons (scaledThing arg_ty)
-      -> False -- don't unpack sum types automatically, but they can be unpacked with an explicit source UNPACK.
-      | otherwise
-      -> gopt Opt_UnboxStrictFields dflags
-         || (gopt Opt_UnboxSmallStrictFields dflags
-             && rep_tys `lengthAtMost` 1)  -- See Note [Unpack one-wide fields]
-  where (rep_tys, _) = dataConArgUnpack arg_ty
 
 -- | Wrappers/Workers and representation following Unpack/Strictness
 -- decisions
@@ -1204,7 +1188,7 @@ dataConArgUnpack
        , (Unboxer, Boxer) )
 dataConArgUnpack scaledTy@(Scaled _ arg_ty)
   | Just (tc, tc_args) <- splitTyConApp_maybe arg_ty
-  = assert (not (isNewTyCon tc))
+  = assert (not (isNewTyCon tc)) $
     case tyConDataCons tc of
       [con] -> dataConArgUnpackProduct scaledTy tc_args con
       cons  -> dataConArgUnpackSum scaledTy tc_args cons
@@ -1220,7 +1204,7 @@ dataConArgUnpackProduct
   -> ( [(Scaled Type, StrictnessMark)]   -- Rep types
      , (Unboxer, Boxer) )
 dataConArgUnpackProduct (Scaled arg_mult _) tc_args con =
-  ASSERT( null (dataConExTyCoVars con) )
+  assert (null (dataConExTyCoVars con)) $
     -- Note [Unpacking GADTs and existentials]
   let rep_tys = map (scaleScaled arg_mult) $ dataConInstArgTys con tc_args
   in ( rep_tys `zip` dataConRepStrictness con
@@ -1325,15 +1309,15 @@ mkUbxSumAltTy :: [Type] -> Type
 mkUbxSumAltTy [ty] = ty
 mkUbxSumAltTy tys  = mkTupleTy Unboxed tys
 
-isUnpackableType :: DynFlags -> FamInstEnvs -> Type -> Bool
--- True if we can unpack the UNPACK the argument type
+isUnpackableType :: DynFlags -> SrcUnpackedness -> FamInstEnvs -> Scaled Type -> Bool
+-- True if we ought to unpack the UNPACK the argument type
 -- See Note [Recursive unboxing]
 -- We look "deeply" inside rather than relying on the DataCons
 -- we encounter on the way, because otherwise we might well
 -- end up relying on ourselves!
-isUnpackableType dflags fam_envs ty
-  | Just data_cons <- unpackable_type_datacons ty
-  = all (ok_con_args emptyNameSet) data_cons
+isUnpackableType dflags prag fam_envs ty
+  | Just data_cons <- unpackable_type_datacons (scaledThing ty)
+  = all (ok_con_args emptyNameSet) data_cons && should_unpack data_cons
   | otherwise
   = False
   where
@@ -1359,7 +1343,7 @@ isUnpackableType dflags fam_envs ty
     ok_ty :: NameSet -> Type -> Bool
     ok_ty dcs ty
       | Just data_cons <- unpackable_type_datacons ty
-      = all (ok_con_args  dcs) data_cons
+      = all (ok_con_args dcs) data_cons
       | otherwise
       = True        -- NB True here, in contrast to False at top level
 
@@ -1374,6 +1358,21 @@ isUnpackableType dflags fam_envs ty
       = xopt LangExt.StrictData dflags -- Be conservative
     attempt_unpack _ = False
 
+    -- Determine whether we ought to unpack a field based on user annotations if present and heuristics if not.
+    should_unpack data_cons =
+      case prag of
+        SrcNoUnpack -> False -- {-# NOUNPACK #-}
+        SrcUnpack   -> True  -- {-# UNPACK #-}
+        NoSrcUnpack -- No explicit unpack pragma, so use heuristics
+          | (_:_:_) <- data_cons
+          -> False -- don't unpack sum types automatically, but they can be unpacked with an explicit source UNPACK.
+          | otherwise
+          -> gopt Opt_UnboxStrictFields dflags
+             || (gopt Opt_UnboxSmallStrictFields dflags
+                 && rep_tys `lengthAtMost` 1)  -- See Note [Unpack one-wide fields]
+      where (rep_tys, _) = dataConArgUnpack ty
+
+
 -- Given a type already assumed to have been normalized by topNormaliseType,
 -- unpackable_type_datacons ty = Just datacons
 -- iff ty is of the form
@@ -1385,7 +1384,9 @@ unpackable_type_datacons :: Type -> Maybe [DataCon]
 unpackable_type_datacons ty
   | Just (tc, _) <- splitTyConApp_maybe ty
   , not (isNewTyCon tc)
-  , let cons = tyConDataCons tc
+    -- Even though `ty` has been normalised, it could still
+    -- be a /recursive/ newtype, so we must check for that
+  , Just cons <- tyConDataCons_maybe tc
   , not (null cons)
   , all (null . dataConExTyCoVars) cons
   = Just cons -- See Note [Unpacking GADTs and existentials]
