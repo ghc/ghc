@@ -1,4 +1,5 @@
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE DataKinds #-}
 
 -- | Provides the heuristics for when it's beneficial to lambda lift bindings.

@@ -1,5 +1,5 @@
 {-# LANGUAGE Safe #-}
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 -----------------------------------------------------------------------------

@@ -97,6 +97,7 @@ import Data.Either      ( partitionEithers )
 import Data.List        ( find, sortBy )
 import qualified Data.List.NonEmpty as NE
 import Control.Arrow    ( first )
+import Control.Applicative ( (<|>) )
 import Data.Function
 import GHC.Types.FieldLabel
 
@@ -1031,9 +1032,15 @@ lookupTypeOccRn rdr_name
   = badVarInType rdr_name
   | otherwise
   = do { mb_name <- lookupOccRn_maybe rdr_name
-       ; case mb_name of
+       ; case mb_name <|> matchEqTyName rdr_name of
              Just name -> return name
              Nothing   -> lookup_demoted rdr_name }
+
+-- See Note [eqTyCon (~) is built-in syntax] in GHC.Builtin.Types
+matchEqTyName :: RdrName -> Maybe Name
+matchEqTyName rdr_name
+  | occName rdr_name == occName eqTyCon_RDR = Just eqTyConName
+  | otherwise = Nothing
 
 lookup_demoted :: RdrName -> RnM Name
 lookup_demoted rdr_name
@@ -1901,13 +1908,7 @@ dataTcOccs rdr_name
   = [rdr_name]
   where
     occ = rdrNameOcc rdr_name
-    rdr_name_tc =
-      case rdr_name of
-        -- The (~) type operator is always in scope, so we need a special case
-        -- for it here, or else  :info (~)  fails in GHCi.
-        -- See Note [eqTyCon (~) is built-in syntax]
-        Unqual occ | occNameFS occ == fsLit "~" -> eqTyCon_RDR
-        _ -> setRdrNameSpace rdr_name tcName
+    rdr_name_tc = setRdrNameSpace rdr_name tcName
 
 {-
 Note [dataTcOccs and Exact Names]

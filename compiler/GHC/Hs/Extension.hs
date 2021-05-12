@@ -11,6 +11,7 @@
 {-# LANGUAGE ScopedTypeVariables     #-}
 {-# LANGUAGE TypeApplications        #-}
 {-# LANGUAGE TypeFamilyDependencies  #-}
+{-# LANGUAGE TypeOperators           #-}
 {-# LANGUAGE UndecidableSuperClasses #-} -- for IsPass; see Note [NoGhcTc]
 {-# LANGUAGE UndecidableInstances    #-} -- Wrinkle in Note [Trees That Grow]
                                          -- in module Language.Haskell.Syntax.Extension

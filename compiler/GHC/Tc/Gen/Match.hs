@@ -5,6 +5,7 @@
 {-# LANGUAGE RecordWildCards  #-}
 {-# LANGUAGE TupleSections    #-}
 {-# LANGUAGE TypeFamilies     #-}
+{-# LANGUAGE TypeOperators    #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 
