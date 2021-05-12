@@ -329,7 +329,7 @@ type instance XSynDecl      GhcPs = EpAnn [AddEpAnn]
 type instance XSynDecl      GhcRn = NameSet -- FVs
 type instance XSynDecl      GhcTc = NameSet -- FVs
 
-type instance XDataDecl     GhcPs = EpAnn [AddEpAnn] -- AZ: used?
+type instance XDataDecl     GhcPs = EpAnn [AddEpAnn]
 type instance XDataDecl     GhcRn = DataDeclRn
 type instance XDataDecl     GhcTc = DataDeclRn
 
@@ -568,7 +568,7 @@ instance OutputableBndrId p
 *                                                                      *
 ********************************************************************* -}
 
-type instance XCHsDataDefn    (GhcPass _) = EpAnn [AddEpAnn]
+type instance XCHsDataDefn    (GhcPass _) = NoExtField
 type instance XXHsDataDefn    (GhcPass _) = NoExtCon
 
 type instance XCHsDerivingClause    (GhcPass _) = EpAnn [AddEpAnn]
@@ -1184,4 +1184,3 @@ type instance Anno (WarnDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (AnnDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (RoleAnnotDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (Maybe Role) = SrcSpan
-
