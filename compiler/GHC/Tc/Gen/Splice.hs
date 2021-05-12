@@ -214,7 +214,7 @@ tcTypedBracket rn_expr brack@(TExpBr _ expr) res_ty
                        rn_expr
                        (unLoc (mkHsApp (mkLHsWrap (applyQuoteWrapper wrapper)
                                                   (nlHsTyApp texpco [rep, expr_ty]))
-                                      (noLocA (HsTcBracketOut noExtField (Just wrapper) brack ps'))))
+                                      (noLocA (HsTcBracketOut (mkAppTy m_var expTyConName) (Just wrapper) brack ps'))))
                        meta_ty res_ty }
 tcTypedBracket _ other_brack _
   = pprPanic "tcTypedBracket" (ppr other_brack)
@@ -243,7 +243,7 @@ tcUntypedBracket rn_expr brack ps res_ty
        -- Unify the overall type of the bracket with the expected result
        -- type
        ; tcWrapResultO BracketOrigin rn_expr
-            (HsTcBracketOut noExtField brack_info brack ps')
+            (HsTcBracketOut expected_type brack_info brack ps')
             expected_type res_ty
 
        }
