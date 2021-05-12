@@ -1,6 +1,6 @@
 module Syntax where
 
-import Data.List
+import Data.List (nub)
 
 ------------------------------------------------------------------
 -- Abstract syntax -----------------------------------------------
