@@ -30,6 +30,8 @@ import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
+import Data.Void ( absurd )
+
 {-
 ************************************************************************
 *                                                                      *
@@ -66,7 +68,7 @@ hsPatType (SigPat ty _ _)               = ty
 hsPatType (NPat ty _ _ _)               = ty
 hsPatType (NPlusKPat ty _ _ _ _ _)      = ty
 hsPatType (XPat (CoPat _ _ ty))         = ty
-hsPatType SplicePat{}                   = panic "hsPatType: SplicePat"
+hsPatType (SplicePat v _)               = absurd v
 
 hsLitType :: HsLit (GhcPass p) -> Type
 hsLitType (HsChar _ _)       = charTy
@@ -93,20 +95,19 @@ hsExprType :: HsExpr GhcTc -> Type
 hsExprType (HsVar _ (L _ id)) = idType id
 hsExprType (HsUnboundVar (HER _ ty _) _) = ty
 hsExprType (HsRecFld _ af) = idType $ selectorAmbiguousFieldOcc af
-hsExprType (HsOverLabel v _) = case v of {}
-hsExprType e@(HsIPVar{}) = pprPanic "hsExprType: HsIPVar present after typechecking"
-                                    (ppr e)
+hsExprType (HsOverLabel v _) = absurd v
+hsExprType (HsIPVar v _) = absurd v
 hsExprType (HsOverLit _ lit) = overLitType lit
 hsExprType (HsLit _ lit) = hsLitType lit
 hsExprType (HsLam     _ (MG { mg_ext = match_group })) = matchGroupTcType match_group
 hsExprType (HsLamCase _ (MG { mg_ext = match_group })) = matchGroupTcType match_group
 hsExprType (HsApp _ f _) = funResultTy $ lhsExprType f
 hsExprType (HsAppType x f _) = piResultTy (lhsExprType f) x
-hsExprType (OpApp v _ _ _) = case v of {}
+hsExprType (OpApp v _ _ _) = absurd v
 hsExprType (NegApp _ _ se) = syntaxExprType se
 hsExprType (HsPar _ e) = lhsExprType e
-hsExprType (SectionL v _ _) = case v of {}
-hsExprType (SectionR v _ _) = case v of {}
+hsExprType (SectionL v _ _) = absurd v
+hsExprType (SectionR v _ _) = absurd v
 hsExprType (ExplicitTuple _ args box) = mkTupleTy box $ map hsTupArgType args
 hsExprType (ExplicitSum alt_tys _ _ _) = mkSumTy alt_tys
 hsExprType (HsCase _ _ (MG { mg_ext = match_group })) = mg_res_ty match_group
@@ -121,18 +122,16 @@ hsExprType e@(RecordUpd (RecordUpdTc { rupd_cons = cons, rupd_out_tys = out_tys 
     con_like:_ -> conLikeResTy con_like out_tys
     []         -> pprPanic "hsExprType: RecordUpdTc with empty rupd_cons"
                            (ppr e)
-hsExprType (HsGetField { gf_ext = v }) = case v of {}
-hsExprType (HsProjection { proj_ext = v }) = case v of {}
+hsExprType (HsGetField { gf_ext = v }) = absurd v
+hsExprType (HsProjection { proj_ext = v }) = absurd v
 hsExprType (ExprWithTySig _ e _) = lhsExprType e
 hsExprType (ArithSeq _ mb_overloaded_op asi) = case mb_overloaded_op of
   Just op -> piResultTy (syntaxExprType op) asi_ty
   Nothing -> asi_ty
   where
     asi_ty = arithSeqInfoType asi
-hsExprType e@(HsBracket{}) = pprPanic "hsExprType: Unexpected HsBracket"
-                                      (ppr e)
-hsExprType e@(HsRnBracketOut{}) = pprPanic "hsExprType: Unexpected HsRnBracketOut"
-                                           (ppr e)
+hsExprType (HsBracket v _) = absurd v
+hsExprType (HsRnBracketOut v _ _) = absurd v
 hsExprType (HsTcBracketOut ty _wrap _bracket _pending) = ty
 hsExprType e@(HsSpliceE{}) = pprPanic "hsExprType: Unexpected HsSpliceE"
                                       (ppr e)
