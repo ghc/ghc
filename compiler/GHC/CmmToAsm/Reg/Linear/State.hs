@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, PatternSynonyms, DeriveFunctor #-}
+{-# LANGUAGE PatternSynonyms, DeriveFunctor #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE UnboxedTuples #-}
 

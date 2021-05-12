@@ -4,7 +4,7 @@
 
 -}
 
-{-# LANGUAGE CPP #-}
+
 
 module GHC.Core.TyCon.Set (
         -- * TyCons set type
@@ -17,8 +17,6 @@ module GHC.Core.TyCon.Set (
         intersectsTyConSet, disjointTyConSet, intersectTyConSet,
         nameSetAny, nameSetAll
     ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 

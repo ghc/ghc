@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, TypeFamilies #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -----------------------------------------------------------------------------
 --
@@ -36,8 +36,6 @@ module GHC.CmmToAsm.X86.Instr
    , isJumpishInstr
    )
 where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 

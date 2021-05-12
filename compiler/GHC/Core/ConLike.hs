@@ -5,7 +5,7 @@
 \section[ConLike]{@ConLike@: Constructor-like things}
 -}
 
-{-# LANGUAGE CPP #-}
+
 
 module GHC.Core.ConLike (
           ConLike(..)
@@ -24,8 +24,6 @@ module GHC.Core.ConLike (
         , conLikeIsInfix
         , conLikeHasBuilder
     ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 

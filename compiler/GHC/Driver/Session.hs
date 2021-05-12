@@ -216,8 +216,6 @@ module GHC.Driver.Session (
         initSDocContext, initDefaultSDocContext,
   ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Platform
@@ -240,6 +238,7 @@ import GHC.Settings.Constants
 import GHC.Utils.Panic
 import qualified GHC.Utils.Ppr.Colour as Col
 import GHC.Utils.Misc
+import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.GlobalVars
 import GHC.Data.Maybe
 import GHC.Utils.Monad

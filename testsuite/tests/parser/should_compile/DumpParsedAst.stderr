@@ -173,12 +173,12 @@
   ,(L
     (SrcSpanAnn (EpAnn
                  (Anchor
-                  { DumpParsedAst.hs:10:1-39 }
+                  { DumpParsedAst.hs:(10,1)-(12,24) }
                   (UnchangedAnchor))
                  (AnnListItem
                   [])
                  (EpaComments
-                  [])) { DumpParsedAst.hs:10:1-39 })
+                  [])) { DumpParsedAst.hs:(10,1)-(12,24) })
     (TyClD
      (NoExtField)
      (FamDecl
@@ -186,7 +186,7 @@
       (FamilyDecl
        (EpAnn
         (Anchor
-         { DumpParsedAst.hs:10:1-45 }
+         { DumpParsedAst.hs:(10,1)-(12,24) }
          (UnchangedAnchor))
         [(AddEpAnn AnnType (EpaSpan { DumpParsedAst.hs:10:1-4 }))
         ,(AddEpAnn AnnFamily (EpaSpan { DumpParsedAst.hs:10:6-11 }))
@@ -619,12 +619,12 @@
   ,(L
     (SrcSpanAnn (EpAnn
                  (Anchor
-                  { DumpParsedAst.hs:17:1-48 }
+                  { DumpParsedAst.hs:(17,1)-(18,30) }
                   (UnchangedAnchor))
                  (AnnListItem
                   [])
                  (EpaComments
-                  [])) { DumpParsedAst.hs:17:1-48 })
+                  [])) { DumpParsedAst.hs:(17,1)-(18,30) })
     (TyClD
      (NoExtField)
      (FamDecl
@@ -632,7 +632,7 @@
       (FamilyDecl
        (EpAnn
         (Anchor
-         { DumpParsedAst.hs:17:1-54 }
+         { DumpParsedAst.hs:(17,1)-(18,30) }
          (UnchangedAnchor))
         [(AddEpAnn AnnType (EpaSpan { DumpParsedAst.hs:17:1-4 }))
         ,(AddEpAnn AnnFamily (EpaSpan { DumpParsedAst.hs:17:6-11 }))

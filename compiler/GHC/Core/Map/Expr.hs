@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RankNTypes #-}
@@ -23,8 +22,6 @@ module GHC.Core.Map.Expr (
    lkDNamed, xtDNamed,
    (>.>), (|>), (|>>),
  ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 

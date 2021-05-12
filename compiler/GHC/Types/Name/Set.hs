@@ -3,7 +3,7 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1998
 -}
 
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module GHC.Types.Name.Set (
         -- * Names set type
@@ -34,8 +34,6 @@ module GHC.Types.Name.Set (
         -- * Non-CAFfy names
         NonCaffySet(..)
     ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 

@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 
 module GHC.Types.Name.Ppr
    ( mkPrintUnqualified
@@ -7,8 +7,6 @@ module GHC.Types.Name.Ppr
    , pkgQual
    )
 where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -112,7 +110,7 @@ mkPrintUnqualified unit_env env
                             -- Eg  f = True; g = 0; f = False
       where
         is_name :: Name -> Bool
-        is_name name = ASSERT2( isExternalName name, ppr name )
+        is_name name = assertPpr (isExternalName name) (ppr name) $
                        nameModule name == mod && nameOccName name == occ
 
         forceUnqualNames :: [Name]

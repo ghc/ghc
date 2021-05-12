@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -8,8 +8,6 @@ module GHC.Tc.Instance.Class (
      InstanceWhat(..), safeOverlap, instanceReturnsDictCon,
      AssocInstInfo(..), isNotAssociated
   ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 

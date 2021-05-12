@@ -4,7 +4,7 @@
 A library for the ``worker\/wrapper'' back-end to the strictness analyser
 -}
 
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE ViewPatterns #-}
 
 module GHC.Core.Opt.WorkWrap.Utils
@@ -15,8 +15,6 @@ module GHC.Core.Opt.WorkWrap.Utils
    , isWorkerSmallEnough
    )
 where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -51,6 +49,7 @@ import GHC.Types.Name ( getOccFS )
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Data.FastString
@@ -229,9 +228,9 @@ mkWwBodies opts rhs_fvs fun_id demands cpr_info
     too_many_args_for_join_point wrap_args
       | Just join_arity <- mb_join_arity
       , wrap_args `lengthExceeds` join_arity
-      = WARN(True, text "Unable to worker/wrapper join point with arity " <+>
+      = warnPprTrace True (text "Unable to worker/wrapper join point with arity " <+>
                      int join_arity <+> text "but" <+>
-                     int (length wrap_args) <+> text "args")
+                     int (length wrap_args) <+> text "args") $
         True
       | otherwise
       = False
@@ -502,7 +501,7 @@ mkWWargs subst fun_ty demands
                   res_ty) }
 
   | otherwise
-  = WARN( True, ppr fun_ty )                          -- Should not happen: if there is a demand
+  = warnPprTrace True (ppr fun_ty) $                  -- Should not happen: if there is a demand
     return ([], nop_fn, nop_fn, substTy subst fun_ty) -- then there should be a function arrow
   where
     -- See Note [Join points and beta-redexes]
@@ -670,7 +669,7 @@ wantToUnboxResult fam_envs ty cpr
 
   where
     -- | See Note [non-algebraic or open body type warning]
-    open_body_ty_warning = WARN( True, text "wantToUnboxResult: non-algebraic or open body type" <+> ppr ty ) Nothing
+    open_body_ty_warning = warnPprTrace True (text "wantToUnboxResult: non-algebraic or open body type" <+> ppr ty) Nothing
 
 isLinear :: Scaled a -> Bool
 isLinear (Scaled w _ ) =
@@ -1024,7 +1023,7 @@ mk_absent_let opts arg
   -- Catch all: Either @arg_ty@ wasn't of form @TYPE rep@ or @rep@ wasn't mono rep.
   -- See (3) in Note [Absent fillers]
   | Nothing <- mb_mono_prim_reps
-  = WARN( True, text "No absent value for" <+> ppr arg_ty )
+  = warnPprTrace True (text "No absent value for" <+> ppr arg_ty) $
     Nothing
   where
     arg_ty = idType arg
@@ -1372,8 +1371,8 @@ mkWWcpr _opts vars []   =
   return (False, toOL vars, nop_fn, nop_fn)
 mkWWcpr opts  vars cprs = do
   -- No existentials in 'vars'. 'wantToUnboxResult' should have checked that.
-  MASSERT2( not (any isTyVar vars), ppr vars $$ ppr cprs )
-  MASSERT2( equalLength vars cprs, ppr vars $$ ppr cprs )
+  massertPpr (not (any isTyVar vars)) (ppr vars $$ ppr cprs)
+  massertPpr (equalLength vars cprs) (ppr vars $$ ppr cprs)
   (usefuls, varss, wrap_build_ress, work_unpack_ress) <-
     unzip4 <$> zipWithM (mkWWcpr_one opts) vars cprs
   return ( or usefuls
@@ -1384,7 +1383,7 @@ mkWWcpr opts  vars cprs = do
 mkWWcpr_one :: WwOpts -> Id -> Cpr -> UniqSM CprWwResult
 -- ^ See if we want to unbox the result and hand off to 'unbox_one_result'.
 mkWWcpr_one opts res_bndr cpr
-  | ASSERT( not (isTyVar res_bndr) ) True
+  | assert (not (isTyVar res_bndr) ) True
   , Unbox dcpc arg_cprs <- wantToUnboxResult (wo_fam_envs opts) (idType res_bndr) cpr
   = unbox_one_result opts res_bndr arg_cprs dcpc
   | otherwise
@@ -1404,7 +1403,7 @@ unbox_one_result opts res_bndr arg_cprs
   pat_bndrs_uniqs <- getUniquesM
   let (_exs, arg_ids) =
         dataConRepFSInstPat (repeat ww_prefix) pat_bndrs_uniqs cprCaseBndrMult dc tc_args
-  MASSERT( null _exs ) -- Should have been caught by wantToUnboxResult
+  massert (null _exs) -- Should have been caught by wantToUnboxResult
 
   let -- con_app = (C a b |> sym co)
       con_app = mkConApp2 dc tc_args arg_ids `mkCast` mkSymCo co

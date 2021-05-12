@@ -1,5 +1,5 @@
 -- Character classification
-{-# LANGUAGE CPP #-}
+
 module GHC.Parser.CharClass
         ( is_ident      -- Char# -> Bool
         , is_symbol     -- Char# -> Bool
@@ -13,8 +13,6 @@ module GHC.Parser.CharClass
         , is_decdigit, is_hexdigit, is_octdigit, is_bindigit
         , hexDigit, octDecDigit
         ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 

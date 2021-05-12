@@ -6,7 +6,6 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -132,8 +131,6 @@ module GHC.Cmm.CLabel (
         foreignLabelStdcallInfo
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Types.Id.Info
@@ -146,6 +143,7 @@ import GHC.Builtin.PrimOps
 import GHC.Types.CostCentre
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Data.FastString
 import GHC.Driver.Session
 import GHC.Platform
@@ -666,22 +664,22 @@ mkRtsPrimOpLabel primop = RtsLabel (RtsPrimOp primop)
 
 mkSelectorInfoLabel :: Platform -> Bool -> Int -> CLabel
 mkSelectorInfoLabel platform upd offset =
-   ASSERT(offset >= 0 && offset <= pc_MAX_SPEC_SELECTEE_SIZE (platformConstants platform))
+   assert (offset >= 0 && offset <= pc_MAX_SPEC_SELECTEE_SIZE (platformConstants platform)) $
    RtsLabel (RtsSelectorInfoTable upd offset)
 
 mkSelectorEntryLabel :: Platform -> Bool -> Int -> CLabel
 mkSelectorEntryLabel platform upd offset =
-   ASSERT(offset >= 0 && offset <= pc_MAX_SPEC_SELECTEE_SIZE (platformConstants platform))
+   assert (offset >= 0 && offset <= pc_MAX_SPEC_SELECTEE_SIZE (platformConstants platform)) $
    RtsLabel (RtsSelectorEntry upd offset)
 
 mkApInfoTableLabel :: Platform -> Bool -> Int -> CLabel
 mkApInfoTableLabel platform upd arity =
-   ASSERT(arity > 0 && arity <= pc_MAX_SPEC_AP_SIZE (platformConstants platform))
+   assert (arity > 0 && arity <= pc_MAX_SPEC_AP_SIZE (platformConstants platform)) $
    RtsLabel (RtsApInfoTable upd arity)
 
 mkApEntryLabel :: Platform -> Bool -> Int -> CLabel
 mkApEntryLabel platform upd arity =
-   ASSERT(arity > 0 && arity <= pc_MAX_SPEC_AP_SIZE (platformConstants platform))
+   assert (arity > 0 && arity <= pc_MAX_SPEC_AP_SIZE (platformConstants platform)) $
    RtsLabel (RtsApEntry upd arity)
 
 

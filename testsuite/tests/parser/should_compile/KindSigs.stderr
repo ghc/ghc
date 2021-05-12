@@ -63,12 +63,12 @@
   [(L
     (SrcSpanAnn (EpAnn
                  (Anchor
-                  { KindSigs.hs:11:1-17 }
+                  { KindSigs.hs:(11,1)-(12,21) }
                   (UnchangedAnchor))
                  (AnnListItem
                   [])
                  (EpaComments
-                  [])) { KindSigs.hs:11:1-17 })
+                  [])) { KindSigs.hs:(11,1)-(12,21) })
     (TyClD
      (NoExtField)
      (FamDecl
@@ -76,7 +76,7 @@
       (FamilyDecl
        (EpAnn
         (Anchor
-         { KindSigs.hs:11:1-23 }
+         { KindSigs.hs:(11,1)-(12,21) }
          (UnchangedAnchor))
         [(AddEpAnn AnnType (EpaSpan { KindSigs.hs:11:1-4 }))
         ,(AddEpAnn AnnFamily (EpaSpan { KindSigs.hs:11:6-11 }))
