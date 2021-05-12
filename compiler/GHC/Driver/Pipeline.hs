@@ -643,10 +643,7 @@ compileFile hsc_env stop_phase (src, mb_phase) = do
         -- When linking, the -o argument refers to the linker's output.
         -- otherwise, we use it as the name for the pipeline's output.
         output
-         -- If we are doing -fno-code, then act as if the output is
-         -- 'Temporary'. This stops GHC trying to copy files to their
-         -- final location.
-         | NoBackend <- backend dflags = Temporary TFL_CurrentModule
+         | NoBackend <- backend dflags = NoOutputFile
          | StopLn <- stop_phase, not (isNoLink ghc_link) = Persistent
                 -- -o foo applies to linker
          | isJust mb_o_file = SpecificFile
@@ -863,6 +860,7 @@ pipeLoop phase input_fn = do
         case output_spec env of
         Temporary _ ->
             return input_fn
+        NoOutputFile -> return input_fn
         output ->
             do pst <- getPipeState
                tmpfs <- hsc_tmpfs <$> getPipeSession
