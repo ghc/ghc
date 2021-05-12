@@ -1,4 +1,4 @@
-Found 255 Language.Haskell.Syntax module dependencies
+Found 256 Language.Haskell.Syntax module dependencies
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
 GHC.Builtin.Types
@@ -240,6 +240,7 @@ GHC.Utils.Lexeme
 GHC.Utils.Logger
 GHC.Utils.Misc
 GHC.Utils.Monad
+GHC.Utils.Monad.State.Strict
 GHC.Utils.Outputable
 GHC.Utils.Panic
 GHC.Utils.Panic.Plain
