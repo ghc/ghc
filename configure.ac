@@ -943,9 +943,9 @@ AC_CHECK_LIB(m, atan, HaveLibM=YES, HaveLibM=NO)
 if test $HaveLibM = YES
 then
   AC_DEFINE([HAVE_LIBM], [1], [Define to 1 if you need to link with libm])
-  AC_SUBST([CabalHaveLibm],[True])
+  AC_SUBST([UseLibm],[YES])
 else
-  AC_SUBST([CabalHaveLibm],[False])
+  AC_SUBST([UseLibm],[NO])
 fi
 TargetHasLibm=$HaveLibM
 AC_SUBST(TargetHasLibm)
@@ -958,15 +958,11 @@ dnl ################################################################
 
 FP_FIND_LIBFFI
 AC_SUBST(UseSystemLibFFI)
-AS_IF([test "x$with_system_libffi" = "xyes"],
-  [CabalUseSystemLibFFI="True"],
-  [CabalUseSystemLibFFI="False"]
-)
-AC_SUBST(CabalUseSystemLibFFI)
 
 dnl ** check whether we need -ldl to get dlopen()
 AC_CHECK_LIB([dl], [dlopen])
-AC_CHECK_LIB([dl], [dlopen], [AC_SUBST([CabalHaveLibdl], [True])], [AC_SUBST([CabalHaveLibdl], [False])])
+AC_CHECK_LIB([dl], [dlopen], HaveLibdl=YES, HaveLibdl=NO)
+AC_SUBST([UseLibdl],[$HaveLibdl])
 dnl ** check whether we have dlinfo
 AC_CHECK_FUNCS([dlinfo])
 
@@ -1003,7 +999,13 @@ FP_MUSTTAIL
 
 dnl ** check for librt
 AC_CHECK_LIB([rt], [clock_gettime])
-AC_CHECK_LIB([rt], [clock_gettime], [AC_SUBST([CabalHaveLibrt], [True])], [AC_SUBST([CabalHaveLibrt], [False])])
+AC_CHECK_LIB([rt], [clock_gettime], HaveLibrt=YES, HaveLibrt=NO)
+if test $HaveLibrt = YES
+then
+  AC_SUBST([UseLibrt],[YES])
+else
+  AC_SUBST([UseLibrt],[NO])
+fi
 AC_CHECK_FUNCS(clock_gettime timer_settime)
 FP_CHECK_TIMER_CREATE
 
@@ -1119,11 +1121,6 @@ AC_DEFINE_UNQUOTED([RTS_LINKER_USE_MMAP], [$RtsLinkerUseMmap],
 
 GHC_ADJUSTORS_METHOD([Target])
 AC_SUBST([UseLibffiForAdjustors])
-AS_IF([test x"${UseLibffiForAdjustors}" = x"YES"],
-  [CabalLibffiAdjustors=True],
-  [CabalLibffiAdjustors=False]
-)
-AC_SUBST([CabalLibffiAdjustors])
 
 dnl ** Other RTS features
 dnl --------------------------------------------------------------
@@ -1173,12 +1170,6 @@ if grep '	' compiler/ghc.cabal.in 2>&1 >/dev/null; then
    AC_MSG_ERROR([compiler/ghc.cabal.in contains tab characters; please remove them])
 fi
 
-# Create the configuration for the Hadrian build system if it is present
-if test -e hadrian/cfg/system.config.in; then
-    AC_CONFIG_FILES([hadrian/cfg/system.config])
-    AC_CONFIG_FILES([hadrian/ghci-cabal hadrian/ghci-stack hadrian/ghci-multi-cabal])
-fi
-
 # We got caught by
 #     http://savannah.gnu.org/bugs/index.php?1516
 #     $(eval ...) inside conditionals causes errors
@@ -1202,27 +1193,12 @@ checkMake380() {
 checkMake380 make
 checkMake380 gmake
 
-AC_CONFIG_FILES([ mk/project.mk ])
-
-dnl When adding things to this list be sure to update hadrian's
-dnl Rules.Configure.configureResults list.
 AC_CONFIG_FILES(
-[ rts/rts.cabal
-  compiler/ghc.cabal
-  ghc/ghc-bin.cabal
-  utils/runghc/runghc.cabal
-  driver/ghci/ghci-wrapper.cabal
-  utils/iserv/iserv.cabal
-  utils/ghc-pkg/ghc-pkg.cabal
-  utils/remote-iserv/remote-iserv.cabal
-  libraries/ghc-boot/ghc-boot.cabal
-  libraries/ghc-boot-th/ghc-boot-th.cabal
-  libraries/ghci/ghci.cabal
-  libraries/ghc-heap/ghc-heap.cabal
-  libraries/libiserv/libiserv.cabal
-  libraries/template-haskell/template-haskell.cabal
+[ mk/project.mk
+  hadrian/cfg/system.config
+  hadrian/ghci-cabal
+  hadrian/ghci-stack
   docs/users_guide/ghc_config.py
-  libraries/prologue.txt
   distrib/configure.ac
 ])
 

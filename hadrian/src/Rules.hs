@@ -130,6 +130,7 @@ buildRules = do
     Rules.BinaryDist.bindistRules
     Rules.Generate.copyRules
     Rules.Generate.generateRules
+    Rules.Generate.templateRules
     Rules.Gmp.gmpRules
     Rules.Libffi.libffiRules
     Rules.Library.libraryRules

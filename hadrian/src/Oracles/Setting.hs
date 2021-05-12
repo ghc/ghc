@@ -65,6 +65,7 @@ data Setting = BuildArch
              | ProjectName
              | ProjectVersion
              | ProjectVersionInt
+             | ProjectVersionMunged
              | ProjectPatchLevel
              | ProjectPatchLevel1
              | ProjectPatchLevel2
@@ -165,6 +166,7 @@ setting key = lookupSystemConfig $ case key of
     ProjectGitCommitId -> "project-git-commit-id"
     ProjectName        -> "project-name"
     ProjectVersion     -> "project-version"
+    ProjectVersionMunged -> "project-version-munged"
     ProjectVersionInt  -> "project-version-int"
     ProjectPatchLevel  -> "project-patch-level"
     ProjectPatchLevel1 -> "project-patch-level1"

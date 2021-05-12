@@ -63,9 +63,9 @@ AC_DEFUN([FP_CC_SUPPORTS__ATOMICS],
     ])
     AC_DEFINE([HAVE_C11_ATOMICS], [1], [Does C compiler support __atomic primitives?])
     if test "$need_latomic" = 1; then
-        AC_SUBST([CabalNeedLibatomic],[True])
+        AC_SUBST([NeedLibatomic],[YES])
     else
-        AC_SUBST([CabalNeedLibatomic],[False])
+        AC_SUBST([NeedLibatomic],[NO])
     fi
     AC_DEFINE_UNQUOTED([NEED_ATOMIC_LIB], [$need_latomic],
         [Define to 1 if we need -latomic.])

@@ -90,13 +90,14 @@ ghc-patch-level       = @GhcPatchLevel@
 
 bootstrap-threaded-rts      = @GhcThreadedRts@
 
-project-name          = @ProjectName@
-project-version       = @ProjectVersion@
-project-version-int   = @ProjectVersionInt@
-project-patch-level   = @ProjectPatchLevel@
-project-patch-level1  = @ProjectPatchLevel1@
-project-patch-level2  = @ProjectPatchLevel2@
-project-git-commit-id = @ProjectGitCommitId@
+project-name           = @ProjectName@
+project-version        = @ProjectVersion@
+project-version-munged = @ProjectVersionMunged@
+project-version-int    = @ProjectVersionInt@
+project-patch-level    = @ProjectPatchLevel@
+project-patch-level1   = @ProjectPatchLevel1@
+project-patch-level2   = @ProjectPatchLevel2@
+project-git-commit-id  = @ProjectGitCommitId@
 
 # Compilation and linking flags:
 #===============================
@@ -201,6 +202,12 @@ libnuma-lib-dir       = @LibNumaLibDir@
 # Optional Dependencies:
 #=======================
 
-with-libdw = @UseLibdw@
-with-libnuma = @UseLibNuma@
-have-lib-mingw-ex = @HaveLibMingwEx@
+use-lib-dw        = @UseLibdw@
+use-lib-numa      = @UseLibNuma@
+use-lib-mingw-ex  = @HaveLibMingwEx@
+use-lib-m         = @UseLibm@
+use-lib-rt        = @UseLibrt@
+use-lib-dl        = @UseLibdl@
+use-lib-bfd       = @UseLibbfd@
+use-lib-pthread   = @UseLibpthread@
+need-libatomic    = @NeedLibatomic@
