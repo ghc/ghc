@@ -176,13 +176,7 @@ function set_toolchain_paths() {
     *) ;;
   esac
 
-  if [[ -n "${IN_NIX_SHELL:-}" ]]; then
-      needs_toolchain=""
-      GHC="$(which ghc)"
-      CABAL="$(which cabal)"
-      HAPPY="$(which happy)"
-      ALEX="$(which alex)"
-  elif [[ -n "$needs_toolchain" ]]; then
+  if [[ -n "$needs_toolchain" ]]; then
       # These are populated by setup_toolchain
       GHC="$toolchain/bin/ghc$exe"
       CABAL="$toolchain/bin/cabal$exe"
