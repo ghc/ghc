@@ -4,11 +4,18 @@
 -- Note that this does /not/ currently support the use case of annotating
 -- every subexpression in an 'HsExpr' with its 'Type'. For more information on
 -- this task, see #12706, #15320, #16804, and #17331.
-module GHC.Hs.Expr.Type (lhsExprType, hsExprType) where
+module GHC.Hs.Expr.Type (
+    -- * Extracting types from HsExpr
+    lhsExprType, hsExprType,
+    -- * Extracting types from HsSyn
+    hsLitType, hsPatType, hsLPatType
+
+  ) where
 
 import GHC.Prelude
 
 import GHC.Builtin.Types
+import GHC.Builtin.Types.Prim
 import GHC.Core.Coercion
 import GHC.Core.ConLike
 import GHC.Core.DataCon
@@ -18,11 +25,64 @@ import GHC.Core.Type
 import GHC.Core.Utils
 import GHC.Hs
 import GHC.Tc.Types.Evidence
-import GHC.Tc.Utils.Zonk
 import GHC.Types.Id
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+
+{-
+************************************************************************
+*                                                                      *
+       Extracting the type from HsSyn
+*                                                                      *
+************************************************************************
+
+-}
+
+hsLPatType :: LPat GhcTc -> Type
+hsLPatType (L _ p) = hsPatType p
+
+hsPatType :: Pat GhcTc -> Type
+hsPatType (ParPat _ pat)                = hsLPatType pat
+hsPatType (WildPat ty)                  = ty
+hsPatType (VarPat _ lvar)               = idType (unLoc lvar)
+hsPatType (BangPat _ pat)               = hsLPatType pat
+hsPatType (LazyPat _ pat)               = hsLPatType pat
+hsPatType (LitPat _ lit)                = hsLitType lit
+hsPatType (AsPat _ var _)               = idType (unLoc var)
+hsPatType (ViewPat ty _ _)              = ty
+hsPatType (ListPat (ListPatTc ty Nothing) _)      = mkListTy ty
+hsPatType (ListPat (ListPatTc _ (Just (ty,_))) _) = ty
+hsPatType (TuplePat tys _ bx)           = mkTupleTy1 bx tys
+                  -- See Note [Don't flatten tuples from HsSyn] in GHC.Core.Make
+hsPatType (SumPat tys _ _ _ )           = mkSumTy tys
+hsPatType (ConPat { pat_con = lcon
+                  , pat_con_ext = ConPatTc
+                    { cpt_arg_tys = tys
+                    }
+                  })
+                                        = conLikeResTy (unLoc lcon) tys
+hsPatType (SigPat ty _ _)               = ty
+hsPatType (NPat ty _ _ _)               = ty
+hsPatType (NPlusKPat ty _ _ _ _ _)      = ty
+hsPatType (XPat (CoPat _ _ ty))         = ty
+hsPatType SplicePat{}                   = panic "hsPatType: SplicePat"
+
+hsLitType :: HsLit (GhcPass p) -> Type
+hsLitType (HsChar _ _)       = charTy
+hsLitType (HsCharPrim _ _)   = charPrimTy
+hsLitType (HsString _ _)     = stringTy
+hsLitType (HsStringPrim _ _) = addrPrimTy
+hsLitType (HsInt _ _)        = intTy
+hsLitType (HsIntPrim _ _)    = intPrimTy
+hsLitType (HsWordPrim _ _)   = wordPrimTy
+hsLitType (HsInt64Prim _ _)  = int64PrimTy
+hsLitType (HsWord64Prim _ _) = word64PrimTy
+hsLitType (HsInteger _ _ ty) = ty
+hsLitType (HsRat _ _ ty)     = ty
+hsLitType (HsFloatPrim _ _)  = floatPrimTy
+hsLitType (HsDoublePrim _ _) = doublePrimTy
+
 
 -- | Compute the 'Type' of an @'LHsExpr' 'GhcTc'@ in a pure fashion.
 lhsExprType :: LHsExpr GhcTc -> Type
