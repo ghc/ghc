@@ -657,12 +657,12 @@ pragSrcBrackets :: SourceText -> String -> SDoc -> SDoc
 pragSrcBrackets (SourceText src) _   doc = text src <+> doc <+> text "#-}"
 pragSrcBrackets NoSourceText     alt doc = text alt <+> doc <+> text "#-}"
 
-pprVarSig :: (OutputableBndr id) => [id] -> SDoc -> SDoc
+pprVarSig :: OutputableBndr id => [id] -> SDoc -> SDoc
 pprVarSig vars pp_ty = sep [pprvars <+> dcolon, nest 2 pp_ty]
   where
     pprvars = hsep $ punctuate comma (map pprPrefixOcc vars)
 
-pprSpec :: (OutputableBndr id) => id -> SDoc -> InlinePragma -> SDoc
+pprSpec :: OutputableBndr id => id -> SDoc -> InlinePragma -> SDoc
 pprSpec var pp_ty inl = pp_inl <+> pprVarSig [var] pp_ty
   where
     pp_inl | isDefaultInlinePragma inl = empty

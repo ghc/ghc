@@ -106,11 +106,11 @@ Inefficient finite maps based on association lists and equality.
 -- | A finite mapping based on equality and association lists.
 type Assoc a b = [(a,b)]
 
-assoc             :: (Eq a) => String -> Assoc a b -> a -> b
-assocDefault      :: (Eq a) => b -> Assoc a b -> a -> b
+assoc             :: Eq a => String -> Assoc a b -> a -> b
+assocDefault      :: Eq a => b -> Assoc a b -> a -> b
 assocUsing        :: (a -> a -> Bool) -> String -> Assoc a b -> a -> b
 -- | Lookup key, fail gracefully using Nothing if not found.
-assocMaybe        :: (Eq a) => Assoc a b -> a -> Maybe b
+assocMaybe        :: Eq a => Assoc a b -> a -> Maybe b
 assocDefaultUsing :: (a -> a -> Bool) -> b -> Assoc a b -> a -> b
 
 assocDefaultUsing _  deflt []             _   = deflt
@@ -136,7 +136,7 @@ assocMaybe alist key
 ************************************************************************
 -}
 
-hasNoDups :: (Eq a) => [a] -> Bool
+hasNoDups :: Eq a => [a] -> Bool
 
 hasNoDups xs = f [] xs
   where

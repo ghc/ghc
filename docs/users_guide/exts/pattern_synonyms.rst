@@ -353,12 +353,12 @@ contexts ⟨CReq⟩ and ⟨CProv⟩:
 For example, consider ::
 
     data T a where
-      MkT :: (Show b) => a -> b -> T a
+      MkT :: Show b => a -> b -> T a
 
     f1 :: (Num a, Eq a) => T a -> String
     f1 (MkT 42 x) = show x
 
-    pattern ExNumPat :: (Num a, Eq a) => (Show b) => b -> T a
+    pattern ExNumPat :: (Num a, Eq a) => Show b => b -> T a
     pattern ExNumPat x = MkT 42 x
 
     f2 :: (Eq a, Num a) => T a -> String

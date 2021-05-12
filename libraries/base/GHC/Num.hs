@@ -60,14 +60,14 @@ default ()              -- Double isn't available yet,
 -- Note that it /isn't/ customarily expected that a type instance of both 'Num'
 -- and 'Ord' implement an ordered ring. Indeed, in @base@ only 'Integer' and
 -- 'Data.Ratio.Rational' do.
-class  Num a  where
+class Num a where
     {-# MINIMAL (+), (*), abs, signum, fromInteger, (negate | (-)) #-}
 
-    (+), (-), (*)       :: a -> a -> a
+    (+), (-), (*) :: a -> a -> a
     -- | Unary negation.
-    negate              :: a -> a
+    negate :: a -> a
     -- | Absolute value.
-    abs                 :: a -> a
+    abs :: a -> a
     -- | Sign of a number.
     -- The functions 'abs' and 'signum' should satisfy the law:
     --
@@ -75,17 +75,17 @@ class  Num a  where
     --
     -- For real numbers, the 'signum' is either @-1@ (negative), @0@ (zero)
     -- or @1@ (positive).
-    signum              :: a -> a
+    signum :: a -> a
     -- | Conversion from an 'Integer'.
     -- An integer literal represents the application of the function
     -- 'fromInteger' to the appropriate value of type 'Integer',
-    -- so such literals have type @('Num' a) => a@.
-    fromInteger         :: Integer -> a
+    -- so such literals have type @'Num' a => a@.
+    fromInteger :: Integer -> a
 
     {-# INLINE (-) #-}
     {-# INLINE negate #-}
-    x - y               = x + negate y
-    negate x            = 0 - x
+    x - y    = x + negate y
+    negate x = 0 - x
 
 -- | the same as @'flip' ('-')@.
 --
@@ -93,7 +93,7 @@ class  Num a  where
 -- @(-@ /e/@)@ is not a section, but an application of prefix negation.
 -- However, @('subtract'@ /exp/@)@ is equivalent to the disallowed section.
 {-# INLINE subtract #-}
-subtract :: (Num a) => a -> a -> a
+subtract :: Num a => a -> a -> a
 subtract x y = y - x
 
 -- | @since 2.01

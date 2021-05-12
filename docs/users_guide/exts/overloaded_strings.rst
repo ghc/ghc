@@ -14,7 +14,7 @@ Overloaded string literals
 GHC supports *overloaded string literals*. Normally a string literal has
 type ``String``, but with overloaded string literals enabled (with
 :extension:`OverloadedStrings`) a string literal has type
-``(IsString a) => a``.
+``IsString a => a``.
 
 This means that the usual string syntax can be used, e.g., for
 ``ByteString``, ``Text``, and other variations of string like types.

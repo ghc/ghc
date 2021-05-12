@@ -344,12 +344,12 @@ arrowToHsType (HsLinearArrow _ _) = noLocA oneDataConHsTy
 arrowToHsType (HsExplicitMult _ _ p) = p
 
 instance
-      (OutputableBndrId pass) =>
+      OutputableBndrId pass =>
       Outputable (HsArrow (GhcPass pass)) where
   ppr arr = parens (pprHsArrow arr)
 
 -- See #18846
-pprHsArrow :: (OutputableBndrId pass) => HsArrow (GhcPass pass) -> SDoc
+pprHsArrow :: OutputableBndrId pass => HsArrow (GhcPass pass) -> SDoc
 pprHsArrow (HsUnrestrictedArrow _) = arrow
 pprHsArrow (HsLinearArrow _ _) = lollipop
 pprHsArrow (HsExplicitMult _ _ p) = (mulArrow (ppr p))
@@ -1020,14 +1020,14 @@ seems like the Right Thing anyway.)
 
 -- Printing works more-or-less as for Types
 
-pprHsType :: (OutputableBndrId p) => HsType (GhcPass p) -> SDoc
+pprHsType :: OutputableBndrId p => HsType (GhcPass p) -> SDoc
 pprHsType ty = ppr_mono_ty ty
 
 ppr_mono_lty :: OutputableBndrId p
              => LHsType (GhcPass p) -> SDoc
 ppr_mono_lty ty = ppr_mono_ty (unLoc ty)
 
-ppr_mono_ty :: (OutputableBndrId p) => HsType (GhcPass p) -> SDoc
+ppr_mono_ty :: OutputableBndrId p => HsType (GhcPass p) -> SDoc
 ppr_mono_ty (HsForAllTy { hst_tele = tele, hst_body = ty })
   = sep [pprHsForAll tele Nothing, ppr_mono_lty ty]
 

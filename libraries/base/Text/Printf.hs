@@ -254,12 +254,12 @@ import System.IO
 --
 -- * Haskell 'printf' will place a zero after a decimal point when
 --   possible.
-printf :: (PrintfType r) => String -> r
+printf :: PrintfType r => String -> r
 printf fmts = spr fmts []
 
 -- | Similar to 'printf', except that output is via the specified
 -- 'Handle'.  The return type is restricted to @('IO' a)@.
-hPrintf :: (HPrintfType r) => Handle -> String -> r
+hPrintf :: HPrintfType r => Handle -> String -> r
 hPrintf hdl fmts = hspr hdl fmts []
 
 -- |The 'PrintfType' class provides the variable argument magic for
@@ -281,7 +281,7 @@ instance PrintfType String where
     spr fmt args = uprintf fmt (reverse args)
 -}
 -- | @since 2.01
-instance (IsChar c) => PrintfType [c] where
+instance IsChar c => PrintfType [c] where
     spr fmts args = map fromChar (uprintf fmts (reverse args))
 
 -- Note that this should really be (IO ()), but GHC's
@@ -289,12 +289,12 @@ instance (IsChar c) => PrintfType [c] where
 -- bringing the GADTs. So we go conditional for these defs.
 
 -- | @since 4.7.0.0
-instance (a ~ ()) => PrintfType (IO a) where
+instance a ~ () => PrintfType (IO a) where
     spr fmts args =
         putStr $ map fromChar $ uprintf fmts $ reverse args
 
 -- | @since 4.7.0.0
-instance (a ~ ()) => HPrintfType (IO a) where
+instance a ~ () => HPrintfType (IO a) where
     hspr hdl fmts args =
         hPutStr hdl (uprintf fmts (reverse args))
 
@@ -327,7 +327,7 @@ instance PrintfArg Char where
     parseFormat _ cf = parseIntFormat (undefined :: Int) cf
 
 -- | @since 2.01
-instance (IsChar c) => PrintfArg [c] where
+instance IsChar c => PrintfArg [c] where
     formatArg = formatString
 
 -- | @since 2.01
@@ -871,7 +871,7 @@ getStar us =
     (_, nu) : us' -> (us', read (nu ufmt ""))
 
 -- Format a RealFloat value.
-dfmt :: (RealFloat a) => Char -> Maybe Int -> Bool -> a -> (String, String)
+dfmt :: RealFloat a => Char -> Maybe Int -> Bool -> a -> (String, String)
 dfmt c p a d =
   let caseConvert = if isUpper c then map toUpper else id
       showFunction = case toLower c of
