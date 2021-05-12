@@ -30,6 +30,8 @@ constraintKind :: Kind
 runtimeRepTyCon, levityTyCon, vecCountTyCon, vecElemTyCon :: TyCon
 runtimeRepTy :: Type
 
+levityTy :: Type
+
 boxedRepDataConTyCon :: TyCon
 liftedDataConTyCon :: TyCon
 vecRepDataConTyCon, tupleRepDataConTyCon :: TyCon
