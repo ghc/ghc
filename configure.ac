@@ -728,8 +728,9 @@ LlvmMinVersion=10.0.0
 LlvmMaxVersion=12.0.0 # inclusive
 AC_SUBST([LlvmMinVersion])
 AC_SUBST([LlvmMaxVersion])
-sUPPORTED_LLVM_VERSION_MIN=$(echo \($LlvmMinVersion\) | sed 's/\./,/'|sed -e 's/\..*//')
-sUPPORTED_LLVM_VERSION_MAX=$(echo \($LlvmMaxVersion\) | sed 's/\./,/'|sed -e 's/\..*//')
+#Takes only one mayor numbers from version with three numbers
+sUPPORTED_LLVM_VERSION_MIN=$(echo \($LlvmMinVersion\) | sed 's/\..*/)/' )
+sUPPORTED_LLVM_VERSION_MAX=$(echo \($LlvmMaxVersion\) | sed 's/\..*/)/' )
 AC_DEFINE_UNQUOTED([sUPPORTED_LLVM_VERSION_MIN], ${sUPPORTED_LLVM_VERSION_MIN}, [The minimum supported LLVM version number])
 AC_DEFINE_UNQUOTED([sUPPORTED_LLVM_VERSION_MAX], ${sUPPORTED_LLVM_VERSION_MAX}, [The maximum supported LLVM version number])
 
