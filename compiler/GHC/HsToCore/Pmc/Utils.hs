@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP                 #-}
+
 {-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Utility module for the pattern-match coverage checker.
@@ -10,8 +10,6 @@ module GHC.HsToCore.Pmc.Utils (
         isMatchContextPmChecked, needToRunPmCheck
 
     ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 

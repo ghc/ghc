@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP                        #-}
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE Rank2Types                 #-}
@@ -40,8 +39,6 @@ module GHC.CmmToAsm.CFG
      )
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 import GHC.Platform
 
@@ -74,6 +71,7 @@ import Data.Bifunctor
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 -- DEBUGGING ONLY
 --import GHC.Cmm.DebugBlock
 --import GHC.Data.OrdList
@@ -212,7 +210,7 @@ getCfgNodes m =
 hasNode :: CFG -> BlockId -> Bool
 hasNode m node =
   -- Check the invariant that each node must exist in the first map or not at all.
-  ASSERT( found || not (any (mapMember node) m))
+  assert (found || not (any (mapMember node) m))
   found
     where
       found = mapMember node m
@@ -645,8 +643,8 @@ getCfg platform weights graph =
         (CmmCall { cml_cont = Nothing })   -> []
         other ->
             panic "Foo" $
-            ASSERT2(False, ppr "Unknown successor cause:" <>
-              (pdoc platform branch <+> text "=>" <> pdoc platform (G.successors other)))
+            assertPpr False (ppr "Unknown successor cause:" <>
+              (pdoc platform branch <+> text "=>" <> pdoc platform (G.successors other))) $
             map (\x -> ((bid,x),mkEdgeInfo 0)) $ G.successors other
       where
         bid = G.entryLabel block

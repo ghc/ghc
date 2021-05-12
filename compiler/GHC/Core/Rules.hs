@@ -4,7 +4,6 @@
 \section[CoreRules]{Rewrite rules}
 -}
 
-{-# LANGUAGE CPP #-}
 
 -- | Functions for collecting together and applying rewrite rules to a module.
 -- The 'CoreRule' datatype itself is declared elsewhere.
@@ -25,8 +24,6 @@ module GHC.Core.Rules (
 
         lookupRule, mkRule, roughTopNames, initRuleOpts
     ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -66,6 +63,7 @@ import GHC.Driver.Ppr
 import GHC.Driver.Flags
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Constants (debugIsOn)
 import GHC.Data.FastString
 import GHC.Data.Maybe
 import GHC.Data.Bag
@@ -858,13 +856,12 @@ match_co renv subst co1 co2
       Just (arg2, res2)
         -> match_cos renv subst [arg1, res1] [arg2, res2]
       _ -> Nothing
-match_co _ _ _co1 _co2
+match_co _ _ co1 co2
     -- Currently just deals with CoVarCo, TyConAppCo and Refl
-#if defined(DEBUG)
-  = pprTrace "match_co: needs more cases" (ppr _co1 $$ ppr _co2) Nothing
-#else
+  | debugIsOn
+  = pprTrace "match_co: needs more cases" (ppr co1 $$ ppr co2) Nothing
+  | otherwise
   = Nothing
-#endif
 
 match_cos :: RuleMatchEnv
          -> RuleSubst

@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 
 module GHC.Core.TyCo.FVs
   (     shallowTyCoVarsOfType, shallowTyCoVarsOfTypes,
@@ -41,8 +41,6 @@ module GHC.Core.TyCo.FVs
         -- * Raw materials
         Endo(..), runTyCoVars
   ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 

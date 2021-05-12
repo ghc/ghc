@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP                 #-}
+
 {-# LANGUAGE DeriveFunctor       #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns        #-}
@@ -33,8 +33,6 @@ module GHC.HsToCore.Pmc.Types (
         module GHC.HsToCore.Pmc.Solver.Types
 
     ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
