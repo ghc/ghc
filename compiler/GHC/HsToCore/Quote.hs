@@ -36,6 +36,7 @@ import GHC.Platform
 
 import GHC.Driver.Session
 
+import GHC.HsToCore.Errors.Types
 import {-# SOURCE #-} GHC.HsToCore.Expr ( dsExpr )
 import GHC.HsToCore.Match.Literal
 import GHC.HsToCore.Monad
@@ -531,9 +532,7 @@ repDataDefn tc opts
                                    ; ksig' <- repMaybeLTy ksig
                                    ; repNewtype cxt1 tc opts ksig' con'
                                                 derivs1 }
-           (NewType, _) -> lift $ failWithDs (text "Multiple constructors for newtype:"
-                                       <+> pprQuotedList
-                                       (getConNames $ unLoc $ head cons))
+           (NewType, _) -> lift $ failWithDs (DsMultipleConForNewtype (getConNames $ unLoc $ head cons))
            (DataType, _) -> do { ksig' <- repMaybeLTy ksig
                                ; consL <- mapM repC cons
                                ; cons1 <- coreListM conTyConName consL
@@ -565,7 +564,7 @@ repFamilyDecl decl@(L loc (FamilyDecl { fdInfo      = info
                 addTyClTyVarBinds resTyVar $ \_ ->
            case info of
              ClosedTypeFamily Nothing ->
-                 notHandled "abstract closed type family" (ppr decl)
+                 notHandled (ThAbstractClosedTypeFamily decl)
              ClosedTypeFamily (Just eqns) ->
                do { eqns1  <- mapM (repTyFamEqn . unLoc) eqns
                   ; eqns2  <- coreListM tySynEqnTyConName eqns1
@@ -756,7 +755,7 @@ repForD (L loc (ForeignImport { fd_name = name, fd_sig_ty = typ
       return (locA loc, dec)
  where
     conv_cimportspec (CLabel cls)
-      = notHandled "Foreign label" (doubleQuotes (ppr cls))
+      = notHandled (ThForeignLabel cls)
     conv_cimportspec (CFunction DynamicTarget) = return "dynamic"
     conv_cimportspec (CFunction (StaticTarget _ fs _ True))
                             = return (unpackFS fs)
@@ -771,7 +770,7 @@ repForD (L loc (ForeignImport { fd_name = name, fd_sig_ty = typ
     chStr = case mch of
             Just (Header _ h) | not raw_cconv -> unpackFS h ++ " "
             _ -> ""
-repForD decl@(L _ ForeignExport{}) = notHandled "Foreign export" (ppr decl)
+repForD decl@(L _ ForeignExport{}) = notHandled (ThForeignExport decl)
 
 repCCallConv :: CCallConv -> MetaM (Core TH.Callconv)
 repCCallConv CCallConv          = rep2_nw cCallName []
@@ -998,8 +997,8 @@ rep_sig (L loc (InlineSig _ nm ispec))= rep_inline nm ispec (locA loc)
 rep_sig (L loc (SpecSig _ nm tys ispec))
   = concatMapM (\t -> rep_specialise nm t ispec (locA loc)) tys
 rep_sig (L loc (SpecInstSig _ _ ty))  = rep_specialiseInst ty (locA loc)
-rep_sig (L _   (MinimalSig {}))       = notHandled "MINIMAL pragmas" empty
-rep_sig (L _   (SCCFunSig {}))        = notHandled "SCC pragmas" empty
+rep_sig (L _   (MinimalSig {}))       = notHandled ThMinimalPragmas
+rep_sig (L _   (SCCFunSig {}))        = notHandled ThSCCPragmas
 rep_sig (L loc (CompleteMatchSig _ _st cls mty))
   = rep_complete_sig cls mty (locA loc)
 
@@ -1119,7 +1118,7 @@ repInline :: InlineSpec -> MetaM (Core TH.Inline)
 repInline NoInline         = dataCon noInlineDataConName
 repInline Inline           = dataCon inlineDataConName
 repInline Inlinable        = dataCon inlinableDataConName
-repInline NoUserInlinePrag = notHandled "NOUSERINLINE" empty
+repInline NoUserInlinePrag = notHandled ThNoUserInline
 
 repRuleMatch :: RuleMatchInfo -> MetaM (Core TH.RuleMatch)
 repRuleMatch ConLike = dataCon conLikeDataConName
@@ -1417,7 +1416,7 @@ repTy (HsIParamTy _ n t) = do
                              t' <- repLTy t
                              repTImplicitParam n' t'
 
-repTy ty                      = notHandled "Exotic form of type" (ppr ty)
+repTy ty                      = notHandled (ThExoticFormOfType ty)
 
 repTyLit :: HsTyLit -> MetaM (Core (M TH.TyLit))
 repTyLit (HsNumTy _ i) = rep2 numTyLitName [mkIntegerExpr i]
@@ -1489,7 +1488,7 @@ repE (HsOverLabel _ s) = repOverLabel s
 
 repE e@(HsRecFld _ f) = case f of
   Unambiguous x _ -> repE (HsVar noExtField (noLocA x))
-  Ambiguous{}     -> notHandled "Ambiguous record selectors" (ppr e)
+  Ambiguous{}     -> notHandled (ThAmbiguousRecordSelectors e)
 
         -- Remember, we're desugaring renamer output here, so
         -- HsOverlit can definitely occur
@@ -1555,7 +1554,7 @@ repE e@(HsDo _ ctxt (L _ sts))
         wrapGenSyms ss e' }
 
   | otherwise
-  = notHandled "monad comprehension and [: :]" (ppr e)
+  = notHandled (ThMonadComprehensionSyntax e)
 
 repE (ExplicitList _ es) = do { xs <- repLEs es; repListExp xs }
 repE (ExplicitTuple _ es boxity) =
@@ -1628,8 +1627,8 @@ repE (XExpr (HsExpanded orig_expr ds_expr))
          then repE ds_expr
          else repE orig_expr }
 
-repE e@(HsPragE _ (HsPragSCC {}) _) = notHandled "Cost centres" (ppr e)
-repE e                              = notHandled "Expression form" (ppr e)
+repE e@(HsPragE _ (HsPragSCC {}) _) = notHandled (ThCostCentres e)
+repE e                              = notHandled (ThExpressionForm e)
 
 {- Note [Quotation and rebindable syntax]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1720,7 +1719,7 @@ repUpdFields = repListM fieldExpTyConName rep_fld
       Unambiguous sel_name _ -> do { fn <- lookupLOcc (L l sel_name)
                                    ; e  <- repLE (hsRecFieldArg fld)
                                    ; repFieldExp fn e }
-      Ambiguous{}            -> notHandled "Ambiguous record updates" (ppr fld)
+      Ambiguous{}            -> notHandled (ThAmbiguousRecordUpdates fld)
 
 
 
@@ -1801,7 +1800,7 @@ repSts (stmt@RecStmt{} : ss)
        ; (ss2,zs) <- addBinds ss1 (repSts ss)
        ; return (ss1++ss2, z : zs) }
 repSts []    = return ([],[])
-repSts other = notHandled "Exotic statement" (ppr other)
+repSts other = notHandled (ThExoticStatement other)
 
 
 -----------------------------------------------------------
@@ -2019,7 +2018,7 @@ repLambda (L _ (Match { m_pats = ps
                 do { xs <- repLPs ps; body <- repLE e; repLam xs body })
       ; wrapGenSyms ss lam }
 
-repLambda (L _ m) = notHandled "Guarded lambdas" (pprMatch m)
+repLambda (L _ m) = notHandled (ThGuardedLambdas m)
 
 
 -----------------------------------------------------------------------------
@@ -3011,15 +3010,12 @@ coreVar :: Id -> Core TH.Name   -- The Id has type Name
 coreVar id = MkC (Var id)
 
 ----------------- Failure -----------------------
-notHandledL :: SrcSpan -> String -> SDoc -> MetaM a
-notHandledL loc what doc
+notHandledL :: SrcSpan -> ThRejectionReason -> MetaM a
+notHandledL loc reason
   | isGoodSrcSpan loc
-  = mapReaderT (putSrcSpanDs loc) $ notHandled what doc
+  = mapReaderT (putSrcSpanDs loc) $ notHandled reason
   | otherwise
-  = notHandled what doc
+  = notHandled reason
 
-notHandled :: String -> SDoc -> MetaM a
-notHandled what doc = lift $ failWithDs msg
-  where
-    msg = hang (text what <+> text "not (yet) handled by Template Haskell")
-             2 doc
+notHandled :: ThRejectionReason -> MetaM a
+notHandled reason = lift $ failWithDs (DsNotYetHandledByTH reason)
