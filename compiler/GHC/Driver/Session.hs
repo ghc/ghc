@@ -4683,6 +4683,7 @@ compilerInfo dflags
        ("GHC Profiled",                showBool hostIsProfiled),
        ("Debug on",                    showBool debugIsOn),
        ("LibDir",                      topDir dflags),
+       ("hc-pkg path",                 topDir dflags </> ".." </> ".." </> "bin" </> "ghc-pkg" <.> exeExtension),
        -- The path of the global package database used by GHC
        ("Global Package DB",           globalPackageDatabasePath dflags)
       ]
