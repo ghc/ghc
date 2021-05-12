@@ -80,6 +80,7 @@ import qualified GHC.Parser.Lexer as Lexer
 import GHC.Parser.Header ( toArgs )
 
 import GHC.Unit
+import GHC.Unit.Env
 import GHC.Unit.State
 import GHC.Unit.Finder as Finder
 import GHC.Unit.Module.Graph (filterToposortToModules)
@@ -3098,8 +3099,12 @@ newDynFlags interactive_only minus_opts = do
           -- delete targets and all eventually defined breakpoints. (#1620)
           clearAllTargets
           when must_reload $ do
-            let units = preloadUnits (hsc_units hsc_env)
-            liftIO $ Loader.loadPackages interp hsc_env units
+            let tmpfs      = hsc_tmpfs hsc_env
+            let unit_env   = hsc_unit_env hsc_env
+            let unit_state = ue_units unit_env
+            let units      = preloadUnits unit_state
+            liftIO $ Loader.initLoaderState logger tmpfs interp dflags2 unit_env
+            liftIO $ Loader.loadPackages logger interp unit_env dflags2 units
           -- package flags changed, we can't re-use any of the old context
           setContextAfterLoad False []
           -- and copy the package flags to the interactive DynFlags
@@ -3117,8 +3122,13 @@ newDynFlags interactive_only minus_opts = do
                          dflags2 { ldInputs = newLdInputs
                                  , cmdlineFrameworks = newCLFrameworks } }
 
-        when (not (null newLdInputs && null newCLFrameworks)) $
-          liftIO $ Loader.loadCmdLineLibs (hscInterp hsc_env') hsc_env'
+        when (not (null newLdInputs && null newCLFrameworks)) $ do
+          let unit_env = hsc_unit_env hsc_env'
+          let tmpfs    = hsc_tmpfs hsc_env'
+          let logger   = hsc_logger hsc_env'
+          let dflags   = hsc_dflags hsc_env'
+          liftIO $ Loader.initLoaderState logger tmpfs interp dflags unit_env
+          liftIO $ Loader.loadCmdLineLibs logger tmpfs interp dflags unit_env
 
       return ()
 
