@@ -22,6 +22,7 @@ import GHC.HsToCore.Utils
 import GHC.HsToCore.Monad
 
 import GHC.Hs
+import GHC.Hs.Expr.Type
 import GHC.Tc.Utils.Zonk
 
 -- NB: The desugarer, which straddles the source and Core worlds, sometimes
