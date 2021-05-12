@@ -104,6 +104,8 @@ data PipelineOutput
         -- ^ The output must go into the specific outputFile in DynFlags.
         -- We don't store the filename in the constructor as it changes
         -- when doing -dynamic-too.
+  | NoOutputFile
+        -- ^ No output should be created, like in Interpreter or NoBackend.
     deriving Show
 
 getPipeEnv :: CompPipeline PipeEnv
