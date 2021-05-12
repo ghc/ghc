@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -16,8 +16,6 @@
 -- But it's still handy for constructing tests.
 
 module GHC.Driver.Backpack (doBackpack) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 

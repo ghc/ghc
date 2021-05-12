@@ -1,5 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE CPP #-}
+
 -----------------------------------------------------------------------------
 --
 -- Tasks running external programs for SysTools
@@ -27,6 +27,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Logger
 import GHC.Utils.TmpFs
+import GHC.Utils.Constants (isWindowsHost)
 
 import Data.List (tails, isPrefixOf)
 import System.IO
@@ -308,23 +309,19 @@ ld: warning: symbol referencing errors
 
 -- See Note [Merging object files for GHCi] in GHC.Driver.Pipeline.
 runMergeObjects :: Logger -> TmpFs -> DynFlags -> [Option] -> IO ()
-#if defined(mingw32_HOST_OS)
-runMergeObjects logger tmpfs  dflags args =
-#else
-runMergeObjects logger _tmpfs dflags args =
-#endif
+runMergeObjects logger tmpfs dflags args =
   traceToolCommand logger dflags "merge-objects" $ do
     let (p,args0) = pgm_lm dflags
         optl_args = map Option (getOpts dflags opt_lm)
         args2     = args0 ++ args ++ optl_args
     -- N.B. Darwin's ld64 doesn't support response files. Consequently we only
     -- use them on Windows where they are truly necessary.
-#if defined(mingw32_HOST_OS)
-    mb_env <- getGccEnv args2
-    runSomethingResponseFile logger tmpfs dflags id "Merge objects" p args2 mb_env
-#else
-    runSomething logger dflags "Merge objects" p args2
-#endif
+    if isWindowsHost
+      then do
+        mb_env <- getGccEnv args2
+        runSomethingResponseFile logger tmpfs dflags id "Merge objects" p args2 mb_env
+      else do
+        runSomething logger dflags "Merge objects" p args2
 
 runLibtool :: Logger -> DynFlags -> [Option] -> IO ()
 runLibtool logger dflags args = traceToolCommand logger dflags "libtool" $ do

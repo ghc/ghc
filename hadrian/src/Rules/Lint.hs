@@ -66,11 +66,10 @@ compiler = do
   let stage1Lib      = buildDir </> "stage1/lib"
   let stage1Compiler = buildDir </> "stage1/compiler/build"
   let machDeps       = "includes/MachDeps.h"
-  let hsVersions     = "compiler/HsVersions.h"
   let compilerDir    = "compiler"
   let ghcautoconf    = stage1Lib </> "ghcautoconf.h"
   let ghcplatform    = stage1Lib </> "ghcplatform.h"
-  need $ mconcat [[ghcautoconf, ghcplatform], hsIncls stage1Compiler, [machDeps, hsVersions]]
+  need $ mconcat [[ghcautoconf, ghcplatform], hsIncls stage1Compiler, [machDeps]]
   let includeDirs =
         [ "includes"
         , stage1Lib

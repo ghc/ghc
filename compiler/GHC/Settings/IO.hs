@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -6,8 +6,6 @@ module GHC.Settings.IO
  ( SettingsError (..)
  , initSettings
  ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 

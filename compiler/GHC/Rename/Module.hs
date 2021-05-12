@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP                 #-}
+
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies        #-}
@@ -15,8 +15,6 @@ Main pass of renamer
 module GHC.Rename.Module (
         rnSrcDecls, addTcgDUs, findSplice
     ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -58,7 +56,7 @@ import GHC.Types.Basic  ( pprRuleName, TypeOrKind(..) )
 import GHC.Data.FastString
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Driver.Session
-import GHC.Utils.Misc   ( debugIsOn, lengthExceeds, partitionWith )
+import GHC.Utils.Misc   ( lengthExceeds, partitionWith )
 import GHC.Utils.Panic
 import GHC.Driver.Env ( HscEnv(..), hsc_home_unit)
 import GHC.Data.List.SetOps ( findDupsEq, removeDups, equivClasses )
@@ -1527,8 +1525,11 @@ rnTyClDecls tycl_ds
 
              all_groups = first_group ++ groups
 
-       ; MASSERT2( null final_inst_ds,  ppr instds_w_fvs $$ ppr inst_ds_map
-                                       $$ ppr (flattenSCCs tycl_sccs) $$ ppr final_inst_ds  )
+       ; massertPpr (null final_inst_ds)
+                    (ppr instds_w_fvs
+                     $$ ppr inst_ds_map
+                     $$ ppr (flattenSCCs tycl_sccs)
+                     $$ ppr final_inst_ds)
 
        ; traceRn "rnTycl dependency analysis made groups" (ppr all_groups)
        ; return (all_groups, all_fvs) }
