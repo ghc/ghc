@@ -216,8 +216,8 @@ mkTyData loc' new_or_data cType (L _ (mcxt, tycl_hdr))
        ; (tyvars, anns) <- checkTyVars (ppr new_or_data) equalsDots tc tparams
        ; cs <- getCommentsFor (locA loc) -- Get any remaining comments
        ; let anns' = addAnns (EpAnn (spanAsAnchor $ locA loc) annsIn emptyComments) (ann ++ anns) cs
-       ; defn <- mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv anns'
-       ; return (L loc (DataDecl { tcdDExt = anns', -- AZ: do we need these?
+       ; defn <- mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
+       ; return (L loc (DataDecl { tcdDExt = anns',
                                    tcdLName = tc, tcdTyVars = tyvars,
                                    tcdFixity = fixity,
                                    tcdDataDefn = defn })) }
@@ -228,11 +228,10 @@ mkDataDefn :: NewOrData
            -> Maybe (LHsKind GhcPs)
            -> [LConDecl GhcPs]
            -> HsDeriving GhcPs
-           -> EpAnn [AddEpAnn]
            -> P (HsDataDefn GhcPs)
-mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv ann
+mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
   = do { checkDatatypeContext mcxt
-       ; return (HsDataDefn { dd_ext = ann
+       ; return (HsDataDefn { dd_ext = noExtField
                             , dd_ND = new_or_data, dd_cType = cType
                             , dd_ctxt = mcxt
                             , dd_cons = data_cons
@@ -310,12 +309,11 @@ mkDataFamInst :: SrcSpan
 mkDataFamInst loc new_or_data cType (mcxt, bndrs, tycl_hdr)
               ksig data_cons (L _ maybe_deriv) anns
   = do { (tc, tparams, fixity, ann) <- checkTyClHdr False tycl_hdr
-       ; -- AZ:TODO: deal with these comments
-       ; cs <- getCommentsFor loc -- Add any API Annotations to the top SrcSpan [temp]
+       ; cs <- getCommentsFor loc -- Add any API Annotations to the top SrcSpan
        ; let anns' = addAnns (EpAnn (spanAsAnchor loc) ann cs) anns emptyComments
-       ; defn <- mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv anns'
+       ; defn <- mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
        ; return (L (noAnnSrcSpan loc) (DataFamInstD anns' (DataFamInstDecl
-                  (FamEqn { feqn_ext    = noAnn -- AZ: get anns
+                  (FamEqn { feqn_ext    = anns'
                           , feqn_tycon  = tc
                           , feqn_bndrs  = bndrs
                           , feqn_pats   = tparams

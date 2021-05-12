@@ -783,12 +783,6 @@ instance ExactPrint (InstDecl GhcPs) where
   getAnnotationEntry (DataFamInstD an _) = fromAnn an
   getAnnotationEntry (TyFamInstD   _  _) = NoEntryVal
 
--- instance Annotate (GHC.InstDecl GHC.GhcPs) where
-
---   markAST l (GHC.ClsInstD     _  cid) = markAST l  cid
---   markAST l (GHC.DataFamInstD _ dfid) = markAST l dfid
---   markAST l (GHC.TyFamInstD   _ tfid) = markAST l tfid
---   markAST _ (GHC.XInstDecl x) = error $ "got XInstDecl for:" ++ showPprUnsafe x
 
   exact (ClsInstD     _  cid) = markAnnotated cid
   exact (DataFamInstD an decl) = do
@@ -801,18 +795,32 @@ instance ExactPrint (InstDecl GhcPs) where
 
 exactDataFamInstDecl :: EpAnn [AddEpAnn] -> TopLevelFlag -> (DataFamInstDecl GhcPs) -> EPP ()
 exactDataFamInstDecl an top_lvl
-  (DataFamInstDecl ( FamEqn { feqn_tycon  = tycon
+  (DataFamInstDecl ( FamEqn { feqn_ext    = an2
+                            , feqn_tycon  = tycon
                             , feqn_bndrs  = bndrs
                             , feqn_pats   = pats
                             , feqn_fixity = fixity
                             , feqn_rhs    = defn }))
-  = exactDataDefn an pp_hdr defn
+  = exactDataDefn an2 pp_hdr defn -- See Note [an and an2 in exactDataFamInstDecl]
   where
     pp_hdr mctxt = do
       case top_lvl of
         TopLevel -> markEpAnn an AnnInstance -- TODO: maybe in toplevel
         NotTopLevel -> return ()
       exactHsFamInstLHS an tycon bndrs pats fixity mctxt
+
+{-
+Note [an and an2 in exactDataFamInstDecl]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The exactDataFamInstDecl function is called to render a
+DataFamInstDecl within its surrounding context. This context is
+rendered via the 'pp_hdr' function, which uses the exact print
+annotations from that context, named 'an'.  The EPAs used for
+rendering the DataDefn are contained in the FamEqn, and are called
+'an2'.
+
+-}
 
 -- ---------------------------------------------------------------------
 
@@ -2684,7 +2692,6 @@ instance ExactPrint (TyClDecl GhcPs) where
           markEpAnn an AnnCloseC
       where
         top_matter = do
-          annotationsToComments (epAnnAnns an)  [AnnOpenP, AnnCloseP]
           markEpAnn an AnnClass
           exactVanillaDeclHead an lclas tyvars fixity context
           unless (null fds) $ do
@@ -2832,14 +2839,14 @@ exactDataDefn :: EpAnn [AddEpAnn]
               -> HsDataDefn GhcPs
               -> EPP ()
 exactDataDefn an exactHdr
-                 (HsDataDefn { dd_ext = an2
-                             , dd_ND = new_or_data, dd_ctxt = context
+                 (HsDataDefn { dd_ND = new_or_data, dd_ctxt = context
                              , dd_cType = mb_ct
                              , dd_kindSig = mb_sig
                              , dd_cons = condecls, dd_derivs = derivings }) = do
+  -- annotationsToComments (epAnnAnns an) [AnnOpenP, AnnCloseP]
   if new_or_data == DataType
-    then markEpAnn an2 AnnData
-    else markEpAnn an2 AnnNewtype
+    then markEpAnn an AnnData
+    else markEpAnn an AnnNewtype
   mapM_ markAnnotated mb_ct
   exactHdr context
   case mb_sig of
@@ -2848,7 +2855,7 @@ exactDataDefn an exactHdr
       markEpAnn an AnnDcolon
       markAnnotated kind
   when (isGadt condecls) $ markEpAnn an AnnWhere
-  exact_condecls an2 condecls
+  exact_condecls an condecls
   mapM_ markAnnotated derivings
   return ()
 
@@ -2866,16 +2873,16 @@ exactVanillaDeclHead an thing (HsQTvs { hsq_explicit = tyvars }) fixity context 
          -- = hsep [char '(',ppr (unLoc varl), pprInfixOcc (unLoc thing)
          --        , (ppr.unLoc) (head varsr), char ')'
          --        , hsep (map (ppr.unLoc) (tail vaprsr))]
-          markEpAnnAll an id AnnOpenP
+          annotationsToComments (epAnnAnns an) [AnnOpenP,AnnCloseP]
           markAnnotated varl
           markAnnotated thing
           markAnnotated (head varsr)
-          markEpAnnAll an id AnnCloseP
           markAnnotated (tail varsr)
           return ()
       | fixity == Infix = do
          -- = hsep [ppr (unLoc varl), pprInfixOcc (unLoc thing)
          -- , hsep (map (ppr.unLoc) varsr)]
+          annotationsToComments (epAnnAnns an) [AnnOpenP,AnnCloseP]
           markAnnotated varl
           markAnnotated thing
           markAnnotated varsr
