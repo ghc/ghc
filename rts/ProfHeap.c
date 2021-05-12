@@ -52,6 +52,10 @@ static char *hp_filename; /* heap profile (hp2ps style) log file */
  * As an exception for Darwin, this comes through the <xlocale.h> header instead
  * of <locale.h>.
  *
+ * On platforms which don't have uselocale(3), we fall back to setlocale() which
+ * mutates the global state. This is of course not thread-safe but is better
+ * than nothing.
+ *
  * On Windows, a different _locale_t opaque type does exist, but isn't directly
  * usable without special-casing all printf() and related calls, which I'm not
  * motivated to trawl through as I don't even have a Windows box to test on.
@@ -63,14 +67,16 @@ static char *hp_filename; /* heap profile (hp2ps style) log file */
 #if defined(mingw32_HOST_OS)
 static int prof_locale_per_thread = -1;
 static const char *saved_locale = NULL;
-#else
+#elif defined(HAVE_USELOCALE)
 static locale_t prof_locale = 0, saved_locale = 0;
+#else
+static char *saved_locale = NULL;
 #endif
 
 STATIC_INLINE void
 init_prof_locale( void )
 {
-#if !defined(mingw32_HOST_OS)
+#if defined(HAVE_USELOCALE)
     if (! prof_locale) {
         prof_locale = newlocale(LC_NUMERIC_MASK, "POSIX", 0);
         if (! prof_locale) {
@@ -84,7 +90,7 @@ init_prof_locale( void )
 STATIC_INLINE void
 free_prof_locale( void )
 {
-#if !defined(mingw32_HOST_OS)
+#if defined(HAVE_USELOCALE)
     if (prof_locale) {
         freelocale(prof_locale);
         prof_locale = 0;
@@ -99,8 +105,11 @@ set_prof_locale( void )
     prof_locale_per_thread = _configthreadlocale(_ENABLE_PER_THREAD_LOCALE);
     saved_locale = setlocale(LC_NUMERIC, NULL);
     setlocale(LC_NUMERIC, "C");
-#else
+#elif defined(HAVE_USELOCALE)
     saved_locale = uselocale(prof_locale);
+#else
+    saved_locale = setlocale(LC_NUMERIC, NULL);
+    setlocale(LC_NUMERIC, "C");
 #endif
 }
 
@@ -110,8 +119,10 @@ restore_locale( void )
 #if defined(mingw32_HOST_OS)
     _configthreadlocale(prof_locale_per_thread);
     setlocale(LC_NUMERIC, saved_locale);
-#else
+#elif defined(HAVE_USELOCALE)
     uselocale(saved_locale);
+#else
+    setlocale(LC_NUMERIC, saved_locale);
 #endif
 }
 
