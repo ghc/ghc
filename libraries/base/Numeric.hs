@@ -132,7 +132,7 @@ readFloatP =
 -- With a bit of luck no one will use it.
 
 -- | Reads a /signed/ 'Real' value, given a reader for an unsigned value.
-readSigned :: (Real a) => ReadS a -> ReadS a
+readSigned :: Real a => ReadS a -> ReadS a
 readSigned readPos = readParen False read'
                      where read' r  = read'' r ++
                                       (do
@@ -181,7 +181,7 @@ showInt n0 cs0
 -- In the call @'showEFloat' digs val@, if @digs@ is 'Nothing',
 -- the value is shown to full precision; if @digs@ is @'Just' d@,
 -- then at most @d@ digits after the decimal point are shown.
-showEFloat    :: (RealFloat a) => Maybe Int -> a -> ShowS
+showEFloat :: RealFloat a => Maybe Int -> a -> ShowS
 
 -- | Show a signed 'RealFloat' value
 -- using standard decimal notation (e.g. @245000@, @0.0015@).
@@ -189,7 +189,7 @@ showEFloat    :: (RealFloat a) => Maybe Int -> a -> ShowS
 -- In the call @'showFFloat' digs val@, if @digs@ is 'Nothing',
 -- the value is shown to full precision; if @digs@ is @'Just' d@,
 -- then at most @d@ digits after the decimal point are shown.
-showFFloat    :: (RealFloat a) => Maybe Int -> a -> ShowS
+showFFloat :: RealFloat a => Maybe Int -> a -> ShowS
 
 -- | Show a signed 'RealFloat' value
 -- using standard decimal notation for arguments whose absolute value lies
@@ -198,7 +198,7 @@ showFFloat    :: (RealFloat a) => Maybe Int -> a -> ShowS
 -- In the call @'showGFloat' digs val@, if @digs@ is 'Nothing',
 -- the value is shown to full precision; if @digs@ is @'Just' d@,
 -- then at most @d@ digits after the decimal point are shown.
-showGFloat    :: (RealFloat a) => Maybe Int -> a -> ShowS
+showGFloat :: RealFloat a => Maybe Int -> a -> ShowS
 
 showEFloat d x =  showString (formatRealFloat FFExponent d x)
 showFFloat d x =  showString (formatRealFloat FFFixed d x)
@@ -211,7 +211,7 @@ showGFloat d x =  showString (formatRealFloat FFGeneric d x)
 -- is always guaranteed, even if not needed.
 --
 -- @since 4.7.0.0
-showFFloatAlt    :: (RealFloat a) => Maybe Int -> a -> ShowS
+showFFloatAlt :: RealFloat a => Maybe Int -> a -> ShowS
 
 -- | Show a signed 'RealFloat' value
 -- using standard decimal notation for arguments whose absolute value lies
@@ -221,7 +221,7 @@ showFFloatAlt    :: (RealFloat a) => Maybe Int -> a -> ShowS
 -- is always guaranteed, even if not needed.
 --
 -- @since 4.7.0.0
-showGFloatAlt    :: (RealFloat a) => Maybe Int -> a -> ShowS
+showGFloatAlt :: RealFloat a => Maybe Int -> a -> ShowS
 
 showFFloatAlt d x =  showString (formatRealFloatAlt FFFixed d True x)
 showGFloatAlt d x =  showString (formatRealFloatAlt FFGeneric d True x)

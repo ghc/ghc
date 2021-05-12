@@ -1946,7 +1946,7 @@ data Scaled a = Scaled !Mult a
   -- Mult part of scaled.
 
 
-instance (Outputable a) => Outputable (Scaled a) where
+instance Outputable a => Outputable (Scaled a) where
    ppr (Scaled _cnt t) = ppr t
      -- Do not print the multiplicity here because it tends to be too verbose
 

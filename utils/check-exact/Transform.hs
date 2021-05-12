@@ -171,27 +171,27 @@ hoistTransform :: (forall x. m x -> n x) -> TransformT m a -> TransformT n a
 hoistTransform nt (TransformT m) = TransformT (mapRWST nt m)
 
 -- |Log a string to the output of the Monad
-logTr :: (Monad m) => String -> TransformT m ()
+logTr :: Monad m => String -> TransformT m ()
 logTr str = tell [str]
 
 -- |Log a representation of the given AST with annotations to the output of the
 -- Monad
-logDataWithAnnsTr :: (Monad m) => (Data a) => String -> a -> TransformT m ()
+logDataWithAnnsTr :: Monad m => Data a => String -> a -> TransformT m ()
 logDataWithAnnsTr str ast = do
   logTr $ str ++ showAst ast
 
 -- |Access the 'Anns' being modified in this transformation
-getAnnsT :: (Monad m) => TransformT m Anns
+getAnnsT :: Monad m => TransformT m Anns
 getAnnsT = gets fst
 
 -- |Replace the 'Anns' after any changes
-putAnnsT :: (Monad m) => Anns -> TransformT m ()
+putAnnsT :: Monad m => Anns -> TransformT m ()
 putAnnsT ans = do
   (_,col) <- get
   put (ans,col)
 
 -- |Change the stored 'Anns'
-modifyAnnsT :: (Monad m) => (Anns -> Anns) -> TransformT m ()
+modifyAnnsT :: Monad m => (Anns -> Anns) -> TransformT m ()
 modifyAnnsT f = do
   ans <- getAnnsT
   putAnnsT (f ans)
@@ -201,7 +201,7 @@ modifyAnnsT f = do
 -- |Once we have 'Anns', a 'SrcSpan' is used purely as part of an 'AnnKey'
 -- to index into the 'Anns'. If we need to add new elements to the AST, they
 -- need their own 'SrcSpan' for this.
-uniqueSrcSpanT :: (Monad m) => TransformT m SrcSpan
+uniqueSrcSpanT :: Monad m => TransformT m SrcSpan
 uniqueSrcSpanT = do
   (an,col) <- get
   put (an,col + 1 )
@@ -219,7 +219,7 @@ srcSpanStartLine' _ = 0
 -- ---------------------------------------------------------------------
 -- |Make a copy of an AST element, replacing the existing SrcSpans with new
 -- ones, and duplicating the matching annotations.
-cloneT :: (Data a,Monad m) => a -> TransformT m (a, [(SrcSpan, SrcSpan)])
+cloneT :: (Data a, Monad m) => a -> TransformT m (a, [(SrcSpan, SrcSpan)])
 cloneT ast = do
   runWriterT $ everywhereM (return `ext2M` replaceLocated) ast
   where
@@ -398,14 +398,14 @@ transferEntryDPT _a b = do
 -- ---------------------------------------------------------------------
 
 -- |'Transform' monad version of 'setPrecedingLinesDecl'
-setPrecedingLinesDeclT :: (Monad m) => LHsDecl GhcPs -> Int -> Int -> TransformT m ()
+setPrecedingLinesDeclT :: Monad m => LHsDecl GhcPs -> Int -> Int -> TransformT m ()
 setPrecedingLinesDeclT ld n c =
   modifyAnnsT (setPrecedingLinesDecl ld n c)
 
 -- ---------------------------------------------------------------------
 
 -- |'Transform' monad version of 'setPrecedingLines'
-setPrecedingLinesT ::  (Data a,Monad m) => LocatedA a -> Int -> Int -> TransformT m ()
+setPrecedingLinesT :: (Data a, Monad m) => LocatedA a -> Int -> Int -> TransformT m ()
 setPrecedingLinesT ld n c =
   modifyAnnsT (setPrecedingLines ld n c)
 
@@ -431,14 +431,14 @@ setPrecedingLinesDecl ld n c ans = setPrecedingLines ld n c ans
 -- ---------------------------------------------------------------------
 
 -- | Adjust the entry annotations to provide an `n` line preceding gap
-setPrecedingLines :: (Data a) => LocatedA a -> Int -> Int -> Anns -> Anns
+setPrecedingLines :: Data a => LocatedA a -> Int -> Int -> Anns -> Anns
 setPrecedingLines ast n c anne = setEntryDP ast (deltaPos n c) anne
 
 -- ---------------------------------------------------------------------
 
 -- |Return the true entry 'DeltaPos' from the annotation for a given AST
 -- element. This is the 'DeltaPos' ignoring any comments.
-getEntryDP :: (Data a) => Anns -> Located a -> DeltaPos
+getEntryDP :: Data a => Anns -> Located a -> DeltaPos
 getEntryDP anns ast =
   case Map.lookup (mkAnnKey ast) anns of
     Nothing  -> SameLine 0
@@ -461,8 +461,8 @@ setEntryDPDecl d dp = setEntryDP' d dp
 
 -- |Set the true entry 'DeltaPos' from the annotation for a given AST
 -- element. This is the 'DeltaPos' ignoring any comments.
--- setEntryDP' :: (Data a) => LocatedA a -> DeltaPos -> LocatedA a
-setEntryDP' :: (Monoid t) => LocatedAn t a -> DeltaPos -> LocatedAn t a
+-- setEntryDP' :: Data a => LocatedA a -> DeltaPos -> LocatedA a
+setEntryDP' :: Monoid t => LocatedAn t a -> DeltaPos -> LocatedAn t a
 setEntryDP' (L (SrcSpanAnn EpAnnNotUsed l) a) dp
   = L (SrcSpanAnn
            (EpAnn (Anchor (realSrcSpan l) (MovedAnchor dp)) mempty emptyComments)
@@ -494,7 +494,7 @@ setEntryDP' (L (SrcSpanAnn (EpAnn (Anchor r _) an cs) l) a) dp
 
 -- |Set the true entry 'DeltaPos' from the annotation for a given AST
 -- element. This is the 'DeltaPos' ignoring any comments.
-setEntryDP :: (Data a) => LocatedA a -> DeltaPos -> Anns -> Anns
+setEntryDP :: Data a => LocatedA a -> DeltaPos -> Anns -> Anns
 setEntryDP _ast _dp anns = anns
 
 -- ---------------------------------------------------------------------
@@ -545,7 +545,7 @@ transferEntryDP (L (SrcSpanAnn EpAnnNotUsed _l1) _) (L (SrcSpanAnn (EpAnn anc2 a
 -- |Take the annEntryDelta associated with the first item and associate it with the second.
 -- Also transfer any comments occuring before it.
 -- TODO: call transferEntryDP, and use pushDeclDP
-transferEntryDP' :: (Monad m) => LHsDecl GhcPs -> LHsDecl GhcPs -> TransformT m (LHsDecl GhcPs)
+transferEntryDP' :: Monad m => LHsDecl GhcPs -> LHsDecl GhcPs -> TransformT m (LHsDecl GhcPs)
 transferEntryDP' la lb = do
   (L l2 b) <- transferEntryDP la lb
   return (L l2 (pushDeclDP b (SameLine 0)))
@@ -573,7 +573,7 @@ pushDeclDP d _dp = d
 
 -- ---------------------------------------------------------------------
 
-addTrailingComma :: (Data a) => Located a -> DeltaPos -> Anns -> Anns
+addTrailingComma :: Data a => Located a -> DeltaPos -> Anns -> Anns
 addTrailingComma a dp anns =
   case Map.lookup (mkAnnKey a) anns of
     Nothing -> anns
@@ -587,7 +587,7 @@ addTrailingComma a dp anns =
 
 -- ---------------------------------------------------------------------
 
-removeTrailingComma :: (Data a) => Located a -> Anns -> Anns
+removeTrailingComma :: Data a => Located a -> Anns -> Anns
 removeTrailingComma a anns =
   case Map.lookup (mkAnnKey a) anns of
     Nothing -> anns
@@ -601,7 +601,7 @@ removeTrailingComma a anns =
 
 -- ---------------------------------------------------------------------
 
-balanceCommentsList :: (Monad m) => [LHsDecl GhcPs] -> TransformT m [LHsDecl GhcPs]
+balanceCommentsList :: Monad m => [LHsDecl GhcPs] -> TransformT m [LHsDecl GhcPs]
 balanceCommentsList [] = return []
 balanceCommentsList [x] = return [x]
 balanceCommentsList (a:b:ls) = do
@@ -702,7 +702,7 @@ pushTrailingComments w cs lb@(HsValBinds an _)
       _ -> (ValBinds NoAnnSortKey emptyBag [], [])
 
 
-balanceCommentsList' :: (Monad m) => [LocatedA a] -> TransformT m [LocatedA a]
+balanceCommentsList' :: Monad m => [LocatedA a] -> TransformT m [LocatedA a]
 balanceCommentsList' [] = return []
 balanceCommentsList' [x] = return [x]
 balanceCommentsList' (a:b:ls) = do
@@ -717,7 +717,7 @@ balanceCommentsList' (a:b:ls) = do
 -- with a passed-in decision function.
 -- The initial situation is that all comments for a given anchor appear as prior comments
 -- Many of these should in fact be following comments for the previous anchor
-balanceComments' :: (Monad m) => LocatedA a -> LocatedA b -> TransformT m (LocatedA a, LocatedA b)
+balanceComments' :: Monad m => LocatedA a -> LocatedA b -> TransformT m (LocatedA a, LocatedA b)
 balanceComments' la1 la2 = do
   logTr $ "balanceComments': (loc1,loc2)=" ++ showGhc (ss2range loc1,ss2range loc2)
   logTr $ "balanceComments': (anchorFromLocatedA la1)=" ++ showGhc (anchorFromLocatedA la1)
@@ -875,7 +875,7 @@ balanceSameLineComments (L la (Match anm mctxt pats (GRHSs x grhss lb))) = do
 -- with the following element in fact do. Of necessity this is a heuristic
 -- process, to be tuned later. Possibly a variant should be provided with a
 -- passed-in decision function.
-balanceTrailingComments :: (Monad m) => (Data a,Data b) => Located a -> Located b
+balanceTrailingComments :: Monad m => (Data a, Data b) => Located a -> Located b
                         -> TransformT m [(Comment, DeltaPos)]
 balanceTrailingComments first second = do
   let
@@ -941,17 +941,17 @@ deltaAnchor (Anchor anc _) ss = Anchor anc (MovedAnchor dp)
 
 -- | Create a @SrcSpanAnn@ with a @MovedAnchor@ operation using the
 -- given @DeltaPos@.
-noAnnSrcSpanDP :: (Monoid ann) => SrcSpan -> DeltaPos -> SrcSpanAnn' (EpAnn ann)
+noAnnSrcSpanDP :: Monoid ann => SrcSpan -> DeltaPos -> SrcSpanAnn' (EpAnn ann)
 noAnnSrcSpanDP l dp
   = SrcSpanAnn (EpAnn (Anchor (realSrcSpan l) (MovedAnchor dp)) mempty emptyComments) l
 
-noAnnSrcSpanDP0 :: (Monoid ann) => SrcSpan -> SrcSpanAnn' (EpAnn ann)
+noAnnSrcSpanDP0 :: Monoid ann => SrcSpan -> SrcSpanAnn' (EpAnn ann)
 noAnnSrcSpanDP0 l = noAnnSrcSpanDP l (SameLine 0)
 
-noAnnSrcSpanDP1 :: (Monoid ann) => SrcSpan -> SrcSpanAnn' (EpAnn ann)
+noAnnSrcSpanDP1 :: Monoid ann => SrcSpan -> SrcSpanAnn' (EpAnn ann)
 noAnnSrcSpanDP1 l = noAnnSrcSpanDP l (SameLine 1)
 
-noAnnSrcSpanDPn :: (Monoid ann) => SrcSpan -> Int -> SrcSpanAnn' (EpAnn ann)
+noAnnSrcSpanDPn :: Monoid ann => SrcSpan -> Int -> SrcSpanAnn' (EpAnn ann)
 noAnnSrcSpanDPn l s = noAnnSrcSpanDP l (SameLine s)
 
 d0 :: EpaLocation
@@ -1031,14 +1031,14 @@ insertBefore (getLocA -> k) = insertAt findBefore
 
 -- |Provide a means to get and process the immediate child declartions of a
 -- given AST element.
-class (Data t) => HasDecls t where
+class Data t => HasDecls t where
 -- ++AZ++: TODO: add tests to confirm that hsDecls followed by replaceDecls is idempotent
 
     -- | Return the 'HsDecl's that are directly enclosed in the
     -- given syntax phrase. They are always returned in the wrapped 'HsDecl'
     -- form, even if orginating in local decls. This is safe, as annotations
     -- never attach to the wrapper, only to the wrapped item.
-    hsDecls :: (Monad m) => t -> TransformT m [LHsDecl GhcPs]
+    hsDecls :: Monad m => t -> TransformT m [LHsDecl GhcPs]
 
     -- | Replace the directly enclosed decl list by the given
     --  decl list. Runs in the 'Transform' monad to be able to update list order
@@ -1059,7 +1059,7 @@ class (Data t) => HasDecls t where
     --   where
     --     nn = 2
     -- @
-    replaceDecls :: (Monad m) => t -> [LHsDecl GhcPs] -> TransformT m t
+    replaceDecls :: Monad m => t -> [LHsDecl GhcPs] -> TransformT m t
 
 -- ---------------------------------------------------------------------
 
@@ -1148,7 +1148,7 @@ instance HasDecls (LocatedA (HsExpr GhcPs)) where
 -- cannot be a member of 'HasDecls' because a 'FunBind' is not idempotent
 -- for 'hsDecls' \/ 'replaceDecls'. 'hsDeclsPatBindD' \/ 'replaceDeclsPatBindD' is
 -- idempotent.
-hsDeclsPatBindD :: (Monad m) => LHsDecl GhcPs -> TransformT m [LHsDecl GhcPs]
+hsDeclsPatBindD :: Monad m => LHsDecl GhcPs -> TransformT m [LHsDecl GhcPs]
 hsDeclsPatBindD (L l (ValD _ d)) = hsDeclsPatBind (L l d)
 hsDeclsPatBindD x = error $ "hsDeclsPatBindD called for:" ++ showGhc x
 
@@ -1156,7 +1156,7 @@ hsDeclsPatBindD x = error $ "hsDeclsPatBindD called for:" ++ showGhc x
 -- cannot be a member of 'HasDecls' because a 'FunBind' is not idempotent
 -- for 'hsDecls' \/ 'replaceDecls'. 'hsDeclsPatBind' \/ 'replaceDeclsPatBind' is
 -- idempotent.
-hsDeclsPatBind :: (Monad m) => LHsBind GhcPs -> TransformT m [LHsDecl GhcPs]
+hsDeclsPatBind :: Monad m => LHsBind GhcPs -> TransformT m [LHsDecl GhcPs]
 hsDeclsPatBind (L _ (PatBind _ _ (GRHSs _ _grhs lb) _)) = hsDeclsValBinds lb
 hsDeclsPatBind x = error $ "hsDeclsPatBind called for:" ++ showGhc x
 
@@ -1166,7 +1166,7 @@ hsDeclsPatBind x = error $ "hsDeclsPatBind called for:" ++ showGhc x
 -- cannot be a member of 'HasDecls' because a 'FunBind' is not idempotent
 -- for 'hsDecls' \/ 'replaceDecls'. 'hsDeclsPatBindD' \/ 'replaceDeclsPatBindD' is
 -- idempotent.
-replaceDeclsPatBindD :: (Monad m) => LHsDecl GhcPs -> [LHsDecl GhcPs]
+replaceDeclsPatBindD :: Monad m => LHsDecl GhcPs -> [LHsDecl GhcPs]
                      -> TransformT m (LHsDecl GhcPs)
 replaceDeclsPatBindD (L l (ValD x d)) newDecls = do
   (L _ d') <- replaceDeclsPatBind (L l d) newDecls
@@ -1177,7 +1177,7 @@ replaceDeclsPatBindD x _ = error $ "replaceDeclsPatBindD called for:" ++ showGhc
 -- cannot be a member of 'HasDecls' because a 'FunBind' is not idempotent
 -- for 'hsDecls' \/ 'replaceDecls'. 'hsDeclsPatBind' \/ 'replaceDeclsPatBind' is
 -- idempotent.
-replaceDeclsPatBind :: (Monad m) => LHsBind GhcPs -> [LHsDecl GhcPs]
+replaceDeclsPatBind :: Monad m => LHsBind GhcPs -> [LHsDecl GhcPs]
                     -> TransformT m (LHsBind GhcPs)
 replaceDeclsPatBind (L l (PatBind x a (GRHSs xr rhss binds) b)) newDecls
     = do
@@ -1307,7 +1307,7 @@ hsDeclsGeneric t = q t
 
     -- ---------------------------------
 
-    lhsbind :: (Monad m) => LHsBind GhcPs -> TransformT m [LHsDecl GhcPs]
+    lhsbind :: Monad m => LHsBind GhcPs -> TransformT m [LHsDecl GhcPs]
     lhsbind (L _ (FunBind _ _ (MG _ (L _ matches) _) _)) = do
         dss <- mapM hsDecls matches
         return (concat dss)
@@ -1322,12 +1322,12 @@ hsDeclsGeneric t = q t
 
     -- ---------------------------------
 
-    llocalbinds :: (Monad m) => Located (HsLocalBinds GhcPs) -> TransformT m [LHsDecl GhcPs]
+    llocalbinds :: Monad m => Located (HsLocalBinds GhcPs) -> TransformT m [LHsDecl GhcPs]
     llocalbinds (L _ ds) = localbinds ds
 
     -- ---------------------------------
 
-    localbinds :: (Monad m) => HsLocalBinds GhcPs -> TransformT m [LHsDecl GhcPs]
+    localbinds :: Monad m => HsLocalBinds GhcPs -> TransformT m [LHsDecl GhcPs]
     localbinds d = hsDeclsValBinds d
 
 -- ---------------------------------------------------------------------
@@ -1348,7 +1348,7 @@ orderedDecls sortKey decls = do
 
 -- ---------------------------------------------------------------------
 
-hsDeclsValBinds :: (Monad m) => HsLocalBinds GhcPs -> TransformT m [LHsDecl GhcPs]
+hsDeclsValBinds :: Monad m => HsLocalBinds GhcPs -> TransformT m [LHsDecl GhcPs]
 hsDeclsValBinds lb = case lb of
     HsValBinds _ (ValBinds sortKey bs sigs) -> do
       let
@@ -1425,7 +1425,7 @@ oldWhereAnnotation (EpAnn anc an cs) ww _oldSpan = do
                   cs
   return an'
 
-newWhereAnnotation :: (Monad m) => WithWhere -> TransformT m (EpAnn AnnList)
+newWhereAnnotation :: Monad m => WithWhere -> TransformT m (EpAnn AnnList)
 newWhereAnnotation ww = do
   newSpan <- uniqueSrcSpanT
   let anc  = Anchor (rs newSpan) (MovedAnchor (DifferentLine 1 2))
@@ -1478,7 +1478,7 @@ modifyValD p ast f = do
 -- ---------------------------------------------------------------------
 
 -- |Used to integrate a @Transform@ into other Monad stacks
-class (Monad m) => (HasTransform m) where
+class Monad m => HasTransform m where
   liftT :: Transform a -> m a
 
 instance Monad m => HasTransform (TransformT m) where

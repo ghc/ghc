@@ -107,7 +107,7 @@ data EvidenceInfo a
   , evidenceDetails :: Maybe (EvVarSource, Scope, Maybe Span)
   } deriving (Eq,Ord,Functor)
 
-instance (Outputable a) => Outputable (EvidenceInfo a) where
+instance Outputable a => Outputable (EvidenceInfo a) where
   ppr (EvidenceInfo name span typ dets) =
     hang (ppr name <+> text "at" <+> ppr span O.<> text ", of type:" <+> ppr typ) 4 $
       pdets $$ (pprDefinedAt name)

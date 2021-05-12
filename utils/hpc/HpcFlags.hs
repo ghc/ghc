@@ -257,7 +257,7 @@ postFuns = [ (show pos,pos)
 data MergeFun = INTERSECTION | UNION
      deriving (Eq,Show, Read, Enum)
 
-theMergeFun :: (Ord a) => MergeFun -> Set.Set a -> Set.Set a -> Set.Set a
+theMergeFun :: Ord a => MergeFun -> Set.Set a -> Set.Set a -> Set.Set a
 theMergeFun INTERSECTION = Set.intersection
 theMergeFun UNION        = Set.union
 

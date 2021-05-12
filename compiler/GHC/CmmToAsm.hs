@@ -834,7 +834,7 @@ generateJumpTables ncgImpl xs = concatMap f xs
 -- Shortcut branches
 
 shortcutBranches
-        :: forall statics instr jumpDest. (Outputable jumpDest) => DynFlags
+        :: forall statics instr jumpDest. Outputable jumpDest => DynFlags
         -> NcgImpl statics instr jumpDest
         -> [NatCmmDecl statics instr]
         -> Maybe CFG

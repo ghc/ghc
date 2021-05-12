@@ -239,7 +239,7 @@ import GHC.Base
 -- True
 -- >>> isSubsequenceOf [1..10] [10,9..0]
 -- False
-isSubsequenceOf :: (Eq a) => [a] -> [a] -> Bool
+isSubsequenceOf :: Eq a => [a] -> [a] -> Bool
 isSubsequenceOf []    _                    = True
 isSubsequenceOf _     []                   = False
 isSubsequenceOf a@(x:a') (y:b) | x == y    = isSubsequenceOf a' b
@@ -292,16 +292,16 @@ stripPrefix _ _ = Nothing
 --
 -- >>> elemIndex 4 [0..]
 -- Just 4
-elemIndex       :: Eq a => a -> [a] -> Maybe Int
-elemIndex x     = findIndex (x==)
+elemIndex :: Eq a => a -> [a] -> Maybe Int
+elemIndex x = findIndex (x==)
 
 -- | The 'elemIndices' function extends 'elemIndex', by returning the
 -- indices of all elements equal to the query element, in ascending order.
 --
 -- >>> elemIndices 'o' "Hello World"
 -- [4,7]
-elemIndices     :: Eq a => a -> [a] -> [Int]
-elemIndices x   = findIndices (x==)
+elemIndices :: Eq a => a -> [a] -> [Int]
+elemIndices x = findIndices (x==)
 
 -- | The 'find' function takes a predicate and a list and returns the
 -- first element in the list matching the predicate, or 'Nothing' if
@@ -312,8 +312,8 @@ elemIndices x   = findIndices (x==)
 --
 -- >>> find (< 0) [1..10]
 -- Nothing
-find            :: (a -> Bool) -> [a] -> Maybe a
-find p          = listToMaybe . filter p
+find :: (a -> Bool) -> [a] -> Maybe a
+find p = listToMaybe . filter p
 
 -- | The 'findIndex' function takes a predicate and a list and returns
 -- the index of the first element in the list satisfying the predicate,
@@ -321,15 +321,15 @@ find p          = listToMaybe . filter p
 --
 -- >>> findIndex isSpace "Hello World!"
 -- Just 5
-findIndex       :: (a -> Bool) -> [a] -> Maybe Int
-findIndex p     = listToMaybe . findIndices p
+findIndex :: (a -> Bool) -> [a] -> Maybe Int
+findIndex p = listToMaybe . findIndices p
 
 -- | The 'findIndices' function extends 'findIndex', by returning the
 -- indices of all elements satisfying the predicate, in ascending order.
 --
 -- >>> findIndices (`elem` "aeiou") "Hello World!"
 -- [1,4,7]
-findIndices      :: (a -> Bool) -> [a] -> [Int]
+findIndices :: (a -> Bool) -> [a] -> [Int]
 #if defined(USE_REPORT_PRELUDE)
 findIndices p xs = [ i | (x,i) <- zip xs [0..], p x]
 #else
@@ -351,10 +351,10 @@ findIndices p ls = build $ \c n ->
 --
 -- >>> "Hello" `isPrefixOf` "Wello Horld!"
 -- False
-isPrefixOf              :: (Eq a) => [a] -> [a] -> Bool
-isPrefixOf [] _         =  True
-isPrefixOf _  []        =  False
-isPrefixOf (x:xs) (y:ys)=  x == y && isPrefixOf xs ys
+isPrefixOf :: Eq a => [a] -> [a] -> Bool
+isPrefixOf [] _          = True
+isPrefixOf _  []         = False
+isPrefixOf (x:xs) (y:ys) = x == y && isPrefixOf xs ys
 
 -- | The 'isSuffixOf' function takes two lists and returns 'True' iff
 -- the first list is a suffix of the second. The second list must be
@@ -365,8 +365,8 @@ isPrefixOf (x:xs) (y:ys)=  x == y && isPrefixOf xs ys
 --
 -- >>> "World" `isSuffixOf` "Hello World!"
 -- False
-isSuffixOf              :: (Eq a) => [a] -> [a] -> Bool
-ns `isSuffixOf` hs      = maybe False id $ do
+isSuffixOf :: Eq a => [a] -> [a] -> Bool
+ns `isSuffixOf` hs = maybe False id $ do
       delta <- dropLengthMaybe ns hs
       return $ ns == dropLength delta hs
       -- Since dropLengthMaybe ns hs succeeded, we know that (if hs is finite)
@@ -409,7 +409,7 @@ dropLengthMaybe (_:x') (_:y') = dropLengthMaybe x' y'
 --
 -- >>> isInfixOf "Ial" "I really like Haskell."
 -- False
-isInfixOf               :: (Eq a) => [a] -> [a] -> Bool
+isInfixOf :: Eq a => [a] -> [a] -> Bool
 isInfixOf needle haystack = any (isPrefixOf needle) (tails haystack)
 
 -- | \(\mathcal{O}(n^2)\). The 'nub' function removes duplicate elements from a
@@ -419,8 +419,8 @@ isInfixOf needle haystack = any (isPrefixOf needle) (tails haystack)
 --
 -- >>> nub [1,2,3,4,3,2,1,2,4,3,5]
 -- [1,2,3,4,5]
-nub                     :: (Eq a) => [a] -> [a]
-nub                     =  nubBy (==)
+nub :: Eq a => [a] -> [a]
+nub = nubBy (==)
 
 -- | The 'nubBy' function behaves just like 'nub', except it uses a
 -- user-supplied equality predicate instead of the overloaded '=='
@@ -428,15 +428,15 @@ nub                     =  nubBy (==)
 --
 -- >>> nubBy (\x y -> mod x 3 == mod y 3) [1,2,4,5,6]
 -- [1,2,6]
-nubBy                   :: (a -> a -> Bool) -> [a] -> [a]
+nubBy :: (a -> a -> Bool) -> [a] -> [a]
 #if defined(USE_REPORT_PRELUDE)
-nubBy eq []             =  []
-nubBy eq (x:xs)         =  x : nubBy eq (filter (\ y -> not (eq x y)) xs)
+nubBy eq []     = []
+nubBy eq (x:xs) = x : nubBy eq (filter (\ y -> not (eq x y)) xs)
 #else
 -- stolen from HBC
-nubBy eq l              = nubBy' l []
+nubBy eq l = nubBy' l []
   where
-    nubBy' [] _         = []
+    nubBy' [] _ = []
     nubBy' (y:ys) xs
        | elem_by eq y xs = nubBy' ys xs
        | otherwise       = y : nubBy' ys (y:xs)
@@ -449,8 +449,8 @@ nubBy eq l              = nubBy' l []
 -- 'xs' is the list of things we've seen so far,
 -- 'y' is the potential new element
 elem_by :: (a -> a -> Bool) -> a -> [a] -> Bool
-elem_by _  _ []         =  False
-elem_by eq y (x:xs)     =  x `eq` y || elem_by eq y xs
+elem_by _  _ []     = False
+elem_by eq y (x:xs) = x `eq` y || elem_by eq y xs
 #endif
 
 
@@ -462,17 +462,17 @@ elem_by eq y (x:xs)     =  x `eq` y || elem_by eq y xs
 --
 -- It is a special case of 'deleteBy', which allows the programmer to
 -- supply their own equality test.
-delete                  :: (Eq a) => a -> [a] -> [a]
-delete                  =  deleteBy (==)
+delete :: Eq a => a -> [a] -> [a]
+delete = deleteBy (==)
 
 -- | \(\mathcal{O}(n)\). The 'deleteBy' function behaves like 'delete', but
 -- takes a user-supplied equality predicate.
 --
 -- >>> deleteBy (<=) 4 [1..10]
 -- [1,2,3,5,6,7,8,9,10]
-deleteBy                :: (a -> a -> Bool) -> a -> [a] -> [a]
-deleteBy _  _ []        = []
-deleteBy eq x (y:ys)    = if x `eq` y then ys else y : deleteBy eq x ys
+deleteBy :: (a -> a -> Bool) -> a -> [a] -> [a]
+deleteBy _  _ []     = []
+deleteBy eq x (y:ys) = if x `eq` y then ys else y : deleteBy eq x ys
 
 -- | The '\\' function is list difference (non-associative).
 -- In the result of @xs@ '\\' @ys@, the first occurrence of each element of
@@ -486,8 +486,8 @@ deleteBy eq x (y:ys)    = if x `eq` y then ys else y : deleteBy eq x ys
 -- It is a special case of 'deleteFirstsBy', which allows the programmer
 -- to supply their own equality test.
 
-(\\)                    :: (Eq a) => [a] -> [a] -> [a]
-(\\)                    =  foldl (flip delete)
+(\\) :: Eq a => [a] -> [a] -> [a]
+(\\) = foldl (flip delete)
 
 -- | The 'union' function returns the list union of the two lists.
 -- For example,
@@ -501,12 +501,12 @@ deleteBy eq x (y:ys)    = if x `eq` y then ys else y : deleteBy eq x ys
 -- It is a special case of 'unionBy', which allows the programmer to supply
 -- their own equality test.
 
-union                   :: (Eq a) => [a] -> [a] -> [a]
-union                   = unionBy (==)
+union :: Eq a => [a] -> [a] -> [a]
+union = unionBy (==)
 
 -- | The 'unionBy' function is the non-overloaded version of 'union'.
-unionBy                 :: (a -> a -> Bool) -> [a] -> [a] -> [a]
-unionBy eq xs ys        =  xs ++ foldl (flip (deleteBy eq)) (nubBy eq ys) xs
+unionBy :: (a -> a -> Bool) -> [a] -> [a] -> [a]
+unionBy eq xs ys = xs ++ foldl (flip (deleteBy eq)) (nubBy eq ys) xs
 
 -- | The 'intersect' function takes the list intersection of two lists.
 -- For example,
@@ -523,14 +523,14 @@ unionBy eq xs ys        =  xs ++ foldl (flip (deleteBy eq)) (nubBy eq ys) xs
 -- supply their own equality test. If the element is found in both the first
 -- and the second list, the element from the first list will be used.
 
-intersect               :: (Eq a) => [a] -> [a] -> [a]
-intersect               =  intersectBy (==)
+intersect :: Eq a => [a] -> [a] -> [a]
+intersect = intersectBy (==)
 
 -- | The 'intersectBy' function is the non-overloaded version of 'intersect'.
-intersectBy             :: (a -> a -> Bool) -> [a] -> [a] -> [a]
-intersectBy _  [] _     =  []
-intersectBy _  _  []    =  []
-intersectBy eq xs ys    =  [x | x <- xs, any (eq x) ys]
+intersectBy :: (a -> a -> Bool) -> [a] -> [a] -> [a]
+intersectBy _  [] _  = []
+intersectBy _  _  [] = []
+intersectBy eq xs ys = [x | x <- xs, any (eq x) ys]
 
 -- | \(\mathcal{O}(n)\). The 'intersperse' function takes an element and a list
 -- and \`intersperses\' that element between the elements of the list. For
@@ -538,16 +538,16 @@ intersectBy eq xs ys    =  [x | x <- xs, any (eq x) ys]
 --
 -- >>> intersperse ',' "abcde"
 -- "a,b,c,d,e"
-intersperse             :: a -> [a] -> [a]
-intersperse _   []      = []
-intersperse sep (x:xs)  = x : prependToAll sep xs
+intersperse :: a -> [a] -> [a]
+intersperse _   []     = []
+intersperse sep (x:xs) = x : prependToAll sep xs
 
 
 -- Not exported:
 -- We want to make every element in the 'intersperse'd list available
 -- as soon as possible to avoid space leaks. Experiments suggested that
 -- a separate top-level helper is more efficient than a local worker.
-prependToAll            :: a -> [a] -> [a]
+prependToAll :: a -> [a] -> [a]
 prependToAll _   []     = []
 prependToAll sep (x:xs) = sep : x : prependToAll sep xs
 
@@ -628,12 +628,12 @@ transpose ((x : xs) : xss) = combine x hds xs tls
 --
 -- >>> partition (`elem` "aeiou") "Hello World!"
 -- ("eoo","Hll Wrld!")
-partition               :: (a -> Bool) -> [a] -> ([a],[a])
+partition :: (a -> Bool) -> [a] -> ([a], [a])
 {-# INLINE partition #-}
-partition p xs = foldr (select p) ([],[]) xs
+partition p xs = foldr (select p) ([], []) xs
 
 select :: (a -> Bool) -> a -> ([a], [a]) -> ([a], [a])
-select p x ~(ts,fs) | p x       = (x:ts,fs)
+select p x ~(ts,fs) | p x       = (x:ts, fs)
                     | otherwise = (ts, x:fs)
 
 -- | The 'mapAccumL' function behaves like a combination of 'map' and
@@ -647,10 +647,10 @@ mapAccumL :: (acc -> x -> (acc, y)) -- Function of elt of input list
           -> [x]            -- Input list
           -> (acc, [y])     -- Final accumulator and result list
 {-# NOINLINE [1] mapAccumL #-}
-mapAccumL _ s []        =  (s, [])
-mapAccumL f s (x:xs)    =  (s'',y:ys)
-                           where (s', y ) = f s x
-                                 (s'',ys) = mapAccumL f s' xs
+mapAccumL _ s []     =  (s, [])
+mapAccumL f s (x:xs) =  (s'', y:ys)
+                           where (s', y)   = f s x
+                                 (s'', ys) = mapAccumL f s' xs
 
 {-# RULES
 "mapAccumL" [~1] forall f s xs . mapAccumL f s xs = foldr (mapAccumLF f) pairWithNil xs s
@@ -680,9 +680,9 @@ mapAccumR :: (acc -> x -> (acc, y))     -- Function of elt of input list
             -> acc              -- Initial accumulator
             -> [x]              -- Input list
             -> (acc, [y])               -- Final accumulator and result list
-mapAccumR _ s []        =  (s, [])
-mapAccumR f s (x:xs)    =  (s'', y:ys)
-                           where (s'',y ) = f s' x
+mapAccumR _ s []     = (s, [])
+mapAccumR f s (x:xs) = (s'', y:ys)
+                           where (s'', y) = f s' x
                                  (s', ys) = mapAccumR f s xs
 
 -- | \(\mathcal{O}(n)\). The 'insert' function takes an element and a list and
@@ -752,92 +752,90 @@ minimumBy cmp = fromMaybe (errorWithoutStackTrace "minimumBy: empty structure")
 -- 3
 -- >>> genericLength [1, 2, 3] :: Float
 -- 3.0
-genericLength           :: (Num i) => [a] -> i
+genericLength :: Num i => [a] -> i
 {-# NOINLINE [1] genericLength #-}
-genericLength []        =  0
-genericLength (_:l)     =  1 + genericLength l
+genericLength []    = 0
+genericLength (_:l) = 1 + genericLength l
 
 {-# RULES
   "genericLengthInt"     genericLength = (strictGenericLength :: [a] -> Int);
   "genericLengthInteger" genericLength = (strictGenericLength :: [a] -> Integer);
  #-}
 
-strictGenericLength     :: (Num i) => [b] -> i
-strictGenericLength l   =  gl l 0
+strictGenericLength :: Num i => [b] -> i
+strictGenericLength l = gl l 0
                         where
                            gl [] a     = a
                            gl (_:xs) a = let a' = a + 1 in a' `seq` gl xs a'
 
 -- | The 'genericTake' function is an overloaded version of 'take', which
 -- accepts any 'Integral' value as the number of elements to take.
-genericTake             :: (Integral i) => i -> [a] -> [a]
+genericTake :: Integral i => i -> [a] -> [a]
 genericTake n _ | n <= 0 = []
-genericTake _ []        =  []
-genericTake n (x:xs)    =  x : genericTake (n-1) xs
+genericTake _ []         = []
+genericTake n (x:xs)     = x : genericTake (n-1) xs
 
 -- | The 'genericDrop' function is an overloaded version of 'drop', which
 -- accepts any 'Integral' value as the number of elements to drop.
-genericDrop             :: (Integral i) => i -> [a] -> [a]
+genericDrop :: Integral i => i -> [a] -> [a]
 genericDrop n xs | n <= 0 = xs
-genericDrop _ []        =  []
-genericDrop n (_:xs)    =  genericDrop (n-1) xs
+genericDrop _ []     = []
+genericDrop n (_:xs) = genericDrop (n-1) xs
 
 
 -- | The 'genericSplitAt' function is an overloaded version of 'splitAt', which
 -- accepts any 'Integral' value as the position at which to split.
-genericSplitAt          :: (Integral i) => i -> [a] -> ([a], [a])
-genericSplitAt n xs | n <= 0 =  ([],xs)
-genericSplitAt _ []     =  ([],[])
-genericSplitAt n (x:xs) =  (x:xs',xs'') where
-    (xs',xs'') = genericSplitAt (n-1) xs
+genericSplitAt :: Integral i => i -> [a] -> ([a], [a])
+genericSplitAt n xs | n <= 0 =  ([], xs)
+genericSplitAt _ []     =  ([], [])
+genericSplitAt n (x:xs) =  (x:xs', xs'') where
+    (xs', xs'') = genericSplitAt (n-1) xs
 
 -- | The 'genericIndex' function is an overloaded version of '!!', which
 -- accepts any 'Integral' value as the index.
-genericIndex :: (Integral i) => [a] -> i -> a
+genericIndex :: Integral i => [a] -> i -> a
 genericIndex (x:_)  0 = x
 genericIndex (_:xs) n
  | n > 0     = genericIndex xs (n-1)
  | otherwise = errorWithoutStackTrace "List.genericIndex: negative argument."
-genericIndex _ _      = errorWithoutStackTrace "List.genericIndex: index too large."
+genericIndex _ _ = errorWithoutStackTrace "List.genericIndex: index too large."
 
 -- | The 'genericReplicate' function is an overloaded version of 'replicate',
 -- which accepts any 'Integral' value as the number of repetitions to make.
-genericReplicate        :: (Integral i) => i -> a -> [a]
-genericReplicate n x    =  genericTake n (repeat x)
+genericReplicate :: Integral i => i -> a -> [a]
+genericReplicate n x = genericTake n (repeat x)
 
 -- | The 'zip4' function takes four lists and returns a list of
 -- quadruples, analogous to 'zip'.
 -- It is capable of list fusion, but it is restricted to its
 -- first list argument and its resulting list.
 {-# INLINE zip4 #-}
-zip4                    :: [a] -> [b] -> [c] -> [d] -> [(a,b,c,d)]
-zip4                    =  zipWith4 (,,,)
+zip4 :: [a] -> [b] -> [c] -> [d] -> [(a,b,c,d)]
+zip4 = zipWith4 (,,,)
 
 -- | The 'zip5' function takes five lists and returns a list of
 -- five-tuples, analogous to 'zip'.
 -- It is capable of list fusion, but it is restricted to its
 -- first list argument and its resulting list.
 {-# INLINE zip5 #-}
-zip5                    :: [a] -> [b] -> [c] -> [d] -> [e] -> [(a,b,c,d,e)]
-zip5                    =  zipWith5 (,,,,)
+zip5 :: [a] -> [b] -> [c] -> [d] -> [e] -> [(a,b,c,d,e)]
+zip5 = zipWith5 (,,,,)
 
 -- | The 'zip6' function takes six lists and returns a list of six-tuples,
 -- analogous to 'zip'.
 -- It is capable of list fusion, but it is restricted to its
 -- first list argument and its resulting list.
 {-# INLINE zip6 #-}
-zip6                    :: [a] -> [b] -> [c] -> [d] -> [e] -> [f] ->
-                              [(a,b,c,d,e,f)]
-zip6                    =  zipWith6 (,,,,,)
+zip6 :: [a] -> [b] -> [c] -> [d] -> [e] -> [f] -> [(a,b,c,d,e,f)]
+zip6 = zipWith6 (,,,,,)
 
 -- | The 'zip7' function takes seven lists and returns a list of
 -- seven-tuples, analogous to 'zip'.
 -- It is capable of list fusion, but it is restricted to its
 -- first list argument and its resulting list.
 {-# INLINE zip7 #-}
-zip7                    :: [a] -> [b] -> [c] -> [d] -> [e] -> [f] ->
-                              [g] -> [(a,b,c,d,e,f,g)]
-zip7                    =  zipWith7 (,,,,,,)
+zip7 :: [a] -> [b] -> [c] -> [d] -> [e] -> [f] -> [g] -> [(a,b,c,d,e,f,g)]
+zip7 = zipWith7 (,,,,,,)
 
 -- | The 'zipWith4' function takes a function which combines four
 -- elements, as well as four lists and returns a list of their point-wise
@@ -845,10 +843,10 @@ zip7                    =  zipWith7 (,,,,,,)
 -- It is capable of list fusion, but it is restricted to its
 -- first list argument and its resulting list.
 {-# NOINLINE [1] zipWith4 #-}
-zipWith4                :: (a->b->c->d->e) -> [a]->[b]->[c]->[d]->[e]
+zipWith4 :: (a->b->c->d->e) -> [a]->[b]->[c]->[d]->[e]
 zipWith4 z (a:as) (b:bs) (c:cs) (d:ds)
-                        =  z a b c d : zipWith4 z as bs cs ds
-zipWith4 _ _ _ _ _      =  []
+                   = z a b c d : zipWith4 z as bs cs ds
+zipWith4 _ _ _ _ _ = []
 
 -- | The 'zipWith5' function takes a function which combines five
 -- elements, as well as five lists and returns a list of their point-wise
@@ -868,10 +866,9 @@ zipWith5 _ _ _ _ _ _    = []
 -- It is capable of list fusion, but it is restricted to its
 -- first list argument and its resulting list.
 {-# NOINLINE [1] zipWith6 #-}
-zipWith6                :: (a->b->c->d->e->f->g) ->
-                           [a]->[b]->[c]->[d]->[e]->[f]->[g]
+zipWith6 :: (a->b->c->d->e->f->g) -> [a]->[b]->[c]->[d]->[e]->[f]->[g]
 zipWith6 z (a:as) (b:bs) (c:cs) (d:ds) (e:es) (f:fs)
-                        =  z a b c d e f : zipWith6 z as bs cs ds es fs
+                        = z a b c d e f : zipWith6 z as bs cs ds es fs
 zipWith6 _ _ _ _ _ _ _  = []
 
 -- | The 'zipWith7' function takes a function which combines seven
@@ -880,10 +877,9 @@ zipWith6 _ _ _ _ _ _ _  = []
 -- It is capable of list fusion, but it is restricted to its
 -- first list argument and its resulting list.
 {-# NOINLINE [1] zipWith7 #-}
-zipWith7                :: (a->b->c->d->e->f->g->h) ->
-                           [a]->[b]->[c]->[d]->[e]->[f]->[g]->[h]
+zipWith7 :: (a->b->c->d->e->f->g->h) -> [a]->[b]->[c]->[d]->[e]->[f]->[g]->[h]
 zipWith7 z (a:as) (b:bs) (c:cs) (d:ds) (e:es) (f:fs) (g:gs)
-                   =  z a b c d e f g : zipWith7 z as bs cs ds es fs gs
+                   = z a b c d e f g : zipWith7 z as bs cs ds es fs gs
 zipWith7 _ _ _ _ _ _ _ _ = []
 
 {-
@@ -1025,47 +1021,47 @@ pragma should be replicated in the @unzipN@ functions below as well.
 {-# INLINE unzip4 #-}
 -- Inline so that fusion with `foldr` has an opportunity to fire.
 -- See Note [Inline @unzipN@ functions] above.
-unzip4                  :: [(a,b,c,d)] -> ([a],[b],[c],[d])
-unzip4                  =  foldr (\(a,b,c,d) ~(as,bs,cs,ds) ->
-                                        (a:as,b:bs,c:cs,d:ds))
-                                 ([],[],[],[])
+unzip4 :: [(a,b,c,d)] -> ([a],[b],[c],[d])
+unzip4 = foldr (\(a,b,c,d) ~(as,bs,cs,ds) ->
+                      (a:as,b:bs,c:cs,d:ds))
+               ([],[],[],[])
 
 -- | The 'unzip5' function takes a list of five-tuples and returns five
 -- lists, analogous to 'unzip'.
 {-# INLINE unzip5 #-}
 -- Inline so that fusion with `foldr` has an opportunity to fire.
 -- See Note [Inline @unzipN@ functions] above.
-unzip5                  :: [(a,b,c,d,e)] -> ([a],[b],[c],[d],[e])
-unzip5                  =  foldr (\(a,b,c,d,e) ~(as,bs,cs,ds,es) ->
-                                        (a:as,b:bs,c:cs,d:ds,e:es))
-                                 ([],[],[],[],[])
+unzip5 :: [(a,b,c,d,e)] -> ([a],[b],[c],[d],[e])
+unzip5 = foldr (\(a,b,c,d,e) ~(as,bs,cs,ds,es) ->
+                      (a:as,b:bs,c:cs,d:ds,e:es))
+               ([],[],[],[],[])
 
 -- | The 'unzip6' function takes a list of six-tuples and returns six
 -- lists, analogous to 'unzip'.
 {-# INLINE unzip6 #-}
 -- Inline so that fusion with `foldr` has an opportunity to fire.
 -- See Note [Inline @unzipN@ functions] above.
-unzip6                  :: [(a,b,c,d,e,f)] -> ([a],[b],[c],[d],[e],[f])
-unzip6                  =  foldr (\(a,b,c,d,e,f) ~(as,bs,cs,ds,es,fs) ->
-                                        (a:as,b:bs,c:cs,d:ds,e:es,f:fs))
-                                 ([],[],[],[],[],[])
+unzip6 :: [(a,b,c,d,e,f)] -> ([a],[b],[c],[d],[e],[f])
+unzip6 = foldr (\(a,b,c,d,e,f) ~(as,bs,cs,ds,es,fs) ->
+                      (a:as,b:bs,c:cs,d:ds,e:es,f:fs))
+               ([],[],[],[],[],[])
 
 -- | The 'unzip7' function takes a list of seven-tuples and returns
 -- seven lists, analogous to 'unzip'.
 {-# INLINE unzip7 #-}
 -- Inline so that fusion with `foldr` has an opportunity to fire.
 -- See Note [Inline @unzipN@ functions] above.
-unzip7          :: [(a,b,c,d,e,f,g)] -> ([a],[b],[c],[d],[e],[f],[g])
-unzip7          =  foldr (\(a,b,c,d,e,f,g) ~(as,bs,cs,ds,es,fs,gs) ->
-                                (a:as,b:bs,c:cs,d:ds,e:es,f:fs,g:gs))
-                         ([],[],[],[],[],[],[])
+unzip7 :: [(a,b,c,d,e,f,g)] -> ([a],[b],[c],[d],[e],[f],[g])
+unzip7 = foldr (\(a,b,c,d,e,f,g) ~(as,bs,cs,ds,es,fs,gs) ->
+                      (a:as,b:bs,c:cs,d:ds,e:es,f:fs,g:gs))
+               ([],[],[],[],[],[],[])
 
 
 -- | The 'deleteFirstsBy' function takes a predicate and two lists and
 -- returns the first list with the first occurrence of each element of
 -- the second list removed.
-deleteFirstsBy          :: (a -> a -> Bool) -> [a] -> [a] -> [a]
-deleteFirstsBy eq       =  foldl (flip (deleteBy eq))
+deleteFirstsBy :: (a -> a -> Bool) -> [a] -> [a] -> [a]
+deleteFirstsBy eq = foldl (flip (deleteBy eq))
 
 -- | The 'group' function takes a list and returns a list of lists such
 -- that the concatenation of the result is equal to the argument.  Moreover,
@@ -1076,14 +1072,14 @@ deleteFirstsBy eq       =  foldl (flip (deleteBy eq))
 --
 -- It is a special case of 'groupBy', which allows the programmer to supply
 -- their own equality test.
-group                   :: Eq a => [a] -> [[a]]
-group                   =  groupBy (==)
+group :: Eq a => [a] -> [[a]]
+group = groupBy (==)
 
 -- | The 'groupBy' function is the non-overloaded version of 'group'.
-groupBy                 :: (a -> a -> Bool) -> [a] -> [[a]]
-groupBy _  []           =  []
-groupBy eq (x:xs)       =  (x:ys) : groupBy eq zs
-                           where (ys,zs) = span (eq x) xs
+groupBy :: (a -> a -> Bool) -> [a] -> [[a]]
+groupBy _  []     = []
+groupBy eq (x:xs) = (x:ys) : groupBy eq zs
+  where (ys,zs) = span (eq x) xs
 
 -- | The 'inits' function returns all initial segments of the argument,
 -- shortest first.  For example,
@@ -1096,8 +1092,8 @@ groupBy eq (x:xs)       =  (x:ys) : groupBy eq zs
 --
 -- In particular,
 -- @inits _|_ = [] : _|_@
-inits                   :: [a] -> [[a]]
-inits                   = map toListSB . scanl' snocSB emptySB
+inits :: [a] -> [[a]]
+inits = map toListSB . scanl' snocSB emptySB
 {-# NOINLINE inits #-}
 
 -- We do not allow inits to inline, because it plays havoc with Call Arity
@@ -1112,9 +1108,9 @@ inits                   = map toListSB . scanl' snocSB emptySB
 --
 -- Note that 'tails' has the following strictness property:
 -- @tails _|_ = _|_ : _|_@
-tails                   :: [a] -> [[a]]
+tails :: [a] -> [[a]]
 {-# INLINABLE tails #-}
-tails lst               =  build (\c n ->
+tails lst = build (\c n ->
   let tailsGo xs = xs `c` case xs of
                              []      -> n
                              _ : xs' -> tailsGo xs'
@@ -1124,17 +1120,17 @@ tails lst               =  build (\c n ->
 --
 -- >>> subsequences "abc"
 -- ["","a","b","ab","c","ac","bc","abc"]
-subsequences            :: [a] -> [[a]]
-subsequences xs         =  [] : nonEmptySubsequences xs
+subsequences :: [a] -> [[a]]
+subsequences xs = [] : nonEmptySubsequences xs
 
 -- | The 'nonEmptySubsequences' function returns the list of all subsequences of the argument,
 --   except for the empty list.
 --
 -- >>> nonEmptySubsequences "abc"
 -- ["a","b","ab","c","ac","bc","abc"]
-nonEmptySubsequences         :: [a] -> [[a]]
-nonEmptySubsequences []      =  []
-nonEmptySubsequences (x:xs)  =  [x] : foldr f [] (nonEmptySubsequences xs)
+nonEmptySubsequences :: [a] -> [[a]]
+nonEmptySubsequences []      = []
+nonEmptySubsequences (x:xs)  = [x] : foldr f [] (nonEmptySubsequences xs)
   where f ys r = ys : (x : ys) : r
 
 
@@ -1142,8 +1138,8 @@ nonEmptySubsequences (x:xs)  =  [x] : foldr f [] (nonEmptySubsequences xs)
 --
 -- >>> permutations "abc"
 -- ["abc","bac","cba","bca","cab","acb"]
-permutations            :: [a] -> [[a]]
-permutations xs0        =  xs0 : perms xs0 []
+permutations :: [a] -> [[a]]
+permutations xs0 = xs0 : perms xs0 []
   where
     perms []     _  = []
     perms (t:ts) is = foldr interleave (perms ts (t:is)) (permutations is)
@@ -1165,7 +1161,7 @@ permutations xs0        =  xs0 : perms xs0 []
 --
 -- >>> sort [1,6,4,3,2,5]
 -- [1,2,3,4,5,6]
-sort :: (Ord a) => [a] -> [a]
+sort :: Ord a => [a] -> [a]
 
 -- | The 'sortBy' function is the non-overloaded version of 'sort'.
 --
@@ -1442,27 +1438,27 @@ unfoldr f b0 = build (\c n ->
 -- ["one","two"]
 --
 -- Thus @'lines' s@ contains at least as many elements as newlines in @s@.
-lines                   :: String -> [String]
-lines ""                =  []
+lines :: String -> [String]
+lines "" =  []
 -- Somehow GHC doesn't detect the selector thunks in the below code,
 -- so s' keeps a reference to the first line via the pair and we have
 -- a space leak (cf. #4334).
 -- So we need to make GHC see the selector thunks with a trick.
-lines s                 =  cons (case break (== '\n') s of
-                                    (l, s') -> (l, case s' of
-                                                    []      -> []
-                                                    _:s''   -> lines s''))
+lines s = cons (case break (== '\n') s of
+                   (l, s') -> (l, case s' of
+                                   []      -> []
+                                   _:s''   -> lines s''))
   where
-    cons ~(h, t)        =  h : t
+    cons ~(h, t) = h : t
 
 -- | 'unlines' is an inverse operation to 'lines'.
 -- It joins lines, after appending a terminating newline to each.
 --
 -- >>> unlines ["Hello", "World", "!"]
 -- "Hello\nWorld\n!\n"
-unlines                 :: [String] -> String
+unlines :: [String] -> String
 #if defined(USE_REPORT_PRELUDE)
-unlines                 =  concatMap (++ "\n")
+unlines =  concatMap (++ "\n")
 #else
 -- HBC version (stolen)
 -- here's a more efficient version
@@ -1475,13 +1471,13 @@ unlines (l:ls) = l ++ '\n' : unlines ls
 --
 -- >>> words "Lorem ipsum\ndolor"
 -- ["Lorem","ipsum","dolor"]
-words                   :: String -> [String]
+words :: String -> [String]
 {-# NOINLINE [1] words #-}
-words s                 =  case dropWhile {-partain:Char.-}isSpace s of
-                                "" -> []
-                                s' -> w : words s''
-                                      where (w, s'') =
-                                             break {-partain:Char.-}isSpace s'
+words s =  case dropWhile {-partain:Char.-}isSpace s of
+  "" -> []
+  s' -> w : words s''
+    where (w, s'') =
+            break {-partain:Char.-}isSpace s'
 
 {-# RULES
 "words" [~1] forall s . words s = build (\c n -> wordsFB c n s)
@@ -1501,16 +1497,16 @@ wordsFB c n = go
 --
 -- >>> unwords ["Lorem", "ipsum", "dolor"]
 -- "Lorem ipsum dolor"
-unwords                 :: [String] -> String
+unwords :: [String] -> String
 #if defined(USE_REPORT_PRELUDE)
-unwords []              =  ""
-unwords ws              =  foldr1 (\w s -> w ++ ' ':s) ws
+unwords [] = ""
+unwords ws = foldr1 (\w s -> w ++ ' ':s) ws
 #else
 -- Here's a lazier version that can get the last element of a
 -- _|_-terminated list.
 {-# NOINLINE [1] unwords #-}
-unwords []              =  ""
-unwords (w:ws)          = w ++ go ws
+unwords []     =  ""
+unwords (w:ws) = w ++ go ws
   where
     go []     = ""
     go (v:vs) = ' ' : (v ++ go vs)
@@ -1528,13 +1524,13 @@ unwords (w:ws)          = w ++ go ws
  #-}
 
 {-# INLINE [0] tailUnwords #-}
-tailUnwords           :: String -> String
-tailUnwords []        = []
-tailUnwords (_:xs)    = xs
+tailUnwords :: String -> String
+tailUnwords []     = []
+tailUnwords (_:xs) = xs
 
 {-# INLINE [0] unwordsFB #-}
-unwordsFB               :: String -> String -> String
-unwordsFB w r           = ' ' : w ++ r
+unwordsFB :: String -> String -> String
+unwordsFB w r = ' ' : w ++ r
 #endif
 
 {- A "SnocBuilder" is a version of Chris Okasaki's banker's queue that supports

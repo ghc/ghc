@@ -85,6 +85,7 @@ import GHC.Generics
 import GHC.Num
 import GHC.Read
 import GHC.Show
+import GHC.ST
 
 import Control.Monad.Fail (MonadFail)
 

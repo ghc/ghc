@@ -230,7 +230,7 @@ pprBooleanFormulaNice = pprBooleanFormula' pprVar pprAnd pprOr 0
   pprAnd' xs@(_:_) = fsep (punctuate comma (init xs)) <> text ", and" <+> last xs
   pprOr p xs = cparen (p > 1) $ text "either" <+> sep (intersperse (text "or") xs)
 
-instance (OutputableBndr a) => Outputable (BooleanFormula a) where
+instance OutputableBndr a => Outputable (BooleanFormula a) where
   ppr = pprBooleanFormulaNormal
 
 pprBooleanFormulaNormal :: (OutputableBndr a)
