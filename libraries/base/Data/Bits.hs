@@ -83,7 +83,7 @@ import GHC.Show
 -- choice.
 --
 -- @since 4.16
-oneBits :: (FiniteBits a) => a
+oneBits :: FiniteBits a => a
 oneBits = complement zeroBits
 {-# INLINE oneBits #-}
 
@@ -107,7 +107,7 @@ newtype And a = And { getAnd :: a }
                  )
 
 -- | @since 4.16
-instance (Bits a) => Semigroup (And a) where
+instance Bits a => Semigroup (And a) where
   And x <> And y = And (x .&. y)
 
 -- | This constraint is arguably too strong. However,
@@ -115,7 +115,7 @@ instance (Bits a) => Semigroup (And a) where
 -- only safe choice.
 --
 -- @since 4.16
-instance (FiniteBits a) => Monoid (And a) where
+instance FiniteBits a => Monoid (And a) where
   mempty = And oneBits
   -- By default, we would get a lazy right fold. This forces the use of a strict
   -- left fold instead.
@@ -142,11 +142,11 @@ newtype Ior a = Ior { getIor :: a }
                  )
 
 -- | @since 4.16
-instance (Bits a) => Semigroup (Ior a) where
+instance Bits a => Semigroup (Ior a) where
   Ior x <> Ior y = Ior (x .|. y)
 
 -- | @since 4.16
-instance (Bits a) => Monoid (Ior a) where
+instance Bits a => Monoid (Ior a) where
   mempty = Ior zeroBits
   -- By default, we would get a lazy right fold. This forces the use of a strict
   -- left fold instead.
@@ -173,11 +173,11 @@ newtype Xor a = Xor { getXor :: a }
                  )
 
 -- | @since 4.16
-instance (Bits a) => Semigroup (Xor a) where
+instance Bits a => Semigroup (Xor a) where
   Xor x <> Xor y = Xor (x `xor` y)
 
 -- | @since 4.16
-instance (Bits a) => Monoid (Xor a) where
+instance Bits a => Monoid (Xor a) where
   mempty = Xor zeroBits
   -- By default, we would get a lazy right fold. This forces the use of a strict
   -- left fold instead.
@@ -209,7 +209,7 @@ newtype Iff a = Iff { getIff :: a }
 -- 'complement', this is the only safe choice.
 --
 -- @since 4.16
-instance (FiniteBits a) => Semigroup (Iff a) where
+instance FiniteBits a => Semigroup (Iff a) where
   Iff x <> Iff y = Iff . complement $ (x `xor` y)
 
 -- | This constraint is arguably
@@ -217,7 +217,7 @@ instance (FiniteBits a) => Semigroup (Iff a) where
 -- 'complement', this is the only safe choice.
 --
 -- @since 4.16
-instance (FiniteBits a) => Monoid (Iff a) where
+instance FiniteBits a => Monoid (Iff a) where
   mempty = Iff oneBits
   -- By default, we would get a lazy right fold. This forces the use of a strict
   -- left fold instead.

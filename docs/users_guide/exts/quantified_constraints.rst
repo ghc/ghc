@@ -25,13 +25,13 @@ is *not* fine in Haskell today; we have no way to solve such a constraint.
 
 :extension:`QuantifiedConstraints` lets us write this ::
 
- instance (Eq a, forall b. (Eq b) => Eq (f b))
+ instance (Eq a, forall b. Eq b => Eq (f b))
         => Eq (Rose f a)
    where
      (Branch x1 c1) == (Branch x2 c2)
         = x1==x1 && c1==c2
 
-Here, the quantified constraint ``forall b. (Eq b) => Eq (f b)`` behaves
+Here, the quantified constraint ``forall b. Eq b => Eq (f b)`` behaves
 a bit like a local instance declaration, and makes the instance typeable.
 
 The paper `Quantified class constraints

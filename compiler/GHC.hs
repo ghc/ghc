@@ -478,7 +478,7 @@ defaultErrorHandler fm (FlushOut flushOut) inner =
 -- | This function is no longer necessary, cleanup is now done by
 -- runGhc/runGhcT.
 {-# DEPRECATED defaultCleanupHandler "Cleanup is now done by runGhc/runGhcT" #-}
-defaultCleanupHandler :: (ExceptionMonad m) => DynFlags -> m a -> m a
+defaultCleanupHandler :: ExceptionMonad m => DynFlags -> m a -> m a
 defaultCleanupHandler _ m = m
  where _warning_suppression = m `MC.onException` undefined
 
