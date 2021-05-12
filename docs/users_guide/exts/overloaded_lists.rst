@@ -108,12 +108,12 @@ several example instances:
       fromList = id
       toList = id
 
-    instance (Ord a) => IsList (Set a) where
+    instance Ord a => IsList (Set a) where
       type Item (Set a) = a
       fromList = Set.fromList
       toList = Set.toList
 
-    instance (Ord k) => IsList (Map k v) where
+    instance Ord k => IsList (Map k v) where
       type Item (Map k v) = (k,v)
       fromList = Map.fromList
       toList = Map.toList

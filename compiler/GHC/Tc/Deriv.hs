@@ -118,7 +118,7 @@ Note [Data decl contexts]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
 
-        data (RealFloat a) => Complex a = !a :+ !a deriving( Read )
+        data RealFloat a => Complex a = !a :+ !a deriving( Read )
 
 We will need an instance decl like:
 

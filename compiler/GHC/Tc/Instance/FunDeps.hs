@@ -481,9 +481,9 @@ in oclose!  Consider #10109:
 
   data Succ a   -- Succ :: forall k. k -> *
   class Add (a :: k1) (b :: k2) (ab :: k3) | a b -> ab
-  instance (Add a b ab) => Add (Succ {k1} (a :: k1))
-                               b
-                               (Succ {k3} (ab :: k3})
+  instance Add a b ab => Add (Succ {k1} (a :: k1))
+                             b
+                             (Succ {k3} (ab :: k3})
 
 We start with seed set {a:k1,b:k2} and closeOverKinds to {a,k1,b,k2}.
 Now use the fundep to extend to {a,k1,b,k2,ab}.  But we need to

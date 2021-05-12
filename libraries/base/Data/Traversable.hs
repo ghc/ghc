@@ -319,11 +319,11 @@ instance Traversable Last where
     traverse f (Last x) = Last <$> traverse f x
 
 -- | @since 4.12.0.0
-instance (Traversable f) => Traversable (Alt f) where
+instance Traversable f => Traversable (Alt f) where
     traverse f (Alt x) = Alt <$> traverse f x
 
 -- | @since 4.12.0.0
-instance (Traversable f) => Traversable (Ap f) where
+instance Traversable f => Traversable (Ap f) where
     traverse f (Ap x) = Ap <$> traverse f x
 
 -- | @since 4.9.0.0

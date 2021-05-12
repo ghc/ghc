@@ -129,7 +129,7 @@ instance (Alternative f, Applicative g) => Alternative (Compose f g) where
 -- | The deduction (via generativity) that if @g x :~: g y@ then @x :~: y@.
 --
 -- @since 4.14.0.0
-instance (TestEquality f) => TestEquality (Compose f g) where
+instance TestEquality f => TestEquality (Compose f g) where
   testEquality (Compose x) (Compose y) =
     case testEquality x y of -- :: Maybe (g x :~: g y)
       Just Refl -> Just Refl -- :: Maybe (x :~: y)

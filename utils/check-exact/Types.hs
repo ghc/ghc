@@ -27,32 +27,32 @@ emptyAnns = Map.empty
 -- | For every @Located a@, use the @SrcSpan@ and constructor name of
 -- a as the key, to store the standard annotation.
 -- These are used to maintain context in the AP and EP monads
-data AnnKey   = AnnKey RealSrcSpan AnnConName
-                  deriving (Eq, Data, Ord)
+data AnnKey = AnnKey RealSrcSpan AnnConName
+  deriving (Eq, Data, Ord)
 
 -- More compact Show instance
 instance Show AnnKey where
   show (AnnKey ss cn) = "AnnKey " ++ showPprUnsafe ss ++ " " ++ show cn
 
-mkAnnKeyPrim :: (Data a) => Located a -> AnnKey
+mkAnnKeyPrim :: Data a => Located a -> AnnKey
 mkAnnKeyPrim (L l a) = AnnKey (realSrcSpan l) (annGetConstr a)
 
-mkAnnKeyPrimA :: (Data a) => LocatedA a -> AnnKey
+mkAnnKeyPrimA :: Data a => LocatedA a -> AnnKey
 mkAnnKeyPrimA (L l a) = AnnKey (realSrcSpan $ locA l) (annGetConstr a)
 
 -- Holds the name of a constructor
 data AnnConName = CN { unConName :: String }
-                 deriving (Eq, Ord, Data)
+  deriving (Eq, Ord, Data)
 
 -- More compact show instance
 instance Show AnnConName where
   show (CN s) = "CN " ++ show s
 
-annGetConstr :: (Data a) => a -> AnnConName
+annGetConstr :: Data a => a -> AnnConName
 annGetConstr a = CN (show $ toConstr a)
 
 -- |Make an unwrapped @AnnKey@ for the @LHsDecl@ case, a normal one otherwise.
-mkAnnKey :: (Data a) => Located a -> AnnKey
+mkAnnKey :: Data a => Located a -> AnnKey
 mkAnnKey ld =
   case cast ld :: Maybe (LHsDecl GhcPs) of
     Just d -> declFun mkAnnKeyPrimA d
@@ -180,5 +180,5 @@ instance Show LayoutStartCol where
 -- ---------------------------------------------------------------------
 
 -- Duplicated here so it can be used in show instances
-showGhc :: (Outputable a) => a -> String
+showGhc :: Outputable a => a -> String
 showGhc = showPprUnsafe

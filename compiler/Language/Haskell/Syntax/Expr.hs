@@ -715,7 +715,7 @@ typechecking and is then directly used in the desugaring without
 modification.
 
 For example, if we have the record pattern synonym P,
-  pattern P :: (Show a) => a -> Maybe a
+  pattern P :: Show a => a -> Maybe a
   pattern P{x} = Just x
 
   foo = (Just True) { x = False }

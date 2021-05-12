@@ -4316,13 +4316,13 @@ pvL a = do { av <- a
 parseModule :: P (Located HsModule)
 parseModule = parseModuleNoHaddock >>= addHaddockToModule
 
-commentsA :: (Monoid ann) => SrcSpan -> EpAnnComments -> SrcSpanAnn' (EpAnn ann)
+commentsA :: Monoid ann => SrcSpan -> EpAnnComments -> SrcSpanAnn' (EpAnn ann)
 commentsA loc cs = SrcSpanAnn (EpAnn (Anchor (rs loc) UnchangedAnchor) mempty cs) loc
 
 -- | Instead of getting the *enclosed* comments, this includes the
 -- *preceding* ones.  It is used at the top level to get comments
 -- between top level declarations.
-commentsPA :: (Monoid ann) => LocatedAn ann a -> P (LocatedAn ann a)
+commentsPA :: Monoid ann => LocatedAn ann a -> P (LocatedAn ann a)
 commentsPA la@(L l a) = do
   cs <- getPriorCommentsFor (getLocA la)
   return (L (addCommentsToSrcAnn l cs) a)
