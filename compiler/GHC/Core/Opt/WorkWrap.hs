@@ -614,7 +614,7 @@ splitFun :: DynFlags -> FamInstEnvs -> Id -> IdInfo -> [Demand] -> Divergence ->
          -> UniqSM [(Id, CoreExpr)]
 splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr join_arg_unfs rhs
   | isRecordSelector fn_id  -- See Note [No worker/wrapper for record selectors]
-  = return [ (fn_id, rhs ) ] -- TODO: Should really be done inside tryWW
+  = return [ (fn_id, rhs ) ]
 
   | otherwise
   = WARN( not (wrap_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr cpr) )
