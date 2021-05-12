@@ -337,7 +337,6 @@ data Instr
         | LOCK        Instr -- lock prefix
         | XADD        Format Operand Operand -- src (r), dst (r/m)
         | CMPXCHG     Format Operand Operand -- src (r), dst (r/m), eax implicit
-        | CMPXCHG8B   AddrMode               -- edx, eax, ecx, ebx implicit
         | XCHG        Format Operand Reg     -- src (r/m), dst (r/m)
         | MFENCE
 
@@ -441,7 +440,6 @@ regUsageOfInstr platform instr
     LOCK i              -> regUsageOfInstr platform i
     XADD _ src dst      -> usageMM src dst
     CMPXCHG _ src dst   -> usageRMM src dst (OpReg eax)
-    CMPXCHG8B addr      -> mkRU (use_EA addr [edx, eax, ecx, ebx]) [edx, eax]
     XCHG _ src dst      -> usageMM src (OpReg dst)
     MFENCE -> noUsage
 
@@ -602,7 +600,6 @@ patchRegsOfInstr instr env
     LOCK i               -> LOCK (patchRegsOfInstr i env)
     XADD fmt src dst     -> patch2 (XADD fmt) src dst
     CMPXCHG fmt src dst  -> patch2 (CMPXCHG fmt) src dst
-    CMPXCHG8B addr       -> CMPXCHG8B (lookupAddr addr)
     XCHG fmt src dst     -> XCHG fmt (patchOp src) (env dst)
     MFENCE               -> instr
 
