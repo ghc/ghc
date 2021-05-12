@@ -1382,7 +1382,7 @@ run_BCO:
             SpW(-2) = tuple_info;
             SpW(-3) = BCO_PTR(o_bco);
             W_ ctoi_t_offset;
-            int tuple_stack_words = tuple_info & 0x3fff;
+            int tuple_stack_words = (tuple_info >> 24) & 0xff;
             switch(tuple_stack_words) {
                 case 0:  ctoi_t_offset = (W_)&stg_ctoi_t0_info;  break;
                 case 1:  ctoi_t_offset = (W_)&stg_ctoi_t1_info;  break;
