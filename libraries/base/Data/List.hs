@@ -1414,7 +1414,7 @@ unfoldr f b0 = build (\c n ->
 -- Functions on strings
 
 -- | 'lines' breaks a string up into a list of strings at newline
--- characters.  The resulting strings do not contain newlines.
+-- characters. The resulting strings do not contain newlines.
 --
 -- Note that after splitting the string at newline characters, the
 -- last part of the string is considered a line even if it doesn't end
@@ -1442,6 +1442,11 @@ unfoldr f b0 = build (\c n ->
 -- ["one","two"]
 --
 -- Thus @'lines' s@ contains at least as many elements as newlines in @s@.
+--
+-- Also, as a result, for a single-line string with no terminating '\n',
+-- 'unlines . lines /= id', as 'unlines' would add a '\n' to the original
+-- string.
+--
 lines                   :: String -> [String]
 lines ""                =  []
 -- Somehow GHC doesn't detect the selector thunks in the below code,
@@ -1455,8 +1460,10 @@ lines s                 =  cons (case break (== '\n') s of
   where
     cons ~(h, t)        =  h : t
 
--- | 'unlines' is an inverse operation to 'lines'.
--- It joins lines, after appending a terminating newline to each.
+-- | 'unlines' is an inverse operation to 'lines', though it should noted that,
+-- for some strings, 'unlines . lines /= id`.
+-- 'unlines' joins lines, after appending a terminating newline ('\n') to each.
+-- Also note that the platform-specific newline characters are not considered.
 --
 -- >>> unlines ["Hello", "World", "!"]
 -- "Hello\nWorld\n!\n"
