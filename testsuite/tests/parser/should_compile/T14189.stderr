@@ -34,7 +34,7 @@
          [])
         (Prefix)
         (HsDataDefn
-         (EpAnnNotUsed)
+         (NoExtField)
          (DataType)
          (Nothing)
          (Nothing)

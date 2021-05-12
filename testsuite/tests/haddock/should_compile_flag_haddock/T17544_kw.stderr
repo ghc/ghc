@@ -63,14 +63,7 @@
        [])
       (Prefix)
       (HsDataDefn
-       (EpAnn
-        (Anchor
-         { T17544_kw.hs:(15,1)-(16,20) }
-         (UnchangedAnchor))
-        [(AddEpAnn AnnData (EpaSpan { T17544_kw.hs:15:1-4 }))
-        ,(AddEpAnn AnnWhere (EpaSpan { T17544_kw.hs:16:3-7 }))]
-        (EpaComments
-         []))
+       (NoExtField)
        (DataType)
        (Nothing)
        (Nothing)
@@ -146,14 +139,7 @@
        [])
       (Prefix)
       (HsDataDefn
-       (EpAnn
-        (Anchor
-         { T17544_kw.hs:(18,1)-(19,26) }
-         (UnchangedAnchor))
-        [(AddEpAnn AnnNewtype (EpaSpan { T17544_kw.hs:18:1-7 }))
-        ,(AddEpAnn AnnWhere (EpaSpan { T17544_kw.hs:19:3-7 }))]
-        (EpaComments
-         []))
+       (NoExtField)
        (NewType)
        (Nothing)
        (Nothing)

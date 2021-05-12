@@ -107,7 +107,7 @@
          [])
         (Prefix)
         (HsDataDefn
-         (EpAnnNotUsed)
+         (NoExtField)
          (DataType)
          (Nothing)
          (Nothing)
@@ -495,7 +495,7 @@
                      {Name: GHC.Types.Type}))))))))))]
           (Prefix)
           (HsDataDefn
-           (EpAnnNotUsed)
+           (NoExtField)
            (NewType)
            (Nothing)
            (Nothing)
@@ -752,7 +752,7 @@
                {Name: k})))))])
         (Prefix)
         (HsDataDefn
-         (EpAnnNotUsed)
+         (NoExtField)
          (DataType)
          (Nothing)
          (Nothing)
