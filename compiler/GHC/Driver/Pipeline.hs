@@ -240,7 +240,7 @@ compileOne' m_tc_result mHscMessage
                                Nothing,
                                Just (HscOut src_flavour mod_name summary status))
                               (Just basename)
-                              Persistent
+                              pipelineOutput
                               (Just location)
                               []
             -- TODO: figure out a way to set this in runPipeline for HsSrcFile
@@ -288,6 +288,11 @@ compileOne' m_tc_result mHscMessage
                  else dflags1
 
        basename = dropExtension input_fn
+
+       pipelineOutput = case bcknd of
+         Interpreter -> NoOutputFile
+         NoBackend -> NoOutputFile
+         _ -> Persistent
 
        -- We add the directory in which the .hs files resides) to the import
        -- path.  This is needed when we try to compile the .hc file later, if it
