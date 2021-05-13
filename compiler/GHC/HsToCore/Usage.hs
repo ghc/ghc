@@ -38,11 +38,12 @@ import GHC.Unit.Module.Deps
 import GHC.Data.Maybe
 
 import Control.Monad (filterM)
-import Data.List (sort, sortBy, nub)
+import Data.List (sortBy, sort, nub)
 import Data.IORef
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+
 import System.Directory
 import System.FilePath
 
@@ -80,8 +81,7 @@ mkDependencies iuid pluginModules
       let (dep_plgins, ms) = unzip [ (moduleName mn, mn) | mn <- pluginModules ]
           plugin_dep_pkgs = filter (/= iuid) (map (toUnitId . moduleUnit) ms)
       th_used <- readIORef th_var
-      let dep_mods = modDepsElts (delFromUFM (imp_dep_mods imports)
-                                             (moduleName mod))
+      let direct_mods = modDepsElts (delFromUFM (imp_direct_dep_mods imports) (moduleName mod))
                 -- M.hi-boot can be in the imp_dep_mods, but we must remove
                 -- it before recording the modules on which this one depends!
                 -- (We want to retain M.hi-boot in imp_dep_mods so that
@@ -93,19 +93,25 @@ mkDependencies iuid pluginModules
                 -- We must also remove self-references from imp_orphs. See
                 -- Note [Module self-dependency]
 
-          raw_pkgs = foldr Set.insert (imp_dep_pkgs imports) plugin_dep_pkgs
+          direct_pkgs_0 = foldr Set.insert (imp_dep_direct_pkgs imports) plugin_dep_pkgs
 
-          pkgs | th_used   = Set.insert thUnitId raw_pkgs
-               | otherwise = raw_pkgs
+          direct_pkgs
+            | th_used = Set.insert thUnitId direct_pkgs_0
+            | otherwise = direct_pkgs_0
 
           -- Set the packages required to be Safe according to Safe Haskell.
           -- See Note [Tracking Trust Transitively] in GHC.Rename.Names
-          sorted_pkgs = sort (Set.toList pkgs)
+          sorted_direct_pkgs = sort (Set.toList direct_pkgs)
           trust_pkgs  = imp_trust_pkgs imports
-          dep_pkgs'   = map (\x -> (x, x `Set.member` trust_pkgs)) sorted_pkgs
+          -- If there's a non-boot import, then it shadows the boot import
+          -- coming from the dependencies
+          source_mods =
+            modDepsElts $ (imp_source_mods imports)
 
-      return Deps { dep_mods   = dep_mods,
-                    dep_pkgs   = dep_pkgs',
+      return Deps { dep_direct_mods = direct_mods,
+                    dep_direct_pkgs = sorted_direct_pkgs,
+                    dep_trusted_pkgs = sort (Set.toList trust_pkgs),
+                    dep_source_mods  = sort source_mods,
                     dep_orphs  = dep_orphs,
                     dep_plgins = dep_plgins,
                     dep_finsts = sortBy stableModuleCmp (imp_finsts imports) }
@@ -235,7 +241,7 @@ mkPluginUsage hsc_env pluginModule
     pNm      = moduleName $ mi_module pluginModule
     pPkg     = moduleUnit $ mi_module pluginModule
     deps     = map gwib_mod $
-      dep_mods $ mi_deps pluginModule
+      dep_direct_mods $ mi_deps pluginModule
 
     -- Lookup object file for a plugin dependency,
     -- from the same package as the plugin.
