@@ -163,6 +163,9 @@ config.way_rts_flags = {
 prof_ways     = [x[0] for x in config.way_flags.items()
                       if '-prof' in x[1]]
 
+debug_ways     = [x[0] for x in config.way_flags.items()
+                      if '-debug' in x[1]]
+
 threaded_ways = [x[0] for x in config.way_flags.items()
                       if '-threaded' in x[1] or 'ghci' == x[0]]
 

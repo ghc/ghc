@@ -171,6 +171,50 @@ test('EventlogOutput2',
        omit_ways(['dyn', 'ghci'] + prof_ways) ],
      makefile_test, ['EventlogOutput2'])
 
+# Test that Info Table Provenance (IPE) events are emitted.
+test('EventlogOutput_IPE',
+     [ extra_files(["EventlogOutput.hs"]),
+       only_ways(debug_ways),
+       ignore_stdout,
+       ignore_stderr
+     ],
+     makefile_test, ['EventlogOutput_IPE'])
+
+# Remove the capability prefix from IPE event log lines.
+def noCapabilityOutputFilter(s):
+     return re.sub(r'[a-f0-9]+: IPE:', 'IPE:', s)
+
+# Manually create IPE entries and dump them to event log (stderr).
+test('ipeEventLog',
+     [ c_src,
+       extra_files(['ipeEventLog_lib.c']),
+       extra_run_opts('+RTS -va -RTS'),
+       grep_errmsg('IPE:'),
+       only_ways(debug_ways),
+       normalise_errmsg_fun(noCapabilityOutputFilter),
+       ignore_stdout,
+       # Due to issues on Darwin CI runners that couldn't be tracked down.
+       # In general this test should work on Darwin - Just not on our CI.
+       when(opsys('darwin'), fragile(0))
+     ],
+     compile_and_run, ['ipeEventLog_lib.c -eventlog'])
+
+# Manually create IPE entries, force the initialization of the underlying hash map
+# and dump them to event log (stderr).
+test('ipeEventLog_fromMap',
+     [ c_src,
+       extra_files(['ipeEventLog_lib.c']),
+       extra_run_opts('+RTS -va -RTS'),
+       grep_errmsg('IPE:'),
+       only_ways(debug_ways),
+       normalise_errmsg_fun(noCapabilityOutputFilter),
+       ignore_stdout,
+       # Due to issues on Darwin CI runners that couldn't be tracked down.
+       # In general this test should work on Darwin - Just not on our CI.
+       when(opsys('darwin'), fragile(0))
+     ],
+     compile_and_run, ['ipeEventLog_lib.c -eventlog'])
+
 test('T4059', [], makefile_test, ['T4059'])
 
 # Test for #4274
@@ -440,3 +484,5 @@ test('T15427', normal, compile_and_run, [''])
 test('T19481', extra_run_opts('+RTS -T  -RTS'), compile_and_run, [''])
 test('T19381', extra_run_opts('+RTS -T -RTS'), compile_and_run, [''])
 test('T20199', normal, makefile_test, [])
+
+test('ipeMap', [c_src], compile_and_run, [''])

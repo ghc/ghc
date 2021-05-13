@@ -668,6 +668,17 @@ void traceIPE(StgInfoTable * info,
               const char *module,
               const char *srcloc )
 {
+#if defined(DEBUG)
+    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
+        ACQUIRE_LOCK(&trace_utx);
+
+        tracePreface();
+        debugBelch("IPE: table_name %s, closure_desc %s, ty_desc %s, label %s, module %s, srcloc %s\n",
+                   table_name, closure_desc, ty_desc, label, module, srcloc);
+
+        RELEASE_LOCK(&trace_utx);
+    } else
+#endif
     if (eventlog_enabled) {
         postIPE((W_) INFO_PTR_TO_STRUCT(info), table_name, closure_desc, ty_desc, label, module, srcloc);
     }
