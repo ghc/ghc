@@ -6,6 +6,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE GADTs                #-}
 
 -------------------------------------------------------------------------------
 -- |
@@ -57,6 +58,12 @@ module GHC.Event.Windows (
 
     -- * I/O Result type
     IOResult(..),
+
+    -- * Basic Types
+    NativeHandle(),
+    ConsoleHandle(),
+    IoHandle(..),
+    Io(),
 
     -- * I/O Event notifications
     HandleData (..), -- seal for release
@@ -129,6 +136,31 @@ import qualified GHC.Windows as Win32
 #if defined(DEBUG_TRACE)
 import {-# SOURCE #-} Debug.Trace (traceEventIO)
 #endif
+
+-- -----------------------------------------------------------------------------
+-- The Windows IO device handles
+
+data NativeHandle
+data ConsoleHandle
+
+-- | Bit of a Hack, but we don't want every handle to have a cooked entry
+--   but all copies of the handles for which we do want one need to share
+--   the same value.
+--   We can't store it separately because we don't know when the handle will
+--   be destroyed or invalidated.
+data IoHandle a where
+  NativeHandle  :: { getNativeHandle  :: HANDLE
+                   -- In certain cases we have inherited a handle and the
+                   -- handle and it may not have been created for async
+                   -- access.  In those case we can't issue a completion
+                   -- request as it would never finish and we'd deadlock.
+                   , isAsynchronous :: Bool
+                   } -> IoHandle NativeHandle
+  ConsoleHandle :: { getConsoleHandle :: HANDLE
+                   , cookedHandle :: IORef Bool
+                   } -> IoHandle ConsoleHandle
+
+type Io a = IoHandle a
 
 -- Note [WINIO Manager design]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -528,13 +560,14 @@ associateHandle Manager{..} h =
 withOverlappedEx :: forall a.
                     Manager
                  -> String -- ^ Handle name
-                 -> HANDLE -- ^ Windows handle associated with the operation.
+                 -> Io NativeHandle -- ^ Windows handle associated with the operation.
                  -> Word64 -- ^ Value to use for the @OVERLAPPED@
                            --   structure's Offset/OffsetHigh members.
                  -> StartIOCallback Int
                  -> CompletionCallback (IOResult a)
                  -> IO (IOResult a)
-withOverlappedEx mgr fname h offset startCB completionCB = do
+withOverlappedEx mgr fname hwnd offset startCB completionCB = do
+    let async = isAsynchronous hwnd
     signal <- newEmptyIOPort :: IO (IOPort (IOResult a))
     let signalReturn a = failIfFalse_ (dbgMsg "signalReturn") $
                             writeIOPort signal (IOSuccess a)
@@ -552,7 +585,7 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
       -- function will block until done so it can call completionCB at the end
       -- we can safely use dynamic memory management here and so reduce the
       -- possibility of memory errors.
-      withRequest offset callbackData $ \hs_lpol cdData -> do
+      withRequest async offset callbackData $ \hs_lpol cdData -> do
         let ptr_lpol = hs_lpol `plusPtr` cdOffset
         let lpol = castPtr hs_lpol
         -- We need to add the payload before calling startCBResult, the reason being
@@ -625,11 +658,11 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
               -- Normally we'd have to clear lpol with 0 before this call,
               -- however the statuses we're interested in would not get to here
               -- so we can save the memset call.
-              finished <- FFI.getOverlappedResult h lpol False
+              finished <- FFI.getOverlappedResult h lpol (not async)
+              lasterr <- getLastError
               debugIO $ "== " ++ show (finished)
               status <- FFI.overlappedIOStatus lpol
               debugIO $ "== >< " ++ show (status)
-              lasterr <- getLastError
               -- This status indicated that we have finished early and so we
               -- won't have a request enqueued.  Handle it inline.
               let done_early = status == #{const STATUS_SUCCESS}
@@ -722,7 +755,8 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
             completionCB err' 0
           _            -> do
             error "unexpected case in `startCBResult'"
-      where dbgMsg s = s ++ " (" ++ show h ++ ":" ++ show offset ++ ")"
+      where h = getNativeHandle hwnd
+            dbgMsg s = s ++ " (" ++ show h ++ ":" ++ show offset ++ ")"
             -- Wait for .25ms (threaded) and 1ms (non-threaded)
             -- Yields in the threaded case allowing other work.
             -- Blocks all haskell execution in the non-threaded case.
@@ -779,7 +813,8 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
             unless :: Bool -> IO () -> IO ()
             unless p a = if p then a else return ()
 
--- Safe version of function
+-- Safe version of function of withOverlappedEx that assumes your handle is
+-- set up for asynchronous access.
 withOverlapped :: String
                -> HANDLE
                -> Word64 -- ^ Value to use for the @OVERLAPPED@
@@ -789,7 +824,9 @@ withOverlapped :: String
                -> IO (IOResult a)
 withOverlapped fname h offset startCB completionCB = do
   mngr <- getSystemManager
-  withOverlappedEx mngr fname h offset startCB completionCB
+  -- Mark the handle as asynchronous
+  let io = NativeHandle h True
+  withOverlappedEx mngr fname io offset startCB completionCB
 
 ------------------------------------------------------------------------
 -- Helper to check if an error code implies an operation has completed.
