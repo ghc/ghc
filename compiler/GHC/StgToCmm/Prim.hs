@@ -868,6 +868,15 @@ emitPrimOp dflags primop = case primop of
     emitPrimCall [res] (MO_Cmpxchg (wordWidth platform)) [dst, expected, new]
   CasAddrOp_Word -> \[dst, expected, new] -> opIntoRegs $ \[res] ->
     emitPrimCall [res] (MO_Cmpxchg (wordWidth platform)) [dst, expected, new]
+  CasAddrOp_Word8 -> \[dst, expected, new] -> opIntoRegs $ \[res] ->
+    emitPrimCall [res] (MO_Cmpxchg W8) [dst, expected, new]
+  CasAddrOp_Word16 -> \[dst, expected, new] -> opIntoRegs $ \[res] ->
+    emitPrimCall [res] (MO_Cmpxchg W16) [dst, expected, new]
+  CasAddrOp_Word32 -> \[dst, expected, new] -> opIntoRegs $ \[res] ->
+    emitPrimCall [res] (MO_Cmpxchg W32) [dst, expected, new]
+  CasAddrOp_Word64 -> \[dst, expected, new] -> opIntoRegs $ \[res] ->
+    emitPrimCall [res] (MO_Cmpxchg W64) [dst, expected, new]
+
 
 -- SIMD primops
   (VecBroadcastOp vcat n w) -> \[e] -> opIntoRegs $ \[res] -> do
@@ -1071,6 +1080,14 @@ emitPrimOp dflags primop = case primop of
     doAtomicWriteByteArray mba ix (bWord platform) val
   CasByteArrayOp_Int -> \[mba, ix, old, new] -> opIntoRegs $ \[res] ->
     doCasByteArray res mba ix (bWord platform) old new
+  CasByteArrayOp_Int8 -> \[mba, ix, old, new] -> opIntoRegs $ \[res] ->
+    doCasByteArray res mba ix b8 old new
+  CasByteArrayOp_Int16 -> \[mba, ix, old, new] -> opIntoRegs $ \[res] ->
+    doCasByteArray res mba ix b16 old new
+  CasByteArrayOp_Int32 -> \[mba, ix, old, new] -> opIntoRegs $ \[res] ->
+    doCasByteArray res mba ix b32 old new
+  CasByteArrayOp_Int64 -> \[mba, ix, old, new] -> opIntoRegs $ \[res] ->
+    doCasByteArray res mba ix b64 old new
 
 -- The rest just translate straightforwardly
 
@@ -1511,6 +1528,16 @@ emitPrimOp dflags primop = case primop of
     if (ncg && x86ish || ppc) || llvm
     then Left MO_F64_Fabs
     else Right $ genericFabsOp W64
+
+  CasAddrOp2_Word32 -> \args -> opCallishHandledLater args $
+    if ncg && x86ish
+    then Left $ MO_Cmpxchg2 W32
+    else panic "CasAddrOp2_Word32"
+
+  CasAddrOp2_Word64 -> \args -> opCallishHandledLater args $
+    if ncg && x86ish
+    then Left $ MO_Cmpxchg2 W64
+    else panic "CasAddrOp2_Word64"
 
   -- tagToEnum# is special: we need to pull the constructor
   -- out of the table, and perform an appropriate return.
@@ -3049,7 +3076,7 @@ doCasByteArray
 doCasByteArray res mba idx idx_ty old new = do
     profile <- getProfile
     platform <- getPlatform
-    let width = (typeWidth idx_ty)
+    let width = typeWidth idx_ty
         addr = cmmIndexOffExpr platform (arrWordsHdrSize profile)
                width mba idx
     emitPrimCall
