@@ -23,7 +23,6 @@ module GHC.Tc.Gen.Expr
          tcPolyExpr, tcExpr,
          tcSyntaxOp, tcSyntaxOpGen, SyntaxOpType(..), synKnownType,
          tcCheckId,
-         addAmbiguousNameErr,
          getFixedTyVars ) where
 
 import GHC.Prelude
@@ -184,7 +183,7 @@ tcExpr :: HsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
 --   - HsApp         value applications
 --   - HsAppType     type applications
 --   - ExprWithTySig (e :: type)
---   - HsRecFld      overloaded record fields
+--   - HsRecSel      overloaded record fields
 --   - HsExpanded    renamer expansions
 --   - HsOpApp       operator applications
 --   - HsOverLit     overloaded literals
@@ -197,7 +196,7 @@ tcExpr e@(HsApp {})              res_ty = tcApp e res_ty
 tcExpr e@(OpApp {})              res_ty = tcApp e res_ty
 tcExpr e@(HsAppType {})          res_ty = tcApp e res_ty
 tcExpr e@(ExprWithTySig {})      res_ty = tcApp e res_ty
-tcExpr e@(HsRecFld {})           res_ty = tcApp e res_ty
+tcExpr e@(HsRecSel {})           res_ty = tcApp e res_ty
 tcExpr e@(XExpr (HsExpanded {})) res_ty = tcApp e res_ty
 
 tcExpr e@(HsOverLit _ lit) res_ty
@@ -974,7 +973,7 @@ tcSyntaxOpGen :: CtOrigin
               -> ([TcSigmaType] -> [Mult] -> TcM a)
               -> TcM (a, SyntaxExprTc)
 tcSyntaxOpGen orig (SyntaxExprRn op) arg_tys res_ty thing_inside
-  = do { (expr, sigma) <- tcInferAppHead (op, VACall op 0 noSrcSpan) [] Nothing
+  = do { (expr, sigma) <- tcInferAppHead (op, VACall op 0 noSrcSpan) []
              -- Ugh!! But all this code is scheduled for demolition anyway
        ; traceTc "tcSyntaxOpGen" (ppr op $$ ppr expr $$ ppr sigma)
        ; (result, expr_wrap, arg_wraps, res_wrap)
@@ -1371,7 +1370,7 @@ tcRecordUpd con_like arg_tys rbinds = fmap catMaybes $ mapM do_bind rbinds
                  return (Just
                          (L l (fld { hsRecFieldLbl
                                       = L loc (Unambiguous
-                                               (extFieldOcc (unLoc f'))
+                                               (foExt (unLoc f'))
                                                (L (noAnnSrcSpan loc) lbl))
                                    , hsRecFieldArg = rhs' }))) }
 
