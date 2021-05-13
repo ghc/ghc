@@ -788,10 +788,11 @@ zonkExpr env (HsAppType ty e t)
 
 zonkExpr _ (HsRnBracketOut x _ _) = absurd x
 
-zonkExpr env (HsTcBracketOut x wrap body bs)
+zonkExpr env (HsTcBracketOut ty wrap body bs)
   = do wrap' <- traverse zonkQuoteWrap wrap
        bs' <- mapM (zonk_b env) bs
-       return (HsTcBracketOut x wrap' body bs')
+       new_ty <- zonkTcTypeToTypeX env ty
+       return (HsTcBracketOut new_ty wrap' body bs')
   where
     zonkQuoteWrap (QuoteWrapper ev ty) = do
         let ev' = zonkIdOcc env ev
