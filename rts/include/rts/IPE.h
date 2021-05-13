@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 2017-2018
+ * (c) The GHC Team, 2017-2021
  *
  * IPE API
  *
@@ -13,23 +13,19 @@
 
 #pragma once
 
-
-typedef struct InfoProv_{
-    char * table_name;
-    char * closure_desc;
-    char * ty_desc;
-    char * label;
-    char * module;
-    char * srcloc;
+typedef struct InfoProv_ {
+    char *table_name;
+    char *closure_desc;
+    char *ty_desc;
+    char *label;
+    char *module;
+    char *srcloc;
 } InfoProv;
 
 typedef struct InfoProvEnt_ {
-    StgInfoTable * info;
+    StgInfoTable *info;
     InfoProv prov;
-    struct InfoProvEnt_ *link;
 } InfoProvEnt;
 
-extern InfoProvEnt * RTS_VAR(IPE_LIST);               // registered IP list
-
 void registerInfoProvList(InfoProvEnt **cc_list);
-InfoProvEnt * lookupIPE(StgInfoTable *info);
+InfoProvEnt *lookupIPE(StgInfoTable *info);

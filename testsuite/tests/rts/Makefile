@@ -135,3 +135,9 @@ EventlogOutput2:
 T20199:
 	"$(TEST_HC)" -no-hs-main -v0 T20199.cpp -o T20199
 	./T20199
+
+.PHONY: EventlogOutput_IPE
+EventlogOutput_IPE:
+	"$(TEST_HC)" -debug -finfo-table-map -v0 EventlogOutput.hs
+	./EventlogOutput +RTS -va 2> EventlogOutput_IPE.stderr.log
+	grep "IPE:" EventlogOutput_IPE.stderr.log
