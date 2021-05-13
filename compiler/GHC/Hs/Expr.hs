@@ -196,13 +196,25 @@ type instance PendingTcSplice' (GhcPass _) = PendingTcSplice
 {- Note [Constructor cannot occur]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Some data constructors can't occur in certain phases; e.g. the output
-of the type checker never has OverLabel. We signal this by setting
-the extension field to Void. For example:
+of the type checker never has OverLabel. We signal this by
+* setting the extension field to Void
+* using dataConCantHappen in the cases that can't happen
+
+For example:
+
    type instance XOverLabel GhcTc = Void
-   dsExpr (HsOverLabel x _) = absurd x
+
+   dsExpr :: HsExpr GhcTc -> blah
+   dsExpr (HsOverLabel x _) = dataConCantHappen x
+
+The function dataConCantHappen is defined thus:
+   dataConCantHappen :: Void -> a
+   dataConCantHappen x = case x of {}
+(i.e. identically to Data.Void.absurd, but more helpfully named).
+Remember Void is a type whose only element is bottom.
 
 It would be better to omit the pattern match altogether, but we
-could only do that if the extension field was strict (#18764)
+could only do that if the extension field was strict (#18764).
 -}
 
 -- API Annotations types
