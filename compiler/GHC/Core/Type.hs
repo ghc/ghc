@@ -68,6 +68,7 @@ module GHC.Core.Type (
         isPredTy,
 
         getRuntimeRep_maybe, kindRep_maybe, kindRep,
+        getCallingConv, getCallingConv_maybe, kindConv_maybe, kindConv,
         getRuntimeInfo, getRuntimeInfo_maybe,
         kindInfo_maybe, kindInfo,
 
@@ -259,6 +260,7 @@ import GHC.Builtin.Types.Prim
 import {-# SOURCE #-} GHC.Builtin.Types
                                  ( naturalTy, listTyCon
                                  , typeSymbolKind, liftedTypeKind
+                                 , runtimeRepTy, callingConvTy
                                  , constraintKind
                                  , unrestrictedFunTyCon
                                  , manyDataConTy, oneDataConTy )
@@ -557,6 +559,11 @@ kindRep k = case kindRep_maybe k of
               Just r  -> r
               Nothing -> pprPanic "kindRep" (ppr k)
 
+kindConv :: HasDebugCallStack => Kind -> Type
+kindConv k = case kindConv_maybe k of
+              Just r  -> r
+              Nothing -> pprPanic "kindConv" (ppr k)
+
 kindInfo :: HasDebugCallStack => Kind -> Type
 kindInfo k = case kindInfo_maybe k of
               Just r  -> r
@@ -573,7 +580,17 @@ kindRep_maybe kind
   , TyConApp rinfo [rep, conv] <- coreFullView arg
   , rinfo `hasKey` runtimeInfoDataConKey    = Just rep
   | TyConApp tc [arg] <- coreFullView kind
-  , tc `hasKey` tYPETyConKey                = Just arg
+  , tc `hasKey` tYPETyConKey                = Just $ (mkTyVarTy . mkTemplateKindVar) runtimeRepTy
+  | otherwise                               = Nothing
+
+kindConv_maybe :: HasDebugCallStack => Kind -> Maybe Type
+kindConv_maybe kind
+  | TyConApp tc [arg] <- coreFullView kind
+  , tc `hasKey` tYPETyConKey
+  , TyConApp rinfo [rep, conv] <- coreFullView arg
+  , rinfo `hasKey` runtimeInfoDataConKey    = Just conv
+  | TyConApp tc [arg] <- coreFullView kind
+  , tc `hasKey` tYPETyConKey                = Just $ (mkTyVarTy . mkTemplateKindVar) callingConvTy
   | otherwise                               = Nothing
 
 kindInfo_maybe :: HasDebugCallStack => Kind -> Maybe Type
@@ -980,10 +997,11 @@ repSplitAppTy_maybe :: HasDebugCallStack => Type -> Maybe (Type,Type)
 -- ^ Does the AppTy split as in 'splitAppTy_maybe', but assumes that
 -- any Core view stuff is already done
 repSplitAppTy_maybe (FunTy _ w ty1 ty2)
-  = Just (TyConApp funTyCon [w, rep1, rep2, ty1], ty2)
-  where
-    rep1 = getRuntimeInfo ty1
-    rep2 = getRuntimeInfo ty2
+  = pprPanic "here" (ppr $ typeKind ty2)
+    -- Just (TyConApp funTyCon [w, rep1, rep2, ty1], ty2)
+  -- where
+  --   rep1 = getRuntimeInfo ty1
+  --   rep2 = getRuntimeInfo ty2
 
 repSplitAppTy_maybe (AppTy ty1 ty2)
   = Just (ty1, ty2)
@@ -2104,6 +2122,10 @@ getRuntimeRep_maybe :: HasDebugCallStack
                     => Type -> Maybe Type
 getRuntimeRep_maybe = kindRep_maybe . typeKind
 
+getCallingConv_maybe :: HasDebugCallStack
+                    => Type -> Maybe Type
+getCallingConv_maybe = kindConv_maybe . typeKind
+
 getRuntimeInfo_maybe :: HasDebugCallStack
                     => Type -> Maybe Type
 getRuntimeInfo_maybe = kindInfo_maybe . typeKind
@@ -2115,6 +2137,12 @@ getRuntimeRep ty
   = case getRuntimeRep_maybe ty of
       Just r  -> r
       Nothing -> pprPanic "getRuntimeRep" (ppr ty <+> dcolon <+> ppr (typeKind ty))
+
+getCallingConv :: HasDebugCallStack => Type -> Type
+getCallingConv ty
+  = case getCallingConv_maybe ty of
+      Just r  -> r
+      Nothing -> pprPanic "getCallingConv" (ppr ty <+> dcolon <+> ppr (typeKind ty))
 
 getRuntimeInfo :: HasDebugCallStack => Type -> Type
 getRuntimeInfo ty

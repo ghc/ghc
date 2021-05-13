@@ -1086,22 +1086,14 @@ mk_tuple Boxed arity = (tycon, tuple_con)
     tc_uniq = mkTupleTyConUnique   boxity arity
     dc_uniq = mkTupleDataConUnique boxity arity
 
-mk_tuple Unboxed arity = case arity of
-  0 ->  (tycon, tuple_con)
-  n -> pprPanic "here" (ppr $ (typeKind . mkTyConTy) tycon)
-  -- n -> pprPanic "here" (ppr $ ri_tys)
-
+mk_tuple Unboxed arity = (tycon, tuple_con)
   where
     tycon = mkTupleTyCon tc_name tc_binders tc_res_kind tc_arity tuple_con
                          UnboxedTuple flavour
 
     -- See Note [Unboxed tuple RuntimeRep vars] in GHC.Core.TyCon
     -- Kind:  forall (k1:RuntimeRep) (k2:RuntimeRep). TYPE k1 -> TYPE k2 -> #
-    -- ri = rInfo runtimeRepTy callingConvTy
-    -- tc_binders = mkTemplateTyConBinders ris (\ris -> map tYPE ris)
-    rep_ar = replicate arity
-
-    tc_binders = mkTemplateTyConBinders (interleave (rep_ar runtimeRepTy)  (rep_ar callingConvTy))
+    tc_binders = mkTemplateTyConBinders (take arity $ cycle [runtimeRepTy, callingConvTy])
                     (\ris -> map (\(r,c) -> tYPE $ rInfo r c) (take2 ris))
 
     tc_res_kind = unboxedTupleKindRI ri_tys
@@ -1665,7 +1657,7 @@ runtimeInfoTy :: Type
 runtimeInfoTy = mkTyConTy runtimeInfoTyCon
 
 rInfo :: Type -> Type -> Type
-rInfo rep conv = TyCoRep.TyConApp runtimeInfoTyCon [rep, conv]
+rInfo rep conv = TyCoRep.TyConApp runtimeInfoDataConTyCon [rep, conv]
 
 
 {- *********************************************************************
@@ -1961,7 +1953,7 @@ mkTupleTy boxity  tys  = mkTupleTy1 boxity tys
 mkTupleTy1 :: Boxity -> [Type] -> Type
 mkTupleTy1 Boxed   tys  = mkTyConApp (tupleTyCon Boxed (length tys)) tys
 mkTupleTy1 Unboxed tys  = mkTyConApp (tupleTyCon Unboxed (length tys))
-                                         (map getRuntimeRep tys ++ tys)
+                                         ((interleave (map getRuntimeRep tys)  (map getCallingConv tys)) ++ tys)
 
 -- | Build the type of a small tuple that holds the specified type of thing
 -- Flattens 1-tuples. See Note [One-tuples].
@@ -1980,7 +1972,7 @@ unitTy = mkTupleTy Boxed []
 
 mkSumTy :: [Type] -> Type
 mkSumTy tys = mkTyConApp (sumTyCon (length tys))
-                         (map getRuntimeRep tys ++ tys)
+                         ((interleave (map getRuntimeRep tys)  (map getCallingConv tys)) ++ tys)
 
 -- Promoted Booleans
 

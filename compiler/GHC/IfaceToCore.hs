@@ -1332,7 +1332,7 @@ tcTupleTyCon in_type sort arity
       ConstraintTuple -> return (cTupleTyCon arity)
       BoxedTuple      -> return (tupleTyCon Boxed   arity)
       UnboxedTuple    -> return (tupleTyCon Unboxed arity')
-        where arity' | in_type   = arity `div` 2
+        where arity' | in_type   = (arity `div` 3) * 2
                      | otherwise = arity
                       -- in expressions, we only have term args
 

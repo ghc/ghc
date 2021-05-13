@@ -13,8 +13,8 @@ Wired-in knowledge about primitive types
 module GHC.Builtin.Types.Prim(
         mkPrimTyConName, -- For implicit parameters in GHC.Builtin.Types only
 
-        mkTemplateKindVars, mkTemplateTyVars, mkTemplateTyVarsFrom,
-        mkTemplateKiTyVars, mkTemplateKiTyVar,
+        mkTemplateKindVar, mkTemplateKindVars, mkTemplateTyVars, 
+        mkTemplateTyVarsFrom, mkTemplateKiTyVars, mkTemplateKiTyVar,
 
         mkTemplateTyConBinders, mkTemplateKindTyConBinders,
         mkTemplateAnonTyConBinders,
@@ -25,6 +25,7 @@ module GHC.Builtin.Types.Prim(
         alphaTysUnliftedRep, alphaTyUnliftedRep,
         runtimeRep1TyVar, runtimeRep2TyVar, runtimeRep1Ty, runtimeRep2Ty,
         runtimeInfo1TyVar, runtimeInfo2TyVar, runtimeInfo1Ty, runtimeInfo2Ty,
+        callingConv1TyVar, callingConv2TyVar, callingConv1Ty, callingConv2Ty,
         openAlphaTy, openBetaTy, openAlphaTyVar, openBetaTyVar,
 
         multiplicityTyVar,
@@ -99,6 +100,7 @@ import GHC.Prelude
 import {-# SOURCE #-} GHC.Builtin.Types
   ( runtimeRepTy, unboxedTupleKind, liftedTypeKind
   , runtimeInfoTy, runtimeInfoDataConTyCon, convEvalDataConTy
+  , callingConvTy, rInfo
   , vecRepDataConTyCon, tupleRepDataConTyCon
   , liftedRepDataConTy, unliftedRepDataConTy
   , intRepDataConTy
@@ -392,6 +394,16 @@ runtimeInfo1Ty, runtimeInfo2Ty :: Type
 runtimeInfo1Ty = mkTyVarTy runtimeInfo1TyVar
 runtimeInfo2Ty = mkTyVarTy runtimeInfo2TyVar
 
+callingConv1TyVar, callingConv2TyVar :: TyVar
+(callingConv1TyVar : callingConv2TyVar : _)
+  = drop 16 (mkTemplateTyVars (repeat callingConvTy))  -- selects 'q','r'  
+
+callingConv1Ty, callingConv2Ty :: Type
+callingConv1Ty = mkTyVarTy callingConv1TyVar
+callingConv2Ty = mkTyVarTy callingConv2TyVar
+
+
+
 openAlphaTyVar, openBetaTyVar :: TyVar
 -- alpha :: TYPE r1
 -- beta  :: TYPE r2
@@ -442,10 +454,13 @@ funTyCon = mkFunTyCon funTyConName tc_bndrs tc_rep_nm
   where
     -- See also unrestrictedFunTyCon
     tc_bndrs = [ mkNamedTyConBinder Required multiplicityTyVar
-               , mkNamedTyConBinder Inferred runtimeInfo1TyVar
-               , mkNamedTyConBinder Inferred runtimeInfo2TyVar ]
-               ++ mkTemplateAnonTyConBinders [ tYPE runtimeInfo1Ty
-                                             , tYPE runtimeInfo2Ty
+               , mkNamedTyConBinder Inferred runtimeRep1TyVar
+               , mkNamedTyConBinder Inferred callingConv1TyVar 
+               , mkNamedTyConBinder Inferred runtimeRep2TyVar
+               , mkNamedTyConBinder Inferred callingConv2TyVar 
+                ]
+               ++ mkTemplateAnonTyConBinders [ tYPE $ rInfo runtimeRep1Ty callingConv1Ty
+                                             , tYPE $ rInfo runtimeRep2Ty callingConv2Ty
                                              ]
     tc_rep_nm = mkPrelTyConRepName funTyConName
 

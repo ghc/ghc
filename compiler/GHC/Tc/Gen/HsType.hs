@@ -1332,16 +1332,20 @@ finish_tuple rn_ty tup_sort tau_tys tau_kinds exp_kind = do
     UnboxedTuple -> do
       let tycon    = tupleTyCon Unboxed arity
           tau_reps = map kindRep tau_kinds
+          tau_ccs = map kindConv tau_kinds
+          reps_ccs = interleave tau_reps tau_ccs
           -- See also Note [Unboxed tuple RuntimeRep vars] in GHC.Core.TyCon
-          arg_tys  = tau_reps ++ tau_tys
+          arg_tys  = reps_ccs ++ tau_tys
           res_kind = unboxedTupleKind tau_reps
       checkTupSize arity
-      -- pprPanic "here" (ppr $ mkTyConApp tycon arg_tys)
       check_expected_kind (mkTyConApp tycon arg_tys) res_kind
   where
     arity = length tau_tys
     check_expected_kind ty act_kind =
       checkExpectedKind rn_ty ty act_kind exp_kind
+
+interleave (a1:a1s) (a2:a2s) = a1:a2:interleave a1s a2s
+interleave _ _ = []
 
 {-
 Note [Ignore unary constraint tuples]
