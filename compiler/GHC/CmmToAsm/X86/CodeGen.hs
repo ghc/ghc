@@ -2750,9 +2750,10 @@ genCCall' _ is32Bit target dest_regs args bid = do
         [dst, old_lo, old_hi, new_lo, new_hi] -> do
           Amode amode code_dst <- getSimpleAmode is32Bit dst
           let format = intFormat width
+              cmpxchg = if width == W32 then CMPXCHG8B else CMPXCHG16B
               reg_res_lo = getRegisterReg platform (CmmLocal res_lo)
               reg_res_hi = getRegisterReg platform (CmmLocal res_hi)
-              code_res = toOL [ LOCK $ CMPXCHG8B amode
+              code_res = toOL [ LOCK $ cmpxchg amode
                               , MOV format (OpReg eax) (OpReg reg_res_lo)
                               , MOV format (OpReg edx) (OpReg reg_res_hi)
                               ]

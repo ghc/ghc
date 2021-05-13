@@ -929,6 +929,12 @@ pprInstr platform i = case i of
             pprAddr platform op
          ]
 
+   CMPXCHG16B op
+      -> hcat [
+            pprMnemonic_ (text "cmpxchg16b"),
+            pprAddr platform op
+         ]
+
 
   where
    gtab :: SDoc
