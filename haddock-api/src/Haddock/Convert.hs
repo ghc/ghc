@@ -211,7 +211,7 @@ synifyTyCon prr _coax tc
 
            , tcdFixity = synifyFixity tc
 
-           , tcdDataDefn = HsDataDefn { dd_ext = noAnn
+           , tcdDataDefn = HsDataDefn { dd_ext = noExtField
                                       , dd_ND = DataType  -- arbitrary lie, they are neither
                                                     -- algebraic data nor newtype:
                                       , dd_ctxt = Nothing
@@ -302,7 +302,7 @@ synifyTyCon _prr coax tc
   cons = rights consRaw
   -- "deriving" doesn't affect the signature, no need to specify any.
   alg_deriv = []
-  defn = HsDataDefn { dd_ext     = noAnn
+  defn = HsDataDefn { dd_ext     = noExtField
                     , dd_ND      = alg_nd
                     , dd_ctxt    = alg_ctx
                     , dd_cType   = Nothing
