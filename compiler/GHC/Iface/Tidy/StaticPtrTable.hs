@@ -151,7 +151,7 @@ import GHC.Types.TyThing
 import GHC.Types.ForeignStubs
 
 import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.State
+import Control.Monad.Trans.State.Strict
 import Data.List (intercalate)
 import Data.Maybe
 import GHC.Fingerprint
