@@ -1363,7 +1363,19 @@ runPhase (HscPostTc mod_summary tc_result tc_warnings mb_old_hash) _ = do
         PipeState{hsc_env=hsc_env'} <- getPipeState
         hscBackendAction <- liftIO $ runHsc hsc_env' $ do
             hscDesugarAndSimplify mod_summary tc_result tc_warnings mb_old_hash
-        return (HscBackend mod_summary hscBackendAction,
+
+        dflags <- getDynFlags
+        let hscBackendPhase = HscBackend mod_summary hscBackendAction
+        next_phase <- case hscBackendAction of
+          HscUpdate iface -> do
+            setIface iface
+            return $ case backend dflags of
+              NoBackend -> RealPhase StopLn
+              Interpreter -> RealPhase StopLn
+              _ -> hscBackendPhase -- Need to create .o, and handle -dynamic-too
+          _ -> return hscBackendPhase
+
+        return (next_phase,
                panic "HscBackend doesn't have an input filename")
 
 runPhase (HscBackend mod_summary result) _ = do
@@ -1377,15 +1389,11 @@ runPhase (HscBackend mod_summary result) _ = do
 
         let o_file = ml_obj_file location -- The real object file
             next_phase = hscPostBackendPhase src_flavour (backend dflags)
-            write_obj = case backend dflags of
-                            NoBackend    -> False
-                            Interpreter  -> False
-                            _            -> True
 
         case result of
             HscUpdate iface ->
                 do
-                   when write_obj $ case src_flavour of
+                   case src_flavour of
                      HsigFile -> do
                        -- We need to create a REAL but empty .o file
                        -- because we are going to attempt to put it in a library
