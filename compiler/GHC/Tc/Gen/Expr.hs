@@ -31,6 +31,7 @@ import GHC.Prelude
 import {-# SOURCE #-}   GHC.Tc.Gen.Splice( tcSpliceExpr, tcTypedBracket, tcUntypedBracket )
 
 import GHC.Hs
+import GHC.Hs.Expr.Type
 import GHC.Rename.Utils
 import GHC.Tc.Utils.Zonk
 import GHC.Tc.Utils.Monad

@@ -47,11 +47,11 @@ import GHC.Rename.Env         ( addUsedGRE )
 import GHC.Rename.Utils       ( addNameClashErrRn, unknownSubordinateErr )
 import GHC.Tc.Solver          ( InferMode(..), simplifyInfer )
 import GHC.Tc.Utils.Env
-import GHC.Tc.Utils.Zonk      ( hsLitType )
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType as TcType
 import GHC.Hs
+import GHC.Hs.Expr.Type
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Core.PatSyn( PatSyn )

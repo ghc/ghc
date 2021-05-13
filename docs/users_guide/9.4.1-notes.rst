@@ -21,3 +21,10 @@ Version 9.4.1
 
   Note that the explicit type applications are required, as the call to
   ``withDict`` would be ambiguous otherwise.
+
+``ghc`` library
+~~~~~~~~~~~~~~~
+
+- A new ``GHC.Hs.Expr.Type`` module has been introduced which defines functions
+  for computing the ``Type`` of an ``HsExpr GhcTc`` in a pure fashion.
+>>>>>>> b6d5b7ffd5 (Draft: hsExprType)
