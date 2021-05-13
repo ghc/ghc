@@ -90,7 +90,6 @@ import GHC.Unit.Module.ModIface
 import Data.List (partition)
 import Data.IORef
 import GHC.Driver.Plugins ( LoadedPlugin(..) )
-import GHC.Unit.Module.Deps
 
 {-
 ************************************************************************
@@ -204,11 +203,9 @@ deSugar hsc_env
         ; used_th <- readIORef tc_splice_used
         ; dep_files <- readIORef dependent_files
         ; safe_mode <- finalSafeMode dflags tcg_env
-        ; let thModules = map (mkHomeModule home_unit)
-                      (map gwib_mod (filter ((== NotBoot) . gwib_isBoot) $ dep_direct_mods deps))
 
         ; usages <- mkUsageInfo hsc_env mod (imp_mods imports) used_names
-                      dep_files merged pluginModules (if used_th then thModules else []) (if used_th then (map fst $ dep_direct_pkgs deps) else [])
+                      dep_files merged
         -- id_mod /= mod when we are processing an hsig, but hsigs
         -- never desugared and compiled (there's no code!)
         -- Consequently, this should hold for any ModGuts that make

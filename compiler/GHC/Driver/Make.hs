@@ -76,7 +76,7 @@ import GHC.Data.Maybe      ( expectJust )
 import GHC.Data.StringBuffer
 import qualified GHC.LanguageExtensions as LangExt
 
-import GHC.Utils.Exception ( tryIO, AsyncException(..), evaluate )
+import GHC.Utils.Exception ( AsyncException(..), evaluate )
 import GHC.Utils.Monad     ( allM )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic

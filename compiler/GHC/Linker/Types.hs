@@ -20,6 +20,7 @@ module GHC.Linker.Types
    , nameOfObject_maybe
    , isInterpretable
    , byteCodeOfObject
+   , LibrarySpec(..)
    )
 where
 
@@ -83,6 +84,8 @@ data LoaderState = LoaderState
         -- ^ The currently-loaded packages; always object code
         -- Held, as usual, in dependency order; though I am not sure if
         -- that is really important
+    , hs_objs_loaded :: ![LibrarySpec]
+    , non_hs_objs_loaded :: ![LibrarySpec]
 
     , temp_sos :: ![(FilePath, String)]
         -- ^ We need to remember the name of previous temporary DLL/.so
@@ -179,3 +182,37 @@ nameOfObject o = fromMaybe (pprPanic "nameOfObject" (ppr o)) (nameOfObject_maybe
 byteCodeOfObject :: Unlinked -> CompiledByteCode
 byteCodeOfObject (BCOs bc _) = bc
 byteCodeOfObject other       = pprPanic "byteCodeOfObject" (ppr other)
+
+{- **********************************************************************
+
+                Loading packages
+
+  ********************************************************************* -}
+
+data LibrarySpec
+   = Objects [FilePath] -- Full path names of set of .o files, including trailing .o
+                        -- We allow batched loading to ensure that cyclic symbol
+                        -- references can be resolved (see #13786).
+                        -- For dynamic objects only, try to find the object
+                        -- file in all the directories specified in
+                        -- v_Library_paths before giving up.
+
+   | Archive FilePath   -- Full path name of a .a file, including trailing .a
+
+   | DLL String         -- "Unadorned" name of a .DLL/.so
+                        --  e.g.    On unix     "qt"  denotes "libqt.so"
+                        --          On Windows  "burble"  denotes "burble.DLL" or "libburble.dll"
+                        --  loadDLL is platform-specific and adds the lib/.so/.DLL
+                        --  suffixes platform-dependently
+
+   | DLLPath FilePath   -- Absolute or relative pathname to a dynamic library
+                        -- (ends with .dll or .so).
+
+   | Framework String   -- Only used for darwin, but does no harm
+
+instance Outputable LibrarySpec where
+  ppr (Objects objs) = text "Objects" <+> ppr objs
+  ppr (Archive a) = text "Archive" <+> text a
+  ppr (DLL s) = text "DLL" <+> text s
+  ppr (DLLPath f) = text "DLLPath" <+> text f
+  ppr (Framework s) = text "Framework" <+> text s

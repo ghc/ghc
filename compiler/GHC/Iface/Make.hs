@@ -97,7 +97,6 @@ import Data.List ( findIndex, mapAccumL, sortBy )
 import Data.Ord
 import Data.IORef
 
-import GHC.Fingerprint
 
 {-
 ************************************************************************
@@ -212,10 +211,8 @@ mkIfaceTc hsc_env safe_mode mod_details mod_summary
           -- but if you pass that in here, we'll decide it's the local
           -- module and does not need to be recorded as a dependency.
           -- See Note [Identity versus semantic module]
-          let home_mods = map (mkHomeModule home_unit)
-                              (map gwib_mod (filter ((== NotBoot) . gwib_isBoot) $ dep_direct_mods deps))
           usages <- mkUsageInfo hsc_env this_mod (imp_mods imports) used_names
-                      dep_files merged pluginModules (if used_th then home_mods else []) (if used_th then map fst (dep_direct_pkgs deps) else [])
+                      dep_files merged
 
           (doc_hdr', doc_map, arg_map) <- extractDocs tc_result
 

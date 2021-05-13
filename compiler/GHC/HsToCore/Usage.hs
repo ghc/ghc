@@ -12,8 +12,6 @@ import GHC.Prelude
 import GHC.Driver.Env
 import GHC.Driver.Session
 
-import GHC.Platform
-import GHC.Platform.Ways
 
 import GHC.Tc.Types
 
@@ -23,33 +21,27 @@ import GHC.Utils.Fingerprint
 import GHC.Utils.Panic
 
 import GHC.Types.Name
-import GHC.Types.Name.Set
+import GHC.Types.Name.Set ( NameSet, allUses )
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.FM
 
 import GHC.Unit
 import GHC.Unit.External
-import GHC.Unit.State
-import GHC.Unit.Finder
 import GHC.Unit.Module.Imported
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.Deps
 
 import GHC.Data.Maybe
 
-import Control.Monad (filterM)
-import Data.List (sortBy, sort, nub)
+import Data.List (sortBy, sort)
 import Data.IORef
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import System.Directory
-import System.FilePath
-import GHC.Driver.Dependencies
 import GHC.Linker.Types
-import GHC.Types.SrcLoc
 import GHC.Utils.Monad
+import GHC.Linker.Loader ( getLoaderState )
 
 {- Note [Module self-dependency]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -129,14 +121,13 @@ mkUsedNames :: TcGblEnv -> NameSet
 mkUsedNames TcGblEnv{ tcg_dus = dus } = allUses dus
 
 mkUsageInfo :: HscEnv -> Module -> ImportedMods -> NameSet -> [FilePath]
-            -> [(Module, Fingerprint)] -> [ModIface] -> [Module] -> [UnitId] ->  IO [Usage]
+            -> [(Module, Fingerprint)] -> IO [Usage]
 mkUsageInfo hsc_env this_mod dir_imp_mods used_names dependent_files merged
-  pluginModules thModules thPackages
   = do
     eps <- hscEPS hsc_env
     hashes <- mapM getFileHash dependent_files
     -- Dependencies on object files due to TH and plugins
-    object_usages <- mkObjectUsage hsc_env (map mi_module pluginModules ++ thModules) thPackages
+    object_usages <- mkObjectUsage hsc_env
     let mod_usages = mk_mod_usage_info (eps_PIT eps) hsc_env this_mod
                                        dir_imp_mods used_names
         usages = mod_usages ++ [ UsageFile { usg_file_path = f
@@ -193,19 +184,19 @@ One way to improve this is to either:
 
 -- | Find object files corresponding to the transitive closure of given home
 -- modules and direct object files for pkg dependencies
-mkObjectUsage :: HscEnv -> [Module] -> [UnitId] -> IO [Usage]
-mkObjectUsage _ [] [] = return []
-mkObjectUsage hsc_env mods pkgs = do
-  (ls, ds) <-
-    case hsc_interp hsc_env of
+mkObjectUsage :: HscEnv -> IO [Usage]
+mkObjectUsage hsc_env = do
+  case hsc_interp hsc_env of
       Just interp -> do
-        (ls, us) <- modifyLoaderState interp (\ps -> return (ps, ((objs_loaded ps ++ bcos_loaded ps), pkgs_loaded ps))) --getLinkDeps (text "usage") hsc_env interp (hsc_HPT hsc_env) ([], [], []) noSrcSpan mods pkgs
-        (ls,) . fst <$> computePackagesDeps interp hsc_env us
-      -- If we're using plugins or TH this case can never happen as the interpreter
-      -- is needed for evaluating plugins/TH
-      Nothing -> pprPanic "computeObjectDeps" (ppr mods $$ ppr pkgs)
+        mps <- getLoaderState interp
+        case mps of
+          Just ps -> do
+            let ls = objs_loaded ps ++ bcos_loaded ps
+                ds = hs_objs_loaded ps
+            concat <$> sequence (map linkableToUsage ls ++ map librarySpecToUsage ds)
+          Nothing -> return []
+      Nothing -> return []
 
-  concat <$> sequence (map linkableToUsage ls ++ map librarySpecToUsage ds)
 
   where
     linkableToUsage (LM _ _ uls) = mapMaybeM unlinkedToUsage uls

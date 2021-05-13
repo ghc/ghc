@@ -3,4 +3,4 @@ module A where
 
 import B
 
-main = $([| print () |])
+main = $(b)

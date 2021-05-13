@@ -388,8 +388,6 @@ import GHC.Types.TyThing
 import GHC.Types.Name.Env
 import GHC.Types.Name.Ppr
 import GHC.Types.TypeEnv
-import GHC.Types.SourceFile
-import GHC.Types.Error ( DiagnosticMessage )
 
 import GHC.Unit
 import GHC.Unit.Env

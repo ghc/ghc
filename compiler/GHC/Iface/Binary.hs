@@ -51,7 +51,6 @@ import GHC.Platform
 import GHC.Data.FastString
 import GHC.Settings.Constants
 import GHC.Utils.Fingerprint
-import GHC.Utils.Misc
 
 import Data.Array
 import Data.Array.IO
