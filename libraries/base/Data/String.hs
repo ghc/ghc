@@ -83,7 +83,7 @@ ensure the good behavior of the above example remains in the future.
 -- | @(a ~ Char)@ context was introduced in @4.9.0.0@
 --
 -- @since 2.01
-instance (a ~ Char) => IsString [a] where
+instance a ~ Char => IsString [a] where
          -- See Note [IsString String]
     fromString xs = xs
 

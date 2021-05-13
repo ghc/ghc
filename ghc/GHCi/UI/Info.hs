@@ -261,7 +261,7 @@ guessModule infos fp = do
 
 
 -- | Collect type info data for the loaded modules.
-collectInfo :: (GhcMonad m) => Map ModuleName ModInfo -> [ModuleName]
+collectInfo :: GhcMonad m => Map ModuleName ModInfo -> [ModuleName]
                -> m (Map ModuleName ModInfo)
 collectInfo ms loaded = do
     df <- getDynFlags
@@ -306,7 +306,7 @@ srcFilePath modSum = fromMaybe obj_fp src_fp
         ms_loc = ms_location modSum
 
 -- | Get info about the module: summary, types, etc.
-getModInfo :: (GhcMonad m) => ModuleName -> m ModInfo
+getModInfo :: GhcMonad m => ModuleName -> m ModInfo
 getModInfo name = do
     m <- getModSummary name
     p <- parseModule m

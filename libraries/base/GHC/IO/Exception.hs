@@ -471,4 +471,3 @@ untangle coded message
           _         -> (loc, "")
         }
     not_bar c = c /= '|'
-

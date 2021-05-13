@@ -369,7 +369,7 @@ module GHC.Generics  (
 -- class @Encode@ for that function:
 --
 -- @
--- instance (Encode c) => Encode' ('K1' i c) where
+-- instance Encode c => Encode' ('K1' i c) where
 --   encode' ('K1' x) = encode x
 -- @
 --
@@ -377,7 +377,7 @@ module GHC.Generics  (
 -- disregard all meta-information:
 --
 -- @
--- instance (Encode' f) => Encode' ('M1' i t f) where
+-- instance Encode' f => Encode' ('M1' i t f) where
 --   encode' ('M1' x) = encode' x
 -- @
 --
@@ -405,7 +405,7 @@ module GHC.Generics  (
 -- Defining a particular instance is now as simple as saying
 --
 -- @
--- instance (Encode a) => Encode (Tree a)
+-- instance Encode a => Encode (Tree a)
 -- @
 --
 #if 0

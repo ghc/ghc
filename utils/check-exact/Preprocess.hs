@@ -278,7 +278,7 @@ placeholderBufSpan = pspan
 
 -- ---------------------------------------------------------------------
 
-parseError :: (GHC.MonadIO m) => GHC.PState -> m b
+parseError :: GHC.MonadIO m => GHC.PState -> m b
 parseError pst = do
      let
        -- (warns,errs) = GHC.getMessages pst dflags

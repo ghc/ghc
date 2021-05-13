@@ -232,7 +232,7 @@ isGadt _ = False
 -- ---------------------------------------------------------------------
 
 -- Is a RdrName of type Exact? SYB query, so can be extended to other types too
-isExactName :: (Data name) => name -> Bool
+isExactName :: Data name => name -> Bool
 isExactName = False `mkQ` isExact
 
 -- ---------------------------------------------------------------------
@@ -266,14 +266,14 @@ mkKWComment kw (EpaSpan ss)
 mkKWComment kw (EpaDelta dp)
   = Comment (keywordToString $ G kw) (Anchor placeholderRealSpan (MovedAnchor dp)) (Just kw)
 
-comment2dp :: (Comment,  DeltaPos) -> (KeywordId, DeltaPos)
+comment2dp :: (Comment, DeltaPos) -> (KeywordId, DeltaPos)
 comment2dp = first AnnComment
 
 sortAnchorLocated :: [GenLocated Anchor a] -> [GenLocated Anchor a]
 sortAnchorLocated = sortBy (compare `on` (anchor . getLoc))
 
 
-getAnnotationEP :: (Data a) =>  Located a  -> Anns -> Maybe Annotation
+getAnnotationEP :: Data a => Located a -> Anns -> Maybe Annotation
 getAnnotationEP  la as =
   Map.lookup (mkAnnKey la) as
 
@@ -347,7 +347,7 @@ locatedAnAnchor (L (SrcSpanAnn (EpAnn a _ _) _) _) = anchor a
 
  -- ---------------------------------------------------------------------
 
-showAst :: (Data a) => a -> String
+showAst :: Data a => a -> String
 showAst ast
   = showSDocUnsafe
     $ showAstData NoBlankSrcSpan NoBlankEpAnnotations ast

@@ -653,7 +653,7 @@ classToIfaceDecl env clas
                 -- like         class Foo a where
                 --                op :: (?x :: String) => a -> a
                 -- and          class Baz a where
-                --                op :: (Ord a) => a -> a
+                --                op :: Ord a => a -> a
           (sel_tyvars, rho_ty) = splitForAllTyCoVars (idType sel_id)
           op_ty                = funResultTy rho_ty
 

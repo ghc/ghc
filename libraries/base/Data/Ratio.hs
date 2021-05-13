@@ -47,7 +47,7 @@ import GHC.Real         -- The basic defns for Ratio
 -- and abs r' < d', and the simplest rational is q%1 + the reciprocal of
 -- the simplest rational between d'%r' and d%r.
 
-approxRational :: (RealFrac a) => a -> a -> Rational
+approxRational :: RealFrac a => a -> a -> Rational
 approxRational rat eps =
     -- We convert rat and eps to rational *before* subtracting/adding since
     -- otherwise we may overflow. This was the cause of #14425.

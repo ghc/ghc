@@ -240,7 +240,7 @@ hsRecUpdFieldOcc = fmap unambiguousFieldOcc . hsRecFieldLbl
 instance OutputableBndrId p => Outputable (Pat (GhcPass p)) where
     ppr = pprPat
 
-pprLPat :: (OutputableBndrId p) => LPat (GhcPass p) -> SDoc
+pprLPat :: OutputableBndrId p => LPat (GhcPass p) -> SDoc
 pprLPat (L _ e) = pprPat e
 
 -- | Print with type info if -dppr-debug is on
@@ -277,7 +277,7 @@ pprParendPat p pat = sdocOption sdocPrintTypecheckerElaboration $ \ print_tc_ela
       -- But otherwise the CoPat is discarded, so it
       -- is the pattern inside that matters.  Sigh.
 
-pprPat :: forall p. (OutputableBndrId p) => Pat (GhcPass p) -> SDoc
+pprPat :: forall p. OutputableBndrId p => Pat (GhcPass p) -> SDoc
 pprPat (VarPat _ lvar)          = pprPatBndr (unLoc lvar)
 pprPat (WildPat _)              = char '_'
 pprPat (LazyPat _ pat)          = char '~' <> pprParendLPat appPrec pat
