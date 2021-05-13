@@ -278,11 +278,10 @@ initCapability (Capability *cap, uint32_t i)
     cap->spark_stats.converted  = 0;
     cap->spark_stats.gcd        = 0;
     cap->spark_stats.fizzled    = 0;
-#if !defined(mingw32_HOST_OS)
-    cap->io_manager_control_wr_fd = -1;
-#endif
 #endif
     cap->total_allocated        = 0;
+
+    initCapabilityIOManager(&cap->iomgr);
 
     cap->f.stgEagerBlackholeInfo = (W_)&__stg_EAGER_BLACKHOLE_info;
     cap->f.stgGCEnter1     = (StgFunPtr)__stg_gc_enter_1;
@@ -1325,6 +1324,8 @@ markCapability (evac_fn evac, void *user, Capability *cap,
         traverseSparkQueue (evac, user, cap);
     }
 #endif
+
+    markCapabilityIOManager(evac, user, cap->iomgr);
 
     // Free STM structures for this Capability
     stmPreGCHook(cap);
