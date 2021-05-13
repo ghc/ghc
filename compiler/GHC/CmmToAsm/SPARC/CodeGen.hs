@@ -676,6 +676,7 @@ outOfLineMachOp_table mop
         MO_Ctz w            -> ctzLabel w
         MO_AtomicRMW w amop -> atomicRMWLabel w amop
         MO_Cmpxchg w        -> cmpxchgLabel w
+        MO_Cmpxchg2 _       -> unsupported
         MO_Xchg w           -> xchgLabel w
         MO_AtomicRead w     -> atomicReadLabel w
         MO_AtomicWrite w    -> atomicWriteLabel w
@@ -696,4 +697,3 @@ outOfLineMachOp_table mop
         (MO_Prefetch_Data _) -> unsupported
     where unsupported = panic ("outOfLineCmmOp: " ++ show mop
                             ++ " not supported here")
-
