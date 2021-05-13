@@ -638,6 +638,7 @@ data CallishMachOp
   -- Should be an AtomicRMW variant eventually.
   -- Sequential consistent.
   | MO_Xchg Width
+  | MO_Cmpxchg2 Width
   deriving (Eq, Show)
 
 -- | The operation to perform atomically.
