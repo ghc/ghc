@@ -46,6 +46,10 @@ import qualified Data.Set as Set
 
 import System.Directory
 import System.FilePath
+import GHC.Driver.Dependencies
+import GHC.Linker.Types
+import GHC.Types.SrcLoc
+import GHC.Utils.Monad
 
 {- Note [Module self-dependency]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

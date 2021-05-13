@@ -269,7 +269,7 @@ checkVersions hsc_env mod_summary iface
        ; recomp <- checkList [checkModUsage (homeUnitAsUnit home_unit) u
                              | u <- mi_usages iface]
        ; return (recomp, Just iface)
-    }}}}}}}}}}
+    }}}}}}}}}}}
   where
     logger = hsc_logger hsc_env
     dflags = hsc_dflags hsc_env
