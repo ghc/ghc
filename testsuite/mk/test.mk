@@ -53,6 +53,10 @@ TEST_HC_OPTS += -fdiagnostics-color=never
 TEST_HC_OPTS += -fno-diagnostics-show-caret
 endif
 
+ifeq "$(MinGhcVersion811)" "YES"
+TEST_HC_OPTS += -fdiagnostics-show-contexts
+endif
+
 # See #15278.
 TEST_HC_OPTS += -Werror=compat
 
