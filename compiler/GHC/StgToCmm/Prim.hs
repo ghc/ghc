@@ -877,12 +877,6 @@ emitPrimOp dflags primop = case primop of
   CasAddrOp_Word64 -> \[dst, expected, new] -> opIntoRegs $ \[res] ->
     emitPrimCall [res] (MO_Cmpxchg W64) [dst, expected, new]
 
-  CasAddrOp2_Word32 -> \[dst, old_lo, old_hi, new_lo, new_hi] ->
-    opIntoRegs $ \[res_lo, res_hi] ->
-    emitPrimCall [res_lo, res_hi] (MO_Cmpxchg2 W32) [dst, old_lo, old_hi, new_lo, new_hi]
-  CasAddrOp2_Word64 -> \[dst, old_lo, old_hi, new_lo, new_hi] ->
-    opIntoRegs $ \[res_lo, res_hi] ->
-    emitPrimCall [res_lo, res_hi] (MO_Cmpxchg2 W64) [dst, old_lo, old_hi, new_lo, new_hi]
 
 -- SIMD primops
   (VecBroadcastOp vcat n w) -> \[e] -> opIntoRegs $ \[res] -> do
@@ -1534,6 +1528,16 @@ emitPrimOp dflags primop = case primop of
     if (ncg && x86ish || ppc) || llvm
     then Left MO_F64_Fabs
     else Right $ genericFabsOp W64
+
+  CasAddrOp2_Word32 -> \args -> opCallishHandledLater args $
+    if ncg && x86ish
+    then Left $ MO_Cmpxchg2 W32
+    else panic "CasAddrOp2_Word32"
+
+  CasAddrOp2_Word64 -> \args -> opCallishHandledLater args $
+    if ncg && x86ish
+    then Left $ MO_Cmpxchg2 W64
+    else panic "CasAddrOp2_Word64"
 
   -- tagToEnum# is special: we need to pull the constructor
   -- out of the table, and perform an appropriate return.
