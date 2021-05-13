@@ -11,4 +11,4 @@ allow-newer:
   *:ghc-prim
 
 -- Pinning the index-state helps to make reasonably CI deterministic
-index-state: 2021-01-24T12:09:34Z
+index-state: 2021-05-13T06:18:55Z
