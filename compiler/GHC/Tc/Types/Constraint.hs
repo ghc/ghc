@@ -29,10 +29,11 @@ module GHC.Tc.Types.Constraint (
         CtIrredReason(..), HoleSet, isInsolubleReason,
 
         CheckTyEqResult, CheckTyEqProblem, cteProblem, cterClearOccursCheck,
-        cteOK, cteImpredicative, cteTypeFamily, cteHoleBlocker,
+        cteOK, cteImpredicative, cteTypeFamily,
         cteInsolubleOccurs, cteSolubleOccurs, cterSetOccursCheckSoluble,
         cterHasNoProblem, cterHasProblem, cterHasOnlyProblem,
         cterRemoveProblem, cterHasOccursCheck, cterFromKind,
+        cterHoles, cterHasOnlyHoles, cteBlockingHoles,
 
         CanEqLHS(..), canEqLHS_maybe, canEqLHSKind, canEqLHSType,
         eqCanEqLHS,
@@ -110,6 +111,7 @@ import GHC.Types.SrcLoc
 import GHC.Data.Bag
 import GHC.Utils.Misc
 import GHC.Utils.Panic
+import GHC.Types.Unique.Set
 
 import Control.Monad ( msum )
 import qualified Data.Semigroup ( (<>) )
@@ -321,18 +323,9 @@ data CtIrredReason
   = IrredShapeReason
       -- ^ this constraint has a non-canonical shape (e.g. @c Int@, for a variable @c@)
 
-  | HoleBlockerReason HoleSet
-     -- ^ this constraint is blocked on the coercion hole(s) listed
-     -- See Note [Equalities with incompatible kinds] in GHC.Tc.Solver.Canonical
-     -- Wrinkle (4a). Why store the HoleSet? See Wrinkle (2) of that
-     -- same Note.
-     -- INVARIANT: A HoleBlockerReason constraint is a homogeneous equality whose
-     --   left hand side can fit in a CanEqLHS.
-
   | NonCanonicalReason CheckTyEqResult
-   -- ^ an equality where some invariant other than (TyEq:H) of 'CEqCan' is not satisfied;
+   -- ^ an equality where some invariant is not satisfied.
    -- the 'CheckTyEqResult' states exactly why
-   -- INVARIANT: the 'CheckTyEqResult' has some bit set other than cteHoleBlocker
 
   | ReprEqReason
     -- ^ an equality that cannot be decomposed because it is representational.
@@ -353,7 +346,6 @@ data CtIrredReason
 
 instance Outputable CtIrredReason where
   ppr IrredShapeReason          = text "(irred)"
-  ppr (HoleBlockerReason holes) = parens (text "blocked on" <+> ppr holes)
   ppr (NonCanonicalReason cter) = ppr cter
   ppr ReprEqReason              = text "(repr)"
   ppr ShapeMismatchReason       = text "(shape)"
@@ -362,7 +354,6 @@ instance Outputable CtIrredReason where
 -- | Are we sure that more solving will never solve this constraint?
 isInsolubleReason :: CtIrredReason -> Bool
 isInsolubleReason IrredShapeReason          = False
-isInsolubleReason (HoleBlockerReason {})    = False
 isInsolubleReason (NonCanonicalReason cter) = cterIsInsoluble cter
 isInsolubleReason ReprEqReason              = False
 isInsolubleReason ShapeMismatchReason       = True
@@ -376,33 +367,32 @@ isInsolubleReason AbstractTyConReason       = True
 
 -- | A set of problems in checking the validity of a type equality.
 -- See 'checkTypeEq'.
-newtype CheckTyEqResult = CTER Word8
+data CheckTyEqResult = CTER Word8 HoleSet
+  -- the HoleSet is the set of blocking coercions
+  -- See Note [Equalities with incompatible kinds] GHC.Tc.Solver.Canonical, wrinkle (2)
 
 -- | No problems in checking the validity of a type equality.
 cteOK :: CheckTyEqResult
-cteOK = CTER zeroBits
+cteOK = CTER zeroBits mempty
 
 -- | Check whether a 'CheckTyEqResult' is marked successful.
 cterHasNoProblem :: CheckTyEqResult -> Bool
-cterHasNoProblem (CTER 0) = True
-cterHasNoProblem _        = False
+cterHasNoProblem (CTER 0 holes) = isEmptyUniqSet holes
+cterHasNoProblem _              = False
 
 -- | An individual problem that might be logged in a 'CheckTyEqResult'
 newtype CheckTyEqProblem = CTEP Word8
 
-cteImpredicative, cteTypeFamily, cteHoleBlocker, cteInsolubleOccurs,
-  cteSolubleOccurs :: CheckTyEqProblem
+cteImpredicative, cteTypeFamily, cteInsolubleOccurs, cteSolubleOccurs :: CheckTyEqProblem
 cteImpredicative   = CTEP (bit 0)   -- forall or (=>) encountered
 cteTypeFamily      = CTEP (bit 1)   -- type family encountered
-cteHoleBlocker     = CTEP (bit 2)   -- blocking coercion hole
-      -- See Note [Equalities with incompatible kinds] in GHC.Tc.Solver.Canonical
 cteInsolubleOccurs = CTEP (bit 3)   -- occurs-check
 cteSolubleOccurs   = CTEP (bit 4)   -- occurs-check under a type function or in a coercion
                                     -- must be one bit to the left of cteInsolubleOccurs
 -- See also Note [Insoluble occurs check] in GHC.Tc.Errors
 
 cteProblem :: CheckTyEqProblem -> CheckTyEqResult
-cteProblem (CTEP mask) = CTER mask
+cteProblem (CTEP mask) = CTER mask mempty
 
 occurs_mask :: Word8
 occurs_mask = insoluble_mask .|. soluble_mask
@@ -412,56 +402,72 @@ occurs_mask = insoluble_mask .|. soluble_mask
 
 -- | Check whether a 'CheckTyEqResult' has a 'CheckTyEqProblem'
 cterHasProblem :: CheckTyEqResult -> CheckTyEqProblem -> Bool
-CTER bits `cterHasProblem` CTEP mask = (bits .&. mask) /= 0
+CTER bits _ `cterHasProblem` CTEP mask = (bits .&. mask) /= 0
 
 -- | Check whether a 'CheckTyEqResult' has one 'CheckTyEqProblem' and no other
 cterHasOnlyProblem :: CheckTyEqResult -> CheckTyEqProblem -> Bool
-CTER bits `cterHasOnlyProblem` CTEP mask = bits == mask
+CTER bits holes `cterHasOnlyProblem` CTEP mask = isEmptyUniqSet holes && (bits == mask)
+
+-- | Check whether a 'CheckTyEqResult' has blocking holes but no other problem
+cterHasOnlyHoles :: CheckTyEqResult -> Bool
+cterHasOnlyHoles (CTER 0 holes) = not (isEmptyUniqSet holes)
+cterHasOnlyHoles _              = False
 
 cterRemoveProblem :: CheckTyEqResult -> CheckTyEqProblem -> CheckTyEqResult
-cterRemoveProblem (CTER bits) (CTEP mask) = CTER (bits .&. complement mask)
+cterRemoveProblem (CTER bits holes) (CTEP mask) = CTER (bits .&. complement mask) holes
 
 cterHasOccursCheck :: CheckTyEqResult -> Bool
-cterHasOccursCheck (CTER bits) = (bits .&. occurs_mask) /= 0
+cterHasOccursCheck (CTER bits _) = (bits .&. occurs_mask) /= 0
 
 cterClearOccursCheck :: CheckTyEqResult -> CheckTyEqResult
-cterClearOccursCheck (CTER bits) = CTER (bits .&. complement occurs_mask)
+cterClearOccursCheck (CTER bits holes) = CTER (bits .&. complement occurs_mask) holes
 
 -- | Mark a 'CheckTyEqResult' as not having an insoluble occurs-check: any occurs
 -- check under a type family or in a representation equality is soluble.
 cterSetOccursCheckSoluble :: CheckTyEqResult -> CheckTyEqResult
-cterSetOccursCheckSoluble (CTER bits)
-  = CTER $ ((bits .&. insoluble_mask) `shift` 1) .|. (bits .&. complement insoluble_mask)
+cterSetOccursCheckSoluble (CTER bits holes)
+  = CTER (((bits .&. insoluble_mask) `shift` 1) .|. (bits .&. complement insoluble_mask))
+         holes
   where
     CTEP insoluble_mask = cteInsolubleOccurs
 
 -- | Retain only information about occurs-check failures, because only that
 -- matters after recurring into a kind.
 cterFromKind :: CheckTyEqResult -> CheckTyEqResult
-cterFromKind (CTER bits)
-  = CTER (bits .&. occurs_mask)
+cterFromKind (CTER bits holes)
+  = CTER (bits .&. occurs_mask) holes
 
 cterIsInsoluble :: CheckTyEqResult -> Bool
-cterIsInsoluble (CTER bits) = (bits .&. mask) /= 0
+cterIsInsoluble (CTER bits _) = (bits .&. mask) /= 0
   where
     mask = impredicative_mask .|. insoluble_occurs_mask
 
     CTEP impredicative_mask    = cteImpredicative
     CTEP insoluble_occurs_mask = cteInsolubleOccurs
 
+cterHoles :: CheckTyEqResult -> HoleSet
+cterHoles (CTER _ holes) = holes
+
+cteBlockingHoles :: HoleSet -> CheckTyEqResult
+cteBlockingHoles holes = ASSERT( not (isEmptyUniqSet holes) )
+                         CTER zeroBits holes
+
 instance Semigroup CheckTyEqResult where
-  CTER bits1 <> CTER bits2 = CTER (bits1 .|. bits2)
+  CTER bits1 holes1 <> CTER bits2 holes2 = CTER (bits1 .|. bits2)
+                                                (holes1 `unionUniqSets` holes2)
 instance Monoid CheckTyEqResult where
   mempty = cteOK
 
 instance Outputable CheckTyEqResult where
   ppr cter | cterHasNoProblem cter = text "cteOK"
            | otherwise
-           = parens $ fcat $ intersperse vbar $ set_bits
+           = parens $ fcat (intersperse vbar set_bits ++ [if isEmptyUniqSet holes
+                                                          then empty
+                                                          else vbar <> ppr holes])
     where
+      holes    = cterHoles cter
       all_bits = [ (cteImpredicative,   "cteImpredicative")
                  , (cteTypeFamily,      "cteTypeFamily")
-                 , (cteHoleBlocker,     "cteHoleBlocker")
                  , (cteInsolubleOccurs, "cteInsolubleOccurs")
                  , (cteSolubleOccurs,   "cteSolubleOccurs") ]
       set_bits = [ text str

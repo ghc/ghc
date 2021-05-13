@@ -2336,10 +2336,7 @@ canEqCanLHSFinish ev eq_rel swapped lhs rhs
                         NomEq  -> result0
                         ReprEq -> cterSetOccursCheckSoluble result0
 
-             reason | result `cterHasOnlyProblem` cteHoleBlocker
-                    = HoleBlockerReason (coercionHolesOfType rhs)
-                    | otherwise
-                    = NonCanonicalReason result
+             reason = NonCanonicalReason result
 
        ; if cterHasNoProblem result
          then do { traceTcS "CEqCan" (ppr lhs $$ ppr rhs)
@@ -2445,7 +2442,7 @@ that is, it should be put aside, and not used to rewrite any other constraint,
 until the kind-equality on which it depends (namely 'co' above) is solved.
 To achieve this
 * The [X] constraint is a CIrredCan
-* With a cc_reason of HoleBlockerReason bchs
+* With a cc_reason of NonCanonicalReason cter, with cterBlockingHoles = bchs
 * Where 'bchs' is the set of "blocking coercion holes".  The blocking coercion
   holes are the free coercion holes of [X]'s type
 * When all the blocking coercion holes in the CIrredCan are filled (solved),
@@ -2470,7 +2467,7 @@ Wrinkles:
 
      So, we have an invariant on CEqCan (TyEq:H) that the RHS does not have
      any coercion holes. This is checked in checkTypeEq. Any equalities that
-     have such an RHS are turned into CIrredCans with a HoleBlockerReason. We also
+     have such an RHS are turned into CIrredCans with a NonCanonicalReason. We also
      must be sure to kick out any such CIrredCan constraints that mention coercion holes
      when those holes get filled in, so that the unification step can now proceed.
 
@@ -2478,7 +2475,8 @@ Wrinkles:
      are stored in the inert_blocked field of InertCans.
 
      However, we must be careful: we kick out only when no coercion holes are
-     left. The holes in the type are stored in the HoleBlockerReason CtIrredReason.
+     left. The holes in the type are stored in the HoleSet in the CheckTyEqResult
+     in the NonCanonicalReason CtIrredReason.
      The extra check that there are no more remaining holes avoids
      needless work when rewriting evidence (which fills coercion holes) and
      aids efficiency.
@@ -2521,7 +2519,7 @@ Wrinkles:
      cast appears opposite a tyvar. This is implemented in the cast case
      of can_eq_nc'.
 
- (4) Reporting an error for a constraint that is blocked with HoleBlockerReason
+ (4) Reporting an error for a constraint that is blocked on a hole
      is hard: what would we say to users? And we don't
      really need to report, because if a constraint is blocked, then
      there is unsolved wanted blocking it; that unsolved wanted will

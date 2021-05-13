@@ -712,7 +712,8 @@ data InertCans   -- See Note [Detailed InertCans Invariants] for more
 
        , inert_blocked :: Cts
               -- Equality predicates blocked on a coercion hole.
-              -- Each Ct is a CIrredCan with cc_reason = HoleBlockerReason
+              -- Each Ct is a CIrredCan with cc_reason = NonCanonicalReason with
+              -- a non-empty set of blocking holes
               -- See Note [Equalities with incompatible kinds] in GHC.Tc.Solver.Canonical
               -- wrinkle (2)
               -- These are stored separately from inert_irreds because
@@ -1871,7 +1872,8 @@ add_item tc_lvl
        TyVarLHS tv     -> ics { inert_eqs    = addTyEq eqs tv item }
 
 add_item tc_lvl ics@(IC { inert_blocked = blocked })
-         item@(CIrredCan { cc_reason = HoleBlockerReason {}})
+         item@(CIrredCan { cc_reason = NonCanonicalReason cter })
+  | cterHasOnlyHoles cter
   = updateGivenEqs tc_lvl item $  -- this item is always an equality
     ics { inert_blocked = blocked `Bag.snocBag` item }
 
@@ -2178,11 +2180,12 @@ kickOutAfterFillingCoercionHole hole filled_co
     kick_ct :: Ct -> Either Ct Ct
          -- Left: kick out; Right: keep. But even if we keep, we may need
          -- to update the set of blocking holes
-    kick_ct ct@(CIrredCan { cc_reason = HoleBlockerReason holes })
-      | hole `elementOfUniqSet` holes
+    kick_ct ct@(CIrredCan { cc_reason = NonCanonicalReason cter })
+      | let holes = cterHoles cter
+      , hole `elementOfUniqSet` holes
       = let new_holes = holes `delOneFromUniqSet` hole
                               `unionUniqSets` holes_of_co
-            updated_ct = ct { cc_reason = HoleBlockerReason new_holes }
+            updated_ct = ct { cc_reason = NonCanonicalReason (cteBlockingHoles new_holes) }
         in
         if isEmptyUniqSet new_holes
         then Left updated_ct

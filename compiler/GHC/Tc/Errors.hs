@@ -64,6 +64,7 @@ import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Data.List.SetOps ( equivClasses )
 import GHC.Data.Maybe
+import GHC.Types.Unique.Set
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Utils.FV ( fvVarList, unionFV )
 
@@ -599,10 +600,11 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics
               , ("Irreds",          is_irred,        False, mkGroupReporter mkIrredErr)
               , ("Dicts",           is_dict,         False, mkGroupReporter mkDictErr) ]
 
-    -- also checks to make sure the constraint isn't HoleBlockerReason
+    -- also checks to make sure the constraint isn't blocked on coercion holes
     -- See TcCanonical Note [Equalities with incompatible kinds], (4)
     unblocked :: (Ct -> Pred -> Bool) -> Ct -> Pred -> Bool
-    unblocked _ (CIrredCan { cc_reason = HoleBlockerReason {}}) _ = False
+    unblocked _ (CIrredCan { cc_reason = NonCanonicalReason cter}) _
+      = isEmptyUniqSet (cterHoles cter)
     unblocked checker ct pred = checker ct pred
 
     -- rigid_nom_eq, rigid_nom_tv_eq,
@@ -1661,12 +1663,10 @@ mkTyVarEqErr' dflags ctxt report ct tv1 ty2
 
     check_eq_result = case ct of
       CIrredCan { cc_reason = NonCanonicalReason result } -> result
-      CIrredCan { cc_reason = HoleBlockerReason {} }      -> cteProblem cteHoleBlocker
       _ -> checkTyVarEq dflags tv1 ty2
         -- in T2627b, we report an error for F (F a0) ~ a0. Note that the type
         -- variable is on the right, so we don't get useful info for the CIrredCan,
         -- and have to compute the result of checkTyVarEq here.
-
 
     insoluble_occurs_check = check_eq_result `cterHasProblem` cteInsolubleOccurs
 

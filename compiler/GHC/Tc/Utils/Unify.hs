@@ -70,6 +70,7 @@ import GHC.Data.Bag
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
+import GHC.Types.Unique.Set
 
 import GHC.Exts      ( inline )
 import Control.Monad
@@ -1980,7 +1981,6 @@ checkTypeEq dflags lhs ty
   where
     impredicative    = cteProblem cteImpredicative
     type_family      = cteProblem cteTypeFamily
-    hole_blocker     = cteProblem cteHoleBlocker
     insoluble_occurs = cteProblem cteInsolubleOccurs
     soluble_occurs   = cteProblem cteSolubleOccurs
 
@@ -2062,11 +2062,13 @@ checkTypeEq dflags lhs ty
         -- Wrinkle (2) about this case in general, Wrinkle (4b) about the check for
         -- deferred type errors
         maybe_hole_blocker | not (gopt Opt_DeferTypeErrors dflags)
-                           , hasCoercionHoleCo co
-                           = hole_blocker
+                           , not (isEmptyUniqSet holes)
+                           = cteBlockingHoles holes
 
                            | otherwise
                            = cteOK
+
+        holes = coercionHolesOfCo co
 
     check_tc :: TyCon -> CheckTyEqResult
     check_tc
