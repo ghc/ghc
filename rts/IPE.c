@@ -30,6 +30,12 @@ HashTable * ipeHashTable = NULL;
 
 IpeListNode* IPE_LIST_LIST = NULL;
 
+Mutex ipeMapLock;
+
+void __attribute__ ((constructor)) setupMutex(void) {
+    initMutex(&ipeMapLock);
+}
+
 void dumpIPEToEventLog(void) {
 #if defined(TRACING)
     updateIpeMap();
@@ -69,6 +75,8 @@ int countIPEs(InfoProvEnt **ent_list) {
 
 void registerInfoProvList(InfoProvEnt **ent_list)
 {
+    ACQUIRE_LOCK(&ipeMapLock);
+
     if(IPE_LIST_LIST == NULL) {
         IPE_LIST_LIST = stgMallocBytes(sizeof(IpeListNode), "registerInfoProvList-firstNode");
         IPE_LIST_LIST->list_buffer[0] = ent_list;
@@ -85,6 +93,8 @@ void registerInfoProvList(InfoProvEnt **ent_list)
             IPE_LIST_LIST = newNode;
         }
     }
+
+    RELEASE_LOCK(&ipeMapLock);
 }
 
 InfoProvEnt * lookupIPE(StgInfoTable *info)
@@ -94,6 +104,13 @@ InfoProvEnt * lookupIPE(StgInfoTable *info)
 }
 
 void updateIpeMap() {
+    // Check if there's any work at all. If so, we can circumvent locking.
+    if(ipeHashTable != NULL && IPE_LIST_LIST == NULL) {
+        return;
+    }
+
+    ACQUIRE_LOCK(&ipeMapLock);
+
     if (ipeHashTable == NULL) {
         ipeHashTable = allocHashTable();
     }
@@ -110,4 +127,6 @@ void updateIpeMap() {
         IPE_LIST_LIST = currentNode->next;
         stgFree(currentNode);
     }
+
+    RELEASE_LOCK(&ipeMapLock);
 }
