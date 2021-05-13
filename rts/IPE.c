@@ -71,13 +71,19 @@ void registerInfoProvList(InfoProvEnt **ent_list)
 {
     if(IPE_LIST_LIST == NULL) {
         IPE_LIST_LIST = stgMallocBytes(sizeof(IpeListNode), "registerInfoProvList-firstNode");
-        IPE_LIST_LIST->list = ent_list;
+        IPE_LIST_LIST->list_buffer[0] = ent_list;
+        IPE_LIST_LIST->list_buffer_count = 1;
         IPE_LIST_LIST->next = NULL;
     } else {
-        IpeListNode* newNode = stgMallocBytes(sizeof(IpeListNode), "registerInfoProvList-nextNode");
-        newNode->list = ent_list;
-        newNode->next = IPE_LIST_LIST;
-        IPE_LIST_LIST = newNode;
+        if(IPE_LIST_LIST->list_buffer_count < 1000) {
+            IPE_LIST_LIST->list_buffer[IPE_LIST_LIST->list_buffer_count] = ent_list;
+            IPE_LIST_LIST->list_buffer_count = IPE_LIST_LIST->list_buffer_count + 1;
+        } else {
+            IpeListNode* newNode = stgMallocBytes(sizeof(IpeListNode), "registerInfoProvList-nextNode");
+            IPE_LIST_LIST->list_buffer[0] = ent_list;
+            IPE_LIST_LIST->list_buffer_count = 1;
+            IPE_LIST_LIST = newNode;
+        }
     }
 }
 
@@ -95,8 +101,10 @@ void updateIpeMap() {
     while(IPE_LIST_LIST != NULL) {
         IpeListNode* currentNode = IPE_LIST_LIST;
 
-        for(InfoProvEnt** ipeList = currentNode->list; *ipeList != NULL; ipeList++) {
-            insertHashTable(ipeHashTable, (StgWord) (*ipeList)->info, *ipeList);
+        for(int i = 0; i < currentNode->list_buffer_count; i++) {
+            for(InfoProvEnt** ipeList = currentNode->list_buffer[i]; *ipeList != NULL; ipeList++) {
+                insertHashTable(ipeHashTable, (StgWord) (*ipeList)->info, *ipeList);
+            }
         }
 
         IPE_LIST_LIST = currentNode->next;

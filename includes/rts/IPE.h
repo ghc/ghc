@@ -30,7 +30,8 @@ typedef struct InfoProvEnt_ {
 } InfoProvEnt;
 
 typedef struct IpeListNode_ {
-    InfoProvEnt** list;
+    InfoProvEnt** list_buffer[1000];
+    StgWord16 list_buffer_count;
     struct IpeListNode_* next;
 } IpeListNode;
 
