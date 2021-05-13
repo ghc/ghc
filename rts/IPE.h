@@ -14,5 +14,7 @@
 #include "BeginPrivate.h"
 
 void dumpIPEToEventLog(void);
+void traceIPEFromHashTable(void *data STG_UNUSED, StgWord key STG_UNUSED, const void *value);
+void updateIpeMap(void);
 
 #include "EndPrivate.h"
