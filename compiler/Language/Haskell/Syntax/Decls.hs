@@ -1784,7 +1784,7 @@ data AnnProvenance pass = ValueAnnProvenance (LIdP pass)
 -- deriving instance Functor     AnnProvenance
 -- deriving instance Foldable    AnnProvenance
 -- deriving instance Traversable AnnProvenance
--- deriving instance (Data pass) => Data (AnnProvenance pass)
+-- deriving instance Data pass => Data (AnnProvenance pass)
 
 annProvenanceName_maybe :: forall p. UnXRec p => AnnProvenance p -> Maybe (IdP p)
 annProvenanceName_maybe (ValueAnnProvenance (unXRec @p -> name)) = Just name

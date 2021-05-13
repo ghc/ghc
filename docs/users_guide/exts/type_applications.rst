@@ -314,7 +314,7 @@ part of the type argument using type constructors.
 
 For a somewhat-contrived example::
 
-    foo :: (Num a) => Maybe [a] -> String
+    foo :: Num a => Maybe [a] -> String
     foo (Nothing @[t]) = show (0 :: t)
     foo (Just @[t] xs) = show (sum xs :: t)
 

@@ -331,7 +331,7 @@ before we know the kind of the type variables.  For example:
      op :: D b => a -> b -> b
 
   class D c where
-     bop :: (Monad c) => ...
+     bop :: Monad c => ...
 
 Here, the kind of the locally-polymorphic type variable "b"
 depends on *all the uses of class D*.  For example, the use of

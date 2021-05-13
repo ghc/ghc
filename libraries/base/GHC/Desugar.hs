@@ -1,8 +1,8 @@
-{-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE NoImplicitPrelude
-           , RankNTypes
-           , ExistentialQuantification
-  #-}
+{-# LANGUAGE GADTs             #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE RankNTypes        #-}
+{-# LANGUAGE Trustworthy       #-}
+
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
@@ -35,7 +35,8 @@ f >>> g = g . f
 {-# INLINE (>>>) #-} -- see Note [INLINE on >>>] in Control.Category
 
 -- A wrapper data type that lets the typechecker get at the appropriate dictionaries for an annotation
-data AnnotationWrapper = forall a. (Data a) => AnnotationWrapper a
+data AnnotationWrapper where
+  AnnotationWrapper :: Data a => a -> AnnotationWrapper
 
-toAnnotationWrapper :: (Data a) => a -> AnnotationWrapper
+toAnnotationWrapper :: Data a => a -> AnnotationWrapper
 toAnnotationWrapper what = AnnotationWrapper what

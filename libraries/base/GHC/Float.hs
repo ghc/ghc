@@ -87,7 +87,7 @@ infixr 8  **
 -- * @exp (a + b)@ = @exp a * exp b@
 -- * @exp (fromInteger 0)@ = @fromInteger 1@
 --
-class  (Fractional a) => Floating a  where
+class Fractional a => Floating a where
     pi                  :: a
     exp, log, sqrt      :: a -> a
     (**), logBase       :: a -> a -> a
@@ -166,7 +166,7 @@ log1mexpOrd a
 
 -- | Efficient, machine-independent access to the components of a
 -- floating-point number.
-class  (RealFrac a, Floating a) => RealFloat a  where
+class (RealFrac a, Floating a) => RealFloat a where
     -- | a constant function, returning the radix of the representation
     -- (often @2@)
     floatRadix          :: a -> Integer
@@ -801,7 +801,7 @@ instance  Enum Double  where
 -- | Show a signed 'RealFloat' value to full precision
 -- using standard decimal notation for arguments whose absolute value lies
 -- between @0.1@ and @9,999,999@, and scientific notation otherwise.
-showFloat :: (RealFloat a) => a -> ShowS
+showFloat :: RealFloat a => a -> ShowS
 showFloat x  =  showString (formatRealFloat FFGeneric Nothing x)
 
 -- These are the format types.  This type is not exported.
@@ -810,10 +810,10 @@ data FFFormat = FFExponent | FFFixed | FFGeneric
 
 -- This is just a compatibility stub, as the "alt" argument formerly
 -- didn't exist.
-formatRealFloat :: (RealFloat a) => FFFormat -> Maybe Int -> a -> String
+formatRealFloat :: RealFloat a => FFFormat -> Maybe Int -> a -> String
 formatRealFloat fmt decs x = formatRealFloatAlt fmt decs False x
 
-formatRealFloatAlt :: (RealFloat a) => FFFormat -> Maybe Int -> Bool -> a
+formatRealFloatAlt :: RealFloat a => FFFormat -> Maybe Int -> Bool -> a
                  -> String
 formatRealFloatAlt fmt decs alt x
    | isNaN x                   = "NaN"
@@ -927,7 +927,7 @@ roundTo base d is =
 --
 --      (3) @0 <= di <= base-1@
 
-floatToDigits :: (RealFloat a) => Integer -> a -> ([Int], Int)
+floatToDigits :: RealFloat a => Integer -> a -> ([Int], Int)
 floatToDigits _ 0 = ([0], 0)
 floatToDigits base x =
  let
@@ -1075,7 +1075,7 @@ instead of
 Here's Joe's code:
 
 \begin{pseudocode}
-fromRat :: (RealFloat a) => Rational -> a
+fromRat :: RealFloat a => Rational -> a
 fromRat x = x'
         where x' = f e
 
@@ -1111,7 +1111,7 @@ Now, here's Lennart's code (which works):
   #-}
 
 {-# NOINLINE [1] fromRat #-}
-fromRat :: (RealFloat a) => Rational -> a
+fromRat :: RealFloat a => Rational -> a
 
 -- Deal with special cases first, delegating the real work to fromRat'
 fromRat (n :% 0) | n > 0     =  1/0        -- +Infinity
@@ -1130,7 +1130,7 @@ fromRat (n :% d) | n > 0     = fromRat' (n :% d)
 -- To speed up the scaling process we compute the log2 of the number to get
 -- a first guess of the exponent.
 
-fromRat' :: (RealFloat a) => Rational -> a
+fromRat' :: RealFloat a => Rational -> a
 -- Invariant: argument is strictly positive
 fromRat' x = r
   where b = floatRadix r

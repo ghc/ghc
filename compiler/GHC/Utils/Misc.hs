@@ -1299,7 +1299,7 @@ modificationTimeIfExists f =
 -- as otherwise a partially written file (e.g. due to crash or Ctrl+C)
 -- also results in a skip.
 
-withAtomicRename :: (MonadIO m) => FilePath -> (FilePath -> m a) -> m a
+withAtomicRename :: MonadIO m => FilePath -> (FilePath -> m a) -> m a
 withAtomicRename targetFile f = do
   -- The temp file must be on the same file system (mount) as the target file
   -- to result in an atomic move on most platforms.
