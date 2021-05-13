@@ -23,6 +23,7 @@ import GHC.Core.Predicate
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.Env( tcInitTidyEnv )
 import GHC.Tc.Utils.TcType
+import GHC.Tc.Utils.Unify ( checkTyVarEq )
 import GHC.Tc.Types.Origin
 import GHC.Rename.Unbound ( unknownNameSuggestions )
 import GHC.Core.Type
@@ -1536,11 +1537,28 @@ mkTyVarEqErr :: ReportErrCtxt -> Report -> Ct
 -- tv1 and ty2 are already tidied
 mkTyVarEqErr ctxt report ct tv1 ty2
   = do { traceTc "mkTyVarEqErr" (ppr ct $$ ppr tv1 $$ ppr ty2)
-       ; return $ mkTyVarEqErr' ctxt report ct tv1 ty2 }
+       ; dflags <- getDynFlags
+       ; return $ mkTyVarEqErr' dflags ctxt report ct tv1 ty2 }
 
-mkTyVarEqErr' :: ReportErrCtxt -> Report -> Ct
+mkTyVarEqErr' :: DynFlags -> ReportErrCtxt -> Report -> Ct
               -> TcTyVar -> TcType -> Report
-mkTyVarEqErr' ctxt report ct tv1 ty2
+mkTyVarEqErr' dflags ctxt report ct tv1 ty2
+     -- impredicativity is a simple error to understand; try it first
+  | check_eq_result `cterHasProblem` cteImpredicative
+  = let msg = vcat [ (if isSkolemTyVar tv1
+                      then text "Cannot equate type variable"
+                      else text "Cannot instantiate unification variable")
+                     <+> quotes (ppr tv1)
+                   , hang (text "with a" <+> what <+> text "involving polytypes:") 2 (ppr ty2) ]
+    in
+       -- Unlike the other reports, this discards the old 'report_important'
+       -- instead of augmenting it.  This is because the details are not likely
+       -- to be helpful since this is just an unimplemented feature.
+    mconcat [ headline_msg
+            , important msg
+            , if isSkolemTyVar tv1 then extraTyVarEqInfo ctxt tv1 ty2 else mempty
+            , report ]
+
   | isSkolemTyVar tv1  -- ty2 won't be a meta-tyvar; we would have
                        -- swapped in Solver.Canonical.canEqTyVarHomo
     || isTyVarTyVar tv1 && not (isTyVarTy ty2)
@@ -1571,16 +1589,6 @@ mkTyVarEqErr' ctxt report ct tv1 ty2
         tyvar_binding tv = ppr tv <+> dcolon <+> ppr (tyVarKind tv)
     in
     mconcat [headline_msg, extra2, extra3, report]
-
-  | check_eq_result `cterHasProblem` cteImpredicative
-  = let msg = vcat [ text "Cannot instantiate unification variable"
-                     <+> quotes (ppr tv1)
-                   , hang (text "with a" <+> what <+> text "involving polytypes:") 2 (ppr ty2) ]
-    in
-       -- Unlike the other reports, this discards the old 'report_important'
-       -- instead of augmenting it.  This is because the details are not likely
-       -- to be helpful since this is just an unimplemented feature.
-    mconcat [ headline_msg, important msg, report ]
 
   -- If the immediately-enclosing implication has 'tv' a skolem, and
   -- we know by now its an InferSkol kind of skolem, then presumably
@@ -1643,7 +1651,7 @@ mkTyVarEqErr' ctxt report ct tv1 ty2
 
   | otherwise
   = reportEqErr ctxt report ct (mkTyVarTy tv1) ty2
-        -- This *can* happen (#6123, and test T2627b)
+        -- This *can* happen (#6123)
         -- Consider an ambiguous top-level constraint (a ~ F a)
         -- Not an occurs check, because F is a type function.
   where
@@ -1654,9 +1662,11 @@ mkTyVarEqErr' ctxt report ct tv1 ty2
     check_eq_result = case ct of
       CIrredCan { cc_reason = NonCanonicalReason result } -> result
       CIrredCan { cc_reason = HoleBlockerReason {} }      -> cteProblem cteHoleBlocker
-      _                                                   -> cteOK
-        -- these really should be CEqCans, but zonking constraints loses
-        -- the CEqCan status
+      _ -> checkTyVarEq dflags tv1 ty2
+        -- in T2627b, we report an error for F (F a0) ~ a0. Note that the type
+        -- variable is on the right, so we don't get useful info for the CIrredCan,
+        -- and have to compute the result of checkTyVarEq here.
+
 
     insoluble_occurs_check = check_eq_result `cterHasProblem` cteInsolubleOccurs
 

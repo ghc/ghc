@@ -2326,10 +2326,15 @@ canEqCanLHSFinish ev eq_rel swapped lhs rhs
      -- equalities, in case have  x ~ (y :: ..x...); this is #12593.
      -- This next line checks also for coercion holes (TyEq:H); see
      -- Note [Equalities with incompatible kinds]
-       ; let result = checkTypeEq dflags lhs rhs `cterRemoveProblem` cteTypeFamily
+       ; let result0 = checkTypeEq dflags lhs rhs `cterRemoveProblem` cteTypeFamily
      -- type families are OK here
      -- NB: no occCheckExpand here; see Note [Rewriting synonyms] in GHC.Tc.Solver.Rewrite
 
+
+              -- a ~R# b a is soluble if b later turns out to be Identity
+             result = case eq_rel of
+                        NomEq  -> result0
+                        ReprEq -> cterSetOccursCheckSoluble result0
 
              reason | result `cterHasOnlyProblem` cteHoleBlocker
                     = HoleBlockerReason (coercionHolesOfType rhs)

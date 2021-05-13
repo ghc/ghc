@@ -428,7 +428,7 @@ cterClearOccursCheck :: CheckTyEqResult -> CheckTyEqResult
 cterClearOccursCheck (CTER bits) = CTER (bits .&. complement occurs_mask)
 
 -- | Mark a 'CheckTyEqResult' as not having an insoluble occurs-check: any occurs
--- check is soluble, after all.
+-- check under a type family or in a representation equality is soluble.
 cterSetOccursCheckSoluble :: CheckTyEqResult -> CheckTyEqResult
 cterSetOccursCheckSoluble (CTER bits)
   = CTER $ ((bits .&. insoluble_mask) `shift` 1) .|. (bits .&. complement insoluble_mask)
