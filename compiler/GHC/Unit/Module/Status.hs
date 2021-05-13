@@ -8,7 +8,6 @@ import GHC.Prelude
 import GHC.Unit
 import GHC.Unit.Module.ModGuts
 import GHC.Unit.Module.ModIface
-import GHC.Unit.Module.ModDetails
 
 import GHC.Utils.Fingerprint
 
@@ -24,7 +23,7 @@ data HscRecompStatus
 -- | Action to perform in backend compilation
 data HscBackendAction
     -- | Update the boot and signature file results.
-    = HscUpdate ModIface ModDetails
+    = HscUpdate ModIface
     -- | Recompile this module.
     | HscRecomp
         { hscs_guts           :: CgGuts
