@@ -330,31 +330,33 @@ profilingInitCode platform this_mod (local_CCs, singleton_CCSs)
 
 -- | Generate code to initialise info pointer origin
 -- See note [Mapping Info Tables to Source Positions]
+--
+-- The generated code looks like:
+-- > extern InfoProvEnt Foo_main_info_Foo_ipe[];
+-- > extern InfoProvEnt s13U_info_Foo_ipe[];
+-- > [...]
+-- > extern InfoProvEnt s13W_info_Foo_ipe[];
+-- > static void ip_init_Foo(void) __attribute__((constructor));
+-- > static void ip_init_Foo(void)
+-- > {registerInfoProvEnt(Foo_main_info_Foo_ipe);
+-- >  registerInfoProvEnt(s13U_info_Foo_ipe);
+-- > [...]
+-- >  registerInfoProvEnt(s13W_info_Foo_ipe);}
 ipInitCode :: DynFlags -> Module -> [InfoProvEnt] -> CStub
 ipInitCode dflags this_mod ents
  = if not (gopt Opt_InfoTableMap dflags)
     then mempty
     else CStub $ vcat
     $  map emit_ipe_decl ents
-    ++ [emit_ipe_list ents]
     ++ [ text "static void ip_init_" <> ppr this_mod
             <> text "(void) __attribute__((constructor));"
        , text "static void ip_init_" <> ppr this_mod <> text "(void)"
-       , braces (vcat
-                 [ text "registerInfoProvList" <> parens local_ipe_list_label <> semi
-                 ])
+       , braces $ vcat (map registerInfoProvEnt_call ents)
        ]
  where
    platform = targetPlatform dflags
+   ipe_lbl ipe = pprCLabel platform CStyle (mkIPELabel ipe)
+   registerInfoProvEnt_call ipe =
+    text "registerInfoProvEnt" <> parens (ipe_lbl ipe) <> semi
    emit_ipe_decl ipe =
-       text "extern InfoProvEnt" <+> ipe_lbl <> text "[];"
-     where ipe_lbl = pprCLabel platform CStyle (mkIPELabel ipe)
-   local_ipe_list_label = text "local_ipe_" <> ppr this_mod
-   emit_ipe_list ipes =
-      text "static InfoProvEnt *" <> local_ipe_list_label <> text "[] ="
-      <+> braces (vcat $ [ pprCLabel platform CStyle (mkIPELabel ipe) <> comma
-                         | ipe <- ipes
-                         ] ++ [text "NULL"])
-      <> semi
-
-
+       text "extern InfoProvEnt" <+> ipe_lbl ipe <> text "[];"
