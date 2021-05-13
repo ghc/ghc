@@ -1383,7 +1383,7 @@ runPhase (HscBackend mod_summary result) _ = do
                             _            -> True
 
         case result of
-            HscUpdate iface _ ->
+            HscUpdate iface ->
                 do
                    when write_obj $ case src_flavour of
                      HsigFile -> do
