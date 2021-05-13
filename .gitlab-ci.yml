@@ -758,7 +758,7 @@ validate-aarch64-darwin:
 # riscv64-linux-ubuntu-21.04
 #################################
 .build-riscv64-linux-ubuntu-21.04:
-extends: .validate-linux
+  extends: .validate-linux
   stage: full-build
   image: "registry.gitlab.haskell.org/juampe/ghc:riscv64-linux-ubuntu2104"
   allow_failure: true
@@ -770,8 +770,8 @@ extends: .validate-linux
   tags:
     - riscv64-linux
 
-.riscv64-linux-ubuntu-21.04-llvm:
-extends: .validate-linux
+.build-riscv64-linux-ubuntu-21.04-llvm:
+  extends: .validate-linux
   stage: full-build
   variables:
     BUILD_FLAVOUR: perf-llvm
