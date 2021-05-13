@@ -173,6 +173,7 @@ GHC.Types.Fixity
 GHC.Types.Fixity.Env
 GHC.Types.ForeignCall
 GHC.Types.ForeignStubs
+GHC.Types.Hint
 GHC.Types.HpcInfo
 GHC.Types.IPE
 GHC.Types.Id

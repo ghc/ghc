@@ -152,7 +152,7 @@ preprocess hsc_env input_fn mb_input_buf mb_phase =
     handler (ProgramError msg) =
       return $ Left $ singleMessage $
         mkPlainErrorMsgEnvelope srcspan $
-        DriverUnknownMessage $ mkPlainError $ text msg
+        DriverUnknownMessage $ mkPlainError noHints $ text msg
     handler ex = throwGhcExceptionIO ex
 
     to_driver_messages :: Messages GhcMessage -> Messages DriverMessage
