@@ -923,6 +923,12 @@ pprInstr platform i = case i of
    CMPXCHG format src dst
       -> pprFormatOpOp (text "cmpxchg") format src dst
 
+   CMPXCHG8B op
+      -> hcat [
+            pprMnemonic_ (text "cmpxchg8b"),
+            pprAddr platform op
+         ]
+
 
   where
    gtab :: SDoc

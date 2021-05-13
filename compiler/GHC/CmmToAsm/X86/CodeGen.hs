@@ -2597,10 +2597,11 @@ genCCall' _ _ (PrimTarget (MO_AtomicWrite width)) [] [addr, val] _ = do
     code <- assignMem_IntCode (intFormat width) addr val
     return $ code `snocOL` MFENCE
 
-genCCall' _ is32Bit (PrimTarget (MO_Cmpxchg width)) [dst] [addr, old, new] _ = do
+genCCall' _ is32Bit (PrimTarget (MO_Cmpxchg width)) [dst] [addr, old, new] _
     -- On x86 we don't have enough registers to use cmpxchg with a
     -- complicated addressing mode, so on that architecture we
     -- pre-compute the address first.
+  | not (is32Bit && width == W64) = do
     Amode amode addr_code <- getSimpleAmode is32Bit addr
     newval <- getNewRegNat format
     newval_code <- getAnyReg new
@@ -2744,6 +2745,26 @@ genCCall' _ is32Bit target dest_regs args bid = do
                                ]
                return code
         _ -> panic "genCCall: Wrong number of arguments/results for imul2"
+    (PrimTarget (MO_Cmpxchg2 width), [res_lo, res_hi]) ->
+        case args of
+        [dst, old_lo, old_hi, new_lo, new_hi] -> do
+          Amode amode code_dst <- getSimpleAmode is32Bit dst
+          let format = intFormat width
+              reg_res_lo = getRegisterReg platform (CmmLocal res_lo)
+              reg_res_hi = getRegisterReg platform (CmmLocal res_hi)
+              code_res = toOL [ CMPXCHG8B amode
+                              , MOV format (OpReg eax) (OpReg reg_res_lo)
+                              , MOV format (OpReg edx) (OpReg reg_res_hi)
+                              ]
+          code_old_lo <- getAnyReg old_lo
+          code_old_hi <- getAnyReg old_hi
+          code_new_lo <- getAnyReg new_lo
+          code_new_hi <- getAnyReg new_hi
+          return $ code_dst `appOL` code_new_lo ebx `appOL` code_new_hi ecx
+            `appOL` code_old_lo eax `appOL` code_old_hi edx
+            `appOL` code_res
+
+        _ -> panic "genCCall: Wrong number of arguments/results for cmpxchg(8|16)b"
 
     _ -> do
         (instrs0, args') <- evalArgs bid args
@@ -3410,7 +3431,9 @@ outOfLineCmmOp bid mop res args
               MO_AtomicRMW _ _ -> fsLit "atomicrmw"
               MO_AtomicRead _  -> fsLit "atomicread"
               MO_AtomicWrite _ -> fsLit "atomicwrite"
-              MO_Cmpxchg _     -> fsLit "cmpxchg"
+              MO_Cmpxchg w     -> cmpxchgLabel w -- for W64 on 32-bit
+                                                 -- TODO: implement
+                                                 -- cmpxchg8b instr
               MO_Xchg _        -> should_be_inline
 
               MO_UF_Conv _ -> unsupported
