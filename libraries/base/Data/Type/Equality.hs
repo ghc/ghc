@@ -79,7 +79,7 @@ castWith :: (a :~: b) -> a -> b
 castWith Refl x = x
 
 -- | Generalized form of type-safe cast using propositional equality
-gcastWith :: (a :~: b) -> ((a ~ b) => r) -> r
+gcastWith :: a :~: b -> ((a ~ b) => r) -> r
 gcastWith Refl x = x
 
 -- | Apply one equality to another, respectively

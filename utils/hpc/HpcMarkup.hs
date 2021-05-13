@@ -458,7 +458,7 @@ showSummary ticked total =
                               "<tr><td height=12 class=" ++ show inner ++ "></td></tr>" ++
                               "</table></td></tr></table>"
 
-percent :: (Integral a) => a -> a -> Maybe a
+percent :: Integral a => a -> a -> Maybe a
 percent ticked total = if total == 0 then Nothing else Just (ticked * 100 `div` total)
 
 instance Semi.Semigroup ModuleSummary where

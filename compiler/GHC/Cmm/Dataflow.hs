@@ -365,7 +365,7 @@ getFact lat l fb = case lookupFact l fb of Just  f -> f
 
 -- | Returns the result of joining the facts from all the successors of the
 -- provided node or block.
-joinOutFacts :: (NonLocal n) => DataflowLattice f -> n e C -> FactBase f -> f
+joinOutFacts :: NonLocal n => DataflowLattice f -> n e C -> FactBase f -> f
 joinOutFacts lattice nonLocal fact_base = foldl' join (fact_bot lattice) facts
   where
     join new old = getJoined $ fact_join lattice (OldFact old) (NewFact new)

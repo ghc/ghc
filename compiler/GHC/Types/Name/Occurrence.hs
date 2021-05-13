@@ -744,7 +744,7 @@ because overloaded constructors (blarg) generate methods too.
 And convert to VarName space
 
 e.g. a call to constructor MkFoo where
-        data (Ord a) => Foo a = MkFoo a
+        data Ord a => Foo a = MkFoo a
 
 If this is necessary, we do it by prefixing '$m'.  These
 guys never show up in error messages.  What a hack.
