@@ -849,12 +849,12 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
       -- We are not generating code, so we can skip simplification
       -- and generate a simple interface.
       _ -> do
-        (iface, mb_old_iface_hash, details) <- liftIO $
+        (iface, mb_old_iface_hash, _details) <- liftIO $
           hscSimpleIface hsc_env tc_result mb_old_hash
 
         liftIO $ hscMaybeWriteIface logger dflags True iface mb_old_iface_hash (ms_location summary)
 
-        return $ HscUpdate iface details
+        return $ HscUpdate iface
 
 {-
 Note [Writing interface files]
