@@ -853,6 +853,8 @@ pprCallishMachOp_for_C mop
         (MO_Prefetch_Data _ ) -> unsupported
         --- we could support prefetch via "__builtin_prefetch"
         --- Not adding it for now
+        MO_Cmpxchg2 _    -> unsupported
+
     where unsupported = panic ("pprCallishMachOp_for_C: " ++ show mop
                             ++ " not supported!")
 

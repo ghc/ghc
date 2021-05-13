@@ -2752,7 +2752,7 @@ genCCall' _ is32Bit target dest_regs args bid = do
           let format = intFormat width
               reg_res_lo = getRegisterReg platform (CmmLocal res_lo)
               reg_res_hi = getRegisterReg platform (CmmLocal res_hi)
-              code_res = toOL [ CMPXCHG8B amode
+              code_res = toOL [ LOCK $ CMPXCHG8B amode
                               , MOV format (OpReg eax) (OpReg reg_res_lo)
                               , MOV format (OpReg edx) (OpReg reg_res_hi)
                               ]
@@ -3434,6 +3434,7 @@ outOfLineCmmOp bid mop res args
               MO_Cmpxchg w     -> cmpxchgLabel w -- for W64 on 32-bit
                                                  -- TODO: implement
                                                  -- cmpxchg8b instr
+              MO_Cmpxchg2 _    -> unsupported
               MO_Xchg _        -> should_be_inline
 
               MO_UF_Conv _ -> unsupported
