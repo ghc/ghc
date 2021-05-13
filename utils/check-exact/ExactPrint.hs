@@ -2781,7 +2781,11 @@ instance ExactPrint (FamilyDecl GhcPs) where
     exact_top_level
     exactVanillaDeclHead an ltycon tyvars fixity Nothing
     exact_kind
-    mapM_ markAnnotated mb_inj
+    case mb_inj of
+      Nothing -> return ()
+      Just inj -> do
+        markEpAnn an AnnVbar
+        markAnnotated inj
     case info of
       ClosedTypeFamily mb_eqns -> do
         markEpAnn an AnnWhere
