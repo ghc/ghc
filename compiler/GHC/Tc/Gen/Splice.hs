@@ -210,12 +210,12 @@ tcTypedBracket rn_expr brack@(TExpBr _ expr) res_ty
        ; let rep = getRuntimeRep expr_ty
        ; meta_ty <- tcTExpTy m_var expr_ty
        ; ps' <- readMutVar ps_ref
-       ; texpco <- tcLookupId unsafeCodeCoerceName
+       ; codeco <- tcLookupId unsafeCodeCoerceName
        ; bracket_ty <- mkAppTy m_var <$> tcMetaTy expTyConName
        ; tcWrapResultO (Shouldn'tHappenOrigin "TExpBr")
                        rn_expr
                        (unLoc (mkHsApp (mkLHsWrap (applyQuoteWrapper wrapper)
-                                                  (nlHsTyApp texpco [rep, expr_ty]))
+                                                  (nlHsTyApp codeco [rep, expr_ty]))
                                       (noLocA (HsTcBracketOut bracket_ty (Just wrapper) brack ps'))))
                        meta_ty res_ty }
 tcTypedBracket _ other_brack _
@@ -691,7 +691,7 @@ runTopSplice (DelayedSplice lcl_env orig_expr res_ty q_expr)
        ; mod_finalizers <- readTcRef modfinalizers_ref
        ; addModFinalizersWithLclEnv $ ThModFinalizers mod_finalizers
        -- We use orig_expr here and not q_expr when tracing as a call to
-       -- unsafeTExpCoerce is added to the original expression by the
+       -- unsafeCodeCoerce is added to the original expression by the
        -- typechecker when typed quotes are type checked.
        ; traceSplice (SpliceInfo { spliceDescription = "expression"
                                  , spliceIsDecl      = False
