@@ -195,13 +195,25 @@ type instance PendingTcSplice' (GhcPass _) = PendingTcSplice
 {- Note [Constructor cannot occur]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Some data constructors can't occur in certain phases; e.g. the output
-of the type checker never has OverLabel. We signal this by setting
-the extension field to Void. For example:
+of the type checker never has OverLabel. We signal this by
+* setting the extension field to Void
+* using dataConCantHappen in the cases that can't happen
+
+For example:
+
    type instance XOverLabel GhcTc = Void
-   dsExpr (HsOverLabel x _) = absurd x
+
+   dsExpr :: HsExpr GhcTc -> blah
+   dsExpr (HsOverLabel x _) = dataConCantHappen x
+
+The function dataConCantHappen is defined thus:
+   dataConCantHappen :: Void -> a
+   dataConCantHappen x = case x of {}
+(i.e. identically to Data.Void.absurd, but more helpfully named).
+Remember Void is a type whose only element is bottom.
 
 It would be better to omit the pattern match altogether, but we
-could only do that if the extension field was strict (#18764)
+could only do that if the extension field was strict (#18764).
 -}
 
 -- API Annotations types
@@ -234,13 +246,17 @@ type instance XVar           (GhcPass _) = NoExtField
 type instance XUnboundVar    GhcPs = EpAnn EpAnnUnboundVar
 type instance XUnboundVar    GhcRn = NoExtField
 type instance XUnboundVar    GhcTc = HoleExprRef
-  -- We really don't need the whole HoleExprRef; just the IORef EvTerm
-  -- would be enough. But then deriving a Data instance becomes impossible.
-  -- Much, much easier just to define HoleExprRef with a Data instance and
-  -- store the whole structure.
+  -- We store an entire HoleExprRef rather just an IORef EvTerm because:
+  --
+  -- * It's easier to derive a Data instance for HsExpr this way, and
+  -- * We can use the TcType from the HoleExprRef in hsExprType.
 
 type instance XRecFld        (GhcPass _) = NoExtField
-type instance XIPVar         (GhcPass _) = EpAnnCO
+
+type instance XIPVar         GhcPs = EpAnnCO
+type instance XIPVar         GhcRn = EpAnnCO
+type instance XIPVar         GhcTc = Void -- See Note [Constructor cannot occur]
+
 type instance XOverLitE      (GhcPass _) = EpAnnCO
 type instance XLitE          (GhcPass _) = EpAnnCO
 
@@ -342,10 +358,17 @@ type instance XArithSeq      GhcPs = EpAnn [AddEpAnn]
 type instance XArithSeq      GhcRn = NoExtField
 type instance XArithSeq      GhcTc = PostTcExpr
 
-type instance XBracket       (GhcPass _) = EpAnn [AddEpAnn]
+type instance XBracket       GhcPs = EpAnn [AddEpAnn]
+type instance XBracket       GhcRn = EpAnn [AddEpAnn]
+type instance XBracket       GhcTc = Void -- See Note [Constructor cannot occur]
 
-type instance XRnBracketOut  (GhcPass _) = NoExtField
-type instance XTcBracketOut  (GhcPass _) = NoExtField
+type instance XRnBracketOut  GhcPs = Void -- See Note [Constructor cannot occur]
+type instance XRnBracketOut  GhcRn = NoExtField
+type instance XRnBracketOut  GhcTc = Void -- See Note [Constructor cannot occur]
+
+type instance XTcBracketOut  GhcPs = Void -- See Note [Constructor cannot occur]
+type instance XTcBracketOut  GhcRn = Void -- See Note [Constructor cannot occur]
+type instance XTcBracketOut  GhcTc = Type -- Type of the TcBracketOut
 
 type instance XSpliceE       (GhcPass _) = EpAnnCO
 type instance XProc          (GhcPass _) = EpAnn [AddEpAnn]
