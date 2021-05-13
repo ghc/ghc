@@ -1328,7 +1328,7 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
         let msg hsc_env _ what _ = oneShotMsg hsc_env what
         plugin_hsc_env' <- liftIO $ initializePlugins hsc_env'
 
-        -- One-shot mode needs a knot-tying mutable variable for interface
+        -- Need to set the knot-tying mutable variable for interface
         -- files. See GHC.Tc.Utils.TcGblEnv.tcg_type_env_var.
         -- See also Note [hsc_type_env_var hack]
         type_env_var <- liftIO $ newIORef emptyNameEnv
