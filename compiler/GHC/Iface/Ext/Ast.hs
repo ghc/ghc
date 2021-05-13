@@ -722,26 +722,24 @@ instance HiePass p => HasType (LocatedA (HsExpr (GhcPass p))) where
   getTypeNode (L spn e) =
     case hiePass @p of
       HieRn -> makeNodeA e spn
-      HieTc | skipDesugaring e -> fallback
+      HieTc | skipType e -> fallback
             | otherwise -> makeTypeNodeA e spn $! hsExprType e
         where
           fallback = makeNodeA e spn
 
-          -- | Skip desugaring of these expressions for performance reasons.
+          -- | Skip computing the type of these expressions for performance reasons.
           --
           -- See impact on Haddock output (esp. missing type annotations or links)
-          -- before marking more things here as 'False'. See impact on Haddock
-          -- performance before marking more things as 'True'.
-          --
-          -- TODO RGS: Is this still necessary with the lhsExprType approach?
-          -- I have no idea. Perhaps wz1000 would know.
-          skipDesugaring :: HsExpr GhcTc -> Bool
-          skipDesugaring e = case e of
+          -- before marking more things here as 'True'. See impact on Haddock
+          -- performance before marking more things as 'False.
+          skipType :: HsExpr GhcTc -> Bool
+          skipType e = case e of
             HsVar{}             -> False
             HsRecSel{}          -> False
             HsOverLabel{}       -> False
             HsIPVar{}           -> False
-            XExpr{}             -> False
+            XExpr (WrapExpr{})  -> False
+            XExpr (ConLikeTc{}) -> False
             HsUnboundVar{}      -> False
             HsLit{}             -> False
             HsOverLit{}         -> False
@@ -751,7 +749,11 @@ instance HiePass p => HasType (LocatedA (HsExpr (GhcPass p))) where
             ExplicitList{}      -> False
             ExplicitSum{}       -> False
             HsDo{}              -> False
+            HsProc{}            -> False
             HsMultiIf{}         -> False
+            NegApp{}            -> False
+            ArithSeq{}          -> False
+            HsTcBracketOut{}    -> False
             _                   -> True
 
 data HiePassEv p where

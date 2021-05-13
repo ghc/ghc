@@ -27,4 +27,3 @@ Version 9.4.1
 
 - A new ``GHC.Hs.Expr.Type`` module has been introduced which defines functions
   for computing the ``Type`` of an ``HsExpr GhcTc`` in a pure fashion.
->>>>>>> b6d5b7ffd5 (Draft: hsExprType)
