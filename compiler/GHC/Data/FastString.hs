@@ -1,7 +1,5 @@
--- (c) The University of Glasgow, 1997-2006
-
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MagicHash #-}
@@ -112,7 +110,8 @@ module GHC.Data.FastString
         lengthPS
        ) where
 
-#include "HsVersions.h"
+-- For GHC_STAGE
+#include "ghcplatform.h"
 
 import GHC.Prelude as Prelude
 

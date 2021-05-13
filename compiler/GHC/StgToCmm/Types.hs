@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 
 module GHC.StgToCmm.Types
   ( CgInfos (..)
@@ -9,8 +9,6 @@ module GHC.StgToCmm.Types
   , StandardFormInfo (..)
   , WordOff
   ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 

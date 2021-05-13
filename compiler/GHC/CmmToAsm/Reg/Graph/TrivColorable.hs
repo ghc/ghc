@@ -1,12 +1,8 @@
-{-# LANGUAGE CPP #-}
-
 module GHC.CmmToAsm.Reg.Graph.TrivColorable (
         trivColorable,
 )
 
 where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 

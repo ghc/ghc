@@ -3,7 +3,7 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 -}
 
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE LambdaCase #-}
 
 module GHC.Iface.Syntax (
@@ -41,8 +41,6 @@ module GHC.Iface.Syntax (
         AltPpr(..), ShowSub(..), ShowHowMuch(..), showToIface, showToHeader
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Builtin.Names ( unrestrictedFunTyConKey, liftedTypeKindTyConKey )
@@ -76,7 +74,7 @@ import GHC.Utils.Binary
 import GHC.Utils.Binary.Typeable ()
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Misc( dropList, filterByList, notNull, unzipWith, debugIsOn,
+import GHC.Utils.Misc( dropList, filterByList, notNull, unzipWith,
                        seqList, zipWithEqual )
 
 import Control.Monad
@@ -657,7 +655,7 @@ pprAxBranch pp_tc idx (IfaceAxBranch { ifaxbTyVars = tvs
                                      , ifaxbLHS = pat_tys
                                      , ifaxbRHS = rhs
                                      , ifaxbIncomps = incomps })
-  = ASSERT2( null _cvs, pp_tc $$ ppr _cvs )
+  = assertPpr (null _cvs) (pp_tc $$ ppr _cvs) $
     hang ppr_binders 2 (hang pp_lhs 2 (equals <+> ppr rhs))
     $+$
     nest 4 maybe_incomps

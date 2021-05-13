@@ -11,7 +11,7 @@ module GHC.Utils.Exception
 import GHC.Prelude
 
 import GHC.IO (catchException)
-import Control.Exception as CE
+import Control.Exception as CE hiding (assert)
 import Control.Monad.IO.Class
 import Control.Monad.Catch
 

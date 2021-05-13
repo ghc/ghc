@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE DeriveDataTypeable #-}
 
 module GHC.Hs.Doc
@@ -22,8 +22,6 @@ module GHC.Hs.Doc
 
   , ExtractedTHDocs(..)
   ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 

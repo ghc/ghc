@@ -3,6 +3,9 @@
 {-# OPTIONS_GHC -fno-cse #-}
 -- -fno-cse is needed for GLOBAL_VAR's to behave properly
 
+-- | Do not use global variables!
+--
+-- Global variables are a hack. Do not use them if you can help it.
 module GHC.Utils.GlobalVars
    ( v_unsafeHasPprDebug
    , v_unsafeHasNoDebugOutput
@@ -19,7 +22,8 @@ module GHC.Utils.GlobalVars
    )
 where
 
-#include "HsVersions.h"
+-- For GHC_STAGE
+#include "ghcplatform.h"
 
 import GHC.Prelude
 
@@ -29,11 +33,32 @@ import System.IO.Unsafe
 import Data.IORef
 import Foreign (Ptr)
 
+#define GLOBAL_VAR(name,value,ty)  \
+{-# NOINLINE name #-};             \
+name :: IORef (ty);                \
+name = global (value);
 
---------------------------------------------------------------------------
--- Do not use global variables!
---
--- Global variables are a hack. Do not use them if you can help it.
+#define GLOBAL_VAR_M(name,value,ty) \
+{-# NOINLINE name #-};              \
+name :: IORef (ty);                 \
+name = globalM (value);
+
+
+#define SHARED_GLOBAL_VAR(name,accessor,saccessor,value,ty) \
+{-# NOINLINE name #-};                                      \
+name :: IORef (ty);                                         \
+name = sharedGlobal (value) (accessor);                     \
+foreign import ccall unsafe saccessor                       \
+  accessor :: Ptr (IORef a) -> IO (Ptr (IORef a));
+
+#define SHARED_GLOBAL_VAR_M(name,accessor,saccessor,value,ty)  \
+{-# NOINLINE name #-};                                         \
+name :: IORef (ty);                                            \
+name = sharedGlobalM (value) (accessor);                       \
+foreign import ccall unsafe saccessor                          \
+  accessor :: Ptr (IORef a) -> IO (Ptr (IORef a));
+
+
 
 #if GHC_STAGE < 2
 

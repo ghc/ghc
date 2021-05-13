@@ -4,10 +4,8 @@
 \section[LiberateCase]{Unroll recursion to allow evals to be lifted from a loop}
 -}
 
-{-# LANGUAGE CPP #-}
-module GHC.Core.Opt.LiberateCase ( liberateCase ) where
 
-#include "HsVersions.h"
+module GHC.Core.Opt.LiberateCase ( liberateCase ) where
 
 import GHC.Prelude
 

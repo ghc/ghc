@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP          #-}
+
 {-# LANGUAGE TypeFamilies #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
@@ -10,8 +10,6 @@ module GHC.Rename.Splice (
         checkThLocalName
         , traceSplice, SpliceInfo(..)
   ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 

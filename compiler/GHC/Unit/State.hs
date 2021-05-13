@@ -1,6 +1,6 @@
 -- (c) The University of Glasgow, 2006
 
-{-# LANGUAGE CPP, ScopedTypeVariables, BangPatterns, FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables, BangPatterns, FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 
 -- | Unit manipulation
@@ -68,8 +68,6 @@ module GHC.Unit.State (
         unwireUnit
     )
 where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 

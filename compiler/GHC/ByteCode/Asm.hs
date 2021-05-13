@@ -15,8 +15,6 @@ module GHC.ByteCode.Asm (
         mkTupleInfoLit
   ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.ByteCode.Instr
@@ -34,7 +32,7 @@ import GHC.Types.Unique.DSet
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Misc
+import GHC.Utils.Panic.Plain
 
 import GHC.Core.TyCon
 import GHC.Data.FastString
@@ -202,7 +200,7 @@ assembleBCO platform (ProtoBCO { protoBCOName       = nm
   (final_insns, final_lits, final_ptrs) <- flip execStateT initial_state $ runAsm platform long_jumps env asm
 
   -- precomputed size should be equal to final size
-  ASSERT(n_insns == sizeSS final_insns) return ()
+  massert (n_insns == sizeSS final_insns)
 
   let asm_insns = ssElts final_insns
       insns_arr = Array.listArray (0, fromIntegral n_insns - 1) asm_insns

@@ -64,7 +64,6 @@ define compilerConfig
 compiler/stage$1/build/GHC/Settings/Config.hs : mk/config.mk mk/project.mk | $$$$(dir $$$$@)/.
 	$$(call removeFiles,$$@)
 	@echo 'Creating $$@ ... '
-	@echo '{-# LANGUAGE CPP #-}'                                        >> $$@
 	@echo 'module GHC.Settings.Config'                                  >> $$@
 	@echo '  ( module GHC.Version'                                      >> $$@
 	@echo '  , cBuildPlatformString'                                    >> $$@

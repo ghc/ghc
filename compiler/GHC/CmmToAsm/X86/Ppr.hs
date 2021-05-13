@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE LambdaCase #-}
 
 -----------------------------------------------------------------------------
@@ -19,8 +19,6 @@ module GHC.CmmToAsm.X86.Ppr (
 )
 
 where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
