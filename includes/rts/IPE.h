@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 2017-2018
+ * (c) The GHC Team, 2017-2021
  *
  * IPE API
  *
@@ -26,10 +26,15 @@ typedef struct InfoProv_{
 typedef struct InfoProvEnt_ {
     StgInfoTable * info;
     InfoProv prov;
-    struct InfoProvEnt_ *link;
 } InfoProvEnt;
 
-extern InfoProvEnt * RTS_VAR(IPE_LIST);               // registered IP list
+#define IPE_LIST_NODE_BUFFER_SIZE 126
+
+typedef struct IpeBufferListNode_ {
+    InfoProvEnt** buffer[IPE_LIST_NODE_BUFFER_SIZE];
+    StgWord8 count;
+    struct IpeBufferListNode_* next;
+} IpeBufferListNode;
 
 void registerInfoProvList(InfoProvEnt **cc_list);
 InfoProvEnt * lookupIPE(StgInfoTable *info);
