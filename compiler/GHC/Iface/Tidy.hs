@@ -647,7 +647,10 @@ chooseExternalIds hsc_env mod omit_prags expose_all binds implicit_binds imp_id_
   -- See Note [Which rules to expose]
   is_external id = isExportedId id || id `elemVarSet` rule_rhs_vars
 
-  rule_rhs_vars  = mapUnionVarSet ruleRhsFreeVars imp_id_rules
+  rule_rhs_vars
+    -- No rules are exposed when omit_prags is enabled see #19836
+    | omit_prags = emptyVarSet
+    | otherwise = mapUnionVarSet ruleRhsFreeVars imp_id_rules
 
   binders          = map fst $ flattenBinds binds
   implicit_binders = bindersOfBinds implicit_binds
