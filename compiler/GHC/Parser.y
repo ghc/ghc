@@ -1792,9 +1792,7 @@ binds   ::  { Located (HsLocalBinds GhcPs) }
                                                 -- No type declarations
         : decllist          {% do { val_binds <- cvBindGroup (unLoc $ snd $ unLoc $1)
                                   ; cs <- getCommentsFor (gl $1)
-                                  ; if (isNilOL (unLoc $ snd $ unLoc $1))
-                                    then return (sL1 $1 $ HsValBinds (EpAnn (glR $1) (AnnList (Just $ glR $1) Nothing Nothing [] []) cs) val_binds)
-                                    else return (sL1 $1 $ HsValBinds (EpAnn (glR $1) (fst $ unLoc $1) cs) val_binds) } }
+                                  ; return (sL1 $1 $ HsValBinds (EpAnn (glR $1) (fst $ unLoc $1) cs) val_binds)} }
 
         | '{'            dbinds '}'     {% acs (\cs -> (L (comb3 $1 $2 $3)
                                              $ HsIPBinds (EpAnn (glR $1) (AnnList (Just$ glR $2) (Just $ moc $1) (Just $ mcc $3) [] []) cs) (IPBinds noExtField (reverse $ unLoc $2)))) }
@@ -2679,9 +2677,9 @@ exp10 :: { ECP }
         -- See Note [%shift: exp10 -> fexp]
         | fexp %shift                  { $1 }
 
-optSemi :: { ([Located Token],Bool) }
-        : ';'         { ([$1],True) }
-        | {- empty -} { ([],False) }
+optSemi :: { (Maybe EpaLocation,Bool) }
+        : ';'         { (msemim $1,True) }
+        | {- empty -} { (Nothing,False) }
 
 {- Note [Pragmas and operator fixity]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2801,10 +2799,12 @@ aexp    :: { ECP }
                               unECP $5 >>= \ $5 ->
                               unECP $8 >>= \ $8 ->
                               mkHsIfPV (comb2A $1 $>) $2 (snd $3) $5 (snd $6) $8
-                                    (mj AnnIf $1:mj AnnThen $4
-                                     :mj AnnElse $7
-                                     :(concatMap (\l -> mz AnnSemi l) (fst $3))
-                                    ++(concatMap (\l -> mz AnnSemi l) (fst $6))) }
+                                    (AnnsIf
+                                      { aiIf = glAA $1
+                                      , aiThen = glAA $4
+                                      , aiElse = glAA $7
+                                      , aiThenSemi = fst $3
+                                      , aiElseSemi = fst $6})}
 
         | 'if' ifgdpats                 {% hintMultiWayIf (getLoc $1) >>= \_ ->
                                            fmap ecpFromExp $
@@ -3289,9 +3289,9 @@ apats  :: { [LPat GhcPs] }
 
 stmtlist :: { forall b. DisambECP b => PV (LocatedL [LocatedA (Stmt GhcPs (LocatedA b))]) }
         : '{'           stmts '}'       { $2 >>= \ $2 -> amsrl
-                                          (sLL $1 $> (reverse $ snd $ unLoc $2)) (AnnList (Just $ glR $2) (Just $ moc $1) (Just $ mcc $3) [] (fst $ unLoc $2)) } -- AZ:performance of reverse?
+                                          (sLL $1 $> (reverse $ snd $ unLoc $2)) (AnnList (Just $ glR $2) (Just $ moc $1) (Just $ mcc $3) (fst $ unLoc $2) []) } -- AZ:performance of reverse?
         |     vocurly   stmts close     { $2 >>= \ $2 -> amsrl
-                                          (L (gl $2) (reverse $ snd $ unLoc $2)) (AnnList (Just $ glR $2) Nothing Nothing [] (fst $ unLoc $2)) }
+                                          (L (gl $2) (reverse $ snd $ unLoc $2)) (AnnList (Just $ glR $2) Nothing Nothing (fst $ unLoc $2) []) }
 
 --      do { ;; s ; s ; ; s ;; }
 -- The last Stmt should be an expression, but that's hard to enforce
@@ -3299,11 +3299,11 @@ stmtlist :: { forall b. DisambECP b => PV (LocatedL [LocatedA (Stmt GhcPs (Locat
 -- So we use BodyStmts throughout, and switch the last one over
 -- in ParseUtils.checkDo instead
 
-stmts :: { forall b. DisambECP b => PV (Located ([TrailingAnn],[LStmt GhcPs (LocatedA b)])) }
+stmts :: { forall b. DisambECP b => PV (Located ([AddEpAnn],[LStmt GhcPs (LocatedA b)])) }
         : stmts ';' stmt  { $1 >>= \ $1 ->
                             $3 >>= \ ($3 :: LStmt GhcPs (LocatedA b)) ->
                             case (snd $ unLoc $1) of
-                              [] -> return (sLL $1 (reLoc $>) ((msemi $2) ++ (fst $ unLoc $1)
+                              [] -> return (sLL $1 (reLoc $>) ((mj AnnSemi $2) : (fst $ unLoc $1)
                                                      ,$3   : (snd $ unLoc $1)))
                               (h:t) -> do
                                { h' <- addTrailingSemiA h (gl $2)
@@ -3311,7 +3311,7 @@ stmts :: { forall b. DisambECP b => PV (Located ([TrailingAnn],[LStmt GhcPs (Loc
 
         | stmts ';'     {  $1 >>= \ $1 ->
                            case (snd $ unLoc $1) of
-                             [] -> return (sLL $1 $> ((msemi $2) ++ (fst $ unLoc $1),snd $ unLoc $1))
+                             [] -> return (sLL $1 $> ((mj AnnSemi $2) : (fst $ unLoc $1),snd $ unLoc $1))
                              (h:t) -> do
                                { h' <- addTrailingSemiA h (gl $2)
                                ; return $ sL1 $1 (fst $ unLoc $1,h':t) }}
@@ -4160,6 +4160,9 @@ mz a l = if isZeroWidthSpan (gl l) then [] else [AddEpAnn a (EpaSpan $ rs $ gl l
 
 msemi :: Located e -> [TrailingAnn]
 msemi l = if isZeroWidthSpan (gl l) then [] else [AddSemiAnn (EpaSpan $ rs $ gl l)]
+
+msemim :: Located e -> Maybe EpaLocation
+msemim l = if isZeroWidthSpan (gl l) then Nothing else Just (EpaSpan $ rs $ gl l)
 
 -- |Construct an AddEpAnn from the annotation keyword and the Located Token. If
 -- the token has a unicode equivalent and this has been used, provide the

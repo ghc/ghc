@@ -123,3 +123,11 @@ test('PprRecordDotSyntax4', ignore_stderr, makefile_test, ['PprRecordDotSyntax4'
 test('PprRecordDotSyntaxA', ignore_stderr, makefile_test, ['PprRecordDotSyntaxA'])
 test('CommentsTest', ignore_stderr, makefile_test, ['CommentsTest'])
 test('InTreeAnnotations1', ignore_stderr, makefile_test, ['InTreeAnnotations1'])
+
+test('Test19784', ignore_stderr, makefile_test, ['Test19784'])
+test('Test19798', ignore_stderr, makefile_test, ['Test19798'])
+
+# The exact printing manages the extra semicolons, normal ppr not, so
+# disabled in the Makefile for this test.
+test('Test19813', ignore_stderr, makefile_test, ['Test19813'])
+test('Test19814', ignore_stderr, makefile_test, ['Test19814'])
