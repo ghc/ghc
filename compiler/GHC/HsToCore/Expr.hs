@@ -274,7 +274,7 @@ dsExpr (HsUnboundVar (HER ref _ _) _)  = dsEvTerm =<< readMutVar ref
 dsExpr (HsPar _ e)            = dsLExpr e
 dsExpr (ExprWithTySig _ e _)  = dsLExpr e
 
-dsExpr (HsIPVar {})           = panic "dsExpr: HsIPVar"
+dsExpr (HsIPVar x _)          = absurd x
 
 dsExpr (HsGetField x _ _)     = absurd x
 dsExpr (HsProjection x _)     = absurd x
@@ -748,7 +748,7 @@ Thus, we pass @r@ as the scrutinee expression to @matchWrapper@ above.
 
 -- Template Haskell stuff
 
-dsExpr (HsRnBracketOut _ _ _)  = panic "dsExpr HsRnBracketOut"
+dsExpr (HsRnBracketOut x _ _)  = absurd x
 dsExpr (HsTcBracketOut _ hs_wrapper x ps) = dsBracket hs_wrapper x ps
 dsExpr (HsSpliceE _ s)         = pprPanic "dsExpr:splice" (ppr s)
 
@@ -782,9 +782,8 @@ dsExpr (HsOverLabel x _) = absurd x
 dsExpr (OpApp x _ _ _)   = absurd x
 dsExpr (SectionL x _ _)  = absurd x
 dsExpr (SectionR x _ _)  = absurd x
-
+dsExpr (HsBracket x _)   = absurd x
 -- HsSyn constructs that just shouldn't be here:
-dsExpr (HsBracket   {}) = panic "dsExpr:HsBracket"
 dsExpr (HsDo        {}) = panic "dsExpr:HsDo"
 
 ds_prag_expr :: HsPragE GhcTc -> LHsExpr GhcTc -> DsM CoreExpr
