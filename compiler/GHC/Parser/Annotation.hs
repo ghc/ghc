@@ -622,6 +622,7 @@ data TrailingAnn
   | AddVbarAnn EpaLocation    -- ^ Trailing '|'
   | AddRarrowAnn EpaLocation  -- ^ Trailing '->'
   | AddRarrowAnnU EpaLocation -- ^ Trailing '->', unicode variant
+  | AddLollyAnnU EpaLocation  -- ^ Trailing '⊸'
   deriving (Data,Show,Eq, Ord)
 
 instance Outputable TrailingAnn where
@@ -630,6 +631,7 @@ instance Outputable TrailingAnn where
   ppr (AddVbarAnn ss)    = text "AddVbarAnn"    <+> ppr ss
   ppr (AddRarrowAnn ss)  = text "AddRarrowAnn"  <+> ppr ss
   ppr (AddRarrowAnnU ss) = text "AddRarrowAnnU" <+> ppr ss
+  ppr (AddLollyAnnU ss)  = text "AddLollyAnnU"  <+> ppr ss
 
 -- | Annotation for items appearing in a list. They can have one or
 -- more trailing punctuations items, such as commas or semicolons.

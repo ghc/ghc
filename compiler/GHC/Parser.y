@@ -2150,7 +2150,7 @@ type :: { LHsType GhcPs }
 
         | btype '->.' ctype            {% hintLinear (getLoc $2) >>
                                           acsA (\cs -> sLL (reLoc $1) (reLoc $>)
-                                            $ HsFunTy (EpAnn (glAR $1) (mau $2) cs) (HsLinearArrow UnicodeSyntax Nothing) $1 $3) }
+                                            $ HsFunTy (EpAnn (glAR $1) (mlu $2) cs) (HsLinearArrow UnicodeSyntax Nothing) $1 $3) }
                                               -- [mu AnnLollyU $2] }
 
 mult :: { Located (IsUnicodeSyntax -> HsArrow GhcPs) }
@@ -2270,8 +2270,8 @@ tv_bndrs :: { [LHsTyVarBndr Specificity GhcPs] }
 
 tv_bndr :: { LHsTyVarBndr Specificity GhcPs }
         : tv_bndr_no_braces             { $1 }
-        | '{' tyvar '}'                 {% acsA (\cs -> sLL $1 $> (UserTyVar (EpAnn (glR $1) [mop $1, mcp $3] cs) InferredSpec $2)) }
-        | '{' tyvar '::' kind '}'       {% acsA (\cs -> sLL $1 $> (KindedTyVar (EpAnn (glR $1) [mop $1,mu AnnDcolon $3 ,mcp $5] cs) InferredSpec $2 $4)) }
+        | '{' tyvar '}'                 {% acsA (\cs -> sLL $1 $> (UserTyVar (EpAnn (glR $1) [moc $1, mcc $3] cs) InferredSpec $2)) }
+        | '{' tyvar '::' kind '}'       {% acsA (\cs -> sLL $1 $> (KindedTyVar (EpAnn (glR $1) [moc $1,mu AnnDcolon $3 ,mcc $5] cs) InferredSpec $2 $4)) }
 
 tv_bndr_no_braces :: { LHsTyVarBndr Specificity GhcPs }
         : tyvar                         {% acsA (\cs -> (sL1 (reLocN $1) (UserTyVar (EpAnn (glNR $1) [] cs) SpecifiedSpec $1))) }
@@ -4173,6 +4173,9 @@ mu a lt@(L l t) = AddEpAnn (toUnicodeAnn a lt) (EpaSpan $ rs l)
 mau :: Located Token -> TrailingAnn
 mau lt@(L l t) = if isUnicode lt then AddRarrowAnnU (EpaSpan $ rs l)
                                  else AddRarrowAnn  (EpaSpan $ rs l)
+
+mlu :: Located Token -> TrailingAnn
+mlu lt@(L l t) = AddLollyAnnU (EpaSpan $ rs l)
 
 -- | If the 'Token' is using its unicode variant return the unicode variant of
 --   the annotation
