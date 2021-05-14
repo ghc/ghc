@@ -124,9 +124,9 @@ lubCprType ty1@(CprType n1 cpr1) ty2@(CprType n2 cpr2)
   | n1 == n2                   = CprType n1 (lubCpr cpr1 cpr2)
   | otherwise                  = topCprType
 
-applyCprTy :: CprType -> CprType
-applyCprTy (CprType n res)
-  | n > 0         = CprType (n-1) res
+applyCprTy :: CprType -> Arity -> CprType
+applyCprTy (CprType n res) k
+  | n >= k        = CprType (n-k) res
   | res == botCpr = botCprType
   | otherwise     = topCprType
 
