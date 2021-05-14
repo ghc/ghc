@@ -43,6 +43,7 @@ flavourTransformers = M.fromList
     , "profiled_ghc" =: enableProfiledGhc
     , "no_dynamic_ghc" =: disableDynamicGhcPrograms
     , "no_profiled_libs" =: disableProfiledLibs
+    , "omit_pragmas" =: omitPragmas
     ]
   where (=:) = (,)
 
@@ -179,6 +180,13 @@ disableProfiledLibs :: Flavour -> Flavour
 disableProfiledLibs flavour =
     flavour { libraryWays = filter (not . wayUnit Profiling) <$> libraryWays flavour }
 
+-- | Build stage2 compiler with -fomit-interface-pragmas to reduce
+-- recompilation.
+omitPragmas :: Flavour -> Flavour
+omitPragmas =
+  let Right kv = parseKV "stage1.ghc.ghc.hs.opts += -fomit-interface-pragmas"
+      Right transformer = applySetting kv
+  in transformer
 
 -- * CLI and <root>/hadrian.settings options
 
