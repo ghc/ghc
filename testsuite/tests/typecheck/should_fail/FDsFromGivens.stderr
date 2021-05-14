@@ -1,0 +1,18 @@
+
+FDsFromGivens.hs:13:1: warning: [-Winaccessible-code (in -Wdefault)]
+    Couldn't match type ‘[a]’ with ‘Bool’
+      arising from a functional dependency between constraints:
+        ‘C Char Bool’
+          arising from the type signature for:
+                         g1 :: forall a.
+                               (C Char [a], C Char Bool) =>
+                               a -> () at FDsFromGivens.hs:13:1-42
+        ‘C Char [a]’
+          arising from the type signature for:
+                         g1 :: forall a.
+                               (C Char [a], C Char Bool) =>
+                               a -> () at FDsFromGivens.hs:13:1-42
+    Unsatisfiable constraints (C Char [a], C Char Bool) in
+      the type signature for:
+        g1 :: forall a. (C Char [a], C Char Bool) => a -> ()
+    This may result in inaccessible code.
