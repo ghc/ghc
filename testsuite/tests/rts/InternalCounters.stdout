@@ -1,1 +1,1 @@
-Internal Counters:
+Internal Counters require the RTS to be built with PROF_SPIN
