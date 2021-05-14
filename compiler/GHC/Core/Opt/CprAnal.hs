@@ -239,9 +239,12 @@ cprTransform env id args
     sig
   where
     sig
-      -- Top-level binding, local let-binding or case binder
+      -- Top-level binding, local let-binding, lambda arg or case binder
       | Just sig <- lookupSigEnv env id
-      = getCprSig sig
+      = applyCprTy (getCprSig sig) (length args)
+      -- CPR transformers for special Ids
+      | Just cpr_ty <- cprTransformSpecial id args
+      = cpr_ty
       -- See Note [CPR for data structures]
       | Just rhs <- cprDataStructureUnfolding_maybe id
       = fst $ cprAnal env rhs
