@@ -9,6 +9,7 @@
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE ViewPatterns         #-}
+{-# LANGUAGE UndecidableInstances #-} -- For ExactPrint (HsOuterTyVarBndrs flag GhcPs)
 
 module ExactPrint
   (
@@ -26,6 +27,7 @@ import GHC.Types.Basic hiding (EP)
 import GHC.Types.Fixity
 import GHC.Types.ForeignCall
 import GHC.Types.SourceText
+import GHC.Types.Var
 import GHC.Utils.Outputable hiding ( (<>) )
 import GHC.Unit.Module.Warnings
 import GHC.Utils.Misc
@@ -575,7 +577,7 @@ markKwT (AddVbarAnn ss)    = markKwA AnnVbar ss
 markKwT (AddRarrowAnn ss)  = markKwA AnnRarrow ss
 markKwT (AddRarrowAnnU ss) = markKwA AnnRarrowU ss
 -- markKwT (AddLollyAnn ss)   = markKwA AnnLolly ss
--- markKwT (AddLollyAnnU ss)  = markKwA AnnLollyU ss
+markKwT (AddLollyAnnU ss)  = markKwA AnnLollyU ss
 
 markKw :: AddEpAnn -> EPP ()
 markKw (AddEpAnn kw ss) = markKwA kw ss
@@ -2909,7 +2911,30 @@ instance ExactPrint (InjectivityAnn GhcPs) where
 --   getAnnotationEntry (KindedTyVar an _ _ _) = fromAnn an
 --   exact = withPpr
 
-instance (Typeable flag) => ExactPrint (HsTyVarBndr flag GhcPs) where
+instance ExactPrint (HsTyVarBndr Specificity GhcPs) where
+  getAnnotationEntry (UserTyVar an _ _)     = fromAnn an
+  getAnnotationEntry (KindedTyVar an _ _ _) = fromAnn an
+
+  exact (UserTyVar an s n)     = do
+    case s of
+      SpecifiedSpec -> markEpAnnAll an id AnnOpenP
+      InferredSpec -> markEpAnnAll an id AnnOpenC
+    markAnnotated n
+    case s of
+      SpecifiedSpec -> markEpAnnAll an id AnnCloseP
+      InferredSpec -> markEpAnnAll an id AnnCloseC
+  exact (KindedTyVar an s n k) = do
+    case s of
+      SpecifiedSpec -> markEpAnnAll an id AnnOpenP
+      InferredSpec -> markEpAnnAll an id AnnOpenC
+    markAnnotated n
+    markEpAnn an AnnDcolon
+    markAnnotated k
+    case s of
+      SpecifiedSpec -> markEpAnnAll an id AnnCloseP
+      InferredSpec -> markEpAnnAll an id AnnCloseC
+
+instance ExactPrint (HsTyVarBndr () GhcPs) where
   getAnnotationEntry (UserTyVar an _ _)     = fromAnn an
   getAnnotationEntry (KindedTyVar an _ _ _) = fromAnn an
 
@@ -3347,7 +3372,8 @@ instance ExactPrint Void where
 
 -- ---------------------------------------------------------------------
 
-instance (Typeable flag) => ExactPrint (HsOuterTyVarBndrs flag GhcPs) where
+instance (ExactPrint (HsTyVarBndr flag GhcPs), Typeable flag)
+  => ExactPrint (HsOuterTyVarBndrs flag GhcPs) where
   getAnnotationEntry (HsOuterImplicit _) = NoEntryVal
   getAnnotationEntry (HsOuterExplicit an _) = fromAnn an
 
