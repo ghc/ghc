@@ -14,7 +14,7 @@ module UserSettings (
     verboseCommand, buildProgressColour, successColour, finalStage
     ) where
 
-import Flavour
+import Flavour.Type
 import Expression
 import {-# SOURCE #-} Settings.Default
 

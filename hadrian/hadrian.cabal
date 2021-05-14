@@ -37,6 +37,7 @@ executable hadrian
                        , Expression
                        , Expression.Type
                        , Flavour
+                       , Flavour.Type
                        , Hadrian.Builder
                        , Hadrian.Builder.Ar
                        , Hadrian.Builder.Sphinx
