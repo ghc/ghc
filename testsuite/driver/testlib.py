@@ -969,7 +969,9 @@ def get_package_cache_timestamp() -> float:
         except:
             return 0.0
 
-do_not_copy = ('.hi', '.o', '.dyn_hi', '.dyn_o', '.out') # 12112
+do_not_copy = ('.hi', '.o', '.dyn_hi'
+              , '.dyn_o', '.out'
+              ,'.hi-boot', '.o-boot') # 12112
 
 def test_common_work(watcher: testutil.Watcher,
                      name: TestName, opts,
