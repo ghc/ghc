@@ -1237,7 +1237,6 @@ loadPackages interp hsc_env new_pkgs = do
 loadPackages' :: Interp -> HscEnv -> [UnitId] -> LoaderState -> IO LoaderState
 loadPackages' interp hsc_env new_pks pls = do
     (pkgs', hs_objs, non_hs_objs) <- link (pkgs_loaded pls) new_pks
-    pprTraceM "loadPackages'" (ppr new_pks $$ ppr pkgs' $$ ppr hs_objs $$ ppr non_hs_objs)
     return $! pls { pkgs_loaded = pkgs'
                   , hs_objs_loaded = hs_objs ++ hs_objs_loaded pls
                   , non_hs_objs_loaded = non_hs_objs ++ non_hs_objs_loaded pls }
@@ -1255,7 +1254,6 @@ loadPackages' interp hsc_env new_pks pls = do
                (pkgs', hs_cls', extra_cls') <- link pkgs (unitDepends pkg_cfg)
                 -- Now link the package itself
              ; (hs_cls, extra_cls) <- loadPackage interp hsc_env pkg_cfg
-             ; pprTraceM "link" (ppr hs_cls $$ ppr extra_cls)
              ; return (new_pkg : pkgs', acc_hs ++ hs_cls ++ hs_cls', acc_non_hs ++ extra_cls ++ extra_cls') }
 
         | otherwise
