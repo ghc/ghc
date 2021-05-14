@@ -275,7 +275,7 @@ rtsPackageArgs = package rts ? do
     let cArgs = mconcat
           [ rtsWarnings
           , flag UseSystemFfi ? arg ("-I" ++ ffiIncludeDir)
-          , flag WithLibdw ? arg ("-I" ++ libdwIncludeDir)
+          , flag UseLibdw ? arg ("-I" ++ libdwIncludeDir)
           , arg "-fomit-frame-pointer"
           -- RTS *must* be compiled with optimisations. The INLINE_HEADER macro
           -- requires that functions are inlined to work as expected. Inlining
@@ -386,8 +386,8 @@ rtsPackageArgs = package rts ? do
           , "-DFFI_LIB="         ++ show libffiName
           , "-DLIBDW_LIB_DIR="   ++ show libdwLibraryDir ]
 
-        , builder HsCpp ? flag WithLibdw ? arg "-DUSE_LIBDW"
-        , builder HsCpp ? flag HaveLibMingwEx ? arg "-DHAVE_LIBMINGWEX" ]
+        , builder HsCpp ? flag UseLibdw ? arg "-DUSE_LIBDW"
+        , builder HsCpp ? flag UseLibmingwex ? arg "-DHAVE_LIBMINGWEX" ]
 
 -- Compile various performance-critical pieces *without* -fPIC -dynamic
 -- even when building a shared library.  If we don't do this, then the
