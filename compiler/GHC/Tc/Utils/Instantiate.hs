@@ -47,6 +47,7 @@ import GHC.Builtin.Types  ( heqDataCon, eqDataCon, integerTyConName )
 import GHC.Builtin.Names
 
 import GHC.Hs
+import GHC.Hs.Expr.Type   ( hsLitType )
 
 import GHC.Core.InstEnv
 import GHC.Core.Predicate
