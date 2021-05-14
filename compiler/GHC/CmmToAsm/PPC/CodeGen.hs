@@ -2012,6 +2012,9 @@ genCCall' config gcp target dest_regs args
                     MO_Memmove _ -> (fsLit "memmove", False)
                     MO_Memcmp _  -> (fsLit "memcmp", False)
 
+                    MO_SuspendThread -> (fsLit "suspendThread", False)
+                    MO_ResumeThread  -> (fsLit "resumeThread", False)
+
                     MO_BSwap w   -> (bSwapLabel w, False)
                     MO_BRev w    -> (bRevLabel w, False)
                     MO_PopCnt w  -> (popCntLabel w, False)
