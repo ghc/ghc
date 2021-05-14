@@ -39,6 +39,7 @@ module Type.Reflection
       -- * Type representations
       -- ** Type-Indexed
     , I.TypeRep
+    , pattern I.TypeRep
     , I.typeOf
     , pattern I.App, pattern I.Con, pattern I.Con', pattern I.Fun
     , I.typeRepTyCon
