@@ -570,7 +570,7 @@ tcRnModule' sum save_rn_syntax mod = do
         logDiagnostics $ singleMessage $
         mkPlainMsgEnvelope dflags (getLoc (hpm_module mod)) $
         GhcDriverMessage $ DriverUnknownMessage $
-        mkPlainDiagnostic reason warnMissingSafeHaskellMode
+        mkPlainDiagnostic reason noHints warnMissingSafeHaskellMode
 
     tcg_res <- {-# SCC "Typecheck-Rename" #-}
                ioMsgMaybe $ hoistTcRnMessage $
@@ -600,14 +600,14 @@ tcRnModule' sum save_rn_syntax mod = do
                 | otherwise -> (logDiagnostics $ singleMessage $
                        mkPlainMsgEnvelope dflags (warnSafeOnLoc dflags) $
                        GhcDriverMessage $ DriverUnknownMessage $
-                       mkPlainDiagnostic (WarningWithFlag Opt_WarnSafe) $
+                       mkPlainDiagnostic (WarningWithFlag Opt_WarnSafe) noHints $
                        errSafe tcg_res')
               False | safeHaskell dflags == Sf_Trustworthy &&
                       wopt Opt_WarnTrustworthySafe dflags ->
                       (logDiagnostics $ singleMessage $
                        mkPlainMsgEnvelope dflags (trustworthyOnLoc dflags) $
                        GhcDriverMessage $ DriverUnknownMessage $
-                       mkPlainDiagnostic (WarningWithFlag Opt_WarnTrustworthySafe) $
+                       mkPlainDiagnostic (WarningWithFlag Opt_WarnTrustworthySafe) noHints $
                        errTwthySafe tcg_res')
               False -> return ()
           return tcg_res'
@@ -1201,7 +1201,7 @@ hscCheckSafeImports tcg_env = do
     warnRules df (L loc (HsRule { rd_name = n })) =
         mkPlainMsgEnvelope df (locA loc) $
         DriverUnknownMessage $
-        mkPlainDiagnostic WarningWithoutFlag $
+        mkPlainDiagnostic WarningWithoutFlag noHints $
             text "Rule \"" <> ftext (snd $ unLoc n) <> text "\" ignored" $+$
             text "User defined rules are disabled under Safe Haskell"
 
@@ -1279,7 +1279,7 @@ checkSafeImports tcg_env
         | imv_is_safe v1 /= imv_is_safe v2
         = throwOneError $
             mkPlainErrorMsgEnvelope (imv_span v1) $
-            GhcDriverMessage $ DriverUnknownMessage $ mkPlainError $
+            GhcDriverMessage $ DriverUnknownMessage $ mkPlainError noHints $
               text "Module" <+> ppr (imv_name v1) <+>
                (text $ "is imported both as a safe and unsafe import!")
         | otherwise
@@ -1349,7 +1349,7 @@ hscCheckSafe' m l = do
             -- can't load iface to check trust!
             Nothing -> throwOneError $
                          mkPlainErrorMsgEnvelope l $
-                         GhcDriverMessage $ DriverUnknownMessage $ mkPlainError $
+                         GhcDriverMessage $ DriverUnknownMessage $ mkPlainError noHints $
                            text "Can't load the interface file for" <+> ppr m
                              <> text ", to check that it can be safely imported"
 
@@ -1384,7 +1384,7 @@ hscCheckSafe' m l = do
                     inferredImportWarn dflags = singleMessage
                         $ mkMsgEnvelope dflags l (pkgQual state)
                         $ GhcDriverMessage $ DriverUnknownMessage
-                        $ mkPlainDiagnostic (WarningWithFlag Opt_WarnInferredSafeImports)
+                        $ mkPlainDiagnostic (WarningWithFlag Opt_WarnInferredSafeImports) noHints
                         $ sep
                             [ text "Importing Safe-Inferred module "
                                 <> ppr (moduleName m)
@@ -1393,7 +1393,7 @@ hscCheckSafe' m l = do
                     pkgTrustErr = singleMessage
                       $ mkErrorMsgEnvelope l (pkgQual state)
                       $ GhcDriverMessage $ DriverUnknownMessage
-                      $ mkPlainError
+                      $ mkPlainError noHints
                       $ sep [ ppr (moduleName m)
                                 <> text ": Can't be safely imported!"
                             , text "The package ("
@@ -1403,7 +1403,7 @@ hscCheckSafe' m l = do
                     modTrustErr = singleMessage
                       $ mkErrorMsgEnvelope l (pkgQual state)
                       $ GhcDriverMessage $ DriverUnknownMessage
-                      $ mkPlainError
+                      $ mkPlainError noHints
                       $ sep [ ppr (moduleName m)
                                 <> text ": Can't be safely imported!"
                             , text "The module itself isn't safe." ]
@@ -1453,7 +1453,7 @@ checkPkgTrust pkgs = do
                      $ mkErrorMsgEnvelope noSrcSpan (pkgQual state)
                      $ GhcDriverMessage
                      $ DriverUnknownMessage
-                     $ mkPlainError
+                     $ mkPlainError noHints
                      $ pprWithUnitState state
                      $ text "The package ("
                         <> ppr pkg
@@ -1481,7 +1481,7 @@ markUnsafeInfer tcg_env whyUnsafe = do
          (logDiagnostics $ singleMessage $
              mkPlainMsgEnvelope dflags (warnUnsafeOnLoc dflags) $
              GhcDriverMessage $ DriverUnknownMessage $
-             mkPlainDiagnostic reason $
+             mkPlainDiagnostic reason noHints $
              whyUnsafe' dflags)
 
     liftIO $ writeIORef (tcg_safe_infer tcg_env) False
@@ -2080,7 +2080,7 @@ hscImport hsc_env str = runInteractiveHsc hsc_env $ do
         [L _ i] -> return i
         _ -> liftIO $ throwOneError $
                  mkPlainErrorMsgEnvelope noSrcSpan $
-                 GhcPsMessage $ PsUnknownMessage $ mkPlainError $
+                 GhcPsMessage $ PsUnknownMessage $ mkPlainError noHints $
                      text "parse error in import declaration"
 
 -- | Typecheck an expression (but don't run it)
@@ -2111,7 +2111,7 @@ hscParseExpr expr = do
     Just (L _ (BodyStmt _ expr _ _)) -> return expr
     _ -> throwOneError $
            mkPlainErrorMsgEnvelope noSrcSpan $
-           GhcPsMessage $ PsUnknownMessage $ mkPlainError $
+           GhcPsMessage $ PsUnknownMessage $ mkPlainError noHints $
              text "not an expression:" <+> quotes (text expr)
 
 hscParseStmt :: String -> Hsc (Maybe (GhciLStmt GhcPs))
