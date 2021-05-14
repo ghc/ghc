@@ -399,3 +399,6 @@ test ('T19474',
       [ collect_stats('bytes allocated', 5), reqlib('vector') ],
       compile_and_run,
       ['-v0 -O'])
+
+test('IPEPerf',[collect_stats(), only_ways(['normal'])],
+     compile_and_run, ['-finfo-table-map'])
