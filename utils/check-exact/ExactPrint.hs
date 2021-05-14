@@ -575,7 +575,7 @@ markKwT (AddVbarAnn ss)    = markKwA AnnVbar ss
 markKwT (AddRarrowAnn ss)  = markKwA AnnRarrow ss
 markKwT (AddRarrowAnnU ss) = markKwA AnnRarrowU ss
 -- markKwT (AddLollyAnn ss)   = markKwA AnnLolly ss
--- markKwT (AddLollyAnnU ss)  = markKwA AnnLollyU ss
+markKwT (AddLollyAnnU ss)  = markKwA AnnLollyU ss
 
 markKw :: AddEpAnn -> EPP ()
 markKw (AddEpAnn kw ss) = markKwA kw ss
@@ -2914,15 +2914,15 @@ instance (Typeable flag) => ExactPrint (HsTyVarBndr flag GhcPs) where
   getAnnotationEntry (KindedTyVar an _ _ _) = fromAnn an
 
   exact (UserTyVar an _ n)     = do
-    markEpAnnAll an id AnnOpenP
+    markEpAnnAll an id AnnOpenC
     markAnnotated n
-    markEpAnnAll an id AnnCloseP
+    markEpAnnAll an id AnnCloseC
   exact (KindedTyVar an _ n k) = do
-    markEpAnnAll an id AnnOpenP
+    markEpAnnAll an id AnnOpenC
     markAnnotated n
     markEpAnn an AnnDcolon
     markAnnotated k
-    markEpAnnAll an id AnnCloseP
+    markEpAnnAll an id AnnCloseC
 
 -- ---------------------------------------------------------------------
 
