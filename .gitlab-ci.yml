@@ -768,7 +768,7 @@ validate-aarch64-darwin:
   cache:
     key: linux-riscv64-ubuntu2004
   tags:
-    - riscv64-linux
+    - x86_64-linux
 
 .build-riscv64-linux-ubuntu-21.04-llvm:
   extends: .validate-linux
@@ -776,7 +776,7 @@ validate-aarch64-darwin:
   variables:
     BUILD_FLAVOUR: perf-llvm
   tags:
-    - riscv64-linux
+    - x86_64-linux
 
 validate-riscv64-linux-ubuntu-21.04:
   extends: .build-riscv64-linux-ubuntu-21.04
