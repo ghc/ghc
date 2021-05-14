@@ -622,10 +622,16 @@ conflicts platform (r, rhs, addr) node
   -- (5) foreign calls clobber heap: see Note [Foreign calls clobber heap]
   | CmmUnsafeForeignCall{} <- node, memConflicts addr AnyMem      = True
 
-  -- (6) native calls clobber any memory
+  -- (6) suspendThread clobbers every global register not backed by a real
+  -- register. It also clobbers heap and stack but this is handled by (5)
+  | CmmUnsafeForeignCall (PrimTarget MO_SuspendThread) _ _ <- node
+  , foldRegsUsed platform (\b g -> globalRegMaybe platform g == Nothing || b) False rhs
+  = True
+
+  -- (7) native calls clobber any memory
   | CmmCall{} <- node, memConflicts addr AnyMem                   = True
 
-  -- (7) otherwise, no conflict
+  -- (8) otherwise, no conflict
   | otherwise = False
 
 {- Note [Inlining foldRegsDefd]
@@ -759,6 +765,10 @@ data AbsMem
 -- Some CallishMachOp imply a memory barrier e.g. AtomicRMW and
 -- therefore we should never float any memory operations across one of
 -- these calls.
+--
+-- `suspendThread` releases the capability used by the thread, hence we mustn't
+-- float accesses to heap, stack or virtual global registers stored in the
+-- capability (e.g. with unregisterised build, see #19237).
 
 
 bothMems :: AbsMem -> AbsMem -> AbsMem
