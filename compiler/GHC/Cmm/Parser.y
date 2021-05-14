@@ -1027,6 +1027,9 @@ callishMachOps platform = listToUFM $
         ( "memmove", memcpyLikeTweakArgs MO_Memmove ),
         ( "memcmp", memcpyLikeTweakArgs MO_Memcmp ),
 
+        ( "suspendThread", (MO_SuspendThread,) ),
+        ( "resumeThread",  (MO_ResumeThread,) ),
+
         ("prefetch0", (MO_Prefetch_Data 0,)),
         ("prefetch1", (MO_Prefetch_Data 1,)),
         ("prefetch2", (MO_Prefetch_Data 2,)),

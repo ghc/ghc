@@ -862,6 +862,9 @@ cmmPrimOpFunctions mop = do
     MO_Memset _   -> fsLit $ "llvm.memset."  ++ intrinTy2
     MO_Memcmp _   -> fsLit $ "memcmp"
 
+    MO_SuspendThread -> fsLit $ "suspendThread"
+    MO_ResumeThread  -> fsLit $ "resumeThread"
+
     (MO_PopCnt w) -> fsLit $ "llvm.ctpop."      ++ showSDoc dflags (ppr $ widthToLlvmInt w)
     (MO_BSwap w)  -> fsLit $ "llvm.bswap."      ++ showSDoc dflags (ppr $ widthToLlvmInt w)
     (MO_BRev w)   -> fsLit $ "llvm.bitreverse." ++ showSDoc dflags (ppr $ widthToLlvmInt w)

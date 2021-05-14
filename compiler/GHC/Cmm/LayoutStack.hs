@@ -12,14 +12,11 @@ import GHC.StgToCmm.Monad      ( newTemp  ) -- XXX layering violation
 import GHC.StgToCmm.Utils      ( callerSaveVolatileRegs  ) -- XXX layering violation
 import GHC.StgToCmm.Foreign    ( saveThreadState, loadThreadState ) -- XXX layering violation
 
-import GHC.Types.Basic
 import GHC.Cmm
 import GHC.Cmm.Info
 import GHC.Cmm.BlockId
-import GHC.Cmm.CLabel
 import GHC.Cmm.Utils
 import GHC.Cmm.Graph
-import GHC.Types.ForeignCall
 import GHC.Cmm.Liveness
 import GHC.Cmm.ProcPoint
 import GHC.Runtime.Heap.Layout
@@ -34,7 +31,6 @@ import GHC.Types.Unique.FM
 import GHC.Utils.Misc
 
 import GHC.Driver.Session
-import GHC.Data.FastString
 import GHC.Utils.Outputable hiding ( isEmpty )
 import GHC.Utils.Panic
 import qualified Data.Set as Set
@@ -1190,21 +1186,14 @@ lowerSafeForeignCall profile block
   | otherwise = return block
 
 
-foreignLbl :: FastString -> CmmExpr
-foreignLbl name = CmmLit (CmmLabel (mkForeignLabel name Nothing ForeignLabelInExternalPackage IsFunction))
-
 callSuspendThread :: Platform -> LocalReg -> Bool -> CmmNode O O
 callSuspendThread platform id intrbl =
-  CmmUnsafeForeignCall
-       (ForeignTarget (foreignLbl (fsLit "suspendThread"))
-        (ForeignConvention CCallConv [AddrHint, NoHint] [AddrHint] CmmMayReturn))
+  CmmUnsafeForeignCall (PrimTarget MO_SuspendThread)
        [id] [baseExpr, mkIntExpr platform (fromEnum intrbl)]
 
 callResumeThread :: LocalReg -> LocalReg -> CmmNode O O
 callResumeThread new_base id =
-  CmmUnsafeForeignCall
-       (ForeignTarget (foreignLbl (fsLit "resumeThread"))
-            (ForeignConvention CCallConv [AddrHint] [AddrHint] CmmMayReturn))
+  CmmUnsafeForeignCall (PrimTarget MO_ResumeThread)
        [new_base] [CmmReg (CmmLocal id)]
 
 -- -----------------------------------------------------------------------------
