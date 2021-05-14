@@ -759,20 +759,9 @@ interestingArgContext :: [CoreRule] -> SimplCont -> Bool
 --
 -- The call_cont passed to interestingArgContext is the context of
 -- the call itself, e.g. g <hole> in the example above
-interestingArgContext rules call_cont
-  = notNull rules || enclosing_fn_has_rules
-  where
-    enclosing_fn_has_rules = go call_cont
-
-    go (Select {})                  = False
-    go (ApplyToVal {})              = False  -- Shouldn't really happen
-    go (ApplyToTy  {})              = False  -- Ditto
-    go (StrictArg { sc_fun = fun }) = ai_encl fun
-    go (StrictBind {})              = False      -- ??
-    go (CastIt _ c)                 = go c
-    go (Stop _ RuleArgCtxt)         = True
-    go (Stop _ _)                   = False
-    go (TickIt _ c)                 = go c
+interestingArgContext _ _ = False
+  -- FB NOTE: this function is stubbed out in order to avoid RULES
+  -- introducing non-determinism depending on when they are loaded.
 
 {- Note [Interesting arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
