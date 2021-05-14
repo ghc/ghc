@@ -229,3 +229,5 @@ test('IncallAffinity',
       when(unregisterised(), skip)],
      compile_and_run,
      ['IncallAffinity_c.c -no-hs-main'])
+
+test('T19237', normal, compile_and_run, ['T19237_c.c'])

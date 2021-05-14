@@ -3395,6 +3395,9 @@ outOfLineCmmOp bid mop res args
               MO_Memmove _ -> fsLit "memmove"
               MO_Memcmp _  -> fsLit "memcmp"
 
+              MO_SuspendThread -> fsLit "suspendThread"
+              MO_ResumeThread  -> fsLit "resumeThread"
+
               MO_PopCnt _  -> fsLit "popcnt"
               MO_BSwap _   -> fsLit "bswap"
               {- Here the C implementation is used as there is no x86
