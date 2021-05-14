@@ -89,7 +89,7 @@ Library
     build-depends:
         rts == 1.0.*,
         ghc-prim >= 0.5.1.0 && < 0.9,
-        ghc-bignum >= 1.0 && < 2.0
+        ghc-bignum >= 1.0 && < 10.0
 
     exposed-modules:
         Control.Applicative

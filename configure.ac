@@ -1376,6 +1376,7 @@ AC_CONFIG_FILES(
   utils/iserv-proxy/iserv-proxy.cabal
   utils/remote-iserv/remote-iserv.cabal
   utils/gen-dll/gen-dll.cabal
+  libraries/ghc-bignum/ghc-bignum.cabal
   libraries/ghc-boot/ghc-boot.cabal
   libraries/ghc-boot-th/ghc-boot-th.cabal
   libraries/ghci/ghci.cabal

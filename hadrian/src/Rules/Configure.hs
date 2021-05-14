@@ -23,6 +23,7 @@ configureResults =
     , "utils/remote-iserv/remote-iserv.cabal"
     , "utils/runghc/runghc.cabal"
     , "utils/gen-dll/gen-dll.cabal"
+    , "libraries/ghc-bignum/ghc-bignum.cabal"
     , "libraries/ghc-boot/ghc-boot.cabal"
     , "libraries/ghc-boot-th/ghc-boot-th.cabal"
     , "libraries/ghci/ghci.cabal"
