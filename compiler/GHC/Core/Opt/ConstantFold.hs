@@ -154,6 +154,7 @@ primOpRules nm = \case
                                     , equalArgs $> Lit zeroW8 ]
    Word8AndOp  -> mkPrimOpRule nm 2 [ binaryLit (word8Op2 (.&.))
                                     , idempotent
+                                    , identity (mkLitWord8 0xFF)
                                     , zeroElem ]
    Word8OrOp   -> mkPrimOpRule nm 2 [ binaryLit (word8Op2 (.|.))
                                     , idempotent
@@ -221,6 +222,7 @@ primOpRules nm = \case
                                     , equalArgs $> Lit zeroW16 ]
    Word16AndOp -> mkPrimOpRule nm 2 [ binaryLit (word16Op2 (.&.))
                                     , idempotent
+                                    , identity (mkLitWord16 0xFFFF)
                                     , zeroElem ]
    Word16OrOp  -> mkPrimOpRule nm 2 [ binaryLit (word16Op2 (.|.))
                                     , idempotent
@@ -288,6 +290,7 @@ primOpRules nm = \case
                                     , equalArgs $> Lit zeroW32 ]
    Word32AndOp -> mkPrimOpRule nm 2 [ binaryLit (word32Op2 (.&.))
                                     , idempotent
+                                    , identity (mkLitWord32 0xFFFFFFFF)
                                     , zeroElem ]
    Word32OrOp  -> mkPrimOpRule nm 2 [ binaryLit (word32Op2 (.|.))
                                     , idempotent
@@ -331,6 +334,7 @@ primOpRules nm = \case
                                     , equalArgs >> retLit zeroi ]
    IntAndOp    -> mkPrimOpRule nm 2 [ binaryLit (intOp2 (.&.))
                                     , idempotent
+                                    , identityPlatform (\p -> mkLitInt p (-1))
                                     , zeroElem ]
    IntOrOp     -> mkPrimOpRule nm 2 [ binaryLit (intOp2 (.|.))
                                     , idempotent
@@ -376,6 +380,7 @@ primOpRules nm = \case
                                     , equalArgs >> retLit zerow ]
    WordAndOp   -> mkPrimOpRule nm 2 [ binaryLit (wordOp2 (.&.))
                                     , idempotent
+                                    , identityPlatform (\p -> mkLitWord p (platformMaxWord p))
                                     , zeroElem ]
    WordOrOp    -> mkPrimOpRule nm 2 [ binaryLit (wordOp2 (.|.))
                                     , idempotent
