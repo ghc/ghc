@@ -1,0 +1,10 @@
+[1 of 2] Compiling T17469A          ( T17469A.hs, T17469A.o )
+[2 of 2] Compiling Main             ( T17469.hs, T17469.o )
+
+T17469.hs:6:14: error:
+    • Constructor ‘MkFoo’ does not have field ‘bar’
+    • In the first argument of ‘print’, namely
+        ‘MkFoo {foo = "", bar = True}’
+      In the expression: print MkFoo {foo = "", bar = True}
+      In an equation for ‘main’:
+          main = print MkFoo {foo = "", bar = True}
