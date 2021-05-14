@@ -4,7 +4,7 @@ module Settings.Default (
     defaultFlavour, defaultBignumBackend
     ) where
 
-import Flavour
+import Flavour.Type
 import Expression
 
 data SourceArgs = SourceArgs

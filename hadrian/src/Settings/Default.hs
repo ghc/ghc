@@ -20,7 +20,7 @@ import Hadrian.Haskell.Cabal.Type
 
 import CommandLine
 import Expression
-import Flavour
+import Flavour.Type
 import Oracles.Flag
 import Packages
 import Settings.Builders.Alex
