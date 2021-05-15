@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP          #-}
+
 {-# LANGUAGE TypeFamilies #-}
 
 -----------------------------------------------------------------------------
@@ -20,8 +20,6 @@ module GHC.Parser.Header
    , checkProcessArgsResult
    )
 where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 

@@ -17,7 +17,8 @@ Some of the other hair in this code is to be able to use a
 Haskell).
 -}
 
-{-# LANGUAGE CPP, BangPatterns, MagicHash #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE BangPatterns, MagicHash #-}
 
 module GHC.Types.Unique (
         -- * Main data types
@@ -45,15 +46,13 @@ module GHC.Types.Unique (
         mkLocalUnique, minLocalUnique, maxLocalUnique,
     ) where
 
-#include "HsVersions.h"
 #include "Unique.h"
 
 import GHC.Prelude
 
 import GHC.Data.FastString
 import GHC.Utils.Outputable
-import GHC.Utils.Misc
-import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 
 -- just for implementing a fast [0,61) -> Char function
 import GHC.Exts (indexCharOffAddr#, Char(..), Int(..))
@@ -311,7 +310,7 @@ Code stolen from Lennart.
 
 iToBase62 :: Int -> String
 iToBase62 n_
-  = ASSERT(n_ >= 0) go n_ ""
+  = assert (n_ >= 0) $ go n_ ""
   where
     go n cs | n < 62
             = let !c = chooseChar62 n in c : cs

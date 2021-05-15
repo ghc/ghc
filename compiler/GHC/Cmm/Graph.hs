@@ -38,8 +38,8 @@ import GHC.Types.ForeignCall
 import GHC.Data.OrdList
 import GHC.Runtime.Heap.Layout (ByteOff)
 import GHC.Types.Unique.Supply
-import GHC.Utils.Misc
 import GHC.Utils.Panic
+import GHC.Utils.Constants (debugIsOn)
 
 
 -----------------------------------------------------------------------------

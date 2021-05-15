@@ -1,6 +1,6 @@
 -- (c) The University of Glasgow 2006
 
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -26,8 +26,6 @@ module GHC.Data.Graph.Directed (
         -- Simple way to classify edges
         EdgeType(..), classifyEdges
     ) where
-
-#include "HsVersions.h"
 
 ------------------------------------------------------------------------------
 -- A version of the graph algorithms described in:

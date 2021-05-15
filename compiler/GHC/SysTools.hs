@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP                 #-}
+
 {-# LANGUAGE ScopedTypeVariables #-}
 
 {-
@@ -27,8 +27,6 @@ module GHC.SysTools (
         Option(..),
         expandTopDir,
  ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 

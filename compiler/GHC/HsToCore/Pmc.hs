@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP               #-}
+
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs             #-}
 {-# LANGUAGE LambdaCase        #-}
@@ -40,8 +40,6 @@ module GHC.HsToCore.Pmc (
         -- See Note [Long-distance information]
         addTyCs, addCoreScrutTmCs, addHsScrutTmCs
     ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 

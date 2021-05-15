@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP          #-}
+
 {-# LANGUAGE ViewPatterns #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
@@ -76,8 +76,6 @@ module GHC.Types.Demand (
     -- * Zapping usage information
     zapUsageDemand, zapDmdEnvSig, zapUsedOnceDemand, zapUsedOnceSig
   ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
