@@ -100,7 +100,7 @@ minimize modifying existing code by having these new rules calculate
 @LHsRecProj GhcPs (Located b)@ ("record projection") values instead:
 @
 newtype FieldLabelStrings = FieldLabelStrings [Located FieldLabelString]
-type RecProj arg = HsRecField' FieldLabelStrings arg
+type RecProj arg = HsFieldBind FieldLabelStrings arg
 type LHsRecProj p arg = Located (RecProj arg)
 @
 
@@ -158,7 +158,7 @@ instance Outputable (HsFieldLabel p) where
 
 -- Field projection updates (e.g. @foo.bar.baz = 1@). See Note
 -- [RecordDotSyntax field updates].
-type RecProj p arg = HsRecField' (FieldLabelStrings p) arg
+type RecProj p arg = HsFieldBind (FieldLabelStrings p) arg
 
 -- The phantom type parameter @p@ is for symmetry with @LHsRecField p
 -- arg@ in the definition of @data Fbind@ (see GHC.Parser.Process).

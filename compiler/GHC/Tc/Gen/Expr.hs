@@ -1184,7 +1184,7 @@ getFixedTyVars upd_fld_occs univ_tvs cons
 -- See Note [Disambiguating record fields] in GHC.Tc.Gen.Head
 disambiguateRecordBinds :: LHsExpr GhcRn -> TcRhoType
                  -> [LHsRecUpdField GhcRn] -> ExpRhoType
-                 -> TcM [LHsRecField' GhcTc (AmbiguousFieldOcc GhcTc) (LHsExpr GhcRn)]
+                 -> TcM [LHsFieldBind GhcTc (AmbiguousFieldOcc GhcTc) (LHsExpr GhcRn)]
 disambiguateRecordBinds record_expr record_rho rbnds res_ty
     -- Are all the fields unambiguous?
   = case mapM isUnambiguous rbnds of
@@ -1249,7 +1249,7 @@ disambiguateRecordBinds record_expr record_rho rbnds res_ty
     -- where T does not have field x.
     pickParent :: RecSelParent
                -> (LHsRecUpdField GhcRn, [(RecSelParent, GlobalRdrElt)])
-               -> TcM (LHsRecField' GhcTc (AmbiguousFieldOcc GhcTc) (LHsExpr GhcRn))
+               -> TcM (LHsFieldBind GhcTc (AmbiguousFieldOcc GhcTc) (LHsExpr GhcRn))
     pickParent p (upd, xs)
       = case lookup p xs of
                       -- Phew! The parent is valid for this field.
@@ -1270,14 +1270,14 @@ disambiguateRecordBinds record_expr record_rho rbnds res_ty
     -- Given a (field update, selector name) pair, look up the
     -- selector to give a field update with an unambiguous Id
     lookupSelector :: (LHsRecUpdField GhcRn, Name)
-                 -> TcM (LHsRecField' GhcRn (AmbiguousFieldOcc GhcTc) (LHsExpr GhcRn))
+                 -> TcM (LHsFieldBind GhcRn (AmbiguousFieldOcc GhcTc) (LHsExpr GhcRn))
     lookupSelector (L l upd, n)
       = do { i <- tcLookupId n
            ; let L loc af = hsRecFieldLbl upd
                  lbl      = rdrNameAmbiguousFieldOcc af
            -- ; return $ L l upd { hsRecFieldLbl
            --                = L loc (Unambiguous i (L (noAnnSrcSpan loc) lbl)) }
-           ; return $ L l HsRecField
+           ; return $ L l HsFieldBind
                { hsRecFieldAnn = hsRecFieldAnn upd
                , hsRecFieldLbl
                        = L loc (Unambiguous i (L (noAnnSrcSpan loc) lbl))
@@ -1332,7 +1332,7 @@ tcRecordBinds con_like arg_tys (HsRecFields rbinds dd)
 
     do_bind :: LHsRecField GhcRn (LHsExpr GhcRn)
             -> TcM (Maybe (LHsRecField GhcTc (LHsExpr GhcTc)))
-    do_bind (L l fld@(HsRecField { hsRecFieldLbl = f
+    do_bind (L l fld@(HsFieldBind { hsRecFieldLbl = f
                                  , hsRecFieldArg = rhs }))
 
       = do { mb <- tcRecordField con_like flds_w_tys f rhs
@@ -1340,7 +1340,7 @@ tcRecordBinds con_like arg_tys (HsRecFields rbinds dd)
                Nothing         -> return Nothing
                -- Just (f', rhs') -> return (Just (L l (fld { hsRecFieldLbl = f'
                --                                            , hsRecFieldArg = rhs' }))) }
-               Just (f', rhs') -> return (Just (L l (HsRecField
+               Just (f', rhs') -> return (Just (L l (HsFieldBind
                                                      { hsRecFieldAnn = hsRecFieldAnn fld
                                                      , hsRecFieldLbl = f'
                                                      , hsRecFieldArg = rhs'
@@ -1349,7 +1349,7 @@ tcRecordBinds con_like arg_tys (HsRecFields rbinds dd)
 tcRecordUpd
         :: ConLike
         -> [TcType]     -- Expected type for each field
-        -> [LHsRecField' GhcTc (AmbiguousFieldOcc GhcTc) (LHsExpr GhcRn)]
+        -> [LHsFieldBind GhcTc (AmbiguousFieldOcc GhcTc) (LHsExpr GhcRn)]
         -> TcM [LHsRecUpdField GhcTc]
 
 tcRecordUpd con_like arg_tys rbinds = fmap catMaybes $ mapM do_bind rbinds
@@ -1357,9 +1357,9 @@ tcRecordUpd con_like arg_tys rbinds = fmap catMaybes $ mapM do_bind rbinds
     fields = map flSelector $ conLikeFieldLabels con_like
     flds_w_tys = zipEqual "tcRecordUpd" fields arg_tys
 
-    do_bind :: LHsRecField' GhcTc (AmbiguousFieldOcc GhcTc) (LHsExpr GhcRn)
+    do_bind :: LHsFieldBind GhcTc (AmbiguousFieldOcc GhcTc) (LHsExpr GhcRn)
             -> TcM (Maybe (LHsRecUpdField GhcTc))
-    do_bind (L l fld@(HsRecField { hsRecFieldLbl = L loc af
+    do_bind (L l fld@(HsFieldBind { hsRecFieldLbl = L loc af
                                  , hsRecFieldArg = rhs }))
       = do { let lbl = rdrNameAmbiguousFieldOcc af
                  sel_id = selectorAmbiguousFieldOcc af
@@ -1471,7 +1471,7 @@ badFieldTypes prs
        2 (vcat [ ppr f <+> dcolon <+> ppr ty | (f,ty) <- prs ])
 
 badFieldsUpd
-  :: [LHsRecField' GhcTc (AmbiguousFieldOcc GhcTc) (LHsExpr GhcRn)]
+  :: [LHsFieldBind GhcTc (AmbiguousFieldOcc GhcTc) (LHsExpr GhcRn)]
                -- Field names that don't belong to a single datacon
   -> [ConLike] -- Data cons of the type which the first field name belongs to
   -> SDoc

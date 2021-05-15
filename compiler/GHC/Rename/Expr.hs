@@ -2618,7 +2618,7 @@ mkProjection _ _ [] = panic "mkProjection: The impossible happened"
 -- e.g. Suppose an update like foo.bar = 1.
 --      We calculate the function \a -> setField @"foo" a (setField @"bar" (getField @"foo" a) 1).
 mkProjUpdateSetField :: Name -> Name -> LHsRecProj GhcRn (LHsExpr GhcRn) -> (LHsExpr GhcRn -> LHsExpr GhcRn)
-mkProjUpdateSetField get_field set_field (L _ (HsRecField { hsRecFieldLbl = (L _ (FieldLabelStrings flds')), hsRecFieldArg = arg } ))
+mkProjUpdateSetField get_field set_field (L _ (HsFieldBind { hsRecFieldLbl = (L _ (FieldLabelStrings flds')), hsRecFieldArg = arg } ))
   = let {
       ; flds = map (fmap (unLoc . hflLabel)) flds'
       ; final = last flds  -- quux
@@ -2643,9 +2643,11 @@ rnHsUpdProjs us = do
   pure (u, plusFVs fvs)
   where
     rnRecUpdProj :: LHsRecUpdProj GhcPs -> RnM (LHsRecUpdProj GhcRn, FreeVars)
-    rnRecUpdProj (L l (HsRecField _ fs arg pun))
+    rnRecUpdProj (L l (HsFieldBind _ fs arg pun))
       = do { (arg, fv) <- rnLExpr arg
-           ; return $ (L l (HsRecField { hsRecFieldAnn = noAnn
-                                       , hsRecFieldLbl = fmap rnFieldLabelStrings fs
-                                       , hsRecFieldArg = arg
-                                       , hsRecPun = pun}), fv) }
+           ; return $
+               (L l (HsFieldBind {
+                         hsRecFieldAnn = noAnn
+                       , hsRecFieldLbl = fmap rnFieldLabelStrings fs
+                       , hsRecFieldArg = arg
+                       , hsRecPun = pun}), fv ) }
