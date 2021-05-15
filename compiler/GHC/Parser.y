@@ -3365,13 +3365,13 @@ fbinds1 :: { forall b. DisambECP b => PV ([Fbind b], Maybe SrcSpan) }
 
 fbind   :: { forall b. DisambECP b => PV (Fbind b) }
         : qvar '=' texp  { unECP $3 >>= \ $3 ->
-                           fmap Left $ acsA (\cs -> sLL (reLocN $1) (reLoc $>) $ HsRecField (EpAnn (glNR $1) [mj AnnEqual $2] cs) (sL1N $1 $ mkFieldOcc $1) $3 False) }
+                           fmap Left $ acsA (\cs -> sLL (reLocN $1) (reLoc $>) $ HsFieldBind (EpAnn (glNR $1) [mj AnnEqual $2] cs) (sL1N $1 $ mkFieldOcc $1) $3 False) }
                         -- RHS is a 'texp', allowing view patterns (#6038)
                         -- and, incidentally, sections.  Eg
                         -- f (R { x = show -> s }) = ...
 
         | qvar          { placeHolderPunRhs >>= \rhs ->
-                          fmap Left $ acsa (\cs -> sL1a (reLocN $1) $ HsRecField (EpAnn (glNR $1) [] cs) (sL1N $1 $ mkFieldOcc $1) rhs True) }
+                          fmap Left $ acsa (\cs -> sL1a (reLocN $1) $ HsFieldBind (EpAnn (glNR $1) [] cs) (sL1N $1 $ mkFieldOcc $1) rhs True) }
                         -- In the punning case, use a place-holder
                         -- The renamer fills in the final value
 

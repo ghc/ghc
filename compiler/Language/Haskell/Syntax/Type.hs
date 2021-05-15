@@ -46,7 +46,7 @@ module Language.Haskell.Syntax.Type (
         HsConDetails(..), noTypeArgs,
 
         FieldOcc(..), LFieldOcc,
-        AmbiguousFieldOcc(..),
+        AmbiguousFieldOcc(..), LAmbiguousFieldOcc,
 
         mapHsOuterImplicit,
         hsQTvExplicit,
@@ -1320,6 +1320,9 @@ instance OutputableBndr (FieldOcc pass) where
 instance OutputableBndr (GenLocated SrcSpan (FieldOcc pass)) where
   pprInfixOcc  = pprInfixOcc . unLoc
   pprPrefixOcc = pprPrefixOcc . unLoc
+
+-- | Located Ambiguous Field Occurence
+type LAmbiguousFieldOcc pass = XRec pass (AmbiguousFieldOcc pass)
 
 -- | Ambiguous Field Occurrence
 --

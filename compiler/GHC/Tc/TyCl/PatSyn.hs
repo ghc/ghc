@@ -1223,7 +1223,7 @@ tcCollectEx pat = go pat
       = mergeMany . map goRecFd $ flds
 
     goRecFd :: LHsRecField GhcTc (LPat GhcTc) -> ([TyVar], [EvVar])
-    goRecFd (L _ HsRecField{ hsRecFieldArg = p }) = go p
+    goRecFd (L _ HsFieldBind{ hfbRHS = p }) = go p
 
     merge (vs1, evs1) (vs2, evs2) = (vs1 ++ vs2, evs1 ++ evs2)
     mergeMany = foldr merge empty

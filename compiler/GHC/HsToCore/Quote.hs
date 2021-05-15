@@ -1707,17 +1707,17 @@ repFields (HsRecFields { rec_flds = flds })
   where
     rep_fld :: LHsRecField GhcRn (LHsExpr GhcRn)
             -> MetaM (Core (M TH.FieldExp))
-    rep_fld (L _ fld) = do { fn <- lookupLOcc (hsRecFieldSel fld)
-                           ; e  <- repLE (hsRecFieldArg fld)
+    rep_fld (L _ fld) = do { fn <- lookupOcc (hsRecFieldSel fld)
+                           ; e  <- repLE (hfbRHS fld)
                            ; repFieldExp fn e }
 
 repUpdFields :: [LHsRecUpdField GhcRn] -> MetaM (Core [M TH.FieldExp])
 repUpdFields = repListM fieldExpTyConName rep_fld
   where
     rep_fld :: LHsRecUpdField GhcRn -> MetaM (Core (M TH.FieldExp))
-    rep_fld (L l fld) = case unLoc (hsRecFieldLbl fld) of
+    rep_fld (L l fld) = case unLoc (hfbLHS fld) of
       Unambiguous sel_name _ -> do { fn <- lookupLOcc (L l sel_name)
-                                   ; e  <- repLE (hsRecFieldArg fld)
+                                   ; e  <- repLE (hfbRHS fld)
                                    ; repFieldExp fn e }
       Ambiguous{}            -> notHandled "Ambiguous record updates" (ppr fld)
 
@@ -2068,8 +2068,8 @@ repP (ConPat NoExtField dc details)
    }
  where
    rep_fld :: LHsRecField GhcRn (LPat GhcRn) -> MetaM (Core (M (TH.Name, TH.Pat)))
-   rep_fld (L _ fld) = do { MkC v <- lookupLOcc (hsRecFieldSel fld)
-                          ; MkC p <- repLP (hsRecFieldArg fld)
+   rep_fld (L _ fld) = do { MkC v <- lookupOcc (hsRecFieldSel fld)
+                          ; MkC p <- repLP (hfbRHS fld)
                           ; rep2 fieldPatName [v,p] }
 repP (NPat _ (L _ l) Nothing _) = do { a <- repOverloadedLiteral l
                                      ; repPlit a }

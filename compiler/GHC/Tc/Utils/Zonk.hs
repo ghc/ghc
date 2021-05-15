@@ -1377,10 +1377,10 @@ zonkRecFields env (HsRecFields flds dd)
         ; return (HsRecFields flds' dd) }
   where
     zonk_rbind (L l fld)
-      = do { new_id   <- wrapLocM (zonkFieldOcc env) (hsRecFieldLbl fld)
-           ; new_expr <- zonkLExpr env (hsRecFieldArg fld)
-           ; return (L l (fld { hsRecFieldLbl = new_id
-                              , hsRecFieldArg = new_expr })) }
+      = do { new_id   <- wrapLocM (zonkFieldOcc env) (hfbLHS fld)
+           ; new_expr <- zonkLExpr env (hfbRHS fld)
+           ; return (L l (fld { hfbLHS = new_id
+                              , hfbRHS = new_expr })) }
 
 zonkRecUpdFields :: ZonkEnv -> [LHsRecUpdField GhcTc]
                  -> TcM [LHsRecUpdField GhcTc]
@@ -1388,9 +1388,9 @@ zonkRecUpdFields env = mapM zonk_rbind
   where
     zonk_rbind (L l fld)
       = do { new_id   <- wrapLocM (zonkFieldOcc env) (hsRecUpdFieldOcc fld)
-           ; new_expr <- zonkLExpr env (hsRecFieldArg fld)
-           ; return (L l (fld { hsRecFieldLbl = fmap ambiguousFieldOcc new_id
-                              , hsRecFieldArg = new_expr })) }
+           ; new_expr <- zonkLExpr env (hfbRHS fld)
+           ; return (L l (fld { hfbLHS = fmap ambiguousFieldOcc new_id
+                              , hfbRHS = new_expr })) }
 
 -------------------------------------------------------------------------
 mapIPNameTc :: (a -> TcM b) -> Either (Located HsIPName) a
@@ -1563,9 +1563,9 @@ zonkConStuff env (InfixCon p1 p2)
         ; return (env', InfixCon p1' p2') }
 
 zonkConStuff env (RecCon (HsRecFields rpats dd))
-  = do  { (env', pats') <- zonkPats env (map (hsRecFieldArg . unLoc) rpats)
+  = do  { (env', pats') <- zonkPats env (map (hfbRHS . unLoc) rpats)
         ; let rpats' = zipWith (\(L l rp) p' ->
-                                  L l (rp { hsRecFieldArg = p' }))
+                                  L l (rp { hfbRHS = p' }))
                                rpats pats'
         ; return (env', RecCon (HsRecFields rpats' dd)) }
         -- Field selectors have declared types; hence no zonking
