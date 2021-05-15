@@ -138,23 +138,23 @@ values (see function @mkRdrRecordUpd@ in 'GHC.Parser.PostProcess').
 -- | RecordDotSyntax field updates
 
 newtype FieldLabelStrings p =
-  FieldLabelStrings [Located (HsFieldLabel p)]
+  FieldLabelStrings [XRec p (DotFieldOcc p)]
 
-instance Outputable (FieldLabelStrings p) where
+instance (UnXRec p, Outputable (XRec p FieldLabelString)) => Outputable (FieldLabelStrings p) where
   ppr (FieldLabelStrings flds) =
-    hcat (punctuate dot (map (ppr . unLoc) flds))
+    hcat (punctuate dot (map (ppr . unXRec @p) flds))
 
-instance OutputableBndr (FieldLabelStrings p) where
+instance (UnXRec p, Outputable (XRec p FieldLabelString)) => OutputableBndr (FieldLabelStrings p) where
   pprInfixOcc = pprFieldLabelStrings
   pprPrefixOcc = pprFieldLabelStrings
 
-pprFieldLabelStrings :: FieldLabelStrings p -> SDoc
+pprFieldLabelStrings :: forall p. (UnXRec p, Outputable (XRec p FieldLabelString)) => FieldLabelStrings p -> SDoc
 pprFieldLabelStrings (FieldLabelStrings flds) =
-    hcat (punctuate dot (map (ppr . unLoc) flds))
+    hcat (punctuate dot (map (ppr . unXRec @p) flds))
 
-instance Outputable (HsFieldLabel p) where
-  ppr (HsFieldLabel _ s) = ppr s
-  ppr XHsFieldLabel{} = text "XHsFieldLabel"
+instance Outputable(XRec p FieldLabelString) => Outputable (DotFieldOcc p) where
+  ppr (DotFieldOcc _ s) = ppr s
+  ppr XDotFieldOcc{} = text "XDotFieldOcc"
 
 -- Field projection updates (e.g. @foo.bar.baz = 1@). See Note
 -- [RecordDotSyntax field updates].
@@ -478,27 +478,29 @@ data HsExpr p
   -- | Record field selection e.g @z.x@.
   --
   --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnDot'
-  --
+
+  -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
+
   -- This case only arises when the OverloadedRecordDot langauge
   -- extension is enabled.
-
   | HsGetField {
         gf_ext :: XGetField p
       , gf_expr :: LHsExpr p
-      , gf_field :: Located (HsFieldLabel p)
+      , gf_field :: XRec p (DotFieldOcc p)
       }
 
   -- | Record field selector. e.g. @(.x)@ or @(.x.y)@
   --
-  --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpenP'
-  --         'GHC.Parser.Annotation.AnnDot', 'GHC.Parser.Annotation.AnnCloseP'
-  --
   -- This case only arises when the OverloadedRecordDot langauge
   -- extensions is enabled.
 
+  --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpenP'
+  --         'GHC.Parser.Annotation.AnnDot', 'GHC.Parser.Annotation.AnnCloseP'
+
+  -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
   | HsProjection {
         proj_ext :: XProjection p
-      , proj_flds :: [Located (HsFieldLabel p)]
+      , proj_flds :: [XRec p (DotFieldOcc p)]
       }
 
   -- | Expression with an explicit type signature. @e :: type@
@@ -613,12 +615,12 @@ type family PendingTcSplice' p
 
 -- ---------------------------------------------------------------------
 
-data HsFieldLabel p
-  = HsFieldLabel
-    { hflExt   :: XCHsFieldLabel p
-    , hflLabel :: Located FieldLabelString
+data DotFieldOcc p
+  = DotFieldOcc
+    { dfoExt   :: XCDotFieldOcc p
+    , dfoLabel :: XRec p FieldLabelString
     }
-  | XHsFieldLabel !(XXHsFieldLabel p)
+  | XDotFieldOcc !(XXDotFieldOcc p)
 
 -- ---------------------------------------------------------------------
 
