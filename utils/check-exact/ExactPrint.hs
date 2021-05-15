@@ -26,6 +26,7 @@ import GHC.Types.Basic hiding (EP)
 import GHC.Types.Fixity
 import GHC.Types.ForeignCall
 import GHC.Types.SourceText
+import GHC.Types.Var
 import GHC.Utils.Outputable hiding ( (<>) )
 import GHC.Unit.Module.Warnings
 import GHC.Utils.Misc
@@ -575,7 +576,7 @@ markKwT (AddVbarAnn ss)    = markKwA AnnVbar ss
 markKwT (AddRarrowAnn ss)  = markKwA AnnRarrow ss
 markKwT (AddRarrowAnnU ss) = markKwA AnnRarrowU ss
 -- markKwT (AddLollyAnn ss)   = markKwA AnnLolly ss
--- markKwT (AddLollyAnnU ss)  = markKwA AnnLollyU ss
+markKwT (AddLollyAnnU ss)  = markKwA AnnLollyU ss
 
 markKw :: AddEpAnn -> EPP ()
 markKw (AddEpAnn kw ss) = markKwA kw ss
@@ -2904,25 +2905,35 @@ instance ExactPrint (InjectivityAnn GhcPs) where
 
 -- ---------------------------------------------------------------------
 
--- instance ExactPrint (HsTyVarBndr () GhcPs) where
---   getAnnotationEntry (UserTyVar an _ _)     = fromAnn an
---   getAnnotationEntry (KindedTyVar an _ _ _) = fromAnn an
---   exact = withPpr
+class Typeable flag => ExactPrintTVFlag flag where
+  exactTVDelimiters :: EpAnn [AddEpAnn] -> flag -> Annotated () -> Annotated ()
 
-instance (Typeable flag) => ExactPrint (HsTyVarBndr flag GhcPs) where
+instance ExactPrintTVFlag () where
+  exactTVDelimiters an _ thing_inside = do
+    markEpAnnAll an id AnnOpenP
+    thing_inside
+    markEpAnnAll an id AnnCloseP
+
+instance ExactPrintTVFlag Specificity where
+  exactTVDelimiters an s thing_inside = do
+    markEpAnnAll an id open
+    thing_inside
+    markEpAnnAll an id close
+    where
+      (open, close) = case s of
+        SpecifiedSpec -> (AnnOpenP, AnnCloseP)
+        InferredSpec  -> (AnnOpenC, AnnCloseC)
+
+instance ExactPrintTVFlag flag => ExactPrint (HsTyVarBndr flag GhcPs) where
   getAnnotationEntry (UserTyVar an _ _)     = fromAnn an
   getAnnotationEntry (KindedTyVar an _ _ _) = fromAnn an
 
-  exact (UserTyVar an _ n)     = do
-    markEpAnnAll an id AnnOpenP
-    markAnnotated n
-    markEpAnnAll an id AnnCloseP
-  exact (KindedTyVar an _ n k) = do
-    markEpAnnAll an id AnnOpenP
+  exact (UserTyVar an flag n) =
+    exactTVDelimiters an flag $ markAnnotated n
+  exact (KindedTyVar an flag n k) = exactTVDelimiters an flag $ do
     markAnnotated n
     markEpAnn an AnnDcolon
     markAnnotated k
-    markEpAnnAll an id AnnCloseP
 
 -- ---------------------------------------------------------------------
 
@@ -3347,7 +3358,7 @@ instance ExactPrint Void where
 
 -- ---------------------------------------------------------------------
 
-instance (Typeable flag) => ExactPrint (HsOuterTyVarBndrs flag GhcPs) where
+instance ExactPrintTVFlag flag => ExactPrint (HsOuterTyVarBndrs flag GhcPs) where
   getAnnotationEntry (HsOuterImplicit _) = NoEntryVal
   getAnnotationEntry (HsOuterExplicit an _) = fromAnn an
 
