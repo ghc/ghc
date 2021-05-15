@@ -261,6 +261,23 @@ is Less Cool because
     typecheck do-notation with (>>=) :: m1 a -> (a -> m2 b) -> m2 b.)
 -}
 
+{-
+Note [Non-overloaded record field selectors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+    data T = MkT { x,y :: Int }
+    f r x = x + y r
+
+This parses with HsVar for x, y, r on the RHS of f. Later, the renamer
+recognises that y in the RHS of f is really a record selector, and
+changes it to a HsRecSel. In contrast x is locally bound, shadowing
+the record selector, and stays as an HsVar.
+
+The renamer adds the Name of the record selector into the XCFieldOcc
+extension field, The typechecker keeps HsRecSel as HsRecSel, and
+transforms the record-selector Name to an Id.
+-}
+
 -- | A Haskell expression.
 data HsExpr p
   = HsVar     (XVar p)
@@ -279,11 +296,9 @@ data HsExpr p
                              --   solving. See Note [Holes] in GHC.Tc.Types.Constraint.
 
 
-  | HsRecFld  (XRecFld p)
-              (AmbiguousFieldOcc p) -- ^ Variable pointing to record selector
-              -- The parser produces HsVars
-              -- The renamer renames record-field selectors to HsRecFld
-              -- The typechecker preserves HsRecFld
+  | HsRecSel  (XRecSel p)
+              (FieldOcc p) -- ^ Variable pointing to record selector
+                           -- See Note [Non-overloaded record field selectors]
 
   | HsOverLabel (XOverLabel p) FastString
      -- ^ Overloaded label (Note [Overloaded labels] in GHC.OverloadedLabels)
@@ -328,7 +343,7 @@ data HsExpr p
   -- NB Bracketed ops such as (+) come out as Vars.
 
   -- NB Sadly, we need an expr for the operator in an OpApp/Section since
-  -- the renamer may turn a HsVar into HsRecFld or HsUnboundVar
+  -- the renamer may turn a HsVar into HsRecSel or HsUnboundVar
 
   | OpApp       (XOpApp p)
                 (LHsExpr p)       -- left operand
