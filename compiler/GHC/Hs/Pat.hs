@@ -28,7 +28,7 @@ module GHC.Hs.Pat (
         ConLikeP,
 
         HsConPatDetails, hsConPatArgs,
-        HsRecFields(..), HsRecField'(..), LHsRecField',
+        HsRecFields(..), HsFieldBind(..), LHsFieldBind,
         HsRecField, LHsRecField,
         HsRecUpdField, LHsRecUpdField,
         hsRecFields, hsRecFieldSel, hsRecFieldId, hsRecFieldsArgs,
@@ -156,7 +156,7 @@ type instance ConLikeP GhcPs = RdrName -- IdP GhcPs
 type instance ConLikeP GhcRn = Name    -- IdP GhcRn
 type instance ConLikeP GhcTc = ConLike
 
-type instance XHsRecField _ = EpAnn [AddEpAnn]
+type instance XHsFieldBind _ = EpAnn [AddEpAnn]
 
 -- ---------------------------------------------------------------------
 
@@ -216,17 +216,17 @@ data CoPat
       co_pat_ty :: Type
     }
 
-hsRecFieldId :: HsRecField GhcTc arg -> Located Id
+hsRecFieldId :: HsRecField GhcTc arg -> Id
 hsRecFieldId = hsRecFieldSel
 
 hsRecUpdFieldRdr :: HsRecUpdField (GhcPass p) -> Located RdrName
-hsRecUpdFieldRdr = fmap rdrNameAmbiguousFieldOcc . hsRecFieldLbl
+hsRecUpdFieldRdr = fmap rdrNameAmbiguousFieldOcc . hfbLHS
 
-hsRecUpdFieldId :: HsRecField' (AmbiguousFieldOcc GhcTc) arg -> Located Id
+hsRecUpdFieldId :: HsFieldBind (Located (AmbiguousFieldOcc GhcTc)) arg -> Located Id
 hsRecUpdFieldId = fmap extFieldOcc . hsRecUpdFieldOcc
 
-hsRecUpdFieldOcc :: HsRecField' (AmbiguousFieldOcc GhcTc) arg -> LFieldOcc GhcTc
-hsRecUpdFieldOcc = fmap unambiguousFieldOcc . hsRecFieldLbl
+hsRecUpdFieldOcc :: HsFieldBind (Located (AmbiguousFieldOcc GhcTc)) arg -> LFieldOcc GhcTc
+hsRecUpdFieldOcc = fmap unambiguousFieldOcc . hfbLHS
 
 
 {-
@@ -685,11 +685,11 @@ type instance Anno (Pat (GhcPass p)) = SrcSpanAnnA
 type instance Anno (HsOverLit (GhcPass p)) = SrcSpan
 type instance Anno ConLike = SrcSpanAnnN
 
-type instance Anno (HsRecField' p arg) = SrcSpanAnnA
-type instance Anno (HsRecField' (GhcPass p) (LocatedA (HsExpr (GhcPass p)))) = SrcSpanAnnA
+type instance Anno (HsFieldBind p arg) = SrcSpanAnnA
+type instance Anno (HsFieldBind (GhcPass p) (LocatedA (HsExpr (GhcPass p)))) = SrcSpanAnnA
 type instance Anno (HsRecField  (GhcPass p) arg) = SrcSpanAnnA
 
 -- type instance Anno (HsRecUpdField p) = SrcSpanAnnA
-type instance Anno (HsRecField' (AmbiguousFieldOcc p) (LocatedA (HsExpr p))) = SrcSpanAnnA
+type instance Anno (HsFieldBind (AmbiguousFieldOcc p) (LocatedA (HsExpr p))) = SrcSpanAnnA
 
 type instance Anno (AmbiguousFieldOcc GhcTc) = SrcSpanAnnA

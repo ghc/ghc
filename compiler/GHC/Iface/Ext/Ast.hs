@@ -1038,10 +1038,10 @@ instance HiePass p => ToHie (PScoped (LocatedA (Pat (GhcPass p)))) where
       contextify (RecCon r) = RecCon $ RC RecFieldMatch $ contextify_rec r
       contextify_rec (HsRecFields fds a) = HsRecFields (map go scoped_fds) a
         where
-          go :: RScoped (LocatedA (HsRecField' id a1))
-                      -> LocatedA (HsRecField' id (PScoped a1)) -- AZ
-          go (RS fscope (L spn (HsRecField x lbl pat pun))) =
-            L spn $ HsRecField x lbl (PS rsp scope fscope pat) pun
+          go :: RScoped (LocatedA (HsFieldBind id a1))
+                      -> LocatedA (HsFieldBind id (PScoped a1)) -- AZ
+          go (RS fscope (L spn (HsFieldBind x lbl pat pun))) =
+            L spn $ HsFieldBind x lbl (PS rsp scope fscope pat) pun
           scoped_fds = listScopes pscope fds
 
 instance ToHie (TScoped (HsPatSigType GhcRn)) where
@@ -1333,12 +1333,12 @@ instance ( ToHie arg , HasLoc arg , Data arg
          , HiePass p ) => ToHie (RContext (HsRecFields (GhcPass p) arg)) where
   toHie (RC c (HsRecFields fields _)) = toHie $ map (RC c) fields
 
-instance ( ToHie (RFContext (Located label))
+instance ( ToHie (RFContext label)
          , ToHie arg, HasLoc arg, Data arg
          , Data label
-         ) => ToHie (RContext (LocatedA (HsRecField' label arg))) where
+         ) => ToHie (RContext (LocatedA (HsFieldBind label arg))) where
   toHie (RC c (L span recfld)) = concatM $ makeNode recfld (locA span) : case recfld of
-    HsRecField _ label expr _ ->
+    HsFieldBind _ label expr _ ->
       [ toHie $ RFC c (getRealSpan $ loc expr) label
       , toHie expr
       ]
