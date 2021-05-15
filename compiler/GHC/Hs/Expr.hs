@@ -1892,6 +1892,8 @@ type instance Anno (HsSplice (GhcPass p)) = SrcSpanAnnA
 type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsExpr (GhcPass pr))))] = SrcSpanAnnL
 type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsCmd  (GhcPass pr))))] = SrcSpanAnnL
 
+type instance Anno (FieldLabelStrings (GhcPass p)) = SrcSpan
+
 instance (Anno a ~ SrcSpanAnn' (EpAnn an))
    => WrapXRec (GhcPass p) a where
   wrapXRec = noLocA
