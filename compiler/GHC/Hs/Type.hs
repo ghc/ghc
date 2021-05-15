@@ -51,7 +51,7 @@ module GHC.Hs.Type (
         HsConDetails(..), noTypeArgs,
 
         FieldOcc(..), LFieldOcc, mkFieldOcc,
-        AmbiguousFieldOcc(..), mkAmbiguousFieldOcc,
+        AmbiguousFieldOcc(..), LAmbiguousFieldOcc, mkAmbiguousFieldOcc,
         rdrNameAmbiguousFieldOcc, selectorAmbiguousFieldOcc,
         unambiguousFieldOcc, ambiguousFieldOcc,
 
@@ -823,6 +823,10 @@ instance OutputableBndr (AmbiguousFieldOcc (GhcPass p)) where
   pprInfixOcc  = pprInfixOcc . rdrNameAmbiguousFieldOcc
   pprPrefixOcc = pprPrefixOcc . rdrNameAmbiguousFieldOcc
 
+instance OutputableBndr (Located (AmbiguousFieldOcc (GhcPass p))) where
+  pprInfixOcc  = pprInfixOcc . unLoc
+  pprPrefixOcc = pprPrefixOcc . unLoc
+
 mkAmbiguousFieldOcc :: LocatedN RdrName -> AmbiguousFieldOcc GhcPs
 mkAmbiguousFieldOcc rdr = Unambiguous noExtField rdr
 
@@ -1239,4 +1243,6 @@ type instance Anno (HsTyVarBndr _flag GhcTc) = SrcSpanAnnA
 type instance Anno (HsOuterTyVarBndrs _ (GhcPass _)) = SrcSpanAnnA
 type instance Anno HsIPName = SrcSpan
 type instance Anno (ConDeclField (GhcPass p)) = SrcSpanAnnA
+
 type instance Anno (FieldOcc (GhcPass p)) = SrcSpan
+type instance Anno (AmbiguousFieldOcc (GhcPass p)) = SrcSpan

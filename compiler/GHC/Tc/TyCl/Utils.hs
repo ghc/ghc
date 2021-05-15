@@ -920,14 +920,14 @@ mkOneRecordSelector all_cons idDetails fl has_sel
                                  (L loc' (HsVar noExtField (L locn field_var)))
     mk_sel_pat con = ConPat NoExtField (L locn (getName con)) (RecCon rec_fields)
     rec_fields = HsRecFields { rec_flds = [rec_field], rec_dotdot = Nothing }
-    rec_field  = noLocA (HsRecField
-                        { hsRecFieldAnn = noAnn
-                        , hsRecFieldLbl
+    rec_field  = noLocA (HsFieldBind
+                        { hfbAnn = noAnn
+                        , hfbLHS
                            = L loc (FieldOcc sel_name
                                      (L locn $ mkVarUnqual lbl))
-                        , hsRecFieldArg
+                        , hfbRHS
                            = L loc' (VarPat noExtField (L locn field_var))
-                        , hsRecPun = False })
+                        , hfbPun = False })
     sel_lname = L locn sel_name
     field_var = mkInternalName (mkBuiltinUnique 1) (getOccName sel_name) loc
 

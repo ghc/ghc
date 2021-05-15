@@ -2183,10 +2183,10 @@ instance (ExactPrint body) => ExactPrint (HsRecFields GhcPs body) where
 
 -- instance (ExactPrint body) => ExactPrint (HsRecField GhcPs body) where
 instance (ExactPrint body)
-    => ExactPrint (HsRecField' (FieldOcc GhcPs) body) where
-  getAnnotationEntry x = fromAnn (hsRecFieldAnn x)
-  exact (HsRecField an f arg isPun) = do
-    debugM $ "HsRecField"
+    => ExactPrint (HsFieldBind (Located (FieldOcc GhcPs)) body) where
+  getAnnotationEntry x = fromAnn (hfbAnn x)
+  exact (HsFieldBind an f arg isPun) = do
+    debugM $ "HsFieldBind"
     markAnnotated f
     if isPun then return ()
              else do
@@ -2196,10 +2196,10 @@ instance (ExactPrint body)
 -- ---------------------------------------------------------------------
 
 instance (ExactPrint body)
-    => ExactPrint (HsRecField' (FieldLabelStrings GhcPs) body) where
-  getAnnotationEntry x = fromAnn (hsRecFieldAnn x)
-  exact (HsRecField an f arg isPun) = do
-    debugM $ "HsRecField FieldLabelStrings"
+    => ExactPrint (HsFieldBind (Located (FieldLabelStrings GhcPs)) body) where
+  getAnnotationEntry x = fromAnn (hfbAnn x)
+  exact (HsFieldBind an f arg isPun) = do
+    debugM $ "HsFieldBind FieldLabelStrings"
     markAnnotated f
     if isPun then return ()
              else do
@@ -2210,11 +2210,11 @@ instance (ExactPrint body)
 
 -- instance ExactPrint (HsRecUpdField GhcPs ) where
 instance (ExactPrint body)
-    => ExactPrint (HsRecField' (AmbiguousFieldOcc GhcPs) body) where
+    => ExactPrint (HsFieldBind (Located (AmbiguousFieldOcc GhcPs)) body) where
 -- instance (ExactPrint body)
-    -- => ExactPrint (HsRecField' (AmbiguousFieldOcc GhcPs) body) where
-  getAnnotationEntry x = fromAnn (hsRecFieldAnn x)
-  exact (HsRecField an f arg isPun) = do
+    -- => ExactPrint (HsFieldBind (AmbiguousFieldOcc GhcPs) body) where
+  getAnnotationEntry x = fromAnn (hfbAnn x)
+  exact (HsFieldBind an f arg isPun) = do
     debugM $ "HsRecUpdField"
     markAnnotated f
     if isPun then return ()
@@ -2223,8 +2223,8 @@ instance (ExactPrint body)
 
 -- ---------------------------------------------------------------------
 -- instance (ExactPrint body)
---     => ExactPrint (Either (HsRecField' (AmbiguousFieldOcc GhcPs) body)
---                           (HsRecField' (FieldOcc GhcPs) body)) where
+--     => ExactPrint (Either (HsFieldBind (Located (AmbiguousFieldOcc GhcPs)) body)
+--                           (HsFieldBind (Located (FieldOcc GhcPs)) body)) where
 --   getAnnotationEntry = const NoEntryVal
 --   exact (Left rbinds) = markAnnotated rbinds
 --   exact (Right pbinds) = markAnnotated pbinds
@@ -2232,19 +2232,19 @@ instance (ExactPrint body)
 -- ---------------------------------------------------------------------
 -- instance (ExactPrint body)
 --     => ExactPrint
---          (Either [LocatedA (HsRecField' (AmbiguousFieldOcc GhcPs) body)]
---                  [LocatedA (HsRecField' (FieldOcc GhcPs) body)]) where
+--          (Either [LocatedA (HsFieldBind (Located (AmbiguousFieldOcc GhcPs)) body)]
+--                  [LocatedA (HsFieldBind (Located (FieldOcc GhcPs)) body)]) where
 --   getAnnotationEntry = const NoEntryVal
 --   exact (Left rbinds) = markAnnotated rbinds
 --   exact (Right pbinds) = markAnnotated pbinds
 
 -- ---------------------------------------------------------------------
 instance -- (ExactPrint body)
-    (ExactPrint (HsRecField' (a GhcPs) body),
-     ExactPrint (HsRecField' (b GhcPs) body))
+    (ExactPrint (HsFieldBind (Located (a GhcPs)) body),
+     ExactPrint (HsFieldBind (Located (b GhcPs)) body))
     => ExactPrint
-         (Either [LocatedA (HsRecField' (a GhcPs) body)]
-                 [LocatedA (HsRecField' (b GhcPs) body)]) where
+         (Either [LocatedA (HsFieldBind (Located (a GhcPs)) body)]
+                 [LocatedA (HsFieldBind (Located (b GhcPs)) body)]) where
   getAnnotationEntry = const NoEntryVal
   exact (Left rbinds) = markAnnotated rbinds
   exact (Right pbinds) = markAnnotated pbinds

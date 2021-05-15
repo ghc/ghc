@@ -993,11 +993,11 @@ addTickHsRecordBinds (HsRecFields fields dd)
   = do  { fields' <- mapM addTickHsRecField fields
         ; return (HsRecFields fields' dd) }
 
-addTickHsRecField :: LHsRecField' GhcTc id (LHsExpr GhcTc)
-                  -> TM (LHsRecField' GhcTc id (LHsExpr GhcTc))
-addTickHsRecField (L l (HsRecField x id expr pun))
+addTickHsRecField :: LHsFieldBind GhcTc id (LHsExpr GhcTc)
+                  -> TM (LHsFieldBind GhcTc id (LHsExpr GhcTc))
+addTickHsRecField (L l (HsFieldBind x id expr pun))
         = do { expr' <- addTickLHsExpr expr
-             ; return (L l (HsRecField x id expr' pun)) }
+             ; return (L l (HsFieldBind x id expr' pun)) }
 
 addTickArithSeqInfo :: ArithSeqInfo GhcTc -> TM (ArithSeqInfo GhcTc)
 addTickArithSeqInfo (From e1) =

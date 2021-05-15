@@ -577,9 +577,9 @@ push_bang_into_newtype_arg l _ty (PrefixCon ts (arg:args))
     PrefixCon ts [L l (BangPat noExtField arg)]
 push_bang_into_newtype_arg l _ty (RecCon rf)
   | HsRecFields { rec_flds = L lf fld : flds } <- rf
-  , HsRecField { hsRecFieldArg = arg } <- fld
+  , HsFieldBind { hfbRHS = arg } <- fld
   = assert (null flds) $
-    RecCon (rf { rec_flds = [L lf (fld { hsRecFieldArg
+    RecCon (rf { rec_flds = [L lf (fld { hfbRHS
                                            = L l (BangPat noExtField arg) })] })
 push_bang_into_newtype_arg l ty (RecCon rf) -- If a user writes !(T {})
   | HsRecFields { rec_flds = [] } <- rf
