@@ -1611,9 +1611,9 @@ expr_ok primop_ok other_expr
         Var f            -> app_ok primop_ok f args
         -- 'LitRubbish' is the only literal that can occur in the head of an
         -- application and will not be matched by the above case (Var /= Lit).
-        Lit LitRubbish{}  -> True
-        Lit _ | debugIsOn -> pprPanic "Non-rubbish lit in app head" (ppr other_expr)
-        _                 -> False
+        Lit lit | isLitRubbish lit -> True
+                | debugIsOn        -> pprPanic "Non-rubbish lit in app head" (ppr lit)
+        _ -> False
 
 -----------------------------
 app_ok :: (PrimOp -> Bool) -> Id -> [CoreExpr] -> Bool

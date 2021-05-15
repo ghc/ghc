@@ -11,7 +11,7 @@ module GHC.Core.Unfold.Make
    , mkInlineUnfolding
    , mkInlineUnfoldingWithArity
    , mkInlinableUnfolding
-   , mkWwInlineRule
+   , mkWrapperUnfolding
    , mkCompulsoryUnfolding
    , mkCompulsoryUnfolding'
    , mkDFunUnfolding
@@ -78,12 +78,15 @@ mkDFunUnfolding bndrs con ops
                   , df_args = map occurAnalyseExpr ops }
                   -- See Note [Occurrence analysis of unfoldings]
 
-mkWwInlineRule :: SimpleOpts -> CoreExpr -> Arity -> Unfolding
-mkWwInlineRule opts expr arity
+mkWrapperUnfolding :: SimpleOpts -> Bool -> CoreExpr -> Arity -> Unfolding
+-- Make the unfolding for the wrapper in a worker/wrapper split
+-- after demand/CPR analysis
+mkWrapperUnfolding opts boring_ok expr arity
   = mkCoreUnfolding InlineStable True
-                   (simpleOptExpr opts expr)
-                   (UnfWhen { ug_arity = arity, ug_unsat_ok = unSaturatedOk
-                            , ug_boring_ok = boringCxtNotOk })
+                    (simpleOptExpr opts expr)
+                    (UnfWhen { ug_arity     = arity
+                             , ug_unsat_ok  = unSaturatedOk
+                             , ug_boring_ok = boring_ok })
 
 mkWorkerUnfolding :: SimpleOpts -> (CoreExpr -> CoreExpr) -> Unfolding -> Unfolding
 -- See Note [Worker/wrapper for INLINABLE functions] in GHC.Core.Opt.WorkWrap

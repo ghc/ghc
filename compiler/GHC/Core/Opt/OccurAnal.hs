@@ -2890,7 +2890,7 @@ restrictFreeVars bndrs fvs = restrictUniqSetToUFM bndrs fvs
 {- Note [Do not mark CoVars as dead]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It's obviously wrong to mark CoVars as dead if they are used.
-Currently we don't traverse types to gather usase info for CoVars,
+Currently we don't traverse types to gather usage info for CoVars,
 so we had better treat them as having noOccInfo.
 
 This showed up in #15696 we had something like
