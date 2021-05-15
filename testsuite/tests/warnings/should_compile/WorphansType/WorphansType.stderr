@@ -1,0 +1,7 @@
+
+WorphansType.hs:6:1: warning: [-Worphans-type (in -Worphans)]
+    Orphan type family instance:
+      type instance TypeFam () = () -- Defined at WorphansType.hs:6:15
+     To avoid this
+        move the instance declaration to the module of the type family, or
+        wrap the type with a newtype and declare the instance on the new type.
