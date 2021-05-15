@@ -102,6 +102,7 @@ workflow:
 # * x86_64-linux: Any Docker-capable x86_64 Linux machine
 # * aarch64-linux: Any Docker-capable AArch64 Linux machine
 # * x86_64-windows: A x86_64 Windows machine
+# * riscv64-linux: Any Docker-capable RiscV64 Linux machine
 # * lint: Any Docker-capable x86_64 Linux machine; distinct from
 #         x86_64-linux to ensure low-latency availability.
 #
@@ -765,6 +766,7 @@ validate-aarch64-darwin:
   variables:
     TEST_ENV: "riscv64-linux-ubuntu2104"
     BIN_DIST_PREP_TAR_COMP: "ghc-riscv64-ubuntu2104-linux.tar.xz"
+    BUILD_FLAVOUR: "quick-llvm"
   cache:
     key: linux-riscv64-ubuntu2004
   tags:
