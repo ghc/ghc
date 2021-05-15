@@ -1158,8 +1158,8 @@ pun_RDR  = mkUnqual varName (fsLit "pun-right-hand-side")
 
 checkPatField :: LHsRecField GhcPs (LocatedA (PatBuilder GhcPs))
               -> PV (LHsRecField GhcPs (LPat GhcPs))
-checkPatField (L l fld) = do p <- checkLPat (hsRecFieldArg fld)
-                             return (L l (fld { hsRecFieldArg = p }))
+checkPatField (L l fld) = do p <- checkLPat (hfbRHS fld)
+                             return (L l (fld { hfbRHS = p }))
 
 patFail :: SrcSpan -> SDoc -> PV a
 patFail loc e = addFatalError $ PsError (PsErrParseErrorInPat e) [] loc
@@ -2411,7 +2411,7 @@ mkRdrRecordUpd overloaded_on exp@(L loc _) fbinds anns = do
       , rupd_flds = Left fs' }
     True -> do
       let qualifiedFields =
-            [ L l lbl | L _ (HsRecField _ (L l lbl) _ _) <- fs'
+            [ L l lbl | L _ (HsFieldBind _ (L l lbl) _ _) <- fs'
                       , isQual . rdrNameAmbiguousFieldOcc $ lbl
             ]
       if not $ null qualifiedFields
@@ -2429,7 +2429,7 @@ mkRdrRecordUpd overloaded_on exp@(L loc _) fbinds anns = do
     -- Convert a top-level field update like {foo=2} or {bar} (punned)
     -- to a projection update.
     recFieldToProjUpdate :: LHsRecField GhcPs  (LHsExpr GhcPs) -> LHsRecUpdProj GhcPs
-    recFieldToProjUpdate (L l (HsRecField anns (L _ (FieldOcc _ (L loc rdr))) arg pun)) =
+    recFieldToProjUpdate (L l (HsFieldBind anns (L _ (FieldOcc _ (L loc rdr))) arg pun)) =
         -- The idea here is to convert the label to a singleton [FastString].
         let f = occNameFS . rdrNameOcc $ rdr
             fl = HsFieldLabel noAnn (L lf f) -- AZ: what about the ann?
@@ -2454,8 +2454,8 @@ mk_rec_fields fs (Just s)  = HsRecFields { rec_flds = fs
                                      , rec_dotdot = Just (L s (length fs)) }
 
 mk_rec_upd_field :: HsRecField GhcPs (LHsExpr GhcPs) -> HsRecUpdField GhcPs
-mk_rec_upd_field (HsRecField noAnn (L loc (FieldOcc _ rdr)) arg pun)
-  = HsRecField noAnn (L loc (Unambiguous noExtField rdr)) arg pun
+mk_rec_upd_field (HsFieldBind noAnn (L loc (FieldOcc _ rdr)) arg pun)
+  = HsFieldBind noAnn (L loc (Unambiguous noExtField rdr)) arg pun
 
 mkInlinePragma :: SourceText -> (InlineSpec, RuleMatchInfo) -> Maybe Activation
                -> InlinePragma
@@ -2972,9 +2972,9 @@ mkRdrProjUpdate :: SrcSpanAnnA -> Located [Located (HsFieldLabel GhcPs)]
                 -> LHsRecProj GhcPs (LHsExpr GhcPs)
 mkRdrProjUpdate _ (L _ []) _ _ _ = panic "mkRdrProjUpdate: The impossible has happened!"
 mkRdrProjUpdate loc (L l flds) arg isPun anns =
-  L loc HsRecField {
-      hsRecFieldAnn = anns
-    , hsRecFieldLbl = L l (FieldLabelStrings flds)
-    , hsRecFieldArg = arg
-    , hsRecPun = isPun
+  L loc HsFieldBind {
+      hfbAnn = anns
+    , hfbLHS = L l (FieldLabelStrings flds)
+    , hfbRHS = arg
+    , hfbPun = isPun
   }

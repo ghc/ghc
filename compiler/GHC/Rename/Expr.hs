@@ -424,8 +424,8 @@ rnExpr (RecordCon { rcon_con = con_id
                 , fvs `plusFV` plusFVs fvss `addOneFV` con_name) }
   where
     mk_hs_var l n = HsVar noExtField (L (noAnnSrcSpan l) n)
-    rn_field (L l fld) = do { (arg', fvs) <- rnLExpr (hsRecFieldArg fld)
-                            ; return (L l (fld { hsRecFieldArg = arg' }), fvs) }
+    rn_field (L l fld) = do { (arg', fvs) <- rnLExpr (hfbRHS fld)
+                            ; return (L l (fld { hfbRHS = arg' }), fvs) }
 
 rnExpr (RecordUpd { rupd_expr = expr, rupd_flds = rbinds })
   = case rbinds of
@@ -437,7 +437,7 @@ rnExpr (RecordUpd { rupd_expr = expr, rupd_flds = rbinds })
       Right flds ->  -- 'OverloadedRecordUpdate' is in effect. Record dot update desugaring.
         do { ; unlessXOptM LangExt.RebindableSyntax $
                  addErr $ text "RebindableSyntax is required if OverloadedRecordUpdate is enabled."
-             ; let punnedFields = [fld | (L _ fld) <- flds, hsRecPun fld]
+             ; let punnedFields = [fld | (L _ fld) <- flds, hfbPun fld]
              ; punsEnabled <-xoptM LangExt.RecordPuns
              ; unless (null punnedFields || punsEnabled) $
                  addErr $ text "For this to work enable NamedFieldPuns."
@@ -2618,7 +2618,7 @@ mkProjection _ _ [] = panic "mkProjection: The impossible happened"
 -- e.g. Suppose an update like foo.bar = 1.
 --      We calculate the function \a -> setField @"foo" a (setField @"bar" (getField @"foo" a) 1).
 mkProjUpdateSetField :: Name -> Name -> LHsRecProj GhcRn (LHsExpr GhcRn) -> (LHsExpr GhcRn -> LHsExpr GhcRn)
-mkProjUpdateSetField get_field set_field (L _ (HsRecField { hsRecFieldLbl = (L _ (FieldLabelStrings flds')), hsRecFieldArg = arg } ))
+mkProjUpdateSetField get_field set_field (L _ (HsFieldBind { hfbLHS = (L _ (FieldLabelStrings flds')), hfbRHS = arg } ))
   = let {
       ; flds = map (fmap (unLoc . hflLabel)) flds'
       ; final = last flds  -- quux
@@ -2643,9 +2643,11 @@ rnHsUpdProjs us = do
   pure (u, plusFVs fvs)
   where
     rnRecUpdProj :: LHsRecUpdProj GhcPs -> RnM (LHsRecUpdProj GhcRn, FreeVars)
-    rnRecUpdProj (L l (HsRecField _ fs arg pun))
+    rnRecUpdProj (L l (HsFieldBind _ fs arg pun))
       = do { (arg, fv) <- rnLExpr arg
-           ; return $ (L l (HsRecField { hsRecFieldAnn = noAnn
-                                       , hsRecFieldLbl = fmap rnFieldLabelStrings fs
-                                       , hsRecFieldArg = arg
-                                       , hsRecPun = pun}), fv) }
+           ; return $
+               (L l (HsFieldBind {
+                         hfbAnn = noAnn
+                       , hfbLHS = fmap rnFieldLabelStrings fs
+                       , hfbRHS = arg
+                       , hfbPun = pun}), fv ) }
