@@ -659,7 +659,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
     rn_fld :: Bool -> Maybe Name -> LHsRecField GhcPs (LocatedA arg)
            -> RnM (LHsRecField GhcRn (LocatedA arg))
     rn_fld pun_ok parent (L l
-                           (HsRecField
+                           (HsFieldBind
                               { hsRecFieldLbl =
                                   (L loc (FieldOcc _ (L ll lbl)))
                               , hsRecFieldArg = arg
@@ -671,7 +671,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                              ; let arg_rdr = mkRdrUnqual (rdrNameOcc lbl)
                              ; return (L (noAnnSrcSpan loc) (mk_arg loc arg_rdr)) }
                      else return arg
-           ; return (L l (HsRecField
+           ; return (L l (HsFieldBind
                              { hsRecFieldAnn = noAnn
                              , hsRecFieldLbl = (L loc (FieldOcc sel (L ll lbl)))
                              , hsRecFieldArg = arg'
@@ -716,7 +716,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
 
            ; addUsedGREs dot_dot_gres
            ; let locn = noAnnSrcSpan loc
-           ; return [ L (noAnnSrcSpan loc) (HsRecField
+           ; return [ L (noAnnSrcSpan loc) (HsFieldBind
                         { hsRecFieldAnn = noAnn
                         , hsRecFieldLbl
                            = L loc (FieldOcc sel (L (noAnnSrcSpan loc) arg_rdr))
@@ -763,9 +763,9 @@ rnHsRecUpdFields flds
   where
     rn_fld :: Bool -> DuplicateRecordFields -> LHsRecUpdField GhcPs
            -> RnM (LHsRecUpdField GhcRn, FreeVars)
-    rn_fld pun_ok dup_fields_ok (L l (HsRecField { hsRecFieldLbl = L loc f
-                                               , hsRecFieldArg = arg
-                                               , hsRecPun      = pun }))
+    rn_fld pun_ok dup_fields_ok (L l (HsFieldBind { hsRecFieldLbl = L loc f
+                                                  , hsRecFieldArg = arg
+                                                  , hsRecPun      = pun }))
       = do { let lbl = rdrNameAmbiguousFieldOcc f
            ; mb_sel <- setSrcSpan loc $
                       -- Defer renaming of overloaded fields to the typechecker
@@ -785,10 +785,10 @@ rnHsRecUpdFields flds
                                            in (Unambiguous sel_name (L (noAnnSrcSpan loc) lbl), fvs `addOneFV` sel_name)
                    AmbiguousFields       -> (Ambiguous   noExtField (L (noAnnSrcSpan loc) lbl), fvs)
 
-           ; return (L l (HsRecField { hsRecFieldAnn = noAnn
-                                     , hsRecFieldLbl = L loc lbl'
-                                     , hsRecFieldArg = arg''
-                                     , hsRecPun      = pun }), fvs') }
+           ; return (L l (HsFieldBind { hsRecFieldAnn = noAnn
+                                      , hsRecFieldLbl = L loc lbl'
+                                      , hsRecFieldArg = arg''
+                                      , hsRecPun      = pun }), fvs') }
 
     dup_flds :: [NE.NonEmpty RdrName]
         -- Each list represents a RdrName that occurred more than once

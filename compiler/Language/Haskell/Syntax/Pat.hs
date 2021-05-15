@@ -22,7 +22,7 @@ module Language.Haskell.Syntax.Pat (
         ConLikeP,
 
         HsConPatDetails, hsConPatArgs,
-        HsRecFields(..), HsRecField'(..), LHsRecField',
+        HsRecFields(..), HsFieldBind(..), LHsFieldBind,
         HsRecField, LHsRecField,
         HsRecUpdField, LHsRecUpdField,
         hsRecFields, hsRecFieldSel, hsRecFieldsArgs,
@@ -256,7 +256,7 @@ data HsRecFields p arg         -- A bunch of record fields
 --                     and the remainder being 'filled in' implicitly
 
 -- | Located Haskell Record Field
-type LHsRecField' p id arg = XRec p (HsRecField' id arg)
+type LHsFieldBind p id arg = XRec p (HsFieldBind id arg)
 
 -- | Located Haskell Record Field
 type LHsRecField  p arg = XRec p (HsRecField  p arg)
@@ -265,18 +265,18 @@ type LHsRecField  p arg = XRec p (HsRecField  p arg)
 type LHsRecUpdField p   = XRec p (HsRecUpdField p)
 
 -- | Haskell Record Field
-type HsRecField    p arg = HsRecField' (FieldOcc p) arg
+type HsRecField    p arg = HsFieldBind (FieldOcc p) arg
 
 -- | Haskell Record Update Field
-type HsRecUpdField p     = HsRecField' (AmbiguousFieldOcc p) (LHsExpr p)
+type HsRecUpdField p     = HsFieldBind (AmbiguousFieldOcc p) (LHsExpr p)
 
 -- | Haskell Record Field
 --
 -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnEqual',
 --
 -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
-data HsRecField' id arg = HsRecField {
-        hsRecFieldAnn :: XHsRecField id,
+data HsFieldBind id arg = HsFieldBind {
+        hsRecFieldAnn :: XHsFieldBind id,
         hsRecFieldLbl :: Located id,
         hsRecFieldArg :: arg,           -- ^ Filled in by renamer when punning
         hsRecPun      :: Bool           -- ^ Note [Punning]
@@ -366,7 +366,7 @@ instance (Outputable arg, Outputable (XRec p (HsRecField p arg)))
           dotdot = text ".." <+> whenPprDebug (ppr (drop n flds))
 
 instance (Outputable p, OutputableBndr p, Outputable arg)
-      => Outputable (HsRecField' p arg) where
-  ppr (HsRecField { hsRecFieldLbl = L _ f, hsRecFieldArg = arg,
+      => Outputable (HsFieldBind p arg) where
+  ppr (HsFieldBind { hsRecFieldLbl = L _ f, hsRecFieldArg = arg,
                     hsRecPun = pun })
     = pprPrefixOcc f <+> (ppUnless pun $ equals <+> ppr arg)
