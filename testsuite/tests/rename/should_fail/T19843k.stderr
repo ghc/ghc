@@ -1,0 +1,4 @@
+
+T19843k.hs:5:8:
+    Not in scope: ‘M.doesn'tExist’
+    Module ‘Data.Monoid’ does not export ‘doesn'tExist’.

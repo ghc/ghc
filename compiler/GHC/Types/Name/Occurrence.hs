@@ -28,8 +28,6 @@ module GHC.Types.Name.Occurrence (
         -- * The 'NameSpace' type
         NameSpace, -- Abstract
 
-        nameSpacesRelated,
-
         -- ** Construction
         -- $real_vs_source_data_constructors
         tcName, clsName, tcClsName, dataName, varName,
@@ -357,19 +355,6 @@ promoteOccName :: OccName -> Maybe OccName
 promoteOccName (OccName space name) = do
   space' <- promoteNameSpace space
   return $ OccName space' name
-
--- Name spaces are related if there is a chance to mean the one when one writes
--- the other, i.e. variables <-> data constructors and type variables <-> type constructors
-nameSpacesRelated :: NameSpace -> NameSpace -> Bool
-nameSpacesRelated ns1 ns2 = ns1 == ns2 || otherNameSpace ns1 == ns2
-
-otherNameSpace :: NameSpace -> NameSpace
-otherNameSpace VarName = DataName
-otherNameSpace DataName = VarName
-otherNameSpace TvName = TcClsName
-otherNameSpace TcClsName = TvName
-
-
 
 {- | Other names in the compiler add additional information to an OccName.
 This class provides a consistent way to access the underlying OccName. -}

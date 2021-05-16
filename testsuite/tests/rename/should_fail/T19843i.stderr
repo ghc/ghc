@@ -1,0 +1,5 @@
+
+T19843i.hs:5:5:
+    Not in scope: ‘M.getSum’
+    Perhaps you want to add ‘getSum’ to the import list
+    in the import of ‘Data.Monoid’ (T19843i.hs:3:1-32).

@@ -7,6 +7,5 @@ T9177.hs:7:14: error:
     Not in scope: type variable ‘integerr’
     Perhaps you meant type constructor or class ‘Integer’ (imported from Prelude)
 
-T9177.hs:16:6: error:
+T9177.hs:17:6: error:
     Not in scope: data constructor ‘Fun’
-    Perhaps you meant variable ‘fun’ (line 20)

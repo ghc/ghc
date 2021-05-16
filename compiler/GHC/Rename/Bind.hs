@@ -443,7 +443,8 @@ rnBindLHS name_maker _ bind@(FunBind { fun_id = rdr_name })
 rnBindLHS name_maker _ (PatSynBind x psb@PSB{ psb_id = rdrname })
   | isTopRecNameMaker name_maker
   = do { addLocMA checkConName rdrname
-       ; name <- lookupLocatedTopBndrRnN rdrname -- Should be in scope already
+       ; name <-
+           lookupLocatedTopConstructorRnN rdrname -- Should be in scope already
        ; return (PatSynBind x psb{ psb_ext = noAnn, psb_id = name }) }
 
   | otherwise  -- Pattern synonym, not at top level

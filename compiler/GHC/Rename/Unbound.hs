@@ -9,11 +9,15 @@ module GHC.Rename.Unbound
    , mkUnboundNameRdr
    , isUnboundName
    , reportUnboundName
+   , reportUnboundName'
    , unknownNameSuggestions
+   , WhatLooking(..)
    , WhereLooking(..)
+   , LookingFor(..)
    , unboundName
    , unboundNameX
    , notInScopeErr
+   , nameSpacesRelated
    , exactNameErr
    )
 where
@@ -30,6 +34,8 @@ import GHC.Utils.Misc
 
 import GHC.Data.Maybe
 import GHC.Data.FastString
+
+import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Name
@@ -51,28 +57,49 @@ import Data.Function ( on )
 ************************************************************************
 -}
 
-data WhereLooking = WL_Any        -- Any binding
+-- What kind of suggestion are we looking for? #19843
+data WhatLooking = WL_Anything    -- Any binding
+                 | WL_Constructor -- Constructors and pattern synonyms
+                        -- E.g. in K { f1 = True }, if K is not in scope,
+                        -- suggest only constructors
+                 | WL_RecField    -- Record fields
+                        -- E.g. in K { f1 = True, f2 = False }, if f2 is not in
+                        -- scope, suggest only constructor fields
+                 | WL_None        -- No suggestions
+                        -- WS_None is used for rebindable syntax, where there
+                        -- is no point in suggesting alternative spellings
+                 deriving Eq
+
+data WhereLooking = WL_Anywhere   -- Any binding
                   | WL_Global     -- Any top-level binding (local or imported)
                   | WL_LocalTop   -- Any top-level binding in this module
                   | WL_LocalOnly
                         -- Only local bindings
-                        -- (pattern synonyms declaractions,
-                        -- see Note [Renaming pattern synonym variables])
+                        -- (pattern synonyms declarations,
+                        -- see Note [Renaming pattern synonym variables]
+                        -- in GHC.Rename.Bind)
+
+data LookingFor = LF { lf_which :: WhatLooking
+                     , lf_where :: WhereLooking
+                     }
 
 mkUnboundNameRdr :: RdrName -> Name
 mkUnboundNameRdr rdr = mkUnboundName (rdrNameOcc rdr)
 
+reportUnboundName' :: WhatLooking -> RdrName -> RnM Name
+reportUnboundName' what_look rdr = unboundName (LF what_look WL_Anywhere) rdr
+
 reportUnboundName :: RdrName -> RnM Name
-reportUnboundName rdr = unboundName WL_Any rdr
+reportUnboundName = reportUnboundName' WL_Anything
 
-unboundName :: WhereLooking -> RdrName -> RnM Name
-unboundName wl rdr = unboundNameX wl rdr Outputable.empty
+unboundName :: LookingFor -> RdrName -> RnM Name
+unboundName lf rdr = unboundNameX lf rdr Outputable.empty
 
-unboundNameX :: WhereLooking -> RdrName -> SDoc -> RnM Name
-unboundNameX where_look rdr_name extra
+unboundNameX :: LookingFor -> RdrName -> SDoc -> RnM Name
+unboundNameX looking_for rdr_name extra
   = do  { dflags <- getDynFlags
         ; let show_helpful_errors = gopt Opt_HelpfulErrors dflags
-              err = notInScopeErr where_look rdr_name $$ extra
+              err = notInScopeErr (lf_where looking_for) rdr_name $$ extra
         ; if not show_helpful_errors
           then addErr err
           else do { local_env  <- getLocalRdrEnv
@@ -80,7 +107,7 @@ unboundNameX where_look rdr_name extra
                   ; impInfo <- getImports
                   ; currmod <- getModule
                   ; hpt <- getHpt
-                  ; let suggestions = unknownNameSuggestions_ where_look
+                  ; let suggestions = unknownNameSuggestions_ looking_for
                           dflags hpt currmod global_env local_env impInfo
                           rdr_name
                   ; addErr (err $$ suggestions) }
@@ -102,20 +129,20 @@ type HowInScope = Either SrcSpan ImpDeclSpec
 
 
 -- | Called from the typechecker ("GHC.Tc.Errors") when we find an unbound variable
-unknownNameSuggestions :: DynFlags
+unknownNameSuggestions :: WhatLooking -> DynFlags
                        -> HomePackageTable -> Module
                        -> GlobalRdrEnv -> LocalRdrEnv -> ImportAvails
                        -> RdrName -> SDoc
-unknownNameSuggestions = unknownNameSuggestions_ WL_Any
+unknownNameSuggestions what_look = unknownNameSuggestions_ (LF what_look WL_Anywhere)
 
-unknownNameSuggestions_ :: WhereLooking -> DynFlags
+unknownNameSuggestions_ :: LookingFor -> DynFlags
                        -> HomePackageTable -> Module
                        -> GlobalRdrEnv -> LocalRdrEnv -> ImportAvails
                        -> RdrName -> SDoc
-unknownNameSuggestions_ where_look dflags hpt curr_mod global_env local_env
+unknownNameSuggestions_ looking_for dflags hpt curr_mod global_env local_env
                           imports tried_rdr_name =
-    similarNameSuggestions where_look dflags global_env local_env tried_rdr_name $$
-    importSuggestions where_look global_env hpt
+    similarNameSuggestions looking_for dflags global_env local_env tried_rdr_name $$
+    importSuggestions looking_for global_env hpt
                       curr_mod imports tried_rdr_name $$
     extensionSuggestions tried_rdr_name $$
     fieldSelectorSuggestions global_env tried_rdr_name
@@ -139,11 +166,11 @@ fieldSelectorSuggestions global_env tried_rdr_name
           | otherwise    = text "belonging to the type" <> plural parents
                              <+> pprQuotedList parents
 
-similarNameSuggestions :: WhereLooking -> DynFlags
-                        -> GlobalRdrEnv -> LocalRdrEnv
-                        -> RdrName -> SDoc
-similarNameSuggestions where_look dflags global_env
-                        local_env tried_rdr_name
+similarNameSuggestions :: LookingFor -> DynFlags
+                       -> GlobalRdrEnv -> LocalRdrEnv
+                       -> RdrName -> SDoc
+similarNameSuggestions looking_for@(LF what_look where_look) dflags global_env
+                       local_env tried_rdr_name
   = case suggest of
       []  -> Outputable.empty
       [p] -> perhaps <+> pp_item p
@@ -151,10 +178,11 @@ similarNameSuggestions where_look dflags global_env
                  , nest 2 (pprWithCommas pp_item ps) ]
   where
     all_possibilities :: [(String, (RdrName, HowInScope))]
-    all_possibilities
-       =  [ (showPpr dflags r, (r, Left loc))
-          | (r,loc) <- local_possibilities local_env ]
-       ++ [ (showPpr dflags r, rp) | (r, rp) <- global_possibilities global_env ]
+    all_possibilities = case what_look of
+      WL_None -> []
+      _ -> [ (showPpr dflags r, (r, Left loc))
+           | (r,loc) <- local_possibilities local_env ]
+        ++ [ (showPpr dflags r, rp) | (r, rp) <- global_possibilities global_env ]
 
     suggest = fuzzyLookup (showPpr dflags tried_rdr_name) all_possibilities
     perhaps = text "Perhaps you meant"
@@ -177,15 +205,17 @@ similarNameSuggestions where_look dflags global_env
     tried_ns      = occNameSpace tried_occ
     tried_is_qual = isQual tried_rdr_name
 
-    correct_name_space occ =  nameSpacesRelated (occNameSpace occ) tried_ns
-                           && isSymOcc occ == tried_is_sym
+    correct_name_space occ =
+      (nameSpacesRelated dflags what_look tried_ns (occNameSpace occ))
+      && isSymOcc occ == tried_is_sym
         -- Treat operator and non-operators as non-matching
         -- This heuristic avoids things like
         --      Not in scope 'f'; perhaps you meant '+' (from Prelude)
 
-    local_ok = case where_look of { WL_Any -> True
+    local_ok = case where_look of { WL_Anywhere  -> True
                                   ; WL_LocalOnly -> True
-                                  ; _ -> False }
+                                  ; _            -> False }
+
     local_possibilities :: LocalRdrEnv -> [(RdrName, SrcSpan)]
     local_possibilities env
       | tried_is_qual = []
@@ -199,8 +229,7 @@ similarNameSuggestions where_look dflags global_env
     global_possibilities global_env
       | tried_is_qual = [ (rdr_qual, (rdr_qual, how))
                         | gre <- globalRdrEnvElts global_env
-                        , isGreOk where_look gre
-                        , not (isNoFieldSelectorGRE gre)
+                        , isGreOk looking_for gre
                         , let occ = greOccName gre
                         , correct_name_space occ
                         , (mod, how) <- qualsInScope gre
@@ -208,8 +237,7 @@ similarNameSuggestions where_look dflags global_env
 
       | otherwise = [ (rdr_unqual, pair)
                     | gre <- globalRdrEnvElts global_env
-                    , isGreOk where_look gre
-                    , not (isNoFieldSelectorGRE gre)
+                    , isGreOk looking_for gre
                     , let occ = greOccName gre
                           rdr_unqual = mkRdrUnqual occ
                     , correct_name_space occ
@@ -245,13 +273,13 @@ similarNameSuggestions where_look dflags global_env
         | i <- is, let ispec = is_decl i, is_qual ispec ]
 
 -- | Generate helpful suggestions if a qualified name Mod.foo is not in scope.
-importSuggestions :: WhereLooking
+importSuggestions :: LookingFor
                   -> GlobalRdrEnv
                   -> HomePackageTable -> Module
                   -> ImportAvails -> RdrName -> SDoc
-importSuggestions where_look global_env hpt currMod imports rdr_name
-  | WL_LocalOnly <- where_look                 = Outputable.empty
-  | WL_LocalTop  <- where_look                 = Outputable.empty
+importSuggestions looking_for global_env hpt currMod imports rdr_name
+  | WL_LocalOnly <- lf_where looking_for       = Outputable.empty
+  | WL_LocalTop  <- lf_where looking_for       = Outputable.empty
   | not (isQual rdr_name || isUnqual rdr_name) = Outputable.empty
   | null interesting_imports
   , Just name <- mod_name
@@ -354,7 +382,8 @@ importSuggestions where_look global_env hpt currMod imports rdr_name
   -- wouldn't have an out-of-scope error in the first place)
   helpful_imports = filter helpful interesting_imports
     where helpful (_,imv)
-            = not . null $ lookupGlobalRdrEnv (imv_all_exports imv) occ_name
+            = any (isGreOk looking_for) $
+              lookupGlobalRdrEnv (imv_all_exports imv) occ_name
 
   -- Which of these do that because of an explicit hiding list resp. an
   -- explicit import list
@@ -364,7 +393,7 @@ importSuggestions where_look global_env hpt currMod imports rdr_name
   -- See note [When to show/hide the module-not-imported line]
   show_not_imported_line :: ModuleName -> Bool                    -- #15611
   show_not_imported_line modnam
-      | modnam `elem` globMods                = False    -- #14225     -- 1
+      | modnam `elem` glob_mods               = False    -- #14225     -- 1
       | moduleName currMod == modnam          = False                  -- 2.1
       | is_last_loaded_mod modnam hpt_uniques = False                  -- 2.2
       | otherwise                             = True
@@ -372,9 +401,8 @@ importSuggestions where_look global_env hpt currMod imports rdr_name
       hpt_uniques = map fst (udfmToList hpt)
       is_last_loaded_mod _ []         = False
       is_last_loaded_mod modnam uniqs = last uniqs == getUnique modnam
-      globMods = nub [ mod
+      glob_mods = nub [ mod
                      | gre <- globalRdrEnvElts global_env
-                     , isGreOk where_look gre
                      , (mod, _) <- qualsInScope gre
                      ]
 
@@ -394,13 +422,76 @@ qualsInScope gre@GRE { gre_lcl = lcl, gre_imp = is }
       | otherwise = [ (is_as ispec, Right ispec)
                     | i <- is, let ispec = is_decl i ]
 
-isGreOk :: WhereLooking -> GlobalRdrElt -> Bool
-isGreOk where_look = case where_look of
-                         WL_LocalTop  -> isLocalGRE
-                         WL_LocalOnly -> const False
-                         _            -> const True
+isGreOk :: LookingFor -> GlobalRdrElt -> Bool
+isGreOk (LF what_look where_look) gre = what_ok && where_ok
+  where
+    -- when looking for record fields, what_ok checks whether the GRE is a
+    -- record field. Otherwise, it checks whether the GRE is a record field
+    -- defined in a module with -XNoFieldSelectors - it wouldn't be a useful
+    -- suggestion in that case.
+    what_ok  = case what_look of
+                 WL_RecField -> isRecFldGRE gre
+                 _           -> not (isNoFieldSelectorGRE gre)
 
-{- Note [When to show/hide the module-not-imported line]           -- #15611
+    where_ok = case where_look of
+                 WL_LocalTop  -> isLocalGRE gre
+                 WL_LocalOnly -> False
+                 _            -> True
+
+-- see Note [Related name spaces]
+nameSpacesRelated :: DynFlags    -- ^ to find out whether -XDataKinds is enabled
+                  -> WhatLooking -- ^ What kind of name are we looking for
+                  -> NameSpace   -- ^ Name space of the original name
+                  -> NameSpace   -- ^ Name space of a name that might have been meant
+                  -> Bool
+nameSpacesRelated dflags what_looking ns ns'
+  = ns' `elem` ns : [ other_ns
+                    | (orig_ns, others) <- other_namespaces
+                    , ns == orig_ns
+                    , (other_ns, wls) <- others
+                    , what_looking `elem` WL_Anything : wls
+                    ]
+  where
+    -- explanation:
+    -- [(orig_ns, [(other_ns, what_looking_possibilities)])]
+    -- A particular other_ns is related if the original namespace is orig_ns
+    -- and what_looking is either WL_Anything or is one of
+    -- what_looking_possibilities
+    other_namespaces =
+      [ (varName  , [(dataName, [WL_Constructor])])
+      , (dataName , [(varName , [WL_RecField])])
+      , (tvName   , (tcClsName, [WL_Constructor]) : promoted_datacons)
+      , (tcClsName, (tvName   , []) : promoted_datacons)
+      ]
+    -- If -XDataKinds is enabled, the data constructor name space is also
+    -- related to the type-level name spaces
+    data_kinds = xopt LangExt.DataKinds dflags
+    promoted_datacons = [(dataName, [WL_Constructor]) | data_kinds]
+
+{-
+Note [Related name space]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Name spaces are related if there is a chance to mean the one when one writes
+the other, i.e. variables <-> data constructors and type variables <-> type
+constructors.
+
+In most contexts, this mistake can happen in both directions. Not so in
+patterns:
+
+When a user writes
+        foo (just a) = ...
+It is possible that they meant to use `Just` instead. However, when they write
+        foo (Map a) = ...
+It is unlikely that they mean to use `map`, since variables cannot be used here.
+
+Similarly, when we look for record fields, data constructors are not in a
+related namespace.
+
+Furthermore, with -XDataKinds, the data constructor name space is related to
+the type variable and type constructor name spaces.
+
+Note [When to show/hide the module-not-imported line]           -- #15611
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 For the error message:
     Not in scope X.Y
     Module X does not export Y

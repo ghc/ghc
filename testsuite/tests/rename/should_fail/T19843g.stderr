@@ -1,0 +1,4 @@
+
+T19843g.hs:10:12: error:
+    Not in scope: ‘mup’
+    Perhaps you meant ‘mop’ (line 7)

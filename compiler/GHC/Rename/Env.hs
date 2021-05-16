@@ -13,8 +13,11 @@ module GHC.Rename.Env (
         newTopSrcBinder,
 
         lookupLocatedTopBndrRn, lookupLocatedTopBndrRnN, lookupTopBndrRn,
+        lookupLocatedTopConstructorRn, lookupLocatedTopConstructorRnN,
 
-        lookupLocatedOccRn, lookupOccRn, lookupOccRn_maybe,
+        lookupLocatedOccRn, lookupLocatedOccRnConstr, lookupLocatedOccRnRecField,
+        lookupLocatedOccRnNone,
+        lookupOccRn, lookupOccRn_maybe,
         lookupLocalOccRn_maybe, lookupInfoOccRn,
         lookupLocalOccThLvl_maybe, lookupLocalOccRn,
         lookupTypeOccRn,
@@ -250,7 +253,7 @@ terribly efficient, but there seems to be no better way.
 
 -- Can be made to not be exposed
 -- Only used unwrapped in rnAnnProvenance
-lookupTopBndrRn :: RdrName -> RnM Name
+lookupTopBndrRn :: WhatLooking -> RdrName -> RnM Name
 -- Look up a top-level source-code binder.   We may be looking up an unqualified 'f',
 -- and there may be several imported 'f's too, which must not confuse us.
 -- For example, this is OK:
@@ -261,7 +264,7 @@ lookupTopBndrRn :: RdrName -> RnM Name
 --
 -- A separate function (importsFromLocalDecls) reports duplicate top level
 -- decls, so here it's safe just to choose an arbitrary one.
-lookupTopBndrRn rdr_name =
+lookupTopBndrRn which_suggest rdr_name =
   lookupExactOrOrig rdr_name id $
     do  {  -- Check for operators in type or class declarations
            -- See Note [Type and class operator definitions]
@@ -275,14 +278,20 @@ lookupTopBndrRn rdr_name =
             [gre] -> return (greMangledName gre)
             _     -> do -- Ambiguous (can't happen) or unbound
                         traceRn "lookupTopBndrRN fail" (ppr rdr_name)
-                        unboundName WL_LocalTop rdr_name
+                        unboundName (LF which_suggest WL_LocalTop) rdr_name
     }
 
+lookupLocatedTopConstructorRn :: Located RdrName -> RnM (Located Name)
+lookupLocatedTopConstructorRn = wrapLocM (lookupTopBndrRn WL_Constructor)
+
+lookupLocatedTopConstructorRnN :: LocatedN RdrName -> RnM (LocatedN Name)
+lookupLocatedTopConstructorRnN = wrapLocMA (lookupTopBndrRn WL_Constructor)
+
 lookupLocatedTopBndrRn :: Located RdrName -> RnM (Located Name)
-lookupLocatedTopBndrRn = wrapLocM lookupTopBndrRn
+lookupLocatedTopBndrRn = wrapLocM (lookupTopBndrRn WL_Anything)
 
 lookupLocatedTopBndrRnN :: LocatedN RdrName -> RnM (LocatedN Name)
-lookupLocatedTopBndrRnN = wrapLocMA lookupTopBndrRn
+lookupLocatedTopBndrRnN = wrapLocMA (lookupTopBndrRn WL_Anything)
 
 -- | Lookup an @Exact@ @RdrName@. See Note [Looking up Exact RdrNames].
 -- This never adds an error, but it may return one, see
@@ -393,7 +402,7 @@ lookupFamInstName :: Maybe Name -> LocatedN RdrName
 lookupFamInstName (Just cls) tc_rdr  -- Associated type; c.f GHC.Rename.Bind.rnMethodBind
   = wrapLocMA (lookupInstDeclBndr cls (text "associated type")) tc_rdr
 lookupFamInstName Nothing tc_rdr     -- Family instance; tc_rdr is an *occurrence*
-  = lookupLocatedOccRn tc_rdr
+  = lookupLocatedOccRnConstr tc_rdr
 
 -----------------------------------------------
 lookupConstructorFields :: Name -> RnM [FieldLabel]
@@ -550,7 +559,8 @@ lookupRecFieldOcc_update dup_fields_ok rdr_name = do
                                   Nothing -> unbound
           | otherwise   -> unbound
   where
-    unbound = UnambiguousGre . NormalGreName <$> unboundName WL_Global rdr_name
+    unbound = UnambiguousGre . NormalGreName
+          <$> unboundName (LF WL_RecField WL_Global) rdr_name
 
 
 {- Note [DisambiguateRecordFields]
@@ -991,6 +1001,18 @@ lookupLocatedOccRn :: GenLocated (SrcSpanAnn' ann) RdrName
                    -> TcRn (GenLocated (SrcSpanAnn' ann) Name)
 lookupLocatedOccRn = wrapLocMA lookupOccRn
 
+lookupLocatedOccRnConstr :: GenLocated (SrcSpanAnn' ann) RdrName
+                         -> TcRn (GenLocated (SrcSpanAnn' ann) Name)
+lookupLocatedOccRnConstr = wrapLocMA lookupOccRnConstr
+
+lookupLocatedOccRnRecField :: GenLocated (SrcSpanAnn' ann) RdrName
+                           -> TcRn (GenLocated (SrcSpanAnn' ann) Name)
+lookupLocatedOccRnRecField = wrapLocMA lookupOccRnRecField
+
+lookupLocatedOccRnNone :: GenLocated (SrcSpanAnn' ann) RdrName
+                       -> TcRn (GenLocated (SrcSpanAnn' ann) Name)
+lookupLocatedOccRnNone = wrapLocMA lookupOccRnNone
+
 lookupLocalOccRn_maybe :: RdrName -> RnM (Maybe Name)
 -- Just look in the local environment
 lookupLocalOccRn_maybe rdr_name
@@ -1003,13 +1025,34 @@ lookupLocalOccThLvl_maybe name
   = do { lcl_env <- getLclEnv
        ; return (lookupNameEnv (tcl_th_bndrs lcl_env) name) }
 
--- lookupOccRn looks up an occurrence of a RdrName
-lookupOccRn :: RdrName -> RnM Name
-lookupOccRn rdr_name
+-- lookupOccRn' looks up an occurrence of a RdrName, and uses its argument to
+-- determine what kind of suggestions should be displayed if it is not in scope
+lookupOccRn' :: WhatLooking -> RdrName -> RnM Name
+lookupOccRn' which_suggest rdr_name
   = do { mb_name <- lookupOccRn_maybe rdr_name
        ; case mb_name of
            Just name -> return name
-           Nothing   -> reportUnboundName rdr_name }
+           Nothing   -> reportUnboundName' which_suggest rdr_name }
+
+-- lookupOccRn looks up an occurrence of a RdrName and displays suggestions if
+-- it is not in scope
+lookupOccRn :: RdrName -> RnM Name
+lookupOccRn = lookupOccRn' WL_Anything
+
+-- lookupOccRnConstr looks up an occurrence of a RdrName and displays
+-- constructors and pattern synonyms as suggestions if it is not in scope
+lookupOccRnConstr :: RdrName -> RnM Name
+lookupOccRnConstr = lookupOccRn' WL_Constructor
+
+-- lookupOccRnRecField looks up an occurrence of a RdrName and displays
+-- record fields as suggestions if it is not in scope
+lookupOccRnRecField :: RdrName -> RnM Name
+lookupOccRnRecField = lookupOccRn' WL_RecField
+
+-- lookupOccRnRecField looks up an occurrence of a RdrName and displays
+-- no suggestions if it is not in scope
+lookupOccRnNone :: RdrName -> RnM Name
+lookupOccRnNone = lookupOccRn' WL_None
 
 -- Only used in one place, to rename pattern synonym binders.
 -- See Note [Renaming pattern synonym variables] in GHC.Rename.Bind
@@ -1018,7 +1061,7 @@ lookupLocalOccRn rdr_name
   = do { mb_name <- lookupLocalOccRn_maybe rdr_name
        ; case mb_name of
            Just name -> return name
-           Nothing   -> unboundName WL_LocalOnly rdr_name }
+           Nothing   -> unboundName (LF WL_Anything WL_LocalOnly) rdr_name }
 
 -- lookupTypeOccRn looks up an optionally promoted RdrName.
 -- Used for looking up type variables.
@@ -1043,7 +1086,7 @@ lookup_demoted rdr_name
        ; if data_kinds
             then do { mb_demoted_name <- lookupOccRn_maybe demoted_rdr
                     ; case mb_demoted_name of
-                        Nothing -> unboundNameX WL_Any rdr_name star_info
+                        Nothing -> unboundNameX looking_for rdr_name star_info
                         Just demoted_name ->
                           do { addDiagnostic
                                  (WarningWithFlag Opt_WarnUntickedPromotedConstructors)
@@ -1057,12 +1100,13 @@ lookup_demoted rdr_name
                                          lookupOccRn_maybe demoted_rdr
                     ; let suggestion | isJust mb_demoted_name = suggest_dk
                                      | otherwise = star_info
-                    ; unboundNameX WL_Any rdr_name suggestion } }
+                    ; unboundNameX looking_for rdr_name suggestion } }
 
   | otherwise
-  = reportUnboundName rdr_name
+  = reportUnboundName' (lf_which looking_for) rdr_name
 
   where
+    looking_for = LF WL_Constructor WL_Anywhere
     suggest_dk = text "A data constructor of that name is in scope; did you mean DataKinds?"
     untickedPromConstrWarn name =
       text "Unticked promoted constructor" <> colon <+> quotes (ppr name) <> dot
@@ -1208,7 +1252,11 @@ lookupGlobalOccRn' fos rdr_name =
     case mn of
       Just n -> return n
       Nothing -> do { traceRn "lookupGlobalOccRn" (ppr rdr_name)
-                    ; unboundName WL_Global rdr_name }
+                    ; unboundName (LF which_suggest WL_Global) rdr_name }
+        where which_suggest = case fos of
+                WantNormal -> WL_Anything
+                WantBoth   -> WL_RecField
+                WantField  -> WL_RecField
 
 -- Looks up a RdrName occurrence in the GlobalRdrEnv and with
 -- lookupQualifiedNameGHCi. Does not try to find an Exact or Orig name first.
@@ -1444,7 +1492,7 @@ lookupGreAvailRn rdr_name
         GreNotFound ->
           do
             traceRn "lookupGreAvailRn" (ppr rdr_name)
-            name <- unboundName WL_Global rdr_name
+            name <- unboundName (LF WL_Anything WL_Global) rdr_name
             return (name, avail name)
         MultipleNames gres ->
           do
@@ -1811,11 +1859,12 @@ lookupBindGroupOcc ctxt what rdr_name
 
     lookup_top keep_me
       = do { env <- getGlobalRdrEnv
+           ; dflags <- getDynFlags
            ; let all_gres = lookupGlobalRdrEnv env (rdrNameOcc rdr_name)
                  names_in_scope = -- If rdr_name lacks a binding, only
                                   -- recommend alternatives from related
                                   -- namespaces. See #17593.
-                                  filter (\n -> nameSpacesRelated
+                                  filter (\n -> nameSpacesRelated dflags WL_Anything
                                                   (rdrNameSpace rdr_name)
                                                   (nameNameSpace n))
                                 $ map greMangledName
@@ -1974,7 +2023,7 @@ lookupIfThenElse
   = do { rebindable_on <- xoptM LangExt.RebindableSyntax
        ; if not rebindable_on
          then return Nothing
-         else do { ite <- lookupOccRn (mkVarUnqual (fsLit "ifThenElse"))
+         else do { ite <- lookupOccRnNone (mkVarUnqual (fsLit "ifThenElse"))
                  ; return (Just ite) } }
 
 lookupSyntaxName :: Name                 -- ^ The standard name
@@ -1989,7 +2038,7 @@ lookupSyntaxName std_name
   = do { rebind <- xoptM LangExt.RebindableSyntax
        ; if not rebind
          then return (std_name, emptyFVs)
-         else do { nm <- lookupOccRn (mkRdrUnqual (nameOccName std_name))
+         else do { nm <- lookupOccRnNone (mkRdrUnqual (nameOccName std_name))
                  ; return (nm, unitFV nm) } }
 
 lookupSyntaxExpr :: Name                          -- ^ The standard name
@@ -2013,7 +2062,8 @@ lookupSyntaxNames std_names
        ; if not rebindable_on then
              return (map (HsVar noExtField . noLocA) std_names, emptyFVs)
         else
-          do { usr_names <- mapM (lookupOccRn . mkRdrUnqual . nameOccName) std_names
+          do { usr_names <-
+                 mapM (lookupOccRnNone . mkRdrUnqual . nameOccName) std_names
              ; return (map (HsVar noExtField . noLocA) usr_names, mkFVs usr_names) } }
 
 
@@ -2047,7 +2097,7 @@ lookupQualifiedDo ctxt std_name
 
 lookupNameWithQualifier :: Name -> ModuleName -> RnM (Name, FreeVars)
 lookupNameWithQualifier std_name modName
-  = do { qname <- lookupOccRn (mkRdrQual modName (nameOccName std_name))
+  = do { qname <- lookupOccRnNone (mkRdrQual modName (nameOccName std_name))
        ; return (qname, unitFV qname) }
 
 -- See Note [QualifiedDo].

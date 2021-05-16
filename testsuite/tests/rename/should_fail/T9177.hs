@@ -12,7 +12,8 @@ type Foo2 = (integerr)
 foo3 = bar
 foo4 = Fun
 
--- this warning is suboptimal (fun would be illegal here)
+-- this warning was suboptimal (fun would be illegal here) as of #9177
+-- fixed with #19843
 foo5 Fun = ()
 
 -- No errors here:

@@ -1,0 +1,5 @@
+
+T19843m.hs:9:12:
+    Not in scope: type constructor or class ‘WrongName’
+    Perhaps you meant one of these:
+      ‘FongName’ (line 6), data constructor ‘LongName’ (line 5)
