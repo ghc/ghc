@@ -124,7 +124,7 @@ tyThingToLHsDecl prr t = case t of
            vs = tyConVisibleTyVars (classTyCon cl)
 
        in withErrs (lefts atTyClDecls) . TyClD noExtField $ ClassDecl
-         { tcdCtxt = synifyCtx (classSCTheta cl)
+         { tcdCtxt = Just $ synifyCtx (classSCTheta cl)
          , tcdLName = synifyNameN cl
          , tcdTyVars = synifyTyVars vs
          , tcdFixity = synifyFixity cl
@@ -302,7 +302,7 @@ synifyTyCon _prr coax tc
   alg_deriv = []
   defn = HsDataDefn { dd_ext     = noExtField
                     , dd_ND      = alg_nd
-                    , dd_ctxt    = alg_ctx
+                    , dd_ctxt    = Just alg_ctx
                     , dd_cType   = Nothing
                     , dd_kindSig = kindSig
                     , dd_cons    = cons
@@ -375,7 +375,7 @@ synifyDataCon use_gadt_syntax dc =
 
   -- skip any EqTheta, use 'orig'inal syntax
   ctx | null theta = Nothing
-      | otherwise = synifyCtx theta
+      | otherwise = Just $ synifyCtx theta
 
   linear_tys =
     zipWith (\ty bang ->
@@ -462,8 +462,8 @@ synifyTcIdSig vs (i, dm) =
     mainSig t = synifySigType DeleteTopLevelQuantification vs t
     defSig t = synifySigType ImplicitizeForAll vs t
 
-synifyCtx :: [PredType] -> Maybe (LHsContext GhcRn)
-synifyCtx ts = Just (noLocA ( map (synifyType WithinType []) ts))
+synifyCtx :: [PredType] -> LHsContext GhcRn
+synifyCtx ts = noLocA ( map (synifyType WithinType []) ts)
 
 
 synifyTyVars :: [TyVar] -> LHsQTyVars GhcRn

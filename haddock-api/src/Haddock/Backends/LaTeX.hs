@@ -983,11 +983,12 @@ ppTypeApp n ts ppDN ppT = ppDN n <+> hsep (map ppT ts)
 -------------------------------------------------------------------------------
 
 
-ppLContext, ppLContextNoArrow :: Maybe (LHsContext DocNameI) -> Bool -> LaTeX
-ppLContext        Nothing _ = empty
-ppLContext        (Just ctxt) unicode  = ppContext        (unLoc ctxt) unicode
-ppLContextNoArrow Nothing _ = empty
-ppLContextNoArrow (Just ctxt) unicode = ppContextNoArrow (unLoc ctxt) unicode
+ppLContext :: Maybe (LHsContext DocNameI) -> Bool -> LaTeX
+ppLContext Nothing _ = empty
+ppLContext (Just ctxt) unicode  = ppContext (unLoc ctxt) unicode
+
+ppLContextNoArrow :: LHsContext DocNameI -> Bool -> LaTeX
+ppLContextNoArrow ctxt unicode = ppContextNoArrow (unLoc ctxt) unicode
 
 ppContextNoLocsMaybe :: [HsType DocNameI] -> Bool -> Maybe LaTeX
 ppContextNoLocsMaybe [] _ = Nothing
@@ -1101,7 +1102,7 @@ ppr_mono_ty (HsForAllTy _ tele ty) unicode
   = sep [ ppHsForAllTelescope tele unicode
         , ppr_mono_lty ty unicode ]
 ppr_mono_ty (HsQualTy _ ctxt ty) unicode
-  = sep [ ppLContext ctxt unicode
+  = sep [ ppLContext (Just ctxt) unicode
         , ppr_mono_lty ty unicode ]
 ppr_mono_ty (HsFunTy _ mult ty1 ty2)   u
   = sep [ ppr_mono_lty ty1 u

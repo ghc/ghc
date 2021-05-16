@@ -258,7 +258,7 @@ renameType t = case t of
                        , hst_tele = tele', hst_body = ltype' })
 
   HsQualTy { hst_ctxt = lcontext , hst_body = ltype } -> do
-    lcontext' <- traverse renameLContext lcontext
+    lcontext' <- renameLContext lcontext
     ltype'    <- renameLType ltype
     return (HsQualTy { hst_xqual = noAnn, hst_ctxt = lcontext', hst_body = ltype' })
 
