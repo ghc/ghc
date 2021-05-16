@@ -289,7 +289,7 @@ compileOne' m_tc_result mHscMessage
        old_paths   = includePaths dflags2
        !prevailing_dflags = hsc_dflags hsc_env0
        dflags =
-          dflags2 { includePaths = addQuoteInclude old_paths [current_dir]
+          dflags2 { includePaths = addImplicitQuoteInclude old_paths [current_dir]
                   , log_action = log_action prevailing_dflags }
                   -- use the prevailing log_action / log_finaliser,
                   -- not the one cached in the summary.  This is so
@@ -1036,7 +1036,7 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn dflags0
   -- the .hs files resides) to the include path, since this is
   -- what gcc does, and it's probably what you want.
         let current_dir = takeDirectory basename
-            new_includes = addQuoteInclude paths [current_dir]
+            new_includes = addImplicitQuoteInclude paths [current_dir]
             paths = includePaths dflags0
             dflags = dflags0 { includePaths = new_includes }
 
@@ -1214,7 +1214,8 @@ runPhase (RealPhase cc_phase) input_fn dflags
         let include_paths_global = foldr (\ x xs -> ("-I" ++ x) : xs) []
               (includePathsGlobal cmdline_include_paths ++ pkg_include_dirs)
         let include_paths_quote = foldr (\ x xs -> ("-iquote" ++ x) : xs) []
-              (includePathsQuote cmdline_include_paths)
+              (includePathsQuote cmdline_include_paths ++
+               includePathsQuoteImplicit cmdline_include_paths)
         let include_paths = include_paths_quote ++ include_paths_global
 
         let gcc_extra_viac_flags = extraGccViaCFlags dflags
@@ -1381,7 +1382,9 @@ runPhase (RealPhase (As with_cpp)) input_fn dflags
         let global_includes = [ SysTools.Option ("-I" ++ p)
                               | p <- includePathsGlobal cmdline_include_paths ]
         let local_includes = [ SysTools.Option ("-iquote" ++ p)
-                             | p <- includePathsQuote cmdline_include_paths ]
+                             | p <- includePathsQuote cmdline_include_paths ++
+                             includePathsQuoteImplicit cmdline_include_paths
+                             ]
         let runAssembler inputFilename outputFilename
                 = liftIO $ as_prog dflags
                        (local_includes ++ global_includes
@@ -2079,7 +2082,8 @@ doCpp dflags raw input_fn output_fn = do
     let include_paths_global = foldr (\ x xs -> ("-I" ++ x) : xs) []
           (includePathsGlobal cmdline_include_paths ++ pkg_include_dirs)
     let include_paths_quote = foldr (\ x xs -> ("-iquote" ++ x) : xs) []
-          (includePathsQuote cmdline_include_paths)
+          (includePathsQuote cmdline_include_paths ++
+           includePathsQuoteImplicit cmdline_include_paths)
     let include_paths = include_paths_quote ++ include_paths_global
 
     let verbFlags = getVerbFlags dflags

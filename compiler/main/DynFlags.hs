@@ -176,6 +176,7 @@ module DynFlags (
 
         -- * Include specifications
         IncludeSpecs(..), addGlobalInclude, addQuoteInclude, flattenIncludes,
+        addImplicitQuoteInclude,
 
 
         -- * Make use of the Cmm CFG
@@ -732,6 +733,7 @@ data WarnReason
 -- includes since -I overrides the system search paths. See Trac #14312.
 data IncludeSpecs
   = IncludeSpecs { includePathsQuote  :: [String]
+                 , includePathsQuoteImplicit :: [String]
                  , includePathsGlobal :: [String]
                  }
   deriving Show
@@ -749,10 +751,15 @@ addQuoteInclude :: IncludeSpecs -> [String] -> IncludeSpecs
 addQuoteInclude spec paths  = let f = includePathsQuote spec
                               in spec { includePathsQuote = f ++ paths }
 
+-- | These includes are not considered while fingerprinting the flags for iface
+addImplicitQuoteInclude :: IncludeSpecs -> [String] -> IncludeSpecs
+addImplicitQuoteInclude spec paths  = let f = includePathsQuoteImplicit spec
+                              in spec { includePathsQuoteImplicit = f ++ paths }
+
 -- | Concatenate and flatten the list of global and quoted includes returning
 -- just a flat list of paths.
 flattenIncludes :: IncludeSpecs -> [String]
-flattenIncludes specs = includePathsQuote specs ++ includePathsGlobal specs
+flattenIncludes specs = includePathsQuote specs ++ includePathsQuoteImplicit specs ++ includePathsGlobal specs
 
 instance Outputable WarnReason where
   ppr = text . show
@@ -1968,7 +1975,7 @@ defaultDynFlags mySettings (myLlvmTargets, myLlvmPasses) =
         dumpPrefix              = Nothing,
         dumpPrefixForce         = Nothing,
         ldInputs                = [],
-        includePaths            = IncludeSpecs [] [],
+        includePaths            = IncludeSpecs [] [] [],
         libraryPaths            = [],
         frameworkPaths          = [],
         cmdlineFrameworks       = [],
