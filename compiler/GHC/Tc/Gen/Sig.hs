@@ -258,7 +258,7 @@ lhsSigWcTypeContextSpan (HsWC { hswc_body = sigType }) = lhsSigTypeContextSpan s
 lhsSigTypeContextSpan :: LHsSigType GhcRn -> ReportRedundantConstraints
 lhsSigTypeContextSpan (L _ HsSig { sig_body = sig_ty }) = go sig_ty
   where
-    go (L _ (HsQualTy { hst_ctxt = Just (L span _) })) = WantRRC $ locA span -- Found it!
+    go (L _ (HsQualTy { hst_ctxt = L span _ })) = WantRRC $ locA span -- Found it!
     go (L _ (HsForAllTy { hst_body = hs_ty })) = go hs_ty  -- Look under foralls
     go (L _ (HsParTy _ hs_ty)) = go hs_ty  -- Look under parens
     go _ = NoRRC  -- Did not find it
@@ -304,7 +304,7 @@ no_anon_wc_ty lty = go lty
                  , hst_body = ty } -> no_anon_wc_tele tele
                                         && go ty
       HsQualTy { hst_ctxt = ctxt
-               , hst_body = ty }  -> gos (fromMaybeContext ctxt) && go ty
+               , hst_body = ty }  -> gos (unLoc ctxt) && go ty
       HsSpliceTy _ (HsSpliced _ _ (HsSplicedTy ty)) -> go $ L noSrcSpanA ty
       HsSpliceTy{} -> True
       HsTyLit{} -> True

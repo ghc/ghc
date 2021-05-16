@@ -1179,7 +1179,7 @@ tc_hs_type mode (HsForAllTy { hst_tele = tele, hst_body = ty }) exp_kind
        ; return (mkForAllTys tv_bndrs ty') }
 
 tc_hs_type mode (HsQualTy { hst_ctxt = ctxt, hst_body = rn_ty }) exp_kind
-  | null (fromMaybeContext ctxt)
+  | null (unLoc ctxt)
   = tc_lhs_type mode rn_ty exp_kind
 
   -- See Note [Body kind of a HsQualTy]
@@ -1933,14 +1933,14 @@ checkExpectedKind hs_ty ty act_kind exp_kind
 ---------------------------
 
 tcHsContext :: Maybe (LHsContext GhcRn) -> TcM [PredType]
-tcHsContext cxt = tc_hs_context typeLevelMode cxt
+tcHsContext Nothing    = return []
+tcHsContext (Just cxt) = tc_hs_context typeLevelMode cxt
 
 tcLHsPredType :: LHsType GhcRn -> TcM PredType
 tcLHsPredType pred = tc_lhs_pred typeLevelMode pred
 
-tc_hs_context :: TcTyMode -> Maybe (LHsContext GhcRn) -> TcM [PredType]
-tc_hs_context _ Nothing = return []
-tc_hs_context mode (Just ctxt) = mapM (tc_lhs_pred mode) (unLoc ctxt)
+tc_hs_context :: TcTyMode -> LHsContext GhcRn -> TcM [PredType]
+tc_hs_context mode ctxt = mapM (tc_lhs_pred mode) (unLoc ctxt)
 
 tc_lhs_pred :: TcTyMode -> LHsType GhcRn -> TcM PredType
 tc_lhs_pred mode pred = tc_lhs_type mode pred constraintKind
