@@ -1287,7 +1287,7 @@ check_e is commented out.
 checkValidRule :: FastString -> [Name] -> LHsExpr GhcRn -> NameSet -> RnM ()
 checkValidRule rule_name ids lhs' fv_lhs'
   = do  {       -- Check for the form of the LHS
-          case (validRuleLhs ids lhs') of
+          case validRuleLhs ids lhs' of
                 Nothing  -> return ()
                 Just bad -> failWithTc (badRuleLhsErr rule_name lhs' bad)
 
