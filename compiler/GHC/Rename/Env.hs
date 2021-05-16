@@ -1821,7 +1821,7 @@ lookupBindGroupOcc ctxt what rdr_name
                  names_in_scope = -- If rdr_name lacks a binding, only
                                   -- recommend alternatives from related
                                   -- namespaces. See #17593.
-                                  filter (\n -> nameSpacesRelated
+                                  filter (\n -> nameSpacesRelated False
                                                   (rdrNameSpace rdr_name)
                                                   (nameNameSpace n))
                                 $ map greMangledName
