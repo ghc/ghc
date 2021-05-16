@@ -22,7 +22,7 @@ module Language.Haskell.Syntax.Pat (
         ConLikeP,
 
         HsConPatDetails, hsConPatArgs,
-        HsRecFields(..), HsRecField'(..), LHsRecField',
+        HsRecFields(..), HsFieldBind(..), LHsFieldBind,
         HsRecField, LHsRecField,
         HsRecUpdField, LHsRecUpdField,
         hsRecFields, hsRecFieldSel, hsRecFieldsArgs,
@@ -225,7 +225,7 @@ type HsConPatDetails p = HsConDetails (HsPatSigType (NoGhcTc p)) (LPat p) (HsRec
 
 hsConPatArgs :: forall p . (UnXRec p) => HsConPatDetails p -> [LPat p]
 hsConPatArgs (PrefixCon _ ps) = ps
-hsConPatArgs (RecCon fs)      = map (hsRecFieldArg . unXRec @p) (rec_flds fs)
+hsConPatArgs (RecCon fs)      = map (hfbRHS . unXRec @p) (rec_flds fs)
 hsConPatArgs (InfixCon p1 p2) = [p1,p2]
 
 -- | Haskell Record Fields
@@ -256,7 +256,7 @@ data HsRecFields p arg         -- A bunch of record fields
 --                     and the remainder being 'filled in' implicitly
 
 -- | Located Haskell Record Field
-type LHsRecField' p id arg = XRec p (HsRecField' id arg)
+type LHsFieldBind p id arg = XRec p (HsFieldBind id arg)
 
 -- | Located Haskell Record Field
 type LHsRecField  p arg = XRec p (HsRecField  p arg)
@@ -265,21 +265,21 @@ type LHsRecField  p arg = XRec p (HsRecField  p arg)
 type LHsRecUpdField p   = XRec p (HsRecUpdField p)
 
 -- | Haskell Record Field
-type HsRecField    p arg = HsRecField' (FieldOcc p) arg
+type HsRecField p arg   = HsFieldBind (LFieldOcc p) arg
 
 -- | Haskell Record Update Field
-type HsRecUpdField p     = HsRecField' (AmbiguousFieldOcc p) (LHsExpr p)
+type HsRecUpdField p    = HsFieldBind (LAmbiguousFieldOcc p) (LHsExpr p)
 
--- | Haskell Record Field
+-- | Haskell Field Binding
 --
 -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnEqual',
 --
 -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
-data HsRecField' id arg = HsRecField {
-        hsRecFieldAnn :: XHsRecField id,
-        hsRecFieldLbl :: Located id,
-        hsRecFieldArg :: arg,           -- ^ Filled in by renamer when punning
-        hsRecPun      :: Bool           -- ^ Note [Punning]
+data HsFieldBind lhs rhs = HsFieldBind {
+        hfbAnn :: XHsFieldBind lhs,
+        hfbLHS :: lhs,
+        hfbRHS :: rhs,           -- ^ Filled in by renamer when punning
+        hfbPun :: Bool           -- ^ Note [Punning]
   } deriving (Functor, Foldable, Traversable)
 
 
@@ -324,28 +324,27 @@ data HsRecField' id arg = HsRecField {
 --
 -- The parsed HsRecUpdField corresponding to the record update will have:
 --
---     hsRecFieldLbl = Unambiguous "x" noExtField :: AmbiguousFieldOcc RdrName
+--     hfbLHS = Unambiguous "x" noExtField :: AmbiguousFieldOcc RdrName
 --
 -- After the renamer, this will become:
 --
---     hsRecFieldLbl = Ambiguous   "x" noExtField :: AmbiguousFieldOcc Name
+--     hfbLHS = Ambiguous   "x" noExtField :: AmbiguousFieldOcc Name
 --
 -- (note that the Unambiguous constructor is not type-correct here).
 -- The typechecker will determine the particular selector:
 --
---     hsRecFieldLbl = Unambiguous "x" $sel:x:MkS  :: AmbiguousFieldOcc Id
+--     hfbLHS = Unambiguous "x" $sel:x:MkS  :: AmbiguousFieldOcc Id
 --
 -- See also Note [Disambiguating record fields] in GHC.Tc.Gen.Head.
 
-hsRecFields :: forall p arg. UnXRec p => HsRecFields p arg -> [XCFieldOcc p]
-hsRecFields rbinds = map (unLoc . hsRecFieldSel . unXRec @p) (rec_flds rbinds)
+hsRecFields :: forall p arg.UnXRec p => HsRecFields p arg -> [XCFieldOcc p]
+hsRecFields rbinds = map (hsRecFieldSel . unXRec @p) (rec_flds rbinds)
 
--- Probably won't typecheck at once, things have changed :/
 hsRecFieldsArgs :: forall p arg. UnXRec p => HsRecFields p arg -> [arg]
-hsRecFieldsArgs rbinds = map (hsRecFieldArg . unXRec @p) (rec_flds rbinds)
+hsRecFieldsArgs rbinds = map (hfbRHS . unXRec @p) (rec_flds rbinds)
 
-hsRecFieldSel :: HsRecField pass arg -> Located (XCFieldOcc pass)
-hsRecFieldSel = fmap extFieldOcc . hsRecFieldLbl
+hsRecFieldSel :: forall p arg. UnXRec p => HsRecField p arg -> XCFieldOcc p
+hsRecFieldSel = extFieldOcc . unXRec @p . hfbLHS
 
 
 {-
@@ -366,7 +365,7 @@ instance (Outputable arg, Outputable (XRec p (HsRecField p arg)))
           dotdot = text ".." <+> whenPprDebug (ppr (drop n flds))
 
 instance (Outputable p, OutputableBndr p, Outputable arg)
-      => Outputable (HsRecField' p arg) where
-  ppr (HsRecField { hsRecFieldLbl = L _ f, hsRecFieldArg = arg,
-                    hsRecPun = pun })
+      => Outputable (HsFieldBind p arg) where
+  ppr (HsFieldBind { hfbLHS = f, hfbRHS = arg,
+                     hfbPun = pun })
     = pprPrefixOcc f <+> (ppUnless pun $ equals <+> ppr arg)
