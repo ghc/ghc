@@ -417,20 +417,20 @@ setCprSigInfo info cpr = cpr `seq` info { cprSigInfo = cpr }
 vanillaIdInfo :: IdInfo
 vanillaIdInfo
   = IdInfo {
-            ruleInfo            = emptyRuleInfo,
-            unfoldingInfo       = noUnfolding,
-            inlinePragInfo      = defaultInlinePragma,
-            occInfo             = noOccInfo,
-            demandInfo          = topDmd,
-            dmdSigInfo      = nopSig,
-            cprSigInfo             = topCprSig,
-            bitfield            = bitfieldSetCafInfo vanillaCafInfo $
-                                  bitfieldSetArityInfo unknownArity $
-                                  bitfieldSetCallArityInfo unknownArity $
-                                  bitfieldSetOneShotInfo NoOneShotInfo $
-                                  bitfieldSetLevityInfo NoLevityInfo $
-                                  emptyBitField,
-            lfInfo              = Nothing
+            ruleInfo       = emptyRuleInfo,
+            unfoldingInfo  = noUnfolding,
+            inlinePragInfo = defaultInlinePragma,
+            occInfo        = noOccInfo,
+            demandInfo     = topDmd,
+            dmdSigInfo     = nopSig,
+            cprSigInfo     = topCprSig,
+            bitfield       = bitfieldSetCafInfo vanillaCafInfo $
+                             bitfieldSetArityInfo unknownArity $
+                             bitfieldSetCallArityInfo unknownArity $
+                             bitfieldSetOneShotInfo NoOneShotInfo $
+                             bitfieldSetLevityInfo NoLevityInfo $
+                             emptyBitField,
+            lfInfo         = Nothing
            }
 
 -- | More informative 'IdInfo' we can use when we know the 'Id' has no CAF references
