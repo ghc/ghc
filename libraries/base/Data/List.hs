@@ -1422,12 +1422,12 @@ unfoldr f b0 = build (\c n ->
 -- -----------------------------------------------------------------------------
 -- Functions on strings
 
--- | 'lines' breaks a string up into a list of strings at newline
--- characters.  The resulting strings do not contain newlines.
+-- | Separates the argument into pieces, with @\n@ characters as
+-- separators. A single trailing @\n@ is ignored. None of the final results
+-- contain @\n@.
 --
--- Note that after splitting the string at newline characters, the
--- last part of the string is considered a line even if it doesn't end
--- with a newline. For example,
+-- After splitting the input on @\n@ characters, the last part of the string is considered a
+-- line, even if it doesn't end with @\n@. For example:
 --
 -- >>> lines ""
 -- []
@@ -1450,7 +1450,14 @@ unfoldr f b0 = build (\c n ->
 -- >>> lines "one\ntwo\n"
 -- ["one","two"]
 --
--- Thus @'lines' s@ contains at least as many elements as newlines in @s@.
+-- Thus @'lines' s@ contains at least as many elements as @\n@ characters in @s@.
+--
+-- = Note
+--
+-- @'unlines' '.' 'lines' '/=' 'id'@. Consider the example below:
+--
+-- >>> unlines . lines $ "foo\nbar"
+-- "foo\nbar\n"
 lines                   :: String -> [String]
 lines ""                =  []
 -- Somehow GHC doesn't detect the selector thunks in the below code,
@@ -1464,11 +1471,18 @@ lines s                 =  cons (case break (== '\n') s of
   where
     cons ~(h, t)        =  h : t
 
--- | 'unlines' is an inverse operation to 'lines'.
--- It joins lines, after appending a terminating newline to each.
+-- | Appends a @\n@ character to each input string, then concatenates the
+-- results. Equivalent to @'foldMap' (\s -> s '++' "\n")@.
 --
 -- >>> unlines ["Hello", "World", "!"]
 -- "Hello\nWorld\n!\n"
+--
+-- = Note
+--
+-- @'unlines' '.' 'lines' '/=' 'id'@. Consider the example below:
+--
+-- >>> unlines . lines $ "foo\nbar"
+-- "foo\nbar\n"
 unlines                 :: [String] -> String
 #if defined(USE_REPORT_PRELUDE)
 unlines                 =  concatMap (++ "\n")
@@ -1479,11 +1493,22 @@ unlines [] = []
 unlines (l:ls) = l ++ '\n' : unlines ls
 #endif
 
--- | 'words' breaks a string up into a list of words, which were delimited
--- by white space.
+-- | Separates the argument into pieces, with (non-empty sequences of) word
+-- separator characters. A \'word separator character\' is anything for which
+-- 'isSpace' returns 'True'.
 --
--- >>> words "Lorem ipsum\ndolor"
+-- None of the final results contain any word separator characters. A sequence
+-- of leading, or trailing, word separator characters will be ignored.
+--
+-- >>> words "Lorem   \r\t ipsum\n\n\ndolor\n\t"
 -- ["Lorem","ipsum","dolor"]
+--
+-- = Note
+--
+-- @'unwords' '.' 'words' '/=' 'id'@. Consider the example below:
+--
+-- >>> unwords . words $ "foo    bar"
+-- "foo bar"
 words                   :: String -> [String]
 {-# NOINLINE [1] words #-}
 words s                 =  case dropWhile {-partain:Char.-}isSpace s of
@@ -1505,11 +1530,18 @@ wordsFB c n = go
              s' -> w `c` go s''
                    where (w, s'') = break isSpace s'
 
--- | 'unwords' is an inverse operation to 'words'.
--- It joins words with separating spaces.
+-- | Links together adjacent strings in the argument with Space characters.
+-- Equivalent to @'intercalate' " "@.
 --
 -- >>> unwords ["Lorem", "ipsum", "dolor"]
 -- "Lorem ipsum dolor"
+--
+-- = Note
+--
+-- @'unwords' '.' 'words' '/=' 'id'@. Consider the example below:
+--
+-- >>> unwords . words $ "foo     bar"
+-- "foo bar"
 unwords                 :: [String] -> String
 #if defined(USE_REPORT_PRELUDE)
 unwords []              =  ""
