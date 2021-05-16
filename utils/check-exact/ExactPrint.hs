@@ -3789,7 +3789,9 @@ instance ExactPrint (Pat GhcPs) where
 instance ExactPrint (HsPatSigType GhcPs) where
   getAnnotationEntry = const NoEntryVal
 
-  exact (HsPS _ ty) = markAnnotated ty
+  exact (HsPS an ty) = do
+    markAnnKw an id AnnAt
+    markAnnotated ty
 
 -- ---------------------------------------------------------------------
 
