@@ -263,7 +263,7 @@ conArgPats  arg_tys (RecCon (HsRecFields { rec_flds = rpats }))
   | null rpats = map WildPat (map scaledThing arg_tys)
         -- Important special case for C {}, which can be used for a
         -- datacon that isn't declared to have fields at all
-  | otherwise  = map (unLoc . hsRecFieldArg . unLoc) rpats
+  | otherwise  = map (unLoc . hfbRHS . unLoc) rpats
 
 {-
 Note [Record patterns]
