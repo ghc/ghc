@@ -23,7 +23,7 @@ import GHC.Tc.Utils.Unify( occCheckForErrors, CheckTyEqResult(..) )
 import GHC.Tc.Utils.Env( tcInitTidyEnv )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Origin
-import GHC.Rename.Unbound ( unknownNameSuggestions )
+import GHC.Rename.Unbound ( unknownNameSuggestions, WhichSuggest(..) )
 import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.TyCo.Rep
@@ -1197,7 +1197,7 @@ mkHoleError _ _tidy_simples ctxt hole@(Hole { hole_occ = occ
        ; hpt <- getHpt
        ; let err = important out_of_scope_msg `mappend`
                    (mk_relevant_bindings $
-                     unknownNameSuggestions dflags hpt curr_mod rdr_env
+                     unknownNameSuggestions WS_Anything dflags hpt curr_mod rdr_env
                        (tcl_rdr lcl_env) imp_info (mkRdrUnqual occ))
 
        ; maybeAddDeferredBindings ctxt hole err
