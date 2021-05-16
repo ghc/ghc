@@ -41,6 +41,7 @@ import GHC.Rename.Pat
 import GHC.Rename.Names
 import GHC.Rename.Env
 import GHC.Rename.Fixity
+import GHC.Rename.Unbound ( WhichSuggest(..) )
 import GHC.Rename.Utils ( HsDocContext(..), mapFvRn
                         , checkDupRdrNames, checkDupRdrNamesN, warnUnusedLocalBinds
                         , checkUnusedRecordWildcard
@@ -442,7 +443,8 @@ rnBindLHS name_maker _ bind@(FunBind { fun_id = rdr_name })
 rnBindLHS name_maker _ (PatSynBind x psb@PSB{ psb_id = rdrname })
   | isTopRecNameMaker name_maker
   = do { addLocMA checkConName rdrname
-       ; name <- lookupLocatedTopBndrRnN rdrname -- Should be in scope already
+       ; name <-
+           lookupLocatedTopBndrRnN WS_Constructor rdrname -- Should be in scope already
        ; return (PatSynBind x psb{ psb_ext = noAnn, psb_id = name }) }
 
   | otherwise  -- Pattern synonym, not at top level
@@ -750,7 +752,7 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
       }
   where
     -- See Note [Renaming pattern synonym variables]
-    lookupPatSynBndr = wrapLocMA lookupLocalOccRn
+    lookupPatSynBndr = wrapLocMA (lookupLocalOccRn WS_Anything)
 
     patternSynonymErr :: SDoc
     patternSynonymErr
@@ -1007,7 +1009,7 @@ renameSig _ (SpecInstSig _ src ty)
 -- then the SPECIALISE pragma is ambiguous, unlike all other signatures
 renameSig ctxt sig@(SpecSig _ v tys inl)
   = do  { new_v <- case ctxt of
-                     TopSigCtxt {} -> lookupLocatedOccRn v
+                     TopSigCtxt {} -> lookupLocatedOccRn WS_Anything v
                      _             -> lookupSigOccRnN ctxt sig v
         ; (new_ty, fvs) <- foldM do_one ([],emptyFVs) tys
         ; return (SpecSig noAnn new_v new_ty inl, fvs) }
@@ -1045,8 +1047,8 @@ renameSig ctxt sig@(SCCFunSig _ st v s)
 -- COMPLETE Sigs can refer to imported IDs which is why we use
 -- lookupLocatedOccRn rather than lookupSigOccRn
 renameSig _ctxt sig@(CompleteMatchSig _ s (L l bf) mty)
-  = do new_bf <- traverse lookupLocatedOccRn bf
-       new_mty  <- traverse lookupLocatedOccRn mty
+  = do new_bf <- traverse (lookupLocatedOccRn WS_Anything) bf
+       new_mty  <- traverse (lookupLocatedOccRn WS_Anything) mty
 
        this_mod <- fmap tcg_mod getGblEnv
        unless (any (nameIsLocalOrFrom this_mod . unLoc) new_bf) $

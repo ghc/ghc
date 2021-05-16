@@ -53,6 +53,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Zonk   ( hsOverLitName )
 import GHC.Rename.Env
 import GHC.Rename.Fixity
+import GHC.Rename.Unbound  ( WhichSuggest(..) )
 import GHC.Rename.Utils    ( HsDocContext(..), newLocalBndrRn, bindLocalNames
                            , warnUnusedMatches, newLocalBndrRn
                            , checkUnusedRecordWildcard
@@ -146,7 +147,7 @@ wrapSrcSpanCps fn (L loc a)
 
 lookupConCps :: LocatedN RdrName -> CpsRn (LocatedN Name)
 lookupConCps con_rdr
-  = CpsRn (\k -> do { con_name <- lookupLocatedOccRn con_rdr
+  = CpsRn (\k -> do { con_name <- lookupLocatedOccRn WS_Constructor con_rdr
                     ; (r, fvs) <- k con_name
                     ; return (r, addOneFV fvs (unLoc con_name)) })
     -- We add the constructor name to the free vars
