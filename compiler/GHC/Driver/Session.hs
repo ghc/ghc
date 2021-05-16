@@ -654,8 +654,11 @@ data DynFlags = DynFlags {
   -- | Run-time linker information (what options we need, etc.)
   rtldInfo              :: IORef (Maybe LinkerInfo),
 
-  -- | Run-time compiler information
+  -- | Run-time C compiler information
   rtccInfo              :: IORef (Maybe CompilerInfo),
+
+  -- | Run-time assembler information
+  rtasmInfo              :: IORef (Maybe CompilerInfo),
 
   -- Constants used to control the amount of optimization done.
 
@@ -1047,6 +1050,7 @@ initDynFlags dflags = do
  refDynamicTooFailed <- newIORef (not platformCanGenerateDynamicToo)
  refRtldInfo <- newIORef Nothing
  refRtccInfo <- newIORef Nothing
+ refRtasmInfo <- newIORef Nothing
  canUseUnicode <- do let enc = localeEncoding
                          str = "‘’"
                      (withCString enc str $ \cstr ->
@@ -1069,7 +1073,8 @@ initDynFlags dflags = do
         canUseColor   = stderrSupportsAnsiColors,
         colScheme     = colScheme',
         rtldInfo      = refRtldInfo,
-        rtccInfo      = refRtccInfo
+        rtccInfo      = refRtccInfo,
+        rtasmInfo     = refRtasmInfo
         }
 
 -- | The normal 'DynFlags'. Note that they are not suitable for use in this form
@@ -1237,6 +1242,7 @@ defaultDynFlags mySettings llvmConfig =
         avx512pf = False,
         rtldInfo = panic "defaultDynFlags: no rtldInfo",
         rtccInfo = panic "defaultDynFlags: no rtccInfo",
+        rtasmInfo = panic "defaultDynFlags: no rtasmInfo",
 
         maxInlineAllocSize = 128,
         maxInlineMemcpyInsns = 32,
