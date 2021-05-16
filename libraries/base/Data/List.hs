@@ -1413,12 +1413,12 @@ unfoldr f b0 = build (\c n ->
 -- -----------------------------------------------------------------------------
 -- Functions on strings
 
--- | Separates the argument into pieces, with LF characters (0x0A) as
--- separators. A single trailing LF is ignored. None of the final results
--- contain LF.
+-- | Separates the argument into pieces, with @\n@ characters as
+-- separators. A single trailing @\n@ is ignored. None of the final results
+-- contain @\n@.
 --
--- After splitting the input on LFs, the last part of the string is considered a
--- line, even if it doesn't end with LF. For example:
+-- After splitting the input on @\n@ characters, the last part of the string is considered a
+-- line, even if it doesn't end with @\n@. For example:
 --
 -- >>> lines ""
 -- []
@@ -1441,7 +1441,7 @@ unfoldr f b0 = build (\c n ->
 -- >>> lines "one\ntwo\n"
 -- ["one","two"]
 --
--- Thus @'lines' s@ contains at least as many elements as newlines in @s@.
+-- Thus @'lines' s@ contains at least as many elements as @\n@ characters in @s@.
 --
 -- = Note
 --
@@ -1462,7 +1462,7 @@ lines s                 =  cons (case break (== '\n') s of
   where
     cons ~(h, t)        =  h : t
 
--- | Appends an LF character to each input string, then concatenates the
+-- | Appends a @\n@ character to each input string, then concatenates the
 -- results. Equivalent to @'foldMap' (\s -> s '++' "\n")@.
 --
 -- >>> unlines ["Hello", "World", "!"]
@@ -1485,14 +1485,8 @@ unlines (l:ls) = l ++ '\n' : unlines ls
 #endif
 
 -- | Separates the argument into pieces, with (non-empty sequences of) word
--- separator characters. A \'word separator character\' is any of the following:
---
--- * TAB (0x09)
--- * LF (0x0A)
--- * VT (0x0B)
--- * FF (0x0C)
--- * CR (0x0D)
--- * Space (0x20)
+-- separator characters. A \'word separator character\' is anything for which
+-- 'isSpace' returns 'True'.
 --
 -- None of the final results contain any word separator characters. A sequence
 -- of leading, or trailing, word separator characters will be ignored.
@@ -1527,8 +1521,8 @@ wordsFB c n = go
              s' -> w `c` go s''
                    where (w, s'') = break isSpace s'
 
--- | Links together adjacent strings in the argument with Space characters
--- (0x20). Equivalent to @'intercalate' " "@.
+-- | Links together adjacent strings in the argument with Space characters. 
+-- Equivalent to @'intercalate' " "@.
 --
 -- >>> unwords ["Lorem", "ipsum", "dolor"]
 -- "Lorem ipsum dolor"
