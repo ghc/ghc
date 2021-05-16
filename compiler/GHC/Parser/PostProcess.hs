@@ -875,7 +875,7 @@ mkRuleBndrs :: [LRuleTyTmVar] -> [LRuleBndr GhcPs]
 mkRuleBndrs = fmap (fmap cvt_one)
   where cvt_one (RuleTyTmVar ann v Nothing) = RuleBndr ann v
         cvt_one (RuleTyTmVar ann v (Just sig)) =
-          RuleBndrSig ann v (mkHsPatSigType sig)
+          RuleBndrSig ann v (mkHsPatSigType noAnn sig)
 
 -- turns RuleTyTmVars into HsTyVarBndrs - this is more interesting
 mkRuleTyVarBndrs :: [LRuleTyTmVar] -> [LHsTyVarBndr () GhcPs]
@@ -1096,7 +1096,7 @@ checkPat loc (L l e@(PatBuilderVar (L ln c))) tyargs args
   | not (null args) && patIsRec c =
       add_hint SuggestRecursiveDo $
       patFail (locA l) (ppr e)
-checkPat loc (L _ (PatBuilderAppType f _ t)) tyargs args =
+checkPat loc (L _ (PatBuilderAppType f t)) tyargs args =
   checkPat loc f (t : tyargs) args
 checkPat loc (L _ (PatBuilderApp f e)) [] args = do
   p <- checkLPat e
@@ -1742,7 +1742,10 @@ instance DisambECP (PatBuilder GhcPs) where
   type FunArg (PatBuilder GhcPs) = PatBuilder GhcPs
   superFunArg m = m
   mkHsAppPV l p1 p2      = return $ L l (PatBuilderApp p1 p2)
-  mkHsAppTypePV l p la t = return $ L l (PatBuilderAppType p la (mkHsPatSigType t))
+  mkHsAppTypePV l p la t = do
+    cs <- getCommentsFor (locA l)
+    let anns = EpAnn (spanAsAnchor (combineSrcSpans la (getLocA t))) (EpaSpan (realSrcSpan la)) cs
+    return $ L l (PatBuilderAppType p (mkHsPatSigType anns t))
   mkHsIfPV l _ _ _ _ _ _ = addFatalError $ PsError PsErrIfTheElseInPat [] l
   mkHsDoPV l _ _ _       = addFatalError $ PsError PsErrDoNotationInPat [] l
   mkHsParPV l p an       = return $ L (noAnnSrcSpan l) (PatBuilderPar p an)
@@ -1755,7 +1758,7 @@ instance DisambECP (PatBuilder GhcPs) where
   mkHsTySigPV l b sig anns = do
     p <- checkLPat b
     cs <- getCommentsFor (locA l)
-    return $ L l (PatBuilderPat (SigPat (EpAnn (spanAsAnchor $ locA l) anns cs) p (mkHsPatSigType sig)))
+    return $ L l (PatBuilderPat (SigPat (EpAnn (spanAsAnchor $ locA l) anns cs) p (mkHsPatSigType noAnn sig)))
   mkHsExplicitListPV l xs anns = do
     ps <- traverse checkLPat xs
     cs <- getCommentsFor l
