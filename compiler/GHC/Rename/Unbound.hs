@@ -10,7 +10,9 @@ module GHC.Rename.Unbound
    , isUnboundName
    , reportUnboundName
    , unknownNameSuggestions
+   , WhichSuggest(..)
    , WhereLooking(..)
+   , LookingFor(..)
    , unboundName
    , unboundNameX
    , notInScopeErr
@@ -51,28 +53,40 @@ import Data.Function ( on )
 ************************************************************************
 -}
 
+-- What kind of suggestion are we looking for? #19843
+data WhichSuggest = WS_Anything    -- Any binding
+                  | WS_Constructor -- Constructors and pattern synonyms
+                  | WS_RecField    -- Record fields
+                  | WS_None        -- No suggestions
+                  deriving Eq
+
 data WhereLooking = WL_Any        -- Any binding
                   | WL_Global     -- Any top-level binding (local or imported)
                   | WL_LocalTop   -- Any top-level binding in this module
                   | WL_LocalOnly
                         -- Only local bindings
-                        -- (pattern synonyms declaractions,
+                        -- (pattern synonyms declarations,
                         -- see Note [Renaming pattern synonym variables])
+                        -- in GHC.Rename.Bind
+
+data LookingFor = LF { lf_which :: WhichSuggest
+                     , lf_where :: WhereLooking
+                     }
 
 mkUnboundNameRdr :: RdrName -> Name
 mkUnboundNameRdr rdr = mkUnboundName (rdrNameOcc rdr)
 
-reportUnboundName :: RdrName -> RnM Name
-reportUnboundName rdr = unboundName WL_Any rdr
+reportUnboundName :: WhichSuggest -> RdrName -> RnM Name
+reportUnboundName which_suggest rdr = unboundName (LF which_suggest WL_Any) rdr
 
-unboundName :: WhereLooking -> RdrName -> RnM Name
-unboundName wl rdr = unboundNameX wl rdr Outputable.empty
+unboundName :: LookingFor -> RdrName -> RnM Name
+unboundName lf rdr = unboundNameX lf rdr Outputable.empty
 
-unboundNameX :: WhereLooking -> RdrName -> SDoc -> RnM Name
-unboundNameX where_look rdr_name extra
+unboundNameX :: LookingFor -> RdrName -> SDoc -> RnM Name
+unboundNameX looking_for rdr_name extra
   = do  { dflags <- getDynFlags
         ; let show_helpful_errors = gopt Opt_HelpfulErrors dflags
-              err = notInScopeErr where_look rdr_name $$ extra
+              err = notInScopeErr (lf_where looking_for) rdr_name $$ extra
         ; if not show_helpful_errors
           then addErr err
           else do { local_env  <- getLocalRdrEnv
@@ -80,7 +94,7 @@ unboundNameX where_look rdr_name extra
                   ; impInfo <- getImports
                   ; currmod <- getModule
                   ; hpt <- getHpt
-                  ; let suggestions = unknownNameSuggestions_ where_look
+                  ; let suggestions = unknownNameSuggestions_ looking_for
                           dflags hpt currmod global_env local_env impInfo
                           rdr_name
                   ; addErr (err $$ suggestions) }
@@ -102,20 +116,20 @@ type HowInScope = Either SrcSpan ImpDeclSpec
 
 
 -- | Called from the typechecker ("GHC.Tc.Errors") when we find an unbound variable
-unknownNameSuggestions :: DynFlags
+unknownNameSuggestions :: WhichSuggest -> DynFlags
                        -> HomePackageTable -> Module
                        -> GlobalRdrEnv -> LocalRdrEnv -> ImportAvails
                        -> RdrName -> SDoc
-unknownNameSuggestions = unknownNameSuggestions_ WL_Any
+unknownNameSuggestions which_suggest = unknownNameSuggestions_ (LF which_suggest WL_Any)
 
-unknownNameSuggestions_ :: WhereLooking -> DynFlags
+unknownNameSuggestions_ :: LookingFor -> DynFlags
                        -> HomePackageTable -> Module
                        -> GlobalRdrEnv -> LocalRdrEnv -> ImportAvails
                        -> RdrName -> SDoc
-unknownNameSuggestions_ where_look dflags hpt curr_mod global_env local_env
+unknownNameSuggestions_ looking_for dflags hpt curr_mod global_env local_env
                           imports tried_rdr_name =
-    similarNameSuggestions where_look dflags global_env local_env tried_rdr_name $$
-    importSuggestions where_look global_env hpt
+    similarNameSuggestions looking_for dflags global_env local_env tried_rdr_name $$
+    importSuggestions (lf_where looking_for) global_env hpt
                       curr_mod imports tried_rdr_name $$
     extensionSuggestions tried_rdr_name $$
     fieldSelectorSuggestions global_env tried_rdr_name
@@ -139,10 +153,10 @@ fieldSelectorSuggestions global_env tried_rdr_name
           | otherwise    = text "belonging to the type" <> plural parents
                              <+> pprQuotedList parents
 
-similarNameSuggestions :: WhereLooking -> DynFlags
-                        -> GlobalRdrEnv -> LocalRdrEnv
-                        -> RdrName -> SDoc
-similarNameSuggestions where_look dflags global_env
+similarNameSuggestions :: LookingFor -> DynFlags
+                       -> GlobalRdrEnv -> LocalRdrEnv
+                       -> RdrName -> SDoc
+similarNameSuggestions (LF which_suggest where_look) dflags global_env
                         local_env tried_rdr_name
   = case suggest of
       []  -> Outputable.empty
@@ -151,10 +165,11 @@ similarNameSuggestions where_look dflags global_env
                  , nest 2 (pprWithCommas pp_item ps) ]
   where
     all_possibilities :: [(String, (RdrName, HowInScope))]
-    all_possibilities
-       =  [ (showPpr dflags r, (r, Left loc))
-          | (r,loc) <- local_possibilities local_env ]
-       ++ [ (showPpr dflags r, rp) | (r, rp) <- global_possibilities global_env ]
+    all_possibilities = case which_suggest of
+      WS_None -> []
+      _ -> [ (showPpr dflags r, (r, Left loc))
+           | (r,loc) <- local_possibilities local_env ]
+        ++ [ (showPpr dflags r, rp) | (r, rp) <- global_possibilities global_env ]
 
     suggest = fuzzyLookup (showPpr dflags tried_rdr_name) all_possibilities
     perhaps = text "Perhaps you meant"
@@ -177,15 +192,22 @@ similarNameSuggestions where_look dflags global_env
     tried_ns      = occNameSpace tried_occ
     tried_is_qual = isQual tried_rdr_name
 
-    correct_name_space occ =  nameSpacesRelated (occNameSpace occ) tried_ns
-                           && isSymOcc occ == tried_is_sym
+    correct_name_space occ =
+      (occNameSpace occ == tried_ns ||
+        which_suggest == WS_Anything && nameSpacesRelated (occNameSpace occ) tried_ns)
+      && isSymOcc occ == tried_is_sym
         -- Treat operator and non-operators as non-matching
         -- This heuristic avoids things like
         --      Not in scope 'f'; perhaps you meant '+' (from Prelude)
 
-    local_ok = case where_look of { WL_Any -> True
+    local_ok = case where_look of { WL_Any       -> True
                                   ; WL_LocalOnly -> True
                                   ; _ -> False }
+
+    field_ok gre = case which_suggest of
+      WS_RecField -> isRecFldGRE gre
+      _ -> not (isNoFieldSelectorGRE gre)
+
     local_possibilities :: LocalRdrEnv -> [(RdrName, SrcSpan)]
     local_possibilities env
       | tried_is_qual = []
@@ -200,7 +222,7 @@ similarNameSuggestions where_look dflags global_env
       | tried_is_qual = [ (rdr_qual, (rdr_qual, how))
                         | gre <- globalRdrEnvElts global_env
                         , isGreOk where_look gre
-                        , not (isNoFieldSelectorGRE gre)
+                        , field_ok gre
                         , let occ = greOccName gre
                         , correct_name_space occ
                         , (mod, how) <- qualsInScope gre
@@ -209,7 +231,7 @@ similarNameSuggestions where_look dflags global_env
       | otherwise = [ (rdr_unqual, pair)
                     | gre <- globalRdrEnvElts global_env
                     , isGreOk where_look gre
-                    , not (isNoFieldSelectorGRE gre)
+                    , field_ok gre
                     , let occ = greOccName gre
                           rdr_unqual = mkRdrUnqual occ
                     , correct_name_space occ

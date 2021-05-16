@@ -33,7 +33,8 @@ import GHC.Rename.Utils ( HsDocContext(..), mapFvRn, bindLocalNames
                         , newLocalBndrsRn
                         , withHsDocContext, noNestedForallsContextsErr
                         , addNoNestedForallsContextsErr, checkInferredVars )
-import GHC.Rename.Unbound ( mkUnboundName, notInScopeErr, WhereLooking(WL_Global) )
+import GHC.Rename.Unbound ( mkUnboundName, notInScopeErr, WhereLooking(WL_Global)
+                          , WhichSuggest(..) )
 import GHC.Rename.Names
 import GHC.Tc.Gen.Annotation ( annCtxt )
 import GHC.Tc.Utils.Monad
@@ -322,8 +323,10 @@ rnAnnProvenance :: AnnProvenance GhcPs
                 -> RnM (AnnProvenance GhcRn, FreeVars)
 rnAnnProvenance provenance = do
     provenance' <- case provenance of
-      ValueAnnProvenance n -> ValueAnnProvenance <$> lookupLocatedTopBndrRnN n
-      TypeAnnProvenance n  -> TypeAnnProvenance  <$> lookupLocatedTopBndrRnN n
+      ValueAnnProvenance n -> ValueAnnProvenance
+                          <$> lookupLocatedTopBndrRnN WS_Anything n
+      TypeAnnProvenance n  -> TypeAnnProvenance
+                          <$> lookupLocatedTopBndrRnN WS_Constructor n
       ModuleAnnProvenance  -> return ModuleAnnProvenance
     return (provenance', maybe emptyFVs unitFV (annProvenanceName_maybe provenance'))
 
@@ -353,7 +356,7 @@ rnDefaultDecl (DefaultDecl _ tys)
 rnHsForeignDecl :: ForeignDecl GhcPs -> RnM (ForeignDecl GhcRn, FreeVars)
 rnHsForeignDecl (ForeignImport { fd_name = name, fd_sig_ty = ty, fd_fi = spec })
   = do { topEnv :: HscEnv <- getTopEnv
-       ; name' <- lookupLocatedTopBndrRnN name
+       ; name' <- lookupLocatedTopBndrRnN WS_Anything name
        ; (ty', fvs) <- rnHsSigType (ForeignDeclCtx name) TypeLevel ty
 
         -- Mark any PackageTarget style imports as coming from the current package
@@ -365,7 +368,7 @@ rnHsForeignDecl (ForeignImport { fd_name = name, fd_sig_ty = ty, fd_fi = spec })
                                , fd_fi = spec' }, fvs) }
 
 rnHsForeignDecl (ForeignExport { fd_name = name, fd_sig_ty = ty, fd_fe = spec })
-  = do { name' <- lookupLocatedOccRn name
+  = do { name' <- lookupLocatedOccRn WS_Anything name
        ; (ty', fvs) <- rnHsSigType (ForeignDeclCtx name) TypeLevel ty
        ; return (ForeignExport { fd_e_ext = noExtField
                                , fd_name = name', fd_sig_ty = ty'
@@ -743,7 +746,7 @@ rnFamEqn doc atfi extra_kvars
 
              groups :: [NonEmpty (LocatedN RdrName)]
              groups = equivClasses cmpLocated pat_kity_vars
-       ; nms_dups <- mapM (lookupOccRn . unLoc) $
+       ; nms_dups <- mapM (lookupOccRn WS_Anything . unLoc) $
                         [ tv | (tv :| (_:_)) <- groups ]
              -- Add to the used variables
              --  a) any variables that appear *more than once* on the LHS
@@ -1781,7 +1784,7 @@ rnTyClDecl (FamDecl { tcdFam = fam })
 
 rnTyClDecl (SynDecl { tcdLName = tycon, tcdTyVars = tyvars,
                       tcdFixity = fixity, tcdRhs = rhs })
-  = do { tycon' <- lookupLocatedTopBndrRnN tycon
+  = do { tycon' <- lookupLocatedTopBndrRnN WS_Constructor tycon
        ; let kvs = extractHsTyRdrTyVarsKindVars rhs
              doc = TySynCtx tycon
        ; traceRn "rntycl-ty" (ppr tycon <+> ppr kvs)
@@ -1797,7 +1800,7 @@ rnTyClDecl (DataDecl
       tcdFixity = fixity,
       tcdDataDefn = defn@HsDataDefn{ dd_ND = new_or_data
                                    , dd_kindSig = kind_sig} })
-  = do { tycon' <- lookupLocatedTopBndrRnN tycon
+  = do { tycon' <- lookupLocatedTopBndrRnN WS_Constructor tycon
        ; let kvs = extractDataDefnKindVars defn
              doc = TyDataCtx tycon
        ; traceRn "rntycl-data" (ppr tycon <+> ppr kvs)
@@ -1818,7 +1821,7 @@ rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
                         tcdFDs = fds, tcdSigs = sigs,
                         tcdMeths = mbinds, tcdATs = ats, tcdATDefs = at_defs,
                         tcdDocs = docs})
-  = do  { lcls' <- lookupLocatedTopBndrRnN lcls
+  = do  { lcls' <- lookupLocatedTopBndrRnN WS_Constructor lcls
         ; let cls' = unLoc lcls'
               kvs = []  -- No scoped kind vars except those in
                         -- kind signatures on the tyvars
@@ -2103,7 +2106,7 @@ rnFamDecl mb_cls (FamilyDecl { fdLName = tycon, fdTyVars = tyvars
                              , fdFixity = fixity
                              , fdInfo = info, fdResultSig = res_sig
                              , fdInjectivityAnn = injectivity })
-  = do { tycon' <- lookupLocatedTopBndrRnN tycon
+  = do { tycon' <- lookupLocatedTopBndrRnN WS_Constructor tycon
        ; ((tyvars', res_sig', injectivity'), fv1) <-
             bindHsQTyVars doc mb_cls kvs tyvars $ \ tyvars' _ ->
             do { let rn_sig = rnFamResultSig doc
@@ -2286,7 +2289,7 @@ rnConDecl decl@(ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
                            , con_mb_cxt = mcxt, con_args = args
                            , con_doc = mb_doc, con_forall = forall })
   = do  { _        <- addLocMA checkConName name
-        ; new_name <- lookupLocatedTopBndrRnN name
+        ; new_name <- lookupLocatedTopBndrRnN WS_Constructor name
 
         -- We bind no implicit binders here; this is just like
         -- a nested HsForAllTy.  E.g. consider
@@ -2321,7 +2324,7 @@ rnConDecl (ConDeclGADT { con_names   = names
                        , con_res_ty  = res_ty
                        , con_doc     = mb_doc })
   = do  { mapM_ (addLocMA checkConName) names
-        ; new_names <- mapM lookupLocatedTopBndrRnN names
+        ; new_names <- mapM (lookupLocatedTopBndrRnN WS_Constructor) names
 
         ; let -- We must ensure that we extract the free tkvs in left-to-right
               -- order of their appearance in the constructor type.
@@ -2466,7 +2469,7 @@ rnHsTyVars tvs  = mapM rnHsTyVar tvs
 
 rnHsTyVar :: LocatedN RdrName -> RnM (LocatedN Name)
 rnHsTyVar (L l tyvar) = do
-  tyvar' <- lookupOccRn tyvar
+  tyvar' <- lookupOccRn WS_Anything tyvar
   return (L l tyvar')
 
 {-

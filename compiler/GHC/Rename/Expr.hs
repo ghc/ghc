@@ -40,7 +40,7 @@ import GHC.Rename.Utils ( HsDocContext(..), bindLocalNamesFV, checkDupNames
                         , mapMaybeFvRn, mapFvRn
                         , warnUnusedLocalBinds, typeAppErr
                         , checkUnusedRecordWildcard )
-import GHC.Rename.Unbound ( reportUnboundName )
+import GHC.Rename.Unbound ( reportUnboundName, WhichSuggest(..) )
 import GHC.Rename.Splice  ( rnBracket, rnSpliceExpr, checkThLocalName )
 import GHC.Rename.HsType
 import GHC.Rename.Pat
@@ -206,7 +206,7 @@ rnUnboundVar v =
        return (HsUnboundVar noExtField (rdrNameOcc v), emptyFVs)
 
         else -- Fail immediately (qualified name)
-             do { n <- reportUnboundName v
+             do { n <- reportUnboundName WS_Anything v
                 ; return (HsVar noExtField (noLocA n), emptyFVs) }
 
 rnExpr (HsVar _ (L l v))
@@ -319,7 +319,7 @@ rnExpr (HsGetField _ e f)
 
 rnExpr (HsProjection _ fs)
   = do { (getField, fv_getField) <- lookupSyntaxName getFieldName
-       ; circ <- lookupOccRn compose_RDR
+       ; circ <- lookupOccRn WS_Anything compose_RDR
        ; let fs' = fmap rnHsFieldLabel fs
        ; return ( mkExpandedExpr
                     (HsProjection noExtField fs')
@@ -415,7 +415,7 @@ rnExpr (ExplicitSum _ alt arity expr)
 
 rnExpr (RecordCon { rcon_con = con_id
                   , rcon_flds = rec_binds@(HsRecFields { rec_dotdot = dd }) })
-  = do { con_lname@(L _ con_name) <- lookupLocatedOccRn con_id
+  = do { con_lname@(L _ con_name) <- lookupLocatedOccRn WS_Constructor con_id
        ; (flds, fvs)   <- rnHsRecFields (HsRecFieldCon con_name) mk_hs_var rec_binds
        ; (flds', fvss) <- mapAndUnzipM rn_field flds
        ; let rec_binds' = HsRecFields { rec_flds = flds', rec_dotdot = dd }
@@ -1287,7 +1287,7 @@ lookupStmtNamePoly ctxt name
   | rebindableContext ctxt
   = do { rebindable_on <- xoptM LangExt.RebindableSyntax
        ; if rebindable_on
-         then do { fm <- lookupOccRn (nameRdrName name)
+         then do { fm <- lookupOccRn WS_Anything (nameRdrName name)
                  ; return (HsVar noExtField (noLocA fm), unitFV fm) }
          else not_rebindable }
   | otherwise
