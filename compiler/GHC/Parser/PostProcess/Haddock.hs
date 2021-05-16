@@ -979,10 +979,10 @@ instance HasHaddock (LocatedA (HsType GhcPs)) where
         pure $ L l (HsForAllTy x tele body')
 
       -- (Eq a, Num a) => t
-      HsQualTy x mlhs rhs -> do
-        traverse_ registerHdkA mlhs
+      HsQualTy x lhs rhs -> do
+        registerHdkA lhs
         rhs' <- addHaddock rhs
-        pure $ L l (HsQualTy x mlhs rhs')
+        pure $ L l (HsQualTy x lhs rhs')
 
       -- arg -> res
       HsFunTy u mult lhs rhs -> do

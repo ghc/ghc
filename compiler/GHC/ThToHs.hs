@@ -1816,7 +1816,7 @@ cvtPatSynSigTy (ForallT univs reqs (ForallT exis provs ty))
                                ; let l = noAnnSrcSpan l'
                                ; ty' <- cvtType (ForallT exis provs ty)
                                ; return $ L l $ mkHsImplicitSigType
-                                        $ L l (HsQualTy { hst_ctxt = Nothing
+                                        $ L l (HsQualTy { hst_ctxt = noLocA []
                                                         , hst_xqual = noExtField
                                                         , hst_body = ty' }) }
   | null reqs             = do { l'      <- getL
@@ -1824,7 +1824,7 @@ cvtPatSynSigTy (ForallT univs reqs (ForallT exis provs ty))
                                ; univs' <- cvtTvs univs
                                ; ty'    <- cvtType (ForallT exis provs ty)
                                ; let forTy = mkHsExplicitSigType noAnn univs' $ L l'' cxtTy
-                                     cxtTy = HsQualTy { hst_ctxt = Nothing
+                                     cxtTy = HsQualTy { hst_ctxt = noLocA []
                                                       , hst_xqual = noExtField
                                                       , hst_body = ty' }
                                ; return $ L (noAnnSrcSpan l') forTy }
@@ -1910,7 +1910,7 @@ mkHsQualTy :: TH.Cxt
 mkHsQualTy ctxt loc ctxt' ty
   | null ctxt = ty
   | otherwise = L loc $ HsQualTy { hst_xqual = noExtField
-                                 , hst_ctxt  = Just ctxt'
+                                 , hst_ctxt  = ctxt'
                                  , hst_body  = ty }
 
 mkHsOuterFamEqnTyVarBndrs :: Maybe [LHsTyVarBndr () GhcPs] -> HsOuterFamEqnTyVarBndrs GhcPs
