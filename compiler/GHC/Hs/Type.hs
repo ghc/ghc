@@ -662,7 +662,7 @@ splitLHsQualTy ty
 -- parentheses, hence the suffix @_KP@ (short for \"Keep Parentheses\").
 splitLHsQualTy_KP :: LHsType (GhcPass pass) -> (Maybe (LHsContext (GhcPass pass)), LHsType (GhcPass pass))
 splitLHsQualTy_KP (L _ (HsQualTy { hst_ctxt = ctxt, hst_body = body }))
-                       = (ctxt, body)
+                       = (Just ctxt, body)
 splitLHsQualTy_KP body = (Nothing, body)
 
 -- | Decompose a type class instance type (of the form
@@ -979,13 +979,12 @@ pprLHsContext :: (OutputableBndrId p)
 pprLHsContext Nothing = empty
 pprLHsContext (Just lctxt)
   | null (unLoc lctxt) = empty
-  | otherwise          = pprLHsContextAlways (Just lctxt)
+  | otherwise          = pprLHsContextAlways lctxt
 
 -- For use in a HsQualTy, which always gets printed if it exists.
 pprLHsContextAlways :: (OutputableBndrId p)
-                    => Maybe (LHsContext (GhcPass p)) -> SDoc
-pprLHsContextAlways Nothing = parens empty <+> darrow
-pprLHsContextAlways (Just (L _ ctxt))
+                    => LHsContext (GhcPass p) -> SDoc
+pprLHsContextAlways (L _ ctxt)
   = case ctxt of
       []       -> parens empty             <+> darrow
       [L _ ty] -> ppr_mono_ty ty           <+> darrow
@@ -1173,7 +1172,7 @@ lhsTypeHasLeadingPromotionQuote ty
 
     go (HsForAllTy{})        = False
     go (HsQualTy{ hst_ctxt = ctxt, hst_body = body})
-      | Just (L _ (c:_)) <- ctxt = goL c
+      | (L _ (c:_)) <- ctxt = goL c
       | otherwise            = goL body
     go (HsBangTy{})          = False
     go (HsRecTy{})           = False
