@@ -97,7 +97,7 @@ typedef struct StgThunk_ {
 
 typedef struct {
     StgThunkHeader   header;
-    StgClosure *selectee;
+    struct StgClosure_ *payload[];
 } StgSelector;
 
 /*
