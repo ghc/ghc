@@ -193,8 +193,7 @@ similarNameSuggestions (LF which_suggest where_look) dflags global_env
     tried_is_qual = isQual tried_rdr_name
 
     correct_name_space occ =
-      (occNameSpace occ == tried_ns ||
-        which_suggest == WS_Anything && nameSpacesRelated (occNameSpace occ) tried_ns)
+      (nameSpacesRelated (which_suggest == WS_Constructor) tried_ns (occNameSpace occ))
       && isSymOcc occ == tried_is_sym
         -- Treat operator and non-operators as non-matching
         -- This heuristic avoids things like
