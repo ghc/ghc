@@ -1957,7 +1957,7 @@ doTopReactEqPred work_item eq_rel t1 t2
     loc = ctEvLoc ev
 
     mk_eq_ev cls tys mk_ev evs
-      = case (mk_ev evs) of
+      = case mk_ev evs of
           EvExpr e -> EvExpr (Var sc_id `mkTyApps` tys `App` e)
           ev       -> pprPanic "mk_eq_ev" (ppr ev)
       where
