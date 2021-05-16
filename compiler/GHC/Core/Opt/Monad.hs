@@ -539,7 +539,7 @@ pprTickCts (FillInCaseDefault v)        = ppr v
 pprTickCts _                            = Outputable.empty
 
 cmpTick :: Tick -> Tick -> Ordering
-cmpTick a b = case (tickToTag a `compare` tickToTag b) of
+cmpTick a b = case tickToTag a `compare` tickToTag b of
                 GT -> GT
                 EQ -> cmpEqTick a b
                 LT -> LT
