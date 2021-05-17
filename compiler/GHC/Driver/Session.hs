@@ -231,6 +231,7 @@ module GHC.Driver.Session (
 
         -- * Include specifications
         IncludeSpecs(..), addGlobalInclude, addQuoteInclude, flattenIncludes,
+        addImplicitQuoteInclude,
 
         -- * SDoc
         initSDocContext, initDefaultSDocContext,
@@ -400,6 +401,8 @@ import Foreign (Ptr)
 data IncludeSpecs
   = IncludeSpecs { includePathsQuote  :: [String]
                  , includePathsGlobal :: [String]
+                 -- | See note [Implicit include paths]
+                 , includePathsQuoteImplicit :: [String]
                  }
   deriving Show
 
@@ -416,10 +419,37 @@ addQuoteInclude :: IncludeSpecs -> [String] -> IncludeSpecs
 addQuoteInclude spec paths  = let f = includePathsQuote spec
                               in spec { includePathsQuote = f ++ paths }
 
+-- | These includes are not considered while fingerprinting the flags for iface
+-- | See note [Implicit include paths]
+addImplicitQuoteInclude :: IncludeSpecs -> [String] -> IncludeSpecs
+addImplicitQuoteInclude spec paths  = let f = includePathsQuoteImplicit spec
+                              in spec { includePathsQuoteImplicit = f ++ paths }
+
+
 -- | Concatenate and flatten the list of global and quoted includes returning
 -- just a flat list of paths.
 flattenIncludes :: IncludeSpecs -> [String]
-flattenIncludes specs = includePathsQuote specs ++ includePathsGlobal specs
+flattenIncludes specs =
+    includePathsQuote specs ++
+    includePathsQuoteImplicit specs ++
+    includePathsGlobal specs
+
+{- Note [Implicit include paths]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  The compile driver adds the path to the folder containing the source file being
+  compiled to the 'IncludeSpecs', and this change gets recorded in the 'DynFlags'
+  that are used later to compute the interface file. Because of this,
+  the flags fingerprint derived from these 'DynFlags' and recorded in the
+  interface file will end up containing the absolute path to the source folder.
+
+  Build systems with a remote cache like Bazel or Buck (or Shake, see #16956)
+  store the build artifacts produced by a build BA for reuse in subsequent builds.
+
+  Embedding source paths in interface fingerprints will thwart these attemps and
+  lead to unnecessary recompilations when the source paths in BA differ from the
+  source paths in subsequent builds.
+ -}
+
 
 -- | The various Safe Haskell modes
 data SafeHaskellMode
@@ -1357,7 +1387,7 @@ defaultDynFlags mySettings llvmConfig =
         dumpPrefix              = Nothing,
         dumpPrefixForce         = Nothing,
         ldInputs                = [],
-        includePaths            = IncludeSpecs [] [],
+        includePaths            = IncludeSpecs [] [] [],
         libraryPaths            = [],
         frameworkPaths          = [],
         cmdlineFrameworks       = [],
