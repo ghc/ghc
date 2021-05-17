@@ -15,7 +15,7 @@ import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcType
 import GHC.Rename.Names
 import GHC.Rename.Env
-import GHC.Rename.Unbound ( reportUnboundName )
+import GHC.Rename.Unbound ( reportUnboundName, WhatLooking(..) )
 import GHC.Utils.Error
 import GHC.Unit.Module
 import GHC.Unit.Module.Imported
