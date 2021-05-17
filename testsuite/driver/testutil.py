@@ -116,7 +116,7 @@ def symlinks_work() -> bool:
         return True
 
 if not symlinks_work():
-    def link_or_copy_file(src: Path, dst: Path, force_copy):
+    def link_or_copy_file(src: Path, dst: Path, force_copy=False):
         shutil.copyfile(str(src), str(dst))
 else:
     def link_or_copy_file(src: Path, dst: Path, force_copy=False):
