@@ -115,7 +115,6 @@ import GHC.Utils.Outputable
 import GHC.Utils.Lexeme
 import GHC.Utils.Binary
 import Control.DeepSeq
-import Control.Monad ( guard )
 import Data.Char
 import Data.Data
 
@@ -368,14 +367,12 @@ nameSpacesRelated :: Bool      -- ^ Does the name in question come from a patter
                   -> NameSpace -- ^ Name space of the original name
                   -> NameSpace -- ^ Name space of a name that might have been meant
                   -> Bool
-nameSpacesRelated in_pattern ns ns' = ns' `elem` potentialNSs ns
+nameSpacesRelated in_pattern ns ns' = ns' `elem` potential_namespaces ns
   where
-    potentialNSs VarName   = [DataName, VarName]
-    potentialNSs DataName  = DataName : when_not_pat [VarName]
-    potentialNSs TvName    = [TcClsName, TvName]
-    potentialNSs TcClsName = TcClsName : when_not_pat [TvName]
-    when_not_pat = (guard (not in_pattern) *>)
-
+    potential_namespaces VarName   = [DataName, VarName]
+    potential_namespaces DataName  = DataName : [VarName | not in_pattern]
+    potential_namespaces TvName    = [TcClsName, TvName]
+    potential_namespaces TcClsName = TcClsName : [TvName | not in_pattern]
 
 
 {- | Other names in the compiler add additional information to an OccName.
