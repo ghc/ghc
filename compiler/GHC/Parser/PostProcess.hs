@@ -118,6 +118,7 @@ import GHC.Types.Name.Reader
 import GHC.Types.Name
 import GHC.Unit.Module (ModuleName)
 import GHC.Types.Basic
+import GHC.Types.Error ( GhcHint(..) )
 import GHC.Types.Fixity
 import GHC.Types.SourceText
 import GHC.Parser.Types
@@ -145,6 +146,7 @@ import GHC.Driver.Flags ( WarningFlag(..) )
 import qualified Data.Semigroup as Semi
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
+import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
 import Text.ParserCombinators.ReadP as ReadP
@@ -1075,7 +1077,7 @@ checkImportDecl mPre mPost = do
 checkPattern :: LocatedA (PatBuilder GhcPs) -> P (LPat GhcPs)
 checkPattern = runPV . checkLPat
 
-checkPattern_hints :: [PsHint] -> PV (LocatedA (PatBuilder GhcPs)) -> P (LPat GhcPs)
+checkPattern_hints :: [GhcHint] -> PV (LocatedA (PatBuilder GhcPs)) -> P (LPat GhcPs)
 checkPattern_hints hints pp = runPV_hints hints (pp >>= checkLPat)
 
 checkLPat :: LocatedA (PatBuilder GhcPs) -> PV (LPat GhcPs)
@@ -1093,7 +1095,7 @@ checkPat loc (L l e@(PatBuilderVar (L ln c))) tyargs args
       add_hint TypeApplicationsInPatternsOnlyDataCons $
       patFail (locA l) (ppr e <+> hsep [text "@" <> ppr t | t <- tyargs])
   | not (null args) && patIsRec c =
-      add_hint SuggestRecursiveDo $
+      add_hint (SuggestExtension LangExt.RecursiveDo) $
       patFail (locA l) (ppr e)
 checkPat loc (L _ (PatBuilderAppType f _ t)) tyargs args =
   checkPat loc f (t : tyargs) args
@@ -2717,7 +2719,7 @@ failOpFewArgs (L loc op) =
 data PV_Context =
   PV_Context
     { pv_options :: ParserOpts
-    , pv_hints   :: [PsHint]  -- See Note [Parser-Validator Hint]
+    , pv_hints   :: [GhcHint]  -- See Note [Parser-Validator Hint]
     }
 
 data PV_Accum =
@@ -2767,7 +2769,7 @@ instance Monad PV where
 runPV :: PV a -> P a
 runPV = runPV_hints []
 
-runPV_hints :: [PsHint] -> PV a -> P a
+runPV_hints :: [GhcHint] -> PV a -> P a
 runPV_hints hints m =
   P $ \s ->
     let
@@ -2788,7 +2790,7 @@ runPV_hints hints m =
         PV_Ok acc' a -> POk (mkPState acc') a
         PV_Failed acc' -> PFailed (mkPState acc')
 
-add_hint :: PsHint -> PV a -> PV a
+add_hint :: GhcHint -> PV a -> PV a
 add_hint hint m =
   let modifyHint ctx = ctx{pv_hints = pv_hints ctx ++ [hint]} in
   PV (\ctx acc -> unPV m (modifyHint ctx) acc)

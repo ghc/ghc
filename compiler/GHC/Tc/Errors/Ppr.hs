@@ -8,3 +8,4 @@ import GHC.Types.Error
 instance Diagnostic TcRnMessage where
   diagnosticMessage (TcRnUnknownMessage m) = diagnosticMessage m
   diagnosticReason  (TcRnUnknownMessage m) = diagnosticReason m
+  diagnosticHints   (TcRnUnknownMessage m) = diagnosticHints m
