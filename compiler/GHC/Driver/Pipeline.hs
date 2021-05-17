@@ -1259,7 +1259,7 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
   -- the .hs files resides) to the include path, since this is
   -- what gcc does, and it's probably what you want.
         let current_dir = takeDirectory basename
-            new_includes = addQuoteInclude paths [current_dir]
+            new_includes = addImplicitQuoteInclude paths [current_dir]
             paths = includePaths dflags0
             dflags = dflags0 { includePaths = new_includes }
 
