@@ -32,6 +32,7 @@ module GHC.Data.StringBuffer
         currentChar,
         prevChar,
         atEnd,
+        fingerprintStringBuffer,
 
         -- * Moving and comparison
         stepOn,
@@ -55,6 +56,8 @@ import GHC.Utils.Encoding
 import GHC.Utils.IO.Unsafe
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Exception      ( bracket_ )
+import GHC.Utils.Misc
+import GHC.Fingerprint
 
 import Data.Maybe
 import System.IO
@@ -255,6 +258,13 @@ byteDiff s1 s2 = cur s2 - cur s1
 -- | Check whether a 'StringBuffer' is empty (analogous to 'Data.List.null').
 atEnd :: StringBuffer -> Bool
 atEnd (StringBuffer _ l c) = l == c
+
+-- | Computes a hash of the contents of a 'StringBuffer'.
+fingerprintStringBuffer :: StringBuffer -> Fingerprint
+fingerprintStringBuffer (StringBuffer buf len cur) =
+  unsafePerformIO $
+    withForeignPtr buf $ \ptr ->
+      fingerprintData (ptr `plusPtr` cur) len
 
 -- | Computes a 'StringBuffer' which points to the first character of the
 -- wanted line. Lines begin at 1.

@@ -2592,7 +2592,7 @@ data CallInfoSet = CIS Id (Bag CallInfo)
 data CallInfo
   = CI { ci_key  :: [SpecArg]   -- All arguments
        , ci_fvs  :: IdSet       -- Free Ids of the ci_key call
-                                -- *not* including the main id itself, of course
+                                -- _not_ including the main id itself, of course
                                 -- NB: excluding tyvars:
                                 --     See Note [Specialising polymorphic dictionaries]
     }
