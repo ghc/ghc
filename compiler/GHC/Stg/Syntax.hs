@@ -50,7 +50,7 @@ module GHC.Stg.Syntax (
         StgOp(..),
 
         -- utils
-        stgRhsArity, freeVarsOfRhs,
+        stgRhsArity, freeVarsOfRhs, exprArgs,
         isDllConApp,
         stgArgType,
         stripStgTicksTop, stripStgTicksTopE,
@@ -508,6 +508,12 @@ freeVarsOfRhs :: (XRhsClosure pass ~ DIdSet) => GenStgRhs pass -> DIdSet
 freeVarsOfRhs (StgRhsCon _ _ _ _ args) = mkDVarSet [ id | StgVarArg id <- args ]
 freeVarsOfRhs (StgRhsClosure fvs _ _ _ _) = fvs
 
+exprArgs :: (XRhsClosure pass ~ DIdSet) => GenStgExpr pass -> DIdSet
+exprArgs (StgApp _ args) = mkDVarSet [ id | StgVarArg id <- args ]
+exprArgs (StgOpApp _ args _)  = mkDVarSet [ id | StgVarArg id <- args ]
+exprArgs (StgConApp _ _ args _) = mkDVarSet [ id | StgVarArg id <- args ]
+exprArgs _ = emptyDVarSet
+
 {-
 ************************************************************************
 *                                                                      *
@@ -718,13 +724,13 @@ pprGenStgTopBindings :: (OutputablePass pass) => StgPprOpts -> [GenStgTopBinding
 pprGenStgTopBindings opts binds
   = vcat $ intersperse blankLine (map (pprGenStgTopBinding opts) binds)
 
-pprStgBinding :: StgPprOpts -> StgBinding -> SDoc
+pprStgBinding :: OutputablePass pass => StgPprOpts -> GenStgBinding pass -> SDoc
 pprStgBinding = pprGenStgBinding
 
-pprStgTopBinding :: StgPprOpts -> StgTopBinding -> SDoc
+pprStgTopBinding :: OutputablePass pass => StgPprOpts -> GenStgTopBinding pass -> SDoc
 pprStgTopBinding = pprGenStgTopBinding
 
-pprStgTopBindings :: StgPprOpts -> [StgTopBinding] -> SDoc
+pprStgTopBindings :: OutputablePass pass => StgPprOpts -> [GenStgTopBinding pass] -> SDoc
 pprStgTopBindings = pprGenStgTopBindings
 
 instance Outputable StgArg where
