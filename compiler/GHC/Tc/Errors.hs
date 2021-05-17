@@ -23,7 +23,7 @@ import GHC.Tc.Utils.Unify( occCheckForErrors, CheckTyEqResult(..) )
 import GHC.Tc.Utils.Env( tcInitTidyEnv )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Origin
-import GHC.Rename.Unbound ( unknownNameSuggestions )
+import GHC.Rename.Unbound ( unknownNameSuggestions, WhatLooking(..) )
 import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.TyCo.Rep
@@ -40,7 +40,8 @@ import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.EvTerm
 import GHC.Hs.Binds ( PatSynBind(..) )
 import GHC.Types.Name
-import GHC.Types.Name.Reader ( lookupGRE_Name, GlobalRdrEnv, mkRdrUnqual )
+import GHC.Types.Name.Reader ( lookupGRE_Name, GlobalRdrEnv, mkRdrUnqual
+                             , emptyLocalRdrEnv, lookupGlobalRdrEnv , lookupLocalRdrOcc )
 import GHC.Builtin.Names ( typeableClassName )
 import GHC.Types.Id
 import GHC.Types.Var
@@ -1197,7 +1198,7 @@ mkHoleError _ _tidy_simples ctxt hole@(Hole { hole_occ = occ
        ; hpt <- getHpt
        ; let err = important out_of_scope_msg `mappend`
                    (mk_relevant_bindings $
-                     unknownNameSuggestions dflags hpt curr_mod rdr_env
+                     unknownNameSuggestions WL_Anything dflags hpt curr_mod rdr_env
                        (tcl_rdr lcl_env) imp_info (mkRdrUnqual occ))
 
        ; maybeAddDeferredBindings ctxt hole err
@@ -2384,7 +2385,8 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
   | null matches  -- No matches but perhaps several unifiers
   = do { (_, binds_msg, ct) <- relevantBindings True ctxt ct
        ; candidate_insts <- get_candidate_instances
-       ; return (cannot_resolve_msg ct candidate_insts binds_msg) }
+       ; field_suggestions <- record_field_suggestions
+       ; return (cannot_resolve_msg ct candidate_insts binds_msg field_suggestions) }
 
   | null unsafe_overlapped   -- Some matches => overlap errors
   = return overlap_msg
@@ -2421,8 +2423,33 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
         in different_names && same_occ_names
       | otherwise = False
 
-    cannot_resolve_msg :: Ct -> [ClsInst] -> SDoc -> SDoc
-    cannot_resolve_msg ct candidate_insts binds_msg
+    -- This is for -XOverloadedRecordDot. We only want to suggest other record
+    -- fields if the OccName of the record field is not somehow in scope,
+    -- either qualified or unqualified, since qualification doesn't make a
+    -- difference here.
+    record_field_suggestions :: TcM SDoc
+    record_field_suggestions = flip (maybe $ return empty) record_field $ \name ->
+       do { glb_env <- getGlobalRdrEnv
+          ; lcl_env <- getLocalRdrEnv
+          ; if occ_name_in_scope glb_env lcl_env name
+              then return empty
+              else do { dflags   <- getDynFlags
+                      ; imp_info <- getImports
+                      ; curr_mod <- getModule
+                      ; hpt      <- getHpt
+                      ; return (unknownNameSuggestions WL_RecField dflags hpt curr_mod
+                          glb_env emptyLocalRdrEnv imp_info (mkRdrUnqual name)) } }
+
+    occ_name_in_scope glb_env lcl_env occ_name = not $
+      null (lookupGlobalRdrEnv glb_env occ_name) &&
+      isNothing (lookupLocalRdrOcc lcl_env occ_name)
+
+    record_field = case orig of
+      HasFieldOrigin name -> Just (mkVarOccFS name)
+      _                   -> Nothing
+
+    cannot_resolve_msg :: Ct -> [ClsInst] -> SDoc -> SDoc -> SDoc
+    cannot_resolve_msg ct candidate_insts binds_msg field_suggestions
       = vcat [ no_inst_msg
              , nest 2 extra_note
              , vcat (pp_givens useful_givens)
@@ -2437,8 +2464,9 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
                            ++ drv_fixes)
              , ppWhen (not (null candidate_insts))
                (hang (text "There are instances for similar types:")
-                   2 (vcat (map ppr candidate_insts))) ]
+                   2 (vcat (map ppr candidate_insts)))
                    -- See Note [Report candidate instances]
+             , field_suggestions ]
       where
         orig = ctOrigin ct
         -- See Note [Highlighting ambiguous type variables]
