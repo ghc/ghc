@@ -44,8 +44,12 @@ fingerprintDynFlags dflags@DynFlags{..} this_mod nameio =
         lang = (fmap fromEnum language,
                 map fromEnum $ EnumSet.toList extensionFlags)
 
+        -- avoid fingerprinting the absolute path to the directory of the source file
+        -- see note [Implicit include paths]
+        includePathsMinusImplicit = includePaths { includePathsQuoteImplicit = [] }
+
         -- -I, -D and -U flags affect CPP
-        cpp = ( map normalise $ flattenIncludes includePaths
+        cpp = ( map normalise $ flattenIncludes includePathsMinusImplicit
             -- normalise: eliminate spurious differences due to "./foo" vs "foo"
               , picPOpts dflags
               , opt_P_signature dflags)
