@@ -695,6 +695,11 @@ def _outputdir( name, opts, odir ):
 
 # ----
 
+def copy_files(name, opts):
+    opts.copy_files = True
+
+# ----
+
 def pre_cmd( cmd ):
     return lambda name, opts, c=cmd: _pre_cmd(name, opts, cmd)
 
@@ -1131,13 +1136,14 @@ def do_test(name: TestName,
     for extra_file in files:
         src = in_srcdir(extra_file)
         dst = in_testdir(os.path.basename(extra_file.rstrip('/\\')))
+        force_copy = opts.copy_files
         if src.is_file():
-            link_or_copy_file(src, dst)
+            link_or_copy_file(src, dst, force_copy)
         elif src.is_dir():
             if dst.exists():
                 shutil.rmtree(str(dst))
             dst.mkdir()
-            lndir(src, dst)
+            lndir(src, dst, force_copy)
         else:
             if not config.haddock and os.path.splitext(extra_file)[1] == '.t':
                 # When using a ghc built without haddock support, .t
