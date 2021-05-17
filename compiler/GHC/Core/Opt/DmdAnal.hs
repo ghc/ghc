@@ -1076,9 +1076,12 @@ dictionaries.
 -}
 
 setBndrsDemandInfo :: [Var] -> [Demand] -> [Var]
-setBndrsDemandInfo (b:bs) (d:ds)
-  | isTyVar b = b : setBndrsDemandInfo bs (d:ds)
-  | otherwise = setIdDemandInfo b d : setBndrsDemandInfo bs ds
+setBndrsDemandInfo (b:bs) ds
+  | isTyVar b = b : setBndrsDemandInfo bs ds
+setBndrsDemandInfo (b:bs) (d:ds) =
+    let !new_info = setIdDemandInfo b d
+        !vars = setBndrsDemandInfo bs ds
+    in new_info : vars
 setBndrsDemandInfo [] ds = ASSERT( null ds ) []
 setBndrsDemandInfo bs _  = pprPanic "setBndrsDemandInfo" (ppr bs)
 
