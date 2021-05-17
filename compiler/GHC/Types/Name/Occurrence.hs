@@ -360,15 +360,19 @@ promoteOccName (OccName space name) = do
 
 -- Name spaces are related if there is a chance to mean the one when one writes
 -- the other, i.e. variables <-> data constructors and type variables <-> type constructors
-nameSpacesRelated :: NameSpace -> NameSpace -> Bool
-nameSpacesRelated ns1 ns2 = ns1 == ns2 || otherNameSpace ns1 == ns2
-
-otherNameSpace :: NameSpace -> NameSpace
-otherNameSpace VarName = DataName
-otherNameSpace DataName = VarName
-otherNameSpace TvName = TcClsName
-otherNameSpace TcClsName = TvName
-
+-- In patterns, a user might have written a variable when they meant to write
+-- constructor, but they can never (correctly) have meant a variable when they
+-- wrote a constructor name
+nameSpacesRelated :: Bool      -- ^ Does the name in question come from a pattern?
+                  -> NameSpace -- ^ Name space of the original name
+                  -> NameSpace -- ^ Name space of a name that might have been meant
+                  -> Bool
+nameSpacesRelated in_pattern ns ns' = ns' `elem` potential_namespaces ns
+  where
+    potential_namespaces VarName   = [DataName, VarName]
+    potential_namespaces DataName  = DataName : [VarName | not in_pattern]
+    potential_namespaces TvName    = [TcClsName, TvName]
+    potential_namespaces TcClsName = TcClsName : [TvName | not in_pattern]
 
 
 {- | Other names in the compiler add additional information to an OccName.
