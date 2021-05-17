@@ -55,3 +55,5 @@ test('T13380b',  [ grep_errmsg('bigDeadAction') ], compile, ['-dppr-cols=200 -dd
 
 # We just want to find the worker of foo in there:
 test('T18122',  [ grep_errmsg(r'wfoo =') ], compile, ['-ddump-simpl'])
+
+test('T19849', normal, compile, [''])
