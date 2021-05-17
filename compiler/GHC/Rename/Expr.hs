@@ -40,7 +40,7 @@ import GHC.Rename.Utils ( HsDocContext(..), bindLocalNamesFV, checkDupNames
                         , mapMaybeFvRn, mapFvRn
                         , warnUnusedLocalBinds, typeAppErr
                         , checkUnusedRecordWildcard )
-import GHC.Rename.Unbound ( reportUnboundName, WhichSuggest(..) )
+import GHC.Rename.Unbound ( reportUnboundName )
 import GHC.Rename.Splice  ( rnBracket, rnSpliceExpr, checkThLocalName )
 import GHC.Rename.HsType
 import GHC.Rename.Pat
@@ -206,7 +206,7 @@ rnUnboundVar v =
        return (HsUnboundVar noExtField (rdrNameOcc v), emptyFVs)
 
         else -- Fail immediately (qualified name)
-             do { n <- reportUnboundName WS_Anything v
+             do { n <- reportUnboundName v
                 ; return (HsVar noExtField (noLocA n), emptyFVs) }
 
 rnExpr (HsVar _ (L l v))
