@@ -129,7 +129,7 @@ unknownNameSuggestions_ :: LookingFor -> DynFlags
 unknownNameSuggestions_ looking_for dflags hpt curr_mod global_env local_env
                           imports tried_rdr_name =
     similarNameSuggestions looking_for dflags global_env local_env tried_rdr_name $$
-    importSuggestions (lf_where looking_for) global_env hpt
+    importSuggestions looking_for global_env hpt
                       curr_mod imports tried_rdr_name $$
     extensionSuggestions tried_rdr_name $$
     fieldSelectorSuggestions global_env tried_rdr_name
@@ -203,10 +203,6 @@ similarNameSuggestions (LF which_suggest where_look) dflags global_env
                                   ; WL_LocalOnly -> True
                                   ; _ -> False }
 
-    field_ok gre = case which_suggest of
-      WS_RecField -> isRecFldGRE gre
-      _ -> not (isNoFieldSelectorGRE gre)
-
     local_possibilities :: LocalRdrEnv -> [(RdrName, SrcSpan)]
     local_possibilities env
       | tried_is_qual = []
@@ -221,7 +217,7 @@ similarNameSuggestions (LF which_suggest where_look) dflags global_env
       | tried_is_qual = [ (rdr_qual, (rdr_qual, how))
                         | gre <- globalRdrEnvElts global_env
                         , isGreOk where_look gre
-                        , field_ok gre
+                        , recordFieldOk which_suggest gre
                         , let occ = greOccName gre
                         , correct_name_space occ
                         , (mod, how) <- qualsInScope gre
@@ -230,7 +226,7 @@ similarNameSuggestions (LF which_suggest where_look) dflags global_env
       | otherwise = [ (rdr_unqual, pair)
                     | gre <- globalRdrEnvElts global_env
                     , isGreOk where_look gre
-                    , field_ok gre
+                    , recordFieldOk which_suggest gre
                     , let occ = greOccName gre
                           rdr_unqual = mkRdrUnqual occ
                     , correct_name_space occ
@@ -266,11 +262,11 @@ similarNameSuggestions (LF which_suggest where_look) dflags global_env
         | i <- is, let ispec = is_decl i, is_qual ispec ]
 
 -- | Generate helpful suggestions if a qualified name Mod.foo is not in scope.
-importSuggestions :: WhereLooking
+importSuggestions :: LookingFor
                   -> GlobalRdrEnv
                   -> HomePackageTable -> Module
                   -> ImportAvails -> RdrName -> SDoc
-importSuggestions where_look global_env hpt currMod imports rdr_name
+importSuggestions (LF which_suggest where_look) global_env hpt currMod imports rdr_name
   | WL_LocalOnly <- where_look                 = Outputable.empty
   | WL_LocalTop  <- where_look                 = Outputable.empty
   | not (isQual rdr_name || isUnqual rdr_name) = Outputable.empty
@@ -375,7 +371,8 @@ importSuggestions where_look global_env hpt currMod imports rdr_name
   -- wouldn't have an out-of-scope error in the first place)
   helpful_imports = filter helpful interesting_imports
     where helpful (_,imv)
-            = not . null $ lookupGlobalRdrEnv (imv_all_exports imv) occ_name
+            = any (recordFieldOk which_suggest) $
+              lookupGlobalRdrEnv (imv_all_exports imv) occ_name
 
   -- Which of these do that because of an explicit hiding list resp. an
   -- explicit import list
@@ -420,6 +417,11 @@ isGreOk where_look = case where_look of
                          WL_LocalTop  -> isLocalGRE
                          WL_LocalOnly -> const False
                          _            -> const True
+
+recordFieldOk :: WhichSuggest -> GlobalRdrElt -> Bool
+recordFieldOk which_suggest gre = case which_suggest of
+  WS_RecField -> isRecFldGRE gre
+  _           -> not (isNoFieldSelectorGRE gre)
 
 {- Note [When to show/hide the module-not-imported line]           -- #15611
 For the error message:
