@@ -492,8 +492,8 @@ inferResultToType (IR { ir_uniq = u, ir_lvl = tc_lvl
             Just ty -> do { ensureMonoType ty
                             -- See Note [inferResultToType]
                           ; return ty }
-            Nothing -> do { rr  <- newMetaTyVarTyAtLevel tc_lvl runtimeInfoTy
-                          ; tau <- newMetaTyVarTyAtLevel tc_lvl (tYPE rr)
+            Nothing -> do { ri  <- newMetaTyVarTyAtLevel tc_lvl runtimeInfoTy
+                          ; tau <- newMetaTyVarTyAtLevel tc_lvl (tYPE ri)
                             -- See Note [TcLevel of ExpType]
                           ; writeMutVar ref (Just tau)
                           ; return tau }
@@ -1048,8 +1048,9 @@ newFlexiTyVarTys n kind = replicateM n (newFlexiTyVarTy kind)
 
 newOpenTypeKind :: TcM TcKind
 newOpenTypeKind
-  = do { rr <- newFlexiTyVarTy runtimeInfoTy
-       ; return (tYPE rr) }
+  = do { rr <- newFlexiTyVarTy runtimeRepTy
+       ; cc <- newFlexiTyVarTy callingConvTy
+       ; return (tYPE $ rInfo rr cc) }
 
 -- | Create a tyvar that can be a lifted or unlifted type.
 -- Returns alpha :: TYPE kappa, where both alpha and kappa are fresh
@@ -1765,16 +1766,16 @@ defaultTyVar default_kind tv
     -- See Note [Inferring kinds for type declarations] in GHC.Tc.TyCl
   = return False
 
-  | isRuntimeInfoVar tv  -- Do not quantify over a RuntimeRep var
+  | isRuntimeInfoVar tv  -- Do not quantify over a RuntimeInfo var
                         -- unless it is a TyVarTv, handled earlier
-  = do { traceTc "Defaulting a RuntimeRep var to LiftedRep" (ppr tv)
+  = do { traceTc "Defaulting a RuntimeInfo var to LiftedRepEvalTy" (ppr tv)
        ; writeMetaTyVar tv liftedRepEvalTy
        ; return True }
 
   | isRuntimeRepVar tv  -- Do not quantify over a RuntimeRep var
                         -- unless it is a TyVarTv, handled earlier
   = do { traceTc "Defaulting a RuntimeRep var to LiftedRep" (ppr tv)
-       ; writeMetaTyVar tv liftedRepEvalTy
+       ; writeMetaTyVar tv liftedRepTy
        ; return True }
   | isMultiplicityVar tv
   = do { traceTc "Defaulting a Multiplicty var to Many" (ppr tv)

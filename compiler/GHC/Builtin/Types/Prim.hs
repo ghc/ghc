@@ -408,7 +408,7 @@ openAlphaTyVar, openBetaTyVar :: TyVar
 -- alpha :: TYPE r1
 -- beta  :: TYPE r2
 [openAlphaTyVar,openBetaTyVar]
-  = mkTemplateTyVars [tYPE runtimeInfo1Ty, tYPE runtimeInfo2Ty]
+  = mkTemplateTyVars [tYPE $ (rInfo runtimeRep1Ty callingConv1Ty), tYPE $ (rInfo runtimeRep2Ty callingConv2Ty)]
 
 openAlphaTy, openBetaTy :: Type
 openAlphaTy = mkTyVarTy openAlphaTyVar

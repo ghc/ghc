@@ -1093,7 +1093,7 @@ mk_tuple Unboxed arity = (tycon, tuple_con)
 
     -- See Note [Unboxed tuple RuntimeRep vars] in GHC.Core.TyCon
     -- Kind:  forall (k1:RuntimeRep) (k2:RuntimeRep). TYPE k1 -> TYPE k2 -> #
-    tc_binders = mkTemplateTyConBinders (take arity $ cycle [runtimeRepTy, callingConvTy])
+    tc_binders = mkTemplateTyConBinders (take (arity * 2) $ cycle [runtimeRepTy, callingConvTy])
                     (\ris -> map (\(r,c) -> tYPE $ rInfo r c) (take2 ris))
 
     tc_res_kind = unboxedTupleKindRI ri_tys
@@ -1418,11 +1418,13 @@ unrestrictedFunTyCon :: TyCon
 unrestrictedFunTyCon = buildSynTyCon unrestrictedFunTyConName [] arrowKind [] unrestrictedFunTy
   where arrowKind = mkTyConKind binders liftedTypeKind
         -- See also funTyCon
-        binders = [ Bndr runtimeInfo1TyVar (NamedTCB Inferred)
-                  , Bndr runtimeInfo2TyVar (NamedTCB Inferred)
+        binders = [ Bndr runtimeRep1TyVar (NamedTCB Inferred)
+                  , Bndr callingConv1TyVar (NamedTCB Inferred)
+                  , Bndr runtimeRep1TyVar (NamedTCB Inferred)
+                  , Bndr callingConv2TyVar (NamedTCB Inferred)
                   ]
-                  ++ mkTemplateAnonTyConBinders [ tYPE runtimeInfo1Ty
-                                                , tYPE runtimeInfo2Ty
+                  ++ mkTemplateAnonTyConBinders [ tYPE $ rInfo runtimeRep1Ty callingConv1Ty
+                                                , tYPE $ rInfo runtimeRep2Ty callingConv2Ty
                                                 ]
 
 unrestrictedFunTyConName :: Name

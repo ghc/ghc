@@ -579,8 +579,8 @@ kindRep_maybe kind
   , tc `hasKey` tYPETyConKey
   , TyConApp rinfo [rep, conv] <- coreFullView arg
   , rinfo `hasKey` runtimeInfoDataConKey    = Just rep
-  | TyConApp tc [arg] <- coreFullView kind
-  , tc `hasKey` tYPETyConKey                = Just $ (mkTyVarTy . mkTemplateKindVar) runtimeRepTy
+  -- | TyConApp tc [arg] <- coreFullView kind
+  -- , tc `hasKey` tYPETyConKey                = Just $ (mkTyVarTy . mkTemplateKindVar) runtimeRepTy
   | otherwise                               = Nothing
 
 kindConv_maybe :: HasDebugCallStack => Kind -> Maybe Type
@@ -589,8 +589,8 @@ kindConv_maybe kind
   , tc `hasKey` tYPETyConKey
   , TyConApp rinfo [rep, conv] <- coreFullView arg
   , rinfo `hasKey` runtimeInfoDataConKey    = Just conv
-  | TyConApp tc [arg] <- coreFullView kind
-  , tc `hasKey` tYPETyConKey                = Just $ (mkTyVarTy . mkTemplateKindVar) callingConvTy
+  -- | TyConApp tc [arg] <- coreFullView kind
+  -- , tc `hasKey` tYPETyConKey                = Just $ (mkTyVarTy . mkTemplateKindVar) callingConvTy
   | otherwise                               = Nothing
 
 kindInfo_maybe :: HasDebugCallStack => Kind -> Maybe Type

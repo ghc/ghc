@@ -1332,7 +1332,7 @@ finish_tuple rn_ty tup_sort tau_tys tau_kinds exp_kind = do
     UnboxedTuple -> do
       let tycon    = tupleTyCon Unboxed arity
           tau_reps = map kindRep tau_kinds
-          tau_ccs = map kindConv tau_kinds
+          tau_ccs  = map kindConv tau_kinds
           reps_ccs = interleave tau_reps tau_ccs
           -- See also Note [Unboxed tuple RuntimeRep vars] in GHC.Core.TyCon
           arg_tys  = reps_ccs ++ tau_tys
