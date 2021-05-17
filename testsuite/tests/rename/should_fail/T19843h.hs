@@ -1,7 +1,7 @@
 {-# LANGUAGE NoFieldSelectors #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 
-module T19843g where
+module T19843h where
 
 import Prelude (Int, map, undefined)
 import Data.Traversable hiding (traverse)
