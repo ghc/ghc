@@ -56,7 +56,6 @@ import GHC.Utils.Encoding
 import GHC.Utils.IO.Unsafe
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Exception      ( bracket_ )
-import GHC.Utils.Misc
 import GHC.Fingerprint
 
 import Data.Maybe
