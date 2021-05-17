@@ -530,7 +530,6 @@ Library
         GHC.Settings.IO
         GHC.Stg.CSE
         GHC.Stg.Debug
-        GHC.Stg.DepAnal
         GHC.Stg.FVs
         GHC.Stg.Lift
         GHC.Stg.Lift.Analysis

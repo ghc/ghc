@@ -154,7 +154,6 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Zonk    ( ZonkFlexi (DefaultFlexi) )
 
 import GHC.Stg.Syntax
-import GHC.Stg.FVs      ( annTopBindingsFreeVars )
 import GHC.Stg.Pipeline ( stg2stg )
 
 import GHC.Builtin.Utils
@@ -1775,23 +1774,21 @@ This reduces residency towards the end of the CodeGen phase significantly
 (5-10%).
 -}
 
-doCodeGen   :: HscEnv -> Module -> InfoTableProvMap -> [TyCon]
-            -> CollectedCCs
-            -> [StgTopBinding]
-            -> HpcInfo
-            -> IO (Stream IO CmmGroupSRTs CgInfos)
+doCodeGen :: HscEnv -> Module -> InfoTableProvMap -> [TyCon]
+          -> CollectedCCs
+          -> [CgStgTopBinding] -- ^ Bindings come already annotated with fvs
+          -> HpcInfo
+          -> IO (Stream IO CmmGroupSRTs CgInfos)
          -- Note we produce a 'Stream' of CmmGroups, so that the
          -- backend can be run incrementally.  Otherwise it generates all
          -- the C-- up front, which has a significant space cost.
 doCodeGen hsc_env this_mod denv data_tycons
-              cost_centre_info stg_binds hpc_info = do
+              cost_centre_info stg_binds_w_fvs hpc_info = do
     let dflags = hsc_dflags hsc_env
     let logger = hsc_logger hsc_env
     let hooks  = hsc_hooks hsc_env
     let tmpfs  = hsc_tmpfs hsc_env
     let platform = targetPlatform dflags
-
-    let stg_binds_w_fvs = annTopBindingsFreeVars stg_binds
 
     dumpIfSet_dyn logger dflags Opt_D_dump_stg_final "Final STG:" FormatSTG (pprGenStgTopBindings (initStgPprOpts dflags) stg_binds_w_fvs)
 
@@ -1835,7 +1832,7 @@ doCodeGen hsc_env this_mod denv data_tycons
 
 myCoreToStgExpr :: Logger -> DynFlags -> InteractiveContext
                 -> Module -> ModLocation -> CoreExpr
-                -> IO ( StgRhs
+                -> IO ( CgStgRhs
                       , InfoTableProvMap
                       , CollectedCCs )
 myCoreToStgExpr logger dflags ictxt this_mod ml prepd_expr = do
@@ -1856,7 +1853,7 @@ myCoreToStgExpr logger dflags ictxt this_mod ml prepd_expr = do
 
 myCoreToStg :: Logger -> DynFlags -> InteractiveContext
             -> Module -> ModLocation -> CoreProgram
-            -> IO ( [StgTopBinding] -- output program
+            -> IO ( [CgStgTopBinding] -- output program
                   , InfoTableProvMap
                   , CollectedCCs )  -- CAF cost centre info (declared and used)
 myCoreToStg logger dflags ictxt this_mod ml prepd_binds = do
@@ -1864,11 +1861,11 @@ myCoreToStg logger dflags ictxt this_mod ml prepd_binds = do
          = {-# SCC "Core2Stg" #-}
            coreToStg dflags this_mod ml prepd_binds
 
-    stg_binds2
+    stg_binds_with_fvs
         <- {-# SCC "Stg2Stg" #-}
            stg2stg logger dflags ictxt this_mod stg_binds
 
-    return (stg_binds2, denv, cost_centre_info)
+    return (stg_binds_with_fvs, denv, cost_centre_info)
 
 {- **********************************************************************
 %*                                                                      *
