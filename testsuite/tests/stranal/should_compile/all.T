@@ -66,3 +66,4 @@ test('T18894b',  [ grep_errmsg(r'Arity=2') ], compile, ['-ddump-stranal -dsuppre
 test('T18982',  [ grep_errmsg(r'\$w. .*Int#$') ], compile, ['-dppr-cols=1000 -ddump-simpl -dsuppress-idinfo -dsuppress-uniques'])
 
 test('T19180', normal, compile, [''])
+test('T19849', normal, compile, [''])

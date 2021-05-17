@@ -1262,10 +1262,10 @@ conservative thing and refrain from strictifying a dfun's argument
 dictionaries.
 -}
 
-setBndrsDemandInfo :: [Var] -> [Demand] -> [Var]
-setBndrsDemandInfo (b:bs) (d:ds)
-  | isTyVar b = b : setBndrsDemandInfo bs (d:ds)
-  | otherwise =
+setBndrsDemandInfo :: HasCallStack => [Var] -> [Demand] -> [Var]
+setBndrsDemandInfo (b:bs) ds
+  | isTyVar b = b : setBndrsDemandInfo bs ds
+setBndrsDemandInfo (b:bs) (d:ds) =
     let !new_info = setIdDemandInfo b d
         !vars = setBndrsDemandInfo bs ds
     in new_info : vars
