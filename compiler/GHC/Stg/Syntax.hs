@@ -718,13 +718,13 @@ pprGenStgTopBindings :: (OutputablePass pass) => StgPprOpts -> [GenStgTopBinding
 pprGenStgTopBindings opts binds
   = vcat $ intersperse blankLine (map (pprGenStgTopBinding opts) binds)
 
-pprStgBinding :: StgPprOpts -> StgBinding -> SDoc
+pprStgBinding :: OutputablePass pass => StgPprOpts -> GenStgBinding pass -> SDoc
 pprStgBinding = pprGenStgBinding
 
-pprStgTopBinding :: StgPprOpts -> StgTopBinding -> SDoc
+pprStgTopBinding :: OutputablePass pass => StgPprOpts -> GenStgTopBinding pass -> SDoc
 pprStgTopBinding = pprGenStgTopBinding
 
-pprStgTopBindings :: StgPprOpts -> [StgTopBinding] -> SDoc
+pprStgTopBindings :: OutputablePass pass => StgPprOpts -> [GenStgTopBinding pass] -> SDoc
 pprStgTopBindings = pprGenStgTopBindings
 
 instance Outputable StgArg where
