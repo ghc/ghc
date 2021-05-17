@@ -15,7 +15,7 @@ import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcType
 import GHC.Rename.Names
 import GHC.Rename.Env
-import GHC.Rename.Unbound ( reportUnboundName )
+import GHC.Rename.Unbound ( reportUnboundName, WhichSuggest(..) )
 import GHC.Utils.Error
 import GHC.Unit.Module
 import GHC.Unit.Module.Imported
@@ -513,7 +513,7 @@ lookupChildrenExport spec_parent rdr_items =
                                 else setRdrNameSpace bareName dataName
 
           case name of
-            NameNotFound -> do { ub <- reportUnboundName unboundName
+            NameNotFound -> do { ub <- reportUnboundName WS_Anything unboundName
                                ; let l = getLoc n
                                ; return (Left (L l (IEName (L (la2na l) ub))))}
             FoundChild par child -> do { checkPatSynParent spec_parent par child

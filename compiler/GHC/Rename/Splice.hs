@@ -22,7 +22,7 @@ import GHC.Driver.Env.Types
 
 import GHC.Rename.Env
 import GHC.Rename.Utils   ( HsDocContext(..), newLocalBndrRn )
-import GHC.Rename.Unbound ( isUnboundName )
+import GHC.Rename.Unbound ( isUnboundName, WhichSuggest(..) )
 import GHC.Rename.Module  ( rnSrcDecls, findSplice )
 import GHC.Rename.Pat     ( rnPat )
 import GHC.Types.Basic    ( TopLevelFlag, isTopLevel )
@@ -120,7 +120,7 @@ rnBracket e br_body
 
 rn_bracket :: ThStage -> HsBracket GhcPs -> RnM (HsBracket GhcRn, FreeVars)
 rn_bracket outer_stage br@(VarBr x flg rdr_name)
-  = do { name <- lookupOccRn (unLoc rdr_name)
+  = do { name <- lookupOccRn WS_Anything (unLoc rdr_name)
        ; this_mod <- getModule
 
        ; when (flg && nameIsLocalOrFrom this_mod name) $
@@ -411,7 +411,7 @@ rnSplice (HsQuasiQuote x splice_name quoter q_loc quote)
         ; splice_name' <- newLocalBndrRn (L (noAnnSrcSpan loc) splice_name)
 
           -- Rename the quoter; akin to the HsVar case of rnExpr
-        ; quoter' <- lookupOccRn quoter
+        ; quoter' <- lookupOccRn WS_Anything quoter
         ; this_mod <- getModule
         ; when (nameIsLocalOrFrom this_mod quoter') $
           checkThLocalName quoter'
