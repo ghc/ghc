@@ -371,7 +371,7 @@ compileOne' m_tc_result mHscMessage
          = (Interpreter, dflags2 { backend = Interpreter })
          | otherwise
          = (backend dflags, dflags2)
-       dflags  = dflags3 { includePaths = addQuoteInclude old_paths [current_dir] }
+       dflags  = dflags3 { includePaths = addImplicitQuoteInclude old_paths [current_dir] }
        hsc_env = hsc_env0 {hsc_dflags = dflags}
 
        -- -fforce-recomp should also work with --make
