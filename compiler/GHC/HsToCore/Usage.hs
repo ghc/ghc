@@ -12,8 +12,6 @@ import GHC.Prelude
 import GHC.Driver.Env
 import GHC.Driver.Session
 
-import GHC.Platform
-import GHC.Platform.Ways
 
 import GHC.Tc.Types
 
@@ -23,28 +21,27 @@ import GHC.Utils.Fingerprint
 import GHC.Utils.Panic
 
 import GHC.Types.Name
-import GHC.Types.Name.Set
+import GHC.Types.Name.Set ( NameSet, allUses )
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.FM
 
 import GHC.Unit
 import GHC.Unit.External
-import GHC.Unit.State
-import GHC.Unit.Finder
 import GHC.Unit.Module.Imported
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.Deps
 
 import GHC.Data.Maybe
 
-import Control.Monad (filterM)
-import Data.List (sort, sortBy, nub)
+import Data.List (sortBy, sort)
 import Data.IORef
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import System.Directory
-import System.FilePath
+
+import GHC.Linker.Types
+import GHC.Utils.Monad
+import GHC.Linker.Loader ( getLoaderState )
 
 {- Note [Module self-dependency]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -80,8 +77,7 @@ mkDependencies iuid pluginModules
       let (dep_plgins, ms) = unzip [ (moduleName mn, mn) | mn <- pluginModules ]
           plugin_dep_pkgs = filter (/= iuid) (map (toUnitId . moduleUnit) ms)
       th_used <- readIORef th_var
-      let dep_mods = modDepsElts (delFromUFM (imp_dep_mods imports)
-                                             (moduleName mod))
+      let direct_mods = modDepsElts (delFromUFM (imp_direct_dep_mods imports) (moduleName mod))
                 -- M.hi-boot can be in the imp_dep_mods, but we must remove
                 -- it before recording the modules on which this one depends!
                 -- (We want to retain M.hi-boot in imp_dep_mods so that
@@ -93,19 +89,25 @@ mkDependencies iuid pluginModules
                 -- We must also remove self-references from imp_orphs. See
                 -- Note [Module self-dependency]
 
-          raw_pkgs = foldr Set.insert (imp_dep_pkgs imports) plugin_dep_pkgs
+          direct_pkgs_0 = foldr Set.insert (imp_dep_direct_pkgs imports) plugin_dep_pkgs
 
-          pkgs | th_used   = Set.insert thUnitId raw_pkgs
-               | otherwise = raw_pkgs
+          direct_pkgs
+            | th_used = Set.insert thUnitId direct_pkgs_0
+            | otherwise = direct_pkgs_0
 
           -- Set the packages required to be Safe according to Safe Haskell.
           -- See Note [Tracking Trust Transitively] in GHC.Rename.Names
-          sorted_pkgs = sort (Set.toList pkgs)
+          sorted_direct_pkgs = sort (Set.toList direct_pkgs)
           trust_pkgs  = imp_trust_pkgs imports
-          dep_pkgs'   = map (\x -> (x, x `Set.member` trust_pkgs)) sorted_pkgs
+          -- If there's a non-boot import, then it shadows the boot import
+          -- coming from the dependencies
+          source_mods =
+            modDepsElts $ (imp_source_mods imports)
 
-      return Deps { dep_mods   = dep_mods,
-                    dep_pkgs   = dep_pkgs',
+      return Deps { dep_direct_mods = direct_mods,
+                    dep_direct_pkgs = sorted_direct_pkgs,
+                    dep_trusted_pkgs = sort (Set.toList trust_pkgs),
+                    dep_source_mods  = sort source_mods,
                     dep_orphs  = dep_orphs,
                     dep_plgins = dep_plgins,
                     dep_finsts = sortBy stableModuleCmp (imp_finsts imports) }
@@ -116,13 +118,13 @@ mkUsedNames :: TcGblEnv -> NameSet
 mkUsedNames TcGblEnv{ tcg_dus = dus } = allUses dus
 
 mkUsageInfo :: HscEnv -> Module -> ImportedMods -> NameSet -> [FilePath]
-            -> [(Module, Fingerprint)] -> [ModIface] -> IO [Usage]
+            -> [(Module, Fingerprint)] -> IO [Usage]
 mkUsageInfo hsc_env this_mod dir_imp_mods used_names dependent_files merged
-  pluginModules
   = do
     eps <- hscEPS hsc_env
     hashes <- mapM getFileHash dependent_files
-    plugin_usages <- mapM (mkPluginUsage hsc_env) pluginModules
+    -- Dependencies on object files due to TH and plugins
+    object_usages <- mkObjectUsage hsc_env
     let mod_usages = mk_mod_usage_info (eps_PIT eps) hsc_env this_mod
                                        dir_imp_mods used_names
         usages = mod_usages ++ [ UsageFile { usg_file_path = f
@@ -133,7 +135,7 @@ mkUsageInfo hsc_env this_mod dir_imp_mods used_names dependent_files merged
                                       usg_mod_hash = hash
                                     }
                                | (mod, hash) <- merged ]
-                            ++ concat plugin_usages
+                            ++ object_usages
     usages `seqList` return usages
     -- seq the list of Usages returned: occasionally these
     -- don't get evaluated for a while and we can end up hanging on to
@@ -176,85 +178,37 @@ One way to improve this is to either:
     compare implementation hashes for recompilation. Creation of implementation
     hashes is however potentially expensive.
 -}
-mkPluginUsage :: HscEnv -> ModIface -> IO [Usage]
-mkPluginUsage hsc_env pluginModule
-  = case lookupPluginModuleWithSuggestions pkgs pNm Nothing of
-    LookupFound _ pkg -> do
-    -- The plugin is from an external package:
-    -- search for the library files containing the plugin.
-      let searchPaths = collectLibraryDirs (ways dflags) [pkg]
-          useDyn = WayDyn `elem` ways dflags
-          suffix = if useDyn then platformSOExt platform else "a"
-          libLocs = [ searchPath </> "lib" ++ libLoc <.> suffix
-                    | searchPath <- searchPaths
-                    , libLoc     <- unitHsLibs (ghcNameVersion dflags) (ways dflags) pkg
-                    ]
-          -- we also try to find plugin library files by adding WayDyn way,
-          -- if it isn't already present (see trac #15492)
-          paths =
-            if useDyn
-              then libLocs
-              else
-                let dflags'  = dflags { targetWays_ = addWay WayDyn (targetWays_ dflags) }
-                    dlibLocs = [ searchPath </> platformHsSOName platform dlibLoc
-                               | searchPath <- searchPaths
-                               , dlibLoc    <- unitHsLibs (ghcNameVersion dflags') (ways dflags') pkg
-                               ]
-                in libLocs ++ dlibLocs
-      files <- filterM doesFileExist paths
-      case files of
-        [] ->
-          pprPanic
-             ( "mkPluginUsage: missing plugin library, tried:\n"
-              ++ unlines paths
-             )
-             (ppr pNm)
-        _  -> mapM hashFile (nub files)
-    _ -> do
-      let fc = hsc_FC hsc_env
-      let units = hsc_units hsc_env
-      let home_unit = hsc_home_unit hsc_env
-      let dflags = hsc_dflags hsc_env
-      foundM <- findPluginModule fc units home_unit dflags pNm
-      case foundM of
-      -- The plugin was built locally: look up the object file containing
-      -- the `plugin` binder, and all object files belong to modules that are
-      -- transitive dependencies of the plugin that belong to the same package.
-        Found ml _ -> do
-          pluginObject <- hashFile (ml_obj_file ml)
-          depObjects   <- catMaybes <$> mapM lookupObjectFile deps
-          return (nub (pluginObject : depObjects))
-        _ -> pprPanic "mkPluginUsage: no object file found" (ppr pNm)
+
+-- | Find object files corresponding to the transitive closure of given home
+-- modules and direct object files for pkg dependencies
+mkObjectUsage :: HscEnv -> IO [Usage]
+mkObjectUsage hsc_env = do
+  case hsc_interp hsc_env of
+      Just interp -> do
+        mps <- getLoaderState interp
+        case mps of
+          Just ps -> do
+            let ls = objs_loaded ps ++ bcos_loaded ps
+                ds = hs_objs_loaded ps
+            concat <$> sequence (map linkableToUsage ls ++ map librarySpecToUsage ds)
+          Nothing -> return []
+      Nothing -> return []
+
+
   where
-    dflags   = hsc_dflags hsc_env
-    fc       = hsc_FC hsc_env
-    home_unit = hsc_home_unit hsc_env
-    units    = hsc_units hsc_env
-    platform = targetPlatform dflags
-    pkgs     = hsc_units hsc_env
-    pNm      = moduleName $ mi_module pluginModule
-    pPkg     = moduleUnit $ mi_module pluginModule
-    deps     = map gwib_mod $
-      dep_mods $ mi_deps pluginModule
+    linkableToUsage (LM _ _ uls) = mapMaybeM unlinkedToUsage uls
 
-    -- Lookup object file for a plugin dependency,
-    -- from the same package as the plugin.
-    lookupObjectFile nm = do
-      foundM <- findImportedModule fc units home_unit dflags nm Nothing
-      case foundM of
-        Found ml m
-          | moduleUnit m == pPkg -> Just <$> hashFile (ml_obj_file ml)
-          | otherwise              -> return Nothing
-        _ -> pprPanic "mkPluginUsage: no object for dependency"
-                      (ppr pNm <+> ppr nm)
+    fing = (\fn -> UsageFile fn <$> getFileHash fn)
 
-    hashFile f = do
-      fExist <- doesFileExist f
-      if fExist
-         then do
-            h <- getFileHash f
-            return (UsageFile f h)
-         else pprPanic "mkPluginUsage: file not found" (ppr pNm <+> text f)
+    unlinkedToUsage ul =
+      -- TODO: Handle BCOs
+      traverse fing  (nameOfObject_maybe ul)
+
+    librarySpecToUsage :: LibrarySpec -> IO [Usage]
+    librarySpecToUsage (Objects os) = traverse fing os
+    librarySpecToUsage (Archive fn) = traverse fing [fn]
+    librarySpecToUsage (DLLPath fn) = traverse fing [fn]
+    librarySpecToUsage _ = return []
 
 mk_mod_usage_info :: PackageIfaceTable
               -> HscEnv

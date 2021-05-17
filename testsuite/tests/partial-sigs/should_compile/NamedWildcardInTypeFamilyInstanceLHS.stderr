@@ -4,4 +4,4 @@ TYPE CONSTRUCTORS
 COERCION AXIOMS
   axiom NamedWildcardInTypeFamilyInstanceLHS.D:R:F :: F _t = Int
 Dependent modules: []
-Dependent packages: [base-4.13.0.0, ghc-bignum-1.0, ghc-prim-0.7.0]
+Dependent packages: [base-4.16.0.0]

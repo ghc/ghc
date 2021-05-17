@@ -102,7 +102,7 @@ test('ghci061', normal, ghci_script, ['ghci061.script'])
 test('ghci062', [extra_files(['ghci062/', 'ghci062/Test.hs']),
                  when(config.have_ext_interp, extra_ways(['ghci-ext']))],
 		ghci_script, ['ghci062.script'])
-test('ghci063', normal, ghci_script, ['ghci063.script'])
+test('ghci063', [extra_files(['../shell.hs'])], ghci_script, ['ghci063.script'])
 test('ghci064', normal, ghci_script, ['ghci064.script'])
 test('ghci065', [extra_hc_opts("-haddock")], ghci_script, ['ghci065.script'])
 test('ghci066', normal, ghci_script, ['ghci066.script'])
@@ -142,10 +142,10 @@ test('T5979',
      normalise_version("transformers")],
     ghci_script, ['T5979.script'])
 test('T5975a',
-     pre_cmd('touch föøbàr1.hs'),
+     pre_cmd('echo >> föøbàr1.hs'),
      ghci_script, ['T5975a.script'])
 test('T5975b',
-     [pre_cmd('touch föøbàr2.hs'), extra_hc_opts('föøbàr2.hs')],
+     [pre_cmd('echo >> föøbàr2.hs'), extra_hc_opts('föøbàr2.hs')],
      ghci_script, ['T5975b.script'])
 test('T6027ghci', normal, ghci_script, ['T6027ghci.script'])
 
@@ -181,7 +181,7 @@ test('T8172', when(opsys('mingw32'), normalise_drive_letter),
      ghci_script, ['T8172.script'])
 test('T8215', normal, ghci_script, ['T8215.script'])
 test('T8305', normal, ghci_script, ['T8305.script'])
-test('T8353', extra_files(['Defer03.hs']), ghci_script, ['T8353.script'])
+test('T8353', extra_files(['../shell.hs', 'Defer03_before.hs']), ghci_script, ['T8353.script'])
 test('T8357', normal, ghci_script, ['T8357.script'])
 test('T8383', normal, ghci_script, ['T8383.script'])
 test('T8469', normal, ghci_script, ['T8469.script'])

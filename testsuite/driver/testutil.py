@@ -62,7 +62,7 @@ def getStdout(cmd_and_args: List[str]):
         raise Exception("stderr from command: %s\nOutput:\n%s\n" % (cmd_and_args, stderr.decode('utf-8')))
     return stdout.decode('utf-8')
 
-def lndir(srcdir: Path, dstdir: Path):
+def lndir(srcdir: Path, dstdir: Path, force_copy=False):
     # Create symlinks for all files in src directory.
     # Not all developers might have lndir installed.
     # os.system('lndir -silent {0} {1}'.format(srcdir, dstdir))
@@ -71,7 +71,7 @@ def lndir(srcdir: Path, dstdir: Path):
         src = srcdir / base
         dst = dstdir / base
         if src.is_file():
-            link_or_copy_file(src, dst)
+            link_or_copy_file(src, dst, force_copy)
         else:
             dst.mkdir()
             lndir(src, dst)
@@ -116,11 +116,14 @@ def symlinks_work() -> bool:
         return True
 
 if not symlinks_work():
-    def link_or_copy_file(src: Path, dst: Path):
+    def link_or_copy_file(src: Path, dst: Path, force_copy):
         shutil.copyfile(str(src), str(dst))
 else:
-    def link_or_copy_file(src: Path, dst: Path):
-        os.symlink(str(src), str(dst))
+    def link_or_copy_file(src: Path, dst: Path, force_copy=False):
+        if force_copy:
+            shutil.copyfile(str(src), str(dst))
+        else:
+            os.symlink(str(src), str(dst))
 
 class Watcher(object):
     def __init__(self, count: int) -> None:
