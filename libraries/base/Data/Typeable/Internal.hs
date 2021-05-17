@@ -59,6 +59,7 @@ module Data.Typeable.Internal (
 
     -- * TypeRep
     TypeRep,
+    pattern TypeRep,
     pattern App, pattern Con, pattern Con', pattern Fun,
     typeRep,
     typeOf,
@@ -228,6 +229,41 @@ data TypeRep a where
                , trFunArg :: !(TypeRep a)
                , trFunRes :: !(TypeRep b) }
             -> TypeRep (FUN m a b)
+
+-- | A 'TypeableInstance' wraps up a 'Typeable' instance for explicit
+-- handling. For internal use: for defining 'TypeRep' pattern.
+type TypeableInstance :: forall k. k -> Type
+data TypeableInstance a where
+ TypeableInstance :: Typeable a => TypeableInstance a
+
+-- | Get a reified 'Typeable' instance from an explicit 'TypeRep'.
+--
+-- For internal use: for defining 'TypeRep' pattern.
+typeableInstance :: forall {k :: Type} (a :: k). TypeRep a -> TypeableInstance a
+typeableInstance rep = withTypeable rep TypeableInstance
+
+-- | A explicitly bidirectional pattern synonym to construct a
+-- concrete representation of a type.
+--
+-- As an __expression__: Constructs a singleton @TypeRep a@ given a
+-- implicit 'Typeable a' constraint:
+--
+-- @
+-- TypeRep @a :: Typeable a => TypeRep a
+-- @
+--
+-- As a __pattern__: Matches on an explicit @TypeRep a@ witness bringing
+-- an implicit @Typeable a@ constraint into scope.
+--
+-- @
+-- f :: TypeRep a -> ..
+-- f TypeRep = {- Typeable a in scope -}
+-- @
+--
+-- @since 4.17.0.0
+pattern TypeRep :: forall {k :: Type} (a :: k). () => Typeable @k a => TypeRep @k a
+pattern TypeRep <- (typeableInstance -> TypeableInstance)
+  where TypeRep = typeRep
 
 {- Note [TypeRep fingerprints]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -433,14 +469,13 @@ mkTrAppChecked :: forall k1 k2 (a :: k1 -> k2) (b :: k1).
                   TypeRep (a :: k1 -> k2)
                -> TypeRep (b :: k1)
                -> TypeRep (a b)
-mkTrAppChecked rep@(TrApp {trAppFun = p, trAppArg = x :: TypeRep x})
+mkTrAppChecked rep@(TrApp {trAppFun = p, trAppArg = x@TypeRep :: TypeRep x})
                (y :: TypeRep y)
   | TrTyCon {trTyCon=con} <- p
   , con == funTyCon  -- cheap check first
-  , Just (IsTYPE (rx :: TypeRep rx)) <- isTYPE (typeRepKind x)
-  , Just (IsTYPE (ry :: TypeRep ry)) <- isTYPE (typeRepKind y)
-  , Just HRefl <- withTypeable x $ withTypeable rx $ withTypeable ry
-                  $ typeRep @((->) x :: TYPE ry -> Type) `eqTypeRep` rep
+  , Just (IsTYPE TypeRep) <- isTYPE (typeRepKind x)
+  , Just (IsTYPE (TypeRep :: TypeRep ry)) <- isTYPE (typeRepKind y)
+  , Just HRefl <- typeRep @((->) x :: TYPE ry -> Type) `eqTypeRep` rep
   = mkTrFun trMany x y
 mkTrAppChecked a b = mkTrApp a b
 
@@ -493,6 +528,17 @@ splitApp (TrTyCon{trTyCon = con, trKindVars = kinds})
       Refl -> IsCon con kinds
 
 -- | Use a 'TypeRep' as 'Typeable' evidence.
+--
+-- The 'TypeRep' pattern synonym brings a 'Typeable' constraint into
+-- scope and can be used in place of 'withTypeable'.
+--
+-- @
+-- f :: TypeRep a -> ..
+-- f rep = withTypeable {- Typeable a in scope -}
+--
+-- f :: TypeRep a -> ..
+-- f TypeRep = {- Typeable a in scope -}
+-- @
 withTypeable :: forall k (a :: k) rep (r :: TYPE rep). ()
              => TypeRep a -> (Typeable a => r) -> r
 withTypeable rep k = withDict @(TypeRep a) @(Typeable a) rep k

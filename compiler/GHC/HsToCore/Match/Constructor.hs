@@ -223,7 +223,7 @@ matchOneConLike vars ty mult (eqn1 :| eqns)   -- All eqns for a single construct
       where
         fld_var_env = mkNameEnv $ zipEqual "get_arg_vars" fields1 arg_vars
         lookup_fld (L _ rpat) = lookupNameEnv_NF fld_var_env
-                                            (idName (unLoc (hsRecFieldId rpat)))
+                                            (idName (hsRecFieldId rpat))
     select_arg_vars _ [] = panic "matchOneCon/select_arg_vars []"
 
 -----------------
@@ -239,7 +239,7 @@ same_fields :: HsRecFields GhcTc (LPat GhcTc) -> HsRecFields GhcTc (LPat GhcTc)
             -> Bool
 same_fields flds1 flds2
   = all2 (\(L _ f1) (L _ f2)
-                          -> unLoc (hsRecFieldId f1) == unLoc (hsRecFieldId f2))
+                          -> hsRecFieldId f1 == hsRecFieldId f2)
          (rec_flds flds1) (rec_flds flds2)
 
 
@@ -263,7 +263,7 @@ conArgPats  arg_tys (RecCon (HsRecFields { rec_flds = rpats }))
   | null rpats = map WildPat (map scaledThing arg_tys)
         -- Important special case for C {}, which can be used for a
         -- datacon that isn't declared to have fields at all
-  | otherwise  = map (unLoc . hsRecFieldArg . unLoc) rpats
+  | otherwise  = map (unLoc . hfbRHS . unLoc) rpats
 
 {-
 Note [Record patterns]
