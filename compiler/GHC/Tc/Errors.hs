@@ -23,7 +23,7 @@ import GHC.Tc.Utils.Unify( occCheckForErrors, CheckTyEqResult(..) )
 import GHC.Tc.Utils.Env( tcInitTidyEnv )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Origin
-import GHC.Rename.Unbound ( unknownNameSuggestions, WhichSuggest(..) )
+import GHC.Rename.Unbound ( unknownNameSuggestions, WhatLooking(..) )
 import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.TyCo.Rep
@@ -1198,7 +1198,7 @@ mkHoleError _ _tidy_simples ctxt hole@(Hole { hole_occ = occ
        ; hpt <- getHpt
        ; let err = important out_of_scope_msg `mappend`
                    (mk_relevant_bindings $
-                     unknownNameSuggestions WS_Anything dflags hpt curr_mod rdr_env
+                     unknownNameSuggestions WL_Anything dflags hpt curr_mod rdr_env
                        (tcl_rdr lcl_env) imp_info (mkRdrUnqual occ))
 
        ; maybeAddDeferredBindings ctxt hole err
@@ -2423,21 +2423,21 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
         in different_names && same_occ_names
       | otherwise = False
 
+    -- This is for -XOverloadedRecordDot. We only want to suggest other record
+    -- fields if the OccName of the record field is not somehow in scope,
+    -- either qualified or unqualified, since qualification doesn't make a
+    -- difference here.
     record_field_suggestions :: TcM SDoc
     record_field_suggestions = flip (maybe $ return empty) record_field $ \name ->
        do { glb_env <- getGlobalRdrEnv
           ; lcl_env <- getLocalRdrEnv
           ; if occ_name_in_scope glb_env lcl_env name
-               -- We only want to suggest other record fields if the OccName of
-               -- the record field is not somehow in scope, either qualified or
-               -- unqualified, since qualification doesn't make a difference
-               -- here, for record dot syntax
               then return empty
               else do { dflags   <- getDynFlags
                       ; imp_info <- getImports
                       ; curr_mod <- getModule
                       ; hpt      <- getHpt
-                      ; return (unknownNameSuggestions WS_RecField dflags hpt curr_mod
+                      ; return (unknownNameSuggestions WL_RecField dflags hpt curr_mod
                           glb_env emptyLocalRdrEnv imp_info (mkRdrUnqual name)) } }
 
     occ_name_in_scope glb_env lcl_env occ_name = not $
