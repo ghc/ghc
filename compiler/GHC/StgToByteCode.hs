@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveFunctor              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RecordWildCards            #-}
+{-# LANGUAGE FlexibleContexts           #-}
 
 {-# OPTIONS_GHC -fprof-auto-top #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
@@ -88,14 +89,13 @@ import GHC.Stack.CCS
 import Data.Either ( partitionEithers )
 
 import GHC.Stg.Syntax
-import GHC.Stg.FVs
 
 -- -----------------------------------------------------------------------------
 -- Generating byte code for a complete module
 
 byteCodeGen :: HscEnv
             -> Module
-            -> [StgTopBinding]
+            -> [CgStgTopBinding]
             -> [TyCon]
             -> Maybe ModBreaks
             -> IO CompiledByteCode
@@ -116,8 +116,7 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks
 
         (BcM_State{..}, proto_bcos) <-
            runBc hsc_env this_mod mb_modBreaks (mkVarEnv stringPtrs) $ do
-             let flattened_binds =
-                   concatMap (flattenBind . annBindingFreeVars) (reverse lifted_binds)
+             let flattened_binds = concatMap flattenBind (reverse lifted_binds)
              mapM schemeTopBind flattened_binds
 
         when (notNull ffis)

@@ -17,7 +17,7 @@ import GHC.Stg.Syntax
 
 import GHC.Stg.Lint     ( lintStgTopBindings )
 import GHC.Stg.Stats    ( showStgStats )
-import GHC.Stg.DepAnal  ( depSortStgPgm )
+import GHC.Stg.FVs      ( depSortWithAnnotStgPgm )
 import GHC.Stg.Unarise  ( unarise )
 import GHC.Stg.BcPrep   ( bcPrep )
 import GHC.Stg.CSE      ( stgCse )
@@ -52,13 +52,13 @@ stg2stg :: Logger
         -> Bool                      -- prepare for bytecode?
         -> Module                    -- module being compiled
         -> [StgTopBinding]           -- input program
-        -> IO [StgTopBinding]        -- output program
+        -> IO [CgStgTopBinding]        -- output program
 stg2stg logger dflags ictxt for_bytecode this_mod binds
   = do  { dump_when Opt_D_dump_stg_from_core "Initial STG:" binds
         ; showPass logger "Stg2Stg"
         -- Do the main business!
         ; binds' <- runStgM 'g' $
-            foldM do_stg_pass binds (getStgToDo for_bytecode dflags)
+            foldM (do_stg_pass this_mod) binds (getStgToDo for_bytecode dflags)
 
           -- Dependency sort the program as last thing. The program needs to be
           -- in dependency order for the SRT algorithm to work (see
@@ -68,8 +68,10 @@ stg2stg logger dflags ictxt for_bytecode this_mod binds
           -- dependency order. We also don't guarantee that StgLiftLams will
           -- preserve the order or only create minimal recursive groups, so a
           -- sorting pass is necessary.
-        ; let binds_sorted = depSortStgPgm this_mod binds'
-        ; return binds_sorted
+          -- This pass will also augment each closure with non-global free variables
+          -- annotations (which is used by code generator to compute offsets into closures)
+        ; let binds_sorted_with_fvs = depSortWithAnnotStgPgm this_mod binds'
+        ; return binds_sorted_with_fvs
    }
 
   where
@@ -80,8 +82,8 @@ stg2stg logger dflags ictxt for_bytecode this_mod binds
       = \ _whodunnit _binds -> return ()
 
     -------------------------------------------
-    do_stg_pass :: [StgTopBinding] -> StgToDo -> StgM [StgTopBinding]
-    do_stg_pass binds to_do
+    do_stg_pass :: Module -> [StgTopBinding] -> StgToDo -> StgM [StgTopBinding]
+    do_stg_pass this_mod binds to_do
       = case to_do of
           StgDoNothing ->
             return binds
@@ -95,7 +97,8 @@ stg2stg logger dflags ictxt for_bytecode this_mod binds
 
           StgLiftLams -> do
             us <- getUniqueSupplyM
-            let binds' = {-# SCC "StgLiftLams" #-} stgLiftLams dflags us binds
+            --
+            let binds' = {-# SCC "StgLiftLams" #-} stgLiftLams this_mod dflags us binds
             end_pass "StgLiftLams" binds'
 
           StgBcPrep -> do

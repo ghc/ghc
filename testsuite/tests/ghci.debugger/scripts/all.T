@@ -72,8 +72,7 @@ test('break015', expect_broken(1532), ghci_script, ['break015.script'])
 test('break016', combined_output, ghci_script, ['break016.script'])
 test('break017', [extra_files(['../QSort.hs']),
                   combined_output], ghci_script, ['break017.script'])
-test('break018', [expect_broken(18004), extra_files(['../mdo.hs'])],
-     ghci_script, ['break018.script'])
+test('break018', extra_files(['../mdo.hs']), ghci_script, ['break018.script'])
 test('break019', extra_files(['../Test2.hs']), ghci_script, ['break019.script'])
 test('break020', extra_files(['Break020b.hs']), ghci_script, ['break020.script'])
 test('break021', extra_files(['Break020b.hs', 'break020.hs']), ghci_script, ['break021.script'])
