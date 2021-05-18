@@ -1475,7 +1475,8 @@ runPhase (RealPhase cc_phase) input_fn
         let include_paths_global = foldr (\ x xs -> ("-I" ++ x) : xs) []
               (includePathsGlobal cmdline_include_paths ++ pkg_include_dirs)
         let include_paths_quote = foldr (\ x xs -> ("-iquote" ++ x) : xs) []
-              (includePathsQuote cmdline_include_paths)
+              (includePathsQuote cmdline_include_paths ++
+               includePathsQuoteImplicit cmdline_include_paths)
         let include_paths = include_paths_quote ++ include_paths_global
 
         -- pass -D or -optP to preprocessor when compiling foreign C files
@@ -1620,7 +1621,8 @@ runPhase (RealPhase (As with_cpp)) input_fn
         let global_includes = [ GHC.SysTools.Option ("-I" ++ p)
                               | p <- includePathsGlobal cmdline_include_paths ]
         let local_includes = [ GHC.SysTools.Option ("-iquote" ++ p)
-                             | p <- includePathsQuote cmdline_include_paths ]
+                             | p <- includePathsQuote cmdline_include_paths ++
+                                includePathsQuoteImplicit cmdline_include_paths]
         let runAssembler inputFilename outputFilename
               = liftIO $
                   withAtomicRename outputFilename $ \temp_outputFilename ->
