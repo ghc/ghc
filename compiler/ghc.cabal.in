@@ -475,7 +475,6 @@ Library
         GHC.Parser
         GHC.Parser.Annotation
         GHC.Parser.CharClass
-        GHC.Parser.Errors
         GHC.Parser.Errors.Ppr
         GHC.Parser.Errors.Types
         GHC.Parser.Header

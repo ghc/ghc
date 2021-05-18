@@ -30,8 +30,6 @@ import GHC.Driver.Config
 import GHC.Driver.Errors.Types -- Unfortunate, needed due to the fact we throw exceptions!
 
 import GHC.Parser.Errors.Types
-import GHC.Parser.Errors.Ppr
-import GHC.Parser.Errors
 import GHC.Parser           ( parseHeader )
 import GHC.Parser.Lexer
 
@@ -53,7 +51,6 @@ import GHC.Utils.Exception as Exception
 
 import GHC.Data.StringBuffer
 import GHC.Data.Maybe
-import GHC.Data.Bag         (Bag, isEmptyBag )
 import GHC.Data.FastString
 
 import Control.Monad
@@ -78,7 +75,7 @@ getImports :: ParserOpts   -- ^ Parser options
            -> FilePath     -- ^ The original source filename (used for locations
                            --   in the function result)
            -> IO (Either
-               (Bag PsError)
+               (Messages PsMessage)
                ([(Maybe FastString, Located ModuleName)],
                 [(Maybe FastString, Located ModuleName)],
                 Located ModuleName))
@@ -94,8 +91,8 @@ getImports popts implicit_prelude buf filename source_filename = do
       let (_warns, errs) = getMessages pst
       -- don't log warnings: they'll be reported when we parse the file
       -- for real.  See #2500.
-      if not (isEmptyBag errs)
-        then throwErrors $ foldPsMessages mkParserErr errs
+      if not (isEmptyMessages errs)
+        then throwErrors (GhcPsMessage <$> errs)
         else
           let   hsmod = unLoc rdr_module
                 mb_mod = hsmodName hsmod

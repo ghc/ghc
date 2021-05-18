@@ -59,7 +59,6 @@ import GHC.Platform.Ways
 import GHC.Platform.ArchOS
 
 import GHC.Parser.Header
-import GHC.Parser.Errors.Ppr
 
 import GHC.SysTools
 import GHC.Utils.TmpFs
@@ -1271,7 +1270,7 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
                 popts = initParserOpts dflags
             eimps <- getImports popts imp_prelude buf input_fn (basename <.> suff)
             case eimps of
-              Left errs -> throwErrors (foldPsMessages mkParserErr errs)
+              Left errs -> throwErrors (GhcPsMessage <$> errs)
               Right (src_imps,imps,L _ mod_name) -> return
                   (Just buf, mod_name, imps, src_imps)
 
