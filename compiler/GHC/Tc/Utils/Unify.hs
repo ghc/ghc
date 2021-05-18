@@ -2009,8 +2009,8 @@ checkTypeEq dflags lhs ty
     go (CastTy ty co)  = go ty  S.<> go_co co
     go (CoercionTy co) = go_co co
     go (ForAllTy (Bndr tv' _) ty) = (case lhs of
-      TyVarLHS tv | tv == tv' -> go_occ tv (tyVarKind tv') S.<> cterClearOccursCheck (go ty)
-                  | otherwise -> go_occ tv (tyVarKind tv') S.<> go ty
+      TyVarLHS tv | tv == tv' -> go_occ (tyVarKind tv') S.<> cterClearOccursCheck (go ty)
+                  | otherwise -> go_occ (tyVarKind tv') S.<> go ty
       _                       -> go ty)
       S.<>
       if ghci_tv then cteOK else impredicative
@@ -2020,7 +2020,7 @@ checkTypeEq dflags lhs ty
       -- we don't have to evaluate this `case` at every variable
       -- occurrence
     go_tv = case lhs of
-      TyVarLHS tv -> \ tv' -> go_occ tv (tyVarKind tv') S.<>
+      TyVarLHS tv -> \ tv' -> go_occ (tyVarKind tv') S.<>
                               if tv == tv' then insoluble_occurs else cteOK
       TyFamLHS {} -> \ _tv' -> cteOK
            -- See Note [Occurrence checking: look inside kinds] in GHC.Core.Type
@@ -2028,8 +2028,7 @@ checkTypeEq dflags lhs ty
      -- For kinds, we only do an occurs check; we do not worry
      -- about type families or foralls
      -- See Note [Checking for foralls]
-    go_occ tv k = cterFromKind $ checkTyVarEq dflags tv k
-                          -- recur via checkTyVarEq for better inlining
+    go_occ k = cterFromKind $ go k
 
     go_tc :: TyCon -> [TcType] -> CheckTyEqResult
       -- this slightly peculiar way of defining this means
