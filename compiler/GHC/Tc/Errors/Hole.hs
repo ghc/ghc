@@ -4,6 +4,24 @@
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 module GHC.Tc.Errors.Hole
    ( findValidHoleFits
+   , tcCheckHoleFit
+   , withoutUnification
+   , tcSubsumes
+   , isFlexiTyVar
+   , tcFilterHoleFits
+   , getLocalBindings
+   , pprHoleFit
+   , addHoleFitDocs
+   , getHoleFitSortingAlg
+   , getHoleFitDispConfig
+   , HoleFitDispConfig (..)
+   , HoleFitSortingAlg (..)
+   , relevantCts
+   , zonkSubs
+
+   , sortHoleFitsByGraph
+   , sortHoleFitsBySize
+
 
    -- Re-exported from GHC.Tc.Errors.Hole.FitTypes
    , HoleFitPlugin (..), HoleFitPluginR (..)
@@ -393,37 +411,37 @@ getHoleFitDispConfig
                     , showMatches = sMatc } }
 
 -- Which sorting algorithm to use
-data SortingAlg = NoSorting      -- Do not sort the fits at all
-                | BySize         -- Sort them by the size of the match
-                | BySubsumption  -- Sort by full subsumption
+data HoleFitSortingAlg = HFSNoSorting      -- Do not sort the fits at all
+                       | HFSBySize         -- Sort them by the size of the match
+                       | HFSBySubsumption  -- Sort by full subsumption
                 deriving (Eq, Ord)
 
-getSortingAlg :: TcM SortingAlg
-getSortingAlg =
+getHoleFitSortingAlg :: TcM HoleFitSortingAlg
+getHoleFitSortingAlg =
     do { shouldSort <- goptM Opt_SortValidHoleFits
        ; subsumSort <- goptM Opt_SortBySubsumHoleFits
        ; sizeSort <- goptM Opt_SortBySizeHoleFits
        -- We default to sizeSort unless it has been explicitly turned off
        -- or subsumption sorting has been turned on.
        ; return $ if not shouldSort
-                    then NoSorting
+                    then HFSNoSorting
                     else if subsumSort
-                         then BySubsumption
+                         then HFSBySubsumption
                          else if sizeSort
-                              then BySize
-                              else NoSorting }
+                              then HFSBySize
+                              else HFSNoSorting }
 
 -- If enabled, we go through the fits and add any associated documentation,
 -- by looking it up in the module or the environment (for local fits)
-addDocs :: [HoleFit] -> TcM [HoleFit]
-addDocs fits =
+addHoleFitDocs :: [HoleFit] -> TcM [HoleFit]
+addHoleFitDocs fits =
   do { showDocs <- goptM Opt_ShowDocsOfHoleFits
      ; if showDocs
        then do { (_, DeclDocMap lclDocs, _) <- getGblEnv >>= extractDocs
                ; mapM (upd lclDocs) fits }
        else return fits }
   where
-   msg = text "GHC.Tc.Errors.Hole addDocs"
+   msg = text "GHC.Tc.Errors.Hole addHoleFitDocs"
    lookupInIface name (ModIface { mi_decl_docs = DeclDocMap dmap })
      = Map.lookup name dmap
    upd lclDocs fit@(HoleFit {hfCand = cand}) =
@@ -530,12 +548,13 @@ findValidHoleFits tidy_env implics simples h@(Hole { hole_sort = ExprHole _
      ; lclBinds <- getLocalBindings tidy_env ct_loc
      ; maxVSubs <- maxValidHoleFits <$> getDynFlags
      ; hfdc <- getHoleFitDispConfig
-     ; sortingAlg <- getSortingAlg
+     ; sortingAlg <- getHoleFitSortingAlg
      ; dflags <- getDynFlags
      ; hfPlugs <- tcg_hf_plugins <$> getGblEnv
-     ; let findVLimit = if sortingAlg > NoSorting then Nothing else maxVSubs
+     ; let findVLimit = if sortingAlg > HFSNoSorting then Nothing else maxVSubs
            refLevel = refLevelHoleFits dflags
-           hole = TypedHole { th_relevant_cts = listToBag relevantCts
+           hole = TypedHole { th_relevant_cts =
+                                listToBag (relevantCts hole_ty simples)
                             , th_implics      = implics
                             , th_hole         = Just h }
            (candidatePlugins, fitPlugins) =
@@ -563,7 +582,7 @@ findValidHoleFits tidy_env implics simples h@(Hole { hole_sort = ExprHole _
      ; plugin_handled_subs <- foldM (flip ($)) tidy_sorted_subs fitPlugins
      ; let (pVDisc, limited_subs) = possiblyDiscard maxVSubs plugin_handled_subs
            vDiscards = pVDisc || searchDiscards
-     ; subs_with_docs <- addDocs limited_subs
+     ; subs_with_docs <- addHoleFitDocs limited_subs
      ; let vMsg = ppUnless (null subs_with_docs) $
                     hang (text "Valid hole fits include") 2 $
                       vcat (map (pprHoleFit hfdc) subs_with_docs)
@@ -578,8 +597,8 @@ findValidHoleFits tidy_env implics simples h@(Hole { hole_sort = ExprHole _
             -- to allow.
             ; ref_tys <- mapM mkRefTy refLvls
             ; traceTc "ref_tys are" $ ppr ref_tys
-            ; let findRLimit = if sortingAlg > NoSorting then Nothing
-                                                         else maxRSubs
+            ; let findRLimit = if sortingAlg > HFSNoSorting then Nothing
+                                                            else maxRSubs
             ; refDs <- mapM (flip (tcFilterHoleFits findRLimit hole)
                               cands) ref_tys
             ; (tidy_env, tidy_rsubs) <- zonkSubs tidy_env $ concatMap snd refDs
@@ -596,7 +615,7 @@ findValidHoleFits tidy_env implics simples h@(Hole { hole_sort = ExprHole _
             ; let (pRDisc, exact_last_rfits) =
                     possiblyDiscard maxRSubs $ plugin_handled_rsubs
                   rDiscards = pRDisc || any fst refDs
-            ; rsubs_with_docs <- addDocs exact_last_rfits
+            ; rsubs_with_docs <- addHoleFitDocs exact_last_rfits
             ; return (tidy_env,
                 ppUnless (null rsubs_with_docs) $
                   hang (text "Valid refinement hole fits include") 2 $
@@ -606,10 +625,7 @@ findValidHoleFits tidy_env implics simples h@(Hole { hole_sort = ExprHole _
      ; traceTc "findingValidHoleFitsFor }" empty
      ; return (tidy_env, vMsg $$ refMsg) }
   where
-    -- We extract the type, the TcLevel and the types free variables
-    -- from the constraint.
-    hole_fvs :: FV
-    hole_fvs = tyCoFVsOfType hole_ty
+    -- We extract the TcLevel from the constraint.
     hole_lvl = ctLocLevel ct_loc
 
     -- BuiltInSyntax names like (:) and []
@@ -629,58 +645,37 @@ findValidHoleFits tidy_env implics simples h@(Hole { hole_sort = ExprHole _
             setLvl = flip setMetaTyVarTcLevel hole_lvl
             wrapWithVars vars = mkVisFunTysMany (map mkTyVarTy vars) hole_ty
 
-    sortFits :: SortingAlg    -- How we should sort the hole fits
+    sortFits :: HoleFitSortingAlg    -- How we should sort the hole fits
              -> [HoleFit]     -- The subs to sort
              -> TcM [HoleFit]
-    sortFits NoSorting subs = return subs
-    sortFits BySize subs
-        = (++) <$> sortBySize (sort lclFits)
-               <*> sortBySize (sort gblFits)
+    sortFits HFSNoSorting subs = return subs
+    sortFits HFSBySize subs
+        = (++) <$> sortHoleFitsBySize (sort lclFits)
+               <*> sortHoleFitsBySize (sort gblFits)
         where (lclFits, gblFits) = span hfIsLcl subs
-
     -- To sort by subsumption, we invoke the sortByGraph function, which
     -- builds the subsumption graph for the fits and then sorts them using a
     -- graph sort.  Since we want locals to come first anyway, we can sort
     -- them separately. The substitutions are already checked in local then
     -- global order, so we can get away with using span here.
     -- We use (<*>) to expose the parallelism, in case it becomes useful later.
-    sortFits BySubsumption subs
-        = (++) <$> sortByGraph (sort lclFits)
-               <*> sortByGraph (sort gblFits)
+    sortFits HFSBySubsumption subs
+        = (++) <$> sortHoleFitsByGraph (sort lclFits)
+               <*> sortHoleFitsByGraph (sort gblFits)
         where (lclFits, gblFits) = span hfIsLcl subs
 
-    -- See Note [Relevant constraints]
-    relevantCts :: [Ct]
-    relevantCts = if isEmptyVarSet (fvVarSet hole_fvs) then []
-                  else filter isRelevant simples
-      where ctFreeVarSet :: Ct -> VarSet
-            ctFreeVarSet = fvVarSet . tyCoFVsOfType . ctPred
-            hole_fv_set = fvVarSet hole_fvs
-            anyFVMentioned :: Ct -> Bool
-            anyFVMentioned ct = ctFreeVarSet ct `intersectsVarSet` hole_fv_set
-            -- We filter out those constraints that have no variables (since
-            -- they won't be solved by finding a type for the type variable
-            -- representing the hole) and also other holes, since we're not
-            -- trying to find hole fits for many holes at once.
-            isRelevant ct = not (isEmptyVarSet (ctFreeVarSet ct))
-                            && anyFVMentioned ct
+    subsDiscardMsg :: SDoc
+    subsDiscardMsg =
+        text "(Some hole fits suppressed;" <+>
+        text "use -fmax-valid-hole-fits=N" <+>
+        text "or -fno-max-valid-hole-fits)"
 
-    -- We zonk the hole fits so that the output aligns with the rest
-    -- of the typed hole error message output.
-    zonkSubs :: TidyEnv -> [HoleFit] -> TcM (TidyEnv, [HoleFit])
-    zonkSubs = zonkSubs' []
-      where zonkSubs' zs env [] = return (env, reverse zs)
-            zonkSubs' zs env (hf:hfs) = do { (env', z) <- zonkSub env hf
-                                           ; zonkSubs' (z:zs) env' hfs }
+    refSubsDiscardMsg :: SDoc
+    refSubsDiscardMsg =
+        text "(Some refinement hole fits suppressed;" <+>
+        text "use -fmax-refinement-hole-fits=N" <+>
+        text "or -fno-max-refinement-hole-fits)"
 
-            zonkSub :: TidyEnv -> HoleFit -> TcM (TidyEnv, HoleFit)
-            zonkSub env hf@RawHoleFit{} = return (env, hf)
-            zonkSub env hf@HoleFit{hfType = ty, hfMatches = m, hfWrap = wrp}
-              = do { (env, ty') <- zonkTidyTcType env ty
-                   ; (env, m') <- zonkTidyTcTypes env m
-                   ; (env, wrp') <- zonkTidyTcTypes env wrp
-                   ; let zFit = hf {hfType = ty', hfMatches = m', hfWrap = wrp'}
-                   ; return (env, zFit ) }
 
     -- Based on the flags, we might possibly discard some or all the
     -- fits we've found.
@@ -688,41 +683,73 @@ findValidHoleFits tidy_env implics simples h@(Hole { hole_sort = ExprHole _
     possiblyDiscard (Just max) fits = (fits `lengthExceeds` max, take max fits)
     possiblyDiscard Nothing fits = (False, fits)
 
-    -- Sort by size uses as a measure for relevance the sizes of the
-    -- different types needed to instantiate the fit to the type of the hole.
-    -- This is much quicker than sorting by subsumption, and gives reasonable
-    -- results in most cases.
-    sortBySize :: [HoleFit] -> TcM [HoleFit]
-    sortBySize = return . sortOn sizeOfFit
-      where sizeOfFit :: HoleFit -> TypeSize
-            sizeOfFit = sizeTypes . nubBy tcEqType .  hfWrap
-
-    -- Based on a suggestion by phadej on #ghc, we can sort the found fits
-    -- by constructing a subsumption graph, and then do a topological sort of
-    -- the graph. This makes the most specific types appear first, which are
-    -- probably those most relevant. This takes a lot of work (but results in
-    -- much more useful output), and can be disabled by
-    -- '-fno-sort-valid-hole-fits'.
-    sortByGraph :: [HoleFit] -> TcM [HoleFit]
-    sortByGraph fits = go [] fits
-      where tcSubsumesWCloning :: TcType -> TcType -> TcM Bool
-            tcSubsumesWCloning ht ty = withoutUnification fvs (tcSubsumes ht ty)
-              where fvs = tyCoFVsOfTypes [ht,ty]
-            go :: [(HoleFit, [HoleFit])] -> [HoleFit] -> TcM [HoleFit]
-            go sofar [] = do { traceTc "subsumptionGraph was" $ ppr sofar
-                             ; return $ uncurry (++)
-                                         $ partition hfIsLcl topSorted }
-              where toV (hf, adjs) = (hf, hfId hf, map hfId adjs)
-                    (graph, fromV, _) = graphFromEdges $ map toV sofar
-                    topSorted = map ((\(h,_,_) -> h) . fromV) $ topSort graph
-            go sofar (hf:hfs) =
-              do { adjs <-
-                     filterM (tcSubsumesWCloning (hfType hf) . hfType) fits
-                 ; go ((hf, adjs):sofar) hfs }
 
 -- We don't (as of yet) handle holes in types, only in expressions.
 findValidHoleFits env _ _ _ = return (env, empty)
 
+-- See Note [Relevant constraints]
+relevantCts :: Type -> [Ct] -> [Ct]
+relevantCts hole_ty simples = if isEmptyVarSet (fvVarSet hole_fvs) then []
+                              else filter isRelevant simples
+  where ctFreeVarSet :: Ct -> VarSet
+        ctFreeVarSet = fvVarSet . tyCoFVsOfType . ctPred
+        hole_fvs = tyCoFVsOfType hole_ty
+        hole_fv_set = fvVarSet hole_fvs
+        anyFVMentioned :: Ct -> Bool
+        anyFVMentioned ct = ctFreeVarSet ct `intersectsVarSet` hole_fv_set
+        -- We filter out those constraints that have no variables (since
+        -- they won't be solved by finding a type for the type variable
+        -- representing the hole) and also other holes, since we're not
+        -- trying to find hole fits for many holes at once.
+        isRelevant ct = not (isEmptyVarSet (ctFreeVarSet ct))
+                        && anyFVMentioned ct
+
+-- We zonk the hole fits so that the output aligns with the rest
+-- of the typed hole error message output.
+zonkSubs :: TidyEnv -> [HoleFit] -> TcM (TidyEnv, [HoleFit])
+zonkSubs = zonkSubs' []
+  where zonkSubs' zs env [] = return (env, reverse zs)
+        zonkSubs' zs env (hf:hfs) = do { (env', z) <- zonkSub env hf
+                                        ; zonkSubs' (z:zs) env' hfs }
+
+        zonkSub :: TidyEnv -> HoleFit -> TcM (TidyEnv, HoleFit)
+        zonkSub env hf@RawHoleFit{} = return (env, hf)
+        zonkSub env hf@HoleFit{hfType = ty, hfMatches = m, hfWrap = wrp}
+            = do { (env, ty') <- zonkTidyTcType env ty
+                ; (env, m') <- zonkTidyTcTypes env m
+                ; (env, wrp') <- zonkTidyTcTypes env wrp
+                ; let zFit = hf {hfType = ty', hfMatches = m', hfWrap = wrp'}
+                ; return (env, zFit ) }
+
+-- | Sort by size uses as a measure for relevance the sizes of the different
+-- types needed to instantiate the fit to the type of the hole.
+-- This is much quicker than sorting by subsumption, and gives reasonable
+-- results in most cases.
+sortHoleFitsBySize :: [HoleFit] -> TcM [HoleFit]
+sortHoleFitsBySize = return . sortOn sizeOfFit
+  where sizeOfFit :: HoleFit -> TypeSize
+        sizeOfFit = sizeTypes . nubBy tcEqType .  hfWrap
+
+-- Based on a suggestion by phadej on #ghc, we can sort the found fits
+-- by constructing a subsumption graph, and then do a topological sort of
+-- the graph. This makes the most specific types appear first, which are
+-- probably those most relevant. This takes a lot of work (but results in
+-- much more useful output), and can be disabled by
+-- '-fno-sort-valid-hole-fits'.
+sortHoleFitsByGraph :: [HoleFit] -> TcM [HoleFit]
+sortHoleFitsByGraph fits = go [] fits
+  where tcSubsumesWCloning :: TcType -> TcType -> TcM Bool
+        tcSubsumesWCloning ht ty = withoutUnification fvs (tcSubsumes ht ty)
+          where fvs = tyCoFVsOfTypes [ht,ty]
+        go :: [(HoleFit, [HoleFit])] -> [HoleFit] -> TcM [HoleFit]
+        go sofar [] = do { traceTc "subsumptionGraph was" $ ppr sofar
+                         ; return $ uncurry (++) $ partition hfIsLcl topSorted }
+          where toV (hf, adjs) = (hf, hfId hf, map hfId adjs)
+                (graph, fromV, _) = graphFromEdges $ map toV sofar
+                topSorted = map ((\(h,_,_) -> h) . fromV) $ topSort graph
+        go sofar (hf:hfs) =
+          do { adjs <- filterM (tcSubsumesWCloning (hfType hf) . hfType) fits
+             ; go ((hf, adjs):sofar) hfs }
 
 -- | tcFilterHoleFits filters the candidates by whether, given the implications
 -- and the relevant constraints, they can be made to match the type by
@@ -878,17 +905,6 @@ tcFilterHoleFits limit typed_hole ht@(hole_ty, _) candidates =
      where fvs = mkFVs ref_vars `unionFV` hole_fvs `unionFV` tyCoFVsOfType ty
            hole = typed_hole { th_hole = Nothing }
 
-subsDiscardMsg :: SDoc
-subsDiscardMsg =
-    text "(Some hole fits suppressed;" <+>
-    text "use -fmax-valid-hole-fits=N" <+>
-    text "or -fno-max-valid-hole-fits)"
-
-refSubsDiscardMsg :: SDoc
-refSubsDiscardMsg =
-    text "(Some refinement hole fits suppressed;" <+>
-    text "use -fmax-refinement-hole-fits=N" <+>
-    text "or -fno-max-refinement-hole-fits)"
 
 
 -- | Checks whether a MetaTyVar is flexible or not.
