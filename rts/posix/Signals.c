@@ -528,6 +528,8 @@ shutdown_handler(int sig STG_UNUSED)
     }
 }
 
+#define LOG_TO_STDERR(msg) write(STDERR_FILENO, msg, strlen(msg))
+
 /* -----------------------------------------------------------------------------
  * SIGQUIT handler.
  *
@@ -537,15 +539,44 @@ shutdown_handler(int sig STG_UNUSED)
 static void
 backtrace_handler(int sig STG_UNUSED)
 {
-#if USE_LIBDW
-    LibdwSession *session = libdwInit();
-    Backtrace *bt = libdwGetBacktrace(session);
-    fprintf(stderr, "\nCaught SIGQUIT; Backtrace:\n");
-    libdwPrintBacktrace(session, stderr, bt);
-    backtraceFree(bt);
-    libdwFree(session);
+#if USE_LIBDW && defined(THREADED_RTS) && (CC_SUPPORTS_TLS == 1) && \
+    ( defined(HAVE_PTHREAD_H) || defined(freebsd_HOST_OS) )
+    /**
+     * propagate SIGQUIT to all threads running as a capability
+     *
+     * there is no good portable way to distinguish os sent SIGQUIT and ones
+     * propagated by us here, posix states that a signal can be delivered to
+     * any thread not blocking it, though Linux always delivers to main thread
+     * unless the main thread blocks it, we should not rely on that as to be
+     * too Linux specific
+     *
+     * instead we track the monotonic time the signal reaches us, and only
+     * propagate with a minimum 1 second interval, effectively limiting the
+     * propagation rate at 1 Hz at maximum, thus to avoid a storm of echos
+     */
+    static StgWord64 propa_record;
+    StgWord64 curr_time, propa_time;
+    curr_time = getMonotonicNSec();
+    propa_time = SEQ_CST_LOAD(&propa_record);
+    if ( curr_time - propa_time >= 1000000000 ) {
+        SEQ_CST_STORE(&propa_record, curr_time);
+
+        OSThreadId currThId = osThreadId();
+        uint32_t n_caps = RELAXED_LOAD(&n_capabilities);
+        for (uint32_t i=0; i < n_caps; i++) {
+            Task *cap_task = ACQUIRE_LOAD(&capabilities[i]->running_task);
+            if (!cap_task) { continue; }
+            OSThreadId tid = ACQUIRE_LOAD(&cap_task->id);
+            if (tid != currThId) {
+                pthread_kill(tid, SIGQUIT);
+            }
+        }
+    }
+
+    /* capture backtrace of current thread and schedule the dump of it */
+    libdwDumpBacktrace();
 #else
-    fprintf(stderr, "This build does not support backtraces.\n");
+    LOG_TO_STDERR("This build does not support backtraces.\n");
 #endif
 }
 
@@ -719,7 +750,7 @@ initDefaultHandlers(void)
         sysErrorBelch("warning: failed to install SIGPIPE handler");
     }
 
-    // Print a backtrace on SIGQUIT
+    initBacktracePrinting();
     action.sa_handler = backtrace_handler;
     sigemptyset(&action.sa_mask);
     action.sa_flags = 0;
