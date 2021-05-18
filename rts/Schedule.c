@@ -31,7 +31,6 @@
 #include "Sparks.h"
 #include "Capability.h"
 #include "Task.h"
-#include "AwaitEvent.h"
 #include "IOManager.h"
 #if defined(mingw32_HOST_OS)
 #include "win32/MIOManager.h"
@@ -70,13 +69,6 @@
 /* -----------------------------------------------------------------------------
  * Global variables
  * -------------------------------------------------------------------------- */
-
-#if !defined(THREADED_RTS)
-// Blocked/sleeping threads
-StgTSO *blocked_queue_hd = NULL;
-StgTSO *blocked_queue_tl = NULL;
-StgTSO *sleeping_queue = NULL;    // perhaps replace with a hash table?
-#endif
 
 // Bytes allocated since the last time a HeapOverflow exception was thrown by
 // the RTS
@@ -323,7 +315,10 @@ schedule (Capability *initialCapability, Task *task)
         /* Notify the I/O manager that we have nothing to do.  If there are
            any outstanding I/O requests we'll block here.  If there are not
            then this is a user error and we will abort soon.  */
-        awaitEvent (emptyRunQueue(cap));
+        /* TODO: see if we can rationalise these two awaitEvent calls before
+         *       and after scheduleDetectDeadlock().
+         */
+        awaitEvent (cap, emptyRunQueue(cap));
 #else
         ASSERT(sched_state >= SCHED_INTERRUPTING);
 #endif
@@ -404,8 +399,10 @@ schedule (Capability *initialCapability, Task *task)
      * the user specified "context switch as often as possible", with
      * +RTS -C0
      */
-    if (RtsFlags.ConcFlags.ctxtSwitchTicks == 0
-        && !emptyThreadQueues(cap)) {
+    if (RtsFlags.ConcFlags.ctxtSwitchTicks == 0 &&
+        (!emptyRunQueue(cap) ||
+         !emptyPendingIO(cap->iomgr) ||
+         !emptyPendingTimeouts(cap->iomgr))) {
         RELAXED_STORE(&cap->context_switch, 1);
     }
 
@@ -905,14 +902,26 @@ static void
 scheduleCheckBlockedThreads(Capability *cap USED_IF_NOT_THREADS)
 {
 #if !defined(THREADED_RTS)
-    //
-    // Check whether any waiting threads need to be woken up.  If the
-    // run queue is empty, and there are no other tasks running, we
-    // can wait indefinitely for something to happen.
-    //
-    if ( !emptyQueue(blocked_queue_hd) || !emptyQueue(sleeping_queue) )
+    /* Check whether there is any completed I/O or expired timers. If so,
+     * process the competions as appropriate, which will typically cause some
+     * waiting threads to be woken up.
+     *
+     * If the run queue is empty, and there are no other threads running, we
+     * can wait indefinitely for something to happen.
+     *
+     * TODO: see if we can rationalise these two awaitEvent calls before
+     * and after scheduleDetectDeadlock()
+     *
+     * TODO: these empty-queue tests are highly dubious because they only make
+     * sense for some I/O managers. The sleeping_queue is _only_ used by the
+     * select() I/O manager. The WinIO I/O manager does not use either the
+     * sleeping_queue or the blocked_queue, so both queues will _always_ be
+     * empty and so awaitEvent will _never_ be called here for WinIO. This may
+     * explain why there is a second call to awaitEvent below for mingw32.
+     */
+    if ( !emptyPendingIO(cap->iomgr) || !emptyPendingTimeouts(cap->iomgr) )
     {
-        awaitEvent (emptyRunQueue(cap));
+        awaitEvent (cap, emptyRunQueue(cap));
     }
 #endif
 }
@@ -931,7 +940,13 @@ scheduleDetectDeadlock (Capability **pcap, Task *task)
      * other tasks are waiting for work, we must have a deadlock of
      * some description.
      */
-    if ( emptyThreadQueues(cap) )
+    if ( emptyRunQueue(cap) &&
+         /* TODO: this test is highly dubious for the WinIO case since the
+            emptyPendingIO test is always true, even when there is I/O pending.
+            Is this why we need the special BlockedOnIOCompletion case below?
+          */
+         emptyPendingIO(cap->iomgr) &&
+         emptyPendingTimeouts(cap->iomgr) )
     {
 #if defined(THREADED_RTS)
         /*
@@ -2386,11 +2401,6 @@ deleteAllThreads ()
     // somewhere, and the main scheduler loop has to deal with it.
     // Also, the run queue is the only thing keeping these threads from
     // being GC'd, and we don't want the "main thread has been GC'd" panic.
-
-#if !defined(THREADED_RTS)
-    ASSERT(blocked_queue_hd == END_TSO_QUEUE);
-    ASSERT(sleeping_queue == END_TSO_QUEUE);
-#endif
 }
 
 /* -----------------------------------------------------------------------------
@@ -2719,12 +2729,6 @@ startWorkerTasks (uint32_t from USED_IF_THREADS, uint32_t to USED_IF_THREADS)
 void
 initScheduler(void)
 {
-#if !defined(THREADED_RTS)
-  blocked_queue_hd  = END_TSO_QUEUE;
-  blocked_queue_tl  = END_TSO_QUEUE;
-  sleeping_queue    = END_TSO_QUEUE;
-#endif
-
   sched_state    = SCHED_RUNNING;
   SEQ_CST_STORE(&recent_activity, ACTIVITY_YES);
 
@@ -2806,16 +2810,6 @@ freeScheduler( void )
     RELEASE_LOCK(&sched_mutex);
 #if defined(THREADED_RTS)
     closeMutex(&sched_mutex);
-#endif
-}
-
-void markScheduler (evac_fn evac USED_IF_NOT_THREADS,
-                    void *user USED_IF_NOT_THREADS)
-{
-#if !defined(THREADED_RTS)
-    evac(user, (StgClosure **)(void *)&blocked_queue_hd);
-    evac(user, (StgClosure **)(void *)&blocked_queue_tl);
-    evac(user, (StgClosure **)(void *)&sleeping_queue);
 #endif
 }
 
