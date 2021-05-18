@@ -1291,8 +1291,8 @@ tcIfaceCompleteMatches :: [IfaceCompleteMatch] -> IfL [CompleteMatch]
 tcIfaceCompleteMatches = mapM tcIfaceCompleteMatch
 
 tcIfaceCompleteMatch :: IfaceCompleteMatch -> IfL CompleteMatch
-tcIfaceCompleteMatch (IfaceCompleteMatch ms mtc) = do
-  conlikes <- mkUniqDSet <$> mapM (forkM doc . tcIfaceConLike) ms
+tcIfaceCompleteMatch (IfaceCompleteMatch ms mtc) = forkM doc $ do
+  conlikes <- mkUniqDSet <$> mapM tcIfaceConLike ms
   mtc' <- traverse tcIfaceTyCon mtc
   return (CompleteMatch conlikes mtc')
   where
