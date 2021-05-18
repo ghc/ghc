@@ -1,5 +1,6 @@
 
 T8501a.hs:5:3: error:
     Parse error in pattern: rec
-    Possibly caused by a missing 'do'?
-    Perhaps you intended to use RecursiveDo
+    Suggested fixes:
+      Perhaps you intended to use RecursiveDo
+      Possibly caused by a missing 'do'?

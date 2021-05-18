@@ -24,7 +24,6 @@ import qualified GHC.Driver.Errors.Types as GHC
 import qualified GHC.Driver.Phases     as GHC
 import qualified GHC.Driver.Pipeline   as GHC
 import qualified GHC.Fingerprint.Type  as GHC
-import qualified GHC.Parser.Errors.Ppr as GHC
 import qualified GHC.Parser.Lexer      as GHC hiding (getMessages)
 import qualified GHC.Settings          as GHC
 import qualified GHC.Types.Error       as GHC (getMessages)
@@ -283,8 +282,7 @@ parseError pst = do
      let
        -- (warns,errs) = GHC.getMessages pst dflags
      -- throw $ GHC.mkSrcErr (GHC.unitBag $ GHC.mkPlainErrMsg dflags sspan err)
-     GHC.throwErrors $
-       (GHC.foldPsMessages GHC.mkParserErr (GHC.getErrorMessages pst))
+     GHC.throwErrors $ (GHC.GhcPsMessage <$> GHC.getErrorMessages pst)
 
 -- ---------------------------------------------------------------------
 

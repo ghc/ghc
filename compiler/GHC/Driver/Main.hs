@@ -143,8 +143,6 @@ import GHC.Core.FamInstEnv
 import GHC.CoreToStg.Prep
 import GHC.CoreToStg    ( coreToStg )
 
-import GHC.Parser.Errors
-import GHC.Parser.Errors.Ppr
 import GHC.Parser.Errors.Types
 import GHC.Parser
 import GHC.Parser.Lexer as Lexer
@@ -232,7 +230,7 @@ import qualified Data.Set as S
 import Data.Set (Set)
 import Data.Functor
 import Control.DeepSeq (force)
-import Data.Bifunctor (first, bimap)
+import Data.Bifunctor (first)
 
 {- **********************************************************************
 %*                                                                      *
@@ -287,26 +285,21 @@ handleWarnings = do
 
 -- | log warning in the monad, and if there are errors then
 -- throw a SourceError exception.
-logWarningsReportErrors :: (Bag PsWarning, Bag PsError) -> Hsc ()
+logWarningsReportErrors :: (Messages PsWarning, Messages PsError) -> Hsc ()
 logWarningsReportErrors (warnings,errors) = do
-    dflags <- getDynFlags
-    let warns = foldPsMessages (mkParserWarn dflags) warnings
-        errs  = foldPsMessages mkParserErr           errors
-    logDiagnostics warns
-    when (not $ isEmptyMessages errs) $ throwErrors errs
+    logDiagnostics (GhcPsMessage <$> warnings)
+    when (not $ isEmptyMessages errors) $ throwErrors (GhcPsMessage <$> errors)
 
 -- | Log warnings and throw errors, assuming the messages
 -- contain at least one error (e.g. coming from PFailed)
-handleWarningsThrowErrors :: (Bag PsWarning, Bag PsError) -> Hsc a
+handleWarningsThrowErrors :: (Messages PsWarning, Messages PsError) -> Hsc a
 handleWarningsThrowErrors (warnings, errors) = do
     dflags <- getDynFlags
-    let warns = foldPsMessages (mkParserWarn dflags) warnings
-        errs  = foldPsMessages mkParserErr           errors
-    logDiagnostics warns
+    logDiagnostics (GhcPsMessage <$> warnings)
     logger <- getLogger
-    let (wWarns, wErrs) = partitionMessages warns
+    let (wWarns, wErrs) = partitionMessages warnings
     liftIO $ printMessages logger dflags wWarns
-    throwErrors $ errs `unionMessages` wErrs
+    throwErrors $ fmap GhcPsMessage $ errors `unionMessages` wErrs
 
 -- | Deal with errors and warnings returned by a compilation step
 --
@@ -417,11 +410,8 @@ hscParse' mod_summary
         PFailed pst ->
             handleWarningsThrowErrors (getMessages pst)
         POk pst rdr_module -> do
-            let (warns, errs) =
-                  bimap (foldPsMessages (mkParserWarn dflags))
-                        (foldPsMessages mkParserErr)
-                        (getMessages pst)
-            logDiagnostics warns
+            let (warns, errs) = getMessages pst
+            logDiagnostics (GhcPsMessage <$> warns)
             liftIO $ dumpIfSet_dyn logger dflags Opt_D_dump_parsed "Parser"
                         FormatHaskell (ppr rdr_module)
             liftIO $ dumpIfSet_dyn logger dflags Opt_D_dump_parsed_ast "Parser AST"
@@ -430,7 +420,7 @@ hscParse' mod_summary
                                                    rdr_module)
             liftIO $ dumpIfSet_dyn logger dflags Opt_D_source_stats "Source Statistics"
                         FormatText (ppSourceStats False rdr_module)
-            when (not $ isEmptyMessages errs) $ throwErrors errs
+            when (not $ isEmptyMessages errs) $ throwErrors (GhcPsMessage <$> errs)
 
             -- To get the list of extra source files, we take the list
             -- that the parser gave us,
@@ -1715,10 +1705,8 @@ hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
                $ do
                   (warns,errs,cmm) <- withTiming logger dflags (text "ParseCmm"<+>brackets (text filename)) (\_ -> ())
                                        $ parseCmmFile dflags cmm_mod home_unit filename
-                  let msgs = foldPsMessages (mkParserWarn dflags) warns
-                             `unionMessages`
-                             foldPsMessages mkParserErr errs
-                  return (msgs, cmm)
+                  let msgs = warns `unionMessages` errs
+                  return (GhcPsMessage <$> msgs, cmm)
     liftIO $ do
         dumpIfSet_dyn logger dflags Opt_D_dump_cmm_verbose_by_proc "Parsed Cmm" FormatCMM (pdoc platform cmm)
 
