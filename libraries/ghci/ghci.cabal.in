@@ -59,6 +59,7 @@ library
             GHCi.TH
 
     include-dirs: @FFIIncludeDir@
+    extra-libraries: ffi
 
     exposed-modules:
         GHCi.BreakArray
