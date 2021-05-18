@@ -2284,8 +2284,7 @@ canEqTyVarFunEq ev eq_rel swapped tv1 ps_xi1 fun_tc2 fun_args2 ps_xi2 mco
   = do { is_touchable <- touchabilityTest (ctEvFlavour ev) tv1 rhs
        ; dflags       <- getDynFlags
        ; if | case is_touchable of { Untouchable -> False; _ -> True }
-            , cterHasNoProblem $
-                checkTyVarEq dflags tv1 rhs `cterRemoveProblem` cteTypeFamily
+            , cterHasNoProblem $ checkTyVarEq dflags tv1 rhs
             -> canEqCanLHSFinish ev eq_rel swapped (TyVarLHS tv1) rhs
 
             | otherwise
@@ -2326,7 +2325,7 @@ canEqCanLHSFinish ev eq_rel swapped lhs rhs
      -- equalities, in case have  x ~ (y :: ..x...); this is #12593.
      -- This next line checks also for coercion holes (TyEq:H); see
      -- Note [Equalities with incompatible kinds]
-       ; let result0 = checkTypeEq dflags lhs rhs `cterRemoveProblem` cteTypeFamily
+       ; let result0 = checkTypeEq dflags lhs rhs
      -- type families are OK here
      -- NB: no occCheckExpand here; see Note [Rewriting synonyms] in GHC.Tc.Solver.Rewrite
 

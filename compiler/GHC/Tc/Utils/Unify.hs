@@ -63,6 +63,7 @@ import GHC.Builtin.Types
 import GHC.Types.Var as Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
+import GHC.Types.Unique.Set
 import GHC.Utils.Error
 import GHC.Driver.Session
 import GHC.Types.Basic
@@ -1445,6 +1446,7 @@ uUnfilledVar2 origin t_or_k swapped tv1 ty2
            -- See Note [Unification preconditions], (UNTOUCHABLE) wrinkles
       , canSolveByUnification (metaTyVarInfo tv1) ty2
       , cterHasNoProblem (checkTyVarEq dflags tv1 ty2)
+      , not (uniqSetAny isTypeFamilyTyCon (tyConsOfType ty2))
            -- See Note [Prevent unification with type families]
       = do { co_k <- uType KindLevel kind_origin (tcTypeKind ty2) (tyVarKind tv1)
            ; traceTc "uUnfilledVar2 ok" $
@@ -1941,10 +1943,9 @@ checkTyFamEq :: DynFlags
              -> TyCon     -- type function
              -> [TcType]  -- args, exactly saturated
              -> TcType    -- RHS
-             -> CheckTyEqResult   -- always drops cteTypeFamily
+             -> CheckTyEqResult
 checkTyFamEq dflags fun_tc fun_args ty
   = inline checkTypeEq dflags (TyFamLHS fun_tc fun_args) ty
-    `cterRemoveProblem` cteTypeFamily
     -- inline checkTypeEq so that the `case`s over the CanEqLHS get blasted away
 
 checkTypeEq :: DynFlags -> CanEqLHS -> TcType -> CheckTyEqResult
@@ -1954,9 +1955,8 @@ checkTypeEq :: DynFlags -> CanEqLHS -> TcType -> CheckTyEqResult
 -- In particular, this looks for:
 --   (a) a forall type (forall a. blah)
 --   (b) a predicate type (c => ty)
---   (c) a type family; see Note [Prevent unification with type families]
---   (d) a blocking coercion hole
---   (e) an occurrence of the LHS (occurs check)
+--   (c) a blocking coercion hole
+--   (d) an occurrence of the LHS (occurs check)
 --
 -- Note that an occurs-check does not mean "definite error".  For example
 --   type family F a
@@ -1966,10 +1966,10 @@ checkTypeEq :: DynFlags -> CanEqLHS -> TcType -> CheckTyEqResult
 -- This is perfectly reasonable, if we later get b0 ~ Int.  But we
 -- certainly can't unify b0 := F b0
 --
--- For (a), (b), and (c) we check only the top level of the type, NOT
--- inside the kinds of variables it mentions.  For (d) we look deeply
+-- For (a) and (b), we check only the top level of the type, NOT
+-- inside the kinds of variables it mentions.  For (c) we look deeply
 -- in coercions when the LHS is a tyvar (but skip coercions for type family
--- LHSs), and for (e) see Note [CEqCan occurs check] in GHC.Tc.Types.Constraint.
+-- LHSs), and for (d) see Note [CEqCan occurs check] in GHC.Tc.Types.Constraint.
 --
 -- checkTypeEq is called from
 --    * checkTyFamEq, checkTyVarEq (which inline it to specialise away the
@@ -1979,7 +1979,6 @@ checkTypeEq dflags lhs ty
   = go ty
   where
     impredicative    = cteProblem cteImpredicative
-    type_family      = cteProblem cteTypeFamily
     hole_blocker     = cteProblem cteHoleBlocker
     insoluble_occurs = cteProblem cteInsolubleOccurs
     soluble_occurs   = cteProblem cteSolubleOccurs
@@ -2071,5 +2070,4 @@ checkTypeEq dflags lhs ty
     check_tc :: TyCon -> CheckTyEqResult
     check_tc
       | ghci_tv   = \ _tc -> cteOK
-      | otherwise = \ tc  -> (if isTauTyCon tc then cteOK else impredicative) S.<>
-                             (if isFamFreeTyCon tc then cteOK else type_family)
+      | otherwise = \ tc  -> if isTauTyCon tc then cteOK else impredicative

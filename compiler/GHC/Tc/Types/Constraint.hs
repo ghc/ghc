@@ -29,7 +29,7 @@ module GHC.Tc.Types.Constraint (
         CtIrredReason(..), HoleSet, isInsolubleReason,
 
         CheckTyEqResult, CheckTyEqProblem, cteProblem, cterClearOccursCheck,
-        cteOK, cteImpredicative, cteTypeFamily, cteHoleBlocker,
+        cteOK, cteImpredicative, cteHoleBlocker,
         cteInsolubleOccurs, cteSolubleOccurs, cterSetOccursCheckSoluble,
         cterHasNoProblem, cterHasProblem, cterHasOnlyProblem,
         cterRemoveProblem, cterHasOccursCheck, cterFromKind,
@@ -390,14 +390,12 @@ cterHasNoProblem _        = False
 -- | An individual problem that might be logged in a 'CheckTyEqResult'
 newtype CheckTyEqProblem = CTEP Word8
 
-cteImpredicative, cteTypeFamily, cteHoleBlocker, cteInsolubleOccurs,
-  cteSolubleOccurs :: CheckTyEqProblem
+cteImpredicative, cteHoleBlocker, cteInsolubleOccurs, cteSolubleOccurs :: CheckTyEqProblem
 cteImpredicative   = CTEP (bit 0)   -- forall or (=>) encountered
-cteTypeFamily      = CTEP (bit 1)   -- type family encountered
-cteHoleBlocker     = CTEP (bit 2)   -- blocking coercion hole
+cteHoleBlocker     = CTEP (bit 1)   -- blocking coercion hole
       -- See Note [Equalities with incompatible kinds] in GHC.Tc.Solver.Canonical
-cteInsolubleOccurs = CTEP (bit 3)   -- occurs-check
-cteSolubleOccurs   = CTEP (bit 4)   -- occurs-check under a type function or in a coercion
+cteInsolubleOccurs = CTEP (bit 2)   -- occurs-check
+cteSolubleOccurs   = CTEP (bit 3)   -- occurs-check under a type function or in a coercion
                                     -- must be one bit to the left of cteInsolubleOccurs
 -- See also Note [Insoluble occurs check] in GHC.Tc.Errors
 
@@ -460,7 +458,6 @@ instance Outputable CheckTyEqResult where
            = parens $ fcat $ intersperse vbar $ set_bits
     where
       all_bits = [ (cteImpredicative,   "cteImpredicative")
-                 , (cteTypeFamily,      "cteTypeFamily")
                  , (cteHoleBlocker,     "cteHoleBlocker")
                  , (cteInsolubleOccurs, "cteInsolubleOccurs")
                  , (cteSolubleOccurs,   "cteSolubleOccurs") ]
