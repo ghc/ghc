@@ -439,21 +439,24 @@ instance Diagnostic PsMessage where
            text "Illegal record syntax (use TraditionalRecordSyntax):" <+> s
     PsErrParseErrorInCmd s
       -> mkSimpleDecorated $ hang (text "Parse error in command:") 2 s
-    PsErrParseErrorInPat s PsParseErrorInPatDetails{..}
+    PsErrInPat s details
       -> let msg  = parse_error_in_pat
-             body = if | peipd_neg_app -> text "-" <> ppr s
-                       | not (null peipd_tyargs) -> ppr s <+> vcat [
-                             hsep [text "@" <> ppr t | t <- peipd_tyargs]
-                           , text "Type applications in patterns are only allowed on data constructors."
-                           ]
-                       | Just fun <- peipd_is_infix -> ppr s <+>
-                           text "In a function binding for the"
-                                   <+> quotes (ppr fun)
-                                   <+> text "operator."
-                                $$ if opIsAt fun
-                                      then perhapsAsPat
-                                      else empty
-                       | otherwise -> ppr s
+             body = case details of
+                 PEIP_NegApp -> text "-" <> ppr s
+                 PEIP_TypeArgs peipd_tyargs
+                   | not (null peipd_tyargs) -> ppr s <+> vcat [
+                               hsep [text "@" <> ppr t | t <- peipd_tyargs]
+                             , text "Type applications in patterns are only allowed on data constructors."
+                             ]
+                   | otherwise -> ppr s
+                 PEIP_OtherPatDetails (ParseContext (Just fun) _)
+                  -> ppr s <+> text "In a function binding for the"
+                                     <+> quotes (ppr fun)
+                                     <+> text "operator."
+                                  $$ if opIsAt fun
+                                        then perhapsAsPat
+                                        else empty
+                 _  -> ppr s
          in mkSimpleDecorated $ msg <+> body
     PsErrParseRightOpSectionInPat infixOcc s
       -> mkSimpleDecorated $ parse_error_in_pat <+> pprInfixOcc infixOcc <> ppr s
@@ -620,7 +623,7 @@ instance Diagnostic PsMessage where
     PsErrInferredTypeVarNotAllowed                -> ErrorWithoutFlag
     PsErrIllegalTraditionalRecordSyntax{}         -> ErrorWithoutFlag
     PsErrParseErrorInCmd{}                        -> ErrorWithoutFlag
-    PsErrParseErrorInPat{}                        -> ErrorWithoutFlag
+    PsErrInPat{}                                  -> ErrorWithoutFlag
     PsErrIllegalRoleName{}                        -> ErrorWithoutFlag
     PsErrInvalidTypeSignature{}                   -> ErrorWithoutFlag
     PsErrUnexpectedTypeInDecl{}                   -> ErrorWithoutFlag
@@ -737,12 +740,16 @@ instance Diagnostic PsMessage where
     PsErrInferredTypeVarNotAllowed                -> noHints
     PsErrIllegalTraditionalRecordSyntax{}         -> noHints
     PsErrParseErrorInCmd{}                        -> noHints
-    PsErrParseErrorInPat _ PsParseErrorInPatDetails{..} ->
-      catMaybes [sug_recdo, sug_missingdo]
+    PsErrInPat _ details                          -> case details of
+      PEIP_RecPattern args YesPatIsRecursive ctx
+       | length args /= 0 -> catMaybes [sug_recdo, sug_missingdo ctx]
+       | otherwise        -> catMaybes [sug_missingdo ctx]
+      PEIP_OtherPatDetails ctx -> catMaybes [sug_missingdo ctx]
+      _                        -> []
       where
-        sug c s       = if c then Just s else Nothing
-        sug_recdo     = sug (peipd_args_num /= 0 && peipd_pat_is_rec) (SuggestExtension LangExt.RecursiveDo)
-        sug_missingdo = sug peipd_incomplete_do_block                 SuggestMissingDo
+        sug_recdo                                           = Just (SuggestExtension LangExt.RecursiveDo)
+        sug_missingdo (ParseContext _ YesIncompleteDoBlock) = Just SuggestMissingDo
+        sug_missingdo _                                     = Nothing
     PsErrParseRightOpSectionInPat{}               -> noHints
     PsErrIllegalRoleName{}                        -> noHints
     PsErrInvalidTypeSignature{}                   -> noHints

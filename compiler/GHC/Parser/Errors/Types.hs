@@ -24,12 +24,44 @@ type PsError   = PsMessage   -- /INVARIANT/: The diagnosticReason is ErrorWithou
 
 data PsMessage
   =
+    {-| An \"unknown\" message from the parser. This type constructor allows
+        arbitrary messages to be embedded. The typical use case would be GHC plugins
+        willing to emit custom diagnostics.
+    -}
    forall a. (Diagnostic a, Typeable a) => PsUnknownMessage a
 
-   -- | Warn when tabulations are found
+   {-| PsWarnTab is a warning (controlled by the -Wwarn-tabs flag) that occurs
+       when tabulations (tabs) are found within a file.
+
+       Test case(s): parser/should_fail/T12610
+                     parser/should_compile/T9723b
+                     parser/should_compile/T9723a
+                     parser/should_compile/read043
+                     parser/should_fail/T16270
+                     warnings/should_compile/T9230
+
+   -}
    | PsWarnTab !Word -- ^ Number of other occurrences other than the first one
 
-   -- | Transitional layout warnings
+   {-| PsWarnTransitionalLayout is a warning (controlled by the
+       -Walternative-layout-rule-transitional flag) that occurs when pipes ('|')
+       or 'where' are at the same depth of an implicit layout block.
+
+       Example(s):
+
+          f :: IO ()
+          f
+           | True = do
+           let x = ()
+               y = ()
+           return ()
+           | True = return ()
+
+       Test case(s): layout/layout006
+                     layout/layout003
+                     layout/layout001
+
+   -}
    | PsWarnTransitionalLayout !TransLayoutReason
 
    -- | Unrecognised pragma
@@ -357,7 +389,7 @@ data PsMessage
    | PsErrParseErrorInCmd !SDoc
 
    -- | Parse error in pattern
-   | PsErrParseErrorInPat !(PatBuilder GhcPs) !PsParseErrorInPatDetails
+   | PsErrInPat !(PatBuilder GhcPs) !PsErrInPatDetails
 
    -- | Parse error in right operator section pattern
    -- TODO: embed the proper operator, if possible
@@ -382,31 +414,46 @@ data PsErrParseDetails
     -- ^ Did we parse a \"pattern\" keyword?
   }
 
-data PsParseErrorInPatDetails
-  = PsParseErrorInPatDetails
-  { peipd_tyargs :: [HsPatSigType GhcPs]
-    -- ^ The number of tyargs
-  , peipd_args_num :: !Int
-    -- ^ The number of arguments
-  , peipd_pat_is_rec :: !Bool
-    -- ^ Is the parsed pattern recursive?
-  , peipd_neg_app :: !Bool
-    -- ^ Negative application pattern?
-  , peipd_is_infix :: !(Maybe RdrName)
-    -- ^ If 'Just', this is an infix pattern with the binded operator name
-  , peipd_incomplete_do_block :: !Bool
-    -- ^ If 'True', the parser likely failed due to an incomplete do block
-  }
+-- | Is the parsed pattern recursive?
+data PatIsRecursive
+  = YesPatIsRecursive
+  | NoPatIsRecursive
 
-noParseErrorInPatDetails :: PsParseErrorInPatDetails
-noParseErrorInPatDetails = PsParseErrorInPatDetails
-  { peipd_tyargs   = []
-  , peipd_args_num = 0
-  , peipd_pat_is_rec = False
-  , peipd_neg_app = False
-  , peipd_is_infix = Nothing
-  , peipd_incomplete_do_block = False
-  }
+data PatIncompleteDoBlock
+  = YesIncompleteDoBlock
+  | NoIncompleteDoBlock
+  deriving Eq
+
+-- | Extra information for the expression GHC is currently inspecting/parsing.
+-- It can be used to generate more informative parser diagnostics and hints.
+data ParseContext
+  = ParseContext
+  { is_infix :: !(Maybe RdrName)
+    -- ^ If 'Just', this is an infix
+    -- pattern with the binded operator name
+  , incomplete_do_block :: !PatIncompleteDoBlock
+    -- ^ Did the parser likely fail due to an incomplete do block?
+  } deriving Eq
+
+data PsErrInPatDetails
+  = PEIP_NegApp
+    -- ^ Negative application pattern?
+  | PEIP_TypeArgs [HsPatSigType GhcPs]
+    -- ^ The list of type arguments for the pattern
+  | PEIP_RecPattern [LPat GhcPs]    -- ^ The pattern arguments
+                    !PatIsRecursive -- ^ Is the parsed pattern recursive?
+                    !ParseContext
+  | PEIP_OtherPatDetails !ParseContext
+
+noParseContext :: ParseContext
+noParseContext = ParseContext Nothing NoIncompleteDoBlock
+
+incompleteDoBlock :: ParseContext
+incompleteDoBlock = ParseContext Nothing YesIncompleteDoBlock
+
+-- | Builds a 'PsErrInPatDetails' with the information provided by the 'ParseContext'.
+fromParseContext :: ParseContext -> PsErrInPatDetails
+fromParseContext = PEIP_OtherPatDetails
 
 data NumUnderscoreReason
    = NumUnderscore_Integral

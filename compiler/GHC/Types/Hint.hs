@@ -70,6 +70,8 @@ data GhcHint
   | SuggestSignatureInstantiations !ModuleName [InstantiationSuggestion]
   {-| Suggests to use spaces instead of tabs.
 
+      Triggered by: 'GHC.Parser.Errors.Types.PsWarnTab'.
+
       Examples: None
       Test Case(s): None
   -}
