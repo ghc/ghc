@@ -1254,14 +1254,6 @@ addLazyFVs dmd_ty lazy_fvs
         -- L demand doesn't get both'd with the Bot coming up from the inner
         -- call to f.  So we just get an L demand for x for g.
 
-{-
-Note [Do not strictify the argument dictionaries of a dfun]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The typechecker can tie recursive knots involving dfuns, so we do the
-conservative thing and refrain from strictifying a dfun's argument
-dictionaries.
--}
-
 setBndrsDemandInfo :: [Var] -> [Demand] -> [Var]
 setBndrsDemandInfo (b:bs) (d:ds)
   | isTyVar b = b : setBndrsDemandInfo bs (d:ds)
@@ -1285,13 +1277,12 @@ annotateBndr env dmd_ty var
     WithDmdType dmd_ty' dmd = findBndrDmd env False dmd_ty var
 
 annotateLamIdBndr :: AnalEnv
-                  -> DFunFlag   -- is this lambda at the top of the RHS of a dfun?
                   -> DmdType    -- Demand type of body
                   -> Id         -- Lambda binder
                   -> WithDmdType Id  -- Demand type of lambda
                                      -- and binder annotated with demand
 
-annotateLamIdBndr env arg_of_dfun dmd_ty id
+annotateLamIdBndr env dmd_ty id
 -- For lambdas we add the demand to the argument demands
 -- Only called for Ids
   = assert (isId id) $
@@ -1394,10 +1385,6 @@ forget that fact, otherwise we might make 'x' absent when it isn't.
 ************************************************************************
 -}
 
-type DFunFlag = Bool  -- indicates if the lambda being considered is in the
-                      -- sequence of lambdas at the top of the RHS of a dfun
-notArgOfDfun :: DFunFlag
-notArgOfDfun = False
 
 data AnalEnv = AE
    { ae_strict_dicts :: !Bool -- ^ Enable strict dict
@@ -1470,7 +1457,7 @@ findBndrsDmds env dmd_ty bndrs
 
 findBndrDmd :: AnalEnv -> Bool -> DmdType -> Id -> WithDmdType Demand
 -- See Note [Trimming a demand to a type]
-findBndrDmd env arg_of_dfun dmd_ty id
+findBndrDmd env dmd_ty id
   = -- pprTrace "findBndrDmd" (ppr id $$ ppr dmd_ty $$ ppr starting_dmd $$ ppr dmd') $
     WithDmdType dmd_ty' dmd'
   where
@@ -1482,19 +1469,62 @@ findBndrDmd env arg_of_dfun dmd_ty id
     id_ty = idType id
 
     strictify dmd
+      -- See Note [Making dictionaries strict]
       | ae_strict_dicts env
              -- We never want to strictify a recursive let. At the moment
              -- annotateBndr is only call for non-recursive lets; if that
              -- changes, we need a RecFlag parameter and another guard here.
-      , not arg_of_dfun -- See Note [Do not strictify the argument dictionaries of a dfun]
       = strictifyDictDmd id_ty dmd
       | otherwise
       = dmd
 
     fam_envs = ae_fam_envs env
 
-{- Note [Initialising strictness]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Making dictionaries strict]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The Opt_DictsStrict flag makes GHC use call-by-value for dictionaries.  Why?
+
+* Generally CBV is more efficient.
+
+* Dictionaries are always non-bottom; and never take much work to
+  compute.  E.g. a dfun from an instance decl always returns a dicionary
+  record immediately.  See DFunUnfolding in CoreSyn.
+  See also Note [Recursive superclasses] in TcInstDcls.
+
+* The strictness analyser will then unbox dictionaries and pass the
+  methods individually, rather than in a bundle.  If there are a lot of
+  methods that might be bad; but worker/wrapper already does throttling.
+
+* A newtype dictionary is *not* always non-bottom.  E.g.
+      class C a where op :: a -> a
+      instance C Int where op = error "urk"
+  Now a value of type (C Int) is just a newtype wrapper (a cast) around
+  the error thunk.  Don't strictify these!
+
+See #17758 for more background and perf numbers.
+
+The implementation is extremly simple: just make the strictness
+analyser strictify the demand on a dictionary binder in
+'findBndrDmd'.
+
+However there is one case where this can make performance worse.
+For the principle consider some function at the core level:
+    myEq :: Eq a => a -> a -> Bool
+    myEq eqDict x y = ((==) eqDict) x y
+If we make the dictionary strict then WW can fire turning this into:
+    $wmyEq :: (a -> a -> Bool) -> a -> a -> Bool
+    $wmyEq eq x y = eq x y
+Which *usually* performs better. However if the dictionary is known we
+are far more likely to inline a function applied to the dictionary than
+to inline one applied to a function. Sometimes this makes just enough
+of a difference to stop a function from inlining. This is documented in
+#18421.
+
+It's somewhat similar to Note [Do not unpack class dictionaries] although
+here our problem is with the inliner, not the specializer.
+
+Note [Initialising strictness]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 See section 9.2 (Finding fixpoints) of the paper.
 
 Our basic plan is to initialise the strictness of each Id in a
