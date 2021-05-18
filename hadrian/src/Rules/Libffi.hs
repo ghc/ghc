@@ -13,8 +13,25 @@ import Settings.Builders.Common
 import Target
 import Utilities
 
-{- Note [Libffi indicating inputs]
+{-
+Note [Uses of libffi in GHC]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GHC uses libffi for two things:
 
+ * it is always used to perform foreign calls in interpreted code. This is
+   implemented in "GHCi.FFI" in the `ghci` library). N.B. it is *not* used for
+   foreign calls in compiled code, which are rather handled by the code generator.
+
+ * it is used by some platforms for "adjustors" used to setup calls into
+   Haskell from `foreign export`s. This is implemented in `rts/Adjustor.c`; see
+   Note [Adjustors] in that file.
+
+   Note that on some platforms (e.g. x86-64) we use our own home-grown
+   adjustors logic instead of libffi. Consequently, the RTS's dependency on
+   libffi is conditional on 'Oracles.Settings.useLibFFIForAdjustors'.
+
+Note [Libffi indicating inputs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 First see https://gitlab.haskell.org/ghc/ghc/wikis/Developing-Hadrian for an
 explanation of "indicating input". Part of the definition is copied here for
 your convenience:

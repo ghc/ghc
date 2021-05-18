@@ -5,7 +5,9 @@
  *
  * ---------------------------------------------------------------------------*/
 
-/* A little bit of background...
+/*
+Note [Adjustors]
+~~~~~~~~~~~~~~~~
 
 An adjustor thunk is a dynamically allocated code snippet that allows
 Haskell closures to be viewed as C function pointers.
@@ -34,6 +36,11 @@ An adjustor thunk differs from a C function pointer in one respect: when
 the code is through with it, it has to be freed in order to release Haskell
 and C resources. Failure to do so will result in memory leaks on both the C and
 Haskell side.
+
+How we implement adjustors is platform dependent (specifically determined by
+USE_LIBFFI_FOR_ADJUSTORS). On PowerPC, x86-64 and i386 we use a home-grown
+adjustor implementation. On all other platforms we rather use libffi. Also see
+Note [Uses of libffi in GHC] in hadrian's Rules.Libffi.
 */
 
 #include "PosixSource.h"

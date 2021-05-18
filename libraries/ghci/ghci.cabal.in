@@ -58,6 +58,7 @@ library
             GHCi.StaticPtrTable
             GHCi.TH
 
+    -- See Note [Uses of libffi in GHC] in hadrian's Rules.Libffi
     include-dirs: @FFIIncludeDir@
     extra-libraries: ffi
 

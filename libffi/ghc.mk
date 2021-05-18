@@ -10,6 +10,7 @@
 #
 # -----------------------------------------------------------------------------
 
+# See Note [Uses of libffi in GHC] in hadrian's Rules.Libffi
 
 libffi_STAMP_STATIC_CONFIGURE = libffi/stamp.ffi.static.configure
 libffi_STAMP_STATIC_BUILD     = libffi/stamp.ffi.static.build

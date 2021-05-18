@@ -378,6 +378,7 @@ rts_CC_OPTS += -DNOSMP
 rts_HC_OPTS += -optc-DNOSMP
 endif
 
+# See Note [Adjustors] in rts/Adjustor.c
 ifeq "$(UseLibFFIForAdjustors)" "YES"
 rts_CC_OPTS += -DUSE_LIBFFI_FOR_ADJUSTORS
 endif
