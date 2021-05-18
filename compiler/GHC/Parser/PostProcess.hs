@@ -59,7 +59,7 @@ module GHC.Parser.PostProcess (
         checkPattern,         -- HsExp -> P HsPat
         checkPattern_details,
         incompleteDoBlock,
-        ExtraDetails(..),
+        ParseContext(..),
         checkMonadComp,       -- P (HsStmtContext GhcPs)
         checkValDef,          -- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
         checkValSigLhs,
@@ -1094,7 +1094,7 @@ checkImportDecl mPre mPost = do
 checkPattern :: LocatedA (PatBuilder GhcPs) -> P (LPat GhcPs)
 checkPattern = runPV . checkLPat
 
-checkPattern_details :: ExtraDetails -> PV (LocatedA (PatBuilder GhcPs)) -> P (LPat GhcPs)
+checkPattern_details :: ParseContext -> PV (LocatedA (PatBuilder GhcPs)) -> P (LPat GhcPs)
 checkPattern_details extraDetails pp = runPV_details extraDetails (pp >>= checkLPat)
 
 checkLPat :: LocatedA (PatBuilder GhcPs) -> PV (LPat GhcPs)
@@ -1108,16 +1108,11 @@ checkPat loc (L l e@(PatBuilderVar (L ln c))) tyargs args
       , pat_con = L ln c
       , pat_args = PrefixCon tyargs args
       }
-  | not (null tyargs) || (not (null args) && patIsRec c) = do
-      extraDetails <- askExtraDetails
-      patFail (locA l) . PsErrParseErrorInPat e $ PsParseErrorInPatDetails {
-              peipd_tyargs              = tyargs
-            , peipd_args_num            = length args
-            , peipd_pat_is_rec          = patIsRec c
-            , peipd_neg_app             = False
-            , peipd_is_infix            = is_infix extraDetails
-            , peipd_incomplete_do_block = incomplete_do_block extraDetails
-            }
+  | not (null tyargs) =
+      patFail (locA l) . PsErrInPat e $ PEIP_TypeArgs tyargs
+  | (not (null args) && patIsRec c) = do
+      ctx <- askParseContext
+      patFail (locA l) . PsErrInPat e $ PEIP_RecPattern args YesPatIsRecursive ctx
 checkPat loc (L _ (PatBuilderAppType f _ t)) tyargs args =
   checkPat loc f (t : tyargs) args
 checkPat loc (L _ (PatBuilderApp f e)) [] args = do
@@ -1127,8 +1122,8 @@ checkPat loc (L l e) [] [] = do
   p <- checkAPat loc e
   return (L l p)
 checkPat loc e _ _ = do
-  details <- withExtraDetails noParseErrorInPatDetails <$> askExtraDetails
-  patFail (locA loc) (PsErrParseErrorInPat (unLoc e) details)
+  details <- fromParseContext <$> askParseContext
+  patFail (locA loc) (PsErrInPat (unLoc e) details)
 
 checkAPat :: SrcSpanAnnA -> PatBuilder GhcPs -> PV (Pat GhcPs)
 checkAPat loc e0 = do
@@ -1172,8 +1167,8 @@ checkAPat loc e0 = do
          (ai,ac) = parenTypeKws pt
      return (ParPat (EpAnn (spanAsAnchor $ (widenSpan (locA l) aa)) an emptyComments) (L l p))
    _           -> do
-     details <- withExtraDetails noParseErrorInPatDetails <$> askExtraDetails
-     patFail (locA loc) (PsErrParseErrorInPat e0 details)
+     details <- fromParseContext <$> askParseContext
+     patFail (locA loc) (PsErrInPat e0 details)
 
 placeHolderPunRhs :: DisambECP b => PV (LocatedA b)
 -- The RHS of a punned record field will be filled in by the renamer
@@ -1245,8 +1240,8 @@ checkFunBind strictness locF ann fun is_infix pats (L _ grhss)
         -- That isn't quite right, but it'll do for now.
   where
     extraDetails
-      | Infix <- is_infix = ExtraDetails (Just $ unLoc fun) False
-      | otherwise         = noExtraDetails
+      | Infix <- is_infix = ParseContext (Just $ unLoc fun) NoIncompleteDoBlock
+      | otherwise         = noParseContext
 
 makeFunBind :: LocatedN RdrName -> LocatedL [LMatch GhcPs (LHsExpr GhcPs)]
             -> HsBind GhcPs
@@ -1807,9 +1802,7 @@ instance DisambECP (PatBuilder GhcPs) where
   mkHsNegAppPV l (L lp p) anns = do
     lit <- case p of
       PatBuilderOverLit pos_lit -> return (L (locA lp) pos_lit)
-      _ -> do
-        details <- withExtraDetails (noParseErrorInPatDetails { peipd_neg_app = True }) <$> askExtraDetails
-        patFail l $ PsErrParseErrorInPat p details
+      _ -> patFail l $ PsErrInPat p PEIP_NegApp
     cs <- getCommentsFor l
     let an = EpAnn (spanAsAnchor l) anns cs
     return $ L (noAnnSrcSpan l) (PatBuilderPat (mkNPat lit (Just noSyntaxExpr) an))
@@ -2763,7 +2756,7 @@ failOpFewArgs (L loc op) =
 data PV_Context =
   PV_Context
     { pv_options :: ParserOpts
-    , pv_details :: ExtraDetails -- See Note [Parser-Validator Details]
+    , pv_details :: ParseContext -- See Note [Parser-Validator Details]
     }
 
 data PV_Accum =
@@ -2811,34 +2804,12 @@ instance Monad PV where
       PV_Failed acc' -> PV_Failed acc'
 
 runPV :: PV a -> P a
-runPV = runPV_details noExtraDetails
+runPV = runPV_details noParseContext
 
-askExtraDetails :: PV ExtraDetails
-askExtraDetails = PV $ \(PV_Context _ details) acc -> PV_Ok acc details
+askParseContext :: PV ParseContext
+askParseContext = PV $ \(PV_Context _ details) acc -> PV_Ok acc details
 
--- | Extra information for the expression GHC is currently inspecting/parsing.
--- It can be used to generate more informative parser diagnostics and hints.
-data ExtraDetails
-  = ExtraDetails
-  { is_infix :: Maybe RdrName
-  , incomplete_do_block :: !Bool
-  } deriving Eq
-
-noExtraDetails :: ExtraDetails
-noExtraDetails = ExtraDetails Nothing False
-
-incompleteDoBlock :: ExtraDetails
-incompleteDoBlock = ExtraDetails Nothing True
-
--- | Enriches the input 'PsParseErrorInPatDetails' with the information provided
--- by the 'ExtraDetails'.
-withExtraDetails :: PsParseErrorInPatDetails -> ExtraDetails -> PsParseErrorInPatDetails
-withExtraDetails details extras =
-  details { peipd_is_infix = is_infix extras
-          , peipd_incomplete_do_block = incomplete_do_block extras
-          }
-
-runPV_details :: ExtraDetails -> PV a -> P a
+runPV_details :: ParseContext -> PV a -> P a
 runPV_details details m =
   P $ \s ->
     let
@@ -2895,7 +2866,7 @@ instance MonadP PV where
 
 {- Note [Parser-Validator Details]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A PV computation is parametrized by some 'ExtraDetails' for diagnostic messages, which can be set
+A PV computation is parametrized by some 'ParseContext' for diagnostic messages, which can be set
 depending on validation context. We use this in checkPattern to fix #984.
 
 Consider this example, where the user has forgotten a 'do':
@@ -2929,10 +2900,10 @@ We attempt to detect such cases and add a hint to the diagnostic messages:
     Possibly caused by a missing 'do'?
 
 The "Possibly caused by a missing 'do'?" suggestion is the hint that is computed
-out of the 'ExtraDetails', which are read by functions like 'patFail' when
+out of the 'ParseContext', which are read by functions like 'patFail' when
 constructing the 'PsParseErrorInPatDetails' data structure. When validating in a
 context other than 'bindpat' (a pattern to the left of <-), we set the
-details to 'noExtraDetails' and it has no effect on the diagnostic messages.
+details to 'noParseContext' and it has no effect on the diagnostic messages.
 
 -}
 
