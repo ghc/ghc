@@ -211,6 +211,7 @@ module GHC.Driver.Session (
 
         -- * Include specifications
         IncludeSpecs(..), addGlobalInclude, addQuoteInclude, flattenIncludes,
+        addImplicitQuoteInclude,
 
         -- * SDoc
         initSDocContext, initDefaultSDocContext,
@@ -364,6 +365,7 @@ import qualified GHC.LanguageExtensions as LangExt
 data IncludeSpecs
   = IncludeSpecs { includePathsQuote  :: [String]
                  , includePathsGlobal :: [String]
+                 , includePathsQuoteImplicit :: [String]
                  }
   deriving Show
 
@@ -380,10 +382,19 @@ addQuoteInclude :: IncludeSpecs -> [String] -> IncludeSpecs
 addQuoteInclude spec paths  = let f = includePathsQuote spec
                               in spec { includePathsQuote = f ++ paths }
 
+-- | These includes are not considered while fingerprinting the flags for iface
+addImplicitQuoteInclude :: IncludeSpecs -> [String] -> IncludeSpecs
+addImplicitQuoteInclude spec paths  = let f = includePathsQuoteImplicit spec
+                              in spec { includePathsQuoteImplicit = f ++ paths }
+
+
 -- | Concatenate and flatten the list of global and quoted includes returning
 -- just a flat list of paths.
 flattenIncludes :: IncludeSpecs -> [String]
-flattenIncludes specs = includePathsQuote specs ++ includePathsGlobal specs
+flattenIncludes specs =
+    includePathsQuote specs ++
+    includePathsQuoteImplicit specs ++
+    includePathsGlobal specs
 
 -- | Contains not only a collection of 'GeneralFlag's but also a plethora of
 -- information relating to the compilation of a single file or GHC session
@@ -1152,7 +1163,7 @@ defaultDynFlags mySettings llvmConfig =
         dumpPrefix              = Nothing,
         dumpPrefixForce         = Nothing,
         ldInputs                = [],
-        includePaths            = IncludeSpecs [] [],
+        includePaths            = IncludeSpecs [] [] [],
         libraryPaths            = [],
         frameworkPaths          = [],
         cmdlineFrameworks       = [],
