@@ -1310,6 +1310,14 @@ in straight-line code. Consequently, GHC.Core.Opt.SetLevels.lvlApp has special
 treatment for runRW# applications, ensure the arguments are not floated as
 MFEs.
 
+Now that we float evaluation context into runRW#, we also have to give runRW# a
+special higher-order CPR transformer lest we risk #19822. E.g.,
+
+  case runRW# (\s -> doThings) of x -> Data.Text.Text x something something'
+      ~>
+  runRW# (\s -> case doThings s of x -> Data.Text.Text x something something')
+
+The former had the CPR property, and so should the latter.
 
 Other considered designs
 ------------------------
