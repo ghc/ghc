@@ -58,7 +58,6 @@ import GHC.Driver.Backend
 import GHC.Driver.Monad
 import GHC.Driver.Env
 import GHC.Driver.Errors
-import GHC.Driver.Errors.Ppr
 import GHC.Driver.Errors.Types
 import GHC.Driver.Main
 
@@ -2708,9 +2707,9 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
                        $ DriverFileModuleNameMismatch pi_mod_name wanted_mod
 
         when (hsc_src == HsigFile && isNothing (lookup pi_mod_name (homeUnitInstantiations home_unit))) $
-            let suggestions = suggestInstantiatedWith pi_mod_name (homeUnitInstantiations home_unit)
+            let instantiations = homeUnitInstantiations home_unit
             in throwE $ singleMessage $ mkPlainErrorMsgEnvelope pi_mod_name_loc
-                      $ DriverUnexpectedSignature pi_mod_name (checkBuildingCabalPackage dflags) suggestions
+                      $ DriverUnexpectedSignature pi_mod_name (checkBuildingCabalPackage dflags) instantiations
 
         liftIO $ makeNewModSummary hsc_env $ MakeNewModSummary
             { nms_src_fn = src_fn
@@ -2861,7 +2860,7 @@ withDeferredDiagnostics f = do
 noModError :: HscEnv -> SrcSpan -> ModuleName -> FindResult -> MsgEnvelope GhcMessage
 -- ToDo: we don't have a proper line number for this error
 noModError hsc_env loc wanted_mod err
-  = mkPlainErrorMsgEnvelope loc $ GhcDriverMessage $ DriverUnknownMessage $ mkPlainError $
+  = mkPlainErrorMsgEnvelope loc $ GhcDriverMessage $ DriverUnknownMessage $ mkPlainError noHints $
     cannotFindModule hsc_env wanted_mod err
 
 noHsFileErr :: SrcSpan -> String -> DriverMessages
