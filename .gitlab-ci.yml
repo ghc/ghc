@@ -520,7 +520,7 @@ release-x86_64-freebsd:
 # x86_64-darwin
 #################################
 
-validate-x86_64-darwin:
+.validate-x86_64-darwin:
   extends: .validate
   stage: full-build
   tags:
@@ -618,7 +618,7 @@ validate-x86_64-darwin:
       - cabal-cache
       - toolchain
 
-validate-aarch64-darwin:
+.validate-aarch64-darwin:
   extends: .validate
   stage: full-build
   tags:
