@@ -1,0 +1,10 @@
+[1 of 5] Compiling C                ( C.hs, C.o )
+[2 of 5] Compiling B                ( B.hs, B.o )
+[3 of 5] Compiling A                ( A.hs, A.o )
+[4 of 5] Compiling M                ( M.hs, M.o )
+[5 of 5] Compiling Top              ( Top.hs, Top.o )
+[1 of 6] Compiling C[boot]          ( C.hs-boot, C.o-boot )
+[3 of 6] Compiling B                ( B.hs, B.o )
+[4 of 6] Compiling A                ( A.hs, A.o ) [B changed]
+[5 of 6] Compiling M                ( M.hs, M.o ) [A changed]
+[6 of 6] Compiling Top              ( Top.hs, Top.o ) [M changed]

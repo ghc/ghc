@@ -6,7 +6,7 @@ DATA CONSTRUCTORS
   K2 :: forall a. FunPtr a -> T2 a
   K1 :: forall a. IO a -> T1 a
 Dependent modules: []
-Dependent packages: [base-4.15.0.0, ghc-bignum-1.0, ghc-prim-0.7.0]
+Dependent packages: [base-4.16.0.0]
 
 ==================== Typechecker ====================
 Roles2.$tcT2

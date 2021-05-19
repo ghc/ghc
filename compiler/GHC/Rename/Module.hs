@@ -763,10 +763,10 @@ rnFamEqn doc atfi extra_kvars
          -- See Note [Renaming associated types].
          -- Per that Note, the LHS type variables consist of:
          --
-         -- * The variables mentioned in the instance's type patterns
+         -- - The variables mentioned in the instance's type patterns
          --   (pat_fvs), and
          --
-         -- * The variables mentioned in an outermost kind signature on the
+         -- - The variables mentioned in an outermost kind signature on the
          --   RHS. This is a subset of `rhs_fvs`. To compute it, we look up
          --   each RdrName in `extra_kvars` to find its corresponding Name in
          --   the LocalRdrEnv.
@@ -1939,7 +1939,7 @@ rnDataDefn doc (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
 
         ; let all_fvs = fvs1 `plusFV` fvs3 `plusFV`
                         con_fvs `plusFV` sig_fvs
-        ; return ( HsDataDefn { dd_ext = noAnn
+        ; return ( HsDataDefn { dd_ext = noExtField
                               , dd_ND = new_or_data, dd_cType = cType
                               , dd_ctxt = context', dd_kindSig = m_sig'
                               , dd_cons = condecls'

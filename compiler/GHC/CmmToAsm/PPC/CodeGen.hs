@@ -978,7 +978,8 @@ condIntCode' _ cond width x (CmmLit (CmmInt y rep))
   | Just src2 <- makeImmediate rep (not $ condUnsigned cond) y
   = do
       let op_len = max W32 width
-      let extend = extendSExpr width op_len
+      let extend = if condUnsigned cond then extendUExpr width op_len
+                   else extendSExpr width op_len
       (src1, code) <- getSomeReg (extend x)
       let format = intFormat op_len
           code' = code `snocOL`
@@ -2011,6 +2012,9 @@ genCCall' config gcp target dest_regs args
                     MO_Memset _  -> (fsLit "memset", False)
                     MO_Memmove _ -> (fsLit "memmove", False)
                     MO_Memcmp _  -> (fsLit "memcmp", False)
+
+                    MO_SuspendThread -> (fsLit "suspendThread", False)
+                    MO_ResumeThread  -> (fsLit "resumeThread", False)
 
                     MO_BSwap w   -> (bSwapLabel w, False)
                     MO_BRev w    -> (bRevLabel w, False)
