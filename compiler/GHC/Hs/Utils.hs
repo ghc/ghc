@@ -880,7 +880,7 @@ isInfixFunBind (FunBind { fun_matches = MG _ matches _ })
 isInfixFunBind _ = False
 
 -- |Return the 'SrcSpan' encompassing the contents of any enclosed binds
-spanHsLocaLBinds :: (Data (HsLocalBinds (GhcPass p))) => HsLocalBinds (GhcPass p) -> SrcSpan
+spanHsLocaLBinds :: Data (HsLocalBinds (GhcPass p)) => HsLocalBinds (GhcPass p) -> SrcSpan
 spanHsLocaLBinds (EmptyLocalBinds _) = noSrcSpan
 spanHsLocaLBinds (HsValBinds _ (ValBinds _ bs sigs))
   = foldr combineSrcSpans noSrcSpan (bsSpans ++ sigsSpans)

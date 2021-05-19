@@ -879,7 +879,7 @@ indexByteArray :: ByteArray# -> Int# -> Word8
 indexByteArray a# n# = W8# (indexWord8Array# a# n#)
 
 -}
-instance (Binary a) => Binary (Ratio a) where
+instance Binary a => Binary (Ratio a) where
     put_ bh (a :% b) = do put_ bh a; put_ bh b
     get bh = do a <- get bh; b <- get bh; return (a :% b)
 

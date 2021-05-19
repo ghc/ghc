@@ -571,7 +571,7 @@ that to whiz up a TypeRep TyCon for 'n', with mkTypeLitTyCon.
 See #10348.
 
 Because of this rule it's inadvisable (see #15322) to have a constraint
-    f :: (Typeable (n :: Nat)) => blah
+    f :: Typeable (n :: Nat) => blah
 in a function signature; it gives rise to overlap problems just as
 if you'd written
     f :: Eq [a] => blah

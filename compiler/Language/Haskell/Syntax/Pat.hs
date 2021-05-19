@@ -223,7 +223,7 @@ type family ConLikeP x
 -- | Haskell Constructor Pattern Details
 type HsConPatDetails p = HsConDetails (HsPatSigType (NoGhcTc p)) (LPat p) (HsRecFields p (LPat p))
 
-hsConPatArgs :: forall p . (UnXRec p) => HsConPatDetails p -> [LPat p]
+hsConPatArgs :: forall p. UnXRec p => HsConPatDetails p -> [LPat p]
 hsConPatArgs (PrefixCon _ ps) = ps
 hsConPatArgs (RecCon fs)      = map (hsRecFieldArg . unXRec @p) (rec_flds fs)
 hsConPatArgs (InfixCon p1 p2) = [p1,p2]

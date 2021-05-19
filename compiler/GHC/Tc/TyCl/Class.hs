@@ -77,7 +77,7 @@ Dictionary handling
 Every class implicitly declares a new data type, corresponding to dictionaries
 of that class. So, for example:
 
-        class (D a) => C a where
+        class D a => C a where
           op1 :: a -> a
           op2 :: forall b. Ord b => a -> b -> b
 

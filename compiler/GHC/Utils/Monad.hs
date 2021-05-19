@@ -179,7 +179,7 @@ mapMaybeM f = foldr g (pure [])
   where g a = liftA2 (maybe id (:)) (f a)
 
 -- | Monadic version of fmap
-fmapMaybeM :: (Monad m) => (a -> m b) -> Maybe a -> m (Maybe b)
+fmapMaybeM :: Monad m => (a -> m b) -> Maybe a -> m (Maybe b)
 fmapMaybeM _ Nothing  = return Nothing
 fmapMaybeM f (Just x) = f x >>= (return . Just)
 
@@ -228,7 +228,7 @@ unlessM condM acc = do { cond <- condM
                        ; unless cond acc }
 
 -- | Like 'filterM', only it reverses the sense of the test.
-filterOutM :: (Applicative m) => (a -> m Bool) -> [a] -> m [a]
+filterOutM :: Applicative m => (a -> m Bool) -> [a] -> m [a]
 filterOutM p =
   foldr (\ x -> liftA2 (\ flg -> if flg then id else (x:)) (p x)) (pure [])
 

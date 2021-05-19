@@ -89,11 +89,11 @@ type ShowS = String -> String
 -- For example, given the declarations
 --
 -- > infixr 5 :^:
--- > data Tree a =  Leaf a  |  Tree a :^: Tree a
+-- > data Tree a = Leaf a | Tree a :^: Tree a
 --
 -- the derived instance of 'Show' is equivalent to
 --
--- > instance (Show a) => Show (Tree a) where
+-- > instance Show a => Show (Tree a) where
 -- >
 -- >        showsPrec d (Leaf m) = showParen (d > app_prec) $
 -- >             showString "Leaf " . showsPrec (app_prec+1) m
@@ -110,7 +110,7 @@ type ShowS = String -> String
 -- * @'show' (Leaf 1 :^: Leaf 2 :^: Leaf 3)@ produces the string
 --   @\"Leaf 1 :^: (Leaf 2 :^: Leaf 3)\"@.
 
-class  Show a  where
+class Show a where
     {-# MINIMAL showsPrec | show #-}
 
     -- | Convert a value to a readable 'String'.
@@ -132,21 +132,20 @@ class  Show a  where
                         -- Function application has precedence @10@.
               -> a      -- ^ the value to be converted to a 'String'
               -> ShowS
+    showsPrec _ x s = show x ++ s
 
     -- | A specialised variant of 'showsPrec', using precedence context
     -- zero, and returning an ordinary 'String'.
-    show      :: a   -> String
+    show :: a -> String
+    show x = shows x ""
 
     -- | The method 'showList' is provided to allow the programmer to
     -- give a specialised way of showing lists of values.
     -- For example, this is used by the predefined 'Show' instance of
     -- the 'Char' type, where values of type 'String' should be shown
     -- in double quotes, rather than between square brackets.
-    showList  :: [a] -> ShowS
-
-    showsPrec _ x s = show x ++ s
-    show x          = shows x ""
-    showList ls   s = showList__ shows ls s
+    showList :: [a] -> ShowS
+    showList ls s = showList__ shows ls s
 
 showList__ :: (a -> ShowS) ->  [a] -> ShowS
 showList__ _     []     s = "[]" ++ s
@@ -337,23 +336,23 @@ show_tuple ss = showChar '('
 --------------------------------------------------------------
 
 -- | equivalent to 'showsPrec' with a precedence of 0.
-shows           :: (Show a) => a -> ShowS
-shows           =  showsPrec 0
+shows :: Show a => a -> ShowS
+shows = showsPrec 0
 
 -- | utility function converting a 'Char' to a show function that
 -- simply prepends the character unchanged.
-showChar        :: Char -> ShowS
-showChar        =  (:)
+showChar :: Char -> ShowS
+showChar = (:)
 
 -- | utility function converting a 'String' to a show function that
 -- simply prepends the string unchanged.
-showString      :: String -> ShowS
-showString      =  (++)
+showString :: String -> ShowS
+showString = (++)
 
 -- | utility function that surrounds the inner show function with
 -- parentheses when the 'Bool' parameter is 'True'.
-showParen       :: Bool -> ShowS -> ShowS
-showParen b p   =  if b then showChar '(' . p . showChar ')' else p
+showParen :: Bool -> ShowS -> ShowS
+showParen b p = if b then showChar '(' . p . showChar ')' else p
 
 showSpace :: ShowS
 showSpace = {-showChar ' '-} \ xs -> ' ' : xs
@@ -367,7 +366,7 @@ showCommaSpace = showString ", "
 --
 -- > showLitChar '\n' s  =  "\\n" ++ s
 --
-showLitChar                :: Char -> ShowS
+showLitChar :: Char -> ShowS
 showLitChar c s | c > '\DEL' =  showChar '\\' (protectEsc isDec (shows (ord c)) s)
 showLitChar '\DEL'         s =  showString "\\DEL" s
 showLitChar '\\'           s =  showString "\\\\" s

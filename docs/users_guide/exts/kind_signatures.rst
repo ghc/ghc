@@ -40,7 +40,7 @@ This extension enables kind signatures in the following places:
 
 -  ``class`` declarations: ::
 
-         class (Eq a) => C (f :: Type -> Type) a where ...
+         class Eq a => C (f :: Type -> Type) a where ...
 
 -  ``forall``\'s in type signatures: ::
 

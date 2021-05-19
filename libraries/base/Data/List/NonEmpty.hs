@@ -370,7 +370,7 @@ groupWith f = groupBy ((==) `on` f)
 -- | 'groupAllWith' operates like 'groupWith', but sorts the list
 -- first so that each equivalence class has, at most, one list in the
 -- output
-groupAllWith :: (Ord b) => (a -> b) -> [a] -> [NonEmpty a]
+groupAllWith :: Ord b => (a -> b) -> [a] -> [NonEmpty a]
 groupAllWith f = groupWith f . List.sortBy (compare `on` f)
 
 -- | 'group1' operates like 'group', but uses the knowledge that its
@@ -384,11 +384,11 @@ groupBy1 eq (x :| xs) = (x :| ys) :| groupBy eq zs
   where (ys, zs) = List.span (eq x) xs
 
 -- | 'groupWith1' is to 'group1' as 'groupWith' is to 'group'
-groupWith1 :: (Eq b) => (a -> b) -> NonEmpty a -> NonEmpty (NonEmpty a)
+groupWith1 :: Eq b => (a -> b) -> NonEmpty a -> NonEmpty (NonEmpty a)
 groupWith1 f = groupBy1 ((==) `on` f)
 
 -- | 'groupAllWith1' is to 'groupWith1' as 'groupAllWith' is to 'groupWith'
-groupAllWith1 :: (Ord b) => (a -> b) -> NonEmpty a -> NonEmpty (NonEmpty a)
+groupAllWith1 :: Ord b => (a -> b) -> NonEmpty a -> NonEmpty (NonEmpty a)
 groupAllWith1 f = groupWith1 f . sortWith f
 
 -- | The 'isPrefixOf' function returns 'True' if the first argument is

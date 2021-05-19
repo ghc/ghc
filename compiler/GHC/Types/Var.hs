@@ -744,7 +744,7 @@ setTyVarKind tv k = tv {varType = k}
 updateTyVarKind :: (Kind -> Kind) -> TyVar -> TyVar
 updateTyVarKind update tv = tv {varType = update (tyVarKind tv)}
 
-updateTyVarKindM :: (Monad m) => (Kind -> m Kind) -> TyVar -> m TyVar
+updateTyVarKindM :: Monad m => (Kind -> m Kind) -> TyVar -> m TyVar
 updateTyVarKindM update tv
   = do { k' <- update (tyVarKind tv)
        ; return $ tv {varType = k'} }
