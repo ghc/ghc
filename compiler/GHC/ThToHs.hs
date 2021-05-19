@@ -874,7 +874,7 @@ cvtRuleBndr (RuleVar n)
 cvtRuleBndr (TypedRuleVar n ty)
   = do { n'  <- vNameN n
        ; ty' <- cvtType ty
-       ; return $ noLoc $ Hs.RuleBndrSig noAnn n' $ mkHsPatSigType ty' }
+       ; return $ noLoc $ Hs.RuleBndrSig noAnn n' $ mkHsPatSigType noAnn ty' }
 
 ---------------------------------------------------
 --              Declarations
@@ -1318,7 +1318,7 @@ cvtp (ConP s ts ps)    = do { s' <- cNameN s
                             ; return $ ConPat
                                 { pat_con_ext = noAnn
                                 , pat_con = s'
-                                , pat_args = PrefixCon (map mkHsPatSigType ts') pps
+                                , pat_args = PrefixCon (map (mkHsPatSigType noAnn) ts') pps
                                 }
                             }
 cvtp (InfixP p1 s p2)  = do { s' <- cNameN s; p1' <- cvtPat p1; p2' <- cvtPat p2
@@ -1353,7 +1353,7 @@ cvtp (ListP ps)        = do { ps' <- cvtPats ps
                             ; return
                                    $ ListPat noAnn ps'}
 cvtp (SigP p t)        = do { p' <- cvtPat p; t' <- cvtType t
-                            ; return $ SigPat noAnn p' (mkHsPatSigType t') }
+                            ; return $ SigPat noAnn p' (mkHsPatSigType noAnn t') }
 cvtp (ViewP e p)       = do { e' <- cvtl e; p' <- cvtPat p
                             ; return $ ViewPat noAnn e' p'}
 
