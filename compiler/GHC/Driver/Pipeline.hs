@@ -1904,7 +1904,8 @@ doCpp logger tmpfs dflags unit_env raw input_fn output_fn = do
     let include_paths_global = foldr (\ x xs -> ("-I" ++ x) : xs) []
           (includePathsGlobal cmdline_include_paths ++ pkg_include_dirs)
     let include_paths_quote = foldr (\ x xs -> ("-iquote" ++ x) : xs) []
-          (includePathsQuote cmdline_include_paths)
+          (includePathsQuote cmdline_include_paths ++
+           includePathsQuoteImplicit cmdline_include_paths)
     let include_paths = include_paths_quote ++ include_paths_global
 
     let verbFlags = getVerbFlags dflags
