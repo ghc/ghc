@@ -218,8 +218,9 @@ bindistRules = do
         top <- topDirectory
         copyFile (top -/- "hadrian" -/- "bindist" -/- "Makefile") makefilePath
 
-    root -/- "bindist" -/- "ghc-*" -/- "wrappers/*" %> \wrapperPath ->
-        writeFile' wrapperPath $ wrapper (takeFileName wrapperPath)
+    root -/- "bindist" -/- "ghc-*" -/- "wrappers/*" %> \wrapperPath -> do
+        content <- wrapper (takeFileName wrapperPath)
+        writeFile' wrapperPath content
 
     -- Copy various configure-related files needed for a working
     -- './configure [...] && make install' workflow
@@ -266,7 +267,7 @@ pkgTarget pkg
     | isLibrary pkg = pkgConfFile (vanillaContext Stage1 pkg)
     | otherwise     = programPath =<< programContext Stage1 pkg
 
-wrapper :: FilePath -> String
+wrapper :: FilePath -> Action String
 wrapper "ghc"         = ghcWrapper
 wrapper "ghc-pkg"     = ghcPkgWrapper
 wrapper "ghci-script" = ghciScriptWrapper
@@ -277,23 +278,27 @@ wrapper _             = commonWrapper
 
 -- | Wrapper scripts for different programs. Common is default wrapper.
 
-ghcWrapper :: String
-ghcWrapper = "exec \"$executablename\" -B\"$libdir\" ${1+\"$@\"}\n"
+ghcWrapper :: Action String
+ghcWrapper = pure $ "exec \"$executablename\" -B\"$libdir\" ${1+\"$@\"}\n"
 
-ghcPkgWrapper :: String
-ghcPkgWrapper = unlines
+ghcPkgWrapper :: Action String
+ghcPkgWrapper = pure $ unlines
     [ "PKGCONF=\"$libdir/package.conf.d\""
     , "exec \"$executablename\" --global-package-db \"$PKGCONF\" ${1+\"$@\"}" ]
 
-haddockWrapper :: String
-haddockWrapper = "exec \"$executablename\" -B\"$libdir\" -l\"$libdir\" ${1+\"$@\"}\n"
+haddockWrapper :: Action String
+haddockWrapper = pure $ "exec \"$executablename\" -B\"$libdir\" -l\"$libdir\" ${1+\"$@\"}\n"
 
-commonWrapper :: String
-commonWrapper = "exec \"$executablename\" ${1+\"$@\"}\n"
+commonWrapper :: Action String
+commonWrapper = pure $ "exec \"$executablename\" ${1+\"$@\"}\n"
 
-hsc2hsWrapper :: String
-hsc2hsWrapper = unlines
-    [ "HSC2HS_EXTRA=\"--cflag=-fno-stack-protector\""
+-- echo 'HSC2HS_EXTRA="$(addprefix --cflag=,$(CONF_CC_OPTS_STAGE1)) $(addprefix --lflag=,$(CONF_GCC_LINKER_OPTS_STAGE1))"' >> "$(WRAPPER)"
+hsc2hsWrapper :: Action String
+hsc2hsWrapper = do
+  ccArgs <- map ("--cflag=" <>) <$> settingList (ConfCcArgs Stage1)
+  ldFlags <- map ("--lflag=" <>) <$> settingList (ConfGccLinkerArgs Stage1)
+  return $ unlines
+    [ "HSC2HS_EXTRA=\"" <> unwords ccArgs <> unwords ldFlags <> "\""
     , "tflag=\"--template=$libdir/template-hsc.h\""
     , "Iflag=\"-I$includedir/\""
     , "for arg do"
@@ -313,13 +318,13 @@ hsc2hsWrapper = unlines
     , "done"
     , "exec \"$executablename\" ${tflag:+\"$tflag\"} $HSC2HS_EXTRA ${1+\"$@\"} \"$Iflag\"" ]
 
-runGhcWrapper :: String
-runGhcWrapper = "exec \"$executablename\" -f \"$exedir/ghc\" ${1+\"$@\"}\n"
+runGhcWrapper :: Action String
+runGhcWrapper = pure $ "exec \"$executablename\" -f \"$exedir/ghc\" ${1+\"$@\"}\n"
 
 -- | We need to ship ghci executable, which basically just calls ghc with
 -- | --interactive flag.
-ghciScriptWrapper :: String
-ghciScriptWrapper = unlines
+ghciScriptWrapper :: Action String
+ghciScriptWrapper = pure $ unlines
     [ "DIR=`dirname \"$0\"`"
     , "executable=\"$DIR/ghc\""
     , "exec $executable --interactive \"$@\"" ]
