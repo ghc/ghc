@@ -266,10 +266,9 @@ ppr_termM1 :: Monad m => Term -> m SDoc
 ppr_termM1 Prim{valRaw=words, ty=ty} =
     return $ repPrim (tyConAppTyCon ty) words
 ppr_termM1 Suspension{ty=ty, bound_to=Nothing} =
-    return (char '_' <+> whenPprDebug (dcolon <> ppr ty))
+    return (char '_' <+> whenPprDebug (dcolon <> pprSigmaType ty))
 ppr_termM1 Suspension{ty=ty, bound_to=Just n}
---  | Just _ <- splitFunTy_maybe ty = return$ text "<function>"
-  | otherwise = return$ parens$ ppr n <> dcolon <> ppr ty
+  | otherwise = return$ parens$ ppr n <> dcolon <> pprSigmaType ty
 ppr_termM1 Term{}        = panic "ppr_termM1 - Term"
 ppr_termM1 RefWrap{}     = panic "ppr_termM1 - RefWrap"
 ppr_termM1 NewtypeWrap{} = panic "ppr_termM1 - NewtypeWrap"
