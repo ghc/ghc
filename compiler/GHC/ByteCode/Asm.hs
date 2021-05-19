@@ -454,7 +454,7 @@ assembleI platform i = case i of
   JMP       l              -> emit bci_JMP [LabelOp l]
   ENTER                    -> emit bci_ENTER []
   RETURN                   -> emit bci_RETURN []
-  RETURN_UBX rep           -> emit (return_ubx rep) []
+  RETURN_UNLIFTED rep      -> emit (return_unlifted rep) []
   RETURN_TUPLE             -> emit bci_RETURN_T []
   CCALL off m_addr i       -> do np <- addr m_addr
                                  emit bci_CCALL [SmallOp off, Op np, SmallOp i]
@@ -522,16 +522,16 @@ push_alts V16 = error "push_alts: vector"
 push_alts V32 = error "push_alts: vector"
 push_alts V64 = error "push_alts: vector"
 
-return_ubx :: ArgRep -> Word16
-return_ubx V   = bci_RETURN_V
-return_ubx P   = bci_RETURN_P
-return_ubx N   = bci_RETURN_N
-return_ubx L   = bci_RETURN_L
-return_ubx F   = bci_RETURN_F
-return_ubx D   = bci_RETURN_D
-return_ubx V16 = error "return_ubx: vector"
-return_ubx V32 = error "return_ubx: vector"
-return_ubx V64 = error "return_ubx: vector"
+return_unlifted :: ArgRep -> Word16
+return_unlifted V   = bci_RETURN_V
+return_unlifted P   = bci_RETURN_P
+return_unlifted N   = bci_RETURN_N
+return_unlifted L   = bci_RETURN_L
+return_unlifted F   = bci_RETURN_F
+return_unlifted D   = bci_RETURN_D
+return_unlifted V16 = error "return_unlifted: vector"
+return_unlifted V32 = error "return_unlifted: vector"
+return_unlifted V64 = error "return_unlifted: vector"
 
 {-
   we can only handle up to a fixed number of words on the stack,

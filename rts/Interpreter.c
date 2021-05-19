@@ -361,11 +361,11 @@ interpretBCO (Capability* cap)
     // ------------------------------------------------------------------------
     // Case 3:
     //
-    //       We have an unboxed value to return.  See comment before
-    //       do_return_unboxed, below.
+    //       We have an unlifted value to return.  See comment before
+    //       do_return_lifted, below.
     //
     else {
-        goto do_return_unboxed;
+        goto do_return_unlifted;
     }
 
     // Evaluate the object on top of the stack.
@@ -650,7 +650,7 @@ do_return:
     }
 
     // -------------------------------------------------------------------------
-    // Returning an unboxed value.  The stack looks like this:
+    // Returning an unlifted value.  The stack looks like this:
     //
     //    |     ....      |
     //    +---------------+
@@ -672,7 +672,7 @@ do_return:
     // We're only interested in the case when the real return address
     // is a BCO; otherwise we'll return to the scheduler.
 
-do_return_unboxed:
+do_return_unlifted:
     {
         int offset;
 
@@ -688,7 +688,7 @@ do_return_unboxed:
         IF_DEBUG(interpreter,
              debugBelch(
              "\n---------------------------------------------------------------\n");
-             debugBelch("Returning unboxed\n");
+             debugBelch("Returning unlifted\n");
              debugBelch("Sp = %p\n", Sp);
 #if defined(PROFILING)
              fprintCCS(stderr, cap->r.rCCCS);
@@ -710,7 +710,7 @@ do_return_unboxed:
             INTERP_TICK(it_retto_BCO);
             obj = (StgClosure*)SpW(offset+1);
             ASSERT(get_itbl(obj)->type == BCO);
-            goto run_BCO_return_unboxed;
+            goto run_BCO_return_unlifted;
 
         default:
         {
@@ -928,7 +928,7 @@ run_BCO_return:
 
     goto run_BCO;
 
-run_BCO_return_unboxed:
+run_BCO_return_unlifted:
     // Heap check
     if (doYouWantToGC(cap)) {
         RETURN_TO_SCHEDULER(ThreadInterpret, HeapOverflow);
@@ -940,7 +940,7 @@ run_BCO_return_unboxed:
     /*
        Restore the current cost centre stack if a tuple is being returned.
 
-       When a "simple" unboxed value is returned, the cccs is restored with
+       When a "simple" unlifted value is returned, the cccs is restored with
        an stg_restore_cccs frame on the stack, for example:
 
            ...
@@ -1654,7 +1654,7 @@ run_BCO:
             /* Unpack N ptr words from t.o.s constructor */
             int i;
             int n_words = BCO_NEXT;
-            StgClosure* con = (StgClosure*)SpW(0);
+            StgClosure* con = UNTAG_CLOSURE((StgClosure*)SpW(0));
             Sp_subW(n_words);
             for (i = 0; i < n_words; i++) {
                 SpW(i) = (W_)con->payload[i];
@@ -1679,10 +1679,25 @@ run_BCO:
             // No write barrier is needed here as this is a new allocation
             // visible only from our stack
             SET_HDR(con, (StgInfoTable*)BCO_LIT(o_itbl), cap->r.rCCCS);
-            SpW(0) = (W_)con;
+
+            // Note [Data constructor dynamic tags]
+            //
+            // compute the pointer tag for the constructor and tag the pointer
+            //
+            //     - 1..(TAG_MASK-1): for first TAG_MASK-1 constructors
+            //     - TAG_MASK:        look in info table
+            //
+            // Note: we need to update this if we change the tagging strategy
+            //
+            // For full details of the invariants on tagging, see
+            // https://gitlab.haskell.org/ghc/ghc/wikis/commentary/rts/haskell-execution/pointer-tagging
+
+            StgClosure* tagged_con = TAG_CLOSURE(stg_min(TAG_MASK, 1 + GET_TAG(con)), con);
+            SpW(0) = (W_)tagged_con;
+
             IF_DEBUG(interpreter,
                      debugBelch("\tBuilt ");
-                     printObj((StgClosure*)con);
+                     printObj((StgClosure*)tagged_con);
                 );
             goto nextInsn;
         }
@@ -1822,32 +1837,32 @@ run_BCO:
         case bci_RETURN_P:
             Sp_subW(1);
             SpW(0) = (W_)&stg_ret_p_info;
-            goto do_return_unboxed;
+            goto do_return_unlifted;
         case bci_RETURN_N:
             Sp_subW(1);
             SpW(0) = (W_)&stg_ret_n_info;
-            goto do_return_unboxed;
+            goto do_return_unlifted;
         case bci_RETURN_F:
             Sp_subW(1);
             SpW(0) = (W_)&stg_ret_f_info;
-            goto do_return_unboxed;
+            goto do_return_unlifted;
         case bci_RETURN_D:
             Sp_subW(1);
             SpW(0) = (W_)&stg_ret_d_info;
-            goto do_return_unboxed;
+            goto do_return_unlifted;
         case bci_RETURN_L:
             Sp_subW(1);
             SpW(0) = (W_)&stg_ret_l_info;
-            goto do_return_unboxed;
+            goto do_return_unlifted;
         case bci_RETURN_V:
             Sp_subW(1);
             SpW(0) = (W_)&stg_ret_v_info;
-            goto do_return_unboxed;
+            goto do_return_unlifted;
         case bci_RETURN_T: {
             /* tuple_info and tuple_bco must already be on the stack */
             Sp_subW(1);
             SpW(0) = (W_)&stg_ret_t_info;
-            goto do_return_unboxed;
+            goto do_return_unlifted;
         }
 
         case bci_SWIZZLE: {
