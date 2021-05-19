@@ -1410,7 +1410,7 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
   ecpFromCmd' :: LHsCmd GhcPs -> PV (LocatedA b)
   -- | Return an expression without ambiguity, or fail in a non-expression context.
   ecpFromExp' :: LHsExpr GhcPs -> PV (LocatedA b)
-  mkHsProjUpdatePV :: SrcSpan -> Located [Located (HsFieldLabel GhcPs)]
+  mkHsProjUpdatePV :: SrcSpan -> Located [Located (DotFieldOcc GhcPs)]
     -> LocatedA b -> Bool -> [AddEpAnn] -> PV (LHsRecProj GhcPs (LocatedA b))
   -- | Disambiguate "\... -> ..." (lambda)
   mkHsLamPV
@@ -2434,7 +2434,7 @@ mkRdrRecordUpd overloaded_on exp@(L loc _) fbinds anns = do
     recFieldToProjUpdate (L l (HsRecField anns (L _ (FieldOcc _ (L loc rdr))) arg pun)) =
         -- The idea here is to convert the label to a singleton [FastString].
         let f = occNameFS . rdrNameOcc $ rdr
-            fl = HsFieldLabel noAnn (L lf f) -- AZ: what about the ann?
+            fl = DotFieldOcc noAnn (L lf f) -- AZ: what about the ann?
             lf = locA loc
         in mkRdrProjUpdate l (L lf [L lf fl]) (punnedVar f) pun anns
         where
@@ -2952,7 +2952,7 @@ starSym False = "*"
 -----------------------------------------
 -- Bits and pieces for RecordDotSyntax.
 
-mkRdrGetField :: SrcSpanAnnA -> LHsExpr GhcPs -> Located (HsFieldLabel GhcPs)
+mkRdrGetField :: SrcSpanAnnA -> LHsExpr GhcPs -> Located (DotFieldOcc GhcPs)
   -> EpAnnCO -> LHsExpr GhcPs
 mkRdrGetField loc arg field anns =
   L loc HsGetField {
@@ -2961,7 +2961,7 @@ mkRdrGetField loc arg field anns =
     , gf_field = field
     }
 
-mkRdrProjection :: [Located (HsFieldLabel GhcPs)] -> EpAnn AnnProjection -> HsExpr GhcPs
+mkRdrProjection :: [Located (DotFieldOcc GhcPs)] -> EpAnn AnnProjection -> HsExpr GhcPs
 mkRdrProjection [] _ = panic "mkRdrProjection: The impossible has happened!"
 mkRdrProjection flds anns =
   HsProjection {
@@ -2969,7 +2969,7 @@ mkRdrProjection flds anns =
     , proj_flds = flds
     }
 
-mkRdrProjUpdate :: SrcSpanAnnA -> Located [Located (HsFieldLabel GhcPs)]
+mkRdrProjUpdate :: SrcSpanAnnA -> Located [Located (DotFieldOcc GhcPs)]
                 -> LHsExpr GhcPs -> Bool -> EpAnn [AddEpAnn]
                 -> LHsRecProj GhcPs (LHsExpr GhcPs)
 mkRdrProjUpdate _ (L _ []) _ _ _ = panic "mkRdrProjUpdate: The impossible has happened!"

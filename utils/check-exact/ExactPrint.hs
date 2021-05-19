@@ -2249,10 +2249,10 @@ instance ExactPrint (FieldLabelStrings GhcPs) where
 
 -- ---------------------------------------------------------------------
 
-instance ExactPrint (HsFieldLabel GhcPs) where
-  getAnnotationEntry (HsFieldLabel an _) = fromAnn an
+instance ExactPrint (DotFieldOcc GhcPs) where
+  getAnnotationEntry (DotFieldOcc an _) = fromAnn an
 
-  exact (HsFieldLabel an fs) = do
+  exact (DotFieldOcc an fs) = do
     markAnnKwM an afDot  AnnDot
     markAnnotated fs
 

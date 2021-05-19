@@ -311,19 +311,19 @@ rnExpr (NegApp _ e _)
 rnExpr (HsGetField _ e f)
  = do { (getField, fv_getField) <- lookupSyntaxName getFieldName
       ; (e, fv_e) <- rnLExpr e
-      ; let f' = rnHsFieldLabel f
+      ; let f' = rnDotFieldOcc f
       ; return ( mkExpandedExpr
                    (HsGetField noExtField e f')
-                   (mkGetField getField e (fmap (unLoc . hflLabel) f'))
+                   (mkGetField getField e (fmap (unLoc . dfoLabel) f'))
                , fv_e `plusFV` fv_getField ) }
 
 rnExpr (HsProjection _ fs)
   = do { (getField, fv_getField) <- lookupSyntaxName getFieldName
        ; circ <- lookupOccRn compose_RDR
-       ; let fs' = fmap rnHsFieldLabel fs
+       ; let fs' = fmap rnDotFieldOcc fs
        ; return ( mkExpandedExpr
                     (HsProjection noExtField fs')
-                    (mkProjection getField circ (map (fmap (unLoc . hflLabel)) fs'))
+                    (mkProjection getField circ (map (fmap (unLoc . dfoLabel)) fs'))
                 , unitFV circ `plusFV` fv_getField) }
 
 ------------------------------------------
@@ -704,11 +704,11 @@ See #18151.
 ************************************************************************
 -}
 
-rnHsFieldLabel :: Located (HsFieldLabel GhcPs) -> Located (HsFieldLabel GhcRn)
-rnHsFieldLabel (L l (HsFieldLabel x label)) = L l (HsFieldLabel x label)
+rnDotFieldOcc :: Located (DotFieldOcc GhcPs) -> Located (DotFieldOcc GhcRn)
+rnDotFieldOcc (L l (DotFieldOcc x label)) = L l (DotFieldOcc x label)
 
 rnFieldLabelStrings :: FieldLabelStrings GhcPs -> FieldLabelStrings GhcRn
-rnFieldLabelStrings (FieldLabelStrings fls) = FieldLabelStrings (map rnHsFieldLabel fls)
+rnFieldLabelStrings (FieldLabelStrings fls) = FieldLabelStrings (map rnDotFieldOcc fls)
 
 {-
 ************************************************************************
@@ -2620,7 +2620,7 @@ mkProjection _ _ [] = panic "mkProjection: The impossible happened"
 mkProjUpdateSetField :: Name -> Name -> LHsRecProj GhcRn (LHsExpr GhcRn) -> (LHsExpr GhcRn -> LHsExpr GhcRn)
 mkProjUpdateSetField get_field set_field (L _ (HsRecField { hsRecFieldLbl = (L _ (FieldLabelStrings flds')), hsRecFieldArg = arg } ))
   = let {
-      ; flds = map (fmap (unLoc . hflLabel)) flds'
+      ; flds = map (fmap (unLoc . dfoLabel)) flds'
       ; final = last flds  -- quux
       ; fields = init flds   -- [foo, bar, baz]
       ; getters = \a -> foldl' (mkGet get_field) [a] fields  -- Ordered from deep to shallow.
