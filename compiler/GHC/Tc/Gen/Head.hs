@@ -24,7 +24,7 @@ module GHC.Tc.Gen.Head
 
        , tcInferAppHead, tcInferAppHead_maybe
        , tcInferId, tcCheckId
-       , obviousSig, addAmbiguousNameErr
+       , obviousSig
        , tyConOf, tyConOfET, lookupParents, fieldNotInType
        , notSelector, nonBidirectionalErr
 
@@ -40,11 +40,10 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Unify
 import GHC.Types.Basic
 import GHC.Tc.Utils.Instantiate
-import GHC.Tc.Instance.Family ( tcGetFamInstEnvs, tcLookupDataFamInst )
+import GHC.Tc.Instance.Family ( tcLookupDataFamInst )
 import GHC.Core.FamInstEnv    ( FamInstEnvs )
 import GHC.Core.UsageEnv      ( unitUE )
-import GHC.Rename.Env         ( addUsedGRE )
-import GHC.Rename.Utils       ( addNameClashErrRn, unknownSubordinateErr )
+import GHC.Rename.Utils       ( unknownSubordinateErr )
 import GHC.Tc.Solver          ( InferMode(..), simplifyInfer )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Zonk      ( hsLitType )
@@ -76,7 +75,6 @@ import GHC.Utils.Panic.Plain
 import Control.Monad
 
 import Data.Function
-import qualified Data.List.NonEmpty as NE
 
 import GHC.Prelude
 
@@ -372,22 +370,21 @@ It's easy to achieve this: `splitHsApps` unwraps `HsExpanded`.
 ********************************************************************* -}
 
 tcInferAppHead :: (HsExpr GhcRn, AppCtxt)
-               -> [HsExprArg 'TcpRn] -> Maybe TcRhoType
-               -- These two args are solely for tcInferRecSelId
+               -> [HsExprArg 'TcpRn]
                -> TcM (HsExpr GhcTc, TcSigmaType)
 -- Infer type of the head of an application
 --   i.e. the 'f' in (f e1 ... en)
 -- See Note [Application chains and heads] in GHC.Tc.Gen.App
 -- We get back a /SigmaType/ because we have special cases for
 --   * A bare identifier (just look it up)
---     This case also covers a record selector HsRecFld
+--     This case also covers a record selector HsRecSel
 --   * An expression with a type signature (e :: ty)
 -- See Note [Application chains and heads] in GHC.Tc.Gen.App
 --
--- Why do we need the arguments to infer the type of the head of
--- the application?  For two reasons:
---   * (Legitimate) The first arg has the source location of the head
---   * (Disgusting) Needed for record disambiguation; see tcInferRecSelId
+-- Why do we need the arguments to infer the type of the head of the
+-- application? Simply to inform add_head_ctxt about whether or not
+-- to put push a new "In the expression..." context. (We don't push a
+-- new one if there are no arguments, because we already have.)
 --
 -- Note that [] and (,,) are both HsVar:
 --   see Note [Empty lists] and [ExplicitTuple] in GHC.Hs.Expr
@@ -396,24 +393,23 @@ tcInferAppHead :: (HsExpr GhcRn, AppCtxt)
 --     cases are dealt with by splitHsApps.
 --
 -- See Note [tcApp: typechecking applications] in GHC.Tc.Gen.App
-tcInferAppHead (fun,ctxt) args mb_res_ty
+tcInferAppHead (fun,ctxt) args
   = setSrcSpan (appCtxtLoc ctxt) $
-    do { mb_tc_fun <- tcInferAppHead_maybe fun args mb_res_ty
+    do { mb_tc_fun <- tcInferAppHead_maybe fun args
        ; case mb_tc_fun of
             Just (fun', fun_sigma) -> return (fun', fun_sigma)
             Nothing -> add_head_ctxt fun args $
                        tcInfer (tcExpr fun) }
 
 tcInferAppHead_maybe :: HsExpr GhcRn
-                     -> [HsExprArg 'TcpRn] -> Maybe TcRhoType
-                        -- These two args are solely for tcInferRecSelId
+                     -> [HsExprArg 'TcpRn]
                      -> TcM (Maybe (HsExpr GhcTc, TcSigmaType))
 -- See Note [Application chains and heads] in GHC.Tc.Gen.App
 -- Returns Nothing for a complicated head
-tcInferAppHead_maybe fun args mb_res_ty
+tcInferAppHead_maybe fun args
   = case fun of
       HsVar _ (L _ nm)          -> Just <$> tcInferId nm
-      HsRecFld _ f              -> Just <$> tcInferRecSelId f args mb_res_ty
+      HsRecSel _ f              -> Just <$> tcInferRecSelId f
       ExprWithTySig _ e hs_ty   -> add_head_ctxt fun args $
                                    Just <$> tcExprWithSig e hs_ty
       HsOverLit _ lit           -> Just <$> tcInferOverLit lit
@@ -433,217 +429,39 @@ add_head_ctxt fun args thing_inside
 *                                                                      *
 ********************************************************************* -}
 
-{-
-Note [Deprecating ambiguous fields]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In the future, the -XDuplicateRecordFields extension will no longer support
-disambiguating record fields during type-checking (as described in Note
-[Disambiguating record fields]).  For now, the -Wambiguous-fields option will
-emit a warning whenever an ambiguous field is resolved using type information.
-In a subsequent GHC release, this functionality will be removed and the warning
-will turn into an ambiguity error in the renamer.
-
-For background information, see GHC proposal #366
-(https://github.com/ghc-proposals/ghc-proposals/pull/366).
-
-
-Note [Disambiguating record fields]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-NB. The following is going to be removed: see
-Note [Deprecating ambiguous fields].
-
-When the -XDuplicateRecordFields extension is used, and the renamer
-encounters a record selector or update that it cannot immediately
-disambiguate (because it involves fields that belong to multiple
-datatypes), it will defer resolution of the ambiguity to the
-typechecker.  In this case, the `Ambiguous` constructor of
-`AmbiguousFieldOcc` is used.
-
-Consider the following definitions:
-
-        data S = MkS { foo :: Int }
-        data T = MkT { foo :: Int, bar :: Int }
-        data U = MkU { bar :: Int, baz :: Int }
-
-When the renamer sees `foo` as a selector or an update, it will not
-know which parent datatype is in use.
-
-For selectors, there are two possible ways to disambiguate:
-
-1. Check if the pushed-in type is a function whose domain is a
-   datatype, for example:
-
-       f s = (foo :: S -> Int) s
-
-       g :: T -> Int
-       g = foo
-
-    This is checked by `tcCheckRecSelId` when checking `HsRecFld foo`.
-
-2. Check if the selector is applied to an argument that has a type
-   signature, for example:
-
-       h = foo (s :: S)
-
-    This is checked by `tcInferRecSelId`.
-
-
-Updates are slightly more complex.  The `disambiguateRecordBinds`
-function tries to determine the parent datatype in three ways:
-
-1. Check for types that have all the fields being updated. For example:
-
-        f x = x { foo = 3, bar = 2 }
-
-   Here `f` must be updating `T` because neither `S` nor `U` have
-   both fields. This may also discover that no possible type exists.
-   For example the following will be rejected:
-
-        f' x = x { foo = 3, baz = 3 }
-
-2. Use the type being pushed in, if it is already a TyConApp. The
-   following are valid updates to `T`:
-
-        g :: T -> T
-        g x = x { foo = 3 }
-
-        g' x = x { foo = 3 } :: T
-
-3. Use the type signature of the record expression, if it exists and
-   is a TyConApp. Thus this is valid update to `T`:
-
-        h x = (x :: T) { foo = 3 }
-
-
-Note that we do not look up the types of variables being updated, and
-no constraint-solving is performed, so for example the following will
-be rejected as ambiguous:
-
-     let bad (s :: S) = foo s
-
-     let r :: T
-         r = blah
-     in r { foo = 3 }
-
-     \r. (r { foo = 3 },  r :: T )
-
-We could add further tests, of a more heuristic nature. For example,
-rather than looking for an explicit signature, we could try to infer
-the type of the argument to a selector or the record expression being
-updated, in case we are lucky enough to get a TyConApp straight
-away. However, it might be hard for programmers to predict whether a
-particular update is sufficiently obvious for the signature to be
-omitted. Moreover, this might change the behaviour of typechecker in
-non-obvious ways.
-
-See also Note [HsRecField and HsRecUpdField] in GHC.Hs.Pat.
--}
-
-tcInferRecSelId :: AmbiguousFieldOcc GhcRn
-                -> [HsExprArg 'TcpRn] -> Maybe TcRhoType
+tcInferRecSelId :: FieldOcc GhcRn
                 -> TcM (HsExpr GhcTc, TcSigmaType)
-tcInferRecSelId (Unambiguous sel_name lbl) _args _mb_res_ty
-   = do { sel_id <- tc_rec_sel_id lbl sel_name
-        ; let expr = HsRecFld noExtField (Unambiguous sel_id lbl)
-        ; return (expr, idType sel_id) }
+tcInferRecSelId (FieldOcc sel_name lbl)
+   = do { sel_id <- tc_rec_sel_id
+        ; let expr = HsRecSel noExtField (FieldOcc sel_id lbl)
+        ; return (expr, idType sel_id)
+        }
+     where
+       occ :: OccName
+       occ = rdrNameOcc (unLoc lbl)
 
-tcInferRecSelId (Ambiguous _ lbl) args mb_res_ty
-   = do { sel_name <- tcInferAmbiguousRecSelId lbl args mb_res_ty
-        ; sel_id   <- tc_rec_sel_id lbl sel_name
-        ; let expr = HsRecFld noExtField (Ambiguous sel_id lbl)
-        ; return (expr, idType sel_id) }
+       tc_rec_sel_id :: TcM TcId
+       -- Like tc_infer_id, but returns an Id not a HsExpr,
+       -- so we can wrap it back up into a HsRecSel
+       tc_rec_sel_id
+         = do { thing <- tcLookup sel_name
+              ; case thing of
+                    ATcId { tct_id = id }
+                      -> do { check_naughty occ id
+                            ; check_local_id id
+                            ; return id }
 
-------------------------
-tc_rec_sel_id :: LocatedN RdrName -> Name -> TcM TcId
--- Like tc_infer_id, but returns an Id not a HsExpr,
--- so we can wrap it back up into a HsRecFld
-tc_rec_sel_id lbl sel_name
-  = do { thing <- tcLookup sel_name
-       ; case thing of
-             ATcId { tct_id = id }
-               -> do { check_naughty occ id
-                     ; check_local_id id
-                     ; return id }
+                    AGlobal (AnId id)
+                      -> do { check_naughty occ id
+                            ; return id }
+                           -- A global cannot possibly be ill-staged
+                           -- nor does it need the 'lifting' treatment
+                           -- hence no checkTh stuff here
 
-             AGlobal (AnId id)
-               -> do { check_naughty occ id
-                     ; return id }
-                    -- A global cannot possibly be ill-staged
-                    -- nor does it need the 'lifting' treatment
-                    -- hence no checkTh stuff here
-
-             _ -> failWithTc $
-                  ppr thing <+> text "used where a value identifier was expected" }
-  where
-    occ = rdrNameOcc (unLoc lbl)
+                    _ -> failWithTc $
+                         ppr thing <+> text "used where a value identifier was expected" }
 
 ------------------------
-tcInferAmbiguousRecSelId :: LocatedN RdrName
-                         -> [HsExprArg 'TcpRn] -> Maybe TcRhoType
-                         -> TcM Name
--- Disgusting special case for ambiguous record selectors
--- Given a RdrName that refers to multiple record fields, and the type
--- of its argument, try to determine the name of the selector that is
--- meant.
--- See Note [Disambiguating record fields]
-tcInferAmbiguousRecSelId lbl args mb_res_ty
-  | arg1 : _ <- dropWhile (not . isVisibleArg) args -- A value arg is first
-  , EValArg { eva_arg = ValArg (L _ arg) } <- arg1
-  , Just sig_ty <- obviousSig arg  -- A type sig on the arg disambiguates
-  = do { sig_tc_ty <- tcHsSigWcType (ExprSigCtxt NoRRC) sig_ty
-       ; finish_ambiguous_selector lbl sig_tc_ty }
-
-  | Just res_ty <- mb_res_ty
-  , Just (arg_ty,_) <- tcSplitFunTy_maybe res_ty
-  = finish_ambiguous_selector lbl (scaledThing arg_ty)
-
-  | otherwise
-  = ambiguousSelector lbl
-
-finish_ambiguous_selector :: LocatedN RdrName -> Type -> TcM Name
-finish_ambiguous_selector lr@(L _ rdr) parent_type
- = do { fam_inst_envs <- tcGetFamInstEnvs
-      ; case tyConOf fam_inst_envs parent_type of {
-          Nothing -> ambiguousSelector lr ;
-          Just p  ->
-
-    do { xs <- lookupParents True rdr
-       ; let parent = RecSelData p
-       ; case lookup parent xs of {
-           Nothing  -> failWithTc (fieldNotInType parent rdr) ;
-           Just gre ->
-
-    -- See Note [Unused name reporting and HasField] in GHC.Tc.Instance.Class
-    do { addUsedGRE True gre
-       ; keepAlive (greMangledName gre)
-         -- See Note [Deprecating ambiguous fields]
-       ; warnIfFlag Opt_WarnAmbiguousFields True $
-          vcat [ text "The field" <+> quotes (ppr rdr)
-                   <+> text "belonging to type" <+> ppr parent_type
-                   <+> text "is ambiguous."
-               , text "This will not be supported by -XDuplicateRecordFields in future releases of GHC."
-               , if isLocalGRE gre
-                 then text "You can use explicit case analysis to resolve the ambiguity."
-                 else text "You can use a qualified import or explicit case analysis to resolve the ambiguity."
-               ]
-       ; return (greMangledName gre) } } } } }
-
--- This field name really is ambiguous, so add a suitable "ambiguous
--- occurrence" error, then give up.
-ambiguousSelector :: LocatedN RdrName -> TcM a
-ambiguousSelector (L _ rdr)
-  = do { addAmbiguousNameErr rdr
-       ; failM }
-
--- | This name really is ambiguous, so add a suitable "ambiguous
--- occurrence" error, then continue
-addAmbiguousNameErr :: RdrName -> TcM ()
-addAmbiguousNameErr rdr
-  = do { env <- getGlobalRdrEnv
-       ; let gres = lookupGRE_RdrName rdr env
-       ; case gres of
-         [] -> panic "addAmbiguousNameErr: not found"
-         gre : gres -> setErrCtxt [] $ addNameClashErrRn rdr $ gre NE.:| gres}
 
 -- A type signature on the argument of an ambiguous record selector or
 -- the record expression in an update must be "obvious", i.e. the
