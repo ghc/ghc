@@ -16,6 +16,7 @@ import GHC.Types.Cpr
 import GHC.Core
 import GHC.Core.Seq
 import GHC.Utils.Outputable
+import GHC.Builtin.Names ( runRWKey )
 import GHC.Types.Var.Env
 import GHC.Types.Basic
 import GHC.Types.Id
@@ -148,8 +149,6 @@ cprAnal' _ (Lit lit)     = (topCprType, Lit lit)
 cprAnal' _ (Type ty)     = (topCprType, Type ty)      -- Doesn't happen, in fact
 cprAnal' _ (Coercion co) = (topCprType, Coercion co)
 
-cprAnal' env (Var var)   = (cprTransform env var, Var var)
-
 cprAnal' env (Cast e co)
   = (cpr_ty, Cast e' co)
   where
@@ -160,19 +159,10 @@ cprAnal' env (Tick t e)
   where
     (cpr_ty, e') = cprAnal env e
 
-cprAnal' env (App fun (Type ty))
-  = (fun_ty, App fun' (Type ty))
-  where
-    (fun_ty, fun') = cprAnal env fun
-
-cprAnal' env (App fun arg)
-  = (res_ty, App fun' arg')
-  where
-    (fun_ty, fun') = cprAnal env fun
-    -- In contrast to DmdAnal, there is no useful (non-nested) CPR info to be
-    -- had by looking into the CprType of arg.
-    (_, arg')      = cprAnal env arg
-    res_ty         = applyCprTy fun_ty
+cprAnal' env e@(Var{})
+  = cprAnalApp env e [] []
+cprAnal' env e@(App{})
+  = cprAnalApp env e [] []
 
 cprAnal' env (Lam var body)
   | isTyVar var
@@ -234,25 +224,55 @@ cprAnalAlt env scrut_ty (Alt con bndrs rhs)
 -- * CPR transformer
 --
 
-cprTransform :: AnalEnv         -- ^ The analysis environment
-             -> Id              -- ^ The function
-             -> CprType         -- ^ The demand type of the function
-cprTransform env id
-  = -- pprTrace "cprTransform" (vcat [ppr id, ppr sig])
+cprAnalApp :: AnalEnv -> CoreExpr -> [CoreArg] -> [CprType] -> (CprType, CoreExpr)
+cprAnalApp env e args' arg_tys
+  -- Collect CprTypes for (value) args (inlined collectArgs):
+  | App fn arg <- e, isTypeArg arg -- Don't analyse Type args
+  = cprAnalApp env fn (arg:args') arg_tys
+  | App fn arg <- e
+  , (arg_ty, arg') <- cprAnal env arg
+  = cprAnalApp env fn (arg':args') (arg_ty:arg_tys)
+
+  | Var fn <- e
+  = (cprTransform env fn arg_tys, mkApps e args')
+
+  | otherwise -- e is not an App and not a Var
+  , (e_ty, e') <- cprAnal env e
+  = (applyCprTy e_ty (length arg_tys), mkApps e' args')
+
+cprTransform :: AnalEnv   -- ^ The analysis environment
+             -> Id        -- ^ The function
+             -> [CprType] -- ^ info about incoming /value/ arguments
+             -> CprType   -- ^ The demand type of the application
+cprTransform env id args
+  = -- pprTrace "cprTransform" (vcat [ppr id, ppr args, ppr sig])
     sig
   where
     sig
-      -- Top-level binding, local let-binding or case binder
+      -- Top-level binding, local let-binding, lambda arg or case binder
       | Just sig <- lookupSigEnv env id
-      = getCprSig sig
+      = applyCprTy (getCprSig sig) (length args)
+      -- CPR transformers for special Ids
+      | Just cpr_ty <- cprTransformSpecial id args
+      = cpr_ty
       -- See Note [CPR for data structures]
       | Just rhs <- cprDataStructureUnfolding_maybe id
       = fst $ cprAnal env rhs
       -- Imported function or data con worker
       | isGlobalId id
-      = getCprSig (idCprSig id)
+      = applyCprTy (getCprSig (idCprSig id)) (length args)
       | otherwise
       = topCprType
+
+-- | CPR transformers for special Ids
+cprTransformSpecial :: Id -> [CprType] -> Maybe CprType
+cprTransformSpecial id args
+  -- See Note [Simplification of runRW#] in GHC.CoreToStg.Prep
+  | idUnique id == runRWKey -- `runRW (\s -> e)`
+  , [arg] <- args           -- `\s -> e` has CPR type `arg` (e.g. `. -> 2`)
+  = Just $ applyCprTy arg 1 -- `e` has CPR type `2`
+  | otherwise
+  = Nothing
 
 --
 -- * Bindings

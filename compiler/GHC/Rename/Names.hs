@@ -22,8 +22,6 @@ module GHC.Rename.Names (
         checkConName,
         mkChildEnv,
         findChildren,
-        dodgyMsg,
-        dodgyMsgInsert,
         findImportUsage,
         getMinimalImports,
         printMinimalImports,
@@ -40,6 +38,7 @@ import GHC.Rename.Env
 import GHC.Rename.Fixity
 import GHC.Rename.Utils ( warnUnusedTopBinds, mkFieldEnv )
 
+import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
 
@@ -71,6 +70,7 @@ import GHC.Types.Basic  ( TopLevelFlag(..) )
 import GHC.Types.SourceText
 import GHC.Types.Id
 import GHC.Types.HpcInfo
+import GHC.Types.Unique.FM
 
 import GHC.Unit
 import GHC.Unit.Module.Warnings
@@ -198,9 +198,20 @@ rnImports imports = do
     stuff2 <- mapAndReportM (rnImportDecl this_mod) source
     -- Safe Haskell: See Note [Tracking Trust Transitively]
     let (decls, rdr_env, imp_avails, hpc_usage) = combine (stuff1 ++ stuff2)
-    return (decls, rdr_env, imp_avails, hpc_usage)
+    -- Update imp_boot_mods if imp_direct_mods mentions any of them
+    let final_import_avail = clobberSourceImports imp_avails
+    return (decls, rdr_env, final_import_avail, hpc_usage)
 
   where
+    clobberSourceImports imp_avails =
+      imp_avails { imp_boot_mods = imp_boot_mods' }
+      where
+        imp_boot_mods' = mergeUFM combJ id (const mempty)
+                            (imp_boot_mods imp_avails)
+                            (imp_direct_dep_mods imp_avails)
+
+        combJ (GWIB _ IsBoot) x = Just x
+        combJ r _               = Just r
     -- See Note [Combining ImportAvails]
     combine :: [(LImportDecl GhcRn,  GlobalRdrEnv, ImportAvails, AnyHpcUsage)]
             -> ([LImportDecl GhcRn], GlobalRdrEnv, ImportAvails, AnyHpcUsage)
@@ -422,6 +433,7 @@ calculateAvails home_unit iface mod_safe' want_boot imported_by =
       deps       = mi_deps iface
       trust      = getSafeMode $ mi_trust iface
       trust_pkg  = mi_trust_pkg iface
+      is_sig     = mi_hsc_src iface == HsigFile
 
       -- If the module exports anything defined in this module, just
       -- ignore it.  Reason: otherwise it looks as if there are two
@@ -457,53 +469,61 @@ calculateAvails home_unit iface mod_safe' want_boot imported_by =
                             imp_sem_mod : dep_finsts deps
              | otherwise  = dep_finsts deps
 
+      -- Trusted packages are a lot like orphans.
+      trusted_pkgs | mod_safe' = S.fromList (dep_trusted_pkgs deps)
+                   | otherwise = S.empty
+
+
       pkg = moduleUnit (mi_module iface)
       ipkg = toUnitId pkg
 
       -- Does this import mean we now require our own pkg
       -- to be trusted? See Note [Trust Own Package]
       ptrust = trust == Sf_Trustworthy || trust_pkg
+      pkg_trust_req
+        | isHomeUnit home_unit pkg = ptrust
+        | otherwise = False
 
-      (dependent_mods, dependent_pkgs, pkg_trust_req)
-         | isHomeUnit home_unit pkg =
-            -- Imported module is from the home package
-            -- Take its dependent modules and add imp_mod itself
-            -- Take its dependent packages unchanged
-            --
-            -- NB: (dep_mods deps) might include a hi-boot file
-            -- for the module being compiled, CM. Do *not* filter
-            -- this out (as we used to), because when we've
-            -- finished dealing with the direct imports we want to
-            -- know if any of them depended on CM.hi-boot, in
-            -- which case we should do the hi-boot consistency
-            -- check.  See GHC.Iface.Load.loadHiBootInterface
-            ( GWIB { gwib_mod = moduleName imp_mod, gwib_isBoot = want_boot } : dep_mods deps
-            , dep_pkgs deps
-            , ptrust
-            )
+      dependent_pkgs = if isHomeUnit home_unit pkg
+                        then S.empty
+                        else S.fromList [ipkg]
 
-         | otherwise =
-            -- Imported module is from another package
-            -- Dump the dependent modules
-            -- Add the package imp_mod comes from to the dependent packages
-            assertPpr (not (ipkg `elem` (map fst $ dep_pkgs deps)))
-                      (ppr ipkg <+> ppr (dep_pkgs deps))
-            ([], (ipkg, False) : dep_pkgs deps, False)
+      direct_mods = mkModDeps $ if isHomeUnit home_unit pkg
+                      then [GWIB (moduleName imp_mod) want_boot]
+                      else []
+
+      dep_boot_mods_map = mkModDeps (dep_boot_mods deps)
+
+      boot_mods
+        -- If we are looking for a boot module, it must be HPT
+        | IsBoot <- want_boot = addToUFM dep_boot_mods_map (moduleName imp_mod) (GWIB (moduleName imp_mod) IsBoot)
+        -- Now we are importing A properly, so don't go looking for
+        -- A.hs-boot
+        | isHomeUnit home_unit pkg = dep_boot_mods_map
+        -- There's no boot files to find in external imports
+        | otherwise = emptyUFM
+
+      sig_mods =
+        if is_sig
+          then moduleName imp_mod : dep_sig_mods deps
+          else dep_sig_mods deps
+
 
   in ImportAvails {
           imp_mods       = unitModuleEnv (mi_module iface) [imported_by],
           imp_orphs      = orphans,
           imp_finsts     = finsts,
-          imp_dep_mods   = mkModDeps dependent_mods,
-          imp_dep_pkgs   = S.fromList . map fst $ dependent_pkgs,
+          imp_sig_mods   = sig_mods,
+          imp_direct_dep_mods = direct_mods,
+          imp_dep_direct_pkgs = dependent_pkgs,
+          imp_boot_mods = boot_mods,
+
           -- Add in the imported modules trusted package
           -- requirements. ONLY do this though if we import the
           -- module as a safe import.
           -- See Note [Tracking Trust Transitively]
           -- and Note [Trust Transitive Property]
-          imp_trust_pkgs = if mod_safe'
-                               then S.fromList . map fst $ filter snd dependent_pkgs
-                               else S.empty,
+          imp_trust_pkgs = trusted_pkgs,
           -- Do we require our own pkg to be trusted?
           -- See Note [Trust Own Package]
           imp_trust_own_pkg = pkg_trust_req
@@ -1162,9 +1182,9 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
         where
             -- Warn when importing T(..) if T was exported abstractly
             emit_warning (DodgyImport n) = whenWOptM Opt_WarnDodgyImports $
-              addDiagnostic (WarningWithFlag Opt_WarnDodgyImports) (dodgyImportWarn n)
+              addTcRnDiagnostic (TcRnDodgyImports n)
             emit_warning MissingImportList = whenWOptM Opt_WarnMissingImportList $
-              addDiagnostic (WarningWithFlag Opt_WarnMissingImportList) (missingImportListItem ieRdr)
+              addTcRnDiagnostic (TcRnMissingImportList ieRdr)
             emit_warning (BadImportW ie) = whenWOptM Opt_WarnDodgyImports $
               addDiagnostic (WarningWithFlag Opt_WarnDodgyImports) (lookup_err_msg (BadImport ie))
 
@@ -2003,26 +2023,6 @@ badImportItemErr iface decl_spec ie avails
 illegalImportItemErr :: SDoc
 illegalImportItemErr = text "Illegal import item"
 
-dodgyImportWarn :: RdrName -> SDoc
-dodgyImportWarn item
-  = dodgyMsg (text "import") item (dodgyMsgInsert item :: IE GhcPs)
-
-dodgyMsg :: (Outputable a, Outputable b) => SDoc -> a -> b -> SDoc
-dodgyMsg kind tc ie
-  = sep [ text "The" <+> kind <+> text "item"
-                    -- <+> quotes (ppr (IEThingAll (noLoc (IEName $ noLoc tc))))
-                     <+> quotes (ppr ie)
-                <+> text "suggests that",
-          quotes (ppr tc) <+> text "has (in-scope) constructors or class methods,",
-          text "but it has none" ]
-
-dodgyMsgInsert :: forall p . IdP (GhcPass p) -> IE (GhcPass p)
-dodgyMsgInsert tc = IEThingAll noAnn ii
-  where
-    ii :: LIEWrappedName (IdP (GhcPass p))
-    ii = noLocA (IEName $ noLocA tc)
-
-
 addDupDeclErr :: [GlobalRdrElt] -> TcRn ()
 addDupDeclErr [] = panic "addDupDeclErr: empty list"
 addDupDeclErr gres@(gre : _)
@@ -2045,10 +2045,6 @@ addDupDeclErr gres@(gre : _)
 missingImportListWarn :: ModuleName -> SDoc
 missingImportListWarn mod
   = text "The module" <+> quotes (ppr mod) <+> text "does not have an explicit import list"
-
-missingImportListItem :: IE GhcPs -> SDoc
-missingImportListItem ie
-  = text "The import item" <+> quotes (ppr ie) <+> text "does not have an explicit import list"
 
 moduleWarn :: ModuleName -> WarningTxt -> SDoc
 moduleWarn mod (WarningTxt _ txt)

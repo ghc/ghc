@@ -1,0 +1,5 @@
+
+DodgyExports01.hs:2:13: warning: [-Wdodgy-exports (in -Wextra)]
+    The export item ‘T(..)’ suggests that
+    ‘T’ has (in-scope) constructors or class methods,
+    but it has none
