@@ -78,3 +78,4 @@ test('T18064',
 test('T18594', just_ghci, ghci_script, ['T18594.script'])
 test('T18562', just_ghci, ghci_script, ['T18562.script'])
 test('T19733', just_ghci, compile_and_run, [''])
+test('T19628', just_ghci, compile_and_run, [''])
