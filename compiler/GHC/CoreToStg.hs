@@ -41,6 +41,7 @@ import GHC.Builtin.Types ( unboxedUnitDataCon )
 import GHC.Types.Literal
 import GHC.Utils.Outputable
 import GHC.Utils.Monad
+import GHC.Utils.Misc (HasDebugCallStack)
 import GHC.Data.FastString
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
@@ -373,7 +374,7 @@ coreToTopStgRhs dflags ccs this_mod (bndr, rhs)
 -- handle with the function coreToPreStgRhs.
 
 coreToStgExpr
-        :: CoreExpr
+        :: HasDebugCallStack => CoreExpr
         -> CtsM StgExpr
 
 -- The second and third components can be derived in a simple bottom up pass, not
@@ -387,17 +388,18 @@ coreToStgExpr
 coreToStgExpr (Lit (LitNumber LitNumInteger _)) = panic "coreToStgExpr: LitInteger"
 coreToStgExpr (Lit (LitNumber LitNumNatural _)) = panic "coreToStgExpr: LitNatural"
 coreToStgExpr (Lit l)                           = return (StgLit l)
-coreToStgExpr (App l@(Lit LitRubbish{}) Type{}) = coreToStgExpr l
 coreToStgExpr (Var v) = coreToStgApp v [] []
 coreToStgExpr (Coercion _)
   -- See Note [Coercion tokens]
   = coreToStgApp coercionTokenId [] []
 
 coreToStgExpr expr@(App _ _)
-  = coreToStgApp f args ticks
-  where
-    (f, args, ticks) = myCollectArgs expr
-
+  = case app_head of
+      Var f               -> coreToStgApp f args ticks -- Regular application
+      Lit l@LitRubbish{}  -> return (StgLit l) -- LitRubbish
+      _                   -> pprPanic "coreToStgExpr - Invalid app head:" (ppr expr)
+    where
+      (app_head, args, ticks) = myCollectArgs expr
 coreToStgExpr expr@(Lam _ _)
   = let
         (args, body) = myCollectBinders expr
@@ -689,7 +691,7 @@ data PreStgRhs = PreStgRhs [Id] StgExpr -- The [Id] is empty for thunks
 
 -- Convert the RHS of a binding from Core to STG. This is a wrapper around
 -- coreToStgExpr that can handle value lambdas.
-coreToPreStgRhs :: CoreExpr -> CtsM PreStgRhs
+coreToPreStgRhs :: HasDebugCallStack => CoreExpr -> CtsM PreStgRhs
 coreToPreStgRhs (Cast expr _) = coreToPreStgRhs expr
 coreToPreStgRhs expr@(Lam _ _) =
     let
@@ -950,13 +952,13 @@ myCollectBinders expr
     go bs (Cast e _)         = go bs e
     go bs e                  = (reverse bs, e)
 
--- | Precondition: argument expression is an 'App', and there is a 'Var' at the
--- head of the 'App' chain.
-myCollectArgs :: CoreExpr -> (Id, [CoreArg], [CoreTickish])
+-- | If the argument expression is (potential chain of) 'App', return the head
+-- of the app chain, and collect ticks/args along the chain.
+myCollectArgs :: HasDebugCallStack => CoreExpr -> (CoreExpr, [CoreArg], [CoreTickish])
 myCollectArgs expr
   = go expr [] []
   where
-    go (Var v)          as ts = (v, as, ts)
+    go h@(Var _v)       as ts = (h, as, ts)
     go (App f a)        as ts = go f (a:as) ts
     go (Tick t e)       as ts = assertPpr (not (tickishIsCode t) || all isTypeArg as)
                                           (ppr e $$ ppr as $$ ppr ts) $
@@ -965,7 +967,7 @@ myCollectArgs expr
     go (Cast e _)       as ts = go e as ts
     go (Lam b e)        as ts
        | isTyVar b            = go e as ts -- Note [Collect args]
-    go _                _  _  = pprPanic "CoreToStg.myCollectArgs" (ppr expr)
+    go e                as ts = (e, as, ts)
 
 {- Note [Collect args]
 ~~~~~~~~~~~~~~~~~~~~~~

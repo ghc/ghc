@@ -1598,11 +1598,13 @@ runPhase (RealPhase (As with_cpp)) input_fn
 
         -- LLVM from version 3.0 onwards doesn't support the OS X system
         -- assembler, so we use clang as the assembler instead. (#5636)
-        let as_prog | backend dflags == LLVM
+        let (as_prog, get_asm_info) | backend dflags == LLVM
                     , platformOS platform == OSDarwin
-                    = GHC.SysTools.runClang
+                    = (GHC.SysTools.runClang, pure Clang)
                     | otherwise
-                    = GHC.SysTools.runAs
+                    = (GHC.SysTools.runAs, liftIO $ getAssemblerInfo logger dflags)
+
+        asmInfo <- get_asm_info
 
         let cmdline_include_paths = includePaths dflags
         let pic_c_flags = picCCOpts dflags
@@ -1614,7 +1616,6 @@ runPhase (RealPhase (As with_cpp)) input_fn
         -- might be a hierarchical module.
         liftIO $ createDirectoryIfMissing True (takeDirectory output_fn)
 
-        ccInfo <- liftIO $ getCompilerInfo logger dflags
         let global_includes = [ GHC.SysTools.Option ("-I" ++ p)
                               | p <- includePathsGlobal cmdline_include_paths ]
         let local_includes = [ GHC.SysTools.Option ("-iquote" ++ p)
@@ -1643,7 +1644,7 @@ runPhase (RealPhase (As with_cpp)) input_fn
                        ++ (if platformArch (targetPlatform dflags) == ArchSPARC
                            then [GHC.SysTools.Option "-mcpu=v9"]
                            else [])
-                       ++ (if any (ccInfo ==) [Clang, AppleClang, AppleClang51]
+                       ++ (if any (asmInfo ==) [Clang, AppleClang, AppleClang51]
                             then [GHC.SysTools.Option "-Qunused-arguments"]
                             else [])
                        ++ [ GHC.SysTools.Option "-x"

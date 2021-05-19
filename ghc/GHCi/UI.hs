@@ -1538,7 +1538,7 @@ infoThing allInfo str = do
                                      (catMaybes mb_stuffs)
     return $ vcat (intersperse (text "") $ map pprInfo filtered)
 
-  -- Filter out names whose parent is also there Good
+  -- Filter out names whose parent is also there. Good
   -- example is '[]', which is both a type and data
   -- constructor in the same type
 filterOutChildren :: (a -> TyThing) -> [a] -> [a]

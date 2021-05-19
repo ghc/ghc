@@ -1,5 +1,9 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
+## 4.17.0.0 *TBA*
+
+  * Add explicitly bidirectional `pattern TypeRep` to `Type.Reflection`.
+
 ## 4.16.0.0 *TBA*
 
   * Make it possible to promote `Natural`s and remove the separate `Nat` kind.
