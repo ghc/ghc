@@ -174,9 +174,9 @@ data BCInstr
 
    -- To Infinity And Beyond
    | ENTER
-   | RETURN            -- return a lifted value
-   | RETURN_UBX ArgRep -- return an unlifted value, here's its rep
-   | RETURN_TUPLE      -- return an unboxed tuple (info already on stack)
+   | RETURN                 -- return a lifted value
+   | RETURN_UNLIFTED ArgRep -- return an unlifted value, here's its rep
+   | RETURN_TUPLE           -- return an unboxed tuple (info already on stack)
 
    -- Breakpoints
    | BRK_FUN          Word16 Unique (RemotePtr CostCentre)
@@ -312,7 +312,7 @@ instance Outputable BCInstr where
                                                <+> text "by" <+> ppr n
    ppr ENTER                 = text "ENTER"
    ppr RETURN                = text "RETURN"
-   ppr (RETURN_UBX pk)       = text "RETURN_UBX  " <+> ppr pk
+   ppr (RETURN_UNLIFTED pk)  = text "RETURN_UNLIFTED  " <+> ppr pk
    ppr (RETURN_TUPLE)        = text "RETURN_TUPLE"
    ppr (BRK_FUN index uniq _cc) = text "BRK_FUN" <+> ppr index <+> ppr uniq <+> text "<cc>"
 
@@ -392,7 +392,7 @@ bciStackUse CASEFAIL{}            = 0
 bciStackUse JMP{}                 = 0
 bciStackUse ENTER{}               = 0
 bciStackUse RETURN{}              = 0
-bciStackUse RETURN_UBX{}          = 1 -- pushes stg_ret_X for some X
+bciStackUse RETURN_UNLIFTED{}     = 1 -- pushes stg_ret_X for some X
 bciStackUse RETURN_TUPLE{}        = 1 -- pushes stg_ret_t header
 bciStackUse CCALL{}               = 0
 bciStackUse SWIZZLE{}             = 0

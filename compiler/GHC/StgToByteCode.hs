@@ -440,7 +440,10 @@ schemeTopBind (id, rhs)
         -- by just re-using the single top-level definition.  So
         -- for the worker itself, we must allocate it directly.
     -- ioToBc (putStrLn $ "top level BCO")
-    emitBc (mkProtoBCO platform (getName id) (toOL [PACK data_con 0, ENTER])
+    let enter = if isUnliftedTypeKind (tyConResKind (dataConTyCon data_con))
+                then RETURN_UNLIFTED P
+                else ENTER
+    emitBc (mkProtoBCO platform (getName id) (toOL [PACK data_con 0, enter])
                        (Right rhs) 0 0 [{-no bitmap-}] False{-not alts-})
 
   | otherwise
@@ -576,36 +579,36 @@ fvsToEnv p rhs =  [v | v <- dVarSetElems $ freeVarsOfRhs rhs,
 
 -- Returning an unlifted value.
 -- Heave it on the stack, SLIDE, and RETURN.
-returnUnboxedAtom
+returnUnliftedAtom
     :: StackDepth
     -> Sequel
     -> BCEnv
     -> StgArg
     -> BcM BCInstrList
-returnUnboxedAtom d s p e = do
+returnUnliftedAtom d s p e = do
     let reps = case e of
                  StgLitArg lit -> typePrimRepArgs (literalType lit)
                  StgVarArg i   -> bcIdPrimReps i
     (push, szb) <- pushAtom d p e
-    ret <- returnUnboxedReps d s szb reps
+    ret <- returnUnliftedReps d s szb reps
     return (push `appOL` ret)
 
--- return an unboxed value from the top of the stack
-returnUnboxedReps
+-- return an unlifted value from the top of the stack
+returnUnliftedReps
     :: StackDepth
     -> Sequel
     -> ByteOff    -- size of the thing we're returning
     -> [PrimRep]  -- representations
     -> BcM BCInstrList
-returnUnboxedReps d s szb reps = do
+returnUnliftedReps d s szb reps = do
     profile <- getProfile
     let platform = profilePlatform profile
         non_void VoidRep = False
         non_void _ = True
     ret <- case filter non_void reps of
              -- use RETURN_UBX for unary representations
-             []    -> return (unitOL $ RETURN_UBX V)
-             [rep] -> return (unitOL $ RETURN_UBX (toArgRep platform rep))
+             []    -> return (unitOL $ RETURN_UNLIFTED V)
+             [rep] -> return (unitOL $ RETURN_UNLIFTED (toArgRep platform rep))
              -- otherwise use RETURN_TUPLE with a tuple descriptor
              nv_reps -> do
                let (tuple_info, args_offsets) = layoutTuple profile 0 (primRepCmmType platform) nv_reps
@@ -634,19 +637,19 @@ returnUnboxedTuple d s p es = do
                                          MASSERT(off == dd + szb)
                                          go (dd + szb) (push:pushes) cs
     pushes <- go d [] tuple_components
-    ret <- returnUnboxedReps d
-                             s
-                             (wordsToBytes platform $ tupleSize tuple_info)
-                             (map atomPrimRep es)
+    ret <- returnUnliftedReps d
+                              s
+                              (wordsToBytes platform $ tupleSize tuple_info)
+                              (map atomPrimRep es)
     return (mconcat pushes `appOL` ret)
 
 -- Compile code to apply the given expression to the remaining args
 -- on the stack, returning a HNF.
 schemeE
     :: StackDepth -> Sequel -> BCEnv -> CgStgExpr -> BcM BCInstrList
-schemeE d s p (StgLit lit) = returnUnboxedAtom d s p (StgLitArg lit)
+schemeE d s p (StgLit lit) = returnUnliftedAtom d s p (StgLitArg lit)
 schemeE d s p (StgApp x [])
-   | isUnliftedType (idType x) = returnUnboxedAtom d s p (StgVarArg x)
+   | isUnliftedType (idType x) = returnUnliftedAtom d s p (StgVarArg x)
 -- Delegate tail-calls to schemeT.
 schemeE d s p e@(StgApp {}) = schemeT d s p e
 schemeE d s p e@(StgConApp {}) = schemeT d s p e
@@ -884,7 +887,9 @@ schemeT d s p (StgConApp con _ext args _tys)
         platform <- profilePlatform <$> getProfile
         return (alloc_con         `appOL`
                 mkSlideW 1 (bytesToWords platform $ d - s) `snocOL`
-                ENTER)
+                if isUnliftedTypeKind (tyConResKind (dataConTyCon con))
+                then RETURN_UNLIFTED P
+                else ENTER)
 
    -- Case 4: Tail call of function
 schemeT d s p (StgApp fn args)
@@ -952,7 +957,10 @@ doTailCall init_d s p fn args = do
         platform <- profilePlatform <$> getProfile
         ASSERT( sz == wordSize platform ) return ()
         let slide = mkSlideB platform (d - init_d + wordSize platform) (init_d - s)
-        return (push_fn `appOL` (slide `appOL` unitOL ENTER))
+            enter = if isUnliftedType (idType fn)
+                    then RETURN_UNLIFTED P
+                    else ENTER
+        return (push_fn `appOL` (slide `appOL` unitOL enter))
   do_pushes !d args reps = do
       let (push_apply, n, rest_of_reps) = findPushSeq reps
           (these_args, rest_of_args) = splitAt n args
@@ -1049,9 +1057,9 @@ doCase d s p scrut bndr alts
         -- An unlifted value gets an extra info table pushed on top
         -- when it is returned.
         unlifted_itbl_size_b :: StackDepth
-        unlifted_itbl_size_b | isAlgCase       = 0
-                             | ubx_tuple_frame = 3 * wordSize platform
-                             | otherwise       = wordSize platform
+        unlifted_itbl_size_b | ubx_tuple_frame              = 3 * wordSize platform
+                             | not (isUnliftedType bndr_ty) = 0
+                             | otherwise                    = wordSize platform
 
         (bndr_size, tuple_info, args_offsets)
            | ubx_tuple_frame =
@@ -1072,7 +1080,7 @@ doCase d s p scrut bndr alts
         d_bndr =
             d + ret_frame_size_b + bndr_size
 
-        -- depth of stack after the extra info table for an unboxed return
+        -- depth of stack after the extra info table for an unlifted return
         -- has been pushed, if any.  This is the stack depth at the
         -- continuation.
         d_alts = d + ret_frame_size_b + bndr_size + unlifted_itbl_size_b
@@ -1082,7 +1090,7 @@ doCase d s p scrut bndr alts
         p_alts = Map.insert bndr d_bndr p
 
         bndr_ty = idType bndr
-        isAlgCase = not (isUnliftedType bndr_ty)
+        isAlgCase = isAlgType bndr_ty
 
         -- given an alt, return a discr and code for it.
         codeAlt (DEFAULT, _, rhs)
@@ -1131,11 +1139,17 @@ doCase d s p scrut bndr alts
                         [ (arg, stack_bot - ByteOff offset)
                         | (NonVoid arg, offset) <- args_offsets ]
                         p_alts
+
+                 -- unlifted datatypes have an infotable word on top
+                 unpack = if isUnliftedType bndr_ty
+                          then PUSH_L 1 `consOL`
+                               UNPACK (trunc16W size) `consOL`
+                               unitOL (SLIDE (trunc16W size) 1)
+                          else unitOL (UNPACK (trunc16W size))
              in do
              MASSERT(isAlgCase)
              rhs_code <- schemeE stack_bot s p' rhs
-             return (my_discr alt,
-                     unitOL (UNPACK (trunc16W size)) `appOL` rhs_code)
+             return (my_discr alt, unpack `appOL` rhs_code)
            where
              real_bndrs = filterOut isTyVar bndrs
 
@@ -1224,7 +1238,7 @@ doCase d s p scrut bndr alts
               return (PUSH_ALTS_TUPLE alt_bco' tuple_info tuple_bco
                       `consOL` scrut_code)
        else let push_alts
-                  | isAlgCase
+                  | not (isUnliftedType bndr_ty)
                   = PUSH_ALTS alt_bco'
                   | otherwise
                   = let unlifted_rep =
@@ -1619,7 +1633,7 @@ generateCCall d0 s p (CCallSpec target cconv safety) result_ty args_r_to_l
          -- slide and return
          d_after_r_min_s = bytesToWords platform (d_after_r - s)
          wrapup       = mkSlideW (trunc16W r_sizeW) (d_after_r_min_s - r_sizeW)
-                        `snocOL` RETURN_UBX (toArgRep platform r_rep)
+                        `snocOL` RETURN_UNLIFTED (toArgRep platform r_rep)
          --trace (show (arg1_offW, args_offW  ,  (map argRepSizeW a_reps) )) $
      return (
          push_args `appOL`
