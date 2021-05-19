@@ -43,6 +43,7 @@ import GHC.Tc.Types.Evidence( HsWrapper, (<.>) )
 import GHC.Core( hasSomeUnfolding )
 import GHC.Core.Type ( mkTyVarBinders )
 import GHC.Core.Multiplicity
+import GHC.HsToCore.Errors.Types
 
 import GHC.Driver.Session
 import GHC.Driver.Backend
@@ -445,7 +446,7 @@ tcPatSynSig name sig_ty@(L _ (HsSig{sig_bndrs = hs_outer_bndrs, sig_body = hs_ty
        -- arguments become the types of binders. We thus cannot allow
        -- levity polymorphism here
        ; let (arg_tys, _) = tcSplitFunTys body_ty
-       ; mapM_ (checkForLevPoly empty . scaledThing) arg_tys
+       ; mapM_ (checkForLevPoly LevityCheckGenSig . scaledThing) arg_tys
 
        ; traceTc "tcTySig }" $
          vcat [ text "kvs"          <+> ppr_tvs (binderVars kv_bndrs)

@@ -29,6 +29,7 @@ import GHC.HsToCore.Utils
 import GHC.HsToCore.Arrows
 import GHC.HsToCore.Monad
 import GHC.HsToCore.Pmc ( addTyCs, pmcGRHSs )
+import GHC.HsToCore.Errors.Types
 import GHC.Types.SourceText
 import GHC.Types.Name
 import GHC.Types.Name.Env
@@ -125,7 +126,7 @@ ds_val_bind (NonRecursive, hsbinds) body
   = putSrcSpanDs (locA loc) $
      -- see Note [Strict binds checks] in GHC.HsToCore.Binds
     if is_polymorphic bind
-    then errDsCoreExpr (poly_bind_err bind)
+    then errDsCoreExpr (DsCannotMixPolyAndUnliftedBindings bind)
             -- data Ptr a = Ptr Addr#
             -- f x = let p@(Ptr y) = ... in ...
             -- Here the binding for 'p' is polymorphic, but does
@@ -133,7 +134,7 @@ ds_val_bind (NonRecursive, hsbinds) body
             -- use a bang pattern.  #6078.
 
     else do { when (looksLazyPatBind bind) $
-              warnIfSetDs Opt_WarnUnbangedStrictPatterns (unlifted_must_be_bang bind)
+              diagnosticDs (DsUnbangedStrictPatterns bind)
         -- Complain about a binding that looks lazy
         --    e.g.    let I# y = x in ...
         -- Remember, in checkStrictBinds we are going to do strict
@@ -148,22 +149,11 @@ ds_val_bind (NonRecursive, hsbinds) body
                      = not (null tvs && null evs)
     is_polymorphic _ = False
 
-    unlifted_must_be_bang bind
-      = hang (text "Pattern bindings containing unlifted types should use" $$
-              text "an outermost bang pattern:")
-           2 (ppr bind)
-
-    poly_bind_err bind
-      = hang (text "You can't mix polymorphic and unlifted bindings:")
-           2 (ppr bind) $$
-        text "Probable fix: add a type signature"
 
 ds_val_bind (is_rec, binds) _body
   | anyBag (isUnliftedHsBind . unLoc) binds  -- see Note [Strict binds checks] in GHC.HsToCore.Binds
   = assert (isRec is_rec )
-    errDsCoreExpr $
-    hang (text "Recursive bindings for unlifted types aren't allowed:")
-       2 (vcat (map ppr (bagToList binds)))
+    errDsCoreExpr $ DsRecBindsNotAllowedForUnliftedTys (bagToList binds)
 
 -- Ordinary case for bindings; none should be unlifted
 ds_val_bind (is_rec, binds) body
@@ -261,7 +251,7 @@ dsLExprNoLP :: LHsExpr GhcTc -> DsM CoreExpr
 dsLExprNoLP (L loc e)
   = putSrcSpanDsA loc $
     do { e' <- dsExpr e
-       ; dsNoLevPolyExpr e' (text "In the type of expression:" <+> ppr e)
+       ; dsNoLevPolyExpr e' (LevityCheckHsExpr e)
        ; return e' }
 
 dsExpr :: HsExpr GhcTc -> DsM CoreExpr
@@ -1102,8 +1092,7 @@ warnDiscardedDoBindings rhs rhs_ty
 
            -- Warn about discarding non-() things in 'monadic' binding
        ; if warn_unused && not (isUnitTy norm_elt_ty)
-         then diagnosticDs (WarningWithFlag Opt_WarnUnusedDoBind)
-                           (badMonadBind rhs elt_ty)
+         then diagnosticDs (DsUnusedDoBind rhs elt_ty)
          else
 
            -- Warn about discarding m a things in 'monadic' binding of the same type,
@@ -1112,20 +1101,11 @@ warnDiscardedDoBindings rhs rhs_ty
                 case tcSplitAppTy_maybe norm_elt_ty of
                       Just (elt_m_ty, _)
                          | m_ty `eqType` topNormaliseType fam_inst_envs elt_m_ty
-                         -> diagnosticDs (WarningWithFlag Opt_WarnWrongDoBind)
-                                         (badMonadBind rhs elt_ty)
+                         -> diagnosticDs (DsWrongDoBind rhs elt_ty)
                       _ -> return () } }
 
   | otherwise   -- RHS does have type of form (m ty), which is weird
   = return ()   -- but at least this warning is irrelevant
-
-badMonadBind :: LHsExpr GhcTc -> Type -> SDoc
-badMonadBind rhs elt_ty
-  = vcat [ hang (text "A do-notation statement discarded a result of type")
-              2 (quotes (ppr elt_ty))
-         , hang (text "Suppress this warning by saying")
-              2 (quotes $ text "_ <-" <+> ppr rhs)
-         ]
 
 {-
 ************************************************************************
@@ -1323,9 +1303,7 @@ ds_withDict wrapped_ty
        ; pure $ mkLams [sv, k] $ Var k `App` Cast (Var sv) (mkSymCo co) }
 
   | otherwise
-  = errDsCoreExpr $ hang (text "Invalid instantiation of" <+>
-                          quotes (ppr withDictName) <+> text "at type:")
-                       4 (ppr wrapped_ty)
+  = errDsCoreExpr (DsInvalidInstantiationDictAtType wrapped_ty)
 
 {- Note [withDict]
 ~~~~~~~~~~~~~~~~~~

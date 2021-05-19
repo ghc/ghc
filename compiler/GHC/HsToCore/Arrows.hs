@@ -39,6 +39,7 @@ import GHC.Core.FVs
 import GHC.Core.Utils
 import GHC.Core.Make
 import GHC.HsToCore.Binds (dsHsWrapper)
+import GHC.HsToCore.Errors.Types
 
 import GHC.Types.Id
 import GHC.Core.ConLike
@@ -121,8 +122,7 @@ mkCmdEnv tc_meths
                    -> Maybe Id -> DsM ()
     check_lev_poly _     Nothing = return ()
     check_lev_poly arity (Just id)
-      = dsNoLevPoly (nTimes arity res_type (idType id))
-          (text "In the result of the function" <+> quotes (ppr id))
+      = dsNoLevPoly (nTimes arity res_type (idType id)) (LevityCheckMkCmdEnv id)
 
 
 -- arr :: forall b c. (b -> c) -> a b c
@@ -631,8 +631,7 @@ dsCmd ids local_vars stack_ty res_ty do_block@(HsCmdDo stmts_ty
                                                (L loc stmts))
                                                                    env_ids = do
     putSrcSpanDsA loc $
-      dsNoLevPoly stmts_ty
-        (text "In the do-command:" <+> ppr do_block)
+      dsNoLevPoly stmts_ty (LevityCheckDoCmd do_block)
     (core_stmts, env_ids') <- dsCmdDo ids local_vars res_ty stmts env_ids
     let env_ty = mkBigCoreVarTupTy env_ids
     core_fst <- mkFstExpr env_ty stack_ty
@@ -702,8 +701,7 @@ dsfixCmd
                 DIdSet,         -- subset of local vars that occur free
                 [Id])           -- the same local vars as a list, fed back
 dsfixCmd ids local_vars stk_ty cmd_ty cmd
-  = do { putSrcSpanDs (getLocA cmd) $ dsNoLevPoly cmd_ty
-           (text "When desugaring the command:" <+> ppr cmd)
+  = do { putSrcSpanDs (getLocA cmd) $ dsNoLevPoly cmd_ty (LevityCheckDesugaringCmd cmd)
        ; trimInput (dsLCmd ids local_vars stk_ty cmd_ty cmd) }
 
 -- Feed back the list of local variables actually used a command,
@@ -792,8 +790,7 @@ dsCmdDo _ _ _ [] _ = panic "dsCmdDo"
 --              ---> premap (\ (xs) -> ((xs), ())) c
 
 dsCmdDo ids local_vars res_ty [L loc (LastStmt _ body _ _)] env_ids = do
-    putSrcSpanDsA loc $ dsNoLevPoly res_ty
-                         (text "In the command:" <+> ppr body)
+    putSrcSpanDsA loc $ dsNoLevPoly res_ty (LevityCheckInCmd body)
     (core_body, env_ids') <- dsLCmd ids local_vars unitTy res_ty body env_ids
     let env_ty = mkBigCoreVarTupTy env_ids
     env_var <- newSysLocalDs Many env_ty
@@ -861,7 +858,7 @@ dsCmdStmt ids local_vars out_ids (BodyStmt c_ty cmd _ _) env_ids = do
         out_ty = mkBigCoreVarTupTy out_ids
         before_c_ty = mkCorePairTy in_ty1 out_ty
         after_c_ty = mkCorePairTy c_ty out_ty
-    dsNoLevPoly c_ty empty -- I (Richard E, Dec '16) have no idea what to say here
+    dsNoLevPoly c_ty LevityCheckCmdStmt -- I (Richard E, Dec '16) have no idea what to say here
     snd_fn <- mkSndExpr c_ty out_ty
     return (do_premap ids in_ty before_c_ty out_ty core_mux $
                 do_compose ids before_c_ty after_c_ty out_ty
