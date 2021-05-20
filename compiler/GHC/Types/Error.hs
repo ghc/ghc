@@ -1,3 +1,4 @@
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -24,11 +25,15 @@ module GHC.Types.Error
    , Diagnostic (..)
    , DiagnosticMessage (..)
    , DiagnosticReason (..)
-   , mkDiagnosticMessage
+   , DiagnosticHint (..)
    , mkPlainDiagnostic
    , mkPlainError
    , mkDecoratedDiagnostic
    , mkDecoratedError
+
+   -- * Hints and refactoring actions
+   , GhcHint (..)
+   , noHints
 
     -- * Rendering Messages
 
@@ -67,6 +72,7 @@ import GHC.Utils.Json
 
 import Data.Bifunctor
 import Data.Foldable    ( fold )
+import GHC.Types.Hint
 
 {-
 Note [Messages]
@@ -202,6 +208,13 @@ constraint.
 class Diagnostic a where
   diagnosticMessage :: a -> DecoratedSDoc
   diagnosticReason  :: a -> DiagnosticReason
+  diagnosticHints   :: a -> [GhcHint]
+
+-- | A generic 'Hint' message, to be used with 'DiagnosticMessage'.
+data DiagnosticHint = DiagnosticHint !SDoc
+
+instance Outputable DiagnosticHint where
+  ppr (DiagnosticHint msg) = msg
 
 -- | A generic 'Diagnostic' message, without any further classification or
 -- provenance: By looking at a 'DiagnosticMessage' we don't know neither
@@ -211,30 +224,36 @@ class Diagnostic a where
 data DiagnosticMessage = DiagnosticMessage
   { diagMessage :: !DecoratedSDoc
   , diagReason  :: !DiagnosticReason
+  , diagHints   :: [GhcHint]
   }
 
 instance Diagnostic DiagnosticMessage where
   diagnosticMessage = diagMessage
   diagnosticReason  = diagReason
+  diagnosticHints   = diagHints
 
--- | Create a 'DiagnosticMessage' with a 'DiagnosticReason'
-mkDiagnosticMessage :: DecoratedSDoc -> DiagnosticReason -> DiagnosticMessage
-mkDiagnosticMessage = DiagnosticMessage
+-- | Helper function to use when no hints can be provided. Currently this function
+-- can be used to construct plain 'DiagnosticMessage' and add hints to them, but
+-- once #18516 will be fully executed, the main usage of this function would be in
+-- the implementation of the 'diagnosticHints' typeclass method, to report the fact
+-- that a particular 'Diagnostic' has no hints.
+noHints :: [GhcHint]
+noHints = mempty
 
-mkPlainDiagnostic :: DiagnosticReason -> SDoc -> DiagnosticMessage
-mkPlainDiagnostic rea doc = DiagnosticMessage (mkSimpleDecorated doc) rea
+mkPlainDiagnostic :: DiagnosticReason -> [GhcHint] -> SDoc -> DiagnosticMessage
+mkPlainDiagnostic rea hints doc = DiagnosticMessage (mkSimpleDecorated doc) rea hints
 
 -- | Create an error 'DiagnosticMessage' holding just a single 'SDoc'
-mkPlainError :: SDoc -> DiagnosticMessage
-mkPlainError doc = DiagnosticMessage (mkSimpleDecorated doc) ErrorWithoutFlag
+mkPlainError :: [GhcHint] -> SDoc -> DiagnosticMessage
+mkPlainError hints doc = DiagnosticMessage (mkSimpleDecorated doc) ErrorWithoutFlag hints
 
 -- | Create a 'DiagnosticMessage' from a list of bulleted SDocs and a 'DiagnosticReason'
-mkDecoratedDiagnostic :: DiagnosticReason -> [SDoc] -> DiagnosticMessage
-mkDecoratedDiagnostic rea docs = DiagnosticMessage (mkDecorated docs) rea
+mkDecoratedDiagnostic :: DiagnosticReason -> [GhcHint] -> [SDoc] -> DiagnosticMessage
+mkDecoratedDiagnostic rea hints docs = DiagnosticMessage (mkDecorated docs) rea hints
 
 -- | Create an error 'DiagnosticMessage' from a list of bulleted SDocs
-mkDecoratedError :: [SDoc] -> DiagnosticMessage
-mkDecoratedError docs = DiagnosticMessage (mkDecorated docs) ErrorWithoutFlag
+mkDecoratedError :: [GhcHint] -> [SDoc] -> DiagnosticMessage
+mkDecoratedError hints docs = DiagnosticMessage (mkDecorated docs) ErrorWithoutFlag hints
 
 -- | The reason /why/ a 'Diagnostic' was emitted in the first place.
 -- Diagnostic messages are born within GHC with a very precise reason, which

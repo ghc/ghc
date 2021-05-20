@@ -307,7 +307,7 @@ findDependency hsc_env srcloc pkg imp is_boot include_pkg_deps = do
     fail ->
         throwOneError $
           mkPlainErrorMsgEnvelope srcloc $
-          GhcDriverMessage $ DriverUnknownMessage $ mkPlainError $
+          GhcDriverMessage $ DriverUnknownMessage $ mkPlainError noHints $
              cannotFindModule hsc_env imp fail
 
 -----------------------------
