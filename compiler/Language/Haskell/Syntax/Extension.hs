@@ -425,9 +425,9 @@ type family XPragE          x
 type family XXExpr          x
 
 -- -------------------------------------
--- FieldLabel type families
-type family XCHsFieldLabel  x
-type family XXHsFieldLabel  x
+-- DotFieldOcc type families
+type family XCDotFieldOcc  x
+type family XXDotFieldOcc  x
 
 -- -------------------------------------
 -- HsPragE type families
