@@ -145,6 +145,7 @@ isNothing _       = False
 -- *** Exception: Maybe.fromJust: Nothing
 -- ...
 --
+-- WARNING: This function is partial. You can use case-matching instead.
 fromJust          :: HasCallStack => Maybe a -> a
 fromJust Nothing  = error "Maybe.fromJust: Nothing" -- yuck
 fromJust (Just x) = x
