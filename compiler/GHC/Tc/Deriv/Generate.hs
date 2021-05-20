@@ -203,8 +203,8 @@ possibly zero of them).  Here's an example, with both \tr{N}ullary and
 We thought about doing this: If we're also deriving 'Ord' for this
 tycon, we generate:
   instance ... Eq (Foo ...) where
-    (==) a b  = case (compare a b) of { _LT -> False; _EQ -> True ; _GT -> False}
-    (/=) a b  = case (compare a b) of { _LT -> True ; _EQ -> False; _GT -> True }
+    (==) a b  = case compare a b of { _LT -> False; _EQ -> True ; _GT -> False}
+    (/=) a b  = case compare a b of { _LT -> True ; _EQ -> False; _GT -> True }
 However, that requires that (Ord <whatever>) was put in the context
 for the instance decl, which it probably wasn't, so the decls
 produced don't get through the typechecker.
@@ -534,7 +534,7 @@ mkCompareFields op tys
     go _ _ _ = panic "mkCompareFields"
 
     -- (mk_compare ty a b) generates
-    --    (case (compare a b) of { LT -> <lt>; EQ -> <eq>; GT -> <bt> })
+    --    (case compare a b of { LT -> <lt>; EQ -> <eq>; GT -> <bt> })
     -- but with suitable special cases for
     mk_compare ty a b lt eq gt
       | isUnliftedType ty
@@ -773,15 +773,15 @@ instance ... Ix (Foo ...) where
 
     -- or, really...
     range (a, b)
-      = case (dataToTag# a) of { a# ->
-        case (dataToTag# b) of { b# ->
+      = case dataToTag# a of { a# ->
+        case dataToTag# b of { b# ->
         map tag2con_Foo (enumFromTo (I# a#) (I# b#))
         }}
 
     -- Generate code for unsafeIndex, because using index leads
     -- to lots of redundant range tests
     unsafeIndex c@(a, b) d
-      = case (dataToTag# d -# dataToTag# a) of
+      = case dataToTag# d -# dataToTag# a of
                r# -> I# r#
 
     inRange (a, b) c
@@ -2120,7 +2120,7 @@ genAuxBindSpecOriginal dflags loc spec
       where
         rhs = nlHsApp (nlHsVar intDataCon_RDR)
                       (nlHsLit (HsIntPrim NoSourceText max_tag))
-        max_tag =  case (tyConDataCons tycon) of
+        max_tag =  case tyConDataCons tycon of
                      data_cons -> toInteger ((length data_cons) - fIRST_TAG)
 
     gen_bind (DerivDataDataType tycon dataT_RDR dataC_RDRs)
