@@ -287,7 +287,7 @@ desugarConPatOut x con univ_tys ex_tvs dicts = \case
     -- LHsRecField
     rec_field_ps fs = map (tagged_pat . unLoc) fs
       where
-        tagged_pat f = (lbl_to_index (getName (hsRecFieldId f)), hsRecFieldArg f)
+        tagged_pat f = (lbl_to_index (getName (hsRecFieldId f)), hfbRHS f)
         -- Unfortunately the label info is empty when the DataCon wasn't defined
         -- with record field labels, hence we desugar to field index.
         orig_lbls        = map flSelector $ conLikeFieldLabels con
