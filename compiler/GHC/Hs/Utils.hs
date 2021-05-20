@@ -1600,8 +1600,8 @@ lPatImplicits = hs_lpat
       [(err_loc, collectPatsBinders CollNoDictBinders implicit_pats) | Just{} <- [rec_dotdot fs] ]
         ++ hs_lpats explicit_pats
 
-      where implicit_pats = map (hsRecFieldArg . unLoc) implicit
-            explicit_pats = map (hsRecFieldArg . unLoc) explicit
+      where implicit_pats = map (hfbRHS . unLoc) implicit
+            explicit_pats = map (hfbRHS . unLoc) explicit
 
 
             (explicit, implicit) = partitionEithers [if pat_explicit then Left fld else Right fld
