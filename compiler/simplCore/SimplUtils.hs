@@ -298,14 +298,16 @@ instance Outputable ArgSpec where
 
 addValArgTo :: ArgInfo -> OutExpr -> ArgInfo
 addValArgTo ai arg
-  | ArgInfo { ai_dmds = dmd:dmds, ai_discs = _:discs, ai_rules = rules } <- ai
+  | ArgInfo { ai_dmds = dmd:dmds, ai_discs = _:discs, ai_rules = rules, ai_type = ty } <- ai
       -- Pop the top demand and and discounts off
   , let arg_spec = ValArg { as_arg = arg
                           , as_dmd = dmd }
   = ai { ai_args  = arg_spec : ai_args ai
        , ai_dmds  = dmds
        , ai_discs = discs
-       , ai_rules = decRules rules }
+       , ai_rules = decRules rules
+       , ai_type = applyTypeToArg ty arg
+       }
   | otherwise
   = pprPanic "addValArgTo" (ppr ai $$ ppr arg)
     -- There should always be enough demands and discounts
