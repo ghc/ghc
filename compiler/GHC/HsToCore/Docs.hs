@@ -371,7 +371,7 @@ filterDecls = filter (isHandled . unXRec @p . fst)
 
 
 -- | Go through all class declarations and filter their sub-declarations
-filterClasses :: forall p doc. (IsPass p) => [(LHsDecl (GhcPass p), doc)] -> [(LHsDecl (GhcPass p), doc)]
+filterClasses :: forall p doc. IsPass p => [(LHsDecl (GhcPass p), doc)] -> [(LHsDecl (GhcPass p), doc)]
 filterClasses = map (first (mapLoc filterClass))
   where
     filterClass (TyClD x c@(ClassDecl {})) =

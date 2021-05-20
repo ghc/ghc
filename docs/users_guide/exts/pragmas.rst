@@ -614,10 +614,10 @@ specialise it as follows:
          {-# SPECIALISE f :: Int -> b -> b #-}
 
          g :: (Eq a, Ix b) => a -> b -> b
-         {-# SPECIALISE g :: (Eq a) => a -> Int -> Int #-}
+         {-# SPECIALISE g :: Eq a => a -> Int -> Int #-}
 
          h :: Eq a => a -> a -> a
-         {-# SPECIALISE h :: (Eq a) => [a] -> [a] -> [a] #-}
+         {-# SPECIALISE h :: Eq a => [a] -> [a] -> [a] #-}
 
    The last of these examples will generate a RULE with a
    somewhat-complex left-hand side (try it yourself), so it might not
@@ -733,7 +733,7 @@ Same idea, except for instance declarations. For example:
 
 ::
 
-    instance (Eq a) => Eq (Foo a) where {
+    instance Eq a => Eq (Foo a) where {
        {-# SPECIALIZE instance Eq (Foo [(Int, Bar)]) #-}
        ... usual stuff ...
      }

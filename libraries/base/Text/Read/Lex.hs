@@ -53,9 +53,9 @@ import Data.Maybe
 -- local copy to break import-cycle
 -- | @'guard' b@ is @'return' ()@ if @b@ is 'True',
 -- and 'mzero' if @b@ is 'False'.
-guard           :: (MonadPlus m) => Bool -> m ()
-guard True      =  return ()
-guard False     =  mzero
+guard :: MonadPlus m => Bool -> m ()
+guard True  = return ()
+guard False = mzero
 
 -- -----------------------------------------------------------------------------
 -- Lexing types

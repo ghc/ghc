@@ -55,12 +55,12 @@ import System.IO
 --
 -- This class is used in the translation of the recursive @do@ notation
 -- supported by GHC and Hugs.
-class (Monad m) => MonadFix m where
-        -- | The fixed point of a monadic computation.
-        -- @'mfix' f@ executes the action @f@ only once, with the eventual
-        -- output fed back as the input.  Hence @f@ should not be strict,
-        -- for then @'mfix' f@ would diverge.
-        mfix :: (a -> m a) -> m a
+class Monad m => MonadFix m where
+    -- | The fixed point of a monadic computation.
+    -- @'mfix' f@ executes the action @f@ only once, with the eventual
+    -- output fed back as the input.  Hence @f@ should not be strict,
+    -- for then @'mfix' f@ would diverge.
+    mfix :: (a -> m a) -> m a
 
 -- Instances of MonadFix for Prelude monads
 
@@ -105,37 +105,37 @@ instance MonadFix (Either e) where
 
 -- | @since 2.01
 instance MonadFix (ST s) where
-        mfix = fixST
+    mfix = fixST
 
 -- Instances of Data.Monoid wrappers
 
 -- | @since 4.8.0.0
 instance MonadFix Dual where
-    mfix f   = Dual (fix (getDual . f))
+    mfix f = Dual (fix (getDual . f))
 
 -- | @since 4.8.0.0
 instance MonadFix Sum where
-    mfix f   = Sum (fix (getSum . f))
+    mfix f = Sum (fix (getSum . f))
 
 -- | @since 4.8.0.0
 instance MonadFix Product where
-    mfix f   = Product (fix (getProduct . f))
+    mfix f = Product (fix (getProduct . f))
 
 -- | @since 4.8.0.0
 instance MonadFix First where
-    mfix f   = First (mfix (getFirst . f))
+    mfix f = First (mfix (getFirst . f))
 
 -- | @since 4.8.0.0
 instance MonadFix Last where
-    mfix f   = Last (mfix (getLast . f))
+    mfix f = Last (mfix (getLast . f))
 
 -- | @since 4.8.0.0
 instance MonadFix f => MonadFix (Alt f) where
-    mfix f   = Alt (mfix (getAlt . f))
+    mfix f = Alt (mfix (getAlt . f))
 
 -- | @since 4.12.0.0
 instance MonadFix f => MonadFix (Ap f) where
-    mfix f   = Ap (mfix (getAp . f))
+    mfix f = Ap (mfix (getAp . f))
 
 -- Instances for GHC.Generics
 -- | @since 4.9.0.0

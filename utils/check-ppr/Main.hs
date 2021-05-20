@@ -110,7 +110,7 @@ getPragmas (L _ (HsModule { hsmodAnn = anns'})) = pragmaStr
     pragmas = filter (\c -> isPrefixOf "{-#" c ) comments'
     pragmaStr = intercalate "\n" pragmas
 
-pp :: (Outputable a) => a -> String
+pp :: Outputable a => a -> String
 pp a = showPprUnsafe a
 
 eraseLayoutInfo :: ParsedSource -> ParsedSource

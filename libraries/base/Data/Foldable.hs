@@ -870,11 +870,11 @@ instance Foldable Last where
     foldMap f = foldMap f . getLast
 
 -- | @since 4.12.0.0
-instance (Foldable f) => Foldable (Alt f) where
+instance Foldable f => Foldable (Alt f) where
     foldMap f = foldMap f . getAlt
 
 -- | @since 4.12.0.0
-instance (Foldable f) => Foldable (Ap f) where
+instance Foldable f => Foldable (Ap f) where
     foldMap f = foldMap f . getAp
 
 -- Instances for GHC.Generics

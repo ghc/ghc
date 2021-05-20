@@ -1177,9 +1177,9 @@ Example
 
     infixr 5 :^:
 
-    data Tree a =  Leaf a  |  Tree a :^: Tree a
+    data Tree a = Leaf a | Tree a :^: Tree a
 
-    instance (Show a) => Show (Tree a) where
+    instance Show a => Show (Tree a) where
 
         showsPrec d (Leaf m) = showParen (d > app_prec) showStr
           where
@@ -1612,7 +1612,7 @@ Example:
 
     ==>
 
-    instance (Lift a) => Lift (Foo a) where
+    instance Lift a => Lift (Foo a) where
         lift (Foo a) = [| Foo a |]
         lift ((:^:) u v) = [| (:^:) u v |]
 

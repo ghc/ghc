@@ -114,31 +114,31 @@ readParen b g   =  if b then mandatory else optional
 -- For example, given the declarations
 --
 -- > infixr 5 :^:
--- > data Tree a =  Leaf a  |  Tree a :^: Tree a
+-- > data Tree a = Leaf a | Tree a :^: Tree a
 --
 -- the derived instance of 'Read' in Haskell 2010 is equivalent to
 --
--- > instance (Read a) => Read (Tree a) where
+-- > instance Read a => Read (Tree a) where
 -- >
--- >         readsPrec d r =  readParen (d > app_prec)
--- >                          (\r -> [(Leaf m,t) |
--- >                                  ("Leaf",s) <- lex r,
--- >                                  (m,t) <- readsPrec (app_prec+1) s]) r
+-- >         readsPrec d r = readParen (d > app_prec)
+-- >                         (\r -> [(Leaf m,t) |
+-- >                                 ("Leaf",s) <- lex r,
+-- >                                 (m,t) <- readsPrec (app_prec+1) s]) r
 -- >
--- >                       ++ readParen (d > up_prec)
--- >                          (\r -> [(u:^:v,w) |
--- >                                  (u,s) <- readsPrec (up_prec+1) r,
--- >                                  (":^:",t) <- lex s,
--- >                                  (v,w) <- readsPrec (up_prec+1) t]) r
+-- >                      ++ readParen (d > up_prec)
+-- >                         (\r -> [(u:^:v,w) |
+-- >                                 (u,s) <- readsPrec (up_prec+1) r,
+-- >                                 (":^:",t) <- lex s,
+-- >                                 (v,w) <- readsPrec (up_prec+1) t]) r
 -- >
--- >           where app_prec = 10
--- >                 up_prec = 5
+-- >          where app_prec = 10
+-- >                up_prec = 5
 --
 -- Note that right-associativity of @:^:@ is unused.
 --
 -- The derived instance in GHC is equivalent to
 --
--- > instance (Read a) => Read (Tree a) where
+-- > instance Read a => Read (Tree a) where
 -- >
 -- >         readPrec = parens $ (prec app_prec $ do
 -- >                                  Ident "Leaf" <- lexP

@@ -400,7 +400,7 @@ changeRename1 _libdir parsed = return (rename "bar2" [((3,1),(3,4))] parsed)
 changeRename2 :: Changer
 changeRename2 _libdir parsed = return (rename "joe" [((2,1),(2,5))] parsed)
 
-rename :: (Data a) => String -> [(Pos, Pos)] -> a -> a
+rename :: Data a => String -> [(Pos, Pos)] -> a -> a
 rename newNameStr spans' a
   = everywhere (mkT replaceRdr) a
   where

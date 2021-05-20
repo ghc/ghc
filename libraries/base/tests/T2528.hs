@@ -4,12 +4,12 @@ import qualified Data.List as L
 
 -- USE_REPORT_PRELUDE versions of nub and nubBy, copied from
 -- libraries/base/Data/OldList.hs.
-nub                     :: (Eq a) => [a] -> [a]
-nub                     =  nubBy (==)
+nub :: Eq a => [a] -> [a]
+nub = nubBy (==)
 
-nubBy                   :: (a -> a -> Bool) -> [a] -> [a]
-nubBy eq []             =  []
-nubBy eq (x:xs)         =  x : nubBy eq (filter (\ y -> not (eq x y)) xs)
+nubBy :: (a -> a -> Bool) -> [a] -> [a]
+nubBy eq []     = []
+nubBy eq (x:xs) = x : nubBy eq (filter (\ y -> not (eq x y)) xs)
 
 data Asymmetric = A | B deriving Show
 
