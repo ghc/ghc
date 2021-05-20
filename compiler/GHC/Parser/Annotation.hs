@@ -28,8 +28,8 @@ module GHC.Parser.Annotation (
 
   -- ** Annotations in 'GenLocated'
   LocatedA, LocatedL, LocatedC, LocatedN, LocatedAn, LocatedP,
-  SrcSpanAnnA, SrcSpanAnnL, SrcSpanAnnP, SrcSpanAnnC, SrcSpanAnnN, SrcSpanAnn'(..),
-  SrcAnn,
+  SrcSpanAnnA, SrcSpanAnnL, SrcSpanAnnP, SrcSpanAnnC, SrcSpanAnnN,
+  SrcSpanAnn'(..), SrcAnn,
 
   -- ** Annotation data types used in 'GenLocated'
 
@@ -69,7 +69,8 @@ module GHC.Parser.Annotation (
   combineSrcSpansA,
   addCLocA, addCLocAA,
 
-  -- ** Constructing 'GenLocated' annotation types when we do not care about annotations.
+  -- ** Constructing 'GenLocated' annotation types when we do not care
+  -- about annotations.
   noLocA, getLocA,
   noSrcSpanA,
   noAnnSrcSpan,
@@ -184,11 +185,8 @@ https://gitlab.haskell.org/ghc/ghc/wikis/api-annotations
 
 -- | Exact print annotations exist so that tools can perform source to
 -- source conversions of Haskell code. They are used to keep track of
--- the various syntactic keywords that are not captured in the
--- existing AST.
---
--- The annotations, together with original source comments are made available in
--- the @'pm_parsed_source@ field of @'GHC.Driver.Env.HsParsedModule'@.
+-- the various syntactic keywords that are not otherwise captured in the
+-- AST.
 --
 -- The wiki page describing this feature is
 -- https://gitlab.haskell.org/ghc/ghc/wikis/api-annotations
@@ -311,49 +309,6 @@ data AnnKeywordId
 instance Outputable AnnKeywordId where
   ppr x = text (show x)
 
--- ---------------------------------------------------------------------
-
-data EpaComment =
-  EpaComment
-    { ac_tok :: EpaCommentTok
-    , ac_prior_tok :: RealSrcSpan
-    -- ^ The location of the prior token, used in exact printing.  The
-    -- 'EpaComment' appears as an 'LEpaComment' containing its
-    -- location.  The difference between the end of the prior token
-    -- and the start of this location is used for the spacing when
-    -- exact printing the comment.
-    }
-    deriving (Eq, Ord, Data, Show)
-
-data EpaCommentTok =
-  -- Documentation annotations
-    EpaDocCommentNext  String     -- ^ something beginning '-- |'
-  | EpaDocCommentPrev  String     -- ^ something beginning '-- ^'
-  | EpaDocCommentNamed String     -- ^ something beginning '-- $'
-  | EpaDocSection      Int String -- ^ a section heading
-  | EpaDocOptions      String     -- ^ doc options (prune, ignore-exports, etc)
-  | EpaLineComment     String     -- ^ comment starting by "--"
-  | EpaBlockComment    String     -- ^ comment in {- -}
-  | EpaEofComment                 -- ^ empty comment, capturing
-                                  -- location of EOF
-
-  -- See #19697 for a discussion of its use and how it should be
-  -- removed in favour of capturing it in the location for
-  -- 'Located HsModule' in the parser.
-
-    deriving (Eq, Ord, Data, Show)
--- Note: these are based on the Token versions, but the Token type is
--- defined in GHC.Parser.Lexer and bringing it in here would create a loop
-
-instance Outputable EpaComment where
-  ppr x = text (show x)
-
--- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen',
---             'GHC.Parser.Annotation.AnnClose','GHC.Parser.Annotation.AnnComma',
---             'GHC.Parser.Annotation.AnnRarrow'
---             'GHC.Parser.Annotation.AnnTilde'
---   - May have 'GHC.Parser.Annotation.AnnComma' when in a list
-
 -- | Certain tokens can have alternate representations when unicode syntax is
 -- enabled. This flag is attached to those tokens in the lexer so that the
 -- original source representation can be reproduced in the corresponding
@@ -391,6 +346,43 @@ data HasE = HasE | NoE
 
 -- ---------------------------------------------------------------------
 
+data EpaComment =
+  EpaComment
+    { ac_tok :: EpaCommentTok
+    , ac_prior_tok :: RealSrcSpan
+    -- ^ The location of the prior token, used in exact printing.  The
+    -- 'EpaComment' appears as an 'LEpaComment' containing its
+    -- location.  The difference between the end of the prior token
+    -- and the start of this location is used for the spacing when
+    -- exact printing the comment.
+    }
+    deriving (Eq, Ord, Data, Show)
+
+data EpaCommentTok =
+  -- Documentation annotations
+    EpaDocCommentNext  String     -- ^ something beginning '-- |'
+  | EpaDocCommentPrev  String     -- ^ something beginning '-- ^'
+  | EpaDocCommentNamed String     -- ^ something beginning '-- $'
+  | EpaDocSection      Int String -- ^ a section heading
+  | EpaDocOptions      String     -- ^ doc options (prune, ignore-exports, etc)
+  | EpaLineComment     String     -- ^ comment starting by "--"
+  | EpaBlockComment    String     -- ^ comment in {- -}
+  | EpaEofComment                 -- ^ empty comment, capturing
+                                  -- location of EOF
+
+  -- See #19697 for a discussion of EpaEofComment's use and how it
+  -- should be removed in favour of capturing it in the location for
+  -- 'Located HsModule' in the parser.
+
+    deriving (Eq, Ord, Data, Show)
+-- Note: these are based on the Token versions, but the Token type is
+-- defined in GHC.Parser.Lexer and bringing it in here would create a loop
+
+instance Outputable EpaComment where
+  ppr x = text (show x)
+
+-- ---------------------------------------------------------------------
+
 -- | Captures an annotation, storing the @'AnnKeywordId'@ and its
 -- location.  The parser only ever inserts @'EpaLocation'@ fields with a
 -- RealSrcSpan being the original location of the annotation in the
@@ -412,12 +404,16 @@ data EpaLocation = EpaSpan RealSrcSpan
                  | EpaDelta DeltaPos
                deriving (Data,Show,Eq,Ord)
 
--- | Relative position, line then column.  If 'deltaLine' is zero then
--- 'deltaColumn' gives the number of spaces between the end of the
--- preceding output element and the start of the one this is attached
--- to, on the same line.  If 'deltaLine' is > 0, then it is the number
--- of lines to advance, and 'deltaColumn' is the start column on the
--- new line.
+-- | Spacing between output items when exact printing.  It captures
+-- the spacing from the current print position on the page to the
+-- position required for the thing about to be printed.  This is
+-- either on the same line in which case is is simply the number of
+-- spaces to emit, or it is some number of lines down, with a given
+-- column offset.  The exact printing algorithm keeps track of the
+-- column offset pertaining to the current anchor position, so the
+-- `deltaColumn` is the additional spaces to add in this case.  See
+-- https://gitlab.haskell.org/ghc/ghc/wikis/api-annotations for
+-- details.
 data DeltaPos
   = SameLine { deltaColumn :: !Int }
   | DifferentLine
@@ -425,6 +421,8 @@ data DeltaPos
         deltaColumn :: !Int
       } deriving (Show,Eq,Ord,Data)
 
+-- | Smart constructor for a 'DeltaPos'. It preserves the invariant
+-- that for the 'DifferentLine' constructor 'deltaLine' is always > 0.
 deltaPos :: Int -> Int -> DeltaPos
 deltaPos l c = case l of
   0 -> SameLine c
@@ -450,40 +448,10 @@ instance Outputable AddEpAnn where
 
 -- ---------------------------------------------------------------------
 
-{-
-Note [In-tree Api annotations]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-GHC 7.10 brought in the concept of API Annotations,
-https://gitlab.haskell.org/ghc/ghc/-/wikis/api-annotations:
-
-  The hsSyn AST does not directly capture the locations of certain
-  keywords and punctuation, such as 'let', 'in', 'do', etc.
-
-  These locations are required by any tools wanting to parse a haskell
-  file, transform the AST in some way, and then regenerate the
-  original layout for the unchaged parts."
-
-These were returned in a separate data structure, linked to the main
-AST via a combination of SrcSpan and constructor name.
-
-This indirect linkage kept the AST uncluttered, but made working with
-the annotations complex, as two separate data structures had to be
-changed at the same time in a coherent way.
-
-From GHC 9.2.1, these annotations are captured directly in the AST,
-using the types in this file, and the Trees That Grow (TTG) extension
-points for GhcPs.
-
-See https://gitlab.haskell.org/ghc/ghc/wikis/api-annotations
-
-See Note [XRec and Anno in the AST] for details of how this is done.
--}
-
--- | The API Annotations are now kept in the HsSyn AST for the GhcPs
---   phase. We do not always have API Annotations though, only for
---   parsed code. This type captures that, and allows the
---   representation decision to be easily revisited as it evolves.
+-- | The exact print annotations (EPAs) are kept in the HsSyn AST for
+--   the GhcPs phase. We do not always have EPAs though, only for code
+--   that has been parsed as they do not exist for generated
+--   code. This type captures that they may be missing.
 --
 -- A goal of the annotations is that an AST can be edited, including
 -- moving subtrees from one place to another, duplicating them, and so
@@ -496,8 +464,8 @@ See Note [XRec and Anno in the AST] for details of how this is done.
 -- fragment are also captured here.
 --
 -- The 'ann' type parameter allows this general structure to be
--- specialised to the specific set of locations of original API
--- Annotation elements.  So for 'HsLet' we have
+-- specialised to the specific set of locations of original exact
+-- print annotation elements.  So for 'HsLet' we have
 --
 --    type instance XLet GhcPs = EpAnn AnnsLet
 --    data AnnsLet
@@ -507,11 +475,12 @@ See Note [XRec and Anno in the AST] for details of how this is done.
 --          } deriving Data
 --
 -- The spacing between the items under the scope of a given EpAnn is
--- derived from the original 'Anchor'.  But there is no requirement
--- that the items included in the sub-element have a "matching"
--- location in their relative anchors. This allows us to freely move
--- elements around, and stitch together new AST fragments out of old
--- ones, and have them still printed out in a reasonable way.
+-- normally derived from the original 'Anchor'.  But if a sub-element
+-- is not in its original position, the required spacing can be
+-- directly captured in the 'anchor_op' field of the 'entry' Anchor.
+-- This allows us to freely move elements around, and stitch together
+-- new AST fragments out of old ones, and have them still printed out
+-- in a precise way.
 data EpAnn ann
   = EpAnn { entry   :: Anchor
            -- ^ Base location for the start of the syntactic element
@@ -528,8 +497,11 @@ data EpAnn ann
 -- | An 'Anchor' records the base location for the start of the
 -- syntactic element holding the annotations, and is used as the point
 -- of reference for calculating delta positions for contained
--- annotations.  If an AST element is moved or deleted, the original
--- location is also tracked, for printing the source without gaps.
+-- annotations.
+-- It is also normally used as the reference point for the spacing of
+-- the element relative to its container. If it is moved, that
+-- relationship is tracked in the 'anchor_op' instead.
+
 data Anchor = Anchor        { anchor :: RealSrcSpan
                                  -- ^ Base location for the start of
                                  -- the syntactic element holding
@@ -557,8 +529,8 @@ realSpanAsAnchor s  = Anchor s UnchangedAnchor
 
 -- | When we are parsing we add comments that belong a particular AST
 -- element, and print them together with the element, interleaving
--- them into the output stream.  But when editin the AST, to move
--- fragments around, it is useful to be able to first separate the
+-- them into the output stream.  But when editing the AST to move
+-- fragments around it is useful to be able to first separate the
 -- comments into those occuring before the AST element and those
 -- following it.  The 'EpaCommentsBalanced' constructor is used to do
 -- this. The GHC parser will only insert the 'EpaComments' form.
@@ -587,14 +559,7 @@ data SrcSpanAnn' a = SrcSpanAnn { ann :: a, locA :: SrcSpan }
 
 -- | We mostly use 'SrcSpanAnn\'' with an 'EpAnn\''
 type SrcAnn ann = SrcSpanAnn' (EpAnn ann)
--- AZ: is SrcAnn the right abbreviation here? Any better suggestions?
 
--- AZ: should we rename LocatedA to LocatedL?  The name comes from
--- this being the most common usage, and hence being the default
--- annotation. It also has a matching set if utility functions such as
--- locA, noLocA, etc.  LocatedL would then need a new name, but it is
--- relatively rare, and captures a list having an openinc and closing
--- adorment, such as parens, braces, etc.
 type LocatedA = GenLocated SrcSpanAnnA
 type LocatedN = GenLocated SrcSpanAnnN
 
@@ -617,7 +582,7 @@ type LocatedAn an = GenLocated (SrcAnn an)
 Note [XRec and Anno in the AST]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The API annotations are now captured directly inside the AST, using
+The exact print annotations are captured directly inside the AST, using
 TTG extension points. However certain annotations need to be captured
 on the Located versions too.  While there is a general form for these,
 captured in the type SrcSpanAnn', there are also specific usages in
@@ -683,8 +648,6 @@ data AnnListItem
 -- keywords such as 'where'.
 data AnnList
   = AnnList {
-      -- TODO:AZ: should we distinguish AnnList variants for lists
-      -- with layout and without?
       al_anchor    :: Maybe Anchor, -- ^ start point of a list having layout
       al_open      :: Maybe AddEpAnn,
       al_close     :: Maybe AddEpAnn,
@@ -698,7 +661,7 @@ data AnnList
 -- Annotations for parenthesised elements, such as tuples, lists
 -- ---------------------------------------------------------------------
 
--- | API Annotation for an item having surrounding "brackets", such as
+-- | exact print annotation for an item having surrounding "brackets", such as
 -- tuples or lists
 data AnnParen
   = AnnParen {
@@ -707,7 +670,7 @@ data AnnParen
       ap_close     :: EpaLocation
       } deriving (Data)
 
--- | Detail of the "brackets" used in an 'AnnParen' API Annotation.
+-- | Detail of the "brackets" used in an 'AnnParen' exact print annotation.
 data ParenType
   = AnnParens       -- ^ '(', ')'
   | AnnParensHash   -- ^ '(#', '#)'
@@ -723,7 +686,7 @@ parenTypeKws AnnParensSquare = (AnnOpenS, AnnCloseS)
 
 -- ---------------------------------------------------------------------
 
--- | API Annotation for the 'Context' data type.
+-- | Exact print annotation for the 'Context' data type.
 data AnnContext
   = AnnContext {
       ac_darrow    :: Maybe (IsUnicodeSyntax, EpaLocation),
@@ -737,7 +700,7 @@ data AnnContext
 -- Annotations for names
 -- ---------------------------------------------------------------------
 
--- | API Annotations for a 'RdrName'.  There are many kinds of
+-- | exact print annotations for a 'RdrName'.  There are many kinds of
 -- adornment that can be attached to a given 'RdrName'. This type
 -- captures them, as detailed on the individual constructors.
 data NameAnn
@@ -795,8 +758,8 @@ data NameAdornment
 
 -- ---------------------------------------------------------------------
 
--- | API Annotation used for capturing the locations of annotations in
--- pragmas.
+-- | exact print annotation used for capturing the locations of
+-- annotations in pragmas.
 data AnnPragma
   = AnnPragma {
       apr_open      :: AddEpAnn,
