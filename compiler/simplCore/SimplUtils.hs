@@ -29,6 +29,7 @@ module SimplUtils (
         ArgInfo(..), ArgSpec(..), mkArgInfo,
         addValArgTo, addCastTo, addTyArgTo,
         argInfoExpr, argInfoAppArgs, pushSimplifiedArgs,
+        isStrictArgInfo, lazyArgContext,
 
         abstractFloats,
 
@@ -150,8 +151,9 @@ data SimplCont
   | StrictArg           -- (StrictArg (f e1 ..en) K)[e] = K[ f e1 .. en e ]
       { sc_dup  :: DupFlag     -- Always Simplified or OkToDup
       , sc_fun  :: ArgInfo     -- Specifies f, e1..en, Whether f has rules, etc
-                               --     plus strictness flags for *further* args
-      , sc_cci  :: CallCtxt    -- Whether *this* argument position is interesting
+                               --     plus demands and discount flags for *this* arg
+                               --          and further args
+                               --     So ai_dmds and ai_discs are never empty
       , sc_cont :: SimplCont }
 
   | TickIt              -- (TickIt t K)[e] = K[ tick t e ]
@@ -263,29 +265,52 @@ data ArgInfo
                                 -- or an enclosing one has rules (recursively)
                                 --      True => be keener to inline in all args
 
-        ai_strs :: [Bool],      -- Strictness of remaining arguments
+        ai_dmds :: [Demand],    -- Demands on remaining value arguments (beyond ai_args)
                                 --   Usually infinite, but if it is finite it guarantees
                                 --   that the function diverges after being given
                                 --   that number of args
-        ai_discs :: [Int]       -- Discounts for remaining arguments; non-zero => be keener to inline
+
+        ai_discs :: [Int]       -- Discounts for remaining value arguments (beyong ai_args)
+                                --   non-zero => be keener to inline
                                 --   Always infinite
     }
 
 data ArgSpec
-  = ValArg OutExpr                    -- Apply to this (coercion or value); c.f. ApplyToVal
+  = ValArg { as_dmd  :: Demand        -- Demand placed on this argument
+           , as_arg  :: OutExpr }     -- Apply to this (coercion or value); c.f. ApplyToVal
+
   | TyArg { as_arg_ty  :: OutType     -- Apply to this type; c.f. ApplyToTy
           , as_hole_ty :: OutType }   -- Type of the function (presumably forall a. blah)
+
   | CastBy OutCoercion                -- Cast by this; c.f. CastIt
 
+instance Outputable ArgInfo where
+  ppr (ArgInfo { ai_fun = fun, ai_args = args, ai_dmds = dmds })
+    = text "ArgInfo" <+> braces
+         (sep [ text "fun =" <+> ppr fun
+              , text "dmds =" <+> ppr dmds
+              , text "args =" <+> ppr args ])
+
 instance Outputable ArgSpec where
-  ppr (ValArg e)                 = text "ValArg" <+> ppr e
+  ppr (ValArg { as_arg = e })    = text "ValArg" <+> ppr e
   ppr (TyArg { as_arg_ty = ty }) = text "TyArg" <+> ppr ty
   ppr (CastBy c)                 = text "CastBy" <+> ppr c
 
 addValArgTo :: ArgInfo -> OutExpr -> ArgInfo
-addValArgTo ai arg = ai { ai_args = ValArg arg : ai_args ai
-                        , ai_type = applyTypeToArg (ai_type ai) arg
-                        , ai_rules = decRules (ai_rules ai) }
+addValArgTo ai arg
+  | ArgInfo { ai_dmds = dmd:dmds, ai_discs = _:discs, ai_rules = rules, ai_type = ty } <- ai
+      -- Pop the top demand and and discounts off
+  , let arg_spec = ValArg { as_arg = arg
+                          , as_dmd = dmd }
+  = ai { ai_args  = arg_spec : ai_args ai
+       , ai_dmds  = dmds
+       , ai_discs = discs
+       , ai_rules = decRules rules
+       , ai_type  = applyTypeToArg ty arg
+       }
+  | otherwise
+  = pprPanic "addValArgTo" (ppr ai $$ ppr arg)
+    -- There should always be enough demands and discounts
 
 addTyArgTo :: ArgInfo -> OutType -> ArgInfo
 addTyArgTo ai arg_ty = ai { ai_args = arg_spec : ai_args ai
@@ -299,10 +324,16 @@ addCastTo :: ArgInfo -> OutCoercion -> ArgInfo
 addCastTo ai co = ai { ai_args = CastBy co : ai_args ai
                      , ai_type = pSnd (coercionKind co) }
 
+isStrictArgInfo :: ArgInfo -> Bool
+-- True if the function is strict in the next argument
+isStrictArgInfo (ArgInfo { ai_dmds = dmds })
+  | dmd:_ <- dmds = isStrictDmd dmd
+  | otherwise     = False
+
 argInfoAppArgs :: [ArgSpec] -> [OutExpr]
 argInfoAppArgs []                              = []
 argInfoAppArgs (CastBy {}                : _)  = []  -- Stop at a cast
-argInfoAppArgs (ValArg e                 : as) = e       : argInfoAppArgs as
+argInfoAppArgs (ValArg { as_arg = e }    : as) = e       : argInfoAppArgs as
 argInfoAppArgs (TyArg { as_arg_ty = ty } : as) = Type ty : argInfoAppArgs as
 
 pushSimplifiedArgs :: SimplEnv -> [ArgSpec] -> SimplCont -> SimplCont
@@ -311,7 +342,7 @@ pushSimplifiedArgs env  (arg : args) k
   = case arg of
       TyArg { as_arg_ty = arg_ty, as_hole_ty = hole_ty }
                -> ApplyToTy  { sc_arg_ty = arg_ty, sc_hole_ty = hole_ty, sc_cont = rest }
-      ValArg e -> ApplyToVal { sc_arg = e, sc_env = env, sc_dup = Simplified, sc_cont = rest }
+      ValArg { as_arg = e } -> ApplyToVal { sc_arg = e, sc_env = env, sc_dup = Simplified, sc_cont = rest }
       CastBy c -> CastIt c rest
   where
     rest = pushSimplifiedArgs env args k
@@ -324,7 +355,7 @@ argInfoExpr fun rev_args
   = go rev_args
   where
     go []                              = Var fun
-    go (ValArg a                 : as) = go as `App` a
+    go (ValArg { as_arg = a }    : as) = go as `App` a
     go (TyArg { as_arg_ty = ty } : as) = go as `App` Type ty
     go (CastBy co                : as) = mkCast (go as) co
 
@@ -434,8 +465,8 @@ contArgs cont
   | otherwise = go [] cont
   where
     lone (ApplyToTy  {}) = False  -- See Note [Lone variables] in CoreUnfold
-    lone (ApplyToVal {}) = False
-    lone (CastIt {})     = False
+    lone (ApplyToVal {}) = False  -- NB: even a type application or cast
+    lone (CastIt {})     = False  --     stops it being "lone"
     lone _               = True
 
     go args (ApplyToVal { sc_arg = arg, sc_env = se, sc_cont = k })
@@ -462,17 +493,18 @@ mkArgInfo env fun rules n_val_args call_cont
   = ArgInfo { ai_fun = fun, ai_args = [], ai_type = fun_ty
             , ai_rules = fun_rules
             , ai_encl = False
-            , ai_strs = vanilla_stricts
+            , ai_dmds = vanilla_dmds
             , ai_discs = vanilla_discounts }
   | otherwise
-  = ArgInfo { ai_fun = fun, ai_args = [], ai_type = fun_ty
+  = ArgInfo { ai_fun = fun
+            , ai_args = []
+            , ai_type = fun_ty
             , ai_rules = fun_rules
             , ai_encl  = interestingArgContext rules call_cont
-            , ai_strs  = arg_stricts
+            , ai_dmds  = add_type_strictness fun_ty arg_dmds
             , ai_discs = arg_discounts }
   where
     fun_ty = idType fun
-
     fun_rules = mkFunRules rules
 
     vanilla_discounts, arg_discounts :: [Int]
@@ -482,14 +514,14 @@ mkArgInfo env fun rules n_val_args call_cont
                               -> discounts ++ vanilla_discounts
                         _     -> vanilla_discounts
 
-    vanilla_stricts, arg_stricts :: [Bool]
-    vanilla_stricts  = repeat False
+    vanilla_dmds, arg_dmds :: [Demand]
+    vanilla_dmds  = repeat topDmd
 
-    arg_stricts
+    arg_dmds
       | not (sm_inline (seMode env))
-      = vanilla_stricts -- See Note [Do not expose strictness if sm_inline=False]
+      = vanilla_dmds -- See Note [Do not expose strictness if sm_inline=False]
       | otherwise
-      = add_type_str fun_ty $
+      = -- add_type_str fun_ty $
         case splitStrictSig (idStrictness fun) of
           (demands, result_info)
                 | not (demands `lengthExceeds` n_val_args)
@@ -499,38 +531,43 @@ mkArgInfo env fun rules n_val_args call_cont
                         -- interesting context.  This avoids substituting
                         -- top-level bindings for (say) strings into
                         -- calls to error.  But now we are more careful about
-                        -- inlining lone variables, so its ok (see SimplUtils.analyseCont)
+                        -- inlining lone variables, so its ok
+                        -- (see GHC.Core.Op.Simplify.Utils.analyseCont)
                    if isBotRes result_info then
-                        map isStrictDmd demands         -- Finite => result is bottom
+                        demands         -- Finite => result is bottom
                    else
-                        map isStrictDmd demands ++ vanilla_stricts
+                        demands ++ vanilla_dmds
                | otherwise
                -> WARN( True, text "More demands than arity" <+> ppr fun <+> ppr (idArity fun)
                                 <+> ppr n_val_args <+> ppr demands )
-                   vanilla_stricts      -- Not enough args, or no strictness
+                  vanilla_dmds      -- Not enough args, or no strictness
 
-    add_type_str :: Type -> [Bool] -> [Bool]
+    add_type_strictness :: Type -> [Demand] -> [Demand]
     -- If the function arg types are strict, record that in the 'strictness bits'
     -- No need to instantiate because unboxed types (which dominate the strict
     --   types) can't instantiate type variables.
-    -- add_type_str is done repeatedly (for each call);
+    -- add_type_strictness is done repeatedly (for each call);
     --   might be better once-for-all in the function
     -- But beware primops/datacons with no strictness
 
-    add_type_str _ [] = []
-    add_type_str fun_ty all_strs@(str:strs)
+    add_type_strictness fun_ty dmds
+      | null dmds = []
+
+      | Just (_, fun_ty') <- splitForAllTy_maybe fun_ty
+      = add_type_strictness fun_ty' dmds     -- Look through foralls
+
       | Just (arg_ty, fun_ty') <- splitFunTy_maybe fun_ty        -- Add strict-type info
-      = (str || Just False == isLiftedType_maybe arg_ty)
-        : add_type_str fun_ty' strs
+      , dmd : rest_dmds <- dmds
+      , let dmd' = case isLiftedType_maybe arg_ty of
+                       Just False -> strictenDmd dmd
+                       _          -> dmd
+      = dmd' : add_type_strictness fun_ty' rest_dmds
           -- If the type is levity-polymorphic, we can't know whether it's
           -- strict. isLiftedType_maybe will return Just False only when
           -- we're sure the type is unlifted.
 
-      | Just (_, fun_ty') <- splitForAllTy_maybe fun_ty
-      = add_type_str fun_ty' all_strs     -- Look through foralls
-
       | otherwise
-      = all_strs
+      = dmds
 
 {- Note [Unsaturated functions]
   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -619,6 +656,26 @@ This made a small compile-time perf improvement in perf/compiler/T6048,
 and it looks plausible to me.
 -}
 
+lazyArgContext :: ArgInfo -> CallCtxt
+-- Use this for lazy arguments
+lazyArgContext (ArgInfo { ai_encl = encl_rules, ai_discs = discs })
+  | encl_rules                = RuleArgCtxt
+  | disc:_ <- discs, disc > 0 = DiscArgCtxt  -- Be keener here
+  | otherwise                 = BoringCtxt   -- Nothing interesting
+
+strictArgContext :: ArgInfo -> CallCtxt
+strictArgContext (ArgInfo { ai_encl = encl_rules, ai_discs = discs })
+-- Use this for strict arguments
+  | encl_rules                = RuleArgCtxt
+  | disc:_ <- discs, disc > 0 = DiscArgCtxt  -- Be keener here
+  | otherwise                 = RhsCtxt
+      -- Why RhsCtxt?  if we see f (g x) (h x), and f is strict, we
+      -- want to be a bit more eager to inline g, because it may
+      -- expose an eval (on x perhaps) that can be eliminated or
+      -- shared. I saw this in nofib 'boyer2', RewriteFuns.onewayunify1
+      -- It's worth an 18% improvement in allocation for this
+      -- particular benchmark; 5% on 'mate' and 1.3% on 'multiplier'
+
 interestingCallContext :: SimplEnv -> SimplCont -> CallCtxt
 -- See Note [Interesting call context]
 interestingCallContext env cont
@@ -635,7 +692,7 @@ interestingCallContext env cont
         -- motivation to inline. See Note [Cast then apply]
         -- in CoreUnfold
 
-    interesting (StrictArg { sc_cci = cci }) = cci
+    interesting (StrictArg { sc_fun = fun }) = strictArgContext fun
     interesting (StrictBind {})              = BoringCtxt
     interesting (Stop _ cci)                 = cci
     interesting (TickIt _ k)                 = interesting k
@@ -685,15 +742,12 @@ interestingArgContext rules call_cont
     go (Select {})                  = False
     go (ApplyToVal {})              = False  -- Shouldn't really happen
     go (ApplyToTy  {})              = False  -- Ditto
-    go (StrictArg { sc_cci = cci }) = interesting cci
+    go (StrictArg { sc_fun = fun }) = ai_encl fun
     go (StrictBind {})              = False      -- ??
     go (CastIt _ c)                 = go c
-    go (Stop _ cci)                 = interesting cci
+    go (Stop _ RuleArgCtxt)         = True
+    go (Stop _ _)                   = False
     go (TickIt _ c)                 = go c
-
-    interesting RuleArgCtxt = True
-    interesting _           = False
-
 
 {- Note [Interesting arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1173,7 +1227,7 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
     extend_subst_with inl_rhs = extendIdSubst env bndr (mkContEx rhs_env inl_rhs)
 
     one_occ IAmDead = True -- Happens in ((\x.1) v)
-    one_occ (OneOcc { occ_one_br = True      -- One textual occurrence
+    one_occ (OneOcc { occ_n_br = 1      -- One textual occurrence
                     , occ_in_lam = in_lam
                     , occ_int_cxt = int_cxt })
         | not in_lam = isNotTopLevel top_lvl || early_phase
@@ -1291,24 +1345,15 @@ postInlineUnconditionally env top_lvl bndr occ_info rhs
   | exprIsTrivial rhs           = True
   | otherwise
   = case occ_info of
-        -- The point of examining occ_info here is that for *non-values*
-        -- that occur outside a lambda, the call-site inliner won't have
-        -- a chance (because it doesn't know that the thing
-        -- only occurs once).   The pre-inliner won't have gotten
-        -- it either, if the thing occurs in more than one branch
-        -- So the main target is things like
-        --      let x = f y in
-        --      case v of
-        --         True  -> case x of ...
-        --         False -> case x of ...
-        -- This is very important in practice; e.g. wheel-seive1 doubles
-        -- in allocation if you miss this out
-      OneOcc { occ_in_lam = in_lam, occ_int_cxt = int_cxt }
-               -- OneOcc => no code-duplication issue
-        ->     smallEnoughToInline dflags unfolding     -- Small enough to dup
+      OneOcc { occ_in_lam = in_lam, occ_int_cxt = int_cxt, occ_n_br = n_br }
+        -- See Note [Inline small things to avoid creating a thunk]
+
+        -> n_br < 100  -- See Note [Suppress exponential blowup]
+
+           && smallEnoughToInline dflags unfolding     -- Small enough to dup
                         -- ToDo: consider discount on smallEnoughToInline if int_cxt is true
                         --
-                        -- NB: Do NOT inline arbitrarily big things, even if one_br is True
+                        -- NB: Do NOT inline arbitrarily big things, even if occ_n_br=1
                         -- Reason: doing so risks exponential behaviour.  We simplify a big
                         --         expression, inline it, and simplify it again.  But if the
                         --         very same thing happens in the big expression, we get
@@ -1355,7 +1400,56 @@ postInlineUnconditionally env top_lvl bndr occ_info rhs
     active    = isActive (sm_phase (getMode env)) (idInlineActivation bndr)
         -- See Note [pre/postInlineUnconditionally in gentle mode]
 
-{-
+{- Note [Inline small things to avoid creating a thunk]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The point of examining occ_info here is that for *non-values* that
+occur outside a lambda, the call-site inliner won't have a chance
+(because it doesn't know that the thing only occurs once).  The
+pre-inliner won't have gotten it either, if the thing occurs in more
+than one branch So the main target is things like
+
+     let x = f y in
+     case v of
+        True  -> case x of ...
+        False -> case x of ...
+
+This is very important in practice; e.g. wheel-seive1 doubles
+in allocation if you miss this out.  And bits of GHC itself start
+to allocate more.  An egregious example is test perf/compiler/T14697,
+where GHC.Driver.CmdLine.$wprocessArgs allocated hugely more.
+
+Note [Suppress exponential blowup]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In #13253, and several related tickets, we got an exponential blowup
+in code size from postInlineUnconditionally.  The trouble comes when
+we have
+  let j1a = case f y     of { True -> p;   False -> q }
+      j1b = case f y     of { True -> q;   False -> p }
+      j2a = case f (y+1) of { True -> j1a; False -> j1b }
+      j2b = case f (y+1) of { True -> j1b; False -> j1a }
+      ...
+  in case f (y+10) of { True -> j10a; False -> j10b }
+
+when there are many branches. In pass 1, postInlineUnconditionally
+inlines j10a and j10b (they are both small).  Now we have two calls
+to j9a and two to j9b.  In pass 2, postInlineUnconditionally inlines
+all four of these calls, leaving four calls to j8a and j8b. Etc.
+Yikes!  This is exponential!
+
+A possible plan: stop doing postInlineUnconditionally
+for some fixed, smallish number of branches, say 4. But that turned
+out to be bad: see Note [Inline small things to avoid creating a thunk].
+And, as it happened, the problem with #13253 was solved in a
+different way (Note [Duplicating StrictArg] in Simplify).
+
+So I just set an arbitrary, high limit of 100, to stop any
+totally exponential behaviour.
+
+This still leaves the nasty possiblity that /ordinary/ inlining (not
+postInlineUnconditionally) might inline these join points, each of
+which is individually quiet small.  I'm still not sure what to do
+about this (e.g. see #15488).
+
 Note [Top level and postInlineUnconditionally]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We don't do postInlineUnconditionally for top-level things (even for
