@@ -1827,7 +1827,7 @@ rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
         ; ((tyvars', context', fds', ats'), stuff_fvs)
             <- bindHsQTyVars cls_doc Nothing kvs tyvars $ \ tyvars' _ -> do
                   -- Checks for distinct tyvars
-             { (context', cxt_fvs) <- rnContext cls_doc context
+             { (context', cxt_fvs) <- rnMaybeContext cls_doc context
              ; fds'  <- rnFds fds
                          -- The fundeps have no free variables
              ; (ats', fv_ats) <- rnATDecls cls' ats
@@ -1924,7 +1924,7 @@ rnDataDefn doc (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
         ; (m_sig', sig_fvs) <- case m_sig of
              Just sig -> first Just <$> rnLHsKind doc sig
              Nothing  -> return (Nothing, emptyFVs)
-        ; (context', fvs1) <- rnContext doc context
+        ; (context', fvs1) <- rnMaybeContext doc context
         ; (derivs',  fvs3) <- rn_derivs derivs
 
         -- For the constructor declarations, drop the LocalRdrEnv
@@ -2360,7 +2360,7 @@ rnConDecl (ConDeclGADT { con_names   = names
 rnMbContext :: HsDocContext -> Maybe (LHsContext GhcPs)
             -> RnM (Maybe (LHsContext GhcRn), FreeVars)
 rnMbContext _    Nothing    = return (Nothing, emptyFVs)
-rnMbContext doc cxt = do { (ctx',fvs) <- rnContext doc cxt
+rnMbContext doc cxt = do { (ctx',fvs) <- rnMaybeContext doc cxt
                          ; return (ctx',fvs) }
 
 rnConDeclH98Details ::

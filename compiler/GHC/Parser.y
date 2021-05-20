@@ -2104,7 +2104,7 @@ ctype   :: { LHsType GhcPs }
                                                          , hst_xforall = noExtField
                                                          , hst_body = $2 } }
         | context '=>' ctype          {% acsA (\cs -> (sLL (reLoc $1) (reLoc $>) $
-                                            HsQualTy { hst_ctxt = Just (addTrailingDarrowC $1 $2 cs)
+                                            HsQualTy { hst_ctxt = addTrailingDarrowC $1 $2 cs
                                                      , hst_xqual = NoExtField
                                                      , hst_body = $3 })) }
 
