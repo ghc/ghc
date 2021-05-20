@@ -1684,7 +1684,7 @@ run_BCO:
             //     - TAG_MASK:        look in info table
             //
             // Note: we need to update this if we change the tagging strategy
-            StgClosure* tagged_con = TAG_CLOSURE(1 + stg_min(TAG_MASK-1, GET_TAG(con)), con);
+            StgClosure* tagged_con = TAG_CLOSURE(stg_min(TAG_MASK, 1 + GET_TAG(con)), con);
             SpW(0) = (W_)tagged_con;
 
             IF_DEBUG(interpreter,
