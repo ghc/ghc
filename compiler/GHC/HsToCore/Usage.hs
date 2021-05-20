@@ -33,14 +33,13 @@ import GHC.Unit.Module.Deps
 
 import GHC.Data.Maybe
 
-import Data.List (sortBy, sort)
+import Data.List (sortBy, sort, partition)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import GHC.Linker.Types
 import GHC.Linker.Loader ( getLoaderState )
-import Data.List (partition)
 
 {- Note [Module self-dependency]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
