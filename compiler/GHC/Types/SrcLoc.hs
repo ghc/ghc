@@ -779,12 +779,12 @@ cmpBufSpan (L l1 _) (L l2  _)
 
   | otherwise = panic "cmpBufSpan: no BufSpan"
 
-instance (Outputable e) => Outputable (Located e) where
+instance Outputable e => Outputable (Located e) where
   ppr (L l e) = -- GenLocated:
                 -- Print spans without the file name etc
                 whenPprDebug (braces (pprUserSpan False l))
              $$ ppr e
-instance (Outputable e) => Outputable (GenLocated RealSrcSpan e) where
+instance Outputable e => Outputable (GenLocated RealSrcSpan e) where
   ppr (L l e) = -- GenLocated:
                 -- Print spans without the file name etc
                 whenPprDebug (braces (pprUserSpan False (RealSrcSpan l Nothing)))

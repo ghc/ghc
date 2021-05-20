@@ -155,9 +155,9 @@ PARSER EMISSION OF ANNOTATIONS
 
 The parser interacts with the lexer using the functions
 
-> getCommentsFor      :: (MonadP m) => SrcSpan -> m EpAnnComments
-> getPriorCommentsFor :: (MonadP m) => SrcSpan -> m EpAnnComments
-> getFinalCommentsFor :: (MonadP m) => SrcSpan -> m EpAnnComments
+> getCommentsFor      :: MonadP m => SrcSpan -> m EpAnnComments
+> getPriorCommentsFor :: MonadP m => SrcSpan -> m EpAnnComments
+> getFinalCommentsFor :: MonadP m => SrcSpan -> m EpAnnComments
 
 The 'getCommentsFor' function is the one used most often.  It takes
 the AST element SrcSpan and removes and returns any comments in the
@@ -1035,7 +1035,7 @@ comment loc cs = EpAnn (Anchor loc UnchangedAnchor) NoEpAnns cs
 
 -- | Add additional comments to a 'SrcAnn', used for manipulating the
 -- AST prior to exact printing the changed one.
-addCommentsToSrcAnn :: (Monoid ann) => SrcAnn ann -> EpAnnComments -> SrcAnn ann
+addCommentsToSrcAnn :: Monoid ann => SrcAnn ann -> EpAnnComments -> SrcAnn ann
 addCommentsToSrcAnn (SrcSpanAnn EpAnnNotUsed loc) cs
   = SrcSpanAnn (EpAnn (Anchor (realSrcSpan loc) UnchangedAnchor) mempty cs) loc
 addCommentsToSrcAnn (SrcSpanAnn (EpAnn a an cs) loc) cs'
@@ -1043,7 +1043,7 @@ addCommentsToSrcAnn (SrcSpanAnn (EpAnn a an cs) loc) cs'
 
 -- | Replace any existing comments on a 'SrcAnn', used for manipulating the
 -- AST prior to exact printing the changed one.
-setCommentsSrcAnn :: (Monoid ann) => SrcAnn ann -> EpAnnComments -> SrcAnn ann
+setCommentsSrcAnn :: Monoid ann => SrcAnn ann -> EpAnnComments -> SrcAnn ann
 setCommentsSrcAnn (SrcSpanAnn EpAnnNotUsed loc) cs
   = SrcSpanAnn (EpAnn (Anchor (realSrcSpan loc) UnchangedAnchor) mempty cs) loc
 setCommentsSrcAnn (SrcSpanAnn (EpAnn a an _) loc) cs
@@ -1051,7 +1051,7 @@ setCommentsSrcAnn (SrcSpanAnn (EpAnn a an _) loc) cs
 
 -- | Add additional comments, used for manipulating the
 -- AST prior to exact printing the changed one.
-addCommentsToEpAnn :: (Monoid a)
+addCommentsToEpAnn :: Monoid a
   => SrcSpan -> EpAnn a -> EpAnnComments -> EpAnn a
 addCommentsToEpAnn loc EpAnnNotUsed cs
   = EpAnn (Anchor (realSrcSpan loc) UnchangedAnchor) mempty cs
@@ -1059,7 +1059,7 @@ addCommentsToEpAnn _ (EpAnn a an ocs) ncs = EpAnn a an (ocs <> ncs)
 
 -- | Replace any existing comments, used for manipulating the
 -- AST prior to exact printing the changed one.
-setCommentsEpAnn :: (Monoid a)
+setCommentsEpAnn :: Monoid a
   => SrcSpan -> EpAnn a -> EpAnnComments -> EpAnn a
 setCommentsEpAnn loc EpAnnNotUsed cs
   = EpAnn (Anchor (realSrcSpan loc) UnchangedAnchor) mempty cs
@@ -1094,13 +1094,13 @@ removeCommentsA (SrcSpanAnn (EpAnn a an _) loc)
 -- Semigroup instances, to allow easy combination of annotaion elements
 -- ---------------------------------------------------------------------
 
-instance (Semigroup an) => Semigroup (SrcSpanAnn' an) where
+instance Semigroup an => Semigroup (SrcSpanAnn' an) where
   (SrcSpanAnn a1 l1) <> (SrcSpanAnn a2 l2) = SrcSpanAnn (a1 <> a2) (combineSrcSpans l1 l2)
    -- The critical part about the location is its left edge, and all
    -- annotations must follow it. So we combine them which yields the
    -- largest span
 
-instance (Semigroup a) => Semigroup (EpAnn a) where
+instance Semigroup a => Semigroup (EpAnn a) where
   EpAnnNotUsed <> x = x
   x <> EpAnnNotUsed = x
   (EpAnn l1 a1 b1) <> (EpAnn l2 a2 b2) = EpAnn (l1 <> l2) (a1 <> a2) (b1 <> b2)
@@ -1121,7 +1121,7 @@ instance Semigroup EpAnnComments where
   EpaCommentsBalanced cs1 as1 <> EpaCommentsBalanced cs2 as2 = EpaCommentsBalanced (cs1 ++ cs2) (as1++as2)
 
 
-instance (Monoid a) => Monoid (EpAnn a) where
+instance Monoid a => Monoid (EpAnn a) where
   mempty = EpAnnNotUsed
 
 instance Semigroup AnnListItem where
@@ -1158,7 +1158,7 @@ instance Semigroup AnnSortKey where
 instance Monoid AnnSortKey where
   mempty = NoAnnSortKey
 
-instance (Outputable a) => Outputable (EpAnn a) where
+instance Outputable a => Outputable (EpAnn a) where
   ppr (EpAnn l a c)  = text "EpAnn" <+> ppr l <+> ppr a <+> ppr c
   ppr EpAnnNotUsed = text "EpAnnNotUsed"
 
@@ -1180,7 +1180,7 @@ instance Outputable EpAnnComments where
   ppr (EpaComments cs) = text "EpaComments" <+> ppr cs
   ppr (EpaCommentsBalanced cs ts) = text "EpaCommentsBalanced" <+> ppr cs <+> ppr ts
 
-instance (NamedThing (Located a)) => NamedThing (LocatedAn an a) where
+instance NamedThing (Located a) => NamedThing (LocatedAn an a) where
   getName (L l a) = getName (L (locA l) a)
 
 instance Outputable AnnContext where
@@ -1204,7 +1204,7 @@ instance Binary a => Binary (LocatedL a) where
             x <- get bh
             return (L (noAnnSrcSpan l) x)
 
-instance (Outputable a) => Outputable (SrcSpanAnn' a) where
+instance Outputable a => Outputable (SrcSpanAnn' a) where
   ppr (SrcSpanAnn a l) = text "SrcSpanAnn" <+> ppr a <+> ppr l
 
 instance (Outputable a, Outputable e)

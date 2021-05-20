@@ -147,7 +147,7 @@ newtype NonVoid a = NonVoid a
 fromNonVoid :: NonVoid a -> a
 fromNonVoid (NonVoid a) = a
 
-instance (Outputable a) => Outputable (NonVoid a) where
+instance Outputable a => Outputable (NonVoid a) where
   ppr (NonVoid a) = ppr a
 
 nonVoidIds :: [Id] -> [NonVoid Id]

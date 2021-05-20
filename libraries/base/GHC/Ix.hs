@@ -21,9 +21,10 @@ module GHC.Ix (
         Ix(..), indexError
     ) where
 
-import GHC.Enum
-import GHC.Num
 import GHC.Base
+import GHC.Enum
+import GHC.List ( and )
+import GHC.Num
 import GHC.Real( fromIntegral )
 import GHC.Show
 
@@ -45,23 +46,23 @@ import GHC.Show
 --
 -- * @'rangeSize' (l,u) == 'length' ('range' (l,u))@ @ @
 --
-class (Ord a) => Ix a where
+class Ord a => Ix a where
     {-# MINIMAL range, (index | unsafeIndex), inRange #-}
 
     -- | The list of values in the subrange defined by a bounding pair.
-    range               :: (a,a) -> [a]
+    range :: (a, a) -> [a]
     -- | The position of a subscript in the subrange.
-    index               :: (a,a) -> a -> Int
+    index :: (a, a) -> a -> Int
     -- | Like 'index', but without checking that the value is in range.
-    unsafeIndex         :: (a,a) -> a -> Int
+    unsafeIndex :: (a, a) -> a -> Int
     -- | Returns 'True' the given subscript lies in the range defined
     -- the bounding pair.
-    inRange             :: (a,a) -> a -> Bool
+    inRange :: (a, a) -> a -> Bool
     -- | The size of the subrange defined by a bounding pair.
-    rangeSize           :: (a,a) -> Int
+    rangeSize :: (a, a) -> Int
     -- | like 'rangeSize', but without checking that the upper bound is
     -- in range.
-    unsafeRangeSize     :: (a,a) -> Int
+    unsafeRangeSize :: (a, a) -> Int
 
         -- Must specify one of index, unsafeIndex
 
@@ -157,7 +158,7 @@ hopelessIndexError = errorWithoutStackTrace "Error in array index"
 
 ----------------------------------------------------------------------
 -- | @since 2.01
-instance  Ix Char  where
+instance Ix Char where
     {-# INLINE range #-}
     range (m,n) = [m..n]
 
@@ -166,14 +167,14 @@ instance  Ix Char  where
 
     {-# INLINE index #-}  -- See Note [Out-of-bounds error messages]
                           -- and Note [Inlining index]
-    index b i | inRange b i =  unsafeIndex b i
-              | otherwise   =  indexError b i "Char"
+    index b i | inRange b i = unsafeIndex b i
+              | otherwise   = indexError b i "Char"
 
-    inRange (m,n) i     =  m <= i && i <= n
+    inRange (m,n) i = m <= i && i <= n
 
 ----------------------------------------------------------------------
 -- | @since 2.01
-instance  Ix Int  where
+instance Ix Int where
     {-# INLINE range #-}
         -- The INLINE stops the build in the RHS from getting inlined,
         -- so that callers can fuse with the result of range
@@ -184,11 +185,11 @@ instance  Ix Int  where
 
     {-# INLINE index #-}  -- See Note [Out-of-bounds error messages]
                           -- and Note [Inlining index]
-    index b i | inRange b i =  unsafeIndex b i
-              | otherwise   =  indexError b i "Int"
+    index b i | inRange b i = unsafeIndex b i
+              | otherwise   = indexError b i "Int"
 
     {-# INLINE inRange #-}
-    inRange (I# m,I# n) (I# i) =  isTrue# (m <=# i) && isTrue# (i <=# n)
+    inRange (I# m, I# n) (I# i) = isTrue# (m <=# i) && isTrue# (i <=# n)
 
 -- | @since 4.6.0.0
 instance Ix Word where
@@ -203,14 +204,14 @@ instance  Ix Integer  where
     range (m,n) = [m..n]
 
     {-# INLINE unsafeIndex #-}
-    unsafeIndex (m,_n) i   = fromInteger (i - m)
+    unsafeIndex (m,_n) i = fromInteger (i - m)
 
     {-# INLINE index #-}  -- See Note [Out-of-bounds error messages]
                           -- and Note [Inlining index]
-    index b i | inRange b i =  unsafeIndex b i
-              | otherwise   =  indexError b i "Integer"
+    index b i | inRange b i = unsafeIndex b i
+              | otherwise   = indexError b i "Integer"
 
-    inRange (m,n) i     =  m <= i && i <= n
+    inRange (m,n) i = m <= i && i <= n
 
 ----------------------------------------------------------------------
 -- | @since 4.8.0.0
@@ -232,8 +233,8 @@ instance Ix Bool where -- as derived
 
     {-# INLINE index #-}  -- See Note [Out-of-bounds error messages]
                           -- and Note [Inlining index]
-    index b i | inRange b i =  unsafeIndex b i
-              | otherwise   =  indexError b i "Bool"
+    index b i | inRange b i = unsafeIndex b i
+              | otherwise   = indexError b i "Bool"
 
     inRange (l,u) i = fromEnum i >= fromEnum l && fromEnum i <= fromEnum u
 
@@ -257,9 +258,9 @@ instance Ix Ordering where -- as derived
 -- | @since 2.01
 instance Ix () where
     {-# INLINE range #-}
-    range   ((), ())    = [()]
+    range ((), ()) = [()]
     {-# INLINE unsafeIndex #-}
-    unsafeIndex   ((), ()) () = 0
+    unsafeIndex ((), ()) () = 0
     {-# INLINE inRange #-}
     inRange ((), ()) () = True
 
@@ -280,14 +281,16 @@ instance (Ix a, Ix b) => Ix (a, b) where -- as derived
       unsafeIndex (l1,u1) i1 * unsafeRangeSize (l2,u2) + unsafeIndex (l2,u2) i2
 
     {-# INLINE inRange #-}
-    inRange ((l1,l2),(u1,u2)) (i1,i2) =
-      inRange (l1,u1) i1 && inRange (l2,u2) i2
+    inRange ((l1,l2),(u1,u2)) (i1,i2) = and
+      [ inRange (l1,u1) i1
+      , inRange (l2,u2) i2
+      ]
 
     -- Default method for index
 
 ----------------------------------------------------------------------
 -- | @since 2.01
-instance  (Ix a1, Ix a2, Ix a3) => Ix (a1,a2,a3)  where
+instance (Ix a1, Ix a2, Ix a3) => Ix (a1,a2,a3) where
     {-# SPECIALISE instance Ix (Int,Int,Int) #-}
 
     range ((l1,l2,l3),(u1,u2,u3)) =
@@ -300,15 +303,17 @@ instance  (Ix a1, Ix a2, Ix a3) => Ix (a1,a2,a3)  where
       unsafeIndex (l2,u2) i2 + unsafeRangeSize (l2,u2) * (
       unsafeIndex (l1,u1) i1))
 
-    inRange ((l1,l2,l3),(u1,u2,u3)) (i1,i2,i3) =
-      inRange (l1,u1) i1 && inRange (l2,u2) i2 &&
-      inRange (l3,u3) i3
+    inRange ((l1,l2,l3),(u1,u2,u3)) (i1,i2,i3) = and
+      [ inRange (l1,u1) i1
+      , inRange (l2,u2) i2
+      , inRange (l3,u3) i3
+      ]
 
     -- Default method for index
 
 ----------------------------------------------------------------------
 -- | @since 2.01
-instance  (Ix a1, Ix a2, Ix a3, Ix a4) => Ix (a1,a2,a3,a4)  where
+instance (Ix a1, Ix a2, Ix a3, Ix a4) => Ix (a1,a2,a3,a4) where
     range ((l1,l2,l3,l4),(u1,u2,u3,u4)) =
       [(i1,i2,i3,i4) | i1 <- range (l1,u1),
                        i2 <- range (l2,u2),
@@ -321,15 +326,18 @@ instance  (Ix a1, Ix a2, Ix a3, Ix a4) => Ix (a1,a2,a3,a4)  where
       unsafeIndex (l2,u2) i2 + unsafeRangeSize (l2,u2) * (
       unsafeIndex (l1,u1) i1)))
 
-    inRange ((l1,l2,l3,l4),(u1,u2,u3,u4)) (i1,i2,i3,i4) =
-      inRange (l1,u1) i1 && inRange (l2,u2) i2 &&
-      inRange (l3,u3) i3 && inRange (l4,u4) i4
+    inRange ((l1,l2,l3,l4),(u1,u2,u3,u4)) (i1,i2,i3,i4) = and
+      [ inRange (l1,u1) i1
+      , inRange (l2,u2) i2
+      , inRange (l3,u3) i3
+      , inRange (l4,u4) i4
+      ]
 
     -- Default method for index
 
 ----------------------------------------------------------------------
 -- | @since 2.01
-instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5) => Ix (a1,a2,a3,a4,a5)  where
+instance (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5) => Ix (a1,a2,a3,a4,a5) where
     range ((l1,l2,l3,l4,l5),(u1,u2,u3,u4,u5)) =
       [(i1,i2,i3,i4,i5) | i1 <- range (l1,u1),
                           i2 <- range (l2,u2),
@@ -344,17 +352,20 @@ instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5) => Ix (a1,a2,a3,a4,a5)  where
       unsafeIndex (l2,u2) i2 + unsafeRangeSize (l2,u2) * (
       unsafeIndex (l1,u1) i1))))
 
-    inRange ((l1,l2,l3,l4,l5),(u1,u2,u3,u4,u5)) (i1,i2,i3,i4,i5) =
-      inRange (l1,u1) i1 && inRange (l2,u2) i2 &&
-      inRange (l3,u3) i3 && inRange (l4,u4) i4 &&
-      inRange (l5,u5) i5
+    inRange ((l1,l2,l3,l4,l5),(u1,u2,u3,u4,u5)) (i1,i2,i3,i4,i5) = and
+      [ inRange (l1,u1) i1
+      , inRange (l2,u2) i2
+      , inRange (l3,u3) i3
+      , inRange (l4,u4) i4
+      , inRange (l5,u5) i5
+      ]
 
     -- Default method for index
 
 ----------------------------------------------------------------------
 -- | @since 4.15.0.0
-instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6) =>
-      Ix (a1,a2,a3,a4,a5,a6)  where
+instance (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6) =>
+      Ix (a1,a2,a3,a4,a5,a6) where
     range ((l1,l2,l3,l4,l5,l6),(u1,u2,u3,u4,u5,u6)) =
       [(i1,i2,i3,i4,i5,i6) | i1 <- range (l1,u1),
                              i2 <- range (l2,u2),
@@ -371,17 +382,21 @@ instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6) =>
       unsafeIndex (l2,u2) i2 + unsafeRangeSize (l2,u2) * (
       unsafeIndex (l1,u1) i1)))))
 
-    inRange ((l1,l2,l3,l4,l5,l6),(u1,u2,u3,u4,u5,u6)) (i1,i2,i3,i4,i5,i6) =
-      inRange (l1,u1) i1 && inRange (l2,u2) i2 &&
-      inRange (l3,u3) i3 && inRange (l4,u4) i4 &&
-      inRange (l5,u5) i5 && inRange (l6,u6) i6
+    inRange ((l1,l2,l3,l4,l5,l6),(u1,u2,u3,u4,u5,u6)) (i1,i2,i3,i4,i5,i6) = and
+      [ inRange (l1,u1) i1
+      , inRange (l2,u2) i2
+      , inRange (l3,u3) i3
+      , inRange (l4,u4) i4
+      , inRange (l5,u5) i5
+      , inRange (l6,u6) i6
+      ]
 
     -- Default method for index
 
 ----------------------------------------------------------------------
 -- | @since 4.15.0.0
-instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7) =>
-      Ix (a1,a2,a3,a4,a5,a6,a7)  where
+instance (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7) =>
+      Ix (a1,a2,a3,a4,a5,a6,a7) where
     range ((l1,l2,l3,l4,l5,l6,l7),(u1,u2,u3,u4,u5,u6,u7)) =
       [(i1,i2,i3,i4,i5,i6,i7) | i1 <- range (l1,u1),
                                 i2 <- range (l2,u2),
@@ -402,18 +417,22 @@ instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7) =>
       unsafeIndex (l1,u1) i1))))))
 
     inRange ((l1,l2,l3,l4,l5,l6,l7),(u1,u2,u3,u4,u5,u6,u7))
-        (i1,i2,i3,i4,i5,i6,i7) =
-      inRange (l1,u1) i1 && inRange (l2,u2) i2 &&
-      inRange (l3,u3) i3 && inRange (l4,u4) i4 &&
-      inRange (l5,u5) i5 && inRange (l6,u6) i6 &&
-      inRange (l7,u7) i7
+        (i1,i2,i3,i4,i5,i6,i7) = and
+      [ inRange (l1,u1) i1
+      , inRange (l2,u2) i2
+      , inRange (l3,u3) i3
+      , inRange (l4,u4) i4
+      , inRange (l5,u5) i5
+      , inRange (l6,u6) i6
+      , inRange (l7,u7) i7
+      ]
 
     -- Default method for index
 
 ----------------------------------------------------------------------
 -- | @since 4.15.0.0
-instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8) =>
-      Ix (a1,a2,a3,a4,a5,a6,a7,a8)  where
+instance (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8) =>
+      Ix (a1,a2,a3,a4,a5,a6,a7,a8) where
     range ((l1,l2,l3,l4,l5,l6,l7,l8),(u1,u2,u3,u4,u5,u6,u7,u8)) =
       [(i1,i2,i3,i4,i5,i6,i7,i8) | i1 <- range (l1,u1),
                                    i2 <- range (l2,u2),
@@ -436,18 +455,23 @@ instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8) =>
       unsafeIndex (l1,u1) i1)))))))
 
     inRange ((l1,l2,l3,l4,l5,l6,l7,l8),(u1,u2,u3,u4,u5,u6,u7,u8))
-        (i1,i2,i3,i4,i5,i6,i7,i8) =
-      inRange (l1,u1) i1 && inRange (l2,u2) i2 &&
-      inRange (l3,u3) i3 && inRange (l4,u4) i4 &&
-      inRange (l5,u5) i5 && inRange (l6,u6) i6 &&
-      inRange (l7,u7) i7 && inRange (l8,u8) i8
+        (i1,i2,i3,i4,i5,i6,i7,i8) = and
+      [ inRange (l1,u1) i1
+      , inRange (l2,u2) i2
+      , inRange (l3,u3) i3
+      , inRange (l4,u4) i4
+      , inRange (l5,u5) i5
+      , inRange (l6,u6) i6
+      , inRange (l7,u7) i7
+      , inRange (l8,u8) i8
+      ]
 
     -- Default method for index
 
 ----------------------------------------------------------------------
 -- | @since 4.15.0.0
-instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8, Ix a9) =>
-      Ix (a1,a2,a3,a4,a5,a6,a7,a8,a9)  where
+instance (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8, Ix a9) =>
+      Ix (a1,a2,a3,a4,a5,a6,a7,a8,a9) where
     range ((l1,l2,l3,l4,l5,l6,l7,l8,l9),(u1,u2,u3,u4,u5,u6,u7,u8,u9)) =
       [(i1,i2,i3,i4,i5,i6,i7,i8,i9) | i1 <- range (l1,u1),
                                       i2 <- range (l2,u2),
@@ -472,20 +496,25 @@ instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8, Ix a9) =>
       unsafeIndex (l1,u1) i1))))))))
 
     inRange ((l1,l2,l3,l4,l5,l6,l7,l8,l9),(u1,u2,u3,u4,u5,u6,u7,u8,u9))
-        (i1,i2,i3,i4,i5,i6,i7,i8,i9) =
-      inRange (l1,u1) i1 && inRange (l2,u2) i2 &&
-      inRange (l3,u3) i3 && inRange (l4,u4) i4 &&
-      inRange (l5,u5) i5 && inRange (l6,u6) i6 &&
-      inRange (l7,u7) i7 && inRange (l8,u8) i8 &&
-      inRange (l9,u9) i9
+        (i1,i2,i3,i4,i5,i6,i7,i8,i9) = and
+      [ inRange (l1,u1) i1
+      , inRange (l2,u2) i2
+      , inRange (l3,u3) i3
+      , inRange (l4,u4) i4
+      , inRange (l5,u5) i5
+      , inRange (l6,u6) i6
+      , inRange (l7,u7) i7
+      , inRange (l8,u8) i8
+      , inRange (l9,u9) i9
+      ]
 
     -- Default method for index
 
 ----------------------------------------------------------------------
 -- | @since 4.15.0.0
-instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8, Ix a9,
-           Ix aA) =>
-      Ix (a1,a2,a3,a4,a5,a6,a7,a8,a9,aA)  where
+instance (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8, Ix a9,
+          Ix aA) =>
+      Ix (a1,a2,a3,a4,a5,a6,a7,a8,a9,aA) where
     range ((l1,l2,l3,l4,l5,l6,l7,l8,l9,lA),(u1,u2,u3,u4,u5,u6,u7,u8,u9,uA)) =
       [(i1,i2,i3,i4,i5,i6,i7,i8,i9,iA) | i1 <- range (l1,u1),
                                          i2 <- range (l2,u2),
@@ -513,20 +542,26 @@ instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8, Ix a9,
       unsafeIndex (l1,u1) i1)))))))))
 
     inRange ((l1,l2,l3,l4,l5,l6,l7,l8,l9,lA),(u1,u2,u3,u4,u5,u6,u7,u8,u9,uA))
-        (i1,i2,i3,i4,i5,i6,i7,i8,i9,iA) =
-      inRange (l1,u1) i1 && inRange (l2,u2) i2 &&
-      inRange (l3,u3) i3 && inRange (l4,u4) i4 &&
-      inRange (l5,u5) i5 && inRange (l6,u6) i6 &&
-      inRange (l7,u7) i7 && inRange (l8,u8) i8 &&
-      inRange (l9,u9) i9 && inRange (lA,uA) iA
+        (i1,i2,i3,i4,i5,i6,i7,i8,i9,iA) = and
+      [ inRange (l1,u1) i1
+      , inRange (l2,u2) i2
+      , inRange (l3,u3) i3
+      , inRange (l4,u4) i4
+      , inRange (l5,u5) i5
+      , inRange (l6,u6) i6
+      , inRange (l7,u7) i7
+      , inRange (l8,u8) i8
+      , inRange (l9,u9) i9
+      , inRange (lA,uA) iA
+      ]
 
     -- Default method for index
 
 ----------------------------------------------------------------------
 -- | @since 4.15.0.0
-instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8, Ix a9,
-           Ix aA, Ix aB) =>
-      Ix (a1,a2,a3,a4,a5,a6,a7,a8,a9,aA,aB)  where
+instance (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8, Ix a9,
+          Ix aA, Ix aB) =>
+      Ix (a1,a2,a3,a4,a5,a6,a7,a8,a9,aA,aB) where
     range ((l1,l2,l3,l4,l5,l6,l7,l8,l9,lA,lB),
            (u1,u2,u3,u4,u5,u6,u7,u8,u9,uA,uB)) =
       [(i1,i2,i3,i4,i5,i6,i7,i8,i9,iA,iB) | i1 <- range (l1,u1),
@@ -558,21 +593,27 @@ instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8, Ix a9,
 
     inRange ((l1,l2,l3,l4,l5,l6,l7,l8,l9,lA,lB),
              (u1,u2,u3,u4,u5,u6,u7,u8,u9,uA,uB))
-        (i1,i2,i3,i4,i5,i6,i7,i8,i9,iA,iB) =
-      inRange (l1,u1) i1 && inRange (l2,u2) i2 &&
-      inRange (l3,u3) i3 && inRange (l4,u4) i4 &&
-      inRange (l5,u5) i5 && inRange (l6,u6) i6 &&
-      inRange (l7,u7) i7 && inRange (l8,u8) i8 &&
-      inRange (l9,u9) i9 && inRange (lA,uA) iA &&
-      inRange (lB,uB) iB
+        (i1,i2,i3,i4,i5,i6,i7,i8,i9,iA,iB) = and
+      [ inRange (l1,u1) i1
+      , inRange (l2,u2) i2
+      , inRange (l3,u3) i3
+      , inRange (l4,u4) i4
+      , inRange (l5,u5) i5
+      , inRange (l6,u6) i6
+      , inRange (l7,u7) i7
+      , inRange (l8,u8) i8
+      , inRange (l9,u9) i9
+      , inRange (lA,uA) iA
+      , inRange (lB,uB) iB
+      ]
 
     -- Default method for index
 
 ----------------------------------------------------------------------
 -- | @since 4.15.0.0
-instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8, Ix a9,
-           Ix aA, Ix aB, Ix aC) =>
-      Ix (a1,a2,a3,a4,a5,a6,a7,a8,a9,aA,aB,aC)  where
+instance (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8, Ix a9,
+          Ix aA, Ix aB, Ix aC) =>
+      Ix (a1,a2,a3,a4,a5,a6,a7,a8,a9,aA,aB,aC) where
     range ((l1,l2,l3,l4,l5,l6,l7,l8,l9,lA,lB,lC),
            (u1,u2,u3,u4,u5,u6,u7,u8,u9,uA,uB,uC)) =
       [(i1,i2,i3,i4,i5,i6,i7,i8,i9,iA,iB,iC) | i1 <- range (l1,u1),
@@ -606,21 +647,28 @@ instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8, Ix a9,
 
     inRange ((l1,l2,l3,l4,l5,l6,l7,l8,l9,lA,lB,lC),
              (u1,u2,u3,u4,u5,u6,u7,u8,u9,uA,uB,uC))
-        (i1,i2,i3,i4,i5,i6,i7,i8,i9,iA,iB,iC) =
-      inRange (l1,u1) i1 && inRange (l2,u2) i2 &&
-      inRange (l3,u3) i3 && inRange (l4,u4) i4 &&
-      inRange (l5,u5) i5 && inRange (l6,u6) i6 &&
-      inRange (l7,u7) i7 && inRange (l8,u8) i8 &&
-      inRange (l9,u9) i9 && inRange (lA,uA) iA &&
-      inRange (lB,uB) iB && inRange (lC,uC) iC
+        (i1,i2,i3,i4,i5,i6,i7,i8,i9,iA,iB,iC) = and
+      [ inRange (l1,u1) i1
+      , inRange (l2,u2) i2
+      , inRange (l3,u3) i3
+      , inRange (l4,u4) i4
+      , inRange (l5,u5) i5
+      , inRange (l6,u6) i6
+      , inRange (l7,u7) i7
+      , inRange (l8,u8) i8
+      , inRange (l9,u9) i9
+      , inRange (lA,uA) iA
+      , inRange (lB,uB) iB
+      , inRange (lC,uC) iC
+      ]
 
     -- Default method for index
 
 ----------------------------------------------------------------------
 -- | @since 4.15.0.0
-instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8, Ix a9,
-           Ix aA, Ix aB, Ix aC, Ix aD) =>
-      Ix (a1,a2,a3,a4,a5,a6,a7,a8,a9,aA,aB,aC,aD)  where
+instance (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8, Ix a9,
+          Ix aA, Ix aB, Ix aC, Ix aD) =>
+      Ix (a1,a2,a3,a4,a5,a6,a7,a8,a9,aA,aB,aC,aD) where
     range ((l1,l2,l3,l4,l5,l6,l7,l8,l9,lA,lB,lC,lD),
            (u1,u2,u3,u4,u5,u6,u7,u8,u9,uA,uB,uC,uD)) =
       [(i1,i2,i3,i4,i5,i6,i7,i8,i9,iA,iB,iC,iD) | i1 <- range (l1,u1),
@@ -656,22 +704,29 @@ instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8, Ix a9,
 
     inRange ((l1,l2,l3,l4,l5,l6,l7,l8,l9,lA,lB,lC,lD),
              (u1,u2,u3,u4,u5,u6,u7,u8,u9,uA,uB,uC,uD))
-        (i1,i2,i3,i4,i5,i6,i7,i8,i9,iA,iB,iC,iD) =
-      inRange (l1,u1) i1 && inRange (l2,u2) i2 &&
-      inRange (l3,u3) i3 && inRange (l4,u4) i4 &&
-      inRange (l5,u5) i5 && inRange (l6,u6) i6 &&
-      inRange (l7,u7) i7 && inRange (l8,u8) i8 &&
-      inRange (l9,u9) i9 && inRange (lA,uA) iA &&
-      inRange (lB,uB) iB && inRange (lC,uC) iC &&
-      inRange (lD,uD) iD
+        (i1,i2,i3,i4,i5,i6,i7,i8,i9,iA,iB,iC,iD) = and
+      [ inRange (l1,u1) i1
+      , inRange (l2,u2) i2
+      , inRange (l3,u3) i3
+      , inRange (l4,u4) i4
+      , inRange (l5,u5) i5
+      , inRange (l6,u6) i6
+      , inRange (l7,u7) i7
+      , inRange (l8,u8) i8
+      , inRange (l9,u9) i9
+      , inRange (lA,uA) iA
+      , inRange (lB,uB) iB
+      , inRange (lC,uC) iC
+      , inRange (lD,uD) iD
+      ]
 
     -- Default method for index
 
 ----------------------------------------------------------------------
 -- | @since 4.15.0.0
-instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8, Ix a9,
-           Ix aA, Ix aB, Ix aC, Ix aD, Ix aE) =>
-      Ix (a1,a2,a3,a4,a5,a6,a7,a8,a9,aA,aB,aC,aD,aE)  where
+instance (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8, Ix a9,
+          Ix aA, Ix aB, Ix aC, Ix aD, Ix aE) =>
+      Ix (a1,a2,a3,a4,a5,a6,a7,a8,a9,aA,aB,aC,aD,aE) where
     range ((l1,l2,l3,l4,l5,l6,l7,l8,l9,lA,lB,lC,lD,lE),
            (u1,u2,u3,u4,u5,u6,u7,u8,u9,uA,uB,uC,uD,uE)) =
       [(i1,i2,i3,i4,i5,i6,i7,i8,i9,iA,iB,iC,iD,iE) | i1 <- range (l1,u1),
@@ -709,22 +764,30 @@ instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8, Ix a9,
 
     inRange ((l1,l2,l3,l4,l5,l6,l7,l8,l9,lA,lB,lC,lD,lE),
              (u1,u2,u3,u4,u5,u6,u7,u8,u9,uA,uB,uC,uD,uE))
-        (i1,i2,i3,i4,i5,i6,i7,i8,i9,iA,iB,iC,iD,iE) =
-      inRange (l1,u1) i1 && inRange (l2,u2) i2 &&
-      inRange (l3,u3) i3 && inRange (l4,u4) i4 &&
-      inRange (l5,u5) i5 && inRange (l6,u6) i6 &&
-      inRange (l7,u7) i7 && inRange (l8,u8) i8 &&
-      inRange (l9,u9) i9 && inRange (lA,uA) iA &&
-      inRange (lB,uB) iB && inRange (lC,uC) iC &&
-      inRange (lD,uD) iD && inRange (lE,uE) iE
+        (i1,i2,i3,i4,i5,i6,i7,i8,i9,iA,iB,iC,iD,iE) = and
+      [ inRange (l1,u1) i1
+      , inRange (l2,u2) i2
+      , inRange (l3,u3) i3
+      , inRange (l4,u4) i4
+      , inRange (l5,u5) i5
+      , inRange (l6,u6) i6
+      , inRange (l7,u7) i7
+      , inRange (l8,u8) i8
+      , inRange (l9,u9) i9
+      , inRange (lA,uA) iA
+      , inRange (lB,uB) iB
+      , inRange (lC,uC) iC
+      , inRange (lD,uD) iD
+      , inRange (lE,uE) iE
+      ]
 
     -- Default method for index
 
 ----------------------------------------------------------------------
 -- | @since 4.15.0.0
-instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8, Ix a9,
-           Ix aA, Ix aB, Ix aC, Ix aD, Ix aE, Ix aF) =>
-      Ix (a1,a2,a3,a4,a5,a6,a7,a8,a9,aA,aB,aC,aD,aE,aF)  where
+instance (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8, Ix a9,
+          Ix aA, Ix aB, Ix aC, Ix aD, Ix aE, Ix aF) =>
+      Ix (a1,a2,a3,a4,a5,a6,a7,a8,a9,aA,aB,aC,aD,aE,aF) where
     range ((l1,l2,l3,l4,l5,l6,l7,l8,l9,lA,lB,lC,lD,lE,lF),
            (u1,u2,u3,u4,u5,u6,u7,u8,u9,uA,uB,uC,uD,uE,uF)) =
       [(i1,i2,i3,i4,i5,i6,i7,i8,i9,iA,iB,iC,iD,iE,iF) | i1 <- range (l1,u1),
@@ -764,14 +827,22 @@ instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8, Ix a9,
 
     inRange ((l1,l2,l3,l4,l5,l6,l7,l8,l9,lA,lB,lC,lD,lE,lF),
              (u1,u2,u3,u4,u5,u6,u7,u8,u9,uA,uB,uC,uD,uE,uF))
-        (i1,i2,i3,i4,i5,i6,i7,i8,i9,iA,iB,iC,iD,iE,iF) =
-      inRange (l1,u1) i1 && inRange (l2,u2) i2 &&
-      inRange (l3,u3) i3 && inRange (l4,u4) i4 &&
-      inRange (l5,u5) i5 && inRange (l6,u6) i6 &&
-      inRange (l7,u7) i7 && inRange (l8,u8) i8 &&
-      inRange (l9,u9) i9 && inRange (lA,uA) iA &&
-      inRange (lB,uB) iB && inRange (lC,uC) iC &&
-      inRange (lD,uD) iD && inRange (lE,uE) iE &&
-      inRange (lF,uF) iF
+        (i1,i2,i3,i4,i5,i6,i7,i8,i9,iA,iB,iC,iD,iE,iF) = and
+      [ inRange (l1,u1) i1
+      , inRange (l2,u2) i2
+      , inRange (l3,u3) i3
+      , inRange (l4,u4) i4
+      , inRange (l5,u5) i5
+      , inRange (l6,u6) i6
+      , inRange (l7,u7) i7
+      , inRange (l8,u8) i8
+      , inRange (l9,u9) i9
+      , inRange (lA,uA) iA
+      , inRange (lB,uB) iB
+      , inRange (lC,uC) iC
+      , inRange (lD,uD) iD
+      , inRange (lE,uE) iE
+      , inRange (lF,uF) iF
+      ]
 
     -- Default method for index

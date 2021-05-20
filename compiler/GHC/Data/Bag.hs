@@ -308,7 +308,7 @@ nonEmptyToBag (x :| xs) = ListBag (x : xs)
 bagToList :: Bag a -> [a]
 bagToList b = foldr (:) [] b
 
-instance (Outputable a) => Outputable (Bag a) where
+instance Outputable a => Outputable (Bag a) where
     ppr bag = braces (pprWithCommas ppr (bagToList bag))
 
 instance Data a => Data (Bag a) where

@@ -80,7 +80,7 @@ newtype Identity a = Identity { runIdentity :: a }
 -- 'Identity' newtype if the 'runIdentity' field were removed
 --
 -- @since 4.8.0.0
-instance (Read a) => Read (Identity a) where
+instance Read a => Read (Identity a) where
     readsPrec d = readParen (d > 10) $ \ r ->
         [(Identity x,t) | ("Identity",s) <- lex r, (x,t) <- readsPrec 11 s]
 
@@ -88,7 +88,7 @@ instance (Read a) => Read (Identity a) where
 -- 'Identity' newtype if the 'runIdentity' field were removed
 --
 -- @since 4.8.0.0
-instance (Show a) => Show (Identity a) where
+instance Show a => Show (Identity a) where
     showsPrec d (Identity x) = showParen (d > 10) $
         showString "Identity " . showsPrec 11 x
 

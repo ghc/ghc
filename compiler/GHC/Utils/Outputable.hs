@@ -918,13 +918,13 @@ instance Outputable Double where
 instance Outputable () where
     ppr _ = text "()"
 
-instance (Outputable a) => Outputable [a] where
+instance Outputable a => Outputable [a] where
     ppr xs = brackets (fsep (punctuate comma (map ppr xs)))
 
-instance (Outputable a) => Outputable (NonEmpty a) where
+instance Outputable a => Outputable (NonEmpty a) where
     ppr = ppr . NEL.toList
 
-instance (Outputable a) => Outputable (Set a) where
+instance Outputable a => Outputable (Set a) where
     ppr s = braces (fsep (punctuate comma (map ppr (Set.toList s))))
 
 instance Outputable IntSet.IntSet where
@@ -996,7 +996,7 @@ deriving newtype instance Outputable LexicalFastString
 instance (Outputable key, Outputable elt) => Outputable (M.Map key elt) where
     ppr m = ppr (M.toList m)
 
-instance (Outputable elt) => Outputable (IM.IntMap elt) where
+instance Outputable elt => Outputable (IM.IntMap elt) where
     ppr m = ppr (IM.toList m)
 
 instance Outputable Fingerprint where
@@ -1146,7 +1146,7 @@ instance OutputableP env a => OutputableP env (SCC a) where
 instance OutputableP env SDoc where
    pdoc _ x = x
 
-instance (OutputableP env a) => OutputableP env (Set a) where
+instance OutputableP env a => OutputableP env (Set a) where
     pdoc env s = braces (fsep (punctuate comma (map (pdoc env) (Set.toList s))))
 
 

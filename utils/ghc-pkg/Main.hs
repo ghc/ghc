@@ -115,7 +115,7 @@ import System.Console.Terminfo as Terminfo
 #endif
 
 -- | Short-circuit 'any' with a \"monadic predicate\".
-anyM :: (Monad m) => (a -> m Bool) -> [a] -> m Bool
+anyM :: Monad m => (a -> m Bool) -> [a] -> m Bool
 anyM _ [] = return False
 anyM p (x:xs) = do
   b <- p x

@@ -45,7 +45,7 @@ import GHC.Show
 -- of functions from "Data.List", for example:
 --
 -- >   ... sortBy (comparing fst) ...
-comparing :: (Ord a) => (b -> a) -> b -> b -> Ordering
+comparing :: Ord a => (b -> a) -> b -> b -> Ordering
 comparing p x y = compare (p x) (p y)
 
 -- |
@@ -64,7 +64,7 @@ comparing p x y = compare (p x) (p y)
 --
 -- >>> clamp ('a', 'm') 'x'
 -- 'm'
-clamp :: (Ord a) => (a, a) -> a -> a
+clamp :: Ord a => (a, a) -> a -> a
 clamp (low, high) a = min high (max a low)
 
 -- | The 'Down' type allows you to reverse sort order conveniently.  A value of type
@@ -117,7 +117,7 @@ newtype Down a = Down
 -- 'Down' newtype if the 'getDown' field were removed
 --
 -- @since 4.7.0.0
-instance (Read a) => Read (Down a) where
+instance Read a => Read (Down a) where
     readsPrec d = readParen (d > 10) $ \ r ->
         [(Down x,t) | ("Down",s) <- lex r, (x,t) <- readsPrec 11 s]
 
@@ -125,7 +125,7 @@ instance (Read a) => Read (Down a) where
 -- 'Down' newtype if the 'getDown' field were removed
 --
 -- @since 4.7.0.0
-instance (Show a) => Show (Down a) where
+instance Show a => Show (Down a) where
     showsPrec d (Down x) = showParen (d > 10) $
         showString "Down " . showsPrec 11 x
 

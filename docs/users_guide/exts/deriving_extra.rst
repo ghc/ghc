@@ -543,7 +543,7 @@ Here is an example of how one can derive ``Lift``:
     data Foo a = Foo a | a :^: a deriving Lift
 
     {-
-    instance (Lift a) => Lift (Foo a) where
+    instance Lift a => Lift (Foo a) where
         lift (Foo a) = [| Foo a |]
         lift ((:^:) u v) = [| (:^:) u v |]
 

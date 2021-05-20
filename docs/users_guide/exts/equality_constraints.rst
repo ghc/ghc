@@ -28,7 +28,7 @@ idea is to rewrite a class declaration of the form ::
 
 to ::
 
-    class (F a ~ b) => C a b where
+    class F a ~ b => C a b where
       type F a
 
 That is, we represent every functional dependency (FD) ``a1 .. an -> b``

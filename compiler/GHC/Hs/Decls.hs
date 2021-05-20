@@ -258,7 +258,7 @@ appendGroups
         hs_ruleds = rulds1 ++ rulds2,
         hs_docs   = docs1  ++ docs2 }
 
-instance (OutputableBndrId p) => Outputable (HsDecl (GhcPass p)) where
+instance OutputableBndrId p => Outputable (HsDecl (GhcPass p)) where
     ppr (TyClD _ dcl)             = ppr dcl
     ppr (ValD _ binds)            = ppr binds
     ppr (DefD _ def)              = ppr def
@@ -274,7 +274,7 @@ instance (OutputableBndrId p) => Outputable (HsDecl (GhcPass p)) where
     ppr (DocD _ doc)              = ppr doc
     ppr (RoleAnnotD _ ra)         = ppr ra
 
-instance (OutputableBndrId p) => Outputable (HsGroup (GhcPass p)) where
+instance OutputableBndrId p => Outputable (HsGroup (GhcPass p)) where
     ppr (HsGroup { hs_valds  = val_decls,
                    hs_tyclds = tycl_decls,
                    hs_derivds = deriv_decls,
@@ -386,7 +386,7 @@ hsDeclHasCusk (ClassDecl { tcdTyVars = tyvars }) = hsTvbAllKinded tyvars
 -- Pretty-printing TyClDecl
 -- ~~~~~~~~~~~~~~~~~~~~~~~~
 
-instance (OutputableBndrId p) => Outputable (TyClDecl (GhcPass p)) where
+instance OutputableBndrId p => Outputable (TyClDecl (GhcPass p)) where
 
     ppr (FamDecl { tcdFam = decl }) = ppr decl
     ppr (SynDecl { tcdLName = ltycon, tcdTyVars = tyvars, tcdFixity = fixity
@@ -677,7 +677,7 @@ pp_condecls cs
       (L _ ConDeclH98{}  : _) -> False
       (L _ ConDeclGADT{} : _) -> True
 
-instance (OutputableBndrId p) => Outputable (ConDecl (GhcPass p)) where
+instance OutputableBndrId p => Outputable (ConDecl (GhcPass p)) where
     ppr = pprConDecl
 
 pprConDecl :: forall p. OutputableBndrId p => ConDecl (GhcPass p) -> SDoc
@@ -713,7 +713,7 @@ pprConDecl (ConDeclGADT { con_names = cons, con_bndrs = L _ outer_bndrs
     ppr_arrow_chain (a:as) = sep (a : map (arrow <+>) as)
     ppr_arrow_chain []     = empty
 
-ppr_con_names :: (OutputableBndr a) => [GenLocated l a] -> SDoc
+ppr_con_names :: OutputableBndr a => [GenLocated l a] -> SDoc
 ppr_con_names = pprWithCommas (pprPrefixOcc . unLoc)
 
 {-
@@ -852,7 +852,7 @@ ppOverlapPragma mb =
     maybe_stext (SourceText src) _   = text src <+> text "#-}"
 
 
-instance (OutputableBndrId p) => Outputable (InstDecl (GhcPass p)) where
+instance OutputableBndrId p => Outputable (InstDecl (GhcPass p)) where
     ppr (ClsInstD     { cid_inst  = decl }) = ppr decl
     ppr (TyFamInstD   { tfid_inst = decl }) = ppr decl
     ppr (DataFamInstD { dfid_inst = decl }) = ppr decl
@@ -1034,13 +1034,13 @@ type instance XCRuleBndr    (GhcPass _) = EpAnn [AddEpAnn]
 type instance XRuleBndrSig  (GhcPass _) = EpAnn [AddEpAnn]
 type instance XXRuleBndr    (GhcPass _) = NoExtCon
 
-instance (OutputableBndrId p) => Outputable (RuleDecls (GhcPass p)) where
+instance OutputableBndrId p => Outputable (RuleDecls (GhcPass p)) where
   ppr (HsRules { rds_src = st
                , rds_rules = rules })
     = pprWithSourceText st (text "{-# RULES")
           <+> vcat (punctuate semi (map ppr rules)) <+> text "#-}"
 
-instance (OutputableBndrId p) => Outputable (RuleDecl (GhcPass p)) where
+instance OutputableBndrId p => Outputable (RuleDecl (GhcPass p)) where
   ppr (HsRule { rd_name = name
               , rd_act  = act
               , rd_tyvs = tys
@@ -1057,7 +1057,7 @@ instance (OutputableBndrId p) => Outputable (RuleDecl (GhcPass p)) where
           pp_forall_tm Nothing | null tms = empty
           pp_forall_tm _ = forAllLit <+> fsep (map ppr tms) <> dot
 
-instance (OutputableBndrId p) => Outputable (RuleBndr (GhcPass p)) where
+instance OutputableBndrId p => Outputable (RuleBndr (GhcPass p)) where
    ppr (RuleBndr _ name) = ppr name
    ppr (RuleBndrSig _ name ty) = parens (ppr name <> dcolon <> ppr ty)
 
@@ -1102,7 +1102,7 @@ instance OutputableBndrId p
 type instance XHsAnnotation (GhcPass _) = EpAnn AnnPragma
 type instance XXAnnDecl     (GhcPass _) = NoExtCon
 
-instance (OutputableBndrId p) => Outputable (AnnDecl (GhcPass p)) where
+instance OutputableBndrId p => Outputable (AnnDecl (GhcPass p)) where
     ppr (HsAnnotation _ _ provenance expr)
       = hsep [text "{-#", pprAnnProvenance provenance, pprExpr (unLoc expr), text "#-}"]
 
