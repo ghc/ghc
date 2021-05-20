@@ -9,15 +9,16 @@ import GHC.Unit
 import GHC.Unit.Module.ModGuts
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.ModDetails
+import GHC.Unit.Home.ModInfo
 
 import GHC.Utils.Fingerprint
 
 -- | Status of a module compilation to machine code
 data HscStatus
     -- | Nothing to do.
-    = HscNotGeneratingCode ModIface ModDetails
+    = HscNotGeneratingCode HomeModInfo
     -- | Nothing to do because code already exists.
-    | HscUpToDate ModIface ModDetails
+    | HscUpToDate HomeModInfo
     -- | Update boot file result.
     | HscUpdateBoot ModIface ModDetails
     -- | Generate signature file (backpack)

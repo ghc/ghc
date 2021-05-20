@@ -679,3 +679,9 @@ T14452:
 T17786:
 	# N.B. Check for the presence of caret diagnostics.
 	"$(TEST_HC)" $(TEST_HC_OPTS) -v "$(shell cygpath -w -a T17786.hs)" 2>&1 | grep --quiet '3 |'
+
+.PHONY: OneShotTH
+OneShotTH:
+	"$(TEST_HC)" $(TEST_HC_OPTS) -c OneShotTH.hs
+	# Should print nothing, as the module should be recompiled
+	"$(TEST_HC)" $(TEST_HC_OPTS) -c OneShotTH.hs
