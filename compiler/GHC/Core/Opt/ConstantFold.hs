@@ -163,8 +163,8 @@ primOpRules nm = \case
                                     , equalArgs $> Lit zeroW8 ]
    Word8NotOp  -> mkPrimOpRule nm 1 [ unaryLit complementOp
                                     , semiInversePrimOp Word8NotOp ]
-   Word8SllOp  -> mkPrimOpRule nm 2 [ shiftRule LitNumWord (const shiftL) ]
-   Word8SrlOp  -> mkPrimOpRule nm 2 [ shiftRule LitNumWord $ const $ shiftRightLogical @Word8 ]
+   Word8SllOp  -> mkPrimOpRule nm 2 [ shiftRule LitNumWord8 (const shiftL) ]
+   Word8SrlOp  -> mkPrimOpRule nm 2 [ shiftRule LitNumWord8 $ const $ shiftRightLogical @Word8 ]
 
 
    -- Int16 operations
@@ -230,8 +230,8 @@ primOpRules nm = \case
                                     , equalArgs $> Lit zeroW16 ]
    Word16NotOp -> mkPrimOpRule nm 1 [ unaryLit complementOp
                                     , semiInversePrimOp Word16NotOp ]
-   Word16SllOp -> mkPrimOpRule nm 2 [ shiftRule LitNumWord (const shiftL) ]
-   Word16SrlOp -> mkPrimOpRule nm 2 [ shiftRule LitNumWord $ const $ shiftRightLogical @Word16 ]
+   Word16SllOp -> mkPrimOpRule nm 2 [ shiftRule LitNumWord16 (const shiftL) ]
+   Word16SrlOp -> mkPrimOpRule nm 2 [ shiftRule LitNumWord16 $ const $ shiftRightLogical @Word16 ]
 
 
    -- Int32 operations
@@ -297,8 +297,8 @@ primOpRules nm = \case
                                     , equalArgs $> Lit zeroW32 ]
    Word32NotOp -> mkPrimOpRule nm 1 [ unaryLit complementOp
                                     , semiInversePrimOp Word32NotOp ]
-   Word32SllOp -> mkPrimOpRule nm 2 [ shiftRule LitNumWord (const shiftL) ]
-   Word32SrlOp -> mkPrimOpRule nm 2 [ shiftRule LitNumWord $ const $ shiftRightLogical @Word32 ]
+   Word32SllOp -> mkPrimOpRule nm 2 [ shiftRule LitNumWord32 (const shiftL) ]
+   Word32SrlOp -> mkPrimOpRule nm 2 [ shiftRule LitNumWord32 $ const $ shiftRightLogical @Word32 ]
 
 
    -- Int operations
