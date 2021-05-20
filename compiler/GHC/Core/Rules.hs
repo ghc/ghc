@@ -872,13 +872,32 @@ match renv subst e1@(App {}) e2@(Lam {}) mco
 match renv subst (App f1 a1) (App f2 a2) _mco
   = match_app renv subst f1 [a1] f2 [a2]
 
-match renv subst (Lam x1 e1) e2 MRefl
-  -- ToDo: improve the MRefl
-  | Just (x2, e2, ts) <- exprIsLambda_maybe (rvInScopeEnv renv) e2
+match renv subst (Lam x1 e1) e2 mco
+  | Just (x2, e2, ts) <- exprIsLambda_maybe (rvInScopeEnv renv) (mkCastMCo e2 mco)
+    -- See Note [Lambdas in the template]
   = let renv' = renv { rv_lcl = rnBndr2 (rv_lcl renv) x1 x2
                      , rv_fltR = delBndr (rv_fltR renv) x2 }
         subst' = subst { rs_binds = rs_binds subst . flip (foldr mkTick) ts }
     in  match renv' subst' e1 e2 MRefl
+
+{- Note [Lambdas in the template]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we match
+   Template:   (\x. blah_template)
+   Target:     (\y. blah_target)
+then we want to match inside the lambdas, using rn_lcl to match up
+x and y.
+
+But what about this?
+   Template   (\x. blah1 |> cv)
+   Target     (\y. blah2) |> co
+
+This happens quite readily, because the Simplifier generally moves
+casts outside lambdas: see Note [Casts and lambdas] in
+GHC.Core.Opt.Simplify.Utils. So, tiresomely, we want to push `co`
+back inside, which is what `exprIsLambda_maybe` does.  But we've
+stripped off that cast, so now we need to put it back.
+-}
 
 {- Disabled: see Note [Matching cases] below
 match renv (tv_subst, id_subst, binds) e1
