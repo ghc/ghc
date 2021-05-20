@@ -771,7 +771,7 @@ instance HiePass p => HasType (LocatedA (HsExpr (GhcPass p))) where
           skipDesugaring :: HsExpr GhcTc -> Bool
           skipDesugaring e = case e of
             HsVar{}             -> False
-            HsRecFld{}          -> False
+            HsRecSel{}          -> False
             HsOverLabel{}       -> False
             HsIPVar{}           -> False
             XExpr (WrapExpr {}) -> False
@@ -902,7 +902,7 @@ instance HiePass p => ToHie (Located (PatSynBind (GhcPass p) (GhcPass p))) where
             (InfixCon a b) -> combineScopes (mkLScopeN a) (mkLScopeN b)
             (RecCon r) -> foldr go NoScope r
           go (RecordPatSynField a b) c = combineScopes c
-            $ combineScopes (mkLScopeN (rdrNameFieldOcc a)) (mkLScopeN b)
+            $ combineScopes (mkLScopeN (foLabel a)) (mkLScopeN b)
           detSpan = case detScope of
             LocalScope a -> Just a
             _ -> Nothing
@@ -1082,7 +1082,7 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
              -- Patch up var location since typechecker removes it
         ]
       HsUnboundVar _ _ -> []  -- there is an unbound name here, but that causes trouble
-      HsRecFld _ fld ->
+      HsRecSel _ fld ->
         [ toHie $ RFC RecFieldOcc Nothing (L (locA mspan) fld)
         ]
       HsOverLabel {} -> []
