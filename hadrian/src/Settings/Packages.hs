@@ -274,8 +274,6 @@ rtsPackageArgs = package rts ? do
 
     let cArgs = mconcat
           [ rtsWarnings
-          , flag UseSystemFfi ? arg ("-I" ++ ffiIncludeDir)
-          , flag WithLibdw ? arg ("-I" ++ libdwIncludeDir)
           , arg "-fomit-frame-pointer"
           -- RTS *must* be compiled with optimisations. The INLINE_HEADER macro
           -- requires that functions are inlined to work as expected. Inlining
@@ -373,6 +371,8 @@ rtsPackageArgs = package rts ? do
           , if not (null libdwIncludeDir) then arg ("--extra-include-dirs="++libdwIncludeDir) else mempty
           , if not (null libnumaLibraryDir) then arg ("--extra-lib-dirs="++libnumaLibraryDir) else mempty
           , if not (null libnumaIncludeDir) then arg ("--extra-include-dirs="++libnumaIncludeDir) else mempty
+          , notM (flag UseSystemFfi) ? arg ("--extra-include-dirs=" ++ path)
+          , if not (null ffiIncludeDir) then arg ("--extra-lib-dirs="++ffiIncludeDir) else mempty
           ]
         , builder (Cc FindCDependencies) ? cArgs
         , builder (Ghc CompileCWithGhc) ? map ("-optc" ++) <$> cArgs
