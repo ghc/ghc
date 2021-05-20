@@ -895,9 +895,10 @@ pipeLoop phase input_fn = do
                                         stopPhase output (src_basename env)
                                         dflags stopPhase (maybe_loc pst)
                when (final_fn /= input_fn) $ do
-                  let msg = ("Copying `" ++ input_fn ++"' to `" ++ final_fn ++ "'")
-                      line_prag = Just ("{-# LINE 1 \"" ++ src_filename env ++ "\" #-}\n")
-                  liftIO $ copyWithHeader logger dflags msg line_prag input_fn final_fn
+                  let msg = "Copying `" ++ input_fn ++"' to `" ++ final_fn ++ "'"
+                      line_prag = "{-# LINE 1 \"" ++ src_filename env ++ "\" #-}\n"
+                  liftIO $ showPass logger dflags msg
+                  liftIO $ copyWithHeader line_prag input_fn final_fn
                return final_fn
 
 

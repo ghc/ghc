@@ -359,27 +359,20 @@ endMkDependHS logger dflags
   case makefile_hdl of
      Nothing  -> return ()
      Just hdl -> do
-
-          -- slurp the rest of the original makefile and copy it into the output
-        let slurp = do
-                l <- hGetLine hdl
-                hPutStrLn tmp_hdl l
-                slurp
-
-        catchIO slurp
-                (\e -> if isEOFError e then return () else ioError e)
-
+        -- slurp the rest of the original makefile and copy it into the output
+        SysTools.copyHandle hdl tmp_hdl
         hClose hdl
 
   hClose tmp_hdl  -- make sure it's flushed
 
         -- Create a backup of the original makefile
-  when (isJust makefile_hdl)
-       (SysTools.copy logger dflags ("Backing up " ++ makefile)
-          makefile (makefile++".bak"))
+  when (isJust makefile_hdl) $ do
+    showPass logger dflags ("Backing up " ++ makefile)
+    SysTools.copyFile makefile (makefile++".bak")
 
         -- Copy the new makefile in place
-  SysTools.copy logger dflags "Installing new makefile" tmp_file makefile
+  showPass logger dflags "Installing new makefile"
+  SysTools.copyFile tmp_file makefile
 
 
 -----------------------------------------------------------------
