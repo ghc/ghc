@@ -33,7 +33,7 @@ testOneFile libdir fileName = do
                          , targetContents = Nothing }
         load LoadAllTargets
         modSum <- getModSummary mn
-        toks <- getRichTokenStream (ms_mod modSum)
+        toks <- getRichTokenStream modSum
         return toks
 
     putStrLn (intercalate "\n" [showToks t])
