@@ -20,7 +20,9 @@ module GHC.SysTools (
         module GHC.SysTools.Tasks,
         module GHC.SysTools.Info,
 
-        copy,
+        -- * Fast file copy
+        copyFile,
+        copyHandle,
         copyWithHeader,
 
         -- * General utilities
@@ -32,20 +34,21 @@ import GHC.Prelude
 
 import GHC.Settings.Utils
 
-import GHC.Utils.Error
 import GHC.Utils.Panic
-import GHC.Utils.Logger
 import GHC.Driver.Session
 
-import Control.Monad.Trans.Except (runExceptT)
-import System.FilePath
-import System.IO
-import System.IO.Unsafe (unsafeInterleaveIO)
 import GHC.Linker.ExtraObj
 import GHC.SysTools.Info
 import GHC.SysTools.Tasks
 import GHC.SysTools.BaseDir
 import GHC.Settings.IO
+
+import Control.Monad.Trans.Except (runExceptT)
+import System.FilePath
+import System.IO
+import System.IO.Unsafe (unsafeInterleaveIO)
+import Foreign.Marshal.Alloc (allocaBytes)
+import System.Directory (copyFile)
 
 {-
 Note [How GHC finds toolchain utilities]
@@ -184,26 +187,25 @@ for more information.
 
 -}
 
-copy :: Logger -> DynFlags -> String -> FilePath -> FilePath -> IO ()
-copy logger dflags purpose from to = copyWithHeader logger dflags purpose Nothing from to
+-- | Copy remaining bytes from the first Handle to the second one
+copyHandle :: Handle -> Handle -> IO ()
+copyHandle hin hout = do
+  let buf_size = 8192
+  allocaBytes buf_size $ \ptr -> do
+    let go = do
+          c <- hGetBuf hin ptr buf_size
+          hPutBuf hout ptr c
+          if c == 0 then return () else go
+    go
 
-copyWithHeader :: Logger -> DynFlags -> String -> Maybe String -> FilePath -> FilePath
-               -> IO ()
-copyWithHeader logger dflags purpose maybe_header from to = do
-  showPass logger dflags purpose
-
-  hout <- openBinaryFile to   WriteMode
-  hin  <- openBinaryFile from ReadMode
-  ls <- hGetContents hin -- inefficient, but it'll do for now. ToDo: speed up
-  maybe (return ()) (header hout) maybe_header
-  hPutStr hout ls
-  hClose hout
-  hClose hin
- where
-  -- write the header string in UTF-8.  The header is something like
-  --   {-# LINE "foo.hs" #-}
-  -- and we want to make sure a Unicode filename isn't mangled.
-  header h str = do
-   hSetEncoding h utf8
-   hPutStr h str
-   hSetBinaryMode h True
+-- | Copy file after printing the given header
+copyWithHeader :: String -> FilePath -> FilePath -> IO ()
+copyWithHeader header from to =
+  withBinaryFile to WriteMode $ \hout -> do
+    -- write the header string in UTF-8.  The header is something like
+    --   {-# LINE "foo.hs" #-}
+    -- and we want to make sure a Unicode filename isn't mangled.
+    hSetEncoding hout utf8
+    hPutStr hout header
+    withBinaryFile from ReadMode $ \hin ->
+      copyHandle hin hout
