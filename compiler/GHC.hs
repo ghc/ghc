@@ -1584,25 +1584,26 @@ pprParenSymName a = parenSymOcc (getOccName a) (ppr (getName a))
 -- on whether the module is interpreted or not.
 
 
--- Extract the filename, stringbuffer content and dynflags associed to a module
+-- Extract the filename, stringbuffer content and dynflags associed to a ModSummary
+-- Given an initialised GHC session a ModSummary can be retrieved for
+-- a module by using 'getModSummary'
 --
 -- XXX: Explain pre-conditions
-getModuleSourceAndFlags :: GhcMonad m => Module -> m (String, StringBuffer, DynFlags)
-getModuleSourceAndFlags mod = do
-  m <- getModSummary (moduleName mod)
+getModuleSourceAndFlags :: ModSummary -> IO (String, StringBuffer, DynFlags)
+getModuleSourceAndFlags m = do
   case ml_hs_file $ ms_location m of
-    Nothing -> do dflags <- getDynFlags
-                  liftIO $ throwIO $ mkApiErr dflags (text "No source available for module " <+> ppr mod)
+    Nothing -> throwIO $ mkApiErr (ms_hspp_opts m) (text "No source available for module " <+> ppr (ms_mod m))
     Just sourceFile -> do
-        source <- liftIO $ hGetStringBuffer sourceFile
+        source <- hGetStringBuffer sourceFile
         return (sourceFile, source, ms_hspp_opts m)
 
 
 -- | Return module source as token stream, including comments.
 --
--- The module must be in the module graph and its source must be available.
+-- A 'Module' can be turned into a 'ModSummary' using 'getModSummary' if
+-- your session is fully initialised.
 -- Throws a 'GHC.Driver.Env.SourceError' on parse error.
-getTokenStream :: GhcMonad m => Module -> m [Located Token]
+getTokenStream :: ModSummary -> IO [Located Token]
 getTokenStream mod = do
   (sourceFile, source, dflags) <- getModuleSourceAndFlags mod
   let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
@@ -1613,7 +1614,7 @@ getTokenStream mod = do
 -- | Give even more information on the source than 'getTokenStream'
 -- This function allows reconstructing the source completely with
 -- 'showRichTokenStream'.
-getRichTokenStream :: GhcMonad m => Module -> m [(Located Token, String)]
+getRichTokenStream :: ModSummary -> IO [(Located Token, String)]
 getRichTokenStream mod = do
   (sourceFile, source, dflags) <- getModuleSourceAndFlags mod
   let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
