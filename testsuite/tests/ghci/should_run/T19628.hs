@@ -1,6 +1,7 @@
 {- test GHCi support for unlifted types -}
 
 {-# LANGUAGE UnliftedDatatypes #-}
+{-# OPTIONS_GHC -fbyte-code #-}
 
 module Main (main) where
 
@@ -10,12 +11,7 @@ import GHC.Arr
 import Data.Kind
 import Control.Exception
 
--- unlifted but boxed datatypes
-type Strict :: Type -> TYPE ('BoxedRep 'Unlifted)
-data Strict a = Force a
-
-type Strict2 :: Type -> TYPE ('BoxedRep 'Unlifted)
-data Strict2 a = Force2 a a
+import T19628a
 
 x1 :: Int
 x1 = case test of Force _ -> 10
@@ -52,6 +48,15 @@ x6 = case test of Force y -> y
     test :: Strict Int
     test = Force undefined
 
+x7 :: Int
+x7 = case addStrict (Force 4) (Force 5) of (Force y) -> y
+
+x8 :: (Int, Int)
+x8 = (y1, y2)
+  where
+    y1 = unStrict (Force 8)
+    y2 = case toStrict 7 of Force z -> z
+
 main :: IO ()
 main = do
   print x1
@@ -60,3 +65,5 @@ main = do
   print x4
   print x5 `catch` \(e::SomeException) -> putStrLn "x5: exception"
   print x6 `catch` \(e::SomeException) -> putStrLn "x6: exception"
+  print x7
+  print x8

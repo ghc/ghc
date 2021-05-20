@@ -1654,7 +1654,7 @@ run_BCO:
             /* Unpack N ptr words from t.o.s constructor */
             int i;
             int n_words = BCO_NEXT;
-            StgClosure* con = (StgClosure*)SpW(0);
+            StgClosure* con = UNTAG_CLOSURE((StgClosure*)SpW(0));
             Sp_subW(n_words);
             for (i = 0; i < n_words; i++) {
                 SpW(i) = (W_)con->payload[i];
@@ -1679,10 +1679,19 @@ run_BCO:
             // No write barrier is needed here as this is a new allocation
             // visible only from our stack
             SET_HDR(con, (StgInfoTable*)BCO_LIT(o_itbl), cap->r.rCCCS);
-            SpW(0) = (W_)con;
+
+            // compute the pointer tag for the constructor and tag the pointer
+            //
+            //     - 1..(TAG_MASK-1): for first TAG_MASK-1 constructors
+            //     - TAG_MASK:        look in info table
+            //
+            // Note: we need to update this if we change the tagging strategy
+            StgClosure* tagged_con = TAG_CLOSURE(1 + stg_min(TAG_MASK-1, GET_TAG(con)), con);
+            SpW(0) = (W_)tagged_con;
+
             IF_DEBUG(interpreter,
                      debugBelch("\tBuilt ");
-                     printObj((StgClosure*)con);
+                     printObj((StgClosure*)tagged_con);
                 );
             goto nextInsn;
         }
