@@ -534,13 +534,13 @@ then mash it with the modify function, and put it back.
 -}
 
 modifyVarEnv mangle_fn env key
-  = case (lookupVarEnv env key) of
+  = case lookupVarEnv env key of
       Nothing -> env
       Just xx -> extendVarEnv env key (mangle_fn xx)
 
 modifyVarEnv_Directly :: (a -> a) -> UniqFM key a -> Unique -> UniqFM key a
 modifyVarEnv_Directly mangle_fn env key
-  = case (lookupUFM_Directly env key) of
+  = case lookupUFM_Directly env key of
       Nothing -> env
       Just xx -> addToUFM_Directly env key (mangle_fn xx)
 
@@ -620,7 +620,7 @@ extendDVarEnv_C = addToUDFM_C
 
 modifyDVarEnv :: (a -> a) -> DVarEnv a -> Var -> DVarEnv a
 modifyDVarEnv mangle_fn env key
-  = case (lookupDVarEnv env key) of
+  = case lookupDVarEnv env key of
       Nothing -> env
       Just xx -> extendDVarEnv env key (mangle_fn xx)
 
