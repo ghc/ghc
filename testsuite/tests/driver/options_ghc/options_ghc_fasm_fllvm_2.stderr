@@ -1,0 +1,5 @@
+[1 of 3] Compiling Mod_fasm         ( Mod_fasm.hs, Mod_fasm.o )
+[2 of 3] Compiling Mod_fllvm        ( Mod_fllvm.hs, Mod_fllvm.o )
+llc: Unknown command line argument '-SOMETHING_INVALID'.  Try: 'llc --help'
+llc: Did you mean '-I'?
+`llc' failed in phase `LLVM Compiler'. (Exit code: 1)
