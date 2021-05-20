@@ -1887,7 +1887,7 @@ checkValidInstance ctxt hs_type ty
 
         ; traceTc "cvi 2" (ppr ty)
 
-        ; case (checkInstCoverage undecidable_ok clas theta inst_tys) of
+        ; case checkInstCoverage undecidable_ok clas theta inst_tys of
             IsValid      -> return ()   -- Check succeeded
             NotValid msg -> addErrTc (instTypeErr clas inst_tys msg)
 

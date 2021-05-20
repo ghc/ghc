@@ -395,7 +395,7 @@ roundFloat x = case properFractionFloat x of
                                 m         = if r < 0.0 then n - 1 else n + 1
                                 half_down = abs r - 0.5
                               in
-                              case (compare half_down 0.0) of
+                              case compare half_down 0.0 of
                                 LT -> n
                                 EQ -> if even n then n else m
                                 GT -> m
@@ -648,7 +648,7 @@ roundDouble x
                  m         = if r < 0.0 then n - 1 else n + 1
                  half_down = abs r - 0.5
                in
-               case (compare half_down 0.0) of
+               case compare half_down 0.0 of
                  LT -> n
                  EQ -> if even n then n else m
                  GT -> m
@@ -660,7 +660,7 @@ properFractionDouble x
     if n >= 0 then
         (fromInteger m * 2 ^ n, 0.0)
     else
-        case (quotRem m (2^(negate n))) of { (w,r) ->
+        case quotRem m (2^(negate n)) of { (w,r) ->
         (fromInteger w, encodeFloat r n)
         }
     }
