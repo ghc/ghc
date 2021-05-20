@@ -205,22 +205,34 @@ getLinkerInfo' logger dflags = do
         return UnknownLD
     )
 
--- Grab compiler info and cache it in DynFlags.
+-- | Grab compiler info and cache it in DynFlags.
 getCompilerInfo :: Logger -> DynFlags -> IO CompilerInfo
 getCompilerInfo logger dflags = do
   info <- readIORef (rtccInfo dflags)
   case info of
     Just v  -> return v
     Nothing -> do
-      v <- getCompilerInfo' logger dflags
+      let pgm = pgm_c dflags
+      v <- getCompilerInfo' logger dflags pgm
       writeIORef (rtccInfo dflags) (Just v)
       return v
 
+-- | Grab assembler info and cache it in DynFlags.
+getAssemblerInfo :: Logger -> DynFlags -> IO CompilerInfo
+getAssemblerInfo logger dflags = do
+  info <- readIORef (rtasmInfo dflags)
+  case info of
+    Just v  -> return v
+    Nothing -> do
+      let (pgm, _) = pgm_a dflags
+      v <- getCompilerInfo' logger dflags pgm
+      writeIORef (rtasmInfo dflags) (Just v)
+      return v
+
 -- See Note [Run-time linker info].
-getCompilerInfo' :: Logger -> DynFlags -> IO CompilerInfo
-getCompilerInfo' logger dflags = do
-  let pgm = pgm_c dflags
-      -- Try to grab the info from the process output.
+getCompilerInfo' :: Logger -> DynFlags -> String -> IO CompilerInfo
+getCompilerInfo' logger dflags pgm = do
+  let -- Try to grab the info from the process output.
       parseCompilerInfo _stdo stde _exitc
         -- Regular GCC
         | any ("gcc version" `isInfixOf`) stde =
@@ -240,8 +252,8 @@ getCompilerInfo' logger dflags = do
         -- Xcode 4.1 clang
         | any ("Apple clang version" `isPrefixOf`) stde =
           return AppleClang
-         -- Unknown linker.
-        | otherwise = fail $ "invalid -v output, or compiler is unsupported: " ++ unlines stde
+         -- Unknown compiler.
+        | otherwise = fail $ "invalid -v output, or compiler is unsupported (" ++ pgm ++ "): " ++ unlines stde
 
   -- Process the executable call
   catchIO (do
