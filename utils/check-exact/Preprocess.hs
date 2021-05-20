@@ -44,9 +44,6 @@ import qualified Data.Set as Set
 
 -- import Debug.Trace
 --
-{-# ANN module ("HLint: ignore Eta reduce" :: String) #-}
-{-# ANN module ("HLint: ignore Redundant do" :: String) #-}
-{-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
 
 -- ---------------------------------------------------------------------
 

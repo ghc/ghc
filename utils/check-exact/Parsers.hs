@@ -65,9 +65,6 @@ import qualified GHC.Utils.Error        as GHC
 
 import qualified GHC.LanguageExtensions as LangExt
 
-{-# ANN module "HLint: ignore Eta reduce" #-}
-{-# ANN module "HLint: ignore Redundant do" #-}
-{-# ANN module "HLint: ignore Reduce duplication" #-}
 -- ---------------------------------------------------------------------
 
 -- | Wrapper function which returns Annotations along with the parsed
