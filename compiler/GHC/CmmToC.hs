@@ -268,12 +268,18 @@ pprStmt platform stmt =
         hresults = zip results res_hints
         hargs    = zip args arg_hints
 
+        need_cdecl
+          | Just _align <- machOpMemcpyishAlign op = True
+          | MO_ResumeThread  <- op                 = True
+          | MO_SuspendThread <- op                 = True
+          | otherwise                              = False
+
         fn_call
           -- The mem primops carry an extra alignment arg.
           -- We could maybe emit an alignment directive using this info.
           -- We also need to cast mem primops to prevent conflicts with GCC
           -- builtins (see bug #5967).
-          | Just _align <- machOpMemcpyishAlign op
+          | need_cdecl
           = (text ";EFF_(" <> fn <> char ')' <> semi) $$
             pprForeignCall platform fn cconv hresults hargs
           | otherwise
@@ -824,6 +830,9 @@ pprCallishMachOp_for_C mop
         MO_Memset _     -> text "memset"
         MO_Memmove _    -> text "memmove"
         MO_Memcmp _     -> text "memcmp"
+
+        MO_SuspendThread -> text "suspendThread"
+        MO_ResumeThread  -> text "resumeThread"
 
         MO_BSwap w          -> ftext (bSwapLabel w)
         MO_BRev w           -> ftext (bRevLabel w)
