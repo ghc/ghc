@@ -311,7 +311,10 @@ instance H.Builder Builder where
 
                 -- RunTest produces a very large amount of (colorised) output;
                 -- Don't attempt to capture it.
-                RunTest -> cmd echo [path] buildArgs
+                RunTest -> do
+                  Exit code <- cmd echo [path] buildArgs
+                  when (code /= ExitSuccess) $ do
+                    fail "tests failed"
 
                 _  -> cmd' echo [path] buildArgs
 
