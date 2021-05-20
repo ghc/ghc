@@ -29,6 +29,8 @@ module GHC.Builtin.Types.Prim(
         openAlphaTyVar, openBetaTyVar, openGammaTyVar,
         openAlphaTy, openBetaTy, openGammaTy,
 
+        levPolyAlphaTyVar, levPolyAlphaTy, levity1TyVar, levity1Ty,
+
         multiplicityTyVar1, multiplicityTyVar2,
 
         -- Kind constructors...
@@ -97,7 +99,8 @@ module GHC.Builtin.Types.Prim(
 import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Builtin.Types
-  ( runtimeRepTy, unboxedTupleKind, liftedTypeKind
+  ( runtimeRepTy, levityTy, unboxedTupleKind, liftedTypeKind
+  , boxedRepDataConTyCon, unliftedTypeKind
   , vecRepDataConTyCon, tupleRepDataConTyCon
   , liftedRepTy, unliftedRepTy
   , intRepDataConTy
@@ -117,6 +120,7 @@ import {-# SOURCE #-} GHC.Builtin.Types
 import GHC.Types.Var    ( TyVar, mkTyVar )
 import GHC.Types.Name
 import {-# SOURCE #-} GHC.Types.TyThing
+import {-# SOURCE #-} GHC.Core.Type (mkTyConApp)
 import GHC.Core.TyCon
 import GHC.Types.SrcLoc
 import GHC.Types.Unique
@@ -130,6 +134,8 @@ import GHC.Core.TyCo.Rep -- Doesn't need special access, but this is easier to a
 import {-# SOURCE #-} GHC.Core.Type ( mkTyConTy, tYPE )
 
 import Data.Char
+
+import qualified GHC.Core.TyCo.Rep as TyCoRep (Type(TyConApp))
 
 {-
 ************************************************************************
@@ -397,6 +403,20 @@ openAlphaTy = mkTyVarTy openAlphaTyVar
 openBetaTy  = mkTyVarTy openBetaTyVar
 openGammaTy = mkTyVarTy openGammaTyVar
 
+levity1TyVar :: TyVar
+(levity1TyVar : _)
+  = drop 21 (mkTemplateTyVars (repeat levityTy))  -- selects 'v'
+
+levity1Ty :: Type
+levity1Ty = mkTyVarTy levity1TyVar
+
+levPolyAlphaTyVar :: TyVar
+[levPolyAlphaTyVar]
+  = mkTemplateTyVars [tYPE (mkTyConApp boxedRepDataConTyCon [levity1Ty])]
+
+levPolyAlphaTy :: Type
+levPolyAlphaTy = mkTyVarTy levPolyAlphaTyVar
+
 multiplicityTyVar1, multiplicityTyVar2  :: TyVar
 (multiplicityTyVar1 : multiplicityTyVar2 : _)
    = drop 13 (mkTemplateTyVars (repeat multiplicityTy))  -- selects 'n', 'm'
@@ -580,6 +600,16 @@ pcPrimTyCon name roles rep
   where
     binders     = mkTemplateAnonTyConBinders (map (const liftedTypeKind) roles)
     result_kind = tYPE (primRepToRuntimeRep rep)
+
+-- Types whose kinds look like this:
+--   forall {v :: Levity}. TYPE (BoxedRep v) -> UnliftedType
+pcPrimTyConLev1 :: Name -> TyCon
+pcPrimTyConLev1 name
+  = mkPrimTyCon name binders result_kind [Nominal,Representational]
+  where
+    binders = mkTemplateTyConBinders [levityTy]
+      (\[v] -> [TyCoRep.TyConApp tYPETyCon [mkTyConApp boxedRepDataConTyCon [v]]])
+    result_kind = unliftedTypeKind
 
 -- | Convert a 'PrimRep' to a 'Type' of kind RuntimeRep
 -- Defined here to avoid (more) module loops
@@ -979,7 +1009,7 @@ equalityTyCon Phantom          = eqPhantPrimTyCon
 arrayPrimTyCon, mutableArrayPrimTyCon, mutableByteArrayPrimTyCon,
     byteArrayPrimTyCon, arrayArrayPrimTyCon, mutableArrayArrayPrimTyCon,
     smallArrayPrimTyCon, smallMutableArrayPrimTyCon :: TyCon
-arrayPrimTyCon             = pcPrimTyCon arrayPrimTyConName             [Representational] UnliftedRep
+arrayPrimTyCon             = pcPrimTyConLev1 arrayPrimTyConName
 mutableArrayPrimTyCon      = pcPrimTyCon  mutableArrayPrimTyConName     [Nominal, Representational] UnliftedRep
 mutableByteArrayPrimTyCon  = pcPrimTyCon mutableByteArrayPrimTyConName  [Nominal] UnliftedRep
 byteArrayPrimTyCon         = pcPrimTyCon0 byteArrayPrimTyConName        UnliftedRep
@@ -988,8 +1018,8 @@ mutableArrayArrayPrimTyCon = pcPrimTyCon mutableArrayArrayPrimTyConName [Nominal
 smallArrayPrimTyCon        = pcPrimTyCon smallArrayPrimTyConName        [Representational] UnliftedRep
 smallMutableArrayPrimTyCon = pcPrimTyCon smallMutableArrayPrimTyConName [Nominal, Representational] UnliftedRep
 
-mkArrayPrimTy :: Type -> Type
-mkArrayPrimTy elt           = TyConApp arrayPrimTyCon [elt]
+mkArrayPrimTy :: Type -> Type -> Type
+mkArrayPrimTy v elt         = TyConApp arrayPrimTyCon [v,elt]
 byteArrayPrimTy :: Type
 byteArrayPrimTy             = mkTyConTy byteArrayPrimTyCon
 mkArrayArrayPrimTy :: Type
