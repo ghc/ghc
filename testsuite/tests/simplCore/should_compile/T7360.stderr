@@ -47,14 +47,12 @@ fun2 :: forall a. [a] -> ((), Int)
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (@ a) (x [Occ=Once!] :: [a]) ->
-                 (T7360.fun5,
-                  case x of wild [Occ=Once] {
-                    [] -> T7360.fun4;
-                    : _ [Occ=Dead] _ [Occ=Dead] ->
-                      case GHC.List.$wlenAcc @ a wild 0# of ww2 [Occ=Once] { __DEFAULT ->
-                      GHC.Types.I# ww2
-                      }
+         Tmpl= \ (@a) (x [Occ=Once] :: [a]) ->
+                 (T7360.fun4,
+                  case x of wild [Occ=Once] { __DEFAULT ->
+                  case GHC.List.$wlenAcc @a wild 0# of ww2 [Occ=Once] { __DEFAULT ->
+                  GHC.Types.I# ww2
+                  }
                   })}]
 fun2
   = \ (@ a) (x :: [a]) ->
