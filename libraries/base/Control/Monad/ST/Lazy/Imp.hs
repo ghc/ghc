@@ -237,7 +237,7 @@ Convert a lazy 'ST' computation into a strict one.
 -}
 lazyToStrictST :: ST s a -> ST.ST s a
 lazyToStrictST (ST m) = GHC.ST.ST $ \s ->
-        case (m (S# s)) of (a, S# s') -> (# s', a #)
+        case m (S# s) of (a, S# s') -> (# s', a #)
 
 -- | A monad transformer embedding lazy 'ST' in the 'IO'
 -- monad.  The 'RealWorld' parameter indicates that the internal state
