@@ -1,14 +1,6 @@
-                 (wombat1 [Occ=Once3!] :: T -> t)
-                   A -> wombat1 T17901.A;
-                   B -> wombat1 T17901.B;
-                   C -> wombat1 T17901.C
   = \ (@t) (wombat1 :: T -> t) (x :: T) ->
       case x of wild { __DEFAULT -> wombat1 wild }
-                 (wombat2 [Occ=Once1!] :: S -> t)
-                 case x of wild [Occ=Once1] { __DEFAULT -> wombat2 wild }}]
   = \ (@t) (wombat2 :: S -> t) (x :: S) ->
       case x of wild { __DEFAULT -> wombat2 wild }
-                 (wombat3 [Occ=Once1!] :: W -> t)
-                 case x of wild [Occ=Once1] { __DEFAULT -> wombat3 wild }}]
   = \ (@t) (wombat3 :: W -> t) (x :: W) ->
       case x of wild { __DEFAULT -> wombat3 wild }
