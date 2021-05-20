@@ -865,9 +865,6 @@ checkHiBootIface'
 
     check_export boot_avail     -- boot_avail is exported by the boot iface
       | name `elem` boot_dfun_names = return ()
-      | isWiredInName name          = return () -- No checking for wired-in names.  In particular,
-                                                -- 'error' is handled by a rather gross hack
-                                                -- (see comments in GHC.Err.hs-boot)
 
         -- Check that the actual module exports the same thing
       | not (null missing_names)

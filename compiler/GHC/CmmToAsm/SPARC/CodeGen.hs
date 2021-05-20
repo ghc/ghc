@@ -665,6 +665,9 @@ outOfLineMachOp_table mop
         MO_Memmove _ -> fsLit "memmove"
         MO_Memcmp _  -> fsLit "memcmp"
 
+        MO_SuspendThread -> fsLit "suspendThread"
+        MO_ResumeThread  -> fsLit "resumeThread"
+
         MO_BSwap w          -> bSwapLabel w
         MO_BRev w           -> bRevLabel w
         MO_PopCnt w         -> popCntLabel w
