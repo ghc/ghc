@@ -197,7 +197,7 @@ setNameModule (Just m) n =
 tcIfaceLclId :: FastString -> IfL Id
 tcIfaceLclId occ
   = do  { lcl <- getLclEnv
-        ; case (lookupFsEnv (if_id_env lcl) occ) of
+        ; case lookupFsEnv (if_id_env lcl) occ of
             Just ty_var -> return ty_var
             Nothing     -> failIfM (text "Iface id out of scope: " <+> ppr occ)
         }
@@ -213,7 +213,7 @@ extendIfaceIdEnv ids thing_inside
 tcIfaceTyVar :: FastString -> IfL TyVar
 tcIfaceTyVar occ
   = do  { lcl <- getLclEnv
-        ; case (lookupFsEnv (if_tv_env lcl) occ) of
+        ; case lookupFsEnv (if_tv_env lcl) occ of
             Just ty_var -> return ty_var
             Nothing     -> failIfM (text "Iface type variable out of scope: " <+> ppr occ)
         }

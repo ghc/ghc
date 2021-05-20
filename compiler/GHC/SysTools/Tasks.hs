@@ -258,7 +258,7 @@ runLink logger tmpfs dflags args = traceToolCommand logger dflags "linker" $ do
   mb_env <- getGccEnv args2
   runSomethingResponseFile logger tmpfs dflags ld_filter "Linker" p args2 mb_env
   where
-    ld_filter = case (platformOS (targetPlatform dflags)) of
+    ld_filter = case platformOS (targetPlatform dflags) of
                   OSSolaris2 -> sunos_ld_filter
                   _ -> id
 {-
