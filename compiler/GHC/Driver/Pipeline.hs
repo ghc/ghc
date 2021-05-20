@@ -1369,10 +1369,15 @@ runPhase (HscPostTc mod_summary tc_result tc_warnings mb_old_hash) _ = do
         next_phase <- case hscBackendAction of
           HscUpdate iface -> do
             setIface iface
-            return $ case backend dflags of
-              NoBackend -> RealPhase StopLn
-              Interpreter -> RealPhase StopLn
-              _ -> hscBackendPhase -- Need to create .o, and handle -dynamic-too
+            -- Need to set a fake linkable
+            let setLinkableAndStop = do
+                  unless (isHsBootOrSig $ ms_hsc_src mod_summary) $
+                    setLinkable (LM (ms_hs_date mod_summary) (ms_mod mod_summary) [])
+                  return $ RealPhase StopLn
+            case backend dflags of
+              NoBackend -> setLinkableAndStop
+              Interpreter -> setLinkableAndStop
+              _ -> return hscBackendPhase -- Need to create .o, and handle -dynamic-too
           _ -> return hscBackendPhase
 
         return (next_phase,
