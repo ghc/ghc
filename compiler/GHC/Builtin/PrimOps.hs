@@ -728,7 +728,7 @@ primOpSig op
   where
     arity = length arg_tys
     (tyvars, arg_tys, res_ty)
-      = case (primOpInfo op) of
+      = case primOpInfo op of
         Compare   _occ ty                    -> ([],     [ty,ty], intPrimTy)
         GenPrimOp _occ tyvars arg_tys res_ty -> (tyvars, arg_tys, res_ty   )
 
@@ -742,7 +742,7 @@ data PrimOpResultInfo
 
 getPrimOpResultInfo :: PrimOp -> PrimOpResultInfo
 getPrimOpResultInfo op
-  = case (primOpInfo op) of
+  = case primOpInfo op of
       Compare _ _                         -> ReturnsPrim (tyConPrimRep1 intPrimTyCon)
       GenPrimOp _ _ _ ty | isPrimTyCon tc -> ReturnsPrim (tyConPrimRep1 tc)
                          | otherwise      -> ReturnsAlg tc

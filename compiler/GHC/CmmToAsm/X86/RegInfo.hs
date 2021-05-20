@@ -33,7 +33,7 @@ mkVirtualReg u format
 
 regDotColor :: Platform -> RealReg -> SDoc
 regDotColor platform reg
- = case (lookupUFM (regColors platform) reg) of
+ = case lookupUFM (regColors platform) reg of
         Just str -> text str
         _        -> panic "Register not assigned a color"
 
