@@ -1077,6 +1077,21 @@ dnl ################################################################
 
 # system libffi
 
+# Whether to use libffi for adjustors (foreign import "wrapper") or
+# not.  If we have built-in support (rts/Adjustor.c) then we use that,
+# otherwise we fall back on libffi, which is slightly slower.
+AC_MSG_CHECKING(whether target needs libffi for adjustors)
+case "$TargetArch" in
+    i386|x86_64)
+        UseLibFFIForAdjustors=YES
+        AC_MSG_RESULT([no])
+        ;;
+    *)
+        UseLibFFIForAdjustors=YES
+        AC_MSG_RESULT([yes])
+        ;;
+esac
+
 AC_ARG_WITH([system-libffi],
 [AS_HELP_STRING([--with-system-libffi],
   [Use system provided libffi for RTS [default=no]])
@@ -1140,6 +1155,11 @@ AS_IF([test "$UseSystemLibFFI" = "YES"], [
  CFLAGS="$CFLAGS2"
  LDFLAGS="$LDFLAGS2"
 ])
+
+AS_IF([test "$UseLibFFIForAdjustors" = "YES"],
+      [AC_SUBST([CabalHaveLibffi], [True])])
+
+
 
 dnl ** check whether we need -ldl to get dlopen()
 AC_CHECK_LIB([dl], [dlopen])
