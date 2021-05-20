@@ -1,0 +1,4 @@
+[1 of 2] Compiling B                ( B.hs, B.o, B.dyn_o )
+[2 of 2] Compiling A                ( A.hs, A.o, A.dyn_o )
+[1 of 2] Compiling B                ( B.hs, B.o, B.dyn_o )
+[2 of 2] Compiling A                ( A.hs, A.o, A.dyn_o ) [./B.dyn_o changed]

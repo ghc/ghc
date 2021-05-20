@@ -100,6 +100,7 @@ module GHC.Utils.Misc (
         doesDirNameExist,
         getModificationUTCTime,
         modificationTimeIfExists,
+        fileHashIfExists,
         withAtomicRename,
 
         -- * Filenames and paths
@@ -132,6 +133,7 @@ import GHC.Prelude
 import GHC.Utils.Exception
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Constants
+import GHC.Utils.Fingerprint
 
 import Data.Data
 import qualified Data.List as List
@@ -1287,6 +1289,16 @@ getModificationUTCTime = getModificationTime
 modificationTimeIfExists :: FilePath -> IO (Maybe UTCTime)
 modificationTimeIfExists f =
   (do t <- getModificationUTCTime f; return (Just t))
+        `catchIO` \e -> if isDoesNotExistError e
+                        then return Nothing
+                        else ioError e
+
+-- --------------------------------------------------------------
+-- check existence & hash at the same time
+
+fileHashIfExists :: FilePath -> IO (Maybe Fingerprint)
+fileHashIfExists f =
+  (do t <- getFileHash f; return (Just t))
         `catchIO` \e -> if isDoesNotExistError e
                         then return Nothing
                         else ioError e
