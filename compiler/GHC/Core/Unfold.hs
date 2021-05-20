@@ -967,9 +967,10 @@ certainlyWillInline opts fn_info
              UnfIfGoodArgs { ug_size = size, ug_args = args }
                -> do_cunf expr size args src'
         where
-          src' = case src of
-                   InlineRhs -> InlineStable
-                   _         -> src  -- Do not change InlineCompulsory!
+          src' = -- Do not change InlineCompulsory!
+                 case src of
+                   InlineCompulsory -> InlineCompulsory
+                   _                -> InlineStable
 
       DFunUnfolding {} -> Just fn_unf  -- Don't w/w DFuns; it never makes sense
                                        -- to do so, and even if it is currently a
