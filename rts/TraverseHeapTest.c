@@ -48,7 +48,7 @@ struct node {
         .id = _id,                                      \
         .u.selector = {                                 \
             .header = { .info = INFO(&info_selector) }, \
-            .selectee = (StgClosure*)&(n##a.u),         \
+            .payload = (StgClosure*)&(n##a.u),          \
         }                                               \
     }
 

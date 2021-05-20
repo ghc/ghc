@@ -506,8 +506,8 @@ instance Outputable IdLabelInfo where
 
 
 data RtsLabelInfo
-  = RtsSelectorInfoTable Bool{-updatable-} Int{-offset-}  -- ^ Selector thunks
-  | RtsSelectorEntry     Bool{-updatable-} Int{-offset-}
+  = RtsSelectorInfoTable Bool{-updatable-} (Maybe Int){-offset-}  -- ^ Selector thunks
+  | RtsSelectorEntry     Bool{-updatable-} (Maybe Int){-offset-}
 
   | RtsApInfoTable       Bool{-updatable-} Int{-arity-}    -- ^ AP thunks
   | RtsApEntry           Bool{-updatable-} Int{-arity-}
@@ -664,13 +664,21 @@ mkRtsPrimOpLabel primop = RtsLabel (RtsPrimOp primop)
 
 mkSelectorInfoLabel :: Platform -> Bool -> Int -> CLabel
 mkSelectorInfoLabel platform upd offset =
-   assert (offset >= 0 && offset <= pc_MAX_SPEC_SELECTEE_SIZE (platformConstants platform)) $
-   RtsLabel (RtsSelectorInfoTable upd offset)
+   assert (offset >= 0) $
+   let moffset =
+        if offset <= pc_MAX_SPEC_SELECTEE_SIZE (platformConstants platform)
+        then Just offset
+        else Nothing
+   in RtsLabel (RtsSelectorInfoTable upd moffset)
 
 mkSelectorEntryLabel :: Platform -> Bool -> Int -> CLabel
 mkSelectorEntryLabel platform upd offset =
-   assert (offset >= 0 && offset <= pc_MAX_SPEC_SELECTEE_SIZE (platformConstants platform)) $
-   RtsLabel (RtsSelectorEntry upd offset)
+   assert (offset >= 0) $
+   let moffset =
+        if offset <= pc_MAX_SPEC_SELECTEE_SIZE (platformConstants platform)
+        then Just offset
+        else Nothing
+   in RtsLabel (RtsSelectorEntry upd moffset)
 
 mkApInfoTableLabel :: Platform -> Bool -> Int -> CLabel
 mkApInfoTableLabel platform upd arity =
@@ -1337,6 +1345,8 @@ pprCLabel !platform !sty lbl = -- see Note [Bangs in CLabel]
       AsmStyle -> asmTempLabelPrefix platform
       CStyle   -> char '_'
 
+    pprSelectorOffset (Just offset) = text (show offset)
+    pprSelectorOffset Nothing = text "n"
 
   in case lbl of
    LocalBlockLabel u -> case sty of
@@ -1400,14 +1410,14 @@ pprCLabel !platform !sty lbl = -- see Note [Bangs in CLabel]
       -> maybe_underscore $ ftext str <> text "_fast"
 
    RtsLabel (RtsSelectorInfoTable upd_reqd offset)
-      -> maybe_underscore $ hcat [ text "stg_sel_", text (show offset)
+      -> maybe_underscore $ hcat [ text "stg_sel_", pprSelectorOffset offset
                                  , if upd_reqd
                                     then text "_upd_info"
                                     else text "_noupd_info"
                                  ]
 
    RtsLabel (RtsSelectorEntry upd_reqd offset)
-      -> maybe_underscore $ hcat [ text "stg_sel_", text (show offset)
+      -> maybe_underscore $ hcat [ text "stg_sel_", pprSelectorOffset offset
                                  , if upd_reqd
                                     then text "_upd_entry"
                                     else text "_noupd_entry"
