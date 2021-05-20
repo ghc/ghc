@@ -10,9 +10,12 @@ import Data.List (intercalate)
 import Data.Data
 import GHC.Types.Name.Occurrence
 import GHC.Types.Name.Reader
+import GHC.Unit.Module.ModSummary
+import Control.Monad.IO.Class
 import GHC hiding (moduleName)
 import GHC.Driver.Ppr
 import GHC.Driver.Session
+import GHC.Driver.Make
 import GHC.Hs.Dump
 import GHC.Data.Bag
 import System.Environment( getArgs )
@@ -334,29 +337,19 @@ ppAst :: Data a => a -> String
 ppAst ast = showSDocUnsafe $ showAstData BlankSrcSpanFile NoBlankEpAnnotations ast
 
 parseOneFile :: FilePath -> FilePath -> IO (ParsedModule, [Located Token])
-parseOneFile libdir fileName = do
-       let modByFile m =
-             case ml_hs_file $ ms_location m of
-               Nothing -> False
-               Just fn -> fn == fileName
+parseOneFile libdir fileName =
        runGhc (Just libdir) $ do
          dflags <- getSessionDynFlags
          let dflags2 = dflags `gopt_set` Opt_KeepRawTokenStream
          _ <- setSessionDynFlags dflags2
-         addTarget Target { targetId = TargetFile fileName Nothing
-                          , targetUnitId = homeUnitId_ dflags
-                          , targetAllowObjCode = True
-                          , targetContents = Nothing }
-         _ <- load LoadAllTargets
-         graph <- getModuleGraph
-         let
-           modSum = case filter modByFile (mgModSummaries graph) of
-                     [x] -> x
-                     xs -> error $ "Can't find module, got:"
-                              ++ show (map (ml_hs_file . ms_location) xs)
-         pm <- GHC.parseModule modSum
-         toks <- getTokenStream (ms_mod modSum)
-         return (pm, toks)
+         hsc_env <- getSession
+         emodSum <- liftIO $ summariseFile hsc_env [] fileName Nothing True Nothing
+         case emsModSummary <$> emodSum of
+           Left _err -> error "parseOneFile"
+           Right modSum -> do
+            pm <- GHC.parseModule modSum
+            toks <- liftIO $ getTokenStream modSum
+            return (pm, toks)
 
 
 -- ---------------------------------------------------------------------

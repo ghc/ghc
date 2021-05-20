@@ -28,6 +28,7 @@ module GHC.Driver.Make (
         ms_home_srcimps, ms_home_imps,
 
         summariseModule,
+        summariseFile,
         hscSourceToIsBoot,
         findExtraSigImports,
         implicitRequirementsShallow,
