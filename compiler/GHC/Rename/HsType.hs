@@ -12,7 +12,7 @@
 
 module GHC.Rename.HsType (
         -- Type related stuff
-        rnHsType, rnLHsType, rnLHsTypes, rnContext,
+        rnHsType, rnLHsType, rnLHsTypes, rnContext, rnMaybeContext,
         rnHsKind, rnLHsKind, rnLHsTypeArgs,
         rnHsSigType, rnHsWcType, rnHsPatSigTypeBindingVars,
         HsPatSigTypeScoping(..), rnHsSigWcType, rnHsPatSigType,
@@ -254,34 +254,27 @@ rnWcBody ctxt nwc_rdrs hs_ty
                                 , hst_tele = tele', hst_body = hs_body' }
                     , fvs) }
 
-    rn_ty env (HsQualTy { hst_ctxt = m_ctxt
+    rn_ty env (HsQualTy { hst_ctxt = L cx hs_ctxt
                         , hst_body = hs_ty })
-      | Just (L cx hs_ctxt) <- m_ctxt
-      , Just (hs_ctxt1, hs_ctxt_last) <- snocView hs_ctxt
+      | Just (hs_ctxt1, hs_ctxt_last) <- snocView hs_ctxt
       , L lx (HsWildCardTy _)  <- ignoreParens hs_ctxt_last
       = do { (hs_ctxt1', fvs1) <- mapFvRn (rn_top_constraint env) hs_ctxt1
            ; setSrcSpanA lx $ checkExtraConstraintWildCard env hs_ctxt1
            ; let hs_ctxt' = hs_ctxt1' ++ [L lx (HsWildCardTy noExtField)]
            ; (hs_ty', fvs2) <- rnLHsTyKi env hs_ty
            ; return (HsQualTy { hst_xqual = noExtField
-                              , hst_ctxt = Just (L cx hs_ctxt')
+                              , hst_ctxt = L cx hs_ctxt'
                               , hst_body = hs_ty' }
                     , fvs1 `plusFV` fvs2) }
 
-      | Just (L cx hs_ctxt) <- m_ctxt
+      | otherwise
       = do { (hs_ctxt', fvs1) <- mapFvRn (rn_top_constraint env) hs_ctxt
            ; (hs_ty', fvs2)   <- rnLHsTyKi env hs_ty
            ; return (HsQualTy { hst_xqual = noExtField
-                              , hst_ctxt = Just (L cx hs_ctxt')
+                              , hst_ctxt = L cx hs_ctxt'
                               , hst_body = hs_ty' }
                     , fvs1 `plusFV` fvs2) }
 
-      | Nothing <- m_ctxt
-      = do { (hs_ty', fvs2)   <- rnLHsTyKi env hs_ty
-           ; return (HsQualTy { hst_xqual = noExtField
-                              , hst_ctxt = Nothing
-                              , hst_body = hs_ty' }
-                    , fvs2) }
 
     rn_ty env hs_ty = rnHsTyKi env hs_ty
 
@@ -574,18 +567,26 @@ rnLHsTypeArgs :: HsDocContext -> [LHsTypeArg GhcPs]
 rnLHsTypeArgs doc args = mapFvRn (rnLHsTypeArg doc) args
 
 --------------
-rnTyKiContext :: RnTyKiEnv -> Maybe (LHsContext GhcPs)
-              -> RnM (Maybe (LHsContext GhcRn), FreeVars)
-rnTyKiContext _ Nothing = return (Nothing, emptyFVs)
-rnTyKiContext env (Just (L loc cxt))
+rnTyKiContext :: RnTyKiEnv -> LHsContext GhcPs
+              -> RnM (LHsContext GhcRn, FreeVars)
+rnTyKiContext env (L loc cxt)
   = do { traceRn "rncontext" (ppr cxt)
        ; let env' = env { rtke_what = RnConstraint }
        ; (cxt', fvs) <- mapFvRn (rnLHsTyKi env') cxt
-       ; return (Just $ L loc cxt', fvs) }
+       ; return (L loc cxt', fvs) }
 
-rnContext :: HsDocContext -> Maybe (LHsContext GhcPs)
-          -> RnM (Maybe (LHsContext GhcRn), FreeVars)
+rnContext :: HsDocContext -> LHsContext GhcPs
+          -> RnM (LHsContext GhcRn, FreeVars)
 rnContext doc theta = rnTyKiContext (mkTyKiEnv doc TypeLevel RnConstraint) theta
+
+rnMaybeContext :: HsDocContext -> Maybe (LHsContext GhcPs)
+          -> RnM (Maybe (LHsContext GhcRn), FreeVars)
+rnMaybeContext _ Nothing = return (Nothing, emptyFVs)
+rnMaybeContext doc (Just theta)
+  = do { (theta', fvs) <- rnContext doc theta
+       ; return (Just theta', fvs)
+       }
+
 
 --------------
 rnLHsTyKi  :: RnTyKiEnv -> LHsType GhcPs -> RnM (LHsType GhcRn, FreeVars)
@@ -1906,9 +1907,8 @@ extractDataDefnKindVars :: HsDataDefn GhcPs ->  FreeKiTyVars
 extractDataDefnKindVars (HsDataDefn { dd_kindSig = ksig })
   = maybe [] extractHsTyRdrTyVars ksig
 
-extract_lctxt :: Maybe (LHsContext GhcPs) -> FreeKiTyVars -> FreeKiTyVars
-extract_lctxt Nothing     = id
-extract_lctxt (Just ctxt) = extract_ltys (unLoc ctxt)
+extract_lctxt :: LHsContext GhcPs -> FreeKiTyVars -> FreeKiTyVars
+extract_lctxt ctxt = extract_ltys (unLoc ctxt)
 
 extract_scaled_ltys :: [HsScaled GhcPs (LHsType GhcPs)]
                     -> FreeKiTyVars -> FreeKiTyVars
