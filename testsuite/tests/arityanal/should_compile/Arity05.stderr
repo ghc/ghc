@@ -27,16 +27,12 @@ f5h [InlPrag=[2]] :: forall {a} {t}. Num a => (t -> a) -> t -> (t -> a) -> a
  Arity=4,
  Str=<1P(SCS(C1(L)),A,A,A,A,A,MCM(L))><MCM(L)><L><MCM(L)>,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=4,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (@a) (@t) (w [Occ=Once1!] :: Num a) (w1 [Occ=Once1] :: t -> a) (w2 [Occ=Once1] :: t) (w3 [Occ=Once1] :: t -> a) -> case w of { GHC.Num.C:Num ww1 [Occ=Once1] _ [Occ=Dead] _ [Occ=Dead] _ [Occ=Dead] _ [Occ=Dead] _ [Occ=Dead] ww7 [Occ=Once1] -> F5.$wf5h @a @t ww1 ww7 w1 w2 w3 }}]
-f5h = \ (@a) (@t) (w :: Num a) (w1 :: t -> a) (w2 :: t) (w3 :: t -> a) -> case w of { GHC.Num.C:Num ww1 ww2 ww3 ww4 ww5 ww6 ww7 -> F5.$wf5h @a @t ww1 ww7 w1 w2 w3 }
+         Tmpl= \ (@a) (@t) (w [Occ=Once1!] :: Num a) (w1 [Occ=Once1] :: t -> a) (w2 [Occ=Once1] :: t) (w3 [Occ=Once1] :: t -> a) -> case w of { GHC.Num.C:Num ww [Occ=Once1] _ [Occ=Dead] _ [Occ=Dead] _ [Occ=Dead] _ [Occ=Dead] _ [Occ=Dead] ww6 [Occ=Once1] -> F5.$wf5h @a @t ww ww6 w1 w2 w3 }}]
+f5h = \ (@a) (@t) (w :: Num a) (w1 :: t -> a) (w2 :: t) (w3 :: t -> a) -> case w of { GHC.Num.C:Num ww ww1 ww2 ww3 ww4 ww5 ww6 -> F5.$wf5h @a @t ww ww6 w1 w2 w3 }
 
 -- RHS size: {terms: 4, types: 1, coercions: 0, joins: 0/0}
 f5y :: Integer -> Integer
-[GblId,
- Arity=1,
- Str=<1L>,
- Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (y [Occ=Once1] :: Integer) -> GHC.Num.Integer.integerAdd y F5.f5g1}]
+[GblId, Arity=1, Str=<1L>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 30 0}]
 f5y = \ (y :: Integer) -> GHC.Num.Integer.integerAdd y F5.f5g1
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
