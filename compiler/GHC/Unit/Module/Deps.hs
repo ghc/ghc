@@ -32,9 +32,6 @@ data Dependencies = Deps
       -- ^ All packages directly imported by this module
       -- I.e. packages to which this module's direct imports belong.
       --
-   , dep_plgins :: [ModuleName]
-      -- ^ All the plugins used while compiling this module.
-
 
     -- Transitive information below here
    , dep_trusted_pkgs :: [UnitId]
@@ -76,7 +73,6 @@ instance Binary Dependencies where
                       put_ bh (dep_source_mods deps)
                       put_ bh (dep_orphs deps)
                       put_ bh (dep_finsts deps)
-                      put_ bh (dep_plgins deps)
 
     get bh = do dms <- get bh
                 dps <- get bh
@@ -84,16 +80,15 @@ instance Binary Dependencies where
                 sms <- get bh
                 os <- get bh
                 fis <- get bh
-                pl <- get bh
                 return (Deps { dep_direct_mods = dms
                              , dep_direct_pkgs = dps
                              , dep_source_mods = sms
                              , dep_trusted_pkgs = tps
                              , dep_orphs = os,
-                               dep_finsts = fis, dep_plgins = pl })
+                               dep_finsts = fis })
 
 noDependencies :: Dependencies
-noDependencies = Deps [] [] [] [] [] [] []
+noDependencies = Deps [] [] [] [] [] []
 
 -- | Records modules for which changes may force recompilation of this module
 -- See wiki: https://gitlab.haskell.org/ghc/ghc/wikis/commentary/compiler/recompilation-avoidance
@@ -141,6 +136,11 @@ data Usage
         -- contents don't change.  This previously lead to odd
         -- recompilation behaviors; see #8114
   }
+  | UsageHomeModuleInterface {
+        usg_mod_name :: ModuleName
+        , usg_iface_hash :: Fingerprint
+
+  }
   -- | A requirement which was merged into this one.
   | UsageMergedRequirement {
         usg_mod :: Module,
@@ -185,6 +185,11 @@ instance Binary Usage where
         put_ bh (usg_mod      usg)
         put_ bh (usg_mod_hash usg)
 
+    put_ bh usg@UsageHomeModuleInterface{} = do
+        putByte bh 4
+        put_ bh (usg_mod_name usg)
+        put_ bh (usg_iface_hash usg)
+
     get bh = do
         h <- getByte bh
         case h of
@@ -209,6 +214,10 @@ instance Binary Usage where
             mod <- get bh
             hash <- get bh
             return UsageMergedRequirement { usg_mod = mod, usg_mod_hash = hash }
+          4 -> do
+            mod <- get bh
+            hash <- get bh
+            return UsageHomeModuleInterface { usg_mod_name = mod, usg_iface_hash = hash }
           i -> error ("Binary.get(Usage): " ++ show i)
 
 

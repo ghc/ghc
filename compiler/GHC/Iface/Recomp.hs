@@ -461,8 +461,8 @@ checkDependencies hsc_env summary iface
       Right es -> do
         let (hs, ps) = partitionEithers es
         --pprTraceM "check_mods" (ppr (sort hs) $$ ppr prev_dep_mods)
-        --pprTraceM "check_packages" (ppr (sort ps) $$ ppr prev_dep_pkgs)
-        res1 <- liftIO $ check_mods (sort hs) prev_mods
+        --pprTraceM "check_packages" (ppr (sortBy (comparing snd) ps) $$ ppr prev_dep_pkgs)
+        res1 <- liftIO $ check_mods (sort hs) prev_dep_mods
         res2 <- liftIO $ check_packages (sortBy (comparing snd) ps) prev_dep_pkgs
         return (res1 `mappend` res2)
 --    liftIO $ checkList (map dep_missin
@@ -472,12 +472,8 @@ checkDependencies hsc_env summary iface
    fc            = hsc_FC hsc_env
    home_unit     = hsc_home_unit hsc_env
    units         = hsc_units hsc_env
-   prev_mods     = case prev_dep_plgn of
-                      -- Small optimisation to avoid sorting when there are no HPT plugins
-                      [] -> prev_dep_mods
-                      _  -> sort (prev_dep_plgn ++ prev_dep_mods)
    prev_dep_mods = map gwib_mod $ dep_direct_mods (mi_deps iface)
-   prev_dep_plgn = dep_plgins (mi_deps iface)
+--   prev_dep_plgn = pprTraceIt "dp" (dep_plgins (mi_deps iface))
    prev_dep_pkgs = dep_direct_pkgs (mi_deps iface)
 
    classify _ (Found _ mod)
@@ -500,15 +496,16 @@ checkDependencies hsc_env summary iface
            text " not among previous dependencies"
         return (RecompBecause (moduleNameString new ++ " added"))
 
+--   check_packages r1 r2 | pprTrace "as" (ppr r1 $$ ppr r2) False = undefined
    check_packages [] [] = return UpToDate
    check_packages [] (old:_) = do
      trace_hi_diffs logger dflags $
-      text "package no longer " <> quotes (ppr old) <>
-        text "in dependencies"
+      text "package " <> quotes (ppr old) <>
+        text "no longer in dependencies"
      return (RecompBecause (unitString old ++ " removed"))
    check_packages (new:news) olds
     | Just (old, olds') <- uncons olds
-    , snd new == old = check_packages (dropWhile (== new) news) olds'
+    , snd new == old = check_packages (dropWhile ((== (snd new)) . snd) news) olds'
     | otherwise = do
         trace_hi_diffs logger dflags $
            text "imported package " <> quotes (ppr new) <>
@@ -574,6 +571,13 @@ checkModUsage _ UsageMergedRequirement{ usg_mod = mod, usg_mod_hash = old_mod_ha
   needInterface mod $ \iface -> do
     let reason = moduleNameString (moduleName mod) ++ " changed (raw)"
     checkModuleFingerprint logger dflags reason old_mod_hash (mi_mod_hash (mi_final_exts iface))
+checkModUsage this_pkg UsageHomeModuleInterface{ usg_mod_name = mod_name, usg_iface_hash = old_mod_hash } = do
+  let mod = mkModule this_pkg mod_name
+  dflags <- getDynFlags
+  logger <- getLogger
+  needInterface mod $ \iface -> do
+    let reason = moduleNameString (moduleName mod) ++ " changed (interface)"
+    checkIfaceFingerprint logger dflags reason old_mod_hash (mi_iface_hash (mi_final_exts iface))
 
 checkModUsage this_pkg UsageHomeModule{
                                 usg_mod_name = mod_name,
@@ -638,6 +642,21 @@ checkModuleFingerprint logger dflags reason old_mod_hash new_mod_hash
 
   | otherwise
   = out_of_date_hash logger dflags reason (text "  Module fingerprint has changed")
+                     old_mod_hash new_mod_hash
+
+checkIfaceFingerprint
+  :: Logger
+  -> DynFlags
+  -> String
+  -> Fingerprint
+  -> Fingerprint
+  -> IO RecompileRequired
+checkIfaceFingerprint logger dflags reason old_mod_hash new_mod_hash
+  | new_mod_hash == old_mod_hash
+  = up_to_date logger dflags (text "Iface fingerprint unchanged")
+
+  | otherwise
+  = out_of_date_hash logger dflags reason (text "  Iface fingerprint has changed")
                      old_mod_hash new_mod_hash
 
 ------------------------
@@ -1174,8 +1193,7 @@ sortDependencies d
           dep_trusted_pkgs  = sort (dep_trusted_pkgs d),
           dep_source_mods   = sort (dep_source_mods d),
           dep_orphs  = sortBy stableModuleCmp (dep_orphs d),
-          dep_finsts = sortBy stableModuleCmp (dep_finsts d),
-          dep_plgins = sortBy (lexicalCompareFS `on` moduleNameFS) (dep_plgins d) }
+          dep_finsts = sortBy stableModuleCmp (dep_finsts d) }
 
 {-
 ************************************************************************

@@ -34,14 +34,13 @@ import GHC.Unit.Module.Deps
 import GHC.Data.Maybe
 
 import Data.List (sortBy, sort)
-import Data.IORef
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import GHC.Linker.Types
-import GHC.Utils.Monad
 import GHC.Linker.Loader ( getLoaderState )
+import Data.List (partition)
 
 {- Note [Module self-dependency]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -69,15 +68,15 @@ its dep_orphs. This was the cause of #14128.
 mkDependencies :: UnitId -> [Module] -> TcGblEnv -> IO Dependencies
 mkDependencies iuid pluginModules
           (TcGblEnv{ tcg_mod = mod,
-                    tcg_imports = imports,
-                    tcg_th_used = th_var
+                    tcg_imports = imports
                   })
  = do
       -- Template Haskell used?
-      let (dep_plgins, ms) = unzip [ (moduleName mn, mn) | mn <- pluginModules ]
-          plugin_dep_pkgs = filter (/= iuid) (map (toUnitId . moduleUnit) ms)
-      th_used <- readIORef th_var
-      let direct_mods = modDepsElts (delFromUFM (imp_direct_dep_mods imports) (moduleName mod))
+      let (home_plugins, package_plugins) = partition ((== iuid) . toUnitId . moduleUnit) pluginModules
+          plugin_dep_pkgs =  map (toUnitId . moduleUnit) package_plugins
+      let all_direct_mods = foldr (\mn m -> addToUFM m mn (GWIB mn NotBoot)) (imp_direct_dep_mods imports) (map moduleName home_plugins)
+
+          direct_mods = modDepsElts (delFromUFM all_direct_mods (moduleName mod))
                 -- M.hi-boot can be in the imp_dep_mods, but we must remove
                 -- it before recording the modules on which this one depends!
                 -- (We want to retain M.hi-boot in imp_dep_mods so that
@@ -91,9 +90,7 @@ mkDependencies iuid pluginModules
 
           direct_pkgs_0 = foldr Set.insert (imp_dep_direct_pkgs imports) plugin_dep_pkgs
 
-          direct_pkgs
-            | th_used = Set.insert thUnitId direct_pkgs_0
-            | otherwise = direct_pkgs_0
+          direct_pkgs = direct_pkgs_0
 
           -- Set the packages required to be Safe according to Safe Haskell.
           -- See Note [Tracking Trust Transitively] in GHC.Rename.Names
@@ -109,7 +106,6 @@ mkDependencies iuid pluginModules
                     dep_trusted_pkgs = sort (Set.toList trust_pkgs),
                     dep_source_mods  = sort source_mods,
                     dep_orphs  = dep_orphs,
-                    dep_plgins = dep_plgins,
                     dep_finsts = sortBy stableModuleCmp (imp_finsts imports) }
                     -- sort to get into canonical order
                     -- NB. remember to use lexicographic ordering
@@ -124,7 +120,7 @@ mkUsageInfo hsc_env this_mod dir_imp_mods used_names dependent_files merged
     eps <- hscEPS hsc_env
     hashes <- mapM getFileHash dependent_files
     -- Dependencies on object files due to TH and plugins
-    object_usages <- mkObjectUsage hsc_env
+    object_usages <- mkObjectUsage (eps_PIT eps) hsc_env
     let mod_usages = mk_mod_usage_info (eps_PIT eps) hsc_env this_mod
                                        dir_imp_mods used_names
         usages = mod_usages ++ [ UsageFile { usg_file_path = f
@@ -181,8 +177,8 @@ One way to improve this is to either:
 
 -- | Find object files corresponding to the transitive closure of given home
 -- modules and direct object files for pkg dependencies
-mkObjectUsage :: HscEnv -> IO [Usage]
-mkObjectUsage hsc_env = do
+mkObjectUsage :: PackageIfaceTable -> HscEnv -> IO [Usage]
+mkObjectUsage pit hsc_env = do
   case hsc_interp hsc_env of
       Just interp -> do
         mps <- getLoaderState interp
@@ -196,13 +192,21 @@ mkObjectUsage hsc_env = do
 
 
   where
-    linkableToUsage (LM _ _ uls) = mapMaybeM unlinkedToUsage uls
+    linkableToUsage (LM _ m uls) = mapM (unlinkedToUsage m) uls
 
     fing = (\fn -> UsageFile fn <$> getFileHash fn)
 
-    unlinkedToUsage ul =
-      -- TODO: Handle BCOs
-      traverse fing  (nameOfObject_maybe ul)
+    unlinkedToUsage m ul =
+      case nameOfObject_maybe ul of
+        Just fn -> fing fn
+        Nothing ->  do
+          -- This should only happen for home package things but oneshot puts
+          -- home package ifaces in the PIT.
+          let miface = lookupIfaceByModule (hsc_HPT hsc_env) pit m
+          case miface of
+            Nothing -> pprPanic "mkObjectUsage" (ppr m)
+            Just iface ->
+              return $ UsageHomeModuleInterface (moduleName m) (mi_iface_hash (mi_final_exts iface))
 
     librarySpecToUsage :: LibrarySpec -> IO [Usage]
     librarySpecToUsage (Objects os) = traverse fing os

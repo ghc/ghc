@@ -1169,6 +1169,8 @@ pprUsage usage@UsageFile{}
           ppr (usg_file_hash usage)]
 pprUsage usage@UsageMergedRequirement{}
   = hsep [text "merged", ppr (usg_mod usage), ppr (usg_mod_hash usage)]
+pprUsage usage@UsageHomeModuleInterface{}
+  = hsep [text "implementation", ppr (usg_mod_name usage), ppr (usg_iface_hash usage)]
 
 pprUsageImport :: Outputable a => Usage -> (Usage -> a) -> SDoc
 pprUsageImport usage usg_mod'
@@ -1186,14 +1188,13 @@ pprDeps unit_state (Deps { dep_direct_mods = dmods
                          , dep_direct_pkgs = pkgs
                          , dep_trusted_pkgs = tps
                          , dep_finsts = finsts
-                         , dep_plgins = plugins })
+                         })
   = pprWithUnitState unit_state $
     vcat [text "direct module dependencies:" <+> fsep (map ppr_mod dmods),
           text "source module dependencies:" <+> fsep (map ppr smods),
           text "direct package dependencies:" <+> fsep (map ppr_pkg pkgs),
           if null tps then empty else text "trusted package dependencies:" <+> fsep (map ppr_pkg pkgs),
           text "orphans:" <+> fsep (map ppr orphs),
-          text "plugins:" <+> fsep (map ppr plugins),
           text "family instance modules:" <+> fsep (map ppr finsts)
         ]
   where
