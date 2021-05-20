@@ -34,8 +34,7 @@ import           Data.Time
 import           Prelude           hiding (mod,(<>))
 import           System.Directory
 
-import qualified GHC.Core.Utils
-import           GHC.HsToCore
+import           GHC.Hs.Expr.Type
 import           GHC.Driver.Session (HasDynFlags(..))
 import           GHC.Data.FastString
 import           GHC
@@ -46,7 +45,6 @@ import           GHC.Types.Name
 import           GHC.Types.Name.Set
 import           GHC.Utils.Outputable
 import           GHC.Types.SrcLoc
-import           GHC.Tc.Utils.Zonk
 import           GHC.Types.Var
 
 -- | Info about a module. This information is generated every time a
@@ -311,36 +309,33 @@ getModInfo name = do
     m <- getModSummary name
     p <- parseModule m
     typechecked <- typecheckModule p
-    allTypes <- processAllTypeCheckedModule typechecked
+    let allTypes = processAllTypeCheckedModule typechecked
     let i = tm_checked_module_info typechecked
     ts <- liftIO $ getModificationTime $ srcFilePath m
     return (ModInfo m allTypes i ts)
 
 -- | Get ALL source spans in the module.
-processAllTypeCheckedModule :: forall m . GhcMonad m => TypecheckedModule
-                            -> m [SpanInfo]
-processAllTypeCheckedModule tcm = do
-    bts <- mapM (getTypeLHsBind ) $ listifyAllSpans tcs
-    ets <- mapM (getTypeLHsExpr ) $ listifyAllSpans tcs
-    pts <- mapM (getTypeLPat    ) $ listifyAllSpans tcs
-    return $ mapMaybe toSpanInfo
-           $ sortBy cmpSpan
-           $ catMaybes (bts ++ ets ++ pts)
+processAllTypeCheckedModule :: TypecheckedModule -> [SpanInfo]
+processAllTypeCheckedModule tcm
+  = mapMaybe toSpanInfo
+  $ sortBy cmpSpan
+  $ catMaybes (bts ++ ets ++ pts)
   where
+    bts = map getTypeLHsBind $ listifyAllSpans tcs
+    ets = map getTypeLHsExpr $ listifyAllSpans tcs
+    pts = map getTypeLPat    $ listifyAllSpans tcs
+
     tcs = tm_typechecked_source tcm
 
     -- | Extract 'Id', 'SrcSpan', and 'Type' for 'LHsBind's
-    getTypeLHsBind :: LHsBind GhcTc -> m (Maybe (Maybe Id,SrcSpan,Type))
+    getTypeLHsBind :: LHsBind GhcTc -> Maybe (Maybe Id,SrcSpan,Type)
     getTypeLHsBind (L _spn FunBind{fun_id = pid,fun_matches = MG _ _ _})
-        = pure $ Just (Just (unLoc pid), getLocA pid,varType (unLoc pid))
-    getTypeLHsBind _ = pure Nothing
+        = Just (Just (unLoc pid), getLocA pid,varType (unLoc pid))
+    getTypeLHsBind _ = Nothing
 
     -- | Extract 'Id', 'SrcSpan', and 'Type' for 'LHsExpr's
-    getTypeLHsExpr :: LHsExpr GhcTc -> m (Maybe (Maybe Id,SrcSpan,Type))
-    getTypeLHsExpr e = do
-        hs_env  <- getSession
-        (_,mbe) <- liftIO $ deSugarExpr hs_env e
-        return $ fmap (\expr -> (mid, getLocA e, GHC.Core.Utils.exprType expr)) mbe
+    getTypeLHsExpr :: LHsExpr GhcTc -> Maybe (Maybe Id,SrcSpan,Type)
+    getTypeLHsExpr e = Just (mid, getLocA e, lhsExprType e)
       where
         mid :: Maybe Id
         mid | HsVar _ (L _ i) <- unwrapVar (unLoc e) = Just i
@@ -350,9 +345,8 @@ processAllTypeCheckedModule tcm = do
         unwrapVar e'                                = e'
 
     -- | Extract 'Id', 'SrcSpan', and 'Type' for 'LPats's
-    getTypeLPat :: LPat GhcTc -> m (Maybe (Maybe Id,SrcSpan,Type))
-    getTypeLPat (L spn pat) =
-        pure (Just (getMaybeId pat,locA spn,hsPatType pat))
+    getTypeLPat :: LPat GhcTc -> Maybe (Maybe Id,SrcSpan,Type)
+    getTypeLPat (L spn pat) = Just (getMaybeId pat,locA spn,hsPatType pat)
       where
         getMaybeId :: Pat GhcTc -> Maybe Id
         getMaybeId (VarPat _ (L _ vid)) = Just vid
