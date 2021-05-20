@@ -144,7 +144,13 @@ PATH="$toolchain/bin:$PATH"
 
 export METRICS_FILE="$CI_PROJECT_DIR/performance-metrics.tsv"
 
-cores="$(mk/detect-cpu-count.sh)"
+# Use only 1 core for riscv64 qemu process, qemu uses *huge* amount of memory per 
+# ghc process.
+case "$(uname -m)" in
+  riscv64) cores="1" ;;
+  *) cores="$(mk/detect-cpu-count.sh)";;
+esac
+
 
 # Use a local temporary directory to ensure that concurrent builds don't
 # interfere with one another
