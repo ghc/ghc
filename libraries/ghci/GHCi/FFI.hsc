@@ -2,6 +2,8 @@
 --
 -- libffi bindings
 --
+-- See Note [Uses of libffi in GHC] in hadrian's Rules.Libffi
+--
 -- (c) The University of Glasgow 2008
 --
 -----------------------------------------------------------------------------
