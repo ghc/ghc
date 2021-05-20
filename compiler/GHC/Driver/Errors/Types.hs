@@ -4,7 +4,6 @@ module GHC.Driver.Errors.Types (
     GhcMessage(..)
   , DriverMessage(..), DriverMessages
   , BuildingCabalPackage(..)
-  , InstantiationSuggestion(..)
   , WarningMessages
   , ErrorMessages
   , WarnMsg
@@ -26,7 +25,7 @@ import GHC.Driver.Session
 import GHC.Types.Error
 import GHC.Unit.Module
 
-import GHC.Parser.Errors       ( PsErrorDesc, PsHint )
+import GHC.Parser.Errors       ( PsErrorDesc )
 import GHC.Parser.Errors.Types ( PsMessage )
 import GHC.Tc.Errors.Types     ( TcRnMessage )
 import GHC.HsToCore.Errors.Types ( DsMessage )
@@ -116,12 +115,11 @@ type DriverMessages = Messages DriverMessage
 
 -- | A message from the driver.
 data DriverMessage where
-  -- | Simply wraps a generic 'DiagnosticMessage'.
+  -- | Simply wraps a generic 'Diagnostic' message @a@.
   DriverUnknownMessage :: (Diagnostic a, Typeable a) => a -> DriverMessage
-
   -- | A parse error in parsing a Haskell file header during dependency
   -- analysis
-  DriverPsHeaderMessage :: !PsErrorDesc -> ![PsHint] -> DriverMessage
+  DriverPsHeaderMessage :: !PsErrorDesc -> ![GhcHint] -> DriverMessage
 
   {-| DriverMissingHomeModules is a warning (controlled with -Wmissing-home-modules) that
       arises when running GHC in --make mode when some modules needed for compilation
@@ -189,7 +187,7 @@ data DriverMessage where
 
      Test cases: driver/T12955
   -}
-  DriverUnexpectedSignature :: !ModuleName -> !BuildingCabalPackage -> [InstantiationSuggestion] -> DriverMessage
+  DriverUnexpectedSignature :: !ModuleName -> !BuildingCabalPackage -> GenInstantiations UnitId -> DriverMessage
 
   {-| DriverFileNotFound occurs when the input file (e.g. given on the command line) can't be found.
 
@@ -210,19 +208,6 @@ data DriverMessage where
      Test cases: -
   -}
   DriverBackpackModuleNotFound :: !ModuleName -> DriverMessage
-
--- | An 'InstantiationSuggestion' for a '.hsig' file. This is generated
--- by GHC in case of a 'DriverUnexpectedSignature' and suggests a way
--- to instantiate a particular signature, where the first argument is
--- the signature name and the second is the module where the signature
--- was defined.
--- Example:
---
--- src/MyStr.hsig:2:11: error:
---     Unexpected signature: ‘MyStr’
---     (Try passing -instantiated-with="MyStr=<MyStr>"
---      replacing <MyStr> as necessary.)
-data InstantiationSuggestion = InstantiationSuggestion !ModuleName !Module
 
 -- | Pass to a 'DriverMessage' the information whether or not the
 -- '-fbuilding-cabal-package' flag is set.

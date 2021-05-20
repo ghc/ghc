@@ -1,3 +1,4 @@
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-} -- instance Diagnostic {DriverMessage, GhcMessage}
 
@@ -15,6 +16,7 @@ import GHC.Types.Error
 import GHC.Unit.Types
 import GHC.Utils.Outputable
 import GHC.Unit.Module
+import GHC.Types.Hint
 
 --
 -- Suggestions
@@ -50,6 +52,18 @@ instance Diagnostic GhcMessage where
       -> diagnosticReason m
     GhcUnknownMessage m
       -> diagnosticReason m
+
+  diagnosticHints = \case
+    GhcPsMessage m
+      -> diagnosticHints m
+    GhcTcRnMessage m
+      -> diagnosticHints m
+    GhcDsMessage m
+      -> diagnosticHints m
+    GhcDriverMessage m
+      -> diagnosticHints m
+    GhcUnknownMessage m
+      -> diagnosticHints m
 
 instance Diagnostic DriverMessage where
   diagnosticMessage = \case
@@ -99,22 +113,8 @@ instance Diagnostic DriverMessage where
            $$ text "Saw     :" <+> quotes (ppr actual)
            $$ text "Expected:" <+> quotes (ppr expected)
 
-    DriverUnexpectedSignature pi_mod_name buildingCabalPackage suggestions
-      -> let suggested_instantiated_with =
-               hcat (punctuate comma $
-                   [ ppr k <> text "=" <> ppr v
-                   | InstantiationSuggestion k v <- suggestions
-                   ])
-             msg = text "Unexpected signature:" <+> quotes (ppr pi_mod_name)
-                   $$ if buildingCabalPackage == YesBuildingCabalPackage
-                       then parens (text "Try adding" <+> quotes (ppr pi_mod_name)
-                               <+> text "to the"
-                               <+> quotes (text "signatures")
-                               <+> text "field in your Cabal file.")
-                       else parens (text "Try passing -instantiated-with=\"" <>
-                                    suggested_instantiated_with <> text "\"" $$
-                                       text "replacing <" <> ppr pi_mod_name <> text "> as necessary.")
-         in mkSimpleDecorated msg
+    DriverUnexpectedSignature pi_mod_name _buildingCabalPackage _instantiations
+      -> mkSimpleDecorated $ text "Unexpected signature:" <+> quotes (ppr pi_mod_name)
     DriverFileNotFound hsFilePath
       -> mkSimpleDecorated (text "Can't find" <+> text hsFilePath)
     DriverStaticPointersNotSupported
@@ -147,3 +147,31 @@ instance Diagnostic DriverMessage where
       -> WarningWithoutFlag
     DriverBackpackModuleNotFound{}
       -> ErrorWithoutFlag
+
+  diagnosticHints = \case
+    DriverUnknownMessage m
+      -> diagnosticHints m
+    DriverPsHeaderMessage _desc hints
+      -> hints
+    DriverMissingHomeModules{}
+      -> noHints
+    DriverUnusedPackages{}
+      -> noHints
+    DriverUnnecessarySourceImports{}
+      -> noHints
+    DriverDuplicatedModuleDeclaration{}
+      -> noHints
+    DriverModuleNotFound{}
+      -> noHints
+    DriverFileModuleNameMismatch{}
+      -> noHints
+    DriverUnexpectedSignature pi_mod_name buildingCabalPackage instantiations
+      -> if buildingCabalPackage == YesBuildingCabalPackage
+           then [SuggestAddSignatureCabalFile pi_mod_name]
+           else [SuggestSignatureInstantiations pi_mod_name (suggestInstantiatedWith pi_mod_name instantiations)]
+    DriverFileNotFound{}
+      -> noHints
+    DriverStaticPointersNotSupported
+      -> noHints
+    DriverBackpackModuleNotFound{}
+      -> noHints
