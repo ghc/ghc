@@ -1855,7 +1855,7 @@ parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
 
   -- Set timer stats & heap size
   when (enableTimeStats dflags4) $ liftIO enableTimingStats
-  case (ghcHeapSize dflags4) of
+  case ghcHeapSize dflags4 of
     Just x -> liftIO (setHeapSize x)
     _      -> return ()
 

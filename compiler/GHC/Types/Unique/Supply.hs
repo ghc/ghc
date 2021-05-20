@@ -341,12 +341,12 @@ instance MonadFix UniqSM where
 
 thenUs :: UniqSM a -> (a -> UniqSM b) -> UniqSM b
 thenUs (USM expr) cont
-  = mkUniqSM (\us0 -> case (expr us0) of
+  = mkUniqSM (\us0 -> case expr us0 of
                    UniqResult result us1 -> unUSM (cont result) us1)
 
 thenUs_ :: UniqSM a -> UniqSM b -> UniqSM b
 thenUs_ (USM expr) (USM cont)
-  = mkUniqSM (\us0 -> case (expr us0) of { UniqResult _ us1 -> cont us1 })
+  = mkUniqSM (\us0 -> case expr us0 of { UniqResult _ us1 -> cont us1 })
 
 returnUs :: a -> UniqSM a
 returnUs result = mkUniqSM (\us -> UniqResult result us)
