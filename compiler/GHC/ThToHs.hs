@@ -253,7 +253,7 @@ cvtDec (DataD ctxt tc tvs ksig constrs derivs)
         ; ksig' <- cvtKind `traverse` ksig
         ; cons' <- mapM cvtConstr constrs
         ; derivs' <- cvtDerivs derivs
-        ; let defn = HsDataDefn { dd_ext = noAnn
+        ; let defn = HsDataDefn { dd_ext = noExtField
                                 , dd_ND = DataType, dd_cType = Nothing
                                 , dd_ctxt = Just ctxt'
                                 , dd_kindSig = ksig'
@@ -269,7 +269,7 @@ cvtDec (NewtypeD ctxt tc tvs ksig constr derivs)
         ; ksig' <- cvtKind `traverse` ksig
         ; con' <- cvtConstr constr
         ; derivs' <- cvtDerivs derivs
-        ; let defn = HsDataDefn { dd_ext = noAnn
+        ; let defn = HsDataDefn { dd_ext = noExtField
                                 , dd_ND = NewType, dd_cType = Nothing
                                 , dd_ctxt = Just ctxt'
                                 , dd_kindSig = ksig'
@@ -340,7 +340,7 @@ cvtDec (DataInstD ctxt bndrs tys ksig constrs derivs)
        ; ksig' <- cvtKind `traverse` ksig
        ; cons' <- mapM cvtConstr constrs
        ; derivs' <- cvtDerivs derivs
-       ; let defn = HsDataDefn { dd_ext = noAnn
+       ; let defn = HsDataDefn { dd_ext = noExtField
                                , dd_ND = DataType, dd_cType = Nothing
                                , dd_ctxt = Just ctxt'
                                , dd_kindSig = ksig'
@@ -361,7 +361,7 @@ cvtDec (NewtypeInstD ctxt bndrs tys ksig constr derivs)
        ; ksig' <- cvtKind `traverse` ksig
        ; con' <- cvtConstr constr
        ; derivs' <- cvtDerivs derivs
-       ; let defn = HsDataDefn { dd_ext = noAnn
+       ; let defn = HsDataDefn { dd_ext = noExtField
                                , dd_ND = NewType, dd_cType = Nothing
                                , dd_ctxt = Just ctxt'
                                , dd_kindSig = ksig'
@@ -1082,13 +1082,13 @@ which we don't want.
 -}
 
 cvtFld :: (RdrName -> t) -> (TH.Name, TH.Exp)
-       -> CvtM (LHsRecField' GhcPs t (LHsExpr GhcPs))
+       -> CvtM (LHsFieldBind GhcPs (Located t) (LHsExpr GhcPs))
 cvtFld f (v,e)
   = do  { v' <- vNameL v; e' <- cvtl e
-        ; return (noLocA $ HsRecField { hsRecFieldAnn = noAnn
-                                      , hsRecFieldLbl = reLoc $ fmap f v'
-                                      , hsRecFieldArg = e'
-                                      , hsRecPun      = False}) }
+        ; return (noLocA $ HsFieldBind { hfbAnn = noAnn
+                                       , hfbLHS = reLoc $ fmap f v'
+                                       , hfbRHS = e'
+                                       , hfbPun = False}) }
 
 cvtDD :: Range -> CvtM (ArithSeqInfo GhcPs)
 cvtDD (FromR x)           = do { x' <- cvtl x; return $ From x' }
@@ -1361,11 +1361,11 @@ cvtPatFld :: (TH.Name, TH.Pat) -> CvtM (LHsRecField GhcPs (LPat GhcPs))
 cvtPatFld (s,p)
   = do  { L ls s' <- vNameN s
         ; p' <- cvtPat p
-        ; return (noLocA $ HsRecField { hsRecFieldAnn = noAnn
-                                      , hsRecFieldLbl
-                                         = L (locA ls) $ mkFieldOcc (L ls s')
-                                      , hsRecFieldArg = p'
-                                      , hsRecPun      = False}) }
+        ; return (noLocA $ HsFieldBind { hfbAnn = noAnn
+                                       , hfbLHS
+                                          = L (locA ls) $ mkFieldOcc (L ls s')
+                                       , hfbRHS = p'
+                                       , hfbPun = False}) }
 
 {- | @cvtOpAppP x op y@ converts @op@ and @y@ and produces the operator application @x `op` y@.
 The produced tree of infix patterns will be left-biased, provided @x@ is.
