@@ -20,7 +20,6 @@ module GHC.Tc.Gen.Pat
    , tcCheckPat, tcCheckPat_O, tcInferPat
    , tcPats
    , addDataConStupidTheta
-   , badFieldCon
    , polyPatSig
    )
 where
@@ -1265,7 +1264,7 @@ tcConArgs con_like arg_tys tenv penv con_args thing_inside = case con_args of
                 --      f (R { foo = (a,b) }) = a+b
                 -- If foo isn't one of R's fields, we don't want to crash when
                 -- typechecking the "a+b".
-           [] -> failWith (badFieldCon con_like lbl)
+           [] -> failWith (badFieldConErr con_like lbl)
 
                 -- The normal case, when the field comes from the right constructor
            (pat_ty : extras) -> do
@@ -1460,11 +1459,6 @@ existentialLazyPat
 existentialProcPat :: SDoc
 existentialProcPat
   = text "Proc patterns cannot use existential or GADT data constructors"
-
-badFieldCon :: ConLike -> FieldLabelString -> SDoc
-badFieldCon con field
-  = hsep [text "Constructor" <+> quotes (ppr con),
-          text "does not have field", quotes (ppr field)]
 
 polyPatSig :: TcType -> SDoc
 polyPatSig sig_ty
