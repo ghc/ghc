@@ -236,4 +236,4 @@ TYPE SIGNATURES
     (a -> b -> c -> d) -> [a] -> [b] -> [c] -> [d]
   (||) :: Bool -> Bool -> Bool
 Dependent modules: []
-Dependent packages: [base-4.14.0.0, ghc-bignum-1.0, ghc-prim-0.7.0]
+Dependent packages: [base-4.16.0.0]

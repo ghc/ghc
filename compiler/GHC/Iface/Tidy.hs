@@ -459,7 +459,7 @@ tidyProgram hsc_env  (ModGuts { mg_module           = mod
                            cg_binds    = all_tidy_binds,
                            cg_foreign  = add_spt_init_code foreign_stubs,
                            cg_foreign_files = foreign_files,
-                           cg_dep_pkgs = map fst $ dep_pkgs deps,
+                           cg_dep_pkgs = dep_direct_pkgs deps,
                            cg_hpc_info = hpc_info,
                            cg_modBreaks = modBreaks,
                            cg_spt_entries = spt_entries },
@@ -647,7 +647,14 @@ chooseExternalIds hsc_env mod omit_prags expose_all binds implicit_binds imp_id_
   -- See Note [Which rules to expose]
   is_external id = isExportedId id || id `elemVarSet` rule_rhs_vars
 
-  rule_rhs_vars  = mapUnionVarSet ruleRhsFreeVars imp_id_rules
+  rule_rhs_vars
+    -- No rules are exposed when omit_prags is enabled see #19836
+    -- imp_id_rules are the RULES in /this/ module for /imported/ Ids
+    -- If omit_prags is True, these rules won't be put in the interface file.
+    -- But if omit_prags is False, so imp_id_rules are in the interface file for
+    -- this module, then the local-defined Ids they use must be made external.
+    | omit_prags = emptyVarSet
+    | otherwise = mapUnionVarSet ruleRhsFreeVars imp_id_rules
 
   binders          = map fst $ flattenBinds binds
   implicit_binders = bindersOfBinds implicit_binds

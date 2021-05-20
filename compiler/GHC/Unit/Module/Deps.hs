@@ -17,24 +17,40 @@ import GHC.Utils.Fingerprint
 import GHC.Utils.Binary
 
 -- | Dependency information about ALL modules and packages below this one
--- in the import hierarchy.
+-- in the import hierarchy. This is the serialisable version of `ImportAvails`.
 --
 -- Invariant: the dependencies of a module @M@ never includes @M@.
 --
 -- Invariant: none of the lists contain duplicates.
+--
+-- See Note [Transitive Information in Dependencies]
 data Dependencies = Deps
-   { dep_mods   :: [ModuleNameWithIsBoot]
-      -- ^ All home-package modules transitively below this one
-      -- I.e. modules that this one imports, or that are in the
-      --      dep_mods of those directly-imported modules
+   { dep_direct_mods :: [ModuleNameWithIsBoot]
+      -- ^ All home-package modules which are directly imported by this one.
 
-   , dep_pkgs   :: [(UnitId, Bool)]
-      -- ^ All packages transitively below this module
-      -- I.e. packages to which this module's direct imports belong,
-      --      or that are in the dep_pkgs of those modules
-      -- The bool indicates if the package is required to be
-      -- trusted when the module is imported as a safe import
+   , dep_direct_pkgs :: [UnitId]
+      -- ^ All packages directly imported by this module
+      -- I.e. packages to which this module's direct imports belong.
+      --
+   , dep_plgins :: [ModuleName]
+      -- ^ All the plugins used while compiling this module.
+
+
+    -- Transitive information below here
+   , dep_sig_mods :: ![ModuleName]
+    -- ^ Transitive closure of hsig files in the home package
+
+
+   , dep_trusted_pkgs :: [UnitId]
+      -- Packages which we are required to trust
+      -- when the module is imported as a safe import
       -- (Safe Haskell). See Note [Tracking Trust Transitively] in GHC.Rename.Names
+
+   , dep_boot_mods :: [ModuleNameWithIsBoot]
+      -- ^ All modules which have boot files below this one, and whether we
+      -- should use the boot file or not.
+      -- This information is only used to populate the eps_is_boot field.
+      -- See Note [Structure of dep_boot_mods]
 
    , dep_orphs  :: [Module]
       -- ^ Transitive closure of orphan modules (whether
@@ -53,30 +69,39 @@ data Dependencies = Deps
       -- does NOT include us, unlike 'imp_finsts'. See Note
       -- [The type family instance consistency story].
 
-   , dep_plgins :: [ModuleName]
-      -- ^ All the plugins used while compiling this module.
    }
    deriving( Eq )
         -- Equality used only for old/new comparison in GHC.Iface.Recomp.addFingerprints
         -- See 'GHC.Tc.Utils.ImportAvails' for details on dependencies.
 
 instance Binary Dependencies where
-    put_ bh deps = do put_ bh (dep_mods deps)
-                      put_ bh (dep_pkgs deps)
+    put_ bh deps = do put_ bh (dep_direct_mods deps)
+                      put_ bh (dep_direct_pkgs deps)
+                      put_ bh (dep_trusted_pkgs deps)
+                      put_ bh (dep_sig_mods deps)
+                      put_ bh (dep_boot_mods deps)
                       put_ bh (dep_orphs deps)
                       put_ bh (dep_finsts deps)
                       put_ bh (dep_plgins deps)
 
-    get bh = do ms <- get bh
-                ps <- get bh
+    get bh = do dms <- get bh
+                dps <- get bh
+                tps <- get bh
+                hsigms <- get bh
+                sms <- get bh
                 os <- get bh
                 fis <- get bh
                 pl <- get bh
-                return (Deps { dep_mods = ms, dep_pkgs = ps, dep_orphs = os,
+                return (Deps { dep_direct_mods = dms
+                             , dep_direct_pkgs = dps
+                             , dep_sig_mods = hsigms
+                             , dep_boot_mods = sms
+                             , dep_trusted_pkgs = tps
+                             , dep_orphs = os,
                                dep_finsts = fis, dep_plgins = pl })
 
 noDependencies :: Dependencies
-noDependencies = Deps [] [] [] [] []
+noDependencies = Deps [] [] [] [] [] [] [] []
 
 -- | Records modules for which changes may force recompilation of this module
 -- See wiki: https://gitlab.haskell.org/ghc/ghc/wikis/commentary/compiler/recompilation-avoidance
@@ -193,3 +218,75 @@ instance Binary Usage where
             hash <- get bh
             return UsageMergedRequirement { usg_mod = mod, usg_mod_hash = hash }
           i -> error ("Binary.get(Usage): " ++ show i)
+
+
+{-
+Note [Transitive Information in Dependencies]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+It is important to be careful what information we put in 'Dependencies' because
+ultimately it ends up serialised in an interface file. Interface files must always
+be kept up-to-date with the state of the world, so if `Dependencies` needs to be updated
+then the module had to be recompiled just to update `Dependencies`.
+
+Before #16885, the dependencies used to contain the transitive closure of all
+home modules. Therefore, if you added an import somewhere low down in the home package
+it would recompile nearly every module in your project, just to update this information.
+
+Now, we are a bit more careful about what we store and
+explicitly store transitive information only if it is really needed.
+
+# Direct Information
+
+* dep_direct_mods - Directly imported home package modules
+* dep_direct_pkgs - Directly imported packages
+* dep_plgins      - Directly used plugins
+
+# Transitive Information
+
+Some features of the compiler require transitive information about what is currently
+being compiled, so that is explicitly stored separately in the form they need.
+
+* dep_trusted_pkgs - Only used for the -fpackage-trust feature
+* dep_boot_mods  - Only used to populate eps_is_boot in -c mode
+* dep_orphs        - Modules with orphan instances
+* dep_finsts       - Modules with type family instances
+
+Important note: If you add some transitive information to the interface file then
+you need to make sure recompilation is triggered when it could be out of date.
+The correct way to do this is to include the transitive information in the export
+hash of the module. The export hash is computed in `GHC.Iface.Recomp.addFingerprints`.
+-}
+
+{-
+Note [Structure of mod_boot_deps]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In `-c` mode we always need to know whether to load the normal or boot version of
+an interface file, and this can't be determined from just looking at the direct imports.
+
+Consider modules with dependencies:
+
+```
+A -(S)-> B
+A -> C -> B -(S)-> B
+```
+
+Say when compiling module `A` that we need to load the interface for `B`, do we load
+`B.hi` or `B.hi-boot`? Well, `A` does directly {-# SOURCE #-} import B, so you might think
+that we would load the `B.hi-boot` file, however this is wrong because `C` imports
+`B` normally. Therefore in the interface file for `C` we still need to record that
+there is a hs-boot file for `B` below it but that we now want `B.hi` rather than
+`B.hi-boot`. When `C` is imported, the fact that it needs `B.hi` clobbers the `{- SOURCE -}`
+import for `B`.
+
+Therefore in mod_boot_deps we store the names of any modules which have hs-boot files,
+and whether we want to import the .hi or .hi-boot version of the interface file.
+
+If you get this wrong, then GHC fails to compile, so there is a test but you might
+not make it that far if you get this wrong!
+
+Question: does this happen even across packages?
+No: if I need to load the interface for module X from package P I always look for p:X.hi.
+
+-}

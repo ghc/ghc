@@ -638,6 +638,12 @@ data CallishMachOp
   -- Should be an AtomicRMW variant eventually.
   -- Sequential consistent.
   | MO_Xchg Width
+
+  -- These rts provided functions are special: suspendThread releases the
+  -- capability, hence we mustn't sink any use of data stored in the capability
+  -- after this instruction.
+  | MO_SuspendThread
+  | MO_ResumeThread
   deriving (Eq, Show)
 
 -- | The operation to perform atomically.
@@ -653,13 +659,16 @@ data AtomicMachOp =
 pprCallishMachOp :: CallishMachOp -> SDoc
 pprCallishMachOp mo = text (show mo)
 
+-- | Return (results_hints,args_hints)
 callishMachOpHints :: CallishMachOp -> ([ForeignHint], [ForeignHint])
 callishMachOpHints op = case op of
-  MO_Memcpy _  -> ([], [AddrHint,AddrHint,NoHint])
-  MO_Memset _  -> ([], [AddrHint,NoHint,NoHint])
-  MO_Memmove _ -> ([], [AddrHint,AddrHint,NoHint])
-  MO_Memcmp _  -> ([], [AddrHint, AddrHint, NoHint])
-  _            -> ([],[])
+  MO_Memcpy _      -> ([], [AddrHint,AddrHint,NoHint])
+  MO_Memset _      -> ([], [AddrHint,NoHint,NoHint])
+  MO_Memmove _     -> ([], [AddrHint,AddrHint,NoHint])
+  MO_Memcmp _      -> ([], [AddrHint, AddrHint, NoHint])
+  MO_SuspendThread -> ([AddrHint], [AddrHint,NoHint])
+  MO_ResumeThread  -> ([AddrHint], [AddrHint])
+  _                -> ([],[])
   -- empty lists indicate NoHint
 
 -- | The alignment of a 'memcpy'-ish operation.
