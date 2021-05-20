@@ -1,1 +1,1 @@
-{"span": null,"doc": "TYPE SIGNATURES\n  foo :: forall a. a -> a\nDependent modules: []\nDependent packages: [base-4.13.0.0, ghc-bignum-1.0, ghc-prim-0.7.0]","messageClass": "MCOutput"}
+{"span": null,"doc": "TYPE SIGNATURES\n  foo :: forall a. a -> a\nDependent modules: []\nDependent packages: [base-4.16.0.0]","messageClass": "MCOutput"}
