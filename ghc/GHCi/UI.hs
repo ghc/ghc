@@ -480,6 +480,10 @@ interactiveUI config srcs maybe_exprs = do
                       LangExt.MonomorphismRestriction xopt_unset)
                $ dflags
    GHC.setInteractiveDynFlags dflags'
+   _ <- GHC.setProgramDynFlags
+               -- Set Opt_KeepGoing so that :reload loads as much as
+               -- possible
+               (gopt_set dflags Opt_KeepGoing)
 
    -- Update the LogAction. Ensure we don't override the user's log action lest
    -- we break -ddump-json (#14078)
