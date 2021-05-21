@@ -2510,13 +2510,6 @@ We treat the unlifted and lifted cases separately:
   we won't build a thunk because the let is strict.
   See also Note [Case-to-let for strictly-used binders]
 
-  NB: absentError satisfies exprIsHNF: see Note [aBSENT_ERROR_ID] in GHC.Core.Make.
-  We want to turn
-     case (absentError "foo") of r -> ...MkT r...
-  into
-     let r = absentError "foo" in ...MkT r...
-
-
 Note [Case-to-let for strictly-used binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If we have this:
