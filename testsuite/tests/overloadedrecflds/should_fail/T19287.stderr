@@ -1,0 +1,5 @@
+
+T19287.hs:4:27: error:
+    Multiple declarations of ‘x’
+    Declared at: T19287.hs:4:18
+                 T19287.hs:4:27
