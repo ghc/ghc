@@ -1,20 +1,34 @@
 {-# LANGUAGE RankNTypes #-}
 
 -- | Logger
+--
+-- The Logger is an configurable entity that is used by the compiler to output
+-- messages on the console (stdout, stderr) and in dump files.
+--
+-- The behaviour of default Logger returned by `initLogger` can be modified with
+-- hooks. The compiler itself uses hooks in multithreaded code (--make) and it
+-- is also probably used by ghc-api users (IDEs, etc.).
+--
+-- In addition to hooks, the Logger suppors LogFlags: basically a subset of the
+-- command-line flags that control the logger behaviour at a higher level than
+-- hooks.
+--
+--  1. Hooks are used to define how to generate a info/warning/error/dump messages
+--  2. LogFlags are used to decide when and how to generate messages
+--
 module GHC.Utils.Logger
     ( Logger
-    , initLogger
     , HasLogger (..)
     , ContainsLogger (..)
+
+    -- * Logger setup
+    , initLogger
     , LogAction
     , DumpAction
     , TraceAction
     , DumpFormat (..)
-    , putLogMsg
-    , putDumpMsg
-    , putTraceMsg
 
-    -- * Hooks
+    -- ** Hooks
     , popLogHook
     , pushLogHook
     , popDumpHook
@@ -23,27 +37,45 @@ module GHC.Utils.Logger
     , pushTraceHook
     , makeThreadSafe
 
+    -- ** Flags
+    , LogFlags (..)
+    , defaultLogFlags
+    , log_dopt
+    , log_set_dopt
+    , setLogFlags
+    , updateLogFlags
+    , logFlags
+    , logHasDumpFlag
+    , logVerbAtLeast
+
     -- * Logging
     , jsonLogAction
+    , putLogMsg
     , defaultLogAction
     , defaultLogActionHPrintDoc
     , defaultLogActionHPutStrDoc
+    , logMsg
+    , logDumpMsg
 
     -- * Dumping
     , defaultDumpAction
+    , putDumpFile
+    , putDumpFileMaybe
+    , putDumpFileMaybe'
     , withDumpFileHandle
     , touchDumpFile
-    , dumpIfSet
-    , dumpIfSet_dyn
-    , dumpIfSet_dyn_printer
+    , logDumpFile
 
     -- * Tracing
     , defaultTraceAction
+    , putTraceMsg
+    , loggerTraceFlushUpdate
+    , loggerTraceFlush
+    , logTraceMsg
     )
 where
 
 import GHC.Prelude
-import GHC.Driver.Session
 import GHC.Driver.Flags
 import GHC.Driver.Ppr
 import GHC.Types.Error
@@ -53,6 +85,9 @@ import qualified GHC.Utils.Ppr as Pretty
 import GHC.Utils.Outputable
 import GHC.Utils.Json
 import GHC.Utils.Panic
+
+import GHC.Data.EnumSet (EnumSet)
+import qualified GHC.Data.EnumSet as EnumSet
 
 import Data.IORef
 import System.Directory
@@ -67,13 +102,79 @@ import Control.Monad
 import Control.Concurrent.MVar
 import System.IO.Unsafe
 
-type LogAction = DynFlags
+---------------------------------------------------------------
+-- Log flags
+---------------------------------------------------------------
+
+-- | Logger flags
+data LogFlags = LogFlags
+  { log_default_user_context :: SDocContext
+  , log_default_dump_context :: SDocContext
+  , log_dump_flags           :: !(EnumSet DumpFlag) -- ^ Dump flags
+  , log_show_caret           :: !Bool               -- ^ Show caret in diagnostics
+  , log_show_warn_groups     :: !Bool               -- ^ Show warning flag groups
+  , log_enable_timestamps    :: !Bool               -- ^ Enable timestamps
+  , log_dump_to_file         :: !Bool               -- ^ Enable dump to file
+  , log_dump_dir             :: !(Maybe FilePath)   -- ^ Dump directory
+  , log_dump_prefix          :: !(Maybe FilePath)   -- ^ Normal dump path ("basename.")
+  , log_dump_prefix_override :: !(Maybe FilePath)   -- ^ Overriden dump path
+  , log_enable_debug         :: !Bool               -- ^ Enable debug output
+  , log_verbosity            :: !Int                -- ^ Verbosity level
+  }
+
+-- | Default LogFlags
+defaultLogFlags :: LogFlags
+defaultLogFlags = LogFlags
+  { log_default_user_context = defaultSDocContext
+  , log_default_dump_context = defaultSDocContext
+  , log_dump_flags           = EnumSet.empty
+  , log_show_caret           = True
+  , log_show_warn_groups     = True
+  , log_enable_timestamps    = True
+  , log_dump_to_file         = False
+  , log_dump_dir             = Nothing
+  , log_dump_prefix          = Nothing
+  , log_dump_prefix_override = Nothing
+  , log_enable_debug         = False
+  , log_verbosity            = 0
+  }
+
+-- | Test if a DumpFlag is enabled
+log_dopt :: DumpFlag -> LogFlags -> Bool
+log_dopt f logflags = f `EnumSet.member` log_dump_flags logflags
+
+-- | Enable a DumpFlag
+log_set_dopt :: DumpFlag -> LogFlags -> LogFlags
+log_set_dopt f logflags = logflags { log_dump_flags = EnumSet.insert f (log_dump_flags logflags) }
+
+-- | Test if a DumpFlag is set
+logHasDumpFlag :: Logger -> DumpFlag -> Bool
+logHasDumpFlag logger f = log_dopt f (logFlags logger)
+
+-- | Test if verbosity is >= to the given value
+logVerbAtLeast :: Logger -> Int -> Bool
+logVerbAtLeast logger v = log_verbosity (logFlags logger) >= v
+
+-- | Update LogFlags
+updateLogFlags :: Logger -> (LogFlags -> LogFlags) -> Logger
+updateLogFlags logger f = setLogFlags logger (f (logFlags logger))
+
+-- | Set LogFlags
+setLogFlags :: Logger -> LogFlags -> Logger
+setLogFlags logger flags = logger { logFlags = flags }
+
+
+---------------------------------------------------------------
+-- Logger
+---------------------------------------------------------------
+
+type LogAction = LogFlags
               -> MessageClass
               -> SrcSpan
               -> SDoc
               -> IO ()
 
-type DumpAction = DynFlags
+type DumpAction = LogFlags
                -> PprStyle
                -> DumpFlag
                -> String
@@ -81,7 +182,7 @@ type DumpAction = DynFlags
                -> SDoc
                -> IO ()
 
-type TraceAction a = DynFlags -> String -> SDoc -> a -> a
+type TraceAction a = LogFlags -> String -> SDoc -> a -> a
 
 -- | Format of a dump
 --
@@ -114,7 +215,27 @@ data Logger = Logger
 
     , generated_dumps :: DumpCache
         -- ^ Already dumped files (to append instead of overwriting them)
+
+    , trace_flush :: IO ()
+        -- ^ Flush the trace buffer
+
+    , logFlags :: !LogFlags
+        -- ^ Logger flags
     }
+
+-- | Set the trace flushing function
+--
+-- The currently set trace flushing function is passed to the updating function
+loggerTraceFlushUpdate :: Logger -> (IO () -> IO ()) -> Logger
+loggerTraceFlushUpdate logger upd = logger { trace_flush = upd (trace_flush logger) }
+
+-- | Calls the trace flushing function
+loggerTraceFlush :: Logger -> IO ()
+loggerTraceFlush logger = trace_flush logger
+
+-- | Default trace flushing function (flush stderr)
+defaultTraceFlush :: IO ()
+defaultTraceFlush = hFlush stderr
 
 initLogger :: IO Logger
 initLogger = do
@@ -124,6 +245,8 @@ initLogger = do
         , dump_hook       = []
         , trace_hook      = []
         , generated_dumps = dumps
+        , trace_flush     = defaultTraceFlush
+        , logFlags        = defaultLogFlags
         }
 
 -- | Log something
@@ -131,8 +254,8 @@ putLogMsg :: Logger -> LogAction
 putLogMsg logger = foldr ($) defaultLogAction (log_hook logger)
 
 -- | Dump something
-putDumpMsg :: Logger -> DumpAction
-putDumpMsg logger =
+putDumpFile :: Logger -> DumpAction
+putDumpFile logger =
     let
         fallback = putLogMsg logger
         dumps    = generated_dumps logger
@@ -182,15 +305,15 @@ makeThreadSafe logger = do
         with_lock :: forall a. IO a -> IO a
         with_lock act = withMVar lock (const act)
 
-        log action dflags msg_class loc doc =
-            with_lock (action dflags msg_class loc doc)
+        log action logflags msg_class loc doc =
+            with_lock (action logflags msg_class loc doc)
 
-        dmp action dflags sty opts str fmt doc =
-            with_lock (action dflags sty opts str fmt doc)
+        dmp action logflags sty opts str fmt doc =
+            with_lock (action logflags sty opts str fmt doc)
 
         trc :: forall a. TraceAction a -> TraceAction a
-        trc action dflags str doc v =
-            unsafePerformIO (with_lock (return $! action dflags str doc v))
+        trc action logflags str doc v =
+            unsafePerformIO (with_lock (return $! action logflags str doc v))
 
     return $ pushLogHook log
            $ pushDumpHook dmp
@@ -201,12 +324,12 @@ makeThreadSafe logger = do
 --
 jsonLogAction :: LogAction
 jsonLogAction _ (MCDiagnostic SevIgnore _) _ _ = return () -- suppress the message
-jsonLogAction dflags msg_class srcSpan msg
+jsonLogAction logflags msg_class srcSpan msg
   =
-    defaultLogActionHPutStrDoc dflags True stdout
+    defaultLogActionHPutStrDoc logflags True stdout
       (withPprStyle (PprCode CStyle) (doc $$ text ""))
     where
-      str = renderWithContext (initSDocContext dflags defaultUserStyle) msg
+      str = renderWithContext (log_default_user_context logflags) msg
       doc = renderJSON $
               JSObject [ ( "span", json srcSpan )
                        , ( "doc" , JSString str )
@@ -214,8 +337,8 @@ jsonLogAction dflags msg_class srcSpan msg
                        ]
 
 defaultLogAction :: LogAction
-defaultLogAction dflags msg_class srcSpan msg
-  | dopt Opt_D_dump_json dflags = jsonLogAction dflags msg_class srcSpan msg
+defaultLogAction logflags msg_class srcSpan msg
+  | log_dopt Opt_D_dump_json logflags = jsonLogAction logflags msg_class srcSpan msg
   | otherwise = case msg_class of
       MCOutput                 -> printOut msg
       MCDump                   -> printOut (msg $$ blankLine)
@@ -225,16 +348,16 @@ defaultLogAction dflags msg_class srcSpan msg
       MCDiagnostic SevIgnore _ -> pure () -- suppress the message
       MCDiagnostic sev rea     -> printDiagnostics sev rea
     where
-      printOut   = defaultLogActionHPrintDoc  dflags False stdout
-      printErrs  = defaultLogActionHPrintDoc  dflags False stderr
-      putStrSDoc = defaultLogActionHPutStrDoc dflags False stdout
+      printOut   = defaultLogActionHPrintDoc  logflags False stdout
+      printErrs  = defaultLogActionHPrintDoc  logflags False stderr
+      putStrSDoc = defaultLogActionHPutStrDoc logflags False stdout
       -- Pretty print the warning flag, if any (#10752)
       message sev rea = mkLocMessageAnn (flagMsg sev rea) msg_class srcSpan msg
 
       printDiagnostics severity reason = do
         hPutChar stderr '\n'
         caretDiagnostic <-
-            if gopt Opt_DiagnosticsShowCaret dflags
+            if log_show_caret logflags
             then getCaretDiagnostic msg_class srcSpan
             else pure empty
         printErrs $ getPprStyle $ \style ->
@@ -262,26 +385,24 @@ defaultLogAction dflags msg_class srcSpan msg
         panic "SevWarning with ErrorWithoutFlag"
 
       warnFlagGrp flag
-          | gopt Opt_ShowWarnGroups dflags =
+          | log_show_warn_groups logflags =
                 case smallestWarningGroups flag of
                     [] -> ""
                     groups -> " (in " ++ intercalate ", " (map ("-W"++) groups) ++ ")"
           | otherwise = ""
 
 -- | Like 'defaultLogActionHPutStrDoc' but appends an extra newline.
-defaultLogActionHPrintDoc :: DynFlags -> Bool -> Handle -> SDoc -> IO ()
-defaultLogActionHPrintDoc dflags asciiSpace h d
- = defaultLogActionHPutStrDoc dflags asciiSpace h (d $$ text "")
+defaultLogActionHPrintDoc :: LogFlags -> Bool -> Handle -> SDoc -> IO ()
+defaultLogActionHPrintDoc logflags asciiSpace h d
+ = defaultLogActionHPutStrDoc logflags asciiSpace h (d $$ text "")
 
 -- | The boolean arguments let's the pretty printer know if it can optimize indent
 -- by writing ascii ' ' characters without going through decoding.
-defaultLogActionHPutStrDoc :: DynFlags -> Bool -> Handle -> SDoc -> IO ()
-defaultLogActionHPutStrDoc dflags asciiSpace h d
+defaultLogActionHPutStrDoc :: LogFlags -> Bool -> Handle -> SDoc -> IO ()
+defaultLogActionHPutStrDoc logflags asciiSpace h d
   -- Don't add a newline at the end, so that successive
   -- calls to this log-action can output all on the same line
-  = printSDoc ctx (Pretty.PageMode asciiSpace) h d
-    where
-      ctx = initSDocContext dflags defaultUserStyle
+  = printSDoc (log_default_dump_context logflags) (Pretty.PageMode asciiSpace) h d
 
 --
 -- Note [JSON Error Messages]
@@ -301,8 +422,8 @@ defaultLogActionHPutStrDoc dflags asciiSpace h d
 
 -- | Default action for 'dumpAction' hook
 defaultDumpAction :: DumpCache -> LogAction -> DumpAction
-defaultDumpAction dumps log_action dflags sty flag title _fmt doc =
-  dumpSDocWithStyle dumps log_action sty dflags flag title doc
+defaultDumpAction dumps log_action logflags sty flag title _fmt doc =
+  dumpSDocWithStyle dumps log_action sty logflags flag title doc
 
 -- | Write out a dump.
 --
@@ -311,38 +432,37 @@ defaultDumpAction dumps log_action dflags sty flag title _fmt doc =
 --
 -- When @hdr@ is empty, we print in a more compact format (no separators and
 -- blank lines)
-dumpSDocWithStyle :: DumpCache -> LogAction -> PprStyle -> DynFlags -> DumpFlag -> String -> SDoc -> IO ()
-dumpSDocWithStyle dumps log_action sty dflags flag hdr doc =
-    withDumpFileHandle dumps dflags flag writeDump
+dumpSDocWithStyle :: DumpCache -> LogAction -> PprStyle -> LogFlags -> DumpFlag -> String -> SDoc -> IO ()
+dumpSDocWithStyle dumps log_action sty logflags flag hdr doc =
+    withDumpFileHandle dumps logflags flag writeDump
   where
     -- write dump to file
     writeDump (Just handle) = do
         doc' <- if null hdr
                 then return doc
-                else do t <- getCurrentTime
-                        let timeStamp = if (gopt Opt_SuppressTimestamps dflags)
-                                          then empty
-                                          else text (show t)
+                else do timeStamp <- if log_enable_timestamps logflags
+                          then (text . show) <$> getCurrentTime
+                          else pure empty
                         let d = timeStamp
                                 $$ blankLine
                                 $$ doc
                         return $ mkDumpDoc hdr d
         -- When we dump to files we use UTF8. Which allows ascii spaces.
-        defaultLogActionHPrintDoc dflags True handle (withPprStyle sty doc')
+        defaultLogActionHPrintDoc logflags True handle (withPprStyle sty doc')
 
     -- write the dump to stdout
     writeDump Nothing = do
         let (doc', msg_class)
               | null hdr  = (doc, MCOutput)
               | otherwise = (mkDumpDoc hdr doc, MCDump)
-        log_action dflags msg_class noSrcSpan (withPprStyle sty doc')
+        log_action logflags msg_class noSrcSpan (withPprStyle sty doc')
 
 
 -- | Run an action with the handle of a 'DumpFlag' if we are outputting to a
 -- file, otherwise 'Nothing'.
-withDumpFileHandle :: DumpCache -> DynFlags -> DumpFlag -> (Maybe Handle -> IO ()) -> IO ()
-withDumpFileHandle dumps dflags flag action = do
-    let mFile = chooseDumpFile dflags flag
+withDumpFileHandle :: DumpCache -> LogFlags -> DumpFlag -> (Maybe Handle -> IO ()) -> IO ()
+withDumpFileHandle dumps logflags flag action = do
+    let mFile = chooseDumpFile logflags flag
     case mFile of
       Just fileName -> do
         gd <- readIORef dumps
@@ -361,10 +481,10 @@ withDumpFileHandle dumps dflags flag action = do
             action (Just handle)
       Nothing -> action Nothing
 
--- | Choose where to put a dump file based on DynFlags and DumpFlag
-chooseDumpFile :: DynFlags -> DumpFlag -> Maybe FilePath
-chooseDumpFile dflags flag
-    | gopt Opt_DumpToFile dflags || forced_to_file
+-- | Choose where to put a dump file based on LogFlags and DumpFlag
+chooseDumpFile :: LogFlags -> DumpFlag -> Maybe FilePath
+chooseDumpFile logflags flag
+    | log_dump_to_file logflags || forced_to_file
     , Just prefix <- getPrefix
     = Just $ setDir (prefix ++ dump_suffix)
 
@@ -389,27 +509,46 @@ chooseDumpFile dflags flag
     getPrefix
          -- dump file location is being forced
          --      by the --ddump-file-prefix flag.
-       | Just prefix <- dumpPrefixForce dflags
+       | Just prefix <- log_dump_prefix_override logflags
           = Just prefix
          -- dump file location chosen by GHC.Driver.Pipeline.runPipeline
-       | Just prefix <- dumpPrefix dflags
+       | Just prefix <- log_dump_prefix logflags
           = Just prefix
          -- we haven't got a place to put a dump file.
        | otherwise
           = Nothing
-    setDir f = case dumpDir dflags of
+    setDir f = case log_dump_dir logflags of
                  Just d  -> d </> f
                  Nothing ->       f
 
--- | This is a helper for 'dumpIfSet' to ensure that it's not duplicated
--- despite the fact that 'dumpIfSet' has an @INLINE@.
-doDump :: Logger -> DynFlags -> String -> SDoc -> IO ()
-doDump logger dflags hdr doc =
-  putLogMsg logger dflags
-            MCDump
-            noSrcSpan
-            (withPprStyle defaultDumpStyle
-              (mkDumpDoc hdr doc))
+
+
+-- | Default action for 'traceAction' hook
+defaultTraceAction :: TraceAction a
+defaultTraceAction logflags title doc x =
+  if not (log_enable_debug logflags)
+    then x
+    else trace (showSDocDump (log_default_dump_context logflags)
+                             (sep [text title, nest 2 doc])) x
+
+
+-- | Log something
+logMsg :: Logger -> MessageClass -> SrcSpan -> SDoc -> IO ()
+logMsg logger mc loc msg = putLogMsg logger (logFlags logger) mc loc msg
+
+-- | Dump something
+logDumpFile :: Logger -> PprStyle -> DumpFlag -> String -> DumpFormat -> SDoc -> IO ()
+logDumpFile logger = putDumpFile logger (logFlags logger)
+
+-- | Log a trace message
+logTraceMsg :: Logger -> String -> SDoc -> a -> a
+logTraceMsg logger hdr doc a = putTraceMsg logger (logFlags logger) hdr doc a
+
+-- | Log a dump message (not a dump file)
+logDumpMsg :: Logger -> String -> SDoc -> IO ()
+logDumpMsg logger hdr doc = logMsg logger MCDump noSrcSpan
+  (withPprStyle defaultDumpStyle
+  (mkDumpDoc hdr doc))
 
 mkDumpDoc :: String -> SDoc -> SDoc
 mkDumpDoc hdr doc
@@ -421,50 +560,32 @@ mkDumpDoc hdr doc
         line = text "===================="
 
 
-dumpIfSet :: Logger -> DynFlags -> Bool -> String -> SDoc -> IO ()
-dumpIfSet logger dflags flag hdr doc
-  | not flag   = return ()
-  | otherwise  = doDump logger dflags hdr doc
-{-# INLINE dumpIfSet #-}  -- see Note [INLINE conditional tracing utilities]
+-- | Dump if the given DumpFlag is set
+putDumpFileMaybe :: Logger -> DumpFlag -> String -> DumpFormat -> SDoc -> IO ()
+putDumpFileMaybe logger = putDumpFileMaybe' logger alwaysQualify
+{-# INLINE putDumpFileMaybe #-}  -- see Note [INLINE conditional tracing utilities]
 
--- | A wrapper around 'dumpAction'.
--- First check whether the dump flag is set
--- Do nothing if it is unset
-dumpIfSet_dyn :: Logger -> DynFlags -> DumpFlag -> String -> DumpFormat -> SDoc -> IO ()
-dumpIfSet_dyn = dumpIfSet_dyn_printer alwaysQualify
-{-# INLINE dumpIfSet_dyn #-}  -- see Note [INLINE conditional tracing utilities]
-
--- | A wrapper around 'putDumpMsg'.
--- First check whether the dump flag is set
--- Do nothing if it is unset
+-- | Dump if the given DumpFlag is set
 --
--- Unlike 'dumpIfSet_dyn', has a printer argument
-dumpIfSet_dyn_printer
-    :: PrintUnqualified
-    -> Logger
-    -> DynFlags
+-- Unlike 'putDumpFileMaybe', has a PrintUnqualified argument
+putDumpFileMaybe'
+    :: Logger
+    -> PrintUnqualified
     -> DumpFlag
     -> String
     -> DumpFormat
     -> SDoc
     -> IO ()
-dumpIfSet_dyn_printer printer logger dflags flag hdr fmt doc
-  = when (dopt flag dflags) $ do
+putDumpFileMaybe' logger printer flag hdr fmt doc
+  = when (logHasDumpFlag logger flag) $ do
       let sty = mkDumpStyle printer
-      putDumpMsg logger dflags sty flag hdr fmt doc
-{-# INLINE dumpIfSet_dyn_printer #-}  -- see Note [INLINE conditional tracing utilities]
+      logDumpFile logger sty flag hdr fmt doc
+{-# INLINE putDumpFileMaybe' #-}  -- see Note [INLINE conditional tracing utilities]
 
 -- | Ensure that a dump file is created even if it stays empty
-touchDumpFile :: Logger -> DynFlags -> DumpFlag -> IO ()
-touchDumpFile logger dflags flag =
-    withDumpFileHandle (generated_dumps logger) dflags flag (const (return ()))
-
-
--- | Default action for 'traceAction' hook
-defaultTraceAction :: TraceAction a
-defaultTraceAction dflags title doc = pprTraceWithFlags dflags title doc
-
-
+touchDumpFile :: Logger -> DumpFlag -> IO ()
+touchDumpFile logger flag =
+    withDumpFileHandle (generated_dumps logger) (logFlags logger) flag (const (return ()))
 
 class HasLogger m where
     getLogger :: m Logger
