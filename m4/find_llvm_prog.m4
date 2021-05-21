@@ -11,7 +11,9 @@
 #
 AC_DEFUN([FIND_LLVM_PROG],[
     # Test for program with and without version name.
-    PROG_VERSION_CANDIDATES=$(for llvmVersion in `seq $4 -1 $3`; do echo "$2-$llvmVersion $2-$llvmVersion.0"; done)
+    LOWER_MAJOR_VERSION=`echo $3|awk -F'.' '{print $1}'`
+    UPPER_MAJOR_VERSION=`echo $4|awk -F'.' '{print $1}'`
+    PROG_VERSION_CANDIDATES=$(for llvmVersion in `seq $UPPER_MAJOR_VERSION -1 $LOWER_MAJOR_VERSION`; do echo "$2-$llvmVersion $2-$llvmVersion.0"; done)
     AC_CHECK_TOOLS([$1], [$PROG_VERSION_CANDIDATES $2], [])
     AS_IF([test x"$$1" != x],[
         PROG_VERSION=`$$1 --version | awk '/.*version [[0-9\.]]+/{for(i=1;i<=NF;i++){ if(\$i ~ /^[[0-9\.]]+$/){print \$i}}}'`
