@@ -1,0 +1,315 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 178, types: 125, coercions: 0, joins: 0/0}
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T17819.$trModule4 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+T17819.$trModule4 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T17819.$trModule3 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T17819.$trModule3 = GHC.Types.TrNameS T17819.$trModule4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T17819.$trModule2 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+T17819.$trModule2 = "T17819"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T17819.$trModule1 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T17819.$trModule1 = GHC.Types.TrNameS T17819.$trModule2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T17819.$trModule :: GHC.Types.Module
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T17819.$trModule
+  = GHC.Types.Module T17819.$trModule3 T17819.$trModule1
+
+-- RHS size: {terms: 23, types: 8, coercions: 0, joins: 0/0}
+T17819.$wbar [InlPrag=NOINLINE]
+  :: GHC.Prim.Int#
+     -> GHC.Prim.Int#
+     -> GHC.Prim.Int#
+     -> GHC.Prim.Int#
+     -> GHC.Prim.Int#
+     -> GHC.Prim.Int#
+     -> GHC.Prim.Int#
+     -> GHC.Prim.Int#
+     -> GHC.Prim.Int#
+[GblId, Arity=8, Str=<L><L><L><L><L><L><L><L>, Unf=OtherCon []]
+T17819.$wbar
+  = \ (ww_szq :: GHC.Prim.Int#)
+      (ww1_szt :: GHC.Prim.Int#)
+      (ww2_szw :: GHC.Prim.Int#)
+      (ww3_szz :: GHC.Prim.Int#)
+      (ww4_szC :: GHC.Prim.Int#)
+      (ww5_szF :: GHC.Prim.Int#)
+      (ww6_szI :: GHC.Prim.Int#)
+      (ww7_szL :: GHC.Prim.Int#) ->
+      GHC.Prim.+#
+        (GHC.Prim.+#
+           (GHC.Prim.+#
+              (GHC.Prim.+#
+                 (GHC.Prim.+#
+                    (GHC.Prim.+# (GHC.Prim.+# ww_szq ww1_szt) ww2_szw) ww3_szz)
+                 ww4_szC)
+              ww5_szF)
+           ww6_szI)
+        ww7_szL
+
+-- RHS size: {terms: 45, types: 25, coercions: 0, joins: 0/0}
+bar [InlPrag=[final]]
+  :: Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int
+[GblId,
+ Arity=8,
+ Str=<1P(L)><1P(L)><1P(L)><1P(L)><1P(L)><1P(L)><1P(L)><1P(L)>,
+ Cpr=1,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=8,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (x1_aww [Occ=Once1!] :: Int)
+                 (x2_awx [Occ=Once1!] :: Int)
+                 (x3_awy [Occ=Once1!] :: Int)
+                 (x4_awz [Occ=Once1!] :: Int)
+                 (x5_awA [Occ=Once1!] :: Int)
+                 (x6_awB [Occ=Once1!] :: Int)
+                 (x7_awC [Occ=Once1!] :: Int)
+                 (x8_awD [Occ=Once1!] :: Int) ->
+                 case x1_aww of { GHC.Types.I# ww_szq [Occ=Once1] ->
+                 case x2_awx of { GHC.Types.I# ww1_szt [Occ=Once1] ->
+                 case x3_awy of { GHC.Types.I# ww2_szw [Occ=Once1] ->
+                 case x4_awz of { GHC.Types.I# ww3_szz [Occ=Once1] ->
+                 case x5_awA of { GHC.Types.I# ww4_szC [Occ=Once1] ->
+                 case x6_awB of { GHC.Types.I# ww5_szF [Occ=Once1] ->
+                 case x7_awC of { GHC.Types.I# ww6_szI [Occ=Once1] ->
+                 case x8_awD of { GHC.Types.I# ww7_szL [Occ=Once1] ->
+                 case T17819.$wbar
+                        ww_szq ww1_szt ww2_szw ww3_szz ww4_szC ww5_szF ww6_szI ww7_szL
+                 of ww8_sAq [Occ=Once1]
+                 { __DEFAULT ->
+                 GHC.Types.I# ww8_sAq
+                 }
+                 }
+                 }
+                 }
+                 }
+                 }
+                 }
+                 }
+                 }}]
+bar
+  = \ (x1_aww :: Int)
+      (x2_awx :: Int)
+      (x3_awy :: Int)
+      (x4_awz :: Int)
+      (x5_awA :: Int)
+      (x6_awB :: Int)
+      (x7_awC :: Int)
+      (x8_awD :: Int) ->
+      case x1_aww of { GHC.Types.I# ww_szq ->
+      case x2_awx of { GHC.Types.I# ww1_szt ->
+      case x3_awy of { GHC.Types.I# ww2_szw ->
+      case x4_awz of { GHC.Types.I# ww3_szz ->
+      case x5_awA of { GHC.Types.I# ww4_szC ->
+      case x6_awB of { GHC.Types.I# ww5_szF ->
+      case x7_awC of { GHC.Types.I# ww6_szI ->
+      case x8_awD of { GHC.Types.I# ww7_szL ->
+      case T17819.$wbar
+             ww_szq ww1_szt ww2_szw ww3_szz ww4_szC ww5_szF ww6_szI ww7_szL
+      of ww8_sAq
+      { __DEFAULT ->
+      GHC.Types.I# ww8_sAq
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+
+-- RHS size: {terms: 32, types: 11, coercions: 0, joins: 0/0}
+T17819.$wfoo [InlPrag=NOINLINE]
+  :: GHC.Prim.Int#
+     -> GHC.Prim.Int#
+     -> GHC.Prim.Int#
+     -> GHC.Prim.Int#
+     -> GHC.Prim.Int#
+     -> GHC.Prim.Int#
+     -> GHC.Prim.Int#
+     -> GHC.Prim.Int#
+     -> GHC.Prim.Int#
+     -> GHC.Prim.Int#
+     -> GHC.Prim.Int#
+     -> GHC.Prim.Int#
+[GblId,
+ Arity=11,
+ Str=<L><L><L><L><L><L><L><L><L><L><L>,
+ Unf=OtherCon []]
+T17819.$wfoo
+  = \ (ww_szR :: GHC.Prim.Int#)
+      (ww1_szU :: GHC.Prim.Int#)
+      (ww2_szX :: GHC.Prim.Int#)
+      (ww3_sA0 :: GHC.Prim.Int#)
+      (ww4_sA3 :: GHC.Prim.Int#)
+      (ww5_sA6 :: GHC.Prim.Int#)
+      (ww6_sA9 :: GHC.Prim.Int#)
+      (ww7_sAc :: GHC.Prim.Int#)
+      (ww8_sAf :: GHC.Prim.Int#)
+      (ww9_sAi :: GHC.Prim.Int#)
+      (ww10_sAl :: GHC.Prim.Int#) ->
+      GHC.Prim.+#
+        (GHC.Prim.+#
+           (GHC.Prim.+#
+              (GHC.Prim.+#
+                 (GHC.Prim.+#
+                    (GHC.Prim.+#
+                       (GHC.Prim.+#
+                          (GHC.Prim.+#
+                             (GHC.Prim.+# (GHC.Prim.+# ww_szR ww1_szU) ww2_szX) ww3_sA0)
+                          ww4_sA3)
+                       ww5_sA6)
+                    ww6_sA9)
+                 ww7_sAc)
+              ww8_sAf)
+           ww9_sAi)
+        ww10_sAl
+
+-- RHS size: {terms: 60, types: 34, coercions: 0, joins: 0/0}
+foo [InlPrag=[final]]
+  :: Int
+     -> Int
+     -> Int
+     -> Int
+     -> Int
+     -> Int
+     -> Int
+     -> Int
+     -> Int
+     -> Int
+     -> Int
+     -> Int
+[GblId,
+ Arity=11,
+ Str=<1P(L)><1P(L)><1P(L)><1P(L)><1P(L)><1P(L)><1P(L)><1P(L)><1P(L)><1P(L)><1P(L)>,
+ Cpr=1,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=11,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (x1_au5 [Occ=Once1!] :: Int)
+                 (x2_au6 [Occ=Once1!] :: Int)
+                 (x3_au7 [Occ=Once1!] :: Int)
+                 (x4_au8 [Occ=Once1!] :: Int)
+                 (x5_au9 [Occ=Once1!] :: Int)
+                 (x6_aua [Occ=Once1!] :: Int)
+                 (x7_aub [Occ=Once1!] :: Int)
+                 (x8_auc [Occ=Once1!] :: Int)
+                 (x9_aud [Occ=Once1!] :: Int)
+                 (x10_aue [Occ=Once1!] :: Int)
+                 (x11_auf [Occ=Once1!] :: Int) ->
+                 case x1_au5 of { GHC.Types.I# ww_szR [Occ=Once1] ->
+                 case x2_au6 of { GHC.Types.I# ww1_szU [Occ=Once1] ->
+                 case x3_au7 of { GHC.Types.I# ww2_szX [Occ=Once1] ->
+                 case x4_au8 of { GHC.Types.I# ww3_sA0 [Occ=Once1] ->
+                 case x5_au9 of { GHC.Types.I# ww4_sA3 [Occ=Once1] ->
+                 case x6_aua of { GHC.Types.I# ww5_sA6 [Occ=Once1] ->
+                 case x7_aub of { GHC.Types.I# ww6_sA9 [Occ=Once1] ->
+                 case x8_auc of { GHC.Types.I# ww7_sAc [Occ=Once1] ->
+                 case x9_aud of { GHC.Types.I# ww8_sAf [Occ=Once1] ->
+                 case x10_aue of { GHC.Types.I# ww9_sAi [Occ=Once1] ->
+                 case x11_auf of { GHC.Types.I# ww10_sAl [Occ=Once1] ->
+                 case T17819.$wfoo
+                        ww_szR
+                        ww1_szU
+                        ww2_szX
+                        ww3_sA0
+                        ww4_sA3
+                        ww5_sA6
+                        ww6_sA9
+                        ww7_sAc
+                        ww8_sAf
+                        ww9_sAi
+                        ww10_sAl
+                 of ww11_sAs [Occ=Once1]
+                 { __DEFAULT ->
+                 GHC.Types.I# ww11_sAs
+                 }
+                 }
+                 }
+                 }
+                 }
+                 }
+                 }
+                 }
+                 }
+                 }
+                 }
+                 }}]
+foo
+  = \ (x1_au5 :: Int)
+      (x2_au6 :: Int)
+      (x3_au7 :: Int)
+      (x4_au8 :: Int)
+      (x5_au9 :: Int)
+      (x6_aua :: Int)
+      (x7_aub :: Int)
+      (x8_auc :: Int)
+      (x9_aud :: Int)
+      (x10_aue :: Int)
+      (x11_auf :: Int) ->
+      case x1_au5 of { GHC.Types.I# ww_szR ->
+      case x2_au6 of { GHC.Types.I# ww1_szU ->
+      case x3_au7 of { GHC.Types.I# ww2_szX ->
+      case x4_au8 of { GHC.Types.I# ww3_sA0 ->
+      case x5_au9 of { GHC.Types.I# ww4_sA3 ->
+      case x6_aua of { GHC.Types.I# ww5_sA6 ->
+      case x7_aub of { GHC.Types.I# ww6_sA9 ->
+      case x8_auc of { GHC.Types.I# ww7_sAc ->
+      case x9_aud of { GHC.Types.I# ww8_sAf ->
+      case x10_aue of { GHC.Types.I# ww9_sAi ->
+      case x11_auf of { GHC.Types.I# ww10_sAl ->
+      case T17819.$wfoo
+             ww_szR
+             ww1_szU
+             ww2_szX
+             ww3_sA0
+             ww4_sA3
+             ww5_sA6
+             ww6_sA9
+             ww7_sAc
+             ww8_sAf
+             ww9_sAi
+             ww10_sAl
+      of ww11_sAs
+      { __DEFAULT ->
+      GHC.Types.I# ww11_sAs
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+      }
+
+
+
