@@ -23,7 +23,7 @@ AC_MSG_RESULT($WINDOWS)
 AC_CHECK_TYPES([long long])
 
 # check for specific header (.h) files that we are interested in
-AC_CHECK_HEADERS([ctype.h errno.h fcntl.h inttypes.h limits.h signal.h sys/file.h sys/resource.h sys/select.h sys/stat.h sys/syscall.h sys/time.h sys/timeb.h sys/timers.h sys/times.h sys/types.h sys/utsname.h sys/wait.h termios.h time.h unistd.h utime.h windows.h winsock.h langinfo.h poll.h sys/epoll.h sys/event.h sys/eventfd.h sys/socket.h])
+AC_CHECK_HEADERS([ctype.h errno.h fcntl.h inttypes.h limits.h signal.h sys/file.h sys/resource.h sys/select.h sys/stat.h sys/syscall.h sys/time.h sys/timeb.h sys/timers.h sys/times.h sys/types.h sys/utsname.h sys/wait.h termios.h time.h unistd.h utime.h windows.h winsock.h langinfo.h poll.h sys/epoll.h sys/event.h sys/eventfd.h sys/socket.h linux/io_uring.h])
 
 # Enable large file support. Do this before testing the types ino_t, off_t, and
 # rlim_t, because it will affect the result of that test.
@@ -60,6 +60,11 @@ struct kevent kev;])
 
   AC_CHECK_SIZEOF([kev.flags], [], [#include <sys/event.h>
 struct kevent kev;])
+fi
+
+if test "$ac_cv_header_linux_io_uring_h" = yes; then
+  # Not all versions of io_uring have the opcodes we need so just having the library is not enough
+  AC_CHECK_DECLS([IORING_OP_POLL_ADD IORING_OP_POLL_REMOVE IORING_OP_TIMEOUT], [AC_DEFINE([HAVE_IO_URING], [1], [Define if you have io_uring support.])], [], [[#include <linux/io_uring.h>]])
 fi
 
 if test "$ac_cv_header_poll_h" = yes && test "$ac_cv_func_poll" = yes; then
