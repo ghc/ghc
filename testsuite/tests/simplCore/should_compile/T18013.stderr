@@ -140,8 +140,8 @@ mapMaybeRule [InlPrag=[2]]
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (@a) (@b) (w [Occ=Once1!] :: Rule IO a b) ->
-                 case w of { Rule @s ww ww1 [Occ=OnceL1!] ->
+         Tmpl= \ (@a) (@b) (f [Occ=Once1!] :: Rule IO a b) ->
+                 case f of { Rule @s ww ww1 [Occ=OnceL1!] ->
                  T18013a.Rule
                    @IO
                    @(Maybe a)
@@ -176,8 +176,8 @@ mapMaybeRule [InlPrag=[2]]
                                       ~R# (s -> Maybe a -> IO (Result s (Maybe b))))
                  }}]
 mapMaybeRule
-  = \ (@a) (@b) (w :: Rule IO a b) ->
-      case w of { Rule @s ww ww1 ->
+  = \ (@a) (@b) (f :: Rule IO a b) ->
+      case f of { Rule @s ww ww1 ->
       let {
         lvl :: Result s (Maybe b)
         [LclId, Unf=OtherCon []]
