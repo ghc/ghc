@@ -44,6 +44,7 @@ runTestGhcFlags = do
         , ifMinGhcVer "711" "-fshow-warning-groups"
         , ifMinGhcVer "801" "-fdiagnostics-color=never"
         , ifMinGhcVer "801" "-fno-diagnostics-show-caret"
+        , ifMinGhcVer "811" "-fdiagnostics-show-contexts"
         , pure "-Werror=compat" -- See #15278
         , pure "-dno-debug-output"
         ]
