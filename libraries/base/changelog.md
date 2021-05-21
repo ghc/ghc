@@ -1,5 +1,16 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
+## 4.14.2.0 *June 2021*
+
+  * Bundled with GHC 8.10.5
+
+  * Update Unicode class definitions to Unicode version 7.0
+
+  * Inline mconcat (#17123)
+
+  * Enable large-file support in `base`'s the OFD file locking
+    implementation, avoiding #17950.
+
 ## 4.14.1.0 *Jul 2020*
 
   * Bundled with GHC 8.10.2
