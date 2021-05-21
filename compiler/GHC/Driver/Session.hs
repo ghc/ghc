@@ -24,7 +24,7 @@ module GHC.Driver.Session (
         WarningFlag(..), DiagnosticReason(..),
         Language(..),
         PlatformConstants(..),
-        FatalMessager, FlushOut(..), FlushErr(..),
+        FatalMessager, FlushOut(..),
         ProfAuto(..),
         glasgowExtsFlags,
         hasPprDebug, hasNoDebugOutput, hasNoStateHack, hasNoOptCoercion,
@@ -150,7 +150,6 @@ module GHC.Driver.Session (
         initDynFlags,                   -- DynFlags -> IO DynFlags
         defaultFatalMessager,
         defaultFlushOut,
-        defaultFlushErr,
         setOutputFile, setDynOutputFile, setOutputHi,
 
         getOpts,                        -- DynFlags -> (DynFlags -> [a]) -> [a]
@@ -232,7 +231,7 @@ import GHC.Driver.Flags
 import GHC.Driver.Backend
 import GHC.Settings.Config
 import GHC.Utils.CliOption
-import {-# SOURCE #-} GHC.Core.Unfold
+import GHC.Core.Unfold
 import GHC.Driver.CmdLine
 import GHC.Settings.Constants
 import GHC.Utils.Panic
@@ -452,7 +451,6 @@ data DynFlags = DynFlags {
   simplPhases           :: Int,         -- ^ Number of simplifier phases
   maxSimplIterations    :: Int,         -- ^ Max simplifier iterations
   ruleCheck             :: Maybe String,
-  inlineCheck           :: Maybe String, -- ^ A prefix to report inlining decisions about
   strictnessBefore      :: [Int],       -- ^ Additional demand analysis
 
   parMakeCount          :: Maybe Int,   -- ^ The number of modules to compile in parallel
@@ -648,7 +646,6 @@ data DynFlags = DynFlags {
   ghciHistSize          :: Int,
 
   flushOut              :: FlushOut,
-  flushErr              :: FlushErr,
 
   ghcVersionFile        :: Maybe FilePath,
   haddockOptions        :: Maybe String,
@@ -1122,7 +1119,6 @@ defaultDynFlags mySettings llvmConfig =
         simplPhases             = 2,
         maxSimplIterations      = 4,
         ruleCheck               = Nothing,
-        inlineCheck             = Nothing,
         binBlobThreshold        = 500000, -- 500K is a good default (see #16190)
         maxRelevantBinds        = Just 6,
         maxValidHoleFits   = Just 6,
@@ -1252,7 +1248,6 @@ defaultDynFlags mySettings llvmConfig =
         ghciHistSize = 50, -- keep a log of length 50 by default
 
         flushOut = defaultFlushOut,
-        flushErr = defaultFlushErr,
         pprUserLength = 5,
         pprCols = 100,
         useUnicode = False,
@@ -1296,11 +1291,6 @@ newtype FlushOut = FlushOut (IO ())
 
 defaultFlushOut :: FlushOut
 defaultFlushOut = FlushOut $ hFlush stdout
-
-newtype FlushErr = FlushErr (IO ())
-
-defaultFlushErr :: FlushErr
-defaultFlushErr = FlushErr $ hFlush stderr
 
 {-
 Note [Verbosity levels]
@@ -2519,7 +2509,7 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "dsource-stats"
         (setDumpFlag Opt_D_source_stats)
   , make_ord_flag defGhcFlag "dverbose-core2core"
-        (NoArg $ setVerbosity (Just 2) >> setVerboseCore2Core)
+        (NoArg $ setVerbosity (Just 2) >> setDumpFlag' Opt_D_verbose_core2core)
   , make_ord_flag defGhcFlag "dverbose-stg2stg"
         (setDumpFlag Opt_D_verbose_stg2stg)
   , make_ord_flag defGhcFlag "ddump-hi"
@@ -2559,7 +2549,7 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "dshow-passes"
         (NoArg $ forceRecompile >> (setVerbosity $ Just 2))
   , make_ord_flag defGhcFlag "dfaststring-stats"
-        (NoArg (setGeneralFlag Opt_D_faststring_stats))
+        (setDumpFlag Opt_D_faststring_stats)
   , make_ord_flag defGhcFlag "dno-llvm-mangler"
         (NoArg (setGeneralFlag Opt_NoLlvmMangler)) -- hidden flag
   , make_ord_flag defGhcFlag "dno-typeable-binds"
@@ -2718,7 +2708,7 @@ dynamic_flags_deps = [
   , make_ord_flag defFlag "drule-check"
       (sepArg (\s d -> d { ruleCheck = Just s }))
   , make_ord_flag defFlag "dinline-check"
-      (sepArg (\s d -> d { inlineCheck = Just s }))
+      (sepArg (\s d -> d { unfoldingOpts = updateReportPrefix (Just s) (unfoldingOpts d)}))
   , make_ord_flag defFlag "freduction-depth"
       (intSuffix (\n d -> d { reductionDepth = treatZeroAsInf n }))
   , make_ord_flag defFlag "fconstraint-solver-iterations"
@@ -4175,9 +4165,6 @@ forceRecompile = do dfs <- liftEwM getCmdLineState
         where
           force_recomp dfs = isOneShot (ghcMode dfs)
 
-
-setVerboseCore2Core :: DynP ()
-setVerboseCore2Core = setDumpFlag' Opt_D_verbose_core2core
 
 setVerbosity :: Maybe Int -> DynP ()
 setVerbosity mb_n = upd (\dfs -> dfs{ verbosity = mb_n `orElse` 3 })

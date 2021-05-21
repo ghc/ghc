@@ -96,7 +96,7 @@ doMkDependHS srcs = do
     let sorted = GHC.topSortModuleGraph False module_graph Nothing
 
     -- Print out the dependencies if wanted
-    liftIO $ debugTraceMsg logger dflags 2 (text "Module dependencies" $$ ppr sorted)
+    liftIO $ debugTraceMsg logger 2 (text "Module dependencies" $$ ppr sorted)
 
     -- Process them one by one, dumping results into makefile
     -- and complaining about cycles
@@ -105,10 +105,10 @@ doMkDependHS srcs = do
     mapM_ (liftIO . processDeps dflags hsc_env excl_mods root (mkd_tmp_hdl files)) sorted
 
     -- If -ddump-mod-cycles, show cycles in the module graph
-    liftIO $ dumpModCycles logger dflags module_graph
+    liftIO $ dumpModCycles logger module_graph
 
     -- Tidy up
-    liftIO $ endMkDependHS logger dflags files
+    liftIO $ endMkDependHS logger files
 
     -- Unconditional exiting is a bad idea.  If an error occurs we'll get an
     --exception; if that is not caught it's fine, but at least we have a
@@ -347,9 +347,9 @@ insertSuffixes file_name extras
 --
 -----------------------------------------------------------------
 
-endMkDependHS :: Logger -> DynFlags -> MkDepFiles -> IO ()
+endMkDependHS :: Logger -> MkDepFiles -> IO ()
 
-endMkDependHS logger dflags
+endMkDependHS logger
    (MkDep { mkd_make_file = makefile, mkd_make_hdl =  makefile_hdl,
             mkd_tmp_file  = tmp_file, mkd_tmp_hdl  =  tmp_hdl })
   = do
@@ -367,11 +367,11 @@ endMkDependHS logger dflags
 
         -- Create a backup of the original makefile
   when (isJust makefile_hdl) $ do
-    showPass logger dflags ("Backing up " ++ makefile)
+    showPass logger ("Backing up " ++ makefile)
     SysTools.copyFile makefile (makefile++".bak")
 
         -- Copy the new makefile in place
-  showPass logger dflags "Installing new makefile"
+  showPass logger "Installing new makefile"
   SysTools.copyFile tmp_file makefile
 
 
@@ -379,16 +379,16 @@ endMkDependHS logger dflags
 --              Module cycles
 -----------------------------------------------------------------
 
-dumpModCycles :: Logger -> DynFlags -> ModuleGraph -> IO ()
-dumpModCycles logger dflags module_graph
-  | not (dopt Opt_D_dump_mod_cycles dflags)
+dumpModCycles :: Logger -> ModuleGraph -> IO ()
+dumpModCycles logger module_graph
+  | not (logHasDumpFlag logger Opt_D_dump_mod_cycles)
   = return ()
 
   | null cycles
-  = putMsg logger dflags (text "No module cycles")
+  = putMsg logger (text "No module cycles")
 
   | otherwise
-  = putMsg logger dflags (hang (text "Module cycles found:") 2 pp_cycles)
+  = putMsg logger (hang (text "Module cycles found:") 2 pp_cycles)
   where
     topoSort = filterToposortToModules $
       GHC.topSortModuleGraph True module_graph Nothing
