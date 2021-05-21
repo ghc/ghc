@@ -16,7 +16,6 @@ import GHC.Core
 import GHC.Core.Unfold
 import GHC.Core.Unfold.Make
 import GHC.Core.Utils  ( exprType, exprIsHNF )
-import GHC.Core.FVs    ( exprFreeVars )
 import GHC.Core.Type
 import GHC.Core.Opt.WorkWrap.Utils
 import GHC.Core.FamInstEnv
@@ -210,7 +209,7 @@ unfolding to the *worker*.  So we will get something like this:
   fw d x y' = let y = I# y' in ...f...
 
 How do we "transfer the unfolding"? Easy: by using the old one, wrapped
-in work_fn! See GHC.Core.Unfold.mkWorkerUnfolding.
+in work_fn! See GHC.Core.Unfold.Make.mkWorkerUnfolding.
 
 Note [No worker/wrapper for record selectors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -629,7 +628,13 @@ means GHC.Core.Opt.Arity didn't eta expand that binding. When this happens, it d
 for a reason (see Note [exprArity invariant] in GHC.Core.Opt.Arity) and we probably have
 a PAP, cast or trivial expression as RHS.
 
-Performing the worker/wrapper split will implicitly eta-expand the binding to
+Below is a historical account of what happened when w/w still did eta expansion.
+Nowadays, it doesn't do that, but will simply w/w for the wrong arity, unleashing
+a demand signature meant for e.g. 2 args to be unleashed for e.g. 1 arg
+(manifest arity). That's at least as terrible as doing eta expansion, so don't
+do it.
+---
+When worker/wrapper did eta expansion, it implictly eta expanded the binding to
 idArity, overriding GHC.Core.Opt.Arity's decision. Other than playing fast and loose with
 divergence, it's also broken for newtypes:
 
@@ -684,7 +689,7 @@ splitFun :: WwOpts -> Id -> IdInfo -> CoreExpr -> UniqSM [(Id, CoreExpr)]
 splitFun ww_opts fn_id fn_info rhs
   = warnPprTrace (not (wrap_dmds `lengthIs` (arityInfo fn_info)))
                  (ppr fn_id <+> (ppr wrap_dmds $$ ppr cpr)) $
-    do { mb_stuff <- mkWwBodies ww_opts rhs_fvs fn_id wrap_dmds use_cpr_info
+    do { mb_stuff <- mkWwBodies ww_opts fn_id arg_vars (exprType body) wrap_dmds use_cpr_info
        ; case mb_stuff of
             Nothing -> -- No useful wrapper; leave the binding alone
                        return [(fn_id, rhs)]
@@ -699,11 +704,13 @@ splitFun ww_opts fn_id fn_info rhs
 
               | otherwise
               -> do { work_uniq <- getUniqueM
-                    ; return (mkWWBindPair ww_opts fn_id fn_info rhs
+                    ; return (mkWWBindPair ww_opts fn_id fn_info arg_vars body
                                            work_uniq div cpr stuff) } }
   where
     uf_opts = so_uf_opts (wo_simple_opts ww_opts)
-    rhs_fvs = exprFreeVars rhs
+    (arg_vars, body) = collectBinders rhs
+            -- collectBinders was not enough for GHC.Event.IntTable.insertWith
+            -- last time I checked, where manifest lambdas were wrapped in casts
 
     (wrap_dmds, div) = splitDmdSig (dmdSigInfo fn_info)
 
@@ -722,10 +729,10 @@ splitFun ww_opts fn_id fn_info rhs
 
 
 mkWWBindPair :: WwOpts -> Id -> IdInfo
-             -> CoreExpr -> Unique -> Divergence -> Cpr
+             -> [Var] -> CoreExpr -> Unique -> Divergence -> Cpr
              -> ([Demand], JoinArity, Id -> CoreExpr, Expr CoreBndr -> CoreExpr)
              -> [(Id, CoreExpr)]
-mkWWBindPair ww_opts fn_id fn_info rhs work_uniq div cpr
+mkWWBindPair ww_opts fn_id fn_info fn_args fn_body work_uniq div cpr
              (work_demands, join_arity, wrap_fn, work_fn)
   = [(work_id, work_rhs), (wrap_id, wrap_rhs)]
      -- Worker first, because wrapper mentions it
@@ -736,7 +743,7 @@ mkWWBindPair ww_opts fn_id fn_info rhs work_uniq div cpr
 
     simpl_opts = wo_simple_opts ww_opts
 
-    work_rhs = work_fn rhs
+    work_rhs = work_fn (mkLams fn_args fn_body)
     work_act = case fn_inline_spec of  -- See Note [Worker activation]
                    NoInline -> inl_act fn_inl_prag
                    _        -> inl_act wrap_prag
