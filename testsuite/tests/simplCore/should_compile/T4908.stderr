@@ -63,10 +63,10 @@ T4908.$wf [InlPrag=[2]] :: Int# -> (Int, Int) -> Bool
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [30 20] 101 20}]
 T4908.$wf
-  = \ (ww :: Int#) (w :: (Int, Int)) ->
+  = \ (ww :: Int#) (x :: (Int, Int)) ->
       case ww of ds {
         __DEFAULT ->
-          case w of { (a, b) ->
+          case x of { (a, b) ->
           case b of { I# ds1 ->
           case ds1 of ds2 {
             __DEFAULT -> T4908.f_$s$wf a ds2 (-# ds 1#);
@@ -85,10 +85,10 @@ f [InlPrag=[2]] :: Int -> (Int, Int) -> Bool
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (w [Occ=Once1!] :: Int) (w1 [Occ=Once1] :: (Int, Int)) ->
-                 case w of { I# ww [Occ=Once1] -> T4908.$wf ww w1 }}]
-f = \ (w :: Int) (w1 :: (Int, Int)) ->
-      case w of { I# ww -> T4908.$wf ww w1 }
+         Tmpl= \ (ds [Occ=Once1!] :: Int) (x [Occ=Once1] :: (Int, Int)) ->
+                 case ds of { I# ww [Occ=Once1] -> T4908.$wf ww x }}]
+f = \ (ds :: Int) (x :: (Int, Int)) ->
+      case ds of { I# ww -> T4908.$wf ww x }
 
 
 ------ Local rules for imported ids --------
