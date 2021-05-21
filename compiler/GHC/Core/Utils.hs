@@ -70,7 +70,7 @@ import GHC.Platform
 import GHC.Driver.Ppr
 
 import GHC.Core
-import GHC.Builtin.Names (absentErrorIdKey, makeStaticName, unsafeEqualityProofName)
+import GHC.Builtin.Names (makeStaticName, unsafeEqualityProofName)
 import GHC.Core.Ppr
 import GHC.Core.FVs( exprFreeVars )
 import GHC.Types.Var
@@ -1925,9 +1925,6 @@ exprIsHNFlike is_con is_con_unf = is_hnf_like
     id_app_is_value id n_val_args
        = is_con id
        || idArity id > n_val_args
-       || id `hasKey` absentErrorIdKey  -- See Note [aBSENT_ERROR_ID] in GHC.Core.Make
-                      -- absentError behaves like an honorary data constructor
-
 
 {-
 Note [exprIsHNF Tick]
