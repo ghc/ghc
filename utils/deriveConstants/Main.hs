@@ -893,7 +893,8 @@ writeHaskellType fn ws = atomicWriteFile fn xs
             \  s <- readFile fp\n\
             \  let def = \"#define HS_CONSTANTS \\\"\"\n\
             \      find [] xs = xs\n\
-            \      find _  [] = error $ \"Couldn't find \" ++ def ++ \" in \" ++ fp\n\
+            \      find _  [] = error $ \"GHC couldn't find the RTS constants (\"++def++\") in \" ++ fp ++ \": the RTS package you are trying to use is perhaps for another GHC version\" ++\n\
+            \                               \"(e.g. you are using the wrong package database) or the package database is broken.\\n\"\n\
             \      find (d:ds) (x:xs)\n\
             \        | d == x    = find ds xs\n\
             \        | otherwise = find def xs\n\n\
