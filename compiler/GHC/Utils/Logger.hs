@@ -44,6 +44,7 @@ where
 
 import GHC.Prelude
 import GHC.Driver.Session
+import GHC.Driver.Flags
 import GHC.Driver.Ppr
 import GHC.Types.Error
 import GHC.Types.SrcLoc
@@ -59,6 +60,7 @@ import System.FilePath  ( takeDirectory, (</>) )
 import qualified Data.Set as Set
 import Data.Set (Set)
 import Data.List (intercalate, stripPrefix)
+import qualified Data.List.NonEmpty as NE
 import Data.Time
 import System.IO
 import Control.Monad
@@ -247,21 +249,21 @@ defaultLogAction dflags msg_class srcSpan msg
       flagMsg SevIgnore _                 =  panic "Called flagMsg with SevIgnore"
       flagMsg SevError WarningWithoutFlag =  Just "-Werror"
       flagMsg SevError (WarningWithFlag wflag) = do
-        spec <- flagSpecOf wflag
+        let name = NE.head (warnFlagNames wflag)
         return $
-          "-W" ++ flagSpecName spec ++ warnFlagGrp wflag ++
-          ", -Werror=" ++ flagSpecName spec
+          "-W" ++ name ++ warnFlagGrp wflag ++
+          ", -Werror=" ++ name
       flagMsg SevError ErrorWithoutFlag = Nothing
       flagMsg SevWarning WarningWithoutFlag = Nothing
       flagMsg SevWarning (WarningWithFlag wflag) = do
-        spec <- flagSpecOf wflag
-        return ("-W" ++ flagSpecName spec ++ warnFlagGrp wflag)
+        let name = NE.head (warnFlagNames wflag)
+        return ("-W" ++ name ++ warnFlagGrp wflag)
       flagMsg SevWarning ErrorWithoutFlag =
         panic "SevWarning with ErrorWithoutFlag"
 
       warnFlagGrp flag
           | gopt Opt_ShowWarnGroups dflags =
-                case smallestGroups flag of
+                case smallestWarningGroups flag of
                     [] -> ""
                     groups -> " (in " ++ intercalate ", " (map ("-W"++) groups) ++ ")"
           | otherwise = ""
