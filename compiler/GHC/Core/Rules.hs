@@ -774,7 +774,7 @@ match :: RuleMatchEnv
       -> Maybe RuleSubst
 -- Invariant: typeof( subst(template) ) = typeof( target |> mco )
 
-{- Note [rn_lcl in RuleMatchEnv]
+{- Note [rv_lcl in RuleMatchEnv]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider matching
      \x->f      against    \f->f
@@ -831,6 +831,7 @@ cast is a variable -- which it always is.
 -- See the notes with Unify.match, which matches types
 -- Everything is very similar for terms
 
+------------------------ Variables ---------------------
 -- The Var case follows closely what happens in GHC.Core.Unify.match
 match renv subst (Var v1) e2 mco
   = match_var renv subst v1 (mkCastMCo e2 mco)
@@ -847,6 +848,7 @@ match renv subst e1 (Var v2) mco  -- Note [Expanding variables]
         -- No need to apply any renaming first (hence no rnOccR)
         -- because of the not-inRnEnvR
 
+------------------------ Float lets ---------------------
 match renv subst e1 (Let bind e2) mco
   | -- pprTrace "match:Let" (vcat [ppr bind, ppr $ okToFloat (rv_lcl renv) (bindFreeVars bind)]) $
     not (isJoinBind bind) -- can't float join point out of argument position
@@ -860,18 +862,13 @@ match renv subst e1 (Let bind e2) mco
     (flt_subst', bind') = substBind flt_subst bind
     new_bndrs = bindersOf bind'
 
+------------------------ Literals ---------------------
 match _ subst (Lit lit1) (Lit lit2) mco
   | lit1 == lit2
   = ASSERT2( isReflMCo mco, ppr mco )
     Just subst
 
-match renv subst e1@(App {}) e2@(Lam {}) mco
-  | Just (renv', e2') <- eta_reduce renv e2  -- See Note [Eta reduction in matching]
-  = match renv' subst e1 e2' mco
-
-match renv subst (App f1 a1) (App f2 a2) _mco
-  = match_app renv subst f1 [a1] f2 [a2]
-
+------------------------  Lambdas ---------------------
 match renv subst (Lam x1 e1) e2 mco
   | Just (x2, e2, ts) <- exprIsLambda_maybe (rvInScopeEnv renv) (mkCastMCo e2 mco)
     -- See Note [Lambdas in the template]
@@ -880,12 +877,16 @@ match renv subst (Lam x1 e1) e2 mco
         subst' = subst { rs_binds = rs_binds subst . flip (foldr mkTick) ts }
     in  match renv' subst' e1 e2 MRefl
 
+match renv subst e1 e2@(Lam {}) mco
+  | Just (renv', e2') <- eta_reduce renv e2  -- See Note [Eta reduction in the target]
+  = match renv' subst e1 e2' mco
+
 {- Note [Lambdas in the template]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If we match
    Template:   (\x. blah_template)
    Target:     (\y. blah_target)
-then we want to match inside the lambdas, using rn_lcl to match up
+then we want to match inside the lambdas, using rv_lcl to match up
 x and y.
 
 But what about this?
@@ -896,8 +897,21 @@ This happens quite readily, because the Simplifier generally moves
 casts outside lambdas: see Note [Casts and lambdas] in
 GHC.Core.Opt.Simplify.Utils. So, tiresomely, we want to push `co`
 back inside, which is what `exprIsLambda_maybe` does.  But we've
-stripped off that cast, so now we need to put it back.
+stripped off that cast, so now we need to put it back, hence mkCastMCo.
+
+Unlike the target, where we attempt eta-reduction, we do not attempt
+to eta-reduce the template, and may therefore fail on
+  Template:   \x. f True x
+  Target      f True x
+
+It's not especially easy to deal with eta reducing the template,
+and never happens, because no one write eta-expanded left-hand-sides.
 -}
+
+------------------------ Applications ---------------------
+match renv subst (App f1 a1) (App f2 a2) _mco
+  = match_app renv subst f1 [a1] f2 [a2]
+
 
 {- Disabled: see Note [Matching cases] below
 match renv (tv_subst, id_subst, binds) e1
@@ -932,26 +946,32 @@ match _ _ _e1 _e2 _mco = -- pprTrace "Failing at" ((text "e1:" <+> ppr _e1) $$ (
 
 -------------
 eta_reduce :: RuleMatchEnv -> CoreExpr -> Maybe (RuleMatchEnv, CoreExpr)
--- See Note [Eta reduction in matching]
+-- See Note [Eta reduction in the target]
 eta_reduce renv e
   = go renv id [] e
   where
     go :: RuleMatchEnv -> BindWrapper -> [Var] -> CoreExpr
        -> Maybe (RuleMatchEnv, CoreExpr)
     go renv bw vs (Let b e) = go renv (bw . Let b) vs e
-    go renv bw vs (Lam v e) = go renv bw (v:vs) e
+
+    go renv bw vs (Lam v e) = go renv' bw (v':vs) e
+      where
+         (rn_env', v') = rnBndrR (rv_lcl renv) v
+         renv' = renv { rv_lcl = rn_env' }
+
     go renv bw (v:vs) (App f arg)
-      | Var v' <- arg, v==v'
-      = go (rn_bndr renv v) bw vs f
-      | Type ty <- arg, Just tv <- getTyVar_maybe ty, v==tv
-      = go (rn_bndr renv v) bw vs f
+      | Var a <- arg, v == rnOccR (rv_lcl renv) a
+      = go renv bw vs f
+
+      | Type ty <- arg, Just tv <- getTyVar_maybe ty
+      , v == rnOccR (rv_lcl renv) tv
+      = go renv bw vs f
+
     go renv bw []    e = Just (renv, bw e)
     go _    _  (_:_) _ = Nothing
 
-    -- Ensure that there are no name clashes on v
-    rn_bndr renv v = renv { rv_lcl = fst (rnBndrR (rv_lcl renv) v) }
 
-{- Note [Eta reduction in matching]
+{- Note [Eta reduction the target]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we are faced with this (#19790)
    Template {x}  f x
@@ -960,10 +980,16 @@ You might wonder waht we have an eta-expanded target, but regardless of
 how it came about, we'd like eta-expansion not to impede matching.
 
 So eta_reduce does on-the-fly eta-reduction of the target expression.
-Given (\a b c. let blah in e a b c), it returns (let blah in e).  Note
-that it does /not/ need to check that the bindings 'blah' and
-expression 'e' don't mention a b c; but it /does/ extend the rn_lcl
-RnEnv2.
+Given (\a b c. let blah in e a b c), it returns (let blah in e).
+
+The Lam case of eta_reduce renames as it goes.
+Consider (\x. \x. f x x).  We should not eta- reduce this.  As we go
+we rename the first x to x1, and the second to x2; then both argument
+x's are x2.
+
+A subtle point: it does /not/ need to check that the bindings 'blah'
+and expression 'e' don't mention a b c; but it /does/ extend the
+rv_lcl RnEnv2 (see rn_bndr in eta_reduce).
 * If 'blah' mentions the binders, the let-float rule won't
   fire; and
 * if 'e' mentions the binders we we'll also fail to match
@@ -1067,7 +1093,7 @@ match_tmpl_var (RV { rv_lcl = rn_env, rv_fltR = flt_env })
                subst@(RS { rs_id_subst = id_subst, rs_bndrs = let_bndrs })
                v1' e2
   | any (inRnEnvR rn_env) (exprFreeVarsList e2)
-  = Nothing     -- Occurs check failure
+  = Nothing     -- Skolem-escape failure
                 -- e.g. match forall a. (\x-> a x) against (\y. y y)
 
   | Just e1' <- lookupVarEnv id_subst v1'
