@@ -21,7 +21,7 @@ import GHC.Prelude
 
 -- In a separate module because it hooks into the parser.
 import GHC.Driver.Backpack.Syntax
-import GHC.Driver.Config
+import GHC.Driver.Config.Parser (initParserOpts)
 import GHC.Driver.Monad
 import GHC.Driver.Session
 import GHC.Driver.Ppr
@@ -96,7 +96,7 @@ doBackpack [src_filename] = do
     let dflags1 = dflags0
     src_opts <- liftIO $ getOptionsFromFile dflags1 src_filename
     (dflags, unhandled_flags, warns) <- liftIO $ parseDynamicFilePragma dflags1 src_opts
-    modifySession (\hsc_env -> hsc_env {hsc_dflags = dflags})
+    modifySession (hscSetFlags dflags)
     -- Cribbed from: preprocessFile / GHC.Driver.Pipeline
     liftIO $ checkProcessArgsResult unhandled_flags
     liftIO $ handleFlagWarnings logger dflags warns
@@ -177,9 +177,7 @@ withBkpSession cid insts deps session_type do_this = do
                  , not (null insts) = sub_comp (key_base p) </> uid_str
                  | otherwise = sub_comp (key_base p)
 
-        mk_temp_env hsc_env = hsc_env
-            { hsc_dflags   = mk_temp_dflags (hsc_units hsc_env) (hsc_dflags hsc_env)
-            }
+        mk_temp_env hsc_env = hscUpdateFlags (\dflags -> mk_temp_dflags (hsc_units hsc_env) dflags) hsc_env
         mk_temp_dflags unit_state dflags = dflags
             { backend = case session_type of
                             TcSession -> NoBackend
@@ -415,7 +413,7 @@ addUnit :: GhcMonad m => UnitInfo -> m ()
 addUnit u = do
     hsc_env <- getSession
     logger <- getLogger
-    let dflags0 = hsc_dflags hsc_env
+    let dflags0 = extractDynFlags hsc_env
     let old_unit_env = hsc_unit_env hsc_env
     newdbs <- case ue_unit_dbs old_unit_env of
         Nothing  -> panic "addUnit: called too early"
@@ -439,10 +437,7 @@ addUnit u = do
           , ue_units     = unit_state
           , ue_unit_dbs  = Just dbs
           }
-    setSession $ hsc_env
-        { hsc_dflags   = dflags
-        , hsc_unit_env = unit_env
-        }
+    setSession $ hscSetFlags dflags $ hsc_env { hsc_unit_env = unit_env }
 
 compileInclude :: Int -> (Int, Unit) -> BkpM ()
 compileInclude n (i, uid) = do
@@ -483,7 +478,7 @@ data BkpEnv
 -- Blah, to get rid of the default instance for IOEnv
 -- TODO: just make a proper new monad for BkpM, rather than use IOEnv
 instance {-# OVERLAPPING #-} HasDynFlags BkpM where
-    getDynFlags = fmap hsc_dflags getSession
+    getDynFlags = fmap extractDynFlags getSession
 instance {-# OVERLAPPING #-} HasLogger BkpM where
     getLogger = fmap hsc_logger getSession
 
@@ -540,10 +535,10 @@ initBkpM file bkp m =
 
 -- | Print a compilation progress message, but with indentation according
 -- to @level@ (for nested compilation).
-backpackProgressMsg :: Int -> Logger -> DynFlags -> SDoc -> IO ()
-backpackProgressMsg level logger dflags msg =
-    compilationProgressMsg logger dflags $ text (replicate (level * 2) ' ') -- TODO: use GHC.Utils.Ppr.RStr
-                                      <> msg
+backpackProgressMsg :: Int -> Logger -> SDoc -> IO ()
+backpackProgressMsg level logger msg =
+    compilationProgressMsg logger $ text (replicate (level * 2) ' ') -- TODO: use GHC.Utils.Ppr.RStr
+                                    <> msg
 
 -- | Creates a 'Messager' for Backpack compilation; this is basically
 -- a carbon copy of 'batchMsg' but calling 'backpackProgressMsg', which
@@ -552,11 +547,11 @@ mkBackpackMsg :: BkpM Messager
 mkBackpackMsg = do
     level <- getBkpLevel
     return $ \hsc_env mod_index recomp node ->
-      let dflags = hsc_dflags hsc_env
+      let dflags = extractDynFlags hsc_env
           logger = hsc_logger hsc_env
           state = hsc_units hsc_env
           showMsg msg reason =
-            backpackProgressMsg level logger dflags $ pprWithUnitState state $
+            backpackProgressMsg level logger $ pprWithUnitState state $
                 showModuleIndex mod_index <>
                 msg <> showModMsg dflags (recompileRequired recomp) node
                     <> reason
@@ -565,14 +560,14 @@ mkBackpackMsg = do
           case recomp of
             MustCompile -> showMsg (text "Instantiating ") empty
             UpToDate
-              | verbosity (hsc_dflags hsc_env) >= 2 -> showMsg (text "Skipping  ") empty
+              | verbosity (extractDynFlags hsc_env) >= 2 -> showMsg (text "Skipping  ") empty
               | otherwise -> return ()
             RecompBecause reason -> showMsg (text "Instantiating ") (text " [" <> text reason <> text "]")
         ModuleNode _ ->
           case recomp of
             MustCompile -> showMsg (text "Compiling ") empty
             UpToDate
-              | verbosity (hsc_dflags hsc_env) >= 2 -> showMsg (text "Skipping  ") empty
+              | verbosity (extractDynFlags hsc_env) >= 2 -> showMsg (text "Skipping  ") empty
               | otherwise -> return ()
             RecompBecause reason -> showMsg (text "Compiling ") (text " [" <> text reason <> text "]")
 
@@ -589,21 +584,19 @@ backpackStyle =
 -- | Message when we initially process a Backpack unit.
 msgTopPackage :: (Int,Int) -> HsComponentId -> BkpM ()
 msgTopPackage (i,n) (HsComponentId (PackageName fs_pn) _) = do
-    dflags <- getDynFlags
     logger <- getLogger
     level <- getBkpLevel
-    liftIO . backpackProgressMsg level logger dflags
+    liftIO . backpackProgressMsg level logger
         $ showModuleIndex (i, n) <> text "Processing " <> ftext fs_pn
 
 -- | Message when we instantiate a Backpack unit.
 msgUnitId :: Unit -> BkpM ()
 msgUnitId pk = do
-    dflags <- getDynFlags
     logger <- getLogger
     hsc_env <- getSession
     level <- getBkpLevel
     let state = hsc_units hsc_env
-    liftIO . backpackProgressMsg level logger dflags
+    liftIO . backpackProgressMsg level logger
         $ pprWithUnitState state
         $ text "Instantiating "
            <> withPprStyle backpackStyle (ppr pk)
@@ -611,12 +604,11 @@ msgUnitId pk = do
 -- | Message when we include a Backpack unit.
 msgInclude :: (Int,Int) -> Unit -> BkpM ()
 msgInclude (i,n) uid = do
-    dflags <- getDynFlags
     logger <- getLogger
     hsc_env <- getSession
     level <- getBkpLevel
     let state = hsc_units hsc_env
-    liftIO . backpackProgressMsg level logger dflags
+    liftIO . backpackProgressMsg level logger
         $ pprWithUnitState state
         $ showModuleIndex (i, n) <> text "Including "
             <> withPprStyle backpackStyle (ppr uid)
@@ -743,7 +735,7 @@ hsunitModuleGraph unit = do
 summariseRequirement :: PackageName -> ModuleName -> BkpM ModSummary
 summariseRequirement pn mod_name = do
     hsc_env <- getSession
-    let dflags = hsc_dflags hsc_env
+    let dflags = extractDynFlags hsc_env
     let home_unit = hsc_home_unit hsc_env
 
     let PackageName pn_fs = pn
@@ -829,7 +821,7 @@ hsModuleToModSummary pn hsc_src modname
     -- Sort of the same deal as in GHC.Driver.Pipeline's getLocation
     -- Use the PACKAGE NAME to find the location
     let PackageName unit_fs = pn
-        dflags = hsc_dflags hsc_env
+        dflags = extractDynFlags hsc_env
     -- Unfortunately, we have to define a "fake" location in
     -- order to appease the various code which uses the file
     -- name to figure out where to put, e.g. object files.

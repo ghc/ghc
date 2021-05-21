@@ -240,7 +240,7 @@ data Env gbl lcl
     }
 
 instance ContainsDynFlags (Env gbl lcl) where
-    extractDynFlags env = hsc_dflags (env_top env)
+    extractDynFlags env = extractDynFlags (env_top env)
 
 instance ContainsHooks (Env gbl lcl) where
     extractHooks env = hsc_hooks (env_top env)

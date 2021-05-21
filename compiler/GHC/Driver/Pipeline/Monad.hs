@@ -103,7 +103,7 @@ data PipeState = PipeState {
   }
 
 pipeStateDynFlags :: PipeState -> DynFlags
-pipeStateDynFlags = hsc_dflags . hsc_env
+pipeStateDynFlags = extractDynFlags . hsc_env
 
 pipeStateModIface :: PipeState -> Maybe ModIface
 pipeStateModIface = iface
@@ -137,14 +137,14 @@ getPipeSession :: CompPipeline HscEnv
 getPipeSession = P $ \_env state -> return (state, hsc_env state)
 
 instance HasDynFlags CompPipeline where
-    getDynFlags = P $ \_env state -> return (state, hsc_dflags (hsc_env state))
+    getDynFlags = P $ \_env state -> return (state, extractDynFlags (hsc_env state))
 
 instance HasLogger CompPipeline where
     getLogger = P $ \_env state -> return (state, hsc_logger (hsc_env state))
 
 setDynFlags :: DynFlags -> CompPipeline ()
 setDynFlags dflags = P $ \_env state ->
-  return (state{hsc_env= (hsc_env state){ hsc_dflags = dflags }}, ())
+  return (state{ hsc_env = hscSetFlags dflags (hsc_env state)}, ())
 
 setPlugins :: [LoadedPlugin] -> [StaticPlugin] -> CompPipeline ()
 setPlugins dyn static = P $ \_env state ->
