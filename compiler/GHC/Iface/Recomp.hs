@@ -209,7 +209,31 @@ check_old_iface hsc_env mod_summary src_modified maybe_iface
                     -- even in the SourceUnmodifiedAndStable case we
                     -- should check versions because some packages
                     -- might have changed or gone away.
-                    Just iface -> checkVersions hsc_env mod_summary iface
+                    Just iface -> do
+                        (recomp_reqd, mb_checked_iface) <-
+                            checkVersions hsc_env mod_summary iface
+                        return $ case mb_checked_iface of
+                            Just iface | not (recompileRequired recomp_reqd) ->
+                                -- If the module used TH splices when it was last
+                                -- compiled, then the recompilation check is not
+                                -- accurate enough (#481) and we must ignore
+                                -- it.  However, if the module is stable (none of
+                                -- the modules it depends on, directly or
+                                -- indirectly, changed), then we *can* skip
+                                -- recompilation. This is why the SourceModified
+                                -- type contains SourceUnmodifiedAndStable, and
+                                -- it's pretty important: otherwise ghc --make
+                                -- would always recompile TH modules, even if
+                                -- nothing at all has changed. Stability is just
+                                -- the same check that make is doing for us in
+                                -- one-shot mode.
+                                let stable = case src_modified of
+                                        SourceUnmodifiedAndStable -> True
+                                        _                         -> False
+                                in if mi_used_th iface && not stable
+                                    then (RecompBecause "TH", mb_checked_iface)
+                                    else (recomp_reqd, mb_checked_iface)
+                            _ -> (recomp_reqd, mb_checked_iface)
 
 -- | Check if a module is still the same 'version'.
 --
