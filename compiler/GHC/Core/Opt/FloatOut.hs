@@ -19,7 +19,7 @@ import GHC.Core.Opt.Arity ( exprArity, etaExpand )
 import GHC.Core.Opt.Monad ( FloatOutSwitches(..) )
 
 import GHC.Driver.Session
-import GHC.Utils.Logger  ( dumpIfSet_dyn, DumpFormat (..), Logger )
+import GHC.Utils.Logger
 import GHC.Types.Id      ( Id, idArity, idType, isDeadEndId,
                            isJoinId, isJoinId_maybe )
 import GHC.Types.Tickish
@@ -164,23 +164,22 @@ Without floating, we're stuck with three loops instead of one.
 
 floatOutwards :: Logger
               -> FloatOutSwitches
-              -> DynFlags
               -> UniqSupply
               -> CoreProgram -> IO CoreProgram
 
-floatOutwards logger float_sws dflags us pgm
+floatOutwards logger float_sws us pgm
   = do {
         let { annotated_w_levels = setLevels float_sws pgm us ;
               (fss, binds_s')    = unzip (map floatTopBind annotated_w_levels)
             } ;
 
-        dumpIfSet_dyn logger dflags Opt_D_verbose_core2core "Levels added:"
+        putDumpFileMaybe logger Opt_D_verbose_core2core "Levels added:"
                   FormatCore
                   (vcat (map ppr annotated_w_levels));
 
         let { (tlets, ntlets, lams) = get_stats (sum_stats fss) };
 
-        dumpIfSet_dyn logger dflags Opt_D_dump_simpl_stats "FloatOut stats:"
+        putDumpFileMaybe logger Opt_D_dump_simpl_stats "FloatOut stats:"
                 FormatText
                 (hcat [ int tlets,  text " Lets floated to top level; ",
                         int ntlets, text " Lets floated elsewhere; from ",
