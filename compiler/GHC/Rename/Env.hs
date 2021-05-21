@@ -506,7 +506,8 @@ lookupRecFieldOcc mb_con rdr_name
   , isUnboundName con  -- Avoid error cascade
   = return (mkUnboundNameRdr rdr_name)
   | Just con <- mb_con
-  = do { flds <- lookupConstructorFields con
+  = lookupExactOrOrig rdr_name id $  -- See Note [Record field names and Template Haskell]
+    do { flds <- lookupConstructorFields con
        ; env <- getGlobalRdrEnv
        ; let lbl      = occNameFS (rdrNameOcc rdr_name)
              mb_field = do fl <- find ((== lbl) . flLabel) flds
@@ -522,7 +523,12 @@ lookupRecFieldOcc mb_con rdr_name
        ; case mb_field of
            Just (fl, gre) -> do { addUsedGRE True gre
                                 ; return (flSelector fl) }
-           Nothing        -> lookupGlobalOccRn' WantBoth rdr_name }
+           Nothing        -> do {
+                                --   conLike <- tcLookupConLike con
+                                -- ; addErr (badFieldConErr conLike lbl)      <- this won't error out.
+                                                                              -- with failWith there is no error context! (no SrcSpan)
+                                ; unboundName WL_Global rdr_name}}
+
              -- See Note [Fall back on lookupGlobalOccRn in lookupRecFieldOcc]
   | otherwise
   -- This use of Global is right as we are looking up a selector which
@@ -647,7 +653,7 @@ determine it.
 Note [Fall back on lookupGlobalOccRn in lookupRecFieldOcc]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Whenever we fail to find the field or it is not in scope, mb_field
-will be False, and we fall back on looking it up normally using
+will be Nothing, and we fall back on looking it up normally using
 lookupGlobalOccRn.  We don't report an error immediately because the
 actual problem might be located elsewhere.  For example (#9975):
 
@@ -661,7 +667,9 @@ pattern synonym RHS.  However, if the pattern synonym gets added to
 the environment first, we will try and fail to find `x` amongst the
 (nonexistent) fields of the pattern synonym.
 
-Alternatively, the scope check can fail due to Template Haskell.
+
+Note [Record field names and Template Haskell]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider (#12130):
 
    module Foo where
@@ -845,7 +853,7 @@ lookupSubBndrOcc :: Bool
                  -> RdrName
                  -> RnM (Either SDoc Name)
 -- Find all the things the rdr-name maps to
--- and pick the one with the right parent namep
+-- and pick the one with the right parent name
 lookupSubBndrOcc warn_if_deprec the_parent doc rdr_name = do
   res <-
     lookupExactOrOrig rdr_name (FoundChild NoParent . NormalGreName) $
