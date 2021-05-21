@@ -10,6 +10,7 @@ flag librt
   default: @CabalHaveLibrt@
 flag libdl
   default: @CabalHaveLibdl@
+-- See Note [Uses of libffi in GHC] in hadrian's Rules.Libffi
 flag ffi
   default: @CabalHaveLibffi@
 flag need-pthread

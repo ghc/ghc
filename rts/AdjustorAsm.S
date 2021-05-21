@@ -1,5 +1,7 @@
 #include "../includes/ghcconfig.h"
 
+// See Note [Adjustors] in rts/Adjustor.c
+
 /* ******************************** PowerPC ******************************** */
 
 #if defined(powerpc_HOST_ARCH) || defined(powerpc64_HOST_ARCH)
