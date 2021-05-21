@@ -601,10 +601,10 @@ instance Bits Natural where
 --
 -- > toIntegral :: (Integral a, Integral b) => a -> Maybe b
 -- > toIntegral x
--- >   | toInteger x == y = Just (fromInteger y)
--- >   | otherwise        = Nothing
+-- >   | toInteger x == toInteger y = Just y
+-- >   | otherwise                  = Nothing
 -- >   where
--- >     y = toInteger x
+-- >     y = fromIntegral x
 --
 -- This version requires going through 'Integer', which can be inefficient.
 -- However, @toIntegralSized@ is optimized to allow GHC to statically determine
