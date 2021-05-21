@@ -388,6 +388,9 @@ Library
         GHC.Driver.CmdLine
         GHC.Driver.CodeOutput
         GHC.Driver.Config
+        GHC.Driver.Config.CmmToAsm
+        GHC.Driver.Config.Logger
+        GHC.Driver.Config.Parser
         GHC.Driver.Env
         GHC.Driver.Env.Types
         GHC.Driver.Errors

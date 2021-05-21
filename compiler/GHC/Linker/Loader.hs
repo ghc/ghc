@@ -351,16 +351,16 @@ loadCmdLineLibs' interp hsc_env pls =
 
       lib_paths_env <- addEnvPaths "LIBRARY_PATH" lib_paths_base
 
-      maybePutStrLn logger dflags "Search directories (user):"
-      maybePutStr logger dflags (unlines $ map ("  "++) lib_paths_env)
-      maybePutStrLn logger dflags "Search directories (gcc):"
-      maybePutStr logger dflags (unlines $ map ("  "++) gcc_paths)
+      maybePutStrLn logger "Search directories (user):"
+      maybePutStr logger (unlines $ map ("  "++) lib_paths_env)
+      maybePutStrLn logger "Search directories (gcc):"
+      maybePutStr logger (unlines $ map ("  "++) gcc_paths)
 
       libspecs
         <- mapM (locateLib interp hsc_env False lib_paths_env gcc_paths) minus_ls
 
       -- (d) Link .o files from the command-line
-      classified_ld_inputs <- mapM (classifyLdInput logger dflags)
+      classified_ld_inputs <- mapM (classifyLdInput logger platform)
                                 [ f | FileOption _ f <- cmdline_ld_inputs ]
 
       -- (e) Link any MacOS frameworks
@@ -392,13 +392,13 @@ loadCmdLineLibs' interp hsc_env pls =
            pls1 <- foldM (preloadLib interp hsc_env lib_paths framework_paths) pls
                          merged_specs
 
-           maybePutStr logger dflags "final link ... "
+           maybePutStr logger "final link ... "
            ok <- resolveObjs interp
 
            -- DLLs are loaded, reset the search paths
            mapM_ (removeLibrarySearchPath interp) $ reverse pathCache
 
-           if succeeded ok then maybePutStrLn logger dflags "done"
+           if succeeded ok then maybePutStrLn logger "done"
            else throwGhcExceptionIO (ProgramError "linking extra libraries/objects failed")
 
            return pls1
@@ -441,16 +441,15 @@ package I want to link in eagerly". Would that be too complicated for
 users?
 -}
 
-classifyLdInput :: Logger -> DynFlags -> FilePath -> IO (Maybe LibrarySpec)
-classifyLdInput logger dflags f
+classifyLdInput :: Logger -> Platform -> FilePath -> IO (Maybe LibrarySpec)
+classifyLdInput logger platform f
   | isObjectFilename platform f = return (Just (Objects [f]))
   | isDynLibFilename platform f = return (Just (DLLPath f))
   | otherwise          = do
-        putLogMsg logger dflags MCInfo noSrcSpan
+        logMsg logger MCInfo noSrcSpan
             $ withPprStyle defaultUserStyle
             (text ("Warning: ignoring unrecognised input `" ++ f ++ "'"))
         return Nothing
-    where platform = targetPlatform dflags
 
 preloadLib
   :: Interp
@@ -461,22 +460,22 @@ preloadLib
   -> LibrarySpec
   -> IO LoaderState
 preloadLib interp hsc_env lib_paths framework_paths pls lib_spec = do
-  maybePutStr logger dflags ("Loading object " ++ showLS lib_spec ++ " ... ")
+  maybePutStr logger ("Loading object " ++ showLS lib_spec ++ " ... ")
   case lib_spec of
     Objects static_ishs -> do
       (b, pls1) <- preload_statics lib_paths static_ishs
-      maybePutStrLn logger dflags (if b  then "done" else "not found")
+      maybePutStrLn logger (if b  then "done" else "not found")
       return pls1
 
     Archive static_ish -> do
       b <- preload_static_archive lib_paths static_ish
-      maybePutStrLn logger dflags (if b  then "done" else "not found")
+      maybePutStrLn logger (if b  then "done" else "not found")
       return pls
 
     DLL dll_unadorned -> do
       maybe_errstr <- loadDLL interp (platformSOName platform dll_unadorned)
       case maybe_errstr of
-         Nothing -> maybePutStrLn logger dflags "done"
+         Nothing -> maybePutStrLn logger "done"
          Just mm | platformOS platform /= OSDarwin ->
            preloadFailed mm lib_paths lib_spec
          Just mm | otherwise -> do
@@ -486,14 +485,14 @@ preloadLib interp hsc_env lib_paths framework_paths pls lib_spec = do
            let libfile = ("lib" ++ dll_unadorned) <.> "so"
            err2 <- loadDLL interp libfile
            case err2 of
-             Nothing -> maybePutStrLn logger dflags "done"
+             Nothing -> maybePutStrLn logger "done"
              Just _  -> preloadFailed mm lib_paths lib_spec
       return pls
 
     DLLPath dll_path -> do
       do maybe_errstr <- loadDLL interp dll_path
          case maybe_errstr of
-            Nothing -> maybePutStrLn logger dflags "done"
+            Nothing -> maybePutStrLn logger "done"
             Just mm -> preloadFailed mm lib_paths lib_spec
          return pls
 
@@ -501,7 +500,7 @@ preloadLib interp hsc_env lib_paths framework_paths pls lib_spec = do
       if platformUsesFrameworks (targetPlatform dflags)
       then do maybe_errstr <- loadFramework interp framework_paths framework
               case maybe_errstr of
-                 Nothing -> maybePutStrLn logger dflags "done"
+                 Nothing -> maybePutStrLn logger "done"
                  Just mm -> preloadFailed mm framework_paths lib_spec
               return pls
       else throwGhcExceptionIO (ProgramError "preloadLib Framework")
@@ -514,7 +513,7 @@ preloadLib interp hsc_env lib_paths framework_paths pls lib_spec = do
 
     preloadFailed :: String -> [String] -> LibrarySpec -> IO ()
     preloadFailed sys_errmsg paths spec
-       = do maybePutStr logger dflags "failed.\n"
+       = do maybePutStr logger "failed.\n"
             throwGhcExceptionIO $
               CmdLineError (
                     "user specified .o/.so/.DLL could not be loaded ("
@@ -1128,11 +1127,10 @@ unload interp hsc_env linkables
                  pls1 <- unload_wkr interp linkables pls
                  return (pls1, pls1)
 
-        let dflags = hsc_dflags hsc_env
         let logger = hsc_logger hsc_env
-        debugTraceMsg logger dflags 3 $
+        debugTraceMsg logger 3 $
           text "unload: retaining objs" <+> ppr (objs_loaded new_pls)
-        debugTraceMsg logger dflags 3 $
+        debugTraceMsg logger 3 $
           text "unload: retaining bcos" <+> ppr (bcos_loaded new_pls)
         return ()
 
@@ -1325,7 +1323,7 @@ loadPackage interp hsc_env pkg
         all_paths_env <- addEnvPaths "LD_LIBRARY_PATH" all_paths
         pathCache <- mapM (addLibrarySearchPath interp) all_paths_env
 
-        maybePutSDoc logger dflags
+        maybePutSDoc logger
             (text "Loading unit " <> pprUnitInfoForUser pkg <> text " ... ")
 
         -- See comments with partOfGHCi
@@ -1345,7 +1343,7 @@ loadPackage interp hsc_env pkg
         mapM_ (loadObj interp) objs
         mapM_ (loadArchive interp) archs
 
-        maybePutStr logger dflags "linking ... "
+        maybePutStr logger "linking ... "
         ok <- resolveObjs interp
 
         -- DLLs are loaded, reset the search paths
@@ -1356,7 +1354,7 @@ loadPackage interp hsc_env pkg
 
         if succeeded ok
            then do
-             maybePutStrLn logger dflags "done."
+             maybePutStrLn logger "done."
              return (hs_classifieds, extra_classifieds)
            else let errmsg = text "unable to load unit `"
                              <> pprUnitInfoForUser pkg <> text "'"
@@ -1419,7 +1417,7 @@ load_dyn interp hsc_env crash_early dll = do
         then cmdLineErrorIO err
         else
           when (wopt Opt_WarnMissedExtraSharedLib dflags)
-            $ putLogMsg logger dflags
+            $ logMsg logger
                 (mkMCDiagnostic dflags $ WarningWithFlag Opt_WarnMissedExtraSharedLib)
                   noSrcSpan $ withPprStyle defaultUserStyle (note err)
   where
@@ -1580,10 +1578,11 @@ locateLib interp hsc_env is_hs lib_dirs gcc_dirs lib
       , not loading_dynamic_hs_libs
       , interpreterProfiled interp
       = do
-          warningMsg logger dflags
-            (text "Interpreter failed to load profiled static library" <+> text lib <> char '.' $$
+          let diag = mkMCDiagnostic dflags WarningWithoutFlag
+          logMsg logger diag noSrcSpan $ withPprStyle defaultErrStyle $
+            text "Interpreter failed to load profiled static library" <+> text lib <> char '.' $$
               text " \tTrying dynamic library instead. If this fails try to rebuild" <+>
-              text "libraries with profiling support.")
+              text "libraries with profiling support."
           return (DLL lib)
       | otherwise = return (DLL lib)
      infixr `orElse`
@@ -1714,16 +1713,16 @@ addEnvPaths name list
 
   ********************************************************************* -}
 
-maybePutSDoc :: Logger -> DynFlags -> SDoc -> IO ()
-maybePutSDoc logger dflags s
-    = when (verbosity dflags > 1) $
-          putLogMsg logger dflags
+maybePutSDoc :: Logger -> SDoc -> IO ()
+maybePutSDoc logger s
+    = when (logVerbAtLeast logger 2) $
+          logMsg logger
               MCInteractive
               noSrcSpan
               $ withPprStyle defaultUserStyle s
 
-maybePutStr :: Logger -> DynFlags -> String -> IO ()
-maybePutStr logger dflags s = maybePutSDoc logger dflags (text s)
+maybePutStr :: Logger -> String -> IO ()
+maybePutStr logger s = maybePutSDoc logger (text s)
 
-maybePutStrLn :: Logger -> DynFlags -> String -> IO ()
-maybePutStrLn logger dflags s = maybePutSDoc logger dflags (text s <> text "\n")
+maybePutStrLn :: Logger -> String -> IO ()
+maybePutStrLn logger s = maybePutSDoc logger (text s <> text "\n")
