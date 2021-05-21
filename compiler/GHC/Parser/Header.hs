@@ -26,7 +26,7 @@ import GHC.Prelude
 import GHC.Platform
 
 import GHC.Driver.Session
-import GHC.Driver.Config
+import GHC.Driver.Config.Parser (initParserOpts)
 import GHC.Driver.Errors.Types -- Unfortunate, needed due to the fact we throw exceptions!
 
 import GHC.Parser.Errors.Types

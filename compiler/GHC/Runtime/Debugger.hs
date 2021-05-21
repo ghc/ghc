@@ -97,9 +97,8 @@ pprintClosureCommand bindThings force str = do
    printSDocs :: GhcMonad m => [SDoc] -> m ()
    printSDocs sdocs = do
       logger <- getLogger
-      dflags <- getDynFlags
       unqual <- GHC.getPrintUnqual
-      liftIO $ printOutputForUser logger dflags unqual $ vcat sdocs
+      liftIO $ printOutputForUser logger unqual $ vcat sdocs
 
    -- Do the obtainTerm--bindSuspensions-computeSubstitution dance
    go :: GhcMonad m => TCvSubst -> Id -> m (TCvSubst, Term)
@@ -118,10 +117,9 @@ pprintClosureCommand bindThings force str = do
        hsc_env <- getSession
        case (improveRTTIType hsc_env id_ty' reconstructed_type) of
          Nothing     -> return (subst, term')
-         Just subst' -> do { dflags <- GHC.getSessionDynFlags
-                           ; logger <- getLogger
+         Just subst' -> do { logger <- getLogger
                            ; liftIO $
-                               dumpIfSet_dyn logger dflags Opt_D_dump_rtti "RTTI"
+                               putDumpFileMaybe logger Opt_D_dump_rtti "RTTI"
                                  FormatText
                                  (fsep $ [text "RTTI Improvement for", ppr id,
                                   text "old substitution:" , ppr subst,

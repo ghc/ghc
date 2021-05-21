@@ -21,7 +21,7 @@ import GHC.Prelude
 
 -- In a separate module because it hooks into the parser.
 import GHC.Driver.Backpack.Syntax
-import GHC.Driver.Config
+import GHC.Driver.Config.Parser (initParserOpts)
 import GHC.Driver.Monad
 import GHC.Driver.Session
 import GHC.Driver.Ppr
@@ -97,7 +97,7 @@ doBackpack [src_filename] = do
     let dflags1 = dflags0
     src_opts <- liftIO $ getOptionsFromFile dflags1 src_filename
     (dflags, unhandled_flags, warns) <- liftIO $ parseDynamicFilePragma dflags1 src_opts
-    modifySession (\hsc_env -> hsc_env {hsc_dflags = dflags})
+    modifySession (hscSetFlags dflags)
     -- Cribbed from: preprocessFile / GHC.Driver.Pipeline
     liftIO $ checkProcessArgsResult unhandled_flags
     liftIO $ handleFlagWarnings logger dflags warns
@@ -178,9 +178,7 @@ withBkpSession cid insts deps session_type do_this = do
                  , not (null insts) = sub_comp (key_base p) </> uid_str
                  | otherwise = sub_comp (key_base p)
 
-        mk_temp_env hsc_env = hsc_env
-            { hsc_dflags   = mk_temp_dflags (hsc_units hsc_env) (hsc_dflags hsc_env)
-            }
+        mk_temp_env hsc_env = hscUpdateFlags (\dflags -> mk_temp_dflags (hsc_units hsc_env) dflags) hsc_env
         mk_temp_dflags unit_state dflags = dflags
             { backend = case session_type of
                             TcSession -> NoBackend
@@ -443,10 +441,7 @@ addUnit u = do
           , ue_units     = unit_state
           , ue_unit_dbs  = Just dbs
           }
-    setSession $ hsc_env
-        { hsc_dflags   = dflags
-        , hsc_unit_env = unit_env
-        }
+    setSession $ hscSetFlags dflags $ hsc_env { hsc_unit_env = unit_env }
 
 compileInclude :: Int -> (Int, Unit) -> BkpM ()
 compileInclude n (i, uid) = do
@@ -544,10 +539,10 @@ initBkpM file bkp m =
 
 -- | Print a compilation progress message, but with indentation according
 -- to @level@ (for nested compilation).
-backpackProgressMsg :: Int -> Logger -> DynFlags -> SDoc -> IO ()
-backpackProgressMsg level logger dflags msg =
-    compilationProgressMsg logger dflags $ text (replicate (level * 2) ' ') -- TODO: use GHC.Utils.Ppr.RStr
-                                      <> msg
+backpackProgressMsg :: Int -> Logger -> SDoc -> IO ()
+backpackProgressMsg level logger msg =
+    compilationProgressMsg logger $ text (replicate (level * 2) ' ') -- TODO: use GHC.Utils.Ppr.RStr
+                                    <> msg
 
 -- | Creates a 'Messager' for Backpack compilation; this is basically
 -- a carbon copy of 'batchMsg' but calling 'backpackProgressMsg', which
@@ -560,7 +555,7 @@ mkBackpackMsg = do
           logger = hsc_logger hsc_env
           state = hsc_units hsc_env
           showMsg msg reason =
-            backpackProgressMsg level logger dflags $ pprWithUnitState state $
+            backpackProgressMsg level logger $ pprWithUnitState state $
                 showModuleIndex mod_index <>
                 msg <> showModMsg dflags (recompileRequired recomp) node
                     <> reason
@@ -593,21 +588,19 @@ backpackStyle =
 -- | Message when we initially process a Backpack unit.
 msgTopPackage :: (Int,Int) -> HsComponentId -> BkpM ()
 msgTopPackage (i,n) (HsComponentId (PackageName fs_pn) _) = do
-    dflags <- getDynFlags
     logger <- getLogger
     level <- getBkpLevel
-    liftIO . backpackProgressMsg level logger dflags
+    liftIO . backpackProgressMsg level logger
         $ showModuleIndex (i, n) <> text "Processing " <> ftext fs_pn
 
 -- | Message when we instantiate a Backpack unit.
 msgUnitId :: Unit -> BkpM ()
 msgUnitId pk = do
-    dflags <- getDynFlags
     logger <- getLogger
     hsc_env <- getSession
     level <- getBkpLevel
     let state = hsc_units hsc_env
-    liftIO . backpackProgressMsg level logger dflags
+    liftIO . backpackProgressMsg level logger
         $ pprWithUnitState state
         $ text "Instantiating "
            <> withPprStyle backpackStyle (ppr pk)
@@ -615,12 +608,11 @@ msgUnitId pk = do
 -- | Message when we include a Backpack unit.
 msgInclude :: (Int,Int) -> Unit -> BkpM ()
 msgInclude (i,n) uid = do
-    dflags <- getDynFlags
     logger <- getLogger
     hsc_env <- getSession
     level <- getBkpLevel
     let state = hsc_units hsc_env
-    liftIO . backpackProgressMsg level logger dflags
+    liftIO . backpackProgressMsg level logger
         $ pprWithUnitState state
         $ showModuleIndex (i, n) <> text "Including "
             <> withPprStyle backpackStyle (ppr uid)

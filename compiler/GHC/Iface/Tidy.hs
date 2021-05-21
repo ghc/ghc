@@ -144,8 +144,8 @@ Plan A: mkBootModDetails: omit pragmas, make interfaces small
 -- We don't look at the bindings at all -- there aren't any
 -- for hs-boot files
 
-mkBootModDetailsTc :: HscEnv -> TcGblEnv -> IO ModDetails
-mkBootModDetailsTc hsc_env
+mkBootModDetailsTc :: Logger -> TcGblEnv -> IO ModDetails
+mkBootModDetailsTc logger
         TcGblEnv{ tcg_exports          = exports,
                   tcg_type_env         = type_env, -- just for the Ids
                   tcg_tcs              = tcs,
@@ -157,7 +157,7 @@ mkBootModDetailsTc hsc_env
                 }
   = -- This timing isn't terribly useful since the result isn't forced, but
     -- the message is useful to locating oneself in the compilation process.
-    Err.withTiming logger dflags
+    Err.withTiming logger
                    (text "CoreTidy"<+>brackets (ppr this_mod))
                    (const ()) $
     return (ModDetails { md_types            = type_env'
@@ -169,9 +169,6 @@ mkBootModDetailsTc hsc_env
                        , md_complete_matches = complete_matches
                        })
   where
-    dflags = hsc_dflags hsc_env
-    logger = hsc_logger hsc_env
-
     -- Find the LocalIds in the type env that are exported
     -- Make them into GlobalIds, and tidy their types
     --
@@ -365,7 +362,7 @@ tidyProgram hsc_env  (ModGuts { mg_module           = mod
                               , mg_modBreaks        = modBreaks
                               })
 
-  = Err.withTiming logger dflags
+  = Err.withTiming logger
                    (text "CoreTidy"<+>brackets (ppr mod))
                    (const ()) $
     do  { let { omit_prags = gopt Opt_OmitInterfacePragmas dflags
@@ -438,15 +435,15 @@ tidyProgram hsc_env  (ModGuts { mg_module           = mod
 
           -- If the endPass didn't print the rules, but ddump-rules is
           -- on, print now
-        ; unless (dopt Opt_D_dump_simpl dflags) $
-            Logger.dumpIfSet_dyn logger dflags Opt_D_dump_rules
+        ; unless (logHasDumpFlag logger Opt_D_dump_simpl) $
+            Logger.putDumpFileMaybe logger Opt_D_dump_rules
               (showSDoc dflags (ppr CoreTidy <+> text "rules"))
               FormatText
               (pprRulesForUser tidy_rules)
 
           -- Print one-line size info
         ; let cs = coreBindsStats tidy_binds
-        ; Logger.dumpIfSet_dyn logger dflags Opt_D_dump_core_stats "Core Stats"
+        ; Logger.putDumpFileMaybe logger Opt_D_dump_core_stats "Core Stats"
             FormatText
             (text "Tidy size (terms,types,coercions)"
              <+> ppr (moduleName mod) <> colon

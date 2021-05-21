@@ -21,7 +21,7 @@ printMessages :: Diagnostic a => Logger -> DynFlags -> Messages a -> IO ()
 printMessages logger dflags msgs
   = sequence_ [ let style = mkErrStyle unqual
                     ctx   = initSDocContext dflags style
-                in putLogMsg logger dflags (MCDiagnostic sev . diagnosticReason $ dia) s $
+                in logMsg logger (MCDiagnostic sev . diagnosticReason $ dia) s $
                    withPprStyle style (messageWithHints ctx dia)
               | MsgEnvelope { errMsgSpan      = s,
                               errMsgDiagnostic = dia,
