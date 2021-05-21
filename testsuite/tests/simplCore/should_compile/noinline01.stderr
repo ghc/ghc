@@ -2,7 +2,7 @@
 ==================== Initial STG: ====================
 Noinline01.f [InlPrag=INLINE (sat-args=1)]
   :: forall {p}. p -> GHC.Types.Bool
-[GblId, Arity=1, Str=<A>, Unf=OtherCon []] =
+[GblId, Arity=1, Str=<A>, Cpr=2, Unf=OtherCon []] =
     \r [eta] GHC.Types.True [];
 
 Noinline01.g :: GHC.Types.Bool

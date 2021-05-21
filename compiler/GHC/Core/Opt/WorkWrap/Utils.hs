@@ -647,7 +647,7 @@ addDataConStrictness con ds
 wantToUnboxResult :: FamInstEnvs -> Type -> Cpr -> UnboxingDecision Cpr
 -- See Note [Which types are unboxed?]
 wantToUnboxResult fam_envs ty cpr
-  | Just (con_tag, _cprs) <- asConCpr cpr
+  | Just (con_tag, arg_cprs) <- asConCpr cpr
   , Just (tc, tc_args, co) <- normSplitTyConApp_maybe fam_envs ty
   , isDataTyCon tc -- NB: No unboxed sums or tuples
   , Just dcs <- tyConAlgDataCons_maybe tc <|> open_body_ty_warning
@@ -662,7 +662,7 @@ wantToUnboxResult fam_envs ty cpr
   -- Deactivates CPR worker/wrapper splits on constructors with non-linear
   -- arguments, for the moment, because they require unboxed tuple with variable
   -- multiplicity fields.
-  = Unbox (DataConPatContext dc tc_args co) []
+  = Unbox (DataConPatContext dc tc_args co) arg_cprs
 
   | otherwise
   = StopUnboxing
