@@ -263,7 +263,7 @@ exception handler.
 -}
 forkIO :: IO () -> IO ThreadId
 forkIO action = IO $ \ s ->
-   case (fork# action_plus s) of (# s1, tid #) -> (# s1, ThreadId tid #)
+   case fork# action_plus s of (# s1, tid #) -> (# s1, ThreadId tid #)
  where
   -- We must use 'catch' rather than 'catchException' because the action
   -- could be bottom. #13330
@@ -313,7 +313,7 @@ is recommended).
 -}
 forkOn :: Int -> IO () -> IO ThreadId
 forkOn (I# cpu) action = IO $ \ s ->
-   case (forkOn# cpu action_plus s) of (# s1, tid #) -> (# s1, ThreadId tid #)
+   case forkOn# cpu action_plus s of (# s1, tid #) -> (# s1, ThreadId tid #)
  where
   -- We must use 'catch' rather than 'catchException' because the action
   -- could be bottom. #13330
@@ -464,12 +464,12 @@ inside 'mask' or 'uninterruptibleMask'.
   -}
 throwTo :: Exception e => ThreadId -> e -> IO ()
 throwTo (ThreadId tid) ex = IO $ \ s ->
-   case (killThread# tid (toException ex) s) of s1 -> (# s1, () #)
+   case killThread# tid (toException ex) s of s1 -> (# s1, () #)
 
 -- | Returns the 'ThreadId' of the calling thread (GHC only).
 myThreadId :: IO ThreadId
 myThreadId = IO $ \s ->
-   case (myThreadId# s) of (# s1, tid #) -> (# s1, ThreadId tid #)
+   case myThreadId# s of (# s1, tid #) -> (# s1, ThreadId tid #)
 
 
 -- | The 'yield' action allows (forces, in a co-operative multitasking
@@ -478,7 +478,7 @@ myThreadId = IO $ \s ->
 -- concurrency abstractions.
 yield :: IO ()
 yield = IO $ \s ->
-   case (yield# s) of s1 -> (# s1, () #)
+   case yield# s of s1 -> (# s1, () #)
 
 {- | 'labelThread' stores a string as identifier for this thread. This
 identifier will be used in the debugging output to make distinction of
@@ -513,7 +513,7 @@ pseq  x y = x `seq` lazy y
 
 {-# INLINE par  #-}
 par :: a -> b -> b
-par  x y = case (par# x) of { _ -> lazy y }
+par  x y = case par# x of { _ -> lazy y }
 
 -- | Internal function used by the RTS to run sparks.
 runSparks :: IO ()
