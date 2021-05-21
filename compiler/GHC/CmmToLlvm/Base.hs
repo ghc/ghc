@@ -425,9 +425,8 @@ getLlvmVer = getEnv envVersion
 -- | Dumps the document if the corresponding flag has been set by the user
 dumpIfSetLlvm :: DumpFlag -> String -> DumpFormat -> Outp.SDoc -> LlvmM ()
 dumpIfSetLlvm flag hdr fmt doc = do
-  dflags <- getDynFlags
   logger <- getLogger
-  liftIO $ dumpIfSet_dyn logger dflags flag hdr fmt doc
+  liftIO $ putDumpFileMaybe logger flag hdr fmt doc
 
 -- | Prints the given contents to the output handle
 renderLlvm :: Outp.SDoc -> LlvmM ()

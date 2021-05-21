@@ -27,6 +27,7 @@ import GHC.Cmm              ( RawCmmGroup )
 import GHC.Cmm.CLabel
 
 import GHC.Driver.Session
+import GHC.Driver.Config.CmmToAsm (initNCGConfig)
 import GHC.Driver.Ppr
 import GHC.Driver.Backend
 
@@ -92,16 +93,14 @@ codeOutput logger tmpfs dflags unit_state this_mod filenm location genForeignStu
                     else cmm_stream
 
               do_lint cmm = withTimingSilent logger
-                  dflags
                   (text "CmmLint"<+>brackets (ppr this_mod))
                   (const ()) $ do
                 { case cmmLint (targetPlatform dflags) cmm of
-                        Just err -> do { putLogMsg logger
-                                                   dflags
+                        Just err -> do { logMsg logger
                                                    MCDump
                                                    noSrcSpan
                                                    $ withPprStyle defaultDumpStyle err
-                                       ; ghcExit logger dflags 1
+                                       ; ghcExit logger 1
                                        }
                         Nothing  -> return ()
                 ; return cmm
@@ -137,7 +136,7 @@ outputC :: Logger
         -> [UnitId]
         -> IO a
 outputC logger dflags filenm cmm_stream packages =
-  withTiming logger dflags (text "C codegen") (\a -> seq a () {- FIXME -}) $ do
+  withTiming logger (text "C codegen") (\a -> seq a () {- FIXME -}) $ do
     let pkg_names = map unitIdString packages
     doOutput filenm $ \ h -> do
       hPutStr h ("/* GHC_PACKAGES " ++ unwords pkg_names ++ "\n*/\n")
@@ -145,7 +144,7 @@ outputC logger dflags filenm cmm_stream packages =
       let platform = targetPlatform dflags
           writeC cmm = do
             let doc = cmmToC platform cmm
-            dumpIfSet_dyn logger dflags Opt_D_dump_c_backend
+            putDumpFileMaybe logger Opt_D_dump_c_backend
                           "C backend output"
                           FormatC
                           doc
@@ -169,10 +168,11 @@ outputAsm :: Logger
           -> IO a
 outputAsm logger dflags this_mod location filenm cmm_stream = do
   ncg_uniqs <- mkSplitUniqSupply 'n'
-  debugTraceMsg logger dflags 4 (text "Outputing asm to" <+> text filenm)
+  debugTraceMsg logger 4 (text "Outputing asm to" <+> text filenm)
+  let ncg_config = initNCGConfig dflags this_mod
   {-# SCC "OutputAsm" #-} doOutput filenm $
     \h -> {-# SCC "NativeCodeGen" #-}
-      nativeCodeGen logger dflags this_mod location h ncg_uniqs cmm_stream
+      nativeCodeGen logger ncg_config location h ncg_uniqs cmm_stream
 
 {-
 ************************************************************************
@@ -226,7 +226,7 @@ outputForeignStubs logger tmpfs dflags unit_state mod location stubs
 
         createDirectoryIfMissing True (takeDirectory stub_h)
 
-        dumpIfSet_dyn logger dflags Opt_D_dump_foreign
+        putDumpFileMaybe logger Opt_D_dump_foreign
                       "Foreign export header file"
                       FormatC
                       stub_h_output_d
@@ -251,7 +251,7 @@ outputForeignStubs logger tmpfs dflags unit_state mod location stubs
            <- outputForeignStubs_help stub_h stub_h_output_w
                 ("#include <HsFFI.h>\n" ++ cplusplus_hdr) cplusplus_ftr
 
-        dumpIfSet_dyn logger dflags Opt_D_dump_foreign
+        putDumpFileMaybe logger Opt_D_dump_foreign
                       "Foreign export stubs" FormatC stub_c_output_d
 
         stub_c_file_exists

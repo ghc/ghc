@@ -577,14 +577,12 @@ initUnits :: Logger -> DynFlags -> Maybe [UnitDatabase UnitId] -> IO ([UnitDatab
 initUnits logger dflags cached_dbs = do
 
   let forceUnitInfoMap (state, _) = unitInfoMap state `seq` ()
-  let ctx     = initSDocContext dflags defaultUserStyle -- SDocContext used to render exception messages
-  let printer = debugTraceMsg logger dflags             -- printer for trace messages
 
-  (unit_state,dbs) <- withTiming logger dflags (text "initializing unit database")
+  (unit_state,dbs) <- withTiming logger (text "initializing unit database")
                    forceUnitInfoMap
-                 $ mkUnitState ctx printer (initUnitConfig dflags cached_dbs)
+                 $ mkUnitState logger (initUnitConfig dflags cached_dbs)
 
-  dumpIfSet_dyn logger dflags Opt_D_dump_mod_map "Module Map"
+  putDumpFileMaybe logger Opt_D_dump_mod_map "Module Map"
     FormatText (updSDocContext (\ctx -> ctx {sdocLineLength = 200})
                 $ pprModuleMap (moduleNameProvidersMap unit_state))
 
@@ -643,11 +641,11 @@ mkHomeUnit unit_state hu_id hu_instanceof hu_instantiations_ =
 -- -----------------------------------------------------------------------------
 -- Reading the unit database(s)
 
-readUnitDatabases :: (Int -> SDoc -> IO ()) -> UnitConfig -> IO [UnitDatabase UnitId]
-readUnitDatabases printer cfg = do
+readUnitDatabases :: Logger -> UnitConfig -> IO [UnitDatabase UnitId]
+readUnitDatabases logger cfg = do
   conf_refs <- getUnitDbRefs cfg
   confs     <- liftM catMaybes $ mapM (resolveUnitDatabase cfg) conf_refs
-  mapM (readUnitDatabase printer cfg) confs
+  mapM (readUnitDatabase logger cfg) confs
 
 
 getUnitDbRefs :: UnitConfig -> IO [PkgDbRef]
@@ -699,8 +697,8 @@ resolveUnitDatabase cfg UserPkgDb = runMaybeT $ do
   if exist then return pkgconf else mzero
 resolveUnitDatabase _ (PkgDbPath name) = return $ Just name
 
-readUnitDatabase :: (Int -> SDoc -> IO ()) -> UnitConfig -> FilePath -> IO (UnitDatabase UnitId)
-readUnitDatabase printer cfg conf_file = do
+readUnitDatabase :: Logger -> UnitConfig -> FilePath -> IO (UnitDatabase UnitId)
+readUnitDatabase logger cfg conf_file = do
   isdir <- doesDirectoryExist conf_file
 
   proto_pkg_configs <-
@@ -736,21 +734,21 @@ readUnitDatabase printer cfg conf_file = do
       cache_exists <- doesFileExist filename
       if cache_exists
         then do
-          printer 2 $ text "Using binary package database:" <+> text filename
+          debugTraceMsg logger 2 $ text "Using binary package database:" <+> text filename
           readPackageDbForGhc filename
         else do
           -- If there is no package.cache file, we check if the database is not
           -- empty by inspecting if the directory contains any .conf file. If it
           -- does, something is wrong and we fail. Otherwise we assume that the
           -- database is empty.
-          printer 2 $ text "There is no package.cache in"
+          debugTraceMsg logger 2 $ text "There is no package.cache in"
                       <+> text conf_dir
                        <> text ", checking if the database is empty"
           db_empty <- all (not . isSuffixOf ".conf")
                    <$> getDirectoryContents conf_dir
           if db_empty
             then do
-              printer 3 $ text "There are no .conf files in"
+              debugTraceMsg logger 3 $ text "There are no .conf files in"
                           <+> text conf_dir <> text ", treating"
                           <+> text "package database as empty"
               return []
@@ -775,7 +773,7 @@ readUnitDatabase printer cfg conf_file = do
           let conf_dir = conf_file <.> "d"
           direxists <- doesDirectoryExist conf_dir
           if direxists
-             then do printer 2 (text "Ignoring old file-style db and trying:" <+> text conf_dir)
+             then do debugTraceMsg logger 2 (text "Ignoring old file-style db and trying:" <+> text conf_dir)
                      liftM Just (readDirStyleUnitInfo conf_dir)
              else return (Just []) -- ghc-pkg will create it when it's updated
         else return Nothing
@@ -1030,7 +1028,7 @@ pprTrustFlag flag = case flag of
 type WiringMap = Map UnitId UnitId
 
 findWiredInUnits
-   :: (SDoc -> IO ())      -- debug trace
+   :: Logger
    -> UnitPrecedenceMap
    -> [UnitInfo]           -- database
    -> VisibilityMap             -- info on what units are visible
@@ -1038,7 +1036,7 @@ findWiredInUnits
    -> IO ([UnitInfo],  -- unit database updated for wired in
           WiringMap)   -- map from unit id to wired identity
 
-findWiredInUnits printer prec_map pkgs vis_map = do
+findWiredInUnits logger prec_map pkgs vis_map = do
   -- Now we must find our wired-in units, and rename them to
   -- their canonical names (eg. base-1.0 ==> base), as described
   -- in Note [Wired-in units] in GHC.Unit.Module
@@ -1076,14 +1074,14 @@ findWiredInUnits printer prec_map pkgs vis_map = do
             many -> pick (head (sortByPreference prec_map many))
           where
                 notfound = do
-                          printer $
+                          debugTraceMsg logger 2 $
                             text "wired-in package "
                                  <> ftext (unitIdFS wired_pkg)
                                  <> text " not found."
                           return Nothing
                 pick :: UnitInfo -> IO (Maybe (UnitId, UnitInfo))
                 pick pkg = do
-                        printer $
+                        debugTraceMsg logger 2 $
                             text "wired-in package "
                                  <> ftext (unitIdFS wired_pkg)
                                  <> text " mapped to "
@@ -1203,20 +1201,20 @@ pprReason pref reason = case reason of
       pref <+> text "unusable due to shadowed dependencies:" $$
         nest 2 (hsep (map ppr deps))
 
-reportCycles :: (SDoc -> IO ()) -> [SCC UnitInfo] -> IO ()
-reportCycles printer sccs = mapM_ report sccs
+reportCycles :: Logger -> [SCC UnitInfo] -> IO ()
+reportCycles logger sccs = mapM_ report sccs
   where
     report (AcyclicSCC _) = return ()
     report (CyclicSCC vs) =
-        printer $
+        debugTraceMsg logger 2 $
           text "these packages are involved in a cycle:" $$
             nest 2 (hsep (map (ppr . unitId) vs))
 
-reportUnusable :: (SDoc -> IO ()) -> UnusableUnits -> IO ()
-reportUnusable printer pkgs = mapM_ report (Map.toList pkgs)
+reportUnusable :: Logger -> UnusableUnits -> IO ()
+reportUnusable logger pkgs = mapM_ report (Map.toList pkgs)
   where
     report (ipid, (_, reason)) =
-       printer $
+       debugTraceMsg logger 2 $
          pprReason
            (text "package" <+> ppr ipid <+> text "is") reason
 
@@ -1306,15 +1304,15 @@ type UnitPrecedenceMap = Map UnitId Int
 -- units with the same unit id in later databases override
 -- earlier ones.  This does NOT check if the resulting database
 -- makes sense (that's done by 'validateDatabase').
-mergeDatabases :: (SDoc -> IO ()) -> [UnitDatabase UnitId]
+mergeDatabases :: Logger -> [UnitDatabase UnitId]
                -> IO (UnitInfoMap, UnitPrecedenceMap)
-mergeDatabases printer = foldM merge (Map.empty, Map.empty) . zip [1..]
+mergeDatabases logger = foldM merge (Map.empty, Map.empty) . zip [1..]
   where
     merge (pkg_map, prec_map) (i, UnitDatabase db_path db) = do
-      printer $
+      debugTraceMsg logger 2 $
           text "loading package database" <+> text db_path
       forM_ (Set.toList override_set) $ \pkg ->
-          printer $
+          debugTraceMsg logger 2 $
               text "package" <+> ppr pkg <+>
               text "overrides a previously defined package"
       return (pkg_map', prec_map')
@@ -1397,11 +1395,10 @@ validateDatabase cfg pkg_map1 =
 -- settings and populate the unit state.
 
 mkUnitState
-    :: SDocContext            -- ^ SDocContext used to render exception messages
-    -> (Int -> SDoc -> IO ()) -- ^ Trace printer
+    :: Logger
     -> UnitConfig
     -> IO (UnitState,[UnitDatabase UnitId])
-mkUnitState ctx printer cfg = do
+mkUnitState logger cfg = do
 {-
    Plan.
 
@@ -1457,7 +1454,7 @@ mkUnitState ctx printer cfg = do
 
   -- if databases have not been provided, read the database flags
   raw_dbs <- case unitConfigDBCache cfg of
-               Nothing  -> readUnitDatabases printer cfg
+               Nothing  -> readUnitDatabases logger cfg
                Just dbs -> return dbs
 
   -- distrust all units if the flag is set
@@ -1470,18 +1467,18 @@ mkUnitState ctx printer cfg = do
   -- packageFlags, pluginPackageFlags, etc. are all specified in *reverse* order
   -- than they are on the command line.
   let other_flags = reverse (unitConfigFlagsExposed cfg)
-  printer 2 $
+  debugTraceMsg logger 2 $
       text "package flags" <+> ppr other_flags
 
   -- Merge databases together, without checking validity
-  (pkg_map1, prec_map) <- mergeDatabases (printer 2) dbs
+  (pkg_map1, prec_map) <- mergeDatabases logger dbs
 
   -- Now that we've merged everything together, prune out unusable
   -- packages.
   let (pkg_map2, unusable, sccs) = validateDatabase cfg pkg_map1
 
-  reportCycles   (printer 2) sccs
-  reportUnusable (printer 2) unusable
+  reportCycles   logger sccs
+  reportUnusable logger unusable
 
   -- Apply trust flags (these flags apply regardless of whether
   -- or not packages are visible or not)
@@ -1554,7 +1551,7 @@ mkUnitState ctx printer cfg = do
   -- it modifies the unit ids of wired in packages, but when we process
   -- package arguments we need to key against the old versions.
   --
-  (pkgs2, wired_map) <- findWiredInUnits (printer 2) prec_map pkgs1 vis_map2
+  (pkgs2, wired_map) <- findWiredInUnits logger prec_map pkgs1 vis_map2
   let pkg_db = mkUnitInfoMap pkgs2
 
   -- Update the visibility map, so we treat wired packages as visible.
@@ -1624,7 +1621,7 @@ mkUnitState ctx printer cfg = do
                     $ closeUnitDeps pkg_db
                     $ zip (map toUnitId preload3) (repeat Nothing)
 
-  let mod_map1 = mkModuleNameProvidersMap ctx cfg pkg_db emptyUniqSet vis_map
+  let mod_map1 = mkModuleNameProvidersMap logger cfg pkg_db emptyUniqSet vis_map
       mod_map2 = mkUnusableModuleNameProvidersMap unusable
       mod_map = Map.union mod_map1 mod_map2
 
@@ -1635,7 +1632,7 @@ mkUnitState ctx printer cfg = do
          , unitInfoMap                  = pkg_db
          , preloadClosure               = emptyUniqSet
          , moduleNameProvidersMap       = mod_map
-         , pluginModuleNameProvidersMap = mkModuleNameProvidersMap ctx cfg pkg_db emptyUniqSet plugin_vis_map
+         , pluginModuleNameProvidersMap = mkModuleNameProvidersMap logger cfg pkg_db emptyUniqSet plugin_vis_map
          , packageNameMap               = pkgname_map
          , wireMap                      = wired_map
          , unwireMap                    = Map.fromList [ (v,k) | (k,v) <- Map.toList wired_map ]
@@ -1659,13 +1656,13 @@ unwireUnit _ uid = uid
 -- packages a bit bothersome.
 
 mkModuleNameProvidersMap
-  :: SDocContext     -- ^ SDocContext used to render exception messages
+  :: Logger
   -> UnitConfig
   -> UnitInfoMap
   -> PreloadUnitClosure
   -> VisibilityMap
   -> ModuleNameProvidersMap
-mkModuleNameProvidersMap ctx cfg pkg_map closure vis_map =
+mkModuleNameProvidersMap logger cfg pkg_map closure vis_map =
     -- What should we fold on?  Both situations are awkward:
     --
     --    * Folding on the visibility map means that we won't create
@@ -1716,7 +1713,8 @@ mkModuleNameProvidersMap ctx cfg pkg_map closure vis_map =
     rnBinding (orig, new) = (new, setOrigins origEntry fromFlag)
      where origEntry = case lookupUFM esmap orig of
             Just r -> r
-            Nothing -> throwGhcException (CmdLineError (renderWithContext ctx
+            Nothing -> throwGhcException (CmdLineError (renderWithContext
+                        (log_default_user_context (logFlags logger))
                         (text "package flag: could not find module name" <+>
                             ppr orig <+> text "in package" <+> ppr pk)))
 

@@ -302,16 +302,15 @@ simplRecOrTopPair env top_lvl is_rec mb_cont old_bndr new_bndr rhs
     simplLazyBind env top_lvl is_rec old_bndr new_bndr rhs env
 
   where
-    dflags = seDynFlags env
     logger = seLogger env
 
     -- trace_bind emits a trace for each top-level binding, which
     -- helps to locate the tracing for inlining and rule firing
     trace_bind what thing_inside
-      | not (dopt Opt_D_verbose_core2core dflags)
+      | not (logHasDumpFlag logger Opt_D_verbose_core2core)
       = thing_inside
       | otherwise
-      = putTraceMsg logger dflags ("SimplBind " ++ what)
+      = logTraceMsg logger ("SimplBind " ++ what)
          (ppr old_bndr) thing_inside
 
 --------------------------
@@ -1948,7 +1947,7 @@ simplIdF env var cont
 
 completeCall :: SimplEnv -> OutId -> SimplCont -> SimplM (SimplFloats, OutExpr)
 completeCall env var cont
-  | Just expr <- callSiteInline logger dflags case_depth var active_unf
+  | Just expr <- callSiteInline logger uf_opts case_depth var active_unf
                                 lone_variable arg_infos interesting_cont
   -- Inline the variable's RHS
   = do { checkedTick (UnfoldingDone var)
@@ -1965,7 +1964,7 @@ completeCall env var cont
        ; rebuildCall env info cont }
 
   where
-    dflags     = seDynFlags env
+    uf_opts    = seUnfoldingOpts env
     case_depth = seCaseDepth env
     logger     = seLogger env
     (lone_variable, arg_infos, call_cont) = contArgs cont
@@ -1974,14 +1973,13 @@ completeCall env var cont
     active_unf       = activeUnfolding (getMode env) var
 
     log_inlining doc
-      = liftIO $ putDumpMsg logger dflags
-           (mkDumpStyle alwaysQualify)
+      = liftIO $ logDumpFile logger (mkDumpStyle alwaysQualify)
            Opt_D_dump_inlinings
            "" FormatText doc
 
     dump_inline unfolding cont
-      | not (dopt Opt_D_dump_inlinings dflags) = return ()
-      | not (dopt Opt_D_verbose_core2core dflags)
+      | not (logHasDumpFlag logger Opt_D_dump_inlinings) = return ()
+      | not (logHasDumpFlag logger Opt_D_verbose_core2core)
       = when (isExternalName (idName var)) $
             log_inlining $
                 sep [text "Inlining done:", nest 4 (ppr var)]
@@ -2248,8 +2246,8 @@ tryRules env rules fn args call_cont
                       (ruleModule rule))
 
     dump rule rule_rhs
-      | dopt Opt_D_dump_rule_rewrites dflags
-      = log_rule dflags Opt_D_dump_rule_rewrites "Rule fired" $ vcat
+      | logHasDumpFlag logger Opt_D_dump_rule_rewrites
+      = log_rule Opt_D_dump_rule_rewrites "Rule fired" $ vcat
           [ text "Rule:" <+> ftext (ruleName rule)
           , text "Module:" <+>  printRuleModule rule
           , text "Before:" <+> hang (ppr fn) 2 (sep (map ppr args))
@@ -2257,8 +2255,8 @@ tryRules env rules fn args call_cont
                                (sep $ map ppr $ drop (ruleArity rule) args)
           , text "Cont:  " <+> ppr call_cont ]
 
-      | dopt Opt_D_dump_rule_firings dflags
-      = log_rule dflags Opt_D_dump_rule_firings "Rule fired:" $
+      | logHasDumpFlag logger Opt_D_dump_rule_firings
+      = log_rule Opt_D_dump_rule_firings "Rule fired:" $
           ftext (ruleName rule)
             <+> printRuleModule rule
 
@@ -2266,22 +2264,20 @@ tryRules env rules fn args call_cont
       = return ()
 
     nodump
-      | dopt Opt_D_dump_rule_rewrites dflags
+      | logHasDumpFlag logger Opt_D_dump_rule_rewrites
       = liftIO $
-          touchDumpFile logger dflags Opt_D_dump_rule_rewrites
+          touchDumpFile logger Opt_D_dump_rule_rewrites
 
-      | dopt Opt_D_dump_rule_firings dflags
+      | logHasDumpFlag logger Opt_D_dump_rule_firings
       = liftIO $
-          touchDumpFile logger dflags Opt_D_dump_rule_firings
+          touchDumpFile logger Opt_D_dump_rule_firings
 
       | otherwise
       = return ()
 
-    log_rule dflags flag hdr details
-      = liftIO $ do
-          let sty = mkDumpStyle alwaysQualify
-          putDumpMsg logger dflags sty flag "" FormatText $
-              sep [text hdr, nest 4 details]
+    log_rule flag hdr details
+      = liftIO $ logDumpFile logger (mkDumpStyle alwaysQualify) flag "" FormatText
+               $ sep [text hdr, nest 4 details]
 
 trySeqRules :: SimplEnv
             -> OutExpr -> InExpr   -- Scrutinee and RHS

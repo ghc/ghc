@@ -135,6 +135,7 @@ data DumpFlag
    | Opt_D_ppr_debug
    | Opt_D_no_debug_output
    | Opt_D_dump_faststrings
+   | Opt_D_faststring_stats
    deriving (Eq, Show, Enum)
 
 -- | Enumerates the simple on-or-off dynamic flags
@@ -142,7 +143,6 @@ data GeneralFlag
 -- See Note [Updating flag description in the User's Guide]
 
    = Opt_DumpToFile                     -- ^ Append dump output to files instead of stdout.
-   | Opt_D_faststring_stats
    | Opt_D_dump_minimal_imports
    | Opt_DoCoreLinting
    | Opt_DoLinearCoreLinting

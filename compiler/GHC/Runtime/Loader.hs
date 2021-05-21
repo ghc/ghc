@@ -192,11 +192,10 @@ getValueSafely hsc_env mnwib val_name expected_type = do
   case mb_hval of
     Nothing   -> return Nothing
     Just hval -> do
-      value <- lessUnsafeCoerce logger dflags "getValueSafely" hval
+      value <- lessUnsafeCoerce logger "getValueSafely" hval
       return (Just value)
   where
     interp = hscInterp hsc_env
-    dflags = hsc_dflags hsc_env
     logger = hsc_logger hsc_env
     hooks  = hsc_hooks hsc_env
 
@@ -232,12 +231,12 @@ getHValueSafely interp hsc_env mnwib val_name expected_type = do
 --
 -- 2) Wrap it in some debug messages at verbosity 3 or higher so we can see what happened
 --    if it /does/ segfault
-lessUnsafeCoerce :: Logger -> DynFlags -> String -> a -> IO b
-lessUnsafeCoerce logger dflags context what = do
-    debugTraceMsg logger dflags 3 $
+lessUnsafeCoerce :: Logger -> String -> a -> IO b
+lessUnsafeCoerce logger context what = do
+    debugTraceMsg logger 3 $
         (text "Coercing a value in") <+> (text context) <> (text "...")
     output <- evaluate (unsafeCoerce what)
-    debugTraceMsg logger dflags 3 (text "Successfully evaluated coercion")
+    debugTraceMsg logger 3 (text "Successfully evaluated coercion")
     return output
 
 

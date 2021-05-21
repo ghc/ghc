@@ -21,6 +21,7 @@ module GHC.Tc.Utils.Monad(
   discardResult,
   getTopEnv, updTopEnv, getGblEnv, updGblEnv,
   setGblEnv, getLclEnv, updLclEnv, setLclEnv,
+  updTopFlags,
   getEnvs, setEnvs,
   xoptM, doptM, goptM, woptM,
   setXOptM, unsetXOptM, unsetGOptM, unsetWOptM,
@@ -266,10 +267,11 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
              -- bangs to avoid leaking the env (#19356)
              !dflags = hsc_dflags hsc_env ;
              !home_unit = hsc_home_unit hsc_env ;
+             !logger = hsc_logger hsc_env ;
 
              maybe_rn_syntax :: forall a. a -> Maybe a ;
              maybe_rn_syntax empty_val
-                | dopt Opt_D_dump_rn_ast dflags = Just empty_val
+                | logHasDumpFlag logger Opt_D_dump_rn_ast = Just empty_val
 
                 | gopt Opt_WriteHie dflags       = Just empty_val
 
@@ -499,32 +501,30 @@ setEnvs (gbl_env, lcl_env) = updEnv (\ env -> env { env_gbl = gbl_env, env_lcl =
 -- Command-line flags
 
 xoptM :: LangExt.Extension -> TcRnIf gbl lcl Bool
-xoptM flag = do { dflags <- getDynFlags; return (xopt flag dflags) }
+xoptM flag = xopt flag <$> getDynFlags
 
 doptM :: DumpFlag -> TcRnIf gbl lcl Bool
-doptM flag = do { dflags <- getDynFlags; return (dopt flag dflags) }
+doptM flag = do
+  logger <- getLogger
+  return (logHasDumpFlag logger flag)
 
 goptM :: GeneralFlag -> TcRnIf gbl lcl Bool
-goptM flag = do { dflags <- getDynFlags; return (gopt flag dflags) }
+goptM flag = gopt flag <$> getDynFlags
 
 woptM :: WarningFlag -> TcRnIf gbl lcl Bool
-woptM flag = do { dflags <- getDynFlags; return (wopt flag dflags) }
+woptM flag = wopt flag <$> getDynFlags
 
 setXOptM :: LangExt.Extension -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
-setXOptM flag =
-  updTopEnv (\top -> top { hsc_dflags = xopt_set (hsc_dflags top) flag})
+setXOptM flag = updTopFlags (\dflags -> xopt_set dflags flag)
 
 unsetXOptM :: LangExt.Extension -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
-unsetXOptM flag =
-  updTopEnv (\top -> top { hsc_dflags = xopt_unset (hsc_dflags top) flag})
+unsetXOptM flag = updTopFlags (\dflags -> xopt_unset dflags flag)
 
 unsetGOptM :: GeneralFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
-unsetGOptM flag =
-  updTopEnv (\top -> top { hsc_dflags = gopt_unset (hsc_dflags top) flag})
+unsetGOptM flag = updTopFlags (\dflags -> gopt_unset dflags flag)
 
 unsetWOptM :: WarningFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
-unsetWOptM flag =
-  updTopEnv (\top -> top { hsc_dflags = wopt_unset (hsc_dflags top) flag})
+unsetWOptM flag = updTopFlags (\dflags -> wopt_unset dflags flag)
 
 -- | Do it flag is true
 whenDOptM :: DumpFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
@@ -554,12 +554,13 @@ unlessXOptM flag thing_inside = do b <- xoptM flag
 {-# INLINE unlessXOptM #-} -- see Note [INLINE conditional tracing utilities]
 
 getGhcMode :: TcRnIf gbl lcl GhcMode
-getGhcMode = do { env <- getTopEnv; return (ghcMode (hsc_dflags env)) }
+getGhcMode = ghcMode <$> getDynFlags
 
 withoutDynamicNow :: TcRnIf gbl lcl a -> TcRnIf gbl lcl a
-withoutDynamicNow =
-  updTopEnv (\top@(HscEnv { hsc_dflags = dflags }) ->
-              top { hsc_dflags = dflags { dynamicNow = False} })
+withoutDynamicNow = updTopFlags (\dflags -> dflags { dynamicNow = False})
+
+updTopFlags :: (DynFlags -> DynFlags) -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
+updTopFlags f = updTopEnv (hscUpdateFlags f)
 
 getEpsVar :: TcRnIf gbl lcl (TcRef ExternalPackageState)
 getEpsVar = do
@@ -777,21 +778,20 @@ dumpOptTcRn flag title fmt doc =
 --
 dumpTcRn :: Bool -> DumpFlag -> String -> DumpFormat -> SDoc -> TcRn ()
 dumpTcRn useUserStyle flag title fmt doc = do
-  dflags <- getDynFlags
   logger <- getLogger
   printer <- getPrintUnqualified
   real_doc <- wrapDocLoc doc
   let sty = if useUserStyle
               then mkUserStyle printer AllTheWay
               else mkDumpStyle printer
-  liftIO $ putDumpMsg logger dflags sty flag title fmt real_doc
+  liftIO $ logDumpFile logger sty flag title fmt real_doc
 
 -- | Add current location if -dppr-debug
 -- (otherwise the full location is usually way too much)
 wrapDocLoc :: SDoc -> TcRn SDoc
 wrapDocLoc doc = do
-  dflags <- getDynFlags
-  if hasPprDebug dflags
+  logger <- getLogger
+  if logHasDumpFlag logger Opt_D_ppr_debug
     then do
       loc <- getSrcSpanM
       return (mkLocMessage MCOutput loc doc)
@@ -807,10 +807,9 @@ getPrintUnqualified
 -- | Like logInfoTcRn, but for user consumption
 printForUserTcRn :: SDoc -> TcRn ()
 printForUserTcRn doc = do
-    dflags <- getDynFlags
     logger <- getLogger
     printer <- getPrintUnqualified
-    liftIO (printOutputForUser logger dflags printer doc)
+    liftIO (printOutputForUser logger printer doc)
 
 {-
 traceIf works in the TcRnIf monad, where no RdrEnv is
@@ -826,9 +825,8 @@ traceIf = traceOptIf Opt_D_dump_if_trace
 traceOptIf :: DumpFlag -> SDoc -> TcRnIf m n ()
 traceOptIf flag doc
   = whenDOptM flag $ do   -- No RdrEnv available, so qualify everything
-        dflags <- getDynFlags
         logger <- getLogger
-        liftIO (putMsg logger dflags doc)
+        liftIO (putMsg logger doc)
 {-# INLINE traceOptIf #-}  -- see Note [INLINE conditional tracing utilities]
 
 {-
@@ -2134,9 +2132,8 @@ failIfM :: SDoc -> IfL a
 failIfM msg = do
     env <- getLclEnv
     let full_msg = (if_loc env <> colon) $$ nest 2 msg
-    dflags <- getDynFlags
     logger <- getLogger
-    liftIO (putLogMsg logger dflags MCFatal
+    liftIO (logMsg logger MCFatal
              noSrcSpan $ withPprStyle defaultErrStyle full_msg)
     failM
 
@@ -2166,11 +2163,10 @@ forkM_maybe doc thing_inside
                 -- Otherwise we silently discard errors. Errors can legitimately
                 -- happen when compiling interface signatures (see tcInterfaceSigs)
                   whenDOptM Opt_D_dump_if_trace $ do
-                      dflags <- getDynFlags
                       logger <- getLogger
                       let msg = hang (text "forkM failed:" <+> doc)
                                    2 (text (show exn))
-                      liftIO $ putLogMsg logger dflags
+                      liftIO $ logMsg logger
                                          MCFatal
                                          noSrcSpan
                                          $ withPprStyle defaultErrStyle msg

@@ -53,7 +53,7 @@ import qualified GHC hiding (parseModule)
 import qualified Control.Monad.IO.Class as GHC
 import qualified GHC.Data.FastString    as GHC
 import qualified GHC.Data.StringBuffer  as GHC
-import qualified GHC.Driver.Config      as GHC
+import qualified GHC.Driver.Config.Parser as GHC
 import qualified GHC.Driver.Errors.Types as GHC
 import qualified GHC.Driver.Session     as GHC
 import qualified GHC.Parser             as GHC

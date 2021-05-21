@@ -141,7 +141,7 @@ cleanTempDirs logger tmpfs dflags
    $ mask_
    $ do let ref = tmp_dirs_to_clean tmpfs
         ds <- atomicModifyIORef' ref $ \ds -> (Map.empty, ds)
-        removeTmpDirs logger dflags (Map.elems ds)
+        removeTmpDirs logger (Map.elems ds)
 
 -- | Delete all files in @tmp_files_to_clean@.
 cleanTempFiles :: Logger -> TmpFs -> DynFlags -> IO ()
@@ -155,7 +155,7 @@ cleanTempFiles logger tmpfs dflags
                 , ftcGhcSession = gs_files
                 } -> ( emptyFilesToClean
                      , Set.toList cm_files ++ Set.toList gs_files)
-        removeTmpFiles logger dflags to_delete
+        removeTmpFiles logger to_delete
 
 -- | Delete all files in @tmp_files_to_clean@. That have lifetime
 -- TFL_CurrentModule.
@@ -169,7 +169,7 @@ cleanCurrentModuleTempFiles logger tmpfs dflags
         to_delete <- atomicModifyIORef' ref $
             \ftc@FilesToClean{ftcCurrentModule = cm_files} ->
                 (ftc {ftcCurrentModule = Set.empty}, Set.toList cm_files)
-        removeTmpFiles logger dflags to_delete
+        removeTmpFiles logger to_delete
 
 -- | Ensure that new_files are cleaned on the next call of
 -- 'cleanTempFiles' or 'cleanCurrentModuleTempFiles', depending on lifetime.
@@ -294,7 +294,7 @@ getTempDir logger tmpfs dflags = do
         -- directory we created.  Otherwise return the directory we created.
         case their_dir of
             Nothing  -> do
-                debugTraceMsg logger dflags 2 $
+                debugTraceMsg logger 2 $
                     text "Created temporary directory:" <+> text our_dir
                 return our_dir
             Just dir -> do
@@ -314,18 +314,18 @@ the process id).
 
 This is ok, as the temporary directory used contains the pid (see getTempDir).
 -}
-removeTmpDirs :: Logger -> DynFlags -> [FilePath] -> IO ()
-removeTmpDirs logger dflags ds
-  = traceCmd logger dflags "Deleting temp dirs"
+removeTmpDirs :: Logger -> [FilePath] -> IO ()
+removeTmpDirs logger ds
+  = traceCmd logger "Deleting temp dirs"
              ("Deleting: " ++ unwords ds)
-             (mapM_ (removeWith logger dflags removeDirectory) ds)
+             (mapM_ (removeWith logger removeDirectory) ds)
 
-removeTmpFiles :: Logger -> DynFlags -> [FilePath] -> IO ()
-removeTmpFiles logger dflags fs
+removeTmpFiles :: Logger -> [FilePath] -> IO ()
+removeTmpFiles logger fs
   = warnNon $
-    traceCmd logger dflags "Deleting temp files"
+    traceCmd logger "Deleting temp files"
              ("Deleting: " ++ unwords deletees)
-             (mapM_ (removeWith logger dflags removeFile) deletees)
+             (mapM_ (removeWith logger removeFile) deletees)
   where
      -- Flat out refuse to delete files that are likely to be source input
      -- files (is there a worse bug than having a compiler delete your source
@@ -336,21 +336,21 @@ removeTmpFiles logger dflags fs
     warnNon act
      | null non_deletees = act
      | otherwise         = do
-        putMsg logger dflags (text "WARNING - NOT deleting source files:"
-                       <+> hsep (map text non_deletees))
+        putMsg logger (text "WARNING - NOT deleting source files:"
+                   <+> hsep (map text non_deletees))
         act
 
     (non_deletees, deletees) = partition isHaskellUserSrcFilename fs
 
-removeWith :: Logger -> DynFlags -> (FilePath -> IO ()) -> FilePath -> IO ()
-removeWith logger dflags remover f = remover f `Exception.catchIO`
+removeWith :: Logger -> (FilePath -> IO ()) -> FilePath -> IO ()
+removeWith logger remover f = remover f `Exception.catchIO`
   (\e ->
    let msg = if isDoesNotExistError e
              then text "Warning: deleting non-existent" <+> text f
              else text "Warning: exception raised when deleting"
                                             <+> text f <> colon
                $$ text (show e)
-   in debugTraceMsg logger dflags 2 msg
+   in debugTraceMsg logger 2 msg
   )
 
 #if defined(mingw32_HOST_OS)

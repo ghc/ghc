@@ -46,20 +46,20 @@ cmmPipeline hsc_env srtInfo prog = do
   let logger = hsc_logger hsc_env
   let dflags = hsc_dflags hsc_env
   let forceRes (info, group) = info `seq` foldr (\decl r -> decl `seq` r) () group
-  withTimingSilent logger dflags (text "Cmm pipeline") forceRes $ do
-     tops <- {-# SCC "tops" #-} mapM (cpsTop logger dflags) prog
+  let platform = targetPlatform dflags
+  withTimingSilent logger (text "Cmm pipeline") forceRes $ do
+     tops <- {-# SCC "tops" #-} mapM (cpsTop logger platform dflags) prog
 
      let (procs, data_) = partitionEithers tops
      (srtInfo, cmms) <- {-# SCC "doSRTs" #-} doSRTs dflags srtInfo procs data_
-     let platform = targetPlatform dflags
-     dumpWith logger dflags Opt_D_dump_cmm_cps "Post CPS Cmm" FormatCMM (pdoc platform cmms)
+     dumpWith logger Opt_D_dump_cmm_cps "Post CPS Cmm" FormatCMM (pdoc platform cmms)
 
      return (srtInfo, cmms)
 
 
-cpsTop :: Logger -> DynFlags -> CmmDecl -> IO (Either (CAFEnv, [CmmDecl]) (CAFSet, CmmDecl))
-cpsTop _logger dflags p@(CmmData _ statics) = return (Right (cafAnalData (targetPlatform dflags) statics, p))
-cpsTop logger dflags proc =
+cpsTop :: Logger -> Platform -> DynFlags -> CmmDecl -> IO (Either (CAFEnv, [CmmDecl]) (CAFSet, CmmDecl))
+cpsTop _logger platform _ p@(CmmData _ statics) = return (Right (cafAnalData platform statics, p))
+cpsTop logger platform dflags proc =
     do
       ----------- Control-flow optimisations ----------------------------------
 
@@ -96,7 +96,7 @@ cpsTop logger dflags proc =
             then do
               pp <- {-# SCC "minimalProcPointSet" #-} runUniqSM $
                  minimalProcPointSet platform call_pps g
-              dumpWith logger dflags Opt_D_dump_cmm_proc "Proc points"
+              dumpWith logger Opt_D_dump_cmm_proc "Proc points"
                     FormatCMM (pdoc platform l $$ ppr pp $$ pdoc platform g)
               return pp
             else
@@ -117,14 +117,14 @@ cpsTop logger dflags proc =
 
       ------------- CAF analysis ----------------------------------------------
       let cafEnv = {-# SCC "cafAnal" #-} cafAnal platform call_pps l g
-      dumpWith logger dflags Opt_D_dump_cmm_caf "CAFEnv" FormatText (pdoc platform cafEnv)
+      dumpWith logger Opt_D_dump_cmm_caf "CAFEnv" FormatText (pdoc platform cafEnv)
 
       g <- if splitting_proc_points
            then do
              ------------- Split into separate procedures -----------------------
              let pp_map = {-# SCC "procPointAnalysis" #-}
                           procPointAnalysis proc_points g
-             dumpWith logger dflags Opt_D_dump_cmm_procmap "procpoint map"
+             dumpWith logger Opt_D_dump_cmm_procmap "procpoint map"
                 FormatCMM (ppr pp_map)
              g <- {-# SCC "splitAtProcPoints" #-} runUniqSM $
                   splitAtProcPoints platform l call_pps proc_points pp_map
@@ -151,11 +151,10 @@ cpsTop logger dflags proc =
 
       return (Left (cafEnv, g))
 
-  where platform = targetPlatform dflags
-        dump = dumpGraph logger dflags
+  where dump = dumpGraph logger platform dflags
 
         dumps flag name
-           = mapM_ (dumpWith logger dflags flag name FormatCMM . pdoc platform)
+           = mapM_ (dumpWith logger flag name FormatCMM . pdoc platform)
 
         condPass flag pass g dumpflag dumpname =
             if gopt flag dflags
@@ -348,24 +347,23 @@ runUniqSM m = do
   return (initUs_ us m)
 
 
-dumpGraph :: Logger -> DynFlags -> DumpFlag -> String -> CmmGraph -> IO ()
-dumpGraph logger dflags flag name g = do
+dumpGraph :: Logger -> Platform -> DynFlags -> DumpFlag -> String -> CmmGraph -> IO ()
+dumpGraph logger platform dflags flag name g = do
   when (gopt Opt_DoCmmLinting dflags) $ do_lint g
-  dumpWith logger dflags flag name FormatCMM (pdoc platform g)
+  dumpWith logger flag name FormatCMM (pdoc platform g)
  where
-  platform = targetPlatform dflags
   do_lint g = case cmmLintGraph platform g of
-                 Just err -> do { fatalErrorMsg logger dflags err
-                                ; ghcExit logger dflags 1
+                 Just err -> do { fatalErrorMsg logger err
+                                ; ghcExit logger 1
                                 }
                  Nothing  -> return ()
 
-dumpWith :: Logger -> DynFlags -> DumpFlag -> String -> DumpFormat -> SDoc -> IO ()
-dumpWith logger dflags flag txt fmt sdoc = do
-  dumpIfSet_dyn logger dflags flag txt fmt sdoc
-  when (not (dopt flag dflags)) $
+dumpWith :: Logger -> DumpFlag -> String -> DumpFormat -> SDoc -> IO ()
+dumpWith logger flag txt fmt sdoc = do
+  putDumpFileMaybe logger flag txt fmt sdoc
+  when (not (logHasDumpFlag logger flag)) $
     -- If `-ddump-cmm-verbose -ddump-to-file` is specified,
     -- dump each Cmm pipeline stage output to a separate file.  #16930
-    when (dopt Opt_D_dump_cmm_verbose dflags)
-      $ putDumpMsg logger dflags (mkDumpStyle alwaysQualify) flag txt fmt sdoc
-  dumpIfSet_dyn logger dflags Opt_D_dump_cmm_verbose_by_proc txt fmt sdoc
+    when (logHasDumpFlag logger Opt_D_dump_cmm_verbose)
+      $ logDumpFile logger (mkDumpStyle alwaysQualify) flag txt fmt sdoc
+  putDumpFileMaybe logger Opt_D_dump_cmm_verbose_by_proc txt fmt sdoc

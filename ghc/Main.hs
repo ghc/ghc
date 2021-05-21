@@ -29,6 +29,7 @@ import GHC.Driver.Pipeline  ( oneShot, compileFile )
 import GHC.Driver.MakeFile  ( doMkDependHS )
 import GHC.Driver.Backpack  ( doBackpack )
 import GHC.Driver.Plugins
+import GHC.Driver.Config.Logger (initLogFlags)
 
 import GHC.Platform
 import GHC.Platform.Ways
@@ -152,7 +153,6 @@ main = do
 main' :: PostLoadMode -> DynFlags -> [Located String] -> [Warn]
       -> Ghc ()
 main' postLoadMode dflags0 args flagWarnings = do
-  logger <- getLogger
 
   -- set the default GhcMode, backend and GhcLink.  The backend
   -- can be further adjusted on a module by module basis, using only
@@ -192,10 +192,13 @@ main' postLoadMode dflags0 args flagWarnings = do
                                        `gopt_set` Opt_IgnoreOptimChanges
                                        `gopt_set` Opt_IgnoreHpcChanges
 
+  logger1 <- getLogger
+  let logger2 = setLogFlags logger1 (initLogFlags dflags2)
+
         -- The rest of the arguments are "dynamic"
         -- Leftover ones are presumably files
   (dflags3, fileish_args, dynamicFlagWarnings) <-
-      GHC.parseDynamicFlags logger dflags2 args
+      GHC.parseDynamicFlags logger2 dflags2 args
 
   let dflags4 = case bcknd of
                 Interpreter | not (gopt Opt_ExternalInterpreter dflags3) ->
@@ -211,14 +214,16 @@ main' postLoadMode dflags0 args flagWarnings = do
                 _ ->
                     dflags3
 
-  GHC.prettyPrintGhcErrors dflags4 $ do
+  let logger4 = setLogFlags logger2 (initLogFlags dflags4)
+
+  GHC.prettyPrintGhcErrors logger4 $ do
 
   let flagWarnings' = flagWarnings ++ dynamicFlagWarnings
 
   handleSourceError (\e -> do
        GHC.printException e
        liftIO $ exitWith (ExitFailure 1)) $ do
-         liftIO $ handleFlagWarnings logger dflags4 flagWarnings'
+         liftIO $ handleFlagWarnings logger4 dflags4 flagWarnings'
 
   liftIO $ showBanner postLoadMode dflags4
 
@@ -228,6 +233,7 @@ main' postLoadMode dflags0 args flagWarnings = do
   _ <- GHC.setSessionDynFlags dflags5
   dflags6 <- GHC.getSessionDynFlags
   hsc_env <- GHC.getSession
+  logger <- getLogger
 
         ---------------- Display configuration -----------
   case verbosity dflags6 of
@@ -244,7 +250,7 @@ main' postLoadMode dflags0 args flagWarnings = do
        GHC.printException e
        liftIO $ exitWith (ExitFailure 1)) $ do
     case postLoadMode of
-       ShowInterface f        -> liftIO $ showIface (hsc_logger hsc_env)
+       ShowInterface f        -> liftIO $ showIface logger
                                                     (hsc_dflags hsc_env)
                                                     (hsc_units  hsc_env)
                                                     (hsc_NC     hsc_env)
@@ -259,7 +265,7 @@ main' postLoadMode dflags0 args flagWarnings = do
        DoFrontend f           -> doFrontend f srcs
        DoBackpack             -> doBackpack (map fst srcs)
 
-  liftIO $ dumpFinalStats logger dflags6
+  liftIO $ dumpFinalStats logger
 
 ghciUI :: [(FilePath, Maybe Phase)] -> Maybe [String] -> Ghc ()
 #if !defined(HAVE_INTERNAL_INTERPRETER)
@@ -760,19 +766,19 @@ showUsage ghci dflags = do
      dump ('$':'$':s) = putStr progName >> dump s
      dump (c:s)       = putChar c >> dump s
 
-dumpFinalStats :: Logger -> DynFlags -> IO ()
-dumpFinalStats logger dflags = do
-  when (gopt Opt_D_faststring_stats dflags) $ dumpFastStringStats logger dflags
+dumpFinalStats :: Logger -> IO ()
+dumpFinalStats logger = do
+  when (logHasDumpFlag logger Opt_D_faststring_stats) $ dumpFastStringStats logger
 
-  when (dopt Opt_D_dump_faststrings dflags) $ do
+  when (logHasDumpFlag logger Opt_D_dump_faststrings) $ do
     fss <- getFastStringTable
     let ppr_table         = fmap ppr_segment (fss `zip` [0..])
         ppr_segment (s,n) = hang (text "Segment" <+> int n) 2 (vcat (fmap ppr_bucket (s `zip` [0..])))
         ppr_bucket  (b,n) = hang (text "Bucket" <+> int n) 2 (vcat (fmap ftext b))
-    dumpIfSet_dyn logger dflags Opt_D_dump_faststrings "FastStrings" FormatText (vcat ppr_table)
+    putDumpFileMaybe logger Opt_D_dump_faststrings "FastStrings" FormatText (vcat ppr_table)
 
-dumpFastStringStats :: Logger -> DynFlags -> IO ()
-dumpFastStringStats logger dflags = do
+dumpFastStringStats :: Logger -> IO ()
+dumpFastStringStats logger = do
   segments <- getFastStringTable
   hasZ <- getFastStringZEncCounter
   let buckets = concat segments
@@ -793,14 +799,14 @@ dumpFastStringStats logger dflags = do
         -- which is not counted as "z-encoded".  Only strings whose
         -- Z-encoding is different from the original string are counted in
         -- the "z-encoded" total.
-  putMsg logger dflags msg
+  putMsg logger msg
   where
    x `pcntOf` y = int ((x * 100) `quot` y) Outputable.<> char '%'
 
 showUnits, dumpUnits, dumpUnitsSimple :: HscEnv -> IO ()
 showUnits       hsc_env = putStrLn (showSDoc (hsc_dflags hsc_env) (pprUnits (hsc_units hsc_env)))
-dumpUnits       hsc_env = putMsg (hsc_logger hsc_env) (hsc_dflags hsc_env) (pprUnits (hsc_units hsc_env))
-dumpUnitsSimple hsc_env = putMsg (hsc_logger hsc_env) (hsc_dflags hsc_env) (pprUnitsSimple (hsc_units hsc_env))
+dumpUnits       hsc_env = putMsg (hsc_logger hsc_env) (pprUnits (hsc_units hsc_env))
+dumpUnitsSimple hsc_env = putMsg (hsc_logger hsc_env) (pprUnitsSimple (hsc_units hsc_env))
 
 -- -----------------------------------------------------------------------------
 -- Frontend plugin support

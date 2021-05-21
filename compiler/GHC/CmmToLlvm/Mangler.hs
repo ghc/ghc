@@ -13,30 +13,25 @@ module GHC.CmmToLlvm.Mangler ( llvmFixupAsm ) where
 
 import GHC.Prelude
 
-import GHC.Driver.Session ( DynFlags, targetPlatform )
-import GHC.Platform ( platformArch, Arch(..) )
-import GHC.Utils.Error ( withTiming )
-import GHC.Utils.Outputable ( text )
-import GHC.Utils.Logger
+import GHC.Platform ( Platform, platformArch, Arch(..) )
 import GHC.Utils.Exception (try)
 
 import qualified Data.ByteString.Char8 as B
 import System.IO
 
 -- | Read in assembly file and process
-llvmFixupAsm :: Logger -> DynFlags -> FilePath -> FilePath -> IO ()
-llvmFixupAsm logger dflags f1 f2 = {-# SCC "llvm_mangler" #-}
-    withTiming logger dflags (text "LLVM Mangler") id $
-    withBinaryFile f1 ReadMode $ \r -> withBinaryFile f2 WriteMode $ \w -> do
-        go r w
-        hClose r
-        hClose w
-        return ()
+llvmFixupAsm :: Platform -> FilePath -> FilePath -> IO ()
+llvmFixupAsm platform f1 f2 = {-# SCC "llvm_mangler" #-}
+  withBinaryFile f1 ReadMode $ \r -> withBinaryFile f2 WriteMode $ \w -> do
+      go r w
+      hClose r
+      hClose w
+      return ()
   where
     go :: Handle -> Handle -> IO ()
     go r w = do
       e_l <- try $ B.hGetLine r ::IO (Either IOError B.ByteString)
-      let writeline a = B.hPutStrLn w (rewriteLine dflags rewrites a) >> go r w
+      let writeline a = B.hPutStrLn w (rewriteLine platform rewrites a) >> go r w
       case e_l of
         Right l -> writeline l
         Left _  -> return ()
@@ -45,12 +40,12 @@ llvmFixupAsm logger dflags f1 f2 = {-# SCC "llvm_mangler" #-}
 rewrites :: [Rewrite]
 rewrites = [rewriteSymType, rewriteAVX, rewriteCall]
 
-type Rewrite = DynFlags -> B.ByteString -> Maybe B.ByteString
+type Rewrite = Platform -> B.ByteString -> Maybe B.ByteString
 
 -- | Rewrite a line of assembly source with the given rewrites,
 -- taking the first rewrite that applies.
-rewriteLine :: DynFlags -> [Rewrite] -> B.ByteString -> B.ByteString
-rewriteLine dflags rewrites l
+rewriteLine :: Platform -> [Rewrite] -> B.ByteString -> B.ByteString
+rewriteLine platform rewrites l
   -- We disable .subsections_via_symbols on darwin and ios, as the llvm code
   -- gen uses prefix data for the info table.  This however does not prevent
   -- llvm from generating .subsections_via_symbols, which in turn with
@@ -58,7 +53,7 @@ rewriteLine dflags rewrites l
   | isSubsectionsViaSymbols l =
     (B.pack "## no .subsection_via_symbols for ghc. We need our info tables!")
   | otherwise =
-    case firstJust $ map (\rewrite -> rewrite dflags rest) rewrites of
+    case firstJust $ map (\rewrite -> rewrite platform rest) rewrites of
       Nothing        -> l
       Just rewritten -> B.concat $ [symbol, B.pack "\t", rewritten]
   where
@@ -97,13 +92,13 @@ rewriteSymType _ l
 -- tells LLVM that the stack is 32-byte aligned (even though it isn't) and then
 -- rewrites the instructions in the mangler.
 rewriteAVX :: Rewrite
-rewriteAVX dflags s
+rewriteAVX platform s
   | not isX86_64 = Nothing
   | isVmovdqa s  = Just $ replaceOnce (B.pack "vmovdqa") (B.pack "vmovdqu") s
   | isVmovap s   = Just $ replaceOnce (B.pack "vmovap") (B.pack "vmovup") s
   | otherwise    = Nothing
   where
-    isX86_64 = platformArch (targetPlatform dflags) == ArchX86_64
+    isX86_64 = platformArch platform == ArchX86_64
     isVmovdqa = B.isPrefixOf (B.pack "vmovdqa")
     isVmovap = B.isPrefixOf (B.pack "vmovap")
 
@@ -111,13 +106,13 @@ rewriteAVX dflags s
 -- functions on riscv64. The replacement will load the address from the
 -- GOT, which is resolved to point to the real address of the function.
 rewriteCall :: Rewrite
-rewriteCall dflags l
+rewriteCall platform l
   | not isRISCV64 = Nothing
   | isCall l      = Just $ replaceCall "call" "jalr" "ra" l
   | isTail l      = Just $ replaceCall "tail" "jr" "t1" l
   | otherwise     = Nothing
   where
-    isRISCV64 = platformArch (targetPlatform dflags) == ArchRISCV64
+    isRISCV64 = platformArch platform == ArchRISCV64
     isCall = B.isPrefixOf (B.pack "call\t")
     isTail = B.isPrefixOf (B.pack "tail\t")
 

@@ -98,7 +98,7 @@ codeGen logger tmpfs dflags this_mod ip_map@(InfoTableProvMap (UniqMap denv) _) 
         ; cgref <- liftIO $ initC >>= \s -> newIORef (CodeGenState mempty s)
         ; let cg :: FCode a -> Stream IO CmmGroup a
               cg fcode = do
-                (a, cmm) <- liftIO . withTimingSilent logger dflags (text "STG -> Cmm") (`seq` ()) $ do
+                (a, cmm) <- liftIO . withTimingSilent logger (text "STG -> Cmm") (`seq` ()) $ do
                          CodeGenState ts st <- readIORef cgref
                          let (a,st') = runC dflags this_mod st (getCmm fcode)
 

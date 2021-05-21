@@ -3,7 +3,7 @@ module Main where
 import GHC
 import GHC.Driver.Session
 import GHC.Driver.Monad
-import GHC.Driver.Config
+import GHC.Driver.Config.Parser (initParserOpts)
 import System.Environment
 
 testStrings = [

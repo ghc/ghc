@@ -24,6 +24,10 @@ compileInGhc targets handlerOutput = do
     flags0 <- getSessionDynFlags
     let flags = flags0 {verbosity = 1 }
     setSessionDynFlags flags
+    let collectSrcError handlerOutput _flags MCOutput _srcspan msg
+          = handlerOutput $ GHC.showSDocForUser flags emptyUnitState alwaysQualify msg
+        collectSrcError _ _ _ _ _
+          = return ()
     pushLogHookM (const (collectSrcError handlerOutput))
     -- Set up targets.
     oldTargets <- getTargets
@@ -48,10 +52,6 @@ compileInGhc targets handlerOutput = do
         TargetFile file Nothing -> file
         _ -> error "fileFromTarget: not a known target"
 
-    collectSrcError handlerOutput flags MCOutput _srcspan msg
-      = handlerOutput $ GHC.showSDocForUser flags emptyUnitState alwaysQualify msg
-    collectSrcError _ _ _ _ _
-      = return ()
 
 main :: IO ()
 main = do

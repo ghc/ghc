@@ -173,16 +173,16 @@ main = do
         logger <- getLogger
         liftIO $ forM_ exprs $ \(n,e) -> do
             case lintExpr dflags [f,scrutf,scruta] e of
-                Just errs -> putMsg logger dflags (pprMessageBag errs $$ text "in" <+> text n)
+                Just errs -> putMsg logger (pprMessageBag errs $$ text "in" <+> text n)
                 Nothing -> return ()
-            putMsg logger dflags (text n Outputable.<> char ':')
-            -- liftIO $ putMsg dflags (ppr e)
+            putMsg logger (text n Outputable.<> char ':')
+            -- liftIO $ putMsg logger (ppr e)
             let e' = callArityRHS e
             let bndrs = nonDetEltsUniqSet (allBoundIds e')
               -- It should be OK to use nonDetEltsUniqSet here, if it becomes a
               -- problem we should use DVarSet
-            -- liftIO $ putMsg dflags (ppr e')
-            forM_ bndrs $ \v -> putMsg logger dflags $ nest 4 $ ppr v <+> ppr (idCallArity v)
+            -- liftIO $ putMsg logger (ppr e')
+            forM_ bndrs $ \v -> putMsg logger $ nest 4 $ ppr v <+> ppr (idCallArity v)
 
 -- Utilities
 mkLApps :: Id -> [Integer] -> CoreExpr

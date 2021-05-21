@@ -124,7 +124,7 @@ addTicksToBinds hsc_env mod mod_loc exports tyCons binds
      modBreaks <- mkModBreaks hsc_env mod tickCount entries
 
      let logger = hsc_logger hsc_env
-     dumpIfSet_dyn logger dflags Opt_D_dump_ticked "HPC" FormatHaskell
+     putDumpFileMaybe logger Opt_D_dump_ticked "HPC" FormatHaskell
        (pprLHsBinds binds1)
 
      return (binds1, HpcInfo tickCount hashNo, modBreaks)

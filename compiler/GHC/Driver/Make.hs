@@ -51,7 +51,8 @@ import GHC.Linker.Types
 
 import GHC.Runtime.Context
 
-import GHC.Driver.Config
+import GHC.Driver.Config.Logger (initLogFlags)
+import GHC.Driver.Config.Parser (initParserOpts)
 import GHC.Driver.Phases
 import GHC.Driver.Pipeline
 import GHC.Driver.Session
@@ -206,13 +207,12 @@ depanalPartial
 depanalPartial excluded_mods allow_dup_roots = do
   hsc_env <- getSession
   let
-         dflags  = hsc_dflags hsc_env
          targets = hsc_targets hsc_env
          old_graph = hsc_mod_graph hsc_env
          logger  = hsc_logger hsc_env
 
-  withTiming logger dflags (text "Chasing dependencies") (const ()) $ do
-    liftIO $ debugTraceMsg logger dflags 2 (hcat [
+  withTiming logger (text "Chasing dependencies") (const ()) $ do
+    liftIO $ debugTraceMsg logger 2 (hcat [
               text "Chasing modules from: ",
               hcat (punctuate comma (map pprTarget targets))])
 
@@ -435,7 +435,7 @@ load' how_much mHscMessage mod_graph = do
         checkMod m and_then
             | m `elementOfUniqSet` all_home_mods = and_then
             | otherwise = do
-                    liftIO $ errorMsg logger dflags
+                    liftIO $ errorMsg logger
                         (text "no such module:" <+> quotes (ppr m))
                     return Failed
 
@@ -508,8 +508,8 @@ load' how_much mHscMessage mod_graph = do
 
         mg = partial_mg
 
-    liftIO $ debugTraceMsg logger dflags 2 (hang (text "Ready for upsweep")
-                               2 (ppr mg))
+    liftIO $ debugTraceMsg logger 2 (hang (text "Ready for upsweep")
+                                    2 (ppr mg))
 
     n_jobs <- case parMakeCount dflags of
                     Nothing -> liftIO getNumProcessors
@@ -535,7 +535,7 @@ load' how_much mHscMessage mod_graph = do
 
      then
        -- Easy; just relink it all.
-       do liftIO $ debugTraceMsg logger dflags 2 (text "Upsweep completely successful.")
+       do liftIO $ debugTraceMsg logger 2 (text "Upsweep completely successful.")
 
           -- Clean up after ourselves
           hsc_env1 <- getSession
@@ -567,7 +567,7 @@ load' how_much mHscMessage mod_graph = do
 
           if ghcLink dflags == LinkBinary && isJust ofile && not do_linking
              then do
-                liftIO $ errorMsg logger dflags $ text
+                liftIO $ errorMsg logger $ text
                    ("output was redirected with -o, " ++
                     "but no output will be generated\n" ++
                     "because there is no " ++
@@ -581,7 +581,7 @@ load' how_much mHscMessage mod_graph = do
        -- Tricky.  We need to back out the effects of compiling any
        -- half-done cycles, both so as to clean up the top level envs
        -- and to avoid telling the interactive linker to link them.
-       do liftIO $ debugTraceMsg logger dflags 2 (text "Upsweep partially successful.")
+       do liftIO $ debugTraceMsg logger 2 (text "Upsweep partially successful.")
 
           let modsDone_names
                  = map (ms_mod . emsModSummary) modsDone
@@ -720,7 +720,7 @@ guessOutputFile = modifySession $ \env ->
     in
     case outputFile_ dflags of
         Just _ -> env
-        Nothing -> env { hsc_dflags = dflags { outputFile_ = name_exe } }
+        Nothing -> hscSetFlags (dflags { outputFile_ = name_exe }) env
 
 -- -----------------------------------------------------------------------------
 --
@@ -1032,7 +1032,7 @@ parUpsweep n_jobs mHscMessage old_hpt sccs = do
                       , show mod_idx
                       ]
                     ]
-                -- Replace the default log_action with one that writes each
+                -- Replace the default logger with one that writes each
                 -- message to the module's log_queue. The main thread will
                 -- deal with synchronously printing these messages.
                 let lcl_logger = pushLogHook (const (parLogAction log_queue)) thread_safe_logger
@@ -1045,15 +1045,18 @@ parUpsweep n_jobs mHscMessage old_hpt sccs = do
 
                 -- Unmask asynchronous exceptions and perform the thread-local
                 -- work to compile the module (see parUpsweep_one).
-                m_res <- MC.try $ unmask $ prettyPrintGhcErrors dflags $
+                m_res <- MC.try $ unmask $ prettyPrintGhcErrors logger $
                   case mod of
                     InstantiationNode iuid -> do
                       hsc_env <- readMVar hsc_env_var
                       liftIO $ upsweep_inst hsc_env mHscMessage mod_idx (length sccs) iuid
                       pure Succeeded
-                    ModuleNode ems ->
-                      parUpsweep_one (emsModSummary ems) home_mod_map comp_graph_loops
-                                     lcl_logger lcl_tmpfs dflags (hsc_home_unit hsc_env)
+                    ModuleNode ems -> do
+                      let summary     = emsModSummary ems
+                      let lcl_dflags  = ms_hspp_opts summary
+                      let lcl_logger' = setLogFlags lcl_logger (initLogFlags lcl_dflags)
+                      parUpsweep_one summary home_mod_map comp_graph_loops
+                                     lcl_logger' lcl_tmpfs dflags (hsc_home_unit hsc_env)
                                      mHscMessage
                                      par_sem hsc_env_var old_hpt_var
                                      mod_idx (length sccs)
@@ -1066,7 +1069,7 @@ parUpsweep n_jobs mHscMessage old_hpt sccs = do
                         -- interrupt, and the user doesn't have to be informed
                         -- about that.
                         when (fromException exc /= Just ThreadKilled)
-                             (errorMsg lcl_logger dflags (text (show exc)))
+                             (errorMsg lcl_logger (text (show exc)))
                         return Failed
 
                 -- Populate the result MVar.
@@ -1092,7 +1095,7 @@ parUpsweep n_jobs mHscMessage old_hpt sccs = do
         -- Loop over each module in the compilation graph in order, printing
         -- each message from its log_queue.
         forM comp_graph $ \(mod,mvar,log_queue) -> do
-            printLogs logger dflags log_queue
+            printLogs logger log_queue
             result <- readMVar mvar
             if succeeded result then return (Just mod) else return Nothing
 
@@ -1105,7 +1108,7 @@ parUpsweep n_jobs mHscMessage old_hpt sccs = do
     -- of the upsweep.
     case cycle of
         Just mss -> do
-            liftIO $ fatalErrorMsg logger dflags (cyclicModuleErr mss)
+            liftIO $ fatalErrorMsg logger (cyclicModuleErr mss)
             return (Failed,ok_results)
         Nothing  -> do
             let success_flag = successIf (all isJust results)
@@ -1124,10 +1127,9 @@ parUpsweep n_jobs mHscMessage old_hpt sccs = do
     parLogAction log_queue _dflags !msgClass !srcSpan !msg =
         writeLogQueue log_queue (Just (msgClass,srcSpan,msg))
 
-    -- Print each message from the log_queue using the log_action from the
-    -- session's DynFlags.
-    printLogs :: Logger -> DynFlags -> LogQueue -> IO ()
-    printLogs !logger !dflags (LogQueue ref sem) = read_msgs
+    -- Print each message from the log_queue using the global logger
+    printLogs :: Logger -> LogQueue -> IO ()
+    printLogs !logger (LogQueue ref sem) = read_msgs
       where read_msgs = do
                 takeMVar sem
                 msgs <- atomicModifyIORef' ref $ \xs -> ([], reverse xs)
@@ -1136,7 +1138,7 @@ parUpsweep n_jobs mHscMessage old_hpt sccs = do
             print_loop [] = read_msgs
             print_loop (x:xs) = case x of
                 Just (msgClass,srcSpan,msg) -> do
-                    putLogMsg logger dflags msgClass srcSpan msg
+                    logMsg logger msgClass srcSpan msg
                     print_loop xs
                 -- Exit the loop once we encounter the end marker.
                 Nothing -> return ()
@@ -1297,7 +1299,7 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_logger lcl_tmpfs lcl_dflags
                     -- EXCEPT the loop closer.  However, our precomputed
                     -- SCCs include the loop closer, so we have to filter
                     -- it out.
-                    Just loop -> typecheckLoop lcl_dflags lcl_hsc_env' $
+                    Just loop -> typecheckLoop lcl_hsc_env' $
                                  filter (/= moduleName (gwib_mod this_build_mod)) $
                                  map (moduleName . gwib_mod) loop
 
@@ -1327,7 +1329,7 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_logger lcl_tmpfs lcl_dflags
                     -- closer!
                     hsc_env'' <- case finish_loop of
                         Nothing   -> return hsc_env'
-                        Just loop -> typecheckLoop lcl_dflags hsc_env' $
+                        Just loop -> typecheckLoop hsc_env' $
                                      map (moduleName . gwib_mod) loop
                     return (hsc_env'', localize_hsc_env hsc_env'')
 
@@ -1391,9 +1393,8 @@ upsweep mHscMessage old_hpt sccs = do
         nmods' = nmods - length dropped_ms
 
     when (not $ null dropped_ms) $ do
-        dflags <- getSessionDynFlags
         logger <- getLogger
-        liftIO $ debugTraceMsg logger dflags 2 (keepGoingPruneErr dropped_ms)
+        liftIO $ debugTraceMsg logger 2 (keepGoingPruneErr $ dropped_ms)
     (_, done') <- upsweep' old_hpt done mods' (mod_index+1) nmods'
     return (Failed, done')
 
@@ -1412,7 +1413,7 @@ upsweep mHscMessage old_hpt sccs = do
      (CyclicSCC ms : mods) mod_index nmods
    = do dflags <- getSessionDynFlags
         logger <- getLogger
-        liftIO $ fatalErrorMsg logger dflags (cyclicModuleErr ms)
+        liftIO $ fatalErrorMsg logger (cyclicModuleErr ms)
         if gopt Opt_KeepGoing dflags
           then keep_going (mkHomeBuildModule <$> ms) old_hpt done mods mod_index nmods
           else return (Failed, done)
@@ -1745,7 +1746,7 @@ reTypecheckLoop hsc_env ms graph
             let l = emsModSummary ems
             guard $ not $ isBootSummary l == IsBoot && ms_mod l == ms_mod ms
             pure l
-  = typecheckLoop (hsc_dflags hsc_env) hsc_env (map ms_mod_name non_boot)
+  = typecheckLoop hsc_env (map ms_mod_name non_boot)
   | otherwise
   = return hsc_env
   where
@@ -1805,9 +1806,9 @@ getModLoop ms graph appearsAsBoot
 
 -- NB: sometimes mods has duplicates; this is harmless because
 -- any duplicates get clobbered in addListToHpt and never get forced.
-typecheckLoop :: DynFlags -> HscEnv -> [ModuleName] -> IO HscEnv
-typecheckLoop dflags hsc_env mods = do
-  debugTraceMsg logger dflags 2 $
+typecheckLoop :: HscEnv -> [ModuleName] -> IO HscEnv
+typecheckLoop hsc_env mods = do
+  debugTraceMsg logger 2 $
      text "Re-typechecking loop: " <> ppr mods
   new_hpt <-
     fixIO $ \new_hpt -> do
@@ -2065,7 +2066,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
 
         dflags = hsc_dflags hsc_env
         logger = hsc_logger hsc_env
-        roots = hsc_targets hsc_env
+        roots  = hsc_targets hsc_env
 
         old_summary_map :: ModNodeMap ExtendedModSummary
         old_summary_map = mkNodeMap old_summaries
@@ -2625,7 +2626,7 @@ withDeferredDiagnostics f = do
     logger <- getLogger
 
     let deferDiagnostics _dflags !msgClass !srcSpan !msg = do
-          let action = putLogMsg logger dflags msgClass srcSpan msg
+          let action = logMsg logger msgClass srcSpan msg
           case msgClass of
             MCDiagnostic SevWarning _reason
               -> atomicModifyIORef' warnings $ \i -> (action: i, ())

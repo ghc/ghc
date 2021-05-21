@@ -2,7 +2,6 @@
 module GHC.Driver.Config
    ( initOptCoercionOpts
    , initSimpleOpts
-   , initParserOpts
    , initBCOOpts
    , initEvalOpts
    )
@@ -13,9 +12,7 @@ import GHC.Prelude
 import GHC.Driver.Session
 import GHC.Core.SimpleOpt
 import GHC.Core.Coercion.Opt
-import GHC.Parser.Lexer
 import GHC.Runtime.Interpreter (BCOOpts(..))
-import GHC.Utils.Error (mkPlainMsgEnvelope)
 import GHCi.Message (EvalOpts(..))
 
 import GHC.Conc (getNumProcessors)
@@ -33,18 +30,6 @@ initSimpleOpts dflags = SimpleOpts
    { so_uf_opts = unfoldingOpts dflags
    , so_co_opts = initOptCoercionOpts dflags
    }
-
--- | Extracts the flag information needed for parsing
-initParserOpts :: DynFlags -> ParserOpts
-initParserOpts =
-  mkParserOpts
-    <$> warningFlags
-    <*> extensionFlags
-    <*> mkPlainMsgEnvelope
-    <*> safeImportsOn
-    <*> gopt Opt_Haddock
-    <*> gopt Opt_KeepRawTokenStream
-    <*> const True
 
 -- | Extract BCO options from DynFlags
 initBCOOpts :: DynFlags -> IO BCOOpts

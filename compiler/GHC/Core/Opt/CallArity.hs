@@ -13,7 +13,6 @@ import GHC.Prelude
 
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
-import GHC.Driver.Session ( DynFlags )
 
 import GHC.Types.Basic
 import GHC.Core
@@ -434,8 +433,8 @@ choice, and hence Call Arity sets the call arity for join points as well.
 
 -- Main entry point
 
-callArityAnalProgram :: DynFlags -> CoreProgram -> CoreProgram
-callArityAnalProgram _dflags binds = binds'
+callArityAnalProgram :: CoreProgram -> CoreProgram
+callArityAnalProgram binds = binds'
   where
     (_, binds') = callArityTopLvl [] emptyVarSet binds
 

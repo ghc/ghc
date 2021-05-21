@@ -205,6 +205,10 @@ module GHC.Cmm.Parser ( parseCmmFile ) where
 import GHC.Prelude
 import qualified Prelude -- for happy-generated code
 
+import GHC.Driver.Session
+import GHC.Driver.Ppr
+import GHC.Driver.Config.Parser (initParserOpts)
+
 import GHC.Platform
 import GHC.Platform.Profile
 
@@ -251,9 +255,6 @@ import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.SrcLoc
 import GHC.Types.Tickish  ( GenTickish(SourceNote) )
-import GHC.Driver.Session
-import GHC.Driver.Ppr
-import GHC.Driver.Config
 import GHC.Utils.Error
 import GHC.Data.StringBuffer
 import GHC.Data.FastString

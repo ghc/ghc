@@ -90,7 +90,7 @@ mkExtraObj logger tmpfs dflags unit_state extn xs
 mkExtraObjToLinkIntoBinary :: Logger -> TmpFs -> DynFlags -> UnitState -> IO (Maybe FilePath)
 mkExtraObjToLinkIntoBinary logger tmpfs dflags unit_state = do
   when (gopt Opt_NoHsMain dflags && haveRtsOptsFlags dflags) $
-     logInfo logger dflags $ withPprStyle defaultUserStyle
+     logInfo logger $ withPprStyle defaultUserStyle
          (text "Warning: -rtsopts and -with-rtsopts have no effect with -no-hs-main." $$
           text "    Call hs_init_ghc() from your main() function to set these options.")
 
@@ -238,11 +238,11 @@ checkLinkInfo logger dflags unit_env pkg_deps exe_file
  | otherwise
  = do
    link_info <- getLinkInfo dflags unit_env pkg_deps
-   debugTraceMsg logger dflags 3 $ text ("Link info: " ++ link_info)
-   m_exe_link_info <- readElfNoteAsString logger dflags exe_file
+   debugTraceMsg logger 3 $ text ("Link info: " ++ link_info)
+   m_exe_link_info <- readElfNoteAsString logger exe_file
                           ghcLinkInfoSectionName ghcLinkInfoNoteName
    let sameLinkInfo = (Just link_info == m_exe_link_info)
-   debugTraceMsg logger dflags 3 $ case m_exe_link_info of
+   debugTraceMsg logger 3 $ case m_exe_link_info of
      Nothing -> text "Exe link info: Not found"
      Just s
        | sameLinkInfo -> text ("Exe link info is the same")

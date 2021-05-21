@@ -169,9 +169,8 @@ thenSmpl_ m k
 
 traceSmpl :: String -> SDoc -> SimplM ()
 traceSmpl herald doc
-  = do dflags <- getDynFlags
-       logger <- getLogger
-       liftIO $ Logger.dumpIfSet_dyn logger dflags Opt_D_dump_simpl_trace "Simpl Trace"
+  = do logger <- getLogger
+       liftIO $ Logger.putDumpFileMaybe logger Opt_D_dump_simpl_trace "Simpl Trace"
          FormatText
          (hang (text herald) 2 doc)
 {-# INLINE traceSmpl #-}  -- see Note [INLINE conditional tracing utilities]

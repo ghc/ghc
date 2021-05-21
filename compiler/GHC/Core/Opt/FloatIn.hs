@@ -21,13 +21,10 @@ module GHC.Core.Opt.FloatIn ( floatInwards ) where
 import GHC.Prelude
 import GHC.Platform
 
-import GHC.Driver.Session
-
 import GHC.Core
 import GHC.Core.Make hiding ( wrapFloats )
 import GHC.Core.Utils
 import GHC.Core.FVs
-import GHC.Core.Opt.Monad   ( CoreM )
 import GHC.Core.Type
 
 import GHC.Types.Basic      ( RecFlag(..), isRec )
@@ -35,8 +32,6 @@ import GHC.Types.Id         ( isOneShotBndr, idType, isJoinId, isJoinId_maybe )
 import GHC.Types.Tickish
 import GHC.Types.Var
 import GHC.Types.Var.Set
-
-import GHC.Unit.Module.ModGuts
 
 import GHC.Utils.Misc
 import GHC.Utils.Panic
@@ -47,11 +42,8 @@ Top-level interface function, @floatInwards@.  Note that we do not
 actually float any bindings downwards from the top-level.
 -}
 
-floatInwards :: ModGuts -> CoreM ModGuts
-floatInwards pgm@(ModGuts { mg_binds = binds })
-  = do { dflags <- getDynFlags
-       ; let platform = targetPlatform dflags
-       ; return (pgm { mg_binds = map (fi_top_bind platform) binds }) }
+floatInwards :: Platform -> CoreProgram -> CoreProgram
+floatInwards platform binds = map (fi_top_bind platform) binds
   where
     fi_top_bind platform (NonRec binder rhs)
       = NonRec binder (fiExpr platform [] (freeVars rhs))

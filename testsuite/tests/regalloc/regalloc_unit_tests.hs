@@ -24,6 +24,7 @@ import qualified GHC.CmmToAsm.Reg.Graph.Stats as Color
 import qualified GHC.CmmToAsm.Reg.Linear.Base as Linear
 import qualified GHC.CmmToAsm.X86.Instr as X86.Instr
 import qualified GHC.CmmToAsm.X86 as X86
+import GHC.Driver.Config.CmmToAsm
 import GHC.Driver.Main
 import GHC.Driver.Env
 import GHC.StgToCmm.CgUtils
@@ -44,6 +45,7 @@ import GHC.Types.Unique.Supply
 import GHC.Driver.Session
 import GHC.Driver.Errors
 import GHC.Utils.Error
+import GHC.Utils.Logger
 import GHC.Utils.Outputable
 import GHC.Types.Basic
 import GHC.Unit.Home
@@ -64,8 +66,15 @@ main = do
 
     --get a GHC context and run the tests
     runGhc (Just libdir) $ do
-        dflags0 <- fmap setOptions getDynFlags
-        setSessionDynFlags dflags0
+        dflags0 <- flip gopt_set Opt_RegsGraph <$> getDynFlags
+        --the register allocator's intermediate data
+        --structures are usually discarded
+        --(in GHC.CmmToAsm.cmmNativeGen) for performance
+        --reasons.  To prevent this we need to tell
+        --cmmNativeGen we want them printed out even
+        --though we ignore stderr in the test configuration.
+        let dflags1 = dopt_set dflags0 Opt_D_dump_asm_stats
+        setSessionDynFlags dflags1
 
         dflags <- getDynFlags
         logger <- getLogger
@@ -74,8 +83,6 @@ main = do
             runTests logger dflags us
 
     return ()
-
-    where setOptions = (flip gopt_set) Opt_RegsGraph
 
 
 -- | TODO: Make this an IORef along the lines of Data.Unique.newUnique to add
@@ -113,7 +120,7 @@ compileCmmForRegAllocStats ::
     UniqSupply ->
     IO [( Maybe [Color.RegAllocStats (Alignment, RawCmmStatics) X86.Instr.Instr]
         , Maybe [Linear.RegAllocStats])]
-compileCmmForRegAllocStats logger dflags' cmmFile ncgImplF us = do
+compileCmmForRegAllocStats logger dflags cmmFile ncgImplF us = do
     let ncgImpl = ncgImplF (initNCGConfig dflags thisMod)
     hscEnv <- newHscEnv dflags
 
@@ -127,13 +134,14 @@ compileCmmForRegAllocStats logger dflags' cmmFile ncgImplF us = do
     let initTopSRT = emptySRT thisMod
     cmmGroup <- fmap snd $ cmmPipeline hscEnv initTopSRT $ fst $ fromJust parsedCmm
 
-    rawCmms <- cmmToRawCmm logger dflags (Stream.yield cmmGroup)
+    let profile = targetProfile dflags
+    rawCmms <- cmmToRawCmm logger profile (Stream.yield cmmGroup)
 
     collectedCmms <- mconcat <$> Stream.collect rawCmms
 
     -- compile and discard the generated code, returning regalloc stats
     mapM (\ (count, thisCmm) ->
-        cmmNativeGen logger dflags thisModLoc ncgImpl
+        cmmNativeGen logger thisModLoc ncgImpl
             usb dwarfFileIds dbgMap thisCmm count >>=
                 (\(_, _, _, _, colorStats, linearStats, _) ->
                 -- scrub unneeded output from cmmNativeGen
@@ -141,13 +149,6 @@ compileCmmForRegAllocStats logger dflags' cmmFile ncgImplF us = do
                 $ zip [0.. (length collectedCmms)] collectedCmms
 
     where
-          --the register allocator's intermediate data
-          --structures are usually discarded
-          --(in AsmCodeGen.cmmNativeGen) for performance
-          --reasons.  To prevent this we need to tell
-          --cmmNativeGen we want them printed out even
-          --though we ignore stderr in the test configuration.
-          dflags = dopt_set dflags' Opt_D_dump_asm_stats
           [usa, usb, usc, usd] = take 4 . listSplitUniqSupply $ us
           -- don't need debugging information
           dwarfFileIds = emptyUFM

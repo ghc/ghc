@@ -42,31 +42,31 @@ import System.Process
 -}
 
 runUnlit :: Logger -> DynFlags -> [Option] -> IO ()
-runUnlit logger dflags args = traceToolCommand logger dflags "unlit" $ do
+runUnlit logger dflags args = traceToolCommand logger "unlit" $ do
   let prog = pgm_L dflags
       opts = getOpts dflags opt_L
-  runSomething logger dflags "Literate pre-processor" prog
+  runSomething logger "Literate pre-processor" prog
                (map Option opts ++ args)
 
 runCpp :: Logger -> DynFlags -> [Option] -> IO ()
-runCpp logger dflags args = traceToolCommand logger dflags "cpp" $ do
+runCpp logger dflags args = traceToolCommand logger "cpp" $ do
   let (p,args0) = pgm_P dflags
       args1 = map Option (getOpts dflags opt_P)
       args2 = [Option "-Werror" | gopt Opt_WarnIsError dflags]
                 ++ [Option "-Wundef" | wopt Opt_WarnCPPUndef dflags]
   mb_env <- getGccEnv args2
-  runSomethingFiltered logger dflags id  "C pre-processor" p
+  runSomethingFiltered logger id  "C pre-processor" p
                        (args0 ++ args1 ++ args2 ++ args) Nothing mb_env
 
 runPp :: Logger -> DynFlags -> [Option] -> IO ()
-runPp logger dflags args = traceToolCommand logger dflags "pp" $ do
+runPp logger dflags args = traceToolCommand logger "pp" $ do
   let prog = pgm_F dflags
       opts = map Option (getOpts dflags opt_F)
-  runSomething logger dflags "Haskell pre-processor" prog (args ++ opts)
+  runSomething logger "Haskell pre-processor" prog (args ++ opts)
 
 -- | Run compiler of C-like languages and raw objects (such as gcc or clang).
 runCc :: Maybe ForeignSrcLang -> Logger -> TmpFs -> DynFlags -> [Option] -> IO ()
-runCc mLanguage logger tmpfs dflags args = traceToolCommand logger dflags "cc" $ do
+runCc mLanguage logger tmpfs dflags args = traceToolCommand logger "cc" $ do
   let p = pgm_c dflags
       args1 = map Option userOpts
       args2 = languageOptions ++ args ++ args1
@@ -148,43 +148,43 @@ xs `isContainedIn` ys = any (xs `isPrefixOf`) (tails ys)
 
 -- | Run the linker with some arguments and return the output
 askLd :: Logger -> DynFlags -> [Option] -> IO String
-askLd logger dflags args = traceToolCommand logger dflags "linker" $ do
+askLd logger dflags args = traceToolCommand logger "linker" $ do
   let (p,args0) = pgm_l dflags
       args1     = map Option (getOpts dflags opt_l)
       args2     = args0 ++ args1 ++ args
   mb_env <- getGccEnv args2
-  runSomethingWith logger dflags "gcc" p args2 $ \real_args ->
+  runSomethingWith logger "gcc" p args2 $ \real_args ->
     readCreateProcessWithExitCode' (proc p real_args){ env = mb_env }
 
 runAs :: Logger -> DynFlags -> [Option] -> IO ()
-runAs logger dflags args = traceToolCommand logger dflags "as" $ do
+runAs logger dflags args = traceToolCommand logger "as" $ do
   let (p,args0) = pgm_a dflags
       args1 = map Option (getOpts dflags opt_a)
       args2 = args0 ++ args1 ++ args
   mb_env <- getGccEnv args2
-  runSomethingFiltered logger dflags id "Assembler" p args2 Nothing mb_env
+  runSomethingFiltered logger id "Assembler" p args2 Nothing mb_env
 
 -- | Run the LLVM Optimiser
 runLlvmOpt :: Logger -> DynFlags -> [Option] -> IO ()
-runLlvmOpt logger dflags args = traceToolCommand logger dflags "opt" $ do
+runLlvmOpt logger dflags args = traceToolCommand logger "opt" $ do
   let (p,args0) = pgm_lo dflags
       args1 = map Option (getOpts dflags opt_lo)
       -- We take care to pass -optlo flags (e.g. args0) last to ensure that the
       -- user can override flags passed by GHC. See #14821.
-  runSomething logger dflags "LLVM Optimiser" p (args1 ++ args ++ args0)
+  runSomething logger "LLVM Optimiser" p (args1 ++ args ++ args0)
 
 -- | Run the LLVM Compiler
 runLlvmLlc :: Logger -> DynFlags -> [Option] -> IO ()
-runLlvmLlc logger dflags args = traceToolCommand logger dflags "llc" $ do
+runLlvmLlc logger dflags args = traceToolCommand logger "llc" $ do
   let (p,args0) = pgm_lc dflags
       args1 = map Option (getOpts dflags opt_lc)
-  runSomething logger dflags "LLVM Compiler" p (args0 ++ args1 ++ args)
+  runSomething logger "LLVM Compiler" p (args0 ++ args1 ++ args)
 
 -- | Run the clang compiler (used as an assembler for the LLVM
 -- backend on OS X as LLVM doesn't support the OS X system
 -- assembler)
 runClang :: Logger -> DynFlags -> [Option] -> IO ()
-runClang logger dflags args = traceToolCommand logger dflags "clang" $ do
+runClang logger dflags args = traceToolCommand logger "clang" $ do
   let (clang,_) = pgm_lcc dflags
       -- be careful what options we call clang with
       -- see #5903 and #7617 for bugs caused by this.
@@ -193,9 +193,9 @@ runClang logger dflags args = traceToolCommand logger dflags "clang" $ do
       args2 = args0 ++ args1 ++ args
   mb_env <- getGccEnv args2
   catchException
-    (runSomethingFiltered logger dflags id "Clang (Assembler)" clang args2 Nothing mb_env)
+    (runSomethingFiltered logger id "Clang (Assembler)" clang args2 Nothing mb_env)
     (\(err :: SomeException) -> do
-        errorMsg logger dflags $
+        errorMsg logger $
             text ("Error running clang! you need clang installed to use the" ++
                   " LLVM backend") $+$
             text "(or GHC tried to execute clang incorrectly)"
@@ -204,7 +204,7 @@ runClang logger dflags args = traceToolCommand logger dflags "clang" $ do
 
 -- | Figure out which version of LLVM we are running this session
 figureLlvmVersion :: Logger -> DynFlags -> IO (Maybe LlvmVersion)
-figureLlvmVersion logger dflags = traceToolCommand logger dflags "llc" $ do
+figureLlvmVersion logger dflags = traceToolCommand logger "llc" $ do
   let (pgm,opts) = pgm_lc dflags
       args = filter notNull (map showOpt opts)
       -- we grab the args even though they should be useless just in
@@ -230,10 +230,10 @@ figureLlvmVersion logger dflags = traceToolCommand logger dflags "llc" $ do
               return mb_ver
             )
             (\err -> do
-                debugTraceMsg logger dflags 2
+                debugTraceMsg logger 2
                     (text "Error (figuring out LLVM version):" <+>
                       text (show err))
-                errorMsg logger dflags $ vcat
+                errorMsg logger $ vcat
                     [ text "Warning:", nest 9 $
                           text "Couldn't figure out LLVM version!" $$
                           text ("Make sure you have installed LLVM between "
@@ -245,7 +245,7 @@ figureLlvmVersion logger dflags = traceToolCommand logger dflags "llc" $ do
 
 
 runLink :: Logger -> TmpFs -> DynFlags -> [Option] -> IO ()
-runLink logger tmpfs dflags args = traceToolCommand logger dflags "linker" $ do
+runLink logger tmpfs dflags args = traceToolCommand logger "linker" $ do
   -- See Note [Run-time linker info]
   --
   -- `-optl` args come at the end, so that later `-l` options
@@ -310,7 +310,7 @@ ld: warning: symbol referencing errors
 -- See Note [Merging object files for GHCi] in GHC.Driver.Pipeline.
 runMergeObjects :: Logger -> TmpFs -> DynFlags -> [Option] -> IO ()
 runMergeObjects logger tmpfs dflags args =
-  traceToolCommand logger dflags "merge-objects" $ do
+  traceToolCommand logger "merge-objects" $ do
     let (p,args0) = pgm_lm dflags
         optl_args = map Option (getOpts dflags opt_lm)
         args2     = args0 ++ args ++ optl_args
@@ -321,40 +321,40 @@ runMergeObjects logger tmpfs dflags args =
         mb_env <- getGccEnv args2
         runSomethingResponseFile logger tmpfs dflags id "Merge objects" p args2 mb_env
       else do
-        runSomething logger dflags "Merge objects" p args2
+        runSomething logger "Merge objects" p args2
 
 runLibtool :: Logger -> DynFlags -> [Option] -> IO ()
-runLibtool logger dflags args = traceToolCommand logger dflags "libtool" $ do
+runLibtool logger dflags args = traceToolCommand logger "libtool" $ do
   linkargs <- neededLinkArgs `fmap` getLinkerInfo logger dflags
   let args1      = map Option (getOpts dflags opt_l)
       args2      = [Option "-static"] ++ args1 ++ args ++ linkargs
       libtool    = pgm_libtool dflags
   mb_env <- getGccEnv args2
-  runSomethingFiltered logger dflags id "Libtool" libtool args2 Nothing mb_env
+  runSomethingFiltered logger id "Libtool" libtool args2 Nothing mb_env
 
 runAr :: Logger -> DynFlags -> Maybe FilePath -> [Option] -> IO ()
-runAr logger dflags cwd args = traceToolCommand logger dflags "ar" $ do
+runAr logger dflags cwd args = traceToolCommand logger "ar" $ do
   let ar = pgm_ar dflags
-  runSomethingFiltered logger dflags id "Ar" ar args cwd Nothing
+  runSomethingFiltered logger id "Ar" ar args cwd Nothing
 
 askOtool :: Logger -> DynFlags -> Maybe FilePath -> [Option] -> IO String
 askOtool logger dflags mb_cwd args = do
   let otool = pgm_otool dflags
-  runSomethingWith logger dflags "otool" otool args $ \real_args ->
+  runSomethingWith logger "otool" otool args $ \real_args ->
     readCreateProcessWithExitCode' (proc otool real_args){ cwd = mb_cwd }
 
 runInstallNameTool :: Logger -> DynFlags -> [Option] -> IO ()
 runInstallNameTool logger dflags args = do
   let tool = pgm_install_name_tool dflags
-  runSomethingFiltered logger dflags id "Install Name Tool" tool args Nothing Nothing
+  runSomethingFiltered logger id "Install Name Tool" tool args Nothing Nothing
 
 runRanlib :: Logger -> DynFlags -> [Option] -> IO ()
-runRanlib logger dflags args = traceToolCommand logger dflags "ranlib" $ do
+runRanlib logger dflags args = traceToolCommand logger "ranlib" $ do
   let ranlib = pgm_ranlib dflags
-  runSomethingFiltered logger dflags id "Ranlib" ranlib args Nothing Nothing
+  runSomethingFiltered logger id "Ranlib" ranlib args Nothing Nothing
 
 runWindres :: Logger -> DynFlags -> [Option] -> IO ()
-runWindres logger dflags args = traceToolCommand logger dflags "windres" $ do
+runWindres logger dflags args = traceToolCommand logger "windres" $ do
   let cc = pgm_c dflags
       cc_args = map Option (sOpt_c (settings dflags))
       windres = pgm_windres dflags
@@ -374,11 +374,11 @@ runWindres logger dflags args = traceToolCommand logger dflags "windres" $ do
             : Option "--use-temp-file"
             : args
   mb_env <- getGccEnv cc_args
-  runSomethingFiltered logger dflags id "Windres" windres args' Nothing mb_env
+  runSomethingFiltered logger id "Windres" windres args' Nothing mb_env
 
 touch :: Logger -> DynFlags -> String -> String -> IO ()
-touch logger dflags purpose arg = traceToolCommand logger dflags "touch" $
-  runSomething logger dflags purpose (pgm_T dflags) [FileOption "" arg]
+touch logger dflags purpose arg = traceToolCommand logger "touch" $
+  runSomething logger purpose (pgm_T dflags) [FileOption "" arg]
 
 -- * Tracing utility
 
@@ -389,6 +389,5 @@ touch logger dflags purpose arg = traceToolCommand logger dflags "touch" $
 --
 --   For those events to show up in the eventlog, you need
 --   to run GHC with @-v2@ or @-ddump-timings@.
-traceToolCommand :: Logger -> DynFlags -> String -> IO a -> IO a
-traceToolCommand logger dflags tool = withTiming logger
-  dflags (text $ "systool:" ++ tool) (const ())
+traceToolCommand :: Logger -> String -> IO a -> IO a
+traceToolCommand logger tool = withTiming logger (text "systool:" <> text tool) (const ())

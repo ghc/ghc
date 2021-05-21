@@ -26,7 +26,8 @@ module GHC.Core.Unfold (
         UnfoldingOpts (..), defaultUnfoldingOpts,
         updateCreationThreshold, updateUseThreshold,
         updateFunAppDiscount, updateDictDiscount,
-        updateVeryAggressive, updateCaseScaling, updateCaseThreshold,
+        updateVeryAggressive, updateCaseScaling,
+        updateCaseThreshold, updateReportPrefix,
 
         ArgSummary(..),
 
@@ -39,8 +40,9 @@ module GHC.Core.Unfold (
 
 import GHC.Prelude
 
-import GHC.Driver.Session
 import GHC.Driver.Ppr
+import GHC.Driver.Flags
+
 import GHC.Core
 import GHC.Core.Utils
 import GHC.Types.Id
@@ -82,11 +84,14 @@ data UnfoldingOpts = UnfoldingOpts
    , unfoldingVeryAggressive :: !Bool
       -- ^ Force inlining in many more cases
 
-      -- Don't consider depth up to x
    , unfoldingCaseThreshold :: !Int
+      -- ^ Don't consider depth up to x
 
-      -- Penalize depth with 1/x
    , unfoldingCaseScaling :: !Int
+      -- ^ Penalize depth with 1/x
+
+   , unfoldingReportPrefix :: !(Maybe String)
+      -- ^ Only report inlining decisions for names with this prefix
    }
 
 defaultUnfoldingOpts :: UnfoldingOpts
@@ -118,6 +123,9 @@ defaultUnfoldingOpts = UnfoldingOpts
 
       -- Penalize depth with (size*depth)/scaling
    , unfoldingCaseScaling = 30
+
+      -- Don't filter inlining decision reports
+   , unfoldingReportPrefix = Nothing
    }
 
 -- Helpers for "GHC.Driver.Session"
@@ -143,6 +151,9 @@ updateCaseThreshold n opts = opts { unfoldingCaseThreshold = n }
 
 updateCaseScaling :: Int -> UnfoldingOpts -> UnfoldingOpts
 updateCaseScaling n opts = opts { unfoldingCaseScaling = n }
+
+updateReportPrefix :: Maybe String -> UnfoldingOpts -> UnfoldingOpts
+updateReportPrefix n opts = opts { unfoldingReportPrefix = n }
 
 {-
 Note [Occurrence analysis of unfoldings]
@@ -1057,16 +1068,6 @@ them inlining is to give them a NOINLINE pragma, which we do in
 StrictAnal.addStrictnessInfoToTopId
 -}
 
-callSiteInline :: Logger
-               -> DynFlags
-               -> Int                   -- Case depth
-               -> Id                    -- The Id
-               -> Bool                  -- True <=> unfolding is active
-               -> Bool                  -- True if there are no arguments at all (incl type args)
-               -> [ArgSummary]          -- One for each value arg; True if it is interesting
-               -> CallCtxt              -- True <=> continuation is interesting
-               -> Maybe CoreExpr        -- Unfolding, if any
-
 data ArgSummary = TrivArg       -- Nothing interesting
                 | NonTrivArg    -- Arg has structure
                 | ValueArg      -- Arg is a con-app or PAP
@@ -1102,7 +1103,16 @@ instance Outputable CallCtxt where
   ppr DiscArgCtxt = text "DiscArgCtxt"
   ppr RuleArgCtxt = text "RuleArgCtxt"
 
-callSiteInline logger dflags !case_depth id active_unfolding lone_variable arg_infos cont_info
+callSiteInline :: Logger
+               -> UnfoldingOpts
+               -> Int                   -- Case depth
+               -> Id                    -- The Id
+               -> Bool                  -- True <=> unfolding is active
+               -> Bool                  -- True if there are no arguments at all (incl type args)
+               -> [ArgSummary]          -- One for each value arg; True if it is interesting
+               -> CallCtxt              -- True <=> continuation is interesting
+               -> Maybe CoreExpr        -- Unfolding, if any
+callSiteInline logger opts !case_depth id active_unfolding lone_variable arg_infos cont_info
   = case idUnfolding id of
       -- idUnfolding checks for loop-breakers, returning NoUnfolding
       -- Things with an INLINE pragma may have an unfolding *and*
@@ -1110,28 +1120,28 @@ callSiteInline logger dflags !case_depth id active_unfolding lone_variable arg_i
         CoreUnfolding { uf_tmpl = unf_template
                       , uf_is_work_free = is_wf
                       , uf_guidance = guidance, uf_expandable = is_exp }
-          | active_unfolding -> tryUnfolding logger dflags case_depth id lone_variable
+          | active_unfolding -> tryUnfolding logger opts case_depth id lone_variable
                                     arg_infos cont_info unf_template
                                     is_wf is_exp guidance
-          | otherwise -> traceInline logger dflags id "Inactive unfolding:" (ppr id) Nothing
+          | otherwise -> traceInline logger opts id "Inactive unfolding:" (ppr id) Nothing
         NoUnfolding      -> Nothing
         BootUnfolding    -> Nothing
         OtherCon {}      -> Nothing
         DFunUnfolding {} -> Nothing     -- Never unfold a DFun
 
 -- | Report the inlining of an identifier's RHS to the user, if requested.
-traceInline :: Logger -> DynFlags -> Id -> String -> SDoc -> a -> a
-traceInline logger dflags inline_id str doc result
+traceInline :: Logger -> UnfoldingOpts -> Id -> String -> SDoc -> a -> a
+traceInline logger opts inline_id str doc result
   -- We take care to ensure that doc is used in only one branch, ensuring that
   -- the simplifier can push its allocation into the branch. See Note [INLINE
   -- conditional tracing utilities].
-  | enable    = putTraceMsg logger dflags str doc result
+  | enable    = logTraceMsg logger str doc result
   | otherwise = result
   where
     enable
-      | dopt Opt_D_dump_verbose_inlinings dflags
+      | logHasDumpFlag logger Opt_D_dump_verbose_inlinings
       = True
-      | Just prefix <- inlineCheck dflags
+      | Just prefix <- unfoldingReportPrefix opts
       = prefix `isPrefixOf` occNameString (getOccName inline_id)
       | otherwise
       = False
@@ -1233,48 +1243,47 @@ needed on a per-module basis.
 
 -}
 
-tryUnfolding :: Logger -> DynFlags -> Int -> Id -> Bool -> [ArgSummary] -> CallCtxt
+tryUnfolding :: Logger -> UnfoldingOpts -> Int -> Id -> Bool -> [ArgSummary] -> CallCtxt
              -> CoreExpr -> Bool -> Bool -> UnfoldingGuidance
              -> Maybe CoreExpr
-tryUnfolding logger dflags !case_depth id lone_variable
+tryUnfolding logger opts !case_depth id lone_variable
              arg_infos cont_info unf_template
              is_wf is_exp guidance
  = case guidance of
-     UnfNever -> traceInline logger dflags id str (text "UnfNever") Nothing
+     UnfNever -> traceInline logger opts id str (text "UnfNever") Nothing
 
      UnfWhen { ug_arity = uf_arity, ug_unsat_ok = unsat_ok, ug_boring_ok = boring_ok }
-        | enough_args && (boring_ok || some_benefit || unfoldingVeryAggressive uf_opts)
+        | enough_args && (boring_ok || some_benefit || unfoldingVeryAggressive opts)
                 -- See Note [INLINE for small functions (3)]
-        -> traceInline logger dflags id str (mk_doc some_benefit empty True) (Just unf_template)
+        -> traceInline logger opts id str (mk_doc some_benefit empty True) (Just unf_template)
         | otherwise
-        -> traceInline logger dflags id str (mk_doc some_benefit empty False) Nothing
+        -> traceInline logger opts id str (mk_doc some_benefit empty False) Nothing
         where
           some_benefit = calc_some_benefit uf_arity
           enough_args = (n_val_args >= uf_arity) || (unsat_ok && n_val_args > 0)
 
      UnfIfGoodArgs { ug_args = arg_discounts, ug_res = res_discount, ug_size = size }
-        | unfoldingVeryAggressive uf_opts
-        -> traceInline logger dflags id str (mk_doc some_benefit extra_doc True) (Just unf_template)
+        | unfoldingVeryAggressive opts
+        -> traceInline logger opts id str (mk_doc some_benefit extra_doc True) (Just unf_template)
         | is_wf && some_benefit && small_enough
-        -> traceInline logger dflags id str (mk_doc some_benefit extra_doc True) (Just unf_template)
+        -> traceInline logger opts id str (mk_doc some_benefit extra_doc True) (Just unf_template)
         | otherwise
-        -> traceInline logger dflags id str (mk_doc some_benefit extra_doc False) Nothing
+        -> traceInline logger opts id str (mk_doc some_benefit extra_doc False) Nothing
         where
           some_benefit = calc_some_benefit (length arg_discounts)
           extra_doc = vcat [ text "case depth =" <+> int case_depth
                            , text "depth based penalty =" <+> int depth_penalty
                            , text "discounted size =" <+> int adjusted_size ]
           -- See Note [Avoid inlining into deeply nested cases]
-          depth_treshold = unfoldingCaseThreshold uf_opts
-          depth_scaling = unfoldingCaseScaling uf_opts
+          depth_treshold = unfoldingCaseThreshold opts
+          depth_scaling = unfoldingCaseScaling opts
           depth_penalty | case_depth <= depth_treshold = 0
                         | otherwise       = (size * (case_depth - depth_treshold)) `div` depth_scaling
           adjusted_size = size + depth_penalty - discount
-          small_enough = adjusted_size <= unfoldingUseThreshold uf_opts
+          small_enough = adjusted_size <= unfoldingUseThreshold opts
           discount = computeDiscount arg_discounts res_discount arg_infos cont_info
 
   where
-    uf_opts = unfoldingOpts dflags
     mk_doc some_benefit extra_doc yes_or_no
       = vcat [ text "arg infos" <+> ppr arg_infos
              , text "interesting continuation" <+> ppr cont_info
@@ -1285,7 +1294,7 @@ tryUnfolding logger dflags !case_depth id lone_variable
              , extra_doc
              , text "ANSWER =" <+> if yes_or_no then text "YES" else text "NO"]
 
-    ctx = initSDocContext dflags defaultDumpStyle
+    ctx = log_default_dump_context (logFlags logger)
     str = "Considering inlining: " ++ showSDocDump ctx (ppr id)
     n_val_args = length arg_infos
 

@@ -1,6 +1,6 @@
 import System.Environment
 import GHC.Driver.Session
-import GHC.Driver.Config
+import GHC.Driver.Config.Parser (initParserOpts)
 import GHC.Data.FastString
 import GHC
 import GHC.Data.StringBuffer
