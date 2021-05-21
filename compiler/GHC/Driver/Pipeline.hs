@@ -48,7 +48,7 @@ import GHC.Driver.Env hiding ( Hsc )
 import GHC.Driver.Errors
 import GHC.Driver.Errors.Types
 import GHC.Driver.Pipeline.Monad
-import GHC.Driver.Config
+import GHC.Driver.Config.Parser (initParserOpts)
 import GHC.Driver.Phases
 import GHC.Driver.Session
 import GHC.Driver.Backend
@@ -209,9 +209,9 @@ compileOne' m_tc_result mHscMessage
             source_modified0
  = do
 
-   debugTraceMsg logger dflags1 2 (text "compile: input file" <+> text input_fnpp)
+   debugTraceMsg logger 2 (text "compile: input file" <+> text input_fnpp)
 
-   let flags = hsc_dflags hsc_env0
+   let flags = extractDynFlags hsc_env0
      in do unless (gopt Opt_KeepHiFiles flags) $
                addFilesToClean tmpfs TFL_CurrentModule $
                    [ml_hi_file $ ms_location summary]
@@ -241,15 +241,15 @@ compileOne' m_tc_result mHscMessage
            (tc_result, warnings) <- hscTypecheckAndGetWarnings plugin_hsc_env summary
            runPostTc tc_result warnings mb_old_hash
 
- where dflags0     = ms_hspp_opts summary
+ where lcl_dflags  = ms_hspp_opts summary
        location    = ms_location summary
        input_fn    = expectJust "compile:hs" (ml_hs_file location)
        input_fnpp  = ms_hspp_file summary
        mod_graph   = hsc_mod_graph hsc_env0
        needsLinker = needsTemplateHaskellOrQQ mod_graph
-       isDynWay    = any (== WayDyn) (ways dflags0)
-       isProfWay   = any (== WayProf) (ways dflags0)
-       internalInterpreter = not (gopt Opt_ExternalInterpreter dflags0)
+       isDynWay    = any (== WayDyn) (ways lcl_dflags)
+       isProfWay   = any (== WayProf) (ways lcl_dflags)
+       internalInterpreter = not (gopt Opt_ExternalInterpreter lcl_dflags)
 
        logger = hsc_logger hsc_env0
        tmpfs  = hsc_tmpfs hsc_env0
@@ -259,8 +259,8 @@ compileOne' m_tc_result mHscMessage
        -- when using -fexternal-interpreter.
        dflags1 = if hostIsDynamic && internalInterpreter &&
                     not isDynWay && not isProfWay && needsLinker
-                  then gopt_set dflags0 Opt_BuildDynamicToo
-                  else dflags0
+                  then gopt_set lcl_dflags Opt_BuildDynamicToo
+                  else lcl_dflags
 
        -- #16331 - when no "internal interpreter" is available but we
        -- need to process some TemplateHaskell or QuasiQuotes, we automatically
@@ -292,7 +292,7 @@ compileOne' m_tc_result mHscMessage
          | otherwise
          = (backend dflags, dflags2)
        dflags  = dflags3 { includePaths = addImplicitQuoteInclude old_paths [current_dir] }
-       hsc_env = hsc_env0 {hsc_dflags = dflags}
+       hsc_env = hscSetFlags dflags hsc_env0
 
        -- -fforce-recomp should also work with --make
        force_recomp = gopt Opt_ForceRecomp dflags
@@ -341,7 +341,7 @@ compileOnePostTc hsc_env summary tc_result warnings mb_old_hash = do
   details <- initModDetails hsc_env summary iface
   return $! HomeModInfo iface details mLinkable
 
- where dflags      = hsc_dflags hsc_env
+ where dflags      = extractDynFlags hsc_env
        this_mod    = ms_mod summary
        location    = ms_location summary
        input_fn    = expectJust "compile:hs" (ml_hs_file location)
@@ -532,11 +532,11 @@ link' logger tmpfs dflags unit_env batch_attempt_linking hpt
             -- the linkables to link
             linkables = map (expectJust "link".hm_linkable) home_mod_infos
 
-        debugTraceMsg logger dflags 3 (text "link: linkables are ..." $$ vcat (map ppr linkables))
+        debugTraceMsg logger 3 (text "link: linkables are ..." $$ vcat (map ppr linkables))
 
         -- check for the -no-link flag
         if isNoLink (ghcLink dflags)
-          then do debugTraceMsg logger dflags 3 (text "link(batch): linking omitted (-c flag given).")
+          then do debugTraceMsg logger 3 (text "link(batch): linking omitted (-c flag given).")
                   return Succeeded
           else do
 
@@ -548,11 +548,11 @@ link' logger tmpfs dflags unit_env batch_attempt_linking hpt
         linking_needed <- linkingNeeded logger dflags unit_env staticLink linkables pkg_deps
 
         if not (gopt Opt_ForceRecomp dflags) && not linking_needed
-           then do debugTraceMsg logger dflags 2 (text exe_file <+> text "is up to date, linking not required.")
+           then do debugTraceMsg logger 2 (text exe_file <+> text "is up to date, linking not required.")
                    return Succeeded
            else do
 
-        compilationProgressMsg logger dflags (text "Linking " <> text exe_file <> text " ...")
+        compilationProgressMsg logger (text "Linking " <> text exe_file <> text " ...")
 
         -- Don't showPass in Batch mode; doLink will do that for us.
         let link = case ghcLink dflags of
@@ -562,13 +562,13 @@ link' logger tmpfs dflags unit_env batch_attempt_linking hpt
                 other         -> panicBadLink other
         link dflags unit_env obj_files pkg_deps
 
-        debugTraceMsg logger dflags 3 (text "link: done")
+        debugTraceMsg logger 3 (text "link: done")
 
         -- linkBinary only returns if it succeeds
         return Succeeded
 
    | otherwise
-   = do debugTraceMsg logger dflags 3 (text "link(batch): upsweep (partially) failed OR" $$
+   = do debugTraceMsg logger 3 (text "link(batch): upsweep (partially) failed OR" $$
                                 text "   Main.main not exported; not linking.")
         return Succeeded
 
@@ -634,7 +634,7 @@ compileFile hsc_env stop_phase (src, mb_phase) = do
         throwGhcExceptionIO (CmdLineError ("does not exist: " ++ src))
 
    let
-        dflags    = hsc_dflags hsc_env
+        dflags    = extractDynFlags hsc_env
         mb_o_file = outputFile dflags
         ghc_link  = ghcLink dflags      -- Set by -c or -no-link
 
@@ -663,7 +663,7 @@ doLink hsc_env stop_phase o_files
 
   | otherwise
   = let
-        dflags   = hsc_dflags   hsc_env
+        dflags   = extractDynFlags   hsc_env
         logger   = hsc_logger   hsc_env
         unit_env = hsc_unit_env hsc_env
         tmpfs    = hsc_tmpfs    hsc_env
@@ -702,13 +702,11 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_input_buf, mb_phase)
              mb_basename output maybe_loc foreign_os
 
     = do let
-             dflags0 = hsc_dflags hsc_env0
-
              -- Decide where dump files should go based on the pipeline output
-             dflags = dflags0 { dumpPrefix = Just (basename ++ ".") }
-             hsc_env = hsc_env0 {hsc_dflags = dflags}
-             logger = hsc_logger hsc_env
-             tmpfs  = hsc_tmpfs  hsc_env
+             hsc_env = hscUpdateFlags (\dflags -> dflags { dumpPrefix = Just (basename ++ ".")}) hsc_env0
+             logger  = hsc_logger hsc_env
+             tmpfs   = hsc_tmpfs  hsc_env
+             dflags  = extractDynFlags hsc_env
 
              (input_basename, suffix) = splitExtension input_fn
              suffix' = drop 1 suffix -- strip off the .
@@ -768,11 +766,10 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_input_buf, mb_phase)
                  return fn
              (_, _) -> return input_fn
 
-         debugTraceMsg logger dflags 4 (text "Running the pipeline")
+         debugTraceMsg logger 4 (text "Running the pipeline")
          r <- runPipeline' start_phase hsc_env env input_fn'
                            maybe_loc foreign_os
 
-         let dflags = hsc_dflags hsc_env
          when isHaskellishFile $
            dynamicTooState dflags >>= \case
                DT_Dont   -> return ()
@@ -798,7 +795,7 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_input_buf, mb_phase)
                    -- NB: Currently disabled on Windows (ref #7134, #8228, and #5987)
                    | OSMinGW32 <- platformOS (targetPlatform dflags) -> return ()
                    | otherwise -> do
-                       debugTraceMsg logger dflags 4
+                       debugTraceMsg logger 4
                            (text "Running the full pipeline again for -dynamic-too")
                        let dflags0 = flip gopt_unset Opt_BuildDynamicToo
                                       $ setDynamicNow
@@ -812,10 +809,8 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_input_buf, mb_phase)
                              , ue_units     = unit_state
                              , ue_unit_dbs  = Just dbs
                              }
-                       let hsc_env'' = hsc_env'
-                            { hsc_dflags   = dflags1
-                            , hsc_unit_env = unit_env
-                            }
+                       let hsc_env'' = hscSetFlags dflags1
+                                       $ hsc_env' { hsc_unit_env = unit_env }
                        _ <- runPipeline' start_phase hsc_env'' env input_fn'
                                          maybe_loc foreign_os
                        return ()
@@ -872,7 +867,7 @@ pipeLoop phase input_fn = do
                when (final_fn /= input_fn) $ do
                   let msg = "Copying `" ++ input_fn ++"' to `" ++ final_fn ++ "'"
                       line_prag = "{-# LINE 1 \"" ++ src_filename env ++ "\" #-}\n"
-                  liftIO $ showPass logger dflags msg
+                  liftIO $ showPass logger msg
                   liftIO $ copyWithHeader line_prag input_fn final_fn
                return final_fn
 
@@ -886,7 +881,7 @@ pipeLoop phase input_fn = do
            " but I wanted to stop at phase " ++ show stopPhase)
 
    _
-     -> do liftIO $ debugTraceMsg logger dflags 4
+     -> do liftIO $ debugTraceMsg logger 4
                                   (text "Running phase" <+> ppr phase)
 
            case phase of
@@ -1148,16 +1143,17 @@ runPhase (RealPhase (Unlit sf)) input_fn = do
 runPhase (RealPhase (Cpp sf)) input_fn
   = do
        dflags0 <- getDynFlags
-       logger <- getLogger
        src_opts <- liftIO $ getOptionsFromFile dflags0 input_fn
        (dflags1, unhandled_flags, warns)
            <- liftIO $ parseDynamicFilePragma dflags0 src_opts
        setDynFlags dflags1
        liftIO $ checkProcessArgsResult unhandled_flags
 
+
        if not (xopt LangExt.Cpp dflags1) then do
            -- we have to be careful to emit warnings only once.
-           unless (gopt Opt_Pp dflags1) $
+           unless (gopt Opt_Pp dflags1) $ do
+               logger <- getLogger
                liftIO $ handleFlagWarnings logger dflags1 warns
 
            -- no need to preprocess CPP, just pass input file along
@@ -1166,9 +1162,10 @@ runPhase (RealPhase (Cpp sf)) input_fn
         else do
             output_fn <- phaseOutputFilename (HsPp sf)
             hsc_env <- getPipeSession
+            logger <- getLogger
             liftIO $ doCpp logger
                            (hsc_tmpfs hsc_env)
-                           (hsc_dflags hsc_env)
+                           (extractDynFlags hsc_env)
                            (hsc_unit_env hsc_env)
                            True{-raw-}
                            input_fn output_fn
@@ -1177,12 +1174,12 @@ runPhase (RealPhase (Cpp sf)) input_fn
             src_opts <- liftIO $ getOptionsFromFile dflags0 output_fn
             (dflags2, unhandled_flags, warns)
                 <- liftIO $ parseDynamicFilePragma dflags0 src_opts
+            setDynFlags dflags2
             liftIO $ checkProcessArgsResult unhandled_flags
-            unless (gopt Opt_Pp dflags2) $
+            unless (gopt Opt_Pp dflags2) $ do
+                logger <- getLogger
                 liftIO $ handleFlagWarnings logger dflags2 warns
             -- the HsPp pass below will emit warnings
-
-            setDynFlags dflags2
 
             return (RealPhase (HsPp sf), output_fn)
 
@@ -1325,7 +1322,7 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
                                         ms_srcimps      = src_imps }
 
   -- run the compiler!
-        let msg hsc_env _ what _ = oneShotMsg hsc_env what
+        let msg hsc_env _ what _ = oneShotMsg (hsc_logger hsc_env) what
         plugin_hsc_env' <- liftIO $ initializePlugins hsc_env'
 
         -- Need to set the knot-tying mutable variable for interface
@@ -1354,7 +1351,7 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
               setPlugins (hsc_plugins        plugin_hsc_env)
                          (hsc_static_plugins plugin_hsc_env)
               -- "driver" plugins may have modified the DynFlags so we update them
-              setDynFlags (hsc_dflags plugin_hsc_env)
+              setDynFlags (extractDynFlags plugin_hsc_env)
 
               return (HscPostTc mod_summary tc_result warnings mb_old_hash,
                       panic "HscPostTc doesn't have an input filename")
@@ -1458,7 +1455,7 @@ runPhase (HscBackend mod_summary result) _ = do
                     (outputFilename, mStub, foreign_files, cg_infos) <- liftIO $
                       hscGenHardCode hsc_env' cgguts mod_location output_fn
 
-                    let dflags = hsc_dflags hsc_env'
+                    let dflags = extractDynFlags hsc_env'
                     final_iface <- liftIO (mkFullIface hsc_env' partial_iface (Just cg_infos))
                     setIface final_iface
 
@@ -1481,7 +1478,7 @@ runPhase (RealPhase CmmCpp) input_fn = do
        output_fn <- phaseOutputFilename Cmm
        liftIO $ doCpp logger
                       (hsc_tmpfs hsc_env)
-                      (hsc_dflags hsc_env)
+                      (extractDynFlags hsc_env)
                       (hsc_unit_env hsc_env)
                       False{-not raw-}
                       input_fn output_fn
@@ -1489,7 +1486,7 @@ runPhase (RealPhase CmmCpp) input_fn = do
 
 runPhase (RealPhase Cmm) input_fn = do
        hsc_env <- getPipeSession
-       let dflags = hsc_dflags hsc_env
+       let dflags = extractDynFlags hsc_env
        let next_phase = hscPostBackendPhase HsSrcFile (backend dflags)
        output_fn <- phaseOutputFilename next_phase
        PipeState{hsc_env} <- getPipeState
@@ -1505,7 +1502,7 @@ runPhase (RealPhase cc_phase) input_fn
    | any (cc_phase `eqPhase`) [Cc, Ccxx, HCc, Cobjc, Cobjcxx]
    = do
         hsc_env <- getPipeSession
-        let dflags    = hsc_dflags hsc_env
+        let dflags    = extractDynFlags hsc_env
         let unit_env  = hsc_unit_env hsc_env
         let home_unit = hsc_home_unit hsc_env
         let tmpfs     = hsc_tmpfs hsc_env
@@ -1643,10 +1640,10 @@ runPhase (RealPhase cc_phase) input_fn
 runPhase (RealPhase (As with_cpp)) input_fn
   = do
         hsc_env <- getPipeSession
-        let dflags     = hsc_dflags   hsc_env
-        let logger     = hsc_logger   hsc_env
-        let unit_env   = hsc_unit_env hsc_env
-        let platform   = ue_platform unit_env
+        let dflags   = extractDynFlags   hsc_env
+        let logger   = hsc_logger   hsc_env
+        let unit_env = hsc_unit_env hsc_env
+        let platform = ue_platform unit_env
 
         -- LLVM from version 3.0 onwards doesn't support the OS X system
         -- assembler, so we use clang as the assembler instead. (#5636)
@@ -1710,7 +1707,7 @@ runPhase (RealPhase (As with_cpp)) input_fn
                           , GHC.SysTools.FileOption "" temp_outputFilename
                           ])
 
-        liftIO $ debugTraceMsg logger dflags 4 (text "Running the assembler")
+        liftIO $ debugTraceMsg logger 4 (text "Running the assembler")
         runAssembler input_fn output_fn
 
         return (RealPhase next_phase, output_fn)
@@ -1835,9 +1832,10 @@ runPhase (RealPhase LlvmLlc) input_fn = do
 runPhase (RealPhase LlvmMangle) input_fn = do
       let next_phase = As False
       output_fn <- phaseOutputFilename next_phase
-      dflags <- getDynFlags
+      platform <- (ue_platform . hsc_unit_env) <$> getPipeSession
       logger <- getLogger
-      liftIO $ llvmFixupAsm logger dflags input_fn output_fn
+      liftIO $ withTiming logger (text "LLVM Mangler") id $
+        llvmFixupAsm platform input_fn output_fn
       return (RealPhase next_phase, output_fn)
 
 -----------------------------------------------------------------------------
@@ -1917,7 +1915,7 @@ getHCFilePackages filename =
 linkDynLibCheck :: Logger -> TmpFs -> DynFlags -> UnitEnv -> [String] -> [UnitId] -> IO ()
 linkDynLibCheck logger tmpfs dflags unit_env o_files dep_units = do
   when (haveRtsOptsFlags dflags) $
-    putLogMsg logger dflags MCInfo noSrcSpan
+    logMsg logger MCInfo noSrcSpan
       $ withPprStyle defaultUserStyle
       (text "Warning: -rtsopts and -with-rtsopts have no effect with -shared." $$
       text "    Call hs_init_ghc() from your main() function to set these options.")
@@ -1929,7 +1927,7 @@ linkDynLibCheck logger tmpfs dflags unit_env o_files dep_units = do
 
 -- | Run CPP
 --
--- UnitState is needed to compute MIN_VERSION macros
+-- UnitEnv is needed to compute MIN_VERSION macros
 doCpp :: Logger -> TmpFs -> DynFlags -> UnitEnv -> Bool -> FilePath -> FilePath -> IO ()
 doCpp logger tmpfs dflags unit_env raw input_fn output_fn = do
     let hscpp_opts = picPOpts dflags

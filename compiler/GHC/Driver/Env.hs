@@ -3,10 +3,13 @@
 module GHC.Driver.Env
    ( Hsc(..)
    , HscEnv (..)
+   , hscUpdateFlags
+   , hscSetFlags
    , hsc_home_unit
    , hsc_units
    , hsc_HPT
    , hscUpdateHPT
+   , hscUpdateLoggerFlags
    , runHsc
    , runHsc'
    , mkInteractiveHscEnv
@@ -33,6 +36,7 @@ import GHC.Driver.Ppr
 import GHC.Driver.Session
 import GHC.Driver.Errors ( printOrThrowDiagnostics )
 import GHC.Driver.Errors.Types ( GhcMessage )
+import GHC.Driver.Config.Logger (initLogFlags)
 
 import GHC.Runtime.Context
 import GHC.Runtime.Interpreter.Types (Interp)
@@ -67,6 +71,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Monad
 import GHC.Utils.Panic
 import GHC.Utils.Misc
+import GHC.Utils.Logger
 import GHC.Types.Unique.FM
 
 import Data.IORef
@@ -75,7 +80,8 @@ import qualified Data.Set as Set
 runHsc :: HscEnv -> Hsc a -> IO a
 runHsc hsc_env (Hsc hsc) = do
     (a, w) <- hsc hsc_env emptyMessages
-    printOrThrowDiagnostics (hsc_logger hsc_env) (hsc_dflags hsc_env) w
+    let dflags = extractDynFlags hsc_env
+    printOrThrowDiagnostics (hsc_logger hsc_env) dflags w
     return a
 
 runHsc' :: HscEnv -> Hsc a -> IO (a, Messages GhcMessage)
@@ -85,9 +91,8 @@ runHsc' hsc_env (Hsc hsc) = hsc hsc_env emptyMessages
 mkInteractiveHscEnv :: HscEnv -> HscEnv
 mkInteractiveHscEnv hsc_env =
     let ic = hsc_IC hsc_env
-    in hsc_env { hsc_dflags  = ic_dflags  ic
-               , hsc_plugins = ic_plugins ic
-               }
+    in hscSetFlags (ic_dflags ic) $
+       hsc_env { hsc_plugins = ic_plugins ic }
 
 -- | A variant of runHsc that switches in the DynFlags and Plugins from the
 -- InteractiveContext before running the Hsc computation.
@@ -249,7 +254,7 @@ hptModulesBelow hsc_env mn = Set.fromList (eltsUFM $ go mn emptyUFM)
 -- C.f Inst.hptInstances
 hptSomeThingsBelowUs :: (HomeModInfo -> [a]) -> Bool -> HscEnv -> [ModuleNameWithIsBoot] -> [a]
 hptSomeThingsBelowUs extract include_hi_boot hsc_env mod
-  | isOneShot (ghcMode (hsc_dflags hsc_env)) = []
+  | isOneShot (ghcMode (extractDynFlags hsc_env)) = []
 
   | otherwise
   = let hpt = hsc_HPT hsc_env
@@ -310,7 +315,7 @@ lookupType hsc_env name = do
                then mkHomeModule (hsc_home_unit hsc_env) (moduleName (nameModule name))
                else nameModule name
 
-       !ty = if isOneShot (ghcMode (hsc_dflags hsc_env))
+       !ty = if isOneShot (ghcMode (extractDynFlags hsc_env))
                -- in one-shot, we don't use the HPT
                then lookupNameEnv pte name
                else case lookupHptByModule hpt mod of
@@ -337,7 +342,7 @@ lookupIfaceByModule hpt pit mod
    -- of its own, but it doesn't seem worth the bother.
 
 mainModIs :: HscEnv -> Module
-mainModIs hsc_env = mkHomeModule (hsc_home_unit hsc_env) (mainModuleNameIs (hsc_dflags hsc_env))
+mainModIs hsc_env = mkHomeModule (hsc_home_unit hsc_env) (mainModuleNameIs (extractDynFlags hsc_env))
 
 -- | Retrieve the target code interpreter
 --
@@ -346,3 +351,20 @@ hscInterp :: HscEnv -> Interp
 hscInterp hsc_env = case hsc_interp hsc_env of
    Nothing -> throw (InstallationError "Couldn't find a target code interpreter. Try with -fexternal-interpreter")
    Just i  -> i
+
+-- | Update the LogFlags of the Log in hsc_logger from the DynFlags in
+-- hsc_dflags. You need to call this when DynFlags are modified.
+hscUpdateLoggerFlags :: HscEnv -> HscEnv
+hscUpdateLoggerFlags h = h
+  { hsc_logger = setLogFlags (hsc_logger h) (initLogFlags (extractDynFlags h)) }
+
+-- | Update Flags
+hscUpdateFlags :: (DynFlags -> DynFlags) -> HscEnv -> HscEnv
+hscUpdateFlags f h = hscSetFlags (f (extractDynFlags h)) h
+
+-- | Set Flags
+hscSetFlags :: DynFlags -> HscEnv -> HscEnv
+hscSetFlags dflags h =
+  -- update LogFlags from the new DynFlags
+  hscUpdateLoggerFlags
+  $ h { hsc_dflags = dflags }

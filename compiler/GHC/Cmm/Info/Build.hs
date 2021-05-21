@@ -41,7 +41,6 @@ import GHC.Runtime.Heap.Layout
 import GHC.Types.Unique.Supply
 import GHC.Types.CostCentre
 import GHC.StgToCmm.Heap
-import GHC.CmmToAsm
 
 import Control.Monad
 import Data.Map.Strict (Map)
@@ -947,7 +946,7 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
 
   let
     this_mod = thisModule topSRT
-    config = initNCGConfig dflags this_mod
+    externalDynamicRefs = gopt Opt_ExternalDynamicRefs dflags
     profile = targetProfile dflags
     platform = profilePlatform profile
     srtMap = moduleSRTMap topSRT
@@ -1047,7 +1046,7 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
           -- when dynamic linking is used we cannot guarantee that the offset
           -- between the SRT and the info table will fit in the offset field.
           -- Consequently we build a singleton SRT in this case.
-          not (labelDynamic config lbl)
+          not (labelDynamic platform this_mod externalDynamicRefs lbl)
 
           -- MachO relocations can't express offsets between compilation units at
           -- all, so we are always forced to build a singleton SRT in this case.
