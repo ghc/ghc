@@ -4,8 +4,8 @@
   :: GHC.Prim.Int# -> GHC.Prim.Int#
   = \ (ww :: GHC.Prim.Int#) ->
 g2 [InlPrag=[2]] :: T -> Int -> Int
-         Tmpl= \ (w [Occ=Once1!] :: T) (w1 [Occ=Once1!] :: Int) ->
-  = \ (w :: T) (w1 :: Int) ->
+         Tmpl= \ (ds [Occ=Once1!] :: T) (ds1 [Occ=Once1!] :: Int) ->
+  = \ (ds :: T) (ds1 :: Int) ->
 g1 [InlPrag=[2]] :: S -> Int -> Int
-         Tmpl= \ (w [Occ=Once1!] :: S) (w1 [Occ=Once1!] :: Int) ->
-  = \ (w :: S) (w1 :: Int) ->
+         Tmpl= \ (ds [Occ=Once1!] :: S) (ds1 [Occ=Once1!] :: Int) ->
+  = \ (ds :: S) (ds1 :: Int) ->
