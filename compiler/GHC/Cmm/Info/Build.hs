@@ -41,7 +41,7 @@ import GHC.Runtime.Heap.Layout
 import GHC.Types.Unique.Supply
 import GHC.Types.CostCentre
 import GHC.StgToCmm.Heap
-import GHC.CmmToAsm
+import GHC.Driver.Config.CmmToAsm
 
 import Control.Monad
 import Data.Map.Strict (Map)
