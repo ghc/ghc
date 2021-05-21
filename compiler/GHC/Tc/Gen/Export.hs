@@ -171,7 +171,7 @@ rnExports explicit_mod exports
        -- thing (especially via 'module Foo' export item)
    do   { hsc_env <- getTopEnv
         ; tcg_env <- getGblEnv
-        ; let dflags = hsc_dflags hsc_env
+        ; let dflags = extractDynFlags hsc_env
               TcGblEnv { tcg_mod     = this_mod
                        , tcg_rdr_env = rdr_env
                        , tcg_imports = imports

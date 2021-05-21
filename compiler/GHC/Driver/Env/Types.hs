@@ -6,7 +6,7 @@ module GHC.Driver.Env.Types
 
 import GHC.Driver.Errors.Types ( GhcMessage )
 import {-# SOURCE #-} GHC.Driver.Hooks
-import GHC.Driver.Session ( DynFlags, HasDynFlags(..) )
+import GHC.Driver.Session ( DynFlags, ContainsDynFlags(..), HasDynFlags(..) )
 import GHC.Prelude
 import GHC.Runtime.Context
 import GHC.Runtime.Interpreter.Types ( Interp )
@@ -44,6 +44,9 @@ instance MonadIO Hsc where
 
 instance HasDynFlags Hsc where
     getDynFlags = Hsc $ \e w -> return (hsc_dflags e, w)
+
+instance ContainsDynFlags HscEnv where
+    extractDynFlags h = hsc_dflags h
 
 instance HasLogger Hsc where
     getLogger = Hsc $ \e w -> return (hsc_logger e, w)
@@ -114,7 +117,11 @@ data HscEnv
                 -- from the DynFlags.
 
         , hsc_logger :: !Logger
-                -- ^ Logger
+                -- ^ Logger with its flags.
+                --
+                -- Don't forget to update the logger flags if the logging
+                -- related DynFlags change. Or better, use hscSetFlags setter
+                -- which does it.
 
         , hsc_hooks :: !Hooks
                 -- ^ Hooks

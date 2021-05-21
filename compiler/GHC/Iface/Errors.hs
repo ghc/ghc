@@ -145,9 +145,9 @@ mayShowLocations dflags files
 
 cannotFindModule :: HscEnv -> ModuleName -> FindResult -> SDoc
 cannotFindModule hsc_env = cannotFindModule'
-    (hsc_dflags   hsc_env)
+    (extractDynFlags   hsc_env)
     (hsc_unit_env hsc_env)
-    (targetProfile (hsc_dflags hsc_env))
+    (targetProfile (extractDynFlags hsc_env))
 
 
 cannotFindModule' :: DynFlags -> UnitEnv -> Profile -> ModuleName -> FindResult -> SDoc
