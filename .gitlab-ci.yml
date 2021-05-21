@@ -814,7 +814,8 @@ nightly-aarch64-linux-deb10:
   tags:
     - armv7-linux
 
-validate-armv7-linux-deb10:
+# Disabled as the build takes over 4 hours
+.validate-armv7-linux-deb10:
   extends: .build-armv7-linux-deb10
   artifacts:
     when: always
