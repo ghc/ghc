@@ -36,7 +36,7 @@ main = do
       `xopt_set` LangExt.PolyKinds
       `xopt_set` LangExt.RankNTypes
     hsc_env <- getSession
-    let dflags = hsc_dflags hsc_env
+    let dflags = extractDynFlags hsc_env
     let logger = hsc_logger hsc_env
     liftIO $ do
       th_t <- runQ [t| forall k {j}.

@@ -1257,7 +1257,7 @@ instance TH.Quasi TcM where
       hsc_env <- getTopEnv
       let fc        = hsc_FC hsc_env
       let home_unit = hsc_home_unit hsc_env
-      let dflags    = hsc_dflags hsc_env
+      let dflags    = extractDynFlags hsc_env
       r <- liftIO $ findHomeModule fc home_unit dflags (mkModuleName plugin)
       let err = hang
             (text "addCorePlugin: invalid plugin module "
@@ -1286,7 +1286,7 @@ instance TH.Quasi TcM where
   qIsExtEnabled = xoptM
 
   qExtsEnabled =
-    EnumSet.toList . extensionFlags . hsc_dflags <$> getTopEnv
+    EnumSet.toList . extensionFlags . extractDynFlags <$> getTopEnv
 
   qPutDoc doc_loc s = do
     th_doc_var <- tcg_th_docs <$> getGblEnv
