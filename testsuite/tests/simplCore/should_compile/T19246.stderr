@@ -6,6 +6,6 @@
 ==================== Tidy Core rules ====================
 "SPEC f" [2] forall ($dOrd :: Ord Int). f @Int $dOrd = $sf
 "SPEC/T19246 $wf @Int" [2]
-    forall (w :: Ord Int). $wf @Int w = $s$wf
+    forall ($dOrd :: Ord Int). $wf @Int $dOrd = $s$wf
 
 
