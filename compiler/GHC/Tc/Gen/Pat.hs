@@ -30,6 +30,7 @@ import GHC.Prelude
 import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcSyntaxOp, tcSyntaxOpGen, tcInferRho )
 
 import GHC.Hs
+import GHC.Hs.Expr.Type
 import GHC.Rename.Utils
 import GHC.Tc.Utils.Zonk
 import GHC.Tc.Gen.Sig( TcPragEnv, lookupPragEnv, addInlinePrags )
