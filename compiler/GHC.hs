@@ -57,7 +57,7 @@ module GHC (
         SuccessFlag(..), succeeded, failed,
         defaultWarnErrLogger, WarnErrLogger,
         workingDirectoryChanged,
-        parseModule, typecheckModule, desugarModule, loadModule,
+        parseModule, typecheckModule, desugarModule,
         ParsedModule(..), TypecheckedModule(..), DesugaredModule(..),
         TypecheckedSource, ParsedSource, RenamedSource,   -- ditto
         TypecheckedMod, ParsedMod,
@@ -314,7 +314,6 @@ import GHC.Driver.Config
 import GHC.Driver.Main
 import GHC.Driver.Make
 import GHC.Driver.Hooks
-import GHC.Driver.Pipeline   ( compileOne' )
 import GHC.Driver.Monad
 import GHC.Driver.Ppr
 
@@ -358,6 +357,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Logger
+import GHC.Utils.Fingerprint
 
 import GHC.Core.Predicate
 import GHC.Core.Type  hiding( typeKind )
@@ -388,7 +388,6 @@ import GHC.Types.TyThing
 import GHC.Types.Name.Env
 import GHC.Types.Name.Ppr
 import GHC.Types.TypeEnv
-import GHC.Types.SourceFile
 
 import GHC.Unit
 import GHC.Unit.Env
@@ -408,7 +407,6 @@ import Data.Set (Set)
 import qualified Data.Set as S
 import qualified Data.Sequence as Seq
 import Data.Maybe
-import Data.Time
 import Data.Typeable    ( Typeable )
 import Data.Word        ( Word8 )
 import Control.Monad
@@ -751,7 +749,7 @@ setProgramDynFlags_ invalidate_needed dflags = do
 -- old log_action.  This is definitely wrong (#7478).
 --
 -- Hence, we invalidate the ModSummary cache after changing the
--- DynFlags.  We do this by tweaking the date on each ModSummary, so
+-- DynFlags.  We do this by tweaking the hash on each ModSummary, so
 -- that the next downsweep will think that all the files have changed
 -- and preprocess them again.  This won't necessarily cause everything
 -- to be recompiled, because by the time we check whether we need to
@@ -762,7 +760,7 @@ invalidateModSummaryCache :: GhcMonad m => m ()
 invalidateModSummaryCache =
   modifySession $ \h -> h { hsc_mod_graph = mapMG inval (hsc_mod_graph h) }
  where
-  inval ms = ms { ms_hs_date = addUTCTime (-1) (ms_hs_date ms) }
+  inval ms = ms { ms_hs_hash = fingerprint0 }
 
 -- | Returns the program 'DynFlags'.
 getProgramDynFlags :: GhcMonad m => m DynFlags
@@ -1186,41 +1184,6 @@ desugarModule tcm = do
        dm_core_module        = guts
      }
 
--- | Load a module.  Input doesn't need to be desugared.
---
--- A module must be loaded before dependent modules can be typechecked.  This
--- always includes generating a 'ModIface' and, depending on the
--- @DynFlags@\'s 'GHC.Driver.Session.backend', may also include code generation.
---
--- This function will always cause recompilation and will always overwrite
--- previous compilation results (potentially files on disk).
---
-loadModule :: (TypecheckedMod mod, GhcMonad m) => mod -> m mod
-loadModule tcm = do
-   let ms = modSummary tcm
-   let mod = ms_mod_name ms
-   let loc = ms_location ms
-   let (tcg, _details) = tm_internals tcm
-
-   mb_linkable <- case ms_obj_date ms of
-                     Just t | t > ms_hs_date ms  -> do
-                         l <- liftIO $ findObjectLinkable (ms_mod ms)
-                                                  (ml_obj_file loc) t
-                         return (Just l)
-                     _otherwise -> return Nothing
-
-   let source_modified | isNothing mb_linkable = SourceModified
-                       | otherwise             = SourceUnmodified
-                       -- we can't determine stability here
-
-   -- compile doesn't change the session
-   hsc_env <- getSession
-   mod_info <- liftIO $ compileOne' (Just tcg) Nothing
-                                    hsc_env ms 1 1 Nothing mb_linkable
-                                    source_modified
-
-   modifySession $ hscUpdateHPT (\hpt -> addToHpt hpt mod mod_info)
-   return tcm
 
 
 -- %************************************************************************
@@ -1584,25 +1547,26 @@ pprParenSymName a = parenSymOcc (getOccName a) (ppr (getName a))
 -- on whether the module is interpreted or not.
 
 
--- Extract the filename, stringbuffer content and dynflags associed to a module
+-- Extract the filename, stringbuffer content and dynflags associed to a ModSummary
+-- Given an initialised GHC session a ModSummary can be retrieved for
+-- a module by using 'getModSummary'
 --
 -- XXX: Explain pre-conditions
-getModuleSourceAndFlags :: GhcMonad m => Module -> m (String, StringBuffer, DynFlags)
-getModuleSourceAndFlags mod = do
-  m <- getModSummary (moduleName mod)
+getModuleSourceAndFlags :: ModSummary -> IO (String, StringBuffer, DynFlags)
+getModuleSourceAndFlags m = do
   case ml_hs_file $ ms_location m of
-    Nothing -> do dflags <- getDynFlags
-                  liftIO $ throwIO $ mkApiErr dflags (text "No source available for module " <+> ppr mod)
+    Nothing -> throwIO $ mkApiErr (ms_hspp_opts m) (text "No source available for module " <+> ppr (ms_mod m))
     Just sourceFile -> do
-        source <- liftIO $ hGetStringBuffer sourceFile
+        source <- hGetStringBuffer sourceFile
         return (sourceFile, source, ms_hspp_opts m)
 
 
 -- | Return module source as token stream, including comments.
 --
--- The module must be in the module graph and its source must be available.
+-- A 'Module' can be turned into a 'ModSummary' using 'getModSummary' if
+-- your session is fully initialised.
 -- Throws a 'GHC.Driver.Env.SourceError' on parse error.
-getTokenStream :: GhcMonad m => Module -> m [Located Token]
+getTokenStream :: ModSummary -> IO [Located Token]
 getTokenStream mod = do
   (sourceFile, source, dflags) <- getModuleSourceAndFlags mod
   let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
@@ -1613,7 +1577,7 @@ getTokenStream mod = do
 -- | Give even more information on the source than 'getTokenStream'
 -- This function allows reconstructing the source completely with
 -- 'showRichTokenStream'.
-getRichTokenStream :: GhcMonad m => Module -> m [(Located Token, String)]
+getRichTokenStream :: ModSummary -> IO [(Located Token, String)]
 getRichTokenStream mod = do
   (sourceFile, source, dflags) <- getModuleSourceAndFlags mod
   let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
