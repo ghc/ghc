@@ -1,0 +1,4 @@
+
+T19843l.hs:7:12:
+    Not in scope: type constructor or class ‘WrongName’
+    Perhaps you meant ‘FongName’ (line 4)
