@@ -264,7 +264,8 @@ dirty_BLOCKING_QUEUE:
     }
 
     case THUNK_SELECTOR:
-        return CLEAN(((StgSelector *) p)->selectee);
+    case THUNK_SELECTOR_N:
+        return CLEAN(((StgSelector *) p)->payload[0]);
 
     case ARR_WORDS:
         return true;
