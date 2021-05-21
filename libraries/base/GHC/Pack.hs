@@ -48,7 +48,7 @@ unpackCString a@(Ptr addr)
   | otherwise      = unpackCString# addr
 
 packCString#         :: [Char]          -> ByteArray#
-packCString# str = case (packString str) of { ByteArray _ _ bytes -> bytes }
+packCString# str = case packString str of { ByteArray _ _ bytes -> bytes }
 
 packString :: [Char] -> ByteArray Int
 packString str = runST (packStringST str)
