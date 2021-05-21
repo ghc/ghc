@@ -41,7 +41,7 @@ import GHC.Tc.Utils.Env     ( checkWellStaged, tcMetaTy )
 
 import GHC.Driver.Session
 import GHC.Data.FastString
-import GHC.Utils.Logger  ( dumpIfSet_dyn_printer, DumpFormat (..), getLogger )
+import GHC.Utils.Logger
 import GHC.Utils.Panic
 import GHC.Driver.Hooks
 import GHC.Builtin.Names.TH ( decsQTyConName, expQTyConName, liftName
@@ -817,10 +817,8 @@ traceSplice (SpliceInfo { spliceDescription = sd, spliceSource = mb_src
        traceOptTcRn Opt_D_dump_splices (spliceDebugDoc loc)
 
        when is_decl $ do -- Raw material for -dth-dec-file
-        dflags <- getDynFlags
         logger <- getLogger
-        liftIO $ dumpIfSet_dyn_printer alwaysQualify logger dflags Opt_D_th_dec_file
-                                       "" FormatHaskell (spliceCodeDoc loc)
+        liftIO $ putDumpFileMaybe logger Opt_D_th_dec_file "" FormatHaskell (spliceCodeDoc loc)
   where
     -- `-ddump-splices`
     spliceDebugDoc :: SrcSpan -> SDoc

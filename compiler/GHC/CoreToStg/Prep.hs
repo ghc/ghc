@@ -243,7 +243,7 @@ type CpeRhs  = CoreExpr    -- Non-terminal 'rhs'
 corePrepPgm :: HscEnv -> Module -> ModLocation -> CoreProgram -> [TyCon]
             -> IO (CoreProgram, S.Set CostCentre)
 corePrepPgm hsc_env this_mod mod_loc binds data_tycons =
-    withTiming logger dflags
+    withTiming logger
                (text "CorePrep"<+>brackets (ppr this_mod))
                (\(a,b) -> a `seqList` b `seq` ()) $ do
     us <- mkSplitUniqSupply 's'
@@ -272,13 +272,12 @@ corePrepPgm hsc_env this_mod mod_loc binds data_tycons =
 
 corePrepExpr :: HscEnv -> CoreExpr -> IO CoreExpr
 corePrepExpr hsc_env expr = do
-    let dflags = hsc_dflags hsc_env
     let logger = hsc_logger hsc_env
-    withTiming logger dflags (text "CorePrep [expr]") (\e -> e `seq` ()) $ do
+    withTiming logger (text "CorePrep [expr]") (\e -> e `seq` ()) $ do
       us <- mkSplitUniqSupply 's'
       initialCorePrepEnv <- mkInitialCorePrepEnv hsc_env
       let new_expr = initUs_ us (cpeBodyNF initialCorePrepEnv expr)
-      dumpIfSet_dyn logger dflags Opt_D_dump_prep "CorePrep" FormatCore (ppr new_expr)
+      putDumpFileMaybe logger Opt_D_dump_prep "CorePrep" FormatCore (ppr new_expr)
       return new_expr
 
 corePrepTopBinds :: CorePrepEnv -> [CoreBind] -> UniqSM Floats
