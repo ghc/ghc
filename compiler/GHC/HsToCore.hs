@@ -135,10 +135,10 @@ deSugar hsc_env
                             tcg_complete_matches = complete_matches
                             })
 
-  = do { let dflags = hsc_dflags hsc_env
+  = do { let dflags = extractDynFlags hsc_env
              logger = hsc_logger hsc_env
              print_unqual = mkPrintUnqualified (hsc_unit_env hsc_env) rdr_env
-        ; withTiming logger dflags
+        ; withTiming logger
                      (text "Desugar"<+>brackets (ppr mod))
                      (const ()) $
      do { -- Desugar the program
@@ -159,7 +159,7 @@ deSugar hsc_env
                           ; (ds_fords, foreign_prs) <- dsForeigns fords
                           ; ds_rules <- mapMaybeM dsRule rules
                           ; let hpc_init
-                                  | gopt Opt_Hpc dflags = hpcInitCode (hsc_dflags hsc_env) mod ds_hpc_info
+                                  | gopt Opt_Hpc dflags = hpcInitCode (extractDynFlags hsc_env) mod ds_hpc_info
                                   | otherwise = mempty
                           ; return ( ds_ev_binds
                                    , foreign_prs `appOL` core_prs `appOL` spec_prs
@@ -189,7 +189,7 @@ deSugar hsc_env
                 = simpleOptPgm simpl_opts mod final_pgm rules_for_imps
                          -- The simpleOptPgm gets rid of type
                          -- bindings plus any stupid dead code
-        ; dumpIfSet_dyn logger dflags Opt_D_dump_occur_anal "Occurrence analysis"
+        ; putDumpFileMaybe logger Opt_D_dump_occur_anal "Occurrence analysis"
             FormatCore (pprCoreBindings occ_anald_binds $$ pprRules ds_rules_for_imps )
 
         ; endPassIO hsc_env print_unqual CoreDesugarOpt ds_binds ds_rules_for_imps
@@ -286,10 +286,9 @@ and Rec the rest.
 
 deSugarExpr :: HscEnv -> LHsExpr GhcTc -> IO (Messages DsMessage, Maybe CoreExpr)
 deSugarExpr hsc_env tc_expr = do
-    let dflags = hsc_dflags hsc_env
     let logger = hsc_logger hsc_env
 
-    showPass logger dflags "Desugar"
+    showPass logger "Desugar"
 
     -- Do desugaring
     (tc_msgs, mb_result) <- runTcInteractive hsc_env $
@@ -304,7 +303,7 @@ deSugarExpr hsc_env tc_expr = do
 
     case mb_core_expr of
        Nothing   -> return ()
-       Just expr -> dumpIfSet_dyn logger dflags Opt_D_dump_ds "Desugared"
+       Just expr -> putDumpFileMaybe logger Opt_D_dump_ds "Desugared"
                     FormatCore (pprCoreExpr expr)
 
       -- callers (i.e. ioMsgMaybe) expect that no expression is returned if
