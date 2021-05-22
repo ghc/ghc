@@ -223,7 +223,7 @@ hsRecUpdFieldRdr :: HsRecUpdField (GhcPass p) -> Located RdrName
 hsRecUpdFieldRdr = fmap rdrNameAmbiguousFieldOcc . hfbLHS
 
 hsRecUpdFieldId :: HsFieldBind (LAmbiguousFieldOcc GhcTc) arg -> Located Id
-hsRecUpdFieldId = fmap extFieldOcc . hsRecUpdFieldOcc
+hsRecUpdFieldId = fmap foExt . hsRecUpdFieldOcc
 
 hsRecUpdFieldOcc :: HsFieldBind (LAmbiguousFieldOcc GhcTc) arg -> LFieldOcc GhcTc
 hsRecUpdFieldOcc = fmap unambiguousFieldOcc . hfbLHS
