@@ -26,6 +26,7 @@ initNCGConfig dflags this_mod = NCGConfig
    , ncgSplitSections         = gopt Opt_SplitSections dflags
    , ncgRegsIterative         = gopt Opt_RegsIterative dflags
    , ncgRegsGraph             = gopt Opt_RegsGraph dflags
+   , ncgRegsGraphChaitin      = gopt Opt_RegsGraphChaitin dflags
    , ncgAsmLinting            = gopt Opt_DoAsmLinting dflags
    , ncgCfgWeights            = cfgWeights dflags
    , ncgCfgBlockLayout        = gopt Opt_CfgBlocklayout dflags
@@ -67,4 +68,6 @@ initNCGConfig dflags this_mod = NCGConfig
    , ncgCmmStaticPred       = gopt Opt_CmmStaticPred dflags
    , ncgEnableShortcutting  = gopt Opt_AsmShortcutting dflags
    , ncgComputeUnwinding    = debugLevel dflags > 0
+
+   , ncgSsaTransform        = gopt Opt_SsaTransform dflags
    }
