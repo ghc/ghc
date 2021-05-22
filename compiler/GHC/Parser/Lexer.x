@@ -2326,16 +2326,16 @@ data PState = PState {
         options    :: ParserOpts,
         warnings   :: Bag PsWarning,
         errors     :: Bag PsError,
-        tab_first  :: !(Strict.Maybe RealSrcSpan),
+        tab_first  :: Strict.Maybe RealSrcSpan,
                                          -- pos of first tab warning in the file
         tab_count  :: !Word,             -- number of tab warnings in the file
-        last_tk    :: !(Strict.Maybe (PsLocated Token)), -- last non-comment token
-        prev_loc   :: !PsSpan,     -- pos of previous token, including comments,
-        prev_loc2  :: !PsSpan,     -- pos of two back token, including comments,
+        last_tk    :: Strict.Maybe (PsLocated Token), -- last non-comment token
+        prev_loc   :: PsSpan,      -- pos of previous token, including comments,
+        prev_loc2  :: PsSpan,      -- pos of two back token, including comments,
                                    -- see Note [PsSpan in Comments]
-        last_loc   :: !PsSpan,     -- pos of current token
+        last_loc   :: PsSpan,      -- pos of current token
         last_len   :: !Int,        -- len of current token
-        loc        :: !PsLoc,      -- current loc (end of prev token + 1)
+        loc        :: PsLoc,       -- current loc (end of prev token + 1)
         context    :: [LayoutContext],
         lex_state  :: [Int],
         srcfiles   :: [FastString],
@@ -2362,8 +2362,8 @@ data PState = PState {
         -- locations of 'noise' tokens in the source, so that users of
         -- the GHC API can do source to source conversions.
         -- See note [exact print annotations] in GHC.Parser.Annotation
-        eof_pos :: !(Strict.Maybe (Strict.Pair RealSrcSpan RealSrcSpan)), -- pos, gap to prior token
-        header_comments :: !(Strict.Maybe [LEpaComment]),
+        eof_pos :: Strict.Maybe (Strict.Pair RealSrcSpan RealSrcSpan), -- pos, gap to prior token
+        header_comments :: Strict.Maybe [LEpaComment],
         comment_q :: [LEpaComment],
 
         -- Haddock comments accumulated in ascending order of their location
