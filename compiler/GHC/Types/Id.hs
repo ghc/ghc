@@ -94,7 +94,7 @@ module GHC.Types.Id (
         -- ** Reading 'IdInfo' fields
         idArity,
         idCallArity, idFunRepArity,
-        idUnfolding, realIdUnfolding,
+        idUnfolding, realIdUnfolding, hasInlineUnfolding,
         idSpecialisation, idCoreRules, idHasRules,
         idCafInfo, idLFInfo_maybe,
         idOneShotInfo, idStateHackOneShotInfo,
@@ -124,7 +124,8 @@ module GHC.Types.Id (
 import GHC.Prelude
 
 import GHC.Core ( CoreRule, isStableUnfolding, evaldUnfolding,
-                 isCompulsoryUnfolding, Unfolding( NoUnfolding ) )
+                 isCompulsoryUnfolding, isInlineUnfolding,
+                 Unfolding( NoUnfolding ) )
 
 import GHC.Types.Id.Info
 import GHC.Types.Basic
@@ -720,6 +721,12 @@ idUnfolding id
   | otherwise                          = unfoldingInfo info
   where
     info = idInfo id
+
+hasInlineUnfolding :: Id -> Bool
+-- ^ True of a non-loop-breaker Id that has a /stable/ unfolding that is
+--   (a) always inlined; that is, with an `UnfWhen` guidance, or
+--   (b) a DFunUnfolding which never needs to be inlined
+hasInlineUnfolding id = isInlineUnfolding (idUnfolding id)
 
 realIdUnfolding :: Id -> Unfolding
 -- Expose the unfolding if there is one, including for loop breakers
