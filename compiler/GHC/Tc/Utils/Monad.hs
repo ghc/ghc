@@ -188,6 +188,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Misc
 import GHC.Utils.Logger
+import qualified GHC.Data.Strict as Strict
 
 import GHC.Types.Error
 import GHC.Types.Fixity.Env
@@ -896,7 +897,7 @@ addDependentFiles fs = do
 
 getSrcSpanM :: TcRn SrcSpan
         -- Avoid clash with Name.getSrcLoc
-getSrcSpanM = do { env <- getLclEnv; return (RealSrcSpan (tcl_loc env) Nothing) }
+getSrcSpanM = do { env <- getLclEnv; return (RealSrcSpan (tcl_loc env) Strict.Nothing) }
 
 -- See Note [Error contexts in generated code]
 inGeneratedCode :: TcRn Bool
