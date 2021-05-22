@@ -229,7 +229,7 @@ unsafeEqualityProof = case unsafeEqualityProof @a @b of UnsafeRefl -> UnsafeRefl
 -- The INLINE will almost certainly happen automatically, but it's almost
 -- certain to generate (slightly) better code, so let's do it.  For example
 --
---   case (unsafeCoerce blah) of ...
+--   case unsafeCoerce blah of ...
 --
 -- will turn into
 --
