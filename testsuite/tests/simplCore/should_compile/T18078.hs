@@ -3,7 +3,7 @@ module T18078 where
 newtype N = N { unN :: Int -> Int }
 
 -- This an example of a worker/wrapper thing
--- See Note [Cast worker/wrappers] in Simplify
+-- See Note [Cast worker/wrapper] in Simplify
 -- We should get good code, with a $wf calling itself
 -- but in 8.10 we do not
 f :: N

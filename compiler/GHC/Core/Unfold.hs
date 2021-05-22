@@ -972,11 +972,11 @@ certainlyWillInline opts fn_info
         | noinline     -> Nothing       -- See Note [Worker/wrapper for NOINLINE functions]
         | otherwise
         -> case guidance of
-             UnfNever  -> Nothing
+             UnfNever   -> Nothing
              UnfWhen {} -> Just (fn_unf { uf_src = src' })
                              -- INLINE functions have UnfWhen
              UnfIfGoodArgs { ug_size = size, ug_args = args }
-               -> do_cunf expr size args src'
+                        -> do_cunf expr size args src'
         where
           src' = -- Do not change InlineCompulsory!
                  case src of

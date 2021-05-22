@@ -230,7 +230,7 @@ The semantics of an INLINE pragma is
 the `UnfoldingGuidance`.)
 
 In the example, x's ug_arity is 0, so we should inline it at every use
-site.  It's rare to have such an INLINE pragma (usually INLINE Is on
+site.  It's rare to have such an INLINE pragma (usually INLINE is on
 functions), but it's occasionally very important (#15578, #15519).
 In #15519 we had something like
    x = case (g a b) of I# r -> T r
