@@ -120,6 +120,7 @@ import GHC.Utils.Json
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Data.FastString
+import qualified GHC.Data.Strict as Strict
 
 import Control.DeepSeq
 import Control.Applicative (liftA2)
@@ -225,8 +226,8 @@ newtype BufPos = BufPos { bufPos :: Int }
 
 -- | Source Location
 data SrcLoc
-  = RealSrcLoc !RealSrcLoc !(Maybe BufPos)  -- See Note [Why Maybe BufPos]
-  | UnhelpfulLoc FastString     -- Just a general indication
+  = RealSrcLoc !RealSrcLoc !(Strict.Maybe BufPos)  -- See Note [Why Maybe BufPos]
+  | UnhelpfulLoc !FastString     -- Just a general indication
   deriving (Eq, Show)
 
 {-
@@ -238,14 +239,14 @@ data SrcLoc
 -}
 
 mkSrcLoc :: FastString -> Int -> Int -> SrcLoc
-mkSrcLoc x line col = RealSrcLoc (mkRealSrcLoc x line col) Nothing
+mkSrcLoc x line col = RealSrcLoc (mkRealSrcLoc x line col) Strict.Nothing
 
 mkRealSrcLoc :: FastString -> Int -> Int -> RealSrcLoc
 mkRealSrcLoc x line col = SrcLoc (LexicalFastString x) line col
 
-getBufPos :: SrcLoc -> Maybe BufPos
+getBufPos :: SrcLoc -> Strict.Maybe BufPos
 getBufPos (RealSrcLoc _ mbpos) = mbpos
-getBufPos (UnhelpfulLoc _) = Nothing
+getBufPos (UnhelpfulLoc _) = Strict.Nothing
 
 -- | Built-in "bad" 'SrcLoc' values for particular locations
 noSrcLoc, generatedSrcLoc, interactiveSrcLoc :: SrcLoc
@@ -381,7 +382,7 @@ instance Semigroup BufSpan where
 -- A 'SrcSpan' identifies either a specific portion of a text file
 -- or a human-readable description of a location.
 data SrcSpan =
-    RealSrcSpan !RealSrcSpan !(Maybe BufSpan)  -- See Note [Why Maybe BufPos]
+    RealSrcSpan !RealSrcSpan !(Strict.Maybe BufSpan)  -- See Note [Why Maybe BufPos]
   | UnhelpfulSpan !UnhelpfulSpanReason
 
   deriving (Eq, Show) -- Show is used by GHC.Parser.Lexer, because we
@@ -430,9 +431,9 @@ instance ToJson RealSrcSpan where
 instance NFData SrcSpan where
   rnf x = x `seq` ()
 
-getBufSpan :: SrcSpan -> Maybe BufSpan
+getBufSpan :: SrcSpan -> Strict.Maybe BufSpan
 getBufSpan (RealSrcSpan _ mbspan) = mbspan
-getBufSpan (UnhelpfulSpan _) = Nothing
+getBufSpan (UnhelpfulSpan _) = Strict.Nothing
 
 -- | Built-in "bad" 'SrcSpan's for common sources of location uncertainty
 noSrcSpan, generatedSrcSpan, wiredInSrcSpan, interactiveSrcSpan :: SrcSpan
@@ -773,8 +774,8 @@ cmpLocated a b = unLoc a `compare` unLoc b
 -- Precondition: both operands have an associated 'BufSpan'.
 cmpBufSpan :: HasDebugCallStack => Located a -> Located a -> Ordering
 cmpBufSpan (L l1 _) (L l2  _)
-  | Just a <- getBufSpan l1
-  , Just b <- getBufSpan l2
+  | Strict.Just a <- getBufSpan l1
+  , Strict.Just b <- getBufSpan l2
   = compare a b
 
   | otherwise = panic "cmpBufSpan: no BufSpan"
@@ -787,7 +788,7 @@ instance (Outputable e) => Outputable (Located e) where
 instance (Outputable e) => Outputable (GenLocated RealSrcSpan e) where
   ppr (L l e) = -- GenLocated:
                 -- Print spans without the file name etc
-                whenPprDebug (braces (pprUserSpan False (RealSrcSpan l Nothing)))
+                whenPprDebug (braces (pprUserSpan False (RealSrcSpan l Strict.Nothing)))
              $$ ppr e
 
 
@@ -882,7 +883,7 @@ psSpanEnd :: PsSpan -> PsLoc
 psSpanEnd (PsSpan r b) = PsLoc (realSrcSpanEnd r) (bufSpanEnd b)
 
 mkSrcSpanPs :: PsSpan -> SrcSpan
-mkSrcSpanPs (PsSpan r b) = RealSrcSpan r (Just b)
+mkSrcSpanPs (PsSpan r b) = RealSrcSpan r (Strict.Just b)
 
 -- | Layout information for declarations.
 data LayoutInfo =
