@@ -225,6 +225,8 @@ function will definitely get a w/w split" and that's hard to predict
 in advance...the logic in mkWwBodies is complex. So I've left the
 super-simple test, with this Note to explain.
 
+NB: record selectors are ordinary functions, inlined iff GHC wants to,
+so won't be caught by the preceding isInlineUnfolding test in tryWW.
 
 Note [Worker/wrapper for NOINLINE functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -511,12 +513,16 @@ tryWW ww_opts is_rec fn_id rhs
   , Just filler <- mkAbsentFiller ww_opts fn_id
   = return [(new_fn_id, filler)]
 
+  -- See Note [Don't w/w INLINE things]
+  | hasInlineUnfolding fn_id
+  = return [(new_fn_id, rhs)]
+
   -- See Note [No worker/wrapper for record selectors]
   | isRecordSelector fn_id
   = return [ (new_fn_id, rhs ) ]
 
   | is_fun && is_eta_exp
-  = splitFun ww_opts new_fn_id fn_info wrap_dmds div cpr rhs
+  = splitFun ww_opts new_fn_id fn_info rhs
 
   -- See Note [Thunk splitting]
   | isNonRec is_rec, is_thunk
@@ -526,16 +532,8 @@ tryWW ww_opts is_rec fn_id rhs
   = return [ (new_fn_id, rhs) ]
 
   where
-    fn_info          = idInfo fn_id
-    (wrap_dmds, div) = splitDmdSig (dmdSigInfo fn_info)
-
-    cpr_ty = getCprSig (cprSigInfo fn_info)
-    -- Arity of the CPR sig should match idArity when it's not a join point.
-    -- See Note [Arity trimming for CPR signatures] in GHC.Core.Opt.CprAnal
-    cpr = assertPpr (isJoinId fn_id || cpr_ty == topCprType || ct_arty cpr_ty == arityInfo fn_info)
-                    (ppr fn_id <> colon <+> text "ct_arty:" <+> int (ct_arty cpr_ty)
-                      <+> text "arityInfo:" <+> ppr (arityInfo fn_info)) $
-          ct_cpr cpr_ty
+    fn_info        = idInfo fn_id
+    (wrap_dmds, _) = splitDmdSig (dmdSigInfo fn_info)
 
     new_fn_id = zapIdUsedOnceInfo (zapIdUsageEnvInfo fn_id)
         -- See Note [Zapping DmdEnv after Demand Analyzer] and
@@ -649,7 +647,7 @@ Consider this (#19824 comment on 15 May 21):
   v = ...big...
   g x = f v x + 1
 
-So `f` will generate a worker/wrapper split; and `g` (since it is small
+So `f` will generate a worker/wrapper split; and `g` (since it is small)
 will trigger the certainlyWillInline case of splitFun.  The danger is that
 we end up with
   g {- StableUnfolding = \x -> f v x + 1 -}
@@ -670,22 +668,22 @@ by LitRubbish (see Note [Drop absent bindings]) so there is no great harm.
 
 
 ---------------------
-splitFun :: WwOpts -> Id -> IdInfo -> [Demand] -> Divergence -> Cpr -> CoreExpr
-         -> UniqSM [(Id, CoreExpr)]
-splitFun ww_opts fn_id fn_info wrap_dmds div cpr rhs
+splitFun :: WwOpts -> Id -> IdInfo -> CoreExpr -> UniqSM [(Id, CoreExpr)]
+splitFun ww_opts fn_id fn_info rhs
   = warnPprTrace (not (wrap_dmds `lengthIs` (arityInfo fn_info)))
                  (ppr fn_id <+> (ppr wrap_dmds $$ ppr cpr)) $
     do { mb_stuff <- mkWwBodies ww_opts rhs_fvs fn_id wrap_dmds use_cpr_info
        ; case mb_stuff of
-            Nothing -> return [(fn_id, rhs)]
+            Nothing -> -- No useful wrapper; leave the binding alone
+                       return [(fn_id, rhs)]
 
             Just stuff
               | Just stable_unf <- certainlyWillInline uf_opts fn_info
+                -- We could make a w/w split, but in fact the RHS is small
+                -- See Note [Don't w/w inline small non-loop-breaker things]
               , let id_w_unf = fn_id `setIdUnfolding` stable_unf
                 -- See Note [Inline pragma for certainlyWillInline]
               ->  return [ (id_w_unf, rhs) ]
-                  -- See Note [Don't w/w INLINE things]
-                  -- See Note [Don't w/w inline small non-loop-breaker things]
 
               | otherwise
               -> do { work_uniq <- getUniqueM
@@ -694,6 +692,16 @@ splitFun ww_opts fn_id fn_info wrap_dmds div cpr rhs
   where
     uf_opts = so_uf_opts (wo_simple_opts ww_opts)
     rhs_fvs = exprFreeVars rhs
+
+    (wrap_dmds, div) = splitDmdSig (dmdSigInfo fn_info)
+
+    cpr_ty = getCprSig (cprSigInfo fn_info)
+    -- Arity of the CPR sig should match idArity when it's not a join point.
+    -- See Note [Arity trimming for CPR signatures] in GHC.Core.Opt.CprAnal
+    cpr = assertPpr (isJoinId fn_id || cpr_ty == topCprType || ct_arty cpr_ty == arityInfo fn_info)
+                    (ppr fn_id <> colon <+> text "ct_arty:" <+> int (ct_arty cpr_ty)
+                      <+> text "arityInfo:" <+> ppr (arityInfo fn_info)) $
+          ct_cpr cpr_ty
 
     -- use_cpr_info is the CPR we w/w for. Note that we kill it for join points,
     -- see Note [Don't w/w join points for CPR].
