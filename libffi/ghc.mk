@@ -130,4 +130,3 @@ $(eval $(call clean-target,libffi,, \
     libffi/build $(wildcard libffi/stamp.ffi.*) libffi/dist-install))
 
 endif
-

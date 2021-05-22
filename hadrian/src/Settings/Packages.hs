@@ -351,12 +351,7 @@ rtsPackageArgs = package rts ? do
 
             , input "**/RetainerProfile.c" ? flag CcLlvmBackend ?
               arg "-Wno-incompatible-pointer-types"
-
-            -- libffi's ffi.h triggers various warnings
-            , inputs [ "**/Interpreter.c", "**/Storage.c", "**/Adjustor.c" ] ?
-              arg "-Wno-strict-prototypes"
-            , inputs ["**/Interpreter.c", "**/Adjustor.c", "**/sm/Storage.c"] ?
-              anyTargetArch ["powerpc"] ? arg "-Wno-undef" ]
+            ]
 
     mconcat
         [ builder (Cabal Flags) ? mconcat
