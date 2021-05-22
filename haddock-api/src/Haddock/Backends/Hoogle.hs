@@ -247,8 +247,8 @@ ppCtor dflags dat subdocs con@ConDeclH98 { con_args = con_args' }
         f (PrefixCon _ args) = [typeSig name $ (map hsScaledThing args) ++ [resType]]
         f (InfixCon a1 a2) = f $ PrefixCon [] [a1,a2]
         f (RecCon (L _ recs)) = f (PrefixCon [] $ map (hsLinear . cd_fld_type . unLoc) recs) ++ concat
-                          [(concatMap (lookupCon dflags subdocs . noLocA . extFieldOcc . unLoc) (cd_fld_names r)) ++
-                           [out dflags (map (extFieldOcc . unLoc) $ cd_fld_names r) `typeSig` [resType, cd_fld_type r]]
+                          [(concatMap (lookupCon dflags subdocs . noLocA . foExt . unLoc) (cd_fld_names r)) ++
+                           [out dflags (map (foExt . unLoc) $ cd_fld_names r) `typeSig` [resType, cd_fld_type r]]
                           | r <- map unLoc recs]
 
         funs = foldr1 (\x y -> reL $ HsFunTy noAnn (HsUnrestrictedArrow NormalSyntax) x y)
@@ -280,7 +280,7 @@ ppCtor dflags _dat subdocs (ConDeclGADT { con_names = names
         name = out dflags $ map unL names
         con_sig_ty = HsSig noExtField outer_bndrs theta_ty where
           theta_ty = case mcxt of
-            Just theta -> noLocA (HsQualTy { hst_xqual = noExtField, hst_ctxt = Just theta, hst_body = tau_ty })
+            Just theta -> noLocA (HsQualTy { hst_xqual = noExtField, hst_ctxt = theta, hst_body = tau_ty })
             Nothing -> tau_ty
           tau_ty = foldr mkFunTy res_ty $
             case args of PrefixConGADT pos_args -> map hsScaledThing pos_args

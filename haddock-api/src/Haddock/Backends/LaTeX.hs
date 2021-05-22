@@ -887,12 +887,12 @@ ppSideBySideConstr subdocs unicode leader (L _ con) =
 -- | Pretty-print a record field
 ppSideBySideField :: [(DocName, DocForDecl DocName)] -> Bool -> ConDeclField DocNameI ->  LaTeX
 ppSideBySideField subdocs unicode (ConDeclField _ names ltype _) =
-  decltt (cat (punctuate comma (map (ppBinder . rdrNameOcc . unLoc . rdrNameFieldOcc . unLoc) names))
+  decltt (cat (punctuate comma (map (ppBinder . rdrNameOcc . unLoc . foLabel . unLoc) names))
     <+> dcolon unicode <+> ppLType unicode ltype) <-> rDoc mbDoc
   where
     -- don't use cd_fld_doc for same reason we don't use con_doc above
     -- Where there is more than one name, they all have the same documentation
-    mbDoc = lookup (extFieldOcc $ unLoc $ head names) subdocs >>= fmap _doc . combineDocumentation . fst
+    mbDoc = lookup (foExt $ unLoc $ head names) subdocs >>= fmap _doc . combineDocumentation . fst
 
 
 -- | Pretty-print a bundled pattern synonym
@@ -983,11 +983,12 @@ ppTypeApp n ts ppDN ppT = ppDN n <+> hsep (map ppT ts)
 -------------------------------------------------------------------------------
 
 
-ppLContext, ppLContextNoArrow :: Maybe (LHsContext DocNameI) -> Bool -> LaTeX
-ppLContext        Nothing _ = empty
-ppLContext        (Just ctxt) unicode  = ppContext        (unLoc ctxt) unicode
-ppLContextNoArrow Nothing _ = empty
-ppLContextNoArrow (Just ctxt) unicode = ppContextNoArrow (unLoc ctxt) unicode
+ppLContext :: Maybe (LHsContext DocNameI) -> Bool -> LaTeX
+ppLContext Nothing _ = empty
+ppLContext (Just ctxt) unicode  = ppContext (unLoc ctxt) unicode
+
+ppLContextNoArrow :: LHsContext DocNameI -> Bool -> LaTeX
+ppLContextNoArrow ctxt unicode = ppContextNoArrow (unLoc ctxt) unicode
 
 ppContextNoLocsMaybe :: [HsType DocNameI] -> Bool -> Maybe LaTeX
 ppContextNoLocsMaybe [] _ = Nothing
@@ -1101,7 +1102,7 @@ ppr_mono_ty (HsForAllTy _ tele ty) unicode
   = sep [ ppHsForAllTelescope tele unicode
         , ppr_mono_lty ty unicode ]
 ppr_mono_ty (HsQualTy _ ctxt ty) unicode
-  = sep [ ppLContext ctxt unicode
+  = sep [ ppLContext (Just ctxt) unicode
         , ppr_mono_lty ty unicode ]
 ppr_mono_ty (HsFunTy _ mult ty1 ty2)   u
   = sep [ ppr_mono_lty ty1 u

@@ -167,7 +167,7 @@ ppSubSigLike unicode qual typ argDocs subdocs sep emptyCtxts = do_sig_args 0 sep
         leader' = leader <+> ppForAllPart unicode qual tele
 
     do_args n leader (HsQualTy _ lctxt ltype)
-      | null (fromMaybeContext lctxt)
+      | null (unLoc lctxt)
       = do_largs n leader ltype
       | otherwise
       = (leader <+> ppLContextNoArrow lctxt unicode qual emptyCtxts, Nothing, [])
@@ -436,12 +436,14 @@ ppTypeApp n ts ppDN ppT = ppDN Prefix n <+> hsep (map ppT ts)
 -------------------------------------------------------------------------------
 
 
-ppLContext, ppLContextNoArrow :: Maybe (LHsContext DocNameI) -> Unicode
+ppLContext :: Maybe (LHsContext DocNameI) -> Unicode
                               -> Qualification -> HideEmptyContexts -> Html
 ppLContext        Nothing  u q h = ppContext        []        u q h
 ppLContext        (Just c) u q h = ppContext        (unLoc c) u q h
-ppLContextNoArrow Nothing  u q h = ppContextNoArrow []        u q h
-ppLContextNoArrow (Just c) u q h = ppContextNoArrow (unLoc c) u q h
+
+ppLContextNoArrow :: LHsContext DocNameI -> Unicode
+                              -> Qualification -> HideEmptyContexts -> Html
+ppLContextNoArrow c u q h = ppContextNoArrow (unLoc c) u q h
 
 ppContextNoArrow :: HsContext DocNameI -> Unicode -> Qualification -> HideEmptyContexts -> Html
 ppContextNoArrow cxt unicode qual emptyCtxts = fromMaybe noHtml $
@@ -1025,7 +1027,7 @@ ppSideBySideField :: [(DocName, DocForDecl DocName)] -> Unicode -> Qualification
 ppSideBySideField subdocs unicode qual (ConDeclField _ names ltype _) =
   ( hsep (punctuate comma [ ppBinder False (rdrNameOcc field)
                           | L _ name <- names
-                          , let field = (unLoc . rdrNameFieldOcc) name
+                          , let field = (unLoc . foLabel) name
                           ])
       <+> dcolon unicode
       <+> ppLType unicode qual HideEmptyContexts ltype
@@ -1035,12 +1037,12 @@ ppSideBySideField subdocs unicode qual (ConDeclField _ names ltype _) =
   where
     -- don't use cd_fld_doc for same reason we don't use con_doc above
     -- Where there is more than one name, they all have the same documentation
-    mbDoc = lookup (extFieldOcc $ unLoc $ head names) subdocs >>= combineDocumentation . fst
+    mbDoc = lookup (foExt $ unLoc $ head names) subdocs >>= combineDocumentation . fst
 
 
 ppShortField :: Bool -> Unicode -> Qualification -> ConDeclField DocNameI -> Html
 ppShortField summary unicode qual (ConDeclField _ names ltype _)
-  = hsep (punctuate comma (map ((ppBinder summary) . rdrNameOcc . unLoc . rdrNameFieldOcc . unLoc) names))
+  = hsep (punctuate comma (map ((ppBinder summary) . rdrNameOcc . unLoc . foLabel . unLoc) names))
     <+> dcolon unicode <+> ppLType unicode qual HideEmptyContexts ltype
 
 
@@ -1185,13 +1187,13 @@ patSigContext sig_typ | hasNonEmptyContext typ && isFirstContextEmpty typ =  Sho
     hasNonEmptyContext t =
       case unLoc t of
         HsForAllTy _ _ s -> hasNonEmptyContext s
-        HsQualTy _ cxt s -> if null (fromMaybeContext cxt) then hasNonEmptyContext s else True
+        HsQualTy _ cxt s -> if null (unLoc cxt) then hasNonEmptyContext s else True
         HsFunTy _ _ _ s    -> hasNonEmptyContext s
         _ -> False
     isFirstContextEmpty t =
       case unLoc t of
         HsForAllTy _ _ s -> isFirstContextEmpty s
-        HsQualTy _ cxt _ -> null (fromMaybeContext cxt)
+        HsQualTy _ cxt _ -> null (unLoc cxt)
         HsFunTy _ _ _ s    -> isFirstContextEmpty s
         _ -> False
 
@@ -1230,7 +1232,7 @@ ppr_mono_ty (HsForAllTy _ tele ty) unicode qual emptyCtxts
   = ppForAllPart unicode qual tele <+> ppr_mono_lty ty unicode qual emptyCtxts
 
 ppr_mono_ty (HsQualTy _ ctxt ty) unicode qual emptyCtxts
-  = ppLContext ctxt unicode qual emptyCtxts <+> ppr_mono_lty ty unicode qual emptyCtxts
+  = ppLContext (Just ctxt) unicode qual emptyCtxts <+> ppr_mono_lty ty unicode qual emptyCtxts
 
 -- UnicodeSyntax alternatives
 ppr_mono_ty (HsTyVar _ _ (L _ name)) True _ _

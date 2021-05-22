@@ -1113,7 +1113,7 @@ extractDecl declMap name decl
                                , Just rec <- map (getRecConArgs_maybe . unLoc) (dd_cons (feqn_rhs d))
                                , ConDeclField { cd_fld_names = ns } <- map unLoc (unLoc rec)
                                , L _ n <- ns
-                               , extFieldOcc n == name
+                               , foExt n == name
                           ]
             in case matches of
               [d0] -> extractDecl declMap name (noLocA . InstD noExtField $ DataFamInstD noExtField d0)
@@ -1146,9 +1146,9 @@ extractPatternSyn nm t tvs cons =
         typ = longArrow args (data_ty con)
         typ' =
           case con of
-            ConDeclH98 { con_mb_cxt = Just cxt } -> noLocA (HsQualTy noExtField (Just cxt) typ)
+            ConDeclH98 { con_mb_cxt = Just cxt } -> noLocA (HsQualTy noExtField cxt typ)
             _ -> typ
-        typ'' = noLocA (HsQualTy noExtField Nothing typ')
+        typ'' = noLocA (HsQualTy noExtField (noLocA []) typ')
     in PatSynSig noAnn [noLocA nm] (mkEmptySigType typ'')
 
   longArrow :: [LHsType GhcRn] -> LHsType GhcRn -> LHsType GhcRn
@@ -1174,7 +1174,7 @@ extractRecSel nm t tvs (L _ con : rest) =
  where
   matching_fields :: [LConDeclField GhcRn] -> [(SrcSpan, LConDeclField GhcRn)]
   matching_fields flds = [ (l,f) | f@(L _ (ConDeclField _ ns _ _)) <- flds
-                                 , L l n <- ns, extFieldOcc n == nm ]
+                                 , L l n <- ns, foExt n == nm ]
   data_ty
     -- ResTyGADT _ ty <- con_res con = ty
     | ConDeclGADT{} <- con = con_res_ty con

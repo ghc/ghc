@@ -171,7 +171,7 @@ getGADTConType (ConDeclGADT { con_bndrs = L _ outer_bndrs
                  , sig_body  = theta_ty })
  where
    theta_ty | Just theta <- mcxt
-            = noLocA (HsQualTy { hst_xqual = noAnn, hst_ctxt = Just theta, hst_body = tau_ty })
+            = noLocA (HsQualTy { hst_xqual = noAnn, hst_ctxt = theta, hst_body = tau_ty })
             | otherwise
             = tau_ty
 
@@ -226,12 +226,11 @@ addClassContext cls tvs0 (L pos (ClassOpSig _ _ lname ltype))
                          , hst_ctxt = add_ctxt ctxt, hst_body = ty })
     go_ty (L loc ty)
        = L loc (HsQualTy { hst_xqual = noExtField
-                         , hst_ctxt = add_ctxt Nothing, hst_body = L loc ty })
+                         , hst_ctxt = add_ctxt (noLocA []), hst_body = L loc ty })
 
     extra_pred = nlHsTyConApp Prefix cls (lHsQTyVarsToTypes tvs0)
 
-    add_ctxt Nothing              = Just $ noLocA [extra_pred]
-    add_ctxt (Just (L loc preds)) = Just $ L loc (extra_pred : preds)
+    add_ctxt (L loc preds) = L loc (extra_pred : preds)
 
 addClassContext _ _ sig = sig   -- E.g. a MinimalSig is fine
 
@@ -291,7 +290,7 @@ restrictCons names decls = [ L p d | L p (Just d) <- map (fmap keep) decls ]
       where
         field_avail :: LConDeclField GhcRn -> Bool
         field_avail (L _ (ConDeclField _ fs _ _))
-            = all (\f -> extFieldOcc (unLoc f) `elem` names) fs
+            = all (\f -> foExt (unLoc f) `elem` names) fs
 
         field_types flds = [ hsUnrestricted t | L _ (ConDeclField _ _ t _) <- flds ]
 
@@ -356,9 +355,7 @@ reparenTypePrec = go
   go p (HsQualTy x ctxt ty)
     = let p' [_] = PREC_CTX
           p' _   = PREC_TOP -- parens will get added anyways later...
-          ctxt' = case ctxt of
-            Nothing -> Nothing
-            Just c -> Just $ mapXRec @a (\xs -> map (goL (p' xs)) xs) c
+          ctxt' = mapXRec @a (\xs -> map (goL (p' xs)) xs) ctxt
       in paren p PREC_CTX $ HsQualTy x ctxt' (goL PREC_TOP ty)
     -- = paren p PREC_FUN $ HsQualTy x (fmap (mapXRec @a (map reparenLType)) ctxt) (reparenLType ty)
   go p (HsFunTy x w ty1 ty2)
@@ -469,7 +466,7 @@ instance Parent (ConDecl GhcRn) where
   children con =
     case getRecConArgs_maybe con of
       Nothing -> []
-      Just flds -> map (extFieldOcc . unLoc) $ concatMap (cd_fld_names . unLoc) (unLoc flds)
+      Just flds -> map (foExt . unLoc) $ concatMap (cd_fld_names . unLoc) (unLoc flds)
 
 instance Parent (TyClDecl GhcRn) where
   children d
