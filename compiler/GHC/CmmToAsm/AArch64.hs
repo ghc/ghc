@@ -51,6 +51,7 @@ instance Instruction AArch64.Instr where
         mkLoadInstr             = AArch64.mkLoadInstr
         takeDeltaInstr          = AArch64.takeDeltaInstr
         isMetaInstr             = AArch64.isMetaInstr
+        isConditionalInstr      = AArch64.isConditionalInstr
         mkRegRegMoveInstr _     = AArch64.mkRegRegMoveInstr
         takeRegRegMoveInstr     = AArch64.takeRegRegMoveInstr
         mkJumpInstr             = AArch64.mkJumpInstr

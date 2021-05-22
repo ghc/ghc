@@ -31,6 +31,7 @@ module GHC.CmmToAsm.CFG
 
     --Construction/Misc
     , getCfg, getCfgProc, pprEdgeWeights, sanityCheckCfg
+    , revPostorderFrom
 
     --Find backedges and update their weight
     , optimizeCFG

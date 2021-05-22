@@ -21,3 +21,4 @@
 # below.
 
 - ignore: {name: Redundant do, within: [GHC.SysTools.Terminal, GHC.Utils.Binary]}
+- ignore: {name: "Use camelCase"}

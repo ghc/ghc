@@ -16,7 +16,7 @@ module GHC.Utils.Monad
         , concatMapM
         , mapMaybeM
         , fmapMaybeM, fmapEitherM
-        , anyM, allM, orM
+        , anyM, allM, orM, andM
         , foldlM, foldlM_, foldrM
         , maybeMapM
         , whenM, unlessM
@@ -207,6 +207,10 @@ allM f bs = go bs
 -- | Monadic version of or
 orM :: Monad m => m Bool -> m Bool -> m Bool
 orM m1 m2 = m1 >>= \x -> if x then return True else m2
+
+-- | Monadic version of and
+andM :: Monad m => m Bool -> m Bool -> m Bool
+andM m1 m2 = m1 >>= \x -> if x then m2 else return False
 
 -- | Monadic version of foldl that discards its result
 foldlM_ :: (Monad m, Foldable t) => (a -> b -> m a) -> a -> t b -> m ()
