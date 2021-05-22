@@ -95,6 +95,7 @@ import GHC.Types.SrcLoc
 import GHC.Utils.Binary
 import GHC.Utils.Outputable hiding ( (<>) )
 import GHC.Utils.Panic
+import qualified GHC.Data.Strict as Strict
 
 {-
 Note [exact print annotations]
@@ -928,7 +929,7 @@ widenSpan :: SrcSpan -> [AddEpAnn] -> SrcSpan
 widenSpan s as = foldl combineSrcSpans s (go as)
   where
     go [] = []
-    go (AddEpAnn _ (EpaSpan s):rest) = RealSrcSpan s Nothing : go rest
+    go (AddEpAnn _ (EpaSpan s):rest) = RealSrcSpan s Strict.Nothing : go rest
     go (AddEpAnn _ (EpaDelta _):rest) = go rest
 
 -- | The annotations need to all come after the anchor.  Make sure

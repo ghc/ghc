@@ -73,6 +73,7 @@ import qualified Data.Monoid
 import GHC.Parser.Lexer
 import GHC.Parser.Errors
 import GHC.Utils.Misc (mergeListsBy, filterOut, mapLastM, (<&&>))
+import qualified GHC.Data.Strict as Strict
 
 {- Note [Adding Haddock comments to the syntax tree]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1023,7 +1024,8 @@ instance HasHaddock (LocatedA (HsType GhcPs)) where
 --  which it is used.
 data HdkA a =
   HdkA
-    !(Maybe BufSpan) -- Just b  <=> BufSpan occupied by the processed AST element.
+    !(Strict.Maybe BufSpan)
+                     -- Just b  <=> BufSpan occupied by the processed AST element.
                      --             The surrounding computations will not look inside.
                      --
                      -- Nothing <=> No BufSpan (e.g. when the HdkA is constructed by 'pure' or 'liftHdkA').
@@ -1056,9 +1058,9 @@ instance Applicative HdkA where
                                 -- These delim1/delim2 are key to how HdkA operates.
     where
       -- Delimit the LHS by the location information from the RHS
-      delim1 = inLocRange (locRangeTo (fmap @Maybe bufSpanStart l2))
+      delim1 = inLocRange (locRangeTo (fmap @Strict.Maybe bufSpanStart l2))
       -- Delimit the RHS by the location information from the LHS
-      delim2 = inLocRange (locRangeFrom (fmap @Maybe bufSpanEnd l1))
+      delim2 = inLocRange (locRangeFrom (fmap @Strict.Maybe bufSpanEnd l1))
 
   pure a =
     -- Return a value without performing any stateful computation, and without
@@ -1377,14 +1379,14 @@ instance Monoid LocRange where
   mempty = LocRange mempty mempty mempty
 
 -- The location range from the specified position to the end of the file.
-locRangeFrom :: Maybe BufPos -> LocRange
-locRangeFrom (Just l) = mempty { loc_range_from = StartLoc l }
-locRangeFrom Nothing = mempty
+locRangeFrom :: Strict.Maybe BufPos -> LocRange
+locRangeFrom (Strict.Just l) = mempty { loc_range_from = StartLoc l }
+locRangeFrom Strict.Nothing = mempty
 
 -- The location range from the start of the file to the specified position.
-locRangeTo :: Maybe BufPos -> LocRange
-locRangeTo (Just l) = mempty { loc_range_to = EndLoc l }
-locRangeTo Nothing = mempty
+locRangeTo :: Strict.Maybe BufPos -> LocRange
+locRangeTo (Strict.Just l) = mempty { loc_range_to = EndLoc l }
+locRangeTo Strict.Nothing = mempty
 
 -- Represents a predicate on BufPos:
 --
