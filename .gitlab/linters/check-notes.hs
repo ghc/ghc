@@ -4,14 +4,17 @@
 -- XXX JB specify note format here
 
 {-# OPTIONS_GHC -Wall #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE RecordWildCards     #-}
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE LambdaCase    #-}
 
-import           Control.Category ((>>>))
-import           Control.Monad.State.Strict
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE NamedFieldPuns      #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE TupleSections       #-}
+{-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE ViewPatterns        #-}
+
 import           Control.Monad.Except
+import           Control.Monad.Reader
+import           Control.Monad.State.Strict
 
 import           Data.Bifunctor
 import           Data.Either
@@ -32,32 +35,45 @@ beginComment, endComment :: [Text]
 beginComment = ["--", "{-", "#", "//", "/*"]
 endComment = ["-}", "*/"]
 
-data FileLocation = FileLocation { filePath   :: Text
-                                 , lineNumber :: Int
+data FileLocation = FileLocation { filePath   :: !Text
+                                 , lineNumber :: !Int
                                  }
 
-data Line = Line { loc     :: FileLocation
-                 , content :: Text
+newtype RawLine = RawLine { rawLine :: Text }
+
+newtype ErrorMessage = ErrorMessage { msg :: Text }
+
+data Line = Line { location :: !FileLocation
+                 , content  :: !Text
                  }
 
-data Note = Note { noteLine :: Text -- where is the note from?
-                 , noteName :: Text
+data Note = Note { noteLine :: !Line -- where is the note from?
+                 , noteName :: !Text
                  }
 
-data Results = Results { numNotes :: Int
-                       , numRefs  :: Int
+newtype Header = Header { headerNote :: Note }
+newtype Ref = Ref { refNote :: Note }
+
+data Results = Results { numNotes :: !Int
+                       , numRefs  :: !Int
                        }
 
 data Errors = Errors
   { errorTypeInfo :: Text
   -- ^ Some info about the type of error and why it might have been encountered
-  , errorList :: NonEmpty (Maybe Line, Text)
-  -- ^ A list of errors consisting of an error message and possibly a source line
+  , errorList :: NonEmpty (Either RawLine Line, ErrorMessage)
+  -- ^ A list of errors consisting of an error message and either a raw or parsed line
   }
 
--- | Creates a list of parse errors for the given lines
-parseErrors :: NonEmpty Text -> Errors
-parseErrors = undefined
+-- | Creates a list of parse errors for the given list of lines and error
+-- messages
+parseErrors :: NonEmpty (RawLine, ErrorMessage) -> Errors
+parseErrors errorMsgs = Errors {errorTypeInfo, errorList = first Left <$> errorMsgs}
+  where
+
+    errorTypeInfo = "\
+\Some of the provided lines could not be parsed. Please make sure that you\n\
+\are running this script using the provided check-notes.sh bash script."
 
 -- | Creates a list of malformed reference errors for the given lines
 malformedRefs :: NonEmpty Line -> Errors
@@ -71,59 +87,101 @@ printErrors :: Errors -> IO ()
 printErrors = undefined
 
 main :: IO ()
-main = either handleErrors success =<< checkLines . T.lines <$> T.getContents
+main = either handleErrors success =<<
+  checkLines . map RawLine . T.lines <$> T.getContents
 
-checkLines :: MonadError Errors m => [Text] -> m Results
+checkLines :: MonadError Errors m => [RawLine] -> m Results
 checkLines rawLines = do
-  parsedLines <- runStage parseLine parseErrors rawLines
-  notes       <- runStage parseNote malformedRefs parsedLines
-  headers     <- runStage parseHeader danglingRefs parsedLines
+  parsedLines <- runStage parseLine   parseErrors   rawLines
+  notes       <- runStage parseNotes  malformedRefs parsedLines
   undefined
-
-parseNote = undefined
 
 runStage :: MonadError Errors m
          => (t -> Except e a)      -- ^ extract an `a` from a `t`
          -> (NonEmpty e -> Errors) -- ^ collect errors into an Errors value
          -> [t]                    -- ^ list of `t`s to extract from
          -> m [a]
-runStage f collect = map (runExcept . f) >>> partitionEithers >>> \case
-  ([]  , res) -> pure res
-  (e:es, _  ) -> throwError $ collect (e :| es)
+runStage stage collect = go . partitionEithers . map (runExcept . stage)
+  where go ([]  , res) = pure res
+        go (e:es, _  ) = throwError $ collect (e :| es)
+
+-- Get the text from the state, parse it, return the result and put the
+-- remaining text back into the state
+statefully :: (MonadState Text m, MonadError e m, MonadReader (Text -> e) m)
+           => T.Reader a -> m a
+statefully parser = parser <$> get >>= \case
+  Left err        -> ask >>= \errFun -> throwError . errFun . T.pack $ err
+  Right (x, rest) -> put rest *> pure x
+
+parseText :: (MonadState Text m, MonadError e m, MonadReader (Text -> e) m)
+          => Text -> m ()
+parseText text = statefully $ \case
+  (T.stripPrefix text -> Just rest) -> Right ((), rest)
+  _                                 -> Left $ "Missing " <> T.unpack text
 
 -- | Parses lines in the format `filePath:lineNumber:lineContent`
-parseLine :: MonadError Text m => Text -> m Line
-parseLine line = flip evalStateT line $ do
-  filePath   <- stateful parseFilePath <* colon
-  lineNumber <- stateful T.decimal     <* colon
+parseLine :: MonadError (RawLine, ErrorMessage) m => RawLine -> m Line
+parseLine line = flip evalStateT (rawLine line) . flip runReaderT parseError $ do
+  filePath   <- statefully parseFilePath <* parseText ",:"
+  lineNumber <- statefully T.decimal     <* parseText ":"
   content    <- get
-  pure Line {loc = FileLocation {..}, ..}
+  pure Line {location = FileLocation {filePath, lineNumber}, content}
 
   where
-    -- get the text from the state, parse it, return the result and put the
-    -- remaining text back into the state
-    stateful :: (MonadState Text m, MonadError Text m) => T.Reader a -> m a
-    stateful reader = get >>=
-      either (parseError . T.pack) (\(x, r) -> put r *> pure x) . reader
-
-    colon :: (MonadState Text m, MonadError Text m) => m ()
-    colon = get >>=
-      maybe (parseError "Missing colon") put . (T.stripPrefix ":")
-
     parseFilePath :: T.Reader Text
     parseFilePath = Right . T.break (== ':')
 
-    parseError :: MonadError Text m => Text -> m a
-    parseError text = throwError $ "Parse error: " <> text <> " in the line\n" <> line
+    parseError :: Text -> (RawLine, ErrorMessage)
+    parseError msg = (line, ErrorMessage $ "Parse error: " <> msg)
 
-noteErrors :: [(FileLocation, Text)] -- ^ All lines that contain a note
-           -> Either Errors Results
-noteErrors = undefined
+-- | Parses a line and produces either a header or a list of note references
+-- the line contains
+-- Some references may look like headers, if they are the only text in their
+-- line (with the exception of comment delimiters). In those cases, this
+-- function will return a Header.
+-- This can potentially result in some dangling references going unnoticed, but
+-- it will never lead to additional (incorrect) error messages.
+parseNotes :: MonadError Line m => Line -> m (Either Header [Ref])
+parseNotes Line {content} = flip evalStateT content $ do
+  -- We don't care about header errors, just try to interpret the line as
+  -- references instead
+  (Left <$> parseHeader) `catchError` const (Right <$> parseRefs)
+  where
+    parseHeader :: (MonadError Line m, MonadState Text m) => m Header
+    parseHeader = undefined
+
+    parseRefs = undefined
+
+    parseNote :: (MonadError Line m, MonadState Text m) => m Note
+    parseNote = undefined
 
 success :: Results -> IO ()
-success Results {..} = do
-  printf "OK, checked %d notes and %d references.\n" numNotes numRefs
+success Results {numNotes, numRefs} = do
+  printf "OK, found %d notes and %d references.\n" numNotes numRefs
   exitSuccess
 
 handleErrors :: Errors -> IO ()
-handleErrors = undefined
+handleErrors Errors {errorTypeInfo, errorList} = do
+  forM_ errorList $ \err -> printError err *> printLnStdErr ""
+  printStdErr errorTypeInfo
+  where
+    printStdErr = T.hPutStr stderr
+    printLnStdErr = T.hPutStrLn stderr
+
+    printError (line, ErrorMessage msg) = do
+      printStdErr (red msg)
+      case line of
+        Left RawLine {rawLine} -> do
+          printLnStdErr " in the line"
+          printLnStdErr rawLine
+        Right Line {location, content} -> do
+          printLnStdErr (locationText location)
+          printLnStdErr content
+
+    -- surround with ANSI escape sequence for red color (and back to normal
+    -- color)
+    red :: Text -> Text
+    red text = "\ESC[31m" <> text <> "\ESC[0m"
+
+    locationText FileLocation {filePath, lineNumber} =
+      "  in file " <> filePath <> ", line " <> T.pack (show lineNumber) <> ":"
