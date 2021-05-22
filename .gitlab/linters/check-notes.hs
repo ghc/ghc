@@ -52,6 +52,7 @@ data Note = Note { noteLine :: !Line -- where is the note from?
                  }
 
 newtype Header = Header { headerNote :: Note }
+
 newtype Ref = Ref { refNote :: Note }
 
 data Results = Results { numNotes :: !Int
@@ -117,12 +118,12 @@ parseText :: (MonadState Text m, MonadError e m, MonadReader (Text -> e) m)
           => Text -> m ()
 parseText text = statefully $ \case
   (T.stripPrefix text -> Just rest) -> Right ((), rest)
-  _                                 -> Left $ "Missing " <> T.unpack text
+  _                                 -> Left $ "Missing " <> show (T.unpack text)
 
 -- | Parses lines in the format `filePath:lineNumber:lineContent`
 parseLine :: MonadError (RawLine, ErrorMessage) m => RawLine -> m Line
 parseLine line = flip evalStateT (rawLine line) . flip runReaderT parseError $ do
-  filePath   <- statefully parseFilePath <* parseText ",:"
+  filePath   <- statefully parseFilePath <* parseText ":"
   lineNumber <- statefully T.decimal     <* parseText ":"
   content    <- get
   pure Line {location = FileLocation {filePath, lineNumber}, content}
@@ -149,6 +150,12 @@ parseNotes Line {content} = flip evalStateT content $ do
   where
     parseHeader :: (MonadError Line m, MonadState Text m) => m Header
     parseHeader = undefined
+    -- XXX JB Why is undefined not defined with errorWithoutStackTrace
+    -- also source for error says that popCallStack depends on error, but it
+    -- actually depends on errorWithoutStackTrace
+    -- maybe open a merge request about that
+    -- and first check the commit from git blame to make sure popCallStack
+    -- really did contain error at that point
 
     parseRefs = undefined
 
