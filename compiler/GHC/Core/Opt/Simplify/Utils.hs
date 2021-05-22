@@ -425,7 +425,8 @@ contIsDupable _                                 = False
 contIsTrivial :: SimplCont -> Bool
 contIsTrivial (Stop {})                                         = True
 contIsTrivial (ApplyToTy { sc_cont = k })                       = contIsTrivial k
-contIsTrivial (ApplyToVal { sc_arg = Coercion _, sc_cont = k }) = contIsTrivial k
+-- This one doesn't look right.  A value application is not trivial
+-- contIsTrivial (ApplyToVal { sc_arg = Coercion _, sc_cont = k }) = contIsTrivial k
 contIsTrivial (CastIt _ k)                                      = contIsTrivial k
 contIsTrivial _                                                 = False
 
