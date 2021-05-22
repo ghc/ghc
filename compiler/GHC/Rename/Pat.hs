@@ -803,7 +803,7 @@ getFieldIds flds = map (hsRecFieldSel . unLoc) flds
 
 getFieldLbls :: forall p arg . UnXRec p => [LHsRecField p arg] -> [RdrName]
 getFieldLbls flds
-  = map (unLoc . rdrNameFieldOcc . unXRec @p . hfbLHS . unXRec @p) flds
+  = map (unXRec @p . foLabel . unXRec @p . hfbLHS . unXRec @p) flds
 
 getFieldUpdLbls :: [LHsRecUpdField GhcPs] -> [RdrName]
 getFieldUpdLbls flds = map (rdrNameAmbiguousFieldOcc . unLoc . hfbLHS . unLoc) flds
