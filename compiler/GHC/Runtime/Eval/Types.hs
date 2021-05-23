@@ -5,6 +5,7 @@
 -- Running statements interactively
 --
 -- -----------------------------------------------------------------------------
+{-# LANGUAGE CPP #-}
 
 module GHC.Runtime.Eval.Types (
         Resume(..), History(..), ExecResult(..),
@@ -46,7 +47,12 @@ isStep _ = True
 
 data ExecResult
   = ExecComplete
-       { execResult :: Either SomeException [Name]
+       {
+#if __GLASGOW_HASKELL__ >= 903
+          execResult :: Either SomeExceptionWithLocation [Name]
+#else
+         execResult :: Either SomeException [Name]
+#endif
        , execAllocation :: Word64
        }
   | ExecBreak

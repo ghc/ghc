@@ -109,7 +109,11 @@ data GhcException
   | PprProgramError String SDoc
 
 instance Exception GhcException where
+#if __GLASGOW_HASKELL__ >= 903
+  fromException (SomeExceptionWithLocation _ e)
+#else
   fromException (SomeException e)
+#endif
     | Just ge <- cast e = Just ge
     | Just pge <- cast e = Just $
         case pge of
@@ -195,7 +199,11 @@ pgmErrorDoc x doc = throwGhcException (PprProgramError x doc)
 -- | Like try, but pass through UserInterrupt and Panic exceptions.
 --   Used when we want soft failures when reading interface files, for example.
 --   TODO: I'm not entirely sure if this is catching what we really want to catch
+#if __GLASGOW_HASKELL__ >= 903
+tryMost :: IO a -> IO (Either SomeExceptionWithLocation a)
+#else
 tryMost :: IO a -> IO (Either SomeException a)
+#endif
 tryMost action = do r <- try action
                     case r of
                         Left se ->

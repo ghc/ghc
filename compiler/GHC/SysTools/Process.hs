@@ -281,7 +281,11 @@ builderMainLoop logger filter_fn pgm real_args mb_cwd mb_env = do
             inner hProcess
         case r of
           -- onException
+#if __GLASGOW_HASKELL__ >= 903
+          Left (SomeExceptionWithLocation _ e) -> do
+#else
           Left (SomeException e) -> do
+#endif
             terminateProcess hProcess
             cleanup_handles
             throw e

@@ -408,13 +408,25 @@ data SerializableException
   | EOtherException String
   deriving (Generic, Show)
 
+#if __GLASGOW_HASKELL__ >= 903
 toSerializableException :: SomeExceptionWithLocation -> SerializableException
+#else
+toSerializableException :: SomeException -> SerializableException
+#endif
 toSerializableException ex
   | Just UserInterrupt <- fromException ex  = EUserInterrupt
   | Just (ec::ExitCode) <- fromException ex = (EExitCode ec)
+#if __GLASGOW_HASKELL__ >= 903
   | otherwise = EOtherException (show (ex :: SomeExceptionWithLocation))
+#else
+  | otherwise = EOtherException (show (ex :: SomeException))
+#endif
 
+#if __GLASGOW_HASKELL__ >= 903
 fromSerializableException :: SerializableException -> SomeExceptionWithLocation
+#else
+fromSerializableException :: SerializableException -> SomeException
+#endif
 fromSerializableException EUserInterrupt = toException UserInterrupt
 fromSerializableException (EExitCode c) = toException c
 fromSerializableException (EOtherException str) = toException (ErrorCall str)

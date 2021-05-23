@@ -7,7 +7,6 @@ module GHC.Exception.Backtrace
     ) where
 
 import GHC.Base
-import GHC.Show
 
 data Backtrace
 
