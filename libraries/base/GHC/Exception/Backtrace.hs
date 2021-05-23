@@ -67,7 +67,7 @@ data BacktraceMechanism
       -- ^ use execution stack unwinding with given limit
 
 showBacktraces :: [Backtrace] -> String
-showBacktraces bts = 
+showBacktraces bts =
     unlines $ intersperse "" $ map show bts
 
 currentBacktraceMechanism :: IORef [BacktraceMechanism]
@@ -96,4 +96,5 @@ collectBacktrace' CostCenterBacktraceMech = do
     -- TODO: is the unit here safe? Is this dummy argument really needed? Why
     -- isn't the state token sufficient?
     return $ if ptr == nullPtr then Nothing else Just (CostCenterBacktrace ptr)
-collectBacktrace' (ExecutionStackBacktraceMech n) = fmap ExecutionBacktrace `fmap` getStackTrace
+-- TODO: (Ptr GHC.Stack.CCS.CostCentreStack) really not needed here?
+collectBacktrace' (ExecutionStackBacktraceMech _) = fmap ExecutionBacktrace `fmap` getStackTrace

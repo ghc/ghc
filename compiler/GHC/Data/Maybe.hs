@@ -1,4 +1,4 @@
-
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE KindSignatures #-}
@@ -30,7 +30,11 @@ import GHC.IO (catchException)
 
 import Control.Monad
 import Control.Monad.Trans.Maybe
+#if __GLASGOW_HASKELL__ >= 903
+import Control.Exception (SomeExceptionWithLocation(..))
+#else
 import Control.Exception (SomeException(..))
+#endif
 import Data.Maybe
 import Data.Foldable ( foldlM )
 import GHC.Utils.Misc (HasCallStack)
@@ -96,8 +100,11 @@ liftMaybeT act = MaybeT $ Just `liftM` act
 tryMaybeT :: IO a -> MaybeT IO a
 tryMaybeT action = MaybeT $ catchException (Just `fmap` action) handler
   where
+#if __GLASGOW_HASKELL__ >= 903
+    handler (SomeExceptionWithLocation _ _) = return Nothing
+#else
     handler (SomeException _) = return Nothing
-
+#endif
 {-
 ************************************************************************
 *                                                                      *
