@@ -27,13 +27,10 @@ import GHC.Types.Id.Info ( JoinArity )
 import GHC.Core.DataCon
 import GHC.Types.Demand
 import GHC.Types.Cpr
-import GHC.Core.Make     ( mkAbsentErrorApp, mkCoreUbxTup, mkCoreApp, mkCoreLet
-                         , mkWildValBinder )
+import GHC.Core.Make     ( mkAbsentErrorApp, mkCoreUbxTup, mkWildValBinder )
 import GHC.Types.Id.Make ( voidArgId, voidPrimId )
 import GHC.Builtin.Types ( tupleDataCon )
 import GHC.Types.Literal ( mkLitRubbish )
-import GHC.Types.Var.Env ( mkInScopeSet )
-import GHC.Types.Var.Set ( VarSet )
 import GHC.Core.Type
 import GHC.Core.Multiplicity
 import GHC.Core.Predicate ( isClassPred )
@@ -44,7 +41,6 @@ import GHC.Types.Basic       ( Boxity(..) )
 import GHC.Core.TyCon
 import GHC.Core.TyCon.RecWalk
 import GHC.Types.Unique.Supply
-import GHC.Types.Unique
 import GHC.Types.Name ( getOccFS )
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
@@ -156,12 +152,32 @@ type WwResult
 nop_fn :: CoreExpr -> CoreExpr
 nop_fn body = body
 
+-- | Given a function definition
+--
+-- > f :: Tx -> Ty -> Tres
+-- > f x y = E
+--
+-- @mkWwBodies _ 'f' ['x','y'] 'Tres' [dmda, dmdb] cpr@ computes
+--   * the wrapper body context @W[_] :: Id -> CoreExpr@ for the call to the
+--     worker function, lacking only the 'Id' for the worker function and
+--     capturing wrapper args x and y by name. Also reboxes the result from
+--     transit variables according to @cpr@.
+--   * the worker body context @w[_] :: CoreExpr -> CoreExpr@ that wraps around
+--     its hole (which is to be filled with the original function body E)
+--     reboxing defns for x and y, as well as returning transit variables of
+--     an unboxed result in an unboxed tuple.
+--   * Id details for the worker function like demands on arguments and its join
+--     arity.
+--
+-- All without looking at E.
+--
 mkWwBodies :: WwOpts
-           -> VarSet         -- Free vars of RHS
-                             -- See Note [Freshen WW arguments]
-           -> Id             -- The original function
-           -> [Demand]       -- Strictness of original function
-           -> Cpr            -- Info about function result
+           -> Id             -- ^ The original function
+           -> [Var]          -- ^ Manifest args of original function
+           -> Type           -- ^ Result type of the original function,
+                             --   after being stripped of args
+           -> [Demand]       -- ^ Strictness of original function
+           -> Cpr            -- ^ Info about function result
            -> UniqSM (Maybe WwResult)
 
 -- wrap_fn_args E       = \x y -> E
@@ -175,27 +191,26 @@ mkWwBodies :: WwOpts
 --                        let x = (a,b) in
 --                        E
 
-mkWwBodies opts rhs_fvs fun_id demands cpr_info
-  = do  { let empty_subst = mkEmptyTCvSubst (mkInScopeSet rhs_fvs)
-                -- See Note [Freshen WW arguments]
+mkWwBodies opts fun_id arg_vars body_ty demands body_cpr
+  = do  { massertPpr (filter isId arg_vars `equalLength` demands)
+                     (text "wrong wrapper arity" $$ ppr arg_vars $$ ppr demands)
 
-        ; (wrap_args, wrap_fn_args, work_fn_args, res_ty)
-             <- mkWWargs empty_subst fun_ty demands
         ; (useful1, work_args, wrap_fn_str, work_fn_str)
-             <- mkWWstr opts inlineable_flag wrap_args
+             <- mkWWstr opts inlineable_flag arg_vars
 
         -- Do CPR w/w.  See Note [Always do CPR w/w]
         ; (useful2, wrap_fn_cpr, work_fn_cpr, cpr_res_ty)
-              <- mkWWcpr_entry opts res_ty cpr_info
+              <- mkWWcpr_entry opts body_ty body_cpr
 
         ; let (work_lam_args, work_call_args) = mkWorkerArgs fun_id (wo_fun_to_thunk opts)
                                                              work_args cpr_res_ty
+              call_worker work_fn = mkVarApps (Var work_fn) work_call_args
+              wrapper_body = wrap_fn_cpr . wrap_fn_str . call_worker
+              worker_body = mkLams work_lam_args . work_fn_str . work_fn_cpr
               worker_args_dmds = [idDemandInfo v | v <- work_call_args, isId v]
-              wrapper_body = wrap_fn_args . wrap_fn_cpr . wrap_fn_str . applyToVars work_call_args . Var
-              worker_body = mkLams work_lam_args. work_fn_str . work_fn_cpr . work_fn_args
 
         ; if isWorkerSmallEnough (wo_max_worker_args opts) (length demands) work_args
-             && not (too_many_args_for_join_point wrap_args)
+             && not (too_many_args_for_join_point arg_vars)
              && ((useful1 && not only_one_void_argument) || useful2)
           then return (Just (worker_args_dmds, length work_call_args,
                        wrapper_body, worker_body))
@@ -209,7 +224,6 @@ mkWwBodies opts rhs_fvs fun_id demands cpr_info
         -- f's RHS is now trivial (size 1) we still want the __inline__ to prevent
         -- fw from being inlined into f's RHS
   where
-    fun_ty        = idType fun_id
     mb_join_arity = isJoinId_maybe fun_id
     inlineable_flag -- See Note [Do not unpack class dictionaries]
       | isStableUnfolding (realIdUnfolding fun_id) = MaybeArgOfInlineableFun
@@ -218,8 +232,8 @@ mkWwBodies opts rhs_fvs fun_id demands cpr_info
     -- Note [Do not split void functions]
     only_one_void_argument
       | [d] <- demands
-      , Just (_, arg_ty1, _) <- splitFunTy_maybe fun_ty
-      , isAbsDmd d && isVoidTy arg_ty1
+      , [v] <- filter isId arg_vars
+      , isAbsDmd d && isVoidTy (idType v)
       = True
       | otherwise
       = False
@@ -234,6 +248,7 @@ mkWwBodies opts rhs_fvs fun_id demands cpr_info
         True
       | otherwise
       = False
+
 
 -- See Note [Limit w/w arity]
 isWorkerSmallEnough :: Int -> Int -> [Var] -> Bool
@@ -410,116 +425,8 @@ have to be concerned about.
 FIXME Currently the functionality to produce "eta-contracted" wrappers is
 unimplemented; we simply give up.
 
-************************************************************************
-*                                                                      *
-\subsection{Coercion stuff}
-*                                                                      *
-************************************************************************
-
-We really want to "look through" coerces.
-Reason: I've seen this situation:
-
-        let f = coerce T (\s -> E)
-        in \x -> case x of
-                    p -> coerce T' f
-                    q -> \s -> E2
-                    r -> coerce T' f
-
-If only we w/w'd f, we'd get
-        let f = coerce T (\s -> fw s)
-            fw = \s -> E
-        in ...
-
-Now we'll inline f to get
-
-        let fw = \s -> E
-        in \x -> case x of
-                    p -> fw
-                    q -> \s -> E2
-                    r -> fw
-
-Now we'll see that fw has arity 1, and will arity expand
-the \x to get what we want.
--}
-
--- mkWWargs just does eta expansion
--- is driven off the function type and arity.
--- It chomps bites off foralls, arrows, newtypes
--- and keeps repeating that until it's satisfied the supplied arity
-
-mkWWargs :: TCvSubst            -- Freshening substitution to apply to the type
-                                --   See Note [Freshen WW arguments]
-         -> Type                -- The type of the function
-         -> [Demand]     -- Demands and one-shot info for value arguments
-         -> UniqSM  ([Var],            -- Wrapper args
-                     CoreExpr -> CoreExpr,      -- Wrapper fn
-                     CoreExpr -> CoreExpr,      -- Worker fn
-                     Type)                      -- Type of wrapper body
-
-mkWWargs subst fun_ty demands
-  | null demands
-  = return ([], nop_fn, nop_fn, substTy subst fun_ty)
-
-  | (dmd:demands') <- demands
-  , Just (mult, arg_ty, fun_ty') <- splitFunTy_maybe fun_ty
-  = do  { uniq <- getUniqueM
-        ; let arg_ty' = substScaledTy subst (Scaled mult arg_ty)
-              id = mk_wrap_arg uniq arg_ty' dmd
-        ; (wrap_args, wrap_fn_args, work_fn_args, res_ty)
-              <- mkWWargs subst fun_ty' demands'
-        ; return (id : wrap_args,
-                  Lam id . wrap_fn_args,
-                  apply_or_bind_then work_fn_args (varToCoreExpr id),
-                  res_ty) }
-
-  | Just (tv, fun_ty') <- splitForAllTyCoVar_maybe fun_ty
-  = do  { uniq <- getUniqueM
-        ; let (subst', tv') = cloneTyVarBndr subst tv uniq
-                -- See Note [Freshen WW arguments]
-        ; (wrap_args, wrap_fn_args, work_fn_args, res_ty)
-             <- mkWWargs subst' fun_ty' demands
-        ; return (tv' : wrap_args,
-                  Lam tv' . wrap_fn_args,
-                  apply_or_bind_then work_fn_args (mkTyArg (mkTyVarTy tv')),
-                  res_ty) }
-
-  | Just (co, rep_ty) <- topNormaliseNewType_maybe fun_ty
-        -- The newtype case is for when the function has
-        -- a newtype after the arrow (rare)
-        --
-        -- It's also important when we have a function returning (say) a pair
-        -- wrapped in a  newtype, at least if CPR analysis can look
-        -- through such newtypes, which it probably can since they are
-        -- simply coerces.
-
-  = do { (wrap_args, wrap_fn_args, work_fn_args, res_ty)
-            <-  mkWWargs subst rep_ty demands
-       ; let co' = substCo subst co
-       ; return (wrap_args,
-                  \e -> Cast (wrap_fn_args e) (mkSymCo co'),
-                  \e -> work_fn_args (Cast e co'),
-                  res_ty) }
-
-  | otherwise
-  = warnPprTrace True (ppr fun_ty) $                  -- Should not happen: if there is a demand
-    return ([], nop_fn, nop_fn, substTy subst fun_ty) -- then there should be a function arrow
-  where
-    -- See Note [Join points and beta-redexes]
-    apply_or_bind_then k arg (Lam bndr body)
-      = mkCoreLet (NonRec bndr arg) (k body)    -- Important that arg is fresh!
-    apply_or_bind_then k arg fun
-      = k $ mkCoreApp (text "mkWWargs") fun arg
-
-applyToVars :: [Var] -> CoreExpr -> CoreExpr
-applyToVars vars fn = mkVarApps fn vars
-
-mk_wrap_arg :: Unique -> Scaled Type -> Demand -> Id
-mk_wrap_arg uniq (Scaled w ty) dmd
-  = mkSysLocalOrCoVar (fsLit "w") uniq w ty
-       `setIdDemandInfo` dmd
-
-{- Note [Freshen WW arguments]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Freshen WW arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Wen we do a worker/wrapper split, we must not in-scope names as the arguments
 of the worker, else we'll get name capture.  E.g.
 
