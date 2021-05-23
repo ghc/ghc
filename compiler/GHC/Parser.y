@@ -64,6 +64,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Misc          ( looksLikePackageName, fstOf3, sndOf3, thdOf3 )
 import GHC.Utils.Panic
 import GHC.Prelude
+import qualified GHC.Data.Strict as Strict
 
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Occurrence ( varName, dataName, tcClsName, tvName, occNameFS, mkVarOcc, occNameString)
@@ -2879,7 +2880,7 @@ aexp2   :: { ECP }
         -- but the less cluttered version fell out of having texps.
         | '(' texp ')'                  { ECP $
                                            unECP $2 >>= \ $2 ->
-                                           mkHsParPV (comb2 $1 $>) $2 (AnnParen AnnParens (glAA $1) (glAA $3)) }
+                                           mkHsParPV (comb2 $1 $>) (hsTok $1) $2 (hsTok $3) }
         | '(' tup_exprs ')'             { ECP $
                                            $2 >>= \ $2 ->
                                            mkSumOrTuplePV (noAnnSrcSpan $ comb2 $1 $>) Boxed $2
@@ -4091,9 +4092,9 @@ looksLikeMult :: LHsType GhcPs -> LocatedN RdrName -> LHsType GhcPs -> Bool
 looksLikeMult ty1 l_op ty2
   | Unqual op_name <- unLoc l_op
   , occNameFS op_name == fsLit "%"
-  , Just ty1_pos <- getBufSpan (getLocA ty1)
-  , Just pct_pos <- getBufSpan (getLocA l_op)
-  , Just ty2_pos <- getBufSpan (getLocA ty2)
+  , Strict.Just ty1_pos <- getBufSpan (getLocA ty1)
+  , Strict.Just pct_pos <- getBufSpan (getLocA l_op)
+  , Strict.Just ty2_pos <- getBufSpan (getLocA ty2)
   , bufSpanEnd ty1_pos /= bufSpanStart pct_pos
   , bufSpanEnd pct_pos == bufSpanStart ty2_pos
   = True
@@ -4230,8 +4231,9 @@ acsFinal a = do
   csf <- getFinalCommentsFor l
   meof <- getEofPos
   let ce = case meof of
-             Nothing  -> EpaComments []
-             Just (pos, gap) -> EpaCommentsBalanced [] [L (realSpanAsAnchor pos) (EpaComment EpaEofComment gap)]
+             Strict.Nothing  -> EpaComments []
+             Strict.Just (pos `Strict.And` gap) ->
+               EpaCommentsBalanced [] [L (realSpanAsAnchor pos) (EpaComment EpaEofComment gap)]
   return (a (cs Semi.<> csf Semi.<> ce))
 
 acsa :: MonadP m => (EpAnnComments -> LocatedAn t a) -> m (LocatedAn t a)
@@ -4340,6 +4342,9 @@ hsDoAnn (L l _) (L ll _) kw
 listAsAnchor :: [LocatedAn t a] -> Anchor
 listAsAnchor [] = spanAsAnchor noSrcSpan
 listAsAnchor (L l _:_) = spanAsAnchor (locA l)
+
+hsTok :: Located Token -> LHsToken tok GhcPs
+hsTok (L l _) = L (EpAnn (Anchor (realSrcSpan l) UnchangedAnchor) NoEpAnns emptyComments) HsTok
 
 -- -------------------------------------
 

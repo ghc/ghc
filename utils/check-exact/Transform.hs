@@ -1135,11 +1135,11 @@ instance HasDecls (LocatedA (HsExpr GhcPs)) where
         return (L ll (HsLet x' binds' ex'))
 
   -- TODO: does this make sense? Especially as no hsDecls for HsPar
-  replaceDecls (L l (HsPar x e)) newDecls
+  replaceDecls (L l (HsPar x lpar e rpar)) newDecls
     = do
         logTr "replaceDecls HsPar"
         e' <- replaceDecls e newDecls
-        return (L l (HsPar x e'))
+        return (L l (HsPar x lpar e' rpar))
   replaceDecls old _new = error $ "replaceDecls (LHsExpr GhcPs) undefined for:" ++ showGhc old
 
 -- ---------------------------------------------------------------------

@@ -270,7 +270,7 @@ dsExpr (HsRecSel _ (FieldOcc id _))    = dsHsVar id
 dsExpr (HsUnboundVar (HER ref _ _) _)  = dsEvTerm =<< readMutVar ref
         -- See Note [Holes] in GHC.Tc.Types.Constraint
 
-dsExpr (HsPar _ e)            = dsLExpr e
+dsExpr (HsPar _ _ e _)        = dsLExpr e
 dsExpr (ExprWithTySig _ e _)  = dsLExpr e
 
 dsExpr (HsIPVar {})           = panic "dsExpr: HsIPVar"
@@ -1235,7 +1235,7 @@ dsHsWrapped :: HsExpr GhcTc -> DsM CoreExpr
 dsHsWrapped orig_hs_expr
   = go idHsWrapper orig_hs_expr
   where
-    go wrap (HsPar _ (L _ hs_e))
+    go wrap (HsPar _ _ (L _ hs_e) _)
        = go wrap hs_e
     go wrap1 (XExpr (WrapExpr (HsWrap wrap2 hs_e)))
        = go (wrap1 <.> wrap2) hs_e

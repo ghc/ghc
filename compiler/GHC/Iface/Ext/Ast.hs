@@ -59,6 +59,7 @@ import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 import GHC.Data.Maybe
 import GHC.Data.FastString
+import qualified GHC.Data.Strict as Strict
 
 import GHC.Iface.Ext.Types
 import GHC.Iface.Ext.Utils
@@ -352,7 +353,7 @@ enrichHie ts (hsGrp, imports, exports, _) ev_bs insts tcs =
           top_ev_asts :: [HieAST Type] <- do
             let
               l :: SrcSpanAnnA
-              l = noAnnSrcSpan (RealSrcSpan (realSrcLocSpan $ mkRealSrcLoc file 1 1) Nothing)
+              l = noAnnSrcSpan (RealSrcSpan (realSrcLocSpan $ mkRealSrcLoc file 1 1) Strict.Nothing)
             toHie $ EvBindContext ModuleScope Nothing
                   $ L l (EvBinds ev_bs)
 
@@ -961,7 +962,7 @@ instance HiePass p => ToHie (PScoped (LocatedA (Pat (GhcPass p)))) where
                     lname
         , toHie $ PS rsp scope pscope pat
         ]
-      ParPat _ pat ->
+      ParPat _ _ pat _ ->
         [ toHie $ PS rsp scope pscope pat
         ]
       BangPat _ pat ->
@@ -1111,7 +1112,7 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
       NegApp _ a _ ->
         [ toHie a
         ]
-      HsPar _ a ->
+      HsPar _ _ a _ ->
         [ toHie a
         ]
       SectionL _ a b ->
@@ -1414,7 +1415,7 @@ instance HiePass p => ToHie (LocatedA (HsCmd (GhcPass p))) where
       HsCmdLam _ mg ->
         [ toHie mg
         ]
-      HsCmdPar _ a ->
+      HsCmdPar _ _ a _ ->
         [ toHie a
         ]
       HsCmdCase _ expr alts ->
