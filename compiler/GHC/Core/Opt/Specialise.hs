@@ -47,7 +47,6 @@ import GHC.Types.Unique.Supply
 import GHC.Types.Unique.DFM
 import GHC.Types.Name
 import GHC.Types.Tickish
-import GHC.Types.RepType  ( typeMonoPrimRep_maybe )
 import GHC.Types.Id.Make  ( voidArgId, voidPrimId )
 import GHC.Types.Var      ( isLocalVar )
 import GHC.Types.Literal  ( mkLitRubbish )
@@ -2346,7 +2345,7 @@ specHeader env (bndr : bndrs) (UnspecArg : args)
              -- C.f. GHC.Core.Opt.WorkWrap.Utils.mk_absent_let
              (mb_spec_bndr, spec_arg)
                 | isDeadBinder bndr
-                , Just reps <- typeMonoPrimRep_maybe bndr_ty
+                , let reps = getRuntimeRep bndr_ty
                 = (Nothing, mkTyApps (Lit (mkLitRubbish reps)) [bndr_ty])
                 | otherwise
                 = (Just bndr', varToCoreExpr bndr')
