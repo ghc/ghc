@@ -27,7 +27,6 @@ module GHC.Driver.Session (
         FatalMessager, FlushOut(..), FlushErr(..),
         ProfAuto(..),
         glasgowExtsFlags,
-        warningGroups, warningHierarchies,
         hasPprDebug, hasNoDebugOutput, hasNoStateHack, hasNoOptCoercion,
         dopt, dopt_set, dopt_unset,
         gopt, gopt_set, gopt_unset, setGeneralFlag', unSetGeneralFlag',
@@ -63,7 +62,6 @@ module GHC.Driver.Session (
         setFlagsFromEnvFile,
         pprDynFlagsDiff,
         flagSpecOf,
-        smallestGroups,
 
         targetProfile,
 
@@ -268,6 +266,7 @@ import Control.Monad.Trans.Except
 import Data.Ord
 import Data.Char
 import Data.List (intercalate, sortBy)
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Set as Set
 import System.FilePath
 import System.Directory
@@ -2972,6 +2971,17 @@ flagSpec' :: String -> flag -> (TurnOnFlag -> DynP ())
           -> (Deprecation, FlagSpec flag)
 flagSpec' name flag act = (NotDeprecated, FlagSpec name flag act AllModes)
 
+-- | Define a warning flag.
+warnSpec :: WarningFlag -> [(Deprecation, FlagSpec WarningFlag)]
+warnSpec flag = warnSpec' flag nop
+
+-- | Define a warning flag with an effect.
+warnSpec' :: WarningFlag -> (TurnOnFlag -> DynP ())
+          -> [(Deprecation, FlagSpec WarningFlag)]
+warnSpec' flag act = [ (NotDeprecated, FlagSpec name flag act AllModes)
+                     | name <- NE.toList (warnFlagNames flag)
+                     ]
+
 -- | Define a new deprecated flag with an effect.
 depFlagSpecOp :: String -> flag -> (TurnOnFlag -> DynP ()) -> String
             -> (Deprecation, FlagSpec flag)
@@ -2982,6 +2992,19 @@ depFlagSpecOp name flag act dep =
 depFlagSpec :: String -> flag -> String
             -> (Deprecation, FlagSpec flag)
 depFlagSpec name flag dep = depFlagSpecOp name flag nop dep
+
+-- | Define a deprecated warning flag.
+depWarnSpec :: WarningFlag -> String
+            -> [(Deprecation, FlagSpec WarningFlag)]
+depWarnSpec flag dep = [ depFlagSpecOp name flag nop dep
+                       | name <- NE.toList (warnFlagNames flag)
+                       ]
+
+-- | Define a deprecated warning name substituted by another.
+subWarnSpec :: String -> WarningFlag -> String
+            -> [(Deprecation, FlagSpec WarningFlag)]
+subWarnSpec oldname flag dep = [ depFlagSpecOp oldname flag nop dep ]
+
 
 -- | Define a new deprecated flag with an effect where the deprecation message
 -- depends on the flag value
@@ -3084,121 +3107,112 @@ wWarningFlags :: [FlagSpec WarningFlag]
 wWarningFlags = map snd (sortBy (comparing fst) wWarningFlagsDeps)
 
 wWarningFlagsDeps :: [(Deprecation, FlagSpec WarningFlag)]
-wWarningFlagsDeps = [
+wWarningFlagsDeps = mconcat [
 -- See Note [Updating flag description in the User's Guide]
 -- See Note [Supporting CLI completion]
 -- Please keep the list of flags below sorted alphabetically
-  flagSpec "alternative-layout-rule-transitional"
-                                      Opt_WarnAlternativeLayoutRuleTransitional,
-  flagSpec "ambiguous-fields"            Opt_WarnAmbiguousFields,
-  depFlagSpec "auto-orphans"             Opt_WarnAutoOrphans
-    "it has no effect",
-  flagSpec "cpp-undef"                   Opt_WarnCPPUndef,
-  flagSpec "unbanged-strict-patterns"    Opt_WarnUnbangedStrictPatterns,
-  flagSpec "deferred-type-errors"        Opt_WarnDeferredTypeErrors,
-  flagSpec "deferred-out-of-scope-variables"
-                                         Opt_WarnDeferredOutOfScopeVariables,
-  flagSpec "deprecations"                Opt_WarnWarningsDeprecations,
-  flagSpec "deprecated-flags"            Opt_WarnDeprecatedFlags,
-  flagSpec "deriving-defaults"           Opt_WarnDerivingDefaults,
-  flagSpec "deriving-typeable"           Opt_WarnDerivingTypeable,
-  flagSpec "dodgy-exports"               Opt_WarnDodgyExports,
-  flagSpec "dodgy-foreign-imports"       Opt_WarnDodgyForeignImports,
-  flagSpec "dodgy-imports"               Opt_WarnDodgyImports,
-  flagSpec "empty-enumerations"          Opt_WarnEmptyEnumerations,
-  depFlagSpec "duplicate-constraints"    Opt_WarnDuplicateConstraints
-    "it is subsumed by -Wredundant-constraints",
-  flagSpec "redundant-constraints"       Opt_WarnRedundantConstraints,
-  flagSpec "duplicate-exports"           Opt_WarnDuplicateExports,
-  depFlagSpec "hi-shadowing"                Opt_WarnHiShadows
-    "it is not used, and was never implemented",
-  flagSpec "inaccessible-code"           Opt_WarnInaccessibleCode,
-  flagSpec "implicit-prelude"            Opt_WarnImplicitPrelude,
-  depFlagSpec "implicit-kind-vars"       Opt_WarnImplicitKindVars
-    "it is now an error",
-  flagSpec "incomplete-patterns"         Opt_WarnIncompletePatterns,
-  flagSpec "incomplete-record-updates"   Opt_WarnIncompletePatternsRecUpd,
-  flagSpec "incomplete-uni-patterns"     Opt_WarnIncompleteUniPatterns,
-  flagSpec "inline-rule-shadowing"       Opt_WarnInlineRuleShadowing,
-  flagSpec "identities"                  Opt_WarnIdentities,
-  flagSpec "missing-fields"              Opt_WarnMissingFields,
-  flagSpec "missing-import-lists"        Opt_WarnMissingImportList,
-  flagSpec "missing-export-lists"        Opt_WarnMissingExportList,
-  depFlagSpec "missing-local-sigs"       Opt_WarnMissingLocalSignatures
-    "it is replaced by -Wmissing-local-signatures",
-  flagSpec "missing-local-signatures"    Opt_WarnMissingLocalSignatures,
-  flagSpec "missing-methods"             Opt_WarnMissingMethods,
-  flagSpec "missing-monadfail-instances" Opt_WarnMissingMonadFailInstances,
-  flagSpec "semigroup"                   Opt_WarnSemigroup,
-  flagSpec "missing-signatures"          Opt_WarnMissingSignatures,
-  flagSpec "missing-kind-signatures"     Opt_WarnMissingKindSignatures,
-  depFlagSpec "missing-exported-sigs"    Opt_WarnMissingExportedSignatures
-    "it is replaced by -Wmissing-exported-signatures",
-  flagSpec "missing-exported-signatures" Opt_WarnMissingExportedSignatures,
-  flagSpec "monomorphism-restriction"    Opt_WarnMonomorphism,
-  flagSpec "name-shadowing"              Opt_WarnNameShadowing,
-  flagSpec "noncanonical-monad-instances"
-                                         Opt_WarnNonCanonicalMonadInstances,
-  depFlagSpec "noncanonical-monadfail-instances"
-                                         Opt_WarnNonCanonicalMonadInstances
-    "fail is no longer a method of Monad",
-  flagSpec "noncanonical-monoid-instances"
-                                         Opt_WarnNonCanonicalMonoidInstances,
-  flagSpec "orphans"                     Opt_WarnOrphans,
-  flagSpec "overflowed-literals"         Opt_WarnOverflowedLiterals,
-  flagSpec "overlapping-patterns"        Opt_WarnOverlappingPatterns,
-  flagSpec "missed-specialisations"      Opt_WarnMissedSpecs,
-  flagSpec "missed-specializations"      Opt_WarnMissedSpecs,
-  flagSpec "all-missed-specialisations"  Opt_WarnAllMissedSpecs,
-  flagSpec "all-missed-specializations"  Opt_WarnAllMissedSpecs,
-  flagSpec' "safe"                       Opt_WarnSafe setWarnSafe,
-  flagSpec "trustworthy-safe"            Opt_WarnTrustworthySafe,
-  flagSpec "inferred-safe-imports"       Opt_WarnInferredSafeImports,
-  flagSpec "missing-safe-haskell-mode"   Opt_WarnMissingSafeHaskellMode,
-  flagSpec "tabs"                        Opt_WarnTabs,
-  flagSpec "type-defaults"               Opt_WarnTypeDefaults,
-  flagSpec "typed-holes"                 Opt_WarnTypedHoles,
-  flagSpec "partial-type-signatures"     Opt_WarnPartialTypeSignatures,
-  flagSpec "unrecognised-pragmas"        Opt_WarnUnrecognisedPragmas,
-  flagSpec' "unsafe"                     Opt_WarnUnsafe setWarnUnsafe,
-  flagSpec "unsupported-calling-conventions"
-                                         Opt_WarnUnsupportedCallingConventions,
-  flagSpec "unsupported-llvm-version"    Opt_WarnUnsupportedLlvmVersion,
-  flagSpec "missed-extra-shared-lib"     Opt_WarnMissedExtraSharedLib,
-  flagSpec "unticked-promoted-constructors"
-                                         Opt_WarnUntickedPromotedConstructors,
-  flagSpec "unused-do-bind"              Opt_WarnUnusedDoBind,
-  flagSpec "unused-foralls"              Opt_WarnUnusedForalls,
-  flagSpec "unused-imports"              Opt_WarnUnusedImports,
-  flagSpec "unused-local-binds"          Opt_WarnUnusedLocalBinds,
-  flagSpec "unused-matches"              Opt_WarnUnusedMatches,
-  flagSpec "unused-pattern-binds"        Opt_WarnUnusedPatternBinds,
-  flagSpec "unused-top-binds"            Opt_WarnUnusedTopBinds,
-  flagSpec "unused-type-patterns"        Opt_WarnUnusedTypePatterns,
-  flagSpec "unused-record-wildcards"     Opt_WarnUnusedRecordWildcards,
-  flagSpec "redundant-bang-patterns"     Opt_WarnRedundantBangPatterns,
-  flagSpec "redundant-record-wildcards"  Opt_WarnRedundantRecordWildcards,
-  flagSpec "warnings-deprecations"       Opt_WarnWarningsDeprecations,
-  flagSpec "wrong-do-bind"               Opt_WarnWrongDoBind,
-  flagSpec "missing-pattern-synonym-signatures"
-                                    Opt_WarnMissingPatternSynonymSignatures,
-  flagSpec "missing-deriving-strategies" Opt_WarnMissingDerivingStrategies,
-  flagSpec "simplifiable-class-constraints" Opt_WarnSimplifiableClassConstraints,
-  flagSpec "missing-home-modules"        Opt_WarnMissingHomeModules,
-  flagSpec "unrecognised-warning-flags"  Opt_WarnUnrecognisedWarningFlags,
-  flagSpec "star-binder"                 Opt_WarnStarBinder,
-  flagSpec "star-is-type"                Opt_WarnStarIsType,
-  depFlagSpec "missing-space-after-bang" Opt_WarnSpaceAfterBang
-    "bang patterns can no longer be written with a space",
-  flagSpec "partial-fields"              Opt_WarnPartialFields,
-  flagSpec "prepositive-qualified-module"
-                                         Opt_WarnPrepositiveQualifiedModule,
-  flagSpec "unused-packages"             Opt_WarnUnusedPackages,
-  flagSpec "compat-unqualified-imports"  Opt_WarnCompatUnqualifiedImports,
-  flagSpec "invalid-haddock"             Opt_WarnInvalidHaddock,
-  flagSpec "operator-whitespace-ext-conflict"  Opt_WarnOperatorWhitespaceExtConflict,
-  flagSpec "operator-whitespace"         Opt_WarnOperatorWhitespace,
-  flagSpec "implicit-lift"               Opt_WarnImplicitLift
+  warnSpec    Opt_WarnAlternativeLayoutRuleTransitional,
+  warnSpec    Opt_WarnAmbiguousFields,
+  depWarnSpec Opt_WarnAutoOrphans
+              "it has no effect",
+  warnSpec    Opt_WarnCPPUndef,
+  warnSpec    Opt_WarnUnbangedStrictPatterns,
+  warnSpec    Opt_WarnDeferredTypeErrors,
+  warnSpec    Opt_WarnDeferredOutOfScopeVariables,
+  warnSpec    Opt_WarnWarningsDeprecations,
+  warnSpec    Opt_WarnDeprecatedFlags,
+  warnSpec    Opt_WarnDerivingDefaults,
+  warnSpec    Opt_WarnDerivingTypeable,
+  warnSpec    Opt_WarnDodgyExports,
+  warnSpec    Opt_WarnDodgyForeignImports,
+  warnSpec    Opt_WarnDodgyImports,
+  warnSpec    Opt_WarnEmptyEnumerations,
+  subWarnSpec "duplicate-constraints"
+              Opt_WarnDuplicateConstraints
+              "it is subsumed by -Wredundant-constraints",
+  warnSpec    Opt_WarnRedundantConstraints,
+  warnSpec    Opt_WarnDuplicateExports,
+  depWarnSpec Opt_WarnHiShadows
+              "it is not used, and was never implemented",
+  warnSpec    Opt_WarnInaccessibleCode,
+  warnSpec    Opt_WarnImplicitPrelude,
+  depWarnSpec Opt_WarnImplicitKindVars
+              "it is now an error",
+  warnSpec    Opt_WarnIncompletePatterns,
+  warnSpec    Opt_WarnIncompletePatternsRecUpd,
+  warnSpec    Opt_WarnIncompleteUniPatterns,
+  warnSpec    Opt_WarnInlineRuleShadowing,
+  warnSpec    Opt_WarnIdentities,
+  warnSpec    Opt_WarnMissingFields,
+  warnSpec    Opt_WarnMissingImportList,
+  warnSpec    Opt_WarnMissingExportList,
+  subWarnSpec "missing-local-sigs"
+              Opt_WarnMissingLocalSignatures
+              "it is replaced by -Wmissing-local-signatures",
+  warnSpec    Opt_WarnMissingLocalSignatures,
+  warnSpec    Opt_WarnMissingMethods,
+  warnSpec    Opt_WarnMissingMonadFailInstances,
+  warnSpec    Opt_WarnSemigroup,
+  warnSpec    Opt_WarnMissingSignatures,
+  warnSpec    Opt_WarnMissingKindSignatures,
+  subWarnSpec "missing-exported-sigs"
+              Opt_WarnMissingExportedSignatures
+              "it is replaced by -Wmissing-exported-signatures",
+  warnSpec    Opt_WarnMissingExportedSignatures,
+  warnSpec    Opt_WarnMonomorphism,
+  warnSpec    Opt_WarnNameShadowing,
+  warnSpec    Opt_WarnNonCanonicalMonadInstances,
+  depWarnSpec Opt_WarnNonCanonicalMonadFailInstances
+              "fail is no longer a method of Monad",
+  warnSpec    Opt_WarnNonCanonicalMonoidInstances,
+  warnSpec    Opt_WarnOrphans,
+  warnSpec    Opt_WarnOverflowedLiterals,
+  warnSpec    Opt_WarnOverlappingPatterns,
+  warnSpec    Opt_WarnMissedSpecs,
+  warnSpec    Opt_WarnAllMissedSpecs,
+  warnSpec'   Opt_WarnSafe setWarnSafe,
+  warnSpec    Opt_WarnTrustworthySafe,
+  warnSpec    Opt_WarnInferredSafeImports,
+  warnSpec    Opt_WarnMissingSafeHaskellMode,
+  warnSpec    Opt_WarnTabs,
+  warnSpec    Opt_WarnTypeDefaults,
+  warnSpec    Opt_WarnTypedHoles,
+  warnSpec    Opt_WarnPartialTypeSignatures,
+  warnSpec    Opt_WarnUnrecognisedPragmas,
+  warnSpec'   Opt_WarnUnsafe setWarnUnsafe,
+  warnSpec    Opt_WarnUnsupportedCallingConventions,
+  warnSpec    Opt_WarnUnsupportedLlvmVersion,
+  warnSpec    Opt_WarnMissedExtraSharedLib,
+  warnSpec    Opt_WarnUntickedPromotedConstructors,
+  warnSpec    Opt_WarnUnusedDoBind,
+  warnSpec    Opt_WarnUnusedForalls,
+  warnSpec    Opt_WarnUnusedImports,
+  warnSpec    Opt_WarnUnusedLocalBinds,
+  warnSpec    Opt_WarnUnusedMatches,
+  warnSpec    Opt_WarnUnusedPatternBinds,
+  warnSpec    Opt_WarnUnusedTopBinds,
+  warnSpec    Opt_WarnUnusedTypePatterns,
+  warnSpec    Opt_WarnUnusedRecordWildcards,
+  warnSpec    Opt_WarnRedundantBangPatterns,
+  warnSpec    Opt_WarnRedundantRecordWildcards,
+  warnSpec    Opt_WarnWrongDoBind,
+  warnSpec    Opt_WarnMissingPatternSynonymSignatures,
+  warnSpec    Opt_WarnMissingDerivingStrategies,
+  warnSpec    Opt_WarnSimplifiableClassConstraints,
+  warnSpec    Opt_WarnMissingHomeModules,
+  warnSpec    Opt_WarnUnrecognisedWarningFlags,
+  warnSpec    Opt_WarnStarBinder,
+  warnSpec    Opt_WarnStarIsType,
+  depWarnSpec Opt_WarnSpaceAfterBang
+              "bang patterns can no longer be written with a space",
+  warnSpec    Opt_WarnPartialFields,
+  warnSpec    Opt_WarnPrepositiveQualifiedModule,
+  warnSpec    Opt_WarnUnusedPackages,
+  warnSpec    Opt_WarnCompatUnqualifiedImports,
+  warnSpec    Opt_WarnInvalidHaddock,
+  warnSpec    Opt_WarnOperatorWhitespaceExtConflict,
+  warnSpec    Opt_WarnOperatorWhitespace,
+  warnSpec    Opt_WarnImplicitLift
  ]
 
 -- | These @-\<blah\>@ flags can all be reversed with @-no-\<blah\>@
@@ -3885,163 +3899,11 @@ optLevelFlags -- see Note [Documenting optimisation flags]
     ]
 
 
--- -----------------------------------------------------------------------------
--- Standard sets of warning options
-
--- Note [Documenting warning flags]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
--- If you change the list of warning enabled by default
--- please remember to update the User's Guide. The relevant file is:
---
---  docs/users_guide/using-warnings.rst
-
--- | Warning groups.
---
--- As all warnings are in the Weverything set, it is ignored when
--- displaying to the user which group a warning is in.
-warningGroups :: [(String, [WarningFlag])]
-warningGroups =
-    [ ("compat",       minusWcompatOpts)
-    , ("unused-binds", unusedBindsFlags)
-    , ("default",      standardWarnings)
-    , ("extra",        minusWOpts)
-    , ("all",          minusWallOpts)
-    , ("everything",   minusWeverythingOpts)
-    ]
-
--- | Warning group hierarchies, where there is an explicit inclusion
--- relation.
---
--- Each inner list is a hierarchy of warning groups, ordered from
--- smallest to largest, where each group is a superset of the one
--- before it.
---
--- Separating this from 'warningGroups' allows for multiple
--- hierarchies with no inherent relation to be defined.
---
--- The special-case Weverything group is not included.
-warningHierarchies :: [[String]]
-warningHierarchies = hierarchies ++ map (:[]) rest
-  where
-    hierarchies = [["default", "extra", "all"]]
-    rest = filter (`notElem` "everything" : concat hierarchies) $
-           map fst warningGroups
-
--- | Find the smallest group in every hierarchy which a warning
--- belongs to, excluding Weverything.
-smallestGroups :: WarningFlag -> [String]
-smallestGroups flag = mapMaybe go warningHierarchies where
-    -- Because each hierarchy is arranged from smallest to largest,
-    -- the first group we find in a hierarchy which contains the flag
-    -- is the smallest.
-    go (group:rest) = fromMaybe (go rest) $ do
-        flags <- lookup group warningGroups
-        guard (flag `elem` flags)
-        pure (Just group)
-    go [] = Nothing
-
--- | Warnings enabled unless specified otherwise
-standardWarnings :: [WarningFlag]
-standardWarnings -- see Note [Documenting warning flags]
-    = [ Opt_WarnOverlappingPatterns,
-        Opt_WarnWarningsDeprecations,
-        Opt_WarnDeprecatedFlags,
-        Opt_WarnDeferredTypeErrors,
-        Opt_WarnTypedHoles,
-        Opt_WarnDeferredOutOfScopeVariables,
-        Opt_WarnPartialTypeSignatures,
-        Opt_WarnUnrecognisedPragmas,
-        Opt_WarnDuplicateExports,
-        Opt_WarnDerivingDefaults,
-        Opt_WarnOverflowedLiterals,
-        Opt_WarnEmptyEnumerations,
-        Opt_WarnAmbiguousFields,
-        Opt_WarnMissingFields,
-        Opt_WarnMissingMethods,
-        Opt_WarnWrongDoBind,
-        Opt_WarnUnsupportedCallingConventions,
-        Opt_WarnDodgyForeignImports,
-        Opt_WarnInlineRuleShadowing,
-        Opt_WarnAlternativeLayoutRuleTransitional,
-        Opt_WarnUnsupportedLlvmVersion,
-        Opt_WarnMissedExtraSharedLib,
-        Opt_WarnTabs,
-        Opt_WarnUnrecognisedWarningFlags,
-        Opt_WarnSimplifiableClassConstraints,
-        Opt_WarnStarBinder,
-        Opt_WarnInaccessibleCode,
-        Opt_WarnSpaceAfterBang,
-        Opt_WarnNonCanonicalMonadInstances,
-        Opt_WarnNonCanonicalMonoidInstances,
-        Opt_WarnOperatorWhitespaceExtConflict
-      ]
-
--- | Things you get with -W
-minusWOpts :: [WarningFlag]
-minusWOpts
-    = standardWarnings ++
-      [ Opt_WarnUnusedTopBinds,
-        Opt_WarnUnusedLocalBinds,
-        Opt_WarnUnusedPatternBinds,
-        Opt_WarnUnusedMatches,
-        Opt_WarnUnusedForalls,
-        Opt_WarnUnusedImports,
-        Opt_WarnIncompletePatterns,
-        Opt_WarnDodgyExports,
-        Opt_WarnDodgyImports,
-        Opt_WarnUnbangedStrictPatterns
-      ]
-
--- | Things you get with -Wall
-minusWallOpts :: [WarningFlag]
-minusWallOpts
-    = minusWOpts ++
-      [ Opt_WarnTypeDefaults,
-        Opt_WarnNameShadowing,
-        Opt_WarnMissingSignatures,
-        Opt_WarnHiShadows,
-        Opt_WarnOrphans,
-        Opt_WarnUnusedDoBind,
-        Opt_WarnTrustworthySafe,
-        Opt_WarnUntickedPromotedConstructors,
-        Opt_WarnMissingPatternSynonymSignatures,
-        Opt_WarnUnusedRecordWildcards,
-        Opt_WarnRedundantRecordWildcards,
-        Opt_WarnStarIsType,
-        Opt_WarnIncompleteUniPatterns,
-        Opt_WarnIncompletePatternsRecUpd
-      ]
-
--- | Things you get with -Weverything, i.e. *all* known warnings flags
-minusWeverythingOpts :: [WarningFlag]
-minusWeverythingOpts = [ toEnum 0 .. ]
-
--- | Things you get with -Wcompat.
---
--- This is intended to group together warnings that will be enabled by default
--- at some point in the future, so that library authors eager to make their
--- code future compatible to fix issues before they even generate warnings.
-minusWcompatOpts :: [WarningFlag]
-minusWcompatOpts
-    = [ Opt_WarnSemigroup
-      , Opt_WarnNonCanonicalMonoidInstances
-      , Opt_WarnStarIsType
-      , Opt_WarnCompatUnqualifiedImports
-      ]
-
 enableUnusedBinds :: DynP ()
 enableUnusedBinds = mapM_ setWarningFlag unusedBindsFlags
 
 disableUnusedBinds :: DynP ()
 disableUnusedBinds = mapM_ unSetWarningFlag unusedBindsFlags
-
--- Things you get with -Wunused-binds
-unusedBindsFlags :: [WarningFlag]
-unusedBindsFlags = [ Opt_WarnUnusedTopBinds
-                   , Opt_WarnUnusedLocalBinds
-                   , Opt_WarnUnusedPatternBinds
-                   ]
 
 enableGlasgowExts :: DynP ()
 enableGlasgowExts = do setGeneralFlag Opt_PrintExplicitForalls
