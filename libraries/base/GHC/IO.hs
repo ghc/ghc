@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE Unsafe #-}
 {-# LANGUAGE NoImplicitPrelude
            , BangPatterns
@@ -195,8 +196,11 @@ catch (IO io) handler = IO $ catch# io handler'
 -- details.
 catchAny :: IO a -> (forall e . Exception e => e -> IO a) -> IO a
 catchAny !(IO io) handler = IO $ catch# io handler'
+#if __GLASGOW_HASKELL__ >= 903
+    where handler' (SomeExceptionWithLocation _ e) = unIO (handler e)
+#else
     where handler' (SomeException e) = unIO (handler e)
-
+#endif
 -- Using catchException here means that if `m` throws an
 -- 'IOError' /as an imprecise exception/, we will not catch
 -- it. No one should really be doing that anyway.
