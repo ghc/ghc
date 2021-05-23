@@ -2879,7 +2879,7 @@ aexp2   :: { ECP }
         -- but the less cluttered version fell out of having texps.
         | '(' texp ')'                  { ECP $
                                            unECP $2 >>= \ $2 ->
-                                           mkHsParPV (comb2 $1 $>) $2 (AnnParen AnnParens (glAA $1) (glAA $3)) }
+                                           mkHsParPV (comb2 $1 $>) (hsTok $1) $2 (hsTok $3) }
         | '(' tup_exprs ')'             { ECP $
                                            $2 >>= \ $2 ->
                                            mkSumOrTuplePV (noAnnSrcSpan $ comb2 $1 $>) Boxed $2
@@ -4340,6 +4340,9 @@ hsDoAnn (L l _) (L ll _) kw
 listAsAnchor :: [LocatedAn t a] -> Anchor
 listAsAnchor [] = spanAsAnchor noSrcSpan
 listAsAnchor (L l _:_) = spanAsAnchor (locA l)
+
+hsTok :: Located Token -> LHsToken tok GhcPs
+hsTok (L l _) = L (EpAnn (Anchor (realSrcSpan l) UnchangedAnchor) NoEpAnns emptyComments) HsTok
 
 -- -------------------------------------
 

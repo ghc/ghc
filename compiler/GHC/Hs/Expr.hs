@@ -278,7 +278,7 @@ type instance XNegApp        GhcPs = EpAnn [AddEpAnn]
 type instance XNegApp        GhcRn = NoExtField
 type instance XNegApp        GhcTc = NoExtField
 
-type instance XPar           (GhcPass _) = EpAnn AnnParen
+type instance XPar           (GhcPass _) = EpAnnCO
 
 type instance XExplicitTuple GhcPs = EpAnn [AddEpAnn]
 type instance XExplicitTuple GhcRn = NoExtField
@@ -496,7 +496,7 @@ ppr_expr (HsIPVar _ v)       = ppr v
 ppr_expr (HsOverLabel _ l)   = char '#' <> ppr l
 ppr_expr (HsLit _ lit)       = ppr lit
 ppr_expr (HsOverLit _ lit)   = ppr lit
-ppr_expr (HsPar _ e)         = parens (ppr_lexpr e)
+ppr_expr (HsPar _ _ e _)     = parens (ppr_lexpr e)
 
 ppr_expr (HsPragE _ prag e) = sep [ppr prag, ppr_lexpr e]
 
@@ -810,19 +810,23 @@ hsExprNeedsParens prec = go
     go_x_rn (HsExpanded a _) = hsExprNeedsParens prec a
 
 
+-- | Parenthesize an expression without token information
+gHsPar :: LHsExpr (GhcPass id) -> HsExpr (GhcPass id)
+gHsPar e = HsPar noAnn noHsTok e noHsTok
+
 -- | @'parenthesizeHsExpr' p e@ checks if @'hsExprNeedsParens' p e@ is true,
 -- and if so, surrounds @e@ with an 'HsPar'. Otherwise, it simply returns @e@.
 parenthesizeHsExpr :: IsPass p => PprPrec -> LHsExpr (GhcPass p) -> LHsExpr (GhcPass p)
 parenthesizeHsExpr p le@(L loc e)
-  | hsExprNeedsParens p e = L loc (HsPar noAnn le)
+  | hsExprNeedsParens p e = L loc (gHsPar le)
   | otherwise             = le
 
 stripParensLHsExpr :: LHsExpr (GhcPass p) -> LHsExpr (GhcPass p)
-stripParensLHsExpr (L _ (HsPar _ e)) = stripParensLHsExpr e
+stripParensLHsExpr (L _ (HsPar _ _ e _)) = stripParensLHsExpr e
 stripParensLHsExpr e = e
 
 stripParensHsExpr :: HsExpr (GhcPass p) -> HsExpr (GhcPass p)
-stripParensHsExpr (HsPar _ (L _ e)) = stripParensHsExpr e
+stripParensHsExpr (HsPar _ _ (L _ e) _) = stripParensHsExpr e
 stripParensHsExpr e = e
 
 isAtomicHsExpr :: forall p. IsPass p => HsExpr (GhcPass p) -> Bool
@@ -1044,7 +1048,7 @@ type instance XCmdArrForm GhcTc = NoExtField
 
 type instance XCmdApp     (GhcPass _) = EpAnnCO
 type instance XCmdLam     (GhcPass _) = NoExtField
-type instance XCmdPar     (GhcPass _) = EpAnn AnnParen
+type instance XCmdPar     (GhcPass _) = EpAnnCO
 
 type instance XCmdCase    GhcPs = EpAnn EpAnnHsCase
 type instance XCmdCase    GhcRn = NoExtField
@@ -1116,7 +1120,7 @@ ppr_lcmd c = ppr_cmd (unLoc c)
 
 ppr_cmd :: forall p. (OutputableBndrId p
                      ) => HsCmd (GhcPass p) -> SDoc
-ppr_cmd (HsCmdPar _ c) = parens (ppr_lcmd c)
+ppr_cmd (HsCmdPar _ _ c _) = parens (ppr_lcmd c)
 
 ppr_cmd (HsCmdApp _ c e)
   = let (fun, args) = collect_args c [e] in
