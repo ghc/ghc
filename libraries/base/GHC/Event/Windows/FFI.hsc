@@ -343,13 +343,19 @@ pokeOffsetOverlapped lpol offset = do
   #{poke OVERLAPPED, OffsetHigh} lpol offsetHigh
 {-# INLINE pokeOffsetOverlapped #-}
 
+-- | Set the event field in an OVERLAPPED structure.
+pokeEventOverlapped :: LPOVERLAPPED -> HANDLE -> IO ()
+pokeEventOverlapped lpol event = do
+  #{poke OVERLAPPED, hEvent} lpol event
+{-# INLINE pokeEventOverlapped #-}
+
 ------------------------------------------------------------------------
 -- Request management
 
-withRequest :: Word64 -> CompletionData
+withRequest :: Bool -> Word64 -> CompletionData
             -> (Ptr HASKELL_OVERLAPPED -> Ptr CompletionData -> IO a)
             -> IO a
-withRequest offset cbData f =
+withRequest async offset cbData f =
     -- Create the completion record and store it.
     -- We only need the record when we enqueue a request, however if we
     -- delay creating it then we will run into a race condition where the
@@ -364,8 +370,30 @@ withRequest offset cbData f =
     allocaBytes #{size HASKELL_OVERLAPPED} $ \hs_lpol ->
       with cbData $ \cdData -> do
         zeroOverlapped hs_lpol
-        pokeOffsetOverlapped (castPtr hs_lpol) offset
-        f hs_lpol cdData
+        let lpol = castPtr hs_lpol
+        pokeOffsetOverlapped lpol offset
+        -- If doing a synchronous request then register an event object.
+        -- This event object MUST be manual reset per MSDN.
+        case async of
+          True -> f hs_lpol cdData
+          False -> do
+            event <- failIfNull "withRequest (create)" $
+                       c_CreateEvent nullPtr True False nullPtr
+            debugIO $ "{{ event " ++ show event ++ " for " ++ show hs_lpol
+            pokeEventOverlapped lpol event
+            res <- f hs_lpol cdData
+            -- Once the request has finished, close the object and free it.
+            failIfFalse_ "withRequest (free)" $ c_CloseHandle event
+            return res
+
+
+-- | Create an event object for use when the HANDLE isn't asynchronous
+foreign import WINDOWS_CCONV unsafe "windows.h CreateEventW"
+    c_CreateEvent :: Ptr () -> Bool -> Bool -> LPCWSTR -> IO HANDLE
+
+-- | Close a handle object
+foreign import WINDOWS_CCONV unsafe "windows.h CloseHandle"
+    c_CloseHandle :: HANDLE -> IO Bool
 
 ------------------------------------------------------------------------
 -- Cancel pending I/O
