@@ -54,7 +54,7 @@ data PatBuilder p
   = PatBuilderPat (Pat p)
   | PatBuilderPar (LocatedA (PatBuilder p)) AnnParen
   | PatBuilderApp (LocatedA (PatBuilder p)) (LocatedA (PatBuilder p))
-  | PatBuilderAppType (LocatedA (PatBuilder p)) SrcSpan (HsPatSigType GhcPs)
+  | PatBuilderAppType (LocatedA (PatBuilder p)) (HsPatSigType GhcPs)
   | PatBuilderOpApp (LocatedA (PatBuilder p)) (LocatedN RdrName)
                     (LocatedA (PatBuilder p)) (EpAnn [AddEpAnn])
   | PatBuilderVar (LocatedN RdrName)
@@ -64,7 +64,7 @@ instance Outputable (PatBuilder GhcPs) where
   ppr (PatBuilderPat p) = ppr p
   ppr (PatBuilderPar (L _ p) _) = parens (ppr p)
   ppr (PatBuilderApp (L _ p1) (L _ p2)) = ppr p1 <+> ppr p2
-  ppr (PatBuilderAppType (L _ p) _ t) = ppr p <+> text "@" <> ppr t
+  ppr (PatBuilderAppType (L _ p) t) = ppr p <+> text "@" <> ppr t
   ppr (PatBuilderOpApp (L _ p1) op (L _ p2) _) = ppr p1 <+> ppr op <+> ppr p2
   ppr (PatBuilderVar v) = ppr v
   ppr (PatBuilderOverLit l) = ppr l

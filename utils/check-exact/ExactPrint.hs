@@ -1780,7 +1780,7 @@ instance ExactPrint (GRHS GhcPs (LocatedA (HsCmd GhcPs))) where
 instance ExactPrint (HsExpr GhcPs) where
   getAnnotationEntry (HsVar{})                    = NoEntryVal
   getAnnotationEntry (HsUnboundVar an _)          = fromAnn an
-  getAnnotationEntry (HsRecFld{})                 = NoEntryVal
+  getAnnotationEntry (HsRecSel{})                 = NoEntryVal
   getAnnotationEntry (HsOverLabel an _)           = fromAnn an
   getAnnotationEntry (HsIPVar an _)               = fromAnn an
   getAnnotationEntry (HsOverLit an _)             = fromAnn an
@@ -1827,7 +1827,7 @@ instance ExactPrint (HsExpr GhcPs) where
         printStringAtAA ob "`"
         printStringAtAA l  "_"
         printStringAtAA cb "`"
-  -- exact x@(HsRecFld{})                 = withPpr x
+  -- exact x@(HsRecSel{})                 = withPpr x
   -- exact x@(HsOverLabel ann _ _)        = withPpr x
   exact (HsIPVar _ (HsIPName n))
     = printStringAdvance ("?" ++ unpackFS n)
@@ -3794,7 +3794,9 @@ instance ExactPrint (Pat GhcPs) where
 instance ExactPrint (HsPatSigType GhcPs) where
   getAnnotationEntry = const NoEntryVal
 
-  exact (HsPS _ ty) = markAnnotated ty
+  exact (HsPS an ty) = do
+    markAnnKw an id AnnAt
+    markAnnotated ty
 
 -- ---------------------------------------------------------------------
 
