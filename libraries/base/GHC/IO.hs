@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE Unsafe #-}
 {-# LANGUAGE NoImplicitPrelude
            , BangPatterns
@@ -45,6 +46,7 @@ module GHC.IO (
 import GHC.Base
 import GHC.ST
 import GHC.Exception
+import {-# SOURCE #-} GHC.Exception.Backtrace (collectBacktrace)
 import GHC.Show
 import GHC.IO.Unsafe
 import Unsafe.Coerce ( unsafeCoerce )
@@ -194,8 +196,11 @@ catch (IO io) handler = IO $ catch# io handler'
 -- details.
 catchAny :: IO a -> (forall e . Exception e => e -> IO a) -> IO a
 catchAny !(IO io) handler = IO $ catch# io handler'
+#if __GLASGOW_HASKELL__ >= 903
+    where handler' (SomeExceptionWithLocation _ e) = unIO (handler e)
+#else
     where handler' (SomeException e) = unIO (handler e)
-
+#endif
 -- Using catchException here means that if `m` throws an
 -- 'IOError' /as an imprecise exception/, we will not catch
 -- it. No one should really be doing that anyway.
@@ -218,7 +223,10 @@ mplusIO m n = m `catchException` \ (_ :: IOError) -> n
 -- ordering with respect to other 'IO' operations, whereas 'throw'
 -- does not.
 throwIO :: Exception e => e -> IO a
-throwIO e = IO (raiseIO# (toException e))
+throwIO e = do
+    bts <- collectBacktrace
+    let e' = foldr addBacktrace (toException e) bts
+    IO (raiseIO# e')
 
 -- -----------------------------------------------------------------------------
 -- Controlling asynchronous exception delivery
@@ -458,5 +466,5 @@ use 'catch' rather than 'catchException'.
 -}
 
 -- For SOURCE import by GHC.Base to define failIO.
-mkUserError       :: [Char]  -> SomeException
+mkUserError       :: [Char]  -> SomeExceptionWithLocation
 mkUserError str   = toException (userError str)
