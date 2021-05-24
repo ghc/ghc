@@ -10,6 +10,7 @@
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE BlockArguments    #-}
+{-# LANGUAGE TupleSections     #-}
 
 import Debug.Trace -- XXX JB
 
@@ -172,7 +173,7 @@ pPassage = do
     pCommentEnd = pComment endComment *> endOfLine
 
 nonNewLineSpaces :: Parser m ()
-nonNewLineSpaces = void . many $ satisfy \c -> isSpace c && c /= '\n'
+nonNewLineSpaces = skipMany $ satisfy \c -> isSpace c && c /= '\n'
 
 -- XXX JB general idea:
 -- first, check if there's anything that comes before the first note. If so, the
@@ -187,10 +188,33 @@ nonNewLineSpaces = void . many $ satisfy \c -> isSpace c && c /= '\n'
 pNotes :: MonadReader Passage m => Parser m ([Header], [Ref])
 pNotes = bimap concat concat $ many do
   mPotentialHeader <- optionMaybe (try pSingleLineNote)
+  noteSeparator
+  firstRefs <- singleLineNotes
   case mPotentialHeader of
-    Nothing -> do
-      notes <- pMultiLineNote `sepBy` (notFollowedBy (pNoteStart spacec) *> anyChar)
-      manyTill anyChar endOfLine
+    Nothing -> ([],) . (firstRefs ++) <$> multiLineNotes
+    Just potentialHeader -> headerBranch <|> refBranch
+      where
+        headerBranch = do
+          try (count 3 $ char '~') *> skipMany (char '~')
+          restRefs <- multiLineNotes
+          pure ([potentialHeader], firstRefs ++ restRefs)
+        refBranch = do
+          restRefs <- noteSeparator *> multiLineNotes <* manyTill anyChar endOfLine
+          pure (potentialHeader : firstRefs ++ restRefs)
+
+-- Even for single-line notes, we don't want the separator being a multi-line
+-- node, hence "spaces", not "nonNewLineSpaces".
+noteSeparator :: Parser m ()
+noteSeparator = many $ notFollowedBy (pNoteStart spaces) *> noneOf "\n"
+
+singleLineNotes :: MonadReader Passage m => Parser m [Note]
+singleLineNotes =
+  concat <$> many pSingleLineNote `sepBy` noteSeparator <* manyTill anyChar endOfLine
+
+-- XXX JB *almost* the same as singleLineNote
+multiLineNotes :: MonadReader Passage m => Parser m [Note]
+multiLineNotes =
+  concat <$> many pMultiLineNote `sepBy` noteSeparator <* manyTill anyChar endOfLine
 
 pNoteStart :: Parser m () -> Parser m ()
 pNoteStart pSpaces = string "Note" *> pSpaces *> char '['
@@ -198,13 +222,13 @@ pNoteStart pSpaces = string "Note" *> pSpaces *> char '['
 pSingleLineNote :: MonadReader Passage m => Parser m Note
 pSingleLineNote = do
   notePassage <- ask
-  noteName <- string "Note" *> nonNewLineSpaces *> char '[' *> manyTill (noneOf "\n") ']'
+  noteName <- pNoteStart nonNewLineSpaces *> manyTill (noneOf "\n") ']'
   pure Note {notePassage, noteName}
 
 pMultiLineNote :: MonadReader Passage m => Parser m Note
 pMultiLineNote = do
   notePassage <- ask
-  noteName <- string "Note" *> spaces *> char '[' *> manyTill anyChar ']'
+  noteName <- pNoteStart spaces *> manyTill anyChar ']'
   pure Note {notePassage, noteName}
 
 success :: Results -> IO ()
