@@ -8,7 +8,7 @@
 	ignore = untracked
 [submodule "libraries/Cabal"]
 	path = libraries/Cabal
-	url = https://gitlab.haskell.org/ghc/packages/Cabal.git
+	url = https://gitlab.haskell.org/supersven/Cabal.git
 	ignore = untracked
 [submodule "libraries/containers"]
 	path = libraries/containers
@@ -16,7 +16,7 @@
 	ignore = untracked
 [submodule "libraries/haskeline"]
 	path = libraries/haskeline
-	url = https://gitlab.haskell.org/ghc/packages/haskeline.git
+	url = https://gitlab.haskell.org/supersven/haskeline.git
 	ignore = untracked
 [submodule "libraries/pretty"]
 	path = libraries/pretty
@@ -109,4 +109,4 @@
 	url = https://gitlab.haskell.org/ghc/gmp-tarballs.git
 [submodule "libraries/exceptions"]
 	path = libraries/exceptions
-	url = https://gitlab.haskell.org/ghc/packages/exceptions.git
+	url = https://gitlab.haskell.org/supersven/exceptions.git
