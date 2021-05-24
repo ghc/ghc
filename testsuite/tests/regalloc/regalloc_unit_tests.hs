@@ -120,11 +120,9 @@ compileCmmForRegAllocStats logger dflags' cmmFile ncgImplF us = do
     -- parse the cmm file and output any warnings or errors
     let fake_mod = mkHomeModule (hsc_home_unit hscEnv) (mkModuleName "fake")
     (warnings, errors, parsedCmm) <- parseCmmFile dflags fake_mod (hsc_home_unit hscEnv) cmmFile
-    let warningMsgs = fmap (mkParserWarn dflags') warnings
-        errorMsgs   = fmap mkParserErr errors
 
     -- print parser errors or warnings
-    mapM_ (printMessages logger dflags . mkMessages) [warningMsgs, errorMsgs]
+    mapM_ (printMessages logger dflags) [warnings, errors]
 
     let initTopSRT = emptySRT thisMod
     cmmGroup <- fmap snd $ cmmPipeline hscEnv initTopSRT $ fst $ fromJust parsedCmm
