@@ -27,13 +27,11 @@ import           Data.Maybe
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
-import qualified Data.Text.Read as T
 
 import           System.Exit
 import           System.IO
 
 import           Text.Parsec hiding (Error)
-import           Text.Parsec.Char
 import           Text.Parsec.Pos
 
 -- comment delimiters that may appear in front of or after note headers
@@ -144,13 +142,11 @@ pPassages = pPassage `sepBy` (string "--" *> endOfLine) <* eof
 --     filePath:lineNumber:firstLine
 --     filePath-lineNumber-secondLine
 -- as is usual for grep output with `-n -A 1`
--- if the first and second lines are surrounded by whitespace or comment
--- delimiter, they are discarded.
 pPassage :: Monad m => Parser m Passage
 pPassage = do
   let colon = char ':'
       dashOrColon  = oneOf "-:"
-      line = pCommentStart *> manyTill anyChar (try pCommentEnd)
+      line = manyTill anyChar endOfLine
 
   -- Parse the line in which "Note" was found
   filePath <- manyTill anyChar colon
@@ -165,22 +161,14 @@ pPassage = do
   -- second consecutive line without "Note".
   followLines <- many do
     lineNumber' <- (lineNumber +) <$> getState
-    string filePath *> dashOrColon
-    string (show lineNumber') *> dashOrColon
+    _ <- string filePath *> dashOrColon
+    _ <- string (show lineNumber') *> dashOrColon
     modifyState (+1)
     line
 
-  let content = T.pack . intercalate "\n" $ noteLine : followLines
+  -- XXX JB
+  let content = T.pack . unlines $ noteLine : followLines
   pure $ Passage (newPos filePath lineNumber 1) content
-  where
-    -- pComment get rid of leading and trailing whitespace and, optionally,
-    -- the provided comment delimiters
-    pComment commentDelim = do
-      nonNewLineSpaces
-      optional . msum $ map (try . string) commentDelim
-      nonNewLineSpaces
-    pCommentStart = pComment beginComment
-    pCommentEnd = pComment endComment *> endOfLine
 
 -- XXX JB comments really should be parsed only in pNotes, so that the column
 -- of the parse errors is correct there, and so the comment delimiters
@@ -188,6 +176,9 @@ pPassage = do
 
 nonNewLineSpaces :: Monad m => Parser m ()
 nonNewLineSpaces = skipMany $ satisfy \c -> isSpace c && c /= '\n'
+
+newLineSpaces :: Monad m => Parser m ()
+newLineSpaces = nonNewLineSpaces <* try (pCommentEnd *> pCommentStart)
 
 -- XXX JB general idea:
 -- first, check if there's anything that comes before the first note. If so, the
@@ -200,36 +191,51 @@ nonNewLineSpaces = skipMany $ satisfy \c -> isSpace c && c /= '\n'
 -- | Parses a passage and produces a list of headers and references in that
 -- passage
 pNotes :: MonadReader Passage m => Parser m ([Header], [Ref])
-pNotes = bimap (map Header) (map Ref) . mconcat <$> many do
+pNotes = bimap (map Header) (map Ref) . mconcat <$> do
   -- Set the source to be the passage we're parsing
   setPosition =<< location <$> ask
+  many do
+    pCommentStart
+    mPotentialHeader <- optionMaybe (try singleLineNote)
+    noteSeparator
+    firstRefs <- singleLineNotes
+    case mPotentialHeader of
+      Nothing -> ([],) . (firstRefs ++) <$> multiLineNotes
+      Just potentialHeader -> headerBranch <|> refBranch
+        where
+          headerBranch = do
+            try (count 3 $ char '~') *> skipMany (char '~')
+            restRefs <- multiLineNotes
+            pure ([potentialHeader], firstRefs ++ restRefs)
+          refBranch = do
+            restRefs <- noteSeparator *> multiLineNotes
+            pure ([], potentialHeader : firstRefs ++ restRefs)
 
-  mPotentialHeader <- optionMaybe (try singleLineNote)
-  noteSeparator
-  firstRefs <- singleLineNotes
-  case mPotentialHeader of
-    Nothing -> ([],) . (firstRefs ++) <$> multiLineNotes
-    Just potentialHeader -> headerBranch <|> refBranch
-      where
-        headerBranch = do
-          try (count 3 $ char '~') *> skipMany (char '~')
-          restRefs <- multiLineNotes
-          pure ([potentialHeader], firstRefs ++ restRefs)
-        refBranch = do
-          restRefs <- noteSeparator *> multiLineNotes <* manyTill anyChar endOfLine
-          pure ([], potentialHeader : firstRefs ++ restRefs)
+-- | pComment gets rid of a potential comment delimiter as well as any
+-- whitespace around it
+pComment :: Monad m => [String] -> Parser m ()
+pComment commentDelims = do
+  nonNewLineSpaces
+  optional . msum $ map (try . string) commentDelims
+  nonNewLineSpaces
+
+pCommentStart :: Monad m => Parser m ()
+pCommentStart = pComment beginComment
+
+pCommentEnd :: Monad m => Parser m ()
+pCommentEnd = pComment endComment <* endOfLine
 
 -- Even for single-line notes, we don't want the separator being a multi-line
 -- node, hence "spaces", not "nonNewLineSpaces".
 noteSeparator :: Monad m => Parser m ()
-noteSeparator = skipMany $ notFollowedBy (pNoteStart spaces) *> noneOf "\n"
+noteSeparator = skipMany $ notFollowedBy (pNoteStart newLineSpaces) *> noneOf "\n"
 
 singleLineNotes :: MonadReader Passage m => Parser m [Note]
-singleLineNotes = (singleLineNote `sepBy` noteSeparator) <* manyTill anyChar endOfLine
+singleLineNotes = (singleLineNote `sepBy` noteSeparator) <* manyTill anyChar pCommentEnd
 
 -- XXX JB *almost* the same as singleLineNote
 multiLineNotes :: MonadReader Passage m => Parser m [Note]
-multiLineNotes = (multiLineNote `sepBy` noteSeparator) <* manyTill anyChar endOfLine
+multiLineNotes = (multiLineNote `sepBy` noteSeparator) <* manyTill anyChar pCommentEnd
 
 pNoteStart :: Monad m => Parser m () -> Parser m ()
 pNoteStart pSpaces = string "Note" *> pSpaces <* char '['
@@ -245,7 +251,7 @@ singleLineNote = do
 multiLineNote :: MonadReader Passage m => Parser m Note
 multiLineNote = do
   notePassage <- ask
-  noteNameStr <- pNoteStart spaces *> manyTill anyChar (char ']')
+  noteNameStr <- pNoteStart newLineSpaces *> manyTill anyChar (char ']')
   pure Note {notePassage, noteName = T.pack noteNameStr}
 
 success :: Results -> IO ()
