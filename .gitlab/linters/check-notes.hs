@@ -166,19 +166,14 @@ pPassage = do
     modifyState (+1)
     line
 
-  -- XXX JB
   let content = T.pack . unlines $ noteLine : followLines
   pure $ Passage (newPos filePath lineNumber 1) content
-
--- XXX JB comments really should be parsed only in pNotes, so that the column
--- of the parse errors is correct there, and so the comment delimiters
--- themselves show up in the passage shown in the error message
 
 nonNewLineSpaces :: Monad m => Parser m ()
 nonNewLineSpaces = skipMany $ satisfy \c -> isSpace c && c /= '\n'
 
 newLineSpaces :: Monad m => Parser m ()
-newLineSpaces = nonNewLineSpaces <* try (pCommentEnd *> pCommentStart)
+newLineSpaces = nonNewLineSpaces <* optional (try (pCommentEnd *> pCommentStart))
 
 -- XXX JB general idea:
 -- first, check if there's anything that comes before the first note. If so, the
@@ -198,18 +193,19 @@ pNotes = bimap (map Header) (map Ref) . mconcat <$> do
     pCommentStart
     mPotentialHeader <- optionMaybe (try singleLineNote)
     noteSeparator
-    firstRefs <- singleLineNotes
     case mPotentialHeader of
-      Nothing -> ([],) . (firstRefs ++) <$> multiLineNotes
-      Just potentialHeader -> headerBranch <|> refBranch
+      Nothing -> ([],) <$> multiLineNotes
+      Just potentialHeader -> try headerBranch <|> refBranch
         where
           headerBranch = do
-            try (count 3 $ char '~') *> skipMany (char '~')
+            firstRefs <- singleLineNotes
+            pCommentStart
+            (count 3 $ char '~') *> skipMany (char '~')
             restRefs <- multiLineNotes
             pure ([potentialHeader], firstRefs ++ restRefs)
           refBranch = do
-            restRefs <- noteSeparator *> multiLineNotes
-            pure ([], potentialHeader : firstRefs ++ restRefs)
+            refs <- noteSeparator *> multiLineNotes
+            pure ([], potentialHeader : refs)
 
 -- | pComment gets rid of a potential comment delimiter as well as any
 -- whitespace around it
@@ -225,9 +221,10 @@ pCommentStart = pComment beginComment
 pCommentEnd :: Monad m => Parser m ()
 pCommentEnd = pComment endComment <* endOfLine
 
--- Even for single-line notes, we don't want the separator being a multi-line
--- node, hence "spaces", not "nonNewLineSpaces".
 noteSeparator :: Monad m => Parser m ()
+-- Even for single-line notes, we want to stop parsing the separator when we
+-- encounter a note start that spans multiple lines, hence "newLineSpaces", not
+-- "nonNewLineSpaces".
 noteSeparator = skipMany $ notFollowedBy (pNoteStart newLineSpaces) *> noneOf "\n"
 
 singleLineNotes :: MonadReader Passage m => Parser m [Note]
