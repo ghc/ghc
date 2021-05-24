@@ -1,7 +1,7 @@
-# Get all lines in any non-binary files that look like they contain notes
-# Send them as input to the haskell script
-grep -rnI 'Note\s*\[[^]]*' $TOP | \
-  $GHC -ignore-dot-ghci "check-notes.hs" -e ":main"
+# Get all lines in any non-binary files that look like they contain notes and
+# the lines that immediately follow them
+# Then send them as input to the haskell script
+grep -rnI -A 1 'Note' $TOP | $GHC -ignore-dot-ghci "check-notes.hs" -e ":main"
 
 # set -e
 
