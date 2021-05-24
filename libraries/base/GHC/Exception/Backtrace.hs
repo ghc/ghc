@@ -1,10 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE NoImplicitPrelude
-           , ExistentialQuantification
-           , MagicHash
-           , RecordWildCards
-           , PatternSynonyms
-  #-}
+{-# LANGUAGE NoImplicitPrelude, ExistentialQuantification  #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
@@ -67,8 +62,7 @@ data BacktraceMechanism
       -- ^ use execution stack unwinding with given limit
 
 showBacktraces :: [Backtrace] -> String
-showBacktraces bts =
-    unlines $ intersperse "" $ map show bts
+showBacktraces bts = unlines $ intersperse "" $ map show bts
 
 currentBacktraceMechanism :: IORef [BacktraceMechanism]
 currentBacktraceMechanism = unsafePerformIO $ newIORef []
