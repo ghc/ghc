@@ -1,3 +1,4 @@
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE Trustworthy #-}
@@ -19,28 +20,56 @@
 -----------------------------------------------------------------------------
 
 module GHC.Exception.Type
-       ( Exception(..)    -- Class
-       , SomeException(..), ArithException(..)
+       ( -- * Fundamentals
+         Exception(..)
+       , SomeException(..)
+       , SomeExceptionWithLocation(..)
+       , addBacktrace
+         -- * Concrete exception types
+       , ArithException(..)
        , divZeroException, overflowException, ratioZeroDenomException
        , underflowException
        ) where
 
+import {-# SOURCE #-} GHC.Exception.Backtrace (Backtrace, showBacktraces)
+
 import Data.Maybe
-import Data.Typeable (Typeable, cast)
+import Data.Typeable (Typeable, cast, typeOf)
    -- loop: Data.Typeable -> GHC.Err -> GHC.Exception
 import GHC.Base
 import GHC.Show
+import Data.List (isPrefixOf)
 
 {- |
-The @SomeException@ type is the root of the exception type hierarchy.
+The @SomeExceptionWithLocation@ type is the root of the exception type hierarchy.
 When an exception of type @e@ is thrown, behind the scenes it is
 encapsulated in a @SomeException@.
+
+@since 4.16.0.0
 -}
-data SomeException = forall e . Exception e => SomeException e
+data SomeExceptionWithLocation = SomeExceptionWithLocation [Backtrace] SomeException
+
+addBacktrace :: Backtrace -> SomeExceptionWithLocation -> SomeExceptionWithLocation
+addBacktrace bt (SomeExceptionWithLocation bts e) =
+    SomeExceptionWithLocation (bt : bts) e
+
+{- |
+The @SomeException@ type represents any exception. This used to be the root of
+the exception type hierarchy, although this role is now played by
+'SomeExceptionWithLocation'
+-}
+data SomeException = forall e. Exception e => SomeException e
+
+-- | @since 3.0
+instance Show SomeExceptionWithLocation where
+        -- TODO: Should this obey the usual Show-is-Haskell invariant?
+    showsPrec p (SomeExceptionWithLocation bts e) =
+        showsPrec p e . showString (showBacktraces bts)
 
 -- | @since 3.0
 instance Show SomeException where
     showsPrec p (SomeException e) = showsPrec p e
+
 
 {- |
 Any type that you wish to throw or catch as an exception must be an
@@ -129,11 +158,26 @@ Caught MismatchedParentheses
 
 -}
 class (Typeable e, Show e) => Exception e where
-    toException   :: e -> SomeException
-    fromException :: SomeException -> Maybe e
+    toException   :: e -> SomeExceptionWithLocation
+    fromException :: SomeExceptionWithLocation -> Maybe e
 
-    toException = SomeException
-    fromException (SomeException e) = cast e
+    -- TODO: This is only a helper function to inspect how an Exception is layered / structured -> remove
+    toTypeString  :: e -> String
+
+    -- TODO: Remove invariant assertion
+    toException e = if isPrefixOf "SomeException" (toTypeString e) then
+                      error "toException - Unexpected nesting of SomeException"
+                    else
+                      SomeExceptionWithLocation [] $ SomeException e
+
+    -- TODO: Remove invariant assertion
+    fromException (SomeExceptionWithLocation _ (SomeException e)) =
+                    if isPrefixOf "SomeException" (toTypeString e) then
+                      error "fromException - Unexpected nesting of SomeException"
+                    else
+                      cast e
+
+    toTypeString e = show $ typeOf e
 
     -- | Render this exception value in a human-friendly manner.
     --
@@ -143,11 +187,20 @@ class (Typeable e, Show e) => Exception e where
     displayException :: e -> String
     displayException = show
 
--- | @since 3.0
-instance Exception SomeException where
+-- | @since 4.16.0.0
+instance Exception SomeExceptionWithLocation where
     toException se = se
     fromException = Just
+    displayException (SomeExceptionWithLocation bt e) = displayException e <> showBacktraces bt
+    toTypeString (SomeExceptionWithLocation _ e) = "SomeExceptionWithLocation " ++ toTypeString e
+
+-- | @since 3.0
+instance Exception SomeException where
+    toException e = SomeExceptionWithLocation [] e
+    fromException (SomeExceptionWithLocation _ (SomeException e)) = Just (SomeException e)
     displayException (SomeException e) = displayException e
+    toTypeString (SomeException e) = "SomeException " ++ toTypeString e
+
 
 -- |Arithmetic exceptions.
 data ArithException
@@ -161,7 +214,7 @@ data ArithException
            , Ord -- ^ @since 3.0
            )
 
-divZeroException, overflowException, ratioZeroDenomException, underflowException  :: SomeException
+divZeroException, overflowException, ratioZeroDenomException, underflowException  :: SomeExceptionWithLocation
 divZeroException        = toException DivideByZero
 overflowException       = toException Overflow
 ratioZeroDenomException = toException RatioZeroDenominator
