@@ -156,6 +156,11 @@ instance Instruction instr => Instruction (InstrSR instr) where
                 Instr instr     -> isMetaInstr instr
                 _               -> False
 
+        isConditionalInstr i
+         = case i of
+                 Instr instr    -> isConditionalInstr instr
+                 _              -> False
+
         mkRegRegMoveInstr platform r1 r2
             = Instr (mkRegRegMoveInstr platform r1 r2)
 
