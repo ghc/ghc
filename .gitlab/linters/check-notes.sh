@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Get all lines in any non-binary files that look like they contain notes and
 # the lines that immediately follow them
 # Then send them as input to the haskell script

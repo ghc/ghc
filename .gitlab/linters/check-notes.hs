@@ -127,8 +127,6 @@ checkNotes grepOutput = do
 
 -- | Parse passages separated by grep's group separation markers (--)
 pPassages :: Parser [Passage]
--- XXX JB Groups are not necessarily separated by -- !! (if they are
--- consecutive lines, i.e. matches are separated by at most one line)
 pPassages = pPassage `sepBy` (string "--" *> endOfLine) <* eof
 
 -- | Parse a passage in the format
@@ -140,32 +138,28 @@ pPassages = pPassage `sepBy` (string "--" *> endOfLine) <* eof
 pPassage :: Parser Passage
 pPassage = do
   let colon = char ':'
-      dash  = char '-'
-      restOfLine = manyTill anyChar (try pCommentEnd)
+      dashOrColon  = oneOf "-:"
+      line = pCommentStart *> manyTill anyChar (try pCommentEnd)
 
   -- Parse the line in which "Note" was found
   filePath <- manyTill anyChar colon
   lineNumber <- foldl' (\a d -> a * 10 + digitToInt d) 0 <$> many1 digit <* colon
-  pCommentStart
-  noteLine <- restOfLine
-  pCommentEnd
   -- We've parsed 1 line so far
   putState 1
+  noteLine <- line
 
-  -- We can have multiple note lines if the string "Note" was found in multiple
-  -- consecutive lines
-  noteLines <- many do
+  -- Following lines in the passage are ones directly following the noteline
+  -- in a source file. If "Note" was found in them, they use the colon
+  -- separator, otherwise, the dash separator. The passage ends before the
+  -- second consecutive line without "Note".
+  followLines <- many do
     lineNumber' <- (lineNumber +) <$> getState
+    string filePath *> dashOrColon
+    string (show lineNumber') *> dashOrColon
     modifyState (+1)
-    try (string filePath *> colon) *> string (show lineNumber') *> dash *> restOfLine
-  -- If a note was found in the last line, we don't expect a second line, hence
-  -- it is optional
-  followLine <- fromMaybe "" <$> optionMaybe do
-    -- in the following line, the line number is one higher
-    lineNumber' <- (lineNumber +) <$> getState
-    try (string filePath *> dash) *> string (show lineNumber') *> dash *> restOfLine
+    line
 
-  let content = T.pack . intercalate " " $ noteLine : noteLines ++ [followLine]
+  let content = T.pack . intercalate "\n" $ noteLine : followLines
   pure $ Passage (newPos filePath lineNumber 1) content
   where
     nonNewLineSpaces = many (satisfy \c -> isSpace c && c /= '\n')
