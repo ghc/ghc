@@ -288,7 +288,7 @@ initInfoTableProv infos itmap this_mod
        --pprTraceM "initInfoTable" (ppr (length ents))
        -- Output the actual IPE data
        mapM_ emitInfoTableProv ents
-       -- Create the C stub which initialises the IPE_LIST
+       -- Create the C stub which initialises the IPE map
        return (ipInitCode dflags this_mod ents)
 
 --- Info Table Prov stuff
