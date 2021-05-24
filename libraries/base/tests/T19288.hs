@@ -10,8 +10,8 @@ import GHC.TypeLits
 data Dat (x :: Proxy 1) = MkD1
 
 evil :: Maybe (Nat :~~: Symbol)
-evil = eqTypeRep (case (typeRepKind (typeRep :: TypeRep Dat)) of
-                          (Fun (App _ x) _) -> typeRepKind x)
+evil = eqTypeRep (case typeRepKind (typeRep :: TypeRep Dat) of
+                          Fun (App _ x) _ -> typeRepKind x)
                  (typeRep :: TypeRep Symbol)
 
 

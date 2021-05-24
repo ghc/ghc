@@ -642,7 +642,7 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = Left fields
         -- Awkwardly, for families, the match goes
         -- from instance type to family type
     (in_ty, out_ty) =
-      case (head cons_to_upd) of
+      case head cons_to_upd of
         RealDataCon data_con ->
           let tycon = dataConTyCon data_con in
           (mkTyConApp tycon in_inst_tys, mkFamilyTyConApp tycon out_inst_tys)
