@@ -1,0 +1,185 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 82, types: 41, coercions: 12, joins: 0/0}
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl_rzl :: Integer
+[GblId, Unf=OtherCon []]
+lvl_rzl = 1
+
+Rec {
+-- RHS size: {terms: 18, types: 9, coercions: 0, joins: 0/0}
+T19890.foo1 [InlPrag=INLINABLE, Occ=LoopBreaker]
+  :: forall {a}. Num a => Bool -> a -> a
+[GblId,
+ Arity=3,
+ Str=<SP(SCS(C1(L)),A,A,A,A,A,L)><1L><L>,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [60 70 0] 230 0
+         Tmpl= \ (@a_ayh)
+                 ($dNum_ayi :: Num a_ayh)
+                 (ds_dyQ [Occ=Once1!] :: Bool)
+                 (eta_B0 [Occ=Once2] :: a_ayh) ->
+                 case ds_dyQ of {
+                   False ->
+                     + @a_ayh $dNum_ayi eta_B0 (fromInteger @a_ayh $dNum_ayi 1);
+                   True -> T19890.foo1 @a_ayh $dNum_ayi GHC.Types.False eta_B0
+                 }}]
+T19890.foo1
+  = \ (@a_ayh)
+      ($dNum_ayi :: Num a_ayh)
+      (ds_dyQ :: Bool)
+      (eta_B0 :: a_ayh) ->
+      case ds_dyQ of {
+        False ->
+          + @a_ayh $dNum_ayi eta_B0 (fromInteger @a_ayh $dNum_ayi lvl_rzl);
+        True -> T19890.foo1 @a_ayh $dNum_ayi GHC.Types.False eta_B0
+      }
+end Rec }
+
+-- RHS size: {terms: 1, types: 0, coercions: 12, joins: 0/0}
+foo :: forall a. Num a => Bool -> Wombat a
+[GblId,
+ Arity=3,
+ Str=<SP(SCS(C1(L)),A,A,A,A,A,L)><1L><L>,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)
+         Tmpl= T19890.foo1
+               `cast` (forall (a :: <*>_N).
+                       <Num a>_R
+                       %<'Many>_N ->_R <Bool>_R
+                       %<'Many>_N ->_R Sym (T19890.N:Wombat[0] <a>_R)
+                       :: (forall {a}. Num a => Bool -> a -> a)
+                          ~R# (forall {a}. Num a => Bool -> Wombat a))}]
+foo
+  = T19890.foo1
+    `cast` (forall (a :: <*>_N).
+            <Num a>_R
+            %<'Many>_N ->_R <Bool>_R
+            %<'Many>_N ->_R Sym (T19890.N:Wombat[0] <a>_R)
+            :: (forall {a}. Num a => Bool -> a -> a)
+               ~R# (forall {a}. Num a => Bool -> Wombat a))
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T19890.$trModule4 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+T19890.$trModule4 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T19890.$trModule3 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T19890.$trModule3 = GHC.Types.TrNameS T19890.$trModule4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T19890.$trModule2 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+T19890.$trModule2 = "T19890"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T19890.$trModule1 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T19890.$trModule1 = GHC.Types.TrNameS T19890.$trModule2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T19890.$trModule :: GHC.Types.Module
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T19890.$trModule
+  = GHC.Types.Module T19890.$trModule3 T19890.$trModule1
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$krep_rzm :: GHC.Types.KindRep
+[GblId, Unf=OtherCon []]
+$krep_rzm = GHC.Types.KindRepVar 0#
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep1_rzn :: GHC.Types.KindRep
+[GblId, Unf=OtherCon []]
+$krep1_rzn = GHC.Types.KindRepFun $krep_rzm $krep_rzm
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T19890.$tcWombat2 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+T19890.$tcWombat2 = "Wombat"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T19890.$tcWombat1 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T19890.$tcWombat1 = GHC.Types.TrNameS T19890.$tcWombat2
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+T19890.$tcWombat :: GHC.Types.TyCon
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T19890.$tcWombat
+  = GHC.Types.TyCon
+      14886729617606120106##
+      9341180610983476309##
+      T19890.$trModule
+      T19890.$tcWombat1
+      0#
+      GHC.Types.krep$*Arr*
+
+-- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
+$krep2_rzo :: [GHC.Types.KindRep]
+[GblId, Unf=OtherCon []]
+$krep2_rzo
+  = GHC.Types.:
+      @GHC.Types.KindRep $krep_rzm (GHC.Types.[] @GHC.Types.KindRep)
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep3_rzp :: GHC.Types.KindRep
+[GblId, Unf=OtherCon []]
+$krep3_rzp = GHC.Types.KindRepTyConApp T19890.$tcWombat $krep2_rzo
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T19890.$tc'Wombat1 [InlPrag=[~]] :: GHC.Types.KindRep
+[GblId, Unf=OtherCon []]
+T19890.$tc'Wombat1 = GHC.Types.KindRepFun $krep1_rzn $krep3_rzp
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T19890.$tc'Wombat3 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+T19890.$tc'Wombat3 = "'Wombat"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T19890.$tc'Wombat2 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T19890.$tc'Wombat2 = GHC.Types.TrNameS T19890.$tc'Wombat3
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+T19890.$tc'Wombat :: GHC.Types.TyCon
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T19890.$tc'Wombat
+  = GHC.Types.TyCon
+      2678731069210293856##
+      16131282919067740460##
+      T19890.$trModule
+      T19890.$tc'Wombat2
+      1#
+      T19890.$tc'Wombat1
+
+
+
