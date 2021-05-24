@@ -364,6 +364,7 @@ import qualified GHC.LanguageExtensions as LangExt
 data IncludeSpecs
   = IncludeSpecs { includePathsQuote  :: [String]
                  , includePathsGlobal :: [String]
+                 -- | See note [Implicit include paths]
                  , includePathsQuoteImplicit :: [String]
                  }
   deriving Show
@@ -394,6 +395,22 @@ flattenIncludes specs =
     includePathsQuote specs ++
     includePathsQuoteImplicit specs ++
     includePathsGlobal specs
+
+{- Note [Implicit include paths]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  The compile driver adds the path to the folder containing the source file being
+  compiled to the 'IncludeSpecs', and this change gets recorded in the 'DynFlags'
+  that are used later to compute the interface file. Because of this,
+  the flags fingerprint derived from these 'DynFlags' and recorded in the
+  interface file will end up containing the absolute path to the source folder.
+
+  Build systems with a remote cache like Bazel or Buck (or Shake!) store the
+  build artifacts produced by a build BA for reuse in subsequent builds BB, BC, etc.
+  Embedding source paths in interface fingerprints will thwart these attemps and
+  lead to unnecessary recompilations when the source paths in BA differ from the
+  source paths in subsequent builds.
+ -}
+
 
 -- | Contains not only a collection of 'GeneralFlag's but also a plethora of
 -- information relating to the compilation of a single file or GHC session
