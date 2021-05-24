@@ -61,7 +61,7 @@ data Results = Results { numNotes :: !Int
                        } deriving Show
 
 -- Int is used to keep track of how many lines were parsed in some contexts
-type Parser = Parsec Text Int
+type Parser m = Parsec Text Int m
 
 data Error = Error { errorMsg :: Text
                    , errorPsg :: Maybe Passage -- Where did the error occur
@@ -114,7 +114,7 @@ checkNotes grepOutput = do
   parsedPassages <- liftEither . first (parseError grepOutput) $
     runParser pPassages 0 "stdin" grepOutput
   -- notes          <- runStage parseNotes   malformedRefs parsedPassages
-  undefined
+  traceShow parsedPassages undefined
 
 -- runStage :: MonadError Errors m
 --          => (t -> Except e a)      -- ^ extract an `a` from a `t`
@@ -126,7 +126,7 @@ checkNotes grepOutput = do
 --         go (e:es, _  ) = throwError $ collect (e :| es)
 
 -- | Parse passages separated by grep's group separation markers (--)
-pPassages :: Parser [Passage]
+pPassages :: Parser m [Passage]
 pPassages = pPassage `sepBy` (string "--" *> endOfLine) <* eof
 
 -- | Parse a passage in the format
@@ -135,7 +135,7 @@ pPassages = pPassage `sepBy` (string "--" *> endOfLine) <* eof
 -- as is usual for grep output with `-n -A 1`
 -- if the first and second lines are surrounded by whitespace or comment
 -- delimiter, they are discarded.
-pPassage :: Parser Passage
+pPassage :: Parser m Passage
 pPassage = do
   let colon = char ':'
       dashOrColon  = oneOf "-:"
@@ -162,7 +162,6 @@ pPassage = do
   let content = T.pack . intercalate "\n" $ noteLine : followLines
   pure $ Passage (newPos filePath lineNumber 1) content
   where
-    nonNewLineSpaces = many (satisfy \c -> isSpace c && c /= '\n')
     -- pComment get rid of leading and trailing whitespace and, optionally,
     -- the provided comment delimiters
     pComment commentDelim = do
@@ -172,11 +171,41 @@ pPassage = do
     pCommentStart = pComment beginComment
     pCommentEnd = pComment endComment *> endOfLine
 
+nonNewLineSpaces :: Parser m ()
+nonNewLineSpaces = void . many $ satisfy \c -> isSpace c && c /= '\n'
 
--- | Parses a line and produces either a header or a list of note references
--- the line contains
--- pNotes :: Parser (Either Header [Ref])
--- pNotes 
+-- XXX JB general idea:
+-- first, check if there's anything that comes before the first note. If so, the
+-- rest of the lines is just references. Else, parse all the notes in the line.
+-- Then, see if the next line is ~~~. If it is, treat the first note from the
+-- previous line (that you hopefully stored in some list) as header, and treat
+-- the rest as references. Otherwise, treat all of them as references. Go back
+-- to step one.
+
+-- | Parses a passage and produces a list of headers and references in that
+-- passage
+pNotes :: MonadReader Passage m => Parser m ([Header], [Ref])
+pNotes = bimap concat concat $ many do
+  mPotentialHeader <- optionMaybe (try pSingleLineNote)
+  case mPotentialHeader of
+    Nothing -> do
+      notes <- pMultiLineNote `sepBy` (notFollowedBy (pNoteStart spacec) *> anyChar)
+      manyTill anyChar endOfLine
+
+pNoteStart :: Parser m () -> Parser m ()
+pNoteStart pSpaces = string "Note" *> pSpaces *> char '['
+
+pSingleLineNote :: MonadReader Passage m => Parser m Note
+pSingleLineNote = do
+  notePassage <- ask
+  noteName <- string "Note" *> nonNewLineSpaces *> char '[' *> manyTill (noneOf "\n") ']'
+  pure Note {notePassage, noteName}
+
+pMultiLineNote :: MonadReader Passage m => Parser m Note
+pMultiLineNote = do
+  notePassage <- ask
+  noteName <- string "Note" *> spaces *> char '[' *> manyTill anyChar ']'
+  pure Note {notePassage, noteName}
 
 success :: Results -> IO ()
 success Results {numNotes, numRefs} = do
@@ -198,6 +227,9 @@ handleErrors Errors {errorTypeInfo, errorList} = do
         Nothing      -> pure ()
         Just passage -> do
           printLnStdErr "in the passage"
+          -- XXX JB print linenumber| in front of each passage line
+          -- remember to leftpad with spaces according to length of the longest
+          -- line number
           printLnStdErr (content passage)
 
     -- surround with ANSI escape sequence for red color and back to no color
