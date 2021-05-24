@@ -37,7 +37,6 @@ import GHC.Types.Var.Set ( VarSet )
 import GHC.Core.Type
 import GHC.Core.Multiplicity
 import GHC.Core.Predicate ( isClassPred )
-import GHC.Types.RepType  ( isVoidTy, typeMonoPrimRep_maybe )
 import GHC.Core.Coercion
 import GHC.Core.FamInstEnv
 import GHC.Types.Basic       ( Boxity(..) )
@@ -59,6 +58,8 @@ import GHC.Data.List.SetOps
 import Control.Applicative ( (<|>) )
 import Control.Monad ( zipWithM )
 import Data.List ( unzip4 )
+
+import GHC.Types.RepType
 
 {-
 ************************************************************************
@@ -458,7 +459,7 @@ mkWWargs :: TCvSubst            -- Freshening substitution to apply to the type
 
 mkWWargs subst fun_ty demands
   | null demands
-  = return ([], nop_fn, nop_fn, substTy subst fun_ty)
+  = return ([], nop_fn, nop_fn, substTyUnchecked subst fun_ty)
 
   | (dmd:demands') <- demands
   , Just (mult, arg_ty, fun_ty') <- splitFunTy_maybe fun_ty
@@ -1011,23 +1012,17 @@ mk_absent_let :: WwOpts -> Id -> Maybe (CoreExpr -> CoreExpr)
 mk_absent_let opts arg
   -- The lifted case: Bind 'absentError' for a nice panic message if we are
   -- wrong (like we were in #11126). See (1) in Note [Absent fillers]
-  | Just [LiftedRep] <- mb_mono_prim_reps
+  | not (isUnliftedType arg_ty)
   , not (isStrictDmd (idDemandInfo arg)) -- See (2) in Note [Absent fillers]
   = Just (Let (NonRec arg panic_rhs))
 
   -- The default case for mono rep: Bind @RUBBISH[prim_reps] \@arg_ty@
   -- See Note [Absent fillers], the main part
-  | Just prim_reps <- mb_mono_prim_reps
-  = Just (bindNonRec arg (mkTyApps (Lit (mkLitRubbish prim_reps)) [arg_ty]))
-
-  -- Catch all: Either @arg_ty@ wasn't of form @TYPE rep@ or @rep@ wasn't mono rep.
-  -- See (3) in Note [Absent fillers]
-  | Nothing <- mb_mono_prim_reps
-  = warnPprTrace True (text "No absent value for" <+> ppr arg_ty) $
-    Nothing
+  | otherwise
+  = Just (bindNonRec arg (mkTyApps (Lit (mkLitRubbish rep)) [arg_ty]))
   where
     arg_ty = idType arg
-    mb_mono_prim_reps = typeMonoPrimRep_maybe arg_ty
+    rep = getRuntimeRep arg_ty
 
     panic_rhs = mkAbsentErrorApp arg_ty msg
 

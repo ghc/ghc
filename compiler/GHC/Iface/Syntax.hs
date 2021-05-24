@@ -556,6 +556,7 @@ data IfaceExpr
   | IfaceLet    IfaceBinding  IfaceExpr
   | IfaceCast   IfaceExpr IfaceCoercion
   | IfaceLit    Literal
+  | IfaceRubbishLit IfaceType
   | IfaceFCall  ForeignCall IfaceType
   | IfaceTick   IfaceTickish IfaceExpr    -- from Tick tickish E
 
@@ -1368,6 +1369,7 @@ pprIfaceExpr :: (SDoc -> SDoc) -> IfaceExpr -> SDoc
 pprIfaceExpr _       (IfaceLcl v)       = ppr v
 pprIfaceExpr _       (IfaceExt v)       = ppr v
 pprIfaceExpr _       (IfaceLit l)       = ppr l
+pprIfaceExpr _       (IfaceRubbishLit r) = text "RUBBISH" <> parens (ppr r)
 pprIfaceExpr _       (IfaceFCall cc ty) = braces (ppr cc <+> ppr ty)
 pprIfaceExpr _       (IfaceType ty)     = char '@' <> pprParendIfaceType ty
 pprIfaceExpr _       (IfaceCo co)       = text "@~" <> pprParendIfaceCoercion co
@@ -2352,6 +2354,9 @@ instance Binary IfaceExpr where
         putByte bh 13
         put_ bh a
         put_ bh b
+    put_ bh (IfaceRubbishLit r) = do
+        putByte bh 14
+        put_ bh r
     get bh = do
         h <- getByte bh
         case h of
@@ -2394,6 +2399,8 @@ instance Binary IfaceExpr where
             13 -> do a <- get bh
                      b <- get bh
                      return (IfaceECase a b)
+            14 -> do r <- get bh
+                     return (IfaceRubbishLit r)
             _ -> panic ("get IfaceExpr " ++ show h)
 
 instance Binary IfaceTickish where
@@ -2618,6 +2625,7 @@ instance NFData IfaceExpr where
     IfaceLet bind e -> rnf bind `seq` rnf e
     IfaceCast e co -> rnf e `seq` rnf co
     IfaceLit l -> l `seq` () -- FIXME
+    IfaceRubbishLit r -> rnf r `seq` ()
     IfaceFCall fc ty -> fc `seq` rnf ty
     IfaceTick tick e -> rnf tick `seq` rnf e
 
