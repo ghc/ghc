@@ -427,19 +427,18 @@ unariseMulti_maybe rho dc args ty_args
 
 -- Doesn't return void args.
 unariseRubbish_maybe :: Literal -> Maybe [OutStgArg]
-unariseRubbish_maybe lit
-  | LitRubbish preps <- lit
-  , [prep] <- preps
+unariseRubbish_maybe (LitRubbish rep)
+  | [prep] <- preps
   , not (isVoidRep prep)
-  -- Single, non-void PrimRep. Nothing to do!
-  = Nothing
+  = Nothing   -- Single, non-void PrimRep. Nothing to do!
 
-  | LitRubbish preps <- lit
-  -- Multiple reps, possibly with VoidRep. Eliminate!
-  = Just [ StgLitArg (LitRubbish [prep]) | prep <- preps, not (isVoidRep prep) ]
+  | otherwise -- Multiple reps, possibly with VoidRep. Eliminate via elimCase
+  = Just [ StgLitArg (LitRubbish (primRepToType prep))
+         | prep <- preps, not (isVoidRep prep) ]
+  where
+    preps = runtimeRepPrimRep (text "unariseRubbish_maybe") rep
 
-  | otherwise
-  = Nothing
+unariseRubbish_maybe _ = Nothing
 
 --------------------------------------------------------------------------------
 
