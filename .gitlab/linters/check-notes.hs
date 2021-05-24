@@ -110,7 +110,7 @@ printErrors = undefined
 
 main :: IO ()
 main = do
-  hSetEncoding stdin utf8
+  mapM_ (flip hSetEncoding utf8) [stdin, stdout, stderr]
   either handleErrors success =<< checkNotes <$> T.getContents
 
 -- Takes raw output from grep and checks the references and header in it
@@ -267,12 +267,22 @@ handleErrors Errors {errorTypeInfo, errorList} = do
       case errorPsg of
         Nothing      -> pure ()
         Just passage -> do
-          printLnStdErr "in the passage"
+          printLnStdErr " in the passage"
           -- XXX JB print linenumber| in front of each passage line
           -- remember to leftpad with spaces according to length of the longest
           -- line number
-          printLnStdErr (content passage)
+          printPassage passage
 
     -- surround with ANSI escape sequence for red color and back to no color
     red :: Text -> Text
     red text = "\ESC[31m" <> text <> "\ESC[0m"
+
+    printPassage :: Passage -> IO ()
+    printPassage Passage {location, content} = do
+      let lineNum = sourceLine location
+          passageLines = T.lines content
+          lastLineNum = lineNum + length passageLines - 1
+          lastLineNumLength = length (show lastLineNum)
+          lineNums = T.justifyRight lastLineNumLength ' ' . T.pack . show <$> [lineNum..]
+          prependNum num str = printLnStdErr $ num <> "|" <> str
+      zipWithM_ prependNum lineNums passageLines
