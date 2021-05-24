@@ -1966,6 +1966,12 @@ convCallDataConKey     = mkPreludeDataConUnique 199
 --      USES TyConUniques 300-399
 -----------------------------------------------------
 
+getRepTyConKey :: Unique
+getRepTyConKey = mkPreludeTyConUnique 400
+
+getConvTyConKey :: Unique
+getConvTyConKey = mkPreludeTyConUnique 401
+
 #include "primop-vector-uniques.hs-incl"
 
 {-

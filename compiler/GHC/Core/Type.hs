@@ -129,6 +129,7 @@ module GHC.Core.Type (
         isPrimitiveType, isStrictType,
         isRuntimeRepTy, isRuntimeRepVar, isRuntimeRepKindedTy,
         isRuntimeInfoTy, isRuntimeInfoVar,
+        isCallingConvTy, isCallingConvVar,
         dropRuntimeRepArgs,
         getRuntimeRep,
 
@@ -261,6 +262,7 @@ import {-# SOURCE #-} GHC.Builtin.Types
                                  ( naturalTy, listTyCon
                                  , typeSymbolKind, liftedTypeKind
                                  , runtimeRepTy, callingConvTy
+                                 , getRepTyCon, getConvTyCon
                                  , constraintKind
                                  , unrestrictedFunTyCon
                                  , manyDataConTy, oneDataConTy )
@@ -579,8 +581,8 @@ kindRep_maybe kind
   , tc `hasKey` tYPETyConKey
   , TyConApp rinfo [rep, conv] <- coreFullView arg
   , rinfo `hasKey` runtimeInfoDataConKey    = Just rep
-  -- | TyConApp tc [arg] <- coreFullView kind
-  -- , tc `hasKey` tYPETyConKey                = Just $ (mkTyVarTy . mkTemplateKindVar) runtimeRepTy
+  | TyConApp tc [arg] <- coreFullView kind
+  , tc `hasKey` tYPETyConKey                = Just $ mkTyConApp getRepTyCon [arg]
   | otherwise                               = Nothing
 
 kindConv_maybe :: HasDebugCallStack => Kind -> Maybe Type
@@ -589,8 +591,8 @@ kindConv_maybe kind
   , tc `hasKey` tYPETyConKey
   , TyConApp rinfo [rep, conv] <- coreFullView arg
   , rinfo `hasKey` runtimeInfoDataConKey    = Just conv
-  -- | TyConApp tc [arg] <- coreFullView kind
-  -- , tc `hasKey` tYPETyConKey                = Just $ (mkTyVarTy . mkTemplateKindVar) callingConvTy
+  | TyConApp tc [arg] <- coreFullView kind
+  , tc `hasKey` tYPETyConKey                = Just $ mkTyConApp getConvTyCon [arg]  
   | otherwise                               = Nothing
 
 kindInfo_maybe :: HasDebugCallStack => Kind -> Maybe Type
@@ -715,6 +717,17 @@ isRuntimeInfoTy ty
 -- | Is a tyvar of type 'RuntimeInfo'?
 isRuntimeInfoVar :: TyVar -> Bool
 isRuntimeInfoVar = isRuntimeInfoTy . tyVarKind
+
+-- | Is this the type 'CallingConv'?
+isCallingConvTy :: Type -> Bool
+isCallingConvTy ty
+  | TyConApp tc args <- coreFullView ty
+  , tc `hasKey` callingConvTyConKey = True
+  | otherwise = False
+
+-- | Is a tyvar of type 'CallingConv'?
+isCallingConvVar :: TyVar -> Bool
+isCallingConvVar = isCallingConvTy . tyVarKind
 
 {- *********************************************************************
 *                                                                      *

@@ -1046,11 +1046,16 @@ newFlexiTyVarTy kind = do
 newFlexiTyVarTys :: Int -> Kind -> TcM [TcType]
 newFlexiTyVarTys n kind = replicateM n (newFlexiTyVarTy kind)
 
+-- newOpenTypeKind :: TcM TcKind
+-- newOpenTypeKind
+--   = do { rr <- newFlexiTyVarTy runtimeRepTy
+--        ; cc <- newFlexiTyVarTy callingConvTy
+--        ; return (tYPE $ rInfo rr cc) }
+
 newOpenTypeKind :: TcM TcKind
 newOpenTypeKind
-  = do { rr <- newFlexiTyVarTy runtimeRepTy
-       ; cc <- newFlexiTyVarTy callingConvTy
-       ; return (tYPE $ rInfo rr cc) }
+  = do { ri <- newFlexiTyVarTy runtimeInfoTy
+       ; return (tYPE ri) }
 
 -- | Create a tyvar that can be a lifted or unlifted type.
 -- Returns alpha :: TYPE kappa, where both alpha and kappa are fresh
@@ -1777,6 +1782,11 @@ defaultTyVar default_kind tv
   = do { traceTc "Defaulting a RuntimeRep var to LiftedRep" (ppr tv)
        ; writeMetaTyVar tv liftedRepTy
        ; return True }
+  | isCallingConvVar tv  -- Do not quantify over a RuntimeRep var
+                        -- unless it is a TyVarTv, handled earlier
+  = do { traceTc "Defaulting a CallingConv var to Eval" (ppr tv)
+       ; writeMetaTyVar tv convEvalDataConTy
+       ; return True }       
   | isMultiplicityVar tv
   = do { traceTc "Defaulting a Multiplicty var to Many" (ppr tv)
        ; writeMetaTyVar tv manyDataConTy

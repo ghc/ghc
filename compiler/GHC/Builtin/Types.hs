@@ -133,7 +133,7 @@ module GHC.Builtin.Types (
         doubleElemRepDataConTy,
 
         runtimeInfoTy, runtimeInfoDataConTyCon, callingConvTy, liftedRepEvalTy,
-        convEvalDataConTy,
+        convEvalDataConTy, getRepTyCon, getConvTyCon,
 
         -- * Multiplicity and friends
         multiplicityTyConName, oneDataConName, manyDataConName, multiplicityTy,
@@ -1621,6 +1621,30 @@ callingConvTyCon = pcTyCon callingConvTyConName Nothing []
 
 callingConvTy :: Type
 callingConvTy = mkTyConTy callingConvTyCon 
+
+getRepTyConName :: Name
+getRepTyConName =
+    mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "GetRep") getRepTyConKey getRepTyCon
+
+getRepTyCon :: TyCon
+getRepTyCon = mkFamilyTyCon getRepTyConName binders runtimeRepTy Nothing
+                         (BuiltInSynFamTyCon trivialBuiltInFamily)
+                         Nothing
+                         NotInjective
+  where
+    binders = mkTemplateAnonTyConBinders [runtimeInfoTy]
+
+getConvTyConName :: Name
+getConvTyConName =
+    mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "GetConv") getConvTyConKey getConvTyCon
+
+getConvTyCon :: TyCon
+getConvTyCon = mkFamilyTyCon getConvTyConName binders callingConvTy Nothing
+                         (BuiltInSynFamTyCon trivialBuiltInFamily)
+                         Nothing
+                         NotInjective
+  where
+    binders = mkTemplateAnonTyConBinders [runtimeInfoTy]
 
 {- *********************************************************************
 *                                                                      *

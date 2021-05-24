@@ -454,13 +454,11 @@ funTyCon = mkFunTyCon funTyConName tc_bndrs tc_rep_nm
   where
     -- See also unrestrictedFunTyCon
     tc_bndrs = [ mkNamedTyConBinder Required multiplicityTyVar
-               , mkNamedTyConBinder Inferred runtimeRep1TyVar
-               , mkNamedTyConBinder Inferred callingConv1TyVar 
-               , mkNamedTyConBinder Inferred runtimeRep2TyVar
-               , mkNamedTyConBinder Inferred callingConv2TyVar 
+               , mkNamedTyConBinder Inferred runtimeInfo1TyVar
+               , mkNamedTyConBinder Inferred runtimeInfo2TyVar
                 ]
-               ++ mkTemplateAnonTyConBinders [ tYPE $ rInfo runtimeRep1Ty callingConv1Ty
-                                             , tYPE $ rInfo runtimeRep2Ty callingConv2Ty
+               ++ mkTemplateAnonTyConBinders [ tYPE runtimeInfo1Ty
+                                             , tYPE runtimeInfo2Ty
                                              ]
     tc_rep_nm = mkPrelTyConRepName funTyConName
 

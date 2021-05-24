@@ -414,7 +414,20 @@ data Levity = Lifted | Unlifted
 
 data CallingConv = ConvEval 
 -- | ConvCall [RuntimeRep]
-data RuntimeInfo = RInfo {rep :: RuntimeRep, conv :: CallingConv}           
+data RuntimeInfo = RInfo {rep :: RuntimeRep, conv :: CallingConv}
+
+-- type family MultMul (a :: Multiplicity) (b :: Multiplicity) :: Multiplicity where
+--   MultMul 'One x = x
+--   MultMul x 'One = x
+--   MultMul 'Many x = 'Many
+--   MultMul x 'Many = 'Many
+
+type family GetRep (ri :: RuntimeInfo) :: RuntimeRep where
+  GetRep ('RInfo rep _) = rep
+
+type family GetConv (ri :: RuntimeInfo) :: CallingConv where
+  GetRep ('RInfo _ conv) = conv
+
 
 -- | GHC maintains a property that the kind of all inhabited types
 -- (as distinct from type constructors or type-level data) tells us
