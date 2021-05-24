@@ -10,6 +10,7 @@ other dynamic, non-language, flag settings:
   -fignore-hpc-changes
   -fno-ghci-history
   -fimplicit-import-qualified
+  -fkeep-going
   -fshow-warning-groups
 warning settings:
   -Wsemigroup
