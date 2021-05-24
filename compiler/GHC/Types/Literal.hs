@@ -53,6 +53,7 @@ module GHC.Types.Literal
         , litFitsInChar
         , litValue, mapLitValue
         , isLitValue_maybe
+        , isLitRubbish
 
         -- ** Coercions
         , narrowInt8Lit, narrowInt16Lit, narrowInt32Lit
@@ -557,6 +558,10 @@ mkLitNatural x = assertPpr (inNaturalRange x) (integer x)
 -- See Note [Rubbish values].
 mkLitRubbish :: [PrimRep] -> Literal
 mkLitRubbish = LitRubbish
+
+isLitRubbish :: Literal -> Bool
+isLitRubbish (LitRubbish {}) = True
+isLitRubbish _               = False
 
 inNaturalRange :: Integer -> Bool
 inNaturalRange x = x >= 0
