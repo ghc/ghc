@@ -16,7 +16,6 @@ import Debug.Trace -- XXX JB
 
 import           Control.Monad.Except
 import           Control.Monad.Reader
-import           Control.Monad.State.Strict
 
 import           Data.Bifunctor
 import           Data.Char
@@ -64,8 +63,8 @@ data Results = Results { numNotes :: !Int
 -- Int is used to keep track of how many lines were parsed in some contexts
 type Parser m = ParsecT Text Int m
 
-data Error = Error { errorMsg :: Text
-                   , errorPsg :: Maybe Passage -- Where did the error occur
+data Error = Error { errorPsg :: Maybe Passage -- Where did the error occur
+                   , errorMsg :: Text
                    } deriving Show
 
 data Errors = Errors
@@ -78,9 +77,9 @@ data Errors = Errors
 parseError :: Text       -- ^ The original input received via stdin
            -> ParseError -- ^ an error produced by parsing said input
            -> Errors
-parseError grepOutput err = Errors {errorTypeInfo , errorList}
+parseError grepOutput err = Errors {errorTypeInfo, errorList}
   where
-    errorList = Error errorMsg Nothing :| []
+    errorList = Error Nothing errorMsg :| []
     errorMsg = T.unlines (T.pack (show err) : lineMsg)
     -- This allows us to display the line in which the parse error occured to
     -- the user
@@ -94,8 +93,13 @@ parseError grepOutput err = Errors {errorTypeInfo , errorList}
 \are running this script using the provided check-notes.sh bash script."
 
 -- | Creates a list of malformed reference errors for the given lines
-malformedRef :: NonEmpty ParseError -> Errors
-malformedRef = undefined
+malformedRefs :: NonEmpty (Passage, ParseError) -> Errors
+malformedRefs errs = Errors {errorTypeInfo, errorList}
+  where
+    errorList = uncurry Error . bimap Just (T.pack . show) <$> errs
+    errorTypeInfo = "\
+\Some Note references or headers were malformed. Please ensure that they\n\
+\follow this format: XXX JB TODO"
 
 -- | Creates a list of dangling reference errors for the given notes
 danglingRefs :: NonEmpty Note -> Errors
@@ -107,23 +111,21 @@ printErrors = undefined
 main :: IO ()
 main = do
   hSetEncoding stdin utf8
-  either handleErrors success =<< runExcept . checkNotes <$> T.getContents
+  either handleErrors success =<< checkNotes <$> T.getContents
 
 -- Takes raw output from grep and checks the references and header in it
 checkNotes :: MonadError Errors m => Text -> m Results
 checkNotes grepOutput = do
   passages <- liftEither . first (parseError grepOutput) $
     runParser pPassages 0 "stdin" grepOutput
-  let mNnotes = partitionEithers $ map (runParserT pNotes 0 "" =<< content) passages
-  case mNotes of
-    ([], notes) -> mconcat notes
-    (e:es, _) -> e :| es
-  -- let a = first malformedRefs $
-  --         traverse (runParserT pNotes 0 "" =<< content) parsedPassages
-  -- a <-
-  --   traverse (runParserT pNotes 0 "" =<< content) parsedPassages
-  -- a <- mconcat <$> traverse (\passage -> runParser pNotes 0 (sourceName $ location passage) (content passage)) parsedPassages
-  traceShow passages _
+
+  let mNotes = partitionEithers $
+        map (liftM2 first (,) (runParserT pNotes 0 "" =<< content)) passages
+  (headers, refs) <- case mNotes of
+    ([]  , notes) -> pure $ mconcat notes
+    (e:es, _    ) -> throwError . malformedRefs $ e :| es
+
+  traceShow passages undefined
 
 -- runStage :: MonadError Errors m
 --          => (t -> Except e a)      -- ^ extract an `a` from a `t`
@@ -202,7 +204,7 @@ pNotes = bimap (map Header) (map Ref) . mconcat <$> many do
   -- Set the source to be the passage we're parsing
   setPosition =<< location <$> ask
 
-  mPotentialHeader <- optionMaybe (try pSingleLineNote)
+  mPotentialHeader <- optionMaybe (try singleLineNote)
   noteSeparator
   firstRefs <- singleLineNotes
   case mPotentialHeader of
@@ -223,25 +225,25 @@ noteSeparator :: Monad m => Parser m ()
 noteSeparator = skipMany $ notFollowedBy (pNoteStart spaces) *> noneOf "\n"
 
 singleLineNotes :: MonadReader Passage m => Parser m [Note]
-singleLineNotes =
-  concat <$> many pSingleLineNote `sepBy` noteSeparator <* manyTill anyChar endOfLine
+singleLineNotes = (singleLineNote `sepBy` noteSeparator) <* manyTill anyChar endOfLine
 
 -- XXX JB *almost* the same as singleLineNote
 multiLineNotes :: MonadReader Passage m => Parser m [Note]
-multiLineNotes =
-  concat <$> many pMultiLineNote `sepBy` noteSeparator <* manyTill anyChar endOfLine
+multiLineNotes = (multiLineNote `sepBy` noteSeparator) <* manyTill anyChar endOfLine
 
 pNoteStart :: Monad m => Parser m () -> Parser m ()
 pNoteStart pSpaces = string "Note" *> pSpaces <* char '['
 
-pSingleLineNote :: MonadReader Passage m => Parser m Note
-pSingleLineNote = do
+-- XXX JB to generify, pass in a single predicate which is either (const true)
+-- or (/= 'n') and then you can combine it with `isSpace` where needed
+singleLineNote :: MonadReader Passage m => Parser m Note
+singleLineNote = do
   notePassage <- ask
   noteNameStr <- pNoteStart nonNewLineSpaces *> manyTill (noneOf "\n") (char ']')
   pure Note {notePassage, noteName = T.pack noteNameStr}
 
-pMultiLineNote :: MonadReader Passage m => Parser m Note
-pMultiLineNote = do
+multiLineNote :: MonadReader Passage m => Parser m Note
+multiLineNote = do
   notePassage <- ask
   noteNameStr <- pNoteStart spaces *> manyTill anyChar (char ']')
   pure Note {notePassage, noteName = T.pack noteNameStr}
@@ -259,7 +261,7 @@ handleErrors Errors {errorTypeInfo, errorList} = do
     printStdErr = T.hPutStr stderr
     printLnStdErr = T.hPutStrLn stderr
 
-    printError Error {errorMsg, errorPsg} = do
+    printError Error {errorPsg, errorMsg} = do
       printStdErr (red "error: ")
       printStdErr errorMsg
       case errorPsg of
