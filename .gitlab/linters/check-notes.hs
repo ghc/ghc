@@ -5,11 +5,11 @@
 
 {-# OPTIONS_GHC -Wall #-}
 
-{-# LANGUAGE OverloadedStrings  #-}
-{-# LANGUAGE NamedFieldPuns     #-}
-{-# LANGUAGE FlexibleContexts   #-}
-{-# LANGUAGE LambdaCase         #-}
-{-# LANGUAGE BlockArguments     #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE NamedFieldPuns    #-}
+{-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE BlockArguments    #-}
 
 import Debug.Trace -- XXX JB
 
@@ -23,6 +23,7 @@ import           Data.Either
 import           Data.List
 import           Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
+import           Data.Maybe
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
@@ -59,7 +60,8 @@ data Results = Results { numNotes :: !Int
                        , numRefs  :: !Int
                        } deriving Show
 
-type Parser = Parsec Text ()
+-- Int is used to keep track of how many lines were parsed in some contexts
+type Parser = Parsec Text Int
 
 data Error = Error { errorMsg :: Text
                    , errorPsg :: Maybe Passage -- Where did the error occur
@@ -110,7 +112,7 @@ main = do
 checkNotes :: MonadError Errors m => Text -> m Results
 checkNotes grepOutput = do
   parsedPassages <- liftEither . first (parseError grepOutput) $
-    parse pPassages "stdin" grepOutput
+    runParser pPassages 0 "stdin" grepOutput
   -- notes          <- runStage parseNotes   malformedRefs parsedPassages
   undefined
 
@@ -125,6 +127,8 @@ checkNotes grepOutput = do
 
 -- | Parse passages separated by grep's group separation markers (--)
 pPassages :: Parser [Passage]
+-- XXX JB Groups are not necessarily separated by -- !! (if they are
+-- consecutive lines, i.e. matches are separated by at most one line)
 pPassages = pPassage `sepBy` (string "--" *> endOfLine) <* eof
 
 -- | Parse a passage in the format
@@ -137,22 +141,39 @@ pPassage :: Parser Passage
 pPassage = do
   let colon = char ':'
       dash  = char '-'
-  filePath <- manyTill anyChar colon
-  lineNumberStr <- many1 digit <* colon
-  let lineNumber = foldl' (\a d -> a * 10 + digitToInt d) 0 lineNumberStr
       restOfLine = manyTill anyChar (try pCommentEnd)
+
+  -- Parse the line in which "Note" was found
+  filePath <- manyTill anyChar colon
+  lineNumber <- foldl' (\a d -> a * 10 + digitToInt d) 0 <$> many1 digit <* colon
   pCommentStart
-  content1 <- restOfLine
-  _ <- string filePath *> dash *> string lineNumberStr *> dash
-  content2 <- restOfLine
-  pure $ Passage (newPos filePath lineNumber 1) (T.pack $ content1 <> " " <> content2)
+  noteLine <- restOfLine
+  pCommentEnd
+  -- We've parsed 1 line so far
+  putState 1
+
+  -- We can have multiple note lines if the string "Note" was found in multiple
+  -- consecutive lines
+  noteLines <- many do
+    lineNumber' <- (lineNumber +) <$> getState
+    modifyState (+1)
+    try (string filePath *> colon) *> string (show lineNumber') *> dash *> restOfLine
+  -- If a note was found in the last line, we don't expect a second line, hence
+  -- it is optional
+  followLine <- fromMaybe "" <$> optionMaybe do
+    -- in the following line, the line number is one higher
+    lineNumber' <- (lineNumber +) <$> getState
+    try (string filePath *> dash) *> string (show lineNumber') *> dash *> restOfLine
+
+  let content = T.pack . intercalate " " $ noteLine : noteLines ++ [followLine]
+  pure $ Passage (newPos filePath lineNumber 1) content
   where
-    nonNewLineSpaces = many (satisfy (\c -> isSpace c && c /= '\n'))
+    nonNewLineSpaces = many (satisfy \c -> isSpace c && c /= '\n')
     -- pComment get rid of leading and trailing whitespace and, optionally,
     -- the provided comment delimiters
     pComment commentDelim = do
       nonNewLineSpaces
-      optional $ traverse (try . string) commentDelim
+      optional . msum $ map (try . string) commentDelim
       nonNewLineSpaces
     pCommentStart = pComment beginComment
     pCommentEnd = pComment endComment *> endOfLine
