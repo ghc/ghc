@@ -62,7 +62,7 @@ data Results = Results { numNotes :: !Int
                        } deriving Show
 
 -- Int is used to keep track of how many lines were parsed in some contexts
-type Parser m = Parsec Text Int m
+type Parser m = ParsecT Text Int m
 
 data Error = Error { errorMsg :: Text
                    , errorPsg :: Maybe Passage -- Where did the error occur
@@ -94,8 +94,8 @@ parseError grepOutput err = Errors {errorTypeInfo , errorList}
 \are running this script using the provided check-notes.sh bash script."
 
 -- | Creates a list of malformed reference errors for the given lines
-malformedRefs :: NonEmpty Passage -> Errors
-malformedRefs = undefined
+malformedRef :: NonEmpty ParseError -> Errors
+malformedRef = undefined
 
 -- | Creates a list of dangling reference errors for the given notes
 danglingRefs :: NonEmpty Note -> Errors
@@ -112,10 +112,18 @@ main = do
 -- Takes raw output from grep and checks the references and header in it
 checkNotes :: MonadError Errors m => Text -> m Results
 checkNotes grepOutput = do
-  parsedPassages <- liftEither . first (parseError grepOutput) $
+  passages <- liftEither . first (parseError grepOutput) $
     runParser pPassages 0 "stdin" grepOutput
-  -- notes          <- runStage parseNotes   malformedRefs parsedPassages
-  traceShow parsedPassages undefined
+  let mNnotes = partitionEithers $ map (runParserT pNotes 0 "" =<< content) passages
+  case mNotes of
+    ([], notes) -> mconcat notes
+    (e:es, _) -> e :| es
+  -- let a = first malformedRefs $
+  --         traverse (runParserT pNotes 0 "" =<< content) parsedPassages
+  -- a <-
+  --   traverse (runParserT pNotes 0 "" =<< content) parsedPassages
+  -- a <- mconcat <$> traverse (\passage -> runParser pNotes 0 (sourceName $ location passage) (content passage)) parsedPassages
+  traceShow passages _
 
 -- runStage :: MonadError Errors m
 --          => (t -> Except e a)      -- ^ extract an `a` from a `t`
@@ -127,7 +135,7 @@ checkNotes grepOutput = do
 --         go (e:es, _  ) = throwError $ collect (e :| es)
 
 -- | Parse passages separated by grep's group separation markers (--)
-pPassages :: Parser m [Passage]
+pPassages :: Monad m => Parser m [Passage]
 pPassages = pPassage `sepBy` (string "--" *> endOfLine) <* eof
 
 -- | Parse a passage in the format
@@ -136,7 +144,7 @@ pPassages = pPassage `sepBy` (string "--" *> endOfLine) <* eof
 -- as is usual for grep output with `-n -A 1`
 -- if the first and second lines are surrounded by whitespace or comment
 -- delimiter, they are discarded.
-pPassage :: Parser m Passage
+pPassage :: Monad m => Parser m Passage
 pPassage = do
   let colon = char ':'
       dashOrColon  = oneOf "-:"
@@ -172,7 +180,11 @@ pPassage = do
     pCommentStart = pComment beginComment
     pCommentEnd = pComment endComment *> endOfLine
 
-nonNewLineSpaces :: Parser m ()
+-- XXX JB comments really should be parsed only in pNotes, so that the column
+-- of the parse errors is correct there, and so the comment delimiters
+-- themselves show up in the passage shown in the error message
+
+nonNewLineSpaces :: Monad m => Parser m ()
 nonNewLineSpaces = skipMany $ satisfy \c -> isSpace c && c /= '\n'
 
 -- XXX JB general idea:
@@ -186,7 +198,10 @@ nonNewLineSpaces = skipMany $ satisfy \c -> isSpace c && c /= '\n'
 -- | Parses a passage and produces a list of headers and references in that
 -- passage
 pNotes :: MonadReader Passage m => Parser m ([Header], [Ref])
-pNotes = bimap concat concat $ many do
+pNotes = bimap (map Header) (map Ref) . mconcat <$> many do
+  -- Set the source to be the passage we're parsing
+  setPosition =<< location <$> ask
+
   mPotentialHeader <- optionMaybe (try pSingleLineNote)
   noteSeparator
   firstRefs <- singleLineNotes
@@ -200,12 +215,12 @@ pNotes = bimap concat concat $ many do
           pure ([potentialHeader], firstRefs ++ restRefs)
         refBranch = do
           restRefs <- noteSeparator *> multiLineNotes <* manyTill anyChar endOfLine
-          pure (potentialHeader : firstRefs ++ restRefs)
+          pure ([], potentialHeader : firstRefs ++ restRefs)
 
 -- Even for single-line notes, we don't want the separator being a multi-line
 -- node, hence "spaces", not "nonNewLineSpaces".
-noteSeparator :: Parser m ()
-noteSeparator = many $ notFollowedBy (pNoteStart spaces) *> noneOf "\n"
+noteSeparator :: Monad m => Parser m ()
+noteSeparator = skipMany $ notFollowedBy (pNoteStart spaces) *> noneOf "\n"
 
 singleLineNotes :: MonadReader Passage m => Parser m [Note]
 singleLineNotes =
@@ -216,20 +231,20 @@ multiLineNotes :: MonadReader Passage m => Parser m [Note]
 multiLineNotes =
   concat <$> many pMultiLineNote `sepBy` noteSeparator <* manyTill anyChar endOfLine
 
-pNoteStart :: Parser m () -> Parser m ()
-pNoteStart pSpaces = string "Note" *> pSpaces *> char '['
+pNoteStart :: Monad m => Parser m () -> Parser m ()
+pNoteStart pSpaces = string "Note" *> pSpaces <* char '['
 
 pSingleLineNote :: MonadReader Passage m => Parser m Note
 pSingleLineNote = do
   notePassage <- ask
-  noteName <- pNoteStart nonNewLineSpaces *> manyTill (noneOf "\n") ']'
-  pure Note {notePassage, noteName}
+  noteNameStr <- pNoteStart nonNewLineSpaces *> manyTill (noneOf "\n") (char ']')
+  pure Note {notePassage, noteName = T.pack noteNameStr}
 
 pMultiLineNote :: MonadReader Passage m => Parser m Note
 pMultiLineNote = do
   notePassage <- ask
-  noteName <- pNoteStart spaces *> manyTill anyChar ']'
-  pure Note {notePassage, noteName}
+  noteNameStr <- pNoteStart spaces *> manyTill anyChar (char ']')
+  pure Note {notePassage, noteName = T.pack noteNameStr}
 
 success :: Results -> IO ()
 success Results {numNotes, numRefs} = do
