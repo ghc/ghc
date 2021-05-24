@@ -8,6 +8,7 @@ module GHC.Driver.Env
    , hsc_HPT
    , hscUpdateHPT
    , runHsc
+   , runHsc'
    , mkInteractiveHscEnv
    , runInteractiveHsc
    , hscEPS
@@ -31,6 +32,7 @@ import GHC.Prelude
 import GHC.Driver.Ppr
 import GHC.Driver.Session
 import GHC.Driver.Errors ( printOrThrowDiagnostics )
+import GHC.Driver.Errors.Types ( GhcMessage )
 
 import GHC.Runtime.Context
 import GHC.Runtime.Interpreter.Types (Interp)
@@ -51,7 +53,7 @@ import GHC.Core.InstEnv ( ClsInst )
 
 import GHC.Types.Annotations ( Annotation, AnnEnv, mkAnnEnv, plusAnnEnv )
 import GHC.Types.CompleteMatch
-import GHC.Types.Error ( emptyMessages )
+import GHC.Types.Error ( emptyMessages, Messages )
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.TyThing
@@ -75,6 +77,9 @@ runHsc hsc_env (Hsc hsc) = do
     (a, w) <- hsc hsc_env emptyMessages
     printOrThrowDiagnostics (hsc_logger hsc_env) (hsc_dflags hsc_env) w
     return a
+
+runHsc' :: HscEnv -> Hsc a -> IO (a, Messages GhcMessage)
+runHsc' hsc_env (Hsc hsc) = hsc hsc_env emptyMessages
 
 -- | Switches in the DynFlags and Plugins from the InteractiveContext
 mkInteractiveHscEnv :: HscEnv -> HscEnv
