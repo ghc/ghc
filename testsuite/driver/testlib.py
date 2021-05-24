@@ -37,6 +37,11 @@ if config.use_threads:
     import threading
     pool_sema = threading.BoundedSemaphore(value=config.threads)
 
+def acquire_all() -> None:
+    global pool_sema
+    for i in range(config.threads):
+        pool_sema.acquire()
+
 global wantToStop
 wantToStop = False
 
@@ -2372,6 +2377,21 @@ def dump_file(f: Path):
     except Exception:
         print('')
 
+# Wait for a process but kill it if a global trigger is sent
+def process_loop(r):
+    finished = False
+    while not (stopping() or finished):
+        try:
+            # communicate rather than wait so that doesn't block on stdin
+            out,errs = r.communicate(timeout=1)
+            finished = True
+        except subprocess.TimeoutExpired:
+            pass
+    if not finished:
+        r.terminate()
+        out, errs = r.communicate()
+    return out,errs
+
 def runCmd(cmd: str,
            stdin: Union[None, Path]=None,
            stdout: Union[None, Path]=None,
@@ -2404,8 +2424,8 @@ def runCmd(cmd: str,
                              stdout=subprocess.PIPE,
                              stderr=hStdErr,
                              env=ghc_env)
+        stdout_buffer, stderr_buffer = process_loop(r)
 
-        stdout_buffer, stderr_buffer = r.communicate()
     finally:
         if stdin_file:
             stdin_file.close()
