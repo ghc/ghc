@@ -52,7 +52,7 @@ module GHC.Types.Literal
         , isZeroLit, isOneLit
         , litFitsInChar
         , litValue, mapLitValue
-        , isLitValue_maybe
+        , isLitValue_maybe, isLitRubbish
 
         -- ** Coercions
         , narrowInt8Lit, narrowInt16Lit, narrowInt32Lit
@@ -68,7 +68,6 @@ import GHC.Prelude
 import GHC.Builtin.Types.Prim
 import {-# SOURCE #-} GHC.Builtin.Types
 import GHC.Core.Type
-import GHC.Core.TyCon
 import GHC.Utils.Outputable
 import GHC.Data.FastString
 import GHC.Types.Basic
@@ -131,13 +130,15 @@ data Literal
                                 -- that can be represented as a Literal. Create
                                 -- with 'nullAddrLit'
 
-  | LitRubbish [PrimRep]        -- ^ A nonsense value of the given
+  | LitRubbish Type             -- ^ A nonsense value of the given
                                 -- representation. See Note [Rubbish values].
                                 --
-                                -- The @[PrimRep]@ of a 'Type' can be obtained
-                                -- from 'typeMonoPrimRep_maybe'. The field
-                                -- becomes empty or singleton post-unarisation,
-                                -- see Note [Post-unarisation invariants].
+                                -- The Type argument, rr, is of kind RuntimeRep.
+                                -- The type of the literal is forall (a:rr). a
+                                --
+                                -- INVARIANT: the Type has no free variables
+                                --    and so substitution etc can ignore it
+                                --
 
   | LitFloat   Rational         -- ^ @Float#@. Create with 'mkLitFloat'
   | LitDouble  Rational         -- ^ @Double#@. Create with 'mkLitDouble'
@@ -242,7 +243,8 @@ instance Binary Literal where
         = do putByte bh 6
              put_ bh nt
              put_ bh i
-    put_ bh (LitRubbish b) = do putByte bh 7; put_ bh b
+    put_ _ (LitRubbish b) = pprPanic "Binary LitRubbish" (ppr b)
+                            -- We use IfaceLitRubbish
     get bh = do
             h <- getByte bh
             case h of
@@ -268,9 +270,6 @@ instance Binary Literal where
                     nt <- get bh
                     i  <- get bh
                     return (LitNumber nt i)
-              7 -> do
-                    b <- get bh
-                    return (LitRubbish b)
               _ -> pprPanic "Binary:Literal" (int (fromIntegral h))
 
 instance Outputable Literal where
@@ -555,8 +554,12 @@ mkLitNatural x = assertPpr (inNaturalRange x) (integer x)
 -- | Create a rubbish literal of the given representation.
 -- The representation of a 'Type' can be obtained via 'typeMonoPrimRep_maybe'.
 -- See Note [Rubbish values].
-mkLitRubbish :: [PrimRep] -> Literal
+mkLitRubbish :: Type -> Literal
 mkLitRubbish = LitRubbish
+
+isLitRubbish :: Literal -> Bool
+isLitRubbish (LitRubbish {}) = True
+isLitRubbish _               = False
 
 inNaturalRange :: Integer -> Bool
 inNaturalRange x = x >= 0
@@ -821,10 +824,10 @@ literalType (LitNumber lt _)  = case lt of
    LitNumWord16  -> word16PrimTy
    LitNumWord32  -> word32PrimTy
    LitNumWord64  -> word64PrimTy
-literalType (LitRubbish preps) = mkForAllTy a Inferred (mkTyVarTy a)
+literalType (LitRubbish rep) = mkForAllTy a Inferred (mkTyVarTy a)
   where
     -- See Note [Rubbish values]
-    a = head $ mkTemplateTyVars [tYPE (primRepsToRuntimeRep preps)]
+    a = mkTemplateKindVar (tYPE rep)
 
 {-
         Comparison
@@ -840,7 +843,7 @@ cmpLit (LitDouble    a)     (LitDouble     b)     = a `compare` b
 cmpLit (LitLabel     a _ _) (LitLabel      b _ _) = a `lexicalCompareFS` b
 cmpLit (LitNumber nt1 a)    (LitNumber nt2  b)
   = (nt1 `compare` nt2) `mappend` (a `compare` b)
-cmpLit (LitRubbish b1)      (LitRubbish b2)       = b1 `compare` b2
+cmpLit (LitRubbish b1)      (LitRubbish b2)       = b1 `nonDetCmpType` b2
 cmpLit lit1 lit2
   | isTrue# (dataToTag# lit1 <# dataToTag# lit2) = LT
   | otherwise                                    = GT
@@ -876,8 +879,8 @@ pprLiteral add_par (LitLabel l mb fod) =
     where b = case mb of
               Nothing -> pprHsString l
               Just x  -> doubleQuotes (text (unpackFS l ++ '@':show x))
-pprLiteral _       (LitRubbish reps)
-  = text "RUBBISH" <> ppr reps
+pprLiteral _       (LitRubbish rep)
+  = text "RUBBISH" <> parens (ppr rep)
 
 pprIntegerVal :: (SDoc -> SDoc) -> Integer -> SDoc
 -- See Note [Printing of literals in Core].
