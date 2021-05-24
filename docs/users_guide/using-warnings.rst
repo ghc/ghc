@@ -1204,6 +1204,24 @@ of ``-W(no-)*``.
 
     This option is off by default.
 
+.. ghc-flag:: -Wmissing-exported-pattern-synonym-signatures
+    :shortdesc: warn about pattern synonyms without signatures, only if they
+        are exported
+    :type: dynamic
+    :reverse: -Wno-missing-exported-pattern-synonym-signatures
+    :category:
+
+    .. index::
+       single: type signatures, missing, pattern synonyms
+
+    If you would like GHC to check that every exported pattern synonym has a
+    type signature, but not check unexported pattern synonyms, use the
+    :ghc-flag:`-Wmissing-exported-pattern-synonym-signatures` option. If this
+    option is used in conjunction with
+    :ghc-flag:`-Wmissing-pattern-synonym-signatures` then every pattern synonym
+    must have a type signature. As part of the warning GHC also reports the
+    inferred type. The option is off by default.
+
 .. ghc-flag:: -Wname-shadowing
     :shortdesc: warn when names are shadowed
     :type: dynamic
