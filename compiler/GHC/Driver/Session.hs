@@ -405,8 +405,9 @@ flattenIncludes specs =
   the flags fingerprint derived from these 'DynFlags' and recorded in the
   interface file will end up containing the absolute path to the source folder.
 
-  Build systems with a remote cache like Bazel or Buck (or Shake!) store the
-  build artifacts produced by a build BA for reuse in subsequent builds BB, BC, etc.
+  Build systems with a remote cache like Bazel or Buck (or Shake, see #16956)
+  store the build artifacts produced by a build BA for reuse in subsequent builds.
+
   Embedding source paths in interface fingerprints will thwart these attemps and
   lead to unnecessary recompilations when the source paths in BA differ from the
   source paths in subsequent builds.
