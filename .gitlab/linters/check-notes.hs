@@ -173,7 +173,7 @@ nonNewLineSpaces :: Monad m => Parser m ()
 nonNewLineSpaces = skipMany $ satisfy \c -> isSpace c && c /= '\n'
 
 newLineSpaces :: Monad m => Parser m ()
-newLineSpaces = nonNewLineSpaces <* optional (try (pCommentEnd *> pCommentStart))
+newLineSpaces = nonNewLineSpaces <* optional (try $ pCommentEnd *> pCommentStart)
 
 -- XXX JB general idea:
 -- first, check if there's anything that comes before the first note. If so, the
@@ -228,11 +228,11 @@ noteSeparator :: Monad m => Parser m ()
 noteSeparator = skipMany $ notFollowedBy (pNoteStart newLineSpaces) *> noneOf "\n"
 
 singleLineNotes :: MonadReader Passage m => Parser m [Note]
-singleLineNotes = (singleLineNote `sepBy` noteSeparator) <* manyTill anyChar pCommentEnd
+singleLineNotes = (singleLineNote `endBy` noteSeparator) <* pCommentEnd
 
 -- XXX JB *almost* the same as singleLineNote
 multiLineNotes :: MonadReader Passage m => Parser m [Note]
-multiLineNotes = (multiLineNote `sepBy` noteSeparator) <* manyTill anyChar pCommentEnd
+multiLineNotes = (multiLineNote `endBy` noteSeparator) <* pCommentEnd
 
 pNoteStart :: Monad m => Parser m () -> Parser m ()
 pNoteStart pSpaces = string "Note" *> pSpaces <* char '['
