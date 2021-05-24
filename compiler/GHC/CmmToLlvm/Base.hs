@@ -69,6 +69,7 @@ import Data.Char (isDigit)
 import Data.List (sortBy, groupBy, intercalate)
 import Data.Ord (comparing)
 import qualified Data.List.NonEmpty as NE
+import Data.Foldable (toList)
 
 -- ----------------------------------------------------------------------------
 -- * Some Data Types
@@ -265,7 +266,18 @@ llvmPtrBits platform = widthInBits $ typeWidth $ gcWord platform
 
 -- Newtype to avoid using the Eq instance!
 newtype LlvmVersion = LlvmVersion { llvmVersionNE :: NE.NonEmpty Int }
-  deriving (Eq, Ord)
+  deriving (Eq)
+
+instance Ord LlvmVersion where
+  compare = \(LlvmVersion a) (LlvmVersion b) -> go (toList a) (toList b)
+    where
+      go [] [] = EQ
+      go [] bs = go [0] bs
+      go as [] = go as [0]
+      go (a : as) (b : bs)
+        | a == b = go as bs
+        | otherwise = a `compare` b
+
 
 parseLlvmVersion :: String -> Maybe LlvmVersion
 parseLlvmVersion =
@@ -288,7 +300,7 @@ supportedLlvmVersionMax = LlvmVersion (sUPPORTED_LLVM_VERSION_MAX NE.:| [])
 
 llvmVersionSupported :: LlvmVersion -> Bool
 llvmVersionSupported v =
-  v > supportedLlvmVersionMin && v <= supportedLlvmVersionMax
+  v >= supportedLlvmVersionMin && v <= supportedLlvmVersionMax
 
 llvmVersionStr :: LlvmVersion -> String
 llvmVersionStr = intercalate "." . map show . llvmVersionList
