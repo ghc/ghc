@@ -22,8 +22,6 @@ import           Data.Char
 import           Data.Either
 import           Data.List
 import           Data.List.NonEmpty (NonEmpty(..))
-import qualified Data.List.NonEmpty as NE
-import           Data.Maybe
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
@@ -39,6 +37,10 @@ beginComment, endComment :: [String]
 beginComment = ["--", "-- |", "{-", "#", "//", "/*"]
 endComment = ["-}", "*/"]
 
+-- | Used as parameter to some functions to determine whether line breaks
+-- should be allowed within a Note
+data AllowLineBreaks = WithLineBreaks | NoLineBreaks
+
 -- XXX JB remove all the Show instances
 -- | A two-line passage from a source file that looks like it might contain a
 -- note, with source location
@@ -46,6 +48,7 @@ data Passage = Passage { location   :: !SourcePos
                        , content    :: !Text
                        } deriving Show
 
+-- | This refers roughly to a string that looks like "Note [<noteName>]"
 data Note = Note { notePassage :: !Passage -- where is the note from?
                  , noteName    :: !Text
                  } deriving Show
@@ -103,9 +106,6 @@ malformedRefs errs = Errors {errorTypeInfo, errorList}
 danglingRefs :: NonEmpty Note -> Errors
 danglingRefs = undefined
 
-printErrors :: Errors -> IO ()
-printErrors = undefined
-
 main :: IO ()
 main = do
   mapM_ (flip hSetEncoding utf8) [stdin, stdout, stderr]
@@ -123,7 +123,7 @@ checkNotes grepOutput = do
     ([]  , notes) -> pure $ mconcat notes
     (e:es, _    ) -> throwError . malformedRefs $ e :| es
 
-  traceShow passages undefined
+  traceShow headers undefined
 
 -- runStage :: MonadError Errors m
 --          => (t -> Except e a)      -- ^ extract an `a` from a `t`
@@ -175,14 +175,6 @@ nonNewLineSpaces = skipMany $ satisfy \c -> isSpace c && c /= '\n'
 newLineSpaces :: Monad m => Parser m ()
 newLineSpaces = nonNewLineSpaces <* optional (try $ pCommentEnd *> pCommentStart)
 
--- XXX JB general idea:
--- first, check if there's anything that comes before the first note. If so, the
--- rest of the lines is just references. Else, parse all the notes in the line.
--- Then, see if the next line is ~~~. If it is, treat the first note from the
--- previous line (that you hopefully stored in some list) as header, and treat
--- the rest as references. Otherwise, treat all of them as references. Go back
--- to step one.
-
 -- | Parses a passage and produces a list of headers and references in that
 -- passage
 pNotes :: MonadReader Passage m => Parser m ([Header], [Ref])
@@ -218,6 +210,8 @@ pComment commentDelims = do
 pCommentStart :: Monad m => Parser m ()
 pCommentStart = pComment beginComment
 
+-- | pCommentEnd parses a potential comment ending delimiter as well as a new
+-- line
 pCommentEnd :: Monad m => Parser m ()
 pCommentEnd = pComment endComment <* endOfLine
 
@@ -237,19 +231,20 @@ multiLineNotes = (multiLineNote `endBy` noteSeparator) <* pCommentEnd
 pNoteStart :: Monad m => Parser m () -> Parser m ()
 pNoteStart pSpaces = string "Note" *> pSpaces <* char '['
 
--- XXX JB to generify, pass in a single predicate which is either (const true)
--- or (/= 'n') and then you can combine it with `isSpace` where needed
-singleLineNote :: MonadReader Passage m => Parser m Note
-singleLineNote = do
+singleNote :: MonadReader Passage m => AllowLineBreaks -> Parser m Note
+singleNote allowLineBreaks = do
   notePassage <- ask
-  noteNameStr <- pNoteStart nonNewLineSpaces *> manyTill (noneOf "\n") (char ']')
+  let (withinNote, pSpaces) = case allowLineBreaks of
+        WithLineBreaks -> (anyChar, newLineSpaces)
+        NoLineBreaks   -> (noneOf "\n", nonNewLineSpaces)
+  noteNameStr <- pNoteStart pSpaces *> manyTill withinNote (char ']')
   pure Note {notePassage, noteName = T.pack noteNameStr}
 
+singleLineNote :: MonadReader Passage m => Parser m Note
+singleLineNote = singleNote NoLineBreaks
+
 multiLineNote :: MonadReader Passage m => Parser m Note
-multiLineNote = do
-  notePassage <- ask
-  noteNameStr <- pNoteStart newLineSpaces *> manyTill anyChar (char ']')
-  pure Note {notePassage, noteName = T.pack noteNameStr}
+multiLineNote = singleNote WithLineBreaks
 
 success :: Results -> IO ()
 success Results {numNotes, numRefs} = do
