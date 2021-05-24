@@ -38,7 +38,7 @@ beginComment = ["--", "-- |", "{-", "#", "//", "/*"]
 endComment = ["-}", "*/"]
 
 -- | Used as parameter to some functions to determine whether line breaks
--- should be allowed within a Note
+-- should be allowed
 data AllowLineBreaks = WithLineBreaks | NoLineBreaks
 
 -- XXX JB remove all the Show instances
@@ -169,11 +169,12 @@ pPassage = do
   let content = T.pack . unlines $ noteLine : followLines
   pure $ Passage (newPos filePath lineNumber 1) content
 
-nonNewLineSpaces :: Monad m => Parser m ()
-nonNewLineSpaces = skipMany $ satisfy \c -> isSpace c && c /= '\n'
-
-newLineSpaces :: Monad m => Parser m ()
-newLineSpaces = nonNewLineSpaces <* optional (try $ pCommentEnd *> pCommentStart)
+pSpaces :: Monad m => AllowLineBreaks -> Parser m ()
+pSpaces allowLineBreaks = do
+  skipMany $ satisfy \c -> isSpace c && c /= '\n'
+  case allowLineBreaks of
+    WithLineBreaks -> optional (try $ pCommentEnd *> pCommentStart)
+    NoLineBreaks   -> pure ()
 
 -- | Parses a passage and produces a list of headers and references in that
 -- passage
@@ -183,29 +184,29 @@ pNotes = bimap (map Header) (map Ref) . mconcat <$> do
   setPosition =<< location <$> ask
   many do
     pCommentStart
-    mPotentialHeader <- optionMaybe (try singleLineNote)
+    mPotentialHeader <- optionMaybe (try $ pNote NoLineBreaks)
     noteSeparator
     case mPotentialHeader of
-      Nothing -> ([],) <$> multiLineNotes
+      Nothing -> ([],) <$> notesUntilEOL WithLineBreaks
       Just potentialHeader -> try headerBranch <|> refBranch
         where
           headerBranch = do
-            firstRefs <- singleLineNotes
+            firstRefs <- notesUntilEOL NoLineBreaks
             pCommentStart
             (count 3 $ char '~') *> skipMany (char '~')
-            restRefs <- multiLineNotes
+            restRefs <- notesUntilEOL WithLineBreaks
             pure ([potentialHeader], firstRefs ++ restRefs)
           refBranch = do
-            refs <- noteSeparator *> multiLineNotes
+            refs <- noteSeparator *> notesUntilEOL WithLineBreaks
             pure ([], potentialHeader : refs)
 
 -- | pComment gets rid of a potential comment delimiter as well as any
 -- whitespace around it
 pComment :: Monad m => [String] -> Parser m ()
 pComment commentDelims = do
-  nonNewLineSpaces
+  pSpaces NoLineBreaks
   optional . msum $ map (try . string) commentDelims
-  nonNewLineSpaces
+  pSpaces NoLineBreaks
 
 pCommentStart :: Monad m => Parser m ()
 pCommentStart = pComment beginComment
@@ -217,34 +218,24 @@ pCommentEnd = pComment endComment <* endOfLine
 
 noteSeparator :: Monad m => Parser m ()
 -- Even for single-line notes, we want to stop parsing the separator when we
--- encounter a note start that spans multiple lines, hence "newLineSpaces", not
--- "nonNewLineSpaces".
-noteSeparator = skipMany $ notFollowedBy (pNoteStart newLineSpaces) *> noneOf "\n"
+-- encounter a note start that spans multiple lines, hence `WithLineBreaks`
+noteSeparator = skipMany $ notFollowedBy (pNoteStart WithLineBreaks) *> noneOf "\n"
 
-singleLineNotes :: MonadReader Passage m => Parser m [Note]
-singleLineNotes = (singleLineNote `endBy` noteSeparator) <* pCommentEnd
+notesUntilEOL :: MonadReader Passage m => AllowLineBreaks -> Parser m [Note]
+notesUntilEOL allowLineBreaks =
+  (pNote allowLineBreaks `endBy` noteSeparator) <* pCommentEnd
 
--- XXX JB *almost* the same as singleLineNote
-multiLineNotes :: MonadReader Passage m => Parser m [Note]
-multiLineNotes = (multiLineNote `endBy` noteSeparator) <* pCommentEnd
+pNoteStart :: Monad m => AllowLineBreaks -> Parser m ()
+pNoteStart allowLineBreaks = string "Note" *> pSpaces allowLineBreaks <* char '['
 
-pNoteStart :: Monad m => Parser m () -> Parser m ()
-pNoteStart pSpaces = string "Note" *> pSpaces <* char '['
-
-singleNote :: MonadReader Passage m => AllowLineBreaks -> Parser m Note
-singleNote allowLineBreaks = do
+pNote :: MonadReader Passage m => AllowLineBreaks -> Parser m Note
+pNote allowLineBreaks = do
   notePassage <- ask
-  let (withinNote, pSpaces) = case allowLineBreaks of
-        WithLineBreaks -> (anyChar, newLineSpaces)
-        NoLineBreaks   -> (noneOf "\n", nonNewLineSpaces)
-  noteNameStr <- pNoteStart pSpaces *> manyTill withinNote (char ']')
+  let withinNote = case allowLineBreaks of
+        WithLineBreaks -> anyChar
+        NoLineBreaks   -> noneOf "\n"
+  noteNameStr <- pNoteStart allowLineBreaks *> manyTill withinNote (char ']')
   pure Note {notePassage, noteName = T.pack noteNameStr}
-
-singleLineNote :: MonadReader Passage m => Parser m Note
-singleLineNote = singleNote NoLineBreaks
-
-multiLineNote :: MonadReader Passage m => Parser m Note
-multiLineNote = singleNote WithLineBreaks
 
 success :: Results -> IO ()
 success Results {numNotes, numRefs} = do
