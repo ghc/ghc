@@ -383,6 +383,7 @@ addQuoteInclude spec paths  = let f = includePathsQuote spec
                               in spec { includePathsQuote = f ++ paths }
 
 -- | These includes are not considered while fingerprinting the flags for iface
+-- | See note [Implicit include paths]
 addImplicitQuoteInclude :: IncludeSpecs -> [String] -> IncludeSpecs
 addImplicitQuoteInclude spec paths  = let f = includePathsQuoteImplicit spec
                               in spec { includePathsQuoteImplicit = f ++ paths }
