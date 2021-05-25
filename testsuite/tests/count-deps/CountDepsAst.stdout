@@ -1,4 +1,12 @@
+<<<<<<< HEAD
+<<<<<<< HEAD
 Found 269 Language.Haskell.Syntax module dependencies
+=======
+Found 268 Language.Haskell.Syntax module dependencies
+>>>>>>> ce23bb7af3... Driver Rework Pt2
+=======
+Found 269 Language.Haskell.Syntax module dependencies
+>>>>>>> 63f9745d1b... update two tests
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
 GHC.Builtin.Types
@@ -94,6 +102,7 @@ GHC.Driver.Hooks
 GHC.Driver.Monad
 GHC.Driver.Phases
 GHC.Driver.Pipeline.Monad
+GHC.Driver.Pipeline.Phases
 GHC.Driver.Plugins
 GHC.Driver.Ppr
 GHC.Driver.Session
@@ -215,6 +224,7 @@ GHC.Types.Var.Set
 GHC.Unit
 GHC.Unit.Env
 GHC.Unit.External
+GHC.Unit.Finder
 GHC.Unit.Finder.Types
 GHC.Unit.Home
 GHC.Unit.Home.ModInfo
