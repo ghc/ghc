@@ -141,12 +141,23 @@ checkNotes grepOutput = do
     ([]  , notes) -> pure $ mconcat notes
     (e:es, _    ) -> throwError . malformedRefs $ e :| es
 
-  let (fmap NE.head -> uniqueSortedHeaders, duplicates) =
+  -- XXX JB TODO: headers should maybe have a target file (i.e. if they say
+  -- Note [some note] in GHC/blablabla) and then there can be one header with
+  -- the same name per file
+  let (duplicates, fmap NE.head -> uniqueSortedHeaders) =
         partition ((> 1) . length) $ NE.groupAllWith (noteName . headerNote) headers
 
   case duplicates of
     []   -> pure ()
     h:hs -> throwError . duplicateHeaders $ h :| hs
+
+  -- XXX JB TODO lookup refs in map of headers. Make sure to look in the target
+  -- file. The target file has to be given as a module name, i.e. dots instead of
+  -- slashes. So we can just check if the module name converted to slashes is a
+  -- suffix of the header filename. I guess we need a suffix trie...?
+  -- Alternatively, maybe it's enough to have a list of Maps, one Map per file,
+  -- and check the filenames sequentially. Whether or not that's efficient
+  -- enough depends on how many note headers per file there are on average.
 
   traceShow refs undefined
 
@@ -288,7 +299,7 @@ handleErrors Errors {errorTypeInfo, errorList} = do
       case errorPsg of
         Nothing      -> pure ()
         Just passage -> do
-          printLnStdErr " in the passage"
+          printLnStdErr " in the passage\n"
           printPassage passage
 
     -- surround with ANSI escape sequence for red color and back to no color
@@ -304,3 +315,4 @@ handleErrors Errors {errorTypeInfo, errorList} = do
           lineNums = T.justifyRight lastLineNumLength ' ' . T.pack . show <$> [lineNum..]
           prependNum num str = num <> " | " <> str
       mapM_ printLnStdErr $ zipWith prependNum lineNums passageLines
+      printLnStdErr $ "\nin " <> T.pack (sourceName location) <> "\n"
