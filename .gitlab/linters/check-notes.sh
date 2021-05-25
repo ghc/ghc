@@ -2,6 +2,9 @@
 # Get all lines in any non-binary files that look like they contain notes and
 # the lines that immediately follow them
 # Then send them as input to the haskell script
+# XXX JB exclude _build
+# XXX JB exclude .hadrian_ghci
+# XXX JB exclude .hie-bios
 grep -rnI -A 1 'Note' $TOP | $GHC -ignore-dot-ghci "check-notes.hs" -e ":main"
 
 # set -e
