@@ -21,7 +21,7 @@ import GHC.Core.Type hiding ( substTy, substTyVar, extendTvSubst, extendCvSubst 
 import GHC.Core.Opt.Simplify.Env
 import GHC.Core.Opt.Simplify.Utils
 import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
-import GHC.Types.Literal   ( litIsLifted ) --, mkLitInt ) -- temporalily commented out. See #8326
+import GHC.Types.Literal   ( Literal, litIsLifted, isLitRubbish ) --, mkLitInt ) -- temporalily commented out. See #8326
 import GHC.Types.SourceText
 import GHC.Types.Id
 import GHC.Types.Id.Make   ( seqId )
@@ -1027,8 +1027,8 @@ simplExprF1 _ (Type ty) cont
     -- The (Type ty) case is handled separately by simplExpr
     -- and by the other callers of simplExprF
 
-simplExprF1 env (Var v)        cont = {-#SCC "simplIdF" #-} simplIdF env v cont
-simplExprF1 env (Lit lit)      cont = {-#SCC "rebuild" #-} rebuild env (Lit lit) cont
+simplExprF1 env (Var v)        cont = {-#SCC "simplIdF" #-}  simplIdF env v cont
+simplExprF1 env (Lit lit)      cont = {-#SCC "rebuild" #-}   simplLit env lit cont
 simplExprF1 env (Tick t expr)  cont = {-#SCC "simplTick" #-} simplTick env t expr cont
 simplExprF1 env (Cast body co) cont = {-#SCC "simplCast" #-} simplCast env body co cont
 simplExprF1 env (Coercion co)  cont = {-#SCC "simplCoercionF" #-} simplCoercionF env co cont
@@ -1167,6 +1167,12 @@ simplJoinRhs env bndr expr cont
 
   | otherwise
   = pprPanic "simplJoinRhs" (ppr bndr)
+
+---------------------------------
+simplLit :: SimplEnv -> Literal -> SimplCont -> SimplM (SimplFloats, OutExpr)
+simplLit env lit cont
+  | isLitRubbish lit = discardContinuation env (Lit lit) cont
+  | otherwise        = rebuild             env (Lit lit) cont
 
 ---------------------------------
 simplType :: SimplEnv -> InType -> SimplM OutType
@@ -1345,6 +1351,19 @@ simplTick env tickish expr cont
 *                                                                      *
 ************************************************************************
 -}
+
+discardContinuation :: SimplEnv -> OutExpr -> SimplCont
+                    -> SimplM (SimplFloats, OutExpr)
+-- Rather like 'rebuild' except that it discards the continuation
+-- instead of wrapping expr in it
+discardContinuation env expr cont
+  | contIsTrivial cont
+  = rebuild env expr cont
+  | otherwise
+  = seqType cont_ty `seq`        -- See Note [Avoiding space leaks in OutType]
+    return (emptyFloats env, castBottomExpr expr cont_ty)
+  where
+    cont_ty = contResultType cont
 
 rebuild :: SimplEnv -> OutExpr -> SimplCont -> SimplM (SimplFloats, OutExpr)
 -- At this point the substitution in the SimplEnv should be irrelevant;
@@ -2015,11 +2034,7 @@ rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_dmds = [] }) con
   | not (contIsTrivial cont)     -- Only do this if there is a non-trivial
                                  -- continuation to discard, else we do it
                                  -- again and again!
-  = seqType cont_ty `seq`        -- See Note [Avoiding space leaks in OutType]
-    return (emptyFloats env, castBottomExpr res cont_ty)
-  where
-    res     = argInfoExpr fun rev_args
-    cont_ty = contResultType cont
+  = discardContinuation env (argInfoExpr fun rev_args) cont
 
 ---------- Try rewrite RULES --------------
 -- See Note [Trying rewrite rules]
