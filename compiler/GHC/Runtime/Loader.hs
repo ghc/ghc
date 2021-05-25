@@ -64,12 +64,13 @@ import Control.Monad     ( unless )
 import Data.Maybe        ( mapMaybe )
 import Unsafe.Coerce     ( unsafeCoerce )
 import GHC.Unit.Types (ModuleNameWithIsBoot)
+import GHC.Stack
 
 -- | Loads the plugins specified in the pluginModNames field of the dynamic
 -- flags. Should be called after command line arguments are parsed, but before
 -- actual compilation starts. Idempotent operation. Should be re-called if
 -- pluginModNames or pluginModNameOpts changes.
-initializePlugins :: HscEnv -> Maybe ModuleNameWithIsBoot -> IO HscEnv
+initializePlugins :: HasCallStack => HscEnv -> Maybe ModuleNameWithIsBoot -> IO HscEnv
 initializePlugins hsc_env mnwib
     -- plugins not changed
   | map lpModuleName (hsc_plugins hsc_env) == pluginModNames dflags
