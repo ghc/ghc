@@ -58,7 +58,7 @@ TEST_HC_OPTS += -Werror=compat
 
 # Add the no-debug-output last as it is often convenient to copy the test invocation
 # removing this line.
-TEST_HC_OPTS += -dno-debug-output
+#TEST_HC_OPTS += -dno-debug-output
 
 TEST_HC_OPTS_INTERACTIVE = $(TEST_HC_OPTS) --interactive -v0 -ignore-dot-ghci -fno-ghci-history
 
