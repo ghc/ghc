@@ -1,5 +1,3 @@
-
-
 -----------------------------------------------------------------------------
 --
 -- GHC Driver
@@ -10,9 +8,12 @@
 
 module GHC.Driver.Phases (
    Phase(..),
-   happensBefore, eqPhase, anyHsc, isStopLn,
+   happensBefore, eqPhase, isStopLn,
    startPhase,
    phaseInputExt,
+
+   StopPhase(..),
+   stopPhaseToPhase,
 
    isHaskellishSuffix,
    isHaskellSrcSuffix,
@@ -67,6 +68,19 @@ import System.FilePath
    linker                 | other         | -             | a.out
 -}
 
+-- Phases we can actually stop after
+data StopPhase = StopPreprocess -- -E
+               | StopC  -- -C
+               | StopAs -- -S
+               | NoStop -- -c
+
+stopPhaseToPhase :: StopPhase -> Phase
+stopPhaseToPhase StopPreprocess = anyHsc
+stopPhaseToPhase StopC   = HCc
+stopPhaseToPhase StopAs  = As False
+stopPhaseToPhase NoStop  = StopLn
+
+-- | Untyped Phase description
 data Phase
         = Unlit HscSource
         | Cpp   HscSource
@@ -86,7 +100,6 @@ data Phase
         | MergeForeign  -- merge in the foreign object files
 
         -- The final phase is a pseudo-phase that tells the pipeline to stop.
-        -- There is no runPhase case for it.
         | StopLn        -- Stop, but linking will follow, so generate .o file
   deriving (Eq, Show)
 
@@ -122,22 +135,8 @@ eqPhase Ccxx        Ccxx       = True
 eqPhase Cobjcxx     Cobjcxx    = True
 eqPhase _           _          = False
 
-{- Note [Partial ordering on phases]
-
-We want to know which phases will occur before which others. This is used for
-sanity checking, to ensure that the pipeline will stop at some point (see
-GHC.Driver.Pipeline.runPipeline).
-
-A < B iff A occurs before B in a normal compilation pipeline.
-
-There is explicitly not a total ordering on phases, because in registerised
-builds, the phase `HsC` doesn't happen before nor after any other phase.
-
-Although we check that a normal user doesn't set the stop_phase to HsC through
-use of -C with registerised builds (in Main.checkOptions), it is still
-possible for a ghc-api user to do so. So be careful when using the function
-happensBefore, and don't think that `not (a <= b)` implies `b < a`.
--}
+-- MP: happensBefore is only used in preprocessPipeline, that usage should
+-- be refactored and this usage removed.
 happensBefore :: Platform -> Phase -> Phase -> Bool
 happensBefore platform p1 p2 = p1 `happensBefore'` p2
     where StopLn `happensBefore'` _ = False
@@ -211,7 +210,7 @@ phaseInputExt (Cpp   _)           = "lpp"       -- intermediate only
 phaseInputExt (HsPp  _)           = "hscpp"     -- intermediate only
 phaseInputExt (Hsc   _)           = "hspp"      -- intermediate only
         -- NB: as things stand, phaseInputExt (Hsc x) must not evaluate x
-        --     because runPipeline uses the StopBefore phase to pick the
+        --     because runPhase uses the StopBefore phase to pick the
         --     output filename.  That could be fixed, but watch out.
 phaseInputExt HCc                 = "hc"
 phaseInputExt Ccxx                = "cpp"
