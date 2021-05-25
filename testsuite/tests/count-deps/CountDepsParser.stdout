@@ -1,4 +1,4 @@
-Found 276 GHC.Parser module dependencies
+Found 278 GHC.Parser module dependencies
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
 GHC.Builtin.Types
@@ -96,6 +96,7 @@ GHC.Driver.Hooks
 GHC.Driver.Monad
 GHC.Driver.Phases
 GHC.Driver.Pipeline.Monad
+GHC.Driver.Pipeline.Phases
 GHC.Driver.Plugins
 GHC.Driver.Ppr
 GHC.Driver.Session
@@ -222,6 +223,7 @@ GHC.Types.Var.Set
 GHC.Unit
 GHC.Unit.Env
 GHC.Unit.External
+GHC.Unit.Finder
 GHC.Unit.Finder.Types
 GHC.Unit.Home
 GHC.Unit.Home.ModInfo

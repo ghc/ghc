@@ -1564,7 +1564,7 @@ hscSimpleIface' tc_result summary mb_old_iface = do
 -- | Compile to hard-code.
 hscGenHardCode :: HscEnv -> CgGuts -> ModLocation -> FilePath
                -> IO (FilePath, Maybe FilePath, [(ForeignSrcLang, FilePath)], CgInfos)
-               -- ^ @Just f@ <=> _stub.c is f
+                -- ^ @Just f@ <=> _stub.c is f
 hscGenHardCode hsc_env cgguts location output_filename = do
         let CgGuts{ -- This is the last use of the ModGuts in a compilation.
                     -- From now on, we just use the bits we need.

@@ -57,7 +57,7 @@ import GHC.Utils.Error
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Outputable as Outputable
-import GHC.Utils.Monad       ( liftIO )
+import GHC.Utils.Monad       ( liftIO, mapMaybeM )
 import GHC.Utils.Binary        ( openBinMem, put_ )
 import GHC.Utils.Logger
 
@@ -324,10 +324,10 @@ checkOptions mode dflags srcs objs = do
         else do
 
    case mode of
-      StopBefore HCc | backend dflags /= ViaC
+      StopBefore StopC | backend dflags /= ViaC
         -> throwGhcException $ UsageError $
            "the option -C is only available with an unregisterised GHC"
-      StopBefore (As False) | ghcLink dflags == NoLink
+      StopBefore StopAs | ghcLink dflags == NoLink
         -> throwGhcException $ UsageError $
            "the options -S and -fno-code are incompatible. Please omit -S"
 
@@ -423,7 +423,7 @@ isShowGhciUsageMode _ = False
 data PostLoadMode
   = ShowInterface FilePath  -- ghc --show-iface
   | DoMkDependHS            -- ghc -M
-  | StopBefore Phase        -- ghc -E | -C | -S
+  | StopBefore StopPhase    -- ghc -E | -C | -S
                             -- StopBefore StopLn is the default
   | DoMake                  -- ghc --make
   | DoBackpack              -- ghc --backpack foo.bkp
@@ -432,6 +432,7 @@ data PostLoadMode
   | DoAbiHash               -- ghc --abi-hash
   | ShowPackages            -- ghc --show-packages
   | DoFrontend ModuleName   -- ghc --frontend Plugin.Module
+
 
 doMkDependHSMode, doMakeMode, doInteractiveMode,
   doAbiHashMode, showUnitsMode :: Mode
@@ -444,7 +445,7 @@ showUnitsMode = mkPostLoadMode ShowPackages
 showInterfaceMode :: FilePath -> Mode
 showInterfaceMode fp = mkPostLoadMode (ShowInterface fp)
 
-stopBeforeMode :: Phase -> Mode
+stopBeforeMode :: StopPhase -> Mode
 stopBeforeMode phase = mkPostLoadMode (StopBefore phase)
 
 doEvalMode :: String -> Mode
@@ -464,7 +465,7 @@ isDoInteractiveMode (Right (Right DoInteractive)) = True
 isDoInteractiveMode _ = False
 
 isStopLnMode :: Mode -> Bool
-isStopLnMode (Right (Right (StopBefore StopLn))) = True
+isStopLnMode (Right (Right (StopBefore NoStop))) = True
 isStopLnMode _ = False
 
 isDoMakeMode :: Mode -> Bool
@@ -496,7 +497,7 @@ needsInputsMode _               = False
 -- True if we are going to attempt to link in this mode.
 -- (we might not actually link, depending on the GhcLink flag)
 isLinkMode :: PostLoadMode -> Bool
-isLinkMode (StopBefore StopLn) = True
+isLinkMode (StopBefore NoStop) = True
 isLinkMode DoMake              = True
 isLinkMode DoInteractive       = True
 isLinkMode (DoEval _)          = True
@@ -578,12 +579,12 @@ mode_flags =
                                                "--show-iface"))
 
       ------- primary modes ------------------------------------------------
-  , defFlag "c"            (PassFlag (\f -> do setMode (stopBeforeMode StopLn) f
+  , defFlag "c"            (PassFlag (\f -> do setMode (stopBeforeMode NoStop) f
                                                addFlag "-no-link" f))
   , defFlag "M"            (PassFlag (setMode doMkDependHSMode))
-  , defFlag "E"            (PassFlag (setMode (stopBeforeMode anyHsc)))
-  , defFlag "C"            (PassFlag (setMode (stopBeforeMode HCc)))
-  , defFlag "S"            (PassFlag (setMode (stopBeforeMode (As False))))
+  , defFlag "E"            (PassFlag (setMode (stopBeforeMode StopPreprocess )))
+  , defFlag "C"            (PassFlag (setMode (stopBeforeMode StopC)))
+  , defFlag "S"            (PassFlag (setMode (stopBeforeMode StopAs)))
   , defFlag "-make"        (PassFlag (setMode doMakeMode))
   , defFlag "-backpack"    (PassFlag (setMode doBackpackMode))
   , defFlag "-interactive" (PassFlag (setMode doInteractiveMode))
@@ -673,10 +674,10 @@ doMake srcs  = do
     -- This means that "ghc Foo.o Bar.o -o baz" links the program as
     -- we expect.
     if (null hs_srcs)
-       then liftIO (oneShot hsc_env StopLn srcs)
+       then liftIO (oneShot hsc_env NoStop srcs)
        else do
 
-    o_files <- mapM (\x -> liftIO $ compileFile hsc_env StopLn x)
+    o_files <- mapMaybeM (\x -> liftIO $ compileFile hsc_env NoStop x)
                  non_hs_srcs
     dflags <- GHC.getSessionDynFlags
     let dflags' = dflags { ldInputs = map (FileOption "") o_files
