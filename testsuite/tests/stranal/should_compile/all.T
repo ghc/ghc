@@ -55,6 +55,8 @@ test('T13380b',  [ grep_errmsg('bigDeadAction') ], compile, ['-dppr-cols=200 -dd
 
 # We just want to find the worker of foo in there:
 test('T18122',  [ grep_errmsg(r'wfoo =') ], compile, ['-ddump-simpl'])
+# We just want to find the workers of foo and bar in there:
+test('T17819',  [ grep_errmsg(r'(wfoo|wbar)') ], compile, ['-ddump-simpl'])
 
 # We care about the call demand on $wg
 test('T18903',  [ grep_errmsg(r'Dmd=\S+C\S+') ], compile, ['-ddump-simpl -dsuppress-uniques'])
@@ -67,3 +69,4 @@ test('T18982',  [ grep_errmsg(r'\$w. .*Int#$') ], compile, ['-dppr-cols=1000 -dd
 
 test('T19180', normal, compile, [''])
 test('T19849', normal, compile, [''])
+test('T19766', [ grep_errmsg(r'absentError') ], compile, ['-ddump-worker-wrapper'])
