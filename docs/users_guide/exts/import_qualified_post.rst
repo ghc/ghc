@@ -28,6 +28,4 @@ The ``ImportQualifiedPost`` extension allows ``qualified`` to appear in postposi
 
 It is an error if ``qualified`` appears in both pre and postpositive positions.
 
-The warning ``-Wprepositive-qualified-syntax`` (off by default) reports on any occurrences of imports annotated ``qualified`` using prepositive syntax.
-
-
+The warning :ghc-flag:`-Wprepositive-qualified-module` (off by default) reports on any occurrences of imports annotated ``qualified`` using prepositive syntax.
