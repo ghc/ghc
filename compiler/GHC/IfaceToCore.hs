@@ -1302,11 +1302,10 @@ tcIfaceCompleteMatch (IfaceCompleteMatch ms mtc) = forkM doc $ do -- See Note [P
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We need to be lazy when type checking the interface, since these functions are
 called when the interface itself is being loaded, which means it is not in the
-PIT yet. If we are not lazy enough, in certain cases we might recursively try to
-load the same interface in an infinite loop.
-
-For this reason, the forkM should be around as much of the computation as
-possible.
+PIT yet. In particular, the `tcIfaceTCon` must be inside the forkM, otherwise
+we'll try to look it up the TyCon, find it's not there, and so initiate the
+process (again) of loading the (very same) interface file. Result: infinite
+loop. See #19744.
 -}
 
 {-
