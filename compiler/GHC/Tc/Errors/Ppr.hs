@@ -2,12 +2,16 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-} -- instance Diagnostic TcRnMessage
 
 module GHC.Tc.Errors.Ppr (
+  formatLevPolyErr
   ) where
 
 import GHC.Prelude
 
+import GHC.Core.TyCo.Ppr (pprWithTYPE)
+import GHC.Core.Type
 import GHC.Tc.Errors.Types
 import GHC.Types.Error
+import GHC.Types.Var.Env (emptyTidyEnv)
 import GHC.Driver.Flags
 import GHC.Hs
 import GHC.Utils.Outputable
@@ -16,6 +20,8 @@ instance Diagnostic TcRnMessage where
   diagnosticMessage = \case
     TcRnUnknownMessage m
       -> diagnosticMessage m
+    TcLevityCheckDsMessage m (ErrInfo extra)
+      -> mkDecorated (unDecorated (diagnosticMessage m) `mappend` [extra])
     TcRnImplicitLift id_or_name errInfo
       -> mkDecorated [text "The variable" <+> quotes (ppr id_or_name) <+>
                       text "is implicitly lifted in the TH quotation"
@@ -35,6 +41,8 @@ instance Diagnostic TcRnMessage where
   diagnosticReason = \case
     TcRnUnknownMessage m
       -> diagnosticReason m
+    TcLevityCheckDsMessage m _
+      -> diagnosticReason m
     TcRnImplicitLift{}
       -> WarningWithFlag Opt_WarnImplicitLift
     TcRnUnusedPatternBinds{}
@@ -48,6 +56,8 @@ instance Diagnostic TcRnMessage where
 
   diagnosticHints = \case
     TcRnUnknownMessage m
+      -> diagnosticHints m
+    TcLevityCheckDsMessage m _
       -> diagnosticHints m
     TcRnImplicitLift{}
       -> noHints
@@ -73,3 +83,13 @@ dodgy_msg_insert tc = IEThingAll noAnn ii
   where
     ii :: LIEWrappedName (IdP (GhcPass p))
     ii = noLocA (IEName $ noLocA tc)
+
+formatLevPolyErr :: Type  -- levity-polymorphic type
+                 -> SDoc
+formatLevPolyErr ty
+  = hang (text "A levity-polymorphic type is not allowed here:")
+       2 (vcat [ text "Type:" <+> pprWithTYPE tidy_ty
+               , text "Kind:" <+> pprWithTYPE tidy_ki ])
+  where
+    (tidy_env, tidy_ty) = tidyOpenType emptyTidyEnv ty
+    tidy_ki             = tidyType tidy_env (tcTypeKind ty)

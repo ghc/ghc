@@ -32,6 +32,7 @@ import GHC.Driver.Env
 import GHC.Driver.Session
 
 import GHC.Hs
+import GHC.HsToCore.Errors.Types
 
 import GHC.Tc.TyCl.Build
 import GHC.Tc.Solver( pushLevelAndSolveEqualities, pushLevelAndSolveEqualitiesX
@@ -4368,7 +4369,7 @@ checkValidDataCon dflags existential_ok tc con
           -- better error message than checkForLevPoly would.
         ; unless (isNewTyCon tc) $
             checkNoErrs $
-            mapM_ (checkForLevPoly empty) (map scaledThing $ dataConOrigArgTys con)
+            mapM_ (checkForLevPoly LevityCheckInValidDataCon) (map scaledThing $ dataConOrigArgTys con)
             -- the checkNoErrs is to prevent a panic in isVanillaDataCon
             -- (called a a few lines down), which can fall over if there is a
             -- bang on a levity-polymorphic argument. This is #18534,
@@ -4573,7 +4574,7 @@ checkValidClass cls
            -- example of what this prevents:
            --   class BoundedX (a :: TYPE r) where minBound :: a
            -- See Note [Levity polymorphism checking] in GHC.HsToCore.Monad
-        ; checkForLevPoly empty tau1
+        ; checkForLevPoly LevityCheckInValidClass tau1
 
         ; unless constrained_class_methods $
           mapM_ check_constraint (tail (cls_pred:op_theta))

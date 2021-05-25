@@ -28,6 +28,7 @@ import {-# SOURCE #-}   GHC.HsToCore.Expr  ( dsLExpr )
 import {-# SOURCE #-}   GHC.HsToCore.Match ( matchWrapper )
 
 import GHC.HsToCore.Monad
+import GHC.HsToCore.Errors.Types
 import GHC.HsToCore.GuardedRHSs
 import GHC.HsToCore.Utils
 import GHC.HsToCore.Pmc ( addTyCs, pmcGRHSs )
@@ -90,8 +91,8 @@ dsTopLHsBinds :: LHsBinds GhcTc -> DsM (OrdList (Id,CoreExpr))
 dsTopLHsBinds binds
      -- see Note [Strict binds checks]
   | not (isEmptyBag unlifted_binds) || not (isEmptyBag bang_binds)
-  = do { mapBagM_ (top_level_err "bindings for unlifted types") unlifted_binds
-       ; mapBagM_ (top_level_err "strict bindings")             bang_binds
+  = do { mapBagM_ (top_level_err UnliftedTypeBinds) unlifted_binds
+       ; mapBagM_ (top_level_err StrictBinds)       bang_binds
        ; return nilOL }
 
   | otherwise
@@ -107,10 +108,9 @@ dsTopLHsBinds binds
     unlifted_binds = filterBag (isUnliftedHsBind . unLoc) binds
     bang_binds     = filterBag (isBangedHsBind   . unLoc) binds
 
-    top_level_err desc (L loc bind)
+    top_level_err bindsType (L loc bind)
       = putSrcSpanDs (locA loc) $
-        errDs (hang (text "Top-level" <+> text desc <+> text "aren't allowed:")
-                  2 (ppr bind))
+        diagnosticDs (DsTopLevelBindsNotAllowed bindsType bind)
 
 
 -- | Desugar all other kind of bindings, Ids of strict binds are returned to
@@ -665,16 +665,14 @@ dsSpec :: Maybe CoreExpr        -- Just rhs => RULE is for a local binding
 dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
   | isJust (isClassOpId_maybe poly_id)
   = putSrcSpanDs loc $
-    do { diagnosticDs WarningWithoutFlag (text "Ignoring useless SPECIALISE pragma for class method selector"
-                                  <+> quotes (ppr poly_id))
+    do { diagnosticDs (DsUselessSpecialiseForClassMethodSelector poly_id)
        ; return Nothing  }  -- There is no point in trying to specialise a class op
                             -- Moreover, classops don't (currently) have an inl_sat arity set
                             -- (it would be Just 0) and that in turn makes makeCorePair bleat
 
   | no_act_spec && isNeverActive rule_act
   = putSrcSpanDs loc $
-    do { diagnosticDs WarningWithoutFlag (text "Ignoring useless SPECIALISE pragma for NOINLINE function:"
-                                  <+> quotes (ppr poly_id))
+    do { diagnosticDs (DsUselessSpecialiseForNoInlineFunction poly_id)
        ; return Nothing  }  -- Function is NOINLINE, and the specialisation inherits that
                             -- See Note [Activation pragmas for SPECIALISE]
 
@@ -699,7 +697,7 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
          --                         , text "ds_rhs:" <+> ppr ds_lhs ]) $
          dflags <- getDynFlags
        ; case decomposeRuleLhs dflags spec_bndrs ds_lhs of {
-           Left msg -> do { diagnosticDs WarningWithoutFlag msg; return Nothing } ;
+           Left msg -> do { diagnosticDs msg; return Nothing } ;
            Right (rule_bndrs, _fn, rule_lhs_args) -> do
 
        { this_mod <- getModule
@@ -768,11 +766,8 @@ dsMkUserRule :: Module -> Bool -> RuleName -> Activation
 dsMkUserRule this_mod is_local name act fn bndrs args rhs = do
     let rule = mkRule this_mod False is_local name act fn bndrs args rhs
     when (isOrphan (ru_orphan rule)) $
-        diagnosticDs (WarningWithFlag Opt_WarnOrphans) (ruleOrphWarn rule)
+        diagnosticDs (DsOrphanRule rule)
     return rule
-
-ruleOrphWarn :: CoreRule -> SDoc
-ruleOrphWarn rule = text "Orphan rule:" <+> ppr rule
 
 {- Note [SPECIALISE on INLINE functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -836,7 +831,7 @@ SPEC f :: ty                [n]   INLINE [k]
 -}
 
 decomposeRuleLhs :: DynFlags -> [Var] -> CoreExpr
-                 -> Either SDoc ([Var], Id, [CoreExpr])
+                 -> Either DsMessage ([Var], Id, [CoreExpr])
 -- (decomposeRuleLhs bndrs lhs) takes apart the LHS of a RULE,
 -- The 'bndrs' are the quantified binders of the rules, but decomposeRuleLhs
 -- may add some extra dictionary binders (see Note [Free dictionaries])
@@ -846,10 +841,10 @@ decomposeRuleLhs :: DynFlags -> [Var] -> CoreExpr
 decomposeRuleLhs dflags orig_bndrs orig_lhs
   | not (null unbound)    -- Check for things unbound on LHS
                           -- See Note [Unused spec binders]
-  = Left (vcat (map dead_msg unbound))
+  = Left (DsRuleBindersNotBound unbound orig_bndrs orig_lhs lhs2)
   | Var funId <- fun2
   , Just con <- isDataConId_maybe funId
-  = Left (constructor_msg con) -- See Note [No RULES on datacons]
+  = Left (DsRuleIgnoredDueToConstructor con) -- See Note [No RULES on datacons]
   | Just (fn_id, args) <- decompose fun2 args2
   , let extra_bndrs = mk_extra_bndrs fn_id args
   = -- pprTrace "decmposeRuleLhs" (vcat [ text "orig_bndrs:" <+> ppr orig_bndrs
@@ -861,7 +856,7 @@ decomposeRuleLhs dflags orig_bndrs orig_lhs
     Right (orig_bndrs ++ extra_bndrs, fn_id, args)
 
   | otherwise
-  = Left bad_shape_msg
+  = Left (DsRuleLhsTooComplicated orig_lhs lhs2)
  where
    simpl_opts   = initSimpleOpts dflags
    lhs1         = drop_dicts orig_lhs
@@ -892,24 +887,6 @@ decomposeRuleLhs dflags orig_bndrs orig_lhs
       = Just (fn_id, args)
 
    decompose _ _ = Nothing
-
-   bad_shape_msg = hang (text "RULE left-hand side too complicated to desugar")
-                      2 (vcat [ text "Optimised lhs:" <+> ppr lhs2
-                              , text "Orig lhs:" <+> ppr orig_lhs])
-   dead_msg bndr = hang (sep [ text "Forall'd" <+> pp_bndr bndr
-                             , text "is not bound in RULE lhs"])
-                      2 (vcat [ text "Orig bndrs:" <+> ppr orig_bndrs
-                              , text "Orig lhs:" <+> ppr orig_lhs
-                              , text "optimised lhs:" <+> ppr lhs2 ])
-   pp_bndr bndr
-    | isTyVar bndr = text "type variable" <+> quotes (ppr bndr)
-    | isEvVar bndr = text "constraint"    <+> quotes (ppr (varType bndr))
-    | otherwise    = text "variable"      <+> quotes (ppr bndr)
-
-   constructor_msg con = vcat
-     [ text "A constructor," <+> ppr con <>
-         text ", appears as outermost match in RULE lhs."
-     , text "This rule will be ignored." ]
 
    drop_dicts :: CoreExpr -> CoreExpr
    drop_dicts e
@@ -1135,7 +1112,7 @@ dsHsWrapper (WpFun c1 c2 (Scaled w t1) doc)
                                    ; w2 <- dsHsWrapper c2
                                    ; let app f a = mkCoreAppDs (text "dsHsWrapper") f a
                                          arg     = w1 (Var x)
-                                   ; (_, ok) <- askNoErrsDs $ dsNoLevPolyExpr arg doc
+                                   ; (_, ok) <- askNoErrsDs $ dsNoLevPolyExpr arg (LevityCheckWpFun doc)
                                    ; if ok
                                      then return (\e -> (Lam x (w2 (app e arg))))
                                      else return id }  -- this return is irrelevant
@@ -1145,7 +1122,7 @@ dsHsWrapper (WpEvApp tm)      = do { core_tm <- dsEvTerm tm
                                    ; return (\e -> App e core_tm) }
   -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
 dsHsWrapper (WpMultCoercion co) = do { when (not (isReflexiveCo co)) $
-                                         errDs (text "Multiplicity coercions are currently not supported")
+                                         diagnosticDs DsMultiplicityCoercionsNotSupported
                                      ; return $ \e -> e }
 --------------------------------------
 dsTcEvBinds_s :: [TcEvBinds] -> DsM [CoreBind]
