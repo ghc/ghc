@@ -97,19 +97,20 @@ neither record constructions).
 The results of these new rules cannot be represented by @LHsRecField
 GhcPs (LHsExpr GhcPs)@ values as the type is defined today. We
 minimize modifying existing code by having these new rules calculate
-@LHsRecProj GhcPs (Located b)@ ("record projection") values instead:
+@LHsRecProj GhcPs (LHsExpr GhcPs)@ ("record projection") values
+instead:
 @
-newtype FieldLabelStrings = FieldLabelStrings [Located FieldLabelString]
+newtype FieldLabelStrings = FieldLabelStrings [XRec p (DotFieldOcc p)]
 type RecProj arg = HsFieldBind FieldLabelStrings arg
-type LHsRecProj p arg = Located (RecProj arg)
+type LHsRecProj p arg = XRec p (RecProj arg)
 @
 
 The @fbind@ rule is then given the type @fbind :: { forall b.
 DisambECP b => PV (Fbind b) }@ accomodating both alternatives:
 @
 type Fbind b = Either
-                  (LHsRecField GhcPs (Located b))
-                  ( LHsRecProj GhcPs (Located b))
+                  (LHsRecField GhcPs (LocatedA b))
+                  ( LHsRecProj GhcPs (LocatedA b))
 @
 
 In @data HsExpr p@, the @RecordUpd@ constuctor indicates regular
@@ -124,8 +125,8 @@ type, an @Either@ instance:
 @
 Here,
 @
-type RecUpdProj p = RecProj (LHsExpr p)
-type LHsRecUpdProj p = Located (RecUpdProj p)
+type RecUpdProj p = RecProj p (LHsExpr p)
+type LHsRecUpdProj p = XRec p (RecUpdProj p)
 @
 and @Left@ values indicating regular record update, @Right@ values
 updates desugared to @setField@s.
@@ -140,27 +141,27 @@ values (see function @mkRdrRecordUpd@ in 'GHC.Parser.PostProcess').
 type LFieldLabelStrings p = XRec p (FieldLabelStrings p)
 
 newtype FieldLabelStrings p =
-  FieldLabelStrings [Located (HsFieldLabel p)]
+  FieldLabelStrings [XRec p (DotFieldOcc p)]
 
-instance Outputable (FieldLabelStrings p) where
+instance (UnXRec p, Outputable (XRec p FieldLabelString)) => Outputable (FieldLabelStrings p) where
   ppr (FieldLabelStrings flds) =
-    hcat (punctuate dot (map (ppr . unLoc) flds))
+    hcat (punctuate dot (map (ppr . unXRec @p) flds))
 
-instance OutputableBndr (FieldLabelStrings p) where
+instance (UnXRec p, Outputable (XRec p FieldLabelString)) => OutputableBndr (FieldLabelStrings p) where
   pprInfixOcc = pprFieldLabelStrings
   pprPrefixOcc = pprFieldLabelStrings
 
-instance OutputableBndr (Located (FieldLabelStrings p)) where
+instance (UnXRec p,  Outputable (XRec p FieldLabelString)) => OutputableBndr (Located (FieldLabelStrings p)) where
   pprInfixOcc = pprInfixOcc . unLoc
   pprPrefixOcc = pprInfixOcc . unLoc
 
-pprFieldLabelStrings :: FieldLabelStrings p -> SDoc
+pprFieldLabelStrings :: forall p. (UnXRec p, Outputable (XRec p FieldLabelString)) => FieldLabelStrings p -> SDoc
 pprFieldLabelStrings (FieldLabelStrings flds) =
-    hcat (punctuate dot (map (ppr . unLoc) flds))
+    hcat (punctuate dot (map (ppr . unXRec @p) flds))
 
-instance Outputable (HsFieldLabel p) where
-  ppr (HsFieldLabel _ s) = ppr s
-  ppr XHsFieldLabel{} = text "XHsFieldLabel"
+instance Outputable(XRec p FieldLabelString) => Outputable (DotFieldOcc p) where
+  ppr (DotFieldOcc _ s) = ppr s
+  ppr XDotFieldOcc{} = text "XDotFieldOcc"
 
 -- Field projection updates (e.g. @foo.bar.baz = 1@). See Note
 -- [RecordDotSyntax field updates].
@@ -534,27 +535,29 @@ data HsExpr p
   -- | Record field selection e.g @z.x@.
   --
   --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnDot'
-  --
+
+  -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
+
   -- This case only arises when the OverloadedRecordDot langauge
   -- extension is enabled. See Note [Record Selectors in the AST].
-
   | HsGetField {
         gf_ext :: XGetField p
       , gf_expr :: LHsExpr p
-      , gf_field :: Located (HsFieldLabel p)
+      , gf_field :: XRec p (DotFieldOcc p)
       }
 
   -- | Record field selector. e.g. @(.x)@ or @(.x.y)@
   --
-  --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpenP'
-  --         'GHC.Parser.Annotation.AnnDot', 'GHC.Parser.Annotation.AnnCloseP'
-  --
   -- This case only arises when the OverloadedRecordDot langauge
   -- extensions is enabled. See Note [Record Selectors in the AST].
 
+  --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpenP'
+  --         'GHC.Parser.Annotation.AnnDot', 'GHC.Parser.Annotation.AnnCloseP'
+
+  -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
   | HsProjection {
         proj_ext :: XProjection p
-      , proj_flds :: [Located (HsFieldLabel p)]
+      , proj_flds :: [XRec p (DotFieldOcc p)]
       }
 
   -- | Expression with an explicit type signature. @e :: type@
@@ -669,12 +672,12 @@ type family PendingTcSplice' p
 
 -- ---------------------------------------------------------------------
 
-data HsFieldLabel p
-  = HsFieldLabel
-    { hflExt   :: XCHsFieldLabel p
-    , hflLabel :: Located FieldLabelString
+data DotFieldOcc p
+  = DotFieldOcc
+    { dfoExt   :: XCDotFieldOcc p
+    , dfoLabel :: XRec p FieldLabelString
     }
-  | XHsFieldLabel !(XXHsFieldLabel p)
+  | XDotFieldOcc !(XXDotFieldOcc p)
 
 -- ---------------------------------------------------------------------
 
