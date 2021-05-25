@@ -8,6 +8,7 @@
 {-# LANGUAGE LambdaCase #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+{-# LANGUAGE GADTs #-}
 
 -----------------------------------------------------------------------------
 --
@@ -120,6 +121,9 @@ import Data.Version
 import Data.Either      ( partitionEithers )
 
 import Data.Time        ( getCurrentTime )
+import qualified GHC.Driver.CmdLine
+import GHC.Driver.CmdLine
+import Control.Monad.Trans.Reader
 
 -- ---------------------------------------------------------------------------
 -- Pre-process
@@ -947,6 +951,16 @@ phaseOutputFilename next_phase = do
   liftIO $ getOutputFilename logger tmpfs stop_phase output_spec
                              src_basename dflags next_phase maybe_loc
 
+phaseOutputFilenameNew :: Phase -> HscEnv -> Maybe ModLocation -> P FilePath
+phaseOutputFilenameNew next_phase hsc_env maybe_loc = do
+  PipeEnv{stop_phase, src_basename, output_spec} <- ask
+  --PipeState{maybe_loc,hsc_env} <- getPipeState
+  let dflags = hsc_dflags hsc_env
+      logger = hsc_logger hsc_env
+      tmpfs = hsc_tmpfs hsc_env
+  liftIO $ getOutputFilename logger tmpfs stop_phase output_spec
+                             src_basename dflags next_phase maybe_loc
+
 -- | Computes the next output filename for something in the compilation
 -- pipeline.  This is controlled by several variables:
 --
@@ -1074,6 +1088,135 @@ llvmOptions dflags =
                 ArchRISCV64 -> "lp64d"
                 _           -> ""
 
+
+type P = ReaderT PipeEnv IO
+
+runPhaseNew :: TPhase out -> P out
+runPhaseNew (T_Unlit hsc_env inp_path) = do
+  out_path <- phaseOutputFilenameNew (Unlit HsSrcFile) hsc_env Nothing
+  liftIO $ runUnlitPhase hsc_env inp_path out_path
+runPhaseNew (T_FileArgs hsc_env inp_path) =
+  liftIO $ getFileArgs hsc_env inp_path
+runPhaseNew (T_Cpp hsc_env inp_path) = do
+  out_path <- phaseOutputFilenameNew (Cpp HsSrcFile) hsc_env Nothing
+  liftIO $ runCppPhase hsc_env inp_path out_path
+runPhaseNew (T_HsPp hsc_env origin_path inp_path) = do
+  out_path <- phaseOutputFilenameNew (HsPp HsSrcFile) hsc_env Nothing
+  liftIO $ runHsPpPhase hsc_env origin_path inp_path out_path
+runPhaseNew (T_IO io_action) = liftIO io_action
+
+
+runUnlitPhase :: HscEnv -> FilePath -> FilePath -> IO FilePath
+runUnlitPhase hsc_env input_fn output_fn = do
+    let
+       -- escape the characters \, ", and ', but don't try to escape
+       -- Unicode or anything else (so we don't use Util.charToC
+       -- here).  If we get this wrong, then in
+       -- GHC.HsToCore.Coverage.isGoodTickSrcSpan where we check that the filename in
+       -- a SrcLoc is the same as the source filenaame, the two will
+       -- look bogusly different. See test:
+       -- libraries/hpc/tests/function/subdir/tough2.hs
+       escape ('\\':cs) = '\\':'\\': escape cs
+       escape ('\"':cs) = '\\':'\"': escape cs
+       escape ('\'':cs) = '\\':'\'': escape cs
+       escape (c:cs)    = c : escape cs
+       escape []        = []
+
+--    output_fn <- phaseOutputFilename (Cpp sf)
+
+    let flags = [ -- The -h option passes the file name for unlit to
+                  -- put in a #line directive
+                  GHC.SysTools.Option     "-h"
+                  -- See Note [Don't normalise input filenames].
+                , GHC.SysTools.Option $ escape input_fn
+                , GHC.SysTools.FileOption "" input_fn
+                , GHC.SysTools.FileOption "" output_fn
+                ]
+
+    let dflags = hsc_dflags hsc_env
+        logger = hsc_logger hsc_env
+    GHC.SysTools.runUnlit logger dflags flags
+
+    return output_fn
+
+getFileArgs :: HscEnv -> FilePath -> IO ((DynFlags, [Warn]))
+getFileArgs hsc_env input_fn = do
+  let dflags0 = hsc_dflags hsc_env
+  src_opts <- getOptionsFromFile dflags0 input_fn
+  (dflags1, unhandled_flags, warns)
+    <- parseDynamicFilePragma dflags0 src_opts
+  checkProcessArgsResult unhandled_flags
+  return (dflags1, warns)
+
+--               liftIO $ handleFlagWarnings logger dflags1 warns
+runCppPhase :: HscEnv -> FilePath -> FilePath -> IO FilePath
+runCppPhase hsc_env input_fn output_fn = do
+  doCpp (hsc_logger hsc_env)
+           (hsc_tmpfs hsc_env)
+           (hsc_dflags hsc_env)
+           (hsc_unit_env hsc_env)
+           True{-raw-}
+           input_fn output_fn
+  return output_fn
+
+runHsPpPhase :: HscEnv -> FilePath -> FilePath -> FilePath -> IO FilePath
+runHsPpPhase hsc_env orig_fn input_fn output_fn = do
+    let dflags = hsc_dflags hsc_env
+    let logger = hsc_logger hsc_env
+    GHC.SysTools.runPp logger dflags
+      ( [ GHC.SysTools.Option     orig_fn
+      , GHC.SysTools.Option     input_fn
+      , GHC.SysTools.FileOption "" output_fn
+      ] )
+    return output_fn
+
+preprocessPipeline :: HscEnv -> FilePath -> TPipeline TPhase FilePath
+preprocessPipeline hsc_env input_fn = do
+  unlit_fn <- use (T_Unlit hsc_env input_fn)
+  (dflags1, warns) <- use (T_FileArgs hsc_env unlit_fn)
+  let hsc_env1 = hsc_env { hsc_dflags = dflags1 }
+
+  (cpp_fn, dflags2, warns2)
+    <- if xopt LangExt.Cpp dflags1
+        then do
+          cpp_fn <- use (T_Cpp hsc_env1 unlit_fn)
+          (dflags2, warns2) <- use (T_FileArgs hsc_env cpp_fn)
+          return (cpp_fn, dflags2, warns2)
+        else
+          return (unlit_fn, dflags1, warns)
+
+  let hsc_env2 = hsc_env { hsc_dflags = dflags2 }
+
+  (pp_fn, dflags3, warns3)
+    <- if gopt Opt_Pp dflags2
+        then do
+          cpp_fn <- use (T_HsPp hsc_env2 input_fn cpp_fn)
+          (dflags2, warns2) <- use (T_FileArgs hsc_env2 cpp_fn)
+          return (cpp_fn, dflags2, warns2)
+        else
+          return (unlit_fn, dflags1, warns2)
+
+  use (T_IO (handleFlagWarnings (hsc_logger hsc_env) dflags3 warns3))
+
+  return pp_fn
+
+
+
+{-
+     -- re-read the pragmas now that we've preprocessed the file
+     -- See #2464,#3457
+     src_opts <- liftIO $ getOptionsFromFile dflags0 output_fn
+     (dflags2, unhandled_flags, warns)
+         <- liftIO $ parseDynamicFilePragma dflags0 src_opts
+     liftIO $ checkProcessArgsResult unhandled_flags
+     unless (gopt Opt_Pp dflags2) $
+         liftIO $ handleFlagWarnings logger dflags2 warns
+     -- the HsPp pass below will emit warnings
+
+     setDynFlags dflags2
+
+     return (RealPhase (HsPp sf), output_fn)
+     -}
 -- -----------------------------------------------------------------------------
 -- | Each phase in the pipeline returns the next phase to execute, and the
 -- name of the file in which the output was placed.
@@ -1098,81 +1241,32 @@ runPhase :: PhasePlus   -- ^ Run this phase
 -- Unlit phase
 
 runPhase (RealPhase (Unlit sf)) input_fn = do
-    let
-       -- escape the characters \, ", and ', but don't try to escape
-       -- Unicode or anything else (so we don't use Util.charToC
-       -- here).  If we get this wrong, then in
-       -- GHC.HsToCore.Coverage.isGoodTickSrcSpan where we check that the filename in
-       -- a SrcLoc is the same as the source filenaame, the two will
-       -- look bogusly different. See test:
-       -- libraries/hpc/tests/function/subdir/tough2.hs
-       escape ('\\':cs) = '\\':'\\': escape cs
-       escape ('\"':cs) = '\\':'\"': escape cs
-       escape ('\'':cs) = '\\':'\'': escape cs
-       escape (c:cs)    = c : escape cs
-       escape []        = []
-
-    output_fn <- phaseOutputFilename (Cpp sf)
-
-    let flags = [ -- The -h option passes the file name for unlit to
-                  -- put in a #line directive
-                  GHC.SysTools.Option     "-h"
-                  -- See Note [Don't normalise input filenames].
-                , GHC.SysTools.Option $ escape input_fn
-                , GHC.SysTools.FileOption "" input_fn
-                , GHC.SysTools.FileOption "" output_fn
-                ]
-
-    dflags <- getDynFlags
-    logger <- getLogger
-    liftIO $ GHC.SysTools.runUnlit logger dflags flags
-
-    return (RealPhase (Cpp sf), output_fn)
+  hsc_env <- getPipeSession
+  output_fn <- phaseOutputFilename (Cpp sf)
+  _ <- liftIO $ runUnlitPhase hsc_env input_fn output_fn
+  return (RealPhase (Cpp sf), output_fn)
 
 -------------------------------------------------------------------------------
 -- Cpp phase : (a) gets OPTIONS out of file
 --             (b) runs cpp if necessary
 
-runPhase (RealPhase (Cpp sf)) input_fn
-  = do
-       dflags0 <- getDynFlags
-       logger <- getLogger
-       src_opts <- liftIO $ getOptionsFromFile dflags0 input_fn
-       (dflags1, unhandled_flags, warns)
-           <- liftIO $ parseDynamicFilePragma dflags0 src_opts
-       setDynFlags dflags1
-       liftIO $ checkProcessArgsResult unhandled_flags
-
-       if not (xopt LangExt.Cpp dflags1) then do
-           -- we have to be careful to emit warnings only once.
-           unless (gopt Opt_Pp dflags1) $
-               liftIO $ handleFlagWarnings logger dflags1 warns
-
-           -- no need to preprocess CPP, just pass input file along
-           -- to the next phase of the pipeline.
-           return (RealPhase (HsPp sf), input_fn)
-        else do
-            output_fn <- phaseOutputFilename (HsPp sf)
-            hsc_env <- getPipeSession
-            liftIO $ doCpp logger
-                           (hsc_tmpfs hsc_env)
-                           (hsc_dflags hsc_env)
-                           (hsc_unit_env hsc_env)
-                           True{-raw-}
-                           input_fn output_fn
-            -- re-read the pragmas now that we've preprocessed the file
-            -- See #2464,#3457
-            src_opts <- liftIO $ getOptionsFromFile dflags0 output_fn
-            (dflags2, unhandled_flags, warns)
-                <- liftIO $ parseDynamicFilePragma dflags0 src_opts
-            liftIO $ checkProcessArgsResult unhandled_flags
-            unless (gopt Opt_Pp dflags2) $
-                liftIO $ handleFlagWarnings logger dflags2 warns
-            -- the HsPp pass below will emit warnings
-
-            setDynFlags dflags2
-
-            return (RealPhase (HsPp sf), output_fn)
+runPhase (RealPhase (Cpp sf)) input_fn = do
+  hsc_env <- getPipeSession
+  logger <- getLogger
+  (dflags1, warns) <- liftIO $ getFileArgs hsc_env input_fn
+  setDynFlags dflags1
+  if not (xopt LangExt.Cpp dflags1) then do
+    unless (gopt Opt_Pp dflags1) $
+      liftIO $ handleFlagWarnings logger dflags1 warns
+    return (RealPhase (HsPp sf), input_fn)
+  else do
+    output_fn <- phaseOutputFilename (HsPp sf)
+    _ <- liftIO $ runCppPhase hsc_env input_fn output_fn
+    (dflags2, warns) <- liftIO $ getFileArgs hsc_env output_fn
+    unless (gopt Opt_Pp dflags2) $
+      liftIO $ handleFlagWarnings logger dflags1 warns
+    setDynFlags dflags2
+    return (RealPhase (HsPp sf), output_fn)
 
 -------------------------------------------------------------------------------
 -- HsPp phase
@@ -1180,29 +1274,20 @@ runPhase (RealPhase (Cpp sf)) input_fn
 runPhase (RealPhase (HsPp sf)) input_fn = do
     dflags <- getDynFlags
     logger <- getLogger
-    if not (gopt Opt_Pp dflags) then
+    if not (gopt Opt_Pp dflags)
+      then
       -- no need to preprocess, just pass input file along
       -- to the next phase of the pipeline.
        return (RealPhase (Hsc sf), input_fn)
-    else do
+      else do
         PipeEnv{src_basename, src_suffix} <- getPipeEnv
         let orig_fn = src_basename <.> src_suffix
         output_fn <- phaseOutputFilename (Hsc sf)
-        liftIO $ GHC.SysTools.runPp logger dflags
-                       ( [ GHC.SysTools.Option     orig_fn
-                         , GHC.SysTools.Option     input_fn
-                         , GHC.SysTools.FileOption "" output_fn
-                         ]
-                       )
-
-        -- re-read pragmas now that we've parsed the file (see #3674)
-        src_opts <- liftIO $ getOptionsFromFile dflags output_fn
-        (dflags1, unhandled_flags, warns)
-            <- liftIO $ parseDynamicFilePragma dflags src_opts
-        setDynFlags dflags1
-        liftIO $ checkProcessArgsResult unhandled_flags
+        hsc_env <- getPipeSession
+        _ <- liftIO $ runHsPpPhase hsc_env orig_fn input_fn output_fn
+        (dflags1, warns) <- liftIO $ getFileArgs hsc_env output_fn
         liftIO $ handleFlagWarnings logger dflags1 warns
-
+        setDynFlags dflags1
         return (RealPhase (Hsc sf), output_fn)
 
 -----------------------------------------------------------------------------

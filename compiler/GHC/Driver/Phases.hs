@@ -1,3 +1,5 @@
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE RankNTypes #-}
 
 
 -----------------------------------------------------------------------------
@@ -36,6 +38,10 @@ module GHC.Driver.Phases (
    isSourceFilename,
 
    phaseForeignLanguage
+   , TPhase(..)
+   , runTPipeline
+   , TPipeline(..)
+   , use
  ) where
 
 import GHC.Prelude
@@ -51,6 +57,10 @@ import GHC.Utils.Panic
 import GHC.Utils.Misc
 
 import System.FilePath
+import {-# SOURCE #-} GHC.Driver.Session ( DynFlags )
+import Control.Monad
+import {-# SOURCE #-} GHC.Driver.Env.Types
+import GHC.Driver.CmdLine (Warn)
 
 -----------------------------------------------------------------------------
 -- Phases
@@ -89,6 +99,37 @@ data Phase
         -- There is no runPhase case for it.
         | StopLn        -- Stop, but linking will follow, so generate .o file
   deriving (Eq, Show)
+
+data TPhase res where
+  T_Unlit :: HscEnv -> FilePath -> TPhase FilePath
+  T_FileArgs :: HscEnv -> FilePath -> TPhase (DynFlags, [Warn])
+  T_Cpp   :: HscEnv -> FilePath -> TPhase FilePath
+  T_HsPp  :: HscEnv -> FilePath -> FilePath -> TPhase FilePath
+  T_IO :: IO a -> TPhase a
+
+data TPipeline f a where
+  Return :: a -> TPipeline f a
+  Roll :: f a -> (a -> TPipeline f b)  -> TPipeline f b
+
+instance Functor (TPipeline f) where
+  fmap f (Return a) = Return (f a)
+  fmap f (Roll fa k) = Roll fa (fmap f . k)
+
+instance Applicative (TPipeline f) where
+  pure = Return
+  (<*>) = ap
+
+instance Monad (TPipeline f) where
+  return = pure
+  (Return a) >>= f = f a
+  (Roll fa k) >>= f = Roll fa (k >=> f)
+
+runTPipeline :: Monad g => (forall a . f a -> g a) -> TPipeline f a -> g a
+runTPipeline _h (Return a) = return a
+runTPipeline h (Roll fa k)   = h fa >>= runTPipeline h. k
+
+use :: f a -> TPipeline f a
+use fa = Roll fa Return
 
 instance Outputable Phase where
     ppr p = text (show p)
