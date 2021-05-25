@@ -15,6 +15,7 @@ module GHC.Linker.Loader
    , initLoaderState
    , uninitializedLoader
    , showLoaderState
+   , getLoaderState
    -- * Load & Unload
    , loadExpr
    , loadDecls
@@ -128,6 +129,10 @@ modifyLoaderState interp f =
     (fmapFst pure . f . fromMaybe uninitialised)
   where fmapFst f = fmap (\(x, y) -> (f x, y))
 
+getLoaderState :: Interp -> IO (Maybe LoaderState)
+getLoaderState interp = readMVar (loader_state (interpLoader interp))
+
+
 emptyLoaderState :: LoaderState
 emptyLoaderState = LoaderState
    { closure_env = emptyNameEnv
@@ -135,6 +140,8 @@ emptyLoaderState = LoaderState
    , pkgs_loaded = init_pkgs
    , bcos_loaded = []
    , objs_loaded = []
+   , hs_objs_loaded = []
+   , non_hs_objs_loaded = []
    , temp_sos = []
    }
   -- Packages that don't need loading, because the compiler
@@ -1184,40 +1191,6 @@ unload_wkr interp keep_linkables pls@LoaderState{..}  = do
                 -- letting go of them (plus of course depopulating
                 -- the symbol table which is done in the main body)
 
-{- **********************************************************************
-
-                Loading packages
-
-  ********************************************************************* -}
-
-data LibrarySpec
-   = Objects [FilePath] -- Full path names of set of .o files, including trailing .o
-                        -- We allow batched loading to ensure that cyclic symbol
-                        -- references can be resolved (see #13786).
-                        -- For dynamic objects only, try to find the object
-                        -- file in all the directories specified in
-                        -- v_Library_paths before giving up.
-
-   | Archive FilePath   -- Full path name of a .a file, including trailing .a
-
-   | DLL String         -- "Unadorned" name of a .DLL/.so
-                        --  e.g.    On unix     "qt"  denotes "libqt.so"
-                        --          On Windows  "burble"  denotes "burble.DLL" or "libburble.dll"
-                        --  loadDLL is platform-specific and adds the lib/.so/.DLL
-                        --  suffixes platform-dependently
-
-   | DLLPath FilePath   -- Absolute or relative pathname to a dynamic library
-                        -- (ends with .dll or .so).
-
-   | Framework String   -- Only used for darwin, but does no harm
-
-instance Outputable LibrarySpec where
-  ppr (Objects objs) = text "Objects" <+> ppr objs
-  ppr (Archive a) = text "Archive" <+> text a
-  ppr (DLL s) = text "DLL" <+> text s
-  ppr (DLLPath f) = text "DLLPath" <+> text f
-  ppr (Framework s) = text "Framework" <+> text s
-
 -- If this package is already part of the GHCi binary, we'll already
 -- have the right DLLs for this package loaded, so don't try to
 -- load them again.
@@ -1263,29 +1236,31 @@ loadPackages interp hsc_env new_pkgs = do
 
 loadPackages' :: Interp -> HscEnv -> [UnitId] -> LoaderState -> IO LoaderState
 loadPackages' interp hsc_env new_pks pls = do
-    pkgs' <- link (pkgs_loaded pls) new_pks
-    return $! pls { pkgs_loaded = pkgs' }
+    (pkgs', hs_objs, non_hs_objs) <- link (pkgs_loaded pls) new_pks
+    return $! pls { pkgs_loaded = pkgs'
+                  , hs_objs_loaded = hs_objs ++ hs_objs_loaded pls
+                  , non_hs_objs_loaded = non_hs_objs ++ non_hs_objs_loaded pls }
   where
-     link :: [UnitId] -> [UnitId] -> IO [UnitId]
+     link :: [UnitId] -> [UnitId] -> IO ([UnitId], [LibrarySpec], [LibrarySpec])
      link pkgs new_pkgs =
-         foldM link_one pkgs new_pkgs
+         foldM link_one (pkgs, [],[]) new_pkgs
 
-     link_one pkgs new_pkg
+     link_one (pkgs, acc_hs, acc_non_hs) new_pkg
         | new_pkg `elem` pkgs   -- Already linked
-        = return pkgs
+        = return (pkgs, acc_hs, acc_non_hs)
 
         | Just pkg_cfg <- lookupUnitId (hsc_units hsc_env) new_pkg
         = do {  -- Link dependents first
-               pkgs' <- link pkgs (unitDepends pkg_cfg)
+               (pkgs', hs_cls', extra_cls') <- link pkgs (unitDepends pkg_cfg)
                 -- Now link the package itself
-             ; loadPackage interp hsc_env pkg_cfg
-             ; return (new_pkg : pkgs') }
+             ; (hs_cls, extra_cls) <- loadPackage interp hsc_env pkg_cfg
+             ; return (new_pkg : pkgs', acc_hs ++ hs_cls ++ hs_cls', acc_non_hs ++ extra_cls ++ extra_cls') }
 
         | otherwise
         = throwGhcExceptionIO (CmdLineError ("unknown package: " ++ unpackFS (unitIdFS new_pkg)))
 
 
-loadPackage :: Interp -> HscEnv -> UnitInfo -> IO ()
+loadPackage :: Interp -> HscEnv -> UnitInfo -> IO ([LibrarySpec], [LibrarySpec])
 loadPackage interp hsc_env pkg
    = do
         let dflags    = hsc_dflags hsc_env
@@ -1369,7 +1344,9 @@ loadPackage interp hsc_env pkg
         mapM_ (removeLibrarySearchPath interp) $ reverse pathCache
 
         if succeeded ok
-           then maybePutStrLn logger dflags "done."
+           then do
+             maybePutStrLn logger dflags "done."
+             return (hs_classifieds, extra_classifieds)
            else let errmsg = text "unable to load unit `"
                              <> pprUnitInfoForUser pkg <> text "'"
                  in throwGhcExceptionIO (InstallationError (showSDoc dflags errmsg))
