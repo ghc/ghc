@@ -79,6 +79,28 @@ data Errors = Errors
   -- ^ A list of errors consisting of an error message and the corresponding passage
   } deriving Show
 
+-- | Type used to check if two values share a common suffix
+newtype Suffixed = UnsafeSuffixed Text
+
+suffixed :: Text -> Suffixed
+suffixed text = UnsafeSuffixed (T.reverse text)
+
+-- We might not even need this XXX JB
+-- fromSuffixed :: Suffixed Text -> Text
+-- fromSuffixed (UnsafeSuffixed text) = reverse text
+
+-- Two Suffixed values are equal if they share a common suffix
+instance Eq Suffixed where
+  UnsafeSuffixed a == UnsafeSuffixed b = case T.commonPrefixes a b of
+    Nothing         -> False
+    Just (_, "", _) -> True
+    Just (_, _, "") -> True
+    _               -> False
+
+instance Ord Suffixed where
+  a@(UnsafeSuffixed a') `compare` b@(UnsafeSuffixed b') =
+    if a == b then EQ else compare a' b'
+
 parseError :: Text       -- ^ The original input received via stdin
            -> ParseError -- ^ an error produced by parsing said input
            -> Errors
@@ -158,6 +180,12 @@ checkNotes grepOutput = do
   -- Alternatively, maybe it's enough to have a list of Maps, one Map per file,
   -- and check the filenames sequentially. Whether or not that's efficient
   -- enough depends on how many note headers per file there are on average.
+  -- For looking up, dots should be converted to dashes and file endings
+  -- removed before creating the map and looking up in it (Though I guess keep
+  -- the original name somewhere so you can tell the user about it if it
+  -- doesn't work)
+  -- Anyway, we don't need a Trie, just use a Map with custom Ord instance
+  -- Suffixed.
 
   traceShow refs undefined
 
