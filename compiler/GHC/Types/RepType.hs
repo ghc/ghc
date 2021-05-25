@@ -339,7 +339,7 @@ needed and how many bits are required. The data type GHC.Core.TyCon.PrimRep
 enumerates all the possibilities.
 
 data PrimRep
-  = VoidRep
+  = VoidRep       -- See Note [VoidRep]
   | LiftedRep     -- ^ Lifted pointer
   | UnliftedRep   -- ^ Unlifted pointer
   | Int8Rep       -- ^ Signed, 8-bit value
