@@ -135,6 +135,12 @@ Language
   ``\x -> x \`f\` "hello"``. For more information, see
   :ref:`simple-subsumption`.
 
+* :extension:`LinearTypes` can now infer multiplicity for ``case``
+  expressions. Previously, the scrutinee of a ``case`` (the bit between ``case``
+  and ``of``) was always assumed to have a multiplicity of ``Many``. Now, GHC
+  will allow the scrutinee to have a multiplicity of ``One``, using its best-effort
+  inference algorithm.
+       
 Compiler
 ~~~~~~~~
 
