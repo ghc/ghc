@@ -4,8 +4,9 @@ module FrontendPlugin where
 import GHC.Plugins
 import qualified GHC
 import GHC              ( Ghc, LoadHowMuch(..) )
+import GHC.Utils.Monad
 
-import GHC.Driver.Pipeline hiding ( hsc_env )
+import GHC.Driver.Pipeline
 import GHC.Driver.Phases
 import System.Exit
 import Control.Monad
@@ -35,10 +36,10 @@ doMake opts srcs  = do
     -- This means that "ghc Foo.o Bar.o -o baz" links the program as
     -- we expect.
     if (null hs_srcs)
-       then liftIO (oneShot hsc_env StopLn srcs)
+       then liftIO (oneShot hsc_env NoStop srcs)
        else do
 
-    o_files <- mapM (\x -> liftIO $ compileFile hsc_env StopLn x)
+    o_files <- mapMaybeM (\x -> liftIO $ compileFile hsc_env NoStop x)
                  non_hs_srcs
     dflags <- GHC.getSessionDynFlags
     let dflags' = dflags { ldInputs = map (FileOption "") o_files
