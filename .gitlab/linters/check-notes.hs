@@ -11,6 +11,7 @@
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE BlockArguments    #-}
 {-# LANGUAGE TupleSections     #-}
+{-# LANGUAGE ViewPatterns      #-}
 
 import Debug.Trace -- XXX JB
 
@@ -22,6 +23,9 @@ import           Data.Char
 import           Data.Either
 import           Data.List
 import           Data.List.NonEmpty (NonEmpty(..))
+import qualified Data.List.NonEmpty as NE
+import           Data.Map.Strict (Map)
+import qualified Data.Map.Strict as M
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
@@ -102,6 +106,20 @@ malformedRefs errs = Errors {errorTypeInfo, errorList}
 \Some Note references or headers were malformed. Please ensure that they\n\
 \follow this format: XXX JB TODO"
 
+duplicateHeaders :: NonEmpty (NonEmpty Header) -> Errors
+duplicateHeaders headers = Errors {errorTypeInfo, errorList}
+  where
+    makeError (Header Note {notePassage, noteName}) = Error
+      (Just notePassage)
+      ("Header was found more than once: [" <> T.pack (show noteName) <> "]")
+    errorList = makeError <$> join headers
+    errorTypeInfo = "\
+\Some Note headers were found more than once. Please ensure each Note\n\
+\header appears at most once. A Note header can be recognized by its\n\
+\underline consisting of tildes, as in\n\
+\    Note [some note]\n\
+\    ~~~~~~~~~~~~~~~~"
+
 -- | Creates a list of dangling reference errors for the given notes
 danglingRefs :: NonEmpty Note -> Errors
 danglingRefs = undefined
@@ -123,7 +141,14 @@ checkNotes grepOutput = do
     ([]  , notes) -> pure $ mconcat notes
     (e:es, _    ) -> throwError . malformedRefs $ e :| es
 
-  traceShow headers undefined
+  let (fmap NE.head -> uniqueSortedHeaders, duplicates) =
+        partition ((> 1) . length) $ NE.groupAllWith (noteName . headerNote) headers
+
+  case duplicates of
+    []   -> pure ()
+    h:hs -> throwError . duplicateHeaders $ h :| hs
+
+  traceShow refs undefined
 
 -- runStage :: MonadError Errors m
 --          => (t -> Except e a)      -- ^ extract an `a` from a `t`
@@ -184,6 +209,9 @@ pNotes = bimap (map Header) (map Ref) . mconcat <$> do
   setPosition =<< location <$> ask
   many do
     pCommentStart
+    -- A note on the beginning of the line could be a header, if the next line
+    -- begins with ~~~~
+    -- otherwise it is a regular Note reference
     mPotentialHeader <- optionMaybe (try $ pNote NoLineBreaks)
     noteSeparator
     case mPotentialHeader of
@@ -191,9 +219,13 @@ pNotes = bimap (map Header) (map Ref) . mconcat <$> do
       Just potentialHeader -> try headerBranch <|> refBranch
         where
           headerBranch = do
+            -- after a header, more references can appear on the same line
             firstRefs <- notesUntilEOL NoLineBreaks
             pCommentStart
-            (count 3 $ char '~') *> skipMany (char '~')
+            -- headers are underlined by ~~~~
+            -- 4 is an arbitrary lower bound on how many tildes you need
+            (count 4 $ char '~') *> skipMany (char '~')
+            -- more references can also appear immediately after the ~~~~
             restRefs <- notesUntilEOL WithLineBreaks
             pure ([potentialHeader], firstRefs ++ restRefs)
           refBranch = do
@@ -257,9 +289,6 @@ handleErrors Errors {errorTypeInfo, errorList} = do
         Nothing      -> pure ()
         Just passage -> do
           printLnStdErr " in the passage"
-          -- XXX JB print linenumber| in front of each passage line
-          -- remember to leftpad with spaces according to length of the longest
-          -- line number
           printPassage passage
 
     -- surround with ANSI escape sequence for red color and back to no color
@@ -273,5 +302,5 @@ handleErrors Errors {errorTypeInfo, errorList} = do
           lastLineNum = lineNum + length passageLines - 1
           lastLineNumLength = length (show lastLineNum)
           lineNums = T.justifyRight lastLineNumLength ' ' . T.pack . show <$> [lineNum..]
-          prependNum num str = printLnStdErr $ num <> "|" <> str
-      zipWithM_ prependNum lineNums passageLines
+          prependNum num str = num <> " | " <> str
+      mapM_ printLnStdErr $ zipWith prependNum lineNums passageLines
