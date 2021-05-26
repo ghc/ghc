@@ -22,3 +22,28 @@ The utility generates the following files for ToBeTested.hs
   - ToBeTested.ppr.hs      : the ppr result
   - ToBeTested.hs.ast      : the AST of the original source
   - ToBeTested.hs.ast.new  : the AST of the re-parsed ppr source
+
+For local development/testing
+-----------------------------
+
+From this directory, start a ghci session by
+
+../../_build/stage1/bin/ghc --interactive
+
+Update Main.hs. the _tt function to firstly have the full local path
+of the _build/stage1/lib directory, and secondly to be cofigured to
+run the test of interest, by adding a new line to the many already
+there or commenting in the one (only) to be tested.
+
+ghci> :l Main.hs
+ghci> _tt
+*** Exception: ExitSuccess
+
+Note: GHC may complain about missing modules, etc, this is not a
+problem, the test passes if it gives ExitSuccess at the end.
+
+Logging can be turned on by flipping the comments in Utils.hs
+
+debugEnabledFlag = True
+-- debugEnabledFlag = False
+
