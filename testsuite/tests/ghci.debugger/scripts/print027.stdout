@@ -1,6 +1,6 @@
 + = (_t1::forall a. Num a => a -> a -> a)
 print = (_t2::forall a. Show a => a -> IO ())
 log = (_t3::forall a. Floating a => a -> a)
-head = (_t4::forall a. [a] -> a)
-tail = (_t5::forall a. [a] -> [a])
+head = (_t4::forall a. GHC.Stack.Types.HasCallStack => [a] -> a)
+tail = (_t5::forall a. GHC.Stack.Types.HasCallStack => [a] -> [a])
 fst = (_t6::forall a b. (a, b) -> a)

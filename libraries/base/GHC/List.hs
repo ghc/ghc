@@ -37,6 +37,7 @@ import Data.Maybe
 import GHC.Base
 import GHC.Num (Num(..))
 import GHC.Num.Integer (Integer)
+import GHC.Stack.Types (HasCallStack)
 
 infixl 9  !!
 infix  4 `elem`, `notElem`
@@ -64,12 +65,12 @@ infix  4 `elem`, `notElem`
 -- 1
 -- >>> head []
 -- *** Exception: Prelude.head: empty list
-head                    :: [a] -> a
+head                    :: HasCallStack => [a] -> a
 head (x:_)              =  x
 head []                 =  badHead
 {-# NOINLINE [1] head #-}
 
-badHead :: a
+badHead :: HasCallStack => a
 badHead = errorEmptyList "head"
 
 -- This rule is useful in cases like
@@ -108,7 +109,7 @@ uncons (x:xs)           = Just (x, xs)
 -- []
 -- >>> tail []
 -- *** Exception: Prelude.tail: empty list
-tail                    :: [a] -> [a]
+tail                    :: HasCallStack => [a] -> [a]
 tail (_:xs)             =  xs
 tail []                 =  errorEmptyList "tail"
 
@@ -121,7 +122,7 @@ tail []                 =  errorEmptyList "tail"
 -- * Hangs forever *
 -- >>> last []
 -- *** Exception: Prelude.last: empty list
-last                    :: [a] -> a
+last                    :: HasCallStack => [a] -> a
 #if defined(USE_REPORT_PRELUDE)
 last [x]                =  x
 last (_:xs)             =  last xs
@@ -134,7 +135,7 @@ last xs = foldl (\_ x -> x) lastError xs
 {-# INLINE last #-}
 -- The inline pragma is required to make GHC remember the implementation via
 -- foldl.
-lastError :: a
+lastError :: HasCallStack => a
 lastError = errorEmptyList "last"
 #endif
 
@@ -147,7 +148,7 @@ lastError = errorEmptyList "last"
 -- []
 -- >>> init []
 -- *** Exception: Prelude.init: empty list
-init                    :: [a] -> [a]
+init                    :: HasCallStack => [a] -> [a]
 #if defined(USE_REPORT_PRELUDE)
 init [x]                =  []
 init (x:xs)             =  x : init xs
@@ -365,12 +366,12 @@ to make the desired list fusion robust.
 -- True
 -- >>> foldl1 (+) [1..]
 -- * Hangs forever *
-foldl1                  :: (a -> a -> a) -> [a] -> a
+foldl1                  :: HasCallStack => (a -> a -> a) -> [a] -> a
 foldl1 f (x:xs)         =  foldl f x xs
 foldl1 _ []             =  errorEmptyList "foldl1"
 
 -- | A strict version of 'foldl1'.
-foldl1'                  :: (a -> a -> a) -> [a] -> a
+foldl1'                  :: HasCallStack => (a -> a -> a) -> [a] -> a
 foldl1' f (x:xs)         =  foldl' f x xs
 foldl1' _ []             =  errorEmptyList "foldl1'"
 
@@ -556,7 +557,7 @@ match on everything past the :, which is just the tail of scanl.
 -- True
 -- >>> force $ foldr1 (+) [1..]
 -- *** Exception: stack overflow
-foldr1                  :: (a -> a -> a) -> [a] -> a
+foldr1                  :: HasCallStack => (a -> a -> a) -> [a] -> a
 foldr1 f = go
   where go [x]            =  x
         go (x:xs)         =  f x (go xs)
@@ -662,7 +663,7 @@ scanr1 f (x:xs)         =  f x q : qs
 -- 55
 -- >>> maximum [1..]
 -- * Hangs forever *
-maximum                 :: (Ord a) => [a] -> a
+maximum                 :: (Ord a, HasCallStack) => [a] -> a
 {-# INLINABLE maximum #-}
 maximum []              =  errorEmptyList "maximum"
 maximum xs              =  foldl1' max xs
@@ -686,7 +687,7 @@ maximum xs              =  foldl1' max xs
 -- -89
 -- >>> minimum [1..]
 -- * Hangs forever *
-minimum                 :: (Ord a) => [a] -> a
+minimum                 :: (Ord a, HasCallStack) => [a] -> a
 {-# INLINABLE minimum #-}
 minimum []              =  errorEmptyList "minimum"
 minimum xs              =  foldl1' min xs
@@ -791,7 +792,7 @@ replicate n x           =  take n (repeat x)
 -- [42,42,42,42,42,42,42,42,42,42...
 -- >>> take 20 $ cycle [2, 5, 7]
 -- [2,5,7,2,5,7,2,5,7,2,5,7...
-cycle                   :: [a] -> [a]
+cycle                   :: HasCallStack => [a] -> [a]
 cycle []                = errorEmptyList "cycle"
 cycle xs                = xs' where xs' = xs ++ xs'
 
@@ -1296,10 +1297,10 @@ concat = foldr (++) []
 -- *** Exception: Prelude.!!: index too large
 -- >>> ['a', 'b', 'c'] !! (-1)
 -- *** Exception: Prelude.!!: negative index
-(!!)                    :: [a] -> Int -> a
+(!!)                    :: HasCallStack => [a] -> Int -> a
 #if defined(USE_REPORT_PRELUDE)
-xs     !! n | n < 0 =  errorWithoutStackTrace "Prelude.!!: negative index"
-[]     !! _         =  errorWithoutStackTrace "Prelude.!!: index too large"
+xs     !! n | n < 0 =  error "Prelude.!!: negative index"
+[]     !! _         =  error "Prelude.!!: index too large"
 (x:_)  !! 0         =  x
 (_:xs) !! n         =  xs !! (n-1)
 #else
@@ -1308,11 +1309,11 @@ xs     !! n | n < 0 =  errorWithoutStackTrace "Prelude.!!: negative index"
 -- We may want to fuss around a bit with NOINLINE, and
 -- if so we should be careful not to trip up known-bottom
 -- optimizations.
-tooLarge :: Int -> a
-tooLarge _ = errorWithoutStackTrace (prel_list_str ++ "!!: index too large")
+tooLarge :: HasCallStack => Int -> a
+tooLarge _ = error (prel_list_str ++ "!!: index too large")
 
-negIndex :: a
-negIndex = errorWithoutStackTrace $ prel_list_str ++ "!!: negative index"
+negIndex :: HasCallStack => a
+negIndex = error $ prel_list_str ++ "!!: negative index"
 
 {-# INLINABLE (!!) #-}
 xs !! n
@@ -1584,9 +1585,9 @@ unzip3   =  foldr (\(a,b,c) ~(as,bs,cs) -> (a:as,b:bs,c:cs))
 -- Common up near identical calls to `error' to reduce the number
 -- constant strings created when compiled:
 
-errorEmptyList :: String -> a
+errorEmptyList :: HasCallStack => String -> a
 errorEmptyList fun =
-  errorWithoutStackTrace (prel_list_str ++ fun ++ ": empty list")
+  error (prel_list_str ++ fun ++ ": empty list")
 
 prel_list_str :: String
 prel_list_str = "Prelude."
