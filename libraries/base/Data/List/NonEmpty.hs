@@ -110,6 +110,7 @@ import           Data.Function       (on)
 import qualified Data.List           as List
 import           Data.Ord            (comparing)
 import           GHC.Base            (NonEmpty(..))
+import           GHC.Stack.Types     (HasCallStack)
 
 infixr 5 <|
 
@@ -194,9 +195,9 @@ sort = lift List.sort
 -- | Converts a normal list to a 'NonEmpty' stream.
 --
 -- Raises an error if given an empty list.
-fromList :: [a] -> NonEmpty a
+fromList :: HasCallStack => [a] -> NonEmpty a
 fromList (a:as) = a :| as
-fromList [] = errorWithoutStackTrace "NonEmpty.fromList: empty list"
+fromList [] = error "NonEmpty.fromList: empty list"
 
 -- | Convert a stream to a normal list efficiently.
 toList :: NonEmpty a -> [a]
@@ -401,11 +402,11 @@ isPrefixOf (y:ys) (x :| xs) = (y == x) && List.isPrefixOf ys xs
 -- @n@. Note that the head of the stream has index 0.
 --
 -- /Beware/: a negative or out-of-bounds index will cause an error.
-(!!) :: NonEmpty a -> Int -> a
+(!!) :: HasCallStack => NonEmpty a -> Int -> a
 (!!) ~(x :| xs) n
   | n == 0 = x
   | n > 0  = xs List.!! (n - 1)
-  | otherwise = errorWithoutStackTrace "NonEmpty.!! negative argument"
+  | otherwise = error "NonEmpty.!! negative index"
 infixl 9 !!
 
 -- | The 'zip' function takes two streams and returns a stream of

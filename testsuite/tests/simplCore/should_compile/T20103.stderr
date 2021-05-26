@@ -1,22 +1,22 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 98, types: 59, coercions: 14, joins: 0/0}
+  = {terms: 136, types: 88, coercions: 25, joins: 0/0}
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 lvl :: Int
 [GblId, Unf=OtherCon []]
-lvl = GHC.Types.I# 12#
+lvl = GHC.Types.I# 28#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 lvl1 :: Int
 [GblId, Unf=OtherCon []]
-lvl1 = GHC.Types.I# 7#
+lvl1 = GHC.Types.I# 6#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 lvl2 :: Int
 [GblId, Unf=OtherCon []]
-lvl2 = GHC.Types.I# 9#
+lvl2 = GHC.Types.I# 24#
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 lvl3 :: GHC.Prim.Addr#
@@ -60,18 +60,60 @@ lvl7 = GHC.Stack.Types.SrcLoc lvl6 lvl5 lvl4 lvl1 lvl2 lvl1 lvl
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 lvl8 :: GHC.Prim.Addr#
 [GblId, Unf=OtherCon []]
-lvl8 = "foo"#
+lvl8 = "head"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 lvl9 :: [Char]
 [GblId]
 lvl9 = GHC.CString.unpackCString# lvl8
 
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+lvl10 :: Int
+[GblId, Unf=OtherCon []]
+lvl10 = GHC.Types.I# 12#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+lvl11 :: Int
+[GblId, Unf=OtherCon []]
+lvl11 = GHC.Types.I# 7#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+lvl12 :: Int
+[GblId, Unf=OtherCon []]
+lvl12 = GHC.Types.I# 9#
+
+-- RHS size: {terms: 8, types: 0, coercions: 0, joins: 0/0}
+lvl13 :: SrcLoc
+[GblId, Unf=OtherCon []]
+lvl13
+  = GHC.Stack.Types.SrcLoc lvl6 lvl5 lvl4 lvl11 lvl12 lvl11 lvl10
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl14 :: GHC.Prim.Addr#
+[GblId, Unf=OtherCon []]
+lvl14 = "foo"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+lvl15 :: [Char]
+[GblId]
+lvl15 = GHC.CString.unpackCString# lvl14
+
+-- RHS size: {terms: 6, types: 5, coercions: 4, joins: 0/0}
+lvl16 :: CallStack -> ([Char], SrcLoc)
+[GblId, Arity=1, Str=<S>b, Cpr=b, Unf=OtherCon []]
+lvl16
+  = \ (wild1 :: CallStack) ->
+      GHC.List.head1
+        @([Char], SrcLoc)
+        ((GHC.Stack.Types.PushCallStack lvl9 lvl7 wild1)
+         `cast` (Sym (GHC.Classes.N:IP[0] <"callStack">_N <CallStack>_N)
+                 :: CallStack ~R# (?callStack::CallStack)))
+
 Rec {
--- RHS size: {terms: 36, types: 29, coercions: 14, joins: 0/0}
+-- RHS size: {terms: 44, types: 41, coercions: 21, joins: 0/0}
 T20103.$wfoo [InlPrag=[2], Occ=LoopBreaker]
   :: HasCallStack => GHC.Prim.Int# -> GHC.Prim.Int#
-[GblId, Arity=2, Str=<1L><1L>, Unf=OtherCon []]
+[GblId, Arity=2, Str=<SL><1L>, Unf=OtherCon []]
 T20103.$wfoo
   = \ ($dIP :: HasCallStack) (ww :: GHC.Prim.Int#) ->
       case ww of ds {
@@ -82,7 +124,7 @@ T20103.$wfoo
           of wild1 {
             __DEFAULT ->
               T20103.$wfoo
-                ((GHC.Stack.Types.PushCallStack lvl9 lvl7 wild1)
+                ((GHC.Stack.Types.PushCallStack lvl15 lvl13 wild1)
                  `cast` (Sym (GHC.Classes.N:IP[0] <"callStack">_N <CallStack>_N)
                          :: CallStack ~R# (?callStack::CallStack)))
                 (GHC.Prim.-# ds 1#);
@@ -99,7 +141,21 @@ T20103.$wfoo
                   `cast` (GHC.Classes.N:IP[0] <"callStack">_N <CallStack>_N
                           :: (?callStack::CallStack) ~R# CallStack))
           of {
-            [] -> case GHC.List.badHead of wild1 { };
+            [] ->
+              case $dIP
+                   `cast` (GHC.Classes.N:IP[0] <"callStack">_N <CallStack>_N
+                           :: (?callStack::CallStack) ~R# CallStack)
+              of wild1 {
+                __DEFAULT -> case lvl16 wild1 of wild2 { };
+                GHC.Stack.Types.FreezeCallStack ds1 ->
+                  case GHC.List.head1
+                         @([Char], SrcLoc)
+                         (wild1
+                          `cast` (Sym (GHC.Classes.N:IP[0] <"callStack">_N <CallStack>_N)
+                                  :: CallStack ~R# (?callStack::CallStack)))
+                  of wild2 {
+                  }
+              };
             : x ds1 -> case x of { (x1, ds2) -> GHC.List.$wlenAcc @Char x1 0# }
           }
       }
@@ -109,7 +165,7 @@ end Rec }
 foo [InlPrag=[2]] :: HasCallStack => Int -> Int
 [GblId,
  Arity=2,
- Str=<1L><1P(1L)>,
+ Str=<SL><1!P(1L)>,
  Cpr=1,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,

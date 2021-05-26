@@ -95,15 +95,15 @@ holes.hs:11:15: warning: [-Wtyped-holes (in -Wdefault)]
         id :: forall a. a -> a
         until :: forall a. (a -> Bool) -> (a -> a) -> a -> a
         ioError :: forall a. IOError -> IO a
-        (!!) :: forall a. [a] -> Int -> a
+        (!!) :: forall a. GHC.Stack.Types.HasCallStack => [a] -> Int -> a
         break :: forall a. (a -> Bool) -> [a] -> ([a], [a])
-        cycle :: forall a. [a] -> [a]
+        cycle :: forall a. GHC.Stack.Types.HasCallStack => [a] -> [a]
         drop :: forall a. Int -> [a] -> [a]
         dropWhile :: forall a. (a -> Bool) -> [a] -> [a]
-        head :: forall a. [a] -> a
-        init :: forall a. [a] -> [a]
+        head :: forall a. GHC.Stack.Types.HasCallStack => [a] -> a
+        init :: forall a. GHC.Stack.Types.HasCallStack => [a] -> [a]
         iterate :: forall a. (a -> a) -> a -> [a]
-        last :: forall a. [a] -> a
+        last :: forall a. GHC.Stack.Types.HasCallStack => [a] -> a
         repeat :: forall a. a -> [a]
         replicate :: forall a. Int -> a -> [a]
         reverse :: forall a. [a] -> [a]
@@ -111,7 +111,7 @@ holes.hs:11:15: warning: [-Wtyped-holes (in -Wdefault)]
         scanr1 :: forall a. (a -> a -> a) -> [a] -> [a]
         span :: forall a. (a -> Bool) -> [a] -> ([a], [a])
         splitAt :: forall a. Int -> [a] -> ([a], [a])
-        tail :: forall a. [a] -> [a]
+        tail :: forall a. GHC.Stack.Types.HasCallStack => [a] -> [a]
         take :: forall a. Int -> [a] -> [a]
         takeWhile :: forall a. (a -> Bool) -> [a] -> [a]
         subtract :: forall a. Num a => a -> a -> a

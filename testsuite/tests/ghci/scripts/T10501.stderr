@@ -1,4 +1,9 @@
 *** Exception: Prelude.head: empty list
+CallStack (from HasCallStack):
+  error, called at libraries/base/GHC/List.hs:1590:3 in base:GHC.List
+  errorEmptyList, called at libraries/base/GHC/List.hs:74:11 in base:GHC.List
+  badHead, called at libraries/base/GHC/List.hs:70:28 in base:GHC.List
+  head, called at <interactive>:1:10 in interactive:Ghci1
 *** Exception: Prelude.undefined
 CallStack (from HasCallStack):
   undefined, called at <interactive>:1:17 in interactive:Ghci1

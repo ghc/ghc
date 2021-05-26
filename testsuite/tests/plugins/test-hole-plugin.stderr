@@ -19,7 +19,7 @@ test-hole-plugin.hs:13:5: warning: [-Wtyped-holes (in -Wdefault)]
         i :: [Int] -> Int
         g :: [Int] -> Int
         h :: [Int] -> Int
-        head :: forall a. [a] -> a
+        head :: forall a. GHC.Stack.Types.HasCallStack => [a] -> a
         (Some hole fits suppressed; use -fmax-valid-hole-fits=N or -fno-max-valid-hole-fits)
 
 test-hole-plugin.hs:14:5: warning: [-Wtyped-holes (in -Wdefault)]
@@ -34,7 +34,7 @@ test-hole-plugin.hs:14:5: warning: [-Wtyped-holes (in -Wdefault)]
         minimum :: forall (t :: * -> *) a. (Foldable t, Ord a) => t a -> a
         maximum :: forall (t :: * -> *) a. (Foldable t, Ord a) => t a -> a
         length :: forall (t :: * -> *) a. Foldable t => t a -> Int
-        last :: forall a. [a] -> a
+        last :: forall a. GHC.Stack.Types.HasCallStack => [a] -> a
         (Some hole fits suppressed; use -fmax-valid-hole-fits=N or -fno-max-valid-hole-fits)
 
 test-hole-plugin.hs:15:5: warning: [-Wtyped-holes (in -Wdefault)]
@@ -44,8 +44,8 @@ test-hole-plugin.hs:15:5: warning: [-Wtyped-holes (in -Wdefault)]
     • Relevant bindings include
         g :: [Int] -> Int (bound at test-hole-plugin.hs:15:1)
       Valid hole fits include
-        head :: forall a. [a] -> a
-        last :: forall a. [a] -> a
+        head :: forall a. GHC.Stack.Types.HasCallStack => [a] -> a
+        last :: forall a. GHC.Stack.Types.HasCallStack => [a] -> a
 
 test-hole-plugin.hs:16:5: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _only_Prelude :: [Int] -> Int
