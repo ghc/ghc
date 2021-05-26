@@ -7,11 +7,11 @@ refinement_hole_fits.hs:4:5: warning: [-Wtyped-holes (in -Wdefault)]
       Valid hole fits include
         f :: [Integer] -> Integer (bound at refinement_hole_fits.hs:4:1)
         g :: [Integer] -> Integer (bound at refinement_hole_fits.hs:7:1)
-        head :: forall a. [a] -> a
+        head :: forall a. GHC.Stack.Types.HasCallStack => [a] -> a
           with head @Integer
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
            (and originally defined in ‘GHC.List’))
-        last :: forall a. [a] -> a
+        last :: forall a. GHC.Stack.Types.HasCallStack => [a] -> a
           with last @Integer
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
            (and originally defined in ‘GHC.List’))
@@ -95,12 +95,12 @@ refinement_hole_fits.hs:4:5: warning: [-Wtyped-holes (in -Wdefault)]
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
            (and originally defined in ‘GHC.Base’))
         head (_ :: [[Integer] -> Integer])
-          where head :: forall a. [a] -> a
+          where head :: forall a. GHC.Stack.Types.HasCallStack => [a] -> a
           with head @([Integer] -> Integer)
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
            (and originally defined in ‘GHC.List’))
         last (_ :: [[Integer] -> Integer])
-          where last :: forall a. [a] -> a
+          where last :: forall a. GHC.Stack.Types.HasCallStack => [a] -> a
           with last @([Integer] -> Integer)
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
            (and originally defined in ‘GHC.List’))
@@ -110,7 +110,9 @@ refinement_hole_fits.hs:4:5: warning: [-Wtyped-holes (in -Wdefault)]
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
            (and originally defined in ‘GHC.Base’))
         (!!) (_ :: [[Integer] -> Integer]) (_ :: Int)
-          where (!!) :: forall a. [a] -> Int -> a
+          where (!!) :: forall a.
+                        GHC.Stack.Types.HasCallStack =>
+                        [a] -> Int -> a
           with (!!) @([Integer] -> Integer)
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
            (and originally defined in ‘GHC.List’))
@@ -194,12 +196,12 @@ refinement_hole_fits.hs:7:5: warning: [-Wtyped-holes (in -Wdefault)]
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
            (and originally defined in ‘GHC.Base’))
         head (_ :: [Integer -> [Integer] -> Integer])
-          where head :: forall a. [a] -> a
+          where head :: forall a. GHC.Stack.Types.HasCallStack => [a] -> a
           with head @(Integer -> [Integer] -> Integer)
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
            (and originally defined in ‘GHC.List’))
         last (_ :: [Integer -> [Integer] -> Integer])
-          where last :: forall a. [a] -> a
+          where last :: forall a. GHC.Stack.Types.HasCallStack => [a] -> a
           with last @(Integer -> [Integer] -> Integer)
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
            (and originally defined in ‘GHC.List’))
@@ -210,7 +212,9 @@ refinement_hole_fits.hs:7:5: warning: [-Wtyped-holes (in -Wdefault)]
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
            (and originally defined in ‘GHC.Base’))
         (!!) (_ :: [Integer -> [Integer] -> Integer]) (_ :: Int)
-          where (!!) :: forall a. [a] -> Int -> a
+          where (!!) :: forall a.
+                        GHC.Stack.Types.HasCallStack =>
+                        [a] -> Int -> a
           with (!!) @(Integer -> [Integer] -> Integer)
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
            (and originally defined in ‘GHC.List’))

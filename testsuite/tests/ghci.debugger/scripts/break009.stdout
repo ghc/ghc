@@ -2,3 +2,8 @@ Breakpoint 0 activated at Test6.hs:5:8-11
 Stopped in Main.main, Test6.hs:5:8-11
 _result :: a = _
 *** Exception: Prelude.head: empty list
+CallStack (from HasCallStack):
+  error, called at libraries/base/GHC/List.hs:1590:3 in base:GHC.List
+  errorEmptyList, called at libraries/base/GHC/List.hs:74:11 in base:GHC.List
+  badHead, called at libraries/base/GHC/List.hs:70:28 in base:GHC.List
+  head, called at Test6.hs:1:8 in main:Main
