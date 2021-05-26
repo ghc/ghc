@@ -7,6 +7,10 @@
 # XXX JB exclude .hie-bios
 grep -rnI -A 1 'Note' $TOP | $GHC -ignore-dot-ghci "check-notes.hs" -e ":main"
 
+# XXX JB EVERYTHING BELOW THIS LINE IS OBSOLETE
+
+############################################################
+
 # set -e
 
 # COMMENT_START='-- {- # // /* dnl'
