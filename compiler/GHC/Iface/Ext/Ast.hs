@@ -1388,9 +1388,19 @@ instance (ToHie tyarg, ToHie arg, ToHie rec) => ToHie (HsConDetails tyarg arg re
   toHie (RecCon rec) = toHie rec
   toHie (InfixCon a b) = concatM [ toHie a, toHie b]
 
-instance ToHie (HsConDeclGADTDetails GhcRn) where
-  toHie (PrefixConGADT args) = toHie args
-  toHie (RecConGADT rec) = toHie rec
+instance ToHie (ConGADTBody GhcRn) where
+  toHie (PrefixConGADT body) = toHie body
+  toHie (RecConGADT flds res_ty) = concatM
+    [ toHie flds
+    , toHie res_ty
+    ]
+
+instance ToHie (PrefixConGADTBody GhcRn) where
+  toHie (PCGResult res_ty) = toHie res_ty
+  toHie (PCGAnonArg arg_ty body) = concatM
+    [ toHie arg_ty
+    , toHie body
+    ]
 
 instance HiePass p => ToHie (Located (HsCmdTop (GhcPass p))) where
   toHie (L span top) = concatM $ makeNode top span : case top of
@@ -1606,7 +1616,7 @@ instance ToHie a => ToHie (HsScaled GhcRn a) where
 instance ToHie (LocatedA (ConDecl GhcRn)) where
   toHie (L span decl) = concatM $ makeNode decl (locA span) : case decl of
       ConDeclGADT { con_names = names, con_bndrs = L outer_bndrs_loc outer_bndrs
-                  , con_mb_cxt = ctx, con_g_args = args, con_res_ty = typ } ->
+                  , con_mb_cxt = ctx, con_body = body } ->
         [ toHie $ map (C (Decl ConDec $ getRealSpanA span)) names
         , case outer_bndrs of
             HsOuterImplicit{hso_ximplicit = imp_vars} ->
@@ -1615,17 +1625,22 @@ instance ToHie (LocatedA (ConDecl GhcRn)) where
             HsOuterExplicit{hso_bndrs = exp_bndrs} ->
               toHie $ tvScopes resScope NoScope exp_bndrs
         , toHie ctx
-        , toHie args
-        , toHie typ
+        , toHie body
         ]
         where
-          rhsScope = combineScopes argsScope tyScope
           ctxScope = maybe NoScope mkLScopeA ctx
-          argsScope = case args of
-            PrefixConGADT xs -> scaled_args_scope xs
-            RecConGADT x     -> mkLScopeA x
-          tyScope = mkLScopeA typ
+          rhsScope = case body of
+            PrefixConGADT prefix_body ->
+              prefix_con_gadt_body_scope prefix_body
+            RecConGADT flds res_ty ->
+              combineScopes (mkLScopeA flds) (mkLScopeA res_ty)
           resScope = ResolvedScopes [ctxScope, rhsScope]
+
+          prefix_con_gadt_body_scope :: PrefixConGADTBody GhcRn -> Scope
+          prefix_con_gadt_body_scope (PCGResult res_ty) = mkLScopeA res_ty
+          prefix_con_gadt_body_scope (PCGAnonArg arg_ty body') =
+            combineScopes (mkLScopeA $ hsScaledThing arg_ty)
+                          (prefix_con_gadt_body_scope body')
       ConDeclH98 { con_name = name, con_ex_tvs = qvars
                  , con_mb_cxt = ctx, con_args = dets } ->
         [ toHie $ C (Decl ConDec $ getRealSpan (locA span)) name
@@ -1640,7 +1655,7 @@ instance ToHie (LocatedA (ConDecl GhcRn)) where
             PrefixCon _ xs -> scaled_args_scope xs
             InfixCon a b   -> scaled_args_scope [a, b]
             RecCon x       -> mkLScopeA x
-    where scaled_args_scope :: [HsScaled GhcRn (LHsType GhcRn)] -> Scope
+          scaled_args_scope :: [HsScaled GhcRn (LHsType GhcRn)] -> Scope
           scaled_args_scope = foldr combineScopes NoScope . map (mkLScopeA . hsScaledThing)
 
 instance ToHie (LocatedL [LocatedA (ConDeclField GhcRn)]) where
