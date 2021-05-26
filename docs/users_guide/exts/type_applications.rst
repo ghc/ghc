@@ -187,8 +187,9 @@ in type and class declarations are ordered (:ref:`inferring-variable-order`).
 Manually defining inferred variables
 ------------------------------------
 
-While user-written type or kind variables are specified by default, GHC permits
-labelling these variables as inferred. By writing the type variable binder in
+Since the 9.0.1 release, GHC permits labelling the user-written
+type or kind variables as *inferred*, in contrast
+to the default of *specified*. By writing the type variable binder in
 braces as ``{tyvar}`` or ``{tyvar :: kind}``, the new variable will be
 classified as inferred, not specified. Doing so gives the programmer control
 over which variables can be manually instantiated and which can't.
