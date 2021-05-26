@@ -14,7 +14,7 @@ General bug fixes
 - First-class support for Apple M1 hardware using GHC's LLVM ARM backend
 
 - Fix a bug where code may be unloaded prematurely when using the parallel
-  garbage collector (see #)
+  garbage collector (see :ghc-ticket:`19417`)
 
 - Fix a bug where the linker may during shutdown unload code before
   libraries' ``atexit`` handlers have a chance to run (:ghc-ticket:`19297`).
@@ -25,6 +25,15 @@ General bug fixes
 - Add ``hs-boot`` file support for :ghc-flag:`-ddump-minimal-imports`
   (:ghc-ticket:`18497`).
 
+- Ensure ``hs-boot`` files are built before source files in GHCs ``-M`` mode
+  (:ghc-ticket:`14482`)
+
+- Fix a long standing GHC API bug affecting clients like HLS where async
+  exceptions used to cancel threads during typechecking would be caught by the
+  Template Haskell evaluator and reported as compile errors (:ghc-ticket:`19410`).
+
+- Improve error messages when looking up packages fails.
+
 - Fix a number of quirks in GC accounting (:ghc-ticket:`19147`)
 
 - Fix a code generation bug which could result in entry of unlifted objects
@@ -32,6 +41,11 @@ General bug fixes
 
 - Ensure that POSIX signals are not delivered to the ticker thread when using
   the pthread itimer implementation.
+
+- Fix a specialiser bug which could result in the construction of
+  recursive dictionaries in some programs (:ghc-ticket:`17151`).
+
+- Bump ``containers`` to 0.6.4.1
 
 - Do not treat :ghc-flag:`-Winferred-safe-imports` warnings as errors.
 
@@ -51,14 +65,8 @@ Portability fixes
 - Ensure that Darwin binary distributions do not depend upon ``utimensat``
   (:ghc-ticket:`17895`).
 
-- Fix a specialiser bug which could result in the construction of
-  recursive dictionaries in some programs (:ghc-ticket:`17151`).
-
-- Bump ``containers`` to 0.6.4.1
-
 - Remove a number of older autoconf idioms from the ``configure`` script,
   improving support in newer environments.
-
 
 Known issues
 ------------
