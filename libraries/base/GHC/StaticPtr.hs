@@ -48,6 +48,7 @@ module GHC.StaticPtr
   , IsStatic(..)
   ) where
 
+import Data.Typeable       (Typeable)
 import Foreign.C.Types     (CInt(..))
 import Foreign.Marshal     (allocaArray, peekArray, withArray)
 import GHC.Ptr             (Ptr(..), nullPtr)
@@ -97,8 +98,13 @@ unsafeLookupStaticPtr (Fingerprint w1 w2) = do
 foreign import ccall unsafe hs_spt_lookup :: Ptr Word64 -> IO (Ptr a)
 
 -- | A class for things buildable from static pointers.
+--
+-- GHC wraps each use of the 'static' keyword with
+-- 'fromStaticPtr'. Because the 'static' keyword requires its argument
+-- to be an instance of 'Typeable', 'fromStaticPtr' carries a
+-- 'Typeable' constraint as well.
 class IsStatic p where
-    fromStaticPtr :: StaticPtr a -> p a
+    fromStaticPtr :: Typeable a => StaticPtr a -> p a
 
 -- | @since 4.9.0.0
 instance IsStatic StaticPtr where

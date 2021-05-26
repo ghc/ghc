@@ -21,3 +21,10 @@ Version 9.4.1
 
   Note that the explicit type applications are required, as the call to
   ``withDict`` would be ambiguous otherwise.
+
+- A `Typeable` constraint has been added to `fromStaticPtr` in the
+  class `GHC.StaticPtr.IsStatic`. GHC automatically wraps each use of
+  the `static` keyword with `fromStaticPtr`. Because `static` requires
+  its argument to be an instance of `Typeable`, `fromStaticPtr` can
+  safely carry this constraint as well.
+  
