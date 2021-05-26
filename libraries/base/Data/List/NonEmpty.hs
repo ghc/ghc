@@ -111,6 +111,9 @@ import qualified Data.List           as List
 import           Data.Ord            (comparing)
 import           GHC.Base            (NonEmpty(..))
 
+-- $setup
+-- >>> import Prelude (negate)
+
 infixr 5 <|
 
 -- $setup
