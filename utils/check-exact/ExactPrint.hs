@@ -196,8 +196,6 @@ enterAnn :: (ExactPrint a) => Entry -> a -> Annotated ()
 enterAnn NoEntryVal a = do
   p <- getPosP
   debugM $ "enterAnn:NO ANN:(p,a) =" ++ show (p, astId a) ++ " starting"
-  -- curAnchor <- getAnchorU
-  -- printComments curAnchor
   exact a
   debugM $ "enterAnn:NO ANN:p =" ++ show (p, astId a) ++ " done"
 enterAnn (Entry anchor' cs) a = do
@@ -269,9 +267,9 @@ enterAnn (Entry anchor' cs) a = do
   withOffset st (advance edp >> exact a)
 
   when ((getFollowingComments cs) /= []) $ do
-    debugM $ "starting trailing comments:" ++ showAst (getFollowingComments cs)
+    -- debugM $ "starting trailing comments:" ++ showAst (getFollowingComments cs)
     mapM_ printOneComment (map tokComment $ getFollowingComments cs)
-    debugM $ "ending trailing comments"
+    -- debugM $ "ending trailing comments"
 
 -- ---------------------------------------------------------------------
 
@@ -285,7 +283,8 @@ addComments :: [Comment] -> EPP ()
 addComments csNew = do
   debugM $ "addComments:" ++ show csNew
   cs <- getUnallocatedComments
-  let cmp (Comment _ l1 _) (Comment _ l2 _) = compare (anchor l1) (anchor l2)
+  -- Must compare without span filenames, for CPP injected comments with fake filename
+  let cmp (Comment _ l1 _) (Comment _ l2 _) = compare (ss2pos $ anchor l1) (ss2pos $ anchor l2)
   -- AZ:TODO: sortedlist?
   putUnallocatedComments (sortBy cmp $ csNew ++ cs)
 
@@ -370,8 +369,6 @@ instance ExactPrint HsModule where
       Nothing -> return ()
       Just (L ln mn) -> do
         markEpAnn' an am_main AnnModule
-        -- debugM $ "HsModule name: (ss,ln)=" ++ show (ss2pos ss,ss2pos (realSrcSpan ln))
-        -- printStringAtSs ln (moduleNameString mn)
         markAnnotated (L ln mn)
 
         -- forM_ mdeprec markLocated
@@ -496,8 +493,19 @@ markLocatedAALS (EpAnn _ a _) f kw (Just str) = go (f a)
 -- ---------------------------------------------------------------------
 
 markArrow :: EpAnn TrailingAnn -> HsArrow GhcPs -> EPP ()
-markArrow EpAnnNotUsed _ = pure ()
-markArrow an _mult = markKwT (anns an)
+markArrow an arr = do
+  case arr of
+    HsUnrestrictedArrow _u ->
+      return ()
+    HsLinearArrow _u ma -> do
+      mapM_ markAddEpAnn ma
+    HsExplicitMult _u ma t  -> do
+      mapM_ markAddEpAnn ma
+      markAnnotated t
+
+  case an of
+    EpAnnNotUsed -> pure ()
+    _ -> markKwT (anns an)
 
 -- ---------------------------------------------------------------------
 
@@ -620,7 +628,7 @@ markAnnList' reallyTrail ann action = do
 printComments :: RealSrcSpan -> EPP ()
 printComments ss = do
   cs <- commentAllocation ss
-  debugM $ "printComments: (ss,comment locations): " ++ showPprUnsafe (rs2range ss,map commentAnchor cs)
+  -- debugM $ "printComments: (ss,comment locations): " ++ showPprUnsafe (rs2range ss,map commentAnchor cs)
   mapM_ printOneComment cs
 
 -- ---------------------------------------------------------------------
@@ -658,7 +666,11 @@ printOneComment c@(Comment _str loc _mo) = do
 commentAllocation :: RealSrcSpan -> EPP [Comment]
 commentAllocation ss = do
   cs <- getUnallocatedComments
-  let (earlier,later) = partition (\(Comment _str loc _mo) -> anchor loc <= ss) cs
+  -- Note: The CPP comment injection may change the file name in the
+  -- RealSrcSpan, which affects comparison, as the Ord instance for
+  -- RealSrcSpan compares the file first. So we sort via ss2pos
+  -- TODO: this is inefficient, use Pos all the way through
+  let (earlier,later) = partition (\(Comment _str loc _mo) -> (ss2pos $ anchor loc) <= (ss2pos ss)) cs
   putUnallocatedComments later
   -- debugM $ "commentAllocation:(ss,earlier,later)" ++ show (rs2range ss,earlier,later)
   return earlier
@@ -3413,7 +3425,9 @@ instance ExactPrint (AmbiguousFieldOcc GhcPs) where
 
 instance (ExactPrint a) => ExactPrint (HsScaled GhcPs a) where
   getAnnotationEntry = const NoEntryVal
-  exact (HsScaled _arr t) = markAnnotated t
+  exact (HsScaled arr t) = do
+    markAnnotated t
+    markArrow EpAnnNotUsed arr
 
 -- ---------------------------------------------------------------------
 
