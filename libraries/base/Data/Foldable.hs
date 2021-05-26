@@ -942,14 +942,19 @@ deriving instance Foldable UWord
 -- | @since 4.12.0.0
 deriving instance Foldable Down
 
--- | Monadic fold over the elements of a structure.  This type of fold is
--- left-associative in the monadic effects, and right-associative in the output
--- value.
+-- | Right-to-left monadic fold over the elements of a structure.
 --
 -- Given a structure @t@ with elements @(a, b, c, ..., x, y)@, the result of
 -- a fold with an operator function @f@ is equivalent to:
 --
 -- > foldrM f z t = do { yy <- f y z; xx <- f x yy; ... ; bb <- f b cc; f a bb }
+--
+-- This amounts to an application to @z@ of a Kleisli composition:
+--
+-- > foldrM f z t = (f y >=> f x >=> ... >=> f b >=> f a) z
+--
+-- Thus the monadic effects are sequenced from right to left, and e.g. folds of
+-- infinite lists will diverge.
 --
 -- If in a 'MonadPlus' the bind short-circuits, the evaluated effects will be
 -- from a tail of the sequence.  If you want to evaluate the monadic effects in
@@ -957,13 +962,10 @@ deriving instance Foldable Down
 -- sequence of elements, you'll need to use `foldlM` instead.
 --
 -- If the monadic effects don't short-circuit, the outer-most application of
--- @f@ is to left-most element @a@, so that, ignoring effects, the result looks
--- like a right fold:
+-- @f@ is to the left-most element @a@, so that, ignoring effects, the result
+-- looks like a right fold:
 --
 -- > a `f` (b `f` (c `f` (... (x `f` (y `f` z))))).
---
--- and yet, left-associative monadic binds, rather than right-associative
--- applications of @f@, sequence the computation.
 --
 -- ==== __Examples__
 --
@@ -983,14 +985,16 @@ foldrM f z0 xs = foldl c return xs z0
   where c k x z = f x z >>= k
         {-# INLINE c #-}
 
--- | Monadic fold over the elements of a structure.  This type of fold is
--- right-associative in the monadic effects, and left-associative in the output
--- value.
+-- | Left-to-right monadic fold over the elements of a structure.
 --
 -- Given a structure @t@ with elements @(a, b, ..., w, x, y)@, the result of
 -- a fold with an operator function @f@ is equivalent to:
 --
 -- > foldlM f z t = do { aa <- f z a; bb <- f aa b; ... ; xx <- f ww x; f xx y }
+--
+-- This amounts to an application to @z@ of a Kleisli composition:
+--
+-- > foldrM f z t = (f a >=> f b >=> ... >=> f x >=> f y) z
 --
 -- If in a 'MonadPlus' the bind short-circuits, the evaluated effects will be
 -- from an initial portion of the sequence.  If you want to evaluate the
@@ -1003,9 +1007,6 @@ foldrM f z0 xs = foldl c return xs z0
 -- looks like a left fold:
 --
 -- > ((((z `f` a) `f` b) ... `f` w) `f` x) `f` y
---
--- and yet, right-associative monadic binds, rather than left-associative
--- applications of @f@, sequence the computation.
 --
 -- ==== __Examples__
 --
@@ -1909,16 +1910,9 @@ elements in a single pass.
 --
 --     @`foldlM` :: (Foldable t, Monad m) => (b -> a -> m b) -> b -> t a -> m b@
 --
---     This type of fold is right-associative in the monadic effects, and
---     left-associative in the output value.
---
---     Given a structure @t@ with elements @(a, b, ..., x, y)@, the result
---     of a fold with operator @f@ is equivalent to:
---
---     > foldlM f z t = do { aa <- f z a; bb <- f aa b; ... ; f xx y }
---
---     If in a 'MonadPlus' the bind short-circuits, the evaluated effects will
---     be from an initial portion of the sequence.
+--     The sequencing of monadic effects proceeds from left to right.  If in a
+--     'MonadPlus' the bind short-circuits, the evaluated effects will be from
+--     an initial portion of the sequence.
 --
 --     >>> :set -XBangPatterns
 --     >>> import Control.Monad
@@ -1933,17 +1927,17 @@ elements in a single pass.
 --     3
 --     Nothing
 --
---     Contrast this with `foldrM`, which uses `foldl` to sequence the effects,
---     and therefore diverges (running out of space) when given an unbounded
---     input structure.  The short-circuit condition is never reached
+--     Contrast this with `foldrM`, which sequences monadic effects from right
+--     to left, and therefore diverges when folding an unbounded input
+--     structure without ever having the opportunity to short-circuit.
 --
 --     >>> let f e _ = when (e > 3) mzero >> lift (print e)
 --     >>> runMaybeT $ foldrM f () [0..]
 --     ...hangs...
 --
---     If instead the operator short-circuits on the initial elements and the
---     structure is finite, `foldrM` will perform the monadic effects in reverse
---     order:
+--     When the structure is finite `foldrM` performs the monadic effects from
+--     right to left, possibly short-circuiting after processing a tail portion
+--     of the element sequence.
 --
 --     >>> let f e _ = when (e < 3) mzero >> lift (print e)
 --     >>> runMaybeT $ foldrM f () [0..5]
@@ -1968,12 +1962,12 @@ elements in a single pass.
 -- @
 --
 -- The lazy left-folds (used corecursively) and 'foldrM' (used to sequence
--- actions right-to-left) can be efficient in structures whose @Foldable@
--- instances take advantage of efficient right-to-left iteration to perform
+-- actions right-to-left) can be performant in structures whose @Foldable@
+-- instances take advantage of efficient right-to-left iteration to compute
 -- lazy left folds outside-in from the right-most element.
 --
 -- The strict 'foldr'' is the least likely to be useful, structures that
--- support efficient sequencing /only/ right-to-left are not at all common.
+-- support efficient sequencing /only/ right-to-left are not common.
 
 --------------
 
