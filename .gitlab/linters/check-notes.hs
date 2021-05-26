@@ -160,11 +160,8 @@ checkNotes grepOutput = do
   -- file
   -- XXX JB We also need an additional flat header map. If a header is not
   -- found, this should check whether another header of the same name exists in
-  -- different files, and display them. Probably not going to bother doing
-  -- string distance checking to check for misspellings, though. I mean, it
-  -- would be convenient, I'm not going to lie. Just sounds like too much work.
-  -- Then again hnngg it would be nice to have
-
+  -- different files, and display them. Possibly check for similar names, in
+  -- case it was misspelled
   traceShow refs undefined
 
 -- XXX JB idea:
@@ -180,6 +177,7 @@ checkNotes grepOutput = do
 -- If it's a module, add .hs extensions and arrange as [dir1, dir2, modname.hs]
 
 
+-- XXX JB obsolete
 -- runStage :: MonadError Errors m
 --          => (t -> Except e a)      -- ^ extract an `a` from a `t`
 --          -> (NonEmpty e -> Errors) -- ^ collect errors into an Errors value
@@ -315,39 +313,15 @@ success Results {numNotes, numRefs} = do
   -- from Suffixed to an actual header (so we can print out the passage etc.)
   -- We might be able to allow pipeline failure on warnings, with
   -- https://gitlab.com/gitlab-org/gitlab/-/issues/273157
-  -- If so, when there are warnings, emit error code 3, since 2 is reserved by
-  -- bash commands being used incorrectly.
-  -- We could also return different exit codes for all types of
-  -- errors/warnings, so they can be individually marked as acceptable or not
-  -- in the travis.yml file.
-  -- You'd have to have sort of a priority list of how bad the warnings are and
-  -- return the one with the highest priority - or, how about his - each one
-  -- could be assigned a prime number and so we could have any combination. I
-  -- don't know if that's feasible - it's probably not necessary, since we can
-  -- only have 0 or 1 of each, not n.
-  -- binary?
-  --   0 = 0 - success
-  --   1 = 1 - error 1 -- fatal error (i.e. Parse error on stdin?)
-  --  10 = 2 - warning 1
-  --  11 = 3 - warning 1 + error 1 -- impossible since fatal error occured
-  -- 100 = 4 - warning 2
-  -- 101 = 5 - warning 2 + error 1 -- impossible since fatal error occured
-  -- 110 = 6 - warning 2 + warning 1
-  -- etc.
-  -- hmm maybe
-  -- just listing all the acceptable codes could be kind of annoying, the
-  -- number is... 2^n where n is the number of acceptable warnings
-  -- so let's say there's 8 acceptable warnings, that would mean
-  -- 2^8 = 256 error codes listed. Yeah I don't know...
-  -- Worth noting, there are only 256 possible error codes, and some of them
-  -- claim to be reserved. So maybe not.
-  -- Yeah probably the better approach is, again, to have a list of warning
-  -- importance from high to low, I guess lower importance gets lower exit
-  -- codes, and then you just have to accept every failure below that exit
-  -- count
-  -- Though I'm not even sure if unused headers are worth a non-zero exit
-  -- codes, maybe people just want that? I guess it depends on how many we
-  -- find.
+  -- If so, there are two options:
+  -- 1. Have a severity ranking of errors/warnings, error code will be the code
+  -- of the highest severity encountered
+  -- -> in gitlab, allow failures of whatever the highest severity is you're
+  -- willing to accept and any lower number
+  -- 2. Simply have one error code for fatal errors, and one error code for
+  -- warnings, and in gitlab you can now control whether to allow warnings or
+  -- not
+  -- (I like option 1 though)
   putStrLn $ "OK, found " ++ show numNotes ++ " and " ++ show numRefs ++ " references."
   exitSuccess
 
