@@ -59,7 +59,6 @@ import GHC.Platform.Ways
 import GHC.Platform.ArchOS
 
 import GHC.Parser.Header
-import GHC.Parser.Errors.Ppr
 
 import GHC.SysTools
 import GHC.Utils.TmpFs
@@ -292,7 +291,7 @@ compileOne' m_tc_result mHscMessage
          = (Interpreter, dflags2 { backend = Interpreter })
          | otherwise
          = (backend dflags, dflags2)
-       dflags  = dflags3 { includePaths = addQuoteInclude old_paths [current_dir] }
+       dflags  = dflags3 { includePaths = addImplicitQuoteInclude old_paths [current_dir] }
        hsc_env = hsc_env0 {hsc_dflags = dflags}
 
        -- -fforce-recomp should also work with --make
@@ -1235,7 +1234,7 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
   -- the .hs files resides) to the include path, since this is
   -- what gcc does, and it's probably what you want.
         let current_dir = takeDirectory basename
-            new_includes = addQuoteInclude paths [current_dir]
+            new_includes = addImplicitQuoteInclude paths [current_dir]
             paths = includePaths dflags0
             dflags = dflags0 { includePaths = new_includes }
 
@@ -1248,7 +1247,7 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
                 popts = initParserOpts dflags
             eimps <- getImports popts imp_prelude buf input_fn (basename <.> suff)
             case eimps of
-              Left errs -> throwErrors (foldPsMessages mkParserErr errs)
+              Left errs -> throwErrors (GhcPsMessage <$> errs)
               Right (src_imps,imps,L _ mod_name) -> return
                   (Just buf, mod_name, imps, src_imps)
 
@@ -1526,7 +1525,8 @@ runPhase (RealPhase cc_phase) input_fn
         let include_paths_global = foldr (\ x xs -> ("-I" ++ x) : xs) []
               (includePathsGlobal cmdline_include_paths ++ pkg_include_dirs)
         let include_paths_quote = foldr (\ x xs -> ("-iquote" ++ x) : xs) []
-              (includePathsQuote cmdline_include_paths)
+              (includePathsQuote cmdline_include_paths ++
+               includePathsQuoteImplicit cmdline_include_paths)
         let include_paths = include_paths_quote ++ include_paths_global
 
         -- pass -D or -optP to preprocessor when compiling foreign C files
@@ -1671,7 +1671,8 @@ runPhase (RealPhase (As with_cpp)) input_fn
         let global_includes = [ GHC.SysTools.Option ("-I" ++ p)
                               | p <- includePathsGlobal cmdline_include_paths ]
         let local_includes = [ GHC.SysTools.Option ("-iquote" ++ p)
-                             | p <- includePathsQuote cmdline_include_paths ]
+                             | p <- includePathsQuote cmdline_include_paths ++
+                                includePathsQuoteImplicit cmdline_include_paths]
         let runAssembler inputFilename outputFilename
               = liftIO $
                   withAtomicRename outputFilename $ \temp_outputFilename ->
@@ -1939,7 +1940,8 @@ doCpp logger tmpfs dflags unit_env raw input_fn output_fn = do
     let include_paths_global = foldr (\ x xs -> ("-I" ++ x) : xs) []
           (includePathsGlobal cmdline_include_paths ++ pkg_include_dirs)
     let include_paths_quote = foldr (\ x xs -> ("-iquote" ++ x) : xs) []
-          (includePathsQuote cmdline_include_paths)
+          (includePathsQuote cmdline_include_paths ++
+           includePathsQuoteImplicit cmdline_include_paths)
     let include_paths = include_paths_quote ++ include_paths_global
 
     let verbFlags = getVerbFlags dflags
