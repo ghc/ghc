@@ -184,7 +184,7 @@ libffiRules = do
         writeFileLines dynLibMan dynLibFiles
         putSuccess "| Successfully build libffi."
 
-    fmap (libffiPath -/-) ["Makefile.in", "configure" ] &%> \[mkIn, _] -> do
+    fmap (libffiPath -/-) ["Makefile.in", "configure", "src/powerpc/ffi_powerpc.h" ] &%> \[mkIn, _, ffi_powerpcH] -> do
         -- Extract libffi tar file
         context <- libffiContext stage
         removeDirectory libffiPath
@@ -203,6 +203,12 @@ libffiRules = do
 
         top <- topDirectory
         fixFile mkIn (fixLibffiMakefile top)
+
+        -- Fix powerpc header file (see libffi commit 4f9e20ac).
+        -- Fixes GHC #19885
+        fixFile ffi_powerpcH
+          (replace "(__FLOAT128_TYPE__)"
+            "(__FLOAT128_TYPE__) && defined(__HAVE_FLOAT128)")
 
         files <- liftIO $ getDirectoryFilesIO "." [libffiPath -/- "**"]
         produces files
