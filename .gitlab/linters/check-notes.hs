@@ -285,6 +285,8 @@ pCommentEnd = pComment endComment <* endOfLine
 noteSeparator :: Monad m => Parser m ()
 -- Even for single-line notes, we want to stop parsing the separator when we
 -- encounter a note start that spans multiple lines, hence `WithLineBreaks`
+-- XXX JB notFollowedBy should include an optional char 's', and Note[s] should
+-- be optional when we're in multinote mode
 noteSeparator = skipMany $ notFollowedBy (pNoteStart WithLineBreaks) *> noneOf "\n"
 
 notesUntilEOL :: MonadReader Passage m => AllowLineBreaks -> Parser m [Note]
@@ -318,6 +320,34 @@ success Results {numNotes, numRefs} = do
   -- We could also return different exit codes for all types of
   -- errors/warnings, so they can be individually marked as acceptable or not
   -- in the travis.yml file.
+  -- You'd have to have sort of a priority list of how bad the warnings are and
+  -- return the one with the highest priority - or, how about his - each one
+  -- could be assigned a prime number and so we could have any combination. I
+  -- don't know if that's feasible - it's probably not necessary, since we can
+  -- only have 0 or 1 of each, not n.
+  -- binary?
+  --   0 = 0 - success
+  --   1 = 1 - error 1 -- fatal error (i.e. Parse error on stdin?)
+  --  10 = 2 - warning 1
+  --  11 = 3 - warning 1 + error 1 -- impossible since fatal error occured
+  -- 100 = 4 - warning 2
+  -- 101 = 5 - warning 2 + error 1 -- impossible since fatal error occured
+  -- 110 = 6 - warning 2 + warning 1
+  -- etc.
+  -- hmm maybe
+  -- just listing all the acceptable codes could be kind of annoying, the
+  -- number is... 2^n where n is the number of acceptable warnings
+  -- so let's say there's 8 acceptable warnings, that would mean
+  -- 2^8 = 256 error codes listed. Yeah I don't know...
+  -- Worth noting, there are only 256 possible error codes, and some of them
+  -- claim to be reserved. So maybe not.
+  -- Yeah probably the better approach is, again, to have a list of warning
+  -- importance from high to low, I guess lower importance gets lower exit
+  -- codes, and then you just have to accept every failure below that exit
+  -- count
+  -- Though I'm not even sure if unused headers are worth a non-zero exit
+  -- codes, maybe people just want that? I guess it depends on how many we
+  -- find.
   putStrLn $ "OK, found " ++ show numNotes ++ " and " ++ show numRefs ++ " references."
   exitSuccess
 
