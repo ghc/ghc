@@ -141,7 +141,7 @@ checkNotes grepOutput = do
     runParser pPassages 0 "stdin" grepOutput
 
   let mHeadersRefs = partitionEithers $
-        map (liftM2 first (,) (runParserT pHeadersRefs 0 "" =<< content)) passages
+        map (first <$> (,) <*> (runParserT pHeadersRefs 0 "" =<< content)) passages
   (headers, refs) <- case mHeadersRefs of
     ([]  , notes) -> pure $ mconcat notes
     (e:es, _    ) -> throwError . malformedRefs $ e :| es
@@ -315,6 +315,9 @@ success Results {numNotes, numRefs} = do
   -- https://gitlab.com/gitlab-org/gitlab/-/issues/273157
   -- If so, when there are warnings, emit error code 3, since 2 is reserved by
   -- bash commands being used incorrectly.
+  -- We could also return different exit codes for all types of
+  -- errors/warnings, so they can be individually marked as acceptable or not
+  -- in the travis.yml file.
   putStrLn $ "OK, found " ++ show numNotes ++ " and " ++ show numRefs ++ " references."
   exitSuccess
 
