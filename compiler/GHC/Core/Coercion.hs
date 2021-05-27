@@ -306,8 +306,8 @@ tidyCoAxBndrsForUser init_env tcvs
 coToMCo :: Coercion -> MCoercion
 -- Convert a coercion to a MCoercion,
 -- It's not clear whether or not isReflexiveCo would be better here
-coToMCo co | isReflexiveCo co = MRefl
-           | otherwise        = MCo co
+coToMCo co | isReflCo co = MRefl
+           | otherwise   = MCo co
 
 -- | Tests if this MCoercion is obviously generalized reflexive
 -- Guaranteed to work very quickly.
@@ -327,15 +327,15 @@ mkGReflCo r ty mco
 mkTransMCo :: MCoercion -> MCoercion -> MCoercion
 mkTransMCo MRefl     co2       = co2
 mkTransMCo co1       MRefl     = co1
-mkTransMCo (MCo co1) (MCo co2) = coToMCo (mkTransCo co1 co2)
+mkTransMCo (MCo co1) (MCo co2) = MCo (mkTransCo co1 co2)
 
 mkTransMCoL :: MCoercion -> Coercion -> MCoercion
-mkTransMCoL MRefl     co2 = MCo co2
-mkTransMCoL (MCo co1) co2 = coToMCo (mkTransCo co1 co2)
+mkTransMCoL MRefl     co2 = coToMCo co2
+mkTransMCoL (MCo co1) co2 = MCo (mkTransCo co1 co2)
 
 mkTransMCoR :: Coercion -> MCoercion -> MCoercion
-mkTransMCoR co1 MRefl     = MCo co1
-mkTransMCoR co1 (MCo co2) = coToMCo (mkTransCo co1 co2)
+mkTransMCoR co1 MRefl     = coToMCo co1
+mkTransMCoR co1 (MCo co2) = MCo (mkTransCo co1 co2)
 
 -- | Get the reverse of an 'MCoercion'
 mkSymMCo :: MCoercion -> MCoercion
