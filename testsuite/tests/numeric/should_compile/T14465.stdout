@@ -1,14 +1,14 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 35, types: 14, coercions: 0, joins: 0/0}
+  = {terms: 30, types: 13, coercions: 0, joins: 0/0}
 
--- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 ten :: Natural
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
-ten = GHC.Num.Natural.NS 10##
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 0}]
+ten = 10
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 M.$trModule4 :: GHC.Prim.Addr#
@@ -52,16 +52,12 @@ M.minusOne1 :: Natural
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 0}]
 M.minusOne1 = 1
 
--- RHS size: {terms: 6, types: 1, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 minusOne :: Natural
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
-         WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 40 10}]
-minusOne
-  = case GHC.Num.Natural.$wnaturalNegate M.minusOne1 of ww
-    { __DEFAULT ->
-    GHC.Num.Natural.NS ww
-    }
+         WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 20 0}]
+minusOne = naturalNegate M.minusOne1
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 twoTimesTwo :: Natural
