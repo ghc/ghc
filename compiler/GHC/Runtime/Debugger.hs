@@ -38,6 +38,7 @@ import GHC.Utils.Exception
 import GHC.Utils.Logger
 
 import GHC.Types.Id
+import GHC.Types.Id.Make (ghcPrimIds)
 import GHC.Types.Name
 import GHC.Types.Var hiding ( varName )
 import GHC.Types.Var.Set
@@ -47,7 +48,7 @@ import GHC.Types.TyThing
 
 import Control.Monad
 import Control.Monad.Catch as MC
-import Data.List ( (\\) )
+import Data.List ( (\\), partition )
 import Data.Maybe
 import Data.IORef
 
@@ -60,25 +61,46 @@ pprintClosureCommand bindThings force str = do
                  mapM (\w -> GHC.parseName w >>=
                                 mapM GHC.lookupName)
                       (words str)
-  let ids = [id | AnId id <- tythings]
+
+  -- Sort out good and bad tythings for :print and friends
+  let (pprintables, unpprintables) = partition can_pprint tythings
 
   -- Obtain the terms and the recovered type information
+  let ids = [id | AnId id <- pprintables]
   (subst, terms) <- mapAccumLM go emptyTCvSubst ids
 
   -- Apply the substitutions obtained after recovering the types
   modifySession $ \hsc_env ->
     hsc_env{hsc_IC = substInteractiveContext (hsc_IC hsc_env) subst}
 
-  -- Finally, print the Terms
-  unqual  <- GHC.getPrintUnqual
+  -- Finally, print the Results
   docterms <- mapM showTerm terms
-  dflags <- getDynFlags
-  logger <- getLogger
-  liftIO $ (printOutputForUser logger dflags unqual . vcat)
-           (zipWith (\id docterm -> ppr id <+> char '=' <+> docterm)
-                    ids
-                    docterms)
+  let sdocTerms = zipWith (\id docterm -> ppr id <+> char '=' <+> docterm)
+                          ids
+                          docterms
+  printSDocs $ (no_pprint <$> unpprintables) ++ sdocTerms
  where
+   -- Check whether a TyThing can be processed by :print and friends.
+   -- Take only Ids, exclude pseudoops, they don't have any HValues.
+   can_pprint :: TyThing -> Bool                              -- #19394
+   can_pprint (AnId x)
+       | x `notElem` ghcPrimIds = True
+       | otherwise              = False
+   can_pprint _                 = False
+
+   -- Create a short message for a TyThing, that cannot processed by :print
+   no_pprint :: TyThing -> SDoc
+   no_pprint tything = ppr tything <+>
+          text "is not eligible for the :print, :sprint or :force commands."
+
+   -- Helper to print out the results of :print and friends
+   printSDocs :: GhcMonad m => [SDoc] -> m ()
+   printSDocs sdocs = do
+      logger <- getLogger
+      dflags <- getDynFlags
+      unqual <- GHC.getPrintUnqual
+      liftIO $ printOutputForUser logger dflags unqual $ vcat sdocs
+
    -- Do the obtainTerm--bindSuspensions-computeSubstitution dance
    go :: GhcMonad m => TCvSubst -> Id -> m (TCvSubst, Term)
    go subst id = do
