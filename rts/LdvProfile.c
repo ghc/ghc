@@ -100,6 +100,7 @@ processHeapClosureForDead( const StgClosure *c )
     case THUNK_1_0:
     case THUNK_0_1:
     case THUNK_SELECTOR:
+    case THUNK_SELECTOR_N:
     case THUNK_2_0:
     case THUNK_1_1:
     case THUNK_0_2:

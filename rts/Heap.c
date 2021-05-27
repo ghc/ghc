@@ -132,7 +132,8 @@ StgWord collect_pointers(StgClosure *closure, StgWord size, StgClosure *ptrs[siz
             break;
 
         case THUNK_SELECTOR:
-            ptrs[nptrs++] = ((StgSelector *)closure)->selectee;
+        case THUNK_SELECTOR_N:
+            ptrs[nptrs++] = ((StgSelector *)closure)->payload[0];
             break;
 
         case AP:
