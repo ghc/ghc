@@ -48,21 +48,21 @@ llvmCodeGen :: Logger -> DynFlags -> Handle
                -> Stream.Stream IO RawCmmGroup a
                -> IO a
 llvmCodeGen logger dflags h cmm_stream
-  = withTiming logger dflags (text "LLVM CodeGen") (const ()) $ do
+  = withTiming logger (text "LLVM CodeGen") (const ()) $ do
        bufh <- newBufHandle h
 
        -- Pass header
-       showPass logger dflags "LLVM CodeGen"
+       showPass logger "LLVM CodeGen"
 
        -- get llvm version, cache for later use
        mb_ver <- figureLlvmVersion logger dflags
 
        -- warn if unsupported
        forM_ mb_ver $ \ver -> do
-         debugTraceMsg logger dflags 2
+         debugTraceMsg logger 2
               (text "Using LLVM version:" <+> text (llvmVersionStr ver))
          let doWarn = wopt Opt_WarnUnsupportedLlvmVersion dflags
-         when (not (llvmVersionSupported ver) && doWarn) $ putMsg logger dflags $
+         when (not (llvmVersionSupported ver) && doWarn) $ putMsg logger $
            "You are using an unsupported version of LLVM!" $$
            "Currently only" <+> text (llvmVersionStr supportedLlvmVersionMin) <+>
            "to" <+> text (llvmVersionStr supportedLlvmVersionMax) <+> "is supported." <+>
@@ -70,7 +70,7 @@ llvmCodeGen logger dflags h cmm_stream
            "We will try though..."
          let isS390X = platformArch (targetPlatform dflags) == ArchS390X
          let major_ver = head . llvmVersionList $ ver
-         when (isS390X && major_ver < 10 && doWarn) $ putMsg logger dflags $
+         when (isS390X && major_ver < 10 && doWarn) $ putMsg logger $
            "Warning: For s390x the GHC calling convention is only supported since LLVM version 10." <+>
            "You are using LLVM version: " <> text (llvmVersionStr ver)
 

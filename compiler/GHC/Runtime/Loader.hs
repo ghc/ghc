@@ -83,7 +83,7 @@ initializePlugins hsc_env
     plugin_args = pluginModNameOpts dflags
     same_args p = paArguments (lpPlugin p) == argumentsForPlugin p plugin_args
     argumentsForPlugin p = map snd . filter ((== lpModuleName p) . fst)
-    dflags = hsc_dflags hsc_env
+    dflags = extractDynFlags hsc_env
 
 loadPlugins :: HscEnv -> IO [LoadedPlugin]
 loadPlugins hsc_env
@@ -92,7 +92,7 @@ loadPlugins hsc_env
        ; plugins <- mapM loadPlugin to_load
        ; return $ zipWith attachOptions to_load plugins }
   where
-    dflags  = hsc_dflags hsc_env
+    dflags  = extractDynFlags hsc_env
     to_load = pluginModNames dflags
 
     attachOptions mod_nm (plug, mod) =
@@ -119,7 +119,7 @@ checkExternalInterpreter hsc_env = case interpInstance <$> hsc_interp hsc_env of
 loadPlugin' :: OccName -> Name -> HscEnv -> ModuleName -> IO (a, ModIface)
 loadPlugin' occ_name plugin_name hsc_env mod_name
   = do { let plugin_rdr_name = mkRdrQual mod_name occ_name
-             dflags = hsc_dflags hsc_env
+             dflags = extractDynFlags hsc_env
        ; mb_name <- lookupRdrNameInModuleForPlugins hsc_env mod_name
                         plugin_rdr_name
        ; case mb_name of {
@@ -171,7 +171,7 @@ forceLoadTyCon hsc_env con_name = do
         Nothing -> throwCmdLineErrorS dflags $ missingTyThingError con_name
         Just (ATyCon tycon) -> return tycon
         Just con_thing -> throwCmdLineErrorS dflags $ wrongTyThingError con_name con_thing
-  where dflags = hsc_dflags hsc_env
+  where dflags = extractDynFlags hsc_env
 
 -- | Loads the value corresponding to a 'Name' if that value has the given 'Type'. This only provides limited safety
 -- in that it is up to the user to ensure that that type corresponds to the type you try to use the return value at!
@@ -191,11 +191,10 @@ getValueSafely hsc_env val_name expected_type = do
   case mb_hval of
     Nothing   -> return Nothing
     Just hval -> do
-      value <- lessUnsafeCoerce logger dflags "getValueSafely" hval
+      value <- lessUnsafeCoerce logger "getValueSafely" hval
       return (Just value)
   where
     interp = hscInterp hsc_env
-    dflags = hsc_dflags hsc_env
     logger = hsc_logger hsc_env
     hooks  = hsc_hooks hsc_env
 
@@ -223,7 +222,7 @@ getHValueSafely interp hsc_env val_name expected_type = do
                 return (Just hval)
              else return Nothing
         Just val_thing -> throwCmdLineErrorS dflags $ wrongTyThingError val_name val_thing
-   where dflags = hsc_dflags hsc_env
+   where dflags = extractDynFlags hsc_env
 
 -- | Coerce a value as usual, but:
 --
@@ -231,12 +230,12 @@ getHValueSafely interp hsc_env val_name expected_type = do
 --
 -- 2) Wrap it in some debug messages at verbosity 3 or higher so we can see what happened
 --    if it /does/ segfault
-lessUnsafeCoerce :: Logger -> DynFlags -> String -> a -> IO b
-lessUnsafeCoerce logger dflags context what = do
-    debugTraceMsg logger dflags 3 $
+lessUnsafeCoerce :: Logger -> String -> a -> IO b
+lessUnsafeCoerce logger context what = do
+    debugTraceMsg logger 3 $
         (text "Coercing a value in") <+> (text context) <> (text "...")
     output <- evaluate (unsafeCoerce what)
-    debugTraceMsg logger dflags 3 (text "Successfully evaluated coercion")
+    debugTraceMsg logger 3 (text "Successfully evaluated coercion")
     return output
 
 
@@ -257,7 +256,7 @@ lessUnsafeCoerce logger dflags context what = do
 lookupRdrNameInModuleForPlugins :: HscEnv -> ModuleName -> RdrName
                                 -> IO (Maybe (Name, ModIface))
 lookupRdrNameInModuleForPlugins hsc_env mod_name rdr_name = do
-    let dflags    = hsc_dflags hsc_env
+    let dflags    = extractDynFlags hsc_env
     let fc        = hsc_FC hsc_env
     let units     = hsc_units hsc_env
     let home_unit = hsc_home_unit hsc_env

@@ -51,7 +51,8 @@ import GHC.Linker.Types
 
 import GHC.Runtime.Context
 
-import GHC.Driver.Config
+import GHC.Driver.Config.Logger (initLogFlags)
+import GHC.Driver.Config.Parser (initParserOpts)
 import GHC.Driver.Phases
 import GHC.Driver.Pipeline
 import GHC.Driver.Session
@@ -206,13 +207,12 @@ depanalPartial
 depanalPartial excluded_mods allow_dup_roots = do
   hsc_env <- getSession
   let
-         dflags  = hsc_dflags hsc_env
          targets = hsc_targets hsc_env
          old_graph = hsc_mod_graph hsc_env
          logger  = hsc_logger hsc_env
 
-  withTiming logger dflags (text "Chasing dependencies") (const ()) $ do
-    liftIO $ debugTraceMsg logger dflags 2 (hcat [
+  withTiming logger (text "Chasing dependencies") (const ()) $ do
+    liftIO $ debugTraceMsg logger 2 (hcat [
               text "Chasing modules from: ",
               hcat (punctuate comma (map pprTarget targets))])
 
@@ -272,7 +272,7 @@ warnMissingHomeModules hsc_env mod_graph =
     when (not (null missing)) $
         logDiagnostics (GhcDriverMessage <$> warn)
   where
-    dflags = hsc_dflags hsc_env
+    dflags = extractDynFlags hsc_env
     targets = map targetId (hsc_targets hsc_env)
 
     is_known_module mod = any (is_my_target mod) targets
@@ -305,7 +305,7 @@ warnMissingHomeModules hsc_env mod_graph =
     missing = map (moduleName . ms_mod) $
       filter (not . is_known_module) (mgModSummaries mod_graph)
 
-    warn = singleMessage $ mkPlainMsgEnvelope (hsc_dflags hsc_env) noSrcSpan
+    warn = singleMessage $ mkPlainMsgEnvelope (extractDynFlags hsc_env) noSrcSpan
                          $ DriverMissingHomeModules missing (checkBuildingCabalPackage dflags)
 
 -- | Describes which modules of the module graph need to be loaded.
@@ -354,7 +354,7 @@ warnUnusedPackages = do
     hsc_env <- getSession
     eps <- liftIO $ hscEPS hsc_env
 
-    let dflags = hsc_dflags hsc_env
+    let dflags = extractDynFlags hsc_env
         state  = hsc_units  hsc_env
         pit = eps_PIT eps
 
@@ -408,7 +408,7 @@ load' how_much mHscMessage mod_graph = do
     hsc_env <- getSession
 
     let hpt1   = hsc_HPT hsc_env
-    let dflags = hsc_dflags hsc_env
+    let dflags = extractDynFlags hsc_env
     let logger = hsc_logger hsc_env
     let interp = hscInterp hsc_env
 
@@ -435,7 +435,7 @@ load' how_much mHscMessage mod_graph = do
         checkMod m and_then
             | m `elementOfUniqSet` all_home_mods = and_then
             | otherwise = do
-                    liftIO $ errorMsg logger dflags
+                    liftIO $ errorMsg logger
                         (text "no such module:" <+> quotes (ppr m))
                     return Failed
 
@@ -472,7 +472,7 @@ load' how_much mHscMessage mod_graph = do
     -- write the pruned HPT to allow the old HPT to be GC'd.
     setSession $ discardIC $ hscUpdateHPT (const pruned_hpt) hsc_env
 
-    liftIO $ debugTraceMsg logger dflags 2 (text "Stable obj:" <+> ppr stable_obj $$
+    liftIO $ debugTraceMsg logger 2 (text "Stable obj:" <+> ppr stable_obj $$
                             text "Stable BCO:" <+> ppr stable_bco)
 
     -- Unload any modules which are going to be re-linked this time around.
@@ -547,8 +547,8 @@ load' how_much mHscMessage mod_graph = do
         -- an unstable module (#7231).
         mg = fmap (fmap ModuleNode) stable_mg ++ unstable_mg
 
-    liftIO $ debugTraceMsg logger dflags 2 (hang (text "Ready for upsweep")
-                               2 (ppr mg))
+    liftIO $ debugTraceMsg logger 2 (hang (text "Ready for upsweep")
+                                    2 (ppr mg))
 
     n_jobs <- case parMakeCount dflags of
                     Nothing -> liftIO getNumProcessors
@@ -574,7 +574,7 @@ load' how_much mHscMessage mod_graph = do
 
      then
        -- Easy; just relink it all.
-       do liftIO $ debugTraceMsg logger dflags 2 (text "Upsweep completely successful.")
+       do liftIO $ debugTraceMsg logger 2 (text "Upsweep completely successful.")
 
           -- Clean up after ourselves
           hsc_env1 <- getSession
@@ -606,7 +606,7 @@ load' how_much mHscMessage mod_graph = do
 
           if ghcLink dflags == LinkBinary && isJust ofile && not do_linking
              then do
-                liftIO $ errorMsg logger dflags $ text
+                liftIO $ errorMsg logger $ text
                    ("output was redirected with -o, " ++
                     "but no output will be generated\n" ++
                     "because there is no " ++
@@ -620,7 +620,7 @@ load' how_much mHscMessage mod_graph = do
        -- Tricky.  We need to back out the effects of compiling any
        -- half-done cycles, both so as to clean up the top level envs
        -- and to avoid telling the interactive linker to link them.
-       do liftIO $ debugTraceMsg logger dflags 2 (text "Upsweep partially successful.")
+       do liftIO $ debugTraceMsg logger 2 (text "Upsweep partially successful.")
 
           let modsDone_names
                  = map (ms_mod . emsModSummary) modsDone
@@ -733,7 +733,7 @@ discardIC hsc_env
 -- by using top-level source file name as a base.
 guessOutputFile :: GhcMonad m => m ()
 guessOutputFile = modifySession $ \env ->
-    let dflags = hsc_dflags env
+    let dflags = extractDynFlags env
         -- Force mod_graph to avoid leaking env
         !mod_graph = hsc_mod_graph env
         mainModuleSrcPath :: Maybe String
@@ -759,7 +759,7 @@ guessOutputFile = modifySession $ \env ->
     in
     case outputFile_ dflags of
         Just _ -> env
-        Nothing -> env { hsc_dflags = dflags { outputFile_ = name_exe } }
+        Nothing -> hscSetFlags (dflags { outputFile_ = name_exe }) env
 
 -- -----------------------------------------------------------------------------
 --
@@ -822,7 +822,7 @@ findPartiallyCompletedCycles modsDone theGraph
 -- | Unloading
 unload :: Interp -> HscEnv -> [Linkable] -> IO ()
 unload interp hsc_env stable_linkables -- Unload everything *except* 'stable_linkables'
-  = case ghcLink (hsc_dflags hsc_env) of
+  = case ghcLink (extractDynFlags hsc_env) of
         LinkInMemory -> Linker.unload interp hsc_env stable_linkables
         _other -> return ()
 
@@ -1051,7 +1051,7 @@ parUpsweep
           [ModuleGraphNode])
 parUpsweep n_jobs mHscMessage old_hpt stable_mods sccs = do
     hsc_env <- getSession
-    let dflags = hsc_dflags hsc_env
+    let dflags = extractDynFlags hsc_env
     let logger = hsc_logger hsc_env
     let tmpfs  = hsc_tmpfs hsc_env
 
@@ -1150,7 +1150,7 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods sccs = do
                       , show mod_idx
                       ]
                     ]
-                -- Replace the default log_action with one that writes each
+                -- Replace the default logger with one that writes each
                 -- message to the module's log_queue. The main thread will
                 -- deal with synchronously printing these messages.
                 let lcl_logger = pushLogHook (const (parLogAction log_queue)) thread_safe_logger
@@ -1163,15 +1163,18 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods sccs = do
 
                 -- Unmask asynchronous exceptions and perform the thread-local
                 -- work to compile the module (see parUpsweep_one).
-                m_res <- MC.try $ unmask $ prettyPrintGhcErrors dflags $
+                m_res <- MC.try $ unmask $ prettyPrintGhcErrors logger $
                   case mod of
                     InstantiationNode iuid -> do
                       hsc_env <- readMVar hsc_env_var
                       liftIO $ upsweep_inst hsc_env mHscMessage mod_idx (length sccs) iuid
                       pure Succeeded
-                    ModuleNode ems ->
-                      parUpsweep_one (emsModSummary ems) home_mod_map comp_graph_loops
-                                     lcl_logger lcl_tmpfs dflags (hsc_home_unit hsc_env)
+                    ModuleNode ems -> do
+                      let summary     = emsModSummary ems
+                      let lcl_dflags  = ms_hspp_opts summary
+                      let lcl_logger' = setLogFlags lcl_logger (initLogFlags lcl_dflags)
+                      parUpsweep_one summary home_mod_map comp_graph_loops
+                                     lcl_logger' lcl_tmpfs dflags (hsc_home_unit hsc_env)
                                      mHscMessage
                                      par_sem hsc_env_var old_hpt_var
                                      stable_mods mod_idx (length sccs)
@@ -1184,7 +1187,7 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods sccs = do
                         -- interrupt, and the user doesn't have to be informed
                         -- about that.
                         when (fromException exc /= Just ThreadKilled)
-                             (errorMsg lcl_logger dflags (text (show exc)))
+                             (errorMsg lcl_logger (text (show exc)))
                         return Failed
 
                 -- Populate the result MVar.
@@ -1210,7 +1213,7 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods sccs = do
         -- Loop over each module in the compilation graph in order, printing
         -- each message from its log_queue.
         forM comp_graph $ \(mod,mvar,log_queue) -> do
-            printLogs logger dflags log_queue
+            printLogs logger log_queue
             result <- readMVar mvar
             if succeeded result then return (Just mod) else return Nothing
 
@@ -1223,7 +1226,7 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods sccs = do
     -- of the upsweep.
     case cycle of
         Just mss -> do
-            liftIO $ fatalErrorMsg logger dflags (cyclicModuleErr mss)
+            liftIO $ fatalErrorMsg logger (cyclicModuleErr mss)
             return (Failed,ok_results)
         Nothing  -> do
             let success_flag = successIf (all isJust results)
@@ -1242,10 +1245,9 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods sccs = do
     parLogAction log_queue _dflags !msgClass !srcSpan !msg =
         writeLogQueue log_queue (Just (msgClass,srcSpan,msg))
 
-    -- Print each message from the log_queue using the log_action from the
-    -- session's DynFlags.
-    printLogs :: Logger -> DynFlags -> LogQueue -> IO ()
-    printLogs !logger !dflags (LogQueue ref sem) = read_msgs
+    -- Print each message from the log_queue using the global logger
+    printLogs :: Logger -> LogQueue -> IO ()
+    printLogs !logger (LogQueue ref sem) = read_msgs
       where read_msgs = do
                 takeMVar sem
                 msgs <- atomicModifyIORef' ref $ \xs -> ([], reverse xs)
@@ -1254,7 +1256,7 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods sccs = do
             print_loop [] = read_msgs
             print_loop (x:xs) = case x of
                 Just (msgClass,srcSpan,msg) -> do
-                    putLogMsg logger dflags msgClass srcSpan msg
+                    logMsg logger msgClass srcSpan msg
                     print_loop xs
                 -- Exit the loop once we encounter the end marker.
                 Nothing -> return ()
@@ -1417,7 +1419,7 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_logger lcl_tmpfs lcl_dflags
                     -- EXCEPT the loop closer.  However, our precomputed
                     -- SCCs include the loop closer, so we have to filter
                     -- it out.
-                    Just loop -> typecheckLoop lcl_dflags lcl_hsc_env' $
+                    Just loop -> typecheckLoop lcl_hsc_env' $
                                  filter (/= moduleName (gwib_mod this_build_mod)) $
                                  map (moduleName . gwib_mod) loop
 
@@ -1447,14 +1449,14 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_logger lcl_tmpfs lcl_dflags
                     -- closer!
                     hsc_env'' <- case finish_loop of
                         Nothing   -> return hsc_env'
-                        Just loop -> typecheckLoop lcl_dflags hsc_env' $
+                        Just loop -> typecheckLoop hsc_env' $
                                      map (moduleName . gwib_mod) loop
                     return (hsc_env'', localize_hsc_env hsc_env'')
 
                 -- Clean up any intermediate files.
                 cleanCurrentModuleTempFiles (hsc_logger lcl_hsc_env')
                                             (hsc_tmpfs  lcl_hsc_env')
-                                            (hsc_dflags lcl_hsc_env')
+                                            (extractDynFlags lcl_hsc_env')
                 return Succeeded
 
   where
@@ -1512,9 +1514,8 @@ upsweep mHscMessage old_hpt stable_mods sccs = do
         nmods' = nmods - length dropped_ms
 
     when (not $ null dropped_ms) $ do
-        dflags <- getSessionDynFlags
         logger <- getLogger
-        liftIO $ fatalErrorMsg logger dflags (keepGoingPruneErr $ dropped_ms)
+        liftIO $ fatalErrorMsg logger (keepGoingPruneErr $ dropped_ms)
     (_, done') <- upsweep' old_hpt done mods' (mod_index+1) nmods'
     return (Failed, done')
 
@@ -1533,7 +1534,7 @@ upsweep mHscMessage old_hpt stable_mods sccs = do
      (CyclicSCC ms : mods) mod_index nmods
    = do dflags <- getSessionDynFlags
         logger <- getLogger
-        liftIO $ fatalErrorMsg logger dflags (cyclicModuleErr ms)
+        liftIO $ fatalErrorMsg logger (cyclicModuleErr ms)
         if gopt Opt_KeepGoing dflags
           then keep_going (mkHomeBuildModule <$> ms) old_hpt done mods mod_index nmods
           else return (Failed, done)
@@ -1556,7 +1557,7 @@ upsweep mHscMessage old_hpt stable_mods sccs = do
         -- Remove unwanted tmp files between compilations
         liftIO $ cleanCurrentModuleTempFiles (hsc_logger hsc_env)
                                              (hsc_tmpfs  hsc_env)
-                                             (hsc_dflags hsc_env)
+                                             (extractDynFlags hsc_env)
 
         -- Get ready to tie the knot
         type_env_var <- liftIO $ newIORef emptyNameEnv
@@ -1617,7 +1618,7 @@ upsweep mHscMessage old_hpt stable_mods sccs = do
                         -- Add any necessary entries to the static pointer
                         -- table. See Note [Grand plan for static forms] in
                         -- GHC.Iface.Tidy.StaticPtrTable.
-                when (backend (hsc_dflags hsc_env4) == Interpreter) $
+                when (backend (extractDynFlags hsc_env4) == Interpreter) $
                     liftIO $ hscAddSptEntries hsc_env4
                                  [ spt
                                  | Just linkable <- pure $ hm_linkable mod_info
@@ -1677,7 +1678,7 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
             -- We're using the dflags for this module now, obtained by
             -- applying any options in its LANGUAGE & OPTIONS_GHC pragmas.
             lcl_dflags = ms_hspp_opts summary
-            prevailing_backend = backend (hsc_dflags hsc_env)
+            prevailing_backend = backend (extractDynFlags hsc_env)
             local_backend      = backend lcl_dflags
 
             -- If OPTIONS_GHC contains -fasm or -fllvm, be careful that
@@ -1739,7 +1740,7 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
             implies False _ = True
             implies True x  = x
 
-            debug_trace n t = liftIO $ debugTraceMsg (hsc_logger hsc_env) (hsc_dflags hsc_env) n t
+            debug_trace n t = liftIO $ debugTraceMsg (hsc_logger hsc_env) n t
 
         in
         case () of
@@ -1935,7 +1936,7 @@ reTypecheckLoop hsc_env ms graph
             let l = emsModSummary ems
             guard $ not $ isBootSummary l == IsBoot && ms_mod l == ms_mod ms
             pure l
-  = typecheckLoop (hsc_dflags hsc_env) hsc_env (map ms_mod_name non_boot)
+  = typecheckLoop hsc_env (map ms_mod_name non_boot)
   | otherwise
   = return hsc_env
   where
@@ -1995,9 +1996,9 @@ getModLoop ms graph appearsAsBoot
 
 -- NB: sometimes mods has duplicates; this is harmless because
 -- any duplicates get clobbered in addListToHpt and never get forced.
-typecheckLoop :: DynFlags -> HscEnv -> [ModuleName] -> IO HscEnv
-typecheckLoop dflags hsc_env mods = do
-  debugTraceMsg logger dflags 2 $
+typecheckLoop :: HscEnv -> [ModuleName] -> IO HscEnv
+typecheckLoop hsc_env mods = do
+  debugTraceMsg logger 2 $
      text "Re-typechecking loop: " <> ppr mods
   new_hpt <-
     fixIO $ \new_hpt -> do
@@ -2253,9 +2254,9 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
         -- in the map eventually for uniformity
         calcDeps (ExtendedModSummary ms _bkp_deps) = msDeps ms
 
-        dflags = hsc_dflags hsc_env
+        dflags = extractDynFlags hsc_env
         logger = hsc_logger hsc_env
-        roots = hsc_targets hsc_env
+        roots  = hsc_targets hsc_env
 
         old_summary_map :: ModNodeMap ExtendedModSummary
         old_summary_map = mkNodeMap old_summaries
@@ -2501,7 +2502,7 @@ summariseFile hsc_env old_summaries src_fn mb_phase obj_allowed maybe_buf
    | Just old_summary <- findSummaryBySourceFile old_summaries src_fn
    = do
         let location = ms_location $ emsModSummary old_summary
-            dflags = hsc_dflags hsc_env
+            dflags = extractDynFlags hsc_env
 
         src_timestamp <- get_src_timestamp
                 -- The file exists; we checked in getRootSummary above.
@@ -2529,7 +2530,7 @@ summariseFile hsc_env old_summaries src_fn mb_phase obj_allowed maybe_buf
 
 
         -- Make a ModLocation for this file
-        location <- liftIO $ mkHomeModLocation (hsc_dflags hsc_env) pi_mod_name src_fn
+        location <- liftIO $ mkHomeModLocation (extractDynFlags hsc_env) pi_mod_name src_fn
 
         -- Tell the Finder cache where it is, so that subsequent calls
         -- to findModule will find it, even if it's not on any search path
@@ -2574,10 +2575,10 @@ checkSummaryTimestamp
   (ExtendedModSummary { emsModSummary = old_summary, emsInstantiatedUnits = bkp_deps})
   location src_timestamp
   | ms_hs_date old_summary == src_timestamp &&
-      not (gopt Opt_ForceRecomp (hsc_dflags hsc_env)) = do
+      not (gopt Opt_ForceRecomp (extractDynFlags hsc_env)) = do
            -- update the object-file timestamp
            obj_timestamp <-
-             if backendProducesObject (backend (hsc_dflags hsc_env))
+             if backendProducesObject (backend (extractDynFlags hsc_env))
                  || obj_allowed -- bug #1205
                  then liftIO $ getObjTimestamp location is_boot
                  else return Nothing
@@ -2651,7 +2652,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
 
   | otherwise  = find_it
   where
-    dflags    = hsc_dflags hsc_env
+    dflags    = extractDynFlags hsc_env
     home_unit = hsc_home_unit hsc_env
     fc        = hsc_FC hsc_env
     units     = hsc_units hsc_env
@@ -2744,7 +2745,7 @@ data MakeNewModSummary
 makeNewModSummary :: HscEnv -> MakeNewModSummary -> IO ExtendedModSummary
 makeNewModSummary hsc_env MakeNewModSummary{..} = do
   let PreprocessedImports{..} = nms_preimps
-  let dflags = hsc_dflags hsc_env
+  let dflags = extractDynFlags hsc_env
 
   -- when the user asks to load a source file by name, we only
   -- use an object file if -fobject-code is on.  See #1205.
@@ -2840,7 +2841,7 @@ withDeferredDiagnostics f = do
     logger <- getLogger
 
     let deferDiagnostics _dflags !msgClass !srcSpan !msg = do
-          let action = putLogMsg logger dflags msgClass srcSpan msg
+          let action = logMsg logger msgClass srcSpan msg
           case msgClass of
             MCDiagnostic SevWarning _reason
               -> atomicModifyIORef' warnings $ \i -> (action: i, ())
