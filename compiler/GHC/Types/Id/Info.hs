@@ -22,7 +22,7 @@ module GHC.Types.Id.Info (
 
         -- * The IdInfo type
         IdInfo,         -- Abstract
-        vanillaIdInfo, noCafIdInfo,
+        vanillaIdInfo, noCafIdInfo, divergingIdInfo,
 
         -- ** The OneShotInfo type
         OneShotInfo(..),
@@ -417,26 +417,43 @@ setCprSigInfo info cpr = cpr `seq` info { cprSigInfo = cpr }
 vanillaIdInfo :: IdInfo
 vanillaIdInfo
   = IdInfo {
-            ruleInfo            = emptyRuleInfo,
-            unfoldingInfo       = noUnfolding,
-            inlinePragInfo      = defaultInlinePragma,
-            occInfo             = noOccInfo,
-            demandInfo          = topDmd,
-            dmdSigInfo      = nopSig,
-            cprSigInfo             = topCprSig,
-            bitfield            = bitfieldSetCafInfo vanillaCafInfo $
-                                  bitfieldSetArityInfo unknownArity $
-                                  bitfieldSetCallArityInfo unknownArity $
-                                  bitfieldSetOneShotInfo NoOneShotInfo $
-                                  bitfieldSetLevityInfo NoLevityInfo $
-                                  emptyBitField,
-            lfInfo              = Nothing
+            ruleInfo       = emptyRuleInfo,
+            unfoldingInfo  = noUnfolding,
+            inlinePragInfo = defaultInlinePragma,
+            occInfo        = noOccInfo,
+            demandInfo     = topDmd,
+            dmdSigInfo     = nopSig,
+            cprSigInfo     = topCprSig,
+            bitfield       = bitfieldSetCafInfo vanillaCafInfo $
+                             bitfieldSetArityInfo unknownArity $
+                             bitfieldSetCallArityInfo unknownArity $
+                             bitfieldSetOneShotInfo NoOneShotInfo $
+                             bitfieldSetLevityInfo NoLevityInfo $
+                             emptyBitField,
+            lfInfo         = Nothing
            }
 
 -- | More informative 'IdInfo' we can use when we know the 'Id' has no CAF references
 noCafIdInfo :: IdInfo
 noCafIdInfo  = vanillaIdInfo `setCafInfo`    NoCafRefs
         -- Used for built-in type Ids in GHC.Types.Id.Make.
+
+-- | An 'IdInfo' for an Id, such as 'aBSENT_ERROR_ID' or 'raiseOverflow', that
+-- throws an (imprecise) exception after being supplied one value arg for every
+-- argument 'Demand' in the list. The demands end up in the demand signature.
+--
+-- 1. Sets the demand signature to unleash the given arg dmds 'botDiv'
+-- 2. Sets the arity info so that it matches the length of arg demands
+-- 3. Sets a bottoming CPR sig with the correct arity
+--
+-- It's important that all 3 agree on the arity, which is what this defn ensures.
+divergingIdInfo :: [Demand] -> IdInfo
+divergingIdInfo arg_dmds
+  = vanillaIdInfo `setArityInfo` arity
+                  `setDmdSigInfo` mkClosedDmdSig arg_dmds botDiv
+                  `setCprSigInfo` mkCprSig arity botCpr
+  where
+    arity = length arg_dmds
 
 {-
 ************************************************************************
