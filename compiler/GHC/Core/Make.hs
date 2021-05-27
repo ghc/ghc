@@ -13,6 +13,7 @@ module GHC.Core.Make (
         sortQuantVars, castBottomExpr,
 
         -- * Constructing boxed literals
+        mkLitRubbish,
         mkWordExpr,
         mkIntExpr, mkIntExprInt, mkUncheckedIntExpr,
         mkIntegerExpr, mkNaturalExpr,
@@ -242,6 +243,18 @@ castBottomExpr e res_ty
   | otherwise            = Case e (mkWildValBinder One e_ty) res_ty []
   where
     e_ty = exprType e
+
+mkLitRubbish :: Type -> Maybe CoreExpr
+-- Make a rubbish-literal CoreExpr of the given type.
+-- Fail (returning Nothing) if the RuntimeRep of the Type is not
+-- monomorphic; see Note [Rubbish literals] item (2).
+mkLitRubbish ty
+  | noFreeVarsOfType rep
+  = Just (Lit (LitRubbish rep) `mkTyApps` [ty])
+  | otherwise
+  = Nothing
+  where
+    rep  = getRuntimeRep ty
 
 {-
 ************************************************************************
