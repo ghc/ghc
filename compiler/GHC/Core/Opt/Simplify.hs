@@ -361,8 +361,8 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
 
         -- ANF-ise a constructor or PAP rhs
         -- We get at most one float per argument here
-        ; (let_floats, bndr2, body2) <- {-#SCC "prepareBinding" #-}
-                                        prepareBinding env top_lvl bndr bndr1 body1
+        ; (let_floats, body2) <- {-#SCC "prepareBinding" #-}
+                                 prepareBinding env top_lvl bndr1 body1
         ; let body_floats2 = body_floats1 `addLetFloats` let_floats
 
         ; (rhs_floats, rhs')
@@ -387,7 +387,7 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
                         ; return (floats, rhs') }
 
         ; (bind_float, env2) <- completeBind (env `setInScopeFromF` rhs_floats)
-                                             top_lvl Nothing bndr bndr2 rhs'
+                                             top_lvl Nothing bndr bndr1 rhs'
         ; return (rhs_floats `addFloats` bind_float, env2) }
 
 --------------------------
@@ -444,8 +444,7 @@ completeNonRecX :: TopLevelFlag -> SimplEnv
 
 completeNonRecX top_lvl env is_strict old_bndr new_bndr new_rhs
   = assertPpr (not (isJoinId new_bndr)) (ppr new_bndr) $
-    do  { (prepd_floats, new_bndr, new_rhs)
-              <- prepareBinding env top_lvl old_bndr new_bndr new_rhs
+    do  { (prepd_floats, new_rhs) <- prepareBinding env top_lvl new_bndr new_rhs
         ; let floats = emptyFloats env `addLetFloats` prepd_floats
         ; (rhs_floats, rhs2) <-
                 if doFloatFromRhs NotTopLevel NonRecursive is_strict floats new_rhs
@@ -463,22 +462,24 @@ completeNonRecX top_lvl env is_strict old_bndr new_bndr new_rhs
 
 {- *********************************************************************
 *                                                                      *
-           prepareBinding, prepareRhs, makeTrivial
+           Cast worker/wrapper
 *                                                                      *
 ************************************************************************
 
-Note [Cast worker/wrappers]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Cast worker/wrapper]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 When we have a binding
    x = e |> co
 we want to do something very similar to worker/wrapper:
    $wx = e
    x = $wx |> co
 
-So now x can be inlined freely.  There's a chance that e will be a
-constructor application or function, or something like that, so moving
-the coercion to the usage site may well cancel the coercions and lead
-to further optimisation.  Example:
+We call this making a cast worker/wrapper in tryCastWorkerWrapper.
+
+The main motivaiton is that x can be inlined freely.  There's a chance
+that e will be a constructor application or function, or something
+like that, so moving the coercion to the usage site may well cancel
+the coercions and lead to further optimisation.  Example:
 
      data family T a :: *
      data instance T Int = T Int
@@ -491,7 +492,11 @@ to further optimisation.  Example:
           go n = case t of { T m -> go (n-m) }
                 -- This case should optimise
 
-We call this making a cast worker/wrapper, and it's done by prepareBinding.
+A second reason for doing cast worker/wrapper is that the worker/wrapper
+pass after strictness analysis can't deal with RHSs like
+     f = (\ a b c. blah) |> co
+Instead, it relies on cast worker/wrapper to get rid of the cast,
+leaving a simpler job for demand-analysis worker/wrapper.  See #19874.
 
 We need to be careful with inline/noinline pragmas:
   rec { {-# NOINLINE f #-}
@@ -513,6 +518,7 @@ cast!  We want to transfer the pagma to $wf:
         $wf = ...g...
       ; f = $wf |> co
       ; g = ...f... }
+
 It's exactly like worker/wrapper for strictness analysis:
   f is the wrapper and must inline like crazy
   $wf is the worker and must carry f's original pragma
@@ -521,9 +527,13 @@ GHC.Core.Opt.WorkWrap.
 
 See #17673, #18093, #18078.
 
+Moreover, if `f` has an INLINE or INLINABLE pragma, and hence a stable
+unfolding, we want to transfer the stable unfolding (suitably casted)
+to the worker (#19890).
+
 Note [Preserve strictness in cast w/w]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In the Note [Cast worker/wrappers] transformation, keep the strictness info.
+In the Note [Cast worker/wrapper] transformation, keep the strictness info.
 Eg
         f = e `cast` co    -- f has strictness SSL
 When we transform to
@@ -553,41 +563,65 @@ instead, we use (case erorr ... of {}). So I'm not sure
 this Note makes much sense any more.
 -}
 
-prepareBinding :: SimplEnv -> TopLevelFlag
-               -> InId -> OutId -> OutExpr
-               -> SimplM (LetFloats, OutId, OutExpr)
-
-prepareBinding env top_lvl old_bndr bndr rhs
-  | Cast rhs1 co <- rhs
-    -- Try for cast worker/wrapper
-    -- See Note [Cast worker/wrappers]
-  , not (isStableUnfolding (realIdUnfolding old_bndr))
-        -- Don't make a cast w/w if the thing is going to be inlined anyway
-  , not (exprIsTrivial rhs1)
-        -- Nor if the RHS is trivial; then again it'll be inlined
-  , let ty1 = coercionLKind co
-  , not (isUnliftedType ty1)
+tryCastWorkerWrapper :: SimplMode -> TopLevelFlag
+                    -> OutId -> OutExpr
+                    -> SimplM (LetFloats, OutId, OutExpr)
+-- Try for cast worker/wrapper
+-- See Note [Cast worker/wrapper]
+tryCastWorkerWrapper mode top_lvl bndr (Cast rhs co)
+  | not will_inline  -- Don't make a cast w/w if the thing
+                     -- is going to be inlined anyway
+  , not (isUnliftedType rhs_ty)
         -- Not if rhs has an unlifted type; see Note [Cast w/w: unlifted]
-  = do { (floats, new_id) <- makeTrivialBinding (getMode env) top_lvl
-                                   (getOccFS bndr) worker_info rhs1 ty1
-       ; let bndr' = bndr `setInlinePragma` mkCastWrapperInlinePrag (idInlinePragma bndr)
-       ; return (floats, bndr', Cast (Var new_id) co) }
+  = do  { (rhs_floats, rhs1) <- prepareRhs mode top_lvl occ_fs rhs
+        ; uniq <- getUniqueM
+        ; let name     = mkSystemVarName uniq occ_fs
+              new_id   = mkLocalIdWithInfo name Many rhs_ty worker_info
+              floats   = rhs_floats `addLetFlts` unitLetFloat (NonRec new_id rhs1)
+              triv_rhs = Cast (Var new_id) co
 
-  | otherwise
-  = do { (floats, rhs') <- prepareRhs (getMode env) top_lvl (getOccFS bndr) rhs
-       ; return (floats, bndr, rhs') }
- where
-   info = idInfo bndr
-   worker_info = vanillaIdInfo `setDmdSigInfo` dmdSigInfo info
-                               `setCprSigInfo`        cprSigInfo info
-                               `setDemandInfo`     demandInfo info
-                               `setInlinePragInfo` inlinePragInfo info
-                               `setArityInfo`      arityInfo info
-          -- We do /not/ want to transfer OccInfo, Rules, Unfolding
-          -- Note [Preserve strictness in cast w/w]
+       ; wrap_unf <- mkLetUnfolding (sm_uf_opts mode) top_lvl InlineRhs bndr triv_rhs
+       ; let bndr' = bndr `setInlinePragma` mkCastWrapperInlinePrag (idInlinePragma bndr)
+                          `setIdUnfolding`  wrap_unf
+
+       ; return (floats, bndr', triv_rhs) }
+
+  where
+    occ_fs = getOccFS bndr
+    rhs_ty = coercionLKind co
+    info   = idInfo bndr
+    unf    = unfoldingInfo info
+    will_inline
+       | isStrongLoopBreaker (idOccInfo bndr)
+       = False
+       | otherwise
+       = case unf of
+           DFunUnfolding {} -> True  -- Don't do cast w/w for dfuns
+                                     -- No help, and we can't transform a DFunUnfolding
+           CoreUnfolding { uf_guidance = UnfWhen {} } -> True
+             -- This UnfWhen encompasses compulsory unfoldings,
+             -- INLINE pramgas, and trivial RHSs
+           _ -> False
+
+    worker_info = vanillaIdInfo `setDmdSigInfo`     dmdSigInfo info
+                                `setCprSigInfo`     cprSigInfo info
+                                `setDemandInfo`     demandInfo info
+                                `setInlinePragInfo` inlinePragInfo info
+                                `setArityInfo`      arityInfo info
+                                `setUnfoldingInfo`  worker_unf
+           -- We do /not/ want to transfer OccInfo, Rules
+           -- Note [Preserve strictness in cast w/w]
+
+    worker_unf = case unf of
+                   CoreUnfolding { uf_tmpl = unf_rhs }
+                     -> unf { uf_tmpl = mkCast unf_rhs (mkSymCo co) }
+                   _ -> NoUnfolding
+
+tryCastWorkerWrapper _ _  bndr rhs  -- All other RHSs
+  = return (emptyLetFloats, bndr, rhs)
 
 mkCastWrapperInlinePrag :: InlinePragma -> InlinePragma
--- See Note [Cast wrappers]
+-- See Note [Cast worker/wrapper]
 mkCastWrapperInlinePrag (InlinePragma { inl_act = act, inl_rule = rule_info })
   = InlinePragma { inl_src    = SourceText "{-# INLINE"
                  , inl_inline = NoUserInlinePrag -- See Note [Wrapper NoUserInline]
@@ -600,6 +634,19 @@ mkCastWrapperInlinePrag (InlinePragma { inl_act = act, inl_rule = rule_info })
     -- But simpler, because we don't need to disable during InitialPhase
     wrap_act | isNeverActive act = activateDuringFinal
              | otherwise         = act
+
+
+{- *********************************************************************
+*                                                                      *
+           prepareBinding, prepareRhs, makeTrivial
+*                                                                      *
+********************************************************************* -}
+
+prepareBinding :: SimplEnv -> TopLevelFlag
+               -> OutId -> OutExpr
+               -> SimplM (LetFloats, OutExpr)
+prepareBinding env top_lvl bndr rhs
+  = prepareRhs (getMode env) top_lvl (getOccFS bndr) rhs
 
 {- Note [prepareRhs]
 ~~~~~~~~~~~~~~~~~~~~
@@ -808,31 +855,39 @@ completeBind env top_lvl mb_cont old_bndr new_bndr new_rhs
    do { let old_info = idInfo old_bndr
             old_unf  = unfoldingInfo old_info
             occ_info = occInfo old_info
+            mode     = getMode env
 
          -- Do eta-expansion on the RHS of the binding
          -- See Note [Eta-expanding at let bindings] in GHC.Core.Opt.Simplify.Utils
-      ; (new_arity, final_rhs) <- tryEtaExpandRhs (getMode env) new_bndr new_rhs
+      ; (new_arity, eta_rhs) <- tryEtaExpandRhs mode new_bndr new_rhs
 
         -- Simplify the unfolding
       ; new_unfolding <- simplLetUnfolding env top_lvl mb_cont old_bndr
-                          final_rhs (idType new_bndr) new_arity old_unf
+                         eta_rhs (idType new_bndr) new_arity old_unf
 
-      ; let final_bndr = addLetBndrInfo new_bndr new_arity new_unfolding
+      ; let new_bndr_w_info = addLetBndrInfo new_bndr new_arity new_unfolding
         -- See Note [In-scope set as a substitution]
+
+      ; (cast_floats, final_bndr, final_rhs)
+           <- tryCastWorkerWrapper mode top_lvl new_bndr_w_info eta_rhs
 
       ; if postInlineUnconditionally env top_lvl final_bndr occ_info final_rhs
 
         then -- Inline and discard the binding
              do  { tick (PostInlineUnconditionally old_bndr)
-                 ; return ( emptyFloats env
-                          , extendIdSubst env old_bndr $
+                 ; let floats = emptyFloats env `addLetFloats` cast_floats
+                       env'   = setInScopeFromF env floats
+                 ; return ( floats
+                          , extendIdSubst env' old_bndr $
                             DoneEx final_rhs (isJoinId_maybe new_bndr)) }
                 -- Use the substitution to make quite, quite sure that the
                 -- substitution will happen, since we are going to discard the binding
 
         else -- Keep the binding
              -- pprTrace "Binding" (ppr final_bndr <+> ppr new_unfolding) $
-             return (mkFloatBind env (NonRec final_bndr final_rhs)) }
+             do { let floats = emptyFloats env `addLetFloats` cast_floats
+                                               `extendFloats` NonRec final_bndr final_rhs
+                ; return (floats, setInScopeFromF env floats) } }
 
 addLetBndrInfo :: OutId -> ArityType -> Unfolding -> OutId
 addLetBndrInfo new_bndr new_arity_type new_unf
