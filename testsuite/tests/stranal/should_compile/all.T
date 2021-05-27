@@ -67,3 +67,5 @@ test('T18982',  [ grep_errmsg(r'\$w. .*Int#$') ], compile, ['-dppr-cols=1000 -dd
 
 test('T19180', normal, compile, [''])
 test('T19849', normal, compile, [''])
+test('T19882a', normal, compile, [''])
+test('T19882b', normal, compile, [''])
