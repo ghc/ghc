@@ -136,7 +136,7 @@ mkPartialIface hsc_env mod_details
 mkFullIface :: HscEnv -> PartialModIface -> Maybe CgInfos -> IO ModIface
 mkFullIface hsc_env partial_iface mb_cg_infos = do
     let decls
-          | gopt Opt_OmitInterfacePragmas (hsc_dflags hsc_env)
+          | gopt Opt_OmitInterfacePragmas (extractDynFlags hsc_env)
           = mi_decls partial_iface
           | otherwise
           = updateDecl (mi_decls partial_iface) mb_cg_infos
@@ -147,7 +147,7 @@ mkFullIface hsc_env partial_iface mb_cg_infos = do
 
     -- Debug printing
     let unit_state = hsc_units hsc_env
-    dumpIfSet_dyn (hsc_logger hsc_env) (hsc_dflags hsc_env) Opt_D_dump_hi "FINAL INTERFACE" FormatText
+    putDumpFileMaybe (hsc_logger hsc_env) Opt_D_dump_hi "FINAL INTERFACE" FormatText
       (pprModIface unit_state full_iface)
 
     return full_iface
@@ -253,7 +253,7 @@ mkIface_ hsc_env
     let home_unit    = hsc_home_unit hsc_env
         semantic_mod = homeModuleNameInstantiation home_unit (moduleName this_mod)
         entities = typeEnvElts type_env
-        show_linear_types = xopt LangExt.LinearTypes (hsc_dflags hsc_env)
+        show_linear_types = xopt LangExt.LinearTypes (extractDynFlags hsc_env)
         decls  = [ tyThingToIfaceDecl show_linear_types entity
                  | entity <- entities,
                    let name = getName entity,
@@ -321,7 +321,7 @@ mkIface_ hsc_env
      cmp_inst     = comparing (nameOccName . ifDFun)
      cmp_fam_inst = comparing (nameOccName . ifFamInstTcName)
 
-     dflags = hsc_dflags hsc_env
+     dflags = extractDynFlags hsc_env
 
      -- We only fill in mi_globals if the module was compiled to byte
      -- code.  Otherwise, the compiler may not have retained all the

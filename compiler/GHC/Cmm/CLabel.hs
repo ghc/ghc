@@ -150,7 +150,6 @@ import GHC.Platform
 import GHC.Types.Unique.Set
 import GHC.Utils.Misc
 import GHC.Core.Ppr ( {- instances -} )
-import GHC.CmmToAsm.Config
 import GHC.Types.SrcLoc
 
 -- -----------------------------------------------------------------------------
@@ -1166,8 +1165,8 @@ isLocalCLabel this_mod lbl =
 -- that data resides in a DLL or not. [Win32 only.]
 -- @labelDynamic@ returns @True@ if the label is located
 -- in a DLL, be it a data reference or not.
-labelDynamic :: NCGConfig -> CLabel -> Bool
-labelDynamic config lbl =
+labelDynamic :: Platform -> Module -> Bool -> CLabel -> Bool
+labelDynamic platform this_mod externalDynamicRefs lbl =
   case lbl of
    -- is the RTS in a DLL or not?
    RtsLabel _ ->
@@ -1218,10 +1217,7 @@ labelDynamic config lbl =
    -- Note that DynamicLinkerLabels do NOT require dynamic linking themselves.
    _                 -> False
   where
-    externalDynamicRefs = ncgExternalDynamicRefs config
-    platform = ncgPlatform config
     os = platformOS platform
-    this_mod = ncgThisModule config
     this_unit = toUnitId (moduleUnit this_mod)
 
 

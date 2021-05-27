@@ -36,7 +36,7 @@ fingerprintDynFlags :: HscEnv -> Module
                     -> IO Fingerprint
 
 fingerprintDynFlags hsc_env this_mod nameio =
-    let dflags@DynFlags{..} = hsc_dflags hsc_env
+    let dflags@DynFlags{..} = extractDynFlags hsc_env
         mainis   = if mainModIs hsc_env == this_mod then Just mainFunIs else Nothing
                       -- see #5878
         -- pkgopts  = (homeUnit home_unit, sort $ packageFlags dflags)

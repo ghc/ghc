@@ -117,8 +117,9 @@ instance Show IOEnvFailure where
 instance Exception IOEnvFailure
 
 instance ContainsDynFlags env => HasDynFlags (IOEnv env) where
-    getDynFlags = do env <- getEnv
-                     return $! extractDynFlags env
+    getDynFlags = do
+        env <- getEnv
+        return $! extractDynFlags env
 
 instance ContainsHooks env => HasHooks (IOEnv env) where
     getHooks = do env <- getEnv
