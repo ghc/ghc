@@ -42,7 +42,7 @@ hsLPatType :: LPat GhcTc -> Type
 hsLPatType (L _ p) = hsPatType p
 
 hsPatType :: Pat GhcTc -> Type
-hsPatType (ParPat _ pat)                = hsLPatType pat
+hsPatType (ParPat _ _ pat _)            = hsLPatType pat
 hsPatType (WildPat ty)                  = ty
 hsPatType (VarPat _ lvar)               = idType (unLoc lvar)
 hsPatType (BangPat _ pat)               = hsLPatType pat
@@ -91,7 +91,7 @@ lhsExprType (L _ e) = hsExprType e
 hsExprType :: HsExpr GhcTc -> Type
 hsExprType (HsVar _ (L _ id)) = idType id
 hsExprType (HsUnboundVar (HER _ ty _) _) = ty
-hsExprType (HsRecFld _ af) = idType $ selectorAmbiguousFieldOcc af
+hsExprType (HsRecSel _ (FieldOcc id _)) = idType id
 hsExprType (HsOverLabel v _) = dataConCantHappen v
 hsExprType (HsIPVar v _) = dataConCantHappen v
 hsExprType (HsOverLit _ lit) = overLitType lit
@@ -102,7 +102,7 @@ hsExprType (HsApp _ f _) = funResultTy $ lhsExprType f
 hsExprType (HsAppType x f _) = piResultTy (lhsExprType f) x
 hsExprType (OpApp v _ _ _) = dataConCantHappen v
 hsExprType (NegApp _ _ se) = syntaxExprType se
-hsExprType (HsPar _ e) = lhsExprType e
+hsExprType (HsPar _ _ e _) = lhsExprType e
 hsExprType (SectionL v _ _) = dataConCantHappen v
 hsExprType (SectionR v _ _) = dataConCantHappen v
 hsExprType (ExplicitTuple _ args box) = mkTupleTy box $ map hsTupArgType args
