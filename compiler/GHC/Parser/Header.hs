@@ -23,10 +23,6 @@ where
 
 import GHC.Prelude
 
-import GHC.Platform
-
-import GHC.Driver.Session
-import GHC.Driver.Config.Parser (initParserOpts)
 import GHC.Driver.Errors.Types -- Unfortunate, needed due to the fact we throw exceptions!
 
 import GHC.Parser.Errors.Types
@@ -163,16 +159,16 @@ mkPrelImports this_mod loc implicit_prelude import_decls
 -- | Parse OPTIONS and LANGUAGE pragmas of the source file.
 --
 -- Throws a 'SourceError' if flag parsing fails (including unsupported flags.)
-getOptionsFromFile :: DynFlags
+getOptionsFromFile :: ParserOpts
                    -> FilePath            -- ^ Input file
                    -> IO [Located String] -- ^ Parsed options, if any.
-getOptionsFromFile dflags filename
+getOptionsFromFile opts filename
     = Exception.bracket
               (openBinaryFile filename ReadMode)
               (hClose)
               (\handle -> do
-                  opts <- fmap (getOptions' dflags)
-                               (lazyGetToks (initParserOpts dflags') filename handle)
+                  opts <- fmap (getOptions' opts)
+                               (lazyGetToks opts' filename handle)
                   seqList opts $ return opts)
     where -- We don't need to get haddock doc tokens when we're just
           -- getting the options from pragmas, and lazily lexing them
@@ -182,7 +178,7 @@ getOptionsFromFile dflags filename
           -- we already have an apparently-complete token.
           -- We therefore just turn Opt_Haddock off when doing the lazy
           -- lex.
-          dflags' = gopt_unset dflags Opt_Haddock
+          opts' = disableHaddock opts
 
 blockSize :: Int
 -- blockSize = 17 -- for testing :-)
@@ -242,21 +238,21 @@ getToks popts filename buf = lexAll pstate
 -- | Parse OPTIONS and LANGUAGE pragmas of the source file.
 --
 -- Throws a 'SourceError' if flag parsing fails (including unsupported flags.)
-getOptions :: DynFlags
+getOptions :: ParserOpts
            -> StringBuffer -- ^ Input Buffer
            -> FilePath     -- ^ Source filename.  Used for location info.
            -> [Located String] -- ^ Parsed options.
-getOptions dflags buf filename
-    = getOptions' dflags (getToks (initParserOpts dflags) filename buf)
+getOptions opts buf filename
+    = getOptions' opts (getToks opts filename buf)
 
 -- The token parser is written manually because Happy can't
 -- return a partial result when it encounters a lexer error.
 -- We want to extract options before the buffer is passed through
 -- CPP, so we can't use the same trick as 'getImports'.
-getOptions' :: DynFlags
+getOptions' :: ParserOpts
             -> [Located Token]      -- Input buffer
             -> [Located String]     -- Options.
-getOptions' dflags toks
+getOptions' opts toks
     = parseToks toks
     where
           parseToks (open:close:xs)
@@ -288,7 +284,7 @@ getOptions' dflags toks
               = parseToks xs
           parseToks _ = []
           parseLanguage ((L loc (ITconid fs)):rest)
-              = checkExtension dflags (L loc fs) :
+              = checkExtension opts (L loc fs) :
                 case rest of
                   (L _loc ITcomma):more -> parseLanguage more
                   (L _loc ITclose_prag):more -> parseToks more
@@ -429,24 +425,23 @@ checkProcessArgsResult flags
 
 -----------------------------------------------------------------------------
 
-checkExtension :: DynFlags -> Located FastString -> Located String
-checkExtension dflags (L l ext)
+checkExtension :: ParserOpts -> Located FastString -> Located String
+checkExtension opts (L l ext)
 -- Checks if a given extension is valid, and if so returns
 -- its corresponding flag. Otherwise it throws an exception.
-  = if ext' `elem` supported
+  = if ext' `elem` (pSupportedExts opts)
     then L l ("-X"++ext')
-    else unsupportedExtnError dflags l ext'
+    else unsupportedExtnError opts l ext'
   where
     ext' = unpackFS ext
-    supported = supportedLanguagesAndExtensions $ platformArchOS $ targetPlatform dflags
 
 languagePragParseError :: SrcSpan -> a
 languagePragParseError loc =
     throwErr loc $ PsErrParseLanguagePragma
 
-unsupportedExtnError :: DynFlags -> SrcSpan -> String -> a
-unsupportedExtnError dflags loc unsup =
-    throwErr loc $ PsErrUnsupportedExt unsup (platformArchOS $ targetPlatform dflags)
+unsupportedExtnError :: ParserOpts -> SrcSpan -> String -> a
+unsupportedExtnError opts loc unsup =
+    throwErr loc $ PsErrUnsupportedExt unsup (pSupportedExts opts)
 
 optionsParseError :: String -> SrcSpan -> a     -- #15053
 optionsParseError str loc =

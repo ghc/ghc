@@ -9,7 +9,6 @@ module GHC.Parser.Errors.Ppr where
 
 import GHC.Prelude
 import GHC.Driver.Flags
-import GHC.Driver.Session (supportedLanguagesAndExtensions)
 import GHC.Parser.Errors.Types
 import GHC.Parser.Types
 import GHC.Types.Basic
@@ -791,7 +790,7 @@ psHeaderMessageHints :: PsHeaderMessage -> [GhcHint]
 psHeaderMessageHints = \case
   PsErrParseLanguagePragma
     -> noHints
-  PsErrUnsupportedExt unsup arch
+  PsErrUnsupportedExt unsup supported
     -> if null suggestions
           then noHints
           -- FIXME(adn) To fix the compiler crash in #19923 we just rewrap this into an
@@ -800,7 +799,7 @@ psHeaderMessageHints = \case
           else [UnknownHint $ text "Perhaps you meant" <+> quotedListWithOr (map text suggestions)]
        where
          suggestions :: [String]
-         suggestions = fuzzyMatch unsup (supportedLanguagesAndExtensions arch)
+         suggestions = fuzzyMatch unsup supported
   PsErrParseOptionsPragma{}
     -> noHints
 

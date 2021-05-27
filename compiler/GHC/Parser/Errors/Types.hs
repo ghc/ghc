@@ -15,7 +15,6 @@ import GHC.Types.Name.Occurrence (OccName)
 import GHC.Types.Name.Reader
 import GHC.Unit.Module.Name
 import GHC.Utils.Outputable
-import GHC.Platform.ArchOS
 
 -- The type aliases below are useful to make some type signatures a bit more
 -- descriptive, like 'handleWarningsThrowErrors' in 'GHC.Driver.Main'.
@@ -37,7 +36,7 @@ and having a single constructor to handle them all is handy.
 
 data PsHeaderMessage
   = PsErrParseLanguagePragma
-  | PsErrUnsupportedExt !String !ArchOS
+  | PsErrUnsupportedExt !String ![String]
   | PsErrParseOptionsPragma !String
 
 

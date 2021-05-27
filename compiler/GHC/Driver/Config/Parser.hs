@@ -4,6 +4,7 @@ module GHC.Driver.Config.Parser
 where
 
 import GHC.Prelude
+import GHC.Platform
 
 import GHC.Driver.Session
 import GHC.Utils.Error
@@ -17,6 +18,7 @@ initParserOpts =
     <$> warningFlags
     <*> extensionFlags
     <*> mkPlainMsgEnvelope
+    <*> (supportedLanguagesAndExtensions . platformArchOS . targetPlatform)
     <*> safeImportsOn
     <*> gopt Opt_Haddock
     <*> gopt Opt_KeepRawTokenStream
