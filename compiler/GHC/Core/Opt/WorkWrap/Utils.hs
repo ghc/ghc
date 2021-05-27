@@ -30,13 +30,12 @@ import GHC.Core.Make    ( mkAbsentErrorApp, mkCoreUbxTup
                         , mkCoreApp, mkCoreLet )
 import GHC.Types.Id.Make ( voidArgId, voidPrimId )
 import GHC.Builtin.Types      ( tupleDataCon )
-import GHC.Types.Literal ( mkLitRubbish )
+import GHC.Core.Make ( mkLitRubbish )
 import GHC.Types.Var.Env ( mkInScopeSet )
 import GHC.Types.Var.Set ( VarSet )
 import GHC.Core.Type
 import GHC.Core.Multiplicity
 import GHC.Core.Predicate ( isClassPred )
-import GHC.Types.RepType  ( isVoidTy, typeMonoPrimRep_maybe )
 import GHC.Core.Coercion
 import GHC.Core.FamInstEnv
 import GHC.Types.Basic       ( Boxity(..) )
@@ -53,6 +52,8 @@ import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Data.FastString
 import GHC.Data.List.SetOps
+
+import GHC.Types.RepType
 
 {-
 ************************************************************************
@@ -423,7 +424,10 @@ mkWWargs :: TCvSubst            -- Freshening substitution to apply to the type
 
 mkWWargs subst fun_ty demands
   | null demands
-  = return ([], id, id, substTy subst fun_ty)
+  = return ([], id, id, substTyUnchecked subst fun_ty)
+    -- I got an ASSERT failure here with `substTy`, and I was
+    -- disinclined to pursue it since this code is about to be
+    -- deleted by Sebastian
 
   | (dmd:demands') <- demands
   , Just (mult, arg_ty, fun_ty') <- splitFunTy_maybe fun_ty
@@ -934,7 +938,6 @@ unbox_one dflags fam_envs arg cs
        ; return (True, worker_args, unbox_fn . wrap_fn, work_fn . rebox_fn) }
                           -- Don't pass the arg, rebox instead
 
-----------------------
 nop_fn :: CoreExpr -> CoreExpr
 nop_fn body = body
 
@@ -1305,7 +1308,7 @@ they are *dead code*) and they are probably discarded after the next run of the
 Simplifier (when they are in fact *unreachable code*). Yet, we have to come up
 with "filler" values that we bind the absent arg Ids to.
 
-That is exactly what Note [Rubbish values] are for: A convenient way to
+That is exactly what Note [Rubbish literals] are for: A convenient way to
 conjure filler values at any type (and any representation or levity!).
 
 Needless to say, there are some wrinkles:
@@ -1313,7 +1316,7 @@ Needless to say, there are some wrinkles:
   1. In case we have a absent, /lazy/, and /lifted/ arg, we use an error-thunk
      instead. If absence analysis was wrong (e.g., #11126) and the binding
      in fact is used, then we get a nice panic message instead of undefined
-     runtime behavior (See Modes of failure from Note [Rubbish values]).
+     runtime behavior (See Modes of failure from Note [Rubbish literals]).
 
      Obviously, we can't use an error-thunk if the value is of unlifted rep
      (like 'Int#' or 'MutVar#'), because we'd immediately evaluate the panic.
@@ -1377,23 +1380,22 @@ mk_absent_let :: DynFlags -> Id -> Demand -> Maybe (CoreExpr -> CoreExpr)
 mk_absent_let dflags arg dmd
   -- The lifted case: Bind 'absentError' for a nice panic message if we are
   -- wrong (like we were in #11126). See (1) in Note [Absent fillers]
-  | Just [LiftedRep] <- mb_mono_prim_reps
+  | not (isUnliftedType arg_ty)
   , not (isStrictDmd dmd) -- See (2) in Note [Absent fillers]
   = Just (Let (NonRec arg panic_rhs))
 
-  -- The default case for mono rep: Bind @RUBBISH[prim_reps] \@arg_ty@
+  -- The default case for mono rep: Bind `RUBBISH[rr] \@arg_ty`
   -- See Note [Absent fillers], the main part
-  | Just prim_reps <- mb_mono_prim_reps
-  = Just (bindNonRec arg (mkTyApps (Lit (mkLitRubbish prim_reps)) [arg_ty]))
+  | Just lit_expr <- mkLitRubbish arg_ty
+  = Just (bindNonRec arg lit_expr)
 
   -- Catch all: Either @arg_ty@ wasn't of form @TYPE rep@ or @rep@ wasn't mono rep.
   -- See (3) in Note [Absent fillers]
-  | Nothing <- mb_mono_prim_reps
+  | otherwise
   = WARN( True, text "No absent value for" <+> ppr arg_ty )
     Nothing
   where
     arg_ty            = idType arg
-    mb_mono_prim_reps = typeMonoPrimRep_maybe arg_ty
 
     panic_rhs = mkAbsentErrorApp arg_ty msg
 

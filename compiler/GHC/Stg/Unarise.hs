@@ -219,7 +219,7 @@ STG programs after unarisation have these invariants:
     This means that it's safe to wrap `StgArg`s of DataCon applications with
     `GHC.StgToCmm.Env.NonVoid`, for example.
 
-  * Similar to unboxed tuples, Note [Rubbish values] of TupleRep may only
+  * Similar to unboxed tuples, Note [Rubbish literals] of TupleRep may only
     appear in return position.
 
   * Alt binders (binders in patterns) are always non-void.
@@ -248,7 +248,7 @@ import GHC.Utils.Panic
 import GHC.Types.RepType
 import GHC.Stg.Syntax
 import GHC.Core.Type
-import GHC.Builtin.Types.Prim (intPrimTy)
+import GHC.Builtin.Types.Prim (intPrimTy, primRepToRuntimeRep)
 import GHC.Builtin.Types
 import GHC.Types.Unique.Supply
 import GHC.Utils.Misc
@@ -389,7 +389,7 @@ unariseExpr rho (StgCase scrut bndr alt_ty alts)
   , Just args' <- unariseMulti_maybe rho dc args ty_args
   = elimCase rho args' bndr alt_ty alts
 
-  -- See (3) of Note [Rubbish values] in GHC.Types.Literal
+  -- See (3) of Note [Rubbish literals] in GHC.Types.Literal
   | StgLit lit <- scrut
   , Just args' <- unariseRubbish_maybe lit
   = elimCase rho args' bndr alt_ty alts
@@ -426,19 +426,18 @@ unariseMulti_maybe rho dc args ty_args
 
 -- Doesn't return void args.
 unariseRubbish_maybe :: Literal -> Maybe [OutStgArg]
-unariseRubbish_maybe lit
-  | LitRubbish preps <- lit
-  , [prep] <- preps
+unariseRubbish_maybe (LitRubbish rep)
+  | [prep] <- preps
   , not (isVoidRep prep)
-  -- Single, non-void PrimRep. Nothing to do!
-  = Nothing
+  = Nothing   -- Single, non-void PrimRep. Nothing to do!
 
-  | LitRubbish preps <- lit
-  -- Multiple reps, possibly with VoidRep. Eliminate!
-  = Just [ StgLitArg (LitRubbish [prep]) | prep <- preps, not (isVoidRep prep) ]
+  | otherwise -- Multiple reps, possibly with VoidRep. Eliminate via elimCase
+  = Just [ StgLitArg (LitRubbish (primRepToType prep))
+         | prep <- preps, not (isVoidRep prep) ]
+  where
+    preps = runtimeRepPrimRep (text "unariseRubbish_maybe") rep
 
-  | otherwise
-  = Nothing
+unariseRubbish_maybe _ = Nothing
 
 --------------------------------------------------------------------------------
 
@@ -658,7 +657,8 @@ ubxSumRubbishArg WordSlot   = StgLitArg (LitNumber LitNumWord 0)
 ubxSumRubbishArg Word64Slot = StgLitArg (LitNumber LitNumWord64 0)
 ubxSumRubbishArg FloatSlot  = StgLitArg (LitFloat 0)
 ubxSumRubbishArg DoubleSlot = StgLitArg (LitDouble 0)
-ubxSumRubbishArg (VecSlot n e) = StgLitArg (LitRubbish [VecRep n e])
+ubxSumRubbishArg (VecSlot n e) = StgLitArg (LitRubbish vec_rep)
+  where vec_rep = primRepToRuntimeRep (VecRep n e)
 
 --------------------------------------------------------------------------------
 

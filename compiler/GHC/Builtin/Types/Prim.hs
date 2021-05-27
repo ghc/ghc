@@ -13,7 +13,8 @@ Wired-in knowledge about primitive types
 module GHC.Builtin.Types.Prim(
         mkPrimTyConName, -- For implicit parameters in GHC.Builtin.Types only
 
-        mkTemplateKindVars, mkTemplateTyVars, mkTemplateTyVarsFrom,
+        mkTemplateKindVar, mkTemplateKindVars,
+        mkTemplateTyVars, mkTemplateTyVarsFrom,
         mkTemplateKiTyVars, mkTemplateKiTyVar,
 
         mkTemplateTyConBinders, mkTemplateKindTyConBinders,

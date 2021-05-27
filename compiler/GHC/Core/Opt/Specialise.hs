@@ -29,6 +29,7 @@ import GHC.Core.Opt.Monad
 import qualified GHC.Core.Subst as Core
 import GHC.Core.Unfold.Make
 import GHC.Core
+import GHC.Core.Make      ( mkLitRubbish )
 import GHC.Core.Rules
 import GHC.Core.Utils     ( exprIsTrivial, getIdFromTrivialExpr_maybe
                           , mkCast, exprType )
@@ -2295,16 +2296,28 @@ specHeader env (bndr : bndrs) (UnspecArg : args)
          let (env', bndr') = substBndr env (zapIdOccInfo bndr)
        ; (useful, env'', leftover_bndrs, rule_bs, rule_es, bs', dx, spec_args)
              <- specHeader env' bndrs args
+
+       ; let bndr_ty = idType bndr'
+
+             -- See Note [Drop dead args from specialisations]
+             -- C.f. GHC.Core.Opt.WorkWrap.Utils.mk_absent_let
+             (mb_spec_bndr, spec_arg)
+                | isDeadBinder bndr
+                , Just lit_expr <- mkLitRubbish bndr_ty
+                = (Nothing, lit_expr)
+                | otherwise
+                = (Just bndr', varToCoreExpr bndr')
+
        ; pure ( useful
               , env''
               , leftover_bndrs
               , bndr' : rule_bs
               , varToCoreExpr bndr' : rule_es
-              , if isDeadBinder bndr
-                  then bs' -- see Note [Drop dead args from specialisations]
-                  else bndr' : bs'
+              , case mb_spec_bndr of
+                  Nothing -> bs' -- see Note [Drop dead args from specialisations]
+                  Just b' -> b' : bs'
               , dx
-              , varToCoreExpr bndr' : spec_args
+              , spec_arg : spec_args
               )
        }
 
