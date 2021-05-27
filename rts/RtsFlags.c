@@ -377,6 +377,7 @@ usage_text[] = {
 "                 y = type description",
 "                 r = retainer",
 "                 b = biography (LAG,DRAG,VOID,USE)",
+"                 o = root objects selected by program",
 "  A subset of closures may be selected thusly:",
 "    -hc<cc>,...  specific cost centre(s) (top of stack only)",
 "    -hC<cc>,...  specific cost centre(s) (anywhere in stack)",
@@ -385,6 +386,7 @@ usage_text[] = {
 "    -hy<typ>...  closures with specified type descriptions",
 "    -hr<cc>...   closures with specified retainers",
 "    -hb<bio>...  closures with specified biographies (lag,drag,void,use)",
+"    -hO          closures reachable from root objects selected by program",
 "",
 "  -R<size>       Set the maximum retainer set size (default: 8)",
 "",
@@ -2199,6 +2201,8 @@ static bool read_heap_profiling_flag(const char *arg)
     case 'B':
     case 'b':
     case 'T':
+    case 'o':
+    case 'O':
         if (arg[2] != '\0' && arg[3] != '\0') {
             {
                 const char *left  = strchr(arg, '{');
@@ -2248,6 +2252,9 @@ static bool read_heap_profiling_flag(const char *arg)
                 }
             }
             break;
+        } else if (arg[2] == 'O') { // root select
+            RtsFlags.ProfFlags.rootSelector = true;
+            break;
         }
 
         if (RtsFlags.ProfFlags.doHeapProfile != 0) {
@@ -2287,6 +2294,9 @@ static bool read_heap_profiling_flag(const char *arg)
             break;
         case 'T':
             RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_CLOSURE_TYPE;
+            break;
+        case 'o':
+            RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_ROOT;
             break;
         }
         break;
