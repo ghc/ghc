@@ -1350,9 +1350,6 @@ nightly-hackage:
 ############################################################
 
 perf-nofib:
-  # This needs to be reverted, and is only
-  # an attempt to unbreak master
-  allow_failure: true
   stage: testing
   needs: [validate-x86_64-linux-deb9-dwarf, doc-tarball]
   dependencies:
@@ -1378,6 +1375,7 @@ perf-nofib:
       rm -Rf tmp
     - export BOOT_HC=$GHC
     - cabal install -w "$BOOT_HC" --lib regex-compat
+    - cabal install -w "$BOOT_HC" --lib unboxed-ref
     - export PATH=$root/bin:$PATH
     - make -C nofib boot mode=fast -j$CPUS
     - "make -C nofib EXTRA_RUNTEST_OPTS='-cachegrind +RTS -V0 -RTS' NoFibRuns=1 mode=fast -j$CPUS 2>&1 | tee nofib.log"
