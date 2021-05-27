@@ -1784,7 +1784,7 @@ builtinBignumRules =
   , integer_to_natural "Integer -> Natural (wrap)"  integerToNaturalName      False False
   , integer_to_natural "Integer -> Natural (throw)" integerToNaturalThrowName True False
 
-  , lit_to_natural  "Word# -> Natural"         naturalNSDataConName
+  , lit_to_natural  "Word# -> Natural"         naturalNSName
   , natural_to_word "Natural -> Word# (wrap)"  naturalToWordName      False
   , natural_to_word "Natural -> Word# (clamp)" naturalToWordClampName True
 
@@ -1857,21 +1857,21 @@ builtinBignumRules =
   , bignum_popcount "naturalPopCount" naturalPopCountName mkLitWordWrap
 
     -- identity passthrough
-  , id_passthrough "Int# -> Integer -> Int#"       integerToIntName    integerISDataConName
+  , id_passthrough "Int# -> Integer -> Int#"       integerToIntName    integerISName
   , id_passthrough "Word# -> Integer -> Word#"     integerToWordName   integerFromWordName
   , id_passthrough "Int64# -> Integer -> Int64#"   integerToInt64Name  integerFromInt64Name
   , id_passthrough "Word64# -> Integer -> Word64#" integerToWord64Name integerFromWord64Name
-  , id_passthrough "Word# -> Natural -> Word#"     naturalToWordName   naturalNSDataConName
+  , id_passthrough "Word# -> Natural -> Word#"     naturalToWordName   naturalNSName
 
     -- identity passthrough with a conversion that can be done directly instead
   , small_passthrough "Int# -> Integer -> Word#"
-        integerISDataConName integerToWordName   (mkPrimOpId IntToWordOp)
+        integerISName integerToWordName   (mkPrimOpId IntToWordOp)
   , small_passthrough "Int# -> Integer -> Float#"
-        integerISDataConName integerToFloatName  (mkPrimOpId IntToFloatOp)
+        integerISName integerToFloatName  (mkPrimOpId IntToFloatOp)
   , small_passthrough "Int# -> Integer -> Double#"
-        integerISDataConName integerToDoubleName (mkPrimOpId IntToDoubleOp)
+        integerISName integerToDoubleName (mkPrimOpId IntToDoubleOp)
   , small_passthrough "Word# -> Natural -> Int#"
-        naturalNSDataConName naturalToWordName   (mkPrimOpId WordToIntOp)
+        naturalNSName naturalToWordName   (mkPrimOpId WordToIntOp)
 
     -- Bits.bit
   , bignum_bit "integerBit" integerBitName mkLitInteger
@@ -1908,6 +1908,11 @@ builtinBignumRules =
   , integer_encode_float "integerEncodeDouble" integerEncodeDoubleName mkDoubleLitDouble
   ]
   where
+    -- Careful not to match directly on the DataCon names! We must match on the
+    -- workers (#19892)
+    integerISName = idName (dataConWorkId integerISDataCon)
+    naturalNSName = idName (dataConWorkId naturalNSDataCon)
+
     mkRule str name nargs f = BuiltinRule
       { ru_name = fsLit str
       , ru_fn = name
