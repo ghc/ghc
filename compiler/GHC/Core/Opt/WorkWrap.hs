@@ -23,11 +23,11 @@ import GHC.Types.Unique.Supply
 import GHC.Types.Basic
 import GHC.Driver.Session
 import GHC.Driver.Ppr
-import GHC.Driver.Config
 import GHC.Types.Demand
 import GHC.Types.Cpr
 import GHC.Types.SourceText
 import GHC.Core.Opt.WorkWrap.Utils
+import GHC.Core.SimpleOpt( SimpleOpts(..) )
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Types.Unique
@@ -68,8 +68,10 @@ wwTopBinds :: DynFlags -> FamInstEnvs -> UniqSupply -> CoreProgram -> CoreProgra
 
 wwTopBinds dflags fam_envs us top_binds
   = initUs_ us $ do
-    top_binds' <- mapM (wwBind dflags fam_envs) top_binds
+    top_binds' <- mapM (wwBind ww_opts) top_binds
     return (concat top_binds')
+  where
+    ww_opts = initWwOpts dflags fam_envs
 
 {-
 ************************************************************************
@@ -82,25 +84,24 @@ wwTopBinds dflags fam_envs us top_binds
 turn.  Non-recursive case first, then recursive...
 -}
 
-wwBind  :: DynFlags
-        -> FamInstEnvs
+wwBind  :: WwOpts
         -> CoreBind
         -> UniqSM [CoreBind]    -- returns a WwBinding intermediate form;
                                 -- the caller will convert to Expr/Binding,
                                 -- as appropriate.
 
-wwBind dflags fam_envs (NonRec binder rhs) = do
-    new_rhs <- wwExpr dflags fam_envs rhs
-    new_pairs <- tryWW dflags fam_envs NonRecursive binder new_rhs
+wwBind ww_opts (NonRec binder rhs) = do
+    new_rhs   <- wwExpr ww_opts rhs
+    new_pairs <- tryWW ww_opts NonRecursive binder new_rhs
     return [NonRec b e | (b,e) <- new_pairs]
       -- Generated bindings must be non-recursive
       -- because the original binding was.
 
-wwBind dflags fam_envs (Rec pairs)
+wwBind ww_opts (Rec pairs)
   = return . Rec <$> concatMapM do_one pairs
   where
-    do_one (binder, rhs) = do new_rhs <- wwExpr dflags fam_envs rhs
-                              tryWW dflags fam_envs Recursive binder new_rhs
+    do_one (binder, rhs) = do new_rhs <- wwExpr ww_opts rhs
+                              tryWW ww_opts Recursive binder new_rhs
 
 {-
 @wwExpr@ basically just walks the tree, looking for appropriate
@@ -109,41 +110,41 @@ matching by looking for strict arguments of the correct type.
 @wwExpr@ is a version that just returns the ``Plain'' Tree.
 -}
 
-wwExpr :: DynFlags -> FamInstEnvs -> CoreExpr -> UniqSM CoreExpr
+wwExpr :: WwOpts -> CoreExpr -> UniqSM CoreExpr
 
-wwExpr _      _ e@(Type {}) = return e
-wwExpr _      _ e@(Coercion {}) = return e
-wwExpr _      _ e@(Lit  {}) = return e
-wwExpr _      _ e@(Var  {}) = return e
+wwExpr _ e@(Type {}) = return e
+wwExpr _ e@(Coercion {}) = return e
+wwExpr _ e@(Lit  {}) = return e
+wwExpr _ e@(Var  {}) = return e
 
-wwExpr dflags fam_envs (Lam binder expr)
-  = Lam new_binder <$> wwExpr dflags fam_envs expr
+wwExpr ww_opts (Lam binder expr)
+  = Lam new_binder <$> wwExpr ww_opts expr
   where new_binder | isId binder = zapIdUsedOnceInfo binder
                    | otherwise   = binder
   -- See Note [Zapping Used Once info in WorkWrap]
 
-wwExpr dflags fam_envs (App f a)
-  = App <$> wwExpr dflags fam_envs f <*> wwExpr dflags fam_envs a
+wwExpr ww_opts (App f a)
+  = App <$> wwExpr ww_opts f <*> wwExpr ww_opts a
 
-wwExpr dflags fam_envs (Tick note expr)
-  = Tick note <$> wwExpr dflags fam_envs expr
+wwExpr ww_opts (Tick note expr)
+  = Tick note <$> wwExpr ww_opts expr
 
-wwExpr dflags fam_envs (Cast expr co) = do
-    new_expr <- wwExpr dflags fam_envs expr
+wwExpr ww_opts (Cast expr co) = do
+    new_expr <- wwExpr ww_opts expr
     return (Cast new_expr co)
 
-wwExpr dflags fam_envs (Let bind expr)
-  = mkLets <$> wwBind dflags fam_envs bind <*> wwExpr dflags fam_envs expr
+wwExpr ww_opts (Let bind expr)
+  = mkLets <$> wwBind ww_opts bind <*> wwExpr ww_opts expr
 
-wwExpr dflags fam_envs (Case expr binder ty alts) = do
-    new_expr <- wwExpr dflags fam_envs expr
+wwExpr ww_opts (Case expr binder ty alts) = do
+    new_expr <- wwExpr ww_opts expr
     new_alts <- mapM ww_alt alts
     let new_binder = zapIdUsedOnceInfo binder
       -- See Note [Zapping Used Once info in WorkWrap]
     return (Case new_expr new_binder ty new_alts)
   where
     ww_alt (Alt con binders rhs) = do
-        new_rhs <- wwExpr dflags fam_envs rhs
+        new_rhs <- wwExpr ww_opts rhs
         let new_binders = [ if isId b then zapIdUsedOnceInfo b else b
                           | b <- binders ]
            -- See Note [Zapping Used Once info in WorkWrap]
@@ -461,7 +462,7 @@ Conclusion:
     exists. NB: Similar to InitialPhase, users can't write INLINE[Final] f;
     it's syntactically illegal.
 
-  - Otherwise inline wrapper in phase 2.  That allows the
+  - Otherwise inline wrapper in phase Final.  That allows the
     'gentle' simplification pass to apply specialisation rules
 
 Note [Wrapper NoUserInlinePrag]
@@ -479,8 +480,7 @@ the inl_act activation.)
 
 -}
 
-tryWW   :: DynFlags
-        -> FamInstEnvs
+tryWW   :: WwOpts
         -> RecFlag
         -> Id                           -- The fn binder
         -> CoreExpr                     -- The bound rhs; its innards
@@ -490,11 +490,23 @@ tryWW   :: DynFlags
                                         -- the orig "wrapper" lives on);
                                         -- if two, then a worker and a
                                         -- wrapper.
-tryWW dflags fam_envs is_rec fn_id rhs
+tryWW ww_opts is_rec fn_id rhs
   -- See Note [Worker/wrapper for NOINLINE functions]
 
+  | isAbsDmd (demandInfo fn_info)
+  , not (isJoinId fn_id)
+  , Just filler <- mkAbsentFiller ww_opts fn_id
+  = return [(new_fn_id, filler)]
+
   | Just stable_unf <- certainlyWillInline uf_opts fn_info
-  = return [ (new_fn_id `setIdUnfolding` stable_unf, rhs) ]
+  , let id_w_unf = new_fn_id `setIdUnfolding`     stable_unf
+                             `modifyInlinePragma` upd_prag
+
+        upd_prag prag | noUserInlineSpec (inlinePragmaSpec prag)
+                      = mkStrWrapperInlinePrag prag
+                      | otherwise
+                      = prag
+  = return [ (id_w_unf, rhs) ]
         -- See Note [Don't w/w INLINE things]
         -- See Note [Don't w/w inline small non-loop-breaker things]
 
@@ -502,16 +514,16 @@ tryWW dflags fam_envs is_rec fn_id rhs
   = return [ (new_fn_id, rhs ) ]
 
   | is_fun && is_eta_exp
-  = splitFun dflags fam_envs new_fn_id fn_info wrap_dmds div cpr rhs
+  = splitFun ww_opts new_fn_id fn_info wrap_dmds div cpr rhs
 
   | isNonRec is_rec, is_thunk                        -- See Note [Thunk splitting]
-  = splitThunk dflags fam_envs is_rec new_fn_id rhs
+  = splitThunk ww_opts is_rec new_fn_id rhs
 
   | otherwise
   = return [ (new_fn_id, rhs) ]
 
   where
-    uf_opts      = unfoldingOpts dflags
+    uf_opts      = so_uf_opts (wo_simple_opts ww_opts)
     fn_info      = idInfo fn_id
     (wrap_dmds, div) = splitDmdSig (dmdSigInfo fn_info)
 
@@ -631,23 +643,18 @@ See https://gitlab.haskell.org/ghc/ghc/merge_requests/312#note_192064.
 
 
 ---------------------
-splitFun :: DynFlags -> FamInstEnvs -> Id -> IdInfo -> [Demand] -> Divergence -> Cpr -> CoreExpr
+splitFun :: WwOpts -> Id -> IdInfo -> [Demand] -> Divergence -> Cpr -> CoreExpr
          -> UniqSM [(Id, CoreExpr)]
-splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
-  = warnPprTrace (not (wrap_dmds `lengthIs` arity)) (ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr cpr)) $
-          -- The arity should match the signature
-    do { mb_stuff <- mkWwBodies (initWwOpts dflags fam_envs) rhs_fvs fn_id wrap_dmds use_cpr_info
+splitFun ww_opts fn_id fn_info wrap_dmds div cpr rhs
+  = do { mb_stuff <- mkWwBodies ww_opts rhs_fvs fn_id wrap_dmds use_cpr_info
        ; case mb_stuff of
             Nothing -> return [(fn_id, rhs)]
 
             Just stuff -> do { work_uniq <- getUniqueM
-                             ; return (mkWWBindPair dflags fn_id fn_info arity rhs
+                             ; return (mkWWBindPair ww_opts fn_id fn_info wrap_dmds rhs
                                                     work_uniq div cpr stuff) } }
   where
     rhs_fvs = exprFreeVars rhs
-    arity   = arityInfo fn_info
-            -- The arity is set by the simplifier using exprEtaExpandArity
-            -- So it may be more than the number of top-level-visible lambdas
 
     -- use_cpr_info is the CPR we w/w for. Note that we kill it for join points,
     -- see Note [Don't w/w join points for CPR].
@@ -655,16 +662,22 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
                   | otherwise      = cpr
 
 
-mkWWBindPair :: DynFlags -> Id -> IdInfo -> Arity
+mkWWBindPair :: WwOpts -> Id -> IdInfo -> [Demand]
              -> CoreExpr -> Unique -> Divergence -> Cpr
              -> ([Demand], JoinArity, Id -> CoreExpr, Expr CoreBndr -> CoreExpr)
              -> [(Id, CoreExpr)]
-mkWWBindPair dflags fn_id fn_info arity rhs work_uniq div cpr
+mkWWBindPair ww_opts fn_id fn_info wrap_dmds rhs work_uniq div cpr
              (work_demands, join_arity, wrap_fn, work_fn)
-  = [(work_id, work_rhs), (wrap_id, wrap_rhs)]
+  = warnPprTrace (not (wrap_dmds `lengthIs` arity)) (ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr cpr)) $
+          -- The arity should match the signature
+    [(work_id, work_rhs), (wrap_id, wrap_rhs)]
      -- Worker first, because wrapper mentions it
   where
-    simpl_opts = initSimpleOpts dflags
+    arity = arityInfo fn_info
+            -- The arity is set by the simplifier using exprEtaExpandArity
+            -- So it may be more than the number of top-level-visible lambdas
+
+    simpl_opts = wo_simple_opts ww_opts
 
     work_rhs = work_fn rhs
     work_act = case fn_inline_spec of  -- See Note [Worker activation]
@@ -720,8 +733,11 @@ mkWWBindPair dflags fn_id fn_info arity rhs work_uniq div cpr
 
     wrap_rhs  = wrap_fn work_id
     wrap_prag = mkStrWrapperInlinePrag fn_inl_prag
+    wrap_unf  = mkWrapperUnfolding simpl_opts boring_ok wrap_rhs arity
+    boring_ok | any isAbsDmd wrap_dmds = boringCxtOk
+              | otherwise              = boringCxtNotOk
 
-    wrap_id   = fn_id `setIdUnfolding`  mkWwInlineRule simpl_opts wrap_rhs arity
+    wrap_id   = fn_id `setIdUnfolding`  wrap_unf
                       `setInlinePragma` wrap_prag
                       `setIdOccInfo`    noOccInfo
                         -- Zap any loop-breaker-ness, to avoid bleating from Lint
@@ -884,12 +900,12 @@ get around by localising the Id for the auxiliary bindings in 'splitThunk'.
 --
 -- How can we do thunk-splitting on a top-level binder?  See
 -- Note [Thunk splitting for top-level binders].
-splitThunk :: DynFlags -> FamInstEnvs -> RecFlag -> Var -> Expr Var -> UniqSM [(Var, Expr Var)]
-splitThunk dflags fam_envs is_rec x rhs
+splitThunk :: WwOpts -> RecFlag -> Var -> Expr Var -> UniqSM [(Var, Expr Var)]
+splitThunk ww_opts is_rec x rhs
   = assert (not (isJoinId x)) $
     do { let x' = localiseId x -- See comment above
        ; (useful,_, wrap_fn, work_fn)
-           <- mkWWstr (initWwOpts dflags fam_envs) NotArgOfInlineableFun [x']
+           <- mkWWstr ww_opts NotArgOfInlineableFun [x']
        ; let res = [ (x, Let (NonRec x' rhs) (wrap_fn (work_fn (Var x')))) ]
        ; if useful then assertPpr (isNonRec is_rec) (ppr x) -- The thunk must be non-recursive
                    return res

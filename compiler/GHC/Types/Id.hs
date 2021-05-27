@@ -174,15 +174,17 @@ infixl  1 `setIdUnfolding`,
 
           `setIdSpecialisation`,
           `setInlinePragma`,
+          `modifyInlinePragma`,
           `setInlineActivation`,
-          `idCafInfo`,
 
           `setIdDemandInfo`,
           `setIdDmdSig`,
           `setIdCprSig`,
 
           `asJoinId`,
-          `asJoinId_maybe`
+          `asJoinId_maybe`,
+
+          `idCafInfo`
 
 {-
 ************************************************************************
