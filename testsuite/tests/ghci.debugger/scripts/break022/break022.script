@@ -12,7 +12,7 @@
 
 :! cp A1.hs A.hs
 :l C
-:! touch A.hs
+:! echo >> A.hs
 :r
 :break a
 a ()
