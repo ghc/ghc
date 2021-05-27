@@ -20,7 +20,6 @@
 #include "BlockAlloc.h"
 #include "GC.h"
 #include "Compact.h"
-#include "Schedule.h"
 #include "Apply.h"
 #include "Trace.h"
 #include "Weak.h"
@@ -963,8 +962,6 @@ compact(StgClosure *static_objects,
 {
     // 1. thread the roots
     markCapabilities((evac_fn)thread_root, NULL);
-
-    markScheduler((evac_fn)thread_root, NULL);
 
     // the weak pointer lists...
     for (W_ g = 0; g < RtsFlags.GcFlags.generations; g++) {
