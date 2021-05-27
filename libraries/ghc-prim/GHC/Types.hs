@@ -426,7 +426,7 @@ type family GetRep (ri :: RuntimeInfo) :: RuntimeRep where
   GetRep ('RInfo rep _) = rep
 
 type family GetConv (ri :: RuntimeInfo) :: CallingConv where
-  GetRep ('RInfo _ conv) = conv
+  GetConv ('RInfo _ conv) = conv
 
 
 -- | GHC maintains a property that the kind of all inhabited types

@@ -1634,6 +1634,7 @@ getRepTyCon = mkFamilyTyCon getRepTyConName binders runtimeRepTy Nothing
   where
     binders = mkTemplateAnonTyConBinders [runtimeInfoTy]
 
+
 getConvTyConName :: Name
 getConvTyConName =
     mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "GetConv") getConvTyConKey getConvTyCon
