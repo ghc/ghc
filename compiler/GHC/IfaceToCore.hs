@@ -1455,6 +1455,10 @@ tcIfaceExpr (IfaceLcl name)
 tcIfaceExpr (IfaceExt gbl)
   = Var <$> tcIfaceExtId gbl
 
+tcIfaceExpr (IfaceRubbishLit rep)
+  = do rep' <- tcIfaceType rep
+       return (Lit (mkLitRubbish rep'))
+
 tcIfaceExpr (IfaceLit lit)
   = do lit' <- tcIfaceLit lit
        return (Lit lit')
