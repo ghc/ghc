@@ -14,7 +14,6 @@ import GHC.Core
 import GHC.Core.Unfold
 import GHC.Core.Unfold.Make
 import GHC.Core.Utils  ( exprType, exprIsHNF )
-import GHC.Core.FVs    ( exprFreeVars )
 import GHC.Types.Var
 import GHC.Types.Id
 import GHC.Types.Id.Info
@@ -206,7 +205,7 @@ unfolding to the *worker*.  So we will get something like this:
   fw d x y' = let y = I# y' in ...f...
 
 How do we "transfer the unfolding"? Easy: by using the old one, wrapped
-in work_fn! See GHC.Core.Unfold.mkWorkerUnfolding.
+in work_fn! See GHC.Core.Unfold.Make.mkWorkerUnfolding.
 
 Note [No worker/wrapper for record selectors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -501,7 +500,7 @@ tryWW dflags fam_envs is_rec fn_id rhs
   | isRecordSelector fn_id  -- See Note [No worker/wrapper for record selectors]
   = return [ (new_fn_id, rhs ) ]
 
-  | is_fun && is_eta_exp
+  | is_fun, is_eta_exp
   = splitFun dflags fam_envs new_fn_id fn_info wrap_dmds div cpr rhs
 
   | isNonRec is_rec, is_thunk                        -- See Note [Thunk splitting]
@@ -605,7 +604,13 @@ means GHC.Core.Opt.Arity didn't eta expand that binding. When this happens, it d
 for a reason (see Note [exprArity invariant] in GHC.Core.Opt.Arity) and we probably have
 a PAP, cast or trivial expression as RHS.
 
-Performing the worker/wrapper split will implicitly eta-expand the binding to
+Below is a historical account of what happened when w/w still did eta expansion.
+Nowadays, it doesn't do that, but will simply w/w for the wrong arity, unleashing
+a demand signature meant for e.g. 2 args to be unleashed for e.g. 1 arg
+(manifest arity). That's at least as terrible as doing eta expansion, so don't
+do it.
+---
+When worker/wrapper did eta expansion, it implictly eta expanded the binding to
 idArity, overriding GHC.Core.Opt.Arity's decision. Other than playing fast and loose with
 divergence, it's also broken for newtypes:
 
@@ -635,19 +640,23 @@ splitFun :: DynFlags -> FamInstEnvs -> Id -> IdInfo -> [Demand] -> Divergence ->
          -> UniqSM [(Id, CoreExpr)]
 splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
   = warnPprTrace (not (wrap_dmds `lengthIs` arity)) (ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr cpr)) $
-          -- The arity should match the signature
-    do { mb_stuff <- mkWwBodies (initWwOpts dflags fam_envs) rhs_fvs fn_id wrap_dmds use_cpr_info
+          -- The arity should match the signature; See Note [Don't eta expand in w/w]
+    do { mb_stuff <- mkWwBodies (initWwOpts dflags fam_envs) fn_id arg_vars (exprType body) wrap_dmds use_cpr_info
        ; case mb_stuff of
             Nothing -> return [(fn_id, rhs)]
 
             Just stuff -> do { work_uniq <- getUniqueM
-                             ; return (mkWWBindPair dflags fn_id fn_info arity rhs
+                             ; return (mkWWBindPair dflags fn_id fn_info arity arg_vars body
                                                     work_uniq div cpr stuff) } }
   where
-    rhs_fvs = exprFreeVars rhs
+    (arg_vars, body) = collectBinders rhs
+            -- collectBinders was not enough for GHC.Event.IntTable.insertWith
+            -- last time I checked, where manifest lambdas were wrapped in casts
     arity   = arityInfo fn_info
             -- The arity is set by the simplifier using exprEtaExpandArity
             -- So it may be more than the number of top-level-visible lambdas
+            -- SG: But it never *should*, right? Isn't that the point of
+            -- Note [Don't eta expand in w/w]?
 
     -- use_cpr_info is the CPR we w/w for. Note that we kill it for join points,
     -- see Note [Don't w/w join points for CPR].
@@ -656,17 +665,17 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
 
 
 mkWWBindPair :: DynFlags -> Id -> IdInfo -> Arity
-             -> CoreExpr -> Unique -> Divergence -> Cpr
+             -> [Var] -> CoreExpr -> Unique -> Divergence -> Cpr
              -> ([Demand], JoinArity, Id -> CoreExpr, Expr CoreBndr -> CoreExpr)
              -> [(Id, CoreExpr)]
-mkWWBindPair dflags fn_id fn_info arity rhs work_uniq div cpr
+mkWWBindPair dflags fn_id fn_info arity fn_args fn_body work_uniq div cpr
              (work_demands, join_arity, wrap_fn, work_fn)
   = [(work_id, work_rhs), (wrap_id, wrap_rhs)]
      -- Worker first, because wrapper mentions it
   where
     simpl_opts = initSimpleOpts dflags
 
-    work_rhs = work_fn rhs
+    work_rhs = work_fn (mkLams fn_args fn_body)
     work_act = case fn_inline_spec of  -- See Note [Worker activation]
                    NoInline -> inl_act fn_inl_prag
                    _        -> inl_act wrap_prag
