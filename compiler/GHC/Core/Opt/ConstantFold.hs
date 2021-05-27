@@ -1382,7 +1382,7 @@ builtinBignumRules _ =
   , integer_to_natural "Integer -> Natural (wrap)"  integerToNaturalName      False False
   , integer_to_natural "Integer -> Natural (throw)" integerToNaturalThrowName True False
 
-  , lit_to_natural  "Word# -> Natural"         naturalNSDataConName
+  , lit_to_natural  "Word# -> Natural"         naturalNSName
   , natural_to_word "Natural -> Word# (wrap)"  naturalToWordName      False
   , natural_to_word "Natural -> Word# (clamp)" naturalToWordClampName True
 
@@ -1455,21 +1455,21 @@ builtinBignumRules _ =
   , bignum_popcount "naturalPopCount" naturalPopCountName mkLitWordWrap
 
     -- identity passthrough
-  , id_passthrough "Int# -> Integer -> Int#"       integerToIntName    integerISDataConName
+  , id_passthrough "Int# -> Integer -> Int#"       integerToIntName    integerISName
   , id_passthrough "Word# -> Integer -> Word#"     integerToWordName   integerFromWordName
   , id_passthrough "Int64# -> Integer -> Int64#"   integerToInt64Name  integerFromInt64Name
   , id_passthrough "Word64# -> Integer -> Word64#" integerToWord64Name integerFromWord64Name
-  , id_passthrough "Word# -> Natural -> Word#"     naturalToWordName   naturalNSDataConName
+  , id_passthrough "Word# -> Natural -> Word#"     naturalToWordName   naturalNSName
 
     -- identity passthrough with a conversion that can be done directly instead
   , small_passthrough "Int# -> Integer -> Word#"
-        integerISDataConName integerToWordName   (mkPrimOpId Int2WordOp)
+        integerISName integerToWordName   (mkPrimOpId Int2WordOp)
   , small_passthrough "Int# -> Integer -> Float#"
-        integerISDataConName integerToFloatName  (mkPrimOpId Int2FloatOp)
+        integerISName integerToFloatName  (mkPrimOpId Int2FloatOp)
   , small_passthrough "Int# -> Integer -> Double#"
-        integerISDataConName integerToDoubleName (mkPrimOpId Int2DoubleOp)
+        integerISName integerToDoubleName (mkPrimOpId Int2DoubleOp)
   , small_passthrough "Word# -> Natural -> Int#"
-        naturalNSDataConName naturalToWordName   (mkPrimOpId Word2IntOp)
+        naturalNSName naturalToWordName   (mkPrimOpId Word2IntOp)
 
     -- Bits.bit
   , bignum_bit "integerBit" integerBitName mkLitInteger
@@ -1506,6 +1506,25 @@ builtinBignumRules _ =
   , integer_encode_float "integerEncodeDouble" integerEncodeDoubleName mkDoubleLitDouble
   ]
   where
+    -- The rule is matching against an occurrence of a data constructor in a
+    -- Core expression. It must match either its worker name or its wrapper
+    -- name, /not/ the DataCon name itself, which is different.
+    -- See Note [Data Constructor Naming] in GHC.Core.DataCon and #19892
+    --
+    -- But data constructor wrappers deliberately inline late; See Note
+    -- [Activation for data constructor wrappers] in GHC.Types.Id.Make.
+    -- Suppose there is a wrapper and the rule matches on the worker: the
+    -- wrapper won't be inlined until rules have finished firing and the rule
+    -- will never fire.
+    --
+    -- Hence the rule must match on the wrapper, if there is one, otherwise on
+    -- the worker. That is exactly the dataConWrapId for the data constructor.
+    -- The data constructor may or may not have a wrapper, but if not
+    -- dataConWrapId will return the worker
+    --
+    integerISName = idName (dataConWrapId integerISDataCon)
+    naturalNSName = idName (dataConWrapId naturalNSDataCon)
+
     mkRule str name nargs f = BuiltinRule
       { ru_name = fsLit str
       , ru_fn = name
