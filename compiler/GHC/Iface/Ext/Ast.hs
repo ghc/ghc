@@ -74,6 +74,7 @@ import Control.Monad              ( forM_ )
 import Control.Monad.Trans.State.Strict
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Class  ( lift )
+import Control.Applicative        ( (<|>) )
 
 {- Note [Updating HieAst for changes in the GHC AST]
 
@@ -720,40 +721,39 @@ instance HiePass p => HasType (LocatedA (Pat (GhcPass p))) where
 instance HiePass p => HasType (LocatedA (HsExpr (GhcPass p))) where
   getTypeNode (L spn e) =
     case hiePass @p of
-      HieRn -> makeNodeA e spn
-      HieTc | skipType e -> fallback
-            | otherwise -> makeTypeNodeA e spn $! hsExprType e
-        where
-          fallback = makeNodeA e spn
+      HieRn -> fallback
+      HieTc -> case computeType e of
+          Just ty -> makeTypeNodeA e spn ty
+          Nothing -> fallback
+    where
+      fallback :: HieM [HieAST Type]
+      fallback = makeNodeA e spn
 
-          -- | Skip computing the type of these expressions for performance reasons.
-          --
-          -- See impact on Haddock output (esp. missing type annotations or links)
-          -- before marking more things here as 'True'. See impact on Haddock
-          -- performance before marking more things as 'False.
-          skipType :: HsExpr GhcTc -> Bool
-          skipType e = case e of
-            HsVar{}             -> False
-            HsRecFld{}          -> False
-            HsOverLabel{}       -> False
-            HsIPVar{}           -> False
-            XExpr (WrapExpr{})  -> False
-            XExpr (ConLikeTc{}) -> False
-            HsUnboundVar{}      -> False
-            HsLit{}             -> False
-            HsOverLit{}         -> False
-            HsLam{}             -> False
-            HsLamCase{}         -> False
-            HsCase{}            -> False
-            ExplicitList{}      -> False
-            ExplicitSum{}       -> False
-            HsDo{}              -> False
-            HsProc{}            -> False
-            HsMultiIf{}         -> False
-            NegApp{}            -> False
-            ArithSeq{}          -> False
-            HsTcBracketOut{}    -> False
-            _                   -> True
+      -- | Skip computing the type of some expressions for performance reasons.
+      --
+      -- See impact on Haddock output (esp. missing type annotations or links)
+      -- before skipping more kinds of expressions. See impact on Haddock
+      -- performance before computing the types of more expressions.
+      computeType :: HsExpr GhcTc -> Maybe Type
+      computeType e = case e of
+        HsApp{} -> Nothing
+        HsAppType{} -> Nothing
+        NegApp{} -> Nothing
+        HsPar _ e -> computeLType e
+        ExplicitTuple{} -> Nothing
+        HsIf _ _ t f -> computeLType t <|> computeLType f
+        HsLet _ _ body -> computeLType body
+        RecordCon con_expr _ _ -> computeType con_expr
+        ExprWithTySig _ e _ -> computeLType e
+        HsStatic _ e -> computeLType e
+        HsTick _ _ e -> computeLType e
+        HsBinTick _ _ _ e -> computeLType e
+        HsPragE _ _ e -> computeLType e
+        XExpr (ExpansionExpr (HsExpanded _ e)) -> computeType e
+        e -> Just (hsExprType e)
+
+      computeLType :: LHsExpr GhcTc -> Maybe Type
+      computeLType (L _ e) = computeType e
 
 data HiePassEv p where
   HieRn :: HiePassEv 'Renamed
