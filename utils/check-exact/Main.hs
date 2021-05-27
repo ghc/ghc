@@ -33,6 +33,7 @@ import GHC.Parser.Lexer
 import GHC.Data.FastString
 import GHC.Types.SrcLoc
 
+
 -- ---------------------------------------------------------------------
 
 _tt :: IO ()
@@ -345,7 +346,7 @@ parseOneFile libdir fileName =
          let dflags2 = dflags `gopt_set` Opt_KeepRawTokenStream
          _ <- setSessionDynFlags dflags2
          hsc_env <- getSession
-         emodSum <- liftIO $ summariseFile hsc_env [] fileName Nothing True Nothing
+         emodSum <- liftIO $ summariseFile hsc_env [] fileName Nothing Nothing
          case emsModSummary <$> emodSum of
            Left _err -> error "parseOneFile"
            Right modSum -> do

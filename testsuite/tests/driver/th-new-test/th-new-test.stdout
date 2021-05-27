@@ -1,0 +1,17 @@
+[1 of 5] Compiling B                ( B.hs, B.o, B.dyn_o )
+[2 of 5] Compiling A                ( A.hs, A.o, A.dyn_o )
+[3 of 5] Compiling D                ( D.hs, D.o, D.dyn_o )
+[4 of 5] Compiling C                ( C.hs, C.o, C.dyn_o )
+[5 of 5] Compiling Main             ( Main.hs, Main.o, Main.dyn_o )
+Linking Main ...
+[1 of 5] Compiling B                ( B.hs, B.o, B.dyn_o )
+[2 of 5] Compiling A                ( A.hs, A.o, A.dyn_o ) [./B.dyn_o changed]
+Linking Main ...
+[3 of 5] Compiling D                ( D.hs, D.o, D.dyn_o )
+[4 of 5] Compiling C                ( C.hs, C.o, C.dyn_o ) [./D.dyn_o changed]
+Linking Main ...
+[1 of 5] Compiling B                ( B.hs, B.o, B.dyn_o )
+[2 of 5] Compiling A                ( A.hs, A.o, A.dyn_o ) [./B.dyn_o changed]
+[3 of 5] Compiling D                ( D.hs, D.o, D.dyn_o )
+[4 of 5] Compiling C                ( C.hs, C.o, C.dyn_o ) [./D.dyn_o changed]
+Linking Main ...
