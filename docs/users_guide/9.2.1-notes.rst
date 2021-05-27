@@ -91,6 +91,15 @@ Language
   :extension:`NondecreasingIndentation`, but :extension:`GHC2021` does not.
   This may break code implicitly using this extension.
 
+* The `Record Dot Syntax Proposal`_ has been implemented:
+
+  - A new extension :extension:`OverloadedRecordDot` provides record ``.`` syntax e.g. ``x.foo``
+  - A new extension :extension:`OverloadedRecordUpdate` provides record ``.``
+    syntax in record updates e.g. ``x{foo.bar = 1}``.  *The design of this
+    extension may well change in the future.*
+
+.. _Record Dot Syntax Proposal: https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0282-record-dot-syntax.rst
+
 * Various records-related extensions have been improved:
 
   - A new extension :extension:`NoFieldSelectors` hides record field selector
