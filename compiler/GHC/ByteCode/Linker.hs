@@ -186,7 +186,13 @@ nameToCLabel n suffix = mkFastString label
     encodeZ = zString . zEncodeFS
     (Module pkgKey modName) = assert (isExternalName n) $ nameModule n
     packagePart = encodeZ (unitFS pkgKey)
-    modulePart  = encodeZ (moduleNameFS modName)
+    moduleFS'   = moduleNameFS modName
+    -- Primops are exported from GHC.Prim, their HValues live in GHC.PrimopWrappers
+    -- See Note [Primop wrappers] in compiler/GHC/Builtin/PrimOps.hs.
+    moduleFS    = if moduleFS' == fsLit "GHC.Prim"
+                    then fsLit "GHC.PrimopWrappers"
+                    else moduleFS'
+    modulePart  = encodeZ moduleFS
     occPart     = encodeZ (occNameFS (nameOccName n))
 
     label = concat
