@@ -646,8 +646,9 @@ rnIfaceExpr (IfaceLet (IfaceRec pairs) body)
                <*> rnIfaceExpr body
 rnIfaceExpr (IfaceCast expr co)
     = IfaceCast <$> rnIfaceExpr expr <*> rnIfaceCo co
-rnIfaceExpr (IfaceLit lit) = pure (IfaceLit lit)
-rnIfaceExpr (IfaceFCall cc ty) = IfaceFCall cc <$> rnIfaceType ty
+rnIfaceExpr (IfaceLit lit)           = pure (IfaceLit lit)
+rnIfaceExpr (IfaceLitRubbish rep)    = IfaceLitRubbish <$> rnIfaceType rep
+rnIfaceExpr (IfaceFCall cc ty)       = IfaceFCall cc <$> rnIfaceType ty
 rnIfaceExpr (IfaceTick tickish expr) = IfaceTick tickish <$> rnIfaceExpr expr
 
 rnIfaceBndrs :: Rename [IfaceBndr]
