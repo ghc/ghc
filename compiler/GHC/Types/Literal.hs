@@ -33,7 +33,6 @@ module GHC.Types.Literal
         , mkLitChar, mkLitString
         , mkLitInteger, mkLitNatural
         , mkLitNumber, mkLitNumberWrap
-        , mkLitRubbish
 
         -- ** Operations on Literals
         , literalType
@@ -52,7 +51,7 @@ module GHC.Types.Literal
         , isZeroLit, isOneLit
         , litFitsInChar
         , litValue, mapLitValue
-        , isLitValue_maybe
+        , isLitValue_maybe, isLitRubbish
 
         -- ** Coercions
         , narrowInt8Lit, narrowInt16Lit, narrowInt32Lit
@@ -68,7 +67,6 @@ import GHC.Prelude
 import GHC.Builtin.Types.Prim
 import {-# SOURCE #-} GHC.Builtin.Types
 import GHC.Core.Type
-import GHC.Core.TyCon
 import GHC.Utils.Outputable
 import GHC.Data.FastString
 import GHC.Types.Basic
@@ -131,13 +129,15 @@ data Literal
                                 -- that can be represented as a Literal. Create
                                 -- with 'nullAddrLit'
 
-  | LitRubbish [PrimRep]        -- ^ A nonsense value of the given
-                                -- representation. See Note [Rubbish values].
+  | LitRubbish Type             -- ^ A nonsense value of the given
+                                -- representation. See Note [Rubbish literals].
                                 --
-                                -- The @[PrimRep]@ of a 'Type' can be obtained
-                                -- from 'typeMonoPrimRep_maybe'. The field
-                                -- becomes empty or singleton post-unarisation,
-                                -- see Note [Post-unarisation invariants].
+                                -- The Type argument, rr, is of kind RuntimeRep.
+                                -- The type of the literal is forall (a:TYPE rr). a
+                                --
+                                -- INVARIANT: the Type has no free variables
+                                --    and so substitution etc can ignore it
+                                --
 
   | LitFloat   Rational         -- ^ @Float#@. Create with 'mkLitFloat'
   | LitDouble  Rational         -- ^ @Double#@. Create with 'mkLitDouble'
@@ -199,7 +199,6 @@ instance Binary LitNumType where
 {-
 Note [BigNum literals]
 ~~~~~~~~~~~~~~~~~~~~~~
-
 GHC supports 2 kinds of arbitrary precision integers (a.k.a BigNum):
 
    * Natural: natural represented as a Word# or as a BigNat
@@ -213,7 +212,6 @@ are replaced with expression to build them at runtime from machine literals
 
 Note [String literals]
 ~~~~~~~~~~~~~~~~~~~~~~
-
 String literals are UTF-8 encoded and stored into ByteStrings in the following
 ASTs: Haskell, Core, Stg, Cmm. TH can also emit ByteString based string literals
 with the BytesPrimL constructor (see #14741).
@@ -242,7 +240,9 @@ instance Binary Literal where
         = do putByte bh 6
              put_ bh nt
              put_ bh i
-    put_ bh (LitRubbish b) = do putByte bh 7; put_ bh b
+    put_ _ (LitRubbish b) = pprPanic "Binary LitRubbish" (ppr b)
+     -- We use IfaceLitRubbish; see Note [Rubbish literals], item (6)
+
     get bh = do
             h <- getByte bh
             case h of
@@ -268,9 +268,6 @@ instance Binary Literal where
                     nt <- get bh
                     i  <- get bh
                     return (LitNumber nt i)
-              7 -> do
-                    b <- get bh
-                    return (LitRubbish b)
               _ -> pprPanic "Binary:Literal" (int (fromIntegral h))
 
 instance Outputable Literal where
@@ -552,11 +549,9 @@ mkLitNatural :: Integer -> Literal
 mkLitNatural x = assertPpr (inNaturalRange x) (integer x)
                     (LitNumber LitNumNatural x)
 
--- | Create a rubbish literal of the given representation.
--- The representation of a 'Type' can be obtained via 'typeMonoPrimRep_maybe'.
--- See Note [Rubbish values].
-mkLitRubbish :: [PrimRep] -> Literal
-mkLitRubbish = LitRubbish
+isLitRubbish :: Literal -> Bool
+isLitRubbish (LitRubbish {}) = True
+isLitRubbish _               = False
 
 inNaturalRange :: Integer -> Bool
 inNaturalRange x = x >= 0
@@ -821,10 +816,12 @@ literalType (LitNumber lt _)  = case lt of
    LitNumWord16  -> word16PrimTy
    LitNumWord32  -> word32PrimTy
    LitNumWord64  -> word64PrimTy
-literalType (LitRubbish preps) = mkForAllTy a Inferred (mkTyVarTy a)
+
+-- LitRubbish: see Note [Rubbish literals]
+literalType (LitRubbish rep)
+  = mkForAllTy a Inferred (mkTyVarTy a)
   where
-    -- See Note [Rubbish values]
-    a = head $ mkTemplateTyVars [tYPE (primRepsToRuntimeRep preps)]
+    a = mkTemplateKindVar (tYPE rep)
 
 {-
         Comparison
@@ -840,7 +837,7 @@ cmpLit (LitDouble    a)     (LitDouble     b)     = a `compare` b
 cmpLit (LitLabel     a _ _) (LitLabel      b _ _) = a `lexicalCompareFS` b
 cmpLit (LitNumber nt1 a)    (LitNumber nt2  b)
   = (nt1 `compare` nt2) `mappend` (a `compare` b)
-cmpLit (LitRubbish b1)      (LitRubbish b2)       = b1 `compare` b2
+cmpLit (LitRubbish b1)      (LitRubbish b2)       = b1 `nonDetCmpType` b2
 cmpLit lit1 lit2
   | isTrue# (dataToTag# lit1 <# dataToTag# lit2) = LT
   | otherwise                                    = GT
@@ -876,8 +873,8 @@ pprLiteral add_par (LitLabel l mb fod) =
     where b = case mb of
               Nothing -> pprHsString l
               Just x  -> doubleQuotes (text (unpackFS l ++ '@':show x))
-pprLiteral _       (LitRubbish reps)
-  = text "RUBBISH" <> ppr reps
+pprLiteral _       (LitRubbish rep)
+  = text "RUBBISH" <> parens (ppr rep)
 
 pprIntegerVal :: (SDoc -> SDoc) -> Integer -> SDoc
 -- See Note [Printing of literals in Core].
@@ -921,75 +918,159 @@ LitInteger      -1                 (-1)
 LitLabel        "__label" ...      ("__label" ...)
 LitRubbish      "RUBBISH[...]"
 
-Note [Rubbish values]
-~~~~~~~~~~~~~~~~~~~~~
+Note [Rubbish literals]
+~~~~~~~~~~~~~~~~~~~~~~~
 Sometimes, we need to cough up a rubbish value of a certain type that is used
 in place of dead code we thus aim to eliminate. The value of a dead occurrence
 has no effect on the dynamic semantics of the program, so we can pick any value
 of the same representation.
+
 Exploiting the results of absence analysis in worker/wrapper is a scenario where
-we need such a rubbish value, see Note [Absent fillers] for examples.
+we need such a rubbish value, see examples in Note [Absent fillers] in
+GHC.Core.Opt.WorkWrap.Utils.
 
 It's completely undefined what the *value* of a rubbish value is, e.g., we could
 pick @0#@ for @Int#@ or @42#@; it mustn't matter where it's inserted into a Core
 program. We embed these rubbish values in the 'LitRubbish' case of the 'Literal'
 data type. Here are the moving parts:
 
-  1. Source Haskell: No way to produce rubbish lits in source syntax. Purely
-     an IR feature.
+1. Source Haskell: No way to produce rubbish lits in source syntax. Purely
+   an IR feature.
 
-  2. Core: 'LitRubbish' carries a @[PrimRep]@ which represents the monomorphic
-     'RuntimeRep' of the type it is substituting for.
-     We have it that @RUBBISH[IntRep]@ has type @forall (a :: TYPE IntRep). a@,
-     and the type application @RUBBISH[IntRep] \@Int# :: Int#@ represents
-     a rubbish value of type @Int#@. Rubbish lits are completely opaque in Core.
-     In general, @RUBBISH[preps] :: forall (a :: TYPE rep). a@, where @rep@
-     is the 'RuntimeRep' corresponding to @preps :: [PrimRep]@
-     (via 'primRepsToRuntimeRep'). See 'literalType'.
-     Why not encode a 'RuntimeRep' via a @Type@? Thus
-     > data Literal = ... | LitRubbish Type | ...
-     Because
-       * We have to provide an Eq and Ord instance and @Type@ has none
-       * The encoded @Type@ might be polymorphic and we can only emit code for
-         monomorphic 'RuntimeRep's anyway.
+2. Core: 'LitRubbish' carries a `Type` of kind RuntimeRep,
+   describing the runtime representaion of the literal (is it a
+   pointer, an unboxed Double#, or whatever).
 
-  3. STG: The type app in @RUBBISH[IntRep] \@Int# :: Int#@ is erased and we get
-     the (untyped) 'StgLit' @RUBBISH[IntRep] :: Int#@ in STG.
-     It's treated mostly opaque, with the exception of the Unariser, where we
-     take apart a case scrutinisation on, or arg occurrence of, e.g.,
-     @RUBBISH[IntRep,DoubleRep]@ (which may stand in for @(# Int#, Double# #)@)
-     into its sub-parts @RUBBISH[IntRep]@ and @RUBBISH[DoubleRep]@, similar to
-     unboxed tuples. @RUBBISH[VoidRep]@ is erased.
-     See 'unariseRubbish_maybe' and also Note [Post-unarisation invariants].
+   We have it that `RUBBISH[rr]` has type `forall (a :: TYPE rr). a`.
+   See the `LitRubbish` case of `literalType`.
 
-  4. Cmm: We translate 'LitRubbish' to their actual rubbish value in 'cgLit'.
-     The particulars are boring, and only matter when debugging illicit use of
-     a rubbish value; see Modes of failure below.
+   The function GHC.Core.Make.mkLitRubbish makes a Core rubbish literal of
+   a given type.  It obeys the following invariants:
 
-  5. Bytecode: In GHC.ByteCode.Asm we just lower it as a 0 literal, because it's
-     all boxed to the host GC anyway.
+   INVARIANT 1: 'rr' has no free variables. Main reason: we don't need to run
+   substitutions and free variable finders over Literal. The rules around
+   levity/runtime-rep polymorphism naturally uphold this invariant.
 
-Why not lower LitRubbish in CoreToStg? Because it enables us to use RubbishLit
-when unarising unboxed sums in the future, and it allows rubbish values of e.g.
-VecRep, for which we can't cough up dummy values in STG.
+   INVARIANT 2: we never make a rubbish literal of type (a ~# b). Reason:
+   see Note [Core type and coercion invariant] in GHC.Core.  We can't substitute
+   a LitRubbish inside a coercion, so it's best not to make one. They are zero
+   width anyway, so passing absent ones around costs nothing.  If we wanted
+   an absent filler of type (a ~# b) we should use (Coercion (UnivCo ...)),
+   but it doesn't seem worth making a new UnivCoProvenance for this purpose.
+
+   This is sad, though: see #18983.
+
+3. STG: The type app in `RUBBISH[IntRep] @Int# :: Int#` is erased and we get
+   the (untyped) 'StgLit' `RUBBISH[IntRep] :: Int#` in STG.
+
+   It's treated mostly opaque, with the exception of the Unariser, where we
+   take apart a case scrutinisation on, or arg occurrence of, e.g.,
+   `RUBBISH[TupleRep[IntRep,DoubleRep]]` (which may stand in for `(# Int#, Double# #)`)
+   into its sub-parts `RUBBISH[IntRep]` and `RUBBISH[DoubleRep]`, similar to
+   unboxed tuples. `RUBBISH[VoidRep]` is erased.
+   See 'unariseRubbish_maybe' and also Note [Post-unarisation invariants].
+
+4. Cmm: We translate 'LitRubbish' to their actual rubbish value in 'cgLit'.
+   The particulars are boring, and only matter when debugging illicit use of
+   a rubbish value; see Modes of failure below.
+
+5. Bytecode: In GHC.ByteCode.Asm we just lower it as a 0 literal, because it's
+   all boxed to the host GC anyway.
+
+6. IfaceSyn: `Literal` is part of `IfaceSyn`, but `Type` really isn't.  So in
+   the passage from Core to Iface I put LitRubbish into its owns IfaceExpr data
+   constructor, IfaceLitRubbish. The remaining constructors of Literal are
+   fine as IfaceSyn.
+
+Wrinkles
+
+a) Why do we put the `Type` (of kind RuntimeRep) inside the literal?  Could
+   we not instead /apply/ the literal to that RuntimeRep?  Alas no, becuase
+   then LitRubbish :: forall (rr::RuntimeRep) (a::TYPE rr). a
+   and that's am ill-formed type because its kind is `TYPE rr`, which escapes
+   the binding site of `rr`. Annoying.
+
+b) A rubbish literal is not bottom, and replies True to exprOkForSpeculation.
+   For unboxed types there is no bottom anyway.  If we have
+       let (x::Int#) = RUBBISH[IntRep] @Int#
+   we want to convert that to a case!  We want to leave it as a let, and
+   probably discard it as dead code soon after because x is unused.
+
+c) We can see a rubbish literal at the head of an application chain.
+   Most obviously, pretty much every rubbish literal is the head of a
+   type application e.g. `RUBBISH[IntRep] @Int#`.  But see also
+   Note [How a rubbish literal can be the head of an application]
+
+c) Literal is in Ord, because (and only because) we use Ord on AltCon when
+   building a TypeMap. Annoying.  We use `nonDetCmpType` here; the
+   non-determinism won't matter because it's only used in TrieMap.
+   Moreover, rubbish literals should not appear in patterns anyway.
+
+d) Why not lower LitRubbish in CoreToStg? Because it enables us to use
+   RubbishLit when unarising unboxed sums in the future, and it allows
+   rubbish values of e.g.  VecRep, for which we can't cough up dummy
+   values in STG.
 
 Modes of failure
 ----------------
 Suppose there is a bug in GHC, and a rubbish value is used after all. That is
 undefined behavior, of course, but let us list a few examples for failure modes:
 
- a) For an value of unboxed numeric type like @Int#@, we just use a silly
+ a) For an value of unboxed numeric type like `Int#`, we just use a silly
     value like 42#. The error might propoagate indefinitely, hence we better
     pick a rather unique literal. Same for Word, Floats, Char and VecRep.
  b) For AddrRep (like String lits), we mit a null pointer, resulting in a
     definitive segfault when accessed.
  c) For boxed values, unlifted or not, we use a pointer to a fixed closure,
-    like @()@, so that the GC has a pointer to follow.
+    like `()`, so that the GC has a pointer to follow.
     If we use that pointer as an 'Array#', we will likely access fields of the
     array that don't exist, and a seg-fault is likely, but not guaranteed.
-    If we use that pointer as @Either Int Bool@, we might try to access the
+    If we use that pointer as `Either Int Bool`, we might try to access the
     'Int' field of the 'Left' constructor (which has the same ConTag as '()'),
     which doesn't exists. In the best case, we'll find an invalid pointer in its
     position and get a seg-fault, in the worst case the error manifests only one
     or two indirections later.
- -}
+
+Note [How a rubbish literal can be the head of an application]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this (#19824):
+
+    h :: T3 -> Int -> blah
+    h _ (I# n) = ...
+
+    f :: (T1 -> T2 -> T3) -> T4 -> blah
+    f g x = ....(h (g n s) x)...
+
+Demand analysis finds that h does not use its first argument, and w/w's h to
+
+    {-# INLINE h #-}
+    h a b = case b of I# n -> $wh n
+
+Demand analysis also finds that f does not use its first arg,
+so the worker for f look like
+
+    $wf x = let g = RUBBISH in
+            ....(h (g n s) x)...
+
+Now we inline g to get:
+
+    $wf x = ....(h (RUBBISH n s) x)...
+
+And lo, until we inline `h`, we have that application of
+RUBBISH in $wf's RHS.  But surely `h` will inline? Not if the
+arguments look boring.  Well, RUBBISH doesn't look boring.  But it
+could be a bit more complicated like
+   f g x = let t = ...(g n s)...
+           in ...(h t x)...
+
+and now the call looks more boring.  Anyway, the point is that we
+might reasonably see RUBBISH at the head of an application chain.
+
+It would be fine to rewrite
+  RUBBISH @(ta->tb->tr) a b  --->   RUBBISH @tr
+but we don't currently do so.
+
+It is NOT ok to discard the entire continuation:
+  case RUBBISH @ty of DEFAULT -> blah
+does not return RUBBISH!
+-}

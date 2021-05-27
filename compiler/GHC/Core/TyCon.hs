@@ -1435,7 +1435,7 @@ tyConRepModOcc tc_module tc_occ = (rep_module, mkTyConRepOcc tc_occ)
 ************************************************************************
 
 Note [rep swamp]
-
+~~~~~~~~~~~~~~~~
 GHC has a rich selection of types that represent "primitive types" of
 one kind or another.  Each of them makes a different set of
 distinctions, and mostly the differences are for good reasons,

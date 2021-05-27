@@ -50,6 +50,7 @@ import GHC.Driver.Ppr
 import GHC.Iface.Syntax
 import GHC.Core.DataCon
 import GHC.Types.Id
+import GHC.Types.Literal
 import GHC.Types.Id.Info
 import GHC.StgToCmm.Types
 import GHC.Core
@@ -539,6 +540,7 @@ toIfUnfolding _ NoUnfolding = Nothing
 
 toIfaceExpr :: CoreExpr -> IfaceExpr
 toIfaceExpr (Var v)         = toIfaceVar v
+toIfaceExpr (Lit (LitRubbish r)) = IfaceLitRubbish (toIfaceType r)
 toIfaceExpr (Lit l)         = IfaceLit l
 toIfaceExpr (Type ty)       = IfaceType (toIfaceType ty)
 toIfaceExpr (Coercion co)   = IfaceCo   (toIfaceCoercion co)
@@ -581,7 +583,9 @@ toIfaceAlt (Alt c bs r) = IfaceAlt (toIfaceCon c) (map getOccFS bs) (toIfaceExpr
 ---------------------
 toIfaceCon :: AltCon -> IfaceConAlt
 toIfaceCon (DataAlt dc) = IfaceDataAlt (getName dc)
-toIfaceCon (LitAlt l)   = IfaceLitAlt l
+toIfaceCon (LitAlt l)   = assertPpr (not (isLitRubbish l)) (ppr l) $
+                          -- assert: see Note [Rubbish literals] wrinkle (b)
+                          IfaceLitAlt l
 toIfaceCon DEFAULT      = IfaceDefault
 
 ---------------------
