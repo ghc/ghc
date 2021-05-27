@@ -1131,7 +1131,8 @@ runPhase (RealPhase (Unlit sf)) input_fn = do
 runPhase (RealPhase (Cpp sf)) input_fn
   = do
        dflags0 <- getDynFlags
-       src_opts <- liftIO $ getOptionsFromFile dflags0 input_fn
+       let parser_opts0 = initParserOpts dflags0
+       src_opts <- liftIO $ getOptionsFromFile parser_opts0 input_fn
        (dflags1, unhandled_flags, warns)
            <- liftIO $ parseDynamicFilePragma dflags0 src_opts
        setDynFlags dflags1
@@ -1159,7 +1160,7 @@ runPhase (RealPhase (Cpp sf)) input_fn
                            input_fn output_fn
             -- re-read the pragmas now that we've preprocessed the file
             -- See #2464,#3457
-            src_opts <- liftIO $ getOptionsFromFile dflags0 output_fn
+            src_opts <- liftIO $ getOptionsFromFile parser_opts0 output_fn
             (dflags2, unhandled_flags, warns)
                 <- liftIO $ parseDynamicFilePragma dflags0 src_opts
             setDynFlags dflags2
@@ -1193,7 +1194,8 @@ runPhase (RealPhase (HsPp sf)) input_fn = do
                        )
 
         -- re-read pragmas now that we've parsed the file (see #3674)
-        src_opts <- liftIO $ getOptionsFromFile dflags output_fn
+        let parser_opts = initParserOpts dflags
+        src_opts <- liftIO $ getOptionsFromFile parser_opts output_fn
         (dflags1, unhandled_flags, warns)
             <- liftIO $ parseDynamicFilePragma dflags src_opts
         setDynFlags dflags1
