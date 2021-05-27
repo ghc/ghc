@@ -95,7 +95,8 @@ doBackpack [src_filename] = do
     -- Apply options from file to dflags
     dflags0 <- getDynFlags
     let dflags1 = dflags0
-    src_opts <- liftIO $ getOptionsFromFile dflags1 src_filename
+    let parser_opts1 = initParserOpts dflags1
+    src_opts <- liftIO $ getOptionsFromFile parser_opts1 src_filename
     (dflags, unhandled_flags, warns) <- liftIO $ parseDynamicFilePragma dflags1 src_opts
     modifySession (hscSetFlags dflags)
     -- Cribbed from: preprocessFile / GHC.Driver.Pipeline
