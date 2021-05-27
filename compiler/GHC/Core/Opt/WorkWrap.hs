@@ -493,11 +493,6 @@ tryWW   :: DynFlags
 tryWW dflags fam_envs is_rec fn_id rhs
   -- See Note [Worker/wrapper for NOINLINE functions]
 
-  | Just stable_unf <- certainlyWillInline uf_opts fn_info
-  = return [ (new_fn_id `setIdUnfolding` stable_unf, rhs) ]
-        -- See Note [Don't w/w INLINE things]
-        -- See Note [Don't w/w inline small non-loop-breaker things]
-
   | isRecordSelector fn_id  -- See Note [No worker/wrapper for record selectors]
   = return [ (new_fn_id, rhs ) ]
 
@@ -511,25 +506,24 @@ tryWW dflags fam_envs is_rec fn_id rhs
   = return [ (new_fn_id, rhs) ]
 
   where
-    uf_opts      = unfoldingOpts dflags
-    fn_info      = idInfo fn_id
+    fn_info          = idInfo fn_id
     (wrap_dmds, div) = splitDmdSig (dmdSigInfo fn_info)
 
-    cpr_ty       = getCprSig (cprSigInfo fn_info)
+    cpr_ty = getCprSig (cprSigInfo fn_info)
     -- Arity of the CPR sig should match idArity when it's not a join point.
     -- See Note [Arity trimming for CPR signatures] in GHC.Core.Opt.CprAnal
-    cpr          = assertPpr (isJoinId fn_id || cpr_ty == topCprType || ct_arty cpr_ty == arityInfo fn_info)
-                             (ppr fn_id <> colon <+> text "ct_arty:" <+> int (ct_arty cpr_ty)
-                              <+> text "arityInfo:" <+> ppr (arityInfo fn_info)) $
-                   ct_cpr cpr_ty
+    cpr = assertPpr (isJoinId fn_id || cpr_ty == topCprType || ct_arty cpr_ty == arityInfo fn_info)
+                    (ppr fn_id <> colon <+> text "ct_arty:" <+> int (ct_arty cpr_ty)
+                      <+> text "arityInfo:" <+> ppr (arityInfo fn_info)) $
+          ct_cpr cpr_ty
 
     new_fn_id = zapIdUsedOnceInfo (zapIdUsageEnvInfo fn_id)
         -- See Note [Zapping DmdEnv after Demand Analyzer] and
         -- See Note [Zapping Used Once info WorkWrap]
 
-    is_fun     = notNull wrap_dmds || isJoinId fn_id
-    -- See Note [Don't eta expand in w/w]
+    -- is_eta_exp: see Note [Don't eta expand in w/w]
     is_eta_exp = length wrap_dmds == manifestArity rhs
+    is_fun     = notNull wrap_dmds || isJoinId fn_id
     is_thunk   = not is_fun && not (exprIsHNF rhs) && not (isJoinId fn_id)
                             && not (isUnliftedType (idType fn_id))
 
@@ -640,9 +634,16 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
        ; case mb_stuff of
             Nothing -> return [(fn_id, rhs)]
 
-            Just stuff -> do { work_uniq <- getUniqueM
-                             ; return (mkWWBindPair dflags fn_id fn_info arity rhs
-                                                    work_uniq div cpr stuff) } }
+            Just stuff
+              | Just stable_unf <- certainlyWillInline (unfoldingOpts dflags) fn_info
+              ->  return [ (fn_id `setIdUnfolding` stable_unf, rhs) ]
+                  -- See Note [Don't w/w INLINE things]
+                  -- See Note [Don't w/w inline small non-loop-breaker things]
+
+              | otherwise
+              -> do { work_uniq <- getUniqueM
+                    ; return (mkWWBindPair dflags fn_id fn_info arity rhs
+                                           work_uniq div cpr stuff) } }
   where
     rhs_fvs = exprFreeVars rhs
     arity   = arityInfo fn_info
