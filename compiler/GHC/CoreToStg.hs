@@ -395,9 +395,11 @@ coreToStgExpr (Coercion _)
 
 coreToStgExpr expr@(App _ _)
   = case app_head of
-      Var f               -> coreToStgApp f args ticks -- Regular application
-      Lit l@LitRubbish{}  -> return (StgLit l) -- LitRubbish
-      _                   -> pprPanic "coreToStgExpr - Invalid app head:" (ppr expr)
+      Var f -> coreToStgApp f args ticks -- Regular application
+      Lit l | isLitRubbish l             -- If there is LitRubbish at the head,
+            -> return (StgLit l)         --    discard the arguments
+
+      _     -> pprPanic "coreToStgExpr - Invalid app head:" (ppr expr)
     where
       (app_head, args, ticks) = myCollectArgs expr
 coreToStgExpr expr@(Lam _ _)
