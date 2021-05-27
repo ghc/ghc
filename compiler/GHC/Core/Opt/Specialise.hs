@@ -27,6 +27,7 @@ import GHC.Core.Opt.Monad
 import qualified GHC.Core.Subst as Core
 import GHC.Core.Unfold.Make
 import GHC.Core
+import GHC.Core.Make      ( mkLitRubbish )
 import GHC.Core.Unify     ( tcMatchTy )
 import GHC.Core.Rules
 import GHC.Core.Utils     ( exprIsTrivial, getIdFromTrivialExpr_maybe
@@ -47,10 +48,8 @@ import GHC.Types.Unique.Supply
 import GHC.Types.Unique.DFM
 import GHC.Types.Name
 import GHC.Types.Tickish
-import GHC.Types.RepType  ( typeMonoPrimRep_maybe )
 import GHC.Types.Id.Make  ( voidArgId, voidPrimId )
 import GHC.Types.Var      ( isLocalVar )
-import GHC.Types.Literal  ( mkLitRubbish )
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Id
@@ -2346,8 +2345,8 @@ specHeader env (bndr : bndrs) (UnspecArg : args)
              -- C.f. GHC.Core.Opt.WorkWrap.Utils.mk_absent_let
              (mb_spec_bndr, spec_arg)
                 | isDeadBinder bndr
-                , Just reps <- typeMonoPrimRep_maybe bndr_ty
-                = (Nothing, mkTyApps (Lit (mkLitRubbish reps)) [bndr_ty])
+                , Just lit_expr <- mkLitRubbish bndr_ty
+                = (Nothing, lit_expr)
                 | otherwise
                 = (Just bndr', varToCoreExpr bndr')
 
