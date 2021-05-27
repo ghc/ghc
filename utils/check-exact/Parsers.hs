@@ -278,7 +278,8 @@ postParseTransform parseRes = fmap mkAnns parseRes
 initDynFlags :: GHC.GhcMonad m => FilePath -> m GHC.DynFlags
 initDynFlags file = do
   dflags0         <- GHC.getSessionDynFlags
-  src_opts        <- GHC.liftIO $ GHC.getOptionsFromFile dflags0 file
+  let parser_opts0 = GHC.initParserOpts dflags0
+  src_opts        <- GHC.liftIO $ GHC.getOptionsFromFile parser_opts0 file
   (dflags1, _, _) <- GHC.parseDynamicFilePragma dflags0 src_opts
   -- Turn this on last to avoid T10942
   let dflags2 = dflags1 `GHC.gopt_set` GHC.Opt_KeepRawTokenStream
@@ -304,7 +305,8 @@ initDynFlagsPure fp s = do
   -- as long as `parseDynamicFilePragma` is impure there seems to be
   -- no reason to use it.
   dflags0 <- GHC.getSessionDynFlags
-  let pragmaInfo = GHC.getOptions dflags0 (GHC.stringToStringBuffer $ s) fp
+  let parser_opts0 = GHC.initParserOpts dflags0
+  let pragmaInfo = GHC.getOptions parser_opts0 (GHC.stringToStringBuffer $ s) fp
   (dflags1, _, _) <- GHC.parseDynamicFilePragma dflags0 pragmaInfo
   -- Turn this on last to avoid T10942
   let dflags2 = dflags1 `GHC.gopt_set` GHC.Opt_KeepRawTokenStream
