@@ -421,6 +421,9 @@ class TestOptions:
        # in temporary directory in /tmp? See Note [Running tests in /tmp].
        self.local = True
 
+       # Should we copy the files of symlink the files for the test?
+       self.copy_files = False
+
 # The default set of options
 global default_testopts
 default_testopts = TestOptions()
