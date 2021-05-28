@@ -752,10 +752,20 @@ addExternal omit_prags expose_all id
        || isStableSource src     -- Always expose things whose
                                  -- source is an inline rule
 
-       || not (bottoming_fn      -- No need to inline bottom functions
-           || never_active       -- Or ones that say not to
-           || loop_breaker       -- Or that are loop breakers
-           || neverUnfoldGuidance guidance)
+       || not dont_inline
+       where
+         dont_inline
+            | never_active = True   -- Will never inline
+            | loop_breaker = True   -- Ditto
+            | otherwise    = case guidance of
+                                UnfWhen {}       -> False
+                                UnfIfGoodArgs {} -> bottoming_fn
+                                UnfNever {}      -> True
+         -- bottoming_fn: don't inline bottoming functions, unless the
+         -- RHS is very small or trivial (UnfWhen), in which case we
+         -- may as well do so For example, a cast might cancel with
+         -- the call site.
+
     show_unfolding (DFunUnfolding {}) = True
     show_unfolding _                  = False
 
