@@ -195,6 +195,9 @@ Note [Data constructor workers and wrappers]
 * INVARIANT: the dictionary constructor for a class
              never has a wrapper.
 
+* See Note [Data Constructor Naming] for how the worker and wrapper
+  are named
+
 * Neither_ the worker _nor_ the wrapper take the dcStupidTheta dicts as arguments
 
 * The wrapper (if it exists) takes dcOrigArgTys as its arguments.
