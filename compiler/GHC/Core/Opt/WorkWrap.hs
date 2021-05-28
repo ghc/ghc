@@ -462,7 +462,7 @@ Conclusion:
     exists. NB: Similar to InitialPhase, users can't write INLINE[Final] f;
     it's syntactically illegal.
 
-  - Otherwise inline wrapper in phase Final.  That allows the
+  - Otherwise inline wrapper after the Initial phase.  That allows the
     'gentle' simplification pass to apply specialisation rules
 
 Note [Wrapper NoUserInlinePrag]
@@ -640,7 +640,7 @@ splitFun ww_opts fn_id fn_info wrap_dmds div cpr rhs
             Just stuff
               | Just stable_unf <- certainlyWillInline uf_opts fn_info
               , let id_w_unf = fn_id `setIdUnfolding`     stable_unf
-                                     `modifyInlinePragma` upd_prag
+--                                     `modifyInlinePragma` upd_prag
               ->  return [ (id_w_unf, rhs) ]
                   -- See Note [Don't w/w INLINE things]
                   -- See Note [Don't w/w inline small non-loop-breaker things]
@@ -653,10 +653,12 @@ splitFun ww_opts fn_id fn_info wrap_dmds div cpr rhs
     uf_opts = so_uf_opts (wo_simple_opts ww_opts)
     rhs_fvs = exprFreeVars rhs
 
+{-
     upd_prag prag | noUserInlineSpec (inlinePragmaSpec prag)
                   = mkStrWrapperInlinePrag prag
                   | otherwise
                   = prag
+-}
 
     -- use_cpr_info is the CPR we w/w for. Note that we kill it for join points,
     -- see Note [Don't w/w join points for CPR].
