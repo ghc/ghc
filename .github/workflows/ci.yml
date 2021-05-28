@@ -4,7 +4,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: ["ghc-9.0"]
+    branches: ["ghc-9.2"]
 
 jobs:
   cabal:
@@ -15,11 +15,11 @@ jobs:
         os: [ubuntu-latest]
         cabal: ["3.4"]
         ghc:
-          - "9.0.1"
+          - "9.2.0.20210422"
 
     steps:
     - uses: actions/checkout@v2
-      if: github.event.action == 'opened' || github.event.action == 'synchronize' || github.event.ref == 'refs/heads/ghc-9.0'
+      if: github.event.action == 'opened' || github.event.action == 'synchronize' || github.event.ref == 'refs/heads/ghc-9.2'
 
     - uses: haskell/actions/setup@v1
       id: setup-haskell-cabal
@@ -37,12 +37,11 @@ jobs:
         cabal freeze
  
     - uses: actions/cache@v2
-      name: Cache ~/.cabal/store and .ghcup
+      name: Cache ~/.cabal/store
       with:
         path: |
           ${{ steps.setup-haskell-cabal.outputs.cabal-store }}
-          .ghcup
-        key: ${{ runner.os }}
+        key: ${{ runner.os }}-${{ matrix.ghc }}-${{ hashFiles('cabal.project.freeze') }}
 
     - name: Build
       run: |

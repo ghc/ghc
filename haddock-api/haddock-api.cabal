@@ -1,6 +1,6 @@
 cabal-version:        2.0
 name:                 haddock-api
-version:              2.24.0
+version:              2.26.0
 synopsis:             A documentation-generation tool for Haskell libraries
 description:          Haddock is a documentation-generation tool for Haskell
                       libraries
@@ -13,7 +13,7 @@ bug-reports:          https://github.com/haskell/haddock/issues
 copyright:            (c) Simon Marlow, David Waern
 category:             Documentation
 build-type:           Simple
-tested-with:          GHC==9.0.*
+tested-with:          GHC==9.2.*
 
 extra-source-files:
   CHANGES.md
@@ -44,7 +44,7 @@ library
 
   -- this package typically supports only single major versions
   build-depends: base            ^>= 4.16.0
-               , ghc             ^>= 9.1
+               , ghc             ^>= 9.2
                , ghc-paths       ^>= 0.1.0.9
                , haddock-library ^>= 1.9.0
                , xhtml           ^>= 3000.2.2
@@ -175,11 +175,11 @@ test-suite spec
     Haddock.Backends.Hyperlinker.Parser
     Haddock.Backends.Hyperlinker.Types
 
-  build-depends: ghc             ^>= 9.1
+  build-depends: ghc             ^>= 9.2
                , ghc-paths       ^>= 0.1.0.12
                , haddock-library ^>= 1.9.0
                , xhtml           ^>= 3000.2.2
-               , hspec           >= 2.4.4 && < 2.8
+               , hspec           ^>= 2.8
                , QuickCheck      >= 2.11  && ^>= 2.14
 
   -- Versions for the dependencies below are transitively pinned by
@@ -195,10 +195,11 @@ test-suite spec
                , filepath
                , ghc-boot
                , ghc-boot-th
+               , mtl
                , transformers
 
   build-tool-depends:
-    hspec-discover:hspec-discover >= 2.4.4 && < 2.8
+    hspec-discover:hspec-discover ^>= 2.8
 
 source-repository head
   type:     git
