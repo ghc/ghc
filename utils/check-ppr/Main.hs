@@ -85,7 +85,7 @@ parseOneFile libdir fileName = do
          let dflags2 = dflags `gopt_set` Opt_KeepRawTokenStream
          _ <- setSessionDynFlags dflags2
          hsc_env <- getSession
-         ms <- liftIO $ summariseFile hsc_env [] fileName Nothing True Nothing
+         ms <- liftIO $ summariseFile hsc_env [] fileName Nothing Nothing
          case ms of
            Left _err -> error "parseOneFile"
            Right ems -> parseModule (emsModSummary ems)
