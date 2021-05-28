@@ -11,7 +11,7 @@ module GHC.Core.Opt.WorkWrap.Utils
    ( WwOpts(..), initWwOpts, mkWwBodies, mkWWstr, mkWorkerArgs
    , DataConPatContext(..)
    , UnboxingDecision(..), ArgOfInlineableFun(..), wantToUnboxArg
-   , findTypeShape
+   , findTypeShape, mkAbsentFiller
    , isWorkerSmallEnough
    )
 where
@@ -41,6 +41,8 @@ import GHC.Core.FamInstEnv
 import GHC.Types.Basic       ( Boxity(..) )
 import GHC.Core.TyCon
 import GHC.Core.TyCon.RecWalk
+import GHC.Core.SimpleOpt( SimpleOpts )
+
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique
 import GHC.Types.Name ( getOccFS )
@@ -50,6 +52,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Driver.Session
 import GHC.Driver.Ppr
+import GHC.Driver.Config( initSimpleOpts )
 import GHC.Data.FastString
 import GHC.Data.OrdList
 import GHC.Data.List.SetOps
@@ -132,6 +135,7 @@ the unusable strictness-info into the interfaces.
 data WwOpts
   = MkWwOpts
   { wo_fam_envs          :: !FamInstEnvs
+  , wo_simple_opts       :: !SimpleOpts
   , wo_cpr_anal          :: !Bool
   , wo_fun_to_thunk      :: !Bool
   , wo_max_worker_args   :: !Int
@@ -141,6 +145,7 @@ data WwOpts
 initWwOpts :: DynFlags -> FamInstEnvs -> WwOpts
 initWwOpts dflags fam_envs = MkWwOpts
   { wo_fam_envs          = fam_envs
+  , wo_simple_opts       = initSimpleOpts dflags
   , wo_cpr_anal          = gopt Opt_CprAnal dflags
   , wo_fun_to_thunk      = gopt Opt_FunToThunk dflags
   , wo_max_worker_args   = maxWorkerArgs dflags
@@ -965,11 +970,11 @@ mkWWstr_one opts inlineable_flag arg =
     _ | isTyVar arg -> do_nothing
 
     DropAbsent
-      | Just work_fn <- mk_absent_let opts arg
+      | Just absent_filler <- mkAbsentFiller opts arg
          -- Absent case.  We can't always handle absence for arbitrary
          -- unlifted types, so we need to choose just the cases we can
          -- (that's what mk_absent_let does)
-      -> return (True, [], nop_fn, work_fn)
+      -> return (True, [], nop_fn, bindNonRec arg absent_filler)
 
     Unbox dcpc cs -> unbox_one_arg opts arg cs dcpc
 
@@ -1010,21 +1015,19 @@ unbox_one_arg opts arg cs
 -- If @mk_absent_let _ id == Just wrap@, then @wrap e@ will wrap a let binding
 -- for @id@ with that RHS around @e@. Otherwise, there could no suitable RHS be
 -- found.
-mk_absent_let :: WwOpts -> Id -> Maybe (CoreExpr -> CoreExpr)
-mk_absent_let opts arg
+mkAbsentFiller :: WwOpts -> Id -> Maybe CoreExpr
+mkAbsentFiller opts arg
   -- The lifted case: Bind 'absentError' for a nice panic message if we are
   -- wrong (like we were in #11126). See (1) in Note [Absent fillers]
   | not (isUnliftedType arg_ty)
   , not (isStrictDmd (idDemandInfo arg)) -- See (2) in Note [Absent fillers]
-  = Just (Let (NonRec arg panic_rhs))
+  = Just panic_rhs
 
   -- The default case for mono rep: Bind `RUBBISH[rr] arg_ty`
   -- See Note [Absent fillers], the main part
-  | Just lit_expr <- mkLitRubbish arg_ty
-  = Just (bindNonRec arg lit_expr)
-
   | otherwise
-  = Nothing
+  = mkLitRubbish arg_ty
+
   where
     arg_ty = idType arg
 
