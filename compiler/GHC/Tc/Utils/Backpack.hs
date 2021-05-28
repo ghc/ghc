@@ -132,6 +132,7 @@ checkHsigIface tcg_env gr sig_iface
     traceTc "checkHsigIface" $ vcat
         [ ppr sig_type_env, ppr sig_insts, ppr sig_exports ]
     mapM_ check_export (map availName sig_exports)
+    failIfErrsM
     unless (null sig_fam_insts) $
         panic ("GHC.Tc.Module.checkHsigIface: Cannot handle family " ++
                "instances in hsig files yet...")
