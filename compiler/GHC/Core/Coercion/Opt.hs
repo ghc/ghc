@@ -19,7 +19,7 @@ import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Subst
 import GHC.Core.Coercion
 import GHC.Core.Type as Type hiding( substTyVarBndr, substTy )
-import GHC.Tc.Utils.TcType   ( exactTyCoVarsOfType )
+-- import GHC.Tc.Utils.TcType   ( exactTyCoVarsOfType )
 import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 import GHC.Types.Var.Set
@@ -27,7 +27,7 @@ import GHC.Types.Var.Env
 import GHC.Data.Pair
 import GHC.Data.List.SetOps ( getNth )
 import GHC.Core.Unify
-import Control.Monad   ( zipWithM )
+-- import Control.Monad   ( zipWithM )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
@@ -1063,6 +1063,7 @@ chooseRole True _ = Representational
 chooseRole _    r = r
 
 -----------
+{-
 isAxiom_maybe :: Coercion -> Maybe (Bool, CoAxiom Branched, Int, [Coercion])
 isAxiom_maybe (SymCo co)
   | Just (sym, con, ind, cos) <- isAxiom_maybe co
@@ -1087,6 +1088,7 @@ matchAxiom sym ax@(CoAxiom { co_ax_tc = tc }) ind co
 
   | otherwise
   = Nothing
+-}
 
 -------------
 compatible_co :: Coercion -> Coercion -> Bool
