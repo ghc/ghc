@@ -132,6 +132,7 @@ checkHsigIface tcg_env gr sig_iface
     traceTc "checkHsigIface" $ vcat
         [ ppr sig_type_env, ppr sig_insts, ppr sig_exports ]
     mapM_ check_export (map availName sig_exports)
+    failIfErrsM -- See Note [Fail before checking instances in checkHsigIface]
     unless (null sig_fam_insts) $
         panic ("GHC.Tc.Module.checkHsigIface: Cannot handle family " ++
                "instances in hsig files yet...")
@@ -191,6 +192,14 @@ checkHsigIface tcg_env gr sig_iface
       | otherwise =
         addErrAt (nameSrcSpan name)
             (missingBootThing False name "exported by")
+
+-- Note [Fail before checking instances in checkHsigIface]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- We need to be careful about failing before checking instances if there happens
+-- to be an error in the exports.
+-- Otherwise, we might proceed with typechecking (and subsequently panic-ing) on
+-- ill-kinded types that are constructed while checking instances.
+-- This lead to #19244
 
 -- Note [Error reporting bad reexport]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
