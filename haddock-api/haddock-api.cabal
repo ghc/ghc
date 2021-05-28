@@ -44,7 +44,7 @@ library
 
   -- this package typically supports only single major versions
   build-depends: base            ^>= 4.16.0
-               , ghc             ^>= 9.1
+               , ghc             ^>= 9.3
                , ghc-paths       ^>= 0.1.0.9
                , haddock-library ^>= 1.9.0
                , xhtml           ^>= 3000.2.2

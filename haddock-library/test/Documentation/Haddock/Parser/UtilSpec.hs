@@ -3,7 +3,7 @@ module Documentation.Haddock.Parser.UtilSpec (main, spec) where
 
 import Documentation.Haddock.Parser.Monad
 import Documentation.Haddock.Parser.Util
-import Data.Either.Compat (isLeft)
+import Data.Either (isLeft)
 import Test.Hspec
 import Control.Applicative
 

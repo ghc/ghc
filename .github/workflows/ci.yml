@@ -4,7 +4,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: ["ghc-9.0"]
+    branches: ["ghc-head"]
 
 jobs:
   cabal:
@@ -13,15 +13,20 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        cabal: ["3.4"]
+        cabal: ["3.4.0.0"]
         ghc:
-          - "9.0.1"
+          - "head"
 
     steps:
     - uses: actions/checkout@v2
-      if: github.event.action == 'opened' || github.event.action == 'synchronize' || github.event.ref == 'refs/heads/ghc-9.0'
+      if: github.event.action == 'opened' || github.event.action == 'synchronize' || github.event.ref == 'refs/heads/ghc-head'
 
-    - uses: haskell/actions/setup@v1
+    - name: Install gmp and tinfo
+      run: |
+        sudo -- sh -c "apt-get update"
+        sudo -- sh -c "apt-get -y install libgmp-dev libtinfo-dev"
+
+    - uses: haskell/actions/setup@main
       id: setup-haskell-cabal
       name: Setup Haskell
       with:
@@ -30,7 +35,6 @@ jobs:
 
     - name: Prepare environment
       run: echo "$HOME/.ghcup/bin" >> $GITHUB_PATH
-
 
     - name: Freeze
       run: |

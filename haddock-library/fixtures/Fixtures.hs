@@ -9,8 +9,7 @@ import Data.Foldable (traverse_)
 import Data.List (foldl')
 import Data.Traversable (for)
 import GHC.Generics (Generic)
-import Prelude ()
-import Prelude.Compat
+import Prelude
 import System.Directory (getDirectoryContents)
 import System.Exit (exitFailure)
 import System.FilePath
