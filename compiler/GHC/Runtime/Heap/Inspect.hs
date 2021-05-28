@@ -809,7 +809,7 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
                         --  ignore the unpointed args, and recover the pointeds
                         -- This preserves laziness, and should be safe.
                        traceTR (text "Not constructor" <+> ppr dcname)
-                       let dflags = hsc_dflags hsc_env
+                       let dflags = extractDynFlags hsc_env
                            tag = showPpr dflags dcname
                        vars     <- replicateM (length pArgs)
                                               (newVar liftedTypeKind)

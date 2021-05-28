@@ -21,6 +21,7 @@ import GHC.Prelude
 
 import GHC.Driver.Env
 import GHC.Driver.Ppr
+import GHC.Driver.Session
 
 import GHC.Types.Basic (TypeOrKind(..))
 import GHC.Types.Fixity (defaultFixity)
@@ -276,7 +277,7 @@ findExtraSigImports' hsc_env HsigFile modname =
             $ moduleFreeHolesPrecise (text "findExtraSigImports")
                 (mkModule (VirtUnit iuid) mod_name)))
   where
-    dflags = hsc_dflags hsc_env
+    dflags = extractDynFlags hsc_env
     unit_state = hsc_units hsc_env
     reqs = requirementMerges unit_state modname
 
@@ -319,7 +320,7 @@ implicitRequirements' hsc_env normal_imports
     fc        = hsc_FC hsc_env
     home_unit = hsc_home_unit hsc_env
     units     = hsc_units hsc_env
-    dflags    = hsc_dflags hsc_env
+    dflags    = extractDynFlags hsc_env
 
 -- | Like @implicitRequirements'@, but returns either the module name, if it is
 -- a free hole, or the instantiated unit the imported module is from, so that
@@ -334,7 +335,7 @@ implicitRequirementsShallow hsc_env normal_imports = go ([], []) normal_imports
   fc        = hsc_FC hsc_env
   home_unit = hsc_home_unit hsc_env
   units     = hsc_units hsc_env
-  dflags    = hsc_dflags hsc_env
+  dflags    = extractDynFlags hsc_env
 
   go acc [] = pure acc
   go (accL, accR) ((mb_pkg, L _ imp):imports) = do
@@ -371,7 +372,7 @@ tcRnCheckUnit ::
     HscEnv -> Unit ->
     IO (Messages TcRnMessage, Maybe ())
 tcRnCheckUnit hsc_env uid =
-   withTiming logger dflags
+   withTiming logger
               (text "Check unit id" <+> ppr uid)
               (const ()) $
    initTc hsc_env
@@ -381,7 +382,7 @@ tcRnCheckUnit hsc_env uid =
           (realSrcLocSpan (mkRealSrcLoc (fsLit loc_str) 0 0)) -- bogus
     $ checkUnit uid
   where
-   dflags = hsc_dflags hsc_env
+   dflags = extractDynFlags hsc_env
    logger = hsc_logger hsc_env
    loc_str = "Command line argument: -unit-id " ++ showSDoc dflags (ppr uid)
 
@@ -392,13 +393,12 @@ tcRnCheckUnit hsc_env uid =
 tcRnMergeSignatures :: HscEnv -> HsParsedModule -> TcGblEnv {- from local sig -} -> ModIface
                     -> IO (Messages TcRnMessage, Maybe TcGblEnv)
 tcRnMergeSignatures hsc_env hpm orig_tcg_env iface =
-  withTiming logger dflags
+  withTiming logger
              (text "Signature merging" <+> brackets (ppr this_mod))
              (const ()) $
   initTc hsc_env HsigFile False this_mod real_loc $
     mergeSignatures hpm orig_tcg_env iface
  where
-  dflags   = hsc_dflags hsc_env
   logger   = hsc_logger hsc_env
   this_mod = mi_module iface
   real_loc = tcg_top_loc orig_tcg_env
@@ -574,7 +574,7 @@ mergeSignatures
     let fc         = hsc_FC hsc_env
     let nc         = hsc_NC hsc_env
     let home_unit  = hsc_home_unit hsc_env
-    let dflags     = hsc_dflags hsc_env
+    let dflags     = extractDynFlags hsc_env
     let logger     = hsc_logger hsc_env
     let hooks      = hsc_hooks hsc_env
 
@@ -930,12 +930,11 @@ tcRnInstantiateSignature ::
     HscEnv -> Module -> RealSrcSpan ->
     IO (Messages TcRnMessage, Maybe TcGblEnv)
 tcRnInstantiateSignature hsc_env this_mod real_loc =
-   withTiming logger dflags
+   withTiming logger
               (text "Signature instantiation"<+>brackets (ppr this_mod))
               (const ()) $
    initTc hsc_env HsigFile False this_mod real_loc $ instantiateSignature
   where
-   dflags = hsc_dflags hsc_env
    logger = hsc_logger hsc_env
 
 exportOccs :: [AvailInfo] -> [OccName]
@@ -1006,7 +1005,7 @@ checkImplements impl_mod req_mod@(Module uid mod_name) = do
     let fc        = hsc_FC hsc_env
     let home_unit = hsc_home_unit hsc_env
     let units     = hsc_units hsc_env
-    let dflags    = hsc_dflags hsc_env
+    let dflags    = extractDynFlags hsc_env
     let logger    = hsc_logger hsc_env
     let hooks     = hsc_hooks hsc_env
     mb_isig_iface <- liftIO $ findAndReadIface logger nc fc hooks units home_unit dflags
