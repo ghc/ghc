@@ -34,7 +34,7 @@ module GHC.Rename.HsType (
         FreeKiTyVars, filterInScopeM,
         extractHsTyRdrTyVars, extractHsTyRdrTyVarsKindVars,
         extractHsTysRdrTyVars, extractRdrKindSigVars,
-        extractConDeclGADTDetailsTyVars, extractDataDefnKindVars,
+        extractConGADTBodyTyVars, extractDataDefnKindVars,
         extractHsOuterTvBndrs, extractHsTyArgRdrKiTyVars,
         nubL, nubN
   ) where
@@ -1885,14 +1885,21 @@ extractRdrKindSigVars (L _ resultSig) = case resultSig of
   TyVarSig _ (L _ (KindedTyVar _ _ _ k)) -> extractHsTyRdrTyVars k
   _ -> []
 
--- | Extracts free type and kind variables from an argument in a GADT
--- constructor, returning variable occurrences in left-to-right order.
--- See @Note [Ordering of implicit variables]@.
-extractConDeclGADTDetailsTyVars ::
-  HsConDeclGADTDetails GhcPs -> FreeKiTyVars -> FreeKiTyVars
-extractConDeclGADTDetailsTyVars con_args = case con_args of
-  PrefixConGADT args    -> extract_scaled_ltys args
-  RecConGADT (L _ flds) -> extract_ltys $ map (cd_fld_type . unLoc) $ flds
+-- | Extracts free type and kind variables from the argument and result types
+-- in a GADT constructor, returning variable occurrences in left-to-right
+-- order. See @Note [Ordering of implicit variables]@.
+extractConGADTBodyTyVars :: ConGADTBody GhcPs -> FreeKiTyVars
+extractConGADTBodyTyVars body = case body of
+  PrefixConGADT body'       -> extract_prefix_con_gadt_body body'
+  RecConGADT (L _ flds) res -> extract_ltys (map (cd_fld_type . unLoc) flds) $
+                               extractHsTyRdrTyVars res
+
+extract_prefix_con_gadt_body :: PrefixConGADTBody GhcPs -> FreeKiTyVars
+extract_prefix_con_gadt_body prefix_body = go prefix_body []
+  where
+    go :: PrefixConGADTBody GhcPs -> FreeKiTyVars -> FreeKiTyVars
+    go (PCGResult res_ty)    acc = extract_lty res_ty acc
+    go (PCGAnonArg arg body) acc = extract_scaled_lty arg (go body acc)
 
 -- | Get type/kind variables mentioned in the kind signature, preserving
 -- left-to-right order:
@@ -1907,10 +1914,6 @@ extractDataDefnKindVars (HsDataDefn { dd_kindSig = ksig })
 
 extract_lctxt :: LHsContext GhcPs -> FreeKiTyVars -> FreeKiTyVars
 extract_lctxt ctxt = extract_ltys (unLoc ctxt)
-
-extract_scaled_ltys :: [HsScaled GhcPs (LHsType GhcPs)]
-                    -> FreeKiTyVars -> FreeKiTyVars
-extract_scaled_ltys args acc = foldr extract_scaled_lty acc args
 
 extract_scaled_lty :: HsScaled GhcPs (LHsType GhcPs)
                    -> FreeKiTyVars -> FreeKiTyVars
