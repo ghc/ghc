@@ -101,6 +101,9 @@ strengthenNonEmpty (x :| rest) = case rest of
   x':xs -> Right (List2 x x' xs)
   []    -> Left x
 
+safeMaximum :: Ord a => NonEmpty a -> a
+safeMaximum = maximum
+
 -- | Assigns a badness level to each warning. Higher is worse, 0 means no
 -- concern whatsoever.
 badness :: Warning -> Int
@@ -128,9 +131,11 @@ checkNotes passages =
   -- XXX JB TODO: headers should maybe have a target file (i.e. if they say
   -- Note [some note] in GHC/blablabla) and then there can be one header with
   -- the same name per file
+      noteNameAndFile Note {noteName, notePassage} =
+        (noteName, sourceName $ location notePassage)
       (uniqueSortedHeaders, map DuplicateHeaders -> duplicates) =
         partitionEithers . map strengthenNonEmpty $
-        NE.groupAllWith (noteName . headerNote) headers
+        NE.groupAllWith (noteNameAndFile . headerNote) headers
 
   -- XXX JB TODO lookup refs in map of headers. Make sure to look in the target
   -- file
@@ -299,14 +304,21 @@ success Results {numHeaders, numRefs, warnings} = do
   -- warnings, and in gitlab you can now control whether to allow warnings or
   -- not
   -- (I like option 1 though)
-  mapM_ (printLnStdErr . warningMessage) warnings
-  let resultMsg | null warnings = "OK"
-                | otherwise     = show (length warnings) ++ " Warnings"
+  (exitCode, resultMsg) <- case NE.nonEmpty warnings of
+    Nothing         -> pure (ExitSuccess, "OK")
+    Just neWarnings -> do
+      mapM_ (printLnStdErr . warningMessage) neWarnings
+      pure ( ExitFailure . safeMaximum . fmap badness $ neWarnings
+           , show (length neWarnings) ++ " Warnings")
+
   putStrLn $ resultMsg ++ ", found " ++ show numHeaders ++ " notes and " ++
     show numRefs ++ " references."
-  exitSuccess
+  exitWith exitCode
 
+printStdErr :: Text -> IO ()
 printStdErr = T.hPutStr stderr
+
+printLnStdErr :: Text -> IO ()
 printLnStdErr = T.hPutStrLn stderr
 
 -- printWarnings :: NonEmpty Warning -> IO ()
@@ -380,16 +392,19 @@ ansiColor :: Int -> Text -> Text
 ansiColor code text = "\ESC[" <> T.pack (show code) <> "m" <> text <> "\ESC[0m"
 
 warningMessage :: Warning -> Text
-warningMessage = (magenta "warning: " <>) . \case
+warningMessage = (magenta "\nwarning: " <>) . \case
   UnusedHeader (Header Note {notePassage, noteName}) ->
     "The note [" <> noteName <> "] is not referenced anywhere" <>
-    showPassage notePassage
+    showPassage ShowPath notePassage
   DuplicateHeaders (fmap headerNote . weakenList2 -> headers) ->
-    "The note [" <> noteName (NE.head headers) <>
-    "] occurs more than once" <> (showPassages . fmap notePassage) headers
+    let header = NE.head headers
+        path = (T.pack . sourceName . location . notePassage) header
+    in "The note [" <> noteName header <>
+       "] occurs more than once\n\nin the file " <> path <>
+       (showPassages Don'tShowPath . fmap notePassage) headers
   DanglingRef (Ref Note {notePassage, noteName}) ->
     "Reference [" <> noteName <> "] points to a non-existent Note"
-    <> showPassage notePassage
+    <> showPassage ShowPath notePassage
     -- XXX JB suggest alternatives in other files or similarly names headers in
     -- the same file
   MalformedNote passage parseError ->
@@ -398,18 +413,20 @@ warningMessage = (magenta "warning: " <>) . \case
     magenta :: Text -> Text
     magenta = ansiColor 35
 
-showPassage :: Passage -> Text
-showPassage passage = showPassages (passage :| [])
+data ShowPath = ShowPath | Don'tShowPath
 
-showPassages :: NonEmpty Passage -> Text
-showPassages passages@(passage :| rest) = T.unlines case rest of
-  _:_ -> " in the passages\n" : (passageLines =<< toList passages)
-  []  -> " in the passage\n"  : passageLines passage
-  where
+showPassage :: ShowPath -> Passage -> Text
+showPassage showPath passage = showPassages showPath (passage :| [])
 
-passageLines :: Passage -> [Text]
-passageLines Passage {location, content} =
-  zipWith prependNum lineNums passageLines ++ [path]
+showPassages :: ShowPath -> NonEmpty Passage -> Text
+showPassages showPath passages@(passage :| rest) = "\nin the passage" <> case rest of
+  _:_ -> "s\n\n" <> combine (passageLines showPath <$> toList passages)
+  []  -> "\n\n"  <> passageLines showPath passage
+  where combine = T.intercalate "\n---\n"
+
+passageLines :: ShowPath -> Passage -> Text
+passageLines showPath Passage {location, content} = T.intercalate "\n" $
+  zipWith prependNum lineNums passageLines ++ [path | ShowPath <- [showPath]]
   where
     lineNum = sourceLine location
     passageLines = T.lines content
