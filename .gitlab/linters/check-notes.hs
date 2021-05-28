@@ -72,9 +72,9 @@ newtype Header = Header { headerNote :: Note } deriving Show
 --                , refNote :: Note } deriving Show
 newtype Ref = Ref { refNote :: Note } deriving Show
 
-data Results = Results { numNotes :: !Int
-                       , numRefs  :: !Int
-                       , warnings :: ![Warning]
+data Results = Results { numHeaders :: !Int
+                       , numRefs    :: !Int
+                       , warnings   :: ![Warning]
                        } deriving Show
 
 -- Int is used to keep track of how many lines were parsed in some contexts
@@ -84,7 +84,7 @@ type Parser m = ParsecT Text Int m
 data List2 a = List2 a a [a] deriving (Foldable, Show)
 
 data Warning = UnusedHeader     !Header
-             | DuplicateHeaders !(List2 Header)
+             | DuplicateHeaders !(List2 Header) -- need at least 2 to have a duplicate
              | DanglingRef      !Ref
              | MalformedNote    !Passage !ParseError
              deriving (Show)
@@ -93,8 +93,13 @@ data Warning = UnusedHeader     !Header
 -- efficiently compare suffixes
 data FilePathSet = ParentDirs !(Map String FilePathSet)
 
-toNonEmpty :: List2 a -> NonEmpty a
-toNonEmpty (List2 x x' xs) = x :| (x':xs)
+weakenList2 :: List2 a -> NonEmpty a
+weakenList2 (List2 x x' xs) = x :| (x':xs)
+
+strengthenNonEmpty :: NonEmpty a -> Either a (List2 a)
+strengthenNonEmpty (x :| rest) = case rest of
+  x':xs -> Right (List2 x x' xs)
+  []    -> Left x
 
 -- | Assigns a badness level to each warning. Higher is worse, 0 means no
 -- concern whatsoever.
@@ -116,19 +121,16 @@ main = do
 -- Takes raw output from grep and checks the references and header in it
 checkNotes :: [Passage] -> Results
 checkNotes passages =
-  let (malformed, notes) = partitionEithers $
+  let (map (uncurry MalformedNote) -> malformed, notes) = partitionEithers $
         map (first <$> (,) <*> (runParserT pHeadersRefs 0 "" =<< content)) passages
       (headers, refs) = mconcat notes
-      malformedWarnings = map (uncurry MalformedNote) malformed
 
   -- XXX JB TODO: headers should maybe have a target file (i.e. if they say
   -- Note [some note] in GHC/blablabla) and then there can be one header with
   -- the same name per file
-  -- XXX JB handle duplicates
-      -- (duplicates, fmap NE.head -> uniqueSortedHeaders) =
-      --   partition ((> 1) . length) $ NE.groupAllWith (noteName . headerNote) headers
-
-      -- duplicateWarnings = case duplicates of 
+      (uniqueSortedHeaders, map DuplicateHeaders -> duplicates) =
+        partitionEithers . map strengthenNonEmpty $
+        NE.groupAllWith (noteName . headerNote) headers
 
   -- XXX JB TODO lookup refs in map of headers. Make sure to look in the target
   -- file
@@ -136,7 +138,8 @@ checkNotes passages =
   -- found, this should check whether another header of the same name exists in
   -- different files, and display them. Possibly check for similar names, in
   -- case it was misspelled
-  in traceShow refs (Results (length headers) (length refs) malformedWarnings)
+      allWarnings = duplicates <> malformed
+  in Results (length headers) (length refs) allWarnings
 
 -- XXX JB idea:
 -- - is length . splitDirectories == 1? Then it's a path
@@ -278,7 +281,7 @@ pNote allowLineBreaks = do
   pure Note {notePassage, noteName = T.pack noteNameStr}
 
 success :: Results -> IO ()
-success Results {numNotes, numRefs} = do
+success Results {numHeaders, numRefs, warnings} = do
   -- XXX JB TODO: keep track of any headers that aren't referenced and emit a
   -- warning for them, before printing this line (and then say in this line %d
   -- headers were found that aren't referenced anywhere.)
@@ -296,7 +299,11 @@ success Results {numNotes, numRefs} = do
   -- warnings, and in gitlab you can now control whether to allow warnings or
   -- not
   -- (I like option 1 though)
-  putStrLn $ "OK, found " ++ show numNotes ++ " and " ++ show numRefs ++ " references."
+  mapM_ (printLnStdErr . warningMessage) warnings
+  let resultMsg | null warnings = "OK"
+                | otherwise     = show (length warnings) ++ " Warnings"
+  putStrLn $ resultMsg ++ ", found " ++ show numHeaders ++ " notes and " ++
+    show numRefs ++ " references."
   exitSuccess
 
 printStdErr = T.hPutStr stderr
@@ -356,7 +363,7 @@ handleError :: Text       -- ^ The original input received via stdin
             -> IO ()
 handleError grepOutput err = print errorMsg
   where
-    errorMsg = T.unlines (T.pack (show err) : lineMsg)
+    errorMsg = T.unlines (T.pack (show err) : lineMsg ++ [errorInfo])
     -- This allows us to display the line in which the parse error occured to
     -- the user
     -- Dropping lines from the input as a safer alternative to (!!)
@@ -375,11 +382,11 @@ ansiColor code text = "\ESC[" <> T.pack (show code) <> "m" <> text <> "\ESC[0m"
 warningMessage :: Warning -> Text
 warningMessage = (magenta "warning: " <>) . \case
   UnusedHeader (Header Note {notePassage, noteName}) ->
-    "The header [" <> noteName <> "] is not referenced anywhere" <>
+    "The note [" <> noteName <> "] is not referenced anywhere" <>
     showPassage notePassage
-  DuplicateHeaders (fmap headerNote . toNonEmpty -> headers) ->
-    "The headers [" <> (T.intercalate "], [" . map noteName . toList) headers <>
-    "] occur more than once" <> (showPassages . fmap notePassage) headers
+  DuplicateHeaders (fmap headerNote . weakenList2 -> headers) ->
+    "The note [" <> noteName (NE.head headers) <>
+    "] occurs more than once" <> (showPassages . fmap notePassage) headers
   DanglingRef (Ref Note {notePassage, noteName}) ->
     "Reference [" <> noteName <> "] points to a non-existent Note"
     <> showPassage notePassage
@@ -396,8 +403,8 @@ showPassage passage = showPassages (passage :| [])
 
 showPassages :: NonEmpty Passage -> Text
 showPassages passages@(passage :| rest) = T.unlines case rest of
-  _:_ -> "in the passages" : (passageLines =<< toList passages)
-  []  -> "in the passage"  : passageLines passage
+  _:_ -> " in the passages\n" : (passageLines =<< toList passages)
+  []  -> " in the passage\n"  : passageLines passage
   where
 
 passageLines :: Passage -> [Text]
@@ -410,5 +417,5 @@ passageLines Passage {location, content} =
     lastLineNumLength = length (show lastLineNum)
     lineNums = T.justifyRight lastLineNumLength ' ' . T.pack . show <$> [lineNum..]
     prependNum num str = num <> " | " <> str
-    path = "in " <> T.pack (sourceName location)
+    path = "in " <> T.pack (sourceName location) <> "\n"
 
