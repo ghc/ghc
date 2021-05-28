@@ -195,10 +195,10 @@ getLinkerInfo' logger dflags = do
         parseLinkerInfo (lines stdo) (lines stde) exitc
     )
     (\err -> do
-        debugTraceMsg logger dflags 2
+        debugTraceMsg logger 2
             (text "Error (figuring out linker information):" <+>
              text (show err))
-        errorMsg logger dflags $ hang (text "Warning:") 9 $
+        errorMsg logger $ hang (text "Warning:") 9 $
           text "Couldn't figure out linker information!" $$
           text "Make sure you're using GNU ld, GNU gold" <+>
           text "or the built in OS X linker, etc."
@@ -213,7 +213,7 @@ getCompilerInfo logger dflags = do
     Just v  -> return v
     Nothing -> do
       let pgm = pgm_c dflags
-      v <- getCompilerInfo' logger dflags pgm
+      v <- getCompilerInfo' logger pgm
       writeIORef (rtccInfo dflags) (Just v)
       return v
 
@@ -225,13 +225,13 @@ getAssemblerInfo logger dflags = do
     Just v  -> return v
     Nothing -> do
       let (pgm, _) = pgm_a dflags
-      v <- getCompilerInfo' logger dflags pgm
+      v <- getCompilerInfo' logger pgm
       writeIORef (rtasmInfo dflags) (Just v)
       return v
 
 -- See Note [Run-time linker info].
-getCompilerInfo' :: Logger -> DynFlags -> String -> IO CompilerInfo
-getCompilerInfo' logger dflags pgm = do
+getCompilerInfo' :: Logger -> String -> IO CompilerInfo
+getCompilerInfo' logger pgm = do
   let -- Try to grab the info from the process output.
       parseCompilerInfo _stdo stde _exitc
         -- Regular GCC
@@ -264,10 +264,10 @@ getCompilerInfo' logger dflags pgm = do
       parseCompilerInfo (lines stdo) (lines stde) exitc
       )
       (\err -> do
-          debugTraceMsg logger dflags 2
+          debugTraceMsg logger 2
               (text "Error (figuring out C compiler information):" <+>
                text (show err))
-          errorMsg logger dflags $ hang (text "Warning:") 9 $
+          errorMsg logger $ hang (text "Warning:") 9 $
             text "Couldn't figure out C compiler information!" $$
             text "Make sure you're using GNU gcc, or clang"
           return UnknownCC

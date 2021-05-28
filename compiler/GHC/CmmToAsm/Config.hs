@@ -26,6 +26,7 @@ data NCGConfig = NCGConfig
    , ncgInlineThresholdMemset :: !Word            -- ^ Ditto for `memset`
    , ncgSplitSections         :: !Bool            -- ^ Split sections
    , ncgRegsIterative         :: !Bool
+   , ncgRegsGraph             :: !Bool
    , ncgAsmLinting            :: !Bool            -- ^ Perform ASM linting pass
    , ncgDoConstantFolding     :: !Bool            -- ^ Perform CMM constant folding
    , ncgSseVersion            :: Maybe SseVersion -- ^ (x86) SSE instructions
@@ -41,6 +42,9 @@ data NCGConfig = NCGConfig
    , ncgDwarfStripBlockInfo   :: !Bool            -- ^ Strip out block information from generated Dwarf
    , ncgExposeInternalSymbols :: !Bool            -- ^ Expose symbol table entries for internal symbols
    , ncgDwarfSourceNotes      :: !Bool            -- ^ Enable GHC-specific source note DIEs
+   , ncgCmmStaticPred         :: !Bool            -- ^ Enable static control-flow prediction
+   , ncgEnableShortcutting    :: !Bool            -- ^ Enable shortcutting (don't jump to blocks only containing a jump)
+   , ncgComputeUnwinding      :: !Bool            -- ^ Compute block unwinding tables
    }
 
 -- | Return Word size

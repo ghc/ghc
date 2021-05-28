@@ -324,7 +324,7 @@ handleRunStatus step expr bindings final_ids status history
     = do
        hsc_env <- getSession
        let interp = hscInterp hsc_env
-       let dflags = hsc_dflags hsc_env
+       let dflags = extractDynFlags hsc_env
        let hmi = expectJust "handleRunStatus" $
                    lookupHptDirectly (hsc_HPT hsc_env)
                                      (mkUniqueGrimily mod_uniq)
@@ -430,7 +430,7 @@ resumeExec canLogSpan step mbCnt
                             , let n = getName thing
                             , not (n `elem` old_names) ]
             interp    = hscInterp hsc_env
-            dflags    = hsc_dflags hsc_env
+            dflags    = extractDynFlags hsc_env
         liftIO $ Loader.deleteFromLoadedEnv interp new_names
 
         case r of
@@ -578,7 +578,7 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv (Just BreakInfo{..}) = do
    mb_hValues <-
       mapM (getBreakpointVar interp apStack_fhv . fromIntegral) offsets
    when (any isNothing mb_hValues) $
-      debugTraceMsg (hsc_logger hsc_env) (hsc_dflags hsc_env) 1 $
+      debugTraceMsg (hsc_logger hsc_env) 1 $
           text "Warning: _result has been evaluated, some bindings have been lost"
 
    us <- mkSplitUniqSupply 'I'   -- Dodgy; will give the same uniques every time
@@ -668,9 +668,8 @@ rttiEnvironment hsc_env@HscEnv{hsc_IC=ic} = do
                         warnPprTrace True (text (":print failed to calculate the "
                                            ++ "improvement for a type")) hsc_env
                Just subst -> do
-                 let dflags = hsc_dflags hsc_env
                  let logger = hsc_logger hsc_env
-                 dumpIfSet_dyn logger dflags Opt_D_dump_rtti "RTTI"
+                 putDumpFileMaybe logger Opt_D_dump_rtti "RTTI"
                    FormatText
                    (fsep [text "RTTI Improvement for", ppr id, equals,
                           ppr subst])
@@ -781,7 +780,7 @@ fromListBL bound l = BL (length l) bound l []
 setContext :: GhcMonad m => [InteractiveImport] -> m ()
 setContext imports
   = do { hsc_env <- getSession
-       ; let dflags = hsc_dflags hsc_env
+       ; let dflags = extractDynFlags hsc_env
        ; all_env_err <- liftIO $ findGlobalRdrEnv hsc_env imports
        ; case all_env_err of
            Left (mod, err) ->
@@ -1194,7 +1193,7 @@ compileExprRemote expr = do
 -- the resulting HValue.
 compileParsedExprRemote :: GhcMonad m => LHsExpr GhcPs -> m ForeignHValue
 compileParsedExprRemote expr@(L loc _) = withSession $ \hsc_env -> do
-  let dflags = hsc_dflags hsc_env
+  let dflags = extractDynFlags hsc_env
   let interp = hscInterp hsc_env
 
   -- > let _compileParsedExpr = expr
@@ -1246,7 +1245,7 @@ showModule :: GhcMonad m => ModSummary -> m String
 showModule mod_summary =
     withSession $ \hsc_env -> do
         interpreted <- moduleIsBootOrNotObjectLinkable mod_summary
-        let dflags = hsc_dflags hsc_env
+        let dflags = extractDynFlags hsc_env
         -- extendModSummaryNoDeps because the message doesn't look at the deps
         return (showSDoc dflags $ showModMsg dflags interpreted (ModuleNode (extendModSummaryNoDeps mod_summary)))
 
