@@ -357,7 +357,12 @@ test('T19586', normal, compile, [''])
 
 test('T19599', normal, compile, ['-O -ddump-rules'])
 test('T19599a', normal, compile, ['-O -ddump-rules'])
-test('T13873',  [ grep_errmsg(r'SPEC') ], compile, ['-O -ddump-rules'])
+
+# Test that we get a specialisation generated for wimwam
+# But it's discarded by tidying (see Note [Trimming auto-rules] in Tidy)
+# so we use -ddump-spec and grep for the RULE
+test('T13873',  [ grep_errmsg(r'SPEC') ], compile, ['-O -ddump-spec'])
+
 
 # Look for a specialisation rule for wimwam
 test('T19672', normal, compile, ['-O2 -ddump-rules'])
