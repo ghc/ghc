@@ -78,6 +78,7 @@ import GHC.Core.TyCon
 import GHC.Core.DataCon
 import GHC.Core.Class
 import GHC.Driver.Env
+import GHC.Driver.Session (extractDynFlags)
 import GHC.Utils.Outputable
 import GHC.Core.Type
 import GHC.Types.Id
@@ -101,7 +102,7 @@ findImportedModule mod_name mb_pkg = do
     let fc        = hsc_FC hsc_env
     let home_unit = hsc_home_unit hsc_env
     let units     = hsc_units hsc_env
-    let dflags    = hsc_dflags hsc_env
+    let dflags    = extractDynFlags hsc_env
     tcPluginIO $ Finder.findImportedModule fc units home_unit dflags mod_name mb_pkg
 
 lookupOrig :: Module -> OccName -> TcPluginM Name

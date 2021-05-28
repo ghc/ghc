@@ -310,7 +310,8 @@ import GHC.Driver.Errors.Types
 import GHC.Driver.CmdLine
 import GHC.Driver.Session
 import GHC.Driver.Backend
-import GHC.Driver.Config
+import GHC.Driver.Config.Parser (initParserOpts)
+import GHC.Driver.Config.Logger (initLogFlags)
 import GHC.Driver.Main
 import GHC.Driver.Make
 import GHC.Driver.Hooks
@@ -528,7 +529,7 @@ withCleanupSession ghc = ghc `MC.finally` cleanup
   where
    cleanup = do
       hsc_env <- getSession
-      let dflags = hsc_dflags hsc_env
+      let dflags = extractDynFlags hsc_env
       let logger = hsc_logger hsc_env
       let tmpfs  = hsc_tmpfs hsc_env
       liftIO $ do
@@ -657,7 +658,7 @@ setSessionDynFlags dflags0 = do
              | otherwise = ""
            msg = text "Starting " <> text prog
          tr <- if verbosity dflags >= 3
-                then return (logInfo logger dflags $ withPprStyle defaultDumpStyle msg)
+                then return (logInfo logger $ withPprStyle defaultDumpStyle msg)
                 else return (pure ())
          let
           conf = IServConfig
@@ -689,13 +690,15 @@ setSessionDynFlags dflags0 = do
         , ue_units     = unit_state
         , ue_unit_dbs  = Just dbs
         }
-  modifySession $ \h -> h{ hsc_dflags = dflags
-                         , hsc_IC = (hsc_IC h){ ic_dflags = dflags }
+
+  modifySession $ \h -> hscSetFlags dflags $
+                        h{ hsc_IC = (hsc_IC h){ ic_dflags = dflags }
                          , hsc_interp = hsc_interp h <|> interp
                            -- we only update the interpreter if there wasn't
                            -- already one set up
                          , hsc_unit_env = unit_env
                          }
+
   invalidateModSummaryCache
 
 -- | Sets the program 'DynFlags'.  Note: this invalidates the internal
@@ -730,10 +733,9 @@ setProgramDynFlags_ invalidate_needed dflags = do
               , ue_units     = unit_state
               , ue_unit_dbs  = Just dbs
               }
-        modifySession $ \h -> h{ hsc_dflags   = dflags1
-                               , hsc_unit_env = unit_env
-                               }
-    else modifySession $ \h -> h{ hsc_dflags = dflags0 }
+        modifySession $ \h -> hscSetFlags dflags1 $ h{ hsc_unit_env = unit_env }
+    else modifySession (hscSetFlags dflags0)
+
   when invalidate_needed $ invalidateModSummaryCache
   return changed
 
@@ -790,7 +792,7 @@ setInteractiveDynFlags dflags = do
     return $ hsc_env0
                 { hsc_IC = ic0
                     { ic_plugins = hsc_plugins plugin_env
-                    , ic_dflags  = hsc_dflags  plugin_env
+                    , ic_dflags  = extractDynFlags plugin_env
                     }
                 }
 
@@ -808,7 +810,10 @@ parseDynamicFlags
     -> m (DynFlags, [Located String], [Warn])
 parseDynamicFlags logger dflags cmdline = do
   (dflags1, leftovers, warns) <- parseDynamicFlagsCmdLine dflags cmdline
-  dflags2 <- liftIO $ interpretPackageEnv logger dflags1
+  -- flags that have just been read are used by the logger when loading package
+  -- env (this is checked by T16318)
+  let logger1 = setLogFlags logger (initLogFlags dflags1)
+  dflags2 <- liftIO $ interpretPackageEnv logger1 dflags1
   return (dflags2, leftovers, warns)
 
 -- | Parse command line arguments that look like files.
@@ -1134,9 +1139,10 @@ getModSummary mod = do
 parseModule :: GhcMonad m => ModSummary -> m ParsedModule
 parseModule ms = do
    hsc_env <- getSession
-   let hsc_env_tmp = hsc_env { hsc_dflags = ms_hspp_opts ms }
-   hpm <- liftIO $ hscParse hsc_env_tmp ms
-   return (ParsedModule ms (hpm_module hpm) (hpm_src_files hpm))
+   liftIO $ do
+     let lcl_hsc_env = hscSetFlags (ms_hspp_opts ms) hsc_env
+     hpm <- hscParse lcl_hsc_env ms
+     return (ParsedModule ms (hpm_module hpm) (hpm_src_files hpm))
                -- See Note [exact print annotations] in GHC.Parser.Annotation
 
 -- | Typecheck and rename a parsed module.
@@ -1144,17 +1150,20 @@ parseModule ms = do
 -- Throws a 'SourceError' if either fails.
 typecheckModule :: GhcMonad m => ParsedModule -> m TypecheckedModule
 typecheckModule pmod = do
- let ms = modSummary pmod
  hsc_env <- getSession
- let hsc_env_tmp = hsc_env { hsc_dflags = ms_hspp_opts ms }
- (tc_gbl_env, rn_info)
-       <- liftIO $ hscTypecheckRename hsc_env_tmp ms $
-                      HsParsedModule { hpm_module = parsedSource pmod,
-                                       hpm_src_files = pm_extra_src_files pmod }
- details <- liftIO $ makeSimpleDetails hsc_env_tmp tc_gbl_env
- safe    <- liftIO $ finalSafeMode (ms_hspp_opts ms) tc_gbl_env
 
- return $
+ liftIO $ do
+   let ms          = modSummary pmod
+   let lcl_dflags  = ms_hspp_opts ms -- take into account pragmas (OPTIONS_GHC, etc.)
+   let lcl_hsc_env = hscSetFlags lcl_dflags hsc_env
+   let lcl_logger  = hsc_logger lcl_hsc_env
+   (tc_gbl_env, rn_info) <- hscTypecheckRename lcl_hsc_env ms $
+                        HsParsedModule { hpm_module = parsedSource pmod,
+                                         hpm_src_files = pm_extra_src_files pmod }
+   details <- makeSimpleDetails lcl_logger tc_gbl_env
+   safe    <- finalSafeMode lcl_dflags tc_gbl_env
+
+   return $
      TypecheckedModule {
        tm_internals_          = (tc_gbl_env, details),
        tm_parsed_module       = pmod,
@@ -1174,12 +1183,13 @@ typecheckModule pmod = do
 -- | Desugar a typechecked module.
 desugarModule :: GhcMonad m => TypecheckedModule -> m DesugaredModule
 desugarModule tcm = do
- let ms = modSummary tcm
- let (tcg, _) = tm_internals tcm
  hsc_env <- getSession
- let hsc_env_tmp = hsc_env { hsc_dflags = ms_hspp_opts ms }
- guts <- liftIO $ hscDesugar hsc_env_tmp ms tcg
- return $
+ liftIO $ do
+   let ms = modSummary tcm
+   let (tcg, _) = tm_internals tcm
+   let lcl_hsc_env = hscSetFlags (ms_hspp_opts ms) hsc_env
+   guts <- hscDesugar lcl_hsc_env ms tcg
+   return $
      DesugaredModule {
        dm_typechecked_module = tcm,
        dm_core_module        = guts
@@ -1363,7 +1373,7 @@ getModuleInfo mdl = withSession $ \hsc_env -> do
   if mgElemModule mg mdl
         then liftIO $ getHomeModuleInfo hsc_env mdl
         else do
-  {- if isHomeModule (hsc_dflags hsc_env) mdl
+  {- if isHomeModule (extractDynFlags hsc_env) mdl
         then return Nothing
         else -} liftIO $ getPackageModuleInfo hsc_env mdl
    -- ToDo: we don't understand what the following comment means.
@@ -1679,7 +1689,7 @@ findModule mod_name maybe_pkg = withSession $ \hsc_env -> do
   let fc        = hsc_FC hsc_env
   let home_unit = hsc_home_unit hsc_env
   let units     = hsc_units hsc_env
-  let dflags    = hsc_dflags hsc_env
+  let dflags    = extractDynFlags hsc_env
   case maybe_pkg of
     Just pkg | not (isHomeUnit home_unit (fsToUnit pkg)) && pkg /= fsLit "this" -> liftIO $ do
       res <- findImportedModule fc units home_unit dflags mod_name maybe_pkg
@@ -1719,7 +1729,7 @@ lookupModule mod_name Nothing = withSession $ \hsc_env -> do
     Nothing -> liftIO $ do
       let fc     = hsc_FC hsc_env
       let units  = hsc_units hsc_env
-      let dflags = hsc_dflags hsc_env
+      let dflags = extractDynFlags hsc_env
       res <- findExposedPackageModule fc units dflags mod_name Nothing
       case res of
         Found _ m -> return m
@@ -1862,7 +1872,7 @@ interpretPackageEnv logger dflags = do
         return dflags
       Just envfile -> do
         content <- readFile envfile
-        compilationProgressMsg logger dflags (text "Loaded package environment from " <> text envfile)
+        compilationProgressMsg logger (text "Loaded package environment from " <> text envfile)
         let (_, dflags') = runCmdLine (runEwM (setFlagsFromEnvFile envfile content)) dflags
 
         return dflags'
