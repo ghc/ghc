@@ -708,17 +708,7 @@ instance HiePass p => HasType (LocatedA (Pat (GhcPass p))) where
 -- the expression. It is not yet possible to do this efficiently for all
 -- expression forms, so we skip filling in the type for those inputs.
 --
--- 'HsApp', for example, doesn't have any type information available directly on
--- the node. Our next recourse would be to desugar it into a 'CoreExpr' then
--- query the type of that. Yet both the desugaring call and the type query both
--- involve recursive calls to the function and argument! This is particularly
--- problematic when you realize that the HIE traversal will eventually visit
--- those nodes too and ask for their types again.
---
--- Since the above is quite costly, we just skip cases where computing the
--- expression's type is going to be expensive.
---
--- See #16233
+-- See Note [Computing the type of every node in the tree]
 instance HiePass p => HasType (LocatedA (HsExpr (GhcPass p))) where
   getTypeNode (L spn e) =
     case hiePass @p of
@@ -735,6 +725,8 @@ instance HiePass p => HasType (LocatedA (HsExpr (GhcPass p))) where
       -- See impact on Haddock output (esp. missing type annotations or links)
       -- before skipping more kinds of expressions. See impact on Haddock
       -- performance before computing the types of more expressions.
+      --
+      -- See Note [Computing the type of every node in the tree]
       computeType :: HsExpr GhcTc -> Maybe Type
       computeType e = case e of
         HsApp{} -> Nothing
@@ -755,6 +747,35 @@ instance HiePass p => HasType (LocatedA (HsExpr (GhcPass p))) where
 
       computeLType :: LHsExpr GhcTc -> Maybe Type
       computeLType (L _ e) = computeType e
+
+{- Note [Computing the type of every node in the tree]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In GHC.Iface.Ext.Ast we decorate every node in the AST with its
+type, computed by `hsExprType` applied to that node.  So it's
+important that `hsExprType` takes roughly constant time per node.
+There are three cases to consider:
+
+1. For many nodes (e.g. HsVar, HsDo, HsCase) it is easy to get their
+   type -- e.g. it is stored in the node, or in sub-node thereof.
+
+2. For some nodes (e.g. HsPar, HsTick, HsIf) the type of the node is
+   the type of a child, so we can recurse, fast.  We don't expect the
+   nesting to be very deep, so while this is theoretically non-linear,
+   we don't expect it to be a problem in practice.
+
+3. A very few nodes (e.g. HsApp) are more troublesome because we need to
+   take the type of a child, and then do some non-trivial processing.
+   To be conservative on computation, we decline to decorate these
+   nodes, using `fallback` instead.
+
+The function `computeType e` returns `Just t` if we can find the type
+of `e` cheaply, and `Nothing` otherwise.  The base `Nothing` cases
+are the troublesome ones in (3) above. Hopefully we can ultimately
+get rid of them all.
+
+See #16233
+
+-}
 
 data HiePassEv p where
   HieRn :: HiePassEv 'Renamed
