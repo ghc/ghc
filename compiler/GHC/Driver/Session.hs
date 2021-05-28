@@ -3243,7 +3243,8 @@ wWarningFlagsDeps = mconcat [
   warnSpec    Opt_WarnInvalidHaddock,
   warnSpec    Opt_WarnOperatorWhitespaceExtConflict,
   warnSpec    Opt_WarnOperatorWhitespace,
-  warnSpec    Opt_WarnImplicitLift
+  warnSpec    Opt_WarnImplicitLift,
+  warnSpec    Opt_WarnMissingExportedPatternSynonymSignatures
  ]
 
 -- | These @-\<blah\>@ flags can all be reversed with @-no-\<blah\>@

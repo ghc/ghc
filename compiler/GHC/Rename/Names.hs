@@ -1482,6 +1482,28 @@ reportUnusedNames gbl_env hsc_src
 *                                                                      *
 ********************************************************************* -}
 
+{-
+Note [Missing signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+There are four warning flags in play:
+
+  * -Wmissing-exported-signatures
+    Warn about any exported top-level function/value without a type signature.
+    Does not include pattern synonyms.
+
+  * -Wmissing-signatures
+    Warn about any top-level function/value without a type signature. Does not
+    include pattern synonyms. Takes priority over -Wmissing-exported-signatures.
+
+  * -Wmissing-exported-pattern-synonym-signatures
+    Warn about any exported pattern synonym without a type signature.
+
+  * -Wmissing-pattern-synonym-signatures
+    Warn about any pattern synonym without a type signature. Takes priority over
+    -Wmissing-exported-pattern-synonym-signatures.
+
+-}
+
 -- | Warn the user about top level binders that lack type signatures.
 -- Called /after/ type inference, so that we can report the
 -- inferred type of the function
@@ -1495,46 +1517,56 @@ warnMissingSignatures gbl_env
 
          -- Warn about missing signatures
          -- Do this only when we have a type to offer
-       ; warn_missing_sigs  <- woptM Opt_WarnMissingSignatures
-       ; warn_only_exported <- woptM Opt_WarnMissingExportedSignatures
-       ; warn_pat_syns      <- woptM Opt_WarnMissingPatternSynonymSignatures
+       ; warn_binds             <- woptM Opt_WarnMissingSignatures
+       ; warn_exported_binds    <- woptM Opt_WarnMissingExportedSignatures
+       ; warn_pat_syns          <- woptM Opt_WarnMissingPatternSynonymSignatures
+       ; warn_exported_pat_syns <- woptM Opt_WarnMissingExportedPatternSynonymSignatures
 
+         -- See Note [Missing signatures]
        ; let add_sig_warns
-               | warn_missing_sigs  = add_warns Opt_WarnMissingSignatures
-               | warn_only_exported = add_warns Opt_WarnMissingExportedSignatures
-               | warn_pat_syns      = add_warns Opt_WarnMissingPatternSynonymSignatures
-               | otherwise          = return ()
+               = when (warn_pat_syns || warn_exported_pat_syns)
+                      (mapM_ add_pat_syn_warn pat_syns) >>
+                 when (warn_binds || warn_exported_binds)
+                      (mapM_ add_bind_warn binds)
 
-             add_warns flag
-                = when (warn_missing_sigs || warn_only_exported)
-                       (mapM_ add_bind_warn binds) >>
-                  when (warn_missing_sigs || warn_pat_syns)
-                       (mapM_ add_pat_syn_warn pat_syns)
-                where
-                  add_pat_syn_warn p
-                    = add_warn name $
-                      hang (text "Pattern synonym with no type signature:")
-                         2 (text "pattern" <+> pprPrefixName name <+> dcolon <+> pp_ty)
-                    where
-                      name  = patSynName p
-                      pp_ty = pprPatSynType p
+             add_pat_syn_warn p
+               = when export_check $
+                 add_warn name flag $
+                 hang (text "Pattern synonym with no type signature:")
+                    2 (text "pattern" <+> pprPrefixName name <+> dcolon <+> pp_ty)
+               where
+                 name  = patSynName p
+                 pp_ty = pprPatSynType p
+                 export_check = warn_pat_syns || name `elemNameSet` exports
+                 flag | warn_pat_syns
+                      = Opt_WarnMissingPatternSynonymSignatures
+                      | otherwise
+                      = Opt_WarnMissingExportedPatternSynonymSignatures
 
-                  add_bind_warn :: Id -> IOEnv (Env TcGblEnv TcLclEnv) ()
-                  add_bind_warn id
-                    = do { env <- tcInitTidyEnv     -- Why not use emptyTidyEnv?
-                         ; let name    = idName id
-                               (_, ty) = tidyOpenType env (idType id)
-                               ty_msg  = pprSigmaType ty
-                         ; add_warn name $
-                           hang (text "Top-level binding with no type signature:")
-                              2 (pprPrefixName name <+> dcolon <+> ty_msg) }
+             add_bind_warn :: Id -> IOEnv (Env TcGblEnv TcLclEnv) ()
+             add_bind_warn id
+               = do { env <- tcInitTidyEnv     -- Why not use emptyTidyEnv?
+                    ; let (_, ty) = tidyOpenType env (idType id)
+                          ty_msg  = pprSigmaType ty
 
-                  add_warn name msg
-                    = when (name `elemNameSet` sig_ns && export_check name)
-                           (addDiagnosticAt (WarningWithFlag flag) (getSrcSpan name) msg)
+                    ; when export_check $
+                      add_warn name flag $
+                      hang (text "Top-level binding with no type signature:")
+                         2 (pprPrefixName name <+> dcolon <+> ty_msg) }
+               where
+                 name = idName id
+                 export_check = warn_binds || name `elemNameSet` exports
+                 flag | warn_binds
+                      = Opt_WarnMissingSignatures
+                      | otherwise
+                      = Opt_WarnMissingExportedSignatures
 
-                  export_check name
-                    = warn_missing_sigs || not warn_only_exported || name `elemNameSet` exports
+             add_warn name flag msg
+               = when not_ghc_generated
+                      (addDiagnosticAt (WarningWithFlag flag) (getSrcSpan name) msg)
+               where
+                 not_ghc_generated
+                   = name `elemNameSet` sig_ns
 
        ; add_sig_warns }
 
