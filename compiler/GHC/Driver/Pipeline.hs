@@ -666,6 +666,136 @@ doLink hsc_env stop_phase o_files
         LinkDynLib    -> linkDynLibCheck    logger tmpfs dflags unit_env o_files []
         other         -> panicBadLink other
 
+runPipelineNew
+  :: Phase                      -- ^ When to stop
+  -> HscEnv                     -- ^ Compilation environment
+  -> TPipeline TPhase res
+  -> Maybe FilePath             -- ^ original basename (if different from ^^^)
+  -> PipelineOutput             -- ^ Output filename
+  -> IO res
+                                -- ^ (final flags, output filename, interface, linkable)
+runPipelineNew stop_phase hsc_env0 pipeline
+             mb_basename output
+
+    = do let
+             dflags0 = hsc_dflags hsc_env0
+
+             -- Decide where dump files should go based on the pipeline output
+             dflags = dflags0 { dumpPrefix = Just (basename ++ ".") }
+             hsc_env = hsc_env0 {hsc_dflags = dflags}
+             logger = hsc_logger hsc_env
+             tmpfs  = hsc_tmpfs  hsc_env
+
+             (input_basename, suffix) = splitExtension input_fn
+             suffix' = drop 1 suffix -- strip off the .
+             basename | Just b <- mb_basename = b
+                      | otherwise             = input_basename
+
+             -- If we were given a -x flag, then use that phase to start from
+             start_phase = fromMaybe (RealPhase (startPhase suffix')) mb_phase
+
+             isHaskell (RealPhase (Unlit _)) = True
+             isHaskell (RealPhase (Cpp   _)) = True
+             isHaskell (RealPhase (HsPp  _)) = True
+             isHaskell (RealPhase (Hsc   _)) = True
+             isHaskell (HscPostTc {})        = True
+             isHaskell (HscBackend {})       = True
+             isHaskell _                     = False
+
+             isHaskellishFile = isHaskell start_phase
+
+             env = PipeEnv{ stop_phase,
+                            src_filename = input_fn,
+                            src_basename = basename,
+                            src_suffix = suffix',
+                            output_spec = output }
+
+         when (isBackpackishSuffix suffix') $
+           throwGhcExceptionIO (UsageError
+                       ("use --backpack to process " ++ input_fn))
+
+         -- We want to catch cases of "you can't get there from here" before
+         -- we start the pipeline, because otherwise it will just run off the
+         -- end.
+         let happensBefore' = happensBefore (targetPlatform dflags)
+         case start_phase of
+             RealPhase start_phase' ->
+                 -- See Note [Partial ordering on phases]
+                 -- Not the same as: (stop_phase `happensBefore` start_phase')
+                 when (not (start_phase' `happensBefore'` stop_phase ||
+                            start_phase' `eqPhase` stop_phase)) $
+                       throwGhcExceptionIO (UsageError
+                                   ("cannot compile this file to desired target: "
+                                      ++ input_fn))
+             HscPostTc {} -> return ()
+             HscBackend {} -> return ()
+
+         -- Write input buffer to temp file if requested
+         input_fn' <- case (start_phase, mb_input_buf) of
+             (RealPhase real_start_phase, Just input_buf) -> do
+                 let suffix = phaseInputExt real_start_phase
+                 fn <- newTempName logger tmpfs dflags TFL_CurrentModule suffix
+                 hdl <- openBinaryFile fn WriteMode
+                 -- Add a LINE pragma so reported source locations will
+                 -- mention the real input file, not this temp file.
+                 hPutStrLn hdl $ "{-# LINE 1 \""++ input_fn ++ "\"#-}"
+                 hPutStringBuffer hdl input_buf
+                 hClose hdl
+                 return fn
+             (_, _) -> return input_fn
+
+         debugTraceMsg logger dflags 4 (text "Running the pipeline")
+         r <- runPipeline' start_phase hsc_env env input_fn'
+                           maybe_loc foreign_os
+
+         let dflags = hsc_dflags hsc_env
+         when isHaskellishFile $
+           dynamicTooState dflags >>= \case
+               DT_Dont   -> return ()
+               DT_Dyn    -> return ()
+               DT_OK     -> return ()
+               -- If we are compiling a Haskell module with -dynamic-too, we
+               -- first try the "fast path": that is we compile the non-dynamic
+               -- version and at the same time we check that interfaces depended
+               -- on exist both for the non-dynamic AND the dynamic way. We also
+               -- check that they have the same hash.
+               --    If they don't, dynamicTooState is set to DT_Failed.
+               --       See GHC.Iface.Load.checkBuildDynamicToo
+               --    If they do, in the end we produce both the non-dynamic and
+               --    dynamic outputs.
+               --
+               -- If this "fast path" failed, we execute the whole pipeline
+               -- again, this time for the dynamic way *only*. To do that we
+               -- just set the dynamicNow bit from the start to ensure that the
+               -- dynamic DynFlags fields are used and we disable -dynamic-too
+               -- (its state is already set to DT_Failed so it wouldn't do much
+               -- anyway).
+               DT_Failed
+                   -- NB: Currently disabled on Windows (ref #7134, #8228, and #5987)
+                   | OSMinGW32 <- platformOS (targetPlatform dflags) -> return ()
+                   | otherwise -> do
+                       debugTraceMsg logger dflags 4
+                           (text "Running the full pipeline again for -dynamic-too")
+                       let dflags0 = flip gopt_unset Opt_BuildDynamicToo
+                                      $ setDynamicNow
+                                      $ dflags
+                       hsc_env' <- newHscEnv dflags0
+                       (dbs,unit_state,home_unit,mconstants) <- initUnits logger dflags0 Nothing
+                       dflags1 <- updatePlatformConstants dflags0 mconstants
+                       unit_env0 <- initUnitEnv (ghcNameVersion dflags1) (targetPlatform dflags1)
+                       let unit_env = unit_env0
+                             { ue_home_unit = Just home_unit
+                             , ue_units     = unit_state
+                             , ue_unit_dbs  = Just dbs
+                             }
+                       let hsc_env'' = hsc_env'
+                            { hsc_dflags   = dflags1
+                            , hsc_unit_env = unit_env
+                            }
+                       _ <- runPipeline' start_phase hsc_env'' env input_fn'
+                                         maybe_loc foreign_os
+                       return ()
+         return r
 
 -- ---------------------------------------------------------------------------
 
