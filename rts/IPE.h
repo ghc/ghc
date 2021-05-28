@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 1998-2005
+ * (c) The GHC Team, 1998-2021
  *
  * Support for IPE
  *
@@ -13,6 +13,20 @@
 
 #include "BeginPrivate.h"
 
+#define IPE_LIST_NODE_BUFFER_SIZE 126
+
+typedef struct IpeBufferListNode_ {
+    InfoProvEnt** buffer[IPE_LIST_NODE_BUFFER_SIZE];
+    StgWord8 count;
+    struct IpeBufferListNode_* next;
+} IpeBufferListNode;
+
 void dumpIPEToEventLog(void);
+void updateIpeMap(void);
+void setupMutex(void);
+
+#if defined(TRACING)
+void traceIPEFromHashTable(void *data STG_UNUSED, StgWord key STG_UNUSED, const void *value);
+#endif
 
 #include "EndPrivate.h"
