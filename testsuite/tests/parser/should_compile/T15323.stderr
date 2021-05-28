@@ -186,42 +186,44 @@
                     (Unqual
                      {OccName: v}))))))))]))
           (PrefixConGADT
-           [])
-          (L
-           (SrcSpanAnn (EpAnnNotUsed) { T15323.hs:6:41-54 })
-           (HsAppTy
-            (NoExtField)
+           (PCGResult
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { T15323.hs:6:41-52 })
-             (HsTyVar
-              (EpAnn
-               (Anchor
-                { T15323.hs:6:41-52 }
-                (UnchangedAnchor))
-               []
-               (EpaComments
-                []))
-              (NotPromoted)
+             (SrcSpanAnn (EpAnnNotUsed) { T15323.hs:6:41-54 })
+             (HsAppTy
+              (NoExtField)
               (L
                (SrcSpanAnn (EpAnnNotUsed) { T15323.hs:6:41-52 })
-               (Unqual
-                {OccName: MaybeDefault}))))
-            (L
-             (SrcSpanAnn (EpAnnNotUsed) { T15323.hs:6:54 })
-             (HsTyVar
-              (EpAnn
-               (Anchor
-                { T15323.hs:6:54 }
-                (UnchangedAnchor))
-               []
-               (EpaComments
-                []))
-              (NotPromoted)
+               (HsTyVar
+                (EpAnn
+                 (Anchor
+                  { T15323.hs:6:41-52 }
+                  (UnchangedAnchor))
+                 []
+                 (EpaComments
+                  []))
+                (NotPromoted)
+                (L
+                 (SrcSpanAnn (EpAnnNotUsed) { T15323.hs:6:41-52 })
+                 (Unqual
+                  {OccName: MaybeDefault}))))
               (L
                (SrcSpanAnn (EpAnnNotUsed) { T15323.hs:6:54 })
-               (Unqual
-                {OccName: v}))))))
+               (HsTyVar
+                (EpAnn
+                 (Anchor
+                  { T15323.hs:6:54 }
+                  (UnchangedAnchor))
+                 []
+                 (EpaComments
+                  []))
+                (NotPromoted)
+                (L
+                 (SrcSpanAnn (EpAnnNotUsed) { T15323.hs:6:54 })
+                 (Unqual
+                  {OccName: v}))))))))
           (Nothing)))]
        []))))]
   (Nothing)
   (Nothing)))
+
+

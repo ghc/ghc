@@ -88,7 +88,8 @@
             (NoExtField)))
           (Nothing)
           (PrefixConGADT
-           [(HsScaled
+           (PCGAnonArg
+            (HsScaled
              (HsUnrestrictedArrow
               (NormalSyntax))
              (L
@@ -113,23 +114,26 @@
                (L
                 (SrcSpanAnn (EpAnnNotUsed) { T18791.hs:5:10-12 })
                 (Unqual
-                 {OccName: Int})))))])
-          (L
-           (SrcSpanAnn (EpAnnNotUsed) { T18791.hs:5:17 })
-           (HsTyVar
-            (EpAnn
-             (Anchor
-              { T18791.hs:5:17 }
-              (UnchangedAnchor))
-             []
-             (EpaComments
-              []))
-            (NotPromoted)
-            (L
-             (SrcSpanAnn (EpAnnNotUsed) { T18791.hs:5:17 })
-             (Unqual
-              {OccName: T}))))
+                 {OccName: Int})))))
+            (PCGResult
+             (L
+              (SrcSpanAnn (EpAnnNotUsed) { T18791.hs:5:17 })
+              (HsTyVar
+               (EpAnn
+                (Anchor
+                 { T18791.hs:5:17 }
+                 (UnchangedAnchor))
+                []
+                (EpaComments
+                 []))
+               (NotPromoted)
+               (L
+                (SrcSpanAnn (EpAnnNotUsed) { T18791.hs:5:17 })
+                (Unqual
+                 {OccName: T})))))))
           (Nothing)))]
        []))))]
   (Nothing)
   (Nothing)))
+
+
