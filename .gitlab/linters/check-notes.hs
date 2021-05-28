@@ -15,6 +15,7 @@
 {-# LANGUAGE BlockArguments    #-}
 {-# LANGUAGE TupleSections     #-}
 {-# LANGUAGE ViewPatterns      #-}
+{-# LANGUAGE DeriveFoldable    #-}
 
 import Debug.Trace -- XXX JB
 
@@ -23,6 +24,7 @@ import           Control.Monad.Reader
 
 import           Data.Bifunctor
 import           Data.Char
+import           Data.Foldable
 import           Data.Either
 import           Data.List
 import           Data.List.NonEmpty (NonEmpty(..))
@@ -47,6 +49,7 @@ endComment = ["-}", "*/"]
 
 -- | Used as parameter to some functions to determine whether line breaks
 -- should be allowed
+-- XXX JB should we just use type AllowLineBreaks = Bool
 data AllowLineBreaks = WithLineBreaks | NoLineBreaks
 
 -- XXX JB remove all the Show instances
@@ -61,6 +64,7 @@ data Note = Note { notePassage :: !Passage -- where is the note from?
                  , noteName    :: !Text
                  } deriving Show
 
+-- XXX JB add FilePathSet
 newtype Header = Header { headerNote :: Note } deriving Show
 
 -- XXX JB
@@ -68,93 +72,63 @@ newtype Header = Header { headerNote :: Note } deriving Show
 --                , refNote :: Note } deriving Show
 newtype Ref = Ref { refNote :: Note } deriving Show
 
-data Results = Results { numNotes      :: !Int
-                       , numRefs       :: !Int
-                       , unusedHeaders :: ![Header]
+data Results = Results { numNotes :: !Int
+                       , numRefs  :: !Int
+                       , warnings :: ![Warning]
                        } deriving Show
 
 -- Int is used to keep track of how many lines were parsed in some contexts
 type Parser m = ParsecT Text Int m
 
-data ErrorType = StdInParseError
-               | MalformedRef
-               | DuplicateHeader
-               | DanglingRef
-               deriving (Eq, Show)
+-- | List with at least two elements
+data List2 a = List2 a a [a] deriving (Foldable, Show)
 
-data Error = Error { errorPsg :: Maybe Passage -- Where did the error occur
-                   , errorMsg :: Text
-                   } deriving Show
+data Warning = UnusedHeader     !Header
+             | DuplicateHeaders !(List2 Header)
+             | DanglingRef      !Ref
+             | MalformedNote    !Passage !ParseError
+             deriving (Show)
 
 -- | A set of filepaths arranged in inverse hierarchical order in order to
 -- efficiently compare suffixes
-data FilePathSet = ParentDirs (Map String FilePathSet)
+data FilePathSet = ParentDirs !(Map String FilePathSet)
 
-data Errors = Errors
-  { errorType :: ErrorType
-  , errorList :: NonEmpty Error
-  -- ^ A list of errors consisting of an error message and the corresponding passage
-  } deriving Show
+toNonEmpty :: List2 a -> NonEmpty a
+toNonEmpty (List2 x x' xs) = x :| (x':xs)
 
-parseError :: Text       -- ^ The original input received via stdin
-           -> ParseError -- ^ an error produced by parsing said input
-           -> Errors
-parseError grepOutput err = Errors {errorType = StdInParseError, errorList}
-  where
-    errorList = Error Nothing errorMsg :| []
-    errorMsg = T.unlines (T.pack (show err) : lineMsg)
-    -- This allows us to display the line in which the parse error occured to
-    -- the user
-    -- Dropping lines from the input as a safer alternative to (!!)
-    lineMsg = case drop (sourceLine (errorPos err) - 1) (T.lines grepOutput) of
-      [] -> ["The corresponding line could not be found in the input. This is \
-             \likely a bug in the check-notes.hs script."]
-      (line:_) -> ["in the line", line]
-
--- | Creates a list of malformed reference errors for the given lines
-malformedRefs :: NonEmpty (Passage, ParseError) -> Errors
-malformedRefs errs = Errors {errorType = MalformedRef, errorList}
-  where
-    errorList = uncurry Error . bimap Just (T.pack . show) <$> errs
-
-duplicateHeaders :: NonEmpty (NonEmpty Header) -> Errors
-duplicateHeaders headers = Errors {errorType = DuplicateHeader, errorList}
-  where
-    makeError (Header Note {notePassage, noteName}) = Error
-      (Just notePassage)
-      ("Header was found more than once: [" <> T.pack (show noteName) <> "]")
-    errorList = makeError <$> join headers
-
--- | Creates a list of dangling reference errors for the given notes
-danglingRefs :: NonEmpty Note -> Errors
-danglingRefs = undefined
+-- | Assigns a badness level to each warning. Higher is worse, 0 means no
+-- concern whatsoever.
+badness :: Warning -> Int
+badness = \case
+  UnusedHeader _     -> 1
+  DuplicateHeaders _ -> 2
+  DanglingRef _      -> 3
+  MalformedNote _ _  -> 4
 
 main :: IO ()
 main = do
   mapM_ (flip hSetEncoding utf8) [stdin, stdout, stderr]
-  either handleErrors success =<< checkNotes <$> T.getContents
 
--- Takes raw output from grep and checks the references and header in it
-checkNotes :: MonadError Errors m => Text -> m Results
-checkNotes grepOutput = do
-  passages <- liftEither . first (parseError grepOutput) $
+  grepOutput <- T.getContents
+  either (handleError grepOutput) (success . checkNotes) $
     runParser pPassages 0 "stdin" grepOutput
 
-  let mHeadersRefs = partitionEithers $
+-- Takes raw output from grep and checks the references and header in it
+checkNotes :: [Passage] -> Results
+checkNotes passages =
+  let (malformed, notes) = partitionEithers $
         map (first <$> (,) <*> (runParserT pHeadersRefs 0 "" =<< content)) passages
-  (headers, refs) <- case mHeadersRefs of
-    ([]  , notes) -> pure $ mconcat notes
-    (e:es, _    ) -> throwError . malformedRefs $ e :| es
+      (headers, refs) = mconcat notes
+      malformedWarnings = map (uncurry MalformedNote) malformed
 
   -- XXX JB TODO: headers should maybe have a target file (i.e. if they say
   -- Note [some note] in GHC/blablabla) and then there can be one header with
   -- the same name per file
-  let (duplicates, fmap NE.head -> uniqueSortedHeaders) =
-        partition ((> 1) . length) $ NE.groupAllWith (noteName . headerNote) headers
+  -- XXX JB handle duplicates
+      -- (duplicates, fmap NE.head -> uniqueSortedHeaders) =
+      --   partition ((> 1) . length) $ NE.groupAllWith (noteName . headerNote) headers
 
-  case duplicates of
-    []   -> pure ()
-    h:hs -> throwError . duplicateHeaders $ h :| hs
+      -- duplicateWarnings = case duplicates of 
 
   -- XXX JB TODO lookup refs in map of headers. Make sure to look in the target
   -- file
@@ -162,7 +136,7 @@ checkNotes grepOutput = do
   -- found, this should check whether another header of the same name exists in
   -- different files, and display them. Possibly check for similar names, in
   -- case it was misspelled
-  traceShow refs undefined
+  in traceShow refs (Results (length headers) (length refs) malformedWarnings)
 
 -- XXX JB idea:
 -- - is length . splitDirectories == 1? Then it's a path
@@ -325,55 +299,116 @@ success Results {numNotes, numRefs} = do
   putStrLn $ "OK, found " ++ show numNotes ++ " and " ++ show numRefs ++ " references."
   exitSuccess
 
-errorTypeInfo :: ErrorType -> Text
-errorTypeInfo = \case
-  StdInParseError -> "\
-\Some of the provided lines could not be parsed. Please make sure that you\n\
-\are running this script using the provided check-notes.sh bash script."
-  MalformedRef -> "\
-\Some Note references or headers were malformed. Please ensure that they\n\
-\follow this format: XXX JB TODO"
-  DuplicateHeader -> "\
-\Some Note headers were found more than once in the same file. Please ensure\n\
-\each Note header appears at most once. A Note header can be recognized by\n\
-\its underline consisting of tildes, as in\n\
-\    Note [some note]\n\
-\    ~~~~~~~~~~~~~~~~"
-  DanglingRef -> "\
-\Some references point to headers that cannot be found. Please XXX JB"
+printStdErr = T.hPutStr stderr
+printLnStdErr = T.hPutStrLn stderr
 
-handleErrors :: Errors -> IO ()
-handleErrors Errors {errorType, errorList} = do
-  forM_ errorList $ \err -> printError err *> printLnStdErr ""
-  printStdErr $ errorTypeInfo errorType
+-- printWarnings :: NonEmpty Warning -> IO ()
+-- printWarnings warnings = do
+--   forM_ warnings \err -> printError err *> printLnStdErr ""
+--   printStdErr $ errorTypeInfo errorType
+--   where
+
+--     printWarning Error {errorPsg, errorMsg} = do
+--       -- XXX JB print something more specific after this like "malformed
+--       -- reference" etc.
+--       printStdErr (red "error: ")
+--       printStdErr errorMsg
+--       case errorPsg of
+--         Nothing      -> pure ()
+--         Just passage -> do
+--           printLnStdErr "\n  in the passage\n"
+--           printPassage passage
+
+--     -- surround with ANSI escape sequence for red color and back to no color
+--     red :: Text -> Text
+--     red = ansiColor 31
+
+--     printPassage :: Passage -> IO ()
+--     printPassage Passage {location, content} = do
+--       let lineNum = sourceLine location
+--           passageLines = T.lines content
+--           lastLineNum = lineNum + length passageLines - 1
+--           lastLineNumLength = length (show lastLineNum)
+--           lineNums = T.justifyRight lastLineNumLength ' ' . T.pack . show <$> [lineNum..]
+--           prependNum num str = num <> " | " <> str
+--       mapM_ printLnStdErr $ zipWith prependNum lineNums passageLines
+
+--       let printFilePath = printLnStdErr $ "\nin " <> T.pack (sourceName location) <> "\n"
+--       when (errorType == DuplicateHeader) printFilePath
+
+-- XXX JB
+-- errorTypeInfo :: Warning -> Text
+-- errorTypeInfo = \case
+--   MalformedRef -> "\
+-- \Some Note references or headers were malformed. Please ensure that they\n\
+-- \follow this format: XXX JB TODO"
+--   DuplicateHeader -> "\
+-- \Some Note headers were found more than once in the same file. Please ensure\n\
+-- \each Note header appears at most once. A Note header can be recognized by\n\
+-- \its underline consisting of tildes, as in\n\
+-- \    Note [some note]\n\
+-- \    ~~~~~~~~~~~~~~~~"
+--   DanglingRef -> "\
+-- \Some references point to headers that cannot be found. Please XXX JB"
+
+handleError :: Text       -- ^ The original input received via stdin
+            -> ParseError -- ^ an error produced by parsing said input
+            -> IO ()
+handleError grepOutput err = print errorMsg
   where
-    printStdErr = T.hPutStr stderr
-    printLnStdErr = T.hPutStrLn stderr
+    errorMsg = T.unlines (T.pack (show err) : lineMsg)
+    -- This allows us to display the line in which the parse error occured to
+    -- the user
+    -- Dropping lines from the input as a safer alternative to (!!)
+    lineMsg = case drop (sourceLine (errorPos err) - 1) (T.lines grepOutput) of
+      [] -> ["The corresponding line could not be found in the input. This is \
+             \likely a bug in the check-notes.hs script."]
+      (line:_) -> ["in the line", line]
+    errorInfo = "\
+\One of the provided lines could not be parsed. Please make sure that you\n\
+\are running this script using the bundled check-notes.sh bash script."
 
-    printError Error {errorPsg, errorMsg} = do
-      -- XXX JB print something more specific after this like "malformed
-      -- reference" etc.
-      printStdErr (red "error: ")
-      printStdErr errorMsg
-      case errorPsg of
-        Nothing      -> pure ()
-        Just passage -> do
-          printLnStdErr "\n  in the passage\n"
-          printPassage passage
+-- surround with ANSI escape sequence for a color code and back to no color
+ansiColor :: Int -> Text -> Text
+ansiColor code text = "\ESC[" <> T.pack (show code) <> "m" <> text <> "\ESC[0m"
 
-    -- surround with ANSI escape sequence for red color and back to no color
-    red :: Text -> Text
-    red text = "\ESC[31m" <> text <> "\ESC[0m"
+warningMessage :: Warning -> Text
+warningMessage = (magenta "warning: " <>) . \case
+  UnusedHeader (Header Note {notePassage, noteName}) ->
+    "The header [" <> noteName <> "] is not referenced anywhere" <>
+    showPassage notePassage
+  DuplicateHeaders (fmap headerNote . toNonEmpty -> headers) ->
+    "The headers [" <> (T.intercalate "], [" . map noteName . toList) headers <>
+    "] occur more than once" <> (showPassages . fmap notePassage) headers
+  DanglingRef (Ref Note {notePassage, noteName}) ->
+    "Reference [" <> noteName <> "] points to a non-existent Note"
+    <> showPassage notePassage
+    -- XXX JB suggest alternatives in other files or similarly names headers in
+    -- the same file
+  MalformedNote passage parseError ->
+    "Found a malformed header or reference in" <> T.pack (show parseError)
+  where
+    magenta :: Text -> Text
+    magenta = ansiColor 35
 
-    printPassage :: Passage -> IO ()
-    printPassage Passage {location, content} = do
-      let lineNum = sourceLine location
-          passageLines = T.lines content
-          lastLineNum = lineNum + length passageLines - 1
-          lastLineNumLength = length (show lastLineNum)
-          lineNums = T.justifyRight lastLineNumLength ' ' . T.pack . show <$> [lineNum..]
-          prependNum num str = num <> " | " <> str
-      mapM_ printLnStdErr $ zipWith prependNum lineNums passageLines
+showPassage :: Passage -> Text
+showPassage passage = showPassages (passage :| [])
 
-      let printFilePath = printLnStdErr $ "\nin " <> T.pack (sourceName location) <> "\n"
-      when (errorType == DuplicateHeader) printFilePath
+showPassages :: NonEmpty Passage -> Text
+showPassages passages@(passage :| rest) = T.unlines case rest of
+  _:_ -> "in the passages" : (passageLines =<< toList passages)
+  []  -> "in the passage"  : passageLines passage
+  where
+
+passageLines :: Passage -> [Text]
+passageLines Passage {location, content} =
+  zipWith prependNum lineNums passageLines ++ [path]
+  where
+    lineNum = sourceLine location
+    passageLines = T.lines content
+    lastLineNum = lineNum + length passageLines - 1
+    lastLineNumLength = length (show lastLineNum)
+    lineNums = T.justifyRight lastLineNumLength ' ' . T.pack . show <$> [lineNum..]
+    prependNum num str = num <> " | " <> str
+    path = "in " <> T.pack (sourceName location)
+
