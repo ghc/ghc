@@ -202,9 +202,11 @@ instance Show Word where
 showWord :: Word# -> ShowS
 showWord w# cs
  | isTrue# (w# `ltWord#` 10##) = C# (chr# (ord# '0'# +# word2Int# w#)) : cs
- | otherwise = case chr# (ord# '0'# +# word2Int# (w# `remWord#` 10##)) of
-               c# ->
-                   showWord (w# `quotWord#` 10##) (C# c# : cs)
+ | otherwise =
+    let
+      !(# q, r #) = quotRemWord# w# 10##
+      !c#         = chr# (ord# '0'# +# word2Int# r)
+    in showWord q (C# c# : cs)
 
 -- | @since 2.01
 deriving instance Show a => Show (Maybe a)
