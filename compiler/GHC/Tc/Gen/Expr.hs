@@ -44,7 +44,6 @@ import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Gen.App
 import GHC.Tc.Gen.Head
 import GHC.Tc.Gen.Bind        ( tcLocalBinds )
-import GHC.Tc.Instance.Family ( tcGetFamInstEnvs )
 import GHC.Core.FamInstEnv    ( FamInstEnvs )
 import GHC.Rename.Env         ( addUsedGRE )
 import GHC.Tc.Utils.Env

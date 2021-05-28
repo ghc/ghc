@@ -51,7 +51,6 @@ import GHC.Tc.Gen.HsType
 import GHC.Tc.Instance.Class( AssocInstInfo(..) )
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
-import GHC.Tc.Instance.Family
 import GHC.Tc.Types.Origin
 
 import GHC.Builtin.Types (oneDataConTy,  unitTy, makeRecoveryTyCon )

@@ -41,7 +41,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Unify
 import GHC.Types.Basic
 import GHC.Tc.Utils.Instantiate
-import GHC.Tc.Instance.Family ( tcGetFamInstEnvs, tcLookupDataFamInst )
+import GHC.Tc.Instance.Family ( tcLookupDataFamInst )
 import GHC.Core.FamInstEnv    ( FamInstEnvs )
 import GHC.Core.UsageEnv      ( unitUE )
 import GHC.Rename.Env         ( addUsedGRE )
