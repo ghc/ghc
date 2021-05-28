@@ -2,5 +2,9 @@
 TH_exn2.hs:1:1: error:
     Exception when trying to run compile-time code:
       Prelude.tail: empty list
+CallStack (from HasCallStack):
+  error, called at libraries/base/GHC/List.hs:1590:3 in base:GHC.List
+  errorEmptyList, called at libraries/base/GHC/List.hs:114:28 in base:GHC.List
+  tail, called at TH_exn2.hs:10:17 in main:TH
     Code: (do ds <- [d| |]
               return (tail ds))
