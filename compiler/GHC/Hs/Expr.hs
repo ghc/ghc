@@ -253,10 +253,10 @@ type instance XVar           (GhcPass _) = NoExtField
 type instance XUnboundVar    GhcPs = EpAnn EpAnnUnboundVar
 type instance XUnboundVar    GhcRn = NoExtField
 type instance XUnboundVar    GhcTc = HoleExprRef
-  -- We store an entire HoleExprRef rather just an IORef EvTerm because:
-  --
-  -- * It's easier to derive a Data instance for HsExpr this way, and
-  -- * We can use the TcType from the HoleExprRef in hsExprType.
+  -- We really don't need the whole HoleExprRef; just the IORef EvTerm
+  -- would be enough. But then deriving a Data instance becomes impossible.
+  -- Much, much easier just to define HoleExprRef with a Data instance and
+  -- store the whole structure.
 
 type instance XIPVar         GhcPs = EpAnnCO
 type instance XIPVar         GhcRn = EpAnnCO
