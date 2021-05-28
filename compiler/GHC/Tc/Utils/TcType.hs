@@ -840,7 +840,7 @@ any_rewritable :: Bool    -- Ignore casts and coercions
 -- role-agnostic, and this one must be role-aware. We could make
 -- foldTyCon role-aware, but that may slow down more common usages.
 --
--- See Note [Rewritable] in GHC.Tc.Solver.Monad for a specification for this function.
+-- See Note [Rewritable] in GHC.Tc.Solver.InertSet for a specification for this function.
 {-# INLINE any_rewritable #-} -- this allows specialization of predicates
 any_rewritable ignore_cos role tv_pred tc_pred should_expand
   = go role emptyVarSet
@@ -889,7 +889,7 @@ anyRewritableTyVar :: Bool     -- Ignore casts and coercions
                    -> EqRel    -- Ambient role
                    -> (EqRel -> TcTyVar -> Bool)  -- check tyvar
                    -> TcType -> Bool
--- See Note [Rewritable] in GHC.Tc.Solver.Monad for a specification for this function.
+-- See Note [Rewritable] in GHC.Tc.Solver.InertSet for a specification for this function.
 anyRewritableTyVar ignore_cos role pred
   = any_rewritable ignore_cos role pred
       (\ _ _ _ -> False) -- no special check for tyconapps
@@ -906,14 +906,14 @@ anyRewritableTyFamApp :: EqRel   -- Ambient role
                           -- should return True only for type family applications
                       -> TcType -> Bool
   -- always ignores casts & coercions
--- See Note [Rewritable] in GHC.Tc.Solver.Monad for a specification for this function.
+-- See Note [Rewritable] in GHC.Tc.Solver.InertSet for a specification for this function.
 anyRewritableTyFamApp role check_tyconapp
   = any_rewritable True role (\ _ _ -> False) check_tyconapp (not . isFamFreeTyCon)
 
 -- This version is used by shouldSplitWD. It *does* look in casts
 -- and coercions, and it always expands type synonyms whose RHSs mention
 -- type families.
--- See Note [Rewritable] in GHC.Tc.Solver.Monad for a specification for this function.
+-- See Note [Rewritable] in GHC.Tc.Solver.InertSet for a specification for this function.
 anyRewritableCanEqLHS :: EqRel   -- Ambient role
                       -> (EqRel -> TcTyVar -> Bool)            -- check tyvar
                       -> (EqRel -> TyCon -> [TcType] -> Bool)  -- check type family

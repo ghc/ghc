@@ -603,8 +603,10 @@ Library
         GHC.Tc.Solver
         GHC.Tc.Solver.Canonical
         GHC.Tc.Solver.Rewrite
+        GHC.Tc.Solver.InertSet
         GHC.Tc.Solver.Interact
         GHC.Tc.Solver.Monad
+        GHC.Tc.Solver.Types
         GHC.Tc.TyCl
         GHC.Tc.TyCl.Build
         GHC.Tc.TyCl.Class

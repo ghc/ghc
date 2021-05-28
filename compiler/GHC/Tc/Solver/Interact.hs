@@ -38,6 +38,8 @@ import GHC.Tc.Types.Constraint
 import GHC.Core.Predicate
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcMType( promoteMetaTyVarTo )
+import GHC.Tc.Solver.Types
+import GHC.Tc.Solver.InertSet
 import GHC.Tc.Solver.Monad
 import GHC.Data.Bag
 import GHC.Utils.Monad ( concatMapM, foldlM )
@@ -2389,7 +2391,7 @@ The same reasoning applies to
 
 And less obviously to:
 
-* Tuple classes.  For reasons described in GHC.Tc.Solver.Monad
+* Tuple classes.  For reasons described in GHC.Tc.Solver.Types
   Note [Tuples hiding implicit parameters], we may have a constraint
      [W] (?x::Int, C a)
   with an exactly-matching Given constraint.  We must decompose this
