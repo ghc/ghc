@@ -966,9 +966,9 @@ splitThunk :: WwOpts -> RecFlag -> Var -> Expr Var -> UniqSM [(Var, Expr Var)]
 splitThunk ww_opts is_rec x rhs
   = assert (not (isJoinId x)) $
     do { let x' = localiseId x -- See comment above
-       ; (useful,_, wrap_fn, work_fn)
-           <- mkWWstr ww_opts NotArgOfInlineableFun [x']
-       ; let res = [ (x, Let (NonRec x' rhs) (wrap_fn (work_fn (Var x')))) ]
+       ; (useful,_, wrap_fn, fn_arg)
+           <- mkWWstr_one ww_opts NotArgOfInlineableFun x'
+       ; let res = [ (x, Let (NonRec x' rhs) (wrap_fn fn_arg)) ]
        ; if useful then assertPpr (isNonRec is_rec) (ppr x) -- The thunk must be non-recursive
                    return res
                    else return [(x, rhs)] }

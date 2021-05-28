@@ -8,7 +8,7 @@ A library for the ``worker\/wrapper'' back-end to the strictness analyser
 {-# LANGUAGE ViewPatterns #-}
 
 module GHC.Core.Opt.WorkWrap.Utils
-   ( WwOpts(..), initWwOpts, mkWwBodies, mkWWstr, mkWorkerArgs
+   ( WwOpts(..), initWwOpts, mkWwBodies, mkWWstr, mkWWstr_one, mkWorkerArgs
    , DataConPatContext(..)
    , UnboxingDecision(..), ArgOfInlineableFun(..), wantToUnboxArg
    , findTypeShape, mkAbsentFiller
@@ -224,7 +224,7 @@ mkWwBodies opts fun_id arg_vars res_ty demands res_cpr
               (subst, cloned_arg_vars) = cloneBndrs empty_subst uniq_supply zapped_arg_vars
               res_ty' = GHC.Core.Subst.substTy subst res_ty
 
-        ; (useful1, work_args, wrap_fn_str, work_fn_str)
+        ; (useful1, work_args, wrap_fn_str, fn_args)
              <- mkWWstr opts inlineable_flag cloned_arg_vars
 
         -- Do CPR w/w.  See Note [Always do CPR w/w]
@@ -234,10 +234,10 @@ mkWwBodies opts fun_id arg_vars res_ty demands res_cpr
         ; let (work_lam_args, work_call_args) = mkWorkerArgs fun_id (wo_fun_to_thunk opts)
                                                              work_args cpr_res_ty
               call_work work_fn  = mkVarApps (Var work_fn) work_call_args
-              call_rhs fn_rhs = mkVarAppsBeta fn_rhs cloned_arg_vars
+              call_rhs fn_rhs = mkAppsBeta fn_rhs fn_args
                                   -- See Note [Join points and beta-redexes]
               wrapper_body = mkLams cloned_arg_vars . wrap_fn_cpr . wrap_fn_str . call_work
-              worker_body = mkLams work_lam_args . work_fn_str . work_fn_cpr . call_rhs
+              worker_body = mkLams work_lam_args . work_fn_cpr . call_rhs
               worker_args_dmds = [idDemandInfo v | v <- work_call_args, isId v]
 
         ; if isWorkerSmallEnough (wo_max_worker_args opts) (length demands) work_args
@@ -285,12 +285,13 @@ mkWwBodies opts fun_id arg_vars res_ty demands res_cpr
       | otherwise
       = False
 
--- | Version of 'GHC.Core.mkVarApps' that does beta reduction on-the-fly.
--- PRECONDITION: The arg vars don't shadow each other or any of the free vars of
--- the function expression.
-mkVarAppsBeta :: CoreExpr -> [Var] -> CoreExpr
-mkVarAppsBeta (Lam b body) (v:vs) = bindNonRec b (varToCoreExpr v) $! mkVarAppsBeta body vs
-mkVarAppsBeta f            vars   = mkVarApps f vars
+-- | Version of 'GHC.Core.mkApps' that does beta reduction on-the-fly.
+-- PRECONDITION: The arg expressions are not free in any of the lambdas binders.
+mkAppsBeta :: CoreExpr -> [CoreArg] -> CoreExpr
+-- The precondition holds for our call site in mkWwBodies, because all the FVs
+-- of as are either cloned_arg_vars (and thus fresh) or fresh worker args.
+mkAppsBeta (Lam b body) (a:as) = bindNonRec b a $! mkAppsBeta body as
+mkAppsBeta f            as     = mkApps f as
 
 -- See Note [Limit w/w arity]
 isWorkerSmallEnough :: Int -> Int -> [Var] -> Bool
@@ -352,7 +353,7 @@ function for the worker:
     in the meantime, so zap it.
 
 We zap in mkWwBodies because we need the zapped variables both when binding them
-in mkWWstr (mk_absent_let, specifically) and in mkWorkerArgs, where we produce
+in mkWWstr (mkAbsentFiller, specifically) and in mkWorkerArgs, where we produce
 the call to the fun body.
 
 ************************************************************************
@@ -897,34 +898,33 @@ mkWWstr :: WwOpts
                    CoreExpr -> CoreExpr, -- Wrapper body, lacking the worker call
                                          -- and without its lambdas
                                          -- This fn adds the unboxing
-
-                   CoreExpr -> CoreExpr) -- Worker body, lacking the original body of the function,
-                                         -- and lacking its lambdas.
-                                         -- This fn does the reboxing
+                   [CoreExpr])           -- Reboxed args for the call to the
+                                         -- original RHS. Corresponds one-to-one
+                                         -- with the wrapper arg vars
 mkWWstr opts inlineable_flag args
   = go args
   where
     go_one arg = mkWWstr_one opts inlineable_flag arg
 
-    go []           = return (False, [], nop_fn, nop_fn)
-    go (arg : args) = do { (useful1, args1, wrap_fn1, work_fn1) <- go_one arg
-                         ; (useful2, args2, wrap_fn2, work_fn2) <- go args
+    go []           = return (False, [], nop_fn, [])
+    go (arg : args) = do { (useful1, args1, wrap_fn1, wrap_arg)  <- go_one arg
+                         ; (useful2, args2, wrap_fn2, wrap_args) <- go args
                          ; return ( useful1 || useful2
                                   , args1 ++ args2
                                   , wrap_fn1 . wrap_fn2
-                                  , work_fn1 . work_fn2) }
+                                  , wrap_arg:wrap_args ) }
 
 ----------------------
--- mkWWstr_one wrap_arg = (useful, work_args, wrap_fn, work_fn)
---   *  wrap_fn assumes wrap_arg is in scope,
+-- mkWWstr_one wrap_var = (useful, work_args, wrap_fn, wrap_arg)
+--   *  wrap_fn assumes wrap_var is in scope,
 --        brings into scope work_args (via cases)
---   * work_fn assumes work_args are in scope, a
---        brings into scope wrap_arg (via lets)
+--   * wrap_arg assumes work_args are in scope, and builds a ConApp that
+--        reconstructs the RHS of wrap_var that we pass to the original RHS
 -- See Note [Worker/wrapper for Strictness and Absence]
 mkWWstr_one :: WwOpts
             -> ArgOfInlineableFun -- See Note [Do not unpack class dictionaries]
             -> Var
-            -> UniqSM (Bool, [Var], CoreExpr -> CoreExpr, CoreExpr -> CoreExpr)
+            -> UniqSM (Bool, [Var], CoreExpr -> CoreExpr, CoreExpr)
 mkWWstr_one opts inlineable_flag arg =
   case wantToUnboxArg fam_envs inlineable_flag arg_ty arg_dmd of
     _ | isTyVar arg -> do_nothing
@@ -933,8 +933,8 @@ mkWWstr_one opts inlineable_flag arg =
       | Just absent_filler <- mkAbsentFiller opts arg
          -- Absent case.  We can't always handle absence for arbitrary
          -- unlifted types, so we need to choose just the cases we can
-         -- (that's what mk_absent_let does)
-      -> return (True, [], nop_fn, bindNonRec arg absent_filler)
+         -- (that's what mkAbsentFiller does)
+      -> return (True, [], nop_fn, absent_filler)
 
     Unbox dcpc cs -> unbox_one_arg opts arg cs dcpc
 
@@ -944,34 +944,33 @@ mkWWstr_one opts inlineable_flag arg =
     fam_envs   = wo_fam_envs opts
     arg_ty     = idType arg
     arg_dmd    = idDemandInfo arg
-    do_nothing = return (False, [arg], nop_fn, nop_fn)
+    do_nothing = return (False, [arg], nop_fn, varToCoreExpr arg)
 
 unbox_one_arg :: WwOpts
           -> Var
           -> [Demand]
           -> DataConPatContext
-          -> UniqSM (Bool, [Var], CoreExpr -> CoreExpr, CoreExpr -> CoreExpr)
-unbox_one_arg opts arg cs
+          -> UniqSM (Bool, [Var], CoreExpr -> CoreExpr, CoreExpr)
+unbox_one_arg opts arg_var cs
           DataConPatContext { dcpc_dc = dc, dcpc_tc_args = tc_args
                             , dcpc_co = co }
   = do { pat_bndrs_uniqs <- getUniquesM
-       ; let ex_name_fss     = map getOccFS $ dataConExTyCoVars dc
+       ; let ex_name_fss = map getOccFS $ dataConExTyCoVars dc
              (ex_tvs', arg_ids) =
-               dataConRepFSInstPat (ex_name_fss ++ repeat ww_prefix) pat_bndrs_uniqs (idMult arg) dc tc_args
-             arg_ids'  = zipWithEqual "unbox_one_arg" setIdDemandInfo arg_ids cs
-             unbox_fn  = mkUnpackCase (Var arg) co (idMult arg)
-                                      dc (ex_tvs' ++ arg_ids')
-             rebox_fn   = Let (NonRec arg con_app)
-             con_app    = mkConApp2 dc tc_args (ex_tvs' ++ arg_ids') `mkCast` mkSymCo co
-       ; (_, worker_args, wrap_fn, work_fn) <- mkWWstr opts NotArgOfInlineableFun (ex_tvs' ++ arg_ids')
-       ; return (True, worker_args, unbox_fn . wrap_fn, work_fn . rebox_fn) }
+               dataConRepFSInstPat (ex_name_fss ++ repeat ww_prefix) pat_bndrs_uniqs (idMult arg_var) dc tc_args
+             arg_ids' = zipWithEqual "unbox_one_arg" setIdDemandInfo arg_ids cs
+             unbox_fn = mkUnpackCase (Var arg_var) co (idMult arg_var)
+                                     dc (ex_tvs' ++ arg_ids')
+       ; (_, worker_args, wrap_fn, wrap_args) <- mkWWstr opts NotArgOfInlineableFun (ex_tvs' ++ arg_ids')
+       ; let wrap_arg = mkConApp dc (map Type tc_args ++ wrap_args) `mkCast` mkSymCo co
+       ; return (True, worker_args, unbox_fn . wrap_fn, wrap_arg) }
                           -- Don't pass the arg, rebox instead
 
--- | Tries to find a suitable dummy RHS to bind the given absent identifier to.
+-- | Tries to find a suitable absent filler to bind the given absent identifier
+-- to. See Note [Absent fillers].
 --
--- If @mk_absent_let _ id == Just wrap@, then @wrap e@ will wrap a let binding
--- for @id@ with that RHS around @e@. Otherwise, there could no suitable RHS be
--- found.
+-- If @mkAbsentFiller _ id == Just e@, then @e@ is an absent filler with the
+-- same type as @id@. Otherwise, no suitable filler could be found.
 mkAbsentFiller :: WwOpts -> Id -> Maybe CoreExpr
 mkAbsentFiller opts arg
   -- The lifted case: Bind 'absentError' for a nice panic message if we are
@@ -1298,17 +1297,16 @@ mkWWcpr_entry opts body_ty body_cpr
     -- Part (1)
     res_bndr <- mk_res_bndr body_ty
     let bind_res_bndr body scope = mkDefaultCase body res_bndr scope
-        deref_res_bndr           = Var res_bndr
 
     -- Part (2)
-    (useful, fromOL -> transit_vars, wrap_build_res, work_unpack_res) <-
+    (useful, fromOL -> transit_vars, rebuilt_result, work_unpack_res) <-
       mkWWcpr_one opts res_bndr body_cpr
 
     -- Part (3)
     let (unbox_transit_tup, transit_tup) = move_transit_vars transit_vars
 
     -- Stacking unboxer (work_fn) and builder (wrap_fn) together
-    let wrap_fn = unbox_transit_tup (wrap_build_res deref_res_bndr)     -- 3 2 1
+    let wrap_fn      = unbox_transit_tup rebuilt_result                 -- 3 2
         work_fn body = bind_res_bndr body (work_unpack_res transit_tup) -- 1 2 3
         work_body_ty = exprType transit_tup
     return $ if not useful
@@ -1327,68 +1325,67 @@ mk_res_bndr body_ty = do
 --
 --   1. A Bool capturing whether the transformation did anything useful.
 --   2. The list of transit variables (see the Note).
---   3. The result builder expression for the wrapper.  'nop_fn' if not useful.
+--   3. The result builder expression for the wrapper.  The original case binder if not useful.
 --   4. The result unpacking expression for the worker. 'nop_fn' if not useful.
-type CprWwResult = (Bool, OrdList Var, CoreExpr -> CoreExpr, CoreExpr -> CoreExpr)
+type CprWwResultOne  = (Bool, OrdList Var,  CoreExpr , CoreExpr -> CoreExpr)
+type CprWwResultMany = (Bool, OrdList Var, [CoreExpr], CoreExpr -> CoreExpr)
 
-mkWWcpr :: WwOpts -> [Id] -> [Cpr] -> UniqSM CprWwResult
+mkWWcpr :: WwOpts -> [Id] -> [Cpr] -> UniqSM CprWwResultMany
 mkWWcpr _opts vars []   =
   -- special case: No CPRs means all top (for example from FlatConCpr),
   -- hence stop WW.
-  return (False, toOL vars, nop_fn, nop_fn)
+  return (False, toOL vars, map varToCoreExpr vars, nop_fn)
 mkWWcpr opts  vars cprs = do
   -- No existentials in 'vars'. 'wantToUnboxResult' should have checked that.
   massertPpr (not (any isTyVar vars)) (ppr vars $$ ppr cprs)
   massertPpr (equalLength vars cprs) (ppr vars $$ ppr cprs)
-  (usefuls, varss, wrap_build_ress, work_unpack_ress) <-
+  (usefuls, varss, rebuilt_results, work_unpack_ress) <-
     unzip4 <$> zipWithM (mkWWcpr_one opts) vars cprs
   return ( or usefuls
          , concatOL varss
-         , foldl' (.) nop_fn wrap_build_ress
+         , rebuilt_results
          , foldl' (.) nop_fn work_unpack_ress )
 
-mkWWcpr_one :: WwOpts -> Id -> Cpr -> UniqSM CprWwResult
+mkWWcpr_one :: WwOpts -> Id -> Cpr -> UniqSM CprWwResultOne
 -- ^ See if we want to unbox the result and hand off to 'unbox_one_result'.
 mkWWcpr_one opts res_bndr cpr
   | assert (not (isTyVar res_bndr) ) True
   , Unbox dcpc arg_cprs <- wantToUnboxResult (wo_fam_envs opts) (idType res_bndr) cpr
   = unbox_one_result opts res_bndr arg_cprs dcpc
   | otherwise
-  = return (False, unitOL res_bndr, nop_fn, nop_fn)
+  = return (False, unitOL res_bndr, varToCoreExpr res_bndr, nop_fn)
 
 unbox_one_result
-  :: WwOpts -> Id -> [Cpr] -> DataConPatContext -> UniqSM CprWwResult
+  :: WwOpts -> Id -> [Cpr] -> DataConPatContext -> UniqSM CprWwResultOne
 -- ^ Implements the main bits of part (2) of Note [Worker/wrapper for CPR]
 unbox_one_result opts res_bndr arg_cprs
                  DataConPatContext { dcpc_dc = dc, dcpc_tc_args = tc_args
                                    , dcpc_co = co } = do
-  -- unboxer (free in `res_bndr`):       |   builder (binds `res_bndr`):
-  --   ( case res_bndr of (i, j) -> )    |     ( let j = I# b in          )
-  --   ( case i of I# a ->          )    |     ( let i = I# a in          )
-  --   ( case j of I# b ->          )    |     ( let res_bndr = (i, j) in )
-  --   ( <hole>                     )    |     ( <hole>                   )
+  -- unboxer (free in `res_bndr`):       |   builder (where <i> builds what was
+  --   ( case res_bndr of (i, j) -> )    |            bound to i)
+  --   ( case i of I# a ->          )    |
+  --   ( case j of I# b ->          )    |     (      (<i>, <j>)      )
+  --   ( <hole>                     )    |
   pat_bndrs_uniqs <- getUniquesM
   let (_exs, arg_ids) =
         dataConRepFSInstPat (repeat ww_prefix) pat_bndrs_uniqs cprCaseBndrMult dc tc_args
   massert (null _exs) -- Should have been caught by wantToUnboxResult
 
-  let -- con_app = (C a b |> sym co)
-      con_app = mkConApp2 dc tc_args arg_ids `mkCast` mkSymCo co
-      -- this_wrap_build_res body = (let res_bndr = C a b |> sym co in <body>[r])
-      this_wrap_build_res = Let (NonRec res_bndr con_app)
+  (nested_useful, transit_vars, con_args, work_unbox_res) <-
+    mkWWcpr opts arg_ids arg_cprs
+
+  let -- rebuilt_result = (C a b |> sym co)
+      rebuilt_result = mkConApp dc (map Type tc_args ++ con_args) `mkCast` mkSymCo co
       -- this_work_unbox_res alt = (case res_bndr |> co of C a b -> <alt>[a,b])
       this_work_unbox_res = mkUnpackCase (Var res_bndr) co cprCaseBndrMult dc arg_ids
-
-  (nested_useful, transit_vars, wrap_build_res, work_unbox_res) <-
-    mkWWcpr opts arg_ids arg_cprs
 
   -- Don't try to WW an unboxed tuple return type when there's nothing inside
   -- to unbox further.
   return $ if isUnboxedTupleDataCon dc && not nested_useful
-              then ( False, unitOL res_bndr, nop_fn, nop_fn )
+              then ( False, unitOL res_bndr, Var res_bndr, nop_fn )
               else ( True
                    , transit_vars
-                   , wrap_build_res . this_wrap_build_res
+                   , rebuilt_result
                    , this_work_unbox_res . work_unbox_res
                    )
 
@@ -1449,10 +1446,7 @@ body `body` (i.e., `(Int, Int)`). Then `mkWWcpr_entry body_ty body_cpr` returns
   * A result-building expression for the wrapper, with a hole for the worker call:
     ```
       build wkr_call = ( case <wkr_call> of (# a, b #) -> )    -- (3)
-                       ( let j = I# b in                  )    -- (2)
-                       ( let i = I# a in                  )    -- (2)
-                       ( let r = (i, j) in                )    -- (2)
-                       ( r                                )    -- (1)
+                       ( (I# a, I# b)                     )    -- (2)
     ```
   * The result type of the worker, e.g., `(# Int#, Int# #)` above.
 

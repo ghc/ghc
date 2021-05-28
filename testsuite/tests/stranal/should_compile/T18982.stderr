@@ -216,7 +216,7 @@ T18982.$wi = \ (@a) (@e) (ww :: a GHC.Prim.~# Int) (ww1 :: e) (ww2 :: GHC.Prim.I
 
 -- RHS size: {terms: 15, types: 22, coercions: 1, joins: 0/0}
 i :: forall a. ExGADT a -> Int
-i = \ (@a) (w :: ExGADT a) -> case w of { ExGADT @e ww ww1 ww2 ww3 -> case ww3 of { GHC.Types.I# ww4 -> case T18982.$wi @a @e @~(ww :: a GHC.Prim.~# Int) ww2 ww4 of ww5 { __DEFAULT -> GHC.Types.I# ww5 } } }
+i = \ (@a) (ds :: ExGADT a) -> case ds of { ExGADT @e ww ww1 ww2 ww3 -> case ww3 of { GHC.Types.I# ww4 -> case T18982.$wi @a @e @~(ww :: a GHC.Prim.~# Int) ww2 ww4 of ww5 { __DEFAULT -> GHC.Types.I# ww5 } } }
 
 -- RHS size: {terms: 6, types: 7, coercions: 0, joins: 0/0}
 T18982.$wh :: forall {a}. (a GHC.Prim.~# Int) -> GHC.Prim.Int# -> GHC.Prim.Int#
@@ -224,7 +224,7 @@ T18982.$wh = \ (@a) (ww :: a GHC.Prim.~# Int) (ww1 :: GHC.Prim.Int#) -> GHC.Prim
 
 -- RHS size: {terms: 14, types: 15, coercions: 1, joins: 0/0}
 h :: forall a. GADT a -> Int
-h = \ (@a) (w :: GADT a) -> case w of { GADT ww ww1 -> case ww1 of { GHC.Types.I# ww2 -> case T18982.$wh @a @~(ww :: a GHC.Prim.~# Int) ww2 of ww3 { __DEFAULT -> GHC.Types.I# ww3 } } }
+h = \ (@a) (ds :: GADT a) -> case ds of { GADT ww ww1 -> case ww1 of { GHC.Types.I# ww2 -> case T18982.$wh @a @~(ww :: a GHC.Prim.~# Int) ww2 of ww3 { __DEFAULT -> GHC.Types.I# ww3 } } }
 
 -- RHS size: {terms: 9, types: 4, coercions: 0, joins: 0/0}
 T18982.$wg :: forall {e}. e -> GHC.Prim.Int# -> GHC.Prim.Int#
@@ -232,7 +232,7 @@ T18982.$wg = \ (@e) (ww :: e) (ww1 :: GHC.Prim.Int#) -> case ww of { __DEFAULT -
 
 -- RHS size: {terms: 14, types: 11, coercions: 0, joins: 0/0}
 g :: Ex Int -> Int
-g = \ (w :: Ex Int) -> case w of { Ex @e ww ww1 -> case ww1 of { GHC.Types.I# ww2 -> case T18982.$wg @e ww ww2 of ww3 { __DEFAULT -> GHC.Types.I# ww3 } } }
+g = \ (ds :: Ex Int) -> case ds of { Ex @e ww ww1 -> case ww1 of { GHC.Types.I# ww2 -> case T18982.$wg @e ww ww2 of ww3 { __DEFAULT -> GHC.Types.I# ww3 } } }
 
 -- RHS size: {terms: 4, types: 1, coercions: 0, joins: 0/0}
 T18982.$wf :: GHC.Prim.Int# -> GHC.Prim.Int#
@@ -240,7 +240,7 @@ T18982.$wf = \ (ww :: GHC.Prim.Int#) -> GHC.Prim.+# ww 1#
 
 -- RHS size: {terms: 13, types: 8, coercions: 0, joins: 0/0}
 f :: Box Int -> Int
-f = \ (w :: Box Int) -> case w of { Box ww -> case ww of { GHC.Types.I# ww1 -> case T18982.$wf ww1 of ww2 { __DEFAULT -> GHC.Types.I# ww2 } } }
+f = \ (ds :: Box Int) -> case ds of { Box ww -> case ww of { GHC.Types.I# ww1 -> case T18982.$wf ww1 of ww2 { __DEFAULT -> GHC.Types.I# ww2 } } }
 
 
 
