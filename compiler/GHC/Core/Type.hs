@@ -395,7 +395,7 @@ how roles in kinds might work out.
 -- See also Note [coreView vs tcView]
 {-# INLINE tcView #-}
 tcView :: Type -> Maybe Type
-tcView (TyConApp tc tys) | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc tys
+tcView ty@(TyConApp tc tys) | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc tys
   = Just (mkAppTys (substTy (mkTvSubstPrs tenv) rhs) tys')
                -- The free vars of 'rhs' should all be bound by 'tenv', so it's
                -- ok to use 'substTy' here.
@@ -403,6 +403,20 @@ tcView (TyConApp tc tys) | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc tys
                -- Its important to use mkAppTys, rather than (foldl AppTy),
                -- because the function part might well return a
                -- partially-applied type constructor; indeed, usually will!
+  | tc `hasKey` getRepTyConKey                      
+  = Just $ getRep ty
+  | tc `hasKey` getConvTyConKey                     
+  = Just $ getConv ty
+  where
+      getRep ty
+        | TyConApp getRepTyCon [rinfo] <-  ty
+        , TyConApp rinfo [rep, conv] <- rinfo = rep
+        | otherwise                           = ty
+      getConv ty
+        | TyConApp getConvTyCon [rinfo] <-  ty
+        , TyConApp rinfo [rep, conv] <- rinfo = conv
+        | otherwise                           = ty
+            
 tcView _ = Nothing
 
 {-# INLINE coreView #-}
@@ -424,6 +438,19 @@ coreView ty@(TyConApp tc tys)
   | isConstraintKindCon tc
   = ASSERT2( null tys, ppr ty )
     Just liftedTypeKind
+  | tc `hasKey` getRepTyConKey                      
+  = Just $ getRep ty
+  | tc `hasKey` getConvTyConKey                     
+  = Just $ getConv ty
+  where
+      getRep ty
+        | TyConApp getRepTyCon [rinfo] <-  ty
+        , TyConApp rinfo [rep, conv] <- rinfo = rep
+        | otherwise                           = ty
+      getConv ty
+        | TyConApp getConvTyCon [rinfo] <-  ty
+        , TyConApp rinfo [rep, conv] <- rinfo = conv
+        | otherwise                           = ty
 
 coreView _ = Nothing
 
@@ -432,21 +459,13 @@ coreFullView :: Type -> Type
 -- ^ Iterates 'coreView' until there is no more to synonym to expand.
 -- See Note [Inlining coreView].
 coreFullView ty@(TyConApp tc _)
-  | isTypeSynonymTyCon tc || isConstraintKindCon tc = go ty
-  | tc `hasKey` getRepTyConKey                      = getRep ty
-  | tc `hasKey` getConvTyConKey                     = getConv ty
+  | isTypeSynonymTyCon tc || isConstraintKindCon tc 
+  || tc `hasKey` getRepTyConKey || tc `hasKey` getConvTyConKey  
+  = go ty
   where
     go ty
       | Just ty' <- coreView ty = go ty'
       | otherwise = ty
-    getRep ty
-      | TyConApp getRepTyCon [rinfo] <-  ty
-      , TyConApp rinfo [rep, conv] <- rinfo = rep
-      | otherwise                           = ty
-    getConv ty
-      | TyConApp getConvTyCon [rinfo] <-  ty
-      , TyConApp rinfo [rep, conv] <- rinfo = conv
-      | otherwise                           = ty
 
 coreFullView ty = ty
 
@@ -589,39 +608,31 @@ kindInfo k = case kindInfo_maybe k of
 kindRep_maybe :: HasDebugCallStack => Kind -> Maybe Type
 kindRep_maybe kind
   | TyConApp tc [arg] <- coreFullView kind
-  , tc `hasKey` tYPETyConKey = getRep_maybe arg
+  , tc `hasKey` tYPETyConKey                = Just $ getRep arg
   | otherwise                               = Nothing
 
 -- | Given a type (RInfo rr cc) extracts its RuntimeRep
 -- classifier rr.
-getRep_maybe :: Type -> Maybe Type
-getRep_maybe rinfo 
-  | TyConApp rinfo [rep, conv] <- rinfo
-  , rinfo `hasKey` runtimeInfoDataConKey    = Just rep
-  | Just tv <- getTyVar_maybe  rinfo
-  , isRuntimeInfoVar tv                     = Just $ mkTyConApp getRepTyCon [rinfo]
-  | rep <- coreFullView rinfo               = Just rep
-  -- , isRuntimeRepTy rep                      = Just rep
-  | otherwise                               = Nothing
+getRep :: Type -> Type
+getRep rinfo 
+  | TyConApp rinfo [rep, _] <- coreFullView rinfo
+  , rinfo `hasKey` runtimeInfoDataConKey    = rep
+  | otherwise                               = mkTyConApp getRepTyCon [rinfo]
 
 
 kindConv_maybe :: HasDebugCallStack => Kind -> Maybe Type
 kindConv_maybe kind
   | TyConApp tc [arg] <- coreFullView kind
-  , tc `hasKey` tYPETyConKey                = getConv_maybe arg
+  , tc `hasKey` tYPETyConKey                = Just $ getConv arg
   | otherwise                               = Nothing
 
 -- | Given a type (RInfo rr cc) extracts its CallingConv
 -- classifier cc.
-getConv_maybe :: Type -> Maybe Type
-getConv_maybe rinfo 
-  | TyConApp rinfo [rep, conv] <- rinfo
-  , rinfo `hasKey` runtimeInfoDataConKey    = Just conv
-  | Just tv <- getTyVar_maybe  rinfo
-  , isRuntimeInfoVar tv                     = Just $ mkTyConApp getConvTyCon [rinfo]
-  | conv <- coreFullView rinfo              = Just conv
-  -- , isRuntimeRepTy rep                      = Just rep
-  | otherwise                               = Nothing
+getConv :: Type -> Type
+getConv rinfo 
+  | TyConApp rinfo [_, conv] <- coreFullView rinfo
+  , rinfo `hasKey` runtimeInfoDataConKey    = conv
+  | otherwise                               = mkTyConApp getConvTyCon [rinfo]
 
 kindInfo_maybe :: HasDebugCallStack => Kind -> Maybe Type
 kindInfo_maybe kind
