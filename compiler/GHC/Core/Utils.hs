@@ -1609,11 +1609,17 @@ expr_ok primop_ok other_expr
   | (expr, args) <- collectArgs other_expr
   = case stripTicksTopE (not . tickishCounts) expr of
         Var f            -> app_ok primop_ok f args
+
         -- 'LitRubbish' is the only literal that can occur in the head of an
         -- application and will not be matched by the above case (Var /= Lit).
-        Lit LitRubbish{}  -> True
-        Lit _ | debugIsOn -> pprPanic "Non-rubbish lit in app head" (ppr other_expr)
-        _                 -> False
+        -- See Note [How a rubbish literal can be the head of an application]
+        -- in GHC.Types.Literal
+        Lit lit | debugIsOn, not (isLitRubbish lit)
+                 -> pprPanic "Non-rubbish lit in app head" (ppr lit)
+                 | otherwise
+                 -> True
+
+        _ -> False
 
 -----------------------------
 app_ok :: (PrimOp -> Bool) -> Id -> [CoreExpr] -> Bool
