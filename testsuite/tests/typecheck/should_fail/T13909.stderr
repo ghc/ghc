@@ -2,6 +2,8 @@
 T13909.hs:11:18: error:
     • Expecting two more arguments to ‘Hm’
       Expected kind ‘k’, but ‘Hm’ has kind ‘forall k -> k -> *’
+      Cannot equate type variable ‘k’
+      with a kind involving polytypes: forall k1 -> k1 -> *
       ‘k’ is a rigid type variable bound by
         an instance declaration
         at T13909.hs:11:10-19
