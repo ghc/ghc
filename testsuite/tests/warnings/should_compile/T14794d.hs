@@ -1,31 +1,16 @@
 {-# LANGUAGE PatternSynonyms #-}
-{-# OPTIONS_GHC -Wmissing-exported-signatures -Wmissing-pattern-synonym-signatures #-}
+{-# OPTIONS_GHC -Wmissing-pattern-synonym-signatures #-}
 
-module T14794d (test1, pattern Test2, test3, pattern Test4) where
+module T14794d (testExported, pattern TestExported) where
 
--- This should generate warnings with;
--- -Wmissing-exported-signatures -Wmissing-pattern-synonym-signatures
+-- These should generate warnings:
 
-test3 = True
+pattern TestExported <- True
 
-pattern Test4 <- True
+pattern TestUnexported <- True
 
+-- These should not generate warnings:
 
--- This should not generate warnings with;
--- -Wmissing-exported-signatures -Wmissing-pattern-synonym-signatures
+testExported = True
 
-test1 :: Bool
-test1 = True
-
-pattern Test2 :: Bool
-pattern Test2 <- True
-
-test5 :: Bool
-test5 = True
-
-pattern Test6 :: Bool
-pattern Test6 <- True
-
-test7 = True
-
-pattern Test8 <- True
+testUnexported = True
