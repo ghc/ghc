@@ -16,7 +16,7 @@ import GHC.Prelude
 import {-# SOURCE #-} GHC.HsToCore.Expr ( dsExpr, dsLExpr, dsLExprNoLP, dsLocalBinds, dsSyntaxExpr )
 
 import GHC.Hs
-import GHC.Hs.Expr.Type
+import GHC.Hs.Syn.Type
 import GHC.Core
 import GHC.Core.Make
 

@@ -3,7 +3,7 @@
 -- Note that this does /not/ currently support the use case of annotating
 -- every subexpression in an 'HsExpr' with its 'Type'. For more information on
 -- this task, see #12706, #15320, #16804, and #17331.
-module GHC.Hs.Expr.Type (
+module GHC.Hs.Syn.Type (
     -- * Extracting types from HsExpr
     lhsExprType, hsExprType,
     -- * Extracting types from HsSyn

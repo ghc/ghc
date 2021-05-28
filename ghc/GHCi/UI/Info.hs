@@ -34,7 +34,7 @@ import           Data.Time
 import           Prelude           hiding (mod,(<>))
 import           System.Directory
 
-import           GHC.Hs.Expr.Type
+import           GHC.Hs.Syn.Type
 import           GHC.Driver.Session (HasDynFlags(..))
 import           GHC.Data.FastString
 import           GHC

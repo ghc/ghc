@@ -18,7 +18,7 @@ import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcCheckMonoExpr, tcInferRho, tcSyntaxOp
                                        , tcCheckPolyExpr )
 
 import GHC.Hs
-import GHC.Hs.Expr.Type
+import GHC.Hs.Syn.Type
 import GHC.Tc.Gen.Match
 import GHC.Tc.Gen.Head( tcCheckId )
 import GHC.Tc.Utils.TcType
