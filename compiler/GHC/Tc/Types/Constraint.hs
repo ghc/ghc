@@ -142,7 +142,7 @@ We thus perform an occurs-check. There is, of course, some subtlety:
 
 The occurs check is performed in GHC.Tc.Utils.Unify.checkTypeEq
 and forms condition T3 in Note [Extending the inert equalities]
-in GHC.Tc.Solver.Monad.
+in GHC.Tc.Solver.InertSet.
 
 -}
 
@@ -192,7 +192,7 @@ data Ct
 
   | CEqCan {  -- CanEqLHS ~ rhs
        -- Invariants:
-       --   * See Note [inert_eqs: the inert equalities] in GHC.Tc.Solver.Monad
+       --   * See Note [inert_eqs: the inert equalities] in GHC.Tc.Solver.InertSet
        --   * Many are checked in checkTypeEq in GHC.Tc.Utils.Unify
        --   * (TyEq:OC) lhs does not occur in rhs (occurs check)
        --               Note [CEqCan occurs check]
@@ -1190,7 +1190,7 @@ data ImplicStatus
 
 data HasGivenEqs -- See Note [HasGivenEqs]
   = NoGivenEqs      -- Definitely no given equalities,
-                    --   except by Note [Let-bound skolems] in GHC.Tc.Solver.Monad
+                    --   except by Note [Let-bound skolems] in GHC.Tc.Solver.InertSet
   | LocalGivenEqs   -- Might have Given equalities, but only ones that affect only
                     --   local skolems e.g. forall a b. (a ~ F b) => ...
   | MaybeGivenEqs   -- Might have any kind of Given equalities; no floating out
@@ -1202,7 +1202,7 @@ data HasGivenEqs -- See Note [HasGivenEqs]
 The GivenEqs data type describes the Given constraints of an implication constraint:
 
 * NoGivenEqs: definitely no Given equalities, except perhaps let-bound skolems
-  which don't count: see Note [Let-bound skolems] in GHC.Tc.Solver.Monad
+  which don't count: see Note [Let-bound skolems] in GHC.Tc.Solver.InertSet
   Examples: forall a. Eq a => ...
             forall a. (Show a, Num a) => ...
             forall a. a ~ Either Int Bool => ...  -- Let-bound skolem
@@ -1648,7 +1648,7 @@ ctEvFlavour (CtDerived {})                  = Derived
 
 -- | Whether or not one 'Ct' can rewrite another is determined by its
 -- flavour and its equality relation. See also
--- Note [Flavours with roles] in "GHC.Tc.Solver.Monad"
+-- Note [Flavours with roles] in GHC.Tc.Solver.InertSet
 type CtFlavourRole = (CtFlavour, EqRel)
 
 -- | Extract the flavour, role, and boxity from a 'CtEvidence'
@@ -1756,7 +1756,7 @@ should rewrite [D] F alpha ~R T a, we could require splitting the first D
 into [D] F alpha ~NO T alpha, [D] F alpha ~R T alpha. Then, we use the R
 half of the split to rewrite the second D, and off we go. This splitting
 would allow the split-off R equality to be rewritten by other equalities,
-thus avoiding the problem in Note [Why R2?] in GHC.Tc.Solver.Monad.
+thus avoiding the problem in Note [Why R2?] in GHC.Tc.Solver.InertSet.
 
 This infelicity is #19665 and tested in typecheck/should_compile/T19665
 (marked as expect_broken).

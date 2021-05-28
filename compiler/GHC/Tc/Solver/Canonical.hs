@@ -20,6 +20,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Core.Type
 import GHC.Tc.Solver.Rewrite
 import GHC.Tc.Solver.Monad
+import GHC.Tc.Solver.InertSet
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.EvTerm
 import GHC.Core.Class
@@ -159,7 +160,7 @@ canClassNC ev cls tys
   -- call, we need to push the current call-site onto the stack instead
   -- of solving it directly from a given.
   -- See Note [Overview of implicit CallStacks] in GHC.Tc.Types.Evidence
-  -- and Note [Solving CallStack constraints] in GHC.Tc.Solver.Monad
+  -- and Note [Solving CallStack constraints] in GHC.Tc.Solver.Types
   = do { -- First we emit a new constraint that will capture the
          -- given CallStack.
        ; let new_loc = setCtLocOrigin loc (IPOccOrigin (HsIPName ip_name))
@@ -1973,7 +1974,7 @@ When an equality fails, we still want to rewrite the equality
 all the way down, so that it accurately reflects
  (a) the mutable reference substitution in force at start of solving
  (b) any ty-binds in force at this point in solving
-See Note [Rewrite insolubles] in GHC.Tc.Solver.Monad.
+See Note [Rewrite insolubles] in GHC.Tc.Solver.InertSet.
 And if we don't do this there is a bad danger that
 GHC.Tc.Solver.applyTyVarDefaulting will find a variable
 that has in fact been substituted.
