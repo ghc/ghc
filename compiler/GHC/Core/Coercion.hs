@@ -34,7 +34,7 @@ module GHC.Core.Coercion (
         mkPiCo, mkPiCos, mkCoCast,
         mkSymCo, mkTransCo,
         mkNthCo, mkNthCoFunCo, nthCoRole, mkLRCo,
-        mkInstCo, mkAppCo, mkAppCos, mkTyConAppCo, mkFunCo,
+        mkInstCo, mkAppCo, mkAppCos, mkTyConAppCo, mkFunCo, mkFunResCo,
         mkForAllCo, mkForAllCos, mkHomoForAllCos,
         mkPhantomCo,
         mkHoleCo, mkUnivCo, mkSubCo,
@@ -71,7 +71,9 @@ module GHC.Core.Coercion (
         isReflCoVar_maybe, isGReflMCo, mkGReflLeftMCo, mkGReflRightMCo,
         mkCoherenceRightMCo,
 
-        coToMCo, mkTransMCo, mkTransMCoL, mkCastTyMCo, mkSymMCo, isReflMCo,
+        coToMCo, mkTransMCo, mkTransMCoL, mkTransMCoR, mkCastTyMCo, mkSymMCo,
+        mkHomoForAllMCo, mkFunResMCo, mkPiMCos,
+        isReflMCo,
 
         -- ** Coercion variables
         mkCoVar, isCoVar, coVarName, setCoVarName, setCoVarUnique,
@@ -333,6 +335,10 @@ mkTransMCoL :: MCoercion -> Coercion -> MCoercion
 mkTransMCoL MRefl     co2 = MCo co2
 mkTransMCoL (MCo co1) co2 = MCo (mkTransCo co1 co2)
 
+mkTransMCoR :: Coercion -> MCoercion -> MCoercion
+mkTransMCoR co1 MRefl     = coToMCo co1
+mkTransMCoR co1 (MCo co2) = MCo (mkTransCo co1 co2)
+
 -- | Get the reverse of an 'MCoercion'
 mkSymMCo :: MCoercion -> MCoercion
 mkSymMCo MRefl    = MRefl
@@ -342,6 +348,18 @@ mkSymMCo (MCo co) = MCo (mkSymCo co)
 mkCastTyMCo :: Type -> MCoercion -> Type
 mkCastTyMCo ty MRefl    = ty
 mkCastTyMCo ty (MCo co) = ty `mkCastTy` co
+
+mkHomoForAllMCo :: TyCoVar -> MCoercion -> MCoercion
+mkHomoForAllMCo _   MRefl    = MRefl
+mkHomoForAllMCo tcv (MCo co) = MCo (mkHomoForAllCos [tcv] co)
+
+mkPiMCos :: [Var] -> MCoercion -> MCoercion
+mkPiMCos _ MRefl = MRefl
+mkPiMCos vs (MCo co) = MCo (mkPiCos Representational vs co)
+
+mkFunResMCo :: Scaled Type -> MCoercionR -> MCoercionR
+mkFunResMCo _      MRefl    = MRefl
+mkFunResMCo arg_ty (MCo co) = MCo (mkFunResCo Representational arg_ty co)
 
 mkGReflLeftMCo :: Role -> Type -> MCoercionN -> Coercion
 mkGReflLeftMCo r ty MRefl    = mkReflCo r ty
@@ -1051,18 +1069,18 @@ mkNthCo :: HasDebugCallStack
         -> Coercion
 mkNthCo r n co
   = assertPpr good_call bad_call_msg $
-    go r n co
+    go n co
   where
     Pair ty1 ty2 = coercionKind co
 
-    go r 0 co
+    go 0 co
       | Just (ty, _) <- isReflCo_maybe co
       , Just (tv, _) <- splitForAllTyCoVar_maybe ty
       = -- works for both tyvar and covar
         assert (r == Nominal) $
         mkNomReflCo (varType tv)
 
-    go r n co
+    go n co
       | Just (ty, r0) <- isReflCo_maybe co
       , let tc = tyConAppTyCon ty
       = assertPpr (ok_tc_app ty n) (ppr n $$ ppr ty) $
@@ -1077,7 +1095,7 @@ mkNthCo r n co
               | otherwise
               = False
 
-    go r 0 (ForAllCo _ kind_co _)
+    go 0 (ForAllCo _ kind_co _)
       = assert (r == Nominal)
         kind_co
       -- If co :: (forall a1:k1. t1) ~ (forall a2:k2. t2)
@@ -1085,10 +1103,10 @@ mkNthCo r n co
       -- If co :: (forall a1:t1 ~ t2. t1) ~ (forall a2:t3 ~ t4. t2)
       -- then (nth 0 co :: (t1 ~ t2) ~N (t3 ~ t4))
 
-    go _ n (FunCo _ w arg res)
+    go n (FunCo _ w arg res)
       = mkNthCoFunCo n w arg res
 
-    go r n (TyConAppCo r0 tc arg_cos) = assertPpr (r == nthRole r0 tc n)
+    go n (TyConAppCo r0 tc arg_cos) = assertPpr (r == nthRole r0 tc n)
                                                   (vcat [ ppr tc
                                                         , ppr arg_cos
                                                         , ppr r0
@@ -1096,8 +1114,11 @@ mkNthCo r n co
                                                         , ppr r ]) $
                                              arg_cos `getNth` n
 
-    go r n co =
-      NthCo r n co
+    go n (SymCo co)  -- Recurse, hoping to get to a TyConAppCo or FunCo
+      = mkSymCo (go n co)
+
+    go n co
+      = NthCo r n co
 
     -- Assertion checking
     bad_call_msg = vcat [ text "Coercion =" <+> ppr co
@@ -1619,8 +1640,17 @@ mkPiCo r v co | isTyVar v = mkHomoForAllCos [v] co
                   -- want it to be r. It is only called in 'mkPiCos', which is
                   -- only used in GHC.Core.Opt.Simplify.Utils, where we are sure for
                   -- now (Aug 2018) v won't occur in co.
-                            mkFunCo r (multToCo (varMult v)) (mkReflCo r (varType v)) co
-              | otherwise = mkFunCo r (multToCo (varMult v)) (mkReflCo r (varType v)) co
+                            mkFunResCo r scaled_ty co
+              | otherwise = mkFunResCo r scaled_ty co
+              where
+                scaled_ty = Scaled (varMult v) (varType v)
+
+mkFunResCo :: Role -> Scaled Type -> Coercion -> Coercion
+-- Given res_co :: res1 -> res2,
+--   mkFunResCo r m arg res_co :: (arg -> res1) ~r (arg -> res2)
+-- Reflexive in the multiplicity argument
+mkFunResCo role (Scaled mult arg_ty) res_co
+  = mkFunCo role (multToCo mult) (mkReflCo role arg_ty) res_co
 
 -- mkCoCast (c :: s1 ~?r t1) (g :: (s1 ~?r t1) ~#R (s2 ~?r t2)) :: s2 ~?r t2
 -- The first coercion might be lifted or unlifted; thus the ~? above
@@ -1777,7 +1807,7 @@ topNormaliseNewType_maybe :: Type -> Maybe (Coercion, Type)
 --
 -- > topNormaliseNewType_maybe rec_nts ty = Just (co, ty')
 --
--- then (a)  @co : ty0 ~ ty'@.
+-- then (a)  @co : ty ~ ty'@.
 --      (b)  ty' is not a newtype.
 --
 -- The function returns @Nothing@ for non-@newtypes@,

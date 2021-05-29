@@ -810,7 +810,7 @@ dsSyntaxExpr (SyntaxExprTc { syn_expr      = expr
         -- See Note [Desugaring representation-polymorphic applications]
         --   in GHC.HsToCore.Utils
              expr_type = hsWrapperType res_wrap
-               (applyTypeToArgs fun (exprType fun) wrapped_args)
+               (applyTypeToArgs (ppr fun) (exprType fun) wrapped_args)
        ; dsWhenNoErrs expr_type
           (zipWithM_ dsNoLevPolyExpr wrapped_args [ mk_msg n | n <- [1..] ])
           (\_ -> core_res_wrap (mkCoreApps fun wrapped_args)) }
