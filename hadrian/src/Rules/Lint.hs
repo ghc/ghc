@@ -51,12 +51,12 @@ base = do
   let machDeps     = "includes/MachDeps.h"
   let ghcautoconf  = stage1Lib </> "ghcautoconf.h"
   let ghcplatform  = stage1Lib </> "ghcplatform.h"
-  need ["stage1:lib:base", ghcautoconf, ghcplatform, machDeps]
+  cmd_ (Cwd "libraries/base") "./configure"
+  need [ghcautoconf, ghcplatform, machDeps]
   let includeDirs =
         [ "includes"
         , "libraries/base/include"
         , stage1Lib
-        , buildDir </> "stage1/libraries/base/build/include"
         ]
   runHLint includeDirs [] "libraries/base"
 
