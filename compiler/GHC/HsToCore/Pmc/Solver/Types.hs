@@ -56,7 +56,7 @@ import GHC.Core.Utils (exprType)
 import GHC.Builtin.Names
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim
-import GHC.Tc.Solver.Monad (InertSet, emptyInert)
+import GHC.Tc.Solver.InertSet (InertSet, emptyInert)
 import GHC.Tc.Utils.TcType (isStringTy)
 import GHC.Types.CompleteMatch (CompleteMatch(..))
 import GHC.Types.SourceText (SourceText(..), mkFractionalLit, FractionalLit

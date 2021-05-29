@@ -1566,7 +1566,7 @@ There are three reasons not to unify:
    between levels 'n' and 'l'.
 
    Exactly what is a "given equality" for the purpose of (UNTOUCHABLE)?
-   Answer: see Note [Tracking Given equalities] in GHC.Tc.Solver.Monad
+   Answer: see Note [Tracking Given equalities] in GHC.Tc.Solver.InertSet
 
 3. (TYVAR-TV) Unifying TyVarTvs and CycleBreakerTvs
    This precondition looks at the MetaInfo of the unification variable:
@@ -1608,7 +1608,7 @@ Needless to say, all three have wrinkles:
 
   * In the constraint solver, we track where Given equalities occur
     and use that to guard unification in GHC.Tc.Solver.Canonical.unifyTest
-    More details in Note [Tracking Given equalities] in GHC.Tc.Solver.Monad
+    More details in Note [Tracking Given equalities] in GHC.Tc.Solver.InertSet
 
     Historical note: in the olden days (pre 2021) the constraint solver
     also used to unify only if l=n.  Equalities were "floated" out of the
@@ -1704,7 +1704,7 @@ Wanteds and Givens, but either way, deepest wins!  Simple.
   Otherwise it can't.  By putting the deepest variable on the left
   we maximise our changes of eliminating skolem capture.
 
-  See also GHC.Tc.Solver.Monad Note [Let-bound skolems] for another reason
+  See also GHC.Tc.Solver.InertSet Note [Let-bound skolems] for another reason
   to orient with the deepest skolem on the left.
 
   IMPORTANT NOTE: this test does a level-number comparison on
