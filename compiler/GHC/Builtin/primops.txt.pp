@@ -3133,7 +3133,8 @@ section "Controlling object lifetime"
 -- See Note [keepAlive# magic] in GHC.CoreToStg.Prep.
 primop KeepAliveOp "keepAlive#" GenPrimOp
    o -> State# RealWorld -> (State# RealWorld -> p) -> p
-   { TODO. }
+   { \tt{keepAlive# x s k} keeps the value \tt{x} alive during the execution
+     of the computation \tt{k}. }
    with
    strictness = { \ _arity -> mkClosedDmdSig [topDmd, topDmd, strictOnceApply1Dmd] topDiv }
 
@@ -3287,13 +3288,6 @@ pseudoop "void#"
      of the primitive type {\tt Void\#}, which is now defined to be {\tt (\# \#)}.
    }
    with deprecated_msg = { Use an unboxed unit tuple instead }
-
-pseudoop "magicDict"
-   a
-   { {\tt magicDict} is a special-purpose placeholder value.
-     It is used internally by modules such as {\tt GHC.TypeNats} to cast a typeclass
-     dictionary with a single method. It is eliminated by a rule during compilation.
-     For the details, see Note [magicDictId magic] in GHC. }
 
 primtype Proxy# a
    { The type constructor {\tt Proxy#} is used to bear witness to some

@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP          #-}
+
 {-# LANGUAGE ViewPatterns #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
@@ -76,8 +76,6 @@ module GHC.Types.Demand (
     -- * Zapping usage information
     zapUsageDemand, zapDmdEnvSig, zapUsedOnceDemand, zapUsedOnceSig
   ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -719,7 +717,7 @@ the latter, for a regrettable-subtle reason.  Consider
   g h p2@(_,_) = h p
 We want to unbox @p1@ of @f@, but not @p2@ of @g@, because @g@ only uses
 @p2@ boxed and we'd have to rebox. So we give @p1@ demand LP(L,L) and @p2@
-demand @L@ to inform 'GHC.Core.Opt.WorkWrap.Utils.wantToUnbox', which will
+demand @L@ to inform 'GHC.Core.Opt.WorkWrap.Utils.wantToUnboxArg', which will
 say "unbox" for @p1@ and "don't unbox" for @p2@.
 
 So the solution is: don't aggressively collapse @Prod [topDmd, topDmd]@ to

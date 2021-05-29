@@ -4,7 +4,7 @@
 
 -}
 
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -19,15 +19,13 @@ module GHC.Tc.TyCl.Instance
    )
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Hs
 import GHC.Tc.Gen.Bind
 import GHC.Tc.TyCl
 import GHC.Tc.TyCl.Utils ( addTyConsToGblEnv )
-import GHC.Tc.TyCl.Class ( tcClassDecl2, tcATDefault,
+import GHC.Tc.TyCl.Class ( tcClassDecl2, ClassScopedTVEnv, tcATDefault,
                            HsSigFun, mkHsSigFun, badMethodErr,
                            findMethodBind, instantiateMethod )
 import GHC.Tc.Solver( pushLevelAndSolveEqualitiesX, reportUnsolvedEqualities )
@@ -80,6 +78,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Types.SrcLoc
 import GHC.Utils.Misc
 import GHC.Data.BooleanFormula ( isUnsatisfied, pprBooleanFormulaNice )
@@ -748,7 +747,7 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
               ; axiom_name  <- newFamInstAxiomName lfam_name [pats]
               ; tc_rhs <- case new_or_data of
                      DataType -> return (mkDataTyConRhs data_cons)
-                     NewType  -> ASSERT( not (null data_cons) )
+                     NewType  -> assert (not (null data_cons)) $
                                  mkNewTyConRhs rep_tc_name rec_rep_tc (head data_cons)
 
               ; let ax_rhs = mkTyConApp rep_tc (mkTyVarTys post_eta_qtvs)
@@ -1054,6 +1053,23 @@ however, so this Note aims to describe these subtleties:
   themselves.  Heavy sigh.  But not truly hard; that's what tcbVisibilities
   does.
 
+* Happily, we don't need to worry about the possibility of
+  building an inhomogeneous axiom, described in GHC.Tc.TyCl.Build
+  Note [Newtype eta and homogeneous axioms].   For example
+     type F :: Type -> forall (b :: Type) -> Type
+     data family F a b
+     newtype instance F Int b = MkF (Proxy b)
+  we get a newtype, and a eta-reduced axiom connecting the data family
+  with the newtype:
+     type R:FIntb :: forall (b :: Type) -> Type
+     newtype R:FIntb b = MkF (Proxy b)
+     axiom Foo.D:R:FIntb0 :: F Int = Foo.R:FIntb
+  Now the subtleties of Note [Newtype eta and homogeneous axioms] are
+  dealt with by the newtype (via mkNewTyConRhs called in tcDataFamInstDecl)
+  while the axiom connecting F Int ~ R:FIntb is eta-reduced, but the
+  quantifer 'b' is derived from the original data family F, and so the
+  kinds will always match.
+
 Note [Kind inference for data family instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this GADT-style data type declaration, where I have used
@@ -1143,17 +1159,17 @@ takes a slightly different approach.
 *                                                                      *
 ********************************************************************* -}
 
-tcInstDecls2 :: [LTyClDecl GhcRn] -> [InstInfo GhcRn]
+tcInstDecls2 :: [LTyClDecl GhcRn] -> [InstInfo GhcRn] -> ClassScopedTVEnv
              -> TcM (LHsBinds GhcTc)
 -- (a) From each class declaration,
 --      generate any default-method bindings
 -- (b) From each instance decl
 --      generate the dfun binding
 
-tcInstDecls2 tycl_decls inst_decls
+tcInstDecls2 tycl_decls inst_decls class_scoped_tv_env
   = do  { -- (a) Default methods from class decls
           let class_decls = filter (isClassDecl . unLoc) tycl_decls
-        ; dm_binds_s <- mapM tcClassDecl2 class_decls
+        ; dm_binds_s <- mapM (tcClassDecl2 class_scoped_tv_env) class_decls
         ; let dm_binds = unionManyBags dm_binds_s
 
           -- (b) instance declarations
@@ -1250,8 +1266,8 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
                      --    con_app_tys  = MkD ty1 ty2
                      --    con_app_scs  = MkD ty1 ty2 sc1 sc2
                      --    con_app_args = MkD ty1 ty2 sc1 sc2 op1 op2
-             con_app_tys  = mkHsWrap (mkWpTyApps inst_tys)
-                                  (HsConLikeOut noExtField (RealDataCon dict_constr))
+             con_app_tys  = mkHsWrap (mkWpTyApps inst_tys) $
+                            mkConLikeTc (RealDataCon dict_constr)
                        -- NB: We *can* have covars in inst_tys, in the case of
                        -- promoted GADT constructors.
 

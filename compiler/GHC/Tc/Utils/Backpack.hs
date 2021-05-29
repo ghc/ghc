@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP                      #-}
+
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE ScopedTypeVariables      #-}
 {-# LANGUAGE TypeFamilies             #-}
@@ -23,7 +23,6 @@ import GHC.Driver.Env
 import GHC.Driver.Ppr
 
 import GHC.Types.Basic (TypeOrKind(..))
-import GHC.Types.Error ( DiagnosticMessage )
 import GHC.Types.Fixity (defaultFixity)
 import GHC.Types.Fixity.Env
 import GHC.Types.TypeEnv
@@ -77,10 +76,10 @@ import GHC.Tc.Utils.Env
 import GHC.Tc.Errors
 import GHC.Tc.Utils.Unify
 
-import GHC.Utils.Misc
 import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 
 import GHC.Data.FastString
 import GHC.Data.Maybe
@@ -89,8 +88,6 @@ import Control.Monad
 import Data.List (find)
 
 import {-# SOURCE #-} GHC.Tc.Module
-
-#include "HsVersions.h"
 
 fixityMisMatch :: TyThing -> Fixity -> Fixity -> SDoc
 fixityMisMatch real_thing real_fixity sig_fixity =
@@ -372,7 +369,7 @@ checkUnit (VirtUnit indef) = do
 -- an @hsig@ file.)
 tcRnCheckUnit ::
     HscEnv -> Unit ->
-    IO (Messages DiagnosticMessage, Maybe ())
+    IO (Messages TcRnMessage, Maybe ())
 tcRnCheckUnit hsc_env uid =
    withTiming logger dflags
               (text "Check unit id" <+> ppr uid)
@@ -393,7 +390,7 @@ tcRnCheckUnit hsc_env uid =
 -- | Top-level driver for signature merging (run after typechecking
 -- an @hsig@ file).
 tcRnMergeSignatures :: HscEnv -> HsParsedModule -> TcGblEnv {- from local sig -} -> ModIface
-                    -> IO (Messages DiagnosticMessage, Maybe TcGblEnv)
+                    -> IO (Messages TcRnMessage, Maybe TcGblEnv)
 tcRnMergeSignatures hsc_env hpm orig_tcg_env iface =
   withTiming logger dflags
              (text "Signature merging" <+> brackets (ppr this_mod))
@@ -931,7 +928,7 @@ mergeSignatures
 -- an @hsig@ file.)
 tcRnInstantiateSignature ::
     HscEnv -> Module -> RealSrcSpan ->
-    IO (Messages DiagnosticMessage, Maybe TcGblEnv)
+    IO (Messages TcRnMessage, Maybe TcGblEnv)
 tcRnInstantiateSignature hsc_env this_mod real_loc =
    withTiming logger dflags
               (text "Signature instantiation"<+>brackets (ppr this_mod))
@@ -1061,8 +1058,8 @@ instantiateSignature = do
     -- TODO: setup the local RdrEnv so the error messages look a little better.
     -- But this information isn't stored anywhere. Should we RETYPECHECK
     -- the local one just to get the information?  Hmm...
-    MASSERT( isHomeModule home_unit outer_mod )
-    MASSERT( isHomeUnitInstantiating home_unit)
+    massert (isHomeModule home_unit outer_mod )
+    massert (isHomeUnitInstantiating home_unit)
     let uid = Indefinite (homeUnitInstanceOf home_unit)
     inner_mod `checkImplements`
         Module

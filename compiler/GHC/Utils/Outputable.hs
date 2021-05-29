@@ -54,6 +54,8 @@ module GHC.Utils.Outputable (
         bufLeftRenderSDoc,
         pprCode,
         showSDocOneLine,
+        showSDocUnsafe,
+        showPprUnsafe,
         renderWithContext,
 
         pprInfixVar, pprPrefixVar,
@@ -595,6 +597,13 @@ showSDocOneLine ctx d
                          Pretty.lineLength = sdocLineLength ctx } in
    Pretty.renderStyle s $
       runSDoc d ctx
+
+showSDocUnsafe :: SDoc -> String
+showSDocUnsafe sdoc = renderWithContext defaultSDocContext sdoc
+
+showPprUnsafe :: Outputable a => a -> String
+showPprUnsafe a = renderWithContext defaultSDocContext (ppr a)
+
 
 isEmpty :: SDocContext -> SDoc -> Bool
 isEmpty ctx sdoc = Pretty.isEmpty $ runSDoc sdoc (ctx {sdocPprDebug = True})

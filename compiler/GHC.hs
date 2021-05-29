@@ -1,4 +1,5 @@
-{-# LANGUAGE CPP, NondecreasingIndentation, ScopedTypeVariables #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE NondecreasingIndentation, ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections, NamedFieldPuns #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -296,8 +297,6 @@ module GHC (
   * inline bits of GHC.Driver.Main here to simplify layering: hscTcExpr, hscStmt.
 -}
 
-#include "HsVersions.h"
-
 import GHC.Prelude hiding (init)
 
 import GHC.Platform
@@ -307,9 +306,9 @@ import GHC.Driver.Phases   ( Phase(..), isHaskellSrcFilename
                            , isSourceFilename, startPhase )
 import GHC.Driver.Env
 import GHC.Driver.Errors
+import GHC.Driver.Errors.Types
 import GHC.Driver.CmdLine
 import GHC.Driver.Session
-import qualified GHC.Driver.Session as Session
 import GHC.Driver.Backend
 import GHC.Driver.Config
 import GHC.Driver.Main
@@ -331,14 +330,12 @@ import GHCi.RemoteTypes
 import qualified GHC.Parser as Parser
 import GHC.Parser.Lexer
 import GHC.Parser.Annotation
-import GHC.Parser.Errors.Ppr
 import GHC.Parser.Utils
 
 import GHC.Iface.Load        ( loadSysInterface )
 import GHC.Hs
 import GHC.Builtin.Types.Prim ( alphaTyVars )
 import GHC.Iface.Tidy
-import GHC.Data.Bag        ( listToBag )
 import GHC.Data.StringBuffer
 import GHC.Data.FastString
 import qualified GHC.LanguageExtensions as LangExt
@@ -382,6 +379,7 @@ import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
 import GHC.Types.SourceError
 import GHC.Types.SafeHaskell
+import GHC.Types.Error hiding ( getMessages, getErrorMessages )
 import GHC.Types.Fixity
 import GHC.Types.Target
 import GHC.Types.Basic
@@ -390,7 +388,6 @@ import GHC.Types.Name.Env
 import GHC.Types.Name.Ppr
 import GHC.Types.TypeEnv
 import GHC.Types.SourceFile
-import GHC.Types.Error ( DiagnosticMessage )
 
 import GHC.Unit
 import GHC.Unit.Env
@@ -912,9 +909,9 @@ checkNewInteractiveDynFlags logger dflags0 = do
   -- We currently don't support use of StaticPointers in expressions entered on
   -- the REPL. See #12356.
   if xopt LangExt.StaticPointers dflags0
-  then do liftIO $ printOrThrowDiagnostics logger dflags0 $ listToBag
-            [mkPlainMsgEnvelope dflags0 Session.WarningWithoutFlag interactiveSrcSpan
-             $ text "StaticPointers is not supported in GHCi interactive expressions."]
+  then do liftIO $ printOrThrowDiagnostics logger dflags0 $ singleMessage
+            $ fmap GhcDriverMessage
+            $ mkPlainMsgEnvelope dflags0 interactiveSrcSpan DriverStaticPointersNotSupported
           return $ xopt_unset dflags0 LangExt.StaticPointers
   else return dflags0
 
@@ -1505,7 +1502,7 @@ getNameToInstancesIndex :: GhcMonad m
                      -- if it is visible from at least one module in the list.
   -> Maybe [Module]  -- ^ modules to load. If this is not specified, we load
                      -- modules for everything that is in scope unqualified.
-  -> m (Messages DiagnosticMessage, Maybe (NameEnv ([ClsInst], [FamInst])))
+  -> m (Messages TcRnMessage, Maybe (NameEnv ([ClsInst], [FamInst])))
 getNameToInstancesIndex visible_mods mods_to_load = do
   hsc_env <- getSession
   liftIO $ runTcInteractive hsc_env $
@@ -1586,42 +1583,43 @@ pprParenSymName a = parenSymOcc (getOccName a) (ppr (getName a))
 -- on whether the module is interpreted or not.
 
 
--- Extract the filename, stringbuffer content and dynflags associed to a module
+-- Extract the filename, stringbuffer content and dynflags associed to a ModSummary
+-- Given an initialised GHC session a ModSummary can be retrieved for
+-- a module by using 'getModSummary'
 --
 -- XXX: Explain pre-conditions
-getModuleSourceAndFlags :: GhcMonad m => Module -> m (String, StringBuffer, DynFlags)
-getModuleSourceAndFlags mod = do
-  m <- getModSummary (moduleName mod)
+getModuleSourceAndFlags :: ModSummary -> IO (String, StringBuffer, DynFlags)
+getModuleSourceAndFlags m = do
   case ml_hs_file $ ms_location m of
-    Nothing -> do dflags <- getDynFlags
-                  liftIO $ throwIO $ mkApiErr dflags (text "No source available for module " <+> ppr mod)
+    Nothing -> throwIO $ mkApiErr (ms_hspp_opts m) (text "No source available for module " <+> ppr (ms_mod m))
     Just sourceFile -> do
-        source <- liftIO $ hGetStringBuffer sourceFile
+        source <- hGetStringBuffer sourceFile
         return (sourceFile, source, ms_hspp_opts m)
 
 
 -- | Return module source as token stream, including comments.
 --
--- The module must be in the module graph and its source must be available.
+-- A 'Module' can be turned into a 'ModSummary' using 'getModSummary' if
+-- your session is fully initialised.
 -- Throws a 'GHC.Driver.Env.SourceError' on parse error.
-getTokenStream :: GhcMonad m => Module -> m [Located Token]
+getTokenStream :: ModSummary -> IO [Located Token]
 getTokenStream mod = do
   (sourceFile, source, dflags) <- getModuleSourceAndFlags mod
   let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
   case lexTokenStream (initParserOpts dflags) source startLoc of
     POk _ ts    -> return ts
-    PFailed pst -> throwErrors (fmap mkParserErr (getErrorMessages pst))
+    PFailed pst -> throwErrors (GhcPsMessage <$> getErrorMessages pst)
 
 -- | Give even more information on the source than 'getTokenStream'
 -- This function allows reconstructing the source completely with
 -- 'showRichTokenStream'.
-getRichTokenStream :: GhcMonad m => Module -> m [(Located Token, String)]
+getRichTokenStream :: ModSummary -> IO [(Located Token, String)]
 getRichTokenStream mod = do
   (sourceFile, source, dflags) <- getModuleSourceAndFlags mod
   let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
   case lexTokenStream (initParserOpts dflags) source startLoc of
     POk _ ts    -> return $ addSourceToTokens startLoc source ts
-    PFailed pst -> throwErrors (fmap mkParserErr (getErrorMessages pst))
+    PFailed pst -> throwErrors (GhcPsMessage <$> getErrorMessages pst)
 
 -- | Given a source location and a StringBuffer corresponding to this
 -- location, return a rich token stream with the source associated to the
@@ -1801,11 +1799,11 @@ parser str dflags filename =
 
      PFailed pst ->
          let (warns,errs) = getMessages pst in
-         (fmap (mkParserWarn dflags) warns, Left (fmap mkParserErr errs))
+         (GhcPsMessage <$> warns, Left $ GhcPsMessage <$> errs)
 
      POk pst rdr_module ->
          let (warns,_) = getMessages pst in
-         (fmap (mkParserWarn dflags) warns, Right rdr_module)
+         (GhcPsMessage <$> warns, Right rdr_module)
 
 -- -----------------------------------------------------------------------------
 -- | Find the package environment (if one exists)

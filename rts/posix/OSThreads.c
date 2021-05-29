@@ -9,15 +9,28 @@
 
 #include "PosixSource.h"
 
+/* We've defined _POSIX_SOURCE via "PosixSource.h", and yet still use
+   some non-POSIX features.  With _POSIX_SOURCE defined, visibility of
+   non-POSIX extension prototypes requires _DARWIN_C_SOURCE on Mac OS X,
+   __BSD_VISIBLE on FreeBSD and DragonflyBSD, and _NETBSD_SOURCE on
+   NetBSD.  Otherwise, for example, code using pthread_setname_np(3) and
+   variants will not compile.  We must therefore define the additional
+   macros that expose non-POSIX APIs early, before any of the relevant
+   system headers are included via "Rts.h".
+
+   An alternative approach could be to write portable wrappers or stubs for all
+   the non-posix functions in a C-module that does not include "PosixSource.h",
+   and then use only POSIX features and the portable wrapper functions in all
+   other C-modules. */
+#include "ghcconfig.h"
 #if defined(freebsd_HOST_OS) || defined(dragonfly_HOST_OS)
-/* Inclusion of system headers usually requires __BSD_VISIBLE on FreeBSD and
- * DragonflyBSD, because of some specific types, like u_char, u_int, etc. */
 #define __BSD_VISIBLE   1
 #endif
 #if defined(darwin_HOST_OS)
-/* Inclusion of system headers usually requires _DARWIN_C_SOURCE on Mac OS X
- * because of some specific types like u_char, u_int, etc. */
 #define _DARWIN_C_SOURCE 1
+#endif
+#if defined(netbsd_HOST_OS)
+#define _NETBSD_SOURCE 1
 #endif
 
 #include "Rts.h"
@@ -42,7 +55,7 @@
 #include <string.h>
 #endif
 
-#if defined(darwin_HOST_OS) || defined(freebsd_HOST_OS)
+#if defined(darwin_HOST_OS) || defined(freebsd_HOST_OS) || defined(netbsd_HOST_OS)
 #include <sys/types.h>
 #include <sys/sysctl.h>
 #endif
@@ -159,6 +172,8 @@ createOSThread (OSThreadId* pId, char *name STG_UNUSED,
     pthread_setname_np(*pId, name);
 #elif defined(HAVE_PTHREAD_SETNAME_NP_DARWIN)
     pthread_setname_np(name);
+#elif defined(HAVE_PTHREAD_SETNAME_NP_NETBSD)
+    pthread_setname_np(*pId, "%s", name);
 #endif
   }
   return result;
@@ -298,6 +313,15 @@ getNumberOfProcessors (void)
             size_t size = sizeof(uint32_t);
             if(sysctlbyname("hw.ncpu",&nproc,&size,NULL,0) != 0)
                 nproc = 1;
+        }
+#elif defined(netbsd_HOST_OS)
+        int mib[2] = { CTL_HW, HW_NCPUONLINE };
+        size_t size = sizeof(nproc);
+        if (sysctl(mib, 2, &nproc, &size, NULL, 0) != 0) {
+            mib[1] = HW_NCPU;
+            if (sysctl(mib, 2, &nproc, &size, NULL, 0) != 0) {
+                nproc = 1;
+            }
         }
 #elif defined(HAVE_SYSCONF) && defined(_SC_NPROCESSORS_ONLN)
         // N.B. This is the number of physical processors.

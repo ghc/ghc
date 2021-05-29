@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -37,7 +37,7 @@ module GHC.Hs.Type (
         HsContext, LHsContext, fromMaybeContext,
         HsTyLit(..),
         HsIPName(..), hsIPNameFS,
-        HsArg(..), numVisibleArgs,
+        HsArg(..), numVisibleArgs, pprHsArgsApp,
         LHsTypeArg, lhsTypeArgSrcSpan,
         OutputableBndrFlag,
 
@@ -51,7 +51,7 @@ module GHC.Hs.Type (
         HsConDetails(..), noTypeArgs,
 
         FieldOcc(..), LFieldOcc, mkFieldOcc,
-        AmbiguousFieldOcc(..), mkAmbiguousFieldOcc,
+        AmbiguousFieldOcc(..), LAmbiguousFieldOcc, mkAmbiguousFieldOcc,
         rdrNameAmbiguousFieldOcc, selectorAmbiguousFieldOcc,
         unambiguousFieldOcc, ambiguousFieldOcc,
 
@@ -84,8 +84,6 @@ module GHC.Hs.Type (
         pprLHsContext,
         hsTypeNeedsParens, parenthesizeHsType, parenthesizeHsContext
     ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -151,7 +149,7 @@ type instance XHsForAllInvis (GhcPass _) = EpAnnForallTy
 
 type instance XXHsForAllTelescope (GhcPass _) = NoExtCon
 
-type EpAnnForallTy = EpAnn' (AddEpAnn, AddEpAnn)
+type EpAnnForallTy = EpAnn (AddEpAnn, AddEpAnn)
   -- ^ Location of 'forall' and '->' for HsForAllVis
   -- Location of 'forall' and '.' for HsForAllInvis
 
@@ -200,7 +198,7 @@ type instance XHsWC              GhcTc b = [Name]
 
 type instance XXHsWildCardBndrs (GhcPass _) _ = NoExtCon
 
-type instance XHsPS GhcPs = NoExtField
+type instance XHsPS GhcPs = EpAnn EpaLocation
 type instance XHsPS GhcRn = HsPSRn
 type instance XHsPS GhcTc = HsPSRn
 
@@ -249,9 +247,9 @@ mkHsWildCardBndrs :: thing -> HsWildCardBndrs GhcPs thing
 mkHsWildCardBndrs x = HsWC { hswc_body = x
                            , hswc_ext  = noExtField }
 
-mkHsPatSigType :: LHsType GhcPs -> HsPatSigType GhcPs
-mkHsPatSigType x = HsPS { hsps_ext  = noExtField
-                        , hsps_body = x }
+mkHsPatSigType :: EpAnn EpaLocation -> LHsType GhcPs -> HsPatSigType GhcPs
+mkHsPatSigType ann x = HsPS { hsps_ext  = ann
+                            , hsps_body = x }
 
 mkEmptyWildCardBndrs :: thing -> HsWildCardBndrs GhcRn thing
 mkEmptyWildCardBndrs x = HsWC { hswc_body = x
@@ -259,8 +257,8 @@ mkEmptyWildCardBndrs x = HsWC { hswc_body = x
 
 --------------------------------------------------
 
-type instance XUserTyVar    (GhcPass _) = EpAnn
-type instance XKindedTyVar  (GhcPass _) = EpAnn
+type instance XUserTyVar    (GhcPass _) = EpAnn [AddEpAnn]
+type instance XKindedTyVar  (GhcPass _) = EpAnn [AddEpAnn]
 
 type instance XXTyVarBndr   (GhcPass _) = NoExtCon
 
@@ -285,17 +283,17 @@ instance NamedThing (HsTyVarBndr flag GhcRn) where
 
 type instance XForAllTy        (GhcPass _) = NoExtField
 type instance XQualTy          (GhcPass _) = NoExtField
-type instance XTyVar           (GhcPass _) = EpAnn
+type instance XTyVar           (GhcPass _) = EpAnn [AddEpAnn]
 type instance XAppTy           (GhcPass _) = NoExtField
-type instance XFunTy           (GhcPass _) = EpAnn' TrailingAnn -- For the AnnRarrow or AnnLolly
-type instance XListTy          (GhcPass _) = EpAnn' AnnParen
-type instance XTupleTy         (GhcPass _) = EpAnn' AnnParen
-type instance XSumTy           (GhcPass _) = EpAnn' AnnParen
+type instance XFunTy           (GhcPass _) = EpAnn TrailingAnn -- For the AnnRarrow or AnnLolly
+type instance XListTy          (GhcPass _) = EpAnn AnnParen
+type instance XTupleTy         (GhcPass _) = EpAnn AnnParen
+type instance XSumTy           (GhcPass _) = EpAnn AnnParen
 type instance XOpTy            (GhcPass _) = NoExtField
-type instance XParTy           (GhcPass _) = EpAnn' AnnParen
-type instance XIParamTy        (GhcPass _) = EpAnn
+type instance XParTy           (GhcPass _) = EpAnn AnnParen
+type instance XIParamTy        (GhcPass _) = EpAnn [AddEpAnn]
 type instance XStarTy          (GhcPass _) = NoExtField
-type instance XKindSig         (GhcPass _) = EpAnn
+type instance XKindSig         (GhcPass _) = EpAnn [AddEpAnn]
 
 type instance XAppKindTy       (GhcPass _) = SrcSpan -- Where the `@` lives
 
@@ -303,18 +301,18 @@ type instance XSpliceTy        GhcPs = NoExtField
 type instance XSpliceTy        GhcRn = NoExtField
 type instance XSpliceTy        GhcTc = Kind
 
-type instance XDocTy           (GhcPass _) = EpAnn
-type instance XBangTy          (GhcPass _) = EpAnn
+type instance XDocTy           (GhcPass _) = EpAnn [AddEpAnn]
+type instance XBangTy          (GhcPass _) = EpAnn [AddEpAnn]
 
-type instance XRecTy           GhcPs = EpAnn' AnnList
+type instance XRecTy           GhcPs = EpAnn AnnList
 type instance XRecTy           GhcRn = NoExtField
 type instance XRecTy           GhcTc = NoExtField
 
-type instance XExplicitListTy  GhcPs = EpAnn
+type instance XExplicitListTy  GhcPs = EpAnn [AddEpAnn]
 type instance XExplicitListTy  GhcRn = NoExtField
 type instance XExplicitListTy  GhcTc = Kind
 
-type instance XExplicitTupleTy GhcPs = EpAnn
+type instance XExplicitTupleTy GhcPs = EpAnn [AddEpAnn]
 type instance XExplicitTupleTy GhcRn = NoExtField
 type instance XExplicitTupleTy GhcTc = [Kind]
 
@@ -354,7 +352,7 @@ pprHsArrow (HsUnrestrictedArrow _) = arrow
 pprHsArrow (HsLinearArrow _ _) = lollipop
 pprHsArrow (HsExplicitMult _ _ p) = (mulArrow (ppr p))
 
-type instance XConDeclField  (GhcPass _) = EpAnn
+type instance XConDeclField  (GhcPass _) = EpAnn [AddEpAnn]
 type instance XXConDeclField (GhcPass _) = NoExtCon
 
 instance OutputableBndrId p
@@ -494,7 +492,7 @@ splitHsFunType ty = go ty
         an' = addTrailingAnnToA l an cs a
         x' = L (SrcSpanAnn an' l) t
 
-    go other = ([], noCom, [], other)
+    go other = ([], emptyComments, [], other)
 
 -- | Retrieve the name of the \"head\" of a nested type application.
 -- This is somewhat like @GHC.Tc.Gen.HsType.splitHsAppTys@, but a little more
@@ -664,7 +662,7 @@ splitLHsQualTy ty
 -- parentheses, hence the suffix @_KP@ (short for \"Keep Parentheses\").
 splitLHsQualTy_KP :: LHsType (GhcPass pass) -> (Maybe (LHsContext (GhcPass pass)), LHsType (GhcPass pass))
 splitLHsQualTy_KP (L _ (HsQualTy { hst_ctxt = ctxt, hst_body = body }))
-                       = (ctxt, body)
+                       = (Just ctxt, body)
 splitLHsQualTy_KP body = (Nothing, body)
 
 -- | Decompose a type class instance type (of the form
@@ -825,6 +823,10 @@ instance OutputableBndr (AmbiguousFieldOcc (GhcPass p)) where
   pprInfixOcc  = pprInfixOcc . rdrNameAmbiguousFieldOcc
   pprPrefixOcc = pprPrefixOcc . rdrNameAmbiguousFieldOcc
 
+instance OutputableBndr (Located (AmbiguousFieldOcc (GhcPass p))) where
+  pprInfixOcc  = pprInfixOcc . unLoc
+  pprPrefixOcc = pprPrefixOcc . unLoc
+
 mkAmbiguousFieldOcc :: LocatedN RdrName -> AmbiguousFieldOcc GhcPs
 mkAmbiguousFieldOcc rdr = Unambiguous noExtField rdr
 
@@ -981,13 +983,12 @@ pprLHsContext :: (OutputableBndrId p)
 pprLHsContext Nothing = empty
 pprLHsContext (Just lctxt)
   | null (unLoc lctxt) = empty
-  | otherwise          = pprLHsContextAlways (Just lctxt)
+  | otherwise          = pprLHsContextAlways lctxt
 
 -- For use in a HsQualTy, which always gets printed if it exists.
 pprLHsContextAlways :: (OutputableBndrId p)
-                    => Maybe (LHsContext (GhcPass p)) -> SDoc
-pprLHsContextAlways Nothing = parens empty <+> darrow
-pprLHsContextAlways (Just (L _ ctxt))
+                    => LHsContext (GhcPass p) -> SDoc
+pprLHsContextAlways (L _ ctxt)
   = case ctxt of
       []       -> parens empty             <+> darrow
       [L _ ty] -> ppr_mono_ty ty           <+> darrow
@@ -1175,7 +1176,7 @@ lhsTypeHasLeadingPromotionQuote ty
 
     go (HsForAllTy{})        = False
     go (HsQualTy{ hst_ctxt = ctxt, hst_body = body})
-      | Just (L _ (c:_)) <- ctxt = goL c
+      | (L _ (c:_)) <- ctxt = goL c
       | otherwise            = goL body
     go (HsBangTy{})          = False
     go (HsRecTy{})           = False
@@ -1241,4 +1242,6 @@ type instance Anno (HsTyVarBndr _flag GhcTc) = SrcSpanAnnA
 type instance Anno (HsOuterTyVarBndrs _ (GhcPass _)) = SrcSpanAnnA
 type instance Anno HsIPName = SrcSpan
 type instance Anno (ConDeclField (GhcPass p)) = SrcSpanAnnA
+
 type instance Anno (FieldOcc (GhcPass p)) = SrcSpan
+type instance Anno (AmbiguousFieldOcc (GhcPass p)) = SrcSpan

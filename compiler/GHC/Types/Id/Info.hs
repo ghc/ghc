@@ -8,7 +8,7 @@
 Haskell. [WDP 94/11])
 -}
 
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE BinaryLiterals #-}
 
@@ -87,8 +87,6 @@ module GHC.Types.Id.Info (
         isNeverLevPolyIdInfo
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Core hiding( hasCoreUnfolding )
@@ -111,6 +109,7 @@ import GHC.Types.Cpr
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 
 import Data.Word
 
@@ -334,13 +333,13 @@ bitfieldSetLevityInfo info (BitField bits) =
 
 bitfieldSetCallArityInfo :: ArityInfo -> BitField -> BitField
 bitfieldSetCallArityInfo info bf@(BitField bits) =
-    ASSERT(info < 2^(30 :: Int) - 1)
+    assert (info < 2^(30 :: Int) - 1) $
     bitfieldSetArityInfo (bitfieldGetArityInfo bf) $
     BitField ((fromIntegral info `shiftL` 3) .|. (bits .&. 0b111))
 
 bitfieldSetArityInfo :: ArityInfo -> BitField -> BitField
 bitfieldSetArityInfo info (BitField bits) =
-    ASSERT(info < 2^(30 :: Int) - 1)
+    assert (info < 2^(30 :: Int) - 1) $
     BitField ((fromIntegral info `shiftL` 33) .|. (bits .&. ((1 `shiftL` 33) - 1)))
 
 -- Getters
@@ -741,7 +740,7 @@ instance Outputable LevityInfo where
 -- polymorphic
 setNeverLevPoly :: HasDebugCallStack => IdInfo -> Type -> IdInfo
 setNeverLevPoly info ty
-  = ASSERT2( not (resultIsLevPoly ty), ppr ty )
+  = assertPpr (not (resultIsLevPoly ty)) (ppr ty) $
     info { bitfield = bitfieldSetLevityInfo NeverLevityPolymorphic (bitfield info) }
 
 setLevityInfoWithType :: IdInfo -> Type -> IdInfo

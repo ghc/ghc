@@ -1,4 +1,5 @@
-{-# LANGUAGE CPP, TupleSections, RecordWildCards #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE TupleSections, RecordWildCards #-}
 {-# LANGUAGE BangPatterns #-}
 
 --
@@ -31,8 +32,6 @@ module GHC.Linker.Loader
    )
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Settings
@@ -44,6 +43,7 @@ import GHC.Driver.Phases
 import GHC.Driver.Env
 import GHC.Driver.Session
 import GHC.Driver.Ppr
+import GHC.Driver.Config
 
 import GHC.Tc.Utils.Monad
 
@@ -66,6 +66,8 @@ import GHC.Types.Unique.DSet
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
+import GHC.Utils.Constants (isWindowsHost, isDarwinHost)
 import GHC.Utils.Misc
 import GHC.Utils.Error
 import GHC.Utils.Logger
@@ -179,7 +181,7 @@ loadName interp hsc_env name = do
 
     case lookupNameEnv (closure_env pls) name of
       Just (_,aa) -> return (pls,aa)
-      Nothing     -> ASSERT2(isExternalName name, ppr name)
+      Nothing     -> assertPpr (isExternalName name) (ppr name) $
                      do let sym_to_find = nameToCLabel name "closure"
                         m <- lookupClosure interp (unpackFS sym_to_find)
                         r <- case m of
@@ -565,11 +567,11 @@ loadExpr interp hsc_env span root_ul_bco = do
         let nobreakarray = error "no break array"
             bco_ix = mkNameEnv [(unlinkedBCOName root_ul_bco, 0)]
         resolved <- linkBCO interp ie ce bco_ix nobreakarray root_ul_bco
-        [root_hvref] <- createBCOs interp dflags [resolved]
+        bco_opts <- initBCOOpts (hsc_dflags hsc_env)
+        [root_hvref] <- createBCOs interp bco_opts [resolved]
         fhv <- mkFinalizedHValue interp root_hvref
         return (pls, fhv)
   where
-     dflags = hsc_dflags hsc_env
      free_names = uniqDSetToList (bcoFreeNames root_ul_bco)
 
      needed_mods :: [Module]
@@ -690,20 +692,20 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
             deps  = mi_deps iface
             home_unit = hsc_home_unit hsc_env
 
-            pkg_deps = dep_pkgs deps
-            (boot_deps, mod_deps) = flip partitionWith (dep_mods deps) $
+            pkg_deps = dep_direct_pkgs deps
+            (boot_deps, mod_deps) = flip partitionWith (dep_direct_mods deps) $
               \ (GWIB { gwib_mod = m, gwib_isBoot = is_boot }) ->
                 m & case is_boot of
                   IsBoot -> Left
                   NotBoot -> Right
 
-            boot_deps' = filter (not . (`elementOfUniqDSet` acc_mods)) boot_deps
+            mod_deps' = filter (not . (`elementOfUniqDSet` acc_mods)) (boot_deps ++ mod_deps)
             acc_mods'  = addListToUniqDSet acc_mods (moduleName mod : mod_deps)
-            acc_pkgs'  = addListToUniqDSet acc_pkgs $ map fst pkg_deps
+            acc_pkgs'  = addListToUniqDSet acc_pkgs pkg_deps
           --
           if not (isHomeUnit home_unit pkg)
              then follow_deps mods acc_mods (addOneToUniqDSet acc_pkgs' (toUnitId pkg))
-             else follow_deps (map (mkHomeModule home_unit) boot_deps' ++ mods)
+             else follow_deps (map (mkHomeModule home_unit) mod_deps' ++ mods)
                               acc_mods' acc_pkgs'
         where
             msg = text "need to link module" <+> ppr mod <+>
@@ -756,7 +758,7 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
                         return lnk
 
             adjust_ul new_osuf (DotO file) = do
-                MASSERT(osuf `isSuffixOf` file)
+                massert (osuf `isSuffixOf` file)
                 let file_base = fromJust (stripExtension osuf file)
                     new_file = file_base <.> new_osuf
                 ok <- doesFileExist new_file
@@ -794,13 +796,13 @@ loadDecls interp hsc_env span cbc@CompiledByteCode{..} = do
               ce = closure_env pls
 
           -- Link the necessary packages and linkables
-          new_bindings <- linkSomeBCOs dflags interp ie ce [cbc]
+          bco_opts <- initBCOOpts (hsc_dflags hsc_env)
+          new_bindings <- linkSomeBCOs bco_opts interp ie ce [cbc]
           nms_fhvs <- makeForeignNamedHValueRefs interp new_bindings
           let pls2 = pls { closure_env = extendClosureEnv ce nms_fhvs
                          , itbl_env    = ie }
           return pls2
   where
-    dflags = hsc_dflags hsc_env
     free_names = uniqDSetToList $
       foldr (unionUniqDSets . bcoFreeNames) emptyUniqDSet bc_bcos
 
@@ -843,7 +845,7 @@ loadModules interp hsc_env pls linkables
 
         let (objs, bcos) = partition isObjectLinkable
                               (concatMap partitionLinkable linkables)
-        let dflags = hsc_dflags hsc_env
+        bco_opts <- initBCOOpts (hsc_dflags hsc_env)
 
                 -- Load objects first; they can't depend on BCOs
         (pls1, ok_flag) <- loadObjects interp hsc_env pls objs
@@ -851,7 +853,7 @@ loadModules interp hsc_env pls linkables
         if failed ok_flag then
                 return (pls1, Failed)
           else do
-                pls2 <- dynLinkBCOs dflags interp pls1 bcos
+                pls2 <- dynLinkBCOs bco_opts interp pls1 bcos
                 return (pls2, Succeeded)
 
 
@@ -1008,8 +1010,8 @@ rmDupLinkables already ls
   ********************************************************************* -}
 
 
-dynLinkBCOs :: DynFlags -> Interp -> LoaderState -> [Linkable] -> IO LoaderState
-dynLinkBCOs dflags interp pls bcos = do
+dynLinkBCOs :: BCOOpts -> Interp -> LoaderState -> [Linkable] -> IO LoaderState
+dynLinkBCOs bco_opts interp pls bcos = do
 
         let (bcos_loaded', new_bcos) = rmDupLinkables (bcos_loaded pls) bcos
             pls1                     = pls { bcos_loaded = bcos_loaded' }
@@ -1024,7 +1026,7 @@ dynLinkBCOs dflags interp pls bcos = do
             gce       = closure_env pls
             final_ie  = foldr plusNameEnv (itbl_env pls) ies
 
-        names_and_refs <- linkSomeBCOs dflags interp final_ie gce cbcs
+        names_and_refs <- linkSomeBCOs bco_opts interp final_ie gce cbcs
 
         -- We only want to add the external ones to the ClosureEnv
         let (to_add, to_drop) = partition (isExternalName.fst) names_and_refs
@@ -1038,7 +1040,7 @@ dynLinkBCOs dflags interp pls bcos = do
                       itbl_env    = final_ie }
 
 -- Link a bunch of BCOs and return references to their values
-linkSomeBCOs :: DynFlags
+linkSomeBCOs :: BCOOpts
              -> Interp
              -> ItblEnv
              -> ClosureEnv
@@ -1048,7 +1050,7 @@ linkSomeBCOs :: DynFlags
                         -- the incoming unlinked BCOs.  Each gives the
                         -- value of the corresponding unlinked BCO
 
-linkSomeBCOs dflags interp ie ce mods = foldr fun do_link mods []
+linkSomeBCOs bco_opts interp ie ce mods = foldr fun do_link mods []
  where
   fun CompiledByteCode{..} inner accum =
     case bc_breaks of
@@ -1063,7 +1065,7 @@ linkSomeBCOs dflags interp ie ce mods = foldr fun do_link mods []
         bco_ix = mkNameEnv (zip names [0..])
     resolved <- sequence [ linkBCO interp ie ce bco_ix breakarray bco
                          | (breakarray, bco) <- flat ]
-    hvrefs <- createBCOs interp dflags resolved
+    hvrefs <- createBCOs interp bco_opts resolved
     return (zip names hvrefs)
 
 -- | Useful to apply to the result of 'linkSomeBCOs'
@@ -1168,9 +1170,6 @@ unload_wkr interp keep_linkables pls@LoaderState{..}  = do
   where
     unloadObjs :: Linkable -> IO ()
     unloadObjs lnk
-        -- The RTS's PEi386 linker currently doesn't support unloading.
-      | isWindowsHost = return ()
-
       | hostIsDynamic = return ()
         -- We don't do any cleanup when linking objects with the
         -- dynamic linker.  Doing so introduces extra complexity for

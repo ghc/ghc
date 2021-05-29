@@ -100,6 +100,7 @@ module GHC.Base
         module GHC.Classes,
         module GHC.CString,
         module GHC.Magic,
+        module GHC.Magic.Dict,
         module GHC.Types,
         module GHC.Prim,        -- Re-export GHC.Prim and [boot] GHC.Err,
         module GHC.Prim.Ext,    -- to avoid lots of people having to
@@ -112,6 +113,7 @@ import GHC.Types
 import GHC.Classes
 import GHC.CString
 import GHC.Magic
+import GHC.Magic.Dict
 import GHC.Prim
 import GHC.Prim.Ext
 import GHC.Err
@@ -1628,17 +1630,6 @@ quotRemInt :: Int -> Int -> (Int, Int)
 divModInt :: Int -> Int -> (Int, Int)
 (I# x) `divModInt` (I# y) = case x `divModInt#` y of
                             (# q, r #) -> (I# q, I# r)
-
-divModInt# :: Int# -> Int# -> (# Int#, Int# #)
-x# `divModInt#` y#
- | isTrue# (x# ># 0#) && isTrue# (y# <# 0#) =
-                                    case (x# -# 1#) `quotRemInt#` y# of
-                                      (# q, r #) -> (# q -# 1#, r +# y# +# 1# #)
- | isTrue# (x# <# 0#) && isTrue# (y# ># 0#) =
-                                    case (x# +# 1#) `quotRemInt#` y# of
-                                      (# q, r #) -> (# q -# 1#, r +# y# -# 1# #)
- | otherwise                                =
-                                    x# `quotRemInt#` y#
 
 {- Note [INLINE division wrappers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

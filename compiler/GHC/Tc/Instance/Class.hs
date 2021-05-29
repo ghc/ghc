@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -8,8 +8,6 @@ module GHC.Tc.Instance.Class (
      InstanceWhat(..), safeOverlap, instanceReturnsDictCon,
      AssocInstInfo(..), isNotAssociated
   ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -101,7 +99,7 @@ data ClsInstResult
 data InstanceWhat
   = BuiltinInstance
   | BuiltinEqInstance   -- A built-in "equality instance"; see the
-                        -- GHC.Tc.Solver.Monad Note [Solved dictionaries]
+                        -- GHC.Tc.Solver.InertSet Note [Solved dictionaries]
   | LocalInstance
   | TopLevInstance { iw_dfun_id   :: DFunId
                    , iw_safe_over :: SafeOverlapping }
@@ -126,7 +124,7 @@ safeOverlap (TopLevInstance { iw_safe_over = so }) = so
 safeOverlap _                                      = True
 
 instanceReturnsDictCon :: InstanceWhat -> Bool
--- See Note [Solved dictionaries] in GHC.Tc.Solver.Monad
+-- See Note [Solved dictionaries] in GHC.Tc.Solver.InertSet
 instanceReturnsDictCon (TopLevInstance {}) = True
 instanceReturnsDictCon BuiltinInstance     = True
 instanceReturnsDictCon BuiltinEqInstance   = False

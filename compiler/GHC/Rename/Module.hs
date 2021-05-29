@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP                 #-}
+
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies        #-}
@@ -15,8 +15,6 @@ Main pass of renamer
 module GHC.Rename.Module (
         rnSrcDecls, addTcgDUs, findSplice
     ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -35,7 +33,7 @@ import GHC.Rename.Utils ( HsDocContext(..), mapFvRn, bindLocalNames
                         , newLocalBndrsRn
                         , withHsDocContext, noNestedForallsContextsErr
                         , addNoNestedForallsContextsErr, checkInferredVars )
-import GHC.Rename.Unbound ( mkUnboundName, notInScopeErr )
+import GHC.Rename.Unbound ( mkUnboundName, notInScopeErr, WhereLooking(WL_Global) )
 import GHC.Rename.Names
 import GHC.Tc.Gen.Annotation ( annCtxt )
 import GHC.Tc.Utils.Monad
@@ -58,7 +56,7 @@ import GHC.Types.Basic  ( pprRuleName, TypeOrKind(..) )
 import GHC.Data.FastString
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Driver.Session
-import GHC.Utils.Misc   ( debugIsOn, lengthExceeds, partitionWith )
+import GHC.Utils.Misc   ( lengthExceeds, partitionWith )
 import GHC.Utils.Panic
 import GHC.Driver.Env ( HscEnv(..), hsc_home_unit)
 import GHC.Data.List.SetOps ( findDupsEq, removeDups, equivClasses )
@@ -140,7 +138,12 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
    -- (D2) Rename the left-hand sides of the value bindings.
    --     This depends on everything from (B) being in scope.
    --     It uses the fixity env from (A) to bind fixities for view patterns.
-   new_lhs <- rnTopBindsLHS local_fix_env val_decls ;
+
+   -- We need to throw an error on such value bindings when in a boot file.
+   is_boot <- tcIsHsBootOrSig ;
+   new_lhs <- if is_boot
+    then rnTopBindsLHSBoot local_fix_env val_decls
+    else rnTopBindsLHS     local_fix_env val_decls ;
 
    -- Bind the LHSes (and their fixities) in the global rdr environment
    let { id_bndrs = collectHsIdBinders CollNoDictBinders new_lhs } ;
@@ -168,7 +171,6 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
    -- (F) Rename Value declarations right-hand sides
    traceRn "Start rnmono" empty ;
    let { val_bndr_set = mkNameSet id_bndrs `unionNameSet` mkNameSet pat_syn_bndrs } ;
-   is_boot <- tcIsHsBootOrSig ;
    (rn_val_decls, bind_dus) <- if is_boot
     -- For an hs-boot, use tc_bndrs (which collects how we're renamed
     -- signatures), since val_bndr_set is empty (there are no x = ...
@@ -320,8 +322,10 @@ rnAnnProvenance :: AnnProvenance GhcPs
                 -> RnM (AnnProvenance GhcRn, FreeVars)
 rnAnnProvenance provenance = do
     provenance' <- case provenance of
-      ValueAnnProvenance n -> ValueAnnProvenance <$> lookupLocatedTopBndrRnN n
-      TypeAnnProvenance n  -> TypeAnnProvenance  <$> lookupLocatedTopBndrRnN n
+      ValueAnnProvenance n -> ValueAnnProvenance
+                          <$> lookupLocatedTopBndrRnN n
+      TypeAnnProvenance n  -> TypeAnnProvenance
+                          <$> lookupLocatedTopConstructorRnN n
       ModuleAnnProvenance  -> return ModuleAnnProvenance
     return (provenance', maybe emptyFVs unitFV (annProvenanceName_maybe provenance'))
 
@@ -761,10 +765,10 @@ rnFamEqn doc atfi extra_kvars
          -- See Note [Renaming associated types].
          -- Per that Note, the LHS type variables consist of:
          --
-         -- * The variables mentioned in the instance's type patterns
+         -- - The variables mentioned in the instance's type patterns
          --   (pat_fvs), and
          --
-         -- * The variables mentioned in an outermost kind signature on the
+         -- - The variables mentioned in an outermost kind signature on the
          --   RHS. This is a subset of `rhs_fvs`. To compute it, we look up
          --   each RdrName in `extra_kvars` to find its corresponding Name in
          --   the LocalRdrEnv.
@@ -1343,7 +1347,7 @@ badRuleLhsErr name lhs bad_e
     text "LHS must be of form (f e1 .. en) where f is not forall'd"
   where
     err = case bad_e of
-            HsUnboundVar _ uv -> notInScopeErr (mkRdrUnqual uv)
+            HsUnboundVar _ uv -> notInScopeErr WL_Global (mkRdrUnqual uv)
             _                 -> text "Illegal expression:" <+> ppr bad_e
 
 {- **************************************************************
@@ -1523,8 +1527,11 @@ rnTyClDecls tycl_ds
 
              all_groups = first_group ++ groups
 
-       ; MASSERT2( null final_inst_ds,  ppr instds_w_fvs $$ ppr inst_ds_map
-                                       $$ ppr (flattenSCCs tycl_sccs) $$ ppr final_inst_ds  )
+       ; massertPpr (null final_inst_ds)
+                    (ppr instds_w_fvs
+                     $$ ppr inst_ds_map
+                     $$ ppr (flattenSCCs tycl_sccs)
+                     $$ ppr final_inst_ds)
 
        ; traceRn "rnTycl dependency analysis made groups" (ppr all_groups)
        ; return (all_groups, all_fvs) }
@@ -1776,7 +1783,7 @@ rnTyClDecl (FamDecl { tcdFam = fam })
 
 rnTyClDecl (SynDecl { tcdLName = tycon, tcdTyVars = tyvars,
                       tcdFixity = fixity, tcdRhs = rhs })
-  = do { tycon' <- lookupLocatedTopBndrRnN tycon
+  = do { tycon' <- lookupLocatedTopConstructorRnN tycon
        ; let kvs = extractHsTyRdrTyVarsKindVars rhs
              doc = TySynCtx tycon
        ; traceRn "rntycl-ty" (ppr tycon <+> ppr kvs)
@@ -1792,7 +1799,7 @@ rnTyClDecl (DataDecl
       tcdFixity = fixity,
       tcdDataDefn = defn@HsDataDefn{ dd_ND = new_or_data
                                    , dd_kindSig = kind_sig} })
-  = do { tycon' <- lookupLocatedTopBndrRnN tycon
+  = do { tycon' <- lookupLocatedTopConstructorRnN tycon
        ; let kvs = extractDataDefnKindVars defn
              doc = TyDataCtx tycon
        ; traceRn "rntycl-data" (ppr tycon <+> ppr kvs)
@@ -1813,7 +1820,7 @@ rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
                         tcdFDs = fds, tcdSigs = sigs,
                         tcdMeths = mbinds, tcdATs = ats, tcdATDefs = at_defs,
                         tcdDocs = docs})
-  = do  { lcls' <- lookupLocatedTopBndrRnN lcls
+  = do  { lcls' <- lookupLocatedTopConstructorRnN lcls
         ; let cls' = unLoc lcls'
               kvs = []  -- No scoped kind vars except those in
                         -- kind signatures on the tyvars
@@ -1822,7 +1829,7 @@ rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
         ; ((tyvars', context', fds', ats'), stuff_fvs)
             <- bindHsQTyVars cls_doc Nothing kvs tyvars $ \ tyvars' _ -> do
                   -- Checks for distinct tyvars
-             { (context', cxt_fvs) <- rnContext cls_doc context
+             { (context', cxt_fvs) <- rnMaybeContext cls_doc context
              ; fds'  <- rnFds fds
                          -- The fundeps have no free variables
              ; (ats', fv_ats) <- rnATDecls cls' ats
@@ -1919,7 +1926,7 @@ rnDataDefn doc (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
         ; (m_sig', sig_fvs) <- case m_sig of
              Just sig -> first Just <$> rnLHsKind doc sig
              Nothing  -> return (Nothing, emptyFVs)
-        ; (context', fvs1) <- rnContext doc context
+        ; (context', fvs1) <- rnMaybeContext doc context
         ; (derivs',  fvs3) <- rn_derivs derivs
 
         -- For the constructor declarations, drop the LocalRdrEnv
@@ -1934,7 +1941,7 @@ rnDataDefn doc (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
 
         ; let all_fvs = fvs1 `plusFV` fvs3 `plusFV`
                         con_fvs `plusFV` sig_fvs
-        ; return ( HsDataDefn { dd_ext = noAnn
+        ; return ( HsDataDefn { dd_ext = noExtField
                               , dd_ND = new_or_data, dd_cType = cType
                               , dd_ctxt = context', dd_kindSig = m_sig'
                               , dd_cons = condecls'
@@ -2098,7 +2105,7 @@ rnFamDecl mb_cls (FamilyDecl { fdLName = tycon, fdTyVars = tyvars
                              , fdFixity = fixity
                              , fdInfo = info, fdResultSig = res_sig
                              , fdInjectivityAnn = injectivity })
-  = do { tycon' <- lookupLocatedTopBndrRnN tycon
+  = do { tycon' <- lookupLocatedTopConstructorRnN tycon
        ; ((tyvars', res_sig', injectivity'), fv1) <-
             bindHsQTyVars doc mb_cls kvs tyvars $ \ tyvars' _ ->
             do { let rn_sig = rnFamResultSig doc
@@ -2281,7 +2288,7 @@ rnConDecl decl@(ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
                            , con_mb_cxt = mcxt, con_args = args
                            , con_doc = mb_doc, con_forall = forall })
   = do  { _        <- addLocMA checkConName name
-        ; new_name <- lookupLocatedTopBndrRnN name
+        ; new_name <- lookupLocatedTopConstructorRnN name
 
         -- We bind no implicit binders here; this is just like
         -- a nested HsForAllTy.  E.g. consider
@@ -2316,7 +2323,7 @@ rnConDecl (ConDeclGADT { con_names   = names
                        , con_res_ty  = res_ty
                        , con_doc     = mb_doc })
   = do  { mapM_ (addLocMA checkConName) names
-        ; new_names <- mapM lookupLocatedTopBndrRnN names
+        ; new_names <- mapM (lookupLocatedTopConstructorRnN) names
 
         ; let -- We must ensure that we extract the free tkvs in left-to-right
               -- order of their appearance in the constructor type.
@@ -2355,7 +2362,7 @@ rnConDecl (ConDeclGADT { con_names   = names
 rnMbContext :: HsDocContext -> Maybe (LHsContext GhcPs)
             -> RnM (Maybe (LHsContext GhcRn), FreeVars)
 rnMbContext _    Nothing    = return (Nothing, emptyFVs)
-rnMbContext doc cxt = do { (ctx',fvs) <- rnContext doc cxt
+rnMbContext doc cxt = do { (ctx',fvs) <- rnMaybeContext doc cxt
                          ; return (ctx',fvs) }
 
 rnConDeclH98Details ::
@@ -2428,7 +2435,7 @@ extendPatSynEnv dup_fields_ok has_sel val_decls local_fix_env thing = do {
                                        , psb_args = RecCon as }))) <- bind
       = do
           bnd_name <- newTopSrcBinder (L (l2l bind_loc) n)
-          let field_occs = map ((\ f -> L (getLocA (rdrNameFieldOcc f)) f) . recordPatSynField) as
+          let field_occs = map ((\ f -> L (getLocA (foLabel f)) f) . recordPatSynField) as
           flds <- mapM (newRecordSelector dup_fields_ok has_sel [bnd_name]) field_occs
           return ((bnd_name, flds): names)
       | L bind_loc (PatSynBind _ (PSB { psb_id = L _ n})) <- bind

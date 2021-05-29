@@ -16,26 +16,27 @@ module Preprocess
 import qualified GHC            as GHC hiding (parseModule)
 
 import qualified Control.Monad.IO.Class as GHC
-import qualified GHC.Data.Bag          as GHC
 import qualified GHC.Data.FastString   as GHC
 import qualified GHC.Data.StringBuffer as GHC
 import qualified GHC.Driver.Config     as GHC
 import qualified GHC.Driver.Env        as GHC
+import qualified GHC.Driver.Errors.Types as GHC
 import qualified GHC.Driver.Phases     as GHC
 import qualified GHC.Driver.Pipeline   as GHC
 import qualified GHC.Fingerprint.Type  as GHC
-import qualified GHC.Parser.Errors.Ppr as GHC
-import qualified GHC.Parser.Lexer      as GHC
+import qualified GHC.Parser.Lexer      as GHC hiding (getMessages)
 import qualified GHC.Settings          as GHC
+import qualified GHC.Types.Error       as GHC (getMessages)
 import qualified GHC.Types.SourceError as GHC
 import qualified GHC.Types.SourceFile  as GHC
 import qualified GHC.Types.SrcLoc      as GHC
 import qualified GHC.Utils.Error       as GHC
 import qualified GHC.Utils.Fingerprint as GHC
+import qualified GHC.Utils.Outputable  as GHC
 import GHC.Types.SrcLoc (mkSrcSpan, mkSrcLoc)
 import GHC.Data.FastString (mkFastString)
 
-import Data.List (isPrefixOf, intercalate)
+import Data.List (isPrefixOf)
 import Data.Maybe
 import Types
 import Utils
@@ -44,9 +45,6 @@ import qualified Data.Set as Set
 
 -- import Debug.Trace
 --
-{-# ANN module ("HLint: ignore Eta reduce" :: String) #-}
-{-# ANN module ("HLint: ignore Redundant do" :: String) #-}
-{-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
 
 -- ---------------------------------------------------------------------
 
@@ -213,7 +211,6 @@ getPreprocessedSrcDirectPrim cppOptions src_fn = do
   hsc_env <- GHC.getSession
   let dfs = GHC.hsc_dflags hsc_env
       new_env = hsc_env { GHC.hsc_dflags = injectCppOptions cppOptions dfs }
-  -- (dflags', hspp_fn) <-
   r <- GHC.liftIO $ GHC.preprocess new_env src_fn Nothing (Just (GHC.Cpp GHC.HsSrcFile))
   case r of
     Left err -> error $ showErrorMessages err
@@ -222,8 +219,13 @@ getPreprocessedSrcDirectPrim cppOptions src_fn = do
       txt <- GHC.liftIO $ readFileGhc hspp_fn
       return (txt, buf, dflags')
 
-showErrorMessages :: GHC.ErrorMessages -> String
-showErrorMessages msgs = intercalate "\n" $ map show $ GHC.bagToList msgs
+showErrorMessages :: GHC.Messages GHC.DriverMessage -> String
+showErrorMessages msgs =
+  GHC.renderWithContext GHC.defaultSDocContext
+    $ GHC.vcat
+    $ GHC.pprMsgEnvelopeBagWithLoc
+    $ GHC.getMessages
+    $ msgs
 
 injectCppOptions :: CppOptions -> GHC.DynFlags -> GHC.DynFlags
 injectCppOptions CppOptions{..} dflags =
@@ -277,7 +279,7 @@ parseError pst = do
      let
        -- (warns,errs) = GHC.getMessages pst dflags
      -- throw $ GHC.mkSrcErr (GHC.unitBag $ GHC.mkPlainErrMsg dflags sspan err)
-     GHC.throwErrors (fmap GHC.mkParserErr (GHC.getErrorMessages pst))
+     GHC.throwErrors $ (GHC.GhcPsMessage <$> GHC.getErrorMessages pst)
 
 -- ---------------------------------------------------------------------
 
@@ -309,4 +311,3 @@ mergeBy cmp (allx@(x:xs)) (ally@(y:ys))
         -- Someone please put this code out of its misery.
     | (x `cmp` y) <= EQ = x : mergeBy cmp xs ally
     | otherwise = y : mergeBy cmp allx ys
-

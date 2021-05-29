@@ -1,5 +1,5 @@
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE RecordWildCards #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
@@ -44,15 +44,15 @@ module GHC.Runtime.Eval (
         Term(..), obtainTermFromId, obtainTermFromVal, reconstructType
         ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Driver.Monad
 import GHC.Driver.Main
+import GHC.Driver.Errors.Types ( hoistTcRnMessage )
 import GHC.Driver.Env
 import GHC.Driver.Session
 import GHC.Driver.Ppr
+import GHC.Driver.Config
 
 import GHC.Runtime.Eval.Types
 import GHC.Runtime.Interpreter as GHCi
@@ -227,8 +227,9 @@ execStmt' stmt stmt_text ExecOptions{..} = do
 
         status <-
           withVirtualCWD $
-            liftIO $
-              evalStmt interp idflags' (isStep execSingleStep) (execWrap hval)
+            liftIO $ do
+              let eval_opts = initEvalOpts idflags' (isStep execSingleStep)
+              evalStmt interp eval_opts (execWrap hval)
 
         let ic = hsc_IC hsc_env
             bindings = (ic_tythings ic, ic_rn_gbl_env ic)
@@ -308,7 +309,7 @@ emptyHistory :: Int -> BoundedList History
 emptyHistory size = nilBL size
 
 handleRunStatus :: GhcMonad m
-                => SingleStep -> String-> ([TyThing],GlobalRdrEnv) -> [Id]
+                => SingleStep -> String -> ([TyThing],GlobalRdrEnv) -> [Id]
                 -> EvalStatus_ [ForeignHValue] [HValueRef]
                 -> BoundedList History
                 -> m ExecResult
@@ -342,7 +343,8 @@ handleRunStatus step expr bindings final_ids status history
                !history' = mkHistory hsc_env apStack_fhv bi `consBL` history
                  -- history is strict, otherwise our BoundedList is pointless.
            fhv <- liftIO $ mkFinalizedHValue interp resume_ctxt
-           status <- liftIO $ GHCi.resumeStmt interp dflags True fhv
+           let eval_opts = initEvalOpts dflags True
+           status <- liftIO $ GHCi.resumeStmt interp eval_opts fhv
            handleRunStatus RunAndLogSteps expr bindings final_ids
                            status history'
     | otherwise
@@ -442,7 +444,8 @@ resumeExec canLogSpan step mbCnt
                   setupBreakpoint hsc_env (fromJust mb_brkpt) (fromJust mbCnt)
                     -- When the user specified a break ignore count, set it
                     -- in the interpreter
-                status <- liftIO $ GHCi.resumeStmt interp dflags (isStep step) fhv
+                let eval_opts = initEvalOpts dflags (isStep step)
+                status <- liftIO $ GHCi.resumeStmt interp eval_opts fhv
                 let prevHistoryLst = fromListBL 50 hist
                     hist' = case mb_brkpt of
                        Nothing -> prevHistoryLst
@@ -662,7 +665,7 @@ rttiEnvironment hsc_env@HscEnv{hsc_IC=ic} = do
              Just new_ty -> do
               case improveRTTIType hsc_env old_ty new_ty of
                Nothing -> return $
-                        WARN(True, text (":print failed to calculate the "
+                        warnPprTrace True (text (":print failed to calculate the "
                                            ++ "improvement for a type")) hsc_env
                Just subst -> do
                  let dflags = hsc_dflags hsc_env
@@ -1032,7 +1035,7 @@ typeKind normalise str = withSession $ \hsc_env ->
 getInstancesForType :: GhcMonad m => Type -> m [ClsInst]
 getInstancesForType ty = withSession $ \hsc_env ->
   liftIO $ runInteractiveHsc hsc_env $
-    ioMsgMaybe $ runTcInteractive hsc_env $ do
+    ioMsgMaybe $ hoistTcRnMessage $ runTcInteractive hsc_env $ do
       -- Bring class and instances from unqualified modules into scope, this fixes #16793.
       loadUnqualIfaces hsc_env (hsc_IC hsc_env)
       matches <- findMatchingInstances ty
@@ -1045,7 +1048,7 @@ parseInstanceHead str = withSession $ \hsc_env0 -> do
   (ty, _) <- liftIO $ runInteractiveHsc hsc_env0 $ do
     hsc_env <- getHscEnv
     ty <- hscParseType str
-    ioMsgMaybe $ tcRnType hsc_env SkolemiseFlexi True ty
+    ioMsgMaybe $ hoistTcRnMessage $ tcRnType hsc_env SkolemiseFlexi True ty
 
   return ty
 
@@ -1211,7 +1214,8 @@ compileParsedExprRemote expr@(L loc _) = withSession $ \hsc_env -> do
         _ -> panic "compileParsedExprRemote"
 
   updateFixityEnv fix_env
-  status <- liftIO $ evalStmt interp dflags False (EvalThis hvals_io)
+  let eval_opts = initEvalOpts dflags False
+  status <- liftIO $ evalStmt interp eval_opts (EvalThis hvals_io)
   case status of
     EvalComplete _ (EvalSuccess [hval]) -> return hval
     EvalComplete _ (EvalException e) ->

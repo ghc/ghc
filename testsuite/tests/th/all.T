@@ -395,8 +395,9 @@ test('T13098', normal, compile, ['-v0'])
 test('T11046', normal, multimod_compile, ['T11046','-v0'])
 test('T13366',
      [expect_broken_for(13366, ['ghci']),
-      # libstdc++ is named differently on FreeBSD
-      when(opsys('freebsd'), expect_broken(17739)),
+      # libstdc++ is GCC-specific on FreeBSD, the test will
+      # fail with clang, and pass with GCC.
+      when(opsys('freebsd'), fragile(17739)),
       when(opsys('darwin'), expect_broken(16083))],
      compile_and_run,
      ['-lstdc++ -v0'])
@@ -513,6 +514,10 @@ test('TH_BytesShowEqOrd', normal, compile_and_run, [''])
 test('T18102', normal, compile_fail, [''])
 test('T18102b', extra_files(['T18102b_aux.hs']), compile_and_run, [''])
 test('T18121', normal, compile, [''])
+test('T19709a', normal, compile_fail, [''])
+test('T19709b', normal, compile_fail, [''])
+test('T19709c', normal, compile_fail, [''])
+test('T19709d', normal, compile_fail, [''])
 test('T18123', normal, compile, [''])
 test('T18388', normal, compile, [''])
 test('T18612', normal, compile, [''])
@@ -522,3 +527,5 @@ test('T19363', normal, compile_and_run, [''])
 test('T19377', normal, compile, [''])
 test('T17804', normal, compile, [''])
 test('T19470', only_ways(['ghci']), ghci_script, ['T19470.script'])
+test('T19737', normal, compile, [''])
+test('T19759', normal, compile, [''])

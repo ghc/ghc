@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP                  #-}
+
 {-# LANGUAGE ConstraintKinds      #-}
 {-# LANGUAGE DataKinds            #-}
 {-# LANGUAGE DeriveDataTypeable   #-}
@@ -65,8 +65,6 @@ module GHC.Stg.Syntax (
         pprGenStgTopBindings, pprStgTopBindings
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Core     ( AltCon )
@@ -90,8 +88,7 @@ import GHC.Builtin.PrimOps ( PrimOp, PrimCall )
 import GHC.Core.TyCon    ( PrimRep(..), TyCon )
 import GHC.Core.Type     ( Type )
 import GHC.Types.RepType ( typePrimRep1 )
-import GHC.Utils.Misc
-import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 
 {-
 ************************************************************************
@@ -503,7 +500,7 @@ type instance XLetNoEscape 'CodeGen = NoExtFieldSilent
 
 stgRhsArity :: StgRhs -> Int
 stgRhsArity (StgRhsClosure _ _ _ bndrs _)
-  = ASSERT( all isId bndrs ) length bndrs
+  = assert (all isId bndrs) $ length bndrs
   -- The arity never includes type parameters, but they should have gone by now
 stgRhsArity (StgRhsCon _ _ _ _ _) = 0
 
@@ -754,10 +751,10 @@ pprStgExpr opts e = case e of
    StgLet srt (StgNonRec bndr (StgRhsClosure cc bi free_vars upd_flag args rhs))
                         expr@(StgLet _ _))
    -> ($$)
-      (hang (hcat [text "let { ", ppr bndr, ptext (sLit " = "),
+      (hang (hcat [text "let { ", ppr bndr, text " = ",
                           ppr cc,
                           pp_binder_info bi,
-                          text " [", whenPprDebug (interppSP free_vars), ptext (sLit "] \\"),
+                          text " [", whenPprDebug (interppSP free_vars), text "] \\",
                           ppr upd_flag, text " [",
                           interppSP args, char ']'])
             8 (sep [hsep [ppr rhs, text "} in"]]))

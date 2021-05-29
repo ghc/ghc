@@ -1,10 +1,10 @@
 
-T16270.hs:3:12: warning: [-Wdeprecated-flags (in -Wdefault)]
+T16270.hs:3:13: warning: [-Wdeprecated-flags (in -Wdefault)]
     -Werror=missing-space-after-bang is deprecated: bang patterns can no longer be written with a space
 
 T16270.hs:8:1: warning: [-Wtabs (in -Wdefault)]
     Tab character found here, and in five further locations.
-    Please use spaces instead.
+    Suggested fix: Please use spaces instead.
 
 T16270.hs:8:12: error:
     Unexpected semi-colons in conditional:
@@ -14,14 +14,16 @@ T16270.hs:8:12: error:
 T16270.hs:13:8: error:
     Unexpected do block in function application:
         do 1
-    You could write it with parentheses
-    Or perhaps you meant to enable BlockArguments?
+    Suggested fixes:
+      Use parentheses.
+      Perhaps you intended to use BlockArguments
 
 T16270.hs:14:8: error:
     Unexpected lambda expression in function application:
         \ x -> x
-    You could write it with parentheses
-    Or perhaps you meant to enable BlockArguments?
+    Suggested fixes:
+      Use parentheses.
+      Perhaps you intended to use BlockArguments
 
 T16270.hs:18:22: error:
     Illegal record syntax (use TraditionalRecordSyntax): {fst :: a,
@@ -64,5 +66,8 @@ T16270.hs:36:5: error:
 T16270.hs:38:5: error:
     primitive string literal must contain only characters <= '\xFF'
 
-T16270.hs:44:1: error:
+T16270.hs:40:7: error:
+    A lambda requires at least one parameter
+
+T16270.hs:46:1: error:
     parse error (possibly incorrect indentation or mismatched brackets)

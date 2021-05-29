@@ -25,7 +25,6 @@ import GHC.Types.FieldLabel   ( FieldLabel )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Data.FastString
 import GHC.Types.SrcLoc
 import Language.Haskell.Syntax.Extension
 import GHC.Hs.Extension
@@ -64,9 +63,9 @@ data ImportDeclQualifiedStyle
 -- | Given two possible located 'qualified' tokens, compute a style
 -- (in a conforming Haskell program only one of the two can be not
 -- 'Nothing'). This is called from "GHC.Parser".
-importDeclQualifiedStyle :: Maybe EpaAnchor
-                         -> Maybe EpaAnchor
-                         -> (Maybe EpaAnchor, ImportDeclQualifiedStyle)
+importDeclQualifiedStyle :: Maybe EpaLocation
+                         -> Maybe EpaLocation
+                         -> (Maybe EpaLocation, ImportDeclQualifiedStyle)
 importDeclQualifiedStyle mPre mPost =
   if isJust mPre then (mPre, QualifiedPre)
   else if isJust mPost then (mPost,QualifiedPost) else (Nothing, NotQualified)
@@ -113,7 +112,7 @@ data ImportDecl pass
 
      -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
 
-type instance XCImportDecl  GhcPs = EpAnn' EpAnnImportDecl
+type instance XCImportDecl  GhcPs = EpAnn EpAnnImportDecl
 type instance XCImportDecl  GhcRn = NoExtField
 type instance XCImportDecl  GhcTc = NoExtField
 
@@ -127,12 +126,12 @@ type instance Anno [LocatedA (IE (GhcPass p))] = SrcSpanAnnL
 -- API Annotations types
 
 data EpAnnImportDecl = EpAnnImportDecl
-  { importDeclAnnImport    :: EpaAnchor
-  , importDeclAnnPragma    :: Maybe (EpaAnchor, EpaAnchor)
-  , importDeclAnnSafe      :: Maybe EpaAnchor
-  , importDeclAnnQualified :: Maybe EpaAnchor
-  , importDeclAnnPackage   :: Maybe EpaAnchor
-  , importDeclAnnAs        :: Maybe EpaAnchor
+  { importDeclAnnImport    :: EpaLocation
+  , importDeclAnnPragma    :: Maybe (EpaLocation, EpaLocation)
+  , importDeclAnnSafe      :: Maybe EpaLocation
+  , importDeclAnnQualified :: Maybe EpaLocation
+  , importDeclAnnPackage   :: Maybe EpaLocation
+  , importDeclAnnAs        :: Maybe EpaLocation
   } deriving (Data)
 
 -- ---------------------------------------------------------------------
@@ -164,7 +163,7 @@ instance (OutputableBndrId p
              4 (pp_spec spec)
       where
         pp_implicit False = empty
-        pp_implicit True = ptext (sLit ("(implicit)"))
+        pp_implicit True = text "(implicit)"
 
         pp_pkg Nothing                    = empty
         pp_pkg (Just (StringLiteral st p _))
@@ -208,9 +207,9 @@ instance (OutputableBndrId p
 -- 'GHC.Parser.Annotation' is the location of the adornment in
 -- the original source.
 data IEWrappedName name
-  = IEName              (LocatedN name)  -- ^ no extra
-  | IEPattern EpaAnchor (LocatedN name)  -- ^ pattern X
-  | IEType    EpaAnchor (LocatedN name)  -- ^ type (:+:)
+  = IEName                (LocatedN name)  -- ^ no extra
+  | IEPattern EpaLocation (LocatedN name)  -- ^ pattern X
+  | IEType    EpaLocation (LocatedN name)  -- ^ type (:+:)
   deriving (Eq,Data)
 
 -- | Located name with possible adornment
@@ -286,15 +285,15 @@ type instance XIEVar             GhcPs = NoExtField
 type instance XIEVar             GhcRn = NoExtField
 type instance XIEVar             GhcTc = NoExtField
 
-type instance XIEThingAbs        (GhcPass _) = EpAnn
-type instance XIEThingAll        (GhcPass _) = EpAnn
+type instance XIEThingAbs        (GhcPass _) = EpAnn [AddEpAnn]
+type instance XIEThingAll        (GhcPass _) = EpAnn [AddEpAnn]
 
 -- See Note [IEThingWith]
-type instance XIEThingWith       (GhcPass 'Parsed)      = EpAnn
+type instance XIEThingWith       (GhcPass 'Parsed)      = EpAnn [AddEpAnn]
 type instance XIEThingWith       (GhcPass 'Renamed)     = [Located FieldLabel]
 type instance XIEThingWith       (GhcPass 'Typechecked) = NoExtField
 
-type instance XIEModuleContents  GhcPs = EpAnn
+type instance XIEModuleContents  GhcPs = EpAnn [AddEpAnn]
 type instance XIEModuleContents  GhcRn = NoExtField
 type instance XIEModuleContents  GhcTc = NoExtField
 

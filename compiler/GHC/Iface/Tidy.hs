@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP           #-}
+
 {-# LANGUAGE DeriveFunctor #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
@@ -12,8 +12,6 @@
 module GHC.Iface.Tidy (
        mkBootModDetailsTc, tidyProgram
    ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -461,7 +459,7 @@ tidyProgram hsc_env  (ModGuts { mg_module           = mod
                            cg_binds    = all_tidy_binds,
                            cg_foreign  = add_spt_init_code foreign_stubs,
                            cg_foreign_files = foreign_files,
-                           cg_dep_pkgs = map fst $ dep_pkgs deps,
+                           cg_dep_pkgs = dep_direct_pkgs deps,
                            cg_hpc_info = hpc_info,
                            cg_modBreaks = modBreaks,
                            cg_spt_entries = spt_entries },
@@ -649,7 +647,14 @@ chooseExternalIds hsc_env mod omit_prags expose_all binds implicit_binds imp_id_
   -- See Note [Which rules to expose]
   is_external id = isExportedId id || id `elemVarSet` rule_rhs_vars
 
-  rule_rhs_vars  = mapUnionVarSet ruleRhsFreeVars imp_id_rules
+  rule_rhs_vars
+    -- No rules are exposed when omit_prags is enabled see #19836
+    -- imp_id_rules are the RULES in /this/ module for /imported/ Ids
+    -- If omit_prags is True, these rules won't be put in the interface file.
+    -- But if omit_prags is False, so imp_id_rules are in the interface file for
+    -- this module, then the local-defined Ids they use must be made external.
+    | omit_prags = emptyVarSet
+    | otherwise = mapUnionVarSet ruleRhsFreeVars imp_id_rules
 
   binders          = map fst $ flattenBinds binds
   implicit_binders = bindersOfBinds implicit_binds
@@ -701,7 +706,7 @@ chooseExternalIds hsc_env mod omit_prags expose_all binds implicit_binds imp_id_
                 -- unfolding in the *definition*; so look up in binder_set
           refined_id = case lookupVarSet binder_set idocc of
                          Just id -> id
-                         Nothing -> WARN( True, ppr idocc ) idocc
+                         Nothing -> warnPprTrace True (ppr idocc) idocc
 
           unfold_env' = extendVarEnv unfold_env idocc (name',show_unfold)
           referrer' | isExportedId refined_id = refined_id
@@ -1218,7 +1223,7 @@ tidyTopIdInfo uf_opts rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold
 
     sig = dmdSigInfo idinfo
     final_sig | not $ isTopSig sig
-              = WARN( _bottom_hidden sig , ppr name ) sig
+              = warnPprTrace (_bottom_hidden sig) (ppr name) sig
               -- try a cheap-and-cheerful bottom analyser
               | Just (_, nsig) <- mb_bot_str = nsig
               | otherwise                    = sig
@@ -1254,7 +1259,7 @@ tidyTopIdInfo uf_opts rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold
     --    the function returns bottom
     -- In this case, show_unfold will be false (we don't expose unfoldings
     -- for bottoming functions), but we might still have a worker/wrapper
-    -- split (see Note [Worker-wrapper for bottoming functions] in
+    -- split (see Note [Worker/wrapper for bottoming functions] in
     -- GHC.Core.Opt.WorkWrap)
 
 

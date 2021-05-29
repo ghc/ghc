@@ -54,6 +54,7 @@ import GHC.Driver.Plugins
 import GHC.Driver.Session
 
 import GHC.Tc.Errors.Hole.FitTypes ( HoleFitPluginR (..) )
+import GHC.Tc.Errors.Types
 import {-# SOURCE #-} GHC.Tc.Gen.Splice ( finishTH, runRemoteModFinalizers )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Validity( checkValidType )
@@ -74,6 +75,7 @@ import GHC.Tc.Gen.Default
 import GHC.Tc.Utils.Env
 import GHC.Tc.Gen.Rule
 import GHC.Tc.Gen.Foreign
+import GHC.Tc.TyCl.Class ( ClassScopedTVEnv )
 import GHC.Tc.TyCl.Instance
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
@@ -129,6 +131,7 @@ import GHC.Runtime.Context
 import GHC.Utils.Error
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 import GHC.Utils.Logger
 
@@ -176,8 +179,6 @@ import qualified Data.Set as S
 import Control.DeepSeq
 import Control.Monad
 
-#include "HsVersions.h"
-
 {-
 ************************************************************************
 *                                                                      *
@@ -191,7 +192,7 @@ tcRnModule :: HscEnv
            -> ModSummary
            -> Bool              -- True <=> save renamed syntax
            -> HsParsedModule
-           -> IO (Messages DiagnosticMessage, Maybe TcGblEnv)
+           -> IO (Messages TcRnMessage, Maybe TcGblEnv)
 
 tcRnModule hsc_env mod_sum save_rn_syntax
    parsedModule@HsParsedModule {hpm_module= L loc this_module}
@@ -213,7 +214,8 @@ tcRnModule hsc_env mod_sum save_rn_syntax
     logger  = hsc_logger hsc_env
     home_unit = hsc_home_unit hsc_env
     err_msg = mkPlainErrorMsgEnvelope loc $
-              text "Module does not have a RealSrcSpan:" <+> ppr this_mod
+              TcRnUnknownMessage $ mkPlainError noHints $
+                text "Module does not have a RealSrcSpan:" <+> ppr this_mod
 
     pair :: (Module, SrcSpan)
     pair@(this_mod,_)
@@ -364,7 +366,7 @@ tcRnImports hsc_env import_decls
 
         ; this_mod <- getModule
         ; let { dep_mods :: ModuleNameEnv ModuleNameWithIsBoot
-              ; dep_mods = imp_dep_mods imports
+              ; dep_mods = imp_direct_dep_mods imports
 
                 -- We want instance declarations from all home-package
                 -- modules below this one, including boot modules, except
@@ -373,17 +375,15 @@ tcRnImports hsc_env import_decls
                 -- filtering also ensures that we don't see instances from
                 -- modules batch (@--make@) compiled before this one, but
                 -- which are not below this one.
-              ; want_instances :: ModuleName -> Bool
-              ; want_instances mod = mod `elemUFM` dep_mods
-                                   && mod /= moduleName this_mod
-              ; (home_insts, home_fam_insts) = hptInstances hsc_env
-                                                            want_instances
+              ; (home_insts, home_fam_insts) = hptInstancesBelow hsc_env (moduleName this_mod) (eltsUFM dep_mods)
               } ;
 
                 -- Record boot-file info in the EPS, so that it's
                 -- visible to loadHiBootInterface in tcRnSrcDecls,
                 -- and any other incrementally-performed imports
-        ; updateEps_ (\eps -> eps { eps_is_boot = dep_mods }) ;
+              ; when (isOneShot (ghcMode (hsc_dflags hsc_env))) $ do {
+                  updateEps_ $ \eps  -> eps { eps_is_boot = imp_boot_mods imports }
+               }
 
                 -- Update the gbl env
         ; updGblEnv ( \ gbl ->
@@ -397,7 +397,7 @@ tcRnImports hsc_env import_decls
               tcg_hpc          = hpc_info
             }) $ do {
 
-        ; traceRn "rn1" (ppr (imp_dep_mods imports))
+        ; traceRn "rn1" (ppr (imp_direct_dep_mods imports))
                 -- Fail if there are any errors so far
                 -- The error printing (if needed) takes advantage
                 -- of the tcg_env we have now set
@@ -697,7 +697,7 @@ tcRnHsBootDecls hsc_src decls
 
                 -- Typecheck type/class/instance decls
         ; traceTc "Tc2 (boot)" empty
-        ; (tcg_env, inst_infos, _deriv_binds)
+        ; (tcg_env, inst_infos, _deriv_binds, _class_scoped_tv_env)
              <- tcTyClsInstDecls tycl_decls deriv_decls val_binds
         ; setGblEnv tcg_env     $ do {
 
@@ -865,9 +865,6 @@ checkHiBootIface'
 
     check_export boot_avail     -- boot_avail is exported by the boot iface
       | name `elem` boot_dfun_names = return ()
-      | isWiredInName name          = return () -- No checking for wired-in names.  In particular,
-                                                -- 'error' is handled by a rather gross hack
-                                                -- (see comments in GHC.Err.hs-boot)
 
         -- Check that the actual module exports the same thing
       | not (null missing_names)
@@ -974,7 +971,7 @@ checkBootDeclM is_boot boot_thing real_thing
 checkBootDecl :: Bool -> TyThing -> TyThing -> Maybe SDoc
 
 checkBootDecl _ (AnId id1) (AnId id2)
-  = ASSERT(id1 == id2)
+  = assert (id1 == id2) $
     check (idType id1 `eqType` idType id2)
           (text "The two types are different")
 
@@ -1114,7 +1111,7 @@ checkBootTyCon is_boot tc1 tc2
   | Just syn_rhs1 <- synTyConRhs_maybe tc1
   , Just syn_rhs2 <- synTyConRhs_maybe tc2
   , Just env <- eqVarBndrs emptyRnEnv2 (tyConTyVars tc1) (tyConTyVars tc2)
-  = ASSERT(tc1 == tc2)
+  = assert (tc1 == tc2) $
     checkRoles roles1 roles2 `andThenCheck`
     check (eqTypeX env syn_rhs1 syn_rhs2) empty   -- nothing interesting to say
   -- This allows abstract 'data T a' to be implemented using 'type T = ...'
@@ -1144,7 +1141,7 @@ checkBootTyCon is_boot tc1 tc2
 
   | Just fam_flav1 <- famTyConFlav_maybe tc1
   , Just fam_flav2 <- famTyConFlav_maybe tc2
-  = ASSERT(tc1 == tc2)
+  = assert (tc1 == tc2) $
     let eqFamFlav OpenSynFamilyTyCon   OpenSynFamilyTyCon = True
         eqFamFlav (DataFamilyTyCon {}) (DataFamilyTyCon {}) = True
         -- This case only happens for hsig merging:
@@ -1170,7 +1167,7 @@ checkBootTyCon is_boot tc1 tc2
 
   | isAlgTyCon tc1 && isAlgTyCon tc2
   , Just env <- eqVarBndrs emptyRnEnv2 (tyConTyVars tc1) (tyConTyVars tc2)
-  = ASSERT(tc1 == tc2)
+  = assert (tc1 == tc2) $
     checkRoles roles1 roles2 `andThenCheck`
     check (eqListBy (eqTypeX env)
                      (tyConStupidTheta tc1) (tyConStupidTheta tc2))
@@ -1279,7 +1276,7 @@ checkBootTyCon is_boot tc1 tc2
                 `andThenCheck`
         -- Don't report roles errors unless the type synonym is nullary
         checkUnless (not (null tvs)) $
-            ASSERT( null roles2 )
+            assert (null roles2) $
             -- If we have something like:
             --
             --  signature H where
@@ -1454,7 +1451,8 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
                 -- Source-language instances, including derivings,
                 -- and import the supporting declarations
         traceTc "Tc3" empty ;
-        (tcg_env, inst_infos, XValBindsLR (NValBinds deriv_binds deriv_sigs))
+        (tcg_env, inst_infos, class_scoped_tv_env,
+         XValBindsLR (NValBinds deriv_binds deriv_sigs))
             <- tcTyClsInstDecls tycl_decls deriv_decls val_binds ;
 
         setGblEnv tcg_env       $ do {
@@ -1495,7 +1493,8 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
                 -- Second pass over class and instance declarations,
                 -- now using the kind-checked decls
         traceTc "Tc6" empty ;
-        inst_binds <- tcInstDecls2 (tyClGroupTyClDecls tycl_decls) inst_infos ;
+        inst_binds <- tcInstDecls2 (tyClGroupTyClDecls tycl_decls)
+                                   inst_infos class_scoped_tv_env ;
 
                 -- Foreign exports
         traceTc "Tc7" empty ;
@@ -1731,13 +1730,14 @@ tcTyClsInstDecls :: [TyClGroup GhcRn]
                          [InstInfo GhcRn],    -- Source-code instance decls to
                                               -- process; contains all dfuns for
                                               -- this module
+                          ClassScopedTVEnv,   -- Class scoped type variables
                           HsValBinds GhcRn)   -- Supporting bindings for derived
                                               -- instances
 
 tcTyClsInstDecls tycl_decls deriv_decls binds
  = tcAddDataFamConPlaceholders (tycl_decls >>= group_instds) $
    tcAddPatSynPlaceholders (getPatSynBinds binds) $
-   do { (tcg_env, inst_info, deriv_info)
+   do { (tcg_env, inst_info, deriv_info, class_scoped_tv_env)
           <- tcTyAndClassDecls tycl_decls ;
       ; setGblEnv tcg_env $ do {
           -- With the @TyClDecl@s and @InstDecl@s checked we're ready to
@@ -1751,7 +1751,8 @@ tcTyClsInstDecls tycl_decls deriv_decls binds
               <- tcInstDeclsDeriv deriv_info deriv_decls
           ; setGblEnv tcg_env' $ do {
                 failIfErrsM
-              ; pure (tcg_env', inst_info' ++ inst_info, val_binds)
+              ; pure ( tcg_env', inst_info' ++ inst_info
+                     , class_scoped_tv_env, val_binds )
       }}}
 
 {- *********************************************************************
@@ -1818,7 +1819,7 @@ checkMain explicit_mod_hdr export_ies
               generateMainBinding tcg_env main_name
 
            | otherwise
-           -> ASSERT( null exported_mains )
+           -> assert (null exported_mains) $
               -- A fully-checked export list can't contain more
               -- than one function with the same OccName
               do { complain_no_main dflags main_mod main_occ
@@ -2010,7 +2011,7 @@ get two defns for 'main' in the interface file!
 *********************************************************
 -}
 
-runTcInteractive :: HscEnv -> TcRn a -> IO (Messages DiagnosticMessage, Maybe a)
+runTcInteractive :: HscEnv -> TcRn a -> IO (Messages TcRnMessage, Maybe a)
 -- Initialise the tcg_inst_env with instances from all home modules.
 -- This mimics the more selective call to hptInstances in tcRnImports
 runTcInteractive hsc_env thing_inside
@@ -2064,7 +2065,7 @@ runTcInteractive hsc_env thing_inside
 
        ; setEnvs (gbl_env', lcl_env') thing_inside }
   where
-    (home_insts, home_fam_insts) = hptInstances hsc_env (\_ -> True)
+    (home_insts, home_fam_insts) = hptAllInstances hsc_env
 
     icxt                     = hsc_IC hsc_env
     (ic_insts, ic_finsts)    = ic_instances icxt
@@ -2126,7 +2127,7 @@ We don't bother with the tcl_th_bndrs environment either.
 -- The returned TypecheckedHsExpr is of type IO [ () ], a list of the bound
 -- values, coerced to ().
 tcRnStmt :: HscEnv -> GhciLStmt GhcPs
-         -> IO (Messages DiagnosticMessage, Maybe ([Id], LHsExpr GhcTc, FixityEnv))
+         -> IO (Messages TcRnMessage, Maybe ([Id], LHsExpr GhcTc, FixityEnv))
 tcRnStmt hsc_env rdr_stmt
   = runTcInteractive hsc_env $ do {
 
@@ -2507,7 +2508,7 @@ getGhciStepIO = do
 
     return (noLocA $ ExprWithTySig noExtField (nlHsVar ghciStepIoMName) stepTy)
 
-isGHCiMonad :: HscEnv -> String -> IO (Messages DiagnosticMessage, Maybe Name)
+isGHCiMonad :: HscEnv -> String -> IO (Messages TcRnMessage, Maybe Name)
 isGHCiMonad hsc_env ty
   = runTcInteractive hsc_env $ do
         rdrEnv <- getGlobalRdrEnv
@@ -2534,7 +2535,7 @@ data TcRnExprMode = TM_Inst     -- ^ Instantiate inferred quantifiers only (:typ
 tcRnExpr :: HscEnv
          -> TcRnExprMode
          -> LHsExpr GhcPs
-         -> IO (Messages DiagnosticMessage, Maybe Type)
+         -> IO (Messages TcRnMessage, Maybe Type)
 tcRnExpr hsc_env mode rdr_expr
   = runTcInteractive hsc_env $
     do {
@@ -2603,7 +2604,7 @@ has a special case for application chains.
 --------------------------
 tcRnImportDecls :: HscEnv
                 -> [LImportDecl GhcPs]
-                -> IO (Messages DiagnosticMessage, Maybe GlobalRdrEnv)
+                -> IO (Messages TcRnMessage, Maybe GlobalRdrEnv)
 -- Find the new chunk of GlobalRdrEnv created by this list of import
 -- decls.  In contract tcRnImports *extends* the TcGblEnv.
 tcRnImportDecls hsc_env import_decls
@@ -2619,7 +2620,7 @@ tcRnType :: HscEnv
          -> ZonkFlexi
          -> Bool        -- Normalise the returned type
          -> LHsType GhcPs
-         -> IO (Messages DiagnosticMessage, Maybe (Type, Kind))
+         -> IO (Messages TcRnMessage, Maybe (Type, Kind))
 tcRnType hsc_env flexi normalise rdr_type
   = runTcInteractive hsc_env $
     setXOptM LangExt.PolyKinds $   -- See Note [Kind-generalise in tcRnType]
@@ -2644,7 +2645,7 @@ tcRnType hsc_env flexi normalise rdr_type
 
        -- Since all the wanteds are equalities, the returned bindings will be empty
        ; empty_binds <- simplifyTop wanted
-       ; MASSERT2( isEmptyBag empty_binds, ppr empty_binds )
+       ; massertPpr (isEmptyBag empty_binds) (ppr empty_binds)
 
        -- Do kind generalisation; see Note [Kind-generalise in tcRnType]
        ; kvs <- kindGeneralizeAll kind
@@ -2753,7 +2754,7 @@ tcRnDeclsi exists to allow class, data, and other declarations in GHCi.
 
 tcRnDeclsi :: HscEnv
            -> [LHsDecl GhcPs]
-           -> IO (Messages DiagnosticMessage, Maybe TcGblEnv)
+           -> IO (Messages TcRnMessage, Maybe TcGblEnv)
 tcRnDeclsi hsc_env local_decls
   = runTcInteractive hsc_env $
     tcRnSrcDecls False Nothing local_decls
@@ -2778,13 +2779,13 @@ externaliseAndTidyId this_mod id
 -- a package module with an interface on disk.  If neither of these is
 -- true, then the result will be an error indicating the interface
 -- could not be found.
-getModuleInterface :: HscEnv -> Module -> IO (Messages DiagnosticMessage, Maybe ModIface)
+getModuleInterface :: HscEnv -> Module -> IO (Messages TcRnMessage, Maybe ModIface)
 getModuleInterface hsc_env mod
   = runTcInteractive hsc_env $
     loadModuleInterface (text "getModuleInterface") mod
 
 tcRnLookupRdrName :: HscEnv -> LocatedN RdrName
-                  -> IO (Messages DiagnosticMessage, Maybe [Name])
+                  -> IO (Messages TcRnMessage, Maybe [Name])
 -- ^ Find all the Names that this RdrName could mean, in GHCi
 tcRnLookupRdrName hsc_env (L loc rdr_name)
   = runTcInteractive hsc_env $
@@ -2798,7 +2799,7 @@ tcRnLookupRdrName hsc_env (L loc rdr_name)
        ; when (null names) (addErrTc (text "Not in scope:" <+> quotes (ppr rdr_name)))
        ; return names }
 
-tcRnLookupName :: HscEnv -> Name -> IO (Messages DiagnosticMessage, Maybe TyThing)
+tcRnLookupName :: HscEnv -> Name -> IO (Messages TcRnMessage, Maybe TyThing)
 tcRnLookupName hsc_env name
   = runTcInteractive hsc_env $
     tcRnLookupName' name
@@ -2817,7 +2818,7 @@ tcRnLookupName' name = do
 
 tcRnGetInfo :: HscEnv
             -> Name
-            -> IO ( Messages DiagnosticMessage
+            -> IO ( Messages TcRnMessage
                   , Maybe (TyThing, Fixity, [ClsInst], [FamInst], SDoc))
 
 -- Used to implement :info in GHCi
@@ -2946,9 +2947,9 @@ pprTcGblEnv (TcGblEnv { tcg_type_env  = type_env,
          , ppr_fam_insts fam_insts
          , ppr_rules rules
          , text "Dependent modules:" <+>
-                pprUFM (imp_dep_mods imports) (ppr . sort)
+                pprUFM (imp_direct_dep_mods imports) (ppr . sort)
          , text "Dependent packages:" <+>
-                ppr (S.toList $ imp_dep_pkgs imports)]
+                ppr (S.toList $ imp_dep_direct_pkgs imports)]
                 -- The use of sort is just to reduce unnecessary
                 -- wobbling in testsuite output
 
@@ -3147,5 +3148,9 @@ mark_plugin_unsafe dflags = unless (gopt Opt_PluginTrustworthy dflags) $
   recordUnsafeInfer pluginUnsafe
   where
     unsafeText = "Use of plugins makes the module unsafe"
-    pluginUnsafe = unitBag ( mkPlainMsgEnvelope dflags WarningWithoutFlag noSrcSpan
-                                   (Outputable.text unsafeText) )
+    pluginUnsafe =
+      singleMessage $
+      mkPlainMsgEnvelope dflags noSrcSpan $
+      TcRnUnknownMessage $
+      mkPlainDiagnostic WarningWithoutFlag noHints $
+      Outputable.text unsafeText

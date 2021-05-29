@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP                  #-}
+
 {-# LANGUAGE ConstraintKinds      #-}
 {-# LANGUAGE DeriveDataTypeable   #-}
 {-# LANGUAGE FlexibleContexts     #-}
@@ -17,8 +17,6 @@
 
 -- | Source-language literals
 module Language.Haskell.Syntax.Lit where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -44,7 +42,8 @@ import Data.Data hiding ( Fixity )
 
 -- Note [Literal source text] in GHC.Types.Basic for SourceText fields in
 -- the following
--- Note [Trees that grow] in Language.Haskell.Syntax.Extension for the Xxxxx fields in the following
+-- Note [Trees That Grow] in Language.Haskell.Syntax.Extension for the Xxxxx
+-- fields in the following
 -- | Haskell Literal
 data HsLit x
   = HsChar (XHsChar x) {- SourceText -} Char
@@ -163,7 +162,7 @@ instance Ord OverLitVal where
   compare (HsFractional f1)   (HsFractional f2)   = f1 `compare` f2
   compare (HsFractional _)    (HsIntegral   _)    = GT
   compare (HsFractional _)    (HsIsString _ _)    = LT
-  compare (HsIsString _ s1)   (HsIsString _ s2)   = s1 `uniqCompareFS` s2
+  compare (HsIsString _ s1)   (HsIsString _ s2)   = s1 `lexicalCompareFS` s2
   compare (HsIsString _ _)    (HsIntegral   _)    = GT
   compare (HsIsString _ _)    (HsFractional _)    = GT
 

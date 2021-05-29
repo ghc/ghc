@@ -1,5 +1,5 @@
 
-UnsafeWarn03.hs:4:16: warning: [-Wunsafe]
+UnsafeWarn03.hs:4:17: warning: [-Wunsafe]
     ‘UnsafeWarn03’ has been inferred as unsafe!
     Reason:
         UnsafeWarn03.hs:9:1: error:

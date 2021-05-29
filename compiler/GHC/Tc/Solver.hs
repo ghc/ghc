@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 
 module GHC.Tc.Solver(
        InferMode(..), simplifyInfer, findInferredDiff,
@@ -26,8 +26,6 @@ module GHC.Tc.Solver(
        approximateWC, runTcSDeriveds
   ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Data.Bag
@@ -48,6 +46,7 @@ import GHC.Tc.Solver.Rewrite     ( rewriteType )
 import GHC.Tc.Utils.Unify        ( buildTvImplication )
 import GHC.Tc.Utils.TcMType as TcM
 import GHC.Tc.Utils.Monad   as TcM
+import GHC.Tc.Solver.InertSet
 import GHC.Tc.Solver.Monad  as TcS
 import GHC.Tc.Types.Constraint
 import GHC.Core.Predicate
@@ -120,7 +119,7 @@ simplifyTopImplic implics
   = do { empty_binds <- simplifyTop (mkImplicWC implics)
 
        -- Since all the inputs are implications the returned bindings will be empty
-       ; MASSERT2( isEmptyBag empty_binds, ppr empty_binds )
+       ; massertPpr (isEmptyBag empty_binds) (ppr empty_binds)
 
        ; return () }
 
@@ -152,7 +151,7 @@ simplifyTop wanteds
 
            ; whyUnsafe <- getWarningMessages <$> TcM.readTcRef errs_var
            ; TcM.writeTcRef errs_var saved_msg
-           ; recordUnsafeInfer whyUnsafe
+           ; recordUnsafeInfer (mkMessages whyUnsafe)
            }
        ; traceTc "reportUnsolved (unsafe overlapping) }" empty
 
@@ -708,10 +707,10 @@ How is this implemented? It's complicated! So we'll step through it all:
     available and how they overlap. So we once again call `lookupInstEnv` to
     figure that out so we can generate a helpful error message.
 
- 6) `GHC.Tc.Utils.Monad.recordUnsafeInfer` -- Save the unsafe result and reason in an
-      IORef called `tcg_safeInfer`.
+ 6) `GHC.Tc.Utils.Monad.recordUnsafeInfer` -- Save the unsafe result and reason in
+      IORefs called `tcg_safe_infer` and `tcg_safe_infer_reason`.
 
- 7) `GHC.Driver.Main.tcRnModule'` -- Reads `tcg_safeInfer` after type-checking, calling
+ 7) `GHC.Driver.Main.tcRnModule'` -- Reads `tcg_safe_infer` after type-checking, calling
     `GHC.Driver.Main.markUnsafeInfer` (passing the reason along) when safe-inferrence
     failed.
 
@@ -1772,7 +1771,7 @@ simplify_loop n limit definitely_redo_implications
        ; (unifs1, wc1) <- reportUnifications $  -- See Note [Superclass iteration]
                           solveSimpleWanteds simples
                 -- Any insoluble constraints are in 'simples' and so get rewritten
-                -- See Note [Rewrite insolubles] in GHC.Tc.Solver.Monad
+                -- See Note [Rewrite insolubles] in GHC.Tc.Solver.InertSet
 
        ; wc2 <- if not definitely_redo_implications  -- See Note [Superclass iteration]
                    && unifs1 == 0                    -- for this conditional
@@ -1932,7 +1931,8 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
     -- remaining commented out for now.
     {-
     check_tc_level = do { cur_lvl <- TcS.getTcLevel
-                        ; MASSERT2( tclvl == pushTcLevel cur_lvl , text "Cur lvl =" <+> ppr cur_lvl $$ text "Imp lvl =" <+> ppr tclvl ) }
+                        ; massertPpr (tclvl == pushTcLevel cur_lvl)
+                                     (text "Cur lvl =" <+> ppr cur_lvl $$ text "Imp lvl =" <+> ppr tclvl) }
     -}
 
 ----------------------
@@ -1946,7 +1946,7 @@ setImplicationStatus implic@(Implic { ic_status     = status
                                     , ic_info       = info
                                     , ic_wanted     = wc
                                     , ic_given      = givens })
- | ASSERT2( not (isSolvedStatus status ), ppr info )
+ | assertPpr (not (isSolvedStatus status)) (ppr info) $
    -- Precondition: we only set the status if it is not already solved
    not (isSolvedWC pruned_wc)
  = do { traceTcS "setImplicationStatus(not-all-solved) {" (ppr implic)

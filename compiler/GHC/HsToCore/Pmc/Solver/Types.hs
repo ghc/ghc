@@ -1,5 +1,5 @@
 {-# LANGUAGE ApplicativeDo       #-}
-{-# LANGUAGE CPP                 #-}
+
 {-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Domain types used in "GHC.HsToCore.Pmc.Solver".
@@ -32,11 +32,8 @@ module GHC.HsToCore.Pmc.Solver.Types (
 
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
-import GHC.Utils.Misc
 import GHC.Data.Bag
 import GHC.Data.FastString
 import GHC.Types.Id
@@ -47,7 +44,7 @@ import GHC.Types.Name
 import GHC.Core.DataCon
 import GHC.Core.ConLike
 import GHC.Utils.Outputable
-import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Data.List.SetOps (unionLists)
 import GHC.Data.Maybe
 import GHC.Core.Type
@@ -59,7 +56,7 @@ import GHC.Core.Utils (exprType)
 import GHC.Builtin.Names
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim
-import GHC.Tc.Solver.Monad (InertSet, emptyInert)
+import GHC.Tc.Solver.InertSet (InertSet, emptyInert)
 import GHC.Tc.Utils.TcType (isStringTy)
 import GHC.Types.CompleteMatch (CompleteMatch(..))
 import GHC.Types.SourceText (SourceText(..), mkFractionalLit, FractionalLit
@@ -431,7 +428,7 @@ instance Eq PmAltCon where
 
 -- | Type of a 'PmAltCon'
 pmAltConType :: PmAltCon -> [Type] -> Type
-pmAltConType (PmAltLit lit)     _arg_tys = ASSERT( null _arg_tys ) pmLitType lit
+pmAltConType (PmAltLit lit)     _arg_tys = assert (null _arg_tys ) $ pmLitType lit
 pmAltConType (PmAltConLike con) arg_tys  = conLikeResTy con arg_tys
 
 -- | Is a match on this constructor forcing the match variable?

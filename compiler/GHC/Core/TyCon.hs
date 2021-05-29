@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP                #-}
+
 {-# LANGUAGE FlexibleInstances  #-}
 {-# LANGUAGE LambdaCase         #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -132,8 +132,6 @@ module GHC.Core.TyCon(
 
 ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 import GHC.Platform
 
@@ -166,6 +164,7 @@ import GHC.Builtin.Names
 import GHC.Data.Maybe
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Data.FastString.Env
 import GHC.Types.FieldLabel
 import GHC.Settings.Constants
@@ -455,7 +454,7 @@ instance Outputable TyConBndrVis where
   ppr (AnonTCB af)    = text "AnonTCB"  <> ppr af
 
 mkAnonTyConBinder :: AnonArgFlag -> TyVar -> TyConBinder
-mkAnonTyConBinder af tv = ASSERT( isTyVar tv)
+mkAnonTyConBinder af tv = assert (isTyVar tv) $
                           Bndr tv (AnonTCB af)
 
 mkAnonTyConBinders :: AnonArgFlag -> [TyVar] -> [TyConBinder]
@@ -463,7 +462,7 @@ mkAnonTyConBinders af tvs = map (mkAnonTyConBinder af) tvs
 
 mkNamedTyConBinder :: ArgFlag -> TyVar -> TyConBinder
 -- The odd argument order supports currying
-mkNamedTyConBinder vis tv = ASSERT( isTyVar tv )
+mkNamedTyConBinder vis tv = assert (isTyVar tv) $
                             Bndr tv (NamedTCB vis)
 
 mkNamedTyConBinders :: ArgFlag -> [TyVar] -> [TyConBinder]
@@ -976,6 +975,36 @@ where
    * required_tvs the same as tyConTyVars
    * tyConArity = length required_tvs
 
+There are some situations where we need to keep the tcTyConScopedTyVars around
+for later use, even after the TcTyCon has been zonked away:
+
+* When typechecking `deriving` clauses for top-level data declarations, the
+  tcTyConScopedTyVars are brought into scope in through the `di_scoped_tvs`
+  field of GHC.Tc.Deriv.DerivInfo. Example (#16731):
+
+    class C x1 x2
+
+    type T :: a -> Type
+    data T (x :: z) deriving (C z)
+
+  When typechecking `C z`, we want `z` to map to `a`, which is exactly what the
+  tcTyConScopedTyVars for T give us.
+
+* Similarly, when typechecking default definitions for class methods, the
+  tcTyConScopedTyVars ought to be brought into scope. Example (#19738):
+
+    type P :: k -> Type
+    data P a = MkP
+
+    type T :: k -> Constraint
+    class T (a :: j) where
+      f :: P a
+      f = MkP @j @a
+
+  We pass the tcTyConScopedTyVars to GHC.Tc.TyCl.Class.tcClassDecl2, the
+  function responsible for typechecking the default definition of `f`, by way
+  of a ClassScopedTVEnv, which maps each class name to its scoped tyvars.
+
 See also Note [How TcTyCons work] in GHC.Tc.TyCl
 
 Note [Promoted GADT data constructors]
@@ -1307,17 +1336,22 @@ Note [Newtype eta]
 ~~~~~~~~~~~~~~~~~~
 Consider
         newtype Parser a = MkParser (IO a) deriving Monad
-Are these two types equal (that is, does a coercion exist between them)?
+Are these two types equal? That is, does a coercion exist between them?
         Monad Parser
         Monad IO
-which we need to make the derived instance for Monad Parser.
+(We need this coercion to make the derived instance for Monad Parser.)
 
 Well, yes.  But to see that easily we eta-reduce the RHS type of
-Parser, in this case to IO, so that even unsaturated applications
-of Parser will work right.  This eta reduction is done when the type
-constructor is built, and cached in NewTyCon.
+Parser, in this case to IO, so that even unsaturated applications of
+Parser will work right.  So instead of
+   axParser :: forall a. Parser a ~ IO a
+we generate an eta-reduced axiom
+   axParser :: Parser ~ IO
 
-Here's an example that I think showed up in practice
+This eta reduction is done when the type constructor is built, in
+GHC.Tc.TyCl.Build.mkNewTyConRhs, and cached in NewTyCon.
+
+Here's an example that I think showed up in practice.
 Source code:
         newtype T a = MkT [a]
         newtype Foo m = MkFoo (forall a. m a -> Int)
@@ -1329,14 +1363,15 @@ Source code:
         w2 = MkFoo (\(MkT x) -> case w1 of MkFoo f -> f x)
 
 After desugaring, and discarding the data constructors for the newtypes,
-we get:
-        w2 = w1 `cast` Foo CoT
-so the coercion tycon CoT must have
-        kind:    T ~ []
+we would like to get:
+        w2 = w1 `cast` Foo axT
+
+so that w2 and w1 share the same code. To do this, the coercion axiom
+axT must have
+        kind:    axT :: T ~ []
  and    arity:   0
 
-This eta-reduction is implemented in GHC.Tc.TyCl.Build.mkNewTyConRhs.
-
+See also Note [Newtype eta and homogeneous axioms] in GHC.Tc.TyCl.Build.
 
 ************************************************************************
 *                                                                      *
@@ -1716,7 +1751,7 @@ mkAlgTyCon name binders res_kind roles cType stupid rhs parent gadt_syn
               algTcStupidTheta = stupid,
               algTcRhs         = rhs,
               algTcFields      = fieldsOfAlgTcRhs rhs,
-              algTcParent      = ASSERT2( okParent name parent, ppr name $$ ppr parent ) parent,
+              algTcParent      = assertPpr (okParent name parent) (ppr name $$ ppr parent) parent,
               algTcGadtSyntax  = gadt_syn
           }
     in tc

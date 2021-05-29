@@ -12,5 +12,3 @@ mkDictSelId     :: Name -> Class   -> Id
 
 mkPrimOpId      :: PrimOp -> Id
 voidPrimId      :: Id
-
-magicDictId :: Id

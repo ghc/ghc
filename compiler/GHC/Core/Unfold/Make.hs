@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 
 -- | Unfolding creation
 module GHC.Core.Unfold.Make
@@ -18,8 +18,6 @@ module GHC.Core.Unfold.Make
    , specUnfolding
    )
 where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 import GHC.Core
@@ -88,7 +86,7 @@ mkWwInlineRule opts expr arity
                             , ug_boring_ok = boringCxtNotOk })
 
 mkWorkerUnfolding :: SimpleOpts -> (CoreExpr -> CoreExpr) -> Unfolding -> Unfolding
--- See Note [Worker-wrapper for INLINABLE functions] in GHC.Core.Opt.WorkWrap
+-- See Note [Worker/wrapper for INLINABLE functions] in GHC.Core.Opt.WorkWrap
 mkWorkerUnfolding opts work_fn
                   (CoreUnfolding { uf_src = src, uf_tmpl = tmpl
                                  , uf_is_top = top_lvl })
@@ -149,8 +147,8 @@ specUnfolding :: SimpleOpts
 --
 specUnfolding opts spec_bndrs spec_app rule_lhs_args
               df@(DFunUnfolding { df_bndrs = old_bndrs, df_con = con, df_args = args })
-  = ASSERT2( rule_lhs_args `equalLength` old_bndrs
-           , ppr df $$ ppr rule_lhs_args )
+  = assertPpr (rule_lhs_args `equalLength` old_bndrs)
+              (ppr df $$ ppr rule_lhs_args) $
            -- For this ASSERT see Note [DFunUnfoldings] in GHC.Core.Opt.Specialise
     mkDFunUnfolding spec_bndrs con (map spec_arg args)
       -- For DFunUnfoldings we transform

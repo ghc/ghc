@@ -1,5 +1,3 @@
-{-# LANGUAGE CPP #-}
-
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 -----------------------------------------------------------------------------
@@ -9,8 +7,6 @@
 -- (c) The University of Glasgow 1993-2004
 --
 -----------------------------------------------------------------------------
-
-#include "HsVersions.h"
 
 module GHC.CmmToAsm.PPC.Instr
    ( Instr(..)

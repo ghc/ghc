@@ -138,8 +138,6 @@ Library
             if flag(stage3)
                 Include-Dirs: stage2
 
-    Install-Includes: HsVersions.h
-
     c-sources:
         cbits/cutils.c
         cbits/genSym.c
@@ -373,6 +371,7 @@ Library
         GHC.Data.OrdList
         GHC.Data.Pair
         GHC.Data.Stream
+        GHC.Data.Strict
         GHC.Data.StringBuffer
         GHC.Data.TrieMap
         GHC.Driver.Backend
@@ -384,6 +383,8 @@ Library
         GHC.Driver.Env
         GHC.Driver.Env.Types
         GHC.Driver.Errors
+        GHC.Driver.Errors.Ppr
+        GHC.Driver.Errors.Types
         GHC.Driver.Flags
         GHC.Driver.Hooks
         GHC.Driver.Main
@@ -413,6 +414,8 @@ Library
         GHC.HsToCore.Binds
         GHC.HsToCore.Coverage
         GHC.HsToCore.Docs
+        GHC.HsToCore.Errors.Ppr
+        GHC.HsToCore.Errors.Types
         GHC.HsToCore.Expr
         GHC.HsToCore.Foreign.Call
         GHC.HsToCore.Foreign.Decl
@@ -473,8 +476,8 @@ Library
         GHC.Parser
         GHC.Parser.Annotation
         GHC.Parser.CharClass
-        GHC.Parser.Errors
         GHC.Parser.Errors.Ppr
+        GHC.Parser.Errors.Types
         GHC.Parser.Header
         GHC.Parser.Lexer
         GHC.Parser.PostProcess
@@ -574,6 +577,8 @@ Library
         GHC.Tc.Errors
         GHC.Tc.Errors.Hole
         GHC.Tc.Errors.Hole.FitTypes
+        GHC.Tc.Errors.Ppr
+        GHC.Tc.Errors.Types
         GHC.Tc.Gen.Annotation
         GHC.Tc.Gen.App
         GHC.Tc.Gen.Arrow
@@ -598,8 +603,10 @@ Library
         GHC.Tc.Solver
         GHC.Tc.Solver.Canonical
         GHC.Tc.Solver.Rewrite
+        GHC.Tc.Solver.InertSet
         GHC.Tc.Solver.Interact
         GHC.Tc.Solver.Monad
+        GHC.Tc.Solver.Types
         GHC.Tc.TyCl
         GHC.Tc.TyCl.Build
         GHC.Tc.TyCl.Class
@@ -635,6 +642,7 @@ Library
         GHC.Types.Fixity.Env
         GHC.Types.ForeignCall
         GHC.Types.ForeignStubs
+        GHC.Types.Hint
         GHC.Types.HpcInfo
         GHC.Types.Id
         GHC.Types.IPE
@@ -701,6 +709,7 @@ Library
         GHC.Utils.Binary.Typeable
         GHC.Utils.BufHandle
         GHC.Utils.CliOption
+        GHC.Utils.Constants
         GHC.Utils.Error
         GHC.Utils.Exception
         GHC.Utils.Fingerprint

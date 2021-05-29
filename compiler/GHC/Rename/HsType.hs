@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP                 #-}
+
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE LambdaCase          #-}
@@ -12,7 +12,7 @@
 
 module GHC.Rename.HsType (
         -- Type related stuff
-        rnHsType, rnLHsType, rnLHsTypes, rnContext,
+        rnHsType, rnLHsType, rnLHsTypes, rnContext, rnMaybeContext,
         rnHsKind, rnLHsKind, rnLHsTypeArgs,
         rnHsSigType, rnHsWcType, rnHsPatSigTypeBindingVars,
         HsPatSigTypeScoping(..), rnHsSigWcType, rnHsPatSigType,
@@ -53,7 +53,7 @@ import GHC.Rename.Utils  ( HsDocContext(..), inHsDocContext, withHsDocContext
                          , checkShadowedRdrNames )
 import GHC.Rename.Fixity ( lookupFieldFixityRn, lookupFixityRn
                          , lookupTyFixityRn )
-import GHC.Rename.Unbound ( notInScopeErr )
+import GHC.Rename.Unbound ( notInScopeErr, WhereLooking(WL_LocalOnly) )
 import GHC.Tc.Utils.Monad
 import GHC.Types.Name.Reader
 import GHC.Builtin.Names
@@ -68,7 +68,7 @@ import GHC.Types.Fixity ( compareFixity, negateFixity
 import GHC.Types.Basic  ( TypeOrKind(..) )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Data.FastString
+import GHC.Utils.Panic.Plain
 import GHC.Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -76,8 +76,6 @@ import Data.List (sortBy, nubBy, partition)
 import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty (NonEmpty(..))
 import Control.Monad
-
-#include "HsVersions.h"
 
 {-
 These type renamers are in a separate module, rather than in (say) GHC.Rename.Module,
@@ -256,34 +254,27 @@ rnWcBody ctxt nwc_rdrs hs_ty
                                 , hst_tele = tele', hst_body = hs_body' }
                     , fvs) }
 
-    rn_ty env (HsQualTy { hst_ctxt = m_ctxt
+    rn_ty env (HsQualTy { hst_ctxt = L cx hs_ctxt
                         , hst_body = hs_ty })
-      | Just (L cx hs_ctxt) <- m_ctxt
-      , Just (hs_ctxt1, hs_ctxt_last) <- snocView hs_ctxt
+      | Just (hs_ctxt1, hs_ctxt_last) <- snocView hs_ctxt
       , L lx (HsWildCardTy _)  <- ignoreParens hs_ctxt_last
       = do { (hs_ctxt1', fvs1) <- mapFvRn (rn_top_constraint env) hs_ctxt1
            ; setSrcSpanA lx $ checkExtraConstraintWildCard env hs_ctxt1
            ; let hs_ctxt' = hs_ctxt1' ++ [L lx (HsWildCardTy noExtField)]
            ; (hs_ty', fvs2) <- rnLHsTyKi env hs_ty
            ; return (HsQualTy { hst_xqual = noExtField
-                              , hst_ctxt = Just (L cx hs_ctxt')
+                              , hst_ctxt = L cx hs_ctxt'
                               , hst_body = hs_ty' }
                     , fvs1 `plusFV` fvs2) }
 
-      | Just (L cx hs_ctxt) <- m_ctxt
+      | otherwise
       = do { (hs_ctxt', fvs1) <- mapFvRn (rn_top_constraint env) hs_ctxt
            ; (hs_ty', fvs2)   <- rnLHsTyKi env hs_ty
            ; return (HsQualTy { hst_xqual = noExtField
-                              , hst_ctxt = Just (L cx hs_ctxt')
+                              , hst_ctxt = L cx hs_ctxt'
                               , hst_body = hs_ty' }
                     , fvs1 `plusFV` fvs2) }
 
-      | Nothing <- m_ctxt
-      = do { (hs_ty', fvs2)   <- rnLHsTyKi env hs_ty
-           ; return (HsQualTy { hst_xqual = noExtField
-                              , hst_ctxt = Nothing
-                              , hst_body = hs_ty' }
-                    , fvs2) }
 
     rn_ty env hs_ty = rnHsTyKi env hs_ty
 
@@ -576,18 +567,26 @@ rnLHsTypeArgs :: HsDocContext -> [LHsTypeArg GhcPs]
 rnLHsTypeArgs doc args = mapFvRn (rnLHsTypeArg doc) args
 
 --------------
-rnTyKiContext :: RnTyKiEnv -> Maybe (LHsContext GhcPs)
-              -> RnM (Maybe (LHsContext GhcRn), FreeVars)
-rnTyKiContext _ Nothing = return (Nothing, emptyFVs)
-rnTyKiContext env (Just (L loc cxt))
+rnTyKiContext :: RnTyKiEnv -> LHsContext GhcPs
+              -> RnM (LHsContext GhcRn, FreeVars)
+rnTyKiContext env (L loc cxt)
   = do { traceRn "rncontext" (ppr cxt)
        ; let env' = env { rtke_what = RnConstraint }
        ; (cxt', fvs) <- mapFvRn (rnLHsTyKi env') cxt
-       ; return (Just $ L loc cxt', fvs) }
+       ; return (L loc cxt', fvs) }
 
-rnContext :: HsDocContext -> Maybe (LHsContext GhcPs)
-          -> RnM (Maybe (LHsContext GhcRn), FreeVars)
+rnContext :: HsDocContext -> LHsContext GhcPs
+          -> RnM (LHsContext GhcRn, FreeVars)
 rnContext doc theta = rnTyKiContext (mkTyKiEnv doc TypeLevel RnConstraint) theta
+
+rnMaybeContext :: HsDocContext -> Maybe (LHsContext GhcPs)
+          -> RnM (Maybe (LHsContext GhcRn), FreeVars)
+rnMaybeContext _ Nothing = return (Nothing, emptyFVs)
+rnMaybeContext doc (Just theta)
+  = do { (theta', fvs) <- rnContext doc theta
+       ; return (Just theta', fvs)
+       }
+
 
 --------------
 rnLHsTyKi  :: RnTyKiEnv -> LHsType GhcPs -> RnM (LHsType GhcRn, FreeVars)
@@ -746,7 +745,7 @@ rnHsTyKi env (XHsType ty)
       mb_name <- lookupLocalOccRn_maybe rdr_name
       when (isNothing mb_name) $
         addErr $ withHsDocContext (rtke_ctxt env) $
-        notInScopeErr rdr_name
+        notInScopeErr WL_LocalOnly rdr_name
 
 rnHsTyKi env ty@(HsExplicitListTy _ ip tys)
   = do { data_kinds <- xoptM LangExt.DataKinds
@@ -831,7 +830,7 @@ rnHsTyOp env overall_ty (L loc op)
 --------------
 notAllowed :: SDoc -> SDoc
 notAllowed doc
-  = text "Wildcard" <+> quotes doc <+> ptext (sLit "not allowed")
+  = text "Wildcard" <+> quotes doc <+> text "not allowed"
 
 checkWildCard :: RnTyKiEnv -> Maybe SDoc -> RnM ()
 checkWildCard env (Just doc)
@@ -1387,19 +1386,17 @@ mkOpAppRn e1 op1 fix1 e2@(L _ (NegApp {})) -- NegApp can occur on the right
 ---------------------------
 --      Default case
 mkOpAppRn e1 op fix e2                  -- Default case, no rearrangment
-  = ASSERT2( right_op_ok fix (unLoc e2),
-             ppr e1 $$ text "---" $$ ppr op $$ text "---" $$ ppr fix $$ text "---" $$ ppr e2
-    )
+  = assertPpr (right_op_ok fix (unLoc e2))
+              (ppr e1 $$ text "---" $$ ppr op $$ text "---" $$ ppr fix $$ text "---" $$ ppr e2) $
     return (OpApp fix e1 op e2)
 
 ----------------------------
 
 -- | Name of an operator in an operator application or section
-data OpName = NormalOp Name         -- ^ A normal identifier
-            | NegateOp              -- ^ Prefix negation
-            | UnboundOp OccName     -- ^ An unbound indentifier
-            | RecFldOp (AmbiguousFieldOcc GhcRn)
-              -- ^ A (possibly ambiguous) record field occurrence
+data OpName = NormalOp Name             -- ^ A normal identifier
+            | NegateOp                  -- ^ Prefix negation
+            | UnboundOp OccName         -- ^ An unbound indentifier
+            | RecFldOp (FieldOcc GhcRn) -- ^ A record field occurrence
 
 instance Outputable OpName where
   ppr (NormalOp n)   = ppr n
@@ -1412,7 +1409,7 @@ get_op :: LHsExpr GhcRn -> OpName
 -- See GHC.Rename.Expr.rnUnboundVar
 get_op (L _ (HsVar _ n))         = NormalOp (unLoc n)
 get_op (L _ (HsUnboundVar _ uv)) = UnboundOp uv
-get_op (L _ (HsRecFld _ fld))    = RecFldOp fld
+get_op (L _ (HsRecSel _ fld))    = RecFldOp fld
 get_op other                     = pprPanic "get_op" (ppr other)
 
 -- Parser left-associates everything, but
@@ -1430,7 +1427,7 @@ right_op_ok _ _
 -- And "deriving" code should respect this (use HsPar if not)
 mkNegAppRn :: LHsExpr GhcRn -> SyntaxExpr GhcRn -> RnM (HsExpr GhcRn)
 mkNegAppRn neg_arg neg_name
-  = ASSERT( not_op_app (unLoc neg_arg) )
+  = assert (not_op_app (unLoc neg_arg)) $
     return (NegApp noExtField neg_arg neg_name)
 
 not_op_app :: HsExpr id -> Bool
@@ -1501,7 +1498,7 @@ mkConOpPatRn op2 fix2 p1@(L loc (ConPat NoExtField op1 (InfixCon p11 p12))) p2
         }
 
 mkConOpPatRn op _ p1 p2                         -- Default case, no rearrangment
-  = ASSERT( not_op_pat (unLoc p2) )
+  = assert (not_op_pat (unLoc p2)) $
     return $ ConPat
       { pat_con_ext = noExtField
       , pat_con = op
@@ -1576,8 +1573,7 @@ checkSectionPrec direction section op arg
                                  (arg_op, arg_fix) section)
 
 -- | Look up the fixity for an operator name.  Be careful to use
--- 'lookupFieldFixityRn' for (possibly ambiguous) record fields
--- (see #13132).
+-- 'lookupFieldFixityRn' for record fields (see #13132).
 lookupFixityOp :: OpName -> RnM Fixity
 lookupFixityOp (NormalOp n)  = lookupFixityRn n
 lookupFixityOp NegateOp      = lookupFixityRn negateName
@@ -1593,7 +1589,7 @@ precParseErr op1@(n1,_) op2@(n2,_)
   = return ()     -- Avoid error cascade
   | otherwise
   = addErr $ hang (text "Precedence parsing error")
-      4 (hsep [text "cannot mix", ppr_opfix op1, ptext (sLit "and"),
+      4 (hsep [text "cannot mix", ppr_opfix op1, text "and",
                ppr_opfix op2,
                text "in the same infix expression"])
 
@@ -1602,7 +1598,7 @@ sectionPrecErr op@(n1,_) arg_op@(n2,_) section
   | is_unbound n1 || is_unbound n2
   = return ()     -- Avoid error cascade
   | otherwise
-  = addErr $ vcat [text "The operator" <+> ppr_opfix op <+> ptext (sLit "of a section"),
+  = addErr $ vcat [text "The operator" <+> ppr_opfix op <+> text "of a section",
          nest 4 (sep [text "must have lower precedence than that of the operand,",
                       nest 2 (text "namely" <+> ppr_opfix arg_op)]),
          nest 4 (text "in the section:" <+> quotes (ppr section))]
@@ -1655,7 +1651,7 @@ warnUnusedForAll doc (L loc tv) used_names
 
 opTyErr :: Outputable a => RdrName -> a -> SDoc
 opTyErr op overall_ty
-  = hang (text "Illegal operator" <+> quotes (ppr op) <+> ptext (sLit "in type") <+> quotes (ppr overall_ty))
+  = hang (text "Illegal operator" <+> quotes (ppr op) <+> text "in type" <+> quotes (ppr overall_ty))
          2 (text "Use TypeOperators to allow operators in types")
 
 {-
@@ -1909,9 +1905,8 @@ extractDataDefnKindVars :: HsDataDefn GhcPs ->  FreeKiTyVars
 extractDataDefnKindVars (HsDataDefn { dd_kindSig = ksig })
   = maybe [] extractHsTyRdrTyVars ksig
 
-extract_lctxt :: Maybe (LHsContext GhcPs) -> FreeKiTyVars -> FreeKiTyVars
-extract_lctxt Nothing     = const []
-extract_lctxt (Just ctxt) = extract_ltys (unLoc ctxt)
+extract_lctxt :: LHsContext GhcPs -> FreeKiTyVars -> FreeKiTyVars
+extract_lctxt ctxt = extract_ltys (unLoc ctxt)
 
 extract_scaled_ltys :: [HsScaled GhcPs (LHsType GhcPs)]
                     -> FreeKiTyVars -> FreeKiTyVars

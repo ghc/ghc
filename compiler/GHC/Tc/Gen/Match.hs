@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP              #-}
+
 {-# LANGUAGE ConstraintKinds  #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes       #-}
@@ -75,8 +75,6 @@ import GHC.Types.SrcLoc
 
 import Control.Monad
 import Control.Arrow ( second )
-
-#include "HsVersions.h"
 
 {-
 ************************************************************************

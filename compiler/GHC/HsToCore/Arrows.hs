@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE TypeFamilies #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
@@ -12,8 +12,6 @@ Desugaring arrow commands
 -}
 
 module GHC.HsToCore.Arrows ( dsProcExpr ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -449,7 +447,7 @@ dsCmd ids local_vars stack_ty res_ty
         env_ids
   = dsCmdLam ids local_vars stack_ty res_ty pats body env_ids
 
-dsCmd ids local_vars stack_ty res_ty (HsCmdPar _ cmd) env_ids
+dsCmd ids local_vars stack_ty res_ty (HsCmdPar _ _ cmd _) env_ids
   = dsLCmd ids local_vars stack_ty res_ty cmd env_ids
 
 -- D, xs |- e :: Bool
@@ -553,8 +551,8 @@ dsCmd ids local_vars stack_ty res_ty
     left_con <- dsLookupDataCon leftDataConName
     right_con <- dsLookupDataCon rightDataConName
     let
-        left_id  = HsConLikeOut noExtField (RealDataCon left_con)
-        right_id = HsConLikeOut noExtField (RealDataCon right_con)
+        left_id  = mkConLikeTc (RealDataCon left_con)
+        right_id = mkConLikeTc (RealDataCon right_con)
         left_expr  ty1 ty2 e = noLocA $ HsApp noComments
                            (noLocA $ mkHsWrap (mkWpTyApps [ty1, ty2]) left_id ) e
         right_expr ty1 ty2 e = noLocA $ HsApp noComments

@@ -49,7 +49,7 @@ main = do
       let (warnings, errors) = partitionMessages messages
       case mres of
         Nothing -> do
-          printBagOfErrors logger dflags warnings
-          printBagOfErrors logger dflags errors
+          printMessages logger dflags warnings
+          printMessages logger dflags errors
         Just (t, _) -> do
           putStrLn $ showSDoc dflags (debugPprType t)

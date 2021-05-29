@@ -6,7 +6,7 @@
 --
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE CPP #-}
+
 module GHC.Types.TyThing.Ppr (
         pprTyThing,
         pprTyThingInContext,
@@ -15,8 +15,6 @@ module GHC.Types.TyThing.Ppr (
         pprTyThingHdr,
         pprFamInst
   ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -167,7 +165,7 @@ pprTyThingInContextLoc tyThing
 -- | Pretty-prints a 'TyThing'.
 pprTyThing :: ShowSub -> TyThing -> SDoc
 -- We pretty-print 'TyThing' via 'IfaceDecl'
--- See Note [Pretty-printing TyThings]
+-- See Note [Pretty printing via Iface syntax]
 pprTyThing ss ty_thing
   = sdocOption sdocLinearTypes $ \show_linear_types ->
       pprIfaceDecl ss' (tyThingToIfaceDecl show_linear_types ty_thing)
@@ -187,7 +185,7 @@ pprTyThing ss ty_thing
          = case nameModule_maybe name of
              Just mod -> Just $ \occ -> getPprStyle $ \sty ->
                pprModulePrefix sty mod occ <> ppr occ
-             Nothing  -> WARN( True, ppr name ) Nothing
+             Nothing  -> warnPprTrace True (ppr name) Nothing
              -- Nothing is unexpected here; TyThings have External names
 
 showWithLoc :: SDoc -> SDoc -> SDoc

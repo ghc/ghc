@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP                 #-}
 {-# LANGUAGE DeriveFunctor       #-}
 {-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -24,8 +23,6 @@ module GHC.Core.Lint (
     displayLintResults, dumpPassResult,
     dumpIfSet,
  ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -76,7 +73,7 @@ import GHC.Data.List.SetOps
 import GHC.Builtin.Names
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
-import GHC.Data.FastString
+import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Misc
 import GHC.Core.InstEnv      ( instanceDFunId )
 import GHC.Core.Coercion.Opt ( checkAxInstCo )
@@ -491,7 +488,18 @@ lintCoreBindings dflags pass local_in_scope binds
                { lf_check_global_ids = check_globals
                , lf_check_inline_loop_breakers = check_lbs
                , lf_check_static_ptrs = check_static_ptrs
-               , lf_check_linearity = check_linearity }
+               , lf_check_linearity = check_linearity
+               , lf_check_levity_poly = check_levity }
+
+    -- In the output of the desugarer, before optimisation,
+    -- we have eta-expanded data constructors with levity-polymorphic
+    -- bindings; so we switch off the lev-poly checks. The very simple
+    -- optimiser will beta-reduce them away.
+    -- See Note [Checking levity-polymorphic data constructors]
+    -- in GHC.HsToCore.Expr.
+    check_levity = case pass of
+                      CoreDesugar -> False
+                      _           -> True
 
     -- See Note [Checking for global Ids]
     check_globals = case pass of
@@ -542,7 +550,6 @@ lintCoreBindings dflags pass local_in_scope binds
 
 Note [Linting Unfoldings from Interfaces]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 We use this to check all top-level unfoldings that come in from interfaces
 (it is very painful to catch errors otherwise).
 
@@ -923,9 +930,9 @@ lintCoreExpr e@(App _ _)
   , fun `hasKey` runRWKey
     -- N.B. we may have an over-saturated application of the form:
     --   runRW (\s -> \x -> ...) y
-  , arg_ty1 : arg_ty2 : arg3 : rest <- args
-  = do { fun_pair1 <- lintCoreArg (idType fun, zeroUE) arg_ty1
-       ; (fun_ty2, ue2) <- lintCoreArg fun_pair1      arg_ty2
+  , ty_arg1 : ty_arg2 : arg3 : rest <- args
+  = do { fun_pair1 <- lintCoreArg (idType fun, zeroUE) ty_arg1
+       ; (fun_ty2, ue2) <- lintCoreArg fun_pair1       ty_arg2
          -- See Note [Linting of runRW#]
        ; let lintRunRWCont :: CoreArg -> LintM (LintedType, UsageEnv)
              lintRunRWCont expr@(Lam _ _) =
@@ -1191,13 +1198,17 @@ lintCoreArg (fun_ty, fun_ue) arg
   = do { (arg_ty, arg_ue) <- markAllJoinsBad $ lintCoreExpr arg
            -- See Note [Levity polymorphism invariants] in GHC.Core
        ; flags <- getLintFlags
-       ; lintL (not (lf_check_levity_poly flags) || not (isTypeLevPoly arg_ty))
-           (text "Levity-polymorphic argument:" <+>
-             (ppr arg <+> dcolon <+> parens (ppr arg_ty <+> dcolon <+> ppr (typeKind arg_ty))))
-          -- check for levity polymorphism first, because otherwise isUnliftedType panics
 
-       ; checkL (not (isUnliftedType arg_ty) || exprOkForSpeculation arg)
-                (mkLetAppMsg arg)
+       ; when (lf_check_levity_poly flags) $
+         -- Only do these checks if lf_check_levity_poly is on,
+         -- because otherwise isUnliftedType panics
+         do { checkL (not (isTypeLevPoly arg_ty))
+                     (text "Levity-polymorphic argument:"
+                      <+> ppr arg <+> dcolon
+                      <+> parens (ppr arg_ty <+> dcolon <+> ppr (typeKind arg_ty)))
+
+            ; checkL (not (isUnliftedType arg_ty) || exprOkForSpeculation arg)
+                     (mkLetAppMsg arg) }
 
        ; lintValApp arg fun_ty arg_ty fun_ue arg_ue }
 
@@ -1324,9 +1335,7 @@ lintCaseExpr scrut var alt_ty alts =
      ; let isLitPat (Alt (LitAlt _) _  _) = True
            isLitPat _                     = False
      ; checkL (not $ isFloatingTy scrut_ty && any isLitPat alts)
-         (ptext (sLit $ "Lint warning: Scrutinising floating-point " ++
-                        "expression with literal pattern in case " ++
-                        "analysis (see #9238).")
+         (text "Lint warning: Scrutinising floating-point expression with literal pattern in case analysis (see #9238)."
           $$ text "scrut" <+> ppr scrut)
 
      ; case tyConAppTyCon_maybe (idType var) of
@@ -1528,7 +1537,7 @@ lintIdBndr :: TopLevelFlag -> BindingSite
 -- new type to the in-scope set of the second argument
 -- ToDo: lint its rules
 lintIdBndr top_lvl bind_site id thing_inside
-  = ASSERT2( isId id, ppr id )
+  = assertPpr (isId id) (ppr id) $
     do { flags <- getLintFlags
        ; checkL (not (lf_check_global_ids flags) || isLocalId id)
                 (text "Non-local Id binder" <+> ppr id)
@@ -2111,6 +2120,9 @@ lintCoercion co@(UnivCo prov r ty1 ty2)
 
        -- see #9122 for discussion of these checks
      checkTypes t1 t2
+       | allow_ill_kinded_univ_co prov
+       = return ()  -- Skip kind checks
+       | otherwise
        = do { checkWarnL (not lev_poly1)
                          (report "left-hand type is levity-polymorphic")
             ; checkWarnL (not lev_poly2)
@@ -2127,6 +2139,13 @@ lintCoercion co@(UnivCo prov r ty1 ty2)
          -- Otherwise, we get #13458
          reps1 = typePrimRep t1
          reps2 = typePrimRep t2
+
+     -- CorePrep deliberately makes ill-kinded casts
+     --  e.g (case error @Int "blah" of {}) :: Int#
+     --     ==> (error @Int "blah") |> Unsafe Int Int#
+     -- See Note [Unsafe coercions] in GHC.Core.CoreToStg.Prep
+     allow_ill_kinded_univ_co (CorePrepProv homo_kind) = not homo_kind
+     allow_ill_kinded_univ_co _                        = False
 
      validateCoercion :: PrimRep -> PrimRep -> LintM ()
      validateCoercion rep1 rep2
@@ -2157,7 +2176,8 @@ lintCoercion co@(UnivCo prov r ty1 ty2)
             ; check_kinds kco k1 k2
             ; return (ProofIrrelProv kco') }
 
-     lint_prov _ _ prov@(PluginProv _) = return prov
+     lint_prov _ _ prov@(PluginProv _)   = return prov
+     lint_prov _ _ prov@(CorePrepProv _) = return prov
 
      check_kinds kco k1 k2
        = do { let Pair k1' k2' = coercionKind kco
@@ -2756,7 +2776,7 @@ addWarnL msg = LintM $ \ env (warns,errs) ->
 
 addMsg :: Bool -> LintEnv ->  Bag SDoc -> SDoc -> Bag SDoc
 addMsg is_error env msgs msg
-  = ASSERT2( notNull loc_msgs, msg )
+  = assertPpr (notNull loc_msgs) msg $
     msgs `snocBag` mk_msg msg
   where
    loc_msgs :: [(SrcLoc, SDoc)]  -- Innermost first

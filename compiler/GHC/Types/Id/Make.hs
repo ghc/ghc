@@ -12,7 +12,7 @@ have a standard form, namely:
 - primitive operations
 -}
 
-{-# LANGUAGE CPP #-}
+
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -30,15 +30,13 @@ module GHC.Types.Id.Make (
         realWorldPrimId,
         voidPrimId, voidArgId,
         nullAddrId, seqId, lazyId, lazyIdKey,
-        coercionTokenId, magicDictId, coerceId,
+        coercionTokenId, coerceId,
         proxyHashId, noinlineId, noinlineIdName,
         coerceName, leftSectionName, rightSectionName,
 
         -- Re-export error Ids
         module GHC.Core.Opt.ConstantFold
     ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -81,6 +79,7 @@ import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Data.FastString
 import GHC.Data.List.SetOps
 import GHC.Types.Var (VarBndr(Bndr))
@@ -173,7 +172,6 @@ ghcPrimIds
     , voidPrimId
     , nullAddrId
     , seqId
-    , magicDictId
     , coerceId
     , proxyHashId
     , leftSectionId
@@ -602,9 +600,8 @@ mkDataConWorkId wkr_name data_con
                   `setLevityInfoWithType` wkr_ty
     id_arg1      = mkScaledTemplateLocal 1 (head arg_tys)
     res_ty_args  = mkTyCoVarTys univ_tvs
-    newtype_unf  = ASSERT2( isVanillaDataCon data_con &&
-                            isSingleton arg_tys
-                          , ppr data_con  )
+    newtype_unf  = assertPpr (isVanillaDataCon data_con && isSingleton arg_tys)
+                             (ppr data_con) $
                               -- Note [Newtype datacons]
                    mkCompulsoryUnfolding defaultSimpleOpts $
                    mkLams univ_tvs $ Lam id_arg1 $
@@ -764,7 +761,7 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
     tycon        = dataConTyCon data_con       -- The representation TyCon (not family)
     wrap_ty      = dataConWrapperType data_con
     ev_tys       = eqSpecPreds eq_spec ++ theta
-    all_arg_tys  = (map unrestricted ev_tys) ++ orig_arg_tys
+    all_arg_tys  = map unrestricted ev_tys ++ orig_arg_tys
     ev_ibangs    = map (const HsLazy) ev_tys
     orig_bangs   = dataConSrcBangs data_con
 
@@ -822,7 +819,7 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
                          ; (rep_ids, binds) <- go subst2 boxers term_vars
                          ; return (ex_vars ++ rep_ids, binds) } )
 
-    go _ [] src_vars = ASSERT2( null src_vars, ppr data_con ) return ([], [])
+    go _ [] src_vars = assertPpr (null src_vars) (ppr data_con) $ return ([], [])
     go subst (UnitBox : boxers) (src_var : src_vars)
       = do { (rep_ids2, binds) <- go subst boxers src_vars
            ; return (src_var : rep_ids2, binds) }
@@ -848,8 +845,8 @@ dataConWrapperInlinePragma = alwaysInlinePragma { inl_rule = ConLike
 
 {- Note [Activation for data constructor wrappers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The Activation on a data constructor wrapper allows it to inline only in Phase
-0. This way rules have a chance to fire if they mention a data constructor on
+The Activation on a data constructor wrapper allows it to inline only in FinalPhase.
+This way rules have a chance to fire if they mention a data constructor on
 the left
    RULE "foo"  f (K a b) = ...
 Since the LHS of rules are simplified with InitialPhase, we won't
@@ -1111,7 +1108,7 @@ dataConArgUnpack (Scaled arg_mult arg_ty)
       -- A recursive newtype might mean that
       -- 'arg_ty' is a newtype
   , let rep_tys = map (scaleScaled arg_mult) $ dataConInstArgTys con tc_args
-  = ASSERT( null (dataConExTyCoVars con) )
+  = assert (null (dataConExTyCoVars con))
       -- Note [Unpacking GADTs and existentials]
     ( rep_tys `zip` dataConRepStrictness con
     ,( \ arg_id ->
@@ -1274,7 +1271,7 @@ wrapNewTypeBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
 -- it, otherwise the wrap/unwrap are both no-ops
 
 wrapNewTypeBody tycon args result_expr
-  = ASSERT( isNewTyCon tycon )
+  = assert (isNewTyCon tycon) $
     mkCast result_expr (mkSymCo co)
   where
     co = mkUnbranchedAxInstCo Representational (newTyConCo tycon) args []
@@ -1286,7 +1283,7 @@ wrapNewTypeBody tycon args result_expr
 
 unwrapNewTypeBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
 unwrapNewTypeBody tycon args result_expr
-  = ASSERT( isNewTyCon tycon )
+  = assert (isNewTyCon tycon) $
     mkCast result_expr (mkUnbranchedAxInstCo Representational (newTyConCo tycon) args [])
 
 -- If the type constructor is a representation type of a data instance, wrap
@@ -1348,7 +1345,7 @@ mkPrimOpId prim_op
 
 mkFCallId :: DynFlags -> Unique -> ForeignCall -> Type -> Id
 mkFCallId dflags uniq fcall ty
-  = ASSERT( noFreeVarsOfType ty )
+  = assert (noFreeVarsOfType ty) $
     -- A CCallOpId should have no free type variables;
     -- when doing substitutions won't substitute over it
     mkGlobalId (FCallId fcall) name ty info
@@ -1429,14 +1426,13 @@ failure when trying.)
 
 nullAddrName, seqName,
    realWorldName, voidPrimIdName, coercionTokenName,
-   magicDictName, coerceName, proxyName,
+   coerceName, proxyName,
    leftSectionName, rightSectionName :: Name
 nullAddrName      = mkWiredInIdName gHC_PRIM  (fsLit "nullAddr#")      nullAddrIdKey      nullAddrId
 seqName           = mkWiredInIdName gHC_PRIM  (fsLit "seq")            seqIdKey           seqId
 realWorldName     = mkWiredInIdName gHC_PRIM  (fsLit "realWorld#")     realWorldPrimIdKey realWorldPrimId
 voidPrimIdName    = mkWiredInIdName gHC_PRIM  (fsLit "void#")          voidPrimIdKey      voidPrimId
 coercionTokenName = mkWiredInIdName gHC_PRIM  (fsLit "coercionToken#") coercionTokenIdKey coercionTokenId
-magicDictName     = mkWiredInIdName gHC_PRIM  (fsLit "magicDict")      magicDictKey       magicDictId
 coerceName        = mkWiredInIdName gHC_PRIM  (fsLit "coerce")         coerceKey          coerceId
 proxyName         = mkWiredInIdName gHC_PRIM  (fsLit "proxy#")         proxyHashKey       proxyHashId
 leftSectionName   = mkWiredInIdName gHC_PRIM  (fsLit "leftSection")    leftSectionKey     leftSectionId
@@ -1596,14 +1592,6 @@ rightSectionId = pcMiscPrelId rightSectionName ty info
                   , multiplicityTyVar1, multiplicityTyVar2
                   , openAlphaTyVar,   openBetaTyVar,    openGammaTyVar ] body
     body = mkLams [f,ymult,xmult] $ mkVarApps (Var f) [xmult,ymult]
-
---------------------------------------------------------------------------------
-magicDictId :: Id  -- See Note [magicDictId magic]
-magicDictId = pcMiscPrelId magicDictName ty info
-  where
-  info = noCafIdInfo `setInlinePragInfo` neverInlinePragma
-                     `setNeverLevPoly`   ty
-  ty   = mkSpecForAllTys [alphaTyVar] alphaTy
 
 --------------------------------------------------------------------------------
 
@@ -1799,54 +1787,6 @@ particular it must make it into the interface in unfoldings. See Note [Preserve
 OneShotInfo] in GHC.Core.Tidy.
 
 Also see https://gitlab.haskell.org/ghc/ghc/wikis/one-shot.
-
-
-Note [magicDictId magic]
-~~~~~~~~~~~~~~~~~~~~~~~~~
-The identifier `magicDict` is just a place-holder, which is used to
-implement a primitive that we cannot define in Haskell but we can write
-in Core.  It is declared with a place-holder type:
-
-    magicDict :: forall a. a
-
-The intention is that the identifier will be used in a very specific way,
-to create dictionaries for classes with a single method.  Consider a class
-like this:
-
-   class C a where
-     f :: T a
-
-We are going to use `magicDict`, in conjunction with a built-in Prelude
-rule, to cast values of type `T a` into dictionaries for `C a`.  To do
-this, we define a function like this in the library:
-
-  data WrapC a b = WrapC (C a => Proxy a -> b)
-
-  withT :: (C a => Proxy a -> b)
-        ->  T a -> Proxy a -> b
-  withT f x y = magicDict (WrapC f) x y
-
-The purpose of `WrapC` is to avoid having `f` instantiated.
-Also, it avoids impredicativity, because `magicDict`'s type
-cannot be instantiated with a forall.  The field of `WrapC` contains
-a `Proxy` parameter which is used to link the type of the constraint,
-`C a`, with the type of the `Wrap` value being made.
-
-Next, we add a built-in Prelude rule (see GHC.Core.Opt.ConstantFold),
-which will replace the RHS of this definition with the appropriate
-definition in Core.  The rewrite rule works as follows:
-
-  magicDict @t (wrap @a @b f) x y
----->
-  f (x `cast` co a) y
-
-The `co` coercion is the newtype-coercion extracted from the type-class.
-The type class is obtained by looking at the type of wrap.
-
-In the constant folding rule it's very import to make sure to strip all ticks
-from the expression as if there's an occurence of
-magicDict we *must* convert it for correctness. See #19667 for where this went
-wrong in GHCi.
 
 
 -------------------------------------------------------------

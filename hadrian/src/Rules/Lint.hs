@@ -13,7 +13,7 @@ lintRules = do
 
 lint :: Action () -> Action ()
 lint lintAction = do
-  isHlintPresent <- isJust <$> (liftIO $ findExecutable "hlint")
+  isHlintPresent <- isJust <$> liftIO (findExecutable "hlint")
   if isHlintPresent
   then do
     putBuild "| Running the linter…"
@@ -30,9 +30,10 @@ runHLint includeDirs defines dir = do
   threads <- shakeThreads <$> getShakeOptions
   hostArch <- (<> "_HOST_ARCH") <$> setting HostArch
   let hlintYaml = dir </> ".hlint.yaml"
-      defines' = [hostArch] ++ defines
+      defines' = hostArch : defines
       cmdLine = unwords $
         [ "hlint"
+        , "--colour=never"
         , "-j" <> show threads
         ] ++
         map ("--cpp-define=" <>) defines' ++
@@ -65,11 +66,10 @@ compiler = do
   let stage1Lib      = buildDir </> "stage1/lib"
   let stage1Compiler = buildDir </> "stage1/compiler/build"
   let machDeps       = "includes/MachDeps.h"
-  let hsVersions     = "compiler/HsVersions.h"
   let compilerDir    = "compiler"
   let ghcautoconf    = stage1Lib </> "ghcautoconf.h"
   let ghcplatform    = stage1Lib </> "ghcplatform.h"
-  need $ mconcat [[ghcautoconf, ghcplatform], hsIncls stage1Compiler, [machDeps, hsVersions]]
+  need $ mconcat [[ghcautoconf, ghcplatform], hsIncls stage1Compiler, [machDeps]]
   let includeDirs =
         [ "includes"
         , stage1Lib

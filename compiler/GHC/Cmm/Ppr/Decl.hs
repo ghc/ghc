@@ -51,7 +51,6 @@ import GHC.Cmm.Ppr.Expr
 import GHC.Cmm
 
 import GHC.Utils.Outputable
-import GHC.Data.FastString
 
 import Data.List (intersperse)
 
@@ -160,15 +159,12 @@ pprSection platform (Section t suffix) =
     section = text "section"
 
 pprSectionType :: SectionType -> SDoc
-pprSectionType s = doubleQuotes (ptext t)
- where
-  t = case s of
-    Text              -> sLit "text"
-    Data              -> sLit "data"
-    ReadOnlyData      -> sLit "readonly"
-    ReadOnlyData16    -> sLit "readonly16"
-    RelocatableReadOnlyData
-                      -> sLit "relreadonly"
-    UninitialisedData -> sLit "uninitialised"
-    CString           -> sLit "cstring"
-    OtherSection s'   -> sLit s' -- Not actually a literal though.
+pprSectionType s = doubleQuotes $ case s of
+  Text                    -> text "text"
+  Data                    -> text "data"
+  ReadOnlyData            -> text "readonly"
+  ReadOnlyData16          -> text "readonly16"
+  RelocatableReadOnlyData -> text "relreadonly"
+  UninitialisedData       -> text "uninitialised"
+  CString                 -> text "cstring"
+  OtherSection s'         -> text s'

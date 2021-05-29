@@ -157,8 +157,7 @@ test('T6106', [extra_files(['../shell.hs']),
 test('T6105', normal, ghci_script, ['T6105.script'])
 test('T7117', normal, ghci_script, ['T7117.script'])
 test('ghci058', [extra_files(['../shell.hs']),
-                 cmd_prefix('ghciWayFlags=' + config.ghci_way_flags),
-                 when(opsys('mingw32'), expect_broken(16858))],
+                 cmd_prefix('ghciWayFlags=' + config.ghci_way_flags)],
      ghci_script, ['ghci058.script'])
 test('T7587', normal, ghci_script, ['T7587.script'])
 test('T7688', normal, ghci_script, ['T7688.script'])
@@ -319,7 +318,8 @@ test('T17403', normal, ghci_script, ['T17403.script'])
 test('T17431', normal, ghci_script, ['T17431.script'])
 test('T17500', [extra_run_opts('-ddump-to-file -ddump-bcos')], ghci_script, ['T17500.script'])
 test('T17549', normal, ghci_script, ['T17549.script'])
-test('T17669', [extra_run_opts('-fexternal-interpreter -fobject-code'), expect_broken(17669)], ghci_script, ['T17669.script'])
+test('T17669', [extra_run_opts('-fexternal-interpreter -fobject-code'),
+                unless(opsys('mingw32'), expect_broken(17669))], ghci_script, ['T17669.script'])
 test('T18501', normal, ghci_script, ['T18501.script'])
 test('T18644', normal, ghci_script, ['T18644.script'])
 test('T18755', normal, ghci_script, ['T18755.script'])
@@ -328,5 +328,14 @@ test('T19197', normal, ghci_script, ['T19197.script'])
 test('T19158', normal, ghci_script, ['T19158.script'])
 test('T19279', normal, ghci_script, ['T19279.script'])
 test('T19310', normal, ghci_script, ['T19310.script'])
+test('T19462', normal, ghci_script, ['T19462.script'])
 test('T19667Ghci', extra_files(['T19667Ghci.hs']), ghci_script, ['T19667Ghci.script'])
 test('T19688', normal, ghci_script, ['T19688.script'])
+test('T19650',
+     [ pre_cmd('$MAKE -s --no-print-directory T19650_setup'),
+       extra_hc_opts('-package-env my_package_env -v1'),
+       # Should only appear once
+       filter_stdout_lines(r'Loaded package env.*')
+     ],
+     ghci_script,
+     ['T19650.script'])

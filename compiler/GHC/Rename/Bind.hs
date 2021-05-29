@@ -18,7 +18,7 @@ they may be affected by renaming (which isn't fully worked out yet).
 
 module GHC.Rename.Bind (
    -- Renaming top-level bindings
-   rnTopBindsLHS, rnTopBindsBoot, rnValBindsRHS,
+   rnTopBindsLHS, rnTopBindsLHSBoot, rnTopBindsBoot, rnValBindsRHS,
 
    -- Renaming local bindings
    rnLocalBindsAndThen, rnLocalValBindsLHS, rnLocalValBindsRHS,
@@ -35,6 +35,7 @@ import GHC.Prelude
 import {-# SOURCE #-} GHC.Rename.Expr( rnExpr, rnLExpr, rnStmts )
 
 import GHC.Hs
+import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Rename.HsType
 import GHC.Rename.Pat
@@ -187,13 +188,24 @@ rnTopBindsLHS :: MiniFixityEnv
 rnTopBindsLHS fix_env binds
   = rnValBindsLHS (topRecNameMaker fix_env) binds
 
+-- Ensure that a hs-boot file has no top-level bindings.
+rnTopBindsLHSBoot :: MiniFixityEnv
+                  -> HsValBinds GhcPs
+                  -> RnM (HsValBindsLR GhcRn GhcPs)
+rnTopBindsLHSBoot fix_env binds
+  = do  { topBinds <- rnTopBindsLHS fix_env binds
+        ; case topBinds of
+            ValBinds x mbinds sigs ->
+              do  { mapM_ bindInHsBootFileErr mbinds
+                  ; pure (ValBinds x emptyBag sigs) }
+            _ -> pprPanic "rnTopBindsLHSBoot" (ppr topBinds) }
+
 rnTopBindsBoot :: NameSet -> HsValBindsLR GhcRn GhcPs
                -> RnM (HsValBinds GhcRn, DefUses)
 -- A hs-boot file has no bindings.
 -- Return a single HsBindGroup with empty binds and renamed signatures
-rnTopBindsBoot bound_names (ValBinds _ mbinds sigs)
-  = do  { checkErr (isEmptyLHsBinds mbinds) (bindsInHsBootFile mbinds)
-        ; (sigs', fvs) <- renameSigs (HsBootCtxt bound_names) sigs
+rnTopBindsBoot bound_names (ValBinds _ _ sigs)
+  = do  { (sigs', fvs) <- renameSigs (HsBootCtxt bound_names) sigs
         ; return (XValBindsLR (NValBinds [] sigs'), usesOnly fvs) }
 rnTopBindsBoot _ b = pprPanic "rnTopBindsBoot" (ppr b)
 
@@ -431,7 +443,8 @@ rnBindLHS name_maker _ bind@(FunBind { fun_id = rdr_name })
 rnBindLHS name_maker _ (PatSynBind x psb@PSB{ psb_id = rdrname })
   | isTopRecNameMaker name_maker
   = do { addLocMA checkConName rdrname
-       ; name <- lookupLocatedTopBndrRnN rdrname -- Should be in scope already
+       ; name <-
+           lookupLocatedTopConstructorRnN rdrname -- Should be in scope already
        ; return (PatSynBind x psb{ psb_ext = noAnn, psb_id = name }) }
 
   | otherwise  -- Pattern synonym, not at top level
@@ -489,8 +502,7 @@ rnBind _ bind@(PatBind { pat_lhs = pat
         -- See Note [Pattern bindings that bind no variables]
         ; whenWOptM Opt_WarnUnusedPatternBinds $
           when (null bndrs && not ok_nobind_pat) $
-          addDiagnostic (WarningWithFlag Opt_WarnUnusedPatternBinds) $
-          unusedPatBindWarn bind'
+          addTcRnDiagnostic (TcRnUnusedPatternBinds bind')
 
         ; fvs' `seq` -- See Note [Free-variable space leak]
           return (bind', bndrs, all_fvs) }
@@ -694,7 +706,7 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
                       ; return ( (pat', InfixCon name1 name2)
                                , mkFVs (map unLoc [name1, name2])) }
                RecCon vars ->
-                   do { checkDupRdrNames (map (rdrNameFieldOcc . recordPatSynField) vars)
+                   do { checkDupRdrNames (map (foLabel . recordPatSynField) vars)
                       ; fls <- lookupConstructorFields name
                       ; let fld_env = mkFsEnv [ (flLabel fl, fl) | fl <- fls ]
                       ; let rnRecordPatSynField
@@ -730,7 +742,7 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
                           , psb_ext = fvs' }
               selector_names = case details' of
                                  RecCon names ->
-                                  map (extFieldOcc . recordPatSynField) names
+                                  map (foExt . recordPatSynField) names
                                  _ -> []
 
         ; fvs' `seq` -- See Note [Free-variable space leak]
@@ -1322,10 +1334,10 @@ defaultSigErr sig = vcat [ hang (text "Unexpected default signature:")
                               2 (ppr sig)
                          , text "Use DefaultSignatures to enable default signatures" ]
 
-bindsInHsBootFile :: LHsBindsLR GhcRn GhcPs -> SDoc
-bindsInHsBootFile mbinds
-  = hang (text "Bindings in hs-boot files are not allowed")
-       2 (ppr mbinds)
+bindInHsBootFileErr :: LHsBindLR GhcRn GhcPs -> RnM ()
+bindInHsBootFileErr (L loc _)
+  = addErrAt (locA loc) $
+      vcat [ text "Bindings in hs-boot files are not allowed" ]
 
 nonStdGuardErr :: (Outputable body,
                    Anno (Stmt GhcRn body) ~ SrcSpanAnnA)
@@ -1333,11 +1345,6 @@ nonStdGuardErr :: (Outputable body,
 nonStdGuardErr guards
   = hang (text "accepting non-standard pattern guards (use PatternGuards to suppress this message)")
        4 (interpp'SP guards)
-
-unusedPatBindWarn :: HsBind GhcRn -> SDoc
-unusedPatBindWarn bind
-  = hang (text "This pattern-binding binds no variables:")
-       2 (ppr bind)
 
 dupMinimalSigErr :: [LSig GhcPs] -> RnM ()
 dupMinimalSigErr sigs@(L loc _ : _)

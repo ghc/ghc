@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP              #-}
+
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TupleSections    #-}
 
@@ -106,9 +106,9 @@ For layout of a sum type,
 
 For example, say we have (# (# Int#, Char #) | (# Int#, Int# #) | Int# #)
 
-  - Layouts of alternatives: [ [Word, Ptr], [Word, Word], [Word] ]
-  - Sorted: [ [Ptr, Word], [Word, Word], [Word] ]
-  - Merge all alternatives together: [ Ptr, Word, Word ]
+  - Layouts of alternatives: [ [Word, LiftedPtr], [Word, Word], [Word] ]
+  - Sorted: [ [LiftedPtr, Word], [Word, Word], [Word] ]
+  - Merge all alternatives together: [ LiftedPtr, Word, Word ]
 
 We add a slot for the tag to the first position. So our tuple type is
 
@@ -129,6 +129,44 @@ Another example using the same type: (# | (# 2#, 3# #) | #). 2# fits in Word#,
 3# fits in Word #, so we get:
 
   (# 2#, rubbish, 2#, 3# #).
+
+
+Note [Don't merge lifted and unlifted slots]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When merging slots, one might be tempted to collapse lifted and unlifted
+pointers. However, as seen in #19645, this is wrong. Imagine that you have
+the program:
+
+  test :: (# Char | ByteArray# #) -> ByteArray#
+  test (# c | #) = doSomething c
+  test (# | ba #) = ba
+
+Collapsing the Char and ByteArray# slots would produce STG like:
+
+  test :: forall {t}. (# t | GHC.Prim.ByteArray# #) -> GHC.Prim.ByteArray#
+    = {} \r [ (tag :: Int#) (slot0 :: (Any :: Type)) ]
+          case tag of tag'
+            1# -> doSomething slot0
+            2# -> slot0;
+
+Note how `slot0` has a lifted type, despite being bound to an unlifted
+ByteArray# in the 2# alternative. This liftedness would cause the code generator to
+attempt to enter it upon returning. As unlifted objects do not have entry code,
+this causes a runtime crash.
+
+For this reason, Unarise treats unlifted and lifted things as distinct slot
+types, despite both being GC pointers. This approach is a slight pessimisation
+(since we need to pass more arguments) but appears to be the simplest way to
+avoid #19645. Other alternatives considered include:
+
+ a. Giving unlifted objects "trivial" entry code. However, we ultimately
+    concluded that the value of the "unlifted things are never entered" invariant
+    outweighed the simplicity of this approach.
+
+ b. Annotating occurrences with calling convention information instead of
+    relying on the binder's type. This seemed like a very complicated
+    way to fix what is ultimately a corner-case.
+
 
 Note [Types in StgConApp]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -203,8 +241,6 @@ STG programs after unarisation have these invariants:
 
 module GHC.Stg.Unarise (unarise) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Types.Basic
@@ -219,6 +255,7 @@ import GHC.Types.Id.Make (voidPrimId, voidArgId)
 import GHC.Utils.Monad (mapAccumLM)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Types.RepType
 import GHC.Stg.Syntax
 import GHC.Core.Type
@@ -269,10 +306,10 @@ instance Outputable UnariseVal where
 -- | Extend the environment, checking the UnariseEnv invariant.
 extendRho :: UnariseEnv -> Id -> UnariseVal -> UnariseEnv
 extendRho rho x (MultiVal args)
-  = ASSERT(all (isNvUnaryType . stgArgType) args)
+  = assert (all (isNvUnaryType . stgArgType) args)
     extendVarEnv rho x (MultiVal args)
 extendRho rho x (UnaryVal val)
-  = ASSERT(isNvUnaryType (stgArgType val))
+  = assert (isNvUnaryType (stgArgType val))
     extendVarEnv rho x (UnaryVal val)
 
 --------------------------------------------------------------------------------
@@ -298,7 +335,7 @@ unariseRhs rho (StgRhsClosure ext ccs update_flag args expr)
        return (StgRhsClosure ext ccs update_flag args1 expr')
 
 unariseRhs rho (StgRhsCon ccs con mu ts args)
-  = ASSERT(not (isUnboxedTupleDataCon con || isUnboxedSumDataCon con))
+  = assert (not (isUnboxedTupleDataCon con || isUnboxedSumDataCon con))
     return (StgRhsCon ccs con mu ts (unariseConArgs rho args))
 
 --------------------------------------------------------------------------------
@@ -382,7 +419,7 @@ unariseMulti_maybe rho dc args ty_args
   = Just (unariseConArgs rho args)
 
   | isUnboxedSumDataCon dc
-  , let args1 = ASSERT(isSingleton args) (unariseConArgs rho args)
+  , let args1 = assert (isSingleton args) (unariseConArgs rho args)
   = Just (mkUbxSum dc ty_args args1)
 
   | otherwise
@@ -416,7 +453,7 @@ elimCase rho args bndr (MultiValAlt _) [(_, bndrs, rhs)]
              | isUnboxedTupleBndr bndr
              = mapTupleIdBinders bndrs args rho1
              | otherwise
-             = ASSERT(isUnboxedSumBndr bndr)
+             = assert (isUnboxedSumBndr bndr) $
                if null bndrs then rho1
                              else mapSumIdBinders bndrs args rho1
 
@@ -451,7 +488,7 @@ unariseAlts rho (MultiValAlt n) bndr [(DEFAULT, [], e)]
 unariseAlts rho (MultiValAlt n) bndr [(DataAlt _, ys, e)]
   | isUnboxedTupleBndr bndr
   = do (rho', ys1) <- unariseConArgBinders rho ys
-       MASSERT(ys1 `lengthIs` n)
+       massert (ys1 `lengthIs` n)
        let rho'' = extendRho rho' bndr (MultiVal (map StgVarArg ys1))
        e' <- unariseExpr rho'' e
        return [(DataAlt (tupleDataCon Unboxed n), ys1, e')]
@@ -521,7 +558,7 @@ mapTupleIdBinders
   -> UnariseEnv
   -> UnariseEnv
 mapTupleIdBinders ids args0 rho0
-  = ASSERT(not (any (isVoidTy . stgArgType) args0))
+  = assert (not (any (isVoidTy . stgArgType) args0)) $
     let
       ids_unarised :: [(Id, [PrimRep])]
       ids_unarised = map (\id -> (id, typePrimRep (idType id))) ids
@@ -532,12 +569,12 @@ mapTupleIdBinders ids args0 rho0
         let
           x_arity = length x_reps
           (x_args, args') =
-            ASSERT(args `lengthAtLeast` x_arity)
+            assert (args `lengthAtLeast` x_arity)
             splitAt x_arity args
 
           rho'
             | x_arity == 1
-            = ASSERT(x_args `lengthIs` 1)
+            = assert (x_args `lengthIs` 1)
               extendRho rho x (UnaryVal (head x_args))
             | otherwise
             = extendRho rho x (MultiVal x_args)
@@ -555,7 +592,7 @@ mapSumIdBinders
   -> UnariseEnv
 
 mapSumIdBinders [id] args rho0
-  = ASSERT(not (any (isVoidTy . stgArgType) args))
+  = assert (not (any (isVoidTy . stgArgType) args)) $
     let
       arg_slots = map primRepSlot $ concatMap (typePrimRep . stgArgType) args
       id_slots  = map primRepSlot $ typePrimRep (idType id)
@@ -563,7 +600,7 @@ mapSumIdBinders [id] args rho0
     in
       if isMultiValBndr id
         then extendRho rho0 id (MultiVal [ args !! i | i <- layout1 ])
-        else ASSERT(layout1 `lengthIs` 1)
+        else assert (layout1 `lengthIs` 1)
              extendRho rho0 id (UnaryVal (args !! head layout1))
 
 mapSumIdBinders ids sum_args _
@@ -616,7 +653,8 @@ mkUbxSum dc ty_args args0
 -- See Note [aBSENT_SUM_FIELD_ERROR_ID] in "GHC.Core.Make"
 --
 ubxSumRubbishArg :: SlotTy -> StgArg
-ubxSumRubbishArg PtrSlot    = StgVarArg aBSENT_SUM_FIELD_ERROR_ID
+ubxSumRubbishArg PtrLiftedSlot    = StgVarArg aBSENT_SUM_FIELD_ERROR_ID
+ubxSumRubbishArg PtrUnliftedSlot  = StgVarArg aBSENT_SUM_FIELD_ERROR_ID
 ubxSumRubbishArg WordSlot   = StgLitArg (LitNumber LitNumWord 0)
 ubxSumRubbishArg Word64Slot = StgLitArg (LitNumber LitNumWord64 0)
 ubxSumRubbishArg FloatSlot  = StgLitArg (LitFloat 0)
@@ -748,7 +786,7 @@ unariseConArg _ arg@(StgLitArg lit)
   | Just as <- unariseRubbish_maybe lit
   = as
   | otherwise
-  = ASSERT(not (isVoidTy (literalType lit))) -- We have no non-rubbish void literals
+  = assert (not (isVoidTy (literalType lit))) -- We have no non-rubbish void literals
     [arg]
 
 unariseConArgs :: UnariseEnv -> [InStgArg] -> [OutStgArg]

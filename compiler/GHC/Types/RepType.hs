@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE FlexibleContexts #-}
 
 module GHC.Types.RepType
@@ -21,8 +21,6 @@ module GHC.Types.RepType
     slotPrimRep, primRepSlot
   ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Types.Basic (Arity, RepArity)
@@ -39,6 +37,7 @@ import {-# SOURCE #-} GHC.Builtin.Types ( anyTypeOfKind, runtimeRepTy )
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 
 import Data.List (sort)
 import qualified Data.IntSet as IS
@@ -224,7 +223,8 @@ layoutUbxSum sum_slots0 arg_slots0 =
 -- We have 3 kinds of slots:
 --
 --   - Pointer slot: Only shared between actual pointers to Haskell heap (i.e.
---     boxed objects)
+--     boxed objects). These come in two variants: Lifted and unlifted (see
+--     #19645).
 --
 --   - Word slots: Shared between IntRep, WordRep, Int64Rep, Word64Rep, AddrRep.
 --
@@ -234,7 +234,7 @@ layoutUbxSum sum_slots0 arg_slots0 =
 --
 -- TODO(michalt): We should probably introduce `SlotTy`s for 8-/16-/32-bit
 -- values, so that we can pack things more tightly.
-data SlotTy = PtrSlot | WordSlot | Word64Slot | FloatSlot | DoubleSlot
+data SlotTy = PtrLiftedSlot | PtrUnliftedSlot | WordSlot | Word64Slot | FloatSlot | DoubleSlot
   deriving (Eq, Ord)
     -- Constructor order is important! If slot A could fit into slot B
     -- then slot A must occur first.  E.g.  FloatSlot before DoubleSlot
@@ -243,11 +243,12 @@ data SlotTy = PtrSlot | WordSlot | Word64Slot | FloatSlot | DoubleSlot
     -- (would not be true on a 128-bit machine)
 
 instance Outputable SlotTy where
-  ppr PtrSlot    = text "PtrSlot"
-  ppr Word64Slot = text "Word64Slot"
-  ppr WordSlot   = text "WordSlot"
-  ppr DoubleSlot = text "DoubleSlot"
-  ppr FloatSlot  = text "FloatSlot"
+  ppr PtrLiftedSlot   = text "PtrLiftedSlot"
+  ppr PtrUnliftedSlot = text "PtrUnliftedSlot"
+  ppr Word64Slot      = text "Word64Slot"
+  ppr WordSlot        = text "WordSlot"
+  ppr DoubleSlot      = text "DoubleSlot"
+  ppr FloatSlot       = text "FloatSlot"
 
 typeSlotTy :: UnaryType -> Maybe SlotTy
 typeSlotTy ty
@@ -258,8 +259,8 @@ typeSlotTy ty
 
 primRepSlot :: PrimRep -> SlotTy
 primRepSlot VoidRep     = pprPanic "primRepSlot" (text "No slot for VoidRep")
-primRepSlot LiftedRep   = PtrSlot
-primRepSlot UnliftedRep = PtrSlot
+primRepSlot LiftedRep   = PtrLiftedSlot
+primRepSlot UnliftedRep = PtrUnliftedSlot
 primRepSlot IntRep      = WordSlot
 primRepSlot Int8Rep     = WordSlot
 primRepSlot Int16Rep    = WordSlot
@@ -276,27 +277,29 @@ primRepSlot DoubleRep   = DoubleSlot
 primRepSlot VecRep{}    = pprPanic "primRepSlot" (text "No slot for VecRep")
 
 slotPrimRep :: SlotTy -> PrimRep
-slotPrimRep PtrSlot     = LiftedRep   -- choice between lifted & unlifted seems arbitrary
-slotPrimRep Word64Slot  = Word64Rep
-slotPrimRep WordSlot    = WordRep
-slotPrimRep DoubleSlot  = DoubleRep
-slotPrimRep FloatSlot   = FloatRep
+slotPrimRep PtrLiftedSlot   = LiftedRep
+slotPrimRep PtrUnliftedSlot = UnliftedRep
+slotPrimRep Word64Slot      = Word64Rep
+slotPrimRep WordSlot        = WordRep
+slotPrimRep DoubleSlot      = DoubleRep
+slotPrimRep FloatSlot       = FloatRep
 
 -- | Returns the bigger type if one fits into the other. (commutative)
+--
+-- Note that lifted and unlifted pointers are *not* in a fits-in relation for
+-- the reasons described in Note [Don't merge lifted and unlifted slots] in
+-- GHC.Stg.Unarise.
 fitsIn :: SlotTy -> SlotTy -> Maybe SlotTy
 fitsIn ty1 ty2
+  | ty1 == ty2
+  = Just ty1
   | isWordSlot ty1 && isWordSlot ty2
   = Just (max ty1 ty2)
   | isFloatSlot ty1 && isFloatSlot ty2
   = Just (max ty1 ty2)
-  | isPtrSlot ty1 && isPtrSlot ty2
-  = Just PtrSlot
   | otherwise
   = Nothing
   where
-    isPtrSlot PtrSlot = True
-    isPtrSlot _       = False
-
     isWordSlot Word64Slot = True
     isWordSlot WordSlot   = True
     isWordSlot _          = False
@@ -528,7 +531,7 @@ kindPrimRep doc ki
   | Just ki' <- coreView ki
   = kindPrimRep doc ki'
 kindPrimRep doc (TyConApp typ [runtime_rep])
-  = ASSERT( typ `hasKey` tYPETyConKey )
+  = assert (typ `hasKey` tYPETyConKey) $
     runtimeRepPrimRep doc runtime_rep
 kindPrimRep doc ki
   = pprPanic "kindPrimRep" (ppr ki $$ doc)
@@ -539,7 +542,7 @@ kindPrimRep doc ki
 runtimeRepMonoPrimRep_maybe :: HasDebugCallStack => Type -> Maybe [PrimRep]
 runtimeRepMonoPrimRep_maybe rr_ty
   | Just (rr_dc, args) <- splitTyConApp_maybe rr_ty
-  , ASSERT2( runtimeRepTy `eqType` typeKind rr_ty, ppr rr_ty ) True
+  , assertPpr (runtimeRepTy `eqType` typeKind rr_ty) (ppr rr_ty) True
   , RuntimeRep fun <- tyConRuntimeRepInfo rr_dc
   = Just (fun args)
   | otherwise

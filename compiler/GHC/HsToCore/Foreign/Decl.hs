@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -14,7 +14,6 @@ Desugaring foreign declarations (see also GHC.HsToCore.Foreign.Call).
 
 module GHC.HsToCore.Foreign.Decl ( dsForeigns ) where
 
-#include "HsVersions.h"
 import GHC.Prelude
 
 import GHC.Tc.Utils.Monad        -- temp
@@ -23,6 +22,7 @@ import GHC.Core
 
 import GHC.HsToCore.Foreign.Call
 import GHC.HsToCore.Monad
+import GHC.HsToCore.Types (ds_next_wrapper_num)
 
 import GHC.Hs
 import GHC.Core.DataCon
@@ -56,8 +56,8 @@ import GHC.Driver.Session
 import GHC.Driver.Config
 import GHC.Platform
 import GHC.Data.OrdList
-import GHC.Utils.Misc
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Driver.Hooks
 import GHC.Utils.Encoding
 
@@ -173,7 +173,7 @@ dsCImport id co (CLabel cid) cconv _ _ = do
                  IsFunction
              _ -> IsData
    (resTy, foRhs) <- resultWrapper ty
-   ASSERT(fromJust resTy `eqType` addrPrimTy)    -- typechecker ensures this
+   assert (fromJust resTy `eqType` addrPrimTy) $    -- typechecker ensures this
     let
         rhs = foRhs (Lit (LitLabel cid stdcall_info fod))
         rhs' = Cast rhs co
@@ -229,12 +229,12 @@ dsFCall fn_id co fcall mDeclHeader = do
     ccall_uniq <- newUnique
     work_uniq  <- newUnique
 
-    dflags <- getDynFlags
     (fcall', cDoc) <-
               case fcall of
               CCall (CCallSpec (StaticTarget _ cName mUnitId isFun)
                                CApiConv safety) ->
-               do wrapperName <- mkWrapperName "ghc_wrapper" (unpackFS cName)
+               do nextWrapperNum <- ds_next_wrapper_num <$> getGblEnv
+                  wrapperName <- mkWrapperName nextWrapperNum "ghc_wrapper" (unpackFS cName)
                   let fcall' = CCall (CCallSpec
                                       (StaticTarget NoSourceText
                                                     wrapperName mUnitId
@@ -278,6 +278,7 @@ dsFCall fn_id co fcall mDeclHeader = do
                   return (fcall', c)
               _ ->
                   return (fcall, empty)
+    dflags <- getDynFlags
     let
         -- Build the worker
         worker_ty     = mkForAllTys tv_bndrs (mkVisFunTysMany (map idType work_arg_ids) ccall_result_ty)
@@ -662,9 +663,9 @@ mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
                 text "rts_apply" <> parens (
                     cap <>
                     text "(HaskellObj)"
-                 <> ptext (if is_IO_res_ty
-                                then (sLit "runIO_closure")
-                                else (sLit "runNonIO_closure"))
+                 <> (if is_IO_res_ty
+                      then text "runIO_closure"
+                      else text "runNonIO_closure")
                  <> comma
                  <> expr_to_run
                 ) <+> comma
@@ -817,8 +818,8 @@ getPrimTyOf ty
   | otherwise =
   case splitDataProductType_maybe rep_ty of
      Just (_, _, data_con, [Scaled _ prim_ty]) ->
-        ASSERT(dataConSourceArity data_con == 1)
-        ASSERT2(isUnliftedType prim_ty, ppr prim_ty)
+        assert (dataConSourceArity data_con == 1) $
+        assertPpr (isUnliftedType prim_ty) (ppr prim_ty)
         prim_ty
      _other -> pprPanic "GHC.HsToCore.Foreign.Decl.getPrimTyOf" (ppr ty)
   where

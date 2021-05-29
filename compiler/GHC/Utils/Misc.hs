@@ -13,10 +13,6 @@
 -- | Highly random utility functions
 --
 module GHC.Utils.Misc (
-        -- * Flags dependent on the compiler build
-        ghciSupported, debugIsOn,
-        isWindowsHost, isDarwinHost,
-
         -- * Miscellaneous higher-order functions
         applyWhen, nTimes,
 
@@ -91,9 +87,6 @@ module GHC.Utils.Misc (
         looksLikeModuleName,
         looksLikePackageName,
 
-        -- * Argument processing
-        getCmd, toCmdArgs, toArgs,
-
         -- * Integers
         exactLog2,
 
@@ -134,12 +127,11 @@ module GHC.Utils.Misc (
         overrideWith,
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Utils.Exception
 import GHC.Utils.Panic.Plain
+import GHC.Utils.Constants
 
 import Data.Data
 import qualified Data.List as List
@@ -173,50 +165,6 @@ import {-# SOURCE #-} GHC.Driver.Ppr ( warnPprTrace )
 
 infixr 9 `thenCmp`
 
-{-
-************************************************************************
-*                                                                      *
-\subsection{Is DEBUG on, are we on Windows, etc?}
-*                                                                      *
-************************************************************************
-
-These booleans are global constants, set by CPP flags.  They allow us to
-recompile a single module (this one) to change whether or not debug output
-appears. They sometimes let us avoid even running CPP elsewhere.
-
-It's important that the flags are literal constants (True/False). Then,
-with -0, tests of the flags in other modules will simplify to the correct
-branch of the conditional, thereby dropping debug code altogether when
-the flags are off.
--}
-
-ghciSupported :: Bool
-#if defined(HAVE_INTERNAL_INTERPRETER)
-ghciSupported = True
-#else
-ghciSupported = False
-#endif
-
-debugIsOn :: Bool
-#if defined(DEBUG)
-debugIsOn = True
-#else
-debugIsOn = False
-#endif
-
-isWindowsHost :: Bool
-#if defined(mingw32_HOST_OS)
-isWindowsHost = True
-#else
-isWindowsHost = False
-#endif
-
-isDarwinHost :: Bool
-#if defined(darwin_HOST_OS)
-isDarwinHost = True
-#else
-isDarwinHost = False
-#endif
 
 {-
 ************************************************************************
@@ -589,7 +537,7 @@ isIn msg x ys
     elem100 :: Eq a => Int -> a -> [a] -> Bool
     elem100 _ _ [] = False
     elem100 i x (y:ys)
-      | i > 100 = WARN(True, text ("Over-long elem in " ++ msg)) (x `elem` (y:ys))
+      | i > 100 = warnPprTrace True (text ("Over-long elem in " ++ msg)) (x `elem` (y:ys))
       | otherwise = x == y || elem100 (i + 1) x ys
 
 isn'tIn msg x ys
@@ -598,7 +546,7 @@ isn'tIn msg x ys
     notElem100 :: Eq a => Int -> a -> [a] -> Bool
     notElem100 _ _ [] =  True
     notElem100 i x (y:ys)
-      | i > 100 = WARN(True, text ("Over-long notElem in " ++ msg)) (x `notElem` (y:ys))
+      | i > 100 = warnPprTrace True (text ("Over-long notElem in " ++ msg)) (x `notElem` (y:ys))
       | otherwise = x /= y && notElem100 (i + 1) x ys
 # endif /* DEBUG */
 
@@ -682,7 +630,7 @@ isSortedBy cmp = sorted
 -}
 
 minWith :: Ord b => (a -> b) -> [a] -> a
-minWith get_key xs = ASSERT( not (null xs) )
+minWith get_key xs = assert (not (null xs) )
                      head (sortWith get_key xs)
 
 nubSort :: Ord a => [a] -> [a]
@@ -1102,67 +1050,6 @@ looksLikeModuleName (c:cs) = isUpper c && go cs
 looksLikePackageName :: String -> Bool
 looksLikePackageName = all (all isAlphaNum <&&> not . (all isDigit)) . split '-'
 
-{-
-Akin to @Prelude.words@, but acts like the Bourne shell, treating
-quoted strings as Haskell Strings, and also parses Haskell [String]
-syntax.
--}
-
-getCmd :: String -> Either String             -- Error
-                           (String, String) -- (Cmd, Rest)
-getCmd s = case break isSpace $ dropWhile isSpace s of
-           ([], _) -> Left ("Couldn't find command in " ++ show s)
-           res -> Right res
-
-toCmdArgs :: String -> Either String             -- Error
-                              (String, [String]) -- (Cmd, Args)
-toCmdArgs s = case getCmd s of
-              Left err -> Left err
-              Right (cmd, s') -> case toArgs s' of
-                                 Left err -> Left err
-                                 Right args -> Right (cmd, args)
-
-toArgs :: String -> Either String   -- Error
-                           [String] -- Args
-toArgs str
-    = case dropWhile isSpace str of
-      s@('[':_) -> case reads s of
-                   [(args, spaces)]
-                    | all isSpace spaces ->
-                       Right args
-                   _ ->
-                       Left ("Couldn't read " ++ show str ++ " as [String]")
-      s -> toArgs' s
- where
-  toArgs' :: String -> Either String [String]
-  -- Remove outer quotes:
-  -- > toArgs' "\"foo\" \"bar baz\""
-  -- Right ["foo", "bar baz"]
-  --
-  -- Keep inner quotes:
-  -- > toArgs' "-DFOO=\"bar baz\""
-  -- Right ["-DFOO=\"bar baz\""]
-  toArgs' s = case dropWhile isSpace s of
-              [] -> Right []
-              ('"' : _) -> do
-                    -- readAsString removes outer quotes
-                    (arg, rest) <- readAsString s
-                    (arg:) `fmap` toArgs' rest
-              s' -> case break (isSpace <||> (== '"')) s' of
-                    (argPart1, s''@('"':_)) -> do
-                        (argPart2, rest) <- readAsString s''
-                        -- show argPart2 to keep inner quotes
-                        ((argPart1 ++ show argPart2):) `fmap` toArgs' rest
-                    (arg, s'') -> (arg:) `fmap` toArgs' s''
-
-  readAsString :: String -> Either String (String, String)
-  readAsString s = case reads s of
-                [(arg, rest)]
-                    -- rest must either be [] or start with a space
-                    | all isSpace (take 1 rest) ->
-                    Right (arg, rest)
-                _ ->
-                    Left ("Couldn't read " ++ show s ++ " as String")
 -----------------------------------------------------------------------------
 -- Integers
 

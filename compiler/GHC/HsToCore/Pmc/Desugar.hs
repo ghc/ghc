@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP               #-}
+
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs             #-}
 {-# LANGUAGE LambdaCase        #-}
@@ -12,8 +12,6 @@
 module GHC.HsToCore.Pmc.Desugar (
       desugarPatBind, desugarGRHSs, desugarMatches, desugarEmptyCase
     ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -33,7 +31,6 @@ import GHC.Builtin.Names (rationalTyConName)
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Misc
 import GHC.Core.DataCon
 import GHC.Types.Var (EvVar)
 import GHC.Core.Coercion
@@ -111,7 +108,7 @@ desugarPat :: Id -> Pat GhcTc -> DsM [PmGrd]
 desugarPat x pat = case pat of
   WildPat  _ty -> pure []
   VarPat _ y   -> pure (mkPmLetVar (unLoc y) x)
-  ParPat _ p   -> desugarLPat x p
+  ParPat _ _ p _ -> desugarLPat x p
   LazyPat _ _  -> pure [] -- like a wildcard
   BangPat _ p@(L l p') ->
     -- Add the bang in front of the list, because it will happen before any
@@ -290,7 +287,7 @@ desugarConPatOut x con univ_tys ex_tvs dicts = \case
     -- LHsRecField
     rec_field_ps fs = map (tagged_pat . unLoc) fs
       where
-        tagged_pat f = (lbl_to_index (getName (hsRecFieldId f)), hsRecFieldArg f)
+        tagged_pat f = (lbl_to_index (getName (hsRecFieldId f)), hfbRHS f)
         -- Unfortunately the label info is empty when the DataCon wasn't defined
         -- with record field labels, hence we desugar to field index.
         orig_lbls        = map flSelector $ conLikeFieldLabels con
@@ -405,7 +402,8 @@ desugarLocalBinds (HsValBinds _ (XValBindsLR (NValBinds binds _))) =
       let go_export :: ABExport GhcTc -> Maybe PmGrd
           go_export ABE{abe_poly = x, abe_mono = y, abe_wrap = wrap}
             | isIdHsWrapper wrap
-            = ASSERT2(idType x `eqType` idType y, ppr x $$ ppr (idType x) $$ ppr y $$ ppr (idType y))
+            = assertPpr (idType x `eqType` idType y)
+                        (ppr x $$ ppr (idType x) $$ ppr y $$ ppr (idType y)) $
               Just $ PmLet x (Var y)
             | otherwise
             = Nothing

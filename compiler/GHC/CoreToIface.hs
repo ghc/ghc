@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE Strict #-} -- See Note [Avoiding space leaks in toIface*]
 
 -- | Functions for converting Core things to interface file things.
@@ -43,8 +43,6 @@ module GHC.CoreToIface
       -- * Other stuff
     , toIfaceLFInfo
     ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -313,6 +311,7 @@ toIfaceCoercionX fr co
     go_prov (PhantomProv co)    = IfacePhantomProv (go co)
     go_prov (ProofIrrelProv co) = IfaceProofIrrelProv (go co)
     go_prov (PluginProv str)    = IfacePluginProv str
+    go_prov (CorePrepProv b)    = IfaceCorePrepProv b
 
 toIfaceTcArgs :: TyCon -> [Type] -> IfaceAppArgs
 toIfaceTcArgs = toIfaceTcArgsX emptyVarSet
@@ -367,7 +366,7 @@ toIfaceAppArgsX fr kind ty_args
         -- This is probably a compiler bug, so we print a trace and
         -- carry on as if it were FunTy.  Without the test for
         -- isEmptyTCvSubst we'd get an infinite loop (#15473)
-        WARN( True, ppr kind $$ ppr ty_args )
+        warnPprTrace True (ppr kind $$ ppr ty_args) $
         IA_Arg (toIfaceTypeX fr t1) Required (go env ty ts1)
 
 tidyToIfaceType :: TidyEnv -> Type -> IfaceType
@@ -630,15 +629,15 @@ toIfaceLFInfo nm lfi = case lfi of
     LFReEntrant top_lvl arity no_fvs _arg_descr ->
       -- Exported LFReEntrant closures are top level, and top-level closures
       -- don't have free variables
-      ASSERT2(isTopLevel top_lvl, ppr nm)
-      ASSERT2(no_fvs, ppr nm)
+      assertPpr (isTopLevel top_lvl) (ppr nm) $
+      assertPpr no_fvs (ppr nm) $
       IfLFReEntrant arity
     LFThunk top_lvl no_fvs updatable sfi mb_fun ->
       -- Exported LFThunk closures are top level (which don't have free
       -- variables) and non-standard (see cgTopRhsClosure)
-      ASSERT2(isTopLevel top_lvl, ppr nm)
-      ASSERT2(no_fvs, ppr nm)
-      ASSERT2(sfi == NonStandardThunk, ppr nm)
+      assertPpr (isTopLevel top_lvl) (ppr nm) $
+      assertPpr no_fvs (ppr nm) $
+      assertPpr (sfi == NonStandardThunk) (ppr nm) $
       IfLFThunk updatable mb_fun
     LFCon dc ->
       IfLFCon (dataConName dc)

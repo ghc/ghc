@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP           #-}
+
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
@@ -19,8 +19,6 @@ module GHC.Tc.Validity (
   checkTyConTelescope,
   allDistinctTyVars
   ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -68,7 +66,6 @@ import GHC.Types.SrcLoc
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Builtin.Uniques  ( mkAlphaTyVarUnique )
-import GHC.Data.Bag      ( emptyBag )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
@@ -809,7 +806,7 @@ check_syn_tc_app (ve@ValidityEnv{ ve_ctxt = ctxt, ve_expand = expand })
     check_args_only expand = mapM_ (check_arg expand) tys
 
     check_expansion_only expand
-      = ASSERT2( isTypeSynonymTyCon tc, ppr tc )
+      = assertPpr (isTypeSynonymTyCon tc) (ppr tc) $
         case tcView ty of
          Just ty' -> let err_ctxt = text "In the expansion of type synonym"
                                     <+> quotes (ppr tc)
@@ -1565,7 +1562,7 @@ check_special_inst_head dflags is_boot is_sig ctxt clas cls_args
   | clas_nm `elem` genericClassNames
   , hand_written_bindings
   =  do { failIfTc (safeLanguageOn dflags) gen_inst_err
-        ; when (safeInferOn dflags) (recordUnsafeInfer emptyBag) }
+        ; when (safeInferOn dflags) (recordUnsafeInfer emptyMessages) }
 
   | clas_nm == hasFieldClassName
   = checkHasFieldInst clas cls_args

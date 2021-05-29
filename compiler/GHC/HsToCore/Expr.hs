@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP          #-}
+
 {-# LANGUAGE TypeFamilies #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
@@ -17,8 +17,6 @@ module GHC.HsToCore.Expr
    , dsValBinds, dsLit, dsSyntaxExpr
    )
 where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -44,8 +42,9 @@ import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Utils.Monad
 import GHC.Core.Type
+import GHC.Core.TyCo.Rep
 import GHC.Core.Multiplicity
-import GHC.Core.Coercion( Coercion )
+import GHC.Core.Coercion( instNewTyCon_maybe, mkSymCo )
 import GHC.Core
 import GHC.Core.Utils
 import GHC.Core.Make
@@ -69,6 +68,7 @@ import GHC.Utils.Misc
 import GHC.Data.Bag
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Core.PatSyn
 import Control.Monad
 import Data.Void( absurd )
@@ -160,19 +160,19 @@ ds_val_bind (NonRecursive, hsbinds) body
 
 ds_val_bind (is_rec, binds) _body
   | anyBag (isUnliftedHsBind . unLoc) binds  -- see Note [Strict binds checks] in GHC.HsToCore.Binds
-  = ASSERT( isRec is_rec )
+  = assert (isRec is_rec )
     errDsCoreExpr $
     hang (text "Recursive bindings for unlifted types aren't allowed:")
        2 (vcat (map ppr (bagToList binds)))
 
 -- Ordinary case for bindings; none should be unlifted
 ds_val_bind (is_rec, binds) body
-  = do  { MASSERT( isRec is_rec || isSingletonBag binds )
+  = do  { massert (isRec is_rec || isSingletonBag binds)
                -- we should never produce a non-recursive list of multiple binds
 
         ; (force_vars,prs) <- dsLHsBinds binds
         ; let body' = foldr seqVar body force_vars
-        ; ASSERT2( not (any (isUnliftedType . idType . fst) prs), ppr is_rec $$ ppr binds )
+        ; assertPpr (not (any (isUnliftedType . idType . fst) prs)) (ppr is_rec $$ ppr binds) $
           case prs of
             [] -> return body
             _  -> return (Let (Rec prs) body') }
@@ -208,8 +208,8 @@ dsUnliftedBind (FunBind { fun_id = L l fun
                -- so must be simply unboxed
   = do { (args, rhs) <- matchWrapper (mkPrefixFunRhs (L l $ idName fun))
                                      Nothing matches
-       ; MASSERT( null args ) -- Functions aren't lifted
-       ; MASSERT( isIdHsWrapper co_fn )
+       ; massert (null args) -- Functions aren't lifted
+       ; massert (isIdHsWrapper co_fn)
        ; let rhs' = mkOptTickBox tick rhs
        ; return (bindNonRec fun rhs' body) }
 
@@ -244,9 +244,9 @@ dsUnliftedBind bind body = pprPanic "dsLet: unlifted" (ppr bind $$ ppr body)
 -- function in GHC.Tc.Utils.Zonk:
 -- putSrcSpanDs loc $ do
 --   { core_expr <- dsExpr e
---   ; MASSERT2( exprType core_expr `eqType` hsExprType e
---             , ppr e <+> dcolon <+> ppr (hsExprType e) $$
---                 ppr core_expr <+> dcolon <+> ppr (exprType core_expr) )
+--   ; massertPpr (exprType core_expr `eqType` hsExprType e)
+--                (ppr e <+> dcolon <+> ppr (hsExprType e) $$
+--                 ppr core_expr <+> dcolon <+> ppr (exprType core_expr))
 --   ; return core_expr }
 dsLExpr :: LHsExpr GhcTc -> DsM CoreExpr
 dsLExpr (L loc e) =
@@ -266,15 +266,13 @@ dsLExprNoLP (L loc e)
 
 dsExpr :: HsExpr GhcTc -> DsM CoreExpr
 dsExpr (HsVar    _ (L _ id))           = dsHsVar id
-dsExpr (HsRecFld _ (Unambiguous id _)) = dsHsVar id
-dsExpr (HsRecFld _ (Ambiguous   id _)) = dsHsVar id
+dsExpr (HsRecSel _ (FieldOcc id _))    = dsHsVar id
 dsExpr (HsUnboundVar (HER ref _ _) _)  = dsEvTerm =<< readMutVar ref
         -- See Note [Holes] in GHC.Tc.Types.Constraint
 
-dsExpr (HsPar _ e)            = dsLExpr e
+dsExpr (HsPar _ _ e _)        = dsLExpr e
 dsExpr (ExprWithTySig _ e _)  = dsLExpr e
 
-dsExpr (HsConLikeOut _ con)   = dsConLike con
 dsExpr (HsIPVar {})           = panic "dsExpr: HsIPVar"
 
 dsExpr (HsGetField x _ _)     = absurd x
@@ -288,10 +286,11 @@ dsExpr (HsOverLit _ lit)
   = do { warnAboutOverflowedOverLit lit
        ; dsOverLit lit }
 
-dsExpr e@(XExpr expansion)
-  = case expansion of
+dsExpr e@(XExpr ext_expr_tc)
+  = case ext_expr_tc of
       ExpansionExpr (HsExpanded _ b) -> dsExpr b
       WrapExpr {}                    -> dsHsWrapped e
+      ConLikeTc {}                   -> dsHsWrapped e
 
 dsExpr (NegApp _ (L loc
                     (HsOverLit _ lit@(OverLit { ol_val = HsIntegral i})))
@@ -483,7 +482,7 @@ dsExpr (RecordCon { rcon_con  = L _ con_like
 
              mk_arg (arg_ty, fl)
                = case findField (rec_flds rbinds) (flSelector fl) of
-                   (rhs:rhss) -> ASSERT( null rhss )
+                   (rhs:rhss) -> assert (null rhss )
                                  dsLExprNoLP rhs
                    []         -> mkErrorAppDs rEC_CON_ERROR_ID arg_ty (ppr (flLabel fl))
              unlabelled_bottom arg_ty = mkErrorAppDs rEC_CON_ERROR_ID arg_ty Outputable.empty
@@ -602,7 +601,7 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = Left fields
   | null fields
   = dsLExpr record_expr
   | otherwise
-  = ASSERT2( notNull cons_to_upd, ppr expr )
+  = assertPpr (notNull cons_to_upd) (ppr expr) $
 
     do  { record_expr' <- dsLExpr record_expr
         ; field_binds' <- mapM ds_field fields
@@ -632,7 +631,7 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = Left fields
       -- else we shadow other uses of the record selector
       -- Hence 'lcl_id'.  Cf #2735
     ds_field (L _ rec_field)
-      = do { rhs <- dsLExpr (hsRecFieldArg rec_field)
+      = do { rhs <- dsLExpr (hfbRHS rec_field)
            ; let fld_id = unLoc (hsRecUpdFieldId rec_field)
            ; lcl_id <- newSysLocalDs (idMult fld_id) (idType fld_id)
            ; return (idName fld_id, lcl_id, rhs) }
@@ -670,7 +669,7 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = Left fields
                  mk_val_arg fl pat_arg_id
                      = nlHsVar (lookupNameEnv upd_fld_env (flSelector fl) `orElse` pat_arg_id)
 
-                 inst_con = noLocA $ mkHsWrap wrap (HsConLikeOut noExtField con)
+                 inst_con = noLocA $ mkHsWrap wrap (mkConLikeTc con)
                         -- Reconstruct with the WrapId so that unpacking happens
                  wrap = mkWpEvVarApps theta_vars                                <.>
                         dict_req_wrap                                           <.>
@@ -770,7 +769,7 @@ dsExpr (HsTick _ tickish e) = do
 
 dsExpr (HsBinTick _ ixT ixF e) = do
   e2 <- dsLExpr e
-  do { ASSERT(exprType e2 `eqType` boolTy)
+  do { assert (exprType e2 `eqType` boolTy)
        mkBinaryTickBox ixT ixF e2
      }
 
@@ -818,8 +817,8 @@ dsSyntaxExpr NoSyntaxExprTc _ = panic "dsSyntaxExpr"
 
 findField :: [LHsRecField GhcTc arg] -> Name -> [arg]
 findField rbinds sel
-  = [hsRecFieldArg fld | L _ fld <- rbinds
-                       , sel == idName (unLoc $ hsRecFieldId fld) ]
+  = [hfbRHS fld | L _ fld <- rbinds
+                       , sel == idName (hsRecFieldId fld) ]
 
 {-
 %--------------------------------------------------------------------
@@ -937,7 +936,7 @@ dsDo ctx stmts
     goL ((L loc stmt):lstmts) = putSrcSpanDsA loc (go loc stmt lstmts)
 
     go _ (LastStmt _ body _ _) stmts
-      = ASSERT( null stmts ) dsLExpr body
+      = assert (null stmts ) dsLExpr body
         -- The 'return' op isn't used for 'do' expressions
 
     go _ (BodyStmt _ rhs then_expr _) stmts
@@ -1041,13 +1040,18 @@ dsDo ctx stmts
 -}
 
 dsHsVar :: Id -> DsM CoreExpr
+-- We could just call dsHsUnwrapped; but this is a short-cut
+-- for the very common case of a variable with no wrapper.
+-- NB: withDict is always instantiated by a wrapper, so we need
+--     only check for it in dsHsUnwrapped
 dsHsVar var
-  = do { checkLevPolyFunction (ppr var) var (idType var)
+  = do { checkLevPolyFunction var var (idType var)
        ; return (varToCoreExpr var) }   -- See Note [Desugaring vars]
 
-dsConLike :: ConLike -> DsM CoreExpr
-dsConLike (RealDataCon dc) = dsHsVar (dataConWrapId dc)
-dsConLike (PatSynCon ps)
+dsHsConLike :: ConLike -> DsM CoreExpr
+dsHsConLike (RealDataCon dc)
+  = return (varToCoreExpr (dataConWrapId dc))
+dsHsConLike (PatSynCon ps)
   | Just (builder_name, _, add_void) <- patSynBuilder ps
   = do { builder_id <- dsLookupGlobalId builder_name
        ; return (if add_void
@@ -1056,6 +1060,26 @@ dsConLike (PatSynCon ps)
                  else Var builder_id) }
   | otherwise
   = pprPanic "dsConLike" (ppr ps)
+
+dsConLike :: ConLike -> [TcInvisTVBinder] -> [Scaled Type] -> DsM CoreExpr
+-- This function desugars ConLikeTc
+-- See Note [Typechecking data constructors] in GHC.Tc.Gen.Head
+--     for what is going on here
+dsConLike con tvbs tys
+  = do { ds_con <- dsHsConLike con
+       ; ids    <- newSysLocalsDs tys
+                   -- newSysLocalDs: /can/ be lev-poly; see
+                   -- Note [Checking levity-polymorphic data constructors]
+       ; return (mkLams tvs $
+                 mkLams ids $
+                 ds_con `mkTyApps` mkTyVarTys tvs
+                        `mkVarApps` drop_stupid ids) }
+  where
+    tvs = binderVars tvbs
+
+    drop_stupid = dropList (conLikeStupidTheta con)
+    -- drop_stupid: see Note [Instantiating stupid theta]
+    --              in GHC.Tc.Gen.Head
 
 {-
 ************************************************************************
@@ -1134,7 +1158,7 @@ Note that if `f :: forall r (a :: Type r). blah`, then
 is absolutely fine.  Here `f` is a function, represented by a
 pointer, and we can pass it to `const` (or anything else).  (See
 #12708 for an example.)  It's only the Id.hasNoBinding functions
-that are a problem.
+that are a problem.  See checkLevPolyFunction.
 
 Interestingly, this approach does not look to see whether the Id in
 question will be eta expanded. The logic is this:
@@ -1145,6 +1169,62 @@ question will be eta expanded. The logic is this:
     argument. If its wrapped type contains levity polymorphic arguments, reject.
 So, either way, we're good to reject.
 
+Note [Nasty wrinkle in levity-polymorphic function check]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A nasty wrinkle came up in T13244
+   type family Rep x
+   type instance Rep Int = IntRep
+
+   type Unboxed x :: TYPE (Rep x)
+   type instance Unboxed Int = Int#
+
+   box :: Unboxed Int -> Int
+   box = I#
+
+Here the function I# is wrapped in a /cast/, thus
+   box = I# |> (co :: (Int# -> Int) ~ (Unboxed Int -> Int))
+If we look only at final type of the expression,
+  namely: Unboxed Int -> Int,
+the kind of the argument type is TYPE (Rep Int), and that needs
+type-family reduction to say whether it is lifted or unlifted.
+
+So we split the wrapper into the instantiating part (which is what
+we really want) and everything else; see splitWrapper.  This is
+very disgusting.
+
+But it also improves the error message in an example like T13233_elab:
+  obscure :: (forall (rep1 :: RuntimeRep) (rep2 :: RuntimeRep)
+                     (a :: TYPE rep1) (b :: TYPE rep2).
+                     a -> b -> (# a, b #)) -> ()
+  obscure _ = ()
+
+  quux = obscure (#,#)
+
+Around the (#,#) we'll get some type /abstractions/ wrapping some type
+/instantiations/. In the levity-poly error message we really only want
+to report the instantiations.  Hence passing (mkHsWrap w_inner e) to
+checkLevPolyArgs.
+
+
+Note [Checking levity-polymorphic data constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Similarly, generated by a newtype data constructor, we might get this:
+  (/\(r :: RuntimeRep) (a :: TYPE r) \(x::a). K r a x) @LiftedRep Int 4
+
+which we want to accept. See Note [Typechecking data constructors] in
+GHC.Tc.Gen.Head.
+
+Because we want to accept this, we switch off Lint's levity-poly checks
+when Lint checks the output of the desugarer; see the lf_check_levity_poly
+flag in GHC.Core.Lint.lintCoreBindings.
+
+We can get this situation both for levity-polymorphic newtype constructors
+(T18481), and for levity-polymorphic algebraic data types, e.g (T18481a)
+    type T :: TYPE (BoxedRep r) -> TYPE (BoxedRep r)
+    data T a = MkT Int
+
+    f :: T Bool
+    f = MkT @Lifted @Bool 42
 -}
 
 ------------------------------
@@ -1153,47 +1233,254 @@ dsHsWrapped :: HsExpr GhcTc -> DsM CoreExpr
 -- or wrappers (HsWrap), and checks that any hasNoBinding function
 -- is not levity polymorphic, *after* instantiation with those wrappers
 dsHsWrapped orig_hs_expr
-  = go id orig_hs_expr
+  = go idHsWrapper orig_hs_expr
   where
-    go wrap (XExpr (WrapExpr (HsWrap co_fn hs_e)))
-       = do { wrap' <- dsHsWrapper co_fn
-            ; addTyCs FromSource (hsWrapDictBinders co_fn) $
-              go (wrap . wrap') hs_e }
-    go wrap (HsConLikeOut _ (RealDataCon dc))
-      = go_head wrap (dataConWrapId dc)
-    go wrap (HsAppType ty hs_e _) = go_l (wrap . (\e -> App e (Type ty))) hs_e
-    go wrap (HsPar _ hs_e)        = go_l wrap hs_e
-    go wrap (HsVar _ (L _ var))   = go_head wrap var
-    go wrap hs_e                  = do { e <- dsExpr hs_e; return (wrap e) }
+    go wrap (HsPar _ _ (L _ hs_e) _)
+       = go wrap hs_e
+    go wrap1 (XExpr (WrapExpr (HsWrap wrap2 hs_e)))
+       = go (wrap1 <.> wrap2) hs_e
+    go wrap (HsAppType ty (L _ hs_e) _)
+       = go (wrap <.> WpTyApp ty) hs_e
 
-    go_l wrap (L _ hs_e) = go wrap hs_e
+    go wrap e@(XExpr (ConLikeTc con tvs tys))
+      = do { let (w_outer, w_inner) = splitWrapper wrap
+           ; w_outer' <- dsHsWrapper w_outer
+           ; w_inner' <- dsHsWrapper w_inner
+           ; ds_con <- dsConLike con tvs tys
+           ; let inst_e  = w_inner' ds_con
+                 inst_ty = exprType inst_e
+           ; checkLevPolyArgs (mkHsWrap w_inner e) inst_ty
+           ; return (w_outer' inst_e) }
 
-    go_head wrap var
-      = do { let wrapped_e  = wrap (Var var)
-                 wrapped_ty = exprType wrapped_e
+    go wrap e@(HsVar _ (L _ var))
+      | var `hasKey` withDictKey
+      = do { wrap' <- dsHsWrapper wrap
+           ; ds_withDict (exprType (wrap' (varToCoreExpr var))) }
 
-           ; checkLevPolyFunction (ppr orig_hs_expr) var wrapped_ty
-             -- See Note [Checking for levity-polymorphic functions]
-             -- Pass orig_hs_expr, so that the user can see entire
-             -- expression with -fprint-typechecker-elaboration
-
+      | otherwise
+      = do { let (w_outer, w_inner) = splitWrapper wrap
+           ; w_outer' <- dsHsWrapper w_outer
+           ; w_inner' <- dsHsWrapper w_inner
+           ; let inst_e  = w_inner' (varToCoreExpr var)
+                 inst_ty = exprType inst_e
+           ; checkLevPolyFunction (mkHsWrap w_inner e) var inst_ty
            ; dflags <- getDynFlags
-           ; warnAboutIdentities dflags var wrapped_ty
+           ; warnAboutIdentities dflags var inst_ty
+           ; return (w_outer' inst_e) }
 
-           ; return wrapped_e }
+    go wrap hs_e
+       = do { wrap' <- dsHsWrapper wrap
+            ; addTyCs FromSource (hsWrapDictBinders wrap) $
+              do { e <- dsExpr hs_e
+                 ; return (wrap' e) } }
 
+splitWrapper :: HsWrapper -> (HsWrapper, HsWrapper)
+-- Split a wrapper w into (outer_wrap <.> inner_wrap), where
+-- inner_wrap does instantiation (type and evidence application)
+-- and outer_wrap is everything else, such as a final cast
+-- See Note [Nasty wrinkle in levity-polymorphic function check]
+splitWrapper wrap
+  = go WpHole wrap
+  where
+    go :: HsWrapper -> HsWrapper -> (HsWrapper, HsWrapper)
+    -- If (go w1 w2) = (w3,w4) then
+    --    - w1 <.> w2  = w3 <.> w4
+    --    - w4 does instantiation only ("instantiator" below)
+    -- 'go' mainly dispatches on w2, using w1 as a work-list
+    -- onto which it pushes stuff in w2 to come back to later
+    go WpHole WpHole              = (WpHole,WpHole)
+    go w      WpHole              = splitWrapper w
+    go w1     (w2 `WpCompose` w3) = go (w1 <.> w2) w3
+
+    go w1 w2 | instantiator w2  = liftSnd (<.> w2) (splitWrapper w1)
+             | otherwise        = (w1 <.> w2, WpHole)
+
+    instantiator (WpTyApp {}) = True
+    instantiator (WpEvApp {}) = True
+    instantiator _            = False
+
+
+-- See Note [withDict]
+ds_withDict :: Type -> DsM CoreExpr
+ds_withDict wrapped_ty
+    -- Check that withDict is of the type `st -> (dt => r) -> r`.
+  | Just (Anon VisArg   (Scaled mult1 st),      rest) <- splitPiTy_maybe wrapped_ty
+  , Just (Anon VisArg   (Scaled mult2 dt_to_r), _r1)  <- splitPiTy_maybe rest
+  , Just (Anon InvisArg (Scaled _     dt),      _r2)  <- splitPiTy_maybe dt_to_r
+    -- Check that dt is a class constraint `C t_1 ... t_n`, where
+    -- `dict_tc = C` and `dict_args = t_1 ... t_n`.
+  , Just (dict_tc, dict_args) <- splitTyConApp_maybe dt
+    -- Check that C is a class of the form
+    -- `class C a_1 ... a_n where op :: meth_ty`, where
+    -- `meth_tvs = a_1 ... a_n` and `co` is a newtype coercion between
+    -- `C` and `meth_ty`.
+  , Just (inst_meth_ty, co) <- instNewTyCon_maybe dict_tc dict_args
+    -- Check that `st` is equal to `meth_ty[t_i/a_i]`.
+  , st `eqType` inst_meth_ty
+  = do { sv <- newSysLocalDs mult1 st
+       ; k  <- newSysLocalDs mult2 dt_to_r
+       ; pure $ mkLams [sv, k] $ Var k `App` Cast (Var sv) (mkSymCo co) }
+
+  | otherwise
+  = errDsCoreExpr $ hang (text "Invalid instantiation of" <+>
+                          quotes (ppr withDictName) <+> text "at type:")
+                       4 (ppr wrapped_ty)
+
+{- Note [withDict]
+~~~~~~~~~~~~~~~~~~
+The identifier `withDict` is just a place-holder, which is used to
+implement a primitive that we cannot define in Haskell but we can write
+in Core.  It is declared with a place-holder type:
+
+    withDict :: forall {rr :: RuntimeRep} st dt (r :: TYPE rr). st -> (dt => r) -> r
+
+The intention is that the identifier will be used in a very specific way,
+to create dictionaries for classes with a single method.  Consider a class
+like this:
+
+   class C a where
+     f :: T a
+
+We can use `withDict`, in conjunction with a special case in the desugarer, to
+cast values of type `T a` into dictionaries for `C a`. To do this, we can
+define a function like this in the library:
+
+  withT :: T a -> (C a => b) -> b
+  withT t k = withDict @(T a) @(C a) t k
+
+Here:
+
+* The `dt` in `withDict` (short for "dictionary type") is instantiated to
+  `C a`.
+
+* The `st` in `withDict` (short for "singleton type") is instantiated to
+  `T a`. The definition of `T` itself is irrelevant, only that `C a` is a class
+  with a single method of type `T a`.
+
+* The `r` in `withDict` is instantiated to `b`.
+
+There is a special case in dsHsWrapped.go_head which will replace the RHS
+of this definition with an appropriate definition in Core. The special case
+rewrites applications of `withDict` as follows:
+
+  withDict @{rr} @mtype @(C t_1 ... t_n) @r
+---->
+  \(sv :: mtype) (k :: C t_1 ... t_n => r) -> k (sv |> sym (co t_1 ... t_n))
+
+Where:
+
+* The `C t_1 ... t_n` argument to withDict is a class constraint.
+
+* C must be defined as:
+
+    class C a_1 ... a_n where
+      op :: meth_type
+
+  That is, C must be a class with exactly one method and no superclasses.
+
+* The `mtype` argument to withDict must be equal to `meth_type[t_i/a_i]`,
+  which is instantied type of C's method.
+
+* `co` is a newtype coercion that, when applied to `t_1 ... t_n`, coerces from
+  `C t_1 ... t_n` to `mtype`. This coercion is guaranteed to exist by virtue of
+  the fact that C is a class with exactly one method and no superclasses, so it
+  is treated like a newtype when compiled to Core.
+
+These requirements are implemented in the guards in ds_withDict's definition.
+
+Some further observations about `withDict`:
+
+* Every use of `withDict` must be instantiated at a /particular/ class C.
+  It's a bit like levity polymorphism: we don't allow class-polymorphic
+  calls of `withDict`. We check this in the desugarer -- and then we
+  can immediately replace this invocation of `withDict` with appropriate
+  class-specific Core code.
+
+* The `dt` in the type of withDict must be explicitly instantiated with
+  visible type application, as invoking `withDict` would be ambiguous
+  otherwise.
+
+* For examples of how `withDict` is used in the `base` library, see `withSNat`
+  in GHC.TypeNats, as well as `withSChar` and `withSSymbol` n GHC.TypeLits.
+
+* The `r` is levity polymorphic to support things like `withTypeable` in
+  `Data.Typeable.Internal`.
+
+* As an alternative to `withDict`, one could define functions like `withT`
+  above in terms of `unsafeCoerce`. This is more error-prone, however.
+
+* In order to define things like `reifySymbol` below:
+
+    reifySymbol :: forall r. String -> (forall (n :: Symbol). KnownSymbol n => r) -> r
+
+  `withDict` needs to be instantiated with `Any`, like so:
+
+    reifySymbol n k = withDict @String @(KnownSymbol Any) @r n (k @Any)
+
+  The use of `Any` is explained in Note [NOINLINE someNatVal] in
+  base:GHC.TypeNats.
+
+* The only valid way to apply `withDict` is as described above. Applying
+  `withDict` in any other way will result in a non-recoverable error during
+  desugaring. In other words, GHC will never execute the `withDict` function
+  in compiled code.
+
+  In theory, this means that we don't need to define a binding for `withDict`
+  in GHC.Magic.Dict. In practice, we define a binding anyway, for two reasons:
+
+    - To give it Haddocks, and
+    - To define the type of `withDict`, which GHC can find in
+      GHC.Magic.Dict.hi.
+
+  Because we define a binding for `withDict`, we have to provide a right-hand
+  side for its definition. We somewhat arbitrarily choose:
+
+    withDict = panicError "Non rewritten withDict"#
+
+  This should never be reachable anyway, but just in case ds_withDict fails
+  to rewrite away `withDict`, this ensures that the program won't get very far.
+
+* One could conceivably implement this special case for `withDict` as a
+  constant-folding rule instead of during desugaring. We choose not to do so
+  for the following reasons:
+
+  - Having a constant-folding rule would require that `withDict`'s definition
+    be wired in to the compiler so as to prevent `withDict` from inlining too
+    early. Implementing the special case in the desugarer, on the other hand,
+    only requires that `withDict` be known-key.
+
+  - If the constant-folding rule were to fail, we want to throw a compile-time
+    error, which is trickier to do with the way that GHC.Core.Opt.ConstantFold
+    is set up.
+-}
 
 -- | Takes a (pretty-printed) expression, a function, and its
 -- instantiated type.  If the function is a hasNoBinding op, and the
 -- type has levity-polymorphic arguments, issue an error.
 -- Note [Checking for levity-polymorphic functions]
-checkLevPolyFunction :: SDoc -> Id -> Type -> DsM ()
-checkLevPolyFunction pp_hs_expr var ty
-  | let bad_tys = isBadLevPolyFunction var ty
+checkLevPolyFunction :: Outputable e => e -> Id -> Type -> DsM ()
+checkLevPolyFunction orig_hs_expr var ty
+  | hasNoBinding var
+  = checkLevPolyArgs orig_hs_expr ty
+  | otherwise
+  = return ()
+
+checkLevPolyArgs :: Outputable e => e -> Type -> DsM ()
+-- Check that there are no levity-polymorphic arguments in
+-- the supplied type
+-- E.g. Given (forall a. t1 -> t2 -> blah), ensure that t1,t2
+--      are not levity-polymorhic
+--
+-- Pass orig_hs_expr, so that the user can see entire thing
+-- Note [Checking for levity-polymorphic functions]
+checkLevPolyArgs orig_hs_expr ty
+  | let (binders, _) = splitPiTys ty
+        arg_tys      = mapMaybe binderRelevantType_maybe binders
+        bad_tys      = filter isTypeLevPoly arg_tys
   , not (null bad_tys)
   = errDs $ vcat
     [ hang (text "Cannot use function with levity-polymorphic arguments:")
-         2 (pp_hs_expr <+> dcolon <+> pprWithTYPE ty)
+         2 (hang (ppr orig_hs_expr) 2 (dcolon <+> pprWithTYPE ty))
     , ppUnlessOption sdocPrintTypecheckerElaboration $ vcat
         [ text "(Note that levity-polymorphic primops such as 'coerce' and unboxed tuples"
         , text "are eta-expanded internally because they must occur fully saturated."
@@ -1205,18 +1492,4 @@ checkLevPolyFunction pp_hs_expr var ty
            bad_tys
     ]
 
-checkLevPolyFunction _ _ _ = return ()
-
--- | Is this a hasNoBinding Id with a levity-polymorphic type?
--- Returns the arguments that are levity polymorphic if they are bad;
--- or an empty list otherwise
--- Note [Checking for levity-polymorphic functions]
-isBadLevPolyFunction :: Id -> Type -> [Type]
-isBadLevPolyFunction id ty
-  | hasNoBinding id
-  = filter isTypeLevPoly arg_tys
-  | otherwise
-  = []
-  where
-    (binders, _) = splitPiTys ty
-    arg_tys      = mapMaybe binderRelevantType_maybe binders
+  | otherwise = return ()

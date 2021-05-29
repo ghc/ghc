@@ -326,34 +326,40 @@ instance  Real Int  where
 instance  Integral Int  where
     toInteger (I# i) = IS i
 
+    {-# INLINE quot #-} -- see Note [INLINE division wrappers] in GHC.Base
     a `quot` b
      | b == 0                     = divZeroError
      | b == (-1) && a == minBound = overflowError -- Note [Order of tests]
                                                   -- in GHC.Int
      | otherwise                  =  a `quotInt` b
 
+    {-# INLINE rem #-} -- see Note [INLINE division wrappers] in GHC.Base
     !a `rem` b -- See Note [Special case of mod and rem is lazy]
      | b == 0                     = divZeroError
      | b == (-1)                  = 0
      | otherwise                  =  a `remInt` b
 
+    {-# INLINE div #-} -- see Note [INLINE division wrappers] in GHC.Base
     a `div` b
      | b == 0                     = divZeroError
      | b == (-1) && a == minBound = overflowError -- Note [Order of tests]
                                                   -- in GHC.Int
      | otherwise                  =  a `divInt` b
 
+    {-# INLINE mod #-} -- see Note [INLINE division wrappers] in GHC.Base
     !a `mod` b -- See Note [Special case of mod and rem is lazy]
      | b == 0                     = divZeroError
      | b == (-1)                  = 0
      | otherwise                  =  a `modInt` b
 
+    {-# INLINE quotRem #-} -- see Note [INLINE division wrappers] in GHC.Base
     a `quotRem` b
      | b == 0                     = divZeroError
        -- Note [Order of tests] in GHC.Int
      | b == (-1) && a == minBound = (overflowError, 0)
      | otherwise                  =  a `quotRemInt` b
 
+    {-# INLINE divMod #-} -- see Note [INLINE division wrappers] in GHC.Base
     a `divMod` b
      | b == 0                     = divZeroError
        -- Note [Order of tests] in GHC.Int
@@ -379,26 +385,38 @@ instance Real Word where
 
 -- | @since 2.01
 instance Integral Word where
+    {-# INLINE quot #-} -- see Note [INLINE division wrappers] in GHC.Base
     quot    (W# x#) y@(W# y#)
         | y /= 0                = W# (x# `quotWord#` y#)
         | otherwise             = divZeroError
+
+    {-# INLINE rem #-} -- see Note [INLINE division wrappers] in GHC.Base
     rem     (W# x#) y@(W# y#)
         | y /= 0                = W# (x# `remWord#` y#)
         | otherwise             = divZeroError
+
+    {-# INLINE div #-} -- see Note [INLINE division wrappers] in GHC.Base
     div     (W# x#) y@(W# y#)
         | y /= 0                = W# (x# `quotWord#` y#)
         | otherwise             = divZeroError
+
+    {-# INLINE mod #-} -- see Note [INLINE division wrappers] in GHC.Base
     mod     (W# x#) y@(W# y#)
         | y /= 0                = W# (x# `remWord#` y#)
         | otherwise             = divZeroError
+
+    {-# INLINE quotRem #-} -- see Note [INLINE division wrappers] in GHC.Base
     quotRem (W# x#) y@(W# y#)
         | y /= 0                = case x# `quotRemWord#` y# of
                                   (# q, r #) ->
                                       (W# q, W# r)
         | otherwise             = divZeroError
+
+    {-# INLINE divMod #-} -- see Note [INLINE division wrappers] in GHC.Base
     divMod  (W# x#) y@(W# y#)
         | y /= 0                = (W# (x# `quotWord#` y#), W# (x# `remWord#` y#))
         | otherwise             = divZeroError
+
     toInteger (W# x#)           = integerFromWord# x#
 
 --------------------------------------------------------------

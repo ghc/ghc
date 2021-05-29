@@ -141,21 +141,21 @@ mapMaybeRule [InlPrag=[2]]
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (@a) (@b) (w [Occ=Once1!] :: Rule IO a b) ->
-                 case w of { Rule @s ww1 ww2 [Occ=OnceL1!] ->
+                 case w of { Rule @s ww ww1 [Occ=OnceL1!] ->
                  T18013a.Rule
                    @IO
                    @(Maybe a)
                    @(Maybe b)
                    @s
-                   ww1
+                   ww
                    ((\ (s2 [Occ=Once1] :: s)
                        (a1 [Occ=Once1!] :: Maybe a)
                        (s1 [Occ=Once2] :: GHC.Prim.State# GHC.Prim.RealWorld) ->
                        case a1 of {
                          Nothing ->
-                           (# s1, T18013a.Result @s @(Maybe b) ww1 (GHC.Maybe.Nothing @b) #);
+                           (# s1, T18013a.Result @s @(Maybe b) ww (GHC.Maybe.Nothing @b) #);
                          Just x [Occ=Once1] ->
-                           case ((ww2 s2 x) `cast` <Co:4>) s1 of
+                           case ((ww1 s2 x) `cast` <Co:4>) s1 of
                            { (# ipv [Occ=Once1], ipv1 [Occ=Once1!] #) ->
                            case ipv1 of { Result t2 [Occ=Once1] c1 [Occ=Once1] ->
                            (# ipv, T18013a.Result @s @(Maybe b) t2 (GHC.Maybe.Just @b c1) #)
@@ -166,24 +166,24 @@ mapMaybeRule [InlPrag=[2]]
                  }}]
 mapMaybeRule
   = \ (@a) (@b) (w :: Rule IO a b) ->
-      case w of { Rule @s ww1 ww2 ->
+      case w of { Rule @s ww ww1 ->
       let {
         lvl :: Result s (Maybe b)
         [LclId, Unf=OtherCon []]
-        lvl = T18013a.Result @s @(Maybe b) ww1 (GHC.Maybe.Nothing @b) } in
+        lvl = T18013a.Result @s @(Maybe b) ww (GHC.Maybe.Nothing @b) } in
       T18013a.Rule
         @IO
         @(Maybe a)
         @(Maybe b)
         @s
-        ww1
+        ww
         ((\ (s2 :: s)
             (a1 :: Maybe a)
             (s1 :: GHC.Prim.State# GHC.Prim.RealWorld) ->
             case a1 of {
               Nothing -> (# s1, lvl #);
               Just x ->
-                case ((ww2 s2 x) `cast` <Co:4>) s1 of { (# ipv, ipv1 #) ->
+                case ((ww1 s2 x) `cast` <Co:4>) s1 of { (# ipv, ipv1 #) ->
                 case ipv1 of { Result t2 c1 ->
                 (# ipv, T18013a.Result @s @(Maybe b) t2 (GHC.Maybe.Just @b c1) #)
                 }

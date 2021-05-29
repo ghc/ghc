@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -14,8 +14,6 @@
 -- let-no-escapes.
 
 module GHC.CoreToStg ( coreToStg ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -43,9 +41,10 @@ import GHC.Builtin.Types ( unboxedUnitDataCon )
 import GHC.Types.Literal
 import GHC.Utils.Outputable
 import GHC.Utils.Monad
+import GHC.Utils.Misc (HasDebugCallStack)
 import GHC.Data.FastString
-import GHC.Utils.Misc
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Driver.Session
 import GHC.Platform.Ways
 import GHC.Driver.Ppr
@@ -54,7 +53,6 @@ import GHC.Types.IPE
 import GHC.Types.Demand    ( isUsedOnceDmd )
 import GHC.Builtin.PrimOps ( PrimCall(..) )
 import GHC.Types.SrcLoc    ( mkGeneralSrcSpan )
-import GHC.Builtin.Names   ( unsafeEqualityProofName )
 
 import Control.Monad (ap)
 import Data.Maybe (fromMaybe)
@@ -269,12 +267,13 @@ coreTopBindsToStg
 coreTopBindsToStg _      _        env ccs []
   = (env, ccs, [])
 coreTopBindsToStg dflags this_mod env ccs (b:bs)
+  | NonRec _ rhs <- b, isTyCoArg rhs
+  = coreTopBindsToStg dflags this_mod env1 ccs1 bs
+  | otherwise
   = (env2, ccs2, b':bs')
   where
-        (env1, ccs1, b' ) =
-          coreTopBindToStg dflags this_mod env ccs b
-        (env2, ccs2, bs') =
-          coreTopBindsToStg dflags this_mod env1 ccs1 bs
+    (env1, ccs1, b' ) = coreTopBindToStg dflags this_mod env ccs b
+    (env2, ccs2, bs') = coreTopBindsToStg dflags this_mod env1 ccs1 bs
 
 coreTopBindToStg
         :: DynFlags
@@ -311,7 +310,7 @@ coreTopBindToStg dflags this_mod env ccs (NonRec id rhs)
     (env', ccs', bind)
 
 coreTopBindToStg dflags this_mod env ccs (Rec pairs)
-  = ASSERT( not (null pairs) )
+  = assert (not (null pairs)) $
     let
         binders = map fst pairs
 
@@ -344,7 +343,7 @@ coreToTopStgRhs dflags ccs this_mod (bndr, rhs)
              stg_arity =
                stgRhsArity stg_rhs
 
-       ; return (ASSERT2( arity_ok stg_arity, mk_arity_msg stg_arity) stg_rhs,
+       ; return (assertPpr (arity_ok stg_arity) (mk_arity_msg stg_arity) stg_rhs,
                  ccs') }
   where
         -- It's vital that the arity on a top-level Id matches
@@ -375,7 +374,7 @@ coreToTopStgRhs dflags ccs this_mod (bndr, rhs)
 -- handle with the function coreToPreStgRhs.
 
 coreToStgExpr
-        :: CoreExpr
+        :: HasDebugCallStack => CoreExpr
         -> CtsM StgExpr
 
 -- The second and third components can be derived in a simple bottom up pass, not
@@ -389,17 +388,18 @@ coreToStgExpr
 coreToStgExpr (Lit (LitNumber LitNumInteger _)) = panic "coreToStgExpr: LitInteger"
 coreToStgExpr (Lit (LitNumber LitNumNatural _)) = panic "coreToStgExpr: LitNatural"
 coreToStgExpr (Lit l)                           = return (StgLit l)
-coreToStgExpr (App l@(Lit LitRubbish{}) Type{}) = coreToStgExpr l
 coreToStgExpr (Var v) = coreToStgApp v [] []
 coreToStgExpr (Coercion _)
   -- See Note [Coercion tokens]
   = coreToStgApp coercionTokenId [] []
 
 coreToStgExpr expr@(App _ _)
-  = coreToStgApp f args ticks
-  where
-    (f, args, ticks) = myCollectArgs expr
-
+  = case app_head of
+      Var f               -> coreToStgApp f args ticks -- Regular application
+      Lit l@LitRubbish{}  -> return (StgLit l) -- LitRubbish
+      _                   -> pprPanic "coreToStgExpr - Invalid app head:" (ppr expr)
+    where
+      (app_head, args, ticks) = myCollectArgs expr
 coreToStgExpr expr@(Lam _ _)
   = let
         (args, body) = myCollectBinders expr
@@ -422,6 +422,7 @@ coreToStgExpr (Cast expr _)
 
 -- Cases require a little more real work.
 
+{-
 coreToStgExpr (Case scrut _ _ [])
   = coreToStgExpr scrut
     -- See Note [Empty case alternatives] in GHC.Core If the case
@@ -433,25 +434,20 @@ coreToStgExpr (Case scrut _ _ [])
     -- code generator, and put a return point anyway that calls a
     -- runtime system error function.
 
-
-coreToStgExpr e0@(Case scrut bndr _ alts) = do
-    alts2 <- extendVarEnvCts [(bndr, LambdaBound)] (mapM vars_alt alts)
-    scrut2 <- coreToStgExpr scrut
-    let stg = StgCase scrut2 bndr (mkStgAltType bndr alts) alts2
+coreToStgExpr e0@(Case scrut bndr _ [alt]) = do
+  | isUnsafeEqualityProof scrut
+  , isDeadBinder bndr -- We can only discard the case if the case-binder is dead
+                      -- It usually is, but see #18227
+  , (_,_,rhs) <- alt
+  = coreToStgExpr rhs
     -- See (U2) in Note [Implementing unsafeCoerce] in base:Unsafe.Coerce
-    case scrut2 of
-      StgApp id [] | idName id == unsafeEqualityProofName
-                   , isDeadBinder bndr ->
-        -- We can only discard the case if the case-binder is dead
-        -- It usually is, but see #18227
-        case alts2 of
-          [(_, [_co], rhs)] ->
-            return rhs
-          _ ->
-            pprPanic "coreToStgExpr" $
-              text "Unexpected unsafe equality case expression:" $$ ppr e0 $$
-              text "STG:" $$ pprStgExpr panicStgPprOpts stg
-      _ -> return stg
+-}
+
+-- The normal case for case-expressions
+coreToStgExpr (Case scrut bndr _ alts)
+  = do { scrut2 <- coreToStgExpr scrut
+       ; alts2 <- extendVarEnvCts [(bndr, LambdaBound)] (mapM vars_alt alts)
+       ; return (StgCase scrut2 bndr (mkStgAltType bndr alts) alts2) }
   where
     vars_alt :: CoreAlt -> CtsM (AltCon, [Var], StgExpr)
     vars_alt (Alt con binders rhs)
@@ -459,7 +455,7 @@ coreToStgExpr e0@(Case scrut bndr _ alts) = do
       = -- This case is a bit smelly.
         -- See Note [Nullary unboxed tuple] in GHC.Core.Type
         -- where a nullary tuple is mapped to (State# World#)
-        ASSERT( null binders )
+        assert (null binders) $
         do { rhs2 <- coreToStgExpr rhs
            ; return (DEFAULT, [], rhs2)  }
       | otherwise
@@ -485,8 +481,7 @@ mkStgAltType bndr alts
           Just tc
             | isAbstractTyCon tc -> look_for_better_tycon
             | isAlgTyCon tc      -> AlgAlt tc
-            | otherwise          -> ASSERT2( _is_poly_alt_tycon tc, ppr tc )
-                                    PolyAlt
+            | otherwise          -> assertPpr (_is_poly_alt_tycon tc) (ppr tc) PolyAlt
           Nothing                -> PolyAlt
       [non_gcd] -> PrimAlt non_gcd
       not_unary -> MultiValAlt (length not_unary)
@@ -509,7 +504,7 @@ mkStgAltType bndr alts
         | ((Alt (DataAlt con) _ _) : _) <- data_alts =
                 AlgAlt (dataConTyCon con)
         | otherwise =
-                ASSERT(null data_alts)
+                assert (null data_alts)
                 PolyAlt
         where
                 (data_alts, _deflt) = findDefault alts
@@ -548,17 +543,17 @@ coreToStgApp f args ticks = do
                 -- Some primitive operator that might be implemented as a library call.
                 -- As noted by Note [Eta expanding primops] in GHC.Builtin.PrimOps
                 -- we require that primop applications be saturated.
-                PrimOpId op      -> ASSERT( saturated )
+                PrimOpId op      -> assert saturated $
                                     StgOpApp (StgPrimOp op) args' res_ty
 
                 -- A call to some primitive Cmm function.
                 FCallId (CCall (CCallSpec (StaticTarget _ lbl (Just pkgId) True)
                                           PrimCallConv _))
-                                 -> ASSERT( saturated )
+                                 -> assert saturated $
                                     StgOpApp (StgPrimCallOp (PrimCall lbl pkgId)) args' res_ty
 
                 -- A regular foreign call.
-                FCallId call     -> ASSERT( saturated )
+                FCallId call     -> assert saturated $
                                     StgOpApp (StgFCallOp call (idType f)) args' res_ty
 
                 TickBoxOpId {}   -> pprPanic "coreToStg TickBox" $ ppr (f,args')
@@ -589,7 +584,7 @@ coreToStgArgs (Coercion _ : args) -- Coercion argument; See Note [Coercion token
        ; return (StgVarArg coercionTokenId : args', ts) }
 
 coreToStgArgs (Tick t e : args)
-  = ASSERT( not (tickishIsCode t) )
+  = assert (not (tickishIsCode t)) $
     do { (args', ts) <- coreToStgArgs (e : args)
        ; let !t' = coreToStgTick (exprType e) t
        ; return (args', t':ts) }
@@ -621,7 +616,7 @@ coreToStgArgs (arg : args) = do         -- Non-type argument
         stg_arg_rep = typePrimRep (stgArgType stg_arg)
         bad_args = not (primRepsCompatible platform arg_rep stg_arg_rep)
 
-    WARN( bad_args, text "Dangerous-looking argument. Probable cause: bad unsafeCoerce#" $$ ppr arg )
+    warnPprTrace bad_args (text "Dangerous-looking argument. Probable cause: bad unsafeCoerce#" $$ ppr arg) $
      return (stg_arg : stg_args, ticks ++ aticks)
 
 coreToStgTick :: Type -- type of the ticked expression
@@ -641,25 +636,24 @@ coreToStgLet
          -> CoreExpr     -- body
          -> CtsM StgExpr -- new let
 
-coreToStgLet bind body = do
-    (bind2, body2)
-       <- do
+coreToStgLet bind body
+  | NonRec _ rhs <- bind, isTyCoArg rhs
+  = coreToStgExpr body
 
-          ( bind2, env_ext)
-                <- vars_bind bind
+  | otherwise
+  = do { (bind2, env_ext) <- vars_bind bind
 
           -- Do the body
-          extendVarEnvCts env_ext $ do
-             body2 <- coreToStgExpr body
-
-             return (bind2, body2)
+         ; body2 <- extendVarEnvCts env_ext $
+                    coreToStgExpr body
 
         -- Compute the new let-expression
-    let
-        new_let | isJoinBind bind = StgLetNoEscape noExtFieldSilent bind2 body2
-                | otherwise       = StgLet noExtFieldSilent bind2 body2
+        ; let new_let | isJoinBind bind
+                      = StgLetNoEscape noExtFieldSilent bind2 body2
+                      | otherwise
+                      = StgLet noExtFieldSilent bind2 body2
 
-    return new_let
+        ; return new_let }
   where
     mk_binding binder rhs
         = (binder, LetBound NestedLet (manifestArity rhs))
@@ -697,7 +691,7 @@ data PreStgRhs = PreStgRhs [Id] StgExpr -- The [Id] is empty for thunks
 
 -- Convert the RHS of a binding from Core to STG. This is a wrapper around
 -- coreToStgExpr that can handle value lambdas.
-coreToPreStgRhs :: CoreExpr -> CtsM PreStgRhs
+coreToPreStgRhs :: HasDebugCallStack => CoreExpr -> CtsM PreStgRhs
 coreToPreStgRhs (Cast expr _) = coreToPreStgRhs expr
 coreToPreStgRhs expr@(Lam _ _) =
     let
@@ -729,8 +723,8 @@ mkTopStgRhs dflags this_mod ccs bndr (PreStgRhs bndrs rhs)
   , -- Dynamic StgConApps are updatable
     not (isDllConApp dflags this_mod con args)
   = -- CorePrep does this right, but just to make sure
-    ASSERT2( not (isUnboxedTupleDataCon con || isUnboxedSumDataCon con)
-           , ppr bndr $$ ppr con $$ ppr args)
+    assertPpr (not (isUnboxedTupleDataCon con || isUnboxedSumDataCon con))
+              (ppr bndr $$ ppr con $$ ppr args)
     ( StgRhsCon dontCareCCS con mn ticks args, ccs )
 
   -- Otherwise it's a CAF, see Note [Cost-centre initialization plan].
@@ -776,8 +770,10 @@ mkStgRhs bndr (PreStgRhs bndrs rhs)
 
   -- After this point we know that `bndrs` is empty,
   -- so this is not a function binding
-  | isJoinId bndr -- must be a nullary join point
-  = ASSERT(idJoinArity bndr == 0)
+
+  | isJoinId bndr -- Must be a nullary join point
+  = -- It might have /type/ arguments (T18328),
+    -- so its JoinArity might be >0
     StgRhsClosure noExtFieldSilent
                   currentCCS
                   ReEntrant -- ignored for LNE
@@ -932,7 +928,7 @@ lookupVarCts v = CtsM $ \_ env -> lookupBinding env v
 lookupBinding :: IdEnv HowBound -> Id -> HowBound
 lookupBinding env v = case lookupVarEnv env v of
                         Just xx -> xx
-                        Nothing -> ASSERT2( isGlobalId v, ppr v ) ImportBound
+                        Nothing -> assertPpr (isGlobalId v) (ppr v) ImportBound
 
 getAllCAFsCC :: Module -> (CostCentre, CostCentreStack)
 getAllCAFsCC this_mod =
@@ -956,22 +952,22 @@ myCollectBinders expr
     go bs (Cast e _)         = go bs e
     go bs e                  = (reverse bs, e)
 
--- | Precondition: argument expression is an 'App', and there is a 'Var' at the
--- head of the 'App' chain.
-myCollectArgs :: CoreExpr -> (Id, [CoreArg], [CoreTickish])
+-- | If the argument expression is (potential chain of) 'App', return the head
+-- of the app chain, and collect ticks/args along the chain.
+myCollectArgs :: HasDebugCallStack => CoreExpr -> (CoreExpr, [CoreArg], [CoreTickish])
 myCollectArgs expr
   = go expr [] []
   where
-    go (Var v)          as ts = (v, as, ts)
+    go h@(Var _v)       as ts = (h, as, ts)
     go (App f a)        as ts = go f (a:as) ts
-    go (Tick t e)       as ts = ASSERT2( not (tickishIsCode t) || all isTypeArg as
-                                       , ppr e $$ ppr as $$ ppr ts )
+    go (Tick t e)       as ts = assertPpr (not (tickishIsCode t) || all isTypeArg as)
+                                          (ppr e $$ ppr as $$ ppr ts) $
                                 -- See Note [Ticks in applications]
                                 go e as (t:ts) -- ticks can appear in type apps
     go (Cast e _)       as ts = go e as ts
     go (Lam b e)        as ts
        | isTyVar b            = go e as ts -- Note [Collect args]
-    go _                _  _  = pprPanic "CoreToStg.myCollectArgs" (ppr expr)
+    go e                as ts = (e, as, ts)
 
 {- Note [Collect args]
 ~~~~~~~~~~~~~~~~~~~~~~

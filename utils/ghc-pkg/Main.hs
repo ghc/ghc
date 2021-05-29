@@ -78,6 +78,7 @@ import System.Exit ( exitWith, ExitCode(..) )
 import System.Environment ( getArgs, getProgName, getEnv )
 import System.IO
 import System.IO.Error
+import GHC.IO           ( catchException )
 import GHC.IO.Exception (IOErrorType(InappropriateType))
 import Data.List ( group, sort, sortBy, nub, partition, find
                  , intercalate, intersperse, foldl', unfoldr
@@ -750,7 +751,7 @@ getPkgDatabases verbosity mode use_user use_cache expand_vars my_flags = do
                 else do
                   db <- readParseDatabase verbosity mb_user_conf
                                           mode use_cache db_path
-                    `Exception.catch` couldntOpenDbForModification db_path
+                    `catchException` couldntOpenDbForModification db_path
                   let ro_db = db { packageDbLock = GhcPkg.DbOpenReadOnly }
                   return (ro_db, Just db)
           | db_path <- final_stack ]
@@ -2236,7 +2237,7 @@ installSignalHandlers = do
 #endif
 
 catchIO :: IO a -> (Exception.IOException -> IO a) -> IO a
-catchIO = Exception.catch
+catchIO = catchException
 
 tryIO :: IO a -> IO (Either Exception.IOException a)
 tryIO = Exception.try

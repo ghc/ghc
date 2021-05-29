@@ -6,7 +6,6 @@ module GHC.CmmToAsm.Dwarf.Constants where
 import GHC.Prelude
 
 import GHC.Utils.Asm
-import GHC.Data.FastString
 import GHC.Platform
 import GHC.Utils.Outputable
 
@@ -165,11 +164,11 @@ dwarfSection platform name =
        -> text "\t.section .debug_" <> text name <> text ",\"dr\""
 
 -- * Dwarf section labels
-dwarfInfoLabel, dwarfAbbrevLabel, dwarfLineLabel, dwarfFrameLabel :: PtrString
-dwarfInfoLabel   = sLit ".Lsection_info"
-dwarfAbbrevLabel = sLit ".Lsection_abbrev"
-dwarfLineLabel   = sLit ".Lsection_line"
-dwarfFrameLabel  = sLit ".Lsection_frame"
+dwarfInfoLabel, dwarfAbbrevLabel, dwarfLineLabel, dwarfFrameLabel :: SDoc
+dwarfInfoLabel   = text ".Lsection_info"
+dwarfAbbrevLabel = text ".Lsection_abbrev"
+dwarfLineLabel   = text ".Lsection_line"
+dwarfFrameLabel  = text ".Lsection_frame"
 
 -- | Mapping of registers to DWARF register numbers
 dwarfRegNo :: Platform -> Reg -> Word8

@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP                        #-}
+
 {-# LANGUAGE DeriveFunctor              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RecordWildCards            #-}
@@ -12,8 +12,6 @@
 
 -- | GHC.StgToByteCode: Generate bytecode from STG
 module GHC.StgToByteCode ( UnlinkedBCO, byteCodeGen, stgExprToBCOs ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -60,6 +58,8 @@ import GHC.Builtin.Uniques
 import GHC.Builtin.Utils ( primOpId )
 import GHC.Data.FastString
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
+import GHC.Utils.Exception (evaluate)
 import GHC.StgToCmm.Closure ( NonVoid(..), fromNonVoid, nonVoidIds )
 import GHC.StgToCmm.Layout
 import GHC.Runtime.Heap.Layout hiding (WordOff, ByteOff, wordsToBytes)
@@ -78,7 +78,6 @@ import Data.Char
 import GHC.Types.Unique.Supply
 import GHC.Unit.Module
 
-import Control.Exception
 import Data.Array
 import Data.Coerce (coerce)
 import Data.ByteString (ByteString)
@@ -466,7 +465,7 @@ schemeR :: [Id]                 -- Free vars of the RHS, ordered as they
 schemeR fvs (nm, rhs)
    = schemeR_wrk fvs nm rhs (collect rhs)
 
--- If an expression is a lambda (after apply bcView), return the
+-- If an expression is a lambda, return the
 -- list of arguments to the lambda (in R-to-L order) and the
 -- underlying expression
 
@@ -633,7 +632,7 @@ returnUnboxedTuple d s p es = do
         (tuple_info, tuple_components) = layoutTuple profile d arg_ty es
         go _   pushes [] = return (reverse pushes)
         go !dd pushes ((a, off):cs) = do (push, szb) <- pushAtom dd p a
-                                         MASSERT(off == dd + szb)
+                                         massert (off == dd + szb)
                                          go (dd + szb) (push:pushes) cs
     pushes <- go d [] tuple_components
     ret <- returnUnboxedReps d
@@ -760,7 +759,7 @@ isNNLJoinPoint x = isJoinId x &&
 -- See Note [Not-necessarily-lifted join points]
 protectNNLJoinPointId :: Id -> Id
 protectNNLJoinPointId x
-  = ASSERT( isNNLJoinPoint x )
+  = assert (isNNLJoinPoint x )
     updateIdTypeButNotMult (unboxedUnitTy `mkVisFunTyMany`) x
 
 {-
@@ -949,10 +948,10 @@ doTailCall init_d s p fn args = do
    do_pushes init_d args (map (atomRep platform) args)
   where
   do_pushes !d [] reps = do
-        ASSERT( null reps ) return ()
+        assert (null reps ) return ()
         (push_fn, sz) <- pushAtom d p (StgVarArg fn)
         platform <- profilePlatform <$> getProfile
-        ASSERT( sz == wordSize platform ) return ()
+        assert (sz == wordSize platform ) return ()
         let slide = mkSlideB platform (d - init_d + wordSize platform) (init_d - s)
         return (push_fn `appOL` (slide `appOL` unitOL ENTER))
   do_pushes !d args reps = do
@@ -1134,7 +1133,7 @@ doCase d s p scrut bndr alts
                         | (NonVoid arg, offset) <- args_offsets ]
                         p_alts
              in do
-             MASSERT(isAlgCase)
+             massert isAlgCase
              rhs_code <- schemeE stack_bot s p' rhs
              return (my_discr alt,
                      unitOL (UNPACK (trunc16W size)) `appOL` rhs_code)
@@ -1263,28 +1262,31 @@ layoutTuple profile start_off arg_ty reps =
       orig_stk_params = [(x, fromIntegral off) | (x, StackParam off) <- pos]
 
       -- sort the register parameters by register and add them to the stack
+      regs_order :: Map.Map GlobalReg Int
+      regs_order = Map.fromList $ zip (tupleRegsCover platform) [0..]
+
+      reg_order :: GlobalReg -> (Int, GlobalReg)
+      reg_order reg | Just n <- Map.lookup reg regs_order = (n, reg)
+      -- a VanillaReg goes to the same place regardless of whether it
+      -- contains a pointer
+      reg_order (VanillaReg n VNonGcPtr) = reg_order (VanillaReg n VGcPtr)
+      -- if we don't have a position for a FloatReg then they must be passed
+      -- in the equivalent DoubleReg
+      reg_order (FloatReg n) = reg_order (DoubleReg n)
+      -- one-tuples can be passed in other registers, but then we don't need
+      -- to care about the order
+      reg_order reg          = (0, reg)
+
       (regs, reg_params)
           = unzip $ sortBy (comparing fst)
-                           [(reg, x) | (x, RegisterParam reg) <- pos]
+                           [(reg_order reg, x) | (x, RegisterParam reg) <- pos]
 
       (new_stk_bytes, new_stk_params) = assignStack platform
                                                     orig_stk_bytes
                                                     arg_ty
                                                     reg_params
 
-      -- make live register bitmaps
-      bmp_reg r ~(v, f, d, l)
-        = case r of VanillaReg n _ -> (a v n, f,     d,     l    )
-                    FloatReg n     -> (v,     a f n, d,     l    )
-                    DoubleReg n    -> (v,     f,     a d n, l    )
-                    LongReg n      -> (v,     f,     d,     a l n)
-                    _              ->
-                      pprPanic "GHC.StgToByteCode.layoutTuple unsupported register type"
-                               (ppr r)
-              where a bmp n = bmp .|. (1 `shiftL` (n-1))
-
-      (vanilla_regs, float_regs, double_regs, long_regs)
-          = foldr bmp_reg (0, 0, 0, 0) regs
+      regs_set = mkRegSet (map snd regs)
 
       get_byte_off (x, StackParam y) = (x, fromIntegral y)
       get_byte_off _                 =
@@ -1292,10 +1294,7 @@ layoutTuple profile start_off arg_ty reps =
 
   in ( TupleInfo
          { tupleSize        = bytesToWords platform (ByteOff new_stk_bytes)
-         , tupleVanillaRegs = vanilla_regs
-         , tupleLongRegs    = long_regs
-         , tupleFloatRegs   = float_regs
-         , tupleDoubleRegs  = double_regs
+         , tupleRegs        = regs_set
          , tupleNativeStackSize = bytesToWords platform
                                                (ByteOff orig_stk_bytes)
          }
@@ -1645,7 +1644,9 @@ primRepToFFIType platform r
      AddrRep     -> FFIPointer
      FloatRep    -> FFIFloat
      DoubleRep   -> FFIDouble
-     _           -> panic "primRepToFFIType"
+     LiftedRep   -> FFIPointer
+     UnliftedRep -> FFIPointer
+     _           -> pprPanic "primRepToFFIType" (ppr r)
   where
     (signed_word, unsigned_word) = case platformWordSize platform of
        PW4 -> (FFISInt32, FFIUInt32)
@@ -1656,19 +1657,21 @@ primRepToFFIType platform r
 mkDummyLiteral :: Platform -> PrimRep -> Literal
 mkDummyLiteral platform pr
    = case pr of
-        IntRep    -> mkLitInt  platform 0
-        WordRep   -> mkLitWord platform 0
-        Int8Rep   -> mkLitInt8 0
-        Word8Rep  -> mkLitWord8 0
-        Int16Rep  -> mkLitInt16 0
-        Word16Rep -> mkLitWord16 0
-        Int32Rep  -> mkLitInt32 0
-        Word32Rep -> mkLitWord32 0
-        Int64Rep  -> mkLitInt64 0
-        Word64Rep -> mkLitWord64 0
-        AddrRep   -> LitNullAddr
-        DoubleRep -> LitDouble 0
-        FloatRep  -> LitFloat 0
+        IntRep      -> mkLitInt  platform 0
+        WordRep     -> mkLitWord platform 0
+        Int8Rep     -> mkLitInt8 0
+        Word8Rep    -> mkLitWord8 0
+        Int16Rep    -> mkLitInt16 0
+        Word16Rep   -> mkLitWord16 0
+        Int32Rep    -> mkLitInt32 0
+        Word32Rep   -> mkLitWord32 0
+        Int64Rep    -> mkLitInt64 0
+        Word64Rep   -> mkLitWord64 0
+        AddrRep     -> LitNullAddr
+        DoubleRep   -> LitDouble 0
+        FloatRep    -> LitFloat 0
+        LiftedRep   -> LitNullAddr
+        UnliftedRep -> LitNullAddr
         _         -> pprPanic "mkDummyLiteral" (ppr pr)
 
 
@@ -1699,9 +1702,7 @@ maybe_getCCallReturnRep fn_ty
        case r_reps of
          []            -> panic "empty typePrimRepArgs"
          [VoidRep]     -> Nothing
-         [rep]
-           | isGcPtrRep rep -> blargh
-           | otherwise      -> Just rep
+         [rep]         -> Just rep
 
                  -- if it was, it would be impossible to create a
                  -- valid return value placeholder on the stack
@@ -1770,7 +1771,7 @@ implement_tagToId
     -> BcM BCInstrList
 -- See Note [Implementing tagToEnum#]
 implement_tagToId d s p arg names
-  = ASSERT( notNull names )
+  = assert (notNull names) $
     do (push_arg, arg_bytes) <- pushAtom d p (StgVarArg arg)
        labels <- getLabelsBc (genericLength names)
        label_fail <- getLabelBc
@@ -1863,7 +1864,7 @@ pushAtom d p (StgVarArg var)
               fromIntegral $ ptrToWordPtr $ fromRemotePtr ptr
             Nothing -> do
                 let sz = idSizeCon platform var
-                MASSERT( sz == wordSize platform )
+                massert (sz == wordSize platform)
                 return (unitOL (PUSH_G (getName var)), sz)
 
 

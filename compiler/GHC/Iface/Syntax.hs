@@ -3,7 +3,7 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 -}
 
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE LambdaCase #-}
 
 module GHC.Iface.Syntax (
@@ -41,8 +41,6 @@ module GHC.Iface.Syntax (
         AltPpr(..), ShowSub(..), ShowHowMuch(..), showToIface, showToHeader
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Builtin.Names ( unrestrictedFunTyConKey, liftedTypeKindTyConKey )
@@ -76,7 +74,7 @@ import GHC.Utils.Binary
 import GHC.Utils.Binary.Typeable ()
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Misc( dropList, filterByList, notNull, unzipWith, debugIsOn,
+import GHC.Utils.Misc( dropList, filterByList, notNull, unzipWith,
                        seqList, zipWithEqual )
 
 import Control.Monad
@@ -657,7 +655,7 @@ pprAxBranch pp_tc idx (IfaceAxBranch { ifaxbTyVars = tvs
                                      , ifaxbLHS = pat_tys
                                      , ifaxbRHS = rhs
                                      , ifaxbIncomps = incomps })
-  = ASSERT2( null _cvs, pp_tc $$ ppr _cvs )
+  = assertPpr (null _cvs) (pp_tc $$ ppr _cvs) $
     hang ppr_binders 2 (hang pp_lhs 2 (equals <+> ppr rhs))
     $+$
     nest 4 maybe_incomps
@@ -806,7 +804,7 @@ constraintIfaceKind =
 
 pprIfaceDecl :: ShowSub -> IfaceDecl -> SDoc
 -- NB: pprIfaceDecl is also used for pretty-printing TyThings in GHCi
---     See Note [Pretty-printing TyThings] in GHC.Types.TyThing.Ppr
+--     See Note [Pretty printing via Iface syntax] in GHC.Types.TyThing.Ppr
 pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
                              ifCtxt = context, ifResKind = kind,
                              ifRoles = roles, ifCons = condecls,
@@ -1025,19 +1023,26 @@ pprIfaceDecl ss (IfaceFamily { ifName = tycon
 pprIfaceDecl _ (IfacePatSyn { ifName = name,
                               ifPatUnivBndrs = univ_bndrs, ifPatExBndrs = ex_bndrs,
                               ifPatProvCtxt = prov_ctxt, ifPatReqCtxt = req_ctxt,
-                              ifPatArgs = arg_tys,
+                              ifPatArgs = arg_tys, ifFieldLabels = pat_fldlbls,
                               ifPatTy = pat_ty} )
   = sdocWithContext mk_msg
   where
+    pat_keywrd = text "pattern"
     mk_msg sdocCtx
-      = hang (text "pattern" <+> pprPrefixOcc name)
-           2 (dcolon <+> sep [univ_msg
-                             , pprIfaceContextArr req_ctxt
-                             , ppWhen insert_empty_ctxt $ parens empty <+> darrow
-                             , ex_msg
-                             , pprIfaceContextArr prov_ctxt
-                             , pprIfaceType $ foldr (IfaceFunTy VisArg many_ty) pat_ty arg_tys ])
+      = vcat [ ppr_pat_ty
+             -- only print this for record pattern synonyms
+             , if null pat_fldlbls then Outputable.empty
+               else pat_keywrd <+> pprPrefixOcc name <+> pat_body]
       where
+        ppr_pat_ty =
+          hang (pat_keywrd <+> pprPrefixOcc name)
+            2 (dcolon <+> sep [univ_msg
+                              , pprIfaceContextArr req_ctxt
+                              , ppWhen insert_empty_ctxt $ parens empty <+> darrow
+                              , ex_msg
+                              , pprIfaceContextArr prov_ctxt
+                              , pprIfaceType $ foldr (IfaceFunTy VisArg many_ty) pat_ty arg_tys ])
+        pat_body = braces $ sep $ punctuate comma $ map ppr pat_fldlbls
         univ_msg = pprUserIfaceForAll $ tyVarSpecToBinders univ_bndrs
         ex_msg   = pprUserIfaceForAll $ tyVarSpecToBinders ex_bndrs
 
@@ -1690,6 +1695,7 @@ freeNamesIfProv :: IfaceUnivCoProv -> NameSet
 freeNamesIfProv (IfacePhantomProv co)    = freeNamesIfCoercion co
 freeNamesIfProv (IfaceProofIrrelProv co) = freeNamesIfCoercion co
 freeNamesIfProv (IfacePluginProv _)      = emptyNameSet
+freeNamesIfProv (IfaceCorePrepProv _)    = emptyNameSet
 
 freeNamesIfVarBndr :: VarBndr IfaceBndr vis -> NameSet
 freeNamesIfVarBndr (Bndr bndr _) = freeNamesIfBndr bndr

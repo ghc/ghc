@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, CPP, ScopedTypeVariables, MagicHash #-}
+{-# LANGUAGE BangPatterns, ScopedTypeVariables, MagicHash #-}
 
 -----------------------------------------------------------------------------
 --
@@ -22,8 +22,6 @@ module GHC.Runtime.Heap.Inspect(
 
      constrClosToName -- exported to use in test T4891
  ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 import GHC.Platform
@@ -60,6 +58,7 @@ import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Utils.Outputable as Ppr
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Char
 import GHC.Exts.Heap
 import GHC.Runtime.Heap.Layout ( roundUpTo )
@@ -267,17 +266,16 @@ ppr_termM1 :: Monad m => Term -> m SDoc
 ppr_termM1 Prim{valRaw=words, ty=ty} =
     return $ repPrim (tyConAppTyCon ty) words
 ppr_termM1 Suspension{ty=ty, bound_to=Nothing} =
-    return (char '_' <+> whenPprDebug (text "::" <> ppr ty))
+    return (char '_' <+> whenPprDebug (dcolon <> pprSigmaType ty))
 ppr_termM1 Suspension{ty=ty, bound_to=Just n}
---  | Just _ <- splitFunTy_maybe ty = return$ ptext (sLit("<function>")
-  | otherwise = return$ parens$ ppr n <> text "::" <> ppr ty
+  | otherwise = return$ parens$ ppr n <> dcolon <> pprSigmaType ty
 ppr_termM1 Term{}        = panic "ppr_termM1 - Term"
 ppr_termM1 RefWrap{}     = panic "ppr_termM1 - RefWrap"
 ppr_termM1 NewtypeWrap{} = panic "ppr_termM1 - NewtypeWrap"
 
 pprNewtypeWrap y p NewtypeWrap{ty=ty, wrapped_term=t}
   | Just (tc,_) <- tcSplitTyConApp_maybe ty
-  , ASSERT(isNewTyCon tc) True
+  , assert (isNewTyCon tc) True
   , Just new_dc <- tyConSingleDataCon_maybe tc = do
              real_term <- y max_prec t
              return $ cparen (p >= app_prec) (ppr new_dc <+> real_term)
@@ -606,7 +604,8 @@ polytype (specifically, see ghci_tv in GHC.Tc.Utils.Unify.preCheck).
 This allows metavariables to unify with types that have
 nested (or higher-rank) `forall`s/`=>`s, which makes `:print fmap`
 display as
-`fmap = (_t1::forall a b. Functor f => (a -> b) -> f a -> f b)`, as expected.
+`fmap = (_t1::forall (f :: * -> *) a b. Functor f => (a -> b) -> f a -> f b)`,
+as expected.
 -}
 
 
@@ -690,13 +689,12 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
   -- we quantify existential tyvars as universal,
   -- as this is needed to be able to manipulate
   -- them properly
-   let quant_old_ty@(old_tvs, old_tau) = quantifyType old_ty
-       sigma_old_ty = mkInfForAllTys old_tvs old_tau
+   let quant_old_ty@(old_tvs, _) = quantifyType old_ty
    traceTR (text "Term reconstruction started with initial type " <> ppr old_ty)
    term <-
      if null old_tvs
       then do
-        term  <- go max_depth sigma_old_ty sigma_old_ty hval
+        term  <- go max_depth old_ty old_ty hval
         term' <- zonkTerm term
         return $ fixFunDictionaries $ expandNewtypes term'
       else do
@@ -704,7 +702,7 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
               my_ty <- newOpenVar
               when (check1 quant_old_ty) (traceTR (text "check1 passed") >>
                                           addConstraint my_ty old_ty')
-              term  <- go max_depth my_ty sigma_old_ty hval
+              term  <- go max_depth my_ty old_ty hval
               new_ty <- zonkTcType (termType term)
               if isMonomorphic new_ty || check2 (quantifyType new_ty) quant_old_ty
                  then do
@@ -731,12 +729,9 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
    return term
     where
   interp = hscInterp hsc_env
+  unit_env = hsc_unit_env hsc_env
 
   go :: Int -> Type -> Type -> ForeignHValue -> TcM Term
-   -- I believe that my_ty should not have any enclosing
-   -- foralls, nor any free RuntimeUnk skolems;
-   -- that is partly what the quantifyType stuff achieved
-   --
    -- [SPJ May 11] I don't understand the difference between my_ty and old_ty
 
   go 0 my_ty _old_ty a = do
@@ -753,7 +748,7 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
 -- Thunks we may want to force
       t | isThunk t && force -> do
          traceTR (text "Forcing a " <> text (show (fmap (const ()) t)))
-         evalRslt <- liftIO $ GHCi.seqHValue interp hsc_env a
+         evalRslt <- liftIO $ GHCi.seqHValue interp unit_env a
          case evalRslt of                                            -- #2950
            EvalSuccess _ -> go (pred max_depth) my_ty old_ty a
            EvalException ex -> do
@@ -792,7 +787,7 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
                   -- MutVar# :: contents_ty -> MutVar# s contents_ty
          traceTR (text "Following a MutVar")
          contents_tv <- newVar liftedTypeKind
-         MASSERT(isUnliftedType my_ty)
+         massert (isUnliftedType my_ty)
          (mutvar_ty,_) <- instScheme $ quantifyType $ mkVisFunTyMany
                             contents_ty (mkTyConApp tycon [world,contents_ty])
          addConstraint (mkVisFunTyMany contents_tv my_ty) mutvar_ty
@@ -912,7 +907,7 @@ extractSubTerms recurse clos = liftM thdOf3 . go 0 0
                      [index size_b aligned_idx word_size endian]
                  | otherwise =
                      let (q, r) = size_b `quotRem` word_size
-                     in ASSERT( r == 0 )
+                     in assert (r == 0 )
                         [ array!!i
                         | o <- [0.. q - 1]
                         , let i = (aligned_idx `quot` word_size) + o
@@ -1079,13 +1074,11 @@ getDataConArgTys :: DataCon -> Type -> TR [Type]
 -- return the types of the arguments.  This is RTTI-land, so 'ty' might
 -- not be fully known.  Moreover, the arg types might involve existentials;
 -- if so, make up fresh RTTI type variables for them
---
--- I believe that con_app_ty should not have any enclosing foralls
 getDataConArgTys dc con_app_ty
   = do { let rep_con_app_ty = unwrapType con_app_ty
        ; traceTR (text "getDataConArgTys 1" <+> (ppr con_app_ty $$ ppr rep_con_app_ty
                    $$ ppr (tcSplitTyConApp_maybe rep_con_app_ty)))
-       ; ASSERT( all isTyVar ex_tvs ) return ()
+       ; assert (all isTyVar ex_tvs ) return ()
                  -- ex_tvs can only be tyvars as data types in source
                  -- Haskell cannot mention covar yet (Aug 2018)
        ; (subst, _) <- instTyVars (univ_tvs ++ ex_tvs)
@@ -1383,18 +1376,12 @@ tyConPhantomTyVars _ = []
 
 type QuantifiedType = ([TyVar], Type)
    -- Make the free type variables explicit
-   -- The returned Type should have no top-level foralls (I believe)
 
 quantifyType :: Type -> QuantifiedType
--- Generalize the type: find all free and forall'd tyvars
--- and return them, together with the type inside, which
--- should not be a forall type.
---
--- Thus (quantifyType (forall a. a->[b]))
--- returns ([a,b], a -> [b])
-
+-- Find all free and forall'd tyvars and return them
+-- together with the unmodified input type.
 quantifyType ty = ( filter isTyVar $
                     tyCoVarsOfTypeWellScoped rho
-                  , rho)
+                  , ty)
   where
-    (_tvs, rho) = tcSplitForAllInvisTyVars ty
+    (_tvs, _, rho) = tcSplitNestedSigmaTys ty

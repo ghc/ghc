@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 
 -----------------------------------------------------------------------------
 --
@@ -13,8 +13,6 @@ module GHC.Driver.MakeFile
    )
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import qualified GHC
@@ -23,10 +21,12 @@ import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Utils.Misc
 import GHC.Driver.Env
+import GHC.Driver.Errors.Types
 import qualified GHC.SysTools as SysTools
 import GHC.Data.Graph.Directed ( SCC(..) )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Types.SourceError
 import GHC.Types.SrcLoc
 import Data.List (partition)
@@ -305,7 +305,9 @@ findDependency hsc_env srcloc pkg imp is_boot include_pkg_deps = do
         -> return Nothing
 
     fail ->
-        throwOneError $ mkPlainErrorMsgEnvelope srcloc $
+        throwOneError $
+          mkPlainErrorMsgEnvelope srcloc $
+          GhcDriverMessage $ DriverUnknownMessage $ mkPlainError noHints $
              cannotFindModule hsc_env imp fail
 
 -----------------------------
@@ -357,27 +359,20 @@ endMkDependHS logger dflags
   case makefile_hdl of
      Nothing  -> return ()
      Just hdl -> do
-
-          -- slurp the rest of the original makefile and copy it into the output
-        let slurp = do
-                l <- hGetLine hdl
-                hPutStrLn tmp_hdl l
-                slurp
-
-        catchIO slurp
-                (\e -> if isEOFError e then return () else ioError e)
-
+        -- slurp the rest of the original makefile and copy it into the output
+        SysTools.copyHandle hdl tmp_hdl
         hClose hdl
 
   hClose tmp_hdl  -- make sure it's flushed
 
         -- Create a backup of the original makefile
-  when (isJust makefile_hdl)
-       (SysTools.copy logger dflags ("Backing up " ++ makefile)
-          makefile (makefile++".bak"))
+  when (isJust makefile_hdl) $ do
+    showPass logger dflags ("Backing up " ++ makefile)
+    SysTools.copyFile makefile (makefile++".bak")
 
         -- Copy the new makefile in place
-  SysTools.copy logger dflags "Installing new makefile" tmp_file makefile
+  showPass logger dflags "Installing new makefile"
+  SysTools.copyFile tmp_file makefile
 
 
 -----------------------------------------------------------------
@@ -402,7 +397,7 @@ dumpModCycles logger dflags module_graph
     cycles =
       [ c | CyclicSCC c <- topoSort ]
 
-    pp_cycles = vcat [ (text "---------- Cycle" <+> int n <+> ptext (sLit "----------"))
+    pp_cycles = vcat [ (text "---------- Cycle" <+> int n <+> text "----------")
                         $$ pprCycle c $$ blankLine
                      | (n,c) <- [1..] `zip` cycles ]
 
@@ -415,7 +410,7 @@ pprCycle summaries = pp_group (CyclicSCC summaries)
 
     pp_group (AcyclicSCC ms) = pp_ms ms
     pp_group (CyclicSCC mss)
-        = ASSERT( not (null boot_only) )
+        = assert (not (null boot_only)) $
                 -- The boot-only list must be non-empty, else there would
                 -- be an infinite chain of non-boot imports, and we've
                 -- already checked for that in processModDeps
@@ -454,4 +449,3 @@ pprCycle summaries = pp_group (CyclicSCC summaries)
 depStartMarker, depEndMarker :: String
 depStartMarker = "# DO NOT DELETE: Beginning of Haskell dependencies"
 depEndMarker   = "# DO NOT DELETE: End of Haskell dependencies"
-

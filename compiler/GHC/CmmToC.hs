@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP           #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE GADTs         #-}
 {-# LANGUAGE LambdaCase    #-}
@@ -26,8 +25,6 @@ module GHC.CmmToC
    )
 where
 
-#include "HsVersions.h"
-
 -- Cmm stuff
 import GHC.Prelude
 
@@ -46,7 +43,6 @@ import GHC.Cmm.Switch
 import GHC.CmmToAsm.CPrim
 import GHC.Driver.Session
 import GHC.Driver.Ppr
-import GHC.Data.FastString
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Platform
@@ -207,7 +203,7 @@ pprStmt :: Platform -> CmmNode e x -> SDoc
 pprStmt platform stmt =
     case stmt of
     CmmEntry{}   -> empty
-    CmmComment _ -> empty -- (hang (text "/*") 3 (ftext s)) $$ ptext (sLit "*/")
+    CmmComment _ -> empty -- (hang (text "/*") 3 (ftext s)) $$ text "*/"
                           -- XXX if the string contains "*/", we need to fix it
                           -- XXX we probably want to emit these comments when
                           -- some debugging option is on.  They can get quite
@@ -221,7 +217,7 @@ pprStmt platform stmt =
     CmmStore  dest src
         | typeWidth rep == W64 && wordWidth platform /= W64
         -> (if isFloatType rep then text "ASSIGN_DBL"
-                               else ptext (sLit ("ASSIGN_Word64"))) <>
+                               else text "ASSIGN_Word64") <>
            parens (mkP_ <> pprExpr1 platform dest <> comma <> pprExpr platform src) <> semi
 
         | otherwise
@@ -272,12 +268,18 @@ pprStmt platform stmt =
         hresults = zip results res_hints
         hargs    = zip args arg_hints
 
+        need_cdecl
+          | Just _align <- machOpMemcpyishAlign op = True
+          | MO_ResumeThread  <- op                 = True
+          | MO_SuspendThread <- op                 = True
+          | otherwise                              = False
+
         fn_call
           -- The mem primops carry an extra alignment arg.
           -- We could maybe emit an alignment directive using this info.
           -- We also need to cast mem primops to prevent conflicts with GCC
           -- builtins (see bug #5967).
-          | Just _align <- machOpMemcpyishAlign op
+          | need_cdecl
           = (text ";EFF_(" <> fn <> char ')' <> semi) $$
             pprForeignCall platform fn cconv hresults hargs
           | otherwise
@@ -828,19 +830,23 @@ pprCallishMachOp_for_C mop
         MO_Memset _     -> text "memset"
         MO_Memmove _    -> text "memmove"
         MO_Memcmp _     -> text "memcmp"
-        (MO_BSwap w)    -> ptext (sLit $ bSwapLabel w)
-        (MO_BRev w)     -> ptext (sLit $ bRevLabel w)
-        (MO_PopCnt w)   -> ptext (sLit $ popCntLabel w)
-        (MO_Pext w)     -> ptext (sLit $ pextLabel w)
-        (MO_Pdep w)     -> ptext (sLit $ pdepLabel w)
-        (MO_Clz w)      -> ptext (sLit $ clzLabel w)
-        (MO_Ctz w)      -> ptext (sLit $ ctzLabel w)
-        (MO_AtomicRMW w amop) -> ptext (sLit $ atomicRMWLabel w amop)
-        (MO_Cmpxchg w)  -> ptext (sLit $ cmpxchgLabel w)
-        (MO_Xchg w)     -> ptext (sLit $ xchgLabel w)
-        (MO_AtomicRead w)  -> ptext (sLit $ atomicReadLabel w)
-        (MO_AtomicWrite w) -> ptext (sLit $ atomicWriteLabel w)
-        (MO_UF_Conv w)  -> ptext (sLit $ word2FloatLabel w)
+
+        MO_SuspendThread -> text "suspendThread"
+        MO_ResumeThread  -> text "resumeThread"
+
+        MO_BSwap w          -> ftext (bSwapLabel w)
+        MO_BRev w           -> ftext (bRevLabel w)
+        MO_PopCnt w         -> ftext (popCntLabel w)
+        MO_Pext w           -> ftext (pextLabel w)
+        MO_Pdep w           -> ftext (pdepLabel w)
+        MO_Clz w            -> ftext (clzLabel w)
+        MO_Ctz w            -> ftext (ctzLabel w)
+        MO_AtomicRMW w amop -> ftext (atomicRMWLabel w amop)
+        MO_Cmpxchg w        -> ftext (cmpxchgLabel w)
+        MO_Xchg w           -> ftext (xchgLabel w)
+        MO_AtomicRead w     -> ftext (atomicReadLabel w)
+        MO_AtomicWrite w    -> ftext (atomicWriteLabel w)
+        MO_UF_Conv w        -> ftext (word2FloatLabel w)
 
         MO_S_Mul2     {} -> unsupported
         MO_S_QuotRem  {} -> unsupported
@@ -973,7 +979,7 @@ pprReg r = case r of
 
 pprAsPtrReg :: CmmReg -> SDoc
 pprAsPtrReg (CmmGlobal (VanillaReg n gcp))
-  = WARN( gcp /= VGcPtr, ppr n ) char 'R' <> int n <> text ".p"
+  = warnPprTrace (gcp /= VGcPtr) (ppr n) $ char 'R' <> int n <> text ".p"
 pprAsPtrReg other_reg = pprReg other_reg
 
 pprGlobalReg :: GlobalReg -> SDoc

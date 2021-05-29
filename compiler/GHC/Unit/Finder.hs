@@ -3,7 +3,7 @@
 
 -}
 
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE FlexibleContexts #-}
 
 -- | Module finder
@@ -31,8 +31,6 @@ module GHC.Unit.Finder (
     findObjectLinkable,
 
   ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -362,7 +360,8 @@ findPackageModule fc unit_state dflags mod = do
 -- for the appropriate config.
 findPackageModule_ :: FinderCache -> DynFlags -> InstalledModule -> UnitInfo -> IO InstalledFindResult
 findPackageModule_ fc dflags mod pkg_conf = do
-  MASSERT2( moduleUnit mod == unitId pkg_conf, ppr (moduleUnit mod) <+> ppr (unitId pkg_conf) )
+  massertPpr (moduleUnit mod == unitId pkg_conf)
+             (ppr (moduleUnit mod) <+> ppr (unitId pkg_conf))
   modLocationCache fc mod $
 
     -- special case for GHC.Prim; we won't find it in the filesystem.

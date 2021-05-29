@@ -3,7 +3,7 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 -}
 
-{-# LANGUAGE CPP #-}
+
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -14,8 +14,6 @@ module GHC.Tc.TyCl.Build (
         mkNewTyConRhs,
         newImplicitBinder, newTyConRepName
     ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -79,6 +77,8 @@ mkNewTyConRhs tycon_name tycon con
         -- has a single argument (Foo a) that is a *type class*, so
         -- dataConInstOrigArgTys returns [].
 
+    -- Eta-reduce the newtype
+    -- See Note [Newtype eta] in GHC.Core.TyCon
     etad_tvs   :: [TyVar]  -- Matched lazily, so that mkNewTypeCo can
     etad_roles :: [Role]   -- return a TyCon without pulling on rhs_ty
     etad_rhs   :: Type     -- See Note [Tricky iface loop] in GHC.Iface.Load
@@ -89,12 +89,51 @@ mkNewTyConRhs tycon_name tycon con
                -> Type          -- Rhs type
                -> ([TyVar], [Role], Type)  -- Eta-reduced version
                                            -- (tyvars in normal order)
-    eta_reduce (a:as) (_:rs) ty | Just (fun, arg) <- splitAppTy_maybe ty,
-                                  Just tv <- getTyVar_maybe arg,
-                                  tv == a,
-                                  not (a `elemVarSet` tyCoVarsOfType fun)
-                                = eta_reduce as rs fun
-    eta_reduce tvs rs ty = (reverse tvs, reverse rs, ty)
+    eta_reduce (a:as) (_:rs) ty
+      | Just (fun, arg) <- splitAppTy_maybe ty
+      , Just tv <- getTyVar_maybe arg
+      , tv == a
+      , not (a `elemVarSet` tyCoVarsOfType fun)
+      , typeKind fun `eqType` typeKind (mkTyConApp tycon (mkTyVarTys $ reverse as))
+        -- Why this kind-check?  See Note [Newtype eta and homogeneous axioms]
+      = eta_reduce as rs fun
+    eta_reduce as rs ty = (reverse as, reverse rs, ty)
+
+{- Note [Newtype eta and homogeneous axioms]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When eta-reducing a newtype, we must be careful to make sure the axiom
+is homogeneous.  (That is, the two types related by the axiom must
+have the same kind.)  All known proofs of type safety for Core rely on
+the homogeneity of axioms, so let's not monkey with that.
+
+It is easy to mistakenly make an inhomogeneous axiom (#19739):
+  type T :: forall (a :: Type) -> Type
+  newtype T a = MkT (Proxy a)
+
+Can we eta-reduce, thus?
+  axT :: T ~ Proxy
+
+No!  Because
+   T     :: forall a -> Type
+   Proxy :: Type     -> Type
+
+This is inhomogeneous. Hence, we have an extra kind-check in eta_reduce,
+to make sure the reducts have the same kind. This is simple, although
+perhaps quadratic in complexity, if we eta-reduce many arguments (which
+seems vanishingly unlikely in practice).  But NB that the free-variable
+check, which immediately precedes the kind check, is also potentially
+quadratic.
+
+There are other ways we could do the check (discussion on #19739):
+
+* We could look at the sequence of binders on the newtype and on the
+  head of the representation type, and make sure the visibilities on
+  the binders match up. This is quite a bit more code, and the reasoning
+  is subtler.
+
+* We could, say, do the kind-check at the end and then backtrack until the
+  kinds match up. Hard to know whether that's more performant or not.
+-}
 
 ------------------------------------------------------
 buildDataCon :: FamInstEnvs
@@ -183,19 +222,19 @@ buildPatSyn src_name declared_infix matcher@(_, matcher_ty,_) builder
             pat_ty field_labels
   = -- The assertion checks that the matcher is
     -- compatible with the pattern synonym
-    ASSERT2((and [ univ_tvs `equalLength` univ_tvs1
-                 , ex_tvs `equalLength` ex_tvs1
-                 , pat_ty `eqType` substTy subst (scaledThing pat_ty1)
-                 , prov_theta `eqTypes` substTys subst prov_theta1
-                 , req_theta `eqTypes` substTys subst req_theta1
-                 , compareArgTys arg_tys (substTys subst (map scaledThing arg_tys1))
-                 ])
-            , (vcat [ ppr univ_tvs <+> twiddle <+> ppr univ_tvs1
+    assertPpr (and [ univ_tvs `equalLength` univ_tvs1
+                   , ex_tvs `equalLength` ex_tvs1
+                   , pat_ty `eqType` substTy subst (scaledThing pat_ty1)
+                   , prov_theta `eqTypes` substTys subst prov_theta1
+                   , req_theta `eqTypes` substTys subst req_theta1
+                   , compareArgTys arg_tys (substTys subst (map scaledThing arg_tys1))
+                   ])
+              (vcat [ ppr univ_tvs <+> twiddle <+> ppr univ_tvs1
                     , ppr ex_tvs <+> twiddle <+> ppr ex_tvs1
                     , ppr pat_ty <+> twiddle <+> ppr pat_ty1
                     , ppr prov_theta <+> twiddle <+> ppr prov_theta1
                     , ppr req_theta <+> twiddle <+> ppr req_theta1
-                    , ppr arg_tys <+> twiddle <+> ppr arg_tys1]))
+                    , ppr arg_tys <+> twiddle <+> ppr arg_tys1]) $
     mkPatSyn src_name declared_infix
              (univ_tvs, req_theta) (ex_tvs, prov_theta)
              arg_tys pat_ty

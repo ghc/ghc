@@ -492,10 +492,11 @@ performance.
     .. index::
        single: old generation, size
 
-    Set the minimum size of the old generation. The old generation is collected
-    whenever it grows to this size or the value of the :rts-flag:`-F ⟨factor⟩`
-    option multiplied by the size of the live data at the previous major
-    collection, whichever is larger.
+    Set the minimum size of the old generation.
+
+    The old generation is collected whenever it grows to this size or the value
+    of the :rts-flag:`-F ⟨factor⟩` option multiplied by the size of the live
+    data at the previous major collection, whichever is larger.
 
 .. rts-flag:: -n ⟨size⟩
 
@@ -503,6 +504,9 @@ performance.
 
     .. index::
        single: allocation area, chunk size
+
+    Set the allocation area chunksize. Setting ``-n0`` means the allocation
+    area is not divided into chunks.
 
     [Example: ``-n4m`` ] When set to a non-zero value, this
     option divides the allocation area (``-A`` value) into chunks of the
@@ -661,6 +665,8 @@ performance.
     .. index::
        single: GC threads, setting the number of
 
+    Set the number of threads to use for the parallel GC.
+
     By default, all of the capabilities participate in parallel
     garbage collection.  If we want to use a very large ``-N`` value,
     however, this can reduce the performance of the GC.  For this
@@ -706,12 +712,13 @@ performance.
     .. index::
        single: idle GC
 
-    In the threaded and SMP versions of the RTS (see
-    :ghc-flag:`-threaded`, :ref:`options-linker`), a major GC is automatically
-    performed if the runtime has been idle (no Haskell computation has
-    been running) for a period of time. The amount of idle time which
-    must pass before a GC is performed is set by the ``-I ⟨seconds⟩``
-    option. Specifying ``-I0`` disables the idle GC.
+    Set the amount of idle time which must pass before a idle GC is
+    performed. Setting ``-I0`` disables the idle GC.
+
+    In the threaded and SMP versions of the RTS (see :ghc-flag:`-threaded`,
+    :ref:`options-linker`), a major GC is automatically performed if the
+    runtime has been idle (no Haskell computation has been running) for a
+    period of time.
 
     For an interactive application, it is probably a good idea to use
     the idle GC, because this will allow finalizers to run and
@@ -732,6 +739,8 @@ performance.
 
     .. index::
        single: idle GC
+
+    Set the minimum wait time between runs of the idle GC.
 
     By default, if idle GC is enabled in the threaded runtime, a major
     GC will be performed every time the process goes idle for a

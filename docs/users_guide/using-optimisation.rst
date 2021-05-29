@@ -343,7 +343,7 @@ by saying ``-fno-wombat``.
     seem cheap to the optimiser.
 
 .. ghc-flag:: -fdicts-strict
-    :shortdesc: Make dictionaries strict
+    :shortdesc: Make dictionaries strict. Implied by :ghc-flag:`-O2`.
     :type: dynamic
     :reverse: -fno-dicts-strict
     :category:
@@ -351,6 +351,15 @@ by saying ``-fno-wombat``.
     :default: off
 
     Make dictionaries strict.
+
+    This enables WW to fire on dictionary constraints which usually results
+    in better runtime. In niche cases it can lead to significant compile time
+    regressions because of changed inlining behaviour. Rarely this can also affect
+    runtime negatively.
+
+    If enabling this flag leads to regressions try increasing the unfolding
+    threshold using :ghc-flag:`-funfolding-use-threshold=⟨n⟩` by a modest amount (~30)
+    as this is likely a result of a known limitation described in `#18421`.
 
 .. ghc-flag:: -fdmd-tx-dict-sel
     :shortdesc: *(deprecated)* Use a special demand transformer for dictionary selectors.
@@ -488,7 +497,7 @@ by saying ``-fno-wombat``.
 
     :default: off
 
-    Worker-wrapper removes unused arguments, but usually we do not
+    Worker/wrapper removes unused arguments, but usually we do not
     remove them all, lest it turn a function closure into a thunk,
     thereby perhaps creating a space leak and/or disrupting inlining.
     This flag allows worker/wrapper to remove *all* value lambdas.
@@ -1399,6 +1408,15 @@ by saying ``-fno-wombat``.
 
     How eager should the compiler be to inline functions?
 
+.. ghc-flag:: -funfolding-keeness-factor=⟨n⟩
+    :shortdesc: This has been deprecated in GHC 9.0.1.
+    :type: dynamic
+    :category:
+
+    This factor was deprecated in GHC 9.0.1. See :ghc-ticket:`15304` for
+    details. Users who need to control inlining should rather consider
+    :ghc-flag:`-funfolding-use-threshold=⟨n⟩`.
+
 .. ghc-flag:: -funfolding-use-threshold=⟨n⟩
     :shortdesc: *default: 80.* Tweak unfolding settings.
     :type: dynamic
@@ -1522,5 +1540,4 @@ by saying ``-fno-wombat``.
     This flag sets the size (in bytes) threshold above which the second approach
     is used. You can disable the second approach entirely by setting the
     threshold to 0.
-
 

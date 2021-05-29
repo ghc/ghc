@@ -8,8 +8,6 @@
 
 module GHC.Core.Opt.Pipeline ( core2core, simplifyExpr ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Driver.Session
@@ -52,9 +50,9 @@ import GHC.Core.FamInstEnv
 import qualified GHC.Utils.Error as Err
 import GHC.Utils.Error  ( withTiming )
 import GHC.Utils.Logger as Logger
-import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Constants (debugIsOn)
 
 import GHC.Unit.External
 import GHC.Unit.Module.Env
@@ -111,7 +109,7 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
   where
     logger         = hsc_logger hsc_env
     dflags         = hsc_dflags hsc_env
-    home_pkg_rules = hptRules hsc_env (dep_mods deps)
+    home_pkg_rules = hptRules hsc_env (dep_direct_mods deps)
     hpt_rule_base  = mkRuleBase home_pkg_rules
     print_unqual   = mkPrintUnqualified (hsc_unit_env hsc_env) rdr_env
     -- mod: get the module out of the current HscEnv so we can retrieve it from the monad.
@@ -745,12 +743,12 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
         -- iteration_no is the number of the iteration we are
         -- about to begin, with '1' for the first
       | iteration_no > max_iterations   -- Stop if we've run out of iterations
-      = WARN( debugIsOn && (max_iterations > 2)
-            , hang (text "Simplifier bailing out after" <+> int max_iterations
+      = warnPprTrace (debugIsOn && (max_iterations > 2))
+            ( hang (text "Simplifier bailing out after" <+> int max_iterations
                     <+> text "iterations"
                     <+> (brackets $ hsep $ punctuate comma $
                          map (int . simplCountN) (reverse counts_so_far)))
-                 2 (text "Size =" <+> ppr (coreBindsStats binds)))
+                 2 (text "Size =" <+> ppr (coreBindsStats binds))) $
 
                 -- Subtract 1 from iteration_no to get the
                 -- number of iterations we actually completed
@@ -1050,8 +1048,7 @@ shortMeOut ind_env exported_id local_id
     then
         if hasShortableIdInfo exported_id
         then True       -- See Note [Messing up the exported Id's IdInfo]
-        else WARN( True, text "Not shorting out:" <+> ppr exported_id )
-             False
+        else warnPprTrace True (text "Not shorting out:" <+> ppr exported_id) False
     else
         False
 

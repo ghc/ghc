@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 
 -- | Dynamically lookup up values from modules and loading them.
 module GHC.Runtime.Loader (
@@ -28,7 +28,7 @@ import GHC.Driver.Hooks
 import GHC.Driver.Plugins
 
 import GHC.Linker.Loader       ( loadModule, loadName )
-import GHC.Runtime.Interpreter ( wormhole, hscInterp )
+import GHC.Runtime.Interpreter ( wormhole )
 import GHC.Runtime.Interpreter.Types
 
 import GHC.Tc.Utils.Monad      ( initTcInteractive, initIfaceTcRn )
@@ -59,8 +59,6 @@ import GHC.Utils.Logger
 import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Exception
-
-import GHC.Data.FastString
 
 import Control.Monad     ( unless )
 import Data.Maybe        ( mapMaybe )
@@ -289,10 +287,10 @@ lookupRdrNameInModuleForPlugins hsc_env mod_name rdr_name = do
     doc = text "contains a name used in an invocation of lookupRdrNameInModule"
 
 wrongTyThingError :: Name -> TyThing -> SDoc
-wrongTyThingError name got_thing = hsep [text "The name", ppr name, ptext (sLit "is not that of a value but rather a"), pprTyThingCategory got_thing]
+wrongTyThingError name got_thing = hsep [text "The name", ppr name, text "is not that of a value but rather a", pprTyThingCategory got_thing]
 
 missingTyThingError :: Name -> SDoc
-missingTyThingError name = hsep [text "The name", ppr name, ptext (sLit "is not in the type environment: are you sure it exists?")]
+missingTyThingError name = hsep [text "The name", ppr name, text "is not in the type environment: are you sure it exists?"]
 
 throwCmdLineErrorS :: DynFlags -> SDoc -> IO a
 throwCmdLineErrorS dflags = throwCmdLineError . showSDoc dflags

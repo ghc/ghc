@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP          #-}
+
 {-# LANGUAGE TypeFamilies #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
@@ -11,14 +11,13 @@ module GHC.Rename.Splice (
         , traceSplice, SpliceInfo(..)
   ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Hs
 import GHC.Types.Name.Reader
+import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Driver.Env.Types
 
@@ -451,11 +450,11 @@ rnSpliceExpr splice
                 runRnSplice UntypedExpSplice runMetaE ppr rn_splice
            ; (lexpr3, fvs) <- checkNoErrs (rnLExpr rn_expr)
              -- See Note [Delaying modFinalizers in untyped splices].
-           ; return ( HsPar noAnn $ HsSpliceE noAnn
-                            . HsSpliced noExtField (ThModFinalizers mod_finalizers)
-                            . HsSplicedExpr <$>
-                            lexpr3
-                    , fvs)
+           ; let e =  HsSpliceE noAnn
+                    . HsSpliced noExtField (ThModFinalizers mod_finalizers)
+                    . HsSplicedExpr
+                        <$> lexpr3
+           ; return (gHsPar e, fvs)
            }
 
 {- Note [Running splices in the Renamer]
@@ -695,12 +694,11 @@ rnSplicePat splice
            ; (pat, mod_finalizers) <-
                 runRnSplice UntypedPatSplice runMetaP ppr rn_splice
              -- See Note [Delaying modFinalizers in untyped splices].
-           ; return ( Left $ ParPat noAnn $ ((SplicePat noExtField)
-                              . HsSpliced noExtField (ThModFinalizers mod_finalizers)
-                              . HsSplicedPat)  `mapLoc`
-                              pat
-                    , emptyFVs
-                    ) }
+           ; let p =  SplicePat noExtField
+                    . HsSpliced noExtField (ThModFinalizers mod_finalizers)
+                    . HsSplicedPat
+                        <$> pat
+           ; return (Left $ gParPat p, emptyFVs) }
               -- Wrap the result of the quasi-quoter in parens so that we don't
               -- lose the outermost location set by runQuasiQuote (#7918)
 
@@ -912,9 +910,7 @@ check_cross_stage_lifting top_lvl name ps_var
               pend_splice = PendingRnSplice UntypedExpSplice name lift_expr
 
           -- Warning for implicit lift (#17804)
-        ; addDiagnosticTc (WarningWithFlag Opt_WarnImplicitLift)
-                          (text "The variable" <+> quotes (ppr name) <+>
-                           text "is implicitly lifted in the TH quotation")
+        ; addDetailedDiagnostic (TcRnImplicitLift name)
 
           -- Update the pending splices
         ; ps <- readMutVar ps_var

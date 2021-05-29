@@ -40,8 +40,8 @@ Note [Language.Haskell.Syntax.* Hierarchy]
 
 Why are these modules not 'GHC.Hs.*', or some other 'GHC.*'? The answer
 is that they are to be separated from GHC and put into another package,
-in accordance with the final goals of Trees that Grow. (See Note [Trees
-that grow] in 'Language.Haskell.Syntax.Extension'.) In short, the
+in accordance with the final goals of Trees That Grow. (See Note [Trees
+That Grow] in 'Language.Haskell.Syntax.Extension'.) In short, the
 'Language.Haskell.Syntax.*' tree should be entirely GHC-independent.
 GHC-specific stuff related to source-language syntax should be in
 'GHC.Hs.*'.

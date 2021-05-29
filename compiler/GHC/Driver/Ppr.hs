@@ -28,6 +28,7 @@ import {-# SOURCE #-} GHC.Driver.Session
 import {-# SOURCE #-} GHC.Unit.State
 
 import GHC.Utils.Exception
+import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -41,14 +42,8 @@ import Control.Monad.IO.Class
 showSDoc :: DynFlags -> SDoc -> String
 showSDoc dflags sdoc = renderWithContext (initSDocContext dflags defaultUserStyle) sdoc
 
-showSDocUnsafe :: SDoc -> String
-showSDocUnsafe sdoc = renderWithContext defaultSDocContext sdoc
-
 showPpr :: Outputable a => DynFlags -> a -> String
 showPpr dflags thing = showSDoc dflags (ppr thing)
-
-showPprUnsafe :: Outputable a => a -> String
-showPprUnsafe a = renderWithContext defaultSDocContext (ppr a)
 
 -- | Allows caller to specify the PrintUnqualified to use
 showSDocForUser :: DynFlags -> UnitState -> PrintUnqualified -> SDoc -> String
@@ -129,16 +124,12 @@ pprTraceException heading doc =
 pprSTrace :: HasCallStack => SDoc -> a -> a
 pprSTrace doc = pprTrace "" (doc $$ callStackDoc)
 
-warnPprTrace :: HasCallStack => Bool -> String -> Int -> SDoc -> a -> a
--- ^ Just warn about an assertion failure, recording the given file and line number.
--- Should typically be accessed with the WARN macros
-warnPprTrace _     _     _     _    x | not debugIsOn     = x
-warnPprTrace _     _file _line _msg x
-   | unsafeHasNoDebugOutput = x
-warnPprTrace False _file _line _msg x = x
-warnPprTrace True   file  line  msg x
-  = pprDebugAndThen defaultSDocContext trace heading
+-- | Just warn about an assertion failure, recording the given file and line number.
+warnPprTrace :: HasCallStack => Bool -> SDoc -> a -> a
+warnPprTrace _     _    x | not debugIsOn     = x
+warnPprTrace _     _msg x | unsafeHasNoDebugOutput = x
+warnPprTrace False _msg x = x
+warnPprTrace True   msg x
+  = pprDebugAndThen defaultSDocContext trace (text "WARNING:")
                     (msg $$ callStackDoc )
                     x
-  where
-    heading = hsep [text "WARNING: file", text file <> comma, text "line", int line]

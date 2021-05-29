@@ -4,7 +4,6 @@ test('T14794c', normal, compile, [''])
 test('T14794d', normal, compile, [''])
 test('T14794e', normal, compile, [''])
 test('T14794f', normal, compile, [''])
-test('T14794g', normal, compile, [''])
 
 test('T9178', [], multimod_compile, ['T9178', '-Wall'])
 
@@ -46,3 +45,4 @@ test('T19564d', normal, compile, [''])
 # When warning about redundant constraints, test only Function context is highlighted by caret diagnostics
 # Also, suppress uniques as one of the warnings is unstable in CI, otherwise.
 test('T19296', normal, compile, ['-fdiagnostics-show-caret -Wredundant-constraints -dsuppress-uniques'])
+test('DodgyExports01', normal, compile, ['-Wdodgy-exports'])

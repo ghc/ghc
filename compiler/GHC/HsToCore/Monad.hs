@@ -64,6 +64,7 @@ import GHC.Driver.Ppr
 import GHC.Hs
 
 import GHC.HsToCore.Types
+import GHC.HsToCore.Errors.Types
 import GHC.HsToCore.Pmc.Solver.Types (Nablas, initNablas)
 
 import GHC.Core.FamInstEnv
@@ -108,6 +109,7 @@ import GHC.Types.Error
 import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import qualified GHC.Data.Strict as Strict
 
 import Data.IORef
 
@@ -204,17 +206,22 @@ type DsWarning = (SrcSpan, SDoc)
         -- into a Doc.
 
 -- | Run a 'DsM' action inside the 'TcM' monad.
-initDsTc :: DsM a -> TcM a
+initDsTc :: DsM a -> TcM (Messages DsMessage, Maybe a)
 initDsTc thing_inside
   = do { tcg_env  <- getGblEnv
-       ; msg_var  <- getErrsVar
+       ; msg_var  <- liftIO $ newIORef emptyMessages
        ; hsc_env  <- getTopEnv
        ; envs     <- mkDsEnvsFromTcGbl hsc_env msg_var tcg_env
-       ; setEnvs envs thing_inside
+       ; e_result <- tryM $  -- need to tryM so that we don't discard
+                             -- DsMessages
+                     setEnvs envs thing_inside
+       ; msgs     <- liftIO $ readIORef msg_var
+       ; return (msgs, case e_result of Left _  -> Nothing
+                                        Right x -> Just x)
        }
 
 -- | Run a 'DsM' action inside the 'IO' monad.
-initDs :: HscEnv -> TcGblEnv -> DsM a -> IO (Messages DiagnosticMessage, Maybe a)
+initDs :: HscEnv -> TcGblEnv -> DsM a -> IO (Messages DsMessage, Maybe a)
 initDs hsc_env tcg_env thing_inside
   = do { msg_var <- newIORef emptyMessages
        ; envs <- mkDsEnvsFromTcGbl hsc_env msg_var tcg_env
@@ -223,7 +230,7 @@ initDs hsc_env tcg_env thing_inside
 
 -- | Build a set of desugarer environments derived from a 'TcGblEnv'.
 mkDsEnvsFromTcGbl :: MonadIO m
-                  => HscEnv -> IORef (Messages DiagnosticMessage) -> TcGblEnv
+                  => HscEnv -> IORef (Messages DsMessage) -> TcGblEnv
                   -> m (DsGblEnv, DsLclEnv)
 mkDsEnvsFromTcGbl hsc_env msg_var tcg_env
   = do { cc_st_var   <- liftIO $ newIORef newCostCentreState
@@ -236,11 +243,13 @@ mkDsEnvsFromTcGbl hsc_env msg_var tcg_env
              complete_matches = hptCompleteSigs hsc_env         -- from the home package
                                 ++ tcg_complete_matches tcg_env -- from the current module
                                 ++ eps_complete_matches eps     -- from imports
+             -- re-use existing next_wrapper_num to ensure uniqueness
+             next_wrapper_num_var = tcg_next_wrapper_num tcg_env
        ; return $ mkDsEnvs unit_env this_mod rdr_env type_env fam_inst_env
-                           msg_var cc_st_var complete_matches
+                           msg_var cc_st_var next_wrapper_num_var complete_matches
        }
 
-runDs :: HscEnv -> (DsGblEnv, DsLclEnv) -> DsM a -> IO (Messages DiagnosticMessage, Maybe a)
+runDs :: HscEnv -> (DsGblEnv, DsLclEnv) -> DsM a -> IO (Messages DsMessage, Maybe a)
 runDs hsc_env (ds_gbl, ds_lcl) thing_inside
   = do { res    <- initTcRnIf 'd' hsc_env ds_gbl ds_lcl
                               (tryM thing_inside)
@@ -253,7 +262,7 @@ runDs hsc_env (ds_gbl, ds_lcl) thing_inside
        }
 
 -- | Run a 'DsM' action in the context of an existing 'ModGuts'
-initDsWithModGuts :: HscEnv -> ModGuts -> DsM a -> IO (Messages DiagnosticMessage, Maybe a)
+initDsWithModGuts :: HscEnv -> ModGuts -> DsM a -> IO (Messages DsMessage, Maybe a)
 initDsWithModGuts hsc_env (ModGuts { mg_module = this_mod, mg_binds = binds
                                    , mg_tcs = tycons, mg_fam_insts = fam_insts
                                    , mg_patsyns = patsyns, mg_rdr_env = rdr_env
@@ -261,6 +270,7 @@ initDsWithModGuts hsc_env (ModGuts { mg_module = this_mod, mg_binds = binds
                                    , mg_complete_matches = local_complete_matches
                           }) thing_inside
   = do { cc_st_var   <- newIORef newCostCentreState
+       ; next_wrapper_num <- newIORef emptyModuleEnv
        ; msg_var <- newIORef emptyMessages
        ; eps <- liftIO $ hscEPS hsc_env
        ; let unit_env = hsc_unit_env hsc_env
@@ -275,7 +285,7 @@ initDsWithModGuts hsc_env (ModGuts { mg_module = this_mod, mg_binds = binds
 
              envs  = mkDsEnvs unit_env this_mod rdr_env type_env
                               fam_inst_env msg_var cc_st_var
-                              complete_matches
+                              next_wrapper_num complete_matches
        ; runDs hsc_env envs thing_inside
        }
 
@@ -313,10 +323,11 @@ initTcDsForSolver thing_inside
            Nothing  -> pprPanic "initTcDsForSolver" (vcat $ pprMsgEnvelopeBagWithLoc (getErrorMessages msgs)) }
 
 mkDsEnvs :: UnitEnv -> Module -> GlobalRdrEnv -> TypeEnv -> FamInstEnv
-         -> IORef (Messages DiagnosticMessage) -> IORef CostCentreState -> CompleteMatches
+         -> IORef (Messages DsMessage) -> IORef CostCentreState
+         -> IORef (ModuleEnv Int) -> CompleteMatches
          -> (DsGblEnv, DsLclEnv)
 mkDsEnvs unit_env mod rdr_env type_env fam_inst_env msg_var cc_st_var
-         complete_matches
+         next_wrapper_num complete_matches
   = let if_genv = IfGblEnv { if_doc       = text "mkDsEnvs",
                              if_rec_types = Just (mod, return type_env) }
         if_lenv = mkIfLclEnv mod (text "GHC error in desugarer lookup in" <+> ppr mod)
@@ -330,6 +341,7 @@ mkDsEnvs unit_env mod rdr_env type_env fam_inst_env msg_var cc_st_var
                            , ds_msgs    = msg_var
                            , ds_complete_matches = complete_matches
                            , ds_cc_st   = cc_st_var
+                           , ds_next_wrapper_num = next_wrapper_num
                            }
         lcl_env = DsLclEnv { dsl_meta    = emptyNameEnv
                            , dsl_loc     = real_span
@@ -443,7 +455,7 @@ updPmNablas nablas = updLclEnv (\env -> env { dsl_nablas = nablas })
 
 getSrcSpanDs :: DsM SrcSpan
 getSrcSpanDs = do { env <- getLclEnv
-                  ; return (RealSrcSpan (dsl_loc env) Nothing) }
+                  ; return (RealSrcSpan (dsl_loc env) Strict.Nothing) }
 
 putSrcSpanDs :: SrcSpan -> DsM a -> DsM a
 putSrcSpanDs (UnhelpfulSpan {}) thing_inside
@@ -461,7 +473,9 @@ diagnosticDs reason warn
   = do { env <- getGblEnv
        ; loc <- getSrcSpanDs
        ; dflags <- getDynFlags
-       ; let msg = mkShortMsgEnvelope dflags reason loc (ds_unqual env) warn
+       ; let msg = mkMsgEnvelope dflags loc (ds_unqual env) $
+                   DsUnknownMessage $
+                   mkPlainDiagnostic reason noHints warn
        ; updMutVar (ds_msgs env) (\ msgs -> msg `addMessage` msgs) }
 
 -- | Emit a warning only if the correct WarningWithoutFlag is set in the DynFlags
@@ -474,7 +488,9 @@ errDs :: SDoc -> DsM ()
 errDs err
   = do  { env <- getGblEnv
         ; loc <- getSrcSpanDs
-        ; let msg = mkShortErrorMsgEnvelope loc (ds_unqual env) err
+        ; let msg = mkErrorMsgEnvelope loc (ds_unqual env) $
+                    DsUnknownMessage $
+                    mkPlainError noHints err
         ; updMutVar (ds_msgs env) (\ msgs -> msg `addMessage` msgs) }
 
 -- | Issue an error, but return the expression for (), so that we can continue

@@ -4,7 +4,7 @@
 Extracting imported and top-level names in scope
 -}
 
-{-# LANGUAGE CPP, NondecreasingIndentation #-}
+{-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -22,15 +22,11 @@ module GHC.Rename.Names (
         checkConName,
         mkChildEnv,
         findChildren,
-        dodgyMsg,
-        dodgyMsgInsert,
         findImportUsage,
         getMinimalImports,
         printMinimalImports,
         ImportDeclUsage
     ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -42,6 +38,7 @@ import GHC.Rename.Env
 import GHC.Rename.Fixity
 import GHC.Rename.Utils ( warnUnusedTopBinds, mkFieldEnv )
 
+import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
 
@@ -73,6 +70,7 @@ import GHC.Types.Basic  ( TopLevelFlag(..) )
 import GHC.Types.SourceText
 import GHC.Types.Id
 import GHC.Types.HpcInfo
+import GHC.Types.Unique.FM
 
 import GHC.Unit
 import GHC.Unit.Module.Warnings
@@ -200,9 +198,20 @@ rnImports imports = do
     stuff2 <- mapAndReportM (rnImportDecl this_mod) source
     -- Safe Haskell: See Note [Tracking Trust Transitively]
     let (decls, rdr_env, imp_avails, hpc_usage) = combine (stuff1 ++ stuff2)
-    return (decls, rdr_env, imp_avails, hpc_usage)
+    -- Update imp_boot_mods if imp_direct_mods mentions any of them
+    let final_import_avail = clobberSourceImports imp_avails
+    return (decls, rdr_env, final_import_avail, hpc_usage)
 
   where
+    clobberSourceImports imp_avails =
+      imp_avails { imp_boot_mods = imp_boot_mods' }
+      where
+        imp_boot_mods' = mergeUFM combJ id (const mempty)
+                            (imp_boot_mods imp_avails)
+                            (imp_direct_dep_mods imp_avails)
+
+        combJ (GWIB _ IsBoot) x = Just x
+        combJ r _               = Just r
     -- See Note [Combining ImportAvails]
     combine :: [(LImportDecl GhcRn,  GlobalRdrEnv, ImportAvails, AnyHpcUsage)]
             -> ([LImportDecl GhcRn], GlobalRdrEnv, ImportAvails, AnyHpcUsage)
@@ -341,7 +350,7 @@ rnImportDecl this_mod
 
     -- Compiler sanity check: if the import didn't say
     -- {-# SOURCE #-} we should not get a hi-boot file
-    WARN( (want_boot == NotBoot) && (mi_boot iface == IsBoot), ppr imp_mod_name ) do
+    warnPprTrace ((want_boot == NotBoot) && (mi_boot iface == IsBoot)) (ppr imp_mod_name) $ do
 
     -- Issue a user warning for a redundant {- SOURCE -} import
     -- NB that we arrange to read all the ordinary imports before
@@ -356,8 +365,7 @@ rnImportDecl this_mod
            (warnRedundantSourceImport imp_mod_name)
     when (mod_safe && not (safeImportsOn dflags)) $
         addErr (text "safe import can't be used as Safe Haskell isn't on!"
-                $+$ ptext (sLit $ "please enable Safe Haskell through either "
-                                   ++ "Safe, Trustworthy or Unsafe"))
+                $+$ text ("please enable Safe Haskell through either Safe, Trustworthy or Unsafe"))
 
     let
         qual_mod_name = fmap unLoc as_mod `orElse` imp_mod_name
@@ -425,6 +433,7 @@ calculateAvails home_unit iface mod_safe' want_boot imported_by =
       deps       = mi_deps iface
       trust      = getSafeMode $ mi_trust iface
       trust_pkg  = mi_trust_pkg iface
+      is_sig     = mi_hsc_src iface == HsigFile
 
       -- If the module exports anything defined in this module, just
       -- ignore it.  Reason: otherwise it looks as if there are two
@@ -452,13 +461,18 @@ calculateAvails home_unit iface mod_safe' want_boot imported_by =
       -- 'imp_finsts' if it defines an orphan or instance family; thus the
       -- orph_iface/has_iface tests.
 
-      orphans | orph_iface = ASSERT2( not (imp_sem_mod `elem` dep_orphs deps), ppr imp_sem_mod <+> ppr (dep_orphs deps) )
+      orphans | orph_iface = assertPpr (not (imp_sem_mod `elem` dep_orphs deps)) (ppr imp_sem_mod <+> ppr (dep_orphs deps)) $
                              imp_sem_mod : dep_orphs deps
               | otherwise  = dep_orphs deps
 
-      finsts | has_finsts = ASSERT2( not (imp_sem_mod `elem` dep_finsts deps), ppr imp_sem_mod <+> ppr (dep_orphs deps) )
+      finsts | has_finsts = assertPpr (not (imp_sem_mod `elem` dep_finsts deps)) (ppr imp_sem_mod <+> ppr (dep_orphs deps)) $
                             imp_sem_mod : dep_finsts deps
              | otherwise  = dep_finsts deps
+
+      -- Trusted packages are a lot like orphans.
+      trusted_pkgs | mod_safe' = S.fromList (dep_trusted_pkgs deps)
+                   | otherwise = S.empty
+
 
       pkg = moduleUnit (mi_module iface)
       ipkg = toUnitId pkg
@@ -466,47 +480,50 @@ calculateAvails home_unit iface mod_safe' want_boot imported_by =
       -- Does this import mean we now require our own pkg
       -- to be trusted? See Note [Trust Own Package]
       ptrust = trust == Sf_Trustworthy || trust_pkg
+      pkg_trust_req
+        | isHomeUnit home_unit pkg = ptrust
+        | otherwise = False
 
-      (dependent_mods, dependent_pkgs, pkg_trust_req)
-         | isHomeUnit home_unit pkg =
-            -- Imported module is from the home package
-            -- Take its dependent modules and add imp_mod itself
-            -- Take its dependent packages unchanged
-            --
-            -- NB: (dep_mods deps) might include a hi-boot file
-            -- for the module being compiled, CM. Do *not* filter
-            -- this out (as we used to), because when we've
-            -- finished dealing with the direct imports we want to
-            -- know if any of them depended on CM.hi-boot, in
-            -- which case we should do the hi-boot consistency
-            -- check.  See GHC.Iface.Load.loadHiBootInterface
-            ( GWIB { gwib_mod = moduleName imp_mod, gwib_isBoot = want_boot } : dep_mods deps
-            , dep_pkgs deps
-            , ptrust
-            )
+      dependent_pkgs = if isHomeUnit home_unit pkg
+                        then S.empty
+                        else S.fromList [ipkg]
 
-         | otherwise =
-            -- Imported module is from another package
-            -- Dump the dependent modules
-            -- Add the package imp_mod comes from to the dependent packages
-            ASSERT2( not (ipkg `elem` (map fst $ dep_pkgs deps))
-                   , ppr ipkg <+> ppr (dep_pkgs deps) )
-            ([], (ipkg, False) : dep_pkgs deps, False)
+      direct_mods = mkModDeps $ if isHomeUnit home_unit pkg
+                      then [GWIB (moduleName imp_mod) want_boot]
+                      else []
+
+      dep_boot_mods_map = mkModDeps (dep_boot_mods deps)
+
+      boot_mods
+        -- If we are looking for a boot module, it must be HPT
+        | IsBoot <- want_boot = addToUFM dep_boot_mods_map (moduleName imp_mod) (GWIB (moduleName imp_mod) IsBoot)
+        -- Now we are importing A properly, so don't go looking for
+        -- A.hs-boot
+        | isHomeUnit home_unit pkg = dep_boot_mods_map
+        -- There's no boot files to find in external imports
+        | otherwise = emptyUFM
+
+      sig_mods =
+        if is_sig
+          then moduleName imp_mod : dep_sig_mods deps
+          else dep_sig_mods deps
+
 
   in ImportAvails {
           imp_mods       = unitModuleEnv (mi_module iface) [imported_by],
           imp_orphs      = orphans,
           imp_finsts     = finsts,
-          imp_dep_mods   = mkModDeps dependent_mods,
-          imp_dep_pkgs   = S.fromList . map fst $ dependent_pkgs,
+          imp_sig_mods   = sig_mods,
+          imp_direct_dep_mods = direct_mods,
+          imp_dep_direct_pkgs = dependent_pkgs,
+          imp_boot_mods = boot_mods,
+
           -- Add in the imported modules trusted package
           -- requirements. ONLY do this though if we import the
           -- module as a safe import.
           -- See Note [Tracking Trust Transitively]
           -- and Note [Trust Transitive Property]
-          imp_trust_pkgs = if mod_safe'
-                               then S.fromList . map fst $ filter snd dependent_pkgs
-                               else S.empty,
+          imp_trust_pkgs = trusted_pkgs,
           -- Do we require our own pkg to be trusted?
           -- See Note [Trust Own Package]
           imp_trust_own_pkg = pkg_trust_req
@@ -1128,16 +1145,16 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
             -> (GreName, AvailInfo, Maybe Name)
     combine (NormalGreName name1, a1@(AvailTC p1 _), mb1)
             (NormalGreName name2, a2@(AvailTC p2 _), mb2)
-      = ASSERT2( name1 == name2 && isNothing mb1 && isNothing mb2
-               , ppr name1 <+> ppr name2 <+> ppr mb1 <+> ppr mb2 )
+      = assertPpr (name1 == name2 && isNothing mb1 && isNothing mb2)
+                  (ppr name1 <+> ppr name2 <+> ppr mb1 <+> ppr mb2) $
         if p1 == name1 then (NormalGreName name1, a1, Just p2)
                        else (NormalGreName name1, a2, Just p1)
     -- 'combine' may also be called for pattern synonyms which appear both
     -- unassociated and associated (see Note [Importing PatternSynonyms]).
     combine (c1, a1, mb1) (c2, a2, mb2)
-      = ASSERT2( c1 == c2 && isNothing mb1 && isNothing mb2
-                          && (isAvailTC a1 || isAvailTC a2)
-               , ppr c1 <+> ppr c2 <+> ppr a1 <+> ppr a2 <+> ppr mb1 <+> ppr mb2 )
+      = assertPpr (c1 == c2 && isNothing mb1 && isNothing mb2
+                          && (isAvailTC a1 || isAvailTC a2))
+                  (ppr c1 <+> ppr c2 <+> ppr a1 <+> ppr a2 <+> ppr mb1 <+> ppr mb2) $
         if isAvailTC a1 then (c1, a1, Nothing)
                         else (c1, a2, Nothing)
 
@@ -1165,9 +1182,9 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
         where
             -- Warn when importing T(..) if T was exported abstractly
             emit_warning (DodgyImport n) = whenWOptM Opt_WarnDodgyImports $
-              addDiagnostic (WarningWithFlag Opt_WarnDodgyImports) (dodgyImportWarn n)
+              addTcRnDiagnostic (TcRnDodgyImports n)
             emit_warning MissingImportList = whenWOptM Opt_WarnMissingImportList $
-              addDiagnostic (WarningWithFlag Opt_WarnMissingImportList) (missingImportListItem ieRdr)
+              addTcRnDiagnostic (TcRnMissingImportList ieRdr)
             emit_warning (BadImportW ie) = whenWOptM Opt_WarnDodgyImports $
               addDiagnostic (WarningWithFlag Opt_WarnDodgyImports) (lookup_err_msg (BadImport ie))
 
@@ -1465,6 +1482,28 @@ reportUnusedNames gbl_env hsc_src
 *                                                                      *
 ********************************************************************* -}
 
+{-
+Note [Missing signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+There are four warning flags in play:
+
+  * -Wmissing-exported-signatures
+    Warn about any exported top-level function/value without a type signature.
+    Does not include pattern synonyms.
+
+  * -Wmissing-signatures
+    Warn about any top-level function/value without a type signature. Does not
+    include pattern synonyms. Takes priority over -Wmissing-exported-signatures.
+
+  * -Wmissing-exported-pattern-synonym-signatures
+    Warn about any exported pattern synonym without a type signature.
+
+  * -Wmissing-pattern-synonym-signatures
+    Warn about any pattern synonym without a type signature. Takes priority over
+    -Wmissing-exported-pattern-synonym-signatures.
+
+-}
+
 -- | Warn the user about top level binders that lack type signatures.
 -- Called /after/ type inference, so that we can report the
 -- inferred type of the function
@@ -1478,46 +1517,56 @@ warnMissingSignatures gbl_env
 
          -- Warn about missing signatures
          -- Do this only when we have a type to offer
-       ; warn_missing_sigs  <- woptM Opt_WarnMissingSignatures
-       ; warn_only_exported <- woptM Opt_WarnMissingExportedSignatures
-       ; warn_pat_syns      <- woptM Opt_WarnMissingPatternSynonymSignatures
+       ; warn_binds             <- woptM Opt_WarnMissingSignatures
+       ; warn_exported_binds    <- woptM Opt_WarnMissingExportedSignatures
+       ; warn_pat_syns          <- woptM Opt_WarnMissingPatternSynonymSignatures
+       ; warn_exported_pat_syns <- woptM Opt_WarnMissingExportedPatternSynonymSignatures
 
+         -- See Note [Missing signatures]
        ; let add_sig_warns
-               | warn_missing_sigs  = add_warns Opt_WarnMissingSignatures
-               | warn_only_exported = add_warns Opt_WarnMissingExportedSignatures
-               | warn_pat_syns      = add_warns Opt_WarnMissingPatternSynonymSignatures
-               | otherwise          = return ()
+               = when (warn_pat_syns || warn_exported_pat_syns)
+                      (mapM_ add_pat_syn_warn pat_syns) >>
+                 when (warn_binds || warn_exported_binds)
+                      (mapM_ add_bind_warn binds)
 
-             add_warns flag
-                = when (warn_missing_sigs || warn_only_exported)
-                       (mapM_ add_bind_warn binds) >>
-                  when (warn_missing_sigs || warn_pat_syns)
-                       (mapM_ add_pat_syn_warn pat_syns)
-                where
-                  add_pat_syn_warn p
-                    = add_warn name $
-                      hang (text "Pattern synonym with no type signature:")
-                         2 (text "pattern" <+> pprPrefixName name <+> dcolon <+> pp_ty)
-                    where
-                      name  = patSynName p
-                      pp_ty = pprPatSynType p
+             add_pat_syn_warn p
+               = when export_check $
+                 add_warn name flag $
+                 hang (text "Pattern synonym with no type signature:")
+                    2 (text "pattern" <+> pprPrefixName name <+> dcolon <+> pp_ty)
+               where
+                 name  = patSynName p
+                 pp_ty = pprPatSynType p
+                 export_check = warn_pat_syns || name `elemNameSet` exports
+                 flag | warn_pat_syns
+                      = Opt_WarnMissingPatternSynonymSignatures
+                      | otherwise
+                      = Opt_WarnMissingExportedPatternSynonymSignatures
 
-                  add_bind_warn :: Id -> IOEnv (Env TcGblEnv TcLclEnv) ()
-                  add_bind_warn id
-                    = do { env <- tcInitTidyEnv     -- Why not use emptyTidyEnv?
-                         ; let name    = idName id
-                               (_, ty) = tidyOpenType env (idType id)
-                               ty_msg  = pprSigmaType ty
-                         ; add_warn name $
-                           hang (text "Top-level binding with no type signature:")
-                              2 (pprPrefixName name <+> dcolon <+> ty_msg) }
+             add_bind_warn :: Id -> IOEnv (Env TcGblEnv TcLclEnv) ()
+             add_bind_warn id
+               = do { env <- tcInitTidyEnv     -- Why not use emptyTidyEnv?
+                    ; let (_, ty) = tidyOpenType env (idType id)
+                          ty_msg  = pprSigmaType ty
 
-                  add_warn name msg
-                    = when (name `elemNameSet` sig_ns && export_check name)
-                           (addDiagnosticAt (WarningWithFlag flag) (getSrcSpan name) msg)
+                    ; when export_check $
+                      add_warn name flag $
+                      hang (text "Top-level binding with no type signature:")
+                         2 (pprPrefixName name <+> dcolon <+> ty_msg) }
+               where
+                 name = idName id
+                 export_check = warn_binds || name `elemNameSet` exports
+                 flag | warn_binds
+                      = Opt_WarnMissingSignatures
+                      | otherwise
+                      = Opt_WarnMissingExportedSignatures
 
-                  export_check name
-                    = warn_missing_sigs || not warn_only_exported || name `elemNameSet` exports
+             add_warn name flag msg
+               = when not_ghc_generated
+                      (addDiagnosticAt (WarningWithFlag flag) (getSrcSpan name) msg)
+               where
+                 not_ghc_generated
+                   = name `elemNameSet` sig_ns
 
        ; add_sig_warns }
 
@@ -1868,14 +1917,14 @@ printMinimalImports hsc_src imports_w_usage
 
 to_ie_post_rn_var :: (HasOccName name) => LocatedA name -> LIEWrappedName name
 to_ie_post_rn_var (L l n)
-  | isDataOcc $ occName n = L l (IEPattern (AR $ la2r l) (L (la2na l) n))
-  | otherwise             = L l (IEName                  (L (la2na l) n))
+  | isDataOcc $ occName n = L l (IEPattern (EpaSpan $ la2r l) (L (la2na l) n))
+  | otherwise             = L l (IEName                       (L (la2na l) n))
 
 
 to_ie_post_rn :: (HasOccName name) => LocatedA name -> LIEWrappedName name
 to_ie_post_rn (L l n)
-  | isTcOcc occ && isSymOcc occ = L l (IEType (AR $ la2r l) (L (la2na l) n))
-  | otherwise                   = L l (IEName               (L (la2na l) n))
+  | isTcOcc occ && isSymOcc occ = L l (IEType (EpaSpan $ la2r l) (L (la2na l) n))
+  | otherwise                   = L l (IEName                    (L (la2na l) n))
   where occ = occName n
 
 {-
@@ -2006,26 +2055,6 @@ badImportItemErr iface decl_spec ie avails
 illegalImportItemErr :: SDoc
 illegalImportItemErr = text "Illegal import item"
 
-dodgyImportWarn :: RdrName -> SDoc
-dodgyImportWarn item
-  = dodgyMsg (text "import") item (dodgyMsgInsert item :: IE GhcPs)
-
-dodgyMsg :: (Outputable a, Outputable b) => SDoc -> a -> b -> SDoc
-dodgyMsg kind tc ie
-  = sep [ text "The" <+> kind <+> ptext (sLit "item")
-                    -- <+> quotes (ppr (IEThingAll (noLoc (IEName $ noLoc tc))))
-                     <+> quotes (ppr ie)
-                <+> text "suggests that",
-          quotes (ppr tc) <+> text "has (in-scope) constructors or class methods,",
-          text "but it has none" ]
-
-dodgyMsgInsert :: forall p . IdP (GhcPass p) -> IE (GhcPass p)
-dodgyMsgInsert tc = IEThingAll noAnn ii
-  where
-    ii :: LIEWrappedName (IdP (GhcPass p))
-    ii = noLocA (IEName $ noLocA tc)
-
-
 addDupDeclErr :: [GlobalRdrElt] -> TcRn ()
 addDupDeclErr [] = panic "addDupDeclErr: empty list"
 addDupDeclErr gres@(gre : _)
@@ -2047,15 +2076,11 @@ addDupDeclErr gres@(gre : _)
 
 missingImportListWarn :: ModuleName -> SDoc
 missingImportListWarn mod
-  = text "The module" <+> quotes (ppr mod) <+> ptext (sLit "does not have an explicit import list")
-
-missingImportListItem :: IE GhcPs -> SDoc
-missingImportListItem ie
-  = text "The import item" <+> quotes (ppr ie) <+> ptext (sLit "does not have an explicit import list")
+  = text "The module" <+> quotes (ppr mod) <+> text "does not have an explicit import list"
 
 moduleWarn :: ModuleName -> WarningTxt -> SDoc
 moduleWarn mod (WarningTxt _ txt)
-  = sep [ text "Module" <+> quotes (ppr mod) <> ptext (sLit ":"),
+  = sep [ text "Module" <+> quotes (ppr mod) <> colon,
           nest 2 (vcat (map (ppr . sl_fs . unLoc) txt)) ]
 moduleWarn mod (DeprecatedTxt _ txt)
   = sep [ text "Module" <+> quotes (ppr mod)

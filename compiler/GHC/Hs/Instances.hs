@@ -278,9 +278,9 @@ deriving instance Data (FieldLabelStrings GhcPs)
 deriving instance Data (FieldLabelStrings GhcRn)
 deriving instance Data (FieldLabelStrings GhcTc)
 
-deriving instance Data (HsFieldLabel GhcPs)
-deriving instance Data (HsFieldLabel GhcRn)
-deriving instance Data (HsFieldLabel GhcTc)
+deriving instance Data (DotFieldOcc GhcPs)
+deriving instance Data (DotFieldOcc GhcRn)
+deriving instance Data (DotFieldOcc GhcTc)
 
 -- deriving instance (DataIdLR p p) => Data (HsPragE p)
 deriving instance Data (HsPragE GhcPs)
@@ -426,7 +426,7 @@ deriving instance Data ConPatTc
 
 deriving instance Data ListPatTc
 
-deriving instance (Data a, Data b) => Data (HsRecField' a b)
+deriving instance (Data a, Data b) => Data (HsFieldBind a b)
 
 deriving instance (Data body) => Data (HsRecFields GhcPs body)
 deriving instance (Data body) => Data (HsRecFields GhcRn body)

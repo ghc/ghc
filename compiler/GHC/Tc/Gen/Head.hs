@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP                 #-}
+
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE GADTs               #-}
@@ -24,7 +24,7 @@ module GHC.Tc.Gen.Head
 
        , tcInferAppHead, tcInferAppHead_maybe
        , tcInferId, tcCheckId
-       , obviousSig, addAmbiguousNameErr
+       , obviousSig
        , tyConOf, tyConOfET, lookupParents, fieldNotInType
        , notSelector, nonBidirectionalErr
 
@@ -33,7 +33,6 @@ module GHC.Tc.Gen.Head
 import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcExpr, tcCheckMonoExprNC, tcCheckPolyExprNC )
 
 import GHC.Tc.Gen.HsType
-import GHC.Tc.Gen.Pat
 import GHC.Tc.Gen.Bind( chooseInferredQuantifiers )
 import GHC.Tc.Gen.Sig( tcUserTypeSig, tcInstSig, lhsSigWcTypeContextSpan )
 import GHC.Tc.TyCl.PatSyn( patSynBuilderOcc )
@@ -41,11 +40,11 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Unify
 import GHC.Types.Basic
 import GHC.Tc.Utils.Instantiate
-import GHC.Tc.Instance.Family ( tcGetFamInstEnvs, tcLookupDataFamInst )
+import GHC.Tc.Instance.Family ( tcLookupDataFamInst )
 import GHC.Core.FamInstEnv    ( FamInstEnvs )
 import GHC.Core.UsageEnv      ( unitUE )
-import GHC.Rename.Env         ( addUsedGRE )
-import GHC.Rename.Utils       ( addNameClashErrRn, unknownSubordinateErr )
+import GHC.Rename.Utils       ( unknownSubordinateErr )
+import GHC.Tc.Errors.Types
 import GHC.Tc.Solver          ( InferMode(..), simplifyInfer )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Zonk      ( hsLitType )
@@ -55,7 +54,8 @@ import GHC.Tc.Utils.TcType as TcType
 import GHC.Hs
 import GHC.Types.Id
 import GHC.Types.Id.Info
-import GHC.Core.ConLike
+import GHC.Core.PatSyn( PatSyn )
+import GHC.Core.ConLike( ConLike(..) )
 import GHC.Core.DataCon
 import GHC.Types.Name
 import GHC.Types.Name.Reader
@@ -72,12 +72,10 @@ import GHC.Utils.Misc
 import GHC.Data.Maybe
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import Control.Monad
 
 import Data.Function
-import qualified Data.List.NonEmpty as NE
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -245,7 +243,7 @@ splitHsApps :: HsExpr GhcRn
 -- See Note [splitHsApps]
 splitHsApps e = go e (top_ctxt 0 e) []
   where
-    top_ctxt n (HsPar _ fun)               = top_lctxt n fun
+    top_ctxt n (HsPar _ _ fun _)           = top_lctxt n fun
     top_ctxt n (HsPragE _ _ fun)           = top_lctxt n fun
     top_ctxt n (HsAppType _ fun _)         = top_lctxt (n+1) fun
     top_ctxt n (HsApp _ fun _)             = top_lctxt (n+1) fun
@@ -256,7 +254,7 @@ splitHsApps e = go e (top_ctxt 0 e) []
 
     go :: HsExpr GhcRn -> AppCtxt -> [HsExprArg 'TcpRn]
        -> ((HsExpr GhcRn, AppCtxt), [HsExprArg 'TcpRn])
-    go (HsPar _     (L l fun))    ctxt args = go fun (set l ctxt) (EWrap (EPar ctxt)   : args)
+    go (HsPar _ _ (L l fun) _)    ctxt args = go fun (set l ctxt) (EWrap (EPar ctxt)   : args)
     go (HsPragE _ p (L l fun))    ctxt args = go fun (set l ctxt) (EPrag      ctxt p   : args)
     go (HsAppType _ (L l fun) ty) ctxt args = go fun (dec l ctxt) (mkETypeArg ctxt ty  : args)
     go (HsApp _ (L l fun) arg)    ctxt args = go fun (dec l ctxt) (mkEValArg  ctxt arg : args)
@@ -294,7 +292,7 @@ rebuildHsApps fun ctxt (arg : args)
       EPrag ctxt' p
         -> rebuildHsApps (HsPragE noExtField p lfun) ctxt' args
       EWrap (EPar ctxt')
-        -> rebuildHsApps (HsPar noAnn lfun) ctxt' args
+        -> rebuildHsApps (gHsPar lfun) ctxt' args
       EWrap (EExpand orig)
         -> rebuildHsApps (XExpr (ExpansionExpr (HsExpanded orig fun))) ctxt args
       EWrap (EHsWrap wrap)
@@ -373,22 +371,21 @@ It's easy to achieve this: `splitHsApps` unwraps `HsExpanded`.
 ********************************************************************* -}
 
 tcInferAppHead :: (HsExpr GhcRn, AppCtxt)
-               -> [HsExprArg 'TcpRn] -> Maybe TcRhoType
-               -- These two args are solely for tcInferRecSelId
+               -> [HsExprArg 'TcpRn]
                -> TcM (HsExpr GhcTc, TcSigmaType)
 -- Infer type of the head of an application
 --   i.e. the 'f' in (f e1 ... en)
 -- See Note [Application chains and heads] in GHC.Tc.Gen.App
 -- We get back a /SigmaType/ because we have special cases for
 --   * A bare identifier (just look it up)
---     This case also covers a record selector HsRecFld
+--     This case also covers a record selector HsRecSel
 --   * An expression with a type signature (e :: ty)
 -- See Note [Application chains and heads] in GHC.Tc.Gen.App
 --
--- Why do we need the arguments to infer the type of the head of
--- the application?  For two reasons:
---   * (Legitimate) The first arg has the source location of the head
---   * (Disgusting) Needed for record disambiguation; see tcInferRecSelId
+-- Why do we need the arguments to infer the type of the head of the
+-- application? Simply to inform add_head_ctxt about whether or not
+-- to put push a new "In the expression..." context. (We don't push a
+-- new one if there are no arguments, because we already have.)
 --
 -- Note that [] and (,,) are both HsVar:
 --   see Note [Empty lists] and [ExplicitTuple] in GHC.Hs.Expr
@@ -397,24 +394,23 @@ tcInferAppHead :: (HsExpr GhcRn, AppCtxt)
 --     cases are dealt with by splitHsApps.
 --
 -- See Note [tcApp: typechecking applications] in GHC.Tc.Gen.App
-tcInferAppHead (fun,ctxt) args mb_res_ty
+tcInferAppHead (fun,ctxt) args
   = setSrcSpan (appCtxtLoc ctxt) $
-    do { mb_tc_fun <- tcInferAppHead_maybe fun args mb_res_ty
+    do { mb_tc_fun <- tcInferAppHead_maybe fun args
        ; case mb_tc_fun of
             Just (fun', fun_sigma) -> return (fun', fun_sigma)
             Nothing -> add_head_ctxt fun args $
                        tcInfer (tcExpr fun) }
 
 tcInferAppHead_maybe :: HsExpr GhcRn
-                     -> [HsExprArg 'TcpRn] -> Maybe TcRhoType
-                        -- These two args are solely for tcInferRecSelId
+                     -> [HsExprArg 'TcpRn]
                      -> TcM (Maybe (HsExpr GhcTc, TcSigmaType))
 -- See Note [Application chains and heads] in GHC.Tc.Gen.App
 -- Returns Nothing for a complicated head
-tcInferAppHead_maybe fun args mb_res_ty
+tcInferAppHead_maybe fun args
   = case fun of
       HsVar _ (L _ nm)          -> Just <$> tcInferId nm
-      HsRecFld _ f              -> Just <$> tcInferRecSelId f args mb_res_ty
+      HsRecSel _ f              -> Just <$> tcInferRecSelId f
       ExprWithTySig _ e hs_ty   -> add_head_ctxt fun args $
                                    Just <$> tcExprWithSig e hs_ty
       HsOverLit _ lit           -> Just <$> tcInferOverLit lit
@@ -434,224 +430,46 @@ add_head_ctxt fun args thing_inside
 *                                                                      *
 ********************************************************************* -}
 
-{-
-Note [Deprecating ambiguous fields]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In the future, the -XDuplicateRecordFields extension will no longer support
-disambiguating record fields during type-checking (as described in Note
-[Disambiguating record fields]).  For now, the -Wambiguous-fields option will
-emit a warning whenever an ambiguous field is resolved using type information.
-In a subsequent GHC release, this functionality will be removed and the warning
-will turn into an ambiguity error in the renamer.
-
-For background information, see GHC proposal #366
-(https://github.com/ghc-proposals/ghc-proposals/pull/366).
-
-
-Note [Disambiguating record fields]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-NB. The following is going to be removed: see
-Note [Deprecating ambiguous fields].
-
-When the -XDuplicateRecordFields extension is used, and the renamer
-encounters a record selector or update that it cannot immediately
-disambiguate (because it involves fields that belong to multiple
-datatypes), it will defer resolution of the ambiguity to the
-typechecker.  In this case, the `Ambiguous` constructor of
-`AmbiguousFieldOcc` is used.
-
-Consider the following definitions:
-
-        data S = MkS { foo :: Int }
-        data T = MkT { foo :: Int, bar :: Int }
-        data U = MkU { bar :: Int, baz :: Int }
-
-When the renamer sees `foo` as a selector or an update, it will not
-know which parent datatype is in use.
-
-For selectors, there are two possible ways to disambiguate:
-
-1. Check if the pushed-in type is a function whose domain is a
-   datatype, for example:
-
-       f s = (foo :: S -> Int) s
-
-       g :: T -> Int
-       g = foo
-
-    This is checked by `tcCheckRecSelId` when checking `HsRecFld foo`.
-
-2. Check if the selector is applied to an argument that has a type
-   signature, for example:
-
-       h = foo (s :: S)
-
-    This is checked by `tcInferRecSelId`.
-
-
-Updates are slightly more complex.  The `disambiguateRecordBinds`
-function tries to determine the parent datatype in three ways:
-
-1. Check for types that have all the fields being updated. For example:
-
-        f x = x { foo = 3, bar = 2 }
-
-   Here `f` must be updating `T` because neither `S` nor `U` have
-   both fields. This may also discover that no possible type exists.
-   For example the following will be rejected:
-
-        f' x = x { foo = 3, baz = 3 }
-
-2. Use the type being pushed in, if it is already a TyConApp. The
-   following are valid updates to `T`:
-
-        g :: T -> T
-        g x = x { foo = 3 }
-
-        g' x = x { foo = 3 } :: T
-
-3. Use the type signature of the record expression, if it exists and
-   is a TyConApp. Thus this is valid update to `T`:
-
-        h x = (x :: T) { foo = 3 }
-
-
-Note that we do not look up the types of variables being updated, and
-no constraint-solving is performed, so for example the following will
-be rejected as ambiguous:
-
-     let bad (s :: S) = foo s
-
-     let r :: T
-         r = blah
-     in r { foo = 3 }
-
-     \r. (r { foo = 3 },  r :: T )
-
-We could add further tests, of a more heuristic nature. For example,
-rather than looking for an explicit signature, we could try to infer
-the type of the argument to a selector or the record expression being
-updated, in case we are lucky enough to get a TyConApp straight
-away. However, it might be hard for programmers to predict whether a
-particular update is sufficiently obvious for the signature to be
-omitted. Moreover, this might change the behaviour of typechecker in
-non-obvious ways.
-
-See also Note [HsRecField and HsRecUpdField] in GHC.Hs.Pat.
--}
-
-tcInferRecSelId :: AmbiguousFieldOcc GhcRn
-                -> [HsExprArg 'TcpRn] -> Maybe TcRhoType
+tcInferRecSelId :: FieldOcc GhcRn
                 -> TcM (HsExpr GhcTc, TcSigmaType)
-tcInferRecSelId (Unambiguous sel_name lbl) _args _mb_res_ty
-   = do { sel_id <- tc_rec_sel_id lbl sel_name
-        ; let expr = HsRecFld noExtField (Unambiguous sel_id lbl)
-        ; return (expr, idType sel_id) }
+tcInferRecSelId (FieldOcc sel_name lbl)
+   = do { sel_id <- tc_rec_sel_id
+        ; let expr = HsRecSel noExtField (FieldOcc sel_id lbl)
+        ; return (expr, idType sel_id)
+        }
+     where
+       occ :: OccName
+       occ = rdrNameOcc (unLoc lbl)
 
-tcInferRecSelId (Ambiguous _ lbl) args mb_res_ty
-   = do { sel_name <- tcInferAmbiguousRecSelId lbl args mb_res_ty
-        ; sel_id   <- tc_rec_sel_id lbl sel_name
-        ; let expr = HsRecFld noExtField (Ambiguous sel_id lbl)
-        ; return (expr, idType sel_id) }
+       tc_rec_sel_id :: TcM TcId
+       -- Like tc_infer_id, but returns an Id not a HsExpr,
+       -- so we can wrap it back up into a HsRecSel
+       tc_rec_sel_id
+         = do { thing <- tcLookup sel_name
+              ; case thing of
+                    ATcId { tct_id = id }
+                      -> do { check_naughty occ id
+                            ; check_local_id id
+                            ; return id }
 
-------------------------
-tc_rec_sel_id :: LocatedN RdrName -> Name -> TcM TcId
--- Like tc_infer_id, but returns an Id not a HsExpr,
--- so we can wrap it back up into a HsRecFld
-tc_rec_sel_id lbl sel_name
-  = do { thing <- tcLookup sel_name
-       ; case thing of
-             ATcId { tct_id = id }
-               -> do { check_naughty occ id
-                     ; check_local_id id
-                     ; return id }
+                    AGlobal (AnId id)
+                      -> do { check_naughty occ id
+                            ; return id }
+                           -- A global cannot possibly be ill-staged
+                           -- nor does it need the 'lifting' treatment
+                           -- hence no checkTh stuff here
 
-             AGlobal (AnId id)
-               -> do { check_naughty occ id
-                     ; return id }
-                    -- A global cannot possibly be ill-staged
-                    -- nor does it need the 'lifting' treatment
-                    -- hence no checkTh stuff here
-
-             _ -> failWithTc $
-                  ppr thing <+> text "used where a value identifier was expected" }
-  where
-    occ = rdrNameOcc (unLoc lbl)
+                    _ -> failWithTc $
+                         ppr thing <+> text "used where a value identifier was expected" }
 
 ------------------------
-tcInferAmbiguousRecSelId :: LocatedN RdrName
-                         -> [HsExprArg 'TcpRn] -> Maybe TcRhoType
-                         -> TcM Name
--- Disgusting special case for ambiguous record selectors
--- Given a RdrName that refers to multiple record fields, and the type
--- of its argument, try to determine the name of the selector that is
--- meant.
--- See Note [Disambiguating record fields]
-tcInferAmbiguousRecSelId lbl args mb_res_ty
-  | arg1 : _ <- dropWhile (not . isVisibleArg) args -- A value arg is first
-  , EValArg { eva_arg = ValArg (L _ arg) } <- arg1
-  , Just sig_ty <- obviousSig arg  -- A type sig on the arg disambiguates
-  = do { sig_tc_ty <- tcHsSigWcType (ExprSigCtxt NoRRC) sig_ty
-       ; finish_ambiguous_selector lbl sig_tc_ty }
-
-  | Just res_ty <- mb_res_ty
-  , Just (arg_ty,_) <- tcSplitFunTy_maybe res_ty
-  = finish_ambiguous_selector lbl (scaledThing arg_ty)
-
-  | otherwise
-  = ambiguousSelector lbl
-
-finish_ambiguous_selector :: LocatedN RdrName -> Type -> TcM Name
-finish_ambiguous_selector lr@(L _ rdr) parent_type
- = do { fam_inst_envs <- tcGetFamInstEnvs
-      ; case tyConOf fam_inst_envs parent_type of {
-          Nothing -> ambiguousSelector lr ;
-          Just p  ->
-
-    do { xs <- lookupParents True rdr
-       ; let parent = RecSelData p
-       ; case lookup parent xs of {
-           Nothing  -> failWithTc (fieldNotInType parent rdr) ;
-           Just gre ->
-
-    -- See Note [Unused name reporting and HasField] in GHC.Tc.Instance.Class
-    do { addUsedGRE True gre
-       ; keepAlive (greMangledName gre)
-         -- See Note [Deprecating ambiguous fields]
-       ; warnIfFlag Opt_WarnAmbiguousFields True $
-          vcat [ text "The field" <+> quotes (ppr rdr)
-                   <+> text "belonging to type" <+> ppr parent_type
-                   <+> text "is ambiguous."
-               , text "This will not be supported by -XDuplicateRecordFields in future releases of GHC."
-               , if isLocalGRE gre
-                 then text "You can use explicit case analysis to resolve the ambiguity."
-                 else text "You can use a qualified import or explicit case analysis to resolve the ambiguity."
-               ]
-       ; return (greMangledName gre) } } } } }
-
--- This field name really is ambiguous, so add a suitable "ambiguous
--- occurrence" error, then give up.
-ambiguousSelector :: LocatedN RdrName -> TcM a
-ambiguousSelector (L _ rdr)
-  = do { addAmbiguousNameErr rdr
-       ; failM }
-
--- | This name really is ambiguous, so add a suitable "ambiguous
--- occurrence" error, then continue
-addAmbiguousNameErr :: RdrName -> TcM ()
-addAmbiguousNameErr rdr
-  = do { env <- getGlobalRdrEnv
-       ; let gres = lookupGRE_RdrName rdr env
-       ; case gres of
-         [] -> panic "addAmbiguousNameErr: not found"
-         gre : gres -> setErrCtxt [] $ addNameClashErrRn rdr $ gre NE.:| gres}
 
 -- A type signature on the argument of an ambiguous record selector or
 -- the record expression in an update must be "obvious", i.e. the
 -- outermost constructor ignoring parentheses.
 obviousSig :: HsExpr GhcRn -> Maybe (LHsSigWcType GhcRn)
 obviousSig (ExprWithTySig _ _ ty) = Just ty
-obviousSig (HsPar _ p)            = obviousSig (unLoc p)
+obviousSig (HsPar _ _ p _)        = obviousSig (unLoc p)
 obviousSig (HsPragE _ _ p)        = obviousSig (unLoc p)
 obviousSig _                      = Nothing
 
@@ -897,12 +715,8 @@ tc_infer_id id_name
                -- Hence no checkTh stuff here
 
              AGlobal (AConLike cl) -> case cl of
-                 RealDataCon con -> return_data_con con
-                 PatSynCon ps
-                   | Just (expr, ty) <- patSynBuilderOcc ps
-                   -> return (expr, ty)
-                   | otherwise
-                   -> failWithTc (nonBidirectionalErr id_name)
+                 RealDataCon con -> tcInferDataCon con
+                 PatSynCon ps    -> tcInferPatSyn id_name ps
 
              AGlobal (ATyCon ty_con)
                -> fail_tycon global_env ty_con
@@ -931,49 +745,6 @@ tc_infer_id id_name
 
     return_id id = return (HsVar noExtField (noLocA id), idType id)
 
-    return_data_con con
-      = do { let tvs = dataConUserTyVarBinders con
-                 theta = dataConOtherTheta con
-                 args = dataConOrigArgTys con
-                 res = dataConOrigResTy con
-
-           -- See Note [Linear fields generalization]
-           ; mul_vars <- newFlexiTyVarTys (length args) multiplicityTy
-           ; let scaleArgs args' = zipWithEqual "return_data_con" combine mul_vars args'
-                 combine var (Scaled One ty) = Scaled var ty
-                 combine _   scaled_ty       = scaled_ty
-                   -- The combine function implements the fact that, as
-                   -- described in Note [Linear fields generalization], if a
-                   -- field is not linear (last line) it isn't made polymorphic.
-
-                 etaWrapper arg_tys = foldr (\scaled_ty wr -> WpFun WpHole wr scaled_ty empty) WpHole arg_tys
-
-           -- See Note [Instantiating stupid theta]
-           ; let shouldInstantiate = (not (null (dataConStupidTheta con)) ||
-                                      isKindLevPoly (tyConResKind (dataConTyCon con)))
-           ; case shouldInstantiate of
-               True -> do { (subst, tvs') <- newMetaTyVars (binderVars tvs)
-                           ; let tys'   = mkTyVarTys tvs'
-                                 theta' = substTheta subst theta
-                                 args'  = substScaledTys subst args
-                                 res'   = substTy subst res
-                           ; wrap <- instCall (OccurrenceOf id_name) tys' theta'
-                           ; let scaled_arg_tys = scaleArgs args'
-                                 eta_wrap = etaWrapper scaled_arg_tys
-                           ; addDataConStupidTheta con tys'
-                           ; return ( mkHsWrap (eta_wrap <.> wrap)
-                                               (HsConLikeOut noExtField (RealDataCon con))
-                                    , mkVisFunTys scaled_arg_tys res')
-                           }
-               False -> let scaled_arg_tys = scaleArgs args
-                            wrap1 = mkWpTyApps (mkTyVarTys $ binderVars tvs)
-                            eta_wrap = etaWrapper (map unrestricted theta ++ scaled_arg_tys)
-                            wrap2 = mkWpTyLams $ binderVars tvs
-                        in return ( mkHsWrap (wrap2 <.> eta_wrap <.> wrap1)
-                                             (HsConLikeOut noExtField (RealDataCon con))
-                                  , mkInvisForAllTys tvs $ mkInvisFunTysMany theta $ mkVisFunTys scaled_arg_tys res)
-           }
-
 check_local_id :: Id -> TcM ()
 check_local_id id
   = do { checkThLocalId id
@@ -984,47 +755,100 @@ check_naughty lbl id
   | isNaughtyRecordSelector id = failWithTc (naughtyRecordSel lbl)
   | otherwise                  = return ()
 
+tcInferDataCon :: DataCon -> TcM (HsExpr GhcTc, TcSigmaType)
+-- See Note [Typechecking data constructors]
+tcInferDataCon con
+  = do { let tvs   = dataConUserTyVarBinders con
+             theta = dataConOtherTheta con
+             args  = dataConOrigArgTys con
+             res   = dataConOrigResTy con
+             stupid_theta = dataConStupidTheta con
+
+       ; scaled_arg_tys <- mapM linear_to_poly args
+
+       ; let full_theta  = stupid_theta ++ theta
+             all_arg_tys = map unrestricted full_theta ++ scaled_arg_tys
+                -- stupid-theta must come first
+                -- See Note [Instantiating stupid theta]
+
+       ; return ( XExpr (ConLikeTc (RealDataCon con) tvs all_arg_tys)
+                , mkInvisForAllTys tvs $ mkPhiTy full_theta $
+                  mkVisFunTys scaled_arg_tys res ) }
+  where
+    linear_to_poly :: Scaled Type -> TcM (Scaled Type)
+    -- linear_to_poly implements point (3,4)
+    -- of Note [Typechecking data constructors]
+    linear_to_poly (Scaled One ty) = do { mul_var <- newFlexiTyVarTy multiplicityTy
+                                        ; return (Scaled mul_var ty) }
+    linear_to_poly scaled_ty       = return scaled_ty
+
+tcInferPatSyn :: Name -> PatSyn -> TcM (HsExpr GhcTc, TcSigmaType)
+tcInferPatSyn id_name ps
+  = case patSynBuilderOcc ps of
+       Just (expr,ty) -> return (expr,ty)
+       Nothing        -> failWithTc (nonBidirectionalErr id_name)
+
 nonBidirectionalErr :: Outputable name => name -> SDoc
 nonBidirectionalErr name = text "non-bidirectional pattern synonym"
                            <+> quotes (ppr name) <+> text "used in an expression"
 
-{-
-Note [Linear fields generalization]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-As per Note [Polymorphisation of linear fields], linear field of data
-constructors get a polymorphic type when the data constructor is used as a term.
+{- Note [Typechecking data constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+As per Note [Polymorphisation of linear fields] in
+GHC.Core.Multiplicity, linear fields of data constructors get a
+polymorphic multiplicity when the data constructor is used as a term:
 
-    Just :: forall {p} a. a #p-> Maybe a
+    Just :: forall {p} a. a %p -> Maybe a
 
-This rule is known only to the typechecker: Just keeps its linear type in Core.
+So at an occurrence of a data constructor we do the following,
+mostly in tcInferDataCon:
 
-In order to desugar this generalised typing rule, we simply eta-expand:
+1. Get its type, say
+    K :: forall (r :: RuntimeRep) (a :: TYPE r). a %1 -> T r a
+   Note the %1: it is linear
 
-    \a (x # p :: a) -> Just @a x
+2. We are going to return a ConLikeTc, thus:
+     XExpr (ConLikeTc K [r,a] [Scaled p a])
+      :: forall (r :: RuntimeRep) (a :: Type r). a %p -> T r a
+   where 'p' is a fresh multiplicity unification variable.
 
-has the appropriate type. We insert these eta-expansion with WpFun wrappers.
+   To get the returned ConLikeTc, we allocate a fresh multiplicity
+   variable for each linear argument, and store the type, scaled by
+   the fresh multiplicity variable in the ConLikeTc; along with
+   the type of the ConLikeTc. This is done by linear_to_poly.
 
-A small hitch: if the constructor is levity-polymorphic (unboxed tuples, sums,
-certain newtypes with -XUnliftedNewtypes) then this strategy produces
+3. If the argument is not linear (perhaps explicitly declared as
+   non-linear by the user), don't bother with this.
 
-    \r1 r2 a b (x # p :: a) (y # q :: b) -> (# a, b #)
+4. The (ConLikeTc K [r,a] [Scaled p a]) is later desugared by
+   GHC.HsToCore.Expr.dsConLike to:
+     (/\r a. \(x %p :: a). K @r @a x)
+   which has the desired type given in the previous bullet.
+   The 'p' is the multiplicity unification variable, which
+   will by now have been unified to something, or defaulted in
+   `GHC.Tc.Utils.Zonk.commitFlexi`. So it won't just be an
+   (unbound) variable.
 
-Which has type
+Wrinkles
 
-    forall r1 r2 a b. a #p-> b #q-> (# a, b #)
+* Why put [InvisTVBinder] in ConLikeTc, when we only need [TyVar] to
+  desugar?  It's a bit of a toss-up, but having [InvisTvBinder] supports
+  a future hsExprType :: HsExpr GhcTc -> Type
 
-Which violates the levity-polymorphism restriction see Note [Levity polymorphism
-checking] in DsMonad.
+* Note that the [InvisTvBinder] is strictly redundant anyway; it's
+  just the dataConUserTyVarBinders of the data constructor.  Similarly
+  in the [Scaled TcType] field of ConLikeTc, the type comes directly
+  from the data constructor.  The only bit that /isn't/ redundant is the
+  fresh multiplicity variables!
 
-So we really must instantiate r1 and r2 rather than quantify over them.  For
-simplicity, we just instantiate the entire type, as described in Note
-[Instantiating stupid theta]. It breaks visible type application with unboxed
-tuples, sums and levity-polymorphic newtypes, but this doesn't appear to be used
-anywhere.
+  So an alternative would be to define ConLikeTc like this:
+      | ConLikeTc [TcType]    -- Just the multiplicity variables
+  But then the desugarer (and hsExprType, when we implement it) would
+  need to repeat some of the work done here.  So for now at least
+  ConLikeTc records this strictly-redundant info.
 
-A better plan: let's force all representation variable to be *inferred*, so that
-they are not subject to visible type applications. Then we can instantiate
-inferred argument eagerly.
+* See Note [Instantiating stupid theta] for an extra wrinkle
+
 
 Note [Adding the implicit parameter to 'assert']
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1037,15 +861,31 @@ being able to reconstruct the exact original program.
 
 Note [Instantiating stupid theta]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Normally, when we infer the type of an Id, we don't instantiate,
-because we wish to allow for visible type application later on.
-But if a datacon has a stupid theta, we're a bit stuck. We need
-to emit the stupid theta constraints with instantiated types. It's
-difficult to defer this to the lazy instantiation, because a stupid
-theta has no spot to put it in a type. So we just instantiate eagerly
-in this case. Thus, users cannot use visible type application with
-a data constructor sporting a stupid theta. I won't feel so bad for
-the users that complain.
+Consider a data type with a "stupid theta":
+  data Ord a => T a = MkT (Maybe a)
+
+We want to generate an Ord constraint for every use of MkT; but
+we also want to allow visible type application, such as
+   MkT @Int
+
+So we generate (ConLikeTc MkT [a] [Ord a, Maybe a]), with type
+   forall a. Ord a => Maybe a -> T a
+
+Now visible type application will work fine. But we desugar the
+ConLikeTc to
+   /\a \(d:Ord a) (x:Maybe a). MkT x
+Notice that 'd' is dropped in this desugaring. We don't need it;
+it was only there to generate a Wanted constraint. (That is why
+it is stupid.)  To achieve this:
+
+* We put the stupid-thata at the front of the list of argument
+  types in ConLikeTc
+
+* GHC.HsToCore.Expr.dsConLike generates /lambdas/ for all the
+  arguments, but drops the stupid-theta arguments when building the
+  /application/.
+
+Nice.
 -}
 
 {-
@@ -1115,9 +955,7 @@ checkCrossStageLifting top_lvl id (Brack _ (TcPending ps_var lie_var q))
                                        [getRuntimeRep id_ty, id_ty]
 
                    -- Warning for implicit lift (#17804)
-        ; addDiagnosticTc (WarningWithFlag Opt_WarnImplicitLift)
-                          (text "The variable" <+> quotes (ppr id) <+>
-                           text "is implicitly lifted in the TH quotation")
+        ; addDetailedDiagnostic (TcRnImplicitLift id)
 
                    -- Update the pending splices
         ; ps <- readMutVar ps_var
@@ -1184,7 +1022,7 @@ addFunResCtxt fun args fun_res_ty env_ty thing_inside
                            Just env_ty -> zonkTcType env_ty
                            Nothing     ->
                              do { dumping <- doptM Opt_D_dump_tc_trace
-                                ; MASSERT( dumping )
+                                ; massert dumping
                                 ; newFlexiTyVarTy liftedTypeKind }
            ; let -- See Note [Splitting nested sigma types in mismatched
                  --           function types]

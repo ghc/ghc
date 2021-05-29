@@ -59,9 +59,9 @@ data DwarfInfo
                      , dwName :: String
                      , dwProducer :: String
                      , dwCompDir :: String
-                     , dwLowLabel :: CLabel
-                     , dwHighLabel :: CLabel
-                     , dwLineLabel :: PtrString }
+                     , dwLowLabel :: SDoc
+                     , dwHighLabel :: SDoc
+                     , dwLineLabel :: SDoc }
   | DwarfSubprogram { dwChildren :: [DwarfInfo]
                     , dwName :: String
                     , dwLabel :: CLabel
@@ -111,7 +111,7 @@ pprAbbrevDecls platform haveDebugLine =
            , (dW_AT_frame_base, dW_FORM_block1)
            ]
   in dwarfAbbrevSection platform $$
-     ptext dwarfAbbrevLabel <> colon $$
+     dwarfAbbrevLabel <> colon $$
      mkAbbrev DwAbbrCompileUnit dW_TAG_compile_unit dW_CHILDREN_yes
        ([(dW_AT_name,     dW_FORM_string)
        , (dW_AT_producer, dW_FORM_string)
@@ -178,10 +178,10 @@ pprDwarfInfoOpen platform haveSrc (DwarfCompileUnit _ name producer compDir lowL
   $$ pprData4 dW_LANG_Haskell
   $$ pprString compDir
      -- Offset due to Note [Info Offset]
-  $$ pprWord platform (pdoc platform lowLabel <> text "-1")
-  $$ pprWord platform (pdoc platform highLabel)
+  $$ pprWord platform (lowLabel <> text "-1")
+  $$ pprWord platform highLabel
   $$ if haveSrc
-     then sectionOffset platform (ptext lineLbl) (ptext dwarfLineLabel)
+     then sectionOffset platform lineLbl dwarfLineLabel
      else empty
 pprDwarfInfoOpen platform _ (DwarfSubprogram _ name label parent) =
   pdoc platform (mkAsmTempDieLabel label) <> colon
@@ -199,7 +199,7 @@ pprDwarfInfoOpen platform _ (DwarfSubprogram _ name label parent) =
     abbrev = case parent of Nothing -> DwAbbrSubprogram
                             Just _  -> DwAbbrSubprogramWithParent
     parentValue = maybe empty pprParentDie parent
-    pprParentDie sym = sectionOffset platform (pdoc platform sym) (ptext dwarfInfoLabel)
+    pprParentDie sym = sectionOffset platform (pdoc platform sym) dwarfInfoLabel
 pprDwarfInfoOpen platform _ (DwarfBlock _ label Nothing) =
   pdoc platform (mkAsmTempDieLabel label) <> colon
   $$ pprAbbrev DwAbbrBlockWithoutCode
@@ -245,8 +245,7 @@ pprDwarfARanges platform arngs unitU =
       initialLength = 8 + paddingSize + (1 + length arngs) * 2 * wordSize
   in pprDwWord (ppr initialLength)
      $$ pprHalf 2
-     $$ sectionOffset platform (pdoc platform $ mkAsmTempLabel $ unitU)
-                               (ptext dwarfInfoLabel)
+     $$ sectionOffset platform (pdoc platform $ mkAsmTempLabel $ unitU) dwarfInfoLabel
      $$ pprByte (fromIntegral wordSize)
      $$ pprByte 0
      $$ pad paddingSize
@@ -364,8 +363,7 @@ pprFrameProc platform frameLbl initUw (DwarfFrameProc procLbl hasInfo blocks)
     in vcat [ whenPprDebug $ text "# Unwinding for" <+> pdoc platform procLbl <> colon
             , pprData4' (pdoc platform fdeEndLabel <> char '-' <> pdoc platform fdeLabel)
             , pdoc platform fdeLabel <> colon
-            , pprData4' (pdoc platform frameLbl <> char '-' <>
-                         ptext dwarfFrameLabel)    -- Reference to CIE
+            , pprData4' (pdoc platform frameLbl <> char '-' <> dwarfFrameLabel)    -- Reference to CIE
             , pprWord platform (pdoc platform procLbl <> ifInfo "-1") -- Code pointer
             , pprWord platform (pdoc platform procEnd <> char '-' <>
                                  pdoc platform procLbl <> ifInfo "+1") -- Block byte length

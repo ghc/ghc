@@ -1,6 +1,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE DataKinds #-}
 
 module GHC.Parser.Types
    ( SumOrTuple(..)
@@ -26,9 +27,9 @@ import GHC.Parser.Annotation
 import Language.Haskell.Syntax
 
 data SumOrTuple b
-  = Sum ConTag Arity (LocatedA b) [EpaAnchor] [EpaAnchor]
+  = Sum ConTag Arity (LocatedA b) [EpaLocation] [EpaLocation]
   -- ^ Last two are the locations of the '|' before and after the payload
-  | Tuple [Either (EpAnn' EpaAnchor) (LocatedA b)]
+  | Tuple [Either (EpAnn EpaLocation) (LocatedA b)]
 
 pprSumOrTuple :: Outputable b => Boxity -> SumOrTuple b -> SDoc
 pprSumOrTuple boxity = \case
@@ -52,19 +53,19 @@ pprSumOrTuple boxity = \case
 -- | See Note [Ambiguous syntactic categories] and Note [PatBuilder]
 data PatBuilder p
   = PatBuilderPat (Pat p)
-  | PatBuilderPar (LocatedA (PatBuilder p)) AnnParen
+  | PatBuilderPar (LHsToken "(" p) (LocatedA (PatBuilder p)) (LHsToken ")" p)
   | PatBuilderApp (LocatedA (PatBuilder p)) (LocatedA (PatBuilder p))
-  | PatBuilderAppType (LocatedA (PatBuilder p)) SrcSpan (HsPatSigType GhcPs)
+  | PatBuilderAppType (LocatedA (PatBuilder p)) (HsPatSigType GhcPs)
   | PatBuilderOpApp (LocatedA (PatBuilder p)) (LocatedN RdrName)
-                    (LocatedA (PatBuilder p)) EpAnn
+                    (LocatedA (PatBuilder p)) (EpAnn [AddEpAnn])
   | PatBuilderVar (LocatedN RdrName)
   | PatBuilderOverLit (HsOverLit GhcPs)
 
 instance Outputable (PatBuilder GhcPs) where
   ppr (PatBuilderPat p) = ppr p
-  ppr (PatBuilderPar (L _ p) _) = parens (ppr p)
+  ppr (PatBuilderPar _ (L _ p) _) = parens (ppr p)
   ppr (PatBuilderApp (L _ p1) (L _ p2)) = ppr p1 <+> ppr p2
-  ppr (PatBuilderAppType (L _ p) _ t) = ppr p <+> text "@" <> ppr t
+  ppr (PatBuilderAppType (L _ p) t) = ppr p <+> text "@" <> ppr t
   ppr (PatBuilderOpApp (L _ p1) op (L _ p2) _) = ppr p1 <+> ppr op <+> ppr p2
   ppr (PatBuilderVar v) = ppr v
   ppr (PatBuilderOverLit l) = ppr l

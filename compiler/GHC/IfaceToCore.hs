@@ -6,7 +6,7 @@
 Type checking of type signatures in interface files
 -}
 
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE NondecreasingIndentation #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
@@ -23,8 +23,6 @@ module GHC.IfaceToCore (
         tcIfaceGlobal,
         tcIfaceOneShot
  ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -74,6 +72,8 @@ import GHC.Unit.Home.ModInfo
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
+import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Logger
 
 import GHC.Data.Bag
@@ -1291,12 +1291,22 @@ tcIfaceCompleteMatches :: [IfaceCompleteMatch] -> IfL [CompleteMatch]
 tcIfaceCompleteMatches = mapM tcIfaceCompleteMatch
 
 tcIfaceCompleteMatch :: IfaceCompleteMatch -> IfL CompleteMatch
-tcIfaceCompleteMatch (IfaceCompleteMatch ms mtc) = do
-  conlikes <- mkUniqDSet <$> mapM (forkM doc . tcIfaceConLike) ms
+tcIfaceCompleteMatch (IfaceCompleteMatch ms mtc) = forkM doc $ do -- See Note [Positioning of forkM]
+  conlikes <- mkUniqDSet <$> mapM tcIfaceConLike ms
   mtc' <- traverse tcIfaceTyCon mtc
   return (CompleteMatch conlikes mtc')
   where
     doc = text "COMPLETE sig" <+> ppr ms
+
+{- Note [Positioning of forkM]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We need to be lazy when type checking the interface, since these functions are
+called when the interface itself is being loaded, which means it is not in the
+PIT yet. In particular, the `tcIfaceTCon` must be inside the forkM, otherwise
+we'll try to look it up the TyCon, find it's not there, and so initiate the
+process (again) of loading the (very same) interface file. Result: infinite
+loop. See #19744.
+-}
 
 {-
 ************************************************************************
@@ -1418,6 +1428,7 @@ tcIfaceUnivCoProv :: IfaceUnivCoProv -> IfL UnivCoProvenance
 tcIfaceUnivCoProv (IfacePhantomProv kco)    = PhantomProv <$> tcIfaceCo kco
 tcIfaceUnivCoProv (IfaceProofIrrelProv kco) = ProofIrrelProv <$> tcIfaceCo kco
 tcIfaceUnivCoProv (IfacePluginProv str)     = return $ PluginProv str
+tcIfaceUnivCoProv (IfaceCorePrepProv b)     = return $ CorePrepProv b
 
 {-
 ************************************************************************
@@ -1556,12 +1567,12 @@ tcIfaceAlt :: CoreExpr -> Mult -> (TyCon, [Type])
            -> IfaceAlt
            -> IfL CoreAlt
 tcIfaceAlt _ _ _ (IfaceAlt IfaceDefault names rhs)
-  = ASSERT( null names ) do
+  = assert (null names) $ do
     rhs' <- tcIfaceExpr rhs
     return (Alt DEFAULT [] rhs')
 
 tcIfaceAlt _ _ _ (IfaceAlt (IfaceLitAlt lit) names rhs)
-  = ASSERT( null names ) do
+  = assert (null names) $ do
     lit' <- tcIfaceLit lit
     rhs' <- tcIfaceExpr rhs
     return (Alt (LitAlt lit') [] rhs')

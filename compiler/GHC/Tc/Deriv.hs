@@ -4,7 +4,7 @@
 
 -}
 
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -12,8 +12,6 @@
 
 -- | Handles @deriving@ clauses on @data@ declarations.
 module GHC.Tc.Deriv ( tcDeriving, DerivInfo(..) ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -61,8 +59,8 @@ import GHC.Types.SrcLoc
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Utils.Logger
-import GHC.Data.FastString
 import GHC.Data.Bag
 import GHC.Utils.FV as FV (fvVarList, unionFV, mkFVs)
 import qualified GHC.LanguageExtensions as LangExt
@@ -171,6 +169,8 @@ data DerivInfo = DerivInfo { di_rep_tc  :: TyCon
                              -- or the *representation* tycon for data families
                            , di_scoped_tvs :: ![(Name,TyVar)]
                              -- ^ Variables that scope over the deriving clause.
+                             -- See @Note [Scoped tyvars in a TcTyCon]@ in
+                             -- "GHC.Core.TyCon".
                            , di_clauses :: [LHsDerivingClause GhcRn]
                            , di_ctxt    :: SDoc -- ^ error context
                            }
@@ -251,10 +251,10 @@ tcDeriving deriv_infos deriv_decls
       =    hang (text "Derived class instances:")
               2 (vcat (map (\i -> pprInstInfoDetails i $$ text "") (bagToList inst_infos))
                  $$ ppr extra_binds)
-        $$ hangP "Derived type family instances:"
+        $$ hangP (text "Derived type family instances:")
              (vcat (map pprRepTy (bagToList repFamInsts)))
 
-    hangP s x = text "" $$ hang (ptext (sLit s)) 2 x
+    hangP s x = text "" $$ hang s 2 x
 
     -- Apply the suspended computations given by genInst calls.
     -- See Note [Staging of tcDeriving]
@@ -1555,7 +1555,7 @@ mkNewTypeEqn newtype_strat dit@(DerivInstTys { dit_cls_tys     = cls_tys
            cant_derive_err = ppUnless eta_ok  eta_msg
            eta_msg = text "cannot eta-reduce the representation type enough"
 
-       MASSERT( cls_tys `lengthIs` (classArity cls - 1) )
+       massert (cls_tys `lengthIs` (classArity cls - 1))
        if newtype_strat
        then
            -- Since the user explicitly asked for GeneralizedNewtypeDeriving,
@@ -1961,7 +1961,7 @@ doDerivInstErrorChecks1 mechanism =
           at_last_cls_tv_in_kind kind
             = last_cls_tv `elemVarSet` exactTyCoVarsOfType kind
           at_tcs = classATs cls
-          last_cls_tv = ASSERT( notNull cls_tyvars )
+          last_cls_tv = assert (notNull cls_tyvars )
                         last cls_tyvars
 
           cant_derive_err
@@ -2007,7 +2007,7 @@ doDerivInstErrorChecks2 clas clas_inst theta wildcard mechanism
          -- See Note [Deriving strategies]
        ; when (exotic_mechanism && className clas `elem` genericClassNames) $
          do { failIfTc (safeLanguageOn dflags) gen_inst_err
-            ; when (safeInferOn dflags) (recordUnsafeInfer emptyBag) } }
+            ; when (safeInferOn dflags) (recordUnsafeInfer emptyMessages) } }
   where
     exotic_mechanism = not $ isDerivSpecStock mechanism
 
@@ -2055,8 +2055,8 @@ genDerivStuff mechanism loc clas inst_tys tyvars
         tyfam_insts <-
           -- canDeriveAnyClass should ensure that this code can't be reached
           -- unless -XDeriveAnyClass is enabled.
-          ASSERT2( isValid (canDeriveAnyClass dflags)
-                 , ppr "genDerivStuff: bad derived class" <+> ppr clas )
+          assertPpr (isValid (canDeriveAnyClass dflags))
+                    (ppr "genDerivStuff: bad derived class" <+> ppr clas) $
           mapM (tcATDefault loc mini_subst emptyNameSet)
                (classATItems clas)
         return ( emptyBag, [] -- No method bindings are needed...
@@ -2293,7 +2293,7 @@ derivingThingErr' newtype_deriving cls cls_args mb_strat strat_msg why
 
 derivingHiddenErr :: TyCon -> SDoc
 derivingHiddenErr tc
-  = hang (text "The data constructors of" <+> quotes (ppr tc) <+> ptext (sLit "are not all in scope"))
+  = hang (text "The data constructors of" <+> quotes (ppr tc) <+> text "are not all in scope")
        2 (text "so you cannot derive an instance for it")
 
 standaloneCtxt :: LHsSigWcType GhcRn -> SDoc

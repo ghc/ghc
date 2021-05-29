@@ -4,7 +4,7 @@
 
 -}
 
-{-# LANGUAGE CPP, BangPatterns, NondecreasingIndentation #-}
+{-# LANGUAGE BangPatterns, NondecreasingIndentation #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -35,8 +35,6 @@ module GHC.Iface.Load (
         module Iface_Errors -- avoids boot files in Ppr modules
    ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import {-# SOURCE #-} GHC.IfaceToCore
@@ -44,6 +42,7 @@ import {-# SOURCE #-} GHC.IfaceToCore
    , tcIfaceAnnotations, tcIfaceCompleteMatches )
 
 import GHC.Driver.Env
+import GHC.Driver.Errors.Types
 import GHC.Driver.Session
 import GHC.Driver.Backend
 import GHC.Driver.Ppr
@@ -63,7 +62,8 @@ import GHC.Utils.Binary   ( BinData(..) )
 import GHC.Utils.Error
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Misc
+import GHC.Utils.Panic.Plain
+import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Logger
 
 import GHC.Settings.Constants
@@ -164,13 +164,13 @@ importDecl :: Name -> IfM lcl (MaybeErr SDoc TyThing)
 -- Get the TyThing for this Name from an interface file
 -- It's not a wired-in thing -- the caller caught that
 importDecl name
-  = ASSERT( not (isWiredInName name) )
+  = assert (not (isWiredInName name)) $
     do  { dflags <- getDynFlags
         ; logger <- getLogger
         ; liftIO $ trace_if logger dflags nd_doc
 
         -- Load the interface, which should populate the PTE
-        ; mb_iface <- ASSERT2( isExternalName name, ppr name )
+        ; mb_iface <- assertPpr (isExternalName name) (ppr name) $
                       loadInterface nd_doc (nameModule name) ImportBySystem
         ; case mb_iface of {
                 Failed err_msg  -> return (Failed err_msg) ;
@@ -244,7 +244,7 @@ checkWiredInTyCon tc
         ; dflags <- getDynFlags
         ; logger <- getLogger
         ; liftIO $ trace_if logger dflags (text "checkWiredInTyCon" <+> ppr tc_name $$ ppr mod)
-        ; ASSERT( isExternalName tc_name )
+        ; assert (isExternalName tc_name )
           when (mod /= nameModule tc_name)
                (initIfaceTcRn (loadWiredInHomeIface tc_name))
                 -- Don't look for (non-existent) Float.hi when
@@ -267,7 +267,7 @@ ifCheckWiredInThing thing
                 -- the HPT, so without the test we'll demand-load it into the PIT!
                 -- C.f. the same test in checkWiredInTyCon above
         ; let name = getName thing
-        ; ASSERT2( isExternalName name, ppr name )
+        ; assertPpr (isExternalName name) (ppr name) $
           when (needWiredInHomeIface thing && mod /= nameModule name)
                (loadWiredInHomeIface name) }
 
@@ -347,8 +347,8 @@ loadInterfaceForName :: SDoc -> Name -> TcRn ModIface
 loadInterfaceForName doc name
   = do { when debugIsOn $  -- Check pre-condition
          do { this_mod <- getModule
-            ; MASSERT2( not (nameIsLocalOrFrom this_mod name), ppr name <+> parens doc ) }
-      ; ASSERT2( isExternalName name, ppr name )
+            ; massertPpr (not (nameIsLocalOrFrom this_mod name)) (ppr name <+> parens doc) }
+      ; assertPpr (isExternalName name) (ppr name) $
         initIfaceTcRn $ loadSysInterface doc (nameModule name) }
 
 -- | Only loads the interface for external non-local names.
@@ -367,7 +367,7 @@ loadInterfaceForModule doc m
     -- Should not be called with this module
     when debugIsOn $ do
       this_mod <- getModule
-      MASSERT2( this_mod /= m, ppr m <+> parens doc )
+      massertPpr (this_mod /= m) (ppr m <+> parens doc)
     initIfaceTcRn $ loadSysInterface doc m
 
 {-
@@ -387,7 +387,7 @@ loadInterfaceForModule doc m
 -- See Note [Loading instances for wired-in things]
 loadWiredInHomeIface :: Name -> IfM lcl ()
 loadWiredInHomeIface name
-  = ASSERT( isWiredInName name )
+  = assert (isWiredInName name) $
     do _ <- loadSysInterface doc (nameModule name); return ()
   where
     doc = text "Need home interface for wired-in thing" <+> ppr name
@@ -535,7 +535,7 @@ loadInterface doc_str mod from
                             -- of one's own boot file! (one-shot only)
                             -- See Note [Loading your own hi-boot file]
 
-        ; WARN( bad_boot, ppr mod )
+        ; warnPprTrace bad_boot (ppr mod) $
           updateEps_  $ \ eps ->
            if elemModuleEnv mod (eps_PIT eps) || is_external_sig home_unit iface
                 then eps
@@ -691,7 +691,7 @@ computeInterface
   -> Module
   -> IO (MaybeErr SDoc (ModIface, FilePath))
 computeInterface hsc_env doc_str hi_boot_file mod0 = do
-  MASSERT( not (isHoleModule mod0) )
+  massert (not (isHoleModule mod0))
   let name_cache = hsc_NC hsc_env
   let fc         = hsc_FC hsc_env
   let home_unit  = hsc_home_unit hsc_env
@@ -707,7 +707,7 @@ computeInterface hsc_env doc_str hi_boot_file mod0 = do
           Succeeded (iface0, path) ->
             rnModIface hsc_env (instUnitInsts (moduleUnit indef)) Nothing iface0 >>= \case
               Right x   -> return (Succeeded (x, path))
-              Left errs -> throwErrors errs
+              Left errs -> throwErrors (GhcTcRnMessage <$> errs)
           Failed err -> return (Failed err)
       (mod, _) -> find_iface mod
 
@@ -799,7 +799,7 @@ wantHiBootFile home_unit eps mod from
 badSourceImport :: Module -> SDoc
 badSourceImport mod
   = hang (text "You cannot {-# SOURCE #-} import a module from another package")
-       2 (text "but" <+> quotes (ppr mod) <+> ptext (sLit "is from package")
+       2 (text "but" <+> quotes (ppr mod) <+> text "is from package"
           <+> quotes (ppr (moduleUnit mod)))
 
 -----------------------------------------------------
@@ -1179,18 +1179,25 @@ pprUsageImport usage usg_mod'
 
 -- | Pretty-print unit dependencies
 pprDeps :: UnitState -> Dependencies -> SDoc
-pprDeps unit_state (Deps { dep_mods = mods, dep_pkgs = pkgs, dep_orphs = orphs,
-                           dep_finsts = finsts })
+pprDeps unit_state (Deps { dep_direct_mods = dmods
+                         , dep_boot_mods = bmods
+                         , dep_orphs = orphs
+                         , dep_direct_pkgs = pkgs
+                         , dep_trusted_pkgs = tps
+                         , dep_finsts = finsts
+                         , dep_plgins = plugins })
   = pprWithUnitState unit_state $
-    vcat [text "module dependencies:" <+> fsep (map ppr_mod mods),
-          text "package dependencies:" <+> fsep (map ppr_pkg pkgs),
+    vcat [text "direct module dependencies:" <+> fsep (map ppr_mod dmods),
+          text "boot module dependencies:" <+> fsep (map ppr bmods),
+          text "direct package dependencies:" <+> fsep (map ppr_pkg pkgs),
+          if null tps then empty else text "trusted package dependencies:" <+> fsep (map ppr_pkg pkgs),
           text "orphans:" <+> fsep (map ppr orphs),
+          text "plugins:" <+> fsep (map ppr plugins),
           text "family instance modules:" <+> fsep (map ppr finsts)
         ]
   where
     ppr_mod (GWIB { gwib_mod = mod_name, gwib_isBoot = boot }) = ppr mod_name <+> ppr_boot boot
-    ppr_pkg (pkg,trust_req)  = ppr pkg <>
-                               (if trust_req then text "*" else Outputable.empty)
+    ppr_pkg pkg  = ppr pkg
     ppr_boot IsBoot  = text "[boot]"
     ppr_boot NotBoot = Outputable.empty
 
@@ -1224,4 +1231,3 @@ pprExtensibleFields :: ExtensibleFields -> SDoc
 pprExtensibleFields (ExtensibleFields fs) = vcat . map pprField $ toList fs
   where
     pprField (name, (BinData size _data)) = text name <+> text "-" <+> ppr size <+> text "bytes"
-

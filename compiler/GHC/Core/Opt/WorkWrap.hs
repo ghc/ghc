@@ -4,7 +4,7 @@
 \section[WorkWrap]{Worker/wrapper-generating back-end of strictness analyser}
 -}
 
-{-# LANGUAGE CPP #-}
+
 module GHC.Core.Opt.WorkWrap ( wwTopBinds ) where
 
 import GHC.Prelude
@@ -32,10 +32,9 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Types.Unique
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Core.FamInstEnv
 import GHC.Utils.Monad
-
-#include "HsVersions.h"
 
 {-
 We take Core bindings whose binders have:
@@ -181,7 +180,7 @@ Notice that we refrain from w/w'ing an INLINE function even if it is
 in a recursive group.  It might not be the loop breaker.  (We could
 test for loop-breaker-hood, but I'm not sure that ever matters.)
 
-Note [Worker-wrapper for INLINABLE functions]
+Note [Worker/wrapper for INLINABLE functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If we have
   {-# INLINABLE f #-}
@@ -209,7 +208,7 @@ unfolding to the *worker*.  So we will get something like this:
 How do we "transfer the unfolding"? Easy: by using the old one, wrapped
 in work_fn! See GHC.Core.Unfold.mkWorkerUnfolding.
 
-Note [No worker-wrapper for record selectors]
+Note [No worker/wrapper for record selectors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We sometimes generate a lot of record selectors, and generally the
 don't benefit from worker/wrapper.  Yes, mkWwBodies would find a w/w split,
@@ -226,7 +225,7 @@ in advance...the logic in mkWwBodies is complex. So I've left the
 super-simple test, with this Note to explain.
 
 
-Note [Worker-wrapper for NOINLINE functions]
+Note [Worker/wrapper for NOINLINE functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We used to disable worker/wrapper for NOINLINE things, but it turns out
 this can cause unnecessary reboxing of values. Consider
@@ -300,7 +299,7 @@ splitting a NOINLINE function.
 
 Note [Worker activation]
 ~~~~~~~~~~~~~~~~~~~~~~~~
-Follows on from Note [Worker-wrapper for INLINABLE functions]
+Follows on from Note [Worker/wrapper for INLINABLE functions]
 
 It is *vital* that if the worker gets an INLINABLE pragma (from the
 original function), then the worker has the same phase activation as
@@ -413,7 +412,7 @@ When should the wrapper inlining be active?
    Id
 
 2. It should be active at some point, despite (1) because of
-   Note [Worker-wrapper for NOINLINE functions]
+   Note [Worker/wrapper for NOINLINE functions]
 
 3. For ordinary functions with no pragmas we want to inline the
    wrapper as early as possible (#15056).  Suppose another module
@@ -469,7 +468,7 @@ Note [Wrapper NoUserInlinePrag]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We use NoUserInlinePrag on the wrapper, to say that there is no
 user-specified inline pragma. (The worker inherits that; see Note
-[Worker-wrapper for INLINABLE functions].)  The wrapper has no pragma
+[Worker/wrapper for INLINABLE functions].)  The wrapper has no pragma
 given by the user.
 
 (Historical note: we used to give the wrapper an INLINE pragma, but
@@ -492,12 +491,15 @@ tryWW   :: DynFlags
                                         -- if two, then a worker and a
                                         -- wrapper.
 tryWW dflags fam_envs is_rec fn_id rhs
-  -- See Note [Worker-wrapper for NOINLINE functions]
+  -- See Note [Worker/wrapper for NOINLINE functions]
 
   | Just stable_unf <- certainlyWillInline uf_opts fn_info
-  = return [ (fn_id `setIdUnfolding` stable_unf, rhs) ]
+  = return [ (new_fn_id `setIdUnfolding` stable_unf, rhs) ]
         -- See Note [Don't w/w INLINE things]
         -- See Note [Don't w/w inline small non-loop-breaker things]
+
+  | isRecordSelector fn_id  -- See Note [No worker/wrapper for record selectors]
+  = return [ (new_fn_id, rhs ) ]
 
   | is_fun && is_eta_exp
   = splitFun dflags fam_envs new_fn_id fn_info wrap_dmds div cpr rhs
@@ -516,8 +518,9 @@ tryWW dflags fam_envs is_rec fn_id rhs
     cpr_ty       = getCprSig (cprSigInfo fn_info)
     -- Arity of the CPR sig should match idArity when it's not a join point.
     -- See Note [Arity trimming for CPR signatures] in GHC.Core.Opt.CprAnal
-    cpr          = ASSERT2( isJoinId fn_id || cpr_ty == topCprType || ct_arty cpr_ty == arityInfo fn_info
-                          , ppr fn_id <> colon <+> text "ct_arty:" <+> int (ct_arty cpr_ty) <+> text "arityInfo:" <+> ppr (arityInfo fn_info))
+    cpr          = assertPpr (isJoinId fn_id || cpr_ty == topCprType || ct_arty cpr_ty == arityInfo fn_info)
+                             (ppr fn_id <> colon <+> text "ct_arty:" <+> int (ct_arty cpr_ty)
+                              <+> text "arityInfo:" <+> ppr (arityInfo fn_info)) $
                    ct_cpr cpr_ty
 
     new_fn_id = zapIdUsedOnceInfo (zapIdUsageEnvInfo fn_id)
@@ -569,6 +572,32 @@ want to _keep_ the info for the code generator).
 We do not do it in the demand analyser for the same reasons outlined in
 Note [Zapping DmdEnv after Demand Analyzer] above.
 
+For example, consider
+  let y = factorial v in
+  let x = y in
+  x + x
+
+Demand analysis will conclude, correctly, that `y` is demanded once.  But if we inline `x` we get
+  let y = factorial v in
+  y + y
+
+Similarly for
+  f y = let x = y in x+x
+where we will put a used-once demand on y, and hence also in f's demand signature.
+
+And recursively
+  f y = case y of (p,q) -> let p2 = p in p2+p2
+ Here we'll get a used-once demand on p; but that is not robust to inlining p2.
+
+Conclusion: "demanded once" info is fragile.
+* We want it after the final immediately-before-code-gen demand analysis, so we can identify single-entry thunks.
+* But we don't want it otherwise because it is not robust.
+
+Conclusion: kill it during worker/wrapper, using `zapUsedOnceInfo`.  Both the *demand signature* of
+the binder, and the *demand-info* of the binder.  Moreover, do so recursively.
+
+(NB THE pre-code-gen demand analysis is not followed by worker/wrapper.)
+
 Note [Don't eta expand in w/w]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A binding where the manifestArity of the RHS is less than idArity of the binder
@@ -605,26 +634,15 @@ See https://gitlab.haskell.org/ghc/ghc/merge_requests/312#note_192064.
 splitFun :: DynFlags -> FamInstEnvs -> Id -> IdInfo -> [Demand] -> Divergence -> Cpr -> CoreExpr
          -> UniqSM [(Id, CoreExpr)]
 splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
-  | isRecordSelector fn_id  -- See Note [No worker/wrapper for record selectors]
-  = return [ (fn_id, rhs ) ]
-
-  | otherwise
-  = WARN( not (wrap_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr cpr) )
+  = warnPprTrace (not (wrap_dmds `lengthIs` arity)) (ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr cpr)) $
           -- The arity should match the signature
-    do { mb_stuff <- mkWwBodies dflags fam_envs rhs_fvs fn_id wrap_dmds use_cpr_info
+    do { mb_stuff <- mkWwBodies (initWwOpts dflags fam_envs) rhs_fvs fn_id wrap_dmds use_cpr_info
        ; case mb_stuff of
             Nothing -> return [(fn_id, rhs)]
 
-            Just stuff
-              | Just stable_unf <- certainlyWillInline (unfoldingOpts dflags) fn_info
-              ->  return [ (fn_id `setIdUnfolding` stable_unf, rhs) ]
-                  -- See Note [Don't w/w INLINE things]
-                  -- See Note [Don't w/w inline small non-loop-breaker things]
-
-              | otherwise
-              -> do { work_uniq <- getUniqueM
-                    ; return (mkWWBindPair dflags fn_id fn_info arity rhs
-                                           work_uniq div cpr stuff) } }
+            Just stuff -> do { work_uniq <- getUniqueM
+                             ; return (mkWWBindPair dflags fn_id fn_info arity rhs
+                                                    work_uniq div cpr stuff) } }
   where
     rhs_fvs = exprFreeVars rhs
     arity   = arityInfo fn_info
@@ -658,7 +676,7 @@ mkWWBindPair dflags fn_id fn_info arity rhs work_uniq div cpr
                              , inl_sat    = Nothing
                              , inl_act    = work_act
                              , inl_rule   = FunLike }
-      -- inl_inline: copy from fn_id; see Note [Worker-wrapper for INLINABLE functions]
+      -- inl_inline: copy from fn_id; see Note [Worker/wrapper for INLINABLE functions]
       -- inl_act:    see Note [Worker activation]
       -- inl_rule:   it does not make sense for workers to be constructorlike.
 
@@ -677,7 +695,7 @@ mkWWBindPair dflags fn_id fn_info arity rhs work_uniq div cpr
                 `setInlinePragma` work_prag
 
                 `setIdUnfolding` mkWorkerUnfolding simpl_opts work_fn fn_unfolding
-                        -- See Note [Worker-wrapper for INLINABLE functions]
+                        -- See Note [Worker/wrapper for INLINABLE functions]
 
                 `setIdDmdSig` mkClosedDmdSig work_demands div
                         -- Even though we may not be at top level,
@@ -868,10 +886,11 @@ get around by localising the Id for the auxiliary bindings in 'splitThunk'.
 -- Note [Thunk splitting for top-level binders].
 splitThunk :: DynFlags -> FamInstEnvs -> RecFlag -> Var -> Expr Var -> UniqSM [(Var, Expr Var)]
 splitThunk dflags fam_envs is_rec x rhs
-  = ASSERT(not (isJoinId x))
+  = assert (not (isJoinId x)) $
     do { let x' = localiseId x -- See comment above
-       ; (useful,_, wrap_fn, work_fn) <- mkWWstr dflags fam_envs False [x']
+       ; (useful,_, wrap_fn, work_fn)
+           <- mkWWstr (initWwOpts dflags fam_envs) NotArgOfInlineableFun [x']
        ; let res = [ (x, Let (NonRec x' rhs) (wrap_fn (work_fn (Var x')))) ]
-       ; if useful then ASSERT2( isNonRec is_rec, ppr x ) -- The thunk must be non-recursive
+       ; if useful then assertPpr (isNonRec is_rec) (ppr x) -- The thunk must be non-recursive
                    return res
                    else return [(x, rhs)] }

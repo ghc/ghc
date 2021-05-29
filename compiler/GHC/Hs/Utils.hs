@@ -20,7 +20,7 @@ just attach noSrcSpan to everything.
 
 -}
 
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -44,7 +44,7 @@ module GHC.Hs.Utils(
   mkHsDictLet, mkHsLams,
   mkHsOpApp, mkHsDo, mkHsDoAnns, mkHsComp, mkHsCompAnns, mkHsWrapPat, mkHsWrapPatCo,
   mkLHsPar, mkHsCmdWrap, mkLHsCmdWrap,
-  mkHsCmdIf,
+  mkHsCmdIf, mkConLikeTc,
 
   nlHsTyApp, nlHsTyApps, nlHsVar, nl_HsVar, nlHsDataCon,
   nlHsLit, nlHsApp, nlHsApps, nlHsSyntaxApps,
@@ -111,8 +111,6 @@ module GHC.Hs.Utils(
   lStmtsImplicits, hsValBindsImplicits, lPatImplicits
   ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Hs.Decls
@@ -170,7 +168,7 @@ just attach 'noSrcSpan' to everything.
 
 -- | @e => (e)@
 mkHsPar :: LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
-mkHsPar e = L (getLoc e) (HsPar noAnn e)
+mkHsPar e = L (getLoc e) (gHsPar e)
 
 mkSimpleMatch :: (Anno (Match (GhcPass p) (LocatedA (body (GhcPass p))))
                         ~ SrcSpanAnnA,
@@ -190,14 +188,14 @@ mkSimpleMatch ctxt pats rhs
 
 unguardedGRHSs :: Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
                      ~ SrcSpan
-               => SrcSpan -> LocatedA (body (GhcPass p)) -> EpAnn' GrhsAnn
+               => SrcSpan -> LocatedA (body (GhcPass p)) -> EpAnn GrhsAnn
                -> GRHSs (GhcPass p) (LocatedA (body (GhcPass p)))
 unguardedGRHSs loc rhs an
   = GRHSs noExtField (unguardedRHS an loc rhs) emptyLocalBinds
 
 unguardedRHS :: Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
                      ~ SrcSpan
-             => EpAnn' GrhsAnn -> SrcSpan -> LocatedA (body (GhcPass p))
+             => EpAnn GrhsAnn -> SrcSpan -> LocatedA (body (GhcPass p))
              -> [LGRHS (GhcPass p) (LocatedA (body (GhcPass p)))]
 unguardedRHS an loc rhs = [L loc (GRHS an [] rhs)]
 
@@ -215,7 +213,8 @@ mkMatchGroup origin matches = MG { mg_ext = noExtField
                                  , mg_alts = matches
                                  , mg_origin = origin }
 
-mkLocatedList :: Semigroup a => [GenLocated (SrcSpanAnn' a) e2] -> LocatedAn an [GenLocated (SrcSpanAnn' a) e2]
+mkLocatedList :: Semigroup a
+  => [GenLocated (SrcAnn a) e2] -> LocatedAn an [GenLocated (SrcAnn a) e2]
 mkLocatedList [] = noLocA []
 mkLocatedList ms = L (noAnnSrcSpan $ locA $ combineLocsA (head ms) (last ms)) ms
 
@@ -285,17 +284,13 @@ nlHsTyApps fun_id tys xs = foldl' nlHsApp (nlHsTyApp fun_id tys) xs
 -- | Wrap in parens if @'hsExprNeedsParens' appPrec@ says it needs them
 -- So @f x@ becomes @(f x)@, but @3@ stays as @3@.
 mkLHsPar :: IsPass id => LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
-mkLHsPar le@(L loc e)
-  | hsExprNeedsParens appPrec e = L loc (HsPar noAnn le)
-  | otherwise                   = le
+mkLHsPar = parenthesizeHsExpr appPrec
 
 mkParPat :: IsPass p => LPat (GhcPass p) -> LPat (GhcPass p)
-mkParPat lp@(L loc p)
-  | patNeedsParens appPrec p = L loc (ParPat noAnn lp)
-  | otherwise                = lp
+mkParPat = parenthesizePat appPrec
 
 nlParPat :: LPat (GhcPass name) -> LPat (GhcPass name)
-nlParPat p = noLocA (ParPat noAnn p)
+nlParPat p = noLocA (gParPat p)
 
 -------------------------------
 -- These are the bits of syntax that contain rebindable names
@@ -305,16 +300,16 @@ mkHsIntegral   :: IntegralLit -> HsOverLit GhcPs
 mkHsFractional :: FractionalLit -> HsOverLit GhcPs
 mkHsIsString   :: SourceText -> FastString -> HsOverLit GhcPs
 mkHsDo         :: HsStmtContext GhcRn -> LocatedL [ExprLStmt GhcPs] -> HsExpr GhcPs
-mkHsDoAnns     :: HsStmtContext GhcRn -> LocatedL [ExprLStmt GhcPs] -> EpAnn' AnnList -> HsExpr GhcPs
+mkHsDoAnns     :: HsStmtContext GhcRn -> LocatedL [ExprLStmt GhcPs] -> EpAnn AnnList -> HsExpr GhcPs
 mkHsComp       :: HsStmtContext GhcRn -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
                -> HsExpr GhcPs
 mkHsCompAnns   :: HsStmtContext GhcRn -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
-               -> EpAnn' AnnList
+               -> EpAnn AnnList
                -> HsExpr GhcPs
 
-mkNPat      :: Located (HsOverLit GhcPs) -> Maybe (SyntaxExpr GhcPs) -> EpAnn
+mkNPat      :: Located (HsOverLit GhcPs) -> Maybe (SyntaxExpr GhcPs) -> EpAnn [AddEpAnn]
             -> Pat GhcPs
-mkNPlusKPat :: LocatedN RdrName -> Located (HsOverLit GhcPs) -> EpAnn
+mkNPlusKPat :: LocatedN RdrName -> Located (HsOverLit GhcPs) -> EpAnn [AddEpAnn]
             -> Pat GhcPs
 
 -- NB: The following functions all use noSyntaxExpr: the generated expressions
@@ -323,7 +318,7 @@ mkLastStmt :: IsPass idR => LocatedA (bodyR (GhcPass idR))
            -> StmtLR (GhcPass idL) (GhcPass idR) (LocatedA (bodyR (GhcPass idR)))
 mkBodyStmt :: LocatedA (bodyR GhcPs)
            -> StmtLR (GhcPass idL) GhcPs (LocatedA (bodyR GhcPs))
-mkPsBindStmt :: EpAnn -> LPat GhcPs -> LocatedA (bodyR GhcPs)
+mkPsBindStmt :: EpAnn [AddEpAnn] -> LPat GhcPs -> LocatedA (bodyR GhcPs)
              -> StmtLR GhcPs GhcPs (LocatedA (bodyR GhcPs))
 mkRnBindStmt :: LPat GhcRn -> LocatedA (bodyR GhcRn)
              -> StmtLR GhcRn GhcRn (LocatedA (bodyR GhcRn))
@@ -345,7 +340,7 @@ mkRecStmt        :: (Anno [GenLocated
                              (Anno (StmtLR (GhcPass idL) GhcPs bodyR))
                              (StmtLR (GhcPass idL) GhcPs bodyR)]
                         ~ SrcSpanAnnL)
-                 => EpAnn' AnnList
+                 => EpAnn AnnList
                  -> LocatedL [LStmtLR (GhcPass idL) GhcPs bodyR]
                  -> StmtLR (GhcPass idL) GhcPs bodyR
 
@@ -363,12 +358,12 @@ mkHsCompAnns ctxt stmts expr anns = mkHsDoAnns ctxt (mkLocatedList (stmts ++ [la
     last_stmt = L (noAnnSrcSpan $ getLocA expr) $ mkLastStmt expr
 
 -- restricted to GhcPs because other phases might need a SyntaxExpr
-mkHsIf :: LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs -> EpAnn
+mkHsIf :: LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs -> EpAnn AnnsIf
        -> HsExpr GhcPs
 mkHsIf c a b anns = HsIf anns c a b
 
 -- restricted to GhcPs because other phases might need a SyntaxExpr
-mkHsCmdIf :: LHsExpr GhcPs -> LHsCmd GhcPs -> LHsCmd GhcPs -> EpAnn
+mkHsCmdIf :: LHsExpr GhcPs -> LHsCmd GhcPs -> LHsCmd GhcPs -> EpAnn AnnsIf
        -> HsCmd GhcPs
 mkHsCmdIf c a b anns = HsCmdIf anns noSyntaxExpr c a b
 
@@ -376,17 +371,17 @@ mkNPat lit neg anns  = NPat anns lit neg noSyntaxExpr
 mkNPlusKPat id lit anns
   = NPlusKPat anns id lit (unLoc lit) noSyntaxExpr noSyntaxExpr
 
-mkTransformStmt    :: EpAnn -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
+mkTransformStmt    :: EpAnn [AddEpAnn] -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
                    -> StmtLR GhcPs GhcPs (LHsExpr GhcPs)
-mkTransformByStmt  :: EpAnn -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
+mkTransformByStmt  :: EpAnn [AddEpAnn] -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
                    -> LHsExpr GhcPs -> StmtLR GhcPs GhcPs (LHsExpr GhcPs)
-mkGroupUsingStmt   :: EpAnn -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
+mkGroupUsingStmt   :: EpAnn [AddEpAnn] -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
                    -> StmtLR GhcPs GhcPs (LHsExpr GhcPs)
-mkGroupByUsingStmt :: EpAnn -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
+mkGroupByUsingStmt :: EpAnn [AddEpAnn] -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
                    -> LHsExpr GhcPs
                    -> StmtLR GhcPs GhcPs (LHsExpr GhcPs)
 
-emptyTransStmt :: EpAnn -> StmtLR GhcPs GhcPs (LHsExpr GhcPs)
+emptyTransStmt :: EpAnn [AddEpAnn] -> StmtLR GhcPs GhcPs (LHsExpr GhcPs)
 emptyTransStmt anns = TransStmt { trS_ext = anns
                                 , trS_form = panic "emptyTransStmt: form"
                                 , trS_stmts = [], trS_bndrs = []
@@ -436,7 +431,7 @@ emptyRecStmtId   = emptyRecStmt' unitRecStmtTc
                                         -- a panic might trigger during zonking
 mkRecStmt anns stmts  = (emptyRecStmt' anns) { recS_stmts = stmts }
 
-mkLetStmt :: EpAnn -> HsLocalBinds GhcPs -> StmtLR GhcPs GhcPs (LocatedA b)
+mkLetStmt :: EpAnn [AddEpAnn] -> HsLocalBinds GhcPs -> StmtLR GhcPs GhcPs (LocatedA b)
 mkLetStmt anns binds = LetStmt anns binds
 
 -------------------------------
@@ -448,10 +443,10 @@ mkHsOpApp e1 op e2 = OpApp noAnn e1 (noLocA (HsVar noExtField (noLocA op))) e2
 unqualSplice :: RdrName
 unqualSplice = mkRdrUnqual (mkVarOccFS (fsLit "splice"))
 
-mkUntypedSplice :: EpAnn -> SpliceDecoration -> LHsExpr GhcPs -> HsSplice GhcPs
+mkUntypedSplice :: EpAnn [AddEpAnn] -> SpliceDecoration -> LHsExpr GhcPs -> HsSplice GhcPs
 mkUntypedSplice ann hasParen e = HsUntypedSplice ann hasParen unqualSplice e
 
-mkTypedSplice :: EpAnn -> SpliceDecoration -> LHsExpr GhcPs -> HsSplice GhcPs
+mkTypedSplice :: EpAnn [AddEpAnn] -> SpliceDecoration -> LHsExpr GhcPs -> HsSplice GhcPs
 mkTypedSplice ann hasParen e = HsTypedSplice ann hasParen unqualSplice e
 
 mkHsQuasiQuote :: RdrName -> SrcSpan -> FastString -> HsSplice GhcPs
@@ -467,6 +462,8 @@ mkHsStringPrimLit fs = HsStringPrim NoSourceText (bytesFS fs)
 mkHsCharPrimLit :: Char -> HsLit (GhcPass p)
 mkHsCharPrimLit c = HsChar NoSourceText c
 
+mkConLikeTc :: ConLike -> HsExpr GhcTc
+mkConLikeTc con = XExpr (ConLikeTc con [] [])
 
 {-
 ************************************************************************
@@ -486,7 +483,7 @@ nl_HsVar n = HsVar noExtField (noLocA n)
 
 -- | NB: Only for 'LHsExpr' 'Id'.
 nlHsDataCon :: DataCon -> LHsExpr GhcTc
-nlHsDataCon con = noLocA (HsConLikeOut noExtField (RealDataCon con))
+nlHsDataCon con = noLocA (mkConLikeTc (RealDataCon con))
 
 nlHsLit :: HsLit (GhcPass p) -> LHsExpr (GhcPass p)
 nlHsLit n = noLocA (HsLit noComments n)
@@ -593,7 +590,7 @@ nlList   :: [LHsExpr GhcPs] -> LHsExpr GhcPs
 
 -- AZ:Is this used?
 nlHsLam match = noLocA (HsLam noExtField (mkMatchGroup Generated (noLocA [match])))
-nlHsPar e     = noLocA (HsPar noAnn e)
+nlHsPar e     = noLocA (gHsPar e)
 
 -- nlHsIf should generate if-expressions which are NOT subject to
 -- RebindableSyntax, so the first field of HsIf is False. (#12080)
@@ -657,7 +654,7 @@ mkLHsVarTuple ids ext = mkLHsTupleExpr (map nlHsVar ids) ext
 nlTuplePat :: [LPat GhcPs] -> Boxity -> LPat GhcPs
 nlTuplePat pats box = noLocA (TuplePat noAnn pats box)
 
-missingTupArg :: EpAnn' EpaAnchor -> HsTupArg GhcPs
+missingTupArg :: EpAnn EpaLocation -> HsTupArg GhcPs
 missingTupArg ann = Missing ann
 
 mkLHsPatTup :: [LPat GhcRn] -> LPat GhcRn
@@ -794,7 +791,7 @@ mkLHsWrap co_fn (L loc e) = L loc (mkHsWrap co_fn e)
 mkHsWrap :: HsWrapper -> HsExpr GhcTc -> HsExpr GhcTc
 mkHsWrap co_fn e | isIdHsWrapper co_fn   = e
 mkHsWrap co_fn (XExpr (WrapExpr (HsWrap co_fn' e))) = mkHsWrap (co_fn <.> co_fn') e
-mkHsWrap co_fn (HsPar x (L l e))                = HsPar x (L l (mkHsWrap co_fn e))
+mkHsWrap co_fn (HsPar x lpar (L l e) rpar)      = HsPar x lpar (L l (mkHsWrap co_fn e)) rpar
 mkHsWrap co_fn e                                = XExpr (WrapExpr $ HsWrap co_fn e)
 
 mkHsWrapCo :: TcCoercionN   -- A Nominal coercion  a ~N b
@@ -862,7 +859,7 @@ mkVarBind var rhs = L (getLoc rhs) $
                               var_id = var, var_rhs = rhs }
 
 mkPatSynBind :: LocatedN RdrName -> HsPatSynDetails GhcPs
-             -> LPat GhcPs -> HsPatSynDir GhcPs -> EpAnn -> HsBind GhcPs
+             -> LPat GhcPs -> HsPatSynDir GhcPs -> EpAnn [AddEpAnn] -> HsBind GhcPs
 mkPatSynBind name details lpat dir anns = PatSynBind noExtField psb
   where
     psb = PSB{ psb_ext = anns
@@ -924,13 +921,8 @@ mkMatch :: forall p. IsPass p
 mkMatch ctxt pats expr binds
   = noLocA (Match { m_ext   = noAnn
                   , m_ctxt  = ctxt
-                  , m_pats  = map paren pats
+                  , m_pats  = map mkParPat pats
                   , m_grhss = GRHSs noExtField (unguardedRHS noAnn noSrcSpan expr) binds })
-  where
-    paren :: LPat (GhcPass p) -> LPat (GhcPass p)
-    paren lp@(L l p)
-      | patNeedsParens appPrec p = L l (ParPat noAnn lp)
-      | otherwise                = lp
 
 {-
 ************************************************************************
@@ -1208,7 +1200,7 @@ collect_pat flag pat bndrs = case pat of
   BangPat _ pat         -> collect_lpat flag pat bndrs
   AsPat _ a pat         -> unXRec @p a : collect_lpat flag pat bndrs
   ViewPat _ _ pat       -> collect_lpat flag pat bndrs
-  ParPat _ pat          -> collect_lpat flag pat bndrs
+  ParPat _ _ pat _      -> collect_lpat flag pat bndrs
   ListPat _ pats        -> foldr (collect_lpat flag) bndrs pats
   TuplePat _ pats _     -> foldr (collect_lpat flag) bndrs pats
   SumPat _ pat _ _      -> collect_lpat flag pat bndrs
@@ -1341,7 +1333,7 @@ hsTyClForeignBinders tycl_decls foreign_decls
          foldMap (foldMap hsLInstDeclBinders . group_instds) tycl_decls)
   where
     getSelectorNames :: ([LocatedA Name], [LFieldOcc GhcRn]) -> [Name]
-    getSelectorNames (ns, fs) = map unLoc ns ++ map (extFieldOcc . unLoc) fs
+    getSelectorNames (ns, fs) = map unLoc ns ++ map (foExt . unLoc) fs
 
 -------------------
 hsLTyClDeclBinders :: IsPass p
@@ -1490,7 +1482,7 @@ hsConDeclsBinders cons
        where
           fld_names = remSeen (concatMap (cd_fld_names . unLoc) (unLoc flds))
           remSeen' = foldr (.) remSeen
-                               [deleteBy ((==) `on` unLoc . rdrNameFieldOcc . unLoc) v
+                               [deleteBy ((==) `on` unLoc . foLabel . unLoc) v
                                | v <- fld_names]
 
 {-
@@ -1583,7 +1575,7 @@ lPatImplicits = hs_lpat
     hs_pat (BangPat _ pat)      = hs_lpat pat
     hs_pat (AsPat _ _ pat)      = hs_lpat pat
     hs_pat (ViewPat _ _ pat)    = hs_lpat pat
-    hs_pat (ParPat _ pat)       = hs_lpat pat
+    hs_pat (ParPat _ _ pat _)   = hs_lpat pat
     hs_pat (ListPat _ pats)     = hs_lpats pats
     hs_pat (TuplePat _ pats _)  = hs_lpats pats
 
@@ -1599,8 +1591,8 @@ lPatImplicits = hs_lpat
       [(err_loc, collectPatsBinders CollNoDictBinders implicit_pats) | Just{} <- [rec_dotdot fs] ]
         ++ hs_lpats explicit_pats
 
-      where implicit_pats = map (hsRecFieldArg . unLoc) implicit
-            explicit_pats = map (hsRecFieldArg . unLoc) explicit
+      where implicit_pats = map (hfbRHS . unLoc) implicit
+            explicit_pats = map (hfbRHS . unLoc) explicit
 
 
             (explicit, implicit) = partitionEithers [if pat_explicit then Left fld else Right fld

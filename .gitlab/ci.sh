@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2230
+# shellcheck disable=SC1090
 
 # This is the primary driver of the GitLab CI infrastructure.
 # Run `ci.sh usage` for usage information.
-
-
-set -e -o pipefail
+set -Eeuo pipefail
 
 # Configuration:
 HACKAGE_INDEX_STATE="2020-12-21T14:48:20Z" # TODO dedup with yaml's def
@@ -17,7 +16,9 @@ if [ ! -d "$TOP/.gitlab" ]; then
   echo "This script expects to be run from the root of a ghc checkout"
 fi
 
-source $TOP/.gitlab/common.sh
+CABAL_CACHE="$TOP/${CABAL_CACHE:-cabal-cache}"
+
+source "$TOP/.gitlab/common.sh"
 
 function usage() {
   cat <<EOF
@@ -154,17 +155,6 @@ mkdir -p "$TOP/tmp"
 export TMP="$TOP/tmp"
 export TEMP="$TOP/tmp"
 
-function darwin_setup() {
-  # It looks like we already have python2 here and just installing python3
-  # does not work.
-  brew upgrade python
-  brew install ghc cabal-install ncurses gmp
-
-  pip3 install sphinx
-  # PDF documentation disabled as MacTeX apparently doesn't include xelatex.
-  #brew cask install mactex
-}
-
 function show_tool() {
   local tool="$1"
   info "$tool = ${!tool}"
@@ -173,12 +163,18 @@ function show_tool() {
 
 function set_toolchain_paths() {
   needs_toolchain="1"
-  case "$(uname)" in
-    Linux) needs_toolchain="0" ;;
+  case "$(uname -m)-$(uname)" in
+    *-Linux) needs_toolchain="" ;;
     *) ;;
   esac
 
-  if [[ "$needs_toolchain" = "1" ]]; then
+  if [[ -n "${IN_NIX_SHELL:-}" ]]; then
+      needs_toolchain=""
+      GHC="$(which ghc)"
+      CABAL="$(which cabal)"
+      HAPPY="$(which happy)"
+      ALEX="$(which alex)"
+  elif [[ -n "$needs_toolchain" ]]; then
       # These are populated by setup_toolchain
       GHC="$toolchain/bin/ghc$exe"
       CABAL="$toolchain/bin/cabal$exe"
@@ -202,19 +198,15 @@ function set_toolchain_paths() {
 
 # Extract GHC toolchain
 function setup() {
-  if [ -d "$TOP/cabal-cache" ]; then
+  if [ -d "${CABAL_CACHE}" ]; then
       info "Extracting cabal cache..."
       mkdir -p "$cabal_dir"
-      cp -Rf cabal-cache/* "$cabal_dir"
+      cp -Rf "${CABAL_CACHE}"/* "$cabal_dir"
   fi
 
   if [[ "$needs_toolchain" = "1" ]]; then
     setup_toolchain
   fi
-  case "$(uname)" in
-    Darwin) darwin_setup ;;
-    *) ;;
-  esac
 
   # Make sure that git works
   git config user.email "ghc-ci@gitlab-haskell.org"
@@ -354,7 +346,7 @@ BUILD_SPHINX_HTML=$BUILD_SPHINX_HTML
 BUILD_SPHINX_PDF=$BUILD_SPHINX_PDF
 BeConservative=YES
 BIGNUM_BACKEND=$BIGNUM_BACKEND
-XZ_CMD=$XZ
+XZ_CMD=${XZ:-}
 
 BuildFlavour=$BUILD_FLAVOUR
 ifneq "\$(BuildFlavour)" ""
@@ -363,7 +355,7 @@ endif
 GhcLibHcOpts+=-haddock
 EOF
 
-  if [ -n "$HADDOCK_HYPERLINKED_SOURCES" ]; then
+  if [ -n "${HADDOCK_HYPERLINKED_SOURCES:-}" ]; then
     echo "EXTRA_HADDOCK_OPTS += --hyperlinked-source --quickjump" >> mk/build.mk
   fi
 
@@ -381,16 +373,15 @@ function configure() {
   run python3 boot
   end_section "booting"
 
-  local target_args=""
-  if [[ -n "$target_triple" ]]; then
-    target_args="--target=$target_triple"
+  read -r -a args <<< "${CONFIGURE_ARGS:-}"
+  if [[ -n "${target_triple:-}" ]]; then
+    args+=("--target=$target_triple")
   fi
 
   start_section "configuring"
   run ./configure \
     --enable-tarballs-autodownload \
-    $target_args \
-    $CONFIGURE_ARGS \
+    "${args[@]}" \
     GHC="$GHC" \
     HAPPY="$HAPPY" \
     ALEX="$ALEX" \
@@ -403,15 +394,15 @@ function build_make() {
   if [[ -z "$BIN_DIST_PREP_TAR_COMP" ]]; then
     fail "BIN_DIST_PREP_TAR_COMP is not set"
   fi
-  if [[ -n "$VERBOSE" ]]; then
-    MAKE_ARGS="$MAKE_ARGS V=1"
+  if [[ -n "${VERBOSE:-}" ]]; then
+    MAKE_ARGS="${MAKE_ARGS:-} V=1"
   else
-    MAKE_ARGS="$MAKE_ARGS V=0"
+    MAKE_ARGS="${MAKE_ARGS:-} V=0"
   fi
 
   echo "include mk/flavours/${BUILD_FLAVOUR}.mk" > mk/build.mk
   echo 'GhcLibHcOpts+=-haddock' >> mk/build.mk
-  run "$MAKE" -j"$cores" $MAKE_ARGS
+  run "$MAKE" -j"$cores" "$MAKE_ARGS"
   run "$MAKE" -j"$cores" binary-dist-prep TAR_COMP_OPTS=-1
   ls -lh "$BIN_DIST_PREP_TAR_COMP"
 }
@@ -422,7 +413,7 @@ function fetch_perf_notes() {
 }
 
 function push_perf_notes() {
-  if [ -n "$CROSS_TARGET" ]; then
+  if [ -n "${CROSS_TARGET:-}" ]; then
     info "Can't test cross-compiled build."
     return
   fi
@@ -434,21 +425,22 @@ function push_perf_notes() {
 # Figure out which commit should be used by the testsuite driver as a
 # performance baseline. See Note [The CI Story].
 function determine_metric_baseline() {
-  export PERF_BASELINE_COMMIT="$(git merge-base $CI_MERGE_REQUEST_TARGET_BRANCH_NAME HEAD)"
+  PERF_BASELINE_COMMIT="$(git merge-base "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" HEAD)"
+  export PERF_BASELINE_COMMIT
   info "Using $PERF_BASELINE_COMMIT for performance metric baseline..."
 }
 
 function test_make() {
-  if [ -n "$CROSS_TARGET" ]; then
+  if [ -n "${CROSS_TARGET:-}" ]; then
     info "Can't test cross-compiled build."
     return
   fi
 
   run "$MAKE" test_bindist TEST_PREP=YES
-  run "$MAKE" V=0 test \
+  run "$MAKE" V=0 VERBOSE=1 test \
     THREADS="$cores" \
     JUNIT_FILE=../../junit.xml \
-    EXTRA_RUNTEST_OPTS="$RUNTEST_ARGS"
+    EXTRA_RUNTEST_OPTS="${RUNTEST_ARGS:-}"
 }
 
 function build_hadrian() {
@@ -458,11 +450,11 @@ function build_hadrian() {
 
   run_hadrian binary-dist
 
-  mv _build/bindist/ghc*.tar.xz $BIN_DIST_NAME.tar.xz
+  mv _build/bindist/ghc*.tar.xz "$BIN_DIST_NAME.tar.xz"
 }
 
 function test_hadrian() {
-  if [ -n "$CROSS_TARGET" ]; then
+  if [ -n "${CROSS_TARGET:-}" ]; then
     info "Can't test cross-compiled build."
     return
   fi
@@ -476,7 +468,7 @@ function test_hadrian() {
     test \
     --summary-junit=./junit.xml \
     --test-compiler="$TOP"/_build/install/bin/ghc \
-    "runtest.opts+=$RUNTEST_ARGS"
+    "runtest.opts+=${RUNTEST_ARGS:-}"
 }
 
 function cabal_test() {
@@ -491,7 +483,7 @@ function cabal_test() {
     -ddump-to-file -dumpdir "$OUT/dumps" -ddump-timings \
     +RTS --machine-readable "-t$OUT/rts.log" -RTS \
     -package mtl -ilibraries/Cabal/Cabal libraries/Cabal/Cabal/Setup.hs \
-    $@
+    "$@"
   rm -Rf tmp
   end_section "Cabal test: $OUT"
 }
@@ -517,24 +509,25 @@ function run_hadrian() {
   if [ -z "$BUILD_FLAVOUR" ]; then
     fail "BUILD_FLAVOUR not set"
   fi
-  if [ -z "$BIGNUM_BACKEND" ]; then BIGNUM_BACKEND="gmp"; fi
-  if [ -n "$VERBOSE" ]; then HADRIAN_ARGS="$HADRIAN_ARGS -V"; fi
+  if [ -z "${BIGNUM_BACKEND:-}" ]; then BIGNUM_BACKEND="gmp"; fi
+  read -r -a args <<< "${HADRIAN_ARGS:-}"
+  if [ -n "${VERBOSE:-}" ]; then args+=("-V"); fi
   run hadrian/build-cabal \
     --flavour="$BUILD_FLAVOUR" \
     -j"$cores" \
-    --broken-test="$BROKEN_TESTS" \
+    --broken-test="${BROKEN_TESTS:-}" \
     --bignum=$BIGNUM_BACKEND \
-    $HADRIAN_ARGS \
-    $@
+    "${args[@]}" \
+    "$@"
 }
 
 # A convenience function to allow debugging in the CI environment.
 function shell() {
-  local cmd=$@
+  local cmd="*@"
   if [ -z "$cmd" ]; then
     cmd="bash -i"
   fi
-  run $cmd
+  run "$cmd"
 }
 
 setup_locale
@@ -560,12 +553,12 @@ case "$(uname)" in
   *) fail "uname $(uname) is not supported" ;;
 esac
 
-if [ -n "$CROSS_TARGET" ]; then
+if [ -n "${CROSS_TARGET:-}" ]; then
   info "Cross-compiling for $CROSS_TARGET..."
   target_triple="$CROSS_TARGET"
 fi
 
-echo "Branch name $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME"
+echo "Branch name ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-}"
 # Ignore performance improvements in @marge-bot batches.
 # See #19562.
 if [ "${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-}" == "wip/marge_bot_batch_merge_job" ]; then
@@ -574,8 +567,8 @@ if [ "${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-}" == "wip/marge_bot_batch_merge_jo
     echo "Ignoring perf failures"
   fi
 fi
-echo "CI_COMMIT_BRANCH: $CI_COMMIT_BRANCH"
-echo "CI_PROJECT_PATH: $CI_PROJECT_PATH"
+echo "CI_COMMIT_BRANCH: ${CI_COMMIT_BRANCH:-}"
+echo "CI_PROJECT_PATH: ${CI_PROJECT_PATH:-}"
 if [ "${CI_COMMIT_BRANCH:-}" == "master" ] &&  [ "${CI_PROJECT_PATH:-}" == "ghc/ghc" ]; then
   if [ -z "${IGNORE_PERF_FAILURES:-}" ]; then
     IGNORE_PERF_FAILURES="decreases"
@@ -609,9 +602,9 @@ case $1 in
     test_hadrian || res=$?
     push_perf_notes
     exit $res ;;
-  run_hadrian) shift; run_hadrian $@ ;;
+  run_hadrian) shift; run_hadrian "$@" ;;
   perf_test) run_perf_test ;;
   clean) clean ;;
-  shell) shell $@ ;;
+  shell) shell "$@" ;;
   *) fail "unknown mode $1" ;;
 esac

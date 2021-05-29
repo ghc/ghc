@@ -1,5 +1,5 @@
 {-# LANGUAGE BangPatterns  #-}
-{-# LANGUAGE CPP           #-}
+
 {-# LANGUAGE DeriveFunctor #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
@@ -8,8 +8,6 @@ module GHC.Tc.Solver.Rewrite(
    rewrite, rewriteKind, rewriteArgsNom,
    rewriteType
  ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -28,7 +26,9 @@ import GHC.Types.Var.Env
 import GHC.Driver.Session
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Tc.Solver.Monad as TcS
+import GHC.Tc.Solver.Types
 
 import GHC.Utils.Misc
 import GHC.Data.Maybe
@@ -257,7 +257,7 @@ rewriteArgsNom ev tc tys
   = do { traceTcS "rewrite_args {" (vcat (map ppr tys))
        ; (tys', cos, kind_co)
            <- runRewriteCtEv ev (rewrite_args_tc tc Nothing tys)
-       ; MASSERT( isReflMCo kind_co )
+       ; massert (isReflMCo kind_co)
        ; traceTcS "rewrite }" (vcat (map ppr tys'))
        ; return (tys', cos) }
 
@@ -334,7 +334,7 @@ it expands the synonym and proceeds; if not, it simply returns the
 unexpanded synonym. See also Note [Rewriting synonyms].
 
 Where do we actually perform rewriting within a type? See Note [Rewritable] in
-GHC.Tc.Solver.Monad.
+GHC.Tc.Solver.InertSet.
 
 Note [rewrite_args performance]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -769,8 +769,8 @@ rewrite_fam_app :: TyCon -> [TcType] -> RewriteM (Xi, Coercion)
   --   rewrite_exact_fam_app      lifts out the application to top level
   -- Postcondition: Coercion :: Xi ~ F tys
 rewrite_fam_app tc tys  -- Can be over-saturated
-    = ASSERT2( tys `lengthAtLeast` tyConArity tc
-             , ppr tc $$ ppr (tyConArity tc) $$ ppr tys)
+    = assertPpr (tys `lengthAtLeast` tyConArity tc)
+                (ppr tc $$ ppr (tyConArity tc) $$ ppr tys) $
 
                  -- Type functions are saturated
                  -- The type function might be *over* saturated
@@ -968,7 +968,7 @@ rewrite_tyvar2 tv fr@(_, eq_rel)
                          ppr rhs_ty $$ ppr ctev)
                     ; let rewrite_co1 = mkSymCo (ctEvCoercion ctev)
                           rewrite_co  = case (ct_eq_rel, eq_rel) of
-                            (ReprEq, _rel)  -> ASSERT( _rel == ReprEq )
+                            (ReprEq, _rel)  -> assert (_rel == ReprEq )
                                     -- if this ASSERT fails, then
                                     -- eqCanRewriteFR answered incorrectly
                                                rewrite_co1

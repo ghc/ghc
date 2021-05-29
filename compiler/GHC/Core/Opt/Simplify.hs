@@ -4,13 +4,11 @@
 \section[Simplify]{The main module of the simplifier}
 -}
 
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE TypeFamilies #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates -Wno-incomplete-uni-patterns #-}
 module GHC.Core.Opt.Simplify ( simplTopBinds, simplExpr, simplRules ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -65,8 +63,9 @@ import GHC.Data.Maybe   ( orElse )
 import Control.Monad
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
+import GHC.Utils.Constants (debugIsOn)
 import GHC.Data.FastString
-import GHC.Utils.Misc
 import GHC.Unit.Module ( moduleName, pprModuleName )
 import GHC.Core.Multiplicity
 import GHC.Builtin.PrimOps ( PrimOp (SeqOp) )
@@ -293,7 +292,7 @@ simplRecOrTopPair env top_lvl is_rec mb_cont old_bndr new_bndr rhs
 
   | Just cont <- mb_cont
   = {-#SCC "simplRecOrTopPair-join" #-}
-    ASSERT( isNotTopLevel top_lvl && isJoinId new_bndr )
+    assert (isNotTopLevel top_lvl && isJoinId new_bndr )
     trace_bind "join" $
     simplJoinBind env cont old_bndr new_bndr rhs env
 
@@ -328,8 +327,8 @@ simplLazyBind :: SimplEnv
 -- Precondition: rhs obeys the let/app invariant
 -- NOT used for JoinIds
 simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
-  = ASSERT( isId bndr )
-    ASSERT2( not (isJoinId bndr), ppr bndr )
+  = assert (isId bndr )
+    assertPpr (not (isJoinId bndr)) (ppr bndr) $
     -- pprTrace "simplLazyBind" ((ppr bndr <+> ppr bndr1) $$ ppr rhs $$ ppr (seIdSubst rhs_se)) $
     do  { let   !rhs_env     = rhs_se `setInScopeFromE` env -- See Note [Bangs in the Simplifier]
                 (tvs, body) = case collectTyAndValBinders rhs of
@@ -415,7 +414,7 @@ simplNonRecX :: SimplEnv
 -- Precondition: rhs satisfies the let/app invariant
 
 simplNonRecX env bndr new_rhs
-  | ASSERT2( not (isJoinId bndr), ppr bndr )
+  | assertPpr (not (isJoinId bndr)) (ppr bndr) $
     isDeadBinder bndr   -- Not uncommon; e.g. case (a,b) of c { (p,q) -> p }
   = return (emptyFloats env, env)    --  Here c is dead, and we avoid
                                          --  creating the binding c = (a,b)
@@ -444,7 +443,7 @@ completeNonRecX :: TopLevelFlag -> SimplEnv
 --               See Note [Core let/app invariant] in GHC.Core
 
 completeNonRecX top_lvl env is_strict old_bndr new_bndr new_rhs
-  = ASSERT2( not (isJoinId new_bndr), ppr new_bndr )
+  = assertPpr (not (isJoinId new_bndr)) (ppr new_bndr) $
     do  { (prepd_floats, new_bndr, new_rhs)
               <- prepareBinding env top_lvl old_bndr new_bndr new_rhs
         ; let floats = emptyFloats env `addLetFloats` prepd_floats
@@ -517,7 +516,7 @@ cast!  We want to transfer the pagma to $wf:
 It's exactly like worker/wrapper for strictness analysis:
   f is the wrapper and must inline like crazy
   $wf is the worker and must carry f's original pragma
-See Note [Worker-wrapper for NOINLINE functions] in
+See Note [Worker/wrapper for NOINLINE functions] in
 GHC.Core.Opt.WorkWrap.
 
 See #17673, #18093, #18078.
@@ -805,7 +804,7 @@ completeBind env top_lvl mb_cont old_bndr new_bndr new_rhs
      _           -> return (mkFloatBind env (NonRec new_bndr new_rhs))
 
  | otherwise
- = ASSERT( isId new_bndr )
+ = assert (isId new_bndr) $
    do { let old_info = idInfo old_bndr
             old_unf  = unfoldingInfo old_info
             occ_info = occInfo old_info
@@ -1096,7 +1095,7 @@ simplExprF1 env (Let (Rec pairs) body) cont
 simplExprF1 env (Let (NonRec bndr rhs) body) cont
   | Type ty <- rhs    -- First deal with type lets (let a = Type ty in e)
   = {-#SCC "simplExprF1-NonRecLet-Type" #-}
-    ASSERT( isTyVar bndr )
+    assert (isTyVar bndr) $
     do { ty' <- simplType env ty
        ; simplExprF (extendTvSubst env bndr ty') body cont }
 
@@ -1554,9 +1553,11 @@ simplLamBndr :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
 -- Used for lambda binders.  These sometimes have unfoldings added by
 -- the worker/wrapper pass that must be preserved, because they can't
 -- be reconstructed from context.  For example:
---      f x = case x of (a,b) -> fw a b x
---      fw a b x{=(a,b)} = ...
--- The "{=(a,b)}" is an unfolding we can't reconstruct otherwise.
+--      f x = case x of StrictPair a b -> fw a b x
+--      fw a{=OtherCon[]} b{=OtherCon[]} x{=(StrictPair a b)} = ...
+-- The "{=(StrictPair a b)}" is an unfolding we can't reconstruct otherwise.
+-- Since simplBinder already retains OtherCon bindings we only have to special
+-- case core unfoldings like the one for `x`.
 simplLamBndr env bndr
   | isId bndr && hasCoreUnfolding old_unf   -- Special case
   = do { (env1, bndr1) <- simplBinder env bndr
@@ -1603,7 +1604,7 @@ simplNonRecE :: SimplEnv
 --       the call to simplLam in simplExprF (Lam ...)
 
 simplNonRecE env bndr (rhs, rhs_se) (bndrs, body) cont
-  | ASSERT( isId bndr && not (isJoinId bndr) ) True
+  | assert (isId bndr && not (isJoinId bndr) ) True
   , Just env' <- preInlineUnconditionally env NotTopLevel bndr rhs rhs_se
   = do { tick (PreInlineUnconditionally bndr)
        ; -- pprTrace "preInlineUncond" (ppr bndr <+> ppr rhs) $
@@ -1637,7 +1638,7 @@ simplRecE :: SimplEnv
 --  * non-top-level recursive lets in expressions
 simplRecE env pairs body cont
   = do  { let bndrs = map fst pairs
-        ; MASSERT(all (not . isJoinId) bndrs)
+        ; massert (all (not . isJoinId) bndrs)
         ; env1 <- simplRecBndrs env bndrs
                 -- NB: bndrs' don't have unfoldings or rules
                 -- We add them as we go down
@@ -1743,7 +1744,7 @@ simplNonRecJoinPoint :: SimplEnv -> InId -> InExpr
                      -> InExpr -> SimplCont
                      -> SimplM (SimplFloats, OutExpr)
 simplNonRecJoinPoint env bndr rhs body cont
-  | ASSERT( isJoinId bndr ) True
+  | assert (isJoinId bndr ) True
   , Just env' <- preInlineUnconditionally env NotTopLevel bndr rhs env
   = do { tick (PreInlineUnconditionally bndr)
        ; simplExprF env' body cont }
@@ -2201,7 +2202,7 @@ tryRules env rules fn args call_cont
                 -- Takes   K -> e  into   tagK# -> e
                 -- where tagK# is the tag of constructor K
              enum_to_tag (DataAlt con, [], rhs)
-               = ASSERT( isEnumerationTyCon (dataConTyCon con) )
+               = assert (isEnumerationTyCon (dataConTyCon con) )
                 (LitAlt tag, [], rhs)
               where
                 tag = mkLitInt dflags (toInteger (dataConTag con - fIRST_TAG))
@@ -2677,7 +2678,7 @@ rebuildCase env scrut case_bndr alts cont
         }
   where
     simple_rhs env wfloats scrut' bs rhs =
-      ASSERT( null bs )
+      assert (null bs) $
       do { (floats1, env') <- simplNonRecX env case_bndr scrut'
              -- scrut is a constructor application,
              -- hence satisfies let/app invariant
@@ -2976,7 +2977,7 @@ simplAlt :: SimplEnv
          -> SimplM OutAlt
 
 simplAlt env _ imposs_deflt_cons case_bndr' cont' (Alt DEFAULT bndrs rhs)
-  = ASSERT( null bndrs )
+  = assert (null bndrs) $
     do  { let env' = addBinderUnfolding env case_bndr'
                                         (mkOtherCon imposs_deflt_cons)
                 -- Record the constructors that the case-binder *can't* be.
@@ -2984,7 +2985,7 @@ simplAlt env _ imposs_deflt_cons case_bndr' cont' (Alt DEFAULT bndrs rhs)
         ; return (Alt DEFAULT [] rhs') }
 
 simplAlt env scrut' _ case_bndr' cont' (Alt (LitAlt lit) bndrs rhs)
-  = ASSERT( null bndrs )
+  = assert (null bndrs) $
     do  { env' <- addAltUnfoldings env scrut' case_bndr' (Lit lit)
         ; rhs' <- simplExprC env' rhs cont'
         ; return (Alt (LitAlt lit) [] rhs') }
@@ -3095,9 +3096,9 @@ addAltUnfoldings env scrut case_bndr con_app
 addBinderUnfolding :: SimplEnv -> Id -> Unfolding -> SimplEnv
 addBinderUnfolding env bndr unf
   | debugIsOn, Just tmpl <- maybeUnfoldingTemplate unf
-  = WARN( not (eqType (idType bndr) (exprType tmpl)),
-          ppr bndr $$ ppr (idType bndr) $$ ppr tmpl $$ ppr (exprType tmpl) )
-    modifyInScope env (bndr `setIdUnfolding` unf)
+  = warnPprTrace (not (eqType (idType bndr) (exprType tmpl)))
+          (ppr bndr $$ ppr (idType bndr) $$ ppr tmpl $$ ppr (exprType tmpl)) $
+          modifyInScope env (bndr `setIdUnfolding` unf)
 
   | otherwise
   = modifyInScope env (bndr `setIdUnfolding` unf)
@@ -3210,15 +3211,15 @@ knownCon env scrut dc_floats dc dc_ty_args dc_args bndr bs rhs cont
     bind_args env' [] _  = return (emptyFloats env', env')
 
     bind_args env' (b:bs') (Type ty : args)
-      = ASSERT( isTyVar b )
+      = assert (isTyVar b )
         bind_args (extendTvSubst env' b ty) bs' args
 
     bind_args env' (b:bs') (Coercion co : args)
-      = ASSERT( isCoVar b )
+      = assert (isCoVar b )
         bind_args (extendCvSubst env' b co) bs' args
 
     bind_args env' (b:bs') (arg : args)
-      = ASSERT( isId b )
+      = assert (isId b) $
         do { let b' = zap_occ b
              -- Note that the binder might be "dead", because it doesn't
              -- occur in the RHS; and simplNonRecX may therefore discard
@@ -3261,7 +3262,7 @@ missingAlt :: SimplEnv -> Id -> [InAlt] -> SimplCont
                 -- it "sees" that the entire branch of an outer case is
                 -- inaccessible.  So we simply put an error case here instead.
 missingAlt env case_bndr _ cont
-  = WARN( True, text "missingAlt" <+> ppr case_bndr )
+  = warnPprTrace True (text "missingAlt" <+> ppr case_bndr) $
     -- See Note [Avoiding space leaks in OutType]
     let cont_ty = contResultType cont
     in seqType cont_ty `seq`
@@ -3530,9 +3531,9 @@ mkDupableAlt platform case_bndr jfloats (Alt con bndrs' rhs')
                              unf = mkInlineUnfolding simpl_opts rhs
                              rhs = mkConApp2 dc (tyConAppArgs scrut_ty) bndrs'
 
-                      LitAlt {} -> WARN( True, text "mkDupableAlt"
-                                                <+> ppr case_bndr <+> ppr con )
-                                   case_bndr
+                      LitAlt {} -> warnPprTrace True
+                                    (text "mkDupableAlt" <+> ppr case_bndr <+> ppr con)
+                                    case_bndr
                            -- The case binder is alive but trivial, so why has
                            -- it not been substituted away?
 
@@ -4054,8 +4055,7 @@ simplRules env mb_new_id rules mb_cont
            ; let rhs_ty = substTy env' (exprType rhs)
                  rhs_cont = case mb_cont of  -- See Note [Rules and unfolding for join points]
                                 Nothing   -> mkBoringStop rhs_ty
-                                Just cont -> ASSERT2( join_ok, bad_join_msg )
-                                             cont
+                                Just cont -> assertPpr join_ok bad_join_msg cont
                  lhs_env = updMode updModeForRules env'
                  rhs_env = updMode (updModeForStableUnfoldings act) env'
                            -- See Note [Simplifying the RHS of a RULE]

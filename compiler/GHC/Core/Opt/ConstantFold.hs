@@ -11,7 +11,6 @@ ToDo:
 -}
 
 {-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
@@ -31,13 +30,11 @@ module GHC.Core.Opt.ConstantFold
    )
 where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Driver.Ppr
 
-import {-# SOURCE #-} GHC.Types.Id.Make ( mkPrimOpId, magicDictId, voidPrimId )
+import {-# SOURCE #-} GHC.Types.Id.Make ( mkPrimOpId, voidPrimId )
 
 import GHC.Core
 import GHC.Core.Make
@@ -49,11 +46,11 @@ import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim
 import GHC.Core.TyCon
    ( tyConDataCons_maybe, isAlgTyCon, isEnumerationTyCon
-   , isNewTyCon, unwrapNewTyCon_maybe, tyConDataCons
+   , isNewTyCon, tyConDataCons
    , tyConFamilySize )
 import GHC.Core.DataCon ( dataConTagZ, dataConTyCon, dataConWrapId, dataConWorkId )
 import GHC.Core.Utils  ( eqExpr, cheapEqExpr, exprIsHNF, exprType
-                       , stripTicksTop, stripTicksTopT, mkTicks, stripTicksE )
+                       , stripTicksTop, stripTicksTopT, mkTicks )
 import GHC.Core.Multiplicity
 import GHC.Core.FVs
 import GHC.Core.Type
@@ -70,7 +67,7 @@ import GHC.Types.Basic
 import GHC.Platform
 import GHC.Utils.Misc
 import GHC.Utils.Panic
-import GHC.Core.Coercion   (mkUnbranchedAxInstCo,mkSymCo,Role(..))
+import GHC.Utils.Panic.Plain
 
 import Control.Applicative ( Alternative(..) )
 
@@ -166,8 +163,8 @@ primOpRules nm = \case
                                     , equalArgs $> Lit zeroW8 ]
    Word8NotOp  -> mkPrimOpRule nm 1 [ unaryLit complementOp
                                     , semiInversePrimOp Word8NotOp ]
-   Word8SllOp  -> mkPrimOpRule nm 2 [ shiftRule LitNumWord (const shiftL) ]
-   Word8SrlOp  -> mkPrimOpRule nm 2 [ shiftRule LitNumWord $ const $ shiftRightLogical @Word8 ]
+   Word8SllOp  -> mkPrimOpRule nm 2 [ shiftRule LitNumWord8 (const shiftL) ]
+   Word8SrlOp  -> mkPrimOpRule nm 2 [ shiftRule LitNumWord8 $ const $ shiftRightLogical @Word8 ]
 
 
    -- Int16 operations
@@ -233,8 +230,8 @@ primOpRules nm = \case
                                     , equalArgs $> Lit zeroW16 ]
    Word16NotOp -> mkPrimOpRule nm 1 [ unaryLit complementOp
                                     , semiInversePrimOp Word16NotOp ]
-   Word16SllOp -> mkPrimOpRule nm 2 [ shiftRule LitNumWord (const shiftL) ]
-   Word16SrlOp -> mkPrimOpRule nm 2 [ shiftRule LitNumWord $ const $ shiftRightLogical @Word16 ]
+   Word16SllOp -> mkPrimOpRule nm 2 [ shiftRule LitNumWord16 (const shiftL) ]
+   Word16SrlOp -> mkPrimOpRule nm 2 [ shiftRule LitNumWord16 $ const $ shiftRightLogical @Word16 ]
 
 
    -- Int32 operations
@@ -300,8 +297,8 @@ primOpRules nm = \case
                                     , equalArgs $> Lit zeroW32 ]
    Word32NotOp -> mkPrimOpRule nm 1 [ unaryLit complementOp
                                     , semiInversePrimOp Word32NotOp ]
-   Word32SllOp -> mkPrimOpRule nm 2 [ shiftRule LitNumWord (const shiftL) ]
-   Word32SrlOp -> mkPrimOpRule nm 2 [ shiftRule LitNumWord $ const $ shiftRightLogical @Word32 ]
+   Word32SllOp -> mkPrimOpRule nm 2 [ shiftRule LitNumWord32 (const shiftL) ]
+   Word32SrlOp -> mkPrimOpRule nm 2 [ shiftRule LitNumWord32 $ const $ shiftRightLogical @Word32 ]
 
 
    -- Int operations
@@ -1537,11 +1534,11 @@ tagToEnumRule = do
       let tag = fromInteger i
           correct_tag dc = (dataConTagZ dc) == tag
       (dc:rest) <- return $ filter correct_tag (tyConDataCons_maybe tycon `orElse` [])
-      ASSERT(null rest) return ()
+      massert (null rest)
       return $ mkTyApps (Var (dataConWorkId dc)) tc_args
 
     -- See Note [tagToEnum#]
-    _ -> WARN( True, text "tagToEnum# on non-enumeration type" <+> ppr ty )
+    _ -> warnPprTrace True (text "tagToEnum# on non-enumeration type" <+> ppr ty) $
          return $ mkRuntimeErrorApp rUNTIME_ERROR_ID ty "tagToEnum# on non-enumeration type"
 
 ------------------------------
@@ -1565,7 +1562,7 @@ dataToTagRule = a `mplus` b
       [_, val_arg] <- getArgs
       in_scope <- getInScopeEnv
       (_,floats, dc,_,_) <- liftMaybe $ exprIsConApp_maybe in_scope val_arg
-      ASSERT( not (isNewTyCon (dataConTyCon dc)) ) return ()
+      massert (not (isNewTyCon (dataConTyCon dc)))
       return $ wrapFloats floats (mkIntVal dflags (toInteger (dataConTagZ dc)))
 
 {- Note [dataToTag# magic]
@@ -1739,8 +1736,6 @@ builtinRules
                    ru_nargs = 1, ru_try = match_cstring_length },
      BuiltinRule { ru_name = fsLit "Inline", ru_fn = inlineIdName,
                    ru_nargs = 2, ru_try = \_ _ _ -> match_inline },
-     BuiltinRule { ru_name = fsLit "MagicDict", ru_fn = idName magicDictId,
-                   ru_nargs = 4, ru_try = \_ _ _ -> match_magicDict },
 
      mkBasicRule unsafeEqualityProofName 3 unsafeEqualityProofRule,
 
@@ -1789,7 +1784,7 @@ builtinBignumRules =
   , integer_to_natural "Integer -> Natural (wrap)"  integerToNaturalName      False False
   , integer_to_natural "Integer -> Natural (throw)" integerToNaturalThrowName True False
 
-  , lit_to_natural  "Word# -> Natural"         naturalNSDataConName
+  , lit_to_natural  "Word# -> Natural"         naturalNSName
   , natural_to_word "Natural -> Word# (wrap)"  naturalToWordName      False
   , natural_to_word "Natural -> Word# (clamp)" naturalToWordClampName True
 
@@ -1862,21 +1857,21 @@ builtinBignumRules =
   , bignum_popcount "naturalPopCount" naturalPopCountName mkLitWordWrap
 
     -- identity passthrough
-  , id_passthrough "Int# -> Integer -> Int#"       integerToIntName    integerISDataConName
+  , id_passthrough "Int# -> Integer -> Int#"       integerToIntName    integerISName
   , id_passthrough "Word# -> Integer -> Word#"     integerToWordName   integerFromWordName
   , id_passthrough "Int64# -> Integer -> Int64#"   integerToInt64Name  integerFromInt64Name
   , id_passthrough "Word64# -> Integer -> Word64#" integerToWord64Name integerFromWord64Name
-  , id_passthrough "Word# -> Natural -> Word#"     naturalToWordName   naturalNSDataConName
+  , id_passthrough "Word# -> Natural -> Word#"     naturalToWordName   naturalNSName
 
     -- identity passthrough with a conversion that can be done directly instead
   , small_passthrough "Int# -> Integer -> Word#"
-        integerISDataConName integerToWordName   (mkPrimOpId IntToWordOp)
+        integerISName integerToWordName   (mkPrimOpId IntToWordOp)
   , small_passthrough "Int# -> Integer -> Float#"
-        integerISDataConName integerToFloatName  (mkPrimOpId IntToFloatOp)
+        integerISName integerToFloatName  (mkPrimOpId IntToFloatOp)
   , small_passthrough "Int# -> Integer -> Double#"
-        integerISDataConName integerToDoubleName (mkPrimOpId IntToDoubleOp)
+        integerISName integerToDoubleName (mkPrimOpId IntToDoubleOp)
   , small_passthrough "Word# -> Natural -> Int#"
-        naturalNSDataConName naturalToWordName   (mkPrimOpId WordToIntOp)
+        naturalNSName naturalToWordName   (mkPrimOpId WordToIntOp)
 
     -- Bits.bit
   , bignum_bit "integerBit" integerBitName mkLitInteger
@@ -1913,6 +1908,25 @@ builtinBignumRules =
   , integer_encode_float "integerEncodeDouble" integerEncodeDoubleName mkDoubleLitDouble
   ]
   where
+    -- The rule is matching against an occurrence of a data constructor in a
+    -- Core expression. It must match either its worker name or its wrapper
+    -- name, /not/ the DataCon name itself, which is different.
+    -- See Note [Data Constructor Naming] in GHC.Core.DataCon and #19892
+    --
+    -- But data constructor wrappers deliberately inline late; See Note
+    -- [Activation for data constructor wrappers] in GHC.Types.Id.Make.
+    -- Suppose there is a wrapper and the rule matches on the worker: the
+    -- wrapper won't be inlined until rules have finished firing and the rule
+    -- will never fire.
+    --
+    -- Hence the rule must match on the wrapper, if there is one, otherwise on
+    -- the worker. That is exactly the dataConWrapId for the data constructor.
+    -- The data constructor may or may not have a wrapper, but if not
+    -- dataConWrapId will return the worker
+    --
+    integerISName = idName (dataConWrapId integerISDataCon)
+    naturalNSName = idName (dataConWrapId naturalNSDataCon)
+
     mkRule str name nargs f = BuiltinRule
       { ru_name = fsLit str
       , ru_fn = name
@@ -2140,7 +2154,7 @@ match_append_lit foldVariant _ id_unf _
     in eqExpr freeVars c1 c2
   , (c1Ticks, c1') <- stripTicksTop tickishFloatable c1
   , c2Ticks <- stripTicksTopT tickishFloatable c2
-  = ASSERT( ty1 `eqType` ty2 )
+  = assert (ty1 `eqType` ty2) $
     Just $ mkTicks strTicks
          $ Var unpk `App` Type ty1
                     `App` Lit (LitString (s1 `BS.append` s2))
@@ -2238,21 +2252,6 @@ match_inline (Type _ : e : _)
   = Just (mkApps unf args1)
 
 match_inline _ = Nothing
-
----------------------------------------------------
--- See Note [magicDictId magic] in "GHC.Types.Id.Make"
--- for a description of what is going on here.
-match_magicDict :: [Expr CoreBndr] -> Maybe (Expr CoreBndr)
-match_magicDict [Type _, (stripTicksE (const True) -> (Var wrap `App` Type a `App` Type _ `App` f)), x, y ]
-  | Just (_, fieldTy, _)  <- splitFunTy_maybe $ dropForAlls $ idType wrap
-  , Just (_, dictTy, _)   <- splitFunTy_maybe fieldTy
-  , Just dictTc           <- tyConAppTyCon_maybe dictTy
-  , Just (_,_,co)         <- unwrapNewTyCon_maybe dictTc
-  = Just
-  $ f `App` Cast x (mkSymCo (mkUnbranchedAxInstCo Representational co [a] []))
-      `App` y
-
-match_magicDict _ = Nothing
 
 --------------------------------------------------------
 -- Note [Constant folding through nested expressions]
@@ -2355,7 +2354,7 @@ match_magicDict _ = Nothing
 
 addFoldingRules :: PrimOp -> NumOps -> RuleM CoreExpr
 addFoldingRules op num_ops = do
-   ASSERT(op == numAdd num_ops) return ()
+   massert (op == numAdd num_ops)
    env <- getEnv
    guard (roNumConstantFolding env)
    [arg1,arg2] <- getArgs
@@ -2367,7 +2366,7 @@ addFoldingRules op num_ops = do
 
 subFoldingRules :: PrimOp -> NumOps -> RuleM CoreExpr
 subFoldingRules op num_ops = do
-   ASSERT(op == numSub num_ops) return ()
+   massert (op == numSub num_ops)
    env <- getEnv
    guard (roNumConstantFolding env)
    [arg1,arg2] <- getArgs
@@ -2376,7 +2375,7 @@ subFoldingRules op num_ops = do
 
 mulFoldingRules :: PrimOp -> NumOps -> RuleM CoreExpr
 mulFoldingRules op num_ops = do
-   ASSERT(op == numMul num_ops) return ()
+   massert (op == numMul num_ops)
    env <- getEnv
    guard (roNumConstantFolding env)
    [arg1,arg2] <- getArgs

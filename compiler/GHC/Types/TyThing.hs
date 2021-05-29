@@ -229,6 +229,8 @@ tyThingParent_maybe (ATyCon tc)   = case tyConAssoc_maybe tc of
 tyThingParent_maybe (AnId id)     = case idDetails id of
                                       RecSelId { sel_tycon = RecSelData tc } ->
                                           Just (ATyCon tc)
+                                      RecSelId { sel_tycon = RecSelPatSyn ps } ->
+                                          Just (AConLike (PatSynCon ps))
                                       ClassOpId cls               ->
                                           Just (ATyCon (classTyCon cls))
                                       _other                      -> Nothing
@@ -311,5 +313,3 @@ class Monad m => MonadThings m where
 -- Instance used in GHC.HsToCore.Quote
 instance MonadThings m => MonadThings (ReaderT s m) where
   lookupThing = lift . lookupThing
-
-

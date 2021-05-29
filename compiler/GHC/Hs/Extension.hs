@@ -101,7 +101,7 @@ type instance Anno RdrName = SrcSpanAnnN
 type instance Anno Name    = SrcSpanAnnN
 type instance Anno Id      = SrcSpanAnnN
 
-type IsSrcSpanAnn p a = ( Anno (IdGhcP p) ~ SrcSpanAnn' (EpAnn' a),
+type IsSrcSpanAnn p a = ( Anno (IdGhcP p) ~ SrcSpanAnn' (EpAnn a),
                           IsPass p)
 
 instance UnXRec (GhcPass p) where
@@ -229,3 +229,8 @@ pprIfRn pp = case ghcPass @p of GhcRn -> pp
 pprIfTc :: forall p. IsPass p => (p ~ 'Typechecked => SDoc) -> SDoc
 pprIfTc pp = case ghcPass @p of GhcTc -> pp
                                 _     -> empty
+
+type instance Anno (HsToken tok) = EpAnnCO
+
+noHsTok :: GenLocated (EpAnn a) (HsToken tok)
+noHsTok = L noAnn HsTok

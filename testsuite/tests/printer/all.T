@@ -123,3 +123,22 @@ test('PprRecordDotSyntax4', ignore_stderr, makefile_test, ['PprRecordDotSyntax4'
 test('PprRecordDotSyntaxA', ignore_stderr, makefile_test, ['PprRecordDotSyntaxA'])
 test('CommentsTest', ignore_stderr, makefile_test, ['CommentsTest'])
 test('InTreeAnnotations1', ignore_stderr, makefile_test, ['InTreeAnnotations1'])
+
+
+# Normal ppr does not reproduce unicode linear arrows, commented out
+# in the Makefile for this test. See #18846
+test('PprLinearArrow', ignore_stderr, makefile_test, ['PprLinearArrow'])
+
+test('Test19784', ignore_stderr, makefile_test, ['Test19784'])
+test('Test19798', ignore_stderr, makefile_test, ['Test19798'])
+
+# The exact printing manages the extra semicolons, normal ppr not, so
+# disabled in the Makefile for this test.
+test('Test19813', ignore_stderr, makefile_test, ['Test19813'])
+
+test('Test19814', ignore_stderr, makefile_test, ['Test19814'])
+test('Test19821', ignore_stderr, makefile_test, ['Test19821'])
+test('Test19834', ignore_stderr, makefile_test, ['Test19834'])
+test('Test19839', ignore_stderr, makefile_test, ['Test19839'])
+test('Test19840', ignore_stderr, makefile_test, ['Test19840'])
+test('Test19850', ignore_stderr, makefile_test, ['Test19850'])

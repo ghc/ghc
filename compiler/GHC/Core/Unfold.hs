@@ -15,7 +15,7 @@ literal'').  In the corner of a @CoreUnfolding@ unfolding, you will
 find, unsurprisingly, a Core expression.
 -}
 
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE BangPatterns #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
@@ -36,8 +36,6 @@ module GHC.Core.Unfold (
         callSiteInline, CallCtxt(..),
         calcUnfoldingGuidance
     ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -278,7 +276,7 @@ Moreover, if we /don't/ inline it, we may be left with
 which will build a thunk -- bad, bad, bad.
 
 Conclusion: we really want inlineBoringOk to be True of the RHS of
-unsafeCoerce.  This is (U4a) in Note [Implementing unsafeCoerce].
+unsafeCoerce.  This is (U4) in Note [Implementing unsafeCoerce].
 
 Note [Computing the size of an expression]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -960,7 +958,7 @@ certainlyWillInline opts fn_info
   = case fn_unf of
       CoreUnfolding { uf_tmpl = expr, uf_guidance = guidance, uf_src = src }
         | loop_breaker -> Nothing       -- Won't inline, so try w/w
-        | noinline     -> Nothing       -- See Note [Worker-wrapper for NOINLINE functions]
+        | noinline     -> Nothing       -- See Note [Worker/wrapper for NOINLINE functions]
         | otherwise
         -> case guidance of
              UnfNever  -> Nothing
@@ -1033,7 +1031,7 @@ certainlyWillInline /must/ return Nothing for a large INLINABLE thing,
 even though we have a stable inlining, so that strictness w/w takes
 place.  It makes a big difference to efficiency, and the w/w pass knows
 how to transfer the INLINABLE info to the worker; see WorkWrap
-Note [Worker-wrapper for INLINABLE functions]
+Note [Worker/wrapper for INLINABLE functions]
 
 ************************************************************************
 *                                                                      *
@@ -1130,7 +1128,7 @@ traceInline logger dflags inline_id str doc result
   | otherwise = result
   where
     enable
-      | dopt Opt_D_dump_inlinings dflags && dopt Opt_D_verbose_core2core dflags
+      | dopt Opt_D_dump_verbose_inlinings dflags
       = True
       | Just prefix <- inlineCheck dflags
       = prefix `isPrefixOf` occNameString (getOccName inline_id)

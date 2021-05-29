@@ -4,7 +4,8 @@
 
 -}
 
-{-# LANGUAGE CPP, TupleSections, ScopedTypeVariables, MultiWayIf #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE TupleSections, ScopedTypeVariables, MultiWayIf #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE LambdaCase #-}
@@ -24,8 +25,6 @@ module GHC.Tc.TyCl (
         unravelFamInstPats, addConsistencyConstraints,
         wrongKindOfFamily
     ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -91,6 +90,8 @@ import GHC.Unit
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
+import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Misc
 
 import Control.Monad
@@ -144,31 +145,35 @@ tcTyAndClassDecls :: [TyClGroup GhcRn]      -- Mutually-recursive groups in
                                             -- and their implicit Ids,DataCons
                          , [InstInfo GhcRn] -- Source-code instance decls info
                          , [DerivInfo]      -- Deriving info
+                         , ClassScopedTVEnv -- Class scoped type variables
                          )
 -- Fails if there are any errors
 tcTyAndClassDecls tyclds_s
   -- The code recovers internally, but if anything gave rise to
   -- an error we'd better stop now, to avoid a cascade
   -- Type check each group in dependency order folding the global env
-  = checkNoErrs $ fold_env [] [] tyclds_s
+  = checkNoErrs $ fold_env [] [] emptyNameEnv tyclds_s
   where
     fold_env :: [InstInfo GhcRn]
              -> [DerivInfo]
+             -> ClassScopedTVEnv
              -> [TyClGroup GhcRn]
-             -> TcM (TcGblEnv, [InstInfo GhcRn], [DerivInfo])
-    fold_env inst_info deriv_info []
+             -> TcM (TcGblEnv, [InstInfo GhcRn], [DerivInfo], ClassScopedTVEnv)
+    fold_env inst_info deriv_info class_scoped_tv_env []
       = do { gbl_env <- getGblEnv
-           ; return (gbl_env, inst_info, deriv_info) }
-    fold_env inst_info deriv_info (tyclds:tyclds_s)
-      = do { (tcg_env, inst_info', deriv_info') <- tcTyClGroup tyclds
+           ; return (gbl_env, inst_info, deriv_info, class_scoped_tv_env) }
+    fold_env inst_info deriv_info class_scoped_tv_env (tyclds:tyclds_s)
+      = do { (tcg_env, inst_info', deriv_info', class_scoped_tv_env')
+               <- tcTyClGroup tyclds
            ; setGblEnv tcg_env $
                -- remaining groups are typechecked in the extended global env.
              fold_env (inst_info' ++ inst_info)
                       (deriv_info' ++ deriv_info)
+                      (class_scoped_tv_env' `plusNameEnv` class_scoped_tv_env)
                       tyclds_s }
 
 tcTyClGroup :: TyClGroup GhcRn
-            -> TcM (TcGblEnv, [InstInfo GhcRn], [DerivInfo])
+            -> TcM (TcGblEnv, [InstInfo GhcRn], [DerivInfo], ClassScopedTVEnv)
 -- Typecheck one strongly-connected component of type, class, and instance decls
 -- See Note [TyClGroups and dependency analysis] in GHC.Hs.Decls
 tcTyClGroup (TyClGroup { group_tyclds = tyclds
@@ -180,7 +185,7 @@ tcTyClGroup (TyClGroup { group_tyclds = tyclds
            -- Step 1: Typecheck the standalone kind signatures and type/class declarations
        ; traceTc "---- tcTyClGroup ---- {" empty
        ; traceTc "Decls for" (ppr (map (tcdName . unLoc) tyclds))
-       ; (tyclss, data_deriv_info, kindless) <-
+       ; (tyclss, data_deriv_info, class_scoped_tv_env, kindless) <-
            tcExtendKindEnv (mkPromotionErrorEnv tyclds) $ -- See Note [Type environment evolution]
            do { kisig_env <- mkNameEnv <$> traverse tcStandaloneKindSig kisigs
               ; tcTyClDecls tyclds kisig_env role_annots }
@@ -216,7 +221,7 @@ tcTyClGroup (TyClGroup { group_tyclds = tyclds
        ; let deriv_info = datafam_deriv_info ++ data_deriv_info
        ; let gbl_env'' = gbl_env'
                 { tcg_ksigs = tcg_ksigs gbl_env' `unionNameSet` kindless }
-       ; return (gbl_env'', inst_info, deriv_info) }
+       ; return (gbl_env'', inst_info, deriv_info, class_scoped_tv_env) }
 
 -- Gives the kind for every TyCon that has a standalone kind signature
 type KindSigEnv = NameEnv Kind
@@ -225,7 +230,7 @@ tcTyClDecls
   :: [LTyClDecl GhcRn]
   -> KindSigEnv
   -> RoleAnnotEnv
-  -> TcM ([TyCon], [DerivInfo], NameSet)
+  -> TcM ([TyCon], [DerivInfo], ClassScopedTVEnv, NameSet)
 tcTyClDecls tyclds kisig_env role_annots
   = do {    -- Step 1: kind-check this group and returns the final
             -- (possibly-polymorphic) kind of each TyCon and Class
@@ -239,11 +244,12 @@ tcTyClDecls tyclds kisig_env role_annots
             -- NB: We have to be careful here to NOT eagerly unfold
             -- type synonyms, as we have not tested for type synonym
             -- loops yet and could fall into a black hole.
-       ; fixM $ \ ~(rec_tyclss, _, _) -> do
+       ; fixM $ \ ~(rec_tyclss, _, _, _) -> do
            { tcg_env <- getGblEnv
                  -- Forced so we don't retain a reference to the TcGblEnv
            ; let !src  = tcg_src tcg_env
                  roles = inferRoles src role_annots rec_tyclss
+                 class_scoped_tv_env = mk_class_scoped_tv_env tc_tycons
 
                  -- Populate environment with knot-tied ATyCon for TyCons
                  -- NB: if the decls mention any ill-staged data cons
@@ -260,13 +266,23 @@ tcTyClDecls tyclds kisig_env role_annots
 
                  -- Kind and type check declarations for this group
                mapAndUnzipM (tcTyClDecl roles) tyclds
-           ; return (tycons, concat data_deriv_infos, kindless)
+           ; return (tycons, concat data_deriv_infos, class_scoped_tv_env, kindless)
            } }
   where
     ppr_tc_tycon tc = parens (sep [ ppr (tyConName tc) <> comma
                                   , ppr (tyConBinders tc) <> comma
                                   , ppr (tyConResKind tc)
                                   , ppr (isTcTyCon tc) ])
+
+    -- Map each class TcTyCon to their tcTyConScopedTyVars. This is ultimately
+    -- meant to be passed to GHC.Tc.TyCl.Class.tcClassDecl2, which consults
+    -- it when bringing type variables into scope over class method defaults.
+    -- See @Note [Scoped tyvars in a TcTyCon]@ in "GHC.Core.TyCon".
+    mk_class_scoped_tv_env :: [TcTyCon] -> ClassScopedTVEnv
+    mk_class_scoped_tv_env tc_tycons =
+      mkNameEnv [ (tyConName tc_tycon, tcTyConScopedTyVars tc_tycon)
+                | tc_tycon <- tc_tycons, tyConFlavour tc_tycon == ClassFlavour
+                ]
 
 zipRecTyClss :: [TcTyCon]
              -> [TyCon]           -- Knot-tied
@@ -1519,7 +1535,7 @@ getFamFlav mb_parent_tycon info =
   case info of
     DataFamily         -> DataFamilyFlavour mb_parent_tycon
     OpenTypeFamily     -> OpenTypeFamilyFlavour mb_parent_tycon
-    ClosedTypeFamily _ -> ASSERT( isNothing mb_parent_tycon ) -- See Note [Closed type family mb_parent_tycon]
+    ClosedTypeFamily _ -> assert (isNothing mb_parent_tycon) -- See Note [Closed type family mb_parent_tycon]
                           ClosedTypeFamilyFlavour
 
 {- Note [Closed type family mb_parent_tycon]
@@ -2362,7 +2378,7 @@ tcTyClDecl1 parent _roles_info (FamDecl { tcdFam = fd })
 tcTyClDecl1 _parent roles_info
             (SynDecl { tcdLName = L _ tc_name
                      , tcdRhs   = rhs })
-  = ASSERT( isNothing _parent )
+  = assert (isNothing _parent )
     fmap noDerivInfos $
     tcTySynRhs roles_info tc_name rhs
 
@@ -2370,7 +2386,7 @@ tcTyClDecl1 _parent roles_info
 tcTyClDecl1 _parent roles_info
             decl@(DataDecl { tcdLName = L _ tc_name
                            , tcdDataDefn = defn })
-  = ASSERT( isNothing _parent )
+  = assert (isNothing _parent) $
     tcDataDefn (tcMkDeclCtxt decl) roles_info tc_name defn
 
 tcTyClDecl1 _parent roles_info
@@ -2381,7 +2397,7 @@ tcTyClDecl1 _parent roles_info
                        , tcdSigs = sigs
                        , tcdATs = ats
                        , tcdATDefs = at_defs })
-  = ASSERT( isNothing _parent )
+  = assert (isNothing _parent) $
     do { clas <- tcClassDecl1 roles_info class_name hs_ctxt
                               meths fundeps sigs ats at_defs
        ; return (noDerivInfos (classTyCon clas)) }
@@ -2535,7 +2551,7 @@ tcDefaultAssocDecl fam_tc
              vis_pats  = numVisibleArgs hs_pats
 
        -- Kind of family check
-       ; ASSERT( fam_tc_name == tc_name )
+       ; assert (fam_tc_name == tc_name) $
          checkTc (isTypeFamilyTyCon fam_tc) (wrongKindOfFamily fam_tc)
 
        -- Arity check
@@ -2942,7 +2958,7 @@ tcDataDefn err_ctxt roles_info tc_name
     mk_tc_rhs _ tycon data_cons
       = case new_or_data of
           DataType -> return (mkDataTyConRhs data_cons)
-          NewType  -> ASSERT( not (null data_cons) )
+          NewType  -> assert (not (null data_cons)) $
                       mkNewTyConRhs tc_name tycon (head data_cons)
 
 
@@ -4229,6 +4245,11 @@ checkValidTyCon tc
     data_cons = tyConDataCons tc
 
     groups = equivClasses cmp_fld (concatMap get_fields data_cons)
+    -- This spot seems OK with non-determinism. cmp_fld is used only in equivClasses
+    -- which produces equivalence classes.
+    -- The order of these equivalence classes might conceivably (non-deterministically)
+    -- depend on the result of this comparison, but that just affects the order in which
+    -- fields are checked for compatibility. It will not affect the compiled binary.
     cmp_fld (f1,_) (f2,_) = flLabel f1 `uniqCompareFS` flLabel f2
     get_fields con = dataConFieldLabels con `zip` repeat con
         -- dataConFieldLabels may return the empty list, which is fine
@@ -4283,7 +4304,7 @@ checkPartialRecordField all_cons fld
     has_field con = fld `elem` (dataConFieldLabels con)
     is_exhaustive = all (dataConCannotMatch inst_tys) cons_without_field
 
-    con1 = ASSERT( not (null cons_with_field) ) head cons_with_field
+    con1 = assert (not (null cons_with_field)) $ head cons_with_field
     (univ_tvs, _, eq_spec, _, _, _) = dataConFullSig con1
     eq_subst = mkTvSubstPrs (map eqSpecPair eq_spec)
     inst_tys = substTyVars eq_subst univ_tvs
@@ -4412,12 +4433,12 @@ checkValidDataCon dflags existential_ok tc con
                    user_tvbs_invariant
                      =    Set.fromList (filterEqSpec eq_spec univs ++ exs)
                        == Set.fromList user_tvs
-             ; MASSERT2( user_tvbs_invariant
-                       , vcat ([ ppr con
+             ; massertPpr user_tvbs_invariant
+                          $ vcat ([ ppr con
                                , ppr univs
                                , ppr exs
                                , ppr eq_spec
-                               , ppr user_tvs ])) }
+                               , ppr user_tvs ]) }
 
         ; traceTc "Done validity of data con" $
           vcat [ ppr con
@@ -5024,8 +5045,8 @@ addVDQNote :: TcTyCon -> TcM a -> TcM a
 -- See Note [Inferring visible dependent quantification]
 -- Only types without a signature (CUSK or SAK) here
 addVDQNote tycon thing_inside
-  | ASSERT2( isTcTyCon tycon, ppr tycon )
-    ASSERT2( not (tcTyConIsPoly tycon), ppr tycon $$ ppr tc_kind )
+  | assertPpr (isTcTyCon tycon) (ppr tycon) $
+    assertPpr (not (tcTyConIsPoly tycon)) (ppr tycon $$ ppr tc_kind)
     has_vdq
   = addLandmarkErrCtxt vdq_warning thing_inside
   | otherwise

@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP                 #-}
+
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -193,8 +193,6 @@ module GHC.Tc.Utils.TcType (
 
   ) where
 
-#include "HsVersions.h"
-
 -- friends:
 import GHC.Prelude
 
@@ -229,6 +227,7 @@ import GHC.Data.Maybe
 import GHC.Data.List.SetOps ( getNth, findDupsEq )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Data.FastString
 import GHC.Utils.Error( Validity(..), isValid )
 import qualified GHC.LanguageExtensions as LangExt
@@ -698,7 +697,7 @@ instance Outputable TcLevel where
 promoteSkolem :: TcLevel -> TcTyVar -> TcTyVar
 promoteSkolem tclvl skol
   | tclvl < tcTyVarLevel skol
-  = ASSERT( isTcTyVar skol && isSkolemTyVar skol )
+  = assert (isTcTyVar skol && isSkolemTyVar skol )
     setTcTyVarDetails skol (SkolemTv tclvl (isOverlappableTyVar skol))
 
   | otherwise
@@ -707,7 +706,7 @@ promoteSkolem tclvl skol
 -- | Change the TcLevel in a skolem, extending a substitution
 promoteSkolemX :: TcLevel -> TCvSubst -> TcTyVar -> (TCvSubst, TcTyVar)
 promoteSkolemX tclvl subst skol
-  = ASSERT( isTcTyVar skol && isSkolemTyVar skol )
+  = assert (isTcTyVar skol && isSkolemTyVar skol )
     (new_subst, new_skol)
   where
     new_skol
@@ -841,7 +840,7 @@ any_rewritable :: Bool    -- Ignore casts and coercions
 -- role-agnostic, and this one must be role-aware. We could make
 -- foldTyCon role-aware, but that may slow down more common usages.
 --
--- See Note [Rewritable] in GHC.Tc.Solver.Monad for a specification for this function.
+-- See Note [Rewritable] in GHC.Tc.Solver.InertSet for a specification for this function.
 {-# INLINE any_rewritable #-} -- this allows specialization of predicates
 any_rewritable ignore_cos role tv_pred tc_pred should_expand
   = go role emptyVarSet
@@ -890,7 +889,7 @@ anyRewritableTyVar :: Bool     -- Ignore casts and coercions
                    -> EqRel    -- Ambient role
                    -> (EqRel -> TcTyVar -> Bool)  -- check tyvar
                    -> TcType -> Bool
--- See Note [Rewritable] in GHC.Tc.Solver.Monad for a specification for this function.
+-- See Note [Rewritable] in GHC.Tc.Solver.InertSet for a specification for this function.
 anyRewritableTyVar ignore_cos role pred
   = any_rewritable ignore_cos role pred
       (\ _ _ _ -> False) -- no special check for tyconapps
@@ -907,14 +906,14 @@ anyRewritableTyFamApp :: EqRel   -- Ambient role
                           -- should return True only for type family applications
                       -> TcType -> Bool
   -- always ignores casts & coercions
--- See Note [Rewritable] in GHC.Tc.Solver.Monad for a specification for this function.
+-- See Note [Rewritable] in GHC.Tc.Solver.InertSet for a specification for this function.
 anyRewritableTyFamApp role check_tyconapp
   = any_rewritable True role (\ _ _ -> False) check_tyconapp (not . isFamFreeTyCon)
 
 -- This version is used by shouldSplitWD. It *does* look in casts
 -- and coercions, and it always expands type synonyms whose RHSs mention
 -- type families.
--- See Note [Rewritable] in GHC.Tc.Solver.Monad for a specification for this function.
+-- See Note [Rewritable] in GHC.Tc.Solver.InertSet for a specification for this function.
 anyRewritableCanEqLHS :: EqRel   -- Ambient role
                       -> (EqRel -> TcTyVar -> Bool)            -- check tyvar
                       -> (EqRel -> TyCon -> [TcType] -> Bool)  -- check type family
@@ -1005,8 +1004,8 @@ isTouchableMetaTyVar ctxt_tclvl tv
   | isTyVar tv -- See Note [Coercion variables in free variable lists]
   , MetaTv { mtv_tclvl = tv_tclvl, mtv_info = info } <- tcTyVarDetails tv
   , isTouchableInfo info
-  = ASSERT2( checkTcLevelInvariant ctxt_tclvl tv_tclvl,
-             ppr tv $$ ppr tv_tclvl $$ ppr ctxt_tclvl )
+  = assertPpr (checkTcLevelInvariant ctxt_tclvl tv_tclvl)
+              (ppr tv $$ ppr tv_tclvl $$ ppr ctxt_tclvl) $
     tv_tclvl `sameDepthAs` ctxt_tclvl
 
   | otherwise = False
@@ -1028,7 +1027,7 @@ isTyConableTyVar tv
   | otherwise = True
 
 isSkolemTyVar tv
-  = ASSERT2( tcIsTcTyVar tv, ppr tv )
+  = assertPpr (tcIsTcTyVar tv) (ppr tv) $
     case tcTyVarDetails tv of
         MetaTv {} -> False
         _other    -> True
@@ -1220,13 +1219,13 @@ variables.  It's up to you to make sure this doesn't matter.
 -- Always succeeds, even if it returns an empty list.
 tcSplitPiTys :: Type -> ([TyBinder], Type)
 tcSplitPiTys ty
-  = ASSERT( all isTyBinder (fst sty) ) sty
+  = assert (all isTyBinder (fst sty) ) sty
   where sty = splitPiTys ty
 
 -- | Splits a type into a TyBinder and a body, if possible. Panics otherwise
 tcSplitPiTy_maybe :: Type -> Maybe (TyBinder, Type)
 tcSplitPiTy_maybe ty
-  = ASSERT( isMaybeTyBinder sty ) sty
+  = assert (isMaybeTyBinder sty ) sty
   where
     sty = splitPiTy_maybe ty
     isMaybeTyBinder (Just (t,_)) = isTyBinder t
@@ -1234,14 +1233,14 @@ tcSplitPiTy_maybe ty
 
 tcSplitForAllTyVarBinder_maybe :: Type -> Maybe (TyVarBinder, Type)
 tcSplitForAllTyVarBinder_maybe ty | Just ty' <- tcView ty = tcSplitForAllTyVarBinder_maybe ty'
-tcSplitForAllTyVarBinder_maybe (ForAllTy tv ty) = ASSERT( isTyVarBinder tv ) Just (tv, ty)
+tcSplitForAllTyVarBinder_maybe (ForAllTy tv ty) = assert (isTyVarBinder tv ) Just (tv, ty)
 tcSplitForAllTyVarBinder_maybe _                = Nothing
 
 -- | Like 'tcSplitPiTys', but splits off only named binders,
 -- returning just the tyvars.
 tcSplitForAllTyVars :: Type -> ([TyVar], Type)
 tcSplitForAllTyVars ty
-  = ASSERT( all isTyVar (fst sty) ) sty
+  = assert (all isTyVar (fst sty) ) sty
   where sty = splitForAllTyCoVars ty
 
 -- | Like 'tcSplitForAllTyVars', but only splits 'ForAllTy's with 'Invisible'
@@ -1265,18 +1264,18 @@ tcSplitSomeForAllTyVars argf_pred ty
 -- | Like 'tcSplitForAllTyVars', but only splits 'ForAllTy's with 'Required' type
 -- variable binders. All split tyvars are annotated with '()'.
 tcSplitForAllReqTVBinders :: Type -> ([TcReqTVBinder], Type)
-tcSplitForAllReqTVBinders ty = ASSERT( all (isTyVar . binderVar) (fst sty) ) sty
+tcSplitForAllReqTVBinders ty = assert (all (isTyVar . binderVar) (fst sty) ) sty
   where sty = splitForAllReqTVBinders ty
 
 -- | Like 'tcSplitForAllTyVars', but only splits 'ForAllTy's with 'Invisible' type
 -- variable binders. All split tyvars are annotated with their 'Specificity'.
 tcSplitForAllInvisTVBinders :: Type -> ([TcInvisTVBinder], Type)
-tcSplitForAllInvisTVBinders ty = ASSERT( all (isTyVar . binderVar) (fst sty) ) sty
+tcSplitForAllInvisTVBinders ty = assert (all (isTyVar . binderVar) (fst sty) ) sty
   where sty = splitForAllInvisTVBinders ty
 
 -- | Like 'tcSplitForAllTyVars', but splits off only named binders.
 tcSplitForAllTyVarBinders :: Type -> ([TyVarBinder], Type)
-tcSplitForAllTyVarBinders ty = ASSERT( all isTyVarBinder (fst sty)) sty
+tcSplitForAllTyVarBinders ty = assert (all isTyVarBinder (fst sty)) sty
   where sty = splitForAllTyCoVarBinders ty
 
 -- | Is this a ForAllTy with a named binder?

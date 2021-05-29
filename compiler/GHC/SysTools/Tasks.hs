@@ -1,5 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE CPP #-}
+
 -----------------------------------------------------------------------------
 --
 -- Tasks running external programs for SysTools
@@ -12,6 +12,7 @@ module GHC.SysTools.Tasks where
 import GHC.Prelude
 import GHC.Platform
 import GHC.ForeignSrcLang
+import GHC.IO (catchException)
 
 import GHC.CmmToLlvm.Base (LlvmVersion, llvmVersionStr, supportedLlvmVersionMin, supportedLlvmVersionMax, llvmVersionStr, parseLlvmVersion)
 
@@ -26,6 +27,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Logger
 import GHC.Utils.TmpFs
+import GHC.Utils.Constants (isWindowsHost)
 
 import Data.List (tails, isPrefixOf)
 import System.IO
@@ -190,7 +192,7 @@ runClang logger dflags args = traceToolCommand logger dflags "clang" $ do
       args1 = map Option (getOpts dflags opt_a)
       args2 = args0 ++ args1 ++ args
   mb_env <- getGccEnv args2
-  catch
+  catchException
     (runSomethingFiltered logger dflags id "Clang (Assembler)" clang args2 Nothing mb_env)
     (\(err :: SomeException) -> do
         errorMsg logger dflags $
@@ -307,23 +309,19 @@ ld: warning: symbol referencing errors
 
 -- See Note [Merging object files for GHCi] in GHC.Driver.Pipeline.
 runMergeObjects :: Logger -> TmpFs -> DynFlags -> [Option] -> IO ()
-#if defined(mingw32_HOST_OS)
-runMergeObjects logger tmpfs  dflags args =
-#else
-runMergeObjects logger _tmpfs dflags args =
-#endif
+runMergeObjects logger tmpfs dflags args =
   traceToolCommand logger dflags "merge-objects" $ do
     let (p,args0) = pgm_lm dflags
         optl_args = map Option (getOpts dflags opt_lm)
         args2     = args0 ++ args ++ optl_args
     -- N.B. Darwin's ld64 doesn't support response files. Consequently we only
     -- use them on Windows where they are truly necessary.
-#if defined(mingw32_HOST_OS)
-    mb_env <- getGccEnv args2
-    runSomethingResponseFile logger tmpfs dflags id "Merge objects" p args2 mb_env
-#else
-    runSomething logger dflags "Merge objects" p args2
-#endif
+    if isWindowsHost
+      then do
+        mb_env <- getGccEnv args2
+        runSomethingResponseFile logger tmpfs dflags id "Merge objects" p args2 mb_env
+      else do
+        runSomething logger dflags "Merge objects" p args2
 
 runLibtool :: Logger -> DynFlags -> [Option] -> IO ()
 runLibtool logger dflags args = traceToolCommand logger dflags "libtool" $ do

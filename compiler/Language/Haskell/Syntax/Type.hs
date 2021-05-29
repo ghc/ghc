@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -6,6 +6,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
                                       -- in module Language.Haskell.Syntax.Extension
 {-
@@ -34,7 +35,7 @@ module Language.Haskell.Syntax.Type (
         HsContext, LHsContext,
         HsTyLit(..),
         HsIPName(..), hsIPNameFS,
-        HsArg(..), numVisibleArgs,
+        HsArg(..), numVisibleArgs, pprHsArgsApp,
         LHsTypeArg,
 
         LBangType, BangType,
@@ -46,15 +47,13 @@ module Language.Haskell.Syntax.Type (
         HsConDetails(..), noTypeArgs,
 
         FieldOcc(..), LFieldOcc,
-        AmbiguousFieldOcc(..),
+        AmbiguousFieldOcc(..), LAmbiguousFieldOcc,
 
         mapHsOuterImplicit,
         hsQTvExplicit,
         isHsKindedTyVar,
         hsPatSigType,
     ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -70,6 +69,7 @@ import GHC.Core.DataCon( HsSrcBang(..), HsImplBang(..),
 import GHC.Core.Type
 import GHC.Hs.Doc
 import GHC.Types.Basic
+import GHC.Types.Fixity
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Data.FastString
@@ -734,7 +734,7 @@ data HsType pass
 
   | HsQualTy   -- See Note [HsType binders]
       { hst_xqual :: XQualTy pass
-      , hst_ctxt  :: Maybe (LHsContext pass)  -- Context C => blah
+      , hst_ctxt  :: LHsContext pass  -- Context C => blah
       , hst_body  :: LHsType pass }
 
   | HsTyVar  (XTyVar pass)
@@ -889,7 +889,7 @@ data HsType pass
 
       -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
 
-  -- For adding new constructors via Trees that Grow
+  -- Extension point; see Note [Trees That Grow] in Language.Haskell.Syntax.Extension
   | XHsType
       !(XXType pass)
 
@@ -1214,10 +1214,56 @@ numVisibleArgs = count is_vis
 -- type level equivalent
 type LHsTypeArg p = HsArg (LHsType p) (LHsKind p)
 
+-- | @'pprHsArgsApp' id fixity args@ pretty-prints an application of @id@
+-- to @args@, using the @fixity@ to tell whether @id@ should be printed prefix
+-- or infix. Examples:
+--
+-- @
+-- pprHsArgsApp T Prefix [HsTypeArg Bool, HsValArg Int]                        = T \@Bool Int
+-- pprHsArgsApp T Prefix [HsTypeArg Bool, HsArgPar, HsValArg Int]              = (T \@Bool) Int
+-- pprHsArgsApp (++) Infix [HsValArg Char, HsValArg Double]                    = Char ++ Double
+-- pprHsArgsApp (++) Infix [HsValArg Char, HsValArg Double, HsVarArg Ordering] = (Char ++ Double) Ordering
+-- @
+pprHsArgsApp :: (OutputableBndr id, Outputable tm, Outputable ty)
+             => id -> LexicalFixity -> [HsArg tm ty] -> SDoc
+pprHsArgsApp thing fixity (argl:argr:args)
+  | Infix <- fixity
+  = let pp_op_app = hsep [ ppr_single_hs_arg argl
+                         , pprInfixOcc thing
+                         , ppr_single_hs_arg argr ] in
+    case args of
+      [] -> pp_op_app
+      _  -> ppr_hs_args_prefix_app (parens pp_op_app) args
+
+pprHsArgsApp thing _fixity args
+  = ppr_hs_args_prefix_app (pprPrefixOcc thing) args
+
+-- | Pretty-print a prefix identifier to a list of 'HsArg's.
+ppr_hs_args_prefix_app :: (Outputable tm, Outputable ty)
+                        => SDoc -> [HsArg tm ty] -> SDoc
+ppr_hs_args_prefix_app acc []         = acc
+ppr_hs_args_prefix_app acc (arg:args) =
+  case arg of
+    HsValArg{}  -> ppr_hs_args_prefix_app (acc <+> ppr_single_hs_arg arg) args
+    HsTypeArg{} -> ppr_hs_args_prefix_app (acc <+> ppr_single_hs_arg arg) args
+    HsArgPar{}  -> ppr_hs_args_prefix_app (parens acc) args
+
+-- | Pretty-print an 'HsArg' in isolation.
+ppr_single_hs_arg :: (Outputable tm, Outputable ty)
+                  => HsArg tm ty -> SDoc
+ppr_single_hs_arg (HsValArg tm)    = ppr tm
+ppr_single_hs_arg (HsTypeArg _ ty) = char '@' <> ppr ty
+-- GHC shouldn't be constructing ASTs such that this case is ever reached.
+-- Still, it's possible some wily user might construct their own AST that
+-- allows this to be reachable, so don't fail here.
+ppr_single_hs_arg (HsArgPar{})     = empty
+
+-- | This instance is meant for debug-printing purposes. If you wish to
+-- pretty-print an application of 'HsArg's, use 'pprHsArgsApp' instead.
 instance (Outputable tm, Outputable ty) => Outputable (HsArg tm ty) where
-  ppr (HsValArg tm)    = ppr tm
-  ppr (HsTypeArg _ ty) = char '@' <> ppr ty
-  ppr (HsArgPar sp)    = text "HsArgPar"  <+> ppr sp
+  ppr (HsValArg tm)     = text "HsValArg"  <+> ppr tm
+  ppr (HsTypeArg sp ty) = text "HsTypeArg" <+> ppr sp <+> ppr ty
+  ppr (HsArgPar sp)     = text "HsArgPar"  <+> ppr sp
 {-
 Note [HsArgPar]
 A HsArgPar indicates that everything to the left of this in the argument list is
@@ -1248,33 +1294,39 @@ type LFieldOcc pass = XRec pass (FieldOcc pass)
 
 -- | Field Occurrence
 --
--- Represents an *occurrence* of an unambiguous field.  This may or may not be a
+-- Represents an *occurrence* of a field. This may or may not be a
 -- binding occurrence (e.g. this type is used in 'ConDeclField' and
--- 'RecordPatSynField' which bind their fields, but also in 'HsRecField' for
--- record construction and patterns, which do not).
+-- 'RecordPatSynField' which bind their fields, but also in
+-- 'HsRecField' for record construction and patterns, which do not).
 --
--- We store both the 'RdrName' the user originally wrote, and after the renamer,
--- the selector function.
-data FieldOcc pass = FieldOcc { extFieldOcc     :: XCFieldOcc pass
-                              , rdrNameFieldOcc :: LocatedN RdrName
-                                 -- ^ See Note [Located RdrNames] in "GHC.Hs.Expr"
-                              }
+-- We store both the 'RdrName' the user originally wrote, and after
+-- the renamer we use the extension field to store the selector
+-- function.
+data FieldOcc pass
+  = FieldOcc {
+        foExt :: XCFieldOcc pass
+      , foLabel :: XRec pass RdrName -- See Note [Located RdrNames] in Language.Haskell.Syntax.Expr
+      }
+  | XFieldOcc !(XXFieldOcc pass)
+deriving instance (
+    Eq (XRec pass RdrName)
+  , Eq (XCFieldOcc pass)
+  , Eq (XXFieldOcc pass)
+  ) => Eq (FieldOcc pass)
 
-  | XFieldOcc
-      !(XXFieldOcc pass)
+instance Outputable (XRec pass RdrName) => Outputable (FieldOcc pass) where
+  ppr = ppr . foLabel
 
-deriving instance (Eq (XCFieldOcc pass), Eq (XXFieldOcc pass)) => Eq (FieldOcc pass)
+instance (UnXRec pass, OutputableBndr (XRec pass RdrName)) => OutputableBndr (FieldOcc pass) where
+  pprInfixOcc  = pprInfixOcc . unXRec @pass . foLabel
+  pprPrefixOcc = pprPrefixOcc . unXRec @pass . foLabel
 
-instance Outputable (FieldOcc pass) where
-  ppr = ppr . rdrNameFieldOcc
-
-instance OutputableBndr (FieldOcc pass) where
-  pprInfixOcc  = pprInfixOcc . unLoc . rdrNameFieldOcc
-  pprPrefixOcc = pprPrefixOcc . unLoc . rdrNameFieldOcc
-
-instance OutputableBndr (GenLocated SrcSpan (FieldOcc pass)) where
+instance (UnXRec pass, OutputableBndr (XRec pass RdrName)) => OutputableBndr (GenLocated SrcSpan (FieldOcc pass)) where
   pprInfixOcc  = pprInfixOcc . unLoc
   pprPrefixOcc = pprPrefixOcc . unLoc
+
+-- | Located Ambiguous Field Occurence
+type LAmbiguousFieldOcc pass = XRec pass (AmbiguousFieldOcc pass)
 
 -- | Ambiguous Field Occurrence
 --
@@ -1285,9 +1337,8 @@ instance OutputableBndr (GenLocated SrcSpan (FieldOcc pass)) where
 -- (for unambiguous occurrences) or the typechecker (for ambiguous
 -- occurrences).
 --
--- See Note [HsRecField and HsRecUpdField] in "GHC.Hs.Pat" and
--- Note [Disambiguating record fields] in "GHC.Tc.Gen.Head".
--- See Note [Located RdrNames] in "GHC.Hs.Expr"
+-- See Note [HsRecField and HsRecUpdField] in "GHC.Hs.Pat".
+-- See Note [Located RdrNames] in "GHC.Hs.Expr".
 data AmbiguousFieldOcc pass
   = Unambiguous (XUnambiguous pass) (LocatedN RdrName)
   | Ambiguous   (XAmbiguous pass)   (LocatedN RdrName)

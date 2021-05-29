@@ -1,0 +1,6 @@
+
+T19781_A.hs-boot:4:1: error:
+    Bindings in hs-boot files are not allowed
+
+T19781_A.hs-boot:7:1: error:
+    Bindings in hs-boot files are not allowed

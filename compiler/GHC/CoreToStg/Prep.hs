@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP          #-}
+
 {-# LANGUAGE BangPatterns #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
@@ -16,8 +16,6 @@ module GHC.CoreToStg.Prep
    , mkConvertNumLiteral
    )
 where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -49,6 +47,7 @@ import GHC.Core.Coercion
 import GHC.Core.TyCon
 import GHC.Core.DataCon
 import GHC.Core.Opt.OccurAnal
+import GHC.Core.TyCo.Rep( UnivCoProvenance(..) )
 
 
 import GHC.Data.Maybe
@@ -58,6 +57,7 @@ import GHC.Data.FastString
 import GHC.Utils.Error
 import GHC.Utils.Misc
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Utils.Outputable
 import GHC.Utils.Monad  ( mapAccumLM )
 import GHC.Utils.Logger
@@ -77,7 +77,9 @@ import GHC.Types.TyThing
 import GHC.Types.CostCentre ( CostCentre, ccFromThisModule )
 import GHC.Types.Unique.Supply
 
+import GHC.Data.Pair
 import Data.List        ( unfoldr )
+import Data.Functor.Identity
 import Control.Monad
 import qualified Data.Set as S
 
@@ -143,10 +145,61 @@ The goal of this pass is to prepare for code generation.
     profiling mode. We have to do this here beucase we won't have unfoldings
     after this pass (see `zapUnfolding` and Note [Drop unfoldings and rules].
 
+13. Eliminate case clutter in favour of unsafe coercions.
+    See Note [Unsafe coercions]
+
+14. Eliminate some magic Ids, specifically
+     runRW# (\s. e)  ==>  e[readWorldId/s]
+             lazy e  ==>  e
+         noinline e  ==>  e
+     ToDo:  keepAlive# ...
+    This is done in cpeApp
+
 This is all done modulo type applications and abstractions, so that
 when type erasure is done for conversion to STG, we don't end up with
 any trivial or useless bindings.
 
+Note [Unsafe coercions]
+~~~~~~~~~~~~~~~~~~~~~~~
+CorePrep does these two transformations:
+
+1. Convert empty case to cast with an unsafe coercion
+          (case e of {}) ===>  e |> unsafe-co
+   See Note [Empty case alternatives] in GHC.Core: if the case
+   alternatives are empty, the scrutinee must diverge or raise an
+   exception, so we can just dive into it.
+
+   Of course, if the scrutinee *does* return, we may get a seg-fault.
+   A belt-and-braces approach would be to persist empty-alternative
+   cases to code generator, and put a return point anyway that calls a
+   runtime system error function.
+
+   Notice that eliminating empty case can lead to an ill-kinded coercion
+       case error @Int "foo" of {}  :: Int#
+       ===> error @Int "foo" |> unsafe-co
+       where unsafe-co :: Int ~ Int#
+   But that's fine because the expression diverges anyway. And it's
+   no different to what happened before.
+
+2. Eliminate unsafeEqualityProof in favour of an unsafe coercion
+           case unsafeEqualityProof of UnsafeRefl g -> e
+           ===>  e[unsafe-co/g]
+   See (U2) in Note [Implementing unsafeCoerce] in base:Unsafe.Coerce
+
+   Note that this requires us to substitute 'unsafe-co' for 'g', and
+   that is the main (current) reason for cpe_tyco_env in CorePrepEnv.
+   Tiresome, but not difficult.
+
+These transformations get rid of "case clutter", leaving only casts.
+We are doing no further significant tranformations, so the reasons
+for the case forms have disappeared. And it is extremely helpful for
+the ANF-ery, CoreToStg, and backends, if trivial expressions really do
+look trivial. #19700 was an example.
+
+In both cases, the "unsafe-co" is just (UnivCo ty1 ty2 (CorePrepProv b)),
+The boolean 'b' says whether the unsafe coercion is supposed to be
+kind-homogeneous (yes for (2), no for (1).  This information is used
+/only/ by Lint.
 
 Note [CorePrep invariants]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -236,7 +289,7 @@ corePrepTopBinds initialCorePrepEnv binds
     go _   []             = return emptyFloats
     go env (bind : binds) = do (env', floats, maybe_new_bind)
                                  <- cpeBind TopLevel env bind
-                               MASSERT(isNothing maybe_new_bind)
+                               massert (isNothing maybe_new_bind)
                                  -- Only join points get returned this way by
                                  -- cpeBind, and no join point may float to top
                                floatss <- go env' binds
@@ -381,6 +434,150 @@ Into this one:
 (Since f is not considered to be free in its own RHS.)
 
 
+Note [keepAlive# magic]
+~~~~~~~~~~~~~~~~~~~~~~~
+When interacting with foreign code, it is often necessary for the user to
+extend the lifetime of a heap object beyond the lifetime that would be apparent
+from the on-heap references alone. For instance, a program like:
+
+  foreign import safe "hello" hello :: ByteArray# -> IO ()
+
+  callForeign :: IO ()
+  callForeign = IO $ \s0 ->
+    case newByteArray# n# s0 of (# s1, barr #) ->
+      unIO hello barr s1
+
+As-written this program is susceptible to memory-unsafety since there are
+no references to `barr` visible to the garbage collector. Consequently, if a
+garbage collection happens during the execution of the C function `hello`, it
+may be that the array is freed while in use by the foreign function.
+
+To address this, we introduced a new primop, keepAlive#, which "scopes over"
+the computation needing the kept-alive value:
+
+  keepAlive# :: forall (ra :: RuntimeRep) (rb :: RuntimeRep) (a :: TYPE a) (b :: TYPE b).
+                a -> State# RealWorld -> (State# RealWorld -> b) -> b
+
+When entered, an application (keepAlive# x s k) will apply `k` to the state
+token, evaluating it to WHNF. However, during the course of this evaluation
+will *guarantee* that `x` is considered to be alive.
+
+There are a few things to note here:
+
+ - we are RuntimeRep-polymorphic in the value to be kept-alive. This is
+   necessary since we will often (but not always) be keeping alive something
+   unlifted (like a ByteArray#)
+
+ - we are RuntimeRep-polymorphic in the result value since the result may take
+   many forms (e.g. a boxed value, a raw state token, or a (# State s, result #).
+
+We implement this operation by desugaring to touch# during CorePrep (see
+GHC.CoreToStg.Prep.cpeApp). Specifically,
+
+  keepAlive# x s0 k
+
+is transformed to:
+
+  case k s0 of r ->
+  case touch# x realWorld# of s1 ->
+    r
+
+Operationally, `keepAlive# x s k` is equivalent to pushing a stack frame with a
+pointer to `x` and entering `k s0`. This compilation strategy is safe
+because we do no optimization on STG that would drop or re-order the
+continuation containing the `touch#`. However, if we were to become more
+aggressive in our STG pipeline then we would need to revisit this.
+
+Beyond this CorePrep transformation, there is very little special about
+keepAlive#. However, we did explore (and eventually gave up on)
+an optimisation which would allow unboxing of constructed product results,
+which we describe below.
+
+
+Lost optimisation: CPR unboxing
+--------------------------------
+One unfortunate property of this approach is that the simplifier is unable to
+unbox the result of a keepAlive# expression. For instance, consider the program:
+
+  case keepAlive# arr s0 (
+         \s1 -> case peekInt arr s1 of
+                  (# s2, r #) -> I# r
+  ) of
+    I# x -> ...
+
+This is a surprisingly common pattern, previously used, e.g., in
+GHC.IO.Buffer.readWord8Buf. While exploring ideas, we briefly played around
+with optimising this away by pushing strict contexts (like the
+`case [] of I# x -> ...` above) into keepAlive#'s continuation. While this can
+recover unboxing, it can also unfortunately in general change the asymptotic
+memory (namely stack) behavior of the program. For instance, consider
+
+  writeN =
+    ...
+      case keepAlive# x s0 (\s1 -> something s1) of
+        (# s2, x #) ->
+          writeN ...
+
+As it is tail-recursive, this program will run in constant space. However, if
+we push outer case into the continuation we get:
+
+  writeN =
+
+      case keepAlive# x s0 (\s1 ->
+        case something s1 of
+          (# s2, x #) ->
+            writeN ...
+      ) of
+        ...
+
+Which ends up building a stack which is linear in the recursion depth. For this
+reason, we ended up giving up on this optimisation.
+
+
+Historical note: touch# and its inadequacy
+------------------------------------------
+Prior to the introduction of `keepAlive#` we instead addressed the need for
+lifetime extension with the `touch#` primop:
+
+    touch# :: a -> State# s -> State# s
+
+This operation would ensure that the `a` value passed as the first argument was
+considered "alive" at the time the primop application is entered.
+
+For instance, the user might modify `callForeign` as:
+
+  callForeign :: IO ()
+  callForeign s0 = IO $ \s0 ->
+    case newByteArray# n# s0 of (# s1, barr #) ->
+    case unIO hello barr s1 of (# s2, () #) ->
+    case touch# barr s2 of s3 ->
+      (# s3, () #)
+
+However, in #14346 we discovered that this primop is insufficient in the
+presence of simplification. For instance, consider a program like:
+
+  callForeign :: IO ()
+  callForeign s0 = IO $ \s0 ->
+    case newByteArray# n# s0 of (# s1, barr #) ->
+    case unIO (forever $ hello barr) s1 of (# s2, () #) ->
+    case touch# barr s2 of s3 ->
+      (# s3, () #)
+
+In this case the Simplifier may realize that (forever $ hello barr)
+will never return and consequently that the `touch#` that follows is dead code.
+As such, it will be dropped, resulting in memory unsoundness.
+This unsoundness lead to the introduction of keepAlive#.
+
+
+
+Other related tickets:
+
+ - #15544
+ - #17760
+ - #14375
+ - #15260
+ - #18061
+
 ************************************************************************
 *                                                                      *
                 The main code
@@ -402,7 +599,7 @@ cpeBind top_lvl env (NonRec bndr rhs)
                                    dmd is_unlifted
                                    env bndr1 rhs
        -- See Note [Inlining in CorePrep]
-       ; let triv_rhs = cpExprIsTrivial rhs1
+       ; let triv_rhs = exprIsTrivial rhs1
              env2    | triv_rhs  = extendCorePrepEnvExpr env1 bndr rhs1
                      | otherwise = env1
              floats1 | triv_rhs, isInternalName (idName bndr)
@@ -415,7 +612,7 @@ cpeBind top_lvl env (NonRec bndr rhs)
        ; return (env2, floats1, Nothing) }
 
   | otherwise -- A join point; see Note [Join points and floating]
-  = ASSERT(not (isTopLevel top_lvl)) -- can't have top-level join point
+  = assert (not (isTopLevel top_lvl)) $ -- can't have top-level join point
     do { (_, bndr1) <- cpCloneBndr env bndr
        ; (bndr2, rhs1) <- cpeJoinPair env bndr1 rhs
        ; return (extendCorePrepEnv env bndr bndr2,
@@ -460,7 +657,7 @@ cpePair :: TopLevelFlag -> RecFlag -> Demand -> Bool
 -- Used for all bindings
 -- The binder is already cloned, hence an OutId
 cpePair top_lvl is_rec dmd is_unlifted env bndr rhs
-  = ASSERT(not (isJoinId bndr)) -- those should use cpeJoinPair
+  = assert (not (isJoinId bndr)) $ -- those should use cpeJoinPair
     do { (floats1, rhs1) <- cpeRhsE env rhs
 
        -- See if we are allowed to float this stuff out of the RHS
@@ -470,7 +667,7 @@ cpePair top_lvl is_rec dmd is_unlifted env bndr rhs
        ; (floats3, rhs3)
             <- if manifestArity rhs1 <= arity
                then return (floats2, cpeEtaExpand arity rhs2)
-               else WARN(True, text "CorePrep: silly extra arguments:" <+> ppr bndr)
+               else warnPprTrace True (text "CorePrep: silly extra arguments:" <+> ppr bndr) $
                                -- Note [Silly extra arguments]
                     (do { v <- newVar (idType bndr)
                         ; let float = mkFloat topDmd False v rhs2
@@ -538,7 +735,7 @@ cpeJoinPair :: CorePrepEnv -> JoinId -> CoreExpr
 -- Used for all join bindings
 -- No eta-expansion: see Note [Do not eta-expand join points] in GHC.Core.Opt.Simplify.Utils
 cpeJoinPair env bndr rhs
-  = ASSERT(isJoinId bndr)
+  = assert (isJoinId bndr) $
     do { let Just join_arity = isJoinId_maybe bndr
              (bndrs, body)   = collectNBinders join_arity rhs
 
@@ -584,8 +781,10 @@ cpeRhsE :: CorePrepEnv -> CoreExpr -> UniqSM (Floats, CpeRhs)
 -- For example
 --      f (g x)   ===>   ([v = g x], f v)
 
-cpeRhsE _env expr@(Type {})      = return (emptyFloats, expr)
-cpeRhsE _env expr@(Coercion {})  = return (emptyFloats, expr)
+cpeRhsE env (Type ty)
+  = return (emptyFloats, Type (cpSubstTy env ty))
+cpeRhsE env (Coercion co)
+  = return (emptyFloats, Coercion (cpSubstCo env co))
 cpeRhsE env expr@(Lit (LitNumber nt i))
    = case cpe_convertNumLit env nt i of
       Nothing -> return (emptyFloats, expr)
@@ -618,7 +817,7 @@ cpeRhsE env (Tick tickish expr)
 
 cpeRhsE env (Cast expr co)
    = do { (floats, expr') <- cpeRhsE env expr
-        ; return (floats, Cast expr' co) }
+        ; return (floats, Cast expr' (cpSubstCo env co)) }
 
 cpeRhsE env expr@(Lam {})
    = do { let (bndrs,body) = collectBinders expr
@@ -626,19 +825,37 @@ cpeRhsE env expr@(Lam {})
         ; body' <- cpeBodyNF env' body
         ; return (emptyFloats, mkLams bndrs' body') }
 
-cpeRhsE env (Case scrut bndr ty alts)
-  | isUnsafeEqualityProof scrut
-  , [Alt con bs rhs] <- alts
-  = do { (floats1, scrut') <- cpeBody env scrut
-       ; (env1, bndr')     <- cpCloneBndr env bndr
-       ; (env2, bs')       <- cpCloneBndrs env1 bs
-       ; (floats2, rhs')   <- cpeBody env2 rhs
-       ; let case_float = FloatCase scrut' bndr' con bs' True
-             floats'    = (floats1 `addFloat` case_float)
-                          `appendFloats` floats2
-       ; return (floats', rhs') }
+-- Eliminate empty case
+-- See Note [Unsafe coercions]
+cpeRhsE env (Case scrut _ ty [])
+  = do { (floats, scrut') <- cpeRhsE env scrut
+       ; let ty'       = cpSubstTy env ty
+             scrut_ty' = exprType scrut'
+             co'       = mkUnivCo prov Representational scrut_ty' ty'
+             prov      = CorePrepProv False
+               -- False says that the kinds of two types may differ
+               -- E.g. we might cast Int to Int#.  This is fine
+               -- because the scrutinee is guaranteed to diverge
 
-  | otherwise
+       ; return (floats, Cast scrut' co') }
+   -- This can give rise to
+   --   Warning: Unsafe coercion: between unboxed and boxed value
+   -- but it's fine because 'scrut' diverges
+
+-- Eliminate unsafeEqualityProof
+-- See Note [Unsafe coercions]
+cpeRhsE env (Case scrut bndr _ alts)
+  | isUnsafeEqualityProof scrut
+  , isDeadBinder bndr -- We can only discard the case if the case-binder
+                      -- is dead.  It usually is, but see #18227
+  , [Alt _ [co_var] rhs] <- alts
+  , let Pair ty1 ty2 = coVarTypes co_var
+        the_co = mkUnivCo prov Nominal (cpSubstTy env ty1) (cpSubstTy env ty2)
+        prov   = CorePrepProv True  -- True <=> kind homogeneous
+        env'   = extendCoVarEnv env co_var the_co
+  = cpeRhsE env' rhs
+
+cpeRhsE env (Case scrut bndr ty alts)
   = do { (floats, scrut') <- cpeBody env scrut
        ; (env', bndr2) <- cpCloneBndr env bndr
        ; let alts'
@@ -714,9 +931,9 @@ rhsToBody expr@(Lam {})
   | all isTyVar bndrs           -- Type lambdas are ok
   = return (emptyFloats, expr)
   | otherwise                   -- Some value lambdas
-  = do { fn <- newVar (exprType expr)
-       ; let rhs   = cpeEtaExpand (exprArity expr) expr
-             float = FloatLet (NonRec fn rhs)
+  = do { let rhs = cpeEtaExpand (exprArity expr) expr
+       ; fn <- newVar (exprType rhs)
+       ; let float = FloatLet (NonRec fn rhs)
        ; return (unitFloat float, Var fn) }
   where
     (bndrs,body) = collectBinders expr
@@ -794,6 +1011,7 @@ cpeApp top_env expr
         = let (terminal, args', depth') = collect_args arg
           in cpe_app env terminal (args' ++ args) (depth + depth' - 1)
 
+    -- See Note [keepAlive# magic].
     cpe_app env
             (Var f)
             args
@@ -807,7 +1025,7 @@ cpeApp top_env expr
           : CpeApp s0
           : CpeApp k
           : rest <- args
-        = do { y <- newVar result_ty
+        = do { y  <- newVar (cpSubstTy env result_ty)
              ; s2 <- newVar realWorldStatePrimTy
              ; -- beta reduce if possible
              ; (floats, k') <- case k of
@@ -845,7 +1063,7 @@ cpeApp top_env expr
            -- Apps it is under are type applications only (c.f.
            -- exprIsTrivial).  But note that we need the type of the
            -- expression, not the id.
-           ; (app, floats) <- rebuild_app args e2 (exprType e2) emptyFloats stricts
+           ; (app, floats) <- rebuild_app env args e2 emptyFloats stricts
            ; mb_saturate hd app floats depth }
         where
           stricts = case idDmdSig v of
@@ -865,13 +1083,11 @@ cpeApp top_env expr
 
         -- N-variable fun, better let-bind it
     cpe_app env fun args depth
-      = do { (fun_floats, fun') <- cpeArg env evalDmd fun ty
+      = do { (fun_floats, fun') <- cpeArg env evalDmd fun
                           -- The evalDmd says that it's sure to be evaluated,
                           -- so we'll end up case-binding it
-           ; (app, floats) <- rebuild_app args fun' ty fun_floats []
+           ; (app, floats) <- rebuild_app env args fun' fun_floats []
            ; mb_saturate Nothing app floats depth }
-        where
-          ty = exprType fun
 
     -- Saturate if necessary
     mb_saturate head app floats depth =
@@ -886,38 +1102,45 @@ cpeApp top_env expr
     -- all of which are used to possibly saturate this application if it
     -- has a constructor or primop at the head.
     rebuild_app
-        :: [ArgInfo]                  -- The arguments (inner to outer)
+        :: CorePrepEnv
+        -> [ArgInfo]                  -- The arguments (inner to outer)
         -> CpeApp
-        -> Type
         -> Floats
         -> [Demand]
         -> UniqSM (CpeApp, Floats)
-    rebuild_app [] app _ floats ss = do
-      MASSERT(null ss) -- make sure we used all the strictness info
-      return (app, floats)
-    rebuild_app (a : as) fun' fun_ty floats ss = case a of
-      CpeApp arg@(Type arg_ty) ->
-        rebuild_app as (App fun' arg) (piResultTy fun_ty arg_ty) floats ss
-      CpeApp arg@(Coercion {}) ->
-        rebuild_app as (App fun' arg) (funResultTy fun_ty) floats ss
+    rebuild_app _ [] app floats ss
+      = assert (null ss) -- make sure we used all the strictness info
+        return (app, floats)
+
+    rebuild_app env (a : as) fun' floats ss = case a of
+
+      CpeApp (Type arg_ty)
+        -> rebuild_app env as (App fun' (Type arg_ty')) floats ss
+        where
+          arg_ty' = cpSubstTy env arg_ty
+
+      CpeApp (Coercion co)
+        -> rebuild_app env as (App fun' (Coercion co')) floats ss
+        where
+            co' = cpSubstCo env co
+
       CpeApp arg -> do
         let (ss1, ss_rest)  -- See Note [lazyId magic] in GHC.Types.Id.Make
                = case (ss, isLazyExpr arg) of
                    (_   : ss_rest, True)  -> (topDmd, ss_rest)
                    (ss1 : ss_rest, False) -> (ss1,    ss_rest)
                    ([],            _)     -> (topDmd, [])
-            (_, arg_ty, res_ty) =
-              case splitFunTy_maybe fun_ty of
-                Just as -> as
-                Nothing -> pprPanic "cpeBody" (ppr fun_ty $$ ppr expr)
-        (fs, arg') <- cpeArg top_env ss1 arg arg_ty
-        rebuild_app as (App fun' arg') res_ty (fs `appendFloats` floats) ss_rest
-      CpeCast co ->
-        let ty2 = coercionRKind co
-        in rebuild_app as (Cast fun' co) ty2 floats ss
-      CpeTick tickish ->
+        (fs, arg') <- cpeArg top_env ss1 arg
+        rebuild_app env as (App fun' arg') (fs `appendFloats` floats) ss_rest
+
+      CpeCast co
+        -> rebuild_app env as (Cast fun' co') floats ss
+        where
+           co' = cpSubstCo env co
+
+      CpeTick tickish
         -- See [Floating Ticks in CorePrep]
-        rebuild_app as fun' fun_ty (addFloat floats (FloatTick tickish)) ss
+        -> rebuild_app env as fun' (addFloat floats (FloatTick tickish)) ss
 
 isLazyExpr :: CoreExpr -> Bool
 -- See Note [lazyId magic] in GHC.Types.Id.Make
@@ -1087,6 +1310,14 @@ in straight-line code. Consequently, GHC.Core.Opt.SetLevels.lvlApp has special
 treatment for runRW# applications, ensure the arguments are not floated as
 MFEs.
 
+Now that we float evaluation context into runRW#, we also have to give runRW# a
+special higher-order CPR transformer lest we risk #19822. E.g.,
+
+  case runRW# (\s -> doThings) of x -> Data.Text.Text x something something'
+      ~>
+  runRW# (\s -> case doThings s of x -> Data.Text.Text x something something')
+
+The former had the CPR property, and so should the latter.
 
 Other considered designs
 ------------------------
@@ -1147,25 +1378,16 @@ okCpeArg :: CoreExpr -> Bool
 -- Don't float literals. See Note [ANF-ising literal string arguments].
 okCpeArg (Lit _) = False
 -- Do not eta expand a trivial argument
-okCpeArg expr    = not (cpExprIsTrivial expr)
-
-cpExprIsTrivial :: CoreExpr -> Bool
-cpExprIsTrivial e
-  | Tick t e <- e
-  , not (tickishIsCode t)
-  = cpExprIsTrivial e
-  | Case scrut _ _ alts <- e
-  , isUnsafeEqualityProof scrut
-  , [Alt _ _ rhs] <- alts
-  = cpExprIsTrivial rhs
-  | otherwise
-  = exprIsTrivial e
+okCpeArg expr    = not (exprIsTrivial expr)
 
 -- This is where we arrange that a non-trivial argument is let-bound
 cpeArg :: CorePrepEnv -> Demand
-       -> CoreArg -> Type -> UniqSM (Floats, CpeArg)
-cpeArg env dmd arg arg_ty
+       -> CoreArg -> UniqSM (Floats, CpeArg)
+cpeArg env dmd arg
   = do { (floats1, arg1) <- cpeRhsE env arg     -- arg1 can be a lambda
+       ; let arg_ty      = exprType arg1
+             is_unlifted = isUnliftedType arg_ty
+             want_float  = wantFloatNested NonRecursive dmd is_unlifted
        ; (floats2, arg2) <- if want_float floats1 arg1
                             then return (floats1, arg1)
                             else dontFloat floats1 arg1
@@ -1179,9 +1401,6 @@ cpeArg env dmd arg arg_ty
                  ; return (addFloat floats2 arg_float, varToCoreExpr v) }
          else return (floats2, arg2)
        }
-  where
-    is_unlifted = isUnliftedType arg_ty
-    want_float  = wantFloatNested NonRecursive dmd is_unlifted
 
 {-
 Note [Floating unlifted arguments]
@@ -1408,7 +1627,7 @@ mkFloat dmd is_unlifted bndr rhs
     -- Otherwise we get  case (\x -> e) of ...!
 
   | is_unlifted = FloatCase rhs bndr DEFAULT [] True
-      -- we used to ASSERT2(ok_for_spec, ppr rhs) here, but it is now disabled
+      -- we used to assertPpr ok_for_spec (ppr rhs) here, but it is now disabled
       -- because exprOkForSpeculation isn't stable under ANF-ing. See for
       -- example #19489 where the following unlifted expression:
       --
@@ -1621,10 +1840,327 @@ data CorePrepEnv
         --      see Note [lazyId magic], Note [Inlining in CorePrep]
         --      and Note [CorePrep inlines trivial CoreExpr not Id] (#12076)
 
+        , cpe_tyco_env :: Maybe CpeTyCoEnv -- See Note [CpeTyCoEnv]
+
         , cpe_convertNumLit   :: LitNumType -> Integer -> Maybe CoreExpr
         -- ^ Convert some numeric literals (Integer, Natural) into their
         -- final Core form
     }
+
+mkInitialCorePrepEnv :: HscEnv -> IO CorePrepEnv
+mkInitialCorePrepEnv hsc_env = do
+   convertNumLit <- mkConvertNumLiteral hsc_env
+   return $ CPE
+      { cpe_dynFlags      = hsc_dflags hsc_env
+      , cpe_env           = emptyVarEnv
+      , cpe_tyco_env      = Nothing
+      , cpe_convertNumLit = convertNumLit
+      }
+
+extendCorePrepEnv :: CorePrepEnv -> Id -> Id -> CorePrepEnv
+extendCorePrepEnv cpe id id'
+    = cpe { cpe_env = extendVarEnv (cpe_env cpe) id (Var id') }
+
+extendCorePrepEnvExpr :: CorePrepEnv -> Id -> CoreExpr -> CorePrepEnv
+extendCorePrepEnvExpr cpe id expr
+    = cpe { cpe_env = extendVarEnv (cpe_env cpe) id expr }
+
+extendCorePrepEnvList :: CorePrepEnv -> [(Id,Id)] -> CorePrepEnv
+extendCorePrepEnvList cpe prs
+    = cpe { cpe_env = extendVarEnvList (cpe_env cpe)
+                        (map (\(id, id') -> (id, Var id')) prs) }
+
+lookupCorePrepEnv :: CorePrepEnv -> Id -> CoreExpr
+lookupCorePrepEnv cpe id
+  = case lookupVarEnv (cpe_env cpe) id of
+        Nothing  -> Var id
+        Just exp -> exp
+
+------------------------------------------------------------------------------
+--           CpeTyCoEnv
+-- ---------------------------------------------------------------------------
+
+{- Note [CpeTyCoEnv]
+~~~~~~~~~~~~~~~~~~~~
+The cpe_tyco_env :: Maybe CpeTyCoEnv field carries a substitution
+for type and coercion varibles
+
+* We need the coercion substitution to support the elimination of
+  unsafeEqualityProof (see Note [Unsafe coercions])
+
+* We need the type substitution in case one of those unsafe
+  coercions occurs in the kind of tyvar binder (sigh)
+
+We don't need an in-scope set because we don't clone any of these
+binders at all, so no new capture can take place.
+
+The cpe_tyco_env is almost always empty -- it only gets populated
+when we get under an usafeEqualityProof.  Hence the Maybe CpeTyCoEnv,
+which makes everything into a no-op in the common case.
+-}
+
+data CpeTyCoEnv = TCE TvSubstEnv CvSubstEnv
+
+emptyTCE :: CpeTyCoEnv
+emptyTCE = TCE emptyTvSubstEnv emptyCvSubstEnv
+
+extend_tce_cv :: CpeTyCoEnv -> CoVar -> Coercion -> CpeTyCoEnv
+extend_tce_cv (TCE tv_env cv_env) cv co
+  = TCE tv_env (extendVarEnv cv_env cv co)
+
+extend_tce_tv :: CpeTyCoEnv -> TyVar -> Type -> CpeTyCoEnv
+extend_tce_tv (TCE tv_env cv_env) tv ty
+  = TCE (extendVarEnv tv_env tv ty) cv_env
+
+lookup_tce_cv :: CpeTyCoEnv -> CoVar -> Coercion
+lookup_tce_cv (TCE _ cv_env) cv
+  = case lookupVarEnv cv_env cv of
+        Just co -> co
+        Nothing -> mkCoVarCo cv
+
+lookup_tce_tv :: CpeTyCoEnv -> TyVar -> Type
+lookup_tce_tv (TCE tv_env _) tv
+  = case lookupVarEnv tv_env tv of
+        Just ty -> ty
+        Nothing -> mkTyVarTy tv
+
+extendCoVarEnv :: CorePrepEnv -> CoVar -> Coercion -> CorePrepEnv
+extendCoVarEnv cpe@(CPE { cpe_tyco_env = mb_tce }) cv co
+  = cpe { cpe_tyco_env = Just (extend_tce_cv tce cv co) }
+  where
+    tce = mb_tce `orElse` emptyTCE
+
+
+cpSubstTy :: CorePrepEnv -> Type -> Type
+cpSubstTy (CPE { cpe_tyco_env = mb_env }) ty
+  = case mb_env of
+      Just env -> runIdentity (subst_ty env ty)
+      Nothing  -> ty
+
+cpSubstCo :: CorePrepEnv -> Coercion -> Coercion
+cpSubstCo (CPE { cpe_tyco_env = mb_env }) co
+  = case mb_env of
+      Just tce -> runIdentity (subst_co tce co)
+      Nothing  -> co
+
+subst_tyco_mapper :: TyCoMapper CpeTyCoEnv Identity
+subst_tyco_mapper = TyCoMapper
+  { tcm_tyvar      = \env tv -> return (lookup_tce_tv env tv)
+  , tcm_covar      = \env cv -> return (lookup_tce_cv env cv)
+  , tcm_hole       = \_ hole -> pprPanic "subst_co_mapper:hole" (ppr hole)
+  , tcm_tycobinder = \env tcv _vis -> if isTyVar tcv
+                                      then return (subst_tv_bndr env tcv)
+                                      else return (subst_cv_bndr env tcv)
+  , tcm_tycon      = \tc -> return tc }
+
+subst_ty :: CpeTyCoEnv -> Type     -> Identity Type
+subst_co :: CpeTyCoEnv -> Coercion -> Identity Coercion
+(subst_ty, _, subst_co, _) = mapTyCoX subst_tyco_mapper
+
+cpSubstTyVarBndr :: CorePrepEnv -> TyVar -> (CorePrepEnv, TyVar)
+cpSubstTyVarBndr env@(CPE { cpe_tyco_env = mb_env }) tv
+  = case mb_env of
+      Nothing  -> (env, tv)
+      Just tce -> (env { cpe_tyco_env = Just tce' }, tv')
+               where
+                  (tce', tv') = subst_tv_bndr tce tv
+
+subst_tv_bndr :: CpeTyCoEnv -> TyVar -> (CpeTyCoEnv, TyVar)
+subst_tv_bndr tce tv
+  = (extend_tce_tv tce tv (mkTyVarTy tv'), tv')
+  where
+    tv'   = mkTyVar (tyVarName tv) kind'
+    kind' = runIdentity $ subst_ty tce $ tyVarKind tv
+
+cpSubstCoVarBndr :: CorePrepEnv -> CoVar -> (CorePrepEnv, CoVar)
+cpSubstCoVarBndr env@(CPE { cpe_tyco_env = mb_env }) cv
+  = case mb_env of
+      Nothing  -> (env, cv)
+      Just tce -> (env { cpe_tyco_env = Just tce' }, cv')
+               where
+                  (tce', cv') = subst_cv_bndr tce cv
+
+subst_cv_bndr :: CpeTyCoEnv -> CoVar -> (CpeTyCoEnv, CoVar)
+subst_cv_bndr tce cv
+  = (extend_tce_cv tce cv (mkCoVarCo cv'), cv')
+  where
+    cv' = mkCoVar (varName cv) ty'
+    ty' = runIdentity (subst_ty tce $ varType cv)
+
+------------------------------------------------------------------------------
+-- Cloning binders
+-- ---------------------------------------------------------------------------
+
+cpCloneBndrs :: CorePrepEnv -> [InVar] -> UniqSM (CorePrepEnv, [OutVar])
+cpCloneBndrs env bs = mapAccumLM cpCloneBndr env bs
+
+cpCloneBndr  :: CorePrepEnv -> InVar -> UniqSM (CorePrepEnv, OutVar)
+cpCloneBndr env bndr
+  | isTyVar bndr
+  = return (cpSubstTyVarBndr env bndr)
+
+  | isCoVar bndr
+  = return (cpSubstCoVarBndr env bndr)
+
+  | otherwise
+  = do { bndr' <- clone_it bndr
+
+       -- Drop (now-useless) rules/unfoldings
+       -- See Note [Drop unfoldings and rules]
+       -- and Note [Preserve evaluatedness] in GHC.Core.Tidy
+       ; let unfolding' = zapUnfolding (realIdUnfolding bndr)
+                          -- Simplifier will set the Id's unfolding
+
+             bndr'' = bndr' `setIdUnfolding`      unfolding'
+                            `setIdSpecialisation` emptyRuleInfo
+
+       ; return (extendCorePrepEnv env bndr bndr'', bndr'') }
+  where
+    clone_it bndr
+      | isLocalId bndr
+      = do { uniq <- getUniqueM
+           ; let ty' = cpSubstTy env (idType bndr)
+           ; return (setVarUnique (setIdType bndr ty') uniq) }
+
+      | otherwise   -- Top level things, which we don't want
+                    -- to clone, have become GlobalIds by now
+      = return bndr
+
+{- Note [Drop unfoldings and rules]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We want to drop the unfolding/rules on every Id:
+
+  - We are now past interface-file generation, and in the
+    codegen pipeline, so we really don't need full unfoldings/rules
+
+  - The unfolding/rule may be keeping stuff alive that we'd like
+    to discard.  See  Note [Dead code in CorePrep]
+
+  - Getting rid of unnecessary unfoldings reduces heap usage
+
+  - We are changing uniques, so if we didn't discard unfoldings/rules
+    we'd have to substitute in them
+
+HOWEVER, we want to preserve evaluated-ness;
+see Note [Preserve evaluatedness] in GHC.Core.Tidy.
+-}
+
+------------------------------------------------------------------------------
+-- Cloning ccall Ids; each must have a unique name,
+-- to give the code generator a handle to hang it on
+-- ---------------------------------------------------------------------------
+
+fiddleCCall :: Id -> UniqSM Id
+fiddleCCall id
+  | isFCallId id = (id `setVarUnique`) <$> getUniqueM
+  | otherwise    = return id
+
+------------------------------------------------------------------------------
+-- Generating new binders
+-- ---------------------------------------------------------------------------
+
+newVar :: Type -> UniqSM Id
+newVar ty
+ = seqType ty `seq` do
+     uniq <- getUniqueM
+     return (mkSysLocalOrCoVar (fsLit "sat") uniq Many ty)
+
+
+------------------------------------------------------------------------------
+-- Floating ticks
+-- ---------------------------------------------------------------------------
+--
+-- Note [Floating Ticks in CorePrep]
+--
+-- It might seem counter-intuitive to float ticks by default, given
+-- that we don't actually want to move them if we can help it. On the
+-- other hand, nothing gets very far in CorePrep anyway, and we want
+-- to preserve the order of let bindings and tick annotations in
+-- relation to each other. For example, if we just wrapped let floats
+-- when they pass through ticks, we might end up performing the
+-- following transformation:
+--
+--   src<...> let foo = bar in baz
+--   ==>  let foo = src<...> bar in src<...> baz
+--
+-- Because the let-binding would float through the tick, and then
+-- immediately materialize, achieving nothing but decreasing tick
+-- accuracy. The only special case is the following scenario:
+--
+--   let foo = src<...> (let a = b in bar) in baz
+--   ==>  let foo = src<...> bar; a = src<...> b in baz
+--
+-- Here we would not want the source tick to end up covering "baz" and
+-- therefore refrain from pushing ticks outside. Instead, we copy them
+-- into the floating binds (here "a") in cpePair. Note that where "b"
+-- or "bar" are (value) lambdas we have to push the annotations
+-- further inside in order to uphold our rules.
+--
+-- All of this is implemented below in @wrapTicks@.
+
+-- | Like wrapFloats, but only wraps tick floats
+wrapTicks :: Floats -> CoreExpr -> (Floats, CoreExpr)
+wrapTicks (Floats flag floats0) expr =
+    (Floats flag (toOL $ reverse floats1), foldr mkTick expr (reverse ticks1))
+  where (floats1, ticks1) = foldlOL go ([], []) $ floats0
+        -- Deeply nested constructors will produce long lists of
+        -- redundant source note floats here. We need to eliminate
+        -- those early, as relying on mkTick to spot it after the fact
+        -- can yield O(n^3) complexity [#11095]
+        go (floats, ticks) (FloatTick t)
+          = assert (tickishPlace t == PlaceNonLam)
+            (floats, if any (flip tickishContains t) ticks
+                     then ticks else t:ticks)
+        go (floats, ticks) f
+          = (foldr wrap f (reverse ticks):floats, ticks)
+
+        wrap t (FloatLet bind)           = FloatLet (wrapBind t bind)
+        wrap t (FloatCase r b con bs ok) = FloatCase (mkTick t r) b con bs ok
+        wrap _ other                     = pprPanic "wrapTicks: unexpected float!"
+                                             (ppr other)
+        wrapBind t (NonRec binder rhs) = NonRec binder (mkTick t rhs)
+        wrapBind t (Rec pairs)         = Rec (mapSnd (mkTick t) pairs)
+
+------------------------------------------------------------------------------
+-- Collecting cost centres
+-- ---------------------------------------------------------------------------
+
+-- | Collect cost centres defined in the current module, including those in
+-- unfoldings.
+collectCostCentres :: Module -> CoreProgram -> S.Set CostCentre
+collectCostCentres mod_name
+  = foldl' go_bind S.empty
+  where
+    go cs e = case e of
+      Var{} -> cs
+      Lit{} -> cs
+      App e1 e2 -> go (go cs e1) e2
+      Lam _ e -> go cs e
+      Let b e -> go (go_bind cs b) e
+      Case scrt _ _ alts -> go_alts (go cs scrt) alts
+      Cast e _ -> go cs e
+      Tick (ProfNote cc _ _) e ->
+        go (if ccFromThisModule cc mod_name then S.insert cc cs else cs) e
+      Tick _ e -> go cs e
+      Type{} -> cs
+      Coercion{} -> cs
+
+    go_alts = foldl' (\cs (Alt _con _bndrs e) -> go cs e)
+
+    go_bind :: S.Set CostCentre -> CoreBind -> S.Set CostCentre
+    go_bind cs (NonRec b e) =
+      go (maybe cs (go cs) (get_unf b)) e
+    go_bind cs (Rec bs) =
+      foldl' (\cs' (b, e) -> go (maybe cs' (go cs') (get_unf b)) e) cs bs
+
+    -- Unfoldings may have cost centres that in the original definion are
+    -- optimized away, see #5889.
+    get_unf = maybeUnfoldingTemplate . realIdUnfolding
+
+
+------------------------------------------------------------------------------
+-- Numeric literals
+-- ---------------------------------------------------------------------------
 
 -- | Create a function that converts Bignum literals into their final CoreExpr
 mkConvertNumLiteral
@@ -1712,196 +2248,3 @@ mkConvertNumLiteral hsc_env = do
 
    return convertNumLit
 
-
-mkInitialCorePrepEnv :: HscEnv -> IO CorePrepEnv
-mkInitialCorePrepEnv hsc_env = do
-   convertNumLit <- mkConvertNumLiteral hsc_env
-   return $ CPE
-      { cpe_dynFlags = hsc_dflags hsc_env
-      , cpe_env = emptyVarEnv
-      , cpe_convertNumLit = convertNumLit
-      }
-
-extendCorePrepEnv :: CorePrepEnv -> Id -> Id -> CorePrepEnv
-extendCorePrepEnv cpe id id'
-    = cpe { cpe_env = extendVarEnv (cpe_env cpe) id (Var id') }
-
-extendCorePrepEnvExpr :: CorePrepEnv -> Id -> CoreExpr -> CorePrepEnv
-extendCorePrepEnvExpr cpe id expr
-    = cpe { cpe_env = extendVarEnv (cpe_env cpe) id expr }
-
-extendCorePrepEnvList :: CorePrepEnv -> [(Id,Id)] -> CorePrepEnv
-extendCorePrepEnvList cpe prs
-    = cpe { cpe_env = extendVarEnvList (cpe_env cpe)
-                        (map (\(id, id') -> (id, Var id')) prs) }
-
-lookupCorePrepEnv :: CorePrepEnv -> Id -> CoreExpr
-lookupCorePrepEnv cpe id
-  = case lookupVarEnv (cpe_env cpe) id of
-        Nothing  -> Var id
-        Just exp -> exp
-
-------------------------------------------------------------------------------
--- Cloning binders
--- ---------------------------------------------------------------------------
-
-cpCloneBndrs :: CorePrepEnv -> [InVar] -> UniqSM (CorePrepEnv, [OutVar])
-cpCloneBndrs env bs = mapAccumLM cpCloneBndr env bs
-
-cpCloneBndr  :: CorePrepEnv -> InVar -> UniqSM (CorePrepEnv, OutVar)
-cpCloneBndr env bndr
-  | not (isId bndr)
-  = return (env, bndr)
-
-  | otherwise
-  = do { bndr' <- clone_it bndr
-
-       -- Drop (now-useless) rules/unfoldings
-       -- See Note [Drop unfoldings and rules]
-       -- and Note [Preserve evaluatedness] in GHC.Core.Tidy
-       ; let unfolding' = zapUnfolding (realIdUnfolding bndr)
-                          -- Simplifier will set the Id's unfolding
-
-             bndr'' = bndr' `setIdUnfolding`      unfolding'
-                            `setIdSpecialisation` emptyRuleInfo
-
-       ; return (extendCorePrepEnv env bndr bndr'', bndr'') }
-  where
-    clone_it bndr
-      | isLocalId bndr, not (isCoVar bndr)
-      = do { uniq <- getUniqueM; return (setVarUnique bndr uniq) }
-      | otherwise   -- Top level things, which we don't want
-                    -- to clone, have become GlobalIds by now
-                    -- And we don't clone tyvars, or coercion variables
-      = return bndr
-
-{- Note [Drop unfoldings and rules]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We want to drop the unfolding/rules on every Id:
-
-  - We are now past interface-file generation, and in the
-    codegen pipeline, so we really don't need full unfoldings/rules
-
-  - The unfolding/rule may be keeping stuff alive that we'd like
-    to discard.  See  Note [Dead code in CorePrep]
-
-  - Getting rid of unnecessary unfoldings reduces heap usage
-
-  - We are changing uniques, so if we didn't discard unfoldings/rules
-    we'd have to substitute in them
-
-HOWEVER, we want to preserve evaluated-ness;
-see Note [Preserve evaluatedness] in GHC.Core.Tidy.
--}
-
-------------------------------------------------------------------------------
--- Cloning ccall Ids; each must have a unique name,
--- to give the code generator a handle to hang it on
--- ---------------------------------------------------------------------------
-
-fiddleCCall :: Id -> UniqSM Id
-fiddleCCall id
-  | isFCallId id = (id `setVarUnique`) <$> getUniqueM
-  | otherwise    = return id
-
-------------------------------------------------------------------------------
--- Generating new binders
--- ---------------------------------------------------------------------------
-
-newVar :: Type -> UniqSM Id
-newVar ty
- = seqType ty `seq` do
-     uniq <- getUniqueM
-     return (mkSysLocalOrCoVar (fsLit "sat") uniq Many ty)
-
-
-------------------------------------------------------------------------------
--- Floating ticks
--- ---------------------------------------------------------------------------
---
--- Note [Floating Ticks in CorePrep]
---
--- It might seem counter-intuitive to float ticks by default, given
--- that we don't actually want to move them if we can help it. On the
--- other hand, nothing gets very far in CorePrep anyway, and we want
--- to preserve the order of let bindings and tick annotations in
--- relation to each other. For example, if we just wrapped let floats
--- when they pass through ticks, we might end up performing the
--- following transformation:
---
---   src<...> let foo = bar in baz
---   ==>  let foo = src<...> bar in src<...> baz
---
--- Because the let-binding would float through the tick, and then
--- immediately materialize, achieving nothing but decreasing tick
--- accuracy. The only special case is the following scenario:
---
---   let foo = src<...> (let a = b in bar) in baz
---   ==>  let foo = src<...> bar; a = src<...> b in baz
---
--- Here we would not want the source tick to end up covering "baz" and
--- therefore refrain from pushing ticks outside. Instead, we copy them
--- into the floating binds (here "a") in cpePair. Note that where "b"
--- or "bar" are (value) lambdas we have to push the annotations
--- further inside in order to uphold our rules.
---
--- All of this is implemented below in @wrapTicks@.
-
--- | Like wrapFloats, but only wraps tick floats
-wrapTicks :: Floats -> CoreExpr -> (Floats, CoreExpr)
-wrapTicks (Floats flag floats0) expr =
-    (Floats flag (toOL $ reverse floats1), foldr mkTick expr (reverse ticks1))
-  where (floats1, ticks1) = foldlOL go ([], []) $ floats0
-        -- Deeply nested constructors will produce long lists of
-        -- redundant source note floats here. We need to eliminate
-        -- those early, as relying on mkTick to spot it after the fact
-        -- can yield O(n^3) complexity [#11095]
-        go (floats, ticks) (FloatTick t)
-          = ASSERT(tickishPlace t == PlaceNonLam)
-            (floats, if any (flip tickishContains t) ticks
-                     then ticks else t:ticks)
-        go (floats, ticks) f
-          = (foldr wrap f (reverse ticks):floats, ticks)
-
-        wrap t (FloatLet bind)           = FloatLet (wrapBind t bind)
-        wrap t (FloatCase r b con bs ok) = FloatCase (mkTick t r) b con bs ok
-        wrap _ other                     = pprPanic "wrapTicks: unexpected float!"
-                                             (ppr other)
-        wrapBind t (NonRec binder rhs) = NonRec binder (mkTick t rhs)
-        wrapBind t (Rec pairs)         = Rec (mapSnd (mkTick t) pairs)
-
-------------------------------------------------------------------------------
--- Collecting cost centres
--- ---------------------------------------------------------------------------
-
--- | Collect cost centres defined in the current module, including those in
--- unfoldings.
-collectCostCentres :: Module -> CoreProgram -> S.Set CostCentre
-collectCostCentres mod_name
-  = foldl' go_bind S.empty
-  where
-    go cs e = case e of
-      Var{} -> cs
-      Lit{} -> cs
-      App e1 e2 -> go (go cs e1) e2
-      Lam _ e -> go cs e
-      Let b e -> go (go_bind cs b) e
-      Case scrt _ _ alts -> go_alts (go cs scrt) alts
-      Cast e _ -> go cs e
-      Tick (ProfNote cc _ _) e ->
-        go (if ccFromThisModule cc mod_name then S.insert cc cs else cs) e
-      Tick _ e -> go cs e
-      Type{} -> cs
-      Coercion{} -> cs
-
-    go_alts = foldl' (\cs (Alt _con _bndrs e) -> go cs e)
-
-    go_bind :: S.Set CostCentre -> CoreBind -> S.Set CostCentre
-    go_bind cs (NonRec b e) =
-      go (maybe cs (go cs) (get_unf b)) e
-    go_bind cs (Rec bs) =
-      foldl' (\cs' (b, e) -> go (maybe cs' (go cs') (get_unf b)) e) cs bs
-
-    -- Unfoldings may have cost centres that in the original definion are
-    -- optimized away, see #5889.
-    get_unf = maybeUnfoldingTemplate . realIdUnfolding

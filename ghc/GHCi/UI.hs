@@ -1,5 +1,5 @@
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE MultiWayIf #-}
@@ -29,8 +29,6 @@ module GHCi.UI (
         ghciCommands,
         ghciWelcomeMsg
     ) where
-
-#include "HsVersions.h"
 
 -- GHCi
 import qualified GHCi.UI.Monad as GhciMonad ( args, runStmt, runDecls' )
@@ -77,6 +75,7 @@ import GHC.Builtin.Types( stringTyCon_RDR )
 import GHC.Types.Name.Reader as RdrName ( getGRE_NameQualifier_maybes, getRdrName )
 import GHC.Types.SrcLoc as SrcLoc
 import qualified GHC.Parser.Lexer as Lexer
+import GHC.Parser.Header ( toArgs )
 
 import GHC.Unit
 import GHC.Unit.State
@@ -98,9 +97,11 @@ import qualified GHC.Linker.Loader as Loader
 import GHC.Data.Maybe ( orElse, expectJust )
 import GHC.Types.Name.Set
 import GHC.Utils.Panic hiding ( showException, try )
+import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Data.Bag (unitBag)
+import qualified GHC.Data.Strict as Strict
 
 -- Haskell Libraries
 import System.Console.Haskeline as Haskeline
@@ -293,7 +294,7 @@ keepGoing' a str = a str >> return False
 
 keepGoingPaths :: ([FilePath] -> InputT GHCi ()) -> (String -> InputT GHCi Bool)
 keepGoingPaths a str
- = do case toArgs str of
+ = do case toArgsNoLoc str of
           Left err -> liftIO $ hPutStrLn stderr err
           Right args -> a args
       return False
@@ -480,6 +481,10 @@ interactiveUI config srcs maybe_exprs = do
                       LangExt.MonomorphismRestriction xopt_unset)
                $ dflags
    GHC.setInteractiveDynFlags dflags'
+   _ <- GHC.setProgramDynFlags
+               -- Set Opt_KeepGoing so that :reload loads as much as
+               -- possible
+               (gopt_set dflags Opt_KeepGoing)
 
    -- Update the LogAction. Ensure we don't override the user's log action lest
    -- we break -ddump-json (#14078)
@@ -918,7 +923,7 @@ generatePromptFunctionFromString promptS modules_names line =
         processString ('%':'s':xs) =
             liftM2 (<>) (return modules_list) (processString xs)
             where
-              modules_list = hsep $ map text modules_names
+              modules_list = hsep . map text . ordNub $ modules_names
         processString ('%':'l':xs) =
             liftM2 (<>) (return $ ppr line) (processString xs)
         processString ('%':'d':xs) =
@@ -1507,7 +1512,7 @@ withSandboxOnly cmd this = do
    dflags <- getDynFlags
    if not (gopt Opt_GhciSandbox dflags)
       then printForUser (text cmd <+>
-                         ptext (sLit "is not supported with -fno-ghci-sandbox"))
+                         text "is not supported with -fno-ghci-sandbox")
       else this
 
 -----------------------------------------------------------------------------
@@ -1538,7 +1543,7 @@ infoThing allInfo str = do
                                      (catMaybes mb_stuffs)
     return $ vcat (intersperse (text "") $ map pprInfo filtered)
 
-  -- Filter out names whose parent is also there Good
+  -- Filter out names whose parent is also there. Good
   -- example is '[]', which is both a type and data
   -- constructor in the same type
 filterOutChildren :: (a -> TyThing) -> [a] -> [a]
@@ -1562,7 +1567,7 @@ pprInfo (thing, fixity, cls_insts, fam_insts, docs)
 -- :main
 
 runMain :: GhciMonad m => String -> m ()
-runMain s = case toArgs s of
+runMain s = case toArgsNoLoc s of
             Left err   -> liftIO (hPutStrLn stderr err)
             Right args ->
                 do dflags <- getDynFlags
@@ -1582,6 +1587,33 @@ runRun s = case toCmdArgs s of
 doWithArgs :: GhciMonad m => [String] -> String -> m ()
 doWithArgs args cmd = enqueueCommands ["System.Environment.withArgs " ++
                                        show args ++ " (" ++ cmd ++ ")"]
+
+{-
+Akin to @Prelude.words@, but acts like the Bourne shell, treating
+quoted strings as Haskell Strings, and also parses Haskell [String]
+syntax.
+-}
+
+getCmd :: String -> Either String             -- Error
+                           (String, String) -- (Cmd, Rest)
+getCmd s = case break isSpace $ dropWhile isSpace s of
+           ([], _) -> Left ("Couldn't find command in " ++ show s)
+           res -> Right res
+
+toCmdArgs :: String -> Either String             -- Error
+                              (String, [String]) -- (Cmd, Args)
+toCmdArgs s = case getCmd s of
+              Left err -> Left err
+              Right (cmd, s') -> case toArgsNoLoc s' of
+                                 Left err -> Left err
+                                 Right args -> Right (cmd, args)
+
+-- wrapper around GHC.Parser.Header.toArgs, but without locations
+toArgsNoLoc :: String -> Either String [String]
+toArgsNoLoc str = map unLoc <$> toArgs fake_loc str
+  where
+    fake_loc = mkRealSrcLoc (fsLit "<interactive>") 1 1
+    -- this should never be seen, because it's discarded with the `map unLoc`
 
 -----------------------------------------------------------------------------
 -- :cd
@@ -1805,7 +1837,7 @@ checkModule m = do
            case GHC.moduleInfo r of
              cm | Just scope <- GHC.modInfoTopLevelScope cm ->
                 let
-                    (loc, glob) = ASSERT( all isExternalName scope )
+                    (loc, glob) = assert (all isExternalName scope) $
                                   partition ((== modl) . GHC.moduleName . GHC.nameModule) scope
                 in
                         (text "global names: " <+> ppr glob) $$
@@ -2540,7 +2572,7 @@ browseModule bang modl exports_only = do
                 -- identifiers first. We would like to improve this; see #1799.
             sorted_names = loc_sort local ++ occ_sort external
                 where
-                (local,external) = ASSERT( all isExternalName names )
+                (local,external) = assert (all isExternalName names) $
                                    partition ((==modl) . nameModule) names
                 occ_sort = sortBy (compare `on` nameOccName)
                 -- try to sort by src location. If the first name in our list
@@ -2854,11 +2886,11 @@ setCmd "-a" = showOptions True
 setCmd str
   = case getCmd str of
     Right ("args",    rest) ->
-        case toArgs rest of
+        case toArgsNoLoc rest of
             Left err -> liftIO (hPutStrLn stderr err)
             Right args -> setArgs args
     Right ("prog",    rest) ->
-        case toArgs rest of
+        case toArgsNoLoc rest of
             Right [prog] -> setProg prog
             _ -> liftIO (hPutStrLn stderr "syntax: :set prog <progname>")
 
@@ -2877,7 +2909,7 @@ setCmd str
     Right ("stop",    rest) -> setStop    $ dropWhile isSpace rest
     Right ("local-config", rest) ->
         setLocalConfigBehaviour $ dropWhile isSpace rest
-    _ -> case toArgs str of
+    _ -> case toArgsNoLoc str of
          Left err -> liftIO (hPutStrLn stderr err)
          Right wds -> setOptions wds
 
@@ -2885,7 +2917,7 @@ setiCmd :: GhciMonad m => String -> m ()
 setiCmd ""   = GHC.getInteractiveDynFlags >>= liftIO . showDynFlags False
 setiCmd "-a" = GHC.getInteractiveDynFlags >>= liftIO . showDynFlags True
 setiCmd str  =
-  case toArgs str of
+  case toArgsNoLoc str of
     Left err -> liftIO (hPutStrLn stderr err)
     Right wds -> newDynFlags True wds
 
@@ -3029,13 +3061,17 @@ setOptions wds =
       -- then, dynamic flags
       when (not (null minus_opts)) $ newDynFlags False minus_opts
 
+-- | newDynFlags will *not* read package environment files, therefore we
+-- use 'parseDynamicFlagsCmdLine' rather than 'parseDynamicFlags'. This
+-- function is called very often and results in repeatedly loading
+-- environment files (see #19650)
 newDynFlags :: GhciMonad m => Bool -> [String] -> m ()
 newDynFlags interactive_only minus_opts = do
       let lopts = map noLoc minus_opts
 
       logger <- getLogger
       idflags0 <- GHC.getInteractiveDynFlags
-      (idflags1, leftovers, warns) <- GHC.parseDynamicFlags logger idflags0 lopts
+      (idflags1, leftovers, warns) <- DynFlags.parseDynamicFlagsCmdLine idflags0 lopts
 
       liftIO $ handleFlagWarnings logger idflags1 warns
       when (not $ null leftovers)
@@ -3051,7 +3087,7 @@ newDynFlags interactive_only minus_opts = do
       dflags0 <- getDynFlags
 
       when (not interactive_only) $ do
-        (dflags1, _, _) <- liftIO $ GHC.parseDynamicFlags logger dflags0 lopts
+        (dflags1, _, _) <- liftIO $ DynFlags.parseDynamicFlagsCmdLine dflags0 lopts
         must_reload <- GHC.setProgramDynFlags dflags1
 
         -- if the package flags changed, reset the context and link
@@ -3312,12 +3348,12 @@ showContext = do
    printForUser $ vcat (map pp_resume (reverse resumes))
   where
    pp_resume res =
-        ptext (sLit "--> ") <> text (GHC.resumeStmt res)
+        text "--> " <> text (GHC.resumeStmt res)
         $$ nest 2 (pprStopped res)
 
 pprStopped :: GHC.Resume -> SDoc
 pprStopped res =
-  ptext (sLit "Stopped in")
+  text "Stopped in"
     <+> ((case mb_mod_name of
            Nothing -> empty
            Just mod_name -> text (moduleNameString mod_name) <> char '.')
@@ -3711,7 +3747,7 @@ stepLocalCmd arg = withSandboxOnly ":steplocal" $ step arg
         Just loc -> do
            md <- fromMaybe (panic "stepLocalCmd") <$> getCurrentBreakModule
            current_toplevel_decl <- enclosingTickSpan md loc
-           doContinue (`isSubspanOf` RealSrcSpan current_toplevel_decl Nothing) GHC.SingleStep
+           doContinue (`isSubspanOf` RealSrcSpan current_toplevel_decl Strict.Nothing) GHC.SingleStep
 
 stepModuleCmd :: GhciMonad m => String -> m ()
 stepModuleCmd arg = withSandboxOnly ":stepmodule" $ step arg
@@ -3732,7 +3768,7 @@ enclosingTickSpan _ (UnhelpfulSpan _) = panic "enclosingTickSpan UnhelpfulSpan"
 enclosingTickSpan md (RealSrcSpan src _) = do
   ticks <- getTickArray md
   let line = srcSpanStartLine src
-  ASSERT(inRange (bounds ticks) line) do
+  massert (inRange (bounds ticks) line)
   let enclosing_spans = [ pan | (_,pan) <- ticks ! line
                                , realSrcSpanEnd pan >= realSrcSpanEnd src]
   return . head . sortBy leftmostLargestRealSrcSpan $ enclosing_spans
@@ -3925,7 +3961,7 @@ backCmd arg
   where
   back num = withSandboxOnly ":back" $ do
       (names, _, pan, _) <- GHC.back num
-      printForUser $ ptext (sLit "Logged breakpoint at") <+> ppr pan
+      printForUser $ text "Logged breakpoint at" <+> ppr pan
       printTypeOfNames names
        -- run the command set with ":set stop <cmd>"
       st <- getGHCiState
@@ -3940,8 +3976,8 @@ forwardCmd arg
   forward num = withSandboxOnly ":forward" $ do
       (names, ix, pan, _) <- GHC.forward num
       printForUser $ (if (ix == 0)
-                        then ptext (sLit "Stopped at")
-                        else ptext (sLit "Logged breakpoint at")) <+> ppr pan
+                        then text "Stopped at"
+                        else text "Logged breakpoint at") <+> ppr pan
       printTypeOfNames names
        -- run the command set with ":set stop <cmd>"
       st <- getGHCiState
@@ -4063,7 +4099,7 @@ findBreakAndSet md lookupTickTree = do
          (alreadySet, nm) <-
                recordBreak $ BreakLocation
                        { breakModule = md
-                       , breakLoc = RealSrcSpan pan Nothing
+                       , breakLoc = RealSrcSpan pan Strict.Nothing
                        , breakTick = tick
                        , onBreakCmd = ""
                        , breakEnabled = True
@@ -4125,7 +4161,7 @@ findBreakByCoord mb_file (line, col) arr
         ticks = arr ! line
 
         -- the ticks that span this coordinate
-        contains = [ tick | tick@(_,pan) <- ticks, RealSrcSpan pan Nothing `spans` (line,col),
+        contains = [ tick | tick@(_,pan) <- ticks, RealSrcSpan pan Strict.Nothing `spans` (line,col),
                             is_correct_file pan ]
 
         is_correct_file pan
@@ -4218,7 +4254,7 @@ list2 [arg] = do
         let loc = GHC.srcSpanStart (GHC.nameSrcSpan name)
         case loc of
             RealSrcLoc l _ ->
-               do tickArray <- ASSERT( isExternalName name )
+               do tickArray <- assert (isExternalName name) $
                                getTickArray (GHC.nameModule name)
                   let mb_span = findBreakByCoord (Just (GHC.srcLocFile l))
                                         (GHC.srcLocLine l, GHC.srcLocCol l)
@@ -4520,7 +4556,7 @@ wantNameFromInterpretedModule noCanDo str and_then =
    case names of
       []    -> return ()
       (n:_) -> do
-            let modl = ASSERT( isExternalName n ) GHC.nameModule n
+            let modl = assert (isExternalName n) $ GHC.nameModule n
             if not (GHC.isExternalName n)
                then noCanDo n $ ppr n <>
                                 text " is not defined in an interpreted module"

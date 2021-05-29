@@ -28,8 +28,6 @@ module GHC.Hs.Expr
   , module GHC.Hs.Expr
   ) where
 
-#include "HsVersions.h"
-
 import Language.Haskell.Syntax.Expr
 
 -- friends:
@@ -46,17 +44,20 @@ import GHC.Parser.Annotation
 
 -- others:
 import GHC.Tc.Types.Evidence
+import GHC.Core.DataCon (FieldLabelString)
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Basic
 import GHC.Types.Fixity
 import GHC.Types.SourceText
 import GHC.Types.SrcLoc
+import GHC.Types.Var( InvisTVBinder )
 import GHC.Core.ConLike
 import GHC.Unit.Module (ModuleName)
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Data.FastString
 import GHC.Core.Type
 import GHC.Builtin.Types (mkTupleStr)
@@ -207,19 +208,24 @@ could only do that if the extension field was strict (#18764)
 -- API Annotations types
 
 data EpAnnHsCase = EpAnnHsCase
-      { hsCaseAnnCase :: EpaAnchor
-      , hsCaseAnnOf   :: EpaAnchor
+      { hsCaseAnnCase :: EpaLocation
+      , hsCaseAnnOf   :: EpaLocation
       , hsCaseAnnsRest :: [AddEpAnn]
       } deriving Data
 
 data EpAnnUnboundVar = EpAnnUnboundVar
-     { hsUnboundBackquotes :: (EpaAnchor, EpaAnchor)
-     , hsUnboundHole       :: EpaAnchor
+     { hsUnboundBackquotes :: (EpaLocation, EpaLocation)
+     , hsUnboundHole       :: EpaLocation
      } deriving Data
 
 type instance XVar           (GhcPass _) = NoExtField
-type instance XConLikeOut    (GhcPass _) = NoExtField
-type instance XRecFld        (GhcPass _) = NoExtField
+
+-- Record selectors at parse time are HsVar; they convert to HsRecSel
+-- on renaming.
+type instance XRecSel              GhcPs = Void
+type instance XRecSel              GhcRn = NoExtField
+type instance XRecSel              GhcTc = NoExtField
+
 type instance XLam           (GhcPass _) = NoExtField
 
 -- OverLabel not present in GhcTc pass; see GHC.Rename.Expr
@@ -232,7 +238,7 @@ type instance XOverLabel     GhcTc = Void  -- See Note [Constructor cannot occur
 
 type instance XVar           (GhcPass _) = NoExtField
 
-type instance XUnboundVar    GhcPs = EpAnn' EpAnnUnboundVar
+type instance XUnboundVar    GhcPs = EpAnn EpAnnUnboundVar
 type instance XUnboundVar    GhcRn = NoExtField
 type instance XUnboundVar    GhcTc = HoleExprRef
   -- We really don't need the whole HoleExprRef; just the IORef EvTerm
@@ -240,15 +246,13 @@ type instance XUnboundVar    GhcTc = HoleExprRef
   -- Much, much easier just to define HoleExprRef with a Data instance and
   -- store the whole structure.
 
-type instance XConLikeOut    (GhcPass _) = NoExtField
-type instance XRecFld        (GhcPass _) = NoExtField
 type instance XIPVar         (GhcPass _) = EpAnnCO
 type instance XOverLitE      (GhcPass _) = EpAnnCO
 type instance XLitE          (GhcPass _) = EpAnnCO
 
 type instance XLam           (GhcPass _) = NoExtField
 
-type instance XLamCase       (GhcPass _) = EpAnn
+type instance XLamCase       (GhcPass _) = EpAnn [AddEpAnn]
 type instance XApp           (GhcPass _) = EpAnnCO
 
 type instance XAppTypeE      GhcPs = SrcSpan -- Where the `@` lives
@@ -257,7 +261,7 @@ type instance XAppTypeE      GhcTc = Type
 
 -- OpApp not present in GhcTc pass; see GHC.Rename.Expr
 -- Note [Handling overloaded and rebindable constructs]
-type instance XOpApp         GhcPs = EpAnn
+type instance XOpApp         GhcPs = EpAnn [AddEpAnn]
 type instance XOpApp         GhcRn = Fixity
 type instance XOpApp         GhcTc = Void  -- See Note [Constructor cannot occur]
 
@@ -271,41 +275,41 @@ type instance XSectionL      GhcTc = Void  -- See Note [Constructor cannot occur
 type instance XSectionR      GhcTc = Void  -- See Note [Constructor cannot occur]
 
 
-type instance XNegApp        GhcPs = EpAnn
+type instance XNegApp        GhcPs = EpAnn [AddEpAnn]
 type instance XNegApp        GhcRn = NoExtField
 type instance XNegApp        GhcTc = NoExtField
 
-type instance XPar           (GhcPass _) = EpAnn' AnnParen
+type instance XPar           (GhcPass _) = EpAnnCO
 
-type instance XExplicitTuple GhcPs = EpAnn
+type instance XExplicitTuple GhcPs = EpAnn [AddEpAnn]
 type instance XExplicitTuple GhcRn = NoExtField
 type instance XExplicitTuple GhcTc = NoExtField
 
-type instance XExplicitSum   GhcPs = EpAnn' AnnExplicitSum
+type instance XExplicitSum   GhcPs = EpAnn AnnExplicitSum
 type instance XExplicitSum   GhcRn = NoExtField
 type instance XExplicitSum   GhcTc = [Type]
 
-type instance XCase          GhcPs = EpAnn' EpAnnHsCase
+type instance XCase          GhcPs = EpAnn EpAnnHsCase
 type instance XCase          GhcRn = NoExtField
 type instance XCase          GhcTc = NoExtField
 
-type instance XIf            GhcPs = EpAnn
+type instance XIf            GhcPs = EpAnn AnnsIf
 type instance XIf            GhcRn = NoExtField
 type instance XIf            GhcTc = NoExtField
 
-type instance XMultiIf       GhcPs = EpAnn
+type instance XMultiIf       GhcPs = EpAnn [AddEpAnn]
 type instance XMultiIf       GhcRn = NoExtField
 type instance XMultiIf       GhcTc = Type
 
-type instance XLet           GhcPs = EpAnn' AnnsLet
+type instance XLet           GhcPs = EpAnn AnnsLet
 type instance XLet           GhcRn = NoExtField
 type instance XLet           GhcTc = NoExtField
 
-type instance XDo            GhcPs = EpAnn' AnnList
+type instance XDo            GhcPs = EpAnn AnnList
 type instance XDo            GhcRn = NoExtField
 type instance XDo            GhcTc = Type
 
-type instance XExplicitList  GhcPs = EpAnn' AnnList
+type instance XExplicitList  GhcPs = EpAnn AnnList
 type instance XExplicitList  GhcRn = NoExtField
 type instance XExplicitList  GhcTc = Type
 -- GhcPs: ExplicitList includes all source-level
@@ -316,11 +320,11 @@ type instance XExplicitList  GhcTc = Type
 -- See Note [Handling overloaded and rebindable constructs]
 -- in  GHC.Rename.Expr
 
-type instance XRecordCon     GhcPs = EpAnn
+type instance XRecordCon     GhcPs = EpAnn [AddEpAnn]
 type instance XRecordCon     GhcRn = NoExtField
 type instance XRecordCon     GhcTc = PostTcExpr   -- Instantiated constructor function
 
-type instance XRecordUpd     GhcPs = EpAnn
+type instance XRecordUpd     GhcPs = EpAnn [AddEpAnn]
 type instance XRecordUpd     GhcRn = NoExtField
 type instance XRecordUpd     GhcTc = RecordUpdTc
 
@@ -330,29 +334,29 @@ type instance XGetField     GhcTc = Void
 -- HsGetField is eliminated by the renamer. See [Handling overloaded
 -- and rebindable constructs].
 
-type instance XProjection     GhcPs = EpAnn' AnnProjection
+type instance XProjection     GhcPs = EpAnn AnnProjection
 type instance XProjection     GhcRn = NoExtField
 type instance XProjection     GhcTc = Void
 -- HsProjection is eliminated by the renamer. See [Handling overloaded
 -- and rebindable constructs].
 
-type instance XExprWithTySig GhcPs = EpAnn
+type instance XExprWithTySig GhcPs = EpAnn [AddEpAnn]
 type instance XExprWithTySig GhcRn = NoExtField
 type instance XExprWithTySig GhcTc = NoExtField
 
-type instance XArithSeq      GhcPs = EpAnn
+type instance XArithSeq      GhcPs = EpAnn [AddEpAnn]
 type instance XArithSeq      GhcRn = NoExtField
 type instance XArithSeq      GhcTc = PostTcExpr
 
-type instance XBracket       (GhcPass _) = EpAnn
+type instance XBracket       (GhcPass _) = EpAnn [AddEpAnn]
 
 type instance XRnBracketOut  (GhcPass _) = NoExtField
 type instance XTcBracketOut  (GhcPass _) = NoExtField
 
 type instance XSpliceE       (GhcPass _) = EpAnnCO
-type instance XProc          (GhcPass _) = EpAnn
+type instance XProc          (GhcPass _) = EpAnn [AddEpAnn]
 
-type instance XStatic        GhcPs = EpAnn
+type instance XStatic        GhcPs = EpAnn [AddEpAnn]
 type instance XStatic        GhcRn = NameSet
 type instance XStatic        GhcTc = NameSet
 
@@ -361,57 +365,54 @@ type instance XBinTick       (GhcPass _) = NoExtField
 
 type instance XPragE         (GhcPass _) = NoExtField
 
-type instance XXExpr         GhcPs       = NoExtCon
-
--- See Note [Rebindable syntax and HsExpansion] below
-type instance XXExpr         GhcRn       = HsExpansion (HsExpr GhcRn)
-                                                       (HsExpr GhcRn)
-type instance XXExpr         GhcTc       = XXExprGhcTc
-
-
 type instance Anno [LocatedA ((StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (body (GhcPass pr)))))] = SrcSpanAnnL
 type instance Anno (StmtLR GhcRn GhcRn (LocatedA (body GhcRn))) = SrcSpanAnnA
 
-data XXExprGhcTc
-  = WrapExpr {-# UNPACK #-} !(HsWrap HsExpr)
-  | ExpansionExpr {-# UNPACK #-} !(HsExpansion (HsExpr GhcRn) (HsExpr GhcTc))
-
 data AnnExplicitSum
   = AnnExplicitSum {
-      aesOpen       :: EpaAnchor,
-      aesBarsBefore :: [EpaAnchor],
-      aesBarsAfter  :: [EpaAnchor],
-      aesClose      :: EpaAnchor
+      aesOpen       :: EpaLocation,
+      aesBarsBefore :: [EpaLocation],
+      aesBarsAfter  :: [EpaLocation],
+      aesClose      :: EpaLocation
       } deriving Data
 
 data AnnsLet
   = AnnsLet {
-      alLet :: EpaAnchor,
-      alIn :: EpaAnchor
+      alLet :: EpaLocation,
+      alIn :: EpaLocation
       } deriving Data
 
 data AnnFieldLabel
   = AnnFieldLabel {
-      afDot :: Maybe EpaAnchor
+      afDot :: Maybe EpaLocation
       } deriving Data
 
 data AnnProjection
   = AnnProjection {
-      apOpen  :: EpaAnchor, -- ^ '('
-      apClose :: EpaAnchor  -- ^ ')'
+      apOpen  :: EpaLocation, -- ^ '('
+      apClose :: EpaLocation  -- ^ ')'
+      } deriving Data
+
+data AnnsIf
+  = AnnsIf {
+      aiIf       :: EpaLocation,
+      aiThen     :: EpaLocation,
+      aiElse     :: EpaLocation,
+      aiThenSemi :: Maybe EpaLocation,
+      aiElseSemi :: Maybe EpaLocation
       } deriving Data
 
 -- ---------------------------------------------------------------------
 
-type instance XSCC           (GhcPass _) = EpAnn' AnnPragma
+type instance XSCC           (GhcPass _) = EpAnn AnnPragma
 type instance XXPragE        (GhcPass _) = NoExtCon
 
-type instance XCHsFieldLabel (GhcPass _) = EpAnn' AnnFieldLabel
-type instance XXHsFieldLabel (GhcPass _) = NoExtCon
+type instance XCDotFieldOcc (GhcPass _) = EpAnn AnnFieldLabel
+type instance XXDotFieldOcc (GhcPass _) = NoExtCon
 
-type instance XPresent         (GhcPass _) = EpAnn
+type instance XPresent         (GhcPass _) = EpAnn [AddEpAnn]
 
-type instance XMissing         GhcPs = EpAnn' EpaAnchor
+type instance XMissing         GhcPs = EpAnn EpaLocation
 type instance XMissing         GhcRn = NoExtField
 type instance XMissing         GhcTc = Scaled Type
 
@@ -420,6 +421,40 @@ type instance XXTupArg         (GhcPass _) = NoExtCon
 tupArgPresent :: HsTupArg (GhcPass p) -> Bool
 tupArgPresent (Present {}) = True
 tupArgPresent (Missing {}) = False
+
+
+{- *********************************************************************
+*                                                                      *
+            XXExpr: the extension constructor of HsExpr
+*                                                                      *
+********************************************************************* -}
+
+type instance XXExpr GhcPs = NoExtCon
+type instance XXExpr GhcRn = HsExpansion (HsExpr GhcRn) (HsExpr GhcRn)
+type instance XXExpr GhcTc = XXExprGhcTc
+-- HsExpansion: see Note [Rebindable syntax and HsExpansion] below
+
+
+data XXExprGhcTc
+  = WrapExpr        -- Type and evidence application and abstractions
+      {-# UNPACK #-} !(HsWrap HsExpr)
+
+  | ExpansionExpr   -- See Note [Rebindable syntax and HsExpansion] below
+      {-# UNPACK #-} !(HsExpansion (HsExpr GhcRn) (HsExpr GhcTc))
+
+  | ConLikeTc      -- Result of typechecking a data-con
+                   -- See Note [Typechecking data constructors] in
+                   --     GHC.Tc.Gen.Head
+                   -- The two arguments describe how to eta-expand
+                   -- the data constructor when desugaring
+        ConLike [InvisTVBinder] [Scaled TcType]
+
+
+{- *********************************************************************
+*                                                                      *
+            Pretty-printing expressions
+*                                                                      *
+********************************************************************* -}
 
 instance (OutputableBndrId p) => Outputable (HsExpr (GhcPass p)) where
     ppr expr = pprExpr expr
@@ -457,13 +492,12 @@ ppr_expr :: forall p. (OutputableBndrId p)
          => HsExpr (GhcPass p) -> SDoc
 ppr_expr (HsVar _ (L _ v))   = pprPrefixOcc v
 ppr_expr (HsUnboundVar _ uv) = pprPrefixOcc uv
-ppr_expr (HsConLikeOut _ c)  = pprPrefixOcc c
-ppr_expr (HsRecFld _ f)      = pprPrefixOcc f
+ppr_expr (HsRecSel _ f)      = pprPrefixOcc f
 ppr_expr (HsIPVar _ v)       = ppr v
 ppr_expr (HsOverLabel _ l)   = char '#' <> ppr l
 ppr_expr (HsLit _ lit)       = ppr lit
 ppr_expr (HsOverLit _ lit)   = ppr lit
-ppr_expr (HsPar _ e)         = parens (ppr_lexpr e)
+ppr_expr (HsPar _ _ e _)     = parens (ppr_lexpr e)
 
 ppr_expr (HsPragE _ prag e) = sep [ppr prag, ppr_lexpr e]
 
@@ -545,14 +579,14 @@ ppr_expr (HsLamCase _ matches)
           nest 2 (pprMatches matches) ]
 
 ppr_expr (HsCase _ expr matches@(MG { mg_alts = L _ alts }))
-  = sep [ sep [text "case", nest 4 (ppr expr), ptext (sLit "of")],
+  = sep [ sep [text "case", nest 4 (ppr expr), text "of"],
           pp_alts ]
   where
     pp_alts | null alts = text "{}"
             | otherwise = nest 2 (pprMatches matches)
 
 ppr_expr (HsIf _ e1 e2 e3)
-  = sep [hsep [text "if", nest 2 (ppr e1), ptext (sLit "then")],
+  = sep [hsep [text "if", nest 2 (ppr e1), text "then"],
          nest 4 (ppr e2),
          text "else",
          nest 4 (ppr e3)]
@@ -570,7 +604,7 @@ ppr_expr (HsMultiIf _ alts)
 
 -- special case: let ... in let ...
 ppr_expr (HsLet _ binds expr@(L _ (HsLet _ _ _)))
-  = sep [hang (text "let") 2 (hsep [pprBinds binds, ptext (sLit "in")]),
+  = sep [hang (text "let") 2 (hsep [pprBinds binds, text "in"]),
          ppr_lexpr expr]
 
 ppr_expr (HsLet _ binds expr)
@@ -616,7 +650,7 @@ ppr_expr (HsTcBracketOut _ _wrap e []) = ppr e
 ppr_expr (HsTcBracketOut _ _wrap e ps) = ppr e $$ text "pending(tc)" <+> pprIfTc @p (ppr ps)
 
 ppr_expr (HsProc _ pat (L _ (HsCmdTop _ cmd)))
-  = hsep [text "proc", ppr pat, ptext (sLit "->"), ppr cmd]
+  = hsep [text "proc", ppr pat, text "->", ppr cmd]
 
 ppr_expr (HsStatic _ e)
   = hsep [text "static", ppr e]
@@ -638,26 +672,40 @@ ppr_expr (XExpr x) = case ghcPass @p of
   GhcPs -> ppr x
 #endif
   GhcRn -> ppr x
-  GhcTc -> case x of
-    WrapExpr (HsWrap co_fn e) -> pprHsWrapper co_fn
-      (\parens -> if parens then pprExpr e else pprExpr e)
-    ExpansionExpr e -> ppr e -- e is an HsExpansion, we print the original
-                             -- expression (LHsExpr GhcPs), not the
-                             -- desugared one (LHsExpr GhcT).
+  GhcTc -> ppr x
+
+instance Outputable XXExprGhcTc where
+  ppr (WrapExpr (HsWrap co_fn e))
+    = pprHsWrapper co_fn (\_parens -> pprExpr e)
+
+  ppr (ExpansionExpr e)
+    = ppr e -- e is an HsExpansion, we print the original
+            -- expression (LHsExpr GhcPs), not the
+            -- desugared one (LHsExpr GhcTc).
+
+  ppr (ConLikeTc con _ _) = pprPrefixOcc con
+   -- Used in error messages generated by
+   -- the pattern match overlap checker
 
 ppr_infix_expr :: forall p. (OutputableBndrId p) => HsExpr (GhcPass p) -> Maybe SDoc
 ppr_infix_expr (HsVar _ (L _ v))    = Just (pprInfixOcc v)
-ppr_infix_expr (HsConLikeOut _ c)   = Just (pprInfixOcc (conLikeName c))
-ppr_infix_expr (HsRecFld _ f)       = Just (pprInfixOcc f)
+ppr_infix_expr (HsRecSel _ f)       = Just (pprInfixOcc f)
 ppr_infix_expr (HsUnboundVar _ occ) = Just (pprInfixOcc occ)
-ppr_infix_expr (XExpr x)            = case (ghcPass @p, x) of
+ppr_infix_expr (XExpr x)            = case ghcPass @p of
 #if __GLASGOW_HASKELL__ < 901
-  (GhcPs, _)                              -> Nothing
+                                        GhcPs -> Nothing
 #endif
-  (GhcRn, HsExpanded a _)                 -> ppr_infix_expr a
-  (GhcTc, WrapExpr (HsWrap _ e))          -> ppr_infix_expr e
-  (GhcTc, ExpansionExpr (HsExpanded a _)) -> ppr_infix_expr a
+                                        GhcRn -> ppr_infix_expr_rn x
+                                        GhcTc -> ppr_infix_expr_tc x
 ppr_infix_expr _ = Nothing
+
+ppr_infix_expr_rn :: HsExpansion (HsExpr GhcRn) (HsExpr GhcRn) -> Maybe SDoc
+ppr_infix_expr_rn (HsExpanded a _) = ppr_infix_expr a
+
+ppr_infix_expr_tc :: XXExprGhcTc -> Maybe SDoc
+ppr_infix_expr_tc (WrapExpr (HsWrap _ e))          = ppr_infix_expr e
+ppr_infix_expr_tc (ExpansionExpr (HsExpanded a _)) = ppr_infix_expr a
+ppr_infix_expr_tc (ConLikeTc {})                   = Nothing
 
 ppr_apps :: (OutputableBndrId p)
          => HsExpr (GhcPass p)
@@ -698,100 +746,110 @@ pprParendExpr p expr
 -- | @'hsExprNeedsParens' p e@ returns 'True' if the expression @e@ needs
 -- parentheses under precedence @p@.
 hsExprNeedsParens :: forall p. IsPass p => PprPrec -> HsExpr (GhcPass p) -> Bool
-hsExprNeedsParens p = go
+hsExprNeedsParens prec = go
   where
+    go :: HsExpr (GhcPass p) -> Bool
     go (HsVar{})                      = False
     go (HsUnboundVar{})               = False
-    go (HsConLikeOut{})               = False
     go (HsIPVar{})                    = False
     go (HsOverLabel{})                = False
-    go (HsLit _ l)                    = hsLitNeedsParens p l
-    go (HsOverLit _ ol)               = hsOverLitNeedsParens p ol
+    go (HsLit _ l)                    = hsLitNeedsParens prec l
+    go (HsOverLit _ ol)               = hsOverLitNeedsParens prec ol
     go (HsPar{})                      = False
-    go (HsApp{})                      = p >= appPrec
-    go (HsAppType {})                 = p >= appPrec
-    go (OpApp{})                      = p >= opPrec
-    go (NegApp{})                     = p > topPrec
+    go (HsApp{})                      = prec >= appPrec
+    go (HsAppType {})                 = prec >= appPrec
+    go (OpApp{})                      = prec >= opPrec
+    go (NegApp{})                     = prec > topPrec
     go (SectionL{})                   = True
     go (SectionR{})                   = True
     -- Special-case unary boxed tuple applications so that they are
     -- parenthesized as `Identity (Solo x)`, not `Identity Solo x` (#18612)
     -- See Note [One-tuples] in GHC.Builtin.Types
     go (ExplicitTuple _ [Present{}] Boxed)
-                                      = p >= appPrec
+                                      = prec >= appPrec
     go (ExplicitTuple{})              = False
     go (ExplicitSum{})                = False
-    go (HsLam{})                      = p > topPrec
-    go (HsLamCase{})                  = p > topPrec
-    go (HsCase{})                     = p > topPrec
-    go (HsIf{})                       = p > topPrec
-    go (HsMultiIf{})                  = p > topPrec
-    go (HsLet{})                      = p > topPrec
+    go (HsLam{})                      = prec > topPrec
+    go (HsLamCase{})                  = prec > topPrec
+    go (HsCase{})                     = prec > topPrec
+    go (HsIf{})                       = prec > topPrec
+    go (HsMultiIf{})                  = prec > topPrec
+    go (HsLet{})                      = prec > topPrec
     go (HsDo _ sc _)
       | isComprehensionContext sc     = False
-      | otherwise                     = p > topPrec
+      | otherwise                     = prec > topPrec
     go (ExplicitList{})               = False
     go (RecordUpd{})                  = False
-    go (ExprWithTySig{})              = p >= sigPrec
+    go (ExprWithTySig{})              = prec >= sigPrec
     go (ArithSeq{})                   = False
-    go (HsPragE{})                    = p >= appPrec
+    go (HsPragE{})                    = prec >= appPrec
     go (HsSpliceE{})                  = False
     go (HsBracket{})                  = False
     go (HsRnBracketOut{})             = False
     go (HsTcBracketOut{})             = False
-    go (HsProc{})                     = p > topPrec
-    go (HsStatic{})                   = p >= appPrec
+    go (HsProc{})                     = prec > topPrec
+    go (HsStatic{})                   = prec >= appPrec
     go (HsTick _ _ (L _ e))           = go e
     go (HsBinTick _ _ _ (L _ e))      = go e
     go (RecordCon{})                  = False
-    go (HsRecFld{})                   = False
+    go (HsRecSel{})                   = False
     go (HsProjection{})               = True
     go (HsGetField{})                 = False
-    go (XExpr x)
-      | GhcTc <- ghcPass @p
-      = case x of
-          WrapExpr      (HsWrap _ e)     -> go e
-          ExpansionExpr (HsExpanded a _) -> hsExprNeedsParens p a
-      | GhcRn <- ghcPass @p
-      = case x of HsExpanded a _ -> hsExprNeedsParens p a
+    go (XExpr x) = case ghcPass @p of
+                     GhcTc -> go_x_tc x
+                     GhcRn -> go_x_rn x
 #if __GLASGOW_HASKELL__ <= 900
-      | otherwise
-      = True
+                     GhcPs -> True
 #endif
 
+    go_x_tc :: XXExprGhcTc -> Bool
+    go_x_tc (WrapExpr (HsWrap _ e))          = hsExprNeedsParens prec e
+    go_x_tc (ExpansionExpr (HsExpanded a _)) = hsExprNeedsParens prec a
+    go_x_tc (ConLikeTc {})                   = False
+
+    go_x_rn :: HsExpansion (HsExpr GhcRn) (HsExpr GhcRn) -> Bool
+    go_x_rn (HsExpanded a _) = hsExprNeedsParens prec a
+
+
+-- | Parenthesize an expression without token information
+gHsPar :: LHsExpr (GhcPass id) -> HsExpr (GhcPass id)
+gHsPar e = HsPar noAnn noHsTok e noHsTok
 
 -- | @'parenthesizeHsExpr' p e@ checks if @'hsExprNeedsParens' p e@ is true,
 -- and if so, surrounds @e@ with an 'HsPar'. Otherwise, it simply returns @e@.
 parenthesizeHsExpr :: IsPass p => PprPrec -> LHsExpr (GhcPass p) -> LHsExpr (GhcPass p)
 parenthesizeHsExpr p le@(L loc e)
-  | hsExprNeedsParens p e = L loc (HsPar noAnn le)
+  | hsExprNeedsParens p e = L loc (gHsPar le)
   | otherwise             = le
 
 stripParensLHsExpr :: LHsExpr (GhcPass p) -> LHsExpr (GhcPass p)
-stripParensLHsExpr (L _ (HsPar _ e)) = stripParensLHsExpr e
+stripParensLHsExpr (L _ (HsPar _ _ e _)) = stripParensLHsExpr e
 stripParensLHsExpr e = e
 
 stripParensHsExpr :: HsExpr (GhcPass p) -> HsExpr (GhcPass p)
-stripParensHsExpr (HsPar _ (L _ e)) = stripParensHsExpr e
+stripParensHsExpr (HsPar _ _ (L _ e) _) = stripParensHsExpr e
 stripParensHsExpr e = e
 
 isAtomicHsExpr :: forall p. IsPass p => HsExpr (GhcPass p) -> Bool
 -- True of a single token
 isAtomicHsExpr (HsVar {})        = True
-isAtomicHsExpr (HsConLikeOut {}) = True
 isAtomicHsExpr (HsLit {})        = True
 isAtomicHsExpr (HsOverLit {})    = True
 isAtomicHsExpr (HsIPVar {})      = True
 isAtomicHsExpr (HsOverLabel {})  = True
 isAtomicHsExpr (HsUnboundVar {}) = True
-isAtomicHsExpr (HsRecFld{})      = True
+isAtomicHsExpr (HsRecSel{})      = True
 isAtomicHsExpr (XExpr x)
-  | GhcTc <- ghcPass @p          = case x of
-      WrapExpr      (HsWrap _ e)     -> isAtomicHsExpr e
-      ExpansionExpr (HsExpanded a _) -> isAtomicHsExpr a
-  | GhcRn <- ghcPass @p          = case x of
-      HsExpanded a _         -> isAtomicHsExpr a
-isAtomicHsExpr _                 = False
+  | GhcTc <- ghcPass @p          = go_x_tc x
+  | GhcRn <- ghcPass @p          = go_x_rn x
+  where
+    go_x_tc (WrapExpr      (HsWrap _ e))     = isAtomicHsExpr e
+    go_x_tc (ExpansionExpr (HsExpanded a _)) = isAtomicHsExpr a
+    go_x_tc (ConLikeTc {})                   = True
+
+    go_x_rn (HsExpanded a _) = isAtomicHsExpr a
+
+isAtomicHsExpr _ = False
 
 instance Outputable (HsPragE (GhcPass p)) where
   ppr (HsPragSCC _ st (StringLiteral stl lbl _)) =
@@ -981,33 +1039,33 @@ instance (Outputable a, Outputable b) => Outputable (HsExpansion a b) where
 ************************************************************************
 -}
 
-type instance XCmdArrApp  GhcPs = EpAnn' AddEpAnn
+type instance XCmdArrApp  GhcPs = EpAnn AddEpAnn
 type instance XCmdArrApp  GhcRn = NoExtField
 type instance XCmdArrApp  GhcTc = Type
 
-type instance XCmdArrForm GhcPs = EpAnn' AnnList
+type instance XCmdArrForm GhcPs = EpAnn AnnList
 type instance XCmdArrForm GhcRn = NoExtField
 type instance XCmdArrForm GhcTc = NoExtField
 
 type instance XCmdApp     (GhcPass _) = EpAnnCO
 type instance XCmdLam     (GhcPass _) = NoExtField
-type instance XCmdPar     (GhcPass _) = EpAnn' AnnParen
+type instance XCmdPar     (GhcPass _) = EpAnnCO
 
-type instance XCmdCase    GhcPs = EpAnn' EpAnnHsCase
+type instance XCmdCase    GhcPs = EpAnn EpAnnHsCase
 type instance XCmdCase    GhcRn = NoExtField
 type instance XCmdCase    GhcTc = NoExtField
 
-type instance XCmdLamCase (GhcPass _) = EpAnn
+type instance XCmdLamCase (GhcPass _) = EpAnn [AddEpAnn]
 
-type instance XCmdIf      GhcPs = EpAnn
+type instance XCmdIf      GhcPs = EpAnn AnnsIf
 type instance XCmdIf      GhcRn = NoExtField
 type instance XCmdIf      GhcTc = NoExtField
 
-type instance XCmdLet     GhcPs = EpAnn' AnnsLet
+type instance XCmdLet     GhcPs = EpAnn AnnsLet
 type instance XCmdLet     GhcRn = NoExtField
 type instance XCmdLet     GhcTc = NoExtField
 
-type instance XCmdDo      GhcPs = EpAnn' AnnList
+type instance XCmdDo      GhcPs = EpAnn AnnList
 type instance XCmdDo      GhcRn = NoExtField
 type instance XCmdDo      GhcTc = Type
 
@@ -1063,7 +1121,7 @@ ppr_lcmd c = ppr_cmd (unLoc c)
 
 ppr_cmd :: forall p. (OutputableBndrId p
                      ) => HsCmd (GhcPass p) -> SDoc
-ppr_cmd (HsCmdPar _ c) = parens (ppr_lcmd c)
+ppr_cmd (HsCmdPar _ _ c _) = parens (ppr_lcmd c)
 
 ppr_cmd (HsCmdApp _ c e)
   = let (fun, args) = collect_args c [e] in
@@ -1076,21 +1134,21 @@ ppr_cmd (HsCmdLam _ matches)
   = pprMatches matches
 
 ppr_cmd (HsCmdCase _ expr matches)
-  = sep [ sep [text "case", nest 4 (ppr expr), ptext (sLit "of")],
+  = sep [ sep [text "case", nest 4 (ppr expr), text "of"],
           nest 2 (pprMatches matches) ]
 
 ppr_cmd (HsCmdLamCase _ matches)
   = sep [ text "\\case", nest 2 (pprMatches matches) ]
 
 ppr_cmd (HsCmdIf _ _ e ct ce)
-  = sep [hsep [text "if", nest 2 (ppr e), ptext (sLit "then")],
+  = sep [hsep [text "if", nest 2 (ppr e), text "then"],
          nest 4 (ppr ct),
          text "else",
          nest 4 (ppr ce)]
 
 -- special case: let ... in let ...
 ppr_cmd (HsCmdLet _ binds cmd@(L _ (HsCmdLet {})))
-  = sep [hang (text "let") 2 (hsep [pprBinds binds, ptext (sLit "in")]),
+  = sep [hang (text "let") 2 (hsep [pprBinds binds, text "in"]),
          ppr_lcmd cmd]
 
 ppr_cmd (HsCmdLet _ binds cmd)
@@ -1108,21 +1166,27 @@ ppr_cmd (HsCmdArrApp _ arrow arg HsHigherOrderApp True)
 ppr_cmd (HsCmdArrApp _ arrow arg HsHigherOrderApp False)
   = hsep [ppr_lexpr arg, arrowtt, ppr_lexpr arrow]
 
-ppr_cmd (HsCmdArrForm _ (L _ (HsVar _ (L _ v))) _ (Just _) [arg1, arg2])
-  = hang (pprCmdArg (unLoc arg1)) 4 (sep [ pprInfixOcc v
-                                         , pprCmdArg (unLoc arg2)])
-ppr_cmd (HsCmdArrForm _ (L _ (HsVar _ (L _ v))) Infix _    [arg1, arg2])
-  = hang (pprCmdArg (unLoc arg1)) 4 (sep [ pprInfixOcc v
-                                         , pprCmdArg (unLoc arg2)])
-ppr_cmd (HsCmdArrForm _ (L _ (HsConLikeOut _ c)) _ (Just _) [arg1, arg2])
-  = hang (pprCmdArg (unLoc arg1)) 4 (sep [ pprInfixOcc (conLikeName c)
-                                         , pprCmdArg (unLoc arg2)])
-ppr_cmd (HsCmdArrForm _ (L _ (HsConLikeOut _ c)) Infix _    [arg1, arg2])
-  = hang (pprCmdArg (unLoc arg1)) 4 (sep [ pprInfixOcc (conLikeName c)
-                                         , pprCmdArg (unLoc arg2)])
-ppr_cmd (HsCmdArrForm _ op _ _ args)
-  = hang (text "(|" <+> ppr_lexpr op)
-         4 (sep (map (pprCmdArg.unLoc) args) <+> text "|)")
+ppr_cmd (HsCmdArrForm _ (L _ op) ps_fix rn_fix args)
+  | HsVar _ (L _ v) <- op
+  = ppr_cmd_infix v
+  | GhcTc <- ghcPass @p
+  , XExpr (ConLikeTc c _ _) <- op
+  = ppr_cmd_infix (conLikeName c)
+  | otherwise
+  = fall_through
+  where
+    fall_through = hang (text "(|" <+> ppr_expr op)
+                      4 (sep (map (pprCmdArg.unLoc) args) <+> text "|)")
+
+    ppr_cmd_infix :: OutputableBndr v => v -> SDoc
+    ppr_cmd_infix v
+      | [arg1, arg2] <- args
+      , isJust rn_fix || ps_fix == Infix
+      = hang (pprCmdArg (unLoc arg1))
+           4 (sep [ pprInfixOcc v, pprCmdArg (unLoc arg2)])
+      | otherwise
+      = fall_through
+
 ppr_cmd (XCmd x) = case ghcPass @p of
 #if __GLASGOW_HASKELL__ < 811
   GhcPs -> ppr x
@@ -1152,7 +1216,7 @@ type instance XMG         GhcTc b = MatchGroupTc
 
 type instance XXMatchGroup (GhcPass _) b = NoExtCon
 
-type instance XCMatch (GhcPass _) b = EpAnn
+type instance XCMatch (GhcPass _) b = EpAnn [AddEpAnn]
 type instance XXMatch (GhcPass _) b = NoExtCon
 
 instance (OutputableBndrId pr, Outputable body)
@@ -1186,11 +1250,11 @@ type instance XXGRHSs (GhcPass _) _ = NoExtCon
 
 data GrhsAnn
   = GrhsAnn {
-      ga_vbar :: Maybe EpaAnchor, -- TODO:AZ do we need this?
+      ga_vbar :: Maybe EpaLocation, -- TODO:AZ do we need this?
       ga_sep  :: AddEpAnn -- ^ Match separator location
       } deriving (Data)
 
-type instance XCGRHS (GhcPass _) _ = EpAnn' GrhsAnn
+type instance XCGRHS (GhcPass _) _ = EpAnn GrhsAnn
                                    -- Location of matchSeparator
                                    -- TODO:AZ does this belong on the GRHS, or GRHSs?
 
@@ -1225,7 +1289,7 @@ pprMatch (Match { m_pats = pats, m_ctxt = ctxt, m_grhss = grhss })
         = case ctxt of
             FunRhs {mc_fun=L _ fun, mc_fixity=fixity, mc_strictness=strictness}
                 | SrcStrict <- strictness
-                -> ASSERT(null pats)     -- A strict variable binding
+                -> assert (null pats)     -- A strict variable binding
                    (char '!'<>pprPrefixOcc fun, pats)
 
                 | Prefix <- fixity
@@ -1304,7 +1368,7 @@ data RecStmtTc =
 
 type instance XLastStmt        (GhcPass _) (GhcPass _) b = NoExtField
 
-type instance XBindStmt        (GhcPass _) GhcPs b = EpAnn
+type instance XBindStmt        (GhcPass _) GhcPs b = EpAnn [AddEpAnn]
 type instance XBindStmt        (GhcPass _) GhcRn b = XBindStmtRn
 type instance XBindStmt        (GhcPass _) GhcTc b = XBindStmtTc
 
@@ -1328,17 +1392,17 @@ type instance XBodyStmt        (GhcPass _) GhcPs b = NoExtField
 type instance XBodyStmt        (GhcPass _) GhcRn b = NoExtField
 type instance XBodyStmt        (GhcPass _) GhcTc b = Type
 
-type instance XLetStmt         (GhcPass _) (GhcPass _) b = EpAnn
+type instance XLetStmt         (GhcPass _) (GhcPass _) b = EpAnn [AddEpAnn]
 
 type instance XParStmt         (GhcPass _) GhcPs b = NoExtField
 type instance XParStmt         (GhcPass _) GhcRn b = NoExtField
 type instance XParStmt         (GhcPass _) GhcTc b = Type
 
-type instance XTransStmt       (GhcPass _) GhcPs b = EpAnn
+type instance XTransStmt       (GhcPass _) GhcPs b = EpAnn [AddEpAnn]
 type instance XTransStmt       (GhcPass _) GhcRn b = NoExtField
 type instance XTransStmt       (GhcPass _) GhcTc b = Type
 
-type instance XRecStmt         (GhcPass _) GhcPs b = EpAnn' AnnList
+type instance XRecStmt         (GhcPass _) GhcPs b = EpAnn AnnList
 type instance XRecStmt         (GhcPass _) GhcRn b = NoExtField
 type instance XRecStmt         (GhcPass _) GhcTc b = RecStmtTc
 
@@ -1459,7 +1523,7 @@ pprTransStmt :: Outputable body => Maybe body -> body -> TransForm -> SDoc
 pprTransStmt by using ThenForm
   = sep [ text "then", nest 2 (ppr using), nest 2 (pprBy by)]
 pprTransStmt by using GroupForm
-  = sep [ text "then group", nest 2 (pprBy by), nest 2 (ptext (sLit "using") <+> ppr using)]
+  = sep [ text "then group", nest 2 (pprBy by), nest 2 (text "using" <+> ppr using)]
 
 pprBy :: Outputable body => Maybe body -> SDoc
 pprBy Nothing  = empty
@@ -1523,8 +1587,8 @@ pprQuals quals = interpp'SP quals
 
 newtype HsSplicedT = HsSplicedT DelayedSplice deriving (Data)
 
-type instance XTypedSplice   (GhcPass _) = EpAnn
-type instance XUntypedSplice (GhcPass _) = EpAnn
+type instance XTypedSplice   (GhcPass _) = EpAnn [AddEpAnn]
+type instance XUntypedSplice (GhcPass _) = EpAnn [AddEpAnn]
 type instance XQuasiQuote    (GhcPass _) = NoExtField
 type instance XSpliced       (GhcPass _) = NoExtField
 type instance XXSplice       GhcPs       = NoExtCon
@@ -1702,7 +1766,7 @@ thBrackets pp_kind pp_body = char '[' <> pp_kind <> vbar <+>
                              pp_body <+> text "|]"
 
 thTyBrackets :: SDoc -> SDoc
-thTyBrackets pp_body = text "[||" <+> pp_body <+> ptext (sLit "||]")
+thTyBrackets pp_body = text "[||" <+> pp_body <+> text "||]"
 
 instance Outputable PendingRnSplice where
   ppr (PendingRnSplice _ n e) = pprPendingSplice n e
@@ -1838,6 +1902,10 @@ type instance Anno (HsSplice (GhcPass p)) = SrcSpanAnnA
 type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsExpr (GhcPass pr))))] = SrcSpanAnnL
 type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsCmd  (GhcPass pr))))] = SrcSpanAnnL
 
-instance (Anno a ~ SrcSpanAnn' (EpAnn' an))
+type instance Anno (FieldLabelStrings (GhcPass p)) = SrcSpan
+type instance Anno (FieldLabelString) = SrcSpan
+type instance Anno (DotFieldOcc (GhcPass p)) = SrcSpan
+
+instance (Anno a ~ SrcSpanAnn' (EpAnn an))
    => WrapXRec (GhcPass p) a where
   wrapXRec = noLocA
