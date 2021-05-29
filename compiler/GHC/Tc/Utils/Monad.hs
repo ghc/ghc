@@ -57,7 +57,7 @@ module GHC.Tc.Utils.Monad(
   getRdrEnvs, getImports,
   getFixityEnv, extendFixityEnv, getRecFieldEnv,
   getDeclaredDefaultTys,
-  addDependentFiles,
+  addDependentFiles, getMnwib,
 
   -- * Error management
   getSrcSpanM, setSrcSpan, setSrcSpanA, addLocM, addLocMA, inGeneratedCode,
@@ -898,6 +898,11 @@ addDependentFiles fs = do
 getSrcSpanM :: TcRn SrcSpan
         -- Avoid clash with Name.getSrcLoc
 getSrcSpanM = do { env <- getLclEnv; return (RealSrcSpan (tcl_loc env) Strict.Nothing) }
+
+getMnwib :: TcRn ModuleNameWithIsBoot
+getMnwib = do
+  gbl_env <- getGblEnv
+  return $ GWIB (moduleName $ tcg_mod gbl_env) (hscSourceToIsBoot (tcg_src gbl_env))
 
 -- See Note [Error contexts in generated code]
 inGeneratedCode :: TcRn Bool
