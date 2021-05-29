@@ -1,0 +1,17 @@
+[1 of 5] Compiling B
+[2 of 5] Compiling A
+[3 of 5] Compiling D
+[4 of 5] Compiling C
+[5 of 5] Compiling Main
+Linking Main ...
+[1 of 5] Compiling B
+[2 of 5] Compiling A [./B.dyn_o changed]
+Linking Main ...
+[3 of 5] Compiling D
+[4 of 5] Compiling C [./D.dyn_o changed]
+Linking Main ...
+[1 of 5] Compiling B
+[2 of 5] Compiling A [./B.dyn_o changed]
+[3 of 5] Compiling D
+[4 of 5] Compiling C [./D.dyn_o changed]
+Linking Main ...
