@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -45,8 +45,6 @@ module GHC.HsToCore.Utils (
         isTrueLHsExpr
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import {-# SOURCE #-} GHC.HsToCore.Match ( matchSimply )
@@ -78,6 +76,7 @@ import GHC.Builtin.Names
 import GHC.Types.Name( isInternalName )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Types.SrcLoc
 import GHC.Types.Tickish
 import GHC.Utils.Misc
@@ -135,7 +134,7 @@ selectMatchVar :: Mult -> Pat GhcTc -> DsM Id
 -- Postcondition: the returned Id has an Internal Name
 selectMatchVar w (BangPat _ pat) = selectMatchVar w (unLoc pat)
 selectMatchVar w (LazyPat _ pat) = selectMatchVar w (unLoc pat)
-selectMatchVar w (ParPat _ pat)  = selectMatchVar w (unLoc pat)
+selectMatchVar w (ParPat _ _ pat _) = selectMatchVar w (unLoc pat)
 selectMatchVar _w (VarPat _ var)  = return (localiseId (unLoc var))
                                   -- Note [Localise pattern binders]
                                   --
@@ -144,7 +143,7 @@ selectMatchVar _w (VarPat _ var)  = return (localiseId (unLoc var))
                                   -- multiplicity stored within the variable
                                   -- itself. It's easier to pull it from the
                                   -- variable, so we ignore the multiplicity.
-selectMatchVar _w (AsPat _ var _) = ASSERT( isManyDataConTy _w ) (return (unLoc var))
+selectMatchVar _w (AsPat _ var _) = assert (isManyDataConTy _w ) (return (unLoc var))
 selectMatchVar w other_pat     = newSysLocalDsNoLP w (hsPatType other_pat)
 
 {- Note [Localise pattern binders]
@@ -198,7 +197,7 @@ worthy of a type synonym and a few handy functions.
 -}
 
 firstPat :: EquationInfo -> Pat GhcTc
-firstPat eqn = ASSERT( notNull (eqn_pats eqn) ) head (eqn_pats eqn)
+firstPat eqn = assert (notNull (eqn_pats eqn)) $ head (eqn_pats eqn)
 
 shiftEqns :: Functor f => f EquationInfo -> f EquationInfo
 -- Drop the first pattern in each equation
@@ -283,7 +282,7 @@ mkCoPrimCaseMatchResult var ty match_alts
 
     sorted_alts = sortWith fst match_alts       -- Right order for a Case
     mk_alt fail (lit, mr)
-       = ASSERT( not (litIsLifted lit) )
+       = assert (not (litIsLifted lit)) $
          do body <- runMatchResult fail mr
             return (Alt (LitAlt lit) [] body)
 
@@ -299,7 +298,7 @@ mkCoAlgCaseMatchResult
   -> MatchResult CoreExpr
 mkCoAlgCaseMatchResult var ty match_alts
   | isNewtype  -- Newtype case; use a let
-  = ASSERT( null match_alts_tail && null (tail arg_ids1) )
+  = assert (null match_alts_tail && null (tail arg_ids1)) $
     mkCoLetMatchResult (NonRec arg_id1 newtype_rhs) match_result1
 
   | otherwise
@@ -313,7 +312,7 @@ mkCoAlgCaseMatchResult var ty match_alts
     alt1@MkCaseAlt{ alt_bndrs = arg_ids1, alt_result = match_result1 } :| match_alts_tail
       = match_alts
     -- Stuff for newtype
-    arg_id1       = ASSERT( notNull arg_ids1 ) head arg_ids1
+    arg_id1       = assert (notNull arg_ids1) $ head arg_ids1
     var_ty        = idType var
     (tc, ty_args) = tcSplitTyConApp var_ty      -- Don't look through newtypes
                                                 -- (not that splitTyConApp does, these days)
@@ -785,7 +784,7 @@ mkSelectorBinds ticks pat val_expr
 
 strip_bangs :: LPat (GhcPass p) -> LPat (GhcPass p)
 -- Remove outermost bangs and parens
-strip_bangs (L _ (ParPat _ p))  = strip_bangs p
+strip_bangs (L _ (ParPat _ _ p _))  = strip_bangs p
 strip_bangs (L _ (BangPat _ p)) = strip_bangs p
 strip_bangs lp                  = lp
 
@@ -793,7 +792,7 @@ is_flat_prod_lpat :: LPat GhcTc -> Bool
 is_flat_prod_lpat = is_flat_prod_pat . unLoc
 
 is_flat_prod_pat :: Pat GhcTc -> Bool
-is_flat_prod_pat (ParPat _ p)          = is_flat_prod_lpat p
+is_flat_prod_pat (ParPat _ _ p _)      = is_flat_prod_lpat p
 is_flat_prod_pat (TuplePat _ ps Boxed) = all is_triv_lpat ps
 is_flat_prod_pat (ConPat { pat_con  = L _ pcon
                          , pat_args = ps})
@@ -808,7 +807,7 @@ is_triv_lpat = is_triv_pat . unLoc
 is_triv_pat :: Pat (GhcPass p) -> Bool
 is_triv_pat (VarPat {})  = True
 is_triv_pat (WildPat{})  = True
-is_triv_pat (ParPat _ p) = is_triv_lpat p
+is_triv_pat (ParPat _ _ p _) = is_triv_lpat p
 is_triv_pat _            = False
 
 
@@ -1058,7 +1057,7 @@ decideBangHood dflags lpat
   where
     go lp@(L l p)
       = case p of
-           ParPat x p    -> L l (ParPat x (go p))
+           ParPat x lpar p rpar -> L l (ParPat x lpar (go p) rpar)
            LazyPat _ lp' -> lp'
            BangPat _ _   -> lp
            _             -> L l (BangPat noExtField lp)
@@ -1090,5 +1089,5 @@ isTrueLHsExpr (L _ (HsBinTick _ ixT _ e))
                      this_mod <- getModule
                      return (Tick (HpcTick this_mod ixT) e))
 
-isTrueLHsExpr (L _ (HsPar _ e))   = isTrueLHsExpr e
-isTrueLHsExpr _                   = Nothing
+isTrueLHsExpr (L _ (HsPar _ _ e _)) = isTrueLHsExpr e
+isTrueLHsExpr _                     = Nothing

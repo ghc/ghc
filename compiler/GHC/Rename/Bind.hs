@@ -35,6 +35,7 @@ import GHC.Prelude
 import {-# SOURCE #-} GHC.Rename.Expr( rnExpr, rnLExpr, rnStmts )
 
 import GHC.Hs
+import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Rename.HsType
 import GHC.Rename.Pat
@@ -442,7 +443,8 @@ rnBindLHS name_maker _ bind@(FunBind { fun_id = rdr_name })
 rnBindLHS name_maker _ (PatSynBind x psb@PSB{ psb_id = rdrname })
   | isTopRecNameMaker name_maker
   = do { addLocMA checkConName rdrname
-       ; name <- lookupLocatedTopBndrRnN rdrname -- Should be in scope already
+       ; name <-
+           lookupLocatedTopConstructorRnN rdrname -- Should be in scope already
        ; return (PatSynBind x psb{ psb_ext = noAnn, psb_id = name }) }
 
   | otherwise  -- Pattern synonym, not at top level
@@ -500,8 +502,7 @@ rnBind _ bind@(PatBind { pat_lhs = pat
         -- See Note [Pattern bindings that bind no variables]
         ; whenWOptM Opt_WarnUnusedPatternBinds $
           when (null bndrs && not ok_nobind_pat) $
-          addDiagnostic (WarningWithFlag Opt_WarnUnusedPatternBinds) $
-          unusedPatBindWarn bind'
+          addTcRnDiagnostic (TcRnUnusedPatternBinds bind')
 
         ; fvs' `seq` -- See Note [Free-variable space leak]
           return (bind', bndrs, all_fvs) }
@@ -705,7 +706,7 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
                       ; return ( (pat', InfixCon name1 name2)
                                , mkFVs (map unLoc [name1, name2])) }
                RecCon vars ->
-                   do { checkDupRdrNames (map (rdrNameFieldOcc . recordPatSynField) vars)
+                   do { checkDupRdrNames (map (foLabel . recordPatSynField) vars)
                       ; fls <- lookupConstructorFields name
                       ; let fld_env = mkFsEnv [ (flLabel fl, fl) | fl <- fls ]
                       ; let rnRecordPatSynField
@@ -741,7 +742,7 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
                           , psb_ext = fvs' }
               selector_names = case details' of
                                  RecCon names ->
-                                  map (extFieldOcc . recordPatSynField) names
+                                  map (foExt . recordPatSynField) names
                                  _ -> []
 
         ; fvs' `seq` -- See Note [Free-variable space leak]
@@ -1344,11 +1345,6 @@ nonStdGuardErr :: (Outputable body,
 nonStdGuardErr guards
   = hang (text "accepting non-standard pattern guards (use PatternGuards to suppress this message)")
        4 (interpp'SP guards)
-
-unusedPatBindWarn :: HsBind GhcRn -> SDoc
-unusedPatBindWarn bind
-  = hang (text "This pattern-binding binds no variables:")
-       2 (ppr bind)
 
 dupMinimalSigErr :: [LSig GhcPs] -> RnM ()
 dupMinimalSigErr sigs@(L loc _ : _)

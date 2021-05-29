@@ -1,5 +1,5 @@
 {-# LANGUAGE AllowAmbiguousTypes    #-}
-{-# LANGUAGE CPP                    #-}
+
 {-# LANGUAGE DataKinds              #-}
 {-# LANGUAGE FlexibleContexts       #-}
 {-# LANGUAGE FunctionalDependencies #-}
@@ -28,8 +28,6 @@
 -----------------------------------------------------------------------------
 
 module GHC.HsToCore.Quote( dsBracket ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 import GHC.Platform
@@ -65,6 +63,7 @@ import GHC.Unit.Module
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 import GHC.Utils.Monad
 
@@ -128,7 +127,7 @@ mkMetaWrappers q@(QuoteWrapper quote_var_raw m_var) = do
                           mkInvisFunTyMany (mkClassPred cls (mkTyVarTys (binderVars tyvars)))
                                            (mkClassPred monad_cls (mkTyVarTys (binderVars tyvars)))
 
-      MASSERT2( idType monad_sel `eqType` expected_ty, ppr monad_sel $$ ppr expected_ty)
+      massertPpr (idType monad_sel `eqType` expected_ty) (ppr monad_sel $$ ppr expected_ty)
 
       let m_ty = Type m_var
           -- Construct the contents of MetaWrappers
@@ -285,7 +284,7 @@ repTopDs group@(HsGroup { hs_valds   = valds
                         , hs_docs    = docs })
  = do { let { bndrs  = hsScopedTvBinders valds
                        ++ hsGroupBinders group
-                       ++ map extFieldOcc (hsPatSynSelectors valds)
+                       ++ map foExt (hsPatSynSelectors valds)
             ; instds = tyclds >>= group_instds } ;
         ss <- mkGenSyms bndrs ;
 
@@ -1487,9 +1486,7 @@ repE (HsVar _ (L _ x)) =
 repE (HsIPVar _ n) = rep_implicit_param_name n >>= repImplicitParamVar
 repE (HsOverLabel _ s) = repOverLabel s
 
-repE e@(HsRecFld _ f) = case f of
-  Unambiguous x _ -> repE (HsVar noExtField (noLocA x))
-  Ambiguous{}     -> notHandled "Ambiguous record selectors" (ppr e)
+repE (HsRecSel _ (FieldOcc x _)) = repE (HsVar noExtField (noLocA x))
 
         -- Remember, we're desugaring renamer output here, so
         -- HsOverlit can definitely occur
@@ -1514,7 +1511,7 @@ repE (NegApp _ x _)      = do
                               a         <- repLE x
                               negateVar <- lookupOcc negateName >>= repVar
                               negateVar `repApp` a
-repE (HsPar _ x)            = repLE x
+repE (HsPar _ _ x _)        = repLE x
 repE (SectionL _ x y)       = do { a <- repLE x; b <- repLE y; repSectionL a b }
 repE (SectionR _ x y)       = do { a <- repLE x; b <- repLE y; repSectionR a b }
 repE (HsCase _ e (MG { mg_alts = (L _ ms) }))
@@ -1708,17 +1705,17 @@ repFields (HsRecFields { rec_flds = flds })
   where
     rep_fld :: LHsRecField GhcRn (LHsExpr GhcRn)
             -> MetaM (Core (M TH.FieldExp))
-    rep_fld (L _ fld) = do { fn <- lookupLOcc (hsRecFieldSel fld)
-                           ; e  <- repLE (hsRecFieldArg fld)
+    rep_fld (L _ fld) = do { fn <- lookupOcc (hsRecFieldSel fld)
+                           ; e  <- repLE (hfbRHS fld)
                            ; repFieldExp fn e }
 
 repUpdFields :: [LHsRecUpdField GhcRn] -> MetaM (Core [M TH.FieldExp])
 repUpdFields = repListM fieldExpTyConName rep_fld
   where
     rep_fld :: LHsRecUpdField GhcRn -> MetaM (Core (M TH.FieldExp))
-    rep_fld (L l fld) = case unLoc (hsRecFieldLbl fld) of
+    rep_fld (L l fld) = case unLoc (hfbLHS fld) of
       Unambiguous sel_name _ -> do { fn <- lookupLOcc (L l sel_name)
-                                   ; e  <- repLE (hsRecFieldArg fld)
+                                   ; e  <- repLE (hfbRHS fld)
                                    ; repFieldExp fn e }
       Ambiguous{}            -> notHandled "Ambiguous record updates" (ppr fld)
 
@@ -1796,7 +1793,7 @@ repSts (stmt@RecStmt{} : ss)
        -- Bring all of binders in the recursive group into scope for the
        -- whole group.
        ; (ss1_other,rss) <- addBinds ss1 $ repSts (map unLoc (unLoc $ recS_stmts stmt))
-       ; MASSERT(sort ss1 == sort ss1_other)
+       ; massert (sort ss1 == sort ss1_other)
        ; z <- repRecSt (nonEmptyCoreList rss)
        ; (ss2,zs) <- addBinds ss1 (repSts ss)
        ; return (ss1++ss2, z : zs) }
@@ -1930,7 +1927,7 @@ rep_bind (L loc (PatSynBind _ (PSB { psb_id   = syn
     mkGenArgSyms (InfixCon arg1 arg2) = mkGenSyms [unLoc arg1, unLoc arg2]
     mkGenArgSyms (RecCon fields)
       = do { let pats = map (unLoc . recordPatSynPatVar) fields
-                 sels = map (extFieldOcc . recordPatSynField) fields
+                 sels = map (foExt . recordPatSynField) fields
            ; ss <- mkGenSyms sels
            ; return $ replaceNames (zip sels pats) ss }
 
@@ -1960,7 +1957,7 @@ repPatSynArgs (InfixCon arg1 arg2)
        ; arg2' <- lookupLOcc arg2
        ; repInfixPatSynArgs arg1' arg2' }
 repPatSynArgs (RecCon fields)
-  = do { sels' <- repList nameTyConName (lookupOcc . extFieldOcc) sels
+  = do { sels' <- repList nameTyConName (lookupOcc . foExt) sels
        ; repRecordPatSynArgs sels' }
   where sels = map recordPatSynField fields
 
@@ -2044,7 +2041,7 @@ repP (LazyPat _ p)      = do { p1 <- repLP p; repPtilde p1 }
 repP (BangPat _ p)      = do { p1 <- repLP p; repPbang p1 }
 repP (AsPat _ x p)      = do { x' <- lookupNBinder x; p1 <- repLP p
                              ; repPaspat x' p1 }
-repP (ParPat _ p)       = repLP p
+repP (ParPat _ _ p _)      = repLP p
 repP (ListPat Nothing ps)  = do { qs <- repLPs ps; repPlist qs }
 repP (ListPat (Just (SyntaxExprRn e)) ps) = do { p <- repP (ListPat Nothing ps)
                                                ; e' <- repE e
@@ -2069,8 +2066,8 @@ repP (ConPat NoExtField dc details)
    }
  where
    rep_fld :: LHsRecField GhcRn (LPat GhcRn) -> MetaM (Core (M (TH.Name, TH.Pat)))
-   rep_fld (L _ fld) = do { MkC v <- lookupLOcc (hsRecFieldSel fld)
-                          ; MkC p <- repLP (hsRecFieldArg fld)
+   rep_fld (L _ fld) = do { MkC v <- lookupOcc (hsRecFieldSel fld)
+                          ; MkC p <- repLP (hfbRHS fld)
                           ; rep2 fieldPatName [v,p] }
 repP (NPat _ (L _ l) Nothing _) = do { a <- repOverloadedLiteral l
                                      ; repPlit a }
@@ -2172,7 +2169,7 @@ globalVar name
         ; MkC uni <- coreIntegerLit (toInteger $ getKey (getUnique name))
         ; rep2_nwDsM mkNameLName [occ,uni] }
   where
-      mod = ASSERT( isExternalName name) nameModule name
+      mod = assert (isExternalName name) nameModule name
       name_mod = moduleNameString (moduleName mod)
       name_pkg = unitString (moduleUnit mod)
       name_occ = nameOccName name
@@ -2707,7 +2704,7 @@ repRecConArgs ips = do
       rep_ip (L _ ip) = mapM (rep_one_ip (cd_fld_type ip)) (cd_fld_names ip)
 
       rep_one_ip :: LBangType GhcRn -> LFieldOcc GhcRn -> MetaM (Core (M TH.VarBangType))
-      rep_one_ip t n = do { MkC v  <- lookupOcc (extFieldOcc $ unLoc n)
+      rep_one_ip t n = do { MkC v  <- lookupOcc (foExt $ unLoc n)
                           ; MkC ty <- repBangTy  t
                           ; rep2 varBangTypeName [v,ty] }
 

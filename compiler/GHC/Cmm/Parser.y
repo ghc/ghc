@@ -239,7 +239,8 @@ import qualified GHC.Cmm.Parser.Monad as PD
 import GHC.Cmm.CallConv
 import GHC.Runtime.Heap.Layout
 import GHC.Parser.Lexer
-import GHC.Parser.Errors
+import GHC.Parser.Errors.Types
+import GHC.Parser.Errors.Ppr
 
 import GHC.Types.CostCentre
 import GHC.Types.ForeignCall
@@ -270,8 +271,6 @@ import System.Exit
 import Data.Maybe
 import qualified Data.Map as M
 import qualified Data.ByteString.Char8 as BS8
-
-#include "HsVersions.h"
 }
 
 %expect 0
@@ -920,7 +919,7 @@ getLit _ = panic "invalid literal" -- TODO messy failure
 nameToMachOp :: FastString -> PD (Width -> MachOp)
 nameToMachOp name =
   case lookupUFM machOps name of
-        Nothing -> failMsgPD $ PsError (PsErrCmmParser (CmmUnknownPrimitive name)) []
+        Nothing -> failMsgPD $ \span -> mkPlainErrorMsgEnvelope span $ PsErrCmmParser (CmmUnknownPrimitive name)
         Just m  -> return m
 
 exprOp :: FastString -> [CmmParse CmmExpr] -> PD (CmmParse CmmExpr)
@@ -1029,6 +1028,9 @@ callishMachOps platform = listToUFM $
         ( "memmove", memcpyLikeTweakArgs MO_Memmove ),
         ( "memcmp", memcpyLikeTweakArgs MO_Memcmp ),
 
+        ( "suspendThread", (MO_SuspendThread,) ),
+        ( "resumeThread",  (MO_ResumeThread,) ),
+
         ("prefetch0", (MO_Prefetch_Data 0,)),
         ("prefetch1", (MO_Prefetch_Data 1,)),
         ("prefetch2", (MO_Prefetch_Data 2,)),
@@ -1082,12 +1084,14 @@ parseSafety :: String -> PD Safety
 parseSafety "safe"   = return PlaySafe
 parseSafety "unsafe" = return PlayRisky
 parseSafety "interruptible" = return PlayInterruptible
-parseSafety str      = failMsgPD $ PsError (PsErrCmmParser (CmmUnrecognisedSafety str)) []
+parseSafety str      = failMsgPD $ \span -> mkPlainErrorMsgEnvelope span $
+                                              PsErrCmmParser (CmmUnrecognisedSafety str)
 
 parseCmmHint :: String -> PD ForeignHint
 parseCmmHint "ptr"    = return AddrHint
 parseCmmHint "signed" = return SignedHint
-parseCmmHint str      = failMsgPD $ PsError (PsErrCmmParser (CmmUnrecognisedHint str)) []
+parseCmmHint str      = failMsgPD $ \span -> mkPlainErrorMsgEnvelope span $
+                                               PsErrCmmParser (CmmUnrecognisedHint str)
 
 -- labels are always pointers, so we might as well infer the hint
 inferCmmHint :: CmmExpr -> ForeignHint
@@ -1114,7 +1118,7 @@ happyError = PD $ \_ _ s -> unP srcParseFail s
 stmtMacro :: FastString -> [CmmParse CmmExpr] -> PD (CmmParse ())
 stmtMacro fun args_code = do
   case lookupUFM stmtMacros fun of
-    Nothing -> failMsgPD $ PsError (PsErrCmmParser (CmmUnknownMacro fun)) []
+    Nothing -> failMsgPD $ \span -> mkPlainErrorMsgEnvelope span $ PsErrCmmParser (CmmUnknownMacro fun)
     Just fcode -> return $ do
         args <- sequence args_code
         code (fcode args)
@@ -1217,7 +1221,8 @@ foreignCall conv_string results_code expr_code args_code safety ret
   = do  conv <- case conv_string of
           "C"       -> return CCallConv
           "stdcall" -> return StdCallConv
-          _         -> failMsgPD $ PsError (PsErrCmmParser (CmmUnknownCConv conv_string)) []
+          _         -> failMsgPD $ \span -> mkPlainErrorMsgEnvelope span $
+                                              PsErrCmmParser (CmmUnknownCConv conv_string)
         return $ do
           platform <- getPlatform
           results <- sequence results_code
@@ -1295,7 +1300,7 @@ primCall results_code name args_code
   = do
     platform <- PD.getPlatform
     case lookupUFM (callishMachOps platform) name of
-        Nothing -> failMsgPD $ PsError (PsErrCmmParser (CmmUnknownPrimitive name)) []
+        Nothing -> failMsgPD $ \span -> mkPlainErrorMsgEnvelope span $ PsErrCmmParser (CmmUnknownPrimitive name)
         Just f  -> return $ do
                 results <- sequence results_code
                 args <- sequence args_code
@@ -1450,7 +1455,11 @@ initEnv profile = listToUFM [
   where platform = profilePlatform profile
 
 
-parseCmmFile :: DynFlags -> Module -> HomeUnit -> FilePath -> IO (Bag PsWarning, Bag PsError, Maybe (CmmGroup, [InfoProvEnt]))
+parseCmmFile :: DynFlags
+             -> Module
+             -> HomeUnit
+             -> FilePath
+             -> IO (Messages PsMessage, Messages PsMessage, Maybe (CmmGroup, [InfoProvEnt]))
 parseCmmFile dflags this_mod home_unit filename = do
   buf <- hGetStringBuffer filename
   let
@@ -1473,7 +1482,7 @@ parseCmmFile dflags this_mod home_unit filename = do
               return (cmm ++ cmm2, used_info)
             (cmm, _) = runC dflags no_module st fcode
             (warnings,errors) = getMessages pst
-        if not (isEmptyBag errors)
+        if not (isEmptyMessages errors)
          then return (warnings, errors, Nothing)
          else return (warnings, errors, Just cmm)
   where

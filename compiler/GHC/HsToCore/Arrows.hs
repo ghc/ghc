@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE TypeFamilies #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
@@ -12,8 +12,6 @@ Desugaring arrow commands
 -}
 
 module GHC.HsToCore.Arrows ( dsProcExpr ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -449,7 +447,7 @@ dsCmd ids local_vars stack_ty res_ty
         env_ids
   = dsCmdLam ids local_vars stack_ty res_ty pats body env_ids
 
-dsCmd ids local_vars stack_ty res_ty (HsCmdPar _ cmd) env_ids
+dsCmd ids local_vars stack_ty res_ty (HsCmdPar _ _ cmd _) env_ids
   = dsLCmd ids local_vars stack_ty res_ty cmd env_ids
 
 -- D, xs |- e :: Bool

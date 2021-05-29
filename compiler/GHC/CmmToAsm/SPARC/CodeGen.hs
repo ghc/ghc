@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 
 -----------------------------------------------------------------------------
 --
@@ -16,8 +16,6 @@ module GHC.CmmToAsm.SPARC.CodeGen (
 )
 
 where
-
-#include "HsVersions.h"
 
 -- NCG stuff:
 import GHC.Prelude
@@ -666,6 +664,9 @@ outOfLineMachOp_table mop
         MO_Memset _  -> fsLit "memset"
         MO_Memmove _ -> fsLit "memmove"
         MO_Memcmp _  -> fsLit "memcmp"
+
+        MO_SuspendThread -> fsLit "suspendThread"
+        MO_ResumeThread  -> fsLit "resumeThread"
 
         MO_BSwap w          -> bSwapLabel w
         MO_BRev w           -> bRevLabel w

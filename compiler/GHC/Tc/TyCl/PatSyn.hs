@@ -65,8 +65,6 @@ import Data.Maybe( mapMaybe )
 import Control.Monad ( zipWithM )
 import Data.List( partition, mapAccumL )
 
-#include "HsVersions.h"
-
 {-
 ************************************************************************
 *                                                                      *
@@ -408,7 +406,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
        -- See Note [Checking against a pattern signature]
        ; req_dicts <- newEvVars skol_req_theta
        ; (tclvl, wanted, (lpat', (ex_tvs', prov_dicts, args'))) <-
-           ASSERT2( equalLength arg_names arg_tys, ppr name $$ ppr arg_names $$ ppr arg_tys )
+           assertPpr (equalLength arg_names arg_tys) (ppr name $$ ppr arg_names $$ ppr arg_tys) $
            pushLevelAndCaptureConstraints   $
            tcExtendNameTyVarEnv univ_tv_prs $
            tcCheckPat PatSyn lpat (unrestricted skol_pat_ty)   $
@@ -1025,7 +1023,7 @@ tcPatToExpr name args pat = go pat
         = return $ HsVar noExtField (L l var)
         | otherwise
         = Left (quotes (ppr var) <+> text "is not bound by the LHS of the pattern synonym")
-    go1 (ParPat _ pat)          = fmap (HsPar noAnn) $ go pat
+    go1 (ParPat _ lpar pat rpar) = fmap (\e -> HsPar noAnn lpar e rpar) $ go pat
     go1 p@(ListPat reb pats)
       | Nothing <- reb = do { exprs <- mapM go pats
                             ; return $ ExplicitList noExtField exprs }
@@ -1203,7 +1201,7 @@ tcCollectEx pat = go pat
     go1 :: Pat GhcTc -> ([TyVar], [EvVar])
     go1 (LazyPat _ p)      = go p
     go1 (AsPat _ _ p)      = go p
-    go1 (ParPat _ p)       = go p
+    go1 (ParPat _ _ p _)   = go p
     go1 (BangPat _ p)      = go p
     go1 (ListPat _ ps)     = mergeMany . map go $ ps
     go1 (TuplePat _ ps _)  = mergeMany . map go $ ps
@@ -1225,7 +1223,7 @@ tcCollectEx pat = go pat
       = mergeMany . map goRecFd $ flds
 
     goRecFd :: LHsRecField GhcTc (LPat GhcTc) -> ([TyVar], [EvVar])
-    goRecFd (L _ HsRecField{ hsRecFieldArg = p }) = go p
+    goRecFd (L _ HsFieldBind{ hfbRHS = p }) = go p
 
     merge (vs1, evs1) (vs2, evs2) = (vs1 ++ vs2, evs1 ++ evs2)
     mergeMany = foldr merge empty

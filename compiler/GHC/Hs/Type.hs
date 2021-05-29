@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -51,7 +51,7 @@ module GHC.Hs.Type (
         HsConDetails(..), noTypeArgs,
 
         FieldOcc(..), LFieldOcc, mkFieldOcc,
-        AmbiguousFieldOcc(..), mkAmbiguousFieldOcc,
+        AmbiguousFieldOcc(..), LAmbiguousFieldOcc, mkAmbiguousFieldOcc,
         rdrNameAmbiguousFieldOcc, selectorAmbiguousFieldOcc,
         unambiguousFieldOcc, ambiguousFieldOcc,
 
@@ -84,8 +84,6 @@ module GHC.Hs.Type (
         pprLHsContext,
         hsTypeNeedsParens, parenthesizeHsType, parenthesizeHsContext
     ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -200,7 +198,7 @@ type instance XHsWC              GhcTc b = [Name]
 
 type instance XXHsWildCardBndrs (GhcPass _) _ = NoExtCon
 
-type instance XHsPS GhcPs = NoExtField
+type instance XHsPS GhcPs = EpAnn EpaLocation
 type instance XHsPS GhcRn = HsPSRn
 type instance XHsPS GhcTc = HsPSRn
 
@@ -249,9 +247,9 @@ mkHsWildCardBndrs :: thing -> HsWildCardBndrs GhcPs thing
 mkHsWildCardBndrs x = HsWC { hswc_body = x
                            , hswc_ext  = noExtField }
 
-mkHsPatSigType :: LHsType GhcPs -> HsPatSigType GhcPs
-mkHsPatSigType x = HsPS { hsps_ext  = noExtField
-                        , hsps_body = x }
+mkHsPatSigType :: EpAnn EpaLocation -> LHsType GhcPs -> HsPatSigType GhcPs
+mkHsPatSigType ann x = HsPS { hsps_ext  = ann
+                            , hsps_body = x }
 
 mkEmptyWildCardBndrs :: thing -> HsWildCardBndrs GhcRn thing
 mkEmptyWildCardBndrs x = HsWC { hswc_body = x
@@ -664,7 +662,7 @@ splitLHsQualTy ty
 -- parentheses, hence the suffix @_KP@ (short for \"Keep Parentheses\").
 splitLHsQualTy_KP :: LHsType (GhcPass pass) -> (Maybe (LHsContext (GhcPass pass)), LHsType (GhcPass pass))
 splitLHsQualTy_KP (L _ (HsQualTy { hst_ctxt = ctxt, hst_body = body }))
-                       = (ctxt, body)
+                       = (Just ctxt, body)
 splitLHsQualTy_KP body = (Nothing, body)
 
 -- | Decompose a type class instance type (of the form
@@ -825,6 +823,10 @@ instance OutputableBndr (AmbiguousFieldOcc (GhcPass p)) where
   pprInfixOcc  = pprInfixOcc . rdrNameAmbiguousFieldOcc
   pprPrefixOcc = pprPrefixOcc . rdrNameAmbiguousFieldOcc
 
+instance OutputableBndr (Located (AmbiguousFieldOcc (GhcPass p))) where
+  pprInfixOcc  = pprInfixOcc . unLoc
+  pprPrefixOcc = pprPrefixOcc . unLoc
+
 mkAmbiguousFieldOcc :: LocatedN RdrName -> AmbiguousFieldOcc GhcPs
 mkAmbiguousFieldOcc rdr = Unambiguous noExtField rdr
 
@@ -981,13 +983,12 @@ pprLHsContext :: (OutputableBndrId p)
 pprLHsContext Nothing = empty
 pprLHsContext (Just lctxt)
   | null (unLoc lctxt) = empty
-  | otherwise          = pprLHsContextAlways (Just lctxt)
+  | otherwise          = pprLHsContextAlways lctxt
 
 -- For use in a HsQualTy, which always gets printed if it exists.
 pprLHsContextAlways :: (OutputableBndrId p)
-                    => Maybe (LHsContext (GhcPass p)) -> SDoc
-pprLHsContextAlways Nothing = parens empty <+> darrow
-pprLHsContextAlways (Just (L _ ctxt))
+                    => LHsContext (GhcPass p) -> SDoc
+pprLHsContextAlways (L _ ctxt)
   = case ctxt of
       []       -> parens empty             <+> darrow
       [L _ ty] -> ppr_mono_ty ty           <+> darrow
@@ -1175,7 +1176,7 @@ lhsTypeHasLeadingPromotionQuote ty
 
     go (HsForAllTy{})        = False
     go (HsQualTy{ hst_ctxt = ctxt, hst_body = body})
-      | Just (L _ (c:_)) <- ctxt = goL c
+      | (L _ (c:_)) <- ctxt = goL c
       | otherwise            = goL body
     go (HsBangTy{})          = False
     go (HsRecTy{})           = False
@@ -1241,4 +1242,6 @@ type instance Anno (HsTyVarBndr _flag GhcTc) = SrcSpanAnnA
 type instance Anno (HsOuterTyVarBndrs _ (GhcPass _)) = SrcSpanAnnA
 type instance Anno HsIPName = SrcSpan
 type instance Anno (ConDeclField (GhcPass p)) = SrcSpanAnnA
+
 type instance Anno (FieldOcc (GhcPass p)) = SrcSpan
+type instance Anno (AmbiguousFieldOcc (GhcPass p)) = SrcSpan

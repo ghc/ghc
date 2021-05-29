@@ -33,8 +33,8 @@ instance Functor ParserM where
   fmap = liftM
 
 instance Applicative ParserM where
-  pure  = return
-  (<*>) = ap
+  pure  a = ParserM $ \i s -> Right (i, s, a)
+  (<*>)   = ap
 
 instance Monad ParserM where
     ParserM m >>= k = ParserM $ \i s -> case m i s of
@@ -43,7 +43,6 @@ instance Monad ParserM where
                                                     ParserM y -> y i' s'
                                             Left err ->
                                                 Left err
-    return a = ParserM $ \i s -> Right (i, s, a)
 
 instance MonadFail ParserM where
     fail err = ParserM $ \_ _ -> Left err

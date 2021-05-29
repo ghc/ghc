@@ -6,6 +6,7 @@
     instances with `DerivingVia`. `Generically` instances include `Semigroup` and
     `Monoid`. `Generically1` instances: `Functor`, `Applicative`, `Alternative`,
     `Eq1` and `Ord1`.
+  * Add explicitly bidirectional `pattern TypeRep` to `Type.Reflection`.
 
 ## 4.16.0.0 *TBA*
 

@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -16,8 +16,6 @@
 -- But it's still handy for constructing tests.
 
 module GHC.Driver.Backpack (doBackpack) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -37,7 +35,6 @@ import GHC.Parser
 import GHC.Parser.Header
 import GHC.Parser.Lexer
 import GHC.Parser.Annotation
-import GHC.Parser.Errors.Ppr
 
 import GHC hiding (Failed, Succeeded)
 import GHC.Tc.Utils.Monad
@@ -108,7 +105,7 @@ doBackpack [src_filename] = do
     buf <- liftIO $ hGetStringBuffer src_filename
     let loc = mkRealSrcLoc (mkFastString src_filename) 1 1 -- TODO: not great
     case unP parseBackpack (initParserState (initParserOpts dflags) buf loc) of
-        PFailed pst -> throwErrors (foldPsMessages mkParserErr (getErrorMessages pst))
+        PFailed pst -> throwErrors (GhcPsMessage <$> getErrorMessages pst)
         POk _ pkgname_bkp -> do
             -- OK, so we have an LHsUnit PackageName, but we want an
             -- LHsUnit HsComponentId.  So let's rename it.

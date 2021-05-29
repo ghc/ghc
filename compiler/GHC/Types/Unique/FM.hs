@@ -23,7 +23,7 @@ of arguments of combining function.
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE CPP #-}
+
 {-# OPTIONS_GHC -Wall #-}
 
 module GHC.Types.Unique.FM (
@@ -54,6 +54,7 @@ module GHC.Types.Unique.FM (
         plusUFM_C,
         plusUFM_CD,
         plusUFM_CD2,
+        mergeUFM,
         plusMaybeUFM_C,
         plusUFMList,
         minusUFM,
@@ -77,20 +78,18 @@ module GHC.Types.Unique.FM (
         pprUniqFM, pprUFM, pprUFMWithKeys, pluralUFM
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Types.Unique ( Uniquable(..), Unique, getKey )
 import GHC.Utils.Outputable
-import GHC.Utils.Panic (assertPanic)
-import GHC.Utils.Misc (debugIsOn)
+import GHC.Utils.Panic.Plain
 import qualified Data.IntMap as M
 import qualified Data.IntMap.Strict as MS
 import qualified Data.IntSet as S
 import Data.Data
 import qualified Data.Semigroup as Semi
 import Data.Functor.Classes (Eq1 (..))
+import Data.Coerce
 
 -- | A finite map from @uniques@ of one type to
 -- elements in another type.
@@ -127,7 +126,7 @@ unitDirectlyUFM u v = UFM (M.singleton (getKey u) v)
 -- Note that listToUFM (zip ks vs) performs similarly, but
 -- the explicit recursion avoids relying too much on fusion.
 zipToUFM :: Uniquable key => [key] -> [elt] -> UniqFM key elt
-zipToUFM ks vs = ASSERT( length ks == length vs ) innerZip emptyUFM ks vs
+zipToUFM ks vs = assert (length ks == length vs ) innerZip emptyUFM ks vs
   where
     innerZip ufm (k:kList) (v:vList) = innerZip (addToUFM ufm k v) kList vList
     innerZip ufm _ _ = ufm
@@ -274,6 +273,20 @@ plusUFM_CD2 f (UFM xm) (UFM ym)
       (\_ x y -> Just (Just x `f` Just y))
       (MS.map (\x -> Just x `f` Nothing))
       (MS.map (\y -> Nothing `f` Just y))
+      xm ym
+
+mergeUFM
+  :: (elta -> eltb -> Maybe eltc)
+  -> (UniqFM key elta -> UniqFM key eltc)  -- map X
+  -> (UniqFM key eltb -> UniqFM key eltc) -- map Y
+  -> UniqFM key elta
+  -> UniqFM key eltb
+  -> UniqFM key eltc
+mergeUFM f g h (UFM xm) (UFM ym)
+  = UFM $ MS.mergeWithKey
+      (\_ x y -> (x `f` y))
+      (coerce g)
+      (coerce h)
       xm ym
 
 plusMaybeUFM_C :: (elt -> elt -> Maybe elt)

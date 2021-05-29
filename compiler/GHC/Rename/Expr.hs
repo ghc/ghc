@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP                 #-}
+
 {-# LANGUAGE ConstraintKinds     #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE MultiWayIf          #-}
@@ -24,8 +24,6 @@ module GHC.Rename.Expr (
         rnLExpr, rnExpr, rnStmts,
         AnnoBody
    ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -61,6 +59,7 @@ import GHC.Utils.Misc
 import GHC.Data.List.SetOps ( removeDups )
 import GHC.Utils.Error
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Utils.Outputable as Outputable
 import GHC.Types.SrcLoc
 import GHC.Data.FastString
@@ -212,12 +211,11 @@ rnUnboundVar v =
 
 rnExpr (HsVar _ (L l v))
   = do { dflags <- getDynFlags
-       ; let dup_fields_ok = xopt_DuplicateRecordFields dflags
-       ; mb_name <- lookupExprOccRn dup_fields_ok v
+       ; mb_name <- lookupExprOccRn v
 
        ; case mb_name of {
            Nothing -> rnUnboundVar v ;
-           Just (UnambiguousGre (NormalGreName name))
+           Just (NormalGreName name)
               | name == nilDataConName -- Treat [] as an ExplicitList, so that
                                        -- OverloadedLists works correctly
                                        -- Note [Empty lists] in GHC.Hs.Expr
@@ -226,12 +224,11 @@ rnExpr (HsVar _ (L l v))
 
               | otherwise
               -> finishHsVar (L (na2la l) name) ;
-            Just (UnambiguousGre (FieldGreName fl)) ->
+            Just (FieldGreName fl) ->
               let sel_name = flSelector fl in
-              return ( HsRecFld noExtField (Unambiguous sel_name (L l v) ), unitFV sel_name) ;
-            Just AmbiguousFields ->
-              return ( HsRecFld noExtField (Ambiguous noExtField (L l v) ), emptyFVs) } }
-
+              return ( HsRecSel noExtField (FieldOcc sel_name (L l v) ), unitFV sel_name) ;
+         }
+       }
 
 rnExpr (HsIPVar x v)
   = return (HsIPVar x v, emptyFVs)
@@ -293,7 +290,7 @@ rnExpr (OpApp _ e1 op e2)
         -- should prevent bad things happening.
         ; fixity <- case op' of
               L _ (HsVar _ (L _ n)) -> lookupFixityRn n
-              L _ (HsRecFld _ f)    -> lookupFieldFixityRn f
+              L _ (HsRecSel _ f)    -> lookupFieldFixityRn f
               _ -> return (Fixity NoSourceText minPrecedence InfixL)
                    -- c.f. lookupFixity for unbound
 
@@ -312,19 +309,19 @@ rnExpr (NegApp _ e _)
 rnExpr (HsGetField _ e f)
  = do { (getField, fv_getField) <- lookupSyntaxName getFieldName
       ; (e, fv_e) <- rnLExpr e
-      ; let f' = rnHsFieldLabel f
+      ; let f' = rnDotFieldOcc f
       ; return ( mkExpandedExpr
                    (HsGetField noExtField e f')
-                   (mkGetField getField e (fmap (unLoc . hflLabel) f'))
+                   (mkGetField getField e (fmap (unLoc . dfoLabel) f'))
                , fv_e `plusFV` fv_getField ) }
 
 rnExpr (HsProjection _ fs)
   = do { (getField, fv_getField) <- lookupSyntaxName getFieldName
        ; circ <- lookupOccRn compose_RDR
-       ; let fs' = fmap rnHsFieldLabel fs
+       ; let fs' = fmap rnDotFieldOcc fs
        ; return ( mkExpandedExpr
                     (HsProjection noExtField fs')
-                    (mkProjection getField circ (map (fmap (unLoc . hflLabel)) fs'))
+                    (mkProjection getField circ (map (fmap (unLoc . dfoLabel)) fs'))
                 , unitFV circ `plusFV` fv_getField) }
 
 ------------------------------------------
@@ -336,17 +333,17 @@ rnExpr (HsSpliceE _ splice) = rnSpliceExpr splice
 ---------------------------------------------
 --      Sections
 -- See Note [Parsing sections] in GHC.Parser
-rnExpr (HsPar x (L loc (section@(SectionL {}))))
+rnExpr (HsPar x lpar (L loc (section@(SectionL {}))) rpar)
   = do  { (section', fvs) <- rnSection section
-        ; return (HsPar x (L loc section'), fvs) }
+        ; return (HsPar x lpar (L loc section') rpar, fvs) }
 
-rnExpr (HsPar x (L loc (section@(SectionR {}))))
+rnExpr (HsPar x lpar (L loc (section@(SectionR {}))) rpar)
   = do  { (section', fvs) <- rnSection section
-        ; return (HsPar x (L loc section'), fvs) }
+        ; return (HsPar x lpar (L loc section') rpar, fvs) }
 
-rnExpr (HsPar x e)
+rnExpr (HsPar x lpar e rpar)
   = do  { (e', fvs_e) <- rnLExpr e
-        ; return (HsPar x e', fvs_e) }
+        ; return (HsPar x lpar e' rpar, fvs_e) }
 
 rnExpr expr@(SectionL {})
   = do  { addErr (sectionErr expr); rnSection expr }
@@ -416,7 +413,7 @@ rnExpr (ExplicitSum _ alt arity expr)
 
 rnExpr (RecordCon { rcon_con = con_id
                   , rcon_flds = rec_binds@(HsRecFields { rec_dotdot = dd }) })
-  = do { con_lname@(L _ con_name) <- lookupLocatedOccRn con_id
+  = do { con_lname@(L _ con_name) <- lookupLocatedOccRnConstr con_id
        ; (flds, fvs)   <- rnHsRecFields (HsRecFieldCon con_name) mk_hs_var rec_binds
        ; (flds', fvss) <- mapAndUnzipM rn_field flds
        ; let rec_binds' = HsRecFields { rec_flds = flds', rec_dotdot = dd }
@@ -425,8 +422,8 @@ rnExpr (RecordCon { rcon_con = con_id
                 , fvs `plusFV` plusFVs fvss `addOneFV` con_name) }
   where
     mk_hs_var l n = HsVar noExtField (L (noAnnSrcSpan l) n)
-    rn_field (L l fld) = do { (arg', fvs) <- rnLExpr (hsRecFieldArg fld)
-                            ; return (L l (fld { hsRecFieldArg = arg' }), fvs) }
+    rn_field (L l fld) = do { (arg', fvs) <- rnLExpr (hfbRHS fld)
+                            ; return (L l (fld { hfbRHS = arg' }), fvs) }
 
 rnExpr (RecordUpd { rupd_expr = expr, rupd_flds = rbinds })
   = case rbinds of
@@ -438,7 +435,7 @@ rnExpr (RecordUpd { rupd_expr = expr, rupd_flds = rbinds })
       Right flds ->  -- 'OverloadedRecordUpdate' is in effect. Record dot update desugaring.
         do { ; unlessXOptM LangExt.RebindableSyntax $
                  addErr $ text "RebindableSyntax is required if OverloadedRecordUpdate is enabled."
-             ; let punnedFields = [fld | (L _ fld) <- flds, hsRecPun fld]
+             ; let punnedFields = [fld | (L _ fld) <- flds, hfbPun fld]
              ; punsEnabled <-xoptM LangExt.RecordPuns
              ; unless (null punnedFields || punsEnabled) $
                  addErr $ text "For this to work enable NamedFieldPuns."
@@ -705,11 +702,11 @@ See #18151.
 ************************************************************************
 -}
 
-rnHsFieldLabel :: Located (HsFieldLabel GhcPs) -> Located (HsFieldLabel GhcRn)
-rnHsFieldLabel (L l (HsFieldLabel x label)) = L l (HsFieldLabel x label)
+rnDotFieldOcc :: Located (DotFieldOcc GhcPs) -> Located (DotFieldOcc GhcRn)
+rnDotFieldOcc (L l (DotFieldOcc x label)) = L l (DotFieldOcc x label)
 
 rnFieldLabelStrings :: FieldLabelStrings GhcPs -> FieldLabelStrings GhcRn
-rnFieldLabelStrings (FieldLabelStrings fls) = FieldLabelStrings (map rnHsFieldLabel fls)
+rnFieldLabelStrings (FieldLabelStrings fls) = FieldLabelStrings (map rnDotFieldOcc fls)
 
 {-
 ************************************************************************
@@ -786,9 +783,9 @@ rnCmd (HsCmdLam _ matches)
   = do { (matches', fvMatch) <- rnMatchGroup LambdaExpr rnLCmd matches
        ; return (HsCmdLam noExtField matches', fvMatch) }
 
-rnCmd (HsCmdPar x e)
+rnCmd (HsCmdPar x lpar e rpar)
   = do  { (e', fvs_e) <- rnLCmd e
-        ; return (HsCmdPar x e', fvs_e) }
+        ; return (HsCmdPar x lpar e' rpar, fvs_e) }
 
 rnCmd (HsCmdCase _ expr matches)
   = do { (new_expr, e_fvs) <- rnLExpr expr
@@ -838,7 +835,7 @@ methodNamesCmd (HsCmdArrApp _ _arrow _arg HsHigherOrderApp _rtl)
   = unitFV appAName
 methodNamesCmd (HsCmdArrForm {}) = emptyFVs
 
-methodNamesCmd (HsCmdPar _ c) = methodNamesLCmd c
+methodNamesCmd (HsCmdPar _ _ c _) = methodNamesLCmd c
 
 methodNamesCmd (HsCmdIf _ _ _ c1 c2)
   = methodNamesLCmd c1 `plusFV` methodNamesLCmd c2 `addOneFV` choiceAName
@@ -1670,7 +1667,7 @@ segsToStmts :: Stmt GhcRn (LocatedA (body GhcRn))
 
 segsToStmts _ [] fvs_later = ([], fvs_later)
 segsToStmts empty_rec_stmt ((defs, uses, fwds, ss) : segs) fvs_later
-  = ASSERT( not (null ss) )
+  = assert (not (null ss))
     (new_stmt : later_stmts, later_uses `plusFV` uses)
   where
     (later_stmts, later_uses) = segsToStmts empty_rec_stmt segs fvs_later
@@ -1903,8 +1900,8 @@ mkStmtTreeHeuristic stmts =
 -- using dynamic programming.  /O(n^3)/
 mkStmtTreeOptimal :: [(ExprLStmt GhcRn, FreeVars)] -> ExprStmtTree
 mkStmtTreeOptimal stmts =
-  ASSERT(not (null stmts)) -- the empty case is handled by the caller;
-                           -- we don't support empty StmtTrees.
+  assert (not (null stmts)) $ -- the empty case is handled by the caller;
+                              -- we don't support empty StmtTrees.
   fst (arr ! (0,n))
   where
     n = length stmts - 1
@@ -2148,7 +2145,7 @@ isStrictPattern lpat =
     VarPat{}        -> False
     LazyPat{}       -> False
     AsPat _ _ p     -> isStrictPattern p
-    ParPat _ p      -> isStrictPattern p
+    ParPat _ _ p _  -> isStrictPattern p
     ViewPat _ _ p   -> isStrictPattern p
     SigPat _ p _    -> isStrictPattern p
     BangPat{}       -> True
@@ -2282,13 +2279,13 @@ needJoin _monad_names stmts = (True, stmts)
 isReturnApp :: MonadNames
             -> LHsExpr GhcRn
             -> Maybe (LHsExpr GhcRn, Bool)
-isReturnApp monad_names (L _ (HsPar _ expr)) = isReturnApp monad_names expr
+isReturnApp monad_names (L _ (HsPar _ _ expr _)) = isReturnApp monad_names expr
 isReturnApp monad_names (L _ e) = case e of
   OpApp _ l op r | is_return l, is_dollar op -> Just (r, True)
   HsApp _ f arg  | is_return f               -> Just (arg, False)
   _otherwise -> Nothing
  where
-  is_var f (L _ (HsPar _ e)) = is_var f e
+  is_var f (L _ (HsPar _ _ e _)) = is_var f e
   is_var f (L _ (HsAppType _ e _)) = is_var f e
   is_var f (L _ (HsVar _ (L _ r))) = f r
        -- TODO: I don't know how to get this right for rebindable syntax
@@ -2619,9 +2616,9 @@ mkProjection _ _ [] = panic "mkProjection: The impossible happened"
 -- e.g. Suppose an update like foo.bar = 1.
 --      We calculate the function \a -> setField @"foo" a (setField @"bar" (getField @"foo" a) 1).
 mkProjUpdateSetField :: Name -> Name -> LHsRecProj GhcRn (LHsExpr GhcRn) -> (LHsExpr GhcRn -> LHsExpr GhcRn)
-mkProjUpdateSetField get_field set_field (L _ (HsRecField { hsRecFieldLbl = (L _ (FieldLabelStrings flds')), hsRecFieldArg = arg } ))
+mkProjUpdateSetField get_field set_field (L _ (HsFieldBind { hfbLHS = (L _ (FieldLabelStrings flds')), hfbRHS = arg } ))
   = let {
-      ; flds = map (fmap (unLoc . hflLabel)) flds'
+      ; flds = map (fmap (unLoc . dfoLabel)) flds'
       ; final = last flds  -- quux
       ; fields = init flds   -- [foo, bar, baz]
       ; getters = \a -> foldl' (mkGet get_field) [a] fields  -- Ordered from deep to shallow.
@@ -2644,9 +2641,11 @@ rnHsUpdProjs us = do
   pure (u, plusFVs fvs)
   where
     rnRecUpdProj :: LHsRecUpdProj GhcPs -> RnM (LHsRecUpdProj GhcRn, FreeVars)
-    rnRecUpdProj (L l (HsRecField _ fs arg pun))
+    rnRecUpdProj (L l (HsFieldBind _ fs arg pun))
       = do { (arg, fv) <- rnLExpr arg
-           ; return $ (L l (HsRecField { hsRecFieldAnn = noAnn
-                                       , hsRecFieldLbl = fmap rnFieldLabelStrings fs
-                                       , hsRecFieldArg = arg
-                                       , hsRecPun = pun}), fv) }
+           ; return $
+               (L l (HsFieldBind {
+                         hfbAnn = noAnn
+                       , hfbLHS = fmap rnFieldLabelStrings fs
+                       , hfbRHS = arg
+                       , hfbPun = pun}), fv ) }

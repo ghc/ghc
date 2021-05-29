@@ -12,13 +12,11 @@ case, so that we don't allocate things, save them on the stack, and
 then discover that they aren't needed in the chosen branch.
 -}
 
-{-# LANGUAGE CPP #-}
+
 {-# OPTIONS_GHC -fprof-auto #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module GHC.Core.Opt.FloatIn ( floatInwards ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 import GHC.Platform
@@ -42,6 +40,7 @@ import GHC.Unit.Module.ModGuts
 
 import GHC.Utils.Misc
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 
 {-
 Top-level interface function, @floatInwards@.  Note that we do not
@@ -151,7 +150,7 @@ fiExpr :: Platform
 
 fiExpr _ to_drop (_, AnnLit lit)     = wrapFloats to_drop (Lit lit)
                                        -- See Note [Dead bindings]
-fiExpr _ to_drop (_, AnnType ty)     = ASSERT( null to_drop ) Type ty
+fiExpr _ to_drop (_, AnnType ty)     = assert (null to_drop) $ Type ty
 fiExpr _ to_drop (_, AnnVar v)       = wrapFloats to_drop (Var v)
 fiExpr _ to_drop (_, AnnCoercion co) = wrapFloats to_drop (Coercion co)
 fiExpr platform to_drop (_, AnnCast expr (co_ann, co))
@@ -701,7 +700,7 @@ sepBindsByDropPoint platform is_case drop_pts floaters
   = [] : [[] | _ <- drop_pts]
 
   | otherwise
-  = ASSERT( drop_pts `lengthAtLeast` 2 )
+  = assert (drop_pts `lengthAtLeast` 2) $
     go floaters (map (\fvs -> (fvs, [])) (emptyDVarSet : drop_pts))
   where
     n_alts = length drop_pts

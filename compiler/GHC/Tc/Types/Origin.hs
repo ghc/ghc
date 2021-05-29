@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE LambdaCase #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
@@ -21,8 +21,6 @@ module GHC.Tc.Types.Origin (
   pprCtOrigin, isGivenOrigin
 
   ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -287,7 +285,7 @@ pprSkolInfo RuntimeUnkSkol     = text "Unknown type from GHCi runtime"
 -- UnkSkol
 -- For type variables the others are dealt with by pprSkolTvBinding.
 -- For Insts, these cases should not happen
-pprSkolInfo UnkSkol = WARN( True, text "pprSkolInfo: UnkSkol" ) text "UnkSkol"
+pprSkolInfo UnkSkol = warnPprTrace True (text "pprSkolInfo: UnkSkol") $ text "UnkSkol"
 
 pprSigSkolInfo :: UserTypeCtxt -> TcType -> SDoc
 -- The type is already tidied
@@ -497,9 +495,9 @@ lexprCtOrigin (L _ e) = exprCtOrigin e
 
 exprCtOrigin :: HsExpr GhcRn -> CtOrigin
 exprCtOrigin (HsVar _ (L _ name)) = OccurrenceOf name
-exprCtOrigin (HsGetField _ _ (L _ f)) = HasFieldOrigin (unLoc $ hflLabel f)
+exprCtOrigin (HsGetField _ _ (L _ f)) = HasFieldOrigin (unLoc $ dfoLabel f)
 exprCtOrigin (HsUnboundVar {})    = Shouldn'tHappenOrigin "unbound variable"
-exprCtOrigin (HsRecFld _ f)       = OccurrenceOfRecSel (rdrNameAmbiguousFieldOcc f)
+exprCtOrigin (HsRecSel _ f)       = OccurrenceOfRecSel (unLoc $ foLabel f)
 exprCtOrigin (HsOverLabel _ l)    = OverLabelOrigin l
 exprCtOrigin (ExplicitList {})    = ListOrigin
 exprCtOrigin (HsIPVar _ ip)       = IPOccOrigin ip
@@ -511,7 +509,7 @@ exprCtOrigin (HsApp _ e1 _)       = lexprCtOrigin e1
 exprCtOrigin (HsAppType _ e1 _)   = lexprCtOrigin e1
 exprCtOrigin (OpApp _ _ op _)     = lexprCtOrigin op
 exprCtOrigin (NegApp _ e _)       = lexprCtOrigin e
-exprCtOrigin (HsPar _ e)          = lexprCtOrigin e
+exprCtOrigin (HsPar _ _ e _)      = lexprCtOrigin e
 exprCtOrigin (HsProjection _ _)   = SectionOrigin
 exprCtOrigin (SectionL _ _ _)     = SectionOrigin
 exprCtOrigin (SectionR _ _ _)     = SectionOrigin

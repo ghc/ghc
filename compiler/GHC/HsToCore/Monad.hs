@@ -109,6 +109,7 @@ import GHC.Types.Error
 import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import qualified GHC.Data.Strict as Strict
 
 import Data.IORef
 
@@ -454,7 +455,7 @@ updPmNablas nablas = updLclEnv (\env -> env { dsl_nablas = nablas })
 
 getSrcSpanDs :: DsM SrcSpan
 getSrcSpanDs = do { env <- getLclEnv
-                  ; return (RealSrcSpan (dsl_loc env) Nothing) }
+                  ; return (RealSrcSpan (dsl_loc env) Strict.Nothing) }
 
 putSrcSpanDs :: SrcSpan -> DsM a -> DsM a
 putSrcSpanDs (UnhelpfulSpan {}) thing_inside
@@ -474,7 +475,7 @@ diagnosticDs reason warn
        ; dflags <- getDynFlags
        ; let msg = mkMsgEnvelope dflags loc (ds_unqual env) $
                    DsUnknownMessage $
-                   mkPlainDiagnostic reason warn
+                   mkPlainDiagnostic reason noHints warn
        ; updMutVar (ds_msgs env) (\ msgs -> msg `addMessage` msgs) }
 
 -- | Emit a warning only if the correct WarningWithoutFlag is set in the DynFlags
@@ -489,7 +490,7 @@ errDs err
         ; loc <- getSrcSpanDs
         ; let msg = mkErrorMsgEnvelope loc (ds_unqual env) $
                     DsUnknownMessage $
-                    mkPlainError err
+                    mkPlainError noHints err
         ; updMutVar (ds_msgs env) (\ msgs -> msg `addMessage` msgs) }
 
 -- | Issue an error, but return the expression for (), so that we can continue

@@ -1,5 +1,4 @@
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE NondecreasingIndentation #-}
@@ -29,6 +28,7 @@ module GHC.Driver.Make (
         ms_home_srcimps, ms_home_imps,
 
         summariseModule,
+        summariseFile,
         hscSourceToIsBoot,
         findExtraSigImports,
         implicitRequirementsShallow,
@@ -39,8 +39,6 @@ module GHC.Driver.Make (
 
         ModNodeMap(..), emptyModNodeMap, modNodeMapElems, modNodeMapLookup, modNodeMapInsert
     ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -61,7 +59,6 @@ import GHC.Driver.Backend
 import GHC.Driver.Monad
 import GHC.Driver.Env
 import GHC.Driver.Errors
-import GHC.Driver.Errors.Ppr
 import GHC.Driver.Errors.Types
 import GHC.Driver.Main
 
@@ -78,14 +75,16 @@ import GHC.Data.Maybe      ( expectJust )
 import GHC.Data.StringBuffer
 import qualified GHC.LanguageExtensions as LangExt
 
-import GHC.Utils.Exception ( tryIO )
+import GHC.Utils.Exception ( tryIO, AsyncException(..), evaluate )
 import GHC.Utils.Monad     ( allM )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 import GHC.Utils.Error
 import GHC.Utils.Logger
 import GHC.Utils.TmpFs
+import GHC.Utils.Constants (isWindowsHost)
 
 import GHC.Types.Basic
 import GHC.Types.Error
@@ -119,7 +118,6 @@ import Control.Concurrent ( forkIOWithUnmask, killThread )
 import qualified GHC.Conc as CC
 import Control.Concurrent.MVar
 import Control.Concurrent.QSem
-import Control.Exception
 import Control.Monad
 import Control.Monad.Trans.Except ( ExceptT(..), runExceptT, throwE )
 import qualified Control.Monad.Catch as MC
@@ -426,7 +424,7 @@ load' how_much mHscMessage mod_graph = do
     -- files without corresponding hs files.
     --  bad_boot_mods = [s        | s <- mod_graph, isBootSummary s,
     --                              not (ms_mod_name s `elem` all_home_mods)]
-    -- ASSERT( null bad_boot_mods ) return ()
+    -- assert (null bad_boot_mods ) return ()
 
     -- check that the module given in HowMuch actually exists, otherwise
     -- topSortModuleGraph will bomb later.
@@ -520,8 +518,9 @@ load' how_much mHscMessage mod_graph = do
         -- is stable).
         partial_mg
             | LoadDependenciesOf _mod <- how_much
-            = ASSERT( case last partial_mg0 of
-                        AcyclicSCC (ModuleNode (ExtendedModSummary ms _)) -> ms_mod_name ms == _mod; _ -> False )
+            = assert (case last partial_mg0 of
+                        AcyclicSCC (ModuleNode (ExtendedModSummary ms _)) -> ms_mod_name ms == _mod
+                        _ -> False) $
               List.init partial_mg0
             | otherwise
             = partial_mg0
@@ -659,7 +658,7 @@ load' how_much mHscMessage mod_graph = do
                  || allHpt (isJust.hm_linkable)
                         (filterHpt ((== HsSrcFile).mi_hsc_src.hm_iface)
                                 hpt5)
-          ASSERT( just_linkables ) do
+          assert just_linkables $ do
 
           -- Link everything together
           hsc_env <- getSession
@@ -744,14 +743,12 @@ guessOutputFile = modifySession $ \env ->
         name = fmap dropExtension mainModuleSrcPath
 
         name_exe = do
-#if defined(mingw32_HOST_OS)
           -- we must add the .exe extension unconditionally here, otherwise
           -- when name has an extension of its own, the .exe extension will
           -- not be added by GHC.Driver.Pipeline.exeFileName.  See #2248
-          name' <- fmap (<.> "exe") name
-#else
-          name' <- name
-#endif
+          name' <- if isWindowsHost --FIXME: should be the target platform
+                    then fmap (<.> "exe") name
+                    else name
           mainModuleSrcPath' <- mainModuleSrcPath
           -- #9930: don't clobber input files (unless they ask for it)
           if name' == mainModuleSrcPath'
@@ -1766,7 +1763,7 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
 
           | not (backendProducesObject bcknd), is_stable_bco,
             (bcknd /= NoBackend) `implies` not is_fake_linkable ->
-                ASSERT(isJust old_hmi) -- must be in the old_hpt
+                assert (isJust old_hmi) $ -- must be in the old_hpt
                 let Just hmi = old_hmi in do
                 debug_trace 5 (text "skipping stable BCO mod:" <+> ppr this_mod_name)
                 return hmi
@@ -2411,7 +2408,11 @@ enableCodeGenWhen logger tmpfs condition should_modify staticLife dynLife bcknd 
         let ms' = ms
               { ms_location =
                   ms_location {ml_hi_file = hi_file, ml_obj_file = o_file}
-              , ms_hspp_opts = updOptLevel 0 $ dflags {backend = bcknd}
+              , ms_hspp_opts = updOptLevel 0 $
+                  setOutputFile (Just o_file) $
+                  setDynOutputFile (Just $ dynamicOutputFile dflags o_file) $
+                  setOutputHi (Just hi_file) $
+                  dflags {backend = bcknd}
               }
         pure (ExtendedModSummary ms' bkp_deps)
       | otherwise = return (ExtendedModSummary ms bkp_deps)
@@ -2711,9 +2712,9 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
                        $ DriverFileModuleNameMismatch pi_mod_name wanted_mod
 
         when (hsc_src == HsigFile && isNothing (lookup pi_mod_name (homeUnitInstantiations home_unit))) $
-            let suggestions = suggestInstantiatedWith pi_mod_name (homeUnitInstantiations home_unit)
+            let instantiations = homeUnitInstantiations home_unit
             in throwE $ singleMessage $ mkPlainErrorMsgEnvelope pi_mod_name_loc
-                      $ DriverUnexpectedSignature pi_mod_name (checkBuildingCabalPackage dflags) suggestions
+                      $ DriverUnexpectedSignature pi_mod_name (checkBuildingCabalPackage dflags) instantiations
 
         liftIO $ makeNewModSummary hsc_env $ MakeNewModSummary
             { nms_src_fn = src_fn
@@ -2817,7 +2818,7 @@ getPreprocessedImports hsc_env src_fn mb_phase maybe_buf = do
           let imp_prelude = xopt LangExt.ImplicitPrelude pi_local_dflags
               popts = initParserOpts pi_local_dflags
           mimps <- getImports popts imp_prelude pi_hspp_buf pi_hspp_fn src_fn
-          return (first (mkMessages . fmap mkDriverPsHeaderMessage) mimps)
+          return (first (mkMessages . fmap mkDriverPsHeaderMessage . getMessages) mimps)
   return PreprocessedImports {..}
 
 
@@ -2864,7 +2865,7 @@ withDeferredDiagnostics f = do
 noModError :: HscEnv -> SrcSpan -> ModuleName -> FindResult -> MsgEnvelope GhcMessage
 -- ToDo: we don't have a proper line number for this error
 noModError hsc_env loc wanted_mod err
-  = mkPlainErrorMsgEnvelope loc $ GhcDriverMessage $ DriverUnknownMessage $ mkPlainError $
+  = mkPlainErrorMsgEnvelope loc $ GhcDriverMessage $ DriverUnknownMessage $ mkPlainError noHints $
     cannotFindModule hsc_env wanted_mod err
 
 noHsFileErr :: SrcSpan -> String -> DriverMessages
@@ -2894,7 +2895,7 @@ cyclicModuleErr :: [ModuleGraphNode] -> SDoc
 -- From a strongly connected component we find
 -- a single cycle to report
 cyclicModuleErr mss
-  = ASSERT( not (null mss) )
+  = assert (not (null mss)) $
     case findCycle graph of
        Nothing   -> text "Unexpected non-cycle" <+> ppr mss
        Just path0 -> vcat

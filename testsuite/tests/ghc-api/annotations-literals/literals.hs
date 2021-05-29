@@ -16,6 +16,7 @@ import System.Directory (removeFile)
 import System.Environment( getArgs )
 import qualified Data.Map as Map
 import Data.Dynamic ( fromDynamic,Dynamic )
+import Control.Monad.IO.Class
 
 main::IO()
 main = do
@@ -33,7 +34,7 @@ testOneFile libdir fileName = do
                          , targetContents = Nothing }
         load LoadAllTargets
         modSum <- getModSummary mn
-        toks <- getRichTokenStream (ms_mod modSum)
+        toks <- liftIO $ getRichTokenStream modSum
         return toks
 
     putStrLn (intercalate "\n" [showToks t])

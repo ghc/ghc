@@ -4,7 +4,7 @@
 
 -}
 
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -34,8 +34,6 @@ module GHC.Tc.Gen.Foreign
         , tcForeignExports'
         , tcCheckFEType
         ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 

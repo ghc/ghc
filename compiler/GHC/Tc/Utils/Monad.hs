@@ -1,5 +1,4 @@
 {-# LANGUAGE BangPatterns      #-}
-{-# LANGUAGE CPP               #-}
 {-# LANGUAGE ExplicitForAll    #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RecordWildCards   #-}
@@ -93,7 +92,7 @@ module GHC.Tc.Utils.Monad(
   failWithTc, failWithTcM,
   checkTc, checkTcM,
   failIfTc, failIfTcM,
-  warnIfFlag, warnIf, diagnosticTc, diagnosticTcM,
+  warnIfFlag, warnIf, diagnosticTc, diagnosticTcM, addDetailedDiagnostic, addTcRnDiagnostic,
   addDiagnosticTc, addDiagnosticTcM, addDiagnostic, addDiagnosticAt, add_diagnostic,
   mkErrInfo,
 
@@ -148,8 +147,6 @@ module GHC.Tc.Utils.Monad(
   module GHC.Data.IOEnv
   ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 
@@ -188,8 +185,10 @@ import GHC.Data.Maybe
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Error
 import GHC.Utils.Panic
+import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Misc
 import GHC.Utils.Logger
+import qualified GHC.Data.Strict as Strict
 
 import GHC.Types.Error
 import GHC.Types.Fixity.Env
@@ -898,7 +897,7 @@ addDependentFiles fs = do
 
 getSrcSpanM :: TcRn SrcSpan
         -- Avoid clash with Name.getSrcLoc
-getSrcSpanM = do { env <- getLclEnv; return (RealSrcSpan (tcl_loc env) Nothing) }
+getSrcSpanM = do { env <- getLclEnv; return (RealSrcSpan (tcl_loc env) Strict.Nothing) }
 
 -- See Note [Error contexts in generated code]
 inGeneratedCode :: TcRn Bool
@@ -1040,7 +1039,7 @@ mkLongErrAt loc msg extra
          let msg' = pprWithUnitState unit_state msg in
          return $ mkErrorMsgEnvelope loc printer
                 $ TcRnUnknownMessage
-                $ mkDecoratedError [msg', extra] }
+                $ mkDecoratedError noHints [msg', extra] }
 
 mkTcRnMessage :: DiagnosticReason
               -> SrcSpan
@@ -1060,7 +1059,7 @@ mkTcRnMessage reason loc important context extra
          in
          return $ mkMsgEnvelope dflags loc printer
                 $ TcRnUnknownMessage
-                $ mkDecoratedDiagnostic reason errDocs }
+                $ mkDecoratedDiagnostic reason noHints errDocs }
 
 addLongErrAt :: SrcSpan -> SDoc -> SDoc -> TcRn ()
 addLongErrAt loc msg extra = mkLongErrAt loc msg extra >>= reportDiagnostic
@@ -1550,6 +1549,25 @@ addDiagnosticTcM reason (env0, msg)
 addDiagnostic :: DiagnosticReason -> SDoc -> TcRn ()
 addDiagnostic reason msg = add_diagnostic reason msg Outputable.empty
 
+-- | A variation of 'addDiagnostic' that takes a function to produce a 'TcRnDsMessage'
+-- given some additional context about the diagnostic.
+addDetailedDiagnostic :: (ErrInfo -> TcRnMessage) -> TcM ()
+addDetailedDiagnostic mkMsg = do
+  loc <- getSrcSpanM
+  printer <- getPrintUnqualified
+  dflags  <- getDynFlags
+  env0 <- tcInitTidyEnv
+  ctxt <- getErrCtxt
+  err_info <- mkErrInfo env0 ctxt
+  reportDiagnostic (mkMsgEnvelope dflags loc printer (mkMsg (ErrInfo err_info)))
+
+addTcRnDiagnostic :: TcRnMessage -> TcM ()
+addTcRnDiagnostic msg = do
+  loc <- getSrcSpanM
+  printer <- getPrintUnqualified
+  dflags  <- getDynFlags
+  reportDiagnostic (mkMsgEnvelope dflags loc printer msg)
+
 -- | Display a diagnostic for a given source location.
 addDiagnosticAt :: DiagnosticReason -> SrcSpan -> SDoc -> TcRn ()
 addDiagnosticAt reason loc msg = add_diagnostic_at reason loc msg Outputable.empty
@@ -1568,7 +1586,7 @@ add_diagnostic_at reason loc msg extra_info
          dflags  <- getDynFlags ;
          let { dia = mkMsgEnvelope dflags loc printer $
                      TcRnUnknownMessage $
-                     mkDecoratedDiagnostic reason [msg, extra_info] } ;
+                     mkDecoratedDiagnostic reason noHints [msg, extra_info] } ;
          reportDiagnostic dia }
 
 

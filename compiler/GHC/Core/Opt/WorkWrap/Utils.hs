@@ -4,7 +4,7 @@
 A library for the ``worker\/wrapper'' back-end to the strictness analyser
 -}
 
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE ViewPatterns #-}
 
 module GHC.Core.Opt.WorkWrap.Utils
@@ -15,8 +15,6 @@ module GHC.Core.Opt.WorkWrap.Utils
    , isWorkerSmallEnough
    )
 where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -51,6 +49,7 @@ import GHC.Types.Name ( getOccFS )
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Data.FastString
@@ -189,7 +188,8 @@ mkWwBodies opts rhs_fvs fun_id demands cpr_info
         ; (useful2, wrap_fn_cpr, work_fn_cpr, cpr_res_ty)
               <- mkWWcpr_entry opts res_ty cpr_info
 
-        ; let (work_lam_args, work_call_args) = mkWorkerArgs (wo_fun_to_thunk opts) work_args cpr_res_ty
+        ; let (work_lam_args, work_call_args) = mkWorkerArgs fun_id (wo_fun_to_thunk opts)
+                                                             work_args cpr_res_ty
               worker_args_dmds = [idDemandInfo v | v <- work_call_args, isId v]
               wrapper_body = wrap_fn_args . wrap_fn_cpr . wrap_fn_str . applyToVars work_call_args . Var
               worker_body = mkLams work_lam_args. work_fn_str . work_fn_cpr . work_fn_args
@@ -228,9 +228,9 @@ mkWwBodies opts rhs_fvs fun_id demands cpr_info
     too_many_args_for_join_point wrap_args
       | Just join_arity <- mb_join_arity
       , wrap_args `lengthExceeds` join_arity
-      = WARN(True, text "Unable to worker/wrapper join point with arity " <+>
+      = warnPprTrace True (text "Unable to worker/wrapper join point with arity " <+>
                      int join_arity <+> text "but" <+>
-                     int (length wrap_args) <+> text "args")
+                     int (length wrap_args) <+> text "args") $
         True
       | otherwise
       = False
@@ -302,31 +302,39 @@ add a void argument.  E.g.
 We use the state-token type which generates no code.
 -}
 
-mkWorkerArgs :: Bool
+mkWorkerArgs :: Id      -- The wrapper Id
+             -> Bool
              -> [Var]
              -> Type    -- Type of body
              -> ([Var], -- Lambda bound args
                  [Var]) -- Args at call site
-mkWorkerArgs fun_to_thunk args res_ty
-    | any isId args || not needsAValueLambda
-    = (args, args)
-    | otherwise
+mkWorkerArgs wrap_id fun_to_thunk args res_ty
+    | not (isJoinId wrap_id) -- Join Ids never need an extra arg
+    , not (any isId args)    -- No existing value lambdas
+    , needs_a_value_lambda   -- and we need to add one
     = (args ++ [voidArgId], args ++ [voidPrimId])
+
+    | otherwise
+    = (args, args)
     where
-      -- See "Making wrapper args" section above
-      needsAValueLambda =
-        lifted
-        -- We may encounter a levity-polymorphic result, in which case we
-        -- conservatively assume that we have laziness that needs preservation.
-        -- See #15186.
-        || not fun_to_thunk
-           -- see Note [Protecting the last value argument]
+      -- If fun_to_thunk is False we always keep at least one value
+      --   argument: see Note [Protecting the last value argument]
+      -- If it is True, we only need to keep a value argument if
+      --   the result type is (or might be) unlifted, in which case
+      --   dropping the last arg would mean we wrongly used call-by-value
+      needs_a_value_lambda
+        = not fun_to_thunk
+          || might_be_unlifted
 
       -- Might the result be lifted?
-      lifted =
-        case isLiftedType_maybe res_ty of
-          Just lifted -> lifted
-          Nothing     -> True
+      --     False => definitely lifted
+      --     True  => might be unlifted
+      -- We may encounter a levity-polymorphic result, in which case we
+      -- conservatively assume that we have laziness that needs
+      -- preservation. See #15186.
+      might_be_unlifted = case isLiftedType_maybe res_ty of
+                            Just lifted -> not lifted
+                            Nothing     -> True
 
 {-
 Note [Protecting the last value argument]
@@ -344,7 +352,6 @@ so f can't be inlined *under a lambda*.
 
 Note [Join points and beta-redexes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 Originally, the worker would invoke the original function by calling it with
 arguments, thus producing a beta-redex for the simplifier to munch away:
 
@@ -375,7 +382,6 @@ worry about hygiene, but luckily wy is freshly generated.)
 
 Note [Join points returning functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 It is crucial that the arity of a join point depends on its *callers,* not its
 own syntax. What this means is that a join point can have "extra lambdas":
 
@@ -495,7 +501,7 @@ mkWWargs subst fun_ty demands
                   res_ty) }
 
   | otherwise
-  = WARN( True, ppr fun_ty )                          -- Should not happen: if there is a demand
+  = warnPprTrace True (ppr fun_ty) $                  -- Should not happen: if there is a demand
     return ([], nop_fn, nop_fn, substTy subst fun_ty) -- then there should be a function arrow
   where
     -- See Note [Join points and beta-redexes]
@@ -663,7 +669,7 @@ wantToUnboxResult fam_envs ty cpr
 
   where
     -- | See Note [non-algebraic or open body type warning]
-    open_body_ty_warning = WARN( True, text "wantToUnboxResult: non-algebraic or open body type" <+> ppr ty ) Nothing
+    open_body_ty_warning = warnPprTrace True (text "wantToUnboxResult: non-algebraic or open body type" <+> ppr ty) Nothing
 
 isLinear :: Scaled a -> Bool
 isLinear (Scaled w _ ) =
@@ -1017,7 +1023,7 @@ mk_absent_let opts arg
   -- Catch all: Either @arg_ty@ wasn't of form @TYPE rep@ or @rep@ wasn't mono rep.
   -- See (3) in Note [Absent fillers]
   | Nothing <- mb_mono_prim_reps
-  = WARN( True, text "No absent value for" <+> ppr arg_ty )
+  = warnPprTrace True (text "No absent value for" <+> ppr arg_ty) $
     Nothing
   where
     arg_ty = idType arg
@@ -1365,8 +1371,8 @@ mkWWcpr _opts vars []   =
   return (False, toOL vars, nop_fn, nop_fn)
 mkWWcpr opts  vars cprs = do
   -- No existentials in 'vars'. 'wantToUnboxResult' should have checked that.
-  MASSERT2( not (any isTyVar vars), ppr vars $$ ppr cprs )
-  MASSERT2( equalLength vars cprs, ppr vars $$ ppr cprs )
+  massertPpr (not (any isTyVar vars)) (ppr vars $$ ppr cprs)
+  massertPpr (equalLength vars cprs) (ppr vars $$ ppr cprs)
   (usefuls, varss, wrap_build_ress, work_unpack_ress) <-
     unzip4 <$> zipWithM (mkWWcpr_one opts) vars cprs
   return ( or usefuls
@@ -1377,7 +1383,7 @@ mkWWcpr opts  vars cprs = do
 mkWWcpr_one :: WwOpts -> Id -> Cpr -> UniqSM CprWwResult
 -- ^ See if we want to unbox the result and hand off to 'unbox_one_result'.
 mkWWcpr_one opts res_bndr cpr
-  | ASSERT( not (isTyVar res_bndr) ) True
+  | assert (not (isTyVar res_bndr) ) True
   , Unbox dcpc arg_cprs <- wantToUnboxResult (wo_fam_envs opts) (idType res_bndr) cpr
   = unbox_one_result opts res_bndr arg_cprs dcpc
   | otherwise
@@ -1397,7 +1403,7 @@ unbox_one_result opts res_bndr arg_cprs
   pat_bndrs_uniqs <- getUniquesM
   let (_exs, arg_ids) =
         dataConRepFSInstPat (repeat ww_prefix) pat_bndrs_uniqs cprCaseBndrMult dc tc_args
-  MASSERT( null _exs ) -- Should have been caught by wantToUnboxResult
+  massert (null _exs) -- Should have been caught by wantToUnboxResult
 
   let -- con_app = (C a b |> sym co)
       con_app = mkConApp2 dc tc_args arg_ids `mkCast` mkSymCo co

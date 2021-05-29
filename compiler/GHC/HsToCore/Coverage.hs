@@ -518,8 +518,7 @@ addBinTickLHsExpr boxLabel (L pos e0)
 addTickHsExpr :: HsExpr GhcTc -> TM (HsExpr GhcTc)
 addTickHsExpr e@(HsVar _ (L _ id))  = do freeVar id; return e
 addTickHsExpr e@(HsUnboundVar {})   = return e
-addTickHsExpr e@(HsRecFld _ (Ambiguous id _))   = do freeVar id; return e
-addTickHsExpr e@(HsRecFld _ (Unambiguous id _)) = do freeVar id; return e
+addTickHsExpr e@(HsRecSel _ (FieldOcc id _))   = do freeVar id; return e
 
 addTickHsExpr e@(HsIPVar {})     = return e
 addTickHsExpr e@(HsOverLit {})   = return e
@@ -544,8 +543,9 @@ addTickHsExpr (NegApp x e neg) =
         liftM2 (NegApp x)
                 (addTickLHsExpr e)
                 (addTickSyntaxExpr hpcSrcSpan neg)
-addTickHsExpr (HsPar x e) =
-        liftM (HsPar x) (addTickLHsExprEvalInner e)
+addTickHsExpr (HsPar x lpar e rpar) = do
+        e' <- addTickLHsExprEvalInner e
+        return (HsPar x lpar e' rpar)
 addTickHsExpr (SectionL x e1 e2) =
         liftM2 (SectionL x)
                 (addTickLHsExpr e1)
@@ -870,7 +870,9 @@ addTickHsCmd (OpApp e1 c2 fix c3) =
                 (return fix)
                 (addTickLHsCmd c3)
 -}
-addTickHsCmd (HsCmdPar x e) = liftM (HsCmdPar x) (addTickLHsCmd e)
+addTickHsCmd (HsCmdPar x lpar e rpar) = do
+        e' <- addTickLHsCmd e
+        return (HsCmdPar x lpar e' rpar)
 addTickHsCmd (HsCmdCase x e mgs) =
         liftM2 (HsCmdCase x)
                 (addTickLHsExpr e)
@@ -993,11 +995,11 @@ addTickHsRecordBinds (HsRecFields fields dd)
   = do  { fields' <- mapM addTickHsRecField fields
         ; return (HsRecFields fields' dd) }
 
-addTickHsRecField :: LHsRecField' GhcTc id (LHsExpr GhcTc)
-                  -> TM (LHsRecField' GhcTc id (LHsExpr GhcTc))
-addTickHsRecField (L l (HsRecField x id expr pun))
+addTickHsRecField :: LHsFieldBind GhcTc id (LHsExpr GhcTc)
+                  -> TM (LHsFieldBind GhcTc id (LHsExpr GhcTc))
+addTickHsRecField (L l (HsFieldBind x id expr pun))
         = do { expr' <- addTickLHsExpr expr
-             ; return (L l (HsRecField x id expr' pun)) }
+             ; return (L l (HsFieldBind x id expr' pun)) }
 
 addTickArithSeqInfo :: ArithSeqInfo GhcTc -> TM (ArithSeqInfo GhcTc)
 addTickArithSeqInfo (From e1) =

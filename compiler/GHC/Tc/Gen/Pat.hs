@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TupleSections #-}
@@ -24,8 +24,6 @@ module GHC.Tc.Gen.Pat
    , polyPatSig
    )
 where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -65,6 +63,7 @@ import GHC.Types.Var.Set
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import qualified GHC.LanguageExtensions as LangExt
 import Control.Arrow  ( second )
 import Control.Monad
@@ -221,7 +220,7 @@ tcPatBndr penv@(PE { pe_ctxt = LetPat { pc_lvl    = bind_lvl
   | otherwise                          -- No signature
   = do { (co, bndr_ty) <- case scaledThing exp_pat_ty of
              Check pat_ty    -> promoteTcType bind_lvl pat_ty
-             Infer infer_res -> ASSERT( bind_lvl == ir_lvl infer_res )
+             Infer infer_res -> assert (bind_lvl == ir_lvl infer_res) $
                                 -- If we were under a constructor that bumped the
                                 -- level, we'd be in checking mode (see tcConArg)
                                 -- hence this assertion
@@ -339,7 +338,7 @@ tc_lpat pat_ty penv (L span pat) thing_inside
 tc_lpats :: [Scaled ExpSigmaType]
          -> Checker [LPat GhcRn] [LPat GhcTc]
 tc_lpats tys penv pats
-  = ASSERT2( equalLength pats tys, ppr pats $$ ppr tys )
+  = assertPpr (equalLength pats tys) (ppr pats $$ ppr tys) $
     tcMultiple (\ penv' (p,t) -> tc_lpat t penv' p)
                penv
                (zipEqual "tc_lpats" pats tys)
@@ -364,9 +363,9 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
         ; pat_ty <- readExpType (scaledThing pat_ty)
         ; return (mkHsWrapPat (wrap <.> mult_wrap) (VarPat x (L l id)) pat_ty, res) }
 
-  ParPat x pat -> do
+  ParPat x lpar pat rpar -> do
         { (pat', res) <- tc_lpat pat_ty penv pat thing_inside
-        ; return (ParPat x pat', res) }
+        ; return (ParPat x lpar pat' rpar, res) }
 
   BangPat x pat -> do
         { (pat', res) <- tc_lpat pat_ty penv pat thing_inside
@@ -536,8 +535,8 @@ Fortunately that's what matchExpectedFunTySigma returns anyway.
                 | otherwise        = unmangled_result
 
         ; pat_ty <- readExpType (scaledThing pat_ty)
-        ; ASSERT( con_arg_tys `equalLength` pats ) -- Syntactically enforced
-          return (mkHsWrapPat coi possibly_mangled_result pat_ty, res)
+        ; massert (con_arg_tys `equalLength` pats) -- Syntactically enforced
+        ; return (mkHsWrapPat coi possibly_mangled_result pat_ty, res)
         }
 
   SumPat _ pat alt arity  -> do
@@ -1246,13 +1245,13 @@ tcConArgs con_like arg_tys tenv penv con_args thing_inside = case con_args of
       tc_field :: Checker (LHsRecField GhcRn (LPat GhcRn))
                           (LHsRecField GhcTc (LPat GhcTc))
       tc_field penv
-               (L l (HsRecField ann (L loc (FieldOcc sel (L lr rdr))) pat pun))
+               (L l (HsFieldBind ann (L loc (FieldOcc sel (L lr rdr))) pat pun))
                thing_inside
         = do { sel'   <- tcLookupId sel
              ; pat_ty <- setSrcSpan loc $ find_field_ty sel
                                             (occNameFS $ rdrNameOcc rdr)
              ; (pat', res) <- tcConArg penv (pat, pat_ty) thing_inside
-             ; return (L l (HsRecField ann (L loc (FieldOcc sel' (L lr rdr))) pat'
+             ; return (L l (HsFieldBind ann (L loc (FieldOcc sel' (L lr rdr))) pat'
                                                                         pun), res) }
 
 
@@ -1271,7 +1270,7 @@ tcConArgs con_like arg_tys tenv penv con_args thing_inside = case con_args of
                 -- The normal case, when the field comes from the right constructor
            (pat_ty : extras) -> do
                 traceTc "find_field" (ppr pat_ty <+> ppr extras)
-                ASSERT( null extras ) (return pat_ty)
+                assert (null extras) (return pat_ty)
 
       field_tys :: [(FieldLabel, Scaled TcType)]
       field_tys = zip (conLikeFieldLabels con_like) arg_tys

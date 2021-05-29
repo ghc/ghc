@@ -4,6 +4,7 @@
 {-# LANGUAGE DeriveDataTypeable      #-}
 {-# LANGUAGE EmptyCase               #-}
 {-# LANGUAGE EmptyDataDeriving       #-}
+{-# LANGUAGE StandaloneDeriving      #-}
 {-# LANGUAGE FlexibleContexts        #-}
 {-# LANGUAGE FlexibleInstances       #-}
 {-# LANGUAGE GADTs                   #-}
@@ -22,6 +23,7 @@ module Language.Haskell.Syntax.Extension where
 
 import GHC.Prelude
 
+import GHC.TypeLits (Symbol, KnownSymbol)
 import Data.Data hiding ( Fixity )
 import Data.Kind (Type)
 import GHC.Utils.Outputable
@@ -385,7 +387,7 @@ type family XXInjectivityAnn  x
 
 type family XVar            x
 type family XUnboundVar     x
-type family XRecFld         x
+type family XRecSel         x
 type family XOverLabel      x
 type family XIPVar          x
 type family XOverLitE       x
@@ -425,9 +427,9 @@ type family XPragE          x
 type family XXExpr          x
 
 -- -------------------------------------
--- FieldLabel type families
-type family XCHsFieldLabel  x
-type family XXHsFieldLabel  x
+-- DotFieldOcc type families
+type family XCDotFieldOcc  x
+type family XXDotFieldOcc  x
 
 -- -------------------------------------
 -- HsPragE type families
@@ -562,25 +564,25 @@ type family XXOverLit x
 -- =====================================================================
 -- Type families for the HsPat extension points
 
-type family XWildPat    x
-type family XVarPat     x
-type family XLazyPat    x
-type family XAsPat      x
-type family XParPat     x
-type family XBangPat    x
-type family XListPat    x
-type family XTuplePat   x
-type family XSumPat     x
-type family XConPat     x
-type family XViewPat    x
-type family XSplicePat  x
-type family XLitPat     x
-type family XNPat       x
-type family XNPlusKPat  x
-type family XSigPat     x
-type family XCoPat      x
-type family XXPat       x
-type family XHsRecField x
+type family XWildPat     x
+type family XVarPat      x
+type family XLazyPat     x
+type family XAsPat       x
+type family XParPat      x
+type family XBangPat     x
+type family XListPat     x
+type family XTuplePat    x
+type family XSumPat      x
+type family XConPat      x
+type family XViewPat     x
+type family XSplicePat   x
+type family XLitPat      x
+type family XNPat        x
+type family XNPlusKPat   x
+type family XSigPat      x
+type family XCoPat       x
+type family XXPat        x
+type family XHsFieldBind x
 
 -- =====================================================================
 -- Type families for the HsTypes type families
@@ -693,3 +695,14 @@ type family NoGhcTc (p :: Type)
 -- =====================================================================
 -- End of Type family definitions
 -- =====================================================================
+
+
+
+-- =====================================================================
+-- Token information
+
+type LHsToken tok p = XRec p (HsToken tok)
+
+data HsToken (tok :: Symbol) = HsTok
+
+deriving instance KnownSymbol tok => Data (HsToken tok)

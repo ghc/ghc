@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -6,6 +6,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
                                       -- in module Language.Haskell.Syntax.Extension
 {-
@@ -46,15 +47,13 @@ module Language.Haskell.Syntax.Type (
         HsConDetails(..), noTypeArgs,
 
         FieldOcc(..), LFieldOcc,
-        AmbiguousFieldOcc(..),
+        AmbiguousFieldOcc(..), LAmbiguousFieldOcc,
 
         mapHsOuterImplicit,
         hsQTvExplicit,
         isHsKindedTyVar,
         hsPatSigType,
     ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -735,7 +734,7 @@ data HsType pass
 
   | HsQualTy   -- See Note [HsType binders]
       { hst_xqual :: XQualTy pass
-      , hst_ctxt  :: Maybe (LHsContext pass)  -- Context C => blah
+      , hst_ctxt  :: LHsContext pass  -- Context C => blah
       , hst_body  :: LHsType pass }
 
   | HsTyVar  (XTyVar pass)
@@ -1295,33 +1294,39 @@ type LFieldOcc pass = XRec pass (FieldOcc pass)
 
 -- | Field Occurrence
 --
--- Represents an *occurrence* of an unambiguous field.  This may or may not be a
+-- Represents an *occurrence* of a field. This may or may not be a
 -- binding occurrence (e.g. this type is used in 'ConDeclField' and
--- 'RecordPatSynField' which bind their fields, but also in 'HsRecField' for
--- record construction and patterns, which do not).
+-- 'RecordPatSynField' which bind their fields, but also in
+-- 'HsRecField' for record construction and patterns, which do not).
 --
--- We store both the 'RdrName' the user originally wrote, and after the renamer,
--- the selector function.
-data FieldOcc pass = FieldOcc { extFieldOcc     :: XCFieldOcc pass
-                              , rdrNameFieldOcc :: LocatedN RdrName
-                                 -- ^ See Note [Located RdrNames] in "GHC.Hs.Expr"
-                              }
+-- We store both the 'RdrName' the user originally wrote, and after
+-- the renamer we use the extension field to store the selector
+-- function.
+data FieldOcc pass
+  = FieldOcc {
+        foExt :: XCFieldOcc pass
+      , foLabel :: XRec pass RdrName -- See Note [Located RdrNames] in Language.Haskell.Syntax.Expr
+      }
+  | XFieldOcc !(XXFieldOcc pass)
+deriving instance (
+    Eq (XRec pass RdrName)
+  , Eq (XCFieldOcc pass)
+  , Eq (XXFieldOcc pass)
+  ) => Eq (FieldOcc pass)
 
-  | XFieldOcc
-      !(XXFieldOcc pass)
+instance Outputable (XRec pass RdrName) => Outputable (FieldOcc pass) where
+  ppr = ppr . foLabel
 
-deriving instance (Eq (XCFieldOcc pass), Eq (XXFieldOcc pass)) => Eq (FieldOcc pass)
+instance (UnXRec pass, OutputableBndr (XRec pass RdrName)) => OutputableBndr (FieldOcc pass) where
+  pprInfixOcc  = pprInfixOcc . unXRec @pass . foLabel
+  pprPrefixOcc = pprPrefixOcc . unXRec @pass . foLabel
 
-instance Outputable (FieldOcc pass) where
-  ppr = ppr . rdrNameFieldOcc
-
-instance OutputableBndr (FieldOcc pass) where
-  pprInfixOcc  = pprInfixOcc . unLoc . rdrNameFieldOcc
-  pprPrefixOcc = pprPrefixOcc . unLoc . rdrNameFieldOcc
-
-instance OutputableBndr (GenLocated SrcSpan (FieldOcc pass)) where
+instance (UnXRec pass, OutputableBndr (XRec pass RdrName)) => OutputableBndr (GenLocated SrcSpan (FieldOcc pass)) where
   pprInfixOcc  = pprInfixOcc . unLoc
   pprPrefixOcc = pprPrefixOcc . unLoc
+
+-- | Located Ambiguous Field Occurence
+type LAmbiguousFieldOcc pass = XRec pass (AmbiguousFieldOcc pass)
 
 -- | Ambiguous Field Occurrence
 --
@@ -1332,9 +1337,8 @@ instance OutputableBndr (GenLocated SrcSpan (FieldOcc pass)) where
 -- (for unambiguous occurrences) or the typechecker (for ambiguous
 -- occurrences).
 --
--- See Note [HsRecField and HsRecUpdField] in "GHC.Hs.Pat" and
--- Note [Disambiguating record fields] in "GHC.Tc.Gen.Head".
--- See Note [Located RdrNames] in "GHC.Hs.Expr"
+-- See Note [HsRecField and HsRecUpdField] in "GHC.Hs.Pat".
+-- See Note [Located RdrNames] in "GHC.Hs.Expr".
 data AmbiguousFieldOcc pass
   = Unambiguous (XUnambiguous pass) (LocatedN RdrName)
   | Ambiguous   (XAmbiguous pass)   (LocatedN RdrName)

@@ -1,5 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE NondecreasingIndentation #-}
 
 {-# OPTIONS_GHC -fprof-auto-top #-}
@@ -40,8 +40,7 @@ module GHC.Driver.Main
 
     -- * Compiling complete source files
     , Messager, batchMsg
-    , HscStatus (..)
-    , hscIncrementalCompile
+    , HscBackendAction (..), HscRecompStatus (..)
     , initModDetails
     , hscMaybeWriteIface
     , hscCompileCmmFile
@@ -50,11 +49,14 @@ module GHC.Driver.Main
     , hscInteractive
 
     -- * Running passes separately
+    , hscRecompStatus
     , hscParse
     , hscTypecheckRename
+    , hscTypecheckAndGetWarnings
     , hscDesugar
     , makeSimpleDetails
     , hscSimplify -- ToDo, shouldn't really export this
+    , hscDesugarAndSimplify
 
     -- * Safe Haskell
     , hscCheckSafe
@@ -143,8 +145,6 @@ import GHC.Core.FamInstEnv
 import GHC.CoreToStg.Prep
 import GHC.CoreToStg    ( coreToStg )
 
-import GHC.Parser.Errors
-import GHC.Parser.Errors.Ppr
 import GHC.Parser.Errors.Types
 import GHC.Parser
 import GHC.Parser.Lexer as Lexer
@@ -198,7 +198,6 @@ import GHC.Types.IPE
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc
 import GHC.Types.Name
-import GHC.Types.Name.Env
 import GHC.Types.Name.Cache ( initNameCache )
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Ppr
@@ -207,6 +206,7 @@ import GHC.Types.HpcInfo
 
 import GHC.Utils.Fingerprint ( Fingerprint )
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
@@ -231,10 +231,7 @@ import qualified Data.Set as S
 import Data.Set (Set)
 import Data.Functor
 import Control.DeepSeq (force)
-import Data.Bifunctor (first, bimap)
-
-#include "HsVersions.h"
-
+import Data.Bifunctor (first)
 
 {- **********************************************************************
 %*                                                                      *
@@ -289,26 +286,21 @@ handleWarnings = do
 
 -- | log warning in the monad, and if there are errors then
 -- throw a SourceError exception.
-logWarningsReportErrors :: (Bag PsWarning, Bag PsError) -> Hsc ()
+logWarningsReportErrors :: (Messages PsWarning, Messages PsError) -> Hsc ()
 logWarningsReportErrors (warnings,errors) = do
-    dflags <- getDynFlags
-    let warns = foldPsMessages (mkParserWarn dflags) warnings
-        errs  = foldPsMessages mkParserErr           errors
-    logDiagnostics warns
-    when (not $ isEmptyMessages errs) $ throwErrors errs
+    logDiagnostics (GhcPsMessage <$> warnings)
+    when (not $ isEmptyMessages errors) $ throwErrors (GhcPsMessage <$> errors)
 
 -- | Log warnings and throw errors, assuming the messages
 -- contain at least one error (e.g. coming from PFailed)
-handleWarningsThrowErrors :: (Bag PsWarning, Bag PsError) -> Hsc a
+handleWarningsThrowErrors :: (Messages PsWarning, Messages PsError) -> Hsc a
 handleWarningsThrowErrors (warnings, errors) = do
     dflags <- getDynFlags
-    let warns = foldPsMessages (mkParserWarn dflags) warnings
-        errs  = foldPsMessages mkParserErr           errors
-    logDiagnostics warns
+    logDiagnostics (GhcPsMessage <$> warnings)
     logger <- getLogger
-    let (wWarns, wErrs) = partitionMessages warns
+    let (wWarns, wErrs) = partitionMessages warnings
     liftIO $ printMessages logger dflags wWarns
-    throwErrors $ errs `unionMessages` wErrs
+    throwErrors $ fmap GhcPsMessage $ errors `unionMessages` wErrs
 
 -- | Deal with errors and warnings returned by a compilation step
 --
@@ -333,7 +325,7 @@ ioMsgMaybe ioA = do
     logDiagnostics warns
     case mb_r of
         Nothing -> throwErrors errs
-        Just r  -> ASSERT( isEmptyMessages errs ) return r
+        Just r  -> assert (isEmptyMessages errs ) return r
 
 -- | like ioMsgMaybe, except that we ignore error messages and return
 -- 'Nothing' instead.
@@ -419,11 +411,8 @@ hscParse' mod_summary
         PFailed pst ->
             handleWarningsThrowErrors (getMessages pst)
         POk pst rdr_module -> do
-            let (warns, errs) =
-                  bimap (foldPsMessages (mkParserWarn dflags))
-                        (foldPsMessages mkParserErr)
-                        (getMessages pst)
-            logDiagnostics warns
+            let (warns, errs) = getMessages pst
+            logDiagnostics (GhcPsMessage <$> warns)
             liftIO $ dumpIfSet_dyn logger dflags Opt_D_dump_parsed "Parser"
                         FormatHaskell (ppr rdr_module)
             liftIO $ dumpIfSet_dyn logger dflags Opt_D_dump_parsed_ast "Parser AST"
@@ -432,7 +421,7 @@ hscParse' mod_summary
                                                    rdr_module)
             liftIO $ dumpIfSet_dyn logger dflags Opt_D_source_stats "Source Statistics"
                         FormatText (ppSourceStats False rdr_module)
-            when (not $ isEmptyMessages errs) $ throwErrors errs
+            when (not $ isEmptyMessages errs) $ throwErrors (GhcPsMessage <$> errs)
 
             -- To get the list of extra source files, we take the list
             -- that the parser gave us,
@@ -520,6 +509,12 @@ hscTypecheckRename :: HscEnv -> ModSummary -> HsParsedModule
 hscTypecheckRename hsc_env mod_summary rdr_module = runHsc hsc_env $
     hsc_typecheck True mod_summary (Just rdr_module)
 
+-- | Do Typechecking without throwing SourceError exception with -Werror
+hscTypecheckAndGetWarnings :: HscEnv ->  ModSummary -> IO (FrontendResult, WarningMessages)
+hscTypecheckAndGetWarnings hsc_env summary = runHsc' hsc_env $ do
+  case hscFrontendHook (hsc_hooks hsc_env) of
+    Nothing -> FrontendTypecheck . fst <$> hsc_typecheck False summary Nothing
+    Just h  -> h summary
 
 -- | A bunch of logic piled around @tcRnModule'@, concerning a) backpack
 -- b) concerning dumping rename info and hie files. It would be nice to further
@@ -540,7 +535,7 @@ hsc_typecheck keep_rn mod_summary mb_rdr_module = do
         src_filename  = ms_hspp_file mod_summary
         real_loc = realSrcLocSpan $ mkRealSrcLoc (mkFastString src_filename) 1 1
         keep_rn' = gopt Opt_WriteHie dflags || keep_rn
-    MASSERT( isHomeModule home_unit outer_mod )
+    massert (isHomeModule home_unit outer_mod)
     tc_result <- if hsc_src == HsigFile && not (isHoleModule inner_mod)
         then ioMsgMaybe $ hoistTcRnMessage $ tcRnInstantiateSignature hsc_env outer_mod' real_loc
         else
@@ -572,7 +567,7 @@ tcRnModule' sum save_rn_syntax mod = do
         logDiagnostics $ singleMessage $
         mkPlainMsgEnvelope dflags (getLoc (hpm_module mod)) $
         GhcDriverMessage $ DriverUnknownMessage $
-        mkPlainDiagnostic reason warnMissingSafeHaskellMode
+        mkPlainDiagnostic reason noHints warnMissingSafeHaskellMode
 
     tcg_res <- {-# SCC "Typecheck-Rename" #-}
                ioMsgMaybe $ hoistTcRnMessage $
@@ -602,14 +597,14 @@ tcRnModule' sum save_rn_syntax mod = do
                 | otherwise -> (logDiagnostics $ singleMessage $
                        mkPlainMsgEnvelope dflags (warnSafeOnLoc dflags) $
                        GhcDriverMessage $ DriverUnknownMessage $
-                       mkPlainDiagnostic (WarningWithFlag Opt_WarnSafe) $
+                       mkPlainDiagnostic (WarningWithFlag Opt_WarnSafe) noHints $
                        errSafe tcg_res')
               False | safeHaskell dflags == Sf_Trustworthy &&
                       wopt Opt_WarnTrustworthySafe dflags ->
                       (logDiagnostics $ singleMessage $
                        mkPlainMsgEnvelope dflags (trustworthyOnLoc dflags) $
                        GhcDriverMessage $ DriverUnknownMessage $
-                       mkPlainDiagnostic (WarningWithFlag Opt_WarnTrustworthySafe) $
+                       mkPlainDiagnostic (WarningWithFlag Opt_WarnTrustworthySafe) noHints $
                        errTwthySafe tcg_res')
               False -> return ()
           return tcg_res'
@@ -629,14 +624,9 @@ hscDesugar hsc_env mod_summary tc_result =
 hscDesugar' :: ModLocation -> TcGblEnv -> Hsc ModGuts
 hscDesugar' mod_location tc_result = do
     hsc_env <- getHscEnv
-    r <- ioMsgMaybe $ hoistDsMessage $
-        {-# SCC "deSugar" #-}
-        deSugar hsc_env mod_location tc_result
-
-    -- always check -Werror after desugaring, this is the last opportunity for
-    -- warnings to arise before the backend.
-    handleWarnings
-    return r
+    ioMsgMaybe $ hoistDsMessage $
+      {-# SCC "deSugar" #-}
+      deSugar hsc_env mod_location tc_result
 
 -- | Make a 'ModDetails' from the results of typechecking. Used when
 -- typechecking only, as opposed to full compilation.
@@ -689,140 +679,41 @@ This is the only thing that isn't caught by the type-system.
 
 type Messager = HscEnv -> (Int,Int) -> RecompileRequired -> ModuleGraphNode -> IO ()
 
--- | This function runs GHC's frontend with recompilation
--- avoidance. Specifically, it checks if recompilation is needed,
--- and if it is, it parses and typechecks the input module.
--- It does not write out the results of typechecking (See
--- compileOne and hscIncrementalCompile).
-hscIncrementalFrontend :: Bool -- always do basic recompilation check?
-                       -> Maybe TcGblEnv
-                       -> Maybe Messager
-                       -> ModSummary
-                       -> SourceModified
-                       -> Maybe ModIface  -- Old interface, if available
-                       -> (Int,Int)       -- (i,n) = module i of n (for msgs)
-                       -> Hsc (Either ModIface (FrontendResult, Maybe Fingerprint))
-
-hscIncrementalFrontend
-  always_do_basic_recompilation_check m_tc_result
-  mHscMessage mod_summary source_modified mb_old_iface mod_index
-    = do
-    hsc_env <- getHscEnv
-
-    let msg what = case mHscMessage of
+-- | Do the recompilation avoidance checks for both one-shot and --make modes
+hscRecompStatus :: Maybe Messager
+                -> HscEnv
+                -> ModSummary
+                -> SourceModified
+                -> Maybe ModIface
+                -> (Int,Int)
+                -> IO HscRecompStatus
+hscRecompStatus
+    mHscMessage hsc_env mod_summary source_modified mb_old_iface mod_index
+  = do
+    let
+        msg what = case mHscMessage of
           -- We use extendModSummaryNoDeps because extra backpack deps are only needed for batch mode
           Just hscMessage -> hscMessage hsc_env mod_index what (ModuleNode (extendModSummaryNoDeps mod_summary))
           Nothing -> return ()
 
-        skip iface = do
-            liftIO $ msg UpToDate
-            return $ Left iface
+    (recomp_reqd, mb_checked_iface)
+        <- {-# SCC "checkOldIface" #-}
+           liftIO $ checkOldIface hsc_env mod_summary
+                        source_modified mb_old_iface
 
-        compile mb_old_hash reason = do
-            liftIO $ msg reason
-            tc_result <- case hscFrontendHook (hsc_hooks hsc_env) of
-              Nothing -> FrontendTypecheck . fst <$> hsc_typecheck False mod_summary Nothing
-              Just h  -> h mod_summary
-            return $ Right (tc_result, mb_old_hash)
+    -- save the interface that comes back from checkOldIface.
+    -- In one-shot mode we don't have the old iface until this
+    -- point, when checkOldIface reads it from the disk.
+    let mb_old_hash = fmap (mi_iface_hash . mi_final_exts) mb_checked_iface
 
-        stable = case source_modified of
-                     SourceUnmodifiedAndStable -> True
-                     _                         -> False
-
-    case m_tc_result of
-         Just tc_result
-          | not always_do_basic_recompilation_check ->
-             return $ Right (FrontendTypecheck tc_result, Nothing)
-         _ -> do
-            (recomp_reqd, mb_checked_iface)
-                <- {-# SCC "checkOldIface" #-}
-                   liftIO $ checkOldIface hsc_env mod_summary
-                                source_modified mb_old_iface
-            -- save the interface that comes back from checkOldIface.
-            -- In one-shot mode we don't have the old iface until this
-            -- point, when checkOldIface reads it from the disk.
-            let mb_old_hash = fmap (mi_iface_hash . mi_final_exts) mb_checked_iface
-
-            case mb_checked_iface of
-                Just iface | not (recompileRequired recomp_reqd) ->
-                    -- If the module used TH splices when it was last
-                    -- compiled, then the recompilation check is not
-                    -- accurate enough (#481) and we must ignore
-                    -- it.  However, if the module is stable (none of
-                    -- the modules it depends on, directly or
-                    -- indirectly, changed), then we *can* skip
-                    -- recompilation. This is why the SourceModified
-                    -- type contains SourceUnmodifiedAndStable, and
-                    -- it's pretty important: otherwise ghc --make
-                    -- would always recompile TH modules, even if
-                    -- nothing at all has changed. Stability is just
-                    -- the same check that make is doing for us in
-                    -- one-shot mode.
-                    case m_tc_result of
-                    Nothing
-                     | mi_used_th iface && not stable ->
-                        compile mb_old_hash (RecompBecause "TH")
-                    _ ->
-                        skip iface
-                _ ->
-                    case m_tc_result of
-                    Nothing -> compile mb_old_hash recomp_reqd
-                    Just tc_result ->
-                        return $ Right (FrontendTypecheck tc_result, mb_old_hash)
-
---------------------------------------------------------------
--- Compilers
---------------------------------------------------------------
-
--- | Used by both OneShot and batch mode. Runs the pipeline HsSyn and Core parts
--- of the pipeline.
--- We return a interface if we already had an old one around and recompilation
--- was not needed. Otherwise it will be created during later passes when we
--- run the compilation pipeline.
-hscIncrementalCompile :: Bool
-                      -> Maybe TcGblEnv
-                      -> Maybe Messager
-                      -> HscEnv
-                      -> ModSummary
-                      -> SourceModified
-                      -> Maybe ModIface
-                      -> (Int,Int)
-                      -> IO (HscStatus, HscEnv)
-hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
-    mHscMessage hsc_env' mod_summary source_modified mb_old_iface mod_index
-  = do
-    hsc_env'' <- initializePlugins hsc_env'
-
-    -- One-shot mode needs a knot-tying mutable variable for interface
-    -- files. See GHC.Tc.Utils.TcGblEnv.tcg_type_env_var.
-    -- See also Note [hsc_type_env_var hack]
-    type_env_var <- newIORef emptyNameEnv
-    let mod = ms_mod mod_summary
-        hsc_env | isOneShot (ghcMode (hsc_dflags hsc_env''))
-                = hsc_env'' { hsc_type_env_var = Just (mod, type_env_var) }
-                | otherwise
-                = hsc_env''
-
-    -- NB: enter Hsc monad here so that we don't bail out early with
-    -- -Werror on typechecker warnings; we also want to run the desugarer
-    -- to get those warnings too. (But we'll always exit at that point
-    -- because the desugarer runs ioMsgMaybe.)
-    runHsc hsc_env $ do
-    e <- hscIncrementalFrontend always_do_basic_recompilation_check m_tc_result mHscMessage
-            mod_summary source_modified mb_old_iface mod_index
-    case e of
+    msg recomp_reqd
+    case mb_checked_iface of
+      Just iface | not (recompileRequired recomp_reqd) -> do
         -- We didn't need to do any typechecking; the old interface
         -- file on disk was good enough.
-        Left iface -> do
-            details <- liftIO $ initModDetails hsc_env mod_summary iface
-            return (HscUpToDate iface details, hsc_env')
-        -- We finished type checking.  (mb_old_hash is the hash of
-        -- the interface that existed on disk; it's possible we had
-        -- to retypecheck but the resulting interface is exactly
-        -- the same.)
-        Right (FrontendTypecheck tc_result, mb_old_hash) -> do
-            status <- finish mod_summary tc_result mb_old_hash
-            return (status, hsc_env)
+        return $ HscUpToDate iface
+
+      _ -> return $ HscRecompNeeded mb_old_hash
 
 -- Knot tying!  See Note [Knot-tying typecheckIface]
 -- See Note [ModDetails and --make mode]
@@ -894,11 +785,12 @@ See !5492 and #13586
 -- HscRecomp in turn will carry the information required to compute a interface
 -- when passed the result of the code generator. So all this can and is done at
 -- the call site of the backend code gen if it is run.
-finish :: ModSummary
-       -> TcGblEnv
+hscDesugarAndSimplify :: ModSummary
+       -> FrontendResult
+       -> Messages GhcMessage
        -> Maybe Fingerprint
-       -> Hsc HscStatus
-finish summary tc_result mb_old_hash = do
+       -> Hsc HscBackendAction
+hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_hash = do
   hsc_env <- getHscEnv
   dflags <- getDynFlags
   logger <- getLogger
@@ -915,6 +807,11 @@ finish summary tc_result mb_old_hash = do
       if ms_mod summary /= gHC_PRIM && hsc_src == HsSrcFile
       then Just <$> hscDesugar' (ms_location summary) tc_result
       else pure Nothing
+
+  -- Report the warnings from both typechecking and desugar together
+  w <- getDiagnostics
+  liftIO $ printOrThrowDiagnostics logger dflags (unionMessages tc_warnings w)
+  clearDiagnostics
 
   -- Simplify, if appropriate, and (whether we simplified or not) generate an
   -- interface file.
@@ -942,17 +839,12 @@ finish summary tc_result mb_old_hash = do
       -- We are not generating code, so we can skip simplification
       -- and generate a simple interface.
       _ -> do
-        (iface, mb_old_iface_hash, details) <- liftIO $
+        (iface, mb_old_iface_hash, _details) <- liftIO $
           hscSimpleIface hsc_env tc_result mb_old_hash
 
         liftIO $ hscMaybeWriteIface logger dflags True iface mb_old_iface_hash (ms_location summary)
 
-        return $ case bcknd of
-          NoBackend -> HscNotGeneratingCode iface details
-          _         -> case hsc_src of
-                        HsBootFile -> HscUpdateBoot iface details
-                        HsigFile   -> HscUpdateSig iface details
-                        _          -> panic "finish"
+        return $ HscUpdate iface
 
 {-
 Note [Writing interface files]
@@ -977,7 +869,7 @@ contents).
 
 Cases for which we generate simple interfaces:
 
-   * GHC.Driver.Main.finish: when a compilation does NOT require (re)compilation
+   * GHC.Driver.Main.hscDesugarAndSimplify: when a compilation does NOT require (re)compilation
    of the hard code
 
    * GHC.Driver.Pipeline.compileOne': when we run in One Shot mode and target
@@ -1203,7 +1095,7 @@ hscCheckSafeImports tcg_env = do
     warnRules df (L loc (HsRule { rd_name = n })) =
         mkPlainMsgEnvelope df (locA loc) $
         DriverUnknownMessage $
-        mkPlainDiagnostic WarningWithoutFlag $
+        mkPlainDiagnostic WarningWithoutFlag noHints $
             text "Rule \"" <> ftext (snd $ unLoc n) <> text "\" ignored" $+$
             text "User defined rules are disabled under Safe Haskell"
 
@@ -1281,7 +1173,7 @@ checkSafeImports tcg_env
         | imv_is_safe v1 /= imv_is_safe v2
         = throwOneError $
             mkPlainErrorMsgEnvelope (imv_span v1) $
-            GhcDriverMessage $ DriverUnknownMessage $ mkPlainError $
+            GhcDriverMessage $ DriverUnknownMessage $ mkPlainError noHints $
               text "Module" <+> ppr (imv_name v1) <+>
                (text $ "is imported both as a safe and unsafe import!")
         | otherwise
@@ -1351,7 +1243,7 @@ hscCheckSafe' m l = do
             -- can't load iface to check trust!
             Nothing -> throwOneError $
                          mkPlainErrorMsgEnvelope l $
-                         GhcDriverMessage $ DriverUnknownMessage $ mkPlainError $
+                         GhcDriverMessage $ DriverUnknownMessage $ mkPlainError noHints $
                            text "Can't load the interface file for" <+> ppr m
                              <> text ", to check that it can be safely imported"
 
@@ -1364,7 +1256,7 @@ hscCheckSafe' m l = do
                     -- check package is trusted
                     safeP = packageTrusted dflags (hsc_units hsc_env) home_unit trust trust_own_pkg m
                     -- pkg trust reqs
-                    pkgRs = S.fromList . map fst $ filter snd $ dep_pkgs $ mi_deps iface'
+                    pkgRs = S.fromList (dep_trusted_pkgs $ mi_deps iface')
                     -- warn if Safe module imports Safe-Inferred module.
                     warns = if wopt Opt_WarnInferredSafeImports dflags
                                 && safeLanguageOn dflags
@@ -1386,7 +1278,7 @@ hscCheckSafe' m l = do
                     inferredImportWarn dflags = singleMessage
                         $ mkMsgEnvelope dflags l (pkgQual state)
                         $ GhcDriverMessage $ DriverUnknownMessage
-                        $ mkPlainDiagnostic (WarningWithFlag Opt_WarnInferredSafeImports)
+                        $ mkPlainDiagnostic (WarningWithFlag Opt_WarnInferredSafeImports) noHints
                         $ sep
                             [ text "Importing Safe-Inferred module "
                                 <> ppr (moduleName m)
@@ -1395,7 +1287,7 @@ hscCheckSafe' m l = do
                     pkgTrustErr = singleMessage
                       $ mkErrorMsgEnvelope l (pkgQual state)
                       $ GhcDriverMessage $ DriverUnknownMessage
-                      $ mkPlainError
+                      $ mkPlainError noHints
                       $ sep [ ppr (moduleName m)
                                 <> text ": Can't be safely imported!"
                             , text "The package ("
@@ -1405,7 +1297,7 @@ hscCheckSafe' m l = do
                     modTrustErr = singleMessage
                       $ mkErrorMsgEnvelope l (pkgQual state)
                       $ GhcDriverMessage $ DriverUnknownMessage
-                      $ mkPlainError
+                      $ mkPlainError noHints
                       $ sep [ ppr (moduleName m)
                                 <> text ": Can't be safely imported!"
                             , text "The module itself isn't safe." ]
@@ -1455,7 +1347,7 @@ checkPkgTrust pkgs = do
                      $ mkErrorMsgEnvelope noSrcSpan (pkgQual state)
                      $ GhcDriverMessage
                      $ DriverUnknownMessage
-                     $ mkPlainError
+                     $ mkPlainError noHints
                      $ pprWithUnitState state
                      $ text "The package ("
                         <> ppr pkg
@@ -1483,7 +1375,7 @@ markUnsafeInfer tcg_env whyUnsafe = do
          (logDiagnostics $ singleMessage $
              mkPlainMsgEnvelope dflags (warnUnsafeOnLoc dflags) $
              GhcDriverMessage $ DriverUnknownMessage $
-             mkPlainDiagnostic reason $
+             mkPlainDiagnostic reason noHints $
              whyUnsafe' dflags)
 
     liftIO $ writeIORef (tcg_safe_infer tcg_env) False
@@ -1519,7 +1411,6 @@ markUnsafeInfer tcg_env whyUnsafe = do
                       ppr (overlapMode $ is_flag ins) <+>
                       text "overlap mode isn't allowed in Safe Haskell"]
                 | otherwise = []
-
 
 -- | Figure out the final correct safe haskell mode
 hscGetSafeMode :: TcGblEnv -> Hsc SafeHaskellMode
@@ -1717,10 +1608,8 @@ hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
                $ do
                   (warns,errs,cmm) <- withTiming logger dflags (text "ParseCmm"<+>brackets (text filename)) (\_ -> ())
                                        $ parseCmmFile dflags cmm_mod home_unit filename
-                  let msgs = foldPsMessages (mkParserWarn dflags) warns
-                             `unionMessages`
-                             foldPsMessages mkParserErr errs
-                  return (msgs, cmm)
+                  let msgs = warns `unionMessages` errs
+                  return (GhcPsMessage <$> msgs, cmm)
     liftIO $ do
         dumpIfSet_dyn logger dflags Opt_D_dump_cmm_verbose_by_proc "Parsed Cmm" FormatCMM (pdoc platform cmm)
 
@@ -2082,7 +1971,7 @@ hscImport hsc_env str = runInteractiveHsc hsc_env $ do
         [L _ i] -> return i
         _ -> liftIO $ throwOneError $
                  mkPlainErrorMsgEnvelope noSrcSpan $
-                 GhcPsMessage $ PsUnknownMessage $ mkPlainError $
+                 GhcPsMessage $ PsUnknownMessage $ mkPlainError noHints $
                      text "parse error in import declaration"
 
 -- | Typecheck an expression (but don't run it)
@@ -2113,7 +2002,7 @@ hscParseExpr expr = do
     Just (L _ (BodyStmt _ expr _ _)) -> return expr
     _ -> throwOneError $
            mkPlainErrorMsgEnvelope noSrcSpan $
-           GhcPsMessage $ PsUnknownMessage $ mkPlainError $
+           GhcPsMessage $ PsUnknownMessage $ mkPlainError noHints $
              text "not an expression:" <+> quotes (text expr)
 
 hscParseStmt :: String -> Hsc (Maybe (GhciLStmt GhcPs))

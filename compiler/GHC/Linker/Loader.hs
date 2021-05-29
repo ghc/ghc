@@ -1,4 +1,5 @@
-{-# LANGUAGE CPP, TupleSections, RecordWildCards #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE TupleSections, RecordWildCards #-}
 {-# LANGUAGE BangPatterns #-}
 
 --
@@ -30,8 +31,6 @@ module GHC.Linker.Loader
    , extendLoadedPkgs
    )
 where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -67,6 +66,8 @@ import GHC.Types.Unique.DSet
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
+import GHC.Utils.Constants (isWindowsHost, isDarwinHost)
 import GHC.Utils.Misc
 import GHC.Utils.Error
 import GHC.Utils.Logger
@@ -180,7 +181,7 @@ loadName interp hsc_env name = do
 
     case lookupNameEnv (closure_env pls) name of
       Just (_,aa) -> return (pls,aa)
-      Nothing     -> ASSERT2(isExternalName name, ppr name)
+      Nothing     -> assertPpr (isExternalName name) (ppr name) $
                      do let sym_to_find = nameToCLabel name "closure"
                         m <- lookupClosure interp (unpackFS sym_to_find)
                         r <- case m of
@@ -691,20 +692,20 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
             deps  = mi_deps iface
             home_unit = hsc_home_unit hsc_env
 
-            pkg_deps = dep_pkgs deps
-            (boot_deps, mod_deps) = flip partitionWith (dep_mods deps) $
+            pkg_deps = dep_direct_pkgs deps
+            (boot_deps, mod_deps) = flip partitionWith (dep_direct_mods deps) $
               \ (GWIB { gwib_mod = m, gwib_isBoot = is_boot }) ->
                 m & case is_boot of
                   IsBoot -> Left
                   NotBoot -> Right
 
-            boot_deps' = filter (not . (`elementOfUniqDSet` acc_mods)) boot_deps
+            mod_deps' = filter (not . (`elementOfUniqDSet` acc_mods)) (boot_deps ++ mod_deps)
             acc_mods'  = addListToUniqDSet acc_mods (moduleName mod : mod_deps)
-            acc_pkgs'  = addListToUniqDSet acc_pkgs $ map fst pkg_deps
+            acc_pkgs'  = addListToUniqDSet acc_pkgs pkg_deps
           --
           if not (isHomeUnit home_unit pkg)
              then follow_deps mods acc_mods (addOneToUniqDSet acc_pkgs' (toUnitId pkg))
-             else follow_deps (map (mkHomeModule home_unit) boot_deps' ++ mods)
+             else follow_deps (map (mkHomeModule home_unit) mod_deps' ++ mods)
                               acc_mods' acc_pkgs'
         where
             msg = text "need to link module" <+> ppr mod <+>
@@ -757,7 +758,7 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
                         return lnk
 
             adjust_ul new_osuf (DotO file) = do
-                MASSERT(osuf `isSuffixOf` file)
+                massert (osuf `isSuffixOf` file)
                 let file_base = fromJust (stripExtension osuf file)
                     new_file = file_base <.> new_osuf
                 ok <- doesFileExist new_file

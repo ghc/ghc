@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP                 #-}
+
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -12,8 +12,6 @@ module GHC.Tc.Errors(
        solverDepthErrorTcS
   ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Tc.Types
@@ -25,7 +23,7 @@ import GHC.Tc.Utils.Unify( occCheckForErrors, CheckTyEqResult(..) )
 import GHC.Tc.Utils.Env( tcInitTidyEnv )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Origin
-import GHC.Rename.Unbound ( unknownNameSuggestions )
+import GHC.Rename.Unbound ( unknownNameSuggestions, WhatLooking(..) )
 import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.TyCo.Rep
@@ -42,7 +40,8 @@ import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.EvTerm
 import GHC.Hs.Binds ( PatSynBind(..) )
 import GHC.Types.Name
-import GHC.Types.Name.Reader ( lookupGRE_Name, GlobalRdrEnv, mkRdrUnqual )
+import GHC.Types.Name.Reader ( lookupGRE_Name, GlobalRdrEnv, mkRdrUnqual
+                             , emptyLocalRdrEnv, lookupGlobalRdrEnv , lookupLocalRdrOcc )
 import GHC.Builtin.Names ( typeableClassName )
 import GHC.Types.Id
 import GHC.Types.Var
@@ -59,6 +58,7 @@ import GHC.Utils.Misc
 import GHC.Data.FastString
 import GHC.Utils.Outputable as O
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Types.SrcLoc
 import GHC.Driver.Session
 import GHC.Driver.Ppr
@@ -66,6 +66,7 @@ import GHC.Data.List.SetOps ( equivClasses )
 import GHC.Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Utils.FV ( fvVarList, unionFV )
+import qualified GHC.Data.Strict as Strict
 
 import Control.Monad    ( unless, when, foldM, forM_ )
 import Data.Foldable    ( toList )
@@ -555,7 +556,7 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics
          -- says to suppress
        ; let ctxt2 = ctxt { cec_suppress = cec_suppress ctxt || cec_suppress ctxt1 }
        ; (_, leftovers) <- tryReporters ctxt2 report2 cts1
-       ; MASSERT2( null leftovers, ppr leftovers )
+       ; massertPpr (null leftovers) (ppr leftovers)
 
             -- All the Derived ones have been filtered out of simples
             -- by the constraint solver. This is ok; we don't want
@@ -1033,7 +1034,7 @@ mkErrorReport :: DiagnosticReason
 mkErrorReport rea ctxt tcl_env (Report important relevant_bindings valid_subs)
   = do { context <- mkErrInfo (cec_tidy ctxt) (tcl_ctxt tcl_env)
        ; mkTcRnMessage rea
-           (RealSrcSpan (tcl_loc tcl_env) Nothing)
+           (RealSrcSpan (tcl_loc tcl_env) Strict.Nothing)
            (vcat important)
            context
            (vcat $ relevant_bindings ++ valid_subs)
@@ -1045,7 +1046,7 @@ mkErrorReportNC :: DiagnosticReason
                 -> Report
                 -> TcM (MsgEnvelope TcRnMessage)
 mkErrorReportNC rea tcl_env (Report important relevant_bindings valid_subs)
-  = mkTcRnMessage rea (RealSrcSpan (tcl_loc tcl_env) Nothing)
+  = mkTcRnMessage rea (RealSrcSpan (tcl_loc tcl_env) Strict.Nothing)
     (vcat important)
     O.empty
     (vcat $ relevant_bindings ++ valid_subs)
@@ -1198,7 +1199,7 @@ mkHoleError _ _tidy_simples ctxt hole@(Hole { hole_occ = occ
        ; hpt <- getHpt
        ; let err = important out_of_scope_msg `mappend`
                    (mk_relevant_bindings $
-                     unknownNameSuggestions dflags hpt curr_mod rdr_env
+                     unknownNameSuggestions WL_Anything dflags hpt curr_mod rdr_env
                        (tcl_rdr lcl_env) imp_info (mkRdrUnqual occ))
 
        ; maybeAddDeferredBindings ctxt hole err
@@ -1629,8 +1630,8 @@ mkTyVarEqErr' dflags ctxt report ct tv1 ty2
   -- See Note [Error messages for untouchables]
   | (implic:_) <- cec_encl ctxt   -- Get the innermost context
   , Implic { ic_given = given, ic_tclvl = lvl, ic_info = skol_info } <- implic
-  = ASSERT2( not (isTouchableMetaTyVar lvl tv1)
-           , ppr tv1 $$ ppr lvl )  -- See Note [Error messages for untouchables]
+  = assertPpr (not (isTouchableMetaTyVar lvl tv1))
+              (ppr tv1 $$ ppr lvl) $  -- See Note [Error messages for untouchables]
     let msg         = misMatchMsg ctxt ct ty1 ty2
         tclvl_extra = important $
              nest 2 $
@@ -1800,7 +1801,7 @@ extraTyVarEqInfo ctxt tv1 ty2
 
 extraTyVarInfo :: ReportErrCtxt -> TcTyVar -> SDoc
 extraTyVarInfo ctxt tv
-  = ASSERT2( isTyVar tv, ppr tv )
+  = assertPpr (isTyVar tv) (ppr tv) $
     case tcTyVarDetails tv of
           SkolemTv {}   -> pprSkols ctxt [tv]
           RuntimeUnk {} -> quotes (ppr tv) <+> text "is an interactive-debugger skolem"
@@ -2344,7 +2345,7 @@ Warn of loopy local equalities that were dropped.
 
 mkDictErr :: ReportErrCtxt -> [Ct] -> TcM Report
 mkDictErr ctxt cts
-  = ASSERT( not (null cts) )
+  = assert (not (null cts)) $
     do { inst_envs <- tcGetInstEnvs
        ; let min_cts = elim_superclasses cts
              lookups = map (lookup_cls_inst inst_envs) min_cts
@@ -2385,7 +2386,8 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
   | null matches  -- No matches but perhaps several unifiers
   = do { (_, binds_msg, ct) <- relevantBindings True ctxt ct
        ; candidate_insts <- get_candidate_instances
-       ; return (cannot_resolve_msg ct candidate_insts binds_msg) }
+       ; field_suggestions <- record_field_suggestions
+       ; return (cannot_resolve_msg ct candidate_insts binds_msg field_suggestions) }
 
   | null unsafe_overlapped   -- Some matches => overlap errors
   = return overlap_msg
@@ -2422,8 +2424,30 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
         in different_names && same_occ_names
       | otherwise = False
 
-    cannot_resolve_msg :: Ct -> [ClsInst] -> SDoc -> SDoc
-    cannot_resolve_msg ct candidate_insts binds_msg
+    -- See Note [Out-of-scope fields with -XOverloadedRecordDot]
+    record_field_suggestions :: TcM SDoc
+    record_field_suggestions = flip (maybe $ return empty) record_field $ \name ->
+       do { glb_env <- getGlobalRdrEnv
+          ; lcl_env <- getLocalRdrEnv
+          ; if occ_name_in_scope glb_env lcl_env name
+              then return empty
+              else do { dflags   <- getDynFlags
+                      ; imp_info <- getImports
+                      ; curr_mod <- getModule
+                      ; hpt      <- getHpt
+                      ; return (unknownNameSuggestions WL_RecField dflags hpt curr_mod
+                          glb_env emptyLocalRdrEnv imp_info (mkRdrUnqual name)) } }
+
+    occ_name_in_scope glb_env lcl_env occ_name = not $
+      null (lookupGlobalRdrEnv glb_env occ_name) &&
+      isNothing (lookupLocalRdrOcc lcl_env occ_name)
+
+    record_field = case orig of
+      HasFieldOrigin name -> Just (mkVarOccFS name)
+      _                   -> Nothing
+
+    cannot_resolve_msg :: Ct -> [ClsInst] -> SDoc -> SDoc -> SDoc
+    cannot_resolve_msg ct candidate_insts binds_msg field_suggestions
       = vcat [ no_inst_msg
              , nest 2 extra_note
              , vcat (pp_givens useful_givens)
@@ -2438,8 +2462,9 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
                            ++ drv_fixes)
              , ppWhen (not (null candidate_insts))
                (hang (text "There are instances for similar types:")
-                   2 (vcat (map ppr candidate_insts))) ]
+                   2 (vcat (map ppr candidate_insts)))
                    -- See Note [Report candidate instances]
+             , field_suggestions ]
       where
         orig = ctOrigin ct
         -- See Note [Highlighting ambiguous type variables]
@@ -2518,7 +2543,7 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
 
     -- Normal overlap error
     overlap_msg
-      = ASSERT( not (null matches) )
+      = assert (not (null matches)) $
         vcat [  addArising orig (text "Overlapping instances for"
                                 <+> pprType (mkClassPred clas tys))
 
@@ -2571,7 +2596,7 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
     -- Overlap error because of Safe Haskell (first
     -- match should be the most specific match)
     safe_haskell_msg
-     = ASSERT( matches `lengthIs` 1 && not (null unsafe_ispecs) )
+     = assert (matches `lengthIs` 1 && not (null unsafe_ispecs)) $
        vcat [ addArising orig (text "Unsafe overlapping instances for"
                        <+> pprType (mkClassPred clas tys))
             , sep [text "The matching instance is:",
@@ -2710,6 +2735,33 @@ message (showing both problems):
          ... Possible fix: add (Show a) to the context of
          the signature for pattern synonym `Pat' ...
 
+Note [Out-of-scope fields with -XOverloadedRecordDot]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+With -XOverloadedRecordDot, when a field isn't in scope, the error that appears
+is produces here, and it says
+    No instance for (GHC.Record.HasField "<fieldname>" ...).
+
+Additionally, though, we want to suggest similar field names that are in scope
+or could be in scope with different import lists.
+
+However, we can still get an error about a missing HasField instance when a
+field is in scope (if the types are wrong), and so it's important that we don't
+suggest similar names here if the record field is in scope, either qualified or
+unqualified, since qualification doesn't matter for -XOverloadedRecordDot.
+
+Example:
+
+    import Data.Monoid (Alt(..))
+
+    foo = undefined.getAll
+
+results in
+
+     No instance for (GHC.Records.HasField "getAll" r0 a0)
+        arising from selecting the field ‘getAll’
+      Perhaps you meant ‘getAlt’ (imported from Data.Monoid)
+      Perhaps you want to add ‘getAll’ to the import list
+      in the import of ‘Data.Monoid’
 -}
 
 show_fixes :: [SDoc] -> SDoc

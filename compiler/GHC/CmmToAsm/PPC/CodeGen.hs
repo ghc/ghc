@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE GADTs #-}
 
 -----------------------------------------------------------------------------
@@ -20,8 +19,6 @@ module GHC.CmmToAsm.PPC.CodeGen (
 )
 
 where
-
-#include "HsVersions.h"
 
 -- NCG stuff:
 import GHC.Prelude
@@ -64,13 +61,13 @@ import GHC.Types.SrcLoc      ( srcSpanFile, srcSpanStartLine, srcSpanStartCol )
 import GHC.Data.OrdList
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 
 import Control.Monad    ( mapAndUnzipM, when )
 import Data.Word
 
 import GHC.Types.Basic
 import GHC.Data.FastString
-import GHC.Utils.Misc
 
 -- -----------------------------------------------------------------------------
 -- Top-level of the instruction selector
@@ -468,7 +465,7 @@ getRegister' _ platform (CmmMachOp (MO_SS_Conv W64 W32) [x])
 getRegister' _ platform (CmmLoad mem pk)
  | not (isWord64 pk) = do
         Amode addr addr_code <- getAmode D mem
-        let code dst = ASSERT((targetClassOfReg platform dst == RcDouble) == isFloatType pk)
+        let code dst = assert ((targetClassOfReg platform dst == RcDouble) == isFloatType pk) $
                        addr_code `snocOL` LD format dst addr
         return (Any format code)
  | not (target32Bit platform) = do
@@ -981,7 +978,8 @@ condIntCode' _ cond width x (CmmLit (CmmInt y rep))
   | Just src2 <- makeImmediate rep (not $ condUnsigned cond) y
   = do
       let op_len = max W32 width
-      let extend = extendSExpr width op_len
+      let extend = if condUnsigned cond then extendUExpr width op_len
+                   else extendSExpr width op_len
       (src1, code) <- getSomeReg (extend x)
       let format = intFormat op_len
           code' = code `snocOL`
@@ -2014,6 +2012,9 @@ genCCall' config gcp target dest_regs args
                     MO_Memset _  -> (fsLit "memset", False)
                     MO_Memmove _ -> (fsLit "memmove", False)
                     MO_Memcmp _  -> (fsLit "memcmp", False)
+
+                    MO_SuspendThread -> (fsLit "suspendThread", False)
+                    MO_ResumeThread  -> (fsLit "resumeThread", False)
 
                     MO_BSwap w   -> (bSwapLabel w, False)
                     MO_BRev w    -> (bRevLabel w, False)

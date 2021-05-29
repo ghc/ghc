@@ -1,24 +1,24 @@
-{-# LANGUAGE CPP, GADTs, MultiWayIf #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE GADTs, MultiWayIf #-}
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
--- ----------------------------------------------------------------------------
--- | Handle conversion of CmmProc to LLVM code.
---
-module GHC.CmmToLlvm.CodeGen ( genLlvmProc ) where
 
-#include "HsVersions.h"
+-- | Handle conversion of CmmProc to LLVM code.
+module GHC.CmmToLlvm.CodeGen ( genLlvmProc ) where
 
 import GHC.Prelude
 
 import GHC.Driver.Session
 import GHC.Driver.Ppr
 
+import GHC.Platform
+import GHC.Platform.Regs ( activeStgRegs )
+
 import GHC.Llvm
 import GHC.CmmToLlvm.Base
 import GHC.CmmToLlvm.Regs
 
 import GHC.Cmm.BlockId
-import GHC.Platform.Regs ( activeStgRegs )
 import GHC.Cmm.CLabel
 import GHC.Cmm
 import GHC.Cmm.Ppr as PprCmm
@@ -29,14 +29,15 @@ import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Collections
 
 import GHC.Data.FastString
-import GHC.Types.ForeignCall
-import GHC.Utils.Outputable
-import GHC.Utils.Panic (assertPanic)
-import qualified GHC.Utils.Panic as Panic
-import GHC.Platform
 import GHC.Data.OrdList
+
+import GHC.Types.ForeignCall
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique
+
+import GHC.Utils.Outputable
+import GHC.Utils.Panic.Plain (massert)
+import qualified GHC.Utils.Panic as Panic
 import GHC.Utils.Misc
 
 import Control.Monad.Trans.Class
@@ -559,7 +560,7 @@ genCallWithOverflow t@(PrimTarget op) w [dstV, dstO] [lhs, rhs] = do
                             , MO_AddWordC w
                             , MO_SubWordC w
                             ]
-    MASSERT(valid)
+    massert valid
     let width = widthToLlvmInt w
     -- This will do most of the work of generating the call to the intrinsic and
     -- extracting the values from the struct.
@@ -860,6 +861,9 @@ cmmPrimOpFunctions mop = do
     MO_Memmove _  -> fsLit $ "llvm.memmove." ++ intrinTy1
     MO_Memset _   -> fsLit $ "llvm.memset."  ++ intrinTy2
     MO_Memcmp _   -> fsLit $ "memcmp"
+
+    MO_SuspendThread -> fsLit $ "suspendThread"
+    MO_ResumeThread  -> fsLit $ "resumeThread"
 
     (MO_PopCnt w) -> fsLit $ "llvm.ctpop."      ++ showSDoc dflags (ppr $ widthToLlvmInt w)
     (MO_BSwap w)  -> fsLit $ "llvm.bswap."      ++ showSDoc dflags (ppr $ widthToLlvmInt w)

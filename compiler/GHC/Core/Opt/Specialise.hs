@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -9,8 +9,6 @@
 -}
 
 module GHC.Core.Opt.Specialise ( specProgram, specUnfolding ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -809,6 +807,7 @@ canSpecImport dflags fn
 tryWarnMissingSpecs :: DynFlags -> [Id] -> Id -> [CallInfo] -> CoreM ()
 -- See Note [Warning about missed specialisations]
 tryWarnMissingSpecs dflags callers fn calls_for_fn
+  | isClassOpId fn = return () -- See Note [Missed specialization for ClassOps]
   | wopt Opt_WarnMissedSpecs dflags
     && not (null callers)
     && allCallersInlined                  = doWarn $ WarningWithFlag Opt_WarnMissedSpecs
@@ -824,7 +823,40 @@ tryWarnMissingSpecs dflags callers fn calls_for_fn
           , whenPprDebug (text "calls:" <+> vcat (map (pprCallInfo fn) calls_for_fn))
           , text "Probable fix: add INLINABLE pragma on" <+> quotes (ppr fn) ])
 
+{- Note [Missed specialisation for ClassOps]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In #19592 I saw a number of missed specialisation warnings
+which were the result of things like:
 
+    case isJumpishInstr @X86.Instr $dInstruction_s7f8 eta3_a78C of { ...
+
+where isJumpishInstr is part of the Instruction class and defined like
+this:
+
+    class Instruction instr where
+        ...
+        isJumpishInstr :: instr -> Bool
+        ...
+
+isJumpishInstr is a ClassOp which will select the right method
+from within the dictionary via our built in rules. See also
+Note [ClassOp/DFun selection] in GHC.Tc.TyCl.Instance.
+
+We don't give these unfoldings, and as a result the specialiser
+complains. But usually this doesn't matter. The simplifier will
+apply the rule and we end up with
+
+    case isJumpishInstrImplX86 eta3_a78C of { ...
+
+Since isJumpishInstrImplX86 is defined for a concrete instance (given
+by the dictionary) it is usually already well specialised!
+Theoretically the implementation of a method could still be overloaded
+over a different type class than what it's a method of. But I wasn't able
+to make this go wrong, and SPJ thinks this should be fine as well.
+
+So I decided to remove the warnings for failed specialisations on ClassOps
+alltogether as they do more harm than good.
+-}
 
 {- Note [Do not specialise imported DFuns]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1406,8 +1438,8 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
     foldlM spec_call ([], [], emptyUDs) calls_for_me
 
   | otherwise   -- No calls or RHS doesn't fit our preconceptions
-  = WARN( not (exprIsTrivial rhs) && notNull calls_for_me,
-          text "Missed specialisation opportunity for" <+> ppr fn $$ _trace_doc )
+  = warnPprTrace (not (exprIsTrivial rhs) && notNull calls_for_me)
+          (text "Missed specialisation opportunity for" <+> ppr fn $$ _trace_doc) $
           -- Note [Specialisation shape]
     -- pprTrace "specDefn: none" (ppr fn <+> ppr calls_for_me) $
     return ([], [], emptyUDs)
@@ -2560,7 +2592,7 @@ data CallInfoSet = CIS Id (Bag CallInfo)
 data CallInfo
   = CI { ci_key  :: [SpecArg]   -- All arguments
        , ci_fvs  :: IdSet       -- Free Ids of the ci_key call
-                                -- *not* including the main id itself, of course
+                                -- _not_ including the main id itself, of course
                                 -- NB: excluding tyvars:
                                 --     See Note [Specialising polymorphic dictionaries]
     }

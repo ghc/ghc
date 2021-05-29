@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -23,9 +23,6 @@
 -- | Abstract Haskell syntax for expressions.
 module Language.Haskell.Syntax.Expr where
 
-#include "HsVersions.h"
-
--- friends:
 import GHC.Prelude
 
 import Language.Haskell.Syntax.Decls
@@ -100,19 +97,20 @@ neither record constructions).
 The results of these new rules cannot be represented by @LHsRecField
 GhcPs (LHsExpr GhcPs)@ values as the type is defined today. We
 minimize modifying existing code by having these new rules calculate
-@LHsRecProj GhcPs (Located b)@ ("record projection") values instead:
+@LHsRecProj GhcPs (LHsExpr GhcPs)@ ("record projection") values
+instead:
 @
-newtype FieldLabelStrings = FieldLabelStrings [Located FieldLabelString]
-type RecProj arg = HsRecField' FieldLabelStrings arg
-type LHsRecProj p arg = Located (RecProj arg)
+newtype FieldLabelStrings = FieldLabelStrings [XRec p (DotFieldOcc p)]
+type RecProj arg = HsFieldBind FieldLabelStrings arg
+type LHsRecProj p arg = XRec p (RecProj arg)
 @
 
 The @fbind@ rule is then given the type @fbind :: { forall b.
 DisambECP b => PV (Fbind b) }@ accomodating both alternatives:
 @
 type Fbind b = Either
-                  (LHsRecField GhcPs (Located b))
-                  ( LHsRecProj GhcPs (Located b))
+                  (LHsRecField GhcPs (LocatedA b))
+                  ( LHsRecProj GhcPs (LocatedA b))
 @
 
 In @data HsExpr p@, the @RecordUpd@ constuctor indicates regular
@@ -127,8 +125,8 @@ type, an @Either@ instance:
 @
 Here,
 @
-type RecUpdProj p = RecProj (LHsExpr p)
-type LHsRecUpdProj p = Located (RecUpdProj p)
+type RecUpdProj p = RecProj p (LHsExpr p)
+type LHsRecUpdProj p = XRec p (RecUpdProj p)
 @
 and @Left@ values indicating regular record update, @Right@ values
 updates desugared to @setField@s.
@@ -140,28 +138,34 @@ values (see function @mkRdrRecordUpd@ in 'GHC.Parser.PostProcess').
 
 -- | RecordDotSyntax field updates
 
+type LFieldLabelStrings p = XRec p (FieldLabelStrings p)
+
 newtype FieldLabelStrings p =
-  FieldLabelStrings [Located (HsFieldLabel p)]
+  FieldLabelStrings [XRec p (DotFieldOcc p)]
 
-instance Outputable (FieldLabelStrings p) where
+instance (UnXRec p, Outputable (XRec p FieldLabelString)) => Outputable (FieldLabelStrings p) where
   ppr (FieldLabelStrings flds) =
-    hcat (punctuate dot (map (ppr . unLoc) flds))
+    hcat (punctuate dot (map (ppr . unXRec @p) flds))
 
-instance OutputableBndr (FieldLabelStrings p) where
+instance (UnXRec p, Outputable (XRec p FieldLabelString)) => OutputableBndr (FieldLabelStrings p) where
   pprInfixOcc = pprFieldLabelStrings
   pprPrefixOcc = pprFieldLabelStrings
 
-pprFieldLabelStrings :: FieldLabelStrings p -> SDoc
-pprFieldLabelStrings (FieldLabelStrings flds) =
-    hcat (punctuate dot (map (ppr . unLoc) flds))
+instance (UnXRec p,  Outputable (XRec p FieldLabelString)) => OutputableBndr (Located (FieldLabelStrings p)) where
+  pprInfixOcc = pprInfixOcc . unLoc
+  pprPrefixOcc = pprInfixOcc . unLoc
 
-instance Outputable (HsFieldLabel p) where
-  ppr (HsFieldLabel _ s) = ppr s
-  ppr XHsFieldLabel{} = text "XHsFieldLabel"
+pprFieldLabelStrings :: forall p. (UnXRec p, Outputable (XRec p FieldLabelString)) => FieldLabelStrings p -> SDoc
+pprFieldLabelStrings (FieldLabelStrings flds) =
+    hcat (punctuate dot (map (ppr . unXRec @p) flds))
+
+instance Outputable(XRec p FieldLabelString) => Outputable (DotFieldOcc p) where
+  ppr (DotFieldOcc _ s) = ppr s
+  ppr XDotFieldOcc{} = text "XDotFieldOcc"
 
 -- Field projection updates (e.g. @foo.bar.baz = 1@). See Note
 -- [RecordDotSyntax field updates].
-type RecProj p arg = HsRecField' (FieldLabelStrings p) arg
+type RecProj p arg = HsFieldBind (LFieldLabelStrings p) arg
 
 -- The phantom type parameter @p@ is for symmetry with @LHsRecField p
 -- arg@ in the definition of @data Fbind@ (see GHC.Parser.Process).
@@ -264,6 +268,55 @@ is Less Cool because
     typecheck do-notation with (>>=) :: m1 a -> (a -> m2 b) -> m2 b.)
 -}
 
+{-
+Note [Record selectors in the AST]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Here is how record selectors are expressed in GHC's AST:
+
+Example data type
+  data T = MkT { size :: Int }
+
+Record selectors:
+                      |    GhcPs     |   GhcRn              |    GhcTc            |
+----------------------------------------------------------------------------------|
+size (assuming one    | HsVar        | HsRecSel             | HsRecSel            |
+     'size' in scope) |              |                      |                     |
+----------------------|--------------|----------------------|---------------------|
+.size (assuming       | HsProjection | getField @"size"     | getField @"size"    |
+ OverloadedRecordDot) |              |                      |                     |
+----------------------|--------------|----------------------|---------------------|
+e.size (assuming      | HsGetField   | getField @"size" e   | getField @"size" e  |
+ OverloadedRecordDot) |              |                      |                     |
+
+NB 1: DuplicateRecordFields makes no difference to the first row of
+this table, except that if 'size' is a field of more than one data
+type, then a naked use of the record selector 'size' may well be
+ambiguous. You have to use a qualified name. And there is no way to do
+this if both data types are declared in the same module.
+
+NB 2: The notation getField @"size" e is short for
+HsApp (HsAppType (HsVar "getField") (HsWC (HsTyLit (HsStrTy "size")) [])) e.
+We track the original parsed syntax via HsExpanded.
+
+-}
+
+{-
+Note [Non-overloaded record field selectors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+    data T = MkT { x,y :: Int }
+    f r x = x + y r
+
+This parses with HsVar for x, y, r on the RHS of f. Later, the renamer
+recognises that y in the RHS of f is really a record selector, and
+changes it to a HsRecSel. In contrast x is locally bound, shadowing
+the record selector, and stays as an HsVar.
+
+The renamer adds the Name of the record selector into the XCFieldOcc
+extension field, The typechecker keeps HsRecSel as HsRecSel, and
+transforms the record-selector Name to an Id.
+-}
+
 -- | A Haskell expression.
 data HsExpr p
   = HsVar     (XVar p)
@@ -282,11 +335,10 @@ data HsExpr p
                              --   solving. See Note [Holes] in GHC.Tc.Types.Constraint.
 
 
-  | HsRecFld  (XRecFld p)
-              (AmbiguousFieldOcc p) -- ^ Variable pointing to record selector
-              -- The parser produces HsVars
-              -- The renamer renames record-field selectors to HsRecFld
-              -- The typechecker preserves HsRecFld
+  | HsRecSel  (XRecSel p)
+              (FieldOcc p) -- ^ Variable pointing to record selector
+                           -- See Note [Non-overloaded record field selectors] and
+                           -- Note [Record selectors in the AST]
 
   | HsOverLabel (XOverLabel p) FastString
      -- ^ Overloaded label (Note [Overloaded labels] in GHC.OverloadedLabels)
@@ -331,7 +383,7 @@ data HsExpr p
   -- NB Bracketed ops such as (+) come out as Vars.
 
   -- NB Sadly, we need an expr for the operator in an OpApp/Section since
-  -- the renamer may turn a HsVar into HsRecFld or HsUnboundVar
+  -- the renamer may turn a HsVar into HsRecSel or HsUnboundVar
 
   | OpApp       (XOpApp p)
                 (LHsExpr p)       -- left operand
@@ -353,7 +405,9 @@ data HsExpr p
 
   -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
   | HsPar       (XPar p)
+               !(LHsToken "(" p)
                 (LHsExpr p)  -- ^ Parenthesised expr; see Note [Parens in HsSyn]
+               !(LHsToken ")" p)
 
   | SectionL    (XSectionL p)
                 (LHsExpr p)    -- operand; see Note [Sections in HsSyn]
@@ -481,27 +535,29 @@ data HsExpr p
   -- | Record field selection e.g @z.x@.
   --
   --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnDot'
-  --
-  -- This case only arises when the OverloadedRecordDot langauge
-  -- extension is enabled.
 
+  -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
+
+  -- This case only arises when the OverloadedRecordDot langauge
+  -- extension is enabled. See Note [Record Selectors in the AST].
   | HsGetField {
         gf_ext :: XGetField p
       , gf_expr :: LHsExpr p
-      , gf_field :: Located (HsFieldLabel p)
+      , gf_field :: XRec p (DotFieldOcc p)
       }
 
   -- | Record field selector. e.g. @(.x)@ or @(.x.y)@
   --
+  -- This case only arises when the OverloadedRecordDot langauge
+  -- extensions is enabled. See Note [Record Selectors in the AST].
+
   --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpenP'
   --         'GHC.Parser.Annotation.AnnDot', 'GHC.Parser.Annotation.AnnCloseP'
-  --
-  -- This case only arises when the OverloadedRecordDot langauge
-  -- extensions is enabled.
 
+  -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
   | HsProjection {
         proj_ext :: XProjection p
-      , proj_flds :: [Located (HsFieldLabel p)]
+      , proj_flds :: [XRec p (DotFieldOcc p)]
       }
 
   -- | Expression with an explicit type signature. @e :: type@
@@ -616,12 +672,12 @@ type family PendingTcSplice' p
 
 -- ---------------------------------------------------------------------
 
-data HsFieldLabel p
-  = HsFieldLabel
-    { hflExt   :: XCHsFieldLabel p
-    , hflLabel :: Located FieldLabelString
+data DotFieldOcc p
+  = DotFieldOcc
+    { dfoExt   :: XCDotFieldOcc p
+    , dfoLabel :: XRec p FieldLabelString
     }
-  | XHsFieldLabel !(XXHsFieldLabel p)
+  | XDotFieldOcc !(XXDotFieldOcc p)
 
 -- ---------------------------------------------------------------------
 
@@ -877,7 +933,9 @@ data HsCmd id
        -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
 
   | HsCmdPar    (XCmdPar id)
+               !(LHsToken "(" id)
                 (LHsCmd id)                     -- parenthesised command
+               !(LHsToken ")" id)
     -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'('@,
     --             'GHC.Parser.Annotation.AnnClose' @')'@
 

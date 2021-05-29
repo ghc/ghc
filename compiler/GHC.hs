@@ -1,4 +1,5 @@
-{-# LANGUAGE CPP, NondecreasingIndentation, ScopedTypeVariables #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE NondecreasingIndentation, ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections, NamedFieldPuns #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -296,8 +297,6 @@ module GHC (
   * inline bits of GHC.Driver.Main here to simplify layering: hscTcExpr, hscStmt.
 -}
 
-#include "HsVersions.h"
-
 import GHC.Prelude hiding (init)
 
 import GHC.Platform
@@ -331,7 +330,6 @@ import GHCi.RemoteTypes
 import qualified GHC.Parser as Parser
 import GHC.Parser.Lexer
 import GHC.Parser.Annotation
-import GHC.Parser.Errors.Ppr
 import GHC.Parser.Utils
 
 import GHC.Iface.Load        ( loadSysInterface )
@@ -1585,42 +1583,43 @@ pprParenSymName a = parenSymOcc (getOccName a) (ppr (getName a))
 -- on whether the module is interpreted or not.
 
 
--- Extract the filename, stringbuffer content and dynflags associed to a module
+-- Extract the filename, stringbuffer content and dynflags associed to a ModSummary
+-- Given an initialised GHC session a ModSummary can be retrieved for
+-- a module by using 'getModSummary'
 --
 -- XXX: Explain pre-conditions
-getModuleSourceAndFlags :: GhcMonad m => Module -> m (String, StringBuffer, DynFlags)
-getModuleSourceAndFlags mod = do
-  m <- getModSummary (moduleName mod)
+getModuleSourceAndFlags :: ModSummary -> IO (String, StringBuffer, DynFlags)
+getModuleSourceAndFlags m = do
   case ml_hs_file $ ms_location m of
-    Nothing -> do dflags <- getDynFlags
-                  liftIO $ throwIO $ mkApiErr dflags (text "No source available for module " <+> ppr mod)
+    Nothing -> throwIO $ mkApiErr (ms_hspp_opts m) (text "No source available for module " <+> ppr (ms_mod m))
     Just sourceFile -> do
-        source <- liftIO $ hGetStringBuffer sourceFile
+        source <- hGetStringBuffer sourceFile
         return (sourceFile, source, ms_hspp_opts m)
 
 
 -- | Return module source as token stream, including comments.
 --
--- The module must be in the module graph and its source must be available.
+-- A 'Module' can be turned into a 'ModSummary' using 'getModSummary' if
+-- your session is fully initialised.
 -- Throws a 'GHC.Driver.Env.SourceError' on parse error.
-getTokenStream :: GhcMonad m => Module -> m [Located Token]
+getTokenStream :: ModSummary -> IO [Located Token]
 getTokenStream mod = do
   (sourceFile, source, dflags) <- getModuleSourceAndFlags mod
   let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
   case lexTokenStream (initParserOpts dflags) source startLoc of
     POk _ ts    -> return ts
-    PFailed pst -> throwErrors (foldPsMessages mkParserErr (getErrorMessages pst))
+    PFailed pst -> throwErrors (GhcPsMessage <$> getErrorMessages pst)
 
 -- | Give even more information on the source than 'getTokenStream'
 -- This function allows reconstructing the source completely with
 -- 'showRichTokenStream'.
-getRichTokenStream :: GhcMonad m => Module -> m [(Located Token, String)]
+getRichTokenStream :: ModSummary -> IO [(Located Token, String)]
 getRichTokenStream mod = do
   (sourceFile, source, dflags) <- getModuleSourceAndFlags mod
   let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
   case lexTokenStream (initParserOpts dflags) source startLoc of
     POk _ ts    -> return $ addSourceToTokens startLoc source ts
-    PFailed pst -> throwErrors (foldPsMessages mkParserErr (getErrorMessages pst))
+    PFailed pst -> throwErrors (GhcPsMessage <$> getErrorMessages pst)
 
 -- | Given a source location and a StringBuffer corresponding to this
 -- location, return a rich token stream with the source associated to the
@@ -1800,12 +1799,11 @@ parser str dflags filename =
 
      PFailed pst ->
          let (warns,errs) = getMessages pst in
-         (foldPsMessages (mkParserWarn dflags) warns
-         , Left (foldPsMessages mkParserErr errs))
+         (GhcPsMessage <$> warns, Left $ GhcPsMessage <$> errs)
 
      POk pst rdr_module ->
          let (warns,_) = getMessages pst in
-         (foldPsMessages (mkParserWarn dflags) warns, Right rdr_module)
+         (GhcPsMessage <$> warns, Right rdr_module)
 
 -- -----------------------------------------------------------------------------
 -- | Find the package environment (if one exists)

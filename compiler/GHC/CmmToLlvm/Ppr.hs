@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 
 -- ----------------------------------------------------------------------------
 -- | Pretty print helpers for the LLVM Code generator.
@@ -6,8 +6,6 @@
 module GHC.CmmToLlvm.Ppr (
         pprLlvmCmmDecl, pprLlvmData, infoSection
     ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 

@@ -1,5 +1,5 @@
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE MultiWayIf #-}
@@ -29,8 +29,6 @@ module GHCi.UI (
         ghciCommands,
         ghciWelcomeMsg
     ) where
-
-#include "HsVersions.h"
 
 -- GHCi
 import qualified GHCi.UI.Monad as GhciMonad ( args, runStmt, runDecls' )
@@ -99,9 +97,11 @@ import qualified GHC.Linker.Loader as Loader
 import GHC.Data.Maybe ( orElse, expectJust )
 import GHC.Types.Name.Set
 import GHC.Utils.Panic hiding ( showException, try )
+import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Data.Bag (unitBag)
+import qualified GHC.Data.Strict as Strict
 
 -- Haskell Libraries
 import System.Console.Haskeline as Haskeline
@@ -1539,7 +1539,7 @@ infoThing allInfo str = do
                                      (catMaybes mb_stuffs)
     return $ vcat (intersperse (text "") $ map pprInfo filtered)
 
-  -- Filter out names whose parent is also there Good
+  -- Filter out names whose parent is also there. Good
   -- example is '[]', which is both a type and data
   -- constructor in the same type
 filterOutChildren :: (a -> TyThing) -> [a] -> [a]
@@ -1833,7 +1833,7 @@ checkModule m = do
            case GHC.moduleInfo r of
              cm | Just scope <- GHC.modInfoTopLevelScope cm ->
                 let
-                    (loc, glob) = ASSERT( all isExternalName scope )
+                    (loc, glob) = assert (all isExternalName scope) $
                                   partition ((== modl) . GHC.moduleName . GHC.nameModule) scope
                 in
                         (text "global names: " <+> ppr glob) $$
@@ -2568,7 +2568,7 @@ browseModule bang modl exports_only = do
                 -- identifiers first. We would like to improve this; see #1799.
             sorted_names = loc_sort local ++ occ_sort external
                 where
-                (local,external) = ASSERT( all isExternalName names )
+                (local,external) = assert (all isExternalName names) $
                                    partition ((==modl) . nameModule) names
                 occ_sort = sortBy (compare `on` nameOccName)
                 -- try to sort by src location. If the first name in our list
@@ -3743,7 +3743,7 @@ stepLocalCmd arg = withSandboxOnly ":steplocal" $ step arg
         Just loc -> do
            md <- fromMaybe (panic "stepLocalCmd") <$> getCurrentBreakModule
            current_toplevel_decl <- enclosingTickSpan md loc
-           doContinue (`isSubspanOf` RealSrcSpan current_toplevel_decl Nothing) GHC.SingleStep
+           doContinue (`isSubspanOf` RealSrcSpan current_toplevel_decl Strict.Nothing) GHC.SingleStep
 
 stepModuleCmd :: GhciMonad m => String -> m ()
 stepModuleCmd arg = withSandboxOnly ":stepmodule" $ step arg
@@ -3764,7 +3764,7 @@ enclosingTickSpan _ (UnhelpfulSpan _) = panic "enclosingTickSpan UnhelpfulSpan"
 enclosingTickSpan md (RealSrcSpan src _) = do
   ticks <- getTickArray md
   let line = srcSpanStartLine src
-  ASSERT(inRange (bounds ticks) line) do
+  massert (inRange (bounds ticks) line)
   let enclosing_spans = [ pan | (_,pan) <- ticks ! line
                                , realSrcSpanEnd pan >= realSrcSpanEnd src]
   return . head . sortBy leftmostLargestRealSrcSpan $ enclosing_spans
@@ -4095,7 +4095,7 @@ findBreakAndSet md lookupTickTree = do
          (alreadySet, nm) <-
                recordBreak $ BreakLocation
                        { breakModule = md
-                       , breakLoc = RealSrcSpan pan Nothing
+                       , breakLoc = RealSrcSpan pan Strict.Nothing
                        , breakTick = tick
                        , onBreakCmd = ""
                        , breakEnabled = True
@@ -4157,7 +4157,7 @@ findBreakByCoord mb_file (line, col) arr
         ticks = arr ! line
 
         -- the ticks that span this coordinate
-        contains = [ tick | tick@(_,pan) <- ticks, RealSrcSpan pan Nothing `spans` (line,col),
+        contains = [ tick | tick@(_,pan) <- ticks, RealSrcSpan pan Strict.Nothing `spans` (line,col),
                             is_correct_file pan ]
 
         is_correct_file pan
@@ -4250,7 +4250,7 @@ list2 [arg] = do
         let loc = GHC.srcSpanStart (GHC.nameSrcSpan name)
         case loc of
             RealSrcLoc l _ ->
-               do tickArray <- ASSERT( isExternalName name )
+               do tickArray <- assert (isExternalName name) $
                                getTickArray (GHC.nameModule name)
                   let mb_span = findBreakByCoord (Just (GHC.srcLocFile l))
                                         (GHC.srcLocLine l, GHC.srcLocCol l)
@@ -4552,7 +4552,7 @@ wantNameFromInterpretedModule noCanDo str and_then =
    case names of
       []    -> return ()
       (n:_) -> do
-            let modl = ASSERT( isExternalName n ) GHC.nameModule n
+            let modl = assert (isExternalName n) $ GHC.nameModule n
             if not (GHC.isExternalName n)
                then noCanDo n $ ppr n <>
                                 text " is not defined in an interpreted module"

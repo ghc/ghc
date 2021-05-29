@@ -24,8 +24,6 @@ module GHC.Builtin.PrimOps (
         PrimCall(..)
     ) where
 
-#include "HsVersions.h"
-
 import GHC.Prelude
 
 import GHC.Builtin.Types.Prim

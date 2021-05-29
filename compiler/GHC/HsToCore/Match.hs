@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE MonadComprehensions #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -19,8 +19,6 @@ module GHC.HsToCore.Match
    , matchSinglePat, matchSinglePatVar
    )
 where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 import GHC.Platform
@@ -61,6 +59,7 @@ import GHC.Utils.Misc
 import GHC.Types.Name
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Data.FastString
 import GHC.Types.Unique
 import GHC.Types.Unique.DFM
@@ -184,15 +183,15 @@ match :: [MatchId]        -- ^ Variables rep\'ing the exprs we\'re matching with
       -> DsM (MatchResult CoreExpr) -- ^ Desugared result!
 
 match [] ty eqns
-  = ASSERT2( not (null eqns), ppr ty )
+  = assertPpr (not (null eqns)) (ppr ty) $
     return (foldr1 combineMatchResults match_results)
   where
-    match_results = [ ASSERT( null (eqn_pats eqn) )
+    match_results = [ assert (null (eqn_pats eqn)) $
                       eqn_rhs eqn
                     | eqn <- eqns ]
 
 match (v:vs) ty eqns    -- Eqns *can* be empty
-  = ASSERT2( all (isInternalName . idName) vars, ppr vars )
+  = assertPpr (all (isInternalName . idName) vars) (ppr vars) $
     do  { dflags <- getDynFlags
         ; let platform = targetPlatform dflags
                 -- Tidy the first pattern, generating
@@ -422,7 +421,7 @@ tidy1 :: Id                  -- The Id being scrutinised
 -- It eliminates many pattern forms (as-patterns, variable patterns,
 -- list patterns, etc) and returns any created bindings in the wrapper.
 
-tidy1 v o (ParPat _ pat)      = tidy1 v o (unLoc pat)
+tidy1 v o (ParPat _ _ pat _)  = tidy1 v o (unLoc pat)
 tidy1 v o (SigPat _ pat _)    = tidy1 v o (unLoc pat)
 tidy1 _ _ (WildPat ty)        = return (idDsWrapper, WildPat ty)
 tidy1 v o (BangPat _ (L l p)) = tidy_bang_pat v o l p
@@ -518,7 +517,7 @@ tidy_bang_pat :: Id -> Origin -> SrcSpanAnnA -> Pat GhcTc
               -> DsM (DsWrapper, Pat GhcTc)
 
 -- Discard par/sig under a bang
-tidy_bang_pat v o _ (ParPat _ (L l p)) = tidy_bang_pat v o l p
+tidy_bang_pat v o _ (ParPat _ _ (L l p) _) = tidy_bang_pat v o l p
 tidy_bang_pat v o _ (SigPat _ (L l p) _) = tidy_bang_pat v o l p
 
 -- Push the bang-pattern inwards, in the hope that
@@ -574,13 +573,13 @@ push_bang_into_newtype_arg :: SrcSpanAnnA
 -- See Note [Bang patterns and newtypes]
 -- We are transforming   !(N p)   into   (N !p)
 push_bang_into_newtype_arg l _ty (PrefixCon ts (arg:args))
-  = ASSERT( null args)
+  = assert (null args) $
     PrefixCon ts [L l (BangPat noExtField arg)]
 push_bang_into_newtype_arg l _ty (RecCon rf)
   | HsRecFields { rec_flds = L lf fld : flds } <- rf
-  , HsRecField { hsRecFieldArg = arg } <- fld
-  = ASSERT( null flds)
-    RecCon (rf { rec_flds = [L lf (fld { hsRecFieldArg
+  , HsFieldBind { hfbRHS = arg } <- fld
+  = assert (null flds) $
+    RecCon (rf { rec_flds = [L lf (fld { hfbRHS
                                            = L l (BangPat noExtField arg) })] })
 push_bang_into_newtype_arg l ty (RecCon rf) -- If a user writes !(T {})
   | HsRecFields { rec_flds = [] } <- rf
@@ -873,7 +872,7 @@ matchSinglePatVar :: Id   -- See Note [Match Ids]
                   -> HsMatchContext GhcRn -> LPat GhcTc
                   -> Type -> MatchResult CoreExpr -> DsM (MatchResult CoreExpr)
 matchSinglePatVar var mb_scrut ctx pat ty match_result
-  = ASSERT2( isInternalName (idName var), ppr var )
+  = assertPpr (isInternalName (idName var)) (ppr var) $
     do { dflags <- getDynFlags
        ; locn   <- getSrcSpanDs
        -- Pattern match check warnings
@@ -1053,8 +1052,8 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
     exp :: HsExpr GhcTc -> HsExpr GhcTc -> Bool
     -- real comparison is on HsExpr's
     -- strip parens
-    exp (HsPar _ (L _ e)) e'   = exp e e'
-    exp e (HsPar _ (L _ e'))   = exp e e'
+    exp (HsPar _ _ (L _ e) _) e' = exp e e'
+    exp e (HsPar _ _ (L _ e') _) = exp e e'
     -- because the expressions do not necessarily have the same type,
     -- we have to compare the wrappers
     exp (XExpr (WrapExpr (HsWrap h e))) (XExpr (WrapExpr (HsWrap  h' e'))) =
@@ -1171,7 +1170,7 @@ patGroup _ (NPat _ (L _ (OverLit {ol_val=oval})) mb_neg _) =
     (HsFractional f, is_neg)
       | is_neg    -> PgN $! negateFractionalLit f
       | otherwise -> PgN f
-    (HsIsString _ s, _) -> ASSERT(isNothing mb_neg)
+    (HsIsString _ s, _) -> assert (isNothing mb_neg) $
                             PgOverS s
 patGroup _ (NPlusKPat _ _ (L _ (OverLit {ol_val=oval})) _ _ _) =
   case oval of

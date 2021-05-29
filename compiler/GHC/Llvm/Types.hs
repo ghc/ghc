@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP        #-}
+
 {-# LANGUAGE LambdaCase #-}
 
 --------------------------------------------------------------------------------
@@ -6,8 +6,6 @@
 --
 
 module GHC.Llvm.Types where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 

@@ -558,7 +558,53 @@ InTreeAnnotations1:
 	$(CHECK_PPR)   $(LIBDIR) InTreeAnnotations1.hs
 	$(CHECK_EXACT) $(LIBDIR) InTreeAnnotations1.hs
 
+.PHONY: PprLinearArrow
+PprLinearArrow:
+	# $(CHECK_PPR)   $(LIBDIR) PprLinearArrow.hs
+	$(CHECK_EXACT) $(LIBDIR) PprLinearArrow.hs
+
+
 .PHONY: Test19784
 Test19784:
 	$(CHECK_PPR)   $(LIBDIR) Test19784.hs
 	$(CHECK_EXACT) $(LIBDIR) Test19784.hs
+
+.PHONY: Test19798
+Test19798:
+	$(CHECK_PPR)   $(LIBDIR) Test19798.hs
+	$(CHECK_EXACT) $(LIBDIR) Test19798.hs
+
+.PHONY: Test19813
+Test19813:
+	# $(CHECK_PPR)   $(LIBDIR) Test19813.hs
+	$(CHECK_EXACT) $(LIBDIR) Test19813.hs
+
+.PHONY: Test19814
+Test19814:
+	$(CHECK_PPR)   $(LIBDIR) Test19814.hs
+	$(CHECK_EXACT) $(LIBDIR) Test19814.hs
+
+.PHONY: Test19821
+Test19821:
+	$(CHECK_PPR)   $(LIBDIR) Test19821.hs
+	$(CHECK_EXACT) $(LIBDIR) Test19821.hs
+
+.PHONY: Test19834
+Test19834:
+	$(CHECK_PPR)   $(LIBDIR) Test19834.hs
+	$(CHECK_EXACT) $(LIBDIR) Test19834.hs
+
+.PHONY: Test19839
+Test19839:
+	$(CHECK_PPR)   $(LIBDIR) Test19839.hs
+	$(CHECK_EXACT) $(LIBDIR) Test19839.hs
+
+.PHONY: Test19840
+Test19840:
+	$(CHECK_PPR)   $(LIBDIR) Test19840.hs
+	$(CHECK_EXACT) $(LIBDIR) Test19840.hs
+
+.PHONY: Test19850
+Test19850:
+	$(CHECK_PPR)   $(LIBDIR) Test19850.hs
+	$(CHECK_EXACT) $(LIBDIR) Test19850.hs

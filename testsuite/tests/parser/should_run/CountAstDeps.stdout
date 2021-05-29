@@ -1,4 +1,4 @@
-Found 255 Language.Haskell.Syntax module dependencies
+Found 257 Language.Haskell.Syntax module dependencies
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
 GHC.Builtin.Types
@@ -76,6 +76,7 @@ GHC.Data.Maybe
 GHC.Data.OrdList
 GHC.Data.Pair
 GHC.Data.Stream
+GHC.Data.Strict
 GHC.Data.StringBuffer
 GHC.Data.TrieMap
 GHC.Driver.Backend
@@ -113,7 +114,6 @@ GHC.Iface.Syntax
 GHC.Iface.Type
 GHC.Linker.Types
 GHC.Parser.Annotation
-GHC.Parser.Errors
 GHC.Parser.Errors.Ppr
 GHC.Parser.Errors.Types
 GHC.Parser.Types
@@ -167,6 +167,7 @@ GHC.Types.Fixity
 GHC.Types.Fixity.Env
 GHC.Types.ForeignCall
 GHC.Types.ForeignStubs
+GHC.Types.Hint
 GHC.Types.HpcInfo
 GHC.Types.IPE
 GHC.Types.Id
@@ -229,6 +230,7 @@ GHC.Utils.Binary
 GHC.Utils.Binary.Typeable
 GHC.Utils.BufHandle
 GHC.Utils.CliOption
+GHC.Utils.Constants
 GHC.Utils.Error
 GHC.Utils.Exception
 GHC.Utils.FV

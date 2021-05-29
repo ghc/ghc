@@ -5,11 +5,14 @@
 
 import Data.List
 import Data.Data
+import Control.Monad.IO.Class
 import GHC.Types.SrcLoc
 import GHC hiding (moduleName)
 import GHC.Hs.Dump
 import GHC.Driver.Session
 import GHC.Driver.Ppr
+import GHC.Driver.Make
+import GHC.Unit.Module.ModSummary
 import GHC.Utils.Outputable hiding (space)
 import System.Environment( getArgs )
 import System.Exit
@@ -77,26 +80,15 @@ testOneFile libdir fileName = do
 
 parseOneFile :: FilePath -> FilePath -> IO ParsedModule
 parseOneFile libdir fileName = do
-       let modByFile m =
-             case ml_hs_file $ ms_location m of
-               Nothing -> False
-               Just fn -> fn == fileName
        runGhc (Just libdir) $ do
          dflags <- getSessionDynFlags
          let dflags2 = dflags `gopt_set` Opt_KeepRawTokenStream
          _ <- setSessionDynFlags dflags2
-         addTarget Target { targetId = TargetFile fileName Nothing
-                          , targetAllowObjCode = True
-                          , targetUnitId = homeUnitId_ dflags
-                          , targetContents = Nothing }
-         _ <- load LoadAllTargets
-         graph <- getModuleGraph
-         let
-           modSum = case filter modByFile (mgModSummaries graph) of
-                     [x] -> x
-                     xs -> error $ "Can't find module, got:"
-                              ++ show (map (ml_hs_file . ms_location) xs)
-         parseModule modSum
+         hsc_env <- getSession
+         ms <- liftIO $ summariseFile hsc_env [] fileName Nothing True Nothing
+         case ms of
+           Left _err -> error "parseOneFile"
+           Right ems -> parseModule (emsModSummary ems)
 
 getPragmas :: Located HsModule -> String
 getPragmas (L _ (HsModule { hsmodAnn = anns'})) = pragmaStr

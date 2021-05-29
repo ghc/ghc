@@ -6,7 +6,7 @@
 Type checking of type signatures in interface files
 -}
 
-{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE NondecreasingIndentation #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
@@ -23,8 +23,6 @@ module GHC.IfaceToCore (
         tcIfaceGlobal,
         tcIfaceOneShot
  ) where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -74,6 +72,8 @@ import GHC.Unit.Home.ModInfo
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
+import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Logger
 
 import GHC.Data.Bag
@@ -1291,12 +1291,23 @@ tcIfaceCompleteMatches :: [IfaceCompleteMatch] -> IfL [CompleteMatch]
 tcIfaceCompleteMatches = mapM tcIfaceCompleteMatch
 
 tcIfaceCompleteMatch :: IfaceCompleteMatch -> IfL CompleteMatch
-tcIfaceCompleteMatch (IfaceCompleteMatch ms mtc) = do
-  conlikes <- mkUniqDSet <$> mapM (forkM doc . tcIfaceConLike) ms
+tcIfaceCompleteMatch (IfaceCompleteMatch ms mtc) = forkM doc $ do -- See Note [Positioning of forkM]
+  conlikes <- mkUniqDSet <$> mapM tcIfaceConLike ms
   mtc' <- traverse tcIfaceTyCon mtc
   return (CompleteMatch conlikes mtc')
   where
     doc = text "COMPLETE sig" <+> ppr ms
+
+{- Note [Positioning of forkM]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We need to be lazy when type checking the interface, since these functions are
+called when the interface itself is being loaded, which means it is not in the
+PIT yet. If we are not lazy enough, in certain cases we might recursively try to
+load the same interface in an infinite loop.
+
+For this reason, the forkM should be around as much of the computation as
+possible.
+-}
 
 {-
 ************************************************************************
@@ -1557,12 +1568,12 @@ tcIfaceAlt :: CoreExpr -> Mult -> (TyCon, [Type])
            -> IfaceAlt
            -> IfL CoreAlt
 tcIfaceAlt _ _ _ (IfaceAlt IfaceDefault names rhs)
-  = ASSERT( null names ) do
+  = assert (null names) $ do
     rhs' <- tcIfaceExpr rhs
     return (Alt DEFAULT [] rhs')
 
 tcIfaceAlt _ _ _ (IfaceAlt (IfaceLitAlt lit) names rhs)
-  = ASSERT( null names ) do
+  = assert (null names) $ do
     lit' <- tcIfaceLit lit
     rhs' <- tcIfaceExpr rhs
     return (Alt (LitAlt lit') [] rhs')

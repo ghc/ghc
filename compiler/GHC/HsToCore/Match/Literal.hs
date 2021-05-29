@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP                 #-}
+
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE TypeApplications    #-}
@@ -23,8 +23,6 @@ module GHC.HsToCore.Match.Literal
    , warnAboutEmptyEnumerations
    )
 where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 import GHC.Platform
@@ -56,6 +54,7 @@ import GHC.Utils.Outputable as Outputable
 import GHC.Driver.Session
 import GHC.Utils.Misc
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Data.FastString
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Core.FamInstEnv ( FamInstEnvs, normaliseType )
@@ -204,7 +203,7 @@ dsFractionalLitToRational fl@FL{ fl_signi = signi, fl_exp = exp, fl_exp_base = b
         !denom = mkIntegerExpr (denominator val)
         (ratio_data_con, integer_ty)
             = case tcSplitTyConApp ty of
-                    (tycon, [i_ty]) -> ASSERT(isIntegerTy i_ty && tycon `hasKey` ratioTyConKey)
+                    (tycon, [i_ty]) -> assert (isIntegerTy i_ty && tycon `hasKey` ratioTyConKey)
                                        (head (tyConDataCons tycon), i_ty)
                     x -> pprPanic "dsLit" (ppr x)
     in return $! (mkCoreConApps ratio_data_con [Type integer_ty, num, denom])
@@ -448,7 +447,7 @@ getLHsIntegralLit :: LHsExpr GhcTc -> Maybe (Integer, Type)
 -- ^ See if the expression is an 'Integral' literal.
 getLHsIntegralLit (L _ e) = go e
   where
-    go (HsPar _ e)            = getLHsIntegralLit e
+    go (HsPar _ _ e _)        = getLHsIntegralLit e
     go (HsOverLit _ over_lit) = getIntegralLit over_lit
     go (HsLit _ lit)          = getSimpleIntegralLit lit
 
@@ -479,7 +478,7 @@ getSimpleIntegralLit _ = Nothing
 
 -- | Extract the Char if the expression is a Char literal.
 getLHsCharLit :: LHsExpr GhcTc -> Maybe Char
-getLHsCharLit (L _ (HsPar _ e))            = getLHsCharLit e
+getLHsCharLit (L _ (HsPar _ _ e _))        = getLHsCharLit e
 getLHsCharLit (L _ (HsTick _ _ e))         = getLHsCharLit e
 getLHsCharLit (L _ (HsBinTick _ _ _ e))    = getLHsCharLit e
 getLHsCharLit (L _ (HsLit _ (HsChar _ c))) = Just c

@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP          #-}
+
 {-# LANGUAGE TypeFamilies #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
@@ -17,8 +17,6 @@ module GHC.HsToCore.Expr
    , dsValBinds, dsLit, dsSyntaxExpr
    )
 where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
@@ -70,6 +68,7 @@ import GHC.Utils.Misc
 import GHC.Data.Bag
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Core.PatSyn
 import Control.Monad
 import Data.Void( absurd )
@@ -161,19 +160,19 @@ ds_val_bind (NonRecursive, hsbinds) body
 
 ds_val_bind (is_rec, binds) _body
   | anyBag (isUnliftedHsBind . unLoc) binds  -- see Note [Strict binds checks] in GHC.HsToCore.Binds
-  = ASSERT( isRec is_rec )
+  = assert (isRec is_rec )
     errDsCoreExpr $
     hang (text "Recursive bindings for unlifted types aren't allowed:")
        2 (vcat (map ppr (bagToList binds)))
 
 -- Ordinary case for bindings; none should be unlifted
 ds_val_bind (is_rec, binds) body
-  = do  { MASSERT( isRec is_rec || isSingletonBag binds )
+  = do  { massert (isRec is_rec || isSingletonBag binds)
                -- we should never produce a non-recursive list of multiple binds
 
         ; (force_vars,prs) <- dsLHsBinds binds
         ; let body' = foldr seqVar body force_vars
-        ; ASSERT2( not (any (isUnliftedType . idType . fst) prs), ppr is_rec $$ ppr binds )
+        ; assertPpr (not (any (isUnliftedType . idType . fst) prs)) (ppr is_rec $$ ppr binds) $
           case prs of
             [] -> return body
             _  -> return (Let (Rec prs) body') }
@@ -209,8 +208,8 @@ dsUnliftedBind (FunBind { fun_id = L l fun
                -- so must be simply unboxed
   = do { (args, rhs) <- matchWrapper (mkPrefixFunRhs (L l $ idName fun))
                                      Nothing matches
-       ; MASSERT( null args ) -- Functions aren't lifted
-       ; MASSERT( isIdHsWrapper co_fn )
+       ; massert (null args) -- Functions aren't lifted
+       ; massert (isIdHsWrapper co_fn)
        ; let rhs' = mkOptTickBox tick rhs
        ; return (bindNonRec fun rhs' body) }
 
@@ -245,9 +244,9 @@ dsUnliftedBind bind body = pprPanic "dsLet: unlifted" (ppr bind $$ ppr body)
 -- function in GHC.Tc.Utils.Zonk:
 -- putSrcSpanDs loc $ do
 --   { core_expr <- dsExpr e
---   ; MASSERT2( exprType core_expr `eqType` hsExprType e
---             , ppr e <+> dcolon <+> ppr (hsExprType e) $$
---                 ppr core_expr <+> dcolon <+> ppr (exprType core_expr) )
+--   ; massertPpr (exprType core_expr `eqType` hsExprType e)
+--                (ppr e <+> dcolon <+> ppr (hsExprType e) $$
+--                 ppr core_expr <+> dcolon <+> ppr (exprType core_expr))
 --   ; return core_expr }
 dsLExpr :: LHsExpr GhcTc -> DsM CoreExpr
 dsLExpr (L loc e) =
@@ -267,12 +266,11 @@ dsLExprNoLP (L loc e)
 
 dsExpr :: HsExpr GhcTc -> DsM CoreExpr
 dsExpr (HsVar    _ (L _ id))           = dsHsVar id
-dsExpr (HsRecFld _ (Unambiguous id _)) = dsHsVar id
-dsExpr (HsRecFld _ (Ambiguous   id _)) = dsHsVar id
+dsExpr (HsRecSel _ (FieldOcc id _))    = dsHsVar id
 dsExpr (HsUnboundVar (HER ref _ _) _)  = dsEvTerm =<< readMutVar ref
         -- See Note [Holes] in GHC.Tc.Types.Constraint
 
-dsExpr (HsPar _ e)            = dsLExpr e
+dsExpr (HsPar _ _ e _)        = dsLExpr e
 dsExpr (ExprWithTySig _ e _)  = dsLExpr e
 
 dsExpr (HsIPVar {})           = panic "dsExpr: HsIPVar"
@@ -484,7 +482,7 @@ dsExpr (RecordCon { rcon_con  = L _ con_like
 
              mk_arg (arg_ty, fl)
                = case findField (rec_flds rbinds) (flSelector fl) of
-                   (rhs:rhss) -> ASSERT( null rhss )
+                   (rhs:rhss) -> assert (null rhss )
                                  dsLExprNoLP rhs
                    []         -> mkErrorAppDs rEC_CON_ERROR_ID arg_ty (ppr (flLabel fl))
              unlabelled_bottom arg_ty = mkErrorAppDs rEC_CON_ERROR_ID arg_ty Outputable.empty
@@ -603,7 +601,7 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = Left fields
   | null fields
   = dsLExpr record_expr
   | otherwise
-  = ASSERT2( notNull cons_to_upd, ppr expr )
+  = assertPpr (notNull cons_to_upd) (ppr expr) $
 
     do  { record_expr' <- dsLExpr record_expr
         ; field_binds' <- mapM ds_field fields
@@ -633,7 +631,7 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = Left fields
       -- else we shadow other uses of the record selector
       -- Hence 'lcl_id'.  Cf #2735
     ds_field (L _ rec_field)
-      = do { rhs <- dsLExpr (hsRecFieldArg rec_field)
+      = do { rhs <- dsLExpr (hfbRHS rec_field)
            ; let fld_id = unLoc (hsRecUpdFieldId rec_field)
            ; lcl_id <- newSysLocalDs (idMult fld_id) (idType fld_id)
            ; return (idName fld_id, lcl_id, rhs) }
@@ -771,7 +769,7 @@ dsExpr (HsTick _ tickish e) = do
 
 dsExpr (HsBinTick _ ixT ixF e) = do
   e2 <- dsLExpr e
-  do { ASSERT(exprType e2 `eqType` boolTy)
+  do { assert (exprType e2 `eqType` boolTy)
        mkBinaryTickBox ixT ixF e2
      }
 
@@ -819,8 +817,8 @@ dsSyntaxExpr NoSyntaxExprTc _ = panic "dsSyntaxExpr"
 
 findField :: [LHsRecField GhcTc arg] -> Name -> [arg]
 findField rbinds sel
-  = [hsRecFieldArg fld | L _ fld <- rbinds
-                       , sel == idName (unLoc $ hsRecFieldId fld) ]
+  = [hfbRHS fld | L _ fld <- rbinds
+                       , sel == idName (hsRecFieldId fld) ]
 
 {-
 %--------------------------------------------------------------------
@@ -938,7 +936,7 @@ dsDo ctx stmts
     goL ((L loc stmt):lstmts) = putSrcSpanDsA loc (go loc stmt lstmts)
 
     go _ (LastStmt _ body _ _) stmts
-      = ASSERT( null stmts ) dsLExpr body
+      = assert (null stmts ) dsLExpr body
         -- The 'return' op isn't used for 'do' expressions
 
     go _ (BodyStmt _ rhs then_expr _) stmts
@@ -1237,7 +1235,7 @@ dsHsWrapped :: HsExpr GhcTc -> DsM CoreExpr
 dsHsWrapped orig_hs_expr
   = go idHsWrapper orig_hs_expr
   where
-    go wrap (HsPar _ (L _ hs_e))
+    go wrap (HsPar _ _ (L _ hs_e) _)
        = go wrap hs_e
     go wrap1 (XExpr (WrapExpr (HsWrap wrap2 hs_e)))
        = go (wrap1 <.> wrap2) hs_e
