@@ -824,10 +824,12 @@ endif # Windows_Host
 # time.  This should help us with code signing issues by removing extended
 # attribuets from all files.
 ifeq "$(Darwin_Host)" "YES"
+XATTR ?= /usr/bin/xattr
+
 install : install_darwin
 .PHONY: install_darwin
 install_darwin:
-	xattr -c -r .
+	if [ -e "${XATTR}" ]; then "${XATTR}" -c -r .; fi
 endif # Darwin_Host
 
 ifneq "$(BINDIST)" "YES"
