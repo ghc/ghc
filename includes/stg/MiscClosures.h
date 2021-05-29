@@ -302,6 +302,9 @@ RTS_ENTRY(stg_sel_13_noupd);
 RTS_ENTRY(stg_sel_14_noupd);
 RTS_ENTRY(stg_sel_15_noupd);
 
+RTS_ENTRY(stg_sel_n_upd);
+RTS_ENTRY(stg_sel_n_noupd);
+
 /* standard ap thunks */
 
 RTS_THUNK(stg_ap_1_upd);
