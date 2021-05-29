@@ -374,7 +374,6 @@ lint-base:
   script:
     - .gitlab/ci.sh setup
     - .gitlab/ci.sh configure
-    - .gitlab/ci.sh run_hadrian stage1:lib:base
     - .gitlab/ci.sh run_hadrian lint:base
 
 lint-compiler:

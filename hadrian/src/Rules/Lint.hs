@@ -50,12 +50,18 @@ base = do
   let machDeps     = "includes/MachDeps.h"
   let ghcautoconf  = stage1Lib </> "ghcautoconf.h"
   let ghcplatform  = stage1Lib </> "ghcplatform.h"
-  need ["stage1:lib:base", ghcautoconf, ghcplatform, machDeps]
+  -- ./configure is called here manually because we need to generate
+  -- HsBaseConfig.h, which is created from HsBaseConfig.h.in. ./configure
+  -- is usually run by Cabal which generates this file but if we do that
+  -- then hadrian thinks it needs to build the stage0 compiler before
+  -- attempting to configure. Therefore we just run it directly everytime,
+  -- which is slower but still faster than building the whole of stage0.
+  cmd_ (Cwd "libraries/base") "./configure"
+  need [ghcautoconf, ghcplatform, machDeps]
   let includeDirs =
         [ "includes"
         , "libraries/base/include"
         , stage1Lib
-        , buildDir </> "stage1/libraries/base/build/include"
         ]
   runHLint includeDirs [] "libraries/base"
 
