@@ -46,6 +46,7 @@ import GHC.Tc.Solver.Rewrite     ( rewriteType )
 import GHC.Tc.Utils.Unify        ( buildTvImplication )
 import GHC.Tc.Utils.TcMType as TcM
 import GHC.Tc.Utils.Monad   as TcM
+import GHC.Tc.Solver.InertSet
 import GHC.Tc.Solver.Monad  as TcS
 import GHC.Tc.Types.Constraint
 import GHC.Core.Predicate
@@ -1770,7 +1771,7 @@ simplify_loop n limit definitely_redo_implications
        ; (unifs1, wc1) <- reportUnifications $  -- See Note [Superclass iteration]
                           solveSimpleWanteds simples
                 -- Any insoluble constraints are in 'simples' and so get rewritten
-                -- See Note [Rewrite insolubles] in GHC.Tc.Solver.Monad
+                -- See Note [Rewrite insolubles] in GHC.Tc.Solver.InertSet
 
        ; wc2 <- if not definitely_redo_implications  -- See Note [Superclass iteration]
                    && unifs1 == 0                    -- for this conditional

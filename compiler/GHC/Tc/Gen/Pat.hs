@@ -1054,7 +1054,7 @@ constraints will kick in: that logic only fires on constraints
 whose Origin is (OccurrenceOf f).
 
 See also Note [Overview of implicit CallStacks] in GHC.Tc.Types.Evidence
-and Note [Solving CallStack constraints] in GHC.Tc.Solver.Monad
+and Note [Solving CallStack constraints] in GHC.Tc.Solver.Types
 -}
 ----------------------------
 -- | Convenient wrapper for calling a matchExpectedXXX function
