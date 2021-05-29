@@ -1,7 +1,7 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 84, types: 54, coercions: 0, joins: 0/1}
+  = {terms: 88, types: 52, coercions: 0, joins: 0/2}
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T18903.$trModule4 :: GHC.Prim.Addr#
@@ -53,43 +53,46 @@ T18903.h2 :: Int
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 T18903.h2 = GHC.Types.I# -2#
 
--- RHS size: {terms: 56, types: 40, coercions: 0, joins: 0/1}
+-- RHS size: {terms: 60, types: 38, coercions: 0, joins: 0/2}
 T18903.$wh [InlPrag=[2]] :: GHC.Prim.Int# -> Int
 [GblId,
  Arity=1,
  Str=<SL>,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [70] 262 10}]
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [70] 197 10}]
 T18903.$wh
   = \ (ww :: GHC.Prim.Int#) ->
       let {
-        $wg [InlPrag=NOINLINE, Dmd=MCM(P(MP(L),1P(L)))]
-          :: GHC.Prim.Int# -> (# Int, Int #)
+        $wg [InlPrag=NOINLINE, Dmd=MCM(P(L,1P(L)))]
+          :: GHC.Prim.Int# -> (# GHC.Prim.Int#, Int #)
         [LclId, Arity=1, Str=<1L>, Unf=OtherCon []]
         $wg
           = \ (ww1 [OS=OneShot] :: GHC.Prim.Int#) ->
               case ww1 of ds {
                 __DEFAULT ->
-                  (# GHC.Types.I# (GHC.Prim.*# 2# ds),
-                     case ds of {
+                  (# GHC.Prim.*# 2# ds,
+                     case ds of wild {
                        __DEFAULT ->
-                         case GHC.Classes.divInt# 2# ds of ww4 { __DEFAULT ->
-                         GHC.Types.I# ww4
+                         let {
+                           c1# :: GHC.Prim.Int#
+                           [LclId]
+                           c1# = GHC.Prim.andI# 1# (GHC.Prim.<# wild 0#) } in
+                         case GHC.Prim.quotInt# (GHC.Prim.-# 2# c1#) wild of wild1
+                         { __DEFAULT ->
+                         GHC.Types.I# (GHC.Prim.-# wild1 c1#)
                          };
                        -1# -> T18903.h2;
-                       0# -> case GHC.Real.divZeroError of wild1 { }
+                       0# -> GHC.Real.divZeroError @Int
                      } #);
-                1# -> (# GHC.Types.I# ww, T18903.h1 #)
+                1# -> (# ww, T18903.h1 #)
               } } in
       case ww of ds {
         __DEFAULT ->
-          case $wg ds of { (# ww2, ww3 #) ->
-          case ww2 of { GHC.Types.I# x ->
-          case ww3 of { GHC.Types.I# y -> GHC.Types.I# (GHC.Prim.+# x y) }
-          }
+          case $wg ds of { (# ww1, ww2 #) ->
+          case ww2 of { GHC.Types.I# y -> GHC.Types.I# (GHC.Prim.+# ww1 y) }
           };
         1# -> T18903.h1;
-        2# -> case $wg 2# of { (# ww2, ww3 #) -> ww3 }
+        2# -> case $wg 2# of { (# ww1, ww2 #) -> ww2 }
       }
 
 -- RHS size: {terms: 6, types: 3, coercions: 0, joins: 0/0}
@@ -101,9 +104,8 @@ h [InlPrag=[2]] :: Int -> Int
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (w [Occ=Once1!] :: Int) ->
-                 case w of { GHC.Types.I# ww1 [Occ=Once1] -> T18903.$wh ww1 }}]
-h = \ (w :: Int) ->
-      case w of { GHC.Types.I# ww1 -> T18903.$wh ww1 }
+                 case w of { GHC.Types.I# ww [Occ=Once1] -> T18903.$wh ww }}]
+h = \ (w :: Int) -> case w of { GHC.Types.I# ww -> T18903.$wh ww }
 
 
 
