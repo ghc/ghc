@@ -11,7 +11,7 @@ Utility functions on @Core@ syntax
 -- | Commonly useful utilities for manipulating the Core language
 module GHC.Core.Utils (
         -- * Constructing expressions
-        mkCast,
+        mkCast, mkCastMCo, mkPiMCo,
         mkTick, mkTicks, mkTickNoHNF, tickHNFArgs,
         bindNonRec, needsCaseBinding,
         mkAltExpr, mkDefaultCase, mkSingleAltCase,
@@ -136,7 +136,7 @@ exprType (Tick _ e)          = exprType e
 exprType (Lam binder expr)   = mkLamType binder (exprType expr)
 exprType e@(App _ _)
   = case collectArgs e of
-        (fun, args) -> applyTypeToArgs e (exprType fun) args
+        (fun, args) -> applyTypeToArgs (pprCoreExpr e) (exprType fun) args
 
 exprType other = pprPanic "exprType" (pprCoreExpr other)
 
@@ -264,10 +264,10 @@ Note that there might be existentially quantified coercion variables, too.
 -}
 
 -- Not defined with applyTypeToArg because you can't print from GHC.Core.
-applyTypeToArgs :: CoreExpr -> Type -> [CoreExpr] -> Type
+applyTypeToArgs :: SDoc -> Type -> [CoreExpr] -> Type
 -- ^ A more efficient version of 'applyTypeToArg' when we have several arguments.
 -- The first argument is just for debugging, and gives some context
-applyTypeToArgs e op_ty args
+applyTypeToArgs pp_e op_ty args
   = go op_ty args
   where
     go op_ty []                   = op_ty
@@ -286,11 +286,20 @@ applyTypeToArgs e op_ty args
     go_ty_args op_ty rev_tys args
        = go (piResultTys op_ty (reverse rev_tys)) args
 
-    panic_msg as = vcat [ text "Expression:" <+> pprCoreExpr e
-                     , text "Type:" <+> ppr op_ty
-                     , text "Args:" <+> ppr args
-                     , text "Args':" <+> ppr as ]
+    panic_msg as = vcat [ text "Expression:" <+> pp_e
+                        , text "Type:" <+> ppr op_ty
+                        , text "Args:" <+> ppr args
+                        , text "Args':" <+> ppr as ]
 
+mkCastMCo :: CoreExpr -> MCoercionR -> CoreExpr
+mkCastMCo e MRefl    = e
+mkCastMCo e (MCo co) = Cast e co
+  -- We are careful to use (MCo co) only when co is not reflexive
+  -- Hence (Cast e co) rather than (mkCast e co)
+
+mkPiMCo :: Var -> MCoercionR -> MCoercionR
+mkPiMCo _  MRefl   = MRefl
+mkPiMCo v (MCo co) = MCo (mkPiCo Representational v co)
 
 {-
 ************************************************************************
@@ -2483,8 +2492,7 @@ tryEtaReduce bndrs body
        , let mult = idMult bndr
        , Just (fun_mult, _, _) <- splitFunTy_maybe fun_ty
        , mult `eqType` fun_mult -- There is no change in multiplicity, otherwise we must abort
-       = let reflCo = mkRepReflCo (idType bndr)
-         in Just (mkFunCo Representational (multToCo mult) reflCo co, [])
+       = Just (mkFunResCo Representational (idScaledType bndr) co, [])
     ok_arg bndr (Cast e co_arg) co fun_ty
        | (ticks, Var v) <- stripTicksTop tickishFloatable e
        , Just (fun_mult, _, _) <- splitFunTy_maybe fun_ty

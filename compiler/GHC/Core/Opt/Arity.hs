@@ -1285,6 +1285,7 @@ etaExpandAT (AT oss _) orig_expr = eta_expand oss                         orig_e
 
 -- etaExpand arity e = res
 -- Then 'res' has at least 'arity' lambdas at the top
+--    possibly with a cast wrapped around the outside
 -- See Note [Eta expansion with ArityType]
 --
 -- etaExpand deals with for-alls. For example:
@@ -1292,33 +1293,43 @@ etaExpandAT (AT oss _) orig_expr = eta_expand oss                         orig_e
 -- where  E :: forall a. a -> a
 -- would return
 --      (/\b. \y::a -> E b y)
---
--- It deals with coerces too, though they are now rare
--- so perhaps the extra code isn't worth it
 
 eta_expand :: [OneShotInfo] -> CoreExpr -> CoreExpr
+eta_expand one_shots (Cast expr co)
+  = mkCast (eta_expand one_shots expr) co
+
 eta_expand one_shots orig_expr
-  = go one_shots orig_expr
+  = go one_shots [] orig_expr
   where
       -- Strip off existing lambdas and casts before handing off to mkEtaWW
+      -- This is mainly to avoid spending time cloning binders and substituting
+      -- when there is actually nothing to do.  It's slightly awkward to deal
+      -- with casts here, apart from the topmost one, and they are rare, so
+      -- if we find one we just hand off to mkEtaWW anyway
       -- Note [Eta expansion and SCCs]
-    go [] expr = expr
-    go oss@(_:oss1) (Lam v body) | isTyVar v = Lam v (go oss  body)
-                                 | otherwise = Lam v (go oss1 body)
-    go oss (Cast expr co) = Cast (go oss expr) co
+    go [] _ _ = orig_expr  -- Already has the specified arity; no-op
 
-    go oss expr
+    go oss@(_:oss1) vs (Lam v body)
+      | isTyVar v = go oss  (v:vs) body
+      | otherwise = go oss1 (v:vs) body
+
+    go oss rev_vs expr
       = -- pprTrace "ee" (vcat [ppr orig_expr, ppr expr, pprEtaInfos etas]) $
-        retick $ etaInfoAbs etas (etaInfoApp in_scope' sexpr etas)
+        retick $ etaInfoAbs top_eis $
+                 etaInfoApp in_scope' sexpr eis
       where
           in_scope = mkInScopeSet (exprFreeVars expr)
-          (in_scope', etas) = mkEtaWW oss (ppr orig_expr) in_scope (exprType expr)
+          (in_scope', eis@(EI eta_bndrs mco))
+              = mkEtaWW oss (ppr orig_expr) in_scope (exprType expr)
+          top_bndrs = reverse rev_vs
+          top_eis   = EI (top_bndrs ++ eta_bndrs) (mkPiMCos top_bndrs mco)
 
           -- Find ticks behind type apps.
           -- See Note [Eta expansion and source notes]
+          -- I don't really understand this code SLPJ May 21
           (expr', args) = collectArgs expr
           (ticks, expr'') = stripTicksTop tickishFloatable expr'
-          sexpr = foldl' App expr'' args
+          sexpr = mkApps expr'' args
           retick expr = foldr mkTick expr ticks
 
 {- *********************************************************************
@@ -1333,23 +1344,23 @@ eta_expand one_shots orig_expr
 Suppose we have (e :: ty) and we want to eta-expand it to arity N.
 This what eta_expand does.  We do it in two steps:
 
-1.  mkEtaWW: from 'ty' and 'N' build a [EtaInfo] which describes
+1.  mkEtaWW: from 'ty' and 'N' build a EtaInfo which describes
     the shape of the expansion necessary to expand to arity N.
 
 2.  Build the term
        \ v1..vn.  e v1 .. vn
     where those abstractions and applications are described by
-    the same [EtaInfo].  Specifically we build the term
+    the same EtaInfo.  Specifically we build the term
 
        etaInfoAbs etas (etaInfoApp in_scope e etas)
 
-   where etas :: [EtaInfo]#
+   where etas :: EtaInfo
          etaInfoAbs builds the lambdas
          etaInfoApp builds the applictions
 
-   Note that the /same/ [EtaInfo] drives both etaInfoAbs and etaInfoApp
+   Note that the /same/ EtaInfo drives both etaInfoAbs and etaInfoApp
 
-To a first approximation [EtaInfo] is just [Var].  But
+To a first approximation EtaInfo is just [Var].  But
 casts complicate the question.  If we have
    newtype N a = MkN (S -> a)
 and
@@ -1370,7 +1381,7 @@ payoff in cancelling out casts aggressively wherever possible.
 
 This matters a lot in etaEInfoApp, where we
 * Do beta-reduction on the fly
-* Use getARg_mabye to get a cast out of the way,
+* Use getArg_maybe to get a cast out of the way,
   so that we can do beta reduction
 Together this makes a big difference.  Consider when e is
    case x of
@@ -1388,88 +1399,17 @@ it.  Better to kill it at birth.
 -}
 
 --------------
-data EtaInfo            -- Abstraction      Application
-  = EtaVar Var          -- /\a. []         [] a
-                        -- (\x. [])        [] x
-  | EtaCo CoercionR     -- [] |> sym co    [] |> co
+data EtaInfo = EI [Var] MCoercionR
 
-instance Outputable EtaInfo where
-   ppr (EtaVar v) = text "EtaVar" <+> ppr v  <+> dcolon <+> ppr (idType v)
-   ppr (EtaCo co) = text "EtaCo"  <+> hang (ppr co) 2 (dcolon <+> ppr (coercionType co))
+-- EI bs co
+-- Abstraction:  (\b1 b2 .. bn. []) |> sym co
+-- Application:  ([] |> co) b1 b2 .. bn
+--
+--    e :: T    co :: T ~ (t1 -> t2 -> .. -> tn -> tr)
+--    e = (\b1 b2 ... bn. (e |> co) b1 b2 .. bn) |> sym co
 
--- Used in debug-printing
--- pprEtaInfos :: [EtaInfo] -> SDoc
--- pprEtaInfos eis = brackets $ vcat $ punctuate comma $ map ppr eis
 
-pushCoercion :: Coercion -> [EtaInfo] -> [EtaInfo]
--- Puts a EtaCo on the front of a [EtaInfo], but combining
--- with an existing EtaCo if possible
--- A minor improvement
-pushCoercion co1 (EtaCo co2 : eis)
-  | isReflCo co = eis
-  | otherwise   = EtaCo co : eis
-  where
-    co = co1 `mkTransCo` co2
-
-pushCoercion co eis
-  = EtaCo co : eis
-
-getArg_maybe :: [EtaInfo] -> Maybe (CoreArg, [EtaInfo])
--- Get an argument to the front of the [EtaInfo], if possible,
--- by pushing any EtaCo through the argument
-getArg_maybe eis = go MRefl eis
-  where
-    go :: MCoercion -> [EtaInfo] -> Maybe (CoreArg, [EtaInfo])
-    go _         []                = Nothing
-    go mco       (EtaCo co2 : eis) = go (mkTransMCoL mco co2) eis
-    go MRefl     (EtaVar v : eis)  = Just (varToCoreExpr v, eis)
-    go (MCo co)  (EtaVar v : eis)
-      | Just (arg, mco) <- pushCoArg co (varToCoreExpr v)
-      = case mco of
-           MRefl  -> Just (arg, eis)
-           MCo co -> Just (arg, pushCoercion co eis)
-      | otherwise
-      = Nothing
-
-mkCastMCo :: CoreExpr -> MCoercionR -> CoreExpr
-mkCastMCo e MRefl    = e
-mkCastMCo e (MCo co) = Cast e co
-  -- We are careful to use (MCo co) only when co is not reflexive
-  -- Hence (Cast e co) rather than (mkCast e co)
-
-mkPiMCo :: Var -> MCoercionR -> MCoercionR
-mkPiMCo _  MRefl   = MRefl
-mkPiMCo v (MCo co) = MCo (mkPiCo Representational v co)
-
---------------
-etaInfoAbs :: [EtaInfo] -> CoreExpr -> CoreExpr
--- See Note [The EtaInfo mechanism]
-etaInfoAbs eis expr
-  | null eis  = expr
-  | otherwise = case final_mco of
-                   MRefl  -> expr'
-                   MCo co -> mkCast expr' co
-  where
-     (expr', final_mco) = foldr do_one (split_cast expr) eis
-
-     do_one :: EtaInfo -> (CoreExpr, MCoercion) -> (CoreExpr, MCoercion)
-     -- Implements the "Abstraction" column in the comments for data EtaInfo
-     -- In both argument and result the pair (e,mco) denotes (e |> mco)
-     do_one (EtaVar v) (expr, mco) = (Lam v expr, mkPiMCo v mco)
-     do_one (EtaCo co) (expr, mco) = (expr, mco `mkTransMCoL` mkSymCo co)
-
-     split_cast :: CoreExpr -> (CoreExpr, MCoercion)
-     split_cast (Cast e co) = (e, MCo co)
-     split_cast e           = (e, MRefl)
-     -- We could look in the body of lets, and the branches of a case
-     -- But then we would have to worry about whether the cast mentioned
-     -- any of the bound variables, which is tiresome. Later maybe.
-     -- Result: we may end up with
-     --     (\(x::Int). case x of { DEFAULT -> e1 |> co }) |> sym (<Int>->co)
-     -- and fail to optimise it away
-
---------------
-etaInfoApp :: InScopeSet -> CoreExpr -> [EtaInfo] -> CoreExpr
+etaInfoApp :: InScopeSet -> CoreExpr -> EtaInfo -> CoreExpr
 -- (etaInfoApp s e eis) returns something equivalent to
 --             (substExpr s e `appliedto` eis)
 -- See Note [The EtaInfo mechanism]
@@ -1477,13 +1417,16 @@ etaInfoApp :: InScopeSet -> CoreExpr -> [EtaInfo] -> CoreExpr
 etaInfoApp in_scope expr eis
   = go (mkEmptySubst in_scope) expr eis
   where
-    go :: Subst -> CoreExpr -> [EtaInfo] -> CoreExpr
+    go :: Subst -> CoreExpr -> EtaInfo -> CoreExpr
     -- 'go' pushed down the eta-infos into the branch of a case
     -- and the body of a let; and does beta-reduction if possible
+    --   go subst fun co [b1,..,bn]  returns  (subst(fun) |> co) b1 .. bn
     go subst (Tick t e) eis
       = Tick (substTickish subst t) (go subst e eis)
-    go subst (Cast e co) eis
-      = go subst e (pushCoercion (Core.substCo subst co) eis)
+
+    go subst (Cast e co) (EI bs mco)
+      = go subst e (EI bs (Core.substCo subst co `mkTransMCoR` mco))
+
     go subst (Case e b ty alts) eis
       = Case (Core.substExprSC subst e) b1 ty' alts'
       where
@@ -1492,35 +1435,40 @@ etaInfoApp in_scope expr eis
         ty'   = etaInfoAppTy (Core.substTy subst ty) eis
         subst_alt (Alt con bs rhs) = Alt con bs' (go subst2 rhs eis)
                  where
-                    (subst2,bs') = Core.substBndrs subst1 bs
+                  (subst2,bs') = Core.substBndrs subst1 bs
+
     go subst (Let b e) eis
       | not (isJoinBind b) -- See Note [Eta expansion for join points]
       = Let b' (go subst' e eis)
       where
         (subst', b') = Core.substBindSC subst b
 
-    -- Beta-reduction if possible, using getArg_maybe to push
-    -- any intervening casts past the argument
-    -- See Note [The EtaInfo mechansim]
-    go subst (Lam v e) eis
-      | Just (arg, eis') <- getArg_maybe eis
-      = go (Core.extendSubst subst v arg) e eis'
+    -- Beta-reduction if possible, pushing any intervening casts past
+    -- the argument. See Note [The EtaInfo mechansim]
+    go subst (Lam v e) (EI (b:bs) mco)
+      | Just (arg,mco') <- pushMCoArg mco (varToCoreExpr b)
+      = go (Core.extendSubst subst v arg) e (EI bs mco')
 
     -- Stop pushing down; just wrap the expression up
-    go subst e eis = wrap (Core.substExprSC subst e) eis
-
-    wrap e []               = e
-    wrap e (EtaVar v : eis) = wrap (App e (varToCoreExpr v)) eis
-    wrap e (EtaCo co : eis) = wrap (Cast e co) eis
-
+    go subst e (EI bs mco) = Core.substExprSC subst e
+                             `mkCastMCo` mco
+                             `mkVarApps` bs
 
 --------------
-etaInfoAppTy :: Type -> [EtaInfo] -> Type
+etaInfoAppTy :: Type -> EtaInfo -> Type
 -- If                    e :: ty
 -- then   etaInfoApp e eis :: etaInfoApp ty eis
-etaInfoAppTy ty []               = ty
-etaInfoAppTy ty (EtaVar v : eis) = etaInfoAppTy (applyTypeToArg ty (varToCoreExpr v)) eis
-etaInfoAppTy _  (EtaCo co : eis) = etaInfoAppTy (coercionRKind co) eis
+etaInfoAppTy ty (EI bs mco)
+  = applyTypeToArgs (text "etaInfoAppTy") ty1 (map varToCoreExpr bs)
+  where
+    ty1 = case mco of
+             MRefl  -> ty
+             MCo co -> coercionRKind co
+
+--------------
+etaInfoAbs :: EtaInfo -> CoreExpr -> CoreExpr
+-- See Note [The EtaInfo mechanism]
+etaInfoAbs (EI bs mco) expr = (mkLams bs expr) `mkCastMCo` mkSymMCo mco
 
 --------------
 -- | @mkEtaWW n _ fvs ty@ will compute the 'EtaInfo' necessary for eta-expanding
@@ -1538,26 +1486,28 @@ mkEtaWW
   -> InScopeSet
   -- ^ A super-set of the free vars of the expression to eta-expand.
   -> Type
-  -> (InScopeSet, [EtaInfo])
+  -> (InScopeSet, EtaInfo)
   -- ^ The variables in 'EtaInfo' are fresh wrt. to the incoming 'InScopeSet'.
   -- The outgoing 'InScopeSet' extends the incoming 'InScopeSet' with the
   -- fresh variables in 'EtaInfo'.
 
 mkEtaWW orig_oss ppr_orig_expr in_scope orig_ty
-  = go 0 orig_oss empty_subst orig_ty []
+  = go 0 orig_oss empty_subst orig_ty
   where
     empty_subst = mkEmptyTCvSubst in_scope
 
     go :: Int                -- For fresh names
        -> [OneShotInfo]      -- Number of value args to expand to
        -> TCvSubst -> Type   -- We are really looking at subst(ty)
-       -> [EtaInfo]          -- Accumulating parameter
-       -> (InScopeSet, [EtaInfo])
-    go _ [] subst _ eis       -- See Note [exprArity invariant]
-       ----------- Done!  No more expansion needed
-       = (getTCvInScope subst, reverse eis)
+       -> (InScopeSet, EtaInfo)
+    -- (go [o1,..,on] subst ty) = (in_scope, EI [b1,..,bn] co)
+    --    co :: subst(ty) ~ b1_ty -> ... -> bn_ty -> tr
 
-    go n oss@(one_shot:oss1) subst ty eis       -- See Note [exprArity invariant]
+    go _ [] subst _       -- See Note [exprArity invariant]
+       ----------- Done!  No more expansion needed
+       = (getTCvInScope subst, EI [] MRefl)
+
+    go n oss@(one_shot:oss1) subst ty       -- See Note [exprArity invariant]
        ----------- Forall types  (forall a. ty)
        | Just (tcv,ty') <- splitForAllTyCoVar_maybe ty
        , (subst', tcv') <- Type.substVarBndr subst tcv
@@ -1565,19 +1515,21 @@ mkEtaWW orig_oss ppr_orig_expr in_scope orig_ty
                   | otherwise   = oss1
          -- A forall can bind a CoVar, in which case
          -- we consume one of the [OneShotInfo]
-       = go n oss' subst' ty' (EtaVar tcv' : eis)
+       , (in_scope, EI bs mco) <- go n oss' subst' ty'
+       = (in_scope, EI (tcv' : bs) (mkHomoForAllMCo tcv' mco))
 
        ----------- Function types  (t1 -> t2)
        | Just (mult, arg_ty, res_ty) <- splitFunTy_maybe ty
        , not (isTypeLevPoly arg_ty)
-          -- See Note [Levity polymorphism invariants] in GHC.Core
+          -- See Note [Representation polymorphism invariants] in GHC.Core
           -- See also test case typecheck/should_run/EtaExpandLevPoly
 
        , (subst', eta_id) <- freshEtaId n subst (Scaled mult arg_ty)
           -- Avoid free vars of the original expression
 
        , let eta_id' = eta_id `setIdOneShotInfo` one_shot
-       = go (n+1) oss1 subst' res_ty (EtaVar eta_id' : eis)
+       , (in_scope, EI bs mco) <- go (n+1) oss1 subst' res_ty
+       = (in_scope, EI (eta_id' : bs) (mkFunResMCo (idScaledType eta_id') mco))
 
        ----------- Newtypes
        -- Given this:
@@ -1587,17 +1539,20 @@ mkEtaWW orig_oss ppr_orig_expr in_scope orig_ty
        -- We want to get
        --      coerce T (\x::[T] -> (coerce ([T]->Int) e) x)
        | Just (co, ty') <- topNormaliseNewType_maybe ty
-       , let co' = Type.substCo subst co
+       , -- co :: ty ~ ty'
+         let co' = Type.substCo subst co
              -- Remember to apply the substitution to co (#16979)
              -- (or we could have applied to ty, but then
              --  we'd have had to zap it for the recursive call)
-       = go n oss subst ty' (pushCoercion co' eis)
+       , (in_scope, EI bs mco) <- go n oss subst ty'
+         -- mco :: subst(ty') ~ b1_ty -> ... -> bn_ty -> tr
+       = (in_scope, EI bs (mkTransMCoR co' mco))
 
        | otherwise       -- We have an expression of arity > 0,
                          -- but its type isn't a function, or a binder
-                         -- is levity-polymorphic
+                         -- is representation-polymorphic
        = WARN( True, (ppr orig_oss <+> ppr orig_ty) $$ ppr_orig_expr )
-         (getTCvInScope subst, reverse eis)
+         (getTCvInScope subst, EI [] MRefl)
         -- This *can* legitimately happen:
         -- e.g.  coerce Int (\x. x) Essentially the programmer is
         -- playing fast and loose with types (Happy does this a lot).
@@ -1635,13 +1590,16 @@ pushCoArgs co (arg:args) = do { (arg',  m_co1) <- pushCoArg  co  arg
                                                  ; return (arg':args', m_co2) }
                                   MRefl  -> return (arg':args, MRefl) }
 
+pushMCoArg :: MCoercionR -> CoreArg -> Maybe (CoreArg, MCoercion)
+pushMCoArg MRefl    arg = Just (arg, MRefl)
+pushMCoArg (MCo co) arg = pushCoArg co arg
+
 pushCoArg :: CoercionR -> CoreArg -> Maybe (CoreArg, MCoercion)
 -- We have (fun |> co) arg, and we want to transform it to
 --         (fun arg) |> co
 -- This may fail, e.g. if (fun :: N) where N is a newtype
 -- C.f. simplCast in GHC.Core.Opt.Simplify
 -- 'co' is always Representational
--- If the returned coercion is Nothing, then it would have been reflexive
 pushCoArg co (Type ty) = do { (ty', m_co') <- pushCoTyArg co ty
                             ; return (Type ty', m_co') }
 pushCoArg co val_arg   = do { (arg_co, m_co') <- pushCoValArg co
