@@ -845,8 +845,8 @@ dataConWrapperInlinePragma = alwaysInlinePragma { inl_rule = ConLike
 
 {- Note [Activation for data constructor wrappers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The Activation on a data constructor wrapper allows it to inline only in Phase
-0. This way rules have a chance to fire if they mention a data constructor on
+The Activation on a data constructor wrapper allows it to inline only in FinalPhase.
+This way rules have a chance to fire if they mention a data constructor on
 the left
    RULE "foo"  f (K a b) = ...
 Since the LHS of rules are simplified with InitialPhase, we won't
