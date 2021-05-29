@@ -30,6 +30,7 @@ import GHC.Platform
 import {-# SOURCE #-} GHC.HsToCore.Match ( match )
 import {-# SOURCE #-} GHC.HsToCore.Expr  ( dsExpr, dsSyntaxExpr )
 
+import GHC.HsToCore.Errors.Types
 import GHC.HsToCore.Monad
 import GHC.HsToCore.Utils
 
@@ -56,7 +57,6 @@ import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Data.FastString
-import qualified GHC.LanguageExtensions as LangExt
 import GHC.Core.FamInstEnv ( FamInstEnvs, normaliseType )
 
 import Control.Monad
@@ -263,10 +263,7 @@ warnAboutIdentities dflags conv_fn type_of_conv
   , idName conv_fn `elem` conversionNames
   , Just (_, arg_ty, res_ty) <- splitFunTy_maybe type_of_conv
   , arg_ty `eqType` res_ty  -- So we are converting  ty -> ty
-  = diagnosticDs (WarningWithFlag Opt_WarnIdentities)
-                 (vcat [ text "Call of" <+> ppr conv_fn <+> dcolon <+> ppr type_of_conv
-                       , nest 2 $ text "can probably be omitted"
-                 ])
+  = diagnosticDs (DsIdentitiesFound conv_fn type_of_conv)
 warnAboutIdentities _ _ _ = return ()
 
 conversionNames :: [Name]
@@ -347,25 +344,13 @@ warnAboutOverflowedLiterals dflags lit
     checkPositive :: Integer -> Name -> DsM ()
     checkPositive i tc
       = when (i < 0) $
-        diagnosticDs (WarningWithFlag Opt_WarnOverflowedLiterals)
-                     (vcat [ text "Literal" <+> integer i
-                             <+> text "is negative but" <+> ppr tc
-                             <+> text "only supports positive numbers"
-                           ])
+        diagnosticDs (DsOverflowedLiterals i tc Nothing (negLiteralExtEnabled dflags))
 
     check i tc minB maxB
       = when (i < minB || i > maxB) $
-        diagnosticDs (WarningWithFlag Opt_WarnOverflowedLiterals)
-                     (vcat [ text "Literal" <+> integer i
-                             <+> text "is out of the" <+> ppr tc <+> text "range"
-                             <+> integer minB <> text ".." <> integer maxB
-                           , sug ])
+        diagnosticDs (DsOverflowedLiterals i tc bounds (negLiteralExtEnabled dflags))
       where
-        sug | minB == -i   -- Note [Suggest NegativeLiterals]
-            , i > 0
-            , not (xopt LangExt.NegativeLiterals dflags)
-            = text "If you are trying to write a large negative literal, use NegativeLiterals"
-            | otherwise = Outputable.empty
+        bounds = Just (MinBound minB, MaxBound maxB)
 
 {-
 Note [Suggest NegativeLiterals]
@@ -441,7 +426,7 @@ warnAboutEmptyEnumerations fam_envs dflags fromExpr mThnExpr toExpr
   | otherwise = return ()
   where
     raiseWarning =
-      diagnosticDs (WarningWithFlag Opt_WarnEmptyEnumerations) (text "Enumeration is empty")
+      diagnosticDs DsEmptyEnumeration
 
 getLHsIntegralLit :: LHsExpr GhcTc -> Maybe (Integer, Type)
 -- ^ See if the expression is an 'Integral' literal.

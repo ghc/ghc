@@ -5,7 +5,7 @@
 -- | Provides factilities for pretty-printing 'Nabla's in a way appropriate for
 -- user facing pattern match warnings.
 module GHC.HsToCore.Pmc.Ppr (
-        pprUncovered
+      pprUncovered
     ) where
 
 import GHC.Prelude
@@ -25,7 +25,6 @@ import GHC.Data.Maybe
 import Data.List.NonEmpty (NonEmpty, nonEmpty, toList)
 
 import GHC.HsToCore.Pmc.Types
-import GHC.HsToCore.Pmc.Solver
 
 -- | Pretty-print the guts of an uncovered value vector abstraction, i.e., its
 -- components and refutable shapes associated to any mentioned variables.
