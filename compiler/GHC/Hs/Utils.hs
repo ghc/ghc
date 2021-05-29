@@ -1454,10 +1454,10 @@ hsConDeclsBinders cons
         in case unLoc r of
            -- remove only the first occurrence of any seen field in order to
            -- avoid circumventing detection of duplicate fields (#9156)
-           ConDeclGADT { con_names = names, con_g_args = args }
+           ConDeclGADT { con_names = names, con_body = body }
              -> (map (L loc . unLoc) names ++ ns, flds ++ fs)
              where
-                (remSeen', flds) = get_flds_gadt remSeen args
+                (remSeen', flds) = get_flds_gadt remSeen body
                 (ns, fs) = go remSeen' rs
 
            ConDeclH98 { con_name = name, con_args = args }
@@ -1471,9 +1471,9 @@ hsConDeclsBinders cons
     get_flds_h98 remSeen (RecCon flds) = get_flds remSeen flds
     get_flds_h98 remSeen _ = (remSeen, [])
 
-    get_flds_gadt :: Seen p -> HsConDeclGADTDetails (GhcPass p)
+    get_flds_gadt :: Seen p -> ConGADTBody (GhcPass p)
                   -> (Seen p, [LFieldOcc (GhcPass p)])
-    get_flds_gadt remSeen (RecConGADT flds) = get_flds remSeen flds
+    get_flds_gadt remSeen (RecConGADT flds _) = get_flds remSeen flds
     get_flds_gadt remSeen _ = (remSeen, [])
 
     get_flds :: Seen p -> LocatedL [LConDeclField (GhcPass p)]

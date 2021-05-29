@@ -95,6 +95,7 @@ import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Misc
 
 import Control.Monad
+import Data.Foldable
 import Data.Function ( on )
 import Data.Functor.Identity
 import Data.List (nubBy, partition)
@@ -1606,16 +1607,22 @@ kcTyClDecl (FamDecl _ (FamilyDecl { fdInfo   = fd_info })) fam_tc
 
 -------------------
 
--- Kind-check the types of the arguments to a data constructor.
+-- Kind-check the type of an argument to a data constructor.
 -- This includes doing kind unification if the type is a newtype.
 -- See Note [Implementation of UnliftedNewtypes] for why we need
--- the first two arguments.
+-- the first argument.
+kcConArgTy :: ContextKind -> HsScaled GhcRn (LHsType GhcRn) -> TcM ()
+kcConArgTy exp_kind (HsScaled mult ty) = do
+  { _ <- tcCheckLHsType (getBangType ty) exp_kind
+  ; void $ tcMult mult
+    -- See Note [Implementation of UnliftedNewtypes], STEP 2
+  }
+
+-- Kind-check the types of the arguments to a data constructor.
 kcConArgTys :: NewOrData -> Kind -> [HsScaled GhcRn (LHsType GhcRn)] -> TcM ()
 kcConArgTys new_or_data res_kind arg_tys = do
   { let exp_kind = getArgExpKind new_or_data res_kind
-  ; forM_ arg_tys (\(HsScaled mult ty) -> do _ <- tcCheckLHsType (getBangType ty) exp_kind
-                                             tcMult mult)
-    -- See Note [Implementation of UnliftedNewtypes], STEP 2
+  ; traverse_ (kcConArgTy exp_kind) arg_tys
   }
 
 -- Kind-check the types of arguments to a Haskell98 data constructor.
@@ -1626,12 +1633,28 @@ kcConH98Args new_or_data res_kind con_args = case con_args of
   RecCon (L _ flds) -> kcConArgTys new_or_data res_kind $
                        map (hsLinear . cd_fld_type . unLoc) flds
 
--- Kind-check the types of arguments to a GADT data constructor.
-kcConGADTArgs :: NewOrData -> Kind -> HsConDeclGADTDetails GhcRn -> TcM ()
-kcConGADTArgs new_or_data res_kind con_args = case con_args of
-  PrefixConGADT tys     -> kcConArgTys new_or_data res_kind tys
-  RecConGADT (L _ flds) -> kcConArgTys new_or_data res_kind $
-                           map (hsLinear . cd_fld_type . unLoc) flds
+-- Kind-check the types of the arguments and result in a GADT data constructor.
+kcConGADTBody :: NewOrData -> Kind -> ConGADTBody GhcRn -> TcM ()
+kcConGADTBody new_or_data res_kind body = case body of
+  PrefixConGADT prefix_body ->
+    kcPrefixConGADTBody new_or_data res_kind prefix_body
+  RecConGADT (L _ flds) res_ty -> do
+    _ <- tcCheckLHsType res_ty (TheKind res_kind)
+    kcConArgTys new_or_data res_kind $ map (hsLinear . cd_fld_type . unLoc) flds
+
+-- Kind-check the types of the arguments and result in a prefix GADT data constructor.
+kcPrefixConGADTBody :: NewOrData -> Kind -> PrefixConGADTBody GhcRn -> TcM ()
+kcPrefixConGADTBody new_or_data res_kind = go
+  where
+    exp_kind :: ContextKind
+    exp_kind = getArgExpKind new_or_data res_kind
+
+    go :: PrefixConGADTBody GhcRn -> TcM ()
+    go (PCGResult res_ty) =
+      void $ tcCheckLHsType res_ty (TheKind res_kind)
+    go (PCGAnonArg arg_ty body) = do
+      go body
+      kcConArgTy exp_kind arg_ty
 
 kcConDecls :: NewOrData
            -> Kind             -- The result kind signature
@@ -1670,17 +1693,16 @@ kcConDecl new_or_data
           _tc_res_kind   -- Not used in GADT case (and doesn't make sense)
           (ConDeclGADT
     { con_names = names, con_bndrs = L _ outer_bndrs, con_mb_cxt = cxt
-    , con_g_args = args, con_res_ty = res_ty })
+    , con_body = body })
   = -- See Note [kcConDecls: kind-checking data type decls]
     addErrCtxt (dataConCtxt names) $
     discardResult                      $
     bindOuterSigTKBndrs_Tv outer_bndrs $
         -- Why "_Tv"?  See Note [Using TyVarTvs for kind-checking GADTs]
     do { _ <- tcHsContext cxt
-       ; traceTc "kcConDecl:GADT {" (ppr names $$ ppr res_ty)
+       ; traceTc "kcConDecl:GADT {" (ppr names)
        ; con_res_kind <- newOpenTypeKind
-       ; _ <- tcCheckLHsType res_ty (TheKind con_res_kind)
-       ; kcConGADTArgs new_or_data con_res_kind args
+       ; kcConGADTBody new_or_data con_res_kind body
        ; traceTc "kcConDecl:GADT }" (ppr names $$ ppr con_res_kind)
        ; return () }
 
@@ -3460,8 +3482,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
   -- we get the res_kind by typechecking the result type.
           (ConDeclGADT { con_names = names
                        , con_bndrs = L _ outer_hs_bndrs
-                       , con_mb_cxt = cxt, con_g_args = hs_args
-                       , con_res_ty = hs_res_ty })
+                       , con_mb_cxt = cxt, con_body = body })
   = addErrCtxt (dataConCtxt names) $
     do { traceTc "tcConDecl 1 gadt" (ppr names)
        ; let (L _ name : _) = names
@@ -3470,26 +3491,8 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
            <- pushLevelAndSolveEqualitiesX "tcConDecl:GADT" $
               tcOuterTKBndrs skol_info outer_hs_bndrs       $
               do { ctxt <- tcHsContext cxt
-                 ; (res_ty, res_kind) <- tcInferLHsTypeKind hs_res_ty
-                         -- See Note [GADT return kinds]
-
-                 -- For data instances (only), ensure that the return type,
-                 -- res_ty, is a substitution instance of the header.
-                 -- See Note [GADT return types]
-                 ; case dd_info of
-                      DDataType -> return ()
-                      DDataInstance hdr_ty ->
-                        do { (subst, _meta_tvs) <- newMetaTyVars (binderVars tc_bndrs)
-                           ; let head_shape = substTy subst hdr_ty
-                           ; discardResult $
-                             popErrCtxt $  -- Drop dataConCtxt
-                             addErrCtxt (dataConResCtxt names) $
-                             unifyType Nothing res_ty head_shape }
-
-                   -- See Note [Datatype return kinds]
-                 ; let exp_kind = getArgExpKind new_or_data res_kind
-                 ; btys <- tcConGADTArgs exp_kind hs_args
-
+                 ; (btys, res_ty) <-
+                     tcConGADTBody names new_or_data dd_info tc_bndrs body
                  ; let (arg_tys, stricts) = unzip btys
                  ; field_lbls <- lookupConstructorFields name
                  ; return (ctxt, arg_tys, res_ty, field_lbls, stricts)
@@ -3527,7 +3530,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
        ; fam_envs <- tcGetFamInstEnvs
        ; let
            buildOneDataCon (L _ name) = do
-             { is_infix <- tcConIsInfixGADT name hs_args
+             { is_infix <- tcConIsInfixGADT name body
              ; rep_nm   <- newTyConRepName name
 
              ; buildDataCon fam_envs name is_infix
@@ -3642,14 +3645,14 @@ tcConIsInfixH98 _   details
            PrefixCon{} -> return False
 
 tcConIsInfixGADT :: Name
-             -> HsConDeclGADTDetails GhcRn
-             -> TcM Bool
-tcConIsInfixGADT con details
-  = case details of
+                 -> ConGADTBody GhcRn
+                 -> TcM Bool
+tcConIsInfixGADT con body
+  = case body of
            RecConGADT{} -> return False
-           PrefixConGADT arg_tys       -- See Note [Infix GADT constructors]
+           PrefixConGADT prefix_body   -- See Note [Infix GADT constructors]
                | isSymOcc (getOccName con)
-               , [_ty1,_ty2] <- map hsScaledThing arg_tys
+               , [_ty1,_ty2] <- map hsScaledThing $ anonPrefixConGADTArgs prefix_body
                   -> do { fix_env <- getFixityEnv
                         ; return (con `elemNameEnv` fix_env) }
                | otherwise -> return False
@@ -3668,15 +3671,60 @@ tcConH98Args exp_kind (InfixCon bty1 bty2)
 tcConH98Args exp_kind (RecCon fields)
   = tcRecConDeclFields exp_kind fields
 
-tcConGADTArgs :: ContextKind  -- expected kind of arguments
-                              -- always OpenKind for datatypes, but unlifted newtypes
-                              -- might have a specific kind
-              -> HsConDeclGADTDetails GhcRn
-              -> TcM [(Scaled TcType, HsSrcBang)]
-tcConGADTArgs exp_kind (PrefixConGADT btys)
-  = mapM (tcConArg exp_kind) btys
-tcConGADTArgs exp_kind (RecConGADT fields)
-  = tcRecConDeclFields exp_kind fields
+tcConGADTBody :: [LocatedN Name]
+              -> NewOrData
+              -> DataDeclInfo
+              -> [TyConBinder]
+              -> ConGADTBody GhcRn
+              -> TcM ([(Scaled TcType, HsSrcBang)], TcType)
+tcConGADTBody names new_or_data dd_info tc_bndrs body =
+  case body of
+    PrefixConGADT btys ->
+      tcPrefixConGADTBody names new_or_data dd_info tc_bndrs btys
+    RecConGADT fields res_ty -> do
+      -- See Note [GADT return kinds]
+      (tc_res_ty, tc_res_kind) <- tcInferLHsTypeKind res_ty
+      -- See Note [Datatype return kinds]
+      let exp_kind = getArgExpKind new_or_data tc_res_kind
+      tc_arg_tys <- tcRecConDeclFields exp_kind fields
+      pure (tc_arg_tys, tc_res_ty)
+
+tcPrefixConGADTBody :: [LocatedN Name]
+                    -> NewOrData
+                    -> DataDeclInfo
+                    -> [TyConBinder]
+                    -> PrefixConGADTBody GhcRn
+                    -> TcM ([(Scaled TcType, HsSrcBang)], TcType)
+tcPrefixConGADTBody names new_or_data dd_info tc_bndrs prefix_body = do
+  (tc_arg_tys, tc_res_ty, _) <- go prefix_body
+  pure (tc_arg_tys, tc_res_ty)
+  where
+    go :: PrefixConGADTBody GhcRn
+       -> TcM ([(Scaled TcType, HsSrcBang)], TcType, TcKind)
+    go (PCGResult res_ty) = do
+      -- See Note [GADT return kinds]
+      (tc_res_ty, tc_res_kind) <- tcInferLHsTypeKind res_ty
+
+      -- For data instances (only), ensure that the return type,
+      -- res_ty, is a substitution instance of the header.
+      -- See Note [GADT return types]
+      ; case dd_info of
+           DDataType -> return ()
+           DDataInstance hdr_ty ->
+             do { (subst, _meta_tvs) <- newMetaTyVars (binderVars tc_bndrs)
+                ; let head_shape = substTy subst hdr_ty
+                ; discardResult $
+                  popErrCtxt $  -- Drop dataConCtxt
+                  addErrCtxt (dataConResCtxt names) $
+                  unifyType Nothing tc_res_ty head_shape }
+
+      pure ([], tc_res_ty, tc_res_kind)
+    go (PCGAnonArg arg_ty body) = do
+      (tc_arg_tys, tc_res_ty, tc_res_kind) <- go body
+      -- See Note [Datatype return kinds]
+      let exp_kind = getArgExpKind new_or_data tc_res_kind
+      tc_arg_ty <- tcConArg exp_kind arg_ty
+      pure (tc_arg_ty:tc_arg_tys, tc_res_ty, tc_res_kind)
 
 tcConArg :: ContextKind  -- expected kind for args; always OpenKind for datatypes,
                          -- but might be an unlifted type with UnliftedNewtypes
@@ -3691,15 +3739,22 @@ tcConArg exp_kind (HsScaled w bty)
 tcRecConDeclFields :: ContextKind
                    -> LocatedL [LConDeclField GhcRn]
                    -> TcM [(Scaled TcType, HsSrcBang)]
-tcRecConDeclFields exp_kind fields
-  = mapM (tcConArg exp_kind) btys
+tcRecConDeclFields exp_kind (L _ fields)
+  = concatMapM tc_field fields
   where
-    -- We need a one-to-one mapping from field_names to btys
-    combined = map (\(L _ f) -> (cd_fld_names f,hsLinear (cd_fld_type f)))
-                   (unLoc fields)
-    explode (ns,ty) = zip ns (repeat ty)
-    exploded = concatMap explode combined
-    (_,btys) = unzip exploded
+    -- We need to ensure that each distinct field name gets its own type.
+    -- For example, if we have:
+    --
+    --   data T = MkT { a,b,c :: Int }
+    --
+    -- Then we should return /three/ Int types, not just one! At the same
+    -- time, we don't want to kind-check Int three separate times, as that
+    -- would be redundant. Therefore, we kind-check Int once and 'replicate'
+    -- it so that we return three occurrences of it.
+    tc_field :: LConDeclField GhcRn -> TcM [(Scaled TcType, HsSrcBang)]
+    tc_field (L _ f) = do
+      bty' <- tcConArg exp_kind $ hsLinear $ cd_fld_type f
+      pure $ replicate (length (cd_fld_names f)) bty'
 
 tcDataConMult :: HsArrow GhcRn -> TcM Mult
 tcDataConMult arr@(HsUnrestrictedArrow _) = do

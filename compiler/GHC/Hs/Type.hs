@@ -72,7 +72,7 @@ module GHC.Hs.Type (
         splitLHsPatSynTy,
         splitLHsForAllTyInvis, splitLHsForAllTyInvis_KP, splitLHsQualTy,
         splitLHsSigmaTyInvis, splitLHsGadtTy,
-        splitHsFunType, hsTyGetAppHead_maybe,
+        splitLHsPrefixGadtBodyTy, hsTyGetAppHead_maybe,
         mkHsOpTy, mkHsAppTy, mkHsAppTys, mkHsAppKindTy,
         ignoreParens, hsSigWcType, hsPatSigType,
         hsTyKindSig,
@@ -87,6 +87,7 @@ module GHC.Hs.Type (
 
 import GHC.Prelude
 
+import Language.Haskell.Syntax.Decls
 import Language.Haskell.Syntax.Type
 
 import {-# SOURCE #-} GHC.Hs.Expr ( pprSplice )
@@ -466,33 +467,42 @@ mkHsAppKindTy ext ty k
 -}
 
 ---------------------------------
--- splitHsFunType decomposes a type (t1 -> t2 ... -> tn)
--- Breaks up any parens in the result type:
---      splitHsFunType (a -> (b -> c)) = ([a,b], c)
--- It returns API Annotations for any parens removed
-splitHsFunType ::
+-- | Decomposes the body of prefix GADT constructor type into its argument
+-- and result types, breaking up parentheses as necessary in the process.
+-- (See also 'splitLHsGadtTy', which decomposes the top-level @forall@s and
+-- context of a GADT constructor type.)
+-- For example:
+--
+-- @
+-- 'splitLHsPrefixGadtBodyTy' (a -> (b -> T c)) =
+--   'PCGAnonArg' a ('PCGAnonArg' b ('PCGResultTy' (T c)))
+-- @
+--
+-- It returns exact print annotations for any parentheses removed, as well as
+-- for any associated comments.
+splitLHsPrefixGadtBodyTy ::
      LHsType (GhcPass p)
   -> ( [AddEpAnn], EpAnnComments -- The locations of any parens and
-                                  -- comments discarded
-     , [HsScaled (GhcPass p) (LHsType (GhcPass p))], LHsType (GhcPass p))
-splitHsFunType ty = go ty
+                                 -- comments discarded
+     , PrefixConGADTBody (GhcPass p) )
+splitLHsPrefixGadtBodyTy ty = go ty
   where
     go (L l (HsParTy an ty))
       = let
-          (anns, cs, args, res) = splitHsFunType ty
+          (anns, cs, body) = go ty
           anns' = anns ++ annParen2AddEpAnn an
           cs' = cs S.<> epAnnComments (ann l) S.<> epAnnComments an
-        in (anns', cs', args, res)
+        in (anns', cs', body)
 
     go (L ll (HsFunTy (EpAnn _ an cs) mult x y))
-      | (anns, csy, args, res) <- splitHsFunType y
-      = (anns, csy S.<> epAnnComments (ann ll), HsScaled mult x':args, res)
+      | (anns, csy, body) <- go y
+      = (anns, csy S.<> epAnnComments (ann ll), PCGAnonArg (HsScaled mult x') body)
       where
         (L (SrcSpanAnn a l) t) = x
         an' = addTrailingAnnToA l an cs a
         x' = L (SrcSpanAnn an' l) t
 
-    go other = ([], emptyComments, [], other)
+    go res_ty = ([], emptyComments, PCGResult res_ty)
 
 -- | Retrieve the name of the \"head\" of a nested type application.
 -- This is somewhat like @GHC.Tc.Gen.HsType.splitHsAppTys@, but a little more
@@ -587,7 +597,7 @@ splitLHsSigmaTyInvis ty
 --
 -- This function is careful not to look through parentheses.
 -- See @Note [GADT abstract syntax] (Wrinkle: No nested foralls or contexts)@
--- "GHC.Hs.Decls" for why this is important.
+-- "Language.Haskell.Syntax.Decls" for why this is important.
 splitLHsGadtTy ::
      LHsSigType GhcPs
   -> (HsOuterSigTyVarBndrs GhcPs, Maybe (LHsContext GhcPs), LHsType GhcPs)

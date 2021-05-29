@@ -88,22 +88,22 @@
             (NoExtField)))
           (Nothing)
           (PrefixConGADT
-           [])
-          (L
-           (SrcSpanAnn (EpAnnNotUsed) { T17544_kw.hs:16:18-20 })
-           (HsTyVar
-            (EpAnn
-             (Anchor
-              { T17544_kw.hs:16:18-20 }
-              (UnchangedAnchor))
-             []
-             (EpaComments
-              []))
-            (NotPromoted)
+           (PCGResult
             (L
              (SrcSpanAnn (EpAnnNotUsed) { T17544_kw.hs:16:18-20 })
-             (Unqual
-              {OccName: Foo}))))
+             (HsTyVar
+              (EpAnn
+               (Anchor
+                { T17544_kw.hs:16:18-20 }
+                (UnchangedAnchor))
+               []
+               (EpaComments
+                []))
+              (NotPromoted)
+              (L
+               (SrcSpanAnn (EpAnnNotUsed) { T17544_kw.hs:16:18-20 })
+               (Unqual
+                {OccName: Foo}))))))
           (Just
            (L
             { T17544_kw.hs:15:10-35 }
@@ -164,7 +164,8 @@
             (NoExtField)))
           (Nothing)
           (PrefixConGADT
-           [(HsScaled
+           (PCGAnonArg
+            (HsScaled
              (HsUnrestrictedArrow
               (NormalSyntax))
              (L
@@ -189,22 +190,23 @@
                 (EpaComments
                  []))
                (HsBoxedOrConstraintTuple)
-               [])))])
-          (L
-           (SrcSpanAnn (EpAnnNotUsed) { T17544_kw.hs:19:24-26 })
-           (HsTyVar
-            (EpAnn
-             (Anchor
-              { T17544_kw.hs:19:24-26 }
-              (UnchangedAnchor))
-             []
-             (EpaComments
-              []))
-            (NotPromoted)
-            (L
-             (SrcSpanAnn (EpAnnNotUsed) { T17544_kw.hs:19:24-26 })
-             (Unqual
-              {OccName: Bar}))))
+               [])))
+            (PCGResult
+             (L
+              (SrcSpanAnn (EpAnnNotUsed) { T17544_kw.hs:19:24-26 })
+              (HsTyVar
+               (EpAnn
+                (Anchor
+                 { T17544_kw.hs:19:24-26 }
+                 (UnchangedAnchor))
+                []
+                (EpaComments
+                 []))
+               (NotPromoted)
+               (L
+                (SrcSpanAnn (EpAnnNotUsed) { T17544_kw.hs:19:24-26 })
+                (Unqual
+                 {OccName: Bar})))))))
           (Just
            (L
             { T17544_kw.hs:18:13-38 }
@@ -312,3 +314,5 @@
     { T17544_kw.hs:12:3-33 }
     (HsDocString
      " Bad comment for the module")))))
+
+
