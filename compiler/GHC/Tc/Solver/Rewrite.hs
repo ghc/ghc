@@ -28,6 +28,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Tc.Solver.Monad as TcS
+import GHC.Tc.Solver.Types
 
 import GHC.Utils.Misc
 import GHC.Data.Maybe
@@ -333,7 +334,7 @@ it expands the synonym and proceeds; if not, it simply returns the
 unexpanded synonym. See also Note [Rewriting synonyms].
 
 Where do we actually perform rewriting within a type? See Note [Rewritable] in
-GHC.Tc.Solver.Monad.
+GHC.Tc.Solver.InertSet.
 
 Note [rewrite_args performance]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
