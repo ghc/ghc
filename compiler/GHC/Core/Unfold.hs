@@ -954,8 +954,11 @@ couldBeSmallEnoughToInline opts threshold rhs
 
 ----------------
 smallEnoughToInline :: UnfoldingOpts -> Unfolding -> Bool
-smallEnoughToInline opts (CoreUnfolding {uf_guidance = UnfIfGoodArgs {ug_size = size}})
-  = size <= unfoldingUseThreshold opts
+smallEnoughToInline opts (CoreUnfolding {uf_guidance = guidance})
+  = case guidance of
+       UnfIfGoodArgs {ug_size = size} -> size <= unfoldingUseThreshold opts
+       UnfWhen {} -> True
+       UnfNever   -> False
 smallEnoughToInline _ _
   = False
 
