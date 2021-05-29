@@ -2526,7 +2526,7 @@ tryEtaReduce bndrs body
        , let mult = idMult bndr
        , Just (fun_mult, _, _) <- splitFunTy_maybe fun_ty
        , mult `eqType` fun_mult -- There is no change in multiplicity, otherwise we must abort
-       = Just (mkFunResCo Representational mult (idType bndr) co, [])
+       = Just (mkFunResCo Representational (idScaledType bndr) co, [])
     ok_arg bndr (Cast e co_arg) co fun_ty
        | (ticks, Var v) <- stripTicksTop tickishFloatable e
        , Just (fun_mult, _, _) <- splitFunTy_maybe fun_ty
