@@ -689,22 +689,13 @@ instance HasHaddock (LocatedA (ConDecl GhcPs)) where
   addHaddock (L l_con_decl con_decl) =
     extendHdkA (locA l_con_decl) $
     case con_decl of
-      ConDeclGADT { con_g_ext, con_names, con_bndrs, con_mb_cxt, con_g_args, con_res_ty } -> do
+      ConDeclGADT { con_g_ext, con_names, con_bndrs, con_mb_cxt, con_body } -> do
         -- discardHasInnerDocs is ok because we don't need this info for GADTs.
         con_doc' <- discardHasInnerDocs $ getConDoc (getLocA (head con_names))
-        con_g_args' <-
-          case con_g_args of
-            PrefixConGADT ts -> PrefixConGADT <$> addHaddock ts
-            RecConGADT (L l_rec flds) -> do
-              -- discardHasInnerDocs is ok because we don't need this info for GADTs.
-              flds' <- traverse (discardHasInnerDocs . addHaddockConDeclField) flds
-              pure $ RecConGADT (L l_rec flds')
-        con_res_ty' <- addHaddock con_res_ty
+        con_body' <- addHaddock con_body
         pure $ L l_con_decl $
           ConDeclGADT { con_g_ext, con_names, con_bndrs, con_mb_cxt,
-                        con_doc = con_doc',
-                        con_g_args = con_g_args',
-                        con_res_ty = con_res_ty' }
+                        con_doc = con_doc', con_body = con_body' }
       ConDeclH98 { con_ext, con_name, con_forall, con_ex_tvs, con_mb_cxt, con_args } ->
         addConTrailingDoc (srcSpanEnd $ locA l_con_decl) $
         case con_args of
@@ -730,6 +721,20 @@ instance HasHaddock (LocatedA (ConDecl GhcPs)) where
               ConDeclH98 { con_ext, con_name, con_forall, con_ex_tvs, con_mb_cxt,
                            con_doc = con_doc',
                            con_args = RecCon (L l_rec flds') }
+
+instance HasHaddock (ConGADTBody GhcPs) where
+  addHaddock (PrefixConGADT body) = PrefixConGADT <$> addHaddock body
+  addHaddock (RecConGADT (L l_rec flds) res_ty) = do
+    -- discardHasInnerDocs is ok because we don't need this info for GADTs.
+    flds'   <- traverse (discardHasInnerDocs . addHaddockConDeclField) flds
+    res_ty' <- addHaddock res_ty
+    pure $ RecConGADT (L l_rec flds') res_ty'
+
+instance HasHaddock (PrefixConGADTBody GhcPs) where
+  addHaddock (PCGAnonArg arg_ty body) =
+    PCGAnonArg <$> addHaddock arg_ty <*> addHaddock body
+  addHaddock (PCGResult res_ty) =
+    PCGResult <$> addHaddock res_ty
 
 -- Keep track of documentation comments on the data constructor or any of its
 -- fields.
