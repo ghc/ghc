@@ -81,6 +81,11 @@ $(libffi_STAMP_CONFIGURE): $(TOUCH_DEP)
 	mv libffi/build/Makefile.in libffi/build/Makefile.in.orig
 	sed 's|@INSTALL@|$$(subst ../install-sh,$(TOP)/install-sh,@INSTALL@)|g' < libffi/build/Makefile.in.orig > libffi/build/Makefile.in
 
+	# Fix powerpc header file (see libffi commit 4f9e20ac).
+	# Fixes GHC #19885
+	mv libffi/build/src/powerpc/ffi_powerpc.h libffi/build/src/powerpc/ffi_powerpc.h.orig
+	sed 's|(__FLOAT128_TYPE__)|(__FLOAT128_TYPE__) \&\& defined(__HAVE_FLOAT128)|' < libffi/build/src/powerpc/ffi_powerpc.h.orig > libffi/build/src/powerpc/ffi_powerpc.h
+
 # * Because -Werror may be in SRC_CC_OPTS/SRC_LD_OPTS, we need to turn
 #   warnings off or the compilation of libffi might fail due to warnings;
 #   hence the -w flags.
@@ -130,4 +135,3 @@ $(eval $(call clean-target,libffi,, \
     libffi/build $(wildcard libffi/stamp.ffi.*) libffi/dist-install))
 
 endif
-
