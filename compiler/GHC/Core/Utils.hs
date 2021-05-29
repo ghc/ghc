@@ -2380,16 +2380,25 @@ variable arguments only) thus:
    f @ (g:t1~t2)   |> co  -->  (f |> (t1~t2 => co)) @ (g:t1~t2)
 These are the equations for ok_arg.
 
-It's true that we could also hope to eta reduce these:
+Note [Eta reduction with casted function]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Since we are pushing a coercion inwards, it is easy to accommodate
     (\xy. (f x |> g) y)
     (\xy. (f x y) |> g)
-But the simplifier pushes those casts outwards, so we don't
-need to address that here.
+
+See the `(Cast e co)` equation for `go` in `tryEtaReduce`.  The
+eta-expander pushes those casts outwards, so you might think we won't
+ever see a cast here, but if we have
+  \xy. (f x y |> g)
+we will call tryEtaReduce [x,y] (f x y |> g), and we'd like that to
+work.  This happens in GHC.Core.Opt.Simplify.Utils.mkLam, where
+eta-expansion may be turned off (by sm_eta_expand).
 -}
 
 -- When updating this function, make sure to update
 -- CorePrep.tryEtaReducePrep as well!
 tryEtaReduce :: [Var] -> CoreExpr -> Maybe CoreExpr
+-- Return an expression equal to (\bndrs. body)
 tryEtaReduce bndrs body
   = go (reverse bndrs) body (mkRepReflCo (exprType body))
   where
@@ -2401,12 +2410,19 @@ tryEtaReduce bndrs body
        -> Maybe CoreExpr   -- Of type a1 -> a2 -> a3 -> ts
     -- See Note [Eta reduction with casted arguments]
     -- for why we have an accumulating coercion
+    --
+    -- Invariant: (go bs body co) returns an expression
+    --            equivalent to (\(reverse bs). body |> co)
     go [] fun co
       | ok_fun fun
       , let used_vars = exprFreeVars fun `unionVarSet` tyCoVarsOfCo co
       , not (any (`elemVarSet` used_vars) bndrs)
       = Just (mkCast fun co)   -- Check for any of the binders free in the result
                                -- including the accumulated coercion
+
+    -- See Note [Eta reduction with casted function]
+    go bs (Cast e co1) co2
+      = go bs e (co1 `mkTransCo` co2)
 
     go bs (Tick t e) co
       | tickishFloatable t
@@ -2454,7 +2470,8 @@ tryEtaReduce bndrs body
     ok_arg :: Var              -- Of type bndr_t
            -> CoreExpr         -- Of type arg_t
            -> Coercion         -- Of kind (t1~t2)
-           -> Type             -- Type of the function to which the argument is applied
+           -> Type             -- Type (arg_t -> t1) of the function
+                               --      to which the argument is supplied
            -> Maybe (Coercion  -- Of type (arg_t -> t1 ~  bndr_t -> t2)
                                --   (and similarly for tyvars, coercion args)
                     , [CoreTickish])
