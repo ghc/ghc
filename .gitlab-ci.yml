@@ -326,7 +326,6 @@ hadrian-ghc-in-ghci:
     - .gitlab/ci.sh setup
     - "cabal update --index=$HACKAGE_INDEX_STATE"
     - .gitlab/ci.sh configure
-    - cd hadrian; cabal new-build -j`../mk/detect-cpu-count.sh` --with-compiler=$GHC --project-file=ci.project; cd ..
     # Load ghc-in-ghci then immediately exit and check the modules loaded
     - echo ":q" | hadrian/ghci -j`mk/detect-cpu-count.sh`| tail -n2 | grep "Ok,"
   after_script:
@@ -355,7 +354,6 @@ hadrian-ghc-in-ghci:
     - git checkout .gitmodules
     - .gitlab/ci.sh setup
     - "cabal update --index=$HACKAGE_INDEX_STATE"
-    - cd hadrian; cabal new-build -j`../mk/detect-cpu-count.sh` --with-compiler=$GHC --project-file=ci.project; cd ..
   after_script:
     - cp -Rf $HOME/.cabal cabal-cache
   variables:
