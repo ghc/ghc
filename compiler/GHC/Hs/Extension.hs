@@ -32,6 +32,8 @@ import GHC.Types.SrcLoc (GenLocated(..), unLoc)
 import GHC.Utils.Panic
 import GHC.Parser.Annotation
 
+import Data.Void
+
 {-
 Note [IsPass]
 ~~~~~~~~~~~~~
@@ -216,6 +218,10 @@ type OutputableBndrId pass =
   , Outputable (GenLocated (Anno (IdGhcP (NoGhcTcPass pass))) (IdGhcP (NoGhcTcPass pass)))
   , IsPass pass
   )
+
+-- | See Note [Constructor cannot occur]
+dataConCantHappen :: Void -> a
+dataConCantHappen = absurd
 
 -- useful helper functions:
 pprIfPs :: forall p. IsPass p => (p ~ 'Parsed => SDoc) -> SDoc
