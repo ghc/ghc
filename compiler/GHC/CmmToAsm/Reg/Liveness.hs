@@ -174,6 +174,8 @@ instance Instruction instr => Instruction (InstrSR instr) where
 
         pprInstr platform i = ppr (fmap (pprInstr platform) i)
 
+        mkComment               = fmap Instr . mkComment
+
 
 -- | An instruction with liveness information.
 data LiveInstr instr
@@ -568,13 +570,40 @@ stripLiveBlock config (BasicBlock i lis)
         spillNat acc []
          =      return (reverse acc)
 
-        spillNat acc (LiveInstr (SPILL reg slot) _ : instrs)
-         = do   delta   <- get
-                spillNat (mkSpillInstr config reg delta slot : acc) instrs
 
-        spillNat acc (LiveInstr (RELOAD slot reg) _ : instrs)
-         = do   delta   <- get
-                spillNat (mkLoadInstr config reg delta slot : acc) instrs
+        -- The SPILL/RELOAD cases fail with:
+        --
+        --     • Couldn't match type ‘instr’ with ‘[instr0]’
+        --       ‘instr’ is a rigid type variable bound by
+        --         the type signature for:
+        --           stripLiveBlock :: forall instr.
+        --                             Instruction instr =>
+        --                             NCGConfig -> LiveBasicBlock instr -> NatBasicBlock instr
+        --         at /builds/ghc/ghc/compiler/GHC/CmmToAsm/Reg/Liveness.hs:(558,1)-(562,30)
+        --       Expected type: [LiveInstr [instr0]]
+        --         Actual type: [LiveInstr instr]
+        --     • In the second argument of ‘spillNat’, namely ‘lis’
+        --       In the first argument of ‘runState’, namely ‘(spillNat [] lis)’
+        --       In the expression: runState (spillNat [] lis) 0
+        --     • Relevant bindings include
+        --       instrs' :: [[instr0]]
+        --
+        --       spillNat :: [[instr0]]
+        --                -> [LiveInstr [instr0]] -> State Int [[instr0]]
+        --
+        --       lis :: [LiveInstr instr]
+        --       stripLiveBlock :: NCGConfig
+        --                      -> LiveBasicBlock instr -> NatBasicBlock instr
+        --
+        -- However, they do not seem to be used dead code anyway.
+
+        -- spillNat acc (LiveInstr (SPILL reg slot) _ : instrs)
+        --  = do   delta   <- get
+        --         spillNat (mkSpillInstr config reg delta slot : acc) instrs
+
+        -- spillNat acc (LiveInstr (RELOAD slot reg) _ : instrs)
+        --  = do   delta   <- get
+        --         spillNat (mkLoadInstr config reg delta slot : acc) instrs
 
         spillNat acc (LiveInstr (Instr instr) _ : instrs)
          | Just i <- takeDeltaInstr instr
