@@ -14,7 +14,7 @@
 
 module GHC.Cmm.Utils(
         -- CmmType
-        primRepCmmType, slotCmmType, slotForeignHint,
+        primRepCmmType, slotCmmType,
         typeCmmType, typeForeignHint, primRepForeignHint,
 
         -- CmmLit
@@ -159,14 +159,6 @@ primRepForeignHint AddrRep      = AddrHint -- NB! AddrHint, but NonPtrArg
 primRepForeignHint FloatRep     = NoHint
 primRepForeignHint DoubleRep    = NoHint
 primRepForeignHint (VecRep {})  = NoHint
-
-slotForeignHint :: SlotTy -> ForeignHint
-slotForeignHint PtrLiftedSlot   = AddrHint
-slotForeignHint PtrUnliftedSlot = AddrHint
-slotForeignHint WordSlot        = NoHint
-slotForeignHint Word64Slot      = NoHint
-slotForeignHint FloatSlot       = NoHint
-slotForeignHint DoubleSlot      = NoHint
 
 typeForeignHint :: UnaryType -> ForeignHint
 typeForeignHint = primRepForeignHint . typePrimRep1

@@ -174,6 +174,8 @@ instance Instruction instr => Instruction (InstrSR instr) where
 
         pprInstr platform i = ppr (fmap (pprInstr platform) i)
 
+        mkComment               = fmap Instr . mkComment
+
 
 -- | An instruction with liveness information.
 data LiveInstr instr
@@ -559,7 +561,7 @@ stripLiveBlock
         -> LiveBasicBlock instr
         -> NatBasicBlock instr
 
-stripLiveBlock config (BasicBlock i lis)
+stripLiveBlock _config (BasicBlock i lis)
  =      BasicBlock i instrs'
 
  where  (instrs', _)
