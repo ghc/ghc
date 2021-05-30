@@ -48,11 +48,12 @@ module GHC.Tc.Module (
     ) where
 
 import GHC.Prelude
-
+import GHC.Driver.Ppr (pprTraceM)
 import GHC.Driver.Env
 import GHC.Driver.Plugins
 import GHC.Driver.Session
 
+import GHC.Types.Unique.Set (pprUniqSet)
 import GHC.Tc.Errors.Hole.FitTypes ( HoleFitPluginR (..) )
 import GHC.Tc.Errors.Types
 import {-# SOURCE #-} GHC.Tc.Gen.Splice ( finishTH, runRemoteModFinalizers )
@@ -2626,12 +2627,16 @@ tcRnType hsc_env flexi normalise rdr_type
     setXOptM LangExt.PolyKinds $   -- See Note [Kind-generalise in tcRnType]
     do { (HsWC { hswc_ext = wcs, hswc_body = rn_type }, _fvs)
                <- rnHsWcType GHCiCtx (mkHsWildCardBndrs rdr_type)
-                  -- The type can have wild cards, but no implicit
-                  -- generalisation; e.g.   :kind (T _)
+       -- changes start here
+       -- make the type into a LHsSigWcType
+       ; let wcBinder = mkHsWildCardBndrs $ noLocA (mkHsImplicitSigType rdr_type)
+       ; (HsWC { hswc_ext = wcs'', hswc_body = rn_type'' }, _fvs'')
+               <- rnHsSigWcType GHCiCtx wcBinder -- <- 2. use rnHsSigWcType instead of rcHsWcType
+       -- You will need to use tcOuterTKBndrs to bring the bound variables into scope for the type-checked; this should wrap the call to tcInferLHsTypeUnsaturated            
+       ; let _si = ForAllSkol (pprUniqSet ppr _fvs)
+       ; _x <- tcOuterTKBndrs si _a {- of type HsOuterTyVarBndrs flag GhcRn -} _b {- of type TcM a -}
        ; failIfErrsM
-
         -- We follow Note [Recipe for checking a signature] in GHC.Tc.Gen.HsType here
-
         -- Now kind-check the type
         -- It can have any rank or kind
         -- First bring into scope any wildcards
