@@ -174,6 +174,8 @@ instance Instruction instr => Instruction (InstrSR instr) where
 
         pprInstr platform i = ppr (fmap (pprInstr platform) i)
 
+        mkComment               = fmap Instr . mkComment
+
 
 -- | An instruction with liveness information.
 data LiveInstr instr
