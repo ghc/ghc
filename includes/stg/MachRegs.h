@@ -548,7 +548,7 @@ the stack. See Note [Overlapping global registers] for implications.
      r30    |  LR     | The Link Register
      r29    |  FP     | The Frame Pointer
    r19-r28  |         | Callee-saved registers
-     r18    |         | The Platform Register, if needed; 
+     r18    |         | The Platform Register, if needed;
             |         | or temporary register
      r17    |  IP1    | The second intra-procedure-call temporary register
      r16    |  IP0    | The first intra-procedure-call scratch register
