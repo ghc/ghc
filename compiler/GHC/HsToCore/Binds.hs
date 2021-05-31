@@ -616,8 +616,8 @@ Note [Strict binds checks]
 There are several checks around properly formed strict bindings. They
 all link to this Note. These checks must be here in the desugarer because
 we cannot know whether or not a type is unlifted until after zonking, due
-to levity polymorphism. These checks all used to be handled in the typechecker
-in checkStrictBinds (before Jan '17).
+to representation polymorphism. These checks all used to be handled in the
+typechecker in checkStrictBinds (before Jan '17).
 
 We define an "unlifted bind" to be any bind that binds an unlifted id. Note that
 
