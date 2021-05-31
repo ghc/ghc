@@ -1,4 +1,5 @@
-{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DerivingVia #-}
+
 module GHC.Driver.Env.Types
   ( Hsc(..)
   , HscEnv(..)
@@ -22,25 +23,15 @@ import GHC.Utils.Logger
 import GHC.Utils.TmpFs
 import {-# SOURCE #-} GHC.Driver.Plugins
 
-import Control.Monad ( ap )
 import Control.Monad.IO.Class
+import Control.Monad.Trans.Reader
+import Control.Monad.Trans.State
 import Data.IORef
 
 -- | The Hsc monad: Passing an environment and diagnostic state
 newtype Hsc a = Hsc (HscEnv -> Messages GhcMessage -> IO (a, Messages GhcMessage))
-    deriving (Functor)
-
-instance Applicative Hsc where
-    pure a = Hsc $ \_ w -> return (a, w)
-    (<*>) = ap
-
-instance Monad Hsc where
-    Hsc m >>= k = Hsc $ \e w -> do (a, w1) <- m e w
-                                   case k a of
-                                       Hsc k' -> k' e w1
-
-instance MonadIO Hsc where
-    liftIO io = Hsc $ \_ w -> do a <- io; return (a, w)
+    deriving (Functor, Applicative, Monad, MonadIO)
+      via ReaderT HscEnv (StateT (Messages GhcMessage) IO)
 
 instance HasDynFlags Hsc where
     getDynFlags = Hsc $ \e w -> return (hsc_dflags e, w)
@@ -129,4 +120,3 @@ data HscEnv
         , hsc_tmpfs :: !TmpFs
                 -- ^ Temporary files
  }
-
