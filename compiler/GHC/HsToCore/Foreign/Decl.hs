@@ -218,7 +218,7 @@ dsFCall fn_id co fcall mDeclHeader = do
         (tv_bndrs, rho)      = tcSplitForAllTyVarBinders ty
         (arg_tys, io_res_ty) = tcSplitFunTys rho
 
-    args <- newSysLocalsDs arg_tys  -- no FFI levity-polymorphism
+    args <- newSysLocalsDs arg_tys  -- no FFI representation polymorphism
     (val_args, arg_wrappers) <- mapAndUnzipM unboxArg (map Var args)
 
     let
@@ -323,7 +323,7 @@ dsPrimCall fn_id co fcall = do
         (tvs, fun_ty)        = tcSplitForAllInvisTyVars ty
         (arg_tys, io_res_ty) = tcSplitFunTys fun_ty
 
-    args <- newSysLocalsDs arg_tys  -- no FFI levity-polymorphism
+    args <- newSysLocalsDs arg_tys  -- no FFI representation polymorphism
 
     ccall_uniq <- newUnique
     dflags <- getDynFlags
