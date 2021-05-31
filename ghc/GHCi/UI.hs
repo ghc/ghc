@@ -51,7 +51,7 @@ import GHC.Driver.Session as DynFlags
 import GHC.Driver.Ppr hiding (printForUser)
 import GHC.Utils.Error hiding (traceCmd)
 import GHC.Driver.Monad ( modifySession )
-import GHC.Driver.Config
+import GHC.Driver.Config.Parser (initParserOpts)
 import qualified GHC
 import GHC ( LoadHowMuch(..), Target(..),  TargetId(..),
              Resume, SingleStep, Ghc,
@@ -1990,7 +1990,7 @@ loadModule' files = do
   -- as a ToDo for now.
 
   hsc_env <- GHC.getSession
-  let !dflags = hsc_dflags hsc_env
+  let !dflags = extractDynFlags hsc_env
 
   let load_module = do
         -- unload first
@@ -2034,7 +2034,7 @@ addModule files = do
       let fc        = hsc_FC hsc_env
       let home_unit = hsc_home_unit hsc_env
       let units     = hsc_units hsc_env
-      let dflags    = hsc_dflags hsc_env
+      let dflags    = extractDynFlags hsc_env
       result <- liftIO $
         Finder.findImportedModule fc units home_unit dflags m (Just (fsLit "this"))
       case result of
@@ -2308,7 +2308,7 @@ allTypesCmd _ = runExceptGhcMonad $ do
       | Just ty <- spaninfoType span' = do
         hsc_env <- GHC.getSession
         let tyInfo = unwords . words $
-                     showSDocForUser (hsc_dflags hsc_env)
+                     showSDocForUser (extractDynFlags hsc_env)
                                      (hsc_units  hsc_env)
                                      alwaysQualify (pprSigmaType ty)
         liftIO . putStrLn $
@@ -2515,7 +2515,7 @@ isSafeModule m = do
                           | otherwise = S.partition part deps
         where part pkg   = unitIsTrusted $ unsafeLookupUnitId unit_state pkg
               unit_state = hsc_units hsc_env
-              dflags     = hsc_dflags hsc_env
+              dflags     = extractDynFlags hsc_env
 
 -----------------------------------------------------------------------------
 -- :browse
@@ -3093,7 +3093,7 @@ newDynFlags interactive_only minus_opts = do
         -- if the package flags changed, reset the context and link
         -- the new packages.
         hsc_env <- GHC.getSession
-        let dflags2 = hsc_dflags hsc_env
+        let dflags2 = extractDynFlags hsc_env
         let interp  = hscInterp hsc_env
         when (packageFlagsChanged dflags2 dflags0) $ do
           when (verbosity dflags2 > 0) $
@@ -3117,9 +3117,10 @@ newDynFlags interactive_only minus_opts = do
             newLdInputs     = drop ld0length (ldInputs dflags2)
             newCLFrameworks = drop fmrk0length (cmdlineFrameworks dflags2)
 
-            hsc_env' = hsc_env { hsc_dflags =
-                         dflags2 { ldInputs = newLdInputs
-                                 , cmdlineFrameworks = newCLFrameworks } }
+            dflags'  = dflags2 { ldInputs = newLdInputs
+                               , cmdlineFrameworks = newCLFrameworks
+                               }
+            hsc_env' = hscSetFlags dflags' hsc_env
 
         when (not (null newLdInputs && null newCLFrameworks)) $
           liftIO $ Loader.loadCmdLineLibs (hscInterp hsc_env') hsc_env'
@@ -3612,7 +3613,7 @@ completeModule = wrapIdentCompleter $ \w -> do
   let pkg_mods = allVisibleModules (hsc_units hsc_env)
   loaded_mods <- liftM (map GHC.ms_mod_name) getLoadedModules
   return $ filter (w `isPrefixOf`)
-        $ map (showPpr (hsc_dflags hsc_env)) $ loaded_mods ++ pkg_mods
+        $ map (showPpr (extractDynFlags hsc_env)) $ loaded_mods ++ pkg_mods
 
 completeSetModule = wrapIdentCompleterWithModifier "+-" $ \m w -> do
   hsc_env <- GHC.getSession
@@ -3624,7 +3625,7 @@ completeSetModule = wrapIdentCompleterWithModifier "+-" $ \m w -> do
       let pkg_mods = allVisibleModules (hsc_units hsc_env)
       loaded_mods <- liftM (map GHC.ms_mod_name) getLoadedModules
       return $ loaded_mods ++ pkg_mods
-  return $ filter (w `isPrefixOf`) $ map (showPpr (hsc_dflags hsc_env)) modules
+  return $ filter (w `isPrefixOf`) $ map (showPpr (extractDynFlags hsc_env)) modules
 
 completeHomeModule = wrapIdentCompleter listHomeModules
 
@@ -4462,11 +4463,11 @@ showException se =
 -- in an exception loop (eg. let a = error a in a) the ^C exception
 -- may never be delivered.  Thanks to Marcin for pointing out the bug.
 
-ghciHandle :: (HasDynFlags m, ExceptionMonad m) => (SomeException -> m a) -> m a -> m a
+ghciHandle :: (HasLogger m, ExceptionMonad m) => (SomeException -> m a) -> m a -> m a
 ghciHandle h m = mask $ \restore -> do
                  -- Force dflags to avoid leaking the associated HscEnv
-                 !dflags <- getDynFlags
-                 catch (restore (GHC.prettyPrintGhcErrors dflags m)) $ \e -> restore (h e)
+                 !log <- getLogger
+                 catch (restore (GHC.prettyPrintGhcErrors log m)) $ \e -> restore (h e)
 
 ghciTry :: ExceptionMonad m => m a -> m (Either SomeException a)
 ghciTry m = fmap Right m `catch` \e -> return $ Left e

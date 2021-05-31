@@ -187,7 +187,7 @@ sptCreateStaticBinds hsc_env this_mod binds
         (fps', bnd') <- replaceStaticBind bnd
         go (reverse fps' ++ fps) (bnd' : bs) xs'
 
-    dflags = hsc_dflags hsc_env
+    dflags = extractDynFlags hsc_env
     platform = targetPlatform dflags
 
     -- Generates keys and replaces 'makeStatic' with 'StaticPtr'.

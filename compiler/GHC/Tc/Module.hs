@@ -197,7 +197,7 @@ tcRnModule :: HscEnv
 tcRnModule hsc_env mod_sum save_rn_syntax
    parsedModule@HsParsedModule {hpm_module= L loc this_module}
  | RealSrcSpan real_loc _ <- loc
- = withTiming logger dflags
+ = withTiming logger
               (text "Renamer/typechecker"<+>brackets (ppr this_mod))
               (const ()) $
    initTc hsc_env hsc_src save_rn_syntax this_mod real_loc $
@@ -210,7 +210,6 @@ tcRnModule hsc_env mod_sum save_rn_syntax
 
   where
     hsc_src = ms_hsc_src mod_sum
-    dflags  = hsc_dflags hsc_env
     logger  = hsc_logger hsc_env
     home_unit = hsc_home_unit hsc_env
     err_msg = mkPlainErrorMsgEnvelope loc $
@@ -316,7 +315,7 @@ tcRnModuleTcRnM hsc_env mod_sum
                                  tcRnSrcDecls explicit_mod_hdr export_ies local_decls
 
                ; whenM (goptM Opt_DoCoreLinting) $
-                 lintGblEnv (hsc_logger hsc_env) (hsc_dflags hsc_env) tcg_env
+                 lintGblEnv (hsc_logger hsc_env) (extractDynFlags hsc_env) tcg_env
 
                ; setGblEnv tcg_env
                  $ do { -- Compare hi-boot iface (if any) with the real thing
@@ -381,7 +380,7 @@ tcRnImports hsc_env import_decls
                 -- Record boot-file info in the EPS, so that it's
                 -- visible to loadHiBootInterface in tcRnSrcDecls,
                 -- and any other incrementally-performed imports
-              ; when (isOneShot (ghcMode (hsc_dflags hsc_env))) $ do {
+              ; when (isOneShot (ghcMode (extractDynFlags hsc_env))) $ do {
                   updateEps_ $ \eps  -> eps { eps_is_boot = imp_boot_mods imports }
                }
 
@@ -1773,7 +1772,7 @@ checkMainType tcg_env
          then return emptyWC else
 
     do { rdr_env <- getGlobalRdrEnv
-       ; let dflags    = hsc_dflags hsc_env
+       ; let dflags    = extractDynFlags hsc_env
              main_occ  = getMainOcc dflags
              main_gres = lookupGlobalRdrEnv rdr_env main_occ
        ; case filter isLocalGRE main_gres of {
@@ -1800,7 +1799,7 @@ checkMain explicit_mod_hdr export_ies
  = do { hsc_env  <- getTopEnv
       ; tcg_env <- getGblEnv
 
-      ; let dflags      = hsc_dflags hsc_env
+      ; let dflags      = extractDynFlags hsc_env
             main_mod    = mainModIs hsc_env
             main_occ    = getMainOcc dflags
 
@@ -2910,11 +2909,11 @@ rnDump rn = dumpOptTcRn Opt_D_dump_rn "Renamer" FormatHaskell (ppr rn)
 
 tcDump :: TcGblEnv -> TcRn ()
 tcDump env
- = do { dflags <- getDynFlags ;
-        unit_state <- hsc_units <$> getTopEnv ;
+ = do { unit_state <- hsc_units <$> getTopEnv ;
+        logger <- getLogger ;
 
         -- Dump short output if -ddump-types or -ddump-tc
-        when (dopt Opt_D_dump_types dflags || dopt Opt_D_dump_tc dflags)
+        when (logHasDumpFlag logger Opt_D_dump_types || logHasDumpFlag logger Opt_D_dump_tc)
           (dumpTcRn True Opt_D_dump_types
             "" FormatText (pprWithUnitState unit_state short_dump)) ;
 
@@ -3116,7 +3115,7 @@ runRenamerPlugin :: TcGblEnv
 runRenamerPlugin gbl_env hs_group = do
     hsc_env <- getTopEnv
     withPlugins hsc_env
-      (\p opts (e, g) -> ( mark_plugin_unsafe (hsc_dflags hsc_env)
+      (\p opts (e, g) -> ( mark_plugin_unsafe (extractDynFlags hsc_env)
                             >> renamedResultAction p opts e g))
       (gbl_env, hs_group)
 
@@ -3139,7 +3138,7 @@ runTypecheckerPlugin :: ModSummary -> TcGblEnv -> TcM TcGblEnv
 runTypecheckerPlugin sum gbl_env = do
     hsc_env <- getTopEnv
     withPlugins hsc_env
-      (\p opts env -> mark_plugin_unsafe (hsc_dflags hsc_env)
+      (\p opts env -> mark_plugin_unsafe (extractDynFlags hsc_env)
                         >> typeCheckResultAction p opts sum env)
       gbl_env
 

@@ -131,7 +131,6 @@ getGccEnv opts =
 -- Running an external program
 
 runSomething :: Logger
-             -> DynFlags
              -> String          -- For -v message
              -> String          -- Command name (possibly a full path)
                                 --      assumed already dos-ified
@@ -139,8 +138,8 @@ runSomething :: Logger
                                 --      runSomething will dos-ify them
              -> IO ()
 
-runSomething logger dflags phase_name pgm args =
-  runSomethingFiltered logger dflags id phase_name pgm args Nothing Nothing
+runSomething logger phase_name pgm args =
+  runSomethingFiltered logger id phase_name pgm args Nothing Nothing
 
 -- | Run a command, placing the arguments in an external response file.
 --
@@ -162,10 +161,10 @@ runSomethingResponseFile
   -> Maybe [(String,String)]
   -> IO ()
 runSomethingResponseFile logger tmpfs dflags filter_fn phase_name pgm args mb_env =
-    runSomethingWith logger dflags phase_name pgm args $ \real_args -> do
+    runSomethingWith logger phase_name pgm args $ \real_args -> do
         fp <- getResponseFile real_args
         let args = ['@':fp]
-        r <- builderMainLoop logger dflags filter_fn pgm args Nothing mb_env
+        r <- builderMainLoop logger filter_fn pgm args Nothing mb_env
         return (r,())
   where
     getResponseFile args = do
@@ -205,23 +204,23 @@ runSomethingResponseFile logger tmpfs dflags filter_fn phase_name pgm args mb_en
         ]
 
 runSomethingFiltered
-  :: Logger -> DynFlags -> (String->String) -> String -> String -> [Option]
+  :: Logger -> (String->String) -> String -> String -> [Option]
   -> Maybe FilePath -> Maybe [(String,String)] -> IO ()
 
-runSomethingFiltered logger dflags filter_fn phase_name pgm args mb_cwd mb_env =
-    runSomethingWith logger dflags phase_name pgm args $ \real_args -> do
-        r <- builderMainLoop logger dflags filter_fn pgm real_args mb_cwd mb_env
+runSomethingFiltered logger filter_fn phase_name pgm args mb_cwd mb_env =
+    runSomethingWith logger phase_name pgm args $ \real_args -> do
+        r <- builderMainLoop logger filter_fn pgm real_args mb_cwd mb_env
         return (r,())
 
 runSomethingWith
-  :: Logger -> DynFlags -> String -> String -> [Option]
+  :: Logger -> String -> String -> [Option]
   -> ([String] -> IO (ExitCode, a))
   -> IO a
 
-runSomethingWith logger dflags phase_name pgm args io = do
+runSomethingWith logger phase_name pgm args io = do
   let real_args = filter notNull (map showOpt args)
       cmdLine = showCommandForUser pgm real_args
-  traceCmd logger dflags phase_name cmdLine $ handleProc pgm phase_name $ io real_args
+  traceCmd logger phase_name cmdLine $ handleProc pgm phase_name $ io real_args
 
 handleProc :: String -> String -> IO (ExitCode, r) -> IO r
 handleProc pgm phase_name proc = do
@@ -241,10 +240,10 @@ handleProc pgm phase_name proc = do
     does_not_exist = throwGhcExceptionIO (InstallationError ("could not execute: " ++ pgm))
 
 
-builderMainLoop :: Logger -> DynFlags -> (String -> String) -> FilePath
+builderMainLoop :: Logger -> (String -> String) -> FilePath
                 -> [String] -> Maybe FilePath -> Maybe [(String, String)]
                 -> IO ExitCode
-builderMainLoop logger dflags filter_fn pgm real_args mb_cwd mb_env = do
+builderMainLoop logger filter_fn pgm real_args mb_cwd mb_env = do
   chan <- newChan
 
   -- We use a mask here rather than a bracket because we want
@@ -305,10 +304,10 @@ builderMainLoop logger dflags filter_fn pgm real_args mb_cwd mb_env = do
       msg <- readChan chan
       case msg of
         BuildMsg msg -> do
-          logInfo logger dflags $ withPprStyle defaultUserStyle msg
+          logInfo logger $ withPprStyle defaultUserStyle msg
           log_loop chan t
         BuildError loc msg -> do
-          putLogMsg logger dflags errorDiagnostic (mkSrcSpan loc loc)
+          logMsg logger errorDiagnostic (mkSrcSpan loc loc)
               $ withPprStyle defaultUserStyle msg
           log_loop chan t
         EOF ->
