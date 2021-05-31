@@ -1204,7 +1204,7 @@ lintCoreArg (fun_ty, fun_ue) arg
          -- Only do these checks if lf_check_levity_poly is on,
          -- because otherwise isUnliftedType panics
          do { checkL (not (isTypeLevPoly arg_ty))
-                     (text "Levity-polymorphic argument:"
+                     (text "Representation-polymorphic argument:"
                       <+> ppr arg <+> dcolon
                       <+> parens (ppr arg_ty <+> dcolon <+> ppr (typeKind arg_ty)))
 
@@ -1555,7 +1555,7 @@ lintIdBndr top_lvl bind_site id thing_inside
           -- See Note [Representation polymorphism invariants] in GHC.Core
        ; lintL (isJoinId id || not (lf_check_levity_poly flags)
                 || not (isTypeLevPoly id_ty)) $
-         text "Levity-polymorphic binder:" <+> ppr id <+> dcolon <+>
+         text "Representation-polymorphic binder:" <+> ppr id <+> dcolon <+>
             parens (ppr id_ty <+> dcolon <+> ppr (typeKind id_ty))
 
        -- Check that a join-id is a not-top-level let-binding
@@ -2125,9 +2125,9 @@ lintCoercion co@(UnivCo prov r ty1 ty2)
        = return ()  -- Skip kind checks
        | otherwise
        = do { checkWarnL (not lev_poly1)
-                         (report "left-hand type is levity-polymorphic")
+                         (report "left-hand type is representation-polymorphic")
             ; checkWarnL (not lev_poly2)
-                         (report "right-hand type is levity-polymorphic")
+                         (report "right-hand type is representation-polymorphic")
             ; when (not (lev_poly1 || lev_poly2)) $
               do { checkWarnL (reps1 `equalLength` reps2)
                               (report "between values with different # of reps")
