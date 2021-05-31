@@ -305,7 +305,7 @@ tuple_v6_a :: TV6 -> Int -> Double -> Int -> Double
 tuple_v6_a f x y z w = case f x y z w of (# x', _, y', _, z', _, w', _ #) ->
                                            (I# x', D# y', I# z', D# w')
 
--- some levity polymorphic things
+-- some representation-polymorphic things
 {-# NOINLINE lev_poly #-}
 lev_poly :: forall r a (b :: TYPE r).
             (a -> a -> a -> a ->

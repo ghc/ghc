@@ -10,7 +10,7 @@ import Unsafe.Coerce
 
 badId :: forall r (a :: TYPE r). a -> a
 badId = unsafeCoerce#
--- Un-saturated application of a levity-polymorphic
+-- Un-saturated application of a representation-polymorphic
 -- function that must be eta-expanded
 
 goodId :: forall (a :: Type). a -> a
