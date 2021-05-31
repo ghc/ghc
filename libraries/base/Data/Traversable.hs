@@ -473,15 +473,43 @@ foldMapDefault = coerce (traverse :: (a -> Const m ()) -> t a -> Const m (t ()))
 -- $overview
 --
 -- #overview#
--- Traversable functors can be thought of as polymorphic containers that
--- support mapping of applicative (or monadic) effects over the container
--- (element-wise) to create a new container of __the same shape__, with the
--- effects sequenced in a natural order for the container type in question.
+-- Traversable structures can be thought of as polymorphic containers that
+-- support element-wise left-to-right sequencing of 'Applicative' (or 'Monad')
+-- effects whose return values fill in new structures of __the same shape__
+-- as the input.
 --
--- The 'Functor' base class means that the container cannot impose any
--- constraints on the element type, so containers that require elements to
+-- The sequencing of effects in @Traversable@ structures is rather
+-- straightforward, see the [Construction](#construction) section for details.
+-- The diverse uses of @Traversable@ structures result from the many possible
+-- choices of Applicative effects to thread through a traversable structure.
+--
+-- After exploring the basic 'Traversable' methods in more detail, and
+-- explaining how instances are constructed, we'll take a look at some examples
+-- of using various Applicative effects to implement the auxiliary functions in
+-- this module.
+--
+-- A @Traversable@ structure is automatically both a 'Functor' and 'Foldable'.
+-- These superclasses do not impose additional limitations on the the set of
+-- structures that can support the @Traversable@ interface because natural
+-- implementations of both 'fmap' and 'foldMap' (also 'foldr', ...) are
+-- available in terms of 'traverse'.
+--
+-- The 'Functor' superclass means that the container cannot (presently) impose
+-- any constraints on the element type, so containers that require elements to
 -- be comparable, or hashable, etc., cannot be instances of the @Traversable@
--- class.
+-- class.  Future Haskell implementations could support constrained Functors,
+-- which may then make possible constrained @Traversable@ structures.
+--
+-- When for a new structure there's no compelling reason to directly implement
+-- the @Functor@ and/or @Foldable@ methods, one can use either or both of
+-- 'fmapDefault' and 'foldMapDefault' to define the requisite instances.  It is
+-- then sufficient to implement just 'traverse'.  Direct implementation of
+-- fine-tuned superclass methods may of course produce more efficient code.
+--
+-- Because 'fmapDefault' is defined in terms of 'traverse' (whose default
+-- definition in terms of 'sequenceA' uses 'fmap'), you must not use
+-- 'fmapDefault' to define the @Functor@ instance if the @Traversable@ instance
+-- directly defines only 'sequenceA'.
 
 ------------------
 
