@@ -16,7 +16,8 @@ import GHC.Parser.Lexer
 -- | Initialise coercion optimiser configuration from DynFlags
 initOptCoercionOpts :: DynFlags -> OptCoercionOpts
 initOptCoercionOpts dflags = OptCoercionOpts
-   { optCoercionEnabled = not (hasNoOptCoercion dflags)
+   { optCoercionEnabled = gopt Opt_OptCoercionSimple dflags
+   , optCoercionNonSimple = False
    }
 
 -- | Initialise Simple optimiser configuration from DynFlags

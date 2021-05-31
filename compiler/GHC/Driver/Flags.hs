@@ -204,6 +204,8 @@ data GeneralFlag
    | Opt_AlignmentSanitisation
    | Opt_CatchBottoms
    | Opt_NumConstantFolding
+   | Opt_OptCoercion       -- ^ Run the full coercion optimizer (as an optimization pass)
+   | Opt_OptCoercionSimple -- ^ Run the simple coercion optimizer (as part of the simple optimizer / simplifier)
 
    -- PreInlining is on by default. The option is there just to see how
    -- bad things get if you turn it off!
@@ -355,7 +357,6 @@ data GeneralFlag
    | Opt_PluginTrustworthy
 
    | Opt_G_NoStateHack
-   | Opt_G_NoOptCoercion
    deriving (Eq, Show, Enum)
 
 -- Check whether a flag should be considered an "optimisation flag"

@@ -362,6 +362,7 @@ coreDumpFlag CoreTidy                 = Just Opt_D_dump_simpl
 coreDumpFlag CorePrep                 = Just Opt_D_dump_prep
 coreDumpFlag CoreOccurAnal            = Just Opt_D_dump_occur_anal
 
+coreDumpFlag CoreDoOptCoercion        = Nothing
 coreDumpFlag CoreAddCallerCcs         = Nothing
 coreDumpFlag CoreDoPrintCore          = Nothing
 coreDumpFlag (CoreDoRuleCheck {})     = Nothing
