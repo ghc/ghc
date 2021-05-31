@@ -643,6 +643,7 @@ Library
         GHC.Types.ForeignCall
         GHC.Types.ForeignStubs
         GHC.Types.Hint
+        GHC.Types.Hint.Ppr
         GHC.Types.HpcInfo
         GHC.Types.Id
         GHC.Types.IPE
