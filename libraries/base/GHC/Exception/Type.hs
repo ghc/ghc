@@ -191,7 +191,7 @@ class (Typeable e, Show e) => Exception e where
 instance Exception SomeExceptionWithLocation where
     toException se = se
     fromException = Just
-    displayException (SomeExceptionWithLocation bt e) = displayException e <> showBacktraces bt
+    displayException (SomeExceptionWithLocation bt (SomeException e)) = displayException e <> showBacktraces bt
     toTypeString (SomeExceptionWithLocation _ e) = "SomeExceptionWithLocation " ++ toTypeString e
 
 -- | @since 3.0

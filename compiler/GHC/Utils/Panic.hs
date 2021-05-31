@@ -110,7 +110,7 @@ data GhcException
 
 instance Exception GhcException where
 #if __GLASGOW_HASKELL__ >= 903
-  fromException (SomeExceptionWithLocation _ e)
+  fromException (SomeExceptionWithLocation _ (SomeException e))
 #else
   fromException (SomeException e)
 #endif
@@ -141,7 +141,11 @@ safeShowException e = do
     r <- try (return $! forceList (showException e))
     case r of
         Right msg -> return msg
+#if __GLASGOW_HASKELL__ >= 903
+        Left e' -> safeShowException (e' :: SomeExceptionWithLocation)
+#else
         Left e' -> safeShowException (e' :: SomeException)
+#endif
     where
         forceList [] = []
         forceList xs@(x : xt) = x `seq` forceList xt `seq` xs

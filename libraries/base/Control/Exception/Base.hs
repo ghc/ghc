@@ -191,7 +191,7 @@ tryJust p a = do
 -- exception raised by the computation.
 onException :: IO a -> IO b -> IO a
 onException io what = io `catch` \e -> do _ <- what
-                                          throwIO (e :: SomeException)
+                                          throwIO (e :: SomeExceptionWithLocation)
 
 -----------------------------------------------------------------------------
 -- Some Useful Functions

@@ -49,7 +49,7 @@ data ExecResult
   = ExecComplete
        {
 #if __GLASGOW_HASKELL__ >= 903
-          execResult :: Either SomeExceptionWithLocation [Name]
+         execResult :: Either SomeExceptionWithLocation [Name]
 #else
          execResult :: Either SomeException [Name]
 #endif
