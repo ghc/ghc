@@ -106,7 +106,7 @@ data Node key payload = DigraphNode {
   }
 
 
-instance (Outputable a, Outputable b) => Outputable (Node  a b) where
+instance (Outputable a, Outputable b) => Outputable (Node a b) where
   ppr (DigraphNode a b c) = ppr (a, b, c)
 
 emptyGraph :: Graph a
