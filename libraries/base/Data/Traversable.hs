@@ -52,6 +52,18 @@ module Data.Traversable (
     --
     -- $construction
 
+    -- * Specialised traversals
+    -- $special
+
+    -- ** Identity: the 'fmapDefault' function
+    -- $identity
+
+    -- ** State: the 'mapAccumL', 'mapAccumR' functions
+    -- $stateful
+
+    -- ** Const: the 'foldMapDefault' function
+    -- $phantom
+
     -- * Laws
     --
     -- $laws
@@ -485,6 +497,7 @@ foldMapDefault = coerce (traverse :: (a -> Const m ()) -> t a -> Const m (t ()))
 -- straightforward, see the [Construction](#construction) section for details.
 -- The diverse uses of @Traversable@ structures result from the many possible
 -- choices of Applicative effects to thread through a traversable structure.
+-- See the [Specialised Traversals](#special) section for some examples.
 --
 -- Every @Traversable@ structure is both a 'Functor' and 'Foldable' because it
 -- is possible to implement both 'fmap' and 'foldMap' (also 'foldr', ...) in
@@ -853,6 +866,261 @@ foldMapDefault = coerce (traverse :: (a -> Const m ()) -> t a -> Const m (t ()))
 --
 -- The actual definition of 'traverse' for lists is expressed as an equivalent
 -- right fold in order to facilitate list /fusion/.
+
+------------------
+
+-- $special
+--
+-- #special#
+-- Below we'll examine the role that the choice of the 'Applicative' functor
+-- __@f@__ plays in being able to perform specialised transformations of a
+-- 'Traversable' structure.
+--
+-- #coercion#
+-- The example code in the specialised use-cases makes use of an advanced
+-- Haskell feature, namely @newtype@ /coercion/.  This is done for two reasons:
+--
+-- * Use of 'coerce' makes it possible to avoid cluttering the code with
+--   functions that wrap and unwrap /newtype/ terms, which at runtime are
+--   indistinguishable from the underlying value.  Coercion is particularly
+--   convenient when one would have to otherwise apply multiple newtype
+--   constructors to function arguments, and then peel off multiple layers
+--   of same from the function output.
+--
+-- * Use of 'coerce' can produce more efficient code, by reusing the original
+--   value, rather than allocating space for a wrapped clone.
+--
+-- If you're not familiar with 'coerce', don't worry, it is just a shorthand
+-- that, e.g., given:
+--
+-- > newtype Foo a = MkFoo { getFoo :: a }
+-- > newtype Bar a = MkBar { getBar :: a }
+-- > newtype Baz a = MkBaz { getBaz :: a }
+-- > f :: Baz Int -> Bar (Foo String)
+--
+-- makes it possible to write:
+--
+-- > x :: Int -> String
+-- > x = coerce f
+--
+-- instead of
+--
+-- > x = getFoo . getBar . f . MkBaz
+
+------------------
+
+-- $identity
+--
+-- #identity#
+-- The simplest Applicative functor is 'Identity', which just wraps and unwraps
+-- pure values and function application.  This allows us to define
+-- 'fmapDefault':
+--
+-- > {-# LANGUAGE ScopedTypeVariables #-}
+-- > import Data.Coercible (coerce)
+-- >
+-- > type TraverseI t a b = (a -> Identity b) -> t a -> Identity (t b)
+-- >
+-- > fmapDefault :: forall t a b. Traversable t => (a -> b) -> t a -> t b
+-- > fmapDefault = coerce (traverse :: TraverseI t a b)
+--
+-- The use of [coercion](#coercion) avoids the need to explicitly wrap and
+-- unwrap terms via 'Identity' and 'runIdentity'.
+--
+-- As noted in [Overview](#overview), 'fmapDefault' can only be used to define
+-- the requisite 'Functor' instance of a 'Traversable' structure when the
+-- 'traverse' method is explicitly implemented.  An infinite loop would result
+-- if in addition 'traverse' were defined in terms of 'sequenceA' and 'fmap'.
+
+------------------
+
+-- $stateful
+--
+-- #stateful#
+-- Applicative functors that thread a changing state through a computation are
+-- an interesting use-case for 'traverse'.  The 'mapAccumL' and 'mapAccumR'
+-- functions in this module are each defined in terms of such traversals.
+--
+-- We first define a simplified (not a monad transformer) version of
+-- 'Control.Monad.Trans.State.State' that threads a state __@s@__ through a
+-- chain of computations left to right.  Its @('<*>')@ operator passes the
+-- input state first to its left argument, and then the resulting state is
+-- passed to its right argument, which in returns the final state.
+--
+-- > newtype StateL s a = StateL { runStateL :: s -> (s, a) }
+-- >
+-- > instance Functor (StateL s) where
+-- >     fmap f (StateL kx) = StateL $ \ s ->
+-- >         let (s', x) = kx s in (s', f x)
+-- >
+-- > instance Applicative (StateL s) where
+-- >     pure a = StateL $ \s -> (s, a)
+-- >     (StateL kf) <*> (StateL kx) = StateL $ \ s ->
+-- >         let { (s',  f) = kf s
+-- >             ; (s'', x) = kx s' } in (s'', f x)
+-- >     liftA2 f (StateL kx) (StateL ky) = StateL $ \ s ->
+-- >         let { (s',  x) = kx s
+-- >             ; (s'', y) = ky s' } in (s'', f x y)
+--
+-- With @StateL@, we can define 'mapAccumL' as follows:
+--
+-- > type TraverseL t s a b = (a -> StateL s b) -> t a -> StateL s (t b)
+-- >
+-- > mapAccumL :: forall t s a b. Traversable t
+-- >           => (s -> a -> (s, b)) -> s -> t a -> (s, t b)
+-- > mapAccumL g s ts = coerce (traverse :: TraverseL t s a b) (flip g) ts s
+--
+-- The use of [coercion](#coercion) avoids the need to explicitly wrap and
+-- unwrap __@newtype@__ terms.
+--
+-- The type of __@flip g@__ is coercible to __@a -> StateL b@__, which makes it
+-- suitable for use with 'traverse'.  As part of the Applicative
+-- [construction](#construction) of __@StateL (t b)@__ the state updates will
+-- thread left-to-right along the sequence of elements of __@t a@__.
+--
+-- While 'mapAccumR' has a type signature identical to 'mapAccumL', it differs
+-- in the expected order of evaluation of effects, which must take place
+-- right-to-left.
+--
+-- For this we need a variant control structure @StateR@, which threads the
+-- state right-to-left, by passing the input state to its right argument and
+-- then using the resulting state as an input to its left argument:
+--
+-- > newtype StateR s a = StateR { runStateR :: s -> (s, a) }
+-- >
+-- > instance Functor (StateR s) where
+-- >     fmap f (StateR kx) = StateR $ \s ->
+-- >         let (s', x) = kx s in (s', f x)
+-- >
+-- > instance Applicative (StateR s) where
+-- >     pure a = StateR $ \s -> (s, a)
+-- >     (StateR kf) <*> (StateR kx) = StateR $ \ s ->
+-- >         let { (s',  x) = kx s
+-- >             ; (s'', f) = kf s' } in (s'', f x)
+-- >     liftA2 f (StateR kx) (StateR ky) = StateR $ \ s ->
+-- >         let { (s',  y) = ky s
+-- >             ; (s'', x) = kx s' } in (s'', f x y)
+--
+-- With @StateR@, we can define 'mapAccumR' as follows:
+--
+-- > type TraverseR t s a b = (a -> StateR s b) -> t a -> StateR s (t b)
+-- >
+-- > mapAccumR :: forall t s a b. Traversable t
+-- >           => (s -> a -> (s, b)) -> s -> t a -> (s, t b)
+-- > mapAccumR g s0 ts = coerce (traverse :: TraverseR t s a b) (flip g) ts s0
+--
+-- The use of [coercion](#coercion) avoids the need to explicitly wrap and
+-- unwrap __@newtype@__ terms.
+--
+-- Various stateful traversals can be constructed from 'mapAccumL' and
+-- 'mapAccumR' for suitable choices of @g@, or built directly along similar
+-- lines.
+
+------------------
+
+-- $phantom
+--
+-- #phantom#
+-- The 'Const' Functor enables applications of 'traverse' that summarise the
+-- input structure to an output value without constructing any output values
+-- of the same type or shape.
+--
+-- As noted [above](#overview), the @Foldable@ superclass constraint is
+-- justified by the fact that it is possible to construct 'foldMap', 'foldr',
+-- etc., from 'traverse'.  The technique used is useful in its own right, and
+-- is explored below.
+--
+-- A key feature of folds is that they can reduce the input structure to a
+-- summary value. Often neither the input structure nor a mutated clone is
+-- needed once the fold is computed, and through list fusion the input may not
+-- even have been memory resident in its entirety at the same time.
+--
+-- The 'traverse' method does not at first seem to be a suitable building block
+-- for folds, because its return value __@f (t b)@__ appears to retain mutated
+-- copies of the input structure.  But the presence of __@t b@__ in the type
+-- signature need not mean that terms of type __@t b@__ are actually embedded
+-- in __@f (t b)@__.  The simplest way to elide the excess terms is by basing
+-- the Applicative functor used with 'traverse' on 'Const'.
+--
+-- Not only does __@Const a b@__ hold just an __@a@__ value, with the __@b@__
+-- parameter merely a /phantom/ type, but when __@m@__ has a 'Monoid' instance,
+-- __@Const m@__ is an 'Applicative' functor:
+--
+-- > import Data.Coerce (coerce)
+-- > newtype Const a b = Const { getConst :: a } deriving (Eq, Ord, Show) -- etc.
+-- > instance Functor (Const m) where fmap = const coerce
+-- > instance Monoid m => Applicative (Const m) where
+-- >    pure _   = Const mempty
+-- >    (<*>)    = coerce (mappend :: m -> m -> m)
+-- >    liftA2 _ = coerce (mappend :: m -> m -> m)
+--
+-- The use of [coercion](#coercion) avoids the need to explicitly wrap and
+-- unwrap __@newtype@__ terms.
+--
+-- We can therefore define a specialisation of 'traverse':
+--
+-- > type TraverseC t a m = (a -> Const m ()) -> t a -> Const m (t ())
+-- > traverseC :: forall t a m. (Monoid m, Traversable t) => TraverseC t a m
+-- > traverseC = traverse
+--
+-- For which the Applicative [construction](#construction) of 'traverse'
+-- leads to:
+--
+-- prop> null ts ==> traverseC g ts = Const mempty
+-- prop> traverseC g (prepend x xs) = Const (g x) <> traverseC g xs
+--
+-- In other words, this makes it possible to define:
+--
+-- > {-# LANGUAGE ScopedTypeVariables #-}
+-- > foldMapDefault :: forall t a m. (Monoid m, Traversable t) => (a -> m) -> t a -> m
+-- > foldMapDefault = coerce (traverse :: TraverseC t a m)
+--
+-- Which is sufficient to define a 'Foldable' superclass instance:
+--
+-- The use of [coercion](#coercion) avoids the need to explicitly wrap and
+-- unwrap __@newtype@__ terms.
+--
+-- > instance Traversable t => Foldable t where foldMap = foldMapDefault
+--
+-- It may however be instructive to also directly define candidate default
+-- implementations of 'foldr' and 'foldl'', which take a bit more machinery
+-- to construct:
+--
+-- > {-# LANGUAGE ScopedTypeVariables #-}
+-- > import Data.Coerce (coerce)
+-- > import Data.Functor.Const (Const(..))
+-- > import Data.Semigroup (Dual(..), Endo(..))
+-- > import GHC.Exts (oneShot)
+-- >
+-- > type TraverseR t a b =
+-- >     (a -> Const (Endo b) ()) -> t a -> Const (Endo b) (t ())
+-- > type TraverseL t a b =
+-- >     (a -> Const (Dual (Endo b)) ()) -> t a -> Const (Dual (Endo b)) (t ())
+-- >
+-- > foldrDefault :: forall t a b. Traversable t => (a -> b -> b) -> b -> t a -> b
+-- > foldrDefault f z = \t -> coerce (traverse :: TraverseR t a b) f t z
+-- >
+-- > foldlDefault' :: forall t a b. Traversable t => (b -> a -> b) -> b -> t a -> b
+-- > foldlDefault' f z = \t -> coerce (traverse :: TraverseL t a b) f' t z
+-- >   where
+-- >     f' :: a -> b -> b
+-- >     f' a = oneShot $ \ b -> b `seq` f b a
+--
+-- In the above we're using the __@'Data.Monoid.Endo' b@__ 'Monoid' and its
+-- 'Dual' to compose a sequence of __@b -> b@__ accumulator updates in either
+-- left-to-right or right-to-left order.
+--
+-- The use of 'seq' in the definition of __@foldlDefault'@__ ensures strictness
+-- in the accumulator.
+--
+-- The use of [coercion](#coercion) avoids the need to explicitly wrap and
+-- unwrap __@newtype@__ terms.
+--
+-- The 'GHC.Exts.oneShot' function gives a hint to the compiler that aids in
+-- correct optimisation of lambda terms that fire at most once (for each
+-- element __@a@__) and so should not try to pre-compute and re-use
+-- subexpressions that pay off only on repeated execution.  Otherwise, it is
+-- just the identity function.
 
 ------------------
 
