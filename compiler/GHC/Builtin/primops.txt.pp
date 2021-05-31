@@ -3271,8 +3271,9 @@ primtype FUN m a b
    producing outputs of type {\tt b}. The multiplicity of the input is
    {\tt m}.
 
-   Note that {\tt FUN m a b} permits levity-polymorphism in both {\tt a} and
-   {\tt b}, so that types like {\tt Int\# -> Int\#} can still be well-kinded.
+   Note that {\tt FUN m a b} permits representation-polymorphism in both
+   {\tt a} and {\tt b}, so that types like {\tt Int\# -> Int\#} can still be
+   well-kinded.
   }
 
 pseudoop "realWorld#"
