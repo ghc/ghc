@@ -664,14 +664,39 @@ by saying ``-fno-wombat``.
     value arguments of the resulting worker exceeds both that of the original
     function and this setting.
 
-.. ghc-flag:: -fno-opt-coercion
-    :shortdesc: Turn off the coercion optimiser
+.. ghc-flag:: -fopt-coercion
+    :shortdesc: Perform coercion optimisation.
     :type: dynamic
+    :reverse: -fno-opt-coercion
     :category:
 
-    :default: coercion optimisation enabled.
+    :default: off
+    :since: 9.4.1
 
-    Turn off the coercion optimiser.
+    Equivalent to both :ghc-flag:`-fopt-coercion-simple` and :ghc-flag:`-fopt-coercion-full`.
+
+.. ghc-flag:: -fopt-coercion-simple
+    :shortdesc: Perform simple coercion optimisations.
+    :type: dynamic
+    :reverse: -fno-opt-coercion-simple
+    :category:
+
+    :default: on
+    :since: 9.4.1
+
+    Run the "simple" coercion optimiser which performs certain coercion optimisations
+    after desugaring and during simplification.
+
+.. ghc-flag:: -fopt-coercion-full
+    :shortdesc: Perform a full coercion optimisation pass.
+    :type: dynamic
+    :reverse: -fno-opt-coercion-full
+    :category:
+
+    :default: off but enabled with :ghc-flag:`-O`.
+    :since: 9.4.1
+
+    Run the coercion optimiser as an optimisation pass, including all optimisations.
 
 .. ghc-flag:: -fno-pre-inlining
     :shortdesc: Turn off pre-inlining

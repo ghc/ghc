@@ -132,6 +132,7 @@ data CoreToDo           -- These are diff core-to-core passes,
   | CorePrep
   | CoreAddCallerCcs
   | CoreOccurAnal
+  | CoreDoOptCoercion
 
 instance Outputable CoreToDo where
   ppr (CoreDoSimplify _ _)     = text "Simplifier"
@@ -154,6 +155,7 @@ instance Outputable CoreToDo where
   ppr CoreAddCallerCcs         = text "Add caller cost-centres"
   ppr CorePrep                 = text "CorePrep"
   ppr CoreOccurAnal            = text "Occurrence analysis"
+  ppr CoreDoOptCoercion        = text "Coercion optimization"
   ppr CoreDoPrintCore          = text "Print core"
   ppr (CoreDoRuleCheck {})     = text "Rule check"
   ppr CoreDoNothing            = text "CoreDoNothing"
