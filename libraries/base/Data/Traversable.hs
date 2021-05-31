@@ -499,84 +499,101 @@ foldMapDefault = coerce (traverse :: (a -> Const m ()) -> t a -> Const m (t ()))
 ------------------
 
 -- $traverse
--- For an 'Applicative' functor __@f@__ and a Traversable functor __@t@__, the
--- type signatures of 'traverse' and 'fmap' are rather similar:
+-- For an 'Applicative' functor __@f@__ and a @Traversable@ functor __@t@__,
+-- the type signatures of 'traverse' and 'fmap' are rather similar:
 --
 -- > fmap     :: (a -> f b) -> t a -> t (f b)
 -- > traverse :: (a -> f b) -> t a -> f (t b)
 --
--- with one crucial difference: 'fmap' produces a container of effects, while
--- traverse produces an aggregate container-valued effect.  For example, when
--- __@f@__ is the __@IO@__ monad, and __@t@__ is the List functor, while 'fmap'
--- returns a list of pending IO actions 'traverse' returns an IO action that
--- evaluates to a list of the return values of the individual actions performed
--- left-to-right.
+-- The key difference is that 'fmap' produces a structure whose elements (of
+-- type __@f b@__) are individual effects, while 'traverse' produces an
+-- aggregate effect yielding structures of type __@t b@__.  The produced
+-- structures all have /the same shape/ (list length, graph of tree nodes, ...)
+-- as the input structure __@t a@__, but the slots previously occupied by
+-- elements of type __@a@__ now hold elements of type __@b@__.
 --
--- More concretely, if @nameAndLineCount@ counts the number of lines in a file,
--- returning a pair with input filename and the line count, then traversal
--- over a list of file names produces an IO action that evaluates to a list
--- of __@(fileName, lineCount)@__ pairs:
+-- For example, when __@f@__ is the __@IO@__ monad, and __@t@__ is __@List@__,
+-- 'fmap' yields a list of IO actions, whereas 'traverse' constructs an IO
+-- action that evaluates to a list of the return values of the individual
+-- actions performed left-to-right.
 --
--- @
--- nameAndLineCount :: FilePath -> IO (FilePath, Int)
--- nameAndLineCount fn = ...
--- @
+-- > traverse :: (a -> IO b) -> [a] -> IO [b]
 --
--- Then @traverse nameAndLineCount ["/etc/passwd","/etc/hosts"]@
--- could return
---
--- @
--- [("/etc/passwd",56),("/etc/hosts",32)]
--- @
---
--- The specialisation of 'traverse' to the case when __@f@__ is a monad is
--- called 'mapM'.  The two are otherwise generally identical:
+-- The specialisation of 'traverse' to the case when __@f@__ is a 'Monad' is
+-- called 'mapM', and is the more idiomatic choice in this case.  The two are
+-- otherwise generally identical (though 'mapM' may be specifically optimised
+-- for monads, and could be more efficient than using the more general
+-- 'traverse').
 --
 -- > traverse :: (Applicative f, Traversable t) => (a -> f b) -> t a -> f (t b)
 -- > mapM     :: (Monad       m, Traversable t) => (a -> m b) -> t a -> m (t b)
 --
--- The behaviour of 'traverse' and 'mapM' can be at first surprising when the
--- applicative functor __@f@__ is __@[]@__ (i.e. the List monad).  The List
--- monad is said to be /non-deterministic/, by which is meant that applying a
--- list of __@n@__ functions __@[a -> b]@__ to a list of __@k@__ values
--- __@[a]@__ produces a list of __@n*k@__ values of each function applied to
--- each input value.
+-- When the traversable term is a simple variable or expression, and the
+-- monadic action to run is a non-trivial do block, it can be more natural to
+-- write the action last.  This idiom is supported by 'for' and 'forM', which
+-- are the flipped versions of 'traverse' and 'mapM', respectively.
 --
--- As a result, traversal with a function __@f :: a -> [b]@__, over an input
--- container __@t a@__, yields a list __@[t b]@__, whose length is the product
--- of the lengths of the lists that the function returns for each element of
--- the input container!  The individual elements __@a@__ of the container are
--- replaced by each element of __@f a@__ in turn:
+-- When 'traverse' or 'mapM' is applied to an empty structure __@ts@__ (one for
+-- which __@'null' ts@__ is 'True') the return value is __@pure ts@__
+-- regardless of the provided function __@g :: a -> f b@__.  It is not possible
+-- to apply the function when no values of type __@a@__ are available, but its
+-- type determines the relevant instance of 'pure'.
 --
--- >>> mapM (\n -> [0..n]) $ Just 2
--- [Just 0,Just 1,Just 2]
--- >>> mapM (\n -> [0..n]) [0..2]
--- [[0,0,0],[0,0,1],[0,0,2],[0,1,0],[0,1,1],[0,1,2]]
+-- prop> null ts ==> traverse g ts == pure ts
 --
--- If any element of the container is mapped to an empty list, then the
--- aggregate result is empty (no value is available to fill one of the
--- slots of the output container).
---
--- >>> traverse (const []) $ Just 0
--- []
---
--- When however the traversed container is empty, the result is always a
--- singleton of the empty container, the function is never evaluated
--- as there are no input values for it to be applied to.
---
--- >>> traverse (const []) Nothing
--- [Nothing]
---
--- The result of 'traverse' is all-or-nothing, either containers of exactly the
--- same shape as the input or a failure ('Nothing', 'Left', empty list, etc.).
--- The 'traverse' function does not perform selective filtering as with e.g.
--- 'Data.Maybe.mapMaybe':
+-- Otherwise, provided that __@ts@__ is non-empty and at least one value of
+-- type __@t b@__ can be extracted from the return value of 'traverse', all
+-- such values will have exactly /the same shape/ as the input __@t a@__.  The
+-- 'traverse' function does not perform selective filtering of slots in the
+-- output structure as with e.g. 'Data.Maybe.mapMaybe'.
 --
 -- >>> let incOdd n = if odd n then Just $ n + 1 else Nothing
--- >>> traverse incOdd [1, 2, 3]
--- Nothing
 -- >>> mapMaybe incOdd [1, 2, 3]
 -- [2,4]
+-- >>> traverse incOdd [1, 3, 5]
+-- Just [2,4,6]
+-- >>> traverse incOdd [1, 2, 3]
+-- Nothing
+--
+-- In the above examples, with 'Maybe' as the 'Applicative' __@f@__, we see
+-- that the number of __@t b@__ structures produced by 'traverse' may differ
+-- from one: it is zero when the result short-circuits to __@Nothing@__.  The
+-- same can happen when __@f@__ is __@List@__ and the result is __@[]@__, or
+-- __@f@__ is __@Either e@__ and the result is __@Left (x :: e)@__, or perhaps
+-- the 'Control.Applicative.empty' value of some
+-- 'Control.Applicative.Alternative' functor.
+--
+-- When __@f@__ is e.g. __@List@__, and the map __@g :: a -> [b]@__ returns
+-- more than one value for some inputs __@a@__ (and at least one for all
+-- __@a@__), the result of __@mapM g ts@__ will contain multiple structures of
+-- the same shape as __@ts@__:
+--
+-- prop> length (mapM g ts) == product (fmap (length . g) ts)
+--
+-- For example:
+--
+-- >>> length $ mapM (\n -> [1..n]) [1..6]
+-- 720
+-- >>> product $ length . (\n -> [1..n]) <$> [1..6]
+-- 720
+--
+-- In other words, a traversal with a function __@g :: a -> [b]@__, over an
+-- input structure __@t a@__, yields a list __@[t b]@__, whose length is the
+-- product of the lengths of the lists that @g@ returns for each element of the
+-- input structure!  The individual elements __@a@__ of the structure are
+-- replaced by each element of __@g a@__ in turn:
+--
+-- >>> mapM (\n -> [1..n]) $ Just 3
+-- [Just 1,Just 2,Just 3]
+-- >>> mapM (\n -> [1..n]) [1..3]
+-- [[1,1,1],[1,1,2],[1,1,3],[1,2,1],[1,2,2],[1,2,3]]
+--
+-- If any element of the structure __@t a@__ is mapped by @g@ to an empty list,
+-- then the entire aggregate result is empty, because no value is available to
+-- fill one of the slots of the output structure:
+--
+-- >>> mapM (\n -> [1..n]) $ [0..6] -- [1..0] is empty
+-- []
 
 ------------------
 
