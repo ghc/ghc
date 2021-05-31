@@ -146,33 +146,6 @@ INTEGRAL_TYPE(CULLong,HTYPE_UNSIGNED_LONG_LONG)
 -- @since 4.10.0.0
 INTEGRAL_TYPE_WITH_CTYPE(CBool,bool,HTYPE_BOOL)
 
-{-# RULES
-"fromIntegral/a->CChar"   fromIntegral = \x -> CChar   (fromIntegral x)
-"fromIntegral/a->CSChar"  fromIntegral = \x -> CSChar  (fromIntegral x)
-"fromIntegral/a->CUChar"  fromIntegral = \x -> CUChar  (fromIntegral x)
-"fromIntegral/a->CShort"  fromIntegral = \x -> CShort  (fromIntegral x)
-"fromIntegral/a->CUShort" fromIntegral = \x -> CUShort (fromIntegral x)
-"fromIntegral/a->CInt"    fromIntegral = \x -> CInt    (fromIntegral x)
-"fromIntegral/a->CUInt"   fromIntegral = \x -> CUInt   (fromIntegral x)
-"fromIntegral/a->CLong"   fromIntegral = \x -> CLong   (fromIntegral x)
-"fromIntegral/a->CULong"  fromIntegral = \x -> CULong  (fromIntegral x)
-"fromIntegral/a->CLLong"  fromIntegral = \x -> CLLong  (fromIntegral x)
-"fromIntegral/a->CULLong" fromIntegral = \x -> CULLong (fromIntegral x)
-
-"fromIntegral/CChar->a"   fromIntegral = \(CChar   x) -> fromIntegral x
-"fromIntegral/CSChar->a"  fromIntegral = \(CSChar  x) -> fromIntegral x
-"fromIntegral/CUChar->a"  fromIntegral = \(CUChar  x) -> fromIntegral x
-"fromIntegral/CShort->a"  fromIntegral = \(CShort  x) -> fromIntegral x
-"fromIntegral/CUShort->a" fromIntegral = \(CUShort x) -> fromIntegral x
-"fromIntegral/CInt->a"    fromIntegral = \(CInt    x) -> fromIntegral x
-"fromIntegral/CUInt->a"   fromIntegral = \(CUInt   x) -> fromIntegral x
-"fromIntegral/CLong->a"   fromIntegral = \(CLong   x) -> fromIntegral x
-"fromIntegral/CULong->a"  fromIntegral = \(CULong  x) -> fromIntegral x
-"fromIntegral/CLLong->a"  fromIntegral = \(CLLong  x) -> fromIntegral x
-"fromIntegral/CULLong->a" fromIntegral = \(CULLong x) -> fromIntegral x
-"fromIntegral/CBool->a"   fromIntegral = \(CBool   x) -> fromIntegral x
- #-}
-
 -- | Haskell type representing the C @float@ type.
 -- /(The concrete types of "Foreign.C.Types#platform" are platform-specific.)/
 FLOATING_TYPE(CFloat,HTYPE_FLOAT)
@@ -205,18 +178,6 @@ INTEGRAL_TYPE(CWchar,HTYPE_WCHAR_T)
 -- | Haskell type representing the C @sig_atomic_t@ type.
 -- /(The concrete types of "Foreign.C.Types#platform" are platform-specific.)/
 INTEGRAL_TYPE(CSigAtomic,HTYPE_SIG_ATOMIC_T)
-
-{-# RULES
-"fromIntegral/a->CPtrdiff"   fromIntegral = \x -> CPtrdiff   (fromIntegral x)
-"fromIntegral/a->CSize"      fromIntegral = \x -> CSize      (fromIntegral x)
-"fromIntegral/a->CWchar"     fromIntegral = \x -> CWchar     (fromIntegral x)
-"fromIntegral/a->CSigAtomic" fromIntegral = \x -> CSigAtomic (fromIntegral x)
-
-"fromIntegral/CPtrdiff->a"   fromIntegral = \(CPtrdiff   x) -> fromIntegral x
-"fromIntegral/CSize->a"      fromIntegral = \(CSize      x) -> fromIntegral x
-"fromIntegral/CWchar->a"     fromIntegral = \(CWchar     x) -> fromIntegral x
-"fromIntegral/CSigAtomic->a" fromIntegral = \(CSigAtomic x) -> fromIntegral x
- #-}
 
 -- | Haskell type representing the C @clock_t@ type.
 -- /(The concrete types of "Foreign.C.Types#platform" are platform-specific.)/
@@ -251,13 +212,6 @@ INTEGRAL_TYPE(CIntPtr,HTYPE_INTPTR_T)
 INTEGRAL_TYPE(CUIntPtr,HTYPE_UINTPTR_T)
 INTEGRAL_TYPE(CIntMax,HTYPE_INTMAX_T)
 INTEGRAL_TYPE(CUIntMax,HTYPE_UINTMAX_T)
-
-{-# RULES
-"fromIntegral/a->CIntPtr"  fromIntegral = \x -> CIntPtr  (fromIntegral x)
-"fromIntegral/a->CUIntPtr" fromIntegral = \x -> CUIntPtr (fromIntegral x)
-"fromIntegral/a->CIntMax"  fromIntegral = \x -> CIntMax  (fromIntegral x)
-"fromIntegral/a->CUIntMax" fromIntegral = \x -> CUIntMax (fromIntegral x)
- #-}
 
 -- C99 types which are still missing include:
 -- wint_t, wctrans_t, wctype_t

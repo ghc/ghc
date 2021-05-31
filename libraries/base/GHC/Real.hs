@@ -455,7 +455,7 @@ instance  Integral Integer where
 
 -- | @since 4.8.0.0
 instance Integral Natural where
-    toInteger = integerFromNatural
+    toInteger x = integerFromNatural x
 
     {-# INLINE quot #-}
     _ `quot` 0 = divZeroError
@@ -565,53 +565,12 @@ instance  (Integral a)  => Enum (Ratio a)  where
 --------------------------------------------------------------
 
 -- | general coercion from integral types
-{-# NOINLINE [1] fromIntegral #-}
+{-# INLINE fromIntegral #-}
+  -- Inlined to allow built-in rules to match.
+  -- See Note [Optimising conversions between numeric types]
+  -- in GHC.Core.Opt.ConstantFold
 fromIntegral :: (Integral a, Num b) => a -> b
 fromIntegral = fromInteger . toInteger
-
-{-# RULES
-"fromIntegral/Int->Int" fromIntegral = id :: Int -> Int
-    #-}
-
-{-# RULES
-"fromIntegral/Int->Word"  fromIntegral = \(I# x#) -> W# (int2Word# x#)
-"fromIntegral/Word->Int"  fromIntegral = \(W# x#) -> I# (word2Int# x#)
-"fromIntegral/Word->Word" fromIntegral = id :: Word -> Word
-    #-}
-
-{-# RULES
-"fromIntegral/Natural->Natural"  fromIntegral = id            :: Natural -> Natural
-"fromIntegral/Natural->Integer"  fromIntegral = toInteger     :: Natural -> Integer
-"fromIntegral/Natural->Word"     fromIntegral = naturalToWord :: Natural -> Word
-  #-}
-
--- Don't forget the type signatures in the following rules! Without a type
--- signature we ended up with the rule:
---
---  "fromIntegral/Int->Natural" forall a (d::Integral a).
---        fromIntegral @a @Natural = naturalFromWord . fromIntegral @a d
---
--- but this rule is certainly not valid for every Integral type a!
---
--- This rule wraps any Integral input into Word's range. As a consequence,
--- (2^64 :: Integer) was incorrectly wrapped to (0 :: Natural), see #19345.
---
--- A follow-up issue with this rule was that no underflow exception was raised
--- for negative Int values (see #20066). We now use a naturalFromInt helper
--- function to restore this behavior.
-
-{-# RULES
-"fromIntegral/Word->Natural"    fromIntegral = naturalFromWord :: Word -> Natural
-"fromIntegral/Int->Natural"     fromIntegral = naturalFromInt  :: Int -> Natural
-  #-}
-
--- | Convert an Int into a Natural, throwing an underflow exception for negative
--- values.
-naturalFromInt :: Int -> Natural
-{-# INLINE naturalFromInt #-}
-naturalFromInt x
-  | x < 0     = underflowError
-  | otherwise = naturalFromWord (fromIntegral x)
 
 -- | general coercion to fractional types
 realToFrac :: (Real a, Fractional b) => a -> b
