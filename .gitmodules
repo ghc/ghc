@@ -36,7 +36,7 @@
 	ignore = untracked
 [submodule "libraries/Win32"]
 	path = libraries/Win32
-	url = https://gitlab.haskell.org/ghc/packages/Win32.git
+	url = https://gitlab.haskell.org/supersven/Win32.git
 	ignore = untracked
 [submodule "libraries/time"]
 	path = libraries/time
