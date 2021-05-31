@@ -691,8 +691,8 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
         -- about to begin, with '1' for the first
       | iteration_no > max_iterations   -- Stop if we've run out of iterations
       = warnPprTrace (debugIsOn && (max_iterations > 2))
-            ( hang (text "Simplifier bailing out after" <+> int max_iterations
-                    <+> text "iterations"
+            ( hang (ppr this_mod <> colon <+> text "simplifier bailing out after"
+                    <+> int max_iterations <+> text "iterations"
                     <+> (brackets $ hsep $ punctuate comma $
                          map (int . simplCountN) (reverse counts_so_far)))
                  2 (text "Size =" <+> ppr (coreBindsStats binds))) $
