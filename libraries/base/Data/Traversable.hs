@@ -44,8 +44,8 @@ module Data.Traversable (
     -- ** The 'sequenceA' and 'sequence' methods
     -- $sequence
 
-    -- ** Sample instance
-    -- $sample_instance
+    -- ** Example binary tree instance
+    -- $tree_instance
 
     -- ** Construction
     --
@@ -745,21 +745,45 @@ foldMapDefault = coerce (traverse :: (a -> Const m ()) -> t a -> Const m (t ()))
 
 ------------------
 
--- $sample_instance
+-- $tree_instance
 --
--- Instances are similar to 'Functor', e.g. given a data type
+-- The definition of a 'Traversable' instance for a binary tree is rather
+-- similar to the corresponding instance of 'Functor', given the data type:
 --
 -- > data Tree a = Empty | Leaf a | Node (Tree a) a (Tree a)
 --
--- a suitable instance would be
+-- a canonical @Functor@ instance would be
+--
+-- > instance Functor Tree where
+-- >    fmap g Empty        = Empty
+-- >    fmap g (Leaf x)     = Leaf (g x)
+-- >    fmap g (Node l k r) = Node (fmap g l) (g k) (fmap g r)
+--
+-- a canonical @Traversable@ instance would be
 --
 -- > instance Traversable Tree where
--- >    traverse f Empty = pure Empty
--- >    traverse f (Leaf x) = Leaf <$> f x
--- >    traverse f (Node l k r) = Node <$> traverse f l <*> f k <*> traverse f r
+-- >    traverse g Empty        = pure Empty
+-- >    traverse g (Leaf x)     = Leaf <$> g x
+-- >    traverse g (Node l k r) = Node <$> traverse g l <*> g k <*> traverse g r
 --
--- This definition works for any applicative functor in the co-domain of @f@,
--- as the laws for '<*>' imply a form of associativity.
+-- This definition works for any __@g :: a -> f b@__, with __@f@__ an
+-- Applicative functor, as the laws for @('<*>')@ imply the requisite
+-- associativity.
+--
+-- we can add an explicit non-default 'mapM' if desired:
+--
+-- >    mapM g Empty        = return Empty
+-- >    mapM g (Leaf x)     = Leaf <$> g x
+-- >    mapM g (Node l k r) = do
+-- >        ml <- mapM g l
+-- >        mk <- g k
+-- >        mr <- mapM g r
+-- >        return $ Node ml mk mr
+--
+-- See [Construction](#construction) below for a more detailed exploration of
+-- the general case, but as mentioned in [Overview](#overview) above, instance
+-- definitions are typically rather simple, all the interesting behaviour is a
+-- result of an interesting choice of 'Applicative' functor for a traversal.
 
 ------------------
 
