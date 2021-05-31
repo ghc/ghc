@@ -679,13 +679,14 @@ foldMapDefault = coerce (traverse :: (a -> Const m ()) -> t a -> Const m (t ()))
 
 -- $sequence
 -- The 'sequenceA' and 'sequence' methods are useful when what you have is a
--- container of applicative or, respectively, monadic actions, and you want to
--- evaluate them left-to-right to obtain a container of the computed values.
+-- container of pending applicative or monadic effects, and you want to combine
+-- them into a single effect that produces zero or more containers with the
+-- computed values.
 --
 -- > sequenceA :: (Applicative f, Traversable t) => t (f a) -> f (t a)
 -- > sequence  :: (Monad       m, Traversable t) => t (m a) -> m (t a)
--- > sequenceA = traverse id
--- > sequence  = mapM id
+-- > sequenceA = traverse id -- default definition
+-- > sequence  = sequenceA   -- default definition
 --
 -- When the monad __@m@__ is 'System.IO.IO', applying 'sequence' to a list of
 -- IO actions, performs each in turn, returning a list of the results:
@@ -694,7 +695,7 @@ foldMapDefault = coerce (traverse :: (a -> Const m ()) -> t a -> Const m (t ()))
 -- >     = (\a b -> [a,b]) <$> putStr "Hello " <*> putStrLn "World!"
 -- >     = do u1 <- putStr "Hello "
 -- >          u2 <- putStrLn "World!"
--- >          return (u1, u2)
+-- >          return [u1, u2]         -- In this case  [(), ()]
 --
 -- For 'sequenceA', the /non-deterministic/ behaviour of @List@ is most easily
 -- seen in the case of a list of lists (of elements of some common fixed type).
@@ -702,6 +703,9 @@ foldMapDefault = coerce (traverse :: (a -> Const m ()) -> t a -> Const m (t ()))
 --
 -- >>> sequenceA [[0, 1, 2], [30, 40], [500]]
 -- [[0,30,500],[0,40,500],[1,30,500],[1,40,500],[2,30,500],[2,40,500]]
+--
+-- Because the input list has three (sublist) elements, the result is a list of
+-- triples (/same shape/).
 --
 -- When the monad __@m@__ is 'Maybe' or 'Either', the effect in question is to
 -- short-circuit the computation on encountering 'Nothing' or 'Left'.
@@ -715,15 +719,27 @@ foldMapDefault = coerce (traverse :: (a -> Const m ()) -> t a -> Const m (t ()))
 -- >>> sequence [Right 1,Left "sorry",Right 3]
 -- Left "sorry"
 --
--- The result of 'sequence' is all-or-nothing, either containers of exactly the
--- same shape as the input or a failure ('Nothing', 'Left', empty list, etc.).
--- The 'sequence' function does not perform selective filtering as with e.g.
--- 'Data.Maybe.catMaybes' or 'Data.Either.rights':
+-- The result of 'sequence' is all-or-nothing, either structures of exactly the
+-- same shape as the input or none at all.  The 'sequence' function does not
+-- perform selective filtering as with e.g. 'Data.Maybe.catMaybes' or
+-- 'Data.Either.rights':
 --
 -- >>> catMaybes [Just 1,Nothing,Just 3]
 -- [1,3]
 -- >>> rights [Right 1,Left "sorry",Right 3]
 -- [1,3]
+--
+-- The 'traverse' and 'mapM' functions can in principle be implemented in terms
+-- of 'sequenceA' and 'sequence' respectively:
+--
+-- > traverse g = sequenceA . fmap g
+-- > mapM g ts = sequence $ fmap g ts
+--
+-- but this is not recommended, it requires that the structure is already
+-- independently a 'Functor', and 'sequenceA' expressed as __@traverse id@__ is
+-- much simpler than 'traverse' expressed via a composition of 'sequenceA' and
+-- 'fmap'.  Instances should generally explicitly implement 'traverse', and
+-- perhaps also a specialised 'mapM'.
 
 ------------------
 
