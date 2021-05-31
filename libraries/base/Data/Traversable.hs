@@ -48,7 +48,7 @@ module Data.Traversable (
     -- ** Example binary tree instance
     -- $tree_instance
 
-    -- ** Construction
+    -- ** Making construction intuitive
     --
     -- $construction
 
@@ -788,96 +788,113 @@ foldMapDefault = coerce (traverse :: (a -> Const m ()) -> t a -> Const m (t ()))
 
 -- $construction
 --
--- How do @Traversable@ functors manage to construct a new container of the
--- same shape by sequencing effects over their elements?  Well, left-to-right
--- traversal with sequencing of effects suggests induction from a base case, so
--- the first question is what is the base case?  A @Traversable@ container with
--- elements of type __@a@__ generally has some minimal form that is either
--- "empty" or has just a single element (think "Data.List" vs.
--- "Data.List.Nonempty").
+-- #construction#
+-- In order to be able to reason about how a given type of 'Applicative'
+-- effects will be sequenced through a general 'Traversable' structure by its
+-- 'traversable' and related methods, it is helpful to look more closely
+-- at how a general 'traverse' method is implemented.  We'll look at how
+-- general traversals are constructed primarily with a view to being able
+-- to predict their behaviour as a user, even if you're not defining your
+-- own 'Traversable' instances.
 --
--- * If the base case is empty (no associated first value of __@a@__) then
---   traversal just reproduces the empty structure with no side effects,
---   so we have:
+-- Traversable structures __@t a@__ are assembled incrementally from their
+-- constituent parts, perhaps by prepending or appending individual elements of
+-- type __@a@__, or, more generally, by recursively combining smaller composite
+-- traversable building blocks that contain multiple such elements.
 --
---     > traverse _ empty = pure empty
+-- As in the [tree example](#tree) above, the components being combined are
+-- typically pieced together by a suitable /constructor/, i.e. a function
+-- taking two or more arguments that returns a composite value.
 --
---     With the List monad, "empty" is __@[]@__, while with 'Maybe' it is
+-- The 'traverse' method enriches simple incremental construction with
+-- threading of 'Applicative' effects of some function __@g :: a -> f b@__.
+--
+-- The basic building blocks out of which we'll model the construction of
+-- 'traverse' will be a hypothetical set of elementary functions, some or all
+-- of which may have direct analogues in actual implementations of
+-- 'Traversable' structures.
+--
+-- > empty :: t a               -- build an empty container
+-- > singleton :: a -> t a      -- build a one-element container
+-- > prepend :: a -> t a -> t a -- extend by prepending a new initial element
+-- > append  :: t a -> a -> t a -- extend by appending a new final element
+-- > combine :: a1 -> a2 -> ... -> an -> t a -- combine multiple inputs
+--
+-- * An empty structure has no elements of type __@a@__, so there's nothing
+--   to which __@g@__ can be applied, but since we need an output of type
+--   __@f (t b)@__, we just use the 'pure' instance of __@f@__ to wrap an
+--   empty of type __@t b@__:
+--
+--     > traverse _ (empty :: t a) = pure (empty :: t b)
+--
+--     With the List monad, /empty/ is __@[]@__, while with 'Maybe' it is
 --     'Nothing'.  With __@Either e a@__ we have an /empty/ case for each
---     value of __@e@__.
+--     value of __@e@__:
 --
--- * If the base case is a __@singleton a@__, then 'traverse' can take that
---   __@a@__, apply __@f :: a -> F b@__ getting an __@F b@__, then
---   __@fmap singleton@__ over that, getting __@F (singleton b)@__:
+--     > traverse _ (Left e :: Either e a) = pure $ (Left e :: Either e b)
 --
---     > traverse f (singleton a) = singleton <$> f a
+-- * A singleton structure has just one element of type __@a@__, and
+--   'traverse' can take that __@a@__, apply __@g :: a -> f b@__ getting an
+--   __@f b@__, then __@fmap singleton@__ over that, getting an __@f (t b)@__
+--   as required:
 --
--- Since 'Maybe' and 'Either' are either empty or singletons, we have
+--     > traverse g (singleton a) = fmap singleton $ g a
 --
--- > traverse _ Nothing = pure Nothing
--- > traverse f (Just a) = Just <$> f a
+--     Note that if __@f@__ is __@List@__ and __@g@__ returns multiple values
+--     the result will be a list of multiple __@t b@__ singletons!
 --
--- > traverse _ (Left e) = pure (Left e)
--- > traverse f (Right a) = Right <$> f a
+--     Since 'Maybe' and 'Either' are either empty or singletons, we have
 --
--- Similarly, for List, we have:
+--     > traverse _ Nothing = pure Nothing
+--     > traverse g (Just a) = Just <$> g a
 --
--- > traverse f [] = pure []
--- > traverse f [a] = fmap (:[]) (f a) = (:) <$> f a <*> pure []
+--     > traverse _ (Left e) = pure (Left e)
+--     > traverse g (Right a) = Right <$> g a
 --
--- What remains to be done is an inductive step beyond the empty and singleton
--- cases.  For a concrete @Traversable@ functor @T@ we need to be able to
--- extend our structure incrementally by filling in holes.  We can view a
--- partially built structure __@t0 :: T a@__ as a function
--- __@append :: a -> T a@__ that takes one more element __@a@__ to insert into
--- the container to the right of the existing elements to produce a larger
--- structure.  Conversely, we can view an element @a@ as a function
--- __@prepend :: T a -> T a@__ of a partially built structure that inserts the
--- element to the left of the existing elements.
+--     For @List@, empty is __@[]@__ and @singleton@ is __@(:[])@__, so we have:
 --
--- Assuming that 'traverse' has already been defined on the partially built
--- structure:
+--     > traverse _ []  = pure []
+--     > traverse g [a] = fmap (:[]) (g a)
+--     >                = (:) <$> (g a) <*> traverse g []
+--     >                = liftA2 (:) (g a) (traverse g [])
 --
--- > f0 = traverse f t0 :: F (T b)
+-- * When the structure is built by adding one more element via __@prepend@__
+--   or __@append@__, traversal amounts to:
 --
--- we aim to define __@traverse f (append t0 a)@__ and/or
--- __@traverse f (prepend a t0)@__.
+--     > traverse g (prepend a t0) = prepend <$> (g a) <*> traverse g t0
+--     >                           = liftA2 prepend (g a) (traverse g t0)
 --
--- We can lift @append@ and apply it to @f0@ to get:
+--     > traverse g (append t0 a) = append <$> traverse g t0 <*> g a
+--     >                          = liftA2 append (traverse g t0) (g a)
 --
--- > append <$> f0 :: F (b -> T b)
+--     The origin of the combinatorial product when __@f@__ is @List@ should now
+--     be apparent, when __@traverse g t0@__ has __@n@__ elements and __@g a@__
+--     has __@m@__ elements, the /non-deterministic/ 'Applicative' instance of
+--     @List@ will produce a result with __@m * n@__ elements.
 --
--- and from the /next/ element __@a@__ we can obtain __@f a :: F b@__, and
--- this is where we'll make use of the applicative instance of @F@.  Adding
--- one more element on the right is then:
+-- * When combining larger building blocks, we again use __@('<*>')@__ to
+--   combine the traversals of the components.  With bare elements __@a@__
+--   mapped to __@f b@__ via __@g@__, and composite traversable
+--   sub-structures transformed via __@traverse g@__:
 --
--- > traverse f (append t0 a) = append <$> traverse f t0 <*> f a
+--     > traverse g (combine a1 a2 ... an) =
+--     >     combine <$> a1' <*> a2' <*> ... <*> an'
+--     >   where
+--     >      a1' = g a1          -- if a1 is an element of type @a@
+--     >      a2' = traverse g a2 -- if a2 is a traversable component
+--     >      ...
 --
--- while prepending an element on the left is:
+-- The above definitions sequence the 'Applicative' effects of __@f@__ in the
+-- expected order while producing results of the expected shape __@t@__.
 --
--- > traverse f (prepend a t0) = prepend <$> f a <*> traverse f t0
+-- When __@t@__ is @List@, we get the natural order of effects by lifting
+-- @(':')@ to a prepend operation:
 --
--- The (binary) @Tree@ instance example makes use of both, after defining the
--- @Empty@ base case and the singleton @Leaf@ node case, non-empty internal
--- nodes introduce both a prepended child node on the left and an appended
--- child node on the right:
+-- > traverse g [] = pure []
+-- > traverse g (x:xs) = liftA2 (:) (g a) (traverse g xs)
 --
--- > traverse f (Node l k r) = Node <$> traverse f l <*> f k <*> traverse f r
---
--- The above definitions sequence the 'Applicative' effects of __@F@__ in the
--- expected order while producing results of the expected shape __@T@__.
---
--- For lists we get the natural order of effects by using
--- __@(prepend \<$\> f a)@__ as the operator and __@(traverse f as)@__ as the
--- operand (the actual definition is written as an equivalent right fold
--- in order to enable /fusion/ rules):
---
--- > traverse f [] = pure []
--- > traverse f (a:as) = (:) <$> f a <*> traverse f as
---
--- The origin of the combinatorial product when __@F@__ is __@[]@__ should now
--- be apparent, the /non-deterministic/ definition of @\<*\>@ for @List@ makes
--- multiple independent choices for each element of the structure.
+-- The actual definition of 'traverse' for lists is expressed as an equivalent
+-- right fold in order to facilitate list /fusion/.
 
 ------------------
 
