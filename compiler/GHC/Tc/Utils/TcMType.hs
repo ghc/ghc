@@ -2647,7 +2647,7 @@ checkForLevPolyX add_err extra ty
 formatLevPolyErr :: Type  -- representation-polymorphic type
                  -> SDoc
 formatLevPolyErr ty
-  = hang (text "A levity-polymorphic type is not allowed here:")
+  = hang (text "A representation-polymorphic type is not allowed here:")
        2 (vcat [ text "Type:" <+> pprWithTYPE tidy_ty
                , text "Kind:" <+> pprWithTYPE tidy_ki ])
   where
