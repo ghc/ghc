@@ -1,4 +1,4 @@
-Found 257 Language.Haskell.Syntax module dependencies
+Found 265 Language.Haskell.Syntax module dependencies
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
 GHC.Builtin.Types
@@ -31,6 +31,7 @@ GHC.Core.FamInstEnv
 GHC.Core.InstEnv
 GHC.Core.Lint
 GHC.Core.Make
+GHC.Core.Map.Expr
 GHC.Core.Map.Type
 GHC.Core.Multiplicity
 GHC.Core.Opt.Arity
@@ -108,6 +109,9 @@ GHC.Hs.Type
 GHC.Hs.Utils
 GHC.HsToCore.Errors.Ppr
 GHC.HsToCore.Errors.Types
+GHC.HsToCore.Pmc.Ppr
+GHC.HsToCore.Pmc.Solver.Types
+GHC.HsToCore.Pmc.Types
 GHC.Iface.Ext.Fields
 GHC.Iface.Recomp.Binary
 GHC.Iface.Syntax
@@ -148,6 +152,8 @@ GHC.SysTools.Terminal
 GHC.Tc.Errors.Hole.FitTypes
 GHC.Tc.Errors.Ppr
 GHC.Tc.Errors.Types
+GHC.Tc.Solver.InertSet
+GHC.Tc.Solver.Types
 GHC.Tc.Types
 GHC.Tc.Types.Constraint
 GHC.Tc.Types.Evidence
@@ -168,6 +174,7 @@ GHC.Types.Fixity.Env
 GHC.Types.ForeignCall
 GHC.Types.ForeignStubs
 GHC.Types.Hint
+GHC.Types.Hint.Ppr
 GHC.Types.HpcInfo
 GHC.Types.IPE
 GHC.Types.Id
@@ -197,6 +204,7 @@ GHC.Types.Unique.DFM
 GHC.Types.Unique.DSet
 GHC.Types.Unique.FM
 GHC.Types.Unique.Map
+GHC.Types.Unique.SDFM
 GHC.Types.Unique.Set
 GHC.Types.Unique.Supply
 GHC.Types.Var
