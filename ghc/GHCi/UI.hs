@@ -2192,7 +2192,7 @@ keepPackageImports = filterM is_pkg_import
      is_pkg_import (IIModule _) = return False
      is_pkg_import (IIDecl d)
          = do e <- MC.try $ GHC.findModule mod_name (fmap sl_fs $ ideclPkgQual d)
-              case e :: Either SomeException Module of
+              case e :: Either SomeExceptionWithLocation Module of
                 Left _  -> return False
                 Right m -> return (not (isMainUnitModule m))
         where
@@ -4025,7 +4025,7 @@ breakById inp = do
     let (mod_str, top_level, fun_str) = splitIdent inp
         mod_top_lvl = combineModIdent mod_str top_level
     mb_mod <- catch (lookupModuleInscope mod_top_lvl)
-                    (\(_ :: SomeException) -> lookupModuleInGraph mod_str)
+                    (\(_ :: SomeExceptionWithLocation) -> lookupModuleInGraph mod_str)
       -- If the top-level name is not in scope, `lookupModuleInscope` will
       -- throw an exception, then lookup the module name in the module graph.
     mb_err_msg <- validateBP mod_str fun_str mb_mod
@@ -4468,17 +4468,13 @@ showException se =
 -- Don't forget to unblock async exceptions in the handler, or if we're
 -- in an exception loop (eg. let a = error a in a) the ^C exception
 -- may never be delivered.  Thanks to Marcin for pointing out the bug.
-#if __GLASGOW_HASKELL__ >= 903
 ghciHandle :: (HasDynFlags m, ExceptionMonad m) => (SomeExceptionWithLocation -> m a) -> m a -> m a
-#else
-ghciHandle :: (HasDynFlags m, ExceptionMonad m) => (SomeException -> m a) -> m a -> m a
-#endif
 ghciHandle h m = mask $ \restore -> do
                  -- Force dflags to avoid leaking the associated HscEnv
                  !dflags <- getDynFlags
                  catch (restore (GHC.prettyPrintGhcErrors dflags m)) $ \e -> restore (h e)
 
-ghciTry :: ExceptionMonad m => m a -> m (Either SomeException a)
+ghciTry :: ExceptionMonad m => m a -> m (Either SomeExceptionWithLocation a)
 ghciTry m = fmap Right m `catch` \e -> return $ Left e
 
 tryBool :: ExceptionMonad m => m a -> m Bool
