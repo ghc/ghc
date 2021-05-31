@@ -640,10 +640,9 @@ The Id for the wrapper of a primop can be found using
 to link primops; it rather does a rather hacky symbol lookup (see
 GHC.ByteCode.Linker.primopToCLabel). TODO: Perhaps this should be changed?
 
-Note that these wrappers aren't *quite*
-as expressive as their unwrapped breathern in that they may exhibit less levity
-polymorphism. For instance, consider the case of mkWeakNoFinalizer# which has
-type:
+Note that these wrappers aren't *quite* as expressive as their unwrapped
+breathren, in that they may exhibit less representation polymorphism.
+For instance, consider the case of mkWeakNoFinalizer#, which has type:
 
     mkWeakNoFinalizer# :: forall (r :: RuntimeRep) (k :: TYPE r) (v :: Type).
                           k -> v
@@ -655,10 +654,10 @@ Naively we could generate a wrapper of the form,
 
     mkWeakNoFinalizer# k v s = GHC.Prim.mkWeakNoFinalizer# k v s
 
-However, this would require that 'k' bind the levity-polymorphic key,
-which is disallowed by our levity polymorphism validity checks (see Note
-[Levity polymorphism invariants] in GHC.Core). Consequently, we give the
-wrapper the simpler, less polymorphic type
+However, this would require that 'k' bind the representation-polymorphic key,
+which is disallowed by our representation polymorphism validity checks
+(see Note [Representation polymorphism invariants] in GHC.Core).
+Consequently, we give the wrapper the simpler, less polymorphic type
 
     mkWeakNoFinalizer# :: forall (k :: Type) (v :: Type).
                           k -> v
@@ -666,8 +665,8 @@ wrapper the simpler, less polymorphic type
                        -> (# State# RealWorld, Weak# v #)
 
 This simplification tends to be good enough for GHCi uses given that there are
-few levity polymorphic primops and we do little simplification on interpreted
-code anyways.
+few representation-polymorphic primops, and we do little simplification
+on interpreted code anyways.
 
 TODO: This behavior is actually wrong; a program becomes ill-typed upon
 replacing a real primop occurrence with one of its wrapper due to the fact that
@@ -678,7 +677,8 @@ Note [Eta expanding primops]
 
 STG requires that primop applications be saturated. This makes code generation
 significantly simpler since otherwise we would need to define a calling
-convention for curried applications that can accommodate levity polymorphism.
+convention for curried applications that can accommodate representation
+polymorphism.
 
 To ensure saturation, CorePrep eta expands expand all primop applications as
 described in Note [Eta expansion of hasNoBinding things in CorePrep] in

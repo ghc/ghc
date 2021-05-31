@@ -92,7 +92,7 @@ module GHC.Tc.Utils.TcMType (
   candidateKindVars, partitionCandidates,
 
   ------------------------------
-  -- Levity polymorphism
+  -- Representation polymorphism
   ensureNotLevPoly, checkForLevPoly, checkForLevPolyX, formatLevPolyErr
   ) where
 
@@ -2606,11 +2606,11 @@ tidySigSkol env cx ty tv_prs
 {-
 %************************************************************************
 %*                                                                      *
-             Levity polymorphism checks
+             Representation polymorphism checks
 *                                                                       *
 *************************************************************************
 
-See Note [Levity polymorphism checking] in GHC.HsToCore.Monad
+See Note [Representation polymorphism checking] in GHC.HsToCore.Monad
 
 -}
 
@@ -2631,7 +2631,7 @@ ensureNotLevPoly ty doc
                    -- forall a. a. See, for example, test ghci/scripts/T9140
     checkForLevPoly doc ty
 
-  -- See Note [Levity polymorphism checking] in GHC.HsToCore.Monad
+  -- See Note [Representation polymorphism checking] in GHC.HsToCore.Monad
 checkForLevPoly :: SDoc -> Type -> TcM ()
 checkForLevPoly = checkForLevPolyX addErr
 
@@ -2644,7 +2644,7 @@ checkForLevPolyX add_err extra ty
   | otherwise
   = return ()
 
-formatLevPolyErr :: Type  -- levity-polymorphic type
+formatLevPolyErr :: Type  -- representation-polymorphic type
                  -> SDoc
 formatLevPolyErr ty
   = hang (text "A levity-polymorphic type is not allowed here:")
