@@ -789,96 +789,114 @@ foldMapDefault = coerce (traverse :: (a -> Const m ()) -> t a -> Const m (t ()))
 
 -- $construction
 --
--- How do @Traversable@ functors manage to construct a new container of the
+-- #construction#
+-- How do @Traversable@ functors manage to construct a new structure of the
 -- same shape by sequencing effects over their elements?  Well, left-to-right
 -- traversal with sequencing of effects suggests induction from a base case, so
--- the first question is what is the base case?  A @Traversable@ container with
--- elements of type __@a@__ generally has some minimal form that is either
--- "empty" or has just a single element (think "Data.List" vs.
+-- the first question is what is the base case?  A @Traversable@ structure with
+-- elements of type __@a@__ typically has some minimal form that is either
+-- /empty/ or has just a single element (consider "Data.List" vs.
 -- "Data.List.Nonempty").
 --
--- * If the base case is empty (no associated first value of __@a@__) then
+-- * If the base case is empty (no first value of __@a@__) then
 --   traversal just reproduces the empty structure with no side effects,
 --   so we have:
 --
 --     > traverse _ empty = pure empty
 --
---     With the List monad, "empty" is __@[]@__, while with 'Maybe' it is
+--     With the List monad, /empty/ is __@[]@__, while with 'Maybe' it is
 --     'Nothing'.  With __@Either e a@__ we have an /empty/ case for each
---     value of __@e@__.
+--     value of __@e@__:
 --
--- * If the base case is a __@singleton a@__, then 'traverse' can take that
---   __@a@__, apply __@f :: a -> F b@__ getting an __@F b@__, then
---   __@fmap singleton@__ over that, getting __@F (singleton b)@__:
+--     > traverse _ (Left e) = pure $ Left e
 --
---     > traverse f (singleton a) = singleton <$> f a
+--     Note, the two @Left@ values above generally have distinct types:
+--     __@Either e a@__ vs. __@Either e b@__, so we must rebuild the value from
+--     __@e@__, rather than reuse the __@Left e@__ term from the left side of
+--     the equation.
+--
+-- * Given a hypothetical function __@singleton :: a -> t a@__ that constructs
+--   a one-element traversable structure, if the base case is __@singleton a@__
+--   for some element __@a@__, then 'traverse' can take that __@a@__, apply
+--   __@g :: a -> f b@__ getting an __@f b@__, then __@fmap singleton@__ over
+--   that, getting an __@f (t b)@__ as required:
+--
+--     > traverse g (singleton a) = singleton <$> g a
 --
 -- Since 'Maybe' and 'Either' are either empty or singletons, we have
 --
 -- > traverse _ Nothing = pure Nothing
--- > traverse f (Just a) = Just <$> f a
+-- > traverse g (Just a) = Just <$> g a
 --
 -- > traverse _ (Left e) = pure (Left e)
--- > traverse f (Right a) = Right <$> f a
+-- > traverse g (Right a) = Right <$> g a
 --
 -- Similarly, for List, we have:
 --
--- > traverse f [] = pure []
--- > traverse f [a] = fmap (:[]) (f a) = (:) <$> f a <*> pure []
+-- > traverse _ []  = pure []
+-- > traverse g [a] = fmap (:[]) (g a)
+-- >                = (:) <$> (g a) <*> traverse g []
+-- >                = liftA2 (:) (g a) (traverse g [])
 --
 -- What remains to be done is an inductive step beyond the empty and singleton
--- cases.  For a concrete @Traversable@ functor @T@ we need to be able to
--- extend our structure incrementally by filling in holes.  We can view a
--- partially built structure __@t0 :: T a@__ as a function
--- __@append :: a -> T a@__ that takes one more element __@a@__ to insert into
--- the container to the right of the existing elements to produce a larger
--- structure.  Conversely, we can view an element @a@ as a function
--- __@prepend :: T a -> T a@__ of a partially built structure that inserts the
--- element to the left of the existing elements.
+-- cases.  For a given @Traversable@ structure __@t@__ we need to be able to
+-- extend our structure incrementally by filling in holes.
+--
+-- Let __@append :: t x -> x -> t x@__ be a function that takes a partially
+-- built structure __@t0 :: t x@__ and one more element __@x@__ to add to the
+-- right of the existing elements to produce a larger structure.  Conversely,
+-- let __@prepend :: x -> t x -> t x@__ be a function that adds one more
+-- element to the left of existing elements of a partially built structure.
 --
 -- Assuming that 'traverse' has already been defined on the partially built
--- structure:
+-- structure __@t0@__:
 --
--- > f0 = traverse f t0 :: F (T b)
+-- > g0 = traverse g t0 :: f (t b)
 --
--- we aim to define __@traverse f (append t0 a)@__ and/or
--- __@traverse f (prepend a t0)@__.
+-- we aim to define __@traverse g (append t0 a)@__ and/or
+-- __@traverse g (prepend a t0)@__.
 --
--- We can lift @append@ and apply it to @f0@ to get:
+-- We can lift __@append@__ and apply it to __@g0@__ to get:
 --
--- > append <$> f0 :: F (b -> T b)
+-- > append <$> g0 :: f (b -> t b)
 --
--- and from the /next/ element __@a@__ we can obtain __@f a :: F b@__, and
--- this is where we'll make use of the applicative instance of @F@.  Adding
--- one more element on the right is then:
+-- and from the /next/ element __@a@__ we can obtain __@g a :: f b@__, and
+-- make use of the Applicative instance of __@f@__ to combine these.  Adding
+-- one more element on the right therefore becomes:
 --
--- > traverse f (append t0 a) = append <$> traverse f t0 <*> f a
+-- > traverse g (append t0 a) = append <$> traverse g t0 <*> g a
+-- >                          = liftA2 append g0 (g a)
 --
--- while prepending an element on the left is:
+-- while adding an element on the left is similarly:
 --
--- > traverse f (prepend a t0) = prepend <$> f a <*> traverse f t0
+-- > traverse g (prepend a t0) = prepend <$> (g a) <*> traverse g t0
+-- >                           = liftA2 prepend (g a) g0
 --
--- The (binary) @Tree@ instance example makes use of both, after defining the
--- @Empty@ base case and the singleton @Leaf@ node case, non-empty internal
--- nodes introduce both a prepended child node on the left and an appended
--- child node on the right:
---
--- > traverse f (Node l k r) = Node <$> traverse f l <*> f k <*> traverse f r
---
--- The above definitions sequence the 'Applicative' effects of __@F@__ in the
--- expected order while producing results of the expected shape __@T@__.
---
--- For lists we get the natural order of effects by using
--- __@(prepend \<$\> f a)@__ as the operator and __@(traverse f as)@__ as the
--- operand (the actual definition is written as an equivalent right fold
--- in order to enable /fusion/ rules):
---
--- > traverse f [] = pure []
--- > traverse f (a:as) = (:) <$> f a <*> traverse f as
---
--- The origin of the combinatorial product when __@F@__ is __@[]@__ should now
--- be apparent, the /non-deterministic/ definition of @\<*\>@ for @List@ makes
+-- The origin of the combinatorial product when __@f@__ is @List@ should now
+-- be apparent, the /non-deterministic/ definition of @('<*>')@ for @List@ makes
 -- multiple independent choices for each element of the structure.
+--
+-- For the (binary) [Tree instance](#tree_instance), after handlingg the
+-- __@Empty@__ base case and the singleton __@Leaf@__ node case, non-empty
+-- internal nodes require both a prepended child node on the left and an
+-- appended child node on the right:
+--
+-- > traverse g (Node l k r) = Node <$> traverse g l <*> g k <*> traverse g r
+--
+-- The above definitions sequence the 'Applicative' effects of __@f@__ in the
+-- expected order while producing results of the expected shape __@t@__.
+--
+-- For another concrete example, when __@t@__ is @List@, we get the natural order
+-- of effects by lifting @(':')@ to affect a prepend operation:
+--
+-- > traverse g [] = pure []
+-- > traverse g (x:xs) = liftA2 (:) (g a) (traverse g xs)
+--
+-- The actual definition is written as an equivalent right fold in order to
+-- facilitate list /fusion/:
+--
+-- > traverse g = List.foldr cons_g (pure [])
+-- >   where cons_g x ys = liftA2 (:) (g x) ys
 
 ------------------
 
