@@ -6,7 +6,6 @@ module GHC.Types.Hint (
   ) where
 
 import GHC.Utils.Outputable
-import GHC.Types.Name.Reader
 import qualified GHC.LanguageExtensions as LangExt
 import Data.Typeable
 import GHC.Unit.Module (ModuleName, Module)
@@ -74,19 +73,19 @@ data GhcHint
       Test case(s): driver/T12955
     -}
   | SuggestSignatureInstantiations !ModuleName [InstantiationSuggestion]
-  {-| Suggests to use spaces instead of tabs.
+    {-| Suggests to use spaces instead of tabs.
 
-      Triggered by: 'GHC.Parser.Errors.Types.PsWarnTab'.
+        Triggered by: 'GHC.Parser.Errors.Types.PsWarnTab'.
 
-      Examples: None
-      Test Case(s): None
-  -}
+        Examples: None
+        Test Case(s): None
+    -}
   | SuggestUseSpaces
-  {-| Suggests wrapping an expression in parentheses
+    {-| Suggests wrapping an expression in parentheses
 
-      Examples: None
-      Test Case(s): None
-  -}
+        Examples: None
+        Test Case(s): None
+    -}
   | SuggestParentheses
     {-| Suggests to increase the -fmax-pmcheck-models limit for the pattern match checker.
 
@@ -101,7 +100,6 @@ data GhcHint
 
     -}
   | SuggestAddTypeSignature
-
     {-| Suggests to explicitly discard the result of a monadic action by binding the result to
         the '_' wilcard.
 

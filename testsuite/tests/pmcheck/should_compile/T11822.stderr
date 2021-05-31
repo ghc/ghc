@@ -19,5 +19,6 @@ T11822.hs:33:1: warning:
       • Redundant clauses might not be reported at all
       • Redundant clauses might be reported as inaccessible
       • Patterns reported as unmatched might actually be matched
-    Increase the limit or resolve the warnings to suppress this message.
+    Suggested fix:
+      Increase the limit or resolve the warnings to suppress this message.
 

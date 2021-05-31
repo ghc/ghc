@@ -31,15 +31,6 @@ instance Outputable GhcHint where
     SuggestLetInDo
       -> text "Perhaps you need a 'let' in a 'do' block?"
            $$ text "e.g. 'let x = 5' instead of 'x = 5'"
-    SuggestInfixBindMaybeAtPat fun
-      -> text "In a function binding for the"
-              <+> quotes (ppr fun)
-              <+> text "operator."
-           $$ if opIsAt fun
-                 then perhapsAsPat
-                 else empty
-    TypeApplicationsInPatternsOnlyDataCons
-      -> text "Type applications in patterns are only allowed on data constructors."
     SuggestAddSignatureCabalFile pi_mod_name
       -> text "Try adding" <+> quotes (ppr pi_mod_name)
            <+> text "to the"
@@ -54,6 +45,10 @@ instance Outputable GhcHint where
          in text "Try passing -instantiated-with=\"" <>
               suggested_instantiated_with <> text "\"" $$
                 text "replacing <" <> ppr pi_mod_name <> text "> as necessary."
+    SuggestUseSpaces
+      -> text "Please use spaces instead."
+    SuggestParentheses
+      -> text "Use parentheses."
     SuggestIncreaseMaxPmCheckModels
       -> text "Increase the limit or resolve the warnings to suppress this message."
     SuggestAddTypeSignature

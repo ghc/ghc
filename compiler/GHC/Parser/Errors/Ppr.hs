@@ -767,6 +767,3 @@ pp_unexpected_fun_app e a =
 
 parse_error_in_pat :: SDoc
 parse_error_in_pat = text "Parse error in pattern:"
-
-perhapsAsPat :: SDoc
-perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"
