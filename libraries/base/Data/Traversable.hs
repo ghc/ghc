@@ -17,7 +17,8 @@
 -- Portability :  portable
 --
 -- Class of data structures that can be traversed from left to right,
--- performing an action on each element.
+-- performing an action on each element.  Instances are expected to satisfy
+-- the listed [laws](#laws).
 -----------------------------------------------------------------------------
 
 module Data.Traversable (
@@ -473,15 +474,25 @@ foldMapDefault = coerce (traverse :: (a -> Const m ()) -> t a -> Const m (t ()))
 -- $overview
 --
 -- #overview#
--- Traversable functors can be thought of as polymorphic containers that
--- support mapping of applicative (or monadic) effects over the container
--- (element-wise) to create a new container of __the same shape__, with the
--- effects sequenced in a natural order for the container type in question.
+-- Traversable structures can be thought of as polymorphic containers that
+-- support element-wise sequencing of 'Applicative' (or 'Monad') effects whose
+-- return values fill in new structures of __the same shape__ as the input.
+-- Instances must satisfy the laws listed in the [Laws section](#laws).
 --
--- The 'Functor' base class means that the container cannot impose any
--- constraints on the element type, so containers that require elements to
--- be comparable, or hashable, etc., cannot be instances of the @Traversable@
--- class.
+-- The sequencing of effects in @Traversable@ structures is rather
+-- straightforward, see the [Construction](#construction) section for details.
+-- The diverse uses of @Traversable@ structures result from the many possible
+-- choices of Applicative effects to thread through a traversable structure.
+--
+-- Every @Traversable@ structure is both a 'Functor' and 'Foldable' because it
+-- is possible to implement both 'fmap' and 'foldMap' (also 'foldr', ...) in
+-- terms of 'traverse'.
+--
+-- When there's no compelling reason to directly implement the @Functor@ and/or
+-- @Foldable@ methods, one can use either or both of 'fmapDefault' and
+-- 'foldMapDefault' to define the required instances.  It is then sufficient to
+-- implement just 'traverse'.  Direct implementation of fine-tuned superclass
+-- methods may of course produce more efficient code.
 
 ------------------
 
@@ -799,6 +810,8 @@ foldMapDefault = coerce (traverse :: (a -> Const m ()) -> t a -> Const m (t ()))
 ------------------
 
 -- $laws
+--
+-- #laws#
 -- A definition of 'traverse' must satisfy the following laws:
 --
 -- [Naturality]
@@ -855,6 +868,11 @@ foldMapDefault = coerce (traverse :: (a -> Const m ()) -> t a -> Const m (t ()))
 --  * In the 'Foldable' instance, 'Data.Foldable.foldMap' should be
 --    equivalent to traversal with a constant applicative functor
 --    ('foldMapDefault').
+--
+-- Note: the 'Functor' superclass means that (in GHC) Traversable structures
+-- cannot impose any constraints on the element type.  A Haskell implementation
+-- that supports constrained functors could make it possible to define
+-- constrained @Traversable@ structures.
 
 ------------------
 
