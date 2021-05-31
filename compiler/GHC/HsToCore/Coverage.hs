@@ -84,7 +84,7 @@ addTicksToBinds
         -> IO (LHsBinds GhcTc, HpcInfo, Maybe ModBreaks)
 
 addTicksToBinds hsc_env mod mod_loc exports tyCons binds
-  | let dflags = hsc_dflags hsc_env
+  | let dflags = extractDynFlags hsc_env
         passes = coveragePasses dflags
   , not (null passes)
   , Just orig_file <- ml_hs_file mod_loc = do
@@ -124,7 +124,7 @@ addTicksToBinds hsc_env mod mod_loc exports tyCons binds
      modBreaks <- mkModBreaks hsc_env mod tickCount entries
 
      let logger = hsc_logger hsc_env
-     dumpIfSet_dyn logger dflags Opt_D_dump_ticked "HPC" FormatHaskell
+     putDumpFileMaybe logger Opt_D_dump_ticked "HPC" FormatHaskell
        (pprLHsBinds binds1)
 
      return (binds1, HpcInfo tickCount hashNo, modBreaks)
@@ -147,7 +147,7 @@ guessSourceFile binds orig_file =
 mkModBreaks :: HscEnv -> Module -> Int -> [MixEntry_] -> IO (Maybe ModBreaks)
 mkModBreaks hsc_env mod count entries
   | Just interp <- hsc_interp hsc_env
-  , breakpointsEnabled (hsc_dflags hsc_env) = do
+  , breakpointsEnabled (extractDynFlags hsc_env) = do
     breakArray <- GHCi.newBreakArray interp (length entries)
     ccs <- mkCCSArray hsc_env mod count entries
     let
@@ -175,7 +175,7 @@ mkCCSArray hsc_env modul count entries =
 
     _ -> return (listArray (0,-1) [])
  where
-    dflags = hsc_dflags hsc_env
+    dflags = extractDynFlags hsc_env
     mk_one (srcspan, decl_path, _, _) = (name, src)
       where name = concat (intersperse "." decl_path)
             src = showSDoc dflags (ppr srcspan)

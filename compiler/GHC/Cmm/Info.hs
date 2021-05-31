@@ -46,7 +46,6 @@ import GHC.Cmm.Dataflow.Collections
 import GHC.Platform
 import GHC.Platform.Profile
 import GHC.Data.Maybe
-import GHC.Driver.Session
 import GHC.Utils.Error (withTimingSilent)
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
@@ -67,20 +66,19 @@ mkEmptyContInfoTable info_lbl
                  , cit_srt  = Nothing
                  , cit_clo  = Nothing }
 
-cmmToRawCmm :: Logger -> DynFlags -> Stream IO CmmGroupSRTs a
+cmmToRawCmm :: Logger -> Profile -> Stream IO CmmGroupSRTs a
             -> IO (Stream IO RawCmmGroup a)
-cmmToRawCmm logger dflags cmms
+cmmToRawCmm logger profile cmms
   = do {
        ; let do_one :: [CmmDeclSRTs] -> IO [RawCmmDecl]
              do_one cmm = do
                uniqs <- mkSplitUniqSupply 'i'
                -- NB. strictness fixes a space leak.  DO NOT REMOVE.
-               withTimingSilent logger dflags (text "Cmm -> Raw Cmm")
-                          (\x -> seqList x ())
+               withTimingSilent logger (text "Cmm -> Raw Cmm") (\x -> seqList x ())
                   -- TODO: It might be better to make `mkInfoTable` run in
                   -- IO as well so we don't have to pass around
                   -- a UniqSupply (see #16843)
-                 (return $ initUs_ uniqs $ concatMapM (mkInfoTable dflags) cmm)
+                 (return $ initUs_ uniqs $ concatMapM (mkInfoTable profile) cmm)
        ; return (Stream.mapM do_one cmms)
        }
 
@@ -118,15 +116,15 @@ cmmToRawCmm logger dflags cmms
 --
 --  * The SRT slot is only there if there is SRT info to record
 
-mkInfoTable :: DynFlags -> CmmDeclSRTs -> UniqSM [RawCmmDecl]
+mkInfoTable :: Profile -> CmmDeclSRTs -> UniqSM [RawCmmDecl]
 mkInfoTable _ (CmmData sec dat) = return [CmmData sec dat]
 
-mkInfoTable dflags proc@(CmmProc infos entry_lbl live blocks)
+mkInfoTable profile proc@(CmmProc infos entry_lbl live blocks)
   --
   -- in the non-tables-next-to-code case, procs can have at most a
   -- single info table associated with the entry label of the proc.
   --
-  | not (platformTablesNextToCode (targetPlatform dflags))
+  | not (platformTablesNextToCode platform)
   = case topInfoTable proc of   --  must be at most one
       -- no info table
       Nothing ->
@@ -134,7 +132,7 @@ mkInfoTable dflags proc@(CmmProc infos entry_lbl live blocks)
 
       Just info@CmmInfoTable { cit_lbl = info_lbl } -> do
         (top_decls, (std_info, extra_bits)) <-
-             mkInfoTableContents dflags info Nothing
+             mkInfoTableContents profile info Nothing
         let
           rel_std_info   = map (makeRelativeRefTo platform info_lbl) std_info
           rel_extra_bits = map (makeRelativeRefTo platform info_lbl) extra_bits
@@ -161,10 +159,10 @@ mkInfoTable dflags proc@(CmmProc infos entry_lbl live blocks)
             [CmmProc (mapFromList raw_infos) entry_lbl live blocks])
 
   where
-   platform = targetPlatform dflags
+   platform = profilePlatform profile
    do_one_info (lbl,itbl) = do
      (top_decls, (std_info, extra_bits)) <-
-         mkInfoTableContents dflags itbl Nothing
+         mkInfoTableContents profile itbl Nothing
      let
         info_lbl = cit_lbl itbl
         rel_std_info   = map (makeRelativeRefTo platform info_lbl) std_info
@@ -178,20 +176,20 @@ type InfoTableContents = ( [CmmLit]          -- The standard part
                          , [CmmLit] )        -- The "extra bits"
 -- These Lits have *not* had mkRelativeTo applied to them
 
-mkInfoTableContents :: DynFlags
+mkInfoTableContents :: Profile
                     -> CmmInfoTable
                     -> Maybe Int               -- Override default RTS type tag?
                     -> UniqSM ([RawCmmDecl],             -- Auxiliary top decls
                                InfoTableContents)       -- Info tbl + extra bits
 
-mkInfoTableContents dflags
+mkInfoTableContents profile
                     info@(CmmInfoTable { cit_lbl  = info_lbl
                                        , cit_rep  = smrep
                                        , cit_prof = prof
                                        , cit_srt = srt })
                     mb_rts_tag
   | RTSRep rts_tag rep <- smrep
-  = mkInfoTableContents dflags info{cit_rep = rep} (Just rts_tag)
+  = mkInfoTableContents profile info{cit_rep = rep} (Just rts_tag)
     -- Completely override the rts_tag that mkInfoTableContents would
     -- otherwise compute, with the rts_tag stored in the RTSRep
     -- (which in turn came from a handwritten .cmm file)
@@ -199,9 +197,9 @@ mkInfoTableContents dflags
   | StackRep frame <- smrep
   = do { (prof_lits, prof_data) <- mkProfLits platform prof
        ; let (srt_label, srt_bitmap) = mkSRTLit platform info_lbl srt
-       ; (liveness_lit, liveness_data) <- mkLivenessBits dflags frame
+       ; (liveness_lit, liveness_data) <- mkLivenessBits platform frame
        ; let
-             std_info = mkStdInfoTable dflags prof_lits rts_tag srt_bitmap liveness_lit
+             std_info = mkStdInfoTable profile prof_lits rts_tag srt_bitmap liveness_lit
              rts_tag | Just tag <- mb_rts_tag = tag
                      | null liveness_data     = rET_SMALL -- Fits in extra_bits
                      | otherwise              = rET_BIG   -- Does not; extra_bits is
@@ -214,13 +212,13 @@ mkInfoTableContents dflags
        ; let (srt_label, srt_bitmap) = mkSRTLit platform info_lbl srt
        ; (mb_srt_field, mb_layout, extra_bits, ct_data)
                                 <- mk_pieces closure_type srt_label
-       ; let std_info = mkStdInfoTable dflags prof_lits
+       ; let std_info = mkStdInfoTable profile prof_lits
                                        (mb_rts_tag   `orElse` rtsClosureType smrep)
                                        (mb_srt_field `orElse` srt_bitmap)
                                        (mb_layout    `orElse` layout)
        ; return (prof_data ++ ct_data, (std_info, extra_bits)) }
   where
-    platform = targetPlatform dflags
+    platform = profilePlatform profile
     mk_pieces :: ClosureTypeInfo -> [CmmLit]
               -> UniqSM ( Maybe CmmLit  -- Override the SRT field with this
                         , Maybe CmmLit  -- Override the layout field with this
@@ -245,7 +243,7 @@ mkInfoTableContents dflags
            ; return (Nothing, Nothing,  extra_bits, []) }
 
     mk_pieces (Fun arity (ArgGen arg_bits)) srt_label
-      = do { (liveness_lit, liveness_data) <- mkLivenessBits dflags arg_bits
+      = do { (liveness_lit, liveness_data) <- mkLivenessBits platform arg_bits
            ; let fun_type | null liveness_data = aRG_GEN
                           | otherwise          = aRG_GEN_BIG
                  extra_bits = [ packIntsCLit platform fun_type arity ]
@@ -343,12 +341,12 @@ makeRelativeRefTo platform info_lbl lit
 -- The head of the stack layout is the top of the stack and
 -- the least-significant bit.
 
-mkLivenessBits :: DynFlags -> Liveness -> UniqSM (CmmLit, [RawCmmDecl])
+mkLivenessBits :: Platform -> Liveness -> UniqSM (CmmLit, [RawCmmDecl])
               -- ^ Returns:
               --   1. The bitmap (literal value or label)
               --   2. Large bitmap CmmData if needed
 
-mkLivenessBits dflags liveness
+mkLivenessBits platform liveness
   | n_bits > mAX_SMALL_BITMAP_SIZE platform -- does not fit in one word
   = do { uniq <- getUniqueM
        ; let bitmap_lbl = mkBitmapLabel uniq
@@ -358,7 +356,6 @@ mkLivenessBits dflags liveness
   | otherwise -- Fits in one word
   = return (mkStgWordCLit platform bitmap_word, [])
   where
-    platform = targetPlatform dflags
     n_bits = length liveness
 
     bitmap :: Bitmap
@@ -390,14 +387,14 @@ mkLivenessBits dflags liveness
 -- so we can't use constant offsets from Constants
 
 mkStdInfoTable
-   :: DynFlags
+   :: Profile
    -> (CmmLit,CmmLit)   -- Closure type descr and closure descr  (profiling)
    -> Int               -- Closure RTS tag
    -> CmmLit            -- SRT length
    -> CmmLit            -- layout field
    -> [CmmLit]
 
-mkStdInfoTable dflags (type_descr, closure_descr) cl_type srt layout_lit
+mkStdInfoTable profile (type_descr, closure_descr) cl_type srt layout_lit
  =      -- Parallel revertible-black hole field
     prof_info
         -- Ticky info (none at present)
@@ -405,9 +402,9 @@ mkStdInfoTable dflags (type_descr, closure_descr) cl_type srt layout_lit
  ++ [layout_lit, tag, srt]
 
  where
-    platform = targetPlatform dflags
+    platform = profilePlatform profile
     prof_info
-        | sccProfilingEnabled dflags = [type_descr, closure_descr]
+        | profileIsProfiling profile = [type_descr, closure_descr]
         | otherwise = []
 
     tag = CmmInt (fromIntegral cl_type) (halfWordWidth platform)

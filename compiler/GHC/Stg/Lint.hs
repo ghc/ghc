@@ -79,7 +79,7 @@ lintStgTopBindings logger dflags ictxt this_mod unarised whodunnit binds
       Nothing  ->
         return ()
       Just msg -> do
-        putLogMsg logger dflags Err.MCDump noSrcSpan
+        logMsg logger Err.MCDump noSrcSpan
           $ withPprStyle defaultDumpStyle
           (vcat [ text "*** Stg Lint ErrMsgs: in" <+>
                         text whodunnit <+> text "***",
@@ -87,7 +87,7 @@ lintStgTopBindings logger dflags ictxt this_mod unarised whodunnit binds
                   text "*** Offending Program ***",
                   pprGenStgTopBindings opts binds,
                   text "*** End of Offense ***"])
-        Err.ghcExit logger dflags 1
+        Err.ghcExit logger 1
   where
     opts = initStgPprOpts dflags
     -- Bring all top-level binds into scope because CoreToStg does not generate

@@ -223,7 +223,7 @@ mkPluginUsage hsc_env pluginModule
       let fc = hsc_FC hsc_env
       let units = hsc_units hsc_env
       let home_unit = hsc_home_unit hsc_env
-      let dflags = hsc_dflags hsc_env
+      let dflags = extractDynFlags hsc_env
       foundM <- findPluginModule fc units home_unit dflags pNm
       case foundM of
       -- The plugin was built locally: look up the object file containing
@@ -235,7 +235,7 @@ mkPluginUsage hsc_env pluginModule
           return (nub (pluginObject : depObjects))
         _ -> pprPanic "mkPluginUsage: no object file found" (ppr pNm)
   where
-    dflags   = hsc_dflags hsc_env
+    dflags   = extractDynFlags hsc_env
     fc       = hsc_FC hsc_env
     home_unit = hsc_home_unit hsc_env
     units    = hsc_units hsc_env
@@ -275,7 +275,7 @@ mk_mod_usage_info pit hsc_env this_mod direct_imports used_names
   = mapMaybe mkUsage usage_mods
   where
     hpt = hsc_HPT hsc_env
-    dflags = hsc_dflags hsc_env
+    dflags = extractDynFlags hsc_env
     home_unit = hsc_home_unit hsc_env
 
     used_mods    = moduleEnvKeys ent_map
