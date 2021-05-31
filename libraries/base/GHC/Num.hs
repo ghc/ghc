@@ -97,7 +97,7 @@ subtract :: (Num a) => a -> a -> a
 subtract x y = y - x
 
 -- | @since 2.01
-instance  Num Int  where
+instance Num Int where
     I# x + I# y = I# (x +# y)
     I# x - I# y = I# (x -# y)
     negate (I# x) = I# (negateInt# x)
@@ -109,7 +109,7 @@ instance  Num Int  where
              | otherwise   = 1
 
     {-# INLINE fromInteger #-}   -- Just to be sure!
-    fromInteger i = integerToInt i
+    fromInteger = \i -> I# (integerToInt# i)
 
 -- | @since 2.01
 instance Num Word where
@@ -120,15 +120,17 @@ instance Num Word where
     abs x                  = x
     signum 0               = 0
     signum _               = 1
-    fromInteger i          = integerToWord i
+    {-# INLINE fromInteger #-}
+    fromInteger            = \i -> W# (integerToWord# i)
 
 -- | @since 2.01
-instance  Num Integer  where
+instance Num Integer where
     (+) = integerAdd
     (-) = integerSub
     (*) = integerMul
     negate         = integerNegate
-    fromInteger x  = x
+    {-# INLINE fromInteger #-}
+    fromInteger    = id
 
     abs    = integerAbs
     signum = integerSignum
@@ -137,11 +139,12 @@ instance  Num Integer  where
 -- additive inverse. It is a semiring though.
 --
 -- @since 4.8.0.0
-instance  Num Natural  where
+instance Num Natural where
     (+)         = naturalAdd
     (-)         = naturalSubThrow
     (*)         = naturalMul
     negate      = naturalNegate
+    {-# INLINE fromInteger #-}
     fromInteger = integerToNaturalThrow
     abs         = id
     signum      = naturalSignum
