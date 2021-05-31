@@ -1,8 +1,364 @@
 
-==================== Tidy Core rules ====================
-"SPEC wimwam @(ST s)"
-    forall (@k) (@(s :: k)) ($dM :: M (ST s)).
-      wimwam @(ST s) $dM
-      = f_$swimwam @k @s
+==================== Specialise ====================
+Result size of Specialise
+  = {terms: 171, types: 109, coercions: 31, joins: 0/0}
+
+-- RHS size: {terms: 5, types: 5, coercions: 0, joins: 0/0}
+$cfoo_aza :: forall k (s :: k). ST s -> Int
+[LclId,
+ Arity=1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)}]
+$cfoo_aza
+  = \ (@k_az7) (@(s_az8 :: k_az7)) _ [Occ=Dead] -> GHC.Types.I# 3#
+
+-- RHS size: {terms: 1, types: 0, coercions: 9, joins: 0/0}
+T13873.$fMST [InlPrag=INLINE (sat-args=0)]
+  :: forall k (s :: k). M (ST s)
+[LclIdX[DFunId(nt)],
+ Arity=1,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=False,boring_ok=True)
+         Tmpl= $cfoo_aza
+               `cast` (forall (k :: <*>_N) (s :: <k>_N).
+                       Sym (T13873.N:M[0] <ST s>_N)
+                       :: (forall {k} {s :: k}. ST s -> Int)
+                          ~R# (forall {k} {s :: k}. M (ST s)))}]
+T13873.$fMST
+  = $cfoo_aza
+    `cast` (forall (k :: <*>_N) (s :: <k>_N).
+            Sym (T13873.N:M[0] <ST s>_N)
+            :: (forall {k} {s :: k}. ST s -> Int)
+               ~R# (forall {k} {s :: k}. M (ST s)))
+
+Rec {
+-- RHS size: {terms: 14, types: 14, coercions: 15, joins: 0/0}
+$swimwam_sAc :: forall {k} {s :: k}. Bool -> ST s -> Int
+[LclId, Arity=2]
+$swimwam_sAc
+  = \ (@k_ayV)
+      (@(s_ayW :: k_ayV))
+      (ds_dzJ :: Bool)
+      (x_auo :: ST s_ayW) ->
+      case ds_dzJ of {
+        False ->
+          (($cfoo_aza @k_ayV @s_ayW)
+           `cast` (Sym (T13873.N:M[0] <ST s_ayW>_N)
+                   ; T13873.N:M[0] <ST s_ayW>_N
+                   :: (ST s_ayW -> Int) ~R# (ST s_ayW -> Int)))
+            x_auo;
+        True ->
+          wimwam
+            @(ST s_ayW)
+            (($cfoo_aza @k_ayV @s_ayW)
+             `cast` (Sym (T13873.N:M[0] <ST s_ayW>_N)
+                     :: (ST s_ayW -> Int) ~R# M (ST s_ayW)))
+            GHC.Types.False
+            x_auo
+      }
+
+-- RHS size: {terms: 14, types: 7, coercions: 2, joins: 0/0}
+wimwam [Occ=LoopBreaker] :: forall a. M a => Bool -> a -> Int
+[LclIdX,
+ Arity=3,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [60 50 0] 80 0},
+ RULES: "SPEC wimwam @(ST s)"
+            forall (@k_ayV) (@(s_ayW :: k_ayV)) ($dM_sAb :: M (ST s_ayW)).
+              wimwam @(ST s_ayW) $dM_sAb
+              = $swimwam_sAc @k_ayV @s_ayW]
+wimwam
+  = \ (@a_ayN)
+      ($dM_ayO :: M a_ayN)
+      (ds_dzJ :: Bool)
+      (x_auo :: a_ayN) ->
+      case ds_dzJ of {
+        False ->
+          ($dM_ayO
+           `cast` (T13873.N:M[0] <a_ayN>_N :: M a_ayN ~R# (a_ayN -> Int)))
+            x_auo;
+        True -> wimwam @a_ayN $dM_ayO GHC.Types.False x_auo
+      }
+end Rec }
+
+-- RHS size: {terms: 10, types: 10, coercions: 5, joins: 0/0}
+f :: forall {k} (s :: k). ST s -> Int
+[LclIdX,
+ Arity=1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 80 0}]
+f = \ (@k_ayV) (@(s_ayW :: k_ayV)) (x_auq :: ST s_ayW) ->
+      GHC.Num.$fNumInt_$c+
+        (wimwam
+           @(ST s_ayW)
+           (($cfoo_aza @k_ayV @s_ayW)
+            `cast` (Sym (T13873.N:M[0] <ST s_ayW>_N)
+                    :: (ST s_ayW -> Int) ~R# M (ST s_ayW)))
+           GHC.Types.True
+           x_auq)
+        (GHC.Types.I# 1#)
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule_szU :: GHC.Prim.Addr#
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+$trModule_szU = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule_szV :: GHC.Types.TrName
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$trModule_szV = GHC.Types.TrNameS $trModule_szU
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule_szW :: GHC.Prim.Addr#
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+$trModule_szW = "T13873"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule_szX :: GHC.Types.TrName
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$trModule_szX = GHC.Types.TrNameS $trModule_szW
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T13873.$trModule :: GHC.Types.Module
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T13873.$trModule = GHC.Types.Module $trModule_szV $trModule_szX
+
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+$krep_azC [InlPrag=[~]] :: GHC.Types.KindRep
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$krep_azC
+  = GHC.Types.KindRepTyConApp
+      GHC.Types.$tcInt (GHC.Types.[] @GHC.Types.KindRep)
+
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+$krep_azy [InlPrag=[~]] :: GHC.Types.KindRep
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$krep_azy
+  = GHC.Types.KindRepTyConApp
+      GHC.Types.$tcConstraint (GHC.Types.[] @GHC.Types.KindRep)
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep_azx [InlPrag=[~]] :: GHC.Types.KindRep
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$krep_azx = GHC.Types.KindRepFun GHC.Types.krep$* $krep_azy
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$krep_szY :: Int
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$krep_szY = GHC.Types.I# 0#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$krep_azB [InlPrag=[~]] :: GHC.Types.KindRep
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=True,
+         WorkFree=False, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+$krep_azB = GHC.Types.$WKindRepVar $krep_szY
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep_azE [InlPrag=[~]] :: GHC.Types.KindRep
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$krep_azE = GHC.Types.KindRepFun $krep_azB GHC.Types.krep$*
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep_azA [InlPrag=[~]] :: GHC.Types.KindRep
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$krep_azA = GHC.Types.KindRepFun $krep_azB $krep_azC
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$krep_szZ :: Int
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$krep_szZ = GHC.Types.I# 1#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$krep_azG [InlPrag=[~]] :: GHC.Types.KindRep
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=True,
+         WorkFree=False, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+$krep_azG = GHC.Types.$WKindRepVar $krep_szZ
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$tcST_sA0 :: GHC.Prim.Addr#
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+$tcST_sA0 = "ST"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$tcST_sA1 :: GHC.Types.TrName
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$tcST_sA1 = GHC.Types.TrNameS $tcST_sA0
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+T13873.$tcST :: GHC.Types.TyCon
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T13873.$tcST
+  = GHC.Types.TyCon
+      6963553042891150327##
+      14763503896158265939##
+      T13873.$trModule
+      $tcST_sA1
+      1#
+      $krep_azE
+
+-- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
+$krep_sA2 :: [GHC.Types.KindRep]
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$krep_sA2
+  = GHC.Types.:
+      @GHC.Types.KindRep $krep_azG (GHC.Types.[] @GHC.Types.KindRep)
+
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+$krep_sA3 :: [GHC.Types.KindRep]
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$krep_sA3 = GHC.Types.: @GHC.Types.KindRep $krep_azB $krep_sA2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep_azF [InlPrag=[~]] :: GHC.Types.KindRep
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$krep_azF = GHC.Types.KindRepTyConApp T13873.$tcST $krep_sA3
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$tc'MkST_sA4 :: GHC.Prim.Addr#
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+$tc'MkST_sA4 = "'MkST"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$tc'MkST_sA5 :: GHC.Types.TrName
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$tc'MkST_sA5 = GHC.Types.TrNameS $tc'MkST_sA4
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+T13873.$tc'MkST :: GHC.Types.TyCon
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T13873.$tc'MkST
+  = GHC.Types.TyCon
+      5475864918367802453##
+      15766652073234575104##
+      T13873.$trModule
+      $tc'MkST_sA5
+      2#
+      $krep_azF
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$tcM_sA6 :: GHC.Prim.Addr#
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+$tcM_sA6 = "M"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$tcM_sA7 :: GHC.Types.TrName
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$tcM_sA7 = GHC.Types.TrNameS $tcM_sA6
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+T13873.$tcM :: GHC.Types.TyCon
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T13873.$tcM
+  = GHC.Types.TyCon
+      4197309254282137524##
+      18334626332448053007##
+      T13873.$trModule
+      $tcM_sA7
+      0#
+      $krep_azx
+
+-- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
+$krep_sA8 :: [GHC.Types.KindRep]
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$krep_sA8
+  = GHC.Types.:
+      @GHC.Types.KindRep $krep_azB (GHC.Types.[] @GHC.Types.KindRep)
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep_azD [InlPrag=[~]] :: GHC.Types.KindRep
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$krep_azD = GHC.Types.KindRepTyConApp T13873.$tcM $krep_sA8
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep_azz [InlPrag=[~]] :: GHC.Types.KindRep
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$krep_azz = GHC.Types.KindRepFun $krep_azA $krep_azD
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$tc'C:M_sA9 :: GHC.Prim.Addr#
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+$tc'C:M_sA9 = "'C:M"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$tc'C:M_sAa :: GHC.Types.TrName
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$tc'C:M_sAa = GHC.Types.TrNameS $tc'C:M_sA9
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+T13873.$tc'C:M :: GHC.Types.TyCon
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T13873.$tc'C:M
+  = GHC.Types.TyCon
+      9142679081805245693##
+      11450648793545401166##
+      T13873.$trModule
+      $tc'C:M_sAa
+      1#
+      $krep_azz
+
 
 
