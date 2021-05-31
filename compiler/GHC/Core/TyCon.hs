@@ -390,7 +390,7 @@ These extra tyvars (q and r) cause some delicate processing around tuples,
 where we need to manually insert RuntimeRep arguments.
 The same situation happens with unboxed sums: each alternative
 has its own RuntimeRep.
-For boxed tuples, there is no levity polymorphism, and therefore
+For boxed tuples, there is no representation polymorphism, and therefore
 we add RuntimeReps only for the unboxed version.
 
 Type constructor (no kind arguments)
@@ -1085,15 +1085,16 @@ data AlgTyConRhs
                              -- Watch out!  If any newtypes become transparent
                              -- again check #1072.
         nt_lev_poly :: Bool
-                        -- 'True' if the newtype can be levity polymorphic when
-                        -- fully applied to its arguments, 'False' otherwise.
+                        -- 'True' if the newtype can be
+                        -- representation-polymorphic when fully applied to its
+                        -- arguments, 'False' otherwise.
                         -- This can only ever be 'True' with UnliftedNewtypes.
                         --
                         -- Invariant: nt_lev_poly nt = isTypeLevPoly (nt_rhs nt)
                         --
                         -- This is cached to make it cheaper to check if a
-                        -- variable binding is levity polymorphic, as used by
-                        -- isTcLevPoly.
+                        -- variable binding is representation-polymorphic,
+                        -- as used by isTcLevPoly.
     }
 
 mkSumTyConRhs :: [DataCon] -> AlgTyConRhs
@@ -1860,7 +1861,7 @@ noTcTyConScopedTyVars = []
 
 -- | Create an unlifted primitive 'TyCon', such as @Int#@.
 mkPrimTyCon :: Name -> [TyConBinder]
-            -> Kind   -- ^ /result/ kind, never levity-polymorphic
+            -> Kind   -- ^ /result/ kind, never representation-polymorphic
             -> [Role] -> TyCon
 mkPrimTyCon name binders res_kind roles
   = mkPrimTyCon' name binders res_kind roles True (Just $ mkPrelTyConRepName name)
@@ -1883,9 +1884,9 @@ mkLiftedPrimTyCon name binders res_kind roles
   where rep_nm = mkPrelTyConRepName name
 
 mkPrimTyCon' :: Name -> [TyConBinder]
-             -> Kind    -- ^ /result/ kind, never levity-polymorphic
-                        -- (If you need a levity-polymorphic PrimTyCon, change
-                        --  isTcLevPoly.)
+             -> Kind    -- ^ /result/ kind, never representation-polymorphic
+                        -- (If you need a representation-polymorphic PrimTyCon,
+                        -- change isTcLevPoly.)
              -> [Role]
              -> Bool -> Maybe TyConRepName -> TyCon
 mkPrimTyCon' name binders res_kind roles is_unlifted rep_nm
@@ -2358,7 +2359,7 @@ setTcTyConKind tc@(TcTyCon {}) kind = let tc' = tc { tyConKind = kind
                                       in tc'
 setTcTyConKind tc              _    = pprPanic "setTcTyConKind" (ppr tc)
 
--- | Could this TyCon ever be levity-polymorphic when fully applied?
+-- | Could this TyCon ever be representation-polymorphic when fully applied?
 -- True is safe. False means we're sure. Does only a quick check
 -- based on the TyCon's category.
 -- Precondition: The fully-applied TyCon has kind (TYPE blah)
@@ -2368,7 +2369,8 @@ isTcLevPoly (AlgTyCon { algTcParent = parent, algTcRhs = rhs })
   | UnboxedAlgTyCon _ <- parent
   = True
   | NewTyCon { nt_lev_poly = lev_poly } <- rhs
-  = lev_poly -- Newtypes can be levity polymorphic with UnliftedNewtypes (#17360)
+  = lev_poly -- Newtypes can be representation-polymorphic
+             -- with UnliftedNewtypes (#17360)
   | otherwise
   = False
 isTcLevPoly SynonymTyCon{}       = True
