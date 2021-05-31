@@ -39,8 +39,8 @@ module Data.Traversable (
     -- ** The 'traverse' and 'mapM' methods
     -- $traverse
 
-    -- ** Validation use-case
-    -- $validation
+    -- *** Their 'Foldable', just the effects, analogues.
+    -- $effectful
 
     -- ** The 'sequenceA' and 'sequence' methods
     -- $sequence
@@ -609,71 +609,37 @@ foldMapDefault = coerce (traverse :: (a -> Const m ()) -> t a -> Const m (t ()))
 
 ------------------
 
--- $validation
+-- $effectful
 --
--- #validation#
--- A hypothetical application of the above is to validate a structure:
+-- The 'traverse' and 'mapM' methods have analogues in the "Data.Foldable"
+-- module.  These are 'traverse_' and 'mapM_', and their flipped variants
+-- 'for_' and 'forM_', respectively.  The result type is __@f ()@__, they don't
+-- return an updated structure, and can be used to sequence effects over all
+-- the elements of a @Traversable@ (any 'Foldable') structure, just for their
+-- side-effects.
 --
--- >>> :{
--- validate :: Int -> Either (String, Int) Int
--- validate i = if odd i then Left ("That's odd", i) else Right i
--- :}
+-- When effects can short-circuit, the result of these functions is not always
+-- __@pure ()@__, it may instead be 'Nothing' when __@f@__ is __'Maybe'__, or
+-- perhaps __@Left e@__ when it is __@'Either' e@__, and so on.  If the
+-- @Traversable@ structure is empty, the result is always __@pure ()@__.
 --
--- >>> traverse validate [2,4,6,8,10]
--- Right [2,4,6,8,10]
--- >>> traverse validate [2,4,6,8,9]
--- Left ("That's odd",9)
+-- It is perhaps worth noting that 'Maybe' is not only a potential
+-- 'Applicative' functor for the return value of the first argument of
+-- 'traverse', but is also itself a 'Traversable' structure with either zero or
+-- one element.  A convenient idiom for conditionally executing an action just
+-- for its effects on a 'Just' value, and doing nothing otherwise is:
 --
--- Since 'Nothing' is an empty structure, none of its elements are odd.
+-- > -- action :: Monad m => a -> m ()
+-- > -- mvalue :: Maybe a
+-- > mapM_ action mvalue -- :: m ()
 --
--- >>> traverse validate Nothing
--- Right Nothing
--- >>> traverse validate (Just 42)
--- Right (Just 42)
--- >>> traverse validate (Just 17)
--- Left ("That's odd",17)
---
--- However, this is not terribly efficient, because we pay the cost of
--- reconstructing the entire structure as a side effect of validation.
--- It is generally cheaper to just check all the elements and then use
--- the original structure if it is valid.  This can be done via the
--- methods of the 'Foldable' superclass, which perform only the
--- side effects without generating a new structure:
---
--- >>> traverse_ validate [2,4,6,8,10]
--- Right ()
--- >>> traverse_ validate [2,4,6,8,9]
--- Left ("That's odd",9)
---
--- The 'Foldable' instance should be defined in a manner that avoids
--- construction of an unnecessary copy of the container.
---
--- The @Foldable@ method 'mapM_' and its flipped version 'forM_' can be used
--- to sequence IO actions over all the elements of a @Traversable@ container
--- (just for their side-effects, ignoring any results) .  One special
--- case is a 'Maybe' container that optionally holds a value. Given:
---
--- > action :: a -> IO ()
--- > mvalue :: Maybe a
---
--- if you want to evaluate the __@action@__ in the @Just@ case, and do
--- nothing otherwise, you can write the more concise and more general:
---
--- > mapM_ action mvalue
---
--- rather than
+-- which is more concise than:
 --
 -- > maybe (return ()) action mvalue
 --
--- The 'mapM_' form works verbatim if the type of __@mvalue@__ is later
--- refactored from __@Maybe a@__ to __@Either e a@__ (assuming it remains
--- OK to silently do nothing in the error case).
---
--- There's even a generic way to handle empty values ('Nothing', 'Left', etc.):
---
--- > case traverse_ (const Nothing) mvalue of
--- >     Nothing -> mapM_ action mvalue -- mvalue is non-empty
--- >     Just () -> ... handle empty mvalue ...
+-- The 'mapM_' idiom works verbatim if the type of __@mvalue@__ is later
+-- refactored from __@Maybe a@__ to __@Either e a@__ (assuming it remains OK to
+-- silently do nothing in the 'Left' case).
 
 ------------------
 
