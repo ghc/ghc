@@ -118,7 +118,7 @@ main = do
           B.tuple_v6   O.tuple_v6
           (\f -> f 601 602 603 604)
 
-    -- levity polymorphic
+    -- representation-polymorphic
     print $ B.lev_poly_a B.lev_poly B.tuple3 991
     print $ B.lev_poly_a B.lev_poly O.tuple3 992
     print $ B.lev_poly_a O.lev_poly B.tuple3 993
