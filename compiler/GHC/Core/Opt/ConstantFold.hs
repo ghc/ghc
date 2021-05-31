@@ -1878,17 +1878,29 @@ builtinBignumRules =
   , id_passthrough "Word# -> Natural -> Word# (clamp)"
       naturalToWordClampName naturalNSName
 
-    -- identity passthrough with a conversion that can be done directly instead
+    -- passthrough bignum small constructors with a conversion that can be done
+    -- directly instead
+
+    -- TODO: Int64/Word64
   , small_passthrough "Int# -> Integer -> Word#"
         integerISName integerToWordName   (mkPrimOpId IntToWordOp)
   , small_passthrough "Int# -> Integer -> Float#"
         integerISName integerToFloatName  (mkPrimOpId IntToFloatOp)
   , small_passthrough "Int# -> Integer -> Double#"
         integerISName integerToDoubleName (mkPrimOpId IntToDoubleOp)
+
+  , small_passthrough "Word# -> Integer -> Int#"
+        integerFromWordName integerToIntName (mkPrimOpId WordToIntOp)
   , small_passthrough "Word# -> Integer -> Float#"
         integerFromWordName integerToFloatName (mkPrimOpId WordToFloatOp)
   , small_passthrough "Word# -> Integer -> Double#"
         integerFromWordName integerToDoubleName (mkPrimOpId WordToDoubleOp)
+  , small_passthrough "Word# -> Integer -> Natural (wrap)"
+        integerFromWordName integerToNaturalName naturalNSId
+  , small_passthrough "Word# -> Integer -> Natural (throw)"
+        integerFromWordName integerToNaturalThrowName naturalNSId
+  , small_passthrough "Word# -> Integer -> Natural (clamp)"
+        integerFromWordName integerToNaturalClampName naturalNSId
 
   , small_passthrough "Word# -> Natural -> Float#"
         naturalNSName naturalToFloatName  (mkPrimOpId WordToFloatOp)
@@ -1946,8 +1958,10 @@ builtinBignumRules =
     -- The data constructor may or may not have a wrapper, but if not
     -- dataConWrapId will return the worker
     --
-    integerISName = idName (dataConWrapId integerISDataCon)
-    naturalNSName = idName (dataConWrapId naturalNSDataCon)
+    integerISId   = dataConWrapId integerISDataCon
+    naturalNSId   = dataConWrapId naturalNSDataCon
+    integerISName = idName integerISId
+    naturalNSName = idName naturalNSId
 
     mkRule str name nargs f = BuiltinRule
       { ru_name = fsLit str
