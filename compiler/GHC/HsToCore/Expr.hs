@@ -252,11 +252,11 @@ dsLExpr :: LHsExpr GhcTc -> DsM CoreExpr
 dsLExpr (L loc e) =
   putSrcSpanDsA loc $ dsExpr e
 
--- | Variant of 'dsLExpr' that ensures that the result is not levity
--- polymorphic. This should be used when the resulting expression will
--- be an argument to some other function.
--- See Note [Levity polymorphism checking] in "GHC.HsToCore.Monad"
--- See Note [Levity polymorphism invariants] in "GHC.Core"
+-- | Variant of 'dsLExpr' that ensures that the result is not
+-- representation- polymorphic. This should be used when the resulting
+-- expression will be an argument to some other function.
+-- See Note [Representation polymorphism checking] in "GHC.HsToCore.Monad"
+-- See Note [Representation polymorphism invariants] in "GHC.Core"
 dsLExprNoLP :: LHsExpr GhcTc -> DsM CoreExpr
 dsLExprNoLP (L loc e)
   = putSrcSpanDsA loc $
@@ -1069,7 +1069,7 @@ dsConLike con tvbs tys
   = do { ds_con <- dsHsConLike con
        ; ids    <- newSysLocalsDs tys
                    -- newSysLocalDs: /can/ be lev-poly; see
-                   -- Note [Checking levity-polymorphic data constructors]
+                   -- Note [Checking representation-polymorphic data constructors]
        ; return (mkLams tvs $
                  mkLams ids $
                  ds_con `mkTyApps` mkTyVarTys tvs
@@ -1129,21 +1129,21 @@ badMonadBind rhs elt_ty
 {-
 ************************************************************************
 *                                                                      *
-            Levity polymorphism checks
+            Representation polymorphism checks
 *                                                                      *
 ************************************************************************
 
-Note [Checking for levity-polymorphic functions]
+Note [Checking for representation-polymorphic functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We cannot have levity polymorphic function arguments. See
-Note [Levity polymorphism invariants] in GHC.Core. That is
+We cannot have representation-polymorphic function arguments. See
+Note [Representation polymorphism invariants] in GHC.Core. That is
 checked by dsLExprNoLP.
 
 But what about
   const True (unsafeCoerce# :: forall r1 r2 (a :: TYPE r1) (b :: TYPE r2). a -> b)
 
 Since `unsafeCoerce#` has no binding, it has a compulsory unfolding.
-But that compulsory unfolding is a levity-polymorphic lambda, which
+But that compulsory unfolding is a representation-polymorphic lambda, which
 is no good.  So we want to reject this.  On the other hand
   const True (unsafeCoerce# @LiftedRep @UnliftedRep)
 is absolutely fine.
@@ -1163,13 +1163,14 @@ that are a problem.  See checkLevPolyFunction.
 Interestingly, this approach does not look to see whether the Id in
 question will be eta expanded. The logic is this:
   * Either the Id in question is saturated or not.
-  * If it is, then it surely can't have levity polymorphic arguments.
-    If its wrapped type contains levity polymorphic arguments, reject.
-  * If it's not, then it can't be eta expanded with levity polymorphic
-    argument. If its wrapped type contains levity polymorphic arguments, reject.
+  * If it is, then it surely can't have representation-polymorphic arguments.
+    If its wrapped type contains representation-polymorphic arguments, reject.
+  * If it's not, then it can't be eta expanded with representation-polymorphic
+    argument. If its wrapped type contains representation-polymorphic arguments,
+    reject.
 So, either way, we're good to reject.
 
-Note [Nasty wrinkle in levity-polymorphic function check]
+Note [Nasty wrinkle in representation-polymorphic function check]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A nasty wrinkle came up in T13244
    type family Rep x
@@ -1186,7 +1187,7 @@ Here the function I# is wrapped in a /cast/, thus
 If we look only at final type of the expression,
   namely: Unboxed Int -> Int,
 the kind of the argument type is TYPE (Rep Int), and that needs
-type-family reduction to say whether it is lifted or unlifted.
+type-family reduction to determine the runtime representation.
 
 So we split the wrapper into the instantiating part (which is what
 we really want) and everything else; see splitWrapper.  This is
@@ -1201,12 +1202,12 @@ But it also improves the error message in an example like T13233_elab:
   quux = obscure (#,#)
 
 Around the (#,#) we'll get some type /abstractions/ wrapping some type
-/instantiations/. In the levity-poly error message we really only want
-to report the instantiations.  Hence passing (mkHsWrap w_inner e) to
-checkLevPolyArgs.
+/instantiations/. In the representation polymorphism error message,
+we really only want to report the instantiations.
+Hence passing (mkHsWrap w_inner e) to checkLevPolyArgs.
 
 
-Note [Checking levity-polymorphic data constructors]
+Note [Checking representation-polymorphic data constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Similarly, generated by a newtype data constructor, we might get this:
   (/\(r :: RuntimeRep) (a :: TYPE r) \(x::a). K r a x) @LiftedRep Int 4
@@ -1214,12 +1215,14 @@ Similarly, generated by a newtype data constructor, we might get this:
 which we want to accept. See Note [Typechecking data constructors] in
 GHC.Tc.Gen.Head.
 
-Because we want to accept this, we switch off Lint's levity-poly checks
-when Lint checks the output of the desugarer; see the lf_check_levity_poly
-flag in GHC.Core.Lint.lintCoreBindings.
+Because we want to accept this, we switch off Lint's
+representation polymorphism checks when Lint checks the output of the
+desugarer; see the lf_check_levity_poly flag in
+GHC.Core.Lint.lintCoreBindings.
 
-We can get this situation both for levity-polymorphic newtype constructors
-(T18481), and for levity-polymorphic algebraic data types, e.g (T18481a)
+We can get this situation both for representation-polymorphic
+newtype constructors (T18481), and for representation-polymorphic
+algebraic data types, e.g (T18481a)
     type T :: TYPE (BoxedRep r) -> TYPE (BoxedRep r)
     data T a = MkT Int
 
@@ -1231,7 +1234,7 @@ We can get this situation both for levity-polymorphic newtype constructors
 dsHsWrapped :: HsExpr GhcTc -> DsM CoreExpr
 -- Looks for a function 'f' wrapped in type applications (HsAppType)
 -- or wrappers (HsWrap), and checks that any hasNoBinding function
--- is not levity polymorphic, *after* instantiation with those wrappers
+-- is not representation-polymorphic, *after* instantiation with those wrappers
 dsHsWrapped orig_hs_expr
   = go idHsWrapper orig_hs_expr
   where
@@ -1278,7 +1281,7 @@ splitWrapper :: HsWrapper -> (HsWrapper, HsWrapper)
 -- Split a wrapper w into (outer_wrap <.> inner_wrap), where
 -- inner_wrap does instantiation (type and evidence application)
 -- and outer_wrap is everything else, such as a final cast
--- See Note [Nasty wrinkle in levity-polymorphic function check]
+-- See Note [Nasty wrinkle in representation-polymorphic function check]
 splitWrapper wrap
   = go WpHole wrap
   where
@@ -1391,7 +1394,7 @@ These requirements are implemented in the guards in ds_withDict's definition.
 Some further observations about `withDict`:
 
 * Every use of `withDict` must be instantiated at a /particular/ class C.
-  It's a bit like levity polymorphism: we don't allow class-polymorphic
+  It's a bit like representation polymorphism: we don't allow class-polymorphic
   calls of `withDict`. We check this in the desugarer -- and then we
   can immediately replace this invocation of `withDict` with appropriate
   class-specific Core code.
@@ -1403,8 +1406,8 @@ Some further observations about `withDict`:
 * For examples of how `withDict` is used in the `base` library, see `withSNat`
   in GHC.TypeNats, as well as `withSChar` and `withSSymbol` n GHC.TypeLits.
 
-* The `r` is levity polymorphic to support things like `withTypeable` in
-  `Data.Typeable.Internal`.
+* The `r` is representation-polymorphic,
+  to support things like `withTypeable` in `Data.Typeable.Internal`.
 
 * As an alternative to `withDict`, one could define functions like `withT`
   above in terms of `unsafeCoerce`. This is more error-prone, however.
@@ -1456,8 +1459,8 @@ Some further observations about `withDict`:
 
 -- | Takes a (pretty-printed) expression, a function, and its
 -- instantiated type.  If the function is a hasNoBinding op, and the
--- type has levity-polymorphic arguments, issue an error.
--- Note [Checking for levity-polymorphic functions]
+-- type has representation-polymorphic arguments, issue an error.
+-- Note [Checking for representation-polymorphic functions]
 checkLevPolyFunction :: Outputable e => e -> Id -> Type -> DsM ()
 checkLevPolyFunction orig_hs_expr var ty
   | hasNoBinding var
@@ -1466,27 +1469,28 @@ checkLevPolyFunction orig_hs_expr var ty
   = return ()
 
 checkLevPolyArgs :: Outputable e => e -> Type -> DsM ()
--- Check that there are no levity-polymorphic arguments in
+-- Check that there are no representation-polymorphic arguments in
 -- the supplied type
 -- E.g. Given (forall a. t1 -> t2 -> blah), ensure that t1,t2
---      are not levity-polymorhic
+--      are not representation-polymorhic
 --
 -- Pass orig_hs_expr, so that the user can see entire thing
--- Note [Checking for levity-polymorphic functions]
+-- Note [Checking for representation-polymorphic functions]
 checkLevPolyArgs orig_hs_expr ty
   | let (binders, _) = splitPiTys ty
         arg_tys      = mapMaybe binderRelevantType_maybe binders
         bad_tys      = filter isTypeLevPoly arg_tys
   , not (null bad_tys)
   = errDs $ vcat
-    [ hang (text "Cannot use function with levity-polymorphic arguments:")
+    [ hang (text "Cannot use function with representation-polymorphic arguments:")
          2 (hang (ppr orig_hs_expr) 2 (dcolon <+> pprWithTYPE ty))
     , ppUnlessOption sdocPrintTypecheckerElaboration $ vcat
-        [ text "(Note that levity-polymorphic primops such as 'coerce' and unboxed tuples"
-        , text "are eta-expanded internally because they must occur fully saturated."
+        [ text "(Note that representation-polymorphic primops,"
+        , text "such as 'coerce' and unboxed tuples, are eta-expanded"
+        , text "internally because they must occur fully saturated."
         , text "Use -fprint-typechecker-elaboration to display the full expression.)"
         ]
-    , hang (text "Levity-polymorphic arguments:")
+    , hang (text "Representation-polymorphic arguments:")
          2 $ vcat $ map
            (\t -> pprWithTYPE t <+> dcolon <+> pprWithTYPE (typeKind t))
            bad_tys
