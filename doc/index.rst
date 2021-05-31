@@ -12,6 +12,7 @@ Contents:
    intro
    invoking
    markup
+   common-errors
 
 
 Indices and tables
