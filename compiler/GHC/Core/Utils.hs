@@ -84,6 +84,7 @@ import GHC.Builtin.PrimOps
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Core.Type as Type
+import GHC.Core.FamInstEnv( FamInstEnvs, topNormaliseType_maybe )
 import GHC.Core.TyCo.Rep( TyCoBinder(..), TyBinder )
 import GHC.Core.Coercion
 import GHC.Core.TyCon
