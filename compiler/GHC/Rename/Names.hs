@@ -185,14 +185,14 @@ with yes we have gone with no for now.
 -- the return types represent.
 -- Note: Do the non SOURCE ones first, so that we get a helpful warning
 -- for SOURCE ones that are unnecessary
-rnImports :: [LImportDecl GhcPs]
+rnImports :: [(LImportDecl GhcPs, SDoc)]
           -> RnM ([LImportDecl GhcRn], GlobalRdrEnv, ImportAvails, AnyHpcUsage)
 rnImports imports = do
     tcg_env <- getGblEnv
     -- NB: want an identity module here, because it's OK for a signature
     -- module to import from its implementor
     let this_mod = tcg_mod tcg_env
-    let (source, ordinary) = partition is_source_import imports
+    let (source, ordinary) = partition (is_source_import . fst) imports
         is_source_import d = ideclSource (unLoc d) == IsBoot
     stuff1 <- mapAndReportM (rnImportDecl this_mod) ordinary
     stuff2 <- mapAndReportM (rnImportDecl this_mod) source
@@ -293,14 +293,14 @@ Running generateModules from #14693 with DEPTH=16, WIDTH=30 finishes in
 --
 --  4. A boolean 'AnyHpcUsage' which is true if the imported module
 --     used HPC.
-rnImportDecl  :: Module -> LImportDecl GhcPs
+rnImportDecl  :: Module -> (LImportDecl GhcPs, SDoc)
              -> RnM (LImportDecl GhcRn, GlobalRdrEnv, ImportAvails, AnyHpcUsage)
 rnImportDecl this_mod
              (L loc decl@(ImportDecl { ideclName = loc_imp_mod_name
                                      , ideclPkgQual = mb_pkg
                                      , ideclSource = want_boot, ideclSafe = mod_safe
                                      , ideclQualified = qual_style, ideclImplicit = implicit
-                                     , ideclAs = as_mod, ideclHiding = imp_details }))
+                                     , ideclAs = as_mod, ideclHiding = imp_details }), import_reason)
   = setSrcSpanA loc $ do
 
     when (isJust mb_pkg) $ do
@@ -312,7 +312,7 @@ rnImportDecl this_mod
     -- If there's an error in loadInterface, (e.g. interface
     -- file not found) we get lots of spurious errors from 'filterImports'
     let imp_mod_name = unLoc loc_imp_mod_name
-        doc = ppr imp_mod_name <+> text "is directly imported"
+        doc = ppr imp_mod_name <+> import_reason
 
     -- Check for self-import, which confuses the typechecker (#9032)
     -- ghc --make rejects self-import cycles already, but batch-mode may not
