@@ -6,6 +6,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE TupleSections #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -278,8 +279,11 @@ tcRnModuleTcRnM hsc_env mod_sum
                 $ (simpleImportDecl mod_name)
                   { ideclHiding = Just (False, noLocA [])}
               ; mkImport _ = panic "mkImport" }
-        ; let { all_imports = prel_imports ++ import_decls
-                       ++ map mkImport (raw_sig_imports ++ raw_req_imports) }
+        ; let { withReason t imps = map (,text t) imps }
+        ; let { all_imports = withReason "is implicitly imported" prel_imports
+                  ++ withReason "is directly imported" import_decls
+                  ++ withReason "is an extra sig import" (map mkImport raw_sig_imports)
+                  ++ withReason "is an implicit req import" (map mkImport raw_req_imports) }
         ; -- OK now finally rename the imports
           tcg_env <- {-# SCC "tcRnImports" #-}
                      tcRnImports hsc_env all_imports
@@ -360,7 +364,7 @@ implicitPreludeWarn
 ************************************************************************
 -}
 
-tcRnImports :: HscEnv -> [LImportDecl GhcPs] -> TcM TcGblEnv
+tcRnImports :: HscEnv -> [(LImportDecl GhcPs, SDoc)] -> TcM TcGblEnv
 tcRnImports hsc_env import_decls
   = do  { (rn_imports, rdr_env, imports, hpc_info) <- rnImports import_decls ;
 
@@ -2610,7 +2614,7 @@ tcRnImportDecls :: HscEnv
 tcRnImportDecls hsc_env import_decls
  =  runTcInteractive hsc_env $
     do { gbl_env <- updGblEnv zap_rdr_env $
-                    tcRnImports hsc_env import_decls
+                    tcRnImports hsc_env $ map (,text "is directly imported") import_decls
        ; return (tcg_rdr_env gbl_env) }
   where
     zap_rdr_env gbl_env = gbl_env { tcg_rdr_env = emptyGlobalRdrEnv }
