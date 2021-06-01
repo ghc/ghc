@@ -259,7 +259,7 @@ pprImm p (ImmCLbl l)    = pdoc p l
 pprImm p (ImmIndex l i) = pdoc p l <> char '+' <> int i
 pprImm _ (ImmLit s)     = s
 
--- XXX: See pprIm below for why this is a bad idea!
+-- TODO: See pprIm below for why this is a bad idea!
 pprImm _ (ImmFloat f)
   | f == 0 = text "wzr"
   | otherwise = float (fromRational f)
@@ -287,7 +287,7 @@ pprIm platform im = case im of
   ImmInt i     -> char '#' <> int i
   ImmInteger i -> char '#' <> integer i
 
-  -- XXX: This will only work for
+  -- TODO: This will only work for
   -- The floating point value must be expressable as ±n ÷ 16 × 2^r,
   -- where n and r are integers such that 16 ≤ n ≤ 31 and -3 ≤ r ≤ 4.
   -- and 0 needs to be encoded as wzr/xzr.
@@ -332,7 +332,7 @@ pprOp plat op = case op of
   OpRegShift w r s i -> pprReg w r <> comma <+> pprShift s <> comma <+> char '#' <> int i
   OpImm im          -> pprIm plat im
   OpImmShift im s i -> pprIm plat im <> comma <+> pprShift s <+> char '#' <> int i
-  -- XXX: Address compuation always use registers as 64bit -- is this correct?
+  -- TODO: Address compuation always use registers as 64bit -- is this correct?
   OpAddr (AddrRegReg r1 r2) -> char '[' <+> pprReg W64 r1 <> comma <+> pprReg W64 r2 <+> char ']'
   OpAddr (AddrRegImm r1 im) -> char '[' <+> pprReg W64 r1 <> comma <+> pprImm plat im <+> char ']'
   OpAddr (AddrReg r1)       -> char '[' <+> pprReg W64 r1 <+> char ']'
@@ -484,17 +484,17 @@ pprInstr platform instr = case instr of
   LDR _f o1 (OpImm (ImmIndex lbl' off)) | Just (_info, lbl) <- dynamicLinkerLabelInfo lbl' ->
     text "\tadrp" <+> pprOp platform o1 <> comma <+> pdoc platform lbl <> text "@gotpage" $$
     text "\tldr" <+> pprOp platform o1 <> comma <+> text "[" <> pprOp platform o1 <> comma <+> pdoc platform lbl <> text "@gotpageoff" <> text "]" $$
-    text "\tadd" <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> char '#' <> int off -- XXX: check that off is in 12bits.
+    text "\tadd" <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> char '#' <> int off -- TODO: check that off is in 12bits.
 
   LDR _f o1 (OpImm (ImmIndex lbl off)) | isForeignLabel lbl ->
     text "\tadrp" <+> pprOp platform o1 <> comma <+> pdoc platform lbl <> text "@gotpage" $$
     text "\tldr" <+> pprOp platform o1 <> comma <+> text "[" <> pprOp platform o1 <> comma <+> pdoc platform lbl <> text "@gotpageoff" <> text "]" $$
-    text "\tadd" <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> char '#' <> int off -- XXX: check that off is in 12bits.
+    text "\tadd" <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> char '#' <> int off -- TODO: check that off is in 12bits.
 
   LDR _f o1 (OpImm (ImmIndex lbl off)) ->
     text "\tadrp" <+> pprOp platform o1 <> comma <+> pdoc platform lbl <> text "@page" $$
     text "\tadd" <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> pdoc platform lbl <> text "@pageoff" $$
-    text "\tadd" <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> char '#' <> int off -- XXX: check that off is in 12bits.
+    text "\tadd" <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> char '#' <> int off -- TODO: check that off is in 12bits.
 
   LDR _f o1 (OpImm (ImmCLbl lbl')) | Just (_info, lbl) <- dynamicLinkerLabelInfo lbl' ->
     text "\tadrp" <+> pprOp platform o1 <> comma <+> pdoc platform lbl <> text "@gotpage" $$
@@ -511,17 +511,17 @@ pprInstr platform instr = case instr of
   LDR _f o1 (OpImm (ImmIndex lbl' off)) | Just (_info, lbl) <- dynamicLinkerLabelInfo lbl' ->
     text "\tadrp" <+> pprOp platform o1 <> comma <+> text ":got:" <> pdoc platform lbl $$
     text "\tldr" <+> pprOp platform o1 <> comma <+> text "[" <> pprOp platform o1 <> comma <+> text ":got_lo12:" <> pdoc platform lbl <> text "]" $$
-    text "\tadd" <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> char '#' <> int off -- XXX: check that off is in 12bits.
+    text "\tadd" <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> char '#' <> int off -- TODO: check that off is in 12bits.
 
   LDR _f o1 (OpImm (ImmIndex lbl off)) | isForeignLabel lbl ->
     text "\tadrp" <+> pprOp platform o1 <> comma <+> text ":got:" <> pdoc platform lbl $$
     text "\tldr" <+> pprOp platform o1 <> comma <+> text "[" <> pprOp platform o1 <> comma <+> text ":got_lo12:" <> pdoc platform lbl <> text "]" $$
-    text "\tadd" <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> char '#' <> int off -- XXX: check that off is in 12bits.
+    text "\tadd" <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> char '#' <> int off -- TODO: check that off is in 12bits.
 
   LDR _f o1 (OpImm (ImmIndex lbl off)) ->
     text "\tadrp" <+> pprOp platform o1 <> comma <+> pdoc platform lbl $$
     text "\tadd" <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> text ":lo12:" <> pdoc platform lbl $$
-    text "\tadd" <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> char '#' <> int off -- XXX: check that off is in 12bits.
+    text "\tadd" <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> char '#' <> int off -- TODO: check that off is in 12bits.
 
   LDR _f o1 (OpImm (ImmCLbl lbl')) | Just (_info, lbl) <- dynamicLinkerLabelInfo lbl' ->
     text "\tadrp" <+> pprOp platform o1 <> comma <+> text ":got:" <> pdoc platform lbl $$

@@ -4,7 +4,7 @@ import GHC.Prelude
 
 -- https://developer.arm.com/documentation/den0024/a/the-a64-instruction-set/data-processing-instructions/conditional-instructions
 
--- XXX: This appears to go a bit overboard? Maybe we should stick with what LLVM
+-- TODO: This appears to go a bit overboard? Maybe we should stick with what LLVM
 -- settled on for fcmp?
 -- false: always yields false, regardless of operands.
 -- oeq: yields true if both operands are not a QNAN and op1 is equal to op2.

@@ -38,7 +38,7 @@ import GHC.Stack
 
 import Data.Bits ((.&.), complement)
 
--- | XXX: verify this!
+-- | TODO: verify this!
 stackFrameHeaderSize :: Platform -> Int
 stackFrameHeaderSize _ = 64
 
@@ -122,7 +122,7 @@ regUsageOfInstr platform instr = case instr of
   -- 7. Load and Store Instructions --------------------------------------------
   STR _ src dst            -> usage (regOp src ++ regOp dst, [])
   LDR _ dst src            -> usage (regOp src, regOp dst)
-  -- XXX is this right? see STR, which I'm only partial about being right?
+  -- TODO is this right? see STR, which I'm only partial about being right?
   STP _ src1 src2 dst      -> usage (regOp src1 ++ regOp src2 ++ regOp dst, [])
   LDP _ dst1 dst2 src      -> usage (regOp src, regOp dst1 ++ regOp dst2)
 
@@ -414,7 +414,7 @@ isMetaInstr instr
 -- | Copy the value in a register to another one.
 -- Must work for all register classes.
 mkRegRegMoveInstr :: Reg -> Reg -> Instr
-mkRegRegMoveInstr src dst = ANN (text $ "Reg->Reg Move: " ++ show src ++ " -> " ++ show dst) $ MOV (OpReg W64 dst) (OpReg W64 src)
+mkRegRegMoveInstr src dst = ANN (text "Reg->Reg Move: " <> ppr src <> text " -> " <> ppr dst) $ MOV (OpReg W64 dst) (OpReg W64 src)
 
 -- | Take the source and destination from this reg -> reg move instruction
 -- or Nothing if it's not one
@@ -575,7 +575,6 @@ data Instr
     -- UXTB = UBFM <Wd>, <Wn>, #0, #7
     -- UXTH = UBFM <Wd>, <Wn>, #0, #15
 
-    -- XXX
     -- 3. Logical and Move Instructions ----------------------------------------
     | AND Operand Operand Operand -- rd = rn & op2
     | ANDS Operand Operand Operand -- rd = rn & op2
@@ -596,7 +595,7 @@ data Instr
     | ROR Operand Operand Operand -- rd = rn ≫ rm  or  rd = rn ≫ #i, i is 6 bits
     | TST Operand Operand -- rn & op2
     -- Load and stores.
-    -- XXX STR/LDR might want to change to STP/LDP with XZR for the second register.
+    -- TODO STR/LDR might want to change to STP/LDP with XZR for the second register.
     | STR Format Operand Operand -- str Xn, address-mode // Xn -> *addr
     | LDR Format Operand Operand -- ldr Xn, address-mode // Xn <- *addr
     | STP Format Operand Operand Operand -- stp Xn, Xm, address-mode // Xn -> *addr, Xm -> *(addr + 8)

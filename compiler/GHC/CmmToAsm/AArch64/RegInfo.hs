@@ -17,18 +17,18 @@ data JumpDest = DestBlockId BlockId
 instance Outputable JumpDest where
   ppr (DestBlockId bid) = text "jd<blk>:" <> ppr bid
 
--- XXX: documen what this does. See Ticket 19914
+-- TODO: documen what this does. See Ticket 19914
 getJumpDestBlockId :: JumpDest -> Maybe BlockId
 getJumpDestBlockId (DestBlockId bid) = Just bid
 
--- XXX: document what this does. See Ticket 19914
+-- TODO: document what this does. See Ticket 19914
 canShortcut :: Instr -> Maybe JumpDest
 canShortcut _ = Nothing
 
--- XXX: document what this does. See Ticket 19914
+-- TODO: document what this does. See Ticket 19914
 shortcutStatics :: (BlockId -> Maybe JumpDest) -> RawCmmStatics -> RawCmmStatics
 shortcutStatics _ other_static = other_static
 
--- XXX: document what this does. See Ticket 19914
+-- TODO: document what this does. See Ticket 19914
 shortcutJump :: (BlockId -> Maybe JumpDest) -> Instr -> Instr
 shortcutJump _ other = other

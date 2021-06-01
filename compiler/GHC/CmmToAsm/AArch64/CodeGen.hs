@@ -41,6 +41,7 @@ import GHC.Cmm
 import GHC.Cmm.Utils
 import GHC.Cmm.Switch
 import GHC.Cmm.CLabel
+import GHC.Cmm.Ppr.Expr
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
 import GHC.Types.Tickish ( GenTickish(..) )
@@ -150,7 +151,7 @@ basicBlockCodeGen block = do
   (mid_instrs,mid_bid) <- stmtsToInstrs id stmts
   (!tail_instrs,_) <- stmtToInstrs mid_bid tail
   let instrs = header_comment_instr `appOL` loc_instrs `appOL` mid_instrs `appOL` tail_instrs
-  -- XXX: Then x86 backend run @verifyBasicBlock@ here and inserts
+  -- TODO: Then x86 backend run @verifyBasicBlock@ here and inserts
   --      unwinding info. See Ticket 19913
   -- code generation may introduce new basic block boundaries, which
   -- are indicated by the NEWBLOCK instruction.  We must split up the
@@ -207,7 +208,7 @@ annExpr e instr {- | debugIsOn -} = ANN (text . show $ e) instr
 -- -----------------------------------------------------------------------------
 -- Generating a table-branch
 
--- XXX jump tables would be a lot faster, but we'll use bare bones for now.
+-- TODO jump tables would be a lot faster, but we'll use bare bones for now.
 -- this is usually done by sticking the jump table ids into an instruction
 -- and then have the @generateJumpTableForInstr@ callback produce the jump
 -- table as a static.
@@ -349,7 +350,7 @@ getRegisterReg platform (CmmGlobal mid)
         -- platform.  Hence if it's not mapped to a registers something
         -- went wrong earlier in the pipeline.
 -- | Convert a BlockId to some CmmStatic data
--- XXX: Add JumpTable Logic, see Ticket 19912
+-- TODO: Add JumpTable Logic, see Ticket 19912
 -- jumpTableEntry :: NCGConfig -> Maybe BlockId -> CmmStatic
 -- jumpTableEntry config Nothing   = CmmStaticLit (CmmInt 0 (ncgWordWidth config))
 -- jumpTableEntry _ (Just blockid) = CmmStaticLit (CmmLabel blockLabel)
@@ -370,7 +371,7 @@ getSomeReg expr = do
     Fixed rep reg code ->
         return (reg, rep, code)
 
--- XXX OPT: we might be able give getRegister
+-- TODO OPT: we might be able give getRegister
 --          a hint, what kind of register we want.
 getFloatReg :: HasCallStack => CmmExpr -> NatM (Reg, Format, InstrBlock)
 getFloatReg expr = do
@@ -392,7 +393,7 @@ getFloatReg expr = do
     Fixed rep reg code ->
       return (reg, rep, code)
 
--- XXX: TODO, bounds. We can't put any immediate
+-- TODO: TODO, bounds. We can't put any immediate
 -- value in. They are constrained.
 -- See Ticket 19911
 litToImm' :: CmmLit -> NatM (Operand, InstrBlock)
@@ -429,7 +430,7 @@ getRegister e = do
 getRegister' :: NCGConfig -> Platform -> CmmExpr -> NatM Register
 -- OPTIMIZATION WARNING: CmmExpr rewrites
 -- 1. Rewrite: Reg + (-n) => Reg - n
---    XXX: this expression souldn't even be generated to begin with.
+--    TODO: this expression souldn't even be generated to begin with.
 getRegister' config plat (CmmMachOp (MO_Add w0) [x, CmmLit (CmmInt i w1)]) | i < 0
   = getRegister' config plat (CmmMachOp (MO_Sub w0) [x, CmmLit (CmmInt (-i) w1)])
 
@@ -445,7 +446,7 @@ getRegister' config plat expr
     CmmLit lit
       -> case lit of
 
-        -- XXX handle CmmInt 0 specially, use wzr or xzr.
+        -- TODO handle CmmInt 0 specially, use wzr or xzr.
 
         CmmInt i W8  -> do
           return (Any (intFormat W8) (\dst -> unitOL $ annExpr expr (MOV (OpReg W8 dst) (OpImm (ImmInteger (narrowS W8 i))))))
@@ -582,7 +583,7 @@ getRegister' config plat expr
         MO_SF_Conv from to -> return $ Any (floatFormat to) (\dst -> code `snocOL` SCVTF (OpReg to dst) (OpReg from reg))  -- (Signed ConVerT Float)
         MO_FS_Conv from to -> return $ Any (intFormat to) (\dst -> code `snocOL` FCVTZS (OpReg to dst) (OpReg from reg)) -- (float convert (-> zero) signed)
 
-        -- XXX this is very hacky
+        -- TODO this is very hacky
         -- Note, UBFM and SBFM expect source and target register to be of the same size, so we'll use @max from to@
         -- UBFM will set the high bits to 0. SBFM will copy the sign (sign extend).
         MO_UU_Conv from to -> return $ Any (intFormat to) (\dst -> code `snocOL` UBFM (OpReg (max from to) dst) (OpReg (max from to) reg) (OpImm (ImmInt 0)) (toImm (min from to)))
@@ -607,22 +608,22 @@ getRegister' config plat expr
     -- compute x<j> <- y
     -- OP x<r>, x<i>, x<j>
     --
-    -- XXX: for now we'll only implement the 64bit versions. And rely on the
+    -- TODO: for now we'll only implement the 64bit versions. And rely on the
     --      fallthrough to alert us if things go wrong!
     -- OPTIMIZATION WARNING: Dyadic CmmMachOp destructuring
-    -- 0. XXX This should not exist! Rewrite: Reg +- 0 -> Reg
+    -- 0. TODO This should not exist! Rewrite: Reg +- 0 -> Reg
     CmmMachOp (MO_Add _) [expr'@(CmmReg (CmmGlobal _r)), CmmLit (CmmInt 0 _)] -> getRegister' config plat expr'
     CmmMachOp (MO_Sub _) [expr'@(CmmReg (CmmGlobal _r)), CmmLit (CmmInt 0 _)] -> getRegister' config plat expr'
     -- 1. Compute Reg +/- n directly.
     --    For Add/Sub we can directly encode 12bits, or 12bits lsl #12.
     CmmMachOp (MO_Add w) [(CmmReg reg), CmmLit (CmmInt n _)]
       | n > 0 && n < 4096 -> return $ Any (intFormat w) (\d -> unitOL $ annExpr expr (ADD (OpReg w d) (OpReg w' r') (OpImm (ImmInteger n))))
-      -- XXX: 12bits lsl #12; e.g. lower 12 bits of n are 0; shift n >> 12, and set lsl to #12.
+      -- TODO: 12bits lsl #12; e.g. lower 12 bits of n are 0; shift n >> 12, and set lsl to #12.
       where w' = formatToWidth (cmmTypeFormat (cmmRegType plat reg))
             r' = getRegisterReg plat reg
     CmmMachOp (MO_Sub w) [(CmmReg reg), CmmLit (CmmInt n _)]
       | n > 0 && n < 4096 -> return $ Any (intFormat w) (\d -> unitOL $ annExpr expr (SUB (OpReg w d) (OpReg w' r') (OpImm (ImmInteger n))))
-      -- XXX: 12bits lsl #12; e.g. lower 12 bits of n are 0; shift n >> 12, and set lsl to #12.
+      -- TODO: 12bits lsl #12; e.g. lower 12 bits of n are 0; shift n >> 12, and set lsl to #12.
       where w' = formatToWidth (cmmTypeFormat (cmmRegType plat reg))
             r' = getRegisterReg plat reg
 
@@ -786,7 +787,7 @@ getRegister' config plat expr
         MO_U_Shr w -> intOp w (\d x y -> unitOL $ LSR d x y)
         MO_S_Shr w -> intOp w (\d x y -> unitOL $ ASR d x y)
 
-        -- XXX
+        -- TODO
 
         op -> pprPanic "getRegister' (unhandled dyadic CmmMachOp): " $ (pprMachOp op) <+> text "in" <+> (pdoc plat expr)
     CmmMachOp _op _xs
@@ -818,7 +819,7 @@ getRegister' config plat expr
 data Amode = Amode AddrMode InstrBlock
 
 getAmode :: Platform -> CmmExpr -> NatM Amode
--- XXX: Specialize stuff we can destructure here.
+-- TODO: Specialize stuff we can destructure here.
 
 -- OPTIMIZATION WARNING: Addressing modes.
 -- Addressing options:
@@ -1067,7 +1068,7 @@ genCCall
     -> [CmmActual]        -- arguments (of mixed type)
     -> BlockId            -- The block we are in
     -> NatM (InstrBlock, Maybe BlockId)
--- XXX: Specialize where we can.
+-- TODO: Specialize where we can.
 -- Generic impl
 genCCall target dest_regs arg_regs bid = do
   -- we want to pass arg_regs into allArgRegs
@@ -1206,7 +1207,7 @@ genCCall target dest_regs arg_regs bid = do
         MO_U_Mul2     _w -> unsupported mop
 
         -- Memory Ordering
-        -- XXX DMBSY is probably *way* too much!
+        -- TODO DMBSY is probably *way* too much!
         MO_ReadBarrier      ->  return (unitOL DMBSY, Nothing)
         MO_WriteBarrier     ->  return (unitOL DMBSY, Nothing)
         MO_Touch            ->  return (nilOL, Nothing) -- Keep variables live (when using interior pointers)
@@ -1215,7 +1216,7 @@ genCCall target dest_regs arg_regs bid = do
 
         -- Memory copy/set/move/cmp, with alignment for optimization
 
-        -- XXX Optimize and use e.g. quad registers to move memory around instead
+        -- TODO Optimize and use e.g. quad registers to move memory around instead
         -- of offloading this to memcpy. For small memcpys we can utilize
         -- the 128bit quad registers in NEON to move block of bytes around.
         -- Might also make sense of small memsets? Use xzr? What's the function
@@ -1240,7 +1241,7 @@ genCCall target dest_regs arg_regs bid = do
         MO_Cmpxchg w        -> mkCCall (cmpxchgLabel w)
         -- -- Should be an AtomicRMW variant eventually.
         -- -- Sequential consistent.
-        -- XXX: this should be implemented properly!
+        -- TODO: this should be implemented properly!
         MO_Xchg w           -> mkCCall (xchgLabel w)
 
   where
@@ -1255,7 +1256,7 @@ genCCall target dest_regs arg_regs bid = do
       let cconv = ForeignConvention CCallConv [NoHint] [NoHint] CmmMayReturn
       genCCall (ForeignTarget target cconv) dest_regs arg_regs bid
 
-    -- XXX: Optimize using paired stores and loads (STP, LDP). It is
+    -- TODO: Optimize using paired stores and loads (STP, LDP). It is
     -- automomatically done by the allocator for us. However it's not optimal,
     -- as we'd rather want to have control over
     --     all spill/load registers, so we can optimize with instructions like
