@@ -9,7 +9,6 @@ import GHC.Driver.Session
 import GHC.Driver.Errors.Types
 import GHC.Data.Bag
 import GHC.Prelude
-import GHC.Parser.Errors.Types
 import GHC.Types.SrcLoc
 import GHC.Types.SourceError
 import GHC.Types.Error
