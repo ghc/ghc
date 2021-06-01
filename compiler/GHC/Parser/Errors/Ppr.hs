@@ -520,6 +520,12 @@ instance Diagnostic PsMessage where
               text "character in package name"
             ]
 
+    PsErrIllegalGadtRecordMultiplicity arr
+      -> mkSimpleDecorated $ vcat
+            [ text "Parse error" <> colon <+> quotes (ppr arr)
+            , text "Record constructors in GADTs must use an ordinary, non-linear arrow."
+            ]
+
   diagnosticReason  = \case
     PsUnknownMessage m                            -> diagnosticReason m
     PsWarnTab{}                                   -> WarningWithFlag Opt_WarnTabs
@@ -628,6 +634,7 @@ instance Diagnostic PsMessage where
     PsErrUnexpectedTypeInDecl{}                   -> ErrorWithoutFlag
     PsErrInvalidPackageName{}                     -> ErrorWithoutFlag
     PsErrParseRightOpSectionInPat{}               -> ErrorWithoutFlag
+    PsErrIllegalGadtRecordMultiplicity{}          -> ErrorWithoutFlag
 
   diagnosticHints  = \case
     PsUnknownMessage m                            -> diagnosticHints m
@@ -754,6 +761,7 @@ instance Diagnostic PsMessage where
     PsErrInvalidTypeSignature{}                   -> noHints
     PsErrUnexpectedTypeInDecl{}                   -> noHints
     PsErrInvalidPackageName{}                     -> noHints
+    PsErrIllegalGadtRecordMultiplicity{}          -> noHints
 
 suggestParensAndBlockArgs :: [GhcHint]
 suggestParensAndBlockArgs =
