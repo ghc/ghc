@@ -240,3 +240,8 @@ type instance Anno (HsToken tok) = EpAnnCO
 
 noHsTok :: GenLocated (EpAnn a) (HsToken tok)
 noHsTok = L noAnn HsTok
+
+type instance Anno (HsUniToken tok utok) = EpAnnCO
+
+noHsUniTok :: GenLocated (EpAnn a) (HsUniToken tok utok)
+noHsUniTok = L noAnn HsNormalTok
