@@ -706,3 +706,11 @@ type LHsToken tok p = XRec p (HsToken tok)
 data HsToken (tok :: Symbol) = HsTok
 
 deriving instance KnownSymbol tok => Data (HsToken tok)
+
+type LHsUniToken tok utok p = XRec p (HsUniToken tok utok)
+
+-- See also IsUnicodeSyntax in GHC.Parser.Annotation; we do not use here to
+-- avoid a dependency.
+data HsUniToken (tok :: Symbol) (utok :: Symbol) = HsNormalTok | HsUnicodeTok
+
+deriving instance (KnownSymbol tok, KnownSymbol utok) => Data (HsUniToken tok utok)
