@@ -719,13 +719,14 @@ mkGadtDecl loc names ty annsIn = do
   (args, res_ty, annsa, csa) <-
     case body_ty of
      L ll (HsFunTy af hsArr (L loc' (HsRecTy an rf)) res_ty) -> do
-       let an' = addTrailingAnnToL (locA loc') (anns af) (comments af) an
-       case hsArr of
-         HsUnrestrictedArrow _ -> return ()
-         _ -> addError $ mkPlainErrorMsgEnvelope (getLocA body_ty) $
+       let an' = addCommentsToEpAnn (locA loc') an (comments af)
+       arr <- case hsArr of
+         HsUnrestrictedArrow arr -> return arr
+         _ -> do addError $ mkPlainErrorMsgEnvelope (getLocA body_ty) $
                                  (PsErrIllegalGadtRecordMultiplicity hsArr)
+                 return noHsUniTok
 
-       return ( RecConGADT (L (SrcSpanAnn an' (locA loc')) rf), res_ty
+       return ( RecConGADT (L (SrcSpanAnn an' (locA loc')) rf) arr, res_ty
               , [], epAnnComments (ann ll))
      _ -> do
        let (anns, cs, arg_types, res_type) = splitHsFunType body_ty
@@ -2980,11 +2981,15 @@ mkLHsOpTy x op y =
   let loc = getLoc x `combineSrcSpansA` (noAnnSrcSpan $ getLocA op) `combineSrcSpansA` getLoc y
   in L loc (mkHsOpTy x op y)
 
-mkMultTy :: IsUnicodeSyntax -> Located Token -> LHsType GhcPs -> HsArrow GhcPs
-mkMultTy u tok t@(L _ (HsTyLit _ (HsNumTy (SourceText "1") 1)))
+mkMultTy :: LHsToken "%" GhcPs -> LHsType GhcPs -> LHsUniToken "->" "→" GhcPs -> HsArrow GhcPs
+mkMultTy pct t@(L _ (HsTyLit _ (HsNumTy (SourceText "1") 1))) arr
   -- See #18888 for the use of (SourceText "1") above
-  = HsLinearArrow u (Just $ AddEpAnn AnnPercentOne (EpaSpan $ realSrcSpan $ combineLocs tok (reLoc t)))
-mkMultTy u tok t = HsExplicitMult u (Just $ AddEpAnn AnnPercent (EpaSpan $ realSrcSpan $ getLoc tok)) t
+  = HsLinearArrow (HsPct1 (L (getLoc pct Semi.<> locOf1) HsTok) arr)
+  where
+    -- The location of "1" in "%1".
+    locOf1 :: EpAnn NoEpAnns
+    locOf1 = EpAnn (spanAsAnchor (locA (getLoc t))) NoEpAnns emptyComments
+mkMultTy pct t arr = HsExplicitMult pct t arr
 
 -----------------------------------------------------------------------------
 -- Token symbols

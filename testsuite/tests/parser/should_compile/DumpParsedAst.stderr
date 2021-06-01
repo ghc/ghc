@@ -144,8 +144,13 @@
            []
            [(HsScaled
              (HsLinearArrow
-              (NormalSyntax)
-              (Nothing))
+              (HsPct1
+               (L
+                (EpAnnNotUsed)
+                (HsTok))
+               (L
+                (EpAnnNotUsed)
+                (HsNormalTok))))
              (L
               (SrcSpanAnn (EpAnnNotUsed) { DumpParsedAst.hs:8:26-30 })
               (HsTyVar
@@ -549,8 +554,13 @@
            []
            [(HsScaled
              (HsLinearArrow
-              (NormalSyntax)
-              (Nothing))
+              (HsPct1
+               (L
+                (EpAnnNotUsed)
+                (HsTok))
+               (L
+                (EpAnnNotUsed)
+                (HsNormalTok))))
              (L
               (SrcSpanAnn (EpAnnNotUsed) { DumpParsedAst.hs:15:25-29 })
               (HsParTy
@@ -831,12 +841,19 @@
               (Anchor
                { DumpParsedAst.hs:17:31 }
                (UnchangedAnchor))
-              (AddRarrowAnn
-               (EpaSpan { DumpParsedAst.hs:17:33-34 }))
+              (NoEpAnns)
               (EpaComments
                []))
              (HsUnrestrictedArrow
-              (NormalSyntax))
+              (L
+               (EpAnn
+                (Anchor
+                 { DumpParsedAst.hs:17:33-34 }
+                 (UnchangedAnchor))
+                (NoEpAnns)
+                (EpaComments
+                 []))
+               (HsNormalTok)))
              (L
               (SrcSpanAnn (EpAnnNotUsed) { DumpParsedAst.hs:17:31 })
               (HsTyVar
@@ -979,3 +996,5 @@
       [])))]
   (Nothing)
   (Nothing)))
+
+

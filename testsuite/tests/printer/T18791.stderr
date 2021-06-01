@@ -90,15 +90,22 @@
           (PrefixConGADT
            [(HsScaled
              (HsUnrestrictedArrow
-              (NormalSyntax))
+              (L
+               (EpAnn
+                (Anchor
+                 { T18791.hs:5:14-15 }
+                 (UnchangedAnchor))
+                (NoEpAnns)
+                (EpaComments
+                 []))
+               (HsNormalTok)))
              (L
               (SrcSpanAnn (EpAnn
                            (Anchor
                             { T18791.hs:5:10-12 }
                             (UnchangedAnchor))
                            (AnnListItem
-                            [(AddRarrowAnn
-                              (EpaSpan { T18791.hs:5:14-15 }))])
+                            [])
                            (EpaComments
                             [])) { T18791.hs:5:10-12 })
               (HsTyVar
@@ -133,3 +140,5 @@
        []))))]
   (Nothing)
   (Nothing)))
+
+

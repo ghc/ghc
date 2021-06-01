@@ -12,6 +12,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -2147,20 +2148,20 @@ type :: { LHsType GhcPs }
         -- See Note [%shift: type -> btype]
         : btype %shift                 { $1 }
         | btype '->' ctype             {% acsA (\cs -> sLL (reLoc $1) (reLoc $>)
-                                            $ HsFunTy (EpAnn (glAR $1) (mau $2) cs) (HsUnrestrictedArrow (toUnicode $2)) $1 $3) }
+                                            $ HsFunTy (EpAnn (glAR $1) NoEpAnns cs) (HsUnrestrictedArrow (hsUniTok $2)) $1 $3) }
 
         | btype mult '->' ctype        {% hintLinear (getLoc $2)
-                                       >> let arr = (unLoc $2) (toUnicode $3)
+                                       >> let arr = (unLoc $2) (hsUniTok $3)
                                           in acsA (\cs -> sLL (reLoc $1) (reLoc $>)
-                                           $ HsFunTy (EpAnn (glAR $1) (mau $3) cs) arr $1 $4) }
+                                           $ HsFunTy (EpAnn (glAR $1) NoEpAnns cs) arr $1 $4) }
 
         | btype '->.' ctype            {% hintLinear (getLoc $2) >>
                                           acsA (\cs -> sLL (reLoc $1) (reLoc $>)
-                                            $ HsFunTy (EpAnn (glAR $1) (mlu $2) cs) (HsLinearArrow UnicodeSyntax Nothing) $1 $3) }
+                                            $ HsFunTy (EpAnn (glAR $1) NoEpAnns cs) (HsLinearArrow (HsLolly (hsTok $2))) $1 $3) }
                                               -- [mu AnnLollyU $2] }
 
-mult :: { Located (IsUnicodeSyntax -> HsArrow GhcPs) }
-        : PREFIX_PERCENT atype          { sLL $1 (reLoc $>) (\u -> mkMultTy u $1 $2) }
+mult :: { Located (LHsUniToken "->" "\8594" GhcPs -> HsArrow GhcPs) }
+        : PREFIX_PERCENT atype          { sLL $1 (reLoc $>) (mkMultTy (hsTok $1) $2) }
 
 btype :: { LHsType GhcPs }
         : infixtype                     {% runPV $1 }
@@ -4178,13 +4179,6 @@ msemim l = if isZeroWidthSpan (gl l) then Nothing else Just (EpaSpan $ rs $ gl l
 mu :: AnnKeywordId -> Located Token -> AddEpAnn
 mu a lt@(L l t) = AddEpAnn (toUnicodeAnn a lt) (EpaSpan $ rs l)
 
-mau :: Located Token -> TrailingAnn
-mau lt@(L l t) = if isUnicode lt then AddRarrowAnnU (EpaSpan $ rs l)
-                                 else AddRarrowAnn  (EpaSpan $ rs l)
-
-mlu :: Located Token -> TrailingAnn
-mlu lt@(L l t) = AddLollyAnnU (EpaSpan $ rs l)
-
 -- | If the 'Token' is using its unicode variant return the unicode variant of
 --   the annotation
 toUnicodeAnn :: AnnKeywordId -> Located Token -> AnnKeywordId
@@ -4350,7 +4344,12 @@ listAsAnchor [] = spanAsAnchor noSrcSpan
 listAsAnchor (L l _:_) = spanAsAnchor (locA l)
 
 hsTok :: Located Token -> LHsToken tok GhcPs
-hsTok (L l _) = L (EpAnn (Anchor (realSrcSpan l) UnchangedAnchor) NoEpAnns emptyComments) HsTok
+hsTok (L l _) = L (EpAnn (spanAsAnchor l) NoEpAnns emptyComments) HsTok
+
+hsUniTok :: Located Token -> LHsUniToken tok utok GhcPs
+hsUniTok t@(L l _) =
+  L (EpAnn (spanAsAnchor l) NoEpAnns emptyComments)
+    (if isUnicode t then HsUnicodeTok else HsNormalTok)
 
 -- -------------------------------------
 

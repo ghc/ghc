@@ -166,15 +166,22 @@
           (PrefixConGADT
            [(HsScaled
              (HsUnrestrictedArrow
-              (NormalSyntax))
+              (L
+               (EpAnn
+                (Anchor
+                 { T17544_kw.hs:19:21-22 }
+                 (UnchangedAnchor))
+                (NoEpAnns)
+                (EpaComments
+                 []))
+               (HsNormalTok)))
              (L
               (SrcSpanAnn (EpAnn
                            (Anchor
                             { T17544_kw.hs:19:18-19 }
                             (UnchangedAnchor))
                            (AnnListItem
-                            [(AddRarrowAnn
-                              (EpaSpan { T17544_kw.hs:19:21-22 }))])
+                            [])
                            (EpaComments
                             [])) { T17544_kw.hs:19:18-19 })
               (HsTupleTy
@@ -312,3 +319,5 @@
     { T17544_kw.hs:12:3-33 }
     (HsDocString
      " Bad comment for the module")))))
+
+

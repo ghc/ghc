@@ -695,10 +695,10 @@ instance HasHaddock (LocatedA (ConDecl GhcPs)) where
         con_g_args' <-
           case con_g_args of
             PrefixConGADT ts -> PrefixConGADT <$> addHaddock ts
-            RecConGADT (L l_rec flds) -> do
+            RecConGADT (L l_rec flds) arr -> do
               -- discardHasInnerDocs is ok because we don't need this info for GADTs.
               flds' <- traverse (discardHasInnerDocs . addHaddockConDeclField) flds
-              pure $ RecConGADT (L l_rec flds')
+              pure $ RecConGADT (L l_rec flds') arr
         con_res_ty' <- addHaddock con_res_ty
         pure $ L l_con_decl $
           ConDeclGADT { con_g_ext, con_names, con_bndrs, con_mb_cxt,

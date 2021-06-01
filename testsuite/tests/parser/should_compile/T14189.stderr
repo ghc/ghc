@@ -61,8 +61,13 @@
              []
              [(HsScaled
                (HsLinearArrow
-                (NormalSyntax)
-                (Nothing))
+                (HsPct1
+                 (L
+                  (EpAnnNotUsed)
+                  (HsTok))
+                 (L
+                  (EpAnnNotUsed)
+                  (HsNormalTok))))
                (L
                 (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:6:18-20 })
                 (HsTyVar
@@ -210,4 +215,5 @@
           (FieldSelectors)
           {Name: T14189.f}))])])])
   (Nothing)))
+
 

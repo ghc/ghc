@@ -706,3 +706,16 @@ type LHsToken tok p = XRec p (HsToken tok)
 data HsToken (tok :: Symbol) = HsTok
 
 deriving instance KnownSymbol tok => Data (HsToken tok)
+
+type LHsUniToken tok utok p = XRec p (HsUniToken tok utok)
+
+-- With UnicodeSyntax, there might be multiple ways to write the same token.
+-- For example an arrow could be either "->" or "→". This choice must be
+-- recorded in order to exactprint such tokens,
+-- so instead of HsToken "->" we introduce HsUniToken "->" "→".
+--
+-- See also IsUnicodeSyntax in GHC.Parser.Annotation; we do not use here to
+-- avoid a dependency.
+data HsUniToken (tok :: Symbol) (utok :: Symbol) = HsNormalTok | HsUnicodeTok
+
+deriving instance (KnownSymbol tok, KnownSymbol utok) => Data (HsUniToken tok utok)

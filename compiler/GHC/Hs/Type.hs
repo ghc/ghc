@@ -24,6 +24,7 @@ module GHC.Hs.Type (
         Mult, HsScaled(..),
         hsMult, hsScaledThing,
         HsArrow(..), arrowToHsType,
+        HsLinearArrowTokens(..),
         hsLinear, hsUnrestricted, isUnrestricted,
 
         HsType(..), HsCoreTy, LHsType, HsKind, LHsKind,
@@ -285,7 +286,7 @@ type instance XForAllTy        (GhcPass _) = NoExtField
 type instance XQualTy          (GhcPass _) = NoExtField
 type instance XTyVar           (GhcPass _) = EpAnn [AddEpAnn]
 type instance XAppTy           (GhcPass _) = NoExtField
-type instance XFunTy           (GhcPass _) = EpAnn TrailingAnn -- For the AnnRarrow or AnnLolly
+type instance XFunTy           (GhcPass _) = EpAnnCO
 type instance XListTy          (GhcPass _) = EpAnn AnnParen
 type instance XTupleTy         (GhcPass _) = EpAnn AnnParen
 type instance XSumTy           (GhcPass _) = EpAnn AnnParen
@@ -329,6 +330,12 @@ oneDataConHsTy = HsTyVar noAnn NotPromoted (noLocA oneDataConName)
 manyDataConHsTy :: HsType GhcRn
 manyDataConHsTy = HsTyVar noAnn NotPromoted (noLocA manyDataConName)
 
+hsLinear :: a -> HsScaled (GhcPass p) a
+hsLinear = HsScaled (HsLinearArrow (HsPct1 noHsTok noHsUniTok))
+
+hsUnrestricted :: a -> HsScaled (GhcPass p) a
+hsUnrestricted = HsScaled (HsUnrestrictedArrow noHsUniTok)
+
 isUnrestricted :: HsArrow GhcRn -> Bool
 isUnrestricted (arrowToHsType -> L _ (HsTyVar _ _ (L _ n))) = n == manyDataConName
 isUnrestricted _ = False
@@ -338,8 +345,8 @@ isUnrestricted _ = False
 -- multiplicity or a shorthand.
 arrowToHsType :: HsArrow GhcRn -> LHsType GhcRn
 arrowToHsType (HsUnrestrictedArrow _) = noLocA manyDataConHsTy
-arrowToHsType (HsLinearArrow _ _) = noLocA oneDataConHsTy
-arrowToHsType (HsExplicitMult _ _ p) = p
+arrowToHsType (HsLinearArrow _) = noLocA oneDataConHsTy
+arrowToHsType (HsExplicitMult _ p _) = p
 
 instance
       (OutputableBndrId pass) =>
@@ -349,8 +356,8 @@ instance
 -- See #18846
 pprHsArrow :: (OutputableBndrId pass) => HsArrow (GhcPass pass) -> SDoc
 pprHsArrow (HsUnrestrictedArrow _) = arrow
-pprHsArrow (HsLinearArrow _ _) = lollipop
-pprHsArrow (HsExplicitMult _ _ p) = (mulArrow (ppr p))
+pprHsArrow (HsLinearArrow _) = lollipop
+pprHsArrow (HsExplicitMult _ p _) = mulArrow (ppr p)
 
 type instance XConDeclField  (GhcPass _) = EpAnn [AddEpAnn]
 type instance XXConDeclField (GhcPass _) = NoExtCon
@@ -484,13 +491,12 @@ splitHsFunType ty = go ty
           cs' = cs S.<> epAnnComments (ann l) S.<> epAnnComments an
         in (anns', cs', args, res)
 
-    go (L ll (HsFunTy (EpAnn _ an cs) mult x y))
+    go (L ll (HsFunTy (EpAnn _ _ cs) mult x y))
       | (anns, csy, args, res) <- splitHsFunType y
       = (anns, csy S.<> epAnnComments (ann ll), HsScaled mult x':args, res)
       where
-        (L (SrcSpanAnn a l) t) = x
-        an' = addTrailingAnnToA l an cs a
-        x' = L (SrcSpanAnn an' l) t
+        L l t = x
+        x' = L (addCommentsToSrcAnn l cs) t
 
     go other = ([], emptyComments, [], other)
 

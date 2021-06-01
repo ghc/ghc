@@ -1630,9 +1630,9 @@ kcConH98Args new_or_data res_kind con_args = case con_args of
 -- Kind-check the types of arguments to a GADT data constructor.
 kcConGADTArgs :: NewOrData -> Kind -> HsConDeclGADTDetails GhcRn -> TcM ()
 kcConGADTArgs new_or_data res_kind con_args = case con_args of
-  PrefixConGADT tys     -> kcConArgTys new_or_data res_kind tys
-  RecConGADT (L _ flds) -> kcConArgTys new_or_data res_kind $
-                           map (hsLinear . cd_fld_type . unLoc) flds
+  PrefixConGADT tys     ->   kcConArgTys new_or_data res_kind tys
+  RecConGADT (L _ flds) _ -> kcConArgTys new_or_data res_kind $
+                             map (hsLinear . cd_fld_type . unLoc) flds
 
 kcConDecls :: NewOrData
            -> Kind             -- The result kind signature
@@ -3676,7 +3676,7 @@ tcConGADTArgs :: ContextKind  -- expected kind of arguments
               -> TcM [(Scaled TcType, HsSrcBang)]
 tcConGADTArgs exp_kind (PrefixConGADT btys)
   = mapM (tcConArg exp_kind) btys
-tcConGADTArgs exp_kind (RecConGADT fields)
+tcConGADTArgs exp_kind (RecConGADT fields _)
   = tcRecConDeclFields exp_kind fields
 
 tcConArg :: ContextKind  -- expected kind for args; always OpenKind for datatypes,

@@ -679,12 +679,19 @@
             (Anchor
              { KindSigs.hs:22:8-20 }
              (UnchangedAnchor))
-            (AddRarrowAnn
-             (EpaSpan { KindSigs.hs:22:22-23 }))
+            (NoEpAnns)
             (EpaComments
              []))
            (HsUnrestrictedArrow
-            (NormalSyntax))
+            (L
+             (EpAnn
+              (Anchor
+               { KindSigs.hs:22:22-23 }
+               (UnchangedAnchor))
+              (NoEpAnns)
+              (EpaComments
+               []))
+             (HsNormalTok)))
            (L
             (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:22:8-20 })
             (HsParTy
@@ -745,12 +752,19 @@
               (Anchor
                { KindSigs.hs:22:25-28 }
                (UnchangedAnchor))
-              (AddRarrowAnn
-               (EpaSpan { KindSigs.hs:22:30-31 }))
+              (NoEpAnns)
               (EpaComments
                []))
              (HsUnrestrictedArrow
-              (NormalSyntax))
+              (L
+               (EpAnn
+                (Anchor
+                 { KindSigs.hs:22:30-31 }
+                 (UnchangedAnchor))
+                (NoEpAnns)
+                (EpaComments
+                 []))
+               (HsNormalTok)))
              (L
               (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:22:25-28 })
               (HsTyVar
@@ -1505,3 +1519,5 @@
       [])))]
   (Nothing)
   (Nothing)))
+
+

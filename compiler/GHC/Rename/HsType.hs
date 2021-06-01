@@ -764,10 +764,11 @@ rnHsTyKi env (HsWildCardTy _)
        ; return (HsWildCardTy noExtField, emptyFVs) }
 
 rnHsArrow :: RnTyKiEnv -> HsArrow GhcPs -> RnM (HsArrow GhcRn, FreeVars)
-rnHsArrow _env (HsUnrestrictedArrow u) = return (HsUnrestrictedArrow u, emptyFVs)
-rnHsArrow _env (HsLinearArrow u a) = return (HsLinearArrow u a, emptyFVs)
-rnHsArrow env (HsExplicitMult u a p)
-  = (\(mult, fvs) -> (HsExplicitMult u a mult, fvs)) <$> rnLHsTyKi env p
+rnHsArrow _env (HsUnrestrictedArrow arr) = return (HsUnrestrictedArrow arr, emptyFVs)
+rnHsArrow _env (HsLinearArrow (HsPct1 pct1 arr)) = return (HsLinearArrow (HsPct1 pct1 arr), emptyFVs)
+rnHsArrow _env (HsLinearArrow (HsLolly arr)) = return (HsLinearArrow (HsLolly arr), emptyFVs)
+rnHsArrow env (HsExplicitMult pct p arr)
+  = (\(mult, fvs) -> (HsExplicitMult pct mult arr, fvs)) <$> rnLHsTyKi env p
 
 {-
 Note [Renaming HsCoreTys]
@@ -1891,8 +1892,8 @@ extractRdrKindSigVars (L _ resultSig) = case resultSig of
 extractConDeclGADTDetailsTyVars ::
   HsConDeclGADTDetails GhcPs -> FreeKiTyVars -> FreeKiTyVars
 extractConDeclGADTDetailsTyVars con_args = case con_args of
-  PrefixConGADT args    -> extract_scaled_ltys args
-  RecConGADT (L _ flds) -> extract_ltys $ map (cd_fld_type . unLoc) $ flds
+  PrefixConGADT args      -> extract_scaled_ltys args
+  RecConGADT (L _ flds) _ -> extract_ltys $ map (cd_fld_type . unLoc) $ flds
 
 -- | Get type/kind variables mentioned in the kind signature, preserving
 -- left-to-right order:
@@ -1966,7 +1967,7 @@ extract_lhs_sig_ty (L _ (HsSig{sig_bndrs = outer_bndrs, sig_body = body})) =
 
 extract_hs_arrow :: HsArrow GhcPs -> FreeKiTyVars ->
                    FreeKiTyVars
-extract_hs_arrow (HsExplicitMult _ _ p) acc = extract_lty p acc
+extract_hs_arrow (HsExplicitMult _ p _) acc = extract_lty p acc
 extract_hs_arrow _ acc = acc
 
 extract_hs_for_all_telescope :: HsForAllTelescope GhcPs

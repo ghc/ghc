@@ -626,7 +626,7 @@ getRecConArgs_maybe (ConDeclH98{con_args = args}) = case args of
   InfixCon{}  -> Nothing
 getRecConArgs_maybe (ConDeclGADT{con_g_args = args}) = case args of
   PrefixConGADT{} -> Nothing
-  RecConGADT flds -> Just flds
+  RecConGADT flds _ -> Just flds
 
 hsConDeclTheta :: Maybe (LHsContext (GhcPass p)) -> [LHsType (GhcPass p)]
 hsConDeclTheta Nothing            = []
@@ -708,7 +708,7 @@ pprConDecl (ConDeclGADT { con_names = cons, con_bndrs = L _ outer_bndrs
               ppr_arrow_chain (get_args args ++ [ppr res_ty]) ])
   where
     get_args (PrefixConGADT args) = map ppr args
-    get_args (RecConGADT fields)  = [pprConDeclFields (unLoc fields)]
+    get_args (RecConGADT fields _) = [pprConDeclFields (unLoc fields)]
 
     ppr_arrow_chain (a:as) = sep (a : map (arrow <+>) as)
     ppr_arrow_chain []     = empty
