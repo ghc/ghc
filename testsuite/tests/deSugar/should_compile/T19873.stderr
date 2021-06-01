@@ -1,0 +1,85 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 51, types: 48, coercions: 0, joins: 0/0}
+
+Rec {
+-- RHS size: {terms: 15, types: 14, coercions: 0, joins: 0/0}
+h [InlPrag=INLINE (sat-args=1)] :: [Int] -> [Int]
+[GblId, Arity=1, Unf=OtherCon []]
+h = \ (x :: [Int]) ->
+      reverse
+        @Int
+        (reverse
+           @Int
+           (reverse
+              @Int
+              (reverse
+                 @Int
+                 (reverse
+                    @Int
+                    (reverse
+                       @Int
+                       (reverse
+                          @Int
+                          (reverse
+                             @Int
+                             (reverse
+                                @Int (reverse @Int (reverse @Int (reverse @Int (f x))))))))))))
+
+-- RHS size: {terms: 15, types: 14, coercions: 0, joins: 0/0}
+g [InlPrag=INLINE (sat-args=1)] :: [Int] -> [Int]
+[GblId, Arity=1, Unf=OtherCon []]
+g = \ (x :: [Int]) ->
+      reverse
+        @Int
+        (reverse
+           @Int
+           (reverse
+              @Int
+              (reverse
+                 @Int
+                 (reverse
+                    @Int
+                    (reverse
+                       @Int
+                       (reverse
+                          @Int
+                          (reverse
+                             @Int
+                             (reverse
+                                @Int (reverse @Int (reverse @Int (reverse @Int (h x))))))))))))
+
+-- RHS size: {terms: 4, types: 3, coercions: 0, joins: 0/0}
+f [Occ=LoopBreaker] :: [Int] -> [Int]
+[GblId, Arity=1, Unf=OtherCon []]
+f = \ (x :: [Int]) -> reverse @Int (g x)
+end Rec }
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule1 :: GHC.Prim.Addr#
+[GblId, Unf=OtherCon []]
+$trModule1 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule2 :: GHC.Types.TrName
+[GblId, Unf=OtherCon []]
+$trModule2 = GHC.Types.TrNameS $trModule1
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule3 :: GHC.Prim.Addr#
+[GblId, Unf=OtherCon []]
+$trModule3 = "T19873"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule4 :: GHC.Types.TrName
+[GblId, Unf=OtherCon []]
+$trModule4 = GHC.Types.TrNameS $trModule3
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T19873.$trModule :: GHC.Types.Module
+[GblId, Unf=OtherCon []]
+T19873.$trModule = GHC.Types.Module $trModule2 $trModule4
+
+
+
