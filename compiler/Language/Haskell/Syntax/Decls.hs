@@ -1,5 +1,6 @@
 
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -1215,7 +1216,7 @@ type HsConDeclH98Details pass
 -- GHC.Tc.TyCl—but that is an orthogonal concern.)
 data HsConDeclGADTDetails pass
    = PrefixConGADT [HsScaled pass (LBangType pass)]
-   | RecConGADT (XRec pass [LConDeclField pass])
+   | RecConGADT (XRec pass [LConDeclField pass]) (LHsUniToken "->" "→" pass)
 
 instance Outputable NewOrData where
   ppr NewType  = text "newtype"
