@@ -11,7 +11,7 @@ module GHC.Core.Opt.WorkWrap.Utils
    ( WwOpts(..), initWwOpts, mkWwBodies, mkWWstr, mkWorkerArgs
    , DataConPatContext(..)
    , UnboxingDecision(..), ArgOfInlineableFun(..), wantToUnboxArg
-   , findTypeShape
+   , findTypeShape, isRecDataCon
    , isWorkerSmallEnough
    )
 where
@@ -23,7 +23,6 @@ import GHC.Core.Utils   ( exprType, mkCast, mkDefaultCase, mkSingleAltCase
                         , bindNonRec, dataConRepFSInstPat
                         , normSplitTyConApp_maybe, exprIsHNF )
 import GHC.Types.Id
-import GHC.Types.Id.Info ( JoinArity )
 import GHC.Core.DataCon
 import GHC.Types.Demand
 import GHC.Types.Cpr
@@ -40,7 +39,7 @@ import GHC.Core.Predicate ( isClassPred )
 import GHC.Types.RepType  ( isVoidTy, typeMonoPrimRep_maybe )
 import GHC.Core.Coercion
 import GHC.Core.FamInstEnv
-import GHC.Types.Basic       ( Boxity(..) )
+import GHC.Types.Basic
 import GHC.Core.TyCon
 import GHC.Core.TyCon.RecWalk
 import GHC.Types.Unique.Supply
@@ -1248,6 +1247,18 @@ fragile
 ************************************************************************
 -}
 
+-- | Exactly 'dataConInstArgTys', but lacks the (ASSERT'ed) precondition that
+-- the 'DataCon' may not have existentials. The lack of cloning the existentials
+-- compared to 'dataConInstExAndArgVars' makes this function \"dubious\";
+-- only use it where type variables aren't substituted for!
+dubiousDataConInstArgTys :: DataCon -> [Type] -> [Type]
+dubiousDataConInstArgTys dc tc_args = arg_tys
+  where
+    univ_tvs = dataConUnivTyVars dc
+    ex_tvs   = dataConExTyCoVars dc
+    subst    = extendTCvInScopeList (zipTvSubst univ_tvs tc_args) ex_tvs
+    arg_tys  = map (substTy subst . scaledThing) (dataConRepArgTys dc)
+
 findTypeShape :: FamInstEnvs -> Type -> TypeShape
 -- Uncover the arrow and product shape of a type
 -- The data type TypeShape is defined in GHC.Types.Demand
@@ -1294,17 +1305,139 @@ findTypeShape fam_envs ty
        | otherwise
        = TsUnk
 
--- | Exactly 'dataConInstArgTys', but lacks the (ASSERT'ed) precondition that
--- the 'DataCon' may not have existentials. The lack of cloning the existentials
--- compared to 'dataConInstExAndArgVars' makes this function \"dubious\";
--- only use it where type variables aren't substituted for!
-dubiousDataConInstArgTys :: DataCon -> [Type] -> [Type]
-dubiousDataConInstArgTys dc tc_args = arg_tys
+-- | @isRecDataCon _ fuel dc@, where @tc = dataConTyCon dc@ returns
+--
+--   * @Just Recursive@ if the analysis found that @tc@ is reachable through one
+--     of @dc@'s fields
+--   * @Just NonRecursive@ if the analysis found that @tc@ is not reachable
+--     through one of @dc@'s fields
+--   * @Nothing@ is only returned iff @fuel /= Infinity@ and @f@ expansions of
+--     nested data TyCons were not enough to prove non-recursivenss, nor arrive
+--     at an occurrence of @tc@ thus proving recursiveness.
+--
+-- If @fuel = 'Infinity'@, the result is never @Nothing@ and the analysis is a
+-- depth-first search. If @fuel = 'Int' f@, then the analysis behaves like a
+-- depth-limited DFS and returns @Nothing@ if the search was inconclusive.
+isRecDataCon :: FamInstEnvs -> IntWithInf -> DataCon -> Maybe RecFlag
+isRecDataCon fam_envs fuel dc
+  = -- pprTrace "isRecDataCon" (ppr dc <+> ppr fuel <+> ppr answer)
+    answer
   where
-    univ_tvs = dataConUnivTyVars dc
-    ex_tvs   = dataConExTyCoVars dc
-    subst    = extendTCvInScopeList (zipTvSubst univ_tvs tc_args) ex_tvs
-    arg_tys  = map (substTy subst . scaledThing) (dataConRepArgTys dc)
+    answer = go_dc fuel (setRecTcMaxBound 1 initRecTc) dc
+    (<||>) = combineRecFlag
+
+    go_ty :: IntWithInf -> RecTcChecker -> Type -> Maybe RecFlag
+    go_ty fuel rec_tc ty
+      | Just (_, arg_ty, res_ty) <- splitFunTy_maybe ty
+      = go_ty fuel rec_tc arg_ty <||> go_ty fuel rec_tc res_ty
+
+      | Just (_tcv, ty') <- splitForAllTyCoVar_maybe ty
+      = go_ty fuel rec_tc ty' -- NB: No recursion into _tcv's kind
+
+      | Just (tc, tc_args) <- splitTyConApp_maybe ty
+      = combineRecFlags (map (go_ty fuel rec_tc) tc_args)
+        <||> go_tc_app fuel rec_tc tc tc_args
+
+      | otherwise
+      = Just NonRecursive
+
+    -- | PRECONDITION: tc_args has no recursive occs
+    go_tc_app :: IntWithInf -> RecTcChecker -> TyCon -> [Type] -> Maybe RecFlag
+    go_tc_app fuel rec_tc tc tc_args
+
+      | tc == dataConTyCon dc
+      = Just Recursive -- loop found!
+
+      | Just (_, rhs, _) <- topReduceTyFamApp_maybe fam_envs tc tc_args
+      = go_ty fuel rec_tc rhs -- NB: Sadly we don't know which parts of rhs we
+                                 -- already checked (the part contributed by tc_args),
+                                 -- so we have to re-check everything.
+                                 --
+      -- from hereon, we only need the length of tc_args
+      | isPrimTyCon tc
+      = Just NonRecursive
+
+      | Nothing <- checkRecTc rec_tc tc
+      = Just NonRecursive -- we expanded this type once already, no need to test it multiple times
+
+      | Just (tvs, rhs, _co) <- unwrapNewTyConEtad_maybe tc -- NB: No recursion into _co
+      , Just rec_tc' <- checkRecTc rec_tc tc
+      , tvs `leLength` tc_args
+      = go_ty fuel rec_tc' rhs
+
+      | Just dcs <- tyConDataCons_maybe tc
+      , tyConTyVars tc `leLength` tc_args
+      , Just rec_tc' <- checkRecTc rec_tc tc
+      = if fuel >= 0
+          then combineRecFlags (map (\dc -> go_dc (subWithInf fuel 1) rec_tc' dc) dcs)
+          else Nothing -- that's why we track fuel!
+
+      | otherwise
+      = Just Recursive
+
+    go_dc :: IntWithInf -> RecTcChecker -> DataCon -> Maybe RecFlag
+    go_dc fuel rec_tc dc =
+      combineRecFlags [ go_ty fuel rec_tc (scaledThing arg_ty)
+                      | arg_ty <- dataConRepArgTys dc ]
+
+-- | Computes the least upper bound on the total order
+-- @Just Recursive > Nothing > Just NonRecursive@.
+combineRecFlag :: Maybe RecFlag -> Maybe RecFlag -> Maybe RecFlag
+combineRecFlag (Just Recursive)    _                   = Just Recursive
+combineRecFlag _                   (Just Recursive)    = Just Recursive
+combineRecFlag Nothing             _                   = Nothing
+combineRecFlag _                   Nothing             = Nothing
+combineRecFlag (Just NonRecursive) (Just NonRecursive) = Just NonRecursive
+
+combineRecFlags :: [Maybe RecFlag] -> Maybe RecFlag
+combineRecFlags = foldr combineRecFlag (Just NonRecursive)
+{-# INLINE combineRecFlags #-}
+
+{-
+
+In a world without TyFams:
+
+data T = T (Int, (Bool, Char))
+
+data T a = T (a, T (Bool, Char))
+
+==> Check TyCon:
+    1. DataTyCon by instantiating DataCons with *fresh ty vars* (also for universals), then check all DataCons
+    2. SynTyCon by simply reducing according to definition
+==> Check DataCon by checking all field tys
+==> Check a type
+      * If it's a TyCon App, check the args and then the TyCon (forking off from same rec_tc)
+      * If it's an arrow, check the arg ty and its return type
+          In doing so, we reject a fun occurrence like data T = T (Int -> T) or data T a = T (T -> a).
+          Such types are rare and it probably doesn't matter anyway; we are talking about one level of "lost" CPR here.
+
+Does this work for GADTs? I think so... We are not smart at all wrt. refining
+possible constructors based on the expected return type.
+
+Now add TyFams:
+
+==> Check FamTyCon by doing a reduction. If we can't reduce, we have to consider
+    *all* equations. If the TyFam is not closed (and the equations we see aren't
+    covering), then we have to return True.
+
+Idea: Refine analysis with shape information about the arg tys after those have
+been checked. So arg tys themselves don't contain any recursive occurrences.
+Then we can simply note that the TyCon args have a certain shape, instantiate,
+even. New algorithm:
+
+==> Check a type
+      * If it's a TyCon App, check the args (!) and then check the TyCon, assuming its arg vars have been substituted to the arg tys
+      * If it's an arrow, same as before
+==> Check TyCon with args arg ty:
+    1. DataTyCon by instantiating DataCons with *arg tys*, then check all DataCons
+    2. FamTyCon by trying to reduce according to defn. If match is non-exhaustive and TyFam is open, then return True
+==> Check DataCon by checking all field tys
+
+But what about
+
+data instance F (a, b) = Blah (T a)
+data T a =
+-}
 
 {-
 ************************************************************************
