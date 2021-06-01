@@ -716,17 +716,22 @@ mkGadtDecl loc names ty annsIn = do
   cs <- getCommentsFor loc
   let l = noAnnSrcSpan loc
 
-  let (args, res_ty, annsa, csa)
-        | L ll (HsFunTy af _w (L loc' (HsRecTy an rf)) res_ty) <- body_ty
-        = let
-            an' = addTrailingAnnToL (locA loc') (anns af) (comments af) an
-          in ( RecConGADT (L (SrcSpanAnn an' (locA loc')) rf), res_ty
-             , [], epAnnComments (ann ll))
-        | otherwise
-        = let (anns, cs, arg_types, res_type) = splitHsFunType body_ty
-          in (PrefixConGADT arg_types, res_type, anns, cs)
+  (args, res_ty, annsa, csa) <-
+    case body_ty of
+     L ll (HsFunTy af hsArr (L loc' (HsRecTy an rf)) res_ty) -> do
+       let an' = addTrailingAnnToL (locA loc') (anns af) (comments af) an
+       case hsArr of
+         HsUnrestrictedArrow _ -> return ()
+         _ -> addError $ mkPlainErrorMsgEnvelope (getLocA body_ty) $
+                                 (PsErrIllegalGadtRecordMultiplicity hsArr)
 
-      an = case outer_bndrs of
+       return ( RecConGADT (L (SrcSpanAnn an' (locA loc')) rf), res_ty
+              , [], epAnnComments (ann ll))
+     _ -> do
+       let (anns, cs, arg_types, res_type) = splitHsFunType body_ty
+       return (PrefixConGADT arg_types, res_type, anns, cs)
+
+  let an = case outer_bndrs of
         _                -> EpAnn (spanAsAnchor loc) (annsIn ++ annsa) (cs Semi.<> csa)
 
   pure $ L l ConDeclGADT
