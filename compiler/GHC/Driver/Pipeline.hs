@@ -165,8 +165,12 @@ preprocess hsc_env input_fn mb_input_buf mb_phase =
                              (vcat $ pprMsgEnvelopeBagWithLoc (getMessages msgs))
       Just msgs' -> msgs'
 
-    to_driver_message (GhcDriverMessage msg) = Just msg
-    to_driver_message _other                 = Nothing
+    to_driver_message = \case
+      GhcDriverMessage msg
+        -> Just msg
+      GhcPsMessage (PsHeaderMessage msg)
+        -> Just (DriverPsHeaderMessage (PsHeaderMessage msg))
+      _ -> Nothing
 
 -- ---------------------------------------------------------------------------
 
