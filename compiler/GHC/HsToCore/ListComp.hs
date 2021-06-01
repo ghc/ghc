@@ -16,7 +16,7 @@ import GHC.Prelude
 import {-# SOURCE #-} GHC.HsToCore.Expr ( dsExpr, dsLExpr, dsLExprNoLP, dsLocalBinds, dsSyntaxExpr )
 
 import GHC.Hs
-import GHC.Tc.Utils.Zonk
+import GHC.Hs.Syn.Type
 import GHC.Core
 import GHC.Core.Make
 
