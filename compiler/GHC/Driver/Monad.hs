@@ -123,23 +123,20 @@ popLogHookM  = modifyLogger popLogHook
 -- | Put a log message
 putMsgM :: GhcMonad m => SDoc -> m ()
 putMsgM doc = do
-    dflags <- getDynFlags
     logger <- getLogger
-    liftIO $ putMsg logger dflags doc
+    liftIO $ putMsg logger doc
 
 -- | Put a log message
 putLogMsgM :: GhcMonad m => MessageClass -> SrcSpan -> SDoc -> m ()
 putLogMsgM msg_class loc doc = do
-    dflags <- getDynFlags
     logger <- getLogger
-    liftIO $ putLogMsg logger dflags msg_class loc doc
+    liftIO $ logMsg logger msg_class loc doc
 
 -- | Time an action
 withTimingM :: GhcMonad m => SDoc -> (b -> ()) -> m b -> m b
 withTimingM doc force action = do
     logger <- getLogger
-    dflags <- getDynFlags
-    withTiming logger dflags doc force action
+    withTiming logger doc force action
 
 -- -----------------------------------------------------------------------------
 -- | A monad that allows logging of diagnostics.
