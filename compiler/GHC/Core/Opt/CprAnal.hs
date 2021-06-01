@@ -309,7 +309,7 @@ cprTransform env id args
       = fst $ cprAnal env rhs
       -- DataCon worker
       | Just con <- isDataConWorkId_maybe id
-      = cprTransformDataConWork con args
+      = cprTransformDataConWork (ae_fam_envs env) con args
       -- Imported function
       | isGlobalId id
       = applyCprTy (getCprSig (idCprSig id)) (length args)
@@ -328,16 +328,19 @@ cprTransformSpecial id args
 
 -- | Get a 'CprType' for an application of a 'DataCon' worker, given a saturated
 -- number of 'CprType's for its fields.
-cprTransformDataConWork :: DataCon -> [(TermFlag, CprType)] -> CprType
-cprTransformDataConWork con args
+cprTransformDataConWork :: FamInstEnvs -> DataCon -> [(TermFlag, CprType)] -> CprType
+cprTransformDataConWork fam_envs con args
   | null (dataConExTyCoVars con)  -- No existentials
   , wkr_arity <= mAX_CPR_SIZE -- See Note [Trimming to mAX_CPR_SIZE]
   , args `lengthIs` wkr_arity
+  , isRecDataCon fam_envs fuel con /= Just Recursive
   -- , pprTrace "cprTransformDataConWork" (ppr con <+> ppr wkr_arity <+> ppr args) True
   = CprType 0 (ConCpr (dataConTag con) (strictZipWith extract_cpr args wkr_str_marks))
   | otherwise
   = topCprType
   where
+    fuel = 3 -- If we can unbox more than 3 constructors to find a
+             -- recursive occurrence, then we can just as well unbox it
     wkr_arity = dataConRepArity con
     wkr_str_marks = dataConRepStrictness con
     extract_cpr (tf, CprType n cpr) str
