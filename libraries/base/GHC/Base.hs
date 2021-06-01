@@ -1514,7 +1514,7 @@ flip f x y              =  f y x
 -- It is also useful in higher-order situations, such as @'map' ('$' 0) xs@,
 -- or @'Data.List.zipWith' ('$') fs xs@.
 --
--- Note that @('$')@ is levity-polymorphic in its result type, so that
+-- Note that @('$')@ is representation-polymorphic in its result type, so that
 -- @foo '$' True@ where @foo :: Bool -> Int#@ is well-typed.
 {-# INLINE ($) #-}
 ($) :: forall r a (b :: TYPE r). (a -> b) -> a -> b
