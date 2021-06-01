@@ -395,6 +395,9 @@ data PsMessage
    -- TODO: embed the proper operator, if possible
    | forall infixOcc. (OutputableBndr infixOcc) => PsErrParseRightOpSectionInPat !infixOcc !(PatBuilder GhcPs)
 
+   -- | Illegal linear arrow or multiplicity annotation in GADT record syntax
+   | PsErrIllegalGadtRecordMultiplicity !(HsArrow GhcPs)
+
 newtype StarIsType = StarIsType Bool
 
 -- | Extra details about a parse error, which helps
