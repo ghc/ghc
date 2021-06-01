@@ -1,2 +1,2 @@
-[1 of 2] Compiling B                ( B.hs, B.o )
+[1 of 2] Compiling B                ( B.hs, B.o ) [Source file changed]
 [2 of 2] Compiling A                ( A.hs, A.o ) [B changed]
