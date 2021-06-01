@@ -2464,7 +2464,7 @@ primop  CatchOp "catch#" GenPrimOp
 
 primop  RaiseOp "raise#" GenPrimOp
    b -> o
-      -- NB: the type variable "o" is "a", but with OpenKind
+      -- NB: "o" denotes a representation-polymorphic type variable
    with
    -- In contrast to 'raiseIO#', which throws a *precise* exception,
    -- exceptions thrown by 'raise#' are considered *imprecise*.
@@ -2831,10 +2831,10 @@ section "Weak pointers"
 
 primtype Weak# b
 
--- note that tyvar "o" denotes openAlphaTyVar
+-- Note: "v" denotes a levity-polymorphic type variable
 
 primop  MkWeakOp "mkWeak#" GenPrimOp
-   o -> b -> (State# RealWorld -> (# State# RealWorld, c #))
+   v -> b -> (State# RealWorld -> (# State# RealWorld, c #))
      -> State# RealWorld -> (# State# RealWorld, Weak# b #)
    { {\tt mkWeak# k v finalizer s} creates a weak reference to value {\tt k},
      with an associated reference to some value {\tt v}. If {\tt k} is still
@@ -2846,7 +2846,7 @@ primop  MkWeakOp "mkWeak#" GenPrimOp
    out_of_line      = True
 
 primop  MkWeakNoFinalizerOp "mkWeakNoFinalizer#" GenPrimOp
-   o -> b -> State# RealWorld -> (# State# RealWorld, Weak# b #)
+   v -> b -> State# RealWorld -> (# State# RealWorld, Weak# b #)
    with
    has_side_effects = True
    out_of_line      = True
@@ -2883,7 +2883,7 @@ primop  FinalizeWeakOp "finalizeWeak#" GenPrimOp
    out_of_line      = True
 
 primop TouchOp "touch#" GenPrimOp
-   o -> State# RealWorld -> State# RealWorld
+   v -> State# RealWorld -> State# RealWorld
    with
    code_size = { 0 }
    has_side_effects = True
@@ -3131,8 +3131,9 @@ section "Controlling object lifetime"
 ------------------------------------------------------------------------
 
 -- See Note [keepAlive# magic] in GHC.CoreToStg.Prep.
+-- NB: "v" denotes a levity-polymorphic type variable
 primop KeepAliveOp "keepAlive#" GenPrimOp
-   o -> State# RealWorld -> (State# RealWorld -> p) -> p
+   v -> State# RealWorld -> (State# RealWorld -> p) -> p
    { \tt{keepAlive# x s k} keeps the value \tt{x} alive during the execution
      of the computation \tt{k}. }
    with
