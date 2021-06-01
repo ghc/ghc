@@ -1295,16 +1295,9 @@ annotateLamIdBndr env dmd_ty id
 -- Only called for Ids
   = assert (isId id) $
     -- pprTrace "annLamBndr" (vcat [ppr id, ppr dmd_ty, ppr final_ty]) $
-    WithDmdType final_ty new_id
+    WithDmdType main_ty new_id
   where
-    new_id = setIdDemandInfo id dmd
-      -- Watch out!  See note [Lambda-bound unfoldings]
-    final_ty = case maybeUnfoldingTemplate (idUnfolding id) of
-                 Nothing  -> main_ty
-                 Just unf -> main_ty `plusDmdType` unf_ty
-                          where
-                             (unf_ty, _) = dmdAnalStar env dmd unf
-
+    new_id  = setIdDemandInfo id dmd
     main_ty = addDemand dmd dmd_ty'
     WithDmdType dmd_ty' dmd = findBndrDmd env dmd_ty id
 
@@ -1374,16 +1367,6 @@ we do when aborting a fixed-point iteration? The we risk losing the information
 that the strict variables are being used. In that case, we take all free variables
 mentioned in the (unsound) strictness signature, conservatively approximate the
 demand put on them (topDmd), and add that to the "lazy_fv" returned by "dmdFix".
-
-
-Note [Lambda-bound unfoldings]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We allow a lambda-bound variable to carry an unfolding, a facility that is used
-exclusively for join points; see Note [Case binders and join points].  If so,
-we must be careful to demand-analyse the RHS of the unfolding!  Example
-   \x. \y{=Just x}. <body>
-Then if <body> uses 'y', then transitively it uses 'x', and we must not
-forget that fact, otherwise we might make 'x' absent when it isn't.
 
 
 ************************************************************************

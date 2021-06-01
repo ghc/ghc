@@ -2650,11 +2650,9 @@ we behave as follows (#15057, #T15664):
 
 Note [Linting linearity]
 ~~~~~~~~~~~~~~~~~~~~~~~~
-There are two known optimisations that have not yet been updated
+There is one known optimisations that have not yet been updated
 to work with Linear Lint:
 
-* Lambda-bound variables with unfoldings
-  (see Note [Case binders and join points] and ticket #17530)
 * Optimisations can create a letrec which uses a variable linearly, e.g.
     letrec f True = f False
            f False = x
@@ -2663,7 +2661,7 @@ to work with Linear Lint:
   Plan: make let-bound variables remember the usage environment.
   See ticket #18694.
 
-We plan to fix both of the issues in the very near future.
+We plan to fix this issue in the very near future.
 For now, -dcore-lint enables only linting output of the desugarer,
 and full Linear Lint has to be enabled separately with -dlinear-core-lint.
 Ticket #19165 concerns enabling Linear Lint with -dcore-lint.
