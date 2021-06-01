@@ -223,26 +223,34 @@ hptAllThings :: (HomeModInfo -> [a]) -> HscEnv -> [a]
 hptAllThings extract hsc_env = concatMap extract (eltsHpt (hsc_HPT hsc_env))
 
 hptModulesBelow :: HscEnv -> [ModuleNameWithIsBoot] -> Set.Set ModuleNameWithIsBoot
-hptModulesBelow hsc_env mn = Set.fromList (eltsUFM $ go mn emptyUFM)
+hptModulesBelow hsc_env mn = Set.fromList (map fst (eltsUFM $ go mn emptyUFM))
   where
     hpt = hsc_HPT hsc_env
 
     go [] seen = seen
     go (mn:mns) seen
-      | Just mn' <- lookupUFM seen (gwib_mod mn)
+      | Just (mn', both) <- lookupUFM seen (gwib_mod mn)
         -- Already seen the module before
-      , gwib_isBoot mn' == gwib_isBoot mn = go mns seen
+      , gwib_isBoot mn' == gwib_isBoot mn
+        || both = go mns seen
       | otherwise =
           case lookupHpt hpt (gwib_mod mn) of
               -- Not a home module
               Nothing -> go mns seen
               Just hmi ->
                 let
-                  comb m@(GWIB { gwib_isBoot = NotBoot }) _ = m
-                  comb (GWIB { gwib_isBoot = IsBoot }) x  = x
+                  -- The bool indicates if we have seen *both* the
+                  -- NotBoot and IsBoot versions
+                  comb :: (GenWithIsBoot ModuleName, Bool)
+                       -> (GenWithIsBoot ModuleName, Bool)
+                       -> (GenWithIsBoot ModuleName, Bool)
+                  comb (o@(GWIB { gwib_isBoot = NotBoot }), b) _ =
+                    (o, IsBoot == gwib_isBoot mn || b)
+                  comb ((GWIB { gwib_isBoot = IsBoot }, _)) (new_gwib, _)  =
+                    (new_gwib, NotBoot == gwib_isBoot mn)
                 in
                   go (dep_direct_mods (mi_deps (hm_iface hmi)) ++ mns)
-                     (addToUFM_C comb seen (gwib_mod mn) mn)
+                     (addToUFM_C comb seen (gwib_mod mn) (mn, False))
 
 
 -- | Get things from modules "below" this one (in the dependency sense)
