@@ -2080,8 +2080,7 @@ mkDefMethBind :: DFunId -> Class -> Id -> Name
 -- See Note [Default methods in instances] for why we use
 -- visible type application here
 mkDefMethBind dfun_id clas sel_id dm_name
-  = do  { dflags <- getDynFlags
-        ; logger <- getLogger
+  = do  { logger <- getLogger
         ; dm_id <- tcLookupId dm_name
         ; let inline_prag = idInlinePragma dm_id
               inline_prags | isAnyInlinePragma inline_prag
@@ -2098,7 +2097,7 @@ mkDefMethBind dfun_id clas sel_id dm_name
               bind = noLocA $ mkTopFunBind Generated fn $
                              [mkSimpleMatch (mkPrefixFunRhs fn) [] rhs]
 
-        ; liftIO (dumpIfSet_dyn logger dflags Opt_D_dump_deriv "Filling in method body"
+        ; liftIO (putDumpFileMaybe logger Opt_D_dump_deriv "Filling in method body"
                    FormatHaskell
                    (vcat [ppr clas <+> ppr inst_tys,
                           nest 2 (ppr sel_id <+> equals <+> ppr rhs)]))
