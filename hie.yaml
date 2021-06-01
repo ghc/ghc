@@ -5,4 +5,4 @@
 # cradle: {bios: {program: "./hadrian/hie-bios.bat"}}
 #
 # The format is documented here - https://github.com/mpickering/hie-bios
-cradle: {bios: {program: "./hadrian/hie-bios"}}
+cradle: {bios: {program: "./hadrian/hie-bios.bat"}}
