@@ -1,6 +1,7 @@
 
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections       #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
@@ -667,7 +668,7 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics
             -- whenNoErrs guard
        ; whenNoErrs $
          do { (_, more_leftovers) <- tryReporters ctxt3 report3 suppressed_items
-            ; MASSERT2( null more_leftovers, ppr more_leftovers ) } }
+            ; massertPpr (null more_leftovers) (ppr more_leftovers) } }
  where
     env        = cec_tidy ctxt
     tidy_cts   = bagToList (mapBag (tidyCt env)   simples)
@@ -981,8 +982,8 @@ machinery, in cases where it is definitely going to be a no-op.
 
 mkUserTypeErrorReporter :: Reporter
 mkUserTypeErrorReporter ctxt
-  = mapM_ $ \item -> do { let err = mkUserTypeError ctxt item
-                        ; maybeReportError ctxt item err
+  = mapM_ $ \item -> do { let err = mkUserTypeError item
+                        ; maybeReportError ctxt item [item] err
                         ; addDeferredBinding ctxt err item }
 
 mkUserTypeError :: ErrorItem -> Report
@@ -999,7 +1000,8 @@ mkGivenErrorReporter ctxt items
   = do { (ctxt, binds_msg, item) <- relevantBindings True ctxt item
        ; let (implic:_) = cec_encl ctxt
                  -- Always non-empty when mkGivenErrorReporter is called
-             item' = item { ei_loc = setCtLocEnv (ei_loc item) (ic_env implic) }
+             loc'  = setCtLocEnv (ei_loc item) (ic_env implic)
+             item' = item { ei_loc = loc' }
                    -- For given constraints we overwrite the env (and hence src-loc)
                    -- with one from the immediately-enclosing implication.
                    -- See Note [Inaccessible code]
@@ -1011,7 +1013,7 @@ mkGivenErrorReporter ctxt items
 
        ; report <- mkEqErr_help ctxt report item' ty1 ty2
        ; err <- mkErrorReport (WarningWithFlag Opt_WarnInaccessibleCode) ctxt
-                              (ctLocEnv (ctLoc ct')) report
+                              (ctLocEnv loc') report
 
        ; traceTc "mkGivenErrorReporter" (ppr item)
        ; reportDiagnostic err }
@@ -1061,7 +1063,7 @@ pattern match which binds some equality constraints.  If we
 find one, we report the insoluble Given.
 -}
 
-mkGroupReporter :: (ReportErrCtxt -> [ErrorItem] -> TcM Report)
+mkGroupReporter :: (ReportErrCtxt -> [ErrorItem] -> TcM (ErrorItem, Report))
                              -- Make error message for a group
                 -> Reporter  -- Deal with lots of constraints
 -- Group together errors from same location,
@@ -1083,26 +1085,27 @@ cmp_loc item1 item2 = get item1 `compare` get item2
              -- Reduce duplication by reporting only one error from each
              -- /starting/ location even if the end location differs
 
-reportGroup :: (ReportErrCtxt -> [ErrorItem] -> TcM Report) -> Reporter
+reportGroup :: (ReportErrCtxt -> [ErrorItem] -> TcM (ErrorItem, Report)) -> Reporter
 reportGroup mk_err ctxt items
-  | ct1 : _ <- items =
-  do { err <- mk_err ctxt items
-     ; traceTc "About to maybeReportErr" $
-       vcat [ text "Constraint:"             <+> ppr items
-            , text "cec_suppress ="          <+> ppr (cec_suppress ctxt)
-            , text "cec_defer_type_errors =" <+> ppr (cec_defer_type_errors ctxt) ]
-     ; maybeReportError ctxt items err
-         -- But see Note [Always warn with -fdefer-type-errors]
-     ; traceTc "reportGroup" (ppr items)
-     ; mapM_ (addDeferredBinding ctxt err) items }
-         -- Add deferred bindings for all
-         -- Redundant if we are going to abort compilation,
-         -- but that's hard to know for sure, and if we don't
-         -- abort, we need bindings for all (e.g. #12156)
-  | otherwise = panic "empty reportGroup"
+  = do { (item, err) <- mk_err ctxt items
+       ; traceTc "About to maybeReportErr" $
+         vcat [ text "Constraint:"             <+> ppr items
+              , text "cec_suppress ="          <+> ppr (cec_suppress ctxt)
+              , text "cec_defer_type_errors =" <+> ppr (cec_defer_type_errors ctxt) ]
+       ; maybeReportError ctxt item items err
+           -- But see Note [Always warn with -fdefer-type-errors]
+       ; traceTc "reportGroup" (ppr items)
+       ; mapM_ (addDeferredBinding ctxt err) items }
+           -- Add deferred bindings for all
+           -- Redundant if we are going to abort compilation,
+           -- but that's hard to know for sure, and if we don't
+           -- abort, we need bindings for all (e.g. #12156)
 
-maybeReportError :: ReportErrCtxt -> [ErrorItem] -> Report -> TcM ()
-maybeReportError ctxt items report
+maybeReportError :: ReportErrCtxt
+                 -> ErrorItem    -- the specific item this error is about
+                 -> [ErrorItem]  -- the list of items that one item is selected from
+                 -> Report -> TcM ()
+maybeReportError ctxt item1 items report
   = unless (cec_suppress ctxt  -- Some worse error has occurred, so suppress this diagnostic
          || all ei_suppress items) $
                            -- if they're all to be suppressed, report nothing
@@ -1110,15 +1113,16 @@ maybeReportError ctxt items report
                            -- the function that generates the error message
                            -- should look for an unsuppressed error item
     do let reason = cec_defer_type_errors ctxt
-       msg <- mkErrorReport reason ctxt (ctLocEnv (ctLoc ct)) report
+       msg <- mkErrorReport reason ctxt (ctLocEnv (ei_loc item1)) report
        reportDiagnostic msg
 
 addDeferredBinding :: ReportErrCtxt -> Report -> ErrorItem -> TcM ()
 -- See Note [Deferring coercion errors to runtime]
-addDeferredBinding ctxt err (EI { ei_evdest = Just dest, ei_pred = item_ty })
+addDeferredBinding ctxt err (EI { ei_evdest = Just dest, ei_pred = item_ty
+                                , ei_loc = loc })
      -- if evdest is Just, then the constraint was from a wanted
   | deferringAnyBindings ctxt
-  = do { err_tm <- mkErrorTerm ctxt (ctLoc ct) item_ty err
+  = do { err_tm <- mkErrorTerm ctxt loc item_ty err
        ; let ev_binds_var = cec_binds ctxt
 
        ; case dest of
@@ -1340,12 +1344,12 @@ solve it.
 ************************************************************************
 -}
 
-mkIrredErr :: ReportErrCtxt -> [ErrorItem] -> TcM Report
+mkIrredErr :: ReportErrCtxt -> [ErrorItem] -> TcM (ErrorItem, Report)
 mkIrredErr ctxt items
   = do { (ctxt, binds_msg, item1) <- relevantBindings True ctxt item1
        ; let orig = errorItemOrigin item1
              msg  = couldNotDeduce (getUserGivens ctxt) (preds, orig)
-       ; return $ msg `mappend` mk_relevant_bindings binds_msg }
+       ; return $ (item1, msg `mappend` mk_relevant_bindings binds_msg) }
   where
     (item1:_) = items
 
@@ -1585,7 +1589,7 @@ givenConstraintsMsg ctxt =
             2 (vcat $ map pprConstraint constraints)
 
 ----------------
-mkIPErr :: ReportErrCtxt -> [ErrorItem] -> TcM Report
+mkIPErr :: ReportErrCtxt -> [ErrorItem] -> TcM (ErrorItem, Report)
 -- What would happen if an item is suppressed because of
 -- Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint? Very unclear
 -- what's best. Let's not worry about this.
@@ -1601,7 +1605,7 @@ mkIPErr ctxt items
                  | otherwise
                  = couldNotDeduce givens (preds, orig)
 
-       ; return $ msg `mappend` mk_relevant_bindings binds_msg }
+       ; return $ (item1, msg `mappend` mk_relevant_bindings binds_msg) }
   where
     (item1:_) = items
 
@@ -1664,14 +1668,14 @@ any more.  So we don't assert that it is.
 
 -- Don't have multiple equality errors from the same location
 -- E.g.   (Int,Bool) ~ (Bool,Int)   one error will do!
-mkEqErr :: ReportErrCtxt -> [ErrorItem] -> TcM Report
+mkEqErr :: ReportErrCtxt -> [ErrorItem] -> TcM (ErrorItem, Report)
 mkEqErr ctxt items
   | item:_ <- filter (not . ei_suppress) items
-  = mkEqErr1 ctxt item
+  = (item,) <$> mkEqErr1 ctxt item
 
   | item:_ <- items  -- they're all suppressed. still need an error message
                      -- for -fdefer-type-errors though
-  = mkEqErr1 ctxt item
+  = (item,) <$> mkEqErr1 ctxt item
 
   | otherwise
   = panic "mkEqErr"  -- guaranteed to have at least one item
@@ -1764,12 +1768,11 @@ mkTyVarEqErr :: ReportErrCtxt -> Report -> ErrorItem
 -- tv1 and ty2 are already tidied
 mkTyVarEqErr ctxt report item tv1 ty2
   = do { traceTc "mkTyVarEqErr" (ppr item $$ ppr tv1 $$ ppr ty2)
-       ; dflags <- getDynFlags
-       ; return $ mkTyVarEqErr' dflags ctxt report item tv1 ty2 }
+       ; return $ mkTyVarEqErr' ctxt report item tv1 ty2 }
 
-mkTyVarEqErr' :: DynFlags -> ReportErrCtxt -> Report -> ErrorItem
+mkTyVarEqErr' :: ReportErrCtxt -> Report -> ErrorItem
               -> TcTyVar -> TcType -> Report
-mkTyVarEqErr' dflags ctxt report item tv1 ty2
+mkTyVarEqErr' ctxt report item tv1 ty2
   | isSkolemTyVar tv1  -- ty2 won't be a meta-tyvar; we would have
                        -- swapped in Solver.Canonical.canEqTyVarHomo
     || isTyVarTyVar tv1 && not (isTyVarTy ty2)
@@ -1810,12 +1813,12 @@ mkTyVarEqErr' dflags ctxt report item tv1 ty2
        -- Unlike the other reports, this discards the old 'report_important'
        -- instead of augmenting it.  This is because the details are not likely
        -- to be helpful since this is just an unimplemented feature.
-       ; mconcat [ headline_msg, important msg, report ]
+    mconcat [ headline_msg, important msg, report ]
 
     -- This is wrinkle (4) in Note [Equalities with incompatible kinds] in
     -- GHC.Tc.Solver.Canonical
   | hasCoercionHoleTy ty2
-  = mkBlockedEqErr ctxt item
+  = mkBlockedEqErr item
 
   -- If the immediately-enclosing implication has 'tv' a skolem, and
   -- we know by now its an InferSkol kind of skolem, then presumably
@@ -1967,8 +1970,8 @@ pp_givens givens
 -- always be another unsolved wanted around, which will ordinarily suppress
 -- this message. But this can still be printed out with -fdefer-type-errors
 -- (sigh), so we must produce a message.
-mkBlockedEqErr :: ReportErrCtxt -> [ErrorItem] -> TcM Report
-mkBlockedEqErr _ item = return $ important msg
+mkBlockedEqErr :: ErrorItem -> Report
+mkBlockedEqErr item = important msg
   where
     msg = vcat [ hang (text "Cannot use equality for substitution:")
                    2 (ppr (ei_pred item))
@@ -2572,7 +2575,7 @@ Warn of loopy local equalities that were dropped.
 ************************************************************************
 -}
 
-mkDictErr :: ReportErrCtxt -> [ErrorItem] -> TcM Report
+mkDictErr :: ReportErrCtxt -> [ErrorItem] -> TcM (ErrorItem, Report)
 mkDictErr ctxt orig_items
   = assert (not (null items)) $
     do { inst_envs <- tcGetInstEnvs
@@ -2585,8 +2588,9 @@ mkDictErr ctxt orig_items
        -- But we report only one of them (hence 'head') because they all
        -- have the same source-location origin, to try avoid a cascade
        -- of error from one location
-       ; err <- mk_dict_err ctxt (head (no_inst_items ++ overlap_items))
-       ; return $ important err
+       ; let err_stuff@(err_item,_):_ = no_inst_items ++ overlap_items
+       ; err <- mk_dict_err ctxt err_stuff
+       ; return $ (err_item, important err) }
   where
     filtered_items = filter (not . ei_suppress) orig_items
     items | null filtered_items = orig_items  -- all suppressed, but must report

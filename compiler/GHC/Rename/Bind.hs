@@ -242,7 +242,7 @@ rnIPBinds (IPBinds _ ip_binds ) = do
 rnIPBind :: IPBind GhcPs -> RnM (IPBind GhcRn, FreeVars)
 rnIPBind (IPBind _ n expr) = do
     (expr',fvExpr) <- rnLExpr expr
-    return (IPBind noAnn n expr', fvExpr)
+    return (IPBind noExtField n expr', fvExpr)
 
 {-
 ************************************************************************
