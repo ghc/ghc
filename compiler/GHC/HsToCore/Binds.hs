@@ -226,6 +226,9 @@ dsAbsBinds dflags tyvars dicts exports
     -- A very important common case: one exported variable
     -- Non-recursive bindings come through this way
     -- So do self-recursive bindings
+    --    gbl_id = wrap (/\tvs \dicts. let ev_binds
+    --                                 letrec bind_prs
+    --                                 in lcl_id)
   | [export] <- exports
   , ABE { abe_poly = global_id, abe_mono = local_id
         , abe_wrap = wrap, abe_prags = prags } <- export
@@ -259,25 +262,25 @@ dsAbsBinds dflags tyvars dicts exports
 
     -- Another common case: no tyvars, no dicts
     -- In this case we can have a much simpler desugaring
+    --    lcl_id        = gbl_id  -- Auxiliary binds
+    --    gbl_id{prags} = rhs     -- Main binds
   | null tyvars, null dicts
+  = assertPpr (all (isIdHsWrapper . abe_wrap) exports) (ppr exports) $
+    do { let mk_bind (lcl, rhs)
+               = case lookupVarEnv global_env lcl of
+                   Just gbl -> [ makeCorePair dflags gbl False 0 rhs
+                               , (lcl, Var gbl) ]
+                   Nothing  -> [ (lcl, rhs) ]
 
-  = do { let mk_bind (ABE { abe_wrap = wrap
-                          , abe_poly = global
-                          , abe_mono = local
-                          , abe_prags = prags })
-              = do { core_wrap <- dsHsWrapper wrap
-                   ; return (makeCorePair dflags global
-                                          (isDefaultMethod prags)
-                                          0 (core_wrap (Var local))) }
-       ; main_binds <- mapM mk_bind exports
-
-       ; return (force_vars, flattenBinds ds_ev_binds ++ bind_prs ++ main_binds) }
+       -- No SpecPrags (no dicts)
+       -- Can't be a default method (default methods are singletons)
+       ; return (force_vars, flattenBinds ds_ev_binds ++ concatMap mk_bind bind_prs) }
 
     -- The general case
     -- See Note [Desugaring AbsBinds]
   | otherwise
   = do { let core_bind = Rec [ makeCorePair dflags (add_inline lcl_id) False 0 rhs
-                              | (lcl_id, rhs) <- bind_prs ]
+                             | (lcl_id, rhs) <- bind_prs ]
                 -- Monomorphic recursion possible, hence Rec
              new_force_vars = get_new_force_vars force_vars
              locals       = map abe_mono exports
