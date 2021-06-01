@@ -226,6 +226,9 @@ dsAbsBinds dflags tyvars dicts exports
     -- A very important common case: one exported variable
     -- Non-recursive bindings come through this way
     -- So do self-recursive bindings
+    --    gbl_id = wrap (/\tvs \dicts. let ev_binds
+    --                                 letrec bind_prs
+    --                                 in lcl_id)
   | [export] <- exports
   , ABE { abe_poly = global_id, abe_mono = local_id
         , abe_wrap = wrap, abe_prags = prags } <- export
@@ -259,26 +262,28 @@ dsAbsBinds dflags tyvars dicts exports
 
     -- Another common case: no tyvars, no dicts
     -- In this case we can have a much simpler desugaring
+    --    lcl_id{inl-prag} = rhs  -- Auxiliary binds
+    --    gbl_id = lcl_id |> co   -- Main binds
   | null tyvars, null dicts
+  = do { let mk_main :: ABExport GhcTc -> DsM (Id, CoreExpr)
+             mk_main (ABE { abe_poly = gbl_id, abe_mono = lcl_id
+                          , abe_wrap = wrap })
+                     -- No SpecPrags (no dicts)
+                     -- Can't be a default method (default methods are singletons)
+               = do { core_wrap <- dsHsWrapper wrap
+                    ; return ( gbl_id `setInlinePragma` defaultInlinePragma
+                             , core_wrap (Var lcl_id)) }
 
-  = do { let mk_bind (ABE { abe_wrap = wrap
-                          , abe_poly = global
-                          , abe_mono = local
-                          , abe_prags = prags })
-              = do { core_wrap <- dsHsWrapper wrap
-                   ; return (makeCorePair dflags global
-                                          (isDefaultMethod prags)
-                                          0 (core_wrap (Var local))) }
-       ; main_binds <- mapM mk_bind exports
-
-       ; return (force_vars, flattenBinds ds_ev_binds ++ bind_prs ++ main_binds) }
+       ; main_prs <- mapM mk_main exports
+       ; return (force_vars, flattenBinds ds_ev_binds
+                              ++ mk_aux_binds bind_prs ++ main_prs ) }
 
     -- The general case
     -- See Note [Desugaring AbsBinds]
   | otherwise
-  = do { let core_bind = Rec [ makeCorePair dflags (add_inline lcl_id) False 0 rhs
-                              | (lcl_id, rhs) <- bind_prs ]
+  = do { let aux_binds = Rec (mk_aux_binds bind_prs)
                 -- Monomorphic recursion possible, hence Rec
+
              new_force_vars = get_new_force_vars force_vars
              locals       = map abe_mono exports
              all_locals   = locals ++ new_force_vars
@@ -286,7 +291,7 @@ dsAbsBinds dflags tyvars dicts exports
              tup_ty       = exprType tup_expr
        ; let poly_tup_rhs = mkLams tyvars $ mkLams dicts $
                             mkCoreLets ds_ev_binds $
-                            mkLet core_bind $
+                            mkLet aux_binds $
                             tup_expr
 
        ; poly_tup_id <- newSysLocalDs Many (exprType poly_tup_rhs)
@@ -320,18 +325,20 @@ dsAbsBinds dflags tyvars dicts exports
                 , (poly_tup_id, poly_tup_rhs) :
                    concat export_binds_s) }
   where
+    mk_aux_binds :: [(Id,CoreExpr)] -> [(Id,CoreExpr)]
+    mk_aux_binds bind_prs = [ makeCorePair dflags lcl_w_inline False 0 rhs
+                            | (lcl_id, rhs) <- bind_prs
+                            , let lcl_w_inline = lookupVarEnv inline_env lcl_id
+                                                 `orElse` lcl_id ]
+
     inline_env :: IdEnv Id -- Maps a monomorphic local Id to one with
-                             -- the inline pragma from the source
-                             -- The type checker put the inline pragma
-                             -- on the *global* Id, so we need to transfer it
+                           -- the inline pragma from the source
+                           -- The type checker put the inline pragma
+                           -- on the *global* Id, so we need to transfer it
     inline_env
       = mkVarEnv [ (lcl_id, setInlinePragma lcl_id prag)
                  | ABE { abe_mono = lcl_id, abe_poly = gbl_id } <- exports
                  , let prag = idInlinePragma gbl_id ]
-
-    add_inline :: Id -> Id    -- tran
-    add_inline lcl_id = lookupVarEnv inline_env lcl_id
-                        `orElse` lcl_id
 
     global_env :: IdEnv Id -- Maps local Id to its global exported Id
     global_env =
