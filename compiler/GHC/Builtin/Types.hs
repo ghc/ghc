@@ -114,7 +114,7 @@ module GHC.Builtin.Types (
         runtimeRepTyCon, levityTyCon, vecCountTyCon, vecElemTyCon,
 
         boxedRepDataConTyCon,
-        runtimeRepTy, levityTy, liftedRepTy, unliftedRepTy,
+        runtimeRepTy, liftedRepTy, unliftedRepTy,
 
         vecRepDataConTyCon, tupleRepDataConTyCon, sumRepDataConTyCon,
 
@@ -1478,9 +1478,8 @@ unrestrictedFunTyConName = mkWiredInTyConName BuiltInSyntax gHC_TYPES (fsLit "->
 
 -- For information about the usage of the following type,
 -- see Note [TYPE and RuntimeRep] in module GHC.Builtin.Types.Prim
-runtimeRepTy, levityTy :: Type
+runtimeRepTy :: Type
 runtimeRepTy = mkTyConTy runtimeRepTyCon
-levityTy     = mkTyConTy levityTyCon
 
 -- Type synonyms; see Note [TYPE and RuntimeRep] in GHC.Builtin.Types.Prim
 -- and Note [Prefer Type over TYPE 'LiftedRep] in GHC.Core.TyCo.Rep.
