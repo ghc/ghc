@@ -442,30 +442,17 @@ checkExtension dflags (L l ext)
 
 languagePragParseError :: SrcSpan -> a
 languagePragParseError loc =
-    throwErr loc $
-       vcat [ text "Cannot parse LANGUAGE pragma"
-            , text "Expecting comma-separated list of language options,"
-            , text "each starting with a capital letter"
-            , nest 2 (text "E.g. {-# LANGUAGE TemplateHaskell, GADTs #-}") ]
+    throwErr loc $ PsErrParseLanguagePragma
 
 unsupportedExtnError :: DynFlags -> SrcSpan -> String -> a
 unsupportedExtnError dflags loc unsup =
-    throwErr loc $
-        text "Unsupported extension: " <> text unsup $$
-        if null suggestions then Outputable.empty else text "Perhaps you meant" <+> quotedListWithOr (map text suggestions)
-  where
-     supported = supportedLanguagesAndExtensions $ platformArchOS $ targetPlatform dflags
-     suggestions = fuzzyMatch unsup supported
+    throwErr loc $ PsErrUnsupportedExt unsup (platformArchOS $ targetPlatform dflags)
 
 optionsParseError :: String -> SrcSpan -> a     -- #15053
 optionsParseError str loc =
-  throwErr loc $
-      vcat [ text "Error while parsing OPTIONS_GHC pragma."
-           , text "Expecting whitespace-separated list of GHC options."
-           , text "  E.g. {-# OPTIONS_GHC -Wall -O2 #-}"
-           , text ("Input was: " ++ show str) ]
+  throwErr loc $ PsErrParseOptionsPragma str
 
-throwErr :: SrcSpan -> SDoc -> a                -- #15053
-throwErr loc doc =
-  let msg = mkPlainErrorMsgEnvelope loc $ GhcPsMessage $ PsUnknownMessage $ mkPlainError noHints doc
+throwErr :: SrcSpan -> PsHeaderMessage -> a                -- #15053
+throwErr loc ps_msg =
+  let msg = mkPlainErrorMsgEnvelope loc $ GhcPsMessage (PsHeaderMessage ps_msg)
   in throw $ mkSrcErr $ singleMessage msg
