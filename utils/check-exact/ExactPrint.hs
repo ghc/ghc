@@ -492,20 +492,18 @@ markLocatedAALS (EpAnn _ a _) f kw (Just str) = go (f a)
 
 -- ---------------------------------------------------------------------
 
-markArrow :: EpAnn TrailingAnn -> HsArrow GhcPs -> EPP ()
-markArrow an arr = do
-  case arr of
-    HsUnrestrictedArrow _u ->
-      return ()
-    HsLinearArrow _u ma -> do
-      mapM_ markAddEpAnn ma
-    HsExplicitMult _u ma t  -> do
-      mapM_ markAddEpAnn ma
-      markAnnotated t
-
-  case an of
-    EpAnnNotUsed -> pure ()
-    _ -> markKwT (anns an)
+markArrow :: HsArrow GhcPs -> EPP ()
+markArrow (HsUnrestrictedArrow arr) = do
+  markUniToken arr
+markArrow (HsLinearArrow (HsPct1 pct1 arr)) = do
+  markToken pct1
+  markUniToken arr
+markArrow (HsLinearArrow (HsLolly arr)) = do
+  markToken arr
+markArrow (HsExplicitMult pct t arr) = do
+  markToken pct
+  markAnnotated t
+  markUniToken arr
 
 -- ---------------------------------------------------------------------
 
@@ -584,10 +582,6 @@ markKwT :: TrailingAnn -> EPP ()
 markKwT (AddSemiAnn ss)    = markKwA AnnSemi ss
 markKwT (AddCommaAnn ss)   = markKwA AnnComma ss
 markKwT (AddVbarAnn ss)    = markKwA AnnVbar ss
-markKwT (AddRarrowAnn ss)  = markKwA AnnRarrow ss
-markKwT (AddRarrowAnnU ss) = markKwA AnnRarrowU ss
--- markKwT (AddLollyAnn ss)   = markKwA AnnLolly ss
-markKwT (AddLollyAnnU ss)  = markKwA AnnLollyU ss
 
 markKw :: AddEpAnn -> EPP ()
 markKw (AddEpAnn kw ss) = markKwA kw ss
@@ -602,6 +596,10 @@ markToken (L (EpAnn (Anchor a a_op) _ _) _) = printStringAtAA aa (symbolVal (Pro
   where aa = case a_op of
                UnchangedAnchor -> EpaSpan a
                MovedAnchor dp  -> EpaDelta dp
+
+markUniToken :: forall tok utok. (KnownSymbol tok, KnownSymbol utok) => LHsUniToken tok utok GhcPs -> EPP ()
+markUniToken (L l HsNormalTok)  = markToken (L l (HsTok @tok))
+markUniToken (L l HsUnicodeTok) = markToken (L l (HsTok @utok))
 
 -- ---------------------------------------------------------------------
 
@@ -3015,9 +3013,9 @@ instance ExactPrint (HsType GhcPs) where
     markAnnotated ty
     printStringAtSs ss "@"
     markAnnotated ki
-  exact (HsFunTy an mult ty1 ty2) = do
+  exact (HsFunTy _an mult ty1 ty2) = do
     markAnnotated ty1
-    markArrow an mult
+    markArrow mult
     markAnnotated ty2
   exact (HsListTy an tys) = do
     markOpeningParen an
@@ -3328,8 +3326,10 @@ instance ExactPrint (ConDecl GhcPs) where
     when (isJust mcxt) $ markEpAnn an AnnDarrow
     -- mapM_ markAnnotated args
     case args of
-        (PrefixConGADT args') -> mapM_ markAnnotated args'
-        (RecConGADT fields)   -> markAnnotated fields
+        PrefixConGADT args' -> mapM_ markAnnotated args'
+        RecConGADT fields arr -> do
+          markAnnotated fields
+          markUniToken arr
           -- mapM_ markAnnotated (unLoc fields)
     markAnnotated res_ty
   -- markAST _ (GHC.ConDeclGADT _ lns (GHC.L l forall) qvars mbCxt args typ _) = do
@@ -3427,7 +3427,7 @@ instance (ExactPrint a) => ExactPrint (HsScaled GhcPs a) where
   getAnnotationEntry = const NoEntryVal
   exact (HsScaled arr t) = do
     markAnnotated t
-    markArrow EpAnnNotUsed arr
+    markArrow arr
 
 -- ---------------------------------------------------------------------
 
