@@ -198,6 +198,8 @@ Library
         GHC.Cmm.Ppr.Decl
         GHC.Cmm.Ppr.Expr
         GHC.Cmm.ProcPoint
+        GHC.Cmm.Reg.Global
+        GHC.Cmm.Reg.Set
         GHC.Cmm.Sink
         GHC.Cmm.Switch
         GHC.Cmm.Switch.Implement

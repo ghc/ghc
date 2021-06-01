@@ -39,7 +39,8 @@ import GHC.Data.FastString
 import GHC.Data.SizedSeq
 
 import GHC.StgToCmm.Layout     ( ArgRep(..) )
-import GHC.Cmm.Expr
+import GHC.Cmm.Reg.Global
+import GHC.Cmm.Reg.Set
 import GHC.Cmm.CallConv        ( tupleRegsCover )
 import GHC.Platform
 import GHC.Platform.Profile

@@ -13,7 +13,7 @@ import GHC.Prelude
 
 import GHC.Llvm
 
-import GHC.Cmm.Expr
+import GHC.Cmm.Reg.Global
 import GHC.Platform
 import GHC.Data.FastString
 import GHC.Utils.Panic ( panic )

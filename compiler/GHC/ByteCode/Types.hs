@@ -43,7 +43,8 @@ import qualified Data.IntMap as IntMap
 import Data.Maybe (catMaybes)
 import qualified GHC.Exts.Heap as Heap
 import GHC.Stack.CCS
-import GHC.Cmm.Expr ( GlobalRegSet, emptyRegSet, regSetToList )
+import GHC.Cmm.Reg.Set ( emptyRegSet, regSetToList )
+import GHC.Cmm.Reg.Global ( GlobalRegSet )
 
 -- -----------------------------------------------------------------------------
 -- Compiled Byte Code

@@ -121,6 +121,7 @@ import GHC.Core.Unify( RoughMatchTc(..) )
 import GHC.Core.FamInstEnv
    ( FamInst, pprFamInst, famInstsRepTyCons
    , famInstEnvElts, extendFamInstEnvList, normaliseType )
+import GHC.Core.Lint     ( lintAxioms )
 
 import GHC.Parser.Header       ( mkPrelImports )
 
@@ -347,6 +348,14 @@ tcRnModuleTcRnM hsc_env mod_sum
                }
         }
       }
+
+-- | Check the 'TcGblEnv' for consistency. Currently, only checks
+-- axioms, but should check other aspects, too.
+lintGblEnv :: Logger -> DynFlags -> TcGblEnv -> TcM ()
+lintGblEnv logger dflags tcg_env =
+  liftIO $ lintAxioms logger dflags (text "TcGblEnv axioms") axioms
+  where
+    axioms = typeEnvCoAxioms (tcg_type_env tcg_env)
 
 implicitPreludeWarn :: SDoc
 implicitPreludeWarn

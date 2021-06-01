@@ -31,7 +31,7 @@ import GHC.Prelude
 
 import GHC.Cmm.DebugBlock
 import GHC.Cmm.CLabel
-import GHC.Cmm.Expr         ( GlobalReg(..) )
+import GHC.Cmm.Reg.Global         ( GlobalReg(..) )
 import GHC.Utils.Encoding
 import GHC.Data.FastString
 import GHC.Utils.Outputable

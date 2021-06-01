@@ -1,5 +1,5 @@
 
-import GHC.Cmm.Expr
+import GHC.Cmm.Reg.Global
 #if !(defined(MACHREGS_i386) || defined(MACHREGS_x86_64) \
     || defined(MACHREGS_sparc) || defined(MACHREGS_powerpc))
 import GHC.Utils.Panic.Plain

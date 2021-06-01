@@ -19,6 +19,7 @@ import GHC.Cmm.Utils
 import GHC.Cmm.Graph
 import GHC.Cmm.Liveness
 import GHC.Cmm.ProcPoint
+import GHC.Cmm.Reg.Set
 import GHC.Runtime.Heap.Layout
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Collections

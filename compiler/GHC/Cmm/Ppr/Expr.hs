@@ -48,6 +48,7 @@ import GHC.Driver.Ppr
 
 import GHC.Platform
 import GHC.Cmm.Expr
+import GHC.Cmm.Reg.Global
 
 import GHC.Utils.Outputable
 

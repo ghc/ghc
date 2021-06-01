@@ -54,7 +54,7 @@ import GHC.CmmToAsm.Utils
 import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Label
-import GHC.Cmm hiding (RegSet, emptyRegSet)
+import GHC.Cmm
 
 import GHC.Data.Graph.Directed
 import GHC.Utils.Monad

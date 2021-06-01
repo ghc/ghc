@@ -22,6 +22,7 @@ import GHC.Cmm.Utils
 import GHC.Cmm.Info
 import GHC.Cmm.Liveness
 import GHC.Cmm.Switch
+import GHC.Cmm.Reg.Set
 import Data.List (sortBy)
 import GHC.Data.Maybe
 import Control.Monad

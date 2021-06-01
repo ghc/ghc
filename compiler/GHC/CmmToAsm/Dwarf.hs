@@ -5,7 +5,7 @@ module GHC.CmmToAsm.Dwarf (
 import GHC.Prelude
 
 import GHC.Cmm.CLabel
-import GHC.Cmm.Expr        ( GlobalReg(..) )
+import GHC.Cmm.Reg.Global  ( GlobalReg(..) )
 import GHC.Settings.Config ( cProjectName, cProjectVersion )
 import GHC.Types.Tickish   ( CmmTickish, GenTickish(..) )
 import GHC.Cmm.DebugBlock

@@ -26,6 +26,7 @@ import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.LRegSet
+import GHC.Cmm.Reg.Set
 
 import GHC.Data.Maybe
 import GHC.Utils.Outputable
@@ -159,5 +160,3 @@ xferLiveL platform (BlockCC eNode middle xNode) fBase =
     let joined = gen_killL platform xNode $! joinOutFacts liveLatticeL xNode fBase
         !result = foldNodesBwdOO (gen_killL platform) middle joined
     in mapSingleton (entryLabel eNode) result
-
-

@@ -30,6 +30,7 @@ module GHC.Cmm (
      -- * Statements, expressions and types
      module GHC.Cmm.Node,
      module GHC.Cmm.Expr,
+     module GHC.Cmm.Reg.Global
   ) where
 
 import GHC.Prelude
@@ -45,6 +46,7 @@ import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Label
+import GHC.Cmm.Reg.Global
 import GHC.Utils.Outputable
 import Data.ByteString (ByteString)
 
@@ -288,4 +290,3 @@ instance OutputableP env instr => OutputableP env (GenBasicBlock instr) where
 pprBBlock :: Outputable stmt => GenBasicBlock stmt -> SDoc
 pprBBlock (BasicBlock ident stmts) =
     hang (ppr ident <> colon) 4 (vcat (map ppr stmts))
-

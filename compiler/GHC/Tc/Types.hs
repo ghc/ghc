@@ -80,9 +80,6 @@ module GHC.Tc.Types(
         RoleAnnotEnv, emptyRoleAnnotEnv, mkRoleAnnotEnv,
         lookupRoleAnnot, getRoleAnnots,
 
-        -- Linting
-        lintGblEnv,
-
         -- Diagnostics
         TcRnMessage
   ) where
@@ -106,7 +103,6 @@ import GHC.Tc.Errors.Types
 import GHC.Core.Type
 import GHC.Core.TyCon  ( TyCon, tyConKind )
 import GHC.Core.PatSyn ( PatSyn )
-import GHC.Core.Lint   ( lintAxioms )
 import GHC.Core.UsageEnv
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
@@ -1755,17 +1751,9 @@ getRoleAnnots bndrs role_env
 
 {- *********************************************************************
 *                                                                      *
-                  Linting a TcGblEnv
+       DocLoc
 *                                                                      *
 ********************************************************************* -}
-
--- | Check the 'TcGblEnv' for consistency. Currently, only checks
--- axioms, but should check other aspects, too.
-lintGblEnv :: Logger -> DynFlags -> TcGblEnv -> TcM ()
-lintGblEnv logger dflags tcg_env =
-  liftIO $ lintAxioms logger dflags (text "TcGblEnv axioms") axioms
-  where
-    axioms = typeEnvCoAxioms (tcg_type_env tcg_env)
 
 -- | This is a mirror of Template Haskell's DocLoc, but the TH names are
 -- resolved to GHC names.

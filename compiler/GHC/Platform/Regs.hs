@@ -4,7 +4,7 @@ module GHC.Platform.Regs
 
 import GHC.Prelude
 
-import GHC.Cmm.Expr
+import GHC.Cmm.Reg.Global
 import GHC.Platform
 import GHC.Platform.Reg
 

@@ -9,21 +9,15 @@ module GHC.Cmm.Expr
     ( CmmExpr(..), cmmExprType, cmmExprWidth, cmmExprAlignment, maybeInvertCmmExpr
     , CmmReg(..), cmmRegType, cmmRegWidth
     , CmmLit(..), cmmLitType
-    , LocalReg(..), localRegType
-    , GlobalReg(..), isArgReg, globalRegType
+    , LocalReg(..), LocalRegSet, localRegType
+    , globalRegType
     , spReg, hpReg, spLimReg, hpLimReg, nodeReg
     , currentTSOReg, currentNurseryReg, hpAllocReg, cccsReg
-    , node, baseReg
-    , VGcPtr(..)
+    , baseReg
 
     , DefinerOfRegs, UserOfRegs
     , foldRegsDefd, foldRegsUsed
     , foldLocalRegsDefd, foldLocalRegsUsed
-
-    , RegSet, LocalRegSet, GlobalRegSet
-    , emptyRegSet, elemRegSet, extendRegSet, deleteFromRegSet, mkRegSet
-    , plusRegSet, minusRegSet, timesRegSet, sizeRegSet, nullRegSet
-    , regSetToList
 
     , Area(..)
     , module GHC.Cmm.MachOp
@@ -34,6 +28,8 @@ where
 import GHC.Prelude
 
 import GHC.Platform
+import GHC.Cmm.Reg.Global
+import GHC.Cmm.Reg.Set
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
 import GHC.Cmm.MachOp
@@ -41,9 +37,6 @@ import GHC.Cmm.Type
 import GHC.Utils.Panic (panic)
 import GHC.Utils.Outputable
 import GHC.Types.Unique
-
-import Data.Set (Set)
-import qualified Data.Set as Set
 
 import GHC.Types.Basic (Alignment, mkAlignment, alignmentOf)
 
@@ -280,6 +273,8 @@ data LocalReg
     --   1. Identifier
     --   2. Type
 
+type LocalRegSet  = RegSet LocalReg
+
 instance Eq LocalReg where
   (LocalReg u1 _) == (LocalReg u2 _) = u1 == u2
 
@@ -305,40 +300,6 @@ localRegType (LocalReg _ rep) = rep
 -----------------------------------------------------------------------------
 --    Register-use information for expressions and other types
 -----------------------------------------------------------------------------
-
--- | Sets of registers
-
--- These are used for dataflow facts, and a common operation is taking
--- the union of two RegSets and then asking whether the union is the
--- same as one of the inputs.  UniqSet isn't good here, because
--- sizeUniqSet is O(n) whereas Set.size is O(1), so we use ordinary
--- Sets.
-
-type RegSet r     = Set r
-type LocalRegSet  = RegSet LocalReg
-type GlobalRegSet = RegSet GlobalReg
-
-emptyRegSet             :: RegSet r
-nullRegSet              :: RegSet r -> Bool
-elemRegSet              :: Ord r => r -> RegSet r -> Bool
-extendRegSet            :: Ord r => RegSet r -> r -> RegSet r
-deleteFromRegSet        :: Ord r => RegSet r -> r -> RegSet r
-mkRegSet                :: Ord r => [r] -> RegSet r
-minusRegSet, plusRegSet, timesRegSet :: Ord r => RegSet r -> RegSet r -> RegSet r
-sizeRegSet              :: RegSet r -> Int
-regSetToList            :: RegSet r -> [r]
-
-emptyRegSet      = Set.empty
-nullRegSet       = Set.null
-elemRegSet       = Set.member
-extendRegSet     = flip Set.insert
-deleteFromRegSet = flip Set.delete
-mkRegSet         = Set.fromList
-minusRegSet      = Set.difference
-plusRegSet       = Set.union
-timesRegSet      = Set.intersection
-sizeRegSet       = Set.size
-regSetToList     = Set.toList
 
 class Ord r => UserOfRegs r a where
   foldRegsUsed :: Platform -> (b -> r -> b) -> b -> a -> b
@@ -397,217 +358,6 @@ instance DefinerOfRegs r a => DefinerOfRegs r [a] where
   foldRegsDefd platform f set as = foldl' (foldRegsDefd platform f) set as
   {-# INLINABLE foldRegsDefd #-}
 
------------------------------------------------------------------------------
---              Global STG registers
------------------------------------------------------------------------------
-
-data VGcPtr = VGcPtr | VNonGcPtr deriving( Eq, Show )
-
------------------------------------------------------------------------------
---              Global STG registers
------------------------------------------------------------------------------
-{-
-Note [Overlapping global registers]
-
-The backend might not faithfully implement the abstraction of the STG
-machine with independent registers for different values of type
-GlobalReg. Specifically, certain pairs of registers (r1, r2) may
-overlap in the sense that a store to r1 invalidates the value in r2,
-and vice versa.
-
-Currently this occurs only on the x86_64 architecture where FloatReg n
-and DoubleReg n are assigned the same microarchitectural register, in
-order to allow functions to receive more Float# or Double# arguments
-in registers (as opposed to on the stack).
-
-There are no specific rules about which registers might overlap with
-which other registers, but presumably it's safe to assume that nothing
-will overlap with special registers like Sp or BaseReg.
-
-Use GHC.Cmm.Utils.regsOverlap to determine whether two GlobalRegs overlap
-on a particular platform. The instance Eq GlobalReg is syntactic
-equality of STG registers and does not take overlap into
-account. However it is still used in UserOfRegs/DefinerOfRegs and
-there are likely still bugs there, beware!
--}
-
-data GlobalReg
-  -- Argument and return registers
-  = VanillaReg                  -- pointers, unboxed ints and chars
-        {-# UNPACK #-} !Int     -- its number
-        VGcPtr
-
-  | FloatReg            -- single-precision floating-point registers
-        {-# UNPACK #-} !Int     -- its number
-
-  | DoubleReg           -- double-precision floating-point registers
-        {-# UNPACK #-} !Int     -- its number
-
-  | LongReg             -- long int registers (64-bit, really)
-        {-# UNPACK #-} !Int     -- its number
-
-  | XmmReg                      -- 128-bit SIMD vector register
-        {-# UNPACK #-} !Int     -- its number
-
-  | YmmReg                      -- 256-bit SIMD vector register
-        {-# UNPACK #-} !Int     -- its number
-
-  | ZmmReg                      -- 512-bit SIMD vector register
-        {-# UNPACK #-} !Int     -- its number
-
-  -- STG registers
-  | Sp                  -- Stack ptr; points to last occupied stack location.
-  | SpLim               -- Stack limit
-  | Hp                  -- Heap ptr; points to last occupied heap location.
-  | HpLim               -- Heap limit register
-  | CCCS                -- Current cost-centre stack
-  | CurrentTSO          -- pointer to current thread's TSO
-  | CurrentNursery      -- pointer to allocation area
-  | HpAlloc             -- allocation count for heap check failure
-
-                -- We keep the address of some commonly-called
-                -- functions in the register table, to keep code
-                -- size down:
-  | EagerBlackholeInfo  -- stg_EAGER_BLACKHOLE_info
-  | GCEnter1            -- stg_gc_enter_1
-  | GCFun               -- stg_gc_fun
-
-  -- Base offset for the register table, used for accessing registers
-  -- which do not have real registers assigned to them.  This register
-  -- will only appear after we have expanded GlobalReg into memory accesses
-  -- (where necessary) in the native code generator.
-  | BaseReg
-
-  -- The register used by the platform for the C stack pointer. This is
-  -- a break in the STG abstraction used exclusively to setup stack unwinding
-  -- information.
-  | MachSp
-
-  -- The is a dummy register used to indicate to the stack unwinder where
-  -- a routine would return to.
-  | UnwindReturnReg
-
-  -- Base Register for PIC (position-independent code) calculations
-  -- Only used inside the native code generator. It's exact meaning differs
-  -- from platform to platform (see module PositionIndependentCode).
-  | PicBaseReg
-
-  deriving( Show )
-
-instance Eq GlobalReg where
-   VanillaReg i _ == VanillaReg j _ = i==j -- Ignore type when seeking clashes
-   FloatReg i == FloatReg j = i==j
-   DoubleReg i == DoubleReg j = i==j
-   LongReg i == LongReg j = i==j
-   -- NOTE: XMM, YMM, ZMM registers actually are the same registers
-   -- at least with respect to store at YMM i and then read from XMM i
-   -- and similarly for ZMM etc.
-   XmmReg i == XmmReg j = i==j
-   YmmReg i == YmmReg j = i==j
-   ZmmReg i == ZmmReg j = i==j
-   Sp == Sp = True
-   SpLim == SpLim = True
-   Hp == Hp = True
-   HpLim == HpLim = True
-   CCCS == CCCS = True
-   CurrentTSO == CurrentTSO = True
-   CurrentNursery == CurrentNursery = True
-   HpAlloc == HpAlloc = True
-   EagerBlackholeInfo == EagerBlackholeInfo = True
-   GCEnter1 == GCEnter1 = True
-   GCFun == GCFun = True
-   BaseReg == BaseReg = True
-   MachSp == MachSp = True
-   UnwindReturnReg == UnwindReturnReg = True
-   PicBaseReg == PicBaseReg = True
-   _r1 == _r2 = False
-
--- NOTE: this Ord instance affects the tuple layout in GHCi, see
---       Note [GHCi tuple layout]
-instance Ord GlobalReg where
-   compare (VanillaReg i _) (VanillaReg j _) = compare i j
-     -- Ignore type when seeking clashes
-   compare (FloatReg i)  (FloatReg  j) = compare i j
-   compare (DoubleReg i) (DoubleReg j) = compare i j
-   compare (LongReg i)   (LongReg   j) = compare i j
-   compare (XmmReg i)    (XmmReg    j) = compare i j
-   compare (YmmReg i)    (YmmReg    j) = compare i j
-   compare (ZmmReg i)    (ZmmReg    j) = compare i j
-   compare Sp Sp = EQ
-   compare SpLim SpLim = EQ
-   compare Hp Hp = EQ
-   compare HpLim HpLim = EQ
-   compare CCCS CCCS = EQ
-   compare CurrentTSO CurrentTSO = EQ
-   compare CurrentNursery CurrentNursery = EQ
-   compare HpAlloc HpAlloc = EQ
-   compare EagerBlackholeInfo EagerBlackholeInfo = EQ
-   compare GCEnter1 GCEnter1 = EQ
-   compare GCFun GCFun = EQ
-   compare BaseReg BaseReg = EQ
-   compare MachSp MachSp = EQ
-   compare UnwindReturnReg UnwindReturnReg = EQ
-   compare PicBaseReg PicBaseReg = EQ
-   compare (VanillaReg _ _) _ = LT
-   compare _ (VanillaReg _ _) = GT
-   compare (FloatReg _) _     = LT
-   compare _ (FloatReg _)     = GT
-   compare (DoubleReg _) _    = LT
-   compare _ (DoubleReg _)    = GT
-   compare (LongReg _) _      = LT
-   compare _ (LongReg _)      = GT
-   compare (XmmReg _) _       = LT
-   compare _ (XmmReg _)       = GT
-   compare (YmmReg _) _       = LT
-   compare _ (YmmReg _)       = GT
-   compare (ZmmReg _) _       = LT
-   compare _ (ZmmReg _)       = GT
-   compare Sp _ = LT
-   compare _ Sp = GT
-   compare SpLim _ = LT
-   compare _ SpLim = GT
-   compare Hp _ = LT
-   compare _ Hp = GT
-   compare HpLim _ = LT
-   compare _ HpLim = GT
-   compare CCCS _ = LT
-   compare _ CCCS = GT
-   compare CurrentTSO _ = LT
-   compare _ CurrentTSO = GT
-   compare CurrentNursery _ = LT
-   compare _ CurrentNursery = GT
-   compare HpAlloc _ = LT
-   compare _ HpAlloc = GT
-   compare GCEnter1 _ = LT
-   compare _ GCEnter1 = GT
-   compare GCFun _ = LT
-   compare _ GCFun = GT
-   compare BaseReg _ = LT
-   compare _ BaseReg = GT
-   compare MachSp _ = LT
-   compare _ MachSp = GT
-   compare UnwindReturnReg _ = LT
-   compare _ UnwindReturnReg = GT
-   compare EagerBlackholeInfo _ = LT
-   compare _ EagerBlackholeInfo = GT
-
--- convenient aliases
-baseReg, spReg, hpReg, spLimReg, hpLimReg, nodeReg,
-  currentTSOReg, currentNurseryReg, hpAllocReg, cccsReg  :: CmmReg
-baseReg = CmmGlobal BaseReg
-spReg = CmmGlobal Sp
-hpReg = CmmGlobal Hp
-hpLimReg = CmmGlobal HpLim
-spLimReg = CmmGlobal SpLim
-nodeReg = CmmGlobal node
-currentTSOReg = CmmGlobal CurrentTSO
-currentNurseryReg = CmmGlobal CurrentNursery
-hpAllocReg = CmmGlobal HpAlloc
-cccsReg = CmmGlobal CCCS
-
-node :: GlobalReg
-node = VanillaReg 1 VGcPtr
-
 globalRegType :: Platform -> GlobalReg -> CmmType
 globalRegType platform = \case
    (VanillaReg _ VGcPtr)    -> gcWord platform
@@ -626,12 +376,16 @@ globalRegType platform = \case
                                  -- dynamically allocated closures
    _          -> bWord platform
 
-isArgReg :: GlobalReg -> Bool
-isArgReg (VanillaReg {}) = True
-isArgReg (FloatReg {})   = True
-isArgReg (DoubleReg {})  = True
-isArgReg (LongReg {})    = True
-isArgReg (XmmReg {})     = True
-isArgReg (YmmReg {})     = True
-isArgReg (ZmmReg {})     = True
-isArgReg _               = False
+-- convenient aliases
+baseReg, spReg, hpReg, spLimReg, hpLimReg, nodeReg,
+  currentTSOReg, currentNurseryReg, hpAllocReg, cccsReg  :: CmmReg
+baseReg = CmmGlobal BaseReg
+spReg = CmmGlobal Sp
+hpReg = CmmGlobal Hp
+hpLimReg = CmmGlobal HpLim
+spLimReg = CmmGlobal SpLim
+nodeReg = CmmGlobal node
+currentTSOReg = CmmGlobal CurrentTSO
+currentNurseryReg = CmmGlobal CurrentNursery
+hpAllocReg = CmmGlobal HpAlloc
+cccsReg = CmmGlobal CCCS

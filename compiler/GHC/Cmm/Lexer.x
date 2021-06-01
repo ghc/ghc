@@ -17,7 +17,7 @@ module GHC.Cmm.Lexer (
 
 import GHC.Prelude
 
-import GHC.Cmm.Expr
+import GHC.Cmm.Reg.Global
 
 import GHC.Parser.Lexer
 import GHC.Cmm.Parser.Monad

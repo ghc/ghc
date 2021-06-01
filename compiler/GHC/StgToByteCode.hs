@@ -26,6 +26,8 @@ import GHC.Cmm.CallConv
 import GHC.Cmm.Expr
 import GHC.Cmm.Node
 import GHC.Cmm.Utils
+import GHC.Cmm.Reg.Global
+import GHC.Cmm.Reg.Set
 
 import GHC.Platform
 import GHC.Platform.Profile

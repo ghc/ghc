@@ -10,6 +10,7 @@ import GHC.Prelude
 import Data.List (nub)
 
 import GHC.Cmm.Expr
+import GHC.Cmm.Reg.Global
 import GHC.Runtime.Heap.Layout
 import GHC.Cmm (Convention(..))
 import GHC.Cmm.Ppr () -- For Outputable instances

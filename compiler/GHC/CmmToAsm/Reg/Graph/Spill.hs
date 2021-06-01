@@ -13,7 +13,7 @@ import GHC.CmmToAsm.Reg.Liveness
 import GHC.CmmToAsm.Reg.Utils
 import GHC.CmmToAsm.Instr
 import GHC.Platform.Reg
-import GHC.Cmm hiding (RegSet)
+import GHC.Cmm
 import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Collections
 

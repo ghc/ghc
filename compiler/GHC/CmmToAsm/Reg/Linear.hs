@@ -124,7 +124,7 @@ import GHC.Platform.Reg
 
 import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Collections
-import GHC.Cmm hiding (RegSet)
+import GHC.Cmm
 
 import GHC.Data.Graph.Directed
 import GHC.Types.Unique

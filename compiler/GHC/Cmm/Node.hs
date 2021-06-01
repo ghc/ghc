@@ -29,6 +29,7 @@ import GHC.Prelude hiding (succ)
 
 import GHC.Platform.Regs
 import GHC.Cmm.Expr
+import GHC.Cmm.Reg.Global
 import GHC.Cmm.Switch
 import GHC.Data.FastString
 import GHC.Types.ForeignCall
