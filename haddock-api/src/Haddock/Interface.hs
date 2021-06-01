@@ -56,7 +56,7 @@ import qualified Data.Set as Set
 import GHC hiding (verbosity)
 import GHC.Data.FastString (unpackFS)
 import GHC.Data.Graph.Directed (flattenSCCs)
-import GHC.Driver.Env (hsc_dflags, hsc_home_unit, hsc_logger, hsc_static_plugins, hsc_units)
+import GHC.Driver.Env (hscUpdateFlags, hsc_home_unit, hsc_logger, hsc_static_plugins, hsc_units)
 import GHC.Driver.Monad (modifySession, withTimingM)
 import GHC.Driver.Session hiding (verbosity)
 import GHC.HsToCore.Docs (getMainDeclBinder)
@@ -145,11 +145,8 @@ createIfaces verbosity modules flags instIfaceMap = do
 
   let
     installHaddockPlugin :: HscEnv -> HscEnv
-    installHaddockPlugin hsc_env = hsc_env
-      {
-        hsc_dflags =
-          gopt_set (hsc_dflags hsc_env) Opt_PluginTrustworthy
-      , hsc_static_plugins =
+    installHaddockPlugin hsc_env = hscUpdateFlags (flip gopt_set Opt_PluginTrustworthy) $ hsc_env
+      { hsc_static_plugins =
           haddockPlugin : hsc_static_plugins hsc_env
       }
 
@@ -212,7 +209,7 @@ plugin verbosity flags instIfaceMap = liftIO $ do
       | otherwise = do
           hsc_env <- getTopEnv
           ifaces <- liftIO $ readIORef ifaceMapRef
-          (iface, modules) <- withTiming (hsc_logger hsc_env) (hsc_dflags hsc_env)
+          (iface, modules) <- withTiming (hsc_logger hsc_env)
                                 "processModule" (const ()) $
             processModule1 verbosity flags ifaces instIfaceMap hsc_env mod_summary tc_gbl_env
 
@@ -266,9 +263,8 @@ processModule1 verbosity flags ifaces inst_ifaces hsc_env mod_summary tc_gbl_env
 
   (!interface, messages) <- do
     logger <- getLogger
-    dflags <- getDynFlags
     {-# SCC createInterface #-}
-     withTiming logger dflags "createInterface" (const ()) $ runIfM (fmap Just . tcLookupGlobal) $
+     withTiming logger "createInterface" (const ()) $ runIfM (fmap Just . tcLookupGlobal) $
       createInterface1 flags unit_state mod_summary tc_gbl_env
         ifaces inst_ifaces
 

@@ -10,6 +10,7 @@ import Data.List           ( isPrefixOf, isSuffixOf )
 
 import qualified Data.ByteString as BS
 
+import GHC.Platform
 import GHC.Types.SourceText
 import GHC.Driver.Session
 import GHC.Utils.Error     ( mkPlainMsgEnvelope, pprLocMsgEnvelope )
@@ -49,9 +50,11 @@ parse dflags fpath bs = case unP (go False []) initState of
     initState = initParserState pflags buf start
     buf = stringBufferFromByteString bs
     start = mkRealSrcLoc (mkFastString fpath) 1 1
+    arch_os = platformArchOS (targetPlatform dflags)
     pflags = mkParserOpts   (warningFlags dflags)
                             (extensionFlags dflags)
                             (mkPlainMsgEnvelope dflags)
+                            (supportedLanguagesAndExtensions arch_os)
                             (safeImportsOn dflags)
                             False -- lex Haddocks as comment tokens
                             True  -- produce comment tokens

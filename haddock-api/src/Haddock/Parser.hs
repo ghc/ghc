@@ -19,7 +19,7 @@ import Documentation.Haddock.Types
 import Haddock.Types
 
 import GHC.Driver.Session ( DynFlags )
-import GHC.Driver.Config
+import GHC.Driver.Config.Parser (initParserOpts)
 import GHC.Data.FastString   ( fsLit )
 import GHC.Parser.Lexer ( initParserState, unP, ParseResult(POk, PFailed) )
 import GHC.Parser       ( parseIdentifier )
