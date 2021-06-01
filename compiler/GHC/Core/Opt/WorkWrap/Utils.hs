@@ -1001,10 +1001,7 @@ unbox_one_arg opts arg cs
              arg_ids'  = zipWithEqual "unbox_one_arg" setIdDemandInfo arg_ids cs
              unbox_fn  = mkUnpackCase (Var arg) co (idMult arg)
                                       dc (ex_tvs' ++ arg_ids')
-             arg_no_unf = zapStableUnfolding arg
-                          -- See Note [Zap unfolding when beta-reducing]
-                          -- in GHC.Core.Opt.Simplify; and see #13890
-             rebox_fn   = Let (NonRec arg_no_unf con_app)
+             rebox_fn   = Let (NonRec arg con_app)
              con_app    = mkConApp2 dc tc_args (ex_tvs' ++ arg_ids') `mkCast` mkSymCo co
        ; (_, worker_args, wrap_fn, work_fn) <- mkWWstr opts NotArgOfInlineableFun (ex_tvs' ++ arg_ids')
        ; return (True, worker_args, unbox_fn . wrap_fn, work_fn . rebox_fn) }

@@ -670,6 +670,8 @@ zapFragileInfo info@(IdInfo { occInfo = occ, unfoldingInfo = unf })
     new_unf = zapFragileUnfolding unf
 
 zapFragileUnfolding :: Unfolding -> Unfolding
+-- ^ Zaps any core unfolding, but /preserves/ evaluated-ness,
+-- i.e. an unfolding of OtherCon
 zapFragileUnfolding unf
  | hasCoreUnfolding unf = noUnfolding
  | otherwise            = unf
