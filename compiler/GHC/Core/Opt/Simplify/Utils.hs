@@ -1923,6 +1923,14 @@ new binding is abstracted.  Note that
     otherwise we get
        t = /\ (f:k->*) (a:k). AccFailure @ (f a)
     which is obviously bogus.
+
+  * We get the variables to abstract over by filtering down the
+    the main_tvs for the original function, picking only ones
+    mentioned in the abstracted body. This means:
+    - they are automatically in dependency order, because main_tvs is
+    - there is no issue about non-determinism
+    - we don't gratuitiously change order, which may help (in a tiny
+      way) with CSE and/or the compiler-debugging experience
 -}
 
 abstractFloats :: UnfoldingOpts -> TopLevelFlag -> [OutTyVar] -> SimplFloats
@@ -1934,7 +1942,6 @@ abstractFloats uf_opts top_lvl main_tvs floats body
         ; return (float_binds, GHC.Core.Subst.substExpr subst body) }
   where
     is_top_lvl  = isTopLevel top_lvl
-    main_tv_set = mkVarSet main_tvs
     body_floats = letFloatBinds (sfLetFloats floats)
     empty_subst = GHC.Core.Subst.mkEmptySubst (sfInScope floats)
 
@@ -1948,10 +1955,9 @@ abstractFloats uf_opts top_lvl main_tvs floats body
         rhs' = GHC.Core.Subst.substExpr subst rhs
 
         -- tvs_here: see Note [Which type variables to abstract over]
-        tvs_here = scopedSort $
-                   filter (`elemVarSet` main_tv_set) $
-                   closeOverKindsList $
-                   exprSomeFreeVarsList isTyVar rhs'
+        tvs_here = filter (`elemVarSet` free_tvs) main_tvs
+        free_tvs = closeOverKinds $
+                   exprSomeFreeVars isTyVar rhs'
 
     abstract subst (Rec prs)
        = do { (poly_ids, poly_apps) <- mapAndUnzipM (mk_poly1 tvs_here) ids
