@@ -659,7 +659,7 @@ cvtConstr (RecGadtC c varstrtys ty)
   = do  { c'       <- mapM cNameN c
         ; ty'      <- cvtType ty
         ; rec_flds <- mapM cvt_id_arg varstrtys
-        ; returnLA $ mk_gadt_decl c' (RecConGADT $ noLocA rec_flds) ty' }
+        ; returnLA $ mk_gadt_decl c' (RecConGADT (noLocA rec_flds) noHsUniTok) ty' }
 
 mk_gadt_decl :: [LocatedN RdrName] -> HsConDeclGADTDetails GhcPs -> LHsType GhcPs
              -> ConDecl GhcPs
@@ -1518,7 +1518,7 @@ cvtTypeKind ty_str ty
                           _            -> return $
                                           parenthesizeHsType sigPrec x'
                  let y'' = parenthesizeHsType sigPrec y'
-                 returnLA (HsFunTy noAnn (HsUnrestrictedArrow NormalSyntax) x'' y'')
+                 returnLA (HsFunTy noAnn (HsUnrestrictedArrow noHsUniTok) x'' y'')
              | otherwise
              -> mk_apps
                 (HsTyVar noAnn NotPromoted (noLocA (getRdrName unrestrictedFunTyCon)))
@@ -1675,9 +1675,9 @@ cvtTypeKind ty_str ty
 hsTypeToArrow :: LHsType GhcPs -> HsArrow GhcPs
 hsTypeToArrow w = case unLoc w of
                      HsTyVar _ _ (L _ (isExact_maybe -> Just n))
-                        | n == oneDataConName -> HsLinearArrow NormalSyntax Nothing
-                        | n == manyDataConName -> HsUnrestrictedArrow NormalSyntax
-                     _ -> HsExplicitMult NormalSyntax Nothing w
+                        | n == oneDataConName -> HsLinearArrow (HsPct1 noHsTok noHsUniTok)
+                        | n == manyDataConName -> HsUnrestrictedArrow noHsUniTok
+                     _ -> HsExplicitMult noHsTok w noHsUniTok
 
 -- ConT/InfixT can contain both data constructor (i.e., promoted) names and
 -- other (i.e, unpromoted) names, as opposed to PromotedT, which can only
