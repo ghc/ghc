@@ -843,7 +843,7 @@ ppSideBySideConstr subdocs unicode leader (L _ con) =
     fieldPart = case con of
         ConDeclGADT{con_g_args = con_args'} -> case con_args' of
           -- GADT record declarations
-          RecConGADT _                    -> doConstrArgsWithDocs []
+          RecConGADT _ _                  -> doConstrArgsWithDocs []
           -- GADT prefix data constructors
           PrefixConGADT args | hasArgDocs -> doConstrArgsWithDocs (map hsScaledThing args)
           _                               -> empty
@@ -1108,9 +1108,9 @@ ppr_mono_ty (HsFunTy _ mult ty1 ty2)   u
   = sep [ ppr_mono_lty ty1 u
         , arr <+> ppr_mono_lty ty2 u ]
    where arr = case mult of
-                 HsLinearArrow _ _ -> lollipop u
+                 HsLinearArrow _ -> lollipop u
                  HsUnrestrictedArrow _ -> arrow u
-                 HsExplicitMult _ _ m -> multAnnotation <> ppr_mono_lty m u <+> arrow u
+                 HsExplicitMult _ m _ -> multAnnotation <> ppr_mono_lty m u <+> arrow u
 
 ppr_mono_ty (HsBangTy _ b ty)     u = ppBang b <> ppLParendType u ty
 ppr_mono_ty (HsTyVar _ NotPromoted (L _ name)) _ = ppDocName name

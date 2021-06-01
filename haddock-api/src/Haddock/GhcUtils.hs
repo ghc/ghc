@@ -177,11 +177,11 @@ getGADTConType (ConDeclGADT { con_bndrs = L _ outer_bndrs
 
 --  tau_ty :: LHsType DocNameI
    tau_ty = case args of
-              RecConGADT flds -> mkFunTy (noLocA (HsRecTy noAnn (unLoc flds))) res_ty
+              RecConGADT flds _ -> mkFunTy (noLocA (HsRecTy noAnn (unLoc flds))) res_ty
               PrefixConGADT pos_args -> foldr mkFunTy res_ty (map hsScaledThing pos_args)
 
    mkFunTy :: LHsType DocNameI -> LHsType DocNameI -> LHsType DocNameI
-   mkFunTy a b = noLocA (HsFunTy noAnn (HsUnrestrictedArrow NormalSyntax) a b)
+   mkFunTy a b = noLocA (HsFunTy noAnn (HsUnrestrictedArrow noHsUniTok) a b)
 
 getGADTConType (ConDeclH98 {}) = panic "getGADTConType"
   -- Should only be called on ConDeclGADT
@@ -283,7 +283,7 @@ restrictCons names decls = [ L p d | L p (Just d) <- map (fmap keep) decls ]
 
           ConDeclGADT { con_g_args = con_args' } -> case con_args' of
             PrefixConGADT {} -> Just d
-            RecConGADT fields
+            RecConGADT fields _
               | all field_avail (unLoc fields) -> Just d
               | otherwise -> Just (d { con_g_args = PrefixConGADT (field_types $ unLoc fields) })
               -- see above

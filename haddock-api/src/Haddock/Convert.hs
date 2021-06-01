@@ -401,7 +401,7 @@ synifyDataCon use_gadt_syntax dc =
 
   mk_gadt_arg_tys :: HsConDeclGADTDetails GhcRn
   mk_gadt_arg_tys
-    | use_named_field_syntax = RecConGADT (noLocA field_tys)
+    | use_named_field_syntax = RecConGADT (noLocA field_tys) noHsUniTok
     | otherwise              = PrefixConGADT (map hsUnrestricted linear_tys)
 
  -- finally we get synifyDataCon's result!
@@ -797,9 +797,9 @@ noKindTyVars _ _ = emptyVarSet
 
 synifyMult :: [TyVar] -> Mult -> HsArrow GhcRn
 synifyMult vs t = case t of
-                    One  -> HsLinearArrow NormalSyntax Nothing
-                    Many -> HsUnrestrictedArrow NormalSyntax
-                    ty -> HsExplicitMult NormalSyntax Nothing (synifyType WithinType vs ty)
+                    One  -> HsLinearArrow (HsPct1 noHsTok noHsUniTok)
+                    Many -> HsUnrestrictedArrow noHsUniTok
+                    ty -> HsExplicitMult noHsTok (synifyType WithinType vs ty) noHsUniTok
 
 
 

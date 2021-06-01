@@ -245,9 +245,10 @@ renameMaybeInjectivityAnn :: Maybe (LInjectivityAnn GhcRn)
 renameMaybeInjectivityAnn = traverse renameInjectivityAnn
 
 renameArrow :: HsArrow GhcRn -> RnM (HsArrow DocNameI)
-renameArrow (HsUnrestrictedArrow u) = return (HsUnrestrictedArrow u)
-renameArrow (HsLinearArrow u a) = return (HsLinearArrow u a)
-renameArrow (HsExplicitMult u a p) = HsExplicitMult u a <$> renameLType p
+renameArrow (HsUnrestrictedArrow arr) = return (HsUnrestrictedArrow arr)
+renameArrow (HsLinearArrow (HsPct1 pct1 arr)) = return (HsLinearArrow (HsPct1 pct1 arr))
+renameArrow (HsLinearArrow (HsLolly arr)) = return (HsLinearArrow (HsLolly arr))
+renameArrow (HsExplicitMult pct p arr) = (\p' -> HsExplicitMult pct p' arr) <$> renameLType p
 
 renameType :: HsType GhcRn -> RnM (HsType DocNameI)
 renameType t = case t of
@@ -548,9 +549,9 @@ renameH98Details (InfixCon a b) = do
 
 renameGADTDetails :: HsConDeclGADTDetails GhcRn
                   -> RnM (HsConDeclGADTDetails DocNameI)
-renameGADTDetails (RecConGADT (L l fields)) = do
+renameGADTDetails (RecConGADT (L l fields) arr) = do
   fields' <- mapM renameConDeclFieldField fields
-  return (RecConGADT (L (locA l) fields'))
+  return (RecConGADT (L (locA l) fields') arr)
 renameGADTDetails (PrefixConGADT ps) = PrefixConGADT <$> mapM renameHsScaled ps
 
 renameConDeclFieldField :: LConDeclField GhcRn -> RnM (LConDeclField DocNameI)

@@ -134,7 +134,7 @@ sugarTuples typ =
 sugarOperators :: HsType GhcRn -> HsType GhcRn
 sugarOperators (HsAppTy _ (L _ (HsAppTy _ (L _ (HsTyVar _ _ (L l name))) la)) lb)
     | isSymOcc $ getOccName name' = mkHsOpTy la (L l name) lb
-    | unrestrictedFunTyConName == name' = HsFunTy noAnn (HsUnrestrictedArrow NormalSyntax) la lb
+    | unrestrictedFunTyConName == name' = HsFunTy noAnn (HsUnrestrictedArrow noHsUniTok) la lb
   where
     name' = getName name
 sugarOperators typ = typ
@@ -311,7 +311,7 @@ renameType t@(HsTyLit _ _) = pure t
 renameType (HsWildCardTy wc) = pure (HsWildCardTy wc)
 
 renameHsArrow :: HsArrow GhcRn -> Rename (IdP GhcRn) (HsArrow GhcRn)
-renameHsArrow (HsExplicitMult u a p) = HsExplicitMult u a <$> renameLType p
+renameHsArrow (HsExplicitMult pct p arr) = (\p' -> HsExplicitMult pct p' arr) <$> renameLType p
 renameHsArrow mult = pure mult
 
 

@@ -969,7 +969,7 @@ ppSideBySideConstr subdocs fixities unicode pkg qual (L _ con)
     fieldPart = case con of
         ConDeclGADT{con_g_args = con_args'} -> case con_args' of
           -- GADT record declarations
-          RecConGADT _                    -> [ doConstrArgsWithDocs [] ]
+          RecConGADT _ _                  -> [ doConstrArgsWithDocs [] ]
           -- GADT prefix data constructors
           PrefixConGADT args | hasArgDocs -> [ doConstrArgsWithDocs args ]
           _                               -> []
@@ -1250,9 +1250,9 @@ ppr_mono_ty (HsFunTy _ mult ty1 ty2) u q e =
        , arr <+> ppr_mono_lty ty2 u q e
        ]
    where arr = case mult of
-                 HsLinearArrow _ _ -> lollipop u
+                 HsLinearArrow _ -> lollipop u
                  HsUnrestrictedArrow _ -> arrow u
-                 HsExplicitMult _ _ m -> multAnnotation <> ppr_mono_lty m u q e <+> arrow u
+                 HsExplicitMult _ m _ -> multAnnotation <> ppr_mono_lty m u q e <+> arrow u
 
 ppr_mono_ty (HsTupleTy _ con tys) u q _ =
   tupleParens con (map (ppLType u q HideEmptyContexts) tys)
