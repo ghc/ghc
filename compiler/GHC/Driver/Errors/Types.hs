@@ -2,7 +2,7 @@
 
 module GHC.Driver.Errors.Types (
     GhcMessage(..)
-  , DriverMessage(..), DriverMessages
+  , DriverMessage(..), DriverMessages, PsMessage(PsHeaderMessage)
   , BuildingCabalPackage(..)
   , WarningMessages
   , ErrorMessages
@@ -24,7 +24,7 @@ import GHC.Driver.Session
 import GHC.Types.Error
 import GHC.Unit.Module
 
-import GHC.Parser.Errors.Types ( PsMessage )
+import GHC.Parser.Errors.Types ( PsMessage(PsHeaderMessage) )
 import GHC.Tc.Errors.Types     ( TcRnMessage )
 import GHC.HsToCore.Errors.Types ( DsMessage )
 

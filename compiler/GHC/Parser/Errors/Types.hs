@@ -15,12 +15,31 @@ import GHC.Types.Name.Occurrence (OccName)
 import GHC.Types.Name.Reader
 import GHC.Unit.Module.Name
 import GHC.Utils.Outputable
+import GHC.Platform.ArchOS
 
 -- The type aliases below are useful to make some type signatures a bit more
 -- descriptive, like 'handleWarningsThrowErrors' in 'GHC.Driver.Main'.
 
 type PsWarning = PsMessage   -- /INVARIANT/: The diagnosticReason is a Warning reason
 type PsError   = PsMessage   -- /INVARIANT/: The diagnosticReason is ErrorWithoutFlag
+
+{-
+Note [Messages from GHC.Parser.Header
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+We group the messages from 'GHC.Parser.Header' because we need to
+be able to pattern match on them in the driver code. This is because
+in functions like 'GHC.Driver.Pipeline.preprocess' we want to handle
+only a specific subset of parser messages, during dependency analysis,
+and having a single constructor to handle them all is handy.
+
+-}
+
+data PsHeaderMessage
+  = PsErrParseLanguagePragma
+  | PsErrUnsupportedExt !String !ArchOS
+  | PsErrParseOptionsPragma !String
+
 
 data PsMessage
   =
@@ -29,6 +48,11 @@ data PsMessage
         willing to emit custom diagnostics.
     -}
    forall a. (Diagnostic a, Typeable a) => PsUnknownMessage a
+
+    {-| A group of parser messages emitted in 'GHC.Parser.Header'.
+        See Note [Messages from GHC.Parser.Header].
+    -}
+   | PsHeaderMessage !PsHeaderMessage
 
    {-| PsWarnTab is a warning (controlled by the -Wwarn-tabs flag) that occurs
        when tabulations (tabs) are found within a file.
