@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
@@ -20,7 +22,10 @@ module GHC.Data.List.SetOps (
         equivClasses,
 
         -- Indexing
-        getNth
+        getNth,
+
+        -- Membership
+        isIn, isn'tIn,
    ) where
 
 import GHC.Prelude
@@ -28,7 +33,7 @@ import GHC.Prelude
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
-import GHC.Driver.Ppr
+import GHC.Utils.Trace
 
 import qualified Data.List as L
 import qualified Data.List.NonEmpty as NE
@@ -176,3 +181,31 @@ findDupsEq _  [] = []
 findDupsEq eq (x:xs) | L.null eq_xs  = findDupsEq eq xs
                      | otherwise     = (x :| eq_xs) : findDupsEq eq neq_xs
     where (eq_xs, neq_xs) = L.partition (eq x) xs
+
+-- Debugging/specialising versions of \tr{elem} and \tr{notElem}
+
+# if !defined(DEBUG)
+isIn, isn'tIn :: Eq a => String -> a -> [a] -> Bool
+isIn    _msg x ys = x `elem` ys
+isn'tIn _msg x ys = x `notElem` ys
+
+# else /* DEBUG */
+isIn, isn'tIn :: (HasDebugCallStack, Eq a) => String -> a -> [a] -> Bool
+isIn msg x ys
+  = elem100 0 x ys
+  where
+    elem100 :: Eq a => Int -> a -> [a] -> Bool
+    elem100 _ _ [] = False
+    elem100 i x (y:ys)
+      | i > 100 = warnPprTrace True (text ("Over-long elem in " ++ msg)) (x `elem` (y:ys))
+      | otherwise = x == y || elem100 (i + 1) x ys
+
+isn'tIn msg x ys
+  = notElem100 0 x ys
+  where
+    notElem100 :: Eq a => Int -> a -> [a] -> Bool
+    notElem100 _ _ [] =  True
+    notElem100 i x (y:ys)
+      | i > 100 = warnPprTrace True (text ("Over-long notElem in " ++ msg)) (x `notElem` (y:ys))
+      | otherwise = x /= y && notElem100 (i + 1) x ys
+# endif /* DEBUG */

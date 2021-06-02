@@ -47,7 +47,6 @@ import GHC.Driver.Env
 import GHC.Driver.Errors.Types
 import GHC.Driver.Session
 import GHC.Driver.Backend
-import GHC.Driver.Ppr
 import GHC.Driver.Hooks
 import GHC.Driver.Plugins
 
@@ -67,6 +66,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Logger
+import GHC.Utils.Trace
 
 import GHC.Settings.Constants
 

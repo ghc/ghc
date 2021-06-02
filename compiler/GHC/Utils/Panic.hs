@@ -29,7 +29,6 @@ module GHC.Utils.Panic
    , assertPprM
    , massertPpr
    , sorry
-   , trace
    , panicDoc
    , sorryDoc
    , pgmErrorDoc
@@ -60,7 +59,6 @@ import Control.Monad.IO.Class
 import qualified Control.Monad.Catch as MC
 import Control.Concurrent
 import Data.Typeable      ( cast )
-import Debug.Trace        ( trace )
 import System.IO.Unsafe
 
 #if !defined(mingw32_HOST_OS)
