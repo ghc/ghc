@@ -392,7 +392,6 @@ import GHC.Types.TypeEnv
 import GHC.Unit
 import GHC.Unit.Env
 import GHC.Unit.External
-import GHC.Unit.State
 import GHC.Unit.Finder
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.ModGuts

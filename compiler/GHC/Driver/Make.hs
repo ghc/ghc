@@ -102,7 +102,6 @@ import GHC.Types.Name.Env
 
 import GHC.Unit
 import GHC.Unit.External
-import GHC.Unit.State
 import GHC.Unit.Finder
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Module.ModIface

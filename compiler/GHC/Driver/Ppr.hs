@@ -12,7 +12,7 @@ where
 import GHC.Prelude
 
 import GHC.Driver.Session
-import {-# SOURCE #-} GHC.Unit.State
+import GHC.Unit.State
 
 import GHC.Utils.Outputable
 import GHC.Utils.Ppr       ( Mode(..) )

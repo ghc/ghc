@@ -46,7 +46,6 @@ import GHC.Utils.Exception (bracket)
 import GHC.Utils.Ppr (Mode(..))
 
 import GHC.Unit
-import GHC.Unit.State
 import GHC.Unit.Finder      ( mkStubPaths )
 
 import GHC.Types.SrcLoc

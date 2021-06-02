@@ -59,7 +59,6 @@ import GHC.Utils.Logger
 import GHC.Unit
 import GHC.Unit.Env
 import GHC.Unit.External
-import GHC.Unit.State
 import GHC.Unit.Finder
 import GHC.Unit.Module.Graph
 import GHC.Unit.Module.ModSummary

@@ -12,7 +12,6 @@ import GHC.Prelude
 
 import GHC.Unit
 import GHC.Unit.Env
-import GHC.Unit.State
 
 import GHC.Core.TyCon
 
