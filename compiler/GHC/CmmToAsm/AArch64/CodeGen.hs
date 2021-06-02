@@ -1,4 +1,3 @@
-{-# language CPP #-}
 {-# language GADTs #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE BangPatterns #-}
@@ -9,8 +8,6 @@ module GHC.CmmToAsm.AArch64.CodeGen (
 )
 
 where
-
-#include "HsVersions.h"
 
 -- NCG stuff:
 import GHC.Prelude hiding (EQ)

@@ -1,11 +1,8 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# language CPP #-}
 
 module GHC.CmmToAsm.AArch64.Instr
 
 where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 

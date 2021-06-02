@@ -1,7 +1,4 @@
-{-# language CPP #-}
 module GHC.CmmToAsm.AArch64.RegInfo where
-
-#include "HsVersions.h"
 
 import GHC.Prelude
 
