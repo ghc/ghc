@@ -169,12 +169,9 @@ newtype CprSig = CprSig { getCprSig :: CprType }
 -- unleashable at that arity. See Note [Understanding DmdType and DmdSig] in
 -- "GHC.Types.Demand"
 mkCprSigForArity :: Arity -> CprType -> CprSig
-mkCprSigForArity arty ty@(CprType n cpr)
-  | arty /= n         = topCprSig
-      -- Trim on arity mismatch
-  | ConCpr t _ <- cpr = CprSig (CprType n (flatConCpr t))
-      -- Flatten nested CPR info, we don't exploit it (yet)
-  | otherwise         = CprSig ty
+mkCprSigForArity arty ty@(CprType n _)
+  | arty /= n = topCprSig -- Trim on arity mismatch
+  | otherwise = CprSig ty
 
 topCprSig :: CprSig
 topCprSig = CprSig topCprType
