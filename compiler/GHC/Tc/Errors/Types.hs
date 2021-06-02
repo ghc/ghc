@@ -14,10 +14,16 @@ import GHC.Types.Name.Reader
 import GHC.Utils.Outputable
 import Data.Typeable
 import GHC.Core.Type (Type, Var)
+import GHC.Unit.State (UnitState)
 
 -- The majority of TcRn messages come with extra context about the error,
 -- and this newtype captures it.
-newtype ErrInfo = ErrInfo { getErrInfo :: SDoc }
+data ErrInfo = ErrInfo {
+    errInfoContext :: !SDoc
+    -- ^ Extra context associated to the error.
+  , errInfoSupplementary :: !SDoc
+    -- ^ Extra supplementary info associated to the error.
+  }
 
 -- | An error which might arise during typechecking/renaming.
 data TcRnMessage where
@@ -26,13 +32,21 @@ data TcRnMessage where
   -}
   TcRnUnknownMessage :: (Diagnostic a, Typeable a) => a -> TcRnMessage
 
+  TcRnUnknownMessageWithInfo :: (Diagnostic a, Typeable a)
+                             => !UnitState
+                             -- ^ The 'UnitState' will allow us to pretty-print
+                             -- some diagnostics with more details.
+                             -> !ErrInfo
+                             -- ^ Any extra info associated with the error.
+                             -> a
+                             -> TcRnMessage
+
   {-| A levity polymorphism check happening during TcRn.
   -}
   TcLevityPolyInType :: !Type
                      -> !LevityCheckProvenance
                      -> !ErrInfo -- Extra info accumulated in the TcM monad
                      -> TcRnMessage
-
 
   {-| TcRnImplicitLift is a warning (controlled with -Wimplicit-lift) that occurs when
       a Template Haskell quote implicitly uses 'lift'.
