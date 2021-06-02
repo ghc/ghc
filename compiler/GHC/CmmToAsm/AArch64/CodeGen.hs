@@ -49,7 +49,7 @@ import GHC.Data.OrdList
 import GHC.Utils.Outputable
 
 import Control.Monad    ( mapAndUnzipM, when, foldM )
-import Data.Bits
+import Data.Bits hiding ( shiftL, shiftR )
 import Data.Word
 import Data.Maybe
 import GHC.Float
