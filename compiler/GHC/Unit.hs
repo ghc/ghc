@@ -17,8 +17,7 @@ import GHC.Unit.Info
 import GHC.Unit.Parser
 import GHC.Unit.Module
 import GHC.Unit.Home
--- source import to avoid DynFlags import loops
-import {-# SOURCE #-} GHC.Unit.State
+import GHC.Unit.State
 
 {-
 
