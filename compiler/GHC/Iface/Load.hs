@@ -415,7 +415,8 @@ loadInterfaceWithException :: SDoc -> Module -> WhereFrom -> IfM lcl ModIface
 loadInterfaceWithException doc mod_name where_from
   = do
     dflags <- getDynFlags
-    withException dflags (loadInterface doc mod_name where_from)
+    let ctx = initSDocContext dflags defaultUserStyle
+    withException ctx (loadInterface doc mod_name where_from)
 
 ------------------
 loadInterface :: SDoc -> Module -> WhereFrom

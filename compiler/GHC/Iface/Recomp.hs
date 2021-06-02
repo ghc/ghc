@@ -1173,11 +1173,12 @@ getOrphanHashes hsc_env mods = do
     hpt        = hsc_HPT hsc_env
     dflags     = hsc_dflags hsc_env
     pit        = eps_PIT eps
+    ctx        = initSDocContext dflags defaultUserStyle
     get_orph_hash mod =
           case lookupIfaceByModule hpt pit mod of
             Just iface -> return (mi_orphan_hash (mi_final_exts iface))
             Nothing    -> do -- similar to 'mkHashFun'
-                iface <- initIfaceLoad hsc_env . withException dflags
+                iface <- initIfaceLoad hsc_env . withException ctx
                             $ loadInterface (text "getOrphanHashes") mod ImportBySystem
                 return (mi_orphan_hash (mi_final_exts iface))
 
@@ -1470,6 +1471,7 @@ mkHashFun hsc_env eps name
       dflags = hsc_dflags hsc_env
       hpt = hsc_HPT hsc_env
       pit = eps_PIT eps
+      ctx = initSDocContext dflags defaultUserStyle
       occ = nameOccName name
       orig_mod = nameModule name
       lookup mod = do
@@ -1481,7 +1483,7 @@ mkHashFun hsc_env eps name
                       -- requirements; we didn't do any /real/ typechecking
                       -- so there's no guarantee everything is loaded.
                       -- Kind of a heinous hack.
-                      initIfaceLoad hsc_env . withException dflags
+                      initIfaceLoad hsc_env . withException ctx
                           $ withoutDynamicNow
                             -- For some unknown reason, we need to reset the
                             -- dynamicNow bit, otherwise only dynamic

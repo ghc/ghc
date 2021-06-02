@@ -21,6 +21,7 @@ import GHC.Prelude
 
 import GHC.Driver.Env
 import GHC.Driver.Ppr
+import GHC.Driver.Session
 
 import GHC.Types.Basic (TypeOrKind(..))
 import GHC.Types.Fixity (defaultFixity)
@@ -283,11 +284,12 @@ findExtraSigImports' :: HscEnv
 findExtraSigImports' hsc_env HsigFile modname =
     fmap unionManyUniqDSets (forM reqs $ \(Module iuid mod_name) ->
         (initIfaceLoad hsc_env
-            . withException dflags
+            . withException ctx
             $ moduleFreeHolesPrecise (text "findExtraSigImports")
                 (mkModule (VirtUnit iuid) mod_name)))
   where
     dflags = hsc_dflags hsc_env
+    ctx = initSDocContext dflags defaultUserStyle
     unit_state = hsc_units hsc_env
     reqs = requirementMerges unit_state modname
 
@@ -598,8 +600,9 @@ mergeSignatures
     ireq_ifaces0 <- liftIO $ forM reqs $ \(Module iuid mod_name) -> do
         let m = mkModule (VirtUnit iuid) mod_name
             im = fst (getModuleInstantiation m)
+            ctx = initSDocContext dflags defaultUserStyle
         fmap fst
-         . withException dflags
+         . withException ctx
          $ findAndReadIface logger nc fc hooks unit_state home_unit dflags
                             (text "mergeSignatures") im m NotBoot
 
