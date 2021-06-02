@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-} -- instance Diagnostic TcRnMessage
+{-# LANGUAGE RecordWildCards #-}
 
 module GHC.Tc.Errors.Ppr (
     formatLevPolyErr
@@ -16,18 +17,22 @@ import GHC.Types.Var.Env (emptyTidyEnv)
 import GHC.Driver.Flags
 import GHC.Hs
 import GHC.Utils.Outputable
+import GHC.Unit.State (pprWithUnitState, UnitState)
+
 
 instance Diagnostic TcRnMessage where
   diagnosticMessage = \case
     TcRnUnknownMessage m
       -> diagnosticMessage m
-    TcLevityPolyInType ty prov (ErrInfo extra)
-      -> mkDecorated [pprLevityPolyInType ty prov, extra]
-    TcRnImplicitLift id_or_name errInfo
-      -> mkDecorated [text "The variable" <+> quotes (ppr id_or_name) <+>
-                      text "is implicitly lifted in the TH quotation"
-                     , getErrInfo errInfo
-                     ]
+    TcLevityPolyInType ty prov (ErrInfo extra supplementary)
+      -> mkDecorated [pprLevityPolyInType ty prov, extra, supplementary]
+    TcRnUnknownMessageWithInfo unit_state err_info msg
+      -> messageWithInfoDiagnosticMessage unit_state err_info (diagnosticMessage msg)
+    TcRnImplicitLift id_or_name ErrInfo{..}
+      -> mkDecorated $
+           ( text "The variable" <+> quotes (ppr id_or_name) <+>
+             text "is implicitly lifted in the TH quotation"
+           ) : [errInfoContext, errInfoSupplementary]
     TcRnUnusedPatternBinds bind
       -> mkDecorated [hang (text "This pattern-binding binds no variables:") 2 (ppr bind)]
     TcRnDodgyImports name
@@ -44,6 +49,8 @@ instance Diagnostic TcRnMessage where
       -> diagnosticReason m
     TcLevityPolyInType{}
       -> ErrorWithoutFlag
+    TcRnUnknownMessageWithInfo _ _ m
+      -> diagnosticReason m
     TcRnImplicitLift{}
       -> WarningWithFlag Opt_WarnImplicitLift
     TcRnUnusedPatternBinds{}
@@ -60,6 +67,8 @@ instance Diagnostic TcRnMessage where
       -> diagnosticHints m
     TcLevityPolyInType{}
       -> noHints
+    TcRnUnknownMessageWithInfo _ _ m
+      -> diagnosticHints m
     TcRnImplicitLift{}
       -> noHints
     TcRnUnusedPatternBinds{}
@@ -70,6 +79,15 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnMissingImportList{}
       -> noHints
+
+messageWithInfoDiagnosticMessage :: UnitState
+                                 -> ErrInfo
+                                 -> DecoratedSDoc
+                                 -> DecoratedSDoc
+messageWithInfoDiagnosticMessage unit_state ErrInfo{..} important =
+  let err_info' = map (pprWithUnitState unit_state) [errInfoContext, errInfoSupplementary]
+      in (mapDecoratedSDoc (pprWithUnitState unit_state) important) `unionDecoratedSDoc`
+         mkDecorated err_info'
 
 dodgy_msg :: (Outputable a, Outputable b) => SDoc -> a -> b -> SDoc
 dodgy_msg kind tc ie
