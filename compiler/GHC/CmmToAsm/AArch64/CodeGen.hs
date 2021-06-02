@@ -1,7 +1,9 @@
 {-# language GADTs #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE BinaryLiterals, NumericUnderscores #-}
+{-# LANGUAGE BinaryLiterals #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE NumericUnderscores #-}
 module GHC.CmmToAsm.AArch64.CodeGen (
       cmmTopCodeGen
     , generateJumpTableForInstr
@@ -1245,11 +1247,11 @@ genCCall target dest_regs arg_regs bid = do
     unsupported :: Show a => a -> b
     unsupported mop = panic ("outOfLineCmmOp: " ++ show mop
                           ++ " not supported here")
-    mkCCall :: String -> NatM (InstrBlock, Maybe BlockId)
+    mkCCall :: FastString -> NatM (InstrBlock, Maybe BlockId)
     mkCCall name = do
       config <- getConfig
       target <- cmmMakeDynamicReference config CallReference $
-          mkForeignLabel (fsLit name) Nothing ForeignLabelInThisPackage IsFunction
+          mkForeignLabel name Nothing ForeignLabelInThisPackage IsFunction
       let cconv = ForeignConvention CCallConv [NoHint] [NoHint] CmmMayReturn
       genCCall (ForeignTarget target cconv) dest_regs arg_regs bid
 
