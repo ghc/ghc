@@ -848,13 +848,13 @@ sl_name :: Entry -> String
 sl_name i = "(fsLit \"" ++ name i ++ "\") "
 
 ppTyVar :: String -> String
-ppTyVar "a" = "alphaTyVar"
-ppTyVar "b" = "betaTyVar"
-ppTyVar "c" = "gammaTyVar"
-ppTyVar "s" = "deltaTyVar"
-ppTyVar "o" = "runtimeRep1TyVar, openAlphaTyVar"
-ppTyVar "p" = "runtimeRep2TyVar, openBetaTyVar"
-ppTyVar "v" = "levity1TyVar, levPolyTyVar1"
+ppTyVar "a" = "alphaTyVarSpec"
+ppTyVar "b" = "betaTyVarSpec"
+ppTyVar "c" = "gammaTyVarSpec"
+ppTyVar "s" = "deltaTyVarSpec"
+ppTyVar "o" = "runtimeRep1TyVarInf, openAlphaTyVarSpec"
+ppTyVar "p" = "runtimeRep2TyVarInf, openBetaTyVarSpec"
+ppTyVar "v" = "levity1TyVarInf, levPolyTyVar1Spec"
 ppTyVar _   = error "Unknown type var"
 
 ppType :: Ty -> String
