@@ -67,23 +67,10 @@ module GHC.Core.Utils (
 import GHC.Prelude
 import GHC.Platform
 
-import GHC.Driver.Ppr
-
 import GHC.Core
-import GHC.Builtin.Names (makeStaticName, unsafeEqualityProofName)
 import GHC.Core.Ppr
 import GHC.Core.FVs( exprFreeVars )
-import GHC.Types.Var
-import GHC.Types.SrcLoc
-import GHC.Types.Var.Env
-import GHC.Types.Var.Set
-import GHC.Types.Name
-import GHC.Types.Literal
-import GHC.Types.Tickish
 import GHC.Core.DataCon
-import GHC.Builtin.PrimOps
-import GHC.Types.Id
-import GHC.Types.Id.Info
 import GHC.Core.Type as Type
 import GHC.Core.FamInstEnv
 import GHC.Core.Predicate
@@ -91,24 +78,41 @@ import GHC.Core.TyCo.Rep( TyCoBinder(..), TyBinder )
 import GHC.Core.Coercion
 import GHC.Core.TyCon
 import GHC.Core.Multiplicity
+
+import GHC.Builtin.Names (makeStaticName, unsafeEqualityProofName)
+import GHC.Builtin.PrimOps
+
+import GHC.Types.Var
+import GHC.Types.SrcLoc
+import GHC.Types.Var.Env
+import GHC.Types.Var.Set
+import GHC.Types.Name
+import GHC.Types.Literal
+import GHC.Types.Tickish
+import GHC.Types.Id
+import GHC.Types.Id.Info
 import GHC.Types.Unique
+import GHC.Types.Basic     ( Arity, FullArgCount )
+import GHC.Types.Unique.Set
+
+import GHC.Data.FastString
+import GHC.Data.Maybe
+import GHC.Data.List.SetOps( minusList )
+import GHC.Data.Pair
+import GHC.Data.OrdList
+
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
-import GHC.Data.FastString
-import GHC.Data.Maybe
-import GHC.Data.List.SetOps( minusList )
-import GHC.Types.Basic     ( Arity, FullArgCount )
 import GHC.Utils.Misc
-import GHC.Data.Pair
+import GHC.Utils.Trace
+
 import Data.ByteString     ( ByteString )
 import Data.Function       ( on )
 import Data.List           ( sort, sortBy, partition, zipWith4, mapAccumL )
 import Data.Ord            ( comparing )
-import GHC.Data.OrdList
 import qualified Data.Set as Set
-import GHC.Types.Unique.Set
 
 {-
 ************************************************************************

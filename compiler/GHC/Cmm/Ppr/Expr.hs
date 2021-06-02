@@ -44,12 +44,11 @@ where
 
 import GHC.Prelude
 
-import GHC.Driver.Ppr
-
 import GHC.Platform
 import GHC.Cmm.Expr
 
 import GHC.Utils.Outputable
+import GHC.Utils.Trace
 
 import Data.Maybe
 import Numeric ( fromRat )
