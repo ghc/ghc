@@ -32,10 +32,12 @@ import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcSyntaxOp, tcSyntaxOpGen, tcInferRho )
 import GHC.Hs
 import GHC.Hs.Syn.Type
 import GHC.Rename.Utils
+import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Zonk
 import GHC.Tc.Gen.Sig( TcPragEnv, lookupPragEnv, addInlinePrags )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Instantiate
+import GHC.Types.Error
 import GHC.Types.Id
 import GHC.Types.Var
 import GHC.Types.Name
@@ -773,9 +775,10 @@ tcPatSig in_pat_bind sig res_ty
                                           2 (ppr res_ty)) ]
             ; return (tidy_env, msg) }
 
-patBindSigErr :: [(Name,TcTyVar)] -> SDoc
+patBindSigErr :: [(Name,TcTyVar)] -> TcRnMessage
 patBindSigErr sig_tvs
-  = hang (text "You cannot bind scoped type variable" <> plural sig_tvs
+  = TcRnUnknownMessage $ mkPlainError noHints $
+    hang (text "You cannot bind scoped type variable" <> plural sig_tvs
           <+> pprQuotedList (map fst sig_tvs))
        2 (text "in a pattern binding signature")
 
@@ -946,7 +949,8 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty_scaled
         ; gadts_on    <- xoptM LangExt.GADTs
         ; families_on <- xoptM LangExt.TypeFamilies
         ; checkTc (no_equalities || gadts_on || families_on)
-                  (text "A pattern match on a GADT requires the" <+>
+                  (TcRnUnknownMessage $ mkPlainError noHints $
+                   text "A pattern match on a GADT requires the" <+>
                    text "GADTs or TypeFamilies language extension")
                   -- #2905 decided that a *pattern-match* of a GADT
                   -- should require the GADT language flag.
@@ -1289,7 +1293,8 @@ tcConTyArg penv rn_ty thing_inside
                -- by the calls to unifyType in tcConArgs, which will also unify
                -- kinds.
        ; when (not (null sig_ibs) && inPatBind penv) $
-           addErr (text "Binding type variables is not allowed in pattern bindings")
+           addErr (TcRnUnknownMessage $ mkPlainError noHints $
+                     text "Binding type variables is not allowed in pattern bindings")
        ; result <- tcExtendNameTyVarEnv sig_wcs $
                    tcExtendNameTyVarEnv sig_ibs $
                    thing_inside
@@ -1319,9 +1324,10 @@ addDataConStupidTheta data_con inst_tys
 conTyArgArityErr :: ConLike
                  -> Int   -- expected # of arguments
                  -> Int   -- actual # of arguments
-                 -> SDoc
+                 -> TcRnMessage
 conTyArgArityErr con_like expected_number actual_number
-  = text "Too many type arguments in constructor pattern for" <+> quotes (ppr con_like) $$
+  = TcRnUnknownMessage $ mkPlainError noHints $
+    text "Too many type arguments in constructor pattern for" <+> quotes (ppr con_like) $$
     text "Expected no more than" <+> ppr expected_number <> semi <+> text "got" <+> ppr actual_number
 
 {-
@@ -1453,18 +1459,21 @@ checkExistentials _ _ (PE { pe_ctxt = LamPat ProcExpr })  = failWithTc existenti
 checkExistentials _ _ (PE { pe_lazy = True })             = failWithTc existentialLazyPat
 checkExistentials _ _ _                                   = return ()
 
-existentialLazyPat :: SDoc
+existentialLazyPat :: TcRnMessage
 existentialLazyPat
-  = hang (text "An existential or GADT data constructor cannot be used")
+  = TcRnUnknownMessage $ mkPlainError noHints $
+    hang (text "An existential or GADT data constructor cannot be used")
        2 (text "inside a lazy (~) pattern")
 
-existentialProcPat :: SDoc
+existentialProcPat :: TcRnMessage
 existentialProcPat
-  = text "Proc patterns cannot use existential or GADT data constructors"
+  = TcRnUnknownMessage $ mkPlainError noHints $
+    text "Proc patterns cannot use existential or GADT data constructors"
 
-badFieldCon :: ConLike -> FieldLabelString -> SDoc
+badFieldCon :: ConLike -> FieldLabelString -> TcRnMessage
 badFieldCon con field
-  = hsep [text "Constructor" <+> quotes (ppr con),
+  = TcRnUnknownMessage $ mkPlainError noHints $
+    hsep [text "Constructor" <+> quotes (ppr con),
           text "does not have field", quotes (ppr field)]
 
 polyPatSig :: TcType -> SDoc

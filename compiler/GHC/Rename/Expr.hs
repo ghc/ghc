@@ -30,6 +30,7 @@ import GHC.Prelude
 import GHC.Rename.Bind ( rnLocalBindsAndThen, rnLocalValBindsLHS, rnLocalValBindsRHS
                         , rnMatchGroup, rnGRHS, makeMiniFixityEnv)
 import GHC.Hs
+import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Env ( isBrackStage )
 import GHC.Tc.Utils.Monad
 import GHC.Unit.Module ( getModule )
@@ -437,11 +438,13 @@ rnExpr (RecordUpd { rupd_expr = expr, rupd_flds = rbinds })
             }
       Right flds ->  -- 'OverloadedRecordUpdate' is in effect. Record dot update desugaring.
         do { ; unlessXOptM LangExt.RebindableSyntax $
-                 addErr $ text "RebindableSyntax is required if OverloadedRecordUpdate is enabled."
+                 addErr $ TcRnUnknownMessage $ mkPlainError noHints $
+                   text "RebindableSyntax is required if OverloadedRecordUpdate is enabled."
              ; let punnedFields = [fld | (L _ fld) <- flds, hfbPun fld]
              ; punsEnabled <-xoptM LangExt.RecordPuns
              ; unless (null punnedFields || punsEnabled) $
-                 addErr $ text "For this to work enable NamedFieldPuns."
+                 addErr $ TcRnUnknownMessage $ mkPlainError noHints $
+                   text "For this to work enable NamedFieldPuns."
              ; (getField, fv_getField) <- lookupSyntaxName getFieldName
              ; (setField, fv_setField) <- lookupSyntaxName setFieldName
              ; (e, fv_e) <- rnLExpr expr
@@ -516,12 +519,13 @@ rnExpr e@(HsStatic _ expr) = do
     -- absolutely prepared to cope with static forms, we check for
     -- -XStaticPointers here as well.
     unlessXOptM LangExt.StaticPointers $
-      addErr $ hang (text "Illegal static expression:" <+> ppr e)
+      addErr $ TcRnUnknownMessage $ mkPlainError noHints $
+        hang (text "Illegal static expression:" <+> ppr e)
                   2 (text "Use StaticPointers to enable this extension")
     (expr',fvExpr) <- rnLExpr expr
     stage <- getStage
     case stage of
-      Splice _ -> addErr $ sep
+      Splice _ -> addErr $ TcRnUnknownMessage $ mkPlainError noHints $ sep
              [ text "static forms cannot be used in splices:"
              , nest 2 $ ppr e
              ]
@@ -1264,7 +1268,8 @@ rnParallelStmts ctxt return_op segs thing_inside
            ; return ((seg':segs', thing), fvs) }
 
     cmpByOcc n1 n2 = nameOccName n1 `compare` nameOccName n2
-    dupErr vs = addErr (text "Duplicate binding in parallel list comprehension for:"
+    dupErr vs = addErr $ TcRnUnknownMessage $ mkPlainError noHints $
+                  (text "Duplicate binding in parallel list comprehension for:"
                     <+> quotes (ppr (NE.head vs)))
 
 lookupQualifiedDoStmtName :: HsStmtContext GhcRn -> Name -> RnM (SyntaxExpr GhcRn, FreeVars)
@@ -2315,10 +2320,13 @@ okEmpty :: HsStmtContext a -> Bool
 okEmpty (PatGuard {}) = True
 okEmpty _             = False
 
-emptyErr :: HsStmtContext GhcRn -> SDoc
-emptyErr (ParStmtCtxt {})   = text "Empty statement group in parallel comprehension"
-emptyErr (TransStmtCtxt {}) = text "Empty statement group preceding 'group' or 'then'"
-emptyErr ctxt               = text "Empty" <+> pprStmtContext ctxt
+emptyErr :: HsStmtContext GhcRn -> TcRnMessage
+emptyErr (ParStmtCtxt {})   = TcRnUnknownMessage $ mkPlainError noHints $
+  text "Empty statement group in parallel comprehension"
+emptyErr (TransStmtCtxt {}) = TcRnUnknownMessage $ mkPlainError noHints $
+  text "Empty statement group preceding 'group' or 'then'"
+emptyErr ctxt               = TcRnUnknownMessage $ mkPlainError noHints $
+  text "Empty" <+> pprStmtContext ctxt
 
 ----------------------
 checkLastStmt :: AnnoBody body => HsStmtContext GhcRn
@@ -2338,7 +2346,9 @@ checkLastStmt ctxt lstmt@(L loc stmt)
           BodyStmt _ e _ _ -> return (L loc (mkLastStmt e))
           LastStmt {}      -> return lstmt   -- "Deriving" clauses may generate a
                                              -- LastStmt directly (unlike the parser)
-          _                -> do { addErr (hang last_error 2 (ppr stmt)); return lstmt }
+          _                -> do { addErr $ TcRnUnknownMessage $ mkPlainError noHints $
+                                     (hang last_error 2 (ppr stmt))
+                                 ; return lstmt }
     last_error = (text "The last statement in" <+> pprAStmtContext ctxt
                   <+> text "must be an expression")
 
@@ -2358,7 +2368,7 @@ checkStmt ctxt (L _ stmt)
   = do { dflags <- getDynFlags
        ; case okStmt dflags ctxt stmt of
            IsValid        -> return ()
-           NotValid extra -> addErr (msg $$ extra) }
+           NotValid extra -> addErr $ TcRnUnknownMessage $ mkPlainError noHints (msg $$ extra) }
   where
    msg = sep [ text "Unexpected" <+> pprStmtCat stmt <+> text "statement"
              , text "in" <+> pprAStmtContext ctxt ]
@@ -2444,17 +2454,21 @@ checkTupleSection args
   = do  { tuple_section <- xoptM LangExt.TupleSections
         ; checkErr (all tupArgPresent args || tuple_section) msg }
   where
-    msg = text "Illegal tuple section: use TupleSections"
+    msg :: TcRnMessage
+    msg = TcRnUnknownMessage $ mkPlainError noHints $
+      text "Illegal tuple section: use TupleSections"
 
 ---------
-sectionErr :: HsExpr GhcPs -> SDoc
+sectionErr :: HsExpr GhcPs -> TcRnMessage
 sectionErr expr
-  = hang (text "A section must be enclosed in parentheses")
+  = TcRnUnknownMessage $ mkPlainError noHints $
+    hang (text "A section must be enclosed in parentheses")
        2 (text "thus:" <+> (parens (ppr expr)))
 
-badIpBinds :: Outputable a => SDoc -> a -> SDoc
+badIpBinds :: Outputable a => SDoc -> a -> TcRnMessage
 badIpBinds what binds
-  = hang (text "Implicit-parameter bindings illegal in" <+> what)
+  = TcRnUnknownMessage $ mkPlainError noHints $
+    hang (text "Implicit-parameter bindings illegal in" <+> what)
          2 (ppr binds)
 
 ---------

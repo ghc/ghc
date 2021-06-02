@@ -42,6 +42,7 @@ import GHC.Core.Class
 import GHC.Core.TyCon
 import GHC.Core.Predicate
 import GHC.Tc.Types.Origin
+import GHC.Tc.Errors.Types
 
 -- others:
 import GHC.Iface.Type    ( pprIfaceType, pprIfaceTypeApp )
@@ -69,6 +70,7 @@ import GHC.Builtin.Uniques  ( mkAlphaTyVarUnique )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
+import Data.Bifunctor
 import Data.Foldable
 import Data.Function
 import Data.List        ( (\\), nub )
@@ -259,7 +261,10 @@ checkUserTypeError = check
 
   fail_with msg = do { env0 <- tcInitTidyEnv
                      ; let (env1, tidy_msg) = tidyOpenType env0 msg
-                     ; failWithTcM (env1, pprUserTypeErrorTy tidy_msg) }
+                     ; failWithTcM (env1
+                                   , TcRnUnknownMessage $
+                                       mkPlainError noHints (pprUserTypeErrorTy tidy_msg))
+                     }
 
 
 {- Note [When we don't check for ambiguity]
@@ -915,10 +920,11 @@ check_arg_type type_syn (ve@ValidityEnv{ve_ctxt = ctxt, ve_rank = rank}) ty
         ; check_type (ve{ve_ctxt = ctxt', ve_rank = rank'}) ty }
 
 ----------------------------------------
-forAllTyErr :: TidyEnv -> Rank -> Type -> (TidyEnv, SDoc)
+forAllTyErr :: TidyEnv -> Rank -> Type -> (TidyEnv, TcRnMessage)
 forAllTyErr env rank ty
    = ( env
-     , vcat [ hang herald 2 (ppr_tidy env ty)
+     , TcRnUnknownMessage $ mkPlainError noHints $
+       vcat [ hang herald 2 (ppr_tidy env ty)
             , suggestion ] )
   where
     (tvs, _rho) = tcSplitForAllTyVars ty
@@ -946,10 +952,11 @@ checkEscapingKind env tvbs theta tau =
         -- If there are any constraints, the kind is *. (#11405)
 
 forAllEscapeErr :: TidyEnv -> [TyVarBinder] -> ThetaType -> Type -> Kind
-                -> (TidyEnv, SDoc)
+                -> (TidyEnv, TcRnMessage)
 forAllEscapeErr env tvbs theta tau tau_kind
   = ( env
-    , vcat [ hang (text "Quantified type's kind mentions quantified type variable")
+    , TcRnUnknownMessage $ mkPlainError noHints $
+      vcat [ hang (text "Quantified type's kind mentions quantified type variable")
                 2 (text "type:" <+> quotes (ppr (mkSigmaTy tvbs theta tau)))
                 -- NB: Don't tidy this type since the tvbs were already tidied
                 -- previously, and re-tidying them will make the names of type
@@ -976,11 +983,13 @@ its binding site! This is not desirable, so we establish a validity check
 kinds in this way.
 -}
 
-ubxArgTyErr :: TidyEnv -> Type -> (TidyEnv, SDoc)
+ubxArgTyErr :: TidyEnv -> Type -> (TidyEnv, TcRnMessage)
 ubxArgTyErr env ty
-  = ( env, vcat [ sep [ text "Illegal unboxed tuple type as function argument:"
-                      , ppr_tidy env ty ]
-                , text "Perhaps you intended to use UnboxedTuples" ] )
+  = ( env
+    , TcRnUnknownMessage $ mkPlainError noHints $
+      vcat [ sep [ text "Illegal unboxed tuple type as function argument:"
+                 , ppr_tidy env ty ]
+                 , text "Perhaps you intended to use UnboxedTuples" ] )
 
 checkConstraintsOK :: ValidityEnv -> ThetaType -> Type -> TcM ()
 checkConstraintsOK ve theta ty
@@ -992,23 +1001,25 @@ checkConstraintsOK ve theta ty
     checkTcM (all isEqPred theta) $
     constraintTyErr (ve_tidy_env ve) ty
 
-constraintTyErr :: TidyEnv -> Type -> (TidyEnv, SDoc)
+constraintTyErr :: TidyEnv -> Type -> (TidyEnv, TcRnMessage)
 constraintTyErr env ty
-  = (env, text "Illegal constraint in a kind:" <+> ppr_tidy env ty)
+  = (env
+    , TcRnUnknownMessage $ mkPlainError noHints $
+        text "Illegal constraint in a kind:" <+> ppr_tidy env ty)
 
 -- | Reject a use of visible, dependent quantification in the type of a term.
-illegalVDQTyErr :: TidyEnv -> Type -> (TidyEnv, SDoc)
+illegalVDQTyErr :: TidyEnv -> Type -> (TidyEnv, TcRnMessage)
 illegalVDQTyErr env ty =
-  (env, vcat
+  (env, TcRnUnknownMessage $ mkPlainError noHints $ vcat
   [ hang (text "Illegal visible, dependent quantification" <+>
           text "in the type of a term:")
        2 (ppr_tidy env ty)
   , text "(GHC does not yet support this)" ] )
 
 -- | Reject uses of linear function arrows in kinds.
-linearFunKindErr :: TidyEnv -> Type -> (TidyEnv, SDoc)
+linearFunKindErr :: TidyEnv -> Type -> (TidyEnv, TcRnMessage)
 linearFunKindErr env ty =
-  (env, text "Illegal linear function in a kind:" <+> ppr_tidy env ty)
+  (env, TcRnUnknownMessage $ mkPlainError noHints $ text "Illegal linear function in a kind:" <+> ppr_tidy env ty)
 
 {-
 Note [Liberal type synonyms]
@@ -1099,9 +1110,9 @@ check_valid_theta _ _ _ []
   = return ()
 check_valid_theta env ctxt expand theta
   = do { dflags <- getDynFlags
-       ; diagnosticTcM (WarningWithFlag Opt_WarnDuplicateConstraints)
-                       (notNull dups)
-                       (dupPredWarn env dups)
+       ; let dia m = TcRnUnknownMessage $
+               mkPlainDiagnostic (WarningWithFlag Opt_WarnDuplicateConstraints) noHints m
+       ; diagnosticTcM (notNull dups) (second dia (dupPredWarn env dups))
        ; traceTc "check_valid_theta" (ppr theta)
        ; mapM_ (check_pred_ty env dflags ctxt expand) theta }
   where
@@ -1294,8 +1305,11 @@ checkSimplifiableClassConstraint env dflags ctxt cls tys
   = do { result <- matchGlobalInst dflags False cls tys
        ; case result of
            OneInst { cir_what = what }
-              -> addDiagnosticTc (WarningWithFlag Opt_WarnSimplifiableClassConstraints)
-                                 (simplifiable_constraint_warn what)
+              -> let dia = TcRnUnknownMessage $
+                       mkPlainDiagnostic (WarningWithFlag Opt_WarnSimplifiableClassConstraints)
+                                         noHints
+                                         (simplifiable_constraint_warn what)
+                 in addDiagnosticTc dia
            _          -> return () }
   where
     pred = mkClassPred cls tys
@@ -1402,40 +1416,47 @@ checkThetaCtxt ctxt theta env
                   , text "While checking" <+> pprUserTypeCtxt ctxt ] )
 
 eqPredTyErr, predTupleErr, predIrredErr,
-   badQuantHeadErr :: TidyEnv -> PredType -> (TidyEnv, SDoc)
+   badQuantHeadErr :: TidyEnv -> PredType -> (TidyEnv, TcRnMessage)
 badQuantHeadErr env pred
   = ( env
-    , hang (text "Quantified predicate must have a class or type variable head:")
+    , TcRnUnknownMessage $ mkPlainError noHints $
+      hang (text "Quantified predicate must have a class or type variable head:")
          2 (ppr_tidy env pred) )
 eqPredTyErr  env pred
   = ( env
-    , text "Illegal equational constraint" <+> ppr_tidy env pred $$
+    , TcRnUnknownMessage $ mkPlainError noHints $
+      text "Illegal equational constraint" <+> ppr_tidy env pred $$
       parens (text "Use GADTs or TypeFamilies to permit this") )
 predTupleErr env pred
   = ( env
-    , hang (text "Illegal tuple constraint:" <+> ppr_tidy env pred)
+    , TcRnUnknownMessage $ mkPlainError noHints $
+      hang (text "Illegal tuple constraint:" <+> ppr_tidy env pred)
          2 (parens constraintKindsMsg) )
 predIrredErr env pred
   = ( env
-    , hang (text "Illegal constraint:" <+> ppr_tidy env pred)
+    , TcRnUnknownMessage $ mkPlainError noHints $
+      hang (text "Illegal constraint:" <+> ppr_tidy env pred)
          2 (parens constraintKindsMsg) )
 
-predTyVarErr :: TidyEnv -> PredType -> (TidyEnv, SDoc)
+predTyVarErr :: TidyEnv -> PredType -> (TidyEnv, TcRnMessage)
 predTyVarErr env pred
   = (env
-    , vcat [ hang (text "Non type-variable argument")
+    , TcRnUnknownMessage $ mkPlainError noHints $
+      vcat [ hang (text "Non type-variable argument")
                 2 (text "in the constraint:" <+> ppr_tidy env pred)
            , parens (text "Use FlexibleContexts to permit this") ])
 
-badIPPred :: TidyEnv -> PredType -> (TidyEnv, SDoc)
+badIPPred :: TidyEnv -> PredType -> (TidyEnv, TcRnMessage)
 badIPPred env pred
   = ( env
-    , text "Illegal implicit parameter" <+> quotes (ppr_tidy env pred) )
+    , TcRnUnknownMessage $ mkPlainError noHints $
+      text "Illegal implicit parameter" <+> quotes (ppr_tidy env pred) )
 
-constraintSynErr :: TidyEnv -> Type -> (TidyEnv, SDoc)
+constraintSynErr :: TidyEnv -> Type -> (TidyEnv, TcRnMessage)
 constraintSynErr env kind
   = ( env
-    , hang (text "Illegal constraint synonym of kind:" <+> quotes (ppr_tidy env kind))
+    , TcRnUnknownMessage $ mkPlainError noHints $
+      hang (text "Illegal constraint synonym of kind:" <+> quotes (ppr_tidy env kind))
          2 (parens constraintKindsMsg) )
 
 dupPredWarn :: TidyEnv -> [NE.NonEmpty PredType] -> (TidyEnv, SDoc)
@@ -1446,7 +1467,7 @@ dupPredWarn env dups
   where
     primaryDups = map NE.head dups
 
-tyConArityErr :: TyCon -> [TcType] -> SDoc
+tyConArityErr :: TyCon -> [TcType] -> TcRnMessage
 -- For type-constructor arity errors, be careful to report
 -- the number of /visible/ arguments required and supplied,
 -- ignoring the /invisible/ arguments, which the user does not see.
@@ -1462,9 +1483,10 @@ tyConArityErr tc tks
     tc_type_arity = count isVisibleTyConBinder (tyConBinders tc)
     tc_type_args  = length vis_tks
 
-arityErr :: Outputable a => SDoc -> a -> Int -> Int -> SDoc
+arityErr :: Outputable a => SDoc -> a -> Int -> Int -> TcRnMessage
 arityErr what name n m
-  = hsep [ text "The" <+> what, quotes (ppr name), text "should have",
+  = TcRnUnknownMessage $ mkPlainError noHints $
+    hsep [ text "The" <+> what, quotes (ppr name), text "should have",
            n_arguments <> comma, text "but has been given",
            if m==0 then text "none" else int m]
     where
@@ -1620,13 +1642,25 @@ check_special_inst_head dflags is_boot is_sig ctxt clas cls_args
                         text "Only one type can be given in an instance head." $$
                         text "Use MultiParamTypeClasses if you want to allow more, or zero."
 
-    rejected_class_msg = text "Class" <+> quotes (ppr clas_nm)
-                         <+> text "does not support user-specified instances"
-    tuple_class_msg    = text "You can't specify an instance for a tuple constraint"
+    rejected_class_msg :: TcRnMessage
+    rejected_class_msg = TcRnUnknownMessage $ mkPlainError noHints $ rejected_class_doc
 
-    gen_inst_err = rejected_class_msg $$ nest 2 (text "(in Safe Haskell)")
+    tuple_class_msg    :: TcRnMessage
+    tuple_class_msg    = TcRnUnknownMessage $ mkPlainError noHints $
+      text "You can't specify an instance for a tuple constraint"
 
-    abstract_class_msg = text "Cannot define instance for abstract class"
+    rejected_class_doc :: SDoc
+    rejected_class_doc =
+      text "Class" <+> quotes (ppr clas_nm)
+                   <+> text "does not support user-specified instances"
+
+    gen_inst_err :: TcRnMessage
+    gen_inst_err = TcRnUnknownMessage $ mkPlainError noHints $
+      rejected_class_doc $$ nest 2 (text "(in Safe Haskell)")
+
+    abstract_class_msg :: TcRnMessage
+    abstract_class_msg = TcRnUnknownMessage $ mkPlainError noHints $
+      text "Cannot define instance for abstract class"
                          <+> quotes (ppr clas_nm)
 
     mb_ty_args_msg
@@ -1696,9 +1730,10 @@ dropCasts ty                  = ty  -- LitTy, TyVarTy, CoercionTy
 dropCastsB :: TyVarBinder -> TyVarBinder
 dropCastsB b = b   -- Don't bother in the kind of a forall
 
-instTypeErr :: Class -> [Type] -> SDoc -> SDoc
+instTypeErr :: Class -> [Type] -> SDoc -> TcRnMessage
 instTypeErr cls tys msg
-  = hang (hang (text "Illegal instance declaration for")
+  = TcRnUnknownMessage $ mkPlainError noHints $
+    hang (hang (text "Illegal instance declaration for")
              2 (quotes (pprClassPred cls tys)))
        2 msg
 
@@ -1851,15 +1886,16 @@ synonyms, by matching on TyConApp directly.
 checkValidInstance :: UserTypeCtxt -> LHsSigType GhcRn -> Type -> TcM ()
 checkValidInstance ctxt hs_type ty
   | not is_tc_app
-  = failWithTc (hang (text "Instance head is not headed by a class:")
-                   2 ( ppr tau))
+  = failWithTc (TcRnUnknownMessage $ mkPlainError noHints $
+      hang (text "Instance head is not headed by a class:") 2 ( ppr tau))
 
   | isNothing mb_cls
-  = failWithTc (vcat [ text "Illegal instance for a" <+> ppr (tyConFlavour tc)
+  = failWithTc (TcRnUnknownMessage $ mkPlainError noHints $
+      vcat [ text "Illegal instance for a" <+> ppr (tyConFlavour tc)
                      , text "A class instance must be for a class" ])
 
   | not arity_ok
-  = failWithTc (text "Arity mis-match in instance head")
+  = failWithTc (TcRnUnknownMessage $ mkPlainError noHints $ text "Arity mis-match in instance head")
 
   | otherwise
   = do  { setSrcSpanA head_loc $
@@ -1961,9 +1997,12 @@ checkInstTermination theta head_pred
               -- when the predicates are individually checked for validity
 
    check2 foralld_tvs pred pred_size
-     | not (null bad_tvs)     = failWithTc (noMoreMsg bad_tvs what (ppr head_pred))
-     | not (isTyFamFree pred) = failWithTc (nestedMsg what)
-     | pred_size >= head_size = failWithTc (smallerMsg what (ppr head_pred))
+     | not (null bad_tvs)     = failWithTc $ TcRnUnknownMessage $ mkPlainError noHints $
+       (noMoreMsg bad_tvs what (ppr head_pred))
+     | not (isTyFamFree pred) = failWithTc $ TcRnUnknownMessage $ mkPlainError noHints $
+       (nestedMsg what)
+     | pred_size >= head_size = failWithTc $ TcRnUnknownMessage $ mkPlainError noHints $
+       (smallerMsg what (ppr head_pred))
      | otherwise              = return ()
      -- isTyFamFree: see Note [Type families in instance contexts]
      where
@@ -2046,8 +2085,9 @@ checkValidCoAxiom ax@(CoAxiom { co_ax_tc = fam_tc, co_ax_branches = branches })
     --   (b) failure of injectivity
     check_branch_compat prev_branches cur_branch
       | cur_branch `isDominatedBy` prev_branches
-      = do { addDiagnosticAt WarningWithoutFlag (coAxBranchSpan cur_branch) $
-             inaccessibleCoAxBranch fam_tc cur_branch
+      = do { let dia = TcRnUnknownMessage $
+                   mkPlainDiagnostic WarningWithoutFlag noHints (inaccessibleCoAxBranch fam_tc cur_branch)
+           ; addDiagnosticAt (coAxBranchSpan cur_branch) dia
            ; return prev_branches }
       | otherwise
       = do { check_injectivity prev_branches cur_branch
@@ -2116,7 +2156,8 @@ checkValidTyFamEqn fam_tc qvs typats rhs
            case drop (tyConArity fam_tc) typats of
              [] -> pure ()
              spec_arg:_ ->
-               addErr $ text "Illegal oversaturated visible kind argument:"
+               addErr $ TcRnUnknownMessage $ mkPlainError noHints $
+                 text "Illegal oversaturated visible kind argument:"
                     <+> quotes (char '@' <> pprParendType spec_arg)
 
          -- The argument patterns, and RHS, are all boxed tau types
@@ -2163,7 +2204,7 @@ checkValidAssocTyFamDeflt fam_tc pats =
     extract_tv pat pat_vis =
       case getTyVar_maybe pat of
         Just tv -> pure tv
-        Nothing -> failWithTc $
+        Nothing -> failWithTc $ TcRnUnknownMessage $ mkPlainError noHints $
           pprWithExplicitKindsWhen (isInvisibleArgFlag pat_vis) $
           hang (text "Illegal argument" <+> quotes (ppr pat) <+> text "in:")
              2 (vcat [ppr_eqn, suggestion])
@@ -2181,6 +2222,7 @@ checkValidAssocTyFamDeflt fam_tc pats =
       let dups = findDupsEq ((==) `on` fst) cpt_tvs_vis in
       traverse_
         (\d -> let (pat_tv, pat_vis) = NE.head d in failWithTc $
+               TcRnUnknownMessage $ mkPlainError noHints $
                pprWithExplicitKindsWhen (isInvisibleArgFlag pat_vis) $
                hang (text "Illegal duplicate variable"
                        <+> quotes (ppr pat_tv) <+> text "in:")
@@ -2203,9 +2245,9 @@ checkValidAssocTyFamDeflt fam_tc pats =
 --
 checkFamInstRhs :: TyCon -> [Type]         -- LHS
                 -> [(TyCon, [Type])]       -- type family calls in RHS
-                -> [SDoc]
+                -> [TcRnMessage]
 checkFamInstRhs lhs_tc lhs_tys famInsts
-  = mapMaybe check famInsts
+  = map (TcRnUnknownMessage . mkPlainError noHints) $ mapMaybe check famInsts
   where
    lhs_size  = sizeTyConAppArgs lhs_tc lhs_tys
    inst_head = pprType (TyConApp lhs_tc lhs_tys)
@@ -2276,7 +2318,7 @@ checkFamPatBinders fam_tc qtvs pats rhs
     dodgy_tvs   = cpt_tvs `minusVarSet` inj_cpt_tvs
 
     check_tvs tvs what what2
-      = unless (null tvs) $ addErrAt (getSrcSpan (head tvs)) $
+      = unless (null tvs) $ addErrAt (getSrcSpan (head tvs)) $ TcRnUnknownMessage $ mkPlainError noHints $
         hang (text "Type variable" <> plural tvs <+> pprQuotedList tvs
               <+> isOrAre tvs <+> what <> comma)
            2 (vcat [ text "but not" <+> what2 <+> text "the family instance"
@@ -2307,7 +2349,7 @@ checkValidTypePats tc pat_ty_args
        -- Ensure that no type family applications occur a type pattern
        ; case tcTyConAppTyFamInstsAndVis tc pat_ty_args of
             [] -> pure ()
-            ((tf_is_invis_arg, tf_tc, tf_args):_) -> failWithTc $
+            ((tf_is_invis_arg, tf_tc, tf_args):_) -> failWithTc $ TcRnUnknownMessage $ mkPlainError noHints $
                ty_fam_inst_illegal_err tf_is_invis_arg
                                        (mkTyConApp tf_tc tf_args) }
   where
@@ -2332,9 +2374,10 @@ nestedMsg what
   = sep [ text "Illegal nested" <+> what
         , parens undecidableMsg ]
 
-badATErr :: Name -> Name -> SDoc
+badATErr :: Name -> Name -> TcRnMessage
 badATErr clas op
-  = hsep [text "Class", quotes (ppr clas),
+  = TcRnUnknownMessage $ mkPlainError noHints $
+    hsep [text "Class", quotes (ppr clas),
           text "does not have an associated type", quotes (ppr op)]
 
 
@@ -2414,7 +2457,7 @@ checkConsistentFamInst (InClsInst { ai_class = clas
       , Just rl_subst1 <- tcMatchTyX_BM bind_me rl_subst ty2 ty1
       = go lr_subst1 rl_subst1 triples
       | otherwise
-      = addErrTc (pp_wrong_at_arg vis)
+      = addErrTc (TcRnUnknownMessage $ mkPlainError noHints $ pp_wrong_at_arg vis)
 
     -- The /scoped/ type variables from the class-instance header
     -- should not be alpha-renamed.  Inferred ones can be.
@@ -2842,7 +2885,7 @@ checkTyConTelescope :: TyCon -> TcM ()
 checkTyConTelescope tc
   | bad_scope
   = -- See "Ill-scoped binders" in Note [Bad TyCon telescopes]
-    addErr $
+    addErr $ TcRnUnknownMessage $ mkPlainError noHints $
     vcat [ hang (text "The kind of" <+> quotes (ppr tc) <+> text "is ill-scoped")
               2 pp_tc_kind
          , extra

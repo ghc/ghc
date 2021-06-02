@@ -78,6 +78,7 @@ import GHC.Prelude
 
 import GHC.Hs
 import GHC.Rename.Utils
+import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Types.Origin
 import GHC.Core.Predicate
@@ -96,6 +97,7 @@ import GHC.Tc.Utils.Instantiate ( tcInstInvisibleTyBinders, tcInstInvisibleTyBin
                                   tcInstInvisibleTyBinder )
 import GHC.Core.Type
 import GHC.Builtin.Types.Prim
+import GHC.Types.Error
 import GHC.Types.Name.Env
 import GHC.Types.Name.Reader( lookupLocalRdrOcc )
 import GHC.Types.Var
@@ -624,7 +626,8 @@ tcHsDeriv hs_ty
              (kind_args, _) = splitFunTys (tcTypeKind pred)
        ; case getClassPredTys_maybe pred of
            Just (cls, tys) -> return (tvs, cls, tys, map scaledThing kind_args)
-           Nothing -> failWithTc (text "Illegal deriving item" <+> quotes (ppr hs_ty)) }
+           Nothing -> failWithTc $ TcRnUnknownMessage $ mkPlainError noHints $
+             (text "Illegal deriving item" <+> quotes (ppr hs_ty)) }
 
 -- | Typecheck a deriving strategy. For most deriving strategies, this is a
 -- no-op, but for the @via@ strategy, this requires typechecking the @via@ type.
@@ -1130,7 +1133,7 @@ tc_hs_type _ ty@(HsBangTy _ bang _) _
     -- While top-level bangs at this point are eliminated (eg !(Maybe Int)),
     -- other kinds of bangs are not (eg ((!Maybe) Int)). These kinds of
     -- bangs are invalid, so fail. (#7210, #14761)
-    = do { let bangError err = failWith $
+    = do { let bangError err = failWith $ TcRnUnknownMessage $ mkPlainError noHints $
                  text "Unexpected" <+> text err <+> text "annotation:" <+> ppr ty $$
                  text err <+> text "annotation cannot appear nested inside a type"
          ; case bang of
@@ -1141,7 +1144,8 @@ tc_hs_type _ ty@(HsBangTy _ bang _) _
 tc_hs_type _ ty@(HsRecTy {})      _
       -- Record types (which only show up temporarily in constructor
       -- signatures) should have been removed by now
-    = failWithTc (text "Record syntax is illegal here:" <+> ppr ty)
+    = failWithTc $ TcRnUnknownMessage $ mkPlainError noHints $
+       (text "Record syntax is illegal here:" <+> ppr ty)
 
 -- HsSpliced is an annotation produced by 'GHC.Rename.Splice.rnSpliceType'.
 -- Here we get rid of it and add the finalizers to the global environment
@@ -1155,7 +1159,8 @@ tc_hs_type mode (HsSpliceTy _ (HsSpliced _ mod_finalizers (HsSplicedTy ty)))
 
 -- This should never happen; type splices are expanded by the renamer
 tc_hs_type _ ty@(HsSpliceTy {}) _exp_kind
-  = failWithTc (text "Unexpected type splice:" <+> ppr ty)
+  = failWithTc $ TcRnUnknownMessage $ mkPlainError noHints $
+     (text "Unexpected type splice:" <+> ppr ty)
 
 ---------- Functions and applications
 tc_hs_type mode (HsFunTy _ mult ty1 ty2) exp_kind
@@ -1703,8 +1708,9 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
     n_initial_val_args _                    = 0
 
     ty_app_err arg ty
-      = failWith $ text "Cannot apply function of kind" <+> quotes (ppr ty)
-                $$ text "to visible kind argument" <+> quotes (ppr arg)
+      = failWith $ TcRnUnknownMessage $ mkPlainError noHints $
+          text "Cannot apply function of kind" <+> quotes (ppr ty)
+            $$ text "to visible kind argument" <+> quotes (ppr arg)
 
 
 mkAppTyM :: TCvSubst
@@ -2722,8 +2728,8 @@ zipBinders = zip_binders [] emptyTCvSubst
       | otherwise
       = (reverse acc, bs, substTy subst ki)
 
-tooManyBindersErr :: Kind -> [LHsTyVarBndr () GhcRn] -> SDoc
-tooManyBindersErr ki bndrs =
+tooManyBindersErr :: Kind -> [LHsTyVarBndr () GhcRn] -> TcRnMessage
+tooManyBindersErr ki bndrs = TcRnUnknownMessage $ mkPlainError noHints $
    hang (text "Not a function kind:")
       4 (ppr ki) $$
    hang (text "but extra binders found:")
@@ -3770,8 +3776,8 @@ checkDataKindSig data_sort kind
         AnyBoxedKind -> ppr boxedRepDataConTyCon
         LiftedKind   -> ppr liftedTypeKind
 
-    err_msg :: DynFlags -> SDoc
-    err_msg dflags =
+    err_msg :: DynFlags -> TcRnMessage
+    err_msg dflags = TcRnUnknownMessage $ mkPlainError noHints $
       sep [ sep [ pp_dec <+>
                   text "has non-" <>
                   pp_allowed_kind dflags
@@ -3796,8 +3802,8 @@ checkDataKindSig data_sort kind
 checkClassKindSig :: Kind -> TcM ()
 checkClassKindSig kind = checkTc (tcIsConstraintKind kind) err_msg
   where
-    err_msg :: SDoc
-    err_msg =
+    err_msg :: TcRnMessage
+    err_msg = TcRnUnknownMessage $ mkPlainError noHints $
       text "Kind signature on a class must end with" <+> ppr constraintKind $$
       text "unobscured by type families"
 
@@ -4248,7 +4254,8 @@ tc_lhs_kind_sig mode ctxt hs_kind
 
 promotionErr :: Name -> PromotionErr -> TcM a
 promotionErr name err
-  = failWithTc (hang (pprPECategory err <+> quotes (ppr name) <+> text "cannot be used here")
+  = failWithTc $ TcRnUnknownMessage $ mkPlainError noHints $
+      (hang (pprPECategory err <+> quotes (ppr name) <+> text "cannot be used here")
                    2 (parens reason))
   where
     reason = case err of

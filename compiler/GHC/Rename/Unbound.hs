@@ -27,6 +27,7 @@ import GHC.Prelude
 import GHC.Driver.Session
 import GHC.Driver.Ppr
 
+import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Builtin.Names ( mkUnboundName, isUnboundName, getUnique)
 import GHC.Utils.Outputable as Outputable
@@ -37,6 +38,7 @@ import GHC.Data.FastString
 
 import qualified GHC.LanguageExtensions as LangExt
 
+import GHC.Types.Error
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Name
 import GHC.Types.Name.Reader
@@ -101,7 +103,7 @@ unboundNameX looking_for rdr_name extra
         ; let show_helpful_errors = gopt Opt_HelpfulErrors dflags
               err = notInScopeErr (lf_where looking_for) rdr_name $$ extra
         ; if not show_helpful_errors
-          then addErr err
+          then addErr (TcRnUnknownMessage $ mkPlainError noHints err)
           else do { local_env  <- getLocalRdrEnv
                   ; global_env <- getGlobalRdrEnv
                   ; impInfo <- getImports
@@ -110,7 +112,7 @@ unboundNameX looking_for rdr_name extra
                   ; let suggestions = unknownNameSuggestions_ looking_for
                           dflags hpt currmod global_env local_env impInfo
                           rdr_name
-                  ; addErr (err $$ suggestions) }
+                  ; addErr (TcRnUnknownMessage $ mkPlainError noHints (err $$ suggestions)) }
         ; return (mkUnboundNameRdr rdr_name) }
 
 notInScopeErr :: WhereLooking -> RdrName -> SDoc

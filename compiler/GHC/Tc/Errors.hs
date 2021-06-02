@@ -30,6 +30,7 @@ import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr  ( pprTyVars, pprWithExplicitKindsWhen, pprSourceTyCon, pprWithTYPE )
 import GHC.Core.Unify     ( tcMatchTys, flattenTys )
 import GHC.Unit.Module
+import GHC.Tc.Errors.Types
 import GHC.Tc.Instance.Family
 import GHC.Tc.Utils.Instantiate
 import GHC.Core.InstEnv
@@ -60,6 +61,7 @@ import GHC.Utils.Outputable as O
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Types.SrcLoc
+import GHC.Driver.Env (hsc_units)
 import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Data.List.SetOps ( equivClasses )
@@ -1033,11 +1035,12 @@ mkErrorReport :: DiagnosticReason
               -> TcM (MsgEnvelope TcRnMessage)
 mkErrorReport rea ctxt tcl_env (Report important relevant_bindings valid_subs)
   = do { context <- mkErrInfo (cec_tidy ctxt) (tcl_ctxt tcl_env)
-       ; mkTcRnMessage rea
+       ; unit_state <- hsc_units <$> getTopEnv ;
+       ; let err_info = ErrInfo context (vcat $ relevant_bindings ++ valid_subs)
+       ; let msg = TcRnUnknownMessage $ mkPlainDiagnostic rea noHints (vcat important)
+       ; mkTcRnMessage
            (RealSrcSpan (tcl_loc tcl_env) Strict.Nothing)
-           (vcat important)
-           context
-           (vcat $ relevant_bindings ++ valid_subs)
+           (TcRnMessageWithInfo unit_state $ TcRnMessageDetailed err_info msg)
        }
 
 -- This version does not include the context
@@ -1046,10 +1049,13 @@ mkErrorReportNC :: DiagnosticReason
                 -> Report
                 -> TcM (MsgEnvelope TcRnMessage)
 mkErrorReportNC rea tcl_env (Report important relevant_bindings valid_subs)
-  = mkTcRnMessage rea (RealSrcSpan (tcl_loc tcl_env) Strict.Nothing)
-    (vcat important)
-    O.empty
-    (vcat $ relevant_bindings ++ valid_subs)
+  = do { unit_state <- hsc_units <$> getTopEnv ;
+       ; let err_info = ErrInfo O.empty (vcat $ relevant_bindings ++ valid_subs)
+       ; let msg = TcRnUnknownMessage $ mkPlainDiagnostic rea noHints (vcat important)
+       ; mkTcRnMessage
+           (RealSrcSpan (tcl_loc tcl_env) Strict.Nothing)
+           (TcRnMessageWithInfo unit_state $ TcRnMessageDetailed err_info msg)
+       }
 
 type UserGiven = Implication
 
@@ -3129,7 +3135,9 @@ warnDefaulting wanteds default_ty
                            , quotes (ppr default_ty) ])
                      2
                      ppr_wanteds
-       ; setCtLocM loc $ diagnosticTc (WarningWithFlag Opt_WarnTypeDefaults) warn_default warn_msg }
+       ; let diag = TcRnUnknownMessage $
+               mkPlainDiagnostic (WarningWithFlag Opt_WarnTypeDefaults) noHints warn_msg
+       ; setCtLocM loc $ diagnosticTc warn_default diag }
 
 {-
 Note [Runtime skolems]
@@ -3153,8 +3161,8 @@ solverDepthErrorTcS loc ty
        ; env0 <- tcInitTidyEnv
        ; let tidy_env     = tidyFreeTyCoVars env0 (tyCoVarsOfTypeList ty)
              tidy_ty      = tidyType tidy_env ty
-             msg
-               = vcat [ text "Reduction stack overflow; size =" <+> ppr depth
+             msg = TcRnUnknownMessage $ mkPlainError noHints $
+                 vcat [ text "Reduction stack overflow; size =" <+> ppr depth
                       , hang (text "When simplifying the following type:")
                            2 (ppr tidy_ty)
                       , note ]

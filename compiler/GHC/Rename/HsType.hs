@@ -55,6 +55,7 @@ import GHC.Rename.Utils  ( HsDocContext(..), inHsDocContext, withHsDocContext
 import GHC.Rename.Fixity ( lookupFieldFixityRn, lookupFixityRn
                          , lookupTyFixityRn )
 import GHC.Rename.Unbound ( notInScopeErr, WhereLooking(WL_LocalOnly) )
+import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Types.Name.Reader
 import GHC.Builtin.Names
@@ -62,6 +63,7 @@ import GHC.Types.Name
 import GHC.Types.SrcLoc
 import GHC.Types.Name.Set
 import GHC.Types.FieldLabel
+import GHC.Types.Error
 
 import GHC.Utils.Misc
 import GHC.Types.Fixity ( compareFixity, negateFixity
@@ -208,7 +210,7 @@ rnHsPatSigTypeBindingVars ctxt sigType thing_inside = case sigType of
     -- Should the inner `a` refer to the outer one? shadow it? We are, as yet, undecided,
     -- so we currently reject.
     when (not (null varsInScope)) $
-      addErr $
+      addErr $ TcRnUnknownMessage $ mkPlainError noHints $
         vcat
           [ text "Type variable" <> plural varsInScope
             <+> hcat (punctuate (text ",") (map (quotes . ppr) varsInScope))
@@ -444,8 +446,11 @@ rnImplicitTvBndrs :: HsDocContext
 rnImplicitTvBndrs ctx mb_assoc implicit_vs_with_dups thing_inside
   = do { implicit_vs <- forM (NE.groupBy eqLocated $ sortBy cmpLocated $ implicit_vs_with_dups) $ \case
            (x :| []) -> return x
-           (x :| _) -> do addErr $ text "Variable" <+> text "`" <> ppr x <> text "'" <+> text "would be bound multiple times by" <+> pprHsDocContext ctx <> text "."
-                          return x
+           (x :| _) -> do
+             let msg = TcRnUnknownMessage $ mkPlainError noHints $
+                   text "Variable" <+> text "`" <> ppr x <> text "'" <+> text "would be bound multiple times by" <+> pprHsDocContext ctx <> text "."
+             addErr msg
+             return x
 
        ; traceRn "rnImplicitTvBndrs" $
          vcat [ ppr implicit_vs_with_dups, ppr implicit_vs ]
@@ -618,7 +623,7 @@ rnHsTyKi env ty@(HsQualTy { hst_ctxt = lctxt, hst_body = tau })
 
 rnHsTyKi env (HsTyVar _ ip (L loc rdr_name))
   = do { when (isRnKindLevel env && isRdrTyVar rdr_name) $
-         unlessXOptM LangExt.PolyKinds $ addErr $
+         unlessXOptM LangExt.PolyKinds $ addErr $ TcRnUnknownMessage $ mkPlainError noHints $
          withHsDocContext (rtke_ctxt env) $
          vcat [ text "Unexpected kind variable" <+> quotes (ppr rdr_name)
               , text "Perhaps you intended to use PolyKinds" ]
@@ -653,8 +658,8 @@ rnHsTyKi env ty@(HsRecTy _ flds)
     get_fields (ConDeclCtx names)
       = concatMapM (lookupConstructorFields . unLoc) names
     get_fields _
-      = do { addErr (hang (text "Record syntax is illegal here:")
-                                   2 (ppr ty))
+      = do { addErr $ TcRnUnknownMessage $ mkPlainError noHints $
+               (hang (text "Record syntax is illegal here:") 2 (ppr ty))
            ; return [] }
 
 rnHsTyKi env (HsFunTy u mult ty1 ty2)
@@ -704,7 +709,9 @@ rnHsTyKi env tyLit@(HsTyLit _ t)
     negLit (HsStrTy _ _) = False
     negLit (HsNumTy _ i) = i < 0
     negLit (HsCharTy _ _) = False
-    negLitErr = text "Illegal literal in type (type literals must not be negative):" <+> ppr tyLit
+    negLitErr :: TcRnMessage
+    negLitErr = TcRnUnknownMessage $ mkPlainError noHints $
+      text "Illegal literal in type (type literals must not be negative):" <+> ppr tyLit
 
 rnHsTyKi env (HsAppTy _ ty1 ty2)
   = do { (ty1', fvs1) <- rnLHsTyKi env ty1
@@ -745,8 +752,9 @@ rnHsTyKi env (XHsType ty)
     check_in_scope rdr_name = do
       mb_name <- lookupLocalOccRn_maybe rdr_name
       when (isNothing mb_name) $
-        addErr $ withHsDocContext (rtke_ctxt env) $
-        notInScopeErr WL_LocalOnly rdr_name
+        addErr $ TcRnUnknownMessage $ mkPlainError noHints $
+          withHsDocContext (rtke_ctxt env) $
+          notInScopeErr WL_LocalOnly rdr_name
 
 rnHsTyKi env ty@(HsExplicitListTy _ ip tys)
   = do { data_kinds <- xoptM LangExt.DataKinds
@@ -825,7 +833,7 @@ rnHsTyOp env overall_ty (L loc op)
   = do { ops_ok <- xoptM LangExt.TypeOperators
        ; op' <- rnTyVar env op
        ; unless (ops_ok || op' `hasKey` eqTyConKey) $
-           addErr (opTyErr op overall_ty)
+           addErr $ TcRnUnknownMessage $ mkPlainError noHints (opTyErr op overall_ty)
        ; let l_op' = L loc op'
        ; return (l_op', unitFV op') }
 
@@ -836,7 +844,8 @@ notAllowed doc
 
 checkWildCard :: RnTyKiEnv -> Maybe SDoc -> RnM ()
 checkWildCard env (Just doc)
-  = addErr $ vcat [doc, nest 2 (text "in" <+> pprHsDocContext (rtke_ctxt env))]
+  = addErr $ TcRnUnknownMessage $ mkPlainError noHints $
+     vcat [doc, nest 2 (text "in" <+> pprHsDocContext (rtke_ctxt env))]
 checkWildCard _ Nothing
   = return ()
 
@@ -907,8 +916,9 @@ checkPolyKinds env ty
   | isRnKindLevel env
   = do { polykinds <- xoptM LangExt.PolyKinds
        ; unless polykinds $
-         addErr (text "Illegal kind:" <+> ppr ty $$
-                 text "Did you mean to enable PolyKinds?") }
+         addErr $ TcRnUnknownMessage $ mkPlainError noHints $
+           (text "Illegal kind:" <+> ppr ty $$
+            text "Did you mean to enable PolyKinds?") }
 checkPolyKinds _ _ = return ()
 
 notInKinds :: Outputable ty
@@ -917,7 +927,8 @@ notInKinds :: Outputable ty
            -> RnM ()
 notInKinds env ty
   | isRnKindLevel env
-  = addErr (text "Illegal kind:" <+> ppr ty)
+  = addErr $ TcRnUnknownMessage $ mkPlainError noHints $
+     text "Illegal kind:" <+> ppr ty
 notInKinds _ _ = return ()
 
 {- *****************************************************
@@ -1593,7 +1604,8 @@ precParseErr op1@(n1,_) op2@(n2,_)
   | is_unbound n1 || is_unbound n2
   = return ()     -- Avoid error cascade
   | otherwise
-  = addErr $ hang (text "Precedence parsing error")
+  = addErr $ TcRnUnknownMessage $ mkPlainError noHints $
+      hang (text "Precedence parsing error")
       4 (hsep [text "cannot mix", ppr_opfix op1, text "and",
                ppr_opfix op2,
                text "in the same infix expression"])
@@ -1603,7 +1615,8 @@ sectionPrecErr op@(n1,_) arg_op@(n2,_) section
   | is_unbound n1 || is_unbound n2
   = return ()     -- Avoid error cascade
   | otherwise
-  = addErr $ vcat [text "The operator" <+> ppr_opfix op <+> text "of a section",
+  = addErr $ TcRnUnknownMessage $ mkPlainError noHints $
+      vcat [text "The operator" <+> ppr_opfix op <+> text "of a section",
          nest 4 (sep [text "must have lower precedence than that of the operand,",
                       nest 2 (text "namely" <+> ppr_opfix arg_op)]),
          nest 4 (text "in the section:" <+> quotes (ppr section))]
@@ -1626,21 +1639,23 @@ ppr_opfix (op, fixity) = pp_op <+> brackets (ppr fixity)
 *                                                      *
 ***************************************************** -}
 
-unexpectedPatSigTypeErr :: HsPatSigType GhcPs -> SDoc
+unexpectedPatSigTypeErr :: HsPatSigType GhcPs -> TcRnMessage
 unexpectedPatSigTypeErr ty
-  = hang (text "Illegal type signature:" <+> quotes (ppr ty))
+  = TcRnUnknownMessage $ mkPlainError noHints $
+    hang (text "Illegal type signature:" <+> quotes (ppr ty))
        2 (text "Type signatures are only allowed in patterns with ScopedTypeVariables")
 
 badKindSigErr :: HsDocContext -> LHsType GhcPs -> TcM ()
 badKindSigErr doc (L loc ty)
-  = setSrcSpanA loc $ addErr $
+  = setSrcSpanA loc $ addErr $ TcRnUnknownMessage $ mkPlainError noHints $
     withHsDocContext doc $
     hang (text "Illegal kind signature:" <+> quotes (ppr ty))
        2 (text "Perhaps you intended to use KindSignatures")
 
-dataKindsErr :: RnTyKiEnv -> HsType GhcPs -> SDoc
+dataKindsErr :: RnTyKiEnv -> HsType GhcPs -> TcRnMessage
 dataKindsErr env thing
-  = hang (text "Illegal" <+> pp_what <> colon <+> quotes (ppr thing))
+  = TcRnUnknownMessage $ mkPlainError noHints $
+    hang (text "Illegal" <+> pp_what <> colon <+> quotes (ppr thing))
        2 (text "Perhaps you intended to use DataKinds")
   where
     pp_what | isRnKindLevel env = text "kind"
@@ -1649,10 +1664,12 @@ dataKindsErr env thing
 warnUnusedForAll :: OutputableBndrFlag flag 'Renamed
                  => HsDocContext -> LHsTyVarBndr flag GhcRn -> FreeVars -> TcM ()
 warnUnusedForAll doc (L loc tv) used_names
-  = unless (hsTyVarName tv `elemNameSet` used_names) $
-    addDiagnosticAt (WarningWithFlag Opt_WarnUnusedForalls) (locA loc) $
-    vcat [ text "Unused quantified type variable" <+> quotes (ppr tv)
-         , inHsDocContext doc ]
+  = unless (hsTyVarName tv `elemNameSet` used_names) $ do
+      let msg = TcRnUnknownMessage $
+            mkPlainDiagnostic (WarningWithFlag Opt_WarnUnusedForalls) noHints $
+              vcat [ text "Unused quantified type variable" <+> quotes (ppr tv)
+                   , inHsDocContext doc ]
+      addDiagnosticAt (locA loc) msg
 
 opTyErr :: Outputable a => RdrName -> a -> SDoc
 opTyErr op overall_ty

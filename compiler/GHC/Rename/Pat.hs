@@ -49,6 +49,7 @@ import {-# SOURCE #-} GHC.Rename.Expr ( rnLExpr )
 import {-# SOURCE #-} GHC.Rename.Splice ( rnSplicePat )
 
 import GHC.Hs
+import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Zonk   ( hsOverLitName )
 import GHC.Rename.Env
@@ -60,6 +61,7 @@ import GHC.Rename.Utils    ( HsDocContext(..), newLocalBndrRn, bindLocalNames
 import GHC.Rename.HsType
 import GHC.Builtin.Names
 import GHC.Types.Avail ( greNameMangledName )
+import GHC.Types.Error
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
@@ -547,7 +549,7 @@ rnConPatAndThen mk con (PrefixCon tyargs pats)
       unless (scoped_tyvars && type_app) $
         case listToMaybe tyargs of
           Nothing    -> pure ()
-          Just tyarg -> addErr $
+          Just tyarg -> addErr $ TcRnUnknownMessage $ mkPlainError noHints $
             hang (text "Illegal visible type application in a pattern:"
                     <+> quotes (char '@' <> ppr tyarg))
                2 (text "Both ScopedTypeVariables and TypeApplications are"
@@ -809,25 +811,29 @@ getFieldLbls flds
 getFieldUpdLbls :: [LHsRecUpdField GhcPs] -> [RdrName]
 getFieldUpdLbls flds = map (rdrNameAmbiguousFieldOcc . unLoc . hfbLHS . unLoc) flds
 
-needFlagDotDot :: HsRecFieldContext -> SDoc
-needFlagDotDot ctxt = vcat [text "Illegal `..' in record" <+> pprRFC ctxt,
-                            text "Use RecordWildCards to permit this"]
+needFlagDotDot :: HsRecFieldContext -> TcRnMessage
+needFlagDotDot ctxt = TcRnUnknownMessage $ mkPlainError noHints $
+  vcat [text "Illegal `..' in record" <+> pprRFC ctxt,
+        text "Use RecordWildCards to permit this"]
 
-badDotDotCon :: Name -> SDoc
+badDotDotCon :: Name -> TcRnMessage
 badDotDotCon con
-  = vcat [ text "Illegal `..' notation for constructor" <+> quotes (ppr con)
+  = TcRnUnknownMessage $ mkPlainError noHints $
+    vcat [ text "Illegal `..' notation for constructor" <+> quotes (ppr con)
          , nest 2 (text "The constructor has no labelled fields") ]
 
-emptyUpdateErr :: SDoc
-emptyUpdateErr = text "Empty record update"
+emptyUpdateErr :: TcRnMessage
+emptyUpdateErr = TcRnUnknownMessage $ mkPlainError noHints $ text "Empty record update"
 
-badPun :: Located RdrName -> SDoc
-badPun fld = vcat [text "Illegal use of punning for field" <+> quotes (ppr fld),
-                   text "Use NamedFieldPuns to permit this"]
+badPun :: Located RdrName -> TcRnMessage
+badPun fld = TcRnUnknownMessage $ mkPlainError noHints $
+  vcat [text "Illegal use of punning for field" <+> quotes (ppr fld),
+        text "Use NamedFieldPuns to permit this"]
 
-dupFieldErr :: HsRecFieldContext -> NE.NonEmpty RdrName -> SDoc
+dupFieldErr :: HsRecFieldContext -> NE.NonEmpty RdrName -> TcRnMessage
 dupFieldErr ctxt dups
-  = hsep [text "duplicate field name",
+  = TcRnUnknownMessage $ mkPlainError noHints $
+    hsep [text "duplicate field name",
           quotes (ppr (NE.head dups)),
           text "in record", pprRFC ctxt]
 
@@ -917,10 +923,12 @@ patSigErr ty
   =  (text "Illegal signature in pattern:" <+> ppr ty)
         $$ nest 4 (text "Use ScopedTypeVariables to permit it")
 
-bogusCharError :: Char -> SDoc
+bogusCharError :: Char -> TcRnMessage
 bogusCharError c
-  = text "character literal out of range: '\\" <> char c  <> char '\''
+  = TcRnUnknownMessage $ mkPlainError noHints $
+  text "character literal out of range: '\\" <> char c  <> char '\''
 
-badViewPat :: Pat GhcPs -> SDoc
-badViewPat pat = vcat [text "Illegal view pattern: " <+> ppr pat,
-                       text "Use ViewPatterns to enable view patterns"]
+badViewPat :: Pat GhcPs -> TcRnMessage
+badViewPat pat = TcRnUnknownMessage $ mkPlainError noHints $
+  vcat [text "Illegal view pattern: " <+> ppr pat,
+       text "Use ViewPatterns to enable view patterns"]
