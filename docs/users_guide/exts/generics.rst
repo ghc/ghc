@@ -3,10 +3,32 @@
 Generic programming
 ===================
 
-Using a combination of :extension:`DeriveGeneric`,
-:extension:`DefaultSignatures`, and :extension:`DeriveAnyClass`, you can
-easily do datatype-generic programming using the :base-ref:`GHC.Generics.`
-framework. This section gives a very brief overview of how to do it.
+There are a few ways to do datatype-generic programming using the
+:base-ref:`GHC.Generics.` framework. One is making use of the
+``Generically`` and ``Generically1`` wrappers from ``GHC.Generics``,
+instances can be derived via them using :extension:`DerivingVia`: ::
+
+    {-# LANGUAGE DeriveGeneric      #-}
+    {-# LANGUAGE DerivingStrategies #-}
+    {-# LANGUAGE DerivingVia        #-}
+
+    import GHC.Generics
+
+    data V4 a = V4 a a a a
+      deriving
+      stock (Generic, Generic1)
+
+      deriving (Semigroup, Monoid)
+      via Generically (V4 a)
+
+      deriving (Functor, Applicative)
+      via Generically1 V4
+
+The older approach uses :extension:`DeriveGeneric`,
+:extension:`DefaultSignatures`, and :extension:`DeriveAnyClass`. It
+derives instances by providing a distinguished generic implementation
+as part of the type class declaration. This section gives a very brief
+overview of how to do it.
 
 Generic programming support in GHC allows defining classes with methods
 that do not need a user specification when instantiating: the method
@@ -248,4 +270,3 @@ original paper [Generics2010]_.
    <http://dreixel.net/research/pdf/gdmh.pdf>`__. Proceedings of
    the third ACM Haskell symposium on Haskell (Haskell'2010), pp. 37-48,
    ACM, 2010.
-
