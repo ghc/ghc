@@ -28,7 +28,7 @@ unliftedRepTyCon :: TyCon
 constraintKind :: Kind
 
 runtimeRepTyCon, levityTyCon, vecCountTyCon, vecElemTyCon :: TyCon
-runtimeRepTy :: Type
+runtimeRepTy, levityTy :: Type
 
 boxedRepDataConTyCon :: TyCon
 liftedDataConTyCon :: TyCon
