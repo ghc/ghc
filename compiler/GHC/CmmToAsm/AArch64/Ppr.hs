@@ -31,7 +31,6 @@ import GHC.Cmm.Ppr.Expr () -- For Outputable instances
 
 import GHC.Types.Unique ( pprUniqueAlways, getUnique )
 import GHC.Platform
-import GHC.Data.FastString
 import GHC.Utils.Outputable
 
 import GHC.Utils.Panic
@@ -115,7 +114,7 @@ pprSectionAlign config sec@(Section seg _) =
 pprSizeDecl :: Platform -> CLabel -> SDoc
 pprSizeDecl platform lbl
  = if osElfTarget (platformOS platform)
-   then text "\t.size" <+> pdoc platform lbl <> ptext (sLit ", .-") <> pdoc platform lbl
+   then text "\t.size" <+> pdoc platform lbl <> text ", .-" <> pdoc platform lbl
    else empty
 
 pprBasicBlock :: NCGConfig -> LabelMap RawCmmStatics -> NatBasicBlock Instr
@@ -210,7 +209,7 @@ pprLabelType' platform lbl =
 pprTypeDecl :: Platform -> CLabel -> SDoc
 pprTypeDecl platform lbl
     = if osElfTarget (platformOS platform) && externallyVisibleCLabel lbl
-      then text ".type " <> pdoc platform lbl <> ptext (sLit  ", ") <> pprLabelType' platform lbl
+      then text ".type " <> pdoc platform lbl <> text ", " <> pprLabelType' platform lbl
       else empty
 
 pprDataItem :: NCGConfig -> CmmLit -> SDoc

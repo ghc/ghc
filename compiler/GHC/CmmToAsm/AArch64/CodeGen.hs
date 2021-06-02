@@ -1,7 +1,9 @@
 {-# language GADTs #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE BinaryLiterals, NumericUnderscores #-}
+{-# LANGUAGE BinaryLiterals #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE NumericUnderscores #-}
 module GHC.CmmToAsm.AArch64.CodeGen (
       cmmTopCodeGen
     , generateJumpTableForInstr
@@ -38,7 +40,6 @@ import GHC.Cmm
 import GHC.Cmm.Utils
 import GHC.Cmm.Switch
 import GHC.Cmm.CLabel
-import GHC.Cmm.Ppr.Expr
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
 import GHC.Types.Tickish ( GenTickish(..) )
@@ -49,7 +50,6 @@ import GHC.Data.OrdList
 import GHC.Utils.Outputable
 
 import Control.Monad    ( mapAndUnzipM, when, foldM )
-import Data.Bits hiding ( shiftL, shiftR )
 import Data.Word
 import Data.Maybe
 import GHC.Float
@@ -1223,6 +1223,9 @@ genCCall target dest_regs arg_regs bid = do
         MO_Memmove _align   -> mkCCall "memmove"
         MO_Memcmp  _align   -> mkCCall "memcmp"
 
+        MO_SuspendThread    -> mkCCall "suspendThread"
+        MO_ResumeThread     -> mkCCall "resumeThread"
+
         MO_PopCnt w         -> mkCCall (popCntLabel w)
         MO_Pdep w           -> mkCCall (pdepLabel w)
         MO_Pext w           -> mkCCall (pextLabel w)
@@ -1245,11 +1248,11 @@ genCCall target dest_regs arg_regs bid = do
     unsupported :: Show a => a -> b
     unsupported mop = panic ("outOfLineCmmOp: " ++ show mop
                           ++ " not supported here")
-    mkCCall :: String -> NatM (InstrBlock, Maybe BlockId)
+    mkCCall :: FastString -> NatM (InstrBlock, Maybe BlockId)
     mkCCall name = do
       config <- getConfig
       target <- cmmMakeDynamicReference config CallReference $
-          mkForeignLabel (fsLit name) Nothing ForeignLabelInThisPackage IsFunction
+          mkForeignLabel name Nothing ForeignLabelInThisPackage IsFunction
       let cconv = ForeignConvention CCallConv [NoHint] [NoHint] CmmMayReturn
       genCCall (ForeignTarget target cconv) dest_regs arg_regs bid
 
