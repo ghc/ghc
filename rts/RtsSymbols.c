@@ -1018,6 +1018,7 @@
       SymI_HasProto(registerInfoProvList)                               \
       SymI_HasProto(lookupIPE)                                          \
       RTS_USER_SIGNALS_SYMBOLS                                          \
+      RTS_LINKER_USE_MMAP_SYMBOLS                                       \
       RTS_INTCHAR_SYMBOLS
 
 
