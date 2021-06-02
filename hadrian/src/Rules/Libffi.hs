@@ -184,7 +184,7 @@ libffiRules = do
         writeFileLines dynLibMan dynLibFiles
         putSuccess "| Successfully build libffi."
 
-    fmap (libffiPath -/-) ["Makefile.in", "configure" ] &%> \[mkIn, _] -> do
+    fmap (libffiPath -/-) ["Makefile.in", "configure" ] &%> \[mkIn, _ ] -> do
         -- Extract libffi tar file
         context <- libffiContext stage
         removeDirectory libffiPath
