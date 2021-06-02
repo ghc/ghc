@@ -13,6 +13,7 @@ Contents:
    invoking
    markup
    common-errors
+   multi-components
 
 
 Indices and tables
