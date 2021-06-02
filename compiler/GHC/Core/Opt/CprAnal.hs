@@ -30,7 +30,7 @@ import GHC.Core.Type
 import GHC.Core.Utils   ( exprIsHNF, dumpIdInfoOfProgram, normSplitTyConApp_maybe )
 import GHC.Utils.Misc
 import GHC.Utils.Panic.Plain
-import GHC.Utils.Logger  ( Logger, dumpIfSet_dyn, DumpFormat (..) )
+import GHC.Utils.Logger  ( Logger, putDumpFileMaybe, DumpFormat (..) )
 import GHC.Data.Graph.UnVar -- for UnVarSet
 import GHC.Data.Maybe   ( isJust )
 
@@ -108,11 +108,11 @@ So currently we have
 -- * Analysing programs
 --
 
-cprAnalProgram :: Logger -> DynFlags -> FamInstEnvs -> CoreProgram -> IO CoreProgram
-cprAnalProgram logger dflags fam_envs binds = do
+cprAnalProgram :: Logger -> FamInstEnvs -> CoreProgram -> IO CoreProgram
+cprAnalProgram logger fam_envs binds = do
   let env            = emptyAnalEnv fam_envs
   let binds_plus_cpr = snd $ mapAccumL cprAnalTopBind env binds
-  dumpIfSet_dyn logger dflags Opt_D_dump_cpr_signatures "Cpr signatures" FormatText $
+  putDumpFileMaybe logger Opt_D_dump_cpr_signatures "Cpr signatures" FormatText $
     dumpIdInfoOfProgram (ppr . cprSigInfo) binds_plus_cpr
   -- See Note [Stamp out space leaks in demand analysis] in GHC.Core.Opt.DmdAnal
   seqBinds binds_plus_cpr `seq` return binds_plus_cpr

@@ -72,9 +72,8 @@ pprintClosureCommand bindThings force str = do
   -- Finally, print the Terms
   unqual  <- GHC.getPrintUnqual
   docterms <- mapM showTerm terms
-  dflags <- getDynFlags
   logger <- getLogger
-  liftIO $ (printOutputForUser logger dflags unqual . vcat)
+  liftIO $ (printOutputForUser logger unqual . vcat)
            (zipWith (\id docterm -> ppr id <+> char '=' <+> docterm)
                     ids
                     docterms)
@@ -96,10 +95,9 @@ pprintClosureCommand bindThings force str = do
        hsc_env <- getSession
        case (improveRTTIType hsc_env id_ty' reconstructed_type) of
          Nothing     -> return (subst, term')
-         Just subst' -> do { dflags <- GHC.getSessionDynFlags
-                           ; logger <- getLogger
+         Just subst' -> do { logger <- getLogger
                            ; liftIO $
-                               dumpIfSet_dyn logger dflags Opt_D_dump_rtti "RTTI"
+                               putDumpFileMaybe logger Opt_D_dump_rtti "RTTI"
                                  FormatText
                                  (fsep $ [text "RTTI Improvement for", ppr id,
                                   text "old substitution:" , ppr subst,

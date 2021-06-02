@@ -270,10 +270,10 @@ newIfaceNames occs
         ; return [ mkInternalName uniq occ noSrcSpan
                  | (occ,uniq) <- occs `zip` uniqsFromSupply uniqs] }
 
-trace_if :: Logger -> DynFlags -> SDoc -> IO ()
+trace_if :: Logger -> SDoc -> IO ()
 {-# INLINE trace_if #-}
-trace_if logger dflags doc = when (dopt Opt_D_dump_if_trace dflags) $ putMsg logger dflags doc
+trace_if logger doc = when (logHasDumpFlag logger Opt_D_dump_if_trace) $ putMsg logger doc
 
-trace_hi_diffs :: Logger -> DynFlags -> SDoc -> IO ()
+trace_hi_diffs :: Logger -> SDoc -> IO ()
 {-# INLINE trace_hi_diffs #-}
-trace_hi_diffs logger dflags doc = when (dopt Opt_D_dump_hi_diffs dflags) $ putMsg logger dflags doc
+trace_hi_diffs logger doc = when (logHasDumpFlag logger Opt_D_dump_hi_diffs) $ putMsg logger doc
