@@ -78,7 +78,6 @@ import qualified GHC.Parser.Lexer as Lexer
 import GHC.Parser.Header ( toArgs )
 
 import GHC.Unit
-import GHC.Unit.State
 import GHC.Unit.Finder as Finder
 import GHC.Unit.Module.Graph (filterToposortToModules)
 import GHC.Unit.Module.ModSummary
