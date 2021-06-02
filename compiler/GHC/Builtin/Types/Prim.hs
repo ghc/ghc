@@ -25,9 +25,12 @@ module GHC.Builtin.Types.Prim(
         alphaTysUnliftedRep, alphaTyUnliftedRep,
         runtimeRep1TyVar, runtimeRep2TyVar, runtimeRep3TyVar,
         runtimeRep1Ty, runtimeRep2Ty, runtimeRep3Ty,
+        levity1TyVar, levity1Ty,
 
         openAlphaTyVar, openBetaTyVar, openGammaTyVar,
         openAlphaTy, openBetaTy, openGammaTy,
+
+        levPolyTyVar1, levPolyTy1,
 
         multiplicityTyVar1, multiplicityTyVar2,
 
@@ -97,8 +100,8 @@ module GHC.Builtin.Types.Prim(
 import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Builtin.Types
-  ( runtimeRepTy, unboxedTupleKind, liftedTypeKind
-  , vecRepDataConTyCon, tupleRepDataConTyCon
+  ( runtimeRepTy, levityTy, unboxedTupleKind, liftedTypeKind
+  , boxedRepDataConTyCon, vecRepDataConTyCon, tupleRepDataConTyCon
   , liftedRepTy, unliftedRepTy
   , intRepDataConTy
   , int8RepDataConTy, int16RepDataConTy, int32RepDataConTy, int64RepDataConTy
@@ -127,7 +130,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Core.TyCo.Rep -- Doesn't need special access, but this is easier to avoid
                          -- import loops which show up if you import Type instead
-import {-# SOURCE #-} GHC.Core.Type ( mkTyConTy, tYPE )
+import {-# SOURCE #-} GHC.Core.Type ( mkTyConTy, mkTyConApp, tYPE )
 
 import Data.Char
 
@@ -396,6 +399,20 @@ openAlphaTy, openBetaTy, openGammaTy :: Type
 openAlphaTy = mkTyVarTy openAlphaTyVar
 openBetaTy  = mkTyVarTy openBetaTyVar
 openGammaTy = mkTyVarTy openGammaTyVar
+
+levity1TyVar :: TyVar
+(levity1TyVar : _)
+  = drop 11 (mkTemplateTyVars (repeat levityTy)) -- selects 'l'
+
+levity1Ty :: Type
+levity1Ty = mkTyVarTy levity1TyVar
+
+levPolyTyVar1 :: TyVar
+[levPolyTyVar1] = mkTemplateTyVars [tYPE (mkTyConApp boxedRepDataConTyCon [levity1Ty])]
+-- tv :: TYPE ('BoxedRep l)
+
+levPolyTy1 :: Type
+levPolyTy1 = mkTyVarTy levPolyTyVar1
 
 multiplicityTyVar1, multiplicityTyVar2  :: TyVar
 (multiplicityTyVar1 : multiplicityTyVar2 : _)
