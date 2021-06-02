@@ -84,6 +84,7 @@ cgForeignCall (CCall (CCallSpec target cconv safety)) typ stg_args res_ty
             arg_size (arg, _) = max (widthInBytes $ typeWidth $ cmmExprType platform arg)
                                      (platformWordSizeInBytes platform)
         ; cmm_args <- getFCallArgs stg_args typ
+        -- ; traceM $ show cmm_args
         ; (res_regs, res_hints) <- newUnboxedTupleRegs res_ty
         ; let ((call_args, arg_hints), cmm_target)
                 = case target of
