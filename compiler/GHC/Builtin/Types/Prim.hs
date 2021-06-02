@@ -20,17 +20,20 @@ module GHC.Builtin.Types.Prim(
         mkTemplateAnonTyConBinders,
 
         alphaTyVars, alphaTyVar, betaTyVar, gammaTyVar, deltaTyVar,
+        alphaTyVarSpec, betaTyVarSpec, gammaTyVarSpec, deltaTyVarSpec,
         alphaTys, alphaTy, betaTy, gammaTy, deltaTy,
         alphaTyVarsUnliftedRep, alphaTyVarUnliftedRep,
         alphaTysUnliftedRep, alphaTyUnliftedRep,
         runtimeRep1TyVar, runtimeRep2TyVar, runtimeRep3TyVar,
+        runtimeRep1TyVarInf, runtimeRep2TyVarInf,
         runtimeRep1Ty, runtimeRep2Ty, runtimeRep3Ty,
-        levity1TyVar, levity1Ty,
+        levity1TyVar, levity1TyVarInf, levity1Ty,
 
         openAlphaTyVar, openBetaTyVar, openGammaTyVar,
+        openAlphaTyVarSpec, openBetaTyVarSpec, openGammaTyVarSpec,
         openAlphaTy, openBetaTy, openGammaTy,
 
-        levPolyTyVar1, levPolyTy1,
+        levPolyTyVar1, levPolyTyVar1Spec, levPolyTy1,
 
         multiplicityTyVar1, multiplicityTyVar2,
 
@@ -117,7 +120,8 @@ import {-# SOURCE #-} GHC.Builtin.Types
   , doubleElemRepDataConTy
   , mkPromotedListTy, multiplicityTy )
 
-import GHC.Types.Var    ( TyVar, mkTyVar )
+import GHC.Types.Var    ( TyVarBinder, TyVar
+                        , mkTyVar, mkTyVarBinder, mkTyVarBinders )
 import GHC.Types.Name
 import {-# SOURCE #-} GHC.Types.TyThing
 import GHC.Core.TyCon
@@ -363,6 +367,9 @@ alphaTyVars = mkTemplateTyVars $ repeat liftedTypeKind
 alphaTyVar, betaTyVar, gammaTyVar, deltaTyVar :: TyVar
 (alphaTyVar:betaTyVar:gammaTyVar:deltaTyVar:_) = alphaTyVars
 
+alphaTyVarSpec, betaTyVarSpec, gammaTyVarSpec, deltaTyVarSpec :: TyVarBinder
+(alphaTyVarSpec:betaTyVarSpec:gammaTyVarSpec:deltaTyVarSpec:_) = mkTyVarBinders Specified alphaTyVars
+
 alphaTys :: [Type]
 alphaTys = mkTyVarTys alphaTyVars
 alphaTy, betaTy, gammaTy, deltaTy :: Type
@@ -383,17 +390,25 @@ runtimeRep1TyVar, runtimeRep2TyVar, runtimeRep3TyVar :: TyVar
 (runtimeRep1TyVar : runtimeRep2TyVar : runtimeRep3TyVar : _)
   = drop 16 (mkTemplateTyVars (repeat runtimeRepTy))  -- selects 'q','r'
 
+runtimeRep1TyVarInf, runtimeRep2TyVarInf :: TyVarBinder
+runtimeRep1TyVarInf = mkTyVarBinder Inferred runtimeRep1TyVar
+runtimeRep2TyVarInf = mkTyVarBinder Inferred runtimeRep2TyVar
+
 runtimeRep1Ty, runtimeRep2Ty, runtimeRep3Ty :: Type
 runtimeRep1Ty = mkTyVarTy runtimeRep1TyVar
 runtimeRep2Ty = mkTyVarTy runtimeRep2TyVar
 runtimeRep3Ty = mkTyVarTy runtimeRep3TyVar
-
 openAlphaTyVar, openBetaTyVar, openGammaTyVar :: TyVar
 -- alpha :: TYPE r1
 -- beta  :: TYPE r2
 -- gamma :: TYPE r3
 [openAlphaTyVar,openBetaTyVar,openGammaTyVar]
   = mkTemplateTyVars [tYPE runtimeRep1Ty, tYPE runtimeRep2Ty, tYPE runtimeRep3Ty]
+
+openAlphaTyVarSpec, openBetaTyVarSpec, openGammaTyVarSpec :: TyVarBinder
+openAlphaTyVarSpec = mkTyVarBinder Specified openAlphaTyVar
+openBetaTyVarSpec  = mkTyVarBinder Specified openBetaTyVar
+openGammaTyVarSpec = mkTyVarBinder Specified openGammaTyVar
 
 openAlphaTy, openBetaTy, openGammaTy :: Type
 openAlphaTy = mkTyVarTy openAlphaTyVar
@@ -404,12 +419,18 @@ levity1TyVar :: TyVar
 (levity1TyVar : _)
   = drop 11 (mkTemplateTyVars (repeat levityTy)) -- selects 'l'
 
+levity1TyVarInf :: TyVarBinder
+levity1TyVarInf = mkTyVarBinder Inferred levity1TyVar
+
 levity1Ty :: Type
 levity1Ty = mkTyVarTy levity1TyVar
 
 levPolyTyVar1 :: TyVar
 [levPolyTyVar1] = mkTemplateTyVars [tYPE (mkTyConApp boxedRepDataConTyCon [levity1Ty])]
 -- tv :: TYPE ('BoxedRep l)
+
+levPolyTyVar1Spec :: TyVarBinder
+levPolyTyVar1Spec = mkTyVarBinder Specified levPolyTyVar1
 
 levPolyTy1 :: Type
 levPolyTy1 = mkTyVarTy levPolyTyVar1
