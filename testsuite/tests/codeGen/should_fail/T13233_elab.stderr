@@ -1,24 +1,24 @@
 
 T13233_elab.hs:17:11: error:
-    Cannot use function with levity-polymorphic arguments:
+    Cannot use function with representation-polymorphic arguments:
       (#,#) @rep @rep @a @a :: a -> a -> (# a, a #)
-    Levity-polymorphic arguments:
+    Representation-polymorphic arguments:
       a :: TYPE rep
       a :: TYPE rep
 
 T13233_elab.hs:25:16: error:
-    Cannot use function with levity-polymorphic arguments:
+    Cannot use function with representation-polymorphic arguments:
       (#,#) @rep1 @rep2 @a @b :: a -> b -> (# a, b #)
-    Levity-polymorphic arguments:
+    Representation-polymorphic arguments:
       a :: TYPE rep1
       b :: TYPE rep2
 
 T13233_elab.hs:33:10: error:
-    Cannot use function with levity-polymorphic arguments:
+    Cannot use function with representation-polymorphic arguments:
       mkWeak# @rep @a @b @c
         :: a
            -> b
            -> (State# RealWorld -> (# State# RealWorld, c #))
            -> State# RealWorld
            -> (# State# RealWorld, Weak# b #)
-    Levity-polymorphic arguments: a :: TYPE rep
+    Representation-polymorphic arguments: a :: TYPE rep
