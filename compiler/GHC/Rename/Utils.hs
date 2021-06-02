@@ -39,8 +39,10 @@ import GHC.Prelude
 import GHC.Core.Type
 import GHC.Hs
 import GHC.Types.Name.Reader
+import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
+import GHC.Types.Error
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
@@ -169,9 +171,11 @@ checkShadowedOccs (global_env,local_env) get_loc_occ ns
                 -- we don't find any GREs that are in scope qualified-only
 
           complain []      = return ()
-          complain pp_locs = addDiagnosticAt (WarningWithFlag Opt_WarnNameShadowing)
-                                             loc
-                                             (shadowedNameWarn occ pp_locs)
+          complain pp_locs = do
+             let msg = TcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag Opt_WarnNameShadowing)
+                                                              noHints
+                                                              (shadowedNameWarn occ pp_locs)
+             addDiagnosticAt loc msg
 
     is_shadowed_gre :: GlobalRdrElt -> RnM Bool
         -- Returns False for record selectors that are shadowed, when
@@ -199,7 +203,7 @@ checkInferredVars ctxt (Just msg) ty =
   let bndrs = sig_ty_bndrs ty
   in case find ((==) InferredSpec . hsTyVarBndrFlag) bndrs of
     Nothing -> return ()
-    Just _  -> addErr $ withHsDocContext ctxt msg
+    Just _  -> addErr $ TcRnUnknownMessage $ mkPlainError noHints (withHsDocContext ctxt msg)
   where
     sig_ty_bndrs :: LHsSigType GhcPs -> [HsTyVarBndr Specificity GhcPs]
     sig_ty_bndrs (L _ (HsSig{sig_bndrs = outer_bndrs}))
@@ -308,7 +312,7 @@ noNestedForallsContextsErr what lty =
 addNoNestedForallsContextsErr :: HsDocContext -> SDoc -> LHsType GhcRn -> RnM ()
 addNoNestedForallsContextsErr ctxt what lty =
   whenIsJust (noNestedForallsContextsErr what lty) $ \(l, err_msg) ->
-    addErrAt l $ withHsDocContext ctxt err_msg
+    addErrAt l $ TcRnUnknownMessage $ mkPlainError noHints (withHsDocContext ctxt err_msg)
 
 {-
 ************************************************************************
@@ -385,9 +389,12 @@ checkUnusedRecordWildcard loc fvs (Just dotdot_names) =
 -- The `..` here doesn't bind any variables as `x` is already bound.
 warnRedundantRecordWildcard :: RnM ()
 warnRedundantRecordWildcard =
-  whenWOptM Opt_WarnRedundantRecordWildcards
-            (addDiagnostic (WarningWithFlag Opt_WarnRedundantRecordWildcards)
-                           redundantWildcardWarning)
+  whenWOptM Opt_WarnRedundantRecordWildcards $
+    let msg = TcRnUnknownMessage $
+                mkPlainDiagnostic (WarningWithFlag Opt_WarnRedundantRecordWildcards)
+                                  noHints
+                                  redundantWildcardWarning
+    in addDiagnostic msg
 
 
 -- | Produce a warning when no variables bound by a `..` pattern are used.
@@ -404,7 +411,7 @@ warnUnusedRecordWildcard :: [Name] -> FreeVars -> RnM ()
 warnUnusedRecordWildcard ns used_names = do
   let used = filter (`elemNameSet` used_names) ns
   traceRn "warnUnused" (ppr ns $$ ppr used_names $$ ppr used)
-  warnIfFlag Opt_WarnUnusedRecordWildcards (null used)
+  warnIf (null used)
     unusedRecordWildcardWarning
 
 
@@ -474,15 +481,17 @@ reportable child
   | otherwise = not (startsWithUnderscore (occName child))
 
 addUnusedWarning :: WarningFlag -> OccName -> SrcSpan -> SDoc -> RnM ()
-addUnusedWarning flag occ span msg
-  = addDiagnosticAt (WarningWithFlag flag) span $
-    sep [msg <> colon,
-         nest 2 $ pprNonVarNameSpace (occNameSpace occ)
-                        <+> quotes (ppr occ)]
+addUnusedWarning flag occ span msg = do
+  let diag = TcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag flag) noHints $
+        sep [msg <> colon,
+             nest 2 $ pprNonVarNameSpace (occNameSpace occ)
+                            <+> quotes (ppr occ)]
+  addDiagnosticAt span diag
 
-unusedRecordWildcardWarning :: SDoc
+unusedRecordWildcardWarning :: TcRnMessage
 unusedRecordWildcardWarning =
-  wildcardDoc $ text "No variables bound in the record wildcard match are used"
+  TcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag Opt_WarnUnusedRecordWildcards) noHints $
+    wildcardDoc $ text "No variables bound in the record wildcard match are used"
 
 redundantWildcardWarning :: SDoc
 redundantWildcardWarning =
@@ -531,7 +540,8 @@ addNameClashErrRn rdr_name gres
   -- already, and we don't want an error cascade.
   = return ()
   | otherwise
-  = addErr (vcat [ text "Ambiguous occurrence" <+> quotes (ppr rdr_name)
+  = addErr $ TcRnUnknownMessage $ mkPlainError noHints $
+    (vcat [ text "Ambiguous occurrence" <+> quotes (ppr rdr_name)
                  , text "It could refer to"
                  , nest 3 (vcat (msg1 : msgs)) ])
   where
@@ -593,7 +603,7 @@ unknownSubordinateErr doc op    -- Doc is "method of class" or
 
 dupNamesErr :: Outputable n => (n -> SrcSpan) -> NE.NonEmpty n -> RnM ()
 dupNamesErr get_loc names
-  = addErrAt big_loc $
+  = addErrAt big_loc $ TcRnUnknownMessage $ mkPlainError noHints $
     vcat [text "Conflicting definitions for" <+> quotes (ppr (NE.head names)),
           locations]
   where
@@ -601,13 +611,15 @@ dupNamesErr get_loc names
     big_loc   = foldr1 combineSrcSpans locs
     locations = text "Bound at:" <+> vcat (map ppr (sortBy SrcLoc.leftmost_smallest locs))
 
-badQualBndrErr :: RdrName -> SDoc
+badQualBndrErr :: RdrName -> TcRnMessage
 badQualBndrErr rdr_name
-  = text "Qualified name in binding position:" <+> ppr rdr_name
+  = TcRnUnknownMessage $ mkPlainError noHints $
+  text "Qualified name in binding position:" <+> ppr rdr_name
 
-typeAppErr :: String -> LHsType GhcPs -> SDoc
+typeAppErr :: String -> LHsType GhcPs -> TcRnMessage
 typeAppErr what (L _ k)
-  = hang (text "Illegal visible" <+> text what <+> text "application"
+  = TcRnUnknownMessage $ mkPlainError noHints $
+    hang (text "Illegal visible" <+> text what <+> text "application"
             <+> quotes (char '@' <> ppr k))
        2 (text "Perhaps you intended to use TypeApplications")
 
@@ -618,9 +630,10 @@ checkTupSize tup_size
   | tup_size <= mAX_TUPLE_SIZE
   = return ()
   | otherwise
-  = addErr (sep [text "A" <+> int tup_size <> text "-tuple is too large for GHC",
+  = addErr $ TcRnUnknownMessage $ mkPlainError noHints $
+    sep [text "A" <+> int tup_size <> text "-tuple is too large for GHC",
                  nest 2 (parens (text "max size is" <+> int mAX_TUPLE_SIZE)),
-                 nest 2 (text "Workaround: use nested tuples or define a data type")])
+                 nest 2 (text "Workaround: use nested tuples or define a data type")]
 
 -- | Ensure that a constraint tuple has arity no larger than 'mAX_CTUPLE_SIZE'.
 checkCTupSize :: Int -> TcM ()
@@ -628,9 +641,10 @@ checkCTupSize tup_size
   | tup_size <= mAX_CTUPLE_SIZE
   = return ()
   | otherwise
-  = addErr (hang (text "Constraint tuple arity too large:" <+> int tup_size
+  = addErr $ TcRnUnknownMessage $ mkPlainError noHints $
+    hang (text "Constraint tuple arity too large:" <+> int tup_size
                   <+> parens (text "max arity =" <+> int mAX_CTUPLE_SIZE))
-               2 (text "Instead, use a nested tuple"))
+               2 (text "Instead, use a nested tuple")
 
 
 {-
