@@ -32,45 +32,47 @@ where
 
 import GHC.Prelude
 
-import GHC.Driver.Ppr
+import GHC.Platform
 
 import {-# SOURCE #-} GHC.Types.Id.Make ( mkPrimOpId, voidPrimId )
+import GHC.Types.Id
+import GHC.Types.Literal
+import GHC.Types.Var.Set
+import GHC.Types.Var.Env
+import GHC.Types.Name.Occurrence ( occNameFS )
+import GHC.Types.Tickish
+import GHC.Types.Name ( Name, nameOccName )
+import GHC.Types.Basic
 
 import GHC.Core
 import GHC.Core.Make
-import GHC.Types.Id
-import GHC.Types.Literal
 import GHC.Core.SimpleOpt (  exprIsConApp_maybe, exprIsLiteral_maybe )
-import GHC.Builtin.PrimOps ( PrimOp(..), tagToEnumKey )
-import GHC.Builtin.Types
-import GHC.Builtin.Types.Prim
-import GHC.Core.TyCon
-   ( tyConDataCons_maybe, isAlgTyCon, isEnumerationTyCon
-   , isNewTyCon, tyConDataCons
-   , tyConFamilySize )
 import GHC.Core.DataCon ( dataConTagZ, dataConTyCon, dataConWrapId, dataConWorkId )
 import GHC.Core.Utils  ( eqExpr, cheapEqExpr, exprIsHNF, exprType
                        , stripTicksTop, stripTicksTopT, mkTicks )
 import GHC.Core.Multiplicity
 import GHC.Core.FVs
 import GHC.Core.Type
-import GHC.Types.Var.Set
-import GHC.Types.Var.Env
-import GHC.Types.Name.Occurrence ( occNameFS )
-import GHC.Types.Tickish
+import GHC.Core.TyCon
+   ( tyConDataCons_maybe, isAlgTyCon, isEnumerationTyCon
+   , isNewTyCon, tyConDataCons
+   , tyConFamilySize )
+
+import GHC.Builtin.PrimOps ( PrimOp(..), tagToEnumKey )
+import GHC.Builtin.Types
+import GHC.Builtin.Types.Prim
 import GHC.Builtin.Names
-import GHC.Data.Maybe      ( orElse )
-import GHC.Types.Name ( Name, nameOccName )
-import GHC.Utils.Outputable
+
 import GHC.Data.FastString
-import GHC.Types.Basic
-import GHC.Platform
+import GHC.Data.Maybe      ( orElse )
+
+import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
+import GHC.Utils.Trace
 
 import Control.Applicative ( Alternative(..) )
-
 import Control.Monad
 import Data.Functor (($>))
 import qualified Data.ByteString as BS

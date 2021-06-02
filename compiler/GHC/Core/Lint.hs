@@ -29,17 +29,33 @@ import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Driver.Env
 
+import GHC.Tc.Utils.TcType ( isFloatingTy, isTyFamFree )
+import GHC.Unit.Module.ModGuts
+import GHC.Runtime.Context
+
 import GHC.Core
 import GHC.Core.FVs
 import GHC.Core.Utils
 import GHC.Core.Stats ( coreBindsStats )
 import GHC.Core.Opt.Monad
-import GHC.Data.Bag
-import GHC.Types.Literal
 import GHC.Core.DataCon
-import GHC.Builtin.Types.Prim
-import GHC.Builtin.Types ( multiplicityTy )
-import GHC.Tc.Utils.TcType ( isFloatingTy, isTyFamFree )
+import GHC.Core.Ppr
+import GHC.Core.Coercion
+import GHC.Core.Type as Type
+import GHC.Core.Multiplicity
+import GHC.Core.UsageEnv
+import GHC.Core.TyCo.Rep   -- checks validity of types/coercions
+import GHC.Core.TyCo.Subst
+import GHC.Core.TyCo.FVs
+import GHC.Core.TyCo.Ppr ( pprTyVar, pprTyVars )
+import GHC.Core.TyCon as TyCon
+import GHC.Core.Coercion.Axiom
+import GHC.Core.Unify
+import GHC.Core.InstEnv      ( instanceDFunId )
+import GHC.Core.Coercion.Opt ( checkAxInstCo )
+import GHC.Core.Opt.Arity    ( typeArity )
+
+import GHC.Types.Literal
 import GHC.Types.Var as Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
@@ -48,41 +64,31 @@ import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Id
 import GHC.Types.Id.Info
-import GHC.Core.Ppr
-import GHC.Core.Coercion
 import GHC.Types.SrcLoc
 import GHC.Types.Tickish
-import GHC.Core.Type as Type
-import GHC.Core.Multiplicity
-import GHC.Core.UsageEnv
 import GHC.Types.RepType
-import GHC.Core.TyCo.Rep   -- checks validity of types/coercions
-import GHC.Core.TyCo.Subst
-import GHC.Core.TyCo.FVs
-import GHC.Core.TyCo.Ppr ( pprTyVar, pprTyVars )
-import GHC.Core.TyCon as TyCon
-import GHC.Core.Coercion.Axiom
-import GHC.Core.Unify
 import GHC.Types.Basic
-import GHC.Utils.Error
-import qualified GHC.Utils.Error as Err
-import GHC.Utils.Logger
-import GHC.Data.List.SetOps
+import GHC.Types.Demand      ( splitDmdSig, isDeadEndDiv )
+import GHC.Types.TypeEnv
+
 import GHC.Builtin.Names
+import GHC.Builtin.Types.Prim
+import GHC.Builtin.Types ( multiplicityTy )
+
+import GHC.Data.Bag
+import GHC.Data.List.SetOps
+
+import GHC.Utils.Monad
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Misc
-import GHC.Core.InstEnv      ( instanceDFunId )
-import GHC.Core.Coercion.Opt ( checkAxInstCo )
-import GHC.Core.Opt.Arity    ( typeArity )
-import GHC.Types.Demand      ( splitDmdSig, isDeadEndDiv )
-import GHC.Types.TypeEnv
-import GHC.Unit.Module.ModGuts
-import GHC.Runtime.Context
+import GHC.Utils.Trace
+import GHC.Utils.Error
+import qualified GHC.Utils.Error as Err
+import GHC.Utils.Logger
 
 import Control.Monad
-import GHC.Utils.Monad
 import Data.Foldable      ( toList )
 import Data.List.NonEmpty ( NonEmpty(..), groupWith )
 import Data.List          ( partition )

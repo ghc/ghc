@@ -77,7 +77,6 @@ where
 
 import GHC.Prelude
 import GHC.Driver.Flags
-import GHC.Driver.Ppr
 import GHC.Types.Error
 import GHC.Types.SrcLoc
 
@@ -101,6 +100,7 @@ import System.IO
 import Control.Monad
 import Control.Concurrent.MVar
 import System.IO.Unsafe
+import Debug.Trace (trace)
 
 ---------------------------------------------------------------
 -- Log flags
@@ -528,7 +528,7 @@ defaultTraceAction :: TraceAction a
 defaultTraceAction logflags title doc x =
   if not (log_enable_debug logflags)
     then x
-    else trace (showSDocDump (log_default_dump_context logflags)
+    else trace (renderWithContext (log_default_dump_context logflags)
                              (sep [text title, nest 2 doc])) x
 
 

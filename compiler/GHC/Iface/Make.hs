@@ -51,7 +51,6 @@ import GHC.Core.Unify( RoughMatchTc(..) )
 import GHC.Driver.Env
 import GHC.Driver.Backend
 import GHC.Driver.Session
-import GHC.Driver.Ppr
 import GHC.Driver.Plugins (LoadedPlugin(..))
 
 import GHC.Types.Id
@@ -77,6 +76,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc  hiding ( eqListBy )
 import GHC.Utils.Logger
+import GHC.Utils.Trace
 
 import GHC.Data.FastString
 import GHC.Data.Maybe

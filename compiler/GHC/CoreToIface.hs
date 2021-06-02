@@ -46,37 +46,42 @@ module GHC.CoreToIface
 
 import GHC.Prelude
 
-import GHC.Driver.Ppr
-import GHC.Iface.Syntax
-import GHC.Core.DataCon
-import GHC.Types.Id
-import GHC.Types.Literal
-import GHC.Types.Id.Info
 import GHC.StgToCmm.Types
+
 import GHC.Core
 import GHC.Core.TyCon hiding ( pprPromotionQuote )
 import GHC.Core.Coercion.Axiom
-import GHC.Builtin.Types.Prim ( eqPrimTyCon, eqReprPrimTyCon )
-import GHC.Builtin.Types ( heqTyCon )
-import GHC.Types.Id.Make ( noinlineIdName )
-import GHC.Builtin.Names
-import GHC.Types.Name
-import GHC.Types.Basic
+import GHC.Core.DataCon
 import GHC.Core.Type
 import GHC.Core.Multiplicity
 import GHC.Core.PatSyn
-import GHC.Utils.Outputable
-import GHC.Utils.Panic
+import GHC.Core.TyCo.Rep
+import GHC.Core.TyCo.Tidy ( tidyCo )
+
+import GHC.Builtin.Types.Prim ( eqPrimTyCon, eqReprPrimTyCon )
+import GHC.Builtin.Types ( heqTyCon )
+import GHC.Builtin.Names
+
+import GHC.Iface.Syntax
 import GHC.Data.FastString
-import GHC.Utils.Misc
+
+import GHC.Types.Id
+import GHC.Types.Id.Info
+import GHC.Types.Id.Make ( noinlineIdName )
+import GHC.Types.Literal
+import GHC.Types.Name
+import GHC.Types.Basic
 import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Tickish
-import GHC.Core.TyCo.Rep
-import GHC.Core.TyCo.Tidy ( tidyCo )
 import GHC.Types.Demand ( isTopSig )
 import GHC.Types.Cpr ( topCprSig )
+
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Utils.Misc
+import GHC.Utils.Trace
 
 import Data.Maybe ( catMaybes )
 
@@ -297,7 +302,7 @@ toIfaceCoercionX fr co
                                           (toIfaceTypeX fr t2)
     go (TyConAppCo r tc cos)
       | tc `hasKey` funTyConKey
-      , [_,_,_,_, _] <- cos         = pprPanic "toIfaceCoercion" empty
+      , [_,_,_,_, _] <- cos         = panic "toIfaceCoercion"
       | otherwise                =
         IfaceTyConAppCo r (toIfaceTyCon tc) (map go cos)
     go (FunCo r w co1 co2)   = IfaceFunCo r (go w) (go co1) (go co2)

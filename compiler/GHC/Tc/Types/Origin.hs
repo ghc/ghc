@@ -46,7 +46,7 @@ import GHC.Data.FastString
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Driver.Ppr
+import GHC.Utils.Trace
 
 {- *********************************************************************
 *                                                                      *

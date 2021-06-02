@@ -9,32 +9,35 @@ module GHC.Core.Opt.WorkWrap ( wwTopBinds ) where
 
 import GHC.Prelude
 
+import GHC.Driver.Session
+
 import GHC.Core.Opt.Arity  ( manifestArity )
 import GHC.Core
 import GHC.Core.Unfold
 import GHC.Core.Unfold.Make
 import GHC.Core.Utils  ( exprType, exprIsHNF )
 import GHC.Core.FVs    ( exprFreeVars )
+import GHC.Core.Type
+import GHC.Core.Opt.WorkWrap.Utils
+import GHC.Core.FamInstEnv
+import GHC.Core.SimpleOpt( SimpleOpts(..) )
+
 import GHC.Types.Var
 import GHC.Types.Id
 import GHC.Types.Id.Info
-import GHC.Core.Type
 import GHC.Types.Unique.Supply
 import GHC.Types.Basic
-import GHC.Driver.Session
-import GHC.Driver.Ppr
 import GHC.Types.Demand
 import GHC.Types.Cpr
 import GHC.Types.SourceText
-import GHC.Core.Opt.WorkWrap.Utils
-import GHC.Core.SimpleOpt( SimpleOpts(..) )
+import GHC.Types.Unique
+
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
-import GHC.Types.Unique
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
-import GHC.Core.FamInstEnv
 import GHC.Utils.Monad
+import GHC.Utils.Trace
 
 {-
 We take Core bindings whose binders have:

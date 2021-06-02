@@ -24,6 +24,12 @@ where
 
 import GHC.Prelude
 
+import GHC.Driver.Session
+import GHC.Driver.Ppr
+import GHC.Driver.Config
+import qualified GHC.LanguageExtensions as LangExt
+import GHC.Unit.Module
+
 import {-# SOURCE #-}   GHC.HsToCore.Expr  ( dsLExpr )
 import {-# SOURCE #-}   GHC.HsToCore.Match ( matchWrapper )
 
@@ -42,41 +48,41 @@ import GHC.Core.Utils
 import GHC.Core.Opt.Arity     ( etaExpand )
 import GHC.Core.Unfold.Make
 import GHC.Core.FVs
-import GHC.Data.Graph.Directed
 import GHC.Core.Predicate
-
-import GHC.Builtin.Names
 import GHC.Core.TyCon
-import GHC.Tc.Types.Evidence
-import GHC.Tc.Utils.TcType
 import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.Multiplicity
+import GHC.Core.Rules
+
+import GHC.Builtin.Names
 import GHC.Builtin.Types ( naturalTy, typeSymbolKind, charTy )
+
+import GHC.Tc.Types.Evidence
+
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Var.Set
-import GHC.Core.Rules
 import GHC.Types.Var.Env
 import GHC.Types.Var( EvVar )
+import GHC.Types.SrcLoc
+import GHC.Types.Basic
+import GHC.Types.Unique.Set( nonDetEltsUniqSet )
+
+import GHC.Data.Maybe
+import GHC.Data.OrdList
+import GHC.Data.Graph.Directed
+import GHC.Data.Bag
+import GHC.Data.FastString
+
+import GHC.Utils.Constants (debugIsOn)
+import GHC.Utils.Misc
+import GHC.Utils.Monad
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
-import GHC.Utils.Constants (debugIsOn)
-import GHC.Unit.Module
-import GHC.Types.SrcLoc
-import GHC.Data.Maybe
-import GHC.Data.OrdList
-import GHC.Data.Bag
-import GHC.Types.Basic
-import GHC.Driver.Session
-import GHC.Driver.Ppr
-import GHC.Driver.Config
-import GHC.Data.FastString
-import GHC.Utils.Misc
-import GHC.Types.Unique.Set( nonDetEltsUniqSet )
-import GHC.Utils.Monad
-import qualified GHC.LanguageExtensions as LangExt
+import GHC.Utils.Trace
+
 import Control.Monad
 
 {-**********************************************************************

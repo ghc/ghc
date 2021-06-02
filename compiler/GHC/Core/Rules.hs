@@ -27,10 +27,14 @@ module GHC.Core.Rules (
 
 import GHC.Prelude
 
-import GHC.Core         -- All of it
+import GHC.Driver.Session      ( DynFlags, gopt, targetPlatform, homeUnitId_ )
+import GHC.Driver.Flags
+
 import GHC.Unit.Types    ( primUnitId, bignumUnitId )
 import GHC.Unit.Module   ( Module )
 import GHC.Unit.Module.Env
+
+import GHC.Core         -- All of it
 import GHC.Core.Subst
 import GHC.Core.SimpleOpt ( exprIsLambda_maybe )
 import GHC.Core.FVs       ( exprFreeVars, exprsFreeVars, bindFreeVars
@@ -39,13 +43,16 @@ import GHC.Core.Utils     ( exprType, eqExpr, mkTick, mkTicks
                           , stripTicksTopT, stripTicksTopE
                           , isJoinBind )
 import GHC.Core.Ppr       ( pprRules )
+import GHC.Core.Unify as Unify ( ruleMatchTyKiX )
 import GHC.Core.Type as Type
    ( Type, TCvSubst, extendTvSubst, extendCvSubst
    , mkEmptyTCvSubst, substTy )
-import GHC.Tc.Utils.TcType  ( tcSplitTyConApp_maybe )
-import GHC.Builtin.Types    ( anyTypeOfKind )
 import GHC.Core.Coercion as Coercion
 import GHC.Core.Tidy     ( tidyRules )
+
+import GHC.Tc.Utils.TcType  ( tcSplitTyConApp_maybe )
+import GHC.Builtin.Types    ( anyTypeOfKind )
+
 import GHC.Types.Id
 import GHC.Types.Id.Info ( RuleInfo( RuleInfo ) )
 import GHC.Types.Var
@@ -56,18 +63,18 @@ import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Types.Unique.FM
 import GHC.Types.Tickish
-import GHC.Core.Unify as Unify ( ruleMatchTyKiX )
 import GHC.Types.Basic
-import GHC.Driver.Session      ( DynFlags, gopt, targetPlatform, homeUnitId_ )
-import GHC.Driver.Ppr
-import GHC.Driver.Flags
-import GHC.Utils.Outputable
-import GHC.Utils.Panic
-import GHC.Utils.Constants (debugIsOn)
+
 import GHC.Data.FastString
 import GHC.Data.Maybe
 import GHC.Data.Bag
+
 import GHC.Utils.Misc as Utils
+import GHC.Utils.Trace
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Utils.Constants (debugIsOn)
+
 import Data.List (sortBy, mapAccumL, isPrefixOf)
 import Data.Function    ( on )
 import Control.Monad    ( guard )

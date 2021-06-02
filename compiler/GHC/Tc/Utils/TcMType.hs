@@ -96,46 +96,48 @@ module GHC.Tc.Utils.TcMType (
   ensureNotLevPoly, checkForLevPoly, checkForLevPolyX,
   ) where
 
--- friends:
 import GHC.Prelude
 
-import {-# SOURCE #-}   GHC.Tc.Utils.Unify( unifyType {- , unifyKind -} )
+import GHC.Driver.Session
+import qualified GHC.LanguageExtensions as LangExt
+
+import GHC.Tc.Types.Origin
+import GHC.Tc.Utils.Monad        -- TcType, amongst others
+import GHC.Tc.Types.Constraint
+import GHC.Tc.Types.Evidence
+import {-# SOURCE #-} GHC.Tc.Utils.Unify( unifyType {- , unifyKind -} )
+import GHC.Tc.Utils.TcType
+import GHC.Tc.Errors.Types
 
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr
-import GHC.Tc.Utils.TcType
 import GHC.Core.Type
 import GHC.Core.TyCon
 import GHC.Core.Coercion
 import GHC.Core.Class
-import GHC.Types.Var
 import GHC.Core.Predicate
-import GHC.Tc.Errors.Types
-import GHC.Tc.Types.Origin
 
--- others:
-import GHC.Tc.Utils.Monad        -- TcType, amongst others
-import GHC.Tc.Types.Constraint
-import GHC.Tc.Types.Evidence
+import GHC.Types.Var
 import GHC.Types.Id as Id
 import GHC.Types.Name
 import GHC.Types.Var.Set
-import GHC.Builtin.Types
 import GHC.Types.Var.Env
 import GHC.Types.Name.Env
+import GHC.Types.Unique.Set
+import GHC.Types.Basic ( TypeOrKind(..) )
+
+import GHC.Builtin.Types
+
+import GHC.Data.FastString
+import GHC.Data.Bag
+import GHC.Data.Pair
+
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Constants (debugIsOn)
-import GHC.Data.FastString
-import GHC.Data.Bag
-import GHC.Data.Pair
-import GHC.Types.Unique.Set
-import GHC.Driver.Session
-import GHC.Driver.Ppr
-import qualified GHC.LanguageExtensions as LangExt
-import GHC.Types.Basic ( TypeOrKind(..) )
+import GHC.Utils.Trace
 
 import Control.Monad
 import GHC.Data.Maybe

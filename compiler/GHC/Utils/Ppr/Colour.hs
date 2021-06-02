@@ -2,7 +2,7 @@ module GHC.Utils.Ppr.Colour where
 import GHC.Prelude
 
 import Data.Maybe (fromMaybe)
-import GHC.Utils.Misc (OverridingBool(..), split)
+import GHC.Data.Bool
 import Data.Semigroup as Semi
 
 -- | A colour\/style for use with 'coloured'.
@@ -93,6 +93,11 @@ parseScheme input    (b, cs) =
     }
   )
   where
+    split :: Char -> String -> [String]
+    split c s = case break (==c) s of
+        (chunk,[])     -> [chunk]
+        (chunk,_:rest) -> chunk : split c rest
+
     table = do
       w <- split ':' input
       let (k, v') = break (== '=') w

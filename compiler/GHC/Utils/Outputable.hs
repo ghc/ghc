@@ -57,6 +57,7 @@ module GHC.Utils.Outputable (
         showSDocUnsafe,
         showPprUnsafe,
         renderWithContext,
+        pprDebugAndThen,
 
         pprInfixVar, pprPrefixVar,
         pprHsChar, pprHsString, pprHsBytes,
@@ -605,6 +606,13 @@ showSDocUnsafe sdoc = renderWithContext defaultSDocContext sdoc
 
 showPprUnsafe :: Outputable a => a -> String
 showPprUnsafe a = renderWithContext defaultSDocContext (ppr a)
+
+
+pprDebugAndThen :: SDocContext -> (String -> a) -> SDoc -> SDoc -> a
+pprDebugAndThen ctx cont heading pretty_msg
+ = cont (renderWithContext ctx doc)
+ where
+     doc = withPprStyle defaultDumpStyle (sep [heading, nest 2 pretty_msg])
 
 
 isEmpty :: SDocContext -> SDoc -> Bool

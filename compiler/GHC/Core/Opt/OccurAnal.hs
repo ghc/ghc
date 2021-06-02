@@ -20,38 +20,40 @@ module GHC.Core.Opt.OccurAnal ( occurAnalysePgm, occurAnalyseExpr ) where
 
 import GHC.Prelude
 
-import GHC.Driver.Ppr
-
 import GHC.Core
 import GHC.Core.FVs
 import GHC.Core.Utils   ( exprIsTrivial, isDefaultAlt, isExpandableApp,
                           stripTicksTopE, mkTicks )
 import GHC.Core.Opt.Arity   ( joinRhsArity )
-import GHC.Types.Id
-import GHC.Types.Id.Info
-import GHC.Types.Basic
-import GHC.Types.Tickish
-import GHC.Unit.Module( Module )
 import GHC.Core.Coercion
 import GHC.Core.Type
 import GHC.Core.TyCo.FVs( tyCoVarsOfMCo )
 
+import GHC.Data.Maybe( isJust )
+import GHC.Data.Graph.Directed ( SCC(..), Node(..)
+                               , stronglyConnCompFromEdgedVerticesUniq
+                               , stronglyConnCompFromEdgedVerticesUniqR )
+import GHC.Types.Unique
+import GHC.Types.Unique.FM
+import GHC.Types.Unique.Set
+import GHC.Types.Id
+import GHC.Types.Id.Info
+import GHC.Types.Basic
+import GHC.Types.Tickish
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Var
 import GHC.Types.Demand ( argOneShots, argsOneShots )
-import GHC.Data.Graph.Directed ( SCC(..), Node(..)
-                               , stronglyConnCompFromEdgedVerticesUniq
-                               , stronglyConnCompFromEdgedVerticesUniqR )
-import GHC.Builtin.Names( runRWKey )
-import GHC.Types.Unique
-import GHC.Types.Unique.FM
-import GHC.Types.Unique.Set
-import GHC.Utils.Misc
-import GHC.Data.Maybe( isJust )
+
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
+import GHC.Utils.Misc
+import GHC.Utils.Trace
+
+import GHC.Builtin.Names( runRWKey )
+import GHC.Unit.Module( Module )
+
 import Data.List (mapAccumL, mapAccumR)
 
 {-

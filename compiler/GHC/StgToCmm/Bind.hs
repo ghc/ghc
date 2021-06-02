@@ -15,6 +15,14 @@ module GHC.StgToCmm.Bind (
 
 import GHC.Prelude hiding ((<*>))
 
+import GHC.Driver.Session
+
+import GHC.Core          ( AltCon(..) )
+import GHC.Runtime.Heap.Layout
+import GHC.Unit.Module
+
+import GHC.Stg.Syntax
+
 import GHC.Platform
 import GHC.Platform.Profile
 
@@ -32,29 +40,26 @@ import GHC.StgToCmm.Closure
 import GHC.StgToCmm.Foreign    (emitPrimCall)
 
 import GHC.Cmm.Graph
-import GHC.Core          ( AltCon(..) )
 import GHC.Cmm.BlockId
-import GHC.Runtime.Heap.Layout
 import GHC.Cmm
 import GHC.Cmm.Info
 import GHC.Cmm.Utils
 import GHC.Cmm.CLabel
-import GHC.Stg.Syntax
+
 import GHC.Types.CostCentre
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Name
-import GHC.Unit.Module
-import GHC.Data.List.SetOps
-import GHC.Utils.Misc
 import GHC.Types.Var.Set
 import GHC.Types.Basic
 import GHC.Types.Tickish ( tickishIsCode )
+
+import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+
 import GHC.Data.FastString
-import GHC.Driver.Session
-import GHC.Driver.Ppr
+import GHC.Data.List.SetOps
 
 import Control.Monad
 
@@ -764,9 +769,10 @@ closureDescription
         -- Not called for StgRhsCon which have global info tables built in
         -- CgConTbls.hs with a description generated from the data constructor
 closureDescription dflags mod_name name
-  = showSDocDump (initSDocContext dflags defaultDumpStyle) (char '<' <>
+  = let ctx = initSDocContext dflags defaultDumpStyle
+    -- defaultDumpStyle, because we want to see the unique on the Name.
+    in renderWithContext ctx (char '<' <>
                     (if isExternalName name
                       then ppr name -- ppr will include the module name prefix
                       else pprModule mod_name <> char '.' <> ppr name) <>
                     char '>')
-   -- showSDocDump, because we want to see the unique on the Name.

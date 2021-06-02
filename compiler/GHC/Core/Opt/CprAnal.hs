@@ -11,16 +11,16 @@ module GHC.Core.Opt.CprAnal ( cprAnalProgram ) where
 import GHC.Prelude
 
 import GHC.Driver.Session
-import GHC.Types.Demand
-import GHC.Types.Cpr
-import GHC.Core
-import GHC.Core.Seq
-import GHC.Utils.Outputable
+
 import GHC.Builtin.Names ( runRWKey )
+
 import GHC.Types.Var.Env
 import GHC.Types.Basic
 import GHC.Types.Id
 import GHC.Types.Id.Info
+import GHC.Types.Demand
+import GHC.Types.Cpr
+
 import GHC.Core.DataCon
 import GHC.Core.FamInstEnv
 import GHC.Core.Multiplicity
@@ -28,17 +28,20 @@ import GHC.Core.Opt.WorkWrap.Utils
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.Utils   ( exprIsHNF, dumpIdInfoOfProgram, normSplitTyConApp_maybe )
-import GHC.Utils.Misc
-import GHC.Utils.Panic.Plain
-import GHC.Utils.Logger  ( Logger, putDumpFileMaybe, DumpFormat (..) )
+import GHC.Core
+import GHC.Core.Seq
+
 import GHC.Data.Graph.UnVar -- for UnVarSet
 import GHC.Data.Maybe   ( isJust )
 
+import GHC.Utils.Outputable
+import GHC.Utils.Misc
+import GHC.Utils.Panic.Plain
+import GHC.Utils.Logger  ( Logger, putDumpFileMaybe, DumpFormat (..) )
+--import GHC.Utils.Trace
+
 import Control.Monad ( guard )
 import Data.List ( mapAccumL )
-
-import GHC.Driver.Ppr
-_ = pprTrace -- Tired of commenting out the import all the time
 
 {- Note [Constructed Product Result]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -17,42 +17,46 @@ module GHC.CoreToStg ( coreToStg ) where
 
 import GHC.Prelude
 
+import GHC.Driver.Session
+
 import GHC.Core
 import GHC.Core.Utils   ( exprType, findDefault, isJoinBind
                         , exprIsTickedString_maybe )
 import GHC.Core.Opt.Arity   ( manifestArity )
+import GHC.Core.Type
+import GHC.Core.TyCon
+import GHC.Core.DataCon
+
 import GHC.Stg.Syntax
 import GHC.Stg.Debug
 
-import GHC.Core.Type
 import GHC.Types.RepType
-import GHC.Core.TyCon
 import GHC.Types.Id.Make ( coercionTokenId )
 import GHC.Types.Id
 import GHC.Types.Id.Info
-import GHC.Core.DataCon
 import GHC.Types.CostCentre
 import GHC.Types.Tickish
 import GHC.Types.Var.Env
-import GHC.Unit.Module
 import GHC.Types.Name   ( isExternalName, nameModule_maybe )
 import GHC.Types.Basic  ( Arity )
-import GHC.Builtin.Types ( unboxedUnitDataCon )
 import GHC.Types.Literal
-import GHC.Utils.Outputable
-import GHC.Utils.Monad
-import GHC.Utils.Misc (HasDebugCallStack)
-import GHC.Data.FastString
-import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
-import GHC.Driver.Session
-import GHC.Platform.Ways
-import GHC.Driver.Ppr
 import GHC.Types.ForeignCall
 import GHC.Types.IPE
 import GHC.Types.Demand    ( isUsedOnceDmd )
-import GHC.Builtin.PrimOps ( PrimCall(..) )
 import GHC.Types.SrcLoc    ( mkGeneralSrcSpan )
+
+import GHC.Unit.Module
+import GHC.Builtin.Types ( unboxedUnitDataCon )
+import GHC.Data.FastString
+import GHC.Platform.Ways
+import GHC.Builtin.PrimOps ( PrimCall(..) )
+
+import GHC.Utils.Outputable
+import GHC.Utils.Monad
+import GHC.Utils.Misc (HasDebugCallStack)
+import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
+import GHC.Utils.Trace
 
 import Control.Monad (ap)
 import Data.Maybe (fromMaybe)

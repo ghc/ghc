@@ -55,6 +55,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Misc as Utils
 import GHC.Utils.Panic
+import GHC.Utils.Trace
 
 import GHC.Types.Fixity.Env
 import GHC.Types.SafeHaskell

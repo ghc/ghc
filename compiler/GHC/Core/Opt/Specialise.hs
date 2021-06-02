@@ -42,6 +42,7 @@ import GHC.Builtin.Types  ( unboxedUnitTy )
 import GHC.Data.Maybe     ( mapMaybe, maybeToList, isJust )
 import GHC.Data.Bag
 import GHC.Data.FastString
+import GHC.Data.List.SetOps
 
 import GHC.Types.Basic
 import GHC.Types.Unique.Supply
@@ -60,6 +61,7 @@ import GHC.Utils.Monad    ( foldlM )
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Trace
 
 import GHC.Unit.Module( Module )
 import GHC.Unit.Module.ModGuts

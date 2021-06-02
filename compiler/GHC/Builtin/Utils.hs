@@ -78,6 +78,8 @@ import GHC.Utils.Constants (debugIsOn)
 import GHC.Hs.Doc
 import GHC.Unit.Module.ModIface (IfaceExport)
 
+import GHC.Data.List.SetOps
+
 import Control.Applicative ((<|>))
 import Data.List        ( intercalate , find )
 import Data.Array

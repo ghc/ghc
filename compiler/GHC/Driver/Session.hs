@@ -241,6 +241,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.GlobalVars
 import GHC.Data.Maybe
+import GHC.Data.Bool
 import GHC.Utils.Monad
 import GHC.Types.Error (DiagnosticReason(..))
 import GHC.Types.SrcLoc

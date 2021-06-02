@@ -15,7 +15,7 @@ where
 
 import GHC.Prelude
 
-import GHC.Driver.Ppr     (pprTrace)
+import GHC.Platform
 
 import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.Monad
@@ -23,30 +23,26 @@ import GHC.CmmToAsm.CFG
 import GHC.CmmToAsm.Types
 import GHC.CmmToAsm.Config
 
-import GHC.Cmm.BlockId
 import GHC.Cmm
+import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Label
 
-import GHC.Platform
 import GHC.Types.Unique.FM
 
 import GHC.Data.Graph.Directed
+import GHC.Data.Maybe
+import GHC.Data.List.SetOps (removeDups)
+import GHC.Data.OrdList
+
+import GHC.Utils.Trace
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
-import GHC.Data.Maybe
 
--- DEBUGGING ONLY
---import GHC.Cmm.DebugBlock
---import Debug.Trace
-import GHC.Data.List.SetOps (removeDups)
-
-import GHC.Data.OrdList
 import Data.List (sortOn, sortBy)
 import Data.Foldable (toList)
-
 import qualified Data.Set as Set
 import Data.STRef
 import Control.Monad.ST.Strict

@@ -163,8 +163,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Utils.GlobalVars
-
-import GHC.Driver.Ppr
+import GHC.Utils.Trace
 
 -- infixl so you can say (id `set` a `set` b)
 infixl  1 `setIdUnfolding`,

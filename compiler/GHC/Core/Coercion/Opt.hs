@@ -11,27 +11,30 @@ where
 
 import GHC.Prelude
 
-import GHC.Driver.Ppr
+import GHC.Tc.Utils.TcType   ( exactTyCoVarsOfType )
 
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Subst
 import GHC.Core.Coercion
 import GHC.Core.Type as Type hiding( substTyVarBndr, substTy )
-import GHC.Tc.Utils.TcType   ( exactTyCoVarsOfType )
 import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
+import GHC.Core.Unify
+
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
+
 import GHC.Data.Pair
 import GHC.Data.List.SetOps ( getNth )
-import GHC.Core.Unify
-import Control.Monad   ( zipWithM )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
+import GHC.Utils.Trace
+
+import Control.Monad   ( zipWithM )
 
 {-
 %************************************************************************

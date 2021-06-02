@@ -89,6 +89,7 @@ import Data.Char
 import Data.List (stripPrefix, isInfixOf, partition)
 import Data.Maybe
 import Data.Word
+import Debug.Trace (trace)
 
 import GHC.Data.EnumSet as EnumSet
 

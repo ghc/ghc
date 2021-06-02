@@ -28,7 +28,6 @@ import GHC.Driver.Session
 import GHC.Utils.Error
 import GHC.Types.Unique.Supply
 import GHC.Utils.Outputable
-import GHC.Utils.Panic
 import GHC.Utils.Logger
 import Control.Monad
 import Control.Monad.IO.Class
@@ -86,7 +85,7 @@ stg2stg logger dflags ictxt this_mod binds
             return binds
 
           StgStats ->
-            trace (showStgStats binds) (return binds)
+            logTraceMsg logger "STG stats" (text (showStgStats binds)) (return binds)
 
           StgCSE -> do
             let binds' = {-# SCC "StgCse" #-} stgCse binds
