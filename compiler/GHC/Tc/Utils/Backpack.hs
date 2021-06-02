@@ -40,7 +40,6 @@ import GHC.Types.Unique.DSet
 import GHC.Types.Name.Shape
 
 import GHC.Unit
-import GHC.Unit.State
 import GHC.Unit.Finder
 import GHC.Unit.Module.Warnings
 import GHC.Unit.Module.ModIface
