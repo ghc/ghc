@@ -39,6 +39,7 @@ import GHC.Utils.Outputable
 import GHC.Builtin.Utils
 import GHC.Builtin.Names
 import GHC.Tc.Errors
+import GHC.Tc.Errors.Types
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Solver.Interact
 import GHC.Tc.Solver.Canonical   ( makeSuperClasses, solveCallStack )
@@ -1343,10 +1344,10 @@ decideMonoTyVars infer_mode name_taus psigs candidates
              mono_tvs = mono_tvs2 `unionVarSet` constrained_tvs
 
            -- Warn about the monomorphism restriction
-       ; when (case infer_mode of { ApplyMR -> True; _ -> False}) $
-         diagnosticTc (WarningWithFlag Opt_WarnMonomorphism)
-                      (constrained_tvs `intersectsVarSet` tyCoVarsOfTypes taus)
-                      mr_msg
+       ; when (case infer_mode of { ApplyMR -> True; _ -> False}) $ do
+           let dia = TcRnUnknownMessage $
+                 mkPlainDiagnostic (WarningWithFlag Opt_WarnMonomorphism) noHints mr_msg
+           diagnosticTc (constrained_tvs `intersectsVarSet` tyCoVarsOfTypes taus) dia
 
        ; traceTc "decideMonoTyVars" $ vcat
            [ text "infer_mode =" <+> ppr infer_mode
@@ -1794,7 +1795,8 @@ maybe_simplify_again n limit unif_happened wc@(WC { wc_simple = simples })
          -- Typically if we blow the limit we are going to report some other error
          -- (an unsolved constraint), and we don't want that error to suppress
          -- the iteration limit warning!
-         addErrTcS (hang (text "solveWanteds: too many iterations"
+         addErrTcS $ TcRnUnknownMessage $ mkPlainError noHints $
+           (hang (text "solveWanteds: too many iterations"
                    <+> parens (text "limit =" <+> ppr limit))
                 2 (vcat [ text "Unsolved:" <+> ppr wc
                         , text "Set limit with -fconstraint-solver-iterations=n; n=0 for no limit"
