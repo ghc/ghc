@@ -143,16 +143,18 @@ instance Enum Word8 where
 
 -- | @since 2.01
 instance Integral Word8 where
+    -- see Note [INLINE division wrappers] in GHC.Base
+    {-# INLINE quot    #-}
+    {-# INLINE rem     #-}
+    {-# INLINE quotRem #-}
+    {-# INLINE div     #-}
+    {-# INLINE mod     #-}
+    {-# INLINE divMod  #-}
+
     quot    (W8# x#) y@(W8# y#)
         | y /= 0                  = W8# (wordToWord8# ((word8ToWord# x#) `quotWord#` (word8ToWord# y#)))
         | otherwise               = divZeroError
     rem     (W8# x#) y@(W8# y#)
-        | y /= 0                  = W8# (wordToWord8# ((word8ToWord# x#) `remWord#` (word8ToWord# y#)))
-        | otherwise               = divZeroError
-    div     (W8# x#) y@(W8# y#)
-        | y /= 0                  = W8# (wordToWord8# ((word8ToWord# x#) `quotWord#` (word8ToWord# y#)))
-        | otherwise               = divZeroError
-    mod     (W8# x#) y@(W8# y#)
         | y /= 0                  = W8# (wordToWord8# ((word8ToWord# x#) `remWord#` (word8ToWord# y#)))
         | otherwise               = divZeroError
     quotRem (W8# x#) y@(W8# y#)
@@ -160,10 +162,11 @@ instance Integral Word8 where
                                     (# q, r #) ->
                                         (W8# (wordToWord8# q), W8# (wordToWord8# r))
         | otherwise               = divZeroError
-    divMod  (W8# x#) y@(W8# y#)
-        | y /= 0                  = (W8# (wordToWord8# ((word8ToWord# x#) `quotWord#` (word8ToWord# y#)))
-                                    ,W8# (wordToWord8# ((word8ToWord# x#) `remWord#` (word8ToWord# y#))))
-        | otherwise               = divZeroError
+
+    div    x y = quot x y
+    mod    x y = rem x y
+    divMod x y = quotRem x y
+
     toInteger (W8# x#)            = IS (word2Int# (word8ToWord# x#))
 
 -- | @since 2.01
@@ -331,16 +334,18 @@ instance Enum Word16 where
 
 -- | @since 2.01
 instance Integral Word16 where
+    -- see Note [INLINE division wrappers] in GHC.Base
+    {-# INLINE quot    #-}
+    {-# INLINE rem     #-}
+    {-# INLINE quotRem #-}
+    {-# INLINE div     #-}
+    {-# INLINE mod     #-}
+    {-# INLINE divMod  #-}
+
     quot    (W16# x#) y@(W16# y#)
         | y /= 0                    = W16# (wordToWord16# ((word16ToWord# x#) `quotWord#` (word16ToWord# y#)))
         | otherwise                 = divZeroError
     rem     (W16# x#) y@(W16# y#)
-        | y /= 0                    = W16# (wordToWord16# ((word16ToWord# x#) `remWord#` (word16ToWord# y#)))
-        | otherwise                 = divZeroError
-    div     (W16# x#) y@(W16# y#)
-        | y /= 0                    = W16# (wordToWord16# ((word16ToWord# x#) `quotWord#` (word16ToWord# y#)))
-        | otherwise                 = divZeroError
-    mod     (W16# x#) y@(W16# y#)
         | y /= 0                    = W16# (wordToWord16# ((word16ToWord# x#) `remWord#` (word16ToWord# y#)))
         | otherwise                 = divZeroError
     quotRem (W16# x#) y@(W16# y#)
@@ -348,10 +353,11 @@ instance Integral Word16 where
                                     (# q, r #) ->
                                         (W16# (wordToWord16# q), W16# (wordToWord16# r))
         | otherwise                 = divZeroError
-    divMod  (W16# x#) y@(W16# y#)
-        | y /= 0                    = (W16# (wordToWord16# ((word16ToWord# x#) `quotWord#` (word16ToWord# y#)))
-                                      ,W16# (wordToWord16# ((word16ToWord# x#) `remWord#` (word16ToWord# y#))))
-        | otherwise                 = divZeroError
+
+    div    x y = quot x y
+    mod    x y = rem x y
+    divMod x y = quotRem x y
+
     toInteger (W16# x#)             = IS (word2Int# (word16ToWord# x#))
 
 -- | @since 2.01
@@ -567,16 +573,18 @@ instance Enum Word32 where
 
 -- | @since 2.01
 instance Integral Word32 where
+    -- see Note [INLINE division wrappers] in GHC.Base
+    {-# INLINE quot    #-}
+    {-# INLINE rem     #-}
+    {-# INLINE quotRem #-}
+    {-# INLINE div     #-}
+    {-# INLINE mod     #-}
+    {-# INLINE divMod  #-}
+
     quot    (W32# x#) y@(W32# y#)
         | y /= 0                    = W32# (wordToWord32# ((word32ToWord# x#) `quotWord#` (word32ToWord# y#)))
         | otherwise                 = divZeroError
     rem     (W32# x#) y@(W32# y#)
-        | y /= 0                    = W32# (wordToWord32# ((word32ToWord# x#) `remWord#` (word32ToWord# y#)))
-        | otherwise                 = divZeroError
-    div     (W32# x#) y@(W32# y#)
-        | y /= 0                    = W32# (wordToWord32# ((word32ToWord# x#) `quotWord#` (word32ToWord# y#)))
-        | otherwise                 = divZeroError
-    mod     (W32# x#) y@(W32# y#)
         | y /= 0                    = W32# (wordToWord32# ((word32ToWord# x#) `remWord#` (word32ToWord# y#)))
         | otherwise                 = divZeroError
     quotRem (W32# x#) y@(W32# y#)
@@ -584,11 +592,20 @@ instance Integral Word32 where
                                     (# q, r #) ->
                                         (W32# (wordToWord32# q), W32# (wordToWord32# r))
         | otherwise                 = divZeroError
-    divMod  (W32# x#) y@(W32# y#)
-        | y /= 0                    = (W32# (wordToWord32# ((word32ToWord# x#) `quotWord#` (word32ToWord# y#)))
-                                      ,W32# (wordToWord32# ((word32ToWord# x#) `remWord#` (word32ToWord# y#))))
-        | otherwise                 = divZeroError
-    toInteger (W32# x#)             = integerFromWord# (word32ToWord# x#)
+
+    div    x y = quot x y
+    mod    x y = rem x y
+    divMod x y = quotRem x y
+
+    toInteger (W32# x#)
+#if WORD_SIZE_IN_BITS == 32
+        | isTrue# (i# >=# 0#)       = IS i#
+        | otherwise                 = integerFromWord# (word32ToWord# x#)
+        where
+        !i# = word2Int# (word32ToWord# x#)
+#else
+                                    = IS (word2Int# (word32ToWord# x#))
+#endif
 
 -- | @since 2.01
 instance Bits Word32 where
@@ -743,24 +760,28 @@ instance Enum Word64 where
 
 -- | @since 2.01
 instance Integral Word64 where
+    -- see Note [INLINE division wrappers] in GHC.Base
+    {-# INLINE quot    #-}
+    {-# INLINE rem     #-}
+    {-# INLINE quotRem #-}
+    {-# INLINE div     #-}
+    {-# INLINE mod     #-}
+    {-# INLINE divMod  #-}
+
     quot    (W64# x#) y@(W64# y#)
         | y /= 0                    = W64# (x# `quotWord64#` y#)
         | otherwise                 = divZeroError
     rem     (W64# x#) y@(W64# y#)
         | y /= 0                    = W64# (x# `remWord64#` y#)
         | otherwise                 = divZeroError
-    div     (W64# x#) y@(W64# y#)
-        | y /= 0                    = W64# (x# `quotWord64#` y#)
-        | otherwise                 = divZeroError
-    mod     (W64# x#) y@(W64# y#)
-        | y /= 0                    = W64# (x# `remWord64#` y#)
-        | otherwise                 = divZeroError
     quotRem (W64# x#) y@(W64# y#)
         | y /= 0                    = (W64# (x# `quotWord64#` y#), W64# (x# `remWord64#` y#))
         | otherwise                 = divZeroError
-    divMod  (W64# x#) y@(W64# y#)
-        | y /= 0                    = (W64# (x# `quotWord64#` y#), W64# (x# `remWord64#` y#))
-        | otherwise                 = divZeroError
+
+    div    x y = quot x y
+    mod    x y = rem x y
+    divMod x y = quotRem x y
+
     toInteger (W64# x#)             = integerFromWord64# x#
 
 -- | @since 2.01
@@ -924,27 +945,34 @@ wordToWord64 (W# w#) = (W64# w#)
 
 -- | @since 2.01
 instance Integral Word64 where
+    -- see Note [INLINE division wrappers] in GHC.Base
+    {-# INLINE quot    #-}
+    {-# INLINE rem     #-}
+    {-# INLINE quotRem #-}
+    {-# INLINE div     #-}
+    {-# INLINE mod     #-}
+    {-# INLINE divMod  #-}
+
     quot    (W64# x#) y@(W64# y#)
         | y /= 0                    = W64# (x# `quotWord#` y#)
         | otherwise                 = divZeroError
     rem     (W64# x#) y@(W64# y#)
         | y /= 0                    = W64# (x# `remWord#` y#)
         | otherwise                 = divZeroError
-    div     (W64# x#) y@(W64# y#)
-        | y /= 0                    = W64# (x# `quotWord#` y#)
-        | otherwise                 = divZeroError
-    mod     (W64# x#) y@(W64# y#)
-        | y /= 0                    = W64# (x# `remWord#` y#)
-        | otherwise                 = divZeroError
     quotRem (W64# x#) y@(W64# y#)
-        | y /= 0                  = case x# `quotRemWord#` y# of
-                                    (# q, r #) ->
-                                        (W64# q, W64# r)
+        | y /= 0                    = case x# `quotRemWord#` y# of
+                                        (# q, r #) -> (W64# q, W64# r)
         | otherwise                 = divZeroError
-    divMod  (W64# x#) y@(W64# y#)
-        | y /= 0                    = (W64# (x# `quotWord#` y#), W64# (x# `remWord#` y#))
-        | otherwise                 = divZeroError
-    toInteger (W64# x#)             = integerFromWord# x#
+
+    div    x y = quot x y
+    mod    x y = rem x y
+    divMod x y = quotRem x y
+
+    toInteger (W64# x#)
+        | isTrue# (i# >=# 0#)       = IS i#
+        | otherwise                 = integerFromWord# x#
+        where
+        !i# = word2Int# x#
 
 -- | @since 2.01
 instance Bits Word64 where

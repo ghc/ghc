@@ -326,34 +326,40 @@ instance  Real Int  where
 instance  Integral Int  where
     toInteger (I# i) = IS i
 
+    {-# INLINE quot #-} -- see Note [INLINE division wrappers] in GHC.Base
     a `quot` b
      | b == 0                     = divZeroError
      | b == (-1) && a == minBound = overflowError -- Note [Order of tests]
                                                   -- in GHC.Int
      | otherwise                  =  a `quotInt` b
 
+    {-# INLINE rem #-} -- see Note [INLINE division wrappers] in GHC.Base
     !a `rem` b -- See Note [Special case of mod and rem is lazy]
      | b == 0                     = divZeroError
      | b == (-1)                  = 0
      | otherwise                  =  a `remInt` b
 
+    {-# INLINE div #-} -- see Note [INLINE division wrappers] in GHC.Base
     a `div` b
      | b == 0                     = divZeroError
      | b == (-1) && a == minBound = overflowError -- Note [Order of tests]
                                                   -- in GHC.Int
      | otherwise                  =  a `divInt` b
 
+    {-# INLINE mod #-} -- see Note [INLINE division wrappers] in GHC.Base
     !a `mod` b -- See Note [Special case of mod and rem is lazy]
      | b == 0                     = divZeroError
      | b == (-1)                  = 0
      | otherwise                  =  a `modInt` b
 
+    {-# INLINE quotRem #-} -- see Note [INLINE division wrappers] in GHC.Base
     a `quotRem` b
      | b == 0                     = divZeroError
        -- Note [Order of tests] in GHC.Int
      | b == (-1) && a == minBound = (overflowError, 0)
      | otherwise                  =  a `quotRemInt` b
 
+    {-# INLINE divMod #-} -- see Note [INLINE division wrappers] in GHC.Base
     a `divMod` b
      | b == 0                     = divZeroError
        -- Note [Order of tests] in GHC.Int
@@ -379,26 +385,32 @@ instance Real Word where
 
 -- | @since 2.01
 instance Integral Word where
+    -- see Note [INLINE division wrappers] in GHC.Base
+    {-# INLINE quot    #-}
+    {-# INLINE rem     #-}
+    {-# INLINE quotRem #-}
+    {-# INLINE div     #-}
+    {-# INLINE mod     #-}
+    {-# INLINE divMod  #-}
+
     quot    (W# x#) y@(W# y#)
         | y /= 0                = W# (x# `quotWord#` y#)
         | otherwise             = divZeroError
+
     rem     (W# x#) y@(W# y#)
         | y /= 0                = W# (x# `remWord#` y#)
         | otherwise             = divZeroError
-    div     (W# x#) y@(W# y#)
-        | y /= 0                = W# (x# `quotWord#` y#)
-        | otherwise             = divZeroError
-    mod     (W# x#) y@(W# y#)
-        | y /= 0                = W# (x# `remWord#` y#)
-        | otherwise             = divZeroError
+
     quotRem (W# x#) y@(W# y#)
         | y /= 0                = case x# `quotRemWord#` y# of
                                   (# q, r #) ->
                                       (W# q, W# r)
         | otherwise             = divZeroError
-    divMod  (W# x#) y@(W# y#)
-        | y /= 0                = (W# (x# `quotWord#` y#), W# (x# `remWord#` y#))
-        | otherwise             = divZeroError
+
+    div    x y = quot x y
+    mod    x y = rem x y
+    divMod x y = quotRem x y
+
     toInteger (W# x#)           = integerFromWord# x#
 
 --------------------------------------------------------------
@@ -427,59 +439,58 @@ instance Real Natural where
 
 -- | @since 2.0.1
 instance  Integral Integer where
+    -- see Note [INLINE division wrappers] in GHC.Base
+    {-# INLINE quot    #-}
+    {-# INLINE rem     #-}
+    {-# INLINE quotRem #-}
+    {-# INLINE div     #-}
+    {-# INLINE mod     #-}
+    {-# INLINE divMod  #-}
+
     toInteger n      = n
 
-    {-# INLINE quot #-}
-    _ `quot` 0 = divZeroError
-    n `quot` d = n `integerQuot` d
+    !_ `quot` 0 = divZeroError
+    n  `quot` d = n `integerQuot` d
 
-    {-# INLINE rem #-}
-    _ `rem` 0 = divZeroError
-    n `rem` d = n `integerRem` d
+    !_ `rem` 0 = divZeroError
+    n  `rem` d = n `integerRem` d
 
-    {-# INLINE div #-}
-    _ `div` 0 = divZeroError
-    n `div` d = n `integerDiv` d
+    !_ `div` 0 = divZeroError
+    n  `div` d = n `integerDiv` d
 
-    {-# INLINE mod #-}
-    _ `mod` 0 = divZeroError
-    n `mod` d = n `integerMod` d
+    !_ `mod` 0 = divZeroError
+    n  `mod` d = n `integerMod` d
 
-    {-# INLINE divMod #-}
-    _ `divMod` 0 = divZeroError
-    n `divMod` d = n `integerDivMod` d
+    !_ `divMod` 0 = divZeroError
+    n  `divMod` d = n `integerDivMod` d
 
-    {-# INLINE quotRem #-}
-    _ `quotRem` 0 = divZeroError
-    n `quotRem` d = n `integerQuotRem` d
+    !_ `quotRem` 0 = divZeroError
+    n  `quotRem` d = n `integerQuotRem` d
 
 -- | @since 4.8.0.0
 instance Integral Natural where
-    toInteger x = integerFromNatural x
-
-    {-# INLINE quot #-}
-    _ `quot` 0 = divZeroError
-    n `quot` d = n `naturalQuot` d
-
-    {-# INLINE rem #-}
-    _ `rem` 0 = divZeroError
-    n `rem` d = n `naturalRem` d
-
-    {-# INLINE div #-}
-    _ `div` 0 = divZeroError
-    n `div` d = n `naturalQuot` d
-
-    {-# INLINE mod #-}
-    _ `mod` 0 = divZeroError
-    n `mod` d = n `naturalRem` d
-
-    {-# INLINE divMod #-}
-    _ `divMod` 0 = divZeroError
-    n `divMod` d = n `naturalQuotRem` d
-
+    -- see Note [INLINE division wrappers] in GHC.Base
+    {-# INLINE quot    #-}
+    {-# INLINE rem     #-}
     {-# INLINE quotRem #-}
-    _ `quotRem` 0 = divZeroError
-    n `quotRem` d = n `naturalQuotRem` d
+    {-# INLINE div     #-}
+    {-# INLINE mod     #-}
+    {-# INLINE divMod  #-}
+
+    toInteger = integerFromNatural
+
+    !_ `quot` 0 = divZeroError
+    n  `quot` d = n `naturalQuot` d
+
+    !_ `rem` 0 = divZeroError
+    n  `rem` d = n `naturalRem` d
+
+    !_ `quotRem` 0 = divZeroError
+    n  `quotRem` d = n `naturalQuotRem` d
+
+    div    x y = quot x y
+    mod    x y = rem x y
+    divMod x y = quotRem x y
 
 --------------------------------------------------------------
 -- Instances for @Ratio@
