@@ -59,8 +59,8 @@ import GHC.Types.Id
 import GHC.Types.Var  ( EvVar, setTyVarUnique )
 import GHC.Types.TyThing
 import GHC.Types.Id.Info
-import GHC.Types.Demand
 import GHC.Types.Cpr
+import GHC.Types.Demand
 import GHC.Types.Name      hiding ( varName )
 import GHC.Types.Literal
 import GHC.Types.Unique.Supply
@@ -891,15 +891,12 @@ rAISE_OVERFLOW_ID         = mkExceptionId raiseOverflowName
 rAISE_UNDERFLOW_ID        = mkExceptionId raiseUnderflowName
 rAISE_DIVZERO_ID          = mkExceptionId raiseDivZeroName
 
--- | Exception with type \"forall a. a\"
+-- | Non-CAFFY Exception with type \"forall a. a\"
 mkExceptionId :: Name -> Id
 mkExceptionId name
   = mkVanillaGlobalWithInfo name
       (mkSpecForAllTys [alphaTyVar] (mkTyVarTy alphaTyVar)) -- forall a . a
-      (vanillaIdInfo `setDmdSigInfo` mkClosedDmdSig [] botDiv
-                     `setCprSigInfo` mkCprSig 0 botCpr
-                     `setArityInfo` 0
-                     `setCafInfo` NoCafRefs) -- #15038
+      (divergingIdInfo [] `setCafInfo` NoCafRefs) -- No CAFs: #15038
 
 mkRuntimeErrorId :: Name -> Id
 -- Error function
@@ -909,29 +906,38 @@ mkRuntimeErrorId :: Name -> Id
 -- The Addr# is expected to be the address of
 --   a UTF8-encoded error string
 mkRuntimeErrorId name
- = mkVanillaGlobalWithInfo name runtimeErrorTy bottoming_info
- where
-    bottoming_info = vanillaIdInfo `setDmdSigInfo`    strict_sig
-                                   `setCprSigInfo`           mkCprSig 1 botCpr
-                                   `setArityInfo`         1
-                        -- Make arity and strictness agree
-
-        -- Do *not* mark them as NoCafRefs, because they can indeed have
-        -- CAF refs.  For example, pAT_ERROR_ID calls GHC.Err.untangle,
-        -- which has some CAFs
-        -- In due course we may arrange that these error-y things are
-        -- regarded by the GC as permanently live, in which case we
-        -- can give them NoCaf info.  As it is, any function that calls
-        -- any pc_bottoming_Id will itself have CafRefs, which bloats
-        -- SRTs.
-
-    strict_sig = mkClosedDmdSig [evalDmd] botDiv
+ = mkVanillaGlobalWithInfo name runtimeErrorTy (divergingIdInfo [evalDmd])
+     -- Do *not* mark them as NoCafRefs, because they can indeed have
+     -- CAF refs.  For example, pAT_ERROR_ID calls GHC.Err.untangle,
+     -- which has some CAFs
+     -- In due course we may arrange that these error-y things are
+     -- regarded by the GC as permanently live, in which case we
+     -- can give them NoCaf info.  As it is, any function that calls
+     -- any pc_bottoming_Id will itself have CafRefs, which bloats
+     -- SRTs.
 
 runtimeErrorTy :: Type
 -- forall (rr :: RuntimeRep) (a :: rr). Addr# -> a
 --   See Note [Error and friends have an "open-tyvar" forall]
 runtimeErrorTy = mkSpecForAllTys [runtimeRep1TyVar, openAlphaTyVar]
                                  (mkVisFunTyMany addrPrimTy openAlphaTy)
+
+-- | An 'IdInfo' for an Id, such as 'aBSENT_ERROR_ID' or 'raiseOverflow', that
+-- throws an (imprecise) exception after being supplied one value arg for every
+-- argument 'Demand' in the list. The demands end up in the demand signature.
+--
+-- 1. Sets the demand signature to unleash the given arg dmds 'botDiv'
+-- 2. Sets the arity info so that it matches the length of arg demands
+-- 3. Sets a bottoming CPR sig with the correct arity
+--
+-- It's important that all 3 agree on the arity, which is what this defn ensures.
+divergingIdInfo :: [Demand] -> IdInfo
+divergingIdInfo arg_dmds
+  = vanillaIdInfo `setArityInfo` arity
+                  `setDmdSigInfo` mkClosedDmdSig arg_dmds botDiv
+                  `setCprSigInfo` mkCprSig arity botCpr
+  where
+    arity = length arg_dmds
 
 {- Note [Error and friends have an "open-tyvar" forall]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -951,7 +957,7 @@ This is OK because it never returns, so the return type is irrelevant.
 
 Note [aBSENT_ERROR_ID]
 ~~~~~~~~~~~~~~~~~~~~~~
-We use aBSENT_ERROR_ID to build dummy values in workers.  E.g.
+We use aBSENT_ERROR_ID to build absent fillers for lifted types in workers. E.g.
 
    f x = (case x of (a,b) -> b) + 1::Int
 
@@ -964,9 +970,16 @@ used, and does a w/w split thus
                x = (a,b)
            in <the original RHS of f>
 
-After some simplification, the (absentError "blah") thunk goes away.
+After some simplification, the (absentError "blah") thunk normally goes away.
+See also Note [Absent fillers] in GHC.Core.Opt.WorkWrap.Utils.
 
------- Tricky wrinkle -------
+Historical Note
+---------------
+We used to have exprIsHNF respond True to absentError and *not* mark it as diverging.
+Here's the reason for the former. It doesn't apply anymore because we no longer say
+that `a` is absent (A). Instead it gets (head strict) demand 1A and we won't
+emit the absent error:
+
 #14285 had, roughly
 
    data T a = MkT a !a
@@ -1018,15 +1031,13 @@ but that should be okay; since there's no pattern match we can't really
 be relying on anything from it.
 -}
 
-aBSENT_ERROR_ID
- = mkVanillaGlobalWithInfo absentErrorName absent_ty arity_info
+aBSENT_ERROR_ID -- See Note [aBSENT_ERROR_ID]
+ = mkVanillaGlobalWithInfo absentErrorName absent_ty id_info
  where
    absent_ty = mkSpecForAllTys [alphaTyVar] (mkVisFunTyMany addrPrimTy alphaTy)
    -- Not runtime-rep polymorphic. aBSENT_ERROR_ID is only used for
    -- lifted-type things; see Note [Absent fillers] in GHC.Core.Opt.WorkWrap.Utils
-   arity_info = vanillaIdInfo `setArityInfo` 1
-   -- NB: no bottoming strictness info, unlike other error-ids.
-   -- See Note [aBSENT_ERROR_ID]
+   id_info = divergingIdInfo [evalDmd] -- NB: CAFFY!
 
 mkAbsentErrorApp :: Type         -- The type to instantiate 'a'
                  -> String       -- The string to print
