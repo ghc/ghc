@@ -16,8 +16,6 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Platform
 
-import GHC.Driver.Ppr
-
 allMachRegNos   :: [RegNo]
 allMachRegNos   = [0..31] ++ [32..63]
 -- allocatableRegs is allMachRegNos with the fixed-use regs removed.
