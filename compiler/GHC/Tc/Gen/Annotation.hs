@@ -15,6 +15,7 @@ import GHC.Prelude
 import GHC.Driver.Session
 import GHC.Driver.Env
 
+import GHC.Tc.Errors.Types
 import {-# SOURCE #-} GHC.Tc.Gen.Splice ( runAnnotation )
 import GHC.Tc.Utils.Monad
 
@@ -27,6 +28,7 @@ import GHC.Utils.Outputable
 import GHC.Types.Name
 import GHC.Types.Annotations
 import GHC.Types.SrcLoc
+import GHC.Types.Error
 
 import Control.Monad ( when )
 
@@ -43,9 +45,10 @@ warnAnns :: [LAnnDecl GhcRn] -> TcM [Annotation]
 --- No GHCI; emit a warning (not an error) and ignore. cf #4268
 warnAnns [] = return []
 warnAnns anns@(L loc _ : _)
-  = do { setSrcSpanA loc $ addDiagnosticTc WarningWithoutFlag $
-             (text "Ignoring ANN annotation" <> plural anns <> comma
-             <+> text "because this is a stage-1 compiler without -fexternal-interpreter or doesn't support GHCi")
+  = do { let msg = TcRnUnknownMessage $ mkPlainDiagnostic WarningWithoutFlag noHints $
+               (text "Ignoring ANN annotation" <> plural anns <> comma
+               <+> text "because this is a stage-1 compiler without -fexternal-interpreter or doesn't support GHCi")
+       ; setSrcSpanA loc $ addDiagnosticTc msg
        ; return [] }
 
 tcAnnotation :: LAnnDecl GhcRn -> TcM Annotation
@@ -61,8 +64,10 @@ tcAnnotation (L loc ann@(HsAnnotation _ _ provenance expr)) = do
       when (safeLanguageOn dflags) $ failWithTc safeHsErr
       runAnnotation target expr
     where
-      safeHsErr = vcat [ text "Annotations are not compatible with Safe Haskell."
-                  , text "See https://gitlab.haskell.org/ghc/ghc/issues/10826" ]
+      safeHsErr :: TcRnMessage
+      safeHsErr = TcRnUnknownMessage $ mkPlainError noHints $
+        vcat [ text "Annotations are not compatible with Safe Haskell."
+             , text "See https://gitlab.haskell.org/ghc/ghc/issues/10826" ]
 
 annProvenanceToTarget :: Module -> AnnProvenance GhcRn
                       -> AnnTarget Name

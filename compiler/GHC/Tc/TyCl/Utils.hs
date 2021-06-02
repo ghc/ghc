@@ -29,6 +29,7 @@ module GHC.Tc.TyCl.Utils(
 
 import GHC.Prelude
 
+import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Env
 import GHC.Tc.Gen.Bind( tcValBinds )
@@ -64,6 +65,7 @@ import GHC.Data.FastString
 import GHC.Unit.Module
 
 import GHC.Types.Basic
+import GHC.Types.Error
 import GHC.Types.FieldLabel
 import GHC.Types.SrcLoc
 import GHC.Types.SourceFile
@@ -204,7 +206,7 @@ checkTyConIsAcyclic tc m = SynCycleM $ \s ->
 checkSynCycles :: Unit -> [TyCon] -> [LTyClDecl GhcRn] -> TcM ()
 checkSynCycles this_uid tcs tyclds =
     case runSynCycleM (mapM_ (go emptyTyConSet []) tcs) emptyTyConSet of
-        Left (loc, err) -> setSrcSpan loc $ failWithTc err
+        Left (loc, err) -> setSrcSpan loc $ failWithTc (TcRnUnknownMessage $ mkPlainError noHints err)
         Right _  -> return ()
   where
     -- Try our best to print the LTyClDecl for locally defined things

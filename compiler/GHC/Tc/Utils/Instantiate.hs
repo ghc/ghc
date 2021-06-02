@@ -70,9 +70,11 @@ import GHC.Tc.Types.Evidence
 import GHC.Tc.Instance.FunDeps
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
+import GHC.Tc.Errors.Types
 
 import GHC.Types.Id.Make( mkDictFunId )
 import GHC.Types.Basic ( TypeOrKind(..) )
+import GHC.Types.Error
 import GHC.Types.SourceText
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Var.Env
@@ -822,14 +824,13 @@ newClsInst overlap_mode dfun_name tvs theta clas tys
 
        ; oflag <- getOverlapFlag overlap_mode
        ; let inst = mkLocalInstance dfun oflag tvs' clas tys'
-       ; warnIfFlag Opt_WarnOrphans
-                    (isOrphan (is_orphan inst))
-                    (instOrphWarn inst)
+       ; warnIf (isOrphan (is_orphan inst)) (instOrphWarn inst)
        ; return inst }
 
-instOrphWarn :: ClsInst -> SDoc
+instOrphWarn :: ClsInst -> TcRnMessage
 instOrphWarn inst
-  = hang (text "Orphan instance:") 2 (pprInstanceHdr inst)
+  = TcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag Opt_WarnOrphans) noHints $
+    hang (text "Orphan instance:") 2 (pprInstanceHdr inst)
     $$ text "To avoid this"
     $$ nest 4 (vcat possibilities)
   where
@@ -967,7 +968,8 @@ addClsInstsErr :: SDoc -> [ClsInst] -> TcRn ()
 addClsInstsErr herald ispecs = do
    unit_state <- hsc_units <$> getTopEnv
    setSrcSpan (getSrcSpan (head sorted)) $
-      addErr $ pprWithUnitState unit_state $ (hang herald 2 (pprInstances sorted))
+      addErr $ TcRnUnknownMessage $ mkPlainError noHints $
+      pprWithUnitState unit_state $ (hang herald 2 (pprInstances sorted))
  where
    sorted = sortBy (SrcLoc.leftmost_smallest `on` getSrcSpan) ispecs
    -- The sortBy just arranges that instances are displayed in order

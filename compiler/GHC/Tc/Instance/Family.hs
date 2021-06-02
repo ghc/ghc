@@ -29,6 +29,7 @@ import GHC.Core.TyCo.Ppr ( pprWithExplicitKindsWhen )
 
 import GHC.Iface.Load
 
+import GHC.Tc.Errors.Types
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Instantiate( freshenTyVarBndrs, freshenCoVarBndrsX )
@@ -41,6 +42,7 @@ import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module.Deps
 import GHC.Unit.Home.ModInfo
 
+import GHC.Types.Error
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Name.Reader
 import GHC.Types.Name
@@ -56,6 +58,7 @@ import GHC.Data.Bag( Bag, unionBags, unitBag )
 import GHC.Data.Maybe
 
 import Control.Monad
+import Data.Bifunctor ( second )
 import Data.List ( sortBy )
 import Data.List.NonEmpty ( NonEmpty(..) )
 import Data.Function ( on )
@@ -949,7 +952,7 @@ unusedInjTvsInRHS _ _ _ _ = (emptyVarSet, False, False)
 reportConflictingInjectivityErrs :: TyCon -> [CoAxBranch] -> CoAxBranch -> TcM ()
 reportConflictingInjectivityErrs _ [] _ = return ()
 reportConflictingInjectivityErrs fam_tc (confEqn1:_) tyfamEqn
-  = addErrs [buildInjectivityError fam_tc herald (confEqn1 :| [tyfamEqn])]
+  = addErrs [second mk_err $ buildInjectivityError fam_tc herald (confEqn1 :| [tyfamEqn])]
   where
     herald = text "Type family equation right-hand sides overlap; this violates" $$
              text "the family's injectivity annotation:"
@@ -974,7 +977,7 @@ reportUnusedInjectiveVarsErr fam_tc tvs has_kinds undec_inst tyfamEqn
                                    herald $$
                                    text "In the type family equation:")
                                   (tyfamEqn :| [])
-    in addErrAt loc (pprWithExplicitKindsWhen has_kinds doc)
+    in addErrAt loc (mk_err $ pprWithExplicitKindsWhen has_kinds doc)
     where
       herald = sep [ what <+> text "variable" <>
                   pluralVarSet tvs <+> pprVarSet tvs (pprQuotedList . scopedSort)
@@ -991,7 +994,7 @@ reportUnusedInjectiveVarsErr fam_tc tvs has_kinds undec_inst tyfamEqn
 -- level of RHS
 reportTfHeadedErr :: TyCon -> CoAxBranch -> TcM ()
 reportTfHeadedErr fam_tc branch
-  = addErrs [buildInjectivityError fam_tc
+  = addErrs [second mk_err $ buildInjectivityError fam_tc
                (injectivityErrorHerald $$
                  text "RHS of injective type family equation cannot" <+>
                  text "be a type family:")
@@ -1001,13 +1004,16 @@ reportTfHeadedErr fam_tc branch
 -- but LHS pattern is not a bare type variable.
 reportBareVariableInRHSErr :: TyCon -> [Type] -> CoAxBranch -> TcM ()
 reportBareVariableInRHSErr fam_tc tys branch
-  = addErrs [buildInjectivityError fam_tc
+  = addErrs [second mk_err $ buildInjectivityError fam_tc
                  (injectivityErrorHerald $$
                   text "RHS of injective type family equation is a bare" <+>
                   text "type variable" $$
                   text "but these LHS type and kind patterns are not bare" <+>
                   text "variables:" <+> pprQuotedList tys)
                  (branch :| [])]
+
+mk_err :: SDoc -> TcRnMessage
+mk_err = TcRnUnknownMessage . mkPlainError noHints
 
 buildInjectivityError :: TyCon -> SDoc -> NonEmpty CoAxBranch -> (SrcSpan, SDoc)
 buildInjectivityError fam_tc herald (eqn1 :| rest_eqns)
@@ -1023,7 +1029,7 @@ reportConflictInstErr fam_inst (match1 : _)
   , let sorted  = sortBy (SrcLoc.leftmost_smallest `on` getSpan) [fam_inst, conf_inst]
         fi1     = head sorted
         span    = coAxBranchSpan (coAxiomSingleBranch (famInstAxiom fi1))
-  = setSrcSpan span $ addErr $
+  = setSrcSpan span $ addErr $ TcRnUnknownMessage $ mkPlainError noHints $
     hang (text "Conflicting family instance declarations:")
        2 (vcat [ pprCoAxBranchUser (coAxiomTyCon ax) (coAxiomSingleBranch ax)
                | fi <- sorted

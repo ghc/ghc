@@ -33,6 +33,7 @@ import GHC.Types.CostCentre (mkUserCC, CCFlavour(DeclCC))
 import GHC.Driver.Session
 import GHC.Data.FastString
 import GHC.Hs
+import GHC.Tc.Errors.Types
 import GHC.Tc.Gen.Sig
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Types.Origin
@@ -233,8 +234,9 @@ tcHsBootSigs binds sigs
         -- Notice that we make GlobalIds, not LocalIds
     tc_boot_sig s = pprPanic "tcHsBootSigs/tc_boot_sig" (ppr s)
 
-badBootDeclErr :: SDoc
-badBootDeclErr = text "Illegal declarations in an hs-boot file"
+badBootDeclErr :: TcRnMessage
+badBootDeclErr = TcRnUnknownMessage $ mkPlainError noHints $
+  text "Illegal declarations in an hs-boot file"
 
 ------------------------
 tcLocalBinds :: HsLocalBinds GhcRn -> TcM thing
@@ -436,7 +438,7 @@ recursivePatSynErr ::
   -> LHsBinds (GhcPass p)
   -> TcM a
 recursivePatSynErr loc binds
-  = failAt loc $
+  = failAt loc $ TcRnUnknownMessage $ mkPlainError noHints $
     hang (text "Recursive pattern synonym definition with following bindings:")
        2 (vcat $ map pprLBind . bagToList $ binds)
   where
@@ -909,7 +911,8 @@ chooseInferredQuantifiers inferred_theta tau_tvs qtvs
   where
     report_dup_tyvar_tv_err (n1,n2)
       | PartialSig { psig_name = fn_name, psig_hs_ty = hs_ty } <- sig
-      = addErrTc (hang (text "Couldn't match" <+> quotes (ppr n1)
+      = addErrTc (TcRnUnknownMessage $ mkPlainError noHints $
+        hang (text "Couldn't match" <+> quotes (ppr n1)
                         <+> text "with" <+> quotes (ppr n2))
                      2 (hang (text "both bound by the partial type signature:")
                            2 (ppr fn_name <+> dcolon <+> ppr hs_ty)))
@@ -919,7 +922,8 @@ chooseInferredQuantifiers inferred_theta tau_tvs qtvs
 
     report_mono_sig_tv_err n
       | PartialSig { psig_name = fn_name, psig_hs_ty = hs_ty } <- sig
-      = addErrTc (hang (text "Can't quantify over" <+> quotes (ppr n))
+      = addErrTc (TcRnUnknownMessage $ mkPlainError noHints $
+        hang (text "Can't quantify over" <+> quotes (ppr n))
                      2 (hang (text "bound by the partial type signature:")
                            2 (ppr fn_name <+> dcolon <+> ppr hs_ty)))
       | otherwise -- Can't happen; by now we know it's a partial sig
@@ -1011,7 +1015,9 @@ warnMissingSignatures :: WarningFlag -> SDoc -> Id -> TcM ()
 warnMissingSignatures flag msg id
   = do  { env0 <- tcInitTidyEnv
         ; let (env1, tidy_ty) = tidyOpenType env0 (idType id)
-        ; addDiagnosticTcM (WarningWithFlag flag) (env1, mk_msg tidy_ty) }
+        ; let dia = TcRnUnknownMessage $
+                mkPlainDiagnostic (WarningWithFlag flag) noHints (mk_msg tidy_ty)
+        ; addDiagnosticTcM (env1, dia) }
   where
     mk_msg ty = sep [ msg, nest 2 $ pprPrefixName (idName id) <+> dcolon <+> ppr ty ]
 
@@ -1027,7 +1033,7 @@ checkOverloadedSig monomorphism_restriction_applies sig
   , monomorphism_restriction_applies
   , let orig_sig = sig_inst_sig sig
   = setSrcSpan (sig_loc orig_sig) $
-    failWith $
+    failWith $ TcRnUnknownMessage $ mkPlainError noHints $
     hang (text "Overloaded signature conflicts with monomorphism restriction")
        2 (ppr orig_sig)
   | otherwise

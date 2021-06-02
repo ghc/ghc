@@ -64,6 +64,7 @@ import GHC.Iface.Load   ( loadInterfaceForName, loadSrcInterface_maybe )
 import GHC.Iface.Env
 import GHC.Hs
 import GHC.Types.Name.Reader
+import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
 import GHC.Parser.PostProcess ( setRdrNameSpace )
@@ -72,6 +73,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Types.Avail
+import GHC.Types.Error
 import GHC.Unit.Module
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.Warnings  ( WarningTxt, pprWarningTxtForMsg )
@@ -389,7 +391,8 @@ lookupInstDeclBndr cls what rdr
                                 -- when it's used
                           cls doc rdr
        ; case mb_name of
-           Left err -> do { addErr err; return (mkUnboundNameRdr rdr) }
+           Left err -> do { addErr (TcRnUnknownMessage $ mkPlainError noHints err)
+                          ; return (mkUnboundNameRdr rdr) }
            Right nm -> return nm }
   where
     doc = what <+> text "of class" <+> quotes (ppr cls)
@@ -436,7 +439,7 @@ lookupExactOrOrig rdr_name res k
        ; case men of
           FoundExactOrOrig n -> return (res n)
           ExactOrOrigError e ->
-            do { addErr e
+            do { addErr (TcRnUnknownMessage $ mkPlainError noHints e)
                ; return (res (mkUnboundNameRdr rdr_name)) }
           NotExactOrOrig     -> k }
 
@@ -1088,9 +1091,11 @@ lookup_demoted rdr_name
                     ; case mb_demoted_name of
                         Nothing -> unboundNameX looking_for rdr_name star_info
                         Just demoted_name ->
-                          do { addDiagnostic
-                                 (WarningWithFlag Opt_WarnUntickedPromotedConstructors)
-                                 (untickedPromConstrWarn demoted_name)
+                          do { let msg = TcRnUnknownMessage $
+                                     mkPlainDiagnostic (WarningWithFlag Opt_WarnUntickedPromotedConstructors)
+                                                       noHints
+                                                       (untickedPromConstrWarn demoted_name)
+                             ; addDiagnostic msg
                              ; return demoted_name } }
             else do { -- We need to check if a data constructor of this name is
                       -- in scope to give good error messages. However, we do
@@ -1129,8 +1134,9 @@ lookup_promoted rdr_name
 
 badVarInType :: RdrName -> RnM Name
 badVarInType rdr_name
-  = do { addErr (text "Illegal promoted term variable in a type:"
-                 <+> ppr rdr_name)
+  = do { addErr (TcRnUnknownMessage $ mkPlainError noHints
+           (text "Illegal promoted term variable in a type:"
+                 <+> ppr rdr_name))
        ; return (mkUnboundNameRdr rdr_name) }
 
 {- Note [Promoted variables in types]
@@ -1570,8 +1576,13 @@ warnIfDeprecated gre@(GRE { gre_imp = iss })
                    -- See Note [Handling of deprecations]
          do { iface <- loadInterfaceForName doc name
             ; case lookupImpDeprec iface gre of
-                Just txt -> addDiagnostic (WarningWithFlag Opt_WarnWarningsDeprecations)
-                                          (mk_msg imp_spec txt)
+                Just txt -> do
+                  let msg = TcRnUnknownMessage $
+                              mkPlainDiagnostic (WarningWithFlag Opt_WarnWarningsDeprecations)
+                                                noHints
+                                                (mk_msg imp_spec txt)
+
+                  addDiagnostic msg
                 Nothing  -> return () } }
   | otherwise
   = return ()
@@ -1809,7 +1820,8 @@ lookupSigCtxtOccRnN ctxt what
   = wrapLocMA $ \ rdr_name ->
     do { mb_name <- lookupBindGroupOcc ctxt what rdr_name
        ; case mb_name of
-           Left err   -> do { addErr err; return (mkUnboundNameRdr rdr_name) }
+           Left err   -> do { addErr (TcRnUnknownMessage $ mkPlainError noHints err)
+                            ; return (mkUnboundNameRdr rdr_name) }
            Right name -> return name }
 
 -- | Lookup a name in relation to the names in a 'HsSigCtxt'
@@ -1821,7 +1833,8 @@ lookupSigCtxtOccRn ctxt what
   = wrapLocMA $ \ rdr_name ->
     do { mb_name <- lookupBindGroupOcc ctxt what rdr_name
        ; case mb_name of
-           Left err   -> do { addErr err; return (mkUnboundNameRdr rdr_name) }
+           Left err   -> do { addErr (TcRnUnknownMessage $ mkPlainError noHints err)
+                            ; return (mkUnboundNameRdr rdr_name) }
            Right name -> return name }
 
 lookupBindGroupOcc :: HsSigCtxt
@@ -1923,7 +1936,8 @@ lookupLocalTcNames :: HsSigCtxt -> SDoc -> RdrName -> RnM [(RdrName, Name)]
 lookupLocalTcNames ctxt what rdr_name
   = do { mb_gres <- mapM lookup (dataTcOccs rdr_name)
        ; let (errs, names) = partitionEithers mb_gres
-       ; when (null names) $ addErr (head errs) -- Bleat about one only
+       ; when (null names) $
+          addErr (TcRnUnknownMessage $ mkPlainError noHints (head errs)) -- Bleat about one only
        ; return names }
   where
     lookup rdr = do { this_mod <- getModule
@@ -2115,19 +2129,20 @@ lookupQualifiedDoName ctxt std_name
 
 -- Error messages
 
-opDeclErr :: RdrName -> SDoc
+opDeclErr :: RdrName -> TcRnMessage
 opDeclErr n
-  = hang (text "Illegal declaration of a type or class operator" <+> quotes (ppr n))
+  = TcRnUnknownMessage $ mkPlainError noHints $
+    hang (text "Illegal declaration of a type or class operator" <+> quotes (ppr n))
        2 (text "Use TypeOperators to declare operators in type and declarations")
 
-badOrigBinding :: RdrName -> SDoc
+badOrigBinding :: RdrName -> TcRnMessage
 badOrigBinding name
   | Just _ <- isBuiltInOcc_maybe occ
-  = text "Illegal binding of built-in syntax:" <+> ppr occ
+  = TcRnUnknownMessage $ mkPlainError noHints $ text "Illegal binding of built-in syntax:" <+> ppr occ
     -- Use an OccName here because we don't want to print Prelude.(,)
   | otherwise
-  = text "Cannot redefine a Name retrieved by a Template Haskell quote:"
-    <+> ppr name
+  = TcRnUnknownMessage $ mkPlainError noHints $
+    text "Cannot redefine a Name retrieved by a Template Haskell quote:" <+> ppr name
     -- This can happen when one tries to use a Template Haskell splice to
     -- define a top-level identifier with an already existing name, e.g.,
     --

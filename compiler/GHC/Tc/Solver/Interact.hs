@@ -11,12 +11,14 @@ module GHC.Tc.Solver.Interact (
 import GHC.Prelude
 import GHC.Types.Basic ( SwapFlag(..),
                          infinity, IntWithInf, intGtLimit )
+import GHC.Types.Error
 import GHC.Tc.Solver.Canonical
 import GHC.Types.Var.Set
 import GHC.Core.Type as Type
 import GHC.Core.InstEnv         ( DFunInstType )
 
 import GHC.Types.Var
+import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.TcType
 import GHC.Builtin.Names ( coercibleTyConKey, heqTyConKey, eqTyConKey, ipClassKey )
 import GHC.Core.Coercion.Axiom ( CoAxBranch (..), CoAxiom (..), TypeEqn, fromBranches, sfInteractInert, sfInteractTop )
@@ -120,7 +122,8 @@ solveSimpleWanteds simples
     go :: Int -> IntWithInf -> WantedConstraints -> TcS (Int, WantedConstraints)
     go n limit wc
       | n `intGtLimit` limit
-      = failTcS (hang (text "solveSimpleWanteds: too many iterations"
+      = failTcS $ TcRnUnknownMessage $ mkPlainError noHints $
+          (hang (text "solveSimpleWanteds: too many iterations"
                        <+> parens (text "limit =" <+> ppr limit))
                     2 (vcat [ text "Set limit with -fconstraint-solver-iterations=n; n=0 for no limit"
                             , text "Simples =" <+> ppr simples

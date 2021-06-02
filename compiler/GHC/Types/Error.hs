@@ -40,6 +40,8 @@ module GHC.Types.Error
    , SDoc
    , DecoratedSDoc (unDecorated)
    , mkDecorated, mkSimpleDecorated
+   , unionDecoratedSDoc
+   , mapDecoratedSDoc
 
    , pprMessageBag
    , mkLocMessage
@@ -161,6 +163,18 @@ mkDecorated = Decorated
 -- | Creates a new 'DecoratedSDoc' out of a single 'SDoc'
 mkSimpleDecorated :: SDoc -> DecoratedSDoc
 mkSimpleDecorated doc = Decorated [doc]
+
+-- | Joins two 'DecoratedSDoc' together. The resulting 'DecoratedSDoc'
+-- will have a number of entries which is the sum of the lengths of
+-- the input.
+unionDecoratedSDoc :: DecoratedSDoc -> DecoratedSDoc -> DecoratedSDoc
+unionDecoratedSDoc (Decorated s1) (Decorated s2) =
+  Decorated (s1 `mappend` s2)
+
+-- | Apply a transformation function to all elements of a 'DecoratedSDoc'.
+mapDecoratedSDoc :: (SDoc -> SDoc) -> DecoratedSDoc -> DecoratedSDoc
+mapDecoratedSDoc f (Decorated s1) =
+  Decorated (map f s1)
 
 {-
 Note [Rendering Messages]

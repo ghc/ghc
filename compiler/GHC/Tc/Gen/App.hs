@@ -24,6 +24,7 @@ import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcPolyExpr )
 import GHC.Builtin.Types (multiplicityTy)
 import GHC.Tc.Gen.Head
 import GHC.Hs
+import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Instantiate
@@ -39,6 +40,7 @@ import GHC.Core.TyCo.Subst (substTyWithInScope)
 import GHC.Core.TyCo.FVs( shallowTyCoVarsOfType )
 import GHC.Core.Type
 import GHC.Tc.Types.Evidence
+import GHC.Types.Error
 import GHC.Types.Var.Set
 import GHC.Builtin.PrimOps( tagToEnumKey )
 import GHC.Builtin.Names
@@ -693,7 +695,7 @@ tcVTA fun_ty hs_ty
 
   | otherwise
   = do { (_, fun_ty) <- zonkTidyTcType emptyTidyEnv fun_ty
-       ; failWith $
+       ; failWith $ TcRnUnknownMessage $ mkPlainError noHints $
          text "Cannot apply expression of type" <+> quotes (ppr fun_ty) $$
          text "to a visible type argument" <+> quotes (ppr hs_ty) }
 
@@ -1175,7 +1177,8 @@ tcTagToEnum tc_fun fun_ctxt tc_args res_ty
        ; return (mkHsWrap df_wrap tc_expr) }}}}}
 
   | otherwise
-  = failWithTc (text "tagToEnum# must appear applied to one value argument")
+  = failWithTc $ TcRnUnknownMessage $ mkPlainError noHints $
+    (text "tagToEnum# must appear applied to one value argument")
 
   where
     vanilla_result = return (rebuildHsApps tc_fun fun_ctxt tc_args)
@@ -1188,9 +1191,10 @@ tcTagToEnum tc_fun fun_ctxt tc_args res_ty
                , text "e.g. (tagToEnum# x) :: Bool" ]
     doc2 = text "Result type must be an enumeration type"
 
-    mk_error :: TcType -> SDoc -> SDoc
+    mk_error :: TcType -> SDoc -> TcRnMessage
     mk_error ty what
-      = hang (text "Bad call to tagToEnum#"
+      = TcRnUnknownMessage $ mkPlainError noHints $
+        hang (text "Bad call to tagToEnum#"
                <+> text "at type" <+> ppr ty)
            2 what
 

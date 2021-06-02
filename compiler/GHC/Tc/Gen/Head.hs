@@ -39,6 +39,7 @@ import GHC.Tc.TyCl.PatSyn( patSynBuilderOcc )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Unify
 import GHC.Types.Basic
+import GHC.Types.Error
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Instance.Family ( tcLookupDataFamInst )
 import GHC.Core.FamInstEnv    ( FamInstEnvs )
@@ -461,7 +462,7 @@ tcInferRecSelId (FieldOcc sel_name lbl)
                            -- nor does it need the 'lifting' treatment
                            -- hence no checkTh stuff here
 
-                    _ -> failWithTc $
+                    _ -> failWithTc $ TcRnUnknownMessage $ mkPlainError noHints $
                          ppr thing <+> text "used where a value identifier was expected" }
 
 ------------------------
@@ -511,17 +512,20 @@ lookupParents is_selector rdr
                               Nothing -> failWithTc (notSelector (greMangledName gre)) }
 
 
-fieldNotInType :: RecSelParent -> RdrName -> SDoc
+fieldNotInType :: RecSelParent -> RdrName -> TcRnMessage
 fieldNotInType p rdr
-  = unknownSubordinateErr (text "field of type" <+> quotes (ppr p)) rdr
+  = TcRnUnknownMessage $ mkPlainError noHints $
+    unknownSubordinateErr (text "field of type" <+> quotes (ppr p)) rdr
 
-notSelector :: Name -> SDoc
+notSelector :: Name -> TcRnMessage
 notSelector field
-  = hsep [quotes (ppr field), text "is not a record selector"]
+  = TcRnUnknownMessage $ mkPlainError noHints $
+  hsep [quotes (ppr field), text "is not a record selector"]
 
-naughtyRecordSel :: OccName -> SDoc
+naughtyRecordSel :: OccName -> TcRnMessage
 naughtyRecordSel lbl
-  = text "Cannot use record selector" <+> quotes (ppr lbl) <+>
+  = TcRnUnknownMessage $ mkPlainError noHints $
+    text "Cannot use record selector" <+> quotes (ppr lbl) <+>
     text "as a function due to escaped type variables" $$
     text "Probable fix: use pattern-matching syntax instead"
 
@@ -720,7 +724,7 @@ tc_infer_id id_name
              ATcTyCon tc -> fail_tycon tc
              ATyVar name _ -> fail_tyvar name
 
-             _ -> failWithTc $
+             _ -> failWithTc $ TcRnUnknownMessage $ mkPlainError noHints $
                   ppr thing <+> text "used where a value identifier was expected" }
   where
     fail_tycon tc = do
@@ -731,14 +735,14 @@ tc_infer_id id_name
             Just gre -> nest 2 (pprNameProvenance gre)
             Nothing  -> empty
       suggestions <- get_suggestions dataName
-      failWithTc (msg $$ pprov $$ suggestions)
+      failWithTc (TcRnUnknownMessage $ mkPlainError noHints (msg $$ pprov $$ suggestions))
 
     fail_tyvar name = do
       let msg = text "Illegal term-level use of the type variable"
                   <+> quotes (ppr name)
           pprov = nest 2 (text "bound at" <+> ppr (getSrcLoc name))
       suggestions <- get_suggestions varName
-      failWithTc (msg $$ pprov $$ suggestions)
+      failWithTc (TcRnUnknownMessage $ mkPlainError noHints (msg $$ pprov $$ suggestions))
 
     get_suggestions ns = do
        let occ = mkOccNameFS ns (occNameFS (occName id_name))
@@ -796,9 +800,10 @@ tcInferPatSyn id_name ps
        Just (expr,ty) -> return (expr,ty)
        Nothing        -> failWithTc (nonBidirectionalErr id_name)
 
-nonBidirectionalErr :: Outputable name => name -> SDoc
-nonBidirectionalErr name = text "non-bidirectional pattern synonym"
-                           <+> quotes (ppr name) <+> text "used in an expression"
+nonBidirectionalErr :: Outputable name => name -> TcRnMessage
+nonBidirectionalErr name = TcRnUnknownMessage $ mkPlainError noHints $
+  text "non-bidirectional pattern synonym"
+  <+> quotes (ppr name) <+> text "used in an expression"
 
 {- Note [Typechecking data constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -978,9 +983,10 @@ checkCrossStageLifting top_lvl id (Brack _ (TcPending ps_var lie_var q))
 
 checkCrossStageLifting _ _ _ = return ()
 
-polySpliceErr :: Id -> SDoc
+polySpliceErr :: Id -> TcRnMessage
 polySpliceErr id
-  = text "Can't splice the polymorphic local variable" <+> quotes (ppr id)
+  = TcRnUnknownMessage $ mkPlainError noHints $
+  text "Can't splice the polymorphic local variable" <+> quotes (ppr id)
 
 {-
 Note [Lifting strings]

@@ -39,6 +39,7 @@ import GHC.Prelude
 
 import GHC.Hs
 
+import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Gen.Expr
@@ -306,11 +307,13 @@ tcCheckFIType arg_tys res_ty idecl@(CImport (L lc cconv) (L ls safety) mh
   | cconv == PrimCallConv = do
       dflags <- getDynFlags
       checkTc (xopt LangExt.GHCForeignImportPrim dflags)
-              (text "Use GHCForeignImportPrim to allow `foreign import prim'.")
+              (TcRnUnknownMessage $ mkPlainError noHints $
+               text "Use GHCForeignImportPrim to allow `foreign import prim'.")
       checkCg checkCOrAsmOrLlvmOrInterp
       checkCTarget target
       checkTc (playSafe safety)
-              (text "The safe/unsafe annotation should not be used with `foreign import prim'.")
+              (TcRnUnknownMessage $ mkPlainError noHints $
+              text "The safe/unsafe annotation should not be used with `foreign import prim'.")
       checkForeignArgs (isFFIPrimArgumentTy dflags) arg_tys
       -- prim import result is more liberal, allows (#,,#)
       checkForeignRes nonIOok checkSafe (isFFIPrimResultTy dflags) res_ty
@@ -326,7 +329,8 @@ tcCheckFIType arg_tys res_ty idecl@(CImport (L lc cconv) (L ls safety) mh
       case target of
           StaticTarget _ _ _ False
            | not (null arg_tys) ->
-              addErrTc (text "`value' imports cannot have function types")
+              addErrTc (TcRnUnknownMessage $ mkPlainError noHints $
+              text "`value' imports cannot have function types")
           _ -> return ()
       return $ CImport (L lc cconv') (L ls safety) mh (CFunction target) src
 
@@ -344,8 +348,9 @@ checkCTarget DynamicTarget = panic "checkCTarget DynamicTarget"
 checkMissingAmpersand :: [Type] -> Type -> TcM ()
 checkMissingAmpersand arg_tys res_ty
   | null arg_tys && isFunPtrTy res_ty
-  = addDiagnosticTc (WarningWithFlag Opt_WarnDodgyForeignImports)
-                    (text "possible missing & in foreign import of FunPtr")
+  = addDiagnosticTc $ TcRnUnknownMessage $
+      mkPlainDiagnostic (WarningWithFlag Opt_WarnDodgyForeignImports) noHints
+                        (text "possible missing & in foreign import of FunPtr")
   | otherwise
   = return ()
 
@@ -519,7 +524,8 @@ checkCg check = do
       _ ->
         case check bcknd of
           IsValid      -> return ()
-          NotValid err -> addErrTc (text "Illegal foreign declaration:" <+> err)
+          NotValid err ->
+            addErrTc (TcRnUnknownMessage $ mkPlainError noHints $ text "Illegal foreign declaration:" <+> err)
 
 -- Calling conventions
 
@@ -531,26 +537,33 @@ checkCConv StdCallConv  = do dflags <- getDynFlags
                              if platformArch platform == ArchX86
                                  then return StdCallConv
                                  else do -- This is a warning, not an error. see #3336
-                                         addDiagnosticTc (WarningWithFlag Opt_WarnUnsupportedCallingConventions)
-                                           (text "the 'stdcall' calling convention is unsupported on this platform," $$ text "treating as ccall")
+                                         let msg = TcRnUnknownMessage $
+                                              mkPlainDiagnostic (WarningWithFlag Opt_WarnUnsupportedCallingConventions)
+                                                                noHints
+                                                                (text "the 'stdcall' calling convention is unsupported on this platform," $$ text "treating as ccall")
+                                         addDiagnosticTc msg
                                          return CCallConv
-checkCConv PrimCallConv = do addErrTc (text "The `prim' calling convention can only be used with `foreign import'")
-                             return PrimCallConv
+checkCConv PrimCallConv = do
+  addErrTc $ TcRnUnknownMessage $ mkPlainError noHints
+    (text "The `prim' calling convention can only be used with `foreign import'")
+  return PrimCallConv
 checkCConv JavaScriptCallConv = do dflags <- getDynFlags
                                    if platformArch (targetPlatform dflags) == ArchJavaScript
                                        then return JavaScriptCallConv
-                                       else do addErrTc (text "The `javascript' calling convention is unsupported on this platform")
-                                               return JavaScriptCallConv
+                                       else do
+                                         addErrTc $ TcRnUnknownMessage $ mkPlainError noHints $
+                                           (text "The `javascript' calling convention is unsupported on this platform")
+                                         return JavaScriptCallConv
 
 -- Warnings
 
-check :: Validity -> (SDoc -> SDoc) -> TcM ()
+check :: Validity -> (SDoc -> TcRnMessage) -> TcM ()
 check IsValid _             = return ()
 check (NotValid doc) err_fn = addErrTc (err_fn doc)
 
-illegalForeignTyErr :: SDoc -> SDoc -> SDoc
+illegalForeignTyErr :: SDoc -> SDoc -> TcRnMessage
 illegalForeignTyErr arg_or_res extra
-  = hang msg 2 extra
+  = TcRnUnknownMessage $ mkPlainError noHints $ hang msg 2 extra
   where
     msg = hsep [ text "Unacceptable", arg_or_res
                , text "type in foreign declaration:"]
@@ -560,9 +573,10 @@ argument, result :: SDoc
 argument = text "argument"
 result   = text "result"
 
-badCName :: CLabelString -> SDoc
+badCName :: CLabelString -> TcRnMessage
 badCName target
-  = sep [quotes (ppr target) <+> text "is not a valid C identifier"]
+  = TcRnUnknownMessage $ mkPlainError noHints $
+  sep [quotes (ppr target) <+> text "is not a valid C identifier"]
 
 foreignDeclCtxt :: ForeignDecl GhcRn -> SDoc
 foreignDeclCtxt fo

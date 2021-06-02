@@ -76,7 +76,6 @@ module GHC.Tc.Utils.Monad(
   tcCollectingUsage, tcScalingUsage, tcEmitBindingUsage,
 
   -- * Shared error message stuff: renamer and typechecker
-  mkLongErrAt, mkTcRnMessage, addLongErrAt, reportDiagnostic, reportDiagnostics,
   recoverM, mapAndRecoverM, mapAndReportM, foldAndRecoverM,
   attemptM, tryTc,
   askNoErrs, discardErrs, tryTcDiscardingErrs,
@@ -87,15 +86,17 @@ module GHC.Tc.Utils.Monad(
   getErrCtxt, setErrCtxt, addErrCtxt, addErrCtxtM, addLandmarkErrCtxt,
   addLandmarkErrCtxtM, popErrCtxt, getCtLocM, setCtLocM,
 
-  -- * Error message generation (type checker)
+  -- * Diagnostic message generation (type checker)
   addErrTc,
   addErrTcM,
   failWithTc, failWithTcM,
   checkTc, checkTcM,
   failIfTc, failIfTcM,
-  warnIfFlag, warnIf, diagnosticTc, diagnosticTcM, addDetailedDiagnostic, addTcRnDiagnostic,
-  addDiagnosticTc, addDiagnosticTcM, addDiagnostic, addDiagnosticAt, add_diagnostic,
   mkErrInfo,
+  addTcRnDiagnostic, addDetailedDiagnostic,
+  mkTcRnMessage, reportDiagnostic, reportDiagnostics,
+  warnIf, diagnosticTc, diagnosticTcM,
+  addDiagnosticTc, addDiagnosticTcM, addDiagnostic, addDiagnosticAt,
 
   -- * Type constraints
   newTcEvBinds, newNoTcEvBinds, cloneEvBindsVar,
@@ -979,30 +980,30 @@ getErrsVar = do { env <- getLclEnv; return (tcl_errs env) }
 setErrsVar :: TcRef (Messages TcRnMessage) -> TcRn a -> TcRn a
 setErrsVar v = updLclEnv (\ env -> env { tcl_errs =  v })
 
-addErr :: SDoc -> TcRn ()
+addErr :: TcRnMessage -> TcRn ()
 addErr msg = do { loc <- getSrcSpanM; addErrAt loc msg }
 
-failWith :: SDoc -> TcRn a
+failWith :: TcRnMessage -> TcRn a
 failWith msg = addErr msg >> failM
 
-failAt :: SrcSpan -> SDoc -> TcRn a
+failAt :: SrcSpan -> TcRnMessage -> TcRn a
 failAt loc msg = addErrAt loc msg >> failM
 
-addErrAt :: SrcSpan -> SDoc -> TcRn ()
+addErrAt :: SrcSpan -> TcRnMessage -> TcRn ()
 -- addErrAt is mainly (exclusively?) used by the renamer, where
 -- tidying is not an issue, but it's all lazy so the extra
 -- work doesn't matter
 addErrAt loc msg = do { ctxt <- getErrCtxt
                       ; tidy_env <- tcInitTidyEnv
                       ; err_info <- mkErrInfo tidy_env ctxt
-                      ; addLongErrAt loc msg err_info }
+                      ; add_long_err_at loc (TcRnMessageDetailed (ErrInfo err_info Outputable.empty) msg) }
 
-addErrs :: [(SrcSpan,SDoc)] -> TcRn ()
+addErrs :: [(SrcSpan,TcRnMessage)] -> TcRn ()
 addErrs msgs = mapM_ add msgs
              where
                add (loc,msg) = addErrAt loc msg
 
-checkErr :: Bool -> SDoc -> TcRn ()
+checkErr :: Bool -> TcRnMessage -> TcRn ()
 -- Add the error if the bool is False
 checkErr ok msg = unless ok (addErr msg)
 
@@ -1035,37 +1036,24 @@ discardWarnings thing_inside
 ************************************************************************
 -}
 
-mkLongErrAt :: SrcSpan -> SDoc -> SDoc -> TcRn (MsgEnvelope TcRnMessage)
-mkLongErrAt loc msg extra
-  = do { printer <- getPrintUnqualified ;
-         unit_state <- hsc_units <$> getTopEnv ;
-         let msg' = pprWithUnitState unit_state msg in
-         return $ mkErrorMsgEnvelope loc printer
-                $ TcRnUnknownMessage
-                $ mkDecoratedError noHints [msg', extra] }
+add_long_err_at :: SrcSpan -> TcRnMessageDetailed -> TcRn ()
+add_long_err_at loc msg = mk_long_err_at loc msg >>= reportDiagnostic
+  where
+    mk_long_err_at :: SrcSpan -> TcRnMessageDetailed -> TcRn (MsgEnvelope TcRnMessage)
+    mk_long_err_at loc msg
+      = do { printer <- getPrintUnqualified ;
+             unit_state <- hsc_units <$> getTopEnv ;
+             return $ mkErrorMsgEnvelope loc printer
+                    $ TcRnMessageWithInfo unit_state msg
+                    }
 
-mkTcRnMessage :: DiagnosticReason
-              -> SrcSpan
-              -> SDoc
-                  -- ^ The important part of the message
-              -> SDoc
-                  -- ^ The context of the message
-              -> SDoc
-                  -- ^ Any supplementary information.
+mkTcRnMessage :: SrcSpan
+              -> TcRnMessage
               -> TcRn (MsgEnvelope TcRnMessage)
-mkTcRnMessage reason loc important context extra
+mkTcRnMessage loc msg
   = do { printer <- getPrintUnqualified ;
-         unit_state <- hsc_units <$> getTopEnv ;
          dflags <- getDynFlags ;
-         let errDocs  = map (pprWithUnitState unit_state)
-                            [important, context, extra]
-         in
-         return $ mkMsgEnvelope dflags loc printer
-                $ TcRnUnknownMessage
-                $ mkDecoratedDiagnostic reason noHints errDocs }
-
-addLongErrAt :: SrcSpan -> SDoc -> SDoc -> TcRn ()
-addLongErrAt loc msg extra = mkLongErrAt loc msg extra >>= reportDiagnostic
+         return $ mkMsgEnvelope dflags loc printer msg }
 
 reportDiagnostics :: [MsgEnvelope TcRnMessage] -> TcM ()
 reportDiagnostics = mapM_ reportDiagnostic
@@ -1471,11 +1459,11 @@ tryTcDiscardingErrs recover thing_inside
     tidy up the message; we then use it to tidy the context messages
 -}
 
-addErrTc :: SDoc -> TcM ()
+addErrTc :: TcRnMessage -> TcM ()
 addErrTc err_msg = do { env0 <- tcInitTidyEnv
                       ; addErrTcM (env0, err_msg) }
 
-addErrTcM :: (TidyEnv, SDoc) -> TcM ()
+addErrTcM :: (TidyEnv, TcRnMessage) -> TcM ()
 addErrTcM (tidy_env, err_msg)
   = do { ctxt <- getErrCtxt ;
          loc  <- getSrcSpanM ;
@@ -1483,27 +1471,27 @@ addErrTcM (tidy_env, err_msg)
 
 -- The failWith functions add an error message and cause failure
 
-failWithTc :: SDoc -> TcM a               -- Add an error message and fail
+failWithTc :: TcRnMessage -> TcM a               -- Add an error message and fail
 failWithTc err_msg
   = addErrTc err_msg >> failM
 
-failWithTcM :: (TidyEnv, SDoc) -> TcM a   -- Add an error message and fail
+failWithTcM :: (TidyEnv, TcRnMessage) -> TcM a   -- Add an error message and fail
 failWithTcM local_and_msg
   = addErrTcM local_and_msg >> failM
 
-checkTc :: Bool -> SDoc -> TcM ()         -- Check that the boolean is true
+checkTc :: Bool -> TcRnMessage -> TcM ()         -- Check that the boolean is true
 checkTc True  _   = return ()
 checkTc False err = failWithTc err
 
-checkTcM :: Bool -> (TidyEnv, SDoc) -> TcM ()
+checkTcM :: Bool -> (TidyEnv, TcRnMessage) -> TcM ()
 checkTcM True  _   = return ()
 checkTcM False err = failWithTcM err
 
-failIfTc :: Bool -> SDoc -> TcM ()         -- Check that the boolean is false
+failIfTc :: Bool -> TcRnMessage -> TcM ()         -- Check that the boolean is false
 failIfTc False _   = return ()
 failIfTc True  err = failWithTc err
 
-failIfTcM :: Bool -> (TidyEnv, SDoc) -> TcM ()
+failIfTcM :: Bool -> (TidyEnv, TcRnMessage) -> TcM ()
    -- Check that the boolean is false
 failIfTcM False _   = return ()
 failIfTcM True  err = failWithTcM err
@@ -1511,46 +1499,39 @@ failIfTcM True  err = failWithTcM err
 
 --         Warnings have no 'M' variant, nor failure
 
--- | Display a warning if a condition is met,
---   and the warning is enabled
-warnIfFlag :: WarningFlag -> Bool -> SDoc -> TcRn ()
-warnIfFlag warn_flag is_bad msg
-  = do { -- No need to check the flag here, it will be done in 'diagReasonSeverity'.
-       ; when is_bad $ addDiagnostic (WarningWithFlag warn_flag) msg }
+-- | Display a warning if a condition is met.
+warnIf :: Bool -> TcRnMessage -> TcRn ()
+warnIf is_bad msg -- No need to check any flag here, it will be done in 'diagReasonSeverity'.
+  = when is_bad (addDiagnostic msg)
+
+no_err_info :: ErrInfo
+no_err_info = ErrInfo Outputable.empty Outputable.empty
 
 -- | Display a warning if a condition is met.
-warnIf :: Bool -> SDoc -> TcRn ()
-warnIf is_bad msg
-  = when is_bad (addDiagnostic WarningWithoutFlag msg)
-
--- | Display a warning if a condition is met.
-diagnosticTc :: DiagnosticReason -> Bool -> SDoc -> TcM ()
-diagnosticTc reason should_report warn_msg
-  | should_report = addDiagnosticTc reason warn_msg
+diagnosticTc :: Bool -> TcRnMessage -> TcM ()
+diagnosticTc should_report warn_msg
+  | should_report = addDiagnosticTc warn_msg
   | otherwise     = return ()
 
 -- | Display a diagnostic if a condition is met.
-diagnosticTcM :: DiagnosticReason -> Bool -> (TidyEnv, SDoc) -> TcM ()
-diagnosticTcM reason should_report warn_msg
-  | should_report = addDiagnosticTcM reason warn_msg
+diagnosticTcM :: Bool -> (TidyEnv, TcRnMessage) -> TcM ()
+diagnosticTcM should_report warn_msg
+  | should_report = addDiagnosticTcM warn_msg
   | otherwise     = return ()
 
 -- | Display a diagnostic in the current context.
-addDiagnosticTc :: DiagnosticReason -> SDoc -> TcM ()
-addDiagnosticTc reason msg
+addDiagnosticTc :: TcRnMessage -> TcM ()
+addDiagnosticTc msg
  = do { env0 <- tcInitTidyEnv ;
-      addDiagnosticTcM reason (env0, msg) }
+      addDiagnosticTcM (env0, msg) }
 
 -- | Display a diagnostic in a given context.
-addDiagnosticTcM :: DiagnosticReason -> (TidyEnv, SDoc) -> TcM ()
-addDiagnosticTcM reason (env0, msg)
- = do { ctxt <- getErrCtxt ;
-        err_info <- mkErrInfo env0 ctxt ;
-        add_diagnostic reason msg err_info }
-
--- | Display a diagnostic for the current source location.
-addDiagnostic :: DiagnosticReason -> SDoc -> TcRn ()
-addDiagnostic reason msg = add_diagnostic reason msg Outputable.empty
+addDiagnosticTcM :: (TidyEnv, TcRnMessage) -> TcM ()
+addDiagnosticTcM (env0, msg)
+ = do { ctxt <- getErrCtxt
+      ; extra <- mkErrInfo env0 ctxt
+      ; let err_info = ErrInfo extra Outputable.empty
+      ; add_diagnostic (TcRnMessageDetailed err_info msg) }
 
 -- | A variation of 'addDiagnostic' that takes a function to produce a 'TcRnDsMessage'
 -- given some additional context about the diagnostic.
@@ -1562,35 +1543,33 @@ addDetailedDiagnostic mkMsg = do
   env0 <- tcInitTidyEnv
   ctxt <- getErrCtxt
   err_info <- mkErrInfo env0 ctxt
-  reportDiagnostic (mkMsgEnvelope dflags loc printer (mkMsg (ErrInfo err_info)))
+  reportDiagnostic (mkMsgEnvelope dflags loc printer (mkMsg (ErrInfo err_info empty)))
 
 addTcRnDiagnostic :: TcRnMessage -> TcM ()
 addTcRnDiagnostic msg = do
   loc <- getSrcSpanM
-  printer <- getPrintUnqualified
-  dflags  <- getDynFlags
-  reportDiagnostic (mkMsgEnvelope dflags loc printer msg)
+  mkTcRnMessage loc msg >>= reportDiagnostic
+
+-- | Display a diagnostic for the current source location, taken from
+-- the 'TcRn' monad.
+addDiagnostic :: TcRnMessage -> TcRn ()
+addDiagnostic msg = add_diagnostic (TcRnMessageDetailed no_err_info msg)
 
 -- | Display a diagnostic for a given source location.
-addDiagnosticAt :: DiagnosticReason -> SrcSpan -> SDoc -> TcRn ()
-addDiagnosticAt reason loc msg = add_diagnostic_at reason loc msg Outputable.empty
+addDiagnosticAt :: SrcSpan -> TcRnMessage -> TcRn ()
+addDiagnosticAt loc msg = do
+  unit_state <- hsc_units <$> getTopEnv
+  let dia = TcRnMessageDetailed no_err_info msg
+  mkTcRnMessage loc (TcRnMessageWithInfo unit_state dia) >>= reportDiagnostic
 
 -- | Display a diagnostic, with an optional flag, for the current source
 -- location.
-add_diagnostic :: DiagnosticReason -> SDoc -> SDoc -> TcRn ()
-add_diagnostic reason msg extra_info
+add_diagnostic :: TcRnMessageDetailed -> TcRn ()
+add_diagnostic msg
   = do { loc <- getSrcSpanM
-       ; add_diagnostic_at reason loc msg extra_info }
-
--- | Display a diagnosticTc, with an optional flag, for a given location.
-add_diagnostic_at :: DiagnosticReason -> SrcSpan -> SDoc -> SDoc -> TcRn ()
-add_diagnostic_at reason loc msg extra_info
-  = do { printer <- getPrintUnqualified ;
-         dflags  <- getDynFlags ;
-         let { dia = mkMsgEnvelope dflags loc printer $
-                     TcRnUnknownMessage $
-                     mkDecoratedDiagnostic reason noHints [msg, extra_info] } ;
-         reportDiagnostic dia }
+       ; unit_state <- hsc_units <$> getTopEnv
+       ; mkTcRnMessage loc (TcRnMessageWithInfo unit_state msg) >>= reportDiagnostic
+       }
 
 
 {-
@@ -1598,12 +1577,12 @@ add_diagnostic_at reason loc msg extra_info
         Other helper functions
 -}
 
-add_err_tcm :: TidyEnv -> SDoc -> SrcSpan
+add_err_tcm :: TidyEnv -> TcRnMessage -> SrcSpan
             -> [ErrCtxt]
             -> TcM ()
-add_err_tcm tidy_env err_msg loc ctxt
+add_err_tcm tidy_env msg loc ctxt
  = do { err_info <- mkErrInfo tidy_env ctxt ;
-        addLongErrAt loc err_msg err_info }
+        add_long_err_at loc (TcRnMessageDetailed (ErrInfo err_info Outputable.empty) msg) }
 
 mkErrInfo :: TidyEnv -> [ErrCtxt] -> TcM SDoc
 -- Tidy the error info, trimming excessive contexts

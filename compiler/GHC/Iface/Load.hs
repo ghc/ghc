@@ -57,6 +57,7 @@ import GHC.Iface.Rename
 import GHC.Iface.Env
 import GHC.Iface.Errors as Iface_Errors
 
+import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 
 import GHC.Utils.Binary   ( BinData(..) )
@@ -298,7 +299,7 @@ loadSrcInterface :: SDoc
 loadSrcInterface doc mod want_boot maybe_pkg
   = do { res <- loadSrcInterface_maybe doc mod want_boot maybe_pkg
        ; case res of
-           Failed err      -> failWithTc err
+           Failed err      -> failWithTc (TcRnUnknownMessage $ mkPlainError noHints err)
            Succeeded iface -> return iface }
 
 -- | Like 'loadSrcInterface', but returns a 'MaybeErr'.

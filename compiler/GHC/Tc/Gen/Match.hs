@@ -41,6 +41,7 @@ import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcSyntaxOp, tcInferRho, tcInferRhoNC
                                        , tcCheckMonoExpr, tcCheckMonoExprNC
                                        , tcCheckPolyExpr )
 
+import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Env
 import GHC.Tc.Gen.Pat
@@ -68,6 +69,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Misc
 import GHC.Driver.Session ( getDynFlags )
 
+import GHC.Types.Error
 import GHC.Types.Fixity (LexicalFixity(..))
 import GHC.Types.Name
 import GHC.Types.Id
@@ -1124,7 +1126,8 @@ checkArgs fun (MG { mg_alts = L _ (match1:matches) })
     | null bad_matches
     = return ()
     | otherwise
-    = failWithTc (vcat [ text "Equations for" <+> quotes (ppr fun) <+>
+    = failWithTc $ TcRnUnknownMessage $ mkPlainError noHints $
+      (vcat [ text "Equations for" <+> quotes (ppr fun) <+>
                          text "have different numbers of arguments"
                        , nest 2 (ppr (getLocA match1))
                        , nest 2 (ppr (getLocA (head bad_matches)))])

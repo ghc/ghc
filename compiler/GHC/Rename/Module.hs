@@ -22,6 +22,7 @@ import {-# SOURCE #-} GHC.Rename.Expr( rnLExpr )
 import {-# SOURCE #-} GHC.Rename.Splice ( rnSpliceDecl, rnTopSpliceDecls )
 
 import GHC.Hs
+import GHC.Types.Error
 import GHC.Types.FieldLabel
 import GHC.Types.Name.Reader
 import GHC.Rename.HsType
@@ -35,6 +36,7 @@ import GHC.Rename.Utils ( HsDocContext(..), mapFvRn, bindLocalNames
                         , addNoNestedForallsContextsErr, checkInferredVars )
 import GHC.Rename.Unbound ( mkUnboundName, notInScopeErr, WhereLooking(WL_Global) )
 import GHC.Rename.Names
+import GHC.Tc.Errors.Types
 import GHC.Tc.Gen.Annotation ( annCtxt )
 import GHC.Tc.Utils.Monad
 
@@ -295,10 +297,11 @@ findDupRdrNames = findDupsEq (\ x -> \ y -> rdrNameOcc (unLoc x) == rdrNameOcc (
 -- we check that the names are defined above
 -- invt: the lists returned by findDupsEq always have at least two elements
 
-dupWarnDecl :: LocatedN RdrName -> RdrName -> SDoc
+dupWarnDecl :: LocatedN RdrName -> RdrName -> TcRnMessage
 -- Located RdrName -> DeprecDecl RdrName -> SDoc
 dupWarnDecl d rdr_name
-  = vcat [text "Multiple warning declarations for" <+> quotes (ppr rdr_name),
+  = TcRnUnknownMessage $ mkPlainError noHints $
+    vcat [text "Multiple warning declarations for" <+> quotes (ppr rdr_name),
           text "also at " <+> ppr (getLocA d)]
 
 {-
@@ -541,36 +544,40 @@ checkCanonicalInstances cls poly_ty mbinds = do
     isAliasMG _ = Nothing
 
     -- got "lhs = rhs" but expected something different
-    addWarnNonCanonicalMethod1 refURL flag lhs rhs =
-        addDiagnostic (WarningWithFlag flag) $ vcat
-                       [ text "Noncanonical" <+>
-                         quotes (text (lhs ++ " = " ++ rhs)) <+>
-                         text "definition detected"
-                       , instDeclCtxt1 poly_ty
-                       , text "Move definition from" <+>
-                         quotes (text rhs) <+>
-                         text "to" <+> quotes (text lhs)
-                       , text "See also:" <+>
-                         text refURL
-                       ]
+    addWarnNonCanonicalMethod1 refURL flag lhs rhs = do
+        let dia = TcRnUnknownMessage $
+              mkPlainDiagnostic (WarningWithFlag flag) noHints $
+                vcat [ text "Noncanonical" <+>
+                       quotes (text (lhs ++ " = " ++ rhs)) <+>
+                       text "definition detected"
+                     , instDeclCtxt1 poly_ty
+                     , text "Move definition from" <+>
+                       quotes (text rhs) <+>
+                       text "to" <+> quotes (text lhs)
+                     , text "See also:" <+>
+                       text refURL
+                     ]
+        addDiagnostic dia
 
     -- expected "lhs = rhs" but got something else
-    addWarnNonCanonicalMethod2 refURL flag lhs rhs =
-        addDiagnostic (WarningWithFlag flag) $ vcat
-                       [ text "Noncanonical" <+>
-                         quotes (text lhs) <+>
-                         text "definition detected"
-                       , instDeclCtxt1 poly_ty
-                       , quotes (text lhs) <+>
-                         text "will eventually be removed in favour of" <+>
-                         quotes (text rhs)
-                       , text "Either remove definition for" <+>
-                         quotes (text lhs) <+> text "(recommended)" <+>
-                         text "or define as" <+>
-                         quotes (text (lhs ++ " = " ++ rhs))
-                       , text "See also:" <+>
-                         text refURL
-                       ]
+    addWarnNonCanonicalMethod2 refURL flag lhs rhs = do
+        let dia = TcRnUnknownMessage $
+              mkPlainDiagnostic (WarningWithFlag flag) noHints $
+                vcat [ text "Noncanonical" <+>
+                       quotes (text lhs) <+>
+                       text "definition detected"
+                     , instDeclCtxt1 poly_ty
+                     , quotes (text lhs) <+>
+                       text "will eventually be removed in favour of" <+>
+                       quotes (text rhs)
+                     , text "Either remove definition for" <+>
+                       quotes (text lhs) <+> text "(recommended)" <+>
+                       text "or define as" <+>
+                       quotes (text (lhs ++ " = " ++ rhs))
+                     , text "See also:" <+>
+                       text refURL
+                     ]
+        addDiagnostic dia
 
     -- stolen from GHC.Tc.TyCl.Instance
     instDeclCtxt1 :: LHsSigType GhcRn -> SDoc
@@ -665,7 +672,7 @@ rnClsInstDecl (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = mbinds
     -- reach the typechecker, lest we encounter different errors that are
     -- hopelessly confusing (such as the one in #16114).
     bail_out (l, err_msg) = do
-      addErrAt l $ withHsDocContext ctxt err_msg
+      addErrAt l $ TcRnUnknownMessage $ mkPlainError noHints (withHsDocContext ctxt err_msg)
       pure $ mkUnboundName (mkTcOccFS (fsLit "<class>"))
 
 rnFamEqn :: HsDocContext
@@ -829,7 +836,8 @@ rnFamEqn doc atfi extra_kvars
 
     badAssocRhs :: [Name] -> RnM ()
     badAssocRhs ns
-      = addErr (hang (text "The RHS of an associated type declaration mentions"
+      = addErr $ TcRnUnknownMessage $ mkPlainError noHints $
+           (hang (text "The RHS of an associated type declaration mentions"
                       <+> text "out-of-scope variable" <> plural ns
                       <+> pprWithCommas (quotes . ppr) ns)
                    2 (text "All such variables must be bound on the LHS"))
@@ -1189,9 +1197,10 @@ rnSrcDerivDecl (DerivDecl _ ty mds overlap)
     loc = getLocA nowc_ty
     nowc_ty = dropWildCards ty
 
-standaloneDerivErr :: SDoc
+standaloneDerivErr :: TcRnMessage
 standaloneDerivErr
-  = hang (text "Illegal standalone deriving declaration")
+  = TcRnUnknownMessage $ mkPlainError noHints $
+    hang (text "Illegal standalone deriving declaration")
        2 (text "Use StandaloneDeriving to enable this extension")
 
 {-
@@ -1332,15 +1341,17 @@ validRuleLhs foralls lhs
     checkl_es es = foldr (mplus . checkl_e) Nothing es
 -}
 
-badRuleVar :: FastString -> Name -> SDoc
+badRuleVar :: FastString -> Name -> TcRnMessage
 badRuleVar name var
-  = sep [text "Rule" <+> doubleQuotes (ftext name) <> colon,
+  = TcRnUnknownMessage $ mkPlainError noHints $
+    sep [text "Rule" <+> doubleQuotes (ftext name) <> colon,
          text "Forall'd variable" <+> quotes (ppr var) <+>
                 text "does not appear on left hand side"]
 
-badRuleLhsErr :: FastString -> LHsExpr GhcRn -> HsExpr GhcRn -> SDoc
+badRuleLhsErr :: FastString -> LHsExpr GhcRn -> HsExpr GhcRn -> TcRnMessage
 badRuleLhsErr name lhs bad_e
-  = sep [text "Rule" <+> pprRuleName name <> colon,
+  = TcRnUnknownMessage $ mkPlainError noHints $
+    sep [text "Rule" <+> pprRuleName name <> colon,
          nest 2 (vcat [err,
                        text "in left-hand side:" <+> ppr lhs])]
     $$
@@ -1600,8 +1611,8 @@ rnStandaloneKindSignature tc_names (StandaloneKindSig _ v ki)
         ; return (StandaloneKindSig noExtField new_v new_ki, fvs)
         }
   where
-    standaloneKiSigErr :: SDoc
-    standaloneKiSigErr =
+    standaloneKiSigErr :: TcRnMessage
+    standaloneKiSigErr = TcRnUnknownMessage $ mkPlainError noHints $
       hang (text "Illegal standalone kind signature")
          2 (text "Did you mean to enable StandaloneKindSignatures?")
 
@@ -1674,7 +1685,7 @@ rnRoleAnnots tc_names role_annots
 
 dupRoleAnnotErr :: NonEmpty (LRoleAnnotDecl GhcPs) -> RnM ()
 dupRoleAnnotErr list
-  = addErrAt (locA loc) $
+  = addErrAt (locA loc) $ TcRnUnknownMessage $ mkPlainError noHints $
     hang (text "Duplicate role annotations for" <+>
           quotes (ppr $ roleAnnotDeclName first_decl) <> colon)
        2 (vcat $ map pp_role_annot $ NE.toList sorted_list)
@@ -1689,7 +1700,7 @@ dupRoleAnnotErr list
 
 dupKindSig_Err :: NonEmpty (LStandaloneKindSig GhcPs) -> RnM ()
 dupKindSig_Err list
-  = addErrAt (locA loc) $
+  = addErrAt (locA loc) $ TcRnUnknownMessage $ mkPlainError noHints $
     hang (text "Duplicate standalone kind signatures for" <+>
           quotes (ppr $ standaloneKindSigName first_decl) <> colon)
        2 (vcat $ map pp_kisig $ NE.toList sorted_list)
@@ -1966,13 +1977,14 @@ warnNoDerivStrat :: Maybe (LDerivStrategy GhcRn)
 warnNoDerivStrat mds loc
   = do { dyn_flags <- getDynFlags
        ; case mds of
-           Nothing -> addDiagnosticAt
-             (WarningWithFlag Opt_WarnMissingDerivingStrategies)
-             loc
-             (if xopt LangExt.DerivingStrategies dyn_flags
-               then no_strat_warning
-               else no_strat_warning $+$ deriv_strat_nenabled
-             )
+           Nothing ->
+             let dia = TcRnUnknownMessage $
+                   mkPlainDiagnostic (WarningWithFlag Opt_WarnMissingDerivingStrategies) noHints $
+                     (if xopt LangExt.DerivingStrategies dyn_flags
+                       then no_strat_warning
+                       else no_strat_warning $+$ deriv_strat_nenabled
+                     )
+             in addDiagnosticAt loc dia
            _ -> pure ()
        }
   where
@@ -2072,14 +2084,16 @@ rnLDerivStrategy doc mds thing_inside
       (thing, fvs) <- thing_inside
       pure (ds, thing, fvs)
 
-badGadtStupidTheta :: HsDocContext -> SDoc
+badGadtStupidTheta :: HsDocContext -> TcRnMessage
 badGadtStupidTheta _
-  = vcat [text "No context is allowed on a GADT-style data declaration",
+  = TcRnUnknownMessage $ mkPlainError noHints $
+    vcat [text "No context is allowed on a GADT-style data declaration",
           text "(You can put a context on each constructor, though.)"]
 
-illegalDerivStrategyErr :: DerivStrategy GhcPs -> SDoc
+illegalDerivStrategyErr :: DerivStrategy GhcPs -> TcRnMessage
 illegalDerivStrategyErr ds
-  = vcat [ text "Illegal deriving strategy" <> colon <+> derivStrategyName ds
+  = TcRnUnknownMessage $ mkPlainError noHints $
+    vcat [ text "Illegal deriving strategy" <> colon <+> derivStrategyName ds
          , text enableStrategy ]
 
   where
@@ -2090,9 +2104,10 @@ illegalDerivStrategyErr ds
       | otherwise
       = "Use DerivingStrategies to enable this extension"
 
-multipleDerivClausesErr :: SDoc
+multipleDerivClausesErr :: TcRnMessage
 multipleDerivClausesErr
-  = vcat [ text "Illegal use of multiple, consecutive deriving clauses"
+  = TcRnUnknownMessage $ mkPlainError noHints $
+    vcat [ text "Illegal use of multiple, consecutive deriving clauses"
          , text "Use DerivingStrategies to allow this" ]
 
 rnFamDecl :: Maybe Name -- Just cls => this FamilyDecl is nested
@@ -2157,7 +2172,7 @@ rnFamResultSig doc (TyVarSig _ tvbndr)
           rdr_env <- getLocalRdrEnv
        ;  let resName = hsLTyVarName tvbndr
        ;  when (resName `elemLocalRdrEnv` rdr_env) $
-          addErrAt (getLocA tvbndr) $
+          addErrAt (getLocA tvbndr) $ TcRnUnknownMessage $ mkPlainError noHints $
                      (hsep [ text "Type variable", quotes (ppr resName) <> comma
                            , text "naming a type family result,"
                            ] $$
@@ -2229,7 +2244,7 @@ rnInjectivityAnn tvBndrs (L _ (TyVarSig _ resTv))
    -- not-in-scope variables) don't check the validity of injectivity
    -- annotation. This gives better error messages.
    ; when (noRnErrors && not lhsValid) $
-        addErrAt (getLocA injFrom)
+        addErrAt (getLocA injFrom) $ TcRnUnknownMessage $ mkPlainError noHints $
               ( vcat [ text $ "Incorrect type variable on the LHS of "
                            ++ "injectivity condition"
               , nest 5
@@ -2238,7 +2253,8 @@ rnInjectivityAnn tvBndrs (L _ (TyVarSig _ resTv))
 
    ; when (noRnErrors && not (Set.null rhsValid)) $
       do { let errorVars = Set.toList rhsValid
-         ; addErrAt srcSpan $ ( hsep
+         ; addErrAt srcSpan $ TcRnUnknownMessage $ mkPlainError noHints $
+                        ( hsep
                         [ text "Unknown type variable" <> plural errorVars
                         , text "on the RHS of injectivity condition:"
                         , interpp'SP errorVars ] ) }
@@ -2516,7 +2532,9 @@ add gp loc (SpliceD _ splice@(SpliceDecl _ _ flag)) ds
 
        ; return (gp, Just (splice, ds)) }
   where
-    badImplicitSplice = text "Parse error: module header, import declaration"
+    badImplicitSplice :: TcRnMessage
+    badImplicitSplice = TcRnUnknownMessage $ mkPlainError noHints $
+                        text "Parse error: module header, import declaration"
                      $$ text "or top-level declaration expected."
                      -- The compiler should suggest the above, and not using
                      -- TemplateHaskell since the former suggestion is more
