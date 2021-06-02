@@ -32,15 +32,14 @@ where
 
 import GHC.Prelude
 
-import GHC.Driver.Ppr
 import GHC.Driver.Session
 import GHC.Driver.Errors ( printOrThrowDiagnostics )
 import GHC.Driver.Errors.Types ( GhcMessage )
 import GHC.Driver.Config.Logger (initLogFlags)
+import GHC.Driver.Env.Types ( Hsc(..), HscEnv(..) )
 
 import GHC.Runtime.Context
 import GHC.Runtime.Interpreter.Types (Interp)
-import GHC.Driver.Env.Types ( Hsc(..), HscEnv(..) )
 
 import GHC.Unit
 import GHC.Unit.Module.ModGuts
@@ -61,6 +60,7 @@ import GHC.Types.Error ( emptyMessages, Messages )
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.TyThing
+import GHC.Types.Unique.FM
 
 import GHC.Builtin.Names ( gHC_PRIM )
 
@@ -72,7 +72,7 @@ import GHC.Utils.Monad
 import GHC.Utils.Panic
 import GHC.Utils.Misc
 import GHC.Utils.Logger
-import GHC.Types.Unique.FM
+import GHC.Utils.Trace
 
 import Data.IORef
 import qualified Data.Set as Set
