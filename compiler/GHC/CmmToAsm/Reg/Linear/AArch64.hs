@@ -11,9 +11,7 @@ import GHC.Utils.Panic
 import GHC.Platform
 
 import Data.Word
-import Data.Bits
 
--- import Debug.Trace
 import GHC.Stack
 -- AArch64 has 32 64bit general purpose register r0..r30, and zr/sp
 -- AArch64 has 32 128bit floating point registers v0..v31 as part of the NEON

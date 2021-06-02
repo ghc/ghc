@@ -33,8 +33,6 @@ import Data.Maybe (fromMaybe)
 
 import GHC.Stack
 
-import Data.Bits ((.&.), complement)
-
 -- | TODO: verify this!
 stackFrameHeaderSize :: Platform -> Int
 stackFrameHeaderSize _ = 64
