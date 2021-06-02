@@ -96,7 +96,7 @@ genericPlatform = Platform
    , platformIsCrossCompiling        = False
    , platformLeadingUnderscore       = False
    , platformTablesNextToCode        = True
-   , platformConstants               = error "No PlatformConstants"
+   , platformConstants               = Nothing
    }
 
 data PlatformWordSize
