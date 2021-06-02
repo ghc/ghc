@@ -64,7 +64,6 @@ module GHC.Utils.Error (
 import GHC.Prelude
 
 import GHC.Driver.Session
-import GHC.Driver.Ppr
 
 import GHC.Data.Bag
 import GHC.Utils.Exception

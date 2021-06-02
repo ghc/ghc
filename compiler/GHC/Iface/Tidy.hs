@@ -47,6 +47,7 @@ import GHC.Iface.Env
 import GHC.Utils.Outputable
 import GHC.Utils.Misc( filterOut )
 import GHC.Utils.Panic
+import GHC.Utils.Trace
 import GHC.Utils.Logger as Logger
 import qualified GHC.Utils.Error as Err
 

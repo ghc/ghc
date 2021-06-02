@@ -39,11 +39,11 @@ module GHC.Core.Opt.Simplify.Utils (
 
 import GHC.Prelude
 
+import GHC.Driver.Session
+
+import GHC.Core
 import GHC.Core.Opt.Simplify.Env
 import GHC.Core.Opt.Monad        ( SimplMode(..), Tick(..) )
-import GHC.Driver.Session
-import GHC.Driver.Ppr
-import GHC.Core
 import qualified GHC.Core.Subst
 import GHC.Core.Ppr
 import GHC.Core.TyCo.Ppr ( pprParendType )
@@ -52,28 +52,31 @@ import GHC.Core.Utils
 import GHC.Core.Opt.Arity
 import GHC.Core.Unfold
 import GHC.Core.Unfold.Make
-import GHC.Types.Name
-import GHC.Types.Id
-import GHC.Types.Id.Info
-import GHC.Types.Tickish
-import GHC.Types.Var
-import GHC.Types.Demand
-import GHC.Types.Var.Set
-import GHC.Types.Basic
 import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Type     hiding( substTy )
 import GHC.Core.Coercion hiding( substCo )
 import GHC.Core.DataCon ( dataConWorkId, isNullaryRepDataCon )
 import GHC.Core.Multiplicity
-import GHC.Utils.Misc
+import GHC.Core.Opt.ConstantFold
+
+import GHC.Types.Name
+import GHC.Types.Id
+import GHC.Types.Id.Info
+import GHC.Types.Tickish
+import GHC.Types.Demand
+import GHC.Types.Var.Set
+import GHC.Types.Basic
+
 import GHC.Data.OrdList ( isNilOL )
+import GHC.Data.FastString ( fsLit )
+
+import GHC.Utils.Misc
 import GHC.Utils.Monad
 import GHC.Utils.Outputable
 import GHC.Utils.Logger
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
-import GHC.Core.Opt.ConstantFold
-import GHC.Data.FastString ( fsLit )
+import GHC.Utils.Trace
 
 import Control.Monad    ( when )
 import Data.List        ( sortBy )
