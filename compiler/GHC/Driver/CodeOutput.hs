@@ -43,6 +43,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Logger
 import GHC.Utils.Exception (bracket)
+import GHC.Utils.Ppr (Mode(..))
 
 import GHC.Unit
 import GHC.Unit.State
@@ -148,7 +149,8 @@ outputC logger dflags filenm cmm_stream packages =
                           "C backend output"
                           FormatC
                           doc
-            printForC dflags h doc
+            let ctx = initSDocContext dflags (PprCode CStyle)
+            printSDocLn ctx LeftMode h doc
       Stream.consume cmm_stream id writeC
 
 {-
