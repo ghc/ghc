@@ -174,7 +174,6 @@ import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
 
 import GHC.Driver.Env
-import GHC.Driver.Ppr
 import GHC.Driver.Session
 
 import GHC.Runtime.Context
@@ -600,11 +599,11 @@ getEpsAndHpt = do { env <- getTopEnv; eps <- liftIO $ hscEPS env
 
 -- | A convenient wrapper for taking a @MaybeErr SDoc a@ and throwing
 -- an exception if it is an error.
-withException :: MonadIO m => DynFlags -> m (MaybeErr SDoc a) -> m a
-withException dflags do_this = do
+withException :: MonadIO m => SDocContext -> m (MaybeErr SDoc a) -> m a
+withException ctx do_this = do
     r <- do_this
     case r of
-        Failed err -> liftIO $ throwGhcExceptionIO (ProgramError (showSDoc dflags err))
+        Failed err -> liftIO $ throwGhcExceptionIO (ProgramError (renderWithContext ctx err))
         Succeeded result -> return result
 
 {-
