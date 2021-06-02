@@ -144,7 +144,7 @@ instance HasLogger CompPipeline where
 
 setDynFlags :: DynFlags -> CompPipeline ()
 setDynFlags dflags = P $ \_env state ->
-  return (state{hsc_env= (hsc_env state){ hsc_dflags = dflags }}, ())
+  return (state{ hsc_env = hscSetFlags dflags (hsc_env state)}, ())
 
 setPlugins :: [LoadedPlugin] -> [StaticPlugin] -> CompPipeline ()
 setPlugins dyn static = P $ \_env state ->

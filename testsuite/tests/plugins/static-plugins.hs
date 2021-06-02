@@ -2,7 +2,7 @@ module Main where
 
 import GHC.Driver.Env
 import GHC.Driver.Session
-  (getDynFlags, parseDynamicFlagsCmdLine, defaultFatalMessager, defaultFlushOut)
+  (extractDynFlags, parseDynamicFlagsCmdLine, defaultFatalMessager, defaultFlushOut)
 import GHC.Driver.Plugins
 import GHC.Driver.Monad
 

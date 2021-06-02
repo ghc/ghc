@@ -82,6 +82,7 @@ GHC.Data.TrieMap
 GHC.Driver.Backend
 GHC.Driver.Backpack.Syntax
 GHC.Driver.CmdLine
+GHC.Driver.Config.Logger
 GHC.Driver.Env
 GHC.Driver.Env.Types
 GHC.Driver.Errors
