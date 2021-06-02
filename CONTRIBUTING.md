@@ -44,20 +44,20 @@ so that documentation built within GHC can benefit from it.
 
 #### Using `cabal`
 
-Requires cabal `>= 3.4` and GHC `== 9.0`:
+Requires cabal `>= 3.4` and GHC `== 9.2`:
+
+First update the package list:
+
+```bash
+cabal v2-update
+```
+
+This is needed as haddock@ghc-9.2 uses the
+[ghc.head](https://ghc.gitlab.haskell.org/head.hackage/) package repository.
 
 ```bash
 cabal v2-build all --enable-tests
 cabal v2-test all
-```
-
-#### Using `stack`
-
-```bash
-stack init
-stack build
-export HADDOCK_PATH="$(stack exec which haddock)"
-stack test
 ```
 
 ### Updating golden testsuite outputs
