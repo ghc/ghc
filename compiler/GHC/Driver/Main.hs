@@ -177,7 +177,6 @@ import GHC.Unit
 import GHC.Unit.Env
 import GHC.Unit.Finder
 import GHC.Unit.External
-import GHC.Unit.State
 import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module.ModGuts
 import GHC.Unit.Module.ModIface
