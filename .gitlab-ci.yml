@@ -102,6 +102,7 @@ workflow:
 # * x86_64-linux: Any Docker-capable x86_64 Linux machine
 # * aarch64-linux: Any Docker-capable AArch64 Linux machine
 # * x86_64-windows: A x86_64 Windows machine
+# * riscv64-linux: Any Docker-capable RiscV64 Linux machine
 # * lint: Any Docker-capable x86_64 Linux machine; distinct from
 #         x86_64-linux to ensure low-latency availability.
 #
@@ -722,6 +723,43 @@ validate-aarch64-darwin:
     paths:
       - cabal-cache
       - toolchain
+
+#################################
+# riscv64-linux-ubuntu-21.04
+#################################
+.build-riscv64-linux-ubuntu-21.04:
+  extends: .validate-linux
+  stage: full-build
+  image: "registry.gitlab.haskell.org/juampe/ghc:riscv64-linux-ubuntu2104"
+  allow_failure: true
+  variables:
+    TEST_ENV: "riscv64-linux-ubuntu2104"
+    BIN_DIST_PREP_TAR_COMP: "ghc-riscv64-ubuntu2104-linux.tar.xz"
+    BUILD_FLAVOUR: "quick-llvm"
+  cache:
+    key: linux-riscv64-ubuntu2004
+  tags:
+    - riscv64-linux
+
+.build-riscv64-linux-ubuntu-21.04-llvm:
+  extends: .validate-linux
+  stage: full-build
+  variables:
+    BUILD_FLAVOUR: perf-llvm
+  tags:
+    - riscv64-linux
+
+validate-riscv64-linux-ubuntu-21.04:
+  extends: .build-riscv64-linux-ubuntu-21.04
+  artifacts:
+    when: always
+    expire_in: 2 week
+
+nightly-riscv64-linux-ubuntu-21.04:
+  <<: *nightly
+  extends: .build-riscv64-linux-ubuntu-21.04
+  variables:
+    TEST_TYPE: slowtest
 
 #################################
 # aarch64-linux-deb10
