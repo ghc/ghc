@@ -1,13 +1,20 @@
 {-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE LambdaCase #-}
-module GHC.Types.Hint where
 
-import GHC.Prelude
+module GHC.Types.Hint (
+  GhcHint(..),
+  InstantiationSuggestion(..)
+  ) where
 
 import GHC.Utils.Outputable
-import GHC.LanguageExtensions
+import qualified GHC.LanguageExtensions as LangExt
 import Data.Typeable
 import GHC.Unit.Module (ModuleName, Module)
+import GHC.Hs.Extension (GhcTc)
+import GHC.Types.Var (Var)
+import GHC.Types.Basic (Activation, RuleName)
+import {-# SOURCE #-} Language.Haskell.Syntax.Expr
+  -- This {-# SOURCE #-} import should be removable once
+  -- 'Language.Haskell.Syntax.Bind' no longer depends on 'GHC.Tc.Types.Evidence'.
 
 -- | A type for hints emitted by GHC.
 -- A /hint/ suggests a possible way to deal with a particular warning or error.
@@ -29,7 +36,7 @@ data GhcHint
                       parser/should_fail/T18251e, ... (and many more)
 
     -}
-  | SuggestExtension !Extension
+  | SuggestExtension !LangExt.Extension
     {-| Suggests that a monadic code block is probably missing a \"do\" keyword.
 
         Example:
@@ -68,51 +75,46 @@ data GhcHint
       Test case(s): driver/T12955
     -}
   | SuggestSignatureInstantiations !ModuleName [InstantiationSuggestion]
-  {-| Suggests to use spaces instead of tabs.
+    {-| Suggests to use spaces instead of tabs.
 
-      Triggered by: 'GHC.Parser.Errors.Types.PsWarnTab'.
+        Triggered by: 'GHC.Parser.Errors.Types.PsWarnTab'.
 
-      Examples: None
-      Test Case(s): None
-  -}
+        Examples: None
+        Test Case(s): None
+    -}
   | SuggestUseSpaces
-  {-| Suggests wrapping an expression in parentheses
+    {-| Suggests wrapping an expression in parentheses
 
-      Examples: None
-      Test Case(s): None
-  -}
+        Examples: None
+        Test Case(s): None
+    -}
   | SuggestParentheses
+    {-| Suggests to increase the -fmax-pmcheck-models limit for the pattern match checker.
 
+      Triggered by: 'GHC.HsToCore.Errors.Types.DsMaxPmCheckModelsReached'
 
-instance Outputable GhcHint where
-  ppr = \case
-    UnknownHint m
-      -> ppr m
-    SuggestExtension ext
-      -> text "Perhaps you intended to use" <+> ppr ext
-    SuggestMissingDo
-      -> text "Possibly caused by a missing 'do'?"
-    SuggestLetInDo
-      -> text "Perhaps you need a 'let' in a 'do' block?"
-           $$ text "e.g. 'let x = 5' instead of 'x = 5'"
-    SuggestAddSignatureCabalFile pi_mod_name
-      -> text "Try adding" <+> quotes (ppr pi_mod_name)
-           <+> text "to the"
-           <+> quotes (text "signatures")
-           <+> text "field in your Cabal file."
-    SuggestSignatureInstantiations pi_mod_name suggestions
-      -> let suggested_instantiated_with =
-               hcat (punctuate comma $
-                   [ ppr k <> text "=" <> ppr v
-                   | InstantiationSuggestion k v <- suggestions
-                   ])
-         in text "Try passing -instantiated-with=\"" <>
-              suggested_instantiated_with <> text "\"" $$
-                text "replacing <" <> ppr pi_mod_name <> text "> as necessary."
-    SuggestUseSpaces
-      -> text "Please use spaces instead."
-    SuggestParentheses
-      -> text "Use parentheses."
+      Test case(s): pmcheck/should_compile/TooManyDeltas
+                    pmcheck/should_compile/TooManyDeltas
+                    pmcheck/should_compile/T11822
+    -}
+  | SuggestIncreaseMaxPmCheckModels
+    {-| Suggests adding a type signature, typically to resolve ambiguity or help GHC inferring types.
+
+    -}
+  | SuggestAddTypeSignature
+    {-| Suggests to explicitly discard the result of a monadic action by binding the result to
+        the '_' wilcard.
+
+        Example:
+           main = do
+             _ <- getCurrentTime
+
+    -}
+  | SuggestBindToWildcard !(LHsExpr GhcTc)
+
+  | SuggestAddInlineOrNoInlinePragma !Var !Activation
+
+  | SuggestAddPhaseToCompetingRule !RuleName
 
 -- | An 'InstantiationSuggestion' for a '.hsig' file. This is generated
 -- by GHC in case of a 'DriverUnexpectedSignature' and suggests a way

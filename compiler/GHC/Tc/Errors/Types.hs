@@ -1,8 +1,10 @@
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE FlexibleContexts #-}
 module GHC.Tc.Errors.Types (
   -- * Main types
     TcRnMessage(..)
   , ErrInfo(..)
+  , LevityCheckProvenance(..)
   ) where
 
 import GHC.Hs
@@ -11,6 +13,7 @@ import GHC.Types.Name (Name)
 import GHC.Types.Name.Reader
 import GHC.Utils.Outputable
 import Data.Typeable
+import GHC.Core.Type (Type, Var)
 
 -- The majority of TcRn messages come with extra context about the error,
 -- and this newtype captures it.
@@ -22,6 +25,15 @@ data TcRnMessage where
       to provide custom diagnostic messages originated during typechecking/renaming.
   -}
   TcRnUnknownMessage :: (Diagnostic a, Typeable a) => a -> TcRnMessage
+
+  {-| A levity polymorphism check happening during TcRn.
+  -}
+  TcLevityPolyInType :: !Type
+                     -> !LevityCheckProvenance
+                     -> !ErrInfo -- Extra info accumulated in the TcM monad
+                     -> TcRnMessage
+
+
   {-| TcRnImplicitLift is a warning (controlled with -Wimplicit-lift) that occurs when
       a Template Haskell quote implicitly uses 'lift'.
 
@@ -76,3 +88,21 @@ data TcRnMessage where
      Test cases: rename/should_compile/T4489
   -}
   TcRnMissingImportList :: IE GhcPs -> TcRnMessage
+
+
+-- | Where the levity checking for the input type originated
+data LevityCheckProvenance
+  = LevityCheckInVarType
+  | LevityCheckInBinder !Var
+  | LevityCheckInWildcardPattern
+  | LevityCheckInUnboxedTuplePattern !(Pat GhcTc)
+  | LevityCheckPatSynSig
+  | LevityCheckCmdStmt
+  | LevityCheckMkCmdEnv !Var
+  | LevityCheckDoCmd !(HsCmd GhcTc)
+  | LevityCheckDesugaringCmd !(LHsCmd GhcTc)
+  | LevityCheckInCmd !(LHsCmd GhcTc)
+  | LevityCheckInFunUse !(LHsExpr GhcTc)
+  | LevityCheckInValidDataCon
+  | LevityCheckInValidClass
+
