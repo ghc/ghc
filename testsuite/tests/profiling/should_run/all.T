@@ -92,7 +92,8 @@ test('T949', [extra_ways(extra_prof_ways)], compile_and_run, [''])
 test('ioprof',
      [expect_broken_for_10037,
       exit_code(1),
-      omit_ways(['ghci-ext-prof']) # doesn't work with exit_code(1)
+      omit_ways(['ghci-ext-prof']), # doesn't work with exit_code(1)
+      ignore_stderr
      ],
      compile_and_run,
      ['-fno-full-laziness -fno-state-hack']) # Note [consistent stacks]
