@@ -1033,9 +1033,14 @@ cTupleArr = listArray (0,mAX_CTUPLE_SIZE) [mk_ctuple i | i <- [0..mAX_CTUPLE_SIZ
 -- constructor. @unboxedTupleSumKind [IntRep, LiftedRep] --> TYPE (TupleRep/SumRep
 -- [IntRep, LiftedRep])@
 unboxedTupleSumKind :: TyCon -> [Type] -> Kind
-unboxedTupleSumKind tc rr_tys
-  = tYPE $ mkTyConApp runtimeInfoDataConTyCon [(mkTyConApp tc [mkPromotedListTy runtimeRepTy rr_tys]), convEvalDataConTy]
+unboxedTupleSumKind tc ri_tys
+  = tYPE $ mkTyConApp runtimeInfoDataConTyCon [(mkTyConApp tc [mkPromotedListTy runtimeRepTy rr_tys ]), convEvalDataConTy]
+    where rr_tys = map getRep' ri_tys
 
+unboxedTupleSumKind tc []
+  = tYPE $ mkTyConApp runtimeInfoDataConTyCon [(mkTyConApp tc [mkPromotedListTy runtimeRepTy []]), convEvalDataConTy]
+
+      
 take2 :: [a] -> [(a,a)]
 take2 xs = case xs of
     (x:y:xs) -> (x,y) : take2 xs  
@@ -1044,23 +1049,10 @@ take2 xs = case xs of
 interleave (a1:a1s) (a2:a2s) = a1:a2:interleave a1s a2s
 interleave _ _ = []
 
-unboxedTupleSumKindRI :: TyCon -> [Type] -> Kind
-unboxedTupleSumKindRI tc ri_tys
-  -- = pprPanic "here" (ppr ty)
-   =  ty
-  where 
-    ty = tYPE $ mkTyConApp runtimeInfoDataConTyCon [(mkTyConApp tc [mkPromotedListTy runtimeRepTy rr_tys]), convEvalDataConTy]
-    rr_tys = map (\(r,c) -> r) (take2 ri_tys)
-
-unboxedTupleSumKindRI tc []
-  = tYPE $ mkTyConApp runtimeInfoDataConTyCon [(mkTyConApp tc [mkPromotedListTy runtimeRepTy []]), convEvalDataConTy]
-
 -- | Specialization of 'unboxedTupleSumKind' for tuples
 unboxedTupleKind :: [Type] -> Kind
 unboxedTupleKind = unboxedTupleSumKind tupleRepDataConTyCon
 
-unboxedTupleKindRI :: [Type] -> Kind
-unboxedTupleKindRI = unboxedTupleSumKindRI tupleRepDataConTyCon
 
 mk_tuple :: Boxity -> Int -> (TyCon,DataCon)
 mk_tuple Boxed arity = (tycon, tuple_con)
@@ -1093,17 +1085,17 @@ mk_tuple Unboxed arity = (tycon, tuple_con)
 
     -- See Note [Unboxed tuple RuntimeRep vars] in GHC.Core.TyCon
     -- Kind:  forall (k1:RuntimeRep) (k2:RuntimeRep). TYPE k1 -> TYPE k2 -> #
-    tc_binders = mkTemplateTyConBinders (take (arity * 2) $ cycle [runtimeRepTy, callingConvTy])
-                    (\ris -> map (\(r,c) -> tYPE $ rInfo r c) (take2 ris))
+    tc_binders = mkTemplateTyConBinders (replicate arity runtimeInfoTy)
+                    (\ris -> map tYPE ris)
 
-    tc_res_kind = unboxedTupleKindRI ri_tys
+    tc_res_kind = unboxedTupleKind ri_tys
 
 
-    tc_arity    = arity * 3
+    tc_arity    = arity * 2
     flavour     = UnboxedAlgTyCon $ Just (mkPrelTyConRepName tc_name)
 
     dc_tvs               = binderVars tc_binders
-    (ri_tys, dc_arg_tys) = splitAt (arity * 2) (mkTyVarTys dc_tvs)
+    (ri_tys, dc_arg_tys) = splitAt arity (mkTyVarTys dc_tvs)
     tuple_con            = pcDataCon dc_name dc_tvs dc_arg_tys tycon
 
     boxity  = Unboxed
@@ -1980,7 +1972,7 @@ mkTupleTy boxity  tys  = mkTupleTy1 boxity tys
 mkTupleTy1 :: Boxity -> [Type] -> Type
 mkTupleTy1 Boxed   tys  = mkTyConApp (tupleTyCon Boxed (length tys)) tys
 mkTupleTy1 Unboxed tys  = mkTyConApp (tupleTyCon Unboxed (length tys))
-                                         ((interleave (map getRuntimeRep tys)  (map getCallingConv tys)) ++ tys)
+                                         ((map getRuntimeInfo tys) ++ tys)
 
 -- | Build the type of a small tuple that holds the specified type of thing
 -- Flattens 1-tuples. See Note [One-tuples].
@@ -1999,7 +1991,7 @@ unitTy = mkTupleTy Boxed []
 
 mkSumTy :: [Type] -> Type
 mkSumTy tys = mkTyConApp (sumTyCon (length tys))
-                         ((interleave (map getRuntimeRep tys)  (map getCallingConv tys)) ++ tys)
+                         ((map getRuntimeInfo tys) ++ tys)
 
 -- Promoted Booleans
 

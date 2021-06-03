@@ -231,6 +231,7 @@ module GHC.Core.Type (
         tidyTyCoVarBinder, tidyTyCoVarBinders,
 
         -- * Kinds
+        getRep',
         isConstraintKindCon,
         classifiesTypeWithValues,
         isKindLevPoly
@@ -263,7 +264,7 @@ import {-# SOURCE #-} GHC.Builtin.Types
                                  , typeSymbolKind, liftedTypeKind
                                  , runtimeRepTy, callingConvTy
                                  , getRepTyCon, getConvTyCon
-                                 , constraintKind
+                                 , constraintKind, rInfo
                                  , unrestrictedFunTyCon
                                  , manyDataConTy, oneDataConTy )
 import GHC.Types.Name( Name )
@@ -292,6 +293,7 @@ import GHC.Types.Unique ( nonDetCmpUnique )
 import GHC.Data.Maybe   ( orElse, expectJust )
 import Data.Maybe       ( isJust )
 import Control.Monad    ( guard )
+
 
 -- $type_classification
 -- #type_classification#
@@ -403,19 +405,6 @@ tcView ty@(TyConApp tc tys) | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc 
                -- Its important to use mkAppTys, rather than (foldl AppTy),
                -- because the function part might well return a
                -- partially-applied type constructor; indeed, usually will!
-  | tc `hasKey` getRepTyConKey                      
-  = Just $ getRep ty
-  | tc `hasKey` getConvTyConKey                     
-  = Just $ getConv ty
-  where
-      getRep ty
-        | TyConApp getRepTyCon [rinfo] <-  ty
-        , TyConApp rinfo [rep, conv] <- rinfo = rep
-        | otherwise                           = ty
-      getConv ty
-        | TyConApp getConvTyCon [rinfo] <-  ty
-        , TyConApp rinfo [rep, conv] <- rinfo = conv
-        | otherwise                           = ty
             
 tcView _ = Nothing
 
@@ -438,19 +427,6 @@ coreView ty@(TyConApp tc tys)
   | isConstraintKindCon tc
   = ASSERT2( null tys, ppr ty )
     Just liftedTypeKind
-  | tc `hasKey` getRepTyConKey                      
-  = Just $ getRep ty
-  | tc `hasKey` getConvTyConKey                     
-  = Just $ getConv ty
-  where
-      getRep ty
-        | TyConApp getRepTyCon [rinfo] <-  ty
-        , TyConApp rinfo [rep, conv] <- rinfo = rep
-        | otherwise                           = ty
-      getConv ty
-        | TyConApp getConvTyCon [rinfo] <-  ty
-        , TyConApp rinfo [rep, conv] <- rinfo = conv
-        | otherwise                           = ty
 
 coreView _ = Nothing
 
@@ -460,7 +436,6 @@ coreFullView :: Type -> Type
 -- See Note [Inlining coreView].
 coreFullView ty@(TyConApp tc _)
   | isTypeSynonymTyCon tc || isConstraintKindCon tc 
-  || tc `hasKey` getRepTyConKey || tc `hasKey` getConvTyConKey  
   = go ty
   where
     go ty
@@ -608,17 +583,83 @@ kindInfo k = case kindInfo_maybe k of
 kindRep_maybe :: HasDebugCallStack => Kind -> Maybe Type
 kindRep_maybe kind
   | TyConApp tc [arg] <- coreFullView kind
-  , tc `hasKey` tYPETyConKey                = Just $ getRep arg
+  , tc `hasKey` tYPETyConKey                = Just $ getRep' arg
   | otherwise                               = Nothing
 
 -- | Given a type (RInfo rr cc) extracts its RuntimeRep
 -- classifier rr.
-getRep :: Type -> Type
-getRep rinfo 
-  | TyConApp rinfo [rep, _] <- coreFullView rinfo
-  , rinfo `hasKey` runtimeInfoDataConKey    = rep
-  | otherwise                               = mkTyConApp getRepTyCon [rinfo]
+getRep' :: Type -> Type
+getRep' rinfo 
+  | Just rep <- extractRep rinfo = rep
+  | otherwise                    = mkTyConApp getRepTyCon [rinfo]
 
+getRepField :: Type -> Type
+getRepField rinfo
+  | TyConApp tc [rep, _] <- rinfo
+  , tc `hasKey` runtimeInfoDataConKey
+  = rep
+  | otherwise 
+  = pprPanic "getRepField of non-RuntimeInfo" (ppr rinfo)
+
+simplifyInfo :: Type -> Maybe Type
+simplifyInfo rinfo
+  | Just rep <- extractRep rinfo
+  , Just conv <- extractConv rinfo
+  =  Just $ rInfo rep conv
+  | otherwise
+  = Just rinfo
+
+getRepArg_maybe :: Type -> Maybe Type
+getRepArg_maybe ty
+    | TyConApp tc [arg] <- ty
+    , tc `hasKey` getRepTyConKey
+    = Just arg
+    | otherwise
+    = Nothing
+
+simplifyRep :: Type -> Type
+simplifyRep rep
+    | rinfo <- getRepArg_maybe rep
+    , Just (TyConApp rinfo [rep', _]) <- rinfo
+    = rep'
+    | otherwise
+    = rep
+
+isGetRepTy :: Type -> Bool
+isGetRepTy ty
+    | TyConApp tc arg <- ty
+    , tc `hasKey` getRepTyConKey
+    = True    
+    | otherwise
+    = False
+
+
+simplifyKind :: Type -> Maybe Type
+simplifyKind kind
+  | Just rinfo <- kindInfo_maybe kind
+  , (TyConApp tr [arg]) <- getRepField rinfo
+  , tr `hasKey` tupleRepDataConKey
+  , TyConApp tl args <- arg
+  , Just conv <- extractConv rinfo
+  , containsGetRep args
+  -- = pprPanic "args" (ppr $ args)
+  -- = pprPanic "here" (ppr kind)
+  =  Just $ rInfo (tupleRep tr tl args) conv
+  | otherwise
+  = Nothing
+  where containsGetRep = (elem True) . (map isGetRepTy)
+        tupleList tl args = TyConApp tl (map simplifyRep args)
+        tupleRep tr tl args = TyConApp tr [tupleList tl args]
+
+
+extractRep :: Type -> Maybe Type
+extractRep rinfo
+  | TyConApp rinfo [rep, _] <- coreFullView rinfo
+  , rinfo `hasKey` runtimeInfoDataConKey       = Just rep
+  | TyConApp tc [arg] <- coreFullView rinfo
+  , tc `hasKey` getRepTyConKey
+  , TyConApp tc [rep,conv] <- coreFullView arg = Just rep
+  | otherwise                                  = Nothing
 
 kindConv_maybe :: HasDebugCallStack => Kind -> Maybe Type
 kindConv_maybe kind
@@ -630,18 +671,24 @@ kindConv_maybe kind
 -- classifier cc.
 getConv :: Type -> Type
 getConv rinfo 
+  | Just rep <- extractConv rinfo = rep
+  | otherwise                    = mkTyConApp getConvTyCon [rinfo]
+
+
+extractConv :: Type -> Maybe Type
+extractConv rinfo
   | TyConApp rinfo [_, conv] <- coreFullView rinfo
-  , rinfo `hasKey` runtimeInfoDataConKey    = conv
-  | otherwise                               = mkTyConApp getConvTyCon [rinfo]
+  , rinfo `hasKey` runtimeInfoDataConKey       = Just conv
+  | TyConApp tc [arg] <- coreFullView rinfo
+  , tc `hasKey` getConvTyConKey
+  , TyConApp tc [_,conv] <- coreFullView arg    = Just conv
+  | otherwise                                  = Nothing  
 
 kindInfo_maybe :: HasDebugCallStack => Kind -> Maybe Type
 kindInfo_maybe kind
   | TyConApp tc [arg] <- coreFullView kind
   , tc `hasKey` tYPETyConKey
-  , TyConApp rinfo [rep, conv] <- coreFullView arg
-  , rinfo `hasKey` runtimeInfoDataConKey    = Just arg
-  | TyConApp tc [arg] <- coreFullView kind
-  , tc `hasKey` tYPETyConKey                = Just arg
+                                            = Just arg
   | otherwise                               = Nothing
 
 -- | This version considers Constraint to be the same as *. Returns True
@@ -684,11 +731,14 @@ isLiftedRuntimeInfo :: Type -> Bool
 -- isLiftedRuntimeRep is true of LiftedRep :: RuntimeRep
 -- False of type variables (a :: RuntimeRep)
 --   and of other reps e.g. (IntRep :: RuntimeRep)
-isLiftedRuntimeInfo rep
-  | TyConApp rr_tc [rep,conv] <- coreFullView rep
-  , rr_tc `hasKey` runtimeInfoDataConKey = isLiftedRuntimeRep rep
-  | otherwise
-  = False
+isLiftedRuntimeInfo rinfo
+  | TyConApp rr_tc [rep,conv] <- coreFullView rinfo
+  , rr_tc `hasKey` runtimeInfoDataConKey
+  = isLiftedRuntimeRep rep
+  | Just rep <- extractRep rinfo
+  = isLiftedRuntimeRep rep
+  | otherwise                            
+  = False 
 
 -- | Returns True if the kind classifies unlifted types and False otherwise.
 -- Note that this returns False for levity-polymorphic kinds, which may
@@ -728,7 +778,8 @@ isUnliftedRuntimeInfo rep
 isRuntimeRepTy :: Type -> Bool
 isRuntimeRepTy ty
   | TyConApp tc args <- coreFullView ty
-  , tc `hasKey` runtimeRepTyConKey = ASSERT( null args ) True
+  , tc `hasKey` runtimeRepTyConKey 
+  , tc `hasKey` getRepTyConKey = ASSERT( null args ) True
 
   | otherwise = False
 
@@ -1049,11 +1100,10 @@ repSplitAppTy_maybe :: HasDebugCallStack => Type -> Maybe (Type,Type)
 -- ^ Does the AppTy split as in 'splitAppTy_maybe', but assumes that
 -- any Core view stuff is already done
 repSplitAppTy_maybe (FunTy _ w ty1 ty2)
-  = pprPanic "here" (ppr $ typeKind ty2)
-    -- Just (TyConApp funTyCon [w, rep1, rep2, ty1], ty2)
-  -- where
-  --   rep1 = getRuntimeInfo ty1
-  --   rep2 = getRuntimeInfo ty2
+  = Just (TyConApp funTyCon [w, rep1, rep2, ty1], ty2)
+  where
+    rep1 = getRuntimeInfo ty1
+    rep2 = getRuntimeInfo ty2
 
 repSplitAppTy_maybe (AppTy ty1 ty2)
   = Just (ty1, ty2)
@@ -1347,6 +1397,9 @@ piResultTys ty orig_args@(arg:args)
       = go (extendTCvSubst subst tv arg) res args
 
       | Just ty' <- coreView ty
+      = go subst ty' all_args
+
+      | Just ty' <- simplifyKind ty
       = go subst ty' all_args
 
       | not (isEmptyTCvSubst subst)  -- See Note [Care with kind instantiation]
@@ -3134,7 +3187,13 @@ isKindLevPoly k = ASSERT2( isLiftedTypeKind k || _is_type, ppr k )
     go ty | Just ty' <- coreView ty = go ty'
     go TyVarTy{}         = True
     go AppTy{}           = True  -- it can't be a TyConApp
-    go (TyConApp tc tys) = isFamilyTyCon tc || any go tys
+    go ty@(TyConApp tc tys)
+      | tc `hasKey` getRepTyConKey
+      , Just ty' <- extractRep ty
+      = go ty'
+      | otherwise
+      = isFamilyTyCon tc || any go tys
+    -- go (TyConApp tc tys) = isFamilyTyCon tc || any go tys
     go ForAllTy{}        = True
     go (FunTy _ w t1 t2) = go w || go t1 || go t2
     go LitTy{}           = False

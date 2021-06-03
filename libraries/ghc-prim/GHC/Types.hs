@@ -33,7 +33,7 @@ module GHC.Types (
         Symbol,
         Any,
         type (~~), Coercible,
-        TYPE, RuntimeRep(..), RuntimeInfo(..), Type, Constraint,
+        TYPE, RuntimeRep(..), RuntimeInfo, Type, Constraint,
           -- The historical type * should ideally be written as
           -- `type *`, without the parentheses. But that's a true
           -- pain to parse, and for little gain.
@@ -423,6 +423,7 @@ data RuntimeInfo = RInfo {rep :: RuntimeRep, conv :: CallingConv}
 --   MultMul x 'Many = 'Many
 
 type family GetRep (ri :: RuntimeInfo) :: RuntimeRep where
+  -- GetRep ('RInfo ('TupleRep '[GetRep a]) _) = 'TupleRep '[]
   GetRep ('RInfo rep _) = rep
 
 type family GetConv (ri :: RuntimeInfo) :: CallingConv where

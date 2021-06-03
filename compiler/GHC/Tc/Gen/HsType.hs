@@ -1331,12 +1331,11 @@ finish_tuple rn_ty tup_sort tau_tys tau_kinds exp_kind = do
       check_expected_kind (mkTyConApp tycon tau_tys) liftedTypeKind
     UnboxedTuple -> do
       let tycon    = tupleTyCon Unboxed arity
-          tau_reps = map kindRep tau_kinds
-          tau_ccs  = map kindConv tau_kinds
-          reps_ccs = interleave tau_reps tau_ccs
+          tau_infos = map kindInfo tau_kinds
+          
           -- See also Note [Unboxed tuple RuntimeRep vars] in GHC.Core.TyCon
-          arg_tys  = reps_ccs ++ tau_tys
-          res_kind = unboxedTupleKind tau_reps
+          arg_tys  = tau_infos ++ tau_tys
+          res_kind = unboxedTupleKind tau_infos
       checkTupSize arity
       check_expected_kind (mkTyConApp tycon arg_tys) res_kind
   where
