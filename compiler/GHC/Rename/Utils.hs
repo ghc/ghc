@@ -276,7 +276,7 @@ Note [No nested foralls or contexts in instance types] in GHC.Hs.Type).
 --
 -- * In GADT constructor types (in 'rnConDecl').
 --   See @Note [GADT abstract syntax] (Wrinkle: No nested foralls or contexts)@
---   in "GHC.Hs.Type".
+--   in "Language.Haskell.Syntax.Decls".
 --
 -- * In instance declaration types (in 'rnClsIntDecl' and 'rnSrcDerivDecl' in
 --   "GHC.Rename.Module" and 'renameSig' in "GHC.Rename.Bind").
