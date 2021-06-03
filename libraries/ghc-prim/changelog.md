@@ -20,6 +20,26 @@
   Note that the explicit type applications are required, as the call to
   `withDict` would be ambiguous otherwise.
 
+- `mkWeak#`, `mkWeakNoFinalizer#`, `touch#` and `keepAlive#` are now
+  levity-polymorphic instead of representation-polymorphic. For instance:
+
+  ```
+  mkWeakNoFinalizer#
+    :: forall {l :: Levity} (a :: TYPE (BoxedRep l)) (b :: Type)
+    .  a -> b -> State# RealWorld -> (# State# RealWorld, Weak# b #)
+  ```
+
+  That is, the type signature now quantifies over a variable of type `Levity`
+  instead of `RuntimeRep`. In addition, this variable is now inferred,
+  instead of specified, meaning that it is no longer eligible for visible type application.
+
+- The `RuntimeRep` parameter to `raise#` is now inferred:
+
+  ```
+  raise# :: forall (a :: Type) {r :: RuntimeRep} (b :: TYPE r). a -> b
+  ```
+
+
 ## 0.8.0 (edit as necessary)
 
 - Change array access primops to use type with size maxing the element size:

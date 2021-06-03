@@ -629,3 +629,5 @@ test('T19397E4', extra_files(['T19397S.hs']), multimod_compile_fail,
     ['T19397E4.hs', '-v0 -main-is foo'])
 test('T19415', normal, compile_fail, [''])
 test('T19615', normal, compile_fail, [''])
+test('T17817', normal, compile_fail, [''])
+test('T17817_elab', normal, compile_fail, ['-fprint-typechecker-elaboration'])

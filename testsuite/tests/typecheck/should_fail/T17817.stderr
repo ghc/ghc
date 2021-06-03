@@ -1,0 +1,13 @@
+
+T17817.hs:16:10: error:
+    Cannot use function with levity-polymorphic arguments:
+      mkWeak#
+        :: a
+           -> b
+           -> (State# RealWorld -> (# State# RealWorld, c #))
+           -> State# RealWorld
+           -> (# State# RealWorld, Weak# b #)
+    (Note that levity-polymorphic primops such as 'coerce' and unboxed tuples
+    are eta-expanded internally because they must occur fully saturated.
+    Use -fprint-typechecker-elaboration to display the full expression.)
+    Levity-polymorphic arguments: a :: TYPE ('BoxedRep l)
