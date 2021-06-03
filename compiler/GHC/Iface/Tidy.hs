@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveFunctor #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+{-# LANGUAGE NamedFieldPuns #-}
 
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
@@ -77,6 +78,9 @@ import GHC.Data.Maybe
 import Control.Monad
 import Data.Function
 import Data.List        ( sortBy, mapAccumL )
+import qualified Data.Set as S
+import GHC.Platform.Ways
+import GHC.Types.CostCentre
 
 {-
 Constructing the TypeEnv, Instances, Rules from which the
@@ -432,6 +436,13 @@ tidyProgram hsc_env  (ModGuts { mg_module           = mod
               --  (c) Constructors even if they are not exported (the
               --      tidied TypeEnv has trimmed these away)
               ; alg_tycons = filter isAlgTyCon tcs
+
+
+              ; local_ccs
+                  | WayProf `S.member` ways dflags
+                        = collectCostCentres mod all_tidy_binds tidy_rules
+                  | otherwise
+                        = S.empty
               }
 
         ; endPassIO hsc_env print_unqual CoreTidy all_tidy_binds tidy_rules
@@ -457,6 +468,7 @@ tidyProgram hsc_env  (ModGuts { mg_module           = mod
         ; return (CgGuts { cg_module   = mod,
                            cg_tycons   = alg_tycons,
                            cg_binds    = all_tidy_binds,
+                           cg_ccs      = S.toList local_ccs,
                            cg_foreign  = add_spt_init_code foreign_stubs,
                            cg_foreign_files = foreign_files,
                            cg_dep_pkgs = dep_direct_pkgs deps,
@@ -476,6 +488,53 @@ tidyProgram hsc_env  (ModGuts { mg_module           = mod
   where
     dflags = hsc_dflags hsc_env
     logger = hsc_logger hsc_env
+
+
+------------------------------------------------------------------------------
+-- Collecting cost centres
+-- ---------------------------------------------------------------------------
+
+-- | Collect cost centres defined in the current module, including those in
+-- unfoldings.
+collectCostCentres :: Module -> CoreProgram -> [CoreRule] -> S.Set CostCentre
+collectCostCentres mod_name binds rules
+  = foldl' go_bind (go_rules S.empty) binds
+  where
+    go cs e = case e of
+      Var{} -> cs
+      Lit{} -> cs
+      App e1 e2 -> go (go cs e1) e2
+      Lam _ e -> go cs e
+      Let b e -> go (go_bind cs b) e
+      Case scrt _ _ alts -> go_alts (go cs scrt) alts
+      Cast e _ -> go cs e
+      Tick (ProfNote cc _ _) e ->
+        go (if ccFromThisModule cc mod_name then S.insert cc cs else cs) e
+      Tick _ e -> go cs e
+      Type{} -> cs
+      Coercion{} -> cs
+
+    go_alts = foldl' (\cs (Alt _con _bndrs e) -> go cs e)
+
+    go_bind :: S.Set CostCentre -> CoreBind -> S.Set CostCentre
+    go_bind cs (NonRec b e) =
+      go (do_binder cs b) e
+    go_bind cs (Rec bs) =
+      foldl' (\cs' (b, e) -> go (do_binder cs' b) e) cs bs
+
+    do_binder cs b = maybe cs (go cs) (get_unf b)
+
+
+    -- Unfoldings may have cost centres that in the original definion are
+    -- optimized away, see #5889.
+    get_unf = maybeUnfoldingTemplate . realIdUnfolding
+
+    -- Have to look at the RHS of rules as well, as these may contain ticks which
+    -- don't appear anywhere else. See #19894
+    go_rules cs = foldl' go cs (mapMaybe get_rhs rules)
+
+    get_rhs Rule { ru_rhs } = Just ru_rhs
+    get_rhs BuiltinRule {} = Nothing
 
 --------------------------
 trimId :: Bool -> Id -> Id
