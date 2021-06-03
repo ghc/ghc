@@ -747,8 +747,8 @@ tcExprSig _ expr sig@(PartialSig { psig_name = name, sig_loc = loc })
                         = ApplyMR
                         | otherwise
                         = NoRestrictions
-       ; (qtvs, givens, ev_binds, _)
-                 <- simplifyInfer tclvl infer_mode [sig_inst] [(name, tau)] wanted
+       ; ((qtvs, givens, ev_binds, _), residual)
+           <- captureConstraints $ simplifyInfer tclvl infer_mode [sig_inst] [(name, tau)] wanted
 
        ; tau <- zonkTcType tau
        ; let inferred_theta = map evVarPred givens

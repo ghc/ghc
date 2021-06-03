@@ -1406,22 +1406,26 @@ decideMonoTyVars infer_mode name_taus psigs candidates
              constrained_tvs = filterVarSet (isQuantifiableTv tc_lvl) $
                                (oclose candidates (tyCoVarsOfTypes no_quant)
                                 `minusVarSet` mono_tvs2)
-                               `delVarSetList` psig_qtvs
+
              -- constrained_tvs: the tyvars that we are not going to
              -- quantify solely because of the monomorphism restriction
              --
              -- (`minusVarSet` mono_tvs2): a type variable is only
              --   "constrained" (so that the MR bites) if it is not
              --   free in the environment (#13785)
-             --
+
+             mono_tvs = (mono_tvs2 `unionVarSet` constrained_tvs)
+                          `delVarSetList` psig_qtvs
+
              -- (`delVarSetList` psig_qtvs): if the user has explicitly
              --   asked for quantification, then that request "wins"
-             --   over the MR.  Note: do /not/ delete psig_qtvs from
-             --   mono_tvs1, because mono_tvs1 cannot under any circumstances
-             --   be quantified (#14479); see
-             --   Note [Quantification and partial signatures], Wrinkle 3, 4
-
-             mono_tvs = mono_tvs2 `unionVarSet` constrained_tvs
+             --   over the MR.
+             --
+             -- Note: it is OK to delete psig_qtvs here:
+             --   problematic variables for quantification, as per
+             --     Note [Quantification and partial signatures], Wrinkle 3, 4
+             --   are handled in GHC.Tc.Gen.Bind.chooseInferredQuantifiers.
+             -- (Test case: T14479.)
 
            -- Warn about the monomorphism restriction
        ; when (case infer_mode of { ApplyMR -> True; _ -> False}) $

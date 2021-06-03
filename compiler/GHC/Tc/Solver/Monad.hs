@@ -169,8 +169,10 @@ import qualified GHC.Rename.Env as TcM
 import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
+import GHC.Utils.Constants ( debugIsOn )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Utils.Logger
 import GHC.Data.Bag as Bag
 import GHC.Types.Unique.Supply
@@ -180,7 +182,6 @@ import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Constraint
 import GHC.Core.Predicate
 
-import GHC.Types.Unique.Set
 import GHC.Core.TyCon.Env
 import GHC.Data.Maybe
 
@@ -196,6 +197,7 @@ import Control.Arrow ( first )
 
 #if defined(DEBUG)
 import GHC.Data.Graph.Directed
+import GHC.Types.Unique.Set (nonDetEltsUniqSet)
 #endif
 
 {-
@@ -777,12 +779,12 @@ addToEqualCtList ct old_eqs
         let shares_lhs (CEqCan { cc_lhs = TyVarLHS old_tv }) = tv == old_tv
             shares_lhs _other                                = False
         in
-        ASSERT( all shares_lhs old_eqs )
-        ASSERT( null ([ (ct1, ct2) | ct1 <- ct : old_eqs
+        assert (all shares_lhs old_eqs) $
+        assert (null ([ (ct1, ct2) | ct1 <- ct : old_eqs
                                    , ct2 <- ct : old_eqs
                                    , let { fr1 = ctFlavourRole ct1
                                          ; fr2 = ctFlavourRole ct2 }
-                                   , fr1 `eqCanRewriteFR` fr2 ]) )
+                                   , fr1 `eqCanRewriteFR` fr2 ])) $
         (ct : old_eqs)
 
       _ -> pprPanic "addToEqualCtList not CEqCan" (ppr ct)

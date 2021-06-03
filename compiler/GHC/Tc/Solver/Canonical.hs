@@ -2998,7 +2998,7 @@ rewriteEvidence _rewriters old_ev new_pred co
   = continueWith (old_ev { ctev_pred = new_pred })
 
 rewriteEvidence rewriters ev@(CtGiven { ctev_evar = old_evar, ctev_loc = loc }) new_pred co
-  = ASSERT( isEmptyRewriterSet rewriters )  -- this is a Given, not a wanted
+  = assert (isEmptyRewriterSet rewriters) $ -- this is a Given, not a wanted
     do { new_ev <- newGivenEvVar loc (new_pred, new_tm)
        ; continueWith new_ev }
   where

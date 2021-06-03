@@ -2712,8 +2712,10 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (item, (matches, unifiers, unsafe_ov
           = vcat [ ppWhen lead_with_ambig $
                      text "Probable fix: use a type annotation to specify what"
                      <+> pprQuotedList ambig_tvs <+> text "should be."
-                 , text "These potential instance" <> plural unifiers
-                   <+> text "exist:"]
+                 , case unifiers of
+                     [_] -> text "This potential instance exists:"
+                     _   -> text "These potential instances exist:"
+                 ]
 
         mb_patsyn_prov :: Maybe SDoc
         mb_patsyn_prov
