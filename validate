@@ -457,7 +457,21 @@ if [ "$use_hadrian" = "YES" ]; then
         grep '\<0 unexpected passes' testsuite_summary.txt >/dev/null 2>/dev/null &&
         grep '\<0 unexpected failures' testsuite_summary.txt >/dev/null 2>/dev/null; then
 
-        no_hadrian_test_failures=1
+        no_hadrian_stage_2_failures=1
+
+        if [ "$BINDIST" = "NO" ]; then
+            grep '\<0 caused framework failures' testsuite_summary_stage1.txt >/dev/null 2>/dev/null &&
+            grep '\<0 unexpected passes' testsuite_summary_stage1.txt >/dev/null 2>/dev/null &&
+            grep '\<0 unexpected failures' testsuite_summary_stage1.txt >/dev/null 2>/dev/null;
+
+                no_hadrian_stage_1_failures=1
+        fi
+
+        if [ "$BINDIST" = "NO" ]; then
+            no_hadrian_test_failures=$no_hadrian_stage_1_failures && $no_hadrian_stage_2_failures
+        else
+            no_hadrian_test_failures=$no_hadrian_stage_2_failures
+        fi
     fi
     if
         grep '\<0 unexpected stat failures' testsuite_summary.txt >/dev/null 2>/dev/null; then
