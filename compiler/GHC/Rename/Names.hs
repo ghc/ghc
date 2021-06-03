@@ -109,7 +109,7 @@ we must also check that these rules hold transitively for all dependent modules
 and packages. Doing this without caching any trust information would be very
 slow as we would need to touch all packages and interface files a module depends
 on. To avoid this we make use of the property that if a modules Safe Haskell
-mode changes, this triggers a recompilation from that module in the dependcy
+mode changes, this triggers a recompilation from that module in the dependecy
 graph. So we can just worry mostly about direct imports.
 
 There is one trust property that can change for a package though without
