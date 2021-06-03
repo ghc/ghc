@@ -34,6 +34,7 @@ import GHC.Types.Name.Reader
 import GHC.Types.SafeHaskell
 import GHC.Types.SourceFile ( HscSource(..), hscSourceToIsBoot )
 import GHC.Types.SrcLoc
+import GHC.Types.CostCentre
 
 
 -- | A ModGuts is carried through the compiler, accumulating stuff as it goes
@@ -131,6 +132,7 @@ data CgGuts
                 -- data constructor workers; reason: we regard them
                 -- as part of the code-gen of tycons
 
+        cg_ccs       :: [CostCentre], -- List of cost centres used in bindings and rules
         cg_foreign   :: !ForeignStubs,   -- ^ Foreign export stubs
         cg_foreign_files :: ![(ForeignSrcLang, FilePath)],
         cg_dep_pkgs  :: ![UnitId], -- ^ Dependent packages, used to

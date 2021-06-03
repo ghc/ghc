@@ -90,6 +90,7 @@ import GHC.Unit.Module.ModIface
 import Data.List (partition)
 import Data.IORef
 import GHC.Driver.Plugins ( LoadedPlugin(..) )
+import GHC.Driver.Ppr
 
 {-
 ************************************************************************
