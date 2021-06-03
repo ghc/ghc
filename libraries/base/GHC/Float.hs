@@ -303,11 +303,18 @@ instance Num Float where
 -- | Convert an Integer to a Float#
 integerToFloat# :: Integer -> Float#
 {-# NOINLINE integerToFloat# #-}
-integerToFloat# (IS i)   = int2Float# i
-integerToFloat# i@(IP _) = case integerToBinaryFloat' i of
-                             F# x -> x
-integerToFloat# (IN bn)  = case integerToBinaryFloat' (IP bn) of
-                             F# x -> negateFloat# x
+integerToFloat# (IS i)  = int2Float# i
+integerToFloat# (IP b)  = case bignatToBinaryFloat' b of
+                            F# x -> x
+integerToFloat# (IN b)  = case bignatToBinaryFloat' b of
+                            F# x -> negateFloat# x
+
+-- | Convert a Natural to a Float#
+naturalToFloat# :: Natural -> Float#
+{-# NOINLINE naturalToFloat# #-}
+naturalToFloat# (NS w) = word2Float# w
+naturalToFloat# (NB b) = case bignatToBinaryFloat' b of
+                           F# x -> x
 
 -- | @since 2.01
 instance  Real Float  where
@@ -342,8 +349,8 @@ rationalToFloat n 0
     | otherwise     = 1/0
 rationalToFloat n d
     | n == 0        = encodeFloat 0 0
-    | n < 0         = -(fromRat'' minEx mantDigs (-n) d)
-    | otherwise     = fromRat'' minEx mantDigs n d
+    | n < 0         = -(fromRat'' minEx mantDigs (integerToNatural (-n)) (integerToNatural d))
+    | otherwise     = fromRat'' minEx mantDigs (integerToNatural n) (integerToNatural d)
       where
         minEx       = FLT_MIN_EXP
         mantDigs    = FLT_MANT_DIG
@@ -524,11 +531,19 @@ instance  Num Double  where
 -- | Convert an Integer to a Double#
 integerToDouble# :: Integer -> Double#
 {-# NOINLINE integerToDouble# #-}
-integerToDouble# (IS i)   = int2Double# i
-integerToDouble# i@(IP _) = case integerToBinaryFloat' i of
-                              D# x -> x
-integerToDouble# (IN bn)  = case integerToBinaryFloat' (IP bn) of
-                              D# x -> negateDouble# x
+integerToDouble# (IS i) = int2Double# i
+integerToDouble# (IP b) = case bignatToBinaryFloat' b of
+                            D# x -> x
+integerToDouble# (IN b) = case bignatToBinaryFloat' b of
+                            D# x -> negateDouble# x
+
+-- | Encode a Natural (mantissa) into a Double#
+naturalToDouble# :: Natural -> Double#
+{-# NOINLINE naturalToDouble# #-}
+naturalToDouble# (NS w) = word2Double# w
+naturalToDouble# (NB b) = case bignatToBinaryFloat' b of
+                            D# x -> x
+
 
 -- | @since 2.01
 instance  Real Double  where
@@ -563,8 +578,8 @@ rationalToDouble n 0
     | otherwise     = 1/0
 rationalToDouble n d
     | n == 0        = encodeFloat 0 0
-    | n < 0         = -(fromRat'' minEx mantDigs (-n) d)
-    | otherwise     = fromRat'' minEx mantDigs n d
+    | n < 0         = -(fromRat'' minEx mantDigs (integerToNatural (-n)) (integerToNatural d))
+    | otherwise     = fromRat'' minEx mantDigs (integerToNatural n) (integerToNatural d)
       where
         minEx       = DBL_MIN_EXP
         mantDigs    = DBL_MANT_DIG
@@ -1021,26 +1036,26 @@ floatToDigits base x =
 -- Converting from an Integer to a RealFloat
 ------------------------------------------------------------------------
 
-{-# SPECIALISE integerToBinaryFloat' :: Integer -> Float,
-                                        Integer -> Double #-}
--- | Converts a positive integer to a floating-point value.
+{-# SPECIALISE bignatToBinaryFloat' :: BigNat# -> Float,
+                                       BigNat# -> Double #-}
+-- | Converts a positive natural to a floating-point value.
 --
 -- The value nearest to the argument will be returned.
 -- If there are two such values, the one with an even significand will
 -- be returned (i.e. IEEE roundTiesToEven).
 --
 -- The argument must be strictly positive, and @floatRadix (undefined :: a)@ must be 2.
-integerToBinaryFloat' :: RealFloat a => Integer -> a
-integerToBinaryFloat' n = result
+bignatToBinaryFloat' :: RealFloat a => BigNat# -> a
+bignatToBinaryFloat' n = result
   where
     mantDigs = floatDigits result
-    k = I# (word2Int# (integerLog2# n))
+    k = I# (word2Int# (bigNatLog2# n))
     result = if k < mantDigs then
-               encodeFloat n 0
+               encodeFloat (IP n) 0
              else
                let !e@(I# e#) = k - mantDigs + 1
-                   q = n `unsafeShiftR` e
-                   n' = case roundingMode# n (e# -# 1#) of
+                   q = (IP n) `unsafeShiftR` e
+                   n' = case roundingMode# (NB n) (e# -# 1#) of
                           0# -> q
                           1# -> if integerToInt q .&. 1 == 0 then
                                   q
@@ -1189,51 +1204,52 @@ Float or Double exploiting the known floatRadix and avoiding
 divisions as much as possible.
 -}
 
-{-# SPECIALISE fromRat'' :: Int -> Int -> Integer -> Integer -> Float,
-                            Int -> Int -> Integer -> Integer -> Double #-}
-fromRat'' :: RealFloat a => Int -> Int -> Integer -> Integer -> a
+{-# SPECIALISE fromRat'' :: Int -> Int -> Natural -> Natural -> Float,
+                            Int -> Int -> Natural -> Natural -> Double #-}
+fromRat'' :: RealFloat a => Int -> Int -> Natural -> Natural -> a
 -- Invariant: n and d strictly positive
 fromRat'' minEx@(I# me#) mantDigs@(I# md#) n d =
-    case integerIsPowerOf2# d of
+    let naturalEncodeFloat n' e = encodeFloat (integerFromNatural n') e
+    in case naturalIsPowerOf2# d of
       (# | ldw# #) ->
           let ld# = word2Int# ldw#
-          in case word2Int# (integerLog2# n) of
+          in case word2Int# (naturalLog2# n) of
             ln# | isTrue# (ln# >=# (ld# +# me# -# 1#)) ->
                   -- this means n/d >= 2^(minEx-1), i.e. we are guaranteed to get
                   -- a normalised number, round to mantDigs bits
                   if isTrue# (ln# <# md#)
-                    then encodeFloat n (I# (negateInt# ld#))
+                    then naturalEncodeFloat n (I# (negateInt# ld#))
                     else let n'  = n `shiftR` (I# (ln# +# 1# -# md#))
                              n'' = case roundingMode# n (ln# -# md#) of
                                     0# -> n'
                                     2# -> n' + 1
-                                    _  -> case fromInteger n' .&. (1 :: Int) of
+                                    _  -> case naturalToWord n' .&. 1 of
                                             0 -> n'
                                             _ -> n' + 1
-                         in encodeFloat n'' (I# (ln# -# ld# +# 1# -# md#))
+                         in naturalEncodeFloat n'' (I# (ln# -# ld# +# 1# -# md#))
                 | otherwise ->
                   -- n/d < 2^(minEx-1), a denorm or rounded to 2^(minEx-1)
                   -- the exponent for encoding is always minEx-mantDigs
                   -- so we must shift right by (minEx-mantDigs) - (-ld)
                   case ld# +# (me# -# md#) of
                     ld'# | isTrue# (ld'# <=# 0#) -> -- we would shift left, so we don't shift
-                           encodeFloat n (I# ((me# -# md#) -# ld'#))
+                           naturalEncodeFloat n (I# ((me# -# md#) -# ld'#))
                          | isTrue# (ld'# <=# ln#) ->
-                           let n' = n `shiftR` (I# ld'#)
+                           let n'  = n `shiftR` (I# ld'#)
                            in case roundingMode# n (ld'# -# 1#) of
-                                0# -> encodeFloat n' (minEx - mantDigs)
-                                1# -> if fromInteger n' .&. (1 :: Int) == 0
-                                        then encodeFloat n' (minEx-mantDigs)
-                                        else encodeFloat (n' + 1) (minEx-mantDigs)
-                                _  -> encodeFloat (n' + 1) (minEx-mantDigs)
+                                0# -> naturalEncodeFloat n' (minEx - mantDigs)
+                                1# -> if naturalToWord n' .&. 1 == 0
+                                        then naturalEncodeFloat n' (minEx-mantDigs)
+                                        else naturalEncodeFloat (n' + 1) (minEx-mantDigs)
+                                _  -> naturalEncodeFloat (n' + 1) (minEx-mantDigs)
                          | isTrue# (ld'# ># (ln# +# 1#)) -> encodeFloat 0 0 -- result of shift < 0.5
                          | otherwise ->  -- first bit of n shifted to 0.5 place
-                           case integerIsPowerOf2# n of
+                           case naturalIsPowerOf2# n of
                             (#       |  _ #) -> encodeFloat 0 0  -- round to even
                             (# (# #) |    #) -> encodeFloat 1 (minEx - mantDigs)
       (# (# #) | #) ->
-          let ln = I# (word2Int# (integerLog2# n))
-              ld = I# (word2Int# (integerLog2# d))
+          let ln = I# (word2Int# (naturalLog2# n))
+              ld = I# (word2Int# (naturalLog2# d))
               -- 2^(ln-ld-1) < n/d < 2^(ln-ld+1)
               p0 = max minEx (ln - ld)
               (n', d')
@@ -1251,10 +1267,10 @@ fromRat'' minEx@(I# me#) mantDigs@(I# md#) n d =
               rdq = case n'' `quotRem` d'' of
                      (q,r) -> case compare (r `shiftL` 1) d'' of
                                 LT -> q
-                                EQ -> if fromInteger q .&. (1 :: Int) == 0
+                                EQ -> if naturalToWord q .&. 1 == 0
                                         then q else q+1
                                 GT -> q+1
-          in  encodeFloat rdq p'
+          in  naturalEncodeFloat rdq p'
 
 -- Assumption: Integer and Int# are strictly positive, Int# is less
 -- than logBase 2 of Integer, otherwise havoc ensues.
@@ -1267,10 +1283,10 @@ fromRat'' minEx@(I# me#) mantDigs@(I# md#) n d =
 -- 0# means round down (towards zero)
 -- 1# means we have a half-integer, round to even
 -- 2# means round up (away from zero)
-roundingMode# :: Integer -> Int# -> Int#
-roundingMode# (IS i#) t =
+roundingMode# :: Natural -> Int# -> Int#
+roundingMode# (NS i#) t =
    let
-      k = int2Word# i# `and#` ((uncheckedShiftL# 2## t) `minusWord#` 1##)
+      k = i# `and#` ((uncheckedShiftL# 2## t) `minusWord#` 1##)
       c = uncheckedShiftL# 1## t
    in if isTrue# (c `gtWord#` k)
          then 0#
@@ -1278,8 +1294,7 @@ roundingMode# (IS i#) t =
                  then 2#
                  else 1#
 
-roundingMode# (IN bn) t = roundingMode# (IP bn) t -- dummy
-roundingMode# (IP bn) t =
+roundingMode# (NB bn) t =
    let
       j = word2Int# (int2Word# t `and#` MMASK##) -- index of relevant bit in word
       k = uncheckedIShiftRA# t WSHIFT#           -- index of relevant word
@@ -1421,10 +1436,6 @@ word2Float :: Word -> Float
 word2Float (W# w) = F# (word2Float# w)
 
 {-# RULES
-"fromIntegral/Int->Float"   fromIntegral = int2Float
-"fromIntegral/Int->Double"  fromIntegral = int2Double
-"fromIntegral/Word->Float"  fromIntegral = word2Float
-"fromIntegral/Word->Double" fromIntegral = word2Double
 "realToFrac/Float->Float"   realToFrac   = id :: Float -> Float
 "realToFrac/Float->Double"  realToFrac   = float2Double
 "realToFrac/Double->Float"  realToFrac   = double2Float
