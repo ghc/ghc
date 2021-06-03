@@ -26,12 +26,14 @@ validateBuilderArgs = builder (Make "testsuite/tests") ? do
     compiler            <- expr $ fullpath ghc
     checkPpr            <- expr $ fullpath checkPpr
     checkExact          <- expr $ fullpath checkExact
+    countDeps          <- expr $ fullpath countDeps
     args                <- expr $ userSetting defaultTestArgs
     return [ setTestSpeed $ testSpeed args
            , "THREADS=" ++ show threads
            , "TEST_HC=" ++ (top -/- compiler)
            , "CHECK_PPR=" ++ (top -/- checkPpr)
            , "CHECK_EXACT=" ++ (top -/- checkExact)
+           , "COUNT_DEPS=" ++ (top -/- countDeps)
            ]
   where
     fullpath :: Package -> Action FilePath
