@@ -30,24 +30,21 @@ import GHC.Data.Bag               ( Bag, bagToList )
 import GHC.Types.Basic
 import GHC.Data.BooleanFormula
 import GHC.Core.Class             ( className, classSCSelIds )
-import GHC.Core.Utils             ( exprType )
-import GHC.Core.ConLike           ( conLikeName, ConLike(RealDataCon) )
+import GHC.Core.ConLike           ( conLikeName )
 import GHC.Core.TyCon             ( TyCon, tyConClass_maybe )
 import GHC.Core.FVs
 import GHC.Core.DataCon           ( dataConNonlinearType )
 import GHC.Types.FieldLabel
 import GHC.Hs
-import GHC.Driver.Env
-import GHC.Utils.Monad            ( concatMapM, liftIO )
+import GHC.Hs.Syn.Type
+import GHC.Utils.Monad            ( concatMapM, MonadIO(liftIO) )
 import GHC.Types.Id               ( isDataConId_maybe )
 import GHC.Types.Name             ( Name, nameSrcSpan, nameUnique )
 import GHC.Types.Name.Env         ( NameEnv, emptyNameEnv, extendNameEnv, lookupNameEnv )
 import GHC.Types.SrcLoc
-import GHC.Tc.Utils.Zonk          ( hsLitType, hsPatType )
-import GHC.Core.Type              ( mkVisFunTys, Type )
+import GHC.Core.Type              ( Type )
 import GHC.Core.Predicate
 import GHC.Core.InstEnv
-import GHC.Builtin.Types          ( mkListTy, mkSumTy )
 import GHC.Tc.Types
 import GHC.Tc.Types.Evidence
 import GHC.Types.Var              ( Id, Var, EvId, varName, varType, varUnique )
@@ -72,14 +69,13 @@ import qualified Data.ByteString as BS
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Data                  ( Data, Typeable )
+import Data.Functor.Identity      ( Identity(..) )
 import Data.Void                  ( Void, absurd )
 import Control.Monad              ( forM_ )
 import Control.Monad.Trans.State.Strict
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Class  ( lift )
-import GHC.HsToCore.Types
-import GHC.HsToCore.Expr
-import GHC.HsToCore.Monad
+import Control.Applicative        ( (<|>) )
 
 {- Note [Updating HieAst for changes in the GHC AST]
 
@@ -277,16 +273,17 @@ modifyState = foldr go id
       = addSubstitution mono poly . f
     go _ f = f
 
-type HieM = ReaderT NodeOrigin (StateT HieState DsM)
+type HieM = ReaderT NodeOrigin (State HieState)
 
 -- | Construct an 'HieFile' from the outputs of the typechecker.
-mkHieFile :: ModSummary
+mkHieFile :: MonadIO m
+          => ModSummary
           -> TcGblEnv
-          -> RenamedSource -> Hsc HieFile
+          -> RenamedSource -> m HieFile
 mkHieFile ms ts rs = do
   let src_file = expectJust "mkHieFile" (ml_hs_file $ ms_location ms)
   src <- liftIO $ BS.readFile src_file
-  mkHieFileWithSource src_file src ms ts rs
+  pure $ mkHieFileWithSource src_file src ms ts rs
 
 -- | Construct an 'HieFile' from the outputs of the typechecker but don't
 -- read the source file again from disk.
@@ -294,16 +291,14 @@ mkHieFileWithSource :: FilePath
                     -> BS.ByteString
                     -> ModSummary
                     -> TcGblEnv
-                    -> RenamedSource -> Hsc HieFile
-mkHieFileWithSource src_file src ms ts rs = do
+                    -> RenamedSource -> HieFile
+mkHieFileWithSource src_file src ms ts rs =
   let tc_binds = tcg_binds ts
       top_ev_binds = tcg_ev_binds ts
       insts = tcg_insts ts
       tcs = tcg_tcs ts
-  hsc_env <- Hsc $ \e w -> return (e, w)
-  (_msgs, res) <- liftIO $ initDs hsc_env ts $ getCompressedAsts tc_binds rs top_ev_binds insts tcs
-  let (asts',arr) = expectJust "mkHieFileWithSource" res
-  return $ HieFile
+      (asts',arr) = getCompressedAsts tc_binds rs top_ev_binds insts tcs in
+  HieFile
       { hie_hs_file = src_file
       , hie_module = ms_mod ms
       , hie_types = arr
@@ -314,15 +309,15 @@ mkHieFileWithSource src_file src ms ts rs = do
       }
 
 getCompressedAsts :: TypecheckedSource -> RenamedSource -> Bag EvBind -> [ClsInst] -> [TyCon]
-  -> DsM (HieASTs TypeIndex, A.Array TypeIndex HieTypeFlat)
-getCompressedAsts ts rs top_ev_binds insts tcs = do
-  asts <- enrichHie ts rs top_ev_binds insts tcs
-  return $ compressTypes asts
+  -> (HieASTs TypeIndex, A.Array TypeIndex HieTypeFlat)
+getCompressedAsts ts rs top_ev_binds insts tcs =
+  let asts = enrichHie ts rs top_ev_binds insts tcs in
+  compressTypes asts
 
 enrichHie :: TypecheckedSource -> RenamedSource -> Bag EvBind -> [ClsInst] -> [TyCon]
-  -> DsM (HieASTs Type)
+  -> HieASTs Type
 enrichHie ts (hsGrp, imports, exports, _) ev_bs insts tcs =
-  flip evalStateT initState $ flip runReaderT SourceInfo $ do
+  runIdentity $ flip evalStateT initState $ flip runReaderT SourceInfo $ do
     tasts <- toHie $ fmap (BC RegularBind ModuleScope) ts
     rasts <- processGrp hsGrp
     imps <- toHie $ filter (not . ideclImplicit . unLoc) imports
@@ -713,70 +708,74 @@ instance HiePass p => HasType (LocatedA (Pat (GhcPass p))) where
 -- the expression. It is not yet possible to do this efficiently for all
 -- expression forms, so we skip filling in the type for those inputs.
 --
--- 'HsApp', for example, doesn't have any type information available directly on
--- the node. Our next recourse would be to desugar it into a 'CoreExpr' then
--- query the type of that. Yet both the desugaring call and the type query both
--- involve recursive calls to the function and argument! This is particularly
--- problematic when you realize that the HIE traversal will eventually visit
--- those nodes too and ask for their types again.
---
--- Since the above is quite costly, we just skip cases where computing the
--- expression's type is going to be expensive.
---
--- See #16233
+-- See Note [Computing the type of every node in the tree]
 instance HiePass p => HasType (LocatedA (HsExpr (GhcPass p))) where
-  getTypeNode e@(L spn e') =
+  getTypeNode (L spn e) =
     case hiePass @p of
-      HieRn -> makeNodeA e' spn
-      HieTc ->
-        -- Some expression forms have their type immediately available
-        let tyOpt = case e' of
-              HsUnboundVar (HER _ ty _) _ -> Just ty
-              HsLit _ l -> Just (hsLitType l)
-              HsOverLit _ o -> Just (overLitType o)
+      HieRn -> fallback
+      HieTc -> case computeType e of
+          Just ty -> makeTypeNodeA e spn ty
+          Nothing -> fallback
+    where
+      fallback :: HieM [HieAST Type]
+      fallback = makeNodeA e spn
 
-              XExpr (ConLikeTc (RealDataCon con) _ _) -> Just (dataConNonlinearType con)
+      -- | Skip computing the type of some expressions for performance reasons.
+      --
+      -- See impact on Haddock output (esp. missing type annotations or links)
+      -- before skipping more kinds of expressions. See impact on Haddock
+      -- performance before computing the types of more expressions.
+      --
+      -- See Note [Computing the type of every node in the tree]
+      computeType :: HsExpr GhcTc -> Maybe Type
+      computeType e = case e of
+        HsApp{} -> Nothing
+        HsAppType{} -> Nothing
+        NegApp{} -> Nothing
+        HsPar _ _ e _ -> computeLType e
+        ExplicitTuple{} -> Nothing
+        HsIf _ _ t f -> computeLType t <|> computeLType f
+        HsLet _ _ body -> computeLType body
+        RecordCon con_expr _ _ -> computeType con_expr
+        ExprWithTySig _ e _ -> computeLType e
+        HsStatic _ e -> computeLType e
+        HsTick _ _ e -> computeLType e
+        HsBinTick _ _ _ e -> computeLType e
+        HsPragE _ _ e -> computeLType e
+        XExpr (ExpansionExpr (HsExpanded _ e)) -> computeType e
+        e -> Just (hsExprType e)
 
-              HsLam     _ (MG { mg_ext = groupTy }) -> Just (matchGroupType groupTy)
-              HsLamCase _ (MG { mg_ext = groupTy }) -> Just (matchGroupType groupTy)
-              HsCase _  _ (MG { mg_ext = groupTy }) -> Just (mg_res_ty groupTy)
+      computeLType :: LHsExpr GhcTc -> Maybe Type
+      computeLType (L _ e) = computeType e
 
-              ExplicitList  ty _     -> Just (mkListTy ty)
-              ExplicitSum   ty _ _ _ -> Just (mkSumTy ty)
-              HsDo          ty _ _   -> Just ty
-              HsMultiIf     ty _     -> Just ty
+{- Note [Computing the type of every node in the tree]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In GHC.Iface.Ext.Ast we decorate every node in the AST with its
+type, computed by `hsExprType` applied to that node.  So it's
+important that `hsExprType` takes roughly constant time per node.
+There are three cases to consider:
 
-              _ -> Nothing
+1. For many nodes (e.g. HsVar, HsDo, HsCase) it is easy to get their
+   type -- e.g. it is stored in the node, or in sub-node thereof.
 
-        in
-        case tyOpt of
-          Just t -> makeTypeNodeA e' spn t
-          Nothing
-            | skipDesugaring e' -> fallback
-            | otherwise -> do
-                (e, no_errs) <- lift $ lift $ discardWarningsDs $ askNoErrsDs $ dsLExpr e
-                if no_errs
-                  then makeTypeNodeA e' spn . exprType $ e
-                  else fallback
-        where
-          fallback = makeNodeA e' spn
+2. For some nodes (e.g. HsPar, HsTick, HsIf) the type of the node is
+   the type of a child, so we can recurse, fast.  We don't expect the
+   nesting to be very deep, so while this is theoretically non-linear,
+   we don't expect it to be a problem in practice.
 
-          matchGroupType :: MatchGroupTc -> Type
-          matchGroupType (MatchGroupTc args res) = mkVisFunTys args res
+3. A very few nodes (e.g. HsApp) are more troublesome because we need to
+   take the type of a child, and then do some non-trivial processing.
+   To be conservative on computation, we decline to decorate these
+   nodes, using `fallback` instead.
 
-          -- | Skip desugaring of these expressions for performance reasons.
-          --
-          -- See impact on Haddock output (esp. missing type annotations or links)
-          -- before marking more things here as 'False'. See impact on Haddock
-          -- performance before marking more things as 'True'.
-          skipDesugaring :: HsExpr GhcTc -> Bool
-          skipDesugaring e = case e of
-            HsVar{}             -> False
-            HsRecSel{}          -> False
-            HsOverLabel{}       -> False
-            HsIPVar{}           -> False
-            XExpr (WrapExpr {}) -> False
-            _                   -> True
+The function `computeType e` returns `Just t` if we can find the type
+of `e` cheaply, and `Nothing` otherwise.  The base `Nothing` cases
+are the troublesome ones in (3) above. Hopefully we can ultimately
+get rid of them all.
+
+See #16233
+
+-}
 
 data HiePassEv p where
   HieRn :: HiePassEv 'Renamed
