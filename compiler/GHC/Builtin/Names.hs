@@ -437,6 +437,8 @@ basicKnownKeyNames
         -- Float/Double
         integerToFloatName,
         integerToDoubleName,
+        naturalToFloatName,
+        naturalToDoubleName,
         rationalToFloatName,
         rationalToDoubleName,
 
@@ -1367,9 +1369,13 @@ floatingClassName  = clsQual gHC_FLOAT (fsLit "Floating")  floatingClassKey
 realFloatClassName = clsQual gHC_FLOAT (fsLit "RealFloat") realFloatClassKey
 
 -- other GHC.Float functions
-integerToFloatName, integerToDoubleName, rationalToFloatName, rationalToDoubleName :: Name
+integerToFloatName, integerToDoubleName,
+  naturalToFloatName, naturalToDoubleName,
+  rationalToFloatName, rationalToDoubleName :: Name
 integerToFloatName   = varQual gHC_FLOAT (fsLit "integerToFloat#") integerToFloatIdKey
 integerToDoubleName  = varQual gHC_FLOAT (fsLit "integerToDouble#") integerToDoubleIdKey
+naturalToFloatName   = varQual gHC_FLOAT (fsLit "naturalToFloat#") naturalToFloatIdKey
+naturalToDoubleName  = varQual gHC_FLOAT (fsLit "naturalToDouble#") naturalToDoubleIdKey
 rationalToFloatName  = varQual gHC_FLOAT (fsLit "rationalToFloat") rationalToFloatIdKey
 rationalToDoubleName = varQual gHC_FLOAT (fsLit "rationalToDouble") rationalToDoubleIdKey
 
@@ -2387,13 +2393,15 @@ coercionTokenIdKey      = mkPreludeMiscIdUnique 124
 noinlineIdKey           = mkPreludeMiscIdUnique 125
 considerAccessibleIdKey = mkPreludeMiscIdUnique 126
 
-integerToFloatIdKey, integerToDoubleIdKey :: Unique
+integerToFloatIdKey, integerToDoubleIdKey, naturalToFloatIdKey, naturalToDoubleIdKey :: Unique
 integerToFloatIdKey    = mkPreludeMiscIdUnique 128
 integerToDoubleIdKey   = mkPreludeMiscIdUnique 129
+naturalToFloatIdKey    = mkPreludeMiscIdUnique 130
+naturalToDoubleIdKey   = mkPreludeMiscIdUnique 131
 
 rationalToFloatIdKey, rationalToDoubleIdKey :: Unique
-rationalToFloatIdKey   = mkPreludeMiscIdUnique 130
-rationalToDoubleIdKey  = mkPreludeMiscIdUnique 131
+rationalToFloatIdKey   = mkPreludeMiscIdUnique 132
+rationalToDoubleIdKey  = mkPreludeMiscIdUnique 133
 
 withDictKey :: Unique
 withDictKey                   = mkPreludeMiscIdUnique 156
