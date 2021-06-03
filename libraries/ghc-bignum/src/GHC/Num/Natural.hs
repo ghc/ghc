@@ -132,19 +132,10 @@ naturalEncodeDouble# (NS w) 0# = word2Double# w
 naturalEncodeDouble# (NS w) e  = wordEncodeDouble# w e
 naturalEncodeDouble# (NB b) e  = bigNatEncodeDouble# b e
 
--- | Encode a Natural (mantissa) into a Double#
-naturalToDouble# :: Natural -> Double#
-naturalToDouble# !n = naturalEncodeDouble# n 0#
-
--- | Encode a Natural (mantissa) into a Float#
-naturalToFloat# :: Natural -> Float#
-naturalToFloat# !i = naturalEncodeFloat# i 0#
-
 -- | Encode (# Natural mantissa, Int# exponent #) into a Float#
 --
 -- TODO: Not sure if it's worth to write 'Float' optimized versions here
 naturalEncodeFloat# :: Natural -> Int# -> Float#
-naturalEncodeFloat# !m 0# = double2Float# (naturalToDouble# m)
 naturalEncodeFloat# !m e  = double2Float# (naturalEncodeDouble# m e)
 
 -- | Equality test for Natural
