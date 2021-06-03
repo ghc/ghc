@@ -1873,8 +1873,17 @@ builtinBignumRules =
         integerISName integerToFloatName  (mkPrimOpId IntToFloatOp)
   , small_passthrough "Int# -> Integer -> Double#"
         integerISName integerToDoubleName (mkPrimOpId IntToDoubleOp)
+  , small_passthrough "Int# -> Integer -> Float#"
+        integerISName integerToFloatName  (mkPrimOpId IntToFloatOp)
+  , small_passthrough "Int# -> Integer -> Double#"
+        integerISName integerToDoubleName (mkPrimOpId IntToDoubleOp)
+
   , small_passthrough "Word# -> Natural -> Int#"
         naturalNSName naturalToWordName   (mkPrimOpId WordToIntOp)
+  , small_passthrough "Word# -> Natural -> Float#"
+        naturalNSName naturalToFloatName  (mkPrimOpId WordToFloatOp)
+  , small_passthrough "Word# -> Natural -> Double#"
+        naturalNSName naturalToDoubleName (mkPrimOpId WordToDoubleOp)
 
     -- Bits.bit
   , bignum_bit "integerBit" integerBitName mkLitInteger
