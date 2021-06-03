@@ -1565,6 +1565,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
                     -- From now on, we just use the bits we need.
                     cg_module   = this_mod,
                     cg_binds    = core_binds,
+                    cg_ccs      = local_ccs,
                     cg_tycons   = tycons,
                     cg_foreign  = foreign_stubs0,
                     cg_foreign_files = foreign_files,
@@ -1582,7 +1583,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
         -------------------
         -- PREPARE FOR CODE GENERATION
         -- Do saturation and convert to A-normal form
-        (prepd_binds, local_ccs) <- {-# SCC "CorePrep" #-}
+        (prepd_binds) <- {-# SCC "CorePrep" #-}
                        corePrepPgm hsc_env this_mod location
                                    core_binds data_tycons
 
@@ -1595,7 +1596,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
                    (myCoreToStg logger dflags (hsc_IC hsc_env) this_mod location prepd_binds)
 
         let cost_centre_info =
-              (S.toList local_ccs ++ caf_ccs, caf_cc_stacks)
+              (local_ccs ++ caf_ccs, caf_cc_stacks)
             platform = targetPlatform dflags
             prof_init
               | sccProfilingEnabled dflags = profilingInitCode platform this_mod cost_centre_info
@@ -1661,7 +1662,7 @@ hscInteractive hsc_env cgguts location = do
     -------------------
     -- PREPARE FOR CODE GENERATION
     -- Do saturation and convert to A-normal form
-    (prepd_binds, _) <- {-# SCC "CorePrep" #-}
+    prepd_binds <- {-# SCC "CorePrep" #-}
                    corePrepPgm hsc_env this_mod location core_binds data_tycons
 
     (stg_binds, _infotable_prov, _caf_ccs__caf_cc_stacks)
@@ -1978,7 +1979,7 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
 
     {- Prepare For Code Generation -}
     -- Do saturation and convert to A-normal form
-    (prepd_binds, _) <- {-# SCC "CorePrep" #-}
+    prepd_binds <- {-# SCC "CorePrep" #-}
       liftIO $ corePrepPgm hsc_env this_mod iNTERACTIVELoc core_binds data_tycons
 
     (stg_binds, _infotable_prov, _caf_ccs__caf_cc_stacks)

@@ -10,3 +10,4 @@ test('T12790', [only_ways(['normal']), req_profiling], compile, ['-O -prof'])
 test('T14931', [when(opsys('mingw32'), skip), only_ways(['normal']), req_profiling],
      makefile_test, ['T14931'])
 test('T15108', [only_ways(['normal']), req_profiling], compile, ['-O -prof -fprof-auto'])
+test('T19894', [only_ways(['normal']), req_profiling, extra_files(['T19894'])], multimod_compile, ['Main', '-v0 -O2 -prof -fprof-auto -iT19894'])

@@ -45,13 +45,13 @@ import GHC.Core.FVs       ( exprsSomeFreeVarsList )
 import GHC.Core.SimpleOpt ( simpleOptPgm, simpleOptExpr )
 import GHC.Core.Utils
 import GHC.Core.Unfold.Make
-import GHC.Core.Ppr
 import GHC.Core.Coercion
 import GHC.Core.DataCon ( dataConWrapId )
 import GHC.Core.Make
 import GHC.Core.Rules
 import GHC.Core.Opt.Monad ( CoreToDo(..) )
 import GHC.Core.Lint     ( endPassIO )
+import GHC.Core.Ppr
 
 import GHC.Builtin.Names
 import GHC.Builtin.Types.Prim
