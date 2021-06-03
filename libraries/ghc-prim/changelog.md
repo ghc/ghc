@@ -20,6 +20,23 @@
   Note that the explicit type applications are required, as the call to
   `withDict` would be ambiguous otherwise.
 
+- ``GHC.Exts.mkWeak#``, ``GHC.Exts.mkWeakNoFinalizer#``, ``GHC.Exts.touch#``
+  and ``GHC.Exts.keepAlive#`` are now levity-polymorphic instead of
+  representation-polymorphic. For instance: ::
+
+        mkWeakNoFinalizer#
+          :: forall {l :: Levity} (a :: TYPE (BoxedRep l)) (b :: Type)
+          .  a -> b -> State# RealWorld -> (# State# RealWorld, Weak# b #)
+
+  That is, the type signature now quantifies over a variable of type ``GHC.Exts.Levity``
+  intead of ``GHC.Exts.RuntimeRep``. In addition, this variable is now inferred,
+  instead of specified, meaning that it is no longer eligible for visible type application.
+
+- The ``GHC.Exts.RuntimeRep`` parameter to ``GHC.Exts.raise#`` is now inferred: ::
+
+        raise# :: forall (a :: Type) {r :: RuntimeRep} (b :: TYPE r). a -> b
+
+
 ## 0.8.0 (edit as necessary)
 
 - Change array access primops to use type with size maxing the element size:
