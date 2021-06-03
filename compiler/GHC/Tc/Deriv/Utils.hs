@@ -688,7 +688,7 @@ checkOriginativeSideConditions
 checkOriginativeSideConditions dflags deriv_ctxt cls cls_tys tc rep_tc
     -- First, check if stock deriving is possible...
   | Just cond <- stockSideConditions deriv_ctxt cls
-  = case (cond dflags tc rep_tc) of
+  = case cond dflags tc rep_tc of
         NotValid err -> StockClassError err  -- Class-specific error
         IsValid  | null (filterOutInvisibleTypes (classTyCon cls) cls_tys)
                    -- All stock derivable classes are unary in the sense that
