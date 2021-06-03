@@ -2,7 +2,7 @@
 
 CABAL="${CABAL:-cabal}"
 GHC="${GHC:-ghc}"
-CABFLAGS=("--with-compiler=$GHC" "--disable-documentation" "--disable-profiling" "--disable-library-profiling" $CABFLAGS)
+CABFLAGS=("--with-compiler=$GHC" "--disable-documentation" "--disable-profiling" "--disable-library-profiling" "-v2" $CABFLAGS)
 ( $GHC --info | grep -s '("Support SMP","YES")' > /dev/null ) || CABFLAGS+=("--constraint=hadrian -threaded")
 
 # It is currently more robust to pass Cabal an absolute path to the project file.
@@ -22,6 +22,8 @@ fi
 
 CABVERSTR=$("$CABAL" --numeric-version)
 CABVER=( ${CABVERSTR//./ } )
+
+ls ~/.cabal/
 
 if [ "${CABVER[0]}" -gt 2 -o "${CABVER[0]}" -eq 2 -a "${CABVER[1]}" -ge 2 ];
 then
