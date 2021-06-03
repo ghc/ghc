@@ -1,6 +1,5 @@
 module Settings.Flavours.Quick
    ( quickFlavour
-   , quickValidateFlavour
    , quickDebugFlavour
    )
 where
@@ -29,17 +28,10 @@ quickFlavour = defaultFlavour
 
 quickArgs :: Args
 quickArgs = sourceArgs SourceArgs
-    { hsDefault  = mconcat $
-        [ pure ["-O0", "-H64m"]
-        ]
+    { hsDefault  = mconcat [ pure ["-O0", "-H64m"] ]
     , hsLibrary  = notStage0 ? arg "-O"
-    , hsCompiler =    stage0 ? arg "-O2"
-    , hsGhc      =    stage0 ? arg "-O" }
-
-quickValidateFlavour :: Flavour
-quickValidateFlavour = werror $ quickFlavour
-    { name = "quick-validate"
-    }
+    , hsCompiler = stage0 ? arg "-O2"
+    , hsGhc      = stage0 ? arg "-O" }
 
 quickDebugFlavour :: Flavour
 quickDebugFlavour = quickFlavour

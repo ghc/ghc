@@ -205,8 +205,18 @@ else
     if [ $be_quiet -eq 0 ]; then
         hadrian="$hadrian -V"
     fi
+
     echo "Hadrian command: $hadrian"
 fi
+
+case $speed in
+SLOW)
+    flavour=slow-validate ;;
+NORMAL)
+    flavour=validate ;;
+FAST)
+    flavour=quick-validate ;;
+esac
 
 if [ $build_only -eq 1 ] ||
     { [ $build_only -eq 0 ] && [ $testsuite_only -eq 0 ]; }; then
@@ -249,14 +259,6 @@ if [ $build_only -eq 1 ] ||
 
         $make -j"$threads"
     else
-        case $speed in
-        SLOW)
-            flavour=slow-validate ;;
-        NORMAL)
-            flavour=validate ;;
-        FAST)
-            flavour=validate ;;
-        esac
         if [ $debugging -eq 1 ]; then
         hadrian="$hadrian --debug"
         fi
