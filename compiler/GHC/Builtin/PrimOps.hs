@@ -109,14 +109,14 @@ data PrimOpInfo
   = Compare     OccName         -- string :: T -> T -> Int#
                 Type
   | GenPrimOp   OccName         -- string :: \/a1..an . T1 -> .. -> Tk -> T
-                [TyVar]
+                [TyVarBinder]
                 [Type]
                 Type
 
 mkCompare :: FastString -> Type -> PrimOpInfo
 mkCompare str ty = Compare (mkVarOccFS str) ty
 
-mkGenPrimOp :: FastString -> [TyVar] -> [Type] -> Type -> PrimOpInfo
+mkGenPrimOp :: FastString -> [TyVarBinder] -> [Type] -> Type -> PrimOpInfo
 mkGenPrimOp str tvs tys ty = GenPrimOp (mkVarOccFS str) tvs tys ty
 
 {-
@@ -607,7 +607,7 @@ primOpType op
     Compare _occ ty -> compare_fun_ty ty
 
     GenPrimOp _occ tyvars arg_tys res_ty ->
-        mkSpecForAllTys tyvars (mkVisFunTysMany arg_tys res_ty)
+        mkForAllTys tyvars (mkVisFunTysMany arg_tys res_ty)
 
 primOpResultType :: PrimOp -> Type
 primOpResultType op
@@ -722,7 +722,7 @@ isComparisonPrimOp op = case primOpInfo op of
 -- (type variables, argument types, result type)
 -- It also gives arity, strictness info
 
-primOpSig :: PrimOp -> ([TyVar], [Type], Type, Arity, DmdSig)
+primOpSig :: PrimOp -> ([TyVarBinder], [Type], Type, Arity, DmdSig)
 primOpSig op
   = (tyvars, arg_tys, res_ty, arity, primOpStrictness op arity)
   where
