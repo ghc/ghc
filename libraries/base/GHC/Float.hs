@@ -309,6 +309,13 @@ integerToFloat# i@(IP _) = case integerToBinaryFloat' i of
 integerToFloat# (IN bn)  = case integerToBinaryFloat' (IP bn) of
                              F# x -> negateFloat# x
 
+-- | Convert a Natural to a Float#
+naturalToFloat# :: Natural -> Float#
+{-# NOINLINE naturalToFloat# #-}
+naturalToFloat# (NS w) = word2Float# w
+naturalToFloat# (NB b) = case integerToBinaryFloat' (IP b) of
+                           F# x -> x
+
 -- | @since 2.01
 instance  Real Float  where
     toRational (F# x#)  =
@@ -512,6 +519,14 @@ integerToDouble# i@(IP _) = case integerToBinaryFloat' i of
                               D# x -> x
 integerToDouble# (IN bn)  = case integerToBinaryFloat' (IP bn) of
                               D# x -> negateDouble# x
+
+-- | Encode a Natural (mantissa) into a Double#
+naturalToDouble# :: Natural -> Double#
+{-# NOINLINE naturalToDouble# #-}
+naturalToDouble# (NS w) = word2Double# w
+naturalToDouble# (NB b) = case integerToBinaryFloat' (IP b) of
+                            D# x -> x
+
 
 -- | @since 2.01
 instance  Real Double  where
