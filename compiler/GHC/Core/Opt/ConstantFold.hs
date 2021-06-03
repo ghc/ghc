@@ -1861,6 +1861,9 @@ builtinBignumRules =
   , id_passthrough "Word# -> Integer -> Word#"     integerToWordName   integerFromWordName
   , id_passthrough "Int64# -> Integer -> Int64#"   integerToInt64Name  integerFromInt64Name
   , id_passthrough "Word64# -> Integer -> Word64#" integerToWord64Name integerFromWord64Name
+  , id_passthrough "Natural -> Integer -> Natural (wrap)"  integerToNaturalName integerFromNaturalName
+  , id_passthrough "Natural -> Integer -> Natural (throw)" integerToNaturalThrowName integerFromNaturalName
+  , id_passthrough "Natural -> Integer -> Natural (clamp)" integerToNaturalClampName integerFromNaturalName
   , id_passthrough "Word# -> Natural -> Word#"     naturalToWordName   naturalNSName
 
     -- identity passthrough with a conversion that can be done directly instead
@@ -1870,8 +1873,17 @@ builtinBignumRules =
         integerISName integerToFloatName  (mkPrimOpId IntToFloatOp)
   , small_passthrough "Int# -> Integer -> Double#"
         integerISName integerToDoubleName (mkPrimOpId IntToDoubleOp)
+  , small_passthrough "Int# -> Integer -> Float#"
+        integerISName integerToFloatName  (mkPrimOpId IntToFloatOp)
+  , small_passthrough "Int# -> Integer -> Double#"
+        integerISName integerToDoubleName (mkPrimOpId IntToDoubleOp)
+
   , small_passthrough "Word# -> Natural -> Int#"
         naturalNSName naturalToWordName   (mkPrimOpId WordToIntOp)
+  , small_passthrough "Word# -> Natural -> Float#"
+        naturalNSName naturalToFloatName  (mkPrimOpId WordToFloatOp)
+  , small_passthrough "Word# -> Natural -> Double#"
+        naturalNSName naturalToDoubleName (mkPrimOpId WordToDoubleOp)
 
     -- Bits.bit
   , bignum_bit "integerBit" integerBitName mkLitInteger
