@@ -11,18 +11,35 @@ import Control.Monad
 import Control.Monad.IO.Class
 import System.Environment
 import System.Exit
-import GHC.Types.Unique.Set
 import GHC.Unit.Module.Deps
+import Data.Map.Strict qualified as Map
+
+dotSpec :: String -> Map.Map String [String] -> String
+dotSpec name g =
+ "digraph \"" ++ name ++ "\" {\n" ++
+    Map.foldlWithKey' f "" g ++ "}\n"
+  where
+    f acc k ns = acc ++ concat ["  " ++ show k ++ " -> " ++ show n ++ ";\n" | n <- ns]
 
 printDeps :: String -> IO ()
 printDeps modName = do
   [libdir] <- getArgs
-  modules <- calcDeps modName libdir
-  let num = sizeUniqSet modules
+  modGraph <-
+    Map.map (map moduleNameString) .
+      Map.mapKeys moduleNameString <$> calcDeps modName libdir
+  let modules = Map.keys modGraph
+      num = length modules
   putStrLn $ "Found " ++ show num ++ " " ++ modName ++ " module dependencies"
-  forM_ (map moduleNameString $ nonDetEltsUniqSet modules) putStrLn
+  forM_ modules putStrLn
+  -- Uncomment the next line to print a dependency graph in dot
+  -- format:
+  -- putStr $ dotSpec modName modGraph
+  -- Then,
+  -- * Copy the digraph output to a file ('deps.dot' say)
+  -- * To render it, use a command along the lines of
+  --   'tred deps.dot > deps-tred.dot && dot -Tpdf -o deps.pdf deps-tred.dot'
 
-calcDeps :: String -> FilePath -> IO (UniqSet ModuleName)
+calcDeps :: String -> FilePath -> IO (Map.Map ModuleName [ModuleName])
 calcDeps modName libdir =
   defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
     runGhc (Just libdir) $ do
@@ -31,19 +48,20 @@ calcDeps modName libdir =
         (df, _, _) <- parseDynamicFlags logger df [noLoc "-package=ghc"]
         setSessionDynFlags df
         env <- getSession
-        loop env emptyUniqSet [mkModuleName modName]
+        loop env Map.empty [mkModuleName modName]
   where
     -- Source imports are only guaranteed to show up in the 'mi_deps'
     -- of modules that import them directly and don’t propagate
     -- transitively so we loop.
-    loop :: HscEnv -> UniqSet ModuleName -> [ModuleName] -> Ghc (UniqSet ModuleName)
+    loop :: HscEnv -> Map.Map ModuleName [ModuleName] -> [ModuleName] -> Ghc (Map.Map ModuleName [ModuleName])
     loop env modules (m : ms) =
-      if m `elementOfUniqSet` modules
+      if m `Map.member` modules
         then loop env modules ms
         else do
-          modules <- return (addOneToUniqSet modules m)
           mi <- liftIO $ hscGetModuleInterface env (mkModule m)
-          loop env modules (ms ++ filter (not . (`elementOfUniqSet` modules)) (modDeps mi))
+          let deps = modDeps mi
+          modules <- return $ Map.insert m [] modules
+          loop env (Map.insert m deps modules) $ ms ++ filter (not . (`Map.member` modules)) deps
     loop _ modules [] = return modules
 
     mkModule :: ModuleName -> Module
