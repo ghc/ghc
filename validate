@@ -422,8 +422,19 @@ if [ $testsuite_only -eq 1 ] ||
             --summary=$basedir/testsuite_summary.txt \
             --summary-junit=$basedir/testsuite.xml"
         sh -c "$hadrian $hadrian_test_with_args \"$test_perf_args\""
-        # TODO: Run testsuite/tests/stage1 using the stage 1 compiler when
-        # BINDIST=NO.
+
+        # Use stage1 compiler when BINDIST=NO
+        if [ "$BINDIST" = "NO" ] && [ ! -d "bindisttest/install   dir" ]; then
+            hadrian_test_with_args_stage1="test --test-speed=$HADRIAN_TEST_SPEED \
+                --test-root-dirs=\"$basedir/testsuite/tests/stage1\" \
+                --test-compiler=\"$testghc\" \
+                --summary=$basedir/testsuite_summary_stage1.txt \
+                --summary-junit=$basedir/testsuite_stage1.xml"
+            sh -c "$hadrian $hadrian_test_with_args_stage1 \"$test_perf_args\""
+
+            echo '==== STAGE 1 TESTS (using Hadrian) ==== '
+            cat testsuite_summary_stage1.txt
+        fi
 
         echo '==== STAGE 2 TESTS (using Hadrian) ==== '
         cat testsuite_summary.txt
