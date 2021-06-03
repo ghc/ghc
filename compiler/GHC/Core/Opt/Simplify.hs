@@ -15,7 +15,7 @@ import GHC.Prelude
 import GHC.Platform
 import GHC.Driver.Session
 import GHC.Driver.Ppr
-import GHC.Driver.Config
+-- import GHC.Driver.Config
 import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Type hiding ( substTy, substTyVar, extendTvSubst, extendCvSubst )
 import GHC.Core.Opt.Simplify.Env
@@ -3512,10 +3512,12 @@ mkDupableAlt platform case_bndr jfloats (Alt con bndrs' rhs')
   = return (jfloats, Alt con bndrs' rhs')
 
   | otherwise
-  = do  { simpl_opts <- initSimpleOpts <$> getDynFlags
+  = do  { -- simpl_opts <- initSimpleOpts <$> getDynFlags
         ; let rhs_ty'  = exprType rhs'
-              scrut_ty = idType case_bndr
+--              scrut_ty = idType case_bndr
               case_bndr_w_unf
+                = case_bndr
+{-
                 = case con of
                       DEFAULT    -> case_bndr
                       DataAlt dc -> setIdUnfolding case_bndr unf
@@ -3529,6 +3531,7 @@ mkDupableAlt platform case_bndr jfloats (Alt con bndrs' rhs')
                                     case_bndr
                            -- The case binder is alive but trivial, so why has
                            -- it not been substituted away?
+-}
 
               final_bndrs'
                 | isDeadBinder case_bndr = filter abstract_over bndrs'
