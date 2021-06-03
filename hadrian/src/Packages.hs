@@ -2,7 +2,7 @@
 module Packages (
     -- * GHC packages
     array, base, binary, bytestring, cabal, checkPpr,
-    checkExact,
+    checkExact, countDeps,
     compareSizes, compiler, containers, deepseq, deriveConstants, directory,
     exceptions, filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh,
     ghcCompact, ghcHeap, ghci, ghciWrapper, ghcPkg, ghcPrim, haddock, haskeline,
@@ -32,7 +32,7 @@ import Oracles.Setting
 -- packages and modify build default build conditions in "UserSettings".
 ghcPackages :: [Package]
 ghcPackages =
-    [ array, base, binary, bytestring, cabal, checkPpr, checkExact
+    [ array, base, binary, bytestring, cabal, checkPpr, checkExact, countDeps
     , compareSizes, compiler, containers, deepseq, deriveConstants, directory
     , exceptions, filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh
     , ghcCompact, ghcHeap, ghci, ghciWrapper, ghcPkg, ghcPrim, haddock, haskeline, hsc2hs
@@ -53,6 +53,7 @@ bytestring          = lib  "bytestring"
 cabal               = lib  "Cabal"           `setPath` "libraries/Cabal/Cabal"
 checkPpr            = util "check-ppr"
 checkExact          = util "check-exact"
+countDeps           = util "count-deps"
 compareSizes        = util "compareSizes"    `setPath` "utils/compare_sizes"
 compiler            = top  "ghc"             `setPath` "compiler"
 containers          = lib  "containers"      `setPath` "libraries/containers/containers"

@@ -1,18 +1,28 @@
-module CountDeps (printDeps) where
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
+{-# LANGUAGE ImportQualifiedPost #-}
+
+module Main where
 
 import GHC.Driver.Env
 import GHC.Unit.Module
 import GHC.Driver.Session
 import GHC.Driver.Main
 import GHC
-import GHC.Utils.Misc
-import Data.Maybe
 import Control.Monad
 import Control.Monad.IO.Class
 import System.Environment
-import System.Exit
 import GHC.Unit.Module.Deps
 import Data.Map.Strict qualified as Map
+
+-- Example invocation:
+--  inplace/bin/count-deps `inplace/bin/ghc-stage2 --print-libdir` "GHC.Parser"
+main :: IO ()
+main = do
+  args <- getArgs
+  case args of
+    [libdir, modName, "--dot"] -> printDeps libdir modName True
+    [libdir, modName] -> printDeps libdir modName False
+    _ -> fail "usage: count-deps libdir module [--dot]"
 
 dotSpec :: String -> Map.Map String [String] -> String
 dotSpec name g =
@@ -21,23 +31,22 @@ dotSpec name g =
   where
     f acc k ns = acc ++ concat ["  " ++ show k ++ " -> " ++ show n ++ ";\n" | n <- ns]
 
-printDeps :: String -> IO ()
-printDeps modName = do
-  [libdir] <- getArgs
+printDeps :: String -> String -> Bool -> IO ()
+printDeps libdir modName dot = do
   modGraph <-
     Map.map (map moduleNameString) .
       Map.mapKeys moduleNameString <$> calcDeps modName libdir
-  let modules = Map.keys modGraph
-      num = length modules
-  putStrLn $ "Found " ++ show num ++ " " ++ modName ++ " module dependencies"
-  forM_ modules putStrLn
-  -- Uncomment the next line to print a dependency graph in dot
-  -- format:
-  -- putStr $ dotSpec modName modGraph
-  -- Then,
-  -- * Copy the digraph output to a file ('deps.dot' say)
-  -- * To render it, use a command along the lines of
-  --   'tred deps.dot > deps-tred.dot && dot -Tpdf -o deps.pdf deps-tred.dot'
+  if not dot then
+    do
+      let modules = Map.keys modGraph
+          num = length modules
+      putStrLn $ "Found " ++ show num ++ " " ++ modName ++ " module dependencies"
+      forM_ modules putStrLn
+  else
+    -- * Copy the digraph output to a file ('deps.dot' say)
+    -- * To render it, use a command along the lines of
+    --   'tred deps.dot > deps-tred.dot && dot -Tpdf -o deps.pdf deps-tred.dot'
+    putStr $ dotSpec modName modGraph
 
 calcDeps :: String -> FilePath -> IO (Map.Map ModuleName [ModuleName])
 calcDeps modName libdir =

@@ -14,14 +14,6 @@ test('NegativeZero', normal, compile_and_run, [''])
 test('HexFloatLiterals', normal, compile_and_run, [''])
 test('NumericUnderscores0', normal, compile_and_run, [''])
 test('NumericUnderscores1', normal, compile_and_run, [''])
-test('CountAstDeps',
-     [ extra_files(['CountDeps.hs']), only_ways(['normal']), extra_run_opts('"' + config.libdir + '"') ],
-     compile_and_run,
-     ['-package ghc'])
-test('CountParserDeps',
-     [ extra_files(['CountDeps.hs']), only_ways(['normal']), extra_run_opts('"' + config.libdir + '"') ],
-     compile_and_run,
-     ['-package ghc'])
 test('LexNegLit', normal, compile_and_run, [''])
 test('RecordDotSyntax1', normal, compile_and_run, [''])
 test('RecordDotSyntax2', normal, compile_and_run, [''])

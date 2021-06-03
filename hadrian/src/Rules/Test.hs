@@ -37,11 +37,17 @@ checkExactSourcePath = "utils/check-exact/Main.hs"
 checkExactExtra :: Maybe String
 checkExactExtra = Just "-iutils/check-exact"
 
+countDepsProgPath, countDepsSourcePath :: FilePath
+countDepsProgPath = "test/bin/count-deps" <.> exe
+countDepsSourcePath = "utils/count-deps/Main.hs"
+countDepsExtra :: Maybe String
+countDepsExtra = Just "-iutils/count-deps"
 
 checkPrograms :: [(FilePath, FilePath, Maybe String, Package)]
 checkPrograms =
     [ (checkPprProgPath, checkPprSourcePath, checkPprExtra, checkPpr)
     , (checkExactProgPath, checkExactSourcePath, checkExactExtra, checkExact)
+    , (countDepsProgPath, countDepsSourcePath, countDepsExtra, countDeps)
     ]
 
 ghcConfigPath :: FilePath
@@ -132,7 +138,9 @@ testRules = do
 
         pythonPath      <- builderPath Python
         need [ root -/- checkPprProgPath
-             , root -/- checkExactProgPath ]
+             , root -/- checkExactProgPath
+             , root -/- countDepsProgPath
+             ]
 
         -- Set environment variables for test's Makefile.
         -- TODO: Ideally we would define all those env vars in 'env', so that
@@ -149,6 +157,7 @@ testRules = do
             setEnv "TEST_HC_OPTS_INTERACTIVE" ghciFlags
             setEnv "CHECK_PPR" (top -/- root -/- checkPprProgPath)
             setEnv "CHECK_EXACT" (top -/- root -/- checkExactProgPath)
+            setEnv "COUNT_DEPS" (top -/- root -/- countDepsProgPath)
 
             -- This lets us bypass the need to generate a config
             -- through Make, which happens in testsuite/mk/boilerplate.mk
