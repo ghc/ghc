@@ -9,6 +9,7 @@ module GHC.Parser.Errors.Ppr where
 
 import GHC.Prelude
 import GHC.Driver.Flags
+import GHC.Driver.Session (supportedLanguagesAndExtensions)
 import GHC.Parser.Errors.Types
 import GHC.Parser.Types
 import GHC.Types.Basic
@@ -31,6 +32,9 @@ instance Diagnostic PsMessage where
   diagnosticMessage = \case
     PsUnknownMessage m
       -> diagnosticMessage m
+
+    PsHeaderMessage m
+      -> psHeaderMessageDiagnostic m
 
     PsWarnHaddockInvalidPos
        -> mkSimpleDecorated $ text "A Haddock comment cannot appear in this position and will be ignored."
@@ -528,6 +532,7 @@ instance Diagnostic PsMessage where
 
   diagnosticReason  = \case
     PsUnknownMessage m                            -> diagnosticReason m
+    PsHeaderMessage  _                            -> ErrorWithoutFlag
     PsWarnTab{}                                   -> WarningWithFlag Opt_WarnTabs
     PsWarnTransitionalLayout{}                    -> WarningWithFlag Opt_WarnAlternativeLayoutRuleTransitional
     PsWarnOperatorWhitespaceExtConflict{}         -> WarningWithFlag Opt_WarnOperatorWhitespaceExtConflict
@@ -638,6 +643,7 @@ instance Diagnostic PsMessage where
 
   diagnosticHints  = \case
     PsUnknownMessage m                            -> diagnosticHints m
+    PsHeaderMessage  m                            -> psHeaderMessageHints m
     PsWarnTab{}                                   -> [SuggestUseSpaces]
     PsWarnTransitionalLayout{}                    -> noHints
     PsWarnOperatorWhitespaceExtConflict{}         -> noHints
@@ -762,6 +768,41 @@ instance Diagnostic PsMessage where
     PsErrUnexpectedTypeInDecl{}                   -> noHints
     PsErrInvalidPackageName{}                     -> noHints
     PsErrIllegalGadtRecordMultiplicity{}          -> noHints
+
+psHeaderMessageDiagnostic :: PsHeaderMessage -> DecoratedSDoc
+psHeaderMessageDiagnostic = \case
+  PsErrParseLanguagePragma
+    -> mkSimpleDecorated $
+         vcat [ text "Cannot parse LANGUAGE pragma"
+              , text "Expecting comma-separated list of language options,"
+              , text "each starting with a capital letter"
+              , nest 2 (text "E.g. {-# LANGUAGE TemplateHaskell, GADTs #-}") ]
+  PsErrUnsupportedExt unsup _
+    -> mkSimpleDecorated $ text "Unsupported extension: " <> text unsup
+  PsErrParseOptionsPragma str
+    -> mkSimpleDecorated $
+         vcat [ text "Error while parsing OPTIONS_GHC pragma."
+              , text "Expecting whitespace-separated list of GHC options."
+              , text "  E.g. {-# OPTIONS_GHC -Wall -O2 #-}"
+              , text ("Input was: " ++ show str) ]
+
+psHeaderMessageHints :: PsHeaderMessage -> [GhcHint]
+psHeaderMessageHints = \case
+  PsErrParseLanguagePragma
+    -> noHints
+  PsErrUnsupportedExt unsup arch
+    -> if null suggestions
+          then noHints
+          -- FIXME(adn) To fix the compiler crash in #19923 we just rewrap this into an
+          -- UnknownHint, but we should have here a proper hint, but that would require
+          -- changing 'supportedExtensions' to emit a list of 'Extension'.
+          else [UnknownHint $ text "Perhaps you meant" <+> quotedListWithOr (map text suggestions)]
+       where
+         suggestions :: [String]
+         suggestions = fuzzyMatch unsup (supportedLanguagesAndExtensions arch)
+  PsErrParseOptionsPragma{}
+    -> noHints
+
 
 suggestParensAndBlockArgs :: [GhcHint]
 suggestParensAndBlockArgs =
