@@ -45,7 +45,6 @@ import GHC.Core.FVs       ( exprsSomeFreeVarsList )
 import GHC.Core.SimpleOpt ( simpleOptPgm, simpleOptExpr )
 import GHC.Core.Utils
 import GHC.Core.Unfold.Make
-import GHC.Core.Ppr
 import GHC.Core.Coercion
 import GHC.Core.DataCon ( dataConWrapId )
 import GHC.Core.Make
@@ -90,6 +89,7 @@ import GHC.Unit.Module.ModIface
 import Data.List (partition)
 import Data.IORef
 import GHC.Driver.Plugins ( LoadedPlugin(..) )
+import GHC.Driver.Ppr
 
 {-
 ************************************************************************
