@@ -410,7 +410,13 @@ if [ $testsuite_only -eq 1 ] ||
         echo '==== STAGE 2 TESTS ==== '
         cat "$basedir"/testsuite_summary.txt
     else
-        testghc=$ghc
+        # If the --fast flag is used, make the test ghc an in tree compiler
+        if  [ -d  "$basedir/bindisttest/install   dir"  ] && [ $BINDIST = "BINDIST=YES" ]; then
+            testghc="$basedir/bindisttest/install   dir/bin/ghc"
+        elif [ $BINDIST = "BINDIST=NO" ]; then
+            testghc="stage2"
+        fi
+
         hadrian_test_with_args="test --test-speed=$HADRIAN_TEST_SPEED \
             --test-compiler=\"$testghc\" \
             --summary=$basedir/testsuite_summary.txt \
