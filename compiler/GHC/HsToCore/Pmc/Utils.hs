@@ -30,10 +30,9 @@ import GHC.HsToCore.Monad
 
 tracePm :: String -> SDoc -> DsM ()
 tracePm herald doc = do
-  dflags <- getDynFlags
-  logger <- getLogger
+  logger  <- getLogger
   printer <- mkPrintUnqualifiedDs
-  liftIO $ dumpIfSet_dyn_printer printer logger dflags
+  liftIO $ putDumpFileMaybe' logger printer
             Opt_D_dump_ec_trace "" FormatText (text herald $$ (nest 2 doc))
 {-# INLINE tracePm #-}  -- see Note [INLINE conditional tracing utilities]
 

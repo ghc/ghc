@@ -19,7 +19,7 @@ module GHCi.UI.Monad (
         PromptFunction,
         BreakLocation(..),
         TickArray,
-        getDynFlags,
+        extractDynFlags, getDynFlags,
 
         runStmt, runDecls, runDecls', resume, recordBreak, revertCAFs,
         ActionStats(..), runAndPrintStats, runWithStats, printStats,
@@ -522,9 +522,8 @@ runInternal :: GhcMonad m => m a -> m a
 runInternal =
     withTempSession mkTempSession
   where
-    mkTempSession hsc_env = hsc_env
-      { hsc_dflags = (hsc_dflags hsc_env) {
-        -- Running GHCi's internal expression is incompatible with -XSafe.
+    mkTempSession = hscUpdateFlags (\dflags -> dflags
+      { -- Running GHCi's internal expression is incompatible with -XSafe.
           -- We temporarily disable any Safe Haskell settings while running
           -- GHCi internal expressions. (see #12509)
         safeHaskell = Sf_None,
@@ -539,7 +538,7 @@ runInternal =
           -- We heavily depend on -fimplicit-import-qualified to compile expr
           -- with fully qualified names without imports.
           `gopt_set` Opt_ImplicitImportQualified
-      }
+      )
 
 compileGHCiExpr :: GhcMonad m => String -> m ForeignHValue
 compileGHCiExpr expr = runInternal $ GHC.compileExprRemote expr

@@ -198,7 +198,7 @@ tcRnModule :: HscEnv
 tcRnModule hsc_env mod_sum save_rn_syntax
    parsedModule@HsParsedModule {hpm_module= L loc this_module}
  | RealSrcSpan real_loc _ <- loc
- = withTiming logger dflags
+ = withTiming logger
               (text "Renamer/typechecker"<+>brackets (ppr this_mod))
               (const ()) $
    initTc hsc_env hsc_src save_rn_syntax this_mod real_loc $
@@ -211,7 +211,6 @@ tcRnModule hsc_env mod_sum save_rn_syntax
 
   where
     hsc_src = ms_hsc_src mod_sum
-    dflags  = hsc_dflags hsc_env
     logger  = hsc_logger hsc_env
     home_unit = hsc_home_unit hsc_env
     err_msg = mkPlainErrorMsgEnvelope loc $
@@ -2914,11 +2913,11 @@ rnDump rn = dumpOptTcRn Opt_D_dump_rn "Renamer" FormatHaskell (ppr rn)
 
 tcDump :: TcGblEnv -> TcRn ()
 tcDump env
- = do { dflags <- getDynFlags ;
-        unit_state <- hsc_units <$> getTopEnv ;
+ = do { unit_state <- hsc_units <$> getTopEnv ;
+        logger <- getLogger ;
 
         -- Dump short output if -ddump-types or -ddump-tc
-        when (dopt Opt_D_dump_types dflags || dopt Opt_D_dump_tc dflags)
+        when (logHasDumpFlag logger Opt_D_dump_types || logHasDumpFlag logger Opt_D_dump_tc)
           (dumpTcRn True Opt_D_dump_types
             "" FormatText (pprWithUnitState unit_state short_dump)) ;
 
