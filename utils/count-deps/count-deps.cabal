@@ -1,0 +1,24 @@
+Name: count-deps
+Version: 0.1
+Copyright: XXX
+License: BSD3
+-- XXX License-File: LICENSE
+Author: XXX
+Maintainer: XXX
+Synopsis: A utilities for analyzing module dependencies
+Description:
+    This utility is used inspect the dependencies of a module
+    @utils/count-deps/README@ in GHC's source distribution for
+    details.
+Category: Development
+build-type: Simple
+cabal-version: >=1.10
+
+Executable count-deps
+    Default-Language: Haskell2010
+    Main-Is: Main.hs
+    Ghc-Options: -Wall
+    other-modules:
+    Build-Depends: base >= 4   && < 5,
+                   containers,
+                   ghc
