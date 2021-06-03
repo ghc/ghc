@@ -110,6 +110,7 @@ test('T5559', fragile(16350), compile_and_run, [''])
 test('T7275', normal, makefile_test, [])
 
 # Note [consistent stacks]
+# ~~~~~~~~~~~~~~~~~~~~~~~~
 #  Certain optimisations can change the stacks we get out of the
 #  profiler.  These flags are necessary (but perhaps not sufficient)
 #  to get consistent stacks:
