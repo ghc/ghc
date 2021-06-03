@@ -27,6 +27,7 @@ module GHC.Tc.Gen.Sig(
 import GHC.Prelude
 
 import GHC.Hs
+import GHC.Tc.Errors.Types ( LevityCheckProvenance(..) )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Types
 import GHC.Tc.Solver( pushLevelAndSolveEqualitiesX, reportUnsolvedEqualities )
@@ -445,7 +446,7 @@ tcPatSynSig name sig_ty@(L _ (HsSig{sig_bndrs = hs_outer_bndrs, sig_body = hs_ty
        -- arguments become the types of binders. We thus cannot allow
        -- levity polymorphism here
        ; let (arg_tys, _) = tcSplitFunTys body_ty
-       ; mapM_ (checkForLevPoly empty . scaledThing) arg_tys
+       ; mapM_ (checkForLevPoly LevityCheckPatSynSig . scaledThing) arg_tys
 
        ; traceTc "tcTySig }" $
          vcat [ text "kvs"          <+> ppr_tvs (binderVars kv_bndrs)
