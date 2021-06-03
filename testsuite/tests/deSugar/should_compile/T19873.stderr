@@ -1,0 +1,110 @@
+
+==================== Desugar (after optimization) ====================
+Result size of Desugar (after optimization)
+  = {terms: 37, types: 43, coercions: 0, joins: 0/0}
+
+Rec {
+-- RHS size: {terms: 15, types: 14, coercions: 0, joins: 0/0}
+h [InlPrag=INLINE (sat-args=1)] :: [Int] -> [Int]
+[LclIdX,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=False,boring_ok=False)
+         Tmpl= \ (x [Occ=Once1] :: [Int]) ->
+                 reverse
+                   @Int
+                   (reverse
+                      @Int
+                      (reverse
+                         @Int
+                         (reverse
+                            @Int
+                            (reverse
+                               @Int
+                               (reverse
+                                  @Int
+                                  (reverse
+                                     @Int
+                                     (reverse
+                                        @Int
+                                        (reverse
+                                           @Int
+                                           (reverse
+                                              @Int (reverse @Int (reverse @Int (f x))))))))))))}]
+h = \ (x :: [Int]) ->
+      reverse
+        @Int
+        (reverse
+           @Int
+           (reverse
+              @Int
+              (reverse
+                 @Int
+                 (reverse
+                    @Int
+                    (reverse
+                       @Int
+                       (reverse
+                          @Int
+                          (reverse
+                             @Int
+                             (reverse
+                                @Int (reverse @Int (reverse @Int (reverse @Int (f x))))))))))))
+
+-- RHS size: {terms: 15, types: 14, coercions: 0, joins: 0/0}
+g [InlPrag=INLINE (sat-args=1)] :: [Int] -> [Int]
+[LclIdX,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=False,boring_ok=False)
+         Tmpl= \ (x [Occ=Once1] :: [Int]) ->
+                 reverse
+                   @Int
+                   (reverse
+                      @Int
+                      (reverse
+                         @Int
+                         (reverse
+                            @Int
+                            (reverse
+                               @Int
+                               (reverse
+                                  @Int
+                                  (reverse
+                                     @Int
+                                     (reverse
+                                        @Int
+                                        (reverse
+                                           @Int
+                                           (reverse
+                                              @Int (reverse @Int (reverse @Int (h x))))))))))))}]
+g = \ (x :: [Int]) ->
+      reverse
+        @Int
+        (reverse
+           @Int
+           (reverse
+              @Int
+              (reverse
+                 @Int
+                 (reverse
+                    @Int
+                    (reverse
+                       @Int
+                       (reverse
+                          @Int
+                          (reverse
+                             @Int
+                             (reverse
+                                @Int (reverse @Int (reverse @Int (reverse @Int (h x))))))))))))
+
+-- RHS size: {terms: 4, types: 3, coercions: 0, joins: 0/0}
+f [Occ=LoopBreaker] :: [Int] -> [Int]
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 40 0}]
+f = \ (x :: [Int]) -> reverse @Int (g x)
+end Rec }
+
+
+
