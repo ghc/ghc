@@ -1,0 +1,29 @@
+README
+======
+
+The `count-deps` executable is used in the test-suite to detect when
+the number of dependencies of certain modules change (see [this blog
+post](https://blog.shaynefletcher.org/2020/10/ghc-lib-parser-module-count.html)
+for motivation).
+
+More generally it is useful for obtaining insight into a modules's
+dependency graph. As used in the tests it produces (1) a count of a
+module's dependencies together with the list of depended upon modules
+or. However it can also (2), print a modules' dependency graph in a
+fashion suitable for rendering with graphviz. See [the graphviz
+downloads page](https://graphviz.org/download/) for information on
+installing graphviz on your system.
+
+Usage examples:
+
+  (1) `inplace/bin/count-deps `inplace/bin/ghc-stage2 --print-libdir` "GHC.Parser"`
+  (2) `inplace/bin/count-deps `inplace/bin/ghc-stage2 --print-libdir` "GHC.Parser" --dot`
+
+To render a graph obtained using (2):
+
+  - Copy the output to a file ('deps.dot' say);
+  - Render the dot file ('deps.dot' from the preceding step) with a
+    command like
+   ```bash
+   tred deps.dot > deps-tred.dot && dot -Tpdf -o deps.pdf deps-tred.dot`
+   ```
