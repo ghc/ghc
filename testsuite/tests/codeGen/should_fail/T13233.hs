@@ -5,7 +5,7 @@
 {-# LANGUAGE MagicHash #-}
 module Bug where
 
-import GHC.Exts (TYPE, RuntimeRep, Weak#, State#, RealWorld, mkWeak# )
+import GHC.Exts ( TYPE, RuntimeRep )
 
 class Foo (a :: TYPE rep) where
   bar :: forall rep2 (b :: TYPE rep2). (a -> a -> b) -> a -> a -> b
@@ -20,8 +20,3 @@ obscure _ = ()
 
 quux :: ()
 quux = obscure (#,#)
-
-primop :: forall (rep :: RuntimeRep) (a :: TYPE rep) b c.
-          a -> b -> (State# RealWorld -> (# State# RealWorld, c #))
-       -> State# RealWorld -> (# State# RealWorld, Weak# b #)
-primop = mkWeak#
