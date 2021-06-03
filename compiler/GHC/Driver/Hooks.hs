@@ -135,14 +135,14 @@ data Hooks = Hooks
             -> TcM (LHsBinds GhcTc, [LForeignDecl GhcTc], Bag GlobalRdrElt)))
   , hscFrontendHook        :: !(Maybe (ModSummary -> Hsc FrontendResult))
   , hscCompileCoreExprHook ::
-               !(Maybe (HscEnv -> SrcSpan -> CoreExpr -> IO ForeignHValue))
+               !(Maybe (HscEnv -> (SrcSpan, Maybe ModuleNameWithIsBoot) -> CoreExpr -> IO ForeignHValue))
   , ghcPrimIfaceHook       :: !(Maybe ModIface)
   , runPhaseHook           :: !(Maybe (PhasePlus -> FilePath -> CompPipeline (PhasePlus, FilePath)))
   , runMetaHook            :: !(Maybe (MetaHook TcM))
   , linkHook               :: !(Maybe (GhcLink -> DynFlags -> Bool
                                          -> HomePackageTable -> IO SuccessFlag))
   , runRnSpliceHook        :: !(Maybe (HsSplice GhcRn -> RnM (HsSplice GhcRn)))
-  , getValueSafelyHook     :: !(Maybe (HscEnv -> Name -> Type
+  , getValueSafelyHook     :: !(Maybe (HscEnv -> Maybe ModuleNameWithIsBoot -> Name -> Type
                                                           -> IO (Maybe HValue)))
   , createIservProcessHook :: !(Maybe (CreateProcess -> IO ProcessHandle))
   , stgToCmmHook           :: !(Maybe (DynFlags -> Module -> InfoTableProvMap -> [TyCon] -> CollectedCCs
