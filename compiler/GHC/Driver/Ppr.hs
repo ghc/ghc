@@ -13,7 +13,6 @@ module GHC.Driver.Ppr
    -- ** Trace
    , warnPprTrace
    , pprTrace
-   , pprTraceWithFlags
    , pprTraceM
    , pprTraceDebug
    , pprTraceIt
@@ -79,13 +78,6 @@ pprDebugAndThen ctx cont heading pretty_msg
  = cont (showSDocDump ctx doc)
  where
      doc = sep [heading, nest 2 pretty_msg]
-
--- | If debug output is on, show some 'SDoc' on the screen
-pprTraceWithFlags :: DynFlags -> String -> SDoc -> a -> a
-pprTraceWithFlags dflags str doc x
-  | hasNoDebugOutput dflags = x
-  | otherwise               = pprDebugAndThen (initSDocContext dflags defaultDumpStyle)
-                                              trace (text str) doc x
 
 -- | If debug output is on, show some 'SDoc' on the screen
 pprTrace :: String -> SDoc -> a -> a

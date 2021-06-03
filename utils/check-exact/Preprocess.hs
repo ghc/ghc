@@ -18,7 +18,7 @@ import qualified GHC            as GHC hiding (parseModule)
 import qualified Control.Monad.IO.Class as GHC
 import qualified GHC.Data.FastString   as GHC
 import qualified GHC.Data.StringBuffer as GHC
-import qualified GHC.Driver.Config     as GHC
+import qualified GHC.Driver.Config.Parser as GHC
 import qualified GHC.Driver.Env        as GHC
 import qualified GHC.Driver.Errors.Types as GHC
 import qualified GHC.Driver.Phases     as GHC
@@ -209,8 +209,8 @@ getPreprocessedSrcDirectPrim :: (GHC.GhcMonad m)
                               -> m (String, GHC.StringBuffer, GHC.DynFlags)
 getPreprocessedSrcDirectPrim cppOptions src_fn = do
   hsc_env <- GHC.getSession
-  let dfs = GHC.hsc_dflags hsc_env
-      new_env = hsc_env { GHC.hsc_dflags = injectCppOptions cppOptions dfs }
+  let dflags = GHC.hsc_dflags hsc_env
+      new_env = GHC.hscSetFlags (injectCppOptions cppOptions dflags) hsc_env
   r <- GHC.liftIO $ GHC.preprocess new_env src_fn Nothing (Just (GHC.Cpp GHC.HsSrcFile))
   case r of
     Left err -> error $ showErrorMessages err
