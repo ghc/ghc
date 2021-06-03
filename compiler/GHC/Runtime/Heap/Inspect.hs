@@ -517,10 +517,7 @@ The function congruenceNewtypes takes a shot at (b)
 -}
 
 
--- A (non-mutable) tau type containing
--- existentially quantified tyvars.
---    (since GHC type language currently does not support
---     existentials, we leave these variables unquantified)
+-- See Note [RttiType]
 type RttiType = Type
 
 -- An incomplete type as stored in GHCi:
@@ -570,6 +567,37 @@ newVar kind = liftTcM (do { tv <- newAnonMetaTyVar RuntimeUnkTv kind
 newOpenVar :: TR TcType
 newOpenVar = liftTcM (do { kind <- newOpenTypeKind
                          ; newVar kind })
+
+{- Note [RttiType]
+~~~~~~~~~~~~~~~~~~
+The type synonym `type RttiType = Type` is the type synonym used
+by the debugger for the types of the data type `Term`.
+
+For a long time the `RttiType` carried the following comment:
+
+>     A (non-mutable) tau type containing
+>     existentially quantified tyvars.
+>          (since GHC type language currently does not support
+>          existentials, we leave these variables unquantified)
+
+The tau type part is only correct for terms representing the results
+of fully saturated functions that return non-function (data) values
+and not functions.
+
+For non-function values, the GHC runtime always works with concrete
+types eg `[Maybe Int]`, but never with polymorphic types like eg
+`(Traversable t, Monad m) => t (m a)`. The concrete types, don't
+need a quantification. They are always tau types.
+
+The debugger binds the terms of :print commands and of the free
+variables at a breakpoint to names. These newly bound names can
+be used in new GHCi expressions. If these names represent functions,
+then the type checker expects that the types of these functions are
+fully-fledged. They must contain the necessary `forall`s and type
+constraints. Hence the types of terms that represent functions must
+be sigmas and not taus.
+(See #12449)
+-}
 
 {- Note [RuntimeUnkTv]
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -700,11 +728,11 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
       else do
               (old_ty', rev_subst) <- instScheme quant_old_ty
               my_ty <- newOpenVar
-              when (check1 quant_old_ty) (traceTR (text "check1 passed") >>
+              when (check1 old_tvs) (traceTR (text "check1 passed") >>
                                           addConstraint my_ty old_ty')
               term  <- go max_depth my_ty old_ty hval
               new_ty <- zonkTcType (termType term)
-              if isMonomorphic new_ty || check2 (quantifyType new_ty) quant_old_ty
+              if isMonomorphic new_ty || check2 new_ty old_ty
                  then do
                       traceTR (text "check2 passed")
                       addConstraint new_ty old_ty'
@@ -974,14 +1002,14 @@ cvReconstructType hsc_env max_depth old_ty hval = runTR_maybe hsc_env $ do
         else do
           (old_ty', rev_subst) <- instScheme sigma_old_ty
           my_ty <- newOpenVar
-          when (check1 sigma_old_ty) (traceTR (text "check1 passed") >>
+          when (check1 old_tvs) (traceTR (text "check1 passed") >>
                                       addConstraint my_ty old_ty')
           search (isMonomorphic `fmap` zonkTcType my_ty)
                  (\(ty,a) -> go ty a)
                  (Seq.singleton (my_ty, hval))
                  max_depth
           new_ty <- zonkTcType my_ty
-          if isMonomorphic new_ty || check2 (quantifyType new_ty) sigma_old_ty
+          if isMonomorphic new_ty || check2 new_ty old_ty
             then do
                  traceTR (text "check2 passed" <+> ppr old_ty $$ ppr new_ty)
                  addConstraint my_ty old_ty'
@@ -1232,21 +1260,37 @@ If that is not the case, then we consider two conditions.
 
 -}
 
-check1 :: QuantifiedType -> Bool
-check1 (tvs, _) = not $ any isHigherKind (map tyVarKind tvs)
+check1 :: [TyVar] -> Bool
+check1 tvs = not $ any isHigherKind (map tyVarKind tvs)
  where
    isHigherKind = not . null . fst . splitPiTys
 
-check2 :: QuantifiedType -> QuantifiedType -> Bool
-check2 (_, rtti_ty) (_, old_ty)
-  | Just (_, rttis) <- tcSplitTyConApp_maybe rtti_ty
-  = case () of
-      _ | Just (_,olds) <- tcSplitTyConApp_maybe old_ty
-        -> and$ zipWith check2 (map quantifyType rttis) (map quantifyType olds)
-      _ | Just _ <- splitAppTy_maybe old_ty
-        -> isMonomorphicOnNonPhantomArgs rtti_ty
-      _ -> True
-  | otherwise = True
+check2 :: Type -> Type -> Bool
+check2 rtti_ty old_ty = check2' (tauPart rtti_ty) (tauPart old_ty)
+  -- The function `tcSplitTyConApp_maybe` doesn't split foralls or types
+  -- headed with (=>). Hence here we need only the tau part of a type.
+  -- See Note [Missing test case].
+  where
+    check2' rtti_ty old_ty
+      | Just (_, rttis) <- tcSplitTyConApp_maybe rtti_ty
+      = case () of
+          _ | Just (_,olds) <- tcSplitTyConApp_maybe old_ty
+            -> and$ zipWith check2 rttis olds
+          _ | Just _ <- splitAppTy_maybe old_ty
+            -> isMonomorphicOnNonPhantomArgs rtti_ty
+          _ -> True
+      | otherwise = True
+    tauPart ty = tau
+      where
+        (_, _, tau) = tcSplitNestedSigmaTys ty
+{-
+Note [Missing test case]
+~~~~~~~~~~~~~~~~~~~~~~~~
+Her we miss a test case. It should be a term, with a function `f`
+with a non-empty sigma part and an unsound type. The result of
+`check2 f` should be different if we omit or do the calls to `tauPart`.
+I (R.Senn) was unable to find such a term, and I'm in doubt, whether it exists.
+-}
 
 -- Dealing with newtypes
 --------------------------
