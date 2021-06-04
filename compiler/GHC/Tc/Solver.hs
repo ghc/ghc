@@ -65,8 +65,6 @@ import GHC.Types.Basic    ( IntWithInf, intGtLimit )
 import GHC.Types.Error
 import qualified GHC.LanguageExtensions as LangExt
 
-import GHC.Driver.Ppr
-
 import Control.Monad
 import Data.Foldable      ( toList )
 import Data.List          ( partition )
@@ -1014,8 +1012,6 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
                | definite_error = (emptyBag, wanted_transformed, mempty)
                | otherwise      = approximateWC False wanted_transformed
 
-       ; traceTc "RAE1" (ppr wanted_transformed $$ ppr definite_error $$ ppr quant_ct_candidates $$ ppr residual_wc)
-
        -- See Note [Simplifying the approximated WC]
        ; (quant_pred_candidates, final_residual_wc) <- case did_fds_combine of
            NoCombinationYet _ -> do { traceTc "skipping simplifying the approximated WC"
@@ -1085,7 +1081,6 @@ emitResidualConstraints rhs_tclvl ev_binds_var
 --      ; _ <- TcM.promoteTyVarSet (tyCoVarsOfCts outer_simple)
 
         ; let inner_wanted = wanteds { wc_simple = inner_simple }
-        ; traceTc "RAE2" (ppr inner_wanted)
         ; implics <- if isEmptyWC inner_wanted
                      then return emptyBag
                      else do implic1 <- newImplication
@@ -1098,8 +1093,7 @@ emitResidualConstraints rhs_tclvl ev_binds_var
                                                , ic_given_eqs = MaybeGivenEqs
                                                , ic_info      = skol_info }
 
-        ; emitConstraints (pprTraceIt "RAE3" $
-                           emptyWC { wc_simple = outer_simple
+        ; emitConstraints (emptyWC { wc_simple = outer_simple
                                    , wc_impl   = implics }) }
   where
     full_theta = map idType full_theta_vars
