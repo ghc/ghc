@@ -145,16 +145,21 @@ preprocess hsc_env input_fn mb_input_buf mb_phase =
   MC.handle handler $
   fmap Right $ do
   massertPpr (isJust mb_phase || isHaskellSrcFilename input_fn) (text input_fn)
-  (dflags, fp, mb_iface, mb_linkable) <- runPipeline anyHsc hsc_env (input_fn, mb_input_buf, fmap RealPhase mb_phase)
+  let pipe_env = mkPipeEnv anyHsc input_fn (Temporary TFL_GhcSession)
+      preprocess_pipeline = preprocessPipeline pipe_env hsc_env input_fn
+  (dflags, fp) <- runPipelineNew preprocess_pipeline
+
+
+  {-
+  runPipeline anyHsc hsc_env (input_fn, mb_input_buf, fmap RealPhase mb_phase)
         Nothing
         -- We keep the processed file for the whole session to save on
         -- duplicated work in ghci.
         (Temporary TFL_GhcSession)
         Nothing{-no ModLocation-}
         []{-no foreign objects-}
+        -}
   -- We stop before Hsc phase so we shouldn't generate an interface
-  massert (isNothing mb_iface)
-  massert (isNothing mb_linkable)
   return (dflags, fp)
   where
     srcspan = srcLocSpan $ mkSrcLoc (mkFastString input_fn) 1 1
@@ -666,136 +671,28 @@ doLink hsc_env stop_phase o_files
         LinkDynLib    -> linkDynLibCheck    logger tmpfs dflags unit_env o_files []
         other         -> panicBadLink other
 
+
+-- | Wrap up a pipeline with specific module scope
+mkPipeEnv :: Phase -- End phase
+          -> FilePath -- input fn
+          -> PipelineOutput -- Output
+          -> PipeEnv
+mkPipeEnv stop_phase  input_fn output =
+
+  let (basename, suffix) = splitExtension input_fn
+      suffix' = drop 1 suffix -- strip off the .
+      env = PipeEnv{ stop_phase,
+                     src_filename = undefined,
+                     src_basename = basename,
+                     src_suffix = suffix',
+                     output_spec = output }
+  in env
+
 runPipelineNew
-  :: Phase                      -- ^ When to stop
-  -> HscEnv                     -- ^ Compilation environment
-  -> TPipeline TPhase res
-  -> Maybe FilePath             -- ^ original basename (if different from ^^^)
-  -> PipelineOutput             -- ^ Output filename
+  :: TPipeline TPhase res
   -> IO res
                                 -- ^ (final flags, output filename, interface, linkable)
-runPipelineNew stop_phase hsc_env0 pipeline
-             mb_basename output
-
-    = do let
-             dflags0 = hsc_dflags hsc_env0
-
-             -- Decide where dump files should go based on the pipeline output
-             dflags = dflags0 { dumpPrefix = Just (basename ++ ".") }
-             hsc_env = hsc_env0 {hsc_dflags = dflags}
-             logger = hsc_logger hsc_env
-             tmpfs  = hsc_tmpfs  hsc_env
-
-             (input_basename, suffix) = splitExtension input_fn
-             suffix' = drop 1 suffix -- strip off the .
-             basename | Just b <- mb_basename = b
-                      | otherwise             = input_basename
-
-             -- If we were given a -x flag, then use that phase to start from
-             start_phase = fromMaybe (RealPhase (startPhase suffix')) mb_phase
-
-             isHaskell (RealPhase (Unlit _)) = True
-             isHaskell (RealPhase (Cpp   _)) = True
-             isHaskell (RealPhase (HsPp  _)) = True
-             isHaskell (RealPhase (Hsc   _)) = True
-             isHaskell (HscPostTc {})        = True
-             isHaskell (HscBackend {})       = True
-             isHaskell _                     = False
-
-             isHaskellishFile = isHaskell start_phase
-
-             env = PipeEnv{ stop_phase,
-                            src_filename = input_fn,
-                            src_basename = basename,
-                            src_suffix = suffix',
-                            output_spec = output }
-
-         when (isBackpackishSuffix suffix') $
-           throwGhcExceptionIO (UsageError
-                       ("use --backpack to process " ++ input_fn))
-
-         -- We want to catch cases of "you can't get there from here" before
-         -- we start the pipeline, because otherwise it will just run off the
-         -- end.
-         let happensBefore' = happensBefore (targetPlatform dflags)
-         case start_phase of
-             RealPhase start_phase' ->
-                 -- See Note [Partial ordering on phases]
-                 -- Not the same as: (stop_phase `happensBefore` start_phase')
-                 when (not (start_phase' `happensBefore'` stop_phase ||
-                            start_phase' `eqPhase` stop_phase)) $
-                       throwGhcExceptionIO (UsageError
-                                   ("cannot compile this file to desired target: "
-                                      ++ input_fn))
-             HscPostTc {} -> return ()
-             HscBackend {} -> return ()
-
-         -- Write input buffer to temp file if requested
-         input_fn' <- case (start_phase, mb_input_buf) of
-             (RealPhase real_start_phase, Just input_buf) -> do
-                 let suffix = phaseInputExt real_start_phase
-                 fn <- newTempName logger tmpfs dflags TFL_CurrentModule suffix
-                 hdl <- openBinaryFile fn WriteMode
-                 -- Add a LINE pragma so reported source locations will
-                 -- mention the real input file, not this temp file.
-                 hPutStrLn hdl $ "{-# LINE 1 \""++ input_fn ++ "\"#-}"
-                 hPutStringBuffer hdl input_buf
-                 hClose hdl
-                 return fn
-             (_, _) -> return input_fn
-
-         debugTraceMsg logger dflags 4 (text "Running the pipeline")
-         r <- runPipeline' start_phase hsc_env env input_fn'
-                           maybe_loc foreign_os
-
-         let dflags = hsc_dflags hsc_env
-         when isHaskellishFile $
-           dynamicTooState dflags >>= \case
-               DT_Dont   -> return ()
-               DT_Dyn    -> return ()
-               DT_OK     -> return ()
-               -- If we are compiling a Haskell module with -dynamic-too, we
-               -- first try the "fast path": that is we compile the non-dynamic
-               -- version and at the same time we check that interfaces depended
-               -- on exist both for the non-dynamic AND the dynamic way. We also
-               -- check that they have the same hash.
-               --    If they don't, dynamicTooState is set to DT_Failed.
-               --       See GHC.Iface.Load.checkBuildDynamicToo
-               --    If they do, in the end we produce both the non-dynamic and
-               --    dynamic outputs.
-               --
-               -- If this "fast path" failed, we execute the whole pipeline
-               -- again, this time for the dynamic way *only*. To do that we
-               -- just set the dynamicNow bit from the start to ensure that the
-               -- dynamic DynFlags fields are used and we disable -dynamic-too
-               -- (its state is already set to DT_Failed so it wouldn't do much
-               -- anyway).
-               DT_Failed
-                   -- NB: Currently disabled on Windows (ref #7134, #8228, and #5987)
-                   | OSMinGW32 <- platformOS (targetPlatform dflags) -> return ()
-                   | otherwise -> do
-                       debugTraceMsg logger dflags 4
-                           (text "Running the full pipeline again for -dynamic-too")
-                       let dflags0 = flip gopt_unset Opt_BuildDynamicToo
-                                      $ setDynamicNow
-                                      $ dflags
-                       hsc_env' <- newHscEnv dflags0
-                       (dbs,unit_state,home_unit,mconstants) <- initUnits logger dflags0 Nothing
-                       dflags1 <- updatePlatformConstants dflags0 mconstants
-                       unit_env0 <- initUnitEnv (ghcNameVersion dflags1) (targetPlatform dflags1)
-                       let unit_env = unit_env0
-                             { ue_home_unit = Just home_unit
-                             , ue_units     = unit_state
-                             , ue_unit_dbs  = Just dbs
-                             }
-                       let hsc_env'' = hsc_env'
-                            { hsc_dflags   = dflags1
-                            , hsc_unit_env = unit_env
-                            }
-                       _ <- runPipeline' start_phase hsc_env'' env input_fn'
-                                         maybe_loc foreign_os
-                       return ()
-         return r
+runPipelineNew pipeline = runTPipeline runPhaseNew pipeline
 
 -- ---------------------------------------------------------------------------
 
@@ -1081,15 +978,17 @@ phaseOutputFilename next_phase = do
   liftIO $ getOutputFilename logger tmpfs stop_phase output_spec
                              src_basename dflags next_phase maybe_loc
 
-phaseOutputFilenameNew :: Phase -> HscEnv -> Maybe ModLocation -> P FilePath
-phaseOutputFilenameNew next_phase hsc_env maybe_loc = do
-  PipeEnv{stop_phase, src_basename, output_spec} <- ask
+phaseOutputFilenameNew :: Phase -> PipeEnv -> HscEnv -> Maybe ModLocation -> IO FilePath
+phaseOutputFilenameNew next_phase pipe_env hsc_env maybe_loc = do
+  let PipeEnv{stop_phase, src_basename, output_spec} = pipe_env
   --PipeState{maybe_loc,hsc_env} <- getPipeState
   let dflags = hsc_dflags hsc_env
       logger = hsc_logger hsc_env
       tmpfs = hsc_tmpfs hsc_env
-  liftIO $ getOutputFilename logger tmpfs stop_phase output_spec
-                             src_basename dflags next_phase maybe_loc
+      --next_phase = nextPhase (targetPlatform dflags) cur_phase
+  getOutputFilename logger tmpfs stop_phase output_spec
+                    src_basename dflags next_phase maybe_loc
+
 
 -- | Computes the next output filename for something in the compilation
 -- pipeline.  This is controlled by several variables:
@@ -1221,17 +1120,24 @@ llvmOptions dflags =
 
 type P = ReaderT PipeEnv IO
 
-runPhaseNew :: TPhase out -> P out
-runPhaseNew (T_Unlit hsc_env inp_path) = do
-  out_path <- phaseOutputFilenameNew (Unlit HsSrcFile) hsc_env Nothing
+data TPhase res where
+  T_Unlit :: PipeEnv -> HscEnv -> FilePath -> TPhase FilePath
+  T_FileArgs :: HscEnv -> FilePath -> TPhase (DynFlags, [Warn])
+  T_Cpp   :: PipeEnv -> HscEnv -> FilePath -> TPhase FilePath
+  T_HsPp  :: PipeEnv -> HscEnv -> FilePath -> FilePath -> TPhase FilePath
+  T_IO :: IO a -> TPhase a
+
+runPhaseNew :: TPhase out -> IO out
+runPhaseNew (T_Unlit pipe_env hsc_env inp_path) = do
+  out_path <- phaseOutputFilenameNew (Cpp HsSrcFile) pipe_env hsc_env Nothing
   liftIO $ runUnlitPhase hsc_env inp_path out_path
 runPhaseNew (T_FileArgs hsc_env inp_path) =
   liftIO $ getFileArgs hsc_env inp_path
-runPhaseNew (T_Cpp hsc_env inp_path) = do
-  out_path <- phaseOutputFilenameNew (Cpp HsSrcFile) hsc_env Nothing
+runPhaseNew (T_Cpp pipe_env hsc_env inp_path) = do
+  out_path <- phaseOutputFilenameNew (HsPp HsSrcFile) pipe_env hsc_env Nothing
   liftIO $ runCppPhase hsc_env inp_path out_path
-runPhaseNew (T_HsPp hsc_env origin_path inp_path) = do
-  out_path <- phaseOutputFilenameNew (HsPp HsSrcFile) hsc_env Nothing
+runPhaseNew (T_HsPp pipe_env hsc_env origin_path inp_path) = do
+  out_path <- phaseOutputFilenameNew (Hsc HsSrcFile) pipe_env hsc_env Nothing
   liftIO $ runHsPpPhase hsc_env origin_path inp_path out_path
 runPhaseNew (T_IO io_action) = liftIO io_action
 
@@ -1300,35 +1206,69 @@ runHsPpPhase hsc_env orig_fn input_fn output_fn = do
       ] )
     return output_fn
 
-preprocessPipeline :: HscEnv -> FilePath -> TPipeline TPhase FilePath
-preprocessPipeline hsc_env input_fn = do
-  unlit_fn <- use (T_Unlit hsc_env input_fn)
-  (dflags1, warns) <- use (T_FileArgs hsc_env unlit_fn)
+
+phaseIfFlag :: HscEnv
+            -> (DynFlags -> Bool)
+            -> a
+            -> TPipeline TPhase a
+            -> TPipeline TPhase a
+phaseIfFlag hsc_env flag def action =
+  if flag (hsc_dflags hsc_env)
+    then action
+    else return def
+
+-- | Check if the start is *before* the current phase, otherwise skip with a default
+phaseIfAfter :: Platform -> Phase -> Phase -> a -> TPipeline TPhase a -> TPipeline TPhase a
+phaseIfAfter platform start_phase cur_phase def action =
+  if start_phase `eqPhase` cur_phase
+         || happensBefore platform start_phase cur_phase
+
+    then action
+    else return def
+
+preprocessPipeline :: PipeEnv -> HscEnv -> FilePath -> TPipeline TPhase (DynFlags, FilePath)
+preprocessPipeline pipe_env hsc_env input_fn = do
+  unlit_fn <-
+    runAfter (Unlit HsSrcFile) input_fn $ do
+      use (T_Unlit pipe_env hsc_env input_fn)
+
+
+  (dflags1, _) <- use (T_FileArgs hsc_env unlit_fn)
   let hsc_env1 = hsc_env { hsc_dflags = dflags1 }
 
-  (cpp_fn, dflags2, warns2)
-    <- if xopt LangExt.Cpp dflags1
-        then do
-          cpp_fn <- use (T_Cpp hsc_env1 unlit_fn)
-          (dflags2, warns2) <- use (T_FileArgs hsc_env cpp_fn)
-          return (cpp_fn, dflags2, warns2)
-        else
-          return (unlit_fn, dflags1, warns)
+  (cpp_fn, hsc_env2)
+    <- runAfterFlag hsc_env1 (Cpp HsSrcFile) (xopt LangExt.Cpp) (unlit_fn, hsc_env1) $ do
+          cpp_fn <- use (T_Cpp pipe_env hsc_env1 unlit_fn)
+          (dflags2, _) <- use (T_FileArgs hsc_env1 cpp_fn)
+          let hsc_env2 = hsc_env1 { hsc_dflags = dflags2 }
+          return (cpp_fn, hsc_env2)
 
-  let hsc_env2 = hsc_env { hsc_dflags = dflags2 }
 
-  (pp_fn, dflags3, warns3)
-    <- if gopt Opt_Pp dflags2
-        then do
-          cpp_fn <- use (T_HsPp hsc_env2 input_fn cpp_fn)
-          (dflags2, warns2) <- use (T_FileArgs hsc_env2 cpp_fn)
-          return (cpp_fn, dflags2, warns2)
-        else
-          return (unlit_fn, dflags1, warns2)
+  pp_fn <- runAfterFlag hsc_env2 (HsPp HsSrcFile) (gopt Opt_Pp) cpp_fn $
+            use (T_HsPp pipe_env hsc_env2 input_fn cpp_fn)
+
+  (dflags3, warns3) <- use (T_FileArgs hsc_env2 pp_fn)
 
   use (T_IO (handleFlagWarnings (hsc_logger hsc_env) dflags3 warns3))
 
-  return pp_fn
+  return (dflags3, pp_fn)
+
+
+  -- This won't change through the compilation pipeline
+  where platform = targetPlatform (hsc_dflags hsc_env)
+        runAfter :: Phase
+                  -> a -> TPipeline TPhase a -> TPipeline TPhase a
+        runAfter = phaseIfAfter platform start_phase
+        start_phase = startPhase (src_suffix pipe_env)
+        runAfterFlag :: HscEnv
+                  -> Phase
+                  -> (DynFlags -> Bool)
+                  -> a
+                  -> TPipeline TPhase a
+                  -> TPipeline TPhase a
+        runAfterFlag hsc_env phase flag def action =
+          runAfter phase def
+           $ phaseIfFlag hsc_env flag def action
 
 
 

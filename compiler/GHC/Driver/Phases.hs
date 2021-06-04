@@ -38,7 +38,6 @@ module GHC.Driver.Phases (
    isSourceFilename,
 
    phaseForeignLanguage
-   , TPhase(..)
    , runTPipeline
    , TPipeline(..)
    , use
@@ -100,20 +99,16 @@ data Phase
         | StopLn        -- Stop, but linking will follow, so generate .o file
   deriving (Eq, Show)
 
-data TPhase res where
-  T_Unlit :: HscEnv -> FilePath -> TPhase FilePath
-  T_FileArgs :: HscEnv -> FilePath -> TPhase (DynFlags, [Warn])
-  T_Cpp   :: HscEnv -> FilePath -> TPhase FilePath
-  T_HsPp  :: HscEnv -> FilePath -> FilePath -> TPhase FilePath
-  T_IO :: IO a -> TPhase a
+
 
 data TPipeline f a where
   Return :: a -> TPipeline f a
   Roll :: f a -> (a -> TPipeline f b)  -> TPipeline f b
 
-instance Functor (TPipeline f) where
+instance Functor (TPipeline f)  where
   fmap f (Return a) = Return (f a)
   fmap f (Roll fa k) = Roll fa (fmap f . k)
+--  fmap f (ModuleScope e k) = ModuleScope e (fmap f k)
 
 instance Applicative (TPipeline f) where
   pure = Return
@@ -123,10 +118,12 @@ instance Monad (TPipeline f) where
   return = pure
   (Return a) >>= f = f a
   (Roll fa k) >>= f = Roll fa (k >=> f)
+--  (ModuleScope r k) >>= f = ModuleScope r (k >>= f)
 
 runTPipeline :: Monad g => (forall a . f a -> g a) -> TPipeline f a -> g a
 runTPipeline _h (Return a) = return a
-runTPipeline h (Roll fa k)   = h fa >>= runTPipeline h. k
+runTPipeline h (Roll fa k)   = h fa >>= runTPipeline h . k
+--runTPipeline h g (ModuleScope e k) = g e (runTPipeline h g k)
 
 use :: f a -> TPipeline f a
 use fa = Roll fa Return
