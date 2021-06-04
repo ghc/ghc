@@ -215,20 +215,37 @@ instance Outputable TyLit where
 
 {- Note [Function types]
 ~~~~~~~~~~~~~~~~~~~~~~~~
-FFunTy is the constructor for a function type.  Lots of things to say
-about it!
+FunTy is the constructor for a function type.  Here are the details:
 
-* FFunTy is the data constructor, meaning "full function type".
-
-* The function type constructor (->) has kind
-     (->) :: forall {r1} {r2}. TYPE r1 -> TYPE r2 -> Type LiftedRep
-  mkTyConApp ensure that we convert a saturated application
-    TyConApp (->) [r1,r2,t1,t2] into FunTy t1 t2
+* The primitive function type constructor FUN has kind
+     FUN :: forall (m :: Multiplicity) ->
+            forall {r1 :: RuntimeRep} {r2 :: RuntimeRep}.
+            TYPE r1 ->
+            TYPE r2 ->
+            Type
+  mkTyConApp ensures that we convert a saturated application
+    TyConApp FUN [m,r1,r2,t1,t2] into FunTy VisArg m t1 t2
   dropping the 'r1' and 'r2' arguments; they are easily recovered
-  from 't1' and 't2'.
+  from 't1' and 't2'. The visibility is always VisArg, because
+  we build constraint arrows (=>) with e.g. mkPhiTy and friends,
+  never `mkTyConApp funTyCon args`.
 
 * For the time being its RuntimeRep quantifiers are left
   inferred. This is to allow for it to evolve.
+
+* Because the RuntimeRep args came first historically (that is,
+  the arrow type constructor gained these arguments before gaining
+  the Multiplicity argument), we wanted to be able to say
+    type (->) = FUN Many
+  which we do in library module GHC.Types. This means that the
+  Multiplicity argument must precede the RuntimeRep arguments --
+  and it means changing the name of the primitive constructor from
+  (->) to FUN.
+
+* The multiplicity argument is dependent, because Typeable does not
+  support a type such as `Multiplicity -> forall {r1 r2 :: RuntimeRep}. ...`.
+  There is a plan to change the argument order and make the
+  multiplicity argument nondependent in #20164.
 
 * The ft_af field says whether or not this is an invisible argument
      VisArg:   t1 -> t2    Ordinary function type
@@ -239,33 +256,8 @@ about it!
   This visibility info makes no difference in Core; it matters
   only when we regard the type as a Haskell source type.
 
-* FunTy is a (unidirectional) pattern synonym that allows
-  positional pattern matching (FunTy arg res), ignoring the
-  ArgFlag.
--}
-
-{- -----------------------
-      Commented out until the pattern match
-      checker can handle it; see #16185
-
-      For now we use the CPP macro #define FunTy FFunTy _
-      (see HsVersions.h) to allow pattern matching on a
-      (positional) FunTy constructor.
-
-{-# COMPLETE FunTy, TyVarTy, AppTy, TyConApp
-           , ForAllTy, LitTy, CastTy, CoercionTy :: Type #-}
-
--- | 'FunTy' is a (uni-directional) pattern synonym for the common
--- case where we want to match on the argument/result type, but
--- ignoring the AnonArgFlag
-pattern FunTy :: Type -> Type -> Type
-pattern FunTy arg res <- FFunTy { ft_arg = arg, ft_res = res }
-
-       End of commented out block
----------------------------------- -}
-
-{- Note [Types for coercions, predicates, and evidence]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Types for coercions, predicates, and evidence]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We treat differently:
 
   (a) Predicate types
