@@ -339,7 +339,7 @@ needed and how many bits are required. The data type GHC.Core.TyCon.PrimRep
 enumerates all the possibilities.
 
 data PrimRep
-  = VoidRep
+  = VoidRep       -- See Note [VoidRep]
   | LiftedRep     -- ^ Lifted pointer
   | UnliftedRep   -- ^ Unlifted pointer
   | Int8Rep       -- ^ Signed, 8-bit value
@@ -550,6 +550,7 @@ runtimeRepMonoPrimRep_maybe rr_ty
 
 -- | Take a type of kind RuntimeRep and extract the list of 'PrimRep' that
 -- it encodes. See also Note [Getting from RuntimeRep to PrimRep]
+-- The [PrimRep] is the final runtime representation /after/ unarisation
 runtimeRepPrimRep :: HasDebugCallStack => SDoc -> Type -> [PrimRep]
 runtimeRepPrimRep doc rr_ty
   | Just rr_ty' <- coreView rr_ty
