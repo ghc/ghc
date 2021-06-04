@@ -107,3 +107,6 @@ mkStoreAccessor(LibHSghcFastStringTable)
 mkStoreAccessor(LibHSghcGlobalHasPprDebug)
 mkStoreAccessor(LibHSghcGlobalHasNoDebugOutput)
 mkStoreAccessor(LibHSghcGlobalHasNoStateHack)
+
+HsInt ghc_unique_counter = 0;
+HsInt ghc_unique_inc     = 1;
