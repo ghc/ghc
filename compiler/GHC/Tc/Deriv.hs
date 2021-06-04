@@ -235,7 +235,7 @@ tcDeriving deriv_infos deriv_decls
         ; (inst_info, rn_binds, rn_dus) <- renameDeriv inst_infos binds
 
         ; unless (isEmptyBag inst_info) $
-             liftIO (dumpIfSet_dyn logger dflags Opt_D_dump_deriv "Derived instances"
+             liftIO (putDumpFileMaybe logger Opt_D_dump_deriv "Derived instances"
                         FormatHaskell
                         (ddump_deriving inst_info rn_binds famInsts))
 

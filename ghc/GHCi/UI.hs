@@ -51,7 +51,7 @@ import GHC.Driver.Session as DynFlags
 import GHC.Driver.Ppr hiding (printForUser)
 import GHC.Utils.Error hiding (traceCmd)
 import GHC.Driver.Monad ( modifySession )
-import GHC.Driver.Config
+import GHC.Driver.Config.Parser (initParserOpts)
 import qualified GHC
 import GHC ( LoadHowMuch(..), Target(..),  TargetId(..),
              Resume, SingleStep, Ghc,
@@ -3117,9 +3117,10 @@ newDynFlags interactive_only minus_opts = do
             newLdInputs     = drop ld0length (ldInputs dflags2)
             newCLFrameworks = drop fmrk0length (cmdlineFrameworks dflags2)
 
-            hsc_env' = hsc_env { hsc_dflags =
-                         dflags2 { ldInputs = newLdInputs
-                                 , cmdlineFrameworks = newCLFrameworks } }
+            dflags'  = dflags2 { ldInputs = newLdInputs
+                               , cmdlineFrameworks = newCLFrameworks
+                               }
+            hsc_env' = hscSetFlags dflags' hsc_env
 
         when (not (null newLdInputs && null newCLFrameworks)) $
           liftIO $ Loader.loadCmdLineLibs (hscInterp hsc_env') hsc_env'
@@ -4462,11 +4463,11 @@ showException se =
 -- in an exception loop (eg. let a = error a in a) the ^C exception
 -- may never be delivered.  Thanks to Marcin for pointing out the bug.
 
-ghciHandle :: (HasDynFlags m, ExceptionMonad m) => (SomeException -> m a) -> m a -> m a
+ghciHandle :: (HasLogger m, ExceptionMonad m) => (SomeException -> m a) -> m a -> m a
 ghciHandle h m = mask $ \restore -> do
                  -- Force dflags to avoid leaking the associated HscEnv
-                 !dflags <- getDynFlags
-                 catch (restore (GHC.prettyPrintGhcErrors dflags m)) $ \e -> restore (h e)
+                 !log <- getLogger
+                 catch (restore (GHC.prettyPrintGhcErrors log m)) $ \e -> restore (h e)
 
 ghciTry :: ExceptionMonad m => m a -> m (Either SomeException a)
 ghciTry m = fmap Right m `catch` \e -> return $ Left e

@@ -45,7 +45,6 @@ module GHC.Core.Opt.Monad (
     putMsg, putMsgS, errorMsg, errorMsgS, msg,
     fatalErrorMsg, fatalErrorMsgS,
     debugTraceMsg, debugTraceMsgS,
-    dumpIfSet_dyn
   ) where
 
 import GHC.Prelude hiding ( read )
@@ -66,7 +65,7 @@ import GHC.Types.Error
 
 import GHC.Utils.Error ( errorDiagnostic )
 import GHC.Utils.Outputable as Outputable
-import GHC.Utils.Logger ( HasLogger (..), DumpFormat (..), putLogMsg, putDumpMsg, Logger )
+import GHC.Utils.Logger
 import GHC.Utils.Monad
 
 import GHC.Data.FastString
@@ -182,7 +181,6 @@ data SimplMode             -- See comments in GHC.Core.Opt.Simplify.Monad
             --    - target platform (for `exprIsDupable` and `mkDupableAlt`)
             --    - Opt_DictsCheap and Opt_PedanticBottoms general flags
             --    - rules options (initRuleOpts)
-            --    - verbose_core2core, dump_inlinings, dump_rule_rewrites/firings
             --    - inlineCheck
         }
 
@@ -794,7 +792,6 @@ we aren't using annotations heavily.
 
 msg :: MessageClass -> SDoc -> CoreM ()
 msg msg_class doc = do
-    dflags <- getDynFlags
     logger <- getLogger
     loc    <- getSrcSpanM
     unqual <- getPrintUnqualified
@@ -805,7 +802,7 @@ msg msg_class doc = do
         err_sty  = mkErrStyle unqual
         user_sty = mkUserStyle unqual AllTheWay
         dump_sty = mkDumpStyle unqual
-    liftIO $ putLogMsg logger dflags msg_class loc (withPprStyle sty doc)
+    liftIO $ logMsg logger msg_class loc (withPprStyle sty doc)
 
 -- | Output a String message to the screen
 putMsgS :: String -> CoreM ()
@@ -838,13 +835,3 @@ debugTraceMsgS = debugTraceMsg . text
 -- | Outputs a debugging message at verbosity level of @-v@ or higher
 debugTraceMsg :: SDoc -> CoreM ()
 debugTraceMsg = msg MCDump
-
--- | Show some labelled 'SDoc' if a particular flag is set or at a verbosity level of @-v -ddump-most@ or higher
-dumpIfSet_dyn :: DumpFlag -> String -> DumpFormat -> SDoc -> CoreM ()
-dumpIfSet_dyn flag str fmt doc = do
-    dflags <- getDynFlags
-    logger <- getLogger
-    unqual <- getPrintUnqualified
-    when (dopt flag dflags) $ liftIO $ do
-        let sty = mkDumpStyle unqual
-        putDumpMsg logger dflags sty flag str fmt doc

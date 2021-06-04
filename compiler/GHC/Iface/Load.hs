@@ -37,6 +37,8 @@ module GHC.Iface.Load (
 
 import GHC.Prelude
 
+import GHC.Platform.Profile
+
 import {-# SOURCE #-} GHC.IfaceToCore
    ( tcIfaceDecls, tcIfaceRules, tcIfaceInst, tcIfaceFamInst
    , tcIfaceAnnotations, tcIfaceCompleteMatches )
@@ -165,9 +167,8 @@ importDecl :: Name -> IfM lcl (MaybeErr SDoc TyThing)
 -- It's not a wired-in thing -- the caller caught that
 importDecl name
   = assert (not (isWiredInName name)) $
-    do  { dflags <- getDynFlags
-        ; logger <- getLogger
-        ; liftIO $ trace_if logger dflags nd_doc
+    do  { logger <- getLogger
+        ; liftIO $ trace_if logger nd_doc
 
         -- Load the interface, which should populate the PTE
         ; mb_iface <- assertPpr (isExternalName name) (ppr name) $
@@ -241,9 +242,8 @@ checkWiredInTyCon tc
   = return ()
   | otherwise
   = do  { mod <- getModule
-        ; dflags <- getDynFlags
         ; logger <- getLogger
-        ; liftIO $ trace_if logger dflags (text "checkWiredInTyCon" <+> ppr tc_name $$ ppr mod)
+        ; liftIO $ trace_if logger (text "checkWiredInTyCon" <+> ppr tc_name $$ ppr mod)
         ; assert (isExternalName tc_name )
           when (mod /= nameModule tc_name)
                (initIfaceTcRn (loadWiredInHomeIface tc_name))
@@ -442,15 +442,12 @@ loadInterface doc_str mod from
   | otherwise
   = do
     logger <- getLogger
-    dflags <- getDynFlags
-    withTimingSilent logger dflags (text "loading interface") (pure ()) $ do
+    withTimingSilent logger (text "loading interface") (pure ()) $ do
         {       -- Read the state
           (eps,hpt) <- getEpsAndHpt
         ; gbl_env <- getGblEnv
-        ; dflags <- getDynFlags
-        ; logger <- getLogger
 
-        ; liftIO $ trace_if logger dflags (text "Considering whether to load" <+> ppr mod <+> ppr from)
+        ; liftIO $ trace_if logger (text "Considering whether to load" <+> ppr mod <+> ppr from)
 
                 -- Check whether we have the interface already
         ; hsc_env <- getTopEnv
@@ -728,10 +725,9 @@ moduleFreeHolesPrecise doc_str mod
  | otherwise =
    case getModuleInstantiation mod of
     (imod, Just indef) -> do
-        dflags <- getDynFlags
         logger <- getLogger
         let insts = instUnitInsts (moduleUnit indef)
-        liftIO $ trace_if logger dflags (text "Considering whether to load" <+> ppr mod <+>
+        liftIO $ trace_if logger (text "Considering whether to load" <+> ppr mod <+>
                  text "to compute precise free module holes")
         (eps, hpt) <- getEpsAndHpt
         case tryEpsAndHpt eps hpt `firstJust` tryDepsCache eps imod insts of
@@ -863,7 +859,7 @@ findAndReadIface
 findAndReadIface logger name_cache fc hooks unit_state home_unit dflags doc_str mod wanted_mod hi_boot_file = do
   let profile = targetProfile dflags
 
-  trace_if logger dflags (sep [hsep [text "Reading",
+  trace_if logger (sep [hsep [text "Reading",
                            if hi_boot_file == IsBoot
                              then text "[boot]"
                              else Outputable.empty,
@@ -902,7 +898,7 @@ findAndReadIface logger name_cache fc hooks unit_state home_unit dflags doc_str 
                                                       hi_boot_file iface fp
                         return r
               err -> do
-                  trace_if logger dflags (text "...not found")
+                  trace_if logger (text "...not found")
                   return $ Failed $ cannotFindInterface
                                       unit_state
                                       home_unit
@@ -931,15 +927,15 @@ load_dynamic_too logger name_cache unit_state dflags wanted_mod is_boot iface fi
      | mi_mod_hash (mi_final_exts iface) == mi_mod_hash (mi_final_exts dynIface)
      -> return ()
      | otherwise ->
-        do trace_if logger dflags (text "Dynamic hash doesn't match")
+        do trace_if logger (text "Dynamic hash doesn't match")
            setDynamicTooFailed dflags
     Failed err ->
-        do trace_if logger dflags (text "Failed to load dynamic interface file:" $$ err)
+        do trace_if logger (text "Failed to load dynamic interface file:" $$ err)
            setDynamicTooFailed dflags
 
 read_file :: Logger -> NameCache -> UnitState -> DynFlags -> Module -> FilePath -> IO (MaybeErr SDoc (ModIface, FilePath))
 read_file logger name_cache unit_state dflags wanted_mod file_path = do
-  trace_if logger dflags (text "readIFace" <+> text file_path)
+  trace_if logger (text "readIFace" <+> text file_path)
 
   -- Figure out what is recorded in mi_module.  If this is
   -- a fully definite interface, it'll match exactly, but
@@ -958,11 +954,10 @@ read_file logger name_cache unit_state dflags wanted_mod file_path = do
 
 
 -- | Write interface file
-writeIface :: Logger -> DynFlags -> FilePath -> ModIface -> IO ()
-writeIface logger dflags hi_file_path new_iface
+writeIface :: Logger -> Profile -> FilePath -> ModIface -> IO ()
+writeIface logger profile hi_file_path new_iface
     = do createDirectoryIfMissing True (takeDirectory hi_file_path)
-         let printer = TraceBinIFace (debugTraceMsg logger dflags 3)
-             profile = targetProfile dflags
+         let printer = TraceBinIFace (debugTraceMsg logger 3)
          writeBinIface profile printer hi_file_path new_iface
 
 -- | @readIface@ tries just the one file.
@@ -1063,7 +1058,7 @@ For some background on this choice see trac #15269.
 showIface :: Logger -> DynFlags -> UnitState -> NameCache -> FilePath -> IO ()
 showIface logger dflags unit_state name_cache filename = do
    let profile = targetProfile dflags
-       printer = putLogMsg logger dflags MCOutput noSrcSpan . withPprStyle defaultDumpStyle
+       printer = logMsg logger MCOutput noSrcSpan . withPprStyle defaultDumpStyle
 
    -- skip the hi way check; we don't want to worry about profiled vs.
    -- non-profiled interfaces, for example.
@@ -1076,7 +1071,7 @@ showIface logger dflags unit_state name_cache filename = do
        print_unqual = QueryQualify qualifyImportedNames
                                    neverQualifyModules
                                    neverQualifyPackages
-   putLogMsg logger dflags MCDump noSrcSpan
+   logMsg logger MCDump noSrcSpan
       $ withPprStyle (mkDumpStyle print_unqual)
       $ pprModIface unit_state iface
 

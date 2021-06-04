@@ -48,7 +48,7 @@ module GHC.Utils.Error (
         -- * Issuing messages during compilation
         putMsg, printInfoForUser, printOutputForUser,
         logInfo, logOutput,
-        errorMsg, warningMsg,
+        errorMsg,
         fatalErrorMsg, fatalErrorMsg'',
         compilationProgressMsg,
         showPass,
@@ -234,10 +234,10 @@ sortMsgBag dflags = maybeLimit . sortBy (cmp `on` errMsgSpan) . bagToList
           Nothing        -> id
           Just err_limit -> take err_limit
 
-ghcExit :: Logger -> DynFlags -> Int -> IO ()
-ghcExit logger dflags val
+ghcExit :: Logger -> Int -> IO ()
+ghcExit logger val
   | val == 0  = exitWith ExitSuccess
-  | otherwise = do errorMsg logger dflags (text "\nCompilation had errors\n\n")
+  | otherwise = do errorMsg logger (text "\nCompilation had errors\n\n")
                    exitWith (ExitFailure val)
 
 doIfSet :: Bool -> IO () -> IO ()
@@ -251,45 +251,30 @@ doIfSet_dyn dflags flag action | gopt flag dflags = action
 -- -----------------------------------------------------------------------------
 -- Outputting messages from the compiler
 
--- We want all messages to go through one place, so that we can
--- redirect them if necessary.  For example, when GHC is used as a
--- library we might want to catch all messages that GHC tries to
--- output and do something else with them.
-
-ifVerbose :: DynFlags -> Int -> IO () -> IO ()
-ifVerbose dflags val act
-  | verbosity dflags >= val = act
-  | otherwise               = return ()
-{-# INLINE ifVerbose #-}  -- see Note [INLINE conditional tracing utilities]
-
-errorMsg :: Logger -> DynFlags -> SDoc -> IO ()
-errorMsg logger dflags msg
-   = putLogMsg logger dflags errorDiagnostic noSrcSpan $
+errorMsg :: Logger -> SDoc -> IO ()
+errorMsg logger msg
+   = logMsg logger errorDiagnostic noSrcSpan $
      withPprStyle defaultErrStyle msg
 
-warningMsg :: Logger -> DynFlags -> SDoc -> IO ()
-warningMsg logger dflags msg
-   = putLogMsg logger dflags (mkMCDiagnostic dflags WarningWithoutFlag) noSrcSpan $
-     withPprStyle defaultErrStyle msg
-
-fatalErrorMsg :: Logger -> DynFlags -> SDoc -> IO ()
-fatalErrorMsg logger dflags msg =
-    putLogMsg logger dflags MCFatal noSrcSpan $ withPprStyle defaultErrStyle msg
+fatalErrorMsg :: Logger -> SDoc -> IO ()
+fatalErrorMsg logger msg =
+    logMsg logger MCFatal noSrcSpan $ withPprStyle defaultErrStyle msg
 
 fatalErrorMsg'' :: FatalMessager -> String -> IO ()
 fatalErrorMsg'' fm msg = fm msg
 
-compilationProgressMsg :: Logger -> DynFlags -> SDoc -> IO ()
-compilationProgressMsg logger dflags msg = do
-    let str = showSDoc dflags msg
-    traceEventIO $ "GHC progress: " ++ str
-    ifVerbose dflags 1 $
-        logOutput logger dflags $ withPprStyle defaultUserStyle msg
+compilationProgressMsg :: Logger -> SDoc -> IO ()
+compilationProgressMsg logger msg = do
+  let logflags = logFlags logger
+  let str = renderWithContext (log_default_user_context logflags) (text "GHC progress: " <> msg)
+  traceEventIO str
+  when (logVerbAtLeast logger 1) $
+    logOutput logger $ withPprStyle defaultUserStyle msg
 
-showPass :: Logger -> DynFlags -> String -> IO ()
-showPass logger dflags what
-  = ifVerbose dflags 2 $
-    logInfo logger dflags $ withPprStyle defaultUserStyle (text "***" <+> text what <> colon)
+showPass :: Logger -> String -> IO ()
+showPass logger what =
+  when (logVerbAtLeast logger 2) $
+    logInfo logger $ withPprStyle defaultUserStyle (text "***" <+> text what <> colon)
 
 data PrintTimings = PrintTimings | DontPrintTimings
   deriving (Eq, Show)
@@ -320,14 +305,13 @@ data PrintTimings = PrintTimings | DontPrintTimings
 -- See Note [withTiming] for more.
 withTiming :: MonadIO m
            => Logger
-           -> DynFlags     -- ^ DynFlags
            -> SDoc         -- ^ The name of the phase
            -> (a -> ())    -- ^ A function to force the result
                            -- (often either @const ()@ or 'rnf')
            -> m a          -- ^ The body of the phase to be timed
            -> m a
-withTiming logger dflags what force action =
-  withTiming' logger dflags what force PrintTimings action
+withTiming logger what force action =
+  withTiming' logger what force PrintTimings action
 
 -- | Same as 'withTiming', but doesn't print timings in the
 --   console (when given @-vN@, @N >= 2@ or @-ddump-timings@).
@@ -336,31 +320,29 @@ withTiming logger dflags what force action =
 withTimingSilent
   :: MonadIO m
   => Logger
-  -> DynFlags   -- ^ DynFlags
   -> SDoc       -- ^ The name of the phase
   -> (a -> ())  -- ^ A function to force the result
                 -- (often either @const ()@ or 'rnf')
   -> m a        -- ^ The body of the phase to be timed
   -> m a
-withTimingSilent logger dflags what force action =
-  withTiming' logger dflags what force DontPrintTimings action
+withTimingSilent logger what force action =
+  withTiming' logger what force DontPrintTimings action
 
 -- | Worker for 'withTiming' and 'withTimingSilent'.
 withTiming' :: MonadIO m
             => Logger
-            -> DynFlags   -- ^ 'DynFlags'
             -> SDoc         -- ^ The name of the phase
             -> (a -> ())    -- ^ A function to force the result
                             -- (often either @const ()@ or 'rnf')
             -> PrintTimings -- ^ Whether to print the timings
             -> m a          -- ^ The body of the phase to be timed
             -> m a
-withTiming' logger dflags what force_result prtimings action
-  = if verbosity dflags >= 2 || dopt Opt_D_dump_timings dflags
+withTiming' logger what force_result prtimings action
+  = if logVerbAtLeast logger 2 || logHasDumpFlag logger Opt_D_dump_timings
     then do whenPrintTimings $
-              logInfo logger dflags $ withPprStyle defaultUserStyle $
+              logInfo logger $ withPprStyle defaultUserStyle $
                 text "***" <+> what <> colon
-            let ctx = initDefaultSDocContext dflags
+            let ctx = log_default_user_context (logFlags logger)
             alloc0 <- liftIO getAllocationCounter
             start <- liftIO getCPUTime
             eventBegins ctx what
@@ -375,8 +357,8 @@ withTiming' logger dflags what force_result prtimings action
             let alloc = alloc0 - alloc1
                 time = realToFrac (end - start) * 1e-9
 
-            when (verbosity dflags >= 2 && prtimings == PrintTimings)
-                $ liftIO $ logInfo logger dflags $ withPprStyle defaultUserStyle
+            when (logVerbAtLeast logger 2 && prtimings == PrintTimings)
+                $ liftIO $ logInfo logger $ withPprStyle defaultUserStyle
                     (text "!!!" <+> what <> colon <+> text "finished in"
                      <+> doublePrec 2 time
                      <+> text "milliseconds"
@@ -386,7 +368,7 @@ withTiming' logger dflags what force_result prtimings action
                      <+> text "megabytes")
 
             whenPrintTimings $
-                dumpIfSet_dyn logger dflags Opt_D_dump_timings "" FormatText
+                putDumpFileMaybe logger Opt_D_dump_timings "" FormatText
                     $ text $ showSDocOneLine ctx
                     $ hsep [ what <> colon
                            , text "alloc=" <> ppr alloc
@@ -413,66 +395,57 @@ withTiming' logger dflags what force_result prtimings action
           eventBeginsDoc ctx w = showSDocOneLine ctx $ text "GHC:started:" <+> w
           eventEndsDoc   ctx w = showSDocOneLine ctx $ text "GHC:finished:" <+> w
 
-debugTraceMsg :: Logger -> DynFlags -> Int -> SDoc -> IO ()
-debugTraceMsg logger dflags val msg =
-   ifVerbose dflags val $
-      logInfo logger dflags (withPprStyle defaultDumpStyle msg)
+debugTraceMsg :: Logger -> Int -> SDoc -> IO ()
+debugTraceMsg logger val msg =
+   when (log_verbosity (logFlags logger) >= val) $
+      logInfo logger (withPprStyle defaultDumpStyle msg)
 {-# INLINE debugTraceMsg #-}  -- see Note [INLINE conditional tracing utilities]
 
-putMsg :: Logger -> DynFlags -> SDoc -> IO ()
-putMsg logger dflags msg = logInfo logger dflags (withPprStyle defaultUserStyle msg)
+putMsg :: Logger -> SDoc -> IO ()
+putMsg logger msg = logInfo logger (withPprStyle defaultUserStyle msg)
 
-printInfoForUser :: Logger -> DynFlags -> PrintUnqualified -> SDoc -> IO ()
-printInfoForUser logger dflags print_unqual msg
-  = logInfo logger dflags (withUserStyle print_unqual AllTheWay msg)
+printInfoForUser :: Logger -> PrintUnqualified -> SDoc -> IO ()
+printInfoForUser logger print_unqual msg
+  = logInfo logger (withUserStyle print_unqual AllTheWay msg)
 
-printOutputForUser :: Logger -> DynFlags -> PrintUnqualified -> SDoc -> IO ()
-printOutputForUser logger dflags print_unqual msg
-  = logOutput logger dflags (withUserStyle print_unqual AllTheWay msg)
+printOutputForUser :: Logger -> PrintUnqualified -> SDoc -> IO ()
+printOutputForUser logger print_unqual msg
+  = logOutput logger (withUserStyle print_unqual AllTheWay msg)
 
-logInfo :: Logger -> DynFlags -> SDoc -> IO ()
-logInfo logger dflags msg
-  = putLogMsg logger dflags MCInfo noSrcSpan msg
+logInfo :: Logger -> SDoc -> IO ()
+logInfo logger msg = logMsg logger MCInfo noSrcSpan msg
 
 -- | Like 'logInfo' but with 'SevOutput' rather then 'SevInfo'
-logOutput :: Logger -> DynFlags -> SDoc -> IO ()
-logOutput logger dflags msg
-  = putLogMsg logger dflags MCOutput noSrcSpan msg
+logOutput :: Logger -> SDoc -> IO ()
+logOutput logger msg = logMsg logger MCOutput noSrcSpan msg
 
 
-prettyPrintGhcErrors :: ExceptionMonad m => DynFlags -> m a -> m a
-prettyPrintGhcErrors dflags
-    = MC.handle $ \e -> case e of
-                      PprPanic str doc ->
-                          pprDebugAndThen ctx panic (text str) doc
-                      PprSorry str doc ->
-                          pprDebugAndThen ctx sorry (text str) doc
-                      PprProgramError str doc ->
-                          pprDebugAndThen ctx pgmError (text str) doc
-                      _ ->
-                          liftIO $ throwIO e
-      where
-         ctx = initSDocContext dflags defaultUserStyle
+prettyPrintGhcErrors :: ExceptionMonad m => Logger -> m a -> m a
+prettyPrintGhcErrors logger = do
+  let ctx = log_default_user_context (logFlags logger)
+  MC.handle $ \e -> case e of
+    PprPanic str doc ->
+        pprDebugAndThen ctx panic (text str) doc
+    PprSorry str doc ->
+        pprDebugAndThen ctx sorry (text str) doc
+    PprProgramError str doc ->
+        pprDebugAndThen ctx pgmError (text str) doc
+    _ -> liftIO $ throwIO e
 
-traceCmd :: Logger -> DynFlags -> String -> String -> IO a -> IO a
--- trace the command (at two levels of verbosity)
-traceCmd logger dflags phase_name cmd_line action
- = do   { let verb = verbosity dflags
-        ; showPass logger dflags phase_name
-        ; debugTraceMsg logger dflags 3 (text cmd_line)
-        ; case flushErr dflags of
-              FlushErr io -> io
-
-           -- And run it!
-        ; action `catchIO` handle_exn verb
-        }
-  where
-    handle_exn _verb exn = do { debugTraceMsg logger dflags 2 (char '\n')
-                              ; debugTraceMsg logger dflags 2
-                                (text "Failed:"
-                                 <+> text cmd_line
-                                 <+> text (show exn))
-                              ; throwGhcExceptionIO (ProgramError (show exn))}
+-- | Trace a command (when verbosity level >= 3)
+traceCmd :: Logger -> String -> String -> IO a -> IO a
+traceCmd logger phase_name cmd_line action = do
+  showPass logger phase_name
+  let
+    cmd_doc = text cmd_line
+    handle_exn exn = do
+      debugTraceMsg logger 2 (char '\n')
+      debugTraceMsg logger 2 (text "Failed:" <+> cmd_doc <+> text (show exn))
+      throwGhcExceptionIO (ProgramError (show exn))
+  debugTraceMsg logger 3 cmd_doc
+  loggerTraceFlush logger
+   -- And run it!
+  action `catchIO` handle_exn
 
 {- Note [withTiming]
 ~~~~~~~~~~~~~~~~~~~~
