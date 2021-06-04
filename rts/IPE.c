@@ -67,8 +67,27 @@ void __attribute__ ((constructor)) setupMutex(void) {
 
 void dumpIPEToEventLog(void) {
 #if defined(TRACING)
-    updateIpeMap();
-    mapHashTable(ipeMap, NULL, &traceIPEFromHashTable);
+    ACQUIRE_LOCK(&ipeMapLock);
+
+    IpeBufferListNode* cursor = ipeBufferList;
+    while (cursor != NULL) {
+        for (int i = 0; i < cursor->count; i++) {
+            for (InfoProvEnt** ipeList = cursor->buffer[i]; *ipeList != NULL; ipeList++) {
+                InfoProvEnt* ipe = *ipeList;
+
+                traceIPE(ipe->info, ipe->prov.table_name, ipe->prov.closure_desc, ipe->prov.ty_desc,
+                         ipe->prov.label, ipe->prov.module, ipe->prov.srcloc);
+            }
+        }
+
+        cursor = cursor->next;
+    }
+
+    if (ipeMap != NULL) {
+        mapHashTable(ipeMap, NULL, &traceIPEFromHashTable);
+    }
+
+    RELEASE_LOCK(&ipeMapLock);
 #endif
     return;
 }
