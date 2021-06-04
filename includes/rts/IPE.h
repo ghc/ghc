@@ -13,20 +13,19 @@
 
 #pragma once
 
-
-typedef struct InfoProv_{
-    char * table_name;
-    char * closure_desc;
-    char * ty_desc;
-    char * label;
-    char * module;
-    char * srcloc;
+typedef struct InfoProv_ {
+    char *table_name;
+    char *closure_desc;
+    char *ty_desc;
+    char *label;
+    char *module;
+    char *srcloc;
 } InfoProv;
 
 typedef struct InfoProvEnt_ {
-    StgInfoTable * info;
+    StgInfoTable *info;
     InfoProv prov;
 } InfoProvEnt;
 
 void registerInfoProvList(InfoProvEnt **cc_list);
-InfoProvEnt * lookupIPE(StgInfoTable *info);
+InfoProvEnt *lookupIPE(StgInfoTable *info);
