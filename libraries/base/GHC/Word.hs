@@ -115,6 +115,7 @@ instance Num Word8 where
     abs x                  = x
     signum 0               = 0
     signum _               = 1
+    {-# INLINE fromInteger #-}
     fromInteger i          = W8# (wordToWord8# (integerToWord# i))
 
 -- | @since 2.01
@@ -159,7 +160,8 @@ instance Integral Word8 where
         | y /= 0                  = (W8# (x# `quotWord8#` y#)
                                     ,W8# (x# `remWord8#` y#))
         | otherwise               = divZeroError
-    toInteger (W8# x#)            = IS (word2Int# (word8ToWord# x#))
+    {-# INLINE toInteger #-}
+    toInteger (W8# x#)            = integerFromWord# (word8ToWord# x#)
 
 -- | @since 2.01
 instance Bounded Word8 where
@@ -215,13 +217,6 @@ instance FiniteBits Word8 where
     finiteBitSize _ = 8
     countLeadingZeros  (W8# x#) = I# (word2Int# (clz8# (word8ToWord# x#)))
     countTrailingZeros (W8# x#) = I# (word2Int# (ctz8# (word8ToWord# x#)))
-
-{-# RULES
-"fromIntegral/Word8->Word8"   fromIntegral = id :: Word8 -> Word8
-"fromIntegral/Word8->Integer" fromIntegral = toInteger :: Word8 -> Integer
-"fromIntegral/a->Word8"       fromIntegral = \x -> case fromIntegral x of W# x# -> W8# (wordToWord8# x#)
-"fromIntegral/Word8->a"       fromIntegral = \(W8# x#) -> fromIntegral (W# (word8ToWord# x#))
-  #-}
 
 {-# RULES
 "properFraction/Float->(Word8,Float)"
@@ -305,6 +300,7 @@ instance Num Word16 where
     abs x                  = x
     signum 0               = 0
     signum _               = 1
+    {-# INLINE fromInteger #-}
     fromInteger i          = W16# (wordToWord16# (integerToWord# i))
 
 -- | @since 2.01
@@ -349,7 +345,8 @@ instance Integral Word16 where
         | y /= 0                    = (W16# (x# `quotWord16#` y#)
                                       ,W16# (x# `remWord16#` y#))
         | otherwise                 = divZeroError
-    toInteger (W16# x#)             = IS (word2Int# (word16ToWord# x#))
+    {-# INLINE toInteger #-}
+    toInteger (W16# x#)             = integerFromWord# (word16ToWord# x#)
 
 -- | @since 2.01
 instance Bounded Word16 where
@@ -411,14 +408,6 @@ instance FiniteBits Word16 where
 -- @since 4.7.0.0
 byteSwap16 :: Word16 -> Word16
 byteSwap16 (W16# w#) = W16# (wordToWord16# (byteSwap16# (word16ToWord# w#)))
-
-{-# RULES
-"fromIntegral/Word8->Word16"   fromIntegral = \(W8# x#) -> W16# (wordToWord16# (word8ToWord# x#))
-"fromIntegral/Word16->Word16"  fromIntegral = id :: Word16 -> Word16
-"fromIntegral/Word16->Integer" fromIntegral = toInteger :: Word16 -> Integer
-"fromIntegral/a->Word16"       fromIntegral = \x -> case fromIntegral x of W# x# -> W16# (wordToWord16# x#)
-"fromIntegral/Word16->a"       fromIntegral = \(W16# x#) -> fromIntegral (W# (word16ToWord# x#))
-  #-}
 
 {-# RULES
 "properFraction/Float->(Word16,Float)"
@@ -534,6 +523,7 @@ instance Num Word32 where
     abs x                  = x
     signum 0               = 0
     signum _               = 1
+    {-# INLINE fromInteger #-}
     fromInteger i          = W32# (wordToWord32# (integerToWord# i))
 
 -- | @since 2.01
@@ -588,15 +578,8 @@ instance Integral Word32 where
         | y /= 0                    = (W32# (x# `quotWord32#` y#)
                                       ,W32# (x# `remWord32#` y#))
         | otherwise                 = divZeroError
-    toInteger (W32# x#)
-#if WORD_SIZE_IN_BITS == 32
-        | isTrue# (i# >=# 0#)       = IS i#
-        | otherwise                 = integerFromWord# (word32ToWord# x#)
-        where
-        !i# = word2Int# (word32ToWord# x#)
-#else
-                                    = IS (word2Int# (word32ToWord# x#))
-#endif
+    {-# INLINE toInteger #-}
+    toInteger (W32# x#)             = integerFromWord# (word32ToWord# x#)
 
 -- | @since 2.01
 instance Bits Word32 where
@@ -641,15 +624,6 @@ instance FiniteBits Word32 where
     finiteBitSize _ = 32
     countLeadingZeros  (W32# x#) = I# (word2Int# (clz32# (word32ToWord# x#)))
     countTrailingZeros (W32# x#) = I# (word2Int# (ctz32# (word32ToWord# x#)))
-
-{-# RULES
-"fromIntegral/Word8->Word32"   fromIntegral = \(W8# x#) -> W32# (wordToWord32# (word8ToWord# x#))
-"fromIntegral/Word16->Word32"  fromIntegral = \(W16# x#) -> W32# (wordToWord32# (word16ToWord# x#))
-"fromIntegral/Word32->Word32"  fromIntegral = id :: Word32 -> Word32
-"fromIntegral/Word32->Integer" fromIntegral = toInteger :: Word32 -> Integer
-"fromIntegral/a->Word32"       fromIntegral = \x -> case fromIntegral x of W# x# -> W32# (wordToWord32# x#)
-"fromIntegral/Word32->a"       fromIntegral = \(W32# x#) -> fromIntegral (W# (word32ToWord# x#))
-  #-}
 
 -- | @since 2.01
 instance Show Word32 where
@@ -728,6 +702,7 @@ instance Num Word64 where
     abs x                  = x
     signum 0               = 0
     signum _               = 1
+    {-# INLINE fromInteger #-}
     fromInteger i          = W64# (integerToWord64# i)
 
 -- | @since 2.01
@@ -770,6 +745,7 @@ instance Integral Word64 where
     divMod  (W64# x#) y@(W64# y#)
         | y /= 0                    = (W64# (x# `quotWord64#` y#), W64# (x# `remWord64#` y#))
         | otherwise                 = divZeroError
+    {-# INLINE toInteger #-}
     toInteger (W64# x#)             = integerFromWord64# x#
 
 -- | @since 2.01
@@ -820,14 +796,6 @@ a `shiftL64#` b  | isTrue# (b >=# 64#) = wordToWord64# 0##
 a `shiftRL64#` b | isTrue# (b >=# 64#) = wordToWord64# 0##
                  | otherwise           = a `uncheckedShiftRL64#` b
 
-{-# RULES
-"fromIntegral/Int->Word64"    fromIntegral = \(I#   x#) -> W64# (int64ToWord64# (intToInt64# x#))
-"fromIntegral/Word->Word64"   fromIntegral = \(W#   x#) -> W64# (wordToWord64# x#)
-"fromIntegral/Word64->Int"    fromIntegral = \(W64# x#) -> I#   (word2Int# (word64ToWord# x#))
-"fromIntegral/Word64->Word"   fromIntegral = \(W64# x#) -> W#   (word64ToWord# x#)
-"fromIntegral/Word64->Word64" fromIntegral = id :: Word64 -> Word64
-  #-}
-
 #else
 
 -- Word64 is represented in the same way as Word.
@@ -875,6 +843,7 @@ instance Num Word64 where
     abs x                  = x
     signum 0               = 0
     signum _               = 1
+    {-# INLINE fromInteger #-}
     fromInteger i          = W64# (integerToWord# i)
 
 -- | @since 2.01
@@ -952,11 +921,8 @@ instance Integral Word64 where
     divMod  (W64# x#) y@(W64# y#)
         | y /= 0                    = (W64# (x# `quotWord#` y#), W64# (x# `remWord#` y#))
         | otherwise                 = divZeroError
-    toInteger (W64# x#)
-        | isTrue# (i# >=# 0#)       = IS i#
-        | otherwise                 = integerFromWord# x#
-        where
-        !i# = word2Int# x#
+    {-# INLINE toInteger #-}
+    toInteger (W64# x#)             = integerFromWord# x#
 
 -- | @since 2.01
 instance Bits Word64 where
@@ -992,11 +958,6 @@ instance Bits Word64 where
     popCount (W64# x#)        = I# (word2Int# (popCnt64# x#))
     bit                       = bitDefault
     testBit                   = testBitDefault
-
-{-# RULES
-"fromIntegral/a->Word64" fromIntegral = \x -> case fromIntegral x of W# x# -> W64# x#
-"fromIntegral/Word64->a" fromIntegral = \(W64# x#) -> fromIntegral (W# x#)
-  #-}
 
 uncheckedShiftL64# :: Word# -> Int# -> Word#
 uncheckedShiftL64#  = uncheckedShiftL#
@@ -1074,34 +1035,6 @@ bitReverse64 (W64# w#) = W64# (bitReverse# w#)
 #endif
 
 -------------------------------------------------------------------------------
-
-{-# RULES
-"fromIntegral/Natural->Word8"
-    fromIntegral = (fromIntegral :: Word -> Word8)  . naturalToWord
-"fromIntegral/Natural->Word16"
-    fromIntegral = (fromIntegral :: Word -> Word16) . naturalToWord
-"fromIntegral/Natural->Word32"
-    fromIntegral = (fromIntegral :: Word -> Word32) . naturalToWord
-  #-}
-
-{-# RULES
-"fromIntegral/Word8->Natural"
-    fromIntegral = naturalFromWord . (fromIntegral :: Word8  -> Word)
-"fromIntegral/Word16->Natural"
-    fromIntegral = naturalFromWord . (fromIntegral :: Word16 -> Word)
-"fromIntegral/Word32->Natural"
-    fromIntegral = naturalFromWord . (fromIntegral :: Word32 -> Word)
-  #-}
-
-#if WORD_SIZE_IN_BITS == 64
--- these RULES are valid for Word==Word64
-{-# RULES
-"fromIntegral/Natural->Word64"
-    fromIntegral = (fromIntegral :: Word -> Word64) . naturalToWord
-"fromIntegral/Word64->Natural"
-    fromIntegral = naturalFromWord . (fromIntegral :: Word64 -> Word)
-  #-}
-#endif
 
 shiftRLWord8# :: Word8# -> Int# -> Word8#
 a `shiftRLWord8#` b | isTrue# (b >=# 8#) = wordToWord8# 0##
