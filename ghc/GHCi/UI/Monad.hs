@@ -15,6 +15,7 @@ module GHCi.UI.Monad (
         GHCiState(..), GhciMonad(..),
         GHCiOption(..), isOptionSet, setOption, unsetOption,
         Command(..), CommandResult(..), cmdSuccess,
+        CmdExecOutcome(..),
         LocalConfigBehaviour(..),
         PromptFunction,
         BreakLocation(..),
@@ -170,7 +171,7 @@ data Command
    = Command
    { cmdName           :: String
      -- ^ Name of GHCi command (e.g. "exit")
-   , cmdAction         :: String -> InputT GHCi Bool
+   , cmdAction         :: String -> InputT GHCi CmdExecOutcome
      -- ^ The 'Bool' value denotes whether to exit GHCi
    , cmdHidden         :: Bool
      -- ^ Commands which are excluded from default completion
@@ -179,6 +180,14 @@ data Command
    , cmdCompletionFunc :: CompletionFunc GHCi
      -- ^ 'CompletionFunc' for arguments
    }
+
+-- | Command Execution outcome
+-- ...
+data CmdExecOutcome
+  = CleanExit
+  | CmdSuccess
+  | CmdFailure
+
 
 data CommandResult
    = CommandComplete
