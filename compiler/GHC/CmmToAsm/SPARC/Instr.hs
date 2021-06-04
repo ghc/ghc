@@ -362,7 +362,7 @@ mkSpillInstr
     -> Reg      -- ^ register to spill
     -> Int      -- ^ current stack delta
     -> Int      -- ^ spill slot to use
-    -> Instr
+    -> [Instr]
 
 mkSpillInstr config reg _ slot
  = let  platform = ncgPlatform config
@@ -373,7 +373,7 @@ mkSpillInstr config reg _ slot
                         RcFloat   -> FF32
                         RcDouble  -> FF64
 
-    in ST fmt reg (fpRel (negate off_w))
+    in [ST fmt reg (fpRel (negate off_w))]
 
 
 -- | Make a spill reload instruction.
@@ -382,7 +382,7 @@ mkLoadInstr
     -> Reg      -- ^ register to load into
     -> Int      -- ^ current stack delta
     -> Int      -- ^ spill slot to use
-    -> Instr
+    -> [Instr]
 
 mkLoadInstr config reg _ slot
   = let platform = ncgPlatform config
@@ -393,7 +393,7 @@ mkLoadInstr config reg _ slot
                         RcFloat   -> FF32
                         RcDouble  -> FF64
 
-        in LD fmt (fpRel (- off_w)) reg
+        in [LD fmt (fpRel (- off_w)) reg]
 
 
 --------------------------------------------------------------------------------
