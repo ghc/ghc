@@ -140,7 +140,11 @@ instance Applicative ZipList where
 -- | @since 4.11.0.0
 instance Alternative ZipList where
    empty = ZipList []
-   ZipList xs <|> ZipList ys = ZipList (xs ++ drop (length xs) ys)
+   ZipList xs <|> ZipList ys = ZipList $ go xs ys
+     where
+       go (x:xs) (y:ys) = x : go xs ys
+       go    []     ys  = ys
+       go    xs      _  = xs
 
 -- extra functions
 
