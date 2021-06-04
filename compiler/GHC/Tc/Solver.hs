@@ -65,6 +65,8 @@ import GHC.Types.Basic    ( IntWithInf, intGtLimit )
 import GHC.Types.Error
 import qualified GHC.LanguageExtensions as LangExt
 
+import GHC.Driver.Ppr
+
 import Control.Monad
 import Data.Foldable      ( toList )
 import Data.List          ( partition )
@@ -1012,6 +1014,8 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
                | definite_error = (emptyBag, wanted_transformed, mempty)
                | otherwise      = approximateWC False wanted_transformed
 
+       ; traceTc "RAE1" (ppr wanted_transformed $$ ppr definite_error $$ ppr quant_ct_candidates $$ ppr residual_wc)
+
        -- See Note [Simplifying the approximated WC]
        ; (quant_pred_candidates, final_residual_wc) <- case did_fds_combine of
            NoCombinationYet _ -> do { traceTc "skipping simplifying the approximated WC"
@@ -1081,6 +1085,7 @@ emitResidualConstraints rhs_tclvl ev_binds_var
 --      ; _ <- TcM.promoteTyVarSet (tyCoVarsOfCts outer_simple)
 
         ; let inner_wanted = wanteds { wc_simple = inner_simple }
+        ; traceTc "RAE2" (ppr inner_wanted)
         ; implics <- if isEmptyWC inner_wanted
                      then return emptyBag
                      else do implic1 <- newImplication
@@ -1093,7 +1098,8 @@ emitResidualConstraints rhs_tclvl ev_binds_var
                                                , ic_given_eqs = MaybeGivenEqs
                                                , ic_info      = skol_info }
 
-        ; emitConstraints (emptyWC { wc_simple = outer_simple
+        ; emitConstraints (pprTraceIt "RAE3" $
+                           emptyWC { wc_simple = outer_simple
                                    , wc_impl   = implics }) }
   where
     full_theta = map idType full_theta_vars
@@ -1198,7 +1204,8 @@ Note [Deciding quantification]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If the monomorphism restriction does not apply, then we quantify as follows:
 
-* Step 1. Take the global tyvars, and "grow" them using the equality
+* Step 1: decideMonoTyVars.
+  Take the global tyvars, and "grow" them using the equality
   constraints
      E.g.  if x:alpha is in the environment, and alpha ~ [beta] (which can
           happen because alpha is untouchable here) then do not quantify over
@@ -1210,7 +1217,8 @@ If the monomorphism restriction does not apply, then we quantify as follows:
 
   Result is mono_tvs; we will not quantify over these.
 
-* Step 2. Default any non-mono tyvars (i.e ones that are definitely
+* Step 2: defaultTyVarsAndSimplify.
+  Default any non-mono tyvars (i.e ones that are definitely
   not going to become further constrained), and re-simplify the
   candidate constraints.
 
@@ -1222,14 +1230,26 @@ If the monomorphism restriction does not apply, then we quantify as follows:
 
   This is all very tiresome.
 
-* Step 3: decide which variables to quantify over, as follows:
+  This step also promotes the mono_tvs from Step 1. See
+  Note [Promote monomorphic tyvars]. In fact, the *only*
+  use of the mono_tvs from Step 1 is to promote them here.
+  This promotion effectively stops us from quantifying over them
+  later, in Step 3. Because the actual variables to quantify
+  over are determined in Step 3 (not in Step 1), it is OK for
+  the mono_tvs to be missing some variables free in the
+  environment. This is why removing the psig_qtvs is OK in
+  decideMonoTyVars. Test case for this scenario: T14479.
 
-  - Take the free vars of the tau-type (zonked_tau_tvs) and "grow"
-    them using all the constraints.  These are tau_tvs_plus
+* Step 3: decideQuantifiedTyVars.
+  Decide which variables to quantify over, as follows:
 
-  - Use quantifyTyVars to quantify over (tau_tvs_plus - mono_tvs), being
-    careful to close over kinds, and to skolemise the quantified tyvars.
-    (This actually unifies each quantifies meta-tyvar with a fresh skolem.)
+  - Take the free vars of the partial-type-signature types and constraints,
+    and the tau-type (zonked_tau_tvs), and then "grow"
+    them using all the constraints.  These are grown_tcvs.
+
+  - Use quantifyTyVars to quantify over the free variables of all the types
+    involved, but only those in the grown_tcvs. "RAE": explain why we
+    need grown_tcvs. I don't think we do.
 
   Result is qtvs.
 
@@ -1350,7 +1370,7 @@ decideMonoTyVars :: InferMode
 -- Decide which tyvars and covars cannot be generalised:
 --   (a) Free in the environment
 --   (b) Mentioned in a constraint we can't generalise
---   (c) Connected by an equality to (a) or (b)
+--   (c) Connected by an equality or fundep to (a) or (b)
 -- Also return CoVars that appear free in the final quantified types
 --   we can't quantify over these, and we must make sure they are in scope
 decideMonoTyVars infer_mode name_taus psigs candidates
@@ -1392,40 +1412,38 @@ decideMonoTyVars infer_mode name_taus psigs candidates
                -- alpha. Actual test case: typecheck/should_compile/tc213
 
              mono_tvs1 = mono_tvs0 `unionVarSet` co_var_tvs
-
                -- mono_tvs1 is now the set of variables from an outer scope
                -- (that's mono_tvs0) and the set of covars, closed over kinds.
                -- Given this set of variables we know we will not quantify,
                -- we want to find any other variables that are determined by this
                -- set, by functional dependencies or equalities. We thus use
                -- oclose to find all further variables determined by this root
-               -- set. "RAE" update comments
+               -- set.
 
              mono_tvs2 = oclose candidates mono_tvs1
+               -- mono_tvs2 now contains any variable determined by the "root
+               -- set" of monomorphic tyvars in mono_tvs1.
 
              constrained_tvs = filterVarSet (isQuantifiableTv tc_lvl) $
                                (oclose candidates (tyCoVarsOfTypes no_quant)
                                 `minusVarSet` mono_tvs2)
-
              -- constrained_tvs: the tyvars that we are not going to
              -- quantify solely because of the monomorphism restriction
              --
              -- (`minusVarSet` mono_tvs2): a type variable is only
              --   "constrained" (so that the MR bites) if it is not
-             --   free in the environment (#13785)
+             --   free in the environment (#13785) or is determined
+             --   by some variable that is free in the env't
 
              mono_tvs = (mono_tvs2 `unionVarSet` constrained_tvs)
                           `delVarSetList` psig_qtvs
-
              -- (`delVarSetList` psig_qtvs): if the user has explicitly
              --   asked for quantification, then that request "wins"
              --   over the MR.
              --
-             -- Note: it is OK to delete psig_qtvs here:
-             --   problematic variables for quantification, as per
-             --     Note [Quantification and partial signatures], Wrinkle 3, 4
-             --   are handled in GHC.Tc.Gen.Bind.chooseInferredQuantifiers.
-             -- (Test case: T14479.)
+             -- What if a psig variable is also free in the environment
+             -- (i.e. says "no" to isQuantifiableTv)? That's OK: explanation
+             -- in Step 2 of Note [Deciding quantification].
 
            -- Warn about the monomorphism restriction
        ; when (case infer_mode of { ApplyMR -> True; _ -> False}) $
@@ -1485,10 +1503,11 @@ growMonoTyVars :: [PredType]   -- candidates
 
 -------------------
 defaultTyVarsAndSimplify :: TcLevel
-                         -> TyCoVarSet
+                         -> TyCoVarSet          -- Promote these mono-tyvars
                          -> [PredType]          -- Assumed zonked
                          -> TcM [PredType]      -- Guaranteed zonked
--- Default any tyvar free in the constraints,
+-- Promote the known-monomorphic tyvars;
+-- Default any tyvar free in the constraints;
 -- and re-simplify in case the defaulting allows further simplification
 defaultTyVarsAndSimplify rhs_tclvl mono_tvs candidates
   = do {  -- Promote any tyvars that we cannot generalise
