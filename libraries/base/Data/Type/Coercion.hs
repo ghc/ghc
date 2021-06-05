@@ -1,12 +1,14 @@
-{-# LANGUAGE TypeOperators       #-}
-{-# LANGUAGE TypeFamilies        #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE GADTs               #-}
-{-# LANGUAGE FlexibleInstances   #-}
-{-# LANGUAGE StandaloneDeriving  #-}
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE PolyKinds           #-}
-{-# LANGUAGE RankNTypes          #-}
+{-# LANGUAGE FlexibleInstances        #-}
+{-# LANGUAGE GADTs                    #-}
+{-# LANGUAGE NoImplicitPrelude        #-}
+{-# LANGUAGE PolyKinds                #-}
+{-# LANGUAGE RankNTypes               #-}
+{-# LANGUAGE ScopedTypeVariables      #-}
+{-# LANGUAGE StandaloneDeriving       #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
+{-# LANGUAGE TypeApplications         #-}
+{-# LANGUAGE TypeFamilies             #-}
+{-# LANGUAGE TypeOperators            #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -46,8 +48,9 @@ import GHC.Base
 -- the @Coercible a b@ instance, and then use 'coerce' to apply it.
 --
 -- @since 4.7.0.0
+type Coercion :: forall k. k -> k -> Type
 data Coercion a b where
-  Coercion :: Coercible a b => Coercion a b
+  Coercion :: forall {k} a b. Coercible a b => Coercion @k a b
 
 -- with credit to Conal Elliott for 'ty', Erik Hesselink & Martijn van
 -- Steenbergen for 'type-equality', Edward Kmett for 'eq', and Gabor Greif
@@ -100,6 +103,7 @@ deriving instance Coercible a b => Bounded (Coercion a b)
 -- | This class contains types where you can learn the equality of two types
 -- from information contained in /terms/. Typically, only singleton types should
 -- inhabit this class.
+type  TestCoercion :: forall {k}. (k -> Type) -> Constraint
 class TestCoercion f where
   -- | Conditionally prove the representational equality of @a@ and @b@.
   testCoercion :: f a -> f b -> Maybe (Coercion a b)

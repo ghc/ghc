@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
 
 module Main where
 
@@ -9,6 +10,7 @@ import Prelude hiding (foldr, foldl, foldl', foldr1, foldl1, length, null, sum,
 import Control.Exception
 import Data.Array
 import Data.Foldable
+import Data.Kind
 import Data.Typeable
 import Data.Either
 import Control.Applicative
@@ -22,7 +24,9 @@ import qualified GHC.List as L
 data BadElementException = BadFirst | BadLast deriving (Show, Eq)
 instance Exception BadElementException
 
+type    ForceDefault :: (Type -> Type) -> Type -> TYpe
 newtype ForceDefault f a = ForceDefault (f a)
+
 instance Foldable f => Foldable (ForceDefault f) where
   foldMap f (ForceDefault c) = foldMap f c
 

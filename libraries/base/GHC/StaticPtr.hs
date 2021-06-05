@@ -1,7 +1,9 @@
 {-# LANGUAGE CPP                       #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE MagicHash                 #-}
+{-# LANGUAGE StandaloneKindSignatures  #-}
 {-# LANGUAGE UnboxedTuples             #-}
+
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 -----------------------------------------------------------------------------
 -- |
@@ -48,6 +50,7 @@ module GHC.StaticPtr
   , IsStatic(..)
   ) where
 
+import Data.Kind (Type, Constraint)
 import Foreign.C.Types     (CInt(..))
 import Foreign.Marshal     (allocaArray, peekArray, withArray)
 import GHC.Ptr             (Ptr(..), nullPtr)
@@ -97,6 +100,7 @@ unsafeLookupStaticPtr (Fingerprint w1 w2) = do
 foreign import ccall unsafe hs_spt_lookup :: Ptr Word64 -> IO (Ptr a)
 
 -- | A class for things buildable from static pointers.
+type  IsStatic :: (Type -> Type) -> Constraint
 class IsStatic p where
     fromStaticPtr :: StaticPtr a -> p a
 

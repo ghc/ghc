@@ -3,7 +3,9 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE Trustworthy #-}
 
 -----------------------------------------------------------------------------
@@ -29,6 +31,7 @@ import Data.Functor.Classes
 
 import Control.Applicative
 import Data.Coerce (coerce)
+import Data.Kind (Type)
 import Data.Data (Data)
 import Data.Type.Equality (TestEquality(..), (:~:)(..))
 import GHC.Generics (Generic, Generic1)
@@ -39,7 +42,11 @@ infixr 9 `Compose`
 -- | Right-to-left composition of functors.
 -- The composition of applicative functors is always applicative,
 -- but the composition of monads is not always a monad.
-newtype Compose f g a = Compose { getCompose :: f (g a) }
+--
+-- @since 4.9.0.0
+type    Compose :: forall k2 k1. (k2 -> Type) -> (k1 -> k2) -> (k1 -> Type)
+newtype Compose f g a where
+  Compose :: forall {k2} {k1} f g a. { getCompose :: f (g a) } -> Compose @k2 @k1 f g a
   deriving ( Data     -- ^ @since 4.9.0.0
            , Generic  -- ^ @since 4.9.0.0
            , Generic1 -- ^ @since 4.9.0.0
