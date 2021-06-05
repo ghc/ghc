@@ -1,7 +1,8 @@
-{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
+{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
 {-|
@@ -23,4 +24,5 @@ import GHC.Num.Natural(Natural)
 -- | Comparison of type-level naturals, as a function.
 --
 -- @since 4.7.0.0
-type family CmpNat (m :: Natural) (n :: Natural) :: Ordering
+type CmpNat :: Natural -> Natural -> Ordering
+type family CmpNat m n
