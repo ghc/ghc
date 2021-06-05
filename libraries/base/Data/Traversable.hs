@@ -3,6 +3,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE TypeOperators #-}
 
@@ -75,7 +76,7 @@ import Data.Proxy ( Proxy(..) )
 
 import GHC.Arr
 import GHC.Base ( Applicative(..), Monad(..), Monoid, Maybe(..), NonEmpty(..),
-                  ($), (.), id, flip )
+                  ($), (.), id, flip, Type, Constraint )
 import GHC.Generics
 import qualified GHC.List as List ( foldr )
 import GHC.Tuple (Solo (..))
@@ -98,6 +99,7 @@ import GHC.Tuple (Solo (..))
 -- A more detailed description can be found in the overview section of
 -- "Data.Traversable#overview".
 --
+type  Traversable :: (Type -> Type) -> Constraint
 class (Functor t, Foldable t) => Traversable t where
     {-# MINIMAL traverse | sequenceA #-}
 

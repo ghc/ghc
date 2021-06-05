@@ -1,7 +1,8 @@
-{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
+{-# LANGUAGE Trustworthy #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -67,6 +68,7 @@ import GHC.Show (Show)
 -- $setup
 -- >>> import Prelude
 
+type    WrappedMonad :: (Type -> Type) -> Type -> Type
 newtype WrappedMonad m a = WrapMonad { unwrapMonad :: m a }
                          deriving ( Generic  -- ^ @since 4.7.0.0
                                   , Generic1 -- ^ @since 4.7.0.0
@@ -88,6 +90,7 @@ instance MonadPlus m => Alternative (WrappedMonad m) where
     empty = WrapMonad mzero
     WrapMonad u <|> WrapMonad v = WrapMonad (u `mplus` v)
 
+type    WrappedArrow :: (Type -> Type -> Type) -> (Type -> Type -> Type)
 newtype WrappedArrow a b c = WrapArrow { unwrapArrow :: a b c }
                            deriving ( Generic  -- ^ @since 4.7.0.0
                                     , Generic1 -- ^ @since 4.7.0.0
