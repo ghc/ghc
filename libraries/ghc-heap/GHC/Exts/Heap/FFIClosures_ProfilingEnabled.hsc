@@ -70,7 +70,6 @@ parseWhyBlocked w = case w of
                         (#const BlockedOnBlackHole) -> BlockedOnBlackHole
                         (#const BlockedOnRead) -> BlockedOnRead
                         (#const BlockedOnWrite) -> BlockedOnWrite
-                        (#const BlockedOnDelay) -> BlockedOnDelay
                         (#const BlockedOnSTM) -> BlockedOnSTM
                         (#const BlockedOnDoProc) -> BlockedOnDoProc
                         (#const BlockedOnCCall) -> BlockedOnCCall

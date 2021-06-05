@@ -866,9 +866,6 @@ printThreadBlockage(StgTSO *tso)
   case BlockedOnWrite:
     debugBelch("is blocked on write to fd %d", (int)(tso->block_info.fd));
     break;
-  case BlockedOnDelay:
-    debugBelch("is blocked until %ld", (long)(tso->block_info.target));
-    break;
 #endif
     break;
   case BlockedOnMVar:
