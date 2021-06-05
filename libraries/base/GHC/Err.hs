@@ -54,16 +54,12 @@ errorWithoutStackTrace s = raise# (errorCallException s)
 -- a partial stack trace, containing the call-site of each function
 -- with a HasCallStack constraint.
 --
--- In base, however, the only functions that have such constraints are
--- error and undefined, so the stack traces from partial functions in
--- base will never contain a call-site in user code. Instead we'll
--- usually just get the actual call to error. Base functions already
--- have a good habit of providing detailed error messages, including the
--- name of the offending partial function, so the partial stack-trace
--- does not provide any extra information, just noise. Thus, we export
--- the callstack-aware error, but within base we use the
--- errorWithoutStackTrace variant for more hygienic error messages.
-
+-- In base, error and undefined were the only functions that had such
+-- constraint. Errors like "Prelude.!!: negative index" are good, yet if the
+-- code base contains dozens of !! applications (including dependencies,
+-- which code is not as easily accessible), pinpointing the bad call is
+-- where the stack trace would help.  Therefore we annotate most calls to
+-- error, so users have a chance to get a better idea.
 
 -- | A special case of 'error'.
 -- It is expected that compilers will recognize this and insert error
