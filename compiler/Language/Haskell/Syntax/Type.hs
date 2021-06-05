@@ -7,6 +7,7 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
                                       -- in module Language.Haskell.Syntax.Extension
 {-
@@ -22,7 +23,7 @@ module Language.Haskell.Syntax.Type (
         Mult, HsScaled(..),
         hsMult, hsScaledThing,
         HsArrow(..),
-        hsLinear, hsUnrestricted,
+        HsLinearArrowTokens(..),
 
         HsType(..), HsCoreTy, LHsType, HsKind, LHsKind,
         HsForAllTelescope(..), HsTyVarBndr(..), LHsTyVarBndr,
@@ -913,15 +914,19 @@ data HsTyLit
 
 -- | Denotes the type of arrows in the surface language
 data HsArrow pass
-  = HsUnrestrictedArrow IsUnicodeSyntax
+  = HsUnrestrictedArrow !(LHsUniToken "->" "→" pass)
     -- ^ a -> b or a → b
-  | HsLinearArrow IsUnicodeSyntax (Maybe AddEpAnn)
+  | HsLinearArrow !(HsLinearArrowTokens pass)
     -- ^ a %1 -> b or a %1 → b, or a ⊸ b
-  | HsExplicitMult IsUnicodeSyntax (Maybe AddEpAnn) (LHsType pass)
+  | HsExplicitMult !(LHsToken "%" pass) !(LHsType pass) !(LHsUniToken "->" "→" pass)
     -- ^ a %m -> b or a %m → b (very much including `a %Many -> b`!
     -- This is how the programmer wrote it). It is stored as an
     -- `HsType` so as to preserve the syntax as written in the
     -- program.
+
+data HsLinearArrowTokens pass
+  = HsPct1 !(LHsToken "%1" pass) !(LHsUniToken "->" "→" pass)
+  | HsLolly !(LHsToken "⊸" pass)
 
 -- | This is used in the syntax. In constructor declaration. It must keep the
 -- arrow representation.
@@ -932,12 +937,6 @@ hsMult (HsScaled m _) = m
 
 hsScaledThing :: HsScaled pass a -> a
 hsScaledThing (HsScaled _ t) = t
-
--- | When creating syntax we use the shorthands. It's better for printing, also,
--- the shorthands work trivially at each pass.
-hsUnrestricted, hsLinear :: a -> HsScaled pass a
-hsUnrestricted = HsScaled (HsUnrestrictedArrow NormalSyntax)
-hsLinear = HsScaled (HsLinearArrow NormalSyntax Nothing)
 
 instance Outputable a => Outputable (HsScaled pass a) where
    ppr (HsScaled _cnt t) = -- ppr cnt <> ppr t

@@ -2389,9 +2389,9 @@ rnConDeclGADTDetails ::
 rnConDeclGADTDetails _ doc (PrefixConGADT tys)
   = do { (new_tys, fvs) <- mapFvRn (rnScaledLHsType doc) tys
        ; return (PrefixConGADT new_tys, fvs) }
-rnConDeclGADTDetails con doc (RecConGADT flds)
+rnConDeclGADTDetails con doc (RecConGADT flds arr)
   = do { (new_flds, fvs) <- rnRecConDeclFields con doc flds
-       ; return (RecConGADT new_flds, fvs) }
+       ; return (RecConGADT new_flds arr, fvs) }
 
 rnRecConDeclFields ::
      Name
