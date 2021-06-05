@@ -305,7 +305,7 @@ repTopDs group@(HsGroup { hs_valds   = valds
                      ; inst_ds  <- mapM repInstD instds
                      ; deriv_ds <- mapM repStandaloneDerivD derivds
                      ; fix_ds   <- mapM repLFixD fixds
-                     ; _        <- mapM no_default_decl defds
+                     ; def_ds   <- mapM repDefD defds
                      ; for_ds   <- mapM repForD fords
                      ; _        <- mapM no_warn (concatMap (wd_warnings . unLoc)
                                                            warnds)
@@ -319,6 +319,7 @@ repTopDs group@(HsGroup { hs_valds   = valds
                                 val_ds ++ catMaybes tycl_ds ++ role_ds
                                        ++ kisig_ds
                                        ++ (concat fix_ds)
+                                       ++ def_ds
                                        ++ inst_ds ++ rule_ds ++ for_ds
                                        ++ ann_ds ++ deriv_ds) }) ;
 
@@ -332,8 +333,6 @@ repTopDs group@(HsGroup { hs_valds   = valds
   where
     no_splice (L loc _)
       = notHandledL (locA loc) ThSplicesWithinDeclBrackets
-    no_default_decl (L loc decl)
-      = notHandledL (locA loc) (ThDefaultDeclarations decl)
     no_warn :: LWarnDecl GhcRn -> MetaM a
     no_warn (L loc (Warning _ thing _))
       = notHandledL (locA loc) (ThWarningAndDeprecationPragmas thing)
@@ -797,6 +796,12 @@ rep_fix_d loc (FixitySig _ names (Fixity _ prec dir))
                    ; dec <- rep2 rep_fn [prec', name']
                    ; return (loc,dec) }
        ; mapM do_one names }
+
+repDefD :: LDefaultDecl GhcRn -> MetaM (SrcSpan, Core (M TH.Dec))
+repDefD (L loc (DefaultDecl _ tys)) = do { tys1 <- repLTys tys
+                                         ; MkC tys2 <- coreListM typeTyConName tys1
+                                         ; dec <- rep2 defaultDName [tys2]
+                                         ; return (locA loc, dec)}
 
 repRuleD :: LRuleDecl GhcRn -> MetaM (SrcSpan, Core (M TH.Dec))
 repRuleD (L loc (HsRule { rd_name = n
