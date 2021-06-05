@@ -1,7 +1,9 @@
-{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
+{-# LANGUAGE Trustworthy #-}
 {-# OPTIONS_GHC -Wno-inline-rule-shadowing #-}
     -- The RULES for the methods of class Category may never fire
     -- e.g. identity/left, identity/right, association;  see #10528
@@ -21,6 +23,7 @@
 module Control.Category where
 
 import qualified GHC.Base (id,(.))
+import GHC.Base (Type, Constraint)
 import Data.Type.Coercion
 import Data.Type.Equality
 import Data.Coerce (coerce)
@@ -34,6 +37,7 @@ infixr 1 >>>, <<<
 -- [Left identity]  @'id' '.' f  =  f@
 -- [Associativity]  @f '.' (g '.' h)  =  (f '.' g) '.' h@
 --
+type  Category :: forall {ob}. (ob -> ob -> Type) -> Constraint
 class Category cat where
     -- | the identity morphism
     id :: cat a a

@@ -5,6 +5,7 @@
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
 
 
 module Main where
@@ -23,6 +24,7 @@ buildTree n a =
 
 data Nat = Z | S Nat
 
+type Vec :: Nat -> Type -> Type
 data Vec n a where
   Nil :: Vec 'Z a
   Cons :: a -> !(Vec n a) -> Vec ('S n) a
@@ -31,6 +33,7 @@ deriving instance Functor (Vec n)
 deriving instance Foldable (Vec n)
 deriving instance Show a => Show (Vec n a)
 
+type  Pure :: Nat -> Constraint
 class Pure n where
   pure' :: a -> Vec n a
 instance Pure 'Z where
