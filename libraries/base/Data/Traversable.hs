@@ -63,6 +63,9 @@ module Data.Traversable (
     -- ** Const: the 'foldMapDefault' function
     -- $phantom
 
+    -- ** ZipList: transposing lists of lists
+    -- $ziplist
+
     -- * Laws
     --
     -- $laws
@@ -497,8 +500,7 @@ foldMapDefault = coerce (traverse :: (a -> Const m ()) -> t a -> Const m (t ()))
 --
 -- After exploring the basic 'Traversable' [methods](#traverse) in more detail,
 -- and looking at how to reason about their [construction](#construction),
--- we'll take a look at [specialised](#special) choices of Applicative effects
--- to implement the auxiliary functions in this module.
+-- we'll take a look at [specialised](#special) choices of Applicative effects.
 --
 -- A @Traversable@ structure is automatically both a 'Functor' and 'Foldable'.
 -- These superclasses do not impose additional limitations on the the set of
@@ -1097,6 +1099,88 @@ foldMapDefault = coerce (traverse :: (a -> Const m ()) -> t a -> Const m (t ()))
 -- element __@a@__) and so should not try to pre-compute and re-use
 -- subexpressions that pay off only on repeated execution.  Otherwise, it is
 -- just the identity function.
+
+------------------
+
+-- $ziplist
+--
+-- #ziplist#
+-- We've already looked at the standard 'Applicative' instance of @List@ for
+-- which applying __@m@__ functions __@f1, f2, ..., fm@__ to __@n@__ input
+-- values __@a1, a2, ..., an@__ produces __@m * n@__ outputs:
+--
+-- >>> :set -XTupleSections
+-- >>> [("f1",), ("f2",), ("f3",)] <*> [1,2]
+-- [("f1",1),("f1",2),("f2",1),("f2",2),("f3",1),("f3",2)]
+--
+-- There are however two more common ways to turn lists into 'Applicative'
+-- control structures.  The first is via __@'Const' [a]@__, since lists are
+-- monoids under concatenation, and we've already seen that __@'Const' m@__ is
+-- an 'Applicative' functor when __@m@__ is a 'Monoid'.  The second, is based
+-- on 'Data.List.zipWith', and is called 'Constrol.Applicative.ZipList':
+--
+-- > {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+-- > newtype ZipList a = ZipList { getZipList :: [a] }
+-- >     deriving (Show, Eq, ..., Functor)
+-- >
+-- > instance Applicative ZipList where
+-- >     liftA2 f (ZipList xs) (ZipList ys) = ZipList $ zipWith f xs ys
+-- >     pure x = repeat x
+--
+-- The 'liftA2' definition is clear enough, instead of applying __@f@__ to each
+-- pair __@(x, y)@__ drawn independently from the __@xs@__ and __@ys@__, only
+-- corresponding pairs at each index in the two lists are used.
+--
+-- The definition of 'pure' may look surprising, but it is needed to ensure
+-- that the instance is lawful:
+--
+-- prop> liftA2 f (pure x) ys == fmap (f x) ys
+--
+-- Since __@ys@__ can have any length, we need to provide an infinite supply
+-- of __@x@__ values in __@pure x@__ in order to have a value to pair with
+-- each element __@y@__.
+--
+-- When 'Constrol.Applicative.ZipList' is the 'Applicative' functor used in the
+-- [construction](#construction) of a traversal, a ZipList holding a partially
+-- built structure with __@m@__ elements is combined with a component holding
+-- __@n@__ elements via 'zipWith', resulting in __@min m n@__ outputs!
+--
+-- Therefore 'traverse' with __@g :: a -> ZipList b@__ will produce a @ZipList@
+-- of __@t b@__ structures whose element count is the minimum length of the
+-- ZipLists __@g a@__ with __@a@__ ranging over the elements of __@t@__.  When
+-- __@t@__ is empty, the length is infinite (as expected for a minimum of an
+-- empty set).
+--
+-- If the structure __@t@__ holds values of type __@ZipList a@__, we can use
+-- the identity function __@id :: ZipList a -> ZipList a@__ for the first
+-- argument of 'traverse':
+--
+-- > traverse (id :: ZipList a -> ZipList a) :: t (ZipList a) -> ZipList (t a)
+--
+-- The number of elements in the output @ZipList@ will be the length of the
+-- shortest @ZipList@ element of __@t@__.  Each output __@t a@__ will have the
+-- /same shape/ as the input __@t (ZipList a)@__, i.e. will share its number of
+-- elements.
+--
+-- If we think of the elements of __@t (ZipList a)@__ as its rows, and the
+-- elements of each individual @ZipList@ as the columns of that row, we see
+-- that our traversal implements a /transpose/ operation swapping the rows
+-- and columns of __@t@__, after first truncating all the rows to the column
+-- count of the shortest one.
+--
+-- Since in fact __@'traverse' id@__ is just 'sequenceA' the above boils down
+-- to a rather concise definition of /transpose,/ in which we coerce away the
+-- @ZipList@ @newtype@ wrappers to operate on a list of lists:
+--
+-- >>> {-# LANGUAGE ScopedTypeVariables #-}
+-- >>> import Control.Applicative (ZipList(..))
+-- >>> import Data.Coerce (coerce)
+-- >>>
+-- >>> transpose :: forall a. [[a]] -> [[a]]
+-- >>> transpose = coerce (sequenceA :: [ZipList a] -> ZipList [a])
+-- >>>
+-- >>> transpose [[1,2,3],[4..],[7..]]
+-- [[1,4,7],[2,5,8],[3,6,9]]
 
 ------------------
 
