@@ -23,6 +23,7 @@ import GHC.Cmm.CLabel
 import GHC.Cmm.Utils
 
 import GHC.Types.Literal
+import GHC.Types.RepType( runtimeRepPrimRep )
 import GHC.Builtin.Types ( unitDataConId )
 import GHC.Core.TyCon
 import GHC.Utils.Misc
@@ -49,8 +50,8 @@ cgLit :: Literal -> FCode CmmExpr
 cgLit (LitString s) =
   CmmLit <$> newByteStringCLit s
  -- not unpackFS; we want the UTF-8 byte stream.
-cgLit (LitRubbish preps) =
-  case expectOnly "cgLit:Rubbish" preps of -- Note [Post-unarisation invariants]
+cgLit (LitRubbish rep) =
+  case expectOnly "cgLit" prim_reps of -- Note [Post-unarisation invariants]
     VoidRep     -> panic "cgLit:VoidRep"   -- dito
     LiftedRep   -> idInfoToAmode <$> getCgIdInfo unitDataConId
     UnliftedRep -> idInfoToAmode <$> getCgIdInfo unitDataConId
@@ -60,7 +61,9 @@ cgLit (LitRubbish preps) =
       let elem_lit = mkSimpleLit platform (num_rep_lit (primElemRepToPrimRep elem))
       pure (CmmLit (CmmVec (replicate n elem_lit)))
     prep        -> cgLit (num_rep_lit prep)
-    where
+  where
+      prim_reps = runtimeRepPrimRep (text "cgLit") rep
+
       num_rep_lit IntRep    = mkLitIntUnchecked 0
       num_rep_lit Int8Rep   = mkLitInt8Unchecked 0
       num_rep_lit Int16Rep  = mkLitInt16Unchecked 0
@@ -74,6 +77,7 @@ cgLit (LitRubbish preps) =
       num_rep_lit FloatRep  = LitFloat 0
       num_rep_lit DoubleRep = LitDouble 0
       num_rep_lit other     = pprPanic "num_rep_lit: Not a num lit" (ppr other)
+
 cgLit other_lit = do
   platform <- getPlatform
   pure (CmmLit (mkSimpleLit platform other_lit))

@@ -92,7 +92,8 @@ test('T949', [extra_ways(extra_prof_ways)], compile_and_run, [''])
 test('ioprof',
      [expect_broken_for_10037,
       exit_code(1),
-      omit_ways(['ghci-ext-prof']) # doesn't work with exit_code(1)
+      omit_ways(['ghci-ext-prof']), # doesn't work with exit_code(1)
+      ignore_stderr
      ],
      compile_and_run,
      ['-fno-full-laziness -fno-state-hack']) # Note [consistent stacks]
@@ -109,6 +110,7 @@ test('T5559', fragile(16350), compile_and_run, [''])
 test('T7275', normal, makefile_test, [])
 
 # Note [consistent stacks]
+# ~~~~~~~~~~~~~~~~~~~~~~~~
 #  Certain optimisations can change the stacks we get out of the
 #  profiler.  These flags are necessary (but perhaps not sufficient)
 #  to get consistent stacks:
