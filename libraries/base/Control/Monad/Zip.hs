@@ -1,4 +1,5 @@
 {-# LANGUAGE Safe #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TypeOperators #-}
 
 -----------------------------------------------------------------------------
@@ -21,6 +22,7 @@ module Control.Monad.Zip where
 import Control.Monad (liftM, liftM2)
 import Data.Functor.Identity
 import Data.Monoid
+import Data.Kind ( Type, Constraint )
 import Data.Ord ( Down(..) )
 import Data.Proxy
 import qualified Data.List.NonEmpty as NE
@@ -40,6 +42,7 @@ import GHC.Tuple (Solo (..))
 --         implies
 --     @'munzip' ('mzip' ma mb) = (ma, mb)@
 --
+type  MonadZip :: (Type -> Type) -> Constraint
 class Monad m => MonadZip m where
     {-# MINIMAL mzip | mzipWith #-}
 

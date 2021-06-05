@@ -1,6 +1,10 @@
-{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
+{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE TypeApplications #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -53,9 +57,13 @@ import GHC.Arr
 --
 -- >>> Proxy :: Proxy complicatedStructure
 -- Proxy
-data Proxy t = Proxy deriving ( Bounded -- ^ @since 4.7.0.0
-                              , Read    -- ^ @since 4.7.0.0
-                              )
+type Proxy :: forall k. k -> Type
+data Proxy a where
+  Proxy :: forall {k} a. Proxy @k a
+  deriving
+    ( Bounded -- ^ @since 4.7.0.0
+    , Read    -- ^ @since 4.7.0.0
+    )
 
 -- | A concrete, promotable proxy type, for use at the kind level.
 -- There are no instances for this because it is intended at the kind level only
@@ -155,4 +163,3 @@ instance MonadPlus Proxy
 asProxyTypeOf :: a -> proxy a -> a
 asProxyTypeOf = const
 {-# INLINE asProxyTypeOf #-}
-

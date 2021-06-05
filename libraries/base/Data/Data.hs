@@ -1,13 +1,14 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE TypeOperators #-}
 
@@ -445,14 +446,17 @@ was transformed successfully.
 
 
 -- | Type constructor for adding counters to queries
+type Qi :: Type -> k -> Type
 data Qi q a = Qi Int (Maybe q)
 
 
 -- | The type constructor used in definition of gmapQr
+type    Qr :: Type -> k -> Type
 newtype Qr r a = Qr { unQr  :: r -> r }
 
 
 -- | The type constructor used in definition of gmapMp
+type    Mp :: (Type -> Type) -> Type -> Type
 newtype Mp m x = Mp { unMp :: m (x, Bool) }
 
 
