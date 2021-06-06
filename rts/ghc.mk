@@ -45,7 +45,10 @@ else
 ALL_DIRS += posix
 endif
 
-rts_C_SRCS := $(wildcard rts/*.c $(foreach dir,$(ALL_DIRS),rts/$(dir)/*.c))
+tmp_rts_C_SRCS := $(wildcard rts/*.c $(foreach dir,$(ALL_DIRS),rts/$(dir)/*.c))
+# We shouldn't include this file in the binary, it's a common function so
+# it will likely clash with something later. See #19948
+rts_C_SRCS = $(filter-out rts/xxhash.c, $(tmp_rts_C_SRCS))
 rts_C_HOOK_SRCS := $(wildcard rts/hooks/*.c)
 rts_CMM_SRCS := $(wildcard rts/*.cmm)
 
@@ -428,7 +431,7 @@ rts/RtsUtils_CC_OPTS += -DTargetVendor=\"$(TargetVendor_CPP)\"
 rts/RtsUtils_CC_OPTS += -DGhcUnregisterised=\"$(GhcUnregisterised)\"
 rts/RtsUtils_CC_OPTS += -DTablesNextToCode=\"$(TablesNextToCode)\"
 #
-rts/xxhash_CC_OPTS += -O3 -ffast-math -ftree-vectorize
+rts/Hash_CC_OPTS += -O3
 
 # Compile various performance-critical pieces *without* -fPIC -dynamic
 # even when building a shared library.  If we don't do this, then the
