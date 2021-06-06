@@ -1,0 +1,3 @@
+:l T19460
+data T = T
+instance Foo T
