@@ -531,10 +531,14 @@ library
                sm/Scav_thr.c
                sm/Storage.c
                sm/Sweep.c
-               xxhash.c
                fs.c
                -- I wish we had wildcards..., this would be:
                -- *.c hooks/**/*.c sm/**/*.c eventlog/**/*.c linker/**/*.c
+
+    extra-source-files:
+               -- This file needs to be in the package but shouldn't be compiled on its own.
+               xxhash.c
+
     if os(windows)
        c-sources: win32/AsyncMIO.c
                   win32/AsyncWinIO.c
