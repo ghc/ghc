@@ -171,6 +171,23 @@ test('EventlogOutput2',
        omit_ways(['dyn', 'ghci'] + prof_ways) ],
      makefile_test, ['EventlogOutput2'])
 
+# Test that Info Table Provenance (IPE) events are emitted.
+# This test requires ghc-events to be available in $PATH.
+test('EventlogOutput_IPE',
+     [ extra_files(["EventlogOutput.hs"]),
+       req_tool('ghc-events'),
+       ignore_stdout,
+       ignore_stderr ],
+     makefile_test, ['EventlogOutput_IPE'])
+
+# Manually create IPE entries and dump them to event log.
+# This test requires ghc-events to be available in $PATH.
+test('ipeEventLog',
+     [ req_tool('ghc-events'),
+       ignore_stdout,
+       ignore_stderr ],
+     makefile_test, ['ipeEventLog'])
+
 test('T4059', [], makefile_test, ['T4059'])
 
 # Test for #4274
@@ -439,3 +456,5 @@ test('T15427', normal, compile_and_run, [''])
 
 test('T19481', extra_run_opts('+RTS -T  -RTS'), compile_and_run, [''])
 test('T19381', extra_run_opts('+RTS -T -RTS'), compile_and_run, [''])
+
+test('ipeMap', [c_src], compile_and_run, [''])
