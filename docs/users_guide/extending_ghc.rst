@@ -545,14 +545,22 @@ is defined thus:
 ::
 
     data TcPlugin = forall s . TcPlugin
-      { tcPluginInit  :: TcPluginM s
-      , tcPluginSolve :: s -> TcPluginSolver
-      , tcPluginStop  :: s -> TcPluginM ()
+      { tcPluginInit    :: TcPluginM s
+      , tcPluginRewrite :: s -> TcPluginRewriter
+      , tcPluginSolve   :: s -> TcPluginSolver
+      , tcPluginStop    :: s -> TcPluginM ()
       }
 
     type TcPluginSolver = [Ct] -> [Ct] -> [Ct] -> TcPluginM TcPluginResult
 
+    type TcPluginRewriter = [Ct] -> [Ct] -> [Ct] -> TyCon -> [TcType] -> TcPluginM TcPluginRewriteResult
+
     data TcPluginResult = TcPluginContradiction [Ct] | TcPluginOk [(EvTerm,Ct)] [Ct]
+
+    data TcPluginRewriteResult where
+      TcPluginRewriteError :: (Diagnostic a, Typeable a) => a -> TcPluginRewriteResult
+      TcPluginNoRewrite :: TcPluginRewriteResult
+      TcPluginRewriteTo :: TcType -> TcPluginRewriteResult
 
 (The details of this representation are subject to change as we gain
 more experience writing typechecker plugins. It should not be assumed to
@@ -573,6 +581,11 @@ The basic idea is as follows:
    contradiction was found or progress was made. If the plugin solver
    makes progress, GHC will re-start the constraint solving pipeline,
    looping until a fixed point is reached.
+
+-  When rewriting type family applications, GHC calls ``tcPluginRewriter``.
+   This function is provided with the current set of constraints,
+   and a saturated type family application. The plugin can then specify
+   a possible rewriting for this type family application, if desired.
 
 -  Finally, GHC calls ``tcPluginStop`` after constraint solving is
    finished, allowing the plugin to dispose of any resources it has
