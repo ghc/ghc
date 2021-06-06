@@ -23,7 +23,8 @@ typedef struct IpeBufferListNode_ {
 
 void dumpIPEToEventLog(void);
 void updateIpeMap(void);
-void setupMutex(void);
+void initIpeMapLock(void);
+void closeIpeMapLock(void);
 
 #if defined(TRACING)
 void traceIPEFromHashTable(void *data STG_UNUSED, StgWord key STG_UNUSED,

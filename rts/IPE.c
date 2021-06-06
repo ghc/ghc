@@ -59,7 +59,9 @@ static IpeBufferListNode *ipeBufferList = NULL;
 
 static Mutex ipeMapLock;
 
-void __attribute__((constructor)) setupMutex(void) { initMutex(&ipeMapLock); }
+void initIpeMapLock(void) { initMutex(&ipeMapLock); }
+
+void closeIpeMapLock(void) { closeMutex(&ipeMapLock); }
 
 void dumpIPEToEventLog(void) {
 #if defined(TRACING)
