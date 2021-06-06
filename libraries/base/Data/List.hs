@@ -759,14 +759,20 @@ genericLength (_:l)     =  1 + genericLength l
 
 {-# RULES
   "genericLengthInt"     genericLength = (strictGenericLength :: [a] -> Int);
+  "genericLengthWord"    genericLength = (strictGenericLength :: [a] -> Word);
   "genericLengthInteger" genericLength = (strictGenericLength :: [a] -> Integer);
  #-}
 
+{-# SPECIALISE strictGenericLength
+    :: [b] -> Int
+     , [b] -> Word
+     , [b] -> Integer
+  #-}
 strictGenericLength     :: (Num i) => [b] -> i
 strictGenericLength l   =  gl l 0
                         where
-                           gl [] a     = a
-                           gl (_:xs) a = let a' = a + 1 in a' `seq` gl xs a'
+                           gl [] !a    = a
+                           gl (_:xs) a = gl xs (a + 1)
 
 -- | The 'genericTake' function is an overloaded version of 'take', which
 -- accepts any 'Integral' value as the number of elements to take.
