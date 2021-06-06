@@ -1,0 +1,5 @@
+
+T19926.hs:3:17: warning: [-Wunsafe]
+    ‘T19926’ has been inferred as unsafe!
+    Reason:
+        <no location info>: warning: Use of plugins makes the module unsafe

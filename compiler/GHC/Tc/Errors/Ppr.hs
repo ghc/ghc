@@ -38,6 +38,10 @@ instance Diagnostic TcRnMessage where
       -> mkDecorated [ text "The import item" <+> quotes (ppr ie) <+>
                        text "does not have an explicit import list"
                      ]
+    TcRnUnsafeDueToPlugin
+      -> mkDecorated [text "Use of plugins makes the module unsafe"]
+    TcRnModMissingRealSrcSpan mod
+      -> mkDecorated [text "Module does not have a RealSrcSpan:" <+> ppr mod]
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -54,6 +58,10 @@ instance Diagnostic TcRnMessage where
       -> WarningWithFlag Opt_WarnDodgyExports
     TcRnMissingImportList{}
       -> WarningWithFlag Opt_WarnMissingImportList
+    TcRnUnsafeDueToPlugin{}
+      -> WarningWithoutFlag
+    TcRnModMissingRealSrcSpan{}
+      -> ErrorWithoutFlag
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -69,6 +77,10 @@ instance Diagnostic TcRnMessage where
     TcRnDodgyExports{}
       -> noHints
     TcRnMissingImportList{}
+      -> noHints
+    TcRnUnsafeDueToPlugin{}
+      -> noHints
+    TcRnModMissingRealSrcSpan{}
       -> noHints
 
 dodgy_msg :: (Outputable a, Outputable b) => SDoc -> a -> b -> SDoc

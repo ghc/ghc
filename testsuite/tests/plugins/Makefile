@@ -131,6 +131,11 @@ T16260:
 	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) -v0 T16260.hs -package-db simple-plugin/pkg.T16260/local.package.conf -fplugin Simple.TrustworthyPlugin
 	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) -v0 T16260.hs -package-db simple-plugin/pkg.T16260/local.package.conf -fplugin Simple.TrustworthyPlugin -fplugin-trustworthy
 
+.PHONY: T19926
+T19926:
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) -v0 T19926.hs -package-db simple-plugin/pkg.T19926/local.package.conf -fplugin Simple.DefaultPlugin
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) -v0 T19926.hs -package-db simple-plugin/pkg.T19926/local.package.conf -fplugin Simple.DefaultPlugin -fplugin-trustworthy
+
 .PHONY: HoleFitPlugin
 HoleFitPlugin:
 	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) -v0 HoleFitPlugin.hs -package-db hole-fit-plugin/pkg.hole-fit-plugin/local.package.conf

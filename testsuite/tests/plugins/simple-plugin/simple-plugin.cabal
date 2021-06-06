@@ -21,3 +21,4 @@ Library
         Simple.SourcePlugin
         Simple.RemovePlugin
         Simple.TrustworthyPlugin
+        Simple.DefaultPlugin

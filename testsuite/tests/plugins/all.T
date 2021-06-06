@@ -208,6 +208,12 @@ test('T16260',
       ],
      makefile_test, [])
 
+test('T19926',
+     [extra_files(['simple-plugin/']),
+      pre_cmd('$MAKE -s --no-print-directory -C simple-plugin package.T19926 TOP={top}')
+      ],
+     makefile_test, [])
+
 test('test-hole-plugin',
      [extra_files(['hole-fit-plugin/']),
       pre_cmd('$MAKE -s --no-print-directory -C hole-fit-plugin package.hole-fit-plugin TOP={top}'),
