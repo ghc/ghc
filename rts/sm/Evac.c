@@ -58,7 +58,7 @@
 #define MAX_THUNK_SELECTOR_DEPTH 16
 
 static void eval_thunk_selector (StgClosure **q, StgSelector *p, bool);
-ATTR_NOINLINE static void evacuate_large(StgPtr p);
+static void evacuate_large(StgPtr p);
 
 /* -----------------------------------------------------------------------------
    Allocate some space in which to copy an object.
@@ -389,7 +389,7 @@ copy(StgClosure **p, const StgInfoTable *info,
    that has been evacuated, or unset otherwise.
    -------------------------------------------------------------------------- */
 
-ATTR_NOINLINE static void
+static void
 evacuate_large(StgPtr p)
 {
   bdescr *bd;
