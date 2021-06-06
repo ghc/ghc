@@ -12,6 +12,9 @@ module GHC.Tc.Solver.Rewrite(
 import GHC.Prelude
 
 import GHC.Core.TyCo.Ppr ( pprTyVar )
+import GHC.Tc.Types ( TcGblEnv(tcg_tc_plugin_rewriters),
+                      TcPluginRewriter, TcPluginRewriteResult(..),
+                      runTcPluginM )
 import GHC.Tc.Types.Constraint
 import GHC.Core.Predicate
 import GHC.Tc.Utils.TcType
@@ -764,6 +767,35 @@ is inlined in that case, and only FINISH 1 is performed.
 
 -}
 
+getTcPluginRewriters :: RewriteM [TcPluginRewriter]
+getTcPluginRewriters
+  = liftTcS $ do { tcg_env <- getGblEnv
+                 ; return (tcg_tc_plugin_rewriters tcg_env) }
+
+runTcPluginRewriters :: [TcPluginRewriter]
+                     -> TyCon -> [TcType]
+                     -> TcS (Maybe (Coercion, Xi))
+runTcPluginRewriters rewriterPlugins tc tys
+  | null rewriterPlugins
+  = return Nothing -- short-circuit for common case
+  | otherwise
+  = do { (givens,deriveds,wanteds) <- return ([],[],[]) -- SLD TODO: get current constraints
+       ; evBindsVar <- getTcEvBindsVar
+       ; runRewriters evBindsVar givens deriveds wanteds rewriterPlugins }
+  where
+  runRewriters _ _ _ _ []
+    = return Nothing
+  runRewriters evBindsVar givens deriveds wanteds (rewriter:rewriters)
+    = do { rewriteResult <- wrapTcS . ( `runTcPluginM` evBindsVar ) $
+                            rewriter givens deriveds wanteds tc tys
+         ; case rewriteResult of
+            { TcPluginRewriteError _msg ->
+                return Nothing -- SLD TODO: report error
+            ; TcPluginRewriteTo res co ->
+                return (Just (co,res))
+            ; TcPluginNoRewrite        ->
+                runRewriters evBindsVar givens deriveds wanteds rewriters }}
+
 rewrite_fam_app :: TyCon -> [TcType] -> RewriteM (Xi, Coercion)
   --   rewrite_fam_app            can be over-saturated
   --   rewrite_exact_fam_app      lifts out the application to top level
@@ -787,9 +819,10 @@ rewrite_fam_app tc tys  -- Can be over-saturated
 rewrite_exact_fam_app :: TyCon -> [TcType] -> RewriteM (Xi, Coercion)
 rewrite_exact_fam_app tc tys
   = do { checkStackDepth (mkTyConApp tc tys)
+       ; rewriters <- getTcPluginRewriters
 
        -- STEP 1/2. Try to reduce without reducing arguments first.
-       ; result1 <- try_to_reduce tc tys
+       ; result1 <- try_to_reduce rewriters tc tys
        ; case result1 of
              -- Don't use the cache;
              -- See Note [rewrite_exact_fam_app performance]
@@ -839,7 +872,7 @@ rewrite_exact_fam_app tc tys
          ; _ ->
 
          -- inert didn't work. Try to reduce again, in STEP 5/6.
-    do { result3 <- try_to_reduce tc xis
+    do { result3 <- try_to_reduce rewriters tc xis
        ; case result3 of
            Just (co, xi) -> finish True (homogenise xi co)
            Nothing       -> -- we have made no progress at all: STEP 7.
@@ -869,9 +902,10 @@ rewrite_exact_fam_app tc tys
 
 -- Returned coercion is output ~r input, where r is the role in the RewriteM monad
 -- See Note [How to normalise a family application]
-try_to_reduce :: TyCon -> [TcType] -> RewriteM (Maybe (TcCoercion, TcType))
-try_to_reduce tc tys
-  = do { result <- liftTcS $ firstJustsM [ lookupFamAppCache tc tys  -- STEP 5
+try_to_reduce :: [TcPluginRewriter] -> TyCon -> [TcType] -> RewriteM (Maybe (TcCoercion, TcType))
+try_to_reduce rewriters tc tys
+  = do { result <- liftTcS $ firstJustsM [ runTcPluginRewriters rewriters tc tys
+                                         , lookupFamAppCache tc tys  -- STEP 5
                                          , matchFam tc tys ]         -- STEP 6
        ; downgrade result }
   where
