@@ -40,3 +40,11 @@ Version 9.4.1
 - The ``GHC.Exts.RuntimeRep`` parameter to ``GHC.Exts.raise#`` is now inferred: ::
 
         raise# :: forall (a :: Type) {r :: RuntimeRep} (b :: TYPE r). a -> b
+
+``ghc`` library
+~~~~~~~~~~~~~~~
+
+- A new ``GHC.Hs.Syn.Type`` module has been introduced which defines functions
+  for computing the ``Type`` of an ``HsExpr GhcTc`` in a pure fashion.
+  The ``hsLitType`` and ``hsPatType`` functions that previously lived in
+  ``GHC.Tc.Utils.Zonk`` have been moved to this module.
