@@ -3,6 +3,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE TypeOperators #-}
 
@@ -57,6 +58,7 @@ import Data.Functor.Compose
 
 import Data.Monoid (Alt(..), All(..))
 import Data.Proxy
+import GHC.Base (Type, Constraint)
 import GHC.Generics
 
 import Prelude hiding ((.), id)
@@ -96,6 +98,7 @@ import Prelude hiding ((.), id)
 -- 'contramap' and the first law, so you need only check that the former
 -- condition holds.
 
+type  Contravariant :: (Type -> Type) -> Constraint
 class Contravariant f where
   contramap :: (a' -> a) -> (f a -> f a')
 

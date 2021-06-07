@@ -1,5 +1,6 @@
 {-# LANGUAGE Safe #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -51,6 +52,7 @@ module Data.Bifoldable
 
 import Control.Applicative
 import Data.Functor.Utils (Max(..), Min(..), (#.))
+import Data.Kind (Type, Constraint)
 import Data.Maybe (fromMaybe)
 import Data.Monoid
 import GHC.Generics (K1(..))
@@ -105,6 +107,7 @@ import GHC.Generics (K1(..))
 -- @
 --
 -- @since 4.10.0.0
+type  Bifoldable :: (Type -> Type -> Type) -> Constraint
 class Bifoldable p where
   {-# MINIMAL bifoldr | bifoldMap #-}
 
