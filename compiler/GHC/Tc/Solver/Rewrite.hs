@@ -23,6 +23,7 @@ import GHC.Tc.Types.Evidence
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep   -- performs delicate algorithm on types
 import GHC.Core.Coercion
+import GHC.Types.Unique.FM
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
@@ -30,8 +31,10 @@ import GHC.Driver.Session
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
+import GHC.Tc.Errors.Types (TcRnMessage(..))
 import GHC.Tc.Solver.Monad as TcS
 import GHC.Tc.Solver.Types
+import GHC.Tc.Utils.Monad (addTcRnDiagnostic)
 
 import GHC.Utils.Misc
 import GHC.Data.Maybe
@@ -767,34 +770,35 @@ is inlined in that case, and only FINISH 1 is performed.
 
 -}
 
-getTcPluginRewriters :: RewriteM [TcPluginRewriter]
-getTcPluginRewriters
-  = liftTcS $ do { tcg_env <- getGblEnv
-                 ; return (tcg_tc_plugin_rewriters tcg_env) }
+getTcPluginRewriters :: TyCon -> RewriteM [TcPluginRewriter]
+getTcPluginRewriters tc
+  = liftTcS $ do { rewriters <- tcg_tc_plugin_rewriters <$> getGblEnv
+                 ; return (lookupWithDefaultUFM rewriters [] tc) }
 
 runTcPluginRewriters :: [TcPluginRewriter]
-                     -> TyCon -> [TcType]
+                     -> [TcType]
                      -> TcS (Maybe (Coercion, Xi))
-runTcPluginRewriters rewriterPlugins tc tys
-  | null rewriterPlugins
+runTcPluginRewriters rewriterFunctions tys
+  | null rewriterFunctions
   = return Nothing -- short-circuit for common case
   | otherwise
-  = do { (givens,deriveds,wanteds) <- return ([],[],[]) -- SLD TODO: get current constraints
+  = do { givens <- getInertGivens
        ; evBindsVar <- getTcEvBindsVar
-       ; runRewriters evBindsVar givens deriveds wanteds rewriterPlugins }
+       ; runRewriters evBindsVar givens rewriterFunctions }
   where
-  runRewriters _ _ _ _ []
+  runRewriters _ _ []
     = return Nothing
-  runRewriters evBindsVar givens deriveds wanteds (rewriter:rewriters)
+  runRewriters evBindsVar givens (rewriter:rewriters)
     = do { rewriteResult <- wrapTcS . ( `runTcPluginM` evBindsVar ) $
-                            rewriter givens deriveds wanteds tc tys
+                            rewriter givens tys
          ; case rewriteResult of
-            { TcPluginRewriteError _msg ->
-                return Nothing -- SLD TODO: report error
+            { TcPluginRewriteError msg ->
+              do { wrapTcS $ addTcRnDiagnostic (TcRnUnknownMessage msg)
+                 ; return Nothing }
             ; TcPluginRewriteTo res co ->
                 return (Just (co,res))
             ; TcPluginNoRewrite        ->
-                runRewriters evBindsVar givens deriveds wanteds rewriters }}
+                runRewriters evBindsVar givens rewriters }}
 
 rewrite_fam_app :: TyCon -> [TcType] -> RewriteM (Xi, Coercion)
   --   rewrite_fam_app            can be over-saturated
@@ -819,7 +823,9 @@ rewrite_fam_app tc tys  -- Can be over-saturated
 rewrite_exact_fam_app :: TyCon -> [TcType] -> RewriteM (Xi, Coercion)
 rewrite_exact_fam_app tc tys
   = do { checkStackDepth (mkTyConApp tc tys)
-       ; rewriters <- getTcPluginRewriters
+
+       -- Get all tc-plugins that can rewrite a family application headed by 'tc'.
+       ; rewriters <- getTcPluginRewriters tc
 
        -- STEP 1/2. Try to reduce without reducing arguments first.
        ; result1 <- try_to_reduce rewriters tc tys
@@ -904,7 +910,7 @@ rewrite_exact_fam_app tc tys
 -- See Note [How to normalise a family application]
 try_to_reduce :: [TcPluginRewriter] -> TyCon -> [TcType] -> RewriteM (Maybe (TcCoercion, TcType))
 try_to_reduce rewriters tc tys
-  = do { result <- liftTcS $ firstJustsM [ runTcPluginRewriters rewriters tc tys
+  = do { result <- liftTcS $ firstJustsM [ runTcPluginRewriters rewriters tys
                                          , lookupFamAppCache tc tys  -- STEP 5
                                          , matchFam tc tys ]         -- STEP 6
        ; downgrade result }
