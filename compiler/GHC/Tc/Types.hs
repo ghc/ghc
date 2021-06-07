@@ -578,8 +578,9 @@ data TcGblEnv
         tcg_tc_plugin_solvers :: [TcPluginSolver],
         -- ^ A list of user-defined type-checking plugins for constraint solving.
 
-        tcg_tc_plugin_rewriters :: [TcPluginRewriter],
-        -- ^ A list of user-defined type-checking plugins for rewriting type family applications.
+        tcg_tc_plugin_rewriters :: UniqFM TyCon [TcPluginRewriter],
+        -- ^ A collection of all the user-defined type-checking plugins for rewriting
+        -- type family applications, collated by their type family 'TyCon's.
 
         tcg_hf_plugins :: [HoleFitPlugin],
         -- ^ A list of user-defined plugins for hole fit suggestions.
@@ -1672,16 +1673,13 @@ Constraint Solver Plugins
 -------------------------
 -}
 
-type TcPluginSolver = [Ct]    -- ^ given
-                   -> [Ct]    -- ^ derived
-                   -> [Ct]    -- ^ wanted
+type TcPluginSolver = [Ct]    -- ^ givens
+                   -> [Ct]    -- ^ deriveds
+                   -> [Ct]    -- ^ wanteds
                    -> TcPluginM TcPluginResult
 
 type TcPluginRewriter
-  =  [Ct] -- ^ given
-  -> [Ct] -- ^ derived
-  -> [Ct] -- ^ wanted
-  -> TyCon -- ^ type family
+  =  [Ct] -- ^ givens
   -> [TcType] -- ^ type family arguments
   -> TcPluginM TcPluginRewriteResult
 
@@ -1731,7 +1729,7 @@ data TcPlugin = forall s. TcPlugin
     -- or specify that it has solved some constraints (with evidence),
     -- and possibly emit additional wanted constraints.
 
-  , tcPluginRewrite :: s -> TcPluginRewriter
+  , tcPluginRewrite :: s -> UniqFM TyCon TcPluginRewriter
     -- ^ Rewrite saturated type family applications.
 
   , tcPluginStop  :: s -> TcPluginM ()
