@@ -1153,7 +1153,7 @@ The idea is that
   Proof: using Definition [Can-rewrite relation], fw can't rewrite anything
          and so K0 holds.  Intuitively, since fw can't rewrite anything (Lemma (L0)),
          adding it cannot cause any loops
-  This is a common case, because Wanteds cannot rewrite Wanteds.
+  This is a common case, because Wanteds cannot rewrite Wanteds. "RAE" not so anymore!
   It's used to avoid even looking for constraint to kick out.
 
 * Lemma (L1): The conditions of the Main Theorem imply that there is no
