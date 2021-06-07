@@ -1,5 +1,5 @@
 # See Note [Order of warning flags].
-SRC_CC_OPTS     += -Wall $(WERROR)
+#SRC_CC_OPTS     += -Wall $(WERROR) # Disable in RISC like, as https://gitlab.haskell.org/ghc/ghc/-/issues/15689
 SRC_HC_OPTS     += -Wall
 # Don't add -Werror to SRC_HC_OPTS_STAGE0 (or SRC_HC_OPTS), because otherwise
 # validate may unnecessarily fail when booting with an older compiler.
