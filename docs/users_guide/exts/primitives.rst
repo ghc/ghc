@@ -327,8 +327,8 @@ lifted types. In either of the equivalent formulations of ``A`` given above,
 users would additionally have access to a coercion between ``A`` and ``Int#``.
 
 As a consequence of the
-`levity-polymorphic binder restriction <#levity-polymorphic-restrictions>`__,
-levity-polymorphic fields are disallowed in data constructors
+`representation-polymorphic binder restriction <#representation-polymorphism-restrictions>`__,
+representation-polymorphic fields are disallowed in data constructors
 of data types declared using ``data``. However, since ``newtype`` data
 constructor application is implemented as a coercion instead of as function
 application, this restriction does not apply to the field inside a ``newtype``
@@ -422,7 +422,7 @@ You may even declare levity-polymorphic data types: ::
 While ``f`` above could reasonably be levity-polymorphic (as it evaluates its
 argument either way), GHC currently disallows the more general type
 ``PEither @l Int Bool -> Bool``. This is a consequence of the
-`levity-polymorphic binder restriction <#levity-polymorphic-restrictions>`__,
+`representation-polymorphic binder restriction <#representation-polymorphism-restrictions>`__,
 
 Due to `ticket 19487 <https://gitlab.haskell.org/ghc/ghc/-/issues/19487>`, it's
 currently not possible to declare levity-polymorphic data types with nullary

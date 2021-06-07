@@ -569,7 +569,7 @@ hasNoBinding id = case Var.idDetails id of
                         FCallId _        -> True
                         DataConWorkId dc -> isUnboxedTupleDataCon dc || isUnboxedSumDataCon dc
                         _                -> isCompulsoryUnfolding (idUnfolding id)
-                                            -- See Note [Levity-polymorphic Ids]
+                                            -- See Note [Representation-polymorphic Ids]
 
 isImplicitId :: Id -> Bool
 -- ^ 'isImplicitId' tells whether an 'Id's info is implied by other
@@ -591,20 +591,20 @@ isImplicitId id
 idIsFrom :: Module -> Id -> Bool
 idIsFrom mod id = nameIsLocalOrFrom mod (idName id)
 
-{- Note [Levity-polymorphic Ids]
+{- Note [Representation-polymorphic Ids]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Some levity-polymorphic Ids must be applied and inlined, not left
+Some representation-polymorphic Ids must be applied and inlined, not left
 un-saturated.  Example:
   unsafeCoerceId :: forall r1 r2 (a::TYPE r1) (b::TYPE r2). a -> b
 
 This has a compulsory unfolding because we can't lambda-bind those
-arguments.  But the compulsory unfolding may leave levity-polymorphic
+arguments.  But the compulsory unfolding may leave representation-polymorphic
 lambdas if it is not applied to enough arguments; e.g. (#14561)
   bad :: forall (a :: TYPE r). a -> a
   bad = unsafeCoerce#
 
 The desugar has special magic to detect such cases: GHC.HsToCore.Expr.badUseOfLevPolyPrimop.
-And we want that magic to apply to levity-polymorphic compulsory-inline things.
+And we want that magic to apply to representation-polymorphic compulsory-inline things.
 The easiest way to do this is for hasNoBinding to return True of all things
 that have compulsory unfolding.  Some Ids with a compulsory unfolding also
 have a binding, but it does not harm to say they don't here, and its a very

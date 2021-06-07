@@ -48,7 +48,7 @@ module GHC.HsToCore.Monad (
         DsMatchContext(..),
         EquationInfo(..), MatchResult (..), runMatchResult, DsWrapper, idDsWrapper,
 
-        -- Levity polymorphism
+        -- Representation polymorphism
         dsNoLevPoly, dsNoLevPolyExpr, dsWhenNoErrs,
 
         -- Trace injection
@@ -363,29 +363,36 @@ grab one or more names.  @newLocalDs@ isn't exported---exported
 functions are defined with it.  The difference in name-strings makes
 it easier to read debugging output.
 
-Note [Levity polymorphism checking]
+Note [Representation polymorphism checking]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-According to the "Levity Polymorphism" paper (PLDI '17), levity
-polymorphism is forbidden in precisely two places: in the type of a bound
-term-level argument and in the type of an argument to a function. The paper
-explains it more fully, but briefly: expressions in these contexts need to be
-stored in registers, and it's hard (read, impossible) to store something
-that's levity polymorphic.
+According to the "Levity Polymorphism" paper (PLDI '17),
+representation polymorphism is forbidden in precisely two places:
+in the type of a bound term-level argument, and in the type of an argument
+to a function.
+Note that the paper doesn't distinguish levity polymorphism, such as
+  \(v::Levity). \(a::TYPE (BoxedRep v)). \(x::a). expr
+from the more general representation polymorphism, as the BoxedRep
+constructor of RuntimeRep didn't exist at the time.
 
-We cannot check for bad levity polymorphism conveniently in the type checker,
-because we can't tell, a priori, which levity metavariables will be solved.
+The paper explains the restrictions more fully, but briefly:
+expressions in these contexts need to be stored in registers, and it's
+hard (read: impossible) to store something that's representation-polymorphic.
+
+We cannot check for bad representation polymorphism conveniently
+in the type checker, because we can't tell, a priori, which
+representation metavariables will be solved.
 At one point, I (Richard) thought we could check in the zonker, but it's hard
 to know where precisely are the abstracted variables and the arguments. So
 we check in the desugarer, the only place where we can see the Core code and
 still report respectable syntax to the user. This covers the vast majority
 of cases; see calls to GHC.HsToCore.Monad.dsNoLevPoly and friends.
 
-Levity polymorphism is also prohibited in the types of binders, and the
+Representation polymorphism is also prohibited in the types of binders, and the
 desugarer checks for this in GHC-generated Ids. (The zonker handles
 the user-writted ids in zonkIdBndr.) This is done in newSysLocalDsNoLP.
 The newSysLocalDs variant is used in the vast majority of cases where
-the binder is obviously not levity polymorphic, omitting the check.
-It would be nice to ASSERT that there is no levity polymorphism here,
+the binder is obviously not representation-polymorphic, omitting the check.
+It would be nice to ASSERT that there is no representation polymorphism here,
 but we can't, because of the fixM in GHC.HsToCore.Arrows. It's all OK, though:
 Core Lint will catch an error here.
 
@@ -396,10 +403,10 @@ in the appropriate HsWrappers (e.g. WpFun) that we can print out in the
 desugarer.
 
 There are a few more checks in places where Core is generated outside the
-desugarer. For example, in datatype and class declarations, where levity
-polymorphism is checked for during validity checking. It would be nice to
-have one central place for all this, but that doesn't seem possible while
-still reporting nice error messages.
+desugarer. For example, in datatype and class declarations, where
+representation polymorphism is checked for during validity checking.
+It would be nice to have one central place for all this, but that doesn't
+seem possible while still reporting nice error messages.
 
 -}
 
@@ -420,12 +427,13 @@ newSysLocalDsNoLP, newSysLocalDs, newFailLocalDs :: Mult -> Type -> DsM Id
 newSysLocalDsNoLP  = mk_local (fsLit "ds")
 
 -- this variant should be used when the caller can be sure that the variable type
--- is not levity-polymorphic. It is necessary when the type is knot-tied because
--- of the fixM used in GHC.HsToCore.Arrows. See Note [Levity polymorphism checking]
+-- is not representation-polymorphic. It is necessary when the type
+-- is knot-tied because of the fixM used in GHC.HsToCore.Arrows.
+-- See Note [Representation polymorphism checking]
 newSysLocalDs = mkSysLocalM (fsLit "ds")
 newFailLocalDs = mkSysLocalM (fsLit "fail")
   -- the fail variable is used only in a situation where we can tell that
-  -- levity-polymorphism is impossible.
+  -- representation polymorphism is impossible.
 
 newSysLocalsDsNoLP, newSysLocalsDs :: [Scaled Type] -> DsM [Id]
 newSysLocalsDsNoLP = mapM (\(Scaled w t) -> newSysLocalDsNoLP w t)
@@ -587,26 +595,26 @@ discardWarningsDs thing_inside
 
         ; return result }
 
--- | Fail with an error message if the type is levity polymorphic.
+-- | Fail with an error message if the type is representation-polymorphic.
 dsNoLevPoly :: Type -> LevityCheckProvenance -> DsM ()
--- See Note [Levity polymorphism checking]
+-- See Note [Representation polymorphism checking]
 dsNoLevPoly ty provenance =
   checkForLevPolyX (\ty -> failWithDs . DsLevityPolyInType ty) provenance ty
 
--- | Check an expression for levity polymorphism, failing if it is
--- levity polymorphic.
+-- | Check an expression for representation polymorphism, failing if it is
+-- representation-polymorphic.
 dsNoLevPolyExpr :: CoreExpr -> LevityExprProvenance -> DsM ()
--- See Note [Levity polymorphism checking]
+-- See Note [Representation polymorphism checking]
 dsNoLevPolyExpr e provenance
   | isExprLevPoly e = diagnosticDs (DsLevityPolyInExpr e provenance)
   | otherwise       = return ()
 
 -- | Runs the thing_inside. If there are no errors, then returns the expr
 -- given. Otherwise, returns unitExpr. This is useful for doing a bunch
--- of levity polymorphism checks and then avoiding making a core App.
--- (If we make a core App on a levity polymorphic argument, detecting how
--- to handle the let/app invariant might call isUnliftedType, which panics
--- on a levity polymorphic type.)
+-- of representation polymorphism checks and then avoiding making a core App.
+-- (If we make a core App on a representation-polymorphic argument, detecting
+-- how to handle the let/app invariant might call isUnliftedType, which panics
+-- on a representation-polymorphic type.)
 -- See #12709 for an example of why this machinery is necessary.
 dsWhenNoErrs :: DsM a -> (a -> CoreExpr) -> DsM CoreExpr
 dsWhenNoErrs thing_inside mk_expr

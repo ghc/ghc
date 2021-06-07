@@ -4168,7 +4168,7 @@ Some notes:
   to add to the context. The problem is that this also grabs data con
   wrapper Ids. These could be filtered out. But, painfully, getting
   the wrapper Ids checks the DataConRep, and forcing the DataConRep
-  can panic if there is a levity-polymorphic argument. This is #18534.
+  can panic if there is a representation-polymorphic argument. This is #18534.
   We don't need the wrapper Ids here anyway. So the code just takes what
   it needs, via child_tycons.
 -}
@@ -4363,16 +4363,16 @@ checkValidDataCon dflags existential_ok tc con
           -- Reason: it's really the argument of an equality constraint
         ; checkValidMonoType orig_res_ty
 
-          -- If we are dealing with a newtype, we allow levity polymorphism
-          -- regardless of whether or not UnliftedNewtypes is enabled. A
-          -- later check in checkNewDataCon handles this, producing a
-          -- better error message than checkForLevPoly would.
+          -- If we are dealing with a newtype, we allow representation
+          -- polymorphism regardless of whether or not UnliftedNewtypes
+          -- is enabled. A later check in checkNewDataCon handles this,
+          -- producing a better error message than checkForLevPoly would.
         ; unless (isNewTyCon tc) $
             checkNoErrs $
             mapM_ (checkForLevPoly LevityCheckInValidDataCon) (map scaledThing $ dataConOrigArgTys con)
             -- the checkNoErrs is to prevent a panic in isVanillaDataCon
             -- (called a a few lines down), which can fall over if there is a
-            -- bang on a levity-polymorphic argument. This is #18534,
+            -- bang on a representation-polymorphic argument. This is #18534,
             -- typecheck/should_fail/T18534
 
           -- Extra checks for newtype data constructors. Importantly, these
@@ -4569,11 +4569,11 @@ checkValidClass cls
                 --      newBoard :: MonadState b m => m ()
                 -- Here, MonadState has a fundep m->b, so newBoard is fine
 
-           -- a method cannot be levity polymorphic, as we have to store the
-           -- method in a dictionary
+           -- a method cannot be representation-polymorphic, as we have to
+           -- store the method in a dictionary
            -- example of what this prevents:
            --   class BoundedX (a :: TYPE r) where minBound :: a
-           -- See Note [Levity polymorphism checking] in GHC.HsToCore.Monad
+           -- See Note [Representation polymorphism checking] in GHC.HsToCore.Monad
         ; checkForLevPoly LevityCheckInValidClass tau1
 
         ; unless constrained_class_methods $
