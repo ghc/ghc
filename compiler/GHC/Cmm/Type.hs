@@ -51,13 +51,14 @@ import Data.Int
 
 data CmmType    -- The important one!
   = CmmType CmmCat !Width
+  deriving Show
 
 data CmmCat                -- "Category" (not exported)
    = GcPtrCat              -- GC pointer
    | BitsCat               -- Non-pointer
    | FloatCat              -- Float
    | VecCat Length CmmCat  -- Vector
-   deriving( Eq )
+   deriving( Eq, Show )
         -- See Note [Signed vs unsigned] at the end
 
 instance Outputable CmmType where
@@ -429,4 +430,3 @@ C calling convention rather early on in the compiler).  However, given
 this, the cons outweigh the pros.
 
 -}
-
