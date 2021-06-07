@@ -35,6 +35,7 @@ module Data.Type.Ord (
   ) where
 
 import GHC.Show(Show(..))
+-- import GHC.Types (Type)
 import GHC.TypeLits.Internal
 import GHC.TypeNats.Internal
 import Data.Bool
@@ -48,12 +49,13 @@ import Data.Ord
 type Compare :: k -> k -> Ordering
 type family Compare a b
 
-type instance Compare (a :: Natural) b = CmpNat    a b
-type instance Compare (a :: Symbol)  b = CmpSymbol a b
-type instance Compare (a :: Char)    b = CmpChar   a b
+type instance Compare @Natural a b = CmpNat    a b
+type instance Compare @Symbol  a b = CmpSymbol a b
+type instance Compare @Char    a b = CmpChar   a b
 
 -- | Ordering data type for type literals that provides proof of their ordering.
 -- @since 4.16.0.0
+-- type OrderingI :: k -> k -> Type
 data OrderingI a b where
   LTI :: Compare a b ~ 'LT => OrderingI a b
   EQI :: Compare a a ~ 'EQ => OrderingI a a
