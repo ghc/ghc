@@ -29,6 +29,7 @@ import GHC.Types.Unique.Supply
 import GHC.Utils.Panic
 
 import Control.Monad (replicateM)
+import Data.Bits
 import Data.Maybe (fromMaybe)
 
 import GHC.Stack

@@ -10,6 +10,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Platform
 
+import Data.Bits
 import Data.Word
 
 import GHC.Stack

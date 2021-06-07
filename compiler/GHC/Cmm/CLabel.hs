@@ -148,6 +148,7 @@ import GHC.Types.CostCentre
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Data.FastString
+import GHC.Driver.Ppr (showPprUnsafe)
 import GHC.Driver.Session
 import GHC.Platform
 import GHC.Types.Unique.Set
@@ -155,7 +156,6 @@ import GHC.Utils.Misc
 import GHC.Core.Ppr ( {- instances -} )
 import GHC.CmmToAsm.Config
 import GHC.Types.SrcLoc
-
 -- -----------------------------------------------------------------------------
 -- The CLabel type
 

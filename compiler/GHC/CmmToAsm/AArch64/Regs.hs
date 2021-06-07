@@ -9,6 +9,7 @@ import GHC.CmmToAsm.Format
 
 import GHC.Cmm
 import GHC.Cmm.CLabel           ( CLabel )
+import GHC.Driver.Ppr           ( showPprUnsafe )
 import GHC.Types.Unique
 
 import GHC.Platform.Regs
