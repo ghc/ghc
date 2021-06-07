@@ -68,6 +68,7 @@ module GHC.Parser.Lexer (
    getLexState, popLexState, pushLexState,
    ExtBits(..),
    xtest, xunset, xset,
+   disableHaddock,
    lexTokenStream,
    mkParensEpAnn,
    getCommentsFor, getPriorCommentsFor, getFinalCommentsFor,
@@ -2324,6 +2325,8 @@ data ParserOpts = ParserOpts
     -- ^ The function to be used to construct diagnostic messages.
     -- The idea is to partially-apply 'mkParserMessage' upstream, to
     -- avoid the dependency on the 'DynFlags' in the Lexer.
+  , pSupportedExts  :: [String]
+    -- ^ supported extensions (only used for suggestions in error messages)
   }
 
 -- | Haddock comment as produced by the lexer. These are accumulated in
@@ -2771,6 +2774,7 @@ mkParserOpts
   :: EnumSet WarningFlag        -- ^ warnings flags enabled
   -> EnumSet LangExt.Extension  -- ^ permitted language extensions enabled
   -> (SrcSpan -> PsMessage -> MsgEnvelope PsMessage) -- ^ How to construct diagnostics
+  -> [String]                   -- ^ Supported Languages and Extensions
   -> Bool                       -- ^ are safe imports on?
   -> Bool                       -- ^ keeping Haddock comment tokens
   -> Bool                       -- ^ keep regular comment tokens
@@ -2782,12 +2786,13 @@ mkParserOpts
 
   -> ParserOpts
 -- ^ Given exactly the information needed, set up the 'ParserOpts'
-mkParserOpts warningFlags extensionFlags mkMessage
+mkParserOpts warningFlags extensionFlags mkMessage supported
   safeImports isHaddock rawTokStream usePosPrags =
     ParserOpts {
       pWarningFlags  = warningFlags
     , pExtsBitmap    = safeHaskellBit .|. langExtBits .|. optBits
     , pMakePsMessage = mkMessage
+    , pSupportedExts = supported
     }
   where
     safeHaskellBit = SafeHaskellBit `setBitIf` safeImports
@@ -2847,6 +2852,12 @@ mkParserOpts warningFlags extensionFlags mkMessage
     setBitIf :: ExtBits -> Bool -> ExtsBitmap
     b `setBitIf` cond | cond      = xbit b
                       | otherwise = 0
+
+disableHaddock :: ParserOpts -> ParserOpts
+disableHaddock opts = upd_bitmap (xunset HaddockBit)
+  where
+    upd_bitmap f = opts { pExtsBitmap = f (pExtsBitmap opts) }
+
 
 -- | Set parser options for parsing OPTIONS pragmas
 initPragState :: ParserOpts -> StringBuffer -> RealSrcLoc -> PState

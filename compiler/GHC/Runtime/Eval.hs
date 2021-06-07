@@ -578,7 +578,7 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv (Just BreakInfo{..}) = do
    mb_hValues <-
       mapM (getBreakpointVar interp apStack_fhv . fromIntegral) offsets
    when (any isNothing mb_hValues) $
-      debugTraceMsg (hsc_logger hsc_env) (hsc_dflags hsc_env) 1 $
+      debugTraceMsg (hsc_logger hsc_env) 1 $
           text "Warning: _result has been evaluated, some bindings have been lost"
 
    us <- mkSplitUniqSupply 'I'   -- Dodgy; will give the same uniques every time
@@ -668,9 +668,8 @@ rttiEnvironment hsc_env@HscEnv{hsc_IC=ic} = do
                         warnPprTrace True (text (":print failed to calculate the "
                                            ++ "improvement for a type")) hsc_env
                Just subst -> do
-                 let dflags = hsc_dflags hsc_env
                  let logger = hsc_logger hsc_env
-                 dumpIfSet_dyn logger dflags Opt_D_dump_rtti "RTTI"
+                 putDumpFileMaybe logger Opt_D_dump_rtti "RTTI"
                    FormatText
                    (fsep [text "RTTI Improvement for", ppr id, equals,
                           ppr subst])

@@ -54,7 +54,7 @@ stg2stg :: Logger
         -> IO [StgTopBinding]        -- output program
 stg2stg logger dflags ictxt this_mod binds
   = do  { dump_when Opt_D_dump_stg_from_core "Initial STG:" binds
-        ; showPass logger dflags "Stg2Stg"
+        ; showPass logger "Stg2Stg"
         -- Do the main business!
         ; binds' <- runStgM 'g' $
             foldM do_stg_pass binds (getStgToDo dflags)
@@ -107,11 +107,11 @@ stg2stg logger dflags ictxt this_mod binds
 
     opts = initStgPprOpts dflags
     dump_when flag header binds
-      = dumpIfSet_dyn logger dflags flag header FormatSTG (pprStgTopBindings opts binds)
+      = putDumpFileMaybe logger flag header FormatSTG (pprStgTopBindings opts binds)
 
     end_pass what binds2
       = liftIO $ do -- report verbosely, if required
-          dumpIfSet_dyn logger dflags Opt_D_verbose_stg2stg what
+          putDumpFileMaybe logger Opt_D_verbose_stg2stg what
             FormatSTG (vcat (map (pprStgTopBinding opts) binds2))
           stg_linter False what binds2
           return binds2

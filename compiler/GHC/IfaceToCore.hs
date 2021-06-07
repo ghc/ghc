@@ -1221,7 +1221,7 @@ tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bnd
                           Nothing   -> return ()
                           Just errs -> do
                             logger <- getLogger
-                            liftIO $ displayLintResults logger dflags False doc
+                            liftIO $ displayLintResults logger False doc
                                                (pprCoreExpr rhs')
                                                (emptyBag, errs) }
                    ; return (bndrs', args', rhs') }
@@ -1763,7 +1763,7 @@ tcPragExpr is_compulsory toplvl name expr
         case lintUnfolding is_compulsory dflags noSrcLoc in_scope core_expr' of
           Nothing   -> return ()
           Just errs -> liftIO $
-            displayLintResults logger dflags False doc
+            displayLintResults logger False doc
                                (pprCoreExpr core_expr') (emptyBag, errs)
     return core_expr'
   where

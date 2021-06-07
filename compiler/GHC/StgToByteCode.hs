@@ -104,7 +104,7 @@ byteCodeGen :: HscEnv
             -> Maybe ModBreaks
             -> IO CompiledByteCode
 byteCodeGen hsc_env this_mod binds tycs mb_modBreaks
-   = withTiming logger dflags
+   = withTiming logger
                 (text "GHC.StgToByteCode"<+>brackets (ppr this_mod))
                 (const ()) $ do
         -- Split top-level binds into strings and others.
@@ -129,7 +129,7 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks
         when (notNull ffis)
              (panic "GHC.StgToByteCode.byteCodeGen: missing final emitBc?")
 
-        dumpIfSet_dyn logger dflags Opt_D_dump_BCOs
+        putDumpFileMaybe logger Opt_D_dump_BCOs
            "Proto-BCOs" FormatByteCode
            (vcat (intersperse (char ' ') (map ppr proto_bcos)))
 
@@ -148,8 +148,8 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks
 
         return cbc
 
-  where dflags = hsc_dflags hsc_env
-        logger = hsc_logger hsc_env
+  where dflags  = hsc_dflags hsc_env
+        logger  = hsc_logger hsc_env
         interp  = hscInterp hsc_env
         profile = targetProfile dflags
 
@@ -186,7 +186,7 @@ stgExprToBCOs :: HscEnv
               -> StgRhs
               -> IO UnlinkedBCO
 stgExprToBCOs hsc_env this_mod expr_ty expr
- = withTiming logger dflags
+ = withTiming logger
               (text "GHC.StgToByteCode"<+>brackets (ppr this_mod))
               (const ()) $ do
 
@@ -205,12 +205,12 @@ stgExprToBCOs hsc_env this_mod expr_ty expr
       when (notNull mallocd)
            (panic "GHC.StgToByteCode.stgExprToBCOs: missing final emitBc?")
 
-      dumpIfSet_dyn logger dflags Opt_D_dump_BCOs "Proto-BCOs" FormatByteCode
+      putDumpFileMaybe logger Opt_D_dump_BCOs "Proto-BCOs" FormatByteCode
          (ppr proto_bco)
 
       assembleOneBCO interp profile proto_bco
-  where dflags = hsc_dflags hsc_env
-        logger = hsc_logger hsc_env
+  where dflags  = hsc_dflags hsc_env
+        logger   = hsc_logger hsc_env
         profile = targetProfile dflags
         interp  = hscInterp hsc_env
         -- we need an otherwise unused Id for bytecode generation
