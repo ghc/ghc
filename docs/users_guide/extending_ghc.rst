@@ -546,21 +546,28 @@ is defined thus:
 
     data TcPlugin = forall s . TcPlugin
       { tcPluginInit    :: TcPluginM s
-      , tcPluginRewrite :: s -> TcPluginRewriter
+      , tcPluginRewrite :: s -> UniqFM TyCon TcPluginRewriter
       , tcPluginSolve   :: s -> TcPluginSolver
       , tcPluginStop    :: s -> TcPluginM ()
       }
 
     type TcPluginSolver = [Ct] -> [Ct] -> [Ct] -> TcPluginM TcPluginResult
 
-    type TcPluginRewriter = [Ct] -> [Ct] -> [Ct] -> TyCon -> [TcType] -> TcPluginM TcPluginRewriteResult
+    type TcPluginRewriter = [Ct] -> [TcType] -> TcPluginM TcPluginRewriteResult
 
-    data TcPluginResult = TcPluginContradiction [Ct] | TcPluginOk [(EvTerm,Ct)] [Ct]
-
+    data TcPluginResult
+      = TcPluginContradiction [Ct]
+      | TcPluginOk
+        { solvedConstraints :: [(EvTerm,Ct)]
+        , newConstraints :: [Ct] }
+    
     data TcPluginRewriteResult where
       TcPluginRewriteError :: (Diagnostic a, Typeable a) => a -> TcPluginRewriteResult
       TcPluginNoRewrite :: TcPluginRewriteResult
-      TcPluginRewriteTo :: TcType -> TcPluginRewriteResult
+      TcPluginRewriteTo
+        :: { rewriteTo :: TcType
+           , rewriteEvidence :: TcCoercion }
+        -> TcPluginRewriteResult
 
 (The details of this representation are subject to change as we gain
 more experience writing typechecker plugins. It should not be assumed to
@@ -583,9 +590,11 @@ The basic idea is as follows:
    looping until a fixed point is reached.
 
 -  When rewriting type family applications, GHC calls ``tcPluginRewriter``.
-   This function is provided with the current set of constraints,
-   and a saturated type family application. The plugin can then specify
-   a possible rewriting for this type family application, if desired.
+   The plugin supplies a collection of type families which it is interested
+   in rewriting. For each of those, the rewriter is provided with the
+   the arguments to that type family, as well as the current collection of
+   given constraints. The plugin can then specify a rewriting for this
+   type family application, if desired.
 
 -  Finally, GHC calls ``tcPluginStop`` after constraint solving is
    finished, allowing the plugin to dispose of any resources it has
