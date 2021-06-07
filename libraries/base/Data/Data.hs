@@ -699,7 +699,7 @@ readConstr dt str =
 
     -- Read a value and build a constructor
     mkReadCon :: Read t => (t -> Constr) -> Maybe Constr
-    mkReadCon f = case (reads str) of
+    mkReadCon f = case reads str of
                     [(t,"")] -> Just (f t)
                     _ -> Nothing
 
