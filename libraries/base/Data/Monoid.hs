@@ -1,9 +1,12 @@
 {-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoImplicitPrelude          #-}
 {-# LANGUAGE PolyKinds                  #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE StandaloneKindSignatures   #-}
 {-# LANGUAGE Trustworthy                #-}
+{-# LANGUAGE TypeApplications           #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -184,29 +187,32 @@ instance Monoid (Last a) where
 -- 'Applicative' pointwise.
 --
 -- @since 4.12.0.0
-newtype Ap f a = Ap { getAp :: f a }
-        deriving ( Alternative -- ^ @since 4.12.0.0
-                 , Applicative -- ^ @since 4.12.0.0
-                 , Enum        -- ^ @since 4.12.0.0
-                 , Eq          -- ^ @since 4.12.0.0
-                 , Functor     -- ^ @since 4.12.0.0
-                 , Generic     -- ^ @since 4.12.0.0
-                 , Generic1    -- ^ @since 4.12.0.0
-                 , Monad       -- ^ @since 4.12.0.0
-                 , MonadFail   -- ^ @since 4.12.0.0
-                 , MonadPlus   -- ^ @since 4.12.0.0
-                 , Ord         -- ^ @since 4.12.0.0
-                 , Read        -- ^ @since 4.12.0.0
-                 , Show        -- ^ @since 4.12.0.0
-                 )
+type    Ap :: forall k. (k -> Type) -> k -> Type
+newtype Ap f a where
+  Ap :: forall {k} f a. { getAp :: f a } -> Ap @k f a
+  deriving
+    ( Alternative -- ^ @since 4.12.0.0
+    , Applicative -- ^ @since 4.12.0.0
+    , Enum        -- ^ @since 4.12.0.0
+    , Eq          -- ^ @since 4.12.0.0
+    , Functor     -- ^ @since 4.12.0.0
+    , Generic     -- ^ @since 4.12.0.0
+    , Generic1    -- ^ @since 4.12.0.0
+    , Monad       -- ^ @since 4.12.0.0
+    , MonadFail   -- ^ @since 4.12.0.0
+    , MonadPlus   -- ^ @since 4.12.0.0
+    , Ord         -- ^ @since 4.12.0.0
+    , Read        -- ^ @since 4.12.0.0
+    , Show        -- ^ @since 4.12.0.0
+    )
 
 -- | @since 4.12.0.0
 instance (Applicative f, Semigroup a) => Semigroup (Ap f a) where
-        (Ap x) <> (Ap y) = Ap $ liftA2 (<>) x y
+  (<>) = liftA2 (<>)
 
 -- | @since 4.12.0.0
 instance (Applicative f, Monoid a) => Monoid (Ap f a) where
-        mempty = Ap $ pure mempty
+  mempty = pure mempty
 
 -- | @since 4.12.0.0
 instance (Applicative f, Bounded a) => Bounded (Ap f a) where

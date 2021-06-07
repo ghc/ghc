@@ -1,8 +1,9 @@
-{-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
+{-# LANGUAGE Trustworthy #-}
 {-# OPTIONS_GHC -Wno-inline-rule-shadowing #-}
     -- The RULES for the methods of class Arrow may never fire
     -- e.g. compose/arr;  see #10528
@@ -89,6 +90,7 @@ infixr 1 ^<<, <<^
 -- The other combinators have sensible default definitions,
 -- which may be overridden for efficiency.
 
+type  Arrow :: (Type -> Type -> Type) -> Constraint
 class Category a => Arrow a where
     {-# MINIMAL arr, (first | (***)) #-}
 
@@ -151,6 +153,7 @@ instance Arrow (->) where
     (***) f g ~(x,y) = (f x, g y)
 
 -- | Kleisli arrows of a monad.
+type    Kleisli :: (Type -> Type) -> Type -> Type -> Type
 newtype Kleisli m a b = Kleisli { runKleisli :: a -> m b }
 
 -- | @since 4.14.0.0
@@ -223,6 +226,7 @@ a <<^ f = a <<< arr f
 (^<<) :: Arrow a => (c -> d) -> a b c -> a b d
 f ^<< a = arr f <<< a
 
+type  ArrowZero :: (Type -> Type -> Type) -> Constraint
 class Arrow a => ArrowZero a where
     zeroArrow :: a b c
 
@@ -231,6 +235,7 @@ instance MonadPlus m => ArrowZero (Kleisli m) where
     zeroArrow = Kleisli (\_ -> mzero)
 
 -- | A monoid on arrows.
+type  ArrowPlus :: (Type -> Type -> Type) -> Constraint
 class ArrowZero a => ArrowPlus a where
     -- | An associative operation with identity 'zeroArrow'.
     (<+>) :: a b c -> a b c -> a b c
@@ -263,6 +268,7 @@ instance MonadPlus m => ArrowPlus (Kleisli m) where
 -- The other combinators have sensible default definitions, which may
 -- be overridden for efficiency.
 
+type  ArrowChoice :: (Type -> Type -> Type) -> Constraint
 class Arrow a => ArrowChoice a where
     {-# MINIMAL (left | (+++)) #-}
 
@@ -342,6 +348,7 @@ instance Monad m => ArrowChoice (Kleisli m) where
 --
 -- Such arrows are equivalent to monads (see 'ArrowMonad').
 
+type  ArrowApply :: (Type -> Type -> Type) -> Constraint
 class Arrow a => ArrowApply a where
     app :: a (a b c, b) c
 
@@ -356,6 +363,7 @@ instance Monad m => ArrowApply (Kleisli m) where
 -- | The 'ArrowApply' class is equivalent to 'Monad': any monad gives rise
 --   to a 'Kleisli' arrow, and any instance of 'ArrowApply' defines a monad.
 
+type    ArrowMonad :: (Type -> Type -> Type) -> Type -> Type
 newtype ArrowMonad a b = ArrowMonad (a () b)
 
 -- | @since 4.6.0.0
@@ -415,6 +423,7 @@ leftApp f = arr ((\b -> (arr (\() -> b) >>> f >>> arr Left, ())) |||
 -- > assoc ((a,b),c) = (a,(b,c))
 -- > unassoc (a,(b,c)) = ((a,b),c)
 --
+type  ArrowLoop :: (Type -> Type -> Type) -> Constraint
 class Arrow a => ArrowLoop a where
     loop :: a (b,d) (c,d) -> a b c
 

@@ -1,5 +1,6 @@
-{-# LANGUAGE Safe #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE Safe #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -18,6 +19,7 @@ module Data.Bifunctor
   ) where
 
 import Control.Applicative  ( Const(..) )
+import Data.Kind (Type, Constraint)
 import GHC.Generics ( K1(..) )
 
 -- $setup
@@ -65,6 +67,7 @@ import GHC.Generics ( K1(..) )
 -- @
 --
 -- @since 4.8.0.0
+type  Bifunctor :: (Type -> Type -> Type) -> Constraint
 class Bifunctor p where
     {-# MINIMAL bimap | first, second #-}
 
