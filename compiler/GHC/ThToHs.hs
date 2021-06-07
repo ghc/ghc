@@ -226,9 +226,13 @@ cvtDec (TH.InfixD fx nm)
        ; returnJustLA (Hs.SigD noExtField (FixSig noAnn
                                       (FixitySig noExtField [nm'] (cvtFixity fx)))) }
 
-cvtDec (TH.DefaultD tys)
+cvtDec (TH.DefaultD Nothing tys)
   = do  { tys' <- traverse cvtType tys
         ; returnJustLA (Hs.DefD noExtField $ DefaultDecl noAnn tys') }
+cvtDec (TH.DefaultD (Just cls) _)
+  = failWith (text "Default declaration with explicit class"
+                 <+> quotes (text (TH.pprint cls))
+                 <+> text "awaits the NamedDefaults extension")
 
 cvtDec (PragmaD prag)
   = cvtPragmaD prag
