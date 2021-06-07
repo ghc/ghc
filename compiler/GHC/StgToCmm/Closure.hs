@@ -878,7 +878,7 @@ mkProfilingInfo profile id val_descr
 
 getTyDescription :: Type -> String
 getTyDescription ty
-  = case (tcSplitSigmaTy ty) of { (_, _, tau_ty) ->
+  = case tcSplitSigmaTy ty of { (_, _, tau_ty) ->
     case tau_ty of
       TyVarTy _              -> "*"
       AppTy fun _            -> getTyDescription fun

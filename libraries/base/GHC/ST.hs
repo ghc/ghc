@@ -56,7 +56,7 @@ type STRep s a = State# s -> (# State# s, a #)
 -- | @since 2.01
 instance Functor (ST s) where
     fmap f (ST m) = ST $ \ s ->
-      case (m s) of { (# new_s, r #) ->
+      case m s of { (# new_s, r #) ->
       (# new_s, f r #) }
 
 -- | @since 4.4.0.0
@@ -74,8 +74,8 @@ instance Monad (ST s) where
     (>>) = (*>)
     (ST m) >>= k
       = ST (\ s ->
-        case (m s) of { (# new_s, r #) ->
-        case (k r) of { ST k2 ->
+        case m s of { (# new_s, r #) ->
+        case k r of { ST k2 ->
         (k2 new_s) }})
 
 -- | @since 4.11.0.0
