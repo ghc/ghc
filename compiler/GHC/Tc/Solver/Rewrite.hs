@@ -12,6 +12,9 @@ module GHC.Tc.Solver.Rewrite(
 import GHC.Prelude
 
 import GHC.Core.TyCo.Ppr ( pprTyVar )
+import GHC.Tc.Types ( TcGblEnv(tcg_tc_plugin_rewriters),
+                      TcPluginRewriter, TcPluginRewriteResult(..),
+                      runTcPluginM )
 import GHC.Tc.Types.Constraint
 import GHC.Core.Predicate
 import GHC.Tc.Utils.TcType
@@ -20,6 +23,7 @@ import GHC.Tc.Types.Evidence
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep   -- performs delicate algorithm on types
 import GHC.Core.Coercion
+import GHC.Types.Unique.FM
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
@@ -27,8 +31,10 @@ import GHC.Driver.Session
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
+import GHC.Tc.Errors.Types (TcRnMessage(..))
 import GHC.Tc.Solver.Monad as TcS
 import GHC.Tc.Solver.Types
+import GHC.Tc.Utils.Monad (addTcRnDiagnostic)
 
 import GHC.Utils.Misc
 import GHC.Data.Maybe
@@ -764,6 +770,36 @@ is inlined in that case, and only FINISH 1 is performed.
 
 -}
 
+getTcPluginRewriters :: TyCon -> RewriteM [TcPluginRewriter]
+getTcPluginRewriters tc
+  = liftTcS $ do { rewriters <- tcg_tc_plugin_rewriters <$> getGblEnv
+                 ; return (lookupWithDefaultUFM rewriters [] tc) }
+
+runTcPluginRewriters :: [TcPluginRewriter]
+                     -> [TcType]
+                     -> TcS (Maybe (Coercion, Xi))
+runTcPluginRewriters rewriterFunctions tys
+  | null rewriterFunctions
+  = return Nothing -- short-circuit for common case
+  | otherwise
+  = do { givens <- return [] -- SLD TODO: get current constraints
+       ; evBindsVar <- getTcEvBindsVar
+       ; runRewriters evBindsVar givens rewriterFunctions }
+  where
+  runRewriters _ _ []
+    = return Nothing
+  runRewriters evBindsVar givens (rewriter:rewriters)
+    = do { rewriteResult <- wrapTcS . ( `runTcPluginM` evBindsVar ) $
+                            rewriter givens tys
+         ; case rewriteResult of
+            { TcPluginRewriteError msg ->
+              do { wrapTcS $ addTcRnDiagnostic (TcRnUnknownMessage msg)
+                 ; return Nothing }
+            ; TcPluginRewriteTo res co ->
+                return (Just (co,res))
+            ; TcPluginNoRewrite        ->
+                runRewriters evBindsVar givens rewriters }}
+
 rewrite_fam_app :: TyCon -> [TcType] -> RewriteM (Xi, Coercion)
   --   rewrite_fam_app            can be over-saturated
   --   rewrite_exact_fam_app      lifts out the application to top level
@@ -788,8 +824,11 @@ rewrite_exact_fam_app :: TyCon -> [TcType] -> RewriteM (Xi, Coercion)
 rewrite_exact_fam_app tc tys
   = do { checkStackDepth (mkTyConApp tc tys)
 
+       -- Get all tc-plugins that can rewrite a family application headed by 'tc'.
+       ; rewriters <- getTcPluginRewriters tc
+
        -- STEP 1/2. Try to reduce without reducing arguments first.
-       ; result1 <- try_to_reduce tc tys
+       ; result1 <- try_to_reduce rewriters tc tys
        ; case result1 of
              -- Don't use the cache;
              -- See Note [rewrite_exact_fam_app performance]
@@ -839,7 +878,7 @@ rewrite_exact_fam_app tc tys
          ; _ ->
 
          -- inert didn't work. Try to reduce again, in STEP 5/6.
-    do { result3 <- try_to_reduce tc xis
+    do { result3 <- try_to_reduce rewriters tc xis
        ; case result3 of
            Just (co, xi) -> finish True (homogenise xi co)
            Nothing       -> -- we have made no progress at all: STEP 7.
@@ -869,9 +908,10 @@ rewrite_exact_fam_app tc tys
 
 -- Returned coercion is output ~r input, where r is the role in the RewriteM monad
 -- See Note [How to normalise a family application]
-try_to_reduce :: TyCon -> [TcType] -> RewriteM (Maybe (TcCoercion, TcType))
-try_to_reduce tc tys
-  = do { result <- liftTcS $ firstJustsM [ lookupFamAppCache tc tys  -- STEP 5
+try_to_reduce :: [TcPluginRewriter] -> TyCon -> [TcType] -> RewriteM (Maybe (TcCoercion, TcType))
+try_to_reduce rewriters tc tys
+  = do { result <- liftTcS $ firstJustsM [ runTcPluginRewriters rewriters tys
+                                         , lookupFamAppCache tc tys  -- STEP 5
                                          , matchFam tc tys ]         -- STEP 6
        ; downgrade result }
   where
