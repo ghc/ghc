@@ -1,6 +1,7 @@
 module Main where
 
 import GHC.Driver.Session
+import GHC.Driver.Config.Parser
 import GHC
 
 import Control.Monad.IO.Class (liftIO)
@@ -17,6 +18,7 @@ main = do
     let dflags' = dflags `gopt_set` Opt_KeepRawTokenStream
                          `gopt_set` Opt_Haddock
         filename = "T10942_A.hs"
+        parser_opts = initParserOpts dflags'
     setSessionDynFlags dflags'
     stringBuffer <- liftIO $ hGetStringBuffer filename
-    liftIO $ print (map unLoc (getOptions dflags' stringBuffer filename))
+    liftIO $ print (map unLoc (getOptions parser_opts stringBuffer filename))

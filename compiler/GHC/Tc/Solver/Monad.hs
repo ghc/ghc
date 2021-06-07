@@ -1289,9 +1289,9 @@ traceFireTcS ev doc
 csTraceTcM :: TcM SDoc -> TcM ()
 -- Constraint-solver tracing, -ddump-cs-trace
 csTraceTcM mk_doc
-  = do { dflags <- getDynFlags
-       ; when (  dopt Opt_D_dump_cs_trace dflags
-                  || dopt Opt_D_dump_tc_trace dflags )
+  = do { logger <- getLogger
+       ; when (  logHasDumpFlag logger Opt_D_dump_cs_trace
+                  || logHasDumpFlag logger Opt_D_dump_tc_trace)
               ( do { msg <- mk_doc
                    ; TcM.dumpTcRn False
                        Opt_D_dump_cs_trace

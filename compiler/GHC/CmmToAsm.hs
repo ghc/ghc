@@ -75,7 +75,6 @@ module GHC.CmmToAsm
    -- cmmNativeGen emits
    , cmmNativeGen
    , NcgImpl(..)
-   , initNCGConfig
    )
 where
 
@@ -149,15 +148,14 @@ import Control.Monad
 import System.IO
 
 --------------------
-nativeCodeGen :: forall a . Logger -> DynFlags -> Module -> ModLocation -> Handle -> UniqSupply
+nativeCodeGen :: forall a . Logger -> NCGConfig -> ModLocation -> Handle -> UniqSupply
               -> Stream IO RawCmmGroup a
               -> IO a
-nativeCodeGen logger dflags this_mod modLoc h us cmms
- = let config   = initNCGConfig dflags this_mod
-       platform = ncgPlatform config
+nativeCodeGen logger config modLoc h us cmms
+ = let platform = ncgPlatform config
        nCG' :: ( OutputableP Platform statics, Outputable jumpDest, Instruction instr)
             => NcgImpl statics instr jumpDest -> IO a
-       nCG' ncgImpl = nativeCodeGen' logger dflags config modLoc ncgImpl h us cmms
+       nCG' ncgImpl = nativeCodeGen' logger config modLoc ncgImpl h us cmms
    in case platformArch platform of
       ArchX86       -> nCG' (X86.ncgX86     config)
       ArchX86_64    -> nCG' (X86.ncgX86_64  config)
@@ -221,7 +219,6 @@ See also Note [What is this unwinding business?] in "GHC.Cmm.DebugBlock".
 
 nativeCodeGen' :: (OutputableP Platform statics, Outputable jumpDest, Instruction instr)
                => Logger
-               -> DynFlags
                -> NCGConfig
                -> ModLocation
                -> NcgImpl statics instr jumpDest
@@ -229,35 +226,34 @@ nativeCodeGen' :: (OutputableP Platform statics, Outputable jumpDest, Instructio
                -> UniqSupply
                -> Stream IO RawCmmGroup a
                -> IO a
-nativeCodeGen' logger dflags config modLoc ncgImpl h us cmms
+nativeCodeGen' logger config modLoc ncgImpl h us cmms
  = do
         -- BufHandle is a performance hack.  We could hide it inside
         -- Pretty if it weren't for the fact that we do lots of little
         -- printDocs here (in order to do codegen in constant space).
         bufh <- newBufHandle h
         let ngs0 = NGS [] [] [] [] [] [] emptyUFM mapEmpty
-        (ngs, us', a) <- cmmNativeGenStream logger dflags config modLoc ncgImpl bufh us
+        (ngs, us', a) <- cmmNativeGenStream logger config modLoc ncgImpl bufh us
                                          cmms ngs0
-        _ <- finishNativeGen logger dflags config modLoc bufh us' ngs
+        _ <- finishNativeGen logger config modLoc bufh us' ngs
         return a
 
 finishNativeGen :: Instruction instr
                 => Logger
-                -> DynFlags
                 -> NCGConfig
                 -> ModLocation
                 -> BufHandle
                 -> UniqSupply
                 -> NativeGenAcc statics instr
                 -> IO UniqSupply
-finishNativeGen logger dflags config modLoc bufh@(BufHandle _ _ h) us ngs
- = withTimingSilent logger dflags (text "NCG") (`seq` ()) $ do
+finishNativeGen logger config modLoc bufh@(BufHandle _ _ h) us ngs
+ = withTimingSilent logger (text "NCG") (`seq` ()) $ do
         -- Write debug data and finish
         us' <- if not (ncgDwarfEnabled config)
                   then return us
                   else do
                      (dwarf, us') <- dwarfGen config modLoc us (ngs_debug ngs)
-                     emitNativeCode logger dflags config bufh dwarf
+                     emitNativeCode logger config bufh dwarf
                      return us'
         bFlush bufh
 
@@ -274,7 +270,7 @@ finishNativeGen logger dflags config modLoc bufh@(BufHandle _ _ h) us ngs
           dump_stats (Color.pprStats stats graphGlobal)
 
           let platform = ncgPlatform config
-          dumpIfSet_dyn logger dflags
+          putDumpFileMaybe logger
                   Opt_D_dump_asm_conflicts "Register conflict graph"
                   FormatText
                   $ Color.dotGraph
@@ -296,13 +292,12 @@ finishNativeGen logger dflags config modLoc bufh@(BufHandle _ _ h) us ngs
                 $ makeImportsDoc config (concat (ngs_imports ngs))
         return us'
   where
-    dump_stats = putDumpMsg logger dflags (mkDumpStyle alwaysQualify)
+    dump_stats = logDumpFile logger (mkDumpStyle alwaysQualify)
                    Opt_D_dump_asm_stats "NCG stats"
                    FormatText
 
 cmmNativeGenStream :: forall statics jumpDest instr a . (OutputableP Platform statics, Outputable jumpDest, Instruction instr)
               => Logger
-              -> DynFlags
               -> NCGConfig
               -> ModLocation
               -> NcgImpl statics instr jumpDest
@@ -312,7 +307,7 @@ cmmNativeGenStream :: forall statics jumpDest instr a . (OutputableP Platform st
               -> NativeGenAcc statics instr
               -> IO (NativeGenAcc statics instr, UniqSupply, a)
 
-cmmNativeGenStream logger dflags config modLoc ncgImpl h us cmm_stream ngs
+cmmNativeGenStream logger config modLoc ncgImpl h us cmm_stream ngs
  = loop us (Stream.runStream cmm_stream) ngs
   where
     ncglabel = text "NCG"
@@ -334,7 +329,6 @@ cmmNativeGenStream logger dflags config modLoc ncgImpl h us cmm_stream ngs
         Stream.Yield cmms cmm_stream' -> do
           (us', ngs'') <-
             withTimingSilent logger
-                dflags
                 ncglabel (\(a, b) -> a `seq` b `seq` ()) $ do
               -- Generate debug information
               let !ndbgs | ncgDwarfEnabled config = cmmDebugGen modLoc cmms
@@ -342,15 +336,15 @@ cmmNativeGenStream logger dflags config modLoc ncgImpl h us cmm_stream ngs
                   dbgMap = debugToMap ndbgs
 
               -- Generate native code
-              (ngs',us') <- cmmNativeGens logger dflags config modLoc ncgImpl h
+              (ngs',us') <- cmmNativeGens logger config modLoc ncgImpl h
                                           dbgMap us cmms ngs 0
 
               -- Link native code information into debug blocks
               -- See Note [What is this unwinding business?] in "GHC.Cmm.DebugBlock".
               let !ldbgs = cmmDebugLink (ngs_labels ngs') (ngs_unwinds ngs') ndbgs
-                  platform = targetPlatform dflags
+                  platform = ncgPlatform config
               unless (null ldbgs) $
-                dumpIfSet_dyn logger dflags Opt_D_dump_debug "Debug Infos" FormatText
+                putDumpFileMaybe logger Opt_D_dump_debug "Debug Infos" FormatText
                   (vcat $ map (pdoc platform) ldbgs)
 
               -- Accumulate debug information for emission in finishNativeGen.
@@ -365,7 +359,6 @@ cmmNativeGenStream logger dflags config modLoc ncgImpl h us cmm_stream ngs
 cmmNativeGens :: forall statics instr jumpDest.
                  (OutputableP Platform statics, Outputable jumpDest, Instruction instr)
               => Logger
-              -> DynFlags
               -> NCGConfig
               -> ModLocation
               -> NcgImpl statics instr jumpDest
@@ -377,7 +370,7 @@ cmmNativeGens :: forall statics instr jumpDest.
               -> Int
               -> IO (NativeGenAcc statics instr, UniqSupply)
 
-cmmNativeGens logger dflags config modLoc ncgImpl h dbgMap = go
+cmmNativeGens logger config modLoc ncgImpl h dbgMap = go
   where
     go :: UniqSupply -> [RawCmmDecl]
        -> NativeGenAcc statics instr -> Int
@@ -390,7 +383,7 @@ cmmNativeGens logger dflags config modLoc ncgImpl h dbgMap = go
         let fileIds = ngs_dwarfFiles ngs
         (us', fileIds', native, imports, colorStats, linearStats, unwinds)
           <- {-# SCC "cmmNativeGen" #-}
-             cmmNativeGen logger dflags modLoc ncgImpl us fileIds dbgMap
+             cmmNativeGen logger modLoc ncgImpl us fileIds dbgMap
                           cmm count
 
         -- Generate .file directives for every new file that has been
@@ -402,17 +395,17 @@ cmmNativeGens logger dflags config modLoc ncgImpl h dbgMap = go
             pprDecl (f,n) = text "\t.file " <> ppr n <+>
                             pprFilePathString (unpackFS f)
 
-        emitNativeCode logger dflags config h $ vcat $
+        emitNativeCode logger config h $ vcat $
           map pprDecl newFileIds ++
           map (pprNatCmmDecl ncgImpl) native
 
         -- force evaluation all this stuff to avoid space leaks
-        let platform = targetPlatform dflags
-        {-# SCC "seqString" #-} evaluate $ seqList (showSDoc dflags $ vcat $ map (pdoc platform) imports) ()
+        let platform = ncgPlatform config
+        {-# SCC "seqString" #-} evaluate $ seqList (showSDocUnsafe $ vcat $ map (pdoc platform) imports) ()
 
         let !labels' = if ncgDwarfEnabled config
                        then cmmDebugLabels isMetaInstr native else []
-            !natives' = if dopt Opt_D_dump_asm_stats dflags
+            !natives' = if logHasDumpFlag logger Opt_D_dump_asm_stats
                         then native : ngs_natives ngs else []
 
             mCon = maybe id (:)
@@ -427,14 +420,14 @@ cmmNativeGens logger dflags config modLoc ncgImpl h dbgMap = go
         go us' cmms ngs' (count + 1)
 
 
-emitNativeCode :: Logger -> DynFlags -> NCGConfig -> BufHandle -> SDoc -> IO ()
-emitNativeCode logger dflags config h sdoc = do
+emitNativeCode :: Logger -> NCGConfig -> BufHandle -> SDoc -> IO ()
+emitNativeCode logger config h sdoc = do
 
         let ctx = ncgAsmContext config
         {-# SCC "pprNativeCode" #-} bufLeftRenderSDoc ctx h sdoc
 
         -- dump native code
-        dumpIfSet_dyn logger dflags
+        putDumpFileMaybe logger
                 Opt_D_dump_asm "Asm code" FormatASM
                 sdoc
 
@@ -444,7 +437,6 @@ emitNativeCode logger dflags config h sdoc = do
 cmmNativeGen
     :: forall statics instr jumpDest. (Instruction instr, OutputableP Platform statics, Outputable jumpDest)
     => Logger
-    -> DynFlags
     -> ModLocation
     -> NcgImpl statics instr jumpDest
         -> UniqSupply
@@ -461,7 +453,7 @@ cmmNativeGen
                 , LabelMap [UnwindPoint]                    -- unwinding information for blocks
                 )
 
-cmmNativeGen logger dflags modLoc ncgImpl us fileIds dbgMap cmm count
+cmmNativeGen logger modLoc ncgImpl us fileIds dbgMap cmm count
  = do
         let config   = ncgConfig ncgImpl
         let platform = ncgPlatform config
@@ -481,7 +473,7 @@ cmmNativeGen logger dflags modLoc ncgImpl us fileIds dbgMap cmm count
                 {-# SCC "cmmToCmm" #-}
                 cmmToCmm config fixed_cmm
 
-        dumpIfSet_dyn logger dflags
+        putDumpFileMaybe logger
                 Opt_D_dump_opt_cmm "Optimised Cmm" FormatCMM
                 (pprCmmGroup platform [opt_cmm])
 
@@ -495,11 +487,11 @@ cmmNativeGen logger dflags modLoc ncgImpl us fileIds dbgMap cmm count
                                         (cmmTopCodeGen ncgImpl)
                                         fileIds dbgMap opt_cmm cmmCfg
 
-        dumpIfSet_dyn logger dflags
+        putDumpFileMaybe logger
                 Opt_D_dump_asm_native "Native code" FormatASM
                 (vcat $ map (pprNatCmmDecl ncgImpl) native)
 
-        maybeDumpCfg logger dflags (Just nativeCfgWeights) "CFG Weights - Native" proc_name
+        maybeDumpCfg logger (Just nativeCfgWeights) "CFG Weights - Native" proc_name
 
         -- tag instructions with register liveness information
         -- also drops dead code. We don't keep the cfg in sync on
@@ -512,15 +504,14 @@ cmmNativeGen logger dflags modLoc ncgImpl us fileIds dbgMap cmm count
                 initUs usGen
                         $ mapM (cmmTopLiveness livenessCfg platform) native
 
-        dumpIfSet_dyn logger dflags
+        putDumpFileMaybe logger
                 Opt_D_dump_asm_liveness "Liveness annotations added"
                 FormatCMM
                 (vcat $ map (pprLiveCmmDecl platform) withLiveness)
 
         -- allocate registers
         (alloced, usAlloc, ppr_raStatsColor, ppr_raStatsLinear, raStats, stack_updt_blks) <-
-         if ( gopt Opt_RegsGraph dflags
-           || gopt Opt_RegsIterative dflags )
+         if ( ncgRegsGraph config || ncgRegsIterative config )
           then do
                 -- the regs usable for allocation
                 let (alloc_regs :: UniqFM RegClass (UniqSet RealReg))
@@ -552,12 +543,12 @@ cmmNativeGen logger dflags modLoc ncgImpl us fileIds dbgMap cmm count
 
 
                 -- dump out what happened during register allocation
-                dumpIfSet_dyn logger dflags
+                putDumpFileMaybe logger
                         Opt_D_dump_asm_regalloc "Registers allocated"
                         FormatCMM
                         (vcat $ map (pprNatCmmDecl ncgImpl) alloced)
 
-                dumpIfSet_dyn logger dflags
+                putDumpFileMaybe logger
                         Opt_D_dump_asm_regalloc_stages "Build/spill stages"
                         FormatText
                         (vcat   $ map (\(stage, stats)
@@ -567,7 +558,7 @@ cmmNativeGen logger dflags modLoc ncgImpl us fileIds dbgMap cmm count
                                 $ zip [0..] regAllocStats)
 
                 let mPprStats =
-                        if dopt Opt_D_dump_asm_stats dflags
+                        if logHasDumpFlag logger Opt_D_dump_asm_stats
                          then Just regAllocStats else Nothing
 
                 -- force evaluation of the Maybe to avoid space leak
@@ -596,13 +587,13 @@ cmmNativeGen logger dflags modLoc ncgImpl us fileIds dbgMap cmm count
                           $ liftM unzip3
                           $ mapM reg_alloc withLiveness
 
-                dumpIfSet_dyn logger dflags
+                putDumpFileMaybe logger
                         Opt_D_dump_asm_regalloc "Registers allocated"
                         FormatCMM
                         (vcat $ map (pprNatCmmDecl ncgImpl) alloced)
 
                 let mPprStats =
-                        if dopt Opt_D_dump_asm_stats dflags
+                        if logHasDumpFlag logger Opt_D_dump_asm_stats
                          then Just (catMaybes regAllocStats) else Nothing
 
                 -- force evaluation of the Maybe to avoid space leak
@@ -631,7 +622,7 @@ cmmNativeGen logger dflags modLoc ncgImpl us fileIds dbgMap cmm count
                 {-# SCC "generateJumpTables" #-}
                 generateJumpTables ncgImpl alloced
 
-        when (not $ null nativeCfgWeights) $ dumpIfSet_dyn logger dflags
+        when (not $ null nativeCfgWeights) $ putDumpFileMaybe logger
                 Opt_D_dump_cfg_weights "CFG Update information"
                 FormatText
                 ( text "stack:" <+> ppr stack_updt_blks $$
@@ -640,20 +631,20 @@ cmmNativeGen logger dflags modLoc ncgImpl us fileIds dbgMap cmm count
         ---- shortcut branches
         let (shorted, postShortCFG)     =
                 {-# SCC "shortcutBranches" #-}
-                shortcutBranches dflags ncgImpl tabled postRegCFG
+                shortcutBranches config ncgImpl tabled postRegCFG
 
         let optimizedCFG :: Maybe CFG
             optimizedCFG =
-                optimizeCFG (gopt Opt_CmmStaticPred dflags) weights cmm <$!> postShortCFG
+                optimizeCFG (ncgCmmStaticPred config) weights cmm <$!> postShortCFG
 
-        maybeDumpCfg logger dflags optimizedCFG "CFG Weights - Final" proc_name
+        maybeDumpCfg logger optimizedCFG "CFG Weights - Final" proc_name
 
         --TODO: Partially check validity of the cfg.
         let getBlks (CmmProc _info _lbl _live (ListGraph blocks)) = blocks
             getBlks _ = []
 
         when ( backendMaintainsCfg platform &&
-                (gopt Opt_DoAsmLinting dflags || debugIsOn )) $ do
+                (ncgAsmLinting config || debugIsOn )) $ do
                 let blocks = concatMap getBlks shorted
                 let labels = setFromList $ fmap blockId blocks :: LabelSet
                 let cfg = fromJust optimizedCFG
@@ -687,7 +678,7 @@ cmmNativeGen logger dflags modLoc ncgImpl us fileIds dbgMap cmm count
                 ncgExpandTop ncgImpl branchOpt
                 --ncgExpandTop ncgImpl sequenced
 
-        dumpIfSet_dyn logger dflags
+        putDumpFileMaybe logger
                 Opt_D_dump_asm_expanded "Synthetic instructions expanded"
                 FormatCMM
                 (vcat $ map (pprNatCmmDecl ncgImpl) expanded)
@@ -699,7 +690,7 @@ cmmNativeGen logger dflags modLoc ncgImpl us fileIds dbgMap cmm count
                 foldl' addUnwind mapEmpty expanded
               where
                 addUnwind acc proc =
-                    acc `mapUnion` computeUnwinding dflags ncgImpl proc
+                    acc `mapUnion` computeUnwinding config ncgImpl proc
 
         return  ( usAlloc
                 , fileIds'
@@ -709,13 +700,13 @@ cmmNativeGen logger dflags modLoc ncgImpl us fileIds dbgMap cmm count
                 , ppr_raStatsLinear
                 , unwinds )
 
-maybeDumpCfg :: Logger -> DynFlags -> Maybe CFG -> String -> SDoc -> IO ()
-maybeDumpCfg _logger _dflags Nothing _ _ = return ()
-maybeDumpCfg logger dflags (Just cfg) msg proc_name
+maybeDumpCfg :: Logger -> Maybe CFG -> String -> SDoc -> IO ()
+maybeDumpCfg _logger Nothing _ _ = return ()
+maybeDumpCfg logger (Just cfg) msg proc_name
         | null cfg = return ()
         | otherwise
-        = dumpIfSet_dyn logger
-                dflags Opt_D_dump_cfg_weights msg
+        = putDumpFileMaybe logger
+                Opt_D_dump_cfg_weights msg
                 FormatText
                 (proc_name <> char ':' $$ pprEdgeWeights cfg)
 
@@ -738,15 +729,16 @@ checkLayout procsUnsequenced procsSequenced =
 
 -- | Compute unwinding tables for the blocks of a procedure
 computeUnwinding :: Instruction instr
-                 => DynFlags -> NcgImpl statics instr jumpDest
+                 => NCGConfig
+                 -> NcgImpl statics instr jumpDest
                  -> NatCmmDecl statics instr
                     -- ^ the native code generated for the procedure
                  -> LabelMap [UnwindPoint]
                     -- ^ unwinding tables for all points of all blocks of the
                     -- procedure
-computeUnwinding dflags _ _
-  | debugLevel dflags == 0         = mapEmpty
-computeUnwinding _ _ (CmmData _ _) = mapEmpty
+computeUnwinding config _ _
+  | not (ncgComputeUnwinding config) = mapEmpty
+computeUnwinding _ _ (CmmData _ _)   = mapEmpty
 computeUnwinding _ ncgImpl (CmmProc _ _ _ (ListGraph blks)) =
     -- In general we would need to push unwinding information down the
     -- block-level call-graph to ensure that we fully account for all
@@ -832,14 +824,15 @@ generateJumpTables ncgImpl xs = concatMap f xs
 -- Shortcut branches
 
 shortcutBranches
-        :: forall statics instr jumpDest. (Outputable jumpDest) => DynFlags
+        :: forall statics instr jumpDest. (Outputable jumpDest)
+        => NCGConfig
         -> NcgImpl statics instr jumpDest
         -> [NatCmmDecl statics instr]
         -> Maybe CFG
         -> ([NatCmmDecl statics instr],Maybe CFG)
 
-shortcutBranches dflags ncgImpl tops weights
-  | gopt Opt_AsmShortcutting dflags
+shortcutBranches config ncgImpl tops weights
+  | ncgEnableShortcutting config
   = ( map (apply_mapping ncgImpl mapping) tops'
     , shortcutWeightMap mappingBid <$!> weights )
   | otherwise
@@ -1144,56 +1137,3 @@ cmmExprNative referenceKind expr = do
 
         other
            -> return other
-
--- | Initialize the native code generator configuration from the DynFlags
-initNCGConfig :: DynFlags -> Module -> NCGConfig
-initNCGConfig dflags this_mod = NCGConfig
-   { ncgPlatform              = targetPlatform dflags
-   , ncgThisModule            = this_mod
-   , ncgAsmContext            = initSDocContext dflags (PprCode AsmStyle)
-   , ncgProcAlignment         = cmmProcAlignment dflags
-   , ncgExternalDynamicRefs   = gopt Opt_ExternalDynamicRefs dflags
-   , ncgPIC                   = positionIndependent dflags
-   , ncgInlineThresholdMemcpy = fromIntegral $ maxInlineMemcpyInsns dflags
-   , ncgInlineThresholdMemset = fromIntegral $ maxInlineMemsetInsns dflags
-   , ncgSplitSections         = gopt Opt_SplitSections dflags
-   , ncgRegsIterative         = gopt Opt_RegsIterative dflags
-   , ncgAsmLinting            = gopt Opt_DoAsmLinting dflags
-   , ncgCfgWeights            = cfgWeights dflags
-   , ncgCfgBlockLayout        = gopt Opt_CfgBlocklayout dflags
-   , ncgCfgWeightlessLayout   = gopt Opt_WeightlessBlocklayout dflags
-
-     -- With -O1 and greater, the cmmSink pass does constant-folding, so
-     -- we don't need to do it again in the native code generator.
-   , ncgDoConstantFolding     = optLevel dflags < 1
-
-   , ncgDumpRegAllocStages    = dopt Opt_D_dump_asm_regalloc_stages dflags
-   , ncgDumpAsmStats          = dopt Opt_D_dump_asm_stats dflags
-   , ncgDumpAsmConflicts      = dopt Opt_D_dump_asm_conflicts dflags
-   , ncgBmiVersion            = case platformArch (targetPlatform dflags) of
-                                 ArchX86_64 -> bmiVersion dflags
-                                 ArchX86    -> bmiVersion dflags
-                                 _          -> Nothing
-
-     -- We assume  SSE1 and SSE2 operations are available on both
-     -- x86 and x86_64. Historically we didn't default to SSE2 and
-     -- SSE1 on x86, which results in defacto nondeterminism for how
-     -- rounding behaves in the associated x87 floating point instructions
-     -- because variations in the spill/fpu stack placement of arguments for
-     -- operations would change the precision and final result of what
-     -- would otherwise be the same expressions with respect to single or
-     -- double precision IEEE floating point computations.
-   , ncgSseVersion =
-      let v | sseVersion dflags < Just SSE2 = Just SSE2
-            | otherwise                     = sseVersion dflags
-      in case platformArch (targetPlatform dflags) of
-            ArchX86_64 -> v
-            ArchX86    -> v
-            _          -> Nothing
-
-   , ncgDwarfEnabled        = osElfTarget (platformOS (targetPlatform dflags)) && debugLevel dflags > 0 && platformArch (targetPlatform dflags) /= ArchAArch64
-   , ncgDwarfUnwindings     = osElfTarget (platformOS (targetPlatform dflags)) && debugLevel dflags > 0
-   , ncgDwarfStripBlockInfo = osElfTarget (platformOS (targetPlatform dflags)) && debugLevel dflags < 2 -- We strip out block information when running with -g0 or -g1.
-   , ncgDwarfSourceNotes    = osElfTarget (platformOS (targetPlatform dflags)) && debugLevel dflags > 2 -- We produce GHC-specific source-note DIEs only with -g3
-   , ncgExposeInternalSymbols = gopt Opt_ExposeInternalSymbols dflags
-   }

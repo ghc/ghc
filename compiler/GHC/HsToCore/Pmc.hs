@@ -52,7 +52,6 @@ import GHC.HsToCore.Pmc.Solver
 import GHC.Types.Basic (Origin(..))
 import GHC.Core (CoreExpr)
 import GHC.Driver.Session
-import GHC.Driver.Env
 import GHC.Hs
 import GHC.Types.Id
 import GHC.Types.SrcLoc
@@ -60,12 +59,12 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Types.Var (EvVar)
-import GHC.Tc.Types
 import GHC.Tc.Utils.TcType (evVarPred)
+import GHC.Tc.Utils.Monad (updTopFlags)
 import {-# SOURCE #-} GHC.HsToCore.Expr (dsLExpr)
 import GHC.HsToCore.Monad
 import GHC.Data.Bag
-import GHC.Data.IOEnv (updEnv, unsafeInterleaveM)
+import GHC.Data.IOEnv (unsafeInterleaveM)
 import GHC.Data.OrdList
 import GHC.Utils.Monad (mapMaybeM)
 
@@ -95,10 +94,7 @@ getLdiNablas = do
 -- is one concern, but also a lack of properly set up long-distance information
 -- might trigger warnings that we normally wouldn't emit.
 noCheckDs :: DsM a -> DsM a
-noCheckDs k = do
-  dflags <- getDynFlags
-  let dflags' = foldl' wopt_unset dflags allPmCheckWarnings
-  updEnv (\env -> env{env_top = (env_top env) {hsc_dflags = dflags'} }) k
+noCheckDs = updTopFlags (\dflags -> foldl' wopt_unset dflags allPmCheckWarnings)
 
 -- | Check a pattern binding (let, where) for exhaustiveness.
 pmcPatBind :: DsMatchContext -> Id -> Pat GhcTc -> DsM ()
