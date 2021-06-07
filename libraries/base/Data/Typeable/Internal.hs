@@ -503,13 +503,15 @@ pattern App :: forall k2 (t :: k2). ()
 pattern App f x <- (splitApp -> IsApp f x)
   where App f x = mkTrAppChecked f x
 
-data AppOrCon (a :: k) where
+type AppOrCon :: k -> Type
+data AppOrCon a where
     IsApp :: forall k k' (f :: k' -> k) (x :: k'). ()
           => TypeRep f %1 -> TypeRep x %1 -> AppOrCon (f x)
     -- See Note [Con evidence]
     IsCon :: IsApplication a ~ "" => TyCon %1 -> [SomeTypeRep] %1 -> AppOrCon a
 
-type family IsApplication (x :: k) :: Symbol where
+type IsApplication :: k -> Symbol
+type family IsApplication x :: Symbol where
   IsApplication (_ _) = "An error message about this unifying with \"\" "
      `AppendSymbol` "means that you tried to match a TypeRep with Con or "
      `AppendSymbol` "Con' when the represented type was known to be an "
@@ -814,7 +816,8 @@ getRuntimeRep _ = error "Data.Typeable.Internal.getRuntimeRep: impossible"
 
 -- | The class 'Typeable' allows a concrete representation of a type to
 -- be calculated.
-class Typeable (a :: k) where
+type  Typeable :: forall k. k -> Constraint
+class Typeable a where
   typeRep# :: TypeRep a
 
 typeRep :: Typeable a => TypeRep a

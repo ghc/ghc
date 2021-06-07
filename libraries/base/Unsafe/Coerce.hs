@@ -9,6 +9,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE Unsafe #-}
 
@@ -217,6 +218,7 @@ There are yet more wrinkles
 -- complete. It is used to implement 'unsafeCoerce'. You probably don't want to
 -- use 'UnsafeRefl' in an expression, but you might conceivably want to pattern-match
 -- on it. Use 'unsafeEqualityProof' to create one of these.
+type UnsafeEquality :: forall k. k -> k -> Type
 data UnsafeEquality a b where
   UnsafeRefl :: UnsafeEquality a a
 

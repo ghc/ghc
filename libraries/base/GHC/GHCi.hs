@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
@@ -21,10 +22,12 @@ module GHC.GHCi {-# WARNING "This is an unstable interface." #-} (
         GHCiSandboxIO(..), NoIO()
     ) where
 
-import GHC.Base (IO(), Monad, Functor(fmap), Applicative(..), (>>=), id, (.), ap)
+import GHC.Base ( Type, Constraint, IO(), Monad, Functor(fmap)
+                , Applicative(..), (>>=), id, (.), ap)
 
 -- | A monad that can execute GHCi statements by lifting them out of
 -- m into the IO monad. (e.g state monads)
+type  GHCiSandboxIO :: (Type -> Type) -> Constraint
 class (Monad m) => GHCiSandboxIO m where
     ghciStepIO :: m a -> IO a
 
