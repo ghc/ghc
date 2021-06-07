@@ -3075,11 +3075,14 @@ withTcPlugins hsc_env m =
                 ev_binds_var <- newTcEvBinds
                 (solvers, rewriters, stops) <-
                   unzip3 `fmap` mapM (startPlugin ev_binds_var) plugins
+                let
+                  rewritersUniqFM :: UniqFM TyCon [TcPluginRewriter]
+                  rewritersUniqFM = sequenceUFMList rewriters
                 -- This ensures that tcPluginStop is called even if a type
                 -- error occurs during compilation (Fix of #10078)
                 eitherRes <- tryM $
                   updGblEnv (\e -> e { tcg_tc_plugin_solvers   = solvers
-                                     , tcg_tc_plugin_rewriters = rewriters }) m
+                                     , tcg_tc_plugin_rewriters = rewritersUniqFM }) m
                 mapM_ (flip runTcPluginM ev_binds_var) stops
                 case eitherRes of
                   Left _ -> failM
