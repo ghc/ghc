@@ -361,23 +361,23 @@ effect whether a wrapper is present or not:
     We'd like 'map Age' to match the LHS. For this to happen, Age
     must be unfolded, otherwise we'll be stuck. This is tested in T16208.
 
-It also allows for the posssibility of levity polymorphic newtypes
+It also allows for the posssibility of representation-polymorphic newtypes
 with wrappers (with -XUnliftedNewtypes):
 
   newtype N (a :: TYPE r) = MkN a
 
-With -XUnliftedNewtypes, this is allowed -- even though MkN is levity-
+With -XUnliftedNewtypes, this is allowed -- even though MkN is representation-
 polymorphic. It's OK because MkN evaporates in the compiled code, becoming
 just a cast. That is, it has a compulsory unfolding. As long as its
-argument is not levity-polymorphic (which it can't be, according to
-Note [Levity polymorphism invariants] in GHC.Core), and it's saturated,
-no levity-polymorphic code ends up in the code generator. The saturation
-condition is effectively checked by Note [Detecting forced eta expansion]
-in GHC.HsToCore.Expr.
+argument is not representation-polymorphic (which it can't be, according to
+Note [Representation polymorphism invariants] in GHC.Core), and it's saturated,
+no representation-polymorphic code ends up in the code generator.
+The saturation condition is effectively checked by
+Note [Detecting forced eta expansion] in GHC.HsToCore.Expr.
 
 However, if we make a *wrapper* for a newtype, we get into trouble.
 The saturation condition is no longer checked (because hasNoBinding
-returns False) and indeed we generate a forbidden levity-polymorphic
+returns False) and indeed we generate a forbidden representation-polymorphic
 binding.
 
 The solution is simple, though: just make the newtype wrappers
@@ -1529,14 +1529,14 @@ oneShotId = pcMiscPrelId oneShotName ty info
 {- Note [Wired-in Ids for rebindable syntax]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The functions leftSectionId, rightSectionId are
-wired in here ONLY because they are use in a levity-polymorphic way
+wired in here ONLY because they are use in a representation-polymorphic way
 by the rebindable syntax mechanism. See GHC.Rename.Expr
 Note [Handling overloaded and rebindable constructs].
 
 Alas, we can't currenly give Haskell definitions for
-levity-polymorphic functions.
+representation-polymorphic functions.
 
-They have Compulsory unfoldings to so that the levity polymorphism
+They have Compulsory unfoldings, so that the representation polymorphism
 does not linger for long.
 -}
 
@@ -1635,9 +1635,9 @@ Historical note:
     In GHC.Tc.Gen.Expr we used to need a special typing rule for 'seq', to handle calls
     whose second argument had an unboxed type, e.g.  x `seq` 3#
 
-    However, with levity polymorphism we can now give seq the type seq ::
-    forall (r :: RuntimeRep) a (b :: TYPE r). a -> b -> b which handles this
-    case without special treatment in the typechecker.
+    However, with representation polymorphism we can now give seq the type
+    seq :: forall (r :: RuntimeRep) a (b :: TYPE r). a -> b -> b
+    which handles this case without special treatment in the typechecker.
 
 Note [User-defined RULES for seq]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1764,8 +1764,8 @@ and Note [Left folds via right fold]) it was determined that it would be useful
 if library authors could explicitly tell the compiler that a certain lambda is
 called at most once. The oneShot function allows that.
 
-'oneShot' is levity-polymorphic, i.e. the type variables can refer to unlifted
-types as well (#10744); e.g.
+'oneShot' is representation-polymorphic, i.e. the type variables can refer
+to unlifted types as well (#10744); e.g.
    oneShot (\x:Int# -> x +# 1#)
 
 Like most magic functions it has a compulsory unfolding, so there is no need

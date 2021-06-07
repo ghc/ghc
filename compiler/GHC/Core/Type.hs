@@ -620,7 +620,7 @@ kindRep_maybe kind
 
 -- | Returns True if the kind classifies types which are allocated on
 -- the GC'd heap and False otherwise. Note that this returns False for
--- levity-polymorphic kinds, which may be specialized to a kind that
+-- representation-polymorphic kinds, which may be specialized to a kind that
 -- classifies AddrRep or even unboxed kinds.
 isBoxedTypeKind :: Kind -> Bool
 isBoxedTypeKind kind
@@ -661,8 +661,8 @@ pickyIsLiftedTypeKind kind
   | otherwise                          = False
 
 -- | Returns True if the kind classifies unlifted types (like 'Int#') and False
--- otherwise. Note that this returns False for levity-polymorphic kinds, which
--- may be specialized to a kind that classifies unlifted types.
+-- otherwise. Note that this returns False for representation-polymorphic
+-- kinds, which may be specialized to a kind that classifies unlifted types.
 isUnliftedTypeKind :: Kind -> Bool
 isUnliftedTypeKind kind
   = case kindRep_maybe kind of
@@ -2243,18 +2243,18 @@ buildSynTyCon name binders res_kind roles rhs
 
 -- | Returns Just True if this type is surely lifted, Just False
 -- if it is surely unlifted, Nothing if we can't be sure (i.e., it is
--- levity polymorphic), and panics if the kind does not have the shape
+-- representation-polymorphic), and panics if the kind does not have the shape
 -- TYPE r.
 isLiftedType_maybe :: HasDebugCallStack => Type -> Maybe Bool
 isLiftedType_maybe ty = case coreFullView (getRuntimeRep ty) of
   ty' | isLiftedRuntimeRep ty'  -> Just True
   TyConApp {}                   -> Just False  -- Everything else is unlifted
-  _                             -> Nothing     -- levity polymorphic
+  _                             -> Nothing     -- representation-polymorphic
 
 -- | See "Type#type_classification" for what an unlifted type is.
--- Panics on levity polymorphic types; See 'mightBeUnliftedType' for
+-- Panics on representation-polymorphic types; See 'mightBeUnliftedType' for
 -- a more approximate predicate that behaves better in the presence of
--- levity polymorphism.
+-- representation polymorphism.
 isUnliftedType :: HasDebugCallStack => Type -> Bool
         -- isUnliftedType returns True for forall'd unlifted types:
         --      x :: forall a. Int#
@@ -2268,7 +2268,8 @@ isUnliftedType ty
 -- | Returns:
 --
 -- * 'False' if the type is /guaranteed/ lifted or
--- * 'True' if it is unlifted, OR we aren't sure (e.g. in a levity-polymorphic case)
+-- * 'True' if it is unlifted, OR we aren't sure
+--    (e.g. in a representation-polymorphic case)
 mightBeUnliftedType :: Type -> Bool
 mightBeUnliftedType ty
   = case isLiftedType_maybe ty of
@@ -2276,9 +2277,9 @@ mightBeUnliftedType ty
       Nothing -> True
 
 -- | See "Type#type_classification" for what a boxed type is.
--- Panics on levity polymorphic types; See 'mightBeUnliftedType' for
+-- Panics on representation-polymorphic types; See 'mightBeUnliftedType' for
 -- a more approximate predicate that behaves better in the presence of
--- levity polymorphism.
+-- representation polymorphism.
 isBoxedType :: Type -> Bool
 isBoxedType ty = isBoxedRuntimeRep (getRuntimeRep ty)
 
@@ -2339,7 +2340,8 @@ isDataFamilyAppType ty = case tyConAppTyCon_maybe ty of
 
 -- | Computes whether an argument (or let right hand side) should
 -- be computed strictly or lazily, based only on its type.
--- Currently, it's just 'isUnliftedType'. Panics on levity-polymorphic types.
+-- Currently, it's just 'isUnliftedType'.
+-- Panics on representation-polymorphic types.
 isStrictType :: HasDebugCallStack => Type -> Bool
 isStrictType = isUnliftedType
 
@@ -2914,7 +2916,7 @@ typeLiteralKind (NumTyLit {}) = naturalTy
 typeLiteralKind (StrTyLit {}) = typeSymbolKind
 typeLiteralKind (CharTyLit {}) = charTy
 
--- | Returns True if a type is levity polymorphic. Should be the same
+-- | Returns True if a type is representation-polymorphic. Should be the same
 -- as (isKindLevPoly . typeKind) but much faster.
 -- Precondition: The type has kind (TYPE blah)
 isTypeLevPoly :: Type -> Bool
@@ -2932,7 +2934,8 @@ isTypeLevPoly = go
 
     check_kind = isKindLevPoly . typeKind
 
--- | Looking past all pi-types, is the end result potentially levity polymorphic?
+-- | Looking past all pi-types, is the end result potentially
+-- representation-polymorphic?
 -- Example: True for (forall r (a :: TYPE r). String -> a)
 -- Example: False for (forall r1 r2 (a :: TYPE r1) (b :: TYPE r2). a -> b -> Type)
 resultIsLevPoly :: Type -> Bool
