@@ -18,7 +18,7 @@ module GHC.Tc.Types.Origin (
   -- CtOrigin
   CtOrigin(..), exprCtOrigin, lexprCtOrigin, matchesCtOrigin, grhssCtOrigin,
   isVisibleOrigin, toInvisibleOrigin,
-  pprCtOrigin, isGivenOrigin
+  pprCtOrigin, isGivenOrigin, isWantedWantedFunDepOrigin
 
   ) where
 
@@ -390,6 +390,8 @@ data CtOrigin
   | ArithSeqOrigin (ArithSeqInfo GhcRn) -- [x..], [x..y] etc
   | AssocFamPatOrigin   -- When matching the patterns of an associated
                         -- family instance with that of its parent class
+                        -- IMPORTANT: These constraints will never cause errors;
+                        -- See Note [Constraints to ignore] in GHC.Tc.Errors
   | SectionOrigin
   | HasFieldOrigin FastString
   | TupleOrigin         -- (..,..)
@@ -446,16 +448,13 @@ data CtOrigin
         -- We only need a CtOrigin on the first, because the location
         -- is pinned on the entire error message
 
-  | ExprHoleOrigin OccName   -- from an expression hole
+  | ExprHoleOrigin (Maybe OccName)   -- from an expression hole
   | TypeHoleOrigin OccName   -- from a type hole (partial type signature)
   | PatCheckOrigin      -- normalisation of a type during pattern-match checking
   | ListOrigin          -- An overloaded list
   | BracketOrigin       -- An overloaded quotation bracket
   | StaticOrigin        -- A static form
-  | Shouldn'tHappenOrigin String
-                            -- the user should never see this one,
-                            -- unless ImpredicativeTypes is on, where all
-                            -- bets are off
+  | Shouldn'tHappenOrigin String   -- the user should never see this one
   | InstProvidedOrigin Module ClsInst
         -- Skolem variable arose when we were testing if an instance
         -- is solvable or not.
@@ -465,6 +464,17 @@ data CtOrigin
   | CycleBreakerOrigin
       CtOrigin   -- origin of the original constraint
       -- See Detail (7) of Note [Type variable cycles] in GHC.Tc.Solver.Canonical
+
+  | WantedSuperclassOrigin PredType CtOrigin
+        -- From expanding out the superclasses of a Wanted; the PredType
+        -- is the subclass predicate, and the origin
+        -- of the original Wanted is the CtOrigin
+
+  | InstanceSigOrigin   -- from the sub-type check of an InstanceSig
+      Name   -- the method name
+      Type   -- the instance-sig type
+      Type   -- the instantiated type of the method
+  | AmbiguityCheckOrigin UserTypeCtxt
 
 -- An origin is visible if the place where the constraint arises is manifest
 -- in user code. Currently, all origins are visible except for invisible
@@ -487,6 +497,12 @@ isGivenOrigin (FunDepOrigin1 _ o1 _ _ o2 _) = isGivenOrigin o1 && isGivenOrigin 
 isGivenOrigin (FunDepOrigin2 _ o1 _ _)      = isGivenOrigin o1
 isGivenOrigin (CycleBreakerOrigin o)        = isGivenOrigin o
 isGivenOrigin _                             = False
+
+-- See Note [Suppressing confusing errors] in GHC.Tc.Errors
+isWantedWantedFunDepOrigin :: CtOrigin -> Bool
+isWantedWantedFunDepOrigin (FunDepOrigin1 _ orig1 _ _ orig2 _)
+  = not (isGivenOrigin orig1) && not (isGivenOrigin orig2)
+isWantedWantedFunDepOrigin _ = False
 
 instance Outputable CtOrigin where
   ppr = pprCtOrigin
@@ -561,7 +577,6 @@ lGRHSCtOrigin _ = Shouldn'tHappenOrigin "multi-way GRHS"
 
 pprCtOrigin :: CtOrigin -> SDoc
 -- "arising from ..."
--- Not an instance of Outputable because of the "arising from" prefix
 pprCtOrigin (GivenOrigin sk) = ctoHerald <+> ppr sk
 
 pprCtOrigin (SpecPragOrigin ctxt)
@@ -635,6 +650,22 @@ pprCtOrigin (InstProvidedOrigin mod cls_inst)
 pprCtOrigin (CycleBreakerOrigin orig)
   = pprCtOrigin orig
 
+pprCtOrigin (WantedSuperclassOrigin subclass_pred subclass_orig)
+  = sep [ ctoHerald <+> text "a superclass required to satisfy" <+> quotes (ppr subclass_pred) <> comma
+        , pprCtOrigin subclass_orig ]
+
+pprCtOrigin (InstanceSigOrigin method_name sig_type orig_method_type)
+  = vcat [ ctoHerald <+> text "the check that an instance signature is more general"
+         , text "than the type of the method (instantiated for this instance)"
+         , hang (text "instance signature:")
+              2 (ppr method_name <+> dcolon <+> ppr sig_type)
+         , hang (text "instantiated method type:")
+              2 (ppr orig_method_type) ]
+
+pprCtOrigin (AmbiguityCheckOrigin ctxt)
+  = ctoHerald <+> text "a type ambiguity check for" $$
+    pprUserTypeCtxt ctxt
+
 pprCtOrigin simple_origin
   = ctoHerald <+> pprCtO simple_origin
 
@@ -668,7 +699,8 @@ pprCtO DoOrigin              = text "a do statement"
 pprCtO MCompOrigin           = text "a statement in a monad comprehension"
 pprCtO ProcOrigin            = text "a proc expression"
 pprCtO AnnOrigin             = text "an annotation"
-pprCtO (ExprHoleOrigin occ)  = text "a use of" <+> quotes (ppr occ)
+pprCtO (ExprHoleOrigin Nothing)    = text "an expression hole"
+pprCtO (ExprHoleOrigin (Just occ)) = text "a use of" <+> quotes (ppr occ)
 pprCtO (TypeHoleOrigin occ)  = text "a use of wildcard" <+> quotes (ppr occ)
 pprCtO PatCheckOrigin        = text "a pattern-match completeness check"
 pprCtO ListOrigin            = text "an overloaded list"

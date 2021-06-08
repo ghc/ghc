@@ -909,7 +909,7 @@ cvtImplicitParamBind :: String -> TH.Exp -> CvtM (LIPBind GhcPs)
 cvtImplicitParamBind n e = do
     n' <- wrapL (ipName n)
     e' <- cvtl e
-    returnLA (IPBind noAnn (Left n') e')
+    returnLA (IPBind noAnn n' e')
 
 -------------------------------------------------------------------
 --              Expressions

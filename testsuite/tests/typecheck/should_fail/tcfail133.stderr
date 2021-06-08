@@ -27,3 +27,14 @@ tcfail133.hs:68:14: error:
       In the expression: show $ add (One :@ Zero) (One :@ One)
       In an equation for ‘foo’:
           foo = show $ add (One :@ Zero) (One :@ One)
+
+tcfail133.hs:68:14: error:
+    • No instance for (Digit (One :@ One))
+        arising from a superclass required to satisfy ‘AddDigit
+                                                         (Zero :@ (One :@ One)) One a0’,
+        arising from a use of ‘add’
+    • In the second argument of ‘($)’, namely
+        ‘add (One :@ Zero) (One :@ One)’
+      In the expression: show $ add (One :@ Zero) (One :@ One)
+      In an equation for ‘foo’:
+          foo = show $ add (One :@ Zero) (One :@ One)
