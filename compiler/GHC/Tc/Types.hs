@@ -1707,8 +1707,12 @@ unsafeTcPluginTcM :: TcM a -> TcPluginM a
 unsafeTcPluginTcM = TcPluginM . const
 
 -- | Access the 'EvBindsVar' carried by the 'TcPluginM' during
--- constraint solving.  Returns 'Nothing' if invoked during
--- 'tcPluginInit' or 'tcPluginStop'.
+-- constraint solving.
+--
+-- Only call this function within 'tcPluginSolve'.
+--
+-- This function will panic if invoked during 'tcPluginInit',
+-- 'tcPluginRewrite' or 'tcPluginStop'.
 getEvBindsTcPluginM :: TcPluginM EvBindsVar
 getEvBindsTcPluginM = TcPluginM return
 
@@ -1722,8 +1726,8 @@ data TcPlugin = forall s. TcPlugin
     --
     -- This function will be invoked at two points in the constraint solving
     -- process: after simplification of given constraints, and after
-    -- unflattening of wanted constraints. The two phases can be distinguished
-    -- because the deriveds and wanteds will be empty in the first case.
+    -- solving of wanted constraints. The two phases can be distinguished
+    -- as follows: the deriveds and wanteds will be empty in the first case.
     --
     -- The plugin can either return a contradiction,
     -- or specify that it has solved some constraints (with evidence),
@@ -1743,27 +1747,36 @@ data TcPluginResult
     -- and recorded as insoluble.
 
   | TcPluginOk
-    { solvedConstraints :: [(EvTerm,Ct)]
-    , newConstraints :: [Ct] }
+    { tcPluginSolvedWanteds :: [(EvTerm,Ct)]
+    , tcPluginNewWanteds :: [Ct] }
     -- ^ The first field is for constraints that were solved.
     -- These are removed from the inert set,
     -- and the evidence for them is recorded.
     -- The second field contains new work, that should be processed by
     -- the constraint solver.
 
+
 data TcPluginRewriteResult where
   -- | The plugin wants to throw an error.
   TcPluginRewriteError :: (Diagnostic a, Typeable a) => a -> TcPluginRewriteResult
 
-  -- | The plugin does not provide any rewriting.
-  TcPluginNoRewrite :: TcPluginRewriteResult
+  -- | The plugin does not rewrite the type family application.
+  --
+  -- The plugin can also emit additional wanted constraints.
+  TcPluginNoRewrite
+    :: { tcRewriterWanteds :: [Ct] }
+    -> TcPluginRewriteResult
 
-  -- | The plugin wants to rewrite the type family application
-  -- to this specific type.
-  TcPluginRewriteTo :: { rewriteTo :: TcType
-                       , rewriteEvidence :: TcCoercion }
-                    -> TcPluginRewriteResult
-
+  -- | The plugin rewrites the type family application
+  -- providing a rewriting together with evidence.
+  --
+  -- The plugin can also emit additional wanted constraints.
+  TcPluginRewriteTo
+    :: { tcPluginRewriteTo :: TcType
+       , tcPluginRewriteEvidence :: TcCoercion
+       , tcRewriterWanteds :: [Ct]
+       }
+    -> TcPluginRewriteResult
 
 {- *********************************************************************
 *                                                                      *
