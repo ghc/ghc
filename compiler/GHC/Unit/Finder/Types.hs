@@ -9,6 +9,8 @@ where
 import GHC.Prelude
 import GHC.Unit
 import GHC.Unit.State
+import qualified Data.Map as M
+import GHC.Fingerprint
 
 import Data.IORef
 
@@ -18,7 +20,10 @@ import Data.IORef
 -- contents of this cache.
 --
 type FinderCacheState = InstalledModuleEnv InstalledFindResult
-newtype FinderCache = FinderCache (IORef FinderCacheState)
+type FileCacheState   = M.Map FilePath Fingerprint
+data FinderCache = FinderCache { fcModuleCache :: (IORef FinderCacheState)
+                               , fcFileCache   :: (IORef FileCacheState)
+                               }
 
 data InstalledFindResult
   = InstalledFound ModLocation InstalledModule
