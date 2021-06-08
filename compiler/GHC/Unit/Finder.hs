@@ -30,6 +30,9 @@ module GHC.Unit.Finder (
     findObjectLinkableMaybe,
     findObjectLinkable,
 
+    -- Hash cache
+    lookupFileCache
+
   ) where
 
 import GHC.Prelude
@@ -56,11 +59,13 @@ import GHC.Utils.Panic
 
 import GHC.Linker.Types
 
+import GHC.Fingerprint
 import Data.IORef
 import System.Directory
 import System.FilePath
 import Control.Monad
 import Data.Time
+import qualified Data.Map as M
 
 
 type FileExt = String   -- Filename extension
@@ -82,27 +87,40 @@ type BaseName = String  -- Basename of file
 
 initFinderCache :: IO FinderCache
 initFinderCache = FinderCache <$> newIORef emptyInstalledModuleEnv
+                              <*> newIORef M.empty
 
 -- remove all the home modules from the cache; package modules are
--- assumed to not move around during a session.
+-- assumed to not move around during a session; also flush the file hash
+-- cache
 flushFinderCaches :: FinderCache -> HomeUnit -> IO ()
-flushFinderCaches (FinderCache ref) home_unit =
+flushFinderCaches (FinderCache ref file_ref) home_unit = do
   atomicModifyIORef' ref $ \fm -> (filterInstalledModuleEnv is_ext fm, ())
+  atomicModifyIORef' file_ref $ \_ -> (M.empty, ())
  where
   is_ext mod _ = not (isHomeInstalledModule home_unit mod)
 
 addToFinderCache :: FinderCache -> InstalledModule -> InstalledFindResult -> IO ()
-addToFinderCache (FinderCache ref) key val =
+addToFinderCache (FinderCache ref _) key val =
   atomicModifyIORef' ref $ \c -> (extendInstalledModuleEnv c key val, ())
 
 removeFromFinderCache :: FinderCache -> InstalledModule -> IO ()
-removeFromFinderCache (FinderCache ref) key =
+removeFromFinderCache (FinderCache ref _) key =
   atomicModifyIORef' ref $ \c -> (delInstalledModuleEnv c key, ())
 
 lookupFinderCache :: FinderCache -> InstalledModule -> IO (Maybe InstalledFindResult)
-lookupFinderCache (FinderCache ref) key = do
+lookupFinderCache (FinderCache ref _) key = do
    c <- readIORef ref
    return $! lookupInstalledModuleEnv c key
+
+lookupFileCache :: FinderCache -> FilePath -> IO Fingerprint
+lookupFileCache (FinderCache _ ref) key = do
+   c <- readIORef ref
+   case M.lookup key c of
+     Nothing -> do
+       hash <- getFileHash key
+       atomicModifyIORef' ref $ \c -> (M.insert key hash c, ())
+       return hash
+     Just fp -> return fp
 
 -- -----------------------------------------------------------------------------
 -- The three external entry points
