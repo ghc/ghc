@@ -52,6 +52,18 @@ Flags:
 
     TEST='read001 read002' ./validate --testsuite-only --fast
 
+  Note on BINDIST variable: The BINDIST variable value indicates whether a binary
+  distribution of GHC built using Hadrian/Make is to be installed. When set
+  to "YES", it indicates that a path, previously set with the --prefix flag in
+  the configuration step (./configure), can be used as the installation location
+  for both Hadrian and legacy Make systems. Otherwise the binary executables
+  built are placed in sub-directories within the "./_validatebuild" directory.
+
+  Note on validate vs GitLab CI setup: This script is distinct from the
+  collection of validation settings used by the GitLab Continuous Integration
+  system (details in ./.gitlab-ci.yml) and can be run locally on a user's computer
+  system. The CI scripts are stored in the ./.gitlab directory for reference.
+
 EOF
 }
 
@@ -182,7 +194,6 @@ if [ "$use_hadrian" = "NO" ]; then
     fi
     $make -C utils/checkUniques
 else
-    # Just build using hadrian.
     if [ "$use_stack" = "NO" ]; then
         hadrian/build --help > /dev/null
         echo "Entering ./hadrian directory..."
@@ -209,6 +220,8 @@ else
     echo "Hadrian command: $hadrian"
 fi
 
+# For details of the following flavours, refer to
+# ./hadrian/src/Settings/Flavours
 case $speed in
 SLOW)
     flavour=slow-validate ;;
@@ -249,7 +262,6 @@ if [ $build_only -eq 1 ] ||
         # That should be the default. Only suppress commands, by setting V=0 and using
         # `make -s`, when user explicitly asks for it with `./validate --quiet`.
         if [ $be_quiet -eq 1 ]; then
-      # See Note [Default build system verbosity].
             echo "V=0"                  >> mk/are-validating.mk # Less gunk
         fi
 
@@ -410,7 +422,7 @@ if [ $testsuite_only -eq 1 ] ||
         echo '==== STAGE 2 TESTS ==== '
         cat "$basedir"/testsuite_summary.txt
     else
-        # If the --fast flag is used, make the test ghc an in tree compiler
+        # If the --fast flag is used, make the test ghc an in-tree compiler
         if  [ -d  "$basedir/bindisttest/install   dir"  ] && [ $BINDIST = "BINDIST=YES" ]; then
             testghc="$basedir/bindisttest/install   dir/bin/ghc"
         elif [ $BINDIST = "BINDIST=NO" ]; then
