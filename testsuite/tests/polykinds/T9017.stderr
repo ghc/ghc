@@ -1,12 +1,12 @@
 
 T9017.hs:8:7: error:
-    • Couldn't match kind ‘k’ with ‘*’
+    • Couldn't match kind ‘k1’ with ‘*’
       When matching types
         a0 :: * -> * -> *
         a :: k -> k1 -> *
       Expected: a b (m b)
         Actual: a0 b0 (m0 b0)
-      ‘k’ is a rigid type variable bound by
+      ‘k1’ is a rigid type variable bound by
         the type signature for:
           foo :: forall {k} {k1} (a :: k -> k1 -> *) (b :: k) (m :: k -> k1).
                  a b (m b)
