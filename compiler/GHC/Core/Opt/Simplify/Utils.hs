@@ -587,8 +587,8 @@ mkArgInfo env fun rules n_val_args call_cont
                        Just False -> strictifyDmd dmd
                        _          -> dmd
       = dmd' : add_type_strictness fun_ty' rest_dmds
-          -- If the type is levity-polymorphic, we can't know whether it's
-          -- strict. isLiftedType_maybe will return Just False only when
+          -- If the type is representation-polymorphic, we can't know whether
+          -- it's strict. isLiftedType_maybe will return Just False only when
           -- we're sure the type is unlifted.
 
       | otherwise
