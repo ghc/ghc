@@ -1,7 +1,5 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE PatternSynonyms #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
