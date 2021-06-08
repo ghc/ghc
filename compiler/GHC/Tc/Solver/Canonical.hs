@@ -2099,7 +2099,7 @@ canEqCanLHS ev eq_rel swapped lhs1 ps_xi1 xi2 ps_xi2
   = canEqCanLHSHomo ev eq_rel swapped lhs1 ps_xi1 xi2 ps_xi2
 
   | otherwise
-  = canEqCanLHSHetero ev eq_rel swapped lhs1 ps_xi1 k1 xi2 ps_xi2 k2
+  = canEqCanLHSHetero ev eq_rel swapped lhs1 k1 xi2 k2
 
   where
     k1 = canEqLHSKind lhs1
@@ -2107,19 +2107,18 @@ canEqCanLHS ev eq_rel swapped lhs1 ps_xi1 xi2 ps_xi2
 
 canEqCanLHSHetero :: CtEvidence         -- :: (xi1 :: ki1) ~ (xi2 :: ki2)
                   -> EqRel -> SwapFlag
-                  -> CanEqLHS -> TcType -- xi1, pretty xi1
+                  -> CanEqLHS           -- xi1
                   -> TcKind             -- ki1
-                  -> TcType -> TcType   -- xi2, pretty xi2 :: ki2
+                  -> TcType             -- xi2
                   -> TcKind             -- ki2
                   -> TcS (StopOrContinue Ct)
-canEqCanLHSHetero ev eq_rel swapped lhs1 ps_xi1 ki1 xi2 ps_xi2 ki2
+canEqCanLHSHetero ev eq_rel swapped lhs1 ki1 xi2 ki2
   -- See Note [Equalities with incompatible kinds]
-  = do { kind_co <- emit_kind_co   -- :: ki2 ~N ki1
+  = do { (kind_ev, kind_co) <- mk_kind_eq   -- :: ki2 ~N ki1
 
        ; let  -- kind_co :: (ki2 :: *) ~N (ki1 :: *)   (whether swapped or not)
               -- co1     :: kind(tv1) ~N ki1
              rhs'    = xi2    `mkCastTy` kind_co   -- :: ki1
-             ps_rhs' = ps_xi2 `mkCastTy` kind_co   -- :: ki1
              rhs_co  = mkTcGReflLeftCo role xi2 kind_co
                -- rhs_co :: (xi2 |> kind_co) ~ xi2
 
@@ -2133,22 +2132,24 @@ canEqCanLHSHetero ev eq_rel swapped lhs1 ps_xi1 ki1 xi2 ps_xi2 ki2
            (ppr kind_co <+> dcolon <+> sep [ ppr ki2, text "~#", ppr ki1 ])
        ; type_ev <- rewriteEqEvidence rewriters ev swapped xi1 rhs' lhs_co rhs_co
 
-          -- rewriteEqEvidence carries out the swap, so we're NotSwapped any more
-       ; canEqCanLHSHomo type_ev eq_rel NotSwapped lhs1 ps_xi1 rhs' ps_rhs' }
+       ; emitWorkNC [type_ev]  -- delay the type equality until after we've finished
+                               -- the kind equality, which may unlock things
+                               -- See Note [Equalities with incompatible kinds]
+
+       ; canEqNC kind_ev NomEq ki2 ki1 }
   where
-    emit_kind_co :: TcS CoercionN
-    emit_kind_co = case ev of
+    mk_kind_eq :: TcS (CtEvidence, CoercionN)
+    mk_kind_eq = case ev of
       CtGiven { ctev_evar = evar }
         -> do { let kind_co = maybe_sym $ mkTcKindCo (mkTcCoVarCo evar)  -- :: k2 ~ k1
               ; kind_ev <- newGivenEvVar kind_loc (kind_pty, evCoercion kind_co)
-              ; emitWorkNC [kind_ev]
-              ; return (ctEvCoercion kind_ev) }
+              ; return (kind_ev, ctEvCoercion kind_ev) }
 
       CtWanted { ctev_rewriters = rewriters }
-        -> unifyWanted rewriters kind_loc Nominal ki2 ki1
+        -> newWantedEq kind_loc rewriters Nominal ki2 ki1
 
       CtDerived {}
-        -> unifyWanted emptyRewriterSet kind_loc Nominal ki2 ki1
+        -> newWantedEq kind_loc emptyRewriterSet Nominal ki2 ki1
 
     xi1      = canEqLHSType lhs1
     loc      = ctev_loc ev
@@ -2460,6 +2461,10 @@ k2 and use this to cast. To wit, from
 
   [X] co :: k2 ~ k1
   [X] (tv :: k1) ~ ((rhs |> co) :: k1)
+
+We carry on with the *kind equality*, not the type equality, because
+solving the former may unlock the latter. This choice is made in
+canEqCanLHSHetero. It is important: otherwise, T13135 loops.
 
 Wrinkles:
 

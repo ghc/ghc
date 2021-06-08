@@ -2021,8 +2021,44 @@ See
 
 Note [Reverse order of fundep equations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose we have an injective type family F :: forall k. k -> Type.
-"RAE" finish this Note.
+Consider this scenario (from dependent/should_fail/T13135_simple):
+
+  type Sig :: Type -> Type
+  data Sig a = SigFun a (Sig a)
+
+  type SmartFun :: forall (t :: Type). Sig t -> Type
+  type family SmartFun sig = r | r -> sig where
+    SmartFun @Type (SigFun @Type a sig) = a -> SmartFun @Type sig
+
+  [W] SmartFun @kappa sigma ~ (Int -> Bool)
+
+The injectivity of SmartFun allows us to produce two new equalities:
+
+  [W] w1 :: Type ~ kappa
+  [W] w2 :: SigFun @Type Int beta ~ sigma
+
+for some fresh (beta :: SigType). The second Wanted here is actually
+heterogeneous: the LHS has type Sig Type while the RHS has type Sig kappa.
+Of course, if we solve the first wanted first, the second becomes homogeneous.
+
+When looking for injectivity-inspired equalities, we work left-to-right,
+producing the two equalities in the order written above. However, these
+equalities are then passed into unifyWanted, which will fail, adding these
+to the work list. However, crucially, the work list operates like a *stack*.
+So, because we add w1 and then w2, we process w2 first. This is silly: solving
+w1 would unlock w2. So we make sure to add equalities to the work
+list in left-to-right order, which requires a few key calls to 'reverse'.
+
+This treatment is also used for class-based functional dependencies, although
+we do not have a program yet known to exhibit a loop there. It just seems
+like the right thing to do.
+
+When this was originally conceived, it was necessary to avoid a loop in T13135.
+That loop is now avoided by continuing with the kind equality (not the type
+equality) in canEqCanLHSHetero (see Note [Equalities with incompatible kinds]
+in GHC.Tc.Solver.Canonical). However, the idea of working left-to-right still
+seems worthwhile, and so the calls to 'reverse' remain.
+
 -}
 
 --------------------
@@ -2046,7 +2082,7 @@ improveTopFunEqs ev fam_tc args rhs
        ; traceTcS "improveTopFunEqs" (vcat [ ppr fam_tc <+> ppr args <+> ppr rhs
                                           , ppr eqns ])
        ; mapM_ (\(Pair ty1 ty2) -> unifyWanted rewriters loc Nominal ty1 ty2)
-               (reverse eqns) }
+               (eqns) }
          -- Missing that `reverse` causes T13135 and T13135_simple to loop.
          -- See Note [Reverse order of fundep equations]
   where
