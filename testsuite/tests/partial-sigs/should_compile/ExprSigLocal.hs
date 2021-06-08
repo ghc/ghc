@@ -7,6 +7,7 @@ module ExprSigLocal where
 
 y :: forall b. b->b
 y  = ((\x -> x) :: forall a. a -> _)
-
+{-
 g :: forall a. a -> _
 g x = x
+-}
