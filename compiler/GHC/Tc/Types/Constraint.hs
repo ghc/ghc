@@ -30,7 +30,7 @@ module GHC.Tc.Types.Constraint (
         tyCoVarsOfCt, tyCoVarsOfCts,
         tyCoVarsOfCtList, tyCoVarsOfCtsList,
 
-        CtIrredReason(..), HoleSet, isInsolubleReason,
+        CtIrredReason(..), isInsolubleReason,
 
         CheckTyEqResult, CheckTyEqProblem, cteProblem, cterClearOccursCheck,
         cteOK, cteImpredicative, cteTypeFamily,

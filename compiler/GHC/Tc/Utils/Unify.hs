@@ -557,8 +557,7 @@ tcSubTypePat :: CtOrigin -> UserTypeCtxt
 -- If wrap = tc_sub_type_et t1 t2
 --    => wrap :: t1 ~> t2
 tcSubTypePat inst_orig ctxt (Check ty_actual) ty_expected
-  = do { dflags <- getDynFlags
-       ; tc_sub_type dflags unifyTypeET inst_orig ctxt ty_actual ty_expected }
+  = tc_sub_type unifyTypeET inst_orig ctxt ty_actual ty_expected
 
 tcSubTypePat _ _ (Infer inf_res) ty_expected
   = do { co <- fillInferResult ty_expected inf_res
@@ -585,9 +584,8 @@ tcSubTypeNC :: CtOrigin       -- Used when instantiating
             -> TcM HsWrapper
 tcSubTypeNC inst_orig ctxt m_thing ty_actual res_ty
   = case res_ty of
-      Check ty_expected -> do { dflags <- getDynFlags
-                              ; tc_sub_type dflags (unifyType m_thing) inst_orig ctxt
-                                            ty_actual ty_expected }
+      Check ty_expected -> tc_sub_type (unifyType m_thing) inst_orig ctxt
+                                       ty_actual ty_expected
 
       Infer inf_res -> do { (wrap, rho) <- topInstantiate inst_orig ty_actual
                                    -- See Note [Instantiation of InferResult]
@@ -640,12 +638,10 @@ tcSubTypeSigma :: CtOrigin       -- where did the actual type arise / why are we
 -- Checks that actual <= expected
 -- Returns HsWrapper :: actual ~ expected
 tcSubTypeSigma orig ctxt ty_actual ty_expected
-  = do { dflags <- getDynFlags
-       ; tc_sub_type dflags (unifyType Nothing) orig ctxt ty_actual ty_expected
+  = tc_sub_type (unifyType Nothing) orig ctxt ty_actual ty_expected
 
 ---------------
-tc_sub_type :: DynFlags
-            -> (TcType -> TcType -> TcM TcCoercionN)  -- How to unify
+tc_sub_type :: (TcType -> TcType -> TcM TcCoercionN)  -- How to unify
             -> CtOrigin       -- Used when instantiating
             -> UserTypeCtxt   -- Used when skolemising
             -> TcSigmaType    -- Actual; a sigma-type
@@ -654,7 +650,7 @@ tc_sub_type :: DynFlags
 -- Checks that actual_ty is more polymorphic than expected_ty
 -- If wrap = tc_sub_type t1 t2
 --    => wrap :: t1 ~> t2
-tc_sub_type dflags unify inst_orig ctxt ty_actual ty_expected
+tc_sub_type unify inst_orig ctxt ty_actual ty_expected
   | definitely_poly ty_expected      -- See Note [Don't skolemise unnecessarily]
   , not (possibly_poly ty_actual)
   = do { traceTc "tc_sub_type (drop to equality)" $
@@ -682,7 +678,7 @@ tc_sub_type dflags unify inst_orig ctxt ty_actual ty_expected
       | (tvs, theta, tau) <- tcSplitSigmaTy ty
       , (tv:_) <- tvs
       , null theta
-      , checkTyVarEq dflags tv tau `cterHasProblem` cteInsolubleOccurs
+      , checkTyVarEq tv tau `cterHasProblem` cteInsolubleOccurs
       = True
       | otherwise
       = False

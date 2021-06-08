@@ -156,10 +156,8 @@ import qualified GHC.Rename.Env as TcM
 import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
-import GHC.Utils.Constants ( debugIsOn )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Utils.Logger
 import GHC.Data.Bag as Bag
 import GHC.Types.Unique.Supply
@@ -168,18 +166,17 @@ import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Utils.Unify
 import GHC.Core.Predicate
+import GHC.Types.Unique.Set (nonDetEltsUniqSet)
 
 import Control.Monad
 import GHC.Utils.Monad
 import Data.IORef
 import GHC.Exts (oneShot)
 import Data.List ( mapAccumL, partition, find )
-import Data.List.NonEmpty ( NonEmpty(..) )
 import Control.Arrow ( first )
 
 #if defined(DEBUG)
 import GHC.Data.Graph.Directed
-import GHC.Types.Unique.Set (nonDetEltsUniqSet)
 #endif
 
 {- *********************************************************************
@@ -750,72 +747,6 @@ kickOutAfterFillingCoercionHole hole
       = isWanted ctev &&    -- optimisation: givens don't have coercion holes anyway
         rhs `hasThisCoercionHoleTy` hole
     kick_ct other = pprPanic "kick_ct (coercion hole)" (ppr other)
-
-{- Note [kickOutRewritable]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-See also Note [inert_eqs: the inert equalities].
-
-When we add a new inert equality (lhs ~N ty) to the inert set,
-we must kick out any inert items that could be rewritten by the
-new equality, to maintain the inert-set invariants.
-
-  - We want to kick out an existing inert constraint if
-    a) the new constraint can rewrite the inert one
-    b) 'lhs' is free in the inert constraint (so that it *will*)
-       rewrite it if we kick it out.
-
-    For (b) we use anyRewritableCanLHS, which examines the types /and
-    kinds/ that are directly visible in the type. Hence
-    we will have exposed all the rewriting we care about to make the
-    most precise kinds visible for matching classes etc. No need to
-    kick out constraints that mention type variables whose kinds
-    contain this LHS!
-
-  - A Derived equality can kick out [D] constraints in inert_eqs,
-    inert_dicts, inert_irreds etc.
-
-  - We don't kick out constraints from inert_solved_dicts, and
-    inert_solved_funeqs optimistically. But when we lookup we have to
-    take the substitution into account
-
-NB: we could in principle avoid kick-out:
-  a) When unifying a meta-tyvar from an outer level, because
-     then the entire implication will be iterated; see
-     Note [The Unification Level Flag]
-
-  b) For Givens, after a unification.  By (GivenInv) in GHC.Tc.Utils.TcType
-     Note [TcLevel invariants], a Given can't include a meta-tyvar from
-     its own level, so it falls under (a).  Of course, we must still
-     kick out Givens when adding a new non-unification Given.
-
-But kicking out more vigorously may lead to earlier unification and fewer
-iterations, so we don't take advantage of these possibilities.
-
-Note [Rewrite insolubles]
-~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose we have an insoluble alpha ~ [alpha], which is insoluble
-because an occurs check.  And then we unify alpha := [Int].  Then we
-really want to rewrite the insoluble to [Int] ~ [[Int]].  Now it can
-be decomposed.  Otherwise we end up with a "Can't match [Int] ~
-[[Int]]" which is true, but a bit confusing because the outer type
-constructors match.
-
-Hence:
- * In the main simplifier loops in GHC.Tc.Solver (solveWanteds,
-   simpl_loop), we feed the insolubles in solveSimpleWanteds,
-   so that they get rewritten (albeit not solved).
-
- * We kick insolubles out of the inert set, if they can be
-   rewritten (see GHC.Tc.Solver.Monad.kick_out_rewritable)
-
- * We rewrite those insolubles in GHC.Tc.Solver.Canonical.
-   See Note [Make sure that insolubles are fully rewritten]
--}
-
-      | otherwise
-      = Right ct
-
-    kick_ct other = pprPanic "kickOutAfterFillingCoercionHole" (ppr other)
 
 --------------
 addInertSafehask :: InertCans -> Ct -> InertCans
@@ -2439,7 +2370,7 @@ breakTyVarCycle_maybe ev cte_result (TyVarLHS lhs_tv) rhs
       _derived_or_wd ->
         do { new_tv <- wrapTcS (TcM.newFlexiTyVar fun_app_kind)
            ; let new_ty = mkTyVarTy new_tv
-           ; co <- emitNewWantedEq new_loc Nominal new_ty fun_app
+           ; co <- emitNewWantedEq new_loc (ctEvRewriters ev) Nominal new_ty fun_app
            ; return (co, new_ty) }
 
       -- See Detail (7) of the Note

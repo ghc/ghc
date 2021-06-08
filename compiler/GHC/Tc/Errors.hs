@@ -580,8 +580,8 @@ mkErrorItem ct
                    ; return (supp, Just dest) }
            CtDerived {} -> return (False, Nothing)
 
-       ; let m_reason = case ct of CtIrred { cc_reason = reason } -> Just reason
-                                   _                              -> Nothing
+       ; let m_reason = case ct of CIrredCan { cc_reason = reason } -> Just reason
+                                   _                                -> Nothing
 
        ; return $ Just $ EI { ei_pred     = ctPred ct
                             , ei_evdest   = m_evdest
@@ -1780,7 +1780,7 @@ mkTyVarEqErr ctxt report item tv1 ty2
 
 mkTyVarEqErr' :: ReportErrCtxt -> Report -> ErrorItem
               -> TcTyVar -> TcType -> Report
-mkTyVarEqErr' dflags ctxt report item tv1 ty2
+mkTyVarEqErr' ctxt report item tv1 ty2
      -- impredicativity is a simple error to understand; try it first
   | check_eq_result `cterHasProblem` cteImpredicative
   = let msg = vcat [ (if isSkolemTyVar tv1
@@ -1904,7 +1904,7 @@ mkTyVarEqErr' dflags ctxt report item tv1 ty2
 
     check_eq_result = case ei_m_reason item of
       Just (NonCanonicalReason result) -> result
-      _ -> checkTyVarEq dflags tv1 ty2
+      _ -> checkTyVarEq tv1 ty2
         -- in T2627b, we report an error for F (F a0) ~ a0. Note that the type
         -- variable is on the right, so we don't get useful info for the CIrredCan,
         -- and have to compute the result of checkTyVarEq here.

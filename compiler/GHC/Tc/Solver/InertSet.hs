@@ -1,4 +1,5 @@
 {-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeApplications #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
@@ -25,6 +26,7 @@ module GHC.Tc.Solver.InertSet (
 
     -- * Inert equalities
     foldTyEqs, delEq, findEq,
+    partitionInertEqs, partitionFunEqs,
 
     -- * Kick-out
     kickOutRewritableLHS
@@ -49,12 +51,11 @@ import GHC.Core.TyCon
 import GHC.Core.Unify
 
 import GHC.Data.Bag
-import GHC.Utils.Misc       ( chkAppend, partitionWith )
+import GHC.Utils.Misc       ( partitionWith )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
 import Data.List          ( partition )
-import Data.List.NonEmpty ( NonEmpty(..) )
 
 {-
 ************************************************************************
@@ -1145,7 +1146,7 @@ instance Outputable InertCans where
       , text "Given eqs at this level =" <+> ppr given_eqs
       ]
     where
-      folder (EqualCtList eqs) rest = listToBag eqs `andCts` rest
+      folder eqs rest = listToBag eqs `andCts` rest
 
 {- *********************************************************************
 *                                                                      *
@@ -1155,7 +1156,7 @@ instance Outputable InertCans where
 
 addTyEq :: InertEqs -> TcTyVar -> Ct -> InertEqs
 addTyEq old_eqs tv ct
-  = extendDVarEnv_C add_eq old_eqs tv ct
+  = extendDVarEnv_C add_eq old_eqs tv [ct]
   where
     add_eq old_eqs _ = addToEqualCtList ct old_eqs
 
@@ -1165,7 +1166,7 @@ addCanFunEq old_eqs fun_tc fun_args ct
   = alterTcApp old_eqs fun_tc fun_args upd
   where
     upd (Just old_equal_ct_list) = Just $ addToEqualCtList ct old_equal_ct_list
-    upd Nothing                  = Just ct
+    upd Nothing                  = Just [ct]
 
 foldTyEqs :: (Ct -> b -> b) -> InertEqs -> b -> b
 foldTyEqs k eqs z
@@ -1228,6 +1229,16 @@ extendInertEqs :: InertEqs -> CanEqLHS -> EqualCtList -> InertEqs
 extendInertEqs eqs (TyVarLHS tv) new_eqs = extendDVarEnv eqs tv new_eqs
 extendInertEqs _ other _ = pprPanic "extendInertEqs" (ppr other)
 
+partitionFunEqs :: (Ct -> Bool)    -- Ct will always be a CEqCan with a TyFamLHS
+                -> FunEqMap EqualCtList
+                -> ([Ct], FunEqMap EqualCtList)
+partitionFunEqs
+  = partition_eqs_container emptyFunEqs (\ f z eqs -> foldFunEqs f eqs z) extendFunEqs
+
+-- precondition: CanEqLHS is a TyFamLHS
+extendFunEqs :: FunEqMap EqualCtList -> CanEqLHS -> EqualCtList -> FunEqMap EqualCtList
+extendFunEqs eqs (TyFamLHS tf args) new_eqs = insertTcApp eqs tf args new_eqs
+extendFunEqs _ other _ = pprPanic "extendFunEqs" (ppr other)
 
 {- *********************************************************************
 *                                                                      *

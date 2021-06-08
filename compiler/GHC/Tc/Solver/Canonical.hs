@@ -2354,7 +2354,7 @@ canEqCanLHSFinish ev eq_rel swapped lhs rhs
      -- guarantees (TyEq:OC), (TyEq:F)
      -- Must do the occurs check even on tyvar/tyvar
      -- equalities, in case have  x ~ (y :: ..x...); this is #12593.
-       ; let result0 = checkTypeEq dflags lhs rhs `cterRemoveProblem` cteTypeFamily
+       ; let result0 = checkTypeEq lhs rhs `cterRemoveProblem` cteTypeFamily
      -- type families are OK here
      -- NB: no occCheckExpand here; see Note [Rewriting synonyms] in GHC.Tc.Solver.Rewrite
 
@@ -2385,14 +2385,15 @@ canEqCanLHSFinish ev eq_rel swapped lhs rhs
                  ; traceTcS "new RHS:" (ppr new_rhs)
 
                    -- This check is Detail (1) in the Note
-                 ; if cterHasOccursCheck (checkTyVarEq dflags lhs_tv new_rhs)
+                 ; if cterHasOccursCheck (checkTyVarEq lhs_tv new_rhs)
 
                    then do { traceTcS "Note [Type variable cycles] Detail (1)"
                                       (ppr new_rhs)
                            ; continueWith (mkIrredCt reason new_ev) }
 
                    else do { -- See Detail (6) of Note [Type variable cycles]
-                             new_new_ev <- rewriteEqEvidence new_ev NotSwapped
+                             new_new_ev <- rewriteEqEvidence emptyRewriterSet
+                                             new_ev NotSwapped
                                              lhs_ty new_rhs
                                              (mkTcNomReflCo lhs_ty) co
 
@@ -3006,7 +3007,8 @@ rewriteEvidence new_rewriters
     rewriters' = rewriters S.<> new_rewriters
 
 
-rewriteEqEvidence :: RewriterSet        -- See GHC.Tc.Types.Constraint
+rewriteEqEvidence :: RewriterSet        -- New rewriters
+                                        -- See GHC.Tc.Types.Constraint
                                         -- Note [Wanteds rewrite Wanteds]
                   -> CtEvidence         -- Old evidence :: olhs ~ orhs (not swapped)
                                         --              or orhs ~ olhs (swapped)

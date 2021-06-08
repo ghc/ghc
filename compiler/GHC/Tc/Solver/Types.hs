@@ -17,9 +17,7 @@ module GHC.Tc.Solver.Types (
 
     TcAppMap, isEmptyTcAppMap, insertTcApp, alterTcApp, filterTcAppMap,
 
-    EqualCtList, pattern EqualCtList,
-    equalCtListToList, filterEqualCtList, unitEqualCtList,
-    listToEqualCtList, addToEqualCtList,
+    EqualCtList, filterEqualCtList, addToEqualCtList
   ) where
 
 import GHC.Prelude
@@ -37,12 +35,10 @@ import GHC.Core.TyCon.Env
 import GHC.Data.Bag
 import GHC.Data.Maybe
 import GHC.Data.TrieMap
+import GHC.Utils.Constants
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-
-import Data.Foldable
-import Data.List.NonEmpty ( NonEmpty(..), nonEmpty, cons )
-import qualified Data.List.NonEmpty as NE
+import GHC.Utils.Panic.Plain
 
 {- *********************************************************************
 *                                                                      *
@@ -270,17 +266,6 @@ foldFunEqs = foldTcAppMap
 
 insertFunEq :: FunEqMap a -> TyCon -> [Type] -> a -> FunEqMap a
 insertFunEq m tc tys val = insertTcApp m tc tys val
-
-partitionFunEqs :: (Ct -> Bool)    -- Ct will always be a CEqCan with a TyFamLHS
-                -> FunEqMap EqualCtList
-                -> ([Ct], FunEqMap EqualCtList)
-partitionFunEqs
-  = partition_eqs_container emptyFunEqs (\ f z eqs -> foldFunEqs f eqs z) extendFunEqs
-
--- precondition: CanEqLHS is a TyFamLHS
-extendFunEqs :: FunEqMap EqualCtList -> CanEqLHS -> EqualCtList -> FunEqMap EqualCtList
-extendFunEqs eqs (TyFamLHS tf args) new_eqs = insertTcApp eqs tf args new_eqs
-extendFunEqs _ other _ = pprPanic "extendFunEqs" (ppr other)
 
 {- *********************************************************************
 *                                                                      *

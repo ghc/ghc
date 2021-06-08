@@ -28,7 +28,6 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Tc.Solver.Monad as TcS
-import GHC.Tc.Solver.Types
 import GHC.Tc.Types    ( TcRef )
 
 import GHC.Utils.Misc

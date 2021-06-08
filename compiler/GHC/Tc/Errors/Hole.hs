@@ -556,8 +556,7 @@ findValidHoleFits tidy_env implics simples h@(Hole { hole_sort = ExprHole _
      ; let findVLimit = if sortingAlg > HFSNoSorting then Nothing else maxVSubs
            refLevel = refLevelHoleFits dflags
            hole = TypedHole { th_relevant_cts =
-                                listToBag (relevantCtEvidence hole_ty
-                                             (map ctEvidence simples))
+                                listToBag (relevantCtEvidence hole_ty simples)
                             , th_implics      = implics
                             , th_hole         = Just h }
            (candidatePlugins, fitPlugins) =
@@ -692,20 +691,18 @@ findValidHoleFits env _ _ _ = return (env, empty)
 
 -- See Note [Relevant constraints]
 relevantCtEvidence :: Type -> [CtEvidence] -> [CtEvidence]
-relevantCtEvidence hole_ty simples = if isEmptyVarSet (fvVarSet hole_fvs) then []
-                              else filter isRelevant simples
-  where ctFreeVarSet :: Ct -> VarSet
-        ctFreeVarSet = fvVarSet . tyCoFVsOfType . ctPred
-        hole_fvs = tyCoFVsOfType hole_ty
+relevantCtEvidence hole_ty simples
+  = if isEmptyVarSet (fvVarSet hole_fvs)
+    then []
+    else filter isRelevant simples
+  where hole_fvs = tyCoFVsOfType hole_ty
         hole_fv_set = fvVarSet hole_fvs
-        anyFVMentioned :: Ct -> Bool
-        anyFVMentioned ct = ctFreeVarSet ct `intersectsVarSet` hole_fv_set
         -- We filter out those constraints that have no variables (since
         -- they won't be solved by finding a type for the type variable
         -- representing the hole) and also other holes, since we're not
         -- trying to find hole fits for many holes at once.
         isRelevant ctev = not (isEmptyVarSet fvs) &&
-                          (fvs `insersectsVarSet` hole_fv_set)
+                          (fvs `intersectsVarSet` hole_fv_set)
           where fvs = tyCoVarsOfCtEv ctev
 
 -- We zonk the hole fits so that the output aligns with the rest
