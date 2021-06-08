@@ -1747,7 +1747,7 @@ an unfolding that isn't going to be looked at.
 -}
 
 tcPragExpr :: Bool  -- Is this unfolding compulsory?
-                    -- See Note [Checking for levity polymorphism] in GHC.Core.Lint
+                    -- See Note [Checking for representation polymorphism] in GHC.Core.Lint
            -> TopLevelFlag -> Name -> IfaceExpr -> IfL (Maybe CoreExpr)
 tcPragExpr is_compulsory toplvl name expr
   = forkM_maybe doc $ do
