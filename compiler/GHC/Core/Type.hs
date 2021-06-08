@@ -85,7 +85,7 @@ module GHC.Core.Type (
 
         -- ** Analyzing types
         TyCoMapper(..), mapTyCo, mapTyCoX,
-        TyCoFolder(..), foldTyCo,
+        TyCoFolder(..), foldTyCo, noView,
 
         -- (Newtypes)
         newTyConInstRhs,

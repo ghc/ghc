@@ -1,0 +1,23 @@
+
+AmbigFDs.hs:10:8: error:
+    • Couldn't match type ‘b1’ with ‘b2’
+        arising from a functional dependency between constraints:
+          ‘C a b2’
+            arising from a type ambiguity check for
+            the type signature for ‘foo’ at AmbigFDs.hs:10:8-35
+          ‘C a b1’
+            arising from the type signature for:
+                           foo :: forall a b1 b2.
+                                  (C a b1, C a b2) =>
+                                  a -> Int at AmbigFDs.hs:10:8-35
+      ‘b1’ is a rigid type variable bound by
+        the type signature for:
+          foo :: forall a b1 b2. (C a b1, C a b2) => a -> Int
+        at AmbigFDs.hs:10:8-35
+      ‘b2’ is a rigid type variable bound by
+        the type signature for:
+          foo :: forall a b1 b2. (C a b1, C a b2) => a -> Int
+        at AmbigFDs.hs:10:8-35
+    • In the ambiguity check for ‘foo’
+      To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
+      In the type signature: foo :: (C a b1, C a b2) => a -> Int
