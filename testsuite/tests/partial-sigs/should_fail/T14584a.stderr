@@ -1,10 +1,4 @@
 
-T14584a.hs:12:5: warning: [-Wdeferred-type-errors (in -Wdefault)]
-    • Couldn't match expected type ‘()’ with actual type ‘m -> m’
-    • Probable cause: ‘id @m :: _’ is applied to too few arguments
-      In the expression: id @m :: _
-      In an equation for ‘f’: f = id @m :: _
-
 T14584a.hs:12:9: warning: [-Wdeferred-type-errors (in -Wdefault)]
     • Expected a type, but ‘m’ has kind ‘k’
       ‘k’ is a rigid type variable bound by
@@ -35,12 +29,4 @@ T14584a.hs:15:17: warning: [-Wdeferred-type-errors (in -Wdefault)]
     • In the type ‘m’
       In the expression: id @m
       In an equation for ‘h’: h = id @m
-    • Relevant bindings include h :: m -> m (bound at T14584a.hs:15:9)
-
-T14584a.hs:16:8: warning: [-Wdeferred-type-errors (in -Wdefault)]
-    • Couldn't match expected type ‘()’ with actual type ‘m -> m’
-    • Probable cause: ‘h’ is applied to too few arguments
-      In the expression: h
-      In the expression: let h = id @m in h
-      In an equation for ‘g’: g = let h = id @m in h
     • Relevant bindings include h :: m -> m (bound at T14584a.hs:15:9)
