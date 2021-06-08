@@ -199,14 +199,15 @@ instance Diagnostic DsMessage where
               2 (vcat (map ppr binds))
     DsCannotUseFunWithPolyArgs orig_hs_expr ty bad_tys
       -> mkSimpleDecorated $
-           vcat [ hang (text "Cannot use function with levity-polymorphic arguments:")
+           vcat [ hang (text "Cannot use function with representation-polymorphic arguments:")
                   2 (hang (ppr orig_hs_expr) 2 (dcolon <+> pprWithTYPE ty))
              , ppUnlessOption sdocPrintTypecheckerElaboration $ vcat
-                 [ text "(Note that levity-polymorphic primops such as 'coerce' and unboxed tuples"
-                 , text "are eta-expanded internally because they must occur fully saturated."
+                 [ text "(Note that representation-polymorphic primops,"
+                 , text "such as 'coerce' and unboxed tuples, are eta-expanded"
+                 , text "internally because they must occur fully saturated."
                  , text "Use -fprint-typechecker-elaboration to display the full expression.)"
                  ]
-             , hang (text "Levity-polymorphic arguments:")
+             , hang (text "Representation-polymorphic arguments:")
                   2 $ vcat $ map
                     (\t -> pprWithTYPE t <+> dcolon <+> pprWithTYPE (typeKind t))
                     bad_tys
