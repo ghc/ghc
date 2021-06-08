@@ -148,6 +148,7 @@ import GHC.Types.CostCentre
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Data.FastString
+import GHC.Driver.Ppr (showPprUnsafe)
 import GHC.Driver.Session
 import GHC.Platform
 import GHC.Types.Unique.Set
@@ -155,7 +156,6 @@ import GHC.Utils.Misc
 import GHC.Core.Ppr ( {- instances -} )
 import GHC.CmmToAsm.Config
 import GHC.Types.SrcLoc
-
 -- -----------------------------------------------------------------------------
 -- The CLabel type
 
@@ -289,6 +289,12 @@ data CLabel
         {-# UNPACK #-} !Unique
 
   deriving Eq
+
+instance Show CLabel where
+  show = showPprUnsafe . pprDebugCLabel genericPlatform
+
+instance Outputable CLabel where
+  ppr = text . show
 
 isIdLabel :: CLabel -> Bool
 isIdLabel IdLabel{} = True
@@ -1535,6 +1541,7 @@ pprDynamicLinkerAsmLabel platform dllInfo ppLbl =
             SymbolPtr       -> char 'L' <> ppLbl <> text "$non_lazy_ptr"
             GotSymbolPtr    -> ppLbl <> text "@GOTPCREL"
             GotSymbolOffset -> ppLbl
+        | platformArch platform == ArchAArch64 -> ppLbl
         | otherwise ->
           case dllInfo of
             CodeStub  -> char 'L' <> ppLbl <> text "$stub"
@@ -1562,6 +1569,10 @@ pprDynamicLinkerAsmLabel platform dllInfo ppLbl =
                        ppLbl <> text "+32768@plt"
           SymbolPtr -> text ".LC_" <> ppLbl
           _         -> panic "pprDynamicLinkerAsmLabel"
+
+      | platformArch platform == ArchAArch64
+      = ppLbl
+
 
       | platformArch platform == ArchX86_64
       = case dllInfo of

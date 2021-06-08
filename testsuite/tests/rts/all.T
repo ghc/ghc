@@ -37,6 +37,7 @@ test('derefnull',
       # The output under OS X is too unstable to readily compare
       when(platform('i386-apple-darwin'), [ignore_stderr, exit_code(139)]),
       when(platform('x86_64-apple-darwin'), [ignore_stderr, exit_code(139)]),
+      when(platform('aarch64-apple-darwin'), [ignore_stderr, exit_code(139)]),
       when(opsys('mingw32'), [ignore_stderr, exit_code(11)]),
       when(opsys('mingw32'), [fragile(18548)]),
       # ThreadSanitizer changes the output
