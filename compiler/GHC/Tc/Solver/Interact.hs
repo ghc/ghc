@@ -1920,11 +1920,15 @@ emitFunDepDeriveds work_rewriters fd_eqns
     do_one_FDEqn (FDEqn { fd_qtvs = tvs, fd_eqs = eqs, fd_loc = (loc, rewriters) })
      | null tvs  -- Common shortcut
      = do { traceTcS "emitFunDepDeriveds 1" (ppr (ctl_depth loc) $$ ppr eqs $$ ppr (isGivenLoc loc))
-          ; mapM_ (\(Pair ty1 ty2) -> unifyWanted all_rewriters loc Nominal ty1 ty2) eqs }
+          ; mapM_ (\(Pair ty1 ty2) -> unifyWanted all_rewriters loc Nominal ty1 ty2)
+                  (reverse eqs) }
+             -- See Note [Reverse order of fundep equations]
+
      | otherwise
      = do { traceTcS "emitFunDepDeriveds 2" (ppr (ctl_depth loc) $$ ppr tvs $$ ppr eqs)
           ; subst <- instFlexi tvs  -- Takes account of kind substitution
-          ; mapM_ (do_one_eq loc all_rewriters subst) eqs }
+          ; mapM_ (do_one_eq loc all_rewriters subst) (reverse eqs) }
+               -- See Note [Reverse order of fundep equations]
      where
        all_rewriters = work_rewriters S.<> rewriters
 
@@ -2014,6 +2018,11 @@ See
  * Note [Evidence for quantified constraints] in GHC.Core.Predicate
  * Note [Equality superclasses in quantified constraints]
    in GHC.Tc.Solver.Canonical
+
+Note [Reverse order of fundep equations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have an injective type family F :: forall k. k -> Type.
+"RAE" finish this Note.
 -}
 
 --------------------
@@ -2036,7 +2045,10 @@ improveTopFunEqs ev fam_tc args rhs
        ; eqns <- improve_top_fun_eqs fam_envs fam_tc args rhs
        ; traceTcS "improveTopFunEqs" (vcat [ ppr fam_tc <+> ppr args <+> ppr rhs
                                           , ppr eqns ])
-       ; mapM_ (\(Pair ty1 ty2) -> unifyWanted rewriters loc Nominal ty1 ty2) eqns }
+       ; mapM_ (\(Pair ty1 ty2) -> unifyWanted rewriters loc Nominal ty1 ty2)
+               (reverse eqns) }
+         -- Missing that `reverse` causes T13135 and T13135_simple to loop.
+         -- See Note [Reverse order of fundep equations]
   where
     loc = bumpCtLocDepth (ctEvLoc ev)
         -- ToDo: this location is wrong; it should be FunDepOrigin2
