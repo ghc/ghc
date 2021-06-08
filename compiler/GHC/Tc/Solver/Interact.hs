@@ -6,6 +6,7 @@
 module GHC.Tc.Solver.Interact (
      solveSimpleGivens,   -- Solves [Ct]
      solveSimpleWanteds,  -- Solves Cts
+     withGivens
   ) where
 
 import GHC.Prelude
@@ -49,6 +50,7 @@ import Data.List( partition, deleteFirstsBy )
 import GHC.Types.SrcLoc
 import GHC.Types.Var.Env
 
+import qualified Data.Semigroup as S
 import Control.Monad
 import GHC.Data.Maybe( isJust )
 import GHC.Data.Pair (Pair(..))
@@ -56,7 +58,6 @@ import GHC.Types.Unique( hasKey )
 import GHC.Driver.Session
 import GHC.Utils.Misc
 import qualified GHC.LanguageExtensions as LangExt
-import Data.List.NonEmpty ( NonEmpty(..) )
 
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Maybe
@@ -1003,6 +1004,39 @@ Passing along the solved_dicts important for two reasons:
   and to solve G2 we may need H. If we don't spot this sharing we may
   solve H twice; and if this pattern repeats we may get exponentially bad
   behaviour.
+
+Note [No Given/Given fundeps]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We do not create constraints from Given/Given interactions via functional
+dependencies or type family injectivity annotations. (In this Note, both
+are called fundeps.) Firstly, these fundep constraints will never serve
+a purpose in accepting more programs: Given constraints do not contain
+metavariables that could be unified via exploring fundeps. They *could*
+be useful in discovering inaccessible code. However, the constraints will
+be Wanteds, and as such will stop compilation if they go unsolved. Maybe
+there is a clever way to get the right inaccessible code warnings, but the
+path forward is far from clear. #12466 has further commentary.
+
+We consider Given/instance fundep interactions the same as Given/Given
+interactions: these, too, are not explored.
+
+Furthermore, here is a case where a Given/instance interaction is actively
+harmful (from dependent/should_compile/RaeJobTalk):
+
+  type family a == b :: Bool
+  type family Not a = r | r -> a where
+    Not False = True
+    Not True  = False
+
+  [G] Not (a == b) ~ True
+
+Reacting this Given with the equations for Not produces
+
+  [W] a == b ~ False
+
+which cannot be proved without evidence for the Given. In effect, because
+fundeps do not carry evidence, extracting them from Givens just doesn't make
+sense.
 -}
 
 interactDict :: InertCans -> Ct -> TcS (StopOrContinue Ct)
@@ -1112,7 +1146,7 @@ shortCutSolver dflags ev_w ev_i
                        ; lift $ checkReductionDepth loc' pred
 
 
-                       ; evc_vs <- mapM (new_wanted_cached loc' solved_dicts') preds
+                       ; evc_vs <- mapM (new_wanted_cached ev loc' solved_dicts') preds
                                   -- Emit work for subgoals but use our local cache
                                   -- so we can solve recursive dictionaries.
 
@@ -1131,12 +1165,13 @@ shortCutSolver dflags ev_w ev_i
     -- Use a local cache of solved dicts while emitting EvVars for new work
     -- We bail out of the entire computation if we need to emit an EvVar for
     -- a subgoal that isn't a ClassPred.
-    new_wanted_cached :: CtLoc -> DictMap CtEvidence -> TcPredType -> MaybeT TcS MaybeNew
-    new_wanted_cached loc cache pty
+    new_wanted_cached :: CtEvidence -> CtLoc
+                      -> DictMap CtEvidence -> TcPredType -> MaybeT TcS MaybeNew
+    new_wanted_cached ev_w loc cache pty
       | ClassPred cls tys <- classifyPredType pty
       = lift $ case findDict cache loc_w cls tys of
           Just ctev -> return $ Cached (ctEvExpr ctev)
-          Nothing   -> Fresh <$> newWantedNC loc pty
+          Nothing   -> Fresh <$> newWantedNC loc (ctEvRewriters ev_w) pty
       | otherwise = mzero
 
 addFunDepWork :: InertCans -> CtEvidence -> Class -> TcS ()
@@ -1160,14 +1195,13 @@ addFunDepWork inerts work_ev cls
                 [ ppr work_ev
                 , pprCtLoc work_loc, ppr (isGivenLoc work_loc)
                 , pprCtLoc inert_loc, ppr (isGivenLoc inert_loc)
-                , pprCtLoc derived_loc, ppr (isGivenLoc derived_loc) ]) ;
+                , pprCtLoc derived_loc, ppr (isGivenLoc derived_loc) ])
 
-        emitFunDepDeriveds $
-        improveFromAnother derived_loc inert_pred work_pred
+           ; unless (isGiven work_ev && isGiven inert_ev) $
+             emitFunDepDeriveds (ctEvRewriters work_ev) $
+             improveFromAnother (derived_loc, inert_rewriters) inert_pred work_pred
                -- We don't really rewrite tys2, see below _rewritten_tys2, so that's ok
-               -- NB: We do create FDs for given to report insoluble equations that arise
-               -- from pairs of Givens, and also because of floating when we approximate
-               -- implications. The relevant test is: typecheck/should_fail/FDsFromGivens.hs
+               -- Do not create FDs from Given/Given interactions: See Note [No Given/Given fundeps]
         }
       | otherwise
       = return ()
@@ -1175,6 +1209,7 @@ addFunDepWork inerts work_ev cls
         inert_ev   = ctEvidence inert_ct
         inert_pred = ctEvPred inert_ev
         inert_loc  = ctEvLoc inert_ev
+        inert_rewriters = ctRewriters inert_ct
         derived_loc = work_loc { ctl_depth  = ctl_depth work_loc `maxSubGoalDepth`
                                               ctl_depth inert_loc
                                , ctl_origin = FunDepOrigin1 work_pred
@@ -1297,11 +1332,11 @@ improveLocalFunEqs work_ev inerts fam_tc args rhs
                    vcat [ text "Eqns:" <+> ppr improvement_eqns
                         , text "Candidates:" <+> ppr funeqs_for_tc
                         , text "Inert eqs:" <+> ppr (inert_eqs inerts) ]
-       ; emitFunDepDeriveds improvement_eqns }
+       ; emitFunDepDeriveds (ctEvRewriters work_ev) improvement_eqns }
   where
     funeqs        = inert_funeqs inerts
-    funeqs_for_tc = [ funeq_ct | EqualCtList (funeq_ct :| _)
-                                   <- findFunEqsByTyCon funeqs fam_tc
+    funeqs_for_tc = [ funeq_ct | equal_ct_list <- findFunEqsByTyCon funeqs fam_tc
+                               , funeq_ct <- equal_ct_list
                                , NomEq == ctEqRel funeq_ct ]
                                   -- representational equalities don't interact
                                   -- with type family dependencies
@@ -1310,7 +1345,7 @@ improveLocalFunEqs work_ev inerts fam_tc args rhs
     fam_inj_info  = tyConInjectivityInfo fam_tc
 
     --------------------
-    improvement_eqns :: [FunDepEqn CtLoc]
+    improvement_eqns :: [FunDepEqn (CtLoc, RewriterSet)]
     improvement_eqns
       | Just ops <- isBuiltInSynFamTyCon_maybe fam_tc
       =    -- Try built-in families, notably for arithmethic
@@ -1334,6 +1369,7 @@ improveLocalFunEqs work_ev inerts fam_tc args rhs
     do_one_injective inj_args rhs (CEqCan { cc_lhs = TyFamLHS _ inert_args
                                           , cc_rhs = irhs, cc_ev = inert_ev })
       | isImprovable inert_ev
+      , not (isGiven inert_ev && isGiven work_ev) -- See Note [No Given/Given fundeps]
       , rhs `tcEqType` irhs
       = mk_fd_eqns inert_ev $ [ Pair arg iarg
                               | (arg, iarg, True) <- zip3 args inert_args inj_args ]
@@ -1343,15 +1379,16 @@ improveLocalFunEqs work_ev inerts fam_tc args rhs
     do_one_injective _ _ _ = pprPanic "interactFunEq 2" (ppr fam_tc)
 
     --------------------
-    mk_fd_eqns :: CtEvidence -> [TypeEqn] -> [FunDepEqn CtLoc]
+    mk_fd_eqns :: CtEvidence -> [TypeEqn] -> [FunDepEqn (CtLoc, RewriterSet)]
     mk_fd_eqns inert_ev eqns
       | null eqns  = []
       | otherwise  = [ FDEqn { fd_qtvs = [], fd_eqs = eqns
                              , fd_pred1 = work_pred
                              , fd_pred2 = ctEvPred inert_ev
-                             , fd_loc   = loc } ]
+                             , fd_loc   = (loc, inert_rewriters) } ]
       where
-        inert_loc = ctEvLoc inert_ev
+        inert_loc       = ctEvLoc inert_ev
+        inert_rewriters = ctEvRewriters inert_ev
         loc = inert_loc { ctl_depth = ctl_depth inert_loc `maxSubGoalDepth`
                                       ctl_depth work_loc }
 
@@ -1523,8 +1560,8 @@ inertsCanDischarge inerts (CEqCan { cc_lhs = lhs_w, cc_rhs = rhs_w
     -- See Note [Combining equalities], third bullet
     keep_deriv ev_i
       | Wanted WOnly  <- ctEvFlavour ev_i  -- inert is [W]
-      , Wanted WDeriv <- flav_w            -- work item is [WD]
-      = True   -- Keep a derived version of the work item
+      , (Wanted WDeriv) <- flav_w           -- work item is [WD]
+      = False  -- "RAE" True   -- Keep a derived version of the work item
       | otherwise
       = False  -- Work item is fully discharged
 
@@ -1840,7 +1877,7 @@ as the fundeps.
 #7875 is a case in point.
 -}
 
-doTopFundepImprovement ::Ct -> TcS (StopOrContinue Ct)
+doTopFundepImprovement :: Ct -> TcS (StopOrContinue Ct)
 -- Try to functional-dependency improvement betweeen the constraint
 -- and the top-level instance declarations
 -- See Note [Fundeps with instances]
@@ -1854,7 +1891,7 @@ doTopFundepImprovement work_item@(CDictCan { cc_ev = ev, cc_class = cls
        ; let fundep_eqns = improveFromInstEnv instEnvs mk_ct_loc cls xis
        ; case fundep_eqns of
            [] -> continueWith work_item  -- No improvement
-           _  -> do { emitFunDepDeriveds fundep_eqns
+           _  -> do { emitFunDepDeriveds (ctEvRewriters ev) fundep_eqns
                     ; continueWith (work_item { cc_fundeps = False }) } }
   | otherwise
   = continueWith work_item
@@ -1866,30 +1903,38 @@ doTopFundepImprovement work_item@(CDictCan { cc_ev = ev, cc_class = cls
 
      mk_ct_loc :: PredType   -- From instance decl
                -> SrcSpan    -- also from instance deol
-               -> CtLoc
+               -> (CtLoc, RewriterSet)
      mk_ct_loc inst_pred inst_loc
-       = dict_loc { ctl_origin = FunDepOrigin2 dict_pred dict_origin
-                                               inst_pred inst_loc }
+       = ( dict_loc { ctl_origin = FunDepOrigin2 dict_pred dict_origin
+                                                 inst_pred inst_loc }
+         , emptyRewriterSet )
 
 doTopFundepImprovement work_item = pprPanic "doTopFundepImprovement" (ppr work_item)
 
-emitFunDepDeriveds :: [FunDepEqn CtLoc] -> TcS ()
+emitFunDepDeriveds :: RewriterSet  -- from the work item
+                   -> [FunDepEqn (CtLoc, RewriterSet)] -> TcS ()
 -- See Note [FunDep and implicit parameter reactions]
-emitFunDepDeriveds fd_eqns
+emitFunDepDeriveds work_rewriters fd_eqns
   = mapM_ do_one_FDEqn fd_eqns
   where
-    do_one_FDEqn (FDEqn { fd_qtvs = tvs, fd_eqs = eqs, fd_loc = loc })
+    do_one_FDEqn (FDEqn { fd_qtvs = tvs, fd_eqs = eqs, fd_loc = (loc, rewriters) })
      | null tvs  -- Common shortcut
      = do { traceTcS "emitFunDepDeriveds 1" (ppr (ctl_depth loc) $$ ppr eqs $$ ppr (isGivenLoc loc))
-          ; mapM_ (unifyDerived loc Nominal) eqs }
+          ; mapM_ (\(Pair ty1 ty2) -> unifyWanted all_rewriters loc Nominal ty1 ty2)
+                  (reverse eqs) }
+             -- See Note [Reverse order of fundep equations]
+
      | otherwise
      = do { traceTcS "emitFunDepDeriveds 2" (ppr (ctl_depth loc) $$ ppr tvs $$ ppr eqs)
           ; subst <- instFlexi tvs  -- Takes account of kind substitution
-          ; mapM_ (do_one_eq loc subst) eqs }
+          ; mapM_ (do_one_eq loc all_rewriters subst) (reverse eqs) }
+               -- See Note [Reverse order of fundep equations]
+     where
+       all_rewriters = work_rewriters S.<> rewriters
 
-    do_one_eq loc subst (Pair ty1 ty2)
-       = unifyDerived loc Nominal $
-         Pair (Type.substTyUnchecked subst ty1) (Type.substTyUnchecked subst ty2)
+    do_one_eq loc rewriters subst (Pair ty1 ty2)
+       = unifyWanted rewriters loc Nominal
+                     (Type.substTyUnchecked subst ty1) (Type.substTyUnchecked subst ty2)
 
 {-
 **********************************************************************
@@ -1901,7 +1946,7 @@ emitFunDepDeriveds fd_eqns
 
 topReactionsStage :: WorkItem -> TcS (StopOrContinue Ct)
 -- The work item does not react with the inert set,
--- so try interaction with top-level instances. Note:
+-- so try interaction with top-level instances.
 topReactionsStage work_item
   = do { traceTcS "doTopReact" (ppr work_item)
        ; case work_item of
@@ -1973,6 +2018,47 @@ See
  * Note [Evidence for quantified constraints] in GHC.Core.Predicate
  * Note [Equality superclasses in quantified constraints]
    in GHC.Tc.Solver.Canonical
+
+Note [Reverse order of fundep equations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this scenario (from dependent/should_fail/T13135_simple):
+
+  type Sig :: Type -> Type
+  data Sig a = SigFun a (Sig a)
+
+  type SmartFun :: forall (t :: Type). Sig t -> Type
+  type family SmartFun sig = r | r -> sig where
+    SmartFun @Type (SigFun @Type a sig) = a -> SmartFun @Type sig
+
+  [W] SmartFun @kappa sigma ~ (Int -> Bool)
+
+The injectivity of SmartFun allows us to produce two new equalities:
+
+  [W] w1 :: Type ~ kappa
+  [W] w2 :: SigFun @Type Int beta ~ sigma
+
+for some fresh (beta :: SigType). The second Wanted here is actually
+heterogeneous: the LHS has type Sig Type while the RHS has type Sig kappa.
+Of course, if we solve the first wanted first, the second becomes homogeneous.
+
+When looking for injectivity-inspired equalities, we work left-to-right,
+producing the two equalities in the order written above. However, these
+equalities are then passed into unifyWanted, which will fail, adding these
+to the work list. However, crucially, the work list operates like a *stack*.
+So, because we add w1 and then w2, we process w2 first. This is silly: solving
+w1 would unlock w2. So we make sure to add equalities to the work
+list in left-to-right order, which requires a few key calls to 'reverse'.
+
+This treatment is also used for class-based functional dependencies, although
+we do not have a program yet known to exhibit a loop there. It just seems
+like the right thing to do.
+
+When this was originally conceived, it was necessary to avoid a loop in T13135.
+That loop is now avoided by continuing with the kind equality (not the type
+equality) in canEqCanLHSHetero (see Note [Equalities with incompatible kinds]
+in GHC.Tc.Solver.Canonical). However, the idea of working left-to-right still
+seems worthwhile, and so the calls to 'reverse' remain.
+
 -}
 
 --------------------
@@ -1986,7 +2072,8 @@ doTopReactEq work_item = doTopReactOther work_item
 improveTopFunEqs :: CtEvidence -> TyCon -> [TcType] -> TcType -> TcS ()
 -- See Note [FunDep and implicit parameter reactions]
 improveTopFunEqs ev fam_tc args rhs
-  | not (isImprovable ev)
+  |  not (isImprovable ev)
+  || isGiven ev  -- See Note [No Given/Given fundeps]
   = return ()
 
   | otherwise
@@ -1994,11 +2081,15 @@ improveTopFunEqs ev fam_tc args rhs
        ; eqns <- improve_top_fun_eqs fam_envs fam_tc args rhs
        ; traceTcS "improveTopFunEqs" (vcat [ ppr fam_tc <+> ppr args <+> ppr rhs
                                           , ppr eqns ])
-       ; mapM_ (unifyDerived loc Nominal) eqns }
+       ; mapM_ (\(Pair ty1 ty2) -> unifyWanted rewriters loc Nominal ty1 ty2)
+               (eqns) }
+         -- Missing that `reverse` causes T13135 and T13135_simple to loop.
+         -- See Note [Reverse order of fundep equations]
   where
     loc = bumpCtLocDepth (ctEvLoc ev)
         -- ToDo: this location is wrong; it should be FunDepOrigin2
         -- See #14778
+    rewriters = ctEvRewriters ev
 
 improve_top_fun_eqs :: FamInstEnvs
                     -> TyCon -> [TcType] -> TcType
@@ -2129,7 +2220,8 @@ doTopReactDict :: InertSet -> Ct -> TcS (StopOrContinue Ct)
 doTopReactDict inerts work_item@(CDictCan { cc_ev = ev, cc_class = cls
                                           , cc_tyargs = xis })
   | isGiven ev   -- Never use instances for Given constraints
-  = doTopFundepImprovement work_item
+  = continueWith work_item
+     -- See Note [No Given/Given fundeps]
 
   | Just solved_ev <- lookupSolvedDict inerts dict_loc cls xis   -- Cached
   = do { setEvBindIfWanted ev (ctEvTerm solved_ev)
@@ -2183,7 +2275,7 @@ chooseInstance work_item
                   -- See Note [Instances in no-evidence implications]
 
                 else
-           do { evc_vars <- mapM (newWanted deeper_loc) theta
+           do { evc_vars <- mapM (newWanted deeper_loc (ctRewriters work_item)) theta
               ; setEvBindIfWanted ev (mk_ev (map getEvExpr evc_vars))
               ; emitWorkNC (freshGoals evc_vars)
               ; stopWith ev "Dict/Top (solved wanted)" }}}
@@ -2481,3 +2573,18 @@ matchLocalInst pred loc
         qtv_set = mkVarSet qtvs
         this_unif = mightEqualLater inerts qpred (ctEvLoc ev) pred loc
         (matches, unif) = match_local_inst inerts qcis
+
+-------------------------------------------------------------
+-- | Bring givens into scope and execute a TcS monad action;
+-- discards any evidence created.
+withGivens :: [Ct]  -- all givens; use mkGivens to make this
+           -> TcS a -> TcM a
+  -- really should be in GHC.Tc.Solver, but here, we avoid module
+  -- loops with GHC.Tc.Errors
+withGivens givens thing_inside
+  = fmap fst $ runTcS $
+    do { traceTcS "withGivens {" (ppr givens)
+       ; solveSimpleGivens givens
+       ; result <- thing_inside
+       ; traceTcS "withGivens }" empty
+       ; return result }

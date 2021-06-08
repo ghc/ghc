@@ -6,6 +6,13 @@ T7279.hs:6:10: error:
                    forall a b. (Eq a, Show b) => Eq (T a)
         at T7279.hs:6:10-35
       The type variable ‘b0’ is ambiguous
+      These potential instances exist:
+        instance Show Ordering -- Defined in ‘GHC.Show’
+        instance Show a => Show (Maybe a) -- Defined in ‘GHC.Show’
+        instance Show Integer -- Defined in ‘GHC.Show’
+        ...plus 23 others
+        ...plus 13 instances involving out-of-scope types
+        (use -fprint-potential-instances to see them all)
     • In the ambiguity check for an instance declaration
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       In the instance declaration for ‘Eq (T a)’
