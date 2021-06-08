@@ -791,22 +791,30 @@ runTcPluginRewriters rewriterFunctions tys
   = return Nothing -- short-circuit for common case
   | otherwise
   = do { givens <- getInertGivens
-       ; evBindsVar <- getTcEvBindsVar
-       ; runRewriters evBindsVar givens rewriterFunctions }
+       ; runRewriters givens rewriterFunctions }
   where
-  runRewriters _ _ []
+  fakeEvBindsVar :: EvBindsVar
+  fakeEvBindsVar = throwGhcException (ProgramError "evBindsVar used in tcPluginRewrite")
+  runRewriters :: [Ct] -> [TcPluginRewriter] -> TcS (Maybe (Coercion, Xi))
+  runRewriters _ []
     = return Nothing
-  runRewriters evBindsVar givens (rewriter:rewriters)
-    = do { rewriteResult <- wrapTcS . ( `runTcPluginM` evBindsVar ) $
+  runRewriters givens (rewriter:rewriters)
+    = do { rewriteResult <- wrapTcS . ( `runTcPluginM` fakeEvBindsVar ) $
                             rewriter givens tys
          ; case rewriteResult of
             { TcPluginRewriteError msg ->
               do { wrapTcS $ addTcRnDiagnostic (TcRnUnknownMessage msg)
                  ; return Nothing }
-            ; TcPluginRewriteTo res co ->
-                return (Just (co,res))
-            ; TcPluginNoRewrite        ->
-                runRewriters evBindsVar givens rewriters }}
+            ; TcPluginRewriteTo
+                { tcPluginRewriteTo = res
+                , tcPluginRewriteEvidence = co
+                , tcRewriterWanteds = wanteds
+                } ->
+              do { emitWork wanteds
+                 ; return (Just (co,res)) }
+            ; TcPluginNoRewrite { tcRewriterWanteds = wanteds } ->
+              do { emitWork wanteds
+                 ; runRewriters givens rewriters }}}
 
 rewrite_fam_app :: TyCon -> [TcType] -> RewriteM (Xi, Coercion)
   --   rewrite_fam_app            can be over-saturated
