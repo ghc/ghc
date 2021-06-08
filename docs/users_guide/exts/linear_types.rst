@@ -130,7 +130,7 @@ an error.
 Printing multiplicity-polymorphic types
 ---------------------------------------
 If :extension:`LinearTypes` is disabled, multiplicity variables in types are defaulted
-to ``Many`` when printing, in the same manner as described in :ref:`printing-levity-polymorphic-types`.
+to ``Many`` when printing, in the same manner as described in :ref:`printing-representation-polymorphic-types`.
 In other words, without :extension:`LinearTypes`, multiplicity-polymorphic functions
 ``a %m -> b`` are printed as normal Haskell2010 functions ``a -> b``. This allows
 existing libraries to be generalized to linear types in a backwards-compatible
