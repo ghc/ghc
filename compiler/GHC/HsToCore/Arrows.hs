@@ -1102,7 +1102,7 @@ dsfixCmdStmts
 
 dsfixCmdStmts ids local_vars out_ids stmts
   = trimInput (dsCmdStmts ids local_vars out_ids stmts)
-   -- TODO: Add levity polymorphism check for the resulting expression.
+   -- TODO: Add representation polymorphism check for the resulting expression.
    -- But I (Richard E.) don't know enough about arrows to do so.
 
 dsCmdStmts

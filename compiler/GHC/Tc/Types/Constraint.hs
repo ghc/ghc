@@ -527,7 +527,7 @@ field by the type checker. The desugarer simply dereferences to get the CoreExpr
 
 Prior to fixing #17812, we used to invent an Id to hold the erroring
 expression, and then bind it during type-checking. But this does not support
-levity-polymorphic out-of-scope identifiers. See
+representation-polymorphic out-of-scope identifiers. See
 typecheck/should_compile/T17812. We thus use the mutable-CoreExpr approach
 described above.
 
