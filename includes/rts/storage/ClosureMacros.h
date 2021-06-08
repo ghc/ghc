@@ -119,17 +119,9 @@ INLINE_HEADER StgHalfWord GET_TAG(const StgClosure *con)
 
 #if defined(PROFILING)
 /*
-  The following macro works for both retainer profiling and LDV profiling. For
- retainer profiling, 'era' remains 0, so by setting the 'ldvw' field we also set
- 'rs' to zero.
-
- Note that we don't have to bother handling the 'flip' bit properly[1] since the
- retainer profiling code will just set 'rs' to NULL upon visiting a closure with
- an invalid 'flip' bit anyways.
-
- See Note [Profiling heap traversal visited bit] for details.
-
- [1]: Technically we should set 'rs' to `NULL | flip`.
+ The following macro works for both heap traversal profilers and LDV
+ profiling. For traversal, 'era' remains 0, so by setting the 'ldvw'
+ field we also set the 'trav' field in the 'hp' union to zero.
  */
 #define SET_PROF_HDR(c,ccs_)            \
         ((c)->header.prof.ccs = ccs_,   \
@@ -494,26 +486,32 @@ INLINE_HEADER StgWord8 *mutArrPtrsCard (StgMutArrPtrs *a, W_ n)
 
     - LDV profiling (PROFILING, and +RTS -hb) and
 
+    - regular heap profiling (PROFILING, and +RTS -h). Only closures that can
+      end up in a pinned block need zeroing here though. See Note [skipping slop
+      in the heap profiler].
+
    However we can get into trouble if we're zeroing slop for ordinarily
    immutable closures when using multiple threads, since there is nothing
    preventing another thread from still being in the process of reading the
    memory we're about to zero.
 
-   Thus, with the THREADED RTS and +RTS -N2 or greater we must not zero
-   immutable closure's slop.
+   Thus, with the THREADED RTS and nCapabilities>1 we must not zero immutable
+   closure's slop. The LDV profiler and sanity checks will be disabled in this
+   case.
 
    Hence, an immutable closure's slop is zeroed when either:
 
-    - PROFILING && era > 0 (LDV is on) or
-    - !THREADED && DEBUG
+    - PROFILING && era > 0 (LDV is on, cannot be enabled if nCapabilities>1) or
+    - DEBUG && nCapabilities==1
 
    Additionally:
-
-    - LDV profiling and +RTS -N2 are incompatible,
 
     - full-heap sanity checks are disabled for the THREADED RTS, at least when
       they don't run right after GC when there is no slop.
       See Note [heap sanity checking with SMP].
+
+   Note this isn't the only place we zero slop when overwriting unfortunately,
+   there's also LDV_FILL_SLOP().
 
    -------------------------------------------------------------------------- */
 
@@ -549,7 +547,7 @@ zeroSlop (
 EXTERN_INLINE void
 zeroSlop (StgClosure *p, uint32_t offset, uint32_t size, bool known_mutable)
 {
-    // see Note [zeroing slop when overwriting closures], also #8402
+    // See Note [zeroing slop when overwriting closures] and also #8402.
 
     const bool want_to_zero_immutable_slop = false
         // Sanity checking (-DS) is enabled
