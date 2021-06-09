@@ -2,28 +2,14 @@
 T8603.hs:33:17: error:
     • Couldn't match kind ‘*’ with ‘* -> *’
       When matching types
-        (->) [a1] :: * -> *
+        m0 :: * -> *
         [a2] :: *
       Expected: [a2] -> StateT s RV a0
-        Actual: t0 ((->) [a1]) (StateT s RV a0)
+        Actual: t0 m0 (StateT s RV a0)
     • The function ‘lift’ is applied to two value arguments,
-        but its type ‘([a1] -> StateT s RV a0)
-                      -> t0 ((->) [a1]) (StateT s RV a0)’
+        but its type ‘m0 (StateT s RV a0) -> t0 m0 (StateT s RV a0)’
         has only one
       In a stmt of a 'do' block: prize <- lift uniform [1, 2, 3]
       In the expression:
         do prize <- lift uniform [1, 2, ....]
            return False
-
-T8603.hs:33:22: error:
-    • Couldn't match type: RV a1
-                     with: StateT s RV a0
-      Expected: [a1] -> StateT s RV a0
-        Actual: [a1] -> RV a1
-    • In the first argument of ‘lift’, namely ‘uniform’
-      In a stmt of a 'do' block: prize <- lift uniform [1, 2, 3]
-      In the expression:
-        do prize <- lift uniform [1, 2, ....]
-           return False
-    • Relevant bindings include
-        testRVState1 :: RVState s Bool (bound at T8603.hs:32:1)

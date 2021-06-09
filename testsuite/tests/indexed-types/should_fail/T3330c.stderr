@@ -3,7 +3,7 @@ T3330c.hs:25:43: error:
     • Couldn't match kind ‘*’ with ‘* -> *’
       When matching types
         f1 :: * -> *
-        Der f1 x :: *
+        f1 x :: *
       Expected: Der ((->) x) (Der f1 x)
         Actual: R f1
     • In the first argument of ‘plug’, namely ‘rf’

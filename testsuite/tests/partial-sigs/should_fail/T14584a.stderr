@@ -10,11 +10,7 @@ T14584a.hs:12:9: warning: [-Wdeferred-type-errors (in -Wdefault)]
       In an equation for ‘f’: f = id @m :: _
 
 T14584a.hs:12:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
-    • Found type wildcard ‘_’ standing for ‘m -> m’
-      Where: ‘m’, ‘k’ are rigid type variables bound by
-               the type signature for:
-                 f :: forall {k} (m :: k). ()
-               at T14584a.hs:11:1-17
+    • Found type wildcard ‘_’ standing for ‘()’
     • In an expression type signature: _
       In the expression: id @m :: _
       In an equation for ‘f’: f = id @m :: _
