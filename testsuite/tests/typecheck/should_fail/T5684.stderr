@@ -8,89 +8,9 @@ T5684.hs:20:12: error:
           flop1 = [op False False, op 'c' undefined, op True undefined]
 
 T5684.hs:24:12: error:
-    • No instance for (B Char b5) arising from a use of ‘op’
+    • No instance for (B Char b0) arising from a use of ‘op’
     • In the expression: op 'c' undefined
       In the expression:
         [op False False, op 'c' undefined, op True undefined]
       In an equation for ‘flop1’:
           flop1 = [op False False, op 'c' undefined, op True undefined]
-
-T5684.hs:29:12: error:
-    • No instance for (A Bool) arising from a use of ‘op’
-    • In the expression: op False False
-      In the expression:
-        [op False False, op True undefined, op 'c' undefined]
-      In an equation for ‘flop2’:
-          flop2 = [op False False, op True undefined, op 'c' undefined]
-
-T5684.hs:31:12: error:
-    • No instance for (B Char b4) arising from a use of ‘op’
-    • In the expression: op 'c' undefined
-      In the expression:
-        [op False False, op True undefined, op 'c' undefined]
-      In an equation for ‘flop2’:
-          flop2 = [op False False, op True undefined, op 'c' undefined]
-
-T5684.hs:35:12: error:
-    • No instance for (B Char b3) arising from a use of ‘op’
-    • In the expression: op 'c' undefined
-      In the expression:
-        [op 'c' undefined, op True undefined, op False False]
-      In an equation for ‘flop3’:
-          flop3 = [op 'c' undefined, op True undefined, op False False]
-
-T5684.hs:37:12: error:
-    • No instance for (A Bool) arising from a use of ‘op’
-    • In the expression: op False False
-      In the expression:
-        [op 'c' undefined, op True undefined, op False False]
-      In an equation for ‘flop3’:
-          flop3 = [op 'c' undefined, op True undefined, op False False]
-
-T5684.hs:40:12: error:
-    • No instance for (B Char b2) arising from a use of ‘op’
-    • In the expression: op 'c' undefined
-      In the expression:
-        [op 'c' undefined, op False False, op True undefined]
-      In an equation for ‘flop4’:
-          flop4 = [op 'c' undefined, op False False, op True undefined]
-
-T5684.hs:41:12: error:
-    • No instance for (A Bool) arising from a use of ‘op’
-    • In the expression: op False False
-      In the expression:
-        [op 'c' undefined, op False False, op True undefined]
-      In an equation for ‘flop4’:
-          flop4 = [op 'c' undefined, op False False, op True undefined]
-
-T5684.hs:47:12: error:
-    • No instance for (B Char b1) arising from a use of ‘op’
-    • In the expression: op 'c' undefined
-      In the expression:
-        [op True undefined, op 'c' undefined, op False False]
-      In an equation for ‘flop5’:
-          flop5 = [op True undefined, op 'c' undefined, op False False]
-
-T5684.hs:48:12: error:
-    • No instance for (A Bool) arising from a use of ‘op’
-    • In the expression: op False False
-      In the expression:
-        [op True undefined, op 'c' undefined, op False False]
-      In an equation for ‘flop5’:
-          flop5 = [op True undefined, op 'c' undefined, op False False]
-
-T5684.hs:53:12: error:
-    • No instance for (A Bool) arising from a use of ‘op’
-    • In the expression: op False False
-      In the expression:
-        [op True undefined, op False False, op 'c' undefined]
-      In an equation for ‘flop6’:
-          flop6 = [op True undefined, op False False, op 'c' undefined]
-
-T5684.hs:54:12: error:
-    • No instance for (B Char b0) arising from a use of ‘op’
-    • In the expression: op 'c' undefined
-      In the expression:
-        [op True undefined, op False False, op 'c' undefined]
-      In an equation for ‘flop6’:
-          flop6 = [op True undefined, op False False, op 'c' undefined]
