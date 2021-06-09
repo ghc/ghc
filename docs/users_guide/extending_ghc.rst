@@ -545,14 +545,35 @@ is defined thus:
 ::
 
     data TcPlugin = forall s . TcPlugin
-      { tcPluginInit  :: TcPluginM s
-      , tcPluginSolve :: s -> TcPluginSolver
-      , tcPluginStop  :: s -> TcPluginM ()
+      { tcPluginInit    :: TcPluginM s
+      , tcPluginRewrite :: s -> UniqFM TyCon TcPluginRewriter
+      , tcPluginSolve   :: s -> TcPluginSolver
+      , tcPluginStop    :: s -> TcPluginM ()
       }
 
     type TcPluginSolver = [Ct] -> [Ct] -> [Ct] -> TcPluginM TcPluginResult
 
-    data TcPluginResult = TcPluginContradiction [Ct] | TcPluginOk [(EvTerm,Ct)] [Ct]
+    type TcPluginRewriter = [Ct] -> [TcType] -> TcPluginM TcPluginRewriteResult
+
+    data TcPluginResult
+      = TcPluginContradiction [Ct]
+      | TcPluginOk
+        { tcPluginSolvedWanteds :: [(EvTerm,Ct)]
+        , tcPluginNewWanteds :: [Ct] }
+    
+    data TcPluginRewriteResult where
+      TcPluginRewriteError
+        :: (Diagnostic a, Typeable a)
+        => a -> TcPluginRewriteResult
+      TcPluginNoRewrite
+        :: { tcRewriterWanteds :: [Ct] }
+        -> TcPluginRewriteResult
+      TcPluginRewriteTo
+        :: { tcPluginRewriteTo :: TcType
+           , tcPluginRewriteEvidence :: TcCoercion
+           , tcRewriterWanteds :: [Ct]
+           }
+        -> TcPluginRewriteResult
 
 (The details of this representation are subject to change as we gain
 more experience writing typechecker plugins. It should not be assumed to
@@ -573,6 +594,13 @@ The basic idea is as follows:
    contradiction was found or progress was made. If the plugin solver
    makes progress, GHC will re-start the constraint solving pipeline,
    looping until a fixed point is reached.
+
+-  When rewriting type family applications, GHC calls ``tcPluginRewriter``.
+   The plugin supplies a collection of type families which it is interested
+   in rewriting. For each of those, the rewriter is provided with the
+   the arguments to that type family, as well as the current collection of
+   given constraints. The plugin can then specify a rewriting for this
+   type family application, if desired.
 
 -  Finally, GHC calls ``tcPluginStop`` after constraint solving is
    finished, allowing the plugin to dispose of any resources it has
@@ -604,9 +632,8 @@ The key component of a typechecker plugin is a function of type
 
 This function will be invoked at two points in the constraint solving
 process: after simplification of given constraints, and after
-unflattening of wanted constraints. The two phases can be distinguished
-because the deriveds and wanteds will be empty in the first case. In
-each case, the plugin should either
+solving of wanted constraints. The two phases can be distinguished
+as follows: the deriveds and wanteds will be empty in the first case.
 
 -  return ``TcPluginContradiction`` with a list of impossible
    constraints (which must be a subset of those passed in), so they can
@@ -638,6 +665,49 @@ typechecking, and can be checked by ``-dcore-lint``. It is possible for
 the plugin to create equality axioms for use in evidence terms, but GHC
 does not check their consistency, and inconsistent axiom sets may lead
 to segfaults or other runtime misbehaviour.
+
+.. _type-family-rewriting-with-plugins:
+
+Type family rewriting with plugins
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Typechecker plugins can also directly rewrite type family applications,
+by supplying the ``tcPluginRewrite`` field of the ``TcPlugin`` record.
+
+
+::
+
+    tcPluginRewrite :: s -> UniqFM TyCon TcPluginRewriter
+
+That is, the plugin registers a map, from a type-family ``TyCon``\s to its
+associated rewriting function: ::
+
+    type TcPluginRewriter = [Ct] -> [TcType] -> TcPluginM TcPluginRewriteResult
+
+This rewriting function is supplied with the Given constraints from the current
+context, and the type family arguments.
+Note that the type family application is guaranteed to be exactly saturated.
+This function should then return a possible rewriting of the type family
+application, by means of the following datatype: ::
+
+    data TcPluginRewriteResult where
+      TcPluginRewriteError :: (Diagnostic a, Typeable a) => a -> TcPluginRewriteResult
+      TcPluginNoRewrite
+        :: { tcRewriterWanteds :: [Ct] }
+        -> TcPluginRewriteResult
+      TcPluginRewriteTo
+        :: { tcPluginRewriteTo :: TcType
+           , tcPluginRewriteEvidence :: TcCoercion
+           , tcRewriterWanteds :: [Ct]
+           }
+        -> TcPluginRewriteResult
+
+That is, the rewriter can specify a rewriting of the type family application,
+throw an error, or do nothing. If the plugin doesn't throw an error, it is also
+able to emit additional wanted constraints.
+
+Note that in this case the evidence required for a rewriting is a ``Coercion``
+between the type family application (on the LHS) and the provided rewriting (RHS).
 
 .. _source-plugins:
 
