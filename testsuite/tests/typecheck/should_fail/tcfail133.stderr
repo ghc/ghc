@@ -12,7 +12,7 @@ tcfail133.hs:68:7: error:
           -- Defined at tcfail133.hs:11:54
         instance Show One -- Defined at tcfail133.hs:9:28
         ...plus 26 others
-        ...plus 12 instances involving out-of-scope types
+        ...plus 13 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the first argument of ‘($)’, namely ‘show’
       In the expression: show $ add (One :@ Zero) (One :@ One)
@@ -21,17 +21,6 @@ tcfail133.hs:68:7: error:
 
 tcfail133.hs:68:14: error:
     • No instance for (AddDigit (Zero :@ (One :@ One)) One a0)
-        arising from a use of ‘add’
-    • In the second argument of ‘($)’, namely
-        ‘add (One :@ Zero) (One :@ One)’
-      In the expression: show $ add (One :@ Zero) (One :@ One)
-      In an equation for ‘foo’:
-          foo = show $ add (One :@ Zero) (One :@ One)
-
-tcfail133.hs:68:14: error:
-    • No instance for (Digit (One :@ One))
-        arising from a superclass required to satisfy ‘AddDigit
-                                                         (Zero :@ (One :@ One)) One a0’,
         arising from a use of ‘add’
     • In the second argument of ‘($)’, namely
         ‘add (One :@ Zero) (One :@ One)’
