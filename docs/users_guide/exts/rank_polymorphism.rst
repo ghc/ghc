@@ -200,7 +200,7 @@ A similar phenomenon occurs for operator sections. For example,
 expanding it to ``\x -> x \`g3a\` "hello"``.
 
 Historical note.  Earlier versions of GHC allowed these now-rejected applications, by inserting
-automatic eta-expansions, as described in Section 4.6 of `Practical type inference for arbitrary-aank types <https://www.microsoft.com/en-us/research/publication/practical-type-inference-for-arbitrary-rank-types/>`__, where it is
+automatic eta-expansions, as described in Section 4.6 of `Practical type inference for arbitrary-rank types <https://www.microsoft.com/en-us/research/publication/practical-type-inference-for-arbitrary-rank-types/>`__, where it is
 called "deep skolemisation".
 But these automatic eta-expansions may silently change the semantics of the user's program,
 and deep skolemisation was removed from the language by
