@@ -278,8 +278,8 @@ deBindComp pat core_list1 quals core_list2 = do
     let res_ty = exprType core_list2
         h_ty   = u1_ty `mkVisFunTyMany` res_ty
 
-       -- no levity polymorphism here, as list comprehensions don't work
-       -- with RebindableSyntax. NB: These are *not* monad comps.
+       -- no representation polymorphism here, as list comprehensions
+       -- don't work with RebindableSyntax. NB: These are *not* monad comps.
     [h, u1, u2, u3] <- newSysLocalsDs $ map unrestricted [h_ty, u1_ty, u2_ty, u3_ty]
 
     -- the "fail" value ...
@@ -647,7 +647,7 @@ dsInnerMonadComp stmts bndrs ret_op
 mkMcUnzipM :: TransForm
            -> HsExpr GhcTc      -- fmap
            -> Id                -- Of type n (a,b,c)
-           -> [Type]            -- [a,b,c]   (not levity-polymorphic)
+           -> [Type]            -- [a,b,c]   (not representation-polymorphic)
            -> DsM CoreExpr      -- Of type (n a, n b, n c)
 mkMcUnzipM ThenForm _ ys _
   = return (Var ys) -- No unzipping to do

@@ -593,8 +593,8 @@ zonk_bind env (AbsBinds { abs_tvs = tyvars, abs_ev_vars = evs
                              , fun_matches = ms
                              , fun_ext     = co_fn })) <- lbind
       = do { new_mono_id <- updateIdTypeAndMultM (zonkTcTypeToTypeX env) mono_id
-                            -- Specifically /not/ zonkIdBndr; we do not
-                            -- want to complain about a levity-polymorphic binder
+                            -- Specifically /not/ zonkIdBndr; we do not want to
+                            -- complain about a representation-polymorphic binder
            ; (env', new_co_fn) <- zonkCoFn env co_fn
            ; new_ms            <- zonkMatchGroup env' zonkLExpr ms
            ; return $ L loc $
@@ -1054,7 +1054,7 @@ zonk_cmd_top env (HsCmdTop (CmdTopTc stack_tys ty ids) cmd)
        new_ids <- mapSndM (zonkExpr env) ids
 
        massert (isLiftedTypeKind (tcTypeKind new_stack_tys))
-         -- desugarer assumes that this is not levity polymorphic...
+         -- desugarer assumes that this is not representation-polymorphic...
          -- but indeed it should always be lifted due to the typing
          -- rules for arrows
 
@@ -1410,7 +1410,8 @@ zonk_pat env p@(ConPat { pat_con = L _ con
     do  { new_tys <- mapM (zonkTcTypeToTypeX env) tys
 
           -- an unboxed tuple pattern (but only an unboxed tuple pattern)
-          -- might have levity-polymorphic arguments. Check for this badness.
+          -- might have representation-polymorphic arguments.
+          -- Check for this badness.
         ; case con of
             RealDataCon dc
               | isUnboxedTupleTyCon (dataConTyCon dc)
