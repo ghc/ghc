@@ -1,7 +1,12 @@
 
-T7696.hs:7:6: error:
-    • Couldn't match type ‘m0 a0’ with ‘()’
+T7696.hs:9:6: error:
+    • Couldn't match kind ‘*’ with ‘* -> *’
+      When matching types
+        t0 :: (* -> *) -> *
+        w :: * -> *
       Expected: ((), w ())
         Actual: (m0 a0, t0 m0)
     • In the expression: f1
       In an equation for ‘f2’: f2 = f1
+    • Relevant bindings include
+        f2 :: ((), w ()) (bound at T7696.hs:9:1)
