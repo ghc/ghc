@@ -38,6 +38,7 @@ import GHC.Iface.Env
 
 import GHC.StgToCmm.Types
 
+import GHC.Tc.Errors.Types
 import GHC.Tc.TyCl.Build
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
@@ -102,6 +103,7 @@ import GHC.Types.Id.Make
 import GHC.Types.Id.Info
 import GHC.Types.Tickish
 import GHC.Types.TyThing
+import GHC.Types.Error
 
 import GHC.Fingerprint
 import qualified GHC.Data.BooleanFormula as BF
@@ -573,9 +575,9 @@ tcHiBootIface hsc_src mod
             Nothing -> return NoSelfBoot
             -- error cases
             Just (GWIB { gwib_isBoot = is_boot }) -> case is_boot of
-              IsBoot -> failWithTc (elaborate err)
+              IsBoot -> failWithTc (TcRnUnknownMessage $ mkPlainError noHints (elaborate err))
               -- The hi-boot file has mysteriously disappeared.
-              NotBoot -> failWithTc moduleLoop
+              NotBoot -> failWithTc (TcRnUnknownMessage $ mkPlainError noHints moduleLoop)
               -- Someone below us imported us!
               -- This is a loop with no hi-boot in the way
     }}}}

@@ -121,6 +121,7 @@ import GHC.Types.Id as Id
 import GHC.Types.Name
 import GHC.Types.Var.Set
 import GHC.Builtin.Types
+import GHC.Types.Error
 import GHC.Types.Var.Env
 import GHC.Types.Name.Env
 import GHC.Utils.Misc
@@ -1828,9 +1829,10 @@ defaultTyVar default_kind tv
            ; writeMetaTyVar kv liftedTypeKind
            ; return True }
       | otherwise
-      = do { addErr (vcat [ text "Cannot default kind variable" <+> quotes (ppr kv')
-                          , text "of kind:" <+> ppr (tyVarKind kv')
-                          , text "Perhaps enable PolyKinds or add a kind signature" ])
+      = do { addErr $ TcRnUnknownMessage $ mkPlainError noHints $
+               (vcat [ text "Cannot default kind variable" <+> quotes (ppr kv')
+                     , text "of kind:" <+> ppr (tyVarKind kv')
+                     , text "Perhaps enable PolyKinds or add a kind signature" ])
            -- We failed to default it, so return False to say so.
            -- Hence, it'll get skolemised.  That might seem odd, but we must either
            -- promote, skolemise, or zap-to-Any, to satisfy GHC.Tc.Gen.HsType
@@ -2018,12 +2020,13 @@ doNotQuantifyTyVars dvs where_found
        ; unless (null leftover_metas) $
          do { let (tidy_env1, tidied_tvs) = tidyOpenTyCoVars emptyTidyEnv leftover_metas
             ; (tidy_env2, where_doc) <- where_found tidy_env1
-            ; let doc = vcat [ text "Uninferrable type variable"
-                               <> plural tidied_tvs
-                               <+> pprWithCommas pprTyVar tidied_tvs
-                               <+> text "in"
-                             , where_doc ]
-            ; failWithTcM (tidy_env2, pprWithExplicitKindsWhen True doc) }
+            ; let msg = TcRnUnknownMessage $ mkPlainError noHints $ pprWithExplicitKindsWhen True $
+                    vcat [ text "Uninferrable type variable"
+                           <> plural tidied_tvs
+                           <+> pprWithCommas pprTyVar tidied_tvs
+                           <+> text "in"
+                         , where_doc ]
+            ; failWithTcM (tidy_env2, msg) }
        ; traceTc "doNotQuantifyTyVars success" empty }
 
 {- Note [Defaulting with -XNoPolyKinds]
@@ -2676,7 +2679,8 @@ naughtyQuantification orig_ty tv escapees
 
              orig_ty'   = tidyType env orig_ty1
              ppr_tidied = pprTyVars . map (tidyTyCoVarOcc env)
-             doc = pprWithExplicitKindsWhen True $
+             msg = TcRnUnknownMessage $ mkPlainError noHints $
+                   pprWithExplicitKindsWhen True $
                    vcat [ sep [ text "Cannot generalise type; skolem" <> plural escapees'
                               , quotes $ ppr_tidied escapees'
                               , text "would escape" <+> itsOrTheir escapees' <+> text "scope"
@@ -2690,4 +2694,4 @@ naughtyQuantification orig_ty tv escapees
                         , text " due to its ill-scoped nature.)"
                         ]
 
-       ; failWithTcM (env, doc) }
+       ; failWithTcM (env, msg) }
