@@ -1,6 +1,8 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -23,6 +25,8 @@ module GHC.Records
        ( HasField(..)
        ) where
 
+import GHC.Base (Type, Constraint)
+
 -- | Constraint representing the fact that the field @x@ belongs to
 -- the record type @r@ and has field type @a@.  This will be solved
 -- automatically, but manual instances may be provided as well.
@@ -33,6 +37,8 @@ module GHC.Records
 --     hence not provided in visible type applications.  Thus you
 --     say     getField @"foo"
 --     not     getField @Symbol @"foo"
+
+type  HasField :: forall {k}. k -> Type -> Type -> Constraint
 class HasField x r a | x r -> a where
   -- | Selector function to extract the field from the record.
   getField :: r -> a

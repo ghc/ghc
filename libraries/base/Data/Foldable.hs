@@ -3,6 +3,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE TypeOperators #-}
 
@@ -152,6 +153,7 @@ infix  4 `elem`, `notElem`
 -- A more detailed description can be found in the overview section of
 -- "Data.Foldable#overview".
 --
+type  Foldable :: (Type -> Type) -> Constraint
 class Foldable t where
     {-# MINIMAL foldMap | foldr #-}
 
