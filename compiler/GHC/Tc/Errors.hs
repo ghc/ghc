@@ -2098,8 +2098,7 @@ misMatchMsg :: ReportErrCtxt -> ErrorItem -> TcType -> TcType -> Report
 misMatchMsg ctxt item ty1 ty2
   = important $
     addArising orig $
--- "RAE"    pprWithExplicitKindsWhenMismatch ty1 ty2 orig $
-    maybe_explicit_kinds $
+    pprWithExplicitKindsWhenMismatch ty1 ty2 orig $
     sep [ case orig of
             TypeEqOrigin {} -> tk_eq_msg ctxt item ty1 ty2 orig
             KindEqOrigin {} -> tk_eq_msg ctxt item ty1 ty2 orig
@@ -2107,12 +2106,6 @@ misMatchMsg ctxt item ty1 ty2
         , sameOccExtra ty2 ty1 ]
   where
     orig = errorItemOrigin item
-
-    maybe_explicit_kinds = case orig of
-      TypeEqOrigin { uo_visible = visible } -> pprWithExplicitKindsWhen (not visible)
-      _                                     -> id
-      -- without this, error messages can be very confusing, saying e.g.
-      -- that Type does not match Rep in Sing a vs Sing a0. (This is test T16204c.)
 
 headline_eq_msg :: Bool -> ErrorItem -> Type -> Type -> SDoc
 -- Generates the main "Could't match 't1' against 't2'
@@ -2315,30 +2308,33 @@ mk_ea_msg ctxt at_top level
 
 mk_ea_msg _ _ _ _ = empty
 
-{- "RAE"
 -- | Prints explicit kinds (with @-fprint-explicit-kinds@) in an 'SDoc' when a
 -- type mismatch occurs to due invisible kind arguments.
 --
--- This function first checks to see if the 'CtOrigin' argument is a
--- 'TypeEqOrigin', and if so, uses the expected/actual types from that to
--- check for a kind mismatch (as these types typically have more surrounding
--- types and are likelier to be able to glean information about whether a
--- mismatch occurred in an invisible argument position or not). If the
--- 'CtOrigin' is not a 'TypeEqOrigin', fall back on the actual mismatched types
--- themselves.
+-- If the 'CtOrigin' is not a 'TypeEqOrigin', we compare the visible portion
+-- of the mismatched types to decide whether to print the kinds.
+--
+-- If the 'CtOrigin' argument is a 'TypeEqOrigin', we can make use of
+-- the additional information this contains.
+-- We first check whether the mismatch under consideration itself occurs
+-- in an invisible position, in which case we always print the explicit kinds
+-- in order for the mismatch to appear.
+-- Otherwise, we use the expected/actual types from the 'TypeEqOrigin' to check
+-- for a kind mismatch (as these types typically have more surrounding types
+-- and are likelier to be able to glean information about whether a mismatch
+-- occurred in an invisible argument position or not).
 pprWithExplicitKindsWhenMismatch :: Type -> Type -> CtOrigin
                                  -> SDoc -> SDoc
 pprWithExplicitKindsWhenMismatch ty1 ty2 ct
   = pprWithExplicitKindsWhen show_kinds
   where
-    (act_ty, exp_ty) = case ct of
+    show_kinds = case ct of
       TypeEqOrigin { uo_actual = act
-                   , uo_expected = exp } -> (act, exp)
-      _                                  -> (ty1, ty2)
-    show_kinds = tcEqTypeVis act_ty exp_ty
-                 -- True when the visible bit of the types look the same,
-                 -- so we want to show the kinds in the displayed type
--}
+                   , uo_expected = exp
+                   , uo_visible = vis }
+        | not vis   -> True -- See tests T15870, T16204c.
+        | otherwise -> tcEqTypeVis act exp -- See tests T9171, T9144.
+      _             -> tcEqTypeVis ty1 ty2
 
 {- Note [Insoluble occurs check]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
