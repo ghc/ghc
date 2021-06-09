@@ -991,7 +991,7 @@ in GADT-syntax (see :extension:`GADTSyntax`). For example::
 
 There are a number of restrictions around these *return kinds*. The text below
 considers :extension:`UnliftedNewtypes` and data families (enabled by :extension:`TypeFamilies`).
-The discussion also assumes familiarity with :ref:`levity polymorphism <runtime-rep>`.
+The discussion also assumes familiarity with :ref:`representation polymorphism <runtime-rep>`.
 
 1. ``data`` and ``data instance`` declarations must have return kinds that
    end in ``TYPE LiftedRep``. (Recall that ``Type`` is just a synonym for
@@ -1055,5 +1055,6 @@ Examples::
 .. index::
    single: TYPE
    single: levity polymorphism
+   single: representation polymorphism
 
 

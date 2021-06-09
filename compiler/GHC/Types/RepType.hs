@@ -318,8 +318,8 @@ fitsIn ty1 ty2
 Note [RuntimeRep and PrimRep]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 This Note describes the relationship between GHC.Types.RuntimeRep
-(of levity-polymorphism fame) and GHC.Core.TyCon.PrimRep, as these types
-are closely related.
+(of levity/representation polymorphism fame) and GHC.Core.TyCon.PrimRep,
+as these types are closely related.
 
 A "primitive entity" is one that can be
  * stored in one register

@@ -231,8 +231,8 @@ data HsWrapper
        -- because we can't use 'sym' to flip around these HsWrappers
        -- The TcType is the "from" type of the first wrapper
        -- The SDoc explains the circumstances under which we have created this
-       -- WpFun, in case we run afoul of levity polymorphism restrictions in
-       -- the desugarer. See Note [Levity polymorphism checking] in GHC.HsToCore.Monad
+       -- WpFun, in case we run afoul of representation polymorphism restrictions in
+       -- the desugarer. See Note [Representation polymorphism checking] in GHC.HsToCore.Monad
 
   | WpCast TcCoercionR        -- A cast:  [] `cast` co
                               -- Guaranteed not the identity coercion

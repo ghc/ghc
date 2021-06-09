@@ -1,6 +1,6 @@
 
 T19615.hs:17:20: error:
-    A levity-polymorphic type is not allowed here:
+    A representation-polymorphic type is not allowed here:
       Type: b
       Kind: TYPE r'
     In the type of expression: (f x)

@@ -94,7 +94,7 @@ lazy x = x
 -- that would otherwise be shared are re-evaluated every time they are used. Otherwise,
 -- the use of `oneShot` is safe.
 --
--- 'oneShot' is representation polymorphic: the type variables may refer to lifted
+-- 'oneShot' is representation-polymorphic: the type variables may refer to lifted
 -- or unlifted types.
 oneShot :: forall (q :: RuntimeRep) (r :: RuntimeRep)
                   (a :: TYPE q) (b :: TYPE r).
@@ -108,7 +108,7 @@ oneShot f = f
 -- semantically undesirable floating. `runRW#` is inlined, but only very late
 -- in compilation after all floating is complete.
 
--- 'runRW#' is representation polymorphic: the result may have a lifted or
+-- 'runRW#' is levity-polymorphic: the result may have a lifted or
 -- unlifted type.
 
 runRW# :: forall (r :: RuntimeRep) (o :: TYPE r).

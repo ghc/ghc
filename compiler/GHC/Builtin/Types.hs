@@ -1415,7 +1415,7 @@ mk_ctuple_class tycon sc_theta sc_sel_ids
 *                                                                      *
 ********************************************************************* -}
 
-{- Multiplicity polymorphism is implemented very similarly to levity
+{- Multiplicity polymorphism is implemented very similarly to representation
  polymorphism. We write in the multiplicity kind and the One and Many
  types which can appear in user programs. These are defined properly in GHC.Types.
 

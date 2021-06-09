@@ -2139,7 +2139,8 @@ tcRnStmt hsc_env rdr_stmt
     zonked_expr <- zonkTopLExpr tc_expr ;
     zonked_ids  <- zonkTopBndrs bound_ids ;
 
-    failIfErrsM ;  -- we can't do the next step if there are levity polymorphism errors
+    failIfErrsM ;  -- we can't do the next step if there are
+                   -- representation polymorphism errors
                    -- test case: ghci/scripts/T13202{,a}
 
         -- None of the Ids should be of unboxed type, because we

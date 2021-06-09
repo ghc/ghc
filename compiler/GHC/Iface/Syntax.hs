@@ -350,7 +350,7 @@ data IfaceInfoItem
   | HsUnfold        Bool             -- True <=> isStrongLoopBreaker is true
                     IfaceUnfolding   -- See Note [Expose recursive functions]
   | HsNoCafRefs
-  | HsLevity                         -- Present <=> never levity polymorphic
+  | HsLevity                         -- Present <=> never representation-polymorphic
   | HsLFInfo        IfaceLFInfo
 
 -- NB: Specialisations and rules come in separately and are

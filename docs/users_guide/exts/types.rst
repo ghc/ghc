@@ -17,7 +17,7 @@ Types
     type_families
     data_kinds
     poly_kinds
-    levity_polymorphism
+    representation_polymorphism
     type_literals
     type_applications
     rank_polymorphism

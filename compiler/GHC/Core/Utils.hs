@@ -186,14 +186,14 @@ mkFunctionType mult arg_ty res_ty
 
 mkLamTypes vs ty = foldr mkLamType ty vs
 
--- | Is this expression levity polymorphic? This should be the
+-- | Is this expression representation-polymorphic? This should be the
 -- same as saying (isKindLevPoly . typeKind . exprType) but
 -- much faster.
 isExprLevPoly :: CoreExpr -> Bool
 isExprLevPoly = go
   where
-   go (Var _)                      = False  -- no levity-polymorphic binders
-   go (Lit _)                      = False  -- no levity-polymorphic literals
+   go (Var _)                      = False  -- no representation-poly binders
+   go (Lit _)                      = False  -- no representation-poly literals
    go e@(App f _) | not (go_app f) = False
                   | otherwise      = check_type e
    go (Lam _ _)                    = False
@@ -209,9 +209,10 @@ isExprLevPoly = go
       -- if the function is a variable (common case), check its
       -- levityInfo. This might mean we don't need to look up and compute
       -- on the type. Spec of these functions: return False if there is
-      -- no possibility, ever, of this expression becoming levity polymorphic,
-      -- no matter what it's applied to; return True otherwise.
-      -- returning True is always safe. See also Note [Levity info] in
+      -- no possibility, ever, of this expression becoming
+      -- representation-polymorphic, no matter what it's applied to;
+      -- return True otherwise.
+      -- Returning True is always safe. See also Note [Levity info] in
       -- IdInfo
    go_app (Var id)        = not (isNeverLevPolyId id)
    go_app (Lit _)         = False
@@ -1955,8 +1956,9 @@ exprIsTopLevelBindable :: CoreExpr -> Type -> Bool
 --   see Note [Core top-level string literals] in "GHC.Core"
 exprIsTopLevelBindable expr ty
   = not (mightBeUnliftedType ty)
-    -- Note that 'expr' may be levity polymorphic here consequently we must use
-    -- 'mightBeUnliftedType' rather than 'isUnliftedType' as the latter would panic.
+    -- Note that 'expr' may be representation-polymorphic here, consequently
+    -- we must use 'mightBeUnliftedType' rather than 'isUnliftedType',
+    -- as the latter would panic.
   || exprIsTickedString expr
 
 -- | Check if the expression is zero or more Ticks wrapped around a literal

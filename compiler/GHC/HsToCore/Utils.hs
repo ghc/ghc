@@ -428,13 +428,13 @@ This case expression accounts for linear variables by assigning bottom usage
 (See Note [Bottom as a usage] in GHC.Core.Multiplicity).
 This is done in mkFailExpr.
 We use '()' instead of the original return type ('a' in this case)
-because there might be levity polymorphism, e.g. in
+because there might be representation polymorphism, e.g. in
 
 g :: forall (a :: TYPE r). (() -> a) %1 -> Bool -> a
 g x True = x ()
 
 adding 'g x False = case error "Non-exhaustive pattern" :: a of {}'
-would create an illegal levity-polymorphic case binder.
+would create an illegal representation-polymorphic case binder.
 This is important for pattern synonym matchers, which often look like this 'g'.
 
 Similarly, a hole
@@ -536,7 +536,7 @@ There are a few subtleties in the desugaring of `seq`:
     which stupidly tries to bind the datacon 'True'.
 -}
 
--- NB: Make sure the argument is not levity polymorphic
+-- NB: Make sure the argument is not representation-polymorphic
 mkCoreAppDs  :: SDoc -> CoreExpr -> CoreExpr -> CoreExpr
 mkCoreAppDs _ (Var f `App` Type _r `App` Type ty1 `App` Type ty2 `App` arg1) arg2
   | f `hasKey` seqIdKey            -- Note [Desugaring seq], points (1) and (2)
@@ -556,7 +556,7 @@ mkCoreAppDs _ (Var f `App` Type _r) arg
 
 mkCoreAppDs s fun arg = mkCoreApp s fun arg  -- The rest is done in GHC.Core.Make
 
--- NB: No argument can be levity polymorphic
+-- NB: No argument can be representation-polymorphic
 mkCoreAppsDs :: SDoc -> CoreExpr -> [CoreExpr] -> CoreExpr
 mkCoreAppsDs s fun args = foldl' (mkCoreAppDs s) fun args
 

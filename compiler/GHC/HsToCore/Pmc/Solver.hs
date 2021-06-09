@@ -1342,7 +1342,7 @@ isDataConTriviallyInhabited dc =
 
 dataConUnliftedFieldTys :: DataCon -> [Type]
 dataConUnliftedFieldTys =
-  -- A levity polymorphic field requires an inhabitation test, hence compare to
+  -- A representation-polymorphic field requires an inhabitation test, hence compare to
   -- @Just True@
   filter ((== Just True) . isLiftedType_maybe) . map scaledThing . dataConOrigArgTys
 

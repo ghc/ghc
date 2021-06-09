@@ -818,8 +818,8 @@ Note [Printing type abbreviations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Normally, we pretty-print `TYPE 'LiftedRep` as `Type` (or `*`) and
 `FUN 'Many` as `(->)`.
-This way, error messages don't refer to levity polymorphism or linearity
-if it is not necessary.
+This way, error messages don't refer to representation polymorphism
+or linearity if it is not necessary.
 
 However, when printing the definition of Type or (->) with :info,
 this would give confusing output: `type (->) = (->)` (#18594).

@@ -1,6 +1,6 @@
 
 T19709b.hs:11:14: error:
-    A levity-polymorphic type is not allowed here:
+    A representation-polymorphic type is not allowed here:
       Type: Any
       Kind: TYPE Any
     In the type of expression: (error @Any "e2")

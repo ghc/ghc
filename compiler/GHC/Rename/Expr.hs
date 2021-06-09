@@ -130,7 +130,7 @@ but several have a little bit of special treatment:
 * SectionL and SectionR (left and right sections)
      (`op` e) ==> rightSection op e
      (e `op`) ==> leftSection  (op e)
-  where `leftSection` and `rightSection` are levity-polymorphic
+  where `leftSection` and `rightSection` are representation-polymorphic
   wired-in Ids. See Note [Left and right sections]
 
 * It's a bit painful to transform `OpApp e1 op e2` to a `HsExpansion`
@@ -613,19 +613,19 @@ Note the wrinkles:
   sections , but only to eliminate special-purpose code paths in the
   renamer and desugarer.
 
-* leftSection and rightSection must be levity-polymorphic, to allow
+* leftSection and rightSection must be representation-polymorphic, to allow
   (+# 4#) and (4# +#) to work. See GHC.Types.Id.Make.
   Note [Wired-in Ids for rebindable syntax] in
 
 * leftSection and rightSection must be multiplicity-polymorphic.
   (Test linear/should_compile/OldList showed this up.)
 
-* Because they are levity-polymorphic, we have to define them
+* Because they are representation-polymorphic, we have to define them
   as wired-in Ids, with compulsory inlining.  See
   GHC.Types.Id.Make.leftSectionId, rightSectionId.
 
 * leftSection is just ($) really; but unlike ($) it is
-  levity polymorphic in the result type, so we can write
+  representation-polymorphic in the result type, so we can write
   `(x +#)`, say.
 
 * The type of leftSection must have an arrow in its first argument,

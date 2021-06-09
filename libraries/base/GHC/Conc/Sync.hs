@@ -629,7 +629,7 @@ newStablePtrPrimMVar (MVar m) = IO $ \s0 ->
   case makeStablePtr# (unsafeCoerce# m :: PrimMVar) s0 of
     -- Coerce unlifted  m :: MVar# RealWorld ()
     --     to lifted    PrimMVar
-    -- apparently because mkStablePtr is not levity-polymorphic
+    -- apparently because mkStablePtr is not representation-polymorphic
     (# s1, sp #) -> (# s1, StablePtr sp #)
 
 -----------------------------------------------------------------------------

@@ -645,9 +645,9 @@ or (Core)
             (x |> (GRefl :: a ~# (a |> TYPE co1)) ; co2)
 
 It looks like we can write this in Haskell directly, but we can't:
-the levity polymorphism checks defeat us. Note that `x` is a levity-
-polymorphic variable. So we must wire it in with a compulsory
-unfolding, like other levity-polymorphic primops.
+the reprsentation polymorphism checks defeat us. Note that `x` is a
+representation-polymorphic variable. So we must wire it in with a
+compulsory unfolding, like other representation-polymorphic primops.
 
 The challenge is that UnsafeEquality is a GADT, and wiring in a GADT
 is *hard*: it has a worker separate from its wrapper, with all manner

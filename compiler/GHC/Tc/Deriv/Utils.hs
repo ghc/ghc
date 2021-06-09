@@ -909,7 +909,7 @@ cond_args cls _ _ rep_tc
      | cls_key == eqClassKey   = check_in arg_ty ordOpTbl
      | cls_key == ordClassKey  = check_in arg_ty ordOpTbl
      | cls_key == showClassKey = check_in arg_ty boxConTbl
-     | cls_key == liftClassKey = True     -- Lift is levity-polymorphic
+     | cls_key == liftClassKey = True     -- Lift is representation-polymorphic
      | otherwise               = False    -- Read, Ix etc
 
     check_in :: Type -> [(Type,a)] -> Bool

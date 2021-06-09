@@ -444,7 +444,7 @@ tcPatSynSig name sig_ty@(L _ (HsSig{sig_bndrs = hs_outer_bndrs, sig_body = hs_ty
          build_patsyn_type implicit_bndrs univ_bndrs req ex_bndrs prov body_ty
 
        -- arguments become the types of binders. We thus cannot allow
-       -- levity polymorphism here
+       -- representation polymorphism here
        ; let (arg_tys, _) = tcSplitFunTys body_ty
        ; mapM_ (checkForLevPoly LevityCheckPatSynSig . scaledThing) arg_tys
 

@@ -777,18 +777,19 @@ never used as an argument to another function, and it is called only
 in tail position. See Note [Join points] and Note [Invariants on join points],
 both in GHC.Core. Because join points do not compile to true, red-blooded
 variables (with, e.g., registers allocated to them), they are allowed
-to be levity-polymorphic. (See invariant #6 in Note [Invariants on join points]
-in GHC.Core.)
+to be representation-polymorphic.
+(See invariant #6 in Note [Invariants on join points] in GHC.Core.)
 
 However, in this byte-code generator, join points *are* treated just as
 ordinary variables. There is no check whether a binding is for a join point
 or not; they are all treated uniformly. (Perhaps there is a missed optimization
 opportunity here, but that is beyond the scope of my (Richard E's) Thursday.)
 
-We thus must have *some* strategy for dealing with levity-polymorphic and
-unlifted join points. Levity-polymorphic variables are generally not allowed
-(though levity-polymorphic join points *are*; see Note [Invariants on join points]
-in GHC.Core, point 6), and we don't wish to evaluate unlifted join points eagerly.
+We thus must have *some* strategy for dealing with representation-polymorphic
+and unlifted join points. Representation-polymorphic variables are generally
+not allowed (though representation -polymorphic join points *are*; see
+Note [Invariants on join points] in GHC.Core, point 6), and we don't wish to
+evaluate unlifted join points eagerly.
 The questionable join points are *not-necessarily-lifted join points*
 (NNLJPs). (Not having such a strategy led to #16509, which panicked in the
 isUnliftedType check in the AnnVar case of schemeE.) Here is the strategy:
@@ -797,9 +798,9 @@ isUnliftedType check in the AnnVar case of schemeE.) Here is the strategy:
 
 2. When binding an NNLJP, add a `\ (_ :: (# #)) ->` to its RHS, and modify the
    type to tack on a `(# #) ->`.
-   Note that functions are never levity-polymorphic, so this transformation
-   changes an NNLJP to a non-levity-polymorphic join point. This is done
-   in bcPrepSingleBind.
+   Note that functions are never representation-polymorphic, so this
+   transformation changes an NNLJP to a non-representation-polymorphic
+   join point. This is done in bcPrepSingleBind.
 
 3. At an occurrence of an NNLJP, add an application to void# (called voidPrimId),
    being careful to note the new type of the NNLJP. This is done in the AnnVar

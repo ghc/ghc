@@ -3274,8 +3274,9 @@ primtype FUN m a b
    producing outputs of type {\tt b}. The multiplicity of the input is
    {\tt m}.
 
-   Note that {\tt FUN m a b} permits levity-polymorphism in both {\tt a} and
-   {\tt b}, so that types like {\tt Int\# -> Int\#} can still be well-kinded.
+   Note that {\tt FUN m a b} permits representation polymorphism in both
+   {\tt a} and {\tt b}, so that types like {\tt Int\# -> Int\#} can still be
+   well-kinded.
   }
 
 pseudoop "realWorld#"
@@ -3416,7 +3417,7 @@ pseudoop   "coerce"
      more complicated settings, e.g. converting a list of newtypes to a list of
      concrete types.
 
-     This function is runtime-representation polymorphic, but the
+     This function is representation-polymorphic, but the
      {\tt RuntimeRep} type argument is marked as {\tt Inferred}, meaning
      that it is not available for visible type application. This means
      the typechecker will accept {\tt coerce @Int @Age 42}.

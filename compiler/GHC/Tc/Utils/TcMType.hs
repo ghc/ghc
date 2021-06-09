@@ -92,7 +92,7 @@ module GHC.Tc.Utils.TcMType (
   candidateKindVars, partitionCandidates,
 
   ------------------------------
-  -- Levity polymorphism
+  -- Representation polymorphism
   ensureNotLevPoly, checkForLevPoly, checkForLevPolyX,
   ) where
 
@@ -2607,11 +2607,11 @@ tidySigSkol env cx ty tv_prs
 {-
 %************************************************************************
 %*                                                                      *
-             Levity polymorphism checks
+             Representation polymorphism checks
 *                                                                       *
 *************************************************************************
 
-See Note [Levity polymorphism checking] in GHC.HsToCore.Monad
+See Note [Representation polymorphism checking] in GHC.HsToCore.Monad
 
 -}
 
@@ -2632,7 +2632,7 @@ ensureNotLevPoly ty provenance
                    -- forall a. a. See, for example, test ghci/scripts/T9140
     checkForLevPoly provenance ty
 
-  -- See Note [Levity polymorphism checking] in GHC.HsToCore.Monad
+  -- See Note [Representation polymorphism checking] in GHC.HsToCore.Monad
 checkForLevPoly :: LevityCheckProvenance -> Type -> TcM ()
 checkForLevPoly = checkForLevPolyX (\ty -> addDetailedDiagnostic . TcLevityPolyInType ty)
 

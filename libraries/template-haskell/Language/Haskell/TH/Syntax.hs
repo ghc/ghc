@@ -351,12 +351,12 @@ newtype TExp (a :: TYPE (r :: RuntimeRep)) = TExp
 --       In the expression: [|| "foo" ||]
 --       In the Template Haskell splice $$([|| "foo" ||])
 --
--- Levity-polymorphic since /template-haskell-2.16.0.0/.
+-- Representation-polymorphic since /template-haskell-2.16.0.0/.
 
 -- | Discard the type annotation and produce a plain Template Haskell
 -- expression
 --
--- Levity-polymorphic since /template-haskell-2.16.0.0/.
+-- Representation-polymorphic since /template-haskell-2.16.0.0/.
 unTypeQ :: forall (r :: RuntimeRep) (a :: TYPE r) m . Quote m => m (TExp a) -> m Exp
 unTypeQ m = do { TExp e <- m
                ; return e }
@@ -366,7 +366,7 @@ unTypeQ m = do { TExp e <- m
 -- This is unsafe because GHC cannot check for you that the expression
 -- really does have the type you claim it has.
 --
--- Levity-polymorphic since /template-haskell-2.16.0.0/.
+-- Representation-polymorphic since /template-haskell-2.16.0.0/.
 unsafeTExpCoerce :: forall (r :: RuntimeRep) (a :: TYPE r) m .
                       Quote m => m Exp -> m (TExp a)
 unsafeTExpCoerce m = do { e <- m
@@ -913,7 +913,7 @@ sequenceQ = sequence
 -- > data Bar a = Bar1 a (Bar a) | Bar2 String
 -- >   deriving Lift
 --
--- Levity-polymorphic since /template-haskell-2.16.0.0/.
+-- Representation-polymorphic since /template-haskell-2.16.0.0/.
 class Lift (t :: TYPE r) where
   -- | Turn a value into a Template Haskell expression, suitable for use in
   -- a splice.

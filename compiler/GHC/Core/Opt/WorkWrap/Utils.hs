@@ -334,7 +334,7 @@ mkWorkerArgs wrap_id fun_to_thunk args res_ty
       -- Might the result be lifted?
       --     False => definitely lifted
       --     True  => might be unlifted
-      -- We may encounter a levity-polymorphic result, in which case we
+      -- We may encounter a representation-polymorphic result, in which case we
       -- conservatively assume that we have laziness that needs
       -- preservation. See #15186.
       might_be_unlifted = case isLiftedType_maybe res_ty of

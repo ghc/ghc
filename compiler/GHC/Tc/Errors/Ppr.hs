@@ -85,10 +85,10 @@ dodgy_msg_insert tc = IEThingAll noAnn ii
     ii :: LIEWrappedName (IdP (GhcPass p))
     ii = noLocA (IEName $ noLocA tc)
 
-formatLevPolyErr :: Type  -- levity-polymorphic type
+formatLevPolyErr :: Type  -- representation-polymorphic type
                  -> SDoc
 formatLevPolyErr ty
-  = hang (text "A levity-polymorphic type is not allowed here:")
+  = hang (text "A representation-polymorphic type is not allowed here:")
        2 (vcat [ text "Type:" <+> pprWithTYPE tidy_ty
                , text "Kind:" <+> pprWithTYPE tidy_ki ])
   where
