@@ -7,6 +7,13 @@ module T8227
 import Data.Kind (Type)
 import T8227a
 
+{-
+type family V a :: Type
+
+type instance V Double    = Double
+type instance V (a -> b)   = V b
+-}
+
 type family Scalar a :: Type
 type instance Scalar (a -> v) = a -> Scalar v
 
