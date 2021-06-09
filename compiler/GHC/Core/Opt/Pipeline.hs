@@ -1028,28 +1028,36 @@ Instead, transfer IdInfo from lcl_id to exp_id, specifically
 
 Overwriting, rather than merging, seems to work ok.
 
-We also zap the InlinePragma on the lcl_id. It might originally
-have had a NOINLINE, which we have now transferred; and we really
-want the lcl_id to inline now that its RHS is trivial!
+For the lcl_id we
+
+* Zap the InlinePragma. It might originally have had a NOINLINE, which
+  we have now transferred; and we really want the lcl_id to inline now
+  that its RHS is trivial!
+
+* Zap any Stable unfolding.  agian, we want lcl_id = gbl_id to inline,
+  replacing lcl_id by gbl_id. That won't happen if lcl_id has its original
+  great big Stable unfolding
 -}
 
 transferIdInfo :: Id -> Id -> (Id, Id)
 -- See Note [Transferring IdInfo]
 transferIdInfo exported_id local_id
   = ( modifyIdInfo transfer exported_id
-    , local_id `setInlinePragma` defaultInlinePragma )
+    , modifyIdInfo zap_info local_id )
   where
     local_info = idInfo local_id
-    transfer exp_info = exp_info `setDmdSigInfo`    dmdSigInfo local_info
-                                 `setCprSigInfo`           cprSigInfo local_info
-                                 `setUnfoldingInfo`     unfoldingInfo local_info
-                                 `setInlinePragInfo`    inlinePragInfo local_info
-                                 `setRuleInfo`          addRuleInfo (ruleInfo exp_info) new_info
+    transfer exp_info = exp_info `setDmdSigInfo`     dmdSigInfo local_info
+                                 `setCprSigInfo`     cprSigInfo local_info
+                                 `setUnfoldingInfo`  unfoldingInfo local_info
+                                 `setInlinePragInfo` inlinePragInfo local_info
+                                 `setRuleInfo`       addRuleInfo (ruleInfo exp_info) new_info
     new_info = setRuleInfoHead (idName exported_id)
                                (ruleInfo local_info)
         -- Remember to set the function-name field of the
         -- rules as we transfer them from one function to another
 
+    zap_info lcl_info = lcl_info `setInlinePragInfo` defaultInlinePragma
+                                 `setUnfoldingInfo`  noUnfolding
 
 
 dmdAnal :: Logger -> DynFlags -> FamInstEnvs -> [CoreRule] -> CoreProgram -> IO CoreProgram
