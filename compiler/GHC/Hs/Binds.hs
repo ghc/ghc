@@ -551,7 +551,10 @@ isEmptyIPBindsPR (IPBinds _ is) = null is
 isEmptyIPBindsTc :: HsIPBinds GhcTc -> Bool
 isEmptyIPBindsTc (IPBinds ds is) = null is && isEmptyTcEvBinds ds
 
-type instance XCIPBind    (GhcPass p) = EpAnn [AddEpAnn]
+-- EPA annotations in GhcPs, dictionary Id in GhcTc
+type instance XCIPBind GhcPs = EpAnn [AddEpAnn]
+type instance XCIPBind GhcRn = NoExtField
+type instance XCIPBind GhcTc = Id
 type instance XXIPBind    (GhcPass p) = NoExtCon
 
 instance OutputableBndrId p
@@ -560,10 +563,11 @@ instance OutputableBndrId p
                         $$ whenPprDebug (pprIfTc @p $ ppr ds)
 
 instance OutputableBndrId p => Outputable (IPBind (GhcPass p)) where
-  ppr (IPBind _ lr rhs) = name <+> equals <+> pprExpr (unLoc rhs)
-    where name = case lr of
-                   Left (L _ ip) -> pprBndr LetBind ip
-                   Right     id  -> pprBndr LetBind id
+  ppr (IPBind x (L _ ip) rhs) = name <+> equals <+> pprExpr (unLoc rhs)
+    where name = case ghcPass @p of
+            GhcPs -> pprBndr LetBind ip
+            GhcRn -> pprBndr LetBind ip
+            GhcTc -> pprBndr LetBind x
 
 {-
 ************************************************************************
