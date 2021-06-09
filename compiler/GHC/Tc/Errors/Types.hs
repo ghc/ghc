@@ -3,6 +3,7 @@
 module GHC.Tc.Errors.Types (
   -- * Main types
     TcRnMessage(..)
+  , TcRnMessageDetailed(..)
   , ErrInfo(..)
   , LevityCheckProvenance(..)
   ) where
@@ -25,6 +26,11 @@ data ErrInfo = ErrInfo {
     -- ^ Extra supplementary info associated to the error.
   }
 
+data TcRnMessageDetailed
+  = TcRnMessageDetailed !ErrInfo
+                        -- ^ Extra info associated with the message
+                        !TcRnMessage
+
 -- | An error which might arise during typechecking/renaming.
 data TcRnMessage where
   {-| Simply wraps a generic 'Diagnostic' message @a@. It can be used by plugins
@@ -32,14 +38,11 @@ data TcRnMessage where
   -}
   TcRnUnknownMessage :: (Diagnostic a, Typeable a) => a -> TcRnMessage
 
-  TcRnUnknownMessageWithInfo :: (Diagnostic a, Typeable a)
-                             => !UnitState
-                             -- ^ The 'UnitState' will allow us to pretty-print
-                             -- some diagnostics with more details.
-                             -> !ErrInfo
-                             -- ^ Any extra info associated with the error.
-                             -> a
-                             -> TcRnMessage
+  TcRnMessageWithInfo :: !UnitState
+                      -- ^ The 'UnitState' will allow us to pretty-print
+                      -- some diagnostics with more details.
+                      -> !TcRnMessageDetailed
+                      -> TcRnMessage
 
   {-| A levity polymorphism check happening during TcRn.
   -}

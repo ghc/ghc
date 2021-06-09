@@ -39,6 +39,7 @@ import GHC.Tc.TyCl.PatSyn( patSynBuilderOcc )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Unify
 import GHC.Types.Basic
+import GHC.Types.Error
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Instance.Family ( tcLookupDataFamInst )
 import GHC.Core.FamInstEnv    ( FamInstEnvs )
@@ -459,7 +460,7 @@ tcInferRecSelId (FieldOcc sel_name lbl)
                            -- nor does it need the 'lifting' treatment
                            -- hence no checkTh stuff here
 
-                    _ -> failWithTc $
+                    _ -> failWithTc $ TcRnUnknownMessage $ mkPlainError noHints $
                          ppr thing <+> text "used where a value identifier was expected" }
 
 ------------------------
@@ -509,17 +510,20 @@ lookupParents is_selector rdr
                               Nothing -> failWithTc (notSelector (greMangledName gre)) }
 
 
-fieldNotInType :: RecSelParent -> RdrName -> SDoc
+fieldNotInType :: RecSelParent -> RdrName -> TcRnMessage
 fieldNotInType p rdr
-  = unknownSubordinateErr (text "field of type" <+> quotes (ppr p)) rdr
+  = TcRnUnknownMessage $ mkPlainError noHints $
+    unknownSubordinateErr (text "field of type" <+> quotes (ppr p)) rdr
 
-notSelector :: Name -> SDoc
+notSelector :: Name -> TcRnMessage
 notSelector field
-  = hsep [quotes (ppr field), text "is not a record selector"]
+  = TcRnUnknownMessage $ mkPlainError noHints $
+  hsep [quotes (ppr field), text "is not a record selector"]
 
-naughtyRecordSel :: OccName -> SDoc
+naughtyRecordSel :: OccName -> TcRnMessage
 naughtyRecordSel lbl
-  = text "Cannot use record selector" <+> quotes (ppr lbl) <+>
+  = TcRnUnknownMessage $ mkPlainError noHints $
+    text "Cannot use record selector" <+> quotes (ppr lbl) <+>
     text "as a function due to escaped type variables" $$
     text "Probable fix: use pattern-matching syntax instead"
 
@@ -722,7 +726,7 @@ tc_infer_id id_name
                -> fail_tycon global_env ty_con
 
              ATyVar name _
-                -> failWithTc $
+                -> failWithTc $ TcRnUnknownMessage $ mkPlainError noHints $
                      text "Illegal term-level use of the type variable"
                        <+> quotes (ppr name)
                        $$ nest 2 (text "bound at" <+> ppr (getSrcLoc name))
@@ -730,14 +734,14 @@ tc_infer_id id_name
              ATcTyCon ty_con
                -> fail_tycon global_env ty_con
 
-             _ -> failWithTc $
+             _ -> failWithTc $ TcRnUnknownMessage $ mkPlainError noHints $
                   ppr thing <+> text "used where a value identifier was expected" }
   where
     fail_tycon global_env ty_con =
       let pprov = case lookupGRE_Name global_env (tyConName ty_con) of
             Just gre -> nest 2 (pprNameProvenance gre)
             Nothing  -> empty
-      in failWithTc (term_level_tycons ty_con $$ pprov)
+      in failWithTc (TcRnUnknownMessage $ mkPlainError noHints (term_level_tycons ty_con $$ pprov))
 
     term_level_tycons ty_con
       = text "Illegal term-level use of the type constructor"
@@ -788,9 +792,10 @@ tcInferPatSyn id_name ps
        Just (expr,ty) -> return (expr,ty)
        Nothing        -> failWithTc (nonBidirectionalErr id_name)
 
-nonBidirectionalErr :: Outputable name => name -> SDoc
-nonBidirectionalErr name = text "non-bidirectional pattern synonym"
-                           <+> quotes (ppr name) <+> text "used in an expression"
+nonBidirectionalErr :: Outputable name => name -> TcRnMessage
+nonBidirectionalErr name = TcRnUnknownMessage $ mkPlainError noHints $
+  text "non-bidirectional pattern synonym"
+  <+> quotes (ppr name) <+> text "used in an expression"
 
 {- Note [Typechecking data constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -970,9 +975,10 @@ checkCrossStageLifting top_lvl id (Brack _ (TcPending ps_var lie_var q))
 
 checkCrossStageLifting _ _ _ = return ()
 
-polySpliceErr :: Id -> SDoc
+polySpliceErr :: Id -> TcRnMessage
 polySpliceErr id
-  = text "Can't splice the polymorphic local variable" <+> quotes (ppr id)
+  = TcRnUnknownMessage $ mkPlainError noHints $
+  text "Can't splice the polymorphic local variable" <+> quotes (ppr id)
 
 {-
 Note [Lifting strings]
