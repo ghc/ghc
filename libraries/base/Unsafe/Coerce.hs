@@ -189,7 +189,7 @@ There are yet more wrinkles
 
      and similarly for unsafeCoerceAddr, unsafeCoerceInt, etc.
 
-(U10) We also want a levity-polymorphic unsafeCoerce#:
+(U10) We also want a representation-polymorphic unsafeCoerce#:
 
        unsafeCoerce# :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
                         (a :: TYPE r1) (b :: TYPE r2).
@@ -271,11 +271,11 @@ unsafeCoerce :: forall (a :: Type) (b :: Type) . a -> b
 unsafeCoerce x = case unsafeEqualityProof @a @b of UnsafeRefl -> x
 
 unsafeCoerceUnlifted :: forall (a :: TYPE ('BoxedRep 'Unlifted)) (b :: TYPE ('BoxedRep 'Unlifted)) . a -> b
--- Kind-homogeneous, but levity monomorphic (TYPE UnliftedRep)
+-- Kind-homogeneous, but representation-monomorphic (TYPE UnliftedRep)
 unsafeCoerceUnlifted x = case unsafeEqualityProof @a @b of UnsafeRefl -> x
 
 unsafeCoerceAddr :: forall (a :: TYPE 'AddrRep) (b :: TYPE 'AddrRep) . a -> b
--- Kind-homogeneous, but levity monomorphic (TYPE AddrRep)
+-- Kind-homogeneous, but representation-monomorphic (TYPE AddrRep)
 unsafeCoerceAddr x = case unsafeEqualityProof @a @b of UnsafeRefl -> x
 
 -- | Highly, terribly dangerous coercion from one representation type

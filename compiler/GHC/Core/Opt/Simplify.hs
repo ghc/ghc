@@ -15,7 +15,6 @@ import GHC.Prelude
 import GHC.Platform
 import GHC.Driver.Session
 import GHC.Driver.Ppr
-import GHC.Driver.Config
 import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Type hiding ( substTy, substTyVar, extendTvSubst, extendCvSubst )
 import GHC.Core.Opt.Simplify.Env
@@ -50,7 +49,7 @@ import GHC.Core.Unfold.Make
 import GHC.Core.Utils
 import GHC.Core.Opt.Arity ( ArityType(..)
                           , pushCoTyArg, pushCoValArg
-                          , idArityType, etaExpandAT )
+                          , etaExpandAT )
 import GHC.Core.SimpleOpt ( exprIsConApp_maybe, joinPointBinding_maybe, joinPointBindings_maybe )
 import GHC.Core.FVs     ( mkRuleInfo )
 import GHC.Core.Rules   ( lookupRule, getRules, initRuleOpts )
@@ -426,10 +425,10 @@ simplNonRecX env bndr new_rhs
         ; completeNonRecX NotTopLevel env' (isStrictId bndr') bndr bndr' new_rhs }
           -- NotTopLevel: simplNonRecX is only used for NotTopLevel things
           --
-          -- isStrictId: use bndr' because in a levity-polymorphic setting
-          -- the InId bndr might have a levity-polymorphic type, which
-          -- which isStrictId doesn't expect
-          -- c.f. Note [Dark corner with levity polymorphism]
+          -- isStrictId: use bndr' because in a representation-polymorphic
+          -- setting, the InId bndr might have a representation-polymorphic
+          -- type, which isStrictId doesn't expect
+          -- c.f. Note [Dark corner with representation polymorphism]
 
 --------------------------
 completeNonRecX :: TopLevelFlag -> SimplEnv
@@ -1485,7 +1484,7 @@ simplCast env body co0 cont0
         levity_ok MRefl = True
         levity_ok (MCo co) = not $ isTypeLevPoly $ coercionRKind co
           -- Without this check, we get a lev-poly arg
-          -- See Note [Levity polymorphism invariants] in GHC.Core
+          -- See Note [Representation polymorphism invariants] in GHC.Core
           -- test: typecheck/should_run/EtaExpandLevPoly
 
 simplArg :: SimplEnv -> DupFlag -> StaticEnv -> CoreExpr
@@ -1520,17 +1519,13 @@ simplLam env (bndr:bndrs) body (ApplyToVal { sc_arg = arg, sc_env = arg_se
   | isSimplified dup  -- Don't re-simplify if we've simplified it once
                       -- See Note [Avoiding exponential behaviour]
   = do  { tick (BetaReduction bndr)
-        ; (floats1, env') <- simplNonRecX env zapped_bndr arg
+        ; (floats1, env') <- simplNonRecX env bndr arg
         ; (floats2, expr') <- simplLam env' bndrs body cont
         ; return (floats1 `addFloats` floats2, expr') }
 
   | otherwise
   = do  { tick (BetaReduction bndr)
-        ; simplNonRecE env zapped_bndr (arg, arg_se) (bndrs, body) cont }
-  where
-    zapped_bndr  -- See Note [Zap unfolding when beta-reducing]
-      | isId bndr = zapStableUnfolding bndr
-      | otherwise = bndr
+        ; simplNonRecE env bndr (arg, arg_se) (bndrs, body) cont }
 
       -- Discard a non-counting tick on a lambda.  This may change the
       -- cost attribution slightly (moving the allocation of the
@@ -1549,26 +1544,11 @@ simplLam env bndrs body cont
 
 -------------
 simplLamBndr :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
--- Used for lambda binders.  These sometimes have unfoldings added by
--- the worker/wrapper pass that must be preserved, because they can't
--- be reconstructed from context.  For example:
---      f x = case x of StrictPair a b -> fw a b x
---      fw a{=OtherCon[]} b{=OtherCon[]} x{=(StrictPair a b)} = ...
--- The "{=(StrictPair a b)}" is an unfolding we can't reconstruct otherwise.
--- Since simplBinder already retains OtherCon bindings we only have to special
--- case core unfoldings like the one for `x`.
-simplLamBndr env bndr
-  | isId bndr && hasCoreUnfolding old_unf   -- Special case
-  = do { (env1, bndr1) <- simplBinder env bndr
-       ; unf'          <- simplStableUnfolding env1 NotTopLevel Nothing bndr
-                                      (idType bndr1) (idArityType bndr1) old_unf
-       ; let bndr2 = bndr1 `setIdUnfolding` unf'
-       ; return (modifyInScope env1 bndr2, bndr2) }
-
-  | otherwise
-  = simplBinder env bndr                -- Normal case
-  where
-    old_unf = idUnfolding bndr
+-- Historically this had a special case for when a lambda-binder
+-- could have a stable unfolding;
+-- see Historical Note [Case binders and join points]
+-- But now it is much simpler!
+simplLamBndr env bndr = simplBinder env bndr
 
 simplLamBndrs :: SimplEnv -> [InBndr] -> SimplM (SimplEnv, [OutBndr])
 simplLamBndrs env bndrs = mapAccumLM simplLamBndr env bndrs
@@ -1613,7 +1593,7 @@ simplNonRecE env bndr (rhs, rhs_se) (bndrs, body) cont
   = do { (env1, bndr1) <- simplNonRecBndr env bndr
 
        -- Deal with strict bindings
-       -- See Note [Dark corner with levity polymorphism]
+       -- See Note [Dark corner with representation polymorphism]
        ; if isStrictId bndr1 && sm_case_case (getMode env)
          then simplExprF (rhs_se `setInScopeFromE` env) rhs
                    (StrictBind { sc_bndr = bndr, sc_bndrs = bndrs, sc_body = body
@@ -1645,17 +1625,17 @@ simplRecE env pairs body cont
         ; (floats2, expr') <- simplExprF env2 body cont
         ; return (floats1 `addFloats` floats2, expr') }
 
-{- Note [Dark corner with levity polymorphism]
+{- Note [Dark corner with representation polymorphism]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In `simplNonRecE`, the call to `isStrictId` will fail if the binder
-has a levity-polymorphic type, of kind (TYPE r).  So we are careful to
+has a representation-polymorphic type, of kind (TYPE r).  So we are careful to
 call `isStrictId` on the OutId, not the InId, in case we have
      ((\(r::RuntimeRep) \(x::Type r). blah) Lifted arg)
 That will lead to `simplNonRecE env (x::Type r) arg`, and we can't tell
 if x is lifted or unlifted from that.
 
 We only get such redexes from the compulsory inlining of a wired-in,
-levity-polymorphic function like `rightSection` (see
+representation-polymorphic function like `rightSection` (see
 GHC.Types.Id.Make).  Mind you, SimpleOpt should probably have inlined
 such compulsory inlinings already, but belt and braces does no harm.
 
@@ -1692,19 +1672,6 @@ simplify BIG True; maybe good things happen.  That is why
     - In rebuildCall we avoid simplifying arguments before we have to
       (see Note [Trying rewrite rules])
 
-
-Note [Zap unfolding when beta-reducing]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Lambda-bound variables can have stable unfoldings, such as
-   $j = \x. \b{Unf=Just x}. e
-See Note [Case binders and join points] below; the unfolding for lets
-us optimise e better.  However when we beta-reduce it we want to
-revert to using the actual value, otherwise we can end up in the
-stupid situation of
-          let x = blah in
-          let b{Unf=Just x} = y
-          in ...b...
-Here it'd be far better to drop the unfolding and use the actual RHS.
 
 ************************************************************************
 *                                                                      *
@@ -3508,27 +3475,11 @@ mkDupableAlt platform case_bndr jfloats (Alt con bndrs' rhs')
   = return (jfloats, Alt con bndrs' rhs')
 
   | otherwise
-  = do  { simpl_opts <- initSimpleOpts <$> getDynFlags
-        ; let rhs_ty'  = exprType rhs'
-              scrut_ty = idType case_bndr
-              case_bndr_w_unf
-                = case con of
-                      DEFAULT    -> case_bndr
-                      DataAlt dc -> setIdUnfolding case_bndr unf
-                          where
-                                 -- See Note [Case binders and join points]
-                             unf = mkInlineUnfolding simpl_opts rhs
-                             rhs = mkConApp2 dc (tyConAppArgs scrut_ty) bndrs'
-
-                      LitAlt {} -> warnPprTrace True
-                                    (text "mkDupableAlt" <+> ppr case_bndr <+> ppr con)
-                                    case_bndr
-                           -- The case binder is alive but trivial, so why has
-                           -- it not been substituted away?
+  = do  { let rhs_ty'  = exprType rhs'
 
               final_bndrs'
                 | isDeadBinder case_bndr = filter abstract_over bndrs'
-                | otherwise              = bndrs' ++ [case_bndr_w_unf]
+                | otherwise              = bndrs' ++ [case_bndr]
 
               abstract_over bndr
                   | isTyVar bndr = True -- Abstract over all type variables just in case
@@ -3587,8 +3538,12 @@ the case rn cancels with.
 
 See #4957 a fuller example.
 
-Note [Case binders and join points]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Historical Note [Case binders and join points]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+NB: this entire Note is now irrelevant.  In Jun 21 we stopped
+adding unfoldings to lambda binders (#17530).  It was always a
+hack and bit us in multiple small and not-so-small ways
+
 Consider this
    case (case .. ) of c {
      I# c# -> ....c....
