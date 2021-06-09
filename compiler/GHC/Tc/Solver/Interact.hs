@@ -2085,7 +2085,7 @@ improveTopFunEqs ev fam_tc args rhs
        ; traceTcS "improveTopFunEqs" (vcat [ ppr fam_tc <+> ppr args <+> ppr rhs
                                           , ppr eqns ])
        ; mapM_ (\(Pair ty1 ty2) -> unifyWanted rewriters loc Nominal ty1 ty2)
-               (eqns) }
+               (reverse eqns) }
          -- Missing that `reverse` causes T13135 and T13135_simple to loop.
          -- See Note [Reverse order of fundep equations]
   where
