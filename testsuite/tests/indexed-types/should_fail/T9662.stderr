@@ -1,13 +1,13 @@
 
 T9662.hs:49:8: error:
-    • Couldn't match type ‘n’ with ‘Int’
+    • Couldn't match type ‘k’ with ‘Int’
       Expected: Exp (((sh :. k) :. m) :. n)
                 -> Exp (((sh :. m) :. n) :. k)
         Actual: Exp
                   (Tuple (((Atom a0 :. Atom Int) :. Atom Int) :. Atom Int))
                 -> Exp
                      (Plain (((Unlifted (Atom a0) :. Exp Int) :. Exp Int) :. Exp Int))
-      ‘n’ is a rigid type variable bound by
+      ‘k’ is a rigid type variable bound by
         the type signature for:
           test :: forall sh k m n.
                   Shape (((sh :. k) :. m) :. n) -> Shape (((sh :. m) :. n) :. k)
