@@ -11,6 +11,7 @@ import GHC.Hs
 import GHC.Types.Error
 import GHC.Types.Name (Name)
 import GHC.Types.Name.Reader
+import GHC.Unit.Types (Module)
 import GHC.Utils.Outputable
 import Data.Typeable
 import GHC.Core.Type (Type, Var)
@@ -88,6 +89,16 @@ data TcRnMessage where
      Test cases: rename/should_compile/T4489
   -}
   TcRnMissingImportList :: IE GhcPs -> TcRnMessage
+  {-| When a module marked trustworthy or unsafe (using -XTrustworthy or -XUnsafe) is compiled
+      with a plugin, the TcRnUnsafeDueToPlugin warning (controlled by -Wunsafe) is used as the
+      reason the module was inferred to be unsafe. This warning is not raised if the
+      -fplugin-trustworthy flag is passed.
+  -}
+  TcRnUnsafeDueToPlugin :: TcRnMessage
+  {-| TcRnModMissingRealSrcSpan is an error that occurrs when compiling a module that lacks
+      an associated 'RealSrcSpan'.
+  -}
+  TcRnModMissingRealSrcSpan :: Module -> TcRnMessage
 
 
 -- | Where the levity checking for the input type originated
