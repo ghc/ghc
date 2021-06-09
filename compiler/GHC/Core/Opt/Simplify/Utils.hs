@@ -34,7 +34,7 @@ module GHC.Core.Opt.Simplify.Utils (
         abstractFloats,
 
         -- Utilities
-        isExitJoinId
+        isExitJoinId, wantEtaExpansion
     ) where
 
 import GHC.Prelude
@@ -1675,7 +1675,7 @@ tryEtaExpandRhs mode bndr rhs
 
   | sm_eta_expand mode      -- Provided eta-expansion is on
   , new_arity > old_arity   -- And the current manifest arity isn't enough
-  , want_eta rhs
+  , wantEtaExpansion rhs
   = do { tick (EtaExpansion bndr)
        ; return (arity_type, etaExpandAT arity_type rhs) }
 
@@ -1690,20 +1690,18 @@ tryEtaExpandRhs mode bndr rhs
                  `maxWithArity` idCallArity bndr
     new_arity = arityTypeArity arity_type
 
-    -- See Note [Which RHSs do we eta-expand?]
-    want_eta (Cast e _)                  = want_eta e
-    want_eta (Tick _ e)                  = want_eta e
-    want_eta (Lam b e) | isTyVar b       = want_eta e
-    want_eta (App e a) | exprIsTrivial a = want_eta e
-    want_eta (Var {})                    = False
-    want_eta (Lit {})                    = False
-    want_eta _ = True
-{-
-    want_eta _ = case arity_type of
-                   ATop (os:_) -> isOneShotInfo os
-                   ATop []     -> False
-                   ABot {}     -> True
--}
+
+
+wantEtaExpansion :: CoreExpr -> Bool
+-- Mostly True; but False of PAPs which will immediately eta-reduce again
+-- See Note [Which RHSs do we eta-expand?]
+wantEtaExpansion (Cast e _)             = wantEtaExpansion e
+wantEtaExpansion (Tick _ e)             = wantEtaExpansion e
+wantEtaExpansion (Lam b e) | isTyVar b  = wantEtaExpansion e
+wantEtaExpansion (App e _)              = wantEtaExpansion e
+wantEtaExpansion (Var {})               = False
+wantEtaExpansion (Lit {})               = False
+wantEtaExpansion _                      = True
 
 {-
 Note [Eta-expanding at let bindings]
