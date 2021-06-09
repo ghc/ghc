@@ -178,10 +178,10 @@ These data types are the heart of the compiler
 --
 -- *  Applications: note that the argument may be a 'Type'.
 --    See Note [Core let/app invariant]
---    See Note [Levity polymorphism invariants]
+--    See Note [Representation polymorphism invariants]
 --
 -- *  Lambda abstraction
---    See Note [Levity polymorphism invariants]
+--    See Note [Representation polymorphism invariants]
 --
 -- *  Recursive and non recursive @let@s. Operationally
 --    this corresponds to allocating a thunk for the things
@@ -189,7 +189,7 @@ These data types are the heart of the compiler
 --
 --    See Note [Core letrec invariant]
 --    See Note [Core let/app invariant]
---    See Note [Levity polymorphism invariants]
+--    See Note [Representation polymorphism invariants]
 --    See Note [Core type and coercion invariant]
 --
 -- *  Case expression. Operationally this corresponds to evaluating
@@ -547,24 +547,30 @@ Note [Core case invariants]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 See Note [Case expression invariants]
 
-Note [Levity polymorphism invariants]
+Note [Representation polymorphism invariants]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The levity-polymorphism invariants are these (as per "Levity Polymorphism",
-PLDI '17):
+The representation polymorphism invariants are described as follows,
+according to the paper "Levity Polymorphism", PLDI '17.
 
-* The type of a term-binder must not be levity-polymorphic,
+* The type of a term-binder must not be representation-polymorphic,
   unless it is a let(rec)-bound join point
      (see Note [Invariants on join points])
 
-* The type of the argument of an App must not be levity-polymorphic.
+* The type of the argument of an App must not be representation-polymorphic.
 
-A type (t::TYPE r) is "levity polymorphic" if 'r' has any free variables.
+A type (t::TYPE r) is "representation-polymorphic" if 'r' has any free variables,
+and "levity-polymorphic" if it is of the form (t::TYPE (BoxedRep v))
+and 'v' has free variables (levity polymorphism is a special case of
+representation polymorphism).
+Note that the aforementioned "Levity Polymorphism" paper conflates both these
+types of polymorphism; a more precise distinction was only made possible
+with the introduction of BoxedRep.
 
 For example
   \(r::RuntimeRep). \(a::TYPE r). \(x::a). e
 is illegal because x's type has kind (TYPE r), which has 'r' free.
 
-See Note [Levity polymorphism checking] in GHC.HsToCore.Monad to see where these
+See Note [Representation polymorphism checking] in GHC.HsToCore.Monad to see where these
 invariants are established for user-written code.
 
 Note [Core let goal]
@@ -707,7 +713,7 @@ However, join points have simpler invariants in other ways
      ok-for-speculation (i.e. drop the let/app invariant)
      e.g.  let j :: Int# = factorial x in ...
 
-  6. A join point can have a levity-polymorphic RHS
+  6. A join point can have a representation-polymorphic RHS
      e.g.  let j :: r :: TYPE l = fail void# in ...
      This happened in an intermediate program #13394
 
