@@ -436,6 +436,21 @@ function test_make() {
     return
   fi
 
+  cabal_install="$CABAL v2-install \
+    --with-compiler=$GHC \
+    --index-state=$HACKAGE_INDEX_STATE \
+    --installdir=$toolchain/bin \
+    --overwrite-policy=always"
+
+    # Avoid symlinks on Windows
+  case "$(uname)" in
+    MSYS_*|MINGW*) cabal_install="$cabal_install --install-method=copy" ;;
+    *) ;;
+  esac
+
+  # Install the ghc-events tool for tests.
+  cabal_install ghc-events
+
   run "$MAKE" test_bindist TEST_PREP=YES
   run "$MAKE" V=0 VERBOSE=1 test \
     THREADS="$cores" \
