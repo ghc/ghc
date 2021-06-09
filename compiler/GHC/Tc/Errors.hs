@@ -1040,7 +1040,7 @@ mkErrorReport rea ctxt tcl_env (Report important relevant_bindings valid_subs)
        ; let msg = mkPlainDiagnostic rea noHints (vcat important)
        ; mkTcRnMessage
            (RealSrcSpan (tcl_loc tcl_env) Strict.Nothing)
-           (TcRnUnknownMessageWithInfo unit_state err_info msg)
+           (TcRnMessageWithInfo unit_state $ TcRnUnknownMessageWithInfo err_info msg)
        }
 
 -- This version does not include the context
@@ -1054,7 +1054,7 @@ mkErrorReportNC rea tcl_env (Report important relevant_bindings valid_subs)
        ; let msg = mkPlainDiagnostic rea noHints (vcat important)
        ; mkTcRnMessage
            (RealSrcSpan (tcl_loc tcl_env) Strict.Nothing)
-           (TcRnUnknownMessageWithInfo unit_state err_info msg)
+           (TcRnMessageWithInfo unit_state $ TcRnUnknownMessageWithInfo err_info msg)
        }
 
 type UserGiven = Implication

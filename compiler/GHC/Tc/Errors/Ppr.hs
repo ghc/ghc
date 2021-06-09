@@ -26,8 +26,10 @@ instance Diagnostic TcRnMessage where
       -> diagnosticMessage m
     TcLevityPolyInType ty prov (ErrInfo extra supplementary)
       -> mkDecorated [pprLevityPolyInType ty prov, extra, supplementary]
-    TcRnUnknownMessageWithInfo unit_state err_info msg
-      -> messageWithInfoDiagnosticMessage unit_state err_info (diagnosticMessage msg)
+    TcRnMessageWithInfo unit_state msg_with_info
+      -> case msg_with_info of
+           TcRnMessageDetailed err_info msg
+             -> messageWithInfoDiagnosticMessage unit_state err_info (diagnosticMessage msg)
     TcRnImplicitLift id_or_name ErrInfo{..}
       -> mkDecorated $
            ( text "The variable" <+> quotes (ppr id_or_name) <+>
@@ -49,8 +51,9 @@ instance Diagnostic TcRnMessage where
       -> diagnosticReason m
     TcLevityPolyInType{}
       -> ErrorWithoutFlag
-    TcRnUnknownMessageWithInfo _ _ m
-      -> diagnosticReason m
+    TcRnMessageWithInfo _ msg_with_info
+      -> case msg_with_info of
+           TcRnMessageDetailed _ m -> diagnosticReason m
     TcRnImplicitLift{}
       -> WarningWithFlag Opt_WarnImplicitLift
     TcRnUnusedPatternBinds{}
@@ -67,8 +70,9 @@ instance Diagnostic TcRnMessage where
       -> diagnosticHints m
     TcLevityPolyInType{}
       -> noHints
-    TcRnUnknownMessageWithInfo _ _ m
-      -> diagnosticHints m
+    TcRnMessageWithInfo _ msg_with_info
+      -> case msg_with_info of
+           TcRnMessageDetailed _ m -> diagnosticHints m
     TcRnImplicitLift{}
       -> noHints
     TcRnUnusedPatternBinds{}
