@@ -2092,7 +2092,8 @@ misMatchMsg :: ReportErrCtxt -> ErrorItem -> TcType -> TcType -> Report
 misMatchMsg ctxt item ty1 ty2
   = important $
     addArising orig $
-    pprWithExplicitKindsWhenMismatch ty1 ty2 orig $
+-- "RAE"    pprWithExplicitKindsWhenMismatch ty1 ty2 orig $
+    maybe_explicit_kinds $
     sep [ case orig of
             TypeEqOrigin {} -> tk_eq_msg ctxt item ty1 ty2 orig
             KindEqOrigin {} -> tk_eq_msg ctxt item ty1 ty2 orig
@@ -2100,6 +2101,12 @@ misMatchMsg ctxt item ty1 ty2
         , sameOccExtra ty2 ty1 ]
   where
     orig = errorItemOrigin item
+
+    maybe_explicit_kinds = case orig of
+      TypeEqOrigin { uo_visible = visible } -> pprWithExplicitKindsWhen (not visible)
+      _                                     -> id
+      -- without this, error messages can be very confusing, saying e.g.
+      -- that Type does not match Rep in Sing a vs Sing a0. (This is test T16204c.)
 
 headline_eq_msg :: Bool -> ErrorItem -> Type -> Type -> SDoc
 -- Generates the main "Could't match 't1' against 't2'
@@ -2302,6 +2309,7 @@ mk_ea_msg ctxt at_top level
 
 mk_ea_msg _ _ _ _ = empty
 
+{- "RAE"
 -- | Prints explicit kinds (with @-fprint-explicit-kinds@) in an 'SDoc' when a
 -- type mismatch occurs to due invisible kind arguments.
 --
@@ -2324,6 +2332,7 @@ pprWithExplicitKindsWhenMismatch ty1 ty2 ct
     show_kinds = tcEqTypeVis act_ty exp_ty
                  -- True when the visible bit of the types look the same,
                  -- so we want to show the kinds in the displayed type
+-}
 
 {- Note [Insoluble occurs check]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
