@@ -831,9 +831,8 @@ addTickHsIPBinds (IPBinds dictbinds ipbinds) =
 
 addTickIPBind :: IPBind GhcTc -> TM (IPBind GhcTc)
 addTickIPBind (IPBind x nm e) =
-        liftM2 (IPBind x)
-                (return nm)
-                (addTickLHsExpr e)
+        liftM (IPBind x nm)
+               (addTickLHsExpr e)
 
 -- There is no location here, so we might need to use a context location??
 addTickSyntaxExpr :: SrcSpan -> SyntaxExpr GhcTc -> TM (SyntaxExpr GhcTc)
