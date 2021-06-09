@@ -146,6 +146,7 @@ import GHC.Tc.Types.Evidence
 import GHC.Core.Class
 import GHC.Core.TyCon
 import GHC.Tc.Errors   ( solverDepthErrorTcS )
+import GHC.Tc.Errors.Types
 
 import GHC.Types.Name
 import GHC.Types.TyThing
@@ -1242,10 +1243,10 @@ wrapWarnTcS :: TcM a -> TcS a
 wrapWarnTcS = wrapTcS
 
 failTcS, panicTcS  :: SDoc -> TcS a
-warnTcS   :: WarningFlag -> SDoc -> TcS ()
+warnTcS   :: TcRnMessage -> TcS ()
 addErrTcS :: SDoc -> TcS ()
 failTcS      = wrapTcS . TcM.failWith
-warnTcS flag = wrapTcS . TcM.addDiagnostic (WarningWithFlag flag)
+warnTcS msg  = wrapTcS (TcM.addDiagnostic $ TcRnMessageDetailed TcM.noErrInfo msg)
 addErrTcS    = wrapTcS . TcM.addErr
 panicTcS doc = pprPanic "GHC.Tc.Solver.Canonical" doc
 

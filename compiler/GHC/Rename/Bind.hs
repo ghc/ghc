@@ -49,6 +49,7 @@ import GHC.Rename.Utils ( HsDocContext(..), mapFvRn
                         , addNoNestedForallsContextsErr, checkInferredVars )
 import GHC.Driver.Session
 import GHC.Unit.Module
+import GHC.Types.Error
 import GHC.Types.FieldLabel
 import GHC.Types.Name
 import GHC.Types.Name.Env
@@ -1260,8 +1261,10 @@ rnGRHS' ctxt rnBody (GRHS _ guards rhs)
         ; ((guards', rhs'), fvs) <- rnStmts (PatGuard ctxt) rnExpr guards $ \ _ ->
                                     rnBody rhs
 
-        ; unless (pattern_guards_allowed || is_standard_guard guards')
-                 (addDiagnostic WarningWithoutFlag (nonStdGuardErr guards'))
+        ; unless (pattern_guards_allowed || is_standard_guard guards') $
+            let diag = TcRnUnknownMessage $
+                  mkPlainDiagnostic WarningWithoutFlag noHints (nonStdGuardErr guards')
+            in addDiagnostic (TcRnMessageDetailed noErrInfo diag)
 
         ; return (GRHS noAnn guards' rhs', fvs) }
   where

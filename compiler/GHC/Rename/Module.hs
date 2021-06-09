@@ -22,6 +22,7 @@ import {-# SOURCE #-} GHC.Rename.Expr( rnLExpr )
 import {-# SOURCE #-} GHC.Rename.Splice ( rnSpliceDecl, rnTopSpliceDecls )
 
 import GHC.Hs
+import GHC.Types.Error
 import GHC.Types.FieldLabel
 import GHC.Types.Name.Reader
 import GHC.Rename.HsType
@@ -35,6 +36,7 @@ import GHC.Rename.Utils ( HsDocContext(..), mapFvRn, bindLocalNames
                         , addNoNestedForallsContextsErr, checkInferredVars )
 import GHC.Rename.Unbound ( mkUnboundName, notInScopeErr, WhereLooking(WL_Global) )
 import GHC.Rename.Names
+import GHC.Tc.Errors.Types
 import GHC.Tc.Gen.Annotation ( annCtxt )
 import GHC.Tc.Utils.Monad
 
@@ -541,36 +543,40 @@ checkCanonicalInstances cls poly_ty mbinds = do
     isAliasMG _ = Nothing
 
     -- got "lhs = rhs" but expected something different
-    addWarnNonCanonicalMethod1 refURL flag lhs rhs =
-        addDiagnostic (WarningWithFlag flag) $ vcat
-                       [ text "Noncanonical" <+>
-                         quotes (text (lhs ++ " = " ++ rhs)) <+>
-                         text "definition detected"
-                       , instDeclCtxt1 poly_ty
-                       , text "Move definition from" <+>
-                         quotes (text rhs) <+>
-                         text "to" <+> quotes (text lhs)
-                       , text "See also:" <+>
-                         text refURL
-                       ]
+    addWarnNonCanonicalMethod1 refURL flag lhs rhs = do
+        let dia = TcRnUnknownMessage $
+              mkPlainDiagnostic (WarningWithFlag flag) noHints $
+                vcat [ text "Noncanonical" <+>
+                       quotes (text (lhs ++ " = " ++ rhs)) <+>
+                       text "definition detected"
+                     , instDeclCtxt1 poly_ty
+                     , text "Move definition from" <+>
+                       quotes (text rhs) <+>
+                       text "to" <+> quotes (text lhs)
+                     , text "See also:" <+>
+                       text refURL
+                     ]
+        addDiagnostic (TcRnMessageDetailed noErrInfo dia)
 
     -- expected "lhs = rhs" but got something else
-    addWarnNonCanonicalMethod2 refURL flag lhs rhs =
-        addDiagnostic (WarningWithFlag flag) $ vcat
-                       [ text "Noncanonical" <+>
-                         quotes (text lhs) <+>
-                         text "definition detected"
-                       , instDeclCtxt1 poly_ty
-                       , quotes (text lhs) <+>
-                         text "will eventually be removed in favour of" <+>
-                         quotes (text rhs)
-                       , text "Either remove definition for" <+>
-                         quotes (text lhs) <+> text "(recommended)" <+>
-                         text "or define as" <+>
-                         quotes (text (lhs ++ " = " ++ rhs))
-                       , text "See also:" <+>
-                         text refURL
-                       ]
+    addWarnNonCanonicalMethod2 refURL flag lhs rhs = do
+        let dia = TcRnUnknownMessage $
+              mkPlainDiagnostic (WarningWithFlag flag) noHints $
+                vcat [ text "Noncanonical" <+>
+                       quotes (text lhs) <+>
+                       text "definition detected"
+                     , instDeclCtxt1 poly_ty
+                     , quotes (text lhs) <+>
+                       text "will eventually be removed in favour of" <+>
+                       quotes (text rhs)
+                     , text "Either remove definition for" <+>
+                       quotes (text lhs) <+> text "(recommended)" <+>
+                       text "or define as" <+>
+                       quotes (text (lhs ++ " = " ++ rhs))
+                     , text "See also:" <+>
+                       text refURL
+                     ]
+        addDiagnostic (TcRnMessageDetailed noErrInfo dia)
 
     -- stolen from GHC.Tc.TyCl.Instance
     instDeclCtxt1 :: LHsSigType GhcRn -> SDoc
@@ -1966,13 +1972,14 @@ warnNoDerivStrat :: Maybe (LDerivStrategy GhcRn)
 warnNoDerivStrat mds loc
   = do { dyn_flags <- getDynFlags
        ; case mds of
-           Nothing -> addDiagnosticAt
-             (WarningWithFlag Opt_WarnMissingDerivingStrategies)
-             loc
-             (if xopt LangExt.DerivingStrategies dyn_flags
-               then no_strat_warning
-               else no_strat_warning $+$ deriv_strat_nenabled
-             )
+           Nothing -> 
+             let dia = TcRnUnknownMessage $
+                   mkPlainDiagnostic (WarningWithFlag Opt_WarnMissingDerivingStrategies) noHints $
+                     (if xopt LangExt.DerivingStrategies dyn_flags
+                       then no_strat_warning
+                       else no_strat_warning $+$ deriv_strat_nenabled
+                     )
+             in addDiagnosticAt loc (TcRnMessageDetailed noErrInfo dia)
            _ -> pure ()
        }
   where

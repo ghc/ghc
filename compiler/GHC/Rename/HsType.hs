@@ -54,6 +54,7 @@ import GHC.Rename.Utils  ( HsDocContext(..), inHsDocContext, withHsDocContext
 import GHC.Rename.Fixity ( lookupFieldFixityRn, lookupFixityRn
                          , lookupTyFixityRn )
 import GHC.Rename.Unbound ( notInScopeErr, WhereLooking(WL_LocalOnly) )
+import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Types.Name.Reader
 import GHC.Builtin.Names
@@ -61,6 +62,7 @@ import GHC.Types.Name
 import GHC.Types.SrcLoc
 import GHC.Types.Name.Set
 import GHC.Types.FieldLabel
+import GHC.Types.Error
 
 import GHC.Utils.Misc
 import GHC.Types.Fixity ( compareFixity, negateFixity
@@ -1644,10 +1646,12 @@ dataKindsErr env thing
 warnUnusedForAll :: OutputableBndrFlag flag 'Renamed
                  => HsDocContext -> LHsTyVarBndr flag GhcRn -> FreeVars -> TcM ()
 warnUnusedForAll doc (L loc tv) used_names
-  = unless (hsTyVarName tv `elemNameSet` used_names) $
-    addDiagnosticAt (WarningWithFlag Opt_WarnUnusedForalls) (locA loc) $
-    vcat [ text "Unused quantified type variable" <+> quotes (ppr tv)
-         , inHsDocContext doc ]
+  = unless (hsTyVarName tv `elemNameSet` used_names) $ do
+      let msg = TcRnUnknownMessage $
+            mkPlainDiagnostic (WarningWithFlag Opt_WarnUnusedForalls) noHints $
+              vcat [ text "Unused quantified type variable" <+> quotes (ppr tv)
+                   , inHsDocContext doc ]
+      addDiagnosticAt (locA loc) (TcRnMessageDetailed noErrInfo msg)
 
 opTyErr :: Outputable a => RdrName -> a -> SDoc
 opTyErr op overall_ty

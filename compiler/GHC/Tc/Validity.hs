@@ -42,6 +42,7 @@ import GHC.Core.Class
 import GHC.Core.TyCon
 import GHC.Core.Predicate
 import GHC.Tc.Types.Origin
+import GHC.Tc.Errors.Types
 
 -- others:
 import GHC.Iface.Type    ( pprIfaceType, pprIfaceTypeApp )
@@ -69,6 +70,7 @@ import GHC.Builtin.Uniques  ( mkAlphaTyVarUnique )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
+import Data.Bifunctor
 import Data.Foldable
 import Data.Function
 import Data.List        ( (\\), nub )
@@ -1099,9 +1101,9 @@ check_valid_theta _ _ _ []
   = return ()
 check_valid_theta env ctxt expand theta
   = do { dflags <- getDynFlags
-       ; diagnosticTcM (WarningWithFlag Opt_WarnDuplicateConstraints)
-                       (notNull dups)
-                       (dupPredWarn env dups)
+       ; let dia m = TcRnUnknownMessage $
+               mkPlainDiagnostic (WarningWithFlag Opt_WarnDuplicateConstraints) noHints m
+       ; diagnosticTcM (notNull dups) (second dia (dupPredWarn env dups))
        ; traceTc "check_valid_theta" (ppr theta)
        ; mapM_ (check_pred_ty env dflags ctxt expand) theta }
   where
@@ -1294,8 +1296,11 @@ checkSimplifiableClassConstraint env dflags ctxt cls tys
   = do { result <- matchGlobalInst dflags False cls tys
        ; case result of
            OneInst { cir_what = what }
-              -> addDiagnosticTc (WarningWithFlag Opt_WarnSimplifiableClassConstraints)
-                                 (simplifiable_constraint_warn what)
+              -> let dia = TcRnUnknownMessage $
+                       mkPlainDiagnostic (WarningWithFlag Opt_WarnSimplifiableClassConstraints)
+                                         noHints
+                                         (simplifiable_constraint_warn what)
+                 in addDiagnosticTc dia
            _          -> return () }
   where
     pred = mkClassPred cls tys
@@ -2045,8 +2050,9 @@ checkValidCoAxiom ax@(CoAxiom { co_ax_tc = fam_tc, co_ax_branches = branches })
     --   (b) failure of injectivity
     check_branch_compat prev_branches cur_branch
       | cur_branch `isDominatedBy` prev_branches
-      = do { addDiagnosticAt WarningWithoutFlag (coAxBranchSpan cur_branch) $
-             inaccessibleCoAxBranch fam_tc cur_branch
+      = do { let dia = TcRnUnknownMessage $
+                   mkPlainDiagnostic WarningWithoutFlag noHints (inaccessibleCoAxBranch fam_tc cur_branch)
+           ; addDiagnosticAt (coAxBranchSpan cur_branch) (TcRnMessageDetailed noErrInfo dia)
            ; return prev_branches }
       | otherwise
       = do { check_injectivity prev_branches cur_branch

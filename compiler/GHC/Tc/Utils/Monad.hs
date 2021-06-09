@@ -99,6 +99,7 @@ module GHC.Tc.Utils.Monad(
   mkTcRnMessage, reportDiagnostic, reportDiagnostics,
   warnIf, diagnosticTc, diagnosticTcM,
   addDiagnosticTc, addDiagnosticTcM, addDiagnostic, addDiagnosticAt,
+  noErrInfo,
 
   -- * Type constraints
   newTcEvBinds, newNoTcEvBinds, cloneEvBindsVar,
