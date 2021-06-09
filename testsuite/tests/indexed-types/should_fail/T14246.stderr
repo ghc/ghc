@@ -5,8 +5,7 @@ T14246.hs:19:5: error:
       In the type family declaration for ‘KLN’
 
 T14246.hs:23:27: error:
-    • Couldn't match kind: 'S (KLN (f t))
-                     with: KLN f
+    • Couldn't match kind ‘*’ with ‘L’
       Expected kind ‘Vect (KLN f) L’,
         but ‘Cons (Label (t :: v)) l’ has kind ‘Vect ('S (KLN (f t))) (*)’
     • In the second argument of ‘Reveal’, namely
