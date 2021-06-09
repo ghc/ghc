@@ -196,7 +196,7 @@ These examples can be made to typecheck by eta-expansion. For example ``f3 (\x -
 is well typed, and similarly ``f3 (\x -> g3c x)`` and ``f4 (\x -> g4 x)``.
 
 Historical note.  Earlier versions of GHC allowed these now-rejected applications, by inserting
-automatic eta-expansions, as described in Section 4.6 of `Practical type inference for arbitrary-aank types <https://www.microsoft.com/en-us/research/publication/practical-type-inference-for-arbitrary-rank-types/>`__, where it is
+automatic eta-expansions, as described in Section 4.6 of `Practical type inference for arbitrary-rank types <https://www.microsoft.com/en-us/research/publication/practical-type-inference-for-arbitrary-rank-types/>`__, where it is
 called "deep skolemisation".
 But these automatic eta-expansions may silently change the semantics of the user's program,
 and deep skolemisation was removed from the language by
