@@ -50,7 +50,7 @@ import GHC.Core.Unfold.Make
 import GHC.Core.Utils
 import GHC.Core.Opt.Arity ( ArityType(..)
                           , pushCoTyArg, pushCoValArg
-                          , idArityType, etaExpandAT )
+                          , idArityType, etaExpandAT, exprArity, arityTypeArity )
 import GHC.Core.SimpleOpt ( exprIsConApp_maybe, joinPointBinding_maybe, joinPointBindings_maybe )
 import GHC.Core.FVs     ( mkRuleInfo )
 import GHC.Core.Rules   ( lookupRule, getRules, initRuleOpts )
@@ -3942,11 +3942,12 @@ simplStableUnfolding env top_lvl mb_cont id rhs_ty id_arity unf
          -- See Note [Simplifying inside stable unfoldings] in GHC.Core.Opt.Simplify.Utils
 
     -- See Note [Eta-expand stable unfoldings]
-    eta_expand expr
-      | not eta_on         = expr
-      | exprIsTrivial expr = expr
-      | otherwise          = etaExpandAT id_arity expr
-    eta_on = sm_eta_expand (getMode env)
+    eta_expand expr | sm_eta_expand (getMode env)
+                    , exprArity expr < arityTypeArity id_arity
+                    , wantEtaExpansion expr
+                    = etaExpandAT id_arity expr
+                    | otherwise
+                    = expr
 
 {- Note [Eta-expand stable unfoldings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
