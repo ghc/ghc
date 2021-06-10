@@ -543,27 +543,8 @@ pprDataItem config lit
                   _ -> panic "X86.Ppr.ppr_item: no match for II64"
                | otherwise ->
                   [text "\t.quad\t" <> pprImm platform imm]
-              _
-               | target32Bit platform ->
-                  [text "\t.quad\t" <> pprImm platform imm]
-               | otherwise ->
-                  -- x86_64: binutils can't handle the R_X86_64_PC64
-                  -- relocation type, which means we can't do
-                  -- pc-relative 64-bit addresses. Fortunately we're
-                  -- assuming the small memory model, in which all such
-                  -- offsets will fit into 32 bits, so we have to stick
-                  -- to 32-bit offset fields and modify the RTS
-                  -- appropriately
-                  --
-                  -- See Note [x86-64-relative] in includes/rts/storage/InfoTables.h
-                  --
-                  case lit of
-                  -- A relative relocation:
-                  CmmLabelDiffOff _ _ _ _ ->
-                      [text "\t.long\t" <> pprImm platform imm,
-                       text "\t.long\t0"]
-                  _ ->
-                      [text "\t.quad\t" <> pprImm platform imm]
+
+              _ -> [text "\t.quad\t" <> pprImm platform imm]
 
 
 asmComment :: SDoc -> SDoc
