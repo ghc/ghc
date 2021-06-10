@@ -371,12 +371,10 @@ checkHie dflags mod_summary =
         hi_date = ms_iface_date mod_summary
     in if not (gopt Opt_WriteHie dflags)
       then UpToDate
-      else case (hie_date_opt, hi_date) of
-             (Nothing, _) -> RecompBecause "HIE file is missing"
-             (Just hie_date, Just hi_date)
-                 | hie_date < hi_date
-                 -> RecompBecause "HIE file is out of date"
-             _ -> UpToDate
+      else case dependencyState hi_date hie_date_opt of
+        DSMissing -> RecompBecause "HIE file is missing"
+        DSOlder -> RecompBecause "HIE file is out of date"
+        DSUpToDate -> UpToDate
 
 -- | Check the flags haven't changed
 checkFlagHash :: HscEnv -> ModIface -> IO RecompileRequired
@@ -1190,6 +1188,7 @@ sortDependencies d
           dep_boot_mods   = sort (dep_boot_mods d),
           dep_orphs  = sortBy stableModuleCmp (dep_orphs d),
           dep_finsts = sortBy stableModuleCmp (dep_finsts d) }
+
 
 {-
 ************************************************************************
