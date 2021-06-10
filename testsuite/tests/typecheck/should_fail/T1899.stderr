@@ -1,15 +1,14 @@
 
-T1899.hs:15:26: error:
+T1899.hs:12:29: error:
     • Couldn't match expected type ‘a’
                   with actual type ‘Proposition a0’
       ‘a’ is a rigid type variable bound by
         the type signature for:
           transRHS :: forall a. [a] -> Int -> Constraint a
         at T1899.hs:9:2-39
-    • In the first argument of ‘Prop’, namely ‘(Auxiliary varSet)’
-      In the expression: Prop (Auxiliary varSet)
-      In the expression:
-        [Prop (Auxiliary varSet), Prop (Auxiliary varSet)]
+    • In the first argument of ‘Prop’, namely ‘(Auxiliary undefined)’
+      In the expression: Prop (Auxiliary undefined)
+      In the expression: [Prop (Auxiliary undefined)]
     • Relevant bindings include
         varSet :: [a] (bound at T1899.hs:10:11)
         transRHS :: [a] -> Int -> Constraint a (bound at T1899.hs:10:2)
