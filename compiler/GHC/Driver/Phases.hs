@@ -16,6 +16,9 @@ module GHC.Driver.Phases (
    startPhase,
    phaseInputExt,
 
+   StopPhase(..),
+   stopPhaseToPhase,
+
    isHaskellishSuffix,
    isHaskellSrcSuffix,
    isBackpackishSuffix,
@@ -56,10 +59,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Misc
 
 import System.FilePath
-import {-# SOURCE #-} GHC.Driver.Session ( DynFlags )
 import Control.Monad
-import {-# SOURCE #-} GHC.Driver.Env.Types
-import GHC.Driver.CmdLine (Warn)
 
 -----------------------------------------------------------------------------
 -- Phases
@@ -75,6 +75,18 @@ import GHC.Driver.CmdLine (Warn)
    assembler              | .s  or .S     | -c            | .o
    linker                 | other         | -             | a.out
 -}
+
+-- Phases we can actually stop after
+data StopPhase = StopPreprocess -- -E
+               | StopC  -- -C
+               | StopAs -- -S
+               | NoStop -- -c
+
+stopPhaseToPhase :: StopPhase -> Phase
+stopPhaseToPhase StopPreprocess = anyHsc
+stopPhaseToPhase StopC   = HCc
+stopPhaseToPhase StopAs  = As False
+stopPhaseToPhase NoStop   = StopLn
 
 data Phase
         = Unlit HscSource
@@ -211,6 +223,7 @@ nextPhase platform p
 -- the first compilation phase for a given file is determined
 -- by its suffix.
 startPhase :: String -> Phase
+startPhase ('b':'u':'f':'_':ext) = startPhase ext
 startPhase "lhs"      = Unlit HsSrcFile
 startPhase "lhs-boot" = Unlit HsBootFile
 startPhase "lhsig"    = Unlit HsigFile

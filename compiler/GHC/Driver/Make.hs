@@ -1578,7 +1578,7 @@ upsweep_mod hsc_env mHscMessage old_hpt summary mod_index nmods
 
             compile_it :: Maybe Linkable -> IO HomeModInfo
             compile_it  mb_linkable =
-                  compileOne' Nothing mHscMessage hsc_env summary' mod_index nmods
+                  compileOne' mHscMessage hsc_env summary' mod_index nmods
                              mb_old_iface mb_linkable
 
         in
@@ -2074,7 +2074,8 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
         getRootSummary Target { targetId = TargetFile file mb_phase
                               , targetContents = maybe_buf
                               }
-           = do exists <- liftIO $ doesFileExist file
+           = do
+                exists <- liftIO $ doesFileExist file
                 if exists || isJust maybe_buf
                     then summariseFile hsc_env old_summaries file mb_phase
                                        maybe_buf

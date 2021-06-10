@@ -4,6 +4,7 @@ module FrontendPlugin where
 import GHC.Plugins
 import qualified GHC
 import GHC              ( Ghc, LoadHowMuch(..) )
+import GHC.Utils.Monad
 
 import GHC.Driver.Pipeline hiding ( hsc_env )
 import GHC.Driver.Phases
@@ -38,7 +39,7 @@ doMake opts srcs  = do
        then liftIO (oneShot hsc_env StopLn srcs)
        else do
 
-    o_files <- mapM (\x -> liftIO $ compileFile hsc_env StopLn x)
+    o_files <- mapMaybeM (\x -> liftIO $ compileFile hsc_env StopLn x)
                  non_hs_srcs
     dflags <- GHC.getSessionDynFlags
     let dflags' = dflags { ldInputs = map (FileOption "") o_files
