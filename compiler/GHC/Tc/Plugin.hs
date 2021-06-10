@@ -186,8 +186,11 @@ newEvVar = unsafeTcPluginTcM . TcM.newEvVar
 newCoercionHole :: PredType -> TcPluginM CoercionHole
 newCoercionHole = unsafeTcPluginTcM . TcM.newCoercionHole
 
--- | Bind an evidence variable.  This must not be invoked from
--- 'tcPluginInit' or 'tcPluginStop', or it will panic.
+-- | Bind an evidence variable.
+--
+-- This should only be invoked from 'tcPluginSolve'.
+-- If invoked from 'tcPluginInit', 'tcPluginRewrite',
+-- or 'tcPluginStop', it will panic.
 setEvBind :: EvBind -> TcPluginM ()
 setEvBind ev_bind = do
     tc_evbinds <- getEvBindsTcPluginM
