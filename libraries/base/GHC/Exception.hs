@@ -77,10 +77,12 @@ errorCallException s = toException (ErrorCall s)
 errorCallWithCallStackException :: String -> CallStack -> SomeException
 errorCallWithCallStackException s stk = unsafeDupablePerformIO $ do
   ccsStack <- currentCallStack
+  execStack <- ExecutionStack.showStackTrace
   let
     implicitParamCallStack = prettyCallStackLines stk
     ccsCallStack = showCCSStack ccsStack
-    stack = intercalate "\n" $ implicitParamCallStack ++ ccsCallStack
+    stack = intercalate "\n"
+          $ implicitParamCallStack ++ ccsCallStack ++ [ "Execution Stack:" ] ++ execStack
   return $ toException (ErrorCallWithLocation s stack)
 
 showCCSStack :: [String] -> [String]
