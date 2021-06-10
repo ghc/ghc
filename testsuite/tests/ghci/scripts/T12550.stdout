@@ -36,6 +36,10 @@ instance Functor Par1 -- Defined in ‘GHC.Generics’
 instance ∀ i (c ∷ Meta) (f ∷ ★ → ★). Functor f ⇒ Functor (M1 i c f)
   -- Defined in ‘GHC.Generics’
 instance ∀ i c. Functor (K1 i c) -- Defined in ‘GHC.Generics’
+instance ∀ (f ∷ ★ → ★).
+         (Generic1 f, Functor (Rep1 f)) ⇒
+         Functor (Generically1 f)
+  -- Defined in ‘GHC.Generics’
 instance ∀ (f ∷ ★ → ★) (g ∷ ★ → ★).
          (Functor f, Functor g) ⇒
          Functor (f :.: g)
