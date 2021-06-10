@@ -204,6 +204,7 @@ Library
         GHC.Environment
         GHC.Err
         GHC.Event.TimeOut
+        GHC.Event.PSQ
         GHC.Exception
         GHC.Exception.Type
         GHC.ExecutionStack
@@ -419,7 +420,6 @@ Library
         exposed-modules:
             GHC.Event
             GHC.Event.Manager
-            GHC.Event.PSQ
             GHC.Event.Poll
             GHC.Event.Thread
             GHC.Event.TimerManager
