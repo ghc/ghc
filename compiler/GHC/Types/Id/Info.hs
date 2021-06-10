@@ -344,7 +344,7 @@ bitfieldSetArityInfo info (BitField bits) =
 
 -- Getters
 
--- | When applied, will this Id ever have a levity-polymorphic type?
+-- | When applied, will this Id ever have a representation-polymorphic type?
 levityInfo :: IdInfo -> LevityInfo
 levityInfo = bitfieldGetLevityInfo . bitfield
 
@@ -719,12 +719,12 @@ instance Outputable TickBoxOp where
 Note [Levity info]
 ~~~~~~~~~~~~~~~~~~
 
-Ids store whether or not they can be levity-polymorphic at any amount
-of saturation. This is helpful in optimizing the levity-polymorphism check
-done in the desugarer, where we can usually learn that something is not
-levity-polymorphic without actually figuring out its type. See
-isExprLevPoly in GHC.Core.Utils for where this info is used. Storing
-this is required to prevent perf/compiler/T5631 from blowing up.
+Ids store whether or not they can be representation-polymorphic at any amount
+of saturation. This is helpful in optimizing the representation polymorphism
+check done in the desugarer, where we can usually learn that something is not
+representation-polymorphic without actually figuring out its type.
+See isExprLevPoly in GHC.Core.Utils for where this info is used.
+Storing this is required to prevent perf/compiler/T5631 from blowing up.
 
 -}
 
@@ -737,9 +737,9 @@ instance Outputable LevityInfo where
   ppr NoLevityInfo           = text "NoLevityInfo"
   ppr NeverLevityPolymorphic = text "NeverLevityPolymorphic"
 
--- | Marks an IdInfo describing an Id that is never levity polymorphic (even when
--- applied). The Type is only there for checking that it's really never levity
--- polymorphic
+-- | Marks an IdInfo describing an Id that is never representation-polymorphic
+-- (even when applied). The Type is only there for checking that it's really
+-- never representation-polymorphic.
 setNeverLevPoly :: HasDebugCallStack => IdInfo -> Type -> IdInfo
 setNeverLevPoly info ty
   = assertPpr (not (resultIsLevPoly ty)) (ppr ty) $

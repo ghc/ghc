@@ -425,10 +425,10 @@ simplNonRecX env bndr new_rhs
         ; completeNonRecX NotTopLevel env' (isStrictId bndr') bndr bndr' new_rhs }
           -- NotTopLevel: simplNonRecX is only used for NotTopLevel things
           --
-          -- isStrictId: use bndr' because in a levity-polymorphic setting
-          -- the InId bndr might have a levity-polymorphic type, which
-          -- which isStrictId doesn't expect
-          -- c.f. Note [Dark corner with levity polymorphism]
+          -- isStrictId: use bndr' because in a representation-polymorphic
+          -- setting, the InId bndr might have a representation-polymorphic
+          -- type, which isStrictId doesn't expect
+          -- c.f. Note [Dark corner with representation polymorphism]
 
 --------------------------
 completeNonRecX :: TopLevelFlag -> SimplEnv
@@ -1484,7 +1484,7 @@ simplCast env body co0 cont0
         levity_ok MRefl = True
         levity_ok (MCo co) = not $ isTypeLevPoly $ coercionRKind co
           -- Without this check, we get a lev-poly arg
-          -- See Note [Levity polymorphism invariants] in GHC.Core
+          -- See Note [Representation polymorphism invariants] in GHC.Core
           -- test: typecheck/should_run/EtaExpandLevPoly
 
 simplArg :: SimplEnv -> DupFlag -> StaticEnv -> CoreExpr
@@ -1593,7 +1593,7 @@ simplNonRecE env bndr (rhs, rhs_se) (bndrs, body) cont
   = do { (env1, bndr1) <- simplNonRecBndr env bndr
 
        -- Deal with strict bindings
-       -- See Note [Dark corner with levity polymorphism]
+       -- See Note [Dark corner with representation polymorphism]
        ; if isStrictId bndr1 && sm_case_case (getMode env)
          then simplExprF (rhs_se `setInScopeFromE` env) rhs
                    (StrictBind { sc_bndr = bndr, sc_bndrs = bndrs, sc_body = body
@@ -1625,17 +1625,17 @@ simplRecE env pairs body cont
         ; (floats2, expr') <- simplExprF env2 body cont
         ; return (floats1 `addFloats` floats2, expr') }
 
-{- Note [Dark corner with levity polymorphism]
+{- Note [Dark corner with representation polymorphism]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In `simplNonRecE`, the call to `isStrictId` will fail if the binder
-has a levity-polymorphic type, of kind (TYPE r).  So we are careful to
+has a representation-polymorphic type, of kind (TYPE r).  So we are careful to
 call `isStrictId` on the OutId, not the InId, in case we have
      ((\(r::RuntimeRep) \(x::Type r). blah) Lifted arg)
 That will lead to `simplNonRecE env (x::Type r) arg`, and we can't tell
 if x is lifted or unlifted from that.
 
 We only get such redexes from the compulsory inlining of a wired-in,
-levity-polymorphic function like `rightSection` (see
+representation-polymorphic function like `rightSection` (see
 GHC.Types.Id.Make).  Mind you, SimpleOpt should probably have inlined
 such compulsory inlinings already, but belt and braces does no harm.
 

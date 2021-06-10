@@ -30,7 +30,7 @@ import Prelude
 -- * Type synonyms
 ----------------------------------------------------------
 
--- | Levity-polymorphic since /template-haskell-2.17.0.0/.
+-- | Representation-polymorphic since /template-haskell-2.17.0.0/.
 type TExpQ :: TYPE r -> Kind.Type
 type TExpQ a = Q (TExp a)
 
