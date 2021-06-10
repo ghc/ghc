@@ -49,7 +49,7 @@ import GHC.Core.Unfold.Make
 import GHC.Core.Utils
 import GHC.Core.Opt.Arity ( ArityType, arityTypeArityDiv, exprArity
                           , pushCoTyArg, pushCoValArg
-                          , idArityType, arityTypeArity, etaExpandAT )
+                          , arityTypeArity, etaExpandAT )
 import GHC.Core.SimpleOpt ( exprIsConApp_maybe, joinPointBinding_maybe, joinPointBindings_maybe )
 import GHC.Core.FVs     ( mkRuleInfo )
 import GHC.Core.Rules   ( lookupRule, getRules, initRuleOpts )
@@ -381,8 +381,9 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
                                                                 tvs' body_floats2 body2
                         ; let poly_floats = foldl' extendFloats (emptyFloats env) poly_binds
                         ; (_empty_floats, rhs') <- rebuildLam env tvs' (emptyFloats body_env) body3 rhs_cont
-                        ; ASSERT( isEmptyFloats _empty_floats )  -- rebuildLam returns emptyFloats
-                          return (poly_floats, rhs') }           -- if given emptyFloats
+                        ; assertPpr (isEmptyFloats _empty_floats) (ppr _empty_floats) $
+                              -- rebuildLam returns emptyFloats if given emptyFloats
+                          return (poly_floats, rhs') }
 
         ; (bind_float, env2) <- completeBind (env `setInScopeFromF` rhs_floats)
                                              top_lvl is_rec Nothing bndr bndr2 rhs'

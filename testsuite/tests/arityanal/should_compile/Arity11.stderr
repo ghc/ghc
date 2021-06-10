@@ -91,11 +91,6 @@ F11.f11_x = F11.f11_fib F11.f3
 -- RHS size: {terms: 4, types: 1, coercions: 0, joins: 0/0}
 F11.f11f1 :: Integer -> Integer
 [GblId, Arity=1, Str=<SL>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 30 0}]
-[GblId,
- Arity=1,
- Str=<SL>,
- Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (y [Occ=Once1] :: Integer) -> GHC.Num.Integer.integerAdd F11.f11_x y}]
 F11.f11f1 = \ (y :: Integer) -> GHC.Num.Integer.integerAdd F11.f11_x y
 
 -- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
