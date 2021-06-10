@@ -33,6 +33,7 @@ import GHC.Types.CostCentre (mkUserCC, CCFlavour(DeclCC))
 import GHC.Driver.Session
 import GHC.Data.FastString
 import GHC.Hs
+import GHC.Tc.Errors.Types
 import GHC.Tc.Gen.Sig
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Types.Origin
@@ -1011,7 +1012,9 @@ warnMissingSignatures :: WarningFlag -> SDoc -> Id -> TcM ()
 warnMissingSignatures flag msg id
   = do  { env0 <- tcInitTidyEnv
         ; let (env1, tidy_ty) = tidyOpenType env0 (idType id)
-        ; addDiagnosticTcM (WarningWithFlag flag) (env1, mk_msg tidy_ty) }
+        ; let dia = TcRnUnknownMessage $
+                mkPlainDiagnostic (WarningWithFlag flag) noHints (mk_msg tidy_ty)
+        ; addDiagnosticTcM (env1, dia) }
   where
     mk_msg ty = sep [ msg, nest 2 $ pprPrefixName (idName id) <+> dcolon <+> ppr ty ]
 

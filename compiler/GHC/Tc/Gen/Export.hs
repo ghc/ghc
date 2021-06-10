@@ -237,8 +237,7 @@ exports_from_avail Nothing rdr_env _imports _this_mod
    -- so that's how we handle it, except we also export the data family
    -- when a data instance is exported.
   = do {
-    ; warnIfFlag Opt_WarnMissingExportList
-        True
+    ; warnIf True
         (missingModuleExportWarn $ moduleName _this_mod)
     ; let avails =
             map fix_faminst . gresToAvailInfo
@@ -284,8 +283,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
     exports_from_item (ExportAccum occs earlier_mods)
                       (L loc ie@(IEModuleContents _ lmod@(L _ mod)))
         | mod `elementOfUniqSet` earlier_mods    -- Duplicate export of M
-        = do { warnIfFlag Opt_WarnDuplicateExports True
-                          (dupModuleExport mod) ;
+        = do { warnIf True (dupModuleExport mod) ;
                return Nothing }
 
         | otherwise
@@ -300,9 +298,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                    }
 
              ; checkErr exportValid (moduleNotImported mod)
-             ; warnIfFlag Opt_WarnDodgyExports
-                          (exportValid && null gre_prs)
-                          (nullModuleExport mod)
+             ; warnIf (exportValid && null gre_prs) (nullModuleExport mod)
 
              ; traceRn "efa" (ppr mod $$ ppr all_gres)
              ; addUsedGREs all_gres
@@ -670,9 +666,7 @@ check_occs ie occs avails
             | greNameMangledName child == greNameMangledName child'   -- Duplicate export
             -- But we don't want to warn if the same thing is exported
             -- by two different module exports. See ticket #4478.
-            -> do { warnIfFlag Opt_WarnDuplicateExports
-                               (not (dupExport_ok child ie ie'))
-                               (dupExportWarn child ie ie')
+            -> do { warnIf (not (dupExport_ok child ie ie')) (dupExportWarn child ie ie')
                   ; return occs }
 
             | otherwise    -- Same occ name but different names: an error
@@ -734,9 +728,10 @@ dupExport_ok child ie1 ie2
     single _               = False
 
 
-dupModuleExport :: ModuleName -> SDoc
+dupModuleExport :: ModuleName -> TcRnMessage
 dupModuleExport mod
-  = hsep [text "Duplicate",
+  = TcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag Opt_WarnDuplicateExports) noHints $
+  hsep [text "Duplicate",
           quotes (text "Module" <+> ppr mod),
           text "in export list"]
 
@@ -746,15 +741,17 @@ moduleNotImported mod
           quotes (text "module" <+> ppr mod),
           text "is not imported"]
 
-nullModuleExport :: ModuleName -> SDoc
+nullModuleExport :: ModuleName -> TcRnMessage
 nullModuleExport mod
-  = hsep [text "The export item",
-          quotes (text "module" <+> ppr mod),
-          text "exports nothing"]
+  = TcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag Opt_WarnDodgyExports) noHints $
+  hsep [text "The export item",
+        quotes (text "module" <+> ppr mod),
+        text "exports nothing"]
 
-missingModuleExportWarn :: ModuleName -> SDoc
+missingModuleExportWarn :: ModuleName -> TcRnMessage
 missingModuleExportWarn mod
-  = hsep [text "The export item",
+  = TcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag Opt_WarnMissingExportList) noHints $
+  hsep [text "The export item",
           quotes (text "module" <+> ppr mod),
           text "is missing an export list"]
 
@@ -776,11 +773,12 @@ exportItemErr export_item
           text "attempts to export constructors or class methods that are not visible here" ]
 
 
-dupExportWarn :: GreName -> IE GhcPs -> IE GhcPs -> SDoc
+dupExportWarn :: GreName -> IE GhcPs -> IE GhcPs -> TcRnMessage
 dupExportWarn child ie1 ie2
-  = hsep [quotes (ppr child),
-          text "is exported by", quotes (ppr ie1),
-          text "and",            quotes (ppr ie2)]
+  = TcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag Opt_WarnDuplicateExports) noHints $
+  hsep [quotes (ppr child),
+        text "is exported by", quotes (ppr ie1),
+        text "and",            quotes (ppr ie2)]
 
 dcErrMsg :: Name -> String -> SDoc -> [SDoc] -> SDoc
 dcErrMsg ty_con what_is thing parents =

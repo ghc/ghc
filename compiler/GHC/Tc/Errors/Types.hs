@@ -3,6 +3,7 @@
 module GHC.Tc.Errors.Types (
   -- * Main types
     TcRnMessage(..)
+  , TcRnMessageDetailed(..)
   , ErrInfo(..)
   , LevityCheckProvenance(..)
   ) where
@@ -14,10 +15,21 @@ import GHC.Types.Name.Reader
 import GHC.Utils.Outputable
 import Data.Typeable
 import GHC.Core.Type (Type, Var)
+import GHC.Unit.State (UnitState)
 
 -- The majority of TcRn messages come with extra context about the error,
 -- and this newtype captures it.
-newtype ErrInfo = ErrInfo { getErrInfo :: SDoc }
+data ErrInfo = ErrInfo {
+    errInfoContext :: !SDoc
+    -- ^ Extra context associated to the error.
+  , errInfoSupplementary :: !SDoc
+    -- ^ Extra supplementary info associated to the error.
+  }
+
+data TcRnMessageDetailed
+  = TcRnMessageDetailed !ErrInfo
+                        -- ^ Extra info associated with the message
+                        !TcRnMessage
 
 -- | An error which might arise during typechecking/renaming.
 data TcRnMessage where
@@ -26,13 +38,18 @@ data TcRnMessage where
   -}
   TcRnUnknownMessage :: (Diagnostic a, Typeable a) => a -> TcRnMessage
 
+  TcRnMessageWithInfo :: !UnitState
+                      -- ^ The 'UnitState' will allow us to pretty-print
+                      -- some diagnostics with more details.
+                      -> !TcRnMessageDetailed
+                      -> TcRnMessage
+
   {-| A levity polymorphism check happening during TcRn.
   -}
   TcLevityPolyInType :: !Type
                      -> !LevityCheckProvenance
                      -> !ErrInfo -- Extra info accumulated in the TcM monad
                      -> TcRnMessage
-
 
   {-| TcRnImplicitLift is a warning (controlled with -Wimplicit-lift) that occurs when
       a Template Haskell quote implicitly uses 'lift'.

@@ -39,6 +39,7 @@ import GHC.Utils.Outputable
 import GHC.Builtin.Utils
 import GHC.Builtin.Names
 import GHC.Tc.Errors
+import GHC.Tc.Errors.Types
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Solver.Interact
 import GHC.Tc.Solver.Canonical   ( makeSuperClasses, solveCallStack )
@@ -1343,10 +1344,10 @@ decideMonoTyVars infer_mode name_taus psigs candidates
              mono_tvs = mono_tvs2 `unionVarSet` constrained_tvs
 
            -- Warn about the monomorphism restriction
-       ; when (case infer_mode of { ApplyMR -> True; _ -> False}) $
-         diagnosticTc (WarningWithFlag Opt_WarnMonomorphism)
-                      (constrained_tvs `intersectsVarSet` tyCoVarsOfTypes taus)
-                      mr_msg
+       ; when (case infer_mode of { ApplyMR -> True; _ -> False}) $ do
+           let dia = TcRnUnknownMessage $
+                 mkPlainDiagnostic (WarningWithFlag Opt_WarnMonomorphism) noHints mr_msg
+           diagnosticTc (constrained_tvs `intersectsVarSet` tyCoVarsOfTypes taus) dia
 
        ; traceTc "decideMonoTyVars" $ vcat
            [ text "infer_mode =" <+> ppr infer_mode
