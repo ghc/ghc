@@ -217,7 +217,7 @@ handleToHANDLE :: Handle -> IO Win.HANDLE
 handleToHANDLE h = case h of
   FileHandle _ mv -> do
     Handle__{haDevice = dev} <- readMVar mv
-    case (cast dev :: Maybe (Win.Io Win.NativeHandle)) of
+    case cast dev :: Maybe (Win.Io Win.NativeHandle) of
       Just hwnd -> return $ Win.toHANDLE hwnd
       Nothing   -> throwErr "not a file HANDLE"
   DuplexHandle{} -> throwErr "not a file handle"
