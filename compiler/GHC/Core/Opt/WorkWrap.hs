@@ -505,6 +505,10 @@ tryWW ww_opts is_rec fn_id rhs
   -- Do this even if there is a NOINLINE pragma
   -- See Note [Worker/wrapper for NOINLINE functions]
 
+  -- See Note [Don't w/w INLINE things]
+  | isInlineUnfolding (unfoldingInfo fn_info)
+  = return [(new_fn_id, rhs)]
+
   -- See Note [Drop absent bindings]
   | isAbsDmd (demandInfo fn_info)
   , not (isJoinId fn_id)
@@ -649,7 +653,7 @@ Consider this (#19824 comment on 15 May 21):
   v = ...big...
   g x = f v x + 1
 
-So `f` will generate a worker/wrapper split; and `g` (since it is small
+So `f` will generate a worker/wrapper split; and `g` (since it is small)
 will trigger the certainlyWillInline case of splitFun.  The danger is that
 we end up with
   g {- StableUnfolding = \x -> f v x + 1 -}
@@ -677,15 +681,16 @@ splitFun ww_opts fn_id fn_info wrap_dmds div cpr rhs
                  (ppr fn_id <+> (ppr wrap_dmds $$ ppr cpr)) $
     do { mb_stuff <- mkWwBodies ww_opts rhs_fvs fn_id wrap_dmds use_cpr_info
        ; case mb_stuff of
-            Nothing -> return [(fn_id, rhs)]
+            Nothing -> -- No useful wrapper; leave the binding alone
+                       return [(fn_id, rhs)]
 
             Just stuff
               | Just stable_unf <- certainlyWillInline uf_opts fn_info
+                -- We could make a w/w split, but in fact the RHS is small
+                -- See Note [Don't w/w inline small non-loop-breaker things]
               , let id_w_unf = fn_id `setIdUnfolding` stable_unf
                 -- See Note [Inline pragma for certainlyWillInline]
               ->  return [ (id_w_unf, rhs) ]
-                  -- See Note [Don't w/w INLINE things]
-                  -- See Note [Don't w/w inline small non-loop-breaker things]
 
               | otherwise
               -> do { work_uniq <- getUniqueM
