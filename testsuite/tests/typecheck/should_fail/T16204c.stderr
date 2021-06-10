@@ -1,12 +1,8 @@
 
 T16204c.hs:16:8: error:
-    • Couldn't match kind ‘Rep’ with ‘*’
-      When matching types
-        a0 :: Rep
-        a :: *
-      Expected: Sing a
-        Actual: Sing a0
+    • Couldn't match type ‘Rep’ with ‘*’
+      Expected: Sing @(*) a
+        Actual: Sing @Rep a0
     • In the first argument of ‘id’, namely ‘sTo’
       In the expression: id sTo
       In an equation for ‘x’: x = id sTo
-    • Relevant bindings include x :: Sing a (bound at T16204c.hs:16:1)

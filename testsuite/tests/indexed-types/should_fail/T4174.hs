@@ -41,7 +41,7 @@ sync_large_objects :: (Monad m,
                    => m (Field (WayOf m) SmStep RtsSpinLock)
 sync_large_objects = field "sync_large_objects"
 
-testcase :: Monad m => m (Field (Way (GHC6'8 minor) n t p) a b)
+testcase :: (Monad m, a ~ SmStep, b ~ RtsSpinLock, WayOf m ~ (Way (GHC6'8 minor) n t p)) => m (Field (Way (GHC6'8 minor) n t p) a b)
 testcase = sync_large_objects
 
 {- Wanted constraints from the occurrence of sync_large_objects
