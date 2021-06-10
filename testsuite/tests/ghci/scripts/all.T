@@ -309,7 +309,10 @@ test('T16509', normal, ghci_script, ['T16509.script'])
 # historical note: introduced to see the changes in the behaviour
 #   when the implementation of :type-at and :uses will be/was changed
 #   to use hie files
-test('T16804', extra_files(['T16804a.hs', 'T16804b.hs', 'T16804c.hs']), ghci_script, ['T16804.script'])
+test('T16804', [extra_files(['T16804a.hs', 'T16804b.hs', 'T16804c.hs'])], ghci_script, ['T16804.script'])
+# Test reading a perproduced hie file in ghci
+test('T16804a', [pre_cmd('$MAKE -s --no-print-directory T16804a_setup'), extra_files(['T16804a.hs'])], ghci_script, ['T16804a.script'])
+
 test('T15546', normal, ghci_script, ['T15546.script'])
 test('T16876', normal, ghci_script, ['T16876.script'])
 test('T17345', normal, ghci_script, ['T17345.script'])

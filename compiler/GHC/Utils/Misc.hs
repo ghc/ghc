@@ -126,6 +126,10 @@ module GHC.Utils.Misc (
         -- * Utils for flags
         OverridingBool(..),
         overrideWith,
+
+        -- * Utils for timestamps of dependent things
+        DependencyState(..),
+        dependencyState,
     ) where
 
 import GHC.Prelude
@@ -1497,3 +1501,19 @@ overrideWith :: Bool -> OverridingBool -> Bool
 overrideWith b Auto   = b
 overrideWith _ Always = True
 overrideWith _ Never  = False
+
+data DependencyState
+  = DSMissing
+  -- ^ the dependee is missing
+  | DSOlder
+  -- ^ the dependee is older
+  | DSUpToDate
+  -- ^ the dependee is up to date
+   deriving Eq
+
+dependencyState :: Maybe UTCTime -> Maybe UTCTime -> DependencyState
+dependencyState _ Nothing = DSMissing
+dependencyState (Just depender) (Just dependee)
+  | dependee < depender = DSOlder
+  | otherwise = DSUpToDate
+dependencyState _ _ = DSUpToDate
