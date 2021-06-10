@@ -477,7 +477,9 @@ data HsExpr p
 
   -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
   | HsLet       (XLet p)
+               !(LHsToken "let" p)
                 (HsLocalBinds p)
+               !(LHsToken "in" p)
                 (LHsExpr  p)
 
   -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnDo',
@@ -952,7 +954,9 @@ data HsCmd id
     -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
 
   | HsCmdLet    (XCmdLet id)
+               !(LHsToken "let" id)
                 (HsLocalBinds id)      -- let(rec)
+               !(LHsToken "in" id)
                 (LHsCmd  id)
     -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnLet',
     --       'GHC.Parser.Annotation.AnnOpen' @'{'@,

@@ -391,12 +391,17 @@ hard_hole_fits.hs:33:30: warning: [-Wtyped-holes (in -Wdefault)]
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
            (and originally defined in ‘GHC.Enum’))
 
-hard_hole_fits.hs:34:28: warning: [-Wtyped-holes (in -Wdefault)]
+hard_hole_fits.hs:34:39: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
-    • In an equation for ‘testMe’: testMe (HsLet xl gl gl') = _
+    • In an equation for ‘testMe’:
+          testMe (HsLet xl tkLet gl tkIn gl') = _
     • Relevant bindings include
-        gl' :: LHsExpr GhcPs (bound at hard_hole_fits.hs:34:21)
+        gl' :: LHsExpr GhcPs (bound at hard_hole_fits.hs:34:32)
+        tkIn :: Language.Haskell.Syntax.Extension.LHsToken "in" GhcPs
+          (bound at hard_hole_fits.hs:34:27)
         gl :: Language.Haskell.Syntax.Binds.HsLocalBinds GhcPs
+          (bound at hard_hole_fits.hs:34:24)
+        tkLet :: Language.Haskell.Syntax.Extension.LHsToken "let" GhcPs
           (bound at hard_hole_fits.hs:34:18)
         xl :: Language.Haskell.Syntax.Extension.XLet GhcPs
           (bound at hard_hole_fits.hs:34:15)

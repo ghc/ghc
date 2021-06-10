@@ -850,10 +850,10 @@ zonkExpr env (HsMultiIf ty alts)
                ; expr'          <- zonkLExpr env' expr
                ; return $ GRHS x guard' expr' }
 
-zonkExpr env (HsLet x binds expr)
+zonkExpr env (HsLet x tkLet binds tkIn expr)
   = do (new_env, new_binds) <- zonkLocalBinds env binds
        new_expr <- zonkLExpr new_env expr
-       return (HsLet x new_binds new_expr)
+       return (HsLet x tkLet new_binds tkIn new_expr)
 
 zonkExpr env (HsDo ty do_or_lc (L l stmts))
   = do (_, new_stmts) <- zonkStmts env zonkLExpr stmts
@@ -1027,10 +1027,10 @@ zonkCmd env (HsCmdIf x eCond ePred cThen cElse)
        ; new_cElse <- zonkLCmd env1 cElse
        ; return (HsCmdIf x new_eCond new_ePred new_cThen new_cElse) }
 
-zonkCmd env (HsCmdLet x binds cmd)
+zonkCmd env (HsCmdLet x tkLet binds tkIn cmd)
   = do (new_env, new_binds) <- zonkLocalBinds env binds
        new_cmd <- zonkLCmd new_env cmd
-       return (HsCmdLet x new_binds new_cmd)
+       return (HsCmdLet x tkLet new_binds tkIn new_cmd)
 
 zonkCmd env (HsCmdDo ty (L l stmts))
   = do (_, new_stmts) <- zonkStmts env zonkLCmd stmts

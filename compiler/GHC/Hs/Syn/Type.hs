@@ -112,7 +112,7 @@ hsExprType (ExplicitSum alt_tys _ _ _) = mkSumTy alt_tys
 hsExprType (HsCase _ _ (MG { mg_ext = match_group })) = mg_res_ty match_group
 hsExprType (HsIf _ _ t _) = lhsExprType t
 hsExprType (HsMultiIf ty _) = ty
-hsExprType (HsLet _ _ body) = lhsExprType body
+hsExprType (HsLet _ _ _ _ body) = lhsExprType body
 hsExprType (HsDo ty _ _) = ty
 hsExprType (ExplicitList ty _) = mkListTy ty
 hsExprType (RecordCon con_expr _ _) = hsExprType con_expr

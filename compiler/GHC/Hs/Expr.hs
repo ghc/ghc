@@ -311,7 +311,7 @@ type instance XMultiIf       GhcPs = EpAnn [AddEpAnn]
 type instance XMultiIf       GhcRn = NoExtField
 type instance XMultiIf       GhcTc = Type
 
-type instance XLet           GhcPs = EpAnn AnnsLet
+type instance XLet           GhcPs = EpAnnCO
 type instance XLet           GhcRn = NoExtField
 type instance XLet           GhcTc = NoExtField
 
@@ -388,12 +388,6 @@ data AnnExplicitSum
       aesBarsBefore :: [EpaLocation],
       aesBarsAfter  :: [EpaLocation],
       aesClose      :: EpaLocation
-      } deriving Data
-
-data AnnsLet
-  = AnnsLet {
-      alLet :: EpaLocation,
-      alIn :: EpaLocation
       } deriving Data
 
 data AnnFieldLabel
@@ -629,11 +623,11 @@ ppr_expr (HsMultiIf _ alts)
         ppr_alt (L _ (XGRHS x)) = ppr x
 
 -- special case: let ... in let ...
-ppr_expr (HsLet _ binds expr@(L _ (HsLet _ _ _)))
+ppr_expr (HsLet _ _ binds _ expr@(L _ (HsLet _ _ _ _ _)))
   = sep [hang (text "let") 2 (hsep [pprBinds binds, text "in"]),
          ppr_lexpr expr]
 
-ppr_expr (HsLet _ binds expr)
+ppr_expr (HsLet _ _ binds _ expr)
   = sep [hang (text "let") 2 (pprBinds binds),
          hang (text "in")  2 (ppr expr)]
 
@@ -1101,7 +1095,7 @@ type instance XCmdIf      GhcPs = EpAnn AnnsIf
 type instance XCmdIf      GhcRn = NoExtField
 type instance XCmdIf      GhcTc = NoExtField
 
-type instance XCmdLet     GhcPs = EpAnn AnnsLet
+type instance XCmdLet     GhcPs = EpAnnCO
 type instance XCmdLet     GhcRn = NoExtField
 type instance XCmdLet     GhcTc = NoExtField
 
@@ -1187,11 +1181,11 @@ ppr_cmd (HsCmdIf _ _ e ct ce)
          nest 4 (ppr ce)]
 
 -- special case: let ... in let ...
-ppr_cmd (HsCmdLet _ binds cmd@(L _ (HsCmdLet {})))
+ppr_cmd (HsCmdLet _ _ binds _ cmd@(L _ (HsCmdLet {})))
   = sep [hang (text "let") 2 (hsep [pprBinds binds, text "in"]),
          ppr_lcmd cmd]
 
-ppr_cmd (HsCmdLet _ binds cmd)
+ppr_cmd (HsCmdLet _ _ binds _ cmd)
   = sep [hang (text "let") 2 (pprBinds binds),
          hang (text "in")  2 (ppr cmd)]
 

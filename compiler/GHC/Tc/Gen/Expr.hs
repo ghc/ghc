@@ -366,10 +366,10 @@ tcExpr (ExplicitSum _ alt arity expr) res_ty
 ************************************************************************
 -}
 
-tcExpr (HsLet x binds expr) res_ty
+tcExpr (HsLet x tkLet binds tkIn expr) res_ty
   = do  { (binds', expr') <- tcLocalBinds binds $
                              tcMonoExpr expr res_ty
-        ; return (HsLet x binds' expr') }
+        ; return (HsLet x tkLet binds' tkIn expr') }
 
 tcExpr (HsCase x scrut matches) res_ty
   = do  {  -- We used to typecheck the case alternatives first.

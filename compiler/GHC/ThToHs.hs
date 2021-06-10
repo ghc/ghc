@@ -981,7 +981,7 @@ cvtl e = wrapLA (cvt e)
       | otherwise      = do { alts' <- mapM cvtpair alts
                             ; return $ HsMultiIf noAnn alts' }
     cvt (LetE ds e)    = do { ds' <- cvtLocalDecs (text "a let expression") ds
-                            ; e' <- cvtl e; return $ HsLet noAnn ds' e'}
+                            ; e' <- cvtl e; return $ HsLet noAnn noHsTok ds' noHsTok e'}
     cvt (CaseE e ms)   = do { e' <- cvtl e; ms' <- mapM (cvtMatch CaseAlt) ms
                             ; th_origin <- getOrigin
                             ; return $ HsCase noAnn e'

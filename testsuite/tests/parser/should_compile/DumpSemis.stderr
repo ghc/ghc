@@ -1478,11 +1478,13 @@
                   (Anchor
                    { DumpSemis.hs:34:10-35 }
                    (UnchangedAnchor))
-                  (AnnsLet
-                   (EpaSpan { DumpSemis.hs:34:10-12 })
-                   (EpaSpan { DumpSemis.hs:34:32-33 }))
+                  (NoEpAnns)
                   (EpaComments
                    []))
+                 (L
+                  (TokenLoc
+                   (EpaSpan { DumpSemis.hs:34:10-12 }))
+                  (HsTok))
                  (HsValBinds
                   (EpAnn
                    (Anchor
@@ -1672,6 +1674,10 @@
                         (FromSource))
                        []))]}
                    []))
+                 (L
+                  (TokenLoc
+                   (EpaSpan { DumpSemis.hs:34:32-33 }))
+                  (HsTok))
                  (L
                   (SrcSpanAnn (EpAnnNotUsed) { DumpSemis.hs:34:35 })
                   (HsVar

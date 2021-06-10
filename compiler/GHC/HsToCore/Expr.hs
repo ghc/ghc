@@ -360,7 +360,7 @@ dsExpr (HsCase _ discrim matches)
 
 -- Pepe: The binds are in scope in the body but NOT in the binding group
 --       This is to avoid silliness in breakpoints
-dsExpr (HsLet _ binds body) = do
+dsExpr (HsLet _ _ binds _ body) = do
     body' <- dsLExpr body
     dsLocalBinds binds body'
 

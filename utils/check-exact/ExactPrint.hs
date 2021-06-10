@@ -1830,7 +1830,7 @@ instance ExactPrint (HsExpr GhcPs) where
   getAnnotationEntry (HsCase an _ _)              = fromAnn an
   getAnnotationEntry (HsIf an _ _ _)              = fromAnn an
   getAnnotationEntry (HsMultiIf an _)             = fromAnn an
-  getAnnotationEntry (HsLet an _ _)               = fromAnn an
+  getAnnotationEntry (HsLet an _ _ _ _)           = fromAnn an
   getAnnotationEntry (HsDo an _ _)                = fromAnn an
   getAnnotationEntry (ExplicitList an _)          = fromAnn an
   getAnnotationEntry (RecordCon an _ _)           = fromAnn an
@@ -1965,13 +1965,13 @@ instance ExactPrint (HsExpr GhcPs) where
     markAnnotated mg
     markEpAnn an AnnCloseC -- optional
 
-  exact (HsLet an binds e) = do
+  exact (HsLet _an tkLet binds tkIn e) = do
     setLayoutBoth $ do -- Make sure the 'in' gets indented too
-      markAnnKw an alLet AnnLet
+      markToken tkLet
       debugM $ "HSlet:binds coming"
       setLayoutBoth $ markAnnotated binds
       debugM $ "HSlet:binds done"
-      markAnnKw an alIn AnnIn
+      markToken tkIn
       debugM $ "HSlet:expr coming"
       markAnnotated e
 
@@ -2306,7 +2306,7 @@ instance ExactPrint (HsCmd GhcPs) where
   getAnnotationEntry (HsCmdCase an _ _)         = fromAnn an
   getAnnotationEntry (HsCmdLamCase an _)        = fromAnn an
   getAnnotationEntry (HsCmdIf an _ _ _ _)       = fromAnn an
-  getAnnotationEntry (HsCmdLet an _ _)          = fromAnn an
+  getAnnotationEntry (HsCmdLet an _ _ _ _)      = fromAnn an
   getAnnotationEntry (HsCmdDo an _)             = fromAnn an
 
 

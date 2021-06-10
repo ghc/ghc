@@ -1463,7 +1463,12 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
     :: SrcSpan -> (EpAnnComments -> MatchGroup GhcPs (LocatedA b)) -> PV (LocatedA b)
   -- | Disambiguate "let ... in ..."
   mkHsLetPV
-    :: SrcSpan -> HsLocalBinds GhcPs -> LocatedA b -> AnnsLet -> PV (LocatedA b)
+    :: SrcSpan
+    -> LHsToken "let" GhcPs
+    -> HsLocalBinds GhcPs
+    -> LHsToken "in" GhcPs
+    -> LocatedA b
+    -> PV (LocatedA b)
   -- | Infix operator representation
   type InfixOp b
   -- | Bring superclass constraints on InfixOp into scope.
@@ -1604,9 +1609,9 @@ instance DisambECP (HsCmd GhcPs) where
   mkHsLamPV l mg = do
     cs <- getCommentsFor l
     return $ L (noAnnSrcSpan l) (HsCmdLam NoExtField (mg cs))
-  mkHsLetPV l bs e anns = do
+  mkHsLetPV l tkLet bs tkIn e = do
     cs <- getCommentsFor l
-    return $ L (noAnnSrcSpan l) (HsCmdLet (EpAnn (spanAsAnchor l) anns cs) bs e)
+    return $ L (noAnnSrcSpan l) (HsCmdLet (EpAnn (spanAsAnchor l) NoEpAnns cs) tkLet bs tkIn e)
   type InfixOp (HsCmd GhcPs) = HsExpr GhcPs
   superInfixOp m = m
   mkHsOpAppPV l c1 op c2 = do
@@ -1691,9 +1696,9 @@ instance DisambECP (HsExpr GhcPs) where
     let mg' = mg cs
     checkLamMatchGroup l mg'
     return $ L (noAnnSrcSpan l) (HsLam NoExtField mg')
-  mkHsLetPV l bs c anns = do
+  mkHsLetPV l tkLet bs tkIn c = do
     cs <- getCommentsFor l
-    return $ L (noAnnSrcSpan l) (HsLet (EpAnn (spanAsAnchor l) anns cs) bs c)
+    return $ L (noAnnSrcSpan l) (HsLet (EpAnn (spanAsAnchor l) NoEpAnns cs) tkLet bs tkIn c)
   type InfixOp (HsExpr GhcPs) = HsExpr GhcPs
   superInfixOp m = m
   mkHsOpAppPV l e1 op e2 = do
@@ -1783,7 +1788,7 @@ instance DisambECP (PatBuilder GhcPs) where
   ecpFromCmd' (L l c)    = addFatalError $ mkPlainErrorMsgEnvelope (locA l) $ PsErrArrowCmdInPat c
   ecpFromExp' (L l e)    = addFatalError $ mkPlainErrorMsgEnvelope (locA l) $ PsErrArrowExprInPat e
   mkHsLamPV l _          = addFatalError $ mkPlainErrorMsgEnvelope l PsErrLambdaInPat
-  mkHsLetPV l _ _ _      = addFatalError $ mkPlainErrorMsgEnvelope l PsErrLetInPat
+  mkHsLetPV l _ _ _ _    = addFatalError $ mkPlainErrorMsgEnvelope l PsErrLetInPat
   mkHsProjUpdatePV l _ _ _ _ = addFatalError $ mkPlainErrorMsgEnvelope l PsErrOverloadedRecordDotInvalid
   type InfixOp (PatBuilder GhcPs) = RdrName
   superInfixOp m = m

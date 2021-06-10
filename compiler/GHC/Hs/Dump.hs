@@ -57,12 +57,12 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
               `extQ` annotationAddEpAnn
               `extQ` annotationGrhsAnn
               `extQ` annotationEpAnnHsCase
-              `extQ` annotationEpAnnHsLet
               `extQ` annotationAnnList
               `extQ` annotationEpAnnImportDecl
               `extQ` annotationAnnParen
               `extQ` annotationTrailingAnn
               `extQ` annotationEpaLocation
+              `extQ` annotationNoEpAnns
               `extQ` addEpAnn
               `extQ` lit `extQ` litr `extQ` litt
               `extQ` sourceText
@@ -242,9 +242,6 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
             annotationEpAnnHsCase :: EpAnn EpAnnHsCase -> SDoc
             annotationEpAnnHsCase = annotation' (text "EpAnn EpAnnHsCase")
 
-            annotationEpAnnHsLet :: EpAnn AnnsLet -> SDoc
-            annotationEpAnnHsLet = annotation' (text "EpAnn AnnsLet")
-
             annotationAnnList :: EpAnn AnnList -> SDoc
             annotationAnnList = annotation' (text "EpAnn AnnList")
 
@@ -259,6 +256,9 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
 
             annotationEpaLocation :: EpAnn EpaLocation -> SDoc
             annotationEpaLocation = annotation' (text "EpAnn EpaLocation")
+
+            annotationNoEpAnns :: EpAnn NoEpAnns -> SDoc
+            annotationNoEpAnns = annotation' (text "EpAnn NoEpAnns")
 
             annotation' :: forall a .(Data a, Typeable a)
                        => SDoc -> EpAnn a -> SDoc

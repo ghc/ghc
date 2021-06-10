@@ -154,11 +154,11 @@ tc_cmd env (HsCmdPar x lpar cmd rpar) res_ty
   = do  { cmd' <- tcCmd env cmd res_ty
         ; return (HsCmdPar x lpar cmd' rpar) }
 
-tc_cmd env (HsCmdLet x binds (L body_loc body)) res_ty
+tc_cmd env (HsCmdLet x tkLet binds tkIn (L body_loc body)) res_ty
   = do  { (binds', body') <- tcLocalBinds binds         $
                              setSrcSpan (locA body_loc) $
                              tc_cmd env body res_ty
-        ; return (HsCmdLet x binds' (L body_loc body')) }
+        ; return (HsCmdLet x tkLet binds' tkIn (L body_loc body')) }
 
 tc_cmd env in_cmd@(HsCmdCase x scrut matches) (stk, res_ty)
   = addErrCtxt (cmdCtxt in_cmd) $ do

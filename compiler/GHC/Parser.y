@@ -2800,8 +2800,7 @@ aexp    :: { ECP }
                                                  , m_grhss = unguardedGRHSs (comb2 $3 (reLoc $4)) $4 (EpAnn (glR $3) (GrhsAnn Nothing (mu AnnRarrow $3)) emptyComments) }])) }
         | 'let' binds 'in' exp          {  ECP $
                                            unECP $4 >>= \ $4 ->
-                                           mkHsLetPV (comb2A $1 $>) (unLoc $2) $4
-                                                 (AnnsLet (glAA $1) (glAA $3)) }
+                                           mkHsLetPV (comb2A $1 $>) (hsTok $1) (unLoc $2) (hsTok $3) $4 }
         | '\\' 'lcase' altslist
             {  ECP $ $3 >>= \ $3 ->
                  mkHsLamCasePV (comb2 $1 (reLoc $>)) $3 [mj AnnLam $1,mj AnnCase $2] }

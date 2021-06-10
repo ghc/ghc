@@ -387,10 +387,10 @@ rnExpr (HsCase _ expr matches)
        ; (new_matches, ms_fvs) <- rnMatchGroup CaseAlt rnLExpr matches
        ; return (HsCase noExtField new_expr new_matches, e_fvs `plusFV` ms_fvs) }
 
-rnExpr (HsLet _ binds expr)
+rnExpr (HsLet _ tkLet binds tkIn expr)
   = rnLocalBindsAndThen binds $ \binds' _ -> do
       { (expr',fvExpr) <- rnLExpr expr
-      ; return (HsLet noExtField binds' expr', fvExpr) }
+      ; return (HsLet noExtField tkLet binds' tkIn expr', fvExpr) }
 
 rnExpr (HsDo _ do_or_lc (L l stmts))
  = do { ((stmts1, _), fvs1) <-
@@ -828,10 +828,10 @@ rnCmd (HsCmdIf _ _ p b1 b2)
 
        ; return (HsCmdIf noExtField ite p' b1' b2', plusFVs [fvITE, fvP, fvB1, fvB2])}
 
-rnCmd (HsCmdLet _ binds cmd)
+rnCmd (HsCmdLet _ tkLet binds tkIn cmd)
   = rnLocalBindsAndThen binds $ \ binds' _ -> do
       { (cmd',fvExpr) <- rnLCmd cmd
-      ; return (HsCmdLet noExtField binds' cmd', fvExpr) }
+      ; return (HsCmdLet noExtField tkLet binds' tkIn cmd', fvExpr) }
 
 rnCmd (HsCmdDo _ (L l stmts))
   = do  { ((stmts', _), fvs) <-
@@ -859,7 +859,7 @@ methodNamesCmd (HsCmdPar _ _ c _) = methodNamesLCmd c
 methodNamesCmd (HsCmdIf _ _ _ c1 c2)
   = methodNamesLCmd c1 `plusFV` methodNamesLCmd c2 `addOneFV` choiceAName
 
-methodNamesCmd (HsCmdLet _ _ c)          = methodNamesLCmd c
+methodNamesCmd (HsCmdLet _ _ _ _ c)      = methodNamesLCmd c
 methodNamesCmd (HsCmdDo _ (L _ stmts))   = methodNamesStmts stmts
 methodNamesCmd (HsCmdApp _ c _)          = methodNamesLCmd c
 methodNamesCmd (HsCmdLam _ match)        = methodNamesMatch match

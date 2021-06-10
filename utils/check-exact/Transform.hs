@@ -1172,17 +1172,16 @@ instance HasDecls (LocatedA (Match GhcPs (LocatedA (HsExpr GhcPs)))) where
 -- ---------------------------------------------------------------------
 
 instance HasDecls (LocatedA (HsExpr GhcPs)) where
-  hsDecls (L _ (HsLet _ decls _ex)) = hsDeclsValBinds decls
-  hsDecls _                         = return []
+  hsDecls (L _ (HsLet _ _ decls _ _ex)) = hsDeclsValBinds decls
+  hsDecls _                             = return []
 
-  replaceDecls (L ll (HsLet x binds ex)) newDecls
+  replaceDecls (L ll (HsLet x tkLet binds tkIn ex)) newDecls
     = do
         logTr "replaceDecls HsLet"
         let lastAnc = realSrcSpan $ spanHsLocaLBinds binds
         -- TODO: may be an intervening comment, take account for lastAnc
-        let (x', ex',newDecls') = case x of
-              EpAnnNotUsed -> (x, ex, newDecls)
-              (EpAnn a (AnnsLet l i) cs) ->
+        let (newDecls', tkIn', ex') = case (tkLet, tkIn) of
+              (L (TokenLoc l) _, L (TokenLoc i) _) ->
                 let
                   off = case l of
                           (EpaSpan r) -> LayoutStartCol $ snd $ ss2pos r
@@ -1192,11 +1191,12 @@ instance HasDecls (LocatedA (HsExpr GhcPs)) where
                   newDecls'' = case newDecls of
                     [] -> newDecls
                     (d:ds) -> setEntryDPDecl d (SameLine 0) : ds
-                in ( EpAnn a (AnnsLet l (addEpaLocationDelta off lastAnc i)) cs
-                   , ex''
-                   , newDecls'')
+                in ( newDecls''
+                   , L (TokenLoc (addEpaLocationDelta off lastAnc i)) HsTok
+                   , ex'' )
+              _ -> (newDecls, tkIn, ex)
         binds' <- replaceDeclsValbinds WithoutWhere binds newDecls'
-        return (L ll (HsLet x' binds' ex'))
+        return (L ll (HsLet x tkLet binds' tkIn' ex'))
 
   -- TODO: does this make sense? Especially as no hsDecls for HsPar
   replaceDecls (L l (HsPar x lpar e rpar)) newDecls
