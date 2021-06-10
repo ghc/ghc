@@ -666,8 +666,8 @@ lvlMFE env strict_ctxt ann_expr
   || hasFreeJoin env fvs   -- If there is a free join, don't float
                            -- See Note [Free join points]
   || isExprLevPoly expr
-         -- We can't let-bind levity polymorphic expressions
-         -- See Note [Levity polymorphism invariants] in GHC.Core
+         -- We can't let-bind representation-polymorphic expressions
+         -- See Note [Representation polymorphism invariants] in GHC.Core
   || notWorthFloating expr abs_vars
   || not float_me
   =     -- Don't float it out
