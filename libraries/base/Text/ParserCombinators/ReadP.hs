@@ -162,6 +162,7 @@ instance Alternative P where
 -- The ReadP type
 
 newtype ReadP a = R (forall b . (a -> P b) -> P b)
+-- deriving .. via Codensity P
 
 -- | @since 2.01
 instance Functor ReadP where
