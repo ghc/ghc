@@ -64,6 +64,7 @@ import GHC.Iface.Load   ( loadInterfaceForName, loadSrcInterface_maybe )
 import GHC.Iface.Env
 import GHC.Hs
 import GHC.Types.Name.Reader
+import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
 import GHC.Parser.PostProcess ( setRdrNameSpace )
@@ -72,6 +73,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Types.Avail
+import GHC.Types.Error
 import GHC.Unit.Module
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.Warnings  ( WarningTxt, pprWarningTxtForMsg )
@@ -1088,9 +1090,11 @@ lookup_demoted rdr_name
                     ; case mb_demoted_name of
                         Nothing -> unboundNameX looking_for rdr_name star_info
                         Just demoted_name ->
-                          do { addDiagnostic
-                                 (WarningWithFlag Opt_WarnUntickedPromotedConstructors)
-                                 (untickedPromConstrWarn demoted_name)
+                          do { let msg = TcRnUnknownMessage $
+                                     mkPlainDiagnostic (WarningWithFlag Opt_WarnUntickedPromotedConstructors)
+                                                       noHints
+                                                       (untickedPromConstrWarn demoted_name)
+                             ; addDiagnostic (TcRnMessageDetailed noErrInfo msg)
                              ; return demoted_name } }
             else do { -- We need to check if a data constructor of this name is
                       -- in scope to give good error messages. However, we do
@@ -1570,8 +1574,13 @@ warnIfDeprecated gre@(GRE { gre_imp = iss })
                    -- See Note [Handling of deprecations]
          do { iface <- loadInterfaceForName doc name
             ; case lookupImpDeprec iface gre of
-                Just txt -> addDiagnostic (WarningWithFlag Opt_WarnWarningsDeprecations)
-                                          (mk_msg imp_spec txt)
+                Just txt -> do
+                  let msg = TcRnUnknownMessage $
+                              mkPlainDiagnostic (WarningWithFlag Opt_WarnWarningsDeprecations)
+                                                noHints
+                                                (mk_msg imp_spec txt)
+
+                  addDiagnostic (TcRnMessageDetailed noErrInfo msg)
                 Nothing  -> return () } }
   | otherwise
   = return ()

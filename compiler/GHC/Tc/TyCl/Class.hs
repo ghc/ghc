@@ -30,6 +30,7 @@ where
 import GHC.Prelude
 
 import GHC.Hs
+import GHC.Tc.Errors.Types
 import GHC.Tc.Gen.Sig
 import GHC.Tc.Types.Evidence ( idHsWrapper )
 import GHC.Tc.Gen.Bind
@@ -50,6 +51,7 @@ import GHC.Core.Coercion ( pprCoAxiom )
 import GHC.Driver.Session
 import GHC.Tc.Instance.Family
 import GHC.Core.FamInstEnv
+import GHC.Types.Error
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Name.Env
@@ -274,10 +276,10 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
 
        ; spec_prags <- discardConstraints $
                        tcSpecPrags global_dm_id prags
-       ; diagnosticTc WarningWithoutFlag
-                      (not (null spec_prags))
-                      (text "Ignoring SPECIALISE pragmas on default method"
-                       <+> quotes (ppr sel_name))
+       ; let dia = TcRnUnknownMessage $
+               mkPlainDiagnostic WarningWithoutFlag noHints $
+                (text "Ignoring SPECIALISE pragmas on default method" <+> quotes (ppr sel_name))
+       ; diagnosticTc (not (null spec_prags)) dia
 
        ; let hs_ty = hs_sig_fn sel_name
                      `orElse` pprPanic "tc_dm" (ppr sel_name)
@@ -572,7 +574,10 @@ warnMissingAT name
        -- hs-boot and signatures never need to provide complete "definitions"
        -- of any sort, as they aren't really defining anything, but just
        -- constraining items which are defined elsewhere.
-       ; diagnosticTc (WarningWithFlag Opt_WarnMissingMethods) (warn && hsc_src == HsSrcFile)
-                      (text "No explicit" <+> text "associated type"
-                          <+> text "or default declaration for"
-                          <+> quotes (ppr name)) }
+       ; let dia = TcRnUnknownMessage $
+               mkPlainDiagnostic (WarningWithFlag Opt_WarnMissingMethods) noHints $
+                 (text "No explicit" <+> text "associated type"
+                                     <+> text "or default declaration for"
+                                     <+> quotes (ppr name))
+       ; diagnosticTc  (warn && hsc_src == HsSrcFile) dia
+                       }

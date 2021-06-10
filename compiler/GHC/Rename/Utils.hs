@@ -39,8 +39,10 @@ import GHC.Prelude
 import GHC.Core.Type
 import GHC.Hs
 import GHC.Types.Name.Reader
+import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
+import GHC.Types.Error
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
@@ -169,9 +171,11 @@ checkShadowedOccs (global_env,local_env) get_loc_occ ns
                 -- we don't find any GREs that are in scope qualified-only
 
           complain []      = return ()
-          complain pp_locs = addDiagnosticAt (WarningWithFlag Opt_WarnNameShadowing)
-                                             loc
-                                             (shadowedNameWarn occ pp_locs)
+          complain pp_locs = do
+             let msg = TcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag Opt_WarnNameShadowing)
+                                                              noHints
+                                                              (shadowedNameWarn occ pp_locs)
+             addDiagnosticAt loc (TcRnMessageDetailed noErrInfo msg)
 
     is_shadowed_gre :: GlobalRdrElt -> RnM Bool
         -- Returns False for record selectors that are shadowed, when
@@ -385,9 +389,12 @@ checkUnusedRecordWildcard loc fvs (Just dotdot_names) =
 -- The `..` here doesn't bind any variables as `x` is already bound.
 warnRedundantRecordWildcard :: RnM ()
 warnRedundantRecordWildcard =
-  whenWOptM Opt_WarnRedundantRecordWildcards
-            (addDiagnostic (WarningWithFlag Opt_WarnRedundantRecordWildcards)
-                           redundantWildcardWarning)
+  whenWOptM Opt_WarnRedundantRecordWildcards $
+    let msg = TcRnUnknownMessage $
+                mkPlainDiagnostic (WarningWithFlag Opt_WarnRedundantRecordWildcards)
+                                  noHints
+                                  redundantWildcardWarning
+    in addDiagnostic (TcRnMessageDetailed noErrInfo msg)
 
 
 -- | Produce a warning when no variables bound by a `..` pattern are used.
@@ -404,7 +411,7 @@ warnUnusedRecordWildcard :: [Name] -> FreeVars -> RnM ()
 warnUnusedRecordWildcard ns used_names = do
   let used = filter (`elemNameSet` used_names) ns
   traceRn "warnUnused" (ppr ns $$ ppr used_names $$ ppr used)
-  warnIfFlag Opt_WarnUnusedRecordWildcards (null used)
+  warnIf (null used)
     unusedRecordWildcardWarning
 
 
@@ -474,15 +481,17 @@ reportable child
   | otherwise = not (startsWithUnderscore (occName child))
 
 addUnusedWarning :: WarningFlag -> OccName -> SrcSpan -> SDoc -> RnM ()
-addUnusedWarning flag occ span msg
-  = addDiagnosticAt (WarningWithFlag flag) span $
-    sep [msg <> colon,
-         nest 2 $ pprNonVarNameSpace (occNameSpace occ)
-                        <+> quotes (ppr occ)]
+addUnusedWarning flag occ span msg = do
+  let diag = TcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag flag) noHints $
+        sep [msg <> colon,
+             nest 2 $ pprNonVarNameSpace (occNameSpace occ)
+                            <+> quotes (ppr occ)]
+  addDiagnosticAt span (TcRnMessageDetailed noErrInfo diag)
 
-unusedRecordWildcardWarning :: SDoc
+unusedRecordWildcardWarning :: TcRnMessage
 unusedRecordWildcardWarning =
-  wildcardDoc $ text "No variables bound in the record wildcard match are used"
+  TcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag Opt_WarnUnusedRecordWildcards) noHints $
+    wildcardDoc $ text "No variables bound in the record wildcard match are used"
 
 redundantWildcardWarning :: SDoc
 redundantWildcardWarning =
