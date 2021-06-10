@@ -190,7 +190,7 @@ floatOutwards logger float_sws us pgm
 
 floatTopBind :: LevelledBind -> (FloatStats, Bag CoreBind)
 floatTopBind bind
-  = case (floatBind bind) of { (fs, floats, bind') ->
+  = case floatBind bind of { (fs, floats, bind') ->
     let float_bag = flattenTopFloats floats
     in case bind' of
       -- bind' can't have unlifted values or join points, so can only be one
@@ -217,7 +217,7 @@ floatBind :: LevelledBind -> (FloatStats, FloatBinds, [CoreBind])
   --       * A recursive group of value binds
   -- See Note [Floating out of Rec rhss] for why things get arranged this way.
 floatBind (NonRec (TB var _) rhs)
-  = case (floatRhs var rhs) of { (fs, rhs_floats, rhs') ->
+  = case floatRhs var rhs of { (fs, rhs_floats, rhs') ->
 
         -- A tiresome hack:
         -- see Note [Bottoming floats: eta expansion] in GHC.Core.Opt.SetLevels
@@ -247,13 +247,13 @@ floatBind (Rec pairs)
                  [(Id,CoreExpr)])) -- Join points and lifted value bindings
     do_pair (TB name spec, rhs)
       | isTopLvl dest_lvl  -- See Note [floatBind for top level]
-      = case (floatRhs name rhs) of { (fs, rhs_floats, rhs') ->
+      = case floatRhs name rhs of { (fs, rhs_floats, rhs') ->
         (fs, emptyFloats, ([], addTopFloatPairs (flattenTopFloats rhs_floats)
                                                 [(name, rhs')]))}
       | otherwise         -- Note [Floating out of Rec rhss]
-      = case (floatRhs name rhs) of { (fs, rhs_floats, rhs') ->
-        case (partitionByLevel dest_lvl rhs_floats) of { (rhs_floats', heres) ->
-        case (splitRecFloats heres) of { (ul_pairs, pairs, case_heres) ->
+      = case floatRhs name rhs of { (fs, rhs_floats, rhs') ->
+        case partitionByLevel dest_lvl rhs_floats of { (rhs_floats', heres) ->
+        case splitRecFloats heres of { (ul_pairs, pairs, case_heres) ->
         let pairs' = (name, installUnderLambdas case_heres rhs') : pairs in
         (fs, rhs_floats', (ul_pairs, pairs')) }}}
       where
@@ -365,8 +365,8 @@ floatBody :: Level
           -> (FloatStats, FloatBinds, CoreExpr)
 
 floatBody lvl arg       -- Used rec rhss, and case-alternative rhss
-  = case (floatExpr arg) of { (fsa, floats, arg') ->
-    case (partitionByLevel lvl floats) of { (floats', heres) ->
+  = case floatExpr arg of { (fsa, floats, arg') ->
+    case partitionByLevel lvl floats of { (floats', heres) ->
         -- Dump bindings are bound here
     (fsa, floats', install heres arg') }}
 
@@ -400,8 +400,8 @@ floatExpr (Coercion co) = (zeroStats, emptyFloats, Coercion co)
 floatExpr (Lit lit) = (zeroStats, emptyFloats, Lit lit)
 
 floatExpr (App e a)
-  = case (atJoinCeiling $ floatExpr  e) of { (fse, floats_e, e') ->
-    case (atJoinCeiling $ floatExpr  a) of { (fsa, floats_a, a') ->
+  = case atJoinCeiling (floatExpr e) of { (fse, floats_e, e') ->
+    case atJoinCeiling (floatExpr a) of { (fsa, floats_a, a') ->
     (fse `add_stats` fsa, floats_e `plusFloats` floats_a, App e' a') }}
 
 floatExpr lam@(Lam (TB _ lam_spec) _)
@@ -412,7 +412,7 @@ floatExpr lam@(Lam (TB _ lam_spec) _)
         -- See GHC.Core.Opt.SetLevels.lvlLamBndrs
         -- Use asJoinCeilLvl to make this the join ceiling
     in
-    case (floatBody bndr_lvl body) of { (fs, floats, body') ->
+    case floatBody bndr_lvl body of { (fs, floats, body') ->
     (add_to_stats fs floats, floats, mkLams bndrs body') }
 
 floatExpr (Tick tickish expr)
@@ -437,14 +437,14 @@ floatExpr (Tick tickish expr)
   = pprPanic "floatExpr tick" (ppr tickish)
 
 floatExpr (Cast expr co)
-  = case (atJoinCeiling $ floatExpr expr) of { (fs, floating_defns, expr') ->
+  = case atJoinCeiling (floatExpr expr) of { (fs, floating_defns, expr') ->
     (fs, floating_defns, Cast expr' co) }
 
 floatExpr (Let bind body)
   = case bind_spec of
       FloatMe dest_lvl
-        -> case (floatBind bind) of { (fsb, bind_floats, binds') ->
-           case (floatExpr body) of { (fse, body_floats, body') ->
+        -> case floatBind bind of { (fsb, bind_floats, binds') ->
+           case floatExpr body of { (fse, body_floats, body') ->
            let new_bind_floats = foldr plusFloats emptyFloats
                                    (map (unitLetFloat dest_lvl) binds') in
            ( add_stats fsb fse
@@ -453,8 +453,8 @@ floatExpr (Let bind body)
            , body') }}
 
       StayPut bind_lvl  -- See Note [Avoiding unnecessary floating]
-        -> case (floatBind bind)          of { (fsb, bind_floats, binds') ->
-           case (floatBody bind_lvl body) of { (fse, body_floats, body') ->
+        -> case floatBind bind          of { (fsb, bind_floats, binds') ->
+           case floatBody bind_lvl body of { (fse, body_floats, body') ->
            ( add_stats fsb fse
            , bind_floats `plusFloats` body_floats
            , foldr Let body' binds' ) }}
@@ -485,7 +485,7 @@ floatExpr (Case scrut (TB case_bndr case_spec) ty alts)
            }}
   where
     float_alt bind_lvl (Alt con bs rhs)
-        = case (floatBody bind_lvl rhs) of { (fs, rhs_floats, rhs') ->
+        = case floatBody bind_lvl rhs of { (fs, rhs_floats, rhs') ->
           (fs, rhs_floats, Alt con [b | TB b _ <- bs] rhs') }
 
 floatRhs :: CoreBndr
