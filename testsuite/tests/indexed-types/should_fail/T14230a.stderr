@@ -1,6 +1,7 @@
 
-T14230a.hs:13:14: error:
-    • Expected kind ‘k -> *’, but ‘a’ has kind ‘*’
-    • In the second argument of ‘CD’, namely ‘(a :: k -> *)’
-      In the data instance declaration for ‘CD’
+T14230a.hs:13:3: error:
+    • Type indexes must match class instance head
+      Expected: CD (*) (Maybe a)
+        Actual: CD k a
+    • In the data instance declaration for ‘CD’
       In the instance declaration for ‘C (Maybe a)’

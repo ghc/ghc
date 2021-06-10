@@ -1,20 +1,9 @@
 
-T14584.hs:56:41: warning: [-Wdeferred-type-errors (in -Wdefault)]
-    • Could not deduce (SingI a) arising from a use of ‘sing’
-      from the context: (Action act, Monoid a, Good m)
-        bound by the instance declaration at T14584.hs:54:10-89
-    • In the second argument of ‘fromSing’, namely
-        ‘(sing @m @a :: Sing _)’
-      In the fourth argument of ‘act’, namely
-        ‘(fromSing @m (sing @m @a :: Sing _))’
-      In the expression:
-        act @_ @_ @act (fromSing @m (sing @m @a :: Sing _))
-
 T14584.hs:56:50: warning: [-Wdeferred-type-errors (in -Wdefault)]
-    • Could not deduce: m ~ *
-      from the context: (Action act, Monoid a, Good m)
+    • Could not deduce: m1 ~ *
+      from the context: (Action act, Monoid a, Good m1)
         bound by the instance declaration at T14584.hs:54:10-89
-      ‘m’ is a rigid type variable bound by
+      ‘m1’ is a rigid type variable bound by
         the instance declaration
         at T14584.hs:54:10-89
     • In the type ‘a’
@@ -24,8 +13,9 @@ T14584.hs:56:50: warning: [-Wdeferred-type-errors (in -Wdefault)]
         ‘(fromSing @m (sing @m @a :: Sing _))’
 
 T14584.hs:56:60: warning: [-Wpartial-type-signatures (in -Wdefault)]
-    • Found type wildcard ‘_’ standing for ‘a :: m’
-      Where: ‘a’, ‘m’ are rigid type variables bound by
+    • Found type wildcard ‘_’ standing for ‘a0 :: m’
+      Where: ‘a0’ is an ambiguous type variable
+             ‘m’ is a rigid type variable bound by
                the instance declaration
                at T14584.hs:54:10-89
     • In the first argument of ‘Sing’, namely ‘_’

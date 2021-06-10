@@ -1,4 +1,4 @@
-{-# LANGUAGE RankNTypes, TypeFamilies, PolyKinds, FunctionalDependencies #-}
+{-# LANGUAGE AllowAmbiguousTypes, RankNTypes, TypeFamilies, PolyKinds, FunctionalDependencies #-}
 module T16946 where
 
 import Data.Kind
