@@ -93,6 +93,7 @@ import Data.Either ( partitionEithers )
 import qualified GHC.Types.CostCentre as CC
 import GHC.Stg.Syntax
 import GHC.Stg.FVs
+import GHC.Driver.Ppr
 
 -- -----------------------------------------------------------------------------
 -- Generating byte code for a complete module
