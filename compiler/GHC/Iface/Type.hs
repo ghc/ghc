@@ -1597,7 +1597,7 @@ pprTuple ctxt_prec sort promoted args =
            -- See Note [Unboxed tuple RuntimeRep vars] in GHC.Core.TyCon
          let tys   = appArgsIfaceTypes args
              args' = case sort of
-                       UnboxedTuple -> drop ((length tys `div` 3) * 2) tys
+                       UnboxedTuple -> drop (length tys `div` 2) tys
                        _            -> tys
          in
          ppr_tuple_app args' $

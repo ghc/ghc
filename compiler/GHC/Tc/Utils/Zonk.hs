@@ -1399,8 +1399,7 @@ zonk_pat env p@(ConPat { pat_con = L _ con
         ; case con of
             RealDataCon dc
               | isUnboxedTupleTyCon (dataConTyCon dc)
-              -> pprPanic "here" (ppr new_tys)
-                -- mapM_ (checkForLevPoly doc) (dropRuntimeRepArgs new_tys)
+              -> mapM_ (checkForLevPoly doc) (dropRuntimeRepArgs new_tys)
             _ -> return ()
 
         ; (env0, new_tyvars) <- zonkTyBndrsX env tyvars

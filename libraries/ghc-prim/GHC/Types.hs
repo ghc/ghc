@@ -416,14 +416,7 @@ data CallingConv = ConvEval
 -- | ConvCall [RuntimeRep]
 data RuntimeInfo = RInfo {rep :: RuntimeRep, conv :: CallingConv}
 
--- type family MultMul (a :: Multiplicity) (b :: Multiplicity) :: Multiplicity where
---   MultMul 'One x = x
---   MultMul x 'One = x
---   MultMul 'Many x = 'Many
---   MultMul x 'Many = 'Many
-
 type family GetRep (ri :: RuntimeInfo) :: RuntimeRep where
-  -- GetRep ('RInfo ('TupleRep '[GetRep a]) _) = 'TupleRep '[]
   GetRep ('RInfo rep _) = rep
 
 type family GetConv (ri :: RuntimeInfo) :: CallingConv where

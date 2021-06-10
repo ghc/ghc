@@ -127,6 +127,7 @@ import GHC.Data.Bag( unitBag )
 import Data.List ( find )
 import Control.Monad
 
+
 {-
         ----------------------------
                 General notes
@@ -1335,7 +1336,7 @@ finish_tuple rn_ty tup_sort tau_tys tau_kinds exp_kind = do
           
           -- See also Note [Unboxed tuple RuntimeRep vars] in GHC.Core.TyCon
           arg_tys  = tau_infos ++ tau_tys
-          res_kind = unboxedTupleKind tau_infos
+          res_kind = unboxedTupleKind $ tau_infos
       checkTupSize arity
       check_expected_kind (mkTyConApp tycon arg_tys) res_kind
   where

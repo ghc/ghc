@@ -265,6 +265,8 @@ import {-# SOURCE #-} GHC.Builtin.Types
                                  , runtimeRepTy, callingConvTy
                                  , getRepTyCon, getConvTyCon
                                  , constraintKind, rInfo
+                                 , mkPromotedListTy
+                                 , extractPromotedList
                                  , unrestrictedFunTyCon
                                  , manyDataConTy, oneDataConTy )
 import GHC.Types.Name( Name )
@@ -293,6 +295,8 @@ import GHC.Types.Unique ( nonDetCmpUnique )
 import GHC.Data.Maybe   ( orElse, expectJust )
 import Data.Maybe       ( isJust )
 import Control.Monad    ( guard )
+
+import GHC.Driver.Ppr (pprTrace)-- temp. remove
 
 
 -- $type_classification
@@ -601,13 +605,33 @@ getRepField rinfo
   | otherwise 
   = pprPanic "getRepField of non-RuntimeInfo" (ppr rinfo)
 
+
+simplifyKind :: Type -> Maybe Type
+simplifyKind k
+  | TyConApp tc [rinfo] <- k
+  , tc `hasKey` tYPETyConKey
+  , Just rinfo' <- simplifyInfo rinfo
+  = Just $ tYPE rinfo'
+  | otherwise
+  = Nothing
+
 simplifyInfo :: Type -> Maybe Type
 simplifyInfo rinfo
-  | Just rep <- extractRep rinfo
+  | canSimplifyInfo rinfo
+  , Just rep <- extractRep rinfo
   , Just conv <- extractConv rinfo
   =  Just $ rInfo rep conv
   | otherwise
-  = Just rinfo
+  = Nothing
+
+canSimplifyInfo :: Type -> Bool
+canSimplifyInfo rinfo 
+  | TyConApp rinfo' [rep,conv] <- rinfo
+  , canSimplifyRep rep || canSimplifyConv conv
+  = panic "here"
+  -- = pprTrace "can_simplify" (ppr rep $$ (ppr $ canSimplifyRep rep)) True
+  | otherwise 
+  = False
 
 getRepArg_maybe :: Type -> Maybe Type
 getRepArg_maybe ty
@@ -617,13 +641,38 @@ getRepArg_maybe ty
     | otherwise
     = Nothing
 
+
+canSimplifyRep :: Type -> Bool
+canSimplifyRep rep
+    | Just rinfo <- getRepArg_maybe rep
+    , TyConApp rinfo [_rep, _conv] <- rinfo
+    = True
+    | otherwise
+    = False
+
 simplifyRep :: Type -> Type
 simplifyRep rep
-    | rinfo <- getRepArg_maybe rep
-    , Just (TyConApp rinfo [rep', _]) <- rinfo
+    | Just rinfo <- getRepArg_maybe rep
+    , (TyConApp rinfo [rep', _]) <- rinfo
     = rep'
     | otherwise
     = rep
+
+simplifyRep_maybe :: Type -> Maybe Type
+simplifyRep_maybe rep
+    | Just rinfo <- getRepArg_maybe rep
+    , (TyConApp rinfo [rep', _]) <- rinfo
+    = Just rep'
+    | otherwise
+    = Nothing
+
+simplifyConv_maybe :: Type -> Maybe Type
+simplifyConv_maybe conv
+    | Just rinfo <- getConvArg_maybe conv
+    , (TyConApp rinfo [_rep, conv']) <- rinfo
+    = Just conv'
+    | otherwise
+    = Nothing
 
 isGetRepTy :: Type -> Bool
 isGetRepTy ty
@@ -633,23 +682,44 @@ isGetRepTy ty
     | otherwise
     = False
 
+getConvArg_maybe :: Type -> Maybe Type
+getConvArg_maybe ty
+    | TyConApp tc [arg] <- ty
+    , tc `hasKey` getConvTyConKey
+    = Just arg
+    | otherwise
+    = Nothing
 
-simplifyKind :: Type -> Maybe Type
-simplifyKind kind
-  | Just rinfo <- kindInfo_maybe kind
-  , (TyConApp tr [arg]) <- getRepField rinfo
+canSimplifyConv :: Type -> Bool
+canSimplifyConv conv
+    | Just rinfo <- getConvArg_maybe conv
+    , TyConApp rinfo [_rep, _conv] <- rinfo
+    = True
+    | otherwise
+    = False    
+
+-- deconsTupleRepList :: Type -> [Type]
+-- deconsTupleRepList (TyConApp tc ([_, a,t])) = a : deconsTupleRepList t
+-- deconsTupleRepList (TyConApp tc _) = []
+
+-- consTupleRepList :: [Type] -> Type
+-- consTupleRepList as = mkPromotedListTy runtimeRepTy as
+
+
+simplifyKindDeep :: Type -> Maybe Type
+simplifyKindDeep kind
+  | Just runtimeInfo <- kindInfo_maybe kind
+  , TyConApp rinfo [rep,conv] <- runtimeInfo
+  , (TyConApp tr [arg]) <- rep
   , tr `hasKey` tupleRepDataConKey
-  , TyConApp tl args <- arg
-  , Just conv <- extractConv rinfo
-  , containsGetRep args
-  -- = pprPanic "args" (ppr $ args)
-  -- = pprPanic "here" (ppr kind)
-  =  Just $ rInfo (tupleRep tr tl args) conv
+  , tupleReps <- extractPromotedList arg
+  , containsSimplifiableGetRep tupleReps  
+  = Just $ tYPE $ rInfo (TyConApp tr [(tup_reps tupleReps)]) conv
   | otherwise
   = Nothing
-  where containsGetRep = (elem True) . (map isGetRepTy)
-        tupleList tl args = TyConApp tl (map simplifyRep args)
-        tupleRep tr tl args = TyConApp tr [tupleList tl args]
+  where containsSimplifiableGetRep = (elem True) . (map (\t -> (canSimplifyRep t) &&  (isGetRepTy t)))
+        tup_reps = ((mkPromotedListTy runtimeRepTy) . (map simplifyRep)) 
+
 
 
 extractRep :: Type -> Maybe Type
@@ -1397,9 +1467,6 @@ piResultTys ty orig_args@(arg:args)
       = go (extendTCvSubst subst tv arg) res args
 
       | Just ty' <- coreView ty
-      = go subst ty' all_args
-
-      | Just ty' <- simplifyKind ty
       = go subst ty' all_args
 
       | not (isEmptyTCvSubst subst)  -- See Note [Care with kind instantiation]
@@ -2260,6 +2327,13 @@ isUnboxedTupleType ty
   = tyConAppTyCon (getRuntimeRep ty) `hasKey` tupleRepDataConKey
   -- NB: Do not use typePrimRep, as that can't tell the difference between
   -- unboxed tuples and unboxed sums
+
+isUnboxedTupleKind :: Type -> Bool
+isUnboxedTupleKind k
+  | Just (TyConApp tc _)  <- kindRep_maybe k
+  = tc `hasKey` tupleRepDataConKey
+  | otherwise
+  = False
 
 
 isUnboxedSumType :: Type -> Bool
@@ -3182,15 +3256,27 @@ during type inference.
 isKindLevPoly :: Kind -> Bool
 isKindLevPoly k = ASSERT2( isLiftedTypeKind k || _is_type, ppr k )
                     -- the isLiftedTypeKind check is necessary b/c of Constraint
-                  go k
+                  -- go k
+                  pprTrace "init call" (ppr k) (go k)
   where
     go ty | Just ty' <- coreView ty = go ty'
     go TyVarTy{}         = True
     go AppTy{}           = True  -- it can't be a TyConApp
     go ty@(TyConApp tc tys)
-      | tc `hasKey` getRepTyConKey
-      , Just ty' <- extractRep ty
-      = go ty'
+      | isUnboxedTupleKind ty
+      , TyConApp tr [reps] <- kindRep ty
+      , reps' <- extractPromotedList reps
+      = pprTrace "trace simplify ubxt" (ppr reps') (any go reps')  
+      | Just rep <- simplifyRep_maybe ty
+      -- =  go rep
+      =  pprTrace "trace simplify rep" (ppr ty $$ ppr rep) (go rep) 
+      | Just conv <- simplifyConv_maybe ty
+      = go conv
+      -- | isUnboxedTupleKind ty
+      -- = False
+      -- | Just ty' <- simplifyKind ty
+      -- , pprTrace "trace simplify" (ppr ty $$ ppr ty') True
+      -- = go ty'
       | otherwise
       = isFamilyTyCon tc || any go tys
     -- go (TyConApp tc tys) = isFamilyTyCon tc || any go tys

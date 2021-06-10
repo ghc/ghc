@@ -62,7 +62,7 @@ module GHC.Builtin.Types (
         nilDataCon, nilDataConName, nilDataConKey,
         consDataCon_RDR, consDataCon, consDataConName,
         promotedNilDataCon, promotedConsDataCon,
-        mkListTy, mkPromotedListTy,
+        mkListTy, mkPromotedListTy, extractPromotedList,
 
         -- * Maybe
         maybeTyCon, maybeTyConName,
@@ -1036,18 +1036,9 @@ unboxedTupleSumKind :: TyCon -> [Type] -> Kind
 unboxedTupleSumKind tc ri_tys
   = tYPE $ mkTyConApp runtimeInfoDataConTyCon [(mkTyConApp tc [mkPromotedListTy runtimeRepTy rr_tys ]), convEvalDataConTy]
     where rr_tys = map getRep' ri_tys
-
 unboxedTupleSumKind tc []
   = tYPE $ mkTyConApp runtimeInfoDataConTyCon [(mkTyConApp tc [mkPromotedListTy runtimeRepTy []]), convEvalDataConTy]
 
-      
-take2 :: [a] -> [(a,a)]
-take2 xs = case xs of
-    (x:y:xs) -> (x,y) : take2 xs  
-    _        -> []
-
-interleave (a1:a1s) (a2:a2s) = a1:a2:interleave a1s a2s
-interleave _ _ = []
 
 -- | Specialization of 'unboxedTupleSumKind' for tuples
 unboxedTupleKind :: [Type] -> Kind

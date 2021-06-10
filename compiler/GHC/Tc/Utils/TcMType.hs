@@ -1046,12 +1046,6 @@ newFlexiTyVarTy kind = do
 newFlexiTyVarTys :: Int -> Kind -> TcM [TcType]
 newFlexiTyVarTys n kind = replicateM n (newFlexiTyVarTy kind)
 
--- newOpenTypeKind :: TcM TcKind
--- newOpenTypeKind
---   = do { rr <- newFlexiTyVarTy runtimeRepTy
---        ; cc <- newFlexiTyVarTy callingConvTy
---        ; return (tYPE $ rInfo rr cc) }
-
 newOpenTypeKind :: TcM TcKind
 newOpenTypeKind
   = do { ri <- newFlexiTyVarTy runtimeInfoTy
