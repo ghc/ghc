@@ -46,9 +46,9 @@ initFreeRegs platform = foldl' (flip releaseReg) noFreeRegs (allocatableRegs pla
 
 getFreeRegs :: RegClass -> FreeRegs -> [RealReg]        -- lazily
 getFreeRegs cls (FreeRegs g f)
+    | RcFloat <- cls = [] -- no float regs on PowerPC, use double
     | RcDouble <- cls = go f (0x80000000) 63
     | RcInteger <- cls = go g (0x80000000) 31
-    | otherwise = pprPanic "RegAllocLinear.getFreeRegs: Bad register class" (ppr cls)
     where
         go _ 0 _ = []
         go x m i | x .&. m /= 0 = RealRegSingle i : (go x (m `shiftR` 1) $! i-1)
