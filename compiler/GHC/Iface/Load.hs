@@ -461,7 +461,7 @@ loadInterface doc_str mod from
             _ -> do {
 
         -- READ THE MODULE IN
-        ; read_result <- case (wantHiBootFile home_unit eps mod from) of
+        ; read_result <- case wantHiBootFile home_unit eps mod from of
                            Failed err             -> return (Failed err)
                            Succeeded hi_boot_file -> do
                              hsc_env <- getTopEnv

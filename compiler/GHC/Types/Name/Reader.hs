@@ -319,10 +319,10 @@ instance Eq RdrName where
     _             == _             = False
 
 instance Ord RdrName where
-    a <= b = case (a `compare` b) of { LT -> True;  EQ -> True;  GT -> False }
-    a <  b = case (a `compare` b) of { LT -> True;  EQ -> False; GT -> False }
-    a >= b = case (a `compare` b) of { LT -> False; EQ -> True;  GT -> True  }
-    a >  b = case (a `compare` b) of { LT -> False; EQ -> False; GT -> True  }
+    a <= b = case a `compare` b of { LT -> True;  EQ -> True;  GT -> False }
+    a <  b = case a `compare` b of { LT -> True;  EQ -> False; GT -> False }
+    a >= b = case a `compare` b of { LT -> False; EQ -> True;  GT -> True  }
+    a >  b = case a `compare` b of { LT -> False; EQ -> False; GT -> True  }
 
         -- Exact < Unqual < Qual < Orig
         -- [Note: Apr 2004] We used to use nukeExact to convert Exact to Orig
