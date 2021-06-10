@@ -313,7 +313,7 @@ genSwitch config expr targets
         = error "MachCodeGen: sparc genSwitch PIC not finished\n"
 
         | otherwise
-        = do    (e_reg, e_code) <- getSomeReg (cmmOffset (ncgPlatform config) expr offset)
+        = do    (e_reg, e_code) <- getSomeReg indexExpr
 
                 base_reg        <- getNewRegNat II32
                 offset_reg      <- getNewRegNat II32
@@ -334,7 +334,15 @@ genSwitch config expr targets
                         , LD      II32 (AddrRegReg base_reg offset_reg) dst
                         , JMP_TBL (AddrRegImm dst (ImmInt 0)) ids label
                         , NOP ]
-  where (offset, ids) = switchTargetsToTable targets
+  where
+    indexExpr = cmmOffset platform exprWidened offset
+    -- We widen to a native-width register to santize the high bits
+    exprWidened = CmmMachOp
+      (MO_UU_Conv (cmmExprWidth platform expr)
+                  (platformWordWidth platform))
+      [expr]
+    (offset, ids) = switchTargetsToTable targets
+    platform = ncgPlatform config
 
 generateJumpTableForInstr :: Platform -> Instr
                           -> Maybe (NatCmmDecl RawCmmStatics Instr)

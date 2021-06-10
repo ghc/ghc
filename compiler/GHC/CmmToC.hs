@@ -341,15 +341,17 @@ pprSwitch platform e ids
   where
     (pairs, mbdef) = switchTargetsFallThrough ids
 
+    rep = typeWidth (cmmExprType platform e)
+
     -- fall through case
     caseify (ix:ixs, ident) = vcat (map do_fallthrough ixs) $$ final_branch ix
         where
         do_fallthrough ix =
-                 hsep [ text "case" , pprHexVal platform ix (wordWidth platform) <> colon ,
+                 hsep [ text "case" , pprHexVal platform ix rep <> colon ,
                         text "/* fall through */" ]
 
         final_branch ix =
-                hsep [ text "case" , pprHexVal platform ix (wordWidth platform) <> colon ,
+                hsep [ text "case" , pprHexVal platform ix rep <> colon ,
                        text "goto" , (pprBlockId ident) <> semi ]
 
     caseify (_     , _    ) = panic "pprSwitch: switch with no cases!"

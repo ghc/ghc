@@ -3476,9 +3476,16 @@ genSwitch :: CmmExpr -> SwitchTargets -> NatM InstrBlock
 genSwitch expr targets = do
   config <- getConfig
   let platform = ncgPlatform config
+      -- We widen to a native-width register because we cannot use arbitry sizes
+      -- in x86 addressing modes.
+      exprWidened = CmmMachOp
+        (MO_UU_Conv (cmmExprWidth platform expr)
+                    (platformWordWidth platform))
+        [expr]
+      indexExpr = cmmOffset platform exprWidened offset
   if ncgPIC config
   then do
-        (reg,e_code) <- getNonClobberedReg (cmmOffset platform expr offset)
+        (reg,e_code) <- getNonClobberedReg indexExpr
            -- getNonClobberedReg because it needs to survive across t_code
         lbl <- getNewLabelNat
         let is32bit = target32Bit platform
@@ -3519,7 +3526,7 @@ genSwitch expr targets = do
                                JMP_TBL (OpReg tableReg) ids rosection lbl
                        ]
   else do
-        (reg,e_code) <- getSomeReg (cmmOffset platform expr offset)
+        (reg,e_code) <- getSomeReg indexExpr
         lbl <- getNewLabelNat
         let op = OpAddr (AddrBaseIndex EABaseNone (EAIndex reg (platformWordSizeInBytes platform)) (ImmCLbl lbl))
             code = e_code `appOL` toOL [
