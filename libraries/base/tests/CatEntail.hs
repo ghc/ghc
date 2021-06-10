@@ -1,3 +1,4 @@
+{-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE ConstraintKinds, GADTs, RankNTypes #-}
 {-# LANGUAGE TypeOperators, KindSignatures #-}
 module CatEntail where
@@ -6,11 +7,12 @@ import Data.Kind
 import Control.Category
 
 -- One dictionary to rule them all.
-data Dict :: Constraint -> Type where
+type Dict :: Constraint -> Type
+data Dict ctx where
   Dict :: ctx => Dict ctx
 
 -- Entailment.
--- Note the kind 'Constraint -> Constraint -> *'
+type    (|-) :: Constraint -> Constraint -> Type
 newtype (|-) a b = Sub (a => Dict b)
 
 (\\) :: a => (b => r) -> (a |- b) -> r

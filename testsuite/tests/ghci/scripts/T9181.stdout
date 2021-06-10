@@ -17,12 +17,12 @@ data GHC.TypeLits.ErrorMessage
     GHC.TypeLits.:$$:
     GHC.TypeLits.ErrorMessage
 type GHC.TypeLits.KnownChar :: Char -> Constraint
-class GHC.TypeLits.KnownChar n where
-  GHC.TypeLits.charSing :: GHC.TypeLits.SChar n
+class GHC.TypeLits.KnownChar ch where
+  GHC.TypeLits.charSing :: GHC.TypeLits.SChar ch
   {-# MINIMAL charSing #-}
 type GHC.TypeLits.KnownSymbol :: GHC.Types.Symbol -> Constraint
-class GHC.TypeLits.KnownSymbol n where
-  GHC.TypeLits.symbolSing :: GHC.TypeLits.SSymbol n
+class GHC.TypeLits.KnownSymbol str where
+  GHC.TypeLits.symbolSing :: GHC.TypeLits.SSymbol str
   {-# MINIMAL symbolSing #-}
 type GHC.TypeLits.NatToChar :: GHC.Num.Natural.Natural -> Char
 type family GHC.TypeLits.NatToChar a
@@ -36,9 +36,9 @@ data GHC.TypeLits.SomeSymbol
   = forall (n :: GHC.Types.Symbol).
     GHC.TypeLits.KnownSymbol n =>
     GHC.TypeLits.SomeSymbol (Data.Proxy.Proxy n)
-type GHC.TypeLits.TypeError :: forall b.
-                               GHC.TypeLits.ErrorMessage -> b
-type family GHC.TypeLits.TypeError a where
+type GHC.TypeLits.TypeError :: forall k.
+                               GHC.TypeLits.ErrorMessage -> k
+type family GHC.TypeLits.TypeError errorMsg where
 type GHC.TypeLits.UnconsSymbol :: GHC.Types.Symbol
                                   -> Maybe (Char, GHC.Types.Symbol)
 type family GHC.TypeLits.UnconsSymbol a
