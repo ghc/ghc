@@ -537,7 +537,7 @@ tryWW ww_opts is_rec fn_id rhs
                       <+> text "arityInfo:" <+> ppr (arityInfo fn_info)) $
           ct_cpr cpr_ty
 
-    new_fn_id = zapIdUsedOnceInfo (zapIdUsageEnvInfo fn_id)
+    new_fn_id = zapIdUsageEnvInfo fn_id
         -- See Note [Zapping DmdEnv after Demand Analyzer] and
         -- See Note [Zapping Used Once info WorkWrap]
 
