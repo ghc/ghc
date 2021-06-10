@@ -1,14 +1,12 @@
 
-RecordDotSyntaxFail13.hs:26:11:
-     Couldn't match type ‘Int’ with ‘Foo -> Int’
+RecordDotSyntaxFail13.hs:26:11: error:
+    • Couldn't match type ‘Int’ with ‘Foo -> Int’
         arising from a functional dependency between:
           constraint ‘HasField "foo" Foo (Foo -> Int)’
-            << This should not appear in error messages. If you see this
-            in an error message, please report a bug mentioning ‘record update’ at
-            https://gitlab.haskell.org/ghc/ghc/wikis/report-a-bug >>
+            arising from a record update
           instance ‘HasField "foo" Foo Int’
             at RecordDotSyntaxFail13.hs:21:10-31
-     In the second argument of ‘($)’, namely ‘a {foo}’
+    • In the second argument of ‘($)’, namely ‘a {foo}’
       In a stmt of a 'do' block: print $ a {foo}
       In the expression:
         do let a = ...
