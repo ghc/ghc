@@ -18,3 +18,11 @@ test('cmp64',
 #       ],
 #       multimod_compile,
 #       ['T17516', '-O -v0'])
+
+test('ByteSwitch',
+     [    extra_run_opts('"' + config.libdir + '"')
+     ,    omit_ways(['ghci'])
+     ,    extra_clean('ByteSwitch_cmm.o')
+     ],
+     multi_compile_and_run,
+     ['ByteSwitch', [('ByteSwitch_cmm.cmm', '')], ''])
