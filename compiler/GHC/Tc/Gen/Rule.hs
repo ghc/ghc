@@ -134,7 +134,7 @@ tcRule (HsRule { rd_ext  = ext
        ; (lhs_evs, residual_lhs_wanted)
             <- simplifyRule name tc_lvl lhs_wanted rhs_wanted
 
-       -- SimplfyRule Plan, step 4
+       -- SimplifyRule Plan, step 4
        -- Now figure out what to quantify over
        -- c.f. GHC.Tc.Solver.simplifyInfer
        -- We quantify over any tyvars free in *either* the rule
@@ -306,8 +306,9 @@ revert to SimplCheck when going under an implication.
 
 * Step 0: typecheck the LHS and RHS to get constraints from each
 
-* Step 1: Simplify the LHS and RHS constraints all together in one bag
-          We do this to discover all unification equalities
+* Step 1: Simplify the LHS and RHS constraints all together in one bag,
+          but /discarding/ the simplified constraints. We do this only
+          to discover all unification equalities.
 
 * Step 2: Zonk the ORIGINAL (unsimplified) LHS constraints, to take
           advantage of those unifications
