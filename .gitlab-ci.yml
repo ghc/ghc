@@ -562,6 +562,7 @@ validate-x86_64-darwin:
         --keep CI_PROJECT_DIR --keep MAKE_ARGS --keep HADRIAN_ARGS --keep CABAL_CACHE \
         --keep LANG --keep CONFIGURE_ARGS --keep TEST_ENV --keep BIN_DIST_NAME \
         --keep MACOSX_DEPLOYMENT_TARGET --keep ac_cv_func_clock_gettime --keep HACKAGE_INDEX_STATE \
+        --keep PERF_NOTE_KEY --keep HEAD_HACKAGE_TRIGGER_TOKEN \
         --run "$1" 2>&1
     }
     # fix up config.sub in libraries for the time.
