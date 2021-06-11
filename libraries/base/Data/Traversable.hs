@@ -48,6 +48,9 @@ module Data.Traversable (
     -- ** Example binary tree instance
     -- $tree_instance
 
+    -- *** Pre-order and post-order tree traversal
+    -- $tree_order
+
     -- ** Making construction intuitive
     --
     -- $construction
@@ -758,6 +761,128 @@ foldMapDefault = coerce (traverse :: (a -> Const m ()) -> t a -> Const m (t ()))
 -- the general case, but as mentioned in [Overview](#overview) above, instance
 -- definitions are typically rather simple, all the interesting behaviour is a
 -- result of an interesting choice of 'Applicative' functor for a traversal.
+
+-- $tree_order
+--
+-- It is perhaps worth noting that the traversal defined above gives an
+-- /in-order/ sequencing of the elements.  If instead you want either
+-- /pre-order/ (parent first, then child nodes) or post-order (child nodes
+-- first, then parent) sequencing, you can define the instance accordingly:
+--
+-- > inOrderNode :: Tree a -> a -> Tree a -> Tree a
+-- > inOrderNode l x r = Node l x r
+-- >
+-- > preOrderNode :: a -> Tree a -> Tree a -> Tree a
+-- > preOrderNode x l r = Node l x r
+-- >
+-- > postOrderNode :: Tree a -> Tree a -> a -> Tree a
+-- > postOrderNode l r x = Node l x r
+-- >
+-- > -- Traversable instance with in-order traversal
+-- > instance Traversable Tree where
+-- >     traverse g t = case t of
+-- >         Empty      -> pure Empty
+-- >         Leaf x     -> Leaf <$> g x
+-- >         Node l x r -> inOrderNode <$> traverse g l <*> g x <*> traverse g r
+-- >
+-- > -- Traversable instance with pre-order traversal
+-- > instance Traversable Tree where
+-- >     traverse g t = case t of
+-- >         Empty      -> pure Empty
+-- >         Leaf x     -> Leaf <$> g x
+-- >         Node l x r -> preOrderNode <$> g x <*> traverse g l <*> traverse g r
+-- >
+-- > -- Traversable instance with post-order traversal
+-- > instance Traversable Tree where
+-- >     traverse g t = case t of
+-- >         Empty      -> pure Empty
+-- >         Leaf x     -> Leaf <$> g x
+-- >         Node l x r -> postOrderNode <$> traverse g l <*> traverse g r <*> g x
+--
+-- Since the same underlying Tree structure is used in all three cases, it is
+-- possible to use @newtype@ wrappers to make all three available at the same
+-- time!  The user need only wrap the root of the tree in the appropriate
+-- @newtype@ for the desired traversal order.  Tne associated instance
+-- definitions are shown below (see [coercion](#coercion) if unfamiliar with
+-- the use of 'coerce' in the sample code):
+--
+-- > {-# LANGUAGE ScopedTypeVariables #-}
+-- >
+-- > -- Default in-order traversal
+-- >
+-- > import Data.Coerce (coerce)
+-- > import Data.Foldable (toList)
+-- > import Data.Traversable
+-- >
+-- > data Tree a = Empty | Leaf a | Node (Tree a) a (Tree a)
+-- > instance Functor  Tree where fmap    = fmapDefault
+-- > instance Foldable Tree where foldMap = foldMapDefault
+-- >
+-- > instance Traversable Tree where
+-- >     traverse _ Empty = pure Empty
+-- >     traverse g (Leaf a) = Leaf <$> g a
+-- >     traverse g (Node l a r) = Node <$> traverse g l <*> g a <*> traverse g r
+-- >
+-- > -- Optional pre-order traversal
+-- >
+-- > newtype PreOrderTree a = PreOrderTree (Tree a)
+-- > instance Functor  PreOrderTree where fmap    = fmapDefault
+-- > instance Foldable PreOrderTree where foldMap = foldMapDefault
+-- >
+-- > instance Traversable PreOrderTree where
+-- >     traverse _ (PreOrderTree Empty)        = pure $ preOrderEmpty
+-- >     traverse g (PreOrderTree (Leaf x))     = preOrderLeaf <$> g x
+-- >     traverse g (PreOrderTree (Node l x r)) = preOrderNode
+-- >         <$> g x
+-- >         <*> traverse g (coerce l)
+-- >         <*> traverse g (coerce r)
+-- >
+-- > preOrderEmpty :: forall a. PreOrderTree a
+-- > preOrderEmpty = coerce (Empty :: Tree a)
+-- > preOrderLeaf :: forall a. a -> PreOrderTree a
+-- > preOrderLeaf = coerce (Leaf :: a -> Tree a)
+-- > preOrderNode :: a -> PreOrderTree a -> PreOrderTree a -> PreOrderTree a
+-- > preOrderNode x l r = coerce (Node (coerce l) x (coerce r))
+-- >
+-- > -- Optional post-order traversal
+-- >
+-- > newtype PostOrderTree a = PostOrderTree (Tree a)
+-- > instance Functor  PostOrderTree where fmap    = fmapDefault
+-- > instance Foldable PostOrderTree where foldMap = foldMapDefault
+-- >
+-- > instance Traversable PostOrderTree where
+-- >     traverse _ (PostOrderTree Empty)        = pure postOrderEmpty
+-- >     traverse g (PostOrderTree (Leaf x))     = postOrderLeaf <$> g x
+-- >     traverse g (PostOrderTree (Node l x r)) = postOrderNode
+-- >         <$> traverse g (coerce l)
+-- >         <*> traverse g (coerce r)
+-- >         <*> g x
+-- >
+-- > postOrderEmpty :: forall a. PostOrderTree a
+-- > postOrderEmpty = coerce (Empty :: Tree a)
+-- > postOrderLeaf :: forall a. a -> PostOrderTree a
+-- > postOrderLeaf = coerce (Leaf :: a -> Tree a)
+-- > postOrderNode :: PostOrderTree a -> PostOrderTree a -> a -> PostOrderTree a
+-- > postOrderNode l r x = coerce (Node (coerce l) x (coerce r))
+--
+-- With the above, given a sample tree:
+--
+-- > inOrder :: Tree Int
+-- > inOrder = Node (Node (Leaf 10) 3 (Leaf 20)) 5 (Leaf 42)
+--
+-- we have:
+--
+-- > print $ toList inOrder
+-- > [10,3,20,5,42]
+-- >
+-- > print $ toList (coerce inOrder :: PreOrderTree Int)
+-- > [5,3,10,20,42]
+-- >
+-- > print $ toList (coerce inOrder :: PostOrderTree Int)
+-- > [10,20,3,42,5]
+--
+-- You would typically define instances for additional common type classes,
+-- such as 'Eq', 'Ord', 'Show', etc.
 
 ------------------
 
