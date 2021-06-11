@@ -2599,7 +2599,7 @@ emitCopyArray copy src0 src_off dst0 dst_off0 n =
         dst_off <- assignTempE dst_off0
 
         -- Nonmoving collector write barrier
-        emitCopyUpdRemSetPush dflags (arrPtrsHdrSizeW dflags) dst dst_off n
+        emitCopyUpdRemSetPush dflags (arrPtrsHdrSize dflags) dst dst_off n
 
         -- Set the dirty bit in the header.
         emit (setInfo dst (CmmLit (CmmLabel mkMAP_DIRTY_infoLabel)))
@@ -2664,7 +2664,7 @@ emitCopySmallArray copy src0 src_off dst0 dst_off n =
         dst     <- assignTempE dst0
 
         -- Nonmoving collector write barrier
-        emitCopyUpdRemSetPush dflags (smallArrPtrsHdrSizeW dflags) dst dst_off n
+        emitCopyUpdRemSetPush dflags (smallArrPtrsHdrSize dflags) dst dst_off n
 
         -- Set the dirty bit in the header.
         emit (setInfo dst (CmmLit (CmmLabel mkSMAP_DIRTY_infoLabel)))
@@ -2987,7 +2987,7 @@ emitCtzCall res x width = do
 -- | Push a range of pointer-array elements that are about to be copied over to
 -- the update remembered set.
 emitCopyUpdRemSetPush :: DynFlags
-                      -> WordOff    -- ^ array header size
+                      -> ByteOff    -- ^ array header size (in bytes)
                       -> CmmExpr    -- ^ destination array
                       -> CmmExpr    -- ^ offset in destination array (in words)
                       -> Int        -- ^ number of elements to copy
