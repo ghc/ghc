@@ -511,9 +511,7 @@ stg_copyArray_barrier ( W_ hdr_size, gcptr dst, W_ dst_off, W_ n)
     end = p + WDS(n);
 
 again:
-    IF_NONMOVING_WRITE_BARRIER_ENABLED {
-        ccall updateRemembSetPushClosure_(BaseReg "ptr", W_[p] "ptr");
-    }
+    ccall updateRemembSetPushClosure_(BaseReg "ptr", W_[p] "ptr");
     p = p + WDS(1);
     if (p < end) {
         goto again;
