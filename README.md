@@ -25,8 +25,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) to see how to make contributions to the
 project.
 
 
-[CI page]: https://travis-ci.org/haskell/haddock
-[CI badge]: https://travis-ci.org/haskell/haddock.svg?branch=ghc-8.10
+[CI page]: https://github.com/haskell/haddock/actions/workflows/ci.yml
+[CI badge]: https://github.com/haskell/haddock/actions/workflows/ci.yml/badge.svg
 [Hackage page]: https://hackage.haskell.org/package/haddock
 [Hackage badge]: https://img.shields.io/hackage/v/haddock.svg
 [ReST]: http://www.sphinx-doc.org/en/stable/rest.html
