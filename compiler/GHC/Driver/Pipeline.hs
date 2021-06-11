@@ -1148,7 +1148,7 @@ runLlvmManglePhase pipe_env hsc_env input_fn = do
       return output_fn
 
 runMergeForeign :: PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> [FilePath] -> IO FilePath
-runMergeForeign pipe_env hsc_env location input_fn foreign_os = do
+runMergeForeign _pipe_env hsc_env _location input_fn foreign_os = do
      if null foreign_os
        then return input_fn
        else do
