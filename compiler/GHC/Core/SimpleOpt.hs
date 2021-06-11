@@ -48,12 +48,12 @@ import GHC.Builtin.Types
 import GHC.Builtin.Names
 import GHC.Types.Basic
 import GHC.Unit.Module ( Module )
+import GHC.Utils.Encoding
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 import GHC.Data.Maybe       ( orElse )
-import GHC.Data.FastString
 import Data.List (mapAccumL)
 import qualified Data.ByteString as BS
 
@@ -874,9 +874,8 @@ calls to unpackCString# and returns:
 
 Just (':', [Char], ['a', unpackCString# "bc"]).
 
-We need to be careful about UTF8 strings here. ""# contains a ByteString, so
-we must parse it back into a FastString to split off the first character.
-That way we can treat unpackCString# and unpackCStringUtf8# in the same way.
+We need to be careful about UTF8 strings here. ""# contains an encoded ByteString, so
+we call utf8UnconsByteString to correctly deal with the encoding and splitting.
 
 We must also be careful about
    lvl = "foo"#
@@ -884,6 +883,8 @@ We must also be careful about
 to ensure that we see through the let-binding for 'lvl'.  Hence the
 (exprIsLiteral_maybe .. arg) in the guard before the call to
 dealWithStringLiteral.
+
+The tests for this function are in T9400.
 
 Note [Push coercions in exprIsConApp_maybe]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1237,23 +1238,18 @@ dealWithStringLiteral :: Var -> BS.ByteString -> Coercion
 -- This is not possible with user-supplied empty literals, GHC.Core.Make.mkStringExprFS
 -- turns those into [] automatically, but just in case something else in GHC
 -- generates a string literal directly.
-dealWithStringLiteral _   str co
-  | BS.null str
-  = pushCoDataCon nilDataCon [Type charTy] co
+dealWithStringLiteral fun str co =
+  case utf8UnconsByteString str of
+    Nothing -> pushCoDataCon nilDataCon [Type charTy] co
+    Just (char, charTail) ->
+      let char_expr = mkConApp charDataCon [mkCharLit char]
+          -- In singleton strings, just add [] instead of unpackCstring# ""#.
+          rest = if BS.null charTail
+                   then mkConApp nilDataCon [Type charTy]
+                   else App (Var fun)
+                            (Lit (LitString charTail))
 
-dealWithStringLiteral fun str co
-  = let strFS = mkFastStringByteString str
-
-        char = mkConApp charDataCon [mkCharLit (headFS strFS)]
-        charTail = BS.tail (bytesFS strFS)
-
-        -- In singleton strings, just add [] instead of unpackCstring# ""#.
-        rest = if BS.null charTail
-                 then mkConApp nilDataCon [Type charTy]
-                 else App (Var fun)
-                          (Lit (LitString charTail))
-
-    in pushCoDataCon consDataCon [Type charTy, char, rest] co
+      in pushCoDataCon consDataCon [Type charTy, char_expr, rest] co
 
 {-
 Note [Unfolding DFuns]
