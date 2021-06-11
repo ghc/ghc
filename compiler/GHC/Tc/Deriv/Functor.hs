@@ -531,7 +531,7 @@ functorLikeTraverse var (FT { ft_triv = caseTrivial,     ft_var = caseVar
          -- runtime rep arguments, or else GHC will generate twice as many
          -- variables in a unboxed tuple pattern match and expression as it
          -- actually needs. See #12399
-         (xrs,xcs) = unzip (map (go co) (dropRuntimeRepArgs args))
+         (xrs,xcs) = unzip (map (go co) (dropRuntimeInfoArgs args))
     go co (ForAllTy (Bndr v vis) x)
        | isVisibleArgFlag vis = panic "unexpected visible binder"
        | v /= var && xc       = (caseForAll v xr,True)

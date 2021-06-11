@@ -44,6 +44,8 @@ import GHC.Utils.Panic
 import Data.List (sort)
 import qualified Data.IntSet as IS
 
+import GHC.Driver.Ppr (pprTrace)-- temp. remove
+
 {- **********************************************************************
 *                                                                       *
                 Representation types
@@ -512,8 +514,8 @@ kindPrimRep :: HasDebugCallStack => SDoc -> Kind -> [PrimRep]
 kindPrimRep doc ki
   | Just ki' <- coreView ki
   = kindPrimRep doc ki'
-kindPrimRep doc (TyConApp typ [arg])
-  | Just (rinfo, [rep, conv]) <- splitTyConApp_maybe arg
+kindPrimRep doc ki@(TyConApp typ [arg])
+  | Just (rinfo, [rep, _conv]) <- splitTyConApp_maybe arg
   = ASSERT( typ `hasKey` tYPETyConKey )
     runtimeRepPrimRep doc rep
 kindPrimRep doc ki
@@ -524,6 +526,8 @@ kindPrimRep doc ki
 runtimeRepPrimRep :: HasDebugCallStack => SDoc -> Type -> [PrimRep]
 runtimeRepPrimRep doc rr_ty
   | Just rr_ty' <- coreView rr_ty
+  = runtimeRepPrimRep doc rr_ty'
+  | Just rr_ty' <- simplifyRep rr_ty
   = runtimeRepPrimRep doc rr_ty'
   | TyConApp rr_dc args <- rr_ty
   , RuntimeRep fun <- tyConRuntimeRepInfo rr_dc

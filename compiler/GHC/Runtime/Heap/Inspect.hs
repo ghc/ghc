@@ -867,7 +867,7 @@ extractSubTerms recurse clos = liftM thdOf3 . go 0 0
       , isUnboxedTupleTyCon tc
                 -- See Note [Unboxed tuple RuntimeRep vars] in GHC.Core.TyCon
       = do (ptr_i, arr_i, terms0) <-
-               go ptr_i arr_i (dropRuntimeRepArgs elem_tys)
+               go ptr_i arr_i (dropRuntimeInfoArgs elem_tys)
            (ptr_i, arr_i, terms1) <- go ptr_i arr_i tys
            return (ptr_i, arr_i, unboxedTupleTerm ty terms0 : terms1)
       | otherwise

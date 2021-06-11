@@ -395,7 +395,7 @@ mkCoreUbxTup :: [Type] -> [CoreExpr] -> CoreExpr
 mkCoreUbxTup tys exps
   = ASSERT( tys `equalLength` exps)
     mkCoreConApps (tupleDataCon Unboxed (length tys))
-             (map (Type . getRuntimeRep) tys ++ map Type tys ++ exps)
+             (map (Type . getRuntimeInfo) tys ++ map Type tys ++ exps)
 
 -- | Make a core tuple of the given boxity; don't flatten 1-tuples
 mkCoreTupBoxity :: Boxity -> [CoreExpr] -> CoreExpr

@@ -131,7 +131,10 @@ module GHC.Core.Type (
         isRuntimeInfoTy, isRuntimeInfoVar,
         isCallingConvTy, isCallingConvVar,
         dropRuntimeRepArgs,
+        dropRuntimeInfoArgs,
         getRuntimeRep,
+        simplifyRep,
+        simplifyConv,
 
         -- * Multiplicity
 
@@ -295,9 +298,6 @@ import GHC.Types.Unique ( nonDetCmpUnique )
 import GHC.Data.Maybe   ( orElse, expectJust )
 import Data.Maybe       ( isJust )
 import Control.Monad    ( guard )
-
-import GHC.Driver.Ppr (pprTrace)-- temp. remove
-
 
 -- $type_classification
 -- #type_classification#
@@ -594,8 +594,10 @@ kindRep_maybe kind
 -- classifier rr.
 getRep' :: Type -> Type
 getRep' rinfo 
-  | Just rep <- extractRep rinfo = rep
-  | otherwise                    = mkTyConApp getRepTyCon [rinfo]
+  | Just rep <- extractRep rinfo 
+  = rep
+  | otherwise                    
+  = mkTyConApp getRepTyCon [rinfo]
 
 getRepField :: Type -> Type
 getRepField rinfo
@@ -606,32 +608,6 @@ getRepField rinfo
   = pprPanic "getRepField of non-RuntimeInfo" (ppr rinfo)
 
 
-simplifyKind :: Type -> Maybe Type
-simplifyKind k
-  | TyConApp tc [rinfo] <- k
-  , tc `hasKey` tYPETyConKey
-  , Just rinfo' <- simplifyInfo rinfo
-  = Just $ tYPE rinfo'
-  | otherwise
-  = Nothing
-
-simplifyInfo :: Type -> Maybe Type
-simplifyInfo rinfo
-  | canSimplifyInfo rinfo
-  , Just rep <- extractRep rinfo
-  , Just conv <- extractConv rinfo
-  =  Just $ rInfo rep conv
-  | otherwise
-  = Nothing
-
-canSimplifyInfo :: Type -> Bool
-canSimplifyInfo rinfo 
-  | TyConApp rinfo' [rep,conv] <- rinfo
-  , canSimplifyRep rep || canSimplifyConv conv
-  = panic "here"
-  -- = pprTrace "can_simplify" (ppr rep $$ (ppr $ canSimplifyRep rep)) True
-  | otherwise 
-  = False
 
 getRepArg_maybe :: Type -> Maybe Type
 getRepArg_maybe ty
@@ -650,24 +626,24 @@ canSimplifyRep rep
     | otherwise
     = False
 
-simplifyRep :: Type -> Type
-simplifyRep rep
+simplifyRep_trans :: Type -> Type
+simplifyRep_trans rep
     | Just rinfo <- getRepArg_maybe rep
     , (TyConApp rinfo [rep', _]) <- rinfo
     = rep'
     | otherwise
     = rep
 
-simplifyRep_maybe :: Type -> Maybe Type
-simplifyRep_maybe rep
+simplifyRep :: Type -> Maybe Type
+simplifyRep rep
     | Just rinfo <- getRepArg_maybe rep
     , (TyConApp rinfo [rep', _]) <- rinfo
     = Just rep'
     | otherwise
     = Nothing
 
-simplifyConv_maybe :: Type -> Maybe Type
-simplifyConv_maybe conv
+simplifyConv :: Type -> Maybe Type
+simplifyConv conv
     | Just rinfo <- getConvArg_maybe conv
     , (TyConApp rinfo [_rep, conv']) <- rinfo
     = Just conv'
@@ -690,21 +666,6 @@ getConvArg_maybe ty
     | otherwise
     = Nothing
 
-canSimplifyConv :: Type -> Bool
-canSimplifyConv conv
-    | Just rinfo <- getConvArg_maybe conv
-    , TyConApp rinfo [_rep, _conv] <- rinfo
-    = True
-    | otherwise
-    = False    
-
--- deconsTupleRepList :: Type -> [Type]
--- deconsTupleRepList (TyConApp tc ([_, a,t])) = a : deconsTupleRepList t
--- deconsTupleRepList (TyConApp tc _) = []
-
--- consTupleRepList :: [Type] -> Type
--- consTupleRepList as = mkPromotedListTy runtimeRepTy as
-
 
 simplifyKindDeep :: Type -> Maybe Type
 simplifyKindDeep kind
@@ -718,7 +679,7 @@ simplifyKindDeep kind
   | otherwise
   = Nothing
   where containsSimplifiableGetRep = (elem True) . (map (\t -> (canSimplifyRep t) &&  (isGetRepTy t)))
-        tup_reps = ((mkPromotedListTy runtimeRepTy) . (map simplifyRep)) 
+        tup_reps = ((mkPromotedListTy runtimeRepTy) . (map simplifyRep_trans)) 
 
 
 
@@ -2287,6 +2248,14 @@ isRuntimeRepKindedTy = isRuntimeRepTy . typeKind
 dropRuntimeRepArgs :: [Type] -> [Type]
 dropRuntimeRepArgs = dropWhile isRuntimeRepKindedTy
 
+-- | Is this a type of kind RuntimeInfo? (e.g. RInfo rep conv)
+isRuntimeInfoKindedTy :: Type -> Bool
+isRuntimeInfoKindedTy = isRuntimeInfoTy . typeKind
+
+
+dropRuntimeInfoArgs :: [Type] -> [Type]
+dropRuntimeInfoArgs = dropWhile isRuntimeInfoKindedTy
+
 -- | Extract the RuntimeRep classifier of a type. For instance,
 -- @getRuntimeRep_maybe Int = LiftedRep@. Returns 'Nothing' if this is not
 -- possible.
@@ -3256,31 +3225,19 @@ during type inference.
 isKindLevPoly :: Kind -> Bool
 isKindLevPoly k = ASSERT2( isLiftedTypeKind k || _is_type, ppr k )
                     -- the isLiftedTypeKind check is necessary b/c of Constraint
-                  -- go k
-                  pprTrace "init call" (ppr k) (go k)
+                  go k
   where
     go ty | Just ty' <- coreView ty = go ty'
     go TyVarTy{}         = True
     go AppTy{}           = True  -- it can't be a TyConApp
     go ty@(TyConApp tc tys)
-      | isUnboxedTupleKind ty
-      , TyConApp tr [reps] <- kindRep ty
-      , reps' <- extractPromotedList reps
-      = pprTrace "trace simplify ubxt" (ppr reps') (any go reps')  
-      | Just rep <- simplifyRep_maybe ty
-      -- =  go rep
-      =  pprTrace "trace simplify rep" (ppr ty $$ ppr rep) (go rep) 
-      | Just conv <- simplifyConv_maybe ty
+      | Just rep <- simplifyRep ty
+      =  go rep
+      | Just conv <- simplifyConv ty
       = go conv
-      -- | isUnboxedTupleKind ty
-      -- = False
-      -- | Just ty' <- simplifyKind ty
-      -- , pprTrace "trace simplify" (ppr ty $$ ppr ty') True
-      -- = go ty'
       | otherwise
       = isFamilyTyCon tc || any go tys
-    -- go (TyConApp tc tys) = isFamilyTyCon tc || any go tys
-    go ForAllTy{}        = True
+    go ForAllTy{}        =  True
     go (FunTy _ w t1 t2) = go w || go t1 || go t2
     go LitTy{}           = False
     go CastTy{}          = True
