@@ -1532,32 +1532,7 @@ upsweep_mod :: HscEnv
             -> IO HomeModInfo
 upsweep_mod hsc_env mHscMessage old_hpt summary mod_index nmods
    =    let
-            this_mod_name = ms_mod_name summary
-
-            old_hmi = lookupHpt old_hpt this_mod_name
-
-            -- We're using the dflags for this module now, obtained by
-            -- applying any options in its LANGUAGE & OPTIONS_GHC pragmas.
-            lcl_dflags = ms_hspp_opts summary
-            prevailing_backend = backend (hsc_dflags hsc_env)
-            local_backend      = backend lcl_dflags
-
-            -- If OPTIONS_GHC contains -fasm or -fllvm, be careful that
-            -- we don't do anything dodgy: these should only work to change
-            -- from -fllvm to -fasm and vice-versa, or away from -fno-code,
-            -- otherwise we could end up trying to link object code to byte
-            -- code.
-            bcknd = case (prevailing_backend,local_backend) of
-               (LLVM,NCG) -> NCG
-               (NCG,LLVM) -> LLVM
-               (NoBackend,b)
-                  | backendProducesObject b -> b
-               (Interpreter,b)
-                  | backendProducesObject b -> b
-               _ -> prevailing_backend
-
-            -- store the corrected backend into the summary
-            summary' = summary{ ms_hspp_opts = lcl_dflags { backend = bcknd } }
+            old_hmi = lookupHpt old_hpt (ms_mod_name summary)
 
             -- The old interface is ok if
             --  a) we're compiling a source file, and the old HPT
@@ -1579,7 +1554,7 @@ upsweep_mod hsc_env mHscMessage old_hpt summary mod_index nmods
 
             compile_it :: Maybe Linkable -> IO HomeModInfo
             compile_it  mb_linkable =
-                  compileOne' Nothing mHscMessage hsc_env summary' mod_index nmods
+                  compileOne' Nothing mHscMessage hsc_env summary mod_index nmods
                              mb_old_iface mb_linkable
 
         in

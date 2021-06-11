@@ -2681,7 +2681,7 @@ repGadtDataCons cons details res_ty
              arg_tys <- repPrefixConArgs ps
              res_ty' <- repLTy res_ty
              rep2 gadtCName [ unC (nonEmptyCoreList cons'), unC arg_tys, unC res_ty']
-           RecConGADT ips -> do
+           RecConGADT ips _ -> do
              arg_vtys <- repRecConArgs ips
              res_ty'  <- repLTy res_ty
              rep2 recGadtCName [unC (nonEmptyCoreList cons'), unC arg_vtys,
