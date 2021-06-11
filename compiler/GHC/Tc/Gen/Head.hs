@@ -44,6 +44,8 @@ import GHC.Tc.Instance.Family ( tcLookupDataFamInst )
 import GHC.Core.FamInstEnv    ( FamInstEnvs )
 import GHC.Core.UsageEnv      ( unitUE )
 import GHC.Rename.Utils       ( unknownSubordinateErr )
+import GHC.Rename.Unbound     ( unknownNameSuggestions, WhatLooking(..) )
+import GHC.Unit.Module        ( getModule )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Solver          ( InferMode(..), simplifyInfer )
 import GHC.Tc.Utils.Env
@@ -702,46 +704,52 @@ tc_infer_assert assert_name
 tc_infer_id :: Name -> TcM (HsExpr GhcTc, TcSigmaType)
 tc_infer_id id_name
  = do { thing <- tcLookup id_name
-      ; global_env <- getGlobalRdrEnv
       ; case thing of
              ATcId { tct_id = id }
                -> do { check_local_id id
                      ; return_id id }
 
-             AGlobal (AnId id)
-               -> return_id id
+             AGlobal (AnId id) -> return_id id
                -- A global cannot possibly be ill-staged
                -- nor does it need the 'lifting' treatment
                -- Hence no checkTh stuff here
 
-             AGlobal (AConLike cl) -> case cl of
-                 RealDataCon con -> tcInferDataCon con
-                 PatSynCon ps    -> tcInferPatSyn id_name ps
-
-             AGlobal (ATyCon ty_con)
-               -> fail_tycon global_env ty_con
-
-             ATyVar name _
-                -> failWithTc $
-                     text "Illegal term-level use of the type variable"
-                       <+> quotes (ppr name)
-                       $$ nest 2 (text "bound at" <+> ppr (getSrcLoc name))
-
-             ATcTyCon ty_con
-               -> fail_tycon global_env ty_con
+             AGlobal (AConLike (RealDataCon con)) -> tcInferDataCon con
+             AGlobal (AConLike (PatSynCon ps)) -> tcInferPatSyn id_name ps
+             AGlobal (ATyCon tc) -> fail_tycon tc
+             ATcTyCon tc -> fail_tycon tc
+             ATyVar name _ -> fail_tyvar name
 
              _ -> failWithTc $
                   ppr thing <+> text "used where a value identifier was expected" }
   where
-    fail_tycon global_env ty_con =
-      let pprov = case lookupGRE_Name global_env (tyConName ty_con) of
+    fail_tycon tc = do
+      gre <- getGlobalRdrEnv
+      let msg = text "Illegal term-level use of the type constructor"
+                  <+> quotes (ppr (tyConName tc))
+          pprov = case lookupGRE_Name gre (tyConName tc) of
             Just gre -> nest 2 (pprNameProvenance gre)
             Nothing  -> empty
-      in failWithTc (term_level_tycons ty_con $$ pprov)
+      suggestions <- get_suggestions dataName
+      failWithTc (msg $$ pprov $$ suggestions)
 
-    term_level_tycons ty_con
-      = text "Illegal term-level use of the type constructor"
-          <+> quotes (ppr (tyConName ty_con))
+    fail_tyvar name = do
+      let msg = text "Illegal term-level use of the type variable"
+                  <+> quotes (ppr name)
+          pprov = nest 2 (text "bound at" <+> ppr (getSrcLoc name))
+      suggestions <- get_suggestions varName
+      failWithTc (msg $$ pprov $$ suggestions)
+
+    get_suggestions ns = do
+       let occ = mkOccNameFS ns (occNameFS (occName id_name))
+       dflags  <- getDynFlags
+       rdr_env <- getGlobalRdrEnv
+       lcl_env <- getLocalRdrEnv
+       imp_info <- getImports
+       curr_mod <- getModule
+       hpt <- getHpt
+       return $ unknownNameSuggestions WL_Anything dflags hpt curr_mod rdr_env
+         lcl_env imp_info (mkRdrUnqual occ)
 
     return_id id = return (HsVar noExtField (noLocA id), idType id)
 
