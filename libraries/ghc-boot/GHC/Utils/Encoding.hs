@@ -22,6 +22,7 @@ module GHC.Utils.Encoding (
         utf8CharStart,
         utf8DecodeChar,
         utf8DecodeByteString,
+        utf8UnconsByteString,
         utf8DecodeShortByteString,
         utf8CompareShortByteString,
         utf8DecodeStringLazy,
@@ -168,6 +169,14 @@ utf8DecodeLazy# retain decodeChar# len#
 utf8DecodeByteString :: ByteString -> [Char]
 utf8DecodeByteString (BS.PS fptr offset len)
   = utf8DecodeStringLazy fptr offset len
+
+utf8UnconsByteString :: ByteString -> Maybe (Char, ByteString)
+utf8UnconsByteString (BS.PS _ _ 0) = Nothing
+utf8UnconsByteString (BS.PS fptr offset len)
+  = unsafeDupablePerformIO $
+      withForeignPtr fptr $ \ptr -> do
+        let (c,n) = utf8DecodeChar (ptr `plusPtr` offset)
+        return $ Just (c, BS.PS fptr (offset + n) (len - n))
 
 utf8DecodeStringLazy :: ForeignPtr Word8 -> Int -> Int -> [Char]
 utf8DecodeStringLazy fp offset (I# len#)
