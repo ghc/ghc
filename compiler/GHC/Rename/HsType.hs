@@ -21,6 +21,7 @@ module GHC.Rename.HsType (
         rnScaledLHsType,
 
         -- Precence related stuff
+        NegationHandling(..),
         mkOpAppRn, mkNegAppRn, mkOpFormRn, mkConOpPatRn,
         checkPrecMatch, checkSectionPrec,
 
@@ -1228,20 +1229,21 @@ mk_hs_op_ty mk1 op1 fix1 ty1
 
 
 ---------------------------
-mkOpAppRn :: LHsExpr GhcRn             -- Left operand; already rearranged
+mkOpAppRn :: NegationHandling
+          -> LHsExpr GhcRn             -- Left operand; already rearranged
           -> LHsExpr GhcRn -> Fixity   -- Operator and fixity
           -> LHsExpr GhcRn             -- Right operand (not an OpApp, but might
                                        -- be a NegApp)
           -> RnM (HsExpr GhcRn)
 
 -- (e11 `op1` e12) `op2` e2
-mkOpAppRn e1@(L _ (OpApp fix1 e11 op1 e12)) op2 fix2 e2
+mkOpAppRn negation_handling e1@(L _ (OpApp fix1 e11 op1 e12)) op2 fix2 e2
   | nofix_error
   = do precParseErr (get_op op1,fix1) (get_op op2,fix2)
        return (OpApp fix2 e1 op2 e2)
 
   | associate_right = do
-    new_e <- mkOpAppRn e12 op2 fix2 e2
+    new_e <- mkOpAppRn negation_handling e12 op2 fix2 e2
     return (OpApp fix1 e11 op1 (L loc' new_e))
   where
     loc'= combineLocs e12 e2
@@ -1249,13 +1251,13 @@ mkOpAppRn e1@(L _ (OpApp fix1 e11 op1 e12)) op2 fix2 e2
 
 ---------------------------
 --      (- neg_arg) `op` e2
-mkOpAppRn e1@(L _ (NegApp _ neg_arg neg_name)) op2 fix2 e2
+mkOpAppRn ReassociateNegation e1@(L _ (NegApp _ neg_arg neg_name)) op2 fix2 e2
   | nofix_error
   = do precParseErr (NegateOp,negateFixity) (get_op op2,fix2)
        return (OpApp fix2 e1 op2 e2)
 
   | associate_right
-  = do new_e <- mkOpAppRn neg_arg op2 fix2 e2
+  = do new_e <- mkOpAppRn ReassociateNegation neg_arg op2 fix2 e2
        return (NegApp noExtField (L loc' new_e) neg_name)
   where
     loc' = combineLocs neg_arg e2
@@ -1263,7 +1265,7 @@ mkOpAppRn e1@(L _ (NegApp _ neg_arg neg_name)) op2 fix2 e2
 
 ---------------------------
 --      e1 `op` - neg_arg
-mkOpAppRn e1 op1 fix1 e2@(L _ (NegApp {})) -- NegApp can occur on the right
+mkOpAppRn ReassociateNegation e1 op1 fix1 e2@(L _ (NegApp {})) -- NegApp can occur on the right
   | not associate_right                        -- We *want* right association
   = do precParseErr (get_op op1, fix1) (NegateOp, negateFixity)
        return (OpApp fix1 e1 op1 e2)
@@ -1272,11 +1274,11 @@ mkOpAppRn e1 op1 fix1 e2@(L _ (NegApp {})) -- NegApp can occur on the right
 
 ---------------------------
 --      Default case
-mkOpAppRn e1 op fix e2                  -- Default case, no rearrangment
-  = ASSERT2( right_op_ok fix (unLoc e2),
-             ppr e1 $$ text "---" $$ ppr op $$ text "---" $$ ppr fix $$ text "---" $$ ppr e2
-    )
+mkOpAppRn _ e1 op fix e2                  -- Default case, no rearrangment
+  = ASSERT2(right_op_ok fix (unLoc e2), ppr e1 $$ text "---" $$ ppr op $$ text "---" $$ ppr fix $$ text "---" $$ ppr e2)
     return (OpApp fix e1 op e2)
+
+data NegationHandling = ReassociateNegation | KeepNegationIntact
 
 ----------------------------
 
