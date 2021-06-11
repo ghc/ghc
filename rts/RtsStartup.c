@@ -33,7 +33,7 @@
 #include "Hash.h"
 #include "Profiling.h"
 #include "IPE.h"
-#include "ProfHeap.h"
+#include "rts/ProfHeap.h"
 #include "Timer.h"
 #include "Globals.h"
 #include "FileLock.h"
@@ -43,7 +43,6 @@
 #include "TopHandler.h"
 
 #if defined(PROFILING)
-# include "ProfHeap.h"
 # include "RetainerProfile.h"
 #endif
 
