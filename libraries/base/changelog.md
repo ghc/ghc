@@ -3,6 +3,10 @@
 ## 4.17.0.0 *TBA*
 
   * Add explicitly bidirectional `pattern TypeRep` to `Type.Reflection`.
+  * Add `Generically` and `Generically1` to `GHC.Generics` for deriving generic
+    instances with `DerivingVia`. `Generically` instances include `Semigroup` and
+    `Monoid`. `Generically1` instances: `Functor`, `Applicative`, `Alternative`,
+    `Eq1` and `Ord1`.
 
 ## 4.16.0.0 *TBA*
 
@@ -88,7 +92,7 @@
   * Add `MonadFix` and `MonadZip` instances for `Complex`
 
   * Add `Ix` instances for tuples of size 6 through 15
-   
+
   * Correct `Bounded` instance and remove `Enum` and `Integral` instances for
     `Data.Ord.Down`.
 
