@@ -1149,16 +1149,18 @@ runLlvmManglePhase pipe_env hsc_env input_fn = do
 
 runMergeForeign :: PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> [FilePath] -> IO FilePath
 runMergeForeign pipe_env hsc_env location input_fn foreign_os = do
-     output_fn <- phaseOutputFilenameNew StopLn pipe_env hsc_env location
-     liftIO $ createDirectoryIfMissing True (takeDirectory output_fn)
      if null foreign_os
-       then output_fn <$ copyFile input_fn output_fn
+       then return input_fn
        else do
+         -- Work around a binutil < 2.31 bug where you can't merge objects if the output file
+         -- is one of the inputs
+         new_o <- newTempName (hsc_logger hsc_env) (hsc_tmpfs hsc_env) (hsc_dflags hsc_env) TFL_CurrentModule "o"
+         copyFile input_fn new_o
          let dflags = hsc_dflags hsc_env
              logger = hsc_logger hsc_env
          let tmpfs = hsc_tmpfs hsc_env
-         liftIO $ joinObjectFiles logger tmpfs dflags (input_fn : foreign_os) output_fn
-         return output_fn
+         liftIO $ joinObjectFiles logger tmpfs dflags (new_o : foreign_os) input_fn
+         return input_fn
 
 
 runLlvmLlcPhase :: PipeEnv -> HscEnv -> FilePath -> IO FilePath
@@ -1290,7 +1292,7 @@ runAsPhase with_cpp pipe_env hsc_env location input_fn = do
         let cmdline_include_paths = includePaths dflags
         let pic_c_flags = picCCOpts dflags
 
-        output_fn <- phaseOutputFilenameNew MergeForeign pipe_env hsc_env location
+        output_fn <- phaseOutputFilenameNew StopLn pipe_env hsc_env location
 
         -- we create directories for the object file, because it
         -- might be a hierarchical module.
