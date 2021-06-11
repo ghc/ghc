@@ -48,12 +48,12 @@ import GHC.Builtin.Types
 import GHC.Builtin.Names
 import GHC.Types.Basic
 import GHC.Unit.Module ( Module )
+import GHC.Utils.Encoding
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 import GHC.Data.Maybe       ( orElse )
-import GHC.Data.FastString
 import Data.List (mapAccumL)
 import qualified Data.ByteString as BS
 
@@ -1237,23 +1237,18 @@ dealWithStringLiteral :: Var -> BS.ByteString -> Coercion
 -- This is not possible with user-supplied empty literals, GHC.Core.Make.mkStringExprFS
 -- turns those into [] automatically, but just in case something else in GHC
 -- generates a string literal directly.
-dealWithStringLiteral _   str co
-  | BS.null str
-  = pushCoDataCon nilDataCon [Type charTy] co
+dealWithStringLiteral fun str co =
+  case utf8UnconsByteString str of
+    Nothing -> pushCoDataCon nilDataCon [Type charTy] co
+    Just (char, charTail) ->
+      let char_expr = mkConApp charDataCon [mkCharLit char]
+          -- In singleton strings, just add [] instead of unpackCstring# ""#.
+          rest = if BS.null charTail
+                   then mkConApp nilDataCon [Type charTy]
+                   else App (Var fun)
+                            (Lit (LitString charTail))
 
-dealWithStringLiteral fun str co
-  = let strFS = mkFastStringByteString str
-
-        char = mkConApp charDataCon [mkCharLit (headFS strFS)]
-        charTail = BS.tail (bytesFS strFS)
-
-        -- In singleton strings, just add [] instead of unpackCstring# ""#.
-        rest = if BS.null charTail
-                 then mkConApp nilDataCon [Type charTy]
-                 else App (Var fun)
-                          (Lit (LitString charTail))
-
-    in pushCoDataCon consDataCon [Type charTy, char, rest] co
+      in pushCoDataCon consDataCon [Type charTy, char_expr, rest] co
 
 {-
 Note [Unfolding DFuns]
