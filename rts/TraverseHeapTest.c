@@ -12,7 +12,7 @@
             (type *)( (char *)__mptr - offsetof(type,member) );})
 
 static StgInfoTable info_weak     = { .type = WEAK };
-static StgInfoTable info_selector = { .type = THUNK_SELECTOR };
+static StgInfoTable info_ind      = { .type = IND };
 static StgInfoTable info_arrwords = { .type = ARR_WORDS };
 
 struct node {
@@ -20,7 +20,7 @@ struct node {
     union node_union {
         StgClosure cls;
         StgWeak weak;
-        StgSelector selector;
+        StgInd ind;
         StgArrBytes arrbytes;
     } u;
 };
@@ -46,9 +46,9 @@ struct node {
 #define node1(_id, a)                                   \
     static struct node n##_id = {                       \
         .id = _id,                                      \
-        .u.selector = {                                 \
-            .header = { .info = INFO(&info_selector) }, \
-            .selectee = (StgClosure*)&(n##a.u),         \
+        .u.ind = {                                      \
+            .header = { .info = INFO(&info_ind) },      \
+            .indirectee = (StgClosure*)&(n##a.u),       \
         }                                               \
     }
 
