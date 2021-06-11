@@ -1149,11 +1149,11 @@ runLlvmManglePhase pipe_env hsc_env input_fn = do
 
 runMergeForeign :: PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> [FilePath] -> IO FilePath
 runMergeForeign pipe_env hsc_env location input_fn foreign_os = do
+     output_fn <- phaseOutputFilenameNew StopLn pipe_env hsc_env location
+     liftIO $ createDirectoryIfMissing True (takeDirectory output_fn)
      if null foreign_os
-       then return input_fn
+       then output_fn <$ copyFile input_fn output_fn
        else do
-         output_fn <- phaseOutputFilenameNew StopLn pipe_env hsc_env location
-         liftIO $ createDirectoryIfMissing True (takeDirectory output_fn)
          let dflags = hsc_dflags hsc_env
              logger = hsc_logger hsc_env
          let tmpfs = hsc_tmpfs hsc_env
@@ -1290,7 +1290,7 @@ runAsPhase with_cpp pipe_env hsc_env location input_fn = do
         let cmdline_include_paths = includePaths dflags
         let pic_c_flags = picCCOpts dflags
 
-        output_fn <- phaseOutputFilenameNew StopLn pipe_env hsc_env location
+        output_fn <- phaseOutputFilenameNew MergeForeign pipe_env hsc_env location
 
         -- we create directories for the object file, because it
         -- might be a hierarchical module.
