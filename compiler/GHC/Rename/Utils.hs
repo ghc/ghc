@@ -18,6 +18,7 @@ module GHC.Rename.Utils (
         checkUnusedRecordWildcard,
         mkFieldEnv,
         unknownSubordinateErr, badQualBndrErr, typeAppErr,
+        badFieldConErr,
         HsDocContext(..), pprHsDocContext,
         inHsDocContext, withHsDocContext,
 
@@ -44,6 +45,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
+import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.SourceFile
@@ -610,6 +612,11 @@ typeAppErr what (L _ k)
   = hang (text "Illegal visible" <+> text what <+> text "application"
             <+> quotes (char '@' <> ppr k))
        2 (text "Perhaps you intended to use TypeApplications")
+
+badFieldConErr :: ConLike -> FieldLabelString -> SDoc
+badFieldConErr con field
+  = hsep [text "Constructor" <+> quotes (ppr con),
+          text "does not have field", quotes (ppr field)]
 
 -- | Ensure that a boxed or unboxed tuple has arity no larger than
 -- 'mAX_TUPLE_SIZE'.
