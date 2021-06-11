@@ -1085,7 +1085,7 @@ data TPhase res where
   T_LlvmOpt :: PipeEnv -> HscEnv -> FilePath -> TPhase FilePath
   T_LlvmLlc :: PipeEnv -> HscEnv -> FilePath -> TPhase FilePath
   T_LlvmMangle :: PipeEnv -> HscEnv -> FilePath -> TPhase FilePath
-  T_MergeForeign :: PipeEnv -> HscEnv -> FilePath -> [FilePath] -> TPhase FilePath
+  T_MergeForeign :: PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> [FilePath] -> TPhase FilePath
   T_IO :: IO a -> TPhase a
 
 runPhaseNew :: TPhase out -> IO out
@@ -1134,8 +1134,8 @@ runPhaseNew (T_LlvmLlc pipe_env hsc_env input_fn) =
   runLlvmLlcPhase pipe_env hsc_env input_fn
 runPhaseNew (T_LlvmMangle pipe_env hsc_env input_fn) =
   runLlvmManglePhase pipe_env hsc_env input_fn
-runPhaseNew (T_MergeForeign pipe_env hsc_env input_fn fos) =
-  runMergeForeign pipe_env hsc_env input_fn fos
+runPhaseNew (T_MergeForeign pipe_env hsc_env location input_fn fos) =
+  runMergeForeign pipe_env hsc_env location input_fn fos
 runPhaseNew (T_IO io_action) = liftIO io_action
 
 runLlvmManglePhase :: PipeEnv -> HscEnv -> FilePath -> IO [Char]
@@ -1147,13 +1147,13 @@ runLlvmManglePhase pipe_env hsc_env input_fn = do
       liftIO $ llvmFixupAsm logger dflags input_fn output_fn
       return output_fn
 
-runMergeForeign :: PipeEnv -> HscEnv -> FilePath -> [FilePath] -> IO FilePath
-runMergeForeign pipe_env hsc_env input_fn foreign_os = do
-     output_fn <- phaseOutputFilenameNew StopLn pipe_env hsc_env Nothing
-     liftIO $ createDirectoryIfMissing True (takeDirectory output_fn)
+runMergeForeign :: PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> [FilePath] -> IO FilePath
+runMergeForeign pipe_env hsc_env location input_fn foreign_os = do
      if null foreign_os
        then return input_fn
        else do
+         output_fn <- phaseOutputFilenameNew StopLn pipe_env hsc_env location
+         liftIO $ createDirectoryIfMissing True (takeDirectory output_fn)
          let dflags = hsc_dflags hsc_env
              logger = hsc_logger hsc_env
          let tmpfs = hsc_tmpfs hsc_env
@@ -1912,7 +1912,7 @@ hscGenBackendPipeline pipe_env hsc_env mod_sum result = do
       Nothing -> return mlinkable
       Just o_fp -> do
         unlinked_time <- use (T_IO (liftIO getCurrentTime))
-        final_o <- use (T_MergeForeign pipe_env hsc_env o_fp fos)
+        final_o <- use (T_MergeForeign pipe_env hsc_env (Just location) o_fp fos)
         let !linkable = LM unlinked_time
                                     (ms_mod mod_sum)
                                     [DotO final_o]
@@ -1959,7 +1959,7 @@ cmmPipeline pipe_env hsc_env input_fn = do
   mo_fn <- hscPostBackendPipeline pipe_env hsc_env HsSrcFile (backend (hsc_dflags hsc_env)) Nothing output_fn
   case mo_fn of
     Nothing -> panic "CMM pipeline - produced no .o file"
-    Just mo_fn -> use (T_MergeForeign pipe_env hsc_env mo_fn fos)
+    Just mo_fn -> use (T_MergeForeign pipe_env hsc_env Nothing mo_fn fos)
 
 
 
