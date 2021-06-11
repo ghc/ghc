@@ -200,7 +200,10 @@ rnExpr (OpApp _ e1 op e2)
               _ -> return (Fixity NoSourceText minPrecedence InfixL)
                    -- c.f. lookupFixity for unbound
 
-        ; final_e <- mkOpAppRn e1' op' fixity e2'
+        ; lexical_negation <- xoptM LangExt.LexicalNegation
+        ; let negation_handling | lexical_negation = KeepNegationIntact
+                                | otherwise = ReassociateNegation
+        ; final_e <- mkOpAppRn negation_handling e1' op' fixity e2'
         ; return (final_e, fv_e1 `plusFV` fv_op `plusFV` fv_e2) }
 
 rnExpr (NegApp _ e _)
