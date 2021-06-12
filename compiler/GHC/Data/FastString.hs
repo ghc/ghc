@@ -1,6 +1,7 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}
@@ -265,13 +266,11 @@ uniqCompareFS fs1 fs2 = compare (uniq fs1) (uniq fs2)
 -- is not deterministic from one run to the other.
 newtype NonDetFastString
    = NonDetFastString FastString
-   deriving (Eq,Data)
+   deriving newtype (Eq, Show)
+   deriving stock Data
 
 instance Ord NonDetFastString where
    compare (NonDetFastString fs1) (NonDetFastString fs2) = uniqCompareFS fs1 fs2
-
-instance Show NonDetFastString where
-   show (NonDetFastString fs) = show fs
 
 -- | Lexical FastString
 --
@@ -280,13 +279,11 @@ instance Show NonDetFastString where
 -- representation). Hence it is deterministic from one run to the other.
 newtype LexicalFastString
    = LexicalFastString FastString
-   deriving (Eq,Data)
+   deriving newtype (Eq, Show)
+   deriving stock Data
 
 instance Ord LexicalFastString where
    compare (LexicalFastString fs1) (LexicalFastString fs2) = lexicalCompareFS fs1 fs2
-
-instance Show LexicalFastString where
-   show (LexicalFastString fs) = show fs
 
 -- -----------------------------------------------------------------------------
 -- Construction

@@ -1389,7 +1389,7 @@ instance (ToHie tyarg, ToHie arg, ToHie rec) => ToHie (HsConDetails tyarg arg re
 
 instance ToHie (HsConDeclGADTDetails GhcRn) where
   toHie (PrefixConGADT args) = toHie args
-  toHie (RecConGADT rec) = toHie rec
+  toHie (RecConGADT rec _) = toHie rec
 
 instance HiePass p => ToHie (Located (HsCmdTop (GhcPass p))) where
   toHie (L span top) = concatM $ makeNode top span : case top of
@@ -1622,7 +1622,7 @@ instance ToHie (LocatedA (ConDecl GhcRn)) where
           ctxScope = maybe NoScope mkLScopeA ctx
           argsScope = case args of
             PrefixConGADT xs -> scaled_args_scope xs
-            RecConGADT x     -> mkLScopeA x
+            RecConGADT x _   -> mkLScopeA x
           tyScope = mkLScopeA typ
           resScope = ResolvedScopes [ctxScope, rhsScope]
       ConDeclH98 { con_name = name, con_ex_tvs = qvars
