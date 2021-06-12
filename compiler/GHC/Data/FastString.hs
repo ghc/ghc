@@ -88,6 +88,7 @@ module GHC.Data.FastString
         isUnderscoreFS,
         lexicalCompareFS,
         uniqCompareFS,
+        headByteFS,
 
         -- ** Outputting
         hPutFS,
@@ -611,6 +612,10 @@ headFS :: FastString -> Char
 headFS fs
   | SBS.null $ fs_sbs fs = panic "headFS: Empty FastString"
 headFS fs = head $ unpackFS fs
+
+-- the first byte of the Modified UTF-8 encoded string
+headByteFS :: FastString -> Word8
+headByteFS fs = SBS.index (fs_sbs fs) 0
 
 consFS :: Char -> FastString -> FastString
 consFS c fs = mkFastString (c : unpackFS fs)
