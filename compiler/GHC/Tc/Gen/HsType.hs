@@ -1163,7 +1163,7 @@ tc_hs_type mode (HsFunTy _ mult ty1 ty2) exp_kind
 
 tc_hs_type mode (HsOpTy _ ty1 (L _ op) ty2) exp_kind
   | op `hasKey` funTyConKey
-  = tc_fun_type mode (HsUnrestrictedArrow NormalSyntax) ty1 ty2 exp_kind
+  = tc_fun_type mode (HsUnrestrictedArrow noHsUniTok) ty1 ty2 exp_kind
 
 --------- Foralls
 tc_hs_type mode (HsForAllTy { hst_tele = tele, hst_body = ty }) exp_kind
