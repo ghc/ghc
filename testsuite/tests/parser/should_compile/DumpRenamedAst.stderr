@@ -148,8 +148,13 @@
              []
              [(HsScaled
                (HsLinearArrow
-                (NormalSyntax)
-                (Nothing))
+                (HsPct1
+                 (L
+                  (EpAnnNotUsed)
+                  (HsTok))
+                 (L
+                  (EpAnnNotUsed)
+                  (HsNormalTok))))
                (L
                 (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:10:26-30 })
                 (HsTyVar
@@ -375,12 +380,19 @@
               (Anchor
                { DumpRenamedAst.hs:16:20 }
                (UnchangedAnchor))
-              (AddRarrowAnn
-               (EpaSpan { DumpRenamedAst.hs:16:22-23 }))
+              (NoEpAnns)
               (EpaComments
                []))
              (HsUnrestrictedArrow
-              (NormalSyntax))
+              (L
+               (EpAnn
+                (Anchor
+                 { DumpRenamedAst.hs:16:22-23 }
+                 (UnchangedAnchor))
+                (NoEpAnns)
+                (EpaComments
+                 []))
+               (HsNormalTok)))
              (L
               (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:16:20 })
               (HsTyVar
@@ -396,12 +408,19 @@
                 (Anchor
                  { DumpRenamedAst.hs:16:25 }
                  (UnchangedAnchor))
-                (AddRarrowAnn
-                 (EpaSpan { DumpRenamedAst.hs:16:27-28 }))
+                (NoEpAnns)
                 (EpaComments
                  []))
                (HsUnrestrictedArrow
-                (NormalSyntax))
+                (L
+                 (EpAnn
+                  (Anchor
+                   { DumpRenamedAst.hs:16:27-28 }
+                   (UnchangedAnchor))
+                  (NoEpAnns)
+                  (EpaComments
+                   []))
+                 (HsNormalTok)))
                (L
                 (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:16:25 })
                 (HsTyVar
@@ -471,12 +490,19 @@
                    (Anchor
                     { DumpRenamedAst.hs:19:28 }
                     (UnchangedAnchor))
-                   (AddRarrowAnn
-                    (EpaSpan { DumpRenamedAst.hs:19:30-31 }))
+                   (NoEpAnns)
                    (EpaComments
                     []))
                   (HsUnrestrictedArrow
-                   (NormalSyntax))
+                   (L
+                    (EpAnn
+                     (Anchor
+                      { DumpRenamedAst.hs:19:30-31 }
+                      (UnchangedAnchor))
+                     (NoEpAnns)
+                     (EpaComments
+                      []))
+                    (HsNormalTok)))
                   (L
                    (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:19:28 })
                    (HsTyVar
@@ -507,12 +533,19 @@
                (Anchor
                 { DumpRenamedAst.hs:19:42-52 }
                 (UnchangedAnchor))
-               (AddRarrowAnn
-                (EpaSpan { DumpRenamedAst.hs:19:54-55 }))
+               (NoEpAnns)
                (EpaComments
                 []))
               (HsUnrestrictedArrow
-               (NormalSyntax))
+               (L
+                (EpAnn
+                 (Anchor
+                  { DumpRenamedAst.hs:19:54-55 }
+                  (UnchangedAnchor))
+                 (NoEpAnns)
+                 (EpaComments
+                  []))
+                (HsNormalTok)))
               (L
                (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:19:42-52 })
                (HsParTy
@@ -524,12 +557,19 @@
                    (Anchor
                     { DumpRenamedAst.hs:19:43 }
                     (UnchangedAnchor))
-                   (AddRarrowAnn
-                    (EpaSpan { DumpRenamedAst.hs:19:45-46 }))
+                   (NoEpAnns)
                    (EpaComments
                     []))
                   (HsUnrestrictedArrow
-                   (NormalSyntax))
+                   (L
+                    (EpAnn
+                     (Anchor
+                      { DumpRenamedAst.hs:19:45-46 }
+                      (UnchangedAnchor))
+                     (NoEpAnns)
+                     (EpaComments
+                      []))
+                    (HsNormalTok)))
                   (L
                    (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:19:43 })
                    (HsTyVar
@@ -570,15 +610,22 @@
               (PrefixConGADT
                [(HsScaled
                  (HsUnrestrictedArrow
-                  (NormalSyntax))
+                  (L
+                   (EpAnn
+                    (Anchor
+                     { DumpRenamedAst.hs:20:36-37 }
+                     (UnchangedAnchor))
+                    (NoEpAnns)
+                    (EpaComments
+                     []))
+                   (HsNormalTok)))
                  (L
                   (SrcSpanAnn (EpAnn
                                (Anchor
                                 { DumpRenamedAst.hs:20:10-34 }
                                 (UnchangedAnchor))
                                (AnnListItem
-                                [(AddRarrowAnn
-                                  (EpaSpan { DumpRenamedAst.hs:20:36-37 }))])
+                                [])
                                (EpaComments
                                 [])) { DumpRenamedAst.hs:20:10-34 })
                   (HsParTy
@@ -610,12 +657,19 @@
                         (Anchor
                          { DumpRenamedAst.hs:20:22-25 }
                          (UnchangedAnchor))
-                        (AddRarrowAnn
-                         (EpaSpan { DumpRenamedAst.hs:20:27-28 }))
+                        (NoEpAnns)
                         (EpaComments
                          []))
                        (HsUnrestrictedArrow
-                        (NormalSyntax))
+                        (L
+                         (EpAnn
+                          (Anchor
+                           { DumpRenamedAst.hs:20:27-28 }
+                           (UnchangedAnchor))
+                          (NoEpAnns)
+                          (EpaComments
+                           []))
+                         (HsNormalTok)))
                        (L
                         (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:20:22-25 })
                         (HsAppTy
@@ -771,8 +825,13 @@
              []
              [(HsScaled
                (HsLinearArrow
-                (NormalSyntax)
-                (Nothing))
+                (HsPct1
+                 (L
+                  (EpAnnNotUsed)
+                  (HsTok))
+                 (L
+                  (EpAnnNotUsed)
+                  (HsNormalTok))))
                (L
                 (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:22:25-29 })
                 (HsParTy
@@ -955,12 +1014,19 @@
                 (Anchor
                  { DumpRenamedAst.hs:24:31 }
                  (UnchangedAnchor))
-                (AddRarrowAnn
-                 (EpaSpan { DumpRenamedAst.hs:24:33-34 }))
+                (NoEpAnns)
                 (EpaComments
                  []))
                (HsUnrestrictedArrow
-                (NormalSyntax))
+                (L
+                 (EpAnn
+                  (Anchor
+                   { DumpRenamedAst.hs:24:33-34 }
+                   (UnchangedAnchor))
+                  (NoEpAnns)
+                  (EpaComments
+                   []))
+                 (HsNormalTok)))
                (L
                 (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:24:31 })
                 (HsTyVar
@@ -1302,3 +1368,5 @@
               {Name: GHC.Types.Type})))))])))))]
   (Nothing)
   (Nothing)))
+
+
