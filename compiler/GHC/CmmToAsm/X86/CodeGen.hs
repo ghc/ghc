@@ -3390,6 +3390,39 @@ outOfLineCmmOp bid mop res args
               MO_F64_Acosh  -> fsLit "acosh"
               MO_F64_Atanh  -> fsLit "atanh"
 
+              MO_64_S_Conv_ToNative   -> fsLit "hs_int64ToInt"
+              MO_64_S_Conv_FromNative -> fsLit "hs_intToInt64"
+              MO_64_U_Conv_ToNative   -> fsLit "hs_word64ToWord"
+              MO_64_U_Conv_FromNative -> fsLit "hs_wordToWord64"
+
+              MO_64_Neg    -> fsLit "hs_neg64"
+              MO_64_Add    -> fsLit "hs_add64"
+              MO_64_Sub    -> fsLit "hs_sub64"
+              MO_64_Mul    -> fsLit "hs_mul64"
+              MO_64_S_Quot -> fsLit "hs_quotInt64"
+              MO_64_S_Rem  -> fsLit "hs_remInt64"
+              MO_64_U_Quot -> fsLit "hs_quotWord64"
+              MO_64_U_Rem  -> fsLit "hs_remWord64"
+
+              MO_64_And    -> fsLit "hs_and64"
+              MO_64_Or     -> fsLit "hs_or64"
+              MO_64_Xor    -> fsLit "hs_xor64"
+              MO_64_Not    -> fsLit "hs_not64"
+              MO_64_Shl    -> fsLit "hs_uncheckedShiftL64"
+              MO_64_S_Shr  -> fsLit "hs_uncheckedShiftRA64"
+              MO_64_U_Shr  -> fsLit "hs_uncheckedIShiftRL64"
+
+              MO_64_Eq     -> fsLit "hs_eq64"
+              MO_64_Ne     -> fsLit "hs_ne64"
+              MO_64_S_Ge   -> fsLit "hs_geInt64"
+              MO_64_S_Gt   -> fsLit "hs_gtInt64"
+              MO_64_S_Le   -> fsLit "hs_leInt64"
+              MO_64_S_Lt   -> fsLit "hs_ltInt64"
+              MO_64_U_Ge   -> fsLit "hs_geWord64"
+              MO_64_U_Gt   -> fsLit "hs_gtWord64"
+              MO_64_U_Le   -> fsLit "hs_leWord64"
+              MO_64_U_Lt   -> fsLit "hs_ltWord64"
+
               MO_Memcpy _  -> fsLit "memcpy"
               MO_Memset _  -> fsLit "memset"
               MO_Memmove _ -> fsLit "memmove"
@@ -3448,9 +3481,16 @@ genSwitch :: CmmExpr -> SwitchTargets -> NatM InstrBlock
 genSwitch expr targets = do
   config <- getConfig
   let platform = ncgPlatform config
+      -- We widen to a native-width register because we cannot use arbitry sizes
+      -- in x86 addressing modes.
+      exprWidened = CmmMachOp
+        (MO_UU_Conv (cmmExprWidth platform expr)
+                    (platformWordWidth platform))
+        [expr]
+      indexExpr = cmmOffset platform exprWidened offset
   if ncgPIC config
   then do
-        (reg,e_code) <- getNonClobberedReg (cmmOffset platform expr offset)
+        (reg,e_code) <- getNonClobberedReg indexExpr
            -- getNonClobberedReg because it needs to survive across t_code
         lbl <- getNewLabelNat
         let is32bit = target32Bit platform
@@ -3491,7 +3531,7 @@ genSwitch expr targets = do
                                JMP_TBL (OpReg tableReg) ids rosection lbl
                        ]
   else do
-        (reg,e_code) <- getSomeReg (cmmOffset platform expr offset)
+        (reg,e_code) <- getSomeReg indexExpr
         lbl <- getNewLabelNat
         let op = OpAddr (AddrBaseIndex EABaseNone (EAIndex reg (platformWordSizeInBytes platform)) (ImmCLbl lbl))
             code = e_code `appOL` toOL [
