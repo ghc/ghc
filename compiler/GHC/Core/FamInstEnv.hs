@@ -1099,7 +1099,7 @@ but we also need to handle closed ones when normalising a type:
 reduceTyFamApp_maybe :: FamInstEnvs
                      -> Role              -- Desired role of result coercion
                      -> TyCon -> [Type]
-                     -> Maybe (Coercion, Type)
+                     -> Maybe Reduction
 -- Attempt to do a *one-step* reduction of a type-family application
 --    but *not* newtypes
 -- Works on type-synonym families always; data-families only if
@@ -1131,19 +1131,19 @@ reduceTyFamApp_maybe envs role tc tys
 
   = let co = mkUnbranchedAxInstCo role ax inst_tys inst_cos
         ty = coercionRKind co
-    in Just (co, ty)
+    in Just $ Reduction ty co
 
   | Just ax <- isClosedSynFamilyTyConWithAxiom_maybe tc
   , Just (ind, inst_tys, inst_cos) <- chooseBranch ax tys
   = let co = mkAxInstCo role ax ind inst_tys inst_cos
         ty = coercionRKind co
-    in Just (co, ty)
+    in Just $ Reduction ty co
 
   | Just ax           <- isBuiltInSynFamTyCon_maybe tc
   , Just (coax,ts,ty) <- sfMatchFam ax tys
   , role == coaxrRole coax
   = let co = mkAxiomRuleCo coax (zipWith mkReflCo (coaxrAsmpRoles coax) ts)
-    in Just (co, ty)
+    in Just $ Reduction ty co
 
   | otherwise
   = Nothing
@@ -1343,7 +1343,7 @@ normalise_tc_app tc tys
        ; role <- getRole
        ; (args_co, ntys, res_co) <- normalise_tc_args tc tys
        ; case reduceTyFamApp_maybe env role tc ntys of
-           Just (first_co, ty')
+           Just (Reduction ty' first_co)
              -> do { (rest_co,nty) <- normalise_type ty'
                    ; return (assemble_result role nty
                                              (args_co `mkTransCo` first_co `mkTransCo` rest_co)
@@ -1382,7 +1382,7 @@ topReduceTyFamApp_maybe :: FamInstEnvs -> TyCon -> [Type]
                         -> Maybe (Coercion, Type, MCoercion)
 topReduceTyFamApp_maybe envs fam_tc arg_tys
   | isFamilyTyCon fam_tc   -- type families and data families
-  , Just (co, rhs) <- reduceTyFamApp_maybe envs role fam_tc ntys
+  , Just (Reduction rhs co) <- reduceTyFamApp_maybe envs role fam_tc ntys
   = Just (args_co `mkTransCo` co, rhs, res_co)
   | otherwise
   = Nothing
@@ -1498,9 +1498,9 @@ normalise_args fun_ki roles args
     fvs = tyCoVarsOfTypes args
 
     -- rewriter conventions are different from ours
-    impedance_match :: NormM (Coercion, Type) -> NormM (Type, Coercion)
+    impedance_match :: NormM (Coercion, Type) -> NormM Reduction
     impedance_match action = do { (co, ty) <- action
-                                ; return (ty, mkSymCo co) }
+                                ; return $ Reduction ty (mkSymCo co) }
 
     normalise1 role ty
       = impedance_match $ withRole role $ normalise_type ty
