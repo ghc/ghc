@@ -33,6 +33,7 @@ module GHC.Tc.Types(
         setLclEnvLoc, getLclEnvLoc,
         IfGblEnv(..), IfLclEnv(..),
         tcVisibleOrphanMods,
+        RewriteEnv(..),
 
         -- Frontend types (shouldn't really be here)
         FrontendResult(..),
@@ -112,6 +113,7 @@ import GHC.Core.Lint   ( lintAxioms )
 import GHC.Core.UsageEnv
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
+import GHC.Core.Predicate
 
 import GHC.Types.Id         ( idType, idName )
 import GHC.Types.FieldLabel ( FieldLabel )
@@ -159,7 +161,7 @@ import qualified Data.Set as S
 import Data.List ( sort )
 import Data.Map ( Map )
 import Data.Dynamic  ( Dynamic )
-import Data.Typeable ( Typeable, TypeRep )
+import Data.Typeable ( TypeRep )
 import Data.Maybe    ( mapMaybe )
 import GHCi.Message
 import GHCi.RemoteTypes
@@ -253,6 +255,20 @@ instance ContainsLogger (Env gbl lcl) where
 instance ContainsModule gbl => ContainsModule (Env gbl lcl) where
     extractModule env = extractModule (env_gbl env)
 
+{-
+************************************************************************
+*                                                                      *
+*                            RewriteEnv
+*                     The rewriting environment
+*                                                                      *
+************************************************************************
+-}
+
+data RewriteEnv
+  = FE { fe_loc     :: !CtLoc             -- See Note [Rewriter CtLoc]
+       , fe_flavour :: !CtFlavour
+       , fe_eq_rel  :: !EqRel             -- See Note [Rewriter EqRels]
+       }
 
 {-
 ************************************************************************
@@ -1679,8 +1695,9 @@ type TcPluginSolver = [Ct]    -- ^ givens
                    -> TcPluginM TcPluginResult
 
 type TcPluginRewriter
-  =  [Ct] -- ^ givens
-  -> [TcType] -- ^ type family arguments
+  =  RewriteEnv -- ^ rewriter environment
+  -> [Ct]       -- ^ givens
+  -> [TcType]   -- ^ type family arguments
   -> TcPluginM TcPluginRewriteResult
 
 newtype TcPluginM a = TcPluginM (EvBindsVar -> TcM a) deriving (Functor)
@@ -1756,27 +1773,23 @@ data TcPluginResult
     -- the constraint solver.
 
 
-data TcPluginRewriteResult where
-  -- | The plugin wants to throw an error.
-  TcPluginRewriteError :: (Diagnostic a, Typeable a) => a -> TcPluginRewriteResult
-
+data TcPluginRewriteResult
+  =
   -- | The plugin does not rewrite the type family application.
   --
-  -- The plugin can also emit additional wanted constraints.
-  TcPluginNoRewrite
-    :: { tcRewriterWanteds :: [Ct] }
-    -> TcPluginRewriteResult
+  -- The plugin can also emit additional wanted constraints,
+  -- including insoluble ones (e.g. a type error message).
+    TcPluginNoRewrite { tcRewriterWanteds :: [Ct] }
 
   -- | The plugin rewrites the type family application
   -- providing a rewriting together with evidence.
   --
   -- The plugin can also emit additional wanted constraints.
-  TcPluginRewriteTo
-    :: { tcPluginRewriteTo :: TcType
-       , tcPluginRewriteEvidence :: TcCoercion
-       , tcRewriterWanteds :: [Ct]
-       }
-    -> TcPluginRewriteResult
+  | TcPluginRewriteTo
+    { tcPluginRewriteTo :: TcType
+    , tcPluginRewriteEvidence :: TcCoercion
+    , tcRewriterWanteds :: [Ct]
+    }
 
 {- *********************************************************************
 *                                                                      *
