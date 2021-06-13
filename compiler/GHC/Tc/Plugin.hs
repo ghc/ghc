@@ -60,6 +60,7 @@ import qualified GHC.Tc.Instance.Family as TcM
 import qualified GHC.Iface.Env          as IfaceEnv
 import qualified GHC.Unit.Finder        as Finder
 
+import GHC.Core.Coercion       ( Reduction )
 import GHC.Core.FamInstEnv     ( FamInstEnv )
 import GHC.Tc.Utils.Monad      ( TcGblEnv, TcLclEnv, TcPluginM
                                , unsafeTcPluginTcM, getEvBindsTcPluginM
@@ -67,7 +68,7 @@ import GHC.Tc.Utils.Monad      ( TcGblEnv, TcLclEnv, TcPluginM
 import GHC.Tc.Types.Constraint ( Ct, CtLoc, CtEvidence(..), ctLocOrigin )
 import GHC.Tc.Utils.TcMType    ( TcTyVar, TcType )
 import GHC.Tc.Utils.Env        ( TcTyThing )
-import GHC.Tc.Types.Evidence   ( TcCoercion, CoercionHole, EvTerm(..)
+import GHC.Tc.Types.Evidence   ( CoercionHole, EvTerm(..)
                                , EvExpr, EvBind, mkGivenEvBind )
 import GHC.Types.Var           ( EvVar )
 
@@ -140,7 +141,7 @@ getFamInstEnvs :: TcPluginM (FamInstEnv, FamInstEnv)
 getFamInstEnvs = unsafeTcPluginTcM TcM.tcGetFamInstEnvs
 
 matchFam :: TyCon -> [Type]
-         -> TcPluginM (Maybe (TcCoercion, TcType))
+         -> TcPluginM (Maybe Reduction)
 matchFam tycon args = unsafeTcPluginTcM $ TcS.matchFamTcM tycon args
 
 newUnique :: TcPluginM Unique
@@ -186,8 +187,11 @@ newEvVar = unsafeTcPluginTcM . TcM.newEvVar
 newCoercionHole :: PredType -> TcPluginM CoercionHole
 newCoercionHole = unsafeTcPluginTcM . TcM.newCoercionHole
 
--- | Bind an evidence variable.  This must not be invoked from
--- 'tcPluginInit' or 'tcPluginStop', or it will panic.
+-- | Bind an evidence variable.
+--
+-- This should only be invoked from 'tcPluginSolve'.
+-- If invoked from 'tcPluginInit', 'tcPluginRewrite',
+-- or 'tcPluginStop', it will panic.
 setEvBind :: EvBind -> TcPluginM ()
 setEvBind ev_bind = do
     tc_evbinds <- getEvBindsTcPluginM

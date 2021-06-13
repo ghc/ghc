@@ -18,6 +18,7 @@ module GHC.Core.Coercion (
         LeftOrRight(..),
         Var, CoVar, TyCoVar,
         Role(..), ltRole,
+        Reduction(..),
 
         -- ** Functions over coercions
         coVarTypes, coVarKind, coVarKindsTypesRole, coVarRole,
@@ -2939,6 +2940,11 @@ is `k -> Any @a`, and thus the third argument of `x :: k` is well-kinded.
 -}
 
 
+data Reduction = Reduction !Type !Coercion
+
+instance Outputable Reduction where
+  ppr (Reduction co xi) = text "Reduction" <> ppr co <> ppr xi
+
 -- This is shared between the rewriter and the normaliser in GHC.Core.FamInstEnv.
 -- See Note [simplifyArgsWorker]
 {-# INLINE simplifyArgsWorker #-}
@@ -2946,10 +2952,10 @@ simplifyArgsWorker :: [TyCoBinder] -> Kind
                        -- the binders & result kind (not a Π-type) of the function applied to the args
                        -- list of binders can be shorter or longer than the list of args
                    -> TyCoVarSet   -- free vars of the args
-                   -> [Role]   -- list of roles, r
-                   -> [(Type, Coercion)] -- rewritten type arguments, arg
-                                         -- each comes with the coercion used to rewrite it,
-                                         -- with co :: rewritten_type ~ original_type
+                   -> [Role]      -- list of roles, r
+                   -> [Reduction] -- rewritten type arguments, arg
+                                  -- each comes with the coercion used to rewrite it,
+                                  -- with co :: rewritten_type ~ original_type
                    -> ([Type], [Coercion], MCoercionN)
 -- Returns (xis, cos, res_co), where each co :: xi ~ arg,
 -- and res_co :: kind (f xis) ~ kind (f tys), where f is the function applied to the args
@@ -2971,7 +2977,7 @@ simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
        -> [TyCoBinder]    -- Unsubsted binders of function's kind
        -> Kind        -- Unsubsted result kind of function (not a Pi-type)
        -> [Role]      -- Roles at which to rewrite these ...
-       -> [(Type, Coercion)]  -- rewritten arguments, with their rewriting coercions
+       -> [Reduction] -- rewritten arguments, with their rewriting coercions
        -> ([Type], [Coercion], MCoercionN)
     go acc_xis acc_cos !lc binders inner_ki _ []
         -- The !lc makes the function strict in the lifting context
@@ -2982,7 +2988,7 @@ simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
         kind_co | noFreeVarsOfType final_kind = MRefl
                 | otherwise                   = MCo $ liftCoSubst Nominal lc final_kind
 
-    go acc_xis acc_cos lc (binder:binders) inner_ki (role:roles) ((xi,co):args)
+    go acc_xis acc_cos lc (binder:binders) inner_ki (role:roles) (Reduction xi co:args)
       = -- By Note [Rewriting] in GHC.Tc.Solver.Rewrite invariant (F2),
          -- tcTypeKind(xi) = tcTypeKind(ty). But, it's possible that xi will be
          -- used as an argument to a function whose kind is different, if
@@ -3015,12 +3021,12 @@ simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
     go acc_xis acc_cos lc [] inner_ki roles args
       = let co1 = liftCoSubst Nominal lc inner_ki
             co1_kind              = coercionKind co1
-            unrewritten_tys       = map (coercionRKind . snd) args
+            unrewritten_tys       = map (coercionRKind . (\(Reduction _ co) -> co)) args
             (arg_cos, res_co)     = decomposePiCos co1 co1_kind unrewritten_tys
             casted_args           = assertPpr (equalLength args arg_cos)
                                               (ppr args $$ ppr arg_cos)
-                                    [ (casted_xi, casted_co)
-                                    | ((xi, co), arg_co, role) <- zip3 args arg_cos roles
+                                    [ Reduction casted_xi casted_co
+                                    | (Reduction xi co, arg_co, role) <- zip3 args arg_cos roles
                                     , let casted_xi = xi `mkCastTy` arg_co
                                           casted_co = mkCoherenceLeftCo role xi arg_co co ]
                -- In general decomposePiCos can return fewer cos than tys,
