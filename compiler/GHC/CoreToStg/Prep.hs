@@ -20,7 +20,6 @@ where
 import GHC.Prelude
 
 import GHC.Platform
-import GHC.Platform.Ways
 
 import GHC.Driver.Session
 import GHC.Driver.Env
@@ -74,14 +73,12 @@ import GHC.Types.SrcLoc ( SrcSpan(..), realSrcLocSpan, mkRealSrcLoc )
 import GHC.Types.Literal
 import GHC.Types.Tickish
 import GHC.Types.TyThing
-import GHC.Types.CostCentre ( CostCentre, ccFromThisModule )
 import GHC.Types.Unique.Supply
 
 import GHC.Data.Pair
 import Data.List        ( unfoldr )
 import Data.Functor.Identity
 import Control.Monad
-import qualified Data.Set as S
 
 {-
 -- ---------------------------------------------------------------------------
@@ -241,20 +238,15 @@ type CpeRhs  = CoreExpr    -- Non-terminal 'rhs'
 -}
 
 corePrepPgm :: HscEnv -> Module -> ModLocation -> CoreProgram -> [TyCon]
-            -> IO (CoreProgram, S.Set CostCentre)
+            -> IO CoreProgram
 corePrepPgm hsc_env this_mod mod_loc binds data_tycons =
     withTiming logger
                (text "CorePrep"<+>brackets (ppr this_mod))
-               (\(a,b) -> a `seqList` b `seq` ()) $ do
+               (\a -> a `seqList` ()) $ do
     us <- mkSplitUniqSupply 's'
     initialCorePrepEnv <- mkInitialCorePrepEnv hsc_env
 
-    let cost_centres
-          | WayProf `S.member` ways dflags
-          = collectCostCentres this_mod binds
-          | otherwise
-          = S.empty
-
+    let
         implicit_binds = mkDataConWorkers dflags mod_loc data_tycons
             -- NB: we must feed mkImplicitBinds through corePrep too
             -- so that they are suitably cloned and eta-expanded
@@ -265,7 +257,7 @@ corePrepPgm hsc_env this_mod mod_loc binds data_tycons =
                       return (deFloatTop (floats1 `appendFloats` floats2))
 
     endPassIO hsc_env alwaysQualify CorePrep binds_out []
-    return (binds_out, cost_centres)
+    return binds_out
   where
     dflags = hsc_dflags hsc_env
     logger = hsc_logger hsc_env
@@ -2120,41 +2112,6 @@ wrapTicks (Floats flag floats0) expr =
         wrapBind t (NonRec binder rhs) = NonRec binder (mkTick t rhs)
         wrapBind t (Rec pairs)         = Rec (mapSnd (mkTick t) pairs)
 
-------------------------------------------------------------------------------
--- Collecting cost centres
--- ---------------------------------------------------------------------------
-
--- | Collect cost centres defined in the current module, including those in
--- unfoldings.
-collectCostCentres :: Module -> CoreProgram -> S.Set CostCentre
-collectCostCentres mod_name
-  = foldl' go_bind S.empty
-  where
-    go cs e = case e of
-      Var{} -> cs
-      Lit{} -> cs
-      App e1 e2 -> go (go cs e1) e2
-      Lam _ e -> go cs e
-      Let b e -> go (go_bind cs b) e
-      Case scrt _ _ alts -> go_alts (go cs scrt) alts
-      Cast e _ -> go cs e
-      Tick (ProfNote cc _ _) e ->
-        go (if ccFromThisModule cc mod_name then S.insert cc cs else cs) e
-      Tick _ e -> go cs e
-      Type{} -> cs
-      Coercion{} -> cs
-
-    go_alts = foldl' (\cs (Alt _con _bndrs e) -> go cs e)
-
-    go_bind :: S.Set CostCentre -> CoreBind -> S.Set CostCentre
-    go_bind cs (NonRec b e) =
-      go (maybe cs (go cs) (get_unf b)) e
-    go_bind cs (Rec bs) =
-      foldl' (\cs' (b, e) -> go (maybe cs' (go cs') (get_unf b)) e) cs bs
-
-    -- Unfoldings may have cost centres that in the original definion are
-    -- optimized away, see #5889.
-    get_unf = maybeUnfoldingTemplate . realIdUnfolding
 
 
 ------------------------------------------------------------------------------
