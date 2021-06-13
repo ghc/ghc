@@ -1,6 +1,7 @@
 
 {-# LANGUAGE DeriveFunctor              #-}
 {-# LANGUAGE ExistentialQuantification  #-}
+{-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 {-
@@ -32,6 +33,7 @@ module GHC.Tc.Types(
         setLclEnvLoc, getLclEnvLoc,
         IfGblEnv(..), IfLclEnv(..),
         tcVisibleOrphanMods,
+        RewriteEnv(..),
 
         -- Frontend types (shouldn't really be here)
         FrontendResult(..),
@@ -72,7 +74,8 @@ module GHC.Tc.Types(
         getPlatform,
 
         -- Constraint solver plugins
-        TcPlugin(..), TcPluginResult(..), TcPluginSolver,
+        TcPlugin(..), TcPluginResult(..), TcPluginRewriteResult(..),
+        TcPluginSolver, TcPluginRewriter,
         TcPluginM, runTcPluginM, unsafeTcPluginTcM,
         getEvBindsTcPluginM,
 
@@ -110,6 +113,7 @@ import GHC.Core.Lint   ( lintAxioms )
 import GHC.Core.UsageEnv
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
+import GHC.Core.Predicate
 
 import GHC.Types.Id         ( idType, idName )
 import GHC.Types.FieldLabel ( FieldLabel )
@@ -251,6 +255,20 @@ instance ContainsLogger (Env gbl lcl) where
 instance ContainsModule gbl => ContainsModule (Env gbl lcl) where
     extractModule env = extractModule (env_gbl env)
 
+{-
+************************************************************************
+*                                                                      *
+*                            RewriteEnv
+*                     The rewriting environment
+*                                                                      *
+************************************************************************
+-}
+
+data RewriteEnv
+  = FE { fe_loc     :: !CtLoc             -- See Note [Rewriter CtLoc]
+       , fe_flavour :: !CtFlavour
+       , fe_eq_rel  :: !EqRel             -- See Note [Rewriter EqRels]
+       }
 
 {-
 ************************************************************************
@@ -573,8 +591,13 @@ data TcGblEnv
         -- are supplied (#19714), or if those reasons have already been
         -- reported by GHC.Driver.Main.markUnsafeInfer
 
-        tcg_tc_plugins :: [TcPluginSolver],
-        -- ^ A list of user-defined plugins for the constraint solver.
+        tcg_tc_plugin_solvers :: [TcPluginSolver],
+        -- ^ A list of user-defined type-checking plugins for constraint solving.
+
+        tcg_tc_plugin_rewriters :: UniqFM TyCon [TcPluginRewriter],
+        -- ^ A collection of all the user-defined type-checking plugins for rewriting
+        -- type family applications, collated by their type family 'TyCon's.
+
         tcg_hf_plugins :: [HoleFitPlugin],
         -- ^ A list of user-defined plugins for hole fit suggestions.
 
@@ -1666,10 +1689,16 @@ Constraint Solver Plugins
 -------------------------
 -}
 
-type TcPluginSolver = [Ct]    -- given
-                   -> [Ct]    -- derived
-                   -> [Ct]    -- wanted
+type TcPluginSolver = [Ct]    -- ^ givens
+                   -> [Ct]    -- ^ deriveds
+                   -> [Ct]    -- ^ wanteds
                    -> TcPluginM TcPluginResult
+
+type TcPluginRewriter
+  =  RewriteEnv -- ^ rewriter environment
+  -> [Ct]       -- ^ givens
+  -> [TcType]   -- ^ type family arguments
+  -> TcPluginM TcPluginRewriteResult
 
 newtype TcPluginM a = TcPluginM (EvBindsVar -> TcM a) deriving (Functor)
 
@@ -1695,8 +1724,12 @@ unsafeTcPluginTcM :: TcM a -> TcPluginM a
 unsafeTcPluginTcM = TcPluginM . const
 
 -- | Access the 'EvBindsVar' carried by the 'TcPluginM' during
--- constraint solving.  Returns 'Nothing' if invoked during
--- 'tcPluginInit' or 'tcPluginStop'.
+-- constraint solving.
+--
+-- Only call this function within 'tcPluginSolve'.
+--
+-- This function will panic if invoked during 'tcPluginInit',
+-- 'tcPluginRewrite' or 'tcPluginStop'.
 getEvBindsTcPluginM :: TcPluginM EvBindsVar
 getEvBindsTcPluginM = TcPluginM return
 
@@ -1707,7 +1740,18 @@ data TcPlugin = forall s. TcPlugin
 
   , tcPluginSolve :: s -> TcPluginSolver
     -- ^ Solve some constraints.
-    -- TODO: WRITE MORE DETAILS ON HOW THIS WORKS.
+    --
+    -- This function will be invoked at two points in the constraint solving
+    -- process: after simplification of given constraints, and after
+    -- solving of wanted constraints. The two phases can be distinguished
+    -- as follows: the deriveds and wanteds will be empty in the first case.
+    --
+    -- The plugin can either return a contradiction,
+    -- or specify that it has solved some constraints (with evidence),
+    -- and possibly emit additional wanted constraints.
+
+  , tcPluginRewrite :: s -> UniqFM TyCon TcPluginRewriter
+    -- ^ Rewrite saturated type family applications.
 
   , tcPluginStop  :: s -> TcPluginM ()
    -- ^ Clean up after the plugin, when exiting the type-checker.
@@ -1719,12 +1763,33 @@ data TcPluginResult
     -- The returned constraints are removed from the inert set,
     -- and recorded as insoluble.
 
-  | TcPluginOk [(EvTerm,Ct)] [Ct]
+  | TcPluginOk
+    { tcPluginSolvedWanteds :: [(EvTerm,Ct)]
+    , tcPluginNewWanteds :: [Ct] }
     -- ^ The first field is for constraints that were solved.
     -- These are removed from the inert set,
     -- and the evidence for them is recorded.
     -- The second field contains new work, that should be processed by
     -- the constraint solver.
+
+
+data TcPluginRewriteResult
+  =
+  -- | The plugin does not rewrite the type family application.
+  --
+  -- The plugin can also emit additional wanted constraints,
+  -- including insoluble ones (e.g. a type error message).
+    TcPluginNoRewrite { tcRewriterWanteds :: [Ct] }
+
+  -- | The plugin rewrites the type family application
+  -- providing a rewriting together with evidence.
+  --
+  -- The plugin can also emit additional wanted constraints.
+  | TcPluginRewriteTo
+    { tcPluginRewriteTo :: TcType
+    , tcPluginRewriteEvidence :: TcCoercion
+    , tcRewriterWanteds :: [Ct]
+    }
 
 {- *********************************************************************
 *                                                                      *
