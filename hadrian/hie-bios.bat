@@ -1,3 +1,4 @@
 set TERM=dumb
 set CABFLAGS=-v0
-%CD%\hadrian\build-cabal.bat tool:%1 -q --build-root=_hie-bios --flavour=ghc-in-ghci > %HIE_BIOS_OUTPUT%
+set TOOL_OUTPUT=%HIE_BIOS_OUTPUT%
+%CD%\hadrian\build-cabal.bat tool:%1 --build-root=_hie-bios --flavour=ghc-in-ghci

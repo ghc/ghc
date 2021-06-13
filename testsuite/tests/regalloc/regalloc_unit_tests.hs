@@ -39,6 +39,7 @@ import GHC.Parser.Errors.Ppr
 import GHC.Unit.Module
 import GHC.Cmm.DebugBlock
 import GHC
+import GHC.Run
 import GHC.Driver.Monad
 import GHC.Driver.Config.Diagnostic
 import GHC.Types.Unique.FM
@@ -54,6 +55,7 @@ import GHC.Unit.Finder
 import GHC.Unit.Env
 import GHC.Unit.Home.ModInfo
 import GHC.Driver.Config.Finder
+import qualified Data.Map as Map
 
 import GHC.Data.Stream as Stream (collect, yield)
 
@@ -70,7 +72,7 @@ main = do
     [libdir] <- getArgs
 
     --get a GHC context and run the tests
-    runGhc (Just libdir) $ do
+    runGhcWithAbiHashes (Just libdir) $ do
         dflags0 <- flip gopt_set Opt_RegsGraph <$> getDynFlags
         --the register allocator's intermediate data
         --structures are usually discarded
@@ -127,7 +129,7 @@ compileCmmForRegAllocStats ::
         , Maybe [Linear.RegAllocStats])]
 compileCmmForRegAllocStats logger dflags cmmFile ncgImplF us = do
     let ncgImpl = ncgImplF (initNCGConfig dflags thisMod)
-    hscEnv <- newHscEnv dflags
+    hscEnv <- newHscEnv Map.empty dflags
 
     -- parse the cmm file and output any warnings or errors
     let fake_mod = mkHomeModule (hsc_home_unit hscEnv) (mkModuleName "fake")

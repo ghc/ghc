@@ -250,15 +250,17 @@ import Data.List.NonEmpty (NonEmpty ((:|)))
 %*                                                                      *
 %********************************************************************* -}
 
-newHscEnv :: DynFlags -> IO HscEnv
-newHscEnv dflags = newHscEnvWithHUG dflags (homeUnitId_ dflags) home_unit_graph
+newHscEnv :: LinkedAbiHashes -- ^ See Note [Loader Consistency Checks]
+          -> DynFlags -> IO HscEnv
+newHscEnv myAbiHashes dflags = newHscEnvWithHUG myAbiHashes dflags (homeUnitId_ dflags) home_unit_graph
   where
     home_unit_graph = unitEnv_singleton
                         (homeUnitId_ dflags)
                         (mkHomeUnitEnv dflags emptyHomePackageTable Nothing)
 
-newHscEnvWithHUG :: DynFlags -> UnitId -> HomeUnitGraph -> IO HscEnv
-newHscEnvWithHUG top_dynflags cur_unit home_unit_graph = do
+newHscEnvWithHUG :: LinkedAbiHashes -- ^ See Note [Loader Consistency Checks]
+                 -> DynFlags -> UnitId -> HomeUnitGraph -> IO HscEnv
+newHscEnvWithHUG myAbiHashes top_dynflags cur_unit home_unit_graph = do
     nc_var  <- initNameCache 'r' knownKeyNames
     fc_var  <- initFinderCache
     logger  <- initLogger
@@ -278,6 +280,7 @@ newHscEnvWithHUG top_dynflags cur_unit home_unit_graph = do
                   ,  hsc_plugins        = emptyPlugins
                   ,  hsc_hooks          = emptyHooks
                   ,  hsc_tmpfs          = tmpfs
+                  ,  hsc_linked_abi_hashes = myAbiHashes
                   }
 
 -- -----------------------------------------------------------------------------

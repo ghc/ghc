@@ -6,6 +6,7 @@ import GHC.Runtime.Heap.Layout
 import GHC.StgToCmm.Layout
 import GHC.StgToCmm.Closure
 import GHC
+import GHC.Run
 import GHC.Driver.Monad
 import System.Environment
 import GHC.Platform
@@ -13,7 +14,7 @@ import GHC.Platform
 main :: IO ()
 main = do
     [libdir] <- getArgs
-    runGhc (Just libdir) $ do
+    runGhcWithAbiHashes (Just libdir) $ do
       setSessionDynFlags =<< getDynFlags
       tests
 

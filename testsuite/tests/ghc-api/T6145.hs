@@ -6,6 +6,7 @@ module Main where
 
 import System.IO
 import GHC
+import GHC.Run
 import GHC.Utils.Monad
 import GHC.Utils.Outputable
 import GHC.Data.Bag (filterBag,isEmptyBag)
@@ -17,7 +18,7 @@ main = do
         let c="module Test where\ndata DataT=MkData {name :: String}\n"
         writeFile "Test.hs" c
         [libdir] <- getArgs
-        ok<-    runGhc (Just libdir) $ do
+        ok<-    runGhcWithAbiHashes (Just libdir) $ do
                         dflags <- getSessionDynFlags
                         setSessionDynFlags dflags
                         let mn =mkModuleName "Test"

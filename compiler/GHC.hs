@@ -504,14 +504,15 @@ defaultCleanupHandler _ m = m
 -- Any errors not handled inside the 'Ghc' action are propagated as IO
 -- exceptions.
 
-runGhc :: Maybe FilePath  -- ^ See argument to 'initGhcMonad'.
+runGhc :: LinkedAbiHashes -- ^ See Note [Loader Consistency Checks]
+       -> Maybe FilePath  -- ^ See argument to 'initGhcMonad'.
        -> Ghc a           -- ^ The action to perform.
        -> IO a
-runGhc mb_top_dir ghc = do
+runGhc myAbiHashes mb_top_dir ghc = do
   ref <- newIORef (panic "empty session")
   let session = Session ref
   flip unGhc session $ withSignalHandlers $ do -- catch ^C
-    initGhcMonad mb_top_dir
+    initGhcMonad myAbiHashes mb_top_dir
     withCleanupSession ghc
 
 -- | Run function for 'GhcT' monad transformer.
@@ -520,15 +521,16 @@ runGhc mb_top_dir ghc = do
 -- to this function will create a new session which should not be shared among
 -- several threads.
 
-runGhcT :: ExceptionMonad m =>
-           Maybe FilePath  -- ^ See argument to 'initGhcMonad'.
+runGhcT :: ExceptionMonad m
+        => LinkedAbiHashes -- ^ See Note [Loader Consistency Checks]
+        -> Maybe FilePath  -- ^ See argument to 'initGhcMonad'.
         -> GhcT m a        -- ^ The action to perform.
         -> m a
-runGhcT mb_top_dir ghct = do
+runGhcT myAbiHashes mb_top_dir ghct = do
   ref <- liftIO $ newIORef (panic "empty session")
   let session = Session ref
   flip unGhcT session $ withSignalHandlers $ do -- catch ^C
-    initGhcMonad mb_top_dir
+    initGhcMonad myAbiHashes mb_top_dir
     withCleanupSession ghct
 
 withCleanupSession :: GhcMonad m => m a -> m a
@@ -560,14 +562,14 @@ withCleanupSession ghc = ghc `MC.finally` cleanup
 -- portability, you should use the @ghc-paths@ package, available at
 -- <http://hackage.haskell.org/package/ghc-paths>.
 
-initGhcMonad :: GhcMonad m => Maybe FilePath -> m ()
-initGhcMonad mb_top_dir
+initGhcMonad :: GhcMonad m => LinkedAbiHashes -> Maybe FilePath -> m ()
+initGhcMonad myAbiHashes mb_top_dir
   = do { env <- liftIO $
                 do { top_dir <- findTopDir mb_top_dir
                    ; mySettings <- initSysTools top_dir
                    ; myLlvmConfig <- lazyInitLlvmConfig top_dir
                    ; dflags <- initDynFlags (defaultDynFlags mySettings myLlvmConfig)
-                   ; hsc_env <- newHscEnv dflags
+                   ; hsc_env <- newHscEnv myAbiHashes dflags
                    ; checkBrokenTablesNextToCode (hsc_logger hsc_env) dflags
                    ; setUnsafeGlobalDynFlags dflags
                       -- c.f. DynFlags.parseDynamicFlagsFull, which

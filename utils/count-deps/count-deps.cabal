@@ -21,4 +21,5 @@ Executable count-deps
     other-modules:
     Build-Depends: base >= 4   && < 5,
                    containers,
-                   ghc
+                   ghc,
+                   ghc-abihash

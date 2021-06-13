@@ -1,6 +1,7 @@
 module LinkerUnload (init) where
 
 import GHC
+import GHC.Run
 import GHC.Unit.State
 import GHC.Driver.Env
 import GHC.Driver.Session
@@ -15,7 +16,7 @@ foreign export ccall loadPackages :: IO ()
 loadPackages :: IO ()
 loadPackages = do
   [libdir] <- getArgs
-  runGhc (Just libdir) $ do
+  runGhcWithAbiHashes (Just libdir) $ do
     dflags <- getSessionDynFlags
     let dflags' = dflags { backend = NoBackend
                          , ghcLink = LinkInMemory }

@@ -10,10 +10,10 @@ import Hadrian.BuildPath
 import Hadrian.Haskell.Cabal
 import Hadrian.Haskell.Cabal.Type
 
-import Rules.Generate (ghcPrimDependencies)
+import Rules.Generate (generatedDependencies)
 import Base
 import Context
-import Expression (getContextData, interpretInContext, (?), package)
+import Expression (getContextData, interpretInContext)
 import Flavour
 import Oracles.ModuleFiles
 import Oracles.Setting (topDirectory)
@@ -241,12 +241,8 @@ buildPackageDocumentation = do
         need [ takeDirectory file  -/- "haddock-prologue.txt"]
         haddocks <- haddockDependencies context
 
-        -- `ghc-prim` has a source file for 'GHC.Prim' which is generated just
-        -- for Haddock. We need to 'union' (instead of '++') to avoid passing
-        -- 'GHC.PrimopWrappers' (which unfortunately shows up in both
-        -- `generatedSrcs` and `vanillaSrcs`) to Haddock twice.
-        generatedSrcs <- interpretInContext context (Expression.package ghcPrim ? ghcPrimDependencies)
-        vanillaSrcs <- hsSources context
+        generatedSrcs <- interpretInContext context generatedDependencies
+        vanillaSrcs <- hsSources generatedSrcs context
         let srcs = vanillaSrcs `union` generatedSrcs
 
         need $ srcs ++ haddocks
@@ -257,7 +253,7 @@ buildPackageDocumentation = do
         let haddockWay = if dynamicPrograms then dynamic else vanilla
         statsFilesDir <- haddockStatsFilesDir
         createDirectory statsFilesDir
-        build $ target (context {way = haddockWay}) (Haddock BuildPackage) srcs [file]
+        build $ target (context {way = haddockWay}) (Haddock BuildPackage) (filter ((".hs-incl" /=) . takeExtension) srcs) [file]
         produces [
           statsFilesDir </> pkgName (Context.package context) <.> "t"
           ]

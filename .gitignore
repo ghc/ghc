@@ -154,6 +154,7 @@ _darcs/
 /libraries/prologue.txt
 /libraries/doc-index*.html
 /libraries/frames.html
+/libraries/ghc-abihash/ghc-abihash.cabal
 /libraries/ghc-boot/GNUmakefile
 /libraries/ghc-boot/ghc-boot.cabal
 /libraries/ghc-boot-th/GNUmakefile
@@ -242,3 +243,4 @@ ghc.nix/
 
 # clangd
 .clangd
+dist-newstyle/

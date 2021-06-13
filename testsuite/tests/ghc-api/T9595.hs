@@ -1,6 +1,7 @@
 module Main where
 
 import GHC
+import GHC.Run
 import GHC.Unit.State
 import GHC.Driver.Monad
 import GHC.Driver.Session
@@ -11,12 +12,12 @@ import System.Environment
 
 main =
   do [libdir] <- getArgs
-     _ <- runGhc (Just libdir) $ do
+     _ <- runGhcWithAbiHashes (Just libdir) $ do
                 dflags <- getSessionDynFlags
                 setSessionDynFlags dflags
                 state <- hsc_units <$> getSession
                 liftIO $ print (mkModuleName "GHC.Utils.Outputable" `elem` listVisibleModuleNames state)
-     _ <- runGhc (Just libdir) $ do
+     _ <- runGhcWithAbiHashes (Just libdir) $ do
                 dflags <- getSessionDynFlags
                 setSessionDynFlags (dflags {
                     packageFlags = [ExposePackage "-package ghc"

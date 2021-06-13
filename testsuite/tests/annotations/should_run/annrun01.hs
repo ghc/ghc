@@ -3,6 +3,7 @@
 module Main where
 
 import GHC
+import GHC.Run
 import GHC.Utils.Monad  ( liftIO )
 import Data.Maybe
 import GHC.Driver.Session    ( defaultFatalMessager, defaultFlushOut )
@@ -19,7 +20,7 @@ import Data.Function
 
 main :: IO ()
 main = defaultErrorHandler defaultFatalMessager defaultFlushOut
-     $ runGhc (Just cTop) $ do
+     $ runGhcWithAbiHashes (Just cTop) $ do
     liftIO $ putStrLn "Initializing Package Database"
     dflags <- getSessionDynFlags
     let dflags' = dflags

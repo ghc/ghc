@@ -8,6 +8,7 @@ import Control.Monad (void)
 import System.Environment
 
 import GHC
+import GHC.Run
 import qualified GHC.Settings.Config as GHC
 import qualified GHC.Utils.Outputable as GHC
 import qualified GHC.Driver.Ppr as GHC
@@ -56,7 +57,7 @@ compileInGhc targets handlerOutput = do
 main :: IO ()
 main = do
   [libdir] <- getArgs
-  runGhc (Just libdir) $ do
+  runGhcWithAbiHashes (Just libdir) $ do
 
   liftIO $ putStrLn "----- 0 ------"
   compileInGhc ["A.hs", "B.hs"] $ \msg -> print (0 :: Int, msg)

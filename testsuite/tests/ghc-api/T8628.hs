@@ -3,6 +3,7 @@ module Main where
 import System.IO
 import GHC.Driver.Session
 import GHC
+import GHC.Run
 import GHC.Utils.Exception
 import GHC.Unit.Module
 import GHC.Data.FastString
@@ -17,7 +18,7 @@ import Control.Monad.Catch as MC
 main :: IO()
 main
   = do  [libdir] <- getArgs
-        ok <- runGhc (Just libdir) $ do
+        ok <- runGhcWithAbiHashes (Just libdir) $ do
           dflags <- getSessionDynFlags
           setSessionDynFlags dflags
           liftIO (setUnsafeGlobalDynFlags dflags)

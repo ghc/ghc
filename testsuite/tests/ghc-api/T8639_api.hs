@@ -1,6 +1,7 @@
 module Main where
 
 import GHC
+import GHC.Run
 import GHC.Driver.Monad
 import GHC.Driver.Ppr
 import GHC.Utils.Outputable
@@ -9,7 +10,7 @@ import System.Environment( getArgs )
 
 main
  = do { [libdir] <- getArgs
-      ; runGhc (Just libdir) $ do
+      ; runGhcWithAbiHashes (Just libdir) $ do
            flags <- getSessionDynFlags
            setSessionDynFlags (flags{ backend = Interpreter, ghcLink = LinkInMemory})
            target <- guessTarget "T8639_api_a.hs" Nothing Nothing

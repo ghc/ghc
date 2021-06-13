@@ -7,6 +7,7 @@ import Data.Data
 import Data.List (intercalate)
 import System.IO
 import GHC
+import GHC.Run
 import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Utils.Monad
@@ -24,7 +25,7 @@ main = do
         testOneFile libdir "LiteralsTest"
 
 testOneFile libdir fileName = do
-    t <- runGhc (Just libdir) $ do
+    t <- runGhcWithAbiHashes (Just libdir) $ do
         dflags <- getSessionDynFlags
         setSessionDynFlags dflags
         let mn =mkModuleName fileName

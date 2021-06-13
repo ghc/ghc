@@ -1,7 +1,10 @@
 module Rules.Generate (
     isGeneratedCmmFile, compilerDependencies, generatePackageCode,
     generateRules, copyRules, generatedDependencies,
-    ghcPrimDependencies
+    ghcPrimDependencies,
+    generateVersionHs,
+    generatePlatformHostHs,
+    generateConfigHs
     ) where
 
 import Base
@@ -98,8 +101,7 @@ generatePackageCode :: Context -> Rules ()
 generatePackageCode context@(Context stage pkg _) = do
     root <- buildRootRules
     let dir         = buildDir context
-        generated f = (root -/- dir -/- "**/*.hs") ?== f && not ("//autogen/*" ?== f)
-        go gen file = generate file context gen
+        generated f = (root -/- dir -/- "**/*.hs") ?== f && not ("//autogen/*" ?== f) && not ("//global-autogen/**" ?== f)
     generated ?> \file -> do
         let unpack = fromMaybe . error $ "No generator for " ++ file ++ "."
         (src, builder) <- unpack <$> findGenerator context file
@@ -114,14 +116,10 @@ generatePackageCode context@(Context stage pkg _) = do
     priority 2.0 $ do
         when (pkg == compiler) $ do
             root -/- "**" -/- dir -/- "GHC/Platform/Constants.hs" %> genPlatformConstantsType context
-            root -/- "**" -/- dir -/- "GHC/Settings/Config.hs" %> go generateConfigHs
             root -/- "**" -/- dir -/- "*.hs-incl" %> genPrimopCode context
         when (pkg == ghcPrim) $ do
             root -/- "**" -/- dir -/- "GHC/Prim.hs" %> genPrimopCode context
             root -/- "**" -/- dir -/- "GHC/PrimopWrappers.hs" %> genPrimopCode context
-        when (pkg == ghcBoot) $ do
-            root -/- "**" -/- dir -/- "GHC/Version.hs" %> go generateVersionHs
-            root -/- "**" -/- dir -/- "GHC/Platform/Host.hs" %> go generatePlatformHostHs
 
     when (pkg == compiler) $ do
         root -/- primopsTxt stage %> \file -> do
@@ -354,7 +352,7 @@ generateSettings = do
 
 
 -- | Generate @Config.hs@ files.
-generateConfigHs :: Expr String
+generateConfigHs :: Expr [(String,String)]
 generateConfigHs = do
     stage <- getStage
     let chooseSetting x y = getSetting $ if stage == Stage0 then x else y
@@ -363,35 +361,12 @@ generateConfigHs = do
     trackGenerateHs
     cProjectName        <- getSetting ProjectName
     cBooterVersion      <- getSetting GhcVersion
-    return $ unlines
-        [ "module GHC.Settings.Config"
-        , "  ( module GHC.Version"
-        , "  , cBuildPlatformString"
-        , "  , cHostPlatformString"
-        , "  , cProjectName"
-        , "  , cBooterVersion"
-        , "  , cStage"
-        , "  ) where"
-        , ""
-        , "import GHC.Prelude"
-        , ""
-        , "import GHC.Version"
-        , ""
-        , "cBuildPlatformString :: String"
-        , "cBuildPlatformString = " ++ show buildPlatform
-        , ""
-        , "cHostPlatformString :: String"
-        , "cHostPlatformString = " ++ show hostPlatform
-        , ""
-        , "cProjectName          :: String"
-        , "cProjectName          = " ++ show cProjectName
-        , ""
-        , "cBooterVersion        :: String"
-        , "cBooterVersion        = " ++ show cBooterVersion
-        , ""
-        , "cStage                :: String"
-        , "cStage                = show (" ++ show (fromEnum stage + 1) ++ " :: Int)"
-        ]
+    pure [("cBuildPlatformString", buildPlatform)
+         ,("cHostPlatformString", hostPlatform)
+         ,("cProjectName", cProjectName)
+         ,("cBooterVersion", cBooterVersion)
+         ,("cStage", show (fromEnum stage + 1))
+         ]
 
 -- | Generate @ghcautoconf.h@ header.
 generateGhcAutoconfH :: Expr String
@@ -414,7 +389,7 @@ generateGhcAutoconfH = do
         | otherwise = Just s
 
 -- | Generate @Version.hs@ files.
-generateVersionHs :: Expr String
+generateVersionHs :: Expr [(String, String)]
 generateVersionHs = do
     trackGenerateHs
     cProjectGitCommitId <- getSetting ProjectGitCommitId
@@ -423,47 +398,20 @@ generateVersionHs = do
     cProjectPatchLevel  <- getSetting ProjectPatchLevel
     cProjectPatchLevel1 <- getSetting ProjectPatchLevel1
     cProjectPatchLevel2 <- getSetting ProjectPatchLevel2
-    return $ unlines
-        [ "module GHC.Version where"
-        , ""
-        , "import Prelude -- See Note [Why do we import Prelude here?]"
-        , ""
-        , "cProjectGitCommitId   :: String"
-        , "cProjectGitCommitId   = " ++ show cProjectGitCommitId
-        , ""
-        , "cProjectVersion       :: String"
-        , "cProjectVersion       = " ++ show cProjectVersion
-        , ""
-        , "cProjectVersionInt    :: String"
-        , "cProjectVersionInt    = " ++ show cProjectVersionInt
-        , ""
-        , "cProjectPatchLevel    :: String"
-        , "cProjectPatchLevel    = " ++ show cProjectPatchLevel
-        , ""
-        , "cProjectPatchLevel1   :: String"
-        , "cProjectPatchLevel1   = " ++ show cProjectPatchLevel1
-        , ""
-        , "cProjectPatchLevel2   :: String"
-        , "cProjectPatchLevel2   = " ++ show cProjectPatchLevel2
-        ]
+    return $ [("cProjectGitCommitId", cProjectGitCommitId)
+             ,("cProjectVersion", cProjectVersion)
+             ,("cProjectVersionInt", cProjectVersionInt)
+             ,("cProjectPatchLevel", cProjectPatchLevel)
+             ,("cProjectPatchLevel1", cProjectPatchLevel1)
+             ,("cProjectPatchLevel2", cProjectPatchLevel2)
+             ]
 
 -- | Generate @Platform/Host.hs@ files.
-generatePlatformHostHs :: Expr String
+generatePlatformHostHs :: Expr [(String,String)]
 generatePlatformHostHs = do
     trackGenerateHs
     cHostPlatformArch <- getSetting HostArchHaskell
     cHostPlatformOS   <- getSetting HostOsHaskell
-    return $ unlines
-        [ "module GHC.Platform.Host where"
-        , ""
-        , "import GHC.Platform.ArchOS"
-        , ""
-        , "hostPlatformArch :: Arch"
-        , "hostPlatformArch = " ++ cHostPlatformArch
-        , ""
-        , "hostPlatformOS   :: OS"
-        , "hostPlatformOS   = " ++ cHostPlatformOS
-        , ""
-        , "hostPlatformArchOS :: ArchOS"
-        , "hostPlatformArchOS = ArchOS hostPlatformArch hostPlatformOS"
-        ]
+    return $ [("hostPlatformArch", cHostPlatformArch)
+             ,("hostPlatformOS", cHostPlatformOS)
+             ]

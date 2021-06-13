@@ -10,6 +10,7 @@
 module Main where
 
 import GHC
+import GHC.Run
 import GHC.Driver.Session
 import GHC.Driver.Backend
 import GHC.Utils.Monad ( MonadIO(..) )
@@ -21,7 +22,7 @@ import System.IO
 
 main = do
   libdir : args <- getArgs
-  runGhc (Just libdir) $ do
+  runGhcWithAbiHashes (Just libdir) $ do
     dflags0 <- getSessionDynFlags
     logger <- getLogger
     (dflags, _, _) <- parseDynamicFlags logger dflags0

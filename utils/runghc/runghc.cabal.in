@@ -31,5 +31,6 @@ Executable runghc
                    process    >= 1   && < 1.7,
                    filepath
 
+    cpp-options: -DVERSION="@ProjectVersion@"
     if !os(windows)
       build-depends: unix

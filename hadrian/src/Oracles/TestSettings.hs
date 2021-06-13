@@ -96,6 +96,10 @@ getBinaryDirectory "stage0" = takeDirectory <$> setting SystemGhc
 getBinaryDirectory "stage1" = liftM2 (-/-) absoluteBuildRoot  (pure "stage1-test/bin/")
 getBinaryDirectory "stage2" = liftM2 (-/-) topDirectory (stageBinPath Stage1)
 getBinaryDirectory "stage3" = liftM2 (-/-) topDirectory (stageBinPath Stage2)
+getBinaryDirectory "stage-cabal" = do
+  top <- topDirectory
+  root <- buildRoot
+  pure (top -/- root -/- "stage-cabal" -/- "bin")
 getBinaryDirectory compiler = pure $ takeDirectory compiler
 
 -- | Get the path to the given @--test-compiler@.
@@ -104,6 +108,10 @@ getCompilerPath "stage0" = setting SystemGhc
 getCompilerPath "stage1" = liftM2 (-/-) absoluteBuildRoot (pure ("stage1-test/bin/ghc" <.> exe))
 getCompilerPath "stage2" = liftM2 (-/-) topDirectory (fullPath Stage1 ghc)
 getCompilerPath "stage3" = liftM2 (-/-) topDirectory (fullPath Stage2 ghc)
+getCompilerPath "stage-cabal" = do
+  top <- topDirectory
+  root <- buildRoot
+  pure (top -/- root -/- "stage-cabal" -/- "bin" -/- "ghc")
 getCompilerPath compiler = pure compiler
 
 isInTreeCompiler :: String -> Bool

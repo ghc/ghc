@@ -905,6 +905,56 @@ validate-x86_64-linux-deb10-dwarf:
   rules:
     - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
 
+#################################
+# x86_64-linux-deb10
+#################################
+
+.build-x86_64-linux-deb10:
+  extends: .validate-linux
+  stage: full-build
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
+  variables:
+    TEST_ENV: "x86_64-linux-deb10"
+    BIN_DIST_PREP_TAR_COMP: "./ghc-x86_64-deb10-linux.tar.xz"
+  cache:
+    key: linux-x86_64-deb10-$CACHE_REV
+
+# Disabled to alleviate CI load
+.validate-x86_64-linux-deb10:
+  extends: .build-x86_64-linux-deb10
+  stage: full-build
+
+nightly-x86_64-linux-deb10:
+  <<: *nightly
+  extends: .build-x86_64-linux-deb10
+  variables:
+    TEST_TYPE: slowtest
+
+release-x86_64-linux-deb10:
+  <<: *release
+  extends: .build-x86_64-linux-deb10
+
+nightly-cabal-reinstall-x86_64-linux-deb10:
+  <<: *nightly
+  extends: .validate-linux-hadrian
+  stage: full-build
+  before_script:
+    - ./boot
+    - ./configure
+    - "cabal update --index=$HACKAGE_INDEX_STATE --project-file=cabal.project"
+  variables:
+    REINSTALL_GHC: "yes"
+
+test-cabal-reinstall-x86_64-linux-deb10:
+  extends: .validate-linux-hadrian
+  stage: tool-lint
+  before_script:
+    - ./boot
+    - ./configure
+    - "cabal update --index=$HACKAGE_INDEX_STATE --project-file=cabal.project"
+  variables:
+    REINSTALL_GHC: "yes"
+
 release-x86_64-linux-deb10-dwarf:
   <<: *release
   extends: .build-x86_64-linux-deb10

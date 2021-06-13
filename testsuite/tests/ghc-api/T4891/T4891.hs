@@ -6,6 +6,7 @@ import GHC.Core.Opt.Monad
 import Data.Array
 import GHC.Core.DataCon
 import GHC
+import GHC.Run
 import GHC.Exts.Heap
 import GHC.Driver.Ppr
 import GHC.Linker.Loader
@@ -28,7 +29,7 @@ import System.Environment
 
 main :: IO ()
 main = do [libdir] <- getArgs
-          runGhc (Just libdir) doit
+          runGhcWithAbiHashes (Just libdir) doit
 
 doit :: Ghc ()
 doit = do

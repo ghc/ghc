@@ -18,13 +18,14 @@ import GHC.Hs.ImpExp
 import GHC.Utils.Outputable
 import System.Environment
 import GHC.Tc.Types
+import GHC.Run
 
 import Simple.SourcePlugin (plugin)
 
 main = do
   libdir:args <- getArgs
   defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
-    runGhc (Just libdir) $ do
+    runGhcWithAbiHashes (Just libdir) $ do
       dflags <- getSessionDynFlags
       -- liftIO $ print args
       -- (dflags,_,_)

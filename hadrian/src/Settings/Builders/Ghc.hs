@@ -264,12 +264,14 @@ includeGhcArgs = do
     srcDirs <- getContextData srcDirs
     abSrcDirs <- exprIO $ mapM makeAbsolute [ (pkgPath pkg -/- dir) | dir <- srcDirs ]
     autogen <- expr (autogenPath context)
+    gbl_autogen <- exprIO . makeAbsolute =<< expr (globalAutogenPath context)
     cautogen <-  exprIO (makeAbsolute autogen)
     let cabalMacros = autogen -/- "cabal_macros.h"
     expr $ need [cabalMacros]
     mconcat [ arg "-i"
             , arg $ "-i" ++ path
             , arg $ "-i" ++ cautogen
+            , arg $ "-i" ++ gbl_autogen
             , pure [ "-i" ++ d | d <- abSrcDirs ]
             , cIncludeArgs
             , pure ["-optP-include", "-optP" ++ cabalMacros] ]

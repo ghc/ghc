@@ -15,6 +15,7 @@
 module Main (main) where
 
 -- The official GHC API
+import GHC.Run (runGhcWithAbiHashes)
 import qualified GHC
 import GHC              (parseTargetFiles,  Ghc, GhcMonad(..), Backend (..),
                           LoadHowMuch(..) )
@@ -146,7 +147,7 @@ main = do
                    ShowOptions isInteractive -> showOptions isInteractive
         Right postStartupMode ->
             -- start our GHC session
-            GHC.runGhc mbMinusB $ do
+            runGhcWithAbiHashes mbMinusB $ do
 
             dflags <- GHC.getSessionDynFlags
 

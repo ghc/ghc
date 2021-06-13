@@ -12,6 +12,7 @@ import qualified Oracles.Flavour
 import qualified Oracles.ModuleFiles
 import Packages
 import qualified Rules.BinaryDist
+import qualified Rules.CabalReinstall
 import qualified Rules.Compile
 import qualified Rules.Dependencies
 import qualified Rules.Documentation
@@ -136,6 +137,7 @@ buildRules = do
     Rules.Library.libraryRules
     Rules.Rts.rtsRules
     packageRules
+    Rules.CabalReinstall.cabalBuildRules
 
 oracleRules :: Rules ()
 oracleRules = do

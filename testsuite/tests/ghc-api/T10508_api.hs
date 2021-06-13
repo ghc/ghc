@@ -2,6 +2,7 @@ module Main where
 
 import GHC.Driver.Session
 import GHC
+import GHC.Run
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad (forM_)
@@ -11,7 +12,7 @@ import System.Environment (getArgs)
 main :: IO ()
 main = do
   [libdir] <- getArgs
-  runGhc (Just libdir) $ do
+  runGhcWithAbiHashes (Just libdir) $ do
     dflags <- getSessionDynFlags
     setSessionDynFlags $ dflags
       `gopt_unset` Opt_ImplicitImportQualified

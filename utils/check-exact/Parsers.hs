@@ -50,6 +50,7 @@ import Preprocess
 import Control.Monad.RWS
 
 import qualified GHC hiding (parseModule)
+import qualified GHC.Run as GHC
 import qualified Control.Monad.IO.Class as GHC
 import qualified GHC.Data.FastString    as GHC
 import qualified GHC.Data.StringBuffer  as GHC
@@ -229,7 +230,7 @@ parseModuleEpAnnsWithCpp libdir cppOptions file = ghcWrapper libdir $ do
 ghcWrapper :: FilePath -> GHC.Ghc a -> IO a
 ghcWrapper libdir a =
   GHC.defaultErrorHandler GHC.defaultFatalMessager GHC.defaultFlushOut
-    $ GHC.runGhc (Just libdir) a
+    $ GHC.runGhcWithAbiHashes (Just libdir) a
 
 -- | Internal function. Exposed if you want to muck with DynFlags
 -- before parsing.

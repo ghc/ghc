@@ -1,9 +1,10 @@
 import GHC
+import GHC.Run
 import System.Environment
 
 main = do
   (libdir:_) <- getArgs
-  GHC.runGhcT (Just libdir) $ do
+  runGhcTWithAbiHashes (Just libdir) $ do
     df <- getSessionDynFlags
     setSessionDynFlags $ df { ghcLink = LinkInMemory }
     load LoadAllTargets

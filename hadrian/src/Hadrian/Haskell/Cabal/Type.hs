@@ -30,6 +30,7 @@ data PackageData = PackageData
     , synopsis                  :: String
     , description               :: String
     , packageDependencies       :: [Package]
+    , packageSetupDependencies  :: [Package]
     , genericPackageDescription :: GenericPackageDescription
     } deriving (Eq, Generic, Show, Typeable)
 

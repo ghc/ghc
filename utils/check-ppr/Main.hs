@@ -18,6 +18,7 @@ import System.Environment( getArgs )
 import System.Exit
 import System.FilePath
 import System.IO
+import qualified Data.Map as M
 
 usage :: String
 usage = unlines
@@ -80,7 +81,7 @@ testOneFile libdir fileName = do
 
 parseOneFile :: FilePath -> FilePath -> IO ParsedModule
 parseOneFile libdir fileName = do
-       runGhc (Just libdir) $ do
+       runGhc M.empty (Just libdir) $ do
          dflags <- getSessionDynFlags
          let dflags2 = dflags `gopt_set` Opt_KeepRawTokenStream
          _ <- setSessionDynFlags dflags2

@@ -80,11 +80,14 @@ findGenerator Context {..} file = do
         return (source, builder)
 
 -- | Find all Haskell source files for a given 'Context'.
-hsSources :: Context -> Action [FilePath]
-hsSources context = do
+hsSources :: [FilePath] -- ^ The generated dependencies
+          -> Context
+          -> Action [FilePath]
+hsSources gens context = do
     let modFile (m, Nothing)
-            | "Paths_" `isPrefixOf` m = autogenFile context m
-            | otherwise               = generatedFile context m
+            | "Paths_" `isPrefixOf` m               = autogenFile context m
+            | any (("//"++moduleSource m) ?==) gens = generatedFile context m
+            | otherwise                             = globalAutogenFile context m
         modFile (m, Just file )
             | takeExtension file `elem` haskellExtensions = return file
             | otherwise = generatedFile context m
@@ -105,6 +108,10 @@ generatedFile context moduleName = buildPath context <&> (-/- moduleSource modul
 -- | Generated module files live in the 'Context' specific build directory.
 autogenFile :: Context -> ModuleName -> Action FilePath
 autogenFile context modName = autogenPath context <&> (-/- moduleSource modName)
+
+-- | Generated module files live in the 'Context' specific build directory.
+globalAutogenFile :: Context -> ModuleName -> Action FilePath
+globalAutogenFile context modName = globalAutogenPath context <&> (-/- moduleSource modName)
 
 -- | Turn a module name (e.g. @Data.Functor@) to a path (e.g. @Data/Functor.hs@).
 moduleSource :: ModuleName -> FilePath

@@ -33,5 +33,6 @@ Executable check-exact
                    directory,
                    filepath,
                    ghc,
+                   ghc-abihash,
                    ghc-boot,
                    mtl

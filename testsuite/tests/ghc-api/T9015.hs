@@ -1,6 +1,7 @@
 module Main where
 
 import GHC
+import GHC.Run
 import GHC.Driver.Session
 import GHC.Driver.Monad
 import GHC.Driver.Config.Parser (initParserOpts)
@@ -40,7 +41,7 @@ testStrings = [
 
 main = do
   [libdir] <- getArgs
-  runGhc (Just libdir) $ do
+  runGhcWithAbiHashes (Just libdir) $ do
     liftIO (putStrLn "Is import:")
     testWithParser isImport
 

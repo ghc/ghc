@@ -10,6 +10,7 @@ import GHC.Builtin.Types.Prim
 import GHC.Builtin.Types
 import GHC.Types.Unique.Set
 import GHC.Types.Unique
+import GHC.Run
 
 import qualified Control.Exception as E
 import Control.Monad
@@ -23,7 +24,7 @@ assert True  _  _   = return ()
 main :: IO ()
 main = do
     [libdir] <- getArgs
-    runGhc (Just libdir) $ liftIO $ do
+    runGhcWithAbiHashes (Just libdir) $ liftIO $ do
       -- need to initialize the monad to initialize static flags etc.
       sequence_ [ uniq_tests, layout_tests ]
 

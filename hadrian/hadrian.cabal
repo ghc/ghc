@@ -67,6 +67,7 @@ executable hadrian
                        , Packages
                        , Rules
                        , Rules.BinaryDist
+                       , Rules.CabalReinstall
                        , Rules.Clean
                        , Rules.Compile
                        , Rules.Dependencies
@@ -137,7 +138,7 @@ executable hadrian
                        , BangPatterns
     other-extensions:    MultiParamTypeClasses
                        , TypeFamilies
-    build-depends:       Cabal                >= 3.2     && < 3.7
+    build-depends:       Cabal                >= 3.7     && < 3.9
                        , QuickCheck           >= 2.6     && < 2.15
                        , base                 >= 4.8     && < 5
                        , bytestring           >= 0.10    && < 0.12
@@ -155,6 +156,7 @@ executable hadrian
                        -Wredundant-constraints
                        -fno-warn-name-shadowing
                        -rtsopts
+                       -fno-ignore-asserts
 
     if flag(threaded)
       ghc-options:

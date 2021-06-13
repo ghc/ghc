@@ -8,6 +8,7 @@ import GHC.Unit.Module
 import GHC.Driver.Session
 import GHC.Driver.Main
 import GHC
+import GHC.Run
 import Control.Monad
 import Control.Monad.IO.Class
 import System.Environment
@@ -52,7 +53,7 @@ printDeps libdir modName dot = do
 calcDeps :: String -> FilePath -> IO (Map.Map ModuleName [ModuleName])
 calcDeps modName libdir =
   defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
-    runGhc (Just libdir) $ do
+    runGhcWithAbiHashes (Just libdir) $ do
         df <- getSessionDynFlags
         logger <- getLogger
         (df, _, _) <- parseDynamicFlags logger df [noLoc "-package=ghc"]

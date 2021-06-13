@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE MultiWayIf #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module     : Hadrian.Haskell.Cabal.Parse
@@ -51,7 +52,10 @@ import Hadrian.Haskell.Cabal
 import Hadrian.Haskell.Cabal.Type
 import Hadrian.Oracles.Cabal
 import Hadrian.Oracles.ArgsHash
+import Settings.Builders.Common (packageDatabaseArgs )
 import Hadrian.Target
+import Oracles.Setting (setting, Setting(..))
+import Rules.Generate
 
 import Base
 import Builder
@@ -76,10 +80,12 @@ parsePackageData pkg = do
         sorted  = sort [ C.unPackageName p | C.Dependency p _ _ <- allDeps ]
         deps    = nubOrd sorted \\ [name]
         depPkgs = catMaybes $ map findPackageByName deps
+        setupDeps = [ C.unPackageName p | C.Dependency p _ _ <- maybe [] C.setupDepends $ C.setupBuildInfo pd ]
+        setupDepPkgs = catMaybes $ map findPackageByName setupDeps
     return $ PackageData name version
                          (C.fromShortText (C.synopsis pd))
                          (C.fromShortText (C.description pd))
-                         depPkgs gpd
+                         depPkgs setupDepPkgs gpd
   where
     -- Collect an overapproximation of dependencies by ignoring conditionals
     collectDeps :: Maybe (C.CondTree v [C.Dependency] a) -> [C.Dependency]
@@ -122,7 +128,9 @@ configurePackage :: Context -> Action ()
 configurePackage context@Context {..} = do
     putProgressInfo $ "| Configure package " ++ quote (pkgName package)
     gpd     <- pkgGenericDescription package
-    depPkgs <- packageDependencies <$> readPackageData package
+    pd      <- readPackageData package
+    let depPkgs      = packageDependencies pd
+    let setupDepPkgs = packageSetupDependencies pd
 
     -- Stage packages are those we have in this stage.
     stagePkgs <- stagePackages stage
@@ -130,23 +138,6 @@ configurePackage context@Context {..} = do
     deps <- sequence [ pkgConfFile (context { package = pkg })
                      | pkg <- depPkgs, pkg `elem` stagePkgs ]
     need deps
-
-    -- Figure out what hooks we need.
-    hooks <- case C.buildType (C.flattenPackageDescription gpd) of
-        C.Configure -> pure C.autoconfUserHooks
-        -- The 'time' package has a 'C.Custom' Setup.hs, but it's actually
-        -- 'C.Configure' plus a @./Setup test@ hook. However, Cabal is also
-        -- 'C.Custom', but doesn't have a configure script.
-        C.Custom -> do
-            configureExists <- doesFileExist $
-                replaceFileName (pkgCabalFile package) "configure"
-            pure $ if configureExists then C.autoconfUserHooks else C.simpleUserHooks
-        -- Not quite right, but good enough for us:
-        _ | package == rts ->
-            -- Don't try to do post configuration validation for 'rts'. This
-            -- will simply not work, due to the @ld-options@ and @Stg.h@.
-            pure $ C.simpleUserHooks { C.postConf = \_ _ _ _ -> return () }
-          | otherwise -> pure C.simpleUserHooks
 
     -- Compute the list of flags, and the Cabal configuration arguments
     flavourArgs <- args <$> flavour
@@ -159,14 +150,50 @@ configurePackage context@Context {..} = do
         argList' = argList ++ ["--flags=" ++ unwords flagList, v]
     when (verbosity >= Verbose) $
         putProgressInfo $ "| Package " ++ quote (pkgName package) ++ " configuration flags: " ++ unwords argList'
-    traced "cabal-configure" $
-        C.defaultMainWithHooksNoReadArgs hooks gpd argList'
-
     dir <- Context.buildPath context
+    createDirectory dir
+    case C.buildType (C.flattenPackageDescription gpd) of
+      C.Make -> error "Make build types are not currently supported by hadrian"
+      C.Simple
+          -- Don't try to do post configuration validation for 'rts'. This
+          -- will simply not work, due to the @ld-options@ and @Stg.h@.
+          | package == rts -> traced "cabal-configure" $ C.defaultMainWithHooksNoReadArgs C.simpleUserHooks{ C.postConf = \_ _ _ _ -> return () } gpd argList'
+          | otherwise -> traced "cabal-configure" $ C.defaultMainWithHooksNoReadArgs C.simpleUserHooks gpd argList'
+      C.Configure -> traced "cabal-configure" $ C.defaultMainWithHooksNoReadArgs C.autoconfUserHooks gpd argList'
+      C.Custom -> do
+        stage0Pkgs <- stagePackages Stage0
+        setup_deps <- sequence [ pkgConfFile (context { package = pkg, stage = Stage0 }) -- Need setup dependencies from Stage0
+                               | pkg <- setupDepPkgs, pkg `elem` stage0Pkgs ]
+        need setup_deps
+        pkgFlags <- interpret (target context{stage = Stage0} (Ghc CompileHs Stage0) [] []) packageDatabaseArgs
+        ghc <- setting SystemGhc
+        need [pkgPath package -/- "Setup.hs"]
+        verbose <- getVerbosity
+        let quietlyUnlessVerbose = if verbose >= Diagnostic then withVerbosity Diagnostic else quietly
+        quietlyUnlessVerbose $ cmd_ ghc $ concat
+          [ ["-hide-all-packages", "-package-env -", "-no-user-package-db"]
+          , pkgFlags
+          , concat [["-package", pkgName p] | p <- setupDepPkgs]
+          , [pkgPath package -/- "Setup.hs", "-outputdir", dir -/- "setup-output", "-o", dir -/- "Setup" <.> exe]
+          ]
+        hadrianEnv <- if
+          | package == ghcBoot -> do
+            versionEnv <- interpretInContext context generateVersionHs
+            platformEnv <- interpretInContext context generatePlatformHostHs
+            pure $ show (versionEnv ++ platformEnv)
+          | package == compiler -> do
+            configEnv <- interpretInContext context generateConfigHs
+            pure $ show configEnv
+          | otherwise -> pure "[]"
+        cmd_ (AddEnv "HADRIAN_SETTINGS" hadrianEnv) (Traced "cabal-configure") (dir -/- "Setup" <.> exe) argList'
+
     files <- liftIO $ getDirectoryFilesIO "." [ dir -/- "include" -/- "**"
                                               , dir -/- "*.buildinfo"
                                               , dir -/- "lib" -/- "**"
-                                              , dir -/- "config.*" ]
+                                              , dir -/- "config.*"
+                                              , dir -/- "Setup" <.> exe
+                                              , dir -/- "build" -/- "global-autogen" -/- "**"
+                                              ]
     produces files
 
 -- | Copy the 'Package' of a given 'Context' into the package database

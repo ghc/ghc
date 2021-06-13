@@ -17,6 +17,7 @@ import Settings.Program (programContext)
 import Target
 import Utilities
 import Context.Type
+import Rules.CabalReinstall (findCabalPackageDb)
 import qualified System.Directory as IO
 
 ghcConfigHsPath :: FilePath
@@ -137,8 +138,12 @@ testRules = do
         args <- userSetting defaultTestArgs
         let testGhc = testCompiler args
         ghcPath <- getCompilerPath testGhc
-        whenJust (stageOf testGhc) $ \stg ->
+        case stageOf testGhc of
+          Just stg ->
             need . (:[]) =<< programPath (Context stg ghc vanilla)
+          Nothing -> do
+            dir <- liftIO $ IO.getCurrentDirectory
+            need [makeRelative dir ghcPath]
         need [root -/- ghcConfigProgPath]
         cmd [FileStdout $ root -/- ghcConfigPath] (root -/- ghcConfigProgPath)
             [ghcPath]
@@ -178,6 +183,24 @@ testRules = do
 
         pythonPath      <- builderPath Python
 
+        packageDbPathArg <-
+          if testCompiler args == "stage-cabal"
+          then do
+            packageDbPath <- do
+              need [root -/- "stage-cabal" -/- "cabal-packages"]
+              env <- liftIO $ readFile $ root -/- "stage-cabal" -/- "cabal-packages"
+              pure $ findCabalPackageDb env
+            pure $ "--package-db=" ++ packageDbPath
+          else pure ""
+
+        ghcDynamic <- testSetting TestGhcDynamic
+        let cabal_min_build = "--enable-library-vanilla --disable-shared " ++ packageDbPathArg
+        let cabal_plugin_build = base_plugin_build ++ packageDbPathArg
+            base_plugin_build = case parseYesNo ghcDynamic of
+              Just True -> "--enable-shared --disable-library-vanilla"
+              Just False -> "--enable-library-vanilla --disable-shared"
+              Nothing -> error $ "Couldn't parse setting " ++ show TestGhcDynamic
+
         -- Set environment variables for test's Makefile.
         -- TODO: Ideally we would define all those env vars in 'env', so that
         --       Shake can keep track of them, but it is not as easy as it seems
@@ -196,6 +219,8 @@ testRules = do
             setEnv "CHECK_PPR" (top -/- root -/- checkPprProgPath)
             setEnv "CHECK_EXACT" (top -/- root -/- checkExactProgPath)
             setEnv "COUNT_DEPS" (top -/- root -/- countDepsProgPath)
+            setEnv "CABAL_MINIMAL_BUILD" cabal_min_build
+            setEnv "CABAL_PLUGIN_BUILD" cabal_plugin_build
 
             -- This lets us bypass the need to generate a config
             -- through Make, which happens in testsuite/mk/boilerplate.mk

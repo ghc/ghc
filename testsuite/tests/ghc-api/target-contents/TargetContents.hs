@@ -4,6 +4,7 @@ module Main where
 
 import GHC.Driver.Session
 import GHC
+import GHC.Run
 
 import Control.Monad
 import Control.Monad.Catch as MC (try)
@@ -28,7 +29,7 @@ main :: IO ()
 main = do
   libdir:args <- getArgs
   createDirectoryIfMissing False "outdir"
-  runGhc (Just libdir) $ do
+  runGhcWithAbiHashes (Just libdir) $ do
     dflags0 <- getSessionDynFlags
     logger <- getLogger
     (dflags1, xs, warn) <- parseDynamicFlags logger dflags0 $ map noLoc $

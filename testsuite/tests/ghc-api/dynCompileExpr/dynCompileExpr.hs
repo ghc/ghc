@@ -2,13 +2,14 @@
 module Main where
 
 import GHC
+import GHC.Run
 import GHC.Utils.Monad
 
 import System.Environment
 
 main :: IO ()
 main = do [libdir] <- getArgs
-          runGhc (Just libdir) doit
+          runGhcWithAbiHashes (Just libdir) doit
 
 doit :: Ghc ()
 doit = do

@@ -7,7 +7,7 @@ module GHC.Driver.Env.Types
 
 import GHC.Driver.Errors.Types ( GhcMessage )
 import {-# SOURCE #-} GHC.Driver.Hooks
-import GHC.Driver.Session ( ContainsDynFlags(..), HasDynFlags(..), DynFlags )
+import GHC.Driver.Session ( ContainsDynFlags(..), HasDynFlags(..), DynFlags, LinkedAbiHashes )
 import GHC.Prelude
 import GHC.Runtime.Context
 import GHC.Runtime.Interpreter.Types ( Interp )
@@ -106,4 +106,10 @@ data HscEnv
 
         , hsc_tmpfs :: !TmpFs
                 -- ^ Temporary files
+        , hsc_linked_abi_hashes:: LinkedAbiHashes
+                -- ^ The ABI hashes of the packages linked into the current executable.
+                -- Use ghc-abihash:GHC.AbiHash.ghcAbiHashes to populate this field
+                -- This is required to ensure we don't load any packages which are inconsistent
+                -- with the current GHC ABI.
+                -- See Note [Loader Consistency Checks]
  }

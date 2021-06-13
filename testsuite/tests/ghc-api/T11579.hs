@@ -3,6 +3,7 @@ import GHC.Driver.Session
 import GHC.Driver.Config.Parser (initParserOpts)
 import GHC.Data.FastString
 import GHC
+import GHC.Run
 import GHC.Data.StringBuffer
 import GHC.Parser.Lexer
 import GHC.Types.SrcLoc
@@ -15,7 +16,7 @@ main = do
     let stringBuffer = stringToStringBuffer "-- $bar some\n-- named chunk"
         loc = mkRealSrcLoc (mkFastString "Foo.hs") 1 1
 
-    hdk_comments <- runGhc (Just libdir) $ do
+    hdk_comments <- runGhcWithAbiHashes (Just libdir) $ do
         dflags <- getSessionDynFlags
         let opts   = initParserOpts (dflags `gopt_set` Opt_Haddock)
             pstate = initParserState opts stringBuffer loc

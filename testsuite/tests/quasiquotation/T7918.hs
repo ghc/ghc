@@ -2,6 +2,7 @@
 module Main (main) where
 
 import GHC
+import GHC.Run
 import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Utils.Outputable
@@ -79,4 +80,4 @@ test7918 = do
 main :: IO ()
 main = do
   [libdir] <- getArgs
-  runGhc (Just libdir) test7918
+  runGhcWithAbiHashes (Just libdir) test7918

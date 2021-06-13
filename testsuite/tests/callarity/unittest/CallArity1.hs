@@ -1,4 +1,5 @@
 {-# LANGUAGE TupleSections, PatternSynonyms #-}
+import GHC.Run
 import GHC.Core
 import GHC.Core.Utils
 import GHC.Types.Id
@@ -167,7 +168,7 @@ exprs =
 
 main = do
     [libdir] <- getArgs
-    runGhc (Just libdir) $ do
+    runGhcWithAbiHashes (Just libdir) $ do
         getSessionDynFlags >>= setSessionDynFlags . flip gopt_set Opt_SuppressUniques
         dflags <- getSessionDynFlags
         logger <- getLogger

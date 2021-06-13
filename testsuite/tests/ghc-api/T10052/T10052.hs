@@ -4,6 +4,7 @@ module Main where
 
 import System.Environment
 import GHC
+import GHC.Run
 
 main :: IO ()
 main = do
@@ -18,7 +19,7 @@ runGhc' :: [String] -> Ghc a -> IO a
 runGhc' args act = do
     let libdir = head args
         flags  = map noLoc (tail args)
-    runGhc (Just libdir) $ do
+    runGhcWithAbiHashes (Just libdir) $ do
       dflags0 <- getSessionDynFlags
       logger <- getLogger
       (dflags1, _leftover, _warns) <- parseDynamicFlags logger dflags0 flags

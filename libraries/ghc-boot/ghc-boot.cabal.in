@@ -24,8 +24,11 @@ description:    This library is shared between GHC, ghc-pkg, and other boot
                 The package database format and this library are constructed in
                 such a way that while ghc-pkg depends on Cabal, the GHC library
                 and program do not have to depend on Cabal.
-build-type:     Simple
+build-type:     Custom
 extra-source-files: changelog.md
+
+custom-setup
+    setup-depends: base >= 3 && < 5, Cabal >= 1.6 && <3.8, directory, filepath
 
 source-repository head
     type:     git
@@ -62,9 +65,9 @@ Library
             , GHC.Lexeme
 
     -- but done by Hadrian
-    -- autogen-modules:
-    --         GHC.Version
-    --         GHC.Platform.Host
+    autogen-modules:
+            GHC.Version
+            GHC.Platform.Host
 
     build-depends: base       >= 4.7 && < 4.17,
                    binary     == 0.8.*,

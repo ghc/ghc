@@ -944,6 +944,21 @@ for example).
     automatically, you can reverse this behaviour by reversing this flag:
     ``-fno-link-rts``.
 
+.. ghc-flag:: -fdisable-strict-loader-integrity-check
+    :shortdesc: Disable strict loader integrity checks
+    :type: dynamic
+    :category: linking
+
+    When loading packages that are also themselves dependencies of GHC itself,
+    the loader performs a check to ensure that the ABI of the package is
+    compatible with the the version of the package that is linked into the GHC
+    executable itself. If this is not the case, it can lead to mysterious
+    segfaults and worse when trying to use these inconsistent packages as
+    dependencies of Template Haskell or GHC plugin code.
+
+    This flag disables the check, which might be too strict when you just
+    want to load a package into GHCi without running any plugin or TH code.
+
 .. ghc-flag:: -main-is ⟨thing⟩
     :shortdesc: Set main module and function
     :type: dynamic

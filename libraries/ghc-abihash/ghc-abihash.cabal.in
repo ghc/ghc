@@ -1,0 +1,36 @@
+Cabal-Version: 2.2
+-- WARNING: ghc-abihash.cabal is automatically generated from ghc-abihash.cabal.in by
+-- ./configure.  Make sure you are editing ghc-abihash.cabal.in, not ghc-abihash.cabal.
+
+Name: ghc-abihash
+Version: @ProjectVersionMunged@
+Copyright: XXX
+-- License: XXX
+-- License-File: XXX
+Author: XXX
+Maintainer: glasgow-haskell-users@haskell.org
+Homepage: http://www.haskell.org/ghc/
+Synopsis: The Glorious Glasgow Haskell Compiler.
+Description:
+    This package is meant to be used by GHC API clients, to get easy access
+    to the ABI hashes of the GHC library and all its dependencies, so that
+    integrity can be checked when loading code into a GHC API program.
+Category: Development
+Build-Type: Custom
+
+custom-setup
+    setup-depends: base >= 3 && < 5, Cabal >= 1.6 && <3.8, directory, filepath
+
+Library
+    Default-Language: Haskell2010
+    Build-Depends: base       >= 4   && < 5,
+                   containers >= 0.5 && < 0.7,
+                   ghc-boot   == @ProjectVersionMunged@,
+                   ghc        == @ProjectVersionMunged@
+
+    GHC-Options: -Wall
+
+    Exposed-Modules:
+      GHC.AbiHashes
+      GHC.Run
+    autogen-modules: GHC.AbiHashes

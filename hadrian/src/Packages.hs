@@ -4,15 +4,15 @@ module Packages (
     array, base, binary, bytestring, cabal, checkPpr,
     checkExact, countDeps,
     compareSizes, compiler, containers, deepseq, deriveConstants, directory,
-    exceptions, filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh,
-    ghcCompact, ghcHeap, ghci, ghciWrapper, ghcPkg, ghcPrim, haddock, haskeline,
+    exceptions, filepath, genapply, genprimopcode, ghc, ghcAbiHash, ghcBignum, ghcBoot,
+    ghcBootTh, ghcCompact, ghcHeap, ghci, ghciWrapper, ghcPkg, ghcPrim, haddock, haskeline,
     hsc2hs, hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, iservProxy,
     libffi, libiserv, mtl, parsec, pretty, primitive, process, remoteIserv, rts,
     runGhc, stm, templateHaskell, terminfo, text, time, timeout, touchy,
     transformers, unlit, unix, win32, xhtml, ghcPackages, isGhcPackage,
 
     -- * Package information
-    programName, nonHsMainPackage, autogenPath, programPath, timeoutPath,
+    programName, nonHsMainPackage, autogenPath, globalAutogenPath, programPath, timeoutPath,
     rtsContext, rtsBuildPath, libffiBuildPath,
     ensureConfigured
     ) where
@@ -34,9 +34,9 @@ ghcPackages :: [Package]
 ghcPackages =
     [ array, base, binary, bytestring, cabal, checkPpr, checkExact, countDeps
     , compareSizes, compiler, containers, deepseq, deriveConstants, directory
-    , exceptions, filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh
-    , ghcCompact, ghcHeap, ghci, ghciWrapper, ghcPkg, ghcPrim, haddock, haskeline, hsc2hs
-    , hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, libffi, libiserv, mtl
+    , exceptions, filepath, genapply, genprimopcode, ghc, ghcAbiHash, ghcBignum, ghcBoot
+    , ghcBootTh , ghcCompact, ghcHeap, ghci, ghciWrapper, ghcPkg, ghcPrim, haddock, haskeline
+    , hsc2hs , hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, libffi, libiserv, mtl
     , parsec, pretty, process, rts, runGhc, stm, templateHaskell
     , terminfo, text, time, touchy, transformers, unlit, unix, win32, xhtml
     , timeout ]
@@ -65,6 +65,7 @@ filepath            = lib  "filepath"
 genapply            = util "genapply"
 genprimopcode       = util "genprimopcode"
 ghc                 = prg  "ghc-bin"         `setPath` "ghc"
+ghcAbiHash          = lib  "ghc-abihash"
 ghcBignum           = lib  "ghc-bignum"
 ghcBoot             = lib  "ghc-boot"
 ghcBootTh           = lib  "ghc-boot-th"
@@ -193,6 +194,11 @@ autogenPath context@Context {..}
     | otherwise         = autogen $ "build" -/- pkgName package
   where
     autogen dir = contextPath context <&> (-/- dir -/- "autogen")
+
+globalAutogenPath :: Context -> Action FilePath
+globalAutogenPath context= autogen "build"
+  where
+    autogen dir = contextPath context <&> (-/- dir -/- "global-autogen")
 
 -- | Make sure a given context has already been fully configured. The
 -- implementation simply calls 'need' on the context's @autogen/cabal_macros.h@

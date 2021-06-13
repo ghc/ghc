@@ -4,6 +4,7 @@
 -- kinds of parse errors occur in modules.
 
 import GHC
+import GHC.Run
 import GHC.Driver.Make
 import GHC.Driver.Session
 import GHC.Utils.Outputable
@@ -46,7 +47,7 @@ main :: IO ()
 main = do
   libdir:args <- getArgs
 
-  runGhc (Just libdir) $ do
+  runGhcWithAbiHashes (Just libdir) $ do
     dflags0 <- getSessionDynFlags
     logger <- getLogger
     (dflags1, _, _) <- parseDynamicFlags logger dflags0 $ map noLoc $

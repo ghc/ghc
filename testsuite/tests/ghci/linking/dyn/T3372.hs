@@ -10,6 +10,7 @@ import Control.Concurrent ( forkIO )
 import Control.Concurrent.Chan
 
 import GHC ( Ghc )
+import GHC.Run
 import qualified GHC
 import qualified GHC.Utils.Monad as GHC
 
@@ -38,7 +39,7 @@ newGhcServer = do (libdir:_) <- getArgs
                   let be_a_server = forever $ join (GHC.liftIO $ readChan pChan)
                   forkIO $ ghc be_a_server libdir
                   return pChan
-  where ghc action libdir = GHC.runGhc (Just libdir) (init >> action)
+  where ghc action libdir = runGhcWithAbiHashes (Just libdir) (init >> action)
         init = do df <- GHC.getSessionDynFlags
                   GHC.setSessionDynFlags df{GHC.ghcMode    = GHC.CompManager,
                                             GHC.backend    = GHC.Interpreter,

@@ -17,6 +17,7 @@ import GHC.Driver.Env
 import GHC.Driver.Errors
 import GHC.Driver.Config.Diagnostic
 import GHC
+import GHC.Run
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.Either (fromRight)
@@ -26,7 +27,7 @@ import System.Environment (getArgs)
 main :: IO ()
 main = do
   [libdir] <- getArgs
-  runGhc (Just libdir) $ do
+  runGhcWithAbiHashes (Just libdir) $ do
     initial_dflags <- getSessionDynFlags
     setSessionDynFlags $ initial_dflags
       `dopt_set` Opt_D_ppr_debug

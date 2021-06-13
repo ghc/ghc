@@ -309,6 +309,7 @@ data GeneralFlag
    | Opt_KeepGoing
    | Opt_ByteCode
    | Opt_LinkRts
+   | Opt_DisableLoaderIntegrityCheck
 
    -- output style opts
    | Opt_ErrorSpans -- Include full span info in error messages,

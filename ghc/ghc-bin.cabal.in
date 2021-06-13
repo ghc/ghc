@@ -14,8 +14,6 @@ Description:
     This package contains the @ghc@ executable, the user facing front-end
     to the Glasgow Haskell Compiler.
 Category: Development
-Data-Dir: ..
-Data-Files: settings
 Build-Type: Simple
 Cabal-Version: >=1.10
 
@@ -41,8 +39,9 @@ Executable ghc
                    filepath   >= 1   && < 1.5,
                    containers >= 0.5 && < 0.7,
                    transformers == 0.5.*,
-                   ghc-boot   == @ProjectVersionMunged@,
-                   ghc        == @ProjectVersionMunged@
+                   ghc-boot      == @ProjectVersionMunged@,
+                   ghc-abihash   == @ProjectVersionMunged@,
+                   ghc           == @ProjectVersionMunged@
 
     if os(windows)
         Build-Depends: Win32  >= 2.3 && < 2.13

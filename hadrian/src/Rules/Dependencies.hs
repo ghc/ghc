@@ -21,8 +21,8 @@ buildPackageDependencies rs = do
     root -/- "**/.dependencies.mk" %> \mk -> do
         DepMkFile stage pkgpath <- getDepMkFile root mk
         let context = Context stage (unsafeFindPackageByPath pkgpath) vanilla
-        srcs <- hsSources context
         gens <- interpretInContext context generatedDependencies
+        srcs <- hsSources gens context
         need (srcs ++ gens)
         if null srcs
         then writeFileChanged mk ""

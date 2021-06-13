@@ -3,6 +3,7 @@
 {-# LANGUAGE ViewPatterns #-}
 
 import GHC
+import GHC.Run
 import GHC.Driver.Make
 import GHC.Driver.Session
 import GHC.Driver.Env
@@ -22,7 +23,7 @@ main :: IO ()
 main = do
   libdir:args <- getArgs
 
-  runGhc (Just libdir) $
+  runGhcWithAbiHashes (Just libdir) $
     defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
 
     dflags0 <- getSessionDynFlags
