@@ -2053,56 +2053,55 @@ genSwitch :: NCGConfig -> CmmExpr -> SwitchTargets -> NatM InstrBlock
 genSwitch config expr targets
   | OSAIX <- platformOS platform
   = do
-        (reg,e_code) <- getSomeReg (cmmOffset platform expr offset)
-        let fmt = archWordFormat $ target32Bit platform
-            sha = if target32Bit platform then 2 else 3
+        (e_reg,e_code) <- getSomeReg (cmmOffset platform expr offset)
         tmp <- getNewRegNat fmt
         lbl <- getNewLabelNat
         dynRef <- cmmMakeDynamicReference config DataReference lbl
         (tableReg,t_code) <- getSomeReg $ dynRef
-        let code = e_code `appOL` t_code `appOL` toOL [
-                            SL fmt tmp reg (RIImm (ImmInt sha)),
-                            LD fmt tmp (AddrRegReg tableReg tmp),
-                            MTCTR tmp,
-                            BCTR ids (Just lbl) []
-                    ]
+        let code = e_code `appOL` t_code `appOL` toOL
+                   [ RLWINM tmp e_reg sha mb me
+                   , LD fmt tmp (AddrRegReg tableReg tmp)
+                   , MTCTR tmp
+                   , BCTR ids (Just lbl) []
+                   ]
         return code
 
   | (ncgPIC config) || (not $ target32Bit platform)
   = do
-        (reg,e_code) <- getSomeReg (cmmOffset platform expr offset)
-        let fmt = archWordFormat $ target32Bit platform
-            sha = if target32Bit platform then 2 else 3
+        (e_reg,e_code) <- getSomeReg (cmmOffset platform expr offset)
         tmp <- getNewRegNat fmt
         lbl <- getNewLabelNat
         dynRef <- cmmMakeDynamicReference config DataReference lbl
         (tableReg,t_code) <- getSomeReg $ dynRef
-        let code = e_code `appOL` t_code `appOL` toOL [
-                            SL fmt tmp reg (RIImm (ImmInt sha)),
-                            LD fmt tmp (AddrRegReg tableReg tmp),
-                            ADD tmp tmp (RIReg tableReg),
-                            MTCTR tmp,
-                            BCTR ids (Just lbl) []
-                    ]
+        let code = e_code `appOL` t_code `appOL` toOL
+                   [ RLWINM tmp e_reg sha mb me
+                   , LD fmt tmp (AddrRegReg tableReg tmp)
+                   , ADD tmp tmp (RIReg tableReg)
+                   , MTCTR tmp
+                   , BCTR ids (Just lbl) []
+                   ]
         return code
   | otherwise
   = do
-        (reg,e_code) <- getSomeReg (cmmOffset platform expr offset)
-        let fmt = archWordFormat $ target32Bit platform
-            sha = if target32Bit platform then 2 else 3
+        (e_reg,e_code) <- getSomeReg (cmmOffset platform expr offset)
         tmp <- getNewRegNat fmt
         lbl <- getNewLabelNat
-        let code = e_code `appOL` toOL [
-                            SL fmt tmp reg (RIImm (ImmInt sha)),
-                            ADDIS tmp tmp (HA (ImmCLbl lbl)),
-                            LD fmt tmp (AddrRegImm tmp (LO (ImmCLbl lbl))),
-                            MTCTR tmp,
-                            BCTR ids (Just lbl) []
-                    ]
+        let code = e_code `appOL` toOL
+                   [ RLWINM tmp e_reg sha mb me
+                   , ADDIS tmp tmp (HA (ImmCLbl lbl))
+                   , LD fmt tmp (AddrRegImm tmp (LO (ImmCLbl lbl)))
+                   , MTCTR tmp
+                   , BCTR ids (Just lbl) []
+                   ]
         return code
   where
     (offset, ids) = switchTargetsToTable targets
     platform      = ncgPlatform config
+    width         = widthInBits $ cmmExprWidth platform expr
+    sha           = if target32Bit platform then 2 else 3
+    mb            = max (32 - width - sha) 0
+    me            = 32 - sha
+    fmt           = archWordFormat $ target32Bit platform
 
 generateJumpTableForInstr :: NCGConfig -> Instr
                           -> Maybe (NatCmmDecl RawCmmStatics Instr)
