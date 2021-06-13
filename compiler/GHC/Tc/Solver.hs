@@ -23,7 +23,11 @@ module GHC.Tc.Solver(
 
        -- For Rules we need these
        solveWanteds, solveWantedsAndDrop,
-       approximateWC, runTcSDeriveds
+       approximateWC, runTcSDeriveds,
+
+       -- We need this for valid hole-fits
+       runTcSDerivedsEarlyAbort
+
   ) where
 
 import GHC.Prelude
