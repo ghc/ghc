@@ -1,9 +1,10 @@
+Cabal-Version: 2.2
 -- WARNING: ghc.cabal is automatically generated from ghc.cabal.in by
 -- ./configure.  Make sure you are editing ghc.cabal.in, not ghc.cabal.
 
 Name: ghc
 Version: @ProjectVersionMunged@
-License: BSD3
+License: BSD-3-Clause
 License-File: LICENSE
 Author: The GHC Team
 Maintainer: glasgow-haskell-users@haskell.org
@@ -20,8 +21,10 @@ Description:
     See <https://gitlab.haskell.org/ghc/ghc/-/wikis/commentary/compiler>
     for more information.
 Category: Development
-Build-Type: Simple
-Cabal-Version: >=1.10
+Build-Type: Custom
+
+custom-setup
+    setup-depends: base >= 3 && < 5, Cabal >= 1.6 && <3.6, directory, process, filepath
 
 Flag internal-interpreter
     Description: Build with internal interpreter support.
@@ -56,6 +59,8 @@ Flag dynamic-system-linker
 Library
     Default-Language: Haskell2010
     Exposed: False
+
+    build-tool-depends: alex:alex >= 3.2.6, happy:happy >= 1.20.0, genprimopcode:genprimopcode, deriveConstants:deriveConstants
 
     Build-Depends: base       >= 4.11 && < 4.17,
                    deepseq    >= 1.4 && < 1.5,
