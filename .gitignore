@@ -242,3 +242,4 @@ ghc.nix/
 
 # clangd
 .clangd
+dist-newstyle/

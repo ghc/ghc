@@ -956,6 +956,22 @@ nightly-x86_64-linux-deb10-llvm:
     BUILD_FLAVOUR: perf-llvm
     TEST_ENV: "x86_64-linux-deb10-llvm"
 
+####################################
+# Testing reinstallable ghc codepath
+####################################
+
+test-cabal-reinstall-x86_64-linux-deb10:
+  extends: .validate-linux-hadrian
+  stage: full-build
+  before_script:
+    - ./boot
+    - ./configure
+    - "cabal update --index=$HACKAGE_INDEX_STATE --project-file=cabal.project-reinstall"
+  variables:
+    REINSTALL_GHC: "yes"
+    BUILD_FLAVOUR: validate
+    TEST_ENV: "x86_64-linux-deb10-cabal-install"
+
 #################################
 # x86_64-linux-deb11
 #################################

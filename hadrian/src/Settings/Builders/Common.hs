@@ -5,7 +5,7 @@ module Settings.Builders.Common (
     module Oracles.Setting,
     module Settings,
     module UserSettings,
-    cIncludeArgs, ldArgs, cArgs, cWarnings,
+    cIncludeArgs, ldArgs, cArgs, cppArgs, cWarnings,
     packageDatabaseArgs, bootPackageDatabaseArgs
     ) where
 
@@ -49,6 +49,9 @@ ldArgs = mempty
 
 cArgs :: Args
 cArgs = mempty
+
+cppArgs :: Args
+cppArgs = mempty
 
 -- TODO: should be in a different file
 cWarnings :: Args

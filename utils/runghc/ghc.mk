@@ -17,7 +17,6 @@ utils/runghc_dist-install_SHELL_WRAPPER = YES
 utils/runghc_dist-install_INSTALL = YES
 utils/runghc_dist-install_INSTALL_INPLACE = YES
 utils/runghc_dist-install_INSTALL_SHELL_WRAPPER_NAME = runghc-$(ProjectVersion)
-utils/runghc_dist-install_EXTRA_HC_OPTS = -cpp -DVERSION="\"$(ProjectVersion)\""
 
 # Be explicit about which version of ghc to call (#9054).
 define utils/runghc_dist-install_INPLACE_SHELL_WRAPPER_EXTRA

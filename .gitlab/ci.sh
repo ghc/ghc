@@ -90,6 +90,8 @@ Environment variables determining build configuration of Make system:
 Environment variables determining build configuration of Hadrian system:
 
   BUILD_FLAVOUR     Which flavour to build.
+  REINSTALL_GHC     Build and test a reinstalled "stage3" ghc built using cabal-install
+                    This tests the "reinstall" configuration
 
 Environment variables determining bootstrap toolchain (Linux):
 
@@ -348,6 +350,7 @@ function setup_toolchain() {
     --with-compiler=$GHC \
     --index-state=$HACKAGE_INDEX_STATE \
     --installdir=$toolchain/bin \
+    --ignore-project \
     --overwrite-policy=always"
 
   # Avoid symlinks on Windows
@@ -487,9 +490,14 @@ function build_hadrian() {
   # N.B. First build Hadrian, unsetting MACOSX_DEPLOYMENT_TARGET which may warn
   # if the bootstrap libraries were built with a different version expectation.
   MACOSX_DEPLOYMENT_TARGET="" run_hadrian stage1:exe:ghc-bin
-  run_hadrian binary-dist -V
 
-  mv _build/bindist/ghc*.tar.xz "$BIN_DIST_NAME.tar.xz"
+  if [[ -n "${REINSTALL_GHC:-}" ]]; then
+    run_hadrian build-cabal -V
+  else
+    run_hadrian binary-dist -V
+    mv _build/bindist/ghc*.tar.xz "$BIN_DIST_NAME.tar.xz"
+  fi
+
 }
 
 function test_hadrian() {
@@ -514,32 +522,50 @@ function test_hadrian() {
     fi
   fi
 
-  cd _build/bindist/ghc-*/
-  case "$(uname)" in
-    MSYS_*|MINGW*)
-      mkdir -p "$TOP"/_build/install
-      cp -a * "$TOP"/_build/install
-      ;;
-    *)
-      read -r -a args <<< "${INSTALL_CONFIGURE_ARGS:-}"
-      run ./configure --prefix="$TOP"/_build/install "${args[@]}"
-      run "$MAKE" install
-      ;;
-  esac
-  cd ../../../
 
-  run_hadrian \
-    test \
-    --test-root-dirs=testsuite/tests/stage1 \
-    --test-compiler=stage1 \
-    "runtest.opts+=${RUNTEST_ARGS:-}"
+  if [[ -n "${REINSTALL_GHC:-}" ]]; then
+    run_hadrian \
+      test \
+      --test-root-dirs=testsuite/tests/stage1 \
+      --test-compiler=stage-cabal \
+      --test-root-dirs=testsuite/tests/perf \
+      --test-root-dirs=testsuite/tests/typecheck \
+      "runtest.opts+=${RUNTEST_ARGS:-}"
+  else
+    cd _build/bindist/ghc-*/
+    case "$(uname)" in
+      MSYS_*|MINGW*)
+        mkdir -p "$TOP"/_build/install
+        cp -a * "$TOP"/_build/install
+        ;;
+      *)
+        read -r -a args <<< "${INSTALL_CONFIGURE_ARGS:-}"
+        run ./configure --prefix="$TOP"/_build/install "${args[@]}"
+        run "$MAKE" install
+        ;;
+    esac
+    cd ../../../
+    test_compiler="$TOP/_build/install/bin/ghc$exe"
 
-  run_hadrian \
-    test \
-    --summary-junit=./junit.xml \
-    --test-have-intree-files \
-    --test-compiler="$TOP/_build/install/bin/ghc$exe" \
-    "runtest.opts+=${RUNTEST_ARGS:-}"
+
+    run_hadrian \
+      test \
+      --test-root-dirs=testsuite/tests/stage1 \
+      --test-compiler=stage1 \
+      "runtest.opts+=${RUNTEST_ARGS:-}"
+
+    shell ls
+    shell ls _build/stage-cabal/bin
+
+    run_hadrian \
+      test \
+      --summary-junit=./junit.xml \
+      --test-have-intree-files \
+      --test-compiler="${test_compiler}" \
+      "runtest.opts+=${RUNTEST_ARGS:-}" \
+
+    fi
+
 }
 
 function cabal_test() {

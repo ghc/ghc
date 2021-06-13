@@ -78,6 +78,7 @@ compilerDependencies = do
                   , "primop-vector-uniques.hs-incl"
                   , "primop-docs.hs-incl"
                   , "GHC/Platform/Constants.hs"
+                  , "GHC/Settings/Config.hs"
                   ]
 
 generatedDependencies :: Expr [FilePath]

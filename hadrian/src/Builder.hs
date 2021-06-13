@@ -89,7 +89,11 @@ instance NFData   GhcMode
 --   This instructs package configuration functions (such as 'configurePackage')
 --   to enable the @profiling@ Cabal flag when processing @rts.cabal@ and
 --   building RTS with profiling information.
-data ConfigurationInfo = Setup | Flags deriving (Eq, Generic, Show)
+data ConfigurationInfo
+  = Setup
+  | Flags
+  | Install
+  deriving (Eq, Generic, Show)
 
 instance Binary   ConfigurationInfo
 instance Hashable ConfigurationInfo
@@ -426,6 +430,7 @@ systemBuilderPath builder = case builder of
     Xelatex         -> fromKey "xelatex"
     Makeindex       -> fromKey "makeindex"
     Win32Tarballs _ -> fromKey "python"
+    Cabal _ _       -> fromKey "cabal"
     _               -> error $ "No entry for " ++ show builder ++ inCfg
   where
     inCfg = " in " ++ quote configFile ++ " file."

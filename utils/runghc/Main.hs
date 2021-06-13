@@ -110,7 +110,7 @@ parseRunGhcFlags = f mempty
 
 printVersion :: IO ()
 printVersion = do
-    putStrLn ("runghc " ++ VERSION)
+    putStrLn ("runghc " ++ CURRENT_PACKAGE_VERSION )
 
 printUsage :: IO ()
 printUsage = do

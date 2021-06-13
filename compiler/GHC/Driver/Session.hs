@@ -4429,6 +4429,7 @@ parseEnvFile envfile = mapM_ parseEntry . lines
         where envdir = takeDirectory envfile
               db     = drop 11 str
       ["clear-package-db"]  -> clearPkgDb
+      ["hide-package", pkg]  -> hidePackage pkg
       ["global-package-db"] -> addPkgDbRef GlobalPkgDb
       ["user-package-db"]   -> addPkgDbRef UserPkgDb
       ["package-id", pkgid] -> exposePackageId pkgid
@@ -4622,6 +4623,10 @@ compilerInfo dflags
           (rawSettings dflags)
    ++ [("Project version",             projectVersion dflags),
        ("Project Git commit id",       cProjectGitCommitId),
+       ("Project Version Int",         cProjectVersionInt),
+       ("Project Patch Level",         cProjectPatchLevel),
+       ("Project Patch Level1",        cProjectPatchLevel1),
+       ("Project Patch Level2",        cProjectPatchLevel2),
        ("Booter version",              cBooterVersion),
        ("Stage",                       cStage),
        ("Build platform",              cBuildPlatformString),

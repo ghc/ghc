@@ -1,0 +1,79 @@
+packages: ./compiler
+          ./utils/genprimopcode/
+          ./utils/deriveConstants/
+          ./ghc/
+          -- ./libraries/array
+          -- ./libraries/base
+          ./libraries/binary
+          ./libraries/bytestring
+          ./libraries/Cabal/Cabal
+          ./libraries/Cabal/Cabal-syntax
+          ./libraries/containers/containers/
+          -- ./libraries/deepseq/
+          ./libraries/directory/
+          ./libraries/exceptions/
+          -- ./libraries/filepath/
+          -- ./libraries/ghc-bignum/
+           ./libraries/ghc-boot/
+          -- ./libraries/ghc-boot-th/
+          ./libraries/ghc-compact
+          ./libraries/ghc-heap
+          ./libraries/ghci
+          -- ./libraries/ghc-prim
+          ./libraries/haskeline
+          ./libraries/directory
+          ./libraries/hpc
+          -- ./libraries/integer-gmp
+          ./libraries/libiserv/
+          ./libraries/mtl/
+          ./libraries/parsec/
+          -- ./libraries/pretty/
+          ./libraries/process/
+          ./libraries/stm
+          -- ./libraries/template-haskell/
+          ./libraries/terminfo/
+          ./libraries/text
+          ./libraries/time
+          ./libraries/transformers/
+          ./libraries/unix/
+          ./libraries/Win32/
+          ./libraries/xhtml/
+          ./utils/ghc-pkg
+          ./utils/haddock
+          ./utils/hp2ps
+          ./utils/hpc
+          ./utils/hsc2hs
+          ./utils/runghc
+          ./utils/unlit
+          ./utils/iserv
+
+constraints: ghc +internal-interpreter +dynamic-system-linke +terminfo,
+             ghc-bin +internal-interpreter +threaded,
+             ghci +internal-interpreter,
+             haddock +in-ghc-tree,
+             any.array installed,
+             any.base installed,
+             any.deepseq installed,
+             any.filepath installed,
+             any.ghc-bignum installed,
+             any.ghc-boot-th installed,
+             any.integer-gmp installed,
+             any.pretty installed,
+             any.template-haskell installed
+
+allow-newer:
+  ghc-paths:Cabal,
+  *:base,
+  *:ghc-prim,
+  tree-diff:time
+
+benchmarks: False
+tests: False
+allow-boot-library-installs: False
+
+-- Workaround for https://github.com/haskell/cabal/issues/7297
+package *
+  library-vanilla: True
+  shared: True
+  executable-profiling: False
+  executable-dynamic: True
