@@ -404,8 +404,9 @@ cardTableSizeW platform elems =
 -----------------------------------------------------------------------------
 -- deriving the RTS closure type from an SMRep
 
-#include "../includes/rts/storage/ClosureTypes.h"
-#include "../includes/rts/storage/FunTypes.h"
+#include "rts/storage/FunTypes.h"
+#include "rts/storage/ClosureTypes.h"
+
 -- Defines CONSTR, CONSTR_1_0 etc
 
 -- | Derives the RTS closure type from an 'SMRep'
