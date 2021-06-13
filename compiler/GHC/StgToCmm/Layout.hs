@@ -30,6 +30,8 @@ module GHC.StgToCmm.Layout (
         getArgAmode, getNonVoidArgAmodes
   ) where
 
+-- For GHC_STAGE
+#include "ghcplatform.h"
 
 import GHC.Prelude hiding ((<*>))
 
@@ -541,7 +543,11 @@ mkVirtConstrSizes profile field_reps
 -------------------------------------------------------------------------
 
 -- bring in ARG_P, ARG_N, etc.
+#if GHC_STAGE >= 2
+#include "rts/storage/FunTypes.h"
+#else
 #include "../includes/rts/storage/FunTypes.h"
+#endif
 
 mkArgDescr :: Platform -> [Id] -> ArgDescr
 mkArgDescr platform args
