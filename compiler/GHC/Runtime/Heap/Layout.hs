@@ -45,6 +45,9 @@ module GHC.Runtime.Heap.Layout (
         card, cardRoundUp, cardTableSizeB, cardTableSizeW
     ) where
 
+-- For GHC_STAGE
+#include "ghcplatform.h"
+
 import GHC.Prelude
 
 import GHC.Types.Basic( ConTagZ )
@@ -404,8 +407,9 @@ cardTableSizeW platform elems =
 -----------------------------------------------------------------------------
 -- deriving the RTS closure type from an SMRep
 
-#include "../includes/rts/storage/ClosureTypes.h"
-#include "../includes/rts/storage/FunTypes.h"
+#include "rts/storage/FunTypes.h"
+#include "rts/storage/ClosureTypes.h"
+
 -- Defines CONSTR, CONSTR_1_0 etc
 
 -- | Derives the RTS closure type from an 'SMRep'
