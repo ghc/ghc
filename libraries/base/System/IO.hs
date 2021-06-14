@@ -475,7 +475,9 @@ openTempFile :: FilePath   -- ^ Directory in which to create the file
              -> String     -- ^ File name template. If the template is \"foo.ext\" then
                            -- the created file will be \"fooXXX.ext\" where XXX is some
                            -- random number. Note that this should not contain any path
-                           -- separator characters.
+                           -- separator characters. On Windows, the template prefix may
+                           -- be trunacted to 3 chars, e.g. \"foobar.ext\" will be
+                           -- \"fooXXX.ext\".
              -> IO (FilePath, Handle)
 openTempFile tmp_dir template
     = openTempFile' "openTempFile" tmp_dir template False 0o600
