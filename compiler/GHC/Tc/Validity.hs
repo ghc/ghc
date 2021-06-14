@@ -398,6 +398,8 @@ checkValidType ctxt ty
        -- Check for ambiguous types.  See Note [When to call checkAmbiguity]
        -- NB: this will happen even for monotypes, but that should be cheap;
        --     and there may be nested foralls for the subtype test to examine
+       -- Inaccessible code warnings would be duplicates of those found when checking ty
+       -- above, and so we disable them.
        ; checkAmbiguity ctxt ty
 
        ; traceTc "checkValidType done" (ppr ty <+> text "::" <+> ppr (tcTypeKind ty)) }
