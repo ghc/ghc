@@ -609,7 +609,7 @@ nlHsParTy :: LHsType (GhcPass p)                        -> LHsType (GhcPass p)
 
 nlHsAppTy f t = noLocA (HsAppTy noExtField f (parenthesizeHsType appPrec t))
 nlHsTyVar x   = noLocA (HsTyVar noAnn NotPromoted (noLocA x))
-nlHsFunTy a b = noLocA (HsFunTy noAnn (HsUnrestrictedArrow NormalSyntax) (parenthesizeHsType funPrec a) b)
+nlHsFunTy a b = noLocA (HsFunTy noAnn (HsUnrestrictedArrow noHsUniTok) (parenthesizeHsType funPrec a) b)
 nlHsParTy t   = noLocA (HsParTy noAnn t)
 
 nlHsTyConApp :: IsSrcSpanAnn p a
@@ -1473,7 +1473,7 @@ hsConDeclsBinders cons
 
     get_flds_gadt :: Seen p -> HsConDeclGADTDetails (GhcPass p)
                   -> (Seen p, [LFieldOcc (GhcPass p)])
-    get_flds_gadt remSeen (RecConGADT flds) = get_flds remSeen flds
+    get_flds_gadt remSeen (RecConGADT flds _) = get_flds remSeen flds
     get_flds_gadt remSeen _ = (remSeen, [])
 
     get_flds :: Seen p -> LocatedL [LConDeclField (GhcPass p)]
