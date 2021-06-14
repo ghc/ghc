@@ -2,22 +2,23 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE BangPatterns #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
-import Data.List (intercalate)
 import Data.Data
+import Data.List (intercalate)
+import GHC hiding (moduleName)
+import GHC.Data.Bag
+import GHC.Driver.Errors.Types
+import GHC.Driver.Ppr
+import GHC.Hs.Dump
+import GHC.Types.Error
 import GHC.Types.Name.Occurrence
 import GHC.Types.Name.Reader
-import GHC.Unit.Module.ModSummary
-import Control.Monad.IO.Class
-import GHC hiding (moduleName)
-import GHC.Driver.Ppr
-import GHC.Driver.Session
-import GHC.Driver.Make
-import GHC.Hs.Dump
-import GHC.Data.Bag
+import GHC.Utils.Error
+import GHC.Utils.Outputable
 import System.Environment( getArgs )
 import System.Exit
 import System.FilePath
@@ -29,7 +30,7 @@ import ExactPrint
 import Transform
 import Parsers
 
-import GHC.Parser.Lexer
+import GHC.Parser.Lexer hiding (getMessages)
 import GHC.Data.FastString
 import GHC.Types.SrcLoc
 
@@ -195,7 +196,9 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/exactprin
  -- "../../testsuite/tests/printer/Test19834.hs" Nothing
  -- "../../testsuite/tests/printer/Test19840.hs" Nothing
  -- "../../testsuite/tests/printer/Test19850.hs" Nothing
- "../../testsuite/tests/printer/PprLinearArrow.hs" Nothing
+ -- "../../testsuite/tests/printer/PprLinearArrow.hs" Nothing
+ -- "../../testsuite/tests/printer/PprSemis.hs" Nothing
+ "../../testsuite/tests/printer/PprEmptyMostly.hs" Nothing
 
 -- cloneT does not need a test, function can be retired
 
@@ -284,8 +287,8 @@ testOneFile _ libdir fileName mchanger = do
        (p,_toks) <- parseOneFile libdir fileName
        -- putStrLn $ "\n\ngot p" ++ showAst (take 4 $ reverse _toks)
        let
-         origAst = ppAst (pm_parsed_source p)
-         pped    = exactPrint (pm_parsed_source p)
+         origAst = ppAst p
+         pped    = exactPrint p
 
          newFile         = dropExtension fileName <.> "ppr"      <.> takeExtension fileName
          newFileChanged  = dropExtension fileName <.> "changed"  <.> takeExtension fileName
@@ -299,7 +302,7 @@ testOneFile _ libdir fileName mchanger = do
 
        (changedSourceOk, expectedSource, changedSource) <- case mchanger of
          Just changer -> do
-           (pped', ast') <- exactprintWithChange libdir changer (pm_parsed_source p)
+           (pped', ast') <- exactprintWithChange libdir changer p
            writeBinFile changedAstFile (ppAst ast')
            writeBinFile newFileChanged pped'
 
@@ -311,7 +314,7 @@ testOneFile _ libdir fileName mchanger = do
 
        (p',_) <- parseOneFile libdir newFile
        let newAstStr :: String
-           newAstStr = ppAst (pm_parsed_source p')
+           newAstStr = ppAst p'
        writeBinFile newAstFile newAstStr
 
        let origAstOk = origAst == newAstStr
@@ -340,21 +343,23 @@ testOneFile _ libdir fileName mchanger = do
 ppAst :: Data a => a -> String
 ppAst ast = showSDocUnsafe $ showAstData BlankSrcSpanFile NoBlankEpAnnotations ast
 
-parseOneFile :: FilePath -> FilePath -> IO (ParsedModule, [Located Token])
-parseOneFile libdir fileName =
-       runGhc (Just libdir) $ do
-         dflags <- getSessionDynFlags
-         let dflags2 = dflags `gopt_set` Opt_KeepRawTokenStream
-         _ <- setSessionDynFlags dflags2
-         hsc_env <- getSession
-         emodSum <- liftIO $ summariseFile hsc_env [] fileName Nothing Nothing
-         case emsModSummary <$> emodSum of
-           Left _err -> error "parseOneFile"
-           Right modSum -> do
-            pm <- GHC.parseModule modSum
-            toks <- liftIO $ getTokenStream modSum
-            return (pm, toks)
 
+parseOneFile :: FilePath -> FilePath -> IO (ParsedSource, [Located Token])
+parseOneFile libdir fileName = do
+  res <- parseModuleEpAnnsWithCpp libdir defaultCppOptions fileName
+  case res of
+    Left m -> error (showErrorMessages m)
+    Right (injectedComments, _dflags, pmod) -> do
+      let !pmodWithComments = insertCppComments pmod injectedComments
+      return (pmodWithComments, [])
+
+showErrorMessages :: Messages GhcMessage -> String
+showErrorMessages msgs =
+  renderWithContext defaultSDocContext
+    $ vcat
+    $ pprMsgEnvelopeBagWithLoc
+    $ getMessages
+    $ msgs
 
 -- ---------------------------------------------------------------------
 
@@ -507,7 +512,7 @@ changeLocalDecls libdir (L l p) = do
             os' = setEntryDP' os (DifferentLine 2 0)
         let sortKey = captureOrder decls
         let (EpAnn anc (AnnList (Just (Anchor anc2 _)) a b c dd) cs) = van
-        let van' = (EpAnn anc (AnnList (Just (Anchor anc2 (MovedAnchor (DifferentLine 1 4)))) a b c dd) cs)
+        let van' = (EpAnn anc (AnnList (Just (Anchor anc2 (MovedAnchor (DifferentLine 1 5)))) a b c dd) cs)
         let binds' = (HsValBinds van'
                           (ValBinds sortKey (listToBag $ decl':oldBinds)
                                           (sig':os':oldSigs)))
@@ -531,8 +536,8 @@ changeLocalDecls2 libdir (L l p) = do
                         -> Transform (LMatch GhcPs (LHsExpr GhcPs))
       replaceLocalBinds (L lm (Match ma mln pats (GRHSs _ rhs EmptyLocalBinds{}))) = do
         newSpan <- uniqueSrcSpanT
-        let anc = (Anchor (rs newSpan) (MovedAnchor (DifferentLine 1 2)))
-        let anc2 = (Anchor (rs newSpan) (MovedAnchor (DifferentLine 1 4)))
+        let anc = (Anchor (rs newSpan) (MovedAnchor (DifferentLine 1 3)))
+        let anc2 = (Anchor (rs newSpan) (MovedAnchor (DifferentLine 1 5)))
         let an = EpAnn anc
                         (AnnList (Just anc2) Nothing Nothing
                                  [(undeltaSpan (rs newSpan) AnnWhere (SameLine 0))] [])
@@ -579,7 +584,7 @@ changeWhereIn3b _libdir (L l p) = do
 addLocaLDecl1 :: Changer
 addLocaLDecl1 libdir lp = do
   Right (L ld (ValD _ decl)) <- withDynFlags libdir (\df -> parseDecl df "decl" "nn = 2")
-  let decl' = setEntryDP' (L ld decl) (DifferentLine 1 4)
+  let decl' = setEntryDP' (L ld decl) (DifferentLine 1 5)
       doAddLocal = do
         (de1:d2:d3:_) <- hsDecls lp
         (de1'',d2') <- balanceComments de1 d2
