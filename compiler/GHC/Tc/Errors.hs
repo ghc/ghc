@@ -798,7 +798,7 @@ mkGivenWarningReporter ctxt cts
                       [ hang (text "Unsatisfiable constraint" <> plural givens
                               <+> pprEvVarTheta givens <+> text "in")
                              2 (ppr (ic_info implic))
-                      , text "This may result in inaccessible code." ]
+                      , text "This will result in inaccessible code." ]
                    report = important inaccessible_msg `mappend`
                             mk_relevant_bindings binds_msg
 
