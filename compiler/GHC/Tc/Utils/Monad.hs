@@ -912,11 +912,12 @@ setSrcSpan :: SrcSpan -> TcRn a -> TcRn a
 setSrcSpan (RealSrcSpan loc _) thing_inside =
   updLclEnv (\env -> env { tcl_loc = loc }) $
     withProvenance OtherCP thing_inside
-setSrcSpan loc@(UnhelpfulSpan _) thing_inside
+setSrcSpan (UnhelpfulSpan reason) thing_inside =
   -- See Note [Rebindable syntax and HsExpansion].
-  | isRebindableSyntaxSrcSpan loc =
-    withProvenance RebindableSyntaxCP thing_inside
-  | otherwise = thing_inside
+  case reason of
+    UnhelpfulRebindableSyntax ->
+      withProvenance RebindableSyntaxCP thing_inside
+    _ -> thing_inside
 
 setSrcSpanA :: SrcSpanAnn' ann -> TcRn a -> TcRn a
 setSrcSpanA l = setSrcSpan (locA l)
