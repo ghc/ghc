@@ -608,3 +608,123 @@ Test19840:
 Test19850:
 	$(CHECK_PPR)   $(LIBDIR) Test19850.hs
 	$(CHECK_EXACT) $(LIBDIR) Test19850.hs
+
+.PHONY: PprCommentsOnly
+PprCommentsOnly:
+	$(CHECK_PPR)   $(LIBDIR) PprCommentsOnly.hs
+	$(CHECK_EXACT) $(LIBDIR) PprCommentsOnly.hs
+
+.PHONY: PprSemis
+PprSemis:
+	$(CHECK_PPR)   $(LIBDIR) PprSemis.hs
+	$(CHECK_EXACT) $(LIBDIR) PprSemis.hs
+
+.PHONY: PprForeignDecl
+PprForeignDecl:
+	# $(CHECK_PPR)   $(LIBDIR) PprForeignDecl.hs
+	$(CHECK_EXACT) $(LIBDIR) PprForeignDecl.hs
+
+.PHONY: PprRoles
+PprRoles:
+	$(CHECK_PPR)   $(LIBDIR) PprRoles.hs
+	$(CHECK_EXACT) $(LIBDIR) PprRoles.hs
+
+.PHONY: PprTypeSynParens
+PprTypeSynParens:
+	$(CHECK_PPR)   $(LIBDIR) PprTypeSynParens.hs
+	$(CHECK_EXACT) $(LIBDIR) PprTypeSynParens.hs
+
+.PHONY: PprEmptyMostlyInst
+PprEmptyMostlyInst:
+	$(CHECK_PPR)   $(LIBDIR) PprEmptyMostlyInst.hs
+	$(CHECK_EXACT) $(LIBDIR) PprEmptyMostlyInst.hs
+
+.PHONY: PprParenFunBind
+PprParenFunBind:
+	$(CHECK_PPR)   $(LIBDIR) PprParenFunBind.hs
+	$(CHECK_EXACT) $(LIBDIR) PprParenFunBind.hs
+
+.PHONY: PprRecordSemi
+PprRecordSemi:
+	$(CHECK_PPR)   $(LIBDIR) PprRecordSemi.hs
+	$(CHECK_EXACT) $(LIBDIR) PprRecordSemi.hs
+
+.PHONY: PprCompleteSig
+PprCompleteSig:
+	$(CHECK_PPR)   $(LIBDIR) PprCompleteSig.hs
+	$(CHECK_EXACT) $(LIBDIR) PprCompleteSig.hs
+
+.PHONY: PprOverloadedLabels
+PprOverloadedLabels:
+	$(CHECK_PPR)   $(LIBDIR) PprOverloadedLabels.hs
+	$(CHECK_EXACT) $(LIBDIR) PprOverloadedLabels.hs
+
+.PHONY: PprArrows
+PprArrows:
+	$(CHECK_PPR)   $(LIBDIR) PprArrows.hs
+	$(CHECK_EXACT) $(LIBDIR) PprArrows.hs
+
+.PHONY: PprOverloadedRecords
+PprOverloadedRecords:
+	$(CHECK_PPR)   $(LIBDIR) PprOverloadedRecords.hs
+	$(CHECK_EXACT) $(LIBDIR) PprOverloadedRecords.hs
+
+.PHONY: PprArrowLambdaCase
+PprArrowLambdaCase:
+	$(CHECK_PPR)   $(LIBDIR) PprArrowLambdaCase.hs
+	$(CHECK_EXACT) $(LIBDIR) PprArrowLambdaCase.hs
+
+.PHONY: PprRecursiveDo
+PprRecursiveDo:
+	$(CHECK_PPR)   $(LIBDIR) PprRecursiveDo.hs
+	$(CHECK_EXACT) $(LIBDIR) PprRecursiveDo.hs
+
+.PHONY: PprTypeBrackets
+PprTypeBrackets:
+	$(CHECK_PPR)   $(LIBDIR) PprTypeBrackets.hs
+	$(CHECK_EXACT) $(LIBDIR) PprTypeBrackets.hs
+
+.PHONY: PprDynamic
+PprDynamic:
+	$(CHECK_PPR)   $(LIBDIR) PprDynamic.hs
+	$(CHECK_EXACT) $(LIBDIR) PprDynamic.hs
+
+.PHONY: PprEmptyMostly
+PprEmptyMostly:
+	$(CHECK_PPR)   $(LIBDIR) PprEmptyMostly.hs
+	$(CHECK_EXACT) $(LIBDIR) PprEmptyMostly.hs
+
+.PHONY: PprClassParens
+PprClassParens:
+	$(CHECK_PPR)   $(LIBDIR) PprClassParens.hs
+	$(CHECK_EXACT) $(LIBDIR) PprClassParens.hs
+
+.PHONY: PprThAbstractFamily
+PprThAbstractFamily:
+	$(CHECK_PPR)   $(LIBDIR) PprThAbstractFamily.hs
+	$(CHECK_EXACT) $(LIBDIR) PprThAbstractFamily.hs
+
+.PHONY: PprClassTypeFamily
+PprClassTypeFamily:
+	$(CHECK_PPR)   $(LIBDIR) PprClassTypeFamily.hs
+	$(CHECK_EXACT) $(LIBDIR) PprClassTypeFamily.hs
+
+.PHONY: PprT13747
+PprT13747:
+	$(CHECK_PPR)   $(LIBDIR) PprT13747.hs
+	$(CHECK_EXACT) $(LIBDIR) PprT13747.hs
+
+.PHONY: PprBracesSemiDataDecl
+PprBracesSemiDataDecl:
+	$(CHECK_PPR)   $(LIBDIR) PprBracesSemiDataDecl.hs
+	$(CHECK_EXACT) $(LIBDIR) PprBracesSemiDataDecl.hs
+
+.PHONY: PprUnicodeSyntax
+PprUnicodeSyntax:
+	$(CHECK_PPR)   $(LIBDIR) PprUnicodeSyntax.hs
+	$(CHECK_EXACT) $(LIBDIR) PprUnicodeSyntax.hs
+
+.PHONY: PprCommentPlacement2
+PprCommentPlacement2:
+	$(CHECK_PPR)   $(LIBDIR) PprCommentPlacement2.hs
+	$(CHECK_EXACT) $(LIBDIR) PprCommentPlacement2.hs
