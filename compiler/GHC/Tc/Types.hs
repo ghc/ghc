@@ -28,7 +28,7 @@ module GHC.Tc.Types(
         -- The environment types
         Env(..),
         TcGblEnv(..), TcLclEnv(..),
-        CodeProvenance(..), inRebindableSyntax, inDeriving, setCodeProvenance,
+        CodeProvenance(..), inRebindableSyntax, inDeriving, setCodeProvenance, updateCodeProvenance,
         TcReason(..), inAmbiguityCheck, setReason,
         setLclEnvTcLevel, getLclEnvTcLevel,
         setLclEnvLoc, getLclEnvLoc,
@@ -798,14 +798,14 @@ data TcLclEnv           -- Changes as we move inside an expression
     }
 
 setCodeProvenance :: CodeProvenance -> TcLclEnv -> TcLclEnv
-setCodeProvenance p e = e { tcl_provenance = update (tcl_provenance e) p }
-  where
-    -- This function explains how provenance is allowed to change as we move inward in the source tree.
-    -- When setting the provenance of code, any code generated inside a deriving clause is attributed to deriving.
-    update :: CodeProvenance -> CodeProvenance -> CodeProvenance
-    update x y = case x of
-      DerivingCP -> DerivingCP
-      _ -> y
+setCodeProvenance p e = e { tcl_provenance = updateCodeProvenance (tcl_provenance e) p }
+
+-- | This function explains how provenance is allowed to change as we move inward in the source tree.
+-- When setting the provenance of code, any code generated inside a deriving clause is attributed to deriving, and so we refuse to change the provenance further.
+updateCodeProvenance :: CodeProvenance -> CodeProvenance -> CodeProvenance
+updateCodeProvenance x y = case x of
+  DerivingCP -> DerivingCP
+  _ -> y
 
 setReason :: TcReason -> TcLclEnv -> TcLclEnv
 setReason r e = e { tcl_reason = r }
