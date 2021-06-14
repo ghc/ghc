@@ -1689,13 +1689,22 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
     tc_item :: ClassOpItem -> TcM (Id, LHsBind GhcTc, Maybe Implication)
     tc_item (sel_id, dm_info)
       | Just (user_bind, bndr_loc, prags) <- findMethodBind (idName sel_id) binds prag_fn
-      = tcMethodBody clas tyvars dfun_ev_vars inst_tys
-                              dfun_ev_binds is_derived hs_sig_fn
+      = add_deriving sel_id $ -- if the bindings are derived, set the deriving flag for code provenance, and add some context to any errors produced
+        tcMethodBody clas tyvars dfun_ev_vars inst_tys
+                              dfun_ev_binds hs_sig_fn
                               spec_inst_prags prags
                               sel_id user_bind bndr_loc
       | otherwise
       = do { traceTc "tc_def" (ppr sel_id)
            ; tc_default sel_id dm_info }
+
+    -- For instance decls that come from deriving clauses
+    -- we want to print out the full source code if there's an error
+    -- because otherwise the user won't see the code at all.
+    -- Also, we want to set the code provenance using setDeriving.
+    add_deriving sel_id thing
+      | is_derived = setDeriving (addLandmarkErrCtxt (derivBindCtxt sel_id clas inst_tys) thing)
+      | otherwise  = thing
 
     ----------------------
     tc_default :: Id -> DefMethInfo
@@ -1703,8 +1712,9 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
 
     tc_default sel_id (Just (dm_name, _))
       = do { (meth_bind, inline_prags) <- mkDefMethBind dfun_id clas sel_id dm_name
-           ; tcMethodBody clas tyvars dfun_ev_vars inst_tys
-                          dfun_ev_binds is_derived hs_sig_fn
+           ; add_deriving sel_id $
+             tcMethodBody clas tyvars dfun_ev_vars inst_tys
+                          dfun_ev_binds hs_sig_fn
                           spec_inst_prags inline_prags
                           sel_id meth_bind inst_loc }
 
@@ -1819,28 +1829,20 @@ Instead, we take the much simpler approach of always disabling
    basis. If an Implication's DynFlags indicate that -Winaccessible-code was
    disabled, then don't bother reporting it. That's it!
 
-Note that either we're in a deriving, or we're not.
-* If we are, then the deriving starts at top level and all enclosing implications will
-  arise from the deriving, and won't have -Winaccessible-code.
-* If we're not, then none of the enclosing implications are from deriving, and so
-  all implications will have whatever setting the user wants.
-So we only examine the top level implication when determining whether we're
-in a deriving for that purpose. (cf. should_warn in GHC.Tc.Errors.reportWanteds)
 -}
 
 ------------------------
 tcMethodBody :: Class -> [TcTyVar] -> [EvVar] -> [TcType]
-             -> TcEvBinds -> Bool
+             -> TcEvBinds
              -> HsSigFun
              -> [LTcSpecPrag] -> [LSig GhcRn]
              -> Id -> LHsBind GhcRn -> SrcSpan
              -> TcM (TcId, LHsBind GhcTc, Maybe Implication)
 tcMethodBody clas tyvars dfun_ev_vars inst_tys
-                     dfun_ev_binds is_derived
+                     dfun_ev_binds
                      sig_fn spec_inst_prags prags
                      sel_id (L bind_loc meth_bind) bndr_loc
-  = add_meth_ctxt $
-    do { traceTc "tcMethodBody" (ppr sel_id <+> ppr (idType sel_id) $$ ppr bndr_loc)
+  = do { traceTc "tcMethodBody" (ppr sel_id <+> ppr (idType sel_id) $$ ppr bndr_loc)
        ; (global_meth_id, local_meth_id) <- setSrcSpan bndr_loc $
                                             mkMethIds clas tyvars dfun_ev_vars
                                                       inst_tys sel_id
@@ -1876,13 +1878,6 @@ tcMethodBody clas tyvars dfun_ev_vars inst_tys
                                    , abs_sig      = True }
 
         ; return (global_meth_id, L bind_loc full_bind, Just meth_implic) }
-  where
-        -- For instance decls that come from deriving clauses
-        -- we want to print out the full source code if there's an error
-        -- because otherwise the user won't see the code at all
-    add_meth_ctxt thing
-      | is_derived = addLandmarkErrCtxt (derivBindCtxt sel_id clas inst_tys) (setDeriving thing)
-      | otherwise  = thing
 
 tcMethodBodyHelp :: HsSigFun -> Id -> TcId
                  -> LHsBind GhcRn -> TcM (LHsBinds GhcTc)
