@@ -910,8 +910,8 @@ setSrcSpan :: SrcSpan -> TcRn a -> TcRn a
 -- See Note [Error contexts in generated code]
 -- for the provenance manipulation
 setSrcSpan (RealSrcSpan loc _) thing_inside =
-  updLclEnv (\env -> env { tcl_loc = loc }) $
-    withProvenance OtherCP thing_inside
+  updLclEnv (\env -> env { tcl_loc = loc, tcl_provenance = updateCodeProvenance OtherCP (tcl_provenance env) })
+    thing_inside
 setSrcSpan (UnhelpfulSpan reason) thing_inside =
   -- See Note [Rebindable syntax and HsExpansion].
   case reason of
