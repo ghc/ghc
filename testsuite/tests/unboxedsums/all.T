@@ -27,3 +27,17 @@ test('T12711', only_ways(['ghci']), ghci_script, ['T12711.script'])
 test('UbxSumLevPoly', normal, compile, ['-Wno-overlapping-patterns'])
 test('T14051', normal, multi_compile, ['T14051.hs', [('T14051a.hs', '')], '-O2 -v0'])
 test('T19645', normal, compile_and_run, [''])
+
+test('unpack_sums_1', omit_ways(['ghci']), compile_and_run, ['-O'])
+test('unpack_sums_2', omit_ways(['ghci']), compile, ['-O'])
+test('unpack_sums_3', omit_ways(['ghci']), compile_and_run, ['-O'])
+test('unpack_sums_4', omit_ways(['ghci']), compile_and_run, ['-O'])
+test('unpack_sums_5', omit_ways(['ghci']), compile, ['-O'])
+test('unpack_sums_6', omit_ways(['ghci']), compile_and_run, ['-O'])
+test('unpack_sums_7', [], makefile_test, [])
+
+# TODO: Need to run this in --slow mode only
+# test('sum_api_annots',
+#      [only_ways(['normal']),
+#       extra_files([ "unboxedsums" + str(i) + ".hs" for i in range(1, 12) ])],
+#      makefile_test, [])
