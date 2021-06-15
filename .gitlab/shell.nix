@@ -44,6 +44,7 @@
 
   # unconditionally add the MacOSX.sdk and TargetConditional.h
   export NIX_CFLAGS_COMPILE+=" -isystem /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include"
+  export NIX_LDFLAGS=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib:$NIX_LDFLAGS"
   echo $NIX_LDFLAGS
 
   # Use an architecture specific home, so cabal for different architectures don't confuse each other.
