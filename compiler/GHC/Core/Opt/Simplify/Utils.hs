@@ -1807,9 +1807,13 @@ tryEtaExpandRhs env bndr rhs
     dflags    = sm_dflags mode
     arityOpts = initArityOpts dflags
     old_arity = exprArity rhs
+    ty_arity  = typeArity (idType bndr)
 
     arity_type = findRhsArity arityOpts bndr rhs old_arity
                  `maxWithArity` idCallArity bndr
+                 `minWithArity` ty_arity
+    -- minWithArity: see Note [Arity trimming] in GHC.Core.Opt.Arity
+
     new_arity = arityTypeArity arity_type
 
     -- See Note [Which RHSs do we eta-expand?]
