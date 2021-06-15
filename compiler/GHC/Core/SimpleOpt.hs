@@ -48,14 +48,15 @@ import GHC.Builtin.Types
 import GHC.Builtin.Names
 import GHC.Types.Basic
 import GHC.Unit.Module ( Module )
+import GHC.Utils.Encoding
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 import GHC.Data.Maybe       ( orElse )
-import GHC.Data.FastString
 import Data.List (mapAccumL)
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as BS8
 
 {-
 ************************************************************************
@@ -1242,18 +1243,21 @@ dealWithStringLiteral _   str co
   = pushCoDataCon nilDataCon [Type charTy] co
 
 dealWithStringLiteral fun str co
-  = let strFS = mkFastStringByteString str
-
-        char = mkConApp charDataCon [mkCharLit (headFS strFS)]
-        charTail = BS.tail (bytesFS strFS)
+  = let -- IMPORTANT: Use utf8Decode here as otherwise we don't deal
+        -- correctly with unicode characters (see #19976)
+        (char, charTail) = case utf8DecodeByteString str of
+                             [] -> pprPanic "dealWithStringLiteral" (text (show str))
+                             (x:xs) -> (x, xs)
+        char_expr = mkConApp charDataCon [mkCharLit char]
+        tail_bs = BS8.pack charTail
 
         -- In singleton strings, just add [] instead of unpackCstring# ""#.
-        rest = if BS.null charTail
+        rest = if null charTail
                  then mkConApp nilDataCon [Type charTy]
                  else App (Var fun)
-                          (Lit (LitString charTail))
+                          (Lit (LitString tail_bs))
 
-    in pushCoDataCon consDataCon [Type charTy, char, rest] co
+    in pushCoDataCon consDataCon [Type charTy, char_expr, rest] co
 
 {-
 Note [Unfolding DFuns]
