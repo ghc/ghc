@@ -17,7 +17,7 @@ import GHC.Types.Var.Env
 import GHC.Types.Basic
 import GHC.Core
 import GHC.Types.Id
-import GHC.Core.Opt.Arity ( typeArity )
+import GHC.Core.Opt.Arity ( typeArity, typeOneShots )
 import GHC.Core.Utils ( exprIsCheap, exprIsTrivial )
 import GHC.Data.Graph.UnVar
 import GHC.Types.Demand
@@ -544,7 +544,7 @@ callArityAnal arity int (Let bind e)
 -- Which bindings should we look at?
 -- See Note [Which variables are interesting]
 isInteresting :: Var -> Bool
-isInteresting v = not $ null (typeArity (idType v))
+isInteresting v = not $ null $ typeOneShots $ idType v
 
 interestingBinds :: CoreBind -> [Var]
 interestingBinds = filter isInteresting . bindersOf
@@ -700,7 +700,7 @@ callArityRecEnv any_boring ae_rhss ae_body
 trimArity :: Id -> Arity -> Arity
 trimArity v a = minimum [a, max_arity_by_type, max_arity_by_strsig]
   where
-    max_arity_by_type = length (typeArity (idType v))
+    max_arity_by_type = typeArity (idType v)
     max_arity_by_strsig
         | isDeadEndDiv result_info = length demands
         | otherwise = a

@@ -38,7 +38,7 @@ import GHC.Core.Ppr     ( pprCoreExpr )
 import GHC.Core.Unfold
 import GHC.Core.Unfold.Make
 import GHC.Core.Utils
-import GHC.Core.Opt.Arity ( ArityType(..)
+import GHC.Core.Opt.Arity ( ArityType(..), typeArity
                           , pushCoTyArg, pushCoValArg
                           , etaExpandAT )
 import GHC.Core.SimpleOpt ( exprIsConApp_maybe, joinPointBinding_maybe, joinPointBindings_maybe )
@@ -605,7 +605,7 @@ tryCastWorkerWrapper env bind_cxt old_bndr occ_info bndr (Cast rhs co)
                                                    -- See Note [OPAQUE pragma]
   = do  { uniq <- getUniqueM
         ; let work_name = mkSystemVarName uniq occ_fs
-              work_id   = mkLocalIdWithInfo work_name Many rhs_ty worker_info
+              work_id   = mkLocalIdWithInfo work_name Many work_ty work_info
               is_strict = isStrictId bndr
 
         ; (rhs_floats, work_rhs) <- prepareBinding env top_lvl is_rec is_strict
@@ -636,14 +636,15 @@ tryCastWorkerWrapper env bind_cxt old_bndr occ_info bndr (Cast rhs co)
   where
     mode   = getMode env
     occ_fs = getOccFS bndr
-    rhs_ty = coercionLKind co
+    work_ty = coercionLKind co
     info   = idInfo bndr
+    work_arity = arityInfo info `min` typeArity work_ty
 
-    worker_info = vanillaIdInfo `setDmdSigInfo`     dmdSigInfo info
-                                `setCprSigInfo`     cprSigInfo info
-                                `setDemandInfo`     demandInfo info
-                                `setInlinePragInfo` inlinePragInfo info
-                                `setArityInfo`      arityInfo info
+    work_info = vanillaIdInfo `setDmdSigInfo`     dmdSigInfo info
+                              `setCprSigInfo`     cprSigInfo info
+                              `setDemandInfo`     demandInfo info
+                              `setInlinePragInfo` inlinePragInfo info
+                              `setArityInfo`      work_arity
            -- We do /not/ want to transfer OccInfo, Rules
            -- Note [Preserve strictness in cast w/w]
            -- and Wrinkle 2 of Note [Cast worker/wrapper]
