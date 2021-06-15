@@ -45,6 +45,7 @@ module GHC.IO (
 import GHC.Base
 import GHC.ST
 import GHC.Exception
+import {-# SOURCE #-} GHC.Exception.Backtrace (collectBacktrace)
 import GHC.Show
 import GHC.IO.Unsafe
 import Unsafe.Coerce ( unsafeCoerce )
@@ -218,7 +219,10 @@ mplusIO m n = m `catchException` \ (_ :: IOError) -> n
 -- ordering with respect to other 'IO' operations, whereas 'throw'
 -- does not.
 throwIO :: Exception e => e -> IO a
-throwIO e = IO (raiseIO# (toException e))
+throwIO e = do
+    bts <- collectBacktrace
+    let e' = foldr addBacktrace (toException e) bts
+    IO (raiseIO# e')
 
 -- -----------------------------------------------------------------------------
 -- Controlling asynchronous exception delivery
@@ -458,5 +462,5 @@ use 'catch' rather than 'catchException'.
 -}
 
 -- For SOURCE import by GHC.Base to define failIO.
-mkUserError       :: [Char]  -> SomeException
+mkUserError       :: [Char]  -> SomeExceptionWithLocation
 mkUserError str   = toException (userError str)
