@@ -85,6 +85,7 @@ import GHC.Hs
 import GHC.Iface.Env
 import GHC.Iface.Load
 
+import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
@@ -128,6 +129,7 @@ import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Name.Reader
 import GHC.Types.TyThing
+import GHC.Types.Error
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.IORef
@@ -254,7 +256,7 @@ tcLookupGlobal name
     do  { mb_thing <- tcLookupImported_maybe name
         ; case mb_thing of
             Succeeded thing -> return thing
-            Failed msg      -> failWithTc msg
+            Failed msg      -> failWithTc (TcRnUnknownMessage $ mkPlainError noHints msg)
         }}}
 
 -- Look up only in this module's global env't. Don't look in imports, etc.
@@ -324,10 +326,12 @@ tcLookupInstance :: Class -> [Type] -> TcM ClsInst
 tcLookupInstance cls tys
   = do { instEnv <- tcGetInstEnvs
        ; case lookupUniqueInstEnv instEnv cls tys of
-           Left err             -> failWithTc $ text "Couldn't match instance:" <+> err
+           Left err             ->
+             failWithTc $ TcRnUnknownMessage
+                        $ mkPlainError noHints (text "Couldn't match instance:" <+> err)
            Right (inst, tys)
              | uniqueTyVars tys -> return inst
-             | otherwise        -> failWithTc errNotExact
+             | otherwise        -> failWithTc (TcRnUnknownMessage $ mkPlainError noHints errNotExact)
        }
   where
     errNotExact = text "Not an exact match (i.e., some variables get instantiated)"
@@ -874,6 +878,7 @@ checkWellStaged pp_thing bind_lvl use_lvl
 
   | otherwise                   -- Badly staged
   = failWithTc $                -- E.g.  \x -> $(f x)
+    TcRnUnknownMessage $ mkPlainError noHints $
     text "Stage error:" <+> pp_thing <+>
         hsep   [text "is bound at stage" <+> ppr bind_lvl,
                 text "but used at stage" <+> ppr use_lvl]
@@ -881,6 +886,7 @@ checkWellStaged pp_thing bind_lvl use_lvl
 stageRestrictionError :: SDoc -> TcM a
 stageRestrictionError pp_thing
   = failWithTc $
+    TcRnUnknownMessage $ mkPlainError noHints $
     sep [ text "GHC stage restriction:"
         , nest 2 (vcat [ pp_thing <+> text "is used in a top-level splice, quasi-quote, or annotation,"
                        , text "and must be imported, not defined locally"])]
@@ -1148,6 +1154,7 @@ notFound name
                                             -- don't report it again (#11941)
              | otherwise -> stageRestrictionError (quotes (ppr name))
            _ -> failWithTc $
+                TcRnUnknownMessage $ mkPlainError noHints $
                 vcat[text "GHC internal error:" <+> quotes (ppr name) <+>
                      text "is not in scope during type checking, but it passed the renamer",
                      text "tcl_env of environment:" <+> ppr (tcl_env lcl_env)]
@@ -1163,8 +1170,10 @@ wrongThingErr :: String -> TcTyThing -> Name -> TcM a
 -- turn does not look at the details of the TcTyThing.
 -- See Note [Placeholder PatSyn kinds] in GHC.Tc.Gen.Bind
 wrongThingErr expected thing name
-  = failWithTc (pprTcTyThingCategory thing <+> quotes (ppr name) <+>
-                text "used as a" <+> text expected)
+  = let msg = TcRnUnknownMessage $ mkPlainError noHints $
+          (pprTcTyThingCategory thing <+> quotes (ppr name) <+>
+                     text "used as a" <+> text expected)
+  in failWithTc msg
 
 {- Note [Out of scope might be a staging error]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
