@@ -237,7 +237,7 @@ exports_from_avail Nothing rdr_env _imports _this_mod
    -- so that's how we handle it, except we also export the data family
    -- when a data instance is exported.
   = do {
-    ; warnIf True
+    ; addDiagnostic
         (missingModuleExportWarn $ moduleName _this_mod)
     ; let avails =
             map fix_faminst . gresToAvailInfo
@@ -283,7 +283,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
     exports_from_item (ExportAccum occs earlier_mods)
                       (L loc ie@(IEModuleContents _ lmod@(L _ mod)))
         | mod `elementOfUniqSet` earlier_mods    -- Duplicate export of M
-        = do { warnIf True (dupModuleExport mod) ;
+        = do { addDiagnostic (dupModuleExport mod) ;
                return Nothing }
 
         | otherwise
