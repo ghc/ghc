@@ -263,7 +263,7 @@ exception handler.
 -}
 forkIO :: IO () -> IO ThreadId
 forkIO action = IO $ \ s ->
-   case (fork# action_plus s) of (# s1, tid #) -> (# s1, ThreadId tid #)
+   case (fork# (unIO action_plus) s) of (# s1, tid #) -> (# s1, ThreadId tid #)
  where
   -- We must use 'catch' rather than 'catchException' because the action
   -- could be bottom. #13330
