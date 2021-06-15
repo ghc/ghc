@@ -1680,12 +1680,18 @@ run_BCO:
             // visible only from our stack
             SET_HDR(con, (StgInfoTable*)BCO_LIT(o_itbl), cap->r.rCCCS);
 
+            // Note [Data constructor dynamic tags]
+            //
             // compute the pointer tag for the constructor and tag the pointer
             //
             //     - 1..(TAG_MASK-1): for first TAG_MASK-1 constructors
             //     - TAG_MASK:        look in info table
             //
             // Note: we need to update this if we change the tagging strategy
+            //
+            // For full details of the invariants on tagging, see
+            // https://gitlab.haskell.org/ghc/ghc/wikis/commentary/rts/haskell-execution/pointer-tagging
+
             StgClosure* tagged_con = TAG_CLOSURE(stg_min(TAG_MASK, 1 + GET_TAG(con)), con);
             SpW(0) = (W_)tagged_con;
 
