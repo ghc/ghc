@@ -1,2 +1,2 @@
-                 case ds of { Bar dt [Occ=Once1] _ [Occ=Dead] -> GHC.Types.I# dt }}]
-f = \ (ds :: Bar) -> case ds of { Bar dt dt1 -> GHC.Types.I# dt }
+                 case ds of { Bar bx [Occ=Once1] _ [Occ=Dead] -> GHC.Types.I# bx }}]
+f = \ (ds :: Bar) -> case ds of { Bar bx bx1 -> GHC.Types.I# bx }
