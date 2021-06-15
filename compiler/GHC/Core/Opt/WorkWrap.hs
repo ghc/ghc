@@ -539,7 +539,7 @@ tryWW ww_opts is_rec fn_id rhs
 
     new_fn_id = zapIdUsedOnceInfo (zapIdUsageEnvInfo fn_id)
         -- See Note [Zapping DmdEnv after Demand Analyzer] and
-        -- See Note [Zapping Used Once info WorkWrap]
+        -- See Note [Zapping Used Once info in WorkWrap]
 
     -- is_eta_exp: see Note [Don't eta expand in w/w]
     is_eta_exp = length wrap_dmds == manifestArity rhs
@@ -570,47 +570,56 @@ Note [Final Demand Analyser run] in GHC.Core.Opt.DmdAnal).
 
 Note [Zapping Used Once info in WorkWrap]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In the worker-wrapper pass we zap the used once info in demands and in
-strictness signatures.
+During the work/wrap pass, using zapIdUsedOnceInfo, we zap the "used once" info
+* on every binder (let binders, case binders, lambda binders)
+* in both demands and in strictness signatures
+* recursively
 
 Why?
  * The simplifier may happen to transform code in a way that invalidates the
    data (see #11731 for an example).
  * It is not used in later passes, up to code generation.
 
-So as the data is useless and possibly wrong, we want to remove it. The most
-convenient place to do that is the worker wrapper phase, as it runs after every
-run of the demand analyser besides the very last one (which is the one where we
-want to _keep_ the info for the code generator).
+At first it's hard to see how the simplifier might invalidate it (and
+indeed for a while I thought it couldn't: #19482), but it's not quite
+as simple as I thought.  Consider this:
+  {-# STRICTNESS SIG <SP(M,A)> #-}
+  f p = let v = case p of (a,b) -> a
+        in p `seq` (v,v)
 
-We do not do it in the demand analyser for the same reasons outlined in
-Note [Zapping DmdEnv after Demand Analyzer] above.
+I think we'll give `f` the strictness signature `<SP(M,A)>`, where the
+`M` sayd that we'll evaluate the first component of the pair at most
+once.  Why?  Because the RHS of the thunk `v` is evaluated at most
+once.
 
-For example, consider
-  let y = factorial v in
-  let x = y in
-  x + x
+But now let's worker/wrapper f:
+  {-# STRICTNESS SIG <M> #-}
+  $wf p1 = let p2 = absentError "urk" in
+           let p = (p1,p2) in
+           let v = case p of (a,b) -> a
+           in p `seq` (v,v)
 
-Demand analysis will conclude, correctly, that `y` is demanded once.  But if we inline `x` we get
-  let y = factorial v in
-  y + y
+where I've gotten the demand on `p1` by decomposing the P(M,A) argument demand.
+This rapidly simplifies to
+  {-# STRICTNESS SIG <M> #-}
+  $wf p1 = let v = p1 in
+           (v,v)
 
-Similarly for
-  f y = let x = y in x+x
-where we will put a used-once demand on y, and hence also in f's demand signature.
+and thence to `(p1,p1)` by inlining the trivial let. Now the demand on `p1` should
+not be at most once!!
 
-And recursively
-  f y = case y of (p,q) -> let p2 = p in p2+p2
- Here we'll get a used-once demand on p; but that is not robust to inlining p2.
+Conclusion: used-once info is fragile to simplification, because of
+the non-monotonic behaviour of let's, which turn used-many into
+used-once.  So indeed we should zap this info in worker/wrapper.
 
-Conclusion: "demanded once" info is fragile.
-* We want it after the final immediately-before-code-gen demand analysis, so we can identify single-entry thunks.
-* But we don't want it otherwise because it is not robust.
+Conclusion: kill it during worker/wrapper, using `zapUsedOnceInfo`.
+Both the *demand signature* of the binder, and the *demand-info* of
+the binder.  Moreover, do so recursively.
 
-Conclusion: kill it during worker/wrapper, using `zapUsedOnceInfo`.  Both the *demand signature* of
-the binder, and the *demand-info* of the binder.  Moreover, do so recursively.
-
-(NB THE pre-code-gen demand analysis is not followed by worker/wrapper.)
+You might wonder: why do we generate used-once info if we then throw
+it away.  The main reason is that we do a final run of the demand analyser,
+immediately before CoreTidy, which is /not/ followed by worker/wrapper; it
+is there only to generate used-once info for single-entry thunks.
 
 Note [Don't eta expand in w/w]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
