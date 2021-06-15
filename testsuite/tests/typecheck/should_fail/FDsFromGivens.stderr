@@ -12,7 +12,7 @@ FDsFromGivens.hs:13:1: warning: [-Winaccessible-code (in -Wdefault)]
                          g1 :: forall a.
                                (C Char [a], C Char Bool) =>
                                a -> () at FDsFromGivens.hs:13:1-42
-    Unsatisfiable constraints (C Char [a], C Char Bool) in
+    Unsatisfiable constraints (C Char [a], C Char Bool) assumed by
       the type signature for:
         g1 :: forall a. (C Char [a], C Char Bool) => a -> ()
-    This may result in inaccessible code.
+    This will result in inaccessible code.

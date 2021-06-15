@@ -1,10 +1,10 @@
 
 T15450.hs:5:1: warning: [-Winaccessible-code (in -Wdefault)]
     Couldn't match type ‘Int’ with ‘Bool’
-    Unsatisfiable constraint Int ~ Bool in
+    Unsatisfiable constraint Int ~ Bool assumed by
       the type signature for:
         f :: forall a. (Int ~ Bool) => Bool -> a
-    This may result in inaccessible code.
+    This will result in inaccessible code.
 
 T15450.hs:6:7: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
@@ -15,10 +15,10 @@ T15450.hs:6:7: warning: [-Wincomplete-patterns (in -Wextra)]
 
 T15450.hs:8:1: warning: [-Winaccessible-code (in -Wdefault)]
     Couldn't match type ‘Int’ with ‘Bool’
-    Unsatisfiable constraint Int ~ Bool in
+    Unsatisfiable constraint Int ~ Bool assumed by
       the type signature for:
         g :: forall a. (Int ~ Bool) => Bool -> a
-    This may result in inaccessible code.
+    This will result in inaccessible code.
 
 T15450.hs:9:7: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
