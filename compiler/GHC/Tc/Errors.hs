@@ -785,7 +785,7 @@ mkGivenWarningReporter :: Reporter
 mkGivenWarningReporter ctxt cts
   = do { (ctxt, binds_msg, ct) <- relevantBindings True ctxt ct
        ; let env = ctLocEnv (ctLoc ct)
-       ; unless (inDeriving env || inAmbiguityCheck env) $
+       ; unless (inDeriving env) $
           do { let (implic:_) = cec_encl ctxt
                        -- Always non-empty when mkGivenWarningReporter is called
                    ct' = setCtLoc ct (setCtLocEnv (ctLoc ct) (ic_env implic))

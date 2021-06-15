@@ -216,8 +216,7 @@ checkAmbiguity ctxt ty
          -- tyvars are skolemised, we can safely use tcSimplifyTop
        ; allow_ambiguous <- xoptM LangExt.AllowAmbiguousTypes
        ; unless allow_ambiguous $
-          do { (_wrap, wanted) <- updLclEnv (setReason AmbiguityCheckTR) $
-                                  addErrCtxt (mk_msg allow_ambiguous) $
+          do { (_wrap, wanted) <- addErrCtxt (mk_msg allow_ambiguous) $
                                   captureConstraints $
                                   tcSubTypeSigma ctxt ty ty
              ; simplifyAmbiguityCheck ty wanted
@@ -400,7 +399,8 @@ checkValidType ctxt ty
        --     and there may be nested foralls for the subtype test to examine
        -- Inaccessible code warnings would be duplicates of those found when checking ty
        -- above, and so we disable them.
-       ; checkAmbiguity ctxt ty
+       ; unsetWOptM Opt_WarnInaccessibleCode $ -- turn off inaccessible code warnings, since they would be redundant with warnings reported by the above checks on ty.
+         checkAmbiguity ctxt ty
 
        ; traceTc "checkValidType done" (ppr ty <+> text "::" <+> ppr (tcTypeKind ty)) }
 
