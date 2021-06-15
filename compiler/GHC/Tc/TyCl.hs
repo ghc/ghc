@@ -5,7 +5,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE TupleSections, ScopedTypeVariables, MultiWayIf #-}
+{-# LANGUAGE ScopedTypeVariables, MultiWayIf #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE LambdaCase #-}
@@ -64,6 +64,7 @@ import GHC.Core.Coercion
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep   -- for checkValidRoles
 import GHC.Core.TyCo.Ppr( pprTyVars )
+import GHC.Core.TyCo.Subst
 import GHC.Core.Class
 import GHC.Core.Coercion.Axiom
 import GHC.Core.TyCon
@@ -4307,7 +4308,8 @@ checkPartialRecordField all_cons fld
 
     con1 = assert (not (null cons_with_field)) $ head cons_with_field
     (univ_tvs, _, eq_spec, _, _, _) = dataConFullSig con1
-    eq_subst = mkTvSubstPrs (map eqSpecPair eq_spec)
+    eq_subst = mkTvSubstZipEqual (map eqSpecTyVar eq_spec)
+                             (map eqSpecType  eq_spec)
     inst_tys = substTyVars eq_subst univ_tvs
 
 checkFieldCompat :: FieldLabelString -> DataCon -> DataCon
