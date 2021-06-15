@@ -452,7 +452,7 @@ expand_syn arity tvs rhs tys
   | tys `lengthExceeds` arity = mkAppTys rhs' (drop arity tys)
   | otherwise                 = rhs'
   where
-    rhs' = substTy (mkTvSubstPrs (tvs `zip` tys)) rhs
+    rhs' = substTy (mkTvSubstZipEqual tvs (take arity tys)) rhs
                -- The free vars of 'rhs' should all be bound by 'tenv', so it's
                -- ok to use 'substTy' here (which is what expandSynTyConApp_maybe does).
                -- See also Note [The substitution invariant] in GHC.Core.TyCo.Subst.
