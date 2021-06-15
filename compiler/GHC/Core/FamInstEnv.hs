@@ -40,6 +40,7 @@ module GHC.Core.FamInstEnv (
 import GHC.Prelude
 
 import GHC.Core.Unify
+import GHC.Core.TyCo.Subst
 import GHC.Core.Type as Type
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCon
@@ -1335,7 +1336,7 @@ normalise_tc_app tc tys
   = -- A synonym with type families in the RHS
     -- Expand and try again
     -- See Note [Normalisation and type synonyms]
-    normalise_type (mkAppTys (substTy (mkTvSubstPrs (tvs `zip` tv_tys)) rhs) tys')
+    normalise_type (mkAppTys (substTy (mkTvSubstPrs2 tvs tv_tys) rhs) tys')
 
   | isFamilyTyCon tc
   = -- A type-family application

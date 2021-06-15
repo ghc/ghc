@@ -46,6 +46,7 @@ import GHC.Core.Opt.ConstantFold
 import GHC.Core.Type
 import GHC.Core.Multiplicity
 import GHC.Core.TyCo.Rep
+import GHC.Core.TyCo.Subst
 import GHC.Core.FamInstEnv
 import GHC.Core.Coercion
 import GHC.Tc.Utils.TcType as TcType
@@ -756,7 +757,9 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
     (univ_tvs, ex_tvs, eq_spec, theta, orig_arg_tys, _orig_res_ty)
       = dataConFullSig data_con
     wrap_tvs     = dataConUserTyVars data_con
-    res_ty_args  = substTyVars (mkTvSubstPrs (map eqSpecPair eq_spec)) univ_tvs
+    eq_subst     = mkTvSubstPrs2 (map eqSpecTyVar eq_spec)
+                                 (map eqSpecType  eq_spec)
+    res_ty_args  = substTyVars eq_subst univ_tvs
 
     tycon        = dataConTyCon data_con       -- The representation TyCon (not family)
     wrap_ty      = dataConWrapperType data_con
