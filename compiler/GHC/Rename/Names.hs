@@ -349,7 +349,7 @@ rnImportDecl this_mod
                                    mkPlainDiagnostic (WarningWithFlag Opt_WarnMissingImportList)
                                                      noHints
                                                      (missingImportListWarn imp_mod_name)
-                             addDiagnostic (TcRnMessageDetailed noErrInfo msg)
+                             addDiagnostic msg
 
 
     iface <- loadSrcInterface doc imp_mod_name want_boot (fmap sl_fs mb_pkg)
@@ -415,7 +415,7 @@ rnImportDecl this_mod
                mkPlainDiagnostic (WarningWithFlag Opt_WarnWarningsDeprecations)
                                  noHints
                                  (moduleWarn imp_mod_name txt)
-         addDiagnostic (TcRnMessageDetailed noErrInfo msg)
+         addDiagnostic msg
        _           -> return ()
 
     -- Complain about -Wcompat-unqualified-imports violations.
@@ -553,7 +553,7 @@ warnUnqualifiedImport decl iface =
             mkPlainDiagnostic (WarningWithFlag Opt_WarnCompatUnqualifiedImports)
                               noHints
                               warning
-      addDiagnosticAt loc (TcRnMessageDetailed noErrInfo msg)
+      addDiagnosticAt loc msg
   where
     mod = mi_module iface
     loc = getLoc $ ideclName decl
@@ -1205,7 +1205,7 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
                     mkPlainDiagnostic (WarningWithFlag Opt_WarnDodgyImports)
                                       noHints
                                       (lookup_err_msg (BadImport ie))
-              addDiagnostic (TcRnMessageDetailed noErrInfo msg)
+              addDiagnostic msg
 
             run_lookup :: IELookupM a -> TcRn (Maybe a)
             run_lookup m = case m of
@@ -1586,7 +1586,7 @@ warnMissingSignatures gbl_env
                = when not_ghc_generated $ do
                    let dia = TcRnUnknownMessage $
                          mkPlainDiagnostic (WarningWithFlag flag) noHints msg
-                   addDiagnosticAt (getSrcSpan name)(TcRnMessageDetailed noErrInfo dia)
+                   addDiagnosticAt (getSrcSpan name) dia
                where
                  not_ghc_generated
                    = name `elemNameSet` sig_ns
@@ -1611,7 +1611,7 @@ warnMissingKindSignatures gbl_env
         let dia = TcRnUnknownMessage $
               mkPlainDiagnostic (WarningWithFlag Opt_WarnMissingKindSignatures) noHints $
                 hang msg 2 (text "type" <+> pprPrefixName name <+> dcolon <+> ki_msg)
-        addDiagnosticAt (getSrcSpan name) (TcRnMessageDetailed noErrInfo dia)
+        addDiagnosticAt (getSrcSpan name) dia
       where
         msg | cusks_enabled = text "Top-level type constructor with no standalone kind signature or CUSK:"
             | otherwise     = text "Top-level type constructor with no standalone kind signature:"
@@ -1779,7 +1779,7 @@ warnUnusedImport flag fld_env (L loc decl, used, unused)
   | null used
   = let dia = TcRnUnknownMessage $
           mkPlainDiagnostic (WarningWithFlag flag) noHints msg1
-    in addDiagnosticAt (locA loc) (TcRnMessageDetailed noErrInfo dia)
+    in addDiagnosticAt (locA loc) dia
 
   -- Everything imported is used; nop
   | null unused
@@ -1791,12 +1791,12 @@ warnUnusedImport flag fld_env (L loc decl, used, unused)
   , length unused == 1
   , Just (L loc _) <- find (\(L _ ie) -> ((ieName ie) :: Name) `elem` unused) imports
   = let dia = TcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag flag) noHints msg2
-    in addDiagnosticAt (locA loc) (TcRnMessageDetailed noErrInfo dia)
+    in addDiagnosticAt (locA loc) dia
 
   -- Some imports are unused
   | otherwise
   = let dia = TcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag flag) noHints msg2
-    in addDiagnosticAt (locA loc) (TcRnMessageDetailed noErrInfo dia)
+    in addDiagnosticAt (locA loc) dia
 
   where
     msg1 = vcat [ pp_herald <+> quotes pp_mod <+> is_redundant

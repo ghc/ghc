@@ -86,20 +86,17 @@ module GHC.Tc.Utils.Monad(
   getErrCtxt, setErrCtxt, addErrCtxt, addErrCtxtM, addLandmarkErrCtxt,
   addLandmarkErrCtxtM, popErrCtxt, getCtLocM, setCtLocM,
 
-  -- * SDoc-based (legacy) error message generation (type checker)
+  -- * Diagnostic message generation (type checker)
   addErrTc,
   addErrTcM,
   failWithTc, failWithTcM,
   checkTc, checkTcM,
   failIfTc, failIfTcM,
   mkErrInfo,
-
-  -- * Diagnostic message generation (type checker)
   addTcRnDiagnostic, addDetailedDiagnostic,
   mkTcRnMessage, reportDiagnostic, reportDiagnostics,
   warnIf, diagnosticTc, diagnosticTcM,
   addDiagnosticTc, addDiagnosticTcM, addDiagnostic, addDiagnosticAt,
-  noErrInfo,
 
   -- * Type constraints
   newTcEvBinds, newNoTcEvBinds, cloneEvBindsVar,
@@ -1505,10 +1502,10 @@ failIfTcM True  err = failWithTcM err
 -- | Display a warning if a condition is met.
 warnIf :: Bool -> TcRnMessage -> TcRn ()
 warnIf is_bad msg -- No need to check any flag here, it will be done in 'diagReasonSeverity'.
-  = when is_bad (addDiagnostic $ TcRnMessageDetailed noErrInfo msg)
+  = when is_bad (addDiagnostic msg)
 
-noErrInfo :: ErrInfo
-noErrInfo = ErrInfo Outputable.empty Outputable.empty
+no_err_info :: ErrInfo
+no_err_info = ErrInfo Outputable.empty Outputable.empty
 
 -- | Display a warning if a condition is met.
 diagnosticTc :: Bool -> TcRnMessage -> TcM ()
@@ -1555,14 +1552,15 @@ addTcRnDiagnostic msg = do
 
 -- | Display a diagnostic for the current source location, taken from
 -- the 'TcRn' monad.
-addDiagnostic :: TcRnMessageDetailed -> TcRn ()
-addDiagnostic = add_diagnostic
+addDiagnostic :: TcRnMessage -> TcRn ()
+addDiagnostic msg = add_diagnostic (TcRnMessageDetailed no_err_info msg)
 
 -- | Display a diagnostic for a given source location.
-addDiagnosticAt :: SrcSpan -> TcRnMessageDetailed -> TcRn ()
+addDiagnosticAt :: SrcSpan -> TcRnMessage -> TcRn ()
 addDiagnosticAt loc msg = do
   unit_state <- hsc_units <$> getTopEnv
-  mkTcRnMessage loc (TcRnMessageWithInfo unit_state msg) >>= reportDiagnostic
+  let dia = TcRnMessageDetailed no_err_info msg
+  mkTcRnMessage loc (TcRnMessageWithInfo unit_state dia) >>= reportDiagnostic
 
 -- | Display a diagnostic, with an optional flag, for the current source
 -- location.

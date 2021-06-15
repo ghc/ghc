@@ -263,7 +263,7 @@ tcRnModuleTcRnM hsc_env mod_sum
         ; when (notNull prel_imports) $ do
             let msg = TcRnUnknownMessage $
                         mkPlainDiagnostic (WarningWithFlag Opt_WarnImplicitPrelude) noHints (implicitPreludeWarn)
-            addDiagnostic (TcRnMessageDetailed noErrInfo msg)
+            addDiagnostic msg
 
         ; -- TODO This is a little skeevy; maybe handle a bit more directly
           let { simplifyImport (L _ idecl) =
@@ -1600,7 +1600,7 @@ tcPreludeClashWarn warnFlag name = do
     ; traceTc "tcPreludeClashWarn/prelude_functions"
                 (hang (ppr name) 4 (sep [ppr clashingElts]))
 
-    ; let warn_msg x = addDiagnosticAt (nameSrcSpan (greMangledName x)) $ TcRnMessageDetailed noErrInfo $
+    ; let warn_msg x = addDiagnosticAt (nameSrcSpan (greMangledName x)) $
             TcRnUnknownMessage $
             mkPlainDiagnostic (WarningWithFlag warnFlag) noHints $ (hsep
               [ text "Local definition of"
@@ -1713,7 +1713,7 @@ tcMissingParentClassWarn warnFlag isName shouldName
            -- <should>" e.g. "Foo is an instance of Monad but not Applicative"
            ; let instLoc = srcLocSpan . nameSrcLoc $ getName isInst
                  warnMsg (KnownTc name:_) =
-                      addDiagnosticAt instLoc $ TcRnMessageDetailed noErrInfo $
+                      addDiagnosticAt instLoc $
                         TcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag warnFlag) noHints $
                            hsep [ (quotes . ppr . nameOccName) name
                                 , text "is an instance of"
