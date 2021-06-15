@@ -1653,22 +1653,25 @@ split again.
 -- | Shift the argument left by the specified number of bits
 -- (which must be non-negative).
 shiftL# :: Word# -> Int# -> Word#
-a `shiftL#` b   | isTrue# (b >=# WORD_SIZE_IN_BITS#) = 0##
-                | otherwise                          = a `uncheckedShiftL#` b
+a `shiftL#` b = (a `uncheckedShiftL#` b)
+                -- isTrue# (b >=# WORD_SIZE_IN_BITS#) = 0##
+                `and#` int2Word# (negateInt# (b <# WORD_SIZE_IN_BITS#))
 
 -- | Shift the argument right by the specified number of bits
 -- (which must be non-negative).
 -- The "RL" means "right, logical" (as opposed to RA for arithmetic)
 -- (although an arithmetic right shift wouldn't make sense for Word#)
 shiftRL# :: Word# -> Int# -> Word#
-a `shiftRL#` b  | isTrue# (b >=# WORD_SIZE_IN_BITS#) = 0##
-                | otherwise                          = a `uncheckedShiftRL#` b
+a `shiftRL#` b = (a `uncheckedShiftRL#` b)
+                 -- isTrue# (b >=# WORD_SIZE_IN_BITS#) = 0##
+                 `and#` int2Word# (negateInt# (b <# WORD_SIZE_IN_BITS#))
 
 -- | Shift the argument left by the specified number of bits
 -- (which must be non-negative).
 iShiftL# :: Int# -> Int# -> Int#
-a `iShiftL#` b  | isTrue# (b >=# WORD_SIZE_IN_BITS#) = 0#
-                | otherwise                          = a `uncheckedIShiftL#` b
+a `iShiftL#` b = (a `uncheckedIShiftL#` b)
+                 -- isTrue# (b >=# WORD_SIZE_IN_BITS#) = 0#
+                 `andI#` negateInt# (b <# WORD_SIZE_IN_BITS#)
 
 -- | Shift the argument right (signed) by the specified number of bits
 -- (which must be non-negative).
@@ -1683,8 +1686,9 @@ a `iShiftRA#` b | isTrue# (b >=# WORD_SIZE_IN_BITS#) = if isTrue# (a <# 0#)
 -- (which must be non-negative).
 -- The "RL" means "right, logical" (as opposed to RA for arithmetic)
 iShiftRL# :: Int# -> Int# -> Int#
-a `iShiftRL#` b | isTrue# (b >=# WORD_SIZE_IN_BITS#) = 0#
-                | otherwise                          = a `uncheckedIShiftRL#` b
+a `iShiftRL#` b = (a `uncheckedIShiftRL#` b)
+                  -- isTrue# (b >=# WORD_SIZE_IN_BITS#) = 0#
+                  `andI#` negateInt# (b <# WORD_SIZE_IN_BITS#)
 
 -- Rules for C strings (the functions themselves are now in GHC.CString)
 {-# RULES
