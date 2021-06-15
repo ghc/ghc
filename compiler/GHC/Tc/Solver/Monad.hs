@@ -174,7 +174,7 @@ import Data.IORef
 import GHC.Exts (oneShot)
 import Data.List ( mapAccumL, partition )
 import Data.List.NonEmpty ( NonEmpty(..) )
-import Control.Arrow ( first )
+
 
 #if defined(DEBUG)
 import GHC.Data.Graph.Directed
@@ -1110,20 +1110,20 @@ lookupSolvedDict (IS { inert_solved_dicts = solved }) loc cls tys
       _       -> Nothing
 
 ---------------------------
-lookupFamAppCache :: TyCon -> [Type] -> TcS (Maybe (TcCoercion, TcType))
+lookupFamAppCache :: TyCon -> [Type] -> TcS (Maybe Reduction)
 lookupFamAppCache fam_tc tys
   = do { IS { inert_famapp_cache = famapp_cache } <- getTcSInerts
        ; case findFunEq famapp_cache fam_tc tys of
-           result@(Just (co, ty)) ->
+           redn@(Just (Reduction ty co)) ->
              do { traceTcS "famapp_cache hit" (vcat [ ppr (mkTyConApp fam_tc tys)
                                                     , ppr ty
                                                     , ppr co ])
-                ; return result }
+                ; return redn }
            Nothing -> return Nothing }
 
-extendFamAppCache :: TyCon -> [Type] -> (TcCoercion, TcType) -> TcS ()
+extendFamAppCache :: TyCon -> [Type] -> Reduction -> TcS ()
 -- NB: co :: rhs ~ F tys, to match expectations of rewriter
-extendFamAppCache tc xi_args stuff@(_, ty)
+extendFamAppCache tc xi_args stuff@(Reduction ty _)
   = do { dflags <- getDynFlags
        ; when (gopt Opt_FamAppCache dflags) $
     do { traceTcS "extendFamAppCache" (vcat [ ppr tc <+> ppr xi_args
@@ -1140,8 +1140,8 @@ dropFromFamAppCache varset
        ; let filtered = filterTcAppMap check famapp_cache
        ; setTcSInerts $ inerts { inert_famapp_cache = filtered } }
   where
-    check :: (TcCoercion, TcType) -> Bool
-    check (co, _) = not (anyFreeVarsOfCo (`elemVarSet` varset) co)
+    check :: Reduction -> Bool
+    check (Reduction _ co) = not (anyFreeVarsOfCo (`elemVarSet` varset) co)
 
 {- *********************************************************************
 *                                                                      *
@@ -1254,7 +1254,7 @@ traceTcS herald doc = wrapTcS (TcM.traceTc herald doc)
 {-# INLINE traceTcS #-}  -- see Note [INLINE conditional tracing utilities]
 
 runTcPluginTcS :: TcPluginM a -> TcS a
-runTcPluginTcS m = wrapTcS . runTcPluginM m =<< getTcEvBindsVar
+runTcPluginTcS = wrapTcS . runTcPluginM
 
 instance HasDynFlags TcS where
     getDynFlags = wrapTcS getDynFlags
@@ -2189,11 +2189,12 @@ checkReductionDepth loc ty
          wrapErrTcS $
          solverDepthErrorTcS loc ty }
 
-matchFam :: TyCon -> [Type] -> TcS (Maybe (CoercionN, TcType))
+matchFam :: TyCon -> [Type] -> TcS (Maybe Reduction)
 -- Given (F tys) return (ty, co), where co :: ty ~N F tys
-matchFam tycon args = fmap (fmap (first mkTcSymCo)) $ wrapTcS $ matchFamTcM tycon args
+matchFam tycon args = fmap (fmap (\( Reduction xi co) -> Reduction xi (mkTcSymCo co)))
+                    $ wrapTcS $ matchFamTcM tycon args
 
-matchFamTcM :: TyCon -> [Type] -> TcM (Maybe (CoercionN, TcType))
+matchFamTcM :: TyCon -> [Type] -> TcM (Maybe Reduction)
 -- Given (F tys) return (ty, co), where co :: F tys ~N ty
 matchFamTcM tycon args
   = do { fam_envs <- FamInst.tcGetFamInstEnvs
@@ -2204,10 +2205,11 @@ matchFamTcM tycon args
               , ppr_res match_fam_result ]
        ; return match_fam_result }
   where
-    ppr_res Nothing        = text "Match failed"
-    ppr_res (Just (co,ty)) = hang (text "Match succeeded:")
-                                2 (vcat [ text "Rewrites to:" <+> ppr ty
-                                        , text "Coercion:" <+> ppr co ])
+    ppr_res Nothing = text "Match failed"
+    ppr_res (Just (Reduction ty co))
+      = hang (text "Match succeeded:") 2
+          (vcat [ text "Rewrites to:" <+> ppr ty
+                , text "Coercion:" <+> ppr co ])
 
 {-
 ************************************************************************

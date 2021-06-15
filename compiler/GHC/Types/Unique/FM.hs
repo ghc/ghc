@@ -57,6 +57,7 @@ module GHC.Types.Unique.FM (
         mergeUFM,
         plusMaybeUFM_C,
         plusUFMList,
+        sequenceUFMList,
         minusUFM,
         intersectUFM,
         intersectUFM_C,
@@ -300,6 +301,15 @@ plusMaybeUFM_C f (UFM xm) (UFM ym)
 
 plusUFMList :: [UniqFM key elt] -> UniqFM key elt
 plusUFMList = foldl' plusUFM emptyUFM
+
+sequenceUFMList :: forall key elt. [UniqFM key elt] -> UniqFM key [elt]
+sequenceUFMList = foldr (plusUFM_CD2 cons) emptyUFM
+  where
+    cons :: Maybe elt -> Maybe [elt] -> [elt]
+    cons (Just x) (Just ys) = x : ys
+    cons Nothing  (Just ys) = ys
+    cons (Just x) Nothing   = [x]
+    cons Nothing  Nothing   = []
 
 minusUFM :: UniqFM key elt1 -> UniqFM key elt2 -> UniqFM key elt1
 minusUFM (UFM x) (UFM y) = UFM (M.difference x y)
