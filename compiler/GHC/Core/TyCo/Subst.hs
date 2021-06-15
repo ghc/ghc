@@ -29,7 +29,7 @@ module GHC.Core.TyCo.Subst
         unionTCvSubst, zipTyEnv, zipCoEnv,
         zipTvSubst, zipCvSubst,
         zipTCvSubst,
-        mkTvSubstPrs,
+        mkTvSubstPrs, mkTvSubstPrs2,
 
         substTyWith, substTyWithCoVars, substTysWith, substTysWithCoVars,
         substCoWith,
@@ -438,6 +438,16 @@ mkTvSubstPrs prs =
           and [ isTyVar tv && not (isCoercionTy ty)
               | (tv, ty) <- prs ]
 
+-- | Generates the in-scope set for the 'TCvSubst' from the types in the
+-- incoming environment. No CoVars, please!
+mkTvSubstPrs2 :: [TyVar] -> [Type] -> TCvSubst
+mkTvSubstPrs2 tvs tys =
+    assertPpr onlyTyVarsAndNoCoercionTy (text "prs" <+> ppr (tvs `zip` tys)) $
+    mkTvSubst in_scope (zipEqualVarEnv tvs tys)
+  where in_scope = mkInScopeSet $ shallowTyCoVarsOfTypes $ tys
+        onlyTyVarsAndNoCoercionTy =
+          all isTyVar tvs && all (not . isCoercionTy) tys
+
 zipTyEnv :: HasDebugCallStack => [TyVar] -> [Type] -> TvSubstEnv
 zipTyEnv tyvars tys
   | debugIsOn
@@ -445,7 +455,7 @@ zipTyEnv tyvars tys
   = pprPanic "zipTyEnv" (ppr tyvars $$ ppr tys)
   | otherwise
   = assert (all (not . isCoercionTy) tys )
-    zipToUFM tyvars tys
+    zipEqualToUFM tyvars tys
         -- There used to be a special case for when
         --      ty == TyVarTy tv
         -- (a not-uncommon case) in which case the substitution was dropped.
@@ -465,7 +475,7 @@ zipCoEnv cvs cos
   , not (all isCoVar cvs)
   = pprPanic "zipCoEnv" (ppr cvs <+> ppr cos)
   | otherwise
-  = mkVarEnv (zipEqual "zipCoEnv" cvs cos)
+  = zipEqualVarEnv cvs cos
 
 instance Outputable TCvSubst where
   ppr (TCvSubst ins tenv cenv)
