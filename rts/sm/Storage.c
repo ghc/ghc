@@ -1644,7 +1644,7 @@ void freeExec (AdjustorExecutable addr)
     RELEASE_SM_LOCK
 }
 
-#elif defined(darwin_HOST_OS)
+#elif defined(USE_LIBFFI_FOR_ADJUSTORS) && defined(darwin_HOST_OS)
 
 static HashTable* allocatedExecs;
 
