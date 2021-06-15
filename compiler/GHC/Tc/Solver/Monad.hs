@@ -1246,7 +1246,7 @@ panicTcS  :: SDoc -> TcS a
 failTcS   :: TcRnMessage -> TcS a
 warnTcS, addErrTcS :: TcRnMessage -> TcS ()
 failTcS      = wrapTcS . TcM.failWith
-warnTcS msg  = wrapTcS (TcM.addDiagnostic $ TcRnMessageDetailed TcM.noErrInfo msg)
+warnTcS msg  = wrapTcS (TcM.addDiagnostic msg)
 addErrTcS    = wrapTcS . TcM.addErr
 panicTcS doc = pprPanic "GHC.Tc.Solver.Canonical" doc
 
