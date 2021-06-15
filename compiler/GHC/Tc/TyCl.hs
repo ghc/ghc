@@ -4959,7 +4959,7 @@ checkValidRoles tc
     -- tyConDataCons returns an empty list for data families
   = mapM_ check_dc_roles (tyConDataCons tc)
   | Just rhs <- synTyConRhs_maybe tc
-  = check_ty_roles (zipVarEnv (tyConTyVars tc) (tyConRoles tc)) Representational rhs
+  = check_ty_roles (zipEqualVarEnv (tyConTyVars tc) (tyConRoles tc)) Representational rhs
   | otherwise
   = return ()
   where
@@ -4971,9 +4971,9 @@ checkValidRoles tc
       where
         (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _res_ty)
           = dataConFullSig datacon
-        univ_roles = zipVarEnv univ_tvs (tyConRoles tc)
-              -- zipVarEnv uses zipEqual, but we don't want that for ex_tvs
-        ex_roles   = mkVarEnv (map (, Nominal) ex_tvs)
+        univ_roles = zipEqualVarEnv univ_tvs (tyConRoles tc)
+              -- we don't want zipEqual for ex_tvs
+        ex_roles   = zipVarEnv ex_tvs (repeat Nominal)
         role_env   = univ_roles `plusVarEnv` ex_roles
 
     check_ty_roles env role ty

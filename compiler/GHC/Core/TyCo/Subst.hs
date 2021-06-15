@@ -445,7 +445,7 @@ zipTyEnv tyvars tys
   = pprPanic "zipTyEnv" (ppr tyvars $$ ppr tys)
   | otherwise
   = assert (all (not . isCoercionTy) tys )
-    zipToUFM tyvars tys
+    zipEqualToUFM tyvars tys
         -- There used to be a special case for when
         --      ty == TyVarTy tv
         -- (a not-uncommon case) in which case the substitution was dropped.
@@ -465,7 +465,7 @@ zipCoEnv cvs cos
   , not (all isCoVar cvs)
   = pprPanic "zipCoEnv" (ppr cvs <+> ppr cos)
   | otherwise
-  = mkVarEnv (zipEqual "zipCoEnv" cvs cos)
+  = zipEqualVarEnv cvs cos
 
 instance Outputable TCvSubst where
   ppr (TCvSubst ins tenv cenv)
