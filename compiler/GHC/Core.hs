@@ -95,7 +95,7 @@ module GHC.Core (
 import GHC.Prelude
 import GHC.Platform
 
-import GHC.Types.Var.Env( InScopeSet )
+import GHC.Types.Var.Env( InScopeSet, IdEnv )
 import GHC.Types.Var
 import GHC.Core.Type
 import GHC.Core.Coercion
@@ -1299,6 +1299,7 @@ data UnfoldingGuidance
       ug_args ::  [Int],  -- Discount if the argument is evaluated.
                           -- (i.e., a simplification will definitely
                           -- be possible).  One elt of the list per *value* arg.
+      ug_fvs :: IdEnv Int,   -- Discount for free variables
 
       ug_size :: Int,     -- The "size" of the unfolding.
 
