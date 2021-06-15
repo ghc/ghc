@@ -584,11 +584,12 @@ instead, we use (case erorr ... of {}). So I'm not sure
 this Note makes much sense any more.
 -}
 
-tryCastWorkerWrapper :: SimplMode -> TopLevelFlag
-                    -> OutId -> OutExpr
-                    -> SimplM (LetFloats, OutId, OutExpr)
+tryCastWorkerWrapper :: SimplEnv -> TopLevelFlag
+                     -> InId -> OccInfo
+                     -> OutId -> OutExpr
+                     -> SimplM (SimplFloats, SimplEnv)
 -- See Note [Cast worker/wrapper]
-tryCastWorkerWrapper mode top_lvl bndr (Cast rhs co)
+tryCastWorkerWrapper env top_lvl old_bndr occ_info bndr (Cast rhs co)
   | not (isJoinId bndr) -- Not for join points
   , not (isDFunId bndr) -- nor DFuns; cast w/w is no help, and we can't transform
                         --            a DFunUnfolding in mk_worker_unfolding
@@ -603,16 +604,29 @@ tryCastWorkerWrapper mode top_lvl bndr (Cast rhs co)
 
        ; work_unf <- mk_worker_unfolding work_id work_rhs
        ; let  work_id_w_unf = work_id `setIdUnfolding` work_unf
-              floats   = rhs_floats `addLetFlts` unitLetFloat (NonRec work_id_w_unf work_rhs)
+              floats   = emptyFloats env
+                         `addLetFloats` rhs_floats
+                         `addLetFloats` unitLetFloat (NonRec work_id_w_unf work_rhs)
+
               triv_rhs = Cast (Var work_id_w_unf) co
 
-       ; wrap_unf <- mkLetUnfolding (sm_uf_opts mode) top_lvl InlineRhs bndr triv_rhs
-       ; let bndr' = bndr `setInlinePragma` mkCastWrapperInlinePrag (idInlinePragma bndr)
-                          `setIdUnfolding`  wrap_unf
+       ; if postInlineUnconditionally env top_lvl bndr occ_info triv_rhs
+            -- Almost always True, because the RHS is trivial
+            -- In that case we want to eliminate the binding fast
+            -- We conservatively use postInlineUnconditionally so that we
+            -- check all the right things
+         then do { tick (PostInlineUnconditionally bndr)
+                 ; return ( floats
+                          , extendIdSubst (setInScopeFromF env floats) old_bndr $
+                            DoneEx triv_rhs Nothing ) }
 
-       ; return (floats, bndr', triv_rhs) }
-
+         else do { wrap_unf <- mkLetUnfolding (sm_uf_opts mode) top_lvl InlineRhs bndr triv_rhs
+                 ; let bndr' = bndr `setInlinePragma` mkCastWrapperInlinePrag (idInlinePragma bndr)
+                               `setIdUnfolding`  wrap_unf
+                       floats' = floats `extendFloats` NonRec bndr' triv_rhs
+                 ; return ( floats', setInScopeFromF env floats' ) } }
   where
+    mode   = getMode env
     occ_fs = getOccFS bndr
     rhs_ty = coercionLKind co
     info   = idInfo bndr
@@ -638,8 +652,8 @@ tryCastWorkerWrapper mode top_lvl bndr (Cast rhs co)
              | isStableSource src -> return (unf { uf_tmpl = mkCast unf_rhs (mkSymCo co) })
            _ -> mkLetUnfolding (sm_uf_opts mode) top_lvl InlineRhs work_id work_rhs
 
-tryCastWorkerWrapper _ _  bndr rhs  -- All other bindings
-  = return (emptyLetFloats, bndr, rhs)
+tryCastWorkerWrapper env _ _ _ bndr rhs  -- All other bindings
+  = return (mkFloatBind env (NonRec bndr rhs))
 
 mkCastWrapperInlinePrag :: InlinePragma -> InlinePragma
 -- See Note [Cast worker/wrapper]
@@ -901,12 +915,7 @@ completeBind env top_lvl mb_cont old_bndr new_bndr new_rhs
 
         else -- Keep the binding; do cast worker/wrapper
              -- pprTrace "Binding" (ppr final_bndr <+> ppr new_unfolding) $
-             do { (cast_floats, final_bndr, final_rhs)
-                      <- tryCastWorkerWrapper mode top_lvl new_bndr_w_info eta_rhs
-
-                ; let floats = emptyFloats env `addLetFloats` cast_floats
-                                               `extendFloats` NonRec final_bndr final_rhs
-                ; return (floats, setInScopeFromF env floats) } }
+             tryCastWorkerWrapper env top_lvl old_bndr occ_info new_bndr_w_info eta_rhs }
 
 addLetBndrInfo :: OutId -> ArityType -> Unfolding -> OutId
 addLetBndrInfo new_bndr new_arity_type new_unf
