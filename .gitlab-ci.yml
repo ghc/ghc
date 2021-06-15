@@ -378,7 +378,6 @@ validate-x86_64-darwin:
       time nix-shell .gitlab/shell.nix \
         -I nixpkgs=https://github.com/angerman/nixpkgs/archive/75f7281738b.tar.gz \
         --argstr system "x86_64-darwin" \
-        --pure \
         --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR \
         --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --keep PROJECT_DIR \
         --keep CI_PROJECT_DIR --keep MAKE_ARGS --keep HADRIAN_ARGS --keep CABAL_CACHE \
@@ -474,7 +473,6 @@ validate-aarch64-darwin:
       time nix-shell .gitlab/shell.nix \
         -I nixpkgs=https://github.com/angerman/nixpkgs/archive/75f7281738b.tar.gz \
         --argstr system "aarch64-darwin" \
-        --pure \
         --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR \
         --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --keep PROJECT_DIR \
         --keep CI_PROJECT_DIR --keep MAKE_ARGS --keep HADRIAN_ARGS --keep CABAL_CACHE  \
