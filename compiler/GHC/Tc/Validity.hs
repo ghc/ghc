@@ -2086,7 +2086,7 @@ checkValidCoAxiom ax@(CoAxiom { co_ax_tc = fam_tc, co_ax_branches = branches })
       | cur_branch `isDominatedBy` prev_branches
       = do { let dia = TcRnUnknownMessage $
                    mkPlainDiagnostic WarningWithoutFlag noHints (inaccessibleCoAxBranch fam_tc cur_branch)
-           ; addDiagnosticAt (coAxBranchSpan cur_branch) (TcRnMessageDetailed noErrInfo dia)
+           ; addDiagnosticAt (coAxBranchSpan cur_branch) dia
            ; return prev_branches }
       | otherwise
       = do { check_injectivity prev_branches cur_branch

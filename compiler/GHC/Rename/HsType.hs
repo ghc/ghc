@@ -1664,7 +1664,7 @@ warnUnusedForAll doc (L loc tv) used_names
             mkPlainDiagnostic (WarningWithFlag Opt_WarnUnusedForalls) noHints $
               vcat [ text "Unused quantified type variable" <+> quotes (ppr tv)
                    , inHsDocContext doc ]
-      addDiagnosticAt (locA loc) (TcRnMessageDetailed noErrInfo msg)
+      addDiagnosticAt (locA loc) msg
 
 opTyErr :: Outputable a => RdrName -> a -> SDoc
 opTyErr op overall_ty

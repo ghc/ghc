@@ -557,7 +557,7 @@ checkCanonicalInstances cls poly_ty mbinds = do
                      , text "See also:" <+>
                        text refURL
                      ]
-        addDiagnostic (TcRnMessageDetailed noErrInfo dia)
+        addDiagnostic dia
 
     -- expected "lhs = rhs" but got something else
     addWarnNonCanonicalMethod2 refURL flag lhs rhs = do
@@ -577,7 +577,7 @@ checkCanonicalInstances cls poly_ty mbinds = do
                      , text "See also:" <+>
                        text refURL
                      ]
-        addDiagnostic (TcRnMessageDetailed noErrInfo dia)
+        addDiagnostic dia
 
     -- stolen from GHC.Tc.TyCl.Instance
     instDeclCtxt1 :: LHsSigType GhcRn -> SDoc
@@ -1984,7 +1984,7 @@ warnNoDerivStrat mds loc
                        then no_strat_warning
                        else no_strat_warning $+$ deriv_strat_nenabled
                      )
-             in addDiagnosticAt loc (TcRnMessageDetailed noErrInfo dia)
+             in addDiagnosticAt loc dia
            _ -> pure ()
        }
   where
