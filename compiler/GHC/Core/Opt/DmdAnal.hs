@@ -43,7 +43,8 @@ import GHC.Builtin.PrimOps
 import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
 import GHC.Types.Unique.Set
 
--- import GHC.Driver.Ppr
+import GHC.Utils.Trace
+_ = pprTrace -- Tired of commenting out the import all the time
 
 {-
 ************************************************************************
@@ -340,11 +341,12 @@ dmdAnalStar :: AnalEnv
             -> Demand   -- This one takes a *Demand*
             -> CoreExpr -- Should obey the let/app invariant
             -> (PlusDmdArg, CoreExpr)
-dmdAnalStar env (n :* cd) e
-  | WithDmdType dmd_ty e'    <- dmdAnal env cd e
+dmdAnalStar env (n :* sd) e
+  -- NB: (:*) expands AbsDmd and BotDmd as needed
+  -- See Note [Analysing with absent demand]
+  | WithDmdType dmd_ty e' <- dmdAnal env sd e
   = assertPpr (not (isUnliftedType (exprType e)) || exprOkForSpeculation e) (ppr e)
     -- The argument 'e' should satisfy the let/app invariant
-    -- See Note [Analysing with absent demand] in GHC.Types.Demand
     (toPlusDmdArg $ multDmdType n dmd_ty, e')
 
 -- Main Demand Analsysis machinery
@@ -427,7 +429,7 @@ dmdAnal' env dmd (Case scrut case_bndr ty [Alt alt bndrs rhs])
         WithDmdType alt_ty2 case_bndr_dmd = findBndrDmd env alt_ty1 case_bndr
         -- Evaluation cardinality on the case binder is irrelevant and a no-op.
         -- What matters is its nested sub-demand!
-        (_ :* case_bndr_sd)      = case_bndr_dmd
+        (_ :* case_bndr_sd) = case_bndr_dmd
         -- Compute demand on the scrutinee
         -- FORCE the result, otherwise thunks will end up retaining the
         -- whole DmdEnv
@@ -548,7 +550,7 @@ dmdAnalSumAlt env dmd case_bndr (Alt con bndrs rhs)
   , WithDmdType alt_ty dmds <- findBndrsDmds env rhs_ty bndrs
   , let (_ :* case_bndr_sd) = findIdDemand alt_ty case_bndr
         -- See Note [Demand on scrutinee of a product case]
-        id_dmds             = addCaseBndrDmd case_bndr_sd dmds
+        id_dmds              = addCaseBndrDmd case_bndr_sd dmds
         -- Do not put a thunk into the Alt
         !new_ids  = setBndrsDemandInfo bndrs id_dmds
   = WithDmdType alt_ty (Alt con new_ids rhs')
@@ -557,7 +559,7 @@ dmdAnalSumAlt env dmd case_bndr (Alt con bndrs rhs)
 Note [Analysing with absent demand]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we analyse an expression with demand A.  The "A" means
-"absent", so this expression will never be needed.  What should happen?
+"absent", so this expression will never be needed. What should happen?
 There are several wrinkles:
 
 * We *do* want to analyse the expression regardless.
@@ -565,6 +567,15 @@ There are several wrinkles:
 
   But we can post-process the results to ignore all the usage
   demands coming back. This is done by multDmdType.
+
+* Nevertheless, which sub-demand should we pick for analysis?
+  Since the demand was absent, any would do. Worker/wrapper will replace
+  absent bindings with an absent filler anyway, so annotations in the RHS
+  of an absent binding don't matter much.
+  Picking 'botSubDmd' would be the most useful, but would also look a bit
+  misleading in the Core output of DmdAnal, because all nested annotations would
+  be bottoming. Better pick 'seqSubDmd', so that we annotate many of those
+  nested bindings with A themselves.
 
 * In a previous incarnation of GHC we needed to be extra careful in the
   case of an *unlifted type*, because unlifted values are evaluated
