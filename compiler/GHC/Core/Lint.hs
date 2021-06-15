@@ -1717,8 +1717,8 @@ lintTySynFamApp report_unsat ty tc tys
   = failWithL (hang (text "Un-saturated type application") 2 (ppr ty))
 
   -- Deal with type synonyms
-  | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc tys
-  , let expanded_ty = mkAppTys (substTy (mkTvSubstPrs tenv) rhs) tys'
+  | Just (tvs, tv_tys, rhs, tys') <- expandSynTyCon_maybe tc tys
+  , let expanded_ty = mkAppTys (substTy (mkTvSubstPrs (tvs `zip` tv_tys)) rhs) tys'
   = do { -- Kind-check the argument types, but without reporting
          -- un-saturated type families/synonyms
          tys' <- setReportUnsat False (mapM lintType tys)
@@ -2713,7 +2713,7 @@ initL dflags flags vars m
     (tcvs, ids) = partition isTyCoVar vars
     env = LE { le_flags = flags
              , le_subst = mkEmptyTCvSubst (mkInScopeSet (mkVarSet tcvs))
-             , le_ids   = mkVarEnv [(id, (id,idType id)) | id <- ids]
+             , le_ids   = zipEqualVarEnv ids (map (\i -> (i, idType i)) ids)
              , le_joins = emptyVarSet
              , le_loc = []
              , le_dynflags = dflags

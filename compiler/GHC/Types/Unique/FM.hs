@@ -35,6 +35,7 @@ module GHC.Types.Unique.FM (
         emptyUFM,
         unitUFM,
         unitDirectlyUFM,
+        zipEqualToUFM,
         zipToUFM,
         listToUFM,
         listToUFM_Directly,
@@ -83,6 +84,7 @@ import GHC.Prelude
 import GHC.Types.Unique ( Uniquable(..), Unique, getKey )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic.Plain
+import GHC.Utils.Misc (HasDebugCallStack)
 import qualified Data.IntMap as M
 import qualified Data.IntMap.Strict as MS
 import qualified Data.IntSet as S
@@ -125,8 +127,11 @@ unitDirectlyUFM u v = UFM (M.singleton (getKey u) v)
 -- compiler allocation by more than 10% (in T12545, see !3935)
 -- Note that listToUFM (zip ks vs) performs similarly, but
 -- the explicit recursion avoids relying too much on fusion.
+zipEqualToUFM :: (HasDebugCallStack, Uniquable key) => [key] -> [elt] -> UniqFM key elt
+zipEqualToUFM ks vs = assert (length ks == length vs ) $ zipToUFM ks vs
+
 zipToUFM :: Uniquable key => [key] -> [elt] -> UniqFM key elt
-zipToUFM ks vs = assert (length ks == length vs ) innerZip emptyUFM ks vs
+zipToUFM ks vs = innerZip emptyUFM ks vs
   where
     innerZip ufm (k:kList) (v:vList) = innerZip (addToUFM ufm k v) kList vList
     innerZip ufm _ _ = ufm

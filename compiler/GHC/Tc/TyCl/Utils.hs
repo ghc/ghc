@@ -731,7 +731,7 @@ setRoleInferenceVars :: [TyVar] -> RoleM a -> RoleM a
 setRoleInferenceVars tvs thing
   = RM $ \m_name _vps _nvps state ->
     assert (isJust m_name) $
-    unRM thing m_name (mkVarEnv (zip tvs [0..])) (panic "setRoleInferenceVars")
+    unRM thing m_name (zipVarEnv tvs [0..]) (panic "setRoleInferenceVars")
          state
 
 getRoleEnv :: RoleM RoleEnv
