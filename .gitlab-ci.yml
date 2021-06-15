@@ -109,111 +109,6 @@ workflow:
 # tool linting
 ############################################################
 
-ghc-linters:
-  stage: tool-lint
-  image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
-  script:
-    - git fetch "$CI_MERGE_REQUEST_PROJECT_URL" $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
-    - base="$(git merge-base FETCH_HEAD $CI_COMMIT_SHA)"
-    - "echo Linting changes between $base..$CI_COMMIT_SHA"
-    #    - validate-commit-msg .git $(git rev-list $base..$CI_COMMIT_SHA)
-    - validate-whitespace .git $(git rev-list $base..$CI_COMMIT_SHA)
-    - .gitlab/linters/check-makefiles.py commits $base $CI_COMMIT_SHA
-    - .gitlab/linters/check-cpp.py commits $base $CI_COMMIT_SHA
-    - .gitlab/linters/check-version-number.sh
-    - python3 utils/checkUniques/check-uniques.py .
-  dependencies: []
-  tags:
-    - lint
-  rules:
-    - if: $CI_MERGE_REQUEST_ID
-
-# Run mypy Python typechecker on linter scripts.
-lint-linters:
-  stage: tool-lint
-  image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
-  script:
-    - mypy .gitlab/linters/*.py
-  dependencies: []
-  tags:
-    - lint
-
-# Check that .T files all parse by listing broken tests.
-lint-testsuite:
-  stage: tool-lint
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
-  script:
-    - make -Ctestsuite list_broken TEST_HC=$GHC
-  dependencies: []
-  tags:
-    - lint
-
-# Run mypy Python typechecker on testsuite driver
-typecheck-testsuite:
-  stage: tool-lint
-  image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
-  script:
-    - mypy testsuite/driver/runtests.py
-  dependencies: []
-  tags:
-    - lint
-
-# We allow the submodule checker to fail when run on merge requests (to
-# accommodate, e.g., haddock changes not yet upstream) but not on `master` or
-# Marge jobs.
-.lint-submods:
-  stage: tool-lint
-  image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
-  script:
-    - git fetch "$CI_MERGE_REQUEST_PROJECT_URL" $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
-    - base="$(git merge-base FETCH_HEAD $CI_COMMIT_SHA)"
-    - "echo Linting submodule changes between $base..$CI_COMMIT_SHA"
-    - git submodule foreach git remote update
-    - submodchecker . $(git rev-list $base..$CI_COMMIT_SHA)
-  dependencies: []
-  tags:
-    - lint
-
-lint-submods:
-  extends: .lint-submods
-  # Allow failure on merge requests since any necessary submodule patches may
-  # not be upstreamed yet.
-  rules:
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/'
-      allow_failure: false
-    - allow_failure: true
-
-lint-submods-branch:
-  extends: .lint-submods
-  script:
-    - "echo Linting submodule changes between $CI_COMMIT_BEFORE_SHA..$CI_COMMIT_SHA"
-    - git submodule foreach git remote update
-    - submodchecker . $(git rev-list $CI_COMMIT_BEFORE_SHA..$CI_COMMIT_SHA)
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "master"'
-    - if: '$CI_COMMIT_BRANCH =~ /ghc-[0.9]+\.[0-9]+/'
-
-.lint-changelogs:
-  stage: tool-lint
-  image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
-  dependencies: []
-  tags:
-    - lint
-  script:
-    - bash .gitlab/linters/check-changelogs.sh
-
-lint-changelogs:
-  extends: .lint-changelogs
-  # Allow failure since this isn't a final release.
-  allow_failure: true
-  rules:
-    - if: '$CI_COMMIT_BRANCH =~ /ghc-[0.9]+\.[0-9]+/'
-
-lint-release-changelogs:
-  extends: .lint-changelogs
-  rules:
-    - if: '$CI_COMMIT_BRANCH =~ /ghc-[0.9]+\.[0-9]+/'
-
 ############################################################
 # Validation via Pipelines (hadrian)
 ############################################################
@@ -259,16 +154,6 @@ lint-release-changelogs:
   tags:
     - x86_64-linux
 
-# Verify that Hadrian builds with stack. Note that we don't actually perform a
-# build of GHC itself; we merely test that the Hadrian executable builds and
-# works (by invoking `hadrian --version`).
-stack-hadrian-build:
-  extends: .validate-linux-hadrian
-  stage: quick-build
-  script:
-    - .gitlab/ci.sh setup
-    - .gitlab/ci.sh configure
-    - hadrian/build-stack --version
 
 validate-x86_64-linux-deb9-hadrian:
   extends: .validate-linux-hadrian
@@ -305,71 +190,11 @@ nightly-x86_64-linux-deb10-hadrian-cross-aarch64:
 # GHC-in-GHCi (Hadrian)
 ############################################################
 
-hadrian-ghc-in-ghci:
-  stage: quick-build
-  needs: [lint-linters, lint-submods]
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
-  before_script:
-    # workaround for docker permissions
-    - sudo chown ghc:ghc -R .
-    - git submodule sync --recursive
-    - git submodule update --init --recursive
-    - git checkout .gitmodules
-  variables:
-    GHC_FLAGS: -Werror
-  tags:
-    - x86_64-linux
-  script:
-    - git clean -xdf && git submodule foreach git clean -xdf
-    - .gitlab/ci.sh setup
-    - "cabal update --index=$HACKAGE_INDEX_STATE"
-    - .gitlab/ci.sh configure
-    # Load ghc-in-ghci then immediately exit and check the modules loaded
-    - echo ":q" | hadrian/ghci -j`mk/detect-cpu-count.sh`| tail -n2 | grep "Ok,"
-  after_script:
-    - cp -Rf $HOME/.cabal cabal-cache
-  cache:
-    key: hadrian-ghci
-    paths:
-      - cabal-cache
 
 ############################################################
 # GHC source code linting
 ############################################################
 
-.lint-params:
-  stage: quick-build
-  needs: [lint-submods]
-  tags:
-    - lint
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
-  before_script:
-    - export PATH="/opt/toolchain/bin:$PATH"
-    # workaround for docker permissions
-    - sudo chown ghc:ghc -R .
-    - git submodule sync --recursive
-    - git submodule update --init --recursive
-    - git checkout .gitmodules
-    - .gitlab/ci.sh setup
-    - "cabal update --index=$HACKAGE_INDEX_STATE"
-  after_script:
-    - cp -Rf $HOME/.cabal cabal-cache
-  variables:
-    GHC_FLAGS: -Werror
-  cache:
-    key: lint
-    paths:
-      - cabal-cache
-
-lint-libs:
-  extends: .lint-params
-  variables:
-    BUILD_FLAVOUR: default
-  script:
-    - .gitlab/ci.sh setup
-    - .gitlab/ci.sh configure
-    - .gitlab/ci.sh run_hadrian lint:base
-    - .gitlab/ci.sh run_hadrian lint:compiler
 
 ############################################################
 # Validation via Pipelines (make)
