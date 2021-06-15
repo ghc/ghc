@@ -6,7 +6,7 @@ T5236.hs:16:1: warning: [-Winaccessible-code (in -Wdefault)]
           arising from the type signature for:
                          loop :: Id A B => Bool
         instance ‘Id B B’ at T5236.hs:11:10-15
-    Unsatisfiable constraint Id A B in
+    Unsatisfiable constraint Id A B assumed by
       the type signature for:
         loop :: Id A B => Bool
-    This may result in inaccessible code.
+    This will result in inaccessible code.

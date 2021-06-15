@@ -8,6 +8,5 @@ overloadedlistsfail02.hs:6:8: error:
 overloadedlistsfail02.hs:6:9: error:
     • No instance for (Num (GHC.Exts.Item Foo))
         arising from the literal ‘7’
-    • In the expression: 7
-      In the expression: [7]
+    • In the expression: [7]
       In an equation for ‘test’: test = [7]
