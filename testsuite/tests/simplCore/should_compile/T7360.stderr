@@ -13,11 +13,13 @@ T7360.$WFoo3 [InlPrag=INLINE[final] CONLIKE] :: Int %1 -> Foo
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (dt [Occ=Once1!] :: Int) ->
-                 case dt of { GHC.Types.I# dt [Occ=Once1] -> T7360.Foo3 dt }}]
+         Tmpl= \ (conrep [Occ=Once1!] :: Int) ->
+                 case conrep of { GHC.Types.I# unbx [Occ=Once1] ->
+                 T7360.Foo3 unbx
+                 }}]
 T7360.$WFoo3
-  = \ (dt [Occ=Once1!] :: Int) ->
-      case dt of { GHC.Types.I# dt [Occ=Once1] -> T7360.Foo3 dt }
+  = \ (conrep [Occ=Once1!] :: Int) ->
+      case conrep of { GHC.Types.I# unbx [Occ=Once1] -> T7360.Foo3 unbx }
 
 -- RHS size: {terms: 5, types: 2, coercions: 0, joins: 0/0}
 fun1 [InlPrag=NOINLINE] :: Foo -> ()
