@@ -796,7 +796,7 @@ mkGivenWarningReporter ctxt cts
                    givens = ic_given implic
                    inaccessible_msg = vcat
                       [ hang (text "Unsatisfiable constraint" <> plural givens
-                              <+> pprEvVarTheta givens <+> text "in")
+                              <+> pprEvVarTheta givens <+> text "assumed by")
                              2 (ppr (ic_info implic))
                       , text "This will result in inaccessible code." ]
                    report = important inaccessible_msg `mappend`
