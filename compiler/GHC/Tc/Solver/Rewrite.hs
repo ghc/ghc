@@ -949,25 +949,19 @@ runTcPluginRewriters rewriteEnv rewriterFunctions tys
   = do { givens <- getInertGivens
        ; runRewriters givens rewriterFunctions }
   where
-  -- rewriting plugins should not use the evBindsVar
-  fakeEvBindsVar :: EvBindsVar
-  fakeEvBindsVar
-    = throwGhcException $
-      ProgramError "error: evBindsVar used in tcPluginRewrite"
   runRewriters :: [Ct] -> [TcPluginRewriter] -> TcS (Maybe Reduction)
   runRewriters _ []
     = return Nothing
   runRewriters givens (rewriter:rewriters)
-    = do { rewriteResult <- wrapTcS . ( `runTcPluginM` fakeEvBindsVar ) $
+    = do { rewriteResult <- wrapTcS . runTcPluginM $
                             rewriter rewriteEnv givens tys
          ; case rewriteResult of
             { TcPluginRewriteTo
-                { tcPluginRewriteTo = res
-                , tcPluginRewriteEvidence = co
+                { tcPluginReduction = redn
                 , tcRewriterWanteds = wanteds
                 } ->
               do { emitWork wanteds
-                 ; return $ Just (Reduction res co) }
+                 ; return $ Just redn }
             ; TcPluginNoRewrite { tcRewriterWanteds = wanteds } ->
               do { emitWork wanteds
                  ; runRewriters givens rewriters }}}
