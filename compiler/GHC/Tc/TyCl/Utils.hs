@@ -49,6 +49,7 @@ import GHC.Core.TyCon
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.TyCon.Set
+import GHC.Core.TyCo.Subst
 import GHC.Core.Coercion ( ltRole )
 
 import GHC.Utils.Outputable
@@ -957,7 +958,8 @@ mkOneRecordSelector all_cons idDetails fl has_sel
 
     (univ_tvs, _, eq_spec, _, req_theta, _, data_ty) = conLikeFullSig con1
 
-    eq_subst = mkTvSubstPrs (map eqSpecPair eq_spec)
+    eq_subst = mkTvSubstPrs2 (map eqSpecTyVar eq_spec)
+                             (map eqSpecType  eq_spec)
     -- inst_tys corresponds to one of the following:
     --
     -- * The arguments to the user-written return type (for GADT constructors).

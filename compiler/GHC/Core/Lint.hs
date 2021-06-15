@@ -1721,7 +1721,7 @@ lintTySynFamApp report_unsat ty tc tys
 
   -- Deal with type synonyms
   | Just (tvs, tv_tys, rhs, tys') <- expandSynTyCon_maybe tc tys
-  , let expanded_ty = mkAppTys (substTy (mkTvSubstPrs (tvs `zip` tv_tys)) rhs) tys'
+  , let expanded_ty = mkAppTys (substTy (mkTvSubstPrs2 tvs tv_tys) rhs) tys'
   = do { -- Kind-check the argument types, but without reporting
          -- un-saturated type families/synonyms
          tys' <- setReportUnsat False (mapM lintType tys)
