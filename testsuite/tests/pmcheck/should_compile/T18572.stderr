@@ -1,10 +1,10 @@
 
 T18572.hs:12:1: warning: [-Winaccessible-code (in -Wdefault)]
     • Couldn't match type ‘'False’ with ‘'True’
-      Unsatisfiable constraint 'False ~ 'True in
+      Unsatisfiable constraint 'False ~ 'True assumed by
         a pattern with constructor: STrue :: SBool 'True,
         in a pattern binding
-      This may result in inaccessible code.
+      This will result in inaccessible code.
     • In the pattern: STrue
       In a pattern binding: STrue = SFalse
 

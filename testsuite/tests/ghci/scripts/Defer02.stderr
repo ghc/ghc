@@ -18,10 +18,10 @@ Defer01.hs:25:1: warning: [-Woverlapping-patterns (in -Wdefault)]
 
 Defer01.hs:25:4: warning: [-Winaccessible-code (in -Wdefault)]
     • Couldn't match type ‘Int’ with ‘Bool’
-      Unsatisfiable constraint Int ~ Bool in
+      Unsatisfiable constraint Int ~ Bool assumed by
         a pattern with constructor: C2 :: Bool -> C Bool,
         in an equation for ‘c’
-      This may result in inaccessible code.
+      This will result in inaccessible code.
     • In the pattern: C2 x
       In an equation for ‘c’: c (C2 x) = True
 
@@ -57,10 +57,10 @@ Defer01.hs:39:17: warning: [-Wdeferred-type-errors (in -Wdefault)]
 
 Defer01.hs:46:1: warning: [-Winaccessible-code (in -Wdefault)]
     Couldn't match type ‘Int’ with ‘Bool’
-    Unsatisfiable constraint Int ~ Bool in
+    Unsatisfiable constraint Int ~ Bool assumed by
       the type signature for:
         k :: (Int ~ Bool) => Int -> Bool
-    This may result in inaccessible code.
+    This will result in inaccessible code.
 
 Defer01.hs:47:7: warning: [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match expected type ‘Bool’ with actual type ‘Int’

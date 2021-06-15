@@ -5,7 +5,7 @@ T10715.hs:17:1: warning: [-Winaccessible-code (in -Wdefault)]
       the type signature for:
         doCoerce :: forall a. Coercible a (X a) => a -> X a
       at T10715.hs:17:1-41
-    Unsatisfiable constraint Coercible a (X a) in
+    Unsatisfiable constraint Coercible a (X a) assumed by
       the type signature for:
         doCoerce :: forall a. Coercible a (X a) => a -> X a
-    This may result in inaccessible code.
+    This will result in inaccessible code.
