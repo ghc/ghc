@@ -122,8 +122,7 @@ isInterestingTopLevelFn :: Id -> Bool
 -- If there was a gain, that regression might be acceptable.
 -- Plus, we could use LetUp for thunks and share some code with local let
 -- bindings.
-isInterestingTopLevelFn id =
-  typeArity (idType id) `lengthExceeds` 0
+isInterestingTopLevelFn id = typeArity (idType id) > 0
 
 {- Note [Stamp out space leaks in demand analysis]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

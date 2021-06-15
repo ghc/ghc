@@ -11,14 +11,15 @@
 
 -- | Arity and eta expansion
 module GHC.Core.Opt.Arity
-   ( manifestArity, joinRhsArity, exprArity, typeArity
+   ( manifestArity, joinRhsArity, exprArity
+   , typeArity, typeOneShots
    , exprEtaExpandArity, findRhsArity
    , etaExpand, etaExpandAT
    , exprBotStrictness_maybe
 
    -- ** ArityType
    , ArityType(..), mkBotArityType, mkTopArityType, expandableArityType
-   , arityTypeArity, maxWithArity, idArityType
+   , arityTypeArity, maxWithArity, minWithArity, idArityType
 
    -- ** Join points
    , etaExpandToJoinPoint, etaExpandToJoinPointRule
@@ -120,14 +121,17 @@ joinRhsArity _         = 0
 ---------------
 exprArity :: CoreExpr -> Arity
 -- ^ An approximate, fast, version of 'exprEtaExpandArity'
+-- We do /not/ guarantee that exprArity e <= typeArity e
+-- You may need to do arity trimming after calling exprArity
+-- See Note [Arity trimming]
+-- (If we do arity trimming here we have to do it at every cast.
 exprArity e = go e
   where
     go (Var v)                     = idArity v
     go (Lam x e) | isId x          = go e + 1
                  | otherwise       = go e
     go (Tick t e) | not (tickishIsCode t) = go e
-    go (Cast e co)                 = trim_arity (go e) (coercionRKind co)
-                                        -- Note [exprArity invariant]
+    go (Cast e _)                  = go e
     go (App e (Type _))            = go e
     go (App f a) | exprIsTrivial a = (go f - 1) `max` 0
         -- See Note [exprArity for applications]
@@ -135,15 +139,15 @@ exprArity e = go e
 
     go _                           = 0
 
-    trim_arity :: Arity -> Type -> Arity
-    trim_arity arity ty = arity `min` length (typeArity ty)
-
 ---------------
-typeArity :: Type -> [OneShotInfo]
+typeArity :: Type -> Arity
+typeArity = length . typeOneShots
+
+typeOneShots :: Type -> [OneShotInfo]
 -- How many value arrows are visible in the type?
 -- We look through foralls, and newtypes
--- See Note [exprArity invariant]
-typeArity ty
+-- See Note [typeArity invariants]
+typeOneShots ty
   = go initRecTc ty
   where
     go rec_nts ty
@@ -184,33 +188,64 @@ exprBotStrictness_maybe e
     sig ar = mkClosedDmdSig (replicate ar topDmd) botDiv
 
 {-
-Note [exprArity invariant]
+Note [typeArity invariants]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-exprArity has the following invariants:
+We have the following invariants around typeArity
 
-  (1) If typeArity (exprType e) = n,
+  (1) In any binding x = e,
+      idArity f <= typeArity (idType f)
+
+  (2) If typeArity (exprType e) = n,
       then manifestArity (etaExpand e n) = n
 
       That is, etaExpand can always expand as much as typeArity says
       So the case analysis in etaExpand and in typeArity must match
 
-  (2) exprArity e <= typeArity (exprType e)
-
-  (3) Hence if (exprArity e) = n, then manifestArity (etaExpand e n) = n
-
-      That is, if exprArity says "the arity is n" then etaExpand really
-      can get "n" manifest lambdas to the top.
-
 Why is this important?  Because
+
   - In GHC.Iface.Tidy we use exprArity to fix the *final arity* of
     each top-level Id, and in
+
   - In CorePrep we use etaExpand on each rhs, so that the visible lambdas
     actually match that arity, which in turn means
     that the StgRhs has the right number of lambdas
 
-An alternative would be to do the eta-expansion in GHC.Iface.Tidy, at least
-for top-level bindings, in which case we would not need the trim_arity
-in exprArity.  That is a less local change, so I'm going to leave it for today!
+Suppose we have
+   f :: Int -> Int -> Int
+   f x y = x+y    -- Arity 2
+
+   g :: F Int
+   g = case x of { True  -> f |> co1
+                 ; False -> g |> co2 }
+
+Now, we can't eta-expand g to have arity 2, because etaExpand, which works
+off the /type/ of the expression, doesn't know how to make an eta-expanded
+binding
+   g = (\a b. case x of ...) |> co
+because can't make up `co` or the types of `a` and `b`.
+
+So invariant (1) ensures that every binding has an arity that is no greater
+than the typeArity of the RHS; and invariant (2) ensures that etaExpand
+and handle what typeArity says.
+
+Note [Arity trimming]
+~~~~~~~~~~~~~~~~~~~~~
+Arity trimming, implemented by minWithArity, directly implements
+invariant (1) of Note [typeArity invariants]. Failing to do so, and
+hence breaking invariant (1) led to #5441.
+
+How to trim?  If we end in topDiv, it's easy.  But we must take great care with
+dead ends (i.e. botDiv). Suppose the expression was (\x y. error "urk"),
+we'll get \??.⊥.  We absolutely must not trim that to \?.⊥, because that
+claims that ((\x y. error "urk") |> co) diverges when given one argument,
+which it absolutely does not. And Bad Things happen if we think something
+returns bottom when it doesn't (#16066).
+
+So, if we need to trim a dead-ending arity type, switch (conservatively) to
+topDiv.
+
+Historical note: long ago, we unconditionally switched to topDiv when we
+encountered a cast, but that is far too conservative: see #5475
 
 Note [Newtype classes and eta expansion]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -599,6 +634,9 @@ expandableArityType at = arityTypeArity at > 0
 isDeadEndArityType :: ArityType -> Bool
 isDeadEndArityType (AT _ div) = isDeadEndDiv div
 
+-----------------------
+infixl 2 `maxWithArity`, `minWithArity`
+
 -- | Expand a non-bottoming arity type so that it has at least the given arity.
 maxWithArity :: ArityType -> Arity -> ArityType
 maxWithArity at@(AT oss div) !ar
@@ -608,12 +646,13 @@ maxWithArity at@(AT oss div) !ar
 
 -- | Trim an arity type so that it has at most the given arity.
 -- Any excess 'OneShotInfo's are truncated to 'topDiv', even if they end in
--- 'ABot'.
+-- 'ABot'.  See Note [Arity trimming]
 minWithArity :: ArityType -> Arity -> ArityType
 minWithArity at@(AT oss _) ar
   | oss `lengthAtMost` ar = at
   | otherwise             = AT (take ar oss) topDiv
 
+----------------------
 takeWhileOneShot :: ArityType -> ArityType
 takeWhileOneShot (AT oss div)
   | isDeadEndDiv div = AT (takeWhile isOneShotInfo oss) topDiv
@@ -624,7 +663,8 @@ takeWhileOneShot (AT oss div)
 exprEtaExpandArity :: DynFlags -> CoreExpr -> ArityType
 -- exprEtaExpandArity is used when eta expanding
 --      e  ==>  \xy -> e x y
-exprEtaExpandArity dflags e = arityType (etaExpandArityEnv dflags) e
+exprEtaExpandArity dflags e
+  = arityType (etaExpandArityEnv dflags) e
 
 getBotArity :: ArityType -> Maybe Arity
 -- Arity of a divergent function
@@ -662,7 +702,9 @@ findRhsArity dflags bndr rhs old_arity
         next_at = step cur_at
 
     step :: ArityType -> ArityType
-    step at = -- pprTrace "step" (ppr bndr <+> ppr at <+> ppr (arityType env rhs)) $
+    step at = -- pprTrace "step" (vcat [ ppr bndr <+> ppr at <+> ppr (arityType env rhs)
+              --                      , ppr (idType bndr)
+              --                      , ppr (typeArity (idType bndr)) ]) $
               arityType env rhs
       where
         env = extendSigEnv (findRhsArityEnv dflags) bndr at
@@ -1007,15 +1049,6 @@ myIsCheapApp sigs fn n_val_args = case lookupVarEnv sigs fn of
 ----------------
 arityType :: ArityEnv -> CoreExpr -> ArityType
 
-arityType env (Cast e co)
-  = minWithArity (arityType env e) co_arity -- See Note [Arity trimming]
-  where
-    co_arity = length (typeArity (coercionRKind co))
-    -- See Note [exprArity invariant] (2); must be true of
-    -- arityType too, since that is how we compute the arity
-    -- of variables, and they in turn affect result of exprArity
-    -- #5441 is a nice demo
-
 arityType env (Var v)
   | v `elemVarSet` ae_joins env
   = botArityType  -- See Note [Eta-expansion and join points]
@@ -1023,6 +1056,9 @@ arityType env (Var v)
   = at
   | otherwise
   = idArityType v
+
+arityType env (Cast e _)
+  = arityType env e
 
         -- Lambdas; increase arity
 arityType env (Lam x e)
@@ -1048,14 +1084,17 @@ arityType env (App fun arg )
 arityType env (Case scrut bndr _ alts)
   | exprIsDeadEnd scrut || null alts
   = botArityType    -- Do not eta expand. See Note [Dealing with bottom (1)]
+
   | not (pedanticBottoms env)  -- See Note [Dealing with bottom (2)]
   , myExprIsCheap env scrut (Just (idType bndr))
   = alts_type
+
   | exprOkForSpeculation scrut
   = alts_type
 
   | otherwise                  -- In the remaining cases we may not push
   = takeWhileOneShot alts_type -- evaluation of the scrutinee in
+
   where
     env' = delInScope env bndr
     arity_type_alt (Alt _con bndrs rhs) = arityType (delInScopeList env' bndrs) rhs
@@ -1165,7 +1204,7 @@ idArityType v
   = AT (take (idArity v) one_shots) topDiv
   where
     one_shots :: [OneShotInfo]  -- One-shot-ness derived from the type
-    one_shots = typeArity (idType v)
+    one_shots = typeOneShots (idType v)
 
 {-
 %************************************************************************
@@ -1274,7 +1313,7 @@ Consider
 We'll get an ArityType for foo of \?1.T.
 
 Then we want to eta-expand to
-  foo = \x. (\eta{os}. (case x of ...as before...) eta) |> some_co
+  foo = (\x. \eta{os}. (case x of ...as before...) eta)) |> some_co
 
 That 'eta' binder is fresh, and we really want it to have the
 one-shot flag from the inner \s{os}.  By expanding with the

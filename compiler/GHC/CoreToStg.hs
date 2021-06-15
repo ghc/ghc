@@ -696,16 +696,13 @@ data PreStgRhs = PreStgRhs [Id] StgExpr -- The [Id] is empty for thunks
 -- Convert the RHS of a binding from Core to STG. This is a wrapper around
 -- coreToStgExpr that can handle value lambdas.
 coreToPreStgRhs :: HasDebugCallStack => CoreExpr -> CtsM PreStgRhs
-coreToPreStgRhs (Cast expr _) = coreToPreStgRhs expr
-coreToPreStgRhs expr@(Lam _ _) =
-    let
-        (args, body) = myCollectBinders expr
-        args'        = filterStgBinders args
-    in
-        extendVarEnvCts [ (a, LambdaBound) | a <- args' ] $ do
-          body' <- coreToStgExpr body
-          return (PreStgRhs args' body')
-coreToPreStgRhs expr = PreStgRhs [] <$> coreToStgExpr expr
+coreToPreStgRhs expr
+  = extendVarEnvCts [ (a, LambdaBound) | a <- args' ] $
+    do { body' <- coreToStgExpr body
+       ; return (PreStgRhs args' body') }
+  where
+   (args, body) = myCollectBinders expr
+   args'        = filterStgBinders args
 
 -- Generate a top-level RHS. Any new cost centres generated for CAFs will be
 -- appended to `CollectedCCs` argument.

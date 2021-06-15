@@ -34,9 +34,9 @@ import GHC.Core.Stats   (coreBindsStats, CoreStats(..))
 import GHC.Core.Seq     (seqBinds)
 import GHC.Core.Lint
 import GHC.Core.Rules
-import GHC.Core.Opt.Arity   ( exprArity, exprBotStrictness_maybe )
+import GHC.Core.Opt.Arity   ( exprArity, typeArity, exprBotStrictness_maybe )
 import GHC.Core.InstEnv
-import GHC.Core.Type     ( tidyTopType )
+import GHC.Core.Type     ( Type, tidyTopType )
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.Class
@@ -1244,8 +1244,8 @@ tidyTopPair uf_opts show_unfold rhs_tidy_env name' (bndr, rhs)
     details  = idDetails bndr   -- Preserve the IdDetails
     ty'      = tidyTopType (idType bndr)
     rhs1     = tidyExpr rhs_tidy_env rhs
-    idinfo'  = tidyTopIdInfo uf_opts rhs_tidy_env name' rhs rhs1 (idInfo bndr)
-                             show_unfold
+    idinfo'  = tidyTopIdInfo uf_opts rhs_tidy_env name' ty'
+                             rhs rhs1 (idInfo bndr) show_unfold
 
 -- tidyTopIdInfo creates the final IdInfo for top-level
 -- binders.  The delicate piece:
@@ -1254,27 +1254,27 @@ tidyTopPair uf_opts show_unfold rhs_tidy_env name' (bndr, rhs)
 --      Indeed, CorePrep must eta expand where necessary to make
 --      the manifest arity equal to the claimed arity.
 --
-tidyTopIdInfo :: UnfoldingOpts -> TidyEnv -> Name -> CoreExpr -> CoreExpr
-              -> IdInfo -> Bool -> IdInfo
-tidyTopIdInfo uf_opts rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold
+tidyTopIdInfo :: UnfoldingOpts -> TidyEnv -> Name -> Type
+              -> CoreExpr -> CoreExpr -> IdInfo -> Bool -> IdInfo
+tidyTopIdInfo uf_opts rhs_tidy_env name rhs_ty orig_rhs tidy_rhs idinfo show_unfold
   | not is_external     -- For internal Ids (not externally visible)
   = vanillaIdInfo       -- we only need enough info for code generation
                         -- Arity and strictness info are enough;
                         --      c.f. GHC.Core.Tidy.tidyLetBndr
         `setArityInfo`      arity
-        `setDmdSigInfo` final_sig
-        `setCprSigInfo`        final_cpr
+        `setDmdSigInfo`     final_sig
+        `setCprSigInfo`     final_cpr
         `setUnfoldingInfo`  minimal_unfold_info  -- See note [Preserve evaluatedness]
                                                  -- in GHC.Core.Tidy
 
   | otherwise           -- Externally-visible Ids get the whole lot
   = vanillaIdInfo
-        `setArityInfo`         arity
-        `setDmdSigInfo`    final_sig
-        `setCprSigInfo`           final_cpr
-        `setOccInfo`           robust_occ_info
-        `setInlinePragInfo`    (inlinePragInfo idinfo)
-        `setUnfoldingInfo`     unfold_info
+        `setArityInfo`       arity
+        `setDmdSigInfo`      final_sig
+        `setCprSigInfo`      final_cpr
+        `setOccInfo`         robust_occ_info
+        `setInlinePragInfo`  inlinePragInfo idinfo
+        `setUnfoldingInfo`   unfold_info
                 -- NB: we throw away the Rules
                 -- They have already been extracted by findExternalRules
   where
@@ -1337,4 +1337,112 @@ tidyTopIdInfo uf_opts rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold
     -- did was to let-bind a non-atomic argument and then float
     -- it to the top level. So it seems more robust just to
     -- fix it here.
-    arity = exprArity orig_rhs
+    arity = exprArity orig_rhs `min` typeArity rhs_ty
+            -- orig_rhs: using tidy_rhs would make a black hole, since
+            --           exprArity uses the arities of Ids inside the rhs
+            -- typeArity: see Note [typeArity invariants]
+            --            in GHC.Core.Opt.Arity
+
+{-
+************************************************************************
+*                                                                      *
+                  Old, dead, type-trimming code
+*                                                                      *
+************************************************************************
+
+We used to try to "trim off" the constructors of data types that are
+not exported, to reduce the size of interface files, at least without
+-O.  But that is not always possible: see the old Note [When we can't
+trim types] below for exceptions.
+
+Then (#7445) I realised that the TH problem arises for any data type
+that we have deriving( Data ), because we can invoke
+   Language.Haskell.TH.Quote.dataToExpQ
+to get a TH Exp representation of a value built from that data type.
+You don't even need {-# LANGUAGE TemplateHaskell #-}.
+
+At this point I give up. The pain of trimming constructors just
+doesn't seem worth the gain.  So I've dumped all the code, and am just
+leaving it here at the end of the module in case something like this
+is ever resurrected.
+
+
+Note [When we can't trim types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The basic idea of type trimming is to export algebraic data types
+abstractly (without their data constructors) when compiling without
+-O, unless of course they are explicitly exported by the user.
+
+We always export synonyms, because they can be mentioned in the type
+of an exported Id.  We could do a full dependency analysis starting
+from the explicit exports, but that's quite painful, and not done for
+now.
+
+But there are some times we can't do that, indicated by the 'no_trim_types' flag.
+
+First, Template Haskell.  Consider (#2386) this
+        module M(T, makeOne) where
+          data T = Yay String
+          makeOne = [| Yay "Yep" |]
+Notice that T is exported abstractly, but makeOne effectively exports it too!
+A module that splices in $(makeOne) will then look for a declaration of Yay,
+so it'd better be there.  Hence, brutally but simply, we switch off type
+constructor trimming if TH is enabled in this module.
+
+Second, data kinds.  Consider (#5912)
+     {-# LANGUAGE DataKinds #-}
+     module M() where
+     data UnaryTypeC a = UnaryDataC a
+     type Bug = 'UnaryDataC
+We always export synonyms, so Bug is exposed, and that means that
+UnaryTypeC must be too, even though it's not explicitly exported.  In
+effect, DataKinds means that we'd need to do a full dependency analysis
+to see what data constructors are mentioned.  But we don't do that yet.
+
+In these two cases we just switch off type trimming altogether.
+
+mustExposeTyCon :: Bool         -- Type-trimming flag
+                -> NameSet      -- Exports
+                -> TyCon        -- The tycon
+                -> Bool         -- Can its rep be hidden?
+-- We are compiling without -O, and thus trying to write as little as
+-- possible into the interface file.  But we must expose the details of
+-- any data types whose constructors or fields are exported
+mustExposeTyCon no_trim_types exports tc
+  | no_trim_types               -- See Note [When we can't trim types]
+  = True
+
+  | not (isAlgTyCon tc)         -- Always expose synonyms (otherwise we'd have to
+                                -- figure out whether it was mentioned in the type
+                                -- of any other exported thing)
+  = True
+
+  | isEnumerationTyCon tc       -- For an enumeration, exposing the constructors
+  = True                        -- won't lead to the need for further exposure
+
+  | isFamilyTyCon tc            -- Open type family
+  = True
+
+  -- Below here we just have data/newtype decls or family instances
+
+  | null data_cons              -- Ditto if there are no data constructors
+  = True                        -- (NB: empty data types do not count as enumerations
+                                -- see Note [Enumeration types] in GHC.Core.TyCon
+
+  | any exported_con data_cons  -- Expose rep if any datacon or field is exported
+  = True
+
+  | isNewTyCon tc && isFFITy (snd (newTyConRhs tc))
+  = True   -- Expose the rep for newtypes if the rep is an FFI type.
+           -- For a very annoying reason.  'Foreign import' is meant to
+           -- be able to look through newtypes transparently, but it
+           -- can only do that if it can "see" the newtype representation
+
+  | otherwise
+  = False
+  where
+    data_cons = tyConDataCons tc
+    exported_con con = any (`elemNameSet` exports)
+                           (dataConName con : dataConFieldLabels con)
+-}
+>>>>>>> Do arity trimming at bindings, rather than in exprArity
