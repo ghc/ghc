@@ -29,7 +29,7 @@ module GHC.Core.TyCo.Subst
         unionTCvSubst, zipTyEnv, zipCoEnv,
         zipTvSubst, zipCvSubst,
         zipTCvSubst,
-        mkTvSubstPrs,
+        mkTvSubstPrs, mkTvSubstZipEqual,
 
         substTyWith, substTyWithCoVars, substTysWith, substTysWithCoVars,
         substCoWith,
@@ -437,6 +437,16 @@ mkTvSubstPrs prs =
         onlyTyVarsAndNoCoercionTy =
           and [ isTyVar tv && not (isCoercionTy ty)
               | (tv, ty) <- prs ]
+
+-- | Generates the in-scope set for the 'TCvSubst' from the types in the
+-- incoming environment. No CoVars, please!
+mkTvSubstZipEqual :: HasDebugCallStack => [TyVar] -> [Type] -> TCvSubst
+mkTvSubstZipEqual tvs tys =
+    assertPpr onlyTyVarsAndNoCoercionTy (text "prs" <+> ppr (tvs `zip` tys)) $
+    mkTvSubst in_scope (zipEqualVarEnv tvs tys)
+  where in_scope = mkInScopeSet $ shallowTyCoVarsOfTypes $ tys
+        onlyTyVarsAndNoCoercionTy =
+          all isTyVar tvs && all (not . isCoercionTy) tys
 
 zipTyEnv :: HasDebugCallStack => [TyVar] -> [Type] -> TvSubstEnv
 zipTyEnv tyvars tys

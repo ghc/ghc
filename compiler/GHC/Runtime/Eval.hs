@@ -72,6 +72,7 @@ import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv ( FamInst )
 import GHC.Core.FVs        ( orphNamesOfFamInst )
 import GHC.Core.TyCon
+import GHC.Core.TyCo.Subst
 import GHC.Core.Type       hiding( typeKind )
 import qualified GHC.Core.Type as Type
 
@@ -620,9 +621,11 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv (Just BreakInfo{..}) = do
      -- Similarly, clone the type variables mentioned in the types
      -- we have here, *and* make them all RuntimeUnk tyvars
    newTyVars us tvs
-     = mkTvSubstPrs [ (tv, mkTyVarTy (mkRuntimeUnkTyVar name (tyVarKind tv)))
-                    | (tv, uniq) <- tvs `zip` uniqsFromSupply us
-                    , let name = setNameUnique (tyVarName tv) uniq ]
+     = mkTvSubstZipEqual tvs (map mk_v tvs)
+        where
+          mk_v tv = mkTyVarTy (mkRuntimeUnkTyVar
+                      (setNameUnique (tyVarName tv) (uniqFromSupply us))
+                      (tyVarKind tv))
 
    isPointer id | [rep] <- typePrimRep (idType id)
                 , isGcPtrRep rep                   = True
