@@ -476,7 +476,7 @@ openTempFile :: FilePath   -- ^ Directory in which to create the file
                            -- the created file will be \"fooXXX.ext\" where XXX is some
                            -- random number. Note that this should not contain any path
                            -- separator characters. On Windows, the template prefix may
-                           -- be trunacted to 3 chars, e.g. \"foobar.ext\" will be
+                           -- be truncated to 3 chars, e.g. \"foobar.ext\" will be
                            -- \"fooXXX.ext\".
              -> IO (FilePath, Handle)
 openTempFile tmp_dir template
