@@ -751,7 +751,7 @@ data TcLclEnv           -- Changes as we move inside an expression
   = TcLclEnv {
         tcl_loc        :: RealSrcSpan,     -- Source span
         tcl_ctxt       :: [ErrCtxt],       -- Error context, innermost on top
-        tcl_provenance :: CodeProvenance,  -- Where did this code come from?
+        tcl_provenance :: CodeProvenance,  -- Where did the code at tcl_loc come from?
         tcl_tclvl      :: TcLevel,
 
         tcl_th_ctxt    :: ThStage,         -- Template Haskell context
