@@ -349,7 +349,7 @@ bestOneShot NoOneShotInfo os         = os
 bestOneShot OneShotLam    _          = OneShotLam
 
 pprOneShotInfo :: OneShotInfo -> SDoc
-pprOneShotInfo NoOneShotInfo = empty
+pprOneShotInfo NoOneShotInfo = text "NoOS"
 pprOneShotInfo OneShotLam    = text "OneShot"
 
 instance Outputable OneShotInfo where
