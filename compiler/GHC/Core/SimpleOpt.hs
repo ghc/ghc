@@ -1173,7 +1173,7 @@ exprIsConApp_maybe (in_scope, id_unf) expr
         -- Look through dictionary functions; see Note [Unfolding DFuns]
         | DFunUnfolding { df_bndrs = bndrs, df_con = con, df_args = dfun_args } <- unfolding
         , bndrs `equalLength` args    -- See Note [DFun arity check]
-        , let subst = mkOpenSubst in_scope (bndrs `zip` args)
+        , let subst = mkOpenSubst in_scope bndrs args
         = succeedWith in_scope floats $
           pushCoDataCon con (map (substExpr subst) dfun_args) co
 

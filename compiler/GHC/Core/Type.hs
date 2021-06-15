@@ -509,8 +509,8 @@ expandTypeSynonyms ty
     in_scope = mkInScopeSet (tyCoVarsOfType ty)
 
     go subst (TyConApp tc tys)
-      | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc expanded_tys
-      = let subst' = mkTvSubst in_scope (mkVarEnv tenv)
+      | Just (tvs, tv_tys, rhs, tys') <- expandSynTyCon_maybe tc expanded_tys
+      = let subst' = mkTvSubst in_scope (zipEqualVarEnv tvs tv_tys)
             -- Make a fresh substitution; rhs has nothing to
             -- do with anything that has happened so far
             -- NB: if you make changes here, be sure to build an
