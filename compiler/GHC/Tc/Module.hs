@@ -3083,14 +3083,14 @@ withTcPlugins hsc_env m =
                 eitherRes <- tryM $
                   updGblEnv (\e -> e { tcg_tc_plugin_solvers   = solvers
                                      , tcg_tc_plugin_rewriters = rewritersUniqFM }) m
-                mapM_ (flip runTcPluginM ev_binds_var) stops
+                mapM_ runTcPluginM stops
                 case eitherRes of
                   Left _ -> failM
                   Right res -> return res
   where
   startPlugin ev_binds_var (TcPlugin start solve rewrite stop) =
-    do s <- runTcPluginM start ev_binds_var
-       return (solve s, rewrite s, stop s)
+    do s <- runTcPluginM start
+       return (solve s ev_binds_var, rewrite s, stop s)
 
 getTcPlugins :: HscEnv -> [GHC.Tc.Utils.Monad.TcPlugin]
 getTcPlugins hsc_env = catMaybes $ mapPlugins hsc_env (\p args -> tcPlugin p args)
