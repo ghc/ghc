@@ -326,11 +326,11 @@ tagSkeletonRhs bndr (StgRhsClosure fvs ccs upd bndrs body)
 rhsCard :: Id -> Card
 rhsCard bndr
   | is_thunk  = oneifyCard n
-  | otherwise = peelManyCalls (idArity bndr) cd
+  | otherwise = peelManyCalls (idArity bndr) sd
   where
     is_thunk = idArity bndr == 0
     -- Let's pray idDemandInfo is still OK after unarise...
-    n :* cd = idDemandInfo bndr
+    (n :* sd) = idDemandInfo bndr
 
 tagSkeletonAlt :: CgStgAlt -> (Skeleton, IdSet, LlStgAlt)
 tagSkeletonAlt (con, bndrs, rhs)
