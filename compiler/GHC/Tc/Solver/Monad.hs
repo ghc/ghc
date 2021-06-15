@@ -146,6 +146,7 @@ import GHC.Tc.Types.Evidence
 import GHC.Core.Class
 import GHC.Core.TyCon
 import GHC.Tc.Errors   ( solverDepthErrorTcS )
+import GHC.Tc.Errors.Types
 
 import GHC.Types.Name
 import GHC.Types.TyThing
@@ -1241,11 +1242,11 @@ wrapWarnTcS :: TcM a -> TcS a
 -- There's no static check; it's up to the user
 wrapWarnTcS = wrapTcS
 
-failTcS, panicTcS  :: SDoc -> TcS a
-warnTcS   :: WarningFlag -> SDoc -> TcS ()
-addErrTcS :: SDoc -> TcS ()
+panicTcS  :: SDoc -> TcS a
+failTcS   :: TcRnMessage -> TcS a
+warnTcS, addErrTcS :: TcRnMessage -> TcS ()
 failTcS      = wrapTcS . TcM.failWith
-warnTcS flag = wrapTcS . TcM.addDiagnostic (WarningWithFlag flag)
+warnTcS msg  = wrapTcS (TcM.addDiagnostic msg)
 addErrTcS    = wrapTcS . TcM.addErr
 panicTcS doc = pprPanic "GHC.Tc.Solver.Canonical" doc
 

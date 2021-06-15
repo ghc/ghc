@@ -18,6 +18,7 @@ import GHC.Prelude
 import GHC.Hs
 import GHC.Driver.Session
 
+import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Instance.Family
 import GHC.Tc.Types.Origin
@@ -46,6 +47,7 @@ import GHC.Core.Type
 import GHC.Utils.Error
 import GHC.Core.DataCon
 import GHC.Data.Maybe
+import GHC.Types.Hint
 import GHC.Types.Name.Reader
 import GHC.Types.Name
 import GHC.Types.Name.Set as NameSet
@@ -738,9 +740,10 @@ tcStandaloneDerivInstType ctxt
 
 warnUselessTypeable :: TcM ()
 warnUselessTypeable
-  = do { addDiagnosticTc (WarningWithFlag Opt_WarnDerivingTypeable)
-       $ text "Deriving" <+> quotes (ppr typeableClassName) <+>
-         text "has no effect: all types now auto-derive Typeable" }
+  = do { addDiagnosticTc $ TcRnUnknownMessage
+           $ mkPlainDiagnostic (WarningWithFlag Opt_WarnDerivingTypeable) noHints $
+             text "Deriving" <+> quotes (ppr typeableClassName) <+>
+             text "has no effect: all types now auto-derive Typeable" }
 
 ------------------------------------------------------------------
 deriveTyData :: TyCon -> [Type] -- LHS of data or data instance
@@ -1609,7 +1612,10 @@ mkNewTypeEqn newtype_strat dit@(DerivInstTys { dit_cls_tys     = cls_tys
                  -- DeriveAnyClass, but emitting a warning about the choice.
                  -- See Note [Deriving strategies]
                  when (newtype_deriving && deriveAnyClass) $
-                   lift $ addDiagnosticTc (WarningWithFlag Opt_WarnDerivingDefaults) $ sep
+                   lift $ addDiagnosticTc
+                        $ TcRnUnknownMessage
+                        $ mkPlainDiagnostic (WarningWithFlag Opt_WarnDerivingDefaults) noHints
+                        $ sep
                      [ text "Both DeriveAnyClass and"
                        <+> text "GeneralizedNewtypeDeriving are enabled"
                      , text "Defaulting to the DeriveAnyClass strategy"
@@ -1998,9 +2004,8 @@ doDerivInstErrorChecks2 clas clas_inst theta wildcard mechanism
        ; case wildcard of
            Nothing -> pure ()
            Just span -> setSrcSpan span $ do
-             checkTc xpartial_sigs (hang partial_sig_msg 2 pts_suggestion)
-             diagnosticTc (WarningWithFlag Opt_WarnPartialTypeSignatures)
-                          wpartial_sigs partial_sig_msg
+             checkTc xpartial_sigs (partial_sig_msg [pts_suggestion])
+             diagnosticTc wpartial_sigs (partial_sig_msg noHints)
 
          -- Check for Generic instances that are derived with an exotic
          -- deriving strategy like DAC
@@ -2011,14 +2016,21 @@ doDerivInstErrorChecks2 clas clas_inst theta wildcard mechanism
   where
     exotic_mechanism = not $ isDerivSpecStock mechanism
 
-    partial_sig_msg = text "Found type wildcard" <+> quotes (char '_')
-                  <+> text "standing for" <+> quotes (pprTheta theta)
+    partial_sig_msg :: [GhcHint] -> TcRnMessage
+    partial_sig_msg hints = TcRnUnknownMessage
+      $ mkPlainDiagnostic (WarningWithFlag Opt_WarnPartialTypeSignatures) hints $
+        text "Found type wildcard" <+> quotes (char '_')
+                    <+> text "standing for" <+> quotes (pprTheta theta)
 
+    pts_suggestion :: GhcHint
     pts_suggestion
-      = text "To use the inferred type, enable PartialTypeSignatures"
+      = UnknownHint (text "To use the inferred type, enable PartialTypeSignatures")
 
-    gen_inst_err = text "Generic instances can only be derived in"
-               <+> text "Safe Haskell using the stock strategy."
+    gen_inst_err :: TcRnMessage
+    gen_inst_err = TcRnUnknownMessage
+      $ mkPlainError noHints $
+            text "Generic instances can only be derived in"
+        <+> text "Safe Haskell using the stock strategy."
 
 derivingThingFailWith :: Bool -- If True, add a snippet about how not even
                               -- GeneralizedNewtypeDeriving would make this
@@ -2206,8 +2218,9 @@ What con2tag/tag2con functions are available?
 ************************************************************************
 -}
 
-nonUnaryErr :: LHsSigType GhcRn -> SDoc
-nonUnaryErr ct = quotes (ppr ct)
+nonUnaryErr :: LHsSigType GhcRn -> TcRnMessage
+nonUnaryErr ct = TcRnUnknownMessage $ mkPlainError noHints $
+  quotes (ppr ct)
   <+> text "is not a unary constraint, as expected by a deriving clause"
 
 nonStdErr :: Class -> SDoc
@@ -2222,9 +2235,10 @@ gndNonNewtypeErr =
 derivingNullaryErr :: SDoc
 derivingNullaryErr = text "Cannot derive instances for nullary classes"
 
-derivingKindErr :: TyCon -> Class -> [Type] -> Kind -> Bool -> SDoc
+derivingKindErr :: TyCon -> Class -> [Type] -> Kind -> Bool -> TcRnMessage
 derivingKindErr tc cls cls_tys cls_kind enough_args
-  = sep [ hang (text "Cannot derive well-kinded instance of form"
+  = TcRnUnknownMessage $ mkPlainError noHints $
+    sep [ hang (text "Cannot derive well-kinded instance of form"
                       <+> quotes (pprClassPred cls cls_tys
                                     <+> parens (ppr tc <+> text "...")))
                2 gen1_suggestion
@@ -2237,35 +2251,37 @@ derivingKindErr tc cls cls_tys cls_kind enough_args
                     = text "(Perhaps you intended to use PolyKinds)"
                     | otherwise = Outputable.empty
 
-derivingViaKindErr :: Class -> Kind -> Type -> Kind -> SDoc
+derivingViaKindErr :: Class -> Kind -> Type -> Kind -> TcRnMessage
 derivingViaKindErr cls cls_kind via_ty via_kind
-  = hang (text "Cannot derive instance via" <+> quotes (pprType via_ty))
-       2 (text "Class" <+> quotes (ppr cls)
-               <+> text "expects an argument of kind"
-               <+> quotes (pprKind cls_kind) <> char ','
-      $+$ text "but" <+> quotes (pprType via_ty)
-               <+> text "has kind" <+> quotes (pprKind via_kind))
+  = TcRnUnknownMessage $ mkPlainDiagnostic ErrorWithoutFlag noHints $
+      hang (text "Cannot derive instance via" <+> quotes (pprType via_ty))
+         2 (text "Class" <+> quotes (ppr cls)
+                 <+> text "expects an argument of kind"
+                 <+> quotes (pprKind cls_kind) <> char ','
+        $+$ text "but" <+> quotes (pprType via_ty)
+                 <+> text "has kind" <+> quotes (pprKind via_kind))
 
-derivingEtaErr :: Class -> [Type] -> Type -> SDoc
+derivingEtaErr :: Class -> [Type] -> Type -> TcRnMessage
 derivingEtaErr cls cls_tys inst_ty
-  = sep [text "Cannot eta-reduce to an instance of form",
+  = TcRnUnknownMessage $ mkPlainDiagnostic ErrorWithoutFlag noHints $
+    sep [text "Cannot eta-reduce to an instance of form",
          nest 2 (text "instance (...) =>"
                 <+> pprClassPred cls (cls_tys ++ [inst_ty]))]
 
 derivingThingErr :: Bool -> Class -> [Type]
-                 -> Maybe (DerivStrategy GhcTc) -> SDoc -> SDoc
+                 -> Maybe (DerivStrategy GhcTc) -> SDoc -> TcRnMessage
 derivingThingErr newtype_deriving cls cls_args mb_strat why
   = derivingThingErr' newtype_deriving cls cls_args mb_strat
                       (maybe empty derivStrategyName mb_strat) why
 
-derivingThingErrM :: Bool -> SDoc -> DerivM SDoc
+derivingThingErrM :: Bool -> SDoc -> DerivM TcRnMessage
 derivingThingErrM newtype_deriving why
   = do DerivEnv { denv_cls      = cls
                 , denv_inst_tys = cls_args
                 , denv_strat    = mb_strat } <- ask
        pure $ derivingThingErr newtype_deriving cls cls_args mb_strat why
 
-derivingThingErrMechanism :: DerivSpecMechanism -> SDoc -> DerivM SDoc
+derivingThingErrMechanism :: DerivSpecMechanism -> SDoc -> DerivM TcRnMessage
 derivingThingErrMechanism mechanism why
   = do DerivEnv { denv_cls      = cls
                 , denv_inst_tys = cls_args
@@ -2274,9 +2290,10 @@ derivingThingErrMechanism mechanism why
                 (derivStrategyName $ derivSpecMechanismToStrategy mechanism) why
 
 derivingThingErr' :: Bool -> Class -> [Type]
-                  -> Maybe (DerivStrategy GhcTc) -> SDoc -> SDoc -> SDoc
+                  -> Maybe (DerivStrategy GhcTc) -> SDoc -> SDoc -> TcRnMessage
 derivingThingErr' newtype_deriving cls cls_args mb_strat strat_msg why
-  = sep [(hang (text "Can't make a derived instance of")
+  = TcRnUnknownMessage $ mkPlainError noHints $
+    sep [(hang (text "Can't make a derived instance of")
              2 (quotes (ppr pred) <+> via_mechanism)
           $$ nest 2 extra) <> colon,
          nest 2 why]
