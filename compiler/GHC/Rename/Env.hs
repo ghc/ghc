@@ -1095,7 +1095,7 @@ lookup_demoted rdr_name
                                      mkPlainDiagnostic (WarningWithFlag Opt_WarnUntickedPromotedConstructors)
                                                        noHints
                                                        (untickedPromConstrWarn demoted_name)
-                             ; addDiagnostic (TcRnMessageDetailed noErrInfo msg)
+                             ; addDiagnostic msg
                              ; return demoted_name } }
             else do { -- We need to check if a data constructor of this name is
                       -- in scope to give good error messages. However, we do
@@ -1582,7 +1582,7 @@ warnIfDeprecated gre@(GRE { gre_imp = iss })
                                                 noHints
                                                 (mk_msg imp_spec txt)
 
-                  addDiagnostic (TcRnMessageDetailed noErrInfo msg)
+                  addDiagnostic msg
                 Nothing  -> return () } }
   | otherwise
   = return ()

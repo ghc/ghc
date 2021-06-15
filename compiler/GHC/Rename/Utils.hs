@@ -175,7 +175,7 @@ checkShadowedOccs (global_env,local_env) get_loc_occ ns
              let msg = TcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag Opt_WarnNameShadowing)
                                                               noHints
                                                               (shadowedNameWarn occ pp_locs)
-             addDiagnosticAt loc (TcRnMessageDetailed noErrInfo msg)
+             addDiagnosticAt loc msg
 
     is_shadowed_gre :: GlobalRdrElt -> RnM Bool
         -- Returns False for record selectors that are shadowed, when
@@ -394,7 +394,7 @@ warnRedundantRecordWildcard =
                 mkPlainDiagnostic (WarningWithFlag Opt_WarnRedundantRecordWildcards)
                                   noHints
                                   redundantWildcardWarning
-    in addDiagnostic (TcRnMessageDetailed noErrInfo msg)
+    in addDiagnostic msg
 
 
 -- | Produce a warning when no variables bound by a `..` pattern are used.
@@ -486,7 +486,7 @@ addUnusedWarning flag occ span msg = do
         sep [msg <> colon,
              nest 2 $ pprNonVarNameSpace (occNameSpace occ)
                             <+> quotes (ppr occ)]
-  addDiagnosticAt span (TcRnMessageDetailed noErrInfo diag)
+  addDiagnosticAt span diag
 
 unusedRecordWildcardWarning :: TcRnMessage
 unusedRecordWildcardWarning =

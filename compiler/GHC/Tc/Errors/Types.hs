@@ -26,6 +26,10 @@ data ErrInfo = ErrInfo {
     -- ^ Extra supplementary info associated to the error.
   }
 
+
+-- | 'TcRnMessageDetailed' is an \"internal\" type (used only inside
+-- 'GHC.Tc.Utils.Monad' that wraps a 'TcRnMessage' while also providing
+-- any extra info needed to correctly pretty-print this diagnostic later on.
 data TcRnMessageDetailed
   = TcRnMessageDetailed !ErrInfo
                         -- ^ Extra info associated with the message
@@ -38,9 +42,15 @@ data TcRnMessage where
   -}
   TcRnUnknownMessage :: (Diagnostic a, Typeable a) => a -> TcRnMessage
 
+  {-| TcRnMessageWithInfo is a constructor which is used when extra information is needed
+      to be provided in order to qualify a diagnostic and where it was originated (and why).
+      It carries an extra 'UnitState' which can be used to pretty-print some names
+      and it wraps a 'TcRnMessageDetailed', which includes any extra context associated
+      with this diagnostic.
+  -}
   TcRnMessageWithInfo :: !UnitState
                       -- ^ The 'UnitState' will allow us to pretty-print
-                      -- some diagnostics with more details.
+                      -- some diagnostics with more detail.
                       -> !TcRnMessageDetailed
                       -> TcRnMessage
 

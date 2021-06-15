@@ -1168,7 +1168,7 @@ instance TH.Quasi TcM where
   -- 'msg' is forced to ensure exceptions don't escape,
   -- see Note [Exceptions in TH]
   qReport True msg  = seqList msg $ addErr $ TcRnUnknownMessage $ mkPlainError noHints (text msg)
-  qReport False msg = seqList msg $ addDiagnostic $ TcRnMessageDetailed noErrInfo $ TcRnUnknownMessage $
+  qReport False msg = seqList msg $ addDiagnostic $ TcRnUnknownMessage $
     mkPlainDiagnostic WarningWithoutFlag noHints (text msg)
 
   qLocation = do { m <- getModule
