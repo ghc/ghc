@@ -129,8 +129,6 @@ import GHC.Types.Name.Env
 import GHC.Types.Unique.Set
 import GHC.Types.Basic ( TypeOrKind(..) )
 
-import GHC.Builtin.Types
-
 import GHC.Data.FastString
 import GHC.Data.Bag
 import GHC.Data.Pair

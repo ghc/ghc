@@ -1268,7 +1268,7 @@ rnGRHS' ctxt rnBody (GRHS _ guards rhs)
         ; unless (pattern_guards_allowed || is_standard_guard guards') $
             let diag = TcRnUnknownMessage $
                   mkPlainDiagnostic WarningWithoutFlag noHints (nonStdGuardErr guards')
-            in addDiagnostic (TcRnMessageDetailed noErrInfo diag)
+            in addDiagnostic diag
 
         ; return (GRHS noAnn guards' rhs', fvs) }
   where

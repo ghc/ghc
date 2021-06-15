@@ -1291,7 +1291,7 @@ disambiguateRecordBinds record_expr record_rho rbnds res_ty
     -- See Note [Deprecating ambiguous fields] in GHC.Tc.Gen.Head
     reportAmbiguousField :: TyCon -> TcM ()
     reportAmbiguousField parent_type =
-        setSrcSpan loc $ warnIf True $
+        setSrcSpan loc $ addDiagnostic $
           TcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag Opt_WarnAmbiguousFields) noHints $
           vcat [ text "The record update" <+> ppr rupd
                    <+> text "with type" <+> ppr parent_type

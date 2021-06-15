@@ -46,13 +46,11 @@ import GHC.Tc.Utils.Unify( tcSkolemise, unifyType )
 import GHC.Tc.Utils.Instantiate( topInstantiate, tcInstTypeBndrs )
 import GHC.Tc.Utils.Env( tcLookupId )
 import GHC.Tc.Types.Evidence( HsWrapper, (<.>) )
-import GHC.Tc.Errors.Types ( LevityCheckProvenance(..) )
 
 import GHC.Core( hasSomeUnfolding )
 import GHC.Core.Type ( mkTyVarBinders )
 import GHC.Core.Multiplicity
 
-import GHC.Driver.Ppr
 import GHC.Types.Error
 import GHC.Types.Var ( TyVar, Specificity(..), tyVarKind, binderVars )
 import GHC.Types.Id  ( Id, idName, idType, setInlinePragma
