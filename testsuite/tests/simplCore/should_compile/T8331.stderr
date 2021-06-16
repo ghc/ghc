@@ -14,52 +14,10 @@
                       ReaderT r (ST s) a -> ReaderT r (ST s) b -> r -> STRep s b)
                      (forall {a} {b}.
                       ReaderT r (ST s) a -> ReaderT r (ST s) b -> ReaderT r (ST s) b))
-"SPEC $c<* @(ST s) _"
-    forall (@s) (@r) ($dApplicative :: Applicative (ST s)).
-      $fApplicativeReaderT_$c<* @(ST s) @r $dApplicative
-      = ($fApplicativeReaderT2 @s @r)
-        `cast` (forall (a :: <*>_N) (b :: <*>_N).
-                <ReaderT r (ST s) a>_R
-                %<'Many>_N ->_R <ReaderT r (ST s) b>_R
-                %<'Many>_N ->_R <r>_R %<'Many>_N ->_R Sym (N:ST[0] <s>_N <a>_R)
-                                ; Sym (N:ReaderT[0] <*>_N <r>_R <ST s>_R <a>_N)
-                :: Coercible
-                     (forall {a} {b}.
-                      ReaderT r (ST s) a -> ReaderT r (ST s) b -> r -> STRep s a)
-                     (forall {a} {b}.
-                      ReaderT r (ST s) a -> ReaderT r (ST s) b -> ReaderT r (ST s) a))
-"SPEC $c<*> @(ST s) _"
-    forall (@s) (@r) ($dApplicative :: Applicative (ST s)).
-      $fApplicativeReaderT5 @(ST s) @r $dApplicative
-      = ($fApplicativeReaderT6 @s @r)
-        `cast` (forall (a :: <*>_N) (b :: <*>_N).
-                <ReaderT r (ST s) (a -> b)>_R
-                %<'Many>_N ->_R <ReaderT r (ST s) a>_R
-                %<'Many>_N ->_R <r>_R
-                %<'Many>_N ->_R Sym (N:ST[0] <s>_N <b>_R)
-                :: Coercible
-                     (forall {a} {b}.
-                      ReaderT r (ST s) (a -> b) -> ReaderT r (ST s) a -> r -> STRep s b)
-                     (forall {a} {b}.
-                      ReaderT r (ST s) (a -> b) -> ReaderT r (ST s) a -> r -> ST s b))
 "SPEC $c>> @(ST s) _"
     forall (@s) (@r) ($dMonad :: Monad (ST s)).
       $fMonadReaderT_$c>> @(ST s) @r $dMonad
       = $fMonadAbstractIOSTReaderT_$s$c>> @s @r
-"SPEC $c>>= @(ST s) _"
-    forall (@s) (@r) ($dMonad :: Monad (ST s)).
-      $fMonadReaderT1 @(ST s) @r $dMonad
-      = ($fMonadReaderT2 @s @r)
-        `cast` (forall (a :: <*>_N) (b :: <*>_N).
-                <ReaderT r (ST s) a>_R
-                %<'Many>_N ->_R <a -> ReaderT r (ST s) b>_R
-                %<'Many>_N ->_R <r>_R
-                %<'Many>_N ->_R Sym (N:ST[0] <s>_N <b>_R)
-                :: Coercible
-                     (forall {a} {b}.
-                      ReaderT r (ST s) a -> (a -> ReaderT r (ST s) b) -> r -> STRep s b)
-                     (forall {a} {b}.
-                      ReaderT r (ST s) a -> (a -> ReaderT r (ST s) b) -> r -> ST s b))
 "SPEC $cliftA2 @(ST s) _"
     forall (@s) (@r) ($dApplicative :: Applicative (ST s)).
       $fApplicativeReaderT_$cliftA2 @(ST s) @r $dApplicative
