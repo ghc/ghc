@@ -400,6 +400,8 @@ library
 
     if os(osx)
       ld-options: "-Wl,-search_paths_first"
+                  -- TODO: Comment
+                  "-Wl,-U,___darwin_check_fd_set_overflow"
       if !arch(x86_64) && !arch(aarch64)
          ld-options: -read_only_relocs warning
 
