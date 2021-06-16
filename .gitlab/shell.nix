@@ -43,8 +43,8 @@
   export NIX_CFLAGS_COMPILE+=" -Wno-nullability-completeness -Wno-availability -Wno-expansion-to-defined -Wno-builtin-requires-header -Wno-unused-command-line-argument"
 
   # unconditionally add the MacOSX.sdk and TargetConditional.h
-  export NIX_CFLAGS_COMPILE+=" -isystem /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include"
-  export NIX_LDFLAGS="-L/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib $NIX_LDFLAGS"
+  export NIX_CFLAGS_COMPILE+=" -isystem /Library/Developer/CommandLineTools/SDKs/MacOSX10.15.sdk/usr/include"
+  export NIX_LDFLAGS="-L/Library/Developer/CommandLineTools/SDKs/MacOSX10.15.sdk/usr/lib $NIX_LDFLAGS"
   echo $NIX_LDFLAGS
 
   echo $MACOSX_DEPLOYMENT_TARGET
