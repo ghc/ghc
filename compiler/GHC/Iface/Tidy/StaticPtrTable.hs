@@ -188,7 +188,6 @@ sptCreateStaticBinds hsc_env this_mod binds
         go (reverse fps' ++ fps) (bnd' : bs) xs'
 
     dflags = hsc_dflags hsc_env
-    platform = targetPlatform dflags
 
     -- Generates keys and replaces 'makeStatic' with 'StaticPtr'.
     --
@@ -230,8 +229,8 @@ sptCreateStaticBinds hsc_env this_mod binds
       staticPtrDataCon <- lift $ lookupDataConHscEnv staticPtrDataConName
       return (fp, mkConApp staticPtrDataCon
                                [ Type t
-                               , mkWord64LitWordRep platform w0
-                               , mkWord64LitWordRep platform w1
+                               , mkWord64LitWord64 w0
+                               , mkWord64LitWord64 w1
                                , info
                                , e ])
 
@@ -241,13 +240,6 @@ sptCreateStaticBinds hsc_env this_mod binds
         , moduleNameString $ moduleName this_mod
         , show n
         ]
-
-    -- Choose either 'Word64#' or 'Word#' to represent the arguments of the
-    -- 'Fingerprint' data constructor.
-    mkWord64LitWordRep platform =
-      case platformWordSize platform of
-        PW4 -> mkWord64LitWord64
-        PW8 -> mkWordLit platform . toInteger
 
     lookupIdHscEnv :: Name -> IO Id
     lookupIdHscEnv n = lookupType hsc_env n >>=

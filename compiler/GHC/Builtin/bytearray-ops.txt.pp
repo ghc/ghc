@@ -70,7 +70,7 @@ primop IndexByteArrayOp_Int32 "indexInt32Array#" GenPrimOp
    with can_fail = True
 
 primop IndexByteArrayOp_Int64 "indexInt64Array#" GenPrimOp
-   ByteArray# -> Int# -> INT64
+   ByteArray# -> Int# -> Int64#
    {Read a 64-bit signed integer; offset in 8-byte words.}
    with can_fail = True
 
@@ -90,7 +90,7 @@ primop IndexByteArrayOp_Word32 "indexWord32Array#" GenPrimOp
    with can_fail = True
 
 primop IndexByteArrayOp_Word64 "indexWord64Array#" GenPrimOp
-   ByteArray# -> Int# -> WORD64
+   ByteArray# -> Int# -> Word64#
    {Read a 64-bit unsigned integer; offset in 8-byte words.}
    with can_fail = True
 
@@ -150,7 +150,7 @@ primop IndexByteArrayOp_Word8AsInt32 "indexWord8ArrayAsInt32#" GenPrimOp
    with can_fail = True
 
 primop IndexByteArrayOp_Word8AsInt64 "indexWord8ArrayAsInt64#" GenPrimOp
-   ByteArray# -> Int# -> INT64
+   ByteArray# -> Int# -> Int64#
    {Read a 64-bit signed integer; offset in bytes.}
    with can_fail = True
 
@@ -165,7 +165,7 @@ primop IndexByteArrayOp_Word8AsWord32 "indexWord8ArrayAsWord32#" GenPrimOp
    with can_fail = True
 
 primop IndexByteArrayOp_Word8AsWord64 "indexWord8ArrayAsWord64#" GenPrimOp
-   ByteArray# -> Int# -> WORD64
+   ByteArray# -> Int# -> Word64#
    {Read a 64-bit unsigned integer; offset in bytes.}
    with can_fail = True
 
@@ -241,7 +241,7 @@ primop ReadByteArrayOp_Int32 "readInt32Array#" GenPrimOp
         can_fail = True
 
 primop ReadByteArrayOp_Int64 "readInt64Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, INT64 #)
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Int64# #)
    {Read a 64-bit signed integer; offset in 8-byte words.}
    with has_side_effects = True
         can_fail = True
@@ -265,7 +265,7 @@ primop ReadByteArrayOp_Word32 "readWord32Array#" GenPrimOp
         can_fail = True
 
 primop ReadByteArrayOp_Word64 "readWord64Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, WORD64 #)
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Word64# #)
    {Read a 64-bit unsigned integer; offset in 8-byte words.}
    with has_side_effects = True
         can_fail = True
@@ -336,7 +336,7 @@ primop ReadByteArrayOp_Word8AsInt32 "readWord8ArrayAsInt32#" GenPrimOp
         can_fail = True
 
 primop ReadByteArrayOp_Word8AsInt64 "readWord8ArrayAsInt64#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, INT64 #)
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Int64# #)
    {Read a 64-bit signed integer; offset in bytes.}
    with has_side_effects = True
         can_fail = True
@@ -354,7 +354,7 @@ primop ReadByteArrayOp_Word8AsWord32 "readWord8ArrayAsWord32#" GenPrimOp
         can_fail = True
 
 primop ReadByteArrayOp_Word8AsWord64 "readWord8ArrayAsWord64#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, WORD64 #)
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Word64# #)
    {Read a 64-bit unsigned integer; offset in bytes.}
    with has_side_effects = True
         can_fail = True
@@ -431,7 +431,7 @@ primop WriteByteArrayOp_Int32 "writeInt32Array#" GenPrimOp
         can_fail = True
 
 primop WriteByteArrayOp_Int64 "writeInt64Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> INT64 -> State# s -> State# s
+   MutableByteArray# s -> Int# -> Int64# -> State# s -> State# s
    {Write a 64-bit signed integer; offset in 8-byte words.}
    with has_side_effects = True
         can_fail = True
@@ -455,7 +455,7 @@ primop WriteByteArrayOp_Word32 "writeWord32Array#" GenPrimOp
         can_fail = True
 
 primop WriteByteArrayOp_Word64 "writeWord64Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> WORD64 -> State# s -> State# s
+   MutableByteArray# s -> Int# -> Word64# -> State# s -> State# s
    {Write a 64-bit unsigned integer; offset in 8-byte words.}
    with has_side_effects = True
         can_fail = True
@@ -526,7 +526,7 @@ primop WriteByteArrayOp_Word8AsInt32 "writeWord8ArrayAsInt32#" GenPrimOp
         can_fail = True
 
 primop WriteByteArrayOp_Word8AsInt64 "writeWord8ArrayAsInt64#" GenPrimOp
-   MutableByteArray# s -> Int# -> INT64 -> State# s -> State# s
+   MutableByteArray# s -> Int# -> Int64# -> State# s -> State# s
    {Write a 64-bit signed integer; offset in bytes.}
    with has_side_effects = True
         can_fail = True
@@ -544,7 +544,7 @@ primop WriteByteArrayOp_Word8AsWord32 "writeWord8ArrayAsWord32#" GenPrimOp
         can_fail = True
 
 primop WriteByteArrayOp_Word8AsWord64 "writeWord8ArrayAsWord64#" GenPrimOp
-   MutableByteArray# s -> Int# -> WORD64 -> State# s -> State# s
+   MutableByteArray# s -> Int# -> Word64# -> State# s -> State# s
    {Write a 64-bit unsigned integer; offset in bytes.}
    with has_side_effects = True
         can_fail = True

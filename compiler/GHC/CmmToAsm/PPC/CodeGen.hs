@@ -2006,6 +2006,39 @@ genCCall' config gcp target dest_regs args
                     MO_F64_Acosh -> (fsLit "acosh", False)
                     MO_F64_Atanh -> (fsLit "atanh", False)
 
+                    MO_64_S_Conv_ToNative   -> (fsLit "hs_int64ToInt", False)
+                    MO_64_S_Conv_FromNative -> (fsLit "hs_intToInt64", False)
+                    MO_64_U_Conv_ToNative   -> (fsLit "hs_word64ToWord", False)
+                    MO_64_U_Conv_FromNative -> (fsLit "hs_wordToWord64", False)
+
+                    MO_64_Neg    -> (fsLit "hs_neg64", False)
+                    MO_64_Add    -> (fsLit "hs_add64", False)
+                    MO_64_Sub    -> (fsLit "hs_sub64", False)
+                    MO_64_Mul    -> (fsLit "hs_mul64", False)
+                    MO_64_S_Quot -> (fsLit "hs_quotInt64", False)
+                    MO_64_S_Rem  -> (fsLit "hs_remInt64", False)
+                    MO_64_U_Quot -> (fsLit "hs_quotWord64", False)
+                    MO_64_U_Rem  -> (fsLit "hs_remWord64", False)
+
+                    MO_64_And    -> (fsLit "hs_and64", False)
+                    MO_64_Or     -> (fsLit "hs_or64", False)
+                    MO_64_Xor    -> (fsLit "hs_xor64", False)
+                    MO_64_Not    -> (fsLit "hs_not64", False)
+                    MO_64_Shl    -> (fsLit "hs_uncheckedShiftL64", False)
+                    MO_64_S_Shr  -> (fsLit "hs_uncheckedShiftRA64", False)
+                    MO_64_U_Shr  -> (fsLit "hs_uncheckedIShiftRL64", False)
+
+                    MO_64_Eq     -> (fsLit "hs_eq64", False)
+                    MO_64_Ne     -> (fsLit "hs_ne64", False)
+                    MO_64_S_Ge   -> (fsLit "hs_geInt64", False)
+                    MO_64_S_Gt   -> (fsLit "hs_gtInt64", False)
+                    MO_64_S_Le   -> (fsLit "hs_leInt64", False)
+                    MO_64_S_Lt   -> (fsLit "hs_ltInt64", False)
+                    MO_64_U_Ge   -> (fsLit "hs_geWord64", False)
+                    MO_64_U_Gt   -> (fsLit "hs_gtWord64", False)
+                    MO_64_U_Le   -> (fsLit "hs_leWord64", False)
+                    MO_64_U_Lt   -> (fsLit "hs_ltWord64", False)
+
                     MO_UF_Conv w -> (word2FloatLabel w, False)
 
                     MO_Memcpy _  -> (fsLit "memcpy", False)
@@ -2053,7 +2086,7 @@ genSwitch :: NCGConfig -> CmmExpr -> SwitchTargets -> NatM InstrBlock
 genSwitch config expr targets
   | OSAIX <- platformOS platform
   = do
-        (reg,e_code) <- getSomeReg (cmmOffset platform expr offset)
+        (reg,e_code) <- getSomeReg indexExpr
         let fmt = archWordFormat $ target32Bit platform
             sha = if target32Bit platform then 2 else 3
         tmp <- getNewRegNat fmt
@@ -2070,7 +2103,7 @@ genSwitch config expr targets
 
   | (ncgPIC config) || (not $ target32Bit platform)
   = do
-        (reg,e_code) <- getSomeReg (cmmOffset platform expr offset)
+        (reg,e_code) <- getSomeReg indexExpr
         let fmt = archWordFormat $ target32Bit platform
             sha = if target32Bit platform then 2 else 3
         tmp <- getNewRegNat fmt
@@ -2087,7 +2120,7 @@ genSwitch config expr targets
         return code
   | otherwise
   = do
-        (reg,e_code) <- getSomeReg (cmmOffset platform expr offset)
+        (reg,e_code) <- getSomeReg indexExpr
         let fmt = archWordFormat $ target32Bit platform
             sha = if target32Bit platform then 2 else 3
         tmp <- getNewRegNat fmt
@@ -2101,6 +2134,12 @@ genSwitch config expr targets
                     ]
         return code
   where
+    indexExpr = cmmOffset platform exprWidened offset
+    -- We widen to a native-width register to santize the high bits
+    exprWidened = CmmMachOp
+      (MO_UU_Conv (cmmExprWidth platform expr)
+                  (platformWordWidth platform))
+      [expr]
     (offset, ids) = switchTargetsToTable targets
     platform      = ncgPlatform config
 

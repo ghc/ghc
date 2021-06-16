@@ -313,7 +313,7 @@ genSwitch config expr targets
         = error "MachCodeGen: sparc genSwitch PIC not finished\n"
 
         | otherwise
-        = do    (e_reg, e_code) <- getSomeReg (cmmOffset (ncgPlatform config) expr offset)
+        = do    (e_reg, e_code) <- getSomeReg indexExpr
 
                 base_reg        <- getNewRegNat II32
                 offset_reg      <- getNewRegNat II32
@@ -334,7 +334,15 @@ genSwitch config expr targets
                         , LD      II32 (AddrRegReg base_reg offset_reg) dst
                         , JMP_TBL (AddrRegImm dst (ImmInt 0)) ids label
                         , NOP ]
-  where (offset, ids) = switchTargetsToTable targets
+  where
+    indexExpr = cmmOffset platform exprWidened offset
+    -- We widen to a native-width register to santize the high bits
+    exprWidened = CmmMachOp
+      (MO_UU_Conv (cmmExprWidth platform expr)
+                  (platformWordWidth platform))
+      [expr]
+    (offset, ids) = switchTargetsToTable targets
+    platform = ncgPlatform config
 
 generateJumpTableForInstr :: Platform -> Instr
                           -> Maybe (NatCmmDecl RawCmmStatics Instr)
@@ -657,6 +665,39 @@ outOfLineMachOp_table mop
         MO_F64_Asinh  -> fsLit "asinh"
         MO_F64_Acosh  -> fsLit "acosh"
         MO_F64_Atanh  -> fsLit "atanh"
+
+        MO_64_S_Conv_ToNative   -> fsLit "hs_int64ToInt"
+        MO_64_S_Conv_FromNative -> fsLit "hs_intToInt64"
+        MO_64_U_Conv_ToNative   -> fsLit "hs_word64ToWord"
+        MO_64_U_Conv_FromNative -> fsLit "hs_wordToWord64"
+
+        MO_64_Neg    -> fsLit "hs_neg64"
+        MO_64_Add    -> fsLit "hs_add64"
+        MO_64_Sub    -> fsLit "hs_sub64"
+        MO_64_Mul    -> fsLit "hs_mul64"
+        MO_64_S_Quot -> fsLit "hs_quotInt64"
+        MO_64_S_Rem  -> fsLit "hs_remInt64"
+        MO_64_U_Quot -> fsLit "hs_quotWord64"
+        MO_64_U_Rem  -> fsLit "hs_remWord64"
+
+        MO_64_And    -> fsLit "hs_and64"
+        MO_64_Or     -> fsLit "hs_or64"
+        MO_64_Xor    -> fsLit "hs_xor64"
+        MO_64_Not    -> fsLit "hs_not64"
+        MO_64_Shl    -> fsLit "hs_uncheckedShiftL64"
+        MO_64_S_Shr  -> fsLit "hs_uncheckedShiftRA64"
+        MO_64_U_Shr  -> fsLit "hs_uncheckedIShiftRL64"
+
+        MO_64_Eq     -> fsLit "hs_eq64"
+        MO_64_Ne     -> fsLit "hs_ne64"
+        MO_64_S_Ge   -> fsLit "hs_geInt64"
+        MO_64_S_Gt   -> fsLit "hs_gtInt64"
+        MO_64_S_Le   -> fsLit "hs_leInt64"
+        MO_64_S_Lt   -> fsLit "hs_ltInt64"
+        MO_64_U_Ge   -> fsLit "hs_geWord64"
+        MO_64_U_Gt   -> fsLit "hs_gtWord64"
+        MO_64_U_Le   -> fsLit "hs_leWord64"
+        MO_64_U_Lt   -> fsLit "hs_ltWord64"
 
         MO_UF_Conv w -> word2FloatLabel w
 

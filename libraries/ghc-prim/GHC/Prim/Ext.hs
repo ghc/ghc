@@ -26,41 +26,20 @@
 -- are described over there.
 module GHC.Prim.Ext
   (
-  -- 64-bit bit aliases
-    INT64
-  , WORD64
+  -- * Misc
+    getThreadAllocationCounter#
   -- * Delay\/wait operations
 #if defined(mingw32_HOST_OS)
   , asyncRead#
   , asyncWrite#
   , asyncDoProc#
 #endif
-  -- * Misc
-  , getThreadAllocationCounter#
   ) where
 
 import GHC.Prim
 import GHC.Types () -- Make implicit dependency known to build system
 
 default () -- Double and Integer aren't available yet
-
-------------------------------------------------------------------------
--- 64-bit bit aliases
-------------------------------------------------------------------------
-
-type INT64 =
-#if WORD_SIZE_IN_BITS < 64
-  Int64#
-#else
-  Int#
-#endif
-
-type WORD64 =
-#if WORD_SIZE_IN_BITS < 64
-  Word64#
-#else
-  Word#
-#endif
 
 ------------------------------------------------------------------------
 -- Delay/wait operations
@@ -102,4 +81,4 @@ foreign import prim "stg_asyncDoProczh" asyncDoProc#
 -- | Retrieves the allocation counter for the current thread.
 foreign import prim "stg_getThreadAllocationCounterzh" getThreadAllocationCounter#
   :: State# RealWorld
-  -> (# State# RealWorld, INT64 #)
+  -> (# State# RealWorld, Int64# #)
