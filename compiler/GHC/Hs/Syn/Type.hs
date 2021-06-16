@@ -64,7 +64,10 @@ hsPatType (ConPat { pat_con = lcon
 hsPatType (SigPat ty _ _)               = ty
 hsPatType (NPat ty _ _ _)               = ty
 hsPatType (NPlusKPat ty _ _ _ _ _)      = ty
-hsPatType (XPat (CoPat _ _ ty))         = ty
+hsPatType (XPat ext) =
+  case ext of
+    XCoPat (CoPat _ _ ty)              -> ty
+    ExpansionPat (HsPatExpanded _ pat) -> hsPatType pat
 hsPatType (SplicePat v _)               = dataConCantHappen v
 
 hsLitType :: HsLit (GhcPass p) -> Type

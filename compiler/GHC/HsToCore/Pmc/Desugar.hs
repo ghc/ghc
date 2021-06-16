@@ -122,16 +122,19 @@ desugarPat x pat = case pat of
 
   SigPat _ p _ty -> desugarLPat x p
 
-  -- See Note [Desugar CoPats]
-  -- Generally the translation is
-  -- pat |> co   ===>   let y = x |> co, pat <- y  where y is a match var of pat
-  XPat (CoPat wrapper p _ty)
-    | isIdHsWrapper wrapper                   -> desugarPat x p
-    | WpCast co <-  wrapper, isReflexiveCo co -> desugarPat x p
-    | otherwise -> do
-        (y, grds) <- desugarPatV p
-        wrap_rhs_y <- dsHsWrapper wrapper
-        pure (PmLet y (wrap_rhs_y (Var x)) : grds)
+  XPat ext -> case ext of
+    ExpansionPat (HsPatExpanded _ p) -> desugarPat x p
+
+    -- See Note [Desugar CoPats]
+    -- Generally the translation is
+    -- pat |> co   ===>   let y = x |> co, pat <- y  where y is a match var of pat
+    XCoPat (CoPat wrapper p _ty)
+      | isIdHsWrapper wrapper                   -> desugarPat x p
+      | WpCast co <-  wrapper, isReflexiveCo co -> desugarPat x p
+      | otherwise -> do
+          (y, grds) <- desugarPatV p
+          wrap_rhs_y <- dsHsWrapper wrapper
+          pure (PmLet y (wrap_rhs_y (Var x)) : grds)
 
   -- (n + k)  ===>   let b = x >= k, True <- b, let n = x-k
   NPlusKPat _pat_ty (L _ n) k1 k2 ge minus -> do
