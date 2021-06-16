@@ -576,8 +576,8 @@ prepareBinding env top_lvl old_bndr bndr rhs
        ; return (floats, bndr, rhs') }
  where
    info = idInfo bndr
-   worker_info = vanillaIdInfo `setDmdSigInfo` dmdSigInfo info
-                               `setCprSigInfo`        cprSigInfo info
+   worker_info = vanillaIdInfo `setDmdSigInfo`     dmdSigInfo info
+                               `setCprSigInfo`     cprSigInfo info
                                `setDemandInfo`     demandInfo info
                                `setInlinePragInfo` inlinePragInfo info
                                `setArityInfo`      arityInfo info
