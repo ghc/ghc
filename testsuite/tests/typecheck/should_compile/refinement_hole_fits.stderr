@@ -85,6 +85,10 @@ refinement_hole_fits.hs:4:5: warning: [-Wtyped-holes (in -Wdefault)]
           with ($!) @GHC.Types.LiftedRep @[Integer] @Integer
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
            (and originally defined in ‘GHC.Base’))
+        j (_ :: [Integer] -> Integer)
+          where j :: forall a. a -> a
+          with j @([Integer] -> Integer)
+          (bound at refinement_hole_fits.hs:10:1)
         id (_ :: [Integer] -> Integer)
           where id :: forall a. a -> a
           with id @([Integer] -> Integer)
@@ -180,6 +184,10 @@ refinement_hole_fits.hs:7:5: warning: [-Wtyped-holes (in -Wdefault)]
           with ($!) @GHC.Types.LiftedRep @Integer @([Integer] -> Integer)
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
            (and originally defined in ‘GHC.Base’))
+        j (_ :: Integer -> [Integer] -> Integer)
+          where j :: forall a. a -> a
+          with j @(Integer -> [Integer] -> Integer)
+          (bound at refinement_hole_fits.hs:10:1)
         id (_ :: Integer -> [Integer] -> Integer)
           where id :: forall a. a -> a
           with id @(Integer -> [Integer] -> Integer)
@@ -206,3 +214,20 @@ refinement_hole_fits.hs:7:5: warning: [-Wtyped-holes (in -Wdefault)]
           with (!!) @(Integer -> [Integer] -> Integer)
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
            (and originally defined in ‘GHC.List’))
+
+refinement_hole_fits.hs:10:7: warning: [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _ :: a
+      Where: ‘a’ is a rigid type variable bound by
+               the type signature for:
+                 j :: forall a. a -> a
+               at refinement_hole_fits.hs:9:1-11
+    • In an equation for ‘j’: j a = _
+    • Relevant bindings include
+        a :: a (bound at refinement_hole_fits.hs:10:3)
+        j :: a -> a (bound at refinement_hole_fits.hs:10:1)
+      Valid hole fits include
+        a :: a (bound at refinement_hole_fits.hs:10:3)
+      Valid refinement hole fits include
+        j (_ :: a)
+          where j :: a -> a
+          (bound at refinement_hole_fits.hs:10:1)
