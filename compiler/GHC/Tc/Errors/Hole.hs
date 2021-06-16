@@ -66,7 +66,7 @@ import Data.List        ( partition, sort, sortOn, nubBy )
 import Data.Graph       ( graphFromEdges, topSort )
 
 
-import GHC.Tc.Solver    ( simplifyTopWanteds, runTcSDeriveds )
+import GHC.Tc.Solver    ( simplifyTopWanteds, runTcSDerivedsEarlyAbort, runTcSDeriveds )
 import GHC.Tc.Utils.Unify ( tcSubTypeSigma )
 
 import GHC.HsToCore.Docs ( extractDocs )
@@ -391,6 +391,19 @@ cause bewildering error messages. The solution here is simple: if a candidate
 would cause the type checker to error, it is not a valid hole fit, and thus it
 is discarded.
 
+Note [Speeding up valid hole-fits]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+To fix #16875 we noted that a lot of time was being spent on uneccessary work.
+
+When we'd call `tcCheckHoleFit hole hole_ty ty`, we would end up by generating
+a constraint to show that `hole_ty ~ ty`, including any constraints in `ty`. For
+example, if `hole_ty = Int` and `ty = Foldable t => (a -> Bool) -> t a -> Bool`,
+we'd have `(a_a1pa[sk:1] -> Bool) -> t_t2jk[sk:1] a_a1pa[sk:1] -> Bool ~# Int`
+from the coercion, as well as `Foldable t_t2jk[sk:1]`. By adding a flag to
+`TcSEnv` and adding a `runTcSDerivedsEarlyAbort`, we can fail as soon as we hit
+an insoluble constraint. Since we don't need the result in the case that it
+fails, a boolean `False` (i.e. "it didn't work" from `runTcSDerivedsEarlyAbort`)
+is sufficient.
 -}
 
 data HoleFitDispConfig = HFDC { showWrap :: Bool
@@ -876,7 +889,6 @@ tcFilterHoleFits limit typed_hole ht@(hole_ty, _) candidates =
          ; traceTc "Did it fit?" $ ppr fits
          ; traceTc "wrap is: " $ ppr wrp
          ; traceTc "checkingFitOf }" empty
-         ; z_wrp_tys <- zonkTcTypes (unfoldWrapper wrp)
          -- We'd like to avoid refinement suggestions like `id _ _` or
          -- `head _ _`, and only suggest refinements where our all phantom
          -- variables got unified during the checking. This can be disabled
@@ -885,24 +897,26 @@ tcFilterHoleFits limit typed_hole ht@(hole_ty, _) candidates =
          -- variables, i.e. zonk them to read their final value to check for
          -- abstract refinements, and to report what the type of the simulated
          -- holes must be for this to be a match.
-         ; if fits
-           then if null ref_vars
-                then return (Just (z_wrp_tys, []))
-                else do { let -- To be concrete matches, matches have to
-                              -- be more than just an invented type variable.
-                              fvSet = fvVarSet fvs
-                              notAbstract :: TcType -> Bool
-                              notAbstract t = case getTyVar_maybe t of
-                                                Just tv -> tv `elemVarSet` fvSet
-                                                _ -> True
-                              allConcrete = all notAbstract z_wrp_tys
-                        ; z_vars  <- zonkTcTyVars ref_vars
-                        ; let z_mtvs = mapMaybe tcGetTyVar_maybe z_vars
-                        ; allFilled <- not <$> anyM isFlexiTyVar z_mtvs
-                        ; allowAbstract <- goptM Opt_AbstractRefHoleFits
-                        ; if allowAbstract || (allFilled && allConcrete )
-                          then return $ Just (z_wrp_tys, z_vars)
-                          else return Nothing }
+         ; if fits then do {
+              -- Zonking is expensive, so we only do it if required.
+              z_wrp_tys <- zonkTcTypes (unfoldWrapper wrp)
+            ; if null ref_vars
+              then return (Just (z_wrp_tys, []))
+              else do { let -- To be concrete matches, matches have to
+                            -- be more than just an invented type variable.
+                            fvSet = fvVarSet fvs
+                            notAbstract :: TcType -> Bool
+                            notAbstract t = case getTyVar_maybe t of
+                                              Just tv -> tv `elemVarSet` fvSet
+                                              _ -> True
+                            allConcrete = all notAbstract z_wrp_tys
+                      ; z_vars  <- zonkTcTyVars ref_vars
+                      ; let z_mtvs = mapMaybe tcGetTyVar_maybe z_vars
+                      ; allFilled <- not <$> anyM isFlexiTyVar z_mtvs
+                      ; allowAbstract <- goptM Opt_AbstractRefHoleFits
+                      ; if allowAbstract || (allFilled && allConcrete )
+                        then return $ Just (z_wrp_tys, z_vars)
+                        else return Nothing }}
            else return Nothing }
      where fvs = mkFVs ref_vars `unionFV` hole_fvs `unionFV` tyCoFVsOfType ty
            hole = typed_hole { th_hole = Nothing }
@@ -942,7 +956,8 @@ tcSubsumes ty_a ty_b = fst <$> tcCheckHoleFit dummyHole ty_a ty_b
 -- constraints on the type of the hole.
 tcCheckHoleFit :: TypedHole   -- ^ The hole to check against
                -> TcSigmaType
-               -- ^ The type to check against (possibly modified, e.g. refined)
+               -- ^ The type of the hole to check against (possibly modified,
+               -- e.g. refined with additional holes for refinement hole-fits.)
                -> TcSigmaType -- ^ The type to check whether fits.
                -> TcM (Bool, HsWrapper)
                -- ^ Whether it was a match, and the wrapper from hole_ty to ty.
@@ -970,22 +985,21 @@ tcCheckHoleFit (TypedHole {..}) hole_ty ty = discardErrs $
                 -- The relevant constraints may contain HoleDests, so we must
                 -- take care to clone them as well (to avoid #15370).
                ; cloned_relevants <- mapBagM cloneWanted th_relevant_cts
-                 -- We wrap the WC in the nested implications, see
+                 -- We wrap the WC in the nested implications, for details, see
                  -- Note [Checking hole fits]
-               ; let outermost_first = reverse th_implics
-                    -- We add the cloned relevants to the wanteds generated by
-                    -- the call to tcSubType_NC, see Note [Relevant constraints]
-                    -- There's no need to clone the wanteds, because they are
-                    -- freshly generated by `tcSubtype_NC`.
-                     w_rel_cts = addSimples wanted cloned_relevants
-                     final_wc  = foldr (setWCAndBinds fresh_binds) w_rel_cts outermost_first
+               ; let wrapInImpls cts = foldl (flip (setWCAndBinds fresh_binds)) cts th_implics
+                     final_wc  = wrapInImpls $ addSimples wanted cloned_relevants
+                 -- We add the cloned relevants to the wanteds generated
+                 -- by the call to tcSubType_NC, for details, see
+                 -- Note [Relevant constraints]. There's no need to clone
+                 -- the wanteds, because they are freshly generated by the
+                 -- call to`tcSubtype_NC`.
                ; traceTc "final_wc is: " $ ppr final_wc
-               ; rem <- runTcSDeriveds $ simplifyTopWanteds final_wc
-               -- We don't want any insoluble or simple constraints left, but
-               -- solved implications are ok (and necessary for e.g. undefined)
-               ; traceTc "rems was:" $ ppr rem
+                 -- See Note [Speeding up valid-hole fits]
+               ; (rem, _) <- tryTc $ runTcSDerivedsEarlyAbort $ simplifyTopWanteds final_wc
                ; traceTc "}" empty
-               ; return (isSolvedWC rem, wrap) } }
+               ; return (any isSolvedWC rem, wrap)
+               } }
      where
        setWCAndBinds :: EvBindsVar         -- Fresh ev binds var.
                      -> Implication        -- The implication to put WC in.
