@@ -94,6 +94,7 @@ GHC.Driver.Hooks
 GHC.Driver.Monad
 GHC.Driver.Phases
 GHC.Driver.Pipeline.Monad
+GHC.Driver.Pipeline.Phases
 GHC.Driver.Plugins
 GHC.Driver.Ppr
 GHC.Driver.Session
