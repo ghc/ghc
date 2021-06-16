@@ -213,12 +213,13 @@ checkAmbiguity ctxt ty
          -- can cause a cascade of further errors.  Since the free
          -- tyvars are skolemised, we can safely use tcSimplifyTop
        ; allow_ambiguous <- xoptM LangExt.AllowAmbiguousTypes
-       ; (_wrap, wanted) <- addErrCtxt (mk_msg allow_ambiguous) $
-                            captureConstraints $
-                            tcSubTypeSigma ctxt ty ty
-       ; simplifyAmbiguityCheck ty wanted
-
-       ; traceTc "Done ambiguity check for" (ppr ty) }
+       ; unless allow_ambiguous $
+          do { (_wrap, wanted) <- addErrCtxt (mk_msg allow_ambiguous) $
+                                  captureConstraints $
+                                  tcSubTypeSigma ctxt ty ty
+             ; simplifyAmbiguityCheck ty wanted
+             ; traceTc "Done ambiguity check for" (ppr ty) }
+       }
 
   | otherwise
   = return ()
@@ -394,7 +395,10 @@ checkValidType ctxt ty
        -- Check for ambiguous types.  See Note [When to call checkAmbiguity]
        -- NB: this will happen even for monotypes, but that should be cheap;
        --     and there may be nested foralls for the subtype test to examine
-       ; checkAmbiguity ctxt ty
+       -- Inaccessible code warnings would be duplicates of those found when checking ty
+       -- above, and so we disable them.
+       ; unsetWOptM Opt_WarnInaccessibleCode $ -- turn off inaccessible code warnings, since they would be redundant with warnings reported by the above checks on ty.
+         checkAmbiguity ctxt ty
 
        ; traceTc "checkValidType done" (ppr ty <+> text "::" <+> ppr (tcTypeKind ty)) }
 
