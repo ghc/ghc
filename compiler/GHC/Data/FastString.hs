@@ -598,8 +598,8 @@ zEncodeFS :: FastString -> FastZString
 zEncodeFS fs = fs_zenc fs
 
 appendFS :: FastString -> FastString -> FastString
-appendFS fs1 fs2 = mkFastStringByteString
-                 $ BS.append (bytesFS fs1) (bytesFS fs2)
+appendFS fs1 fs2 = mkFastStringShortByteString
+                 $ (Semi.<>) (fs_sbs fs1) (fs_sbs fs2)
 
 concatFS :: [FastString] -> FastString
 concatFS = mkFastStringShortByteString . mconcat . map fs_sbs
