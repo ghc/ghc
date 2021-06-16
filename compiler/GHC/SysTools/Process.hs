@@ -93,9 +93,9 @@ readProcessEnvWithExitCode
     -> (String, String) -- ^ addition to the environment
     -> IO (ExitCode, String, String) -- ^ (exit_code, stdout, stderr)
 readProcessEnvWithExitCode prog args env_update = do
-    current_env <- getEnvironment
-    readCreateProcessWithExitCode (proc prog args) {
-        env = Just (replaceVar env_update current_env) } ""
+--    current_env <- getEnvironment
+    readCreateProcessWithExitCode (proc prog args) -- {
+--        env = Just (replaceVar env_update current_env) } ""
 
 -- Don't let gcc localize version info string, #8825
 c_locale_env :: (String, String)
