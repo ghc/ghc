@@ -35,7 +35,6 @@ import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
 
 import GHC.Core.Utils
 import GHC.Core.Opt.Arity
-import GHC.Core.FVs
 import GHC.Core.Opt.Monad ( CoreToDo(..) )
 import GHC.Core.Lint    ( endPassIO )
 import GHC.Core
@@ -63,7 +62,6 @@ import GHC.Utils.Trace
 
 import GHC.Types.Demand
 import GHC.Types.Var
-import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Id
 import GHC.Types.Id.Info
@@ -782,7 +780,7 @@ cpeRhsE env expr@(Lit (LitNumber nt i))
       Just e  -> cpeRhsE env e
 cpeRhsE _env expr@(Lit {}) = return (emptyFloats, expr)
 cpeRhsE env expr@(Var {})  = cpeApp env expr
-cpeRhsE env expr@(App {}) = cpeApp env expr
+cpeRhsE env expr@(App {})  = cpeApp env expr
 
 cpeRhsE env (Let bind body)
   = do { (env', bind_floats, maybe_bind') <- cpeBind NotTopLevel env bind
@@ -916,9 +914,7 @@ rhsToBody (Cast e co)
   = do { (floats, e') <- rhsToBody e
        ; return (floats, Cast e' co) }
 
-rhsToBody expr@(Lam {})
-  | Just no_lam_result <- tryEtaReducePrep bndrs body
-  = return (emptyFloats, no_lam_result)
+rhsToBody expr@(Lam {})   -- See Note [No eta reduction needed in rhsToBody]
   | all isTyVar bndrs           -- Type lambdas are ok
   = return (emptyFloats, expr)
   | otherwise                   -- Some value lambdas
@@ -927,11 +923,30 @@ rhsToBody expr@(Lam {})
        ; let float = FloatLet (NonRec fn rhs)
        ; return (unitFloat float, Var fn) }
   where
-    (bndrs,body) = collectBinders expr
+    (bndrs,_) = collectBinders expr
 
 rhsToBody expr = return (emptyFloats, expr)
 
 
+{- Note [No eta reduction needed in rhsToBody]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Historical note.  In the olden days we used to have a Prep-specific
+eta-reduction step in rhsToBody:
+  rhsToBody expr@(Lam {})
+    | Just no_lam_result <- tryEtaReducePrep bndrs body
+    = return (emptyFloats, no_lam_result)
+
+The goal was to reduce
+        case x of { p -> \xs. map f xs }
+    ==> case x of { p -> map f }
+
+to avoid allocating a lambda.  Of course, we'd allocate a PAP
+instead, which is hardly better, but that's the way it was.
+
+Anyway, now we eta-reduce PAPs in the Simplifier (see
+Note [Eta reduce PAPs] in GHC.Core.Opt.Arity), so there is
+no need to do so here.
+-}
 
 -- ---------------------------------------------------------------------------
 --              CpeApp: produces a result satisfying CpeApp
@@ -1085,7 +1100,7 @@ cpeApp top_env expr
        case head of
          Just fn_id -> do { sat_app <- maybeSaturate fn_id app depth
                           ; return (floats, sat_app) }
-         _other              -> return (floats, app)
+         _other     -> return (floats, app)
 
     -- Deconstruct and rebuild the application, floating any non-atomic
     -- arguments to the outside.  We collect the type of the expression,
@@ -1452,7 +1467,7 @@ maybeSaturate fn expr n_args
 
 Note [Eta expansion]
 ~~~~~~~~~~~~~~~~~~~~~
-Eta expand to match the arity claimed by the binder Remember,
+Eta expand to match the arity claimed by the binder. Remember,
 CorePrep must not change arity
 
 Eta expansion might not have happened already, because it is done by
@@ -1460,7 +1475,7 @@ the simplifier only when there at least one lambda already.
 
 NB1:we could refrain when the RHS is trivial (which can happen
     for exported things).  This would reduce the amount of code
-    generated (a little) and make things a little words for
+    generated (a little) and make things a little worse for
     code compiled without -O.  The case in point is data constructor
     wrappers.
 
@@ -1493,50 +1508,6 @@ cpeEtaExpand arity expr
   | arity == 0 = expr
   | otherwise  = etaExpand arity expr
 
-{-
--- -----------------------------------------------------------------------------
---      Eta reduction
--- -----------------------------------------------------------------------------
-
-Why try eta reduction?  Hasn't the simplifier already done eta?
-But the simplifier only eta reduces if that leaves something
-trivial (like f, or f Int).  But for deLam it would be enough to
-get to a partial application:
-        case x of { p -> \xs. map f xs }
-    ==> case x of { p -> map f }
--}
-
--- When updating this function, make sure it lines up with
--- GHC.Core.Utils.tryEtaReduce!
-tryEtaReducePrep :: [CoreBndr] -> CoreExpr -> Maybe CoreExpr
-tryEtaReducePrep bndrs expr@(App _ _)
-  | ok_to_eta_reduce f
-  , n_remaining >= 0
-  , and (zipWith ok bndrs last_args)
-  , not (any (`elemVarSet` fvs_remaining) bndrs)
-  , exprIsHNF remaining_expr   -- Don't turn value into a non-value
-                               -- else the behaviour with 'seq' changes
-  = Just remaining_expr
-  where
-    (f, args) = collectArgs expr
-    remaining_expr = mkApps f remaining_args
-    fvs_remaining = exprFreeVars remaining_expr
-    (remaining_args, last_args) = splitAt n_remaining args
-    n_remaining = length args - length bndrs
-
-    ok bndr (Var arg) = bndr == arg
-    ok _    _         = False
-
-    -- We can't eta reduce something which must be saturated.
-    ok_to_eta_reduce (Var f) = not (hasNoBinding f) && not (isLinearType (idType f))
-    ok_to_eta_reduce _       = False -- Safe. ToDo: generalise
-
-
-tryEtaReducePrep bndrs (Tick tickish e)
-  | tickishFloatable tickish
-  = fmap (mkTick tickish) $ tryEtaReducePrep bndrs e
-
-tryEtaReducePrep _ _ = Nothing
 
 {-
 ************************************************************************

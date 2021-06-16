@@ -8,7 +8,8 @@ The simplifier utilities
 
 module GHC.Core.Opt.Simplify.Utils (
         -- Rebuilding
-        mkLam, mkCase, prepareAlts, tryEtaExpandRhs,
+        rebuildLam, mkCase, prepareAlts,
+        tryEtaExpandRhs, wantEtaExpansion,
 
         -- Inlining,
         preInlineUnconditionally, postInlineUnconditionally,
@@ -22,7 +23,7 @@ module GHC.Core.Opt.Simplify.Utils (
         contIsDupable, contResultType, contHoleType, contHoleScaling,
         contIsTrivial, contArgs,
         countArgs,
-        mkBoringStop, mkRhsStop, mkLazyArgStop, contIsRhsOrArg,
+        mkBoringStop, mkRhsStop, mkLazyArgStop,
         interestingCallContext,
 
         -- ArgInfo
@@ -394,22 +395,16 @@ mkFunRules rs = Just (n_required, rs)
 mkBoringStop :: OutType -> SimplCont
 mkBoringStop ty = Stop ty BoringCtxt
 
-mkRhsStop :: OutType -> SimplCont       -- See Note [RHS of lets] in GHC.Core.Unfold
-mkRhsStop ty = Stop ty RhsCtxt
+mkRhsStop :: OutType -> RecFlag -> SimplCont       -- See Note [RHS of lets] in GHC.Core.Unfold
+mkRhsStop ty is_rec = Stop ty (RhsCtxt is_rec)
 
 mkLazyArgStop :: OutType -> CallCtxt -> SimplCont
 mkLazyArgStop ty cci = Stop ty cci
 
 -------------------
-contIsRhsOrArg :: SimplCont -> Bool
-contIsRhsOrArg (Stop {})       = True
-contIsRhsOrArg (StrictBind {}) = True
-contIsRhsOrArg (StrictArg {})  = True
-contIsRhsOrArg _               = False
-
-contIsRhs :: SimplCont -> Bool
-contIsRhs (Stop _ RhsCtxt) = True
-contIsRhs _                = False
+contIsRhs :: SimplCont -> Maybe RecFlag
+contIsRhs (Stop _ (RhsCtxt is_rec)) = Just is_rec
+contIsRhs _                         = Nothing
 
 -------------------
 contIsStop :: SimplCont -> Bool
@@ -697,7 +692,7 @@ strictArgContext (ArgInfo { ai_encl = encl_rules, ai_discs = discs })
 -- Use this for strict arguments
   | encl_rules                = RuleArgCtxt
   | disc:_ <- discs, disc > 0 = DiscArgCtxt  -- Be keener here
-  | otherwise                 = RhsCtxt
+  | otherwise                 = RhsCtxt NonRecursive
       -- Why RhsCtxt?  if we see f (g x) (h x), and f is strict, we
       -- want to be a bit more eager to inline g, because it may
       -- expose an eval (on x perhaps) that can be eliminated or
@@ -1553,55 +1548,77 @@ won't inline because 'e' is too big.
 ************************************************************************
 -}
 
-mkLam :: SimplEnv -> [OutBndr] -> OutExpr -> SimplCont -> SimplM OutExpr
--- mkLam tries three things
+rebuildLam :: SimplEnv
+           -> [OutBndr] -> SimplFloats -> OutExpr
+           -> SimplCont -> SimplM (SimplFloats, OutExpr)
+-- (rebuildLam env bndrs floats body cont)
+-- returns an expression that means the same as
+--      \bndrs. let floats in body
+-- But it tries
 --      a) eta reduction, if that gives a trivial expression
 --      b) eta expansion [only if there are some value lambdas]
+--
+-- Invariant: emptyFloats in => emptyFloats out
+rebuildLam _env [] floats body _cont
+  = return (floats, body)
 
-mkLam _env [] body _cont
-  = return body
-mkLam env bndrs body cont
+rebuildLam env bndrs floats body cont
   = do { dflags <- getDynFlags
        ; mkLam' dflags bndrs body }
   where
-    mkLam' :: DynFlags -> [OutBndr] -> OutExpr -> SimplM OutExpr
+
+    mb_rhs :: Maybe RecFlag   -- Just => continuation is the RHS of a let
+    mb_rhs = contIsRhs cont
+
+    mkLam' :: DynFlags -> [OutBndr] -> OutExpr -> SimplM (SimplFloats, OutExpr)
     mkLam' dflags bndrs (Cast body co)
       | not (any bad bndrs)
         -- Note [Casts and lambdas]
-      = do { lam <- mkLam' dflags bndrs body
-           ; return (mkCast lam (mkPiCos Representational bndrs co)) }
+      = do { (floats, lam) <- mkLam' dflags bndrs body
+           ; return (floats, mkCast lam (mkPiCos Representational bndrs co)) }
       where
         co_vars  = tyCoVarsOfCo co
         bad bndr = isCoVar bndr && bndr `elemVarSet` co_vars
 
     mkLam' dflags bndrs body@(Lam {})
+      | isEmptyFloats floats   -- \xs. let floats in \ys. blah
+                               -- Do not combine these lambdas
       = mkLam' dflags (bndrs ++ bndrs1) body1
       where
         (bndrs1, body1) = collectBinders body
 
     mkLam' dflags bndrs (Tick t expr)
       | tickishFloatable t
-      = mkTick t <$> mkLam' dflags bndrs expr
+      = do { (floats, expr') <- mkLam' dflags bndrs expr
+           ; return (floats, mkTick t expr') }
 
     mkLam' dflags bndrs body
       | gopt Opt_DoEtaReduction dflags
+      , case mb_rhs of { Just Recursive -> False; _ -> True }
+            -- Is this lambda the RHS of a non-recursive let?
+            -- See Note [Eta reduce PAPs] in GHC.Core.Opt.Arity, and
+            -- Note [Do not eta-expand PAPs] in this module
+            -- If so try eta-reduction; but not otherwise
+      , etaFloatOk bndrs floats  -- Can the floats go outside the lambdas?
       , Just etad_lam <- tryEtaReduce bndrs body
       = do { tick (EtaReduction (head bndrs))
-           ; return etad_lam }
+           ; return (floats, etad_lam) }
 
-      | not (contIsRhs cont)   -- See Note [Eta-expanding lambdas]
+      | Nothing <- mb_rhs  -- See Note [Eta-expanding lambdas]
       , sm_eta_expand (getMode env)
-      , any isRuntimeVar bndrs
-      , let body_arity = exprEtaExpandArity dflags body
-      , expandableArityType body_arity
+      , any isRuntimeVar bndrs  -- Only when there is at least one value lambda already
+      , let full_body  = wrapFloats floats body
+            body_arity = exprEtaExpandArity dflags full_body
+      , expandableArityType body_arity  -- This guard is only so that we only do
+                                        -- a tick if there so something to do
       = do { tick (EtaExpansion (head bndrs))
-           ; let res = mkLams bndrs (etaExpandAT body_arity body)
-           ; traceSmpl "eta expand" (vcat [text "before" <+> ppr (mkLams bndrs body)
+           ; let res = mkLams bndrs (etaExpandAT body_arity full_body)
+           ; traceSmpl "eta expand" (vcat [text "before" <+> ppr (mkLams bndrs full_body)
                                           , text "after" <+> ppr res])
-           ; return res }
+           ; return (emptyFloats env, res) }
 
       | otherwise
-      = return (mkLams bndrs body)
+      = return (emptyFloats env, mkLams bndrs (wrapFloats floats body))
 
 {-
 Note [Eta expanding lambdas]
@@ -1664,18 +1681,18 @@ because the latter is not well-kinded.
 ************************************************************************
 -}
 
-tryEtaExpandRhs :: SimplMode -> OutId -> OutExpr
+tryEtaExpandRhs :: SimplMode -> RecFlag -> OutId -> OutExpr
                 -> SimplM (ArityType, OutExpr)
 -- See Note [Eta-expanding at let bindings]
 -- If tryEtaExpandRhs rhs = (n, is_bot, rhs') then
 --   (a) rhs' has manifest arity n
 --   (b) if is_bot is True then rhs' applied to n args is guaranteed bottom
-tryEtaExpandRhs mode bndr rhs
+tryEtaExpandRhs mode is_rec bndr rhs
   | Just join_arity <- isJoinId_maybe bndr
   = do { let (join_bndrs, join_body) = collectNBinders join_arity rhs
              oss   = [idOneShotInfo id | id <- join_bndrs, isId id]
              arity_type | exprIsDeadEnd join_body = mkBotArityType oss
-                        | otherwise               = mkTopArityType oss
+                        | otherwise               = mkManifestArityType oss
        ; return (arity_type, rhs) }
          -- Note [Do not eta-expand join points]
          -- But do return the correct arity and bottom-ness, because
@@ -1684,7 +1701,7 @@ tryEtaExpandRhs mode bndr rhs
 
   | sm_eta_expand mode      -- Provided eta-expansion is on
   , new_arity > old_arity   -- And the current manifest arity isn't enough
-  , want_eta rhs
+  , wantEtaExpansion rhs
   = do { tick (EtaExpansion bndr)
        ; return (arity_type, etaExpandAT arity_type rhs) }
 
@@ -1695,24 +1712,19 @@ tryEtaExpandRhs mode bndr rhs
     dflags    = sm_dflags mode
     old_arity = exprArity rhs
 
-    arity_type = findRhsArity dflags bndr rhs old_arity
-                 `maxWithArity` idCallArity bndr
-    new_arity = arityTypeArity arity_type
+    arity_type = findRhsArity dflags is_rec bndr rhs old_arity
+    new_arity  = arityTypeArity arity_type
 
-    -- See Note [Which RHSs do we eta-expand?]
-    want_eta (Cast e _)                  = want_eta e
-    want_eta (Tick _ e)                  = want_eta e
-    want_eta (Lam b e) | isTyVar b       = want_eta e
-    want_eta (App e a) | exprIsTrivial a = want_eta e
-    want_eta (Var {})                    = False
-    want_eta (Lit {})                    = False
-    want_eta _ = True
-{-
-    want_eta _ = case arity_type of
-                   ATop (os:_) -> isOneShotInfo os
-                   ATop []     -> False
-                   ABot {}     -> True
--}
+wantEtaExpansion :: CoreExpr -> Bool
+-- Mostly True; but False of PAPs which will immediately eta-reduce again
+-- See Note [Which RHSs do we eta-expand?]
+wantEtaExpansion (Cast e _)             = wantEtaExpansion e
+wantEtaExpansion (Tick _ e)             = wantEtaExpansion e
+wantEtaExpansion (Lam b e) | isTyVar b  = wantEtaExpansion e
+wantEtaExpansion (App e _)              = wantEtaExpansion e
+wantEtaExpansion (Var {})               = False
+wantEtaExpansion (Lit {})               = False
+wantEtaExpansion _                      = True
 
 {-
 Note [Eta-expanding at let bindings]

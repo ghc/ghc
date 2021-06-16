@@ -20,7 +20,7 @@ module GHC.Core.Opt.Simplify.Env (
         getSimplRules,
 
         -- * Substitution results
-        SimplSR(..), mkContEx, substId, lookupRecBndr, refineFromInScope,
+        SimplSR(..), mkContEx, substId, lookupRecBndr,
 
         -- * Simplifying 'Id' binders
         simplNonRecBndr, simplNonRecJoinBndr, simplRecBndrs, simplRecJoinBndrs,
@@ -32,7 +32,8 @@ module GHC.Core.Opt.Simplify.Env (
         SimplFloats(..), emptyFloats, mkRecFloats,
         mkFloatBind, addLetFloats, addJoinFloats, addFloats,
         extendFloats, wrapFloats,
-        doFloatFromRhs, getTopFloatBinds,
+        isEmptyFloats, isEmptyJoinFloats, isEmptyLetFloats,
+        doFloatFromRhs, getTopFloatBinds, etaFloatOk,
 
         -- * LetFloats
         LetFloats, letFloatBinds, emptyLetFloats, unitLetFloat,
@@ -49,6 +50,7 @@ import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Opt.Monad        ( SimplMode(..) )
 import GHC.Core
 import GHC.Core.Utils
+import GHC.Core.FVs
 import GHC.Core.Multiplicity     ( scaleScaled )
 import GHC.Core.Unfold
 import GHC.Types.Var
@@ -74,6 +76,8 @@ import GHC.Utils.Logger
 import GHC.Types.Unique.FM      ( pprUniqFM )
 
 import Data.List (mapAccumL)
+
+import GHC.Utils.Trace( pprTrace )
 
 {-
 ************************************************************************
@@ -138,6 +142,10 @@ emptyFloats env
   = SimplFloats { sfLetFloats  = emptyLetFloats
                 , sfJoinFloats = emptyJoinFloats
                 , sfInScope    = seInScope env }
+
+isEmptyFloats :: SimplFloats -> Bool
+isEmptyFloats (SimplFloats { sfLetFloats = lf, sfJoinFloats = jf })
+  = isEmptyLetFloats lf && isEmptyJoinFloats jf
 
 pprSimplEnv :: SimplEnv -> SDoc
 -- Used for debugging; selective
@@ -495,6 +503,23 @@ doFloatFromRhs lvl rec str (SimplFloats { sfLetFloats = LetFloats fs ff }) rhs
                    FltOkSpec  -> isNotTopLevel lvl && isNonRec rec
                    FltCareful -> isNotTopLevel lvl && isNonRec rec && str
 
+etaFloatOk :: [Id] -> SimplFloats -> Bool
+etaFloatOk bndrs (SimplFloats { sfLetFloats = LetFloats let_floats float_flag
+                              , sfJoinFloats = join_floats })
+  =  isEmptyJoinFloats join_floats
+  && case float_flag of { FltCareful -> False; _ -> True }
+  && bndr_set `disjointVarSet` let_float_fvs
+  && bndr_set `disjointVarSet` let_float_bndrs
+  where
+    bndr_set        = mkVarSet bndrs
+    let_float_bndrs = foldr (unionVarSet . mkVarSet . bindersOf) emptyVarSet let_floats
+    let_float_fvs   = foldr (unionVarSet . bindFreeVars) emptyVarSet let_floats
+         -- This formulation may return a set that is slightly too large,
+         -- by not deleting variables bound by the let's, but that is rare
+         -- and at worst we miss an eta-reduction
+
+
+
 {-
 Note [Float when cheap or expandable]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -510,8 +535,14 @@ so we must take the 'or' of the two.
 emptyLetFloats :: LetFloats
 emptyLetFloats = LetFloats nilOL FltLifted
 
+isEmptyLetFloats :: LetFloats -> Bool
+isEmptyLetFloats (LetFloats fs _) = isNilOL fs
+
 emptyJoinFloats :: JoinFloats
 emptyJoinFloats = nilOL
+
+isEmptyJoinFloats :: JoinFloats -> Bool
+isEmptyJoinFloats = isNilOL
 
 unitLetFloat :: OutBind -> LetFloats
 -- This key function constructs a singleton float with the right form
@@ -702,7 +733,8 @@ refineFromInScope :: InScopeSet -> Var -> Var
 refineFromInScope in_scope v
   | isLocalId v = case lookupInScope in_scope v of
                   Just v' -> v'
-                  Nothing -> pprPanic "refineFromInScope" (ppr in_scope $$ ppr v)
+                  Nothing -> pprTrace "refineFromInScope" (ppr in_scope $$ ppr v) v
+                             -- pprPanic "refineFromInScope" (ppr in_scope $$ ppr v)
                              -- c.f #19074 for a subtle place where this went wrong
   | otherwise = v
 
@@ -788,7 +820,6 @@ simplRecBndrs env@(SimplEnv {}) ids
   = assert (all (not . isJoinId) ids) $
     do  { let (!env1, ids1) = mapAccumL substIdBndr env ids
         ; seqIds ids1 `seq` return env1 }
-
 
 ---------------
 substIdBndr :: SimplEnv -> InBndr -> (SimplEnv, OutBndr)
@@ -1016,7 +1047,7 @@ getTCvSubst (SimplEnv { seInScope = in_scope, seTvSubst = tv_env
                       , seCvSubst = cv_env })
   = mkTCvSubst in_scope (tv_env, cv_env)
 
-substTy :: SimplEnv -> Type -> Type
+substTy :: HasDebugCallStack => SimplEnv -> Type -> Type
 substTy env ty = Type.substTy (getTCvSubst env) ty
 
 substTyVar :: SimplEnv -> TyVar -> Type
