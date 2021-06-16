@@ -23,7 +23,6 @@ module GHC.Hs.Pat (
         Pat(..), LPat,
         EpAnnSumPat(..),
         ConPatTc (..),
-        CoPat (..),
         ListPatTc(..),
         ConLikeP,
         HsPatExpansion(..),
@@ -160,21 +159,6 @@ type instance XXPat GhcTc = XXPatGhcTc
   -- HsExpansion allows us to handle RebindableSyntax in pattern position:
   -- see "XXExpr GhcTc" for the counterpart in expressions.
 
-data XXPatGhcTc
-  = XCoPat
-      {-# UNPACK #-} !CoPat
-  | ExpansionPat
-      {-# UNPACK #-} !(HsPatExpansion (Pat GhcRn) (Pat GhcTc))
-
--- See Note [Rebindable syntax and HsExpansion].
-data HsPatExpansion a b
-  = HsPatExpanded a b
-  deriving Data
-
--- | Just print the original expression (the @a@).
-instance (Outputable a, Outputable b) => Outputable (HsPatExpansion a b) where
-  ppr (HsPatExpanded a b) = ifPprDebug (vcat [ppr a, ppr b]) (ppr a)
-
 type instance ConLikeP GhcPs = RdrName -- IdP GhcPs
 type instance ConLikeP GhcRn = Name    -- IdP GhcRn
 type instance ConLikeP GhcTc = ConLike
@@ -192,6 +176,33 @@ data EpAnnSumPat = EpAnnSumPat
       } deriving Data
 
 -- ---------------------------------------------------------------------
+
+-- | Extension constructor for Pat added after typechecking.
+data XXPatGhcTc
+  = -- | Coercion Pattern (translation only)
+    --
+    -- During desugaring a (CoPat co pat) turns into a cast with 'co' on the
+    -- scrutinee, followed by a match on 'pat'.
+    CoPat
+      { -- | Coercion Pattern
+        -- If co :: t1 ~ t2, p :: t2,
+        -- then (CoPat co p) :: t1
+        co_cpt_wrap :: HsWrapper
+
+      , -- | Why not LPat?  Ans: existing locn will do
+        co_pat_inner :: Pat GhcTc
+
+      , -- | Type of whole pattern, t1
+        co_pat_ty :: Type
+      }
+  | ExpansionPat
+      {-# UNPACK #-} !(HsPatExpansion (Pat GhcRn) (Pat GhcTc))
+
+
+-- See Note [Rebindable syntax and HsExpansion].
+data HsPatExpansion a b
+  = HsPatExpanded a b
+  deriving Data
 
 -- | This is the extension field for ConPat, added after typechecking
 -- It adds quite a few extra fields, to support elaboration of pattern matching.
@@ -221,24 +232,6 @@ data ConPatTc
       cpt_wrap  :: HsWrapper
     }
 
--- | Coercion Pattern (translation only)
---
--- During desugaring a (CoPat co pat) turns into a cast with 'co' on the
--- scrutinee, followed by a match on 'pat'.
-data CoPat
-  = CoPat
-    { -- | Coercion Pattern
-      -- If co :: t1 ~ t2, p :: t2,
-      -- then (CoPat co p) :: t1
-      co_cpt_wrap :: HsWrapper
-
-    , -- | Why not LPat?  Ans: existing locn will do
-      co_pat_inner :: Pat GhcTc
-
-    , -- | Type of whole pattern, t1
-      co_pat_ty :: Type
-    }
-
 hsRecFieldId :: HsRecField GhcTc arg -> Id
 hsRecFieldId = hsRecFieldSel
 
@@ -262,6 +255,10 @@ hsRecUpdFieldOcc = fmap unambiguousFieldOcc . hfbLHS
 
 instance OutputableBndrId p => Outputable (Pat (GhcPass p)) where
     ppr = pprPat
+
+-- See Note [Rebindable syntax and HsExpansion].
+instance (Outputable a, Outputable b) => Outputable (HsPatExpansion a b) where
+  ppr (HsPatExpanded a b) = ifPprDebug (vcat [ppr a, ppr b]) (ppr a)
 
 pprLPat :: (OutputableBndrId p) => LPat (GhcPass p) -> SDoc
 pprLPat (L _ e) = pprPat e
@@ -289,7 +286,7 @@ pprParendPat p pat = sdocOption sdocPrintTypecheckerElaboration $ \ print_tc_ela
   where
     need_parens print_tc_elab pat
       | GhcTc <- ghcPass @p
-      , XPat (XCoPat {}) <- pat
+      , XPat (CoPat {}) <- pat
       = print_tc_elab
 
       | otherwise
@@ -357,7 +354,7 @@ pprPat (XPat ext) = case ghcPass @p of
   GhcRn -> case ext of
     HsPatExpanded orig _ -> pprPat orig
   GhcTc -> case ext of
-    XCoPat (CoPat co pat _) ->
+    CoPat co pat _ ->
       pprHsWrapper co $ \parens ->
         if parens
         then pprParendPat appPrec pat
@@ -568,7 +565,7 @@ isIrrefutableHsPat' is_strict = goL
       GhcRn -> case ext of
         HsPatExpanded _ pat -> go pat
       GhcTc -> case ext of
-        XCoPat (CoPat _ pat _) -> go pat
+        CoPat _ pat _ -> go pat
         ExpansionPat (HsPatExpanded _ pat) -> go pat
 
 -- | Is the pattern any of combination of:
@@ -615,6 +612,8 @@ is the only thing that could possibly be matched!
 patNeedsParens :: forall p. IsPass p => PprPrec -> Pat (GhcPass p) -> Bool
 patNeedsParens p = go @p
   where
+    -- Remark: go needs to be polymorphic, as we can call it recursively
+    -- at a different pass. See the case for GhcTc XPat below.
     go :: forall q. IsPass q => Pat (GhcPass q) -> Bool
     go (NPlusKPat {})    = p > opPrec
     go (SplicePat {})    = False
@@ -629,8 +628,8 @@ patNeedsParens p = go @p
       GhcRn -> case ext of
         HsPatExpanded orig _ -> go orig
       GhcTc -> case ext of
-        XCoPat (CoPat _ inner _ ) -> go inner
-        ExpansionPat (HsPatExpanded orig _) -> go orig
+        CoPat _ inner _ -> go inner
+        ExpansionPat (HsPatExpanded orig _) -> go orig -- NB: recursive call of go at a different pass.
     go (WildPat {})      = False
     go (VarPat {})       = False
     go (LazyPat {})      = False
@@ -705,7 +704,7 @@ collectEvVarsPat pat =
                                    $ hsConPatArgs args
     SigPat  _ p _    -> collectEvVarsLPat p
     XPat ext -> case ext of
-      XCoPat (CoPat _ p _)             -> collectEvVarsPat p
+      CoPat _ p _                      -> collectEvVarsPat p
       ExpansionPat (HsPatExpanded _ p) -> collectEvVarsPat p
     _other_pat       -> emptyBag
 

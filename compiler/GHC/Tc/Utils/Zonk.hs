@@ -1467,11 +1467,11 @@ zonk_pat env (NPlusKPat ty (L loc n) (L l lit1) lit2 e1 e2)
                   NPlusKPat ty' (L loc n') (L l lit1') lit2' e1' e2') }
 zonk_pat env (XPat ext) = case ext of
   { ExpansionPat (HsPatExpanded _ pat) -> zonk_pat env pat
-  ; XCoPat (CoPat co_fn pat ty) ->
+  ; CoPat co_fn pat ty ->
     do { (env', co_fn') <- zonkCoFn env co_fn
        ; (env'', pat') <- zonkPat env' (noLocA pat)
        ; ty' <- zonkTcTypeToTypeX env'' ty
-       ; return (env'', XPat . XCoPat $ CoPat co_fn' (unLoc pat') ty')
+       ; return (env'', XPat $ CoPat co_fn' (unLoc pat') ty')
        }}
 
 zonk_pat _ pat = pprPanic "zonk_pat" (ppr pat)

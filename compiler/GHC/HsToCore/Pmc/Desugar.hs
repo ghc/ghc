@@ -128,7 +128,7 @@ desugarPat x pat = case pat of
     -- See Note [Desugar CoPats]
     -- Generally the translation is
     -- pat |> co   ===>   let y = x |> co, pat <- y  where y is a match var of pat
-    XCoPat (CoPat wrapper p _ty)
+    CoPat wrapper p _ty
       | isIdHsWrapper wrapper                   -> desugarPat x p
       | WpCast co <-  wrapper, isReflexiveCo co -> desugarPat x p
       | otherwise -> do

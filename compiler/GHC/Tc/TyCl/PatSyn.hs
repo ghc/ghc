@@ -1213,7 +1213,7 @@ tcCollectEx pat = go pat
                               goConDetails $ pat_args con
     go1 (SigPat _ p _)     = go p
     go1 (XPat ext) = case ext of
-      XCoPat (CoPat _ p _) -> go1 p
+      CoPat _ p _                      -> go1 p
       ExpansionPat (HsPatExpanded _ p) -> go1 p
     go1 (NPlusKPat _ n k _ geq subtract)
       = pprPanic "TODO: NPlusKPat" $ ppr n $$ ppr k $$ ppr geq $$ ppr subtract

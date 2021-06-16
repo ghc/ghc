@@ -66,7 +66,7 @@ hsPatType (NPat ty _ _ _)               = ty
 hsPatType (NPlusKPat ty _ _ _ _ _)      = ty
 hsPatType (XPat ext) =
   case ext of
-    XCoPat (CoPat _ _ ty)              -> ty
+    CoPat _ _ ty                       -> ty
     ExpansionPat (HsPatExpanded _ pat) -> hsPatType pat
 hsPatType (SplicePat v _)               = dataConCantHappen v
 

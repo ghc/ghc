@@ -814,11 +814,11 @@ mkLHsCmdWrap w (L loc c) = L loc (mkHsCmdWrap w c)
 
 mkHsWrapPat :: HsWrapper -> Pat GhcTc -> Type -> Pat GhcTc
 mkHsWrapPat co_fn p ty | isIdHsWrapper co_fn = p
-                       | otherwise           = XPat . XCoPat $ CoPat co_fn p ty
+                       | otherwise           = XPat $ CoPat co_fn p ty
 
 mkHsWrapPatCo :: TcCoercionN -> Pat GhcTc -> Type -> Pat GhcTc
 mkHsWrapPatCo co pat ty | isTcReflCo co = pat
-                        | otherwise     = XPat . XCoPat $ CoPat (mkWpCastN co) pat ty
+                        | otherwise     = XPat $ CoPat (mkWpCastN co) pat ty
 
 mkHsDictLet :: TcEvBinds -> LHsExpr GhcTc -> LHsExpr GhcTc
 mkHsDictLet ev_binds expr = mkLHsWrap (mkWpLet ev_binds) expr
@@ -1245,7 +1245,7 @@ instance IsPass p => CollectPass (GhcPass p) where
         | HsPatExpanded _ pat <- ext
         -> collect_pat flag pat
       GhcTc -> case ext of
-        XCoPat (CoPat _ pat _)             -> collect_pat flag pat
+        CoPat _ pat _                      -> collect_pat flag pat
         ExpansionPat (HsPatExpanded _ pat) -> collect_pat flag pat
 
 {-
