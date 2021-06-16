@@ -1,3 +1,5 @@
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE RankNTypes #-}
 
 
 -----------------------------------------------------------------------------
@@ -13,6 +15,9 @@ module GHC.Driver.Phases (
    happensBefore, eqPhase, anyHsc, isStopLn,
    startPhase,
    phaseInputExt,
+
+   StopPhase(..),
+   stopPhaseToPhase,
 
    isHaskellishSuffix,
    isHaskellSrcSuffix,
@@ -36,6 +41,9 @@ module GHC.Driver.Phases (
    isSourceFilename,
 
    phaseForeignLanguage
+   , runTPipeline
+   , TPipeline(..)
+   , use
  ) where
 
 import GHC.Prelude
@@ -51,6 +59,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Misc
 
 import System.FilePath
+import Control.Monad
 
 -----------------------------------------------------------------------------
 -- Phases
@@ -66,6 +75,18 @@ import System.FilePath
    assembler              | .s  or .S     | -c            | .o
    linker                 | other         | -             | a.out
 -}
+
+-- Phases we can actually stop after
+data StopPhase = StopPreprocess -- -E
+               | StopC  -- -C
+               | StopAs -- -S
+               | NoStop -- -c
+
+stopPhaseToPhase :: StopPhase -> Phase
+stopPhaseToPhase StopPreprocess = anyHsc
+stopPhaseToPhase StopC   = HCc
+stopPhaseToPhase StopAs  = As False
+stopPhaseToPhase NoStop   = StopLn
 
 data Phase
         = Unlit HscSource
@@ -89,6 +110,35 @@ data Phase
         -- There is no runPhase case for it.
         | StopLn        -- Stop, but linking will follow, so generate .o file
   deriving (Eq, Show)
+
+
+
+data TPipeline f a where
+  Return :: a -> TPipeline f a
+  Roll :: f a -> (a -> TPipeline f b)  -> TPipeline f b
+
+instance Functor (TPipeline f)  where
+  fmap f (Return a) = Return (f a)
+  fmap f (Roll fa k) = Roll fa (fmap f . k)
+--  fmap f (ModuleScope e k) = ModuleScope e (fmap f k)
+
+instance Applicative (TPipeline f) where
+  pure = Return
+  (<*>) = ap
+
+instance Monad (TPipeline f) where
+  return = pure
+  (Return a) >>= f = f a
+  (Roll fa k) >>= f = Roll fa (k >=> f)
+--  (ModuleScope r k) >>= f = ModuleScope r (k >>= f)
+
+runTPipeline :: Monad g => (forall a . f a -> g a) -> TPipeline f a -> g a
+runTPipeline _h (Return a) = return a
+runTPipeline h (Roll fa k)   = h fa >>= runTPipeline h . k
+--runTPipeline h g (ModuleScope e k) = g e (runTPipeline h g k)
+
+use :: f a -> TPipeline f a
+use fa = Roll fa Return
 
 instance Outputable Phase where
     ppr p = text (show p)
@@ -173,6 +223,7 @@ nextPhase platform p
 -- the first compilation phase for a given file is determined
 -- by its suffix.
 startPhase :: String -> Phase
+startPhase ('b':'u':'f':'_':ext) = startPhase ext
 startPhase "lhs"      = Unlit HsSrcFile
 startPhase "lhs-boot" = Unlit HsBootFile
 startPhase "lhsig"    = Unlit HsigFile
