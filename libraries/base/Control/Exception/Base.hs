@@ -19,6 +19,7 @@
 module Control.Exception.Base (
 
         -- * The Exception type
+        SomeExceptionWithLocation(..),
         SomeException(..),
         Exception(..),
         IOException,
@@ -408,9 +409,9 @@ patError                 s = throw (PatternMatchFail (untangle s "Non-exhaustive
 typeError                s = throw (TypeError        (unpackCStringUtf8# s))
 
 -- GHC's RTS calls this
-nonTermination :: SomeException
+nonTermination :: SomeExceptionWithLocation
 nonTermination = toException NonTermination
 
 -- GHC's RTS calls this
-nestedAtomically :: SomeException
+nestedAtomically :: SomeExceptionWithLocation
 nestedAtomically = toException NestedAtomically
