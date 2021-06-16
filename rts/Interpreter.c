@@ -1612,13 +1612,14 @@ run_BCO:
             ASSERT(get_itbl(ap->fun)->type == BCO
                    && BCO_BITMAP_SIZE(ap->fun) == ap->n_args);
 
-            for (i = 0; i < n_payload; i++)
+            for (i = 0; i < n_payload; i++) {
                 ap->payload[i] = (StgClosure*)SpW(i+1);
-                Sp_addW(n_payload+1);
-                IF_DEBUG(interpreter,
-                         debugBelch("\tBuilt ");
-                         printObj((StgClosure*)ap);
-                    );
+            }
+            Sp_addW(n_payload+1);
+            IF_DEBUG(interpreter,
+                     debugBelch("\tBuilt ");
+                     printObj((StgClosure*)ap);
+                );
             goto nextInsn;
         }
 
@@ -1638,13 +1639,14 @@ run_BCO:
                 barf("bci_MKPAP");
             }
 
-            for (i = 0; i < n_payload; i++)
+            for (i = 0; i < n_payload; i++) {
                 pap->payload[i] = (StgClosure*)SpW(i+1);
-                Sp_addW(n_payload+1);
-                IF_DEBUG(interpreter,
-                         debugBelch("\tBuilt ");
-                         printObj((StgClosure*)pap);
-                    );
+            }
+            Sp_addW(n_payload+1);
+            IF_DEBUG(interpreter,
+                     debugBelch("\tBuilt ");
+                     printObj((StgClosure*)pap);
+                );
             goto nextInsn;
         }
 
