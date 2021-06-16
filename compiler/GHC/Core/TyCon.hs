@@ -2388,7 +2388,7 @@ isTcLevPoly tc@PromotedDataCon{} = pprPanic "isTcLevPoly datacon" (ppr tc)
 expandSynTyCon_maybe
         :: TyCon
         -> [tyco]                 -- ^ Arguments to 'TyCon'
-        -> Maybe ([(TyVar,tyco)],
+        -> Maybe ([TyVar],[tyco],
                   Type,
                   [tyco])         -- ^ Returns a 'TyVar' substitution, the body
                                   -- type of the synonym (not yet substituted)
@@ -2400,10 +2400,10 @@ expandSynTyCon_maybe
 expandSynTyCon_maybe tc tys
   | SynonymTyCon { tyConTyVars = tvs, synTcRhs = rhs, tyConArity = arity } <- tc
   = if arity == 0
-    then Just ([], rhs, tys)  -- Avoid a bit of work in the case of nullary synonyms
+    then Just ([], [], rhs, tys)  -- Avoid a bit of work in the case of nullary synonyms
     else case tys `listLengthCmp` arity of
-              GT -> Just (tvs `zip` tys, rhs, drop arity tys)
-              EQ -> Just (tvs `zip` tys, rhs, [])
+              GT -> Just (tvs, take arity tys, rhs, drop arity tys)
+              EQ -> Just (tvs, tys, rhs, [])
               LT -> Nothing
    | otherwise
    = Nothing
