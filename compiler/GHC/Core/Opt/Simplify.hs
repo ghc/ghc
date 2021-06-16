@@ -1914,7 +1914,7 @@ simplIdF env var cont
 
 completeCall :: SimplEnv -> OutId -> SimplCont -> SimplM (SimplFloats, OutExpr)
 completeCall env var cont
-  | Just expr <- callSiteInline logger uf_opts case_depth var active_unf
+  | Just expr <- callSiteInline logger uf_opts in_scope case_depth var active_unf
                                 lone_variable arg_infos interesting_cont
   -- Inline the variable's RHS
   = do { checkedTick (UnfoldingDone var)
@@ -1933,6 +1933,7 @@ completeCall env var cont
   where
     uf_opts    = seUnfoldingOpts env
     case_depth = seCaseDepth env
+    in_scope   = seInScope env
     logger     = seLogger env
     (lone_variable, arg_infos, call_cont) = contArgs cont
     n_val_args       = length arg_infos
