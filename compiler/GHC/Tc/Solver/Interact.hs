@@ -283,7 +283,7 @@ runTcPluginSolvers solvers all_cts
         result <- runTcPluginTcS (uncurry3 solver (pluginInputCts p))
         return $ progress p result
 
-    progress :: TcPluginProgress -> TcPluginResult -> TcPluginProgress
+    progress :: TcPluginProgress -> TcPluginSolveResult -> TcPluginProgress
     progress p (TcPluginContradiction bad_cts) =
        p { pluginInputCts = discard bad_cts (pluginInputCts p)
          , pluginBadCts   = bad_cts ++ pluginBadCts p

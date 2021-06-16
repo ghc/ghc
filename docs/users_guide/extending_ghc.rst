@@ -546,14 +546,14 @@ is defined thus:
 
     data TcPlugin = forall s . TcPlugin
       { tcPluginInit    :: TcPluginM s
-      , tcPluginRewrite :: s -> UniqFM TyCon TcPluginRewriter
-      , tcPluginSolve   :: s -> TcPluginSolver
+      , tcPluginSolve   :: s -> EvBindsVar -> TcPluginSolver
+      , tcPluginRewrite :: s -> RewriteEnv -> UniqFM TyCon TcPluginRewriter
       , tcPluginStop    :: s -> TcPluginM ()
       }
 
     type TcPluginSolver = [Ct] -> [Ct] -> [Ct] -> TcPluginM TcPluginResult
 
-    type TcPluginRewriter = [Ct] -> [TcType] -> TcPluginM TcPluginRewriteResult
+    type TcPluginRewriter = [Ct] -> [Type] -> TcPluginM TcPluginRewriteResult
 
     data TcPluginResult
       = TcPluginContradiction [Ct]
