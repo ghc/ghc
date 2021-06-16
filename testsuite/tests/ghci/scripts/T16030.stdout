@@ -14,15 +14,15 @@ data instance forall k (a :: k). Foo2 a where
 type role Foo1 nominal phantom
 type Foo1 :: forall k. k -> *
 data Foo1 @k a where
-  MkFoo1a :: forall {k} (a :: k). Proxy @{k} a -> Int -> Foo1 @k a
+  MkFoo1a :: forall {k} (a :: k). Proxy @k a -> Int -> Foo1 @k a
   MkFoo1b :: forall {k} (a :: k).
-             {a :: Proxy @{k} a, b :: Int} -> Foo1 @k a
+             {a :: Proxy @k a, b :: Int} -> Foo1 @k a
   	-- Defined at T16030.hs:8:1
 type Foo2 :: forall k. k -> *
 data family Foo2 @k a
   	-- Defined at T16030.hs:12:1
 data instance forall k (a :: k). Foo2 @k a where
-  MkFoo2a :: forall {k} (a :: k). Proxy @{k} a -> Int -> Foo2 @k a
+  MkFoo2a :: forall {k} (a :: k). Proxy @k a -> Int -> Foo2 @k a
   MkFoo2b :: forall {k} (a :: k).
-             {c :: Proxy @{k} a, d :: Int} -> Foo2 @k a
+             {c :: Proxy @k a, d :: Int} -> Foo2 @k a
   	-- Defined at T16030.hs:13:15

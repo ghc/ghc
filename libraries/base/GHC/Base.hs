@@ -70,6 +70,7 @@ Other Prelude modules are much easier with fewer complex dependencies.
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE Unsafe #-}
 
@@ -523,6 +524,7 @@ Note, that the second law follows from the free theorem of the type 'fmap' and
 the first law, so you need only check that the former condition holds.
 -}
 
+type  Functor :: (Type -> Type) -> Constraint
 class Functor f where
     -- | 'fmap' is used to apply a function of type @(a -> b)@ to a value of type @f a@,
     -- where f is a functor, to produce a value of type @f b@.
@@ -646,6 +648,7 @@ class Functor f where
 --
 -- (which implies that 'pure' and '<*>' satisfy the applicative functor laws).
 
+type  Applicative :: (Type -> Type) -> Constraint
 class Functor f => Applicative f where
     {-# MINIMAL pure, ((<*>) | liftA2) #-}
     -- | Lift a value.
@@ -839,6 +842,7 @@ and that 'pure' and ('<*>') satisfy the applicative functor laws.
 The instances of 'Monad' for lists, 'Data.Maybe.Maybe' and 'System.IO.IO'
 defined in the "Prelude" satisfy these laws.
 -}
+type  Monad :: (Type -> Type) -> Constraint
 class Applicative m => Monad m where
     -- | Sequentially compose two actions, passing any value produced
     -- by the first as an argument to the second.
@@ -1071,6 +1075,7 @@ infixl 3 <|>
 -- * @'some' v = (:) 'Prelude.<$>' v '<*>' 'many' v@
 --
 -- * @'many' v = 'some' v '<|>' 'pure' []@
+type  Alternative :: (Type -> Type) -> Constraint
 class Applicative f => Alternative f where
     -- | The identity of '<|>'
     empty :: f a
@@ -1102,6 +1107,7 @@ instance Alternative Maybe where
 -- The MonadPlus class definition
 
 -- | Monads that also support choice and failure.
+type  MonadPlus :: (Type -> Type) -> Constraint
 class (Alternative m, Monad m) => MonadPlus m where
    -- | The identity of 'mplus'.  It should also satisfy the equations
    --

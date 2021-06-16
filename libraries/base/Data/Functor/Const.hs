@@ -1,9 +1,12 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE TypeApplications #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -35,8 +38,12 @@ import GHC.Real (Fractional, Integral, Real, RealFrac)
 import GHC.Read (Read(readsPrec), readParen, lex)
 import GHC.Show (Show(showsPrec), showParen, showString)
 
--- | The 'Const' functor.
-newtype Const a b = Const { getConst :: a }
+-- | The 'Const' functor. Type-level analogue of the 'const' function.
+--
+-- @since 4.9.0.0
+type    Const :: forall k. Type -> k -> Type
+newtype Const a b where
+    Const :: forall {k} a b. { getConst :: a } -> Const @k a b
     deriving ( Bits       -- ^ @since 4.9.0.0
              , Bounded    -- ^ @since 4.9.0.0
              , Enum       -- ^ @since 4.9.0.0

@@ -1,7 +1,8 @@
-{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
+{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
 {-|
@@ -23,11 +24,13 @@ import GHC.Types(Symbol, Char)
 -- | Comparison of type-level symbols, as a function.
 --
 -- @since 4.7.0.0
-type family CmpSymbol (m :: Symbol) (n :: Symbol) :: Ordering
+type CmpSymbol :: Symbol -> Symbol -> Ordering
+type family CmpSymbol m n
 
 -- Char-related type families
 
 -- | Comparison of type-level characters.
 --
 -- @since 4.16.0.0
-type family CmpChar (a :: Char) (b :: Char) :: Ordering
+type CmpChar :: Char -> Char -> Ordering
+type family CmpChar a b
