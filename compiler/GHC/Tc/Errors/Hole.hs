@@ -66,7 +66,7 @@ import Data.List        ( partition, sort, sortOn, nubBy )
 import Data.Graph       ( graphFromEdges, topSort )
 
 
-import GHC.Tc.Solver    ( simplifyTopWanteds, runTcSDerivedsEarlyAbort, runTcSDeriveds )
+import GHC.Tc.Solver    ( simplifyTopWanteds, runTcSDerivedsEarlyAbort )
 import GHC.Tc.Utils.Unify ( tcSubTypeSigma )
 
 import GHC.HsToCore.Docs ( extractDocs )
@@ -404,6 +404,13 @@ from the coercion, as well as `Foldable t_t2jk[sk:1]`. By adding a flag to
 an insoluble constraint. Since we don't need the result in the case that it
 fails, a boolean `False` (i.e. "it didn't work" from `runTcSDerivedsEarlyAbort`)
 is sufficient.
+
+We also check whether the type of the hole is an immutable type variable (i.e.
+a skolem). In that case, the only possible fits are fits of exactly that type,
+which can only come from the locals. This speeds things up quite a bit when we
+don't know anything about the type of the hole. This also helps with degenerate
+fits like (`id (_ :: a)` and `head (_ :: [a])`) when looking for fits of type
+`a`, where `a` is a skolem.
 -}
 
 data HoleFitDispConfig = HFDC { showWrap :: Bool
@@ -587,7 +594,11 @@ findValidHoleFits tidy_env implics simples h@(Hole { hole_sort = ExprHole _
                       map IdHFCand lclBinds ++ map GreHFCand lcl
            globals = map GreHFCand gbl
            syntax = map NameHFCand builtIns
-           to_check = locals ++ syntax ++ globals
+           -- If the hole is a rigid type-variable, then we only check the
+           -- locals, since only they can match the type (in a meaningful way).
+           only_locals = any isImmutableTyVar $ getTyVar_maybe hole_ty
+           to_check = if only_locals then locals
+                      else locals ++ syntax ++ globals
      ; cands <- foldM (flip ($)) to_check candidatePlugins
      ; traceTc "numPlugins are:" $ ppr (length candidatePlugins)
      ; (searchDiscards, subs) <-
