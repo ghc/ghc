@@ -274,7 +274,7 @@ matchBangs (var :| vars) ty eqns
 matchCoercion :: NonEmpty MatchId -> Type -> NonEmpty EquationInfo -> DsM (MatchResult CoreExpr)
 -- Apply the coercion to the match variable and then match that
 matchCoercion (var :| vars) ty (eqns@(eqn1 :| _))
-  = do  { let XPat (CoPat co pat _) = firstPat eqn1
+  = do  { let XPat (XCoPat (CoPat co pat _)) = firstPat eqn1
         ; let pat_ty' = hsPatType pat
         ; var' <- newUniqueId var (idMult var) pat_ty'
         ; match_result <- match (var':vars) ty $ NEL.toList $
@@ -320,7 +320,7 @@ decomposeFirstPat extractpat (eqn@(EqnInfo { eqn_pats = pat : pats }))
 decomposeFirstPat _ _ = panic "decomposeFirstPat"
 
 getCoPat, getBangPat, getViewPat, getOLPat :: Pat GhcTc -> Pat GhcTc
-getCoPat (XPat (CoPat _ pat _)) = pat
+getCoPat (XPat (XCoPat (CoPat _ pat _))) = pat
 getCoPat _                   = panic "getCoPat"
 getBangPat (BangPat _ pat  ) = unLoc pat
 getBangPat _                 = panic "getBangPat"
@@ -521,8 +521,8 @@ tidy_bang_pat v o _ (SigPat _ (L l p) _) = tidy_bang_pat v o l p
 -- it may disappear next time
 tidy_bang_pat v o l (AsPat x v' p)
   = tidy1 v o (AsPat x v' (L l (BangPat noExtField p)))
-tidy_bang_pat v o l (XPat (CoPat w p t))
-  = tidy1 v o (XPat $ CoPat w (BangPat noExtField (L l p)) t)
+tidy_bang_pat v o l (XPat (XCoPat (CoPat w p t)))
+  = tidy1 v o (XPat . XCoPat $ CoPat w (BangPat noExtField (L l p)) t)
 
 -- Discard bang around strict pattern
 tidy_bang_pat v o _ p@(LitPat {})    = tidy1 v o p
@@ -1173,11 +1173,12 @@ patGroup _ (NPlusKPat _ _ (L _ (OverLit {ol_val=oval})) _ _ _) =
   case oval of
    HsIntegral i -> PgNpK (il_value i)
    _ -> pprPanic "patGroup NPlusKPat" (ppr oval)
-patGroup _ (XPat (CoPat _ p _))         = PgCo  (hsPatType p)
-                                                    -- Type of innelexp pattern
 patGroup _ (ViewPat _ expr p)           = PgView expr (hsPatType (unLoc p))
 patGroup _ (ListPat (ListPatTc _ (Just _)) _) = PgOverloadedList
 patGroup platform (LitPat _ lit)        = PgLit (hsLitKey platform lit)
+patGroup platform (XPat ext) = case ext of
+  XCoPat (CoPat _ p _)             -> PgCo (hsPatType p) -- Type of innelexp pattern
+  ExpansionPat (HsPatExpanded _ p) -> patGroup platform p
 patGroup _ pat                          = pprPanic "patGroup" (ppr pat)
 
 {-

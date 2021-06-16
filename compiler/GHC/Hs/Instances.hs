@@ -524,6 +524,7 @@ deriving instance Eq (IE GhcTc)
 -- ---------------------------------------------------------------------
 
 deriving instance Data XXExprGhcTc
+deriving instance Data XXPatGhcTc
 
 -- ---------------------------------------------------------------------
 
