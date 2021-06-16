@@ -43,7 +43,9 @@ import GHC.Builtin.PrimOps
 import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
 import GHC.Types.Unique.Set
 
--- import GHC.Driver.Ppr
+import GHC.Driver.Ppr
+_ = pprTrace -- Tired of commenting out the import all the time
+
 
 {-
 ************************************************************************
@@ -340,12 +342,12 @@ dmdAnalStar :: AnalEnv
             -> Demand   -- This one takes a *Demand*
             -> CoreExpr -- Should obey the let/app invariant
             -> (PlusDmdArg, CoreExpr)
-dmdAnalStar env (n :* cd) e
-  | WithDmdType dmd_ty e'    <- dmdAnal env cd e
+dmdAnalStar env dmd e
+  -- See Note [Analysing with absent demand]
+  | WithDmdType dmd_ty e' <- dmdAnal env (dmdEvalSubDmd dmd) e
   = assertPpr (not (isUnliftedType (exprType e)) || exprOkForSpeculation e) (ppr e)
     -- The argument 'e' should satisfy the let/app invariant
-    -- See Note [Analysing with absent demand] in GHC.Types.Demand
-    (toPlusDmdArg $ multDmdType n dmd_ty, e')
+    (toPlusDmdArg $ multDmdType (dmdCard dmd) dmd_ty, e')
 
 -- Main Demand Analsysis machinery
 dmdAnal, dmdAnal' :: AnalEnv
@@ -427,7 +429,7 @@ dmdAnal' env dmd (Case scrut case_bndr ty [Alt alt bndrs rhs])
         WithDmdType alt_ty2 case_bndr_dmd = findBndrDmd env alt_ty1 case_bndr
         -- Evaluation cardinality on the case binder is irrelevant and a no-op.
         -- What matters is its nested sub-demand!
-        (_ :* case_bndr_sd)      = case_bndr_dmd
+        case_bndr_sd = dmdEvalSubDmd case_bndr_dmd
         -- Compute demand on the scrutinee
         -- FORCE the result, otherwise thunks will end up retaining the
         -- whole DmdEnv
@@ -546,7 +548,7 @@ dmdAnalSumAlt :: AnalEnv -> SubDemand -> Id -> Alt Var -> WithDmdType (Alt Var)
 dmdAnalSumAlt env dmd case_bndr (Alt con bndrs rhs)
   | WithDmdType rhs_ty rhs' <- dmdAnal env dmd rhs
   , WithDmdType alt_ty dmds <- findBndrsDmds env rhs_ty bndrs
-  , let (_ :* case_bndr_sd) = findIdDemand alt_ty case_bndr
+  , let case_bndr_sd        = dmdEvalSubDmd $ findIdDemand alt_ty case_bndr
         -- See Note [Demand on scrutinee of a product case]
         id_dmds             = addCaseBndrDmd case_bndr_sd dmds
         -- Do not put a thunk into the Alt
