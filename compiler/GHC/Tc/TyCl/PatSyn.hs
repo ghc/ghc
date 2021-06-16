@@ -1044,6 +1044,7 @@ tcPatToExpr name args pat = go pat
     go1 (SplicePat _ (HsSpliced _ _ (HsSplicedPat pat)))
                                     = go1 pat
     go1 (SplicePat _ (HsSpliced{})) = panic "Invalid splice variety"
+    go1 (XPat (HsPatExpanded _ pat))= go1 pat
 
     -- The following patterns are not invertible.
     go1 p@(BangPat {})                       = notInvertible p -- #14112
@@ -1211,7 +1212,9 @@ tcCollectEx pat = go pat
                            = merge (cpt_tvs con', cpt_dicts con') $
                               goConDetails $ pat_args con
     go1 (SigPat _ p _)     = go p
-    go1 (XPat (CoPat _ p _)) = go1 p
+    go1 (XPat ext) = case ext of
+      XCoPat (CoPat _ p _) -> go1 p
+      ExpansionPat (HsPatExpanded _ p) -> go1 p
     go1 (NPlusKPat _ n k _ geq subtract)
       = pprPanic "TODO: NPlusKPat" $ ppr n $$ ppr k $$ ppr geq $$ ppr subtract
     go1 _                   = empty

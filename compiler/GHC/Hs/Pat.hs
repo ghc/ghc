@@ -26,6 +26,8 @@ module GHC.Hs.Pat (
         CoPat (..),
         ListPatTc(..),
         ConLikeP,
+        HsPatExpansion(..),
+        XXPatGhcTc(..),
 
         HsConPatDetails, hsConPatArgs,
         HsRecFields(..), HsFieldBind(..), LHsFieldBind,
@@ -152,9 +154,26 @@ type instance XSigPat GhcRn = NoExtField
 type instance XSigPat GhcTc = Type
 
 type instance XXPat GhcPs = NoExtCon
-type instance XXPat GhcRn = NoExtCon
-type instance XXPat GhcTc = CoPat
-  -- After typechecking, we add one extra constructor: CoPat
+type instance XXPat GhcRn = HsPatExpansion (Pat GhcRn) (Pat GhcRn)
+type instance XXPat GhcTc = XXPatGhcTc
+  -- After typechecking, we add extra constructors: CoPat and HsExpansion.
+  -- HsExpansion allows us to handle RebindableSyntax in pattern position:
+  -- see "XXExpr GhcTc" for the counterpart in expressions.
+
+data XXPatGhcTc
+  = XCoPat
+      {-# UNPACK #-} !CoPat
+  | ExpansionPat
+      {-# UNPACK #-} !(HsPatExpansion (Pat GhcRn) (Pat GhcTc))
+
+-- See Note [Rebindable syntax and HsExpansion].
+data HsPatExpansion a b
+  = HsPatExpanded a b
+  deriving Data
+
+-- | Just print the original expression (the @a@).
+instance (Outputable a, Outputable b) => Outputable (HsPatExpansion a b) where
+  ppr (HsPatExpanded a b) = ifPprDebug (vcat [ppr a, ppr b]) (ppr a)
 
 type instance ConLikeP GhcPs = RdrName -- IdP GhcPs
 type instance ConLikeP GhcRn = Name    -- IdP GhcRn
@@ -270,8 +289,7 @@ pprParendPat p pat = sdocOption sdocPrintTypecheckerElaboration $ \ print_tc_ela
   where
     need_parens print_tc_elab pat
       | GhcTc <- ghcPass @p
-      , XPat ext <- pat
-      , CoPat {} <- ext
+      , XPat (XCoPat {}) <- pat
       = print_tc_elab
 
       | otherwise
@@ -335,13 +353,16 @@ pprPat (ConPat { pat_con = con
 pprPat (XPat ext) = case ghcPass @p of
 #if __GLASGOW_HASKELL__ < 811
   GhcPs -> noExtCon ext
-  GhcRn -> noExtCon ext
 #endif
-  GhcTc -> pprHsWrapper co $ \parens ->
-      if parens
-      then pprParendPat appPrec pat
-      else pprPat pat
-    where CoPat co pat _ = ext
+  GhcRn -> case ext of
+    HsPatExpanded orig _ -> pprPat orig
+  GhcTc -> case ext of
+    XCoPat (CoPat co pat _) ->
+      pprHsWrapper co $ \parens ->
+        if parens
+        then pprParendPat appPrec pat
+        else pprPat pat
+    ExpansionPat (HsPatExpanded orig _) -> pprPat orig
 
 pprUserCon :: (OutputableBndr con, OutputableBndrId p,
                      Outputable (Anno (IdGhcP p)))
@@ -543,10 +564,12 @@ isIrrefutableHsPat' is_strict = goL
     go (XPat ext)          = case ghcPass @p of
 #if __GLASGOW_HASKELL__ < 811
       GhcPs -> noExtCon ext
-      GhcRn -> noExtCon ext
 #endif
-      GhcTc -> go pat
-        where CoPat _ pat _ = ext
+      GhcRn -> case ext of
+        HsPatExpanded _ pat -> go pat
+      GhcTc -> case ext of
+        XCoPat (CoPat _ pat _) -> go pat
+        ExpansionPat (HsPatExpanded _ pat) -> go pat
 
 -- | Is the pattern any of combination of:
 --
@@ -590,22 +613,24 @@ is the only thing that could possibly be matched!
 -- | @'patNeedsParens' p pat@ returns 'True' if the pattern @pat@ needs
 -- parentheses under precedence @p@.
 patNeedsParens :: forall p. IsPass p => PprPrec -> Pat (GhcPass p) -> Bool
-patNeedsParens p = go
+patNeedsParens p = go @p
   where
-    go :: Pat (GhcPass p) -> Bool
+    go :: forall q. IsPass q => Pat (GhcPass q) -> Bool
     go (NPlusKPat {})    = p > opPrec
     go (SplicePat {})    = False
     go (ConPat { pat_args = ds })
                          = conPatNeedsParens p ds
     go (SigPat {})       = p >= sigPrec
     go (ViewPat {})      = True
-    go (XPat ext)        = case ghcPass @p of
+    go (XPat ext)        = case ghcPass @q of
 #if __GLASGOW_HASKELL__ < 901
       GhcPs -> noExtCon ext
-      GhcRn -> noExtCon ext
 #endif
-      GhcTc -> go inner
-        where CoPat _ inner _ = ext
+      GhcRn -> case ext of
+        HsPatExpanded orig _ -> go orig
+      GhcTc -> case ext of
+        XCoPat (CoPat _ inner _ ) -> go inner
+        ExpansionPat (HsPatExpanded orig _) -> go orig
     go (WildPat {})      = False
     go (VarPat {})       = False
     go (LazyPat {})      = False
@@ -679,7 +704,9 @@ collectEvVarsPat pat =
                                    $ map collectEvVarsLPat
                                    $ hsConPatArgs args
     SigPat  _ p _    -> collectEvVarsLPat p
-    XPat (CoPat _ p _) -> collectEvVarsPat  p
+    XPat ext -> case ext of
+      XCoPat (CoPat _ p _)             -> collectEvVarsPat p
+      ExpansionPat (HsPatExpanded _ p) -> collectEvVarsPat p
     _other_pat       -> emptyBag
 
 {-
