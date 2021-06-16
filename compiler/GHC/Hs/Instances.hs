@@ -421,7 +421,6 @@ deriving instance Data (Pat GhcPs)
 deriving instance Data (Pat GhcRn)
 deriving instance Data (Pat GhcTc)
 
-deriving instance Data CoPat
 deriving instance Data ConPatTc
 
 deriving instance Data ListPatTc
@@ -524,6 +523,7 @@ deriving instance Eq (IE GhcTc)
 -- ---------------------------------------------------------------------
 
 deriving instance Data XXExprGhcTc
+deriving instance Data XXPatGhcTc
 
 -- ---------------------------------------------------------------------
 
