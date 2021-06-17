@@ -56,7 +56,8 @@ import GHC.Rename.Fixity
 import GHC.Rename.Utils    ( HsDocContext(..), newLocalBndrRn, bindLocalNames
                            , warnUnusedMatches, newLocalBndrRn
                            , checkUnusedRecordWildcard
-                           , checkDupNames, checkDupAndShadowedNames )
+                           , checkDupNames, checkDupAndShadowedNames
+                           , wrapGenSpan, genHsApps, genLHsVar, genHsIntegralLit )
 import GHC.Rename.HsType
 import GHC.Builtin.Names
 import GHC.Types.Avail ( greNameMangledName )
@@ -483,7 +484,10 @@ rnPatAndThen mk p@(ViewPat _ expr pat)
        ; pat' <- rnLPatAndThen mk pat
        -- Note: at this point the PreTcType in ty can only be a placeHolder
        -- ; return (ViewPat expr' pat' ty) }
-       ; return (ViewPat noExtField expr' pat') }
+       
+       -- Note: we can't cook up an inverse for an arbitrary view pattern,
+       -- so we pass 'Nothing'.
+       ; return (ViewPat Nothing expr' pat') }
 
 rnPatAndThen mk (ConPat _ con args)
    -- rnConPatAndThen takes care of reconstructing the pattern
@@ -497,10 +501,21 @@ rnPatAndThen mk (ConPat _ con args)
 rnPatAndThen mk (ListPat _ pats)
   = do { opt_OverloadedLists <- liftCps $ xoptM LangExt.OverloadedLists
        ; pats' <- rnLPatsAndThen mk pats
-       ; case opt_OverloadedLists of
-          True -> do { (to_list_name,_) <- liftCps $ lookupSyntax toListName
-                     ; return (ListPat (Just to_list_name) pats')}
-          False -> return (ListPat Nothing pats') }
+       ; if not opt_OverloadedLists
+         then return (ListPat noExtField pats')
+         else
+    -- In the presence of RebindableSyntax, we don't know anything about
+    --     `toList`, so we treat `ListPat` as any other view pattern.
+    -- However, we assume the view pattern is invertible (see #14380).
+    do { (to_list_name    ,_) <- liftCps $ lookupSyntaxName toListName
+       ; (from_list_n_name,_) <- liftCps $ lookupSyntaxName fromListNName
+       ; let rn_list_pat = ListPat noExtField pats'
+             lit_n    = mkIntegralLit (length pats)
+             hs_lit   = genHsIntegralLit lit_n
+             inverse  = genHsApps from_list_n_name [hs_lit]
+             exp_expr = genLHsVar to_list_name
+             exp_list_pat = ViewPat (Just inverse) exp_expr (wrapGenSpan rn_list_pat)
+       ; return $ mkExpandedPat rn_list_pat exp_list_pat}}
 
 rnPatAndThen mk (TuplePat _ pats boxed)
   = do { pats' <- rnLPatsAndThen mk pats
@@ -611,6 +626,23 @@ rnHsRecPatsAndThen mk (L _ con)
     nested_mk (Just _) mk@(LetMk {})         _  = mk
     nested_mk (Just (unLoc -> n)) (LamMk report_unused) n'
       = LamMk (report_unused && (n' <= n))
+
+
+{- *********************************************************************
+*                                                                      *
+              Generating code for HsPatExpanded
+      See Note [Handling overloaded and rebindable constructs]
+*                                                                      *
+********************************************************************* -}
+
+-- | Build a 'HsPatExpansion' out of an extension constructor,
+--   and the two components of the expansion: original and
+--   desugared patterns
+mkExpandedPat
+  :: Pat GhcRn -- ^ source pattern
+  -> Pat GhcRn -- ^ expanded pattern
+  -> Pat GhcRn -- ^ suitably wrapped 'HsPatExpansion'
+mkExpandedPat a b = XPat (HsPatExpanded a b)
 
 {-
 ************************************************************************
