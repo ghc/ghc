@@ -348,7 +348,7 @@ basicKnownKeyNames
         eqStringName, assertName, breakpointName, breakpointCondName,
         opaqueTyConName,
         assertErrorName, traceName,
-        printName, fstName, sndName,
+        printName,
         dollarName,
 
         -- ghc-bignum
@@ -1152,11 +1152,6 @@ breakpointCondName= varQual gHC_BASE (fsLit "breakpointCond") breakpointCondIdKe
 opaqueTyConName   = tcQual  gHC_BASE (fsLit "Opaque")     opaqueTyConKey
 fromStringName = varQual dATA_STRING (fsLit "fromString") fromStringClassOpKey
 
--- PrelTup
-fstName, sndName :: Name
-fstName           = varQual dATA_TUPLE (fsLit "fst") fstIdKey
-sndName           = varQual dATA_TUPLE (fsLit "snd") sndIdKey
-
 -- Module GHC.Num
 numClassName, fromIntegerName, minusName, negateName :: Name
 numClassName      = clsQual gHC_NUM (fsLit "Num")         numClassKey
@@ -1361,7 +1356,7 @@ fromIntegralName    = varQual  gHC_REAL (fsLit "fromIntegral")fromIntegralIdKey
 realToFracName      = varQual  gHC_REAL (fsLit "realToFrac")  realToFracIdKey
 mkRationalBase2Name  = varQual  gHC_REAL  (fsLit "mkRationalBase2")  mkRationalBase2IdKey
 mkRationalBase10Name = varQual  gHC_REAL  (fsLit "mkRationalBase10") mkRationalBase10IdKey
--- PrelFloat classes
+-- GHC.Float classes
 floatingClassName, realFloatClassName :: Name
 floatingClassName  = clsQual gHC_FLOAT (fsLit "Floating")  floatingClassKey
 realFloatClassName = clsQual gHC_FLOAT (fsLit "RealFloat") realFloatClassKey
@@ -2337,7 +2332,7 @@ raiseDivZeroIdKey             = mkPreludeMiscIdUnique 29
 concatIdKey, filterIdKey, zipIdKey,
     bindIOIdKey, returnIOIdKey, newStablePtrIdKey,
     printIdKey, failIOIdKey, nullAddrIdKey, voidArgIdKey,
-    fstIdKey, sndIdKey, otherwiseIdKey, assertIdKey :: Unique
+    otherwiseIdKey, assertIdKey :: Unique
 concatIdKey                   = mkPreludeMiscIdUnique 31
 filterIdKey                   = mkPreludeMiscIdUnique 32
 zipIdKey                      = mkPreludeMiscIdUnique 33
@@ -2348,8 +2343,6 @@ printIdKey                    = mkPreludeMiscIdUnique 37
 failIOIdKey                   = mkPreludeMiscIdUnique 38
 nullAddrIdKey                 = mkPreludeMiscIdUnique 39
 voidArgIdKey                  = mkPreludeMiscIdUnique 40
-fstIdKey                      = mkPreludeMiscIdUnique 41
-sndIdKey                      = mkPreludeMiscIdUnique 42
 otherwiseIdKey                = mkPreludeMiscIdUnique 43
 assertIdKey                   = mkPreludeMiscIdUnique 44
 
