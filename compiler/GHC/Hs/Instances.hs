@@ -423,8 +423,6 @@ deriving instance Data (Pat GhcTc)
 
 deriving instance Data ConPatTc
 
-deriving instance Data ListPatTc
-
 deriving instance (Data a, Data b) => Data (HsFieldBind a b)
 
 deriving instance (Data body) => Data (HsRecFields GhcPs body)
@@ -524,6 +522,7 @@ deriving instance Eq (IE GhcTc)
 
 deriving instance Data XXExprGhcTc
 deriving instance Data XXPatGhcTc
+deriving instance Data IsPatInvertible
 
 -- ---------------------------------------------------------------------
 

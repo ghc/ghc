@@ -1024,10 +1024,9 @@ tcPatToExpr name args pat = go pat
         | otherwise
         = Left (quotes (ppr var) <+> text "is not bound by the LHS of the pattern synonym")
     go1 (ParPat _ lpar pat rpar) = fmap (\e -> HsPar noAnn lpar e rpar) $ go pat
-    go1 p@(ListPat reb pats)
-      | Nothing <- reb = do { exprs <- mapM go pats
-                            ; return $ ExplicitList noExtField exprs }
-      | otherwise                   = notInvertibleListPat p
+    go1 (ListPat _ pats)
+      = do { exprs <- mapM go pats
+           ; return $ ExplicitList noExtField exprs }
     go1 (TuplePat _ pats box)       = do { exprs <- mapM go pats
                                          ; return $ ExplicitTuple noExtField
                                            (map (Present noAnn) exprs) box }
@@ -1046,12 +1045,15 @@ tcPatToExpr name args pat = go pat
     go1 (SplicePat _ (HsSpliced{})) = panic "Invalid splice variety"
     go1 (XPat (HsPatExpanded _ pat))= go1 pat
 
+    go1 p@(ViewPat isInvertible _ pat) = case isInvertible of
+      InvertiblePat -> go1 (unLoc pat)
+      _             -> notInvertible p
+
     -- The following patterns are not invertible.
     go1 p@(BangPat {})                       = notInvertible p -- #14112
     go1 p@(LazyPat {})                       = notInvertible p
     go1 p@(WildPat {})                       = notInvertible p
     go1 p@(AsPat {})                         = notInvertible p
-    go1 p@(ViewPat {})                       = notInvertible p
     go1 p@(NPlusKPat {})                     = notInvertible p
     go1 p@(SplicePat _ (HsTypedSplice {}))   = notInvertible p
     go1 p@(SplicePat _ (HsUntypedSplice {})) = notInvertible p
@@ -1070,14 +1072,6 @@ tcPatToExpr name args pat = go pat
         pp_name = ppr name
         pp_args = hsep (map ppr args)
 
-    -- We should really be able to invert list patterns, even when
-    -- rebindable syntax is on, but doing so involves a bit of
-    -- refactoring; see #14380.  Until then we reject with a
-    -- helpful error message.
-    notInvertibleListPat p
-      = Left (vcat [ not_invertible_msg p
-                   , text "Reason: rebindable syntax is on."
-                   , text "This is fixable: add use-case to #14380" ])
 
 {- Note [Builder for a bidirectional pattern synonym]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
