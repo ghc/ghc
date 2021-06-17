@@ -34,5 +34,5 @@ import {-# SOURCE #-} GHC.Exception.Type
 import GHC.Types ( Char )
 import GHC.Stack.Types ( CallStack )
 
-errorCallException :: [Char] -> SomeException
-errorCallWithCallStackException :: [Char] -> CallStack -> SomeException
+errorCallException :: [Char] -> SomeExceptionWithLocation
+errorCallWithCallStackException :: [Char] -> CallStack -> SomeExceptionWithLocation
