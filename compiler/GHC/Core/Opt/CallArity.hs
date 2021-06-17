@@ -25,7 +25,6 @@ import GHC.Utils.Misc
 
 import Control.Arrow ( first, second )
 
-
 {-
 %************************************************************************
 %*                                                                      *
@@ -276,7 +275,6 @@ together with what other functions.
 
 Note [Analysis type signature]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 The work-hourse of the analysis is the function `callArityAnal`, with the
 following type:
 
@@ -306,7 +304,6 @@ and the following specification:
 
 Note [Which variables are interesting]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 The analysis would quickly become prohibitive expensive if we would analyse all
 variables; for most variables we simply do not care about how often they are
 called, i.e. variables bound in a pattern match. So interesting are variables that are
@@ -315,7 +312,6 @@ called, i.e. variables bound in a pattern match. So interesting are variables th
 
 Note [Taking boring variables into account]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 If we decide that the variable bound in `let x = e1 in e2` is not interesting,
 the analysis of `e2` will not report anything about `x`. To ensure that
 `callArityBind` does still do the right thing we have to take that into account
@@ -335,7 +331,6 @@ recursive groups (#10293).
 
 Note [Recursion and fixpointing]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 For a mutually recursive let, we begin by
  1. analysing the body, using the same incoming arity as for the whole expression.
  2. Then we iterate, memoizing for each of the bound variables the last
@@ -351,7 +346,6 @@ For a mutually recursive let, we begin by
 
 Note [Thunks in recursive groups]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 We never eta-expand a thunk in a recursive group, on the grounds that if it is
 part of a recursive group, then it will be called multiple times.
 
@@ -370,7 +364,6 @@ relevant in the wild.
 
 Note [Analysing top-level binds]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 We can eta-expand top-level-binds if they are not exported, as we see all calls
 to them. The plan is as follows: Treat the top-level binds as nested lets around
 a body representing “all external calls”, which returns a pessimistic
@@ -378,7 +371,6 @@ CallArityRes (the co-call graph is the complete graph, all arityies 0).
 
 Note [Trimming arity]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 In the Call Arity papers, we are working on an untyped lambda calculus with no
 other id annotations, where eta-expansion is always possible. But this is not
 the case for Core!
@@ -400,7 +392,6 @@ the case for Core!
 
 Note [What is a thunk]
 ~~~~~~~~~~~~~~~~~~~~~~
-
 Originally, everything that is not in WHNF (`exprIsWHNF`) is considered a
 thunk, not eta-expanded, to avoid losing any sharing. This is also how the
 published papers on Call Arity describe it.
@@ -410,9 +401,11 @@ pattern-matching on a variable, and the benefits of eta-expansion likely
 outweigh the cost of doing that repeatedly. Therefore, this implementation of
 Call Arity considers everything that is not cheap (`exprIsCheap`) as a thunk.
 
+Moreover, nullary join points are not thunks: they are not memoised,
+so we do not lose sharing by eta-expanding.
+
 Note [Call Arity and Join Points]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 The Call Arity analysis does not care about join points, and treats them just
 like normal functions. This is ok.
 
@@ -476,7 +469,8 @@ callArityAnal _     _   e@(Coercion _)
 callArityAnal arity int (Tick t e)
     = second (Tick t) $ callArityAnal arity int e
 callArityAnal arity int (Cast e co)
-    = second (\e -> Cast e co) $ callArityAnal arity int e
+    = second (\e -> Cast e co) $
+      callArityAnal arity int e
 
 -- The interesting case: Variables, Lambdas, Lets, Applications, Cases
 callArityAnal arity int e@(Var v)
@@ -562,12 +556,12 @@ addInterestingBinds int bind
 callArityBind :: VarSet -> CallArityRes -> VarSet -> CoreBind -> (CallArityRes, CoreBind)
 -- Non-recursive let
 callArityBind boring_vars ae_body int (NonRec v rhs)
-  | otherwise
   = -- pprTrace "callArityBind:NonRec"
     --          (vcat [ppr v, ppr ae_body, ppr int, ppr ae_rhs, ppr safe_arity])
     (final_ae, NonRec v' rhs')
   where
-    is_thunk = not (exprIsCheap rhs) -- see note [What is a thunk]
+    is_thunk = isThunk v rhs
+
     -- If v is boring, we will not find it in ae_body, but always assume (0, False)
     boring = v `elemVarSet` boring_vars
 
@@ -592,7 +586,8 @@ callArityBind boring_vars ae_body int (NonRec v rhs)
     called_with_v
         | boring    = domRes ae_body
         | otherwise = calledWith ae_body v `delUnVarSet` v
-    final_ae = addCrossCoCalls called_by_v called_with_v $ ae_rhs' `lubRes` resDel v ae_body
+    final_ae = addCrossCoCalls called_by_v called_with_v $
+               ae_rhs' `lubRes` resDel v ae_body
 
     v' = v `setIdCallArity` trimmed_arity
 
@@ -637,7 +632,7 @@ callArityBind boring_vars ae_body int b@(Rec binds)
 
             | otherwise
             -- We previously analyzed this with a different arity (or not at all)
-            = let is_thunk = not (exprIsCheap rhs) -- see note [What is a thunk]
+            = let is_thunk = isThunk i rhs
 
                   safe_arity | is_thunk    = 0  -- See Note [Thunks in recursive groups]
                              | otherwise   = new_arity
@@ -695,6 +690,11 @@ callArityRecEnv any_boring ae_rhss ae_body
         called_by_v = domRes ae_rhs
 
     ae_new = first (cross_calls `unionUnVarGraph`) ae_combined
+
+isThunk :: Id -> CoreExpr -> Bool
+ -- See Note [What is a thunk]
+isThunk bndr rhs = not (isJoinId bndr) && not (exprIsCheap rhs)
+
 
 -- See Note [Trimming arity]
 trimArity :: Id -> Arity -> Arity
