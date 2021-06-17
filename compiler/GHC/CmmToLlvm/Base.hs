@@ -263,7 +263,6 @@ llvmPtrBits platform = widthInBits $ typeWidth $ gcWord platform
 -- * Llvm Version
 --
 
--- Newtype to avoid using the Eq instance!
 newtype LlvmVersion = LlvmVersion { llvmVersionNE :: NE.NonEmpty Int }
   deriving (Eq, Ord)
 
@@ -281,14 +280,19 @@ parseLlvmVersion =
       where
         (ver_str, rest) = span isDigit s
 
--- | The LLVM Version that is currently supported.
-supportedLlvmVersionMin, supportedLlvmVersionMax :: LlvmVersion
+-- | The minimum LLVM Version that is currently supported.
+-- Inclusive.
+supportedLlvmVersionMin :: LlvmVersion
 supportedLlvmVersionMin = LlvmVersion (sUPPORTED_LLVM_VERSION_MIN NE.:| [])
-supportedLlvmVersionMax = LlvmVersion (sUPPORTED_LLVM_VERSION_MAX NE.:| [])
+
+-- | The maximum LLVM Version that is currently supported.
+-- Not inclusive.
+supportedLlvmVersionMax :: LlvmVersion
+supportedLlvmVersionMax = LlvmVersion ((sUPPORTED_LLVM_VERSION_MAX + 1) NE.:| [])
 
 llvmVersionSupported :: LlvmVersion -> Bool
 llvmVersionSupported v =
-  v > supportedLlvmVersionMin && v <= supportedLlvmVersionMax
+  v >= supportedLlvmVersionMin && v < supportedLlvmVersionMax
 
 llvmVersionStr :: LlvmVersion -> String
 llvmVersionStr = intercalate "." . map show . llvmVersionList
