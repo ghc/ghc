@@ -990,8 +990,8 @@ error = true;
                       printRtsInfo(rtsConfig);
                       stg_exit(0);
                   }
-                  else if (strequal("eventlog-flush-interval=",
-                               &rts_argv[arg][2])) {
+                  else if (!strncmp("eventlog-flush-interval=",
+                               &rts_argv[arg][2], 24)) {
                       OPTION_SAFE;
                       double intervalSeconds = parseDouble(rts_argv[arg]+26, &error);
                       if (error) {
