@@ -248,6 +248,8 @@ linkDynLib dflags0 o_files dep_packages
 
     pkgs <- getPreloadPackagesAnd dflags dep_packages
 
+    let platform = targetPlatform dflags
+        os = platformOS platform
     let pkg_lib_paths = collectLibraryPaths dflags pkgs
     let pkg_lib_path_opts = concatMap get_pkg_lib_path_opts pkg_lib_paths
         get_pkg_lib_path_opts l
@@ -257,7 +259,7 @@ linkDynLib dflags0 o_files dep_packages
            -- Only if we want dynamic libraries
            WayDyn `elem` ways dflags &&
            -- Only use RPath if we explicitly asked for it
-           gopt Opt_RPath dflags
+           useXLinkerRPath dflags os
             = ["-L" ++ l, "-Xlinker", "-rpath", "-Xlinker", l]
               -- See Note [-Xlinker -rpath vs -Wl,-rpath]
          | otherwise = ["-L" ++ l]
@@ -272,9 +274,7 @@ linkDynLib dflags0 o_files dep_packages
     -- not allow undefined symbols.
     -- The RTS library path is still added to the library search path
     -- above in case the RTS is being explicitly linked in (see #3807).
-    let platform = targetPlatform dflags
-        os = platformOS platform
-        pkgs_no_rts = case os of
+    let pkgs_no_rts = case os of
                       OSMinGW32 ->
                           pkgs
                       _ ->
