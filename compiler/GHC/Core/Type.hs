@@ -452,7 +452,7 @@ expand_syn arity tvs rhs tys
   | tys `lengthExceeds` arity = mkAppTys rhs' (drop arity tys)
   | otherwise                 = rhs'
   where
-    rhs' = substTy (mkTvSubstPrs (tvs `zip` tys)) rhs
+    rhs' = substTy (mkTvSubstPrs2 tvs tys) rhs
                -- The free vars of 'rhs' should all be bound by 'tenv', so it's
                -- ok to use 'substTy' here (which is what expandSynTyConApp_maybe does).
                -- See also Note [The substitution invariant] in GHC.Core.TyCo.Subst.
@@ -509,8 +509,8 @@ expandTypeSynonyms ty
     in_scope = mkInScopeSet (tyCoVarsOfType ty)
 
     go subst (TyConApp tc tys)
-      | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc expanded_tys
-      = let subst' = mkTvSubst in_scope (mkVarEnv tenv)
+      | Just (tvs, tv_tys, rhs, tys') <- expandSynTyCon_maybe tc expanded_tys
+      = let subst' = mkTvSubst in_scope (zipEqualVarEnv tvs tv_tys)
             -- Make a fresh substitution; rhs has nothing to
             -- do with anything that has happened so far
             -- NB: if you make changes here, be sure to build an

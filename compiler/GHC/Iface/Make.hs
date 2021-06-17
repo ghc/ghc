@@ -75,7 +75,6 @@ import GHC.Types.CompleteMatch
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic.Plain
-import GHC.Utils.Misc  hiding ( eqListBy )
 import GHC.Utils.Logger
 
 import GHC.Data.FastString
@@ -603,7 +602,7 @@ tyConToIfaceDecl env tycon
           --     we know that the type variables will line up
           -- The latter (b) is important because we pretty-print type constructors
           -- by converting to Iface syntax and pretty-printing that
-          con_env1 = (fst tc_env1, mkVarEnv (zipEqual "ifaceConDecl" univ_tvs tc_tyvars))
+          con_env1 = (fst tc_env1, zipEqualVarEnv univ_tvs tc_tyvars)
                      -- A bit grimy, perhaps, but it's simple!
 
           (con_env2, ex_tvs') = tidyVarBndrs con_env1 ex_tvs
