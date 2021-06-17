@@ -1368,23 +1368,16 @@ zonk_pat env (AsPat x (L loc v) pat)
         ; (env', pat') <- zonkPat (extendIdZonkEnv env v') pat
         ; return (env', AsPat x (L loc v') pat') }
 
-zonk_pat env (ViewPat ty expr pat)
+zonk_pat env (ViewPat (ViewPatTc ty b) expr pat)
   = do  { expr' <- zonkLExpr env expr
         ; (env', pat') <- zonkPat env pat
         ; ty' <- zonkTcTypeToTypeX env ty
-        ; return (env', ViewPat ty' expr' pat') }
+        ; return (env', ViewPat (ViewPatTc ty' b) expr' pat') }
 
-zonk_pat env (ListPat (ListPatTc ty Nothing) pats)
+zonk_pat env (ListPat ty pats)
   = do  { ty' <- zonkTcTypeToTypeX env ty
         ; (env', pats') <- zonkPats env pats
-        ; return (env', ListPat (ListPatTc ty' Nothing) pats') }
-
-zonk_pat env (ListPat (ListPatTc ty (Just (ty2,wit))) pats)
-  = do  { (env', wit') <- zonkSyntaxExpr env wit
-        ; ty2' <- zonkTcTypeToTypeX env' ty2
-        ; ty' <- zonkTcTypeToTypeX env' ty
-        ; (env'', pats') <- zonkPats env' pats
-        ; return (env'', ListPat (ListPatTc ty' (Just (ty2',wit'))) pats') }
+        ; return (env', ListPat ty' pats') }
 
 zonk_pat env (TuplePat tys pats boxed)
   = do  { tys' <- mapM (zonkTcTypeToTypeX env) tys
@@ -1466,13 +1459,14 @@ zonk_pat env (NPlusKPat ty (L loc n) (L l lit1) lit2 e1 e2)
         ; ty' <- zonkTcTypeToTypeX env2 ty
         ; return (extendIdZonkEnv env2 n',
                   NPlusKPat ty' (L loc n') (L l lit1') lit2' e1' e2') }
-
-zonk_pat env (XPat (CoPat co_fn pat ty))
-  = do { (env', co_fn') <- zonkCoFn env co_fn
+zonk_pat env (XPat ext) = case ext of
+  { ExpansionPat (HsPatExpanded _ pat) -> zonk_pat env pat
+  ; CoPat co_fn pat ty ->
+    do { (env', co_fn') <- zonkCoFn env co_fn
        ; (env'', pat') <- zonkPat env' (noLocA pat)
        ; ty' <- zonkTcTypeToTypeX env'' ty
        ; return (env'', XPat $ CoPat co_fn' (unLoc pat') ty')
-       }
+       }}
 
 zonk_pat _ pat = pprPanic "zonk_pat" (ppr pat)
 
