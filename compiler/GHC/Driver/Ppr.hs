@@ -1,12 +1,10 @@
 -- | Printing related functions that depend on session state (DynFlags)
 module GHC.Driver.Ppr
    ( showSDoc
-   , showSDocUnsafe
    , showSDocForUser
    , showSDocDebug
    , showSDocDump
    , showPpr
-   , showPprUnsafe
    , pprDebugAndThen
    , printForUser
    , printForC
@@ -41,14 +39,8 @@ import Control.Monad.IO.Class
 showSDoc :: DynFlags -> SDoc -> String
 showSDoc dflags sdoc = renderWithContext (initSDocContext dflags defaultUserStyle) sdoc
 
-showSDocUnsafe :: SDoc -> String
-showSDocUnsafe sdoc = renderWithContext defaultSDocContext sdoc
-
 showPpr :: Outputable a => DynFlags -> a -> String
 showPpr dflags thing = showSDoc dflags (ppr thing)
-
-showPprUnsafe :: Outputable a => a -> String
-showPprUnsafe a = renderWithContext defaultSDocContext (ppr a)
 
 -- | Allows caller to specify the PrintUnqualified to use
 showSDocForUser :: DynFlags -> UnitState -> PrintUnqualified -> SDoc -> String

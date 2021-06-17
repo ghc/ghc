@@ -11,8 +11,8 @@ import Data.Data
 import GHC.Types.Name.Occurrence
 import GHC.Types.Name.Reader
 import GHC hiding (moduleName)
-import GHC.Driver.Ppr
 import GHC.Driver.Session
+import GHC.Utils.Outputable hiding ( (<>) )
 import GHC.Hs.Dump
 import GHC.Data.Bag
 import System.Environment( getArgs )
