@@ -31,6 +31,7 @@ import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcSyntaxOp, tcSyntaxOpGen, tcInferRho )
 
 import GHC.Hs
 import GHC.Hs.Syn.Type
+import GHC.Rename.Env ( lookupSyntaxName )
 import GHC.Rename.Utils
 import GHC.Tc.Utils.Zonk
 import GHC.Tc.Gen.Sig( TcPragEnv, lookupPragEnv, addInlinePrags )
@@ -414,7 +415,7 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
         ; pat_ty <- readExpType (scaledThing pat_ty)
         ; return (mkHsWrapPat (wrap <.> mult_wrap) (AsPat x (L nm_loc bndr_id) pat') pat_ty, res) }
 
-  ViewPat _ expr pat -> do
+  ViewPat mbInv expr pat -> do
         { mult_wrap <- checkManyPattern pat_ty
          -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
          --
@@ -448,7 +449,30 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
                --                (pat_ty -> inf_res_sigma)
               expr_wrap = expr_wrap2' <.> expr_wrap1 <.> mult_wrap
               doc = text "When checking the view pattern function:" <+> (ppr expr)
-        ; return (ViewPat pat_ty (mkLHsWrap expr_wrap expr') pat', res)}
+        ; isListView <- isBasicListView mbInv pat_ty (unLoc expr)
+        ; return
+            ( ViewPat
+              (ViewPatTc pat_ty isListView) (mkLHsWrap expr_wrap expr')
+              pat'
+            , res ) }
+
+        where
+          -- See Note [Desugaring overloaded list patterns]
+          isBasicListView :: Maybe (HsExpr GhcRn)
+                          -> Type
+                          -> HsExpr GhcRn
+                          -> TcM Bool
+          isBasicListView mbInv pat_ty expr = 
+            do { (to_list_name,_) <- lookupSyntaxName toListName
+               ; let is_basic_list_view
+                       | Just _ <- mbInv
+                       , Just _ <- splitListTyConApp_maybe pat_ty
+                       , HsVar _ (L _ nm) <- expr
+                       , nm == to_list_name
+                       = True
+                       | otherwise
+                       = False
+               ; return is_basic_list_view }
 
 {- Note [View patterns and polymorphism]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -485,25 +509,13 @@ Fortunately that's what matchExpectedFunTySigma returns anyway.
 
 ------------------------
 -- Lists, tuples, arrays
-  ListPat Nothing pats -> do
+  ListPat _ pats -> do
         { (coi, elt_ty) <- matchExpectedPatTy matchExpectedListTy penv (scaledThing pat_ty)
         ; (pats', res) <- tcMultiple (tc_lpat (pat_ty `scaledSet` mkCheckExpType elt_ty))
                                      penv pats thing_inside
         ; pat_ty <- readExpType (scaledThing pat_ty)
         ; return (mkHsWrapPat coi
-                         (ListPat (ListPatTc elt_ty Nothing) pats') pat_ty, res)
-}
-
-  ListPat (Just e) pats -> do
-        { tau_pat_ty <- expTypeToType (scaledThing pat_ty)
-        ; ((pats', res, elt_ty), e')
-            <- tcSyntaxOpGen ListOrigin e [SynType (mkCheckExpType tau_pat_ty)]
-                                          SynList $
-                 \ [elt_ty] _ ->
-                 do { (pats', res) <- tcMultiple (tc_lpat (pat_ty `scaledSet` mkCheckExpType elt_ty))
-                                                 penv pats thing_inside
-                    ; return (pats', res, elt_ty) }
-        ; return (ListPat (ListPatTc elt_ty (Just (tau_pat_ty,e'))) pats', res)
+                         (ListPat elt_ty pats') pat_ty, res)
 }
 
   TuplePat _ pats boxity -> do
@@ -695,6 +707,9 @@ AST is used for the subtraction operation.
       ; tc_pat pat_ty penv pat thing_inside }
     _ -> panic "invalid splice in splice pat"
 
+  XPat (HsPatExpanded lpat rpat) -> do
+    { (rpat', res) <- tc_pat pat_ty penv rpat thing_inside
+    ; return (XPat . ExpansionPat $ HsPatExpanded lpat rpat', res) }
 
 {-
 Note [Hopping the LIE in lazy patterns]
