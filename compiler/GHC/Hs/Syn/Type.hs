@@ -49,7 +49,7 @@ hsPatType (BangPat _ pat)               = hsLPatType pat
 hsPatType (LazyPat _ pat)               = hsLPatType pat
 hsPatType (LitPat _ lit)                = hsLitType lit
 hsPatType (AsPat _ var _)               = idType (unLoc var)
-hsPatType (ViewPat ty _ _)              = ty
+hsPatType (ViewPat vp _ _)              = vpt_ty vp
 hsPatType (ListPat ty _)                = mkListTy ty
 hsPatType (TuplePat tys _ bx)           = mkTupleTy1 bx tys
                   -- See Note [Don't flatten tuples from HsSyn] in GHC.Core.Make
