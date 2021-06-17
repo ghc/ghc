@@ -23,6 +23,7 @@ module GHC.Hs.Pat (
         Pat(..), LPat,
         EpAnnSumPat(..),
         ConPatTc (..),
+        ViewPatTc (..),
         ConLikeP,
         HsPatExpansion(..),
         XXPatGhcTc(..),
@@ -124,8 +125,7 @@ type instance XConPat GhcTc = ConPatTc
 type instance XViewPat GhcPs = EpAnn [AddEpAnn]
 type instance XViewPat GhcRn = Maybe (HsExpr GhcRn)
   -- The @HsExpr GhcRn@ gives an inverse to the view function
-type instance XViewPat GhcTc = Type
-  -- Type of the overall pattern
+type instance XViewPat GhcTc = ViewPatTc
 
 type instance XSplicePat GhcPs = NoExtField
 type instance XSplicePat GhcRn = NoExtField
@@ -224,6 +224,48 @@ data ConPatTc
       --   ignored for data cons
       cpt_wrap  :: HsWrapper
     }
+
+-- | Record the type of the overall pattern, for use in `hsPatType`.
+--
+-- A Boolean flag is also used to track a special case in desugaring
+-- overloaded list patterns, see Note [Desugaring overloaded list patterns].
+data ViewPatTc
+  = ViewPatTc
+    { vpt_ty :: !Type
+    , vpt_is_basic_list_view :: !Bool
+    }
+
+{- Note [Desugaring overloaded list patterns]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+There is a special case in the handling of an overloaded list pattern:
+  - when RebindableSyntax is off,
+  - and the type being matched on is already a list type.
+
+In this case, instead of creating a view pattern using `toList`,
+we want to directly emit the underlying pattern, under the assumption that
+`toList = id`.
+
+To do this, we set 'vpt_is_basic_list_view' to 'True' in this special case.
+This will allow the pattern match desugarer to return the correct desugaring.
+
+Note that this is somewhat naughty, as technically there could be an
+overlapping instance such as `IsList [Int]` for which `toList` is not
+the identity. We assume this isn't the case.
+
+This allows correct overlap checking to occur for pattern matches of the form
+
+> {-# LANGUAGE OverloadedLists #-}
+> 
+> f :: [a] -> ()
+> f x = case x of
+>   []    -> ()
+>   (_:_) -> ()
+
+Without this special case, the `[]` pattern would desugar to `(toList -> [])`,
+whereas the `(_:_)` remains a constructor pattern. The pattern match checker
+would then warn that the pattern `[]` is not covered (as it can't look through
+view patterns). See #14547.
+-}
 
 hsRecFieldId :: HsRecField GhcTc arg -> Id
 hsRecFieldId = hsRecFieldSel
