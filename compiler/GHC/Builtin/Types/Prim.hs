@@ -368,7 +368,7 @@ alphaTy, betaTy, gammaTy, deltaTy :: Type
 (alphaTy:betaTy:gammaTy:deltaTy:_) = alphaTys
 
 alphaTyVarsUnliftedRep :: [TyVar]
-alphaTyVarsUnliftedRep = mkTemplateTyVars $ repeat (tYPE unliftedRepDataConTy)
+alphaTyVarsUnliftedRep = mkTemplateTyVars $ repeat (tYPE $ rInfo unliftedRepDataConTy convEvalDataConTy)
 
 alphaTyVarUnliftedRep :: TyVar
 (alphaTyVarUnliftedRep:_) = alphaTyVarsUnliftedRep
@@ -408,7 +408,7 @@ openAlphaTyVar, openBetaTyVar :: TyVar
 -- alpha :: TYPE r1
 -- beta  :: TYPE r2
 [openAlphaTyVar,openBetaTyVar]
-  = mkTemplateTyVars [tYPE $ (rInfo runtimeRep1Ty callingConv1Ty), tYPE $ (rInfo runtimeRep2Ty callingConv2Ty)]
+  = mkTemplateTyVars [tYPE runtimeInfo1Ty, tYPE runtimeInfo2Ty]
 
 openAlphaTy, openBetaTy :: Type
 openAlphaTy = mkTyVarTy openAlphaTyVar
@@ -597,7 +597,7 @@ pcPrimTyCon name roles rep
   = mkPrimTyCon name binders result_kind roles
   where
     binders     = mkTemplateAnonTyConBinders (map (const liftedTypeKind) roles)
-    result_kind = tYPE $ TyConApp runtimeInfoDataConTyCon [(primRepToRuntimeRep rep), convEvalDataConTy]
+    result_kind = tYPE $ rInfo (primRepToRuntimeRep rep) convEvalDataConTy
 
 -- | Convert a 'PrimRep' to a 'Type' of kind RuntimeRep
 -- Defined here to avoid (more) module loops

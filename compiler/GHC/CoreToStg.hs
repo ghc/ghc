@@ -536,7 +536,7 @@ coreToStgApp f args ticks = do
         app = case idDetails f of
                 DataConWorkId dc
                   | saturated    -> StgConApp dc args'
-                                      (dropRuntimeRepArgs (fromMaybe [] (tyConAppArgs_maybe res_ty)))
+                                      (dropRuntimeInfoArgs (fromMaybe [] (tyConAppArgs_maybe res_ty)))
 
                 -- Some primitive operator that might be implemented as a library call.
                 -- As noted by Note [Eta expanding primops] in GHC.Builtin.PrimOps

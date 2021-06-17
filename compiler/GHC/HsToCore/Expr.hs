@@ -466,7 +466,7 @@ dsExpr (ExplicitTuple _ tup_args boxity)
 dsExpr (ExplicitSum types alt arity expr)
   = dsWhenNoErrs (dsLExprNoLP expr)
                  (\core_expr -> mkCoreConApps (sumDataCon alt arity)
-                                (map (Type . getRuntimeRep) types ++
+                                (map (Type . getRuntimeInfo) types ++
                                  map Type types ++
                                  [core_expr]) )
 

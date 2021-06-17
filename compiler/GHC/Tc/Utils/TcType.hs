@@ -881,8 +881,8 @@ any_rewritable ignore_cos role tv_pred tc_pred should_expand
     go rl bvs (AppTy fun arg)    = go rl bvs fun || go NomEq bvs arg
     go rl bvs (FunTy _ w arg res)  = go NomEq bvs arg_rep || go NomEq bvs res_rep ||
                                      go rl bvs arg || go rl bvs res || go NomEq bvs w
-      where arg_rep = getRuntimeRep arg -- forgetting these causes #17024
-            res_rep = getRuntimeRep res
+      where arg_rep = getRuntimeInfo arg -- forgetting these causes #17024
+            res_rep = getRuntimeInfo res
     go rl bvs (ForAllTy tv ty)   = go rl (bvs `extendVarSet` binderVar tv) ty
     go rl bvs (CastTy ty co)     = go rl bvs ty || go_co rl bvs co
     go rl bvs (CoercionTy co)    = go_co rl bvs co  -- ToDo: check

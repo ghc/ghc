@@ -1137,10 +1137,10 @@ tc_hs_type mode rn_ty@(HsSumTy _ hs_tys) exp_kind
   = do { let arity = length hs_tys
        ; arg_kinds <- mapM (\_ -> newOpenTypeKind) hs_tys
        ; tau_tys   <- zipWithM (tc_lhs_type mode) hs_tys arg_kinds
-       ; let arg_reps = map kindRep arg_kinds
-             arg_tys  = arg_reps ++ tau_tys
+       ; let arg_infos = map kindInfo arg_kinds
+             arg_tys  = arg_infos ++ tau_tys
              sum_ty   = mkTyConApp (sumTyCon arity) arg_tys
-             sum_kind = unboxedSumKind arg_reps
+             sum_kind = unboxedSumKind arg_infos
        ; checkExpectedKind rn_ty sum_ty sum_kind exp_kind
        }
 

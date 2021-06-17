@@ -478,14 +478,14 @@ tidy1 _ _ (TuplePat tys pats boxity)
     arity = length pats
     tuple_ConPat = mkPrefixConPat (tupleDataCon boxity arity) pats tys'
     tys' = case boxity of
-             Unboxed -> map getRuntimeRep tys ++ tys
+             Unboxed -> map getRuntimeInfo tys ++ tys
              Boxed   -> tys
            -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
 
 tidy1 _ _ (SumPat tys pat alt arity)
   = return (idDsWrapper, unLoc sum_ConPat)
   where
-    sum_ConPat = mkPrefixConPat (sumDataCon alt arity) [pat] (map getRuntimeRep tys ++ tys)
+    sum_ConPat = mkPrefixConPat (sumDataCon alt arity) [pat] (map getRuntimeInfo tys ++ tys)
                  -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
 
 -- LitPats: we *might* be able to replace these w/ a simpler form

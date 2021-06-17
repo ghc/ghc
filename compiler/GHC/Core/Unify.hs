@@ -1605,8 +1605,8 @@ pushRefl co =
     Just (AppTy ty1 ty2, Nominal)
       -> Just (AppCo (mkReflCo Nominal ty1) (mkNomReflCo ty2))
     Just (FunTy _ w ty1 ty2, r)
-      | Just rep1 <- getRuntimeRep_maybe ty1
-      , Just rep2 <- getRuntimeRep_maybe ty2
+      | Just rep1 <- getRuntimeInfo_maybe ty1
+      , Just rep2 <- getRuntimeInfo_maybe ty2
       ->  Just (TyConAppCo r funTyCon [ multToCo w, mkReflCo r rep1, mkReflCo r rep2
                                        , mkReflCo r ty1,  mkReflCo r ty2 ])
     Just (TyConApp tc tys, r)

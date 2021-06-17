@@ -1005,10 +1005,10 @@ can_eq_nc' _rewritten _rdr_env _envs ev eq_rel
            (FunTy { ft_mult = am1, ft_af = af1, ft_arg = ty1a, ft_res = ty1b }) _ps_ty1
            (FunTy { ft_mult = am2, ft_af = af2, ft_arg = ty2a, ft_res = ty2b }) _ps_ty2
   | af1 == af2   -- Don't decompose (Int -> blah) ~ (Show a => blah)
-  , Just ty1a_rep <- getRuntimeRep_maybe ty1a  -- getRutimeRep_maybe:
-  , Just ty1b_rep <- getRuntimeRep_maybe ty1b  -- see Note [Decomposing FunTy]
-  , Just ty2a_rep <- getRuntimeRep_maybe ty2a
-  , Just ty2b_rep <- getRuntimeRep_maybe ty2b
+  , Just ty1a_rep <- getRuntimeInfo_maybe ty1a  -- getRutimeRep_maybe:
+  , Just ty1b_rep <- getRuntimeInfo_maybe ty1b  -- see Note [Decomposing FunTy]
+  , Just ty2a_rep <- getRuntimeInfo_maybe ty2a
+  , Just ty2b_rep <- getRuntimeInfo_maybe ty2b
   = canDecomposableTyConAppOK ev eq_rel funTyCon
                               [am1, ty1a_rep, ty1b_rep, ty1a, ty1b]
                               [am2, ty2a_rep, ty2b_rep, ty2a, ty2b]

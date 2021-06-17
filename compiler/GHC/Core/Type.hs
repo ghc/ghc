@@ -1158,8 +1158,8 @@ tcRepSplitAppTy_maybe (FunTy { ft_af = af, ft_mult = w, ft_arg = ty1, ft_res = t
   | otherwise
   = Just (TyConApp funTyCon [w, rep1, rep2, ty1], ty2)
   where
-    rep1 = getRuntimeRep ty1
-    rep2 = getRuntimeRep ty2
+    rep1 = getRuntimeInfo ty1
+    rep2 = getRuntimeInfo ty2
 
 tcRepSplitAppTy_maybe (AppTy ty1 ty2)    = Just (ty1, ty2)
 tcRepSplitAppTy_maybe (TyConApp tc tys)
@@ -1196,8 +1196,8 @@ splitAppTys ty = split ty ty []
       = ASSERT( null args )
         (TyConApp funTyCon [], [w, rep1, rep2, ty1, ty2])
       where
-        rep1 = getRuntimeRep ty1
-        rep2 = getRuntimeRep ty2
+        rep1 = getRuntimeInfo ty1
+        rep2 = getRuntimeInfo ty2
 
     split orig_ty _                     args  = (orig_ty, args)
 
@@ -1216,8 +1216,8 @@ repSplitAppTys ty = split ty []
       = ASSERT( null args )
         (TyConApp funTyCon [], [w, rep1, rep2, ty1, ty2])
       where
-        rep1 = getRuntimeRep ty1
-        rep2 = getRuntimeRep ty2
+        rep1 = getRuntimeInfo ty1
+        rep2 = getRuntimeInfo ty2
 
     split ty args = (ty, args)
 
@@ -1516,8 +1516,8 @@ tyConAppArgs_maybe :: Type -> Maybe [Type]
 tyConAppArgs_maybe ty = case coreFullView ty of
   TyConApp _ tys -> Just tys
   FunTy _ w arg res
-    | Just rep1 <- getRuntimeRep_maybe arg
-    , Just rep2 <- getRuntimeRep_maybe res
+    | Just rep1 <- getRuntimeInfo_maybe arg
+    , Just rep2 <- getRuntimeInfo_maybe res
     -> Just [w, rep1, rep2, arg, res]
   _ -> Nothing
 
@@ -1559,8 +1559,8 @@ tcSplitTyConApp_maybe :: HasCallStack => Type -> Maybe (TyCon, [Type])
 tcSplitTyConApp_maybe ty | Just ty' <- tcView ty = tcSplitTyConApp_maybe ty'
 tcSplitTyConApp_maybe (TyConApp tc tys)          = Just (tc, tys)
 tcSplitTyConApp_maybe (FunTy VisArg w arg res)
-  | Just arg_rep <- getRuntimeRep_maybe arg
-  , Just res_rep <- getRuntimeRep_maybe res
+  | Just arg_rep <- getRuntimeInfo_maybe arg
+  , Just res_rep <- getRuntimeInfo_maybe res
   = Just (funTyCon, [w, arg_rep, res_rep, arg, res])
 tcSplitTyConApp_maybe _ = Nothing
 
@@ -1577,8 +1577,8 @@ repSplitTyConApp_maybe :: HasDebugCallStack => Type -> Maybe (TyCon, [Type])
 --
 repSplitTyConApp_maybe (TyConApp tc tys) = Just (tc, tys)
 repSplitTyConApp_maybe (FunTy _ w arg res)
-  | Just arg_rep <- getRuntimeRep_maybe arg
-  , Just res_rep <- getRuntimeRep_maybe res
+  | Just arg_rep <- getRuntimeInfo_maybe arg
+  , Just res_rep <- getRuntimeInfo_maybe res
   = Just (funTyCon, [w, arg_rep, res_rep, arg, res])
 repSplitTyConApp_maybe _ = Nothing
 

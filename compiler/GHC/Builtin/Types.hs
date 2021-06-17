@@ -1239,14 +1239,14 @@ mk_sum arity = (tycon, sum_cons)
     -- Unboxed sums are currently not Typeable due to efficiency concerns. See #13276.
     rep_name = Nothing -- Just $ mkPrelTyConRepName tc_name
 
-    tc_binders = mkTemplateTyConBinders (replicate arity runtimeRepTy)
+    tc_binders = mkTemplateTyConBinders (replicate arity runtimeInfoTy)
                                         (\ks -> map tYPE ks)
 
     tyvars = binderVars tc_binders
 
-    tc_res_kind = unboxedSumKind rr_tys
+    tc_res_kind = unboxedSumKind ri_tys
 
-    (rr_tys, tyvar_tys) = splitAt arity (mkTyVarTys tyvars)
+    (ri_tys, tyvar_tys) = splitAt arity (mkTyVarTys tyvars)
 
     tc_name = mkWiredInName gHC_PRIM (mkSumTyConOcc arity) tc_uniq
                             (ATyCon tycon) BuiltInSyntax
@@ -1401,13 +1401,11 @@ unrestrictedFunTyCon :: TyCon
 unrestrictedFunTyCon = buildSynTyCon unrestrictedFunTyConName [] arrowKind [] unrestrictedFunTy
   where arrowKind = mkTyConKind binders liftedTypeKind
         -- See also funTyCon
-        binders = [ Bndr runtimeRep1TyVar (NamedTCB Inferred)
-                  , Bndr callingConv1TyVar (NamedTCB Inferred)
-                  , Bndr runtimeRep1TyVar (NamedTCB Inferred)
-                  , Bndr callingConv2TyVar (NamedTCB Inferred)
+        binders = [ Bndr runtimeInfo1TyVar (NamedTCB Inferred)
+                  , Bndr runtimeInfo2TyVar (NamedTCB Inferred)
                   ]
-                  ++ mkTemplateAnonTyConBinders [ tYPE $ rInfo runtimeRep1Ty callingConv1Ty
-                                                , tYPE $ rInfo runtimeRep2Ty callingConv2Ty
+                  ++ mkTemplateAnonTyConBinders [ tYPE runtimeInfo1Ty
+                                                , tYPE runtimeInfo2Ty
                                                 ]
 
 unrestrictedFunTyConName :: Name

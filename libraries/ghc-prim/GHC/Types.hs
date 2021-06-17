@@ -532,7 +532,7 @@ data KindRep = KindRepTyConApp TyCon [KindRep]
              | KindRepVar !KindBndr
              | KindRepApp KindRep KindRep
              | KindRepFun KindRep KindRep
-             | KindRepTYPE !RuntimeInfo
+             | KindRepTYPE !RuntimeRep
              | KindRepTypeLitS TypeLitSort Addr#
              | KindRepTypeLitD TypeLitSort [Char]
 
