@@ -2939,8 +2939,12 @@ is `k -> Any @a`, and thus the third argument of `x :: k` is well-kinded.
 
 -}
 
-
-data Reduction = Reduction !Type !Coercion
+-- | A reduction to the provided type, with a coercion witnessing the equality.
+--
+-- The 'Coercion' field must be lazy: see for instance GHC.Tc.Solver.Rewrite.rewrite_tyvar2
+-- which returns an error in the Coercion field when dealing with a Derived constraint,
+-- which is OK as this Coercion gets ignored later.
+data Reduction = Reduction !Type Coercion
 
 instance Outputable Reduction where
   ppr (Reduction co xi) = text "Reduction" <> ppr co <> ppr xi
