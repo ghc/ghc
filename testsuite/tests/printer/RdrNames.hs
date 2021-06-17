@@ -97,12 +97,6 @@ lt = undefined
 
 -- ---------------------------------------------------------------------
 
---        | '[:' ':]'             {% ams (sLL $1 $> $ parrTyCon_RDR) [mo $1,mc $2] }
-
--- GHC source indicates this constuctor is only available in PrelPArr
--- ltp :: [::] a
--- ltp = undefined
-
 -- ---------------------------------------------------------------------
 
 --        | '(' '~#' ')'          {% ams (sLL $1 $> $ getRdrName eqPrimTyCon)

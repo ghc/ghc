@@ -3757,7 +3757,7 @@ default_PIC platform =
 -- by polluting the load commands with RPATH entries.
 --
 -- Thus, we disable Opt_RPath by default on OSDarwin.  The savvy user can always
--- enable it with -use-rpath if they so wish.
+-- enable it with -use-rpaths if they so wish.
 --
 -- See Note [Dynamic linking on macOS]
 
