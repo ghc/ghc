@@ -120,7 +120,6 @@
 -fstg-lift-lams-rec-args-any
 -fth
 -ftype-function-depth
--fuse-rpaths
 -fversion-macros
 -fvia-c
 -haddock-opts

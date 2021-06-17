@@ -259,6 +259,7 @@ figureLlvmVersion dflags = traceToolCommand dflags "llc" $ do
 --
 -- See Note [Dynamic linking on macOS]
 runInjectRPaths :: DynFlags -> [FilePath] -> FilePath -> IO ()
+runInjectRPaths dflags _ _ | not (gopt Opt_RPath dflags) = return ()
 runInjectRPaths dflags lib_paths dylib = do
   info <- lines <$> askOtool dflags Nothing [Option "-L", Option dylib]
   -- filter the output for only the libraries. And then drop the @rpath prefix.
