@@ -624,6 +624,15 @@ getRegister' config plat expr
       where w' = formatToWidth (cmmTypeFormat (cmmRegType plat reg))
             r' = getRegisterReg plat reg
 
+    CmmMachOp (MO_U_Quot w) [x, y] | w == W8 -> do
+      (reg_x, _format_x, code_x) <- getSomeReg x
+      (reg_y, _format_y, code_y) <- getSomeReg y
+      return $ Any (intFormat w) (\dst -> code_x `appOL` code_y `snocOL` annExpr expr (UXTB (OpReg w reg_x) (OpReg w reg_x)) `snocOL` (UXTB (OpReg w reg_y) (OpReg w reg_y)) `snocOL` (UDIV (OpReg w dst) (OpReg w reg_x) (OpReg w reg_y)))
+    CmmMachOp (MO_U_Quot w) [x, y] | w == W16 -> do
+      (reg_x, _format_x, code_x) <- getSomeReg x
+      (reg_y, _format_y, code_y) <- getSomeReg y
+      return $ Any (intFormat w) (\dst -> code_x `appOL` code_y `snocOL` annExpr expr (UXTH (OpReg w reg_x) (OpReg w reg_x)) `snocOL` (UXTH (OpReg w reg_y) (OpReg w reg_y)) `snocOL` (UDIV (OpReg w dst) (OpReg w reg_x) (OpReg w reg_y)))
+
     -- 2. Shifts. x << n, x >> n.
     CmmMachOp (MO_Shl w) [x, (CmmLit (CmmInt n _))] | w == W32, 0 <= n, n < 32 -> do
       (reg_x, _format_x, code_x) <- getSomeReg x
@@ -632,9 +641,51 @@ getRegister' config plat expr
       (reg_x, _format_x, code_x) <- getSomeReg x
       return $ Any (intFormat w) (\dst -> code_x `snocOL` annExpr expr (LSL (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
 
+    CmmMachOp (MO_S_Shr w) [x, (CmmLit (CmmInt n _))] | w == W8, 0 <= n, n < 8 -> do
+      (reg_x, _format_x, code_x) <- getSomeReg x
+      return $ Any (intFormat w) (\dst -> code_x `snocOL` annExpr expr (SBFX (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n)) (OpImm (ImmInteger (8-n)))))
+    CmmMachOp (MO_S_Shr w) [x, y] | w == W8 -> do
+      (reg_x, _format_x, code_x) <- getSomeReg x
+      (reg_y, _format_y, code_y) <- getSomeReg y
+      return $ Any (intFormat w) (\dst -> code_x `appOL` code_y `snocOL` annExpr expr (SXTB (OpReg w reg_x) (OpReg w reg_x)) `snocOL` (ASR (OpReg w dst) (OpReg w reg_x) (OpReg w reg_y)))
+
+    CmmMachOp (MO_S_Shr w) [x, (CmmLit (CmmInt n _))] | w == W16, 0 <= n, n < 16 -> do
+      (reg_x, _format_x, code_x) <- getSomeReg x
+      return $ Any (intFormat w) (\dst -> code_x `snocOL` annExpr expr (SBFX (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n)) (OpImm (ImmInteger (16-n)))))
+    CmmMachOp (MO_S_Shr w) [x, y] | w == W16 -> do
+      (reg_x, _format_x, code_x) <- getSomeReg x
+      (reg_y, _format_y, code_y) <- getSomeReg y
+      return $ Any (intFormat w) (\dst -> code_x `appOL` code_y `snocOL` annExpr expr (SXTH (OpReg w reg_x) (OpReg w reg_x)) `snocOL` (ASR (OpReg w dst) (OpReg w reg_x) (OpReg w reg_y)))
+
+    CmmMachOp (MO_S_Shr w) [x, (CmmLit (CmmInt n _))] | w == W32, 0 <= n, n < 32 -> do
+      (reg_x, _format_x, code_x) <- getSomeReg x
+      return $ Any (intFormat w) (\dst -> code_x `snocOL` annExpr expr (ASR (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
+
+    CmmMachOp (MO_S_Shr w) [x, (CmmLit (CmmInt n _))] | w == W64, 0 <= n, n < 64 -> do
+      (reg_x, _format_x, code_x) <- getSomeReg x
+      return $ Any (intFormat w) (\dst -> code_x `snocOL` annExpr expr (ASR (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
+
+
+    CmmMachOp (MO_U_Shr w) [x, (CmmLit (CmmInt n _))] | w == W8, 0 <= n, n < 8 -> do
+      (reg_x, _format_x, code_x) <- getSomeReg x
+      return $ Any (intFormat w) (\dst -> code_x `snocOL` annExpr expr (UBFX (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n)) (OpImm (ImmInteger (8-n)))))
+    CmmMachOp (MO_U_Shr w) [x, y] | w == W8 -> do
+      (reg_x, _format_x, code_x) <- getSomeReg x
+      (reg_y, _format_y, code_y) <- getSomeReg y
+      return $ Any (intFormat w) (\dst -> code_x `appOL` code_y `snocOL` annExpr expr (UXTB (OpReg w reg_x) (OpReg w reg_x)) `snocOL` (ASR (OpReg w dst) (OpReg w reg_x) (OpReg w reg_y)))
+
+    CmmMachOp (MO_U_Shr w) [x, (CmmLit (CmmInt n _))] | w == W16, 0 <= n, n < 16 -> do
+      (reg_x, _format_x, code_x) <- getSomeReg x
+      return $ Any (intFormat w) (\dst -> code_x `snocOL` annExpr expr (UBFX (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n)) (OpImm (ImmInteger (16-n)))))
+    CmmMachOp (MO_U_Shr w) [x, y] | w == W16 -> do
+      (reg_x, _format_x, code_x) <- getSomeReg x
+      (reg_y, _format_y, code_y) <- getSomeReg y
+      return $ Any (intFormat w) (\dst -> code_x `appOL` code_y `snocOL` annExpr expr (UXTH (OpReg w reg_x) (OpReg w reg_x)) `snocOL` (ASR (OpReg w dst) (OpReg w reg_x) (OpReg w reg_y)))
+
     CmmMachOp (MO_U_Shr w) [x, (CmmLit (CmmInt n _))] | w == W32, 0 <= n, n < 32 -> do
       (reg_x, _format_x, code_x) <- getSomeReg x
       return $ Any (intFormat w) (\dst -> code_x `snocOL` annExpr expr (LSR (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
+
     CmmMachOp (MO_U_Shr w) [x, (CmmLit (CmmInt n _))] | w == W64, 0 <= n, n < 64 -> do
       (reg_x, _format_x, code_x) <- getSomeReg x
       return $ Any (intFormat w) (\dst -> code_x `snocOL` annExpr expr (LSR (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
@@ -687,6 +738,13 @@ getRegister' config plat expr
         -- and thus we end up with <float> + <float> => MO_Add <float> <float>
         MO_Add w -> genOp w (\d x y -> unitOL $ annExpr expr (ADD d x y))
         MO_Sub w -> genOp w (\d x y -> unitOL $ annExpr expr (SUB d x y))
+
+        -- Note [CSET]
+        --
+        -- Setting conditional flags: the architecture internally knows the
+        -- following flag bits.  And based on thsoe comparisons as in the
+        -- table below.
+        --
         --    31  30  29  28
         --  .---+---+---+---+-- - -
         --  | N | Z | C | V |
@@ -718,10 +776,13 @@ getRegister' config plat expr
         --  |  AL  | Always                              | Any             | 1110     |
         --  |  NV  | Never                               | Any             | 1111     |
         --- '-------------------------------------------------------------------------'
-
-        MO_Eq w -> intOp w (\d x y -> toOL [ CMP x y, CSET d EQ ])
-        MO_Ne w -> intOp w (\d x y -> toOL [ CMP x y, CSET d NE ])
-        MO_Mul w -> intOp w (\d x y -> unitOL $ MUL d x y)
+        MO_Eq w@W8  -> intOp w (\d x y -> toOL [ SXTB x x, SXTB y y, CMP x y, CSET d EQ ])
+        MO_Eq w@W16 -> intOp w (\d x y -> toOL [ SXTH x x, SXTH y y, CMP x y, CSET d EQ ])
+        MO_Eq w     -> intOp w (\d x y -> toOL [                     CMP x y, CSET d EQ ])
+        MO_Ne w@W8  -> intOp w (\d x y -> toOL [ SXTB x x, SXTB y y, CMP x y, CSET d NE ])
+        MO_Ne w@W16 -> intOp w (\d x y -> toOL [ SXTH x x, SXTH y y, CMP x y, CSET d NE ])
+        MO_Ne w     -> intOp w (\d x y -> toOL [                     CMP x y, CSET d NE ])
+        MO_Mul w    -> intOp w (\d x y -> unitOL $ MUL d x y)
 
         -- Signed multiply/divide
         MO_S_MulMayOflo w -> intOp w (\d x y -> toOL [ MUL d x y, CSET d VS ])
@@ -743,17 +804,33 @@ getRegister' config plat expr
         MO_U_Rem w  -> withTempIntReg w $ \t ->
           intOp w (\d x y -> toOL [ UDIV t x y, MSUB d t y x ])
 
-        -- Signed comparisons -- see above for the CSET discussion
-        MO_S_Ge w -> intOp w (\d x y -> toOL [ CMP x y, CSET d SGE ])
-        MO_S_Le w -> intOp w (\d x y -> toOL [ CMP x y, CSET d SLE ])
-        MO_S_Gt w -> intOp w (\d x y -> toOL [ CMP x y, CSET d SGT ])
-        MO_S_Lt w -> intOp w (\d x y -> toOL [ CMP x y, CSET d SLT ])
+        -- Signed comparisons -- see Note [CSET]
+        MO_S_Ge w@W8  -> intOp w (\d x y -> toOL [ SXTB x x, SXTB y y, CMP x y, CSET d SGE ])
+        MO_S_Ge w@W16 -> intOp w (\d x y -> toOL [ SXTH x x, SXTH y y, CMP x y, CSET d SGE ])
+        MO_S_Ge w     -> intOp w (\d x y -> toOL [                     CMP x y, CSET d SGE ])
+        MO_S_Le w@W8  -> intOp w (\d x y -> toOL [ SXTB x x, SXTB y y, CMP x y, CSET d SLE ])
+        MO_S_Le w@W16 -> intOp w (\d x y -> toOL [ SXTH x x, SXTH y y, CMP x y, CSET d SLE ])
+        MO_S_Le w     -> intOp w (\d x y -> toOL [                     CMP x y, CSET d SLE ])
+        MO_S_Gt w@W8  -> intOp w (\d x y -> toOL [ SXTB x x, SXTB y y, CMP x y, CSET d SGT ])
+        MO_S_Gt w@W16 -> intOp w (\d x y -> toOL [ SXTH x x, SXTH y y, CMP x y, CSET d SGT ])
+        MO_S_Gt w     -> intOp w (\d x y -> toOL [                     CMP x y, CSET d SGT ])
+        MO_S_Lt w@W8  -> intOp w (\d x y -> toOL [ SXTB x x, SXTB y y, CMP x y, CSET d SLT ])
+        MO_S_Lt w@W16 -> intOp w (\d x y -> toOL [ SXTH x x, SXTH y y, CMP x y, CSET d SLT ])
+        MO_S_Lt w     -> intOp w (\d x y -> toOL [                     CMP x y, CSET d SLT ])
 
         -- Unsigned comparisons
-        MO_U_Ge w -> intOp w (\d x y -> toOL [ CMP x y, CSET d UGE ])
-        MO_U_Le w -> intOp w (\d x y -> toOL [ CMP x y, CSET d ULE ])
-        MO_U_Gt w -> intOp w (\d x y -> toOL [ CMP x y, CSET d UGT ])
-        MO_U_Lt w -> intOp w (\d x y -> toOL [ CMP x y, CSET d ULT ])
+        MO_U_Ge w@W8  -> intOp w (\d x y -> toOL [ UXTB x x, UXTB y y, CMP x y, CSET d UGE ])
+        MO_U_Ge w@W16 -> intOp w (\d x y -> toOL [ UXTH x x, UXTH y y, CMP x y, CSET d UGE ])
+        MO_U_Ge w     -> intOp w (\d x y -> toOL [                     CMP x y, CSET d UGE ])
+        MO_U_Le w@W8  -> intOp w (\d x y -> toOL [ UXTB x x, UXTB y y, CMP x y, CSET d ULE ])
+        MO_U_Le w@W16 -> intOp w (\d x y -> toOL [ UXTH x x, UXTH y y, CMP x y, CSET d ULE ])
+        MO_U_Le w     -> intOp w (\d x y -> toOL [                     CMP x y, CSET d ULE ])
+        MO_U_Gt w@W8  -> intOp w (\d x y -> toOL [ UXTB x x, UXTB y y, CMP x y, CSET d UGT ])
+        MO_U_Gt w@W16 -> intOp w (\d x y -> toOL [ UXTH x x, UXTH y y, CMP x y, CSET d UGT ])
+        MO_U_Gt w     -> intOp w (\d x y -> toOL [                     CMP x y, CSET d UGT ])
+        MO_U_Lt w@W8  -> intOp w (\d x y -> toOL [ UXTB x x, UXTB y y, CMP x y, CSET d ULT ])
+        MO_U_Lt w@W16 -> intOp w (\d x y -> toOL [ UXTH x x, UXTH y y, CMP x y, CSET d ULT ])
+        MO_U_Lt w     -> intOp w (\d x y -> toOL [                     CMP x y, CSET d ULT ])
 
         -- Floating point arithmetic
         MO_F_Add w   -> floatOp w (\d x y -> unitOL $ ADD d x y)
@@ -935,11 +1012,28 @@ genCondJump bid expr = do
       -- Generic case.
       CmmMachOp mop [x, y] -> do
 
-        let bcond w cmp = do
-              -- compute both sides.
-              (reg_x, _format_x, code_x) <- getSomeReg x
-              (reg_y, _format_y, code_y) <- getSomeReg y
-              return $ code_x `appOL` code_y `snocOL` CMP (OpReg w reg_x) (OpReg w reg_y) `snocOL` (annExpr expr (BCOND cmp (TBlock bid)))
+        let ubcond w cmp = do
+                -- compute both sides.
+                (reg_x, _format_x, code_x) <- getSomeReg x
+                (reg_y, _format_y, code_y) <- getSomeReg y
+                let x' = OpReg w reg_x
+                    y' = OpReg w reg_y
+                return $ case w of
+                  W8  -> code_x `appOL` code_y `appOL` toOL [ UXTB x' x', UXTB y' y', CMP x' y', (annExpr expr (BCOND cmp (TBlock bid))) ]
+                  W16 -> code_x `appOL` code_y `appOL` toOL [ UXTH x' x', UXTH y' y', CMP x' y', (annExpr expr (BCOND cmp (TBlock bid))) ]
+                  _   -> code_x `appOL` code_y `appOL` toOL [                         CMP x' y', (annExpr expr (BCOND cmp (TBlock bid))) ]
+
+            sbcond w cmp = do
+                -- compute both sides.
+                (reg_x, _format_x, code_x) <- getSomeReg x
+                (reg_y, _format_y, code_y) <- getSomeReg y
+                let x' = OpReg w reg_x
+                    y' = OpReg w reg_y
+                return $ case w of
+                  W8  -> code_x `appOL` code_y `appOL` toOL [ SXTB x' x', SXTB y' y', CMP x' y', (annExpr expr (BCOND cmp (TBlock bid))) ]
+                  W16 -> code_x `appOL` code_y `appOL` toOL [ SXTH x' x', SXTH y' y', CMP x' y', (annExpr expr (BCOND cmp (TBlock bid))) ]
+                  _   -> code_x `appOL` code_y `appOL` toOL [                         CMP x' y', (annExpr expr (BCOND cmp (TBlock bid))) ]
+
             fbcond w cmp = do
               -- ensure we get float regs
               (reg_fx, _format_fx, code_fx) <- getFloatReg x
@@ -955,17 +1049,17 @@ genCondJump bid expr = do
           MO_F_Lt w -> fbcond w OLT
           MO_F_Le w -> fbcond w OLE
 
-          MO_Eq w   -> bcond w EQ
-          MO_Ne w   -> bcond w NE
+          MO_Eq w   -> sbcond w EQ
+          MO_Ne w   -> sbcond w NE
 
-          MO_S_Gt w -> bcond w SGT
-          MO_S_Ge w -> bcond w SGE
-          MO_S_Lt w -> bcond w SLT
-          MO_S_Le w -> bcond w SLE
-          MO_U_Gt w -> bcond w UGT
-          MO_U_Ge w -> bcond w UGE
-          MO_U_Lt w -> bcond w ULT
-          MO_U_Le w -> bcond w ULE
+          MO_S_Gt w -> sbcond w SGT
+          MO_S_Ge w -> sbcond w SGE
+          MO_S_Lt w -> sbcond w SLT
+          MO_S_Le w -> sbcond w SLE
+          MO_U_Gt w -> ubcond w UGT
+          MO_U_Ge w -> ubcond w UGE
+          MO_U_Lt w -> ubcond w ULT
+          MO_U_Le w -> ubcond w ULE
           _ -> pprPanic "AArch64.genCondJump:case mop: " (text $ show expr)
       _ -> pprPanic "AArch64.genCondJump: " (text $ show expr)
 
