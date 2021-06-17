@@ -485,25 +485,13 @@ Fortunately that's what matchExpectedFunTySigma returns anyway.
 
 ------------------------
 -- Lists, tuples, arrays
-  ListPat Nothing pats -> do
+  ListPat _ pats -> do
         { (coi, elt_ty) <- matchExpectedPatTy matchExpectedListTy penv (scaledThing pat_ty)
         ; (pats', res) <- tcMultiple (tc_lpat (pat_ty `scaledSet` mkCheckExpType elt_ty))
                                      penv pats thing_inside
         ; pat_ty <- readExpType (scaledThing pat_ty)
         ; return (mkHsWrapPat coi
-                         (ListPat (ListPatTc elt_ty Nothing) pats') pat_ty, res)
-}
-
-  ListPat (Just e) pats -> do
-        { tau_pat_ty <- expTypeToType (scaledThing pat_ty)
-        ; ((pats', res, elt_ty), e')
-            <- tcSyntaxOpGen ListOrigin e [SynType (mkCheckExpType tau_pat_ty)]
-                                          SynList $
-                 \ [elt_ty] _ ->
-                 do { (pats', res) <- tcMultiple (tc_lpat (pat_ty `scaledSet` mkCheckExpType elt_ty))
-                                                 penv pats thing_inside
-                    ; return (pats', res, elt_ty) }
-        ; return (ListPat (ListPatTc elt_ty (Just (tau_pat_ty,e'))) pats', res)
+                         (ListPat elt_ty pats') pat_ty, res)
 }
 
   TuplePat _ pats boxity -> do
@@ -695,6 +683,9 @@ AST is used for the subtraction operation.
       ; tc_pat pat_ty penv pat thing_inside }
     _ -> panic "invalid splice in splice pat"
 
+  XPat (HsPatExpanded lpat rpat) -> do
+    { (rpat', res) <- tc_pat pat_ty penv rpat thing_inside
+    ; return (XPat . ExpansionPat $ HsPatExpanded lpat rpat', res) }
 
 {-
 Note [Hopping the LIE in lazy patterns]
