@@ -2244,7 +2244,7 @@ AC_DEFUN([FIND_LLVM_PROG],[
             [AC_MSG_RESULT(no)
              $1=""
              AC_MSG_NOTICE([We only support llvm $3 to $4 (found $PROG_VERSION).])],
-            [AX_COMPARE_VERSION([$PROG_VERSION], [gt], [$4],
+            [AX_COMPARE_VERSION([$PROG_VERSION], [ge], [$4],
              [AC_MSG_RESULT(no)
               $1=""
               AC_MSG_NOTICE([We only support llvm $3 to $4 (found $PROG_VERSION).])],
