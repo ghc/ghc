@@ -23,7 +23,6 @@ module GHC.Hs.Pat (
         Pat(..), LPat,
         EpAnnSumPat(..),
         ConPatTc (..),
-        ListPatTc(..),
         ConLikeP,
         HsPatExpansion(..),
         XXPatGhcTc(..),
@@ -52,9 +51,9 @@ module GHC.Hs.Pat (
 import GHC.Prelude
 
 import Language.Haskell.Syntax.Pat
-import Language.Haskell.Syntax.Expr (SyntaxExpr)
 
-import {-# SOURCE #-} GHC.Hs.Expr (pprLExpr, pprSplice)
+import {-# SOURCE #-} GHC.Hs.Expr ( pprLExpr, pprSplice)
+import {-# SOURCE #-} Language.Haskell.Syntax.Expr ( HsExpr )
 
 -- friends:
 import GHC.Hs.Binds
@@ -86,11 +85,6 @@ import Data.Data
 import Data.Void
 
 
-data ListPatTc
-  = ListPatTc
-      Type                             -- The type of the elements
-      (Maybe (Type, SyntaxExpr GhcTc)) -- For rebindable syntax
-
 type instance XWildPat GhcPs = NoExtField
 type instance XWildPat GhcRn = NoExtField
 type instance XWildPat GhcTc = Type
@@ -111,12 +105,9 @@ type instance XBangPat GhcPs = EpAnn [AddEpAnn] -- For '!'
 type instance XBangPat GhcRn = NoExtField
 type instance XBangPat GhcTc = NoExtField
 
--- Note: XListPat cannot be extended when using GHC 8.0.2 as the bootstrap
--- compiler, as it triggers https://gitlab.haskell.org/ghc/ghc/issues/14396 for
--- `SyntaxExpr`
 type instance XListPat GhcPs = EpAnn AnnList
-type instance XListPat GhcRn = Maybe (SyntaxExpr GhcRn)
-type instance XListPat GhcTc = ListPatTc
+type instance XListPat GhcRn = NoExtField
+type instance XListPat GhcTc = Type
 
 type instance XTuplePat GhcPs = EpAnn [AddEpAnn]
 type instance XTuplePat GhcRn = NoExtField
@@ -131,7 +122,7 @@ type instance XConPat GhcRn = NoExtField
 type instance XConPat GhcTc = ConPatTc
 
 type instance XViewPat GhcPs = EpAnn [AddEpAnn]
-type instance XViewPat GhcRn = NoExtField
+type instance XViewPat GhcRn = Maybe (HsExpr GhcRn) -- Possible inverse to the pattern
 type instance XViewPat GhcTc = Type
 
 type instance XSplicePat GhcPs = NoExtField
