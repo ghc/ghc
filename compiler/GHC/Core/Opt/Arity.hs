@@ -118,14 +118,17 @@ joinRhsArity _         = 0
 ---------------
 exprArity :: CoreExpr -> Arity
 -- ^ An approximate, fast, version of 'exprEtaExpandArity'
+-- We do /not/ guarantee that exprArity e <= typeArity e
+-- You may need to do arity trimming after calling exprArity
+-- See Note [Arity trimming]
+-- (If we do arity trimming here we have to do it at every cast.
 exprArity e = go e
   where
     go (Var v)                     = idArity v
     go (Lam x e) | isId x          = go e + 1
                  | otherwise       = go e
     go (Tick t e) | not (tickishIsCode t) = go e
-    go (Cast e co)                 = trim_arity (go e) (coercionRKind co)
-                                        -- Note [exprArity invariant]
+    go (Cast e _)                  = go e
     go (App e (Type _))            = go e
     go (App f a) | exprIsTrivial a = (go f - 1) `max` 0
         -- See Note [exprArity for applications]
@@ -133,14 +136,11 @@ exprArity e = go e
 
     go _                           = 0
 
-    trim_arity :: Arity -> Type -> Arity
-    trim_arity arity ty = arity `min` length (typeArity ty)
-
 ---------------
 typeArity :: Type -> [OneShotInfo]
 -- How many value arrows are visible in the type?
 -- We look through foralls, and newtypes
--- See Note [exprArity invariant]
+-- See Note [typeArity invariants]
 typeArity ty
   = go initRecTc ty
   where
@@ -182,33 +182,64 @@ exprBotStrictness_maybe e
     sig ar = mkClosedDmdSig (replicate ar topDmd) botDiv
 
 {-
-Note [exprArity invariant]
+Note [typeArity invariants]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-exprArity has the following invariants:
+We have the following invariants around typeArity
 
-  (1) If typeArity (exprType e) = n,
+  (1) In any binding x = e,
+      idArity f <= typeArity (idType f)
+
+  (2) If typeArity (exprType e) = n,
       then manifestArity (etaExpand e n) = n
 
       That is, etaExpand can always expand as much as typeArity says
       So the case analysis in etaExpand and in typeArity must match
 
-  (2) exprArity e <= typeArity (exprType e)
-
-  (3) Hence if (exprArity e) = n, then manifestArity (etaExpand e n) = n
-
-      That is, if exprArity says "the arity is n" then etaExpand really
-      can get "n" manifest lambdas to the top.
-
 Why is this important?  Because
+
   - In GHC.Iface.Tidy we use exprArity to fix the *final arity* of
     each top-level Id, and in
+
   - In CorePrep we use etaExpand on each rhs, so that the visible lambdas
     actually match that arity, which in turn means
     that the StgRhs has the right number of lambdas
 
-An alternative would be to do the eta-expansion in GHC.Iface.Tidy, at least
-for top-level bindings, in which case we would not need the trim_arity
-in exprArity.  That is a less local change, so I'm going to leave it for today!
+Suppose we have
+   f :: Int -> Int -> Int
+   f x y = x+y    -- Arity 2
+
+   g :: F Int
+   g = case x of { True  -> f |> co1
+                 ; False -> g |> co2 }
+
+Now, we can't eta-expand g to have arity 2, because etaExpand, which works
+off the /type/ of the expression, doesn't know how to make an eta-expanded
+binding
+   g = (\a b. case x of ...) |> co
+because can't make up `co` or the types of `a` and `b`.
+
+So invariant (1) ensures that every binding has an arity that is no greater
+than the typeArity of the RHS; and invariant (2) ensures that etaExpand
+and handle what typeArity says.
+
+Note [Arity trimming]
+~~~~~~~~~~~~~~~~~~~~~
+Arity trimming, implemented by minWithArity, directly implements
+invariant (1) of Note [typeArity invariants]. Failing to do so, and
+hence breaking invariant (1) led to #5441.
+
+How to trim?  If we end in topDiv, it's easy.  But we must take great care with
+dead ends (i.e. botDiv). Suppose the expression was (\x y. error "urk"),
+we'll get \??.⊥.  We absolutely must not trim that to \?.⊥, because that
+claims that ((\x y. error "urk") |> co) diverges when given one argument,
+which it absolutely does not. And Bad Things happen if we think something
+returns bottom when it doesn't (#16066).
+
+So, if we need to trim a dead-ending arity type, switch (conservatively) to
+topDiv.
+
+Historical note: long ago, we unconditionally switched to topDiv when we
+encountered a cast, but that is far too conservative: see #5475
 
 Note [Newtype classes and eta expansion]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -606,7 +637,7 @@ maxWithArity at@(AT oss div) !ar
 
 -- | Trim an arity type so that it has at most the given arity.
 -- Any excess 'OneShotInfo's are truncated to 'topDiv', even if they end in
--- 'ABot'.
+-- 'ABot'.  See Note [Arity trimming]
 minWithArity :: ArityType -> Arity -> ArityType
 minWithArity at@(AT oss _) ar
   | oss `lengthAtMost` ar = at
@@ -622,7 +653,8 @@ takeWhileOneShot (AT oss div)
 exprEtaExpandArity :: DynFlags -> CoreExpr -> ArityType
 -- exprEtaExpandArity is used when eta expanding
 --      e  ==>  \xy -> e x y
-exprEtaExpandArity dflags e = arityType (etaExpandArityEnv dflags) e
+exprEtaExpandArity dflags e
+  = arityType (etaExpandArityEnv dflags) e
 
 getBotArity :: ArityType -> Maybe Arity
 -- Arity of a divergent function
@@ -645,6 +677,8 @@ findRhsArity dflags bndr rhs old_arity
       -- to be sound. In other words, arities should never decrease.
       -- Result: the common case is that there is just one iteration
   where
+    ty_arity = length (typeArity (idType bndr))
+
     go :: Int -> ArityType -> ArityType
     go !n cur_at@(AT oss div)
       | not (isDeadEndDiv div)           -- the "stop right away" case
@@ -660,8 +694,11 @@ findRhsArity dflags bndr rhs old_arity
         next_at = step cur_at
 
     step :: ArityType -> ArityType
-    step at = -- pprTrace "step" (ppr bndr <+> ppr at <+> ppr (arityType env rhs)) $
-              arityType env rhs
+    step at = -- pprTrace "step" (vcat [ ppr bndr <+> ppr at <+> ppr (arityType env rhs)
+              --                      , ppr (idType bndr)
+              --                      , ppr (typeArity (idType bndr)) ]) $
+              minWithArity (arityType env rhs) ty_arity
+              -- minWithArity: see Note [Arity trimming]
       where
         env = extendSigEnv (findRhsArityEnv dflags) bndr at
 
@@ -810,29 +847,6 @@ So we combine the best of the two branches, on the (slightly dodgy)
 basis that if we know one branch is one-shot, then they all must be.
 Surprisingly, this means that the one-shot arity type is effectively the top
 element of the lattice.
-
-Note [Arity trimming]
-~~~~~~~~~~~~~~~~~~~~~
-Consider ((\x y. blah) |> co), where co :: (Int->Int->Int) ~ (Int -> F a) , and
-F is some type family.
-
-Because of Note [exprArity invariant], item (2), we must return with arity at
-most 1, because typeArity (Int -> F a) = 1.  So we have to trim the result of
-calling arityType on (\x y. blah).  Failing to do so, and hence breaking the
-exprArity invariant, led to #5441.
-
-How to trim?  If we end in topDiv, it's easy.  But we must take great care with
-dead ends (i.e. botDiv). Suppose the expression was (\x y. error "urk"),
-we'll get \??.⊥.  We absolutely must not trim that to \?.⊥, because that
-claims that ((\x y. error "urk") |> co) diverges when given one argument,
-which it absolutely does not. And Bad Things happen if we think something
-returns bottom when it doesn't (#16066).
-
-So, if we need to trim a dead-ending arity type, switch (conservatively) to
-topDiv.
-
-Historical note: long ago, we unconditionally switched to topDiv when we
-encountered a cast, but that is far too conservative: see #5475
 -}
 
 ---------------------------
@@ -950,15 +964,6 @@ myIsCheapApp sigs fn n_val_args = case lookupVarEnv sigs fn of
 ----------------
 arityType :: ArityEnv -> CoreExpr -> ArityType
 
-arityType env (Cast e co)
-  = minWithArity (arityType env e) co_arity -- See Note [Arity trimming]
-  where
-    co_arity = length (typeArity (coercionRKind co))
-    -- See Note [exprArity invariant] (2); must be true of
-    -- arityType too, since that is how we compute the arity
-    -- of variables, and they in turn affect result of exprArity
-    -- #5441 is a nice demo
-
 arityType env (Var v)
   | v `elemVarSet` ae_joins env
   = botArityType  -- See Note [Eta-expansion and join points]
@@ -966,6 +971,9 @@ arityType env (Var v)
   = at
   | otherwise
   = idArityType v
+
+arityType env (Cast e _)
+  = arityType env e
 
         -- Lambdas; increase arity
 arityType env (Lam x e)
@@ -1212,7 +1220,7 @@ Consider
 We'll get an ArityType for foo of \?1.T.
 
 Then we want to eta-expand to
-  foo = \x. (\eta{os}. (case x of ...as before...) eta) |> some_co
+  foo = (\x. \eta{os}. (case x of ...as before...) eta)) |> some_co
 
 That 'eta' binder is fresh, and we really want it to have the
 one-shot flag from the inner \s{os}.  By expanding with the
@@ -1241,6 +1249,7 @@ etaExpandAT (AT oss _) orig_expr = eta_expand oss                         orig_e
 
 -- etaExpand arity e = res
 -- Then 'res' has at least 'arity' lambdas at the top
+--    possibly with a cast wrapped around the outside
 -- See Note [Eta expansion with ArityType]
 --
 -- etaExpand deals with for-alls. For example:
@@ -1248,33 +1257,43 @@ etaExpandAT (AT oss _) orig_expr = eta_expand oss                         orig_e
 -- where  E :: forall a. a -> a
 -- would return
 --      (/\b. \y::a -> E b y)
---
--- It deals with coerces too, though they are now rare
--- so perhaps the extra code isn't worth it
 
 eta_expand :: [OneShotInfo] -> CoreExpr -> CoreExpr
-eta_expand one_shots orig_expr
-  = go one_shots orig_expr
-  where
-      -- Strip off existing lambdas and casts before handing off to mkEtaWW
-      -- Note [Eta expansion and SCCs]
-    go [] expr = expr
-    go oss@(_:oss1) (Lam v body) | isTyVar v = Lam v (go oss  body)
-                                 | otherwise = Lam v (go oss1 body)
-    go oss (Cast expr co) = Cast (go oss expr) co
+eta_expand one_shots (Cast expr co)
+  = mkCast (eta_expand one_shots expr) co
 
-    go oss expr
+eta_expand one_shots orig_expr
+  = go one_shots [] orig_expr
+  where
+      -- Strip off existing lambdas before handing off to mkEtaWW
+      -- This is mainly to avoid spending time cloning binders and substituting
+      -- when there is actually nothing to do.  It's slightly awkward to deal
+      -- with casts here, apart from the topmost one, and they are rare, so
+      -- if we find one we just hand off to mkEtaWW anyway
+      -- Note [Eta expansion and SCCs]
+    go [] _ _ = orig_expr  -- Already has the specified arity; no-op
+
+    go oss@(_:oss1) vs (Lam v body)
+      | isTyVar v = go oss  (v:vs) body
+      | otherwise = go oss1 (v:vs) body
+
+    go oss rev_vs expr
       = -- pprTrace "ee" (vcat [ppr orig_expr, ppr expr, pprEtaInfos etas]) $
-        retick $ etaInfoAbs etas (etaInfoApp in_scope' sexpr etas)
+        retick $ etaInfoAbs top_eis $
+                 etaInfoApp in_scope' sexpr eis
       where
           in_scope = mkInScopeSet (exprFreeVars expr)
-          (in_scope', etas) = mkEtaWW oss (ppr orig_expr) in_scope (exprType expr)
+          (in_scope', eis@(EI eta_bndrs mco))
+              = mkEtaWW oss (ppr orig_expr) in_scope (exprType expr)
+          top_bndrs = reverse rev_vs
+          top_eis   = EI (top_bndrs ++ eta_bndrs) (mkPiMCos top_bndrs mco)
 
           -- Find ticks behind type apps.
           -- See Note [Eta expansion and source notes]
+          -- I don't really understand this code SLPJ May 21
           (expr', args) = collectArgs expr
           (ticks, expr'') = stripTicksTop tickishFloatable expr'
-          sexpr = foldl' App expr'' args
+          sexpr = mkApps expr'' args
           retick expr = foldr mkTick expr ticks
 
 {- *********************************************************************
@@ -1289,23 +1308,23 @@ eta_expand one_shots orig_expr
 Suppose we have (e :: ty) and we want to eta-expand it to arity N.
 This what eta_expand does.  We do it in two steps:
 
-1.  mkEtaWW: from 'ty' and 'N' build a [EtaInfo] which describes
+1.  mkEtaWW: from 'ty' and 'N' build a EtaInfo which describes
     the shape of the expansion necessary to expand to arity N.
 
 2.  Build the term
        \ v1..vn.  e v1 .. vn
     where those abstractions and applications are described by
-    the same [EtaInfo].  Specifically we build the term
+    the same EtaInfo.  Specifically we build the term
 
        etaInfoAbs etas (etaInfoApp in_scope e etas)
 
-   where etas :: [EtaInfo]#
+   where etas :: EtaInfo
          etaInfoAbs builds the lambdas
          etaInfoApp builds the applictions
 
-   Note that the /same/ [EtaInfo] drives both etaInfoAbs and etaInfoApp
+   Note that the /same/ EtaInfo drives both etaInfoAbs and etaInfoApp
 
-To a first approximation [EtaInfo] is just [Var].  But
+To a first approximation EtaInfo is just [Var].  But
 casts complicate the question.  If we have
    newtype N a = MkN (S -> a)
 and
@@ -1326,7 +1345,7 @@ payoff in cancelling out casts aggressively wherever possible.
 
 This matters a lot in etaEInfoApp, where we
 * Do beta-reduction on the fly
-* Use getARg_mabye to get a cast out of the way,
+* Use getArg_maybe to get a cast out of the way,
   so that we can do beta reduction
 Together this makes a big difference.  Consider when e is
    case x of
@@ -1344,88 +1363,20 @@ it.  Better to kill it at birth.
 -}
 
 --------------
-data EtaInfo            -- Abstraction      Application
-  = EtaVar Var          -- /\a. []         [] a
-                        -- (\x. [])        [] x
-  | EtaCo CoercionR     -- [] |> sym co    [] |> co
+data EtaInfo = EI [Var] MCoercionR
 
 instance Outputable EtaInfo where
-   ppr (EtaVar v) = text "EtaVar" <+> ppr v  <+> dcolon <+> ppr (idType v)
-   ppr (EtaCo co) = text "EtaCo"  <+> hang (ppr co) 2 (dcolon <+> ppr (coercionType co))
+  ppr (EI vs mco) = text "EI" <+> ppr vs <+> parens (ppr mco)
 
--- Used in debug-printing
--- pprEtaInfos :: [EtaInfo] -> SDoc
--- pprEtaInfos eis = brackets $ vcat $ punctuate comma $ map ppr eis
+-- EI bs co
+-- Abstraction:  (\b1 b2 .. bn. []) |> sym co
+-- Application:  ([] |> co) b1 b2 .. bn
+--
+--    e :: T    co :: T ~ (t1 -> t2 -> .. -> tn -> tr)
+--    e = (\b1 b2 ... bn. (e |> co) b1 b2 .. bn) |> sym co
 
-pushCoercion :: Coercion -> [EtaInfo] -> [EtaInfo]
--- Puts a EtaCo on the front of a [EtaInfo], but combining
--- with an existing EtaCo if possible
--- A minor improvement
-pushCoercion co1 (EtaCo co2 : eis)
-  | isReflCo co = eis
-  | otherwise   = EtaCo co : eis
-  where
-    co = co1 `mkTransCo` co2
 
-pushCoercion co eis
-  = EtaCo co : eis
-
-getArg_maybe :: [EtaInfo] -> Maybe (CoreArg, [EtaInfo])
--- Get an argument to the front of the [EtaInfo], if possible,
--- by pushing any EtaCo through the argument
-getArg_maybe eis = go MRefl eis
-  where
-    go :: MCoercion -> [EtaInfo] -> Maybe (CoreArg, [EtaInfo])
-    go _         []                = Nothing
-    go mco       (EtaCo co2 : eis) = go (mkTransMCoL mco co2) eis
-    go MRefl     (EtaVar v : eis)  = Just (varToCoreExpr v, eis)
-    go (MCo co)  (EtaVar v : eis)
-      | Just (arg, mco) <- pushCoArg co (varToCoreExpr v)
-      = case mco of
-           MRefl  -> Just (arg, eis)
-           MCo co -> Just (arg, pushCoercion co eis)
-      | otherwise
-      = Nothing
-
-mkCastMCo :: CoreExpr -> MCoercionR -> CoreExpr
-mkCastMCo e MRefl    = e
-mkCastMCo e (MCo co) = Cast e co
-  -- We are careful to use (MCo co) only when co is not reflexive
-  -- Hence (Cast e co) rather than (mkCast e co)
-
-mkPiMCo :: Var -> MCoercionR -> MCoercionR
-mkPiMCo _  MRefl   = MRefl
-mkPiMCo v (MCo co) = MCo (mkPiCo Representational v co)
-
---------------
-etaInfoAbs :: [EtaInfo] -> CoreExpr -> CoreExpr
--- See Note [The EtaInfo mechanism]
-etaInfoAbs eis expr
-  | null eis  = expr
-  | otherwise = case final_mco of
-                   MRefl  -> expr'
-                   MCo co -> mkCast expr' co
-  where
-     (expr', final_mco) = foldr do_one (split_cast expr) eis
-
-     do_one :: EtaInfo -> (CoreExpr, MCoercion) -> (CoreExpr, MCoercion)
-     -- Implements the "Abstraction" column in the comments for data EtaInfo
-     -- In both argument and result the pair (e,mco) denotes (e |> mco)
-     do_one (EtaVar v) (expr, mco) = (Lam v expr, mkPiMCo v mco)
-     do_one (EtaCo co) (expr, mco) = (expr, mco `mkTransMCoL` mkSymCo co)
-
-     split_cast :: CoreExpr -> (CoreExpr, MCoercion)
-     split_cast (Cast e co) = (e, MCo co)
-     split_cast e           = (e, MRefl)
-     -- We could look in the body of lets, and the branches of a case
-     -- But then we would have to worry about whether the cast mentioned
-     -- any of the bound variables, which is tiresome. Later maybe.
-     -- Result: we may end up with
-     --     (\(x::Int). case x of { DEFAULT -> e1 |> co }) |> sym (<Int>->co)
-     -- and fail to optimise it away
-
---------------
-etaInfoApp :: InScopeSet -> CoreExpr -> [EtaInfo] -> CoreExpr
+etaInfoApp :: InScopeSet -> CoreExpr -> EtaInfo -> CoreExpr
 -- (etaInfoApp s e eis) returns something equivalent to
 --             (substExpr s e `appliedto` eis)
 -- See Note [The EtaInfo mechanism]
@@ -1433,13 +1384,16 @@ etaInfoApp :: InScopeSet -> CoreExpr -> [EtaInfo] -> CoreExpr
 etaInfoApp in_scope expr eis
   = go (mkEmptySubst in_scope) expr eis
   where
-    go :: Subst -> CoreExpr -> [EtaInfo] -> CoreExpr
+    go :: Subst -> CoreExpr -> EtaInfo -> CoreExpr
     -- 'go' pushed down the eta-infos into the branch of a case
     -- and the body of a let; and does beta-reduction if possible
+    --   go subst fun co [b1,..,bn]  returns  (subst(fun) |> co) b1 .. bn
     go subst (Tick t e) eis
       = Tick (substTickish subst t) (go subst e eis)
-    go subst (Cast e co) eis
-      = go subst e (pushCoercion (Core.substCo subst co) eis)
+
+    go subst (Cast e co) (EI bs mco)
+      = go subst e (EI bs (Core.substCo subst co `mkTransMCoR` mco))
+
     go subst (Case e b ty alts) eis
       = Case (Core.substExprSC subst e) b1 ty' alts'
       where
@@ -1448,35 +1402,40 @@ etaInfoApp in_scope expr eis
         ty'   = etaInfoAppTy (Core.substTy subst ty) eis
         subst_alt (Alt con bs rhs) = Alt con bs' (go subst2 rhs eis)
                  where
-                    (subst2,bs') = Core.substBndrs subst1 bs
+                  (subst2,bs') = Core.substBndrs subst1 bs
+
     go subst (Let b e) eis
       | not (isJoinBind b) -- See Note [Eta expansion for join points]
       = Let b' (go subst' e eis)
       where
         (subst', b') = Core.substBindSC subst b
 
-    -- Beta-reduction if possible, using getArg_maybe to push
-    -- any intervening casts past the argument
-    -- See Note [The EtaInfo mechansim]
-    go subst (Lam v e) eis
-      | Just (arg, eis') <- getArg_maybe eis
-      = go (Core.extendSubst subst v arg) e eis'
+    -- Beta-reduction if possible, pushing any intervening casts past
+    -- the argument. See Note [The EtaInfo mechansim]
+    go subst (Lam v e) (EI (b:bs) mco)
+      | Just (arg,mco') <- pushMCoArg mco (varToCoreExpr b)
+      = go (Core.extendSubst subst v arg) e (EI bs mco')
 
     -- Stop pushing down; just wrap the expression up
-    go subst e eis = wrap (Core.substExprSC subst e) eis
-
-    wrap e []               = e
-    wrap e (EtaVar v : eis) = wrap (App e (varToCoreExpr v)) eis
-    wrap e (EtaCo co : eis) = wrap (Cast e co) eis
-
+    go subst e (EI bs mco) = Core.substExprSC subst e
+                             `mkCastMCo` mco
+                             `mkVarApps` bs
 
 --------------
-etaInfoAppTy :: Type -> [EtaInfo] -> Type
+etaInfoAppTy :: Type -> EtaInfo -> Type
 -- If                    e :: ty
 -- then   etaInfoApp e eis :: etaInfoApp ty eis
-etaInfoAppTy ty []               = ty
-etaInfoAppTy ty (EtaVar v : eis) = etaInfoAppTy (applyTypeToArg ty (varToCoreExpr v)) eis
-etaInfoAppTy _  (EtaCo co : eis) = etaInfoAppTy (coercionRKind co) eis
+etaInfoAppTy ty (EI bs mco)
+  = applyTypeToArgs (text "etaInfoAppTy") ty1 (map varToCoreExpr bs)
+  where
+    ty1 = case mco of
+             MRefl  -> ty
+             MCo co -> coercionRKind co
+
+--------------
+etaInfoAbs :: EtaInfo -> CoreExpr -> CoreExpr
+-- See Note [The EtaInfo mechanism]
+etaInfoAbs (EI bs mco) expr = (mkLams bs expr) `mkCastMCo` mkSymMCo mco
 
 --------------
 -- | @mkEtaWW n _ fvs ty@ will compute the 'EtaInfo' necessary for eta-expanding
@@ -1494,26 +1453,28 @@ mkEtaWW
   -> InScopeSet
   -- ^ A super-set of the free vars of the expression to eta-expand.
   -> Type
-  -> (InScopeSet, [EtaInfo])
+  -> (InScopeSet, EtaInfo)
   -- ^ The variables in 'EtaInfo' are fresh wrt. to the incoming 'InScopeSet'.
   -- The outgoing 'InScopeSet' extends the incoming 'InScopeSet' with the
   -- fresh variables in 'EtaInfo'.
 
 mkEtaWW orig_oss ppr_orig_expr in_scope orig_ty
-  = go 0 orig_oss empty_subst orig_ty []
+  = go 0 orig_oss empty_subst orig_ty
   where
     empty_subst = mkEmptyTCvSubst in_scope
 
     go :: Int                -- For fresh names
        -> [OneShotInfo]      -- Number of value args to expand to
        -> TCvSubst -> Type   -- We are really looking at subst(ty)
-       -> [EtaInfo]          -- Accumulating parameter
-       -> (InScopeSet, [EtaInfo])
-    go _ [] subst _ eis       -- See Note [exprArity invariant]
-       ----------- Done!  No more expansion needed
-       = (getTCvInScope subst, reverse eis)
+       -> (InScopeSet, EtaInfo)
+    -- (go [o1,..,on] subst ty) = (in_scope, EI [b1,..,bn] co)
+    --    co :: subst(ty) ~ b1_ty -> ... -> bn_ty -> tr
 
-    go n oss@(one_shot:oss1) subst ty eis       -- See Note [exprArity invariant]
+    go _ [] subst _
+       ----------- Done!  No more expansion needed
+       = (getTCvInScope subst, EI [] MRefl)
+
+    go n oss@(one_shot:oss1) subst ty
        ----------- Forall types  (forall a. ty)
        | Just (tcv,ty') <- splitForAllTyCoVar_maybe ty
        , (subst', tcv') <- Type.substVarBndr subst tcv
@@ -1521,7 +1482,8 @@ mkEtaWW orig_oss ppr_orig_expr in_scope orig_ty
                   | otherwise   = oss1
          -- A forall can bind a CoVar, in which case
          -- we consume one of the [OneShotInfo]
-       = go n oss' subst' ty' (EtaVar tcv' : eis)
+       , (in_scope, EI bs mco) <- go n oss' subst' ty'
+       = (in_scope, EI (tcv' : bs) (mkHomoForAllMCo tcv' mco))
 
        ----------- Function types  (t1 -> t2)
        | Just (mult, arg_ty, res_ty) <- splitFunTy_maybe ty
@@ -1533,7 +1495,8 @@ mkEtaWW orig_oss ppr_orig_expr in_scope orig_ty
           -- Avoid free vars of the original expression
 
        , let eta_id' = eta_id `setIdOneShotInfo` one_shot
-       = go (n+1) oss1 subst' res_ty (EtaVar eta_id' : eis)
+       , (in_scope, EI bs mco) <- go (n+1) oss1 subst' res_ty
+       = (in_scope, EI (eta_id' : bs) (mkFunResMCo (idScaledType eta_id') mco))
 
        ----------- Newtypes
        -- Given this:
@@ -1543,17 +1506,20 @@ mkEtaWW orig_oss ppr_orig_expr in_scope orig_ty
        -- We want to get
        --      coerce T (\x::[T] -> (coerce ([T]->Int) e) x)
        | Just (co, ty') <- topNormaliseNewType_maybe ty
-       , let co' = Type.substCo subst co
+       , -- co :: ty ~ ty'
+         let co' = Type.substCo subst co
              -- Remember to apply the substitution to co (#16979)
              -- (or we could have applied to ty, but then
              --  we'd have had to zap it for the recursive call)
-       = go n oss subst ty' (pushCoercion co' eis)
+       , (in_scope, EI bs mco) <- go n oss subst ty'
+         -- mco :: subst(ty') ~ b1_ty -> ... -> bn_ty -> tr
+       = (in_scope, EI bs (mkTransMCoR co' mco))
 
        | otherwise       -- We have an expression of arity > 0,
                          -- but its type isn't a function, or a binder
                          -- is representation-polymorphic
        = warnPprTrace True ((ppr orig_oss <+> ppr orig_ty) $$ ppr_orig_expr)
-         (getTCvInScope subst, reverse eis)
+         (getTCvInScope subst, EI [] MRefl)
         -- This *can* legitimately happen:
         -- e.g.  coerce Int (\x. x) Essentially the programmer is
         -- playing fast and loose with types (Happy does this a lot).
@@ -1591,13 +1557,16 @@ pushCoArgs co (arg:args) = do { (arg',  m_co1) <- pushCoArg  co  arg
                                                  ; return (arg':args', m_co2) }
                                   MRefl  -> return (arg':args, MRefl) }
 
+pushMCoArg :: MCoercionR -> CoreArg -> Maybe (CoreArg, MCoercion)
+pushMCoArg MRefl    arg = Just (arg, MRefl)
+pushMCoArg (MCo co) arg = pushCoArg co arg
+
 pushCoArg :: CoercionR -> CoreArg -> Maybe (CoreArg, MCoercion)
 -- We have (fun |> co) arg, and we want to transform it to
 --         (fun arg) |> co
 -- This may fail, e.g. if (fun :: N) where N is a newtype
 -- C.f. simplCast in GHC.Core.Opt.Simplify
 -- 'co' is always Representational
--- If the returned coercion is Nothing, then it would have been reflexive
 pushCoArg co (Type ty) = do { (ty', m_co') <- pushCoTyArg co ty
                             ; return (Type ty', m_co') }
 pushCoArg co val_arg   = do { (arg_co, m_co') <- pushCoValArg co
