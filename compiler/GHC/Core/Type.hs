@@ -3301,14 +3301,8 @@ isKindLevPoly k = assertPpr (isLiftedTypeKind k || _is_type) (ppr k) $
     _is_type = classifiesTypeWithValues k
 
 -----------------------------------------
---              Subkinding
--- The tc variants are used during type-checking, where ConstraintKind
--- is distinct from all other kinds
--- After type-checking (in core), Constraint and liftedTypeKind are
--- indistinguishable
-
 -- | Does this classify a type allowed to have values? Responds True to things
--- like *, #, TYPE Lifted, TYPE v, Constraint.
+-- like *, TYPE Lifted, TYPE IntRep, TYPE v, Constraint.
 classifiesTypeWithValues :: Kind -> Bool
 -- ^ True of any sub-kind of OpenTypeKind
 classifiesTypeWithValues k = isJust (kindRep_maybe k)

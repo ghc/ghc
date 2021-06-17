@@ -1786,7 +1786,7 @@ points do the job nicely.
 Note [Primops with lifted arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Is this ok-for-speculation (see #13027)?
-   reallyUnsafePtrEq# a b
+   reallyUnsafePtrEquality# a b
 Well, yes.  The primop accepts lifted arguments and does not
 evaluate them.  Indeed, in general primops are, well, primitive
 and do not perform evaluation.

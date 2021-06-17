@@ -446,7 +446,7 @@ Relevant discussions:
  * Phabricator: https://phabricator.haskell.org/D4465
  * GHC Trac: https://gitlab.haskell.org/ghc/ghc/issues/14872
 
-There is a flag `-dword-hex-literals` that causes literals of
+There is a flag `-dhex-word-literals` that causes literals of
 type `Word#` or `Word64#` to be displayed in hexadecimal instead
 of decimal when dumping GHC core. It also affects the presentation
 of these in GHC's error messages. Additionally, the hexadecimal

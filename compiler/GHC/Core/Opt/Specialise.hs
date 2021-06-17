@@ -1762,7 +1762,7 @@ Wrinkles
   unfolding of the specialised function: this is the last field in specHeader's
   big result tuple.
 
-  The right thing to do is to produce a RubbishLit; it should rapidly
+  The right thing to do is to produce a LitRubbish; it should rapidly
   disappear.  Rather like GHC.Core.Opt.WorkWrap.Utils.mk_absent_let.
 
 Note [Zap occ info in rule binders]

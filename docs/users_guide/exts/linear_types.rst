@@ -111,6 +111,7 @@ is no restriction on ``x``.
 It is also possible to define a multiplicity-polymorphic field:
 
 ::
+
     data T3 a m where
         MkT3 :: a %m -> T3 a m
 

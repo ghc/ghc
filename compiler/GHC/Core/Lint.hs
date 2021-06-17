@@ -161,16 +161,6 @@ We check for
 If we have done specialisation the we check that there are
         (a) No top-level bindings of primitive (unboxed type)
 
-Outstanding issues:
-
-    -- Things are *not* OK if:
-    --
-    --  * Unsaturated type app before specialisation has been done;
-    --
-    --  * Oversaturated type app after specialisation (eta reduction
-    --   may well be happening...);
-
-
 Note [Linting function types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 As described in Note [Representation of function types], all saturated
@@ -1746,11 +1736,11 @@ lintTySynFamApp report_unsat ty tc tys
        ; return (TyConApp tc tys') }
 
 -----------------
--- Confirms that a type is really *, #, Constraint etc
+-- Confirms that a type is really TYPE r or Constraint
 checkValueType :: LintedType -> SDoc -> LintM ()
 checkValueType ty doc
   = lintL (classifiesTypeWithValues kind)
-          (text "Non-*-like kind when *-like expected:" <+> ppr kind $$
+          (text "Non-Type-like kind when Type-like expected:" <+> ppr kind $$
            text "when checking" <+> doc)
   where
     kind = typeKind ty

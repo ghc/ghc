@@ -522,13 +522,13 @@ data WarningFlag =
    | Opt_WarnImplicitKindVars             -- Since 8.6
    | Opt_WarnSpaceAfterBang
    | Opt_WarnMissingDerivingStrategies    -- Since 8.8
-   | Opt_WarnPrepositiveQualifiedModule   -- Since TBD
+   | Opt_WarnPrepositiveQualifiedModule   -- Since 8.10
    | Opt_WarnUnusedPackages               -- Since 8.10
    | Opt_WarnInferredSafeImports          -- Since 8.10
    | Opt_WarnMissingSafeHaskellMode       -- Since 8.10
    | Opt_WarnCompatUnqualifiedImports     -- Since 8.10
    | Opt_WarnDerivingDefaults
-   | Opt_WarnInvalidHaddock               -- Since 8.12
+   | Opt_WarnInvalidHaddock               -- Since 9.0
    | Opt_WarnOperatorWhitespaceExtConflict  -- Since 9.2
    | Opt_WarnOperatorWhitespace             -- Since 9.2
    | Opt_WarnAmbiguousFields                -- Since 9.2
