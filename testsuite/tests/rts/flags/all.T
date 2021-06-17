@@ -51,3 +51,7 @@ test('T12870h',
         only_ways(['normal'])],
     multimod_compile_and_run,
     ['T12870g', '-rtsopts=ignoreAll -with-rtsopts="-G3"'])
+
+test('T20006', [extra_run_opts('+RTS --eventlog-flush-interval=1')],
+    compile_and_run,
+    ['-eventlog'])
