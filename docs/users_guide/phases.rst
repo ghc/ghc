@@ -824,6 +824,18 @@ for example).
     Where to find user-supplied libraries… Prepend the directory ⟨dir⟩
     to the library directories path.
 
+.. ghc-flag:: -fuse-rpaths
+    :shortdesc: Set the rpath based on -L flags
+    :type: dynamic
+    :category: linking
+
+    This flag is enabled by default and will set the rpath of the linked
+    object to the library directories of dependent packages.
+
+    When building binaries to distribute it can be useful to pass your own
+    linker options to control the rpath and disable the automatic injection of
+    rpath entries by disabling this flag.
+
 .. ghc-flag:: -framework-path ⟨dir⟩
     :shortdesc: On Darwin/OS X/iOS only, add ⟨dir⟩ to the list of directories
         searched for frameworks. This option corresponds to the ``-F``
@@ -911,7 +923,7 @@ for example).
     When linking shared libraries (:ghc-flag:`-shared`) GHC does not
     automatically link the RTS.  This is to allow choosing the RTS flavour
     (:ghc-flag:`-threaded`, :ghc-flag:`-eventlog`, etc) when linking an
-    executable. 
+    executable.
     However when the shared library is the intended product it is useful to be
     able to reverse this default. See :ref:`shared-libraries-c-api` for an
     usage example.

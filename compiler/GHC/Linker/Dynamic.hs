@@ -57,7 +57,7 @@ linkDynLib logger tmpfs dflags0 unit_env o_files dep_packages
          , -- Only if we want dynamic libraries
            WayDyn `Set.member` ways dflags
            -- Only use RPath if we explicitly asked for it
-         , gopt Opt_RPath dflags
+         , useXLinkerRPath dflags os
             = ["-L" ++ l, "-Xlinker", "-rpath", "-Xlinker", l]
               -- See Note [-Xlinker -rpath vs -Wl,-rpath]
          | otherwise = ["-L" ++ l]

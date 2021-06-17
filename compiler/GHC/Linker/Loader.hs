@@ -964,7 +964,7 @@ dynLoadObjs interp hsc_env pls@LoaderState{..} objs = do
                            concatMap (\l -> [ Option ("-l" ++ l) ])
                                      (nub $ snd <$> temp_sos)
                         ++ concatMap (\lp -> Option ("-L" ++ lp)
-                                          : if gopt Opt_RPath dflags
+                                          : if useXLinkerRPath dflags (platformOS platform)
                                             then [ Option "-Xlinker"
                                                  , Option "-rpath"
                                                  , Option "-Xlinker"
@@ -973,7 +973,7 @@ dynLoadObjs interp hsc_env pls@LoaderState{..} objs = do
                                      (nub $ fst <$> temp_sos)
                         ++ concatMap
                              (\lp -> Option ("-L" ++ lp)
-                                  : if gopt Opt_RPath dflags
+                                  : if useXLinkerRPath dflags (platformOS platform)
                                     then [ Option "-Xlinker"
                                          , Option "-rpath"
                                          , Option "-Xlinker"
