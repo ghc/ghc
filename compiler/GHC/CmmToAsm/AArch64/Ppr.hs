@@ -423,6 +423,14 @@ pprInstr platform instr = case instr of
   -- 2. Bit Manipulation Instructions ------------------------------------------
   SBFM o1 o2 o3 o4 -> text "\tsbfm" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3 <> comma <+> pprOp platform o4
   UBFM o1 o2 o3 o4 -> text "\tubfm" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3 <> comma <+> pprOp platform o4
+  -- signed and unsigned bitfield extract
+  SBFX o1 o2 o3 o4 -> text "\tsbfx" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3 <> comma <+> pprOp platform o4
+  UBFX o1 o2 o3 o4 -> text "\tubfx" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3 <> comma <+> pprOp platform o4
+  SXTB o1 o2       -> text "\tsxtb" <+> pprOp platform o1 <> comma <+> pprOp platform o2
+  UXTB o1 o2       -> text "\tuxtb" <+> pprOp platform o1 <> comma <+> pprOp platform o2
+  SXTH o1 o2       -> text "\tsxth" <+> pprOp platform o1 <> comma <+> pprOp platform o2
+  UXTH o1 o2       -> text "\tuxth" <+> pprOp platform o1 <> comma <+> pprOp platform o2
+
   -- 3. Logical and Move Instructions ------------------------------------------
   AND o1 o2 o3  -> text "\tand" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3
   ANDS o1 o2 o3 -> text "\tands" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3
