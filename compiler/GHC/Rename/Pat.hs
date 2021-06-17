@@ -56,7 +56,8 @@ import GHC.Rename.Fixity
 import GHC.Rename.Utils    ( HsDocContext(..), newLocalBndrRn, bindLocalNames
                            , warnUnusedMatches, newLocalBndrRn
                            , checkUnusedRecordWildcard
-                           , checkDupNames, checkDupAndShadowedNames )
+                           , checkDupNames, checkDupAndShadowedNames
+                           , wrapGenSpan, genHsApps, genLHsVar, genHsIntegralLit )
 import GHC.Rename.HsType
 import GHC.Builtin.Names
 import GHC.Types.Avail ( greNameMangledName )
@@ -483,7 +484,10 @@ rnPatAndThen mk p@(ViewPat _ expr pat)
        ; pat' <- rnLPatAndThen mk pat
        -- Note: at this point the PreTcType in ty can only be a placeHolder
        -- ; return (ViewPat expr' pat' ty) }
-       ; return (ViewPat noExtField expr' pat') }
+       
+       -- Note: we can't cook up an inverse for an arbitrary view pattern,
+       -- so we pass 'Nothing'.
+       ; return (ViewPat Nothing expr' pat') }
 
 rnPatAndThen mk (ConPat _ con args)
    -- rnConPatAndThen takes care of reconstructing the pattern
@@ -495,12 +499,31 @@ rnPatAndThen mk (ConPat _ con args)
       False   -> rnConPatAndThen mk con args
 
 rnPatAndThen mk (ListPat _ pats)
-  = do { opt_OverloadedLists <- liftCps $ xoptM LangExt.OverloadedLists
+  = do { opt_OverloadedLists  <- liftCps $ xoptM LangExt.OverloadedLists
        ; pats' <- rnLPatsAndThen mk pats
-       ; case opt_OverloadedLists of
-          True -> do { (to_list_name,_) <- liftCps $ lookupSyntax toListName
-                     ; return (ListPat (Just to_list_name) pats')}
-          False -> return (ListPat Nothing pats') }
+       ; if not opt_OverloadedLists
+         then return (ListPat noExtField pats')
+         else
+    -- If OverloadedLists is enabled, desugar to a view pattern.
+    -- See Note [Desugaring overloaded list patterns]
+    do { (to_list_name,_)     <- liftCps $ lookupSyntaxName toListName
+       ; opt_RebindableSyntax <- liftCps $ xoptM LangExt.RebindableSyntax
+       ; mbInverse <-
+          -- Use 'fromList' as proof of invertibility of the view pattern
+          -- when RebindableSyntax is _not_ enabled.
+          -- See Note [Desugaring overloaded list patterns]
+          if opt_RebindableSyntax
+          then return Nothing
+          else do
+            { (from_list_n_name,_) <- liftCps $ lookupSyntaxName fromListNName
+            ; let
+                 lit_n  = mkIntegralLit (length pats)
+                 hs_lit = genHsIntegralLit lit_n
+            ; return $ Just $ genHsApps from_list_n_name [hs_lit] }
+       ; let rn_list_pat  = ListPat noExtField pats'
+             exp_expr     = genLHsVar to_list_name
+             exp_list_pat = ViewPat mbInverse exp_expr (wrapGenSpan rn_list_pat)
+       ; return $ mkExpandedPat rn_list_pat exp_list_pat }}
 
 rnPatAndThen mk (TuplePat _ pats boxed)
   = do { pats' <- rnLPatsAndThen mk pats
@@ -520,6 +543,44 @@ rnPatAndThen mk (SplicePat _ splice)
        ; case eith of   -- See Note [rnSplicePat] in GHC.Rename.Splice
            Left  not_yet_renamed -> rnPatAndThen mk not_yet_renamed
            Right already_renamed -> return already_renamed }
+
+{- Note [Desugaring overloaded list patterns]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If OverloadedLists is enabled, we desugar a list pattern to a view pattern,
+directly in the renamer, using the HsPatExpansion mechanism detailed in:
+    Note [Rebindable syntax and HsExpansion]
+
+In the presence of RebindableSyntax, we don't know anything about `toList`,
+so we emit a normal view pattern.
+If RebindableSyntax is _not_ enabled, we emit a special view pattern which
+provides an inverse to the list pattern. This fixes #14380.
+
+There is however one special case:
+  - when RebindableSyntax is off,
+  - and the type being matched on is already a list type.
+
+In this case, instead of creating a view pattern using `toList`,
+we want to directly emit the underlying pattern, under the assumption that
+`toList = id`.
+
+Note that this is somewhat naughty, as technically there could be an
+overlapping instance such as `IsList [Int]` for which `toList` is not
+the identity. We assume this isn't the case.
+
+This allows correct overlap checking to occur for pattern matches of the form
+
+> {-# LANGUAGE OverloadedLists #-}
+> 
+> f :: [a] -> ()
+> f x = case x of
+>   []    -> ()
+>   (_:_) -> ()
+
+Without this special case, the `[]` pattern would desugar to `(toList -> [])`,
+whereas the `(_:_)` remains a constructor pattern. The pattern match checker
+would then warn that the pattern `[]` is not covered (as it can't look through
+view patterns). See #14547.
+-}
 
 --------------------
 rnConPatAndThen :: NameMaker
@@ -611,6 +672,23 @@ rnHsRecPatsAndThen mk (L _ con)
     nested_mk (Just _) mk@(LetMk {})         _  = mk
     nested_mk (Just (unLoc -> n)) (LamMk report_unused) n'
       = LamMk (report_unused && (n' <= n))
+
+
+{- *********************************************************************
+*                                                                      *
+              Generating code for HsPatExpanded
+      See Note [Handling overloaded and rebindable constructs]
+*                                                                      *
+********************************************************************* -}
+
+-- | Build a 'HsPatExpansion' out of an extension constructor,
+--   and the two components of the expansion: original and
+--   desugared patterns
+mkExpandedPat
+  :: Pat GhcRn -- ^ source pattern
+  -> Pat GhcRn -- ^ expanded pattern
+  -> Pat GhcRn -- ^ suitably wrapped 'HsPatExpansion'
+mkExpandedPat a b = XPat (HsPatExpanded a b)
 
 {-
 ************************************************************************
