@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE MagicHash #-}
+{-# OPTIONS_GHC -ddump-cmm -ddump-asm -ddump-to-file -dppr-debug #-}
 
 -----------------------------------------------------------------------------
 --
