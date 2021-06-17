@@ -43,7 +43,6 @@ import GHC.HsToCore.Monad
 import GHC.Core.TyCo.Rep
 import GHC.Core.Type
 import GHC.Data.Maybe
-import qualified GHC.LanguageExtensions as LangExt
 import GHC.Utils.Monad (concatMapM)
 import GHC.Types.SourceText (FractionalLit(..))
 import Control.Monad (zipWithM)
@@ -152,36 +151,8 @@ desugarPat x pat = case pat of
     pure $ PmLet y (App fun (Var x)) : grds
 
   -- list
-  ListPat (ListPatTc _elem_ty Nothing) ps ->
+  ListPat _ ps ->
     desugarListPat x ps
-
-  -- overloaded list
-  ListPat (ListPatTc elem_ty (Just (pat_ty, to_list))) pats -> do
-    dflags <- getDynFlags
-    case splitListTyConApp_maybe pat_ty of
-      Just _e_ty
-        | not (xopt LangExt.RebindableSyntax dflags)
-        -- Just desugar it as a regular ListPat
-        -> desugarListPat x pats
-      _ -> do
-        y <- mkPmId (mkListTy elem_ty)
-        grds <- desugarListPat y pats
-        rhs_y <- dsSyntaxExpr to_list [Var x]
-        pure $ PmLet y rhs_y : grds
-
-    -- (a) In the presence of RebindableSyntax, we don't know anything about
-    --     `toList`, we should treat `ListPat` as any other view pattern.
-    --
-    -- (b) In the absence of RebindableSyntax,
-    --     - If the pat_ty is `[a]`, then we treat the overloaded list pattern
-    --       as ordinary list pattern. Although we can give an instance
-    --       `IsList [Int]` (more specific than the default `IsList [a]`), in
-    --       practice, we almost never do that. We assume the `to_list` is
-    --       the `toList` from `instance IsList [a]`.
-    --
-    --     - Otherwise, we treat the `ListPat` as ordinary view pattern.
-    --
-    -- See #14547, especially comment#9 and comment#10.
 
   ConPat { pat_con     = L _ con
          , pat_args    = ps
