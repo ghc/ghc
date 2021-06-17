@@ -580,7 +580,6 @@ mkDataConWorkId wkr_name data_con
     ----------- Workers for data types --------------
     alg_wkr_info = noCafIdInfo
                    `setArityInfo`          wkr_arity
-                   `setCprSigInfo`            mkCprSig wkr_arity (dataConCPR data_con)
                    `setInlinePragInfo`     wkr_inline_prag
                    `setUnfoldingInfo`      evaldUnfolding  -- Record that it's evaluated,
                                                            -- even if arity = 0
@@ -606,31 +605,6 @@ mkDataConWorkId wkr_name data_con
                    mkCompulsoryUnfolding defaultSimpleOpts $
                    mkLams univ_tvs $ Lam id_arg1 $
                    wrapNewTypeBody tycon res_ty_args (Var id_arg1)
-
-dataConCPR :: DataCon -> Cpr
-dataConCPR con
-  | isDataTyCon tycon     -- Real data types only; that is,
-                          -- not unboxed tuples or newtypes
-  , null (dataConExTyCoVars con)  -- No existentials
-  , wkr_arity > 0
-  , wkr_arity <= mAX_CPR_SIZE
-  = flatConCpr (dataConTag con)
-  | otherwise
-  = topCpr
-  where
-    tycon     = dataConTyCon con
-    wkr_arity = dataConRepArity con
-
-    mAX_CPR_SIZE :: Arity
-    mAX_CPR_SIZE = 10
-    -- We do not treat very big tuples as CPR-ish:
-    --      a) for a start we get into trouble because there aren't
-    --         "enough" unboxed tuple types (a tiresome restriction,
-    --         but hard to fix),
-    --      b) more importantly, big unboxed tuples get returned mainly
-    --         on the stack, and are often then allocated in the heap
-    --         by the caller.  So doing CPR for them may in fact make
-    --         things worse.
 
 {-
 -------------------------------------------------
@@ -708,7 +682,6 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
                          `setInlinePragInfo`    wrap_prag
                          `setUnfoldingInfo`     wrap_unf
                          `setDmdSigInfo`    wrap_sig
-                         `setCprSigInfo`           mkCprSig wrap_arity (dataConCPR data_con)
                              -- We need to get the CAF info right here because GHC.Iface.Tidy
                              -- does not tidy the IdInfo of implicit bindings (like the wrapper)
                              -- so it not make sure that the CAF info is sane
