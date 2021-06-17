@@ -11,7 +11,7 @@ module GHC.SysTools.Tasks where
 
 import GHC.Utils.Exception as Exception
 import GHC.Utils.Error
-import GHC.CmmToLlvm.Base (LlvmVersion, llvmVersionStr, supportedLlvmVersionMin, supportedLlvmVersionMax, llvmVersionStr, parseLlvmVersion)
+import GHC.CmmToLlvm.Base (LlvmVersion, llvmVersionStr, supportedLlvmVersionLowerBound, supportedLlvmVersionUpperBound, llvmVersionStr, parseLlvmVersion)
 import GHC.Driver.Types
 import GHC.Driver.Session
 import GHC.Utils.Outputable
@@ -235,10 +235,11 @@ figureLlvmVersion dflags = traceToolCommand dflags "llc" $ do
                 errorMsg dflags $ vcat
                     [ text "Warning:", nest 9 $
                           text "Couldn't figure out LLVM version!" $$
-                          text ("Make sure you have installed LLVM between "
-                                ++ llvmVersionStr supportedLlvmVersionMin
+                          text ("Make sure you have installed LLVM between ["
+                                ++ llvmVersionStr supportedLlvmVersionLowerBound
                                 ++ " and "
-                                ++ llvmVersionStr supportedLlvmVersionMax) ]
+                                ++ llvmVersionStr supportedLlvmVersionUpperBound
+                                ++ ")") ]
                 return Nothing)
 
 
