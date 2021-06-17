@@ -2049,7 +2049,7 @@ genDerivStuff mechanism loc clas inst_tys tyvars
 
       -- Try DeriveAnyClass
       DerivSpecAnyClass -> do
-        let mini_env   = mkVarEnv (classTyVars clas `zip` inst_tys)
+        let mini_env   = zipEqualVarEnv (classTyVars clas) inst_tys
             mini_subst = mkTvSubst (mkInScopeSet (mkVarSet tyvars)) mini_env
         dflags <- getDynFlags
         tyfam_insts <-
