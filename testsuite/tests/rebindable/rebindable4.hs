@@ -1,5 +1,4 @@
 {-# LANGUAGE RebindableSyntax, NPlusKPatterns #-}
-{-# OPTIONS -Wno-error=missing-monadfail-instances #-}
 
 module Main where
         {
