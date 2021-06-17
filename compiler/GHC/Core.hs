@@ -64,8 +64,8 @@ module GHC.Core (
         maybeUnfoldingTemplate, otherCons,
         isValueUnfolding, isEvaldUnfolding, isCheapUnfolding,
         isExpandableUnfolding, isConLikeUnfolding, isCompulsoryUnfolding,
-        isStableUnfolding, hasCoreUnfolding, hasSomeUnfolding,
-        isBootUnfolding,
+        isStableUnfolding, isInlineUnfolding, isBootUnfolding,
+        hasCoreUnfolding, hasSomeUnfolding,
         canUnfold, neverUnfoldGuidance, isStableSource,
 
         -- * Annotated expression data types
@@ -1461,6 +1461,22 @@ isStableUnfolding :: Unfolding -> Bool
 isStableUnfolding (CoreUnfolding { uf_src = src }) = isStableSource src
 isStableUnfolding (DFunUnfolding {})               = True
 isStableUnfolding _                                = False
+
+isInlineUnfolding :: Unfolding -> Bool
+-- ^ True of a /stable/ unfolding that is
+--   (a) always inlined; that is, with an `UnfWhen` guidance, or
+--   (b) a DFunUnfolding which never needs to be inlined
+isInlineUnfolding (CoreUnfolding { uf_src = src, uf_guidance = guidance })
+  | isStableSource src
+  , UnfWhen {} <- guidance
+  = True
+
+isInlineUnfolding (DFunUnfolding {})
+  = True
+
+-- Default case
+isInlineUnfolding _ = False
+
 
 -- | Only returns False if there is no unfolding information available at all
 hasSomeUnfolding :: Unfolding -> Bool
