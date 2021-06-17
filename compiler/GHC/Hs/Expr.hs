@@ -889,8 +889,9 @@ instance Outputable (HsPragE (GhcPass p)) where
 {- Note [Rebindable syntax and HsExpansion]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We implement rebindable syntax (RS) support by performing a desugaring
-in the renamer. We transform GhcPs expressions affected by RS into the
-appropriate desugared form, but **annotated with the original expression**.
+in the renamer. We transform GhcPs expressions and patterns affected by
+RS into the appropriate desugared form, but **annotated with the original
+expression/pattern**.
 
 Let us consider a piece of code like:
 
@@ -987,12 +988,15 @@ A general recipe to follow this approach for new constructs could go as follows:
   construct, in HsExpr or related syntax data types.
 - At renaming-time:
     - take your original node of interest (HsIf above)
-    - rename its subexpressions (condition, true branch, false branch above)
+    - rename its subexpressions/subpatterns (condition and true/false
+      branches above)
     - construct the suitable "rebound"-and-renamed result (ifThenElse call
       above), where the 'SrcSpan' attached to any _fabricated node_ (the
       HsVar/HsApp nodes, above) is set to 'generatedSrcSpan'
     - take both the original node and that rebound-and-renamed result and wrap
-      them in an XExpr: XExpr (HsExpanded <original node> <desugared>)
+      them into an expansion construct:
+        for expressions, XExpr (HsExpanded <original node> <desugared>)
+        for patterns, XPat (HsPatExpanded <original node> <desugared>)
  - At typechecking-time:
     - remove any logic that was previously dealing with your rebindable
       construct, typically involving [tc]SyntaxOp, SyntaxExpr and friends.
