@@ -148,7 +148,6 @@ import GHC.Types.CostCentre
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Data.FastString
-import GHC.Driver.Ppr (showPprUnsafe)
 import GHC.Driver.Session
 import GHC.Platform
 import GHC.Types.Unique.Set
