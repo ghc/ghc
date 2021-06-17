@@ -95,7 +95,7 @@ linkBinary' staticLink logger tmpfs dflags unit_env o_files dep_units = do
                                  (l `makeRelativeTo` full_output_fn)
                             else l
                   -- See Note [-Xlinker -rpath vs -Wl,-rpath]
-                  rpath = if gopt Opt_RPath dflags
+                  rpath = if useXLinkerRPath dflags (platformOS platform)
                           then ["-Xlinker", "-rpath", "-Xlinker", libpath]
                           else []
                   -- Solaris 11's linker does not support -rpath-link option. It silently
