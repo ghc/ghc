@@ -26,6 +26,7 @@ import GHC.Rename.Utils   ( HsDocContext(..), newLocalBndrRn )
 import GHC.Rename.Unbound ( isUnboundName )
 import GHC.Rename.Module  ( rnSrcDecls, findSplice )
 import GHC.Rename.Pat     ( rnPat )
+import GHC.Types.Error
 import GHC.Types.Basic    ( TopLevelFlag, isTopLevel )
 import GHC.Types.SourceText ( SourceText(..) )
 import GHC.Utils.Outputable
@@ -78,7 +79,7 @@ rnBracket e br_body
     do { -- Check that -XTemplateHaskellQuotes is enabled and available
          thQuotesEnabled <- xoptM LangExt.TemplateHaskellQuotes
        ; unless thQuotesEnabled $
-           failWith ( vcat
+           failWith ( TcRnUnknownMessage $ mkPlainError noHints $ vcat
                       [ text "Syntax error on" <+> ppr e
                       , text ("Perhaps you intended to use TemplateHaskell"
                               ++ " or TemplateHaskellQuotes") ] )
@@ -189,22 +190,23 @@ quotationCtxtDoc br_body
   = hang (text "In the Template Haskell quotation")
          2 (ppr br_body)
 
-illegalBracket :: SDoc
-illegalBracket =
+illegalBracket :: TcRnMessage
+illegalBracket = TcRnUnknownMessage $ mkPlainError noHints $
     text "Template Haskell brackets cannot be nested" <+>
     text "(without intervening splices)"
 
-illegalTypedBracket :: SDoc
-illegalTypedBracket =
+illegalTypedBracket :: TcRnMessage
+illegalTypedBracket = TcRnUnknownMessage $ mkPlainError noHints $
     text "Typed brackets may only appear in typed splices."
 
-illegalUntypedBracket :: SDoc
-illegalUntypedBracket =
+illegalUntypedBracket :: TcRnMessage
+illegalUntypedBracket = TcRnUnknownMessage $ mkPlainError noHints $
     text "Untyped brackets may only appear in untyped splices."
 
-quotedNameStageErr :: HsBracket GhcPs -> SDoc
+quotedNameStageErr :: HsBracket GhcPs -> TcRnMessage
 quotedNameStageErr br
-  = sep [ text "Stage error: the non-top-level quoted name" <+> ppr br
+  = TcRnUnknownMessage $ mkPlainError noHints $
+    sep [ text "Stage error: the non-top-level quoted name" <+> ppr br
         , text "must be used at the same stage at which it is bound" ]
 
 
@@ -293,7 +295,8 @@ checkTopSpliceAllowed splice = do
   let (herald, ext) = spliceExtension splice
   extEnabled <- xoptM ext
   unless extEnabled
-    (failWith $ text herald <+> text "are not permitted without" <+> ppr ext)
+    (failWith $ TcRnUnknownMessage $ mkPlainError noHints $
+       text herald <+> text "are not permitted without" <+> ppr ext)
   where
      spliceExtension :: HsSplice GhcPs -> (String, LangExt.Extension)
      spliceExtension (HsQuasiQuote {}) = ("Quasi-quotes", LangExt.QuasiQuotes)
@@ -836,11 +839,13 @@ traceSplice (SpliceInfo { spliceDescription = sd, spliceSource = mb_src
       = vcat [ text "--" <+> ppr loc <> colon <+> text "Splicing" <+> text sd
              , gen ]
 
-illegalTypedSplice :: SDoc
-illegalTypedSplice = text "Typed splices may not appear in untyped brackets"
+illegalTypedSplice :: TcRnMessage
+illegalTypedSplice = TcRnUnknownMessage $ mkPlainError noHints $
+  text "Typed splices may not appear in untyped brackets"
 
-illegalUntypedSplice :: SDoc
-illegalUntypedSplice = text "Untyped splices may not appear in typed brackets"
+illegalUntypedSplice :: TcRnMessage
+illegalUntypedSplice = TcRnUnknownMessage $ mkPlainError noHints $
+  text "Untyped splices may not appear in typed brackets"
 
 checkThLocalName :: Name -> RnM ()
 checkThLocalName name
