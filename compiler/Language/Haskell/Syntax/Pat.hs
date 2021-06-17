@@ -92,8 +92,13 @@ data Pat p
         ------------ Lists, tuples, arrays ---------------
   | ListPat     (XListPat p)
                 [LPat p]
-                   -- For OverloadedLists a Just (ty,fn) gives
-                   -- overall type of the pattern, and the toList
+    -- Holds built-in Haskell list patterns as well as overloaded list patterns
+    -- at the Parser stage.
+    -- After that, this always means the built-in list pattern,
+    -- as the overloaded list pattern gets expanded away.
+    --
+    -- See Note [Rebindable syntax and HsExpansion].
+
 -- function to convert the scrutinee to a list value
 
     -- ^ Syntactic List
@@ -153,9 +158,11 @@ data Pat p
   -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnRarrow'
 
   -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
-  | ViewPat       (XViewPat p)     -- The overall type of the pattern
-                                   -- (= the argument type of the view function)
-                                   -- for hsPatType.
+  | ViewPat       (XViewPat p)
+      -- Renaming: an inverse for the pattern, if we have been able to find one,
+      -- for tcPatToExpr. This is used for overloaded lists in particular.
+      -- Typechecking: the overall type of the pattern
+      -- (= the argument type of the view function), for hsPatType.
                   (LHsExpr p)
                   (LPat p)
     -- ^ View Pattern
