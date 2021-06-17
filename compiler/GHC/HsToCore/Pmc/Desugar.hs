@@ -145,10 +145,14 @@ desugarPat x pat = case pat of
     pure [PmLet b rhs_b, grd_b, PmLet n rhs_n]
 
   -- (fun -> pat)   ===>   let y = fun x, pat <- y where y is a match var of pat
-  ViewPat _arg_ty lexpr pat -> do
-    (y, grds) <- desugarLPatV pat
-    fun <- dsLExpr lexpr
-    pure $ PmLet y (App fun (Var x)) : grds
+  ViewPat (ViewPatTc _arg_ty is_basic_list_view) lexpr pat
+    -- See Note [Desugaring overloaded list patterns]
+    | is_basic_list_view
+    -> desugarLPat x pat
+    | otherwise -> do
+      (y, grds) <- desugarLPatV pat
+      fun <- dsLExpr lexpr
+      pure $ PmLet y (App fun (Var x)) : grds
 
   -- list
   ListPat _ ps ->

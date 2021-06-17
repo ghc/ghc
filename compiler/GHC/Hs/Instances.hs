@@ -422,6 +422,7 @@ deriving instance Data (Pat GhcRn)
 deriving instance Data (Pat GhcTc)
 
 deriving instance Data ConPatTc
+deriving instance Data ViewPatTc
 
 deriving instance (Data a, Data b) => Data (HsFieldBind a b)
 
