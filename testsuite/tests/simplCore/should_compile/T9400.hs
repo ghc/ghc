@@ -16,3 +16,5 @@ main = do
         (x:xs) -> putStrLn xs
     case "ab" of
         "" -> putStrLn "fail"
+    case "\0abc" of
+        (x:xs) -> putStrLn xs
