@@ -125,7 +125,6 @@ type instance XViewPat GhcPs = EpAnn [AddEpAnn]
 type instance XViewPat GhcRn = Maybe (HsExpr GhcRn)
   -- The @HsExpr GhcRn@ gives an inverse to the view function
 type instance XViewPat GhcTc = Type
-  -- Type of the overall pattern
 
 type instance XSplicePat GhcPs = NoExtField
 type instance XSplicePat GhcRn = NoExtField
