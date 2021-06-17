@@ -82,7 +82,6 @@
 -fspecialize-aggressively
 -fth
 -ftype-function-depth
--fuse-rpaths
 -fversion-macros
 -fvia-c
 -haddock-opts
