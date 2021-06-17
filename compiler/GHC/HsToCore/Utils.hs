@@ -529,7 +529,7 @@ There are a few subtleties in the desugaring of `seq`:
 
  3. (as described in #2409)
 
-    The isLocalId ensures that we don't turn
+    The isInternalName ensures that we don't turn
             True `seq` e
     into
             case True of True { ... }

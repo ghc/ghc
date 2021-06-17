@@ -169,13 +169,13 @@ holes3.hs:11:15: error:
         quotRem :: forall a. Integral a => a -> a -> (a, a)
         rem :: forall a. Integral a => a -> a -> a
         zip :: forall a b. [a] -> [b] -> [(a, b)]
-        fst :: forall a b. (a, b) -> a
-        snd :: forall a b. (a, b) -> b
         map :: forall a b. (a -> b) -> [a] -> [b]
         realToFrac :: forall a b. (Real a, Fractional b) => a -> b
         Left :: forall a b. a -> Either a b
         Right :: forall a b. b -> Either a b
         maybe :: forall b a. b -> (a -> b) -> Maybe a -> b
+        fst :: forall a b. (a, b) -> a
+        snd :: forall a b. (a, b) -> b
         const :: forall a b. a -> b -> a
         scanl :: forall b a. (b -> a -> b) -> b -> [a] -> [b]
         scanr :: forall a b. (a -> b -> b) -> b -> [a] -> [b]

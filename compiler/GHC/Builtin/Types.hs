@@ -1135,7 +1135,7 @@ mk_tuple Unboxed arity = (tycon, tuple_con)
                          UnboxedTuple flavour
 
     -- See Note [Unboxed tuple RuntimeRep vars] in GHC.Core.TyCon
-    -- Kind:  forall (k1:RuntimeRep) (k2:RuntimeRep). TYPE k1 -> TYPE k2 -> #
+    -- Kind:  forall (k1:RuntimeRep) (k2:RuntimeRep). TYPE k1 -> TYPE k2 -> TYPE (TupleRep [k1, k2])
     tc_binders = mkTemplateTyConBinders (replicate arity runtimeRepTy)
                                         (\ks -> map tYPE ks)
 

@@ -636,7 +636,7 @@ have:
     plusInt# a b = P.plusInt# a b
 
 The Id for the wrapper of a primop can be found using
-'GHC.Builtin.PrimOp.primOpWrapperId'. However, GHCi does not use this mechanism
+'GHC.Builtin.PrimOps.primOpWrapperId'. However, GHCi does not use this mechanism
 to link primops; it rather does a rather hacky symbol lookup (see
 GHC.ByteCode.Linker.primopToCLabel). TODO: Perhaps this should be changed?
 

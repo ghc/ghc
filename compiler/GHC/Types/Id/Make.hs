@@ -1542,7 +1542,7 @@ does not linger for long.
 
 -- See Note [Left and right sections] in GHC.Rename.Expr
 -- See Note [Wired-in Ids for rebindable syntax]
---   leftSection :: forall r1 r2 n (a:Type r1) (b:TYPE r2).
+--   leftSection :: forall r1 r2 n (a:TYPE r1) (b:TYPE r2).
 --                  (a %n-> b) -> a %n-> b
 --   leftSection f x = f x
 -- Important that it is eta-expanded, so that (leftSection undefined `seq` ())
