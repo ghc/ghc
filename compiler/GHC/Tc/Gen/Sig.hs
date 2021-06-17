@@ -26,8 +26,11 @@ module GHC.Tc.Gen.Sig(
 
 import GHC.Prelude
 
+import GHC.Driver.Session
+import GHC.Driver.Backend
+
 import GHC.Hs
-import GHC.Tc.Errors.Types ( LevityCheckProvenance(..) )
+
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Types
 import GHC.Tc.Solver( pushLevelAndSolveEqualitiesX, reportUnsolvedEqualities )
@@ -41,26 +44,30 @@ import GHC.Tc.Utils.Unify( tcSkolemise, unifyType )
 import GHC.Tc.Utils.Instantiate( topInstantiate, tcInstTypeBndrs )
 import GHC.Tc.Utils.Env( tcLookupId )
 import GHC.Tc.Types.Evidence( HsWrapper, (<.>) )
+import GHC.Tc.Errors.Types ( LevityCheckProvenance(..) )
+
 import GHC.Core( hasSomeUnfolding )
 import GHC.Core.Type ( mkTyVarBinders )
 import GHC.Core.Multiplicity
 
-import GHC.Driver.Session
-import GHC.Driver.Backend
-import GHC.Driver.Ppr
 import GHC.Types.Var ( TyVar, Specificity(..), tyVarKind, binderVars )
 import GHC.Types.Id  ( Id, idName, idType, setInlinePragma
                      , mkLocalId, realIdUnfolding )
-import GHC.Builtin.Names( mkUnboundName )
 import GHC.Types.Basic
-import GHC.Unit.Module( getModule )
 import GHC.Types.Name
 import GHC.Types.Name.Env
+import GHC.Types.SrcLoc
+
+import GHC.Builtin.Names( mkUnboundName )
+import GHC.Unit.Module( getModule )
+
+import GHC.Utils.Misc as Utils ( singleton )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Types.SrcLoc
-import GHC.Utils.Misc as Utils ( singleton )
+import GHC.Utils.Trace
+
 import GHC.Data.Maybe( orElse )
+
 import Data.Maybe( mapMaybe )
 import Control.Monad( unless )
 
