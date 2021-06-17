@@ -707,7 +707,7 @@ canIrred :: CtEvidence -> TcS (StopOrContinue Ct)
 canIrred ev
   = do { let pred = ctEvPred ev
        ; traceTcS "can_pred" (text "IrredPred = " <+> ppr pred)
-       ; (xi,co) <- rewrite ev pred -- co :: xi ~ pred
+       ; Reduction xi co <- rewrite ev pred -- co :: xi ~ pred
        ; rewriteEvidence ev xi co `andWhenContinue` \ new_ev ->
 
     do { -- Re-classify, in case rewriting has improved its shape
@@ -822,7 +822,7 @@ canForAll :: CtEvidence -> Bool -> TcS (StopOrContinue Ct)
 canForAll ev pend_sc
   = do { -- First rewrite it to apply the current substitution
          let pred = ctEvPred ev
-       ; (xi,co) <- rewrite ev pred -- co :: xi ~ pred
+       ; Reduction xi co <- rewrite ev pred -- co :: xi ~ pred
        ; rewriteEvidence ev xi co `andWhenContinue` \ new_ev ->
 
     do { -- Now decompose into its pieces and solve it
@@ -1056,8 +1056,8 @@ can_eq_nc' True _rdr_env _envs ev NomEq ty1 _ ty2 _
 
 -- No similarity in type structure detected. Rewrite and try again.
 can_eq_nc' False rdr_env envs ev eq_rel _ ps_ty1 _ ps_ty2
-  = do { (xi1, co1) <- rewrite ev ps_ty1
-       ; (xi2, co2) <- rewrite ev ps_ty2
+  = do { Reduction xi1 co1 <- rewrite ev ps_ty1
+       ; Reduction xi2 co2 <- rewrite ev ps_ty2
        ; new_ev <- rewriteEqEvidence ev NotSwapped xi1 xi2 co1 co2
        ; can_eq_nc' True rdr_env envs new_ev eq_rel xi1 xi1 xi2 xi2 }
 
@@ -1910,8 +1910,8 @@ canEqFailure :: CtEvidence -> EqRel
 canEqFailure ev NomEq ty1 ty2
   = canEqHardFailure ev ty1 ty2
 canEqFailure ev ReprEq ty1 ty2
-  = do { (xi1, co1) <- rewrite ev ty1
-       ; (xi2, co2) <- rewrite ev ty2
+  = do { Reduction xi1 co1 <- rewrite ev ty1
+       ; Reduction xi2 co2 <- rewrite ev ty2
             -- We must rewrite the types before putting them in the
             -- inert set, so that we are sure to kick them out when
             -- new equalities become available
@@ -1926,8 +1926,8 @@ canEqHardFailure :: CtEvidence
 -- See Note [Make sure that insolubles are fully rewritten]
 canEqHardFailure ev ty1 ty2
   = do { traceTcS "canEqHardFailure" (ppr ty1 $$ ppr ty2)
-       ; (s1, co1) <- rewrite ev ty1
-       ; (s2, co2) <- rewrite ev ty2
+       ; Reduction s1 co1 <- rewrite ev ty1
+       ; Reduction s2 co2 <- rewrite ev ty2
        ; new_ev <- rewriteEqEvidence ev NotSwapped s1 s2 co1 co2
        ; continueWith (mkIrredCt ShapeMismatchReason new_ev) }
 
