@@ -554,6 +554,32 @@ In the presence of RebindableSyntax, we don't know anything about `toList`,
 so we emit a normal view pattern.
 If RebindableSyntax is _not_ enabled, we emit a special view pattern which
 provides an inverse to the list pattern. This fixes #14380.
+
+There is however one special case:
+  - when RebindableSyntax is off,
+  - and the type being matched on is already a list type.
+
+In this case, instead of creating a view pattern using `toList`,
+we want to directly emit the underlying pattern, under the assumption that
+`toList = id`.
+
+Note that this is somewhat naughty, as technically there could be an
+overlapping instance such as `IsList [Int]` for which `toList` is not
+the identity. We assume this isn't the case.
+
+This allows correct overlap checking to occur for pattern matches of the form
+
+> {-# LANGUAGE OverloadedLists #-}
+> 
+> f :: [a] -> ()
+> f x = case x of
+>   []    -> ()
+>   (_:_) -> ()
+
+Without this special case, the `[]` pattern would desugar to `(toList -> [])`,
+whereas the `(_:_)` remains a constructor pattern. The pattern match checker
+would then warn that the pattern `[]` is not covered (as it can't look through
+view patterns). See #14547.
 -}
 
 --------------------
