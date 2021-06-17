@@ -724,8 +724,8 @@ AC_SUBST(InstallNameToolCmd)
 # tools we are looking for. In the past, GHC supported a number of
 # versions of LLVM simultaneously, but that stopped working around
 # 3.5/3.6 release of LLVM.
-LlvmMinVersion=10
-LlvmMaxVersion=12 # inclusive
+LlvmMinVersion=9  # inclusive
+LlvmMaxVersion=13 # not inclusive
 AC_SUBST([LlvmMinVersion])
 AC_SUBST([LlvmMaxVersion])
 sUPPORTED_LLVM_VERSION_MIN=$(echo \($LlvmMinVersion\) | sed 's/\./,/')

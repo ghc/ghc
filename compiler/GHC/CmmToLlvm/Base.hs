@@ -15,7 +15,7 @@ module GHC.CmmToLlvm.Base (
         LiveGlobalRegs,
         LlvmUnresData, LlvmData, UnresLabel, UnresStatic,
 
-        LlvmVersion, supportedLlvmVersionMin, supportedLlvmVersionMax,
+        LlvmVersion, supportedLlvmVersionLowerBound, supportedLlvmVersionUpperBound,
         llvmVersionSupported, parseLlvmVersion,
         llvmVersionStr, llvmVersionList,
 
@@ -263,7 +263,6 @@ llvmPtrBits platform = widthInBits $ typeWidth $ gcWord platform
 -- * Llvm Version
 --
 
--- Newtype to avoid using the Eq instance!
 newtype LlvmVersion = LlvmVersion { llvmVersionNE :: NE.NonEmpty Int }
   deriving (Eq, Ord)
 
@@ -281,14 +280,17 @@ parseLlvmVersion =
       where
         (ver_str, rest) = span isDigit s
 
--- | The LLVM Version that is currently supported.
-supportedLlvmVersionMin, supportedLlvmVersionMax :: LlvmVersion
-supportedLlvmVersionMin = LlvmVersion (sUPPORTED_LLVM_VERSION_MIN NE.:| [])
-supportedLlvmVersionMax = LlvmVersion (sUPPORTED_LLVM_VERSION_MAX NE.:| [])
+-- | The (inclusive) lower bound on the LLVM Version that is currently supported.
+supportedLlvmVersionLowerBound :: LlvmVersion
+supportedLlvmVersionLowerBound = LlvmVersion (sUPPORTED_LLVM_VERSION_MIN NE.:| [])
+
+-- | The (not-inclusive) upper bound  bound on the LLVM Version that is currently supported.
+supportedLlvmVersionUpperBound :: LlvmVersion
+supportedLlvmVersionUpperBound = LlvmVersion (sUPPORTED_LLVM_VERSION_MAX NE.:| [])
 
 llvmVersionSupported :: LlvmVersion -> Bool
 llvmVersionSupported v =
-  v > supportedLlvmVersionMin && v <= supportedLlvmVersionMax
+  v >= supportedLlvmVersionLowerBound && v < supportedLlvmVersionUpperBound
 
 llvmVersionStr :: LlvmVersion -> String
 llvmVersionStr = intercalate "." . map show . llvmVersionList
