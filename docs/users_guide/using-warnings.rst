@@ -517,32 +517,18 @@ of ``-W(no-)*``.
     This option is off by default.
 
 .. ghc-flag:: -Wnoncanonical-monadfail-instances
-    :shortdesc: warn when ``Monad`` or ``MonadFail`` instances have
+    :shortdesc: *(deprecated)*
+        warn when ``Monad`` or ``MonadFail`` instances have
         noncanonical definitions of ``fail``.
-        See flag description in :ref:`options-sanity` for more details.
     :type: dynamic
     :reverse: -Wno-noncanonical-monadfail-instances
     :category:
 
-    Warn if noncanonical ``Monad`` or ``MonadFail`` instances
-    declarations are detected.
-
-    When this warning is enabled, the following conditions are verified:
-
-    In ``Monad`` instances declarations warn if any of the following
-    conditions does not hold:
-
-     * If ``fail`` is defined it must be canonical
-       (i.e. ``fail = Control.Monad.Fail.fail``).
-
-    Moreover, in ``MonadFail`` instance declarations:
-
-     * Warn if ``fail`` is defined backwards
-       (i.e. ``fail = Control.Monad.fail``).
-
-    See also :ghc-flag:`-Wmissing-monadfail-instances`.
-
-    This option is off by default.
+    This warning is deprecated. It no longer has any effect since GHC 8.8.
+    It was used during the transition period of the MonadFail proposal,
+    to detect when an instance of the ``Monad`` class was not defined
+    via ``MonadFail``, or when a ``MonadFail`` instance was defined
+    backwards, using the method in ``Monad``.
 
 .. ghc-flag:: -Wnoncanonical-monoid-instances
     :shortdesc: warn when ``Semigroup`` or ``Monoid`` instances have
@@ -571,25 +557,17 @@ of ``-W(no-)*``.
     :ghc-flag:`-Wcompat` option group.
 
 .. ghc-flag:: -Wmissing-monadfail-instances
-    :shortdesc: Warn when a failable pattern is used in a do-block that does
+    :shortdesc: *(deprecated)*
+        Warn when a failable pattern is used in a do-block that does
         not have a ``MonadFail`` instance.
     :type: dynamic
     :reverse: -Wno-missing-monadfail-instances
     :category:
 
-    .. index::
-       single: MFP
-       single: MonadFail Proposal
-
-    Warn when a failable pattern is used in a do-block that does not have a
-    ``MonadFail`` instance.
-
-    See also :ghc-flag:`-Wnoncanonical-monadfail-instances`.
-
-    Being part of the :ghc-flag:`-Wcompat` option group, this warning is off by
-    default, but will be switched on in a future GHC release, as part of
-    the `MonadFail Proposal (MFP)
-    <https://gitlab.haskell.org/haskell/prime/-/wikis/libraries/proposals/monad-fail>`__.
+    This warning is deprecated. It no longer has any effect since GHC 8.8.
+    It was used during the transition period of the MonadFail proposal,
+    to warn when a failable pattern is used in a do-block that does not have
+    a ``MonadFail`` instance.
 
 .. ghc-flag:: -Wsemigroup
     :shortdesc: warn when a ``Monoid`` is not ``Semigroup``, and on non-
@@ -836,22 +814,26 @@ of ``-W(no-)*``.
     ``toInteger``, ``toRational``, ``fromIntegral``, and ``realToFrac``.
 
 .. ghc-flag:: -Wimplicit-kind-vars
-    :shortdesc: warn when kind variables are implicitly quantified over.
+    :shortdesc: *(deprecated)* warn when kind variables are
+        implicitly quantified over.
     :type: dynamic
     :reverse: -Wno-implicit-kind-vars
     :category:
 
-    .. index::
-       single: implicit prelude, warning
-
-    Have the compiler warn if a kind variable is not explicitly quantified
+    This warning is deprecated. It no longer has any effect since GHC 8.10.
+    It was used to detect if a kind variable is not explicitly quantified
     over. For instance, the following would produce a warning: ::
 
         f :: forall (a :: k). Proxy a
 
-    This can be fixed by explicitly quantifying over ``k``: ::
+    This is now an error and can be fixed by explicitly quantifying
+    over ``k``: ::
 
         f :: forall k (a :: k). Proxy a
+
+    or ::
+
+        f :: forall {k} (a :: k). Proxy a
 
 .. ghc-flag:: -Wimplicit-lift
     :shortdesc: warn about implicit ``lift`` in Template Haskell quotes
