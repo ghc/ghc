@@ -3172,7 +3172,8 @@ wWarningFlagsDeps = mconcat [
               "it is replaced by -Wmissing-local-signatures",
   warnSpec    Opt_WarnMissingLocalSignatures,
   warnSpec    Opt_WarnMissingMethods,
-  warnSpec    Opt_WarnMissingMonadFailInstances,
+  depWarnSpec Opt_WarnMissingMonadFailInstances
+              "fail is no longer a method of Monad",
   warnSpec    Opt_WarnSemigroup,
   warnSpec    Opt_WarnMissingSignatures,
   warnSpec    Opt_WarnMissingKindSignatures,

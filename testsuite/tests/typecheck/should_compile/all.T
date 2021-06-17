@@ -663,7 +663,7 @@ test('T15473', normal, compile_fail, [''])
 test('T15499', normal, compile, [''])
 test('T15586', normal, compile, [''])
 test('T15368', normal, compile, ['-fdefer-type-errors'])
-test('T15645', normal, compile, ['-Wwarn=missing-monadfail-instances'])
+test('T15645', normal, compile, [''])
 test('T15646',
      compile_timeout_multiplier(0.01),
      # 0.01 may seem tiny (1 is timeout after 300s, so this is 3 seconds),
