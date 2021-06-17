@@ -13,7 +13,7 @@ import GHC.Prelude
 import GHC.Platform
 import GHC.ForeignSrcLang
 
-import GHC.CmmToLlvm.Base (LlvmVersion, llvmVersionStr, supportedLlvmVersionMin, supportedLlvmVersionMax, llvmVersionStr, parseLlvmVersion)
+import GHC.CmmToLlvm.Base (LlvmVersion, llvmVersionStr, supportedLlvmVersionLowerBound, supportedLlvmVersionUpperBound, llvmVersionStr, parseLlvmVersion)
 
 import GHC.SysTools.Process
 import GHC.SysTools.Info
@@ -234,10 +234,11 @@ figureLlvmVersion logger dflags = traceToolCommand logger dflags "llc" $ do
                 errorMsg logger dflags $ vcat
                     [ text "Warning:", nest 9 $
                           text "Couldn't figure out LLVM version!" $$
-                          text ("Make sure you have installed LLVM between "
-                                ++ llvmVersionStr supportedLlvmVersionMin
+                          text ("Make sure you have installed LLVM between ["
+                                ++ llvmVersionStr supportedLlvmVersionLowerBound
                                 ++ " and "
-                                ++ llvmVersionStr supportedLlvmVersionMax) ]
+                                ++ llvmVersionStr supportedLlvmVersionUpperBound
+                                ++ ")") ]
                 return Nothing)
 
 
