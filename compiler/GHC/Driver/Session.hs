@@ -3161,7 +3161,9 @@ wWarningFlagsDeps = [
     "it is replaced by -Wmissing-local-signatures",
   flagSpec "missing-local-signatures"    Opt_WarnMissingLocalSignatures,
   flagSpec "missing-methods"             Opt_WarnMissingMethods,
-  flagSpec "missing-monadfail-instances" Opt_WarnMissingMonadFailInstances,
+  depFlagSpec "missing-monadfail-instances"
+                                         Opt_WarnMissingMonadFailInstances
+    "fail is no longer a method of Monad",
   flagSpec "semigroup"                   Opt_WarnSemigroup,
   flagSpec "missing-signatures"          Opt_WarnMissingSignatures,
   flagSpec "missing-kind-signatures"     Opt_WarnMissingKindSignatures,

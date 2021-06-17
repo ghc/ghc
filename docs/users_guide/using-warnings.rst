@@ -552,14 +552,14 @@ of ``-W(no-)*``.
     This option is off by default.
 
 .. ghc-flag:: -Wnoncanonical-monadfail-instances
-    :shortdesc: warn when ``Monad`` or ``MonadFail`` instances have
+    :shortdesc: *(deprecated)*
+        warn when ``Monad`` or ``MonadFail`` instances have
         noncanonical definitions of ``fail``.
-        See flag description in :ref:`options-sanity` for more details.
     :type: dynamic
     :reverse: -Wno-noncanonical-monadfail-instances
     :category:
 
-    :since: 8.0
+    :since: 8.0, deprecated in 9.2
 
     This warning is deprecated. It no longer has any effect since GHC 8.8.
     It was used during the transition period of the MonadFail proposal,
