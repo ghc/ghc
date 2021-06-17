@@ -38,11 +38,13 @@ pattern State m <- State' m
 
 instance Applicative (State s) where
    pure x   = State $ \s -> (# x, s #)
+   {-# INLINE (<*>) #-}
    m <*> n  = State $ \s -> case runState' m s of
                             (# f, !s' #) -> case runState' n s' of
                                             (# x, s'' #) -> (# f x, s'' #)
 
 instance Monad (State s) where
+    {-# INLINE (>>=) #-}
     m >>= n  = State $ \s -> case runState' m s of
                              (# r, !s' #) -> runState' (n r) s'
 
