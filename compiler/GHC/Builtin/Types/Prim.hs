@@ -785,7 +785,7 @@ error messages, and (~R#) is rendered as Coercible.
 Let's take these one at a time:
 
     --------------------------
-    (~#) :: forall k1 k2. k1 -> k2 -> #
+    (~#) :: forall k1 k2. k1 -> k2 -> TYPE (TupleRep '[])
     --------------------------
 This is The Type Of Equality in GHC. It classifies nominal coercions.
 This type is used in the solver for recording equality constraints.
@@ -865,7 +865,7 @@ They are not defined within GHC at all.
 
 
     --------------------------
-    (~R#) :: forall k1 k2. k1 -> k2 -> #
+    (~R#) :: forall k1 k2. k1 -> k2 -> TYPE (TupleRep '[])
     --------------------------
 The is the representational analogue of ~#. This is the type of representational
 equalities that the solver works on. All wanted constraints of this type are
@@ -900,7 +900,7 @@ within GHC at all.
 
 
     --------------------------
-    (~P#) :: forall k1 k2. k1 -> k2 -> #
+    (~P#) :: forall k1 k2. k1 -> k2 -> TYPE (TupleRep '[])
     --------------------------
 This is the phantom analogue of ~# and it is barely used at all.
 (The solver has no idea about this one.) Here is the motivation:
@@ -960,7 +960,7 @@ mkProxyPrimTy k ty = TyConApp proxyPrimTyCon [k, ty]
 proxyPrimTyCon :: TyCon
 proxyPrimTyCon = mkPrimTyCon proxyPrimTyConName binders res_kind [Nominal,Phantom]
   where
-     -- Kind: forall k. k -> TYPE (Tuple '[])
+     -- Kind: forall k. k -> TYPE (TupleRep '[])
      binders = mkTemplateTyConBinders [liftedTypeKind] id
      res_kind = unboxedTupleKind []
 
@@ -976,7 +976,7 @@ eqPrimTyCon :: TyCon  -- The representation type for equality predicates
                       -- See Note [The equality types story]
 eqPrimTyCon  = mkPrimTyCon eqPrimTyConName binders res_kind roles
   where
-    -- Kind :: forall k1 k2. k1 -> k2 -> TYPE (Tuple '[])
+    -- Kind :: forall k1 k2. k1 -> k2 -> TYPE (TupleRep '[])
     binders  = mkTemplateTyConBinders [liftedTypeKind, liftedTypeKind] id
     res_kind = unboxedTupleKind []
     roles    = [Nominal, Nominal, Nominal, Nominal]
@@ -987,7 +987,7 @@ eqPrimTyCon  = mkPrimTyCon eqPrimTyConName binders res_kind roles
 eqReprPrimTyCon :: TyCon   -- See Note [The equality types story]
 eqReprPrimTyCon = mkPrimTyCon eqReprPrimTyConName binders res_kind roles
   where
-    -- Kind :: forall k1 k2. k1 -> k2 -> TYPE (Tuple '[])
+    -- Kind :: forall k1 k2. k1 -> k2 -> TYPE (TupleRep '[])
     binders  = mkTemplateTyConBinders [liftedTypeKind, liftedTypeKind] id
     res_kind = unboxedTupleKind []
     roles    = [Nominal, Nominal, Representational, Representational]
@@ -998,7 +998,7 @@ eqReprPrimTyCon = mkPrimTyCon eqReprPrimTyConName binders res_kind roles
 eqPhantPrimTyCon :: TyCon
 eqPhantPrimTyCon = mkPrimTyCon eqPhantPrimTyConName binders res_kind roles
   where
-    -- Kind :: forall k1 k2. k1 -> k2 -> TYPE (Tuple '[])
+    -- Kind :: forall k1 k2. k1 -> k2 -> TYPE (TupleRep '[])
     binders  = mkTemplateTyConBinders [liftedTypeKind, liftedTypeKind] id
     res_kind = unboxedTupleKind []
     roles    = [Nominal, Nominal, Phantom, Phantom]

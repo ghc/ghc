@@ -1130,7 +1130,7 @@ is what dsHsWrapped does.  Because we might have an HsVar without a
 wrapper, we check in dsHsVar as well. typecheck/should_fail/T17021
 triggers this case.
 
-Note that if `f :: forall r (a :: Type r). blah`, then
+Note that if `f :: forall r (a :: TYPE r). blah`, then
    const True f
 is absolutely fine.  Here `f` is a function, represented by a
 pointer, and we can pass it to `const` (or anything else).  (See

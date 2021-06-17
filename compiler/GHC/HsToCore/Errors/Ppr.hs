@@ -88,7 +88,7 @@ instance Diagnostic DsMessage where
       -> mkSimpleDecorated $
           text "Ignoring useless SPECIALISE pragma for NOINLINE function:" <+> quotes (ppr poly_id)
     DsMultiplicityCoercionsNotSupported
-      -> mkSimpleDecorated $ text "Multiplicity coercions are currently not supported"
+      -> mkSimpleDecorated $ text "Multiplicity coercions are currently not supported (see GHC #19517)"
     DsOrphanRule rule
       -> mkSimpleDecorated $ text "Orphan rule:" <+> ppr rule
     DsRuleLhsTooComplicated orig_lhs lhs2
