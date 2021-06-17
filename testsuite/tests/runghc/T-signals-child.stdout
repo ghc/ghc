@@ -1,0 +1,3 @@
+Child process: 893417, real process: 893417
+Expected "HUP", received: "No signal reHcUePi"
+Expected ExitFailure 42, received ExitFailure 42
