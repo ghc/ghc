@@ -695,6 +695,9 @@ AST is used for the subtraction operation.
       ; tc_pat pat_ty penv pat thing_inside }
     _ -> panic "invalid splice in splice pat"
 
+  XPat (HsPatExpanded lpat rpat) -> do
+    { (rpat', res) <- tc_pat pat_ty penv rpat thing_inside
+    ; return (XPat . ExpansionPat $ HsPatExpanded lpat rpat', res) }
 
 {-
 Note [Hopping the LIE in lazy patterns]
