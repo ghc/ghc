@@ -32,7 +32,6 @@ import GHC.Builtin.Names
 import GHC.Builtin.PrimOps
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
-import GHC.Types.Id.Make ( realWorldPrimId, mkPrimOpId )
 
 import GHC.Core.Utils
 import GHC.Core.Opt.Arity
@@ -48,10 +47,10 @@ import GHC.Core.DataCon
 import GHC.Core.Opt.OccurAnal
 import GHC.Core.TyCo.Rep( UnivCoProvenance(..) )
 
-
 import GHC.Data.Maybe
 import GHC.Data.OrdList
 import GHC.Data.FastString
+import GHC.Data.Pair
 
 import GHC.Utils.Error
 import GHC.Utils.Misc
@@ -60,6 +59,7 @@ import GHC.Utils.Panic.Plain
 import GHC.Utils.Outputable
 import GHC.Utils.Monad  ( mapAccumLM )
 import GHC.Utils.Logger
+import GHC.Utils.Trace
 
 import GHC.Types.Demand
 import GHC.Types.Var
@@ -67,6 +67,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Id
 import GHC.Types.Id.Info
+import GHC.Types.Id.Make ( realWorldPrimId, mkPrimOpId )
 import GHC.Types.Basic
 import GHC.Types.Name   ( NamedThing(..), nameSrcSpan, isInternalName )
 import GHC.Types.SrcLoc ( SrcSpan(..), realSrcLocSpan, mkRealSrcLoc )
@@ -75,7 +76,6 @@ import GHC.Types.Tickish
 import GHC.Types.TyThing
 import GHC.Types.Unique.Supply
 
-import GHC.Data.Pair
 import Data.List        ( unfoldr )
 import Data.Functor.Identity
 import Control.Monad

@@ -114,8 +114,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
-
-import GHC.Driver.Ppr
+import GHC.Utils.Trace
 
 import Data.Data hiding (TyCon)
 import Data.Int

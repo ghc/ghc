@@ -36,8 +36,6 @@ module GHC.Core.Subst (
 
 import GHC.Prelude
 
-import GHC.Driver.Ppr
-
 import GHC.Core
 import GHC.Core.FVs
 import GHC.Core.Seq
@@ -51,7 +49,6 @@ import GHC.Core.Type hiding
    , isInScope, substTyVarBndr, cloneTyVarBndr )
 import GHC.Core.Coercion hiding ( substCo, substCoVarBndr )
 
-import GHC.Builtin.Names
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Id
@@ -60,11 +57,16 @@ import GHC.Types.Var
 import GHC.Types.Tickish
 import GHC.Types.Id.Info
 import GHC.Types.Unique.Supply
+
+import GHC.Builtin.Names
 import GHC.Data.Maybe
+
+import GHC.Utils.Trace
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
+
 import Data.List (mapAccumL)
 
 

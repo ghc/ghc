@@ -11,7 +11,6 @@ module GHC.Core.Opt.Pipeline ( core2core, simplifyExpr ) where
 import GHC.Prelude
 
 import GHC.Driver.Session
-import GHC.Driver.Ppr
 import GHC.Driver.Plugins ( withPlugins, installCoreToDos )
 import GHC.Driver.Env
 import GHC.Platform.Ways  ( hasWay, Way(WayProf) )
@@ -52,6 +51,7 @@ import GHC.Utils.Logger as Logger
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Constants (debugIsOn)
+import GHC.Utils.Trace
 
 import GHC.Unit.External
 import GHC.Unit.Module.Env

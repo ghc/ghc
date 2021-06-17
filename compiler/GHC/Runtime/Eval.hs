@@ -93,6 +93,7 @@ import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Logger
+import GHC.Utils.Trace
 
 import GHC.Types.RepType
 import GHC.Types.Fixity.Env
