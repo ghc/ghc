@@ -361,6 +361,7 @@ Library
         GHC.Core.Utils
         GHC.Data.Bag
         GHC.Data.Bitmap
+        GHC.Data.Bool
         GHC.Data.BooleanFormula
         GHC.Data.EnumSet
         GHC.Data.FastMutInt
@@ -742,6 +743,7 @@ Library
         GHC.Utils.Ppr
         GHC.Utils.Ppr.Colour
         GHC.Utils.TmpFs
+        GHC.Utils.Trace
 
         Language.Haskell.Syntax
         Language.Haskell.Syntax.Binds
