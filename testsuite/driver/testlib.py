@@ -190,6 +190,7 @@ def have_library(lib: str) -> bool:
 def _reqlib( name, opts, lib ):
     if not have_library(lib):
         opts.expect = 'missing-lib'
+        opts.skip   = True
     else:
         opts.extra_hc_opts = opts.extra_hc_opts + ' -package ' + lib + ' '
         for db in config.test_package_db:
@@ -198,6 +199,7 @@ def _reqlib( name, opts, lib ):
 def req_haddock( name, opts ):
     if not config.haddock:
         opts.expect = 'missing-lib'
+        opts.skip   = True
 
 def req_profiling( name, opts ):
     '''Require the profiling libraries (add 'GhcLibWays += p' to mk/build.mk)'''
@@ -1077,6 +1079,7 @@ def test_common_work(watcher: testutil.Watcher,
                 framework_fail(name, way, traceback.format_exc())
 
         t.n_tests_skipped += len(set(all_ways) - set(do_ways))
+        if getTestOpts().expect == 'missing-lib': t.n_missing_libs += 1
 
         if config.cleanup and do_ways:
             try:
@@ -1212,10 +1215,7 @@ def do_test(name: TestName,
                                 stderr=result.stderr)
                 t.unexpected_failures.append(tr)
         else:
-            if opts.expect == 'missing-lib':
-                t.missing_libs.append(TestResult(directory, name, 'missing-lib', way))
-            else:
-                t.n_expected_failures += 1
+            t.n_expected_failures += 1
 
 # Make is often invoked with -s, which means if it fails, we get
 # no feedback at all. This is annoying. So let's remove the option
@@ -2642,9 +2642,9 @@ def summary(t: TestRun, file: TextIO, short=False, color=False) -> None:
                + ' test cases, of which\n'
                + repr(t.n_tests_skipped).rjust(8)
                + ' were skipped\n'
-               + '\n'
-               + repr(len(t.missing_libs)).rjust(8)
+               + repr(t.n_missing_libs).rjust(8)
                + ' had missing libraries\n'
+               + '\n'
                + repr(t.n_expected_passes).rjust(8)
                + ' expected passes\n'
                + repr(t.n_expected_failures).rjust(8)
