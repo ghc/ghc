@@ -165,19 +165,23 @@ library
                       rts/OSThreads.h
                       rts/Parallel.h
                       rts/PrimFloat.h
+                      rts/ProfHeap.h
                       rts/Profiling.h
                       rts/IPE.h
+                      rts/RootProfile.h
                       rts/Signals.h
                       rts/SpinLock.h
                       rts/StableName.h
                       rts/StablePtr.h
                       rts/StaticPtrTable.h
+                      rts/SyntheticHeap.h
                       rts/TTY.h
                       rts/Threads.h
                       rts/Ticky.h
                       rts/Time.h
                       rts/Timer.h
                       rts/TSANUtils.h
+                      rts/TraverseHeap.h
                       rts/Types.h
                       rts/Utils.h
                       rts/prof/CCS.h
@@ -454,6 +458,7 @@ library
                RaiseAsync.c
                RetainerProfile.c
                RetainerSet.c
+               RootProfile.c
                RtsAPI.c
                RtsDllMain.c
                RtsFlags.c
@@ -482,7 +487,6 @@ library
                TopHandler.c
                Trace.c
                TraverseHeap.c
-               TraverseHeapTest.c
                WSDeque.c
                Weak.c
                eventlog/EventLog.c
