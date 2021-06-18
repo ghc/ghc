@@ -255,7 +255,7 @@ cvtDec (DataD ctxt tc tvs ksig constrs derivs)
         ; derivs' <- cvtDerivs derivs
         ; let defn = HsDataDefn { dd_ext = noExtField
                                 , dd_ND = DataType, dd_cType = Nothing
-                                , dd_ctxt = Just ctxt'
+                                , dd_ctxt = mkHsContextMaybe ctxt ctxt'
                                 , dd_kindSig = ksig'
                                 , dd_cons = cons', dd_derivs = derivs' }
         ; returnJustLA $ TyClD noExtField $
@@ -271,7 +271,7 @@ cvtDec (NewtypeD ctxt tc tvs ksig constr derivs)
         ; derivs' <- cvtDerivs derivs
         ; let defn = HsDataDefn { dd_ext = noExtField
                                 , dd_ND = NewType, dd_cType = Nothing
-                                , dd_ctxt = Just ctxt'
+                                , dd_ctxt = mkHsContextMaybe ctxt ctxt'
                                 , dd_kindSig = ksig'
                                 , dd_cons = [con']
                                 , dd_derivs = derivs' }
@@ -291,7 +291,7 @@ cvtDec (ClassD ctxt cl tvs fds decs)
                    $$ (Outputable.ppr adts'))
         ; returnJustLA $ TyClD noExtField $
           ClassDecl { tcdCExt = (noAnn, NoAnnSortKey, NoLayoutInfo)
-                    , tcdCtxt = Just cxt', tcdLName = tc', tcdTyVars = tvs'
+                    , tcdCtxt = mkHsContextMaybe ctxt cxt', tcdLName = tc', tcdTyVars = tvs'
                     , tcdFixity = Prefix
                     , tcdFDs = fds', tcdSigs = Hs.mkClassOpSigs sigs'
                     , tcdMeths = binds'
@@ -342,7 +342,7 @@ cvtDec (DataInstD ctxt bndrs tys ksig constrs derivs)
        ; derivs' <- cvtDerivs derivs
        ; let defn = HsDataDefn { dd_ext = noExtField
                                , dd_ND = DataType, dd_cType = Nothing
-                               , dd_ctxt = Just ctxt'
+                               , dd_ctxt = mkHsContextMaybe ctxt ctxt'
                                , dd_kindSig = ksig'
                                , dd_cons = cons', dd_derivs = derivs' }
 
@@ -363,7 +363,7 @@ cvtDec (NewtypeInstD ctxt bndrs tys ksig constr derivs)
        ; derivs' <- cvtDerivs derivs
        ; let defn = HsDataDefn { dd_ext = noExtField
                                , dd_ND = NewType, dd_cType = Nothing
-                               , dd_ctxt = Just ctxt'
+                               , dd_ctxt = mkHsContextMaybe ctxt ctxt'
                                , dd_kindSig = ksig'
                                , dd_cons = [con'], dd_derivs = derivs' }
        ; returnJustLA $ InstD noExtField $ DataFamInstD
@@ -1912,6 +1912,22 @@ mkHsQualTy ctxt loc ctxt' ty
   | otherwise = L loc $ HsQualTy { hst_xqual = noExtField
                                  , hst_ctxt  = ctxt'
                                  , hst_body  = ty }
+
+-- | If passed an empty 'TH.Cxt', this returns 'Nothing'. Otherwise, this
+-- returns @'Just' lc@, where @lc@ is the provided @'LHsContext' 'GhcPs'@
+-- argument.
+--
+-- This is much like 'mkHsQualTy', except that it returns a
+-- @'Maybe' ('LHsContext' 'GhcPs')@. This is used specifically for constructing
+-- superclasses and datatype contexts. We wish to avoid using 'Just' in the
+-- case of an empty 'TH.Cxt', as the pretty-printer for superclasses/datatype
+-- contexts always prints 'Just' contexts, even if they're empty. See #20011.
+mkHsContextMaybe :: TH.Cxt
+                 -> LHsContext GhcPs
+                 -> Maybe (LHsContext GhcPs)
+mkHsContextMaybe ctxt ctxt'
+  | null ctxt = Nothing
+  | otherwise = Just ctxt'
 
 mkHsOuterFamEqnTyVarBndrs :: Maybe [LHsTyVarBndr () GhcPs] -> HsOuterFamEqnTyVarBndrs GhcPs
 mkHsOuterFamEqnTyVarBndrs = maybe mkHsOuterImplicit (mkHsOuterExplicit noAnn)
