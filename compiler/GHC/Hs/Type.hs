@@ -987,9 +987,7 @@ pprHsForAll tele cxt
 pprLHsContext :: (OutputableBndrId p)
               => Maybe (LHsContext (GhcPass p)) -> SDoc
 pprLHsContext Nothing = empty
-pprLHsContext (Just lctxt)
-  | null (unLoc lctxt) = empty
-  | otherwise          = pprLHsContextAlways lctxt
+pprLHsContext (Just lctxt) = pprLHsContextAlways lctxt
 
 -- For use in a HsQualTy, which always gets printed if it exists.
 pprLHsContextAlways :: (OutputableBndrId p)
