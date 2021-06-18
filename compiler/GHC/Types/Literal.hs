@@ -1007,7 +1007,7 @@ c) Literal is in Ord, because (and only because) we use Ord on AltCon when
    Moreover, rubbish literals should not appear in patterns anyway.
 
 d) Why not lower LitRubbish in CoreToStg? Because it enables us to use
-   RubbishLit when unarising unboxed sums in the future, and it allows
+   LitRubbish when unarising unboxed sums in the future, and it allows
    rubbish values of e.g.  VecRep, for which we can't cough up dummy
    values in STG.
 
