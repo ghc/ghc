@@ -47,7 +47,7 @@ import GHC.Core.Coercion
 import GHC.Core.Coercion.Axiom
 import GHC.Core.FVs
 import GHC.Core.TyCo.Rep    -- needs to build types & coercions in a knot
-import GHC.Core.TyCo.Subst ( substTyCoVars )
+import GHC.Core.TyCo.Subst ( substTyCoVars, mkTvSubstZipEqual )
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
 import GHC.Core
@@ -1090,9 +1090,10 @@ tcIfaceDataCons tycon_name tycon tc_tybinders if_cons
                 ; return (eq_spec, theta, arg_tys, stricts) }
 
         -- Remember, tycon is the representation tycon
+        ; let eq_subst = mkTvSubstZipEqual (map eqSpecTyVar eq_spec)
+                                       (map eqSpecType  eq_spec)
         ; let orig_res_ty = mkFamilyTyConApp tycon
-                              (substTyCoVars (mkTvSubstPrs (map eqSpecPair eq_spec))
-                                             (binderVars tc_tybinders))
+                              (substTyCoVars eq_subst (binderVars tc_tybinders))
 
         ; prom_rep_name <- newTyConRepName dc_name
 
