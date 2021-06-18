@@ -79,17 +79,17 @@ newWordArray# sz s = newByteArray# (wordsToBytes# sz) s
 
 -- | Create a new WordArray# of the given size (*in Word#*), apply the action to
 -- it, trim its most significant zeroes, then return it frozen
-withNewWordArrayTrimed#
+withNewWordArrayTrimmed#
    :: Int#  -- ^ Size in Word
    -> (MutableWordArray# RealWorld -> State# RealWorld -> State# RealWorld)
    -> WordArray#
-withNewWordArrayTrimed# sz act = withNewWordArray# sz \mwa s ->
+withNewWordArrayTrimmed# sz act = withNewWordArray# sz \mwa s ->
    case act mwa s of
       s' -> mwaTrimZeroes# mwa s'
 
 -- | Create two new WordArray# of the given sizes (*in Word#*), apply the action
 -- to them, trim their most significant zeroes, then return them frozen
-withNewWordArray2Trimed#
+withNewWordArray2Trimmed#
    :: Int#  -- ^ Size in Word
    -> Int#  -- ^ Ditto
    -> (MutableWordArray# RealWorld
@@ -97,7 +97,7 @@ withNewWordArray2Trimed#
       -> State# RealWorld
       -> State# RealWorld)
    -> (# WordArray#, WordArray# #)
-withNewWordArray2Trimed# sz1 sz2 act = withNewWordArray2# sz1 sz2 \mwa1 mwa2 s ->
+withNewWordArray2Trimmed# sz1 sz2 act = withNewWordArray2# sz1 sz2 \mwa1 mwa2 s ->
    case act mwa1 mwa2 s of
       s' -> case mwaTrimZeroes# mwa1 s' of
          s'' -> mwaTrimZeroes# mwa2 s''
@@ -105,11 +105,11 @@ withNewWordArray2Trimed# sz1 sz2 act = withNewWordArray2# sz1 sz2 \mwa1 mwa2 s -
 -- | Create a new WordArray# of the given size (*in Word#*), apply the action to
 -- it. If the action returns true#, trim its most significant zeroes, then
 -- return it frozen. Otherwise, return ().
-withNewWordArrayTrimedMaybe#
+withNewWordArrayTrimmedMaybe#
    :: Int#  -- ^ Size in Word
    -> (MutableWordArray# RealWorld -> State# RealWorld -> (# State# RealWorld, Bool# #))
    -> (# (# #) | WordArray# #)
-withNewWordArrayTrimedMaybe# sz act = case runRW# io of (# _, a #) -> a
+withNewWordArrayTrimmedMaybe# sz act = case runRW# io of (# _, a #) -> a
    where
       io s =
          case newWordArray# sz s of
