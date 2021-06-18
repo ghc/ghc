@@ -238,7 +238,6 @@ nextPhase platform p
 -- the first compilation phase for a given file is determined
 -- by its suffix.
 startPhase :: String -> Phase
-startPhase ('b':'u':'f':'_':ext) = startPhase ext
 startPhase "lhs"      = Unlit HsSrcFile
 startPhase "lhs-boot" = Unlit HsBootFile
 startPhase "lhsig"    = Unlit HsigFile
