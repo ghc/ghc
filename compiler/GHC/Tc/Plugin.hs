@@ -47,7 +47,6 @@ module GHC.Tc.Plugin (
         -- * Manipulating evidence bindings
         newEvVar,
         setEvBind,
-        getEvBindsTcPluginM
     ) where
 
 import GHC.Prelude
@@ -60,15 +59,16 @@ import qualified GHC.Tc.Instance.Family as TcM
 import qualified GHC.Iface.Env          as IfaceEnv
 import qualified GHC.Unit.Finder        as Finder
 
+import GHC.Core.Coercion       ( Reduction )
 import GHC.Core.FamInstEnv     ( FamInstEnv )
 import GHC.Tc.Utils.Monad      ( TcGblEnv, TcLclEnv, TcPluginM
-                               , unsafeTcPluginTcM, getEvBindsTcPluginM
+                               , unsafeTcPluginTcM
                                , liftIO, traceTc )
 import GHC.Tc.Types.Constraint ( Ct, CtLoc, CtEvidence(..), ctLocOrigin )
 import GHC.Tc.Utils.TcMType    ( TcTyVar, TcType )
 import GHC.Tc.Utils.Env        ( TcTyThing )
-import GHC.Tc.Types.Evidence   ( TcCoercion, CoercionHole, EvTerm(..)
-                               , EvExpr, EvBind, mkGivenEvBind )
+import GHC.Tc.Types.Evidence   ( CoercionHole, EvTerm(..)
+                               , EvExpr, EvBindsVar, EvBind, mkGivenEvBind )
 import GHC.Types.Var           ( EvVar )
 
 import GHC.Unit.Module
@@ -140,7 +140,7 @@ getFamInstEnvs :: TcPluginM (FamInstEnv, FamInstEnv)
 getFamInstEnvs = unsafeTcPluginTcM TcM.tcGetFamInstEnvs
 
 matchFam :: TyCon -> [Type]
-         -> TcPluginM (Maybe (TcCoercion, TcType))
+         -> TcPluginM (Maybe Reduction)
 matchFam tycon args = unsafeTcPluginTcM $ TcS.matchFamTcM tycon args
 
 newUnique :: TcPluginM Unique
@@ -159,9 +159,12 @@ zonkTcType = unsafeTcPluginTcM . TcM.zonkTcType
 zonkCt :: Ct -> TcPluginM Ct
 zonkCt = unsafeTcPluginTcM . TcM.zonkCt
 
-
 -- | Create a new wanted constraint.
-newWanted  :: CtLoc -> PredType -> TcPluginM CtEvidence
+--
+-- Note: the location information contained inside the 'CtLoc' is not
+-- conserved. To set specific location information for the new wanted
+-- constraint, use 'setCtLocM'.
+newWanted :: CtLoc -> PredType -> TcPluginM CtEvidence
 newWanted loc pty
   = unsafeTcPluginTcM (TcM.newWanted (ctLocOrigin loc) Nothing pty)
 
@@ -169,26 +172,26 @@ newWanted loc pty
 newDerived :: CtLoc -> PredType -> TcPluginM CtEvidence
 newDerived loc pty = return CtDerived { ctev_pred = pty, ctev_loc = loc }
 
--- | Create a new given constraint, with the supplied evidence.  This
--- must not be invoked from 'tcPluginInit' or 'tcPluginStop', or it
--- will panic.
-newGiven :: CtLoc -> PredType -> EvExpr -> TcPluginM CtEvidence
-newGiven loc pty evtm = do
+-- | Create a new given constraint, with the supplied evidence.
+-- This should only be invoked within 'tcPluginSolve'.
+newGiven :: EvBindsVar -> CtLoc -> PredType -> EvExpr -> TcPluginM CtEvidence
+newGiven tc_evbinds loc pty evtm = do
    new_ev <- newEvVar pty
-   setEvBind $ mkGivenEvBind new_ev (EvExpr evtm)
+   setEvBind tc_evbinds $ mkGivenEvBind new_ev (EvExpr evtm)
    return CtGiven { ctev_pred = pty, ctev_evar = new_ev, ctev_loc = loc }
 
 -- | Create a fresh evidence variable.
+-- This should only be invoked within 'tcPluginSolve'.
 newEvVar :: PredType -> TcPluginM EvVar
 newEvVar = unsafeTcPluginTcM . TcM.newEvVar
 
 -- | Create a fresh coercion hole.
+-- This should only be invoked within 'tcPluginSolve'.
 newCoercionHole :: PredType -> TcPluginM CoercionHole
 newCoercionHole = unsafeTcPluginTcM . TcM.newCoercionHole
 
--- | Bind an evidence variable.  This must not be invoked from
--- 'tcPluginInit' or 'tcPluginStop', or it will panic.
-setEvBind :: EvBind -> TcPluginM ()
-setEvBind ev_bind = do
-    tc_evbinds <- getEvBindsTcPluginM
+-- | Bind an evidence variable.
+-- This should only be invoked within 'tcPluginSolve'.
+setEvBind :: EvBindsVar -> EvBind -> TcPluginM ()
+setEvBind tc_evbinds ev_bind = do
     unsafeTcPluginTcM $ TcM.addTcEvBind tc_evbinds ev_bind
