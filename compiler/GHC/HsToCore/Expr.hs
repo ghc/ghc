@@ -890,7 +890,9 @@ dsSyntaxExpr (SyntaxExprTc { syn_expr      = expr
        ; core_res_wrap  <- dsHsWrapper res_wrap
        ; let wrapped_args = zipWithEqual "dsSyntaxExpr" ($) core_arg_wraps arg_exprs
        ; dsWhenNoErrs (zipWithM_ dsNoLevPolyExpr wrapped_args [ mk_doc n | n <- [1..] ])
-                      (\_ -> core_res_wrap (mkApps fun wrapped_args)) }
+                      (\_ -> core_res_wrap (mkCoreApps fun wrapped_args)) }
+                      -- Use mkCoreApps instead of mkApps:
+                      -- unboxed types are possible with RebindableSyntax (#19883)
   where
     mk_doc n = text "In the" <+> speakNth n <+> text "argument of" <+> quotes (ppr expr)
 dsSyntaxExpr NoSyntaxExprTc _ = panic "dsSyntaxExpr"
