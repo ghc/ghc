@@ -10,9 +10,6 @@ module GHC.Driver.Pipeline.Monad (
   , getPipeEnv, getPipeState, getPipeSession
   , setDynFlags, setModLocation, setForeignOs, setIface
   , pipeStateDynFlags, pipeStateModIface, pipeStateLinkable, setPlugins, setLinkable
-
-  , TypedPhase(..)
-  , PhasePipeline(..)
   ) where
 
 import GHC.Prelude
@@ -60,20 +57,6 @@ instance Monad CompPipeline where
 
 instance MonadIO CompPipeline where
     liftIO m = P $ \_env state -> do a <- m; return (state, a)
-
-
-data PhasePipeline inp out where
-  Unit :: TypedPhase a b -> PhasePipeline a b
-  Comp :: PhasePipeline a b -> PhasePipeline b c -> PhasePipeline a c
-  Par  :: PhasePipeline a b -> PhasePipeline c d -> PhasePipeline (a, c) (b, d)
-  Choose :: PhasePipeline a b -> PhasePipeline c d -> PhasePipeline (Either a c) (Either b d)
-
-
-data TypedPhase inp out where
-  NormalPhase :: PhasePlus -> TypedPhase FilePath FilePath
-
-
-
 
 
 

@@ -7,6 +7,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 -- -----------------------------------------------------------------------------
 --
@@ -1305,7 +1306,7 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_logger lcl_tmpfs lcl_dflags
 
                 -- Compile the module.
                 mod_info <- upsweep_mod lcl_hsc_env'' mHscMessage old_hpt
-                                        mod mod_index num_mods
+                              mod mod_index num_mods
                 return (Just mod_info)
 
         case mb_mod_info of

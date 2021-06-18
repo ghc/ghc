@@ -20,7 +20,6 @@ import GHC.Unit.Module.Name ( ModuleName )
 import GHC.Unit.Module.ModIface
 import GHC.Linker.Types
 import GHC.Driver.Phases
-import Control.Monad.IO.Class
 
 
 data TPhase res where
@@ -45,8 +44,5 @@ data TPhase res where
   T_LlvmMangle :: PipeEnv -> HscEnv -> FilePath -> TPhase FilePath
   T_MergeForeign :: PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> [FilePath] -> TPhase FilePath
   T_IO :: IO a -> TPhase a
-
-instance MonadIO (TPipeline TPhase) where
-  liftIO = use . T_IO
 
 data PhaseHook = PhaseHook (forall a . TPhase a -> IO a)

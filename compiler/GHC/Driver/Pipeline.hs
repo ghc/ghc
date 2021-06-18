@@ -9,6 +9,11 @@
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 -----------------------------------------------------------------------------
 --
@@ -35,7 +40,7 @@ module GHC.Driver.Pipeline (
 
    doCpp,
    linkingNeeded, checkLinkInfo, writeInterfaceOnlyMode
-  ) where
+  ,P,runPipelineNew') where
 
 #include "ghcplatform.h"
 import GHC.Prelude
@@ -122,6 +127,8 @@ import Data.Either      ( partitionEithers )
 
 import Data.Time        ( getCurrentTime )
 import GHC.Driver.CmdLine
+import Control.Monad.Catch
+import Control.Monad.Trans.Reader
 
 -- ---------------------------------------------------------------------------
 -- Pre-process
@@ -145,7 +152,7 @@ preprocess hsc_env input_fn mb_input_buf mb_phase =
   massertPpr (isJust mb_phase || isHaskellSrcFilename input_fn) (text input_fn)
   input_fn_final <- mkInputFn
   let preprocess_pipeline = preprocessPipeline pipe_env (setDumpPrefix pipe_env hsc_env) input_fn_final
-  (dflags, fp) <- runPipelineNew (hsc_hooks hsc_env) preprocess_pipeline
+  (dflags, fp) <- runPipelineNew' (hsc_hooks hsc_env) preprocess_pipeline
 
   -- We stop before Hsc phase so we shouldn't generate an interface
   return (dflags, fp)
@@ -202,6 +209,8 @@ preprocess hsc_env input_fn mb_input_buf mb_phase =
 --
 -- NB.  No old interface can also mean that the source has changed.
 
+type P m = TPipelineClass TPhase m
+
 compileOne :: HscEnv
            -> ModSummary      -- ^ summary for module being compiled
            -> Int             -- ^ module N ...
@@ -240,7 +249,7 @@ compileOne' mHscMessage
    status <- hscRecompStatus mHscMessage plugin_hsc_env summary
                 mb_old_iface mb_old_linkable (mod_index, nmods)
    let pipeline = hscPipeline pipe_env (setDumpPrefix pipe_env plugin_hsc_env, summary, status)
-   (iface, old_linkable) <- runPipelineNew (hsc_hooks hsc_env) pipeline
+   (iface, old_linkable) <- runPipelineNew' (hsc_hooks hsc_env) pipeline
    -- See Note [ModDetails and --make mode]
    details <- initModDetails plugin_hsc_env summary iface
    return $! HomeModInfo iface details old_linkable
@@ -330,7 +339,7 @@ compileForeign hsc_env lang stub_c = do
               RawObject  -> panic "compileForeign: should be unreachable"
 #endif
             pipe_env = mkPipeEnv NoStop stub_c (Temporary TFL_GhcSession)
-        res <- runPipelineNew (hsc_hooks hsc_env) (pipeline pipe_env hsc_env Nothing stub_c)
+        res <- runPipelineNew' (hsc_hooks hsc_env) (pipeline pipe_env hsc_env Nothing stub_c)
         case res of
           -- This should never happen as viaCPipeline should only return `Nothing` when the stop phase is `StopC`.
           -- Future refactoring to not check StopC for this case
@@ -357,7 +366,7 @@ compileEmptyStub dflags hsc_env basename location mod_name = do
   writeFile empty_stub (showSDoc dflags (pprCode CStyle src))
   let pipe_env = (mkPipeEnv NoStop empty_stub Persistent) { src_basename = basename}
       pipeline = viaCPipeline HCc pipe_env hsc_env (Just location) empty_stub
-  _ <- runPipelineNew (hsc_hooks hsc_env) pipeline
+  _ <- runPipelineNew' (hsc_hooks hsc_env) pipeline
   return ()
 
 
@@ -596,7 +605,7 @@ compileFile hsc_env stop_phase (src, _mb_phase) = do
          | otherwise = Persistent
         pipe_env = mkPipeEnv stop_phase src output
         pipeline = pipelineStart pipe_env (setDumpPrefix pipe_env hsc_env) src
-   runPipelineNew (hsc_hooks hsc_env) pipeline
+   runPipelineNew' (hsc_hooks hsc_env) pipeline
 
 
 doLink :: HscEnv -> [FilePath] -> IO ()
@@ -635,17 +644,17 @@ setDumpPrefix pipe_env hsc_env =
   hscUpdateFlags (\dflags -> dflags { dumpPrefix = Just (src_basename pipe_env ++ ".")}) hsc_env
 
 
+newtype HookedUse a = HookedUse { runHookedUse :: Hooks -> IO a }
+  deriving (Functor, Applicative, Monad, MonadIO, MonadThrow, MonadCatch) via (ReaderT Hooks IO)
 
+instance MonadUse TPhase HookedUse where
+  use_ fa = HookedUse $ \hooks ->
+    case runPhaseHook hooks of
+      Nothing -> runPhaseNew fa
+      Just (PhaseHook h) -> h fa
 
-runPipelineNew
-  :: Hooks
-  -> TPipeline TPhase res
-  -> IO res
-                                -- ^ (final flags, output filename, interface, linkable)
-runPipelineNew hooks pipeline =
-  case runPhaseHook hooks of
-    Nothing -> runTPipeline runPhaseNew pipeline
-    Just (PhaseHook h) -> runTPipeline h pipeline
+runPipelineNew' :: Hooks -> HookedUse a -> IO a
+runPipelineNew' hooks pipeline = runHookedUse pipeline hooks
 
 phaseOutputFilenameNew :: Phase -> PipeEnv -> HscEnv -> Maybe ModLocation -> IO FilePath
 phaseOutputFilenameNew next_phase pipe_env hsc_env maybe_loc = do
@@ -1456,18 +1465,19 @@ runHsPpPhase hsc_env orig_fn input_fn output_fn = do
     return output_fn
 
 
-phaseIfFlag :: HscEnv
+phaseIfFlag :: Monad m
+            => HscEnv
             -> (DynFlags -> Bool)
             -> a
-            -> TPipeline TPhase a
-            -> TPipeline TPhase a
+            -> m a
+            -> m a
 phaseIfFlag hsc_env flag def action =
   if flag (hsc_dflags hsc_env)
     then action
     else return def
 
 -- | Check if the start is *before* the current phase, otherwise skip with a default
-phaseIfAfter :: Platform -> Phase -> Phase -> a -> TPipeline TPhase a -> TPipeline TPhase a
+phaseIfAfter :: P m => Platform -> Phase -> Phase -> a -> m a -> m a
 phaseIfAfter platform start_phase cur_phase def action =
   if start_phase `eqPhase` cur_phase
          || happensBefore platform start_phase cur_phase
@@ -1475,7 +1485,7 @@ phaseIfAfter platform start_phase cur_phase def action =
     then action
     else return def
 
-preprocessPipeline :: PipeEnv -> HscEnv -> FilePath -> TPipeline TPhase (DynFlags, FilePath)
+preprocessPipeline :: P m => PipeEnv -> HscEnv -> FilePath -> m (DynFlags, FilePath)
 preprocessPipeline pipe_env hsc_env input_fn = do
   unlit_fn <-
     runAfter (Unlit HsSrcFile) input_fn $ do
@@ -1506,22 +1516,23 @@ preprocessPipeline pipe_env hsc_env input_fn = do
 
   -- This won't change through the compilation pipeline
   where platform = targetPlatform (hsc_dflags hsc_env)
-        runAfter :: Phase
-                  -> a -> TPipeline TPhase a -> TPipeline TPhase a
+        runAfter :: P p => Phase
+                  -> a -> p a -> p a
         runAfter = phaseIfAfter platform start_phase
         start_phase = startPhase (src_suffix pipe_env)
-        runAfterFlag :: HscEnv
+        runAfterFlag :: P p
+                  => HscEnv
                   -> Phase
                   -> (DynFlags -> Bool)
                   -> a
-                  -> TPipeline TPhase a
-                  -> TPipeline TPhase a
+                  -> p a
+                  -> p a
         runAfterFlag hsc_env phase flag def action =
           runAfter phase def
            $ phaseIfFlag hsc_env flag def action
 
 
-fullPipeline :: PipeEnv -> HscEnv -> FilePath -> HscSource -> TPipeline TPhase (ModIface, Maybe Linkable)
+fullPipeline :: P p => PipeEnv -> HscEnv -> FilePath -> HscSource -> p (ModIface, Maybe Linkable)
 fullPipeline pipe_env hsc_env pp_fn src_flavour = do
   (dflags, input_fn) <- preprocessPipeline pipe_env hsc_env pp_fn
   let hsc_env' = hscSetFlags dflags hsc_env
@@ -1532,7 +1543,7 @@ fullPipeline pipe_env hsc_env pp_fn src_flavour = do
   -- Once the pipeline has finished, check to see if -dynamic-too failed and
   -- rerun again if it failed but just the `--dynamic` way.
 
-checkDynamicToo :: PipeEnv -> HscEnv -> FilePath -> HscSource -> (ModIface, Maybe Linkable) -> TPipeline TPhase (ModIface, Maybe Linkable)
+checkDynamicToo :: P m => PipeEnv -> HscEnv -> FilePath -> HscSource -> (ModIface, Maybe Linkable) -> m (ModIface, Maybe Linkable)
 checkDynamicToo pipe_env hsc_env pp_fn src_flavour res = do
   use (T_IO (dynamicTooState (hsc_dflags hsc_env))) >>= \case
       DT_Dont   -> return res
@@ -1591,7 +1602,7 @@ resetHscEnv hsc_env = do
 
 
 -- Everything after preprocess
-hscPipeline :: PipeEnv -> ((HscEnv, ModSummary, HscRecompStatus)) -> TPipeline TPhase (ModIface, Maybe Linkable)
+hscPipeline :: P m => PipeEnv -> ((HscEnv, ModSummary, HscRecompStatus)) -> m (ModIface, Maybe Linkable)
 hscPipeline pipe_env (hsc_env_with_plugins, mod_sum, hsc_recomp_status) = do
   case hsc_recomp_status of
     HscUpToDate iface mb_linkable -> return (iface, mb_linkable)
@@ -1600,7 +1611,7 @@ hscPipeline pipe_env (hsc_env_with_plugins, mod_sum, hsc_recomp_status) = do
       hscBackendAction <- use (T_HscPostTc hsc_env_with_plugins mod_sum tc_result warnings mb_old_hash )
       hscBackendPipeline pipe_env hsc_env_with_plugins mod_sum hscBackendAction
 
-hscBackendPipeline :: PipeEnv -> HscEnv -> ModSummary -> HscBackendAction -> TPipeline TPhase (ModIface, Maybe Linkable)
+hscBackendPipeline :: P m => PipeEnv -> HscEnv -> ModSummary -> HscBackendAction -> m (ModIface, Maybe Linkable)
 hscBackendPipeline pipe_env hsc_env mod_sum result =
   case backend (hsc_dflags hsc_env) of
     NoBackend ->
@@ -1611,18 +1622,19 @@ hscBackendPipeline pipe_env hsc_env mod_sum result =
     -- Interpreter -> (,) <$> use (T_IO (mkFullIface hsc_env (hscs_partial_iface result) Nothing)) <*> pure Nothing
     _ -> do
       res <- hscGenBackendPipeline pipe_env hsc_env mod_sum result
-      use (T_IO (dynamicTooState (hsc_dflags hsc_env))) >>= \case
+      liftIO (dynamicTooState (hsc_dflags hsc_env)) >>= \case
         DT_OK -> do
           let dflags' = setDynamicNow (hsc_dflags hsc_env) -- set "dynamicNow"
           () <$ hscGenBackendPipeline pipe_env (hscSetFlags dflags' hsc_env) mod_sum result
         _ -> return ()
       return res
 
-hscGenBackendPipeline :: PipeEnv
+hscGenBackendPipeline :: P m
+  => PipeEnv
   -> HscEnv
   -> ModSummary
   -> HscBackendAction
-  -> TPipeline TPhase (ModIface, Maybe Linkable)
+  -> m (ModIface, Maybe Linkable)
 hscGenBackendPipeline pipe_env hsc_env mod_sum result = do
   let mod_name = moduleName (ms_mod mod_sum)
       src_flavour = (ms_hsc_src mod_sum)
@@ -1643,28 +1655,28 @@ hscGenBackendPipeline pipe_env hsc_env mod_sum result = do
         return (Just linkable)
   return (miface, final_linkable)
 
-asPipeline :: Bool -> PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> TPipeline TPhase FilePath
+asPipeline :: P m => Bool -> PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> m FilePath
 asPipeline use_cpp pipe_env hsc_env location input_fn = do
   use (T_As use_cpp pipe_env hsc_env location input_fn)
 
-viaCPipeline :: Phase -> PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> TPipeline TPhase (Maybe FilePath)
+viaCPipeline :: P m => Phase -> PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> m (Maybe FilePath)
 viaCPipeline c_phase pipe_env hsc_env location input_fn = do
   out_fn <- use (T_Cc c_phase pipe_env hsc_env input_fn)
   case stop_phase pipe_env of
     StopC -> return Nothing
     _ -> Just <$> asPipeline False pipe_env hsc_env location out_fn
 
-llvmPipeline :: PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath ->  TPipeline TPhase FilePath
+llvmPipeline :: P m => PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> m FilePath
 llvmPipeline pipe_env hsc_env location fp = do
   opt_fn <- use (T_LlvmOpt pipe_env hsc_env fp)
   llvmLlcPipeline pipe_env hsc_env location opt_fn
 
-llvmLlcPipeline :: PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> TPipeline TPhase FilePath
+llvmLlcPipeline :: P m => PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> m FilePath
 llvmLlcPipeline pipe_env hsc_env location opt_fn = do
   llc_fn <- use (T_LlvmLlc pipe_env hsc_env opt_fn)
   llvmManglePipeline pipe_env hsc_env location llc_fn
 
-llvmManglePipeline :: PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> TPipeline TPhase FilePath
+llvmManglePipeline :: P m  => PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> m FilePath
 llvmManglePipeline pipe_env hsc_env location llc_fn = do
   mangled_fn <-
     if gopt Opt_NoLlvmMangler (hsc_dflags hsc_env)
@@ -1672,12 +1684,12 @@ llvmManglePipeline pipe_env hsc_env location llc_fn = do
       else return llc_fn
   asPipeline False pipe_env hsc_env location mangled_fn
 
-cmmCppPipeline :: PipeEnv -> HscEnv -> FilePath -> TPipeline TPhase FilePath
+cmmCppPipeline :: P m => PipeEnv -> HscEnv -> FilePath -> m FilePath
 cmmCppPipeline pipe_env hsc_env input_fn = do
   output_fn <- use (T_CmmCpp pipe_env hsc_env input_fn)
   cmmPipeline pipe_env hsc_env output_fn
 
-cmmPipeline :: PipeEnv -> HscEnv -> FilePath -> TPipeline TPhase FilePath
+cmmPipeline :: P m => PipeEnv -> HscEnv -> FilePath -> m FilePath
 cmmPipeline pipe_env hsc_env input_fn = do
   (fos, output_fn) <- use (T_Cmm pipe_env hsc_env input_fn)
   mo_fn <- hscPostBackendPipeline pipe_env hsc_env HsSrcFile (backend (hsc_dflags hsc_env)) Nothing output_fn
@@ -1687,7 +1699,7 @@ cmmPipeline pipe_env hsc_env input_fn = do
 
 
 
-hscPostBackendPipeline :: PipeEnv -> HscEnv -> HscSource -> Backend -> Maybe ModLocation -> FilePath -> TPipeline TPhase (Maybe FilePath)
+hscPostBackendPipeline :: P m => PipeEnv -> HscEnv -> HscSource -> Backend -> Maybe ModLocation -> FilePath -> m (Maybe FilePath)
 hscPostBackendPipeline _ _ HsBootFile _ _ _   = return Nothing
 hscPostBackendPipeline _ _ HsigFile _ _ _     = return Nothing
 hscPostBackendPipeline pipe_env hsc_env _ bcknd ml input_fn =
@@ -1699,11 +1711,12 @@ hscPostBackendPipeline pipe_env hsc_env _ bcknd ml input_fn =
         Interpreter -> return Nothing
 
 -- Pipeline from a given suffix
-pipelineStart :: PipeEnv -> HscEnv -> FilePath -> TPipeline TPhase (Maybe FilePath)
+pipelineStart :: P m => PipeEnv -> HscEnv -> FilePath -> m (Maybe FilePath)
 pipelineStart pipe_env hsc_env input_fn =
   fromSuffix (src_suffix pipe_env)
   where
    stop_after = stop_phase pipe_env
+   frontend :: P m => HscSource -> m (Maybe FilePath)
    frontend sf = case stop_after of
                     StopPreprocess -> do
                       -- The actual output from preprocessing
@@ -1715,7 +1728,7 @@ pipelineStart pipe_env hsc_env input_fn =
                       -- copy the file, remembering to prepend a {-# LINE #-} pragma so that
                       -- further compilation stages can tell what the original filename was.
                       -- File name we expected the output to have
-                      final_fn <- use (T_IO $ phaseOutputFilenameNew anyHsc pipe_env hsc_env Nothing)
+                      final_fn <- liftIO $ phaseOutputFilenameNew anyHsc pipe_env hsc_env Nothing
                       when (final_fn /= out_fn) $ do
                         let msg = "Copying `" ++ input_fn ++"' to `" ++ final_fn ++ "'"
                             line_prag = "{-# LINE 1 \"" ++ src_filename pipe_env ++ "\" #-}\n"
@@ -1723,7 +1736,9 @@ pipelineStart pipe_env hsc_env input_fn =
                         use (T_IO $ copyWithHeader line_prag input_fn final_fn)
                       return Nothing
                     _ -> objFromLinkable <$> fullPipeline pipe_env hsc_env input_fn sf
+   c :: P m => Phase -> m (Maybe FilePath)
    c phase = viaCPipeline phase pipe_env hsc_env Nothing input_fn
+   as :: P m => Bool -> m (Maybe FilePath)
    as use_cpp = Just <$> asPipeline use_cpp pipe_env hsc_env Nothing input_fn
 
    objFromLinkable (_, Just (LM _ _ [DotO lnk])) = Just lnk
@@ -1733,7 +1748,7 @@ pipelineStart pipe_env hsc_env input_fn =
 
 
 
-   fromSuffix :: String -> TPipeline TPhase (Maybe FilePath)
+   fromSuffix :: P m => String -> m (Maybe FilePath)
    fromSuffix "lhs"      = frontend HsSrcFile
    fromSuffix "lhs-boot" = frontend HsBootFile
    fromSuffix "lhsig"    = frontend HsigFile
