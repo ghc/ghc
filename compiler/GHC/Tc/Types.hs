@@ -1699,7 +1699,6 @@ type TcPluginSolver = [Ct] -- ^ Givens
 
 -- | For rewriting type family applications, a type-checking plugin provides
 -- a function of this type for each type family 'TyCon'.
--- 
 -- The function is provided with the current set of Given constraints, together
 -- with the arguments to the type family.
 -- The type family application will always be fully saturated.

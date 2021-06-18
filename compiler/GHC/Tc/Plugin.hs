@@ -173,7 +173,6 @@ newDerived :: CtLoc -> PredType -> TcPluginM CtEvidence
 newDerived loc pty = return CtDerived { ctev_pred = pty, ctev_loc = loc }
 
 -- | Create a new given constraint, with the supplied evidence.
--- 
 -- This should only be invoked within 'tcPluginSolve'.
 newGiven :: EvBindsVar -> CtLoc -> PredType -> EvExpr -> TcPluginM CtEvidence
 newGiven tc_evbinds loc pty evtm = do
@@ -182,19 +181,16 @@ newGiven tc_evbinds loc pty evtm = do
    return CtGiven { ctev_pred = pty, ctev_evar = new_ev, ctev_loc = loc }
 
 -- | Create a fresh evidence variable.
--- 
 -- This should only be invoked within 'tcPluginSolve'.
 newEvVar :: PredType -> TcPluginM EvVar
 newEvVar = unsafeTcPluginTcM . TcM.newEvVar
 
 -- | Create a fresh coercion hole.
--- 
 -- This should only be invoked within 'tcPluginSolve'.
 newCoercionHole :: PredType -> TcPluginM CoercionHole
 newCoercionHole = unsafeTcPluginTcM . TcM.newCoercionHole
 
 -- | Bind an evidence variable.
---
 -- This should only be invoked within 'tcPluginSolve'.
 setEvBind :: EvBindsVar -> EvBind -> TcPluginM ()
 setEvBind tc_evbinds ev_bind = do
