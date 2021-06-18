@@ -1211,7 +1211,7 @@ checkSafeImports tcg_env
 
         -- Check non-safe imports are correct if inferring safety
         -- See the Note [Safe Haskell Inference]
-        (infErrs, infPkgs) <- case (safeInferOn dflags) of
+        (infErrs, infPkgs) <- case safeInferOn dflags of
           False -> return (emptyMessages, S.empty)
           True -> do infPkgs <- S.fromList <$> mapMaybeM checkSafe regImps
                      infErrs <- getDiagnostics
@@ -1221,14 +1221,14 @@ checkSafeImports tcg_env
         -- restore old errors
         logDiagnostics oldErrs
 
-        case (isEmptyMessages safeErrs) of
+        case isEmptyMessages safeErrs of
           -- Failed safe check
           False -> liftIO . throwErrors $ safeErrs
 
           -- Passed safe check
           True -> do
             let infPassed = isEmptyMessages infErrs
-            tcg_env' <- case (not infPassed) of
+            tcg_env' <- case not infPassed of
               True  -> markUnsafeInfer tcg_env infErrs
               False -> return tcg_env
             when (packageTrustOn dflags) $ checkPkgTrust pkgReqs

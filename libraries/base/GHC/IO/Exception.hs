@@ -465,7 +465,7 @@ untangle coded message
     coded_str = unpackCStringUtf8# coded
 
     (location, details)
-      = case (span not_bar coded_str) of { (loc, rest) ->
+      = case span not_bar coded_str of { (loc, rest) ->
         case rest of
           ('|':det) -> (loc, ' ' : det)
           _         -> (loc, "")
