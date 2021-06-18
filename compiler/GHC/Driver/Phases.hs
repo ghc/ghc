@@ -1,5 +1,10 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE KindSignatures #-}
 
 
 -----------------------------------------------------------------------------
@@ -43,6 +48,8 @@ module GHC.Driver.Phases (
    phaseForeignLanguage
    , runTPipeline
    , TPipeline(..)
+   , TPipelineClass
+   , MonadUse(..)
    , use
  ) where
 
@@ -60,6 +67,8 @@ import GHC.Utils.Misc
 
 import System.FilePath
 import Control.Monad
+import Control.Monad.IO.Class
+import qualified Data.Kind as K
 
 -----------------------------------------------------------------------------
 -- Phases
@@ -113,6 +122,12 @@ data Phase
 
 
 
+type TPipelineClass (f :: K.Type -> K.Type) (m :: K.Type -> K.Type)  = (Functor m, MonadIO m, Applicative m, Monad m, MonadUse f m)
+
+class MonadUse f m where
+  use_ :: f a -> m a
+
+
 data TPipeline f a where
   Return :: a -> TPipeline f a
   Roll :: f a -> (a -> TPipeline f b)  -> TPipeline f b
@@ -137,14 +152,14 @@ runTPipeline _h (Return a) = return a
 runTPipeline h (Roll fa k)   = h fa >>= runTPipeline h . k
 --runTPipeline h g (ModuleScope e k) = g e (runTPipeline h g k)
 
-use :: f a -> TPipeline f a
-use fa = Roll fa Return
+use :: MonadUse f m => f a -> m a
+use fa = use_ fa
 
 instance Outputable Phase where
     ppr p = text (show p)
 
 anyHsc :: Phase
-anyHsc = Hsc (panic "anyHsc")
+anyHsc = Hsc undefined
 
 isStopLn :: Phase -> Bool
 isStopLn StopLn = True
