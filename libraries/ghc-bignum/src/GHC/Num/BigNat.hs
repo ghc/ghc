@@ -412,7 +412,7 @@ bigNatAddWord# a b
    = bigNatFromWord# b
 
    | True
-   = withNewWordArrayTrimed# (wordArraySize# a +# 1#) \mwa s ->
+   = withNewWordArrayTrimmed# (wordArraySize# a +# 1#) \mwa s ->
          inline bignat_add_word mwa a b s
 
 -- | Add a bigNat and a Word
@@ -430,7 +430,7 @@ bigNatAdd a b
       !szB     = wordArraySize# b
       !szMax   = maxI# szA szB
       !sz      = szMax +# 1# -- for the potential carry
-   in withNewWordArrayTrimed# sz \mwa s ->
+   in withNewWordArrayTrimmed# sz \mwa s ->
          inline bignat_add mwa a b s
 
 -------------------------------------------------
@@ -447,7 +447,7 @@ bigNatMulWord# a w
    | isTrue# (bigNatSize# a ==# 1#)
    = case timesWord2# (bigNatIndex# a 0#) w of
       (# h, l #) -> bigNatFromWord2# h l
-   | True = withNewWordArrayTrimed# (bigNatSize# a +# 1#) \mwa s ->
+   | True = withNewWordArrayTrimmed# (bigNatSize# a +# 1#) \mwa s ->
                inline bignat_mul_word mwa a w s
 
 -- | Multiply a BigNAt by a Word
@@ -473,7 +473,7 @@ bigNatMul a b
          !szA = wordArraySize# a
          !szB = wordArraySize# b
          !sz  = szA +# szB
-      in withNewWordArrayTrimed# sz \mwa s->
+      in withNewWordArrayTrimmed# sz \mwa s->
             inline bignat_mul mwa a b s
 
 
@@ -487,7 +487,7 @@ bigNatMul a b
 bigNatSubWordUnsafe# :: BigNat# -> Word# -> BigNat#
 bigNatSubWordUnsafe# x y
    | 0## <- y = x
-   | True     = withNewWordArrayTrimed# sz \mwa -> go mwa y 0#
+   | True     = withNewWordArrayTrimmed# sz \mwa -> go mwa y 0#
    where
       !sz = wordArraySize# x
 
@@ -515,7 +515,7 @@ bigNatSubWord# a b
    | 0## <- b          = (# | a #)
    | bigNatIsZero a    = (# (# #) | #)
    | True
-   = withNewWordArrayTrimedMaybe# (bigNatSize# a) \mwa s ->
+   = withNewWordArrayTrimmedMaybe# (bigNatSize# a) \mwa s ->
             inline bignat_sub_word mwa a b s
 
 
@@ -525,7 +525,7 @@ bigNatSubUnsafe a b
    | bigNatIsZero b = a
    | True =
       let szA = wordArraySize# a
-      in withNewWordArrayTrimed# szA \mwa s->
+      in withNewWordArrayTrimmed# szA \mwa s->
             case inline bignat_sub mwa a b s of
                (# s', 1# #) -> s'
                (# s', _  #) -> case raiseUnderflow of
@@ -541,7 +541,7 @@ bigNatSub a b
    = (# (# #) | #)
 
    | True
-   = withNewWordArrayTrimedMaybe# (bigNatSize# a) \mwa s ->
+   = withNewWordArrayTrimmedMaybe# (bigNatSize# a) \mwa s ->
             inline bignat_sub mwa a b s
 
 
@@ -560,7 +560,7 @@ bigNatQuotWord# a b
    | True =
    let
       sz = wordArraySize# a
-   in withNewWordArrayTrimed# sz \mwq s ->
+   in withNewWordArrayTrimmed# sz \mwq s ->
          inline bignat_quot_word mwq a b s
 
 -- | Divide a BigNat by a Word, return the quotient
@@ -632,7 +632,7 @@ bigNatQuotRem# a b
    | isTrue# (szB ==# 1#)    = case bigNatQuotRemWord# a (bigNatIndex# b 0#) of
                                  (# q, r #) -> (# q, bigNatFromWord# r #)
 
-   | True = withNewWordArray2Trimed# szQ szR \mwq mwr s ->
+   | True = withNewWordArray2Trimmed# szQ szR \mwq mwr s ->
                      inline bignat_quotrem mwq mwr a b s
    where
    cmp = bigNatCompare a b
@@ -651,7 +651,7 @@ bigNatQuot a b
    | LT <- cmp               = bigNatZero# (# #)
    | EQ <- cmp               = bigNatOne# (# #)
    | isTrue# (szB ==# 1#)    = bigNatQuotWord# a (bigNatIndex# b 0#)
-   | True                    = withNewWordArrayTrimed# szQ \mwq s ->
+   | True                    = withNewWordArrayTrimmed# szQ \mwq s ->
                                  inline bignat_quot mwq a b s
    where
    cmp = bigNatCompare a b
@@ -669,7 +669,7 @@ bigNatRem a b
    | EQ <- cmp               = bigNatZero# (# #)
    | isTrue# (szB ==# 1#)    = case bigNatRemWord# a (bigNatIndex# b 0#) of
                                  r -> bigNatFromWord# r
-   | True                    = withNewWordArrayTrimed# szR \mwr s ->
+   | True                    = withNewWordArrayTrimmed# szR \mwr s ->
                                  inline bignat_rem mwr a b s
    where
    cmp = bigNatCompare a b
@@ -723,7 +723,7 @@ bigNatGcd a b
       _            ->
          let
             go wx wy = -- wx > wy
-               withNewWordArrayTrimed# (wordArraySize# wy) \mwr s ->
+               withNewWordArrayTrimmed# (wordArraySize# wy) \mwr s ->
                   bignat_gcd mwr wx wy s
          in case bigNatCompare a b of
                EQ -> a
@@ -812,7 +812,7 @@ bigNatAnd :: BigNat# -> BigNat# -> BigNat#
 bigNatAnd a b
    | bigNatIsZero a = a
    | bigNatIsZero b = b
-   | True           = withNewWordArrayTrimed# sz \mwa s ->
+   | True           = withNewWordArrayTrimmed# sz \mwa s ->
                         inline bignat_and mwa a b s
    where
       !szA = wordArraySize# a
@@ -824,7 +824,7 @@ bigNatAndNot :: BigNat# -> BigNat# -> BigNat#
 bigNatAndNot a b
    | bigNatIsZero a = a
    | bigNatIsZero b = a
-   | True           = withNewWordArrayTrimed# szA \mwa s ->
+   | True           = withNewWordArrayTrimmed# szA \mwa s ->
                         inline bignat_and_not mwa a b s
    where
       !szA = wordArraySize# a
@@ -864,7 +864,7 @@ bigNatXor :: BigNat# -> BigNat# -> BigNat#
 bigNatXor a b
    | bigNatIsZero a = b
    | bigNatIsZero b = a
-   | True           = withNewWordArrayTrimed# sz \mwa s ->
+   | True           = withNewWordArrayTrimmed# sz \mwa s ->
                         inline bignat_xor mwa a b s
    where
       !szA = wordArraySize# a
@@ -911,7 +911,7 @@ bigNatShiftR# a n
       !szA = wordArraySize# a
       !nw  = word2Int# (n `uncheckedShiftRL#` WORD_SIZE_BITS_SHIFT#)
       !sz  = szA -# nw
-     in withNewWordArrayTrimed# sz \mwa s ->
+     in withNewWordArrayTrimmed# sz \mwa s ->
          inline bignat_shiftr mwa a n s
 
 -- | Bit shift right (two's complement)
@@ -932,7 +932,7 @@ bigNatShiftRNeg# a n
       !szA = wordArraySize# a
       !nw  = (word2Int# n -# 1#) `uncheckedIShiftRL#` WORD_SIZE_BITS_SHIFT#
       !sz  = szA -# nw
-     in withNewWordArrayTrimed# sz \mwa s ->
+     in withNewWordArrayTrimmed# sz \mwa s ->
          inline bignat_shiftr_neg mwa a n s
 
 
@@ -960,7 +960,7 @@ bigNatShiftL# a n
       !nb  = word2Int# (n `and#` WORD_SIZE_BITS_MASK##)
       !sz   = szA +# nw +# (nb /=# 0#)
 
-     in withNewWordArrayTrimed# sz \mwa s ->
+     in withNewWordArrayTrimmed# sz \mwa s ->
          inline bignat_shiftl mwa a n s
 
 
@@ -1179,7 +1179,7 @@ bigNatPowMod !b !e !m
    | bigNatIsZero e = bigNatFromWord# 1##
    | bigNatIsZero b = bigNatFromWord# 0##
    | bigNatIsOne  b = bigNatFromWord# 1##
-   | True           = withNewWordArrayTrimed# (bigNatSize# m) \mwa s ->
+   | True           = withNewWordArrayTrimmed# (bigNatSize# m) \mwa s ->
                          inline bignat_powmod mwa b e m s
 
 -- | Return count of trailing zero bits
@@ -1316,7 +1316,7 @@ bigNatToAddr a addr e = IO \s -> case bigNatToAddr# a addr e s of
 --
 -- The size is given in bytes.
 --
--- Higher limbs equal to 0 are automatically trimed.
+-- Higher limbs equal to 0 are automatically trimmed.
 bigNatFromAddrLE# :: Word# -> Addr# -> State# s -> (# State# s, BigNat# #)
 bigNatFromAddrLE# 0## _    s = (# s, bigNatZero# (# #) #)
 bigNatFromAddrLE# sz  addr s =
@@ -1351,7 +1351,7 @@ bigNatFromAddrLE# sz  addr s =
 --
 -- The size is given in bytes.
 --
--- Null higher limbs are automatically trimed.
+-- Null higher limbs are automatically trimmed.
 bigNatFromAddrBE# :: Word# -> Addr# -> State# s -> (# State# s, BigNat# #)
 bigNatFromAddrBE# 0## _    s = (# s, bigNatZero# (# #) #)
 bigNatFromAddrBE# sz  addr s =
@@ -1391,7 +1391,7 @@ bigNatFromAddrBE# sz  addr s =
 -- byte first (big-endian) if @1#@ or least significant byte first
 -- (little-endian) if @0#@.
 --
--- Null higher limbs are automatically trimed.
+-- Null higher limbs are automatically trimmed.
 bigNatFromAddr# :: Word# -> Addr# -> Bool# -> State# s -> (# State# s, BigNat# #)
 bigNatFromAddr# sz addr 0# s = bigNatFromAddrLE# sz addr s
 bigNatFromAddr# sz addr _  s = bigNatFromAddrBE# sz addr s
@@ -1477,7 +1477,7 @@ bigNatToMutableByteArray# a mba off _  s = bigNatToMutableByteArrayBE# a mba off
 --
 -- The size is given in bytes.
 --
--- Null higher limbs are automatically trimed.
+-- Null higher limbs are automatically trimmed.
 bigNatFromByteArrayLE# :: Word# -> ByteArray# -> Word# -> State# s -> (# State# s, BigNat# #)
 bigNatFromByteArrayLE# 0## _  _    s = (# s, bigNatZero# (# #) #)
 bigNatFromByteArrayLE# sz  ba moff s =
@@ -1512,7 +1512,7 @@ bigNatFromByteArrayLE# sz  ba moff s =
 --
 -- The size is given in bytes.
 --
--- Null higher limbs are automatically trimed.
+-- Null higher limbs are automatically trimmed.
 bigNatFromByteArrayBE# :: Word# -> ByteArray# -> Word# -> State# s -> (# State# s, BigNat# #)
 bigNatFromByteArrayBE# 0## _  _    s = (# s, bigNatZero# (# #) #)
 bigNatFromByteArrayBE# sz  ba moff s =
@@ -1552,7 +1552,7 @@ bigNatFromByteArrayBE# sz  ba moff s =
 -- byte first (big-endian) if @1#@ or least significant byte first
 -- (little-endian) if @0#@.
 --
--- Null higher limbs are automatically trimed.
+-- Null higher limbs are automatically trimmed.
 bigNatFromByteArray# :: Word# -> ByteArray# -> Word# -> Bool# -> State# s -> (# State# s, BigNat# #)
 bigNatFromByteArray# sz ba off 0# s = bigNatFromByteArrayLE# sz ba off s
 bigNatFromByteArray# sz ba off _  s = bigNatFromByteArrayBE# sz ba off s
