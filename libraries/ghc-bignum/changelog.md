@@ -1,5 +1,9 @@
 # Changelog for `ghc-bignum` package
 
+## 1.2
+
+- Fix typo (Trimed -> Trimmed)
+
 ## 1.1
 
 - Moved integerToDouble# and integerToFloat# to `base` package with fixed
