@@ -255,10 +255,10 @@ class TestRun:
        self.total_test_cases = 0
 
        self.n_tests_skipped = 0
+       self.n_missing_libs = 0
        self.n_expected_passes = 0
        self.n_expected_failures = 0
 
-       self.missing_libs = [] # type: List[TestResult]
        self.framework_failures = [] # type: List[TestResult]
        self.framework_warnings = [] # type: List[TestResult]
 
