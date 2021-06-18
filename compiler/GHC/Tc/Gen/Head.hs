@@ -809,7 +809,7 @@ mostly in tcInferDataCon:
 
 2. We are going to return a ConLikeTc, thus:
      XExpr (ConLikeTc K [r,a] [Scaled p a])
-      :: forall (r :: RuntimeRep) (a :: Type r). a %p -> T r a
+      :: forall (r :: RuntimeRep) (a :: TYPE r). a %p -> T r a
    where 'p' is a fresh multiplicity unification variable.
 
    To get the returned ConLikeTc, we allocate a fresh multiplicity
