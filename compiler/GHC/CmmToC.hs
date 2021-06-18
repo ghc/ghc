@@ -25,12 +25,14 @@ module GHC.CmmToC
    )
 where
 
--- Cmm stuff
 import GHC.Prelude
+
+import GHC.Platform
+
+import GHC.CmmToAsm.CPrim
 
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
-import GHC.Types.ForeignCall
 import GHC.Cmm hiding (pprBBlock)
 import GHC.Cmm.Ppr () -- For Outputable instances
 import GHC.Cmm.Dataflow.Block
@@ -39,19 +41,16 @@ import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Utils
 import GHC.Cmm.Switch
 
--- Utils
-import GHC.CmmToAsm.CPrim
-import GHC.Driver.Session
-import GHC.Driver.Ppr
-import GHC.Utils.Outputable
-import GHC.Utils.Panic
-import GHC.Platform
+import GHC.Types.ForeignCall
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.FM
 import GHC.Types.Unique
-import GHC.Utils.Misc
 
--- The rest
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Utils.Misc
+import GHC.Utils.Trace
+
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import Control.Monad.ST
