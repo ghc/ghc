@@ -49,7 +49,8 @@ necessary.  The type argument gives the type of the @ei@.
 dsGuarded :: GRHSs GhcTc (LHsExpr GhcTc) -> Type -> NonEmpty Nablas -> DsM CoreExpr
 dsGuarded grhss rhs_ty rhss_nablas = do
     match_result <- dsGRHSs PatBindRhs grhss rhs_ty rhss_nablas
-    error_expr <- mkErrorAppDs nON_EXHAUSTIVE_GUARDS_ERROR_ID rhs_ty empty
+    error_expr <- mkErrorAppDs nON_EXHAUSTIVE_GUARDS_ERROR_ID rhs_ty
+                               (text "pattern binding")
     extractMatchResult match_result error_expr
 
 -- In contrast, @dsGRHSs@ produces a @MatchResult CoreExpr@.
