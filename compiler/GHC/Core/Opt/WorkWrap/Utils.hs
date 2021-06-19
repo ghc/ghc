@@ -11,7 +11,7 @@ module GHC.Core.Opt.WorkWrap.Utils
    ( WwOpts(..), initWwOpts, mkWwBodies, mkWWstr, mkWorkerArgs
    , DataConPatContext(..)
    , UnboxingDecision(..), ArgOfInlineableFun(..), wantToUnboxArg
-   , findTypeShape, mkAbsentFiller
+   , findTypeShape, finaliseBoxity, mkAbsentFiller
    , isWorkerSmallEnough
    )
 where
@@ -38,7 +38,6 @@ import GHC.Core.Multiplicity
 import GHC.Core.Predicate ( isClassPred )
 import GHC.Core.Coercion
 import GHC.Core.FamInstEnv
-import GHC.Types.Basic       ( Boxity(..) )
 import GHC.Core.TyCon
 import GHC.Core.TyCon.RecWalk
 import GHC.Core.SimpleOpt( SimpleOpts )
@@ -609,33 +608,28 @@ data ArgOfInlineableFun
 wantToUnboxArg :: FamInstEnvs -> ArgOfInlineableFun -> Type -> Demand -> UnboxingDecision Demand
 -- See Note [Which types are unboxed?]
 wantToUnboxArg fam_envs inlineable_flag ty dmd
-  | isAbsDmd dmd
+  | isAbs (dmdCard dmd)
   = DropAbsent
 
-  | isStrUsedDmd dmd
+  | n :* sd <- dmd
+  , isStrict n
+  -- See Note [Unpacking arguments with product and polymorphic demands]
+  -- TODO fixup if we see that unboxing around error is still a problem
   , Just (tc, tc_args, co) <- normSplitTyConApp_maybe fam_envs ty
   , Just dc <- tyConSingleAlgDataCon_maybe tc
   , let arity = dataConRepArity dc
-  -- See Note [Unpacking arguments with product and polymorphic demands]
-  , Just cs <- split_prod_dmd_arity dmd arity
+  , Just (Unboxed, cs) <- viewProd arity sd
   -- See Note [Do not unpack class dictionaries]
   , inlineable_flag == NotArgOfInlineableFun || not (isClassPred ty)
   -- See Note [mkWWstr and unsafeCoerce]
   , cs `lengthIs` arity
   -- See Note [Add demands for strict constructors]
   , let cs' = addDataConStrictness dc cs
-  = Unbox (DataConPatContext dc tc_args co) cs'
+  = -- pprTrace "wantToUnboxArg:Unbox" (ppr ty $$ ppr dmd $$ ppr cs') $
+    Unbox (DataConPatContext dc tc_args co) cs'
 
   | otherwise
   = StopUnboxing
-
-  where
-    split_prod_dmd_arity dmd arity
-      -- For seqDmd, it should behave like <S(AAAA)>, for some
-      -- suitable arity
-      | isSeqDmd dmd        = Just (replicate arity absDmd)
-      | _ :* Prod ds <- dmd = Just ds
-      | otherwise           = Nothing
 
 addDataConStrictness :: DataCon -> [Demand] -> [Demand]
 -- See Note [Add demands for strict constructors]
@@ -784,7 +778,7 @@ Consider this program (due to Roman):
     data X a = X !a
 
     foo :: X Int -> Int -> Int
-    foo (X a) n = go 0
+    foo x@(X a) n = go 0
      where
        go i | i < n     = a + go (i+1)
             | otherwise = 0
@@ -806,22 +800,24 @@ because the seq is discarded (very early) since X is strict!
 
 So here's what we do
 
-* We leave the demand-analysis alone.  The demand on 'a' in the
-  definition of 'foo' is <L, U(U)>; the strictness info is Lazy
-  because foo's body may or may not evaluate 'a'; but the usage info
-  says that 'a' is unpacked and its content is used.
+* We leave the demand analysis alone, but account for the additional strictness
+  and boxity in 'annotateLamIdBndr'.  So we infer the demand on 'a' in the
+  definition of 'foo' as 'L!P(L)'; meaning it's used lazily but unboxed. And
+  that is what we annotate its case binder with!
+  But when we finalise the annotation on the lambda binder 'x', we call
+  'finaliseBoxity' on its demand '1!P(L!P(L))' and see that 'X's field is
+  strict, bump up its demand to '1!P(L)', anticipating that worker/wrapper will
+  unbox it (see next point).
 
-* During worker/wrapper, if we unpack a strict constructor (as we do
-  for 'foo'), we use 'addDataConStrictness' to bump up the strictness on
-  the strict arguments of the data constructor.
+* During worker/wrapper, if 'wantToUnboxArg' decides to unpack a strict
+  constructor (as it does for 'x'), we use 'addDataConStrictness' to bump up the
+  strictness on the strict arguments of the data constructor.
 
-* That in turn means that, if the usage info supports doing so
-  (i.e. splitProdDmd_maybe returns Just), we will unpack that argument
-  -- even though the original demand (e.g. on 'a') was lazy.
+* That in turn means that, if the boxity info supports doing so, we will unpack
+  that argument -- even though the original demand (e.g. on 'a') was lazy.
 
 * What does "bump up the strictness" mean?  Just add a head-strict
-  demand to the strictness!  Even for a demand like <L,A> we can
-  safely turn it into <S,A>; remember case (1) of
+  demand to the strictness!  See 'strictifyDmd' and remember case (1) of
   Note [Worker/wrapper for Strictness and Absence].
 
 The net effect is that the w/w transformation is more aggressive about
@@ -833,7 +829,7 @@ if X is monomorphic, and has an UNPACK pragma, then this optimisation
 is even more important.  We don't want the wrapper to rebox an unboxed
 argument, and pass an Int to $wfoo!
 
-This works in nested situations like
+This works in nested situations like T10482
 
     data family Bar a
     data instance Bar (a, b) = BarPair !(Bar a) !(Bar b)
@@ -1292,6 +1288,25 @@ findTypeShape fam_envs ty
 
        | otherwise
        = TsUnk
+
+-- | This function does two things:
+--
+--   * It makes sure that the demand only says 'Unboxed' when worker/wrapper
+--     will actually unbox
+--   * It strictens demands on strict fields if doing so allows to retain
+--     an 'Unboxed' annotation. That's the right thing to do, because after
+--     worker/wrapper, the function will actually be that strict (unboxing
+--     implies call by value).
+--     See Note [Add demands for strict constructors].
+--
+finaliseBoxity :: FamInstEnvs -> Type -> Demand -> Demand
+finaliseBoxity env ty dmd = case wantToUnboxArg env NotArgOfInlineableFun ty dmd of
+  DropAbsent    -> dmd
+  Unbox dcpc ds
+    | let arg_tys = dubiousDataConInstArgTys (dcpc_dc dcpc) (dcpc_tc_args dcpc)
+    , n :* _ <- dmd
+    -> n :* (mkProd Unboxed $! strictZipWith (finaliseBoxity env) arg_tys ds)
+  _ -> trimBoxity dmd
 
 -- | Exactly 'dataConInstArgTys', but lacks the (ASSERT'ed) precondition that
 -- the 'DataCon' may not have existentials. The lack of cloning the existentials
