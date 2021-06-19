@@ -405,11 +405,8 @@ mkErrorAppDs :: Id              -- The error function
 mkErrorAppDs err_id ty msg = do
     src_loc <- getSrcSpanDs
     dflags <- getDynFlags
-    let
-        full_msg = showSDoc dflags (hcat [ppr src_loc, vbar, msg])
-        core_msg = Lit (mkLitString full_msg)
-        -- mkLitString returns a result of type String#
-    return (mkApps (Var err_id) [Type (getRuntimeRep ty), Type ty, core_msg])
+    let full_msg = showSDoc dflags (hcat [ppr src_loc, vbar, msg])
+    return (mkRuntimeErrorApp err_id ty full_msg)
 
 {-
 Note [Incompleteness and linearity]
