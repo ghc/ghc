@@ -1,5 +1,9 @@
 # Changelog for `ghc-bignum` package
 
+## 1.2
+
+- Moved naturalToDouble# and naturalToFloat# to `base` package
+
 ## 1.1
 
 - Moved integerToDouble# and integerToFloat# to `base` package with fixed
