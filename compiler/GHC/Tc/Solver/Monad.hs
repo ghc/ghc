@@ -1208,6 +1208,7 @@ instance Applicative TcS where
   (<*>) = ap
 
 instance Monad TcS where
+  {-# INLINE (>>=) #-}
   m >>= k   = mkTcS $ \ebs -> do
     unTcS m ebs >>= (\r -> unTcS (k r) ebs)
 

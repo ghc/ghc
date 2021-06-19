@@ -66,6 +66,7 @@ mkRewriteM f = RewriteM (oneShot f)
 {-# INLINE mkRewriteM #-}
 
 instance Monad RewriteM where
+  {-# INLINE (>>=) #-}
   m >>= k  = mkRewriteM $ \env ->
              do { a  <- runRewriteM m env
                 ; runRewriteM (k a) env }
