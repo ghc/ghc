@@ -1393,6 +1393,8 @@ instance Applicative UM where
       (<*>)  = ap
 
 instance Monad UM where
+  {-# INLINE (>>=) #-}
+  -- See Note [INLINE pragmas and (>>)] in GHC.Utils.Monad
   m >>= k  = UM (\state ->
                   do { (state', v) <- unUM m state
                      ; unUM (k v) state' })
