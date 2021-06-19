@@ -1,6 +1,5 @@
 {-# LANGUAGE RebindableSyntax, NPlusKPatterns, FlexibleInstances,
              MultiParamTypeClasses, FunctionalDependencies #-}
-{-# OPTIONS -Wno-error=missing-monadfail-instances #-}
 
 module Main where
         {
