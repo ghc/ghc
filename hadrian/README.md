@@ -106,8 +106,7 @@ Stage2 GHC.
 
 * `--skip-depends`: skips rebuilding Haskell module dependency files.
 
-* `--integer-simple`: build GHC using the `integer-simple` integer library
-(instead of `integer-gmp`).
+* `--bignum={native,gmp,check-gmp,ffi}`: choose which bignum implementation to use. The default is `gmp`.
 
 * `--color` and `--no-color`: choose whether to use colors when printing build
 progress info. By default, Hadrian tries to determine if the terminal supports
