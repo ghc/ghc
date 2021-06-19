@@ -195,6 +195,14 @@ def _reqlib( name, opts, lib ):
         for db in config.test_package_db:
             opts.extra_hc_opts = opts.extra_hc_opts + ' -package-db=' + db + ' '
 
+def req_tool( tool_name ):
+    '''Require a tool where 'tool_name' is the executable name in $PATH'''
+    return lambda name, opts, t=tool_name : _req_tool ( name, opts, t )
+
+def _req_tool( name, opts, tool_name ):
+    if not shutil.which(tool_name):
+        opts.expect = 'missing-tool'
+
 def req_haddock( name, opts ):
     if not config.haddock:
         opts.expect = 'missing-lib'
@@ -1178,7 +1186,7 @@ def do_test(name: TestName,
 
     result = func(*[name,way] + args)
 
-    if opts.expect not in ['pass', 'fail', 'missing-lib']:
+    if opts.expect not in ['pass', 'fail', 'missing-lib', 'missing-tool']:
         framework_fail(name, way, 'bad expected ' + opts.expect)
 
     directory = re.sub('^\\.[/\\\\]', '', str(opts.testdir))
@@ -1214,6 +1222,8 @@ def do_test(name: TestName,
         else:
             if opts.expect == 'missing-lib':
                 t.missing_libs.append(TestResult(directory, name, 'missing-lib', way))
+            elif opts.expect == 'missing-tool':
+                t.missing_tools.append(TestResult(directory, name, 'missing-tool', way))
             else:
                 t.n_expected_failures += 1
 
@@ -2645,6 +2655,8 @@ def summary(t: TestRun, file: TextIO, short=False, color=False) -> None:
                + '\n'
                + repr(len(t.missing_libs)).rjust(8)
                + ' had missing libraries\n'
+               + repr(len(t.missing_tools)).rjust(8)
+               + ' had missing tools\n'
                + repr(t.n_expected_passes).rjust(8)
                + ' expected passes\n'
                + repr(t.n_expected_failures).rjust(8)
