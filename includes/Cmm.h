@@ -584,7 +584,7 @@
 
 /* Debugging macros */
 #define LOOKS_LIKE_INFO_PTR(p)                                  \
-   ((p) != NULL &&                                              \
+   (!HEAP_ALLOCED(p) &&                                         \
     LOOKS_LIKE_INFO_PTR_NOT_NULL(p))
 
 #define LOOKS_LIKE_INFO_PTR_NOT_NULL(p)                         \
