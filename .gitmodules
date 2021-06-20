@@ -110,3 +110,6 @@
 [submodule "libraries/exceptions"]
 	path = libraries/exceptions
 	url = https://gitlab.haskell.org/ghc/packages/exceptions.git
+[submodule "libraries/network"]
+	path = libraries/network
+    url = https://gitlab.haskell.org/alinab/network.git
