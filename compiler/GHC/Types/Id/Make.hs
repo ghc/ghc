@@ -696,7 +696,7 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
   = return NoDataConRep
 
   | otherwise
-  = do { wrap_args <- mapM newLocal wrap_arg_tys
+  = do { wrap_args <- mapM (newLocal (fsLit "conrep")) wrap_arg_tys
        ; wrap_body <- mk_rep_app (wrap_args `zip` dropList eq_spec unboxers)
                                  initial_wrap_app
 
@@ -986,10 +986,15 @@ case of a newtype constructor, we simply hardcode its dcr_bangs field to
 -}
 
 -------------------------
-newLocal :: Scaled Type -> UniqSM Var
-newLocal (Scaled w ty) = do { uniq <- getUniqueM
-                            ; return (mkSysLocalOrCoVar (fsLit "dt") uniq w ty) }
-                 -- We should not have "OrCoVar" here, this is a bug (#17545)
+
+-- | Conjure a fresh local binder.
+newLocal :: FastString   -- ^ a string which will form part of the 'Var'\'s name
+         -> Scaled Type  -- ^ the type of the 'Var'
+         -> UniqSM Var
+newLocal name_stem (Scaled w ty) =
+    do { uniq <- getUniqueM
+       ; return (mkSysLocalOrCoVar name_stem uniq w ty) }
+         -- We should not have "OrCoVar" here, this is a bug (#17545)
 
 
 -- | Unpack/Strictness decisions from source module.
@@ -1072,18 +1077,20 @@ wrapCo :: Coercion -> Type -> (Unboxer, Boxer) -> (Unboxer, Boxer)
 wrapCo co rep_ty (unbox_rep, box_rep)  -- co :: arg_ty ~ rep_ty
   = (unboxer, boxer)
   where
-    unboxer arg_id = do { rep_id <- newLocal (Scaled (idMult arg_id) rep_ty)
+    unboxer arg_id = do { rep_id <- newLocal name_stem (Scaled (idMult arg_id) rep_ty)
                         ; (rep_ids, rep_fn) <- unbox_rep rep_id
                         ; let co_bind = NonRec rep_id (Var arg_id `Cast` co)
                         ; return (rep_ids, Let co_bind . rep_fn) }
     boxer = Boxer $ \ subst ->
             do { (rep_ids, rep_expr)
                     <- case box_rep of
-                         UnitBox -> do { rep_id <- newLocal (linear $ TcType.substTy subst rep_ty)
+                         UnitBox -> do { rep_id <- newLocal name_stem (linear $ TcType.substTy subst rep_ty)
                                        ; return ([rep_id], Var rep_id) }
                          Boxer boxer -> boxer subst
                ; let sco = substCoUnchecked subst co
                ; return (rep_ids, rep_expr `Cast` mkSymCo sco) }
+
+    name_stem = fsLit "cowrap"
 
 ------------------------
 seqUnboxer :: Unboxer
@@ -1112,7 +1119,7 @@ dataConArgUnpack (Scaled arg_mult arg_ty)
       -- Note [Unpacking GADTs and existentials]
     ( rep_tys `zip` dataConRepStrictness con
     ,( \ arg_id ->
-       do { rep_ids <- mapM newLocal rep_tys
+       do { rep_ids <- mapM (newLocal (fsLit "unbx")) rep_tys
           ; let r_mult = idMult arg_id
           ; let rep_ids' = map (scaleIdBy r_mult) rep_ids
           ; let unbox_fn body
@@ -1120,7 +1127,7 @@ dataConArgUnpack (Scaled arg_mult arg_ty)
                              (DataAlt con) rep_ids' body
           ; return (rep_ids, unbox_fn) }
      , Boxer $ \ subst ->
-       do { rep_ids <- mapM (newLocal . TcType.substScaledTyUnchecked subst) rep_tys
+       do { rep_ids <- mapM (newLocal (fsLit "bx") . TcType.substScaledTyUnchecked subst) rep_tys
           ; return (rep_ids, Var (dataConWorkId con)
                              `mkTyApps` (substTysUnchecked subst tc_args)
                              `mkVarApps` rep_ids ) } ) )
