@@ -2,7 +2,7 @@ variables:
   GIT_SSL_NO_VERIFY: "1"
 
   # Commit of ghc/ci-images repository from which to pull Docker images
-  DOCKER_REV: 853f348f9caf38b08740b280296fbd34e09abb3a
+  DOCKER_REV: 887b73248d37a10a93e7a7ce0dcbcf77df2ab3b5
 
   # Sequential version number capturing the versions of all tools fetched by
   # .gitlab/ci.sh. Used for invalidation of GitLab CI cache.
@@ -113,7 +113,7 @@ workflow:
 
 ghc-linters:
   stage: tool-lint
-  image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/supersven/ci-images/linters:$DOCKER_REV"
   script:
     - git fetch "$CI_MERGE_REQUEST_PROJECT_URL" $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
     - base="$(git merge-base FETCH_HEAD $CI_COMMIT_SHA)"
@@ -133,7 +133,7 @@ ghc-linters:
 # Run mypy Python typechecker on linter scripts.
 lint-linters:
   stage: tool-lint
-  image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/supersven/ci-images/linters:$DOCKER_REV"
   script:
     - mypy .gitlab/linters/*.py
   dependencies: []
@@ -143,7 +143,7 @@ lint-linters:
 # Check that .T files all parse by listing broken tests.
 lint-testsuite:
   stage: tool-lint
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/supersven/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   script:
     - make -Ctestsuite list_broken TEST_HC=$GHC
   dependencies: []
@@ -153,7 +153,7 @@ lint-testsuite:
 # Run mypy Python typechecker on testsuite driver
 typecheck-testsuite:
   stage: tool-lint
-  image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/supersven/ci-images/linters:$DOCKER_REV"
   script:
     - mypy testsuite/driver/runtests.py
   dependencies: []
@@ -165,7 +165,7 @@ typecheck-testsuite:
 # Marge jobs.
 .lint-submods:
   stage: tool-lint
-  image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/supersven/ci-images/linters:$DOCKER_REV"
   script:
     - git fetch "$CI_MERGE_REQUEST_PROJECT_URL" $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
     - base="$(git merge-base FETCH_HEAD $CI_COMMIT_SHA)"
@@ -197,7 +197,7 @@ lint-submods-branch:
 
 .lint-changelogs:
   stage: tool-lint
-  image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/supersven/ci-images/linters:$DOCKER_REV"
   dependencies: []
   tags:
     - lint
@@ -244,7 +244,7 @@ lint-release-changelogs:
 
 .validate-linux-hadrian:
   extends: .validate-hadrian
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/supersven/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   variables:
     TEST_ENV: "x86_64-linux-deb9-hadrian"
     BIN_DIST_NAME: "ghc-x86_64-deb9-linux"
@@ -285,7 +285,7 @@ validate-x86_64-linux-deb9-unreg-hadrian:
 
 .build-x86_64-linux-deb10-hadrian-cross-aarch64:
   extends: .validate-linux-hadrian
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/supersven/ci-images/x86_64-linux-deb10:$DOCKER_REV"
   variables:
     BIN_DIST_NAME: "ghc-x86_64-deb9-linux"
     CONFIGURE_ARGS: --with-intree-gmp
@@ -310,7 +310,7 @@ nightly-x86_64-linux-deb10-hadrian-cross-aarch64:
 hadrian-ghc-in-ghci:
   stage: quick-build
   needs: [lint-linters, lint-submods]
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/supersven/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   before_script:
     # workaround for docker permissions
     - sudo chown ghc:ghc -R .
@@ -344,7 +344,7 @@ hadrian-ghc-in-ghci:
   needs: [lint-submods]
   tags:
     - lint
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/supersven/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   before_script:
     - export PATH="/opt/toolchain/bin:$PATH"
     # workaround for docker permissions
@@ -731,7 +731,7 @@ validate-aarch64-darwin:
 .build-aarch64-linux-deb10:
   extends: .validate-linux
   stage: full-build
-  image: "registry.gitlab.haskell.org/ghc/ci-images/aarch64-linux-deb10:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/supersven/ci-images/aarch64-linux-deb10:$DOCKER_REV"
   allow_failure: true
   variables:
     TEST_ENV: "aarch64-linux-deb10"
@@ -784,7 +784,7 @@ validate-aarch64-linux-deb10-llvm:
 .build-armv7-linux-deb10:
   extends: .validate-linux
   stage: full-build
-  image: "registry.gitlab.haskell.org/ghc/ci-images/armv7-linux-deb10:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/supersven/ci-images/armv7-linux-deb10:$DOCKER_REV"
   # Due to linker issues
   allow_failure: true
   variables:
@@ -820,7 +820,7 @@ nightly-armv7-linux-deb10:
 .build-i386-linux-deb9:
   extends: .validate-linux
   stage: full-build
-  image: "registry.gitlab.haskell.org/ghc/ci-images/i386-linux-deb9:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/supersven/ci-images/i386-linux-deb9:$DOCKER_REV"
   variables:
     TEST_ENV: "i386-linux-deb9"
     BIN_DIST_PREP_TAR_COMP: "ghc-i386-deb9-linux.tar.xz"
@@ -845,7 +845,7 @@ nightly-i386-linux-deb9:
 
 .build-x86_64-linux-deb9:
   extends: .validate-linux
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/supersven/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   variables:
     TEST_ENV: "x86_64-linux-deb9"
     BIN_DIST_PREP_TAR_COMP: "./ghc-x86_64-deb9-linux.tar.xz"
@@ -942,7 +942,7 @@ validate-x86_64-linux-deb9-dwarf:
 .build-x86_64-linux-deb10:
   extends: .validate-linux
   stage: full-build
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/supersven/ci-images/x86_64-linux-deb10:$DOCKER_REV"
   variables:
     TEST_ENV: "x86_64-linux-deb10"
     BIN_DIST_PREP_TAR_COMP: "./ghc-x86_64-deb10-linux.tar.xz"
@@ -1001,7 +1001,7 @@ nightly-x86_64-linux-deb10-llvm:
 .build-x86_64-linux-ubuntu2004:
   extends: .validate-linux
   stage: full-build
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-ubuntu20_04:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/supersven/ci-images/x86_64-linux-ubuntu20_04:$DOCKER_REV"
   variables:
     TEST_ENV: "x86_64-linux-ubuntu2004"
     BIN_DIST_PREP_TAR_COMP: "./ghc-x86_64-ubuntu2004-linux.tar.xz"
@@ -1030,7 +1030,7 @@ release-x86_64-linux-ubuntu2004:
 .build-x86_64-linux-alpine-hadrian:
   extends: .validate-linux-hadrian
   stage: full-build
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine3_12:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/supersven/ci-images/x86_64-linux-alpine3_12:$DOCKER_REV"
   # There are currently a few failing tests
   allow_failure: true
   variables:
@@ -1073,7 +1073,7 @@ nightly-x86_64-linux-alpine:
 .build-x86_64-linux-centos7:
   extends: .validate-linux
   stage: full-build
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-centos7:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/supersven/ci-images/x86_64-linux-centos7:$DOCKER_REV"
   variables:
     # The sphinx release shipped with Centos 7 fails to build out documentation
     BUILD_SPHINX_HTML: "NO"
@@ -1097,7 +1097,7 @@ release-x86_64-linux-centos7:
 .build-x86_64-linux-fedora27:
   extends: .validate-linux
   stage: full-build
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora27:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/supersven/ci-images/x86_64-linux-fedora27:$DOCKER_REV"
   variables:
     # LLVM 10 is not available for Fedora27
     LLC: /bin/false
@@ -1260,7 +1260,7 @@ doc-tarball:
   needs: [validate-x86_64-linux-deb9-debug, validate-x86_64-windows-hadrian, validate-x86_64-linux-deb9-unreg-hadrian]
   tags:
     - x86_64-linux
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/supersven/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   dependencies:
     - validate-x86_64-linux-deb9-debug
     - validate-x86_64-windows-hadrian
@@ -1294,7 +1294,7 @@ source-tarball:
   needs: [validate-x86_64-linux-deb9-unreg-hadrian]
   tags:
     - x86_64-linux
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/supersven/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   dependencies: []
   rules:
     - if: $CI_COMMIT_TAG
@@ -1363,7 +1363,7 @@ perf-nofib:
   needs: [validate-x86_64-linux-deb9-dwarf, doc-tarball]
   dependencies:
     - validate-x86_64-linux-deb9-dwarf
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/supersven/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   rules:
     - if: $CI_MERGE_REQUEST_ID
     - if: '$CI_COMMIT_BRANCH == "master"'
@@ -1402,7 +1402,7 @@ perf:
   needs: [validate-x86_64-linux-deb9-dwarf, doc-tarball]
   dependencies:
     - validate-x86_64-linux-deb9-dwarf
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/supersven/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   rules:
     - if: $CI_MERGE_REQUEST_ID
     - if: '$CI_COMMIT_BRANCH == "master"'
