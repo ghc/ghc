@@ -405,11 +405,10 @@ mkErrorAppDs :: Id              -- The error function
 mkErrorAppDs err_id ty msg = do
     src_loc <- getSrcSpanDs
     dflags <- getDynFlags
-    let
-        full_msg = showSDoc dflags (hcat [ppr src_loc, vbar, msg])
-        core_msg = Lit (mkLitString full_msg)
-        -- mkLitString returns a result of type String#
-    return (mkApps (Var err_id) [Type (getRuntimeRep ty), Type ty, core_msg])
+    let full_msg = showSDoc dflags (hcat [ppr src_loc, vbar, msg])
+        fail_expr = mkRuntimeErrorApp err_id unitTy full_msg
+    return $ mkWildCase fail_expr (unrestricted unitTy) ty []
+    -- See Note [Incompleteness and linearity]
 
 {-
 Note [Incompleteness and linearity]
@@ -426,7 +425,7 @@ the linearity of x.
 Instead, we use 'f x False = case error "Non-exhausive pattern..." :: () of {}'.
 This case expression accounts for linear variables by assigning bottom usage
 (See Note [Bottom as a usage] in GHC.Core.Multiplicity).
-This is done in mkFailExpr.
+This is done in mkErrorAppDs, called from mkFailExpr.
 We use '()' instead of the original return type ('a' in this case)
 because there might be representation polymorphism, e.g. in
 
@@ -458,9 +457,7 @@ is disabled.
 
 mkFailExpr :: HsMatchContext GhcRn -> Type -> DsM CoreExpr
 mkFailExpr ctxt ty
-  = do fail_expr <- mkErrorAppDs pAT_ERROR_ID unitTy (matchContextErrString ctxt)
-       return $ mkWildCase fail_expr (unrestricted unitTy) ty []
-       -- See Note [Incompleteness and linearity]
+  = mkErrorAppDs pAT_ERROR_ID ty (matchContextErrString ctxt)
 
 {-
 'mkCoreAppDs' and 'mkCoreAppsDs' handle the special-case desugaring of 'seq'.
