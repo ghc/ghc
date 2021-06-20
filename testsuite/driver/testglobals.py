@@ -259,6 +259,7 @@ class TestRun:
        self.n_expected_failures = 0
 
        self.missing_libs = [] # type: List[TestResult]
+       self.missing_tools = [] # type: List[TestResult]
        self.framework_failures = [] # type: List[TestResult]
        self.framework_warnings = [] # type: List[TestResult]
 
