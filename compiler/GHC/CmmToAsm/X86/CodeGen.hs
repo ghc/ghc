@@ -3471,24 +3471,9 @@ genSwitch expr targets = do
         let op = OpAddr (AddrBaseIndex (EABaseReg tableReg)
                                        (EAIndex reg (platformWordSizeInBytes platform)) (ImmInt 0))
 
-        offsetReg <- getNewRegNat (intFormat (platformWordWidth platform))
-        return $ if is32bit || os == OSDarwin
-                 then e_code `appOL` t_code `appOL` toOL [
+        return $ e_code `appOL` t_code `appOL` toOL [
                                 ADD (intFormat (platformWordWidth platform)) op (OpReg tableReg),
                                 JMP_TBL (OpReg tableReg) ids rosection lbl
-                       ]
-                 else -- HACK: On x86_64 binutils<2.17 is only able to generate
-                      -- PC32 relocations, hence we only get 32-bit offsets in
-                      -- the jump table. As these offsets are always negative
-                      -- we need to properly sign extend them to 64-bit. This
-                      -- hack should be removed in conjunction with the hack in
-                      -- PprMach.hs/pprDataItem once binutils 2.17 is standard.
-                      e_code `appOL` t_code `appOL` toOL [
-                               MOVSxL II32 op (OpReg offsetReg),
-                               ADD (intFormat (platformWordWidth platform))
-                                   (OpReg offsetReg)
-                                   (OpReg tableReg),
-                               JMP_TBL (OpReg tableReg) ids rosection lbl
                        ]
   else do
         (reg,e_code) <- getSomeReg (cmmOffset platform expr offset)
