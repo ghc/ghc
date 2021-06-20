@@ -112,4 +112,4 @@
 	url = https://gitlab.haskell.org/ghc/packages/exceptions.git
 [submodule "libraries/network"]
 	path = libraries/network
-	url = git@github.com:haskell/network.git
+    url = https://gitlab.haskell.org/alinab/network.git
