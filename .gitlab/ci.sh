@@ -309,6 +309,8 @@ EOF
 
   info "build.mk is:"
   cat mk/build.mk
+  info "INTEGER_LIBRARY is:"
+  make show! VALUE=INTEGER_LIBRARY
 }
 
 function configure() {
