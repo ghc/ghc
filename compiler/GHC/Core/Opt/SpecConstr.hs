@@ -21,14 +21,15 @@ module GHC.Core.Opt.SpecConstr(
 
 import GHC.Prelude
 
+import GHC.Driver.Session ( DynFlags(..), GeneralFlag( Opt_SpecConstrKeen )
+                          , gopt, hasPprDebug )
+
 import GHC.Core
 import GHC.Core.Subst
 import GHC.Core.Utils
 import GHC.Core.Unfold
 import GHC.Core.FVs     ( exprsFreeVarsList )
 import GHC.Core.Opt.Monad
-import GHC.Types.Literal ( litIsLifted )
-import GHC.Unit.Module.ModGuts
 import GHC.Core.Opt.WorkWrap.Utils ( isWorkerSmallEnough, mkWorkerArgs )
 import GHC.Core.DataCon
 import GHC.Core.Coercion hiding( substCo )
@@ -36,35 +37,42 @@ import GHC.Core.Rules
 import GHC.Core.Type     hiding ( substTy )
 import GHC.Core.TyCon   (TyCon, tyConUnique, tyConName )
 import GHC.Core.Multiplicity
-import GHC.Types.Id
 import GHC.Core.Ppr     ( pprParendExpr )
 import GHC.Core.Make    ( mkImpossibleExpr )
+
+import GHC.Unit.Module
+import GHC.Unit.Module.ModGuts
+
+import GHC.Types.Literal ( litIsLifted )
+import GHC.Types.Id
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Name
 import GHC.Types.Tickish
 import GHC.Types.Basic
-import GHC.Driver.Session ( DynFlags(..), GeneralFlag( Opt_SpecConstrKeen )
-                          , gopt, hasPprDebug )
-import GHC.Driver.Ppr
-import GHC.Data.Maybe     ( orElse, catMaybes, isJust, isNothing )
 import GHC.Types.Demand
 import GHC.Types.Cpr
-import GHC.Serialized   ( deserializeWithData )
-import GHC.Utils.Misc
-import GHC.Data.Pair
 import GHC.Types.Unique.Supply
+import GHC.Types.Unique.FM
+
+import GHC.Data.Maybe     ( orElse, catMaybes, isJust, isNothing )
+import GHC.Data.Pair
+import GHC.Data.FastString
+
+import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Constants (debugIsOn)
-import GHC.Data.FastString
-import GHC.Types.Unique.FM
 import GHC.Utils.Monad
+import GHC.Utils.Trace
+
+import GHC.Builtin.Names ( specTyConKey )
+
+import GHC.Exts( SpecConstrAnnotation(..) )
+import GHC.Serialized   ( deserializeWithData )
+
 import Control.Monad    ( zipWithM )
 import Data.List (nubBy, sortBy, partition, dropWhileEnd, mapAccumL )
-import GHC.Builtin.Names ( specTyConKey )
-import GHC.Unit.Module
-import GHC.Exts( SpecConstrAnnotation(..) )
 import Data.Ord( comparing )
 
 {-

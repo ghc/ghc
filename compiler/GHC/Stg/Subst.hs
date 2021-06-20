@@ -11,8 +11,7 @@ import GHC.Utils.Monad.State.Strict
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
-
-import GHC.Driver.Ppr
+import GHC.Utils.Trace
 
 -- | A renaming substitution from 'Id's to 'Id's. Like 'RnEnv2', but not
 -- maintaining pairs of substitutions. Like 'GHC.Core.Subst.Subst', but
