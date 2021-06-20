@@ -844,11 +844,11 @@ of ``-W(no-)*``.
     :since: 9.2
 
     Template Haskell quotes referring to local variables bound outside
-    of the quote are implicitly converted to use ``lift`. For example,
+    of the quote are implicitly converted to use ``lift``. For example,
     ``f x = [| reverse x |]`` becomes ``f x = [| reverse $(lift x) |])``.
     This flag issues a warning for every such implicit addition of ``lift``.
     This can be useful when debugging more complex staged programs,
-    where an implicit `lift`` can accidentally conceal a variable
+    where an implicit ``lift`` can accidentally conceal a variable
     used at a wrong stage.
 
 .. ghc-flag:: -Wimplicit-prelude
