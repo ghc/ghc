@@ -4,9 +4,10 @@
 
 SRC_HC_OPTS        = -O -H64m
 GhcStage1HcOpts    = -O2
-GhcStage2HcOpts    = -O2 -g3
-GhcRtsHcOpts       = -O2 -g3
-GhcLibHcOpts       = -O2 -g3
+# These optimization settings should match the valide ones.
+GhcStage2HcOpts    = -O -g3
+GhcRtsHcOpts       = -O -g3
+GhcLibHcOpts       = -O -g3
 BUILD_PROF_LIBS    = YES
 #SplitObjs
 #HADDOCK_DOCS
