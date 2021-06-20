@@ -33,7 +33,7 @@ evDelayedError ty msg
     let fail_expr = mkRuntimeErrorApp tYPE_ERROR_ID unitTy msg
     in mkWildCase fail_expr (unrestricted unitTy) ty []
        -- See Note [Incompleteness and linearity] in GHC.HsToCore.Utils
-       -- c.f. mkFailExpr in GHC.HsToCore.Utils
+       -- c.f. mkErrorAppDs in GHC.HsToCore.Utils
 
 -- Dictionary for CallStack implicit parameters
 evCallStack :: (MonadThings m, HasModule m, HasDynFlags m) =>
