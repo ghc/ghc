@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE GADTs #-}
 -- | The CompPipeline monad and associated ops
 --
 -- Defined in separate module so that it can safely be imported from Hooks
@@ -57,6 +58,9 @@ instance Monad CompPipeline where
 instance MonadIO CompPipeline where
     liftIO m = P $ \_env state -> do a <- m; return (state, a)
 
+
+
+
 data PhasePlus = RealPhase Phase
                -- | Runs the pipeline post typechecking, till the end
                | HscPostTc ModSummary FrontendResult (Messages GhcMessage) (Maybe Fingerprint)
@@ -75,7 +79,7 @@ instance Outputable PhasePlus where
 
 -- PipeEnv: invariant information passed down
 data PipeEnv = PipeEnv {
-       stop_phase   :: Phase,       -- ^ Stop just before this phase
+       stop_phase   :: StopPhase,       -- ^ Stop just before this phase
        src_filename :: String,      -- ^ basename of original input source
        src_basename :: String,      -- ^ basename of original input source
        src_suffix   :: String,      -- ^ its extension
