@@ -42,10 +42,10 @@ default:
   interruptible: true
 
 stages:
+  - full-build  # Build all the things
   - lint        # Source linting
   - quick-build # A very quick smoke-test to weed out broken commits
   - build       # A quick smoke-test to weed out broken commits
-  - full-build  # Build all the things
   - packaging   # Source distribution, etc.
   - testing     # head.hackage correctness and compiler performance testing
   - deploy      # push documentation

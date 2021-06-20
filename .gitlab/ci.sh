@@ -283,11 +283,11 @@ function prepare_build_mk() {
 
   cat > mk/build.mk <<EOF
 V=1
-HADDOCK_DOCS=YES
-LATEX_DOCS=YES
-HSCOLOUR_SRCS=YES
-BUILD_SPHINX_HTML=$BUILD_SPHINX_HTML
-BUILD_SPHINX_PDF=$BUILD_SPHINX_PDF
+HADDOCK_DOCS=NO
+LATEX_DOCS=NO
+HSCOLOUR_SRCS=NO
+BUILD_SPHINX_HTML=NO
+BUILD_SPHINX_PDF=NO
 BeConservative=YES
 INTEGER_LIBRARY=$INTEGER_LIBRARY
 
@@ -309,6 +309,8 @@ EOF
 
   info "build.mk is:"
   cat mk/build.mk
+  info "INTEGER_LIBRARY is:"
+  make show! VALUE=INTEGER_LIBRARY
 }
 
 function configure() {
@@ -346,6 +348,10 @@ function build_make() {
 
   echo "include mk/flavours/${BUILD_FLAVOUR}.mk" > mk/build.mk
   echo 'GhcLibHcOpts+=-haddock' >> mk/build.mk
+  info "build.mk is:"
+  cat mk/build.mk
+  info "INTEGER_LIBRARY is:"
+  make show! VALUE=INTEGER_LIBRARY
   run "$MAKE" -j"$cores" $MAKE_ARGS
   run "$MAKE" -j"$cores" binary-dist-prep TAR_COMP_OPTS=-1
   ls -lh "$BIN_DIST_PREP_TAR_COMP"
