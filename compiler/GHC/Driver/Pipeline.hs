@@ -1492,7 +1492,7 @@ preprocessPipeline pipe_env hsc_env input_fn = do
       use (T_Unlit pipe_env hsc_env input_fn)
 
 
-  (dflags1, _) <- use (T_FileArgs hsc_env unlit_fn)
+  (dflags1, warns1) <- use (T_FileArgs hsc_env unlit_fn)
   let hsc_env1 = hscSetFlags dflags1 hsc_env
 
   (cpp_fn, hsc_env2)
@@ -1506,11 +1506,16 @@ preprocessPipeline pipe_env hsc_env input_fn = do
   pp_fn <- runAfterFlag hsc_env2 (HsPp HsSrcFile) (gopt Opt_Pp) cpp_fn $
             use (T_HsPp pipe_env hsc_env2 input_fn cpp_fn)
 
-  -- Reparse with original hsc_env so that we don't get duplicated options
-  (dflags3, warns3) <- use (T_FileArgs hsc_env pp_fn)
+  (dflags3, warns3)
+    <- if pp_fn == unlit_fn
+          -- Didn't run any preprocessors so don't need to reparse, would be nicer
+          -- if `T_FileArgs` recognised this.
+          then return (dflags1, warns1)
+          else do
+            -- Reparse with original hsc_env so that we don't get duplicated options
+            use (T_FileArgs hsc_env pp_fn)
 
   use (T_IO (handleFlagWarnings (hsc_logger hsc_env) dflags3 warns3))
-
   return (dflags3, pp_fn)
 
 
