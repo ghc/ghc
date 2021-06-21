@@ -31,15 +31,16 @@ where
 
 import GHC.Prelude
 
-import GHC.Driver.Ppr
+import GHC.Driver.Session ( DynFlags, GeneralFlag(..), gopt )
 
 import GHC.Core
 import GHC.Core.FVs
 import GHC.Core.Utils
-import GHC.Types.Demand
-import GHC.Types.Var
-import GHC.Types.Var.Env
-import GHC.Types.Id
+import GHC.Core.DataCon
+import GHC.Core.TyCon     ( tyConArity )
+import GHC.Core.TyCon.RecWalk     ( initRecTc, checkRecTc )
+import GHC.Core.Predicate ( isDictTy )
+import GHC.Core.Multiplicity
 
 -- We have two sorts of substitution:
 --   GHC.Core.Subst.Subst, and GHC.Core.TyCo.TCvSubst
@@ -48,22 +49,23 @@ import GHC.Core.Subst    as Core
 import GHC.Core.Type     as Type
 import GHC.Core.Coercion as Type
 
-import GHC.Core.DataCon
-import GHC.Core.TyCon     ( tyConArity )
-import GHC.Core.TyCon.RecWalk     ( initRecTc, checkRecTc )
-import GHC.Core.Predicate ( isDictTy )
-import GHC.Core.Multiplicity
+import GHC.Types.Demand
+import GHC.Types.Var
+import GHC.Types.Var.Env
+import GHC.Types.Id
 import GHC.Types.Var.Set
 import GHC.Types.Basic
 import GHC.Types.Tickish
+
 import GHC.Builtin.Uniques
-import GHC.Driver.Session ( DynFlags, GeneralFlag(..), gopt )
+import GHC.Data.FastString
+import GHC.Data.Pair
+
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
-import GHC.Data.FastString
-import GHC.Data.Pair
+import GHC.Utils.Trace
 import GHC.Utils.Misc
 
 {-

@@ -42,8 +42,6 @@ module GHC.Utils.Misc (
         isSingleton, only, expectOnly, GHC.Utils.Misc.singleton,
         notNull, snocView,
 
-        isIn, isn'tIn,
-
         chunkList,
 
         changeLast,
@@ -122,10 +120,6 @@ module GHC.Utils.Misc (
         -- * Call stacks
         HasCallStack,
         HasDebugCallStack,
-
-        -- * Utils for flags
-        OverridingBool(..),
-        overrideWith,
     ) where
 
 import GHC.Prelude
@@ -159,11 +153,6 @@ import qualified Data.IntMap as IM
 import qualified Data.Set as Set
 
 import Data.Time
-
-#if defined(DEBUG)
-import {-# SOURCE #-} GHC.Utils.Outputable ( text )
-import {-# SOURCE #-} GHC.Driver.Ppr ( warnPprTrace )
-#endif
 
 infixr 9 `thenCmp`
 
@@ -523,34 +512,6 @@ expectOnly _   [a]   = a
 expectOnly _   (a:_) = a
 #endif
 expectOnly msg _     = panic ("expectOnly: " ++ msg)
-
--- Debugging/specialising versions of \tr{elem} and \tr{notElem}
-
-# if !defined(DEBUG)
-isIn, isn'tIn :: Eq a => String -> a -> [a] -> Bool
-isIn    _msg x ys = x `elem` ys
-isn'tIn _msg x ys = x `notElem` ys
-
-# else /* DEBUG */
-isIn, isn'tIn :: (HasDebugCallStack, Eq a) => String -> a -> [a] -> Bool
-isIn msg x ys
-  = elem100 0 x ys
-  where
-    elem100 :: Eq a => Int -> a -> [a] -> Bool
-    elem100 _ _ [] = False
-    elem100 i x (y:ys)
-      | i > 100 = warnPprTrace True (text ("Over-long elem in " ++ msg)) (x `elem` (y:ys))
-      | otherwise = x == y || elem100 (i + 1) x ys
-
-isn'tIn msg x ys
-  = notElem100 0 x ys
-  where
-    notElem100 :: Eq a => Int -> a -> [a] -> Bool
-    notElem100 _ _ [] =  True
-    notElem100 i x (y:ys)
-      | i > 100 = warnPprTrace True (text ("Over-long notElem in " ++ msg)) (x `notElem` (y:ys))
-      | otherwise = x /= y && notElem100 (i + 1) x ys
-# endif /* DEBUG */
 
 
 -- | Split a list into chunks of /n/ elements
@@ -1486,14 +1447,3 @@ type HasDebugCallStack = HasCallStack
 #else
 type HasDebugCallStack = (() :: Constraint)
 #endif
-
-data OverridingBool
-  = Auto
-  | Always
-  | Never
-  deriving Show
-
-overrideWith :: Bool -> OverridingBool -> Bool
-overrideWith b Auto   = b
-overrideWith _ Always = True
-overrideWith _ Never  = False

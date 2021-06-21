@@ -77,8 +77,6 @@ module GHC.Core.Opt.SetLevels (
 
 import GHC.Prelude
 
-import GHC.Driver.Ppr
-
 import GHC.Core
 import GHC.Core.Opt.Monad ( FloatOutSwitches(..) )
 import GHC.Core.Utils   ( exprType, exprIsHNF
@@ -92,6 +90,10 @@ import GHC.Core.Opt.Arity   ( exprBotStrictness_maybe )
 import GHC.Core.FVs     -- all of it
 import GHC.Core.Subst
 import GHC.Core.Make    ( sortQuantVars )
+import GHC.Core.Type    ( Type, splitTyConApp_maybe, tyCoVarsOfType
+                        , mightBeUnliftedType, closeOverKindsDSet )
+import GHC.Core.Multiplicity     ( pattern Many )
+import GHC.Core.DataCon ( dataConOrigResTy )
 
 import GHC.Types.Id
 import GHC.Types.Id.Info
@@ -107,23 +109,24 @@ import GHC.Types.Name         ( getOccName, mkSystemVarName )
 import GHC.Types.Name.Occurrence ( occNameString )
 import GHC.Types.Unique       ( hasKey )
 import GHC.Types.Tickish      ( tickishIsCode )
-import GHC.Core.Type    ( Type, splitTyConApp_maybe, tyCoVarsOfType
-                        , mightBeUnliftedType, closeOverKindsDSet )
-import GHC.Core.Multiplicity     ( pattern Many )
+import GHC.Types.Unique.Supply
+import GHC.Types.Unique.DFM
 import GHC.Types.Basic  ( Arity, RecFlag(..), isRec )
-import GHC.Core.DataCon ( dataConOrigResTy )
+
 import GHC.Builtin.Types
 import GHC.Builtin.Names      ( runRWKey )
-import GHC.Types.Unique.Supply
+
+import GHC.Data.FastString
+
+import GHC.Utils.FV
+import GHC.Utils.Monad  ( mapAccumLM )
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
-import GHC.Data.FastString
-import GHC.Types.Unique.DFM
-import GHC.Utils.FV
+import GHC.Utils.Trace
+
 import Data.Maybe
-import GHC.Utils.Monad  ( mapAccumLM )
 
 {-
 ************************************************************************
