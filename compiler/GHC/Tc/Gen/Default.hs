@@ -14,6 +14,7 @@ import GHC.Hs
 import GHC.Core.Class
 import GHC.Core.Type ( typeKind )
 import GHC.Types.Var( tyVarKind )
+import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Env
 import GHC.Tc.Gen.HsType
@@ -22,6 +23,7 @@ import GHC.Tc.Solver
 import GHC.Tc.Validity
 import GHC.Tc.Utils.TcType
 import GHC.Builtin.Names
+import GHC.Types.Error
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -101,9 +103,10 @@ check_instance ty cls
 defaultDeclCtxt :: SDoc
 defaultDeclCtxt = text "When checking the types in a default declaration"
 
-dupDefaultDeclErr :: [LDefaultDecl GhcRn] -> SDoc
+dupDefaultDeclErr :: [LDefaultDecl GhcRn] -> TcRnMessage
 dupDefaultDeclErr (L _ (DefaultDecl _ _) : dup_things)
-  = hang (text "Multiple default declarations")
+  = TcRnUnknownMessage $ mkPlainError noHints $
+    hang (text "Multiple default declarations")
        2 (vcat (map pp dup_things))
   where
     pp :: LDefaultDecl GhcRn -> SDoc
@@ -111,7 +114,8 @@ dupDefaultDeclErr (L _ (DefaultDecl _ _) : dup_things)
       = text "here was another default declaration" <+> ppr (locA locn)
 dupDefaultDeclErr [] = panic "dupDefaultDeclErr []"
 
-badDefaultTy :: Type -> [Class] -> SDoc
+badDefaultTy :: Type -> [Class] -> TcRnMessage
 badDefaultTy ty deflt_clss
-  = hang (text "The default type" <+> quotes (ppr ty) <+> text "is not an instance of")
+  = TcRnUnknownMessage $ mkPlainError noHints $
+    hang (text "The default type" <+> quotes (ppr ty) <+> text "is not an instance of")
        2 (foldr1 (\a b -> a <+> text "or" <+> b) (map (quotes. ppr) deflt_clss))
