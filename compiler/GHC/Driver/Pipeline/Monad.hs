@@ -75,7 +75,7 @@ instance Outputable PhasePlus where
 
 -- PipeEnv: invariant information passed down
 data PipeEnv = PipeEnv {
-       stop_phase   :: Phase,       -- ^ Stop just before this phase
+       stop_phase   :: StopPhase,       -- ^ Stop just before this phase
        src_filename :: String,      -- ^ basename of original input source
        src_basename :: String,      -- ^ basename of original input source
        src_suffix   :: String,      -- ^ its extension
