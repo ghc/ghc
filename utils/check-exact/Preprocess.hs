@@ -59,29 +59,29 @@ defaultCppOptions = CppOptions [] [] []
 
 -- ---------------------------------------------------------------------
 -- | Remove GHC style line pragams (@{-# LINE .. #-}@) and convert them into comments.
-stripLinePragmas :: String -> (String, [Comment])
+stripLinePragmas :: String -> (String, [GHC.LEpaComment])
 stripLinePragmas = unlines' . unzip . findLines . lines
   where
     unlines' (a, b) = (unlines a, catMaybes b)
 
-findLines :: [String] -> [(String, Maybe Comment)]
+findLines :: [String] -> [(String, Maybe GHC.LEpaComment)]
 findLines = zipWith checkLine [1..]
 
-checkLine :: Int -> String -> (String, Maybe Comment)
+checkLine :: Int -> String -> (String, Maybe GHC.LEpaComment)
 checkLine line s
   |  "{-# LINE" `isPrefixOf` s =
        let (pragma, res) = getPragma s
            size   = length pragma
            mSrcLoc = mkSrcLoc (mkFastString "LINE")
            ss     = mkSrcSpan (mSrcLoc line 1) (mSrcLoc line (size+1))
-       in (res, Just $ mkComment pragma (GHC.spanAsAnchor ss))
+       in (res, Just $ mkLEpaComment pragma (GHC.spanAsAnchor ss))
   -- Deal with shebang/cpp directives too
   -- x |  "#" `isPrefixOf` s = ("",Just $ Comment ((line, 1), (line, length s)) s)
   |  "#!" `isPrefixOf` s =
     let mSrcLoc = mkSrcLoc (mkFastString "SHEBANG")
         ss = mkSrcSpan (mSrcLoc line 1) (mSrcLoc line (length s))
     in
-    ("",Just $ mkComment s (GHC.spanAsAnchor ss))
+    ("",Just $ mkLEpaComment s (GHC.spanAsAnchor ss))
   | otherwise = (s, Nothing)
 
 getPragma :: String -> (String, String)
@@ -100,7 +100,7 @@ getPragma s@(x:xs)
 getCppTokensAsComments :: GHC.GhcMonad m
                        => CppOptions  -- ^ Preprocessor Options
                        -> FilePath    -- ^ Path to source file
-                       -> m [Comment]
+                       -> m [GHC.LEpaComment]
 getCppTokensAsComments cppOptions sourceFile = do
   source <- GHC.liftIO $ GHC.hGetStringBuffer sourceFile
   let startLoc = GHC.mkRealSrcLoc (GHC.mkFastString sourceFile) 1 1
@@ -116,12 +116,16 @@ getCppTokensAsComments cppOptions sourceFile = do
                   let toks = GHC.addSourceToTokens startLoc source ts
                       cppCommentToks = getCppTokens directiveToks nonDirectiveToks toks
                   return $ filter goodComment
-                         $  map (tokComment . GHC.commentToAnnotation . toRealLocated . fst) cppCommentToks
+                         $  map (GHC.commentToAnnotation . toRealLocated . fst) cppCommentToks
         GHC.PFailed pst -> parseError pst
 
-goodComment :: Comment -> Bool
-goodComment (Comment "" _ _) = False
-goodComment _              = True
+
+goodComment :: GHC.LEpaComment -> Bool
+goodComment c = isGoodComment (tokComment c)
+  where
+    isGoodComment :: Comment -> Bool
+    isGoodComment (Comment "" _ _) = False
+    isGoodComment _              = True
 
 
 toRealLocated :: GHC.Located a -> GHC.RealLocated a
