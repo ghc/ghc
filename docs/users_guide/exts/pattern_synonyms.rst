@@ -198,9 +198,9 @@ constructor can be used.
 Usage                                     Example
 =======================================   ==================================
 As a constructor                          ``zero = Point 0 0``
-As a constructor with record syntax       ``zero = Point { x = 0, y = 0}``
+As a constructor with record syntax       ``zero = Point { x = 0, y = 0 }``
 In a pattern context                      ``isZero (Point 0 0) = True``
-In a pattern context with record syntax   ``isZero (Point { x = 0, y = 0 }``
+In a pattern context with record syntax   ``isZero (Point { x = 0, y = 0 }) = True``
 In a pattern context with field puns      ``getX (Point {x}) = x``
 In a record update                        ``(0, 0) { x = 1 } == (1,0)``
 Using record selectors                    ``x (0,0) == 0``
