@@ -9,7 +9,8 @@ COERCION AXIOMS
   axiom Roles4.N:C1 :: C1 a = a -> a
   axiom Roles4.N:C3 :: C3 a = a -> Syn1 a
 Dependent modules: []
-Dependent packages: [base-4.16.0.0]
+Dependent packages: [base-4.16.0.0, ghc-bignum-1.1, ghc-prim-0.8.0,
+                     rts-1.0.1]
 
 ==================== Typechecker ====================
 Roles4.$tcC3
