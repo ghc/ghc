@@ -568,10 +568,8 @@ fvsToEnv :: BCEnv -> CgStgRhs -> [Id]
 -- The code that constructs the thunk, and the code that executes
 -- it, have to agree about this layout
 
-fvsToEnv p (StgRhsClosure fvs _ _ _ _) =
-            [v | v <- dVarSetElems fvs,
-                 v `Map.member` p]
-fvsToEnv _ _ = []
+fvsToEnv p rhs =  [v | v <- dVarSetElems $ freeVarsOfRhs rhs,
+                       v `Map.member` p]
 
 -- -----------------------------------------------------------------------------
 -- schemeE
