@@ -77,6 +77,7 @@ module GHC.Unit.Types
 
    , isInteractiveModule
    , wiredInUnitIds
+   , wiredInUnitIds_always
 
      -- * Boot modules
    , IsBootInterface (..)
@@ -608,13 +609,14 @@ mainUnit = RealUnit (Definite mainUnitId)
 isInteractiveModule :: Module -> Bool
 isInteractiveModule mod = moduleUnit mod == interactiveUnit
 
+-- | Units which are always direct dependencies of a package
+wiredInUnitIds_always :: [UnitId]
+wiredInUnitIds_always = [ primUnitId, bignumUnitId, baseUnitId, rtsUnitId ]
+
 wiredInUnitIds :: [UnitId]
 wiredInUnitIds =
-   [ primUnitId
-   , bignumUnitId
-   , baseUnitId
-   , rtsUnitId
-   , thUnitId
+    wiredInUnitIds_always ++
+   [ thUnitId
    , thisGhcUnitId
    ]
 
