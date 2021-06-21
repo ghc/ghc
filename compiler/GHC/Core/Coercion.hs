@@ -755,8 +755,8 @@ mkTyConAppCo r tc cos
     mkFunCo r w co1 co2
 
                -- Expand type synonyms
-  | Just (tv_co_prs, rhs_ty, leftover_cos) <- expandSynTyCon_maybe tc cos
-  = mkAppCos (liftCoSubst r (mkLiftingContext tv_co_prs) rhs_ty) leftover_cos
+  | Just (tv_cos, tv_co_tys, rhs_ty, leftover_cos) <- expandSynTyCon_maybe tc cos
+  = mkAppCos (liftCoSubst r (mkLiftingContext tv_cos tv_co_tys) rhs_ty) leftover_cos
 
   | Just tys_roles <- traverse isReflCo_maybe cos
   = mkReflCo r (mkTyConApp tc (map fst tys_roles))
@@ -1902,13 +1902,13 @@ liftCoSubstWithEx :: Role          -- desired role for output coercion
                   -> [Type]        -- types and coercions to be bound to ex vars
                   -> (Type -> Coercion, [Type]) -- (lifting function, converted ex args)
 liftCoSubstWithEx role univs omegas exs rhos
-  = let theta = mkLiftingContext (zipEqual "liftCoSubstWithExU" univs omegas)
+  = let theta = mkLiftingContext univs omegas
         psi   = extendLiftingContextEx theta (zipEqual "liftCoSubstWithExX" exs rhos)
     in (ty_co_subst psi role, substTys (lcSubstRight psi) (mkTyCoVarTys exs))
 
 liftCoSubstWith :: Role -> [TyCoVar] -> [Coercion] -> Type -> Coercion
 liftCoSubstWith r tvs cos ty
-  = liftCoSubst r (mkLiftingContext $ zipEqual "liftCoSubstWith" tvs cos) ty
+  = liftCoSubst r (mkLiftingContext tvs cos) ty
 
 -- | @liftCoSubst role lc ty@ produces a coercion (at role @role@)
 -- that coerces between @lc_left(ty)@ and @lc_right(ty)@, where
@@ -1924,10 +1924,10 @@ liftCoSubst r lc@(LC subst env) ty
 emptyLiftingContext :: InScopeSet -> LiftingContext
 emptyLiftingContext in_scope = LC (mkEmptyTCvSubst in_scope) emptyVarEnv
 
-mkLiftingContext :: [(TyCoVar,Coercion)] -> LiftingContext
-mkLiftingContext pairs
-  = LC (mkEmptyTCvSubst $ mkInScopeSet $ tyCoVarsOfCos (map snd pairs))
-       (mkVarEnv pairs)
+mkLiftingContext :: HasDebugCallStack => [TyCoVar] -> [Coercion] -> LiftingContext
+mkLiftingContext ty_cos ty_co_tys
+  = LC (mkEmptyTCvSubst $ mkInScopeSet $ tyCoVarsOfCos ty_co_tys)
+       (zipEqualVarEnv ty_cos ty_co_tys)
 
 mkSubstLiftingContext :: TCvSubst -> LiftingContext
 mkSubstLiftingContext subst = LC subst emptyVarEnv

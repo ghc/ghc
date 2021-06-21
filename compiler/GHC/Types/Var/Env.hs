@@ -17,7 +17,7 @@ module GHC.Types.Var.Env (
         delVarEnvList, delVarEnv,
         minusVarEnv,
         lookupVarEnv, lookupVarEnv_NF, lookupWithDefaultVarEnv,
-        mapVarEnv, zipVarEnv,
+        mapVarEnv, zipEqualVarEnv, zipVarEnv,
         modifyVarEnv, modifyVarEnv_Directly,
         isEmptyVarEnv,
         elemVarEnvByKey,
@@ -462,6 +462,7 @@ type CoVarEnv elt   = UniqFM CoVar elt
 emptyVarEnv       :: VarEnv a
 mkVarEnv          :: [(Var, a)] -> VarEnv a
 mkVarEnv_Directly :: [(Unique, a)] -> VarEnv a
+zipEqualVarEnv    :: HasDebugCallStack => [Var] -> [a] -> VarEnv a
 zipVarEnv         :: [Var] -> [a] -> VarEnv a
 unitVarEnv        :: Var -> a -> VarEnv a
 alterVarEnv       :: (Maybe a -> Maybe a) -> VarEnv a -> Var -> VarEnv a
@@ -523,7 +524,9 @@ restrictVarEnv env vs = filterUFM_Directly keep env
   where
     keep u _ = u `elemVarSetByKey` vs
 
-zipVarEnv tyvars tys   = mkVarEnv (zipEqual "zipVarEnv" tyvars tys)
+zipEqualVarEnv tyvars tys = zipEqualToUFM tyvars tys
+zipVarEnv tyvars tys      = zipToUFM tyvars tys
+
 lookupVarEnv_NF env id = case lookupVarEnv env id of
                          Just xx -> xx
                          Nothing -> panic "lookupVarEnv_NF: Nothing"

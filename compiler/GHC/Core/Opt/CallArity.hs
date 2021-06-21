@@ -441,7 +441,7 @@ callArityAnalProgram binds = binds'
 -- See Note [Analysing top-level-binds]
 callArityTopLvl :: [Var] -> VarSet -> [CoreBind] -> (CallArityRes, [CoreBind])
 callArityTopLvl exported _ []
-    = ( calledMultipleTimes $ (emptyUnVarGraph, mkVarEnv $ [(v, 0) | v <- exported])
+    = ( calledMultipleTimes $ (emptyUnVarGraph, zipVarEnv exported (repeat 0))
       , [] )
 callArityTopLvl exported int1 (b:bs)
     = (ae2, b':bs')
