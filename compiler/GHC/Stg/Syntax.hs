@@ -50,7 +50,7 @@ module GHC.Stg.Syntax (
         StgOp(..),
 
         -- utils
-        stgRhsArity,
+        stgRhsArity, freeVarsOfRhs,
         isDllConApp,
         stgArgType,
         stripStgTicksTop, stripStgTicksTopE,
@@ -503,6 +503,10 @@ stgRhsArity (StgRhsClosure _ _ _ bndrs _)
   = assert (all isId bndrs) $ length bndrs
   -- The arity never includes type parameters, but they should have gone by now
 stgRhsArity (StgRhsCon _ _ _ _ _) = 0
+
+freeVarsOfRhs :: (XRhsClosure pass ~ DIdSet) => GenStgRhs pass -> DIdSet
+freeVarsOfRhs (StgRhsCon _ _ _ _ args) = mkDVarSet [ id | StgVarArg id <- args ]
+freeVarsOfRhs (StgRhsClosure fvs _ _ _ _) = fvs
 
 {-
 ************************************************************************
