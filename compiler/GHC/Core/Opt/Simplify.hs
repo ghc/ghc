@@ -13,21 +13,17 @@ module GHC.Core.Opt.Simplify ( simplTopBinds, simplExpr, simplRules ) where
 import GHC.Prelude
 
 import GHC.Platform
+
 import GHC.Driver.Session
-import GHC.Driver.Ppr
+
+import GHC.Core
 import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Type hiding ( substTy, substTyVar, extendTvSubst, extendCvSubst )
 import GHC.Core.Opt.Simplify.Env
 import GHC.Core.Opt.Simplify.Utils
 import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
-import GHC.Types.Literal   ( litIsLifted ) --, mkLitInt ) -- temporalily commented out. See #8326
-import GHC.Types.SourceText
-import GHC.Types.Id
-import GHC.Types.Id.Make   ( seqId )
 import GHC.Core.Make       ( FloatBind, mkImpossibleExpr, castBottomExpr )
 import qualified GHC.Core.Make
-import GHC.Types.Id.Info
-import GHC.Types.Name           ( mkSystemVarName, isExternalName, getOccFS )
 import GHC.Core.Coercion hiding ( substCo, substCoVar )
 import GHC.Core.Coercion.Opt    ( optCoercion )
 import GHC.Core.FamInstEnv      ( FamInstEnv, topNormaliseType_maybe )
@@ -36,14 +32,7 @@ import GHC.Core.DataCon
    , dataConRepArgTys, isUnboxedTupleDataCon
    , StrictnessMark (..) )
 import GHC.Core.Opt.Monad ( Tick(..), SimplMode(..) )
-import GHC.Core
-import GHC.Builtin.Types.Prim( realWorldStatePrimTy )
-import GHC.Builtin.Names( runRWKey )
-import GHC.Types.Demand ( DmdSig(..), Demand, dmdTypeDepth, isStrUsedDmd
-                        , mkClosedDmdSig, topDmd, seqDmd, isDeadEndDiv )
-import GHC.Types.Cpr    ( mkCprSig, botCpr )
 import GHC.Core.Ppr     ( pprCoreExpr )
-import GHC.Types.Unique ( hasKey )
 import GHC.Core.Unfold
 import GHC.Core.Unfold.Make
 import GHC.Core.Utils
@@ -53,21 +42,39 @@ import GHC.Core.Opt.Arity ( ArityType(..)
 import GHC.Core.SimpleOpt ( exprIsConApp_maybe, joinPointBinding_maybe, joinPointBindings_maybe )
 import GHC.Core.FVs     ( mkRuleInfo )
 import GHC.Core.Rules   ( lookupRule, getRules, initRuleOpts )
+import GHC.Core.Multiplicity
+
+import GHC.Types.Literal   ( litIsLifted ) --, mkLitInt ) -- temporalily commented out. See #8326
+import GHC.Types.SourceText
+import GHC.Types.Id
+import GHC.Types.Id.Make   ( seqId )
+import GHC.Types.Id.Info
+import GHC.Types.Name   ( mkSystemVarName, isExternalName, getOccFS )
+import GHC.Types.Demand ( DmdSig(..), Demand, dmdTypeDepth, isStrUsedDmd
+                        , mkClosedDmdSig, topDmd, seqDmd, isDeadEndDiv )
+import GHC.Types.Cpr    ( mkCprSig, botCpr )
+import GHC.Types.Unique ( hasKey )
 import GHC.Types.Basic
-import GHC.Utils.Monad  ( mapAccumLM, liftIO )
-import GHC.Utils.Logger
 import GHC.Types.Tickish
 import GHC.Types.Var    ( isTyCoVar )
+
+import GHC.Builtin.PrimOps ( PrimOp (SeqOp) )
+import GHC.Builtin.Types.Prim( realWorldStatePrimTy )
+import GHC.Builtin.Names( runRWKey )
+
 import GHC.Data.Maybe   ( orElse )
-import Control.Monad
+import GHC.Data.FastString
+import GHC.Unit.Module ( moduleName, pprModuleName )
+
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Constants (debugIsOn)
-import GHC.Data.FastString
-import GHC.Unit.Module ( moduleName, pprModuleName )
-import GHC.Core.Multiplicity
-import GHC.Builtin.PrimOps ( PrimOp (SeqOp) )
+import GHC.Utils.Trace
+import GHC.Utils.Monad  ( mapAccumLM, liftIO )
+import GHC.Utils.Logger
+
+import Control.Monad
 
 
 {-
@@ -1715,8 +1722,8 @@ simplRecE env pairs body cont
 In `simplNonRecE`, the call to `isStrictId` will fail if the binder
 has a representation-polymorphic type, of kind (TYPE r).  So we are careful to
 call `isStrictId` on the OutId, not the InId, in case we have
-     ((\(r::RuntimeRep) \(x::Type r). blah) Lifted arg)
-That will lead to `simplNonRecE env (x::Type r) arg`, and we can't tell
+     ((\(r::RuntimeRep) \(x::TYPE r). blah) Lifted arg)
+That will lead to `simplNonRecE env (x::TYPE r) arg`, and we can't tell
 if x is lifted or unlifted from that.
 
 We only get such redexes from the compulsory inlining of a wired-in,
@@ -3159,11 +3166,11 @@ even though it'll be over-ridden in every case alternative with a more
 informative unfolding.  Why?  Because suppose a later, less clever, pass
 simply replaces all occurrences of the case binder with the binder itself;
 then Lint may complain about the let/app invariant.  Example
-    case e of b { DEFAULT -> let v = reallyUnsafePtrEq# b y in ....
+    case e of b { DEFAULT -> let v = reallyUnsafePtrEquality# b y in ....
                 ; K       -> blah }
 
 The let/app invariant requires that y is evaluated in the call to
-reallyUnsafePtrEq#, which it is.  But we still want that to be true if we
+reallyUnsafePtrEquality#, which it is.  But we still want that to be true if we
 propagate binders to occurrences.
 
 This showed up in #13027.

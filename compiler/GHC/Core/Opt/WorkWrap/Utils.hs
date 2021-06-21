@@ -18,44 +18,48 @@ where
 
 import GHC.Prelude
 
+import GHC.Driver.Session
+import GHC.Driver.Config (initSimpleOpts)
+
 import GHC.Core
 import GHC.Core.Utils   ( exprType, mkCast, mkDefaultCase, mkSingleAltCase
                         , bindNonRec, dataConRepFSInstPat
                         , normSplitTyConApp_maybe, exprIsHNF )
-import GHC.Types.Id
-import GHC.Types.Id.Info ( JoinArity )
 import GHC.Core.DataCon
-import GHC.Types.Demand
-import GHC.Types.Cpr
 import GHC.Core.Make     ( mkAbsentErrorApp, mkCoreUbxTup, mkCoreApp, mkCoreLet
                          , mkWildValBinder, mkLitRubbish )
-import GHC.Types.Id.Make ( voidArgId, voidPrimId )
-import GHC.Builtin.Types ( tupleDataCon )
-import GHC.Types.Var.Env ( mkInScopeSet )
-import GHC.Types.Var.Set ( VarSet )
 import GHC.Core.Type
 import GHC.Core.Multiplicity
 import GHC.Core.Predicate ( isClassPred )
 import GHC.Core.Coercion
 import GHC.Core.FamInstEnv
-import GHC.Types.Basic       ( Boxity(..) )
 import GHC.Core.TyCon
 import GHC.Core.TyCon.RecWalk
 import GHC.Core.SimpleOpt( SimpleOpts )
 
+import GHC.Types.Id
+import GHC.Types.Id.Info ( JoinArity )
+import GHC.Types.Demand
+import GHC.Types.Cpr
+import GHC.Types.Id.Make ( voidArgId, voidPrimId )
+import GHC.Types.Var.Env ( mkInScopeSet )
+import GHC.Types.Var.Set ( VarSet )
+import GHC.Types.Basic       ( Boxity(..) )
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique
 import GHC.Types.Name ( getOccFS )
+
+import GHC.Data.FastString
+import GHC.Data.OrdList
+import GHC.Data.List.SetOps
+
+import GHC.Builtin.Types ( tupleDataCon )
+
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
-import GHC.Driver.Session
-import GHC.Driver.Ppr
-import GHC.Driver.Config( initSimpleOpts )
-import GHC.Data.FastString
-import GHC.Data.OrdList
-import GHC.Data.List.SetOps
+import GHC.Utils.Trace
 
 import Control.Applicative ( (<|>) )
 import Control.Monad ( zipWithM )
@@ -1209,7 +1213,7 @@ Needless to say, there are some wrinkles:
      cardinality 'C_10' (say, the arg to a bottoming function) where we could've
      used an error-thunk, but that's a small price to pay for simplicity.
 
-  3. We can only emit a RubbishLit if the arg's type @arg_ty@ is mono-rep, e.g.
+  3. We can only emit a LitRubbish if the arg's type @arg_ty@ is mono-rep, e.g.
      of the form @TYPE rep@ where @rep@ is not (and doesn't contain) a variable.
      Why? Because if we don't know its representation (e.g. size in memory,
      register class), we don't know what or how much rubbish to emit in codegen.
