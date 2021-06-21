@@ -65,8 +65,8 @@ module GHC.Unit.State (
         pprWithUnitState,
 
         -- * Utils
-        unwireUnit
-    )
+        unwireUnit,
+        implicitPackageDeps)
 where
 
 import GHC.Prelude
@@ -113,6 +113,7 @@ import qualified Data.Semigroup as Semigroup
 import qualified Data.Map as Map
 import qualified Data.Map.Strict as MapStrict
 import qualified Data.Set as Set
+import GHC.LanguageExtensions
 
 -- ---------------------------------------------------------------------------
 -- The Unit state
@@ -2153,3 +2154,11 @@ pprWithUnitState :: UnitState -> SDoc -> SDoc
 pprWithUnitState state = updSDocContext (\ctx -> ctx
    { sdocUnitIdForUser = \fs -> pprUnitIdForUser state (UnitId fs)
    })
+
+-- | Add package dependencies on the wired-in packages we use
+implicitPackageDeps :: DynFlags -> [UnitId]
+implicitPackageDeps dflags
+   = [thUnitId | xopt TemplateHaskellQuotes dflags]
+   -- TODO: Should also include `base` and `ghc-prim` if we use those implicitly, but
+   -- it is possible to not depend on base (for example, see `ghc-prim`)
+
