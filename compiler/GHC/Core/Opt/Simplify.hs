@@ -290,32 +290,29 @@ simplRecOrTopPair :: SimplEnv
 simplRecOrTopPair env top_lvl is_rec mb_cont old_bndr new_bndr rhs
   | Just env' <- preInlineUnconditionally env top_lvl old_bndr rhs env
   = {-#SCC "simplRecOrTopPair-pre-inline-uncond" #-}
-    trace_bind "pre-inline-uncond" $
+    simplTrace env "SimplBindr:inline-uncond" (ppr old_bndr) $
     do { tick (PreInlineUnconditionally old_bndr)
        ; return ( emptyFloats env, env' ) }
 
   | Just cont <- mb_cont
   = {-#SCC "simplRecOrTopPair-join" #-}
     assert (isNotTopLevel top_lvl && isJoinId new_bndr )
-    trace_bind "join" $
+    simplTrace env "SimplBind:join" (ppr old_bndr) $
     simplJoinBind env cont old_bndr new_bndr rhs env
 
   | otherwise
   = {-#SCC "simplRecOrTopPair-normal" #-}
-    trace_bind "normal" $
+    simplTrace env "SimplBind:normal" (ppr old_bndr) $
     simplLazyBind env top_lvl is_rec old_bndr new_bndr rhs env
 
+simplTrace :: SimplEnv -> String -> SDoc -> a -> a
+simplTrace env herald doc thing_inside
+  | not (logHasDumpFlag logger Opt_D_verbose_core2core)
+  = thing_inside
+  | otherwise
+  = logTraceMsg logger herald doc thing_inside
   where
     logger = seLogger env
-
-    -- trace_bind emits a trace for each top-level binding, which
-    -- helps to locate the tracing for inlining and rule firing
-    trace_bind what thing_inside
-      | not (logHasDumpFlag logger Opt_D_verbose_core2core)
-      = thing_inside
-      | otherwise
-      = logTraceMsg logger ("SimplBind " ++ what)
-         (ppr old_bndr) thing_inside
 
 --------------------------
 simplLazyBind :: SimplEnv
@@ -921,9 +918,12 @@ completeBind env top_lvl mb_cont old_bndr new_bndr new_rhs
 
         then -- Inline and discard the binding
              do  { tick (PostInlineUnconditionally old_bndr)
-                 ; return ( emptyFloats env
+                 ; let unf_rhs = maybeUnfoldingTemplate new_unfolding `orElse` eta_rhs
+                          -- See Note [Use occ-anald RHS in postInlineUnconditionally]
+                 ; simplTrace env "PostInlineUnconditionally" (ppr new_bndr <+> ppr unf_rhs) $
+                   return ( emptyFloats env
                           , extendIdSubst env old_bndr $
-                            DoneEx eta_rhs (isJoinId_maybe new_bndr)) }
+                            DoneEx unf_rhs (isJoinId_maybe new_bndr)) }
                 -- Use the substitution to make quite, quite sure that the
                 -- substitution will happen, since we are going to discard the binding
 
@@ -1026,6 +1026,21 @@ This really happens.  Similarly
 After inlining f at some of its call sites the original binding may
 (for example) be no longer strictly demanded.
 The solution here is a bit ad hoc...
+
+Note [Use occ-anald RHS in postInlineUnconditionally]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we preInlineUnconditionally
+  let f = \x -> x True in ...(f blah)...
+then we'd like inline the /occ-anald/ RHS for 'f'.  If we use the
+non-occ-anald version, we'll end up with a
+    ...(let x = blah in x True)...
+and hence an extra Simplifier iteration.
+
+We already /have/ the occ-anald version in the Unfolding for
+the Id.  Well, maybe not /quite/ always.  If the binder is Dead,
+postInlineUnconditionally will return True, but we may not have an
+unfolding because it's too big. Hence the belt-and-braces `orElse`
+in the defn of unf_rhs.  The Nothing case probably never happens.
 
 
 ************************************************************************
