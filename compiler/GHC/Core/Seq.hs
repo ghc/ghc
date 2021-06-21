@@ -112,5 +112,6 @@ seqUnfolding (CoreUnfolding { uf_tmpl = e, uf_is_top = top,
 seqUnfolding _ = ()
 
 seqGuidance :: UnfoldingGuidance -> ()
-seqGuidance (UnfIfGoodArgs ns n b) = n `seq` sum ns `seq` b `seq` ()
-seqGuidance _                      = ()
+seqGuidance (UnfIfGoodArgs ns ds n b) = n `seq` sum ns `seq` ds `seq` b `seq` ()
+                                        -- We use strict maps so I think `seq` ds will do
+seqGuidance _                         = ()
