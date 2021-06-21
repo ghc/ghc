@@ -527,7 +527,7 @@ def ghc_dynamic() -> bool:
 
 # Symbols have a leading underscore
 def leading_underscore() -> bool:
-    return config.leading_underscore
+    return opsys('darwin') or config.leading_underscore
 
 
 def fast() -> bool:
