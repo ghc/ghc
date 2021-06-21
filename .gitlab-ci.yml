@@ -1330,7 +1330,6 @@ source-tarball:
     UPSTREAM_PROJECT_PATH: "$CI_PROJECT_PATH"
     UPSTREAM_PROJECT_ID: "$CI_PROJECT_ID"
     UPSTREAM_PIPELINE_ID: "$CI_PIPELINE_ID"
-    EXTRA_HC_OPTS: "-dcore-lint"
   trigger:
     project: "ghc/head.hackage"
     branch: "master"
@@ -1349,6 +1348,9 @@ nightly-hackage:
   rules:
     - if: $NIGHTLY
   extends: .hackage
+  variables:
+    # Generate logs for nightly builds
+    EXTRA_HC_OPTS: "-dcore-lint -ddump-timings"
 
 ############################################################
 # Nofib testing
