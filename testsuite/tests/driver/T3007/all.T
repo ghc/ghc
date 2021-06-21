@@ -1,3 +1,4 @@
 test('T3007',
-     extra_files(['A/', 'B/']),
+     [when(opsys('darwin'), expect_broken(20026)),
+      extra_files(['A/', 'B/'])],
      makefile_test, [])
