@@ -94,6 +94,7 @@ import qualified Data.Set as S
 import System.FilePath  ((</>))
 
 import System.IO
+import GHC.Unit.State
 
 {-
 ************************************************************************
@@ -200,7 +201,11 @@ rnImports imports = do
     -- Safe Haskell: See Note [Tracking Trust Transitively]
     let (decls, rdr_env, imp_avails, hpc_usage) = combine (stuff1 ++ stuff2)
     -- Update imp_boot_mods if imp_direct_mods mentions any of them
-    let final_import_avail = clobberSourceImports imp_avails
+    let merged_import_avail = clobberSourceImports imp_avails
+    dflags <- getDynFlags
+    let final_import_avail  =
+          merged_import_avail { imp_dep_direct_pkgs = S.fromList (implicitPackageDeps dflags)
+                                                        `S.union` imp_dep_direct_pkgs merged_import_avail}
     return (decls, rdr_env, final_import_avail, hpc_usage)
 
   where
