@@ -1530,17 +1530,19 @@ getRegOrMem e = do
     (reg, code) <- getNonClobberedReg e
     return (OpReg reg, code)
 
+-- | FIXME
+smallMemoryModel :: Bool
+smallMemoryModel = False
+
 is32BitLit :: Bool -> CmmLit -> Bool
 is32BitLit is32Bit lit
    | not is32Bit = case lit of
       CmmInt i W64              -> is32BitInteger i
-      -- assume that labels are in the range 0-2^31-1: this assumes the
-      -- small memory model (see gcc docs, -mcmodel=small).
-      CmmLabel _                -> True
+      CmmLabel _                -> smallMemoryModel
       -- however we can't assume that label offsets are in this range
       -- (see #15570)
-      CmmLabelOff _ off         -> is32BitInteger (fromIntegral off)
-      CmmLabelDiffOff _ _ off _ -> is32BitInteger (fromIntegral off)
+      CmmLabelOff _ off         -> smallMemoryModel && is32BitInteger (fromIntegral off)
+      CmmLabelDiffOff _ _ off _ -> smallMemoryModel && is32BitInteger (fromIntegral off)
       _                         -> True
 is32BitLit _ _ = True
 
