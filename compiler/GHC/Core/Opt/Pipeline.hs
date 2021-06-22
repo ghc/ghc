@@ -1007,7 +1007,7 @@ hasShortableIdInfo :: Id -> Bool
 hasShortableIdInfo id
   =  isEmptyRuleInfo (ruleInfo info)
   && isDefaultInlinePragma (inlinePragInfo info)
-  && not (isStableUnfolding (unfoldingInfo info))
+  && not (isStableUnfolding (realUnfoldingInfo info))
   where
      info = idInfo id
 
@@ -1048,7 +1048,7 @@ transferIdInfo exported_id local_id
     local_info = idInfo local_id
     transfer exp_info = exp_info `setDmdSigInfo`     dmdSigInfo local_info
                                  `setCprSigInfo`     cprSigInfo local_info
-                                 `setUnfoldingInfo`  unfoldingInfo local_info
+                                 `setUnfoldingInfo`  realUnfoldingInfo local_info
                                  `setInlinePragInfo` inlinePragInfo local_info
                                  `setRuleInfo`       addRuleInfo (ruleInfo exp_info) new_info
     new_info = setRuleInfoHead (idName exported_id)

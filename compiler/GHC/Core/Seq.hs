@@ -32,7 +32,7 @@ megaSeqIdInfo info
 
 -- Omitting this improves runtimes a little, presumably because
 -- some unfoldings are not calculated at all
---    seqUnfolding (unfoldingInfo info)         `seq`
+--    seqUnfolding (realUnfoldingInfo info)         `seq`
 
     seqDemand (demandInfo info)                 `seq`
     seqDmdSig (dmdSigInfo info)          `seq`
