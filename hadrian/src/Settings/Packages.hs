@@ -374,7 +374,8 @@ rtsPackageArgs = package rts ? do
               , cabalExtraDirs libnumaIncludeDir libnumaLibraryDir
               , useSystemFfi ? cabalExtraDirs ffiIncludeDir ffiLibraryDir
               ]
-        , builder (Cc FindCDependencies) ? cArgs
+        , builder (Cc (FindCDependencies CDep)) ? cArgs
+        , builder (Cc (FindCDependencies CxxDep)) ? cArgs
         , builder (Ghc CompileCWithGhc) ? map ("-optc" ++) <$> cArgs
         , builder (Ghc CompileCppWithGhc) ? map ("-optcxx" ++) <$> cArgs
         , builder Ghc ? ghcArgs

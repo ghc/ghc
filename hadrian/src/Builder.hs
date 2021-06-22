@@ -1,9 +1,9 @@
 {-# LANGUAGE InstanceSigs, TypeOperators #-}
 module Builder (
     -- * Data types
-    ArMode (..), CcMode (..), ConfigurationInfo (..), GhcMode (..),
-    GhcPkgMode (..), HaddockMode (..), SphinxMode (..), TarMode (..),
-    Builder (..),
+    ArMode (..), CcMode (..), ConfigurationInfo (..), DependencyType (..),
+    GhcMode (..), GhcPkgMode (..), HaddockMode (..), SphinxMode (..),
+    TarMode (..), Builder (..),
 
     -- * Builder properties
     builderProvenance, systemBuilderPath, builderPath, isSpecified, needBuilder,
@@ -41,11 +41,16 @@ import Packages
 -- | C compiler can be used in two different modes:
 -- * Compile or preprocess a source file.
 -- * Extract source dependencies by passing @-MM@ command line argument.
-data CcMode = CompileC | FindCDependencies deriving (Eq, Generic, Show)
+data CcMode = CompileC | FindCDependencies DependencyType deriving (Eq, Generic, Show)
+data DependencyType = CDep | CxxDep deriving (Eq, Generic, Show)
 
 instance Binary   CcMode
 instance Hashable CcMode
 instance NFData   CcMode
+
+instance Binary   DependencyType
+instance Hashable DependencyType
+instance NFData   DependencyType
 
 -- | GHC can be used in four different modes:
 -- * Compile a Haskell source file.
