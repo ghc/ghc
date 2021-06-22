@@ -480,10 +480,10 @@ function cabal_test() {
   mkdir -p "$OUT"
   run "$HC" \
     -hidir tmp -odir tmp -fforce-recomp \
-    -ddump-to-file -dumpdir "$OUT/dumps" -ddump-timings \
+    -dumpdir "$OUT/dumps" -ddump-timings \
     +RTS --machine-readable "-t$OUT/rts.log" -RTS \
     -ilibraries/Cabal/Cabal/src -XNoPolyKinds Distribution.Simple \
-    "$@"
+    "$@" 2>&1 | tee $OUT/log
   rm -Rf tmp
   end_section "Cabal test: $OUT"
 }
@@ -494,6 +494,8 @@ function run_perf_test() {
   fi
 
   mkdir -p out
+  git -C libraries/Cabal/ rev-parse HEAD > out/cabal_commit
+  $HC --print-project-git-commit-id > out/ghc_commit
   OUT=out/Cabal-O0 cabal_test -O0
   OUT=out/Cabal-O1 cabal_test -O1
   OUT=out/Cabal-O2 cabal_test -O2
