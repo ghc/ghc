@@ -1213,7 +1213,7 @@ Needless to say, there are some wrinkles:
      cardinality 'C_10' (say, the arg to a bottoming function) where we could've
      used an error-thunk, but that's a small price to pay for simplicity.
 
-  3. We can only emit a RubbishLit if the arg's type @arg_ty@ is mono-rep, e.g.
+  3. We can only emit a LitRubbish if the arg's type @arg_ty@ is mono-rep, e.g.
      of the form @TYPE rep@ where @rep@ is not (and doesn't contain) a variable.
      Why? Because if we don't know its representation (e.g. size in memory,
      register class), we don't know what or how much rubbish to emit in codegen.

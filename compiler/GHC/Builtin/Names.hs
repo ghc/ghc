@@ -345,10 +345,9 @@ basicKnownKeyNames
 
         -- Others
         otherwiseIdName, inlineIdName,
-        eqStringName, assertName, breakpointName, breakpointCondName,
-        opaqueTyConName,
+        eqStringName, assertName,
         assertErrorName, traceName,
-        printName, fstName, sndName,
+        printName,
         dollarName,
 
         -- ghc-bignum
@@ -1136,11 +1135,10 @@ groupWithName, considerAccessibleName :: Name
 groupWithName          = varQual gHC_EXTS (fsLit "groupWith")          groupWithIdKey
 considerAccessibleName = varQual gHC_EXTS (fsLit "considerAccessible") considerAccessibleIdKey
 
--- Random PrelBase functions
+-- Random GHC.Base functions
 fromStringName, otherwiseIdName, foldrName, buildName, augmentName,
     mapName, appendName, assertName,
-    breakpointName, breakpointCondName,
-    opaqueTyConName, dollarName :: Name
+    dollarName :: Name
 dollarName        = varQual gHC_BASE (fsLit "$")          dollarIdKey
 otherwiseIdName   = varQual gHC_BASE (fsLit "otherwise")  otherwiseIdKey
 foldrName         = varQual gHC_BASE (fsLit "foldr")      foldrIdKey
@@ -1149,15 +1147,7 @@ augmentName       = varQual gHC_BASE (fsLit "augment")    augmentIdKey
 mapName           = varQual gHC_BASE (fsLit "map")        mapIdKey
 appendName        = varQual gHC_BASE (fsLit "++")         appendIdKey
 assertName        = varQual gHC_BASE (fsLit "assert")     assertIdKey
-breakpointName    = varQual gHC_BASE (fsLit "breakpoint") breakpointIdKey
-breakpointCondName= varQual gHC_BASE (fsLit "breakpointCond") breakpointCondIdKey
-opaqueTyConName   = tcQual  gHC_BASE (fsLit "Opaque")     opaqueTyConKey
 fromStringName = varQual dATA_STRING (fsLit "fromString") fromStringClassOpKey
-
--- PrelTup
-fstName, sndName :: Name
-fstName           = varQual dATA_TUPLE (fsLit "fst") fstIdKey
-sndName           = varQual dATA_TUPLE (fsLit "snd") sndIdKey
 
 -- Module GHC.Num
 numClassName, fromIntegerName, minusName, negateName :: Name
@@ -1363,7 +1353,7 @@ fromIntegralName    = varQual  gHC_REAL (fsLit "fromIntegral")fromIntegralIdKey
 realToFracName      = varQual  gHC_REAL (fsLit "realToFrac")  realToFracIdKey
 mkRationalBase2Name  = varQual  gHC_REAL  (fsLit "mkRationalBase2")  mkRationalBase2IdKey
 mkRationalBase10Name = varQual  gHC_REAL  (fsLit "mkRationalBase10") mkRationalBase10IdKey
--- PrelFloat classes
+-- GHC.Float classes
 floatingClassName, realFloatClassName :: Name
 floatingClassName  = clsQual gHC_FLOAT (fsLit "Floating")  floatingClassKey
 realFloatClassName = clsQual gHC_FLOAT (fsLit "RealFloat") realFloatClassKey
@@ -1956,14 +1946,6 @@ pluginTyConKey, frontendPluginTyConKey :: Unique
 pluginTyConKey                          = mkPreludeTyConUnique 102
 frontendPluginTyConKey                  = mkPreludeTyConUnique 103
 
-unknownTyConKey, unknown1TyConKey, unknown2TyConKey, unknown3TyConKey,
-    opaqueTyConKey :: Unique
-unknownTyConKey                         = mkPreludeTyConUnique 129
-unknown1TyConKey                        = mkPreludeTyConUnique 130
-unknown2TyConKey                        = mkPreludeTyConUnique 131
-unknown3TyConKey                        = mkPreludeTyConUnique 132
-opaqueTyConKey                          = mkPreludeTyConUnique 133
-
 -- Generics (Unique keys)
 v1TyConKey, u1TyConKey, par1TyConKey, rec1TyConKey,
   k1TyConKey, m1TyConKey, sumTyConKey, prodTyConKey,
@@ -2343,7 +2325,7 @@ raiseDivZeroIdKey             = mkPreludeMiscIdUnique 29
 concatIdKey, filterIdKey, zipIdKey,
     bindIOIdKey, returnIOIdKey, newStablePtrIdKey,
     printIdKey, failIOIdKey, nullAddrIdKey, voidArgIdKey,
-    fstIdKey, sndIdKey, otherwiseIdKey, assertIdKey :: Unique
+    otherwiseIdKey, assertIdKey :: Unique
 concatIdKey                   = mkPreludeMiscIdUnique 31
 filterIdKey                   = mkPreludeMiscIdUnique 32
 zipIdKey                      = mkPreludeMiscIdUnique 33
@@ -2354,8 +2336,6 @@ printIdKey                    = mkPreludeMiscIdUnique 37
 failIOIdKey                   = mkPreludeMiscIdUnique 38
 nullAddrIdKey                 = mkPreludeMiscIdUnique 39
 voidArgIdKey                  = mkPreludeMiscIdUnique 40
-fstIdKey                      = mkPreludeMiscIdUnique 41
-sndIdKey                      = mkPreludeMiscIdUnique 42
 otherwiseIdKey                = mkPreludeMiscIdUnique 43
 assertIdKey                   = mkPreludeMiscIdUnique 44
 
@@ -2376,10 +2356,6 @@ runRWKey                      = mkPreludeMiscIdUnique 107
 
 traceKey :: Unique
 traceKey                      = mkPreludeMiscIdUnique 108
-
-breakpointIdKey, breakpointCondIdKey :: Unique
-breakpointIdKey               = mkPreludeMiscIdUnique 110
-breakpointCondIdKey           = mkPreludeMiscIdUnique 111
 
 inlineIdKey, noinlineIdKey :: Unique
 inlineIdKey                   = mkPreludeMiscIdUnique 120

@@ -1722,8 +1722,8 @@ simplRecE env pairs body cont
 In `simplNonRecE`, the call to `isStrictId` will fail if the binder
 has a representation-polymorphic type, of kind (TYPE r).  So we are careful to
 call `isStrictId` on the OutId, not the InId, in case we have
-     ((\(r::RuntimeRep) \(x::Type r). blah) Lifted arg)
-That will lead to `simplNonRecE env (x::Type r) arg`, and we can't tell
+     ((\(r::RuntimeRep) \(x::TYPE r). blah) Lifted arg)
+That will lead to `simplNonRecE env (x::TYPE r) arg`, and we can't tell
 if x is lifted or unlifted from that.
 
 We only get such redexes from the compulsory inlining of a wired-in,
@@ -3166,11 +3166,11 @@ even though it'll be over-ridden in every case alternative with a more
 informative unfolding.  Why?  Because suppose a later, less clever, pass
 simply replaces all occurrences of the case binder with the binder itself;
 then Lint may complain about the let/app invariant.  Example
-    case e of b { DEFAULT -> let v = reallyUnsafePtrEq# b y in ....
+    case e of b { DEFAULT -> let v = reallyUnsafePtrEquality# b y in ....
                 ; K       -> blah }
 
 The let/app invariant requires that y is evaluated in the call to
-reallyUnsafePtrEq#, which it is.  But we still want that to be true if we
+reallyUnsafePtrEquality#, which it is.  But we still want that to be true if we
 propagate binders to occurrences.
 
 This showed up in #13027.
