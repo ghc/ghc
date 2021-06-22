@@ -30,6 +30,7 @@ module GHC.Utils.Error (
         formatBulleted,
 
         -- ** Construction
+        DiagOpts (..), diag_wopt, diag_fatal_wopt,
         emptyMessages, mkDecorated, mkLocMessage, mkLocMessageAnn,
         mkMsgEnvelope, mkPlainMsgEnvelope, mkPlainErrorMsgEnvelope,
         mkErrorMsgEnvelope,
@@ -42,14 +43,13 @@ module GHC.Utils.Error (
         noHints,
 
         -- * Utilities
-        doIfSet, doIfSet_dyn,
         getCaretDiagnostic,
 
         -- * Issuing messages during compilation
         putMsg, printInfoForUser, printOutputForUser,
         logInfo, logOutput,
         errorMsg,
-        fatalErrorMsg, fatalErrorMsg'',
+        fatalErrorMsg,
         compilationProgressMsg,
         showPass,
         withTiming, withTimingSilent,
@@ -63,9 +63,12 @@ module GHC.Utils.Error (
 
 import GHC.Prelude
 
-import GHC.Driver.Session
+import GHC.Driver.Flags
 
 import GHC.Data.Bag
+import qualified GHC.Data.EnumSet as EnumSet
+import GHC.Data.EnumSet (EnumSet)
+
 import GHC.Utils.Exception
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
@@ -76,7 +79,6 @@ import GHC.Types.SrcLoc as SrcLoc
 
 import System.Exit      ( ExitCode(..), exitWith )
 import Data.List        ( sortBy )
-import Data.Maybe       ( fromMaybe )
 import Data.Function
 import Debug.Trace
 import Control.Monad
@@ -85,24 +87,43 @@ import Control.Monad.Catch as MC (handle)
 import GHC.Conc         ( getAllocationCounter )
 import System.CPUTime
 
+data DiagOpts = DiagOpts
+  { diag_warning_flags       :: !(EnumSet WarningFlag) -- ^ Enabled warnings
+  , diag_fatal_warning_flags :: !(EnumSet WarningFlag) -- ^ Fatal warnings
+  , diag_warn_is_error       :: !Bool                  -- ^ Treat warnings as errors
+  , diag_reverse_errors      :: !Bool                  -- ^ Reverse error reporting order
+  , diag_max_errors          :: !(Maybe Int)           -- ^ Max reported error count
+  , diag_ppr_ctx             :: !SDocContext           -- ^ Error printing context
+  }
+
+diag_wopt :: WarningFlag -> DiagOpts -> Bool
+diag_wopt wflag opts = wflag `EnumSet.member` diag_warning_flags opts
+
+diag_fatal_wopt :: WarningFlag -> DiagOpts -> Bool
+diag_fatal_wopt wflag opts = wflag `EnumSet.member` diag_fatal_warning_flags opts
+
 -- | Computes the /right/ 'Severity' for the input 'DiagnosticReason' out of
--- the 'DynFlags'. This function /has/ to be called when a diagnostic is constructed,
--- i.e. with a 'DynFlags' \"snapshot\" taken as close as possible to where a
+-- the 'DiagOpts. This function /has/ to be called when a diagnostic is constructed,
+-- i.e. with a 'DiagOpts \"snapshot\" taken as close as possible to where a
 -- particular diagnostic message is built, otherwise the computed 'Severity' might
 -- not be correct, due to the mutable nature of the 'DynFlags' in GHC.
-diagReasonSeverity :: DynFlags -> DiagnosticReason -> Severity
-diagReasonSeverity dflags (WarningWithFlag wflag) | not (wopt wflag dflags)     = SevIgnore
-                                                  | wopt_fatal wflag dflags     = SevError
-                                                  | otherwise                   = SevWarning
-diagReasonSeverity dflags WarningWithoutFlag      | gopt Opt_WarnIsError dflags = SevError
-                                                  | otherwise                   = SevWarning
-diagReasonSeverity _      ErrorWithoutFlag                                      = SevError
+diagReasonSeverity :: DiagOpts -> DiagnosticReason -> Severity
+diagReasonSeverity opts reason = case reason of
+  WarningWithFlag wflag
+    | not (diag_wopt wflag opts) -> SevIgnore
+    | diag_fatal_wopt wflag opts -> SevError
+    | otherwise                  -> SevWarning
+  WarningWithoutFlag
+    | diag_warn_is_error opts -> SevError
+    | otherwise             -> SevWarning
+  ErrorWithoutFlag
+    -> SevError
 
 
-
--- | Make a 'MessageClass' for a given 'DiagnosticReason', consulting the 'DynFlags'.
-mkMCDiagnostic :: DynFlags -> DiagnosticReason -> MessageClass
-mkMCDiagnostic dflags reason = MCDiagnostic (diagReasonSeverity dflags reason) reason
+-- | Make a 'MessageClass' for a given 'DiagnosticReason', consulting the
+-- 'DiagOpts.
+mkMCDiagnostic :: DiagOpts -> DiagnosticReason -> MessageClass
+mkMCDiagnostic opts reason = MCDiagnostic (diagReasonSeverity opts reason) reason
 
 -- | Varation of 'mkMCDiagnostic' which can be used when we are /sure/ the
 -- input 'DiagnosticReason' /is/ 'ErrorWithoutFlag'.
@@ -129,16 +150,16 @@ mk_msg_envelope severity locn print_unqual err
 
 -- | Wrap a 'Diagnostic' in a 'MsgEnvelope', recording its location.
 -- If you know your 'Diagnostic' is an error, consider using 'mkErrorMsgEnvelope',
--- which does not require looking at the 'DynFlags'
+-- which does not require looking at the 'DiagOpts'
 mkMsgEnvelope
   :: Diagnostic e
-  => DynFlags
+  => DiagOpts
   -> SrcSpan
   -> PrintUnqualified
   -> e
   -> MsgEnvelope e
-mkMsgEnvelope dflags locn print_unqual err
- = mk_msg_envelope (diagReasonSeverity dflags (diagnosticReason err)) locn print_unqual err
+mkMsgEnvelope opts locn print_unqual err
+ = mk_msg_envelope (diagReasonSeverity opts (diagnosticReason err)) locn print_unqual err
 
 -- | Wrap a 'Diagnostic' in a 'MsgEnvelope', recording its location.
 -- Precondition: the diagnostic is, in fact, an error. That is,
@@ -153,12 +174,12 @@ mkErrorMsgEnvelope locn unqual msg =
 
 -- | Variant that doesn't care about qualified/unqualified names.
 mkPlainMsgEnvelope :: Diagnostic e
-                   => DynFlags
+                   => DiagOpts
                    -> SrcSpan
                    -> e
                    -> MsgEnvelope e
-mkPlainMsgEnvelope dflags locn msg =
-  mkMsgEnvelope dflags locn alwaysQualify msg
+mkPlainMsgEnvelope opts locn msg =
+  mkMsgEnvelope opts locn alwaysQualify msg
 
 -- | Variant of 'mkPlainMsgEnvelope' which can be used when we are /sure/ we
 -- are constructing a diagnostic with a 'ErrorWithoutFlag' reason.
@@ -224,28 +245,27 @@ pprLocMsgEnvelope (MsgEnvelope { errMsgSpan      = s
     withErrStyle unqual $
       mkLocMessage (MCDiagnostic sev (diagnosticReason e)) s (formatBulleted ctx $ diagnosticMessage e)
 
-sortMsgBag :: Maybe DynFlags -> Bag (MsgEnvelope e) -> [MsgEnvelope e]
-sortMsgBag dflags = maybeLimit . sortBy (cmp `on` errMsgSpan) . bagToList
-  where cmp
-          | fromMaybe False (fmap reverseErrors dflags) = SrcLoc.rightmost_smallest
-          | otherwise                                   = SrcLoc.leftmost_smallest
-        maybeLimit = case join (fmap maxErrors dflags) of
-          Nothing        -> id
-          Just err_limit -> take err_limit
+sortMsgBag :: Maybe DiagOpts -> Bag (MsgEnvelope e) -> [MsgEnvelope e]
+sortMsgBag mopts = maybeLimit . sortBy (cmp `on` errMsgSpan) . bagToList
+  where
+    cmp
+      | Just opts <- mopts
+      , diag_reverse_errors opts
+      = SrcLoc.rightmost_smallest
+      | otherwise
+      = SrcLoc.leftmost_smallest
+    maybeLimit
+      | Just opts <- mopts
+      , Just err_limit <- diag_max_errors opts
+      = take err_limit
+      | otherwise
+      = id
 
 ghcExit :: Logger -> Int -> IO ()
 ghcExit logger val
   | val == 0  = exitWith ExitSuccess
   | otherwise = do errorMsg logger (text "\nCompilation had errors\n\n")
                    exitWith (ExitFailure val)
-
-doIfSet :: Bool -> IO () -> IO ()
-doIfSet flag action | flag      = action
-                    | otherwise = return ()
-
-doIfSet_dyn :: DynFlags -> GeneralFlag -> IO () -> IO()
-doIfSet_dyn dflags flag action | gopt flag dflags = action
-                               | otherwise        = return ()
 
 -- -----------------------------------------------------------------------------
 -- Outputting messages from the compiler
@@ -258,9 +278,6 @@ errorMsg logger msg
 fatalErrorMsg :: Logger -> SDoc -> IO ()
 fatalErrorMsg logger msg =
     logMsg logger MCFatal noSrcSpan $ withPprStyle defaultErrStyle msg
-
-fatalErrorMsg'' :: FatalMessager -> String -> IO ()
-fatalErrorMsg'' fm msg = fm msg
 
 compilationProgressMsg :: Logger -> SDoc -> IO ()
 compilationProgressMsg logger msg = do
