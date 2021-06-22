@@ -747,6 +747,10 @@ validate-aarch64-linux-deb10:
     when: always
     expire_in: 2 week
 
+release-aarch64-linux-deb10:
+  <<: *release
+  extends: .build-aarch64-linux-deb10
+
 nightly-aarch64-linux-deb10:
   <<: *nightly
   extends: .build-aarch64-linux-deb10
