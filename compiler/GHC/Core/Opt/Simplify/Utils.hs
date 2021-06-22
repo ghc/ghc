@@ -81,6 +81,7 @@ import GHC.Utils.Trace
 
 import Control.Monad    ( when )
 import Data.List        ( sortBy )
+import GHC.Unit.Module
 
 {-
 ************************************************************************
@@ -881,11 +882,13 @@ simplEnvForGHCi logger dflags
                            , sm_eta_expand = eta_expand_on
                            , sm_case_case  = True
                            , sm_pre_inline = pre_inline_on
+                           , sm_opt_off = opt_off
                            }
   where
     rules_on      = gopt Opt_EnableRewriteRules   dflags
     eta_expand_on = gopt Opt_DoLambdaEtaExpansion dflags
     pre_inline_on = gopt Opt_SimplPreInlining     dflags
+    opt_off       = gopt Opt_IgnoreInterfacePragmas dflags
     uf_opts       = unfoldingOpts                 dflags
 
 updModeForStableUnfoldings :: Activation -> SimplMode -> SimplMode
@@ -1086,19 +1089,19 @@ activeUnfolding mode id
       --  (b) sm_inline says so, except that for stable unfoldings
       --                         (ie pragmas) we inline anyway
 
-getUnfoldingInRuleMatch :: SimplEnv -> InScopeEnv
+getUnfoldingInRuleMatch :: SimplEnv -> Module -> InScopeEnv
 -- When matching in RULE, we want to "look through" an unfolding
 -- (to see a constructor) if *rules* are on, even if *inlinings*
 -- are not.  A notable example is DFuns, which really we want to
 -- match in rules like (op dfun) in gentle mode. Another example
 -- is 'otherwise' which we want exprIsConApp_maybe to be able to
 -- see very early on
-getUnfoldingInRuleMatch env
+getUnfoldingInRuleMatch env cur_mod
   = (in_scope, id_unf)
   where
     in_scope = seInScope env
     mode = getMode env
-    id_unf id | unf_is_active id = idUnfolding id
+    id_unf id | unf_is_active id = idUnfoldingChecked cur_mod (sm_opt_off mode) id
               | otherwise        = NoUnfolding
     unf_is_active id
      | not (sm_rules mode) = -- active_unfolding_minimal id
@@ -1246,14 +1249,14 @@ the former.
 -}
 
 preInlineUnconditionally
-    :: SimplEnv -> TopLevelFlag -> InId
+    :: SimplEnv -> Module -> TopLevelFlag -> InId
     -> InExpr -> StaticEnv  -- These two go together
     -> Maybe SimplEnv       -- Returned env has extended substitution
 -- Precondition: rhs satisfies the let/app invariant
 -- See Note [Core let/app invariant] in GHC.Core
 -- Reason: we don't want to inline single uses, or discard dead bindings,
 --         for unlifted, side-effect-ful bindings
-preInlineUnconditionally env top_lvl bndr rhs rhs_env
+preInlineUnconditionally env cur_mod top_lvl bndr rhs rhs_env
   | not pre_inline_unconditionally           = Nothing
   | not active                               = Nothing
   | isTopLevel top_lvl && isDeadEndId bndr   = Nothing -- Note [Top-level bottoming Ids]
@@ -1268,7 +1271,7 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
   , Just inl <- maybeUnfoldingTemplate unf   = Just $! (extend_subst_with inl)
   | otherwise                                = Nothing
   where
-    unf = idUnfolding bndr
+    unf = idUnfoldingChecked cur_mod (sm_opt_off mode) bndr
     extend_subst_with inl_rhs = extendIdSubst env bndr $! (mkContEx rhs_env inl_rhs)
 
     one_occ IAmDead = True -- Happens in ((\x.1) v)

@@ -29,7 +29,7 @@ module GHC.Iface.Binary (
         putSymbolTable,
         BinSymbolTable(..),
         BinDictionary(..)
-    ) where
+    ,refreshBinary) where
 
 import GHC.Prelude
 
@@ -175,9 +175,15 @@ getWithUserData name_cache bh = do
         -- It is only now that we know how to get a Name
         return $ setUserData bh $ newReadState (getSymtabName name_cache dict symtab)
                                                (getDictFastString dict)
-
     -- Read the interface file
     get bh
+
+refreshBinary :: Binary a => NameCache -> a -> IO a
+refreshBinary name_cache a = do
+  bh <- openBinMem 1024
+  putWithUserData QuietBinIFace bh a
+  resetBinOffset bh
+  getWithUserData name_cache bh
 
 -- | Write an interface file
 writeBinIface :: Profile -> TraceBinIFace -> FilePath -> ModIface -> IO ()
