@@ -7,7 +7,7 @@ import GHC.Prelude
 import GHC.Platform
 
 import GHC.Driver.Session
-import GHC.Utils.Error
+import GHC.Driver.Config.Diagnostic
 
 import GHC.Parser.Lexer
 
@@ -15,9 +15,8 @@ import GHC.Parser.Lexer
 initParserOpts :: DynFlags -> ParserOpts
 initParserOpts =
   mkParserOpts
-    <$> warningFlags
-    <*> extensionFlags
-    <*> mkPlainMsgEnvelope
+    <$> extensionFlags
+    <*> initDiagOpts
     <*> (supportedLanguagesAndExtensions . platformArchOS . targetPlatform)
     <*> safeImportsOn
     <*> gopt Opt_Haddock
