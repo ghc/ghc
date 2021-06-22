@@ -72,7 +72,7 @@ The ``CallStack`` will only extend as far as the types allow it, for
 example ::
 
    myHead :: HasCallStack => [a] -> a
-   myHead []     = errorWithCallStack "empty"
+   myHead []     = error "empty"
    myHead (x:xs) = x
 
    bad :: Int
@@ -83,12 +83,11 @@ example ::
    ghci> bad
    *** Exception: empty
    CallStack (from HasCallStack):
-     errorWithCallStack, called at Bad.hs:8:15 in main:Bad
+     error, called at Bad.hs:8:15 in main:Bad
      myHead, called at Bad.hs:12:7 in main:Bad
 
-includes the call-site of ``errorWithCallStack`` in ``myHead``, and of
-``myHead`` in ``bad``, but not the call-site of ``bad`` at the GHCi
-prompt.
+includes the call-site of ``error`` in ``myHead``, and of ``myHead`` in
+``bad``, but not the call-site of ``bad`` at the GHCi prompt.
 
 GHC solves ``HasCallStack`` constraints in two steps:
 
@@ -114,12 +113,12 @@ package, module, and file name, as well as the line and column numbers.
 allows users to freeze the current ``CallStack``, preventing any future push
 operations from having an effect. This can be used by library authors
 to prevent ``CallStack``\s from exposing unnecessary implementation
-details. Consider the ``myHead`` example above, the ``errorWithCallStack`` line in
-the printed stack is not particularly enlightening, so we might choose
-to suppress it by freezing the ``CallStack`` that we pass to ``errorWithCallStack``. ::
+details. Consider the ``myHead`` example above, the ``error`` line in the
+printed stack is not particularly enlightening, so we might choose to suppress
+it by freezing the ``CallStack`` that we pass to ``error``. ::
 
    myHead :: HasCallStack => [a] -> a
-   myHead []     = withFrozenCallStack (errorWithCallStack "empty")
+   myHead []     = withFrozenCallStack (error "empty")
    myHead (x:xs) = x
 
 .. code-block:: none
