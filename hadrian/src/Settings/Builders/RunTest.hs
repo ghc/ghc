@@ -63,6 +63,7 @@ runTestBuilderArgs = builder RunTest ? do
     let hasRtsWay w = elem w rtsWays
         hasLibWay w = elem w libWays
     hasDynamic          <- getBooleanSetting TestGhcDynamic
+    leadingUnderscore   <- getFlag LeadingUnderscore
     withNativeCodeGen   <- getBooleanSetting TestGhcWithNativeCodeGen
     withInterpreter     <- getBooleanSetting TestGhcWithInterpreter
     unregisterised      <- getBooleanSetting TestGhcUnregisterised
@@ -127,6 +128,7 @@ runTestBuilderArgs = builder RunTest ? do
             , arg "-e", arg $ asBool "ghc_with_smp=" withSMP
 
             , arg "-e", arg $ "config.ghc_dynamic=" ++ show hasDynamic
+            , arg "-e", arg $ "config.leading_underscore=" ++ show leadingUnderscore
 
             , arg "-e", arg $ "config.wordsize=" ++ show wordsize
             , arg "-e", arg $ "config.os="       ++ show os
