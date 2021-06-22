@@ -15,6 +15,7 @@ import GHC.Prelude
 import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Driver.Config
+import GHC.Driver.Config.Diagnostic
 import GHC.Driver.Env
 
 import GHC.Tc.Utils.TcType hiding( substTy )
@@ -816,8 +817,9 @@ tryWarnMissingSpecs dflags callers fn calls_for_fn
   | otherwise                             = return ()
   where
     allCallersInlined = all (isAnyInlinePragma . idInlinePragma) callers
+    diag_opts = initDiagOpts dflags
     doWarn reason =
-      msg (mkMCDiagnostic dflags reason)
+      msg (mkMCDiagnostic diag_opts reason)
         (vcat [ hang (text ("Could not specialise imported function") <+> quotes (ppr fn))
                 2 (vcat [ text "when specialising" <+> quotes (ppr caller)
                         | caller <- callers])

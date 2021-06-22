@@ -36,6 +36,7 @@ import GHC.Driver.Session
 import GHC.Driver.Errors ( printOrThrowDiagnostics )
 import GHC.Driver.Errors.Types ( GhcMessage )
 import GHC.Driver.Config.Logger (initLogFlags)
+import GHC.Driver.Config.Diagnostic (initDiagOpts)
 import GHC.Driver.Env.Types ( Hsc(..), HscEnv(..) )
 
 import GHC.Runtime.Context
@@ -81,7 +82,8 @@ runHsc :: HscEnv -> Hsc a -> IO a
 runHsc hsc_env (Hsc hsc) = do
     (a, w) <- hsc hsc_env emptyMessages
     let dflags = hsc_dflags hsc_env
-    printOrThrowDiagnostics (hsc_logger hsc_env) dflags w
+    let !diag_opts = initDiagOpts dflags
+    printOrThrowDiagnostics (hsc_logger hsc_env) diag_opts w
     return a
 
 runHsc' :: HscEnv -> Hsc a -> IO (a, Messages GhcMessage)

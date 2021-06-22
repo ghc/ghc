@@ -22,6 +22,7 @@ import GHC.Prelude
 -- In a separate module because it hooks into the parser.
 import GHC.Driver.Backpack.Syntax
 import GHC.Driver.Config.Parser (initParserOpts)
+import GHC.Driver.Config.Diagnostic
 import GHC.Driver.Monad
 import GHC.Driver.Session
 import GHC.Driver.Ppr
@@ -100,7 +101,7 @@ doBackpack [src_filename] = do
     modifySession (hscSetFlags dflags)
     -- Cribbed from: preprocessFile / GHC.Driver.Pipeline
     liftIO $ checkProcessArgsResult unhandled_flags
-    liftIO $ handleFlagWarnings logger dflags warns
+    liftIO $ handleFlagWarnings logger (initDiagOpts dflags) warns
     -- TODO: Preprocessing not implemented
 
     buf <- liftIO $ hGetStringBuffer src_filename

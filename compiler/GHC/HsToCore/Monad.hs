@@ -60,6 +60,7 @@ import GHC.Prelude
 import GHC.Driver.Env
 import GHC.Driver.Session
 import GHC.Driver.Ppr
+import GHC.Driver.Config.Diagnostic
 
 import GHC.Hs
 
@@ -481,8 +482,8 @@ diagnosticDs :: DsMessage -> DsM ()
 diagnosticDs dsMessage
   = do { env <- getGblEnv
        ; loc <- getSrcSpanDs
-       ; dflags <- getDynFlags
-       ; let msg = mkMsgEnvelope dflags loc (ds_unqual env) dsMessage
+       ; !diag_opts <- initDiagOpts <$> getDynFlags
+       ; let msg = mkMsgEnvelope diag_opts loc (ds_unqual env) dsMessage
        ; updMutVar (ds_msgs env) (\ msgs -> msg `addMessage` msgs) }
 
 -- | Issue an error, but return the expression for (), so that we can continue

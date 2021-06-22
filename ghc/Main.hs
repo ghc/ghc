@@ -30,6 +30,7 @@ import GHC.Driver.MakeFile  ( doMkDependHS )
 import GHC.Driver.Backpack  ( doBackpack )
 import GHC.Driver.Plugins
 import GHC.Driver.Config.Logger (initLogFlags)
+import GHC.Driver.Config.Diagnostic
 
 import GHC.Platform
 import GHC.Platform.Ways
@@ -223,7 +224,7 @@ main' postLoadMode dflags0 args flagWarnings = do
   handleSourceError (\e -> do
        GHC.printException e
        liftIO $ exitWith (ExitFailure 1)) $ do
-         liftIO $ handleFlagWarnings logger4 dflags4 flagWarnings'
+         liftIO $ handleFlagWarnings logger4 (initDiagOpts dflags4) flagWarnings'
 
   liftIO $ showBanner postLoadMode dflags4
 

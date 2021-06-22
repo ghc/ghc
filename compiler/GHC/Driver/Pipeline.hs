@@ -50,6 +50,7 @@ import GHC.Driver.Errors
 import GHC.Driver.Errors.Types
 import GHC.Driver.Pipeline.Monad
 import GHC.Driver.Config.Parser (initParserOpts)
+import GHC.Driver.Config.Diagnostic
 import GHC.Driver.Phases
 import GHC.Driver.Session
 import GHC.Driver.Backend
@@ -1146,7 +1147,7 @@ runPhase (RealPhase (Cpp sf)) input_fn
            -- we have to be careful to emit warnings only once.
            unless (gopt Opt_Pp dflags1) $ do
                logger <- getLogger
-               liftIO $ handleFlagWarnings logger dflags1 warns
+               liftIO $ handleFlagWarnings logger (initDiagOpts dflags1) warns
 
            -- no need to preprocess CPP, just pass input file along
            -- to the next phase of the pipeline.
@@ -1170,7 +1171,7 @@ runPhase (RealPhase (Cpp sf)) input_fn
             liftIO $ checkProcessArgsResult unhandled_flags
             unless (gopt Opt_Pp dflags2) $ do
                 logger <- getLogger
-                liftIO $ handleFlagWarnings logger dflags2 warns
+                liftIO $ handleFlagWarnings logger (initDiagOpts dflags2) warns
             -- the HsPp pass below will emit warnings
 
             return (RealPhase (HsPp sf), output_fn)
@@ -1203,7 +1204,7 @@ runPhase (RealPhase (HsPp sf)) input_fn = do
             <- liftIO $ parseDynamicFilePragma dflags src_opts
         setDynFlags dflags1
         liftIO $ checkProcessArgsResult unhandled_flags
-        liftIO $ handleFlagWarnings logger dflags1 warns
+        liftIO $ handleFlagWarnings logger (initDiagOpts dflags1) warns
 
         return (RealPhase (Hsc sf), output_fn)
 

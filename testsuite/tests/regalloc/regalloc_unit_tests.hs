@@ -40,6 +40,7 @@ import GHC.Unit.Module
 import GHC.Cmm.DebugBlock
 import GHC
 import GHC.Driver.Monad
+import GHC.Driver.Config.Diagnostic
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Supply
 import GHC.Driver.Session
@@ -129,7 +130,8 @@ compileCmmForRegAllocStats logger dflags cmmFile ncgImplF us = do
     (warnings, errors, parsedCmm) <- parseCmmFile dflags fake_mod (hsc_home_unit hscEnv) cmmFile
 
     -- print parser errors or warnings
-    mapM_ (printMessages logger dflags) [warnings, errors]
+    let !diag_opts = initDiagOpts dflags
+    mapM_ (printMessages logger diag_opts) [warnings, errors]
 
     let initTopSRT = emptySRT thisMod
     cmmGroup <- fmap snd $ cmmPipeline hscEnv initTopSRT $ fst $ fromJust parsedCmm

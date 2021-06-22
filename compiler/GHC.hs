@@ -312,6 +312,7 @@ import GHC.Driver.Session
 import GHC.Driver.Backend
 import GHC.Driver.Config.Parser (initParserOpts)
 import GHC.Driver.Config.Logger (initLogFlags)
+import GHC.Driver.Config.Diagnostic
 import GHC.Driver.Main
 import GHC.Driver.Make
 import GHC.Driver.Hooks
@@ -444,19 +445,18 @@ defaultErrorHandler fm (FlushOut flushOut) inner =
            case fromException exception of
                 -- an IO exception probably isn't our fault, so don't panic
                 Just (ioe :: IOException) ->
-                  fatalErrorMsg'' fm (show ioe)
+                  fm (show ioe)
                 _ -> case fromException exception of
                      Just UserInterrupt ->
                          -- Important to let this one propagate out so our
                          -- calling process knows we were interrupted by ^C
                          liftIO $ throwIO UserInterrupt
                      Just StackOverflow ->
-                         fatalErrorMsg'' fm "stack overflow: use +RTS -K<size> to increase it"
+                         fm "stack overflow: use +RTS -K<size> to increase it"
                      _ -> case fromException exception of
                           Just (ex :: ExitCode) -> liftIO $ throwIO ex
                           _ ->
-                              fatalErrorMsg'' fm
-                                  (show (Panic (show exception)))
+                              fm (show (Panic (show exception)))
            exitWith (ExitFailure 1)
          ) $
 
@@ -466,7 +466,7 @@ defaultErrorHandler fm (FlushOut flushOut) inner =
                 flushOut
                 case ge of
                      Signal _ -> exitWith (ExitFailure 1)
-                     _ -> do fatalErrorMsg'' fm (show ge)
+                     _ -> do fm (show ge)
                              exitWith (ExitFailure 1)
             ) $
   inner
@@ -903,7 +903,8 @@ checkNewDynFlags :: MonadIO m => Logger -> DynFlags -> m DynFlags
 checkNewDynFlags logger dflags = do
   -- See Note [DynFlags consistency]
   let (dflags', warnings) = makeDynFlagsConsistent dflags
-  liftIO $ handleFlagWarnings logger dflags (map (Warn WarningWithoutFlag) warnings)
+  let diag_opts = initDiagOpts dflags
+  liftIO $ handleFlagWarnings logger diag_opts (map (Warn WarningWithoutFlag) warnings)
   return dflags'
 
 checkNewInteractiveDynFlags :: MonadIO m => Logger -> DynFlags -> m DynFlags
@@ -911,10 +912,12 @@ checkNewInteractiveDynFlags logger dflags0 = do
   -- We currently don't support use of StaticPointers in expressions entered on
   -- the REPL. See #12356.
   if xopt LangExt.StaticPointers dflags0
-  then do liftIO $ printOrThrowDiagnostics logger dflags0 $ singleMessage
-            $ fmap GhcDriverMessage
-            $ mkPlainMsgEnvelope dflags0 interactiveSrcSpan DriverStaticPointersNotSupported
-          return $ xopt_unset dflags0 LangExt.StaticPointers
+  then do
+    let diag_opts = initDiagOpts dflags0
+    liftIO $ printOrThrowDiagnostics logger diag_opts $ singleMessage
+      $ fmap GhcDriverMessage
+      $ mkPlainMsgEnvelope diag_opts interactiveSrcSpan DriverStaticPointersNotSupported
+    return $ xopt_unset dflags0 LangExt.StaticPointers
   else return dflags0
 
 
