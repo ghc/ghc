@@ -217,7 +217,7 @@ etaExpandCoAxBranch (CoAxBranch { cab_tvs = tvs
 pprCoAxiom :: CoAxiom br -> SDoc
 -- Used in debug-printing only
 pprCoAxiom ax@(CoAxiom { co_ax_tc = tc, co_ax_branches = branches })
-  = hang (text "axiom" <+> ppr ax <+> dcolon)
+  = hang (axiomKeyword <+> ppr ax <+> dcolon)
        2 (vcat (map (pprCoAxBranchUser tc) (fromBranches branches)))
 
 pprCoAxBranchUser :: TyCon -> CoAxBranch -> SDoc

@@ -119,7 +119,7 @@ instance Outputable InstanceWhat where
   ppr LocalInstance     = text "a locally-quantified instance"
   ppr (TopLevInstance { iw_dfun_id = dfun })
       = hang (text "instance" <+> pprSigmaType (idType dfun))
-           2 (text "--" <+> pprDefinedAt (idName dfun))
+           2 (colourComment $ text "--" <+> pprDefinedAt (idName dfun))
 
 safeOverlap :: InstanceWhat -> Bool
 safeOverlap (TopLevInstance { iw_safe_over = so }) = so

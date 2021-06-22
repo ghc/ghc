@@ -993,9 +993,9 @@ writeMetaTyVarRef tyvar ref ty
              -- Note [Extra-constraint holes in partial type signatures]
 
              kind_msg = hang (text "Ill-kinded update to meta tyvar")
-                           2 (    ppr tyvar <+> text "::" <+> (ppr tv_kind $$ ppr zonked_tv_kind)
+                           2 (    ppr tyvar <+> dcolon <+> (ppr tv_kind $$ ppr zonked_tv_kind)
                               <+> text ":="
-                              <+> ppr ty <+> text "::" <+> (ppr zonked_ty_kind) )
+                              <+> ppr ty <+> dcolon <+> (ppr zonked_ty_kind) )
 
        ; traceTc "writeMetaTyVar" (ppr tyvar <+> text ":=" <+> ppr ty)
 

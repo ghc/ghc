@@ -1583,7 +1583,7 @@ missingFields :: ConLike -> [(FieldLabelString, TcType)] -> SDoc
 missingFields con fields
   = vcat [header, nest 2 rest]
   where
-    pprField (f,ty) = ppr f <+> text "::" <+> ppr ty
+    pprField (f,ty) = ppr f <+> dcolon <+> ppr ty
     rest | null fields = Outputable.empty
          | otherwise   = vcat (fmap pprField fields)
     header = text "Fields of" <+> quotes (ppr con) <+>

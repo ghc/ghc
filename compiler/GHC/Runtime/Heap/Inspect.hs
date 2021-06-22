@@ -715,7 +715,7 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
                       return ((fixFunDictionaries . expandNewtypes) zterm')
                  else do
                       traceTR (text "check2 failed" <+> parens
-                                       (ppr term <+> text "::" <+> ppr new_ty))
+                                       (ppr term <+> dcolon <+> ppr new_ty))
                       -- we have unsound types. Replace constructor types in
                       -- subterms with tyvars
                       zterm' <- mapTermTypeM

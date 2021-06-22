@@ -70,7 +70,7 @@ import GHC.Core.TyCo.Ppr
 import GHC.Types.SafeHaskell ( getSafeMode )
 import GHC.Types.Name
 import GHC.Types.SourceText
-import GHC.Types.Var ( varType )
+import GHC.Types.Var (varType)
 import GHC.Iface.Syntax ( showToHeader )
 import GHC.Builtin.Names
 import GHC.Builtin.Types( stringTyCon_RDR )
@@ -1893,9 +1893,9 @@ sigAndLocDoc str tyThing =
       tyDoc = tyThingTyDoc tyThing
       sigDoc = text str <+> nest 2 (dcolon <+> tyDoc)
       comment =
-        hsep [ char '\t' <> text "--"
-             , pprTyThingCategory tyThing
-             , text "defined" <+> pprNameDefnLoc (getName tyThing)
+        hsep [ char '\t' <> colourComment (text "--")
+             , colourComment $ pprTyThingCategory tyThing
+             , colourComment $ text "defined" <+> pprNameDefnLoc (getName tyThing)
              ]
    in hang sigDoc 2 comment
 
@@ -2391,8 +2391,10 @@ showRealSrcSpan spn = concat [ fp, ":(", show sl, ",", show sc
 kindOfType :: GHC.GhcMonad m => Bool -> String -> m ()
 kindOfType norm str = handleSourceError GHC.printException $ do
     (ty, kind) <- GHC.typeKind norm str
-    printForUser $ vcat [ text str <+> dcolon <+> pprSigmaType kind
-                        , ppWhen norm $ equals <+> pprSigmaType ty ]
+    printForUser $ vcat
+      [ colourCon (text str) <+> dcolon <+> colourTyCon (pprSigmaType kind)
+      , ppWhen norm $ equals <+> colourTyCon (pprSigmaType ty)
+      ]
 
 -----------------------------------------------------------------------------
 -- :quit
@@ -2589,8 +2591,8 @@ browseModule bang modl exports_only = do
             pretty | bang      = pprTyThing showToHeader
                    | otherwise = pprTyThingInContext showToHeader
 
-            labels  [] = text "-- not currently imported"
-            labels  l  = text $ intercalate "\n" $ map qualifier l
+            labels  [] = colourComment $ text "-- not currently imported"
+            labels  l  = colourComment $ text $ intercalate "\n" $ map qualifier l
 
             qualifier :: Maybe [ModuleName] -> String
             qualifier  = maybe "-- defined locally"

@@ -49,7 +49,7 @@ module GHC.Types.Basic (
         maybeParen,
 
         TupleSort(..), tupleSortBoxity, boxityTupleSort,
-        tupleParens,
+        tupleParens, tupleParensTyCon,
 
         sumParens, pprAlternative,
 
@@ -840,8 +840,15 @@ boxityTupleSort Unboxed = UnboxedTuple
 
 tupleParens :: TupleSort -> SDoc -> SDoc
 tupleParens BoxedTuple      p = parens p
-tupleParens UnboxedTuple    p = text "(#" <+> p <+> text "#)"
+tupleParens UnboxedTuple    p = sumParens p
 tupleParens ConstraintTuple p   -- In debug-style write (% Eq a, Ord b %)
+  = ifPprDebug (text "(%" <+> p <+> text "%)")
+               (parens p)
+
+tupleParensTyCon :: TupleSort -> SDoc -> SDoc
+tupleParensTyCon BoxedTuple      p = parensTyCon p
+tupleParensTyCon UnboxedTuple    p = sumParensTyCon p
+tupleParensTyCon ConstraintTuple p   -- In debug-style write (% Eq a, Ord b %)
   = ifPprDebug (text "(%" <+> p <+> text "%)")
                (parens p)
 
@@ -852,9 +859,6 @@ tupleParens ConstraintTuple p   -- In debug-style write (% Eq a, Ord b %)
 *                                                                      *
 ************************************************************************
 -}
-
-sumParens :: SDoc -> SDoc
-sumParens p = text "(#" <+> p <+> text "#)"
 
 -- | Pretty print an alternative in an unboxed sum e.g. "| a | |".
 pprAlternative :: (a -> SDoc) -- ^ The pretty printing function to use

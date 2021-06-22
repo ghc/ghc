@@ -224,16 +224,16 @@ pprFamInst :: FamInst -> SDoc
 --     debug printing. See GHC.Types.TyThing.Ppr.pprFamInst for printing for the user
 pprFamInst (FamInst { fi_flavor = flavor, fi_axiom = ax
                     , fi_tvs = tvs, fi_tys = tys, fi_rhs = rhs })
-  = hang (ppr_tc_sort <+> text "instance"
+  = hang (ppr_tc_sort <+> instanceKeyword
              <+> pprCoAxBranchUser (coAxiomTyCon ax) (coAxiomSingleBranch ax))
        2 (whenPprDebug debug_stuff)
   where
     ppr_tc_sort = case flavor of
-                     SynFamilyInst             -> text "type"
+                     SynFamilyInst             -> typeKeyword
                      DataFamilyInst tycon
-                       | isDataTyCon     tycon -> text "data"
-                       | isNewTyCon      tycon -> text "newtype"
-                       | isAbstractTyCon tycon -> text "data"
+                       | isDataTyCon     tycon -> dataKeyword
+                       | isNewTyCon      tycon -> newtypeKeyword
+                       | isAbstractTyCon tycon -> dataKeyword
                        | otherwise             -> text "WEIRD" <+> ppr tycon
 
     debug_stuff = vcat [ text "Coercion axiom:" <+> ppr ax

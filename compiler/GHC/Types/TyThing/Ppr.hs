@@ -31,7 +31,7 @@ import GHC.Core.FamInstEnv( FamInst(..), FamFlavor(..) )
 import GHC.Core.TyCo.Ppr ( pprUserForAll, pprTypeApp )
 
 import GHC.Iface.Syntax ( ShowSub(..), ShowHowMuch(..), AltPpr(..)
-  , showToHeader, pprIfaceDecl )
+  , HighlightCtx(..), showToHeader, pprIfaceDecl )
 import GHC.Iface.Make ( tyThingToIfaceDecl )
 
 import GHC.Utils.Outputable
@@ -121,7 +121,8 @@ pprFamInst (FamInst { fi_flavor = DataFamilyInst rep_tc })
 pprFamInst (FamInst { fi_flavor = SynFamilyInst, fi_axiom = axiom
                     , fi_tvs = tvs, fi_tys = lhs_tys, fi_rhs = rhs })
   = showWithLoc (pprDefinedAt (getName axiom)) $
-    hang (text "type instance"
+    hang (typeKeyword
+            <+> instanceKeyword
             <+> pprUserForAll (mkTyVarBinders Specified tvs)
                 -- See Note [Printing foralls in type family instances]
                 -- in GHC.Iface.Type
@@ -175,24 +176,36 @@ pprTyThing ss ty_thing
     ss' = case ss_how_much ss of
       ShowHeader (AltPpr Nothing)  -> ss { ss_how_much = ShowHeader ppr' }
       ShowSome xs (AltPpr Nothing) -> ss { ss_how_much = ShowSome xs ppr' }
-      _                   -> ss
+      _                            -> ss
 
     ppr' = AltPpr $ ppr_bndr $ getName ty_thing
 
-    ppr_bndr :: Name -> Maybe (OccName -> SDoc)
+    ppr_bndr :: Name -> Maybe (HighlightCtx -> OccName -> SDoc)
     ppr_bndr name
       | isBuiltInSyntax name
          = Nothing
       | otherwise
          = case nameModule_maybe name of
-             Just mod -> Just $ \occ -> getPprStyle $ \sty ->
-               pprModulePrefix sty mod occ <> ppr occ
+             Just mod -> Just $ \highlightCtx occ -> getPprStyle $ \sty ->
+               let colour = case ty_thing of
+                     AnId     {} -> colourTerm
+                     AConLike {} -> colourCon
+                     ATyCon   {} ->
+                       case highlightCtx of
+                         HighlightTyCon     -> colourTyCon
+                         HighlightCon       -> colourCon
+                         HighlightVar       -> id
+                         HighlightField     -> id
+                         HighlightClsMember -> colourTerm
+                     ACoAxiom {} -> colourAxiom
+              in colour $ pprModulePrefix sty mod occ
+                       <> ppr occ
              Nothing  -> WARN( True, ppr name ) Nothing
              -- Nothing is unexpected here; TyThings have External names
 
 showWithLoc :: SDoc -> SDoc -> SDoc
 showWithLoc loc doc
-    = hang doc 2 (char '\t' <> comment <+> loc)
+    = hang doc 2 (char '\t' <> colourComment (comment <+> loc))
                 -- The tab tries to make them line up a bit
   where
     comment = text "--"

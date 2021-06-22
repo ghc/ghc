@@ -331,7 +331,7 @@ checkValidType :: UserTypeCtxt -> Type -> TcM ()
 -- Assumes argument is fully zonked
 -- Not used for instance decls; checkValidInstance instead
 checkValidType ctxt ty
-  = do { traceTc "checkValidType" (ppr ty <+> text "::" <+> ppr (tcTypeKind ty))
+  = do { traceTc "checkValidType" (ppr ty <+> dcolon <+> ppr (tcTypeKind ty))
        ; rankn_flag  <- xoptM LangExt.RankNTypes
        ; impred_flag <- xoptM LangExt.ImpredicativeTypes
        ; let gen_rank :: Rank -> Rank
@@ -398,7 +398,7 @@ checkValidType ctxt ty
        --     and there may be nested foralls for the subtype test to examine
        ; checkAmbiguity ctxt ty
 
-       ; traceTc "checkValidType done" (ppr ty <+> text "::" <+> ppr (tcTypeKind ty)) }
+       ; traceTc "checkValidType done" (ppr ty <+> dcolon <+> ppr (tcTypeKind ty)) }
 
 checkValidMonoType :: Type -> TcM ()
 -- Assumes argument is fully zonked

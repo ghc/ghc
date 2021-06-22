@@ -31,8 +31,8 @@ module GHC.Utils.Outputable (
         char,
         text, ftext, ptext, ztext,
         int, intWithCommas, integer, word, float, double, rational, doublePrec,
-        parens, cparen, brackets, braces, quotes, quote,
-        doubleQuotes, angleBrackets,
+        parens, sumParens, sumParensTyCon, parensTyCon, cparen, brackets, bracketsTyCon,
+        braces, quotes, quote, doubleQuotes, angleBrackets,
         semi, comma, colon, dcolon, space, equals, dot, vbar,
         arrow, lollipop, larrow, darrow, arrowt, larrowt, arrowtt, larrowtt,
         lambda,
@@ -47,7 +47,13 @@ module GHC.Utils.Outputable (
         speakNth, speakN, speakNOf, plural, isOrAre, doOrDoes, itsOrTheir,
         unicodeSyntax,
 
-        coloured, keyword,
+        coloured, keyword, colourKeyword, colourTyCon, colourCon, colourTerm,
+        colourAxiom, colourComment, colourSyntax, colourPragma,
+        dataKeyword, newtypeKeyword, classKeyword, instanceKeyword, whereKeyword,
+        typeKeyword, familyKeyword, patternKeyword, roleKeyword, defaultKeyword,
+        caseKeyword, ofKeyword, letKeyword, letrecKeyword, inKeyword, axiomKeyword,
+        joinKeyword,
+
 
         -- * Converting 'SDoc' into strings and outputting it
         printSDoc, printSDocLn,
@@ -659,15 +665,24 @@ word n      = sdocOption sdocHexWordLiterals $ \case
 doublePrec :: Int -> Double -> SDoc
 doublePrec p n = text (showFFloat (Just p) n "")
 
-parens, braces, brackets, quotes, quote,
-        doubleQuotes, angleBrackets :: SDoc -> SDoc
+parens, sumParens, sumParensTyCon, parensTyCon, braces,
+        brackets, bracketsTyCon, quotes, quote, doubleQuotes,
+        angleBrackets :: SDoc -> SDoc
 
 {-# INLINE CONLIKE parens #-}
 parens d        = SDoc $ Pretty.parens . runSDoc d
+{-# INLINE CONLIKE sumParens #-}
+sumParens p = text "(#" <+> p <+> text "#)"
+{-# INLINE CONLIKE sumParensTyCon #-}
+sumParensTyCon p = colourTyCon (text "(#") <+> p <+> colourTyCon (text "#)")
+{-# INLINE CONLIKE parensTyCon #-}
+parensTyCon d   = colourTyCon (text "(") <> d <> colourTyCon (text ")")
 {-# INLINE CONLIKE braces #-}
 braces d        = SDoc $ Pretty.braces . runSDoc d
 {-# INLINE CONLIKE brackets #-}
 brackets d      = SDoc $ Pretty.brackets . runSDoc d
+{-# INLINE CONLIKE bracketsTyCon #-}
+bracketsTyCon d = colourTyCon (text "[") <> d <> colourTyCon (text "]")
 {-# INLINE CONLIKE quote #-}
 quote d         = SDoc $ Pretty.quote . runSDoc d
 {-# INLINE CONLIKE doubleQuotes #-}
@@ -698,7 +713,8 @@ arrow, lollipop, larrow, darrow, arrowt, larrowt, arrowtt, larrowtt, lambda :: S
 lparen, rparen, lbrack, rbrack, lbrace, rbrace, blankLine :: SDoc
 
 blankLine  = docToSDoc Pretty.emptyText
-dcolon     = unicodeSyntax (char '∷') (docToSDoc $ Pretty.text "::")
+dcolon     = colourSyntax
+           $ unicodeSyntax (char '∷') (docToSDoc $ Pretty.text "::")
 arrow      = unicodeSyntax (char '→') (docToSDoc $ Pretty.text "->")
 lollipop   = unicodeSyntax (char '⊸') (docToSDoc $ Pretty.text "%1 ->")
 larrow     = unicodeSyntax (char '←') (docToSDoc $ Pretty.text "<-")
@@ -728,7 +744,7 @@ mulArrow d = text "%" <> d <+> arrow
 
 
 forAllLit :: SDoc
-forAllLit = unicodeSyntax (char '∀') (text "forall")
+forAllLit = colourKeyword $ unicodeSyntax (char '∀') (text "forall")
 
 bullet :: SDoc
 bullet = unicode (char '•') (char '*')
@@ -864,6 +880,82 @@ coloured col sdoc = sdocOption sdocShouldUseColor $ \case
 
 keyword :: SDoc -> SDoc
 keyword = coloured Col.colBold
+{-# DEPRECATED keyword "use colourKeyword" #-}
+
+colourKeyword :: SDoc -> SDoc
+colourKeyword = coloured Col.colBold
+
+colourTyCon :: SDoc -> SDoc
+colourTyCon = coloured Col.colBold . coloured Col.colBlueFg
+
+colourCon :: SDoc -> SDoc
+colourCon = coloured Col.colBold . coloured Col.colCyanFg
+
+colourTerm :: SDoc -> SDoc
+colourTerm = id
+
+colourAxiom :: SDoc -> SDoc
+colourAxiom = colourTyCon
+
+colourComment :: SDoc -> SDoc
+colourComment = coloured Col.colGreenFg
+
+dataKeyword :: SDoc
+dataKeyword = colourKeyword (text "data")
+
+newtypeKeyword :: SDoc
+newtypeKeyword = colourKeyword (text "newtype")
+
+classKeyword :: SDoc
+classKeyword = colourKeyword (text "class")
+
+instanceKeyword :: SDoc
+instanceKeyword = colourKeyword (text "instance")
+
+whereKeyword :: SDoc
+whereKeyword = colourKeyword (text "where")
+
+typeKeyword :: SDoc
+typeKeyword = colourKeyword (text "type")
+
+familyKeyword :: SDoc
+familyKeyword = colourKeyword (text "family")
+
+patternKeyword :: SDoc
+patternKeyword = colourKeyword (text "pattern")
+
+roleKeyword :: SDoc
+roleKeyword = colourKeyword (text "role")
+
+defaultKeyword :: SDoc
+defaultKeyword = colourKeyword (text "default")
+
+caseKeyword :: SDoc
+caseKeyword = colourKeyword (text "case")
+
+ofKeyword :: SDoc
+ofKeyword = colourKeyword (text "of")
+
+letKeyword :: SDoc
+letKeyword = colourKeyword (text "let")
+
+letrecKeyword :: SDoc
+letrecKeyword = colourKeyword (text "letrec")
+
+inKeyword :: SDoc
+inKeyword = colourKeyword (text "in")
+
+axiomKeyword :: SDoc
+axiomKeyword = colourKeyword (text "axiom")
+
+joinKeyword :: SDoc
+joinKeyword = colourKeyword (text "join")
+
+colourSyntax :: SDoc -> SDoc
+colourSyntax = coloured Col.colMagentaFg
+
+colourPragma :: SDoc -> SDoc
+colourPragma = coloured Col.colMagentaFg
 
 -----------------------------------------------------------------------
 -- The @Outputable@ class

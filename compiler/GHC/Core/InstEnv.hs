@@ -210,14 +210,14 @@ pprInstance :: ClsInst -> SDoc
 -- Prints the ClsInst as an instance declaration
 pprInstance ispec
   = hang (pprInstanceHdr ispec)
-       2 (vcat [ text "--" <+> pprDefinedAt (getName ispec)
+       2 (vcat [ colourComment $ text "--" <+> pprDefinedAt (getName ispec)
                , whenPprDebug (ppr (is_dfun ispec)) ])
 
 -- * pprInstanceHdr is used in VStudio to populate the ClassView tree
 pprInstanceHdr :: ClsInst -> SDoc
 -- Prints the ClsInst as an instance declaration
 pprInstanceHdr (ClsInst { is_flag = flag, is_dfun = dfun })
-  = text "instance" <+> ppr flag <+> pprSigmaType (idType dfun)
+  = instanceKeyword <+> ppr flag <+> pprSigmaType (idType dfun)
 
 pprInstances :: [ClsInst] -> SDoc
 pprInstances ispecs = vcat (map pprInstance ispecs)

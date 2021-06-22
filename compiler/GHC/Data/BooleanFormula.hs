@@ -208,7 +208,7 @@ pprBooleanFormula' pprVar pprAnd pprOr = go
   go p (Var x)  = pprVar p x
   go p (And []) = cparen (p > 0) $ empty
   go p (And xs) = pprAnd p (map (go 3 . unLoc) xs)
-  go _ (Or  []) = keyword $ text "FALSE"
+  go _ (Or  []) = colourKeyword $ text "FALSE"
   go p (Or  xs) = pprOr p (map (go 2 . unLoc) xs)
   go p (Parens x) = go p (unLoc x)
 
@@ -239,7 +239,7 @@ pprBooleanFormulaNormal = go
   where
     go (Var x)    = pprPrefixOcc x
     go (And xs)   = fsep $ punctuate comma (map (go . unLoc) xs)
-    go (Or [])    = keyword $ text "FALSE"
+    go (Or [])    = colourKeyword $ text "FALSE"
     go (Or xs)    = fsep $ intersperse vbar (map (go . unLoc) xs)
     go (Parens x) = parens (go $ unLoc x)
 

@@ -38,7 +38,7 @@ module GHC.Iface.Syntax (
         -- Pretty printing
         pprIfaceExpr,
         pprIfaceDecl,
-        AltPpr(..), ShowSub(..), ShowHowMuch(..), showToIface, showToHeader
+        AltPpr(..), HighlightCtx(..), ShowSub(..), ShowHowMuch(..), showToIface, showToHeader
     ) where
 
 #include "HsVersions.h"
@@ -717,7 +717,14 @@ data ShowSub
 
 -- See Note [Printing IfaceDecl binders]
 -- The alternative pretty printer referred to in the note.
-newtype AltPpr = AltPpr (Maybe (OccName -> SDoc))
+newtype AltPpr = AltPpr (Maybe (HighlightCtx -> OccName -> SDoc))
+
+data HighlightCtx = HighlightTyCon
+                  | HighlightCon
+                  | HighlightField
+                  | HighlightVar
+                  | HighlightClsMember
+  deriving Show
 
 data ShowHowMuch
   = ShowHeader AltPpr -- ^Header information only, not rhs
@@ -792,13 +799,13 @@ isIfaceDataInstance _          = True
 pprClassRoles :: ShowSub -> IfaceTopBndr -> [IfaceTyConBinder] -> [Role] -> SDoc
 pprClassRoles ss clas binders roles =
     pprRoles (== Nominal)
-             (pprPrefixIfDeclBndr (ss_how_much ss) (occName clas))
+             (pprPrefixIfDeclBndr (ss_how_much ss) HighlightTyCon (occName clas))
              binders
              roles
 
 pprClassStandaloneKindSig :: ShowSub -> IfaceTopBndr -> IfaceKind -> SDoc
 pprClassStandaloneKindSig ss clas =
-  pprStandaloneKindSig (pprPrefixIfDeclBndr (ss_how_much ss) (occName clas))
+  pprStandaloneKindSig (pprPrefixIfDeclBndr (ss_how_much ss) HighlightTyCon (occName clas))
 
 constraintIfaceKind :: IfaceKind
 constraintIfaceKind =
@@ -833,7 +840,7 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
     forall_bndrs = [Bndr (binderVar tc_bndr) Specified | tc_bndr <- binders]
 
     cons       = visibleIfConDecls condecls
-    pp_where   = ppWhen (gadt && not (null cons)) $ text "where"
+    pp_where   = ppWhen (gadt && not (null cons)) $ whereKeyword
     pp_cons    = ppr_trim (map show_con cons) :: [SDoc]
     pp_kind    = ppUnless (if ki_sig_printable
                               then isIfaceTauType kind
@@ -846,8 +853,9 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
     pp_lhs = case parent of
                IfNoParent -> pprIfaceDeclHead suppress_bndr_sig context ss tycon binders
                IfDataInstance{}
-                          -> text "instance" <+> pp_data_inst_forall
-                                             <+> pprIfaceTyConParent parent
+                          -> instanceKeyword
+                         <+> pp_data_inst_forall
+                         <+> pprIfaceTyConParent parent
 
     pp_roles
       | is_data_instance = empty
@@ -872,7 +880,7 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
     -- See Note [Suppressing binder signatures] in GHC.Iface.Type
     suppress_bndr_sig = SuppressBndrSig ki_sig_printable
 
-    name_doc = pprPrefixIfDeclBndr (ss_how_much ss) (occName tycon)
+    name_doc = pprPrefixIfDeclBndr (ss_how_much ss) HighlightTyCon (occName tycon)
 
     add_bars []     = Outputable.empty
     add_bars (c:cs) = sep ((equals <+> c) : map (vbar <+>) cs)
@@ -884,9 +892,9 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
       | otherwise = Nothing
 
     pp_nd = case condecls of
-              IfAbstractTyCon{} -> text "data"
-              IfDataTyCon{}     -> text "data"
-              IfNewTyCon{}      -> text "newtype"
+              IfAbstractTyCon{} -> dataKeyword
+              IfDataTyCon{}     -> dataKeyword
+              IfNewTyCon{}      -> newtypeKeyword
 
     pp_extra = vcat [pprCType ctype]
 
@@ -897,7 +905,7 @@ pprIfaceDecl ss (IfaceClass { ifName  = clas
                             , ifBody = IfAbstractClass })
   = vcat [ pprClassRoles ss clas binders roles
          , pprClassStandaloneKindSig ss clas (mkIfaceTyConKind binders constraintIfaceKind)
-         , text "class" <+> pprIfaceDeclHead suppress_bndr_sig [] ss clas binders <+> pprFundeps fds ]
+         , classKeyword <+> pprIfaceDeclHead suppress_bndr_sig [] ss clas binders <+> pprFundeps fds ]
   where
     -- See Note [Suppressing binder signatures] in GHC.Iface.Type
     suppress_bndr_sig = SuppressBndrSig True
@@ -914,11 +922,11 @@ pprIfaceDecl ss (IfaceClass { ifName  = clas
                               }})
   = vcat [ pprClassRoles ss clas binders roles
          , pprClassStandaloneKindSig ss clas (mkIfaceTyConKind binders constraintIfaceKind)
-         , text "class" <+> pprIfaceDeclHead suppress_bndr_sig context ss clas binders <+> pprFundeps fds <+> pp_where
+         , classKeyword <+> pprIfaceDeclHead suppress_bndr_sig context ss clas binders <+> pprFundeps fds <+> pp_where
          , nest 2 (vcat [ vcat asocs, vcat dsigs
                         , ppShowAllSubs ss (pprMinDef minDef)])]
     where
-      pp_where = ppShowRhs ss $ ppUnless (null sigs && null ats) (text "where")
+      pp_where = ppShowRhs ss $ ppUnless (null sigs && null ats) whereKeyword
 
       asocs = ppr_trim $ map maybeShowAssoc ats
       dsigs = ppr_trim $ map maybeShowSig sigs
@@ -934,11 +942,14 @@ pprIfaceDecl ss (IfaceClass { ifName  = clas
         | otherwise     = Nothing
 
       pprMinDef :: BooleanFormula IfLclName -> SDoc
-      pprMinDef minDef = ppUnless (isTrue minDef) $ -- hide empty definitions
-        text "{-# MINIMAL" <+>
-        pprBooleanFormula
-          (\_ def -> cparen (isLexSym def) (ppr def)) 0 minDef <+>
-        text "#-}"
+      pprMinDef minDef =
+        ppUnless (isTrue minDef) $ -- hide empty definitions
+        -- TODO: colour only boolean formula
+        colourPragma $
+          text "{-# MINIMAL" <+>
+          pprBooleanFormula
+            (\_ def -> cparen (isLexSym def) (ppr def)) 0 minDef <+>
+          text "#-}"
 
       -- See Note [Suppressing binder signatures] in GHC.Iface.Type
       suppress_bndr_sig = SuppressBndrSig True
@@ -948,13 +959,13 @@ pprIfaceDecl ss (IfaceSynonym { ifName    = tc
                               , ifSynRhs  = mono_ty
                               , ifResKind = res_kind})
   = vcat [ pprStandaloneKindSig name_doc (mkIfaceTyConKind binders res_kind)
-         , hang (text "type" <+> pprIfaceDeclHead suppress_bndr_sig [] ss tc binders <+> equals)
+         , hang (typeKeyword <+> pprIfaceDeclHead suppress_bndr_sig [] ss tc binders <+> equals)
            2 (sep [ pprIfaceForAll tvs, pprIfaceContextArr theta, ppr_tau
                   , ppUnless (isIfaceLiftedTypeKind res_kind) (dcolon <+> ppr res_kind) ])
          ]
   where
     (tvs, theta, tau) = splitIfaceSigmaTy mono_ty
-    name_doc = pprPrefixIfDeclBndr (ss_how_much ss) (occName tc)
+    name_doc = pprPrefixIfDeclBndr (ss_how_much ss) HighlightTyCon (occName tc)
 
     -- See Note [Printing type abbreviations] in GHC.Iface.Type
     ppr_tau | tc `hasKey` liftedTypeKindTyConKey ||
@@ -971,12 +982,13 @@ pprIfaceDecl ss (IfaceFamily { ifName = tycon
                              , ifResVar = res_var, ifFamInj = inj })
   | IfaceDataFamilyTyCon <- rhs
   = vcat [ pprStandaloneKindSig name_doc (mkIfaceTyConKind binders res_kind)
-         , text "data family" <+> pprIfaceDeclHead suppress_bndr_sig [] ss tycon binders
+         , dataKeyword <+> familyKeyword <+> pprIfaceDeclHead suppress_bndr_sig [] ss tycon binders
          ]
 
   | otherwise
   = vcat [ pprStandaloneKindSig name_doc (mkIfaceTyConKind binders res_kind)
-         , hang (text "type family"
+         , hang (typeKeyword
+                   <+> familyKeyword
                    <+> pprIfaceDeclHead suppress_bndr_sig [] ss tycon binders
                    <+> ppShowRhs ss (pp_where rhs))
               2 (pp_inj res_var inj <+> ppShowRhs ss (pp_rhs rhs))
@@ -984,9 +996,9 @@ pprIfaceDecl ss (IfaceFamily { ifName = tycon
            nest 2 (ppShowRhs ss (pp_branches rhs))
          ]
   where
-    name_doc = pprPrefixIfDeclBndr (ss_how_much ss) (occName tycon)
+    name_doc = pprPrefixIfDeclBndr (ss_how_much ss) HighlightTyCon (occName tycon)
 
-    pp_where (IfaceClosedSynFamilyTyCon {}) = text "where"
+    pp_where (IfaceClosedSynFamilyTyCon {}) = whereKeyword
     pp_where _                              = empty
 
     pp_inj Nothing    _   = empty
@@ -1000,7 +1012,7 @@ pprIfaceDecl ss (IfaceFamily { ifName = tycon
        tvs -> hsep [vbar, ppr res, text "->", interppSP (map ifTyConBinderName tvs)]
 
     pp_rhs IfaceDataFamilyTyCon
-      = ppShowIface ss (text "data")
+      = ppShowIface ss dataKeyword
     pp_rhs IfaceOpenSynFamilyTyCon
       = ppShowIface ss (text "open")
     pp_rhs IfaceAbstractClosedSynFamilyTyCon
@@ -1014,9 +1026,10 @@ pprIfaceDecl ss (IfaceFamily { ifName = tycon
       = vcat (unzipWith (pprAxBranch
                      (pprPrefixIfDeclBndr
                        (ss_how_much ss)
+                       HighlightTyCon
                        (occName tycon))
                   ) $ zip [0..] brs)
-        $$ ppShowIface ss (text "axiom" <+> ppr ax)
+        $$ ppShowIface ss (axiomKeyword <+> ppr ax)
     pp_branches _ = Outputable.empty
 
     -- See Note [Suppressing binder signatures] in GHC.Iface.Type
@@ -1030,7 +1043,7 @@ pprIfaceDecl _ (IfacePatSyn { ifName = name,
   = sdocWithContext mk_msg
   where
     mk_msg sdocCtx
-      = hang (text "pattern" <+> pprPrefixOcc name)
+      = hang (patternKeyword <+> pprPrefixOcc name)
            2 (dcolon <+> sep [univ_msg
                              , pprIfaceContextArr req_ctxt
                              , ppWhen insert_empty_ctxt $ parens empty <+> darrow
@@ -1046,14 +1059,14 @@ pprIfaceDecl _ (IfacePatSyn { ifName = name,
 
 pprIfaceDecl ss (IfaceId { ifName = var, ifType = ty,
                               ifIdDetails = details, ifIdInfo = info })
-  = vcat [ hang (pprPrefixIfDeclBndr (ss_how_much ss) (occName var) <+> dcolon)
+  = vcat [ hang (pprPrefixIfDeclBndr (ss_how_much ss) HighlightVar (occName var) <+> dcolon)
               2 (pprIfaceSigmaType (ss_forall ss) ty)
          , ppShowIface ss (ppr details)
          , ppShowIface ss (ppr info) ]
 
 pprIfaceDecl _ (IfaceAxiom { ifName = name, ifTyCon = tycon
                            , ifAxBranches = branches })
-  = hang (text "axiom" <+> ppr name <+> dcolon)
+  = hang (axiomKeyword <+> ppr name <+> dcolon)
        2 (vcat $ unzipWith (pprAxBranch (ppr tycon)) $ zip [0..] branches)
 
 pprCType :: Maybe CType -> SDoc
@@ -1068,23 +1081,26 @@ pprRoles suppress_if tyCon bndrs roles
   = sdocOption sdocPrintExplicitKinds $ \print_kinds ->
       let froles = suppressIfaceInvisibles (PrintExplicitKinds print_kinds) bndrs roles
       in ppUnless (all suppress_if froles || null froles) $
-         text "type role" <+> tyCon <+> hsep (map ppr froles)
+         typeKeyword <+> roleKeyword <+> colourTyCon tyCon <+> hsep (map ppr froles)
 
 pprStandaloneKindSig :: SDoc -> IfaceType -> SDoc
-pprStandaloneKindSig tyCon ty = text "type" <+> tyCon <+> text "::" <+> ppr ty
+pprStandaloneKindSig tyCon ty = typeKeyword
+                            <+> colourTyCon tyCon
+                            <+> dcolon
+                            <+> ppr ty
 
-pprInfixIfDeclBndr :: ShowHowMuch -> OccName -> SDoc
-pprInfixIfDeclBndr (ShowSome _ (AltPpr (Just ppr_bndr))) name
-  = pprInfixVar (isSymOcc name) (ppr_bndr name)
-pprInfixIfDeclBndr _ name
+pprInfixIfDeclBndr :: ShowHowMuch -> HighlightCtx -> OccName -> SDoc
+pprInfixIfDeclBndr (ShowSome _ (AltPpr (Just ppr_bndr))) hiCtx name
+  = pprInfixVar (isSymOcc name) (ppr_bndr hiCtx name)
+pprInfixIfDeclBndr _ _ name
   = pprInfixVar (isSymOcc name) (ppr name)
 
-pprPrefixIfDeclBndr :: ShowHowMuch -> OccName -> SDoc
-pprPrefixIfDeclBndr (ShowHeader (AltPpr (Just ppr_bndr))) name
-  = parenSymOcc name (ppr_bndr name)
-pprPrefixIfDeclBndr (ShowSome _ (AltPpr (Just ppr_bndr))) name
-  = parenSymOcc name (ppr_bndr name)
-pprPrefixIfDeclBndr _ name
+pprPrefixIfDeclBndr :: ShowHowMuch -> HighlightCtx -> OccName -> SDoc
+pprPrefixIfDeclBndr (ShowHeader (AltPpr (Just ppr_bndr))) hiCtx name
+  = parenSymOcc name (ppr_bndr hiCtx name)
+pprPrefixIfDeclBndr (ShowSome _ (AltPpr (Just ppr_bndr))) hiCtx name
+  = parenSymOcc name (ppr_bndr hiCtx name)
+pprPrefixIfDeclBndr _ _ name
   = parenSymOcc name (ppr name)
 
 instance Outputable IfaceClassOp where
@@ -1095,11 +1111,11 @@ pprIfaceClassOp ss (IfaceClassOp n ty dm)
   = pp_sig n ty $$ generic_dm
   where
    generic_dm | Just (GenericDM dm_ty) <- dm
-              =  text "default" <+> pp_sig n dm_ty
+              =  defaultKeyword <+> pp_sig n dm_ty
               | otherwise
               = empty
    pp_sig n ty
-     = pprPrefixIfDeclBndr (ss_how_much ss) (occName n)
+     = pprPrefixIfDeclBndr (ss_how_much ss) HighlightClsMember (occName n)
      <+> dcolon
      <+> pprIfaceSigmaType ShowForAllWhen ty
 
@@ -1130,7 +1146,7 @@ pprIfaceDeclHead :: SuppressBndrSig
 pprIfaceDeclHead suppress_sig context ss tc_occ bndrs
   = sdocOption sdocPrintExplicitKinds $ \print_kinds ->
     sep [ pprIfaceContextArr context
-        , pprPrefixIfDeclBndr (ss_how_much ss) (occName tc_occ)
+        , pprPrefixIfDeclBndr (ss_how_much ss) HighlightTyCon (occName tc_occ)
           <+> pprIfaceTyConBinders suppress_sig
                 (suppressIfaceInvisibles (PrintExplicitKinds print_kinds) bndrs bndrs) ]
 
@@ -1152,14 +1168,14 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
       | is_infix
       , [ty1, ty2] <- pp_args
       = sep [ ty1
-            , pprInfixIfDeclBndr how_much (occName name)
+            , pprInfixIfDeclBndr how_much HighlightCon (occName name)
             , ty2]
       | otherwise = pp_prefix_con <+> sep pp_args
 
     how_much = ss_how_much ss
     tys_w_strs :: [(IfaceBang, IfaceType)]
     tys_w_strs = zip stricts (map snd arg_tys)
-    pp_prefix_con = pprPrefixIfDeclBndr how_much (occName name)
+    pp_prefix_con = pprPrefixIfDeclBndr how_much HighlightCon (occName name)
 
     -- If we're pretty-printing a H98-style declaration with existential
     -- quantification, then user_tvbs will always consist of the universal
@@ -1187,10 +1203,11 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
                                                             else arrow)
 
     ppr_bang IfNoBang = whenPprDebug $ char '_'
-    ppr_bang IfStrict = char '!'
-    ppr_bang IfUnpack = text "{-# UNPACK #-}"
-    ppr_bang (IfUnpackCo co) = text "! {-# UNPACK #-}" <>
-                               pprParendIfaceCoercion co
+    ppr_bang IfStrict = colourSyntax $ char '!'
+    ppr_bang IfUnpack = colourPragma $ text "{-# UNPACK #-}"
+    ppr_bang (IfUnpackCo co) = colourSyntax (char '!')
+                           <+> colourPragma (text "{-# UNPACK #-}")
+                           <>  pprParendIfaceCoercion co
 
     pprFieldArgTy, pprArgTy :: (IfaceBang, IfaceType) -> SDoc
     -- If using record syntax, the only reason one would need to parenthesize
@@ -1247,7 +1264,7 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
 
     maybe_show_label :: FieldLabel -> (IfaceBang, IfaceType) -> Maybe SDoc
     maybe_show_label lbl bty
-      | showSub ss sel = Just (pprPrefixIfDeclBndr how_much occ
+      | showSub ss sel = Just (pprPrefixIfDeclBndr how_much HighlightField occ
                                 <+> dcolon <+> pprFieldArgTy bty)
       | otherwise      = Nothing
       where
@@ -1276,7 +1293,7 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
     --    variables, if necessary. (See Note
     --    [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in GHC.Core.TyCo.Rep.)
     ppr_tc_app gadt_subst =
-      pprPrefixIfDeclBndr how_much (occName tycon)
+      pprPrefixIfDeclBndr how_much HighlightTyCon (occName tycon)
       <+> pprParendIfaceAppArgs
             (substIfaceAppArgs gadt_subst (mk_tc_app_args tc_binders))
 
@@ -1303,7 +1320,8 @@ instance Outputable IfaceClsInst where
   ppr (IfaceClsInst { ifDFun = dfun_id, ifOFlag = flag
                     , ifInstCls = cls, ifInstTys = mb_tcs
                     , ifInstOrph = orph })
-    = hang (text "instance" <+> ppr flag
+    = hang (instanceKeyword
+              <+> ppr flag
               <+> (if isOrphan orph then text "[orphan]" else Outputable.empty)
               <+> ppr cls <+> brackets (pprWithCommas ppr_rough mb_tcs))
          2 (equals <+> ppr dfun_id)
@@ -1311,7 +1329,8 @@ instance Outputable IfaceClsInst where
 instance Outputable IfaceFamInst where
   ppr (IfaceFamInst { ifFamInstFam = fam, ifFamInstTys = mb_tcs
                     , ifFamInstAxiom = tycon_ax, ifFamInstOrph = orph })
-    = hang (text "family instance"
+    = hang (familyKeyword
+              <+> instanceKeyword
               <+> (if isOrphan orph then text "[orphan]" else Outputable.empty)
               <+> ppr fam <+> pprWithCommas (brackets . ppr_rough) mb_tcs)
          2 (equals <+> ppr tycon_ax)
@@ -1379,19 +1398,19 @@ pprIfaceExpr add_par i@(IfaceLam _ _)
     collect bs e              = (reverse bs, e)
 
 pprIfaceExpr add_par (IfaceECase scrut ty)
-  = add_par (sep [ text "case" <+> pprIfaceExpr noParens scrut
+  = add_par (sep [ caseKeyword <+> pprIfaceExpr noParens scrut
                  , text "ret_ty" <+> pprParendIfaceType ty
-                 , text "of {}" ])
+                 , ofKeyword <+> text "{}" ])
 
 pprIfaceExpr add_par (IfaceCase scrut bndr [IfaceAlt con bs rhs])
-  = add_par (sep [text "case"
-                        <+> pprIfaceExpr noParens scrut <+> text "of"
+  = add_par (sep [caseKeyword
+                        <+> pprIfaceExpr noParens scrut <+> ofKeyword
                         <+> ppr bndr <+> char '{' <+> ppr_con_bs con bs <+> arrow,
                   pprIfaceExpr noParens rhs <+> char '}'])
 
 pprIfaceExpr add_par (IfaceCase scrut bndr alts)
-  = add_par (sep [text "case"
-                        <+> pprIfaceExpr noParens scrut <+> text "of"
+  = add_par (sep [caseKeyword
+                        <+> pprIfaceExpr noParens scrut <+> ofKeyword
                         <+> ppr bndr <+> char '{',
                   nest 2 (sep (map pprIfaceAlt alts)) <+> char '}'])
 
@@ -1401,15 +1420,15 @@ pprIfaceExpr _       (IfaceCast expr co)
          pprParendIfaceCoercion co]
 
 pprIfaceExpr add_par (IfaceLet (IfaceNonRec b rhs) body)
-  = add_par (sep [text "let {",
+  = add_par (sep [letKeyword <+> text "{",
                   nest 2 (ppr_bind (b, rhs)),
-                  text "} in",
+                  text "}" <+> inKeyword,
                   pprIfaceExpr noParens body])
 
 pprIfaceExpr add_par (IfaceLet (IfaceRec pairs) body)
-  = add_par (sep [text "letrec {",
+  = add_par (sep [letrecKeyword <+> text "{",
                   nest 2 (sep (map ppr_bind pairs)),
-                  text "} in",
+                  text "}" <+> inKeyword,
                   pprIfaceExpr noParens body])
 
 pprIfaceExpr add_par (IfaceTick tickish e)
@@ -1471,7 +1490,7 @@ instance Outputable IfaceInfoItem where
 
 instance Outputable IfaceJoinInfo where
   ppr IfaceNotJoinPoint   = empty
-  ppr (IfaceJoinPoint ar) = angleBrackets (text "join" <+> ppr ar)
+  ppr (IfaceJoinPoint ar) = angleBrackets (joinKeyword <+> ppr ar)
 
 instance Outputable IfaceUnfolding where
   ppr (IfCompulsory e)     = text "<compulsory>" <+> parens (ppr e)

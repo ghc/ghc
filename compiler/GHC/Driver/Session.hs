@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RankNTypes #-}
 
 -------------------------------------------------------------------------------
@@ -4920,10 +4921,10 @@ foreign import ccall unsafe "enableTimingStats" enableTimingStats :: IO ()
 -- | Initialize the pretty-printing options
 initSDocContext :: DynFlags -> PprStyle -> SDocContext
 initSDocContext dflags style = SDC
-  { sdocStyle                       = style
+  { sdocStyle                       = setStyleColoured sdocShouldUseColor style
   , sdocColScheme                   = colScheme dflags
   , sdocLastColour                  = Col.colReset
-  , sdocShouldUseColor              = overrideWith (canUseColor dflags) (useColor dflags)
+  , sdocShouldUseColor
   , sdocDefaultDepth                = pprUserLength dflags
   , sdocLineLength                  = pprCols dflags
   , sdocCanUseUnicode               = useUnicode dflags
@@ -4956,6 +4957,8 @@ initSDocContext dflags style = SDC
   , sdocPrintTypeAbbreviations      = True
   , sdocUnitIdForUser               = ftext
   }
+  where
+  sdocShouldUseColor = overrideWith (canUseColor dflags) (useColor dflags)
 
 -- | Initialize the pretty-printing options using the default user style
 initDefaultSDocContext :: DynFlags -> SDocContext

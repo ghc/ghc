@@ -1210,7 +1210,7 @@ ppr_itv_bndrs [] _ = ([], [])
 
 pprIfaceForAllCo :: [(IfLclName, IfaceCoercion)] -> SDoc
 pprIfaceForAllCo []  = empty
-pprIfaceForAllCo tvs = text "forall" <+> pprIfaceForAllCoBndrs tvs <> dot
+pprIfaceForAllCo tvs = forAllLit <+> pprIfaceForAllCoBndrs tvs <> dot
 
 pprIfaceForAllCoBndrs :: [(IfLclName, IfaceCoercion)] -> SDoc
 pprIfaceForAllCoBndrs bndrs = hsep $ map pprIfaceForAllCoBndr bndrs
@@ -1390,7 +1390,7 @@ pprIfaceTyList :: PprPrec -> IfaceType -> IfaceType -> SDoc
 pprIfaceTyList ctxt_prec ty1 ty2
   = case gather ty2 of
       (arg_tys, Nothing)
-        -> char '\'' <> brackets (pprSpaceIfPromotedTyCon ty1 (fsep
+        -> colourTyCon (char '\'') <> bracketsTyCon (pprSpaceIfPromotedTyCon ty1 (fsep
                         (punctuate comma (map (ppr_ty topPrec) (ty1:arg_tys)))))
       (arg_tys, Just tl)
         -> maybeParen ctxt_prec funPrec $ hang (ppr_ty funPrec ty1)
@@ -1422,7 +1422,7 @@ pprTyTcApp ctxt_prec tc tys =
        , IA_Arg (IfaceLitTy (IfaceStrTyLit n))
                 Required (IA_Arg ty Required IA_Nil) <- tys
        -> maybeParen ctxt_prec funPrec
-         $ char '?' <> ftext n <> text "::" <> ppr_ty topPrec ty
+         $ char '?' <> ftext n <> dcolon <> ppr_ty topPrec ty
 
        | IfaceTupleTyCon arity sort <- ifaceTyConSort info
        , not debug
@@ -1467,9 +1467,9 @@ pprTyTcApp ctxt_prec tc tys =
 
 ppr_kind_type :: PprPrec -> SDoc
 ppr_kind_type ctxt_prec = sdocOption sdocStarIsType $ \case
-   False -> text "Type"
+   False -> colourTyCon $ text "Type"
    True  -> maybeParen ctxt_prec starPrec $
-              unicodeSyntax (char '★') (char '*')
+              colourTyCon $ unicodeSyntax (char '★') (char '*')
 
 -- | Pretty-print a type-level equality.
 -- Returns (Just doc) if the argument is a /saturated/ application
@@ -1574,25 +1574,30 @@ pprIfaceCoTcApp ctxt_prec tc tys =
 ppr_iface_tc_app :: (PprPrec -> (a, ArgFlag) -> SDoc)
                  -> PprPrec -> IfaceTyCon -> [(a, ArgFlag)] -> SDoc
 ppr_iface_tc_app pp _ tc [ty]
-  | tc `ifaceTyConHasKey` listTyConKey = pprPromotionQuote tc <> brackets (pp topPrec ty)
+  | tc `ifaceTyConHasKey` listTyConKey
+  = pprPromotionQuote tc <> bracketsTyCon (pp topPrec ty)
 
 ppr_iface_tc_app pp ctxt_prec tc tys
   | tc `ifaceTyConHasKey` liftedTypeKindTyConKey
   = ppr_kind_type ctxt_prec
 
   | not (isSymOcc (nameOccName (ifaceTyConName tc)))
-  = pprIfacePrefixApp ctxt_prec (ppr tc) (map (pp appPrec) tys)
+  = pprIfacePrefixApp ctxt_prec (colourTyCon $ ppr tc) (map (pp appPrec) tys)
 
   | [ ty1@(_, Required)
     , ty2@(_, Required) ] <- tys
       -- Infix, two visible arguments (we know nothing of precedence though).
       -- Don't apply this special case if one of the arguments is invisible,
       -- lest we print something like (@LiftedRep -> @LiftedRep) (#15941).
-  = pprIfaceInfixApp ctxt_prec (ppr tc)
+  = pprIfaceInfixApp ctxt_prec (colourTyCon $ ppr tc)
                      (pp opPrec ty1) (pp opPrec ty2)
 
   | otherwise
-  = pprIfacePrefixApp ctxt_prec (parens (ppr tc)) (map (pp appPrec) tys)
+  = pprIfacePrefixApp ctxt_prec (mkParens (ppr tc)) (map (pp appPrec) tys)
+      where
+        mkParens = case tys of
+          _:[] -> parens
+          _    -> parensTyCon
 
 pprSum :: Arity -> PromotionFlag -> IfaceAppArgs -> SDoc
 pprSum _arity is_promoted args
@@ -1601,7 +1606,7 @@ pprSum _arity is_promoted args
     let tys   = appArgsIfaceTypes args
         args' = drop (length tys `div` 2) tys
     in pprPromotionQuoteI is_promoted
-       <> sumParens (pprWithBars (ppr_ty topPrec) args')
+       <> sumParensTyCon (pprWithBars (ppr_ty topPrec) args')
 
 pprTuple :: PprPrec -> TupleSort -> PromotionFlag -> IfaceAppArgs -> SDoc
 pprTuple ctxt_prec sort promoted args =
@@ -1614,13 +1619,13 @@ pprTuple ctxt_prec sort promoted args =
                _ -> id
          in ppr_tuple_app args' $
             pprPromotionQuoteI IsPromoted <>
-            tupleParens sort (spaceIfPromoted (pprWithCommas pprIfaceType args'))
+            tupleParensTyCon sort (spaceIfPromoted (pprWithCommas pprIfaceType args'))
 
     NotPromoted
       |  ConstraintTuple <- sort
       ,  IA_Nil <- args
       -> maybeParen ctxt_prec sigPrec $
-         text "() :: Constraint"
+         text "()" <+> dcolon <+> text "Constraint"
 
       | otherwise
       ->   -- drop the RuntimeRep vars.

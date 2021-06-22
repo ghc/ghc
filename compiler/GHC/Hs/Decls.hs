@@ -663,7 +663,7 @@ instance OutputableBndrId p
 instance OutputableBndrId p
        => Outputable (StandaloneKindSig (GhcPass p)) where
   ppr (StandaloneKindSig _ v ki)
-    = text "type" <+> pprPrefixOcc (unLoc v) <+> text "::" <+> ppr ki
+    = text "type" <+> pprPrefixOcc (unLoc v) <+> dcolon <+> ppr ki
 
 pp_condecls :: forall p. OutputableBndrId p => [LConDecl (GhcPass p)] -> SDoc
 pp_condecls cs

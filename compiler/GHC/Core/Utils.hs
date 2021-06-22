@@ -334,7 +334,7 @@ mkCast expr co
   = let from_ty = coercionLKind co in
     WARN( not (from_ty `eqType` exprType expr),
           text "Trying to coerce" <+> text "(" <> ppr expr
-          $$ text "::" <+> ppr (exprType expr) <> text ")"
+          $$ dcolon <+> ppr (exprType expr) <> text ")"
           $$ ppr co $$ ppr (coercionType co)
           $$ callStackDoc )
     (Cast expr co)

@@ -46,9 +46,10 @@ showPpr dflags thing = showSDoc dflags (ppr thing)
 
 -- | Allows caller to specify the PrintUnqualified to use
 showSDocForUser :: DynFlags -> UnitState -> PrintUnqualified -> SDoc -> String
-showSDocForUser dflags unit_state unqual doc = renderWithContext (initSDocContext dflags sty) doc'
+showSDocForUser dflags unit_state unqual doc = renderWithContext ctx doc'
    where
-      sty  = mkUserStyle unqual AllTheWay
+      ctx  = initSDocContext dflags
+           $ mkUserStyle unqual AllTheWay
       doc' = pprWithUnitState unit_state doc
 
 showSDocDump :: SDocContext -> SDoc -> String
@@ -64,7 +65,9 @@ showSDocDebug dflags d = renderWithContext ctx d
 printForUser :: DynFlags -> Handle -> PrintUnqualified -> Depth -> SDoc -> IO ()
 printForUser dflags handle unqual depth doc
   = printSDocLn ctx (PageMode False) handle doc
-    where ctx = initSDocContext dflags (mkUserStyle unqual depth)
+    where ctx = initSDocContext dflags
+              . mkUserStyle unqual
+              $ depth
 
 -- | Like 'printSDocLn' but specialized with 'LeftMode' and
 -- @'PprCode' 'CStyle'@.  This is typically used to output C-- code.
