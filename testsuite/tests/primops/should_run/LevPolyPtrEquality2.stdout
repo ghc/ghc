@@ -1,0 +1,3 @@
+eq a b: True
+eq a c: False
+eq b c: False
