@@ -60,6 +60,13 @@
 # endif
 #endif
 
+#if defined(HAVE_LINUX_MMAN_H)
+#include <linux/mman.h>
+
+#define HUGEPAGE_SIZE (2*1024*1024)
+#define HUGEPAGE_FLAGS (MAP_HUGETLB | MAP_HUGE_2MB)
+#endif
+
 #if !defined(darwin_HOST_OS)
 # undef RESERVE_FLAGS
 # if defined(MAP_GUARD)
@@ -72,6 +79,9 @@
 #  endif
 # endif
 #endif
+
+int huge_tried = 0;
+int huge_failed = 0;
 
 static void *next_request = 0;
 
@@ -233,12 +243,28 @@ my_mmap (void *addr, W_ size, int operation)
         errorBelch("my_mmap(,,MEM_RESERVE) not supported on this platform");
 # endif
     } else if (operation == MEM_COMMIT) {
-        flags = MAP_FIXED | MAP_ANON | MAP_PRIVATE;
+        flags = MAP_FIXED | MAP_ANONYMOUS | MAP_PRIVATE;
+#if defined(HUGEPAGE_SIZE)
+        if ( RtsFlags.GcFlags.hugepages &&
+            (size & (HUGEPAGE_SIZE - 1)) == 0) {
+          huge_tried += 1;
+          flags |= HUGEPAGE_FLAGS;
+        }
+#endif /* defined(HUGEPAGE_SIZE) */
     } else {
         flags = MAP_ANON | MAP_PRIVATE;
     }
 
     ret = mmap(addr, size, prot, flags, -1, 0);
+#if defined(HUGEPAGE_SIZE)
+    // If the mmap failed, and we tried with HUGEPAGE_FLAGS
+    // then retry without.
+    if (ret == MAP_FAILED && flags & HUGEPAGE_FLAGS){
+      huge_failed += 1;
+      flags &= ~HUGEPAGE_FLAGS;
+      ret = mmap(addr, size, prot, flags, -1, 0);
+    }
+#endif
 # if defined(linux_HOST_OS)
     if (ret == MAP_FAILED && errno == EPERM) {
         // Linux may return EPERM if it tried to give us
@@ -472,6 +498,7 @@ void setExecutable (void *p, W_ len, bool exec)
 
 #if defined(USE_LARGE_ADDRESS_SPACE)
 
+
 static void *
 osTryReserveHeapMemory (W_ len, void *hint)
 {
@@ -485,6 +512,7 @@ osTryReserveHeapMemory (W_ len, void *hint)
        and then we discard what we don't need */
 
     base = my_mmap(hint, len + MBLOCK_SIZE, MEM_RESERVE);
+
     if (base == NULL)
         return NULL;
 
