@@ -1,7 +1,11 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE Safe #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
+{-# LANGUAGE TypeApplications #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Functor.Sum
@@ -23,12 +27,18 @@ module Data.Functor.Sum (
 
 import Control.Applicative ((<|>))
 import Data.Data (Data)
+import Data.Kind
 import Data.Functor.Classes
 import GHC.Generics (Generic, Generic1)
 import Text.Read (Read(..), readListDefault, readListPrecDefault)
 
 -- | Lifted sum of functors.
-data Sum f g a = InL (f a) | InR (g a)
+--
+-- @since 4.9.0.0
+type Sum :: forall k. (k -> Type) -> (k -> Type) -> (k -> Type)
+data Sum f g a where
+  InL :: forall {k} f g a. f a -> Sum @k f g a
+  InR :: forall {k} f g a. g a -> Sum @k f g a
   deriving ( Data     -- ^ @since 4.9.0.0
            , Generic  -- ^ @since 4.9.0.0
            , Generic1 -- ^ @since 4.9.0.0

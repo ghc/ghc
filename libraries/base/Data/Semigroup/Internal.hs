@@ -1,8 +1,11 @@
-{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
+{-# LANGUAGE TypeApplications #-}
 
 -- | Auxiliary definitions for 'Semigroup'
 --
@@ -301,27 +304,30 @@ instance Monad Product where
 -- Just 24
 --
 -- @since 4.8.0.0
-newtype Alt f a = Alt {getAlt :: f a}
-  deriving ( Generic     -- ^ @since 4.8.0.0
-           , Generic1    -- ^ @since 4.8.0.0
-           , Read        -- ^ @since 4.8.0.0
-           , Show        -- ^ @since 4.8.0.0
-           , Eq          -- ^ @since 4.8.0.0
-           , Ord         -- ^ @since 4.8.0.0
-           , Num         -- ^ @since 4.8.0.0
-           , Enum        -- ^ @since 4.8.0.0
-           , Monad       -- ^ @since 4.8.0.0
-           , MonadPlus   -- ^ @since 4.8.0.0
-           , Applicative -- ^ @since 4.8.0.0
-           , Alternative -- ^ @since 4.8.0.0
-           , Functor     -- ^ @since 4.8.0.0
-           )
+type    Alt :: forall k. (k -> Type) -> k -> Type
+newtype Alt f a where
+  Alt :: forall {k} f a. { getAlt :: f a } -> Alt @k f a
+  deriving
+    ( Generic     -- ^ @since 4.8.0.0
+    , Generic1    -- ^ @since 4.8.0.0
+    , Read        -- ^ @since 4.8.0.0
+    , Show        -- ^ @since 4.8.0.0
+    , Eq          -- ^ @since 4.8.0.0
+    , Ord         -- ^ @since 4.8.0.0
+    , Num         -- ^ @since 4.8.0.0
+    , Enum        -- ^ @since 4.8.0.0
+    , Monad       -- ^ @since 4.8.0.0
+    , MonadPlus   -- ^ @since 4.8.0.0
+    , Applicative -- ^ @since 4.8.0.0
+    , Alternative -- ^ @since 4.8.0.0
+    , Functor     -- ^ @since 4.8.0.0
+    )
 
 -- | @since 4.9.0.0
 instance Alternative f => Semigroup (Alt f a) where
-    (<>) = coerce ((<|>) :: f a -> f a -> f a)
+    (<>) = (<|>)
     stimes = stimesMonoid
 
 -- | @since 4.8.0.0
 instance Alternative f => Monoid (Alt f a) where
-    mempty = Alt empty
+    mempty = empty

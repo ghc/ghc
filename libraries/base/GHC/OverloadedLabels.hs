@@ -4,6 +4,7 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -46,7 +47,8 @@ module GHC.OverloadedLabels
        ( IsLabel(..)
        ) where
 
-import GHC.Base ( Symbol )
+import GHC.Base ( Constraint, Symbol, Type )
 
-class IsLabel (x :: Symbol) a where
+type  IsLabel :: Symbol -> Type -> Constraint
+class IsLabel str a where
   fromLabel :: a

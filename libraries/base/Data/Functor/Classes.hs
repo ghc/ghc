@@ -1,4 +1,5 @@
 {-# LANGUAGE Safe #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Functor.Classes
@@ -75,6 +76,7 @@ import Data.Complex (Complex((:+)))
 import GHC.Tuple (Solo (..))
 import GHC.Read (expectP, list, paren)
 import Data.Fixed (Fixed (..))
+import Data.Kind (Type, Constraint)
 
 import Text.ParserCombinators.ReadPrec (ReadPrec, readPrec_to_S, readS_to_Prec)
 import Text.Read (Read(..), parens, prec, step)
@@ -89,6 +91,7 @@ import Text.Show (showListWith)
 -- | Lifting of the 'Eq' class to unary type constructors.
 --
 -- @since 4.9.0.0
+type  Eq1 :: (Type -> Type) -> Constraint
 class Eq1 f where
     -- | Lift an equality test through the type constructor.
     --
@@ -109,6 +112,7 @@ eq1 = liftEq (==)
 -- | Lifting of the 'Ord' class to unary type constructors.
 --
 -- @since 4.9.0.0
+type  Ord1 :: (Type -> Type) -> Constraint
 class (Eq1 f) => Ord1 f where
     -- | Lift a 'compare' function through the type constructor.
     --
@@ -142,6 +146,7 @@ compare1 = liftCompare compare
 -- For more information, refer to the documentation for the 'Read' class.
 --
 -- @since 4.9.0.0
+type  Read1 :: (Type -> Type) -> Constraint
 class Read1 f where
     {-# MINIMAL liftReadsPrec | liftReadPrec #-}
 
@@ -217,6 +222,7 @@ liftReadListPrecDefault rp rl = list (liftReadPrec rp rl)
 -- | Lifting of the 'Show' class to unary type constructors.
 --
 -- @since 4.9.0.0
+type  Show1 :: (Type -> Type) -> Constraint
 class Show1 f where
     -- | 'showsPrec' function for an application of the type constructor
     -- based on 'showsPrec' and 'showList' functions for the argument type.
@@ -245,6 +251,7 @@ showsPrec1 = liftShowsPrec showsPrec showList
 -- | Lifting of the 'Eq' class to binary type constructors.
 --
 -- @since 4.9.0.0
+type  Eq2 :: (Type -> Type -> Type) -> Constraint
 class Eq2 f where
     -- | Lift equality tests through the type constructor.
     --
@@ -265,6 +272,7 @@ eq2 = liftEq2 (==) (==)
 -- | Lifting of the 'Ord' class to binary type constructors.
 --
 -- @since 4.9.0.0
+type  Ord2 :: (Type -> Type -> Type) -> Constraint
 class (Eq2 f) => Ord2 f where
     -- | Lift 'compare' functions through the type constructor.
     --
@@ -298,6 +306,7 @@ compare2 = liftCompare2 compare compare
 --
 -- For more information, refer to the documentation for the 'Read' class.
 -- @since 4.9.0.0
+type  Read2 :: (Type -> Type -> Type) -> Constraint
 class Read2 f where
     {-# MINIMAL liftReadsPrec2 | liftReadPrec2 #-}
 
@@ -381,6 +390,7 @@ liftReadListPrec2Default rp1 rl1 rp2 rl2 = list (liftReadPrec2 rp1 rl1 rp2 rl2)
 -- | Lifting of the 'Show' class to binary type constructors.
 --
 -- @since 4.9.0.0
+type  Show2 :: (Type -> Type -> Type) -> Constraint
 class Show2 f where
     -- | 'showsPrec' function for an application of the type constructor
     -- based on 'showsPrec' and 'showList' functions for the argument types.
