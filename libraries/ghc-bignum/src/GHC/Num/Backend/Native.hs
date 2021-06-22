@@ -182,8 +182,8 @@ bignat_mul mwa wa wb s1 =
       !ctzB = word2Int# (bigNatCtzWord# wb)
 
       -- multiply a single bj Word# to the whole wa WordArray
-      mul bj j i carry s
-         | isTrue# (i ==# szA)
+      mul mwa wa bj j i carry s
+         | isTrue# (i ==# wordArraySize# wa)
          -- write the carry
          = mwaAddInplaceWord# mwa (i +# j) carry s
 
@@ -193,7 +193,7 @@ bignat_mul mwa wa wb s1 =
                      !(# c'',r #) = plusWord2# r' carry
                      carry'       = plusWord# c' c''
                   in case mwaAddInplaceWord# mwa (i +# j) r s of
-                        s' -> mul bj j (i +# 1#) carry' s'
+                        s' -> mul mwa wa bj j (i +# 1#) carry' s'
 
       -- for each bj in wb, call `mul bj wa`
       mulEachB i s
@@ -201,7 +201,7 @@ bignat_mul mwa wa wb s1 =
          | True = case indexWordArray# wb i of
             -- detect bj == 0## and skip the loop
             0## -> mulEachB (i +# 1#) s
-            bi  -> case mul bi i ctzA 0## s of
+            bi  -> case mul mwa wa bi i ctzA 0## s of
                      s' -> mulEachB (i +# 1#) s'
 
 bignat_sub
