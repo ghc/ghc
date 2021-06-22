@@ -130,3 +130,17 @@ EventlogOutput2:
 	"$(TEST_HC)" -eventlog -v0 EventlogOutput.hs
 	./EventlogOutput +RTS -l
 	ls EventlogOutput.eventlog >/dev/null
+
+.PHONY: EventlogOutput_IPE
+EventlogOutput_IPE:
+	"$(TEST_HC)" -debug -finfo-table-map -v0 EventlogOutput.hs
+	./EventlogOutput +RTS -la
+	ls EventlogOutput.eventlog >/dev/null
+	ghc-events show EventlogOutput.eventlog 2>&1 | grep "Info Table Source Position"
+
+.PHONY: ipeEventLog
+ipeEventLog:
+	"$(TEST_HC)" -debug -finfo-table-map -v0 -no-hs-main -o ipeEventLog ipeEventLog.c
+	./ipeEventLog +RTS -la
+	ls ipeEventLog.eventlog >/dev/null
+	test `ghc-events show ipeEventLog.eventlog 2>&1 | grep -c "Info Table Source Position"` == 383
