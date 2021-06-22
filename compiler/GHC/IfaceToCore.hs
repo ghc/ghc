@@ -1195,8 +1195,8 @@ are in the type environment.  However, remember that typechecking a Rule may
 tcIfaceRules :: Bool            -- True <=> ignore rules
              -> [IfaceRule]
              -> IfL [CoreRule]
-tcIfaceRules ignore_prags if_rules
-  | ignore_prags = return []
+tcIfaceRules _ignore_prags if_rules
+--  | ignore_prags = return []
   | otherwise    = mapM tcIfaceRule if_rules
 
 tcIfaceRule :: IfaceRule -> IfL CoreRule
@@ -1647,7 +1647,9 @@ tcIdInfo ignore_prags toplvl name ty info = do
       -- Always read in compulsory unfoldings
       -- See Note [Always expose compulsory unfoldings] in GHC.Iface.Tidy
     need_prag (HsUnfold _ (IfCompulsory {})) = True
-    need_prag _                              = False
+    need_prag (HsUnfold {}) = True
+    need_prag (HsInline {}) = True
+    need_prag _                              = True
 
     tcPrag :: IdInfo -> IfaceInfoItem -> IfL IdInfo
     tcPrag info HsNoCafRefs        = return (info `setCafInfo`   NoCafRefs)
