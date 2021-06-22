@@ -180,6 +180,7 @@ $docsym    = [\| \^ \* \$]
 
 @varsym    = ($symbol # \:) $symbol*  -- variable (operator) symbol
 @consym    = \: $symbol*              -- constructor (operator) symbol
+@anysym    = $symbol+                 -- operator symbol (variable or constructor)
 
 -- See Note [Lexing NumericUnderscores extension] and #14473
 @numspc       = _*                   -- numeric spacer (#14473)
@@ -482,10 +483,10 @@ $tab          { warnTab }
 -- Operators classified into prefix, suffix, tight infix, and loose infix.
 -- See Note [Whitespace-sensitive operator parsing]
 <0> {
-  @varsym / { precededByClosingToken `alexAndPred` followedByOpeningToken } { varsym_tight_infix }
-  @varsym / { followedByOpeningToken }  { varsym_prefix }
-  @varsym / { precededByClosingToken }  { varsym_suffix }
-  @varsym                               { varsym_loose_infix }
+  @anysym / { precededByClosingToken `alexAndPred` followedByOpeningToken } { sym_tight_infix }
+  @anysym / { followedByOpeningToken }  { sym_prefix }
+  @anysym / { precededByClosingToken }  { sym_suffix }
+  @anysym                               { sym_loose_infix }
 }
 
 -- ToDo: - move `var` and (sym) into lexical syntax?
@@ -493,7 +494,6 @@ $tab          { warnTab }
 <0> {
   @qvarsym                                         { idtoken qvarsym }
   @qconsym                                         { idtoken qconsym }
-  @consym                                          { consym }
 }
 
 -- For the normal boxed literals we need to be careful
@@ -929,23 +929,6 @@ When LexicalNegation is off:
   * ITvarsym "-"   is not used
 -}
 
-{- Note [Why not LexicalNegationBit]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-One might wonder why we define NoLexicalNegationBit instead of
-LexicalNegationBit. The problem lies in the following line in reservedSymsFM:
-
-    ,("-", ITminus, NormalSyntax, xbit NoLexicalNegationBit)
-
-We want to generate ITminus only when LexicalNegation is off. How would one
-do it if we had LexicalNegationBit? I (int-index) tried to use bitwise
-complement:
-
-    ,("-", ITminus, NormalSyntax, complement (xbit LexicalNegationBit))
-
-This did not work, so I opted for NoLexicalNegationBit instead.
--}
-
-
 -- the bitmap provided as the third component indicates whether the
 -- corresponding extension keyword is valid under the extension options
 -- provided to the compiler; if the extension corresponding to *any* of the
@@ -1041,7 +1024,6 @@ reservedSymsFM = listToUFM $
     map (\ (x,w,y,z) -> (mkFastString x,(w,y,z)))
       [ ("..",  ITdotdot,                   NormalSyntax,  0 )
         -- (:) is a reserved op, meaning only list cons
-       ,(":",   ITcolon,                    NormalSyntax,  0 )
        ,("::",  ITdcolon NormalSyntax,      NormalSyntax,  0 )
        ,("=",   ITequal,                    NormalSyntax,  0 )
        ,("\\",  ITlam,                      NormalSyntax,  0 )
@@ -1049,12 +1031,6 @@ reservedSymsFM = listToUFM $
        ,("<-",  ITlarrow NormalSyntax,      NormalSyntax,  0 )
        ,("->",  ITrarrow NormalSyntax,      NormalSyntax,  0 )
        ,("=>",  ITdarrow NormalSyntax,      NormalSyntax,  0 )
-       ,("-",   ITminus,                    NormalSyntax,  xbit NoLexicalNegationBit)
-
-       ,("*",   ITstar NormalSyntax,        NormalSyntax,  xbit StarIsTypeBit)
-
-        -- For 'forall a . t'
-       ,(".",   ITdot,                      NormalSyntax,  0 )
 
        ,("-<",  ITlarrowtail NormalSyntax,  NormalSyntax,  xbit ArrowsBit)
        ,(">-",  ITrarrowtail NormalSyntax,  NormalSyntax,  xbit ArrowsBit)
@@ -1237,11 +1213,7 @@ negLitPred =
     (negative_literals `alexOrPred` lexical_negation)
   where
     negative_literals = ifExtension NegativeLiteralsBit
-
-    lexical_negation  =
-      -- See Note [Why not LexicalNegationBit]
-      alexNotPred (ifExtension NoLexicalNegationBit)
-
+    lexical_negation  = ifExtension LexicalNegationBit
     prefix_minus =
       -- Note [prefix_minus in negLitPred and negHashLitPred]
       alexNotPred precededByClosingToken
@@ -1624,11 +1596,11 @@ qvarsym buf len = ITqvarsym $! splitQualName buf len False
 qconsym buf len = ITqconsym $! splitQualName buf len False
 
 -- See Note [Whitespace-sensitive operator parsing]
-varsym_prefix :: Action
-varsym_prefix = sym $ \span exts s ->
+sym_prefix :: Action
+sym_prefix = sym $ \span exts s ->
   let warnExtConflict errtok =
         do { addPsMessage (mkSrcSpanPs span) (PsWarnOperatorWhitespaceExtConflict errtok)
-           ; return (ITvarsym s) }
+           ; return (mkITsym exts s) }
   in
   if | s == fsLit "@" ->
          return ITtypeApp  -- regardless of TypeApplications for better error messages
@@ -1644,63 +1616,62 @@ varsym_prefix = sym $ \span exts s ->
          if xtest ThQuotesBit exts
          then return ITdollardollar
          else warnExtConflict OperatorWhitespaceSymbol_PrefixDollarDollar
-     | s == fsLit "-" ->
-         return ITprefixminus -- Only when LexicalNegation is on, otherwise we get ITminus
-                              -- and don't hit this code path. See Note [Minus tokens]
+     | s == fsLit "-", LexicalNegationBit `xtest` exts ->
+         return ITprefixminus
      | s == fsLit ".", OverloadedRecordDotBit `xtest` exts ->
          return (ITproj True) -- e.g. '(.x)'
-     | s == fsLit "." -> return ITdot
      | s == fsLit "!" -> return ITbang
      | s == fsLit "~" -> return ITtilde
      | otherwise ->
          do { addPsMessage
                 (mkSrcSpanPs span)
                 (PsWarnOperatorWhitespace s OperatorWhitespaceOccurrence_Prefix)
-            ; return (ITvarsym s) }
+            ; return (mkITsym exts s) }
 
 -- See Note [Whitespace-sensitive operator parsing]
-varsym_suffix :: Action
-varsym_suffix = sym $ \span _ s ->
+sym_suffix :: Action
+sym_suffix = sym $ \span exts s ->
   if | s == fsLit "@" -> failMsgP (\srcLoc -> mkPlainErrorMsgEnvelope srcLoc $ PsErrSuffixAT)
      | otherwise ->
          do { addPsMessage
                 (mkSrcSpanPs span)
                 (PsWarnOperatorWhitespace s OperatorWhitespaceOccurrence_Suffix)
-            ; return (ITvarsym s) }
+            ; return (mkITsym exts s) }
 
 -- See Note [Whitespace-sensitive operator parsing]
-varsym_tight_infix :: Action
-varsym_tight_infix = sym $ \span exts s ->
+sym_tight_infix :: Action
+sym_tight_infix = sym $ \span exts s ->
   if | s == fsLit "@" -> return ITat
      | s == fsLit ".", OverloadedRecordDotBit `xtest` exts  -> return (ITproj False)
-     | s == fsLit "." -> return ITdot
      | otherwise ->
          do { addPsMessage
                 (mkSrcSpanPs span)
                 (PsWarnOperatorWhitespace s (OperatorWhitespaceOccurrence_TightInfix))
-            ;  return (ITvarsym s) }
+            ;  return (mkITsym exts s) }
 
 -- See Note [Whitespace-sensitive operator parsing]
-varsym_loose_infix :: Action
-varsym_loose_infix = sym $ \_ _ s ->
-  if | s == fsLit "."
-     -> return ITdot
-     | otherwise
-     -> return $ ITvarsym s
+sym_loose_infix :: Action
+sym_loose_infix = sym $ \_ exts s -> return (mkITsym exts s)
 
-consym :: Action
-consym = sym (\_span _exts s -> return $ ITconsym s)
+mkITsym :: ExtsBitmap -> FastString -> Token
+mkITsym exts s
+    | s == fsLit ":" = ITcolon
+    | s == fsLit "-", not lexical_negation = ITminus
+    | s == fsLit "." = ITdot
+    | s == fsLit "*", star_is_type = ITstar NormalSyntax
+    | s == fsLit "★", star_is_type && unicode_syntax = ITstar UnicodeSyntax
+    | headByteFS s == fromIntegral (ord ':') = ITconsym s
+    | otherwise = ITvarsym s
+  where
+    lexical_negation = xtest LexicalNegationBit exts
+    star_is_type = xtest StarIsTypeBit exts
+    unicode_syntax = xtest UnicodeSyntaxBit exts
 
 sym :: (PsSpan -> ExtsBitmap -> FastString -> P Token) -> Action
 sym con span buf len =
   case lookupUFM reservedSymsFM fs of
     Just (keyword, NormalSyntax, 0) -> do
-      exts <- getExts
-      if fs == fsLit "." &&
-         exts .&. (xbit OverloadedRecordDotBit) /= 0 &&
-         xtest OverloadedRecordDotBit exts
-      then L span <$!> con span exts fs  -- Process by varsym_*.
-      else return $ L span keyword
+       return $ L span keyword
     Just (keyword, NormalSyntax, i) -> do
       exts <- getExts
       if exts .&. i /= 0
@@ -2757,7 +2728,7 @@ data ExtBits
   | GadtSyntaxBit
   | ImportQualifiedPostBit
   | LinearTypesBit
-  | NoLexicalNegationBit   -- See Note [Why not LexicalNegationBit]
+  | LexicalNegationBit
   | OverloadedRecordDotBit
   | OverloadedRecordUpdateBit
 
@@ -2839,7 +2810,7 @@ mkParserOpts warningFlags extensionFlags mkMessage supported
       .|. GadtSyntaxBit               `xoptBit` LangExt.GADTSyntax
       .|. ImportQualifiedPostBit      `xoptBit` LangExt.ImportQualifiedPost
       .|. LinearTypesBit              `xoptBit` LangExt.LinearTypes
-      .|. NoLexicalNegationBit        `xoptNotBit` LangExt.LexicalNegation -- See Note [Why not LexicalNegationBit]
+      .|. LexicalNegationBit          `xoptBit` LangExt.LexicalNegation
       .|. OverloadedRecordDotBit      `xoptBit` LangExt.OverloadedRecordDot
       .|. OverloadedRecordUpdateBit   `xoptBit` LangExt.OverloadedRecordUpdate  -- Enable testing via 'getBit OverloadedRecordUpdateBit' in the parser (RecordDotSyntax parsing uses that information).
     optBits =
@@ -2848,7 +2819,6 @@ mkParserOpts warningFlags extensionFlags mkMessage supported
       .|. UsePosPragsBit    `setBitIf` usePosPrags
 
     xoptBit bit ext = bit `setBitIf` EnumSet.member ext extensionFlags
-    xoptNotBit bit ext = bit `setBitIf` not (EnumSet.member ext extensionFlags)
 
     setBitIf :: ExtBits -> Bool -> ExtsBitmap
     b `setBitIf` cond | cond      = xbit b
