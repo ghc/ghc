@@ -627,7 +627,7 @@ arityTypeArity (AT oss _) = length oss
 
 -- | True <=> eta-expansion will add at least one lambda
 expandableArityType :: ArityType -> Bool
-expandableArityType at = arityTypeArity at /= 0
+expandableArityType at = arityTypeArity at > 0
 
 -- | See Note [Dead ends] in "GHC.Types.Demand".
 -- Bottom implies a dead end.
@@ -708,6 +708,7 @@ findRhsArity dflags bndr rhs old_arity
               arityType env rhs
       where
         env = extendSigEnv (findRhsArityEnv dflags) bndr at
+
 
 {-
 Note [Arity analysis]
@@ -1292,12 +1293,22 @@ see Note [The one-shot state monad trick] in GHC.Utils.Monad.
 -- We should have that:
 --
 -- > ty = exprType e = exprType e'
-etaExpand   :: Arity     -> CoreExpr -> CoreExpr
-etaExpandAT :: ArityType -> CoreExpr -> CoreExpr
 
-etaExpand   n          orig_expr = eta_expand (replicate n NoOneShotInfo) orig_expr
-etaExpandAT (AT oss _) orig_expr = eta_expand oss                         orig_expr
-                           -- See Note [Eta expansion with ArityType]
+etaExpand :: Arity -> CoreExpr -> CoreExpr
+etaExpand n orig_expr
+  = eta_expand in_scope (replicate n NoOneShotInfo) orig_expr
+  where
+    in_scope = {-#SCC "eta_expand:in-scopeX" #-}
+               mkInScopeSet (exprFreeVars orig_expr)
+
+etaExpandAT :: InScopeSet -> ArityType -> CoreExpr -> CoreExpr
+-- See Note [Eta expansion with ArityType]
+--
+-- We pass in the InScopeSet from the simplifier to avoid recomputing
+-- it here, which can be jolly expensive if the casts are big
+-- In #18223 it took 10% of compile time just to do the exprFreeVars!
+etaExpandAT in_scope (AT oss _) orig_expr
+  = eta_expand in_scope oss orig_expr
 
 -- etaExpand arity e = res
 -- Then 'res' has at least 'arity' lambdas at the top
@@ -1310,12 +1321,12 @@ etaExpandAT (AT oss _) orig_expr = eta_expand oss                         orig_e
 -- would return
 --      (/\b. \y::a -> E b y)
 
-eta_expand :: [OneShotInfo] -> CoreExpr -> CoreExpr
-eta_expand one_shots (Cast expr co)
-  = mkCast (eta_expand one_shots expr) co
+eta_expand :: InScopeSet -> [OneShotInfo] -> CoreExpr -> CoreExpr
+eta_expand in_scope one_shots (Cast expr co)
+  = Cast (eta_expand in_scope one_shots expr) co
 
-eta_expand one_shots orig_expr
-  = go one_shots [] orig_expr
+eta_expand in_scope one_shots orig_expr
+  = go in_scope one_shots [] orig_expr
   where
       -- Strip off existing lambdas before handing off to mkEtaWW
       -- This is mainly to avoid spending time cloning binders and substituting
@@ -1323,20 +1334,20 @@ eta_expand one_shots orig_expr
       -- with casts here, apart from the topmost one, and they are rare, so
       -- if we find one we just hand off to mkEtaWW anyway
       -- Note [Eta expansion and SCCs]
-    go [] _ _ = orig_expr  -- Already has the specified arity; no-op
+    go _ [] _ _ = orig_expr  -- Already has the specified arity; no-op
 
-    go oss@(_:oss1) vs (Lam v body)
-      | isTyVar v = go oss  (v:vs) body
-      | otherwise = go oss1 (v:vs) body
+    go in_scope oss@(_:oss1) vs (Lam v body)
+      | isTyVar v = go (in_scope `extendInScopeSet` v) oss  (v:vs) body
+      | otherwise = go (in_scope `extendInScopeSet` v) oss1 (v:vs) body
 
-    go oss rev_vs expr
-      = -- pprTrace "ee" (vcat [ppr orig_expr, ppr expr, pprEtaInfos etas]) $
-        retick $ etaInfoAbs top_eis $
-                 etaInfoApp in_scope' sexpr eis
+    go in_scope oss rev_vs expr
+      = -- pprTrace "ee" (vcat [ppr in_scope', ppr top_bndrs, ppr eis]) $
+        retick $
+        etaInfoAbs top_eis $
+        etaInfoApp in_scope' sexpr eis
       where
-          in_scope = mkInScopeSet (exprFreeVars expr)
           (in_scope', eis@(EI eta_bndrs mco))
-              = mkEtaWW oss (ppr orig_expr) in_scope (exprType expr)
+                    = mkEtaWW oss (ppr orig_expr) in_scope (exprType expr)
           top_bndrs = reverse rev_vs
           top_eis   = EI (top_bndrs ++ eta_bndrs) (mkPiMCos top_bndrs mco)
 
@@ -1379,23 +1390,29 @@ This what eta_expand does.  We do it in two steps:
 To a first approximation EtaInfo is just [Var].  But
 casts complicate the question.  If we have
    newtype N a = MkN (S -> a)
+     axN :: N a  ~  S -> a
 and
-   ty = N (N Int)
-then the eta-expansion must look like
-        (\x (\y. ((e |> co1) x) |> co2) y)
-           |> sym co2)
-        |> sym co1
+   e :: N (N Int)
+then the eta-expansion should look like
+   (\(x::S) (y::S) -> e |> co x y) |> sym co
 where
-  co1 :: N (N Int) ~ S -> N Int
-  co2 :: N Int     ~ S -> Int
+  co :: N (N Int) ~ S -> S -> Int
+  co = axN @(N Int) ; (S -> axN @Int)
 
-Blimey!  Look at all those casts.  Moreover, if the type
-is very deeply nested (as happens in #18223), the repetition
+We want to get one cast, at the top, to account for all those
+nested newtypes. This is expressed by the EtaInfo type:
+
+   data EtaInfo = EI [Var] MCoercionR
+
+Note [Check for reflexive casts in eta expansion]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It turns out that the casts created by teh above mechanism are often Refl.
+When casts are very deeply nested (as happens in #18223), the repetition
 of types can make the overall term very large.  So there is a big
 payoff in cancelling out casts aggressively wherever possible.
 (See also Note [No crap in eta-expanded code].)
 
-This matters a lot in etaEInfoApp, where we
+This matters particularly in etaInfoApp, where we
 * Do beta-reduction on the fly
 * Use getArg_maybe to get a cast out of the way,
   so that we can do beta reduction
@@ -1412,26 +1429,56 @@ away.
 #18223 was a dramatic example in which the intermediate term was
 grotesquely huge, even though the next Simplifier iteration squashed
 it.  Better to kill it at birth.
+
+The crucial spots in etaInfoApp are:
+* `checkReflexiveMCo` in the (Cast e co) case of `go`
+* `checkReflexiveMCo` in `pushCoArg`
+* Less important: checkReflexiveMCo in the final case of `go`
+Collectively these make a factor-of-5 difference to the total
+allocation of T18223, so take care if you change this stuff!
+
+Example:
+   newtype N = MkN (Y->Z)
+   f :: X -> N
+   f = \(x::X). ((\(y::Y). blah) |> fco)
+
+where fco :: (Y->Z) ~ N
+
+mkEtaWW makes an EtaInfo of (EI [(eta1:X), (eta2:Y)] eta_co
+  where
+    eta_co :: (X->N) ~ (X->Y->Z)
+    eta_co =  (<X> -> nco)
+    nco :: N ~ (Y->Z)  -- Comes from topNormaliseNewType_maybe
+
+Now, when we push that eta_co inward in etaInfoApp:
+* In the (Cast e co) case, the 'fco' and 'nco' will meet, and
+  should cancel.
+* When we meet the (\y.e) we want no cast on the y.
+
 -}
 
 --------------
 data EtaInfo = EI [Var] MCoercionR
 
-instance Outputable EtaInfo where
-  ppr (EI vs mco) = text "EI" <+> ppr vs <+> parens (ppr mco)
-
--- EI bs co
--- Abstraction:  (\b1 b2 .. bn. []) |> sym co
--- Application:  ([] |> co) b1 b2 .. bn
+-- (EI bs co) describes a particular eta-expansion, as follows:
+--  Abstraction:  (\b1 b2 .. bn. []) |> sym co
+--  Application:  ([] |> co) b1 b2 .. bn
 --
 --    e :: T    co :: T ~ (t1 -> t2 -> .. -> tn -> tr)
 --    e = (\b1 b2 ... bn. (e |> co) b1 b2 .. bn) |> sym co
 
+instance Outputable EtaInfo where
+  ppr (EI vs mco) = text "EI" <+> ppr vs <+> parens (ppr mco)
+
 
 etaInfoApp :: InScopeSet -> CoreExpr -> EtaInfo -> CoreExpr
--- (etaInfoApp s e eis) returns something equivalent to
---             (substExpr s e `appliedto` eis)
+-- (etaInfoApp s e (EI bs mco) returns something equivalent to
+--             ((substExpr s e) |> mco b1 .. bn)
 -- See Note [The EtaInfo mechanism]
+--
+-- NB: With very deeply nested casts, this function can be expensive
+--     In T18223, this function alone costs 15% of allocation, all
+--     spent in the calls to substExprSC and substBindSC
 
 etaInfoApp in_scope expr eis
   = go (mkEmptySubst in_scope) expr eis
@@ -1444,7 +1491,10 @@ etaInfoApp in_scope expr eis
       = Tick (substTickish subst t) (go subst e eis)
 
     go subst (Cast e co) (EI bs mco)
-      = go subst e (EI bs (Core.substCo subst co `mkTransMCoR` mco))
+      = go subst e (EI bs mco')
+      where
+        mco' = checkReflexiveMCo (Core.substCo subst co `mkTransMCoR` mco)
+               -- See Note [Check for reflexive casts in eta-expansion]
 
     go subst (Case e b ty alts) eis
       = Case (Core.substExprSC subst e) b1 ty' alts'
@@ -1469,8 +1519,9 @@ etaInfoApp in_scope expr eis
       = go (Core.extendSubst subst v arg) e (EI bs mco')
 
     -- Stop pushing down; just wrap the expression up
+    -- See Note [Check for reflexive casts in eta expansion]
     go subst e (EI bs mco) = Core.substExprSC subst e
-                             `mkCastMCo` mco
+                             `mkCastMCo` checkReflexiveMCo mco
                              `mkVarApps` bs
 
 --------------
@@ -1619,10 +1670,17 @@ pushCoArg :: CoercionR -> CoreArg -> Maybe (CoreArg, MCoercion)
 -- This may fail, e.g. if (fun :: N) where N is a newtype
 -- C.f. simplCast in GHC.Core.Opt.Simplify
 -- 'co' is always Representational
-pushCoArg co (Type ty) = do { (ty', m_co') <- pushCoTyArg co ty
-                            ; return (Type ty', m_co') }
-pushCoArg co val_arg   = do { (arg_co, m_co') <- pushCoValArg co
-                            ; return (val_arg `mkCastMCo` arg_co, m_co') }
+pushCoArg co arg
+  | Type ty <- arg
+  = do { (ty', m_co') <- pushCoTyArg co ty
+       ; return (Type ty', m_co') }
+  | otherwise
+  = do { (arg_mco, m_co') <- pushCoValArg co
+       ; let arg_mco' = checkReflexiveMCo arg_mco
+             -- checkReflexiveMCo: see Note [Check for reflexive casts in eta expansion]
+             -- The coercion is very often (arg_co -> res_co), but without
+             -- the argument coercion actually being ReflCo
+       ; return (arg `mkCastMCo` arg_mco', m_co') }
 
 pushCoTyArg :: CoercionR -> Type -> Maybe (Type, MCoercionR)
 -- We have (fun |> co) @ty

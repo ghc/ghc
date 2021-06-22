@@ -73,7 +73,7 @@ module GHC.Core.Coercion (
 
         coToMCo, mkTransMCo, mkTransMCoL, mkTransMCoR, mkCastTyMCo, mkSymMCo,
         mkHomoForAllMCo, mkFunResMCo, mkPiMCos,
-        isReflMCo,
+        isReflMCo, checkReflexiveMCo,
 
         -- ** Coercion variables
         mkCoVar, isCoVar, coVarName, setCoVarName, setCoVarUnique,
@@ -311,6 +311,11 @@ coToMCo :: Coercion -> MCoercion
 coToMCo co | isReflCo co = MRefl
            | otherwise   = MCo co
 
+checkReflexiveMCo :: MCoercion -> MCoercion
+checkReflexiveMCo MRefl                       = MRefl
+checkReflexiveMCo (MCo co) | isReflexiveCo co = MRefl
+                           | otherwise        = MCo co
+
 -- | Tests if this MCoercion is obviously generalized reflexive
 -- Guaranteed to work very quickly.
 isGReflMCo :: MCoercion -> Bool
@@ -420,6 +425,10 @@ decomposeFunCo :: HasDebugCallStack
 -- Expects co :: (s1 -> t1) ~ (s2 -> t2)
 -- Returns (co1 :: s1~s2, co2 :: t1~t2)
 -- See Note [Function coercions] for the "3" and "4"
+
+decomposeFunCo _ (FunCo _ w co1 co2) = (w, co1, co2)
+   -- Short-circuits the calls to mkNthCo
+
 decomposeFunCo r co = assertPpr all_ok (ppr co)
                       (mkNthCo Nominal 0 co, mkNthCo r 3 co, mkNthCo r 4 co)
   where
