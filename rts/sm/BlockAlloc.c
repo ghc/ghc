@@ -371,21 +371,15 @@ split_block_low (bdescr *bd, W_ n)
     return bd;
 }
 
-/* Only initializes the start pointers on the first megablock and the
- * blocks field of the first bdescr; callers are responsible for calling
- * initGroup afterwards.
- */
+/* Find an MBlock group at least `mblocks` large from the freelist. */
 static bdescr *
-alloc_mega_group (uint32_t node, StgWord mblocks)
+alloc_mega_group_from_freelist(uint32_t node, StgWords mblocks)
 {
-    bdescr *best, *bd, *prev;
-    StgWord n;
+    const StgWord n = MBLOCK_GROUP_BLOCKS(mblocks);
+    bdescr *best = NULL;
+    bdescr *prev = NULL;
 
-    n = MBLOCK_GROUP_BLOCKS(mblocks);
-
-    best = NULL;
-    prev = NULL;
-    for (bd = free_mblock_list[node]; bd != NULL; prev = bd, bd = bd->link)
+    for (bdescr *bd = free_mblock_list[node]; bd != NULL; prev = bd, bd = bd->link)
     {
         if (bd->blocks == n)
         {
@@ -404,6 +398,18 @@ alloc_mega_group (uint32_t node, StgWord mblocks)
             }
         }
     }
+    return best;
+}
+
+/* Only initializes the start pointers on the first megablock and the
+ * blocks field of the first bdescr; callers are responsible for calling
+ * initGroup afterwards.
+ */
+static bdescr *
+alloc_mega_group (uint32_t node, StgWord mblocks)
+{
+    bdescr *best = alloc_mega_group_from_freelist(node, mblocks);
+    bdescr *bd;
 
     if (best)
     {
