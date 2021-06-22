@@ -517,7 +517,7 @@ tryWW ww_opts is_rec fn_id rhs
   = return [(new_fn_id, filler)]
 
   -- See Note [Don't w/w INLINE things]
-  | hasInlineUnfolding fn_id
+  | hasInlineUnfolding fn_info
   = return [(new_fn_id, rhs)]
 
   -- See Note [No worker/wrapper for record selectors]
@@ -800,7 +800,7 @@ mkWWBindPair ww_opts fn_id fn_info rhs work_uniq div cpr
 
     fn_inl_prag     = inlinePragInfo fn_info
     fn_inline_spec  = inl_inline fn_inl_prag
-    fn_unfolding    = unfoldingInfo fn_info
+    fn_unfolding    = realUnfoldingInfo fn_info
 
     -- Even if we don't w/w join points for CPR, we might still do so for
     -- strictness. In which case a join point worker keeps its original CPR

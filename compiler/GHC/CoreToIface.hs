@@ -483,7 +483,7 @@ toIfaceIdInfo id_info
     cpr_hsinfo | cpr_info /= topCprSig = Just (HsCprSig cpr_info)
                | otherwise             = Nothing
     ------------  Unfolding  --------------
-    unfold_hsinfo = toIfUnfolding loop_breaker (unfoldingInfo id_info)
+    unfold_hsinfo = toIfUnfolding loop_breaker (realUnfoldingInfo id_info)
     loop_breaker  = isStrongLoopBreaker (occInfo id_info)
 
     ------------  Inline prag  --------------
