@@ -446,36 +446,6 @@ release-x86_64-freebsd:
 # x86_64-darwin
 #################################
 
-validate-x86_64-darwin-old:
-  extends: .validate
-  stage: full-build
-  tags:
-    - x86_64-darwin
-  variables:
-    GHC_VERSION: 8.6.5
-    CABAL_INSTALL_VERSION: 3.0.0.0
-    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-apple-darwin.tar.xz"
-    MACOSX_DEPLOYMENT_TARGET: "10.7"
-    # Only Sierra and onwards supports clock_gettime. See #12858
-    ac_cv_func_clock_gettime: "no"
-    # Only newer OS Xs support utimensat. See #17895
-    ac_cv_func_utimensat: "no"
-    LANG: "en_US.UTF-8"
-    CONFIGURE_ARGS: "--with-intree-gmp"
-    TEST_ENV: "x86_64-darwin"
-    BUILD_FLAVOUR: "perf"
-  after_script:
-    - cp -Rf $HOME/.cabal cabal-cache
-    - .gitlab/ci.sh clean
-  artifacts:
-    when: always
-    expire_in: 2 week
-  cache:
-    key: "darwin-$GHC_VERSION"
-    paths:
-      - cabal-cache
-      - toolchain
-
 validate-x86_64-darwin:
   extends: .validate
   stage: full-build
