@@ -42,24 +42,31 @@ import GHC.Prelude
 import GHC.Stg.Syntax
 
 import GHC.Driver.Session
+import GHC.Driver.Config.Diagnostic
+
 import GHC.Core.Lint        ( interactiveInScope )
-import GHC.Data.Bag         ( Bag, emptyBag, isEmptyBag, snocBag, bagToList )
+import GHC.Core.DataCon
+import GHC.Core             ( AltCon(..) )
+import GHC.Core.Type
+
 import GHC.Types.Basic      ( TopLevelFlag(..), isTopLevel )
 import GHC.Types.CostCentre ( isCurrentCCS )
 import GHC.Types.Id
 import GHC.Types.Var.Set
-import GHC.Core.DataCon
-import GHC.Core             ( AltCon(..) )
 import GHC.Types.Name       ( getSrcLoc, nameIsLocalOrFrom )
-import GHC.Utils.Error      ( mkLocMessage )
-import GHC.Core.Type
 import GHC.Types.RepType
 import GHC.Types.SrcLoc
+
 import GHC.Utils.Logger
 import GHC.Utils.Outputable
+import GHC.Utils.Error      ( mkLocMessage, DiagOpts )
+import qualified GHC.Utils.Error as Err
+
 import GHC.Unit.Module            ( Module )
 import GHC.Runtime.Context        ( InteractiveContext )
-import qualified GHC.Utils.Error as Err
+
+import GHC.Data.Bag         ( Bag, emptyBag, isEmptyBag, snocBag, bagToList )
+
 import Control.Applicative ((<|>))
 import Control.Monad
 
@@ -75,7 +82,7 @@ lintStgTopBindings :: forall a . (OutputablePass a, BinderP a ~ Id)
 
 lintStgTopBindings logger dflags ictxt this_mod unarised whodunnit binds
   = {-# SCC "StgLint" #-}
-    case initL dflags this_mod unarised opts top_level_binds (lint_binds binds) of
+    case initL diag_opts this_mod unarised opts top_level_binds (lint_binds binds) of
       Nothing  ->
         return ()
       Just msg -> do
@@ -89,6 +96,7 @@ lintStgTopBindings logger dflags ictxt this_mod unarised whodunnit binds
                   text "*** End of Offense ***"])
         Err.ghcExit logger 1
   where
+    diag_opts = initDiagOpts dflags
     opts = initStgPprOpts dflags
     -- Bring all top-level binds into scope because CoreToStg does not generate
     -- bindings in dependency order (so we may see a use before its definition).
@@ -247,7 +255,7 @@ The Lint monad
 newtype LintM a = LintM
     { unLintM :: Module
               -> LintFlags
-              -> DynFlags
+              -> DiagOpts          -- Diagnostic options
               -> StgPprOpts        -- Pretty-printing options
               -> [LintLocInfo]     -- Locations
               -> IdSet             -- Local vars in scope
@@ -282,9 +290,9 @@ pp_binders bs
     pp_binder b
       = hsep [ppr b, dcolon, ppr (idType b)]
 
-initL :: DynFlags -> Module -> Bool -> StgPprOpts -> IdSet -> LintM a -> Maybe SDoc
-initL dflags this_mod unarised opts locals (LintM m) = do
-  let (_, errs) = m this_mod (LintFlags unarised) dflags opts [] locals emptyBag
+initL :: DiagOpts -> Module -> Bool -> StgPprOpts -> IdSet -> LintM a -> Maybe SDoc
+initL diag_opts this_mod unarised opts locals (LintM m) = do
+  let (_, errs) = m this_mod (LintFlags unarised) diag_opts opts [] locals emptyBag
   if isEmptyBag errs then
       Nothing
   else
@@ -300,14 +308,14 @@ instance Monad LintM where
     (>>)  = (*>)
 
 thenL :: LintM a -> (a -> LintM b) -> LintM b
-thenL m k = LintM $ \mod lf dflags opts loc scope errs
-  -> case unLintM m mod lf dflags opts loc scope errs of
-      (r, errs') -> unLintM (k r) mod lf dflags opts loc scope errs'
+thenL m k = LintM $ \mod lf diag_opts opts loc scope errs
+  -> case unLintM m mod lf diag_opts opts loc scope errs of
+      (r, errs') -> unLintM (k r) mod lf diag_opts opts loc scope errs'
 
 thenL_ :: LintM a -> LintM b -> LintM b
-thenL_ m k = LintM $ \mod lf dflags opts loc scope errs
-  -> case unLintM m mod lf dflags opts loc scope errs of
-      (_, errs') -> unLintM k mod lf dflags opts loc scope errs'
+thenL_ m k = LintM $ \mod lf diag_opts opts loc scope errs
+  -> case unLintM m mod lf diag_opts opts loc scope errs of
+      (_, errs') -> unLintM k mod lf diag_opts opts loc scope errs'
 
 checkL :: Bool -> SDoc -> LintM ()
 checkL True  _   = return ()
@@ -354,24 +362,24 @@ checkPostUnariseId id =
 addErrL :: SDoc -> LintM ()
 addErrL msg = LintM $ \_mod _lf df _opts loc _scope errs -> ((), addErr df errs msg loc)
 
-addErr :: DynFlags -> Bag SDoc -> SDoc -> [LintLocInfo] -> Bag SDoc
-addErr dflags errs_so_far msg locs
+addErr :: DiagOpts -> Bag SDoc -> SDoc -> [LintLocInfo] -> Bag SDoc
+addErr diag_opts errs_so_far msg locs
   = errs_so_far `snocBag` mk_msg locs
   where
     mk_msg (loc:_) = let (l,hdr) = dumpLoc loc
-                     in  mkLocMessage (Err.mkMCDiagnostic dflags WarningWithoutFlag)
+                     in  mkLocMessage (Err.mkMCDiagnostic diag_opts WarningWithoutFlag)
                                       l (hdr $$ msg)
     mk_msg []      = msg
 
 addLoc :: LintLocInfo -> LintM a -> LintM a
-addLoc extra_loc m = LintM $ \mod lf dflags opts loc scope errs
-   -> unLintM m mod lf dflags opts (extra_loc:loc) scope errs
+addLoc extra_loc m = LintM $ \mod lf diag_opts opts loc scope errs
+   -> unLintM m mod lf diag_opts opts (extra_loc:loc) scope errs
 
 addInScopeVars :: [Id] -> LintM a -> LintM a
-addInScopeVars ids m = LintM $ \mod lf dflags opts loc scope errs
+addInScopeVars ids m = LintM $ \mod lf diag_opts opts loc scope errs
  -> let
         new_set = mkVarSet ids
-    in unLintM m mod lf dflags opts loc (scope `unionVarSet` new_set) errs
+    in unLintM m mod lf diag_opts opts loc (scope `unionVarSet` new_set) errs
 
 getLintFlags :: LintM LintFlags
 getLintFlags = LintM $ \_mod lf _df _opts _loc _scope errs -> (lf, errs)
@@ -380,10 +388,10 @@ getStgPprOpts :: LintM StgPprOpts
 getStgPprOpts = LintM $ \_mod _lf _df opts _loc _scope errs -> (opts, errs)
 
 checkInScope :: Id -> LintM ()
-checkInScope id = LintM $ \mod _lf dflags _opts loc scope errs
+checkInScope id = LintM $ \mod _lf diag_opts _opts loc scope errs
  -> if nameIsLocalOrFrom mod (idName id) && not (id `elemVarSet` scope) then
-        ((), addErr dflags errs (hsep [ppr id, dcolon, ppr (idType id),
-                                text "is out of scope"]) loc)
+        ((), addErr diag_opts errs (hsep [ppr id, dcolon, ppr (idType id),
+                                    text "is out of scope"]) loc)
     else
         ((), errs)
 
