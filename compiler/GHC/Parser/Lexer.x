@@ -2320,15 +2320,15 @@ warnopt f options = f `EnumSet.member` pWarningFlags options
 --
 -- See 'mkParserOpts' to construct this.
 data ParserOpts = ParserOpts
-  { pWarningFlags   :: EnumSet WarningFlag -- ^ enabled warning flags
-  , pExtsBitmap     :: !ExtsBitmap -- ^ bitmap of permitted extensions
-  , pMakePsMessage  :: SrcSpan -> PsMessage -> MsgEnvelope PsMessage
-    -- ^ The function to be used to construct diagnostic messages.
-    -- The idea is to partially-apply 'mkParserMessage' upstream, to
-    -- avoid the dependency on the 'DynFlags' in the Lexer.
+  { pExtsBitmap     :: !ExtsBitmap -- ^ bitmap of permitted extensions
+  , pDiagOpts       :: !DiagOpts
+    -- ^ Options to construct diagnostic messages.
   , pSupportedExts  :: [String]
     -- ^ supported extensions (only used for suggestions in error messages)
   }
+
+pWarningFlags :: ParserOpts -> EnumSet WarningFlag
+pWarningFlags opts = diag_warning_flags (pDiagOpts opts)
 
 -- | Haddock comment as produced by the lexer. These are accumulated in
 -- 'PState' and then processed in "GHC.Parser.PostProcess.Haddock".
@@ -2772,9 +2772,8 @@ data ExtBits
 
 {-# INLINE mkParserOpts #-}
 mkParserOpts
-  :: EnumSet WarningFlag        -- ^ warnings flags enabled
-  -> EnumSet LangExt.Extension  -- ^ permitted language extensions enabled
-  -> (SrcSpan -> PsMessage -> MsgEnvelope PsMessage) -- ^ How to construct diagnostics
+  :: EnumSet LangExt.Extension  -- ^ permitted language extensions enabled
+  -> DiagOpts                   -- ^ diagnostic options
   -> [String]                   -- ^ Supported Languages and Extensions
   -> Bool                       -- ^ are safe imports on?
   -> Bool                       -- ^ keeping Haddock comment tokens
@@ -2787,12 +2786,11 @@ mkParserOpts
 
   -> ParserOpts
 -- ^ Given exactly the information needed, set up the 'ParserOpts'
-mkParserOpts warningFlags extensionFlags mkMessage supported
+mkParserOpts extensionFlags diag_opts supported
   safeImports isHaddock rawTokStream usePosPrags =
     ParserOpts {
-      pWarningFlags  = warningFlags
+      pDiagOpts      = diag_opts
     , pExtsBitmap    = safeHaskellBit .|. langExtBits .|. optBits
-    , pMakePsMessage = mkMessage
     , pSupportedExts = supported
     }
   where
@@ -2994,8 +2992,8 @@ getEofPos = P $ \s@(PState { eof_pos = pos }) -> POk s pos
 
 addPsMessage :: SrcSpan -> PsMessage -> P ()
 addPsMessage srcspan msg = do
-  opts <- options <$> getPState
-  addWarning ((pMakePsMessage opts) srcspan msg)
+  diag_opts <- (pDiagOpts . options) <$> getPState
+  addWarning (mkPlainMsgEnvelope diag_opts srcspan msg)
 
 addTabWarning :: RealSrcSpan -> P ()
 addTabWarning srcspan
@@ -3017,17 +3015,17 @@ getErrorMessages p = errors p
 getMessages :: PState -> (Messages PsMessage, Messages PsMessage)
 getMessages p =
   let ws = warnings p
+      diag_opts = pDiagOpts (options p)
       -- we add the tabulation warning on the fly because
       -- we count the number of occurrences of tab characters
       ws' = case tab_first p of
         Strict.Nothing -> ws
         Strict.Just tf ->
-          let msg = mkMsg (RealSrcSpan tf Strict.Nothing) $
+          let msg = mkPlainMsgEnvelope diag_opts
+                          (RealSrcSpan tf Strict.Nothing)
                           (PsWarnTab (tab_count p))
           in msg `addMessage` ws
   in (ws', errors p)
-  where
-    mkMsg = pMakePsMessage . options $ p
 
 getContext :: P [LayoutContext]
 getContext = P $ \s@PState{context=ctx} -> POk s ctx
