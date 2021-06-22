@@ -409,6 +409,7 @@ contIsRhsOrArg _               = False
 
 contIsRhs :: SimplCont -> Bool
 contIsRhs (Stop _ RhsCtxt) = True
+contIsRhs (CastIt _ k)     = contIsRhs k   -- For f = e |> co, treat e as Rhs context
 contIsRhs _                = False
 
 -------------------
@@ -1557,11 +1558,13 @@ mkLam :: SimplEnv -> [OutBndr] -> OutExpr -> SimplCont -> SimplM OutExpr
 -- mkLam tries three things
 --      a) eta reduction, if that gives a trivial expression
 --      b) eta expansion [only if there are some value lambdas]
-
+--
+-- NB: the SimplEnv already includes the [OutBndr] in its in-scope set
 mkLam _env [] body _cont
   = return body
 mkLam env bndrs body cont
-  = do { dflags <- getDynFlags
+  = {-#SCC "mkLam" #-}
+    do { dflags <- getDynFlags
        ; mkLam' dflags bndrs body }
   where
     mkLam' :: DynFlags -> [OutBndr] -> OutExpr -> SimplM OutExpr
@@ -1595,13 +1598,16 @@ mkLam env bndrs body cont
       , let body_arity = exprEtaExpandArity dflags body
       , expandableArityType body_arity
       = do { tick (EtaExpansion (head bndrs))
-           ; let res = mkLams bndrs (etaExpandAT body_arity body)
+           ; let res = mkLams bndrs $
+                       etaExpandAT in_scope body_arity body
            ; traceSmpl "eta expand" (vcat [text "before" <+> ppr (mkLams bndrs body)
                                           , text "after" <+> ppr res])
            ; return res }
 
       | otherwise
       = return (mkLams bndrs body)
+      where
+        in_scope = getInScope env  -- Includes 'bndrs'
 
 {-
 Note [Eta expanding lambdas]
@@ -1664,13 +1670,13 @@ because the latter is not well-kinded.
 ************************************************************************
 -}
 
-tryEtaExpandRhs :: SimplMode -> OutId -> OutExpr
+tryEtaExpandRhs :: SimplEnv -> OutId -> OutExpr
                 -> SimplM (ArityType, OutExpr)
 -- See Note [Eta-expanding at let bindings]
 -- If tryEtaExpandRhs rhs = (n, is_bot, rhs') then
 --   (a) rhs' has manifest arity n
 --   (b) if is_bot is True then rhs' applied to n args is guaranteed bottom
-tryEtaExpandRhs mode bndr rhs
+tryEtaExpandRhs env bndr rhs
   | Just join_arity <- isJoinId_maybe bndr
   = do { let (join_bndrs, join_body) = collectNBinders join_arity rhs
              oss   = [idOneShotInfo id | id <- join_bndrs, isId id]
@@ -1686,12 +1692,14 @@ tryEtaExpandRhs mode bndr rhs
   , new_arity > old_arity   -- And the current manifest arity isn't enough
   , want_eta rhs
   = do { tick (EtaExpansion bndr)
-       ; return (arity_type, etaExpandAT arity_type rhs) }
+       ; return (arity_type, etaExpandAT in_scope arity_type rhs) }
 
   | otherwise
   = return (arity_type, rhs)
 
   where
+    mode      = getMode env
+    in_scope  = getInScope env
     dflags    = sm_dflags mode
     old_arity = exprArity rhs
 
