@@ -53,6 +53,7 @@ import GHC.Runtime.Context
 
 import GHC.Driver.Config.Logger (initLogFlags)
 import GHC.Driver.Config.Parser (initParserOpts)
+import GHC.Driver.Config.Diagnostic
 import GHC.Driver.Phases
 import GHC.Driver.Pipeline
 import GHC.Driver.Session
@@ -273,6 +274,7 @@ warnMissingHomeModules hsc_env mod_graph =
   where
     dflags = hsc_dflags hsc_env
     targets = map targetId (hsc_targets hsc_env)
+    diag_opts = initDiagOpts dflags
 
     is_known_module mod = any (is_my_target mod) targets
 
@@ -304,7 +306,7 @@ warnMissingHomeModules hsc_env mod_graph =
     missing = map (moduleName . ms_mod) $
       filter (not . is_known_module) (mgModSummaries mod_graph)
 
-    warn = singleMessage $ mkPlainMsgEnvelope (hsc_dflags hsc_env) noSrcSpan
+    warn = singleMessage $ mkPlainMsgEnvelope diag_opts noSrcSpan
                          $ DriverMissingHomeModules missing (checkBuildingCabalPackage dflags)
 
 -- | Describes which modules of the module graph need to be loaded.
@@ -356,6 +358,7 @@ warnUnusedPackages = do
     let dflags = hsc_dflags hsc_env
         state  = hsc_units  hsc_env
         pit = eps_PIT eps
+        diag_opts = initDiagOpts dflags
 
     let loadedPackages
           = map (unsafeLookupUnit state)
@@ -370,7 +373,7 @@ warnUnusedPackages = do
           = filter (\arg -> not $ any (matching state arg) loadedPackages)
                    requestedArgs
 
-    let warn = singleMessage $ mkPlainMsgEnvelope dflags noSrcSpan (DriverUnusedPackages unusedArgs)
+    let warn = singleMessage $ mkPlainMsgEnvelope diag_opts noSrcSpan (DriverUnusedPackages unusedArgs)
 
     when (not (null unusedArgs)) $
       logDiagnostics (GhcDriverMessage <$> warn)
@@ -1276,7 +1279,8 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_logger lcl_tmpfs lcl_dflags
         hsc_env <- readMVar hsc_env_var
         old_hpt <- readIORef old_hpt_var
 
-        let logg err = printMessages lcl_logger lcl_dflags (srcErrorMessages err)
+        let lcl_diag_opts = initDiagOpts lcl_dflags
+        let logg err = printMessages lcl_logger lcl_diag_opts (srcErrorMessages err)
 
         -- Limit the number of parallel compiles.
         let withSem sem = MC.bracket_ (waitQSem sem) (signalQSem sem)
@@ -1973,17 +1977,17 @@ mkNodeMap summaries = ModNodeMap $ Map.fromList
 -- were necessary, then the edge would be part of a cycle.
 warnUnnecessarySourceImports :: GhcMonad m => [SCC ModSummary] -> m ()
 warnUnnecessarySourceImports sccs = do
-  dflags <- getDynFlags
-  when (wopt Opt_WarnUnusedImports dflags)
-    (logDiagnostics (mkMessages $ listToBag (concatMap (check dflags . flattenSCC) sccs)))
-  where check dflags ms =
+  diag_opts <- initDiagOpts <$> getDynFlags
+  when (diag_wopt Opt_WarnUnusedImports diag_opts) $ do
+    let check ms =
            let mods_in_this_cycle = map ms_mod_name ms in
-           [ warn dflags i | m <- ms, i <- ms_home_srcimps m,
-                             unLoc i `notElem`  mods_in_this_cycle ]
+           [ warn i | m <- ms, i <- ms_home_srcimps m,
+                      unLoc i `notElem`  mods_in_this_cycle ]
 
-        warn :: DynFlags -> Located ModuleName -> MsgEnvelope GhcMessage
-        warn dflags (L loc mod) =
-          GhcDriverMessage <$> mkPlainMsgEnvelope dflags loc (DriverUnnecessarySourceImports mod)
+        warn :: Located ModuleName -> MsgEnvelope GhcMessage
+        warn (L loc mod) = GhcDriverMessage <$> mkPlainMsgEnvelope diag_opts
+                                                  loc (DriverUnnecessarySourceImports mod)
+    logDiagnostics (mkMessages $ listToBag (concatMap (check . flattenSCC) sccs))
 
 
 -----------------------------------------------------------------------------
