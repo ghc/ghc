@@ -174,6 +174,7 @@ import GHC.Core.FamInstEnv
 
 import GHC.Driver.Env
 import GHC.Driver.Session
+import GHC.Driver.Config.Diagnostic
 
 import GHC.Runtime.Context
 
@@ -1055,11 +1056,11 @@ mkTcRnMessage :: DiagnosticReason
 mkTcRnMessage reason loc important context extra
   = do { printer <- getPrintUnqualified ;
          unit_state <- hsc_units <$> getTopEnv ;
-         dflags <- getDynFlags ;
+         !diag_opts <- initDiagOpts <$> getDynFlags ;
          let errDocs  = map (pprWithUnitState unit_state)
                             [important, context, extra]
          in
-         return $ mkMsgEnvelope dflags loc printer
+         return $ mkMsgEnvelope diag_opts loc printer
                 $ TcRnUnknownMessage
                 $ mkDecoratedDiagnostic reason noHints errDocs }
 
@@ -1557,18 +1558,18 @@ addDetailedDiagnostic :: (ErrInfo -> TcRnMessage) -> TcM ()
 addDetailedDiagnostic mkMsg = do
   loc <- getSrcSpanM
   printer <- getPrintUnqualified
-  dflags  <- getDynFlags
+  !diag_opts  <- initDiagOpts <$> getDynFlags
   env0 <- tcInitTidyEnv
   ctxt <- getErrCtxt
   err_info <- mkErrInfo env0 ctxt
-  reportDiagnostic (mkMsgEnvelope dflags loc printer (mkMsg (ErrInfo err_info)))
+  reportDiagnostic (mkMsgEnvelope diag_opts loc printer (mkMsg (ErrInfo err_info)))
 
 addTcRnDiagnostic :: TcRnMessage -> TcM ()
 addTcRnDiagnostic msg = do
   loc <- getSrcSpanM
   printer <- getPrintUnqualified
-  dflags  <- getDynFlags
-  reportDiagnostic (mkMsgEnvelope dflags loc printer msg)
+  !diag_opts  <- initDiagOpts <$> getDynFlags
+  reportDiagnostic (mkMsgEnvelope diag_opts loc printer msg)
 
 -- | Display a diagnostic for a given source location.
 addDiagnosticAt :: DiagnosticReason -> SrcSpan -> SDoc -> TcRn ()
@@ -1585,8 +1586,8 @@ add_diagnostic reason msg extra_info
 add_diagnostic_at :: DiagnosticReason -> SrcSpan -> SDoc -> SDoc -> TcRn ()
 add_diagnostic_at reason loc msg extra_info
   = do { printer <- getPrintUnqualified ;
-         dflags  <- getDynFlags ;
-         let { dia = mkMsgEnvelope dflags loc printer $
+         !diag_opts  <- initDiagOpts <$> getDynFlags ;
+         let { dia = mkMsgEnvelope diag_opts loc printer $
                      TcRnUnknownMessage $
                      mkDecoratedDiagnostic reason noHints [msg, extra_info] } ;
          reportDiagnostic dia }

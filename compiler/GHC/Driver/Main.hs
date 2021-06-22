@@ -103,6 +103,7 @@ import GHC.Driver.Errors.Types
 import GHC.Driver.CodeOutput
 import GHC.Driver.Config.Logger (initLogFlags)
 import GHC.Driver.Config.Parser (initParserOpts)
+import GHC.Driver.Config.Diagnostic
 import GHC.Driver.Hooks
 
 import GHC.Runtime.Context
@@ -281,10 +282,10 @@ getHscEnv = Hsc $ \e w -> return (e, w)
 
 handleWarnings :: Hsc ()
 handleWarnings = do
-    dflags <- getDynFlags
+    diag_opts <- initDiagOpts <$> getDynFlags
     logger <- getLogger
     w <- getDiagnostics
-    liftIO $ printOrThrowDiagnostics logger dflags w
+    liftIO $ printOrThrowDiagnostics logger diag_opts w
     clearDiagnostics
 
 -- | log warning in the monad, and if there are errors then
@@ -298,11 +299,11 @@ logWarningsReportErrors (warnings,errors) = do
 -- contain at least one error (e.g. coming from PFailed)
 handleWarningsThrowErrors :: (Messages PsWarning, Messages PsError) -> Hsc a
 handleWarningsThrowErrors (warnings, errors) = do
-    dflags <- getDynFlags
+    diag_opts <- initDiagOpts <$> getDynFlags
     logDiagnostics (GhcPsMessage <$> warnings)
     logger <- getLogger
     let (wWarns, wErrs) = partitionMessages warnings
-    liftIO $ printMessages logger dflags wWarns
+    liftIO $ printMessages logger diag_opts wWarns
     throwErrors $ fmap GhcPsMessage $ errors `unionMessages` wErrs
 
 -- | Deal with errors and warnings returned by a compilation step
@@ -562,14 +563,15 @@ tcRnModule' :: ModSummary -> Bool -> HsParsedModule
             -> Hsc TcGblEnv
 tcRnModule' sum save_rn_syntax mod = do
     hsc_env <- getHscEnv
-    dflags   <- getDynFlags
+    dflags  <- getDynFlags
 
     let reason = WarningWithFlag Opt_WarnMissingSafeHaskellMode
+    let diag_opts = initDiagOpts dflags
     -- -Wmissing-safe-haskell-mode
     when (not (safeHaskellModeEnabled dflags)
           && wopt Opt_WarnMissingSafeHaskellMode dflags) $
         logDiagnostics $ singleMessage $
-        mkPlainMsgEnvelope dflags (getLoc (hpm_module mod)) $
+        mkPlainMsgEnvelope diag_opts (getLoc (hpm_module mod)) $
         GhcDriverMessage $ DriverUnknownMessage $
         mkPlainDiagnostic reason noHints warnMissingSafeHaskellMode
 
@@ -599,14 +601,14 @@ tcRnModule' sum save_rn_syntax mod = do
               True
                 | safeHaskell dflags == Sf_Safe -> return ()
                 | otherwise -> (logDiagnostics $ singleMessage $
-                       mkPlainMsgEnvelope dflags (warnSafeOnLoc dflags) $
+                       mkPlainMsgEnvelope diag_opts (warnSafeOnLoc dflags) $
                        GhcDriverMessage $ DriverUnknownMessage $
                        mkPlainDiagnostic (WarningWithFlag Opt_WarnSafe) noHints $
                        errSafe tcg_res')
               False | safeHaskell dflags == Sf_Trustworthy &&
                       wopt Opt_WarnTrustworthySafe dflags ->
                       (logDiagnostics $ singleMessage $
-                       mkPlainMsgEnvelope dflags (trustworthyOnLoc dflags) $
+                       mkPlainMsgEnvelope diag_opts (trustworthyOnLoc dflags) $
                        GhcDriverMessage $ DriverUnknownMessage $
                        mkPlainDiagnostic (WarningWithFlag Opt_WarnTrustworthySafe) noHints $
                        errTwthySafe tcg_res')
@@ -864,6 +866,7 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
   logger <- getLogger
   let bcknd  = backend dflags
       hsc_src = ms_hsc_src summary
+      diag_opts = initDiagOpts dflags
 
   -- Desugar, if appropriate
   --
@@ -878,7 +881,7 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
 
   -- Report the warnings from both typechecking and desugar together
   w <- getDiagnostics
-  liftIO $ printOrThrowDiagnostics logger dflags (unionMessages tc_warnings w)
+  liftIO $ printOrThrowDiagnostics logger diag_opts (unionMessages tc_warnings w)
   clearDiagnostics
 
   -- Simplify, if appropriate, and (whether we simplified or not) generate an
@@ -1154,25 +1157,26 @@ hscCheckSafeImports tcg_env = do
 
   where
     checkRULES dflags tcg_env' =
-      case safeLanguageOn dflags of
+      let diag_opts = initDiagOpts dflags
+      in case safeLanguageOn dflags of
           True -> do
               -- XSafe: we nuke user written RULES
-              logDiagnostics $ fmap GhcDriverMessage $ warns dflags (tcg_rules tcg_env')
+              logDiagnostics $ fmap GhcDriverMessage $ warns diag_opts (tcg_rules tcg_env')
               return tcg_env' { tcg_rules = [] }
           False
                 -- SafeInferred: user defined RULES, so not safe
               | safeInferOn dflags && not (null $ tcg_rules tcg_env')
-              -> markUnsafeInfer tcg_env' $ warns dflags (tcg_rules tcg_env')
+              -> markUnsafeInfer tcg_env' $ warns diag_opts (tcg_rules tcg_env')
 
                 -- Trustworthy OR SafeInferred: with no RULES
               | otherwise
               -> return tcg_env'
 
-    warns dflags rules = mkMessages $ listToBag $ map (warnRules dflags) rules
+    warns diag_opts rules = mkMessages $ listToBag $ map (warnRules diag_opts) rules
 
-    warnRules :: DynFlags -> LRuleDecl GhcTc -> MsgEnvelope DriverMessage
-    warnRules df (L loc (HsRule { rd_name = n })) =
-        mkPlainMsgEnvelope df (locA loc) $
+    warnRules :: DiagOpts -> LRuleDecl GhcTc -> MsgEnvelope DriverMessage
+    warnRules diag_opts (L loc (HsRule { rd_name = n })) =
+        mkPlainMsgEnvelope diag_opts (locA loc) $
         DriverUnknownMessage $
         mkPlainDiagnostic WarningWithoutFlag noHints $
             text "Rule \"" <> ftext (snd $ unLoc n) <> text "\" ignored" $+$
@@ -1318,6 +1322,7 @@ hscCheckSafe' m l = do
         hsc_env <- getHscEnv
         dflags <- getDynFlags
         iface <- lookup' m
+        let diag_opts = initDiagOpts dflags
         case iface of
             -- can't load iface to check trust!
             Nothing -> throwOneError $
@@ -1340,7 +1345,7 @@ hscCheckSafe' m l = do
                     warns = if wopt Opt_WarnInferredSafeImports dflags
                                 && safeLanguageOn dflags
                                 && trust == Sf_SafeInferred
-                                then inferredImportWarn dflags
+                                then inferredImportWarn diag_opts
                                 else emptyMessages
                     -- General errors we throw but Safe errors we log
                     errs = case (safeM, safeP) of
@@ -1354,8 +1359,8 @@ hscCheckSafe' m l = do
 
                 where
                     state = hsc_units hsc_env
-                    inferredImportWarn dflags = singleMessage
-                        $ mkMsgEnvelope dflags l (pkgQual state)
+                    inferredImportWarn diag_opts = singleMessage
+                        $ mkMsgEnvelope diag_opts l (pkgQual state)
                         $ GhcDriverMessage $ DriverUnknownMessage
                         $ mkPlainDiagnostic (WarningWithFlag Opt_WarnInferredSafeImports) noHints
                         $ sep
@@ -1450,9 +1455,10 @@ markUnsafeInfer tcg_env whyUnsafe = do
     dflags <- getDynFlags
 
     let reason = WarningWithFlag Opt_WarnUnsafe
-    when (wopt Opt_WarnUnsafe dflags)
+    let diag_opts = initDiagOpts dflags
+    when (diag_wopt Opt_WarnUnsafe diag_opts)
          (logDiagnostics $ singleMessage $
-             mkPlainMsgEnvelope dflags (warnUnsafeOnLoc dflags) $
+             mkPlainMsgEnvelope diag_opts (warnUnsafeOnLoc dflags) $
              GhcDriverMessage $ DriverUnknownMessage $
              mkPlainDiagnostic reason noHints $
              whyUnsafe' dflags)
