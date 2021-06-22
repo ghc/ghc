@@ -180,23 +180,45 @@ increment will happen in the loop.
 
 unpackCString# :: Addr# -> [Char]
 {-# NOINLINE CONLIKE unpackCString# #-}
-unpackCString# addr
-    | isTrue# (ch `eqChar#` '\0'#) = []
-    | True                         = C# ch : unpackCString# (addr `plusAddr#` 1#)
-      where
-        -- See Note [unpackCString# iterating over addr]
-        !ch = indexCharOffAddr# addr 0#
-
+     -- See the NOINLINE note on unpackCString#
+unpackCString# addr = unpackAppendCString'# [] addr
 
 unpackAppendCString# :: Addr# -> [Char] -> [Char]
 {-# NOINLINE unpackAppendCString# #-}
      -- See the NOINLINE note on unpackCString#
-unpackAppendCString# addr rest
-    | isTrue# (ch `eqChar#` '\0'#) = rest
-    | True                         = C# ch : unpackAppendCString# (addr `plusAddr#` 1#) rest
-      where
-        -- See Note [unpackCString# iterating over addr]
-        !ch = indexCharOffAddr# addr 0#
+unpackAppendCString# addr rest = unpackAppendCString'# rest addr
+
+-- | This is an local helper to reduce duplication between
+-- 'unpackCString#' and 'unpackAppendCString#'. Because it is inlined the
+-- this gets specialised to @rest = []@ in the former case.
+unpackAppendCString'# :: [Char] -> Addr# -> [Char]
+{-# INLINE unpackAppendCString'# #-}
+unpackAppendCString'# rest0 addr0 = goStrict addr0 unpackChunkLen
+  where
+    -- Laziness is expensive: it involves allocating a thunk, then an indirect
+    -- jump, perhaps some cache misses, etc. However, in practice we find that
+    -- most applications tend to use at least *some* of their unpacked string.
+    -- Consequently we unpack eagerly in chunks of this many characters.
+    -- Compared to fully-lazy unpacking this improves runtime of GHC by about
+    -- 0.5%.
+    unpackChunkLen = 32#
+
+    unpackChunk :: Addr# -> [Char]
+    unpackChunk addr = goStrict addr unpackChunkLen
+
+    goStrict :: Addr# -> Int# -> [Char]
+    goStrict addr n
+      | isTrue# (ch `eqChar#` '\0'#) = rest0
+      | isTrue# (n ==# 0#) =
+          -- We've reached the end of our chunk, lazily unpack the next chunk
+          let rest = unpackChunk (addr `plusAddr#` 1#)
+          in C# ch : rest
+      | True =
+          let !rest = goStrict (addr `plusAddr#` 1#) (n -# 1#)
+          in C# ch : rest
+        where
+          -- See Note [unpackCString# iterating over addr]
+          !ch = indexCharOffAddr# addr 0#
 
 -- Usually the unpack-list rule turns unpackFoldrCString# into unpackCString#.
 -- See Note [String literals in GHC] for more details.
