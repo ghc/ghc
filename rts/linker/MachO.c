@@ -551,7 +551,8 @@ relocateSectionAarch64(ObjectCode * oc, Section * section)
                 } else {
                     value = (uint64_t)symbol->addr;    // address of the symbol.
                 }
-                if((value - pc + addend) >> (2 + 26)) {
+                /// subtract 1 to account for the sign bit.
+                if((value - pc + addend) >> (2 + 26 - 1)) {
                     /* we need a stub */
                     /* check if we already have that stub */
                     if(findStub(section, (void**)&value, 0)) {
