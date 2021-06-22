@@ -491,9 +491,9 @@ test('T10592', normal, compile, [''])
 test('T11305', normal, compile, [''])
 test('T11254', normal, compile, [''])
 test('T11379', normal, compile, [''])
-test('T11462', [unless(have_dynamic(), expect_broken(10301))], multi_compile,
+test('T11462', normal, multi_compile,
      [None, [('T11462_Plugin.hs', '-package ghc'), ('T11462.hs', '')],
-      '-dynamic'])
+      '-dynamic' if have_dynamic() else ''])
 test('T11480', normal, compile, [''])
 test('RebindHR', normal, compile, [''])
 test('RebindNegate', normal, compile, [''])
@@ -559,9 +559,9 @@ test('T11723', normal, compile, [''])
 test('T12987', normal, compile, [''])
 test('T11736', normal, compile, [''])
 test('T13248', expect_broken(13248), compile, [''])
-test('T11525', [unless(have_dynamic(), expect_broken(10301))], multi_compile,
+test('T11525', normal, multi_compile,
      [None, [('T11525_Plugin.hs', '-package ghc'), ('T11525.hs', '')],
-      '-dynamic'])
+      '-dynamic' if have_dynamic() else ''])
 test('T12923_1', normal, compile, [''])
 test('T12923_2', normal, compile, [''])
 test('T12923_3', normal, compile, [''])
