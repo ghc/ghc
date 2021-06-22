@@ -1240,9 +1240,13 @@ class UnXRec p => CollectPass p where
 instance IsPass p => CollectPass (GhcPass p) where
   collectXXPat _ flag ext =
     case ghcPass @p of
-      GhcTc -> let CoPat _ pat _ = ext in collect_pat flag pat
-      GhcRn -> noExtCon ext
       GhcPs -> noExtCon ext
+      GhcRn
+        | HsPatExpanded _ pat <- ext
+        -> collect_pat flag pat
+      GhcTc -> case ext of
+        CoPat _ pat _      -> collect_pat flag pat
+        ExpansionPat _ pat -> collect_pat flag pat
 
 {-
 Note [Dictionary binders in ConPatOut]
