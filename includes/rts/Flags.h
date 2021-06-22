@@ -90,6 +90,7 @@ typedef struct _GC_FLAGS {
 
     bool numa;                   /* Use NUMA */
     StgWord numaMask;
+    bool hugePage;               /* Use huge pages */
 } GC_FLAGS;
 
 /* See Note [Synchronization of flags and base APIs] */
