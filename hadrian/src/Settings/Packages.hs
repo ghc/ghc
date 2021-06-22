@@ -367,7 +367,8 @@ rtsPackageArgs = package rts ? do
           , if not (null libnumaLibraryDir) then arg ("--extra-lib-dirs="++libnumaLibraryDir) else mempty
           , if not (null libnumaIncludeDir) then arg ("--extra-include-dirs="++libnumaIncludeDir) else mempty
           ]
-        , builder (Cc FindCDependencies) ? cArgs
+        , builder (Cc (FindCDependencies CDep)) ? cArgs
+        , builder (Cc (FindCDependencies  CxxDep)) ? cArgs
         , builder (Ghc CompileCWithGhc) ? map ("-optc" ++) <$> cArgs
         , builder (Ghc CompileCppWithGhc) ? map ("-optcxx" ++) <$> cArgs
         , builder Ghc ? ghcArgs

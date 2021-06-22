@@ -391,7 +391,8 @@ builderSetting =
 
         ccBuilder =
           [ ("c", CompileC)
-          , ("deps", FindCDependencies)
+          -- Not sure how to handle the FindCDependencies CxxDep case
+          , ("deps", FindCDependencies CDep)
           ]
 
         stages = map (\stg -> (stageString stg, stg)) [minBound..maxBound]
