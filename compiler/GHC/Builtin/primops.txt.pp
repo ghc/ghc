@@ -2783,10 +2783,14 @@ primop  ForkOp "fork#" GenPrimOp
                                               , topDmd ] topDiv }
 
 primop  ForkOnOp "forkOn#" GenPrimOp
-   Int# -> a -> State# RealWorld -> (# State# RealWorld, ThreadId# #)
+   Int# -> (State# RealWorld -> (# State# RealWorld, a #))
+   -> State# RealWorld -> (# State# RealWorld, ThreadId# #)
    with
    has_side_effects = True
    out_of_line      = True
+   strictness  = { \ _arity -> mkClosedDmdSig [ topDmd
+                                              , lazyApply1Dmd
+                                              , topDmd ] topDiv }
 
 primop  KillThreadOp "killThread#"  GenPrimOp
    ThreadId# -> a -> State# RealWorld -> State# RealWorld

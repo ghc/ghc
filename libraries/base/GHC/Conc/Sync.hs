@@ -313,7 +313,7 @@ is recommended).
 -}
 forkOn :: Int -> IO () -> IO ThreadId
 forkOn (I# cpu) action = IO $ \ s ->
-   case (forkOn# cpu action_plus s) of (# s1, tid #) -> (# s1, ThreadId tid #)
+   case (forkOn# cpu (unIO action_plus) s) of (# s1, tid #) -> (# s1, ThreadId tid #)
  where
   -- We must use 'catch' rather than 'catchException' because the action
   -- could be bottom. #13330
