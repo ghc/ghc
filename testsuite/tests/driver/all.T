@@ -292,3 +292,5 @@ test('T18369', normal, compile, ['-O'])
 test('FullGHCVersion', normal, compile_and_run, ['-package ghc-boot'])
 test('OneShotTH', normal, makefile_test, [])
 test('T17481', normal, makefile_test, [])
+# There should be multiple rules firing for the compilation of T20021M
+test('T20021', normal, multimod_compile, ['T20021M', ''])

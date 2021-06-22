@@ -9,7 +9,7 @@ module GHC.Core.Opt.Simplify.Monad (
         -- The monad
         SimplM,
         initSmpl, traceSmpl,
-        getSimplRules, getFamEnvs, getOptCoercionOpts,
+        getSimplRules, getSimplCurMod, getFamEnvs, getOptCoercionOpts,
 
         -- Unique supply
         MonadUnique(..), newId, newJoinId,
@@ -45,6 +45,7 @@ import GHC.Types.Basic     ( IntWithInf, treatZeroAsInf, mkIntWithInf )
 import Control.Monad       ( ap )
 import GHC.Core.Multiplicity        ( pattern Many )
 import GHC.Exts( oneShot )
+import GHC.Unit.Module
 
 {-
 ************************************************************************
@@ -78,6 +79,7 @@ pattern SM m <- SM' m
 data SimplTopEnv
   = STE { st_flags     :: DynFlags
         , st_logger    :: !Logger
+        , st_module    :: !Module
         , st_max_ticks :: IntWithInf  -- ^ Max #ticks in this simplifier run
         , st_rules     :: RuleEnv
         , st_fams      :: (FamInstEnv, FamInstEnv)
@@ -86,13 +88,13 @@ data SimplTopEnv
             -- ^ Coercion optimiser options
         }
 
-initSmpl :: Logger -> DynFlags -> RuleEnv -> (FamInstEnv, FamInstEnv)
+initSmpl :: Logger -> DynFlags -> Module -> RuleEnv -> (FamInstEnv, FamInstEnv)
          -> Int                 -- Size of the bindings, used to limit
                                 -- the number of ticks we allow
          -> SimplM a
          -> IO (a, SimplCount)
 
-initSmpl logger dflags rules fam_envs size m
+initSmpl logger dflags mod rules fam_envs size m
   = do -- No init count; set to 0
        let simplCount = zeroSimplCount dflags
        (result, count) <- unSM m env simplCount
@@ -100,6 +102,7 @@ initSmpl logger dflags rules fam_envs size m
   where
     env = STE { st_flags = dflags
               , st_logger = logger
+              , st_module = mod
               , st_rules = rules
               , st_max_ticks = computeMaxTicks dflags size
               , st_fams = fam_envs
@@ -204,6 +207,9 @@ instance MonadIO SimplM where
 
 getSimplRules :: SimplM RuleEnv
 getSimplRules = SM (\st_env sc -> return (st_rules st_env, sc))
+
+getSimplCurMod :: SimplM Module
+getSimplCurMod = SM (\st_env sc -> return (st_module st_env, sc))
 
 getFamEnvs :: SimplM (FamInstEnv, FamInstEnv)
 getFamEnvs = SM (\st_env sc -> return (st_fams st_env, sc))

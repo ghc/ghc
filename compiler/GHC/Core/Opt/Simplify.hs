@@ -8,6 +8,7 @@
 {-# LANGUAGE TypeFamilies #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates -Wno-incomplete-uni-patterns #-}
+{-# LANGUAGE MultiWayIf #-}
 module GHC.Core.Opt.Simplify ( simplTopBinds, simplExpr, simplRules ) where
 
 import GHC.Prelude
@@ -75,6 +76,7 @@ import GHC.Utils.Monad  ( mapAccumLM, liftIO )
 import GHC.Utils.Logger
 
 import Control.Monad
+import GHC.Unit (Module)
 
 
 {-
@@ -289,23 +291,24 @@ simplRecOrTopPair :: SimplEnv
                   -> InId -> OutBndr -> InExpr  -- Binder and rhs
                   -> SimplM (SimplFloats, SimplEnv)
 
-simplRecOrTopPair env top_lvl is_rec mb_cont old_bndr new_bndr rhs
-  | Just env' <- preInlineUnconditionally env top_lvl old_bndr rhs env
-  = {-#SCC "simplRecOrTopPair-pre-inline-uncond" #-}
-    trace_bind "pre-inline-uncond" $
-    do { tick (PreInlineUnconditionally old_bndr)
-       ; return ( emptyFloats env, env' ) }
+simplRecOrTopPair env top_lvl is_rec mb_cont old_bndr new_bndr rhs = do
+  cur_mod <- getSimplCurMod
+  if | Just env' <- preInlineUnconditionally env cur_mod top_lvl old_bndr rhs env
+      -> {-#SCC "simplRecOrTopPair-pre-inline-uncond" #-}
+      trace_bind "pre-inline-uncond" $
+      do { tick (PreInlineUnconditionally old_bndr)
+         ; return ( emptyFloats env, env' ) }
 
-  | Just cont <- mb_cont
-  = {-#SCC "simplRecOrTopPair-join" #-}
-    assert (isNotTopLevel top_lvl && isJoinId new_bndr )
-    trace_bind "join" $
-    simplJoinBind env cont old_bndr new_bndr rhs env
+     | Just cont <- mb_cont
+      -> {-#SCC "simplRecOrTopPair-join" #-}
+      assert (isNotTopLevel top_lvl && isJoinId new_bndr )
+      trace_bind "join" $
+      simplJoinBind env cont old_bndr new_bndr rhs env
 
-  | otherwise
-  = {-#SCC "simplRecOrTopPair-normal" #-}
-    trace_bind "normal" $
-    simplLazyBind env top_lvl is_rec old_bndr new_bndr rhs env
+     | otherwise
+      -> {-#SCC "simplRecOrTopPair-normal" #-}
+      trace_bind "normal" $
+      simplLazyBind env top_lvl is_rec old_bndr new_bndr rhs env
 
   where
     logger = seLogger env
@@ -1449,7 +1452,9 @@ rebuild env expr cont
                        -- NB: mkCast implements the (Coercion co |> g) optimisation
 
       Select { sc_bndr = bndr, sc_alts = alts, sc_env = se, sc_cont = cont }
-        -> rebuildCase (se `setInScopeFromE` env) expr bndr alts cont
+        -> do
+            cur_mod <- getSimplCurMod
+            rebuildCase (se `setInScopeFromE` env) cur_mod expr bndr alts cont
 
       StrictArg { sc_fun = fun, sc_cont = cont, sc_fun_ty = fun_ty }
         -> rebuildCall env (addValArgTo fun expr fun_ty ) cont
@@ -1676,15 +1681,15 @@ simplNonRecE :: SimplEnv
 -- Why?  Because of the binder-occ-info-zapping done before
 --       the call to simplLam in simplExprF (Lam ...)
 
-simplNonRecE env bndr (rhs, rhs_se) (bndrs, body) cont
-  | assert (isId bndr && not (isJoinId bndr) ) True
-  , Just env' <- preInlineUnconditionally env NotTopLevel bndr rhs rhs_se
-  = do { tick (PreInlineUnconditionally bndr)
-       ; -- pprTrace "preInlineUncond" (ppr bndr <+> ppr rhs) $
-         simplLam env' bndrs body cont }
-
-  | otherwise
-  = do { (env1, bndr1) <- simplNonRecBndr env bndr
+simplNonRecE env bndr (rhs, rhs_se) (bndrs, body) cont = do
+  massert (isId bndr && not (isJoinId bndr) )
+  cur_mod <- getSimplCurMod
+  case preInlineUnconditionally env cur_mod NotTopLevel bndr rhs rhs_se of
+    Just env' ->  do { tick (PreInlineUnconditionally bndr)
+                     ; -- pprTrace "preInlineUncond" (ppr bndr <+> ppr rhs) $
+                     simplLam env' bndrs body cont }
+    Nothing -> do
+       { (env1, bndr1) <- simplNonRecBndr env bndr
 
        -- Deal with strict bindings
        -- See Note [Dark corner with representation polymorphism]
@@ -1803,14 +1808,14 @@ type MaybeJoinCont = Maybe SimplCont
 simplNonRecJoinPoint :: SimplEnv -> InId -> InExpr
                      -> InExpr -> SimplCont
                      -> SimplM (SimplFloats, OutExpr)
-simplNonRecJoinPoint env bndr rhs body cont
-  | assert (isJoinId bndr ) True
-  , Just env' <- preInlineUnconditionally env NotTopLevel bndr rhs env
-  = do { tick (PreInlineUnconditionally bndr)
-       ; simplExprF env' body cont }
+simplNonRecJoinPoint env bndr rhs body cont = do
+  massert (isJoinId bndr)
+  cur_mod <- getSimplCurMod
+  case  preInlineUnconditionally env cur_mod NotTopLevel bndr rhs env of
+    Just env' -> do { tick (PreInlineUnconditionally bndr)
+                    ; simplExprF env' body cont }
 
-   | otherwise
-   = wrapJoinCont env cont $ \ env cont ->
+    Nothing -> wrapJoinCont env cont $ \ env cont ->
      do { -- We push join_cont into the join RHS and the body;
           -- and wrap wrap_cont around the whole thing
         ; let mult   = contHoleScaling cont
@@ -1987,7 +1992,9 @@ simplIdF env var cont
 
       DoneId var1 ->
           let cont' = trimJoinCont var (isJoinId_maybe var1) cont
-          in completeCall env var1 cont'
+          in do
+              mod <- getSimplCurMod
+              completeCall env mod var1 cont'
 
       DoneEx e mb_join ->
           let env' = zapSubstEnv env
@@ -2006,9 +2013,9 @@ simplIdF env var cont
 ---------------------------------------------------------
 --      Dealing with a call site
 
-completeCall :: SimplEnv -> OutId -> SimplCont -> SimplM (SimplFloats, OutExpr)
-completeCall env var cont
-  | Just expr <- callSiteInline logger uf_opts case_depth var active_unf
+completeCall :: SimplEnv -> Module -> OutId -> SimplCont -> SimplM (SimplFloats, OutExpr)
+completeCall env cur_mod var cont
+  | Just expr <- callSiteInline logger cur_mod uf_opts case_depth var ignore_prags active_unf
                                 lone_variable arg_infos interesting_cont
   -- Inline the variable's RHS
   = do { checkedTick (UnfoldingDone var)
@@ -2026,6 +2033,7 @@ completeCall env var cont
 
   where
     uf_opts    = seUnfoldingOpts env
+    ignore_prags = sm_opt_off (getMode env)
     case_depth = seCaseDepth env
     logger     = seLogger env
     (lone_variable, arg_infos, call_cont) = contArgs cont
@@ -2089,7 +2097,8 @@ rebuildCall env info@(ArgInfo { ai_fun = fun, ai_args = rev_args
   = -- We've accumulated a simplified call in <fun,rev_args>
     -- so try rewrite rules; see Note [RULEs apply to simplified arguments]
     -- See also Note [Rules for recursive functions]
-    do { mb_match <- tryRules env rules fun (reverse rev_args) cont
+    do { cur_mod <- getSimplCurMod
+       ; mb_match <- tryRules env cur_mod rules fun (reverse rev_args) cont
        ; case mb_match of
              Just (env', rhs, cont') -> simplExprF env' rhs cont'
              Nothing                 -> rebuildCall env info' cont }
@@ -2243,12 +2252,12 @@ all this at once is TOO HARD!
 ************************************************************************
 -}
 
-tryRules :: SimplEnv -> [CoreRule]
+tryRules :: SimplEnv -> Module -> [CoreRule]
          -> Id -> [ArgSpec]
          -> SimplCont
          -> SimplM (Maybe (SimplEnv, CoreExpr, SimplCont))
 
-tryRules env rules fn args call_cont
+tryRules env cur_mod rules fn args call_cont
   | null rules
   = return Nothing
 
@@ -2273,7 +2282,7 @@ tryRules env rules fn args call_cont
       ; return (Just (val_arg, Select dup new_bndr new_alts se cont)) }
 -}
 
-  | Just (rule, rule_rhs) <- lookupRule ropts (getUnfoldingInRuleMatch env)
+  | Just (rule, rule_rhs) <- lookupRule ropts (getUnfoldingInRuleMatch env cur_mod)
                                         (activeRule (getMode env)) fn
                                         (argInfoAppArgs args) rules
   -- Fire a rule for the function
@@ -2347,7 +2356,8 @@ trySeqRules :: SimplEnv
 -- See Note [User-defined RULES for seq]
 trySeqRules in_env scrut rhs cont
   = do { rule_base <- getSimplRules
-       ; tryRules in_env (getRules rule_base seqId) seqId out_args rule_cont }
+       ; cur_mod <- getSimplCurMod
+       ; tryRules in_env cur_mod (getRules rule_base seqId) seqId out_args rule_cont }
   where
     no_cast_scrut = drop_casts scrut
     scrut_ty  = exprType no_cast_scrut
@@ -2689,7 +2699,16 @@ extra complication is not clear.
 ---------------------------------------------------------
 --      Eliminate the case if possible
 
-rebuildCase, reallyRebuildCase
+rebuildCase
+   :: SimplEnv
+   -> Module
+   -> OutExpr          -- Scrutinee
+   -> InId             -- Case binder
+   -> [InAlt]          -- Alternatives (increasing order)
+   -> SimplCont
+   -> SimplM (SimplFloats, OutExpr)
+
+reallyRebuildCase
    :: SimplEnv
    -> OutExpr          -- Scrutinee
    -> InId             -- Case binder
@@ -2701,7 +2720,7 @@ rebuildCase, reallyRebuildCase
 --      1. Eliminate the case if there's a known constructor
 --------------------------------------------------
 
-rebuildCase env scrut case_bndr alts cont
+rebuildCase env cur_mod scrut case_bndr alts cont
   | Lit lit <- scrut    -- No need for same treatment as constructors
                         -- because literals are inlined more vigorously
   , not (litIsLifted lit)
@@ -2711,7 +2730,7 @@ rebuildCase env scrut case_bndr alts cont
             Just (Alt _ bs rhs) -> simple_rhs env [] scrut bs rhs }
 
   | Just (in_scope', wfloats, con, ty_args, other_args)
-      <- exprIsConApp_maybe (getUnfoldingInRuleMatch env) scrut
+      <- exprIsConApp_maybe (getUnfoldingInRuleMatch env cur_mod) scrut
         -- Works when the scrutinee is a variable with a known unfolding
         -- as well as when it's an explicit constructor application
   , let env0 = setInScopeSet env in_scope'
@@ -2771,7 +2790,7 @@ rebuildCase env scrut case_bndr alts cont
 --      2. Eliminate the case if scrutinee is evaluated
 --------------------------------------------------
 
-rebuildCase env scrut case_bndr alts@[Alt _ bndrs rhs] cont
+rebuildCase env _cur_mod scrut case_bndr alts@[Alt _ bndrs rhs] cont
   -- See if we can get rid of the case altogether
   -- See Note [Case elimination]
   -- mkCase made sure that if all the alternatives are equal,
@@ -2813,7 +2832,7 @@ rebuildCase env scrut case_bndr alts@[Alt _ bndrs rhs] cont
     all_dead_bndrs = all isDeadBinder bndrs       -- bndrs are [InId]
     is_plain_seq   = all_dead_bndrs && isDeadBinder case_bndr -- Evaluation *only* for effect
 
-rebuildCase env scrut case_bndr alts cont
+rebuildCase env _cur_mod scrut case_bndr alts cont
   = reallyRebuildCase env scrut case_bndr alts cont
 
 

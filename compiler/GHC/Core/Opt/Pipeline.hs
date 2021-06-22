@@ -144,6 +144,7 @@ getCoreToDo logger dflags
     late_specialise = gopt Opt_LateSpecialise             dflags
     static_args   = gopt Opt_StaticArgumentTransformation dflags
     rules_on      = gopt Opt_EnableRewriteRules           dflags
+    opt_off       = gopt Opt_IgnoreInterfacePragmas       dflags
     eta_expand_on = gopt Opt_DoLambdaEtaExpansion         dflags
     pre_inline_on = gopt Opt_SimplPreInlining             dflags
     ww_on         = gopt Opt_WorkerWrapper                dflags
@@ -167,6 +168,7 @@ getCoreToDo logger dflags
                           , sm_inline     = True
                           , sm_case_case  = True
                           , sm_pre_inline = pre_inline_on
+                          , sm_opt_off    = opt_off
                           }
 
     simpl_phase phase name iter
@@ -591,7 +593,7 @@ simplifyExpr hsc_env expr
 
         ; let sz = exprSize expr
 
-        ; (expr', counts) <- initSmpl logger dflags rule_env fi_env sz $
+        ; (expr', counts) <- initSmpl logger dflags (mainModIs hsc_env) rule_env fi_env sz $
                              simplExprGently simpl_env expr
 
         ; Logger.putDumpFileMaybe logger Opt_D_dump_simpl_stats
@@ -731,7 +733,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
 
                 -- Simplify the program
            ((binds1, rules1), counts1) <-
-             initSmpl logger dflags (mkRuleEnv rule_base2 vis_orphs) fam_envs sz $
+             initSmpl logger dflags this_mod (mkRuleEnv rule_base2 vis_orphs) fam_envs sz $
                do { (floats, env1) <- {-# SCC "SimplTopBinds" #-}
                                       simplTopBinds simpl_env tagged_binds
 
