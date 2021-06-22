@@ -2282,7 +2282,7 @@ diffIdInfo env bndr1 bndr2
     && callArityInfo info1 == callArityInfo info2
     && levityInfo info1 == levityInfo info2
   = locBind "in unfolding of" bndr1 bndr2 $
-    diffUnfold env (unfoldingInfo info1) (unfoldingInfo info2)
+    diffUnfold env (realUnfoldingInfo info1) (realUnfoldingInfo info2)
   | otherwise
   = locBind "in Id info of" bndr1 bndr2
     [fsep [pprBndr LetBind bndr1, text "/=", pprBndr LetBind bndr2]]

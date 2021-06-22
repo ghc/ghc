@@ -967,7 +967,6 @@ certainlyWillInline :: UnfoldingOpts -> IdInfo -> Maybe Unfolding
 certainlyWillInline opts fn_info
   = case fn_unf of
       CoreUnfolding { uf_tmpl = expr, uf_guidance = guidance, uf_src = src }
-        | loop_breaker -> Nothing       -- Won't inline, so try w/w
         | noinline     -> Nothing       -- See Note [Worker/wrapper for NOINLINE functions]
         | otherwise
         -> case guidance of
@@ -989,9 +988,8 @@ certainlyWillInline opts fn_info
       _other_unf       -> Nothing
 
   where
-    loop_breaker = isStrongLoopBreaker (occInfo fn_info)
     noinline     = inlinePragmaSpec (inlinePragInfo fn_info) == NoInline
-    fn_unf       = unfoldingInfo fn_info
+    fn_unf       = unfoldingInfo fn_info -- NB: loop-breakers never inline
 
         -- The UnfIfGoodArgs case seems important.  If we w/w small functions
         -- binary sizes go up by 10%!  (This is with SplitObjs.)

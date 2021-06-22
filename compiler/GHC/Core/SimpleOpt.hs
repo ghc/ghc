@@ -33,7 +33,7 @@ import GHC.Core.Make ( FloatBind(..) )
 import GHC.Core.Opt.OccurAnal( occurAnalyseExpr, occurAnalysePgm )
 import GHC.Types.Literal
 import GHC.Types.Id
-import GHC.Types.Id.Info  ( unfoldingInfo, setUnfoldingInfo, setRuleInfo, IdInfo (..) )
+import GHC.Types.Id.Info  ( realUnfoldingInfo, setUnfoldingInfo, setRuleInfo, IdInfo (..) )
 import GHC.Types.Var      ( isNonCoVarId )
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
@@ -667,7 +667,7 @@ add_info env old_bndr top_level new_rhs new_bndr
    old_rules = ruleInfo old_info
    new_rules = substSpec subst new_bndr old_rules
 
-   old_unfolding = unfoldingInfo old_info
+   old_unfolding = realUnfoldingInfo old_info
    new_unfolding | isStableUnfolding old_unfolding
                  = substUnfolding subst old_unfolding
                  | otherwise

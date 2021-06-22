@@ -94,7 +94,7 @@ module GHC.Types.Id (
         -- ** Reading 'IdInfo' fields
         idArity,
         idCallArity, idFunRepArity,
-        idUnfolding, realIdUnfolding, hasInlineUnfolding,
+        idUnfolding, realIdUnfolding,
         idSpecialisation, idCoreRules, idHasRules,
         idCafInfo, idLFInfo_maybe,
         idOneShotInfo, idStateHackOneShotInfo,
@@ -124,8 +124,7 @@ module GHC.Types.Id (
 import GHC.Prelude
 
 import GHC.Core ( CoreRule, isStableUnfolding, evaldUnfolding,
-                 isCompulsoryUnfolding, isInlineUnfolding,
-                 Unfolding( NoUnfolding ) )
+                 isCompulsoryUnfolding, Unfolding( NoUnfolding ) )
 
 import GHC.Types.Id.Info
 import GHC.Types.Basic
@@ -711,25 +710,19 @@ isStrictId id
                   isStrUsedDmd (idDemandInfo id)
                   -- Take the best of both strictnesses - old and new
 
-        ---------------------------------
-        -- UNFOLDING
-idUnfolding :: Id -> Unfolding
--- Do not expose the unfolding of a loop breaker!
-idUnfolding id
-  | isStrongLoopBreaker (occInfo info) = NoUnfolding
-  | otherwise                          = unfoldingInfo info
-  where
-    info = idInfo id
+---------------------------------
+-- UNFOLDING
 
-hasInlineUnfolding :: Id -> Bool
--- ^ True of a non-loop-breaker Id that has a /stable/ unfolding that is
---   (a) always inlined; that is, with an `UnfWhen` guidance, or
---   (b) a DFunUnfolding which never needs to be inlined
-hasInlineUnfolding id = isInlineUnfolding (idUnfolding id)
+-- | Returns the 'Id's unfolding, but does not expose the unfolding of a strong
+-- loop breaker. See 'unfoldingInfo'.
+--
+-- If you really want the unfolding of a strong loopbreaker, call 'realIdUnfolding'.
+idUnfolding :: Id -> Unfolding
+idUnfolding id = unfoldingInfo (idInfo id)
 
 realIdUnfolding :: Id -> Unfolding
--- Expose the unfolding if there is one, including for loop breakers
-realIdUnfolding id = unfoldingInfo (idInfo id)
+-- ^ Expose the unfolding if there is one, including for loop breakers
+realIdUnfolding id = realUnfoldingInfo (idInfo id)
 
 setIdUnfolding :: Id -> Unfolding -> Id
 setIdUnfolding id unfolding = modifyIdInfo (`setUnfoldingInfo` unfolding) id
