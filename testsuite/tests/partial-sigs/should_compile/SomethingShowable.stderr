@@ -1,7 +1,8 @@
 TYPE SIGNATURES
   somethingShowable :: Show Bool => Bool -> String
 Dependent modules: []
-Dependent packages: [base-4.16.0.0]
+Dependent packages: [base-4.16.0.0, ghc-bignum-1.1, ghc-prim-0.8.0,
+                     rts-1.0.1]
 
 SomethingShowable.hs:5:1: warning: [-Wsimplifiable-class-constraints (in -Wdefault)]
     • The constraint ‘Show Bool’ matches

@@ -5,7 +5,8 @@ TYPE SIGNATURES
     (Applicative f, Num t, Num b) =>
     (t -> f b) -> f b
 Dependent modules: []
-Dependent packages: [base-4.16.0.0]
+Dependent packages: [base-4.16.0.0, ghc-bignum-1.1, ghc-prim-0.8.0,
+                     rts-1.0.1]
 [1 of 1] Compiling A                ( A.hs, A.o )
 TYPE SIGNATURES
   test2 ::
@@ -13,4 +14,5 @@ TYPE SIGNATURES
     (Applicative f, Num t, Num b) =>
     (t -> f b) -> f b
 Dependent modules: []
-Dependent packages: [base-4.16.0.0]
+Dependent packages: [base-4.16.0.0, ghc-bignum-1.1, ghc-prim-0.8.0,
+                     rts-1.0.1]
