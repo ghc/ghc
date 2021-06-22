@@ -175,6 +175,7 @@ import GHC.Core.FamInstEnv
 
 import GHC.Driver.Env
 import GHC.Driver.Session
+import GHC.Driver.Config.Diagnostic
 
 import GHC.Runtime.Context
 
@@ -1051,8 +1052,8 @@ mkTcRnMessage :: SrcSpan
               -> TcRn (MsgEnvelope TcRnMessage)
 mkTcRnMessage loc msg
   = do { printer <- getPrintUnqualified ;
-         dflags <- getDynFlags ;
-         return $ mkMsgEnvelope dflags loc printer msg }
+         diag_opts <- initDiagOpts <$> getDynFlags ;
+         return $ mkMsgEnvelope diag_opts loc printer msg }
 
 reportDiagnostics :: [MsgEnvelope TcRnMessage] -> TcM ()
 reportDiagnostics = mapM_ reportDiagnostic
@@ -1538,11 +1539,11 @@ addDetailedDiagnostic :: (ErrInfo -> TcRnMessage) -> TcM ()
 addDetailedDiagnostic mkMsg = do
   loc <- getSrcSpanM
   printer <- getPrintUnqualified
-  dflags  <- getDynFlags
+  !diag_opts  <- initDiagOpts <$> getDynFlags
   env0 <- tcInitTidyEnv
   ctxt <- getErrCtxt
   err_info <- mkErrInfo env0 ctxt
-  reportDiagnostic (mkMsgEnvelope dflags loc printer (mkMsg (ErrInfo err_info empty)))
+  reportDiagnostic (mkMsgEnvelope diag_opts loc printer (mkMsg (ErrInfo err_info empty)))
 
 addTcRnDiagnostic :: TcRnMessage -> TcM ()
 addTcRnDiagnostic msg = do

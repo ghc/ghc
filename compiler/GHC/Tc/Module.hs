@@ -53,6 +53,7 @@ import GHC.Prelude
 import GHC.Driver.Env
 import GHC.Driver.Plugins
 import GHC.Driver.Session
+import GHC.Driver.Config.Diagnostic
 
 import GHC.Tc.Errors.Hole.FitTypes ( HoleFitPluginR (..) )
 import GHC.Tc.Errors.Types
@@ -3163,6 +3164,7 @@ mark_plugin_unsafe :: DynFlags -> TcM ()
 mark_plugin_unsafe dflags = unless (gopt Opt_PluginTrustworthy dflags) $
   recordUnsafeInfer pluginUnsafe
   where
+    !diag_opts = initDiagOpts dflags
     pluginUnsafe =
       singleMessage $
-      mkPlainMsgEnvelope dflags noSrcSpan TcRnUnsafeDueToPlugin
+      mkPlainMsgEnvelope diag_opts noSrcSpan TcRnUnsafeDueToPlugin
