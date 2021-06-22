@@ -1044,13 +1044,11 @@ foldMapDefault = coerce (traverse :: (a -> Const m ()) -> t a -> Const m (t ()))
 -- pure values and function application.  This allows us to define
 -- 'fmapDefault':
 --
--- > {-# LANGUAGE ScopedTypeVariables #-}
+-- > {-# LANGUAGE ScopedTypeVariables, TypeApplications #-}
 -- > import Data.Coercible (coerce)
 -- >
--- > type TraverseI t a b = (a -> Identity b) -> t a -> Identity (t b)
--- >
 -- > fmapDefault :: forall t a b. Traversable t => (a -> b) -> t a -> t b
--- > fmapDefault = coerce (traverse :: TraverseI t a b)
+-- > fmapDefault = coerce (traverse @t @Identity @a @b)
 --
 -- The use of [coercion](#coercion) avoids the need to explicitly wrap and
 -- unwrap terms via 'Identity' and 'runIdentity'.
@@ -1092,11 +1090,10 @@ foldMapDefault = coerce (traverse :: (a -> Const m ()) -> t a -> Const m (t ()))
 --
 -- With @StateL@, we can define 'mapAccumL' as follows:
 --
--- > type TraverseL t s a b = (a -> StateL s b) -> t a -> StateL s (t b)
--- >
+-- > {-# LANGUAGE ScopedTypeVariables, TypeApplications #-}
 -- > mapAccumL :: forall t s a b. Traversable t
 -- >           => (s -> a -> (s, b)) -> s -> t a -> (s, t b)
--- > mapAccumL g s ts = coerce (traverse :: TraverseL t s a b) (flip g) ts s
+-- > mapAccumL g s ts = coerce (traverse @t @(StateL s) @a @b) (flip g) ts s
 --
 -- The use of [coercion](#coercion) avoids the need to explicitly wrap and
 -- unwrap __@newtype@__ terms.
@@ -1131,11 +1128,10 @@ foldMapDefault = coerce (traverse :: (a -> Const m ()) -> t a -> Const m (t ()))
 --
 -- With @StateR@, we can define 'mapAccumR' as follows:
 --
--- > type TraverseR t s a b = (a -> StateR s b) -> t a -> StateR s (t b)
--- >
+-- > {-# LANGUAGE ScopedTypeVariables, TypeApplications #-}
 -- > mapAccumR :: forall t s a b. Traversable t
 -- >           => (s -> a -> (s, b)) -> s -> t a -> (s, t b)
--- > mapAccumR g s0 ts = coerce (traverse :: TraverseR t s a b) (flip g) ts s0
+-- > mapAccumR g s0 ts = coerce (traverse @t @(StateR s) @a @b) (flip g) ts s0
 --
 -- The use of [coercion](#coercion) avoids the need to explicitly wrap and
 -- unwrap __@newtype@__ terms.
@@ -1187,9 +1183,10 @@ foldMapDefault = coerce (traverse :: (a -> Const m ()) -> t a -> Const m (t ()))
 --
 -- We can therefore define a specialisation of 'traverse':
 --
--- > type TraverseC t a m = (a -> Const m ()) -> t a -> Const m (t ())
--- > traverseC :: forall t a m. (Monoid m, Traversable t) => TraverseC t a m
--- > traverseC = traverse
+-- > {-# LANGUAGE ScopedTypeVariables, TypeApplications #-}
+-- > traverseC :: forall t a m. (Monoid m, Traversable t)
+-- >           => (a -> Const m ()) -> t a -> Const m (t ())
+-- > traverseC = traverse @t @(Const m) @a @()
 --
 -- For which the Applicative [construction](#construction) of 'traverse'
 -- leads to:
@@ -1199,9 +1196,9 @@ foldMapDefault = coerce (traverse :: (a -> Const m ()) -> t a -> Const m (t ()))
 --
 -- In other words, this makes it possible to define:
 --
--- > {-# LANGUAGE ScopedTypeVariables #-}
+-- > {-# LANGUAGE ScopedTypeVariables, TypeApplications #-}
 -- > foldMapDefault :: forall t a m. (Monoid m, Traversable t) => (a -> m) -> t a -> m
--- > foldMapDefault = coerce (traverse :: TraverseC t a m)
+-- > foldMapDefault = coerce (traverse @t @(Const m) @a @())
 --
 -- Which is sufficient to define a 'Foldable' superclass instance:
 --
@@ -1214,22 +1211,20 @@ foldMapDefault = coerce (traverse :: (a -> Const m ()) -> t a -> Const m (t ()))
 -- implementations of 'foldr' and 'foldl'', which take a bit more machinery
 -- to construct:
 --
--- > {-# LANGUAGE ScopedTypeVariables #-}
+-- > {-# LANGUAGE ScopedTypeVariables, TypeApplications #-}
 -- > import Data.Coerce (coerce)
 -- > import Data.Functor.Const (Const(..))
 -- > import Data.Semigroup (Dual(..), Endo(..))
 -- > import GHC.Exts (oneShot)
 -- >
--- > type TraverseR t a b =
--- >     (a -> Const (Endo b) ()) -> t a -> Const (Endo b) (t ())
--- > type TraverseL t a b =
--- >     (a -> Const (Dual (Endo b)) ()) -> t a -> Const (Dual (Endo b)) (t ())
--- >
--- > foldrDefault :: forall t a b. Traversable t => (a -> b -> b) -> b -> t a -> b
--- > foldrDefault f z = \t -> coerce (traverse :: TraverseR t a b) f t z
+-- > foldrDefault :: forall t a b. Traversable t
+-- >              => (a -> b -> b) -> b -> t a -> b
+-- > foldrDefault f z = \t ->
+-- >     coerce (traverse @t @(Const (Endo b)) @a @()) f t z
 -- >
 -- > foldlDefault' :: forall t a b. Traversable t => (b -> a -> b) -> b -> t a -> b
--- > foldlDefault' f z = \t -> coerce (traverse :: TraverseL t a b) f' t z
+-- > foldlDefault' f z = \t ->
+-- >     coerce (traverse @t @(Const (Dual (Endo b))) @a @()) f' t z
 -- >   where
 -- >     f' :: a -> b -> b
 -- >     f' a = oneShot $ \ b -> b `seq` f b a
