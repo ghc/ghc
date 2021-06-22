@@ -9,7 +9,7 @@ T9400.hs:18:9: warning: [-Woverlapping-patterns (in -Wdefault)]
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 38, types: 22, coercions: 0, joins: 0/0}
+  = {terms: 48, types: 28, coercions: 0, joins: 0/0}
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 $trModule1 :: Addr#
@@ -36,7 +36,7 @@ T9400.$trModule :: Module
 [GblId, Unf=OtherCon []]
 T9400.$trModule = GHC.Types.Module $trModule2 $trModule4
 
--- RHS size: {terms: 23, types: 15, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 33, types: 21, coercions: 0, joins: 0/0}
 main :: IO ()
 [GblId]
 main
@@ -64,10 +64,24 @@ main
                @()
                @()
                (putStrLn (unpackCString# "efg"#))
-               (case Control.Exception.Base.patError
-                       @LiftedRep @() "T9400.hs:(17,5)-(18,29)|case"#
-                of wild {
-                }))))
+               (>>
+                  @IO
+                  GHC.Base.$fMonadIO
+                  @()
+                  @()
+                  (case Control.Exception.Base.patError
+                          @LiftedRep @() "T9400.hs:(17,5)-(18,29)|case"#
+                   of wild {
+                   })
+                  (>>
+                     @IO
+                     GHC.Base.$fMonadIO
+                     @()
+                     @()
+                     (putStrLn (unpackCStringUtf8# "abc"#))
+                     (putStrLn
+                        (unpackCStringUtf8#
+                           "a\\197\\188\\195\\179\\197\\130\\196\\135z"#)))))))
 
 
 
