@@ -39,7 +39,10 @@ import GHC.Rename.Utils ( HsDocContext(..), bindLocalNamesFV, checkDupNames
                         , bindLocalNames
                         , mapMaybeFvRn, mapFvRn
                         , warnUnusedLocalBinds, typeAppErr
-                        , checkUnusedRecordWildcard )
+                        , checkUnusedRecordWildcard
+                        , wrapGenSpan, genHsIntegralLit, genHsTyLit
+                        , genHsVar, genLHsVar, genHsApp, genHsApps
+                        , genAppType )
 import GHC.Rename.Unbound ( reportUnboundName )
 import GHC.Rename.Splice  ( rnBracket, rnSpliceExpr, checkThLocalName )
 import GHC.Rename.HsType
@@ -62,7 +65,6 @@ import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Outputable as Outputable
 import GHC.Types.SrcLoc
-import GHC.Data.FastString
 import Control.Monad
 import GHC.Builtin.Types ( nilDataConName )
 import qualified GHC.LanguageExtensions as LangExt
@@ -396,7 +398,7 @@ rnExpr (ExplicitList _ exps)
     do { (from_list_n_name, fvs') <- lookupSyntaxName fromListNName
        ; let rn_list  = ExplicitList noExtField exps'
              lit_n    = mkIntegralLit (length exps)
-             hs_lit   = wrapGenSpan (HsLit noAnn (HsInt noExtField lit_n))
+             hs_lit   = genHsIntegralLit lit_n
              exp_list = genHsApps from_list_n_name [hs_lit, wrapGenSpan rn_list]
        ; return ( mkExpandedExpr rn_list exp_list
                 , fvs `plusFV` fvs') } }
@@ -2545,29 +2547,6 @@ getMonadFailOp ctxt
       See Note [Handling overloaded and rebindable constructs]
 *                                                                      *
 ********************************************************************* -}
-
-genHsApps :: Name -> [LHsExpr GhcRn] -> HsExpr GhcRn
-genHsApps fun args = foldl genHsApp (genHsVar fun) args
-
-genHsApp :: HsExpr GhcRn -> LHsExpr GhcRn -> HsExpr GhcRn
-genHsApp fun arg = HsApp noAnn (wrapGenSpan fun) arg
-
-genLHsVar :: Name -> LHsExpr GhcRn
-genLHsVar nm = wrapGenSpan $ genHsVar nm
-
-genHsVar :: Name -> HsExpr GhcRn
-genHsVar nm = HsVar noExtField $ wrapGenSpan nm
-
-genAppType :: HsExpr GhcRn -> HsType (NoGhcTc GhcRn) -> HsExpr GhcRn
-genAppType expr = HsAppType noExtField (wrapGenSpan expr) . mkEmptyWildCardBndrs . wrapGenSpan
-
-genHsTyLit :: FastString -> HsType GhcRn
-genHsTyLit = HsTyLit noExtField . HsStrTy NoSourceText
-
-wrapGenSpan :: a -> LocatedAn an a
--- Wrap something in a "generatedSrcSpan"
--- See Note [Rebindable syntax and HsExpansion]
-wrapGenSpan x = L (noAnnSrcSpan generatedSrcSpan) x
 
 -- | Build a 'HsExpansion' out of an extension constructor,
 --   and the two components of the expansion: original and
