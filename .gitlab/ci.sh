@@ -464,7 +464,7 @@ function cabal_test() {
     -hidir tmp -odir tmp -fforce-recomp \
     -ddump-to-file -dumpdir "$OUT/dumps" -ddump-timings \
     +RTS --machine-readable "-t$OUT/rts.log" -RTS \
-    -package mtl -ilibraries/Cabal/Cabal libraries/Cabal/Cabal/Setup.hs \
+    -ilibraries/Cabal/Cabal/src -XNoPolyKinds Distribution.Simple \
     "$@"
   rm -Rf tmp
   end_section "Cabal test: $OUT"
@@ -586,6 +586,7 @@ case $1 in
     exit $res ;;
   run_hadrian) shift; run_hadrian "$@" ;;
   perf_test) run_perf_test ;;
+  cabal_test) cabal_test ;;
   clean) clean ;;
   shell) shell "$@" ;;
   *) fail "unknown mode $1" ;;
