@@ -4,6 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 
 -----------------------------------------------------------------------------
@@ -456,8 +457,10 @@ forM = flip mapM
 -- >>> mapAccumL (\a b -> (a <> show b, a)) "0" [1..5]
 -- ("012345",["0","01","012","0123","01234"])
 --
-mapAccumL :: Traversable t => (a -> b -> (a, c)) -> a -> t b -> (a, t c)
-mapAccumL f s t = runStateL (traverse (StateL . flip f) t) s
+mapAccumL :: forall t s a b. Traversable t
+          => (s -> a -> (s, b)) -> s -> t a -> (s, t b)
+-- See Note [Function coercion] in Data.Functor.Utils.
+mapAccumL f s t = coerce (traverse @t @(StateL s) @a @b) (flip f) t s
 
 -- |The 'mapAccumR' function behaves like a combination of 'fmap'
 -- and 'Data.Foldable.foldr'; it applies a function to each element of a structure,
@@ -474,8 +477,10 @@ mapAccumL f s t = runStateL (traverse (StateL . flip f) t) s
 -- >>> mapAccumR (\a b -> (a <> show b, a)) "0" [1..5]
 -- ("054321",["05432","0543","054","05","0"])
 --
-mapAccumR :: Traversable t => (a -> b -> (a, c)) -> a -> t b -> (a, t c)
-mapAccumR f s t = runStateR (traverse (StateR . flip f) t) s
+mapAccumR :: forall t s a b. Traversable t
+          => (s -> a -> (s, b)) -> s -> t a -> (s, t b)
+-- See Note [Function coercion] in Data.Functor.Utils.
+mapAccumR f s t = coerce (traverse @t @(StateR s) @a @b) (flip f) t s
 
 -- | This function may be used as a value for `fmap` in a `Functor`
 --   instance, provided that 'traverse' is defined. (Using
@@ -489,7 +494,7 @@ fmapDefault :: forall t a b . Traversable t
             => (a -> b) -> t a -> t b
 {-# INLINE fmapDefault #-}
 -- See Note [Function coercion] in Data.Functor.Utils.
-fmapDefault = coerce (traverse :: (a -> Identity b) -> t a -> Identity (t b))
+fmapDefault = coerce (traverse @t @Identity @a @b)
 
 -- | This function may be used as a value for `Data.Foldable.foldMap`
 -- in a `Foldable` instance.
@@ -501,7 +506,7 @@ foldMapDefault :: forall t m a . (Traversable t, Monoid m)
                => (a -> m) -> t a -> m
 {-# INLINE foldMapDefault #-}
 -- See Note [Function coercion] in Data.Functor.Utils.
-foldMapDefault = coerce (traverse :: (a -> Const m ()) -> t a -> Const m (t ()))
+foldMapDefault = coerce (traverse @t @(Const m) @a @())
 
 ------------------
 
