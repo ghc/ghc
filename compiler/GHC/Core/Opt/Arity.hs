@@ -673,14 +673,18 @@ getBotArity (AT oss div)
   | otherwise        = Nothing
 
 ----------------------
-findRhsArity :: DynFlags -> Id -> CoreExpr -> Arity -> ArityType
+findRhsArity :: DynFlags -> RecFlag -> Id -> CoreExpr -> Arity -> ArityType
 -- This implements the fixpoint loop for arity analysis
 -- See Note [Arity analysis]
 -- If findRhsArity e = (n, is_bot) then
 --  (a) any application of e to <n arguments will not do much work,
 --      so it is safe to expand e  ==>  (\x1..xn. e x1 .. xn)
 --  (b) if is_bot=True, then e applied to n args is guaranteed bottom
-findRhsArity dflags bndr rhs old_arity
+
+findRhsArity dflags NonRecursive _ rhs _
+  = arityType (findRhsArityEnv dflags) rhs
+
+findRhsArity dflags Recursive bndr rhs old_arity
   = go 0 botArityType
       -- We always do one step, but usually that produces a result equal to
       -- old_arity, and then we stop right away, because old_arity is assumed
