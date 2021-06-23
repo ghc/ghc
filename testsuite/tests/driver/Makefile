@@ -659,6 +659,27 @@ T13604a:
 	# SHOULD output "compilation is NOT required"
 	"$(TEST_HC)" $(TEST_HC_OPTS) -v1 -O0 -c -fignore-hpc-changes T13604a.hs
 
+.PHONY: T14923
+T14923:
+	echo "{-# LANGUAGE UndecidableInstances #-}" > Foo.hs
+	echo "module Foo where" >> Foo.hs
+
+	cat Foo.hs
+
+	$(TEST_HC) $(TEST_HC_OPTS) -c Foo.hs;
+
+	sed -i 's/^{-\#/--&/' Foo.hs # comment out the pragma
+
+	# Check sed actually worked
+	cat Foo.hs
+
+	# This should recompile
+	$(TEST_HC) $(TEST_HC_OPTS) -c Foo.hs;
+	# This should not
+	$(TEST_HC) $(TEST_HC_OPTS) -c Foo.hs;
+	# And this should not
+	$(TEST_HC) $(TEST_HC_OPTS) -c Foo.hs;
+
 .PHONY: T12955
 T12955:
 	! "$(TEST_HC)" $(TEST_HC_OPTS) --make T12955
@@ -685,3 +706,4 @@ OneShotTH:
 	"$(TEST_HC)" $(TEST_HC_OPTS) -c OneShotTH.hs
 	# The module should *not* be recompiled
 	"$(TEST_HC)" $(TEST_HC_OPTS) -c OneShotTH.hs
+
