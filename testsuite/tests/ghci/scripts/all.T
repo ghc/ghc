@@ -320,6 +320,9 @@ test('T17500', [extra_run_opts('-ddump-to-file -ddump-bcos')], ghci_script, ['T1
 test('T17549', normal, ghci_script, ['T17549.script'])
 test('T17669', [extra_run_opts('-fexternal-interpreter -fobject-code'),
                 unless(opsys('mingw32'), expect_broken(17669))], ghci_script, ['T17669.script'])
+test('T18330', [copy_files, extra_files(['../shell.hs', 'T18330.extra', 'T18330.hs'])
+               , extra_hc_opts('-v1')]
+      , ghci_script, ['T18330.script'])
 test('T18501', normal, ghci_script, ['T18501.script'])
 test('T18644', normal, ghci_script, ['T18644.script'])
 test('T18755', normal, ghci_script, ['T18755.script'])
