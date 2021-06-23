@@ -257,7 +257,7 @@ linkDynLib dflags0 o_files dep_packages
            -- Only if we want dynamic libraries
            WayDyn `elem` ways dflags &&
            -- Only use RPath if we explicitly asked for it
-           gopt Opt_RPath dflags
+           useXLinkerRPath dflags os
             = ["-L" ++ l, "-Xlinker", "-rpath", "-Xlinker", l]
               -- See Note [-Xlinker -rpath vs -Wl,-rpath]
          | otherwise = ["-L" ++ l]
