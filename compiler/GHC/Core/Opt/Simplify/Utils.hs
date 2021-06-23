@@ -1670,13 +1670,13 @@ because the latter is not well-kinded.
 ************************************************************************
 -}
 
-tryEtaExpandRhs :: SimplEnv -> OutId -> OutExpr
+tryEtaExpandRhs :: SimplEnv -> RecFlag -> OutId -> OutExpr
                 -> SimplM (ArityType, OutExpr)
 -- See Note [Eta-expanding at let bindings]
 -- If tryEtaExpandRhs rhs = (n, is_bot, rhs') then
 --   (a) rhs' has manifest arity n
 --   (b) if is_bot is True then rhs' applied to n args is guaranteed bottom
-tryEtaExpandRhs env bndr rhs
+tryEtaExpandRhs env is_rec bndr rhs
   | Just join_arity <- isJoinId_maybe bndr
   = do { let (join_bndrs, join_body) = collectNBinders join_arity rhs
              oss   = [idOneShotInfo id | id <- join_bndrs, isId id]
@@ -1704,7 +1704,7 @@ tryEtaExpandRhs env bndr rhs
     old_arity = exprArity rhs
     ty_arity  = typeArity (idType bndr)
 
-    arity_type = findRhsArity dflags bndr rhs old_arity
+    arity_type = findRhsArity dflags is_rec bndr rhs old_arity
                  `maxWithArity` idCallArity bndr
                  `minWithArity` ty_arity
     -- minWithArity: see Note [Arity trimming] in GHC.Core.Opt.Arity
