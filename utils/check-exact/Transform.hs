@@ -383,14 +383,14 @@ getEntryDPT ast = do
 -- ---------------------------------------------------------------------
 
 -- |'Transform' monad version of 'getEntryDP'
-setEntryDPT :: (Data a,Monad m) => LocatedA a -> DeltaPos -> TransformT m ()
+setEntryDPT :: (Monad m) => LocatedA a -> DeltaPos -> TransformT m ()
 setEntryDPT ast dp = do
   modifyAnnsT (setEntryDP ast dp)
 
 -- ---------------------------------------------------------------------
 
 -- |'Transform' monad version of 'transferEntryDP'
-transferEntryDPT :: (Data a,Data b,Monad m) => LocatedA a -> LocatedA b -> TransformT m (LocatedA b)
+transferEntryDPT :: (Monad m) => LocatedA a -> LocatedA b -> TransformT m (LocatedA b)
 transferEntryDPT _a b = do
   return b
   -- modifyAnnsT (transferEntryDP a b)
@@ -405,7 +405,7 @@ setPrecedingLinesDeclT ld n c =
 -- ---------------------------------------------------------------------
 
 -- |'Transform' monad version of 'setPrecedingLines'
-setPrecedingLinesT ::  (Data a,Monad m) => LocatedA a -> Int -> Int -> TransformT m ()
+setPrecedingLinesT ::  (Monad m) => LocatedA a -> Int -> Int -> TransformT m ()
 setPrecedingLinesT ld n c =
   modifyAnnsT (setPrecedingLines ld n c)
 
@@ -431,7 +431,7 @@ setPrecedingLinesDecl ld n c ans = setPrecedingLines ld n c ans
 -- ---------------------------------------------------------------------
 
 -- | Adjust the entry annotations to provide an `n` line preceding gap
-setPrecedingLines :: (Data a) => LocatedA a -> Int -> Int -> Anns -> Anns
+setPrecedingLines :: LocatedA a -> Int -> Int -> Anns -> Anns
 setPrecedingLines ast n c anne = setEntryDP ast (deltaPos n c) anne
 
 -- ---------------------------------------------------------------------
@@ -489,12 +489,12 @@ setEntryDP' (L (SrcSpanAnn (EpAnn (Anchor r _) an cs) l) a) dp
                 col = deltaColumn delta
                 -- TODO: this adjustment by 1 happens all over the place. Generalise it
                 edp' = if line == 0 then SameLine col
-                                    else DifferentLine line (col - 1)
+                                    else DifferentLine line col
                 edp = edp' `debug` ("setEntryDP' :" ++ showGhc (edp', (ss2pos $ anchor $ getLoc lc), r))
 
 -- |Set the true entry 'DeltaPos' from the annotation for a given AST
 -- element. This is the 'DeltaPos' ignoring any comments.
-setEntryDP :: (Data a) => LocatedA a -> DeltaPos -> Anns -> Anns
+setEntryDP :: LocatedA a -> DeltaPos -> Anns -> Anns
 setEntryDP _ast _dp anns = anns
 
 -- ---------------------------------------------------------------------
@@ -534,7 +534,7 @@ transferEntryDP (L (SrcSpanAnn (EpAnn anc1 _an1 cs1) _l1) _) (L (SrcSpanAnn (EpA
     -- TODO: what happens if the receiving side already has comments?
     (L anc _:_) -> do
       logDataWithAnnsTr "transferEntryDP':priorComments anc=" anc
-      return (L (SrcSpanAnn (EpAnn (kludgeAnchor anc) an2 cs2) l2) b)
+      return (L (SrcSpanAnn (EpAnn anc an2 cs2) l2) b)
 transferEntryDP (L (SrcSpanAnn EpAnnNotUsed _l1) _) (L (SrcSpanAnn (EpAnn anc2 an2 cs2) l2) b) = do
   logTr $ "transferEntryDP': EpAnnNotUsed,EpAnn"
   return (L (SrcSpanAnn (EpAnn anc2' an2 cs2) l2) b)
@@ -550,15 +550,6 @@ transferEntryDP' la lb = do
   (L l2 b) <- transferEntryDP la lb
   return (L l2 (pushDeclDP b (SameLine 0)))
 
--- There is an off-by-one in DPs. I *think* it has to do wether we
--- calculate the final position when applying it against the stored
--- final pos or against another RealSrcSpan.  Must get to the bottom
--- of it and come up with a canonical DP.  This function adjusts a
--- "comment space" DP to a "enterAnn" space one
-kludgeAnchor :: Anchor -> Anchor
-kludgeAnchor a@(Anchor _ (MovedAnchor (SameLine _))) = a
-kludgeAnchor (Anchor a (MovedAnchor (DifferentLine r c))) = (Anchor a (MovedAnchor (deltaPos r (c - 1))))
-kludgeAnchor a = a
 
 pushDeclDP :: HsDecl GhcPs -> DeltaPos -> HsDecl GhcPs
 pushDeclDP (ValD x (FunBind a b (MG c (L d  ms ) e) f)) dp
@@ -631,7 +622,7 @@ balanceComments first second = do
 -- |Once 'balanceComments' has been called to move trailing comments to a
 -- 'FunBind', these need to be pushed down from the top level to the last
 -- 'Match' if that 'Match' needs to be manipulated.
-balanceCommentsFB :: (Data b,Monad m)
+balanceCommentsFB :: (Monad m)
   => LHsBind GhcPs -> LocatedA b -> TransformT m (LHsBind GhcPs, LocatedA b)
 balanceCommentsFB (L lf (FunBind x n (MG mx (L lm matches) o) t)) second = do
   logTr $ "balanceCommentsFB entered: " ++ showGhc (ss2range $ locA lf)
@@ -799,23 +790,7 @@ splitComments p (EpaCommentsBalanced cs ts) = EpaCommentsBalanced cs' ts'
 -- original locations.
 commentOrigDeltas :: [LEpaComment] -> [LEpaComment]
 commentOrigDeltas [] = []
-commentOrigDeltas lcs@(L _ (GHC.EpaComment _ pt):_) = go pt lcs
-  -- TODO:AZ: we now have deltas wrt *all* tokens, not just preceding
-  -- non-comment. Simplify this.
-  where
-    go :: RealSrcSpan -> [LEpaComment] -> [LEpaComment]
-    go _ [] = []
-    go p (L (Anchor la _) (GHC.EpaComment t pp):ls)
-      = L (Anchor la op) (GHC.EpaComment t pp) : go p' ls
-      where
-        p' = p
-        (r,c) = ss2posEnd pp
-        op' = if r == 0
-               then MovedAnchor (ss2delta (r,c+1) la)
-               else MovedAnchor (ss2delta (r,c)   la)
-        op = if t == EpaEofComment && op' == MovedAnchor (SameLine 0)
-               then MovedAnchor (DifferentLine 1 0)
-               else op'
+commentOrigDeltas lcs = map commentOrigDelta lcs
 
 addCommentOrigDeltas :: EpAnnComments -> EpAnnComments
 addCommentOrigDeltas (EpaComments cs) = EpaComments (commentOrigDeltas cs)
@@ -833,6 +808,23 @@ anchorFromLocatedA (L (SrcSpanAnn an loc) _)
   = case an of
       EpAnnNotUsed    -> realSrcSpan loc
       (EpAnn anc _ _) -> anchor anc
+
+-- | A GHC comment includes the span of the preceding token.  Take an
+-- original comment, and convert the 'Anchor to have a have a
+-- `MovedAnchor` operation based on the original location, only if it
+-- does not already have one.
+commentOrigDelta :: LEpaComment -> LEpaComment
+-- commentOrigDelta c@(L (GHC.Anchor _ (GHC.MovedAnchor _)) _) = c
+commentOrigDelta (L (GHC.Anchor la _) (GHC.EpaComment t pp))
+  = (L (GHC.Anchor la op) (GHC.EpaComment t pp))
+  where
+        (r,c) = ss2posEnd pp
+        op' = if r == 0
+               then MovedAnchor (ss2delta (r,c+1) la)
+               else MovedAnchor (ss2delta (r,c)   la)
+        op = if t == EpaEofComment && op' == MovedAnchor (SameLine 0)
+               then MovedAnchor (DifferentLine 1 0)
+               else op'
 
 -- ---------------------------------------------------------------------
 
@@ -1428,8 +1420,8 @@ oldWhereAnnotation (EpAnn anc an cs) ww _oldSpan = do
 newWhereAnnotation :: (Monad m) => WithWhere -> TransformT m (EpAnn AnnList)
 newWhereAnnotation ww = do
   newSpan <- uniqueSrcSpanT
-  let anc  = Anchor (rs newSpan) (MovedAnchor (DifferentLine 1 2))
-  let anc2 = Anchor (rs newSpan) (MovedAnchor (DifferentLine 1 4))
+  let anc  = Anchor (rs newSpan) (MovedAnchor (DifferentLine 1 3))
+  let anc2 = Anchor (rs newSpan) (MovedAnchor (DifferentLine 1 5))
   let w = case ww of
         WithWhere -> [AddEpAnn AnnWhere (EpaDelta (SameLine 0))]
         WithoutWhere -> []
