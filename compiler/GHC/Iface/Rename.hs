@@ -25,7 +25,6 @@ import GHC.Iface.Env
 import {-# SOURCE #-} GHC.Iface.Load -- a bit vexing
 
 import GHC.Unit
-import GHC.Unit.State
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.Deps
 
