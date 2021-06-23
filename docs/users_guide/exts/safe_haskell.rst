@@ -273,8 +273,9 @@ Furthermore, we restrict the following features:
   site. This is a detailed restriction, please refer to :ref:`Safe Overlapping
   Instances <safe-overlapping-instances>` for details.
 
-- :extension:`GeneralisedNewtypeDeriving` — GND is not allowed in the safe
-  language. This is due to the ability of it to violate module boundaries when
+- :extension:`GeneralisedNewtypeDeriving` and :extension:`DerivingVia`
+  — GND and DerivingVia are not allowed in the safe language.
+  This is due to the ability of them to violate module boundaries when
   module authors forget to put nominal role annotations on their types as
   appropriate. For this reason, the ``Data.Coerce`` module is also considered
   unsafe. We are hoping to find a better solution here in the future.
