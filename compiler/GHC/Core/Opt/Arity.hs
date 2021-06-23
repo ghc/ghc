@@ -11,14 +11,15 @@
 
 -- | Arity and eta expansion
 module GHC.Core.Opt.Arity
-   ( manifestArity, joinRhsArity, exprArity, typeArity
+   ( manifestArity, joinRhsArity, exprArity
+   , typeArity, typeOneShots
    , exprEtaExpandArity, findRhsArity
    , etaExpand, etaExpandAT
    , exprBotStrictness_maybe
 
    -- ** ArityType
    , ArityType(..), mkBotArityType, mkTopArityType, expandableArityType
-   , arityTypeArity, maxWithArity, idArityType
+   , arityTypeArity, maxWithArity, minWithArity, idArityType
 
    -- ** Join points
    , etaExpandToJoinPoint, etaExpandToJoinPointRule
@@ -139,11 +140,14 @@ exprArity e = go e
     go _                           = 0
 
 ---------------
-typeArity :: Type -> [OneShotInfo]
+typeArity :: Type -> Arity
+typeArity = length . typeOneShots
+
+typeOneShots :: Type -> [OneShotInfo]
 -- How many value arrows are visible in the type?
 -- We look through foralls, and newtypes
 -- See Note [typeArity invariants]
-typeArity ty
+typeOneShots ty
   = go initRecTc ty
   where
     go rec_nts ty
@@ -630,6 +634,9 @@ expandableArityType at = arityTypeArity at > 0
 isDeadEndArityType :: ArityType -> Bool
 isDeadEndArityType (AT _ div) = isDeadEndDiv div
 
+-----------------------
+infixl 2 `maxWithArity`, `minWithArity`
+
 -- | Expand a non-bottoming arity type so that it has at least the given arity.
 maxWithArity :: ArityType -> Arity -> ArityType
 maxWithArity at@(AT oss div) !ar
@@ -645,6 +652,7 @@ minWithArity at@(AT oss _) ar
   | oss `lengthAtMost` ar = at
   | otherwise             = AT (take ar oss) topDiv
 
+----------------------
 takeWhileOneShot :: ArityType -> ArityType
 takeWhileOneShot (AT oss div)
   | isDeadEndDiv div = AT (takeWhile isOneShotInfo oss) topDiv
@@ -679,8 +687,6 @@ findRhsArity dflags bndr rhs old_arity
       -- to be sound. In other words, arities should never decrease.
       -- Result: the common case is that there is just one iteration
   where
-    ty_arity = length (typeArity (idType bndr))
-
     go :: Int -> ArityType -> ArityType
     go !n cur_at@(AT oss div)
       | not (isDeadEndDiv div)           -- the "stop right away" case
@@ -699,8 +705,7 @@ findRhsArity dflags bndr rhs old_arity
     step at = -- pprTrace "step" (vcat [ ppr bndr <+> ppr at <+> ppr (arityType env rhs)
               --                      , ppr (idType bndr)
               --                      , ppr (typeArity (idType bndr)) ]) $
-              minWithArity (arityType env rhs) ty_arity
-              -- minWithArity: see Note [Arity trimming]
+              arityType env rhs
       where
         env = extendSigEnv (findRhsArityEnv dflags) bndr at
 
@@ -913,6 +918,7 @@ findRhsArityEnv dflags
 extendJoinEnv :: ArityEnv -> [JoinId] -> ArityEnv
 extendJoinEnv env@(AE { ae_joins = joins }) join_ids
   = env { ae_joins = joins `extendVarSetList` join_ids }
+    `delSigEnv` join_ids
 
 extendSigEnv :: ArityEnv -> Id -> ArityType -> ArityEnv
 extendSigEnv env@AE { ae_mode = am@FindRhsArity{am_sigs = sigs} } id ar_ty =
@@ -924,6 +930,11 @@ lookupSigEnv AE{ ae_mode = mode } id = case mode of
   BotStrictness                  -> Nothing
   EtaExpandArity{}               -> Nothing
   FindRhsArity{ am_sigs = sigs } -> lookupVarEnv sigs id
+
+delSigEnv :: ArityEnv -> [Var] -> ArityEnv
+delSigEnv env@(AE { ae_mode = mode@(FindRhsArity { am_sigs = sigs }) }) vs
+  = env { ae_mode = mode { am_sigs = sigs `delVarEnvList` vs } }
+delSigEnv env _ = env
 
 -- | Whether the analysis should be pedantic about bottoms.
 -- 'exprBotStrictness_maybe' always is.
@@ -980,7 +991,7 @@ arityType env (Cast e _)
 
         -- Lambdas; increase arity
 arityType env (Lam x e)
-  | isId x    = arityLam x (arityType env e)
+  | isId x    = arityLam x (arityType (env `delSigEnv` [x]) e)
   | otherwise = arityType env e
 
         -- Applications; decrease arity, except for types
@@ -1000,16 +1011,22 @@ arityType env (App fun arg )
 arityType env (Case scrut bndr _ alts)
   | exprIsDeadEnd scrut || null alts
   = botArityType    -- Do not eta expand. See Note [Dealing with bottom (1)]
+
   | not (pedanticBottoms env)  -- See Note [Dealing with bottom (2)]
   , myExprIsCheap env scrut (Just (idType bndr))
   = alts_type
+
   | exprOkForSpeculation scrut
   = alts_type
 
   | otherwise                  -- In the remaining cases we may not push
   = takeWhileOneShot alts_type -- evaluation of the scrutinee in
+
   where
-    alts_type = foldr1 andArityType [arityType env rhs | Alt _ _ rhs <- alts]
+    alts_type = foldr1 andArityType
+                  [ arityType alt_env rhs
+                  | Alt _ bndrs rhs <- alts
+                  , let alt_env = env `delSigEnv` (bndr:bndrs) ]
 
 arityType env (Let (NonRec j rhs) body)
   | Just join_arity <- isJoinId_maybe j
@@ -1040,9 +1057,10 @@ arityType env (Let (NonRec b r) e)
     env'      = extendSigEnv env b (arityType env r)
 
 arityType env (Let (Rec prs) e)
-  = floatIn (all is_cheap prs) (arityType env e)
+  = floatIn (all is_cheap prs) (arityType env' e)
   where
     is_cheap (b,e) = myExprIsCheap env e (Just (idType b))
+    env' = env `delSigEnv` map fst prs
 
 arityType env (Tick t e)
   | not (tickishIsCode t)     = arityType env e
@@ -1114,7 +1132,7 @@ idArityType v
   = AT (take (idArity v) one_shots) topDiv
   where
     one_shots :: [OneShotInfo]  -- One-shot-ness derived from the type
-    one_shots = typeArity (idType v)
+    one_shots = typeOneShots (idType v)
 
 {-
 %************************************************************************
