@@ -845,7 +845,7 @@ makeTrivialBinding env top_lvl occ_fs info expr expr_ty
 
         -- Now something very like completeBind,
         -- but without the postInlineUnconditionally part
-        ; (arity_type, expr2) <- tryEtaExpandRhs env var expr1
+        ; (arity_type, expr2) <- tryEtaExpandRhs env NonRecursive var expr1
           -- Technically we should extend the in-scope set in 'env' with
           -- the 'floats' from prepareRHS; but they are all fresh, so there is
           -- no danger of introducing name shadowig in eta expansion
@@ -945,7 +945,7 @@ completeBind env bind_cxt old_bndr new_bndr new_rhs
 
          -- Do eta-expansion on the RHS of the binding
          -- See Note [Eta-expanding at let bindings] in GHC.Core.Opt.Simplify.Utils
-      ; (new_arity, eta_rhs) <- tryEtaExpandRhs env new_bndr new_rhs
+      ; (new_arity, eta_rhs) <- tryEtaExpandRhs env is_rec new_bndr new_rhs
 
         -- Simplify the unfolding
       ; new_unfolding <- simplLetUnfolding env bind_cxt old_bndr
