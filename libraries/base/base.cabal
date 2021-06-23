@@ -27,8 +27,6 @@ extra-source-files:
     aclocal.m4
     base.buildinfo.in
     changelog.md
-    config.guess
-    config.sub
     configure
     configure.ac
     include/CTypes.h
