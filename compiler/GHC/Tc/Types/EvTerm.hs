@@ -13,34 +13,27 @@ import GHC.Tc.Types.Evidence
 import GHC.Unit
 
 import GHC.Builtin.Names
-import GHC.Builtin.Types ( liftedRepTy, unitTy )
+import GHC.Builtin.Types ( unitTy )
 
 import GHC.Core.Type
 import GHC.Core
 import GHC.Core.Make
 import GHC.Core.Utils
 
-import GHC.Types.Literal ( Literal(..) )
 import GHC.Types.SrcLoc
 import GHC.Types.Name
 import GHC.Types.TyThing
 
-import GHC.Data.FastString
-
 -- Used with Opt_DeferTypeErrors
 -- See Note [Deferring coercion errors to runtime]
 -- in GHC.Tc.Solver
-evDelayedError :: Type -> FastString -> EvTerm
+evDelayedError :: Type -> String -> EvTerm
 evDelayedError ty msg
   = EvExpr $
-    let fail_expr = Var errorId `mkTyApps` [liftedRepTy, unitTy] `mkApps` [litMsg]
+    let fail_expr = mkRuntimeErrorApp tYPE_ERROR_ID unitTy msg
     in mkWildCase fail_expr (unrestricted unitTy) ty []
        -- See Note [Incompleteness and linearity] in GHC.HsToCore.Utils
-       -- c.f. mkFailExpr in GHC.HsToCore.Utils
-
-  where
-    errorId = tYPE_ERROR_ID
-    litMsg  = Lit (LitString (bytesFS msg))
+       -- c.f. mkErrorAppDs in GHC.HsToCore.Utils
 
 -- Dictionary for CallStack implicit parameters
 evCallStack :: (MonadThings m, HasModule m, HasDynFlags m) =>
