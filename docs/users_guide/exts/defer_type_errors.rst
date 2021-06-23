@@ -116,8 +116,7 @@ In a few cases, equality constraints cannot be deferred.  Specifically:
 
   This type signature contains a kind error which cannot be deferred.
 
-- Type equalities under a forall (c.f. `#14605
-  <https://gitlab.haskell.org/ghc/ghc/issues/14605>`_).
+- Type equalities under a forall (c.f. :ghc-ticket:`14605`).
 
 - Kind errors in a visible type application. e.g. ::
 

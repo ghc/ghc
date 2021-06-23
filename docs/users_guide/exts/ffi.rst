@@ -360,7 +360,7 @@ and functions like :base-ref:`System.Timeout.timeout` will not work.
 Finally, after the ``interruptible`` foreign call returns into Haskell, the
 Haskell code should allow exceptions to be raised
 (``Control.Exception``'s ``allowInterrupt``, or ``interruptible yield``
-for non-``-threaded``, see https://gitlab.haskell.org/ghc/ghc/issues/8684),
+for non-``-threaded``, see :ghc-ticket:`8684`),
 and implement the ``EINTR``-retrying in Haskell
 (e.g. using e.g. :base-ref:`Foreign.C.Error.throwErrnoIfMinus1Retry`).
 

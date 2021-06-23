@@ -418,7 +418,7 @@ Note also the following points
          pattern P x y v <- MkT True x y (v::a)
 
    Here the universal type variable `a` scopes over the definition of `P`,
-   but the existential `b` does not.  (c.f. discussion on #14998.)
+   but the existential `b` does not.  (c.f. discussion on :ghc-ticket:`14998`.)
 
 -  For a bidirectional pattern synonym, a use of the pattern synonym as
    an expression has the type
