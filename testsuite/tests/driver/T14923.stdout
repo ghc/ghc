@@ -1,0 +1,6 @@
+{-# LANGUAGE UndecidableInstances #-}
+module Foo where
+--{-# LANGUAGE UndecidableInstances #-}
+module Foo where
+compilation IS NOT required
+compilation IS NOT required
