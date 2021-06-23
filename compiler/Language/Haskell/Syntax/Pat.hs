@@ -92,9 +92,6 @@ data Pat p
         ------------ Lists, tuples, arrays ---------------
   | ListPat     (XListPat p)
                 [LPat p]
-                   -- For OverloadedLists a Just (ty,fn) gives
-                   -- overall type of the pattern, and the toList
--- function to convert the scrutinee to a list value
 
     -- ^ Syntactic List
     --
@@ -153,9 +150,7 @@ data Pat p
   -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnRarrow'
 
   -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
-  | ViewPat       (XViewPat p)     -- The overall type of the pattern
-                                   -- (= the argument type of the view function)
-                                   -- for hsPatType.
+  | ViewPat       (XViewPat p)
                   (LHsExpr p)
                   (LPat p)
     -- ^ View Pattern
