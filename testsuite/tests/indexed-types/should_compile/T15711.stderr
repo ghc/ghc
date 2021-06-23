@@ -3,4 +3,5 @@ TYPE CONSTRUCTORS
   associated type family F{2} :: forall a. Maybe a -> *
     roles nominal nominal
 Dependent modules: []
-Dependent packages: [base-4.16.0.0]
+Dependent packages: [base-4.16.0.0, ghc-bignum-1.1, ghc-prim-0.8.0,
+                     rts-1.0.1]
