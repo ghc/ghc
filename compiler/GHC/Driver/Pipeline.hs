@@ -1746,7 +1746,7 @@ linkBinary' staticLink dflags o_files dep_units = do
          | osMachOTarget (platformOS platform) &&
            dynLibLoader dflags == SystemDependent &&
            WayDyn `elem` ways dflags &&
-           gopt Opt_RPath dflags
+           useXLinkerRPath dflags (platformOS platform)
             = let libpath = if gopt Opt_RelativeDynlibPaths dflags
                             then "@loader_path" </>
                                  (l `makeRelativeTo` full_output_fn)
