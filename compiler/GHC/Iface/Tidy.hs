@@ -1337,7 +1337,7 @@ tidyTopIdInfo uf_opts rhs_tidy_env name rhs_ty orig_rhs tidy_rhs idinfo show_unf
     -- did was to let-bind a non-atomic argument and then float
     -- it to the top level. So it seems more robust just to
     -- fix it here.
-    arity = exprArity orig_rhs `min` length (typeArity rhs_ty)
+    arity = exprArity orig_rhs `min` typeArity rhs_ty
             -- Using tidy_rhs would make a black hole, since exprArity
             -- uses the arities of Ids inside the rhs
 
