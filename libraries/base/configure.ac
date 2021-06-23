@@ -103,7 +103,7 @@ dnl--------------------------------------------------------------------
 AC_ARG_WITH([iconv-includes],
   [AS_HELP_STRING([--with-iconv-includes],
     [directory containing iconv.h])],
-    [ICONV_INCLUDE_DIRS=$withval],
+    [ICONV_INCLUDE_DIRS=$withval; CPPFLAGS="-I$withval $CPPFLAGS"],
     [ICONV_INCLUDE_DIRS=])
 
 AC_ARG_WITH([iconv-libraries],
