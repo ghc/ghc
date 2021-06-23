@@ -666,10 +666,10 @@ lintLetBind top_lvl rec_flag binder rhs rhs_ty
        -- the type and the strictness signature. See Note [exprArity invariant]
        -- and Note [Trimming arity]
 
-       ; checkL (typeArity (idType binder) `lengthAtLeast` idArity binder)
+       ; checkL (typeArity (idType binder) >= idArity binder)
            (text "idArity" <+> ppr (idArity binder) <+>
            text "exceeds typeArity" <+>
-           ppr (length (typeArity (idType binder))) <> colon <+>
+           ppr (typeArity (idType binder)) <> colon <+>
            ppr binder)
 
        ; case splitDmdSig (idDmdSig binder) of
