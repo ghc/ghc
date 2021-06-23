@@ -36,12 +36,12 @@ import GHC.Prelude
 import GHC.Tc.Solver.Types
 
 import GHC.Tc.Types.Constraint
-import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType
 import GHC.Types.Var
 import GHC.Types.Var.Env
 
+import GHC.Core.Coercion (Reduction(..))
 import GHC.Core.Predicate
 import GHC.Core.TyCo.FVs
 import qualified GHC.Core.TyCo.Rep as Rep
@@ -243,7 +243,7 @@ data InertSet
               -- used to undo the cycle-breaking needed to handle
               -- Note [Type variable cycles] in GHC.Tc.Solver.Canonical
 
-       , inert_famapp_cache :: FunEqMap (TcCoercion, TcType)
+       , inert_famapp_cache :: FunEqMap Reduction
               -- Just a hash-cons cache for use when reducing family applications
               -- only
               --
