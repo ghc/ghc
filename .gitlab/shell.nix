@@ -13,13 +13,14 @@
   # we need to inject ncurses into --with-curses-libraries.
   # the real fix is to teach terminfo to use libcurses on macOS.
   # CONFIGURE_ARGS = "--with-intree-gmp --with-curses-libraries=${pkgs.ncurses.out}/lib";
-  CONFIGURE_ARGS = "--with-intree-gmp --with-curses-libraries=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib --with-iconv-includes=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include --with-iconv-libraries=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib SH=/bin/bash";
+  CONFIGURE_ARGS = "--with-intree-gmp";
 
   # magic speedup pony :facepalm:
   #
   # nix has the ugly habbit of duplicating ld flags more than necessary.  This
   # somewhat consolidates this.
   shellHook = ''
+  echo $NIX_LDFLAGS
   export NIX_LDFLAGS=$(for a in $NIX_LDFLAGS; do echo $a; done |sort|uniq|xargs)
   export NIX_LDFLAGS_FOR_TARGET=$(for a in $NIX_LDFLAGS_FOR_TARGET; do echo $a; done |sort|uniq|xargs)
   export NIX_LDFLAGS_FOR_TARGET=$(comm -3 <(for l in $NIX_LDFLAGS_FOR_TARGET; do echo $l; done) <(for l in $NIX_LDFLAGS; do echo $l; done))
@@ -43,6 +44,13 @@
 
   # unconditionally add the MacOSX.sdk and TargetConditional.h
   export NIX_CFLAGS_COMPILE+=" -isystem /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include"
+  export NIX_LDFLAGS="-L/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib $NIX_LDFLAGS"
+  echo $NIX_LDFLAGS
+
+  echo $MACOSX_DEPLOYMENT_TARGET
+  export MACOSX_DEPLOYMENT_TARGET=10.7
+  echo $MACOSX_DEPLOYMENT_TARGET
+
   '';
 
   nativeBuildInputs = (with pkgs; [
