@@ -269,7 +269,7 @@ particular Ids:
 * ($): For a long time GHC has had a special typing rule for ($), that
   allows it to type (runST $ foo), which requires impredicative instantiation
   of ($), without language flags.  It's a bit ad-hoc, but it's been that
-  way for ages.  Using quickLookIds is the only special treatment ($) needs
+  way for ages.  Using quickLookKeys is the only special treatment ($) needs
   now, which is a lot better.
 
 * leftSection, rightSection: these are introduced by the expansion step in
