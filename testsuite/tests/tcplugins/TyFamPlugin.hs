@@ -1,0 +1,71 @@
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ViewPatterns #-}
+
+module TyFamPlugin where
+-- Solving an equality constraint involving type families.
+
+-- base
+import Data.Maybe
+  ( catMaybes )
+
+-- ghc
+import GHC.Builtin.Types
+  ( unitTy )
+import GHC.Core
+  ( Expr(Coercion) )
+import GHC.Core.Coercion
+  ( mkUnivCo )
+import GHC.Core.Predicate
+  ( EqRel(NomEq), Pred(EqPred)
+  , classifyPredType
+  )
+import GHC.Core.TyCo.Rep
+  ( Type, UnivCoProvenance(PluginProv) )
+import GHC.Core.Type
+  ( eqType, mkTyConApp, splitTyConApp_maybe )
+import GHC.Plugins
+  ( Plugin )
+import GHC.Tc.Plugin
+  ( TcPluginM
+  , unsafeTcPluginTcM
+  )
+import GHC.Tc.Types
+  ( TcPluginResult(..) )
+import GHC.Tc.Types.Constraint
+  ( Ct(..), CanEqLHS(..)
+  , ctPred 
+  )
+import GHC.Tc.Types.Evidence
+  ( EvTerm(EvExpr), Role(Nominal) )
+
+-- common
+import Common
+  ( PluginDefs(..)
+  , mkPlugin
+  )
+
+--------------------------------------------------------------------------------
+
+plugin :: Plugin
+plugin = mkPlugin solver
+
+solver :: [String]
+       -> PluginDefs -> [Ct] -> [Ct] -> [Ct]
+       -> TcPluginM TcPluginResult
+solver _args defs _gs _ds ws = do
+  solved <- catMaybes <$> traverse ( solveCt defs ) ws
+  pure $ TcPluginOk solved []
+
+-- Solve `MyTyFam a a ~ ()`.
+solveCt :: PluginDefs -> Ct -> TcPluginM ( Maybe (EvTerm, Ct) )
+solveCt ( PluginDefs {..} ) ct@( classifyPredType . ctPred -> EqPred NomEq lhs rhs )
+  | Just ( tyFam, [arg1, arg2] ) <- splitTyConApp_maybe lhs
+  , tyFam == myTyFam
+  , arg1 `eqType` arg2
+  , rhs `eqType` unitTy
+  , let
+      evTerm :: EvTerm
+      evTerm = EvExpr . Coercion
+             $ mkUnivCo ( PluginProv "TyFamPlugin" ) Nominal lhs rhs
+  = pure $ Just ( evTerm, ct )
+solveCt _ ct = pure Nothing
