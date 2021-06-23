@@ -122,16 +122,37 @@ desugarPat x pat = case pat of
 
   SigPat _ p _ty -> desugarLPat x p
 
-  -- See Note [Desugar CoPats]
-  -- Generally the translation is
-  -- pat |> co   ===>   let y = x |> co, pat <- y  where y is a match var of pat
-  XPat (CoPat wrapper p _ty)
-    | isIdHsWrapper wrapper                   -> desugarPat x p
-    | WpCast co <-  wrapper, isReflexiveCo co -> desugarPat x p
-    | otherwise -> do
-        (y, grds) <- desugarPatV p
-        wrap_rhs_y <- dsHsWrapper wrapper
-        pure (PmLet y (wrap_rhs_y (Var x)) : grds)
+  XPat ext -> case ext of
+
+    ExpansionPat orig expansion -> do
+      dflags <- getDynFlags
+      case orig of
+        -- We add special logic for overloaded list patterns. When:
+        --   - a ViewPat is the expansion of a ListPat,
+        --   - RebindableSyntax is off,
+        --   - the type of the pattern is the built-in list type,
+        -- then we assume that the view function, 'toList', is the identity.
+        -- This improves pattern-match overload checks, as this will allow
+        -- the pattern match checker to directly inspect the inner pattern.
+        -- See #14547, and Note [Desugaring overloaded list patterns] (Wrinkle).
+        ListPat {}
+          | ViewPat arg_ty _lexpr pat <- expansion
+          , not (xopt LangExt.RebindableSyntax dflags)
+          , Just _ <- splitListTyConApp_maybe arg_ty
+          -> desugarLPat x pat
+
+        _ -> desugarPat x expansion
+
+    -- See Note [Desugar CoPats]
+    -- Generally the translation is
+    -- pat |> co   ===>   let y = x |> co, pat <- y  where y is a match var of pat
+    CoPat wrapper p _ty
+      | isIdHsWrapper wrapper                   -> desugarPat x p
+      | WpCast co <-  wrapper, isReflexiveCo co -> desugarPat x p
+      | otherwise -> do
+          (y, grds) <- desugarPatV p
+          wrap_rhs_y <- dsHsWrapper wrapper
+          pure (PmLet y (wrap_rhs_y (Var x)) : grds)
 
   -- (n + k)  ===>   let b = x >= k, True <- b, let n = x-k
   NPlusKPat _pat_ty (L _ n) k1 k2 ge minus -> do
@@ -149,36 +170,8 @@ desugarPat x pat = case pat of
     pure $ PmLet y (App fun (Var x)) : grds
 
   -- list
-  ListPat (ListPatTc _elem_ty Nothing) ps ->
+  ListPat _ ps ->
     desugarListPat x ps
-
-  -- overloaded list
-  ListPat (ListPatTc elem_ty (Just (pat_ty, to_list))) pats -> do
-    dflags <- getDynFlags
-    case splitListTyConApp_maybe pat_ty of
-      Just _e_ty
-        | not (xopt LangExt.RebindableSyntax dflags)
-        -- Just desugar it as a regular ListPat
-        -> desugarListPat x pats
-      _ -> do
-        y <- mkPmId (mkListTy elem_ty)
-        grds <- desugarListPat y pats
-        rhs_y <- dsSyntaxExpr to_list [Var x]
-        pure $ PmLet y rhs_y : grds
-
-    -- (a) In the presence of RebindableSyntax, we don't know anything about
-    --     `toList`, we should treat `ListPat` as any other view pattern.
-    --
-    -- (b) In the absence of RebindableSyntax,
-    --     - If the pat_ty is `[a]`, then we treat the overloaded list pattern
-    --       as ordinary list pattern. Although we can give an instance
-    --       `IsList [Int]` (more specific than the default `IsList [a]`), in
-    --       practice, we almost never do that. We assume the `to_list` is
-    --       the `toList` from `instance IsList [a]`.
-    --
-    --     - Otherwise, we treat the `ListPat` as ordinary view pattern.
-    --
-    -- See #14547, especially comment#9 and comment#10.
 
   ConPat { pat_con     = L _ con
          , pat_args    = ps
