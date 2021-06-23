@@ -1,0 +1,30 @@
+
+T19372consym.hs:7:26: warning: [-Woperator-whitespace]
+    The suffix use of a ‘:’ might be repurposed as special syntax
+      by a future language extension.
+    Suggested fix: add whitespace around it.
+
+T19372consym.hs:8:27: warning: [-Woperator-whitespace]
+    The prefix use of a ‘:’ might be repurposed as special syntax
+      by a future language extension.
+    Suggested fix: add whitespace around it.
+
+T19372consym.hs:9:26: warning: [-Woperator-whitespace]
+    The tight infix use of a ‘:’ might be repurposed as special syntax
+      by a future language extension.
+    Suggested fix: add whitespace around it.
+
+T19372consym.hs:12:26: warning: [-Woperator-whitespace]
+    The suffix use of a ‘:|’ might be repurposed as special syntax
+      by a future language extension.
+    Suggested fix: add whitespace around it.
+
+T19372consym.hs:13:27: warning: [-Woperator-whitespace]
+    The prefix use of a ‘:|’ might be repurposed as special syntax
+      by a future language extension.
+    Suggested fix: add whitespace around it.
+
+T19372consym.hs:14:26: warning: [-Woperator-whitespace]
+    The tight infix use of a ‘:|’ might be repurposed as special syntax
+      by a future language extension.
+    Suggested fix: add whitespace around it.
