@@ -28,6 +28,7 @@ import GHC.Prelude
 import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Driver.Env
+import GHC.Driver.Config.Diagnostic
 
 import GHC.Tc.Utils.TcType ( isFloatingTy, isTyFamFree )
 import GHC.Unit.Module.ModGuts
@@ -2779,7 +2780,8 @@ addMsg is_error env msgs msg
                           , isGoodSrcSpan span ] of
                []    -> noSrcSpan
                (s:_) -> s
-   mk_msg msg = mkLocMessage (mkMCDiagnostic (le_dynflags env) WarningWithoutFlag) msg_span
+   !diag_opts = initDiagOpts (le_dynflags env)
+   mk_msg msg = mkLocMessage (mkMCDiagnostic diag_opts WarningWithoutFlag) msg_span
                              (msg $$ context)
 
 addLoc :: LintLocInfo -> LintM a -> LintM a
