@@ -424,7 +424,7 @@ argument either way), GHC currently disallows the more general type
 ``PEither @l Int Bool -> Bool``. This is a consequence of the
 `representation-polymorphic binder restriction <#representation-polymorphism-restrictions>`__,
 
-Due to `ticket 19487 <https://gitlab.haskell.org/ghc/ghc/-/issues/19487>`, it's
+Due to :ghc-ticket:`19487`, it's
 currently not possible to declare levity-polymorphic data types with nullary
 data constructors. There's a workaround, though: ::
 
