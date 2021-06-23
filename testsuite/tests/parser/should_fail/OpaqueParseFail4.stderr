@@ -1,0 +1,4 @@
+OpaqueParseFail4.hs:6:12: error:
+    Duplicate INLINE pragmas for ‘f’
+    at OpaqueParseFail4.hs:5:12
+       OpaqueParseFail4.hs:6:12

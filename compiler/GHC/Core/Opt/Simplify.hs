@@ -604,6 +604,8 @@ tryCastWorkerWrapper env top_lvl old_bndr occ_info bndr (Cast rhs co)
   , not (isInlineUnfolding unf)  -- Not INLINE things: Wrinkle 4
   , not (isUnliftedType rhs_ty)  -- Not if rhs has an unlifted type;
                                  --     see Note [Cast w/w: unlifted]
+  , not (isOpaquePragma (idInlinePragma old_bndr)) -- Not for OPAQUE bindings
+                                                   -- See Note [OPAQUE pragma]
   = do  { (rhs_floats, work_rhs) <- prepareRhs mode top_lvl occ_fs rhs
         ; uniq <- getUniqueM
         ; let work_name = mkSystemVarName uniq occ_fs
