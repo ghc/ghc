@@ -366,3 +366,8 @@ test('T19780', normal, compile, ['-O2'])
 test('T19794', normal, compile, ['-O'])
 test('T19890',  [ grep_errmsg(r'= T19890.foo1') ], compile, ['-O -ddump-simpl'])
 
+test('OpaqueNoCastWW', normal, compile, ['-O -ddump-simpl -dsuppress-uniques'])
+test('OpaqueNoSpecConstr', normal, compile, ['-O -ddump-simpl -dsuppress-uniques'])
+test('OpaqueNoSpecialise', normal, compile, ['-O -ddump-simpl -dsuppress-uniques'])
+test('OpaqueNoWW', normal, compile, ['-O -ddump-simpl -dsuppress-uniques'])
+test('OpaqueRebox', normal, compile, ['-O -ddump-simpl -dsuppress-uniques'])

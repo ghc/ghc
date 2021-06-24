@@ -194,3 +194,8 @@ test('T19928', normal, compile_fail, [''])
 test('T19923a', normal, compile_fail, [''])
 test('T19923b', normal, compile_fail, [''])
 test('T19923c', normal, compile_fail, [''])
+
+test('OpaqueParseFail1', normal, compile_fail, [''])
+test('OpaqueParseFail2', normal, compile_fail, [''])
+test('OpaqueParseFail3', normal, compile_fail, [''])
+test('OpaqueParseFail4', normal, compile_fail, [''])
