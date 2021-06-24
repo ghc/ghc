@@ -685,3 +685,45 @@ OneShotTH:
 	"$(TEST_HC)" $(TEST_HC_OPTS) -c OneShotTH.hs
 	# The module should *not* be recompiled
 	"$(TEST_HC)" $(TEST_HC_OPTS) -c OneShotTH.hs
+
+T17481:
+	echo 'main = putStrLn "Hello from A"' > A.hs
+	echo 'main = putStrLn "Hello from B"' > B.hs
+
+	ln -f A.hs Main.hs
+	echo "Main.hs is now:"
+	cat Main.hs
+	echo "Compiling and running Main.hs:"
+	$(TEST_HC) $(TEST_HC_OPTS) Main.hs && ./Main
+
+	ln -f B.hs Main.hs
+	echo "Main.hs is now:"
+	cat Main.hs
+	echo "Compiling and running Main.hs:"
+	$(TEST_HC) $(TEST_HC_OPTS) Main.hs && ./Main
+
+	echo "Touching Main.hs"
+	touch Main.hs
+	echo "Compiling and running Main.hs:"
+	$(TEST_HC) $(TEST_HC_OPTS) Main.hs && ./Main
+
+
+T14923:
+	echo "{-# LANGUAGE UndecidableInstances #-}" > Foo.hs
+	echo "module Foo where" >> Foo.hs
+
+	cat Foo.hs
+
+	$(TEST_HC) $(TEST_HC_OPTS) -c Foo.hs;
+
+	sed -i 's/^{-\#/--&/' Foo.hs # comment out the pragma
+
+	# Check sed actually worked
+	cat Foo.hs
+
+	# This should recompile
+	$(TEST_HC) $(TEST_HC_OPTS) -c Foo.hs;
+	# This should not
+	$(TEST_HC) $(TEST_HC_OPTS) -c Foo.hs;
+	# And this should not
+	$(TEST_HC) $(TEST_HC_OPTS) -c Foo.hs;
