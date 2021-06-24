@@ -193,13 +193,19 @@ threadDelay time
 #if defined(mingw32_HOST_OS)
   | isWindowsNativeIO = Windows.threadDelay time
   | threaded          = Windows.threadDelay time
-#else
-  | threaded          = Event.threadDelay time
-#endif
   | otherwise         = IO $ \s ->
         case time of { I# time# ->
         case delay# time# s of { s' -> (# s', () #)
         }}
+#else
+  | threaded          = Event.threadDelay time
+  | otherwise         = IO $ \s0 ->
+        case time of { I# time# ->
+        case newMVar# s0 of { (# s1, mvar# #) ->
+        case registerDelay# mvar# time# s1 of { s2 ->
+        takeMVar# mvar# s2
+        }}}
+#endif
 
 -- | Switch the value of returned 'TVar' from initial value 'False' to 'True'
 -- after a given number of microseconds. The caveats associated with
