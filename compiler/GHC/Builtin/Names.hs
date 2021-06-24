@@ -1464,19 +1464,19 @@ errorMessageTypeErrorFamName
   :: Name
 
 errorMessageTypeErrorFamName =
-  tcQual gHC_TYPELITS (fsLit "TypeError") errorMessageTypeErrorFamKey
+  tcQual gHC_TYPELITS_INTERNAL (fsLit "TypeError") errorMessageTypeErrorFamKey
 
 typeErrorTextDataConName =
-  dcQual gHC_TYPELITS (fsLit "Text") typeErrorTextDataConKey
+  dcQual gHC_TYPELITS_INTERNAL (fsLit "Text") typeErrorTextDataConKey
 
 typeErrorAppendDataConName =
-  dcQual gHC_TYPELITS (fsLit ":<>:") typeErrorAppendDataConKey
+  dcQual gHC_TYPELITS_INTERNAL (fsLit ":<>:") typeErrorAppendDataConKey
 
 typeErrorVAppendDataConName =
-  dcQual gHC_TYPELITS (fsLit ":$$:") typeErrorVAppendDataConKey
+  dcQual gHC_TYPELITS_INTERNAL (fsLit ":$$:") typeErrorVAppendDataConKey
 
 typeErrorShowTypeDataConName =
-  dcQual gHC_TYPELITS (fsLit "ShowType") typeErrorShowTypeDataConKey
+  dcQual gHC_TYPELITS_INTERNAL (fsLit "ShowType") typeErrorShowTypeDataConKey
 
 -- Unsafe coercion proofs
 unsafeEqualityProofName, unsafeEqualityTyConName, unsafeCoercePrimName,
