@@ -1999,7 +1999,7 @@ rebuildCall env (ArgInfo { ai_fun = fun_id, ai_args = rev_args })
                      -- cont' applies to s, then K
        ; body' <- simplExprC env' arg cont'
        ; let arg'  = Lam s body'
-             rr'   = getRuntimeRep ty'
+             rr'   = getRuntimeInfo ty'
              call' = mkApps (Var fun_id) [mkTyArg rr', mkTyArg ty', arg']
        ; return (emptyFloats env, call') }
 

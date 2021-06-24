@@ -851,7 +851,7 @@ ppTyVar "a" = "alphaTyVar"
 ppTyVar "b" = "betaTyVar"
 ppTyVar "c" = "gammaTyVar"
 ppTyVar "s" = "deltaTyVar"
-ppTyVar "o" = "runtimeRep1TyVar, openAlphaTyVar"
+ppTyVar "o" = "runtimeInfoTyVar, openAlphaTyVar"
 ppTyVar _   = error "Unknown type var"
 
 ppType :: Ty -> String
