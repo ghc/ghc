@@ -1907,7 +1907,9 @@ exprIsHNFlike is_con is_con_unf = is_hnf_like
         -- but otherwise I worry that if an Id's unfolding is just itself,
         -- we could get an infinite loop
 
-    is_hnf_like (Lit _)          = True
+    is_hnf_like (Lit l)          = not (isLitRubbish l)
+        -- Regarding a LitRubbish as ConLike leads to unproductive inlining in
+        -- WWRec, see #20035
     is_hnf_like (Type _)         = True       -- Types are honorary Values;
                                               -- we don't mind copying them
     is_hnf_like (Coercion _)     = True       -- Same for coercions
