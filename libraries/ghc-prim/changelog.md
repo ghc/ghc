@@ -39,6 +39,15 @@
   raise# :: forall (a :: Type) {r :: RuntimeRep} (b :: TYPE r). a -> b
   ```
 
+- `reallyUnsafePtrEquality#` is now levity-polymorphic:
+
+   ```
+   reallyUnsafePtrEquality# :: forall {l :: Levity} (a :: TYPE (BoxedRep l)). a -> a -> Int#
+   ```
+
+   This means that `reallyUnsafePtrEquality#` now works on primitive arrays,
+   such as `Array#` and `ByteArray#`.
+
 
 ## 0.8.0 (edit as necessary)
 
