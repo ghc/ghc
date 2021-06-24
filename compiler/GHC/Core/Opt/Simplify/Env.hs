@@ -576,10 +576,13 @@ addLetFloats :: SimplFloats -> LetFloats -> SimplFloats
 -- Add the let-floats for env2 to env1;
 -- *plus* the in-scope set for env2, which is bigger
 -- than that for env1
-addLetFloats floats let_floats@(LetFloats binds _)
+addLetFloats floats let_floats
   = floats { sfLetFloats = sfLetFloats floats `addLetFlts` let_floats
-           , sfInScope   = foldlOL extendInScopeSetBind
-                                   (sfInScope floats) binds }
+           , sfInScope   = sfInScope floats `extendInScopeFromLF` let_floats }
+
+extendInScopeFromLF :: InScopeSet -> LetFloats -> InScopeSet
+extendInScopeFromLF in_scope (LetFloats binds _)
+  = foldlOL extendInScopeSetBind in_scope binds
 
 addJoinFloats :: SimplFloats -> JoinFloats -> SimplFloats
 addJoinFloats floats join_floats
