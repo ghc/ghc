@@ -74,6 +74,7 @@ import GHC.Builtin.Names
 import GHC.Builtin.Types( stringTyCon_RDR )
 import GHC.Types.Name.Reader as RdrName ( getGRE_NameQualifier_maybes, getRdrName )
 import GHC.Types.SrcLoc as SrcLoc
+import GHC.Types.Var as Var
 import qualified GHC.Parser.Lexer as Lexer
 import GHC.Parser.Header ( toArgs )
 
@@ -118,9 +119,11 @@ import Data.Array
 import qualified Data.ByteString.Char8 as BS
 import Data.Char
 import Data.Function
+import Data.Foldable (traverse_)
 import Data.IORef ( IORef, modifyIORef, newIORef, readIORef, writeIORef )
 import Data.List ( elemIndices, find, group, intercalate, intersperse,
-                   isPrefixOf, isSuffixOf, nub, partition, sort, sortBy, (\\) )
+                   isPrefixOf, isSuffixOf, nub, nubBy, partition, sort,
+                   sortBy, tails, (\\) )
 import qualified Data.Set as S
 import Data.Maybe
 import qualified Data.Map as M
@@ -210,6 +213,8 @@ ghciCommands = map mkCmd [
   ("edit",      keepGoing' editFile,            completeFilename),
   ("enable",    keepGoing enableCmd,            noCompletion),
   ("etags",     keepGoing createETagsFileCmd,   completeFilename),
+  ("find",      keepGoing' (findCmd False),     completeIdentifier),
+  ("find!",     keepGoing' (findCmd True),      completeIdentifier),
   ("force",     keepGoing forceCmd,             completeExpression),
   ("forward",   keepGoing forwardCmd,           noCompletion),
   ("help",      keepGoing help,                 noCompletion),
@@ -324,6 +329,8 @@ defFullHelpText =
   "   :edit <file>                edit file\n" ++
   "   :edit                       edit last module\n" ++
   "   :etags [<file>]             create tags file <file> for Emacs (default: \"TAGS\")\n" ++
+  "   :find[!] <name>             find an expression in available modules\n" ++
+  "                               (!: find all expressions which contain the <name> as a substring)\n" ++
   "   :help, :?                   display this list of commands\n" ++
   "   :info[!] [<name> ...]       display information about the given names\n" ++
   "                               (!: do not filter instances)\n" ++
@@ -2627,6 +2634,61 @@ browseModule bang modl exports_only = do
         -- package modules.  When it works, we can do this:
         --        $$ vcat (map GHC.pprInstance (GHC.modInfoInstances mod_info))
 
+
+findCmd :: GHC.GhcMonad m => Bool -> String -> m ()
+findCmd bang identStr = do
+    unqual <- GHC.getPrintUnqual
+    ms <- GHC.listModules
+    things <- fmap concat $ forM ms $ \modl -> do
+      mb_mod_info <- GHC.getModuleInfo modl
+      case mb_mod_info of
+        Nothing -> pure []
+        Just mod_info -> do
+          let names = GHC.modInfoExports mod_info
+
+                -- sort alphabetically name, but putting locally-defined
+                -- identifiers first. We would like to improve this; see #1799.
+              sorted_names = loc_sort local ++ occ_sort external
+                where
+                  (local,external) = ASSERT( all isExternalName names )
+                                     partition ((==modl) . nameModule)
+                                   . filter (\name -> 
+                                            if bang
+                                            then any (identStr `isPrefixOf`)
+                                                     (tails (occNameString (nameOccName name)))
+                                            else ident == occNameFS (nameOccName name))
+                                   $ names
+                  occ_sort = sortBy (compare `on` nameOccName)
+                  -- try to sort by src location. If the first name in our list
+                  -- has a good source location, then they all should.
+                  loc_sort ns
+                        | n:_ <- ns, isGoodSrcSpan (nameSrcSpan n)
+                        = sortBy (SrcLoc.leftmost_smallest `on` nameSrcSpan) ns
+                        | otherwise
+                        = occ_sort ns
+
+          mb_things <- mapM GHC.lookupName sorted_names
+          return . filterOutChildren id
+                 . catMaybes
+                 $ mb_things
+
+    let prettyThings =
+            map pprTyThingHdr
+          . nubBy (\x y -> case (x, y) of
+                    (AnId a, AnId b) -> a == b
+                    _                -> False
+                  )
+          $ things
+    case prettyThings of
+      []    -> return ()
+      (_:_) -> do
+        dflags <- getDynFlags
+        unit_state <- hsc_units <$> GHC.getSession
+        liftIO . traverse_ ( putStrLn
+                           . showSDocForUser dflags unit_state unqual )
+               $  prettyThings
+  where
+    ident = mkFastString identStr
 
 -----------------------------------------------------------------------------
 -- :module
