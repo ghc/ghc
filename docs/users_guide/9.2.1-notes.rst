@@ -393,3 +393,7 @@ Eventlog
       (True,  True)  -> 1
       (False, False) -> 2
       (True,  False) | considerAccessible -> 3 -- No warning!
+
+- A new ``GHC.TypeError`` module is created which exposes functionality related
+  to custom type errors. ``TypeError`` is re-exported from ``GHC.TypeLits`` for
+  backwards compatibility.

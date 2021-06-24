@@ -3,7 +3,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE PolyKinds #-}
-{-# LANGUAGE Safe #-}
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -35,6 +35,7 @@ module Data.Type.Ord (
   ) where
 
 import GHC.Show(Show(..))
+import GHC.TypeError
 import GHC.TypeLits.Internal
 import GHC.TypeNats.Internal
 import Data.Bool
@@ -64,29 +65,31 @@ data OrderingI a b where
 deriving instance Show (OrderingI a b)
 deriving instance Eq   (OrderingI a b)
 
-
 infix 4 <=?, <=, >=?, >=, <?, <, >?, >
 
 -- | Comparison (<=) of comparable types, as a constraint.
 --
 -- @since 4.16.0.0
-type x <= y = (x <=? y) ~ 'True
+type x <= y = Assert (x <=? y) (LeErrMsg x y)
+type LeErrMsg x y = TypeError ('Text "Cannot satisfy: " ':<>: 'ShowType x ':<>: 'Text " <= " ':<>: 'ShowType y)
 
 -- | Comparison (>=) of comparable types, as a constraint.
 --
 -- @since 4.16.0.0
-type x >= y = (x >=? y) ~ 'True
+type x >= y = Assert (x >=? y) (GeErrMsg x y)
+type GeErrMsg x y = TypeError ('Text "Cannot satisfy: " ':<>: 'ShowType x ':<>: 'Text " >= " ':<>: 'ShowType y)
 
 -- | Comparison (<) of comparable types, as a constraint.
 --
 -- @since 4.16.0.0
-type x < y = (x >? y) ~ 'True
+type x < y = Assert (x <? y) (LtErrMsg x y)
+type LtErrMsg x y = TypeError ('Text "Cannot satisfy: " ':<>: 'ShowType x ':<>: 'Text " < " ':<>: 'ShowType y)
 
 -- | Comparison (>) of comparable types, as a constraint.
 --
 -- @since 4.16.0.0
-type x > y = (x >? y) ~ 'True
-
+type x > y = Assert (x >? y) (GtErrMsg x y)
+type GtErrMsg x y = TypeError ('Text "Cannot satisfy: " ':<>: 'ShowType x ':<>: 'Text " > " ':<>: 'ShowType y)
 
 -- | Comparison (<=) of comparable types, as a function.
 --

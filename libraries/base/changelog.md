@@ -71,6 +71,13 @@
   * Functions in `Data.List` are specialized to list.
     `Data.OldList` and `GHC.List` modules are removed.
 
+  * Add `GHC.TypeError` module to contain functionality related to custom type
+    errors. `TypeError` is re-exported from `GHC.TypeLits` for backwards
+    compatibility.
+
+  * Comparison constraints in `Data.Type.Ord` (e.g. `<=`) now use the new
+    `GHC.TypeError.Assert` type family instead of type equality with `~`.
+
 ## 4.15.0.0 *TBA*
 
   * `openFile` now calls the `open` system call with an `interruptible` FFI

@@ -559,7 +559,7 @@ gHC_PRIM, gHC_PRIM_PANIC, gHC_PRIM_EXCEPTION,
     tYPEABLE, tYPEABLE_INTERNAL, gENERICS,
     rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, mONAD_ZIP, mONAD_FAIL,
     aRROW, gHC_DESUGAR, rANDOM, gHC_EXTS,
-    cONTROL_EXCEPTION_BASE, gHC_TYPELITS, gHC_TYPELITS_INTERNAL,
+    cONTROL_EXCEPTION_BASE, gHC_TYPEERROR, gHC_TYPELITS, gHC_TYPELITS_INTERNAL,
     gHC_TYPENATS, gHC_TYPENATS_INTERNAL,
     dATA_COERCE, dEBUG_TRACE, uNSAFE_COERCE :: Module
 
@@ -621,6 +621,7 @@ rANDOM          = mkBaseModule (fsLit "System.Random")
 gHC_EXTS        = mkBaseModule (fsLit "GHC.Exts")
 cONTROL_EXCEPTION_BASE = mkBaseModule (fsLit "Control.Exception.Base")
 gHC_GENERICS    = mkBaseModule (fsLit "GHC.Generics")
+gHC_TYPEERROR   = mkBaseModule (fsLit "GHC.TypeError")
 gHC_TYPELITS    = mkBaseModule (fsLit "GHC.TypeLits")
 gHC_TYPELITS_INTERNAL = mkBaseModule (fsLit "GHC.TypeLits.Internal")
 gHC_TYPENATS    = mkBaseModule (fsLit "GHC.TypeNats")
@@ -1455,19 +1456,19 @@ errorMessageTypeErrorFamName
   :: Name
 
 errorMessageTypeErrorFamName =
-  tcQual gHC_TYPELITS (fsLit "TypeError") errorMessageTypeErrorFamKey
+  tcQual gHC_TYPEERROR (fsLit "TypeError") errorMessageTypeErrorFamKey
 
 typeErrorTextDataConName =
-  dcQual gHC_TYPELITS (fsLit "Text") typeErrorTextDataConKey
+  dcQual gHC_TYPEERROR (fsLit "Text") typeErrorTextDataConKey
 
 typeErrorAppendDataConName =
-  dcQual gHC_TYPELITS (fsLit ":<>:") typeErrorAppendDataConKey
+  dcQual gHC_TYPEERROR (fsLit ":<>:") typeErrorAppendDataConKey
 
 typeErrorVAppendDataConName =
-  dcQual gHC_TYPELITS (fsLit ":$$:") typeErrorVAppendDataConKey
+  dcQual gHC_TYPEERROR (fsLit ":$$:") typeErrorVAppendDataConKey
 
 typeErrorShowTypeDataConName =
-  dcQual gHC_TYPELITS (fsLit "ShowType") typeErrorShowTypeDataConKey
+  dcQual gHC_TYPEERROR (fsLit "ShowType") typeErrorShowTypeDataConKey
 
 -- Unsafe coercion proofs
 unsafeEqualityProofName, unsafeEqualityTyConName, unsafeCoercePrimName,
