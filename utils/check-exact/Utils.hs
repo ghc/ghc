@@ -52,8 +52,8 @@ debugEnabledFlag = False
 
 -- |Global switch to enable debug tracing in ghc-exactprint Pretty
 debugPEnabledFlag :: Bool
-debugPEnabledFlag = True
--- debugPEnabledFlag = False
+-- debugPEnabledFlag = True
+debugPEnabledFlag = False
 
 -- |Provide a version of trace that comes at the end of the line, so it can
 -- easily be commented out when debugging different things.
@@ -110,7 +110,6 @@ ss2deltaStart rrs ss = ss2delta ref ss
   where
     (r,c) = ss2pos rrs
     ref = if r == 0
-             -- then (r,c+1)
              then (r,c)
              else (r,c)
 
@@ -237,6 +236,17 @@ isExactName = False `mkQ` isExact
 
 -- ---------------------------------------------------------------------
 
+insertCppComments ::  ParsedSource -> [LEpaComment] -> ParsedSource
+insertCppComments (L l p) cs = L l p'
+  where
+    ncs = EpaComments cs
+    an' = case GHC.hsmodAnn p of
+      (EpAnn a an ocs) -> EpAnn a an (ocs <> ncs)
+      unused -> unused
+    p' = p { GHC.hsmodAnn = an' }
+
+-- ---------------------------------------------------------------------
+
 ghcCommentText :: LEpaComment -> String
 ghcCommentText (L _ (GHC.EpaComment (EpaDocCommentNext s) _))  = s
 ghcCommentText (L _ (GHC.EpaComment (EpaDocCommentPrev s) _))  = s
@@ -249,6 +259,10 @@ ghcCommentText (L _ (GHC.EpaComment (EpaEofComment) _))        = ""
 
 tokComment :: LEpaComment -> Comment
 tokComment t@(L lt _) = mkComment (normaliseCommentText $ ghcCommentText t) lt
+
+mkLEpaComment :: String -> Anchor -> LEpaComment
+-- Note: fudging the ac_prior_tok value, hope it does not cause a problem
+mkLEpaComment s anc = (L anc (GHC.EpaComment (EpaLineComment s) (anchor anc)))
 
 mkComment :: String -> Anchor -> Comment
 mkComment c anc = Comment c anc Nothing
@@ -271,7 +285,6 @@ comment2dp = first AnnComment
 
 sortAnchorLocated :: [GenLocated Anchor a] -> [GenLocated Anchor a]
 sortAnchorLocated = sortBy (compare `on` (anchor . getLoc))
-
 
 getAnnotationEP :: (Data a) =>  Located a  -> Anns -> Maybe Annotation
 getAnnotationEP  la as =
