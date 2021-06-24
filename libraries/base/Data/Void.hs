@@ -1,8 +1,12 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE EmptyDataDeriving #-}
+{-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE Safe #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -27,6 +31,7 @@ module Data.Void
 import Control.Exception
 import Data.Data
 import Data.Ix
+import Data.Kind (Type)
 import GHC.Generics
 import Data.Semigroup (Semigroup(..), stimesIdempotent)
 
@@ -36,7 +41,8 @@ import Data.Semigroup (Semigroup(..), stimesIdempotent)
 -- | Uninhabited data type
 --
 -- @since 4.8.0.0
-data Void deriving
+type Void :: Type
+data Void deriving stock
   ( Eq      -- ^ @since 4.8.0.0
   , Data    -- ^ @since 4.8.0.0
   , Generic -- ^ @since 4.8.0.0
@@ -50,18 +56,28 @@ data Void deriving
 
 -- | @since 4.8.0.0
 instance Ix Void where
-    range _     = []
-    index _     = absurd
-    inRange _   = absurd
-    rangeSize _ = 0
+  range :: (Void, Void) -> [Void]
+  range _ = []
+
+  index :: (Void, Void) -> Void -> Int
+  index _ = absurd
+
+  inRange :: (Void, Void) -> Void -> Bool
+  inRange _ = absurd
+
+  rangeSize :: (Void, Void) -> Int
+  rangeSize _ = 0
 
 -- | @since 4.8.0.0
 instance Exception Void
 
 -- | @since 4.9.0.0
 instance Semigroup Void where
-    a <> _ = a
-    stimes = stimesIdempotent
+  (<>) :: Void -> Void -> Void
+  a <> _ = a
+
+  stimes :: Integral a => a -> Void -> Void
+  stimes = stimesIdempotent
 
 -- | Since 'Void' values logically don't exist, this witnesses the
 -- logical reasoning tool of \"ex falso quodlibet\".
@@ -76,7 +92,7 @@ instance Semigroup Void where
 --
 -- @since 4.8.0.0
 absurd :: Void -> a
-absurd a = case a of {}
+absurd = \case
 
 -- | If 'Void' is uninhabited then any 'Functor' that holds only
 -- values of type 'Void' is holding no values.
