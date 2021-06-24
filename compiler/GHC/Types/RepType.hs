@@ -44,8 +44,6 @@ import GHC.Utils.Panic
 import Data.List (sort)
 import qualified Data.IntSet as IS
 
-import GHC.Driver.Ppr (pprTrace)-- temp. remove
-
 {- **********************************************************************
 *                                                                       *
                 Representation types
