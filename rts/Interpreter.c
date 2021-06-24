@@ -1013,10 +1013,7 @@ run_BCO:
         register StgWord16* instrs    = (StgWord16*)(bco->instrs->payload);
         register StgWord*  literals   = (StgWord*)(&bco->literals->payload[0]);
         register StgPtr*   ptrs       = (StgPtr*)(&bco->ptrs->payload[0]);
-#if defined(DEBUG)
-        int bcoSize;
-        bcoSize = bco->instrs->bytes / sizeof(StgWord16);
-#endif
+        int bcoSize = bco->instrs->bytes / sizeof(StgWord16);
         IF_DEBUG(interpreter,debugBelch("bcoSize = %d\n", bcoSize));
 
 #if defined(INTERP_STATS)
