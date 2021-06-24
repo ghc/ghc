@@ -1,0 +1,15 @@
+Main.hs is now:
+main = putStrLn "Hello from A"
+Compiling and running Main.hs:
+[1 of 1] Compiling Main             ( Main.hs, Main.o )
+Linking Main ...
+Hello from A
+Main.hs is now:
+main = putStrLn "Hello from B"
+Compiling and running Main.hs:
+[1 of 1] Compiling Main             ( Main.hs, Main.o ) [Source file changed]
+Linking Main ...
+Hello from B
+Touching Main.hs
+Compiling and running Main.hs:
+Hello from B
