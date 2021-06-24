@@ -426,7 +426,7 @@ pprTypedLamBinder bind_site debug_on var
                                    2 (vcat [ dcolon <+> pprType (idType var)
                                            , pp_unf]))
   where
-    unf_info = unfoldingInfo (idInfo var)
+    unf_info = realUnfoldingInfo (idInfo var)
     pp_unf | hasSomeUnfolding unf_info = text "Unf=" <> ppr unf_info
            | otherwise                 = empty
 
@@ -510,7 +510,7 @@ instance Outputable IdInfo where
       str_info = dmdSigInfo info
       has_str_info = not (isTopSig str_info)
 
-      unf_info = unfoldingInfo info
+      unf_info = realUnfoldingInfo info
       has_unf = hasSomeUnfolding unf_info
 
       rules = ruleInfoRules (ruleInfo info)
@@ -557,7 +557,7 @@ ppIdInfo id info
     cpr_info = cprSigInfo info
     has_cpr_info = cpr_info /= topCprSig
 
-    unf_info = unfoldingInfo info
+    unf_info = realUnfoldingInfo info
     has_unf = hasSomeUnfolding unf_info
 
     rules = ruleInfoRules (ruleInfo info)
