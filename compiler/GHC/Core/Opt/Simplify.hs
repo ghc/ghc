@@ -1999,7 +1999,7 @@ simplIdF env var cont
 
 completeCall :: SimplEnv -> OutId -> SimplCont -> SimplM (SimplFloats, OutExpr)
 completeCall env var cont
-  | Just expr <- callSiteInline logger uf_opts case_depth var active_unf
+  | Just expr <- callSiteInline logger uf_opts case_depth var ignore_prags active_unf
                                 lone_variable arg_infos interesting_cont
   -- Inline the variable's RHS
   = do { checkedTick (UnfoldingDone var)
@@ -2017,6 +2017,7 @@ completeCall env var cont
 
   where
     uf_opts    = seUnfoldingOpts env
+    ignore_prags = sm_opt_off (getMode env)
     case_depth = seCaseDepth env
     logger     = seLogger env
     (lone_variable, arg_infos, call_cont) = contArgs cont
@@ -2080,7 +2081,10 @@ rebuildCall env info@(ArgInfo { ai_fun = fun, ai_args = rev_args
   = -- We've accumulated a simplified call in <fun,rev_args>
     -- so try rewrite rules; see Note [RULEs apply to simplified arguments]
     -- See also Note [Rules for recursive functions]
-    do { mb_match <- tryRules env rules fun (reverse rev_args) cont
+    do { mb_match <-
+          case sm_rules (getMode env) of
+            True -> tryRules env rules fun (reverse rev_args) cont
+            False -> return Nothing
        ; case mb_match of
              Just (env', rhs, cont') -> simplExprF env' rhs cont'
              Nothing                 -> rebuildCall env info' cont }

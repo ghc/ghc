@@ -875,11 +875,13 @@ simplEnvForGHCi logger dflags
                            , sm_eta_expand = eta_expand_on
                            , sm_case_case  = True
                            , sm_pre_inline = pre_inline_on
+                           , sm_opt_off = opt_off
                            }
   where
     rules_on      = gopt Opt_EnableRewriteRules   dflags
     eta_expand_on = gopt Opt_DoLambdaEtaExpansion dflags
     pre_inline_on = gopt Opt_SimplPreInlining     dflags
+    opt_off       = gopt Opt_IgnoreInterfacePragmas dflags
     uf_opts       = unfoldingOpts                 dflags
 
 updModeForStableUnfoldings :: Activation -> SimplMode -> SimplMode
@@ -1262,7 +1264,7 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
   , Just inl <- maybeUnfoldingTemplate unf   = Just $! (extend_subst_with inl)
   | otherwise                                = Nothing
   where
-    unf = idUnfolding bndr
+    unf = idUnfoldingChecked (sm_opt_off mode) bndr
     extend_subst_with inl_rhs = extendIdSubst env bndr $! (mkContEx rhs_env inl_rhs)
 
     one_occ IAmDead = True -- Happens in ((\x.1) v)

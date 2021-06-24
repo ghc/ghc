@@ -94,7 +94,7 @@ module GHC.Types.Id (
         -- ** Reading 'IdInfo' fields
         idArity,
         idCallArity, idFunRepArity,
-        idUnfolding, realIdUnfolding, hasInlineUnfolding,
+        idUnfolding, idUnfoldingChecked, realIdUnfolding, hasInlineUnfolding,
         idSpecialisation, idCoreRules, idHasRules,
         idCafInfo, idLFInfo_maybe,
         idOneShotInfo, idStateHackOneShotInfo,
@@ -714,13 +714,23 @@ isStrictId id
 
         ---------------------------------
         -- UNFOLDING
-idUnfolding :: Id -> Unfolding
+idUnfolding :: HasCallStack => Id -> Unfolding
 -- Do not expose the unfolding of a loop breaker!
 idUnfolding id
+--  | pprTrace "idUnfolding" (text $ last $ prettyCallStackLines callStack) $
   | isStrongLoopBreaker (occInfo info) = NoUnfolding
   | otherwise                          = unfoldingInfo info
   where
     info = idInfo id
+
+idUnfoldingChecked :: Bool -> Id -> Unfolding
+-- Do not expose the unfolding of an imported ID
+idUnfoldingChecked ignore id =
+  let unf = idUnfolding id
+  in if ignore && (not $ isCompulsoryUnfolding unf) && isExternalName (idName id)
+        then NoUnfolding
+        else unf
+
 
 hasInlineUnfolding :: Id -> Bool
 -- ^ True of a non-loop-breaker Id that has a /stable/ unfolding that is
