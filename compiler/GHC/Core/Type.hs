@@ -602,7 +602,6 @@ getRep' rinfo
 
 
 
-
 getRepArg_maybe :: Type -> Maybe Type
 getRepArg_maybe ty
     | TyConApp tc [arg] <- ty
@@ -628,13 +627,13 @@ simplifyConv conv
     | otherwise
     = Nothing
 
-isGetRepTy :: Type -> Bool
-isGetRepTy ty
-    | TyConApp tc arg <- ty
-    , tc `hasKey` getRepTyConKey
-    = True    
-    | otherwise
-    = False
+-- isGetRepTy :: Type -> Bool
+-- isGetRepTy ty
+--     | TyConApp tc arg <- ty
+--     , tc `hasKey` getRepTyConKey
+--     = True    
+--     | otherwise
+--     = False
 
 getConvArg_maybe :: Type -> Maybe Type
 getConvArg_maybe ty
@@ -646,16 +645,10 @@ getConvArg_maybe ty
 
 
 
-
-
-
 extractRep :: Type -> Maybe Type
 extractRep rinfo
   | TyConApp rinfo [rep, _] <- coreFullView rinfo
   , rinfo `hasKey` runtimeInfoDataConKey       = Just rep
-  | TyConApp tc [arg] <- coreFullView rinfo
-  , tc `hasKey` getRepTyConKey
-  , TyConApp tc [rep,conv] <- coreFullView arg = Just rep
   | otherwise                                  = Nothing
 
 kindConv_maybe :: HasDebugCallStack => Kind -> Maybe Type
@@ -732,8 +725,9 @@ isLiftedRuntimeInfo rinfo
   | TyConApp rr_tc [rep,conv] <- coreFullView rinfo
   , rr_tc `hasKey` runtimeInfoDataConKey
   = isLiftedRuntimeRep rep
-  | Just rep <- extractRep rinfo
-  = isLiftedRuntimeRep rep
+  | TyConApp rr_tc [rep,conv] <- coreFullView rinfo
+  , Just rep' <- simplifyRep rep
+  = isLiftedRuntimeRep rep'
   | otherwise                            
   = False 
 
@@ -3199,8 +3193,6 @@ isKindLevPoly k = ASSERT2( isLiftedTypeKind k || _is_type, ppr k )
     go ty@(TyConApp tc tys)
       | Just rep <- runtimeRepPrimRep_maybe (ppr k) ty
       =  False
-      -- | Just conv <- simplifyConv ty
-      -- = go conv
       | otherwise
       = isFamilyTyCon tc || any go tys
     go ForAllTy{}        =  True
