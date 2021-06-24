@@ -278,6 +278,7 @@ test('inline-check', omit_ways(['hpc', 'profasm'])
 		   , ['-dinline-check foo -O -ddebug-output'])
 
 test('T14452', [], makefile_test, [])
+test('T14923', normal, makefile_test, [])
 test('T15396', normal, compile_and_run, ['-package ghc'])
 test('T16737',
      [extra_files(['T16737include/']),
@@ -290,3 +291,4 @@ test('T17786', unless(opsys('mingw32'), skip), makefile_test, [])
 test('T18369', normal, compile, ['-O'])
 test('FullGHCVersion', normal, compile_and_run, ['-package ghc-boot'])
 test('OneShotTH', normal, makefile_test, [])
+test('T17481', normal, makefile_test, [])
