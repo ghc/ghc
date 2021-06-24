@@ -318,6 +318,10 @@ type DynTag = Int       -- The tag on a *pointer*
 -- x86-32 and 3 bits on x86-64.
 --
 -- Also see Note [Tagging big families] in GHC.StgToCmm.Expr
+--
+-- The interpreter also needs to be updated if we change the
+-- tagging strategy. See Note [Data constructor dynamic tags] in
+-- rts/Interpreter.c
 
 isSmallFamily :: Platform -> Int -> Bool
 isSmallFamily platform fam_size = fam_size <= mAX_PTR_TAG platform
