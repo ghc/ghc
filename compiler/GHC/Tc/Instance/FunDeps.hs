@@ -153,7 +153,7 @@ instFD :: FunDep TyVar -> [TyVar] -> [Type] -> FunDep Type
 instFD (ls,rs) tvs tys
   = (map lookup ls, map lookup rs)
   where
-    env       = zipVarEnv tvs tys
+    env       = zipEqualVarEnv tvs tys
     lookup tv = lookupVarEnv_NF env tv
 
 zipAndComputeFDEqs :: (Type -> Type -> Bool) -- Discard this FDEq if true
