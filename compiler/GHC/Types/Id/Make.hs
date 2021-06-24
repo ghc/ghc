@@ -1282,10 +1282,6 @@ dataConArgUnpackSum (Scaled arg_mult arg_ty) tc_args cons =
                 mapM (mapM newLocal' . map (TcType.substTy subst)) src_tys
 
               let mk_sum_alt :: Int -> DataCon -> Var -> [Var] -> CoreAlt
-                  mk_sum_alt alt con tuple_bndr [] =
-                    ( Alt (DataAlt (sumDataCon alt ubx_sum_arity)) [tuple_bndr]
-                      (Var (dataConWorkId con) `mkTyApps` tc_args' ))
-
                   mk_sum_alt alt con _ [datacon_bndr] =
                     ( Alt (DataAlt (sumDataCon alt ubx_sum_arity)) [datacon_bndr]
                       (Var (dataConWorkId con) `mkTyApps`  tc_args'
