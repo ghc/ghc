@@ -46,11 +46,6 @@ module GHC.Driver.Phases (
    isSourceFilename,
 
    phaseForeignLanguage
-   , runTPipeline
-   , TPipeline(..)
-   , TPipelineClass
-   , MonadUse(..)
-   , use
  ) where
 
 import GHC.Prelude
@@ -66,9 +61,6 @@ import GHC.Utils.Panic
 import GHC.Utils.Misc
 
 import System.FilePath
-import Control.Monad
-import Control.Monad.IO.Class
-import qualified Data.Kind as K
 
 -----------------------------------------------------------------------------
 -- Phases
@@ -97,6 +89,9 @@ stopPhaseToPhase StopC   = HCc
 stopPhaseToPhase StopAs  = As False
 stopPhaseToPhase NoStop   = StopLn
 
+-- Abstract interface to the pipeline monad
+
+
 data Phase
         = Unlit HscSource
         | Cpp   HscSource
@@ -122,44 +117,11 @@ data Phase
 
 
 
-type TPipelineClass (f :: K.Type -> K.Type) (m :: K.Type -> K.Type)  = (Functor m, MonadIO m, Applicative m, Monad m, MonadUse f m)
-
-class MonadUse f m where
-  use_ :: f a -> m a
-
-
-data TPipeline f a where
-  Return :: a -> TPipeline f a
-  Roll :: f a -> (a -> TPipeline f b)  -> TPipeline f b
-
-instance Functor (TPipeline f)  where
-  fmap f (Return a) = Return (f a)
-  fmap f (Roll fa k) = Roll fa (fmap f . k)
---  fmap f (ModuleScope e k) = ModuleScope e (fmap f k)
-
-instance Applicative (TPipeline f) where
-  pure = Return
-  (<*>) = ap
-
-instance Monad (TPipeline f) where
-  return = pure
-  (Return a) >>= f = f a
-  (Roll fa k) >>= f = Roll fa (k >=> f)
---  (ModuleScope r k) >>= f = ModuleScope r (k >>= f)
-
-runTPipeline :: Monad g => (forall a . f a -> g a) -> TPipeline f a -> g a
-runTPipeline _h (Return a) = return a
-runTPipeline h (Roll fa k)   = h fa >>= runTPipeline h . k
---runTPipeline h g (ModuleScope e k) = g e (runTPipeline h g k)
-
-use :: MonadUse f m => f a -> m a
-use fa = use_ fa
-
 instance Outputable Phase where
     ppr p = text (show p)
 
 anyHsc :: Phase
-anyHsc = Hsc undefined
+anyHsc = Hsc (panic "anyHsc")
 
 isStopLn :: Phase -> Bool
 isStopLn StopLn = True

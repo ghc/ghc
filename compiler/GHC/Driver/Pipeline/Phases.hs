@@ -43,6 +43,5 @@ data TPhase res where
   T_LlvmLlc :: PipeEnv -> HscEnv -> FilePath -> TPhase FilePath
   T_LlvmMangle :: PipeEnv -> HscEnv -> FilePath -> TPhase FilePath
   T_MergeForeign :: PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> [FilePath] -> TPhase FilePath
-  T_IO :: IO a -> TPhase a
 
 data PhaseHook = PhaseHook (forall a . TPhase a -> IO a)
