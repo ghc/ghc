@@ -12,7 +12,8 @@ module GHC.Types.RepType
 
     -- * Type representation for the code generator
     typePrimRep, typePrimRep1,
-    runtimeRepPrimRep, typePrimRepArgs,
+    runtimeRepPrimRep, runtimeRepPrimRep_maybe,
+    typePrimRepArgs,
     runtimeInfoPrimRep, 
     PrimRep(..), primRepToType,
     countFunRepArgs, countConRepArgs, tyConPrimRep, tyConPrimRep1,
@@ -522,16 +523,23 @@ kindPrimRep doc ki
 -- | Take a type of kind RuntimeRep and extract the list of 'PrimRep' that
 -- it encodes. See also Note [Getting from RuntimeRep to PrimRep]
 runtimeRepPrimRep :: HasDebugCallStack => SDoc -> Type -> [PrimRep]
-runtimeRepPrimRep doc rr_ty
-  | Just rr_ty' <- coreView rr_ty
-  = runtimeRepPrimRep doc rr_ty'
-  | Just rr_ty' <- simplifyRep rr_ty
-  = runtimeRepPrimRep doc rr_ty'
-  | TyConApp rr_dc args <- rr_ty
-  , RuntimeRep fun <- tyConRuntimeRepInfo rr_dc
-  = fun args
+runtimeRepPrimRep doc rr_ty 
+  | Just p_reps <- runtimeRepPrimRep_maybe doc rr_ty
+  = p_reps
   | otherwise
   = pprPanic "runtimeRepPrimRep" (doc $$ ppr rr_ty)
+
+runtimeRepPrimRep_maybe :: HasDebugCallStack => SDoc -> Type -> Maybe [PrimRep]
+runtimeRepPrimRep_maybe doc rr_ty
+  | Just rr_ty' <- coreView rr_ty
+  = runtimeRepPrimRep_maybe doc rr_ty'
+  | Just rr_ty' <- simplifyRep rr_ty
+  = runtimeRepPrimRep_maybe doc rr_ty'
+  | TyConApp rr_dc args <- rr_ty
+  , RuntimeRep fun <- tyConRuntimeRepInfo rr_dc
+  = Just $ fun args
+  | otherwise
+  = Nothing
 
 runtimeInfoPrimRep :: HasDebugCallStack => SDoc -> Type -> [PrimRep]
 runtimeInfoPrimRep doc rr_ty

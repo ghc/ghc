@@ -255,6 +255,7 @@ import GHC.Core.TyCo.Tidy
 import GHC.Core.TyCo.FVs
 
 -- friends:
+import {-# SOURCE #-} GHC.Types.RepType (runtimeRepPrimRep_maybe)
 import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
@@ -599,13 +600,6 @@ getRep' rinfo
   | otherwise                    
   = mkTyConApp getRepTyCon [rinfo]
 
-getRepField :: Type -> Type
-getRepField rinfo
-  | TyConApp tc [rep, _] <- rinfo
-  , tc `hasKey` runtimeInfoDataConKey
-  = rep
-  | otherwise 
-  = pprPanic "getRepField of non-RuntimeInfo" (ppr rinfo)
 
 
 
@@ -617,22 +611,6 @@ getRepArg_maybe ty
     | otherwise
     = Nothing
 
-
-canSimplifyRep :: Type -> Bool
-canSimplifyRep rep
-    | Just rinfo <- getRepArg_maybe rep
-    , TyConApp rinfo [_rep, _conv] <- rinfo
-    = True
-    | otherwise
-    = False
-
-simplifyRep_trans :: Type -> Type
-simplifyRep_trans rep
-    | Just rinfo <- getRepArg_maybe rep
-    , (TyConApp rinfo [rep', _]) <- rinfo
-    = rep'
-    | otherwise
-    = rep
 
 simplifyRep :: Type -> Maybe Type
 simplifyRep rep
@@ -667,19 +645,7 @@ getConvArg_maybe ty
     = Nothing
 
 
-simplifyKindDeep :: Type -> Maybe Type
-simplifyKindDeep kind
-  | Just runtimeInfo <- kindInfo_maybe kind
-  , TyConApp rinfo [rep,conv] <- runtimeInfo
-  , (TyConApp tr [arg]) <- rep
-  , tr `hasKey` tupleRepDataConKey
-  , tupleReps <- extractPromotedList arg
-  , containsSimplifiableGetRep tupleReps  
-  = Just $ tYPE $ rInfo (TyConApp tr [(tup_reps tupleReps)]) conv
-  | otherwise
-  = Nothing
-  where containsSimplifiableGetRep = (elem True) . (map (\t -> (canSimplifyRep t) &&  (isGetRepTy t)))
-        tup_reps = ((mkPromotedListTy runtimeRepTy) . (map simplifyRep_trans)) 
+
 
 
 
@@ -3231,10 +3197,10 @@ isKindLevPoly k = ASSERT2( isLiftedTypeKind k || _is_type, ppr k )
     go TyVarTy{}         = True
     go AppTy{}           = True  -- it can't be a TyConApp
     go ty@(TyConApp tc tys)
-      | Just rep <- simplifyRep ty
-      =  go rep
-      | Just conv <- simplifyConv ty
-      = go conv
+      | Just rep <- runtimeRepPrimRep_maybe (ppr k) ty
+      =  False
+      -- | Just conv <- simplifyConv ty
+      -- = go conv
       | otherwise
       = isFamilyTyCon tc || any go tys
     go ForAllTy{}        =  True
