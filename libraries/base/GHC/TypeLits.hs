@@ -1,17 +1,18 @@
-{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
+{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE MagicHash #-}
-{-# LANGUAGE PolyKinds #-}
-{-# LANGUAGE TypeApplications #-}
 
 {-|
 GHC's @DataKinds@ language extension lifts data constructors, natural
@@ -60,7 +61,7 @@ module GHC.TypeLits
   ) where
 
 import GHC.Base(Eq(..), Ord(..), Ordering(..), String, otherwise, withDict)
-import GHC.Types(Symbol, Char)
+import GHC.Types(Type, Constraint, Symbol, Char)
 import GHC.Num(Integer, fromInteger)
 import GHC.Show(Show(..))
 import GHC.Read(Read(..))
@@ -81,8 +82,9 @@ import qualified GHC.TypeNats as N
 -- There are instances of the class for every concrete literal: "hello", etc.
 --
 -- @since 4.7.0.0
-class KnownSymbol (n :: Symbol) where
-  symbolSing :: SSymbol n
+type  KnownSymbol :: Symbol -> Constraint
+class KnownSymbol str where
+  symbolSing :: SSymbol str
 
 -- | @since 4.7.0.0
 natVal :: forall n proxy. N.KnownNat n => proxy n -> Integer
@@ -108,8 +110,9 @@ data SomeSymbol = forall n. KnownSymbol n => SomeSymbol (Proxy n)
                   -- ^ @since 4.7.0.0
 
 -- | @since 4.16.0.0
-class KnownChar (n :: Char) where
-  charSing :: SChar n
+type  KnownChar :: Char -> Constraint
+class KnownChar ch where
+  charSing :: SChar ch
 
 charVal :: forall n proxy. KnownChar n => proxy n -> Char
 charVal _ = case charSing :: SChar n of
@@ -179,7 +182,8 @@ instance Read SomeChar where
 -- | Concatenation of type-level symbols.
 --
 -- @since 4.10.0.0
-type family AppendSymbol (m ::Symbol) (n :: Symbol) :: Symbol
+type AppendSymbol :: Symbol -> Symbol -> Symbol
+type family AppendSymbol m n
 
 -- | A description of a custom type error.
 data {-kind-} ErrorMessage = Text Symbol
@@ -226,7 +230,8 @@ infixl 6 :<>:
 -- @
 --
 -- @since 4.9.0.0
-type family TypeError (a :: ErrorMessage) :: b where
+type TypeError :: ErrorMessage -> k
+type family TypeError errorMsg where
 
 
 -- Char-related type families
@@ -234,23 +239,27 @@ type family TypeError (a :: ErrorMessage) :: b where
 -- | Extending a type-level symbol with a type-level character
 --
 -- @since 4.16.0.0
-type family ConsSymbol (a :: Char) (b :: Symbol) :: Symbol
+type ConsSymbol :: Char -> Symbol -> Symbol
+type family ConsSymbol a b
 
 -- | This type family yields type-level `Just` storing the first character
 -- of a symbol and its tail if it is defined and `Nothing` otherwise.
 --
 -- @since 4.16.0.0
-type family UnconsSymbol (a :: Symbol) :: Maybe (Char, Symbol)
+type UnconsSymbol :: Symbol -> Maybe (Char, Symbol)
+type family UnconsSymbol a
 
 -- | Convert a character to its Unicode code point (cf. `Data.Char.ord`)
 --
 -- @since 4.16.0.0
-type family CharToNat (c :: Char) :: N.Nat
+type CharToNat :: Char -> N.Nat
+type family CharToNat c
 
 -- | Convert a Unicode code point to a character (cf. `Data.Char.chr`)
 --
 -- @since 4.16.0.0
-type family NatToChar (n :: N.Nat) :: Char
+type NatToChar :: N.Nat -> Char
+type family NatToChar n
 
 --------------------------------------------------------------------------------
 
@@ -305,7 +314,8 @@ cmpChar x y = case compare (charVal x) (charVal y) of
 --------------------------------------------------------------------------------
 -- PRIVATE:
 
-newtype SSymbol (s :: Symbol) = SSymbol String
+type    SSymbol :: Symbol -> Type
+newtype SSymbol str = SSymbol String
 
 -- See Note [withDict] in "GHC.HsToCore.Expr" in GHC
 withSSymbol :: forall a b.
@@ -313,7 +323,8 @@ withSSymbol :: forall a b.
             -> SSymbol a      -> Proxy a -> b
 withSSymbol f x y = withDict @(SSymbol a) @(KnownSymbol a) x f y
 
-newtype SChar (s :: Char) = SChar Char
+type    SChar :: Char -> Type
+newtype SChar ch = SChar Char
 
 -- See Note [withDict] in "GHC.HsToCore.Expr" in GHC
 withSChar :: forall a b.

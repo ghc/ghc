@@ -1,4 +1,5 @@
 {-# LANGUAGE Safe #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Control.Monad.IO.Class
@@ -17,6 +18,8 @@ module Control.Monad.IO.Class (
     MonadIO(..)
   ) where
 
+import Data.Kind (Constraint, Type)
+
 -- | Monads in which 'IO' computations may be embedded.
 -- Any monad built by applying a sequence of monad transformers to the
 -- 'IO' monad will be an instance of this class.
@@ -28,6 +31,7 @@ module Control.Monad.IO.Class (
 --
 -- * @'liftIO' (m >>= f) = 'liftIO' m >>= ('liftIO' . f)@
 
+type  MonadIO :: (Type -> Type) -> Constraint
 class (Monad m) => MonadIO m where
     -- | Lift a computation from the 'IO' monad.
     -- This allows us to run IO computations in any monadic stack, so long as it supports these kinds of operations
