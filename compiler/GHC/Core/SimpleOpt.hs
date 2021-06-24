@@ -1175,7 +1175,12 @@ exprIsConApp_maybe (in_scope, id_unf) expr
         -- Look through dictionary functions; see Note [Unfolding DFuns]
         | DFunUnfolding { df_bndrs = bndrs, df_con = con, df_args = dfun_args } <- unfolding
         , bndrs `equalLength` args    -- See Note [DFun arity check]
-        , let subst = mkOpenSubst in_scope (bndrs `zip` args)
+        , let in_scope' = extend_in_scope (exprsFreeVars dfun_args)
+              subst = mkOpenSubst in_scope' (bndrs `zip` args)
+              -- We extend the in-scope set here to silence warnings from
+              -- substExpr when it finds not-in-scope Ids in dfun_args.
+              -- simplOptExpr initialises the in-scope set with exprFreeVars,
+              -- but that doesn't account for DFun unfoldings
         = succeedWith in_scope floats $
           pushCoDataCon con (map (substExpr subst) dfun_args) co
 
@@ -1186,7 +1191,7 @@ exprIsConApp_maybe (in_scope, id_unf) expr
         -- CPR'd workers getting inlined back into their wrappers,
         | idArity fun == 0
         , Just rhs <- expandUnfolding_maybe unfolding
-        , let in_scope' = extendInScopeSetSet in_scope (exprFreeVars rhs)
+        , let in_scope' = extend_in_scope (exprFreeVars rhs)
         = go (Left in_scope') floats rhs cont
 
         -- See Note [exprIsConApp_maybe on literal strings]
@@ -1198,6 +1203,11 @@ exprIsConApp_maybe (in_scope, id_unf) expr
           dealWithStringLiteral fun str co
         where
           unfolding = id_unf fun
+          extend_in_scope unf_fvs
+            | isLocalId fun = in_scope `extendInScopeSetSet` unf_fvs
+            | otherwise     = in_scope
+            -- A GlobalId has no (LocalId) free variables; and the
+            -- in-scope set tracks only LocalIds
 
     go _ _ _ _ = Nothing
 
