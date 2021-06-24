@@ -953,10 +953,10 @@ mkErrorTerm ctxt ct_loc ty report
          -- This will be reported at runtime, so we always want "error:" in the report, never "warning:"
        ; dflags <- getDynFlags
        ; let err_msg = pprLocMsgEnvelope msg
-             err_fs  = mkFastString $ showSDoc dflags $
+             err_str = showSDoc dflags $
                        err_msg $$ text "(deferred type error)"
 
-       ; return $ evDelayedError ty err_fs }
+       ; return $ evDelayedError ty err_str }
 
 tryReporters :: ReportErrCtxt -> [ReporterSpec] -> [Ct] -> TcM (ReportErrCtxt, [Ct])
 -- Use the first reporter in the list whose predicate says True
