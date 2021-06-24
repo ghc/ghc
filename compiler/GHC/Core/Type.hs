@@ -754,10 +754,14 @@ isUnliftedRuntimeRep rep
   | otherwise {- Variables, applications -}
   = False
 
-isUnliftedRuntimeInfo rep
-  | TyConApp rinfo [rep, conv] <- coreFullView rep   -- NB: args might be non-empty
+isUnliftedRuntimeInfo :: Type -> Bool
+isUnliftedRuntimeInfo rinfo
+  | TyConApp rinfo [rep, conv] <- coreFullView rinfo   -- NB: args might be non-empty
   , rinfo `hasKey` runtimeInfoDataConKey
   = isUnliftedRuntimeRep rep
+  | TyConApp rr_tc [rep,conv] <- coreFullView rinfo
+  , Just rep' <- simplifyRep rep
+  = isUnliftedRuntimeRep rep'
         -- Avoid searching all the unlifted RuntimeRep type cons
         -- In the RuntimeRep data type, only LiftedRep is lifted
         -- But be careful of type families (F tys) :: RuntimeRep
