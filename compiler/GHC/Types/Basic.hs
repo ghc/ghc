@@ -85,6 +85,7 @@ module GHC.Types.Basic (
         neverInlinePragma, dfunInlinePragma,
         isDefaultInlinePragma,
         isInlinePragma, isInlinablePragma, isAnyInlinePragma,
+        isNoInlinePragma, isOpaquePragma,
         inlinePragmaSpec, inlinePragmaSat,
         inlinePragmaActivation, inlinePragmaRuleMatchInfo,
         setInlinePragmaActivation, setInlinePragmaRuleMatchInfo,
@@ -1333,6 +1334,7 @@ data InlineSpec   -- What the user's INLINE pragma looked like
   = Inline           -- User wrote INLINE
   | Inlinable        -- User wrote INLINABLE
   | NoInline         -- User wrote NOINLINE
+  | Opaque           -- User wrote OPAQUE
   | NoUserInlinePrag -- User did not write any of INLINE/INLINABLE/NOINLINE
                      -- e.g. in `defaultInlinePragma` or when created by CSE
   deriving( Eq, Data, Show )
@@ -1358,7 +1360,7 @@ If you want to know where InlinePragmas take effect: Look in GHC.HsToCore.Binds.
 Note [inl_inline and inl_act]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 * inl_inline says what the user wrote: did they say INLINE, NOINLINE,
-  INLINABLE, or nothing at all
+  INLINABLE, OPAQUE, or nothing at all
 
 * inl_act says in what phases the unfolding is active or inactive
   E.g  If you write INLINE[1]    then inl_act will be set to ActiveAfter 1
@@ -1407,6 +1409,34 @@ The main effects of CONLIKE are:
 
     - The rule matcher consults this field.  See
       Note [Expanding variables] in GHC.Core.Rules.
+
+Note [OPAQUE pragma]
+~~~~~~~~~~~~~~~~~~~~
+The ultimate goal of the OPAQUE pragma is to ensure that every call of some
+annotated binding 'f' generates a call of 'f', not some name-mangled variant.
+The motivation for the OPAQUE pragma is discussed in GHC proposal 0415:
+https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0415-opaque-pragma.rst
+Basically it boils down to the desire of GHC API users and GHC RULE writers for
+calls to certain binders to be left completely untouched by GHCs optimisations.
+
+What this entails at the time of writing, is that every binder annotated with
+the OPAQUE pragma will:
+
+* Not be inlined (See GHC.Core.Unfold.certainlyWillInline)
+* Not be type-class specialised; SpecConstr is also a no-op. Currently, this
+  depends on the same logic that stops NOINLINE annotated bindings from being
+  specialised (GHC.Parser.PostProcess.mkInlinePragma, GHC.Types.Basic.isNeverActive
+  and GHC.Core.Opt.SpecConstr.specialise)
+* Not be W/W-transformed (See GHC.Core.Opt.WorkWrap.tryWW), not even the cast W/W
+  in the early stage simplifier (See GHC.Core.Opt.Simplify.tryCastWorkerWrapper)
+
+At the moment of writing, the major difference between the NOINLINE pragma and
+the OPAQUE pragma is that binders annoted with the NOINLINE pragma _are_ W/W
+transformed (see also Note [Worker/wrapper for NOINLINE functions]) where binders
+annoted with the OPAQUE pragma are _not_ W/W transformed.
+
+Future "name-mangling" optimisations should respect the OPAQUE pragma and
+update the list of moving parts referenced in this note.
 -}
 
 isConLike :: RuleMatchInfo -> Bool
@@ -1464,6 +1494,16 @@ isAnyInlinePragma prag = case inl_inline prag of
                         Inline    -> True
                         Inlinable -> True
                         _         -> False
+
+isNoInlinePragma :: InlinePragma -> Bool
+isNoInlinePragma prag = case inl_inline prag of
+                          NoInline -> True
+                          _        -> False
+
+isOpaquePragma :: InlinePragma -> Bool
+isOpaquePragma prag = case inl_inline prag of
+                        Opaque -> True
+                        _      -> False
 
 inlinePragmaSat :: InlinePragma -> Maybe Arity
 inlinePragmaSat = inl_sat
@@ -1532,6 +1572,7 @@ instance Outputable InlineSpec where
    ppr Inline           = text "INLINE"
    ppr NoInline         = text "NOINLINE"
    ppr Inlinable        = text "INLINABLE"
+   ppr Opaque           = text "OPAQUE"
    ppr NoUserInlinePrag = empty
 
 instance Binary InlineSpec where
@@ -1539,13 +1580,15 @@ instance Binary InlineSpec where
     put_ bh Inline           = putByte bh 1
     put_ bh Inlinable        = putByte bh 2
     put_ bh NoInline         = putByte bh 3
+    put_ bh Opaque           = putByte bh 4
 
     get bh = do h <- getByte bh
                 case h of
                   0 -> return NoUserInlinePrag
                   1 -> return Inline
                   2 -> return Inlinable
-                  _ -> return NoInline
+                  3 -> return NoInline
+                  _ -> return Opaque
 
 
 instance Outputable InlinePragma where
@@ -1585,6 +1628,7 @@ pprInline' emptyInline (InlinePragma { inl_inline = inline, inl_act = activation
 
       pp_act Inline   AlwaysActive = empty
       pp_act NoInline NeverActive  = empty
+      pp_act Opaque   NeverActive  = empty
       pp_act _        act          = ppr act
 
       pp_sat | Just ar <- mb_arity = parens (text "sat-args=" <> int ar)
