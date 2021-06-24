@@ -362,16 +362,17 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
 
         -- ANF-ise a constructor or PAP rhs
         -- We get at most one float per argument here
+        ; let body_env1 = body_env `setInScopeFromF` body_floats1
+              -- body_env1: add to in-scope set the binders from body_floats1
+              -- so that prepareBinding knows what is in scope in body1
         ; (let_floats, bndr2, body2) <- {-#SCC "prepareBinding" #-}
-                                        prepareBinding env top_lvl bndr bndr1 body1
+                                        prepareBinding body_env1 top_lvl bndr bndr1 body1
         ; let body_floats2 = body_floats1 `addLetFloats` let_floats
 
-        ; (rhs_floats, rhs')
+        ; (rhs_floats, body3)
             <-  if not (doFloatFromRhs top_lvl is_rec False body_floats2 body2)
                 then                    -- No floating, revert to body1
-                     {-#SCC "simplLazyBind-no-floating" #-}
-                     do { rhs' <- mkLam env tvs' (wrapFloats body_floats2 body1) rhs_cont
-                        ; return (emptyFloats env, rhs') }
+                     return (emptyFloats env, wrapFloats body_floats2 body1)
 
                 else if null tvs then   -- Simple floating
                      {-#SCC "simplLazyBind-simple-floating" #-}
@@ -384,11 +385,11 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
                         ; (poly_binds, body3) <- abstractFloats (seUnfoldingOpts env) top_lvl
                                                                 tvs' body_floats2 body2
                         ; let floats = foldl' extendFloats (emptyFloats env) poly_binds
-                        ; rhs' <- mkLam env tvs' body3 rhs_cont
-                        ; return (floats, rhs') }
+                        ; return (floats, body3) }
 
-        ; (bind_float, env2) <- completeBind (env `setInScopeFromF` rhs_floats)
-                                             top_lvl Nothing bndr bndr2 rhs'
+        ; let env' = env `setInScopeFromF` rhs_floats
+        ; rhs' <- mkLam env' tvs' body3 rhs_cont
+        ; (bind_float, env2) <- completeBind env' top_lvl Nothing bndr bndr2 rhs'
         ; return (rhs_floats `addFloats` bind_float, env2) }
 
 --------------------------
@@ -627,7 +628,7 @@ prepareRhs :: SimplMode -> TopLevelFlag
 -- Transforms a RHS into a better RHS by ANF'ing args
 -- for expandable RHSs: constructors and PAPs
 -- e.g        x = Just e
--- becomes    a = e
+-- becomes    a = e               -- 'a' is fresh
 --            x = Just a
 -- See Note [prepareRhs]
 prepareRhs mode top_lvl occ rhs0
@@ -720,6 +721,10 @@ makeTrivialBinding mode top_lvl occ_fs info expr expr_ty
         -- Now something very like completeBind,
         -- but without the postInlineUnconditionally part
         ; (arity_type, expr2) <- tryEtaExpandRhs mode var expr1
+          -- Technically we should extend the in-scope set in 'env' with
+          -- the 'floats' from prepareRHS; but they are all fresh, so there is
+          -- no danger of introducing name shadowig in eta expansion
+
         ; unf <- mkLetUnfolding (sm_uf_opts mode) top_lvl InlineRhs var expr2
 
         ; let final_id = addLetBndrInfo var arity_type unf
