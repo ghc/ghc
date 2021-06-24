@@ -15,6 +15,7 @@ import GHCi.Signals
 import GHCi.Utils
 
 import Control.Exception
+import Control.Concurrent (threadDelay)
 import Control.Monad
 import Data.IORef
 import System.Environment
@@ -43,10 +44,17 @@ main = do
             return (wfd1, rfd2, rest)
         _ -> dieWithUsage
 
-  verbose <- case rest of
-    ["-v"] -> return True
-    []     -> return False
-    _      -> dieWithUsage
+  (verbose, rest') <- case rest of
+    "-v":rest' -> return (True, rest')
+    _ -> return (False, rest)
+
+  (wait, rest'') <- case rest' of
+    "-wait":rest'' -> return (True, rest'')
+    _ -> return (False, rest')
+
+  unless (null rest'') $
+    dieWithUsage
+
   when verbose $
     printf "GHC iserv starting (in: %d; out: %d)\n"
       (fromIntegral rfd2 :: Int) (fromIntegral wfd1 :: Int)
@@ -55,9 +63,14 @@ main = do
   installSignalHandlers
   lo_ref <- newIORef Nothing
   let pipe = Pipe{pipeRead = inh, pipeWrite = outh, pipeLeftovers = lo_ref}
+
+  when wait $ do
+    when verbose $
+      putStrLn "Waiting 3s"
+    threadDelay 3000000
+
   uninterruptibleMask $ serv verbose hook pipe
 
   where hook = return -- empty hook
     -- we cannot allow any async exceptions while communicating, because
     -- we will lose sync in the protocol, hence uninterruptibleMask.
-
