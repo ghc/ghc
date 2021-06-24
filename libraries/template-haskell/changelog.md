@@ -17,6 +17,8 @@
   * Add `newDeclarationGroup` to document the effect of visibility while
     reifying types and instances.
 
+  * Add `DefaultD` constructor to support Haskell `default` declarations.
+
 ## 2.17.0.0
   * Typed Quotations now return a value of type `Code m a` (GHC Proposal #195).
     The main motiviation is to make writing instances easier and make it easier to
