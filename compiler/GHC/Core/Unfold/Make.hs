@@ -169,14 +169,14 @@ specUnfolding opts spec_bndrs spec_app rule_lhs_args
                              , uf_is_top = top_lvl
                              , uf_guidance = old_guidance })
  | isStableSource src  -- See Note [Specialising unfoldings]
- , UnfWhen { ug_arity     = old_arity } <- old_guidance
+ , UnfWhen { ug_arity = old_arity } <- old_guidance
  = mkCoreUnfolding src top_lvl new_tmpl
                    (old_guidance { ug_arity = old_arity - arity_decrease })
  where
    new_tmpl = simpleOptExpr opts $
-              mkLams spec_bndrs    $
+              mkLams spec_bndrs  $
               spec_app tmpl  -- The beta-redexes created by spec_app
-                             -- will besimplified away by simplOptExpr
+                             -- will be simplified away by simplOptExpr
    arity_decrease = count isValArg rule_lhs_args - count isId spec_bndrs
 
 
