@@ -30,6 +30,7 @@ where
 import GHC.Prelude
 
 import GHC.Hs
+import GHC.Tc.Errors.Types
 import GHC.Tc.Gen.Sig
 import GHC.Tc.Types.Evidence ( idHsWrapper )
 import GHC.Tc.Gen.Bind
@@ -50,6 +51,7 @@ import GHC.Core.Coercion ( pprCoAxiom )
 import GHC.Driver.Session
 import GHC.Tc.Instance.Family
 import GHC.Core.FamInstEnv
+import GHC.Types.Error
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Name.Env
@@ -112,8 +114,8 @@ Death to "ExpandingDicts".
 ************************************************************************
 -}
 
-illegalHsigDefaultMethod :: Name -> SDoc
-illegalHsigDefaultMethod n =
+illegalHsigDefaultMethod :: Name -> TcRnMessage
+illegalHsigDefaultMethod n = TcRnUnknownMessage $ mkPlainError noHints $
     text "Illegal default method(s) in class definition of" <+> ppr n <+> text "in hsig file"
 
 tcClassSigs :: Name                -- Name of the class
@@ -274,10 +276,10 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
 
        ; spec_prags <- discardConstraints $
                        tcSpecPrags global_dm_id prags
-       ; diagnosticTc WarningWithoutFlag
-                      (not (null spec_prags))
-                      (text "Ignoring SPECIALISE pragmas on default method"
-                       <+> quotes (ppr sel_name))
+       ; let dia = TcRnUnknownMessage $
+               mkPlainDiagnostic WarningWithoutFlag noHints $
+                (text "Ignoring SPECIALISE pragmas on default method" <+> quotes (ppr sel_name))
+       ; diagnosticTc (not (null spec_prags)) dia
 
        ; let hs_ty = hs_sig_fn sel_name
                      `orElse` pprPanic "tc_dm" (ppr sel_name)
@@ -353,7 +355,7 @@ tcClassMinimalDef _clas sigs op_info
         -- since you can't write a default implementation.
         when (tcg_src tcg_env /= HsigFile) $
             whenIsJust (isUnsatisfied (mindef `impliesAtom`) defMindef) $
-                       (\bf -> addDiagnosticTc WarningWithoutFlag (warningMinimalDefIncomplete bf))
+                       (\bf -> addDiagnosticTc (warningMinimalDefIncomplete bf))
         return mindef
   where
     -- By default require all methods without a default implementation
@@ -454,14 +456,16 @@ This makes the error messages right.
 ************************************************************************
 -}
 
-badMethodErr :: Outputable a => a -> Name -> SDoc
+badMethodErr :: Outputable a => a -> Name -> TcRnMessage
 badMethodErr clas op
-  = hsep [text "Class", quotes (ppr clas),
+  = TcRnUnknownMessage $ mkPlainError noHints $
+    hsep [text "Class", quotes (ppr clas),
           text "does not have a method", quotes (ppr op)]
 
-badGenericMethod :: Outputable a => a -> Name -> SDoc
+badGenericMethod :: Outputable a => a -> Name -> TcRnMessage
 badGenericMethod clas op
-  = hsep [text "Class", quotes (ppr clas),
+  = TcRnUnknownMessage $ mkPlainError noHints $
+    hsep [text "Class", quotes (ppr clas),
           text "has a generic-default signature without a binding", quotes (ppr op)]
 
 {-
@@ -485,13 +489,15 @@ dupGenericInsts tc_inst_infos
 -}
 badDmPrag :: TcId -> Sig GhcRn -> TcM ()
 badDmPrag sel_id prag
-  = addErrTc (text "The" <+> hsSigDoc prag <+> text "for default method"
+  = addErrTc (TcRnUnknownMessage $ mkPlainError noHints $
+    text "The" <+> hsSigDoc prag <+> text "for default method"
               <+> quotes (ppr sel_id)
               <+> text "lacks an accompanying binding")
 
-warningMinimalDefIncomplete :: ClassMinimalDef -> SDoc
+warningMinimalDefIncomplete :: ClassMinimalDef -> TcRnMessage
 warningMinimalDefIncomplete mindef
-  = vcat [ text "The MINIMAL pragma does not require:"
+  = TcRnUnknownMessage $ mkPlainDiagnostic WarningWithoutFlag noHints $
+  vcat [ text "The MINIMAL pragma does not require:"
          , nest 2 (pprBooleanFormulaNice mindef)
          , text "but there is no default implementation." ]
 
@@ -572,7 +578,10 @@ warnMissingAT name
        -- hs-boot and signatures never need to provide complete "definitions"
        -- of any sort, as they aren't really defining anything, but just
        -- constraining items which are defined elsewhere.
-       ; diagnosticTc (WarningWithFlag Opt_WarnMissingMethods) (warn && hsc_src == HsSrcFile)
-                      (text "No explicit" <+> text "associated type"
-                          <+> text "or default declaration for"
-                          <+> quotes (ppr name)) }
+       ; let dia = TcRnUnknownMessage $
+               mkPlainDiagnostic (WarningWithFlag Opt_WarnMissingMethods) noHints $
+                 (text "No explicit" <+> text "associated type"
+                                     <+> text "or default declaration for"
+                                     <+> quotes (ppr name))
+       ; diagnosticTc  (warn && hsc_src == HsSrcFile) dia
+                       }

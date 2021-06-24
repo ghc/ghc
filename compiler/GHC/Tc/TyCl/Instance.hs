@@ -22,6 +22,7 @@ where
 import GHC.Prelude
 
 import GHC.Hs
+import GHC.Tc.Errors.Types
 import GHC.Tc.Gen.Bind
 import GHC.Tc.TyCl
 import GHC.Tc.TyCl.Utils ( addTyConsToGblEnv )
@@ -60,6 +61,7 @@ import GHC.Core.Coercion.Axiom
 import GHC.Core.DataCon
 import GHC.Core.ConLike
 import GHC.Core.Class
+import GHC.Types.Error
 import GHC.Types.Var as Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
@@ -68,7 +70,6 @@ import GHC.Types.Basic
 import GHC.Types.Fixity
 import GHC.Driver.Session
 import GHC.Driver.Ppr
-import GHC.Utils.Error
 import GHC.Utils.Logger
 import GHC.Data.FastString
 import GHC.Types.Id
@@ -1995,9 +1996,10 @@ methSigCtxt sel_name sig_ty meth_ty env0
                               , text "   Class sig:" <+> ppr meth_ty ])
        ; return (env2, msg) }
 
-misplacedInstSig :: Name -> LHsSigType GhcRn -> SDoc
+misplacedInstSig :: Name -> LHsSigType GhcRn -> TcRnMessage
 misplacedInstSig name hs_ty
-  = vcat [ hang (text "Illegal type signature in instance declaration:")
+  = TcRnUnknownMessage $ mkPlainError noHints $
+    vcat [ hang (text "Illegal type signature in instance declaration:")
               2 (hang (pprPrefixName name)
                     2 (dcolon <+> ppr hs_ty))
          , text "(Use InstanceSigs to allow this)" ]
@@ -2123,7 +2125,9 @@ derivBindCtxt sel_id clas tys
 warnUnsatisfiedMinimalDefinition :: ClassMinimalDef -> TcM ()
 warnUnsatisfiedMinimalDefinition mindef
   = do { warn <- woptM Opt_WarnMissingMethods
-       ; diagnosticTc (WarningWithFlag Opt_WarnMissingMethods) warn message
+       ; let msg = TcRnUnknownMessage $
+               mkPlainDiagnostic (WarningWithFlag Opt_WarnMissingMethods) noHints message
+       ; diagnosticTc warn msg
        }
   where
     message = vcat [text "No explicit implementation for"
@@ -2342,26 +2346,30 @@ inst_decl_ctxt :: SDoc -> SDoc
 inst_decl_ctxt doc = hang (text "In the instance declaration for")
                         2 (quotes doc)
 
-badBootFamInstDeclErr :: SDoc
+badBootFamInstDeclErr :: TcRnMessage
 badBootFamInstDeclErr
-  = text "Illegal family instance in hs-boot file"
+  = TcRnUnknownMessage $ mkPlainError noHints $ text "Illegal family instance in hs-boot file"
 
-notFamily :: TyCon -> SDoc
+notFamily :: TyCon -> TcRnMessage
 notFamily tycon
-  = vcat [ text "Illegal family instance for" <+> quotes (ppr tycon)
+  = TcRnUnknownMessage $ mkPlainError noHints $
+    vcat [ text "Illegal family instance for" <+> quotes (ppr tycon)
          , nest 2 $ parens (ppr tycon <+> text "is not an indexed type family")]
 
-assocInClassErr :: TyCon -> SDoc
+assocInClassErr :: TyCon -> TcRnMessage
 assocInClassErr name
- = text "Associated type" <+> quotes (ppr name) <+>
+ = TcRnUnknownMessage $ mkPlainError noHints $
+   text "Associated type" <+> quotes (ppr name) <+>
    text "must be inside a class instance"
 
-badFamInstDecl :: TyCon -> SDoc
+badFamInstDecl :: TyCon -> TcRnMessage
 badFamInstDecl tc_name
-  = vcat [ text "Illegal family instance for" <+>
+  = TcRnUnknownMessage $ mkPlainError noHints $
+    vcat [ text "Illegal family instance for" <+>
            quotes (ppr tc_name)
          , nest 2 (parens $ text "Use TypeFamilies to allow indexed type families") ]
 
-notOpenFamily :: TyCon -> SDoc
+notOpenFamily :: TyCon -> TcRnMessage
 notOpenFamily tc
-  = text "Illegal instance for closed family" <+> quotes (ppr tc)
+  = TcRnUnknownMessage $ mkPlainError noHints $
+  text "Illegal instance for closed family" <+> quotes (ppr tc)
