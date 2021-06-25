@@ -234,6 +234,7 @@ module DynFlags (
         -- * Linker/compiler information
         LinkerInfo(..),
         CompilerInfo(..),
+        useXLinkerRPath,
 
         -- * File cleanup
         FilesToClean(..), emptyFilesToClean,
@@ -4605,15 +4606,14 @@ defaultFlags settings
       Opt_ProfCountEntries,
       Opt_SharedImplib,
       Opt_SimplPreInlining,
-      Opt_VersionMacros
+      Opt_VersionMacros,
+      Opt_RPath
     ]
 
     ++ [f | (ns,f) <- optLevelFlags, 0 `elem` ns]
              -- The default -O0 options
 
     ++ default_PIC platform
-
-    ++ default_RPath platform
 
     ++ concatMap (wayGeneralFlags platform) (defaultWays settings)
     ++ validHoleFitDefaults
@@ -4669,29 +4669,6 @@ default_PIC platform =
                                           -- #10597 for more
                                           -- information.
     _                        -> []
-
-
--- We usually want to use RPath, except on macOS (OSDarwin).  On recent macOS
--- versions the number of load commands we can embed in a dynamic library is
--- restricted.  Hence since b592bd98ff2 we rely on -dead_strip_dylib to only
--- link the needed dylibs instead of linking the full dependency closure.
---
--- If we split the library linking into injecting -rpath and -l @rpath/...
--- components, we will reduce the number of libraries we link, however we will
--- still inject one -rpath entry for each library, independent of their use.
--- That is, we even inject -rpath values for libraries that we dead_strip in
--- the end. As such we can run afoul of the load command size limit simply
--- by polluting the load commands with RPATH entries.
---
--- Thus, we disable Opt_RPath by default on OSDarwin.  The savvy user can always
--- enable it with -use-rpath if they so wish.
---
--- See Note [Dynamic linking on macOS]
-
-default_RPath :: Platform -> [GeneralFlag]
-default_RPath platform | platformOS platform == OSDarwin = []
-default_RPath _                                          = [Opt_RPath]
-
 
 -- General flags that are switched on/off when other general flags are switched
 -- on
@@ -5923,6 +5900,40 @@ data CompilerInfo
    | AppleClang51
    | UnknownCC
    deriving Eq
+
+
+-- | Should we use `-XLinker -rpath` when linking or not?
+-- See Note [-fno-use-rpaths]
+useXLinkerRPath :: DynFlags -> OS -> Bool
+useXLinkerRPath _ OSDarwin = False -- See Note [Dynamic linking on macOS]
+useXLinkerRPath dflags _ = gopt Opt_RPath dflags
+
+{-
+Note [-fno-use-rpaths]
+~~~~~~~~~~~~~~~~~~~~~~
+
+First read, Note [Dynamic linking on macOS] to understand why on darwin we never
+use `-XLinker -rpath`.
+
+The specification of `Opt_RPath` is as follows:
+
+The default case `-fuse-rpaths`:
+* On darwin, never use `-Xlinker -rpath -Xlinker`, always inject the rpath
+  afterwards, see `runInjectRPaths`. There is no way to use `-Xlinker` on darwin
+  as things stand but it wasn't documented in the user guide before this patch how
+  `-fuse-rpaths` should behave and the fact it was always disabled on darwin.
+* Otherwise, use `-Xlinker -rpath -Xlinker` to set the rpath of the executable,
+  this is the normal way you should set the rpath.
+
+The case of `-fno-use-rpaths`
+* Never inject anything into the rpath.
+
+When this was first implemented, `Opt_RPath` was disabled on darwin, but
+the rpath was still always augmented by `runInjectRPaths`, and there was no way to
+stop this. This was problematic because you couldn't build an executable in CI
+with a clean rpath.
+
+-}
 
 -- -----------------------------------------------------------------------------
 -- RTS hooks
