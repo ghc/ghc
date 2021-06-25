@@ -47,7 +47,7 @@ module GHC.Types.Id.Info (
         demandInfo, setDemandInfo, pprStrictness,
 
         -- ** Unfolding Info
-        unfoldingInfo, setUnfoldingInfo,
+        realUnfoldingInfo, unfoldingInfo, setUnfoldingInfo, hasInlineUnfolding,
 
         -- ** The InlinePragInfo type
         InlinePragInfo,
@@ -255,7 +255,7 @@ data IdInfo
         ruleInfo        :: RuleInfo,
         -- ^ Specialisations of the 'Id's function which exist.
         -- See Note [Specialisations and RULES in IdInfo]
-        unfoldingInfo   :: Unfolding,
+        realUnfoldingInfo   :: Unfolding,
         -- ^ The 'Id's unfolding
         inlinePragInfo  :: InlinePragma,
         -- ^ Any inline pragma attached to the 'Id'
@@ -377,13 +377,29 @@ setOccInfo :: IdInfo -> OccInfo -> IdInfo
 setOccInfo        info oc = oc `seq` info { occInfo = oc }
         -- Try to avoid space leaks by seq'ing
 
+-- | Essentially returns the 'realUnfoldingInfo' field, but does not expose the
+-- unfolding of a strong loop breaker.
+--
+-- This is the right thing to call if you plan to decide whether an unfolding
+-- will inline.
+unfoldingInfo :: IdInfo -> Unfolding
+unfoldingInfo info
+  | isStrongLoopBreaker (occInfo info) = zapUnfolding $ realUnfoldingInfo info
+  | otherwise                          =                realUnfoldingInfo info
+
 setUnfoldingInfo :: IdInfo -> Unfolding -> IdInfo
 setUnfoldingInfo info uf
   = -- We don't seq the unfolding, as we generate intermediate
     -- unfoldings which are just thrown away, so evaluating them is a
     -- waste of time.
     -- seqUnfolding uf `seq`
-    info { unfoldingInfo = uf }
+    info { realUnfoldingInfo = uf }
+
+hasInlineUnfolding :: IdInfo -> Bool
+-- ^ True of a /non-loop-breaker/ Id that has a /stable/ unfolding that is
+--   (a) always inlined; that is, with an `UnfWhen` guidance, or
+--   (b) a DFunUnfolding which never needs to be inlined
+hasInlineUnfolding info = isInlineUnfolding (unfoldingInfo info)
 
 setArityInfo :: IdInfo -> ArityInfo -> IdInfo
 setArityInfo info ar =
@@ -418,7 +434,7 @@ vanillaIdInfo :: IdInfo
 vanillaIdInfo
   = IdInfo {
             ruleInfo       = emptyRuleInfo,
-            unfoldingInfo  = noUnfolding,
+            realUnfoldingInfo  = noUnfolding,
             inlinePragInfo = defaultInlinePragma,
             occInfo        = noOccInfo,
             demandInfo     = topDmd,
@@ -659,7 +675,7 @@ zapUsedOnceInfo info
 
 zapFragileInfo :: IdInfo -> Maybe IdInfo
 -- ^ Zap info that depends on free variables
-zapFragileInfo info@(IdInfo { occInfo = occ, unfoldingInfo = unf })
+zapFragileInfo info@(IdInfo { occInfo = occ, realUnfoldingInfo = unf })
   = new_unf `seq`  -- The unfolding field is not (currently) strict, so we
                    -- force it here to avoid a (zapFragileUnfolding unf) thunk
                    -- which might leak space
