@@ -108,6 +108,7 @@ import qualified GHC.Data.BooleanFormula as BF
 
 import Control.Monad
 import GHC.Parser.Annotation
+import GHC.Driver.Ppr
 
 {-
 This module takes

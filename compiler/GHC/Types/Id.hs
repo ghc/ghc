@@ -125,7 +125,7 @@ import GHC.Prelude
 
 import GHC.Core ( CoreRule, isStableUnfolding, evaldUnfolding,
                  isCompulsoryUnfolding, isInlineUnfolding,
-                 Unfolding( NoUnfolding ) )
+                 Unfolding( NoUnfolding, uf_tmpl ), uf_guidance )
 
 import GHC.Types.Id.Info
 import GHC.Types.Basic
@@ -723,13 +723,18 @@ idUnfolding id
   where
     info = idInfo id
 
-idUnfoldingChecked :: Bool -> Id -> Unfolding
+idUnfoldingChecked :: Module -> Bool -> Id -> Unfolding
 -- Do not expose the unfolding of an imported ID
-idUnfoldingChecked ignore id =
-  let unf = idUnfolding id
-  in if ignore && (not $ isCompulsoryUnfolding unf) && isExternalName (idName id)
-        then NoUnfolding
-        else unf
+idUnfoldingChecked cur_mod ignore id =
+  let unf =
+            idUnfolding id
+  in
+--    pprTrace "unf" (ppr (idDetails id) $$ ppr id $$ ppr (isCompulsoryUnfolding unf) $$ ppr (isExternalName (idName id)) $$ ppr (nameModule_maybe (idName id))) $
+      if ignore && (not $ isCompulsoryUnfolding unf)
+                && not (nameIsLocalOrFrom cur_mod (idName id))
+                && not (isDataConWrapId id) -- Data Con wrappers don't obey IgnorePragmas
+          then NoUnfolding
+          else unf
 
 
 hasInlineUnfolding :: Id -> Bool

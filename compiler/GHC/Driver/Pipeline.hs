@@ -237,9 +237,9 @@ compileOne' m_tc_result mHscMessage
          HscUpToDate iface old_linkable -> do
            massert ( isJust old_linkable || isNoLink (ghcLink dflags) )
            -- See Note [ModDetails and --make mode]
-           refresh_iface <- refreshBinary (hsc_NC hsc_env) iface
-           details <- initModDetails plugin_hsc_env summary refresh_iface
-           return $! HomeModInfo refresh_iface details old_linkable
+           --refresh_iface <- refreshBinary (hsc_NC hsc_env) iface
+           details <- initModDetails plugin_hsc_env summary iface
+           return $! HomeModInfo iface details old_linkable
          HscRecompNeeded mb_old_hash -> do
            (tc_result, warnings) <- hscTypecheckAndGetWarnings plugin_hsc_env summary
            runPostTc tc_result warnings mb_old_hash
@@ -332,9 +332,9 @@ compileOnePostTc hsc_env summary tc_result warnings mb_old_hash = do
         return $ Just linkable
       | otherwise -> return Nothing
   -- See Note [ModDetails and --make mode]
-  refresh_iface <- refreshBinary (hsc_NC hsc_env) iface
-  details <- initModDetails hsc_env summary refresh_iface
-  return $! HomeModInfo refresh_iface details mLinkable
+  --refresh_iface <- refreshBinary (hsc_NC hsc_env) iface
+  details <- initModDetails hsc_env summary iface
+  return $! HomeModInfo iface details mLinkable
 
  where dflags      = hsc_dflags hsc_env
        this_mod    = ms_mod summary
