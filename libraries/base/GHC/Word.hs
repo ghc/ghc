@@ -80,8 +80,8 @@ instance Eq Word8 where
     (/=) = neWord8
 
 eqWord8, neWord8 :: Word8 -> Word8 -> Bool
-eqWord8 (W8# x) (W8# y) = isTrue# ((word8ToWord# x) `eqWord#` (word8ToWord# y))
-neWord8 (W8# x) (W8# y) = isTrue# ((word8ToWord# x) `neWord#` (word8ToWord# y))
+eqWord8 (W8# x) (W8# y) = isTrue# (x `eqWord8#` y)
+neWord8 (W8# x) (W8# y) = isTrue# (x `neWord8#` y)
 {-# INLINE [1] eqWord8 #-}
 {-# INLINE [1] neWord8 #-}
 
@@ -273,8 +273,8 @@ instance Eq Word16 where
     (/=) = neWord16
 
 eqWord16, neWord16 :: Word16 -> Word16 -> Bool
-eqWord16 (W16# x) (W16# y) = isTrue# ((word16ToWord# x) `eqWord#` (word16ToWord# y))
-neWord16 (W16# x) (W16# y) = isTrue# ((word16ToWord# x) `neWord#` (word16ToWord# y))
+eqWord16 (W16# x) (W16# y) = isTrue# (x `eqWord16#` y)
+neWord16 (W16# x) (W16# y) = isTrue# (x `neWord16#` y)
 {-# INLINE [1] eqWord16 #-}
 {-# INLINE [1] neWord16 #-}
 
@@ -509,8 +509,8 @@ instance Eq Word32 where
     (/=) = neWord32
 
 eqWord32, neWord32 :: Word32 -> Word32 -> Bool
-eqWord32 (W32# x) (W32# y) = isTrue# ((word32ToWord# x) `eqWord#` (word32ToWord# y))
-neWord32 (W32# x) (W32# y) = isTrue# ((word32ToWord# x) `neWord#` (word32ToWord# y))
+eqWord32 (W32# x) (W32# y) = isTrue# (x `eqWord32#` y)
+neWord32 (W32# x) (W32# y) = isTrue# (x `neWord32#` y)
 {-# INLINE [1] eqWord32 #-}
 {-# INLINE [1] neWord32 #-}
 

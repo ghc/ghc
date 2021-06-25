@@ -2053,7 +2053,7 @@ genSwitch :: NCGConfig -> CmmExpr -> SwitchTargets -> NatM InstrBlock
 genSwitch config expr targets
   | OSAIX <- platformOS platform
   = do
-        (reg,e_code) <- getSomeReg (cmmOffset platform expr offset)
+        (reg,e_code) <- getSomeReg indexExpr
         let fmt = archWordFormat $ target32Bit platform
             sha = if target32Bit platform then 2 else 3
         tmp <- getNewRegNat fmt
@@ -2070,7 +2070,7 @@ genSwitch config expr targets
 
   | (ncgPIC config) || (not $ target32Bit platform)
   = do
-        (reg,e_code) <- getSomeReg (cmmOffset platform expr offset)
+        (reg,e_code) <- getSomeReg indexExpr
         let fmt = archWordFormat $ target32Bit platform
             sha = if target32Bit platform then 2 else 3
         tmp <- getNewRegNat fmt
@@ -2087,7 +2087,7 @@ genSwitch config expr targets
         return code
   | otherwise
   = do
-        (reg,e_code) <- getSomeReg (cmmOffset platform expr offset)
+        (reg,e_code) <- getSomeReg indexExpr
         let fmt = archWordFormat $ target32Bit platform
             sha = if target32Bit platform then 2 else 3
         tmp <- getNewRegNat fmt
@@ -2101,6 +2101,12 @@ genSwitch config expr targets
                     ]
         return code
   where
+    indexExpr = cmmOffset platform exprWidened offset
+    -- We widen to a native-width register to santize the high bits
+    exprWidened = CmmMachOp
+      (MO_UU_Conv (cmmExprWidth platform expr)
+                  (platformWordWidth platform))
+      [expr]
     (offset, ids) = switchTargetsToTable targets
     platform      = ncgPlatform config
 
