@@ -781,6 +781,15 @@ cvtPragmaD (InlineP nm inline rm phases)
                                  , inl_sat    = Nothing }
        ; returnJustLA $ Hs.SigD noExtField $ InlineSig noAnn nm' ip }
 
+cvtPragmaD (OpaqueP nm)
+  = do { nm' <- vNameN nm
+       ; let ip = InlinePragma { inl_src    = SourceText "{-# OPAQUE"
+                               , inl_inline = Opaque
+                               , inl_rule   = Hs.FunLike
+                               , inl_act    = NeverActive
+                               , inl_sat    = Nothing }
+       ; returnJustLA $ Hs.SigD noExtField $ InlineSig noAnn nm' ip }
+
 cvtPragmaD (SpecialiseP nm ty inline phases)
   = do { nm' <- vNameN nm
        ; ty' <- cvtSigType ty
