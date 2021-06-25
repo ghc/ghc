@@ -15,7 +15,7 @@ Haskell 2010 and Haskell 98 define floating literals with the syntax
 
 The language extension :extension:`NumDecimals` allows you to also use the
 scientific notation and floating point literal syntax for instances of
-``Integral``, and have values like ``(1.2e6 :: Num a => a)`` and ``5e10 :: Num a => a``
+``Num``, and have values like ``(1.2e6 :: Num a => a)`` and ``5e10 :: Num a => a``
 . This applies only to literals that really turn out to have integral
 values. For example ``1.23e1 :: Fractional a => a`` since ``1.23e1 == 12.3``,
 however ``1.23e2 :: Num a => a`` as ``1.23e2 == 123``.
