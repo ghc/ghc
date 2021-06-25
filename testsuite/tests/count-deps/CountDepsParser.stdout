@@ -1,12 +1,4 @@
-<<<<<<< HEAD
-<<<<<<< HEAD
-Found 275 GHC.Parser module dependencies
-=======
-Found 274 GHC.Parser module dependencies
->>>>>>> ce23bb7af3... Driver Rework Pt2
-=======
-Found 275 GHC.Parser module dependencies
->>>>>>> 63f9745d1b... update two tests
+Found 277 GHC.Parser module dependencies
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
 GHC.Builtin.Types

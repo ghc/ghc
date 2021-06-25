@@ -1,12 +1,4 @@
-<<<<<<< HEAD
-<<<<<<< HEAD
-Found 269 Language.Haskell.Syntax module dependencies
-=======
-Found 268 Language.Haskell.Syntax module dependencies
->>>>>>> ce23bb7af3... Driver Rework Pt2
-=======
-Found 269 Language.Haskell.Syntax module dependencies
->>>>>>> 63f9745d1b... update two tests
+Found 271 Language.Haskell.Syntax module dependencies
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
 GHC.Builtin.Types
