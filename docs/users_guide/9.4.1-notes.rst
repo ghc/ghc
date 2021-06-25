@@ -3,6 +3,13 @@
 Version 9.4.1
 ==============
 
+Compiler
+~~~~~~~~
+
+- A new pragma, :pragma:`OPAQUE`, that ensures that every call of a named function
+  annotated with an :pragma:`OPAQUE` pragma remains a call of that named function,
+  not some name-mangled variant.
+
 ``base`` library
 ~~~~~~~~~~~~~~~~
 
