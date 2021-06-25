@@ -1,0 +1,9 @@
+OrdErr.hs:12:14: error:
+    • Cannot satisfy: a <= a + 1
+    • In the expression: proxyInEq
+      In an equation for ‘proxyInEq1’: proxyInEq1 = proxyInEq
+
+OrdErr.hs:16:14: error:
+    • Cannot satisfy: 5 <= 3
+    • In the expression: proxyInEq
+      In an equation for ‘proxyInEq2’: proxyInEq2 = proxyInEq
