@@ -544,14 +544,17 @@ Wrinkles
    Notice that the stable unfolding moves to the worker!  Now demand analysis
    will work fine on $wf, whereas it has trouble with the original f.
    c.f. Note [Worker/wrapper for INLINABLE functions] in GHC.Core.Opt.WorkWrap.
+   This point also applies to strong loopbreakers with INLINE pragmas, see
+   wrinkle (4).
 
-4. We should /not/ do cast w/w for INLINE functions (hence isInlineUnfolding in
-   tryCastWorkerWrapper) becuase they'll be inlined, cast and all anyway. And
-   if we do cast w/w for an INLINE function with arity zero, we get something
-   really silly: we inline that "worker" right back into the wrapper! Worse than
-   a no-op, because we haev then lost the stable unfolding.
+4. We should /not/ do cast w/w for non-loop-breaker INLINE functions (hence
+   hasInlineUnfolding in tryCastWorkerWrapper, which responds False to
+   loop-breakers) because they'll definitely be inlined anyway, cast and
+   all. And if we do cast w/w for an INLINE function with arity zero, we get
+   something really silly: we inline that "worker" right back into the wrapper!
+   Worse than a no-op, because we have then lost the stable unfolding.
 
-Both these wrinkles are exactly like worker/wrapper for strictness analysis:
+All these wrinkles are exactly like worker/wrapper for strictness analysis:
   f is the wrapper and must inline like crazy
   $wf is the worker and must carry f's original pragma
 See Note [Worker/wrapper for INLINABLE functions]
@@ -600,10 +603,10 @@ tryCastWorkerWrapper env top_lvl old_bndr occ_info bndr (Cast rhs co)
   | not (isJoinId bndr) -- Not for join points
   , not (isDFunId bndr) -- nor DFuns; cast w/w is no help, and we can't transform
                         --            a DFunUnfolding in mk_worker_unfolding
-  , not (exprIsTrivial rhs)      -- Not x = y |> co; Wrinkle 1
-  , not (isInlineUnfolding unf)  -- Not INLINE things: Wrinkle 4
-  , not (isUnliftedType rhs_ty)  -- Not if rhs has an unlifted type;
-                                 --     see Note [Cast w/w: unlifted]
+  , not (exprIsTrivial rhs)        -- Not x = y |> co; Wrinkle 1
+  , not (hasInlineUnfolding info)  -- Not INLINE things: Wrinkle 4
+  , not (isUnliftedType rhs_ty)    -- Not if rhs has an unlifted type;
+                                   --     see Note [Cast w/w: unlifted]
   = do  { (rhs_floats, work_rhs) <- prepareRhs mode top_lvl occ_fs rhs
         ; uniq <- getUniqueM
         ; let work_name = mkSystemVarName uniq occ_fs
@@ -637,7 +640,6 @@ tryCastWorkerWrapper env top_lvl old_bndr occ_info bndr (Cast rhs co)
     occ_fs = getOccFS bndr
     rhs_ty = coercionLKind co
     info   = idInfo bndr
-    unf    = unfoldingInfo info
 
     worker_info = vanillaIdInfo `setDmdSigInfo`     dmdSigInfo info
                                 `setCprSigInfo`     cprSigInfo info
@@ -654,8 +656,8 @@ tryCastWorkerWrapper env top_lvl old_bndr occ_info bndr (Cast rhs co)
     -- Non-stable case: use work_rhs
     -- Wrinkle 3 of Note [Cast worker/wrapper]
     mk_worker_unfolding work_id work_rhs
-      = case unf of
-           CoreUnfolding { uf_tmpl = unf_rhs, uf_src = src }
+      = case realUnfoldingInfo info of -- NB: the real one, even for loop-breakers
+           unf@(CoreUnfolding { uf_tmpl = unf_rhs, uf_src = src })
              | isStableSource src -> return (unf { uf_tmpl = mkCast unf_rhs (mkSymCo co) })
            _ -> mkLetUnfolding (sm_uf_opts mode) top_lvl InlineRhs work_id work_rhs
 
@@ -895,7 +897,7 @@ completeBind env top_lvl mb_cont old_bndr new_bndr new_rhs
  | otherwise
  = assert (isId new_bndr) $
    do { let old_info = idInfo old_bndr
-            old_unf  = unfoldingInfo old_info
+            old_unf  = realUnfoldingInfo old_info
             occ_info = occInfo old_info
             mode     = getMode env
 
