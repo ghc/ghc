@@ -42,6 +42,7 @@ import GHC.Prelude
 import GHC.Driver.Session
 
 import GHC.Core
+import GHC.Types.Literal ( isLitRubbish )
 import GHC.Core.Opt.Simplify.Env
 import GHC.Core.Opt.Monad        ( SimplMode(..), Tick(..) )
 import qualified GHC.Core.Subst
@@ -819,7 +820,9 @@ interestingArg env e = go env 0 e
            DoneEx e _           -> go (zapSubstEnv env)             n e
            ContEx tvs cvs ids e -> go (setSubstEnv env tvs cvs ids) n e
 
-    go _   _ (Lit {})          = ValueArg
+    go _   _ (Lit l)
+       | isLitRubbish l        = TrivArg -- Leads to unproductive inlining in WWRec, #20035
+       | otherwise             = ValueArg
     go _   _ (Type _)          = TrivArg
     go _   _ (Coercion _)      = TrivArg
     go env n (App fn (Type _)) = go env n fn
