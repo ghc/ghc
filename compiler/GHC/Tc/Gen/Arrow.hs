@@ -19,6 +19,7 @@ import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcCheckMonoExpr, tcInferRho, tcSyntaxOp
 
 import GHC.Hs
 import GHC.Hs.Syn.Type
+import GHC.Tc.Errors.Types
 import GHC.Tc.Gen.Match
 import GHC.Tc.Gen.Head( tcCheckId )
 import GHC.Tc.Utils.TcType
@@ -37,6 +38,7 @@ import GHC.Builtin.Types
 import GHC.Types.Var.Set
 import GHC.Builtin.Types.Prim
 import GHC.Types.Basic( Arity )
+import GHC.Types.Error
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -182,7 +184,7 @@ tc_cmd env (HsCmdIf x fun@(SyntaxExprRn {}) pred b1 b2) res_ty -- Rebindable syn
         ; (_, [r_tv]) <- tcInstSkolTyVars [alphaTyVar]
         ; let r_ty = mkTyVarTy r_tv
         ; checkTc (not (r_tv `elemVarSet` tyCoVarsOfType pred_ty))
-                  (text "Predicate type of `ifThenElse' depends on result type")
+                  (TcRnUnknownMessage $ mkPlainError noHints $ text "Predicate type of `ifThenElse' depends on result type")
         ; (pred', fun')
             <- tcSyntaxOp IfOrigin fun (map synKnownType [pred_ty, r_ty, r_ty])
                                        (mkCheckExpType r_ty) $ \ _ _ ->
@@ -336,8 +338,9 @@ tc_cmd env cmd@(HsCmdArrForm x expr f fixity cmd_args) (cmd_stk, res_ty)
 -- This is where expressions that aren't commands get rejected
 
 tc_cmd _ cmd _
-  = failWithTc (vcat [text "The expression", nest 2 (ppr cmd),
-                      text "was found where an arrow command was expected"])
+  = failWithTc (TcRnUnknownMessage $ mkPlainError noHints $
+       vcat [text "The expression", nest 2 (ppr cmd),
+             text "was found where an arrow command was expected"])
 
 -- | Typechecking for case command alternatives. Used for both
 -- 'HsCmdCase' and 'HsCmdLamCase'.
