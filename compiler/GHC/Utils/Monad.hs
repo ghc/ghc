@@ -355,6 +355,25 @@ function might be required. For example in FCode we use:
       where
         FCode m = FCode' $ oneShot (\cgInfoDown -> oneShot (\state ->m cgInfoDown state))
 
+INLINE pragmas and (>>)
+~~~~~~~~~~~~~~~~~~~~~~~
+A nasty gotcha is described in #20008.  In brief, be careful if you get (>>) via
+its default method:
+
+    instance Applicative M where
+      pure a = MkM (\s -> (s, a))
+      (<*>)  = ap
+
+    instance Monad UM where
+      {-# INLINE (>>=) #-}
+      m >>= k  = MkM (\s -> blah)
+
+Here we define (>>), via its default method, in terms of (>>=). If you do this,
+be sure to put an INLINE pragma on (>>=), as above.  That tells it to inline
+(>>=) in the RHS of (>>), even when it is applied to only two arguments, which
+in turn conveys the one-shot info from (>>=) to (>>).  Lacking the INLINE, GHC
+may eta-expand (>>), and with a non-one-shot lambda.  #20008 has more discussion.
+
 Derived instances
 ~~~~~~~~~~~~~~~~~
 One caveat of both approaches is that derived instances don't use the smart
