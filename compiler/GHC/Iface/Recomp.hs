@@ -74,6 +74,7 @@ import Data.Either
 import qualified Data.Semigroup
 import GHC.List (uncons)
 import Data.Ord
+import Data.Containers.ListUtils
 
 {-
   -----------------------------------------------
@@ -461,7 +462,7 @@ checkDependencies hsc_env summary iface
         let (hs, ps) = partitionEithers es
         res1 <- liftIO $ check_mods (sort hs) prev_dep_mods
 
-        let allPkgDeps = sortBy (comparing snd) (ps ++ bkpk_units)
+        let allPkgDeps = sortBy (comparing snd) $ nubOrdOn snd (ps ++ implicit_deps ++ bkpk_units)
         res2 <- liftIO $ check_packages allPkgDeps prev_dep_pkgs
         return (res1 `mappend` res2)
  where
@@ -474,6 +475,8 @@ checkDependencies hsc_env summary iface
    prev_dep_pkgs = sort (dep_direct_pkgs (mi_deps iface))
    bkpk_units    = map (("Signature",) . indefUnit . instUnitInstanceOf . moduleUnit) (requirementMerges units (moduleName (mi_module iface)))
 
+
+   implicit_deps = map ("Implicit",) (implicitPackageDeps dflags)
 
 
    classify _ (Found _ mod)
