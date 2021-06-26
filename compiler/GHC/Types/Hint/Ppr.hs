@@ -67,6 +67,10 @@ instance Outputable GhcHint where
               , whenPprDebug (ppr bad_rule) ]
     SuggestIncreaseSimplifierIterations
       -> text "Set limit with -fconstraint-solver-iterations=n; n=0 for no limit"
+    SuggestAddToHSigExportList (Just _)
+      -> text "Try adding it to the export list in that hsig file."
+    SuggestAddToHSigExportList Nothing
+      -> text "Try adding it to the export list of the hsig file."
 
 perhapsAsPat :: SDoc
 perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"

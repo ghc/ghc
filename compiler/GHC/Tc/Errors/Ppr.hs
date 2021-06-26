@@ -14,6 +14,7 @@ import GHC.Core.Type
 import GHC.Tc.Errors.Types
 import GHC.Types.Error
 import GHC.Types.Name.Reader (pprNameProvenance)
+import GHC.Types.Name.Occurrence (occName)
 import GHC.Types.Var.Env (emptyTidyEnv)
 import GHC.Driver.Flags
 import GHC.Hs
@@ -92,6 +93,14 @@ instance Diagnostic TcRnMessage where
       -> mkSimpleDecorated $
            vcat [ text "Illegal `..' notation for constructor" <+> quotes (ppr con)
                 , nest 2 (text "The constructor has no labelled fields") ]
+    TcRnIdNotExportedFromSig name mod
+      -> mkDecorated [ text "The identifier" <+> ppr (occName name) <+>
+                       text "does not exist in the signature for" <+> ppr mod
+                     ]
+    TcRnIdNotExportedFromLocalSig name
+      -> mkDecorated [ text "The identifier" <+> ppr (occName name) <+>
+                       text "does not exist in the local signature."
+                     ]
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -114,6 +123,10 @@ instance Diagnostic TcRnMessage where
     TcRnUnsafeDueToPlugin{}
       -> WarningWithoutFlag
     TcRnModMissingRealSrcSpan{}
+      -> WarningWithoutFlag
+    TcRnIdNotExportedFromSig{}
+      -> ErrorWithoutFlag
+    TcRnIdNotExportedFromLocalSig{}
       -> ErrorWithoutFlag
     TcRnShadowedName{}
       -> WarningWithFlag Opt_WarnNameShadowing
@@ -182,6 +195,10 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnIllegalWildcardsInConstructor{}
       -> noHints
+    TcRnIdNotExportedFromSig _ mod
+      -> [SuggestAddToHSigExportList $ Just mod]
+    TcRnIdNotExportedFromLocalSig{}
+      -> [SuggestAddToHSigExportList Nothing]
 
 messageWithInfoDiagnosticMessage :: UnitState
                                  -> ErrInfo
