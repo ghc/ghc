@@ -13,6 +13,7 @@ import GHC.Core.TyCo.Ppr (pprWithTYPE)
 import GHC.Core.Type
 import GHC.Tc.Errors.Types
 import GHC.Types.Error
+import GHC.Types.Name.Occurrence (occName)
 import GHC.Types.Var.Env (emptyTidyEnv)
 import GHC.Driver.Flags
 import GHC.Hs
@@ -49,6 +50,14 @@ instance Diagnostic TcRnMessage where
       -> mkDecorated [text "Use of plugins makes the module unsafe"]
     TcRnModMissingRealSrcSpan mod
       -> mkDecorated [text "Module does not have a RealSrcSpan:" <+> ppr mod]
+    TcRnIdNotExportedFromSig name mod
+      -> mkDecorated [ text "The identifier" <+> ppr (occName name) <+>
+                       text "does not exist in the signature for" <+> ppr mod
+                     ]
+    TcRnIdNotExportedFromLocalSig name
+      -> mkDecorated [ text "The identifier" <+> ppr (occName name) <+>
+                       text "does not exist in the local signature."
+                     ]
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -71,6 +80,10 @@ instance Diagnostic TcRnMessage where
     TcRnUnsafeDueToPlugin{}
       -> WarningWithoutFlag
     TcRnModMissingRealSrcSpan{}
+      -> WarningWithoutFlag
+    TcRnIdNotExportedFromSig{}
+      -> ErrorWithoutFlag
+    TcRnIdNotExportedFromLocalSig{}
       -> ErrorWithoutFlag
 
   diagnosticHints = \case
@@ -95,6 +108,10 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnModMissingRealSrcSpan{}
       -> noHints
+    TcRnIdNotExportedFromSig _ mod
+      -> [SuggestAddToHSigExportList $ Just mod]
+    TcRnIdNotExportedFromLocalSig{}
+      -> [SuggestAddToHSigExportList Nothing]
 
 messageWithInfoDiagnosticMessage :: UnitState
                                  -> ErrInfo
