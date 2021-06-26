@@ -5,6 +5,7 @@ module GHC.Types.Hint (
   InstantiationSuggestion(..)
   ) where
 
+import GHC.Prelude
 import GHC.Utils.Outputable
 import qualified GHC.LanguageExtensions as LangExt
 import Data.Typeable
@@ -115,6 +116,9 @@ data GhcHint
   | SuggestAddInlineOrNoInlinePragma !Var !Activation
 
   | SuggestAddPhaseToCompetingRule !RuleName
+    {-| Suggests adding an identifier to the export list of a signature.
+    -}
+  | SuggestAddToHSigExportList !(Maybe Module)
 
     {-| Suggests increasing the limit for the number of iterations in the simplifier.
 
