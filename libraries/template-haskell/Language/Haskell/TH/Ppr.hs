@@ -361,6 +361,9 @@ ppr_dec _ (SigD f t)    = pprPrefixOcc f <+> dcolon <+> ppr t
 ppr_dec _ (KiSigD f k)  = text "type" <+> pprPrefixOcc f <+> dcolon <+> ppr k
 ppr_dec _ (ForeignD f)  = ppr f
 ppr_dec _ (InfixD fx n) = pprFixity n fx
+ppr_dec _ (DefaultD cls tys) =
+        text "default" <+> maybe empty ppr cls
+                       <+> parens (sep $ punctuate comma $ map ppr tys)
 ppr_dec _ (PragmaD p)   = ppr p
 ppr_dec isTop (DataFamilyD tc tvs kind)
   = text "data" <+> maybeFamily <+> ppr tc <+> hsep (map ppr tvs) <+> maybeKind
