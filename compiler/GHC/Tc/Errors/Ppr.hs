@@ -17,6 +17,7 @@ import GHC.Types.Error
 import GHC.Types.Name (pprPrefixName)
 import GHC.Types.Name.Reader (pprNameProvenance)
 import GHC.Types.SrcLoc (GenLocated(..))
+import GHC.Types.Name.Occurrence (occName)
 import GHC.Types.Var.Env (emptyTidyEnv)
 import GHC.Driver.Flags
 import GHC.Hs
@@ -55,6 +56,14 @@ instance Diagnostic TcRnMessage where
       -> mkDecorated [text "Use of plugins makes the module unsafe"]
     TcRnModMissingRealSrcSpan mod
       -> mkDecorated [text "Module does not have a RealSrcSpan:" <+> ppr mod]
+    TcRnIdNotExportedFromModuleSig name mod
+      -> mkDecorated [ text "The identifier" <+> ppr (occName name) <+>
+                       text "does not exist in the signature for" <+> ppr mod
+                     ]
+    TcRnIdNotExportedFromLocalSig name
+      -> mkDecorated [ text "The identifier" <+> ppr (occName name) <+>
+                       text "does not exist in the local signature."
+                     ]
     TcRnShadowedName occ provenance
       -> let shadowed_locs = case provenance of
                ShadowedNameProvenanceLocal n     -> [text "bound at" <+> ppr n]
@@ -183,6 +192,10 @@ instance Diagnostic TcRnMessage where
       -> WarningWithoutFlag
     TcRnModMissingRealSrcSpan{}
       -> ErrorWithoutFlag
+    TcRnIdNotExportedFromModuleSig{}
+      -> ErrorWithoutFlag
+    TcRnIdNotExportedFromLocalSig{}
+      -> ErrorWithoutFlag
     TcRnShadowedName{}
       -> WarningWithFlag Opt_WarnNameShadowing
     TcRnDuplicateWarningDecls{}
@@ -258,6 +271,10 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnModMissingRealSrcSpan{}
       -> noHints
+    TcRnIdNotExportedFromModuleSig name mod
+      -> [SuggestAddToHSigExportList name $ Just mod]
+    TcRnIdNotExportedFromLocalSig name
+      -> [SuggestAddToHSigExportList name Nothing]
     TcRnShadowedName{}
       -> noHints
     TcRnDuplicateWarningDecls{}

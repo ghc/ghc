@@ -7,4 +7,4 @@
 
 <no location info>: error:
     The identifier T does not exist in the signature for <A>
-    (Try adding it to the export list in that hsig file.)
+    Suggested fix: Try adding it to the export list of A's hsig file.
