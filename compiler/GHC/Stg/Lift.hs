@@ -24,8 +24,9 @@ import GHC.Stg.FVs ( annBindingFreeVars )
 import GHC.Stg.Lift.Analysis
 import GHC.Stg.Lift.Monad
 import GHC.Stg.Syntax
-import GHC.Utils.Outputable
+import GHC.Unit.Module (Module)
 import GHC.Types.Unique.Supply
+import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Types.Var.Set
 import Control.Monad ( when )
@@ -124,17 +125,17 @@ import Data.Maybe ( isNothing )
 --
 -- (Mostly) textbook instance of the lambda lifting transformation, selecting
 -- which bindings to lambda lift by consulting 'goodToLift'.
-stgLiftLams :: DynFlags -> UniqSupply -> [InStgTopBinding] -> [OutStgTopBinding]
-stgLiftLams dflags us = runLiftM dflags us . foldr liftTopLvl (pure ())
+stgLiftLams :: Module -> DynFlags -> UniqSupply -> [InStgTopBinding] -> [OutStgTopBinding]
+stgLiftLams this_mod dflags us = runLiftM dflags us . foldr (liftTopLvl this_mod) (pure ())
 
-liftTopLvl :: InStgTopBinding -> LiftM () -> LiftM ()
-liftTopLvl (StgTopStringLit bndr lit) rest = withSubstBndr bndr $ \bndr' -> do
+liftTopLvl :: Module -> InStgTopBinding -> LiftM () -> LiftM ()
+liftTopLvl _ (StgTopStringLit bndr lit) rest = withSubstBndr bndr $ \bndr' -> do
   addTopStringLit bndr' lit
   rest
-liftTopLvl (StgTopLifted bind) rest = do
+liftTopLvl this_mod (StgTopLifted bind) rest = do
   let is_rec = isRec $ fst $ decomposeStgBinding bind
   when is_rec startBindingGroup
-  let bind_w_fvs = annBindingFreeVars bind
+  let bind_w_fvs = annBindingFreeVars this_mod bind
   withLiftedBind TopLevel (tagSkeletonTopBind bind_w_fvs) NilSk $ \mb_bind' -> do
     -- We signal lifting of a binding through returning Nothing.
     -- Should never happen for a top-level binding, though, since we are already
