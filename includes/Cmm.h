@@ -809,7 +809,7 @@
                                                                \
     dst_p = dst + SIZEOF_StgMutArrPtrs;                        \
     src_p = src + SIZEOF_StgMutArrPtrs + WDS(offset);          \
-    prim %memcpy(dst_p, src_p, n * SIZEOF_W, SIZEOF_W);        \
+    prim %memcpy(dst_p, src_p, WDS(n), SIZEOF_W);              \
                                                                \
     return (dst);
 
@@ -877,7 +877,7 @@
    array ops. Defined as a macro to avoid function call overhead or
    code duplication. */
 #define cloneSmallArray(info, src, offset, n)                  \
-    W_ words, size;                                            \
+    W_ words;                                                  \
     gcptr dst, dst_p, src_p;                                   \
                                                                \
     again: MAYBE_GC(again);                                    \
@@ -891,7 +891,7 @@
                                                                \
     dst_p = dst + SIZEOF_StgSmallMutArrPtrs;                   \
     src_p = src + SIZEOF_StgSmallMutArrPtrs + WDS(offset);     \
-    prim %memcpy(dst_p, src_p, n * SIZEOF_W, SIZEOF_W);        \
+    prim %memcpy(dst_p, src_p, WDS(n), SIZEOF_W);              \
                                                                \
     return (dst);
 
