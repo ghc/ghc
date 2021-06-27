@@ -16,7 +16,7 @@
                       ReaderT r (ST s) a -> ReaderT r (ST s) b -> ReaderT r (ST s) b))
 "SPEC $c>> @(ST s) _"
     forall (@s) (@r) ($dMonad :: Monad (ST s)).
-      $fMonadReaderT_$c>> @(ST s) @r $dMonad
+      $fMonadReaderT1 @(ST s) @r $dMonad
       = $fMonadAbstractIOSTReaderT_$s$c>> @s @r
 "SPEC $cliftA2 @(ST s) _"
     forall (@s) (@r) ($dApplicative :: Applicative (ST s)).

@@ -626,7 +626,7 @@ substIdInfo subst new_id info
                                `setUnfoldingInfo` substUnfolding subst old_unf)
   where
     old_rules     = ruleInfo info
-    old_unf       = unfoldingInfo info
+    old_unf       = realUnfoldingInfo info
     nothing_to_do = isEmptyRuleInfo old_rules && not (hasCoreUnfolding old_unf)
 
 ------------------

@@ -61,15 +61,15 @@ foo [InlPrag=[2]] :: Int -> Int
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (w [Occ=Once1!] :: Int) ->
-                 case w of { GHC.Types.I# ww [Occ=Once1] ->
+         Tmpl= \ (ds [Occ=Once1!] :: Int) ->
+                 case ds of { GHC.Types.I# ww [Occ=Once1] ->
                  case T3717.$wfoo ww of ww1 [Occ=Once1] { __DEFAULT ->
                  GHC.Types.I# ww1
                  }
                  }}]
 foo
-  = \ (w :: Int) ->
-      case w of { GHC.Types.I# ww ->
+  = \ (ds :: Int) ->
+      case ds of { GHC.Types.I# ww ->
       case T3717.$wfoo ww of ww1 { __DEFAULT -> GHC.Types.I# ww1 }
       }
 
