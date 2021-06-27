@@ -200,7 +200,7 @@ runClang logger dflags args = traceToolCommand logger "clang" $ do
 #else
     (\(err :: SomeException) -> do
 #endif
-        errorMsg loggerid $
+        errorMsg logger $
             text ("Error running clang! you need clang installed to use the" ++
                   " LLVM backend") $+$
             text "(or GHC tried to execute clang incorrectly)"
