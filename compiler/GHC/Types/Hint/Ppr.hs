@@ -61,6 +61,10 @@ instance Outputable GhcHint where
     SuggestAddPhaseToCompetingRule bad_rule
       -> vcat [ text "Add phase [n] or [~n] to the competing rule"
               , whenPprDebug (ppr bad_rule) ]
+    SuggestAddToHSigExportList (Just _)
+      -> text "Try adding it to the export list in that hsig file."
+    SuggestAddToHSigExportList Nothing
+      -> text "Try adding it to the export list of the hsig file."
 
 perhapsAsPat :: SDoc
 perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"
