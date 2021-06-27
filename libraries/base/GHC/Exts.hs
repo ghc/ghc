@@ -40,7 +40,7 @@ module GHC.Exts
         uncheckedShiftL64#, uncheckedShiftRL64#,
         uncheckedIShiftL64#, uncheckedIShiftRA64#,
         isTrue#,
-        Void#,  -- Previously exported by GHC.Prim
+        Void#, reallyUnsafePtrEquality#  -- Both previously exported by GHC.Prim
 
         -- * Compat wrapper
         atomicModifyMutVar#,
@@ -348,3 +348,13 @@ resizeSmallMutableArray# arr0 szNew a s0 =
 -- accessible\" by word.
 considerAccessible :: Bool
 considerAccessible = True
+
+-- | Compare the underlying pointers of two types for equality.
+--
+-- Deprecated in favour of the more general 'reallyUnsafeHetPtrEquality',
+-- which is heterogeneous and levity-polymorphic.
+reallyUnsafePtrEquality# :: a -> a -> Int#
+reallyUnsafePtrEquality# = reallyUnsafeHetPtrEquality#
+{-# DEPRECATED reallyUnsafePtrEquality#
+  "Use reallyUnsafeHetPtrEquality# instead."
+#-}

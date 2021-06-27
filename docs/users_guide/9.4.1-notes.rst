@@ -41,6 +41,20 @@ Version 9.4.1
 
         raise# :: forall (a :: Type) {r :: RuntimeRep} (b :: TYPE r). a -> b
 
+- Added a new primitive ``GHC.Exts.reallyUnsafeHetPtrEquality#`` which is heterogeneous
+  and levity-polymorphic: ::
+
+        reallyUnsafeHetPtrEquality# =
+          :: forall {l1 :: Levity} {l2 :: Levity}
+             (a :: TYPE (BoxedRep l1)) (b :: TYPE (BoxedRep l2))
+          . a -> b -> Int#
+
+   This means that ``GHC.Exts.reallyUnsafeHetPtrEquality#`` can be used on primitive arrays,
+   such as ``GHC.Exts.Array#`` and ``GHC.Exts.ByteArray#``.
+
+- Deprecated ``GHC.Exts.reallyUnsafePtrEquality#`` in favour of
+  ``GHC.Exts.reallyUnsafeHetPtrEquality#``.
+
 ``ghc`` library
 ~~~~~~~~~~~~~~~
 
