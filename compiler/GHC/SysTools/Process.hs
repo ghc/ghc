@@ -63,7 +63,11 @@ readCreateProcessWithExitCode' proc = do
 
     -- fork off a thread to start consuming the output
     outMVar <- newEmptyMVar
+#if __GLASGOW_HASKELL__ >= 903
+    let onError :: SomeExceptionWithLocation -> IO ()
+#else
     let onError :: SomeException -> IO ()
+#endif
         onError exc = putMVar outMVar (Left exc)
     _ <- forkIO $ handle onError $ do
       output <- hGetContents' outh
@@ -281,7 +285,11 @@ builderMainLoop logger filter_fn pgm real_args mb_cwd mb_env = do
             inner hProcess
         case r of
           -- onException
+#if __GLASGOW_HASKELL__ >= 903
+          Left (SomeExceptionWithLocation _ (SomeException e)) -> do
+#else
           Left (SomeException e) -> do
+#endif
             terminateProcess hProcess
             cleanup_handles
             throw e

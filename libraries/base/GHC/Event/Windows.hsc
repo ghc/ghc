@@ -663,7 +663,7 @@ withOverlappedEx mgr fname h async offset startCB completionCB = do
         let cancel e = do
                         nerr <- getLastError
                         debugIO $ "## Exception occurred. Cancelling request... "
-                        debugIO $ show (e :: SomeException) ++ " : " ++ show nerr
+                        debugIO $ show (e :: SomeExceptionWithLocation) ++ " : " ++ show nerr
                         _ <- uninterruptibleMask_ $ FFI.cancelIoEx' h lpol
                         -- we need to wait for the cancellation before removing
                         -- the pointer.
