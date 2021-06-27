@@ -40,7 +40,8 @@ module GHC.Exts
         uncheckedShiftL64#, uncheckedShiftRL64#,
         uncheckedIShiftL64#, uncheckedIShiftRA64#,
         isTrue#,
-        Void#,  -- Previously exported by GHC.Prim
+        Void#, -- Previously exported by GHC.Prim
+        reallyUnsafePtrEquality#, -- Previously exported by GHC.Prim
 
         -- * Compat wrapper
         atomicModifyMutVar#,
@@ -349,3 +350,12 @@ resizeSmallMutableArray# arr0 szNew a s0 =
 -- accessible\" by word.
 considerAccessible :: Bool
 considerAccessible = True
+
+-- | Compare the underlying pointers of two values for equality.
+-- 
+-- Returns @1@ if the pointers are equal and @0@ otherwise.
+--
+-- The two values must be of the same type, of kind `Type`.
+-- See also `reallyUnsafeHetPtrEquality#`, which doesn't have such restrictions.
+reallyUnsafePtrEquality# :: a -> a -> Int#
+reallyUnsafePtrEquality# = reallyUnsafeHetPtrEquality#
