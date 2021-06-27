@@ -2,6 +2,7 @@
 {-# LANGUAGE ConstraintKinds         #-}
 {-# LANGUAGE DataKinds               #-}
 {-# LANGUAGE DeriveDataTypeable      #-}
+{-# LANGUAGE DeriveFunctor           #-}
 {-# LANGUAGE EmptyCase               #-}
 {-# LANGUAGE EmptyDataDeriving       #-}
 {-# LANGUAGE StandaloneDeriving      #-}
@@ -107,6 +108,14 @@ noExtCon x = case x of {}
 type family XRec p a = r | r -> a
 
 type family Anno a = b -- See Note [XRec and Anno in the AST] in GHC.Parser.Annotation
+
+newtype Annotated a e = Annotated
+  { unAnnotate :: e
+  }
+
+deriving instance Functor (Annotated a)
+
+type instance Anno (Annotated a e) = a
 
 {-
 Note [XRec and SrcSpans in the AST]
