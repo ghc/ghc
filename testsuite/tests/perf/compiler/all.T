@@ -211,12 +211,13 @@ test('T12234',
      compile,
      [''])
 
-# T12545 is sensitive to -dunique-increments changes, see #19414.
-# I've seen variations of 3% by playing with that parameter, so that's the
-# current acceptance window.
+# T12545 is sensitive to -dunique-increments changes, see #19414. I've seen
+# variations of as much as 4.8% by playing with that parameter, but I think
+# it's better to check with T12545.measure.sh that lower and upper bounds of
+# allocations indeed haven't changed and then simply accept the metric increase.
 test('T12545',
      [ only_ways(['normal']),
-       collect_compiler_stats('bytes allocated', 3),
+       collect_compiler_stats('bytes allocated', 3), # Don't increase it, run T12545.measure.sh and leave a comment on #19414!
        extra_clean(['T12545a.hi', 'T12545a.o'])
      ],
      multimod_compile,
