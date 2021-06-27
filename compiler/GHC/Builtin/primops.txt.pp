@@ -3057,12 +3057,11 @@ section "Unsafe pointer equality"
 --  (#1 Bad Guy: Alastair Reid :)
 ------------------------------------------------------------------------
 
-primop  ReallyUnsafePtrEqualityOp "reallyUnsafePtrEquality#" GenPrimOp
-   a -> a -> Int#
+primop  ReallyUnsafeHetPtrEqualityOp "reallyUnsafeHetPtrEquality#" GenPrimOp
+   v -> w -> Int#
    { Returns {\texttt 1\#} if the given pointers are equal and {\texttt 0\#} otherwise. }
    with
    can_fail   = True -- See Note [reallyUnsafePtrEquality#]
-
 
 -- Note [reallyUnsafePtrEquality#]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
