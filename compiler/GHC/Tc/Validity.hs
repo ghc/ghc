@@ -1586,6 +1586,7 @@ check_special_inst_head dflags is_boot is_sig ctxt clas cls_args
             InstDeclCtxt stand_alone -> not stand_alone
             SpecInstCtxt             -> False
             DerivClauseCtxt          -> False
+            SigmaCtxt                -> False
             _                        -> True
 
     check_h98_arg_shape = case ctxt of
