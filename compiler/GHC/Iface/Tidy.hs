@@ -792,7 +792,7 @@ addExternal omit_prags expose_all id
   where
     new_needed_ids = bndrFvsInOrder show_unfold id
     idinfo         = idInfo id
-    unfolding      = unfoldingInfo idinfo
+    unfolding      = realUnfoldingInfo idinfo
     show_unfold    = show_unfolding unfolding
     never_active   = isNeverActive (inlinePragmaActivation (inlinePragInfo idinfo))
     loop_breaker   = isStrongLoopBreaker (occInfo idinfo)
@@ -916,7 +916,7 @@ dffvLetBndr :: Bool -> Id -> DFFV ()
 -- For top-level bindings (call from addExternal, via bndrFvsInOrder)
 --       we say "True" if we are exposing that unfolding
 dffvLetBndr vanilla_unfold id
-  = do { go_unf (unfoldingInfo idinfo)
+  = do { go_unf (realUnfoldingInfo idinfo)
        ; mapM_ go_rule (ruleInfoRules (ruleInfo idinfo)) }
   where
     idinfo = idInfo id
@@ -1306,7 +1306,7 @@ tidyTopIdInfo uf_opts rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold
                                   Just (arity, _) -> not (appIsDeadEnd id_sig arity)
 
     --------- Unfolding ------------
-    unf_info = unfoldingInfo idinfo
+    unf_info = realUnfoldingInfo idinfo
     unfold_info
       | isCompulsoryUnfolding unf_info || show_unfold
       = tidyUnfolding rhs_tidy_env unf_info unf_from_rhs
