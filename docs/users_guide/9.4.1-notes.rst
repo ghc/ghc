@@ -41,6 +41,21 @@ Version 9.4.1
 
         raise# :: forall (a :: Type) {r :: RuntimeRep} (b :: TYPE r). a -> b
 
+- Added a new primitive ``GHC.Exts.reallyUnsafeHetPtrEquality#`` for comparing the
+  underlying pointers of two values, which is more general than
+  ``GHC.Exts.reallyUnsafePtrEquality#`` by virtue of being heterogeneous
+  and levity-polymorphic: ::
+
+        reallyUnsafeHetPtrEquality# =
+          :: forall {l1 :: Levity} {l2 :: Levity}
+             (a :: TYPE (BoxedRep l1)) (b :: TYPE (BoxedRep l2))
+          . a -> b -> Int#
+
+   This means that ``GHC.Exts.reallyUnsafeHetPtrEquality#`` can be used
+   on primitive arrays such as ``GHC.Exts.Array#`` and ``GHC.Exts.ByteArray#``.
+   It can also be used on values of different types, without needing to call
+   ``GHC.Exts.unsafeCoerce#``.
+
 ``ghc`` library
 ~~~~~~~~~~~~~~~
 
