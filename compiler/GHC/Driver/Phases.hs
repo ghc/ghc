@@ -1,3 +1,10 @@
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE KindSignatures #-}
 
 
 -----------------------------------------------------------------------------
@@ -13,6 +20,9 @@ module GHC.Driver.Phases (
    happensBefore, eqPhase, anyHsc, isStopLn,
    startPhase,
    phaseInputExt,
+
+   StopPhase(..),
+   stopPhaseToPhase,
 
    isHaskellishSuffix,
    isHaskellSrcSuffix,
@@ -67,6 +77,21 @@ import System.FilePath
    linker                 | other         | -             | a.out
 -}
 
+-- Phases we can actually stop after
+data StopPhase = StopPreprocess -- -E
+               | StopC  -- -C
+               | StopAs -- -S
+               | NoStop -- -c
+
+stopPhaseToPhase :: StopPhase -> Phase
+stopPhaseToPhase StopPreprocess = anyHsc
+stopPhaseToPhase StopC   = HCc
+stopPhaseToPhase StopAs  = As False
+stopPhaseToPhase NoStop   = StopLn
+
+-- Abstract interface to the pipeline monad
+
+
 data Phase
         = Unlit HscSource
         | Cpp   HscSource
@@ -89,6 +114,8 @@ data Phase
         -- There is no runPhase case for it.
         | StopLn        -- Stop, but linking will follow, so generate .o file
   deriving (Eq, Show)
+
+
 
 instance Outputable Phase where
     ppr p = text (show p)
