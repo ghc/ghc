@@ -31,7 +31,7 @@ idleCpuUsage = do
   -- measure the process time spent in the rts, not in the mutator
   -- make sure to disable idle GC (+RTS -I0)
   !startCPUTime <- getCPUTime
-  threadDelay 100000
+  GHC.Event.threadDelay 100000
   !endCPUTime <- getCPUTime
   let !t = endCPUTime - startCPUTime
   return $ t
