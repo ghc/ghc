@@ -39,6 +39,20 @@
   raise# :: forall (a :: Type) {r :: RuntimeRep} (b :: TYPE r). a -> b
   ```
 
+- Added a new primitive `reallyUnsafeHetPtrEquality#` which is heterogeneous
+  and levity-polymorphic:
+  
+  ```
+  reallyUnsafeHetPtrEquality# =
+    :: forall {l1 :: Levity} {l2 :: Levity}
+       (a :: TYPE (BoxedRep l1)) (b :: TYPE (BoxedRep l2))
+    . a -> b -> Int#
+  ```
+
+   This means that `reallyUnsafeHetPtrEquality#` can be used on primitive arrays,
+   such as `Array#` and `ByteArray#`.
+
+- Removed `reallyUnsafePtrEquality#`.
 
 ## 0.8.0 (edit as necessary)
 
