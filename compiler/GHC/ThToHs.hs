@@ -6,6 +6,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ViewPatterns #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
@@ -844,7 +845,7 @@ cvtPragmaD (LineP line file)
        ; return Nothing
        }
 cvtPragmaD (CompleteP cls mty)
-  = do { cls' <- noLoc <$> mapM cNameN cls
+  = do { cls' <- (noLoc . Annotated @SrcSpan) <$> mapM cNameN cls
        ; mty'  <- traverse tconNameN mty
        ; returnJustLA $ Hs.SigD noExtField
                    $ CompleteMatchSig noAnn NoSourceText cls' mty' }
