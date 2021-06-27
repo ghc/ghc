@@ -1,5 +1,6 @@
-{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
+{-# LANGUAGE Trustworthy #-}
 
 -- |
 -- Module      :  Control.Monad.Fail
@@ -38,7 +39,7 @@
 --
 module Control.Monad.Fail ( MonadFail(fail) ) where
 
-import GHC.Base (String, Monad(), Maybe(Nothing), IO(), failIO)
+import GHC.Base (Type, Constraint, String, Monad(), Maybe(Nothing), IO(), failIO)
 
 -- | When a value is bound in @do@-notation, the pattern on the left
 -- hand side of @<-@ might not match. In this case, this class
@@ -62,6 +63,7 @@ import GHC.Base (String, Monad(), Maybe(Nothing), IO(), failIO)
 -- @
 --
 -- @since 4.9.0.0
+type  MonadFail :: (Type -> Type) -> Constraint
 class Monad m => MonadFail m where
     fail :: String -> m a
 

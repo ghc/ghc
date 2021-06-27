@@ -12,7 +12,9 @@
 {-# LANGUAGE PolyKinds                  #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE StandaloneDeriving         #-}
+{-# LANGUAGE StandaloneKindSignatures   #-}
 {-# LANGUAGE Trustworthy                #-}
+{-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeOperators              #-}
 {-# LANGUAGE UndecidableInstances       #-}
@@ -756,7 +758,8 @@ import GHC.TypeLits ( KnownSymbol, KnownNat, Nat, symbolVal, natVal )
 --------------------------------------------------------------------------------
 
 -- | Void: used for datatypes without constructors
-data V1 (p :: k)
+type V1 :: k -> Type
+data V1 p
   deriving ( Eq       -- ^ @since 4.9.0.0
            , Ord      -- ^ @since 4.9.0.0
            , Read     -- ^ @since 4.9.0.0
@@ -771,7 +774,8 @@ instance Semigroup (V1 p) where
   v <> _ = v
 
 -- | Unit: used for constructors without arguments
-data U1 (p :: k) = U1
+type U1 :: k -> Type
+data U1 p = U1
   deriving ( Generic  -- ^ @since 4.7.0.0
            , Generic1 -- ^ @since 4.9.0.0
            )
@@ -850,7 +854,8 @@ deriving instance Monoid p => Monoid (Par1 p)
 
 -- | Recursive calls of kind @* -> *@ (or kind @k -> *@, when @PolyKinds@
 -- is enabled)
-newtype Rec1 (f :: k -> Type) (p :: k) = Rec1 { unRec1 :: f p }
+type    Rec1 :: (k -> Type) -> k -> Type
+newtype Rec1 f p = Rec1 { unRec1 :: f p }
   deriving ( Eq       -- ^ @since 4.7.0.0
            , Ord      -- ^ @since 4.7.0.0
            , Read     -- ^ @since 4.7.0.0
@@ -880,7 +885,8 @@ deriving instance Semigroup (f p) => Semigroup (Rec1 f p)
 deriving instance Monoid (f p) => Monoid (Rec1 f p)
 
 -- | Constants, additional parameters and recursion of kind @*@
-newtype K1 (i :: Type) c (p :: k) = K1 { unK1 :: c }
+type    K1 :: Type -> Type -> k -> Type
+newtype K1 i c p = K1 { unK1 :: c }
   deriving ( Eq       -- ^ @since 4.7.0.0
            , Ord      -- ^ @since 4.7.0.0
            , Read     -- ^ @since 4.7.0.0
@@ -921,7 +927,8 @@ deriving instance Semigroup (f p) => Semigroup (M1 i c f p)
 deriving instance Monoid (f p) => Monoid (M1 i c f p)
 
 -- | Meta-information (constructor names, etc.)
-newtype M1 (i :: Type) (c :: Meta) (f :: k -> Type) (p :: k) =
+type    M1 :: Type -> Meta -> (k -> Type) -> k -> Type
+newtype M1 i c f p =
     M1 { unM1 :: f p }
   deriving ( Eq       -- ^ @since 4.7.0.0
            , Ord      -- ^ @since 4.7.0.0
@@ -934,7 +941,8 @@ newtype M1 (i :: Type) (c :: Meta) (f :: k -> Type) (p :: k) =
 
 -- | Sums: encode choice between constructors
 infixr 5 :+:
-data (:+:) (f :: k -> Type) (g :: k -> Type) (p :: k) = L1 (f p) | R1 (g p)
+type (:+:) :: (k -> Type) -> (k -> Type) -> (k -> Type)
+data (f :+: g) p = L1 (f p) | R1 (g p)
   deriving ( Eq       -- ^ @since 4.7.0.0
            , Ord      -- ^ @since 4.7.0.0
            , Read     -- ^ @since 4.7.0.0
@@ -946,7 +954,8 @@ data (:+:) (f :: k -> Type) (g :: k -> Type) (p :: k) = L1 (f p) | R1 (g p)
 
 -- | Products: encode multiple arguments to constructors
 infixr 6 :*:
-data (:*:) (f :: k -> Type) (g :: k -> Type) (p :: k) = f p :*: g p
+type (:*:) :: (k -> Type) -> (k -> Type) -> (k -> Type)
+data (f :*: g) p = f p :*: g p
   deriving ( Eq       -- ^ @since 4.7.0.0
            , Ord      -- ^ @since 4.7.0.0
            , Read     -- ^ @since 4.7.0.0
@@ -987,7 +996,8 @@ instance (Monoid (f p), Monoid (g p)) => Monoid ((f :*: g) p) where
 
 -- | Composition of functors
 infixr 7 :.:
-newtype (:.:) (f :: k2 -> Type) (g :: k1 -> k2) (p :: k1) =
+type    (:.:) :: (k2 -> Type) -> (k1 -> k2) -> (k1 -> Type)
+newtype (f :.: g) p =
     Comp1 { unComp1 :: f (g p) }
   deriving ( Eq       -- ^ @since 4.7.0.0
            , Ord      -- ^ @since 4.7.0.0
@@ -1019,7 +1029,8 @@ deriving instance Monoid (f (g p)) => Monoid ((f :.: g) p)
 -- | Constants of unlifted kinds
 --
 -- @since 4.9.0.0
-data family URec (a :: Type) (p :: k)
+type URec :: Type -> k -> Type
+data family URec a p
 
 -- | Used for marking occurrences of 'Addr#'
 --
@@ -1093,36 +1104,43 @@ data instance URec Word (p :: k) = UWord { uWord# :: Word# }
 -- | Type synonym for @'URec' 'Addr#'@
 --
 -- @since 4.9.0.0
-type UAddr   = URec (Ptr ())
+type UAddr :: k -> Type
+type UAddr = URec (Ptr ())
 -- | Type synonym for @'URec' 'Char#'@
 --
 -- @since 4.9.0.0
-type UChar   = URec Char
+type UChar :: k -> Type
+type UChar = URec Char
 
 -- | Type synonym for @'URec' 'Double#'@
 --
 -- @since 4.9.0.0
+type UDouble :: k -> Type
 type UDouble = URec Double
 
 -- | Type synonym for @'URec' 'Float#'@
 --
 -- @since 4.9.0.0
-type UFloat  = URec Float
+type UFloat :: k -> Type
+type UFloat = URec Float
 
 -- | Type synonym for @'URec' 'Int#'@
 --
 -- @since 4.9.0.0
-type UInt    = URec Int
+type UInt :: k -> Type
+type UInt = URec Int
 
 -- | Type synonym for @'URec' 'Word#'@
 --
 -- @since 4.9.0.0
-type UWord   = URec Word
+type UWord :: k -> Type
+type UWord = URec Word
 
 -- | Tag for K1: recursion (of kind @Type@)
 data R
 
 -- | Type synonym for encoding recursion (of kind @Type@)
+type Rec0 :: Type -> k -> Type
 type Rec0  = K1 R
 
 -- | Tag for M1: datatype
@@ -1133,15 +1151,19 @@ data C
 data S
 
 -- | Type synonym for encoding meta-information for datatypes
+type D1 :: Meta -> (k -> Type) -> k -> Type
 type D1 = M1 D
 
 -- | Type synonym for encoding meta-information for constructors
+type C1 :: Meta -> (k -> Type) -> k -> Type
 type C1 = M1 C
 
 -- | Type synonym for encoding meta-information for record selectors
+type S1 :: Meta -> (k -> Type) -> k -> Type
 type S1 = M1 S
 
 -- | Class for datatypes that represent datatypes
+type  Datatype :: forall {k}. k -> Constraint
 class Datatype d where
   -- | The name of the datatype (unqualified)
   datatypeName :: t d (f :: k -> Type) (a :: k) -> [Char]
@@ -1166,6 +1188,7 @@ instance (KnownSymbol n, KnownSymbol m, KnownSymbol p, SingI nt)
   isNewtype    _ = fromSing  (sing  :: Sing nt)
 
 -- | Class for datatypes that represent data constructors
+type  Constructor :: forall {k}. k -> Constraint
 class Constructor c where
   -- | The name of the constructor
   conName :: t c (f :: k -> Type) (a :: k) -> [Char]
@@ -1305,6 +1328,7 @@ data DecidedStrictness = DecidedLazy
            )
 
 -- | Class for datatypes that represent records
+type  Selector :: forall {k}. k -> Constraint
 class Selector s where
   -- | The name of the selector
   selName :: t s (f :: k -> Type) (a :: k) -> [Char]
@@ -1357,6 +1381,7 @@ class Generic a where
 -- 'from1' . 'to1' ≡ 'Prelude.id'
 -- 'to1' . 'from1' ≡ 'Prelude.id'
 -- @
+type  Generic1 :: (k -> Type) -> Constraint
 class Generic1 (f :: k -> Type) where
   -- | Generic representation type
   type Rep1 f :: k -> Type
@@ -1543,10 +1568,12 @@ deriving instance Generic1 Down
 --------------------------------------------------------------------------------
 
 -- | The singleton kind-indexed data family.
-data family Sing (a :: k)
+type Sing :: k -> Type
+data family Sing a
 
 -- | A 'SingI' constraint is essentially an implicitly-passed singleton.
-class SingI (a :: k) where
+type  SingI :: k -> Constraint
+class SingI a where
   -- | Produce the singleton explicitly. You will likely need the @ScopedTypeVariables@
   -- extension to use this method the way you want.
   sing :: Sing a
@@ -1560,10 +1587,10 @@ class SingKind k where
   type DemoteRep k :: Type
 
   -- | Convert a singleton to its unrefined version.
-  fromSing :: Sing (a :: k) -> DemoteRep k
+  fromSing :: Sing @k a -> DemoteRep k
 
 -- Singleton symbols
-data instance Sing (s :: Symbol) where
+data instance Sing @Symbol s where
   SSym :: KnownSymbol s => Sing s
 
 -- | @since 4.9.0.0
@@ -1575,7 +1602,7 @@ instance SingKind Symbol where
   fromSing (SSym :: Sing s) = symbolVal (Proxy :: Proxy s)
 
 -- Singleton booleans
-data instance Sing (a :: Bool) where
+data instance Sing @Bool bool where
   STrue  :: Sing 'True
   SFalse :: Sing 'False
 
@@ -1592,7 +1619,7 @@ instance SingKind Bool where
   fromSing SFalse = False
 
 -- Singleton Maybe
-data instance Sing (b :: Maybe a) where
+data instance Sing @(Maybe a) maybe where
   SNothing :: Sing 'Nothing
   SJust    :: Sing a -> Sing ('Just a)
 
@@ -1609,7 +1636,7 @@ instance SingKind a => SingKind (Maybe a) where
   fromSing (SJust a) = Just (fromSing a)
 
 -- Singleton Fixity
-data instance Sing (a :: FixityI) where
+data instance Sing @FixityI a where
   SPrefix :: Sing 'PrefixI
   SInfix  :: Sing a -> Integer -> Sing ('InfixI a n)
 
@@ -1627,7 +1654,7 @@ instance SingKind FixityI where
   fromSing (SInfix a n) = Infix (fromSing a) (integerToInt n)
 
 -- Singleton Associativity
-data instance Sing (a :: Associativity) where
+data instance Sing @Associativity a where
   SLeftAssociative  :: Sing 'LeftAssociative
   SRightAssociative :: Sing 'RightAssociative
   SNotAssociative   :: Sing 'NotAssociative
@@ -1649,7 +1676,7 @@ instance SingKind Associativity where
   fromSing SNotAssociative   = NotAssociative
 
 -- Singleton SourceUnpackedness
-data instance Sing (a :: SourceUnpackedness) where
+data instance Sing @SourceUnpackedness a where
   SNoSourceUnpackedness :: Sing 'NoSourceUnpackedness
   SSourceNoUnpack       :: Sing 'SourceNoUnpack
   SSourceUnpack         :: Sing 'SourceUnpack
@@ -1671,7 +1698,7 @@ instance SingKind SourceUnpackedness where
   fromSing SSourceUnpack         = SourceUnpack
 
 -- Singleton SourceStrictness
-data instance Sing (a :: SourceStrictness) where
+data instance Sing @SourceStrictness a where
   SNoSourceStrictness :: Sing 'NoSourceStrictness
   SSourceLazy         :: Sing 'SourceLazy
   SSourceStrict       :: Sing 'SourceStrict
@@ -1693,7 +1720,7 @@ instance SingKind SourceStrictness where
   fromSing SSourceStrict       = SourceStrict
 
 -- Singleton DecidedStrictness
-data instance Sing (a :: DecidedStrictness) where
+data instance Sing @DecidedStrictness a where
   SDecidedLazy   :: Sing 'DecidedLazy
   SDecidedStrict :: Sing 'DecidedStrict
   SDecidedUnpack :: Sing 'DecidedUnpack

@@ -1,9 +1,10 @@
-{-# LANGUAGE ConstraintKinds   #-}
-{-# LANGUAGE ImplicitParams    #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE PolyKinds         #-}
-{-# LANGUAGE RankNTypes        #-}
-{-# LANGUAGE Trustworthy       #-}
+{-# LANGUAGE ConstraintKinds          #-}
+{-# LANGUAGE ImplicitParams           #-}
+{-# LANGUAGE NoImplicitPrelude        #-}
+{-# LANGUAGE PolyKinds                #-}
+{-# LANGUAGE RankNTypes               #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
+{-# LANGUAGE Trustworthy              #-}
 
 {-# OPTIONS_HADDOCK not-home #-}
 -- we hide this module from haddock to enforce GHC.Stack as the main
@@ -47,7 +48,7 @@ import cycle,
 -}
 
 import GHC.Classes (Eq)
-import GHC.Types (Char, Int)
+import GHC.Types (Char, Int, Constraint)
 
 -- Make implicit dependency known to build system
 import GHC.Tuple ()       -- See Note [Depend on GHC.Tuple] in GHC.Base
@@ -69,6 +70,7 @@ import GHC.Num.Integer () -- See Note [Depend on GHC.Num.Integer] in GHC.Base
 -- future.
 --
 -- @since 4.9.0.0
+type HasCallStack :: Constraint
 type HasCallStack = (?callStack :: CallStack)
 
 -- | 'CallStack's are a lightweight method of obtaining a
