@@ -32,6 +32,7 @@ module GHC.Unit.State (
         improveUnit,
         searchPackageId,
         listVisibleModuleNames,
+        listVisibleModules,
         lookupModuleInAllUnits,
         lookupModuleWithSuggestions,
         lookupPluginModuleWithSuggestions,
@@ -1901,6 +1902,11 @@ lookupModuleWithSuggestions' pkgs mod_map m mb_pn
 listVisibleModuleNames :: UnitState -> [ModuleName]
 listVisibleModuleNames state =
     map fst (filter visible (Map.toList (moduleNameProvidersMap state)))
+  where visible (_, ms) = any originVisible (Map.elems ms)
+
+listVisibleModules :: UnitState -> [Module]
+listVisibleModules state =
+    concatMap (Map.keys . snd) (filter visible (Map.toList (moduleNameProvidersMap state)))
   where visible (_, ms) = any originVisible (Map.elems ms)
 
 -- | Takes a list of UnitIds (and their "parent" dependency, used for error
