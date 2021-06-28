@@ -1,8 +1,8 @@
 
 qdofail002.hs:8:11:
     Illegal qualified ‘P.do’ block
-    Perhaps you intended to use QualifiedDo
+    Suggested fix: Perhaps you intended to use QualifiedDo
 
 qdofail002.hs:11:13:
     Illegal qualified ‘P.mdo’ block
-    Perhaps you intended to use QualifiedDo
+    Suggested fix: Perhaps you intended to use QualifiedDo
