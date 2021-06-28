@@ -854,7 +854,8 @@ ppTyVar "c" = "gammaTyVarSpec"
 ppTyVar "s" = "deltaTyVarSpec"
 ppTyVar "o" = "runtimeRep1TyVarInf, openAlphaTyVarSpec"
 ppTyVar "p" = "runtimeRep2TyVarInf, openBetaTyVarSpec"
-ppTyVar "v" = "levity1TyVarInf, levPolyTyVar1Spec"
+ppTyVar "v" = "levity1TyVarInf, levPolyAlphaTyVarSpec"
+ppTyVar "w" = "levity2TyVarInf, levPolyBetaTyVarSpec"
 ppTyVar _   = error "Unknown type var"
 
 ppType :: Ty -> String
@@ -889,7 +890,8 @@ ppType (TyVar "c")                      = "gammaTy"
 ppType (TyVar "s")                      = "deltaTy"
 ppType (TyVar "o")                      = "openAlphaTy"
 ppType (TyVar "p")                      = "openBetaTy"
-ppType (TyVar "v")                      = "levPolyTy1"
+ppType (TyVar "v")                      = "levPolyAlphaTy"
+ppType (TyVar "w")                      = "levPolyBetaTy"
 
 ppType (TyApp (TyCon "State#") [x])             = "mkStatePrimTy " ++ ppType x
 ppType (TyApp (TyCon "MutVar#") [x,y])          = "mkMutVarPrimTy " ++ ppType x

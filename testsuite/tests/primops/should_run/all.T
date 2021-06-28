@@ -38,3 +38,6 @@ test('T14664', normal, compile_and_run, [''])
 test('CStringLength', normal, compile_and_run, ['-O2'])
 test('NonNativeSwitch', normal, compile_and_run, ['-O2'])
 test('Sized', normal, compile_and_run, [''])
+
+test('LevPolyHetPtrEquality1', normal, compile_and_run, [''])
+test('LevPolyHetPtrEquality2', normal, compile_and_run, [''])
