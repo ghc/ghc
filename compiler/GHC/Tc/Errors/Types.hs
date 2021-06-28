@@ -3,6 +3,7 @@
 module GHC.Tc.Errors.Types (
   -- * Main types
     TcRnMessage(..)
+  , TcRnMessageDetailed(..)
   , ErrInfo(..)
   , LevityCheckProvenance(..)
   ) where
@@ -15,10 +16,61 @@ import GHC.Unit.Types (Module)
 import GHC.Utils.Outputable
 import Data.Typeable
 import GHC.Core.Type (Type, Var)
+import GHC.Unit.State (UnitState)
+
+{-
+Note [Migrating TcM Messages]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+As part of #18516, we are slowly migrating the diagnostic messages emitted
+and reported in the TcM from SDoc to TcRnMessage. Historically, GHC emitted
+some diagnostics in 3 pieces, i.e. there were lots of error-reporting functions
+that accepted 3 SDocs an input: one for the important part of the message,
+one for the context and one for any supplementary information. Consider the following:
+
+    • Couldn't match expected type ‘Int’ with actual type ‘Char’
+    • In the expression: x4
+      In a stmt of a 'do' block: return (x2, x4)
+      In the expression:
+
+Under the hood, the reporting functions in Tc.Utils.Monad were emitting "Couldn't match"
+as the important part, "In the expression" as the context and "In a stmt..In the expression"
+as the supplementary, with the context and supplementary usually smashed together so that
+the final message would be composed only by two SDoc (which would then be bulletted like in
+the example).
+
+In order for us to smooth out the migration to the new diagnostic infrastructure, we
+introduce the 'ErrInfo' and 'TcRnMessageDetailed' types, which serve exactly the purpose
+of bridging the two worlds together without breaking the external API or the existing
+format of messages reported by GHC.
+
+Using 'ErrInfo' and 'TcRnMessageDetailed' also allows us to move away from the SDoc-ridden
+diagnostic API inside Tc.Utils.Monad, enabling further refactorings.
+
+In the future, once the conversion will be complete and we will successfully eradicate
+any use of SDoc in the diagnostic reporting of GHC, we can surely revisit the usage and
+existence of these two types, which for now remain a "necessary evil".
+
+-}
+
 
 -- The majority of TcRn messages come with extra context about the error,
--- and this newtype captures it.
-newtype ErrInfo = ErrInfo { getErrInfo :: SDoc }
+-- and this newtype captures it. See Note [Migrating TcM messages].
+data ErrInfo = ErrInfo {
+    errInfoContext :: !SDoc
+    -- ^ Extra context associated to the error.
+  , errInfoSupplementary :: !SDoc
+    -- ^ Extra supplementary info associated to the error.
+  }
+
+
+-- | 'TcRnMessageDetailed' is an \"internal\" type (used only inside
+-- 'GHC.Tc.Utils.Monad' that wraps a 'TcRnMessage' while also providing
+-- any extra info needed to correctly pretty-print this diagnostic later on.
+data TcRnMessageDetailed
+  = TcRnMessageDetailed !ErrInfo
+                        -- ^ Extra info associated with the message
+                        !TcRnMessage
 
 -- | An error which might arise during typechecking/renaming.
 data TcRnMessage where
@@ -27,13 +79,24 @@ data TcRnMessage where
   -}
   TcRnUnknownMessage :: (Diagnostic a, Typeable a) => a -> TcRnMessage
 
+  {-| TcRnMessageWithInfo is a constructor which is used when extra information is needed
+      to be provided in order to qualify a diagnostic and where it was originated (and why).
+      It carries an extra 'UnitState' which can be used to pretty-print some names
+      and it wraps a 'TcRnMessageDetailed', which includes any extra context associated
+      with this diagnostic.
+  -}
+  TcRnMessageWithInfo :: !UnitState
+                      -- ^ The 'UnitState' will allow us to pretty-print
+                      -- some diagnostics with more detail.
+                      -> !TcRnMessageDetailed
+                      -> TcRnMessage
+
   {-| A levity polymorphism check happening during TcRn.
   -}
   TcLevityPolyInType :: !Type
                      -> !LevityCheckProvenance
                      -> !ErrInfo -- Extra info accumulated in the TcM monad
                      -> TcRnMessage
-
 
   {-| TcRnImplicitLift is a warning (controlled with -Wimplicit-lift) that occurs when
       a Template Haskell quote implicitly uses 'lift'.
