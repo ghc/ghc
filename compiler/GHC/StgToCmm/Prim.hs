@@ -340,7 +340,7 @@ emitPrimOp dflags primop = case primop of
   StableNameToIntOp -> \[arg] -> opIntoRegs $ \[res] ->
     emitAssign (CmmLocal res) (cmmLoadIndexW platform arg (fixedHdrSizeW profile) (bWord platform))
 
-  ReallyUnsafePtrEqualityOp -> \[arg1, arg2] -> opIntoRegs $ \[res] ->
+  ReallyUnsafeHetPtrEqualityOp -> \[arg1, arg2] -> opIntoRegs $ \[res] ->
     emitAssign (CmmLocal res) (CmmMachOp (mo_wordEq platform) [arg1,arg2])
 
 --  #define addrToHValuezh(r,a) r=(P_)a
