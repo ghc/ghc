@@ -42,7 +42,7 @@ type Triv k cls color
 --      There used to be more fields, but they were turfed out in a previous revision.
 --      maybe we'll want more later..
 --
-data Graph k cls color
+newtype Graph k cls color
         = Graph {
         -- | All active nodes in the graph.
           graphMap              :: UniqFM k (Node k cls color)  }
