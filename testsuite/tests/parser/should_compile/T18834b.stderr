@@ -2,14 +2,14 @@
 T18834b.hs:5:10: warning: [-Woperator-whitespace]
     The suffix use of a ‘+’ might be repurposed as special syntax
       by a future language extension.
-    Suggested fix: add whitespace around it.
+    Suggested fix: Add whitespace around ‘+’.
 
 T18834b.hs:6:11: warning: [-Woperator-whitespace]
     The prefix use of a ‘+’ might be repurposed as special syntax
       by a future language extension.
-    Suggested fix: add whitespace around it.
+    Suggested fix: Add whitespace around ‘+’.
 
 T18834b.hs:7:10: warning: [-Woperator-whitespace]
     The tight infix use of a ‘+’ might be repurposed as special syntax
       by a future language extension.
-    Suggested fix: add whitespace around it.
+    Suggested fix: Add whitespace around ‘+’.
