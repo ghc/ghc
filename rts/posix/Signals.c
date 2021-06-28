@@ -544,6 +544,8 @@ backtrace_handler(int sig STG_UNUSED)
     libdwPrintBacktrace(session, stderr, bt);
     backtraceFree(bt);
     libdwFree(session);
+#elif defined(PROFILING)
+    atomic_inc(&backtrace_request, 1);
 #else
     fprintf(stderr, "This build does not support backtraces.\n");
 #endif
