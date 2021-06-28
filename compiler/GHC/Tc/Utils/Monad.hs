@@ -173,8 +173,8 @@ import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
 
 import GHC.Driver.Env
-import GHC.Driver.Ppr
 import GHC.Driver.Session
+import GHC.Driver.Config.Diagnostic
 
 import GHC.Runtime.Context
 
@@ -599,11 +599,11 @@ getEpsAndHpt = do { env <- getTopEnv; eps <- liftIO $ hscEPS env
 
 -- | A convenient wrapper for taking a @MaybeErr SDoc a@ and throwing
 -- an exception if it is an error.
-withException :: MonadIO m => DynFlags -> m (MaybeErr SDoc a) -> m a
-withException dflags do_this = do
+withException :: MonadIO m => SDocContext -> m (MaybeErr SDoc a) -> m a
+withException ctx do_this = do
     r <- do_this
     case r of
-        Failed err -> liftIO $ throwGhcExceptionIO (ProgramError (showSDoc dflags err))
+        Failed err -> liftIO $ throwGhcExceptionIO (ProgramError (renderWithContext ctx err))
         Succeeded result -> return result
 
 {-
@@ -1056,11 +1056,11 @@ mkTcRnMessage :: DiagnosticReason
 mkTcRnMessage reason loc important context extra
   = do { printer <- getPrintUnqualified ;
          unit_state <- hsc_units <$> getTopEnv ;
-         dflags <- getDynFlags ;
+         !diag_opts <- initDiagOpts <$> getDynFlags ;
          let errDocs  = map (pprWithUnitState unit_state)
                             [important, context, extra]
          in
-         return $ mkMsgEnvelope dflags loc printer
+         return $ mkMsgEnvelope diag_opts loc printer
                 $ TcRnUnknownMessage
                 $ mkDecoratedDiagnostic reason noHints errDocs }
 
@@ -1558,18 +1558,18 @@ addDetailedDiagnostic :: (ErrInfo -> TcRnMessage) -> TcM ()
 addDetailedDiagnostic mkMsg = do
   loc <- getSrcSpanM
   printer <- getPrintUnqualified
-  dflags  <- getDynFlags
+  !diag_opts  <- initDiagOpts <$> getDynFlags
   env0 <- tcInitTidyEnv
   ctxt <- getErrCtxt
   err_info <- mkErrInfo env0 ctxt
-  reportDiagnostic (mkMsgEnvelope dflags loc printer (mkMsg (ErrInfo err_info)))
+  reportDiagnostic (mkMsgEnvelope diag_opts loc printer (mkMsg (ErrInfo err_info)))
 
 addTcRnDiagnostic :: TcRnMessage -> TcM ()
 addTcRnDiagnostic msg = do
   loc <- getSrcSpanM
   printer <- getPrintUnqualified
-  dflags  <- getDynFlags
-  reportDiagnostic (mkMsgEnvelope dflags loc printer msg)
+  !diag_opts  <- initDiagOpts <$> getDynFlags
+  reportDiagnostic (mkMsgEnvelope diag_opts loc printer msg)
 
 -- | Display a diagnostic for a given source location.
 addDiagnosticAt :: DiagnosticReason -> SrcSpan -> SDoc -> TcRn ()
@@ -1586,8 +1586,8 @@ add_diagnostic reason msg extra_info
 add_diagnostic_at :: DiagnosticReason -> SrcSpan -> SDoc -> SDoc -> TcRn ()
 add_diagnostic_at reason loc msg extra_info
   = do { printer <- getPrintUnqualified ;
-         dflags  <- getDynFlags ;
-         let { dia = mkMsgEnvelope dflags loc printer $
+         !diag_opts  <- initDiagOpts <$> getDynFlags ;
+         let { dia = mkMsgEnvelope diag_opts loc printer $
                      TcRnUnknownMessage $
                      mkDecoratedDiagnostic reason noHints [msg, extra_info] } ;
          reportDiagnostic dia }
