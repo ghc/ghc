@@ -646,11 +646,13 @@ mapAccumL :: (acc -> x -> (acc, y)) -- Function of elt of input list
           -> acc            -- Initial accumulator
           -> [x]            -- Input list
           -> (acc, [y])     -- Final accumulator and result list
-{-# NOINLINE [1] mapAccumL #-}
-mapAccumL _ s []        =  (s, [])
-mapAccumL f s (x:xs)    =  (s'',y:ys)
-                           where (s', y ) = f s x
-                                 (s'',ys) = mapAccumL f s' xs
+{-# INLINE [1] mapAccumL #-}
+mapAccumL f = map_accum_l
+  where
+    map_accum_l s []     = (s, [])
+    map_accum_l s (x:xs) = (s'',y:ys)
+                               where (s', y ) = f s x
+                                     (s'',ys) = map_accum_l s' xs
 
 {-# RULES
 "mapAccumL" [~1] forall f s xs . mapAccumL f s xs = foldr (mapAccumLF f) pairWithNil xs s
@@ -680,10 +682,13 @@ mapAccumR :: (acc -> x -> (acc, y))     -- Function of elt of input list
             -> acc              -- Initial accumulator
             -> [x]              -- Input list
             -> (acc, [y])               -- Final accumulator and result list
-mapAccumR _ s []        =  (s, [])
-mapAccumR f s (x:xs)    =  (s'', y:ys)
-                           where (s'',y ) = f s' x
-                                 (s', ys) = mapAccumR f s xs
+{-# INLINE mapAccumR #-}
+mapAccumR f = map_accum_r
+  where
+    map_accum_r s []     =  (s, [])
+    map_accum_r s (x:xs) =  (s'', y:ys)
+                               where (s'',y ) = f s' x
+                                     (s', ys) = map_accum_r s xs
 
 -- | \(\mathcal{O}(n)\). The 'insert' function takes an element and a list and
 -- inserts the element into the list at the first position where it is less than
