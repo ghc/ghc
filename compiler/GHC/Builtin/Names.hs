@@ -517,7 +517,7 @@ genericTyConNames = [
     k1TyConName, m1TyConName, sumTyConName, prodTyConName,
     compTyConName, rTyConName, dTyConName,
     cTyConName, sTyConName, rec0TyConName,
-    d1TyConName, c1TyConName, s1TyConName, noSelTyConName,
+    d1TyConName, c1TyConName, s1TyConName,
     repTyConName, rep1TyConName, uRecTyConName,
     uAddrTyConName, uCharTyConName, uDoubleTyConName,
     uFloatTyConName, uIntTyConName, uWordTyConName,
@@ -550,16 +550,16 @@ gHC_PRIM, gHC_PRIM_PANIC, gHC_PRIM_EXCEPTION,
     gHC_GHCI, gHC_GHCI_HELPERS, gHC_CSTRING,
     gHC_SHOW, gHC_READ, gHC_NUM, gHC_MAYBE,
     gHC_NUM_INTEGER, gHC_NUM_NATURAL, gHC_NUM_BIGNAT,
-    gHC_LIST, gHC_TUPLE, dATA_TUPLE, dATA_EITHER, dATA_LIST, dATA_STRING,
+    gHC_LIST, gHC_TUPLE, dATA_EITHER, dATA_LIST, dATA_STRING,
     dATA_FOLDABLE, dATA_TRAVERSABLE,
     gHC_CONC, gHC_IO, gHC_IO_Exception,
     gHC_ST, gHC_IX, gHC_STABLE, gHC_PTR, gHC_ERR, gHC_REAL,
     gHC_FLOAT, gHC_TOP_HANDLER, sYSTEM_IO, dYNAMIC,
     tYPEABLE, tYPEABLE_INTERNAL, gENERICS,
     rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, mONAD_ZIP, mONAD_FAIL,
-    aRROW, cONTROL_APPLICATIVE, gHC_DESUGAR, rANDOM, gHC_EXTS,
+    aRROW, gHC_DESUGAR, rANDOM, gHC_EXTS,
     cONTROL_EXCEPTION_BASE, gHC_TYPELITS, gHC_TYPELITS_INTERNAL,
-    gHC_TYPENATS, gHC_TYPENATS_INTERNAL, dATA_TYPE_EQUALITY,
+    gHC_TYPENATS, gHC_TYPENATS_INTERNAL,
     dATA_COERCE, dEBUG_TRACE, uNSAFE_COERCE :: Module
 
 gHC_PRIM        = mkPrimModule (fsLit "GHC.Prim")   -- Primitive types and values
@@ -585,7 +585,6 @@ gHC_NUM_NATURAL = mkBignumModule (fsLit "GHC.Num.Natural")
 gHC_NUM_BIGNAT  = mkBignumModule (fsLit "GHC.Num.BigNat")
 gHC_LIST        = mkBaseModule (fsLit "GHC.List")
 gHC_TUPLE       = mkPrimModule (fsLit "GHC.Tuple")
-dATA_TUPLE      = mkBaseModule (fsLit "Data.Tuple")
 dATA_EITHER     = mkBaseModule (fsLit "Data.Either")
 dATA_LIST       = mkBaseModule (fsLit "Data.List")
 dATA_STRING     = mkBaseModule (fsLit "Data.String")
@@ -616,7 +615,6 @@ mONAD_FIX       = mkBaseModule (fsLit "Control.Monad.Fix")
 mONAD_ZIP       = mkBaseModule (fsLit "Control.Monad.Zip")
 mONAD_FAIL      = mkBaseModule (fsLit "Control.Monad.Fail")
 aRROW           = mkBaseModule (fsLit "Control.Arrow")
-cONTROL_APPLICATIVE = mkBaseModule (fsLit "Control.Applicative")
 gHC_DESUGAR = mkBaseModule (fsLit "GHC.Desugar")
 rANDOM          = mkBaseModule (fsLit "System.Random")
 gHC_EXTS        = mkBaseModule (fsLit "GHC.Exts")
@@ -626,7 +624,6 @@ gHC_TYPELITS    = mkBaseModule (fsLit "GHC.TypeLits")
 gHC_TYPELITS_INTERNAL = mkBaseModule (fsLit "GHC.TypeLits.Internal")
 gHC_TYPENATS    = mkBaseModule (fsLit "GHC.TypeNats")
 gHC_TYPENATS_INTERNAL = mkBaseModule (fsLit "GHC.TypeNats.Internal")
-dATA_TYPE_EQUALITY = mkBaseModule (fsLit "Data.Type.Equality")
 dATA_COERCE     = mkBaseModule (fsLit "Data.Coerce")
 dEBUG_TRACE     = mkBaseModule (fsLit "Debug.Trace")
 uNSAFE_COERCE   = mkBaseModule (fsLit "Unsafe.Coerce")
@@ -663,10 +660,6 @@ mkInteractiveModule n = mkModule interactiveUnit (mkModuleName ("Ghci" ++ show n
 pRELUDE_NAME, mAIN_NAME :: ModuleName
 pRELUDE_NAME   = mkModuleNameFS (fsLit "Prelude")
 mAIN_NAME      = mkModuleNameFS (fsLit "Main")
-
-dATA_ARRAY_PARALLEL_NAME, dATA_ARRAY_PARALLEL_PRIM_NAME :: ModuleName
-dATA_ARRAY_PARALLEL_NAME      = mkModuleNameFS (fsLit "Data.Array.Parallel")
-dATA_ARRAY_PARALLEL_PRIM_NAME = mkModuleNameFS (fsLit "Data.Array.Parallel.Prim")
 
 mkPrimModule :: FastString -> Module
 mkPrimModule m = mkModule primUnit (mkModuleNameFS m)
@@ -984,7 +977,7 @@ v1TyConName, u1TyConName, par1TyConName, rec1TyConName,
   k1TyConName, m1TyConName, sumTyConName, prodTyConName,
   compTyConName, rTyConName, dTyConName,
   cTyConName, sTyConName, rec0TyConName,
-  d1TyConName, c1TyConName, s1TyConName, noSelTyConName,
+  d1TyConName, c1TyConName, s1TyConName,
   repTyConName, rep1TyConName, uRecTyConName,
   uAddrTyConName, uCharTyConName, uDoubleTyConName,
   uFloatTyConName, uIntTyConName, uWordTyConName,
@@ -1016,7 +1009,6 @@ rec0TyConName  = tcQual gHC_GENERICS (fsLit "Rec0") rec0TyConKey
 d1TyConName  = tcQual gHC_GENERICS (fsLit "D1") d1TyConKey
 c1TyConName  = tcQual gHC_GENERICS (fsLit "C1") c1TyConKey
 s1TyConName  = tcQual gHC_GENERICS (fsLit "S1") s1TyConKey
-noSelTyConName = tcQual gHC_GENERICS (fsLit "NoSelector") noSelTyConKey
 
 repTyConName  = tcQual gHC_GENERICS (fsLit "Rep")  repTyConKey
 rep1TyConName = tcQual gHC_GENERICS (fsLit "Rep1") rep1TyConKey
@@ -1889,7 +1881,7 @@ statePrimTyConKey, stableNamePrimTyConKey, stableNameTyConKey,
     wordPrimTyConKey, wordTyConKey, word8PrimTyConKey, word8TyConKey,
     word16PrimTyConKey, word16TyConKey, word32PrimTyConKey, word32TyConKey,
     word64PrimTyConKey, word64TyConKey,
-    anyBoxConKey, kindConKey, boxityConKey,
+    kindConKey, boxityConKey,
     typeConKey, threadIdPrimTyConKey, bcoPrimTyConKey, ptrTyConKey,
     funPtrTyConKey, tVarPrimTyConKey, eqPrimTyConKey,
     eqReprPrimTyConKey, eqPhantPrimTyConKey,
@@ -1912,7 +1904,6 @@ word32PrimTyConKey                      = mkPreludeTyConUnique 65
 word32TyConKey                          = mkPreludeTyConUnique 66
 word64PrimTyConKey                      = mkPreludeTyConUnique 67
 word64TyConKey                          = mkPreludeTyConUnique 68
-anyBoxConKey                            = mkPreludeTyConUnique 71
 kindConKey                              = mkPreludeTyConUnique 72
 boxityConKey                            = mkPreludeTyConUnique 73
 typeConKey                              = mkPreludeTyConUnique 74
@@ -1951,7 +1942,7 @@ v1TyConKey, u1TyConKey, par1TyConKey, rec1TyConKey,
   k1TyConKey, m1TyConKey, sumTyConKey, prodTyConKey,
   compTyConKey, rTyConKey, dTyConKey,
   cTyConKey, sTyConKey, rec0TyConKey,
-  d1TyConKey, c1TyConKey, s1TyConKey, noSelTyConKey,
+  d1TyConKey, c1TyConKey, s1TyConKey,
   repTyConKey, rep1TyConKey, uRecTyConKey,
   uAddrTyConKey, uCharTyConKey, uDoubleTyConKey,
   uFloatTyConKey, uIntTyConKey, uWordTyConKey :: Unique
@@ -1976,7 +1967,6 @@ rec0TyConKey  = mkPreludeTyConUnique 149
 d1TyConKey    = mkPreludeTyConUnique 151
 c1TyConKey    = mkPreludeTyConUnique 152
 s1TyConKey    = mkPreludeTyConUnique 153
-noSelTyConKey = mkPreludeTyConUnique 154
 
 repTyConKey  = mkPreludeTyConUnique 155
 rep1TyConKey = mkPreludeTyConUnique 156
@@ -2277,7 +2267,7 @@ naturalNBDataConKey       = mkPreludeDataConUnique 124
 -}
 
 wildCardKey, absentErrorIdKey, augmentIdKey, appendIdKey,
-    buildIdKey, errorIdKey, foldrIdKey, recSelErrorIdKey,
+    buildIdKey, foldrIdKey, recSelErrorIdKey,
     seqIdKey, eqStringIdKey,
     noMethodBindingErrorIdKey, nonExhaustiveGuardsErrorIdKey,
     runtimeErrorIdKey, patErrorIdKey, voidPrimIdKey,
@@ -2295,7 +2285,6 @@ absentErrorIdKey              = mkPreludeMiscIdUnique  1
 augmentIdKey                  = mkPreludeMiscIdUnique  2
 appendIdKey                   = mkPreludeMiscIdUnique  3
 buildIdKey                    = mkPreludeMiscIdUnique  4
-errorIdKey                    = mkPreludeMiscIdUnique  5
 foldrIdKey                    = mkPreludeMiscIdUnique  6
 recSelErrorIdKey              = mkPreludeMiscIdUnique  7
 seqIdKey                      = mkPreludeMiscIdUnique  8
