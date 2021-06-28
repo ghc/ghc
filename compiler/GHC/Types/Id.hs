@@ -734,7 +734,7 @@ idUnfoldingChecked cur_mod ignore id =
                 && not (isDataConWorkId id) -- Evald unfolding info but nothing concrete
                 && not (isClassOpId id) -- newtype class-op id have unfoldings
                 && not (isFCallId id) -- These ones don't have an unfolding anyway
-                && if isLocalId id /= nameIsLocalOrFrom cur_mod (idName id)
+                && if (isLocalId id /= nameIsLocalOrFrom cur_mod (idName id)) && not (isInteractiveModule cur_mod)
                     then pprPanic "unf" (ppr (idDetails id) $$ ppr id $$ ppr (isCompulsoryUnfolding unf) $$ ppr (isLocalId id) $$ ppr (nameIsLocalOrFrom cur_mod (idName id)) $$ ppr (isExternalName (idName id)) $$ ppr (nameModule_maybe (idName id)))
                     else not (nameIsLocalOrFrom cur_mod (idName id))
           then NoUnfolding
