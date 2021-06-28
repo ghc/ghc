@@ -434,6 +434,10 @@ workerStart(Task *task)
         setThreadNode(numa_map[task->node]);
     }
 
+    // populate thread local libdw session for this worker thread,
+    // so signal handlers on this thread can have it without allocation
+    libdwThreadSession(true);
+
     // set the thread-local pointer to the Task:
     setMyTask(task);
 
