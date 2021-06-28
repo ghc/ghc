@@ -13,7 +13,8 @@ import qualified Data.ByteString as BS
 import GHC.Platform
 import GHC.Types.SourceText
 import GHC.Driver.Session
-import GHC.Utils.Error     ( mkPlainMsgEnvelope, pprLocMsgEnvelope )
+import GHC.Driver.Config.Diagnostic
+import GHC.Utils.Error     ( pprLocMsgEnvelope )
 import GHC.Data.FastString ( mkFastString )
 import GHC.Parser.Errors.Ppr ()
 import qualified GHC.Types.Error as E
@@ -51,9 +52,8 @@ parse dflags fpath bs = case unP (go False []) initState of
     buf = stringBufferFromByteString bs
     start = mkRealSrcLoc (mkFastString fpath) 1 1
     arch_os = platformArchOS (targetPlatform dflags)
-    pflags = mkParserOpts   (warningFlags dflags)
-                            (extensionFlags dflags)
-                            (mkPlainMsgEnvelope dflags)
+    pflags = mkParserOpts   (extensionFlags dflags)
+                            (initDiagOpts dflags)
                             (supportedLanguagesAndExtensions arch_os)
                             (safeImportsOn dflags)
                             False -- lex Haddocks as comment tokens

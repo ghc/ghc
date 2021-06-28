@@ -31,7 +31,6 @@ import GHC
 import GHC.Driver.Ppr
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
-import GHC.Parser.Annotation (IsUnicodeSyntax(..))
 import GHC.Unit.State
 
 import Data.Char
