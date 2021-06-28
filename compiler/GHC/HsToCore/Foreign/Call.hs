@@ -228,7 +228,7 @@ boxResult result_ty
                 = case res of
                      (Just ty,_)
                        | isUnboxedTupleType ty
-                       -> let Just ls = tyConAppArgs_maybe ty in tail ls
+                       -> pprPanic "unboxed" (ppr ty)
                      _ -> []
 
               return_result state anss
