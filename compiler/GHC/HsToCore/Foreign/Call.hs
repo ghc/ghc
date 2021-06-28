@@ -236,6 +236,7 @@ boxResult result_ty
                     (realWorldStatePrimTy : io_res_ty : extra_result_tys)
                     (state : anss)
 
+        ; pprPanic "extra result" (ppr res)
         ; (ccall_res_ty, the_alt) <- mk_alt return_result res
 
         ; state_id <- newSysLocalDs Many realWorldStatePrimTy
