@@ -2285,7 +2285,7 @@ wildCardKey, absentErrorIdKey, augmentIdKey, appendIdKey,
     unpackCStringUtf8IdKey, unpackCStringAppendIdKey,
     unpackCStringFoldrIdKey, unpackCStringFoldrUtf8IdKey,
     unpackCStringIdKey,
-    typeErrorIdKey, divIntIdKey, modIntIdKey,
+    typeErrorIdKey, repPolyErrorIdKey, divIntIdKey, modIntIdKey,
     absentSumFieldErrorIdKey, cstringLengthIdKey,
     raiseOverflowIdKey, raiseUnderflowIdKey, raiseDivZeroIdKey
     :: Unique
@@ -2315,12 +2315,13 @@ unpackCStringIdKey            = mkPreludeMiscIdUnique 20
 unpackCStringFoldrUtf8IdKey   = mkPreludeMiscIdUnique 21
 voidPrimIdKey                 = mkPreludeMiscIdUnique 22
 typeErrorIdKey                = mkPreludeMiscIdUnique 23
-divIntIdKey                   = mkPreludeMiscIdUnique 24
-modIntIdKey                   = mkPreludeMiscIdUnique 25
-cstringLengthIdKey            = mkPreludeMiscIdUnique 26
-raiseOverflowIdKey            = mkPreludeMiscIdUnique 27
-raiseUnderflowIdKey           = mkPreludeMiscIdUnique 28
-raiseDivZeroIdKey             = mkPreludeMiscIdUnique 29
+repPolyErrorIdKey             = mkPreludeMiscIdUnique 24
+divIntIdKey                   = mkPreludeMiscIdUnique 25
+modIntIdKey                   = mkPreludeMiscIdUnique 26
+cstringLengthIdKey            = mkPreludeMiscIdUnique 27
+raiseOverflowIdKey            = mkPreludeMiscIdUnique 28
+raiseUnderflowIdKey           = mkPreludeMiscIdUnique 29
+raiseDivZeroIdKey             = mkPreludeMiscIdUnique 30
 
 concatIdKey, filterIdKey, zipIdKey,
     bindIOIdKey, returnIOIdKey, newStablePtrIdKey,
