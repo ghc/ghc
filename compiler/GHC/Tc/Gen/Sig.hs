@@ -31,6 +31,8 @@ import GHC.Driver.Backend
 
 import GHC.Hs
 
+
+import GHC.Tc.Errors.Types ( TcRnMessage(..), LevityCheckProvenance(..) )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Types
 import GHC.Tc.Solver( pushLevelAndSolveEqualitiesX, reportUnsolvedEqualities )
@@ -44,12 +46,12 @@ import GHC.Tc.Utils.Unify( tcSkolemise, unifyType )
 import GHC.Tc.Utils.Instantiate( topInstantiate, tcInstTypeBndrs )
 import GHC.Tc.Utils.Env( tcLookupId )
 import GHC.Tc.Types.Evidence( HsWrapper, (<.>) )
-import GHC.Tc.Errors.Types ( LevityCheckProvenance(..) )
 
 import GHC.Core( hasSomeUnfolding )
 import GHC.Core.Type ( mkTyVarBinders )
 import GHC.Core.Multiplicity
 
+import GHC.Types.Error
 import GHC.Types.Var ( TyVar, Specificity(..), tyVarKind, binderVars )
 import GHC.Types.Id  ( Id, idName, idType, setInlinePragma
                      , mkLocalId, realIdUnfolding )
@@ -621,10 +623,12 @@ addInlinePrags poly_id prags_for_me
          warn_multiple_inlines inl2 inls
        | otherwise
        = setSrcSpanA loc $
-         addDiagnosticTc WarningWithoutFlag
-                         (hang (text "Multiple INLINE pragmas for" <+> ppr poly_id)
-                           2 (vcat (text "Ignoring all but the first"
-                                    : map pp_inl (inl1:inl2:inls))))
+         let dia = TcRnUnknownMessage $
+               mkPlainDiagnostic WarningWithoutFlag noHints $
+                 (hang (text "Multiple INLINE pragmas for" <+> ppr poly_id)
+                   2 (vcat (text "Ignoring all but the first"
+                            : map pp_inl (inl1:inl2:inls))))
+         in addDiagnosticTc dia
 
     pp_inl (L loc prag) = ppr prag <+> parens (ppr loc)
 
@@ -754,9 +758,11 @@ tcSpecPrags poly_id prag_sigs
     is_bad_sig s = not (isSpecLSig s || isInlineLSig s || isSCCFunSig s)
 
     warn_discarded_sigs
-      = addDiagnosticTc WarningWithoutFlag
-                        (hang (text "Discarding unexpected pragmas for" <+> ppr poly_id)
-                            2 (vcat (map (ppr . getLoc) bad_sigs)))
+      = let dia = TcRnUnknownMessage $
+              mkPlainDiagnostic WarningWithoutFlag noHints $
+                (hang (text "Discarding unexpected pragmas for" <+> ppr poly_id)
+                    2 (vcat (map (ppr . getLoc) bad_sigs)))
+        in addDiagnosticTc dia
 
 --------------
 tcSpecPrag :: TcId -> Sig GhcRn -> TcM [TcSpecPrag]
@@ -769,10 +775,11 @@ tcSpecPrag poly_id prag@(SpecSig _ fun_name hs_tys inl)
 -- However we want to use fun_name in the error message, since that is
 -- what the user wrote (#8537)
   = addErrCtxt (spec_ctxt prag) $
-    do  { warnIf (not (isOverloadedTy poly_ty || isInlinePragma inl))
-                 (text "SPECIALISE pragma for non-overloaded function"
-                  <+> quotes (ppr fun_name))
-                  -- Note [SPECIALISE pragmas]
+    do  { warnIf (not (isOverloadedTy poly_ty || isInlinePragma inl)) $
+                 TcRnUnknownMessage $ mkPlainDiagnostic WarningWithoutFlag noHints
+                   (text "SPECIALISE pragma for non-overloaded function"
+                    <+> quotes (ppr fun_name))
+                    -- Note [SPECIALISE pragmas]
         ; spec_prags <- mapM tc_one hs_tys
         ; traceTc "tcSpecPrag" (ppr poly_id $$ nest 2 (vcat (map ppr spec_prags)))
         ; return spec_prags }
@@ -837,7 +844,9 @@ tcImpSpec (name, prag)
       ; if hasSomeUnfolding (realIdUnfolding id)
            -- See Note [SPECIALISE pragmas for imported Ids]
         then tcSpecPrag id prag
-        else do { addDiagnosticTc WarningWithoutFlag (impSpecErr name)
+        else do { let dia = TcRnUnknownMessage $
+                        mkPlainDiagnostic WarningWithoutFlag noHints (impSpecErr name)
+                ; addDiagnosticTc dia
                 ; return [] } }
 
 impSpecErr :: Name -> SDoc
