@@ -239,7 +239,7 @@ compileNonHsObject rs lang path = do
       Cmm -> obj2src "cmm" isGeneratedCmmFile ctx path
       Cxx -> obj2src "cpp" (const False) ctx path
   need [src]
-  needDependencies ctx src (path <.> "d")
+  needDependencies lang ctx src (path <.> "d")
   buildWithResources rs $ target ctx (builder stage) [src] [path]
 
 -- * Helpers
@@ -247,11 +247,11 @@ compileNonHsObject rs lang path = do
 -- | Discover dependencies of a given source file by iteratively calling @gcc@
 -- in the @-MM -MG@ mode and building generated dependencies if they are missing
 -- until reaching a fixed point.
-needDependencies :: Context -> FilePath -> FilePath -> Action ()
-needDependencies context@Context {..} src depFile = discover
+needDependencies :: SourceLang -> Context -> FilePath -> FilePath -> Action ()
+needDependencies lang context@Context {..} src depFile = discover
   where
     discover = do
-        build $ target context (Cc FindCDependencies stage) [src] [depFile]
+        build $ target context (Cc (FindCDependencies depType) stage) [src] [depFile]
         deps <- parseFile depFile
         -- Generated dependencies, if not yet built, will not be found and hence
         -- will be referred to simply by their file names.
@@ -265,6 +265,10 @@ needDependencies context@Context {..} src depFile = discover
         else do
             need todo  -- Build newly discovered generated dependencies
             discover   -- Continue the discovery process
+
+    -- We need to pass different flags to cc depending on whether the
+    -- file to compile is a .c or a .cpp file
+    depType = if lang == Cxx then CxxDep else CDep
 
     parseFile :: FilePath -> Action [String]
     parseFile file = do
