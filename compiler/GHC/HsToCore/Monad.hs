@@ -599,7 +599,7 @@ discardWarningsDs thing_inside
 dsNoLevPoly :: Type -> LevityCheckProvenance -> DsM ()
 -- See Note [Representation polymorphism checking]
 dsNoLevPoly ty provenance =
-  checkForLevPolyX (\ty -> failWithDs . DsLevityPolyInType ty) provenance ty
+  checkForLevPolyX (\ty -> diagnosticDs . DsLevityPolyInType ty) provenance ty
 
 -- | Check an expression for representation polymorphism, failing if it is
 -- representation-polymorphic.
