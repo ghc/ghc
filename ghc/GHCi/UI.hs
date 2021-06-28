@@ -445,7 +445,7 @@ default_stop = ""
 
 default_prompt, default_prompt_cont :: PromptFunction
 default_prompt = generatePromptFunctionFromString "ghci> "
-default_prompt_cont = generatePromptFunctionFromString "| "
+default_prompt_cont = generatePromptFunctionFromString "ghci| "
 
 default_args :: [String]
 default_args = []
