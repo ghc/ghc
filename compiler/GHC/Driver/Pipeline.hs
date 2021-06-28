@@ -90,7 +90,6 @@ import GHC.Iface.Make          ( mkFullIface )
 import GHC.Runtime.Loader      ( initializePlugins )
 
 
-import GHC.Types.Basic       ( SuccessFlag(..) )
 import GHC.Types.Error       ( singleMessage, getMessages )
 import GHC.Types.Name.Env
 import GHC.Types.Target
@@ -120,6 +119,7 @@ import Data.Version
 import Data.Either      ( partitionEithers )
 
 import Data.Time        ( getCurrentTime )
+import GHC.Types.Basic
 
 -- ---------------------------------------------------------------------------
 -- Pre-process
@@ -236,6 +236,7 @@ compileOne' m_tc_result mHscMessage
          HscUpToDate iface old_linkable -> do
            massert ( isJust old_linkable || isNoLink (ghcLink dflags) )
            -- See Note [ModDetails and --make mode]
+           --refresh_iface <- refreshBinary (hsc_NC hsc_env) iface
            details <- initModDetails plugin_hsc_env summary iface
            return $! HomeModInfo iface details old_linkable
          HscRecompNeeded mb_old_hash -> do
@@ -330,6 +331,7 @@ compileOnePostTc hsc_env summary tc_result warnings mb_old_hash = do
         return $ Just linkable
       | otherwise -> return Nothing
   -- See Note [ModDetails and --make mode]
+  --refresh_iface <- refreshBinary (hsc_NC hsc_env) iface
   details <- initModDetails hsc_env summary iface
   return $! HomeModInfo iface details mLinkable
 
