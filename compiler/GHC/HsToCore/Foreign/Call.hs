@@ -224,17 +224,10 @@ boxResult result_ty
         -- another case, and a coercion.)
         -- The result is IO t, so wrap the result in an IO constructor
   = do  { res <- resultWrapper io_res_ty
-        ; let extra_result_tys
-                = case res of
-                     (Just ty,_)
-                       | isUnboxedTupleType ty
-                       -> let Just ls = tyConAppArgs_maybe ty in tail ls
-                     _ -> []
-
-              return_result state anss
+        ; let return_result state anss
                 = mkCoreUbxTup
-                    (realWorldStatePrimTy : io_res_ty : extra_result_tys)
-                    (state : anss)
+                    [realWorldStatePrimTy, io_res_ty]
+                    [state, anss]
 
         ; (ccall_res_ty, the_alt) <- mk_alt return_result res
 
@@ -266,11 +259,10 @@ boxResult result_ty
                                            [the_alt]
        return (realWorldStatePrimTy `mkVisFunTyMany` ccall_res_ty, wrap)
   where
-    return_result _ [ans] = ans
-    return_result _ _     = panic "return_result: expected single result"
+    return_result _ ans = ans
 
 
-mk_alt :: (Expr Var -> [Expr Var] -> Expr Var)
+mk_alt :: (Expr Var -> Expr Var -> Expr Var)
        -> (Maybe Type, Expr Var -> Expr Var)
        -> DsM (Type, CoreAlt)
 mk_alt return_result (Nothing, wrap_result)
@@ -278,7 +270,7 @@ mk_alt return_result (Nothing, wrap_result)
        state_id <- newSysLocalDs Many realWorldStatePrimTy
        let
              the_rhs = return_result (Var state_id)
-                                     [wrap_result (panic "boxResult")]
+                                     (wrap_result (panic "boxResult"))
 
              ccall_res_ty = mkTupleTy Unboxed [realWorldStatePrimTy]
              the_alt      = Alt (DataAlt (tupleDataCon Unboxed 1)) [state_id] the_rhs
@@ -292,7 +284,7 @@ mk_alt return_result (Just prim_res_ty, wrap_result)
     do { result_id <- newSysLocalDs Many prim_res_ty
        ; state_id <- newSysLocalDs Many realWorldStatePrimTy
        ; let the_rhs = return_result (Var state_id)
-                                [wrap_result (Var result_id)]
+                                (wrap_result (Var result_id))
              ccall_res_ty = mkTupleTy Unboxed [realWorldStatePrimTy, prim_res_ty]
              the_alt      = Alt (DataAlt (tupleDataCon Unboxed 2)) [state_id, result_id] the_rhs
        ; return (ccall_res_ty, the_alt) }
