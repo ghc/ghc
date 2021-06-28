@@ -520,9 +520,9 @@ own):
 .. code-block:: none
 
     ghci> :{
-    | g op n [] = n
-    | g op n (h:t) = h `op` g op n t
-    | :}
+    ghci| g op n [] = n
+    ghci| g op n (h:t) = h `op` g op n t
+    ghci| :}
     ghci> g (*) 1 [1..3]
     6
 
@@ -596,8 +596,8 @@ prompt. Note that layout is in effect, so to add more bindings to this
 
     ghci> :set +m
     ghci> let x = 42
-    |     y = 3
-    |
+    ghci|     y = 3
+    ghci|
     ghci>
 
 Explicit braces and semicolons can be used instead of layout:
@@ -605,9 +605,9 @@ Explicit braces and semicolons can be used instead of layout:
 .. code-block:: none
 
     ghci> do {
-    | putStrLn "hello"
-    | ;putStrLn "world"
-    | }
+    ghci| putStrLn "hello"
+    ghci| ;putStrLn "world"
+    ghci| }
     hello
     world
     ghci>
@@ -620,11 +620,11 @@ Multiline mode is useful when entering monadic ``do`` statements:
 .. code-block:: none
 
     ghci> flip evalStateT 0 $ do
-    | i <- get
-    | lift $ do
-    |   putStrLn "Hello World!"
-    |   print i
-    |
+    ghci| i <- get
+    ghci| lift $ do
+    ghci|   putStrLn "Hello World!"
+    ghci|   print i
+    ghci|
     "Hello World!"
     0
     ghci>
@@ -635,8 +635,8 @@ top-level prompt.
 .. code-block:: none
 
     ghci> do
-    | putStrLn "Hello, World!"
-    | ^C
+    ghci| putStrLn "Hello, World!"
+    ghci| ^C
     ghci>
 
 .. _ghci-decls:
