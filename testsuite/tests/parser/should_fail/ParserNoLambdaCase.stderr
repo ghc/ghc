@@ -1,2 +1,3 @@
 ParserNoLambdaCase.hs:3:6:
-    Illegal lambda-case (use LambdaCase)
+    Illegal lambda-case
+    Suggested fix: Perhaps you intended to use LambdaCase

@@ -2,14 +2,14 @@
 T18834a.hs:6:10: warning: [-Woperator-whitespace-ext-conflict (in -Wdefault)]
     The prefix use of a ‘$’ would denote an untyped splice
       were the TemplateHaskell extension enabled.
-    Suggested fix: add whitespace after the ‘$’.
+    Suggested fix: Add whitespace after the ‘$’.
 
 T18834a.hs:7:10: warning: [-Woperator-whitespace-ext-conflict (in -Wdefault)]
     The prefix use of a ‘$$’ would denote a typed splice
       were the TemplateHaskell extension enabled.
-    Suggested fix: add whitespace after the ‘$$’.
+    Suggested fix: Add whitespace after the ‘$$’.
 
 T18834a.hs:8:10: warning: [-Woperator-whitespace-ext-conflict (in -Wdefault)]
     The prefix use of a ‘%’ would denote a multiplicity annotation
       were the LinearTypes extension enabled.
-    Suggested fix: add whitespace after the ‘%’.
+    Suggested fix: Add whitespace after the ‘%’.

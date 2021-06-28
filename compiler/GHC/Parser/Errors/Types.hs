@@ -10,6 +10,7 @@ import GHC.Core.TyCon (Role)
 import GHC.Data.FastString
 import GHC.Hs
 import GHC.Parser.Types
+import GHC.Parser.Errors.Basic
 import GHC.Types.Error
 import GHC.Types.Name.Occurrence (OccName)
 import GHC.Types.Name.Reader
@@ -510,18 +511,6 @@ data CmmParserError
    | CmmUnknownCConv        !String     -- ^ Unknown calling convention
    | CmmUnrecognisedSafety  !String     -- ^ Unrecognised safety
    | CmmUnrecognisedHint    !String     -- ^ Unrecognised hint
-
--- | The operator symbol in the 'PsOperatorWhitespaceExtConflictMessage' diagnostic.
-data OperatorWhitespaceSymbol
-   = OperatorWhitespaceSymbol_PrefixPercent
-   | OperatorWhitespaceSymbol_PrefixDollar
-   | OperatorWhitespaceSymbol_PrefixDollarDollar
-
--- | The operator occurrence type in the 'PsOperatorWhitespaceMessage' diagnostic.
-data OperatorWhitespaceOccurrence
-   = OperatorWhitespaceOccurrence_Prefix
-   | OperatorWhitespaceOccurrence_Suffix
-   | OperatorWhitespaceOccurrence_TightInfix
 
 data TransLayoutReason
    = TransLayout_Where -- ^ "`where' clause at the same depth as implicit layout block"

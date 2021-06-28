@@ -1,6 +1,7 @@
 
 T16270h.hs:8:22: error:
-    Illegal keyword 'type' (use ExplicitNamespaces to enable)
+    Illegal keyword 'type'
+    Suggested fix: Perhaps you intended to use ExplicitNamespaces
 
 T16270h.hs:10:8: error:
     Parse error: ‘pkg?’
