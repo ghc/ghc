@@ -94,7 +94,6 @@ import qualified Data.Set as S
 import System.FilePath  ((</>))
 
 import System.IO
-import GHC.Unit.State
 
 {-
 ************************************************************************
