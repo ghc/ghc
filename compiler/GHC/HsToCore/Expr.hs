@@ -30,6 +30,7 @@ import GHC.HsToCore.Arrows
 import GHC.HsToCore.Monad
 import GHC.HsToCore.Pmc ( addTyCs, pmcGRHSs )
 import GHC.HsToCore.Errors.Types
+import GHC.Hs.Syn.Type ( hsExprType )
 import GHC.Types.SourceText
 import GHC.Types.Name
 import GHC.Types.Name.Env
@@ -302,7 +303,7 @@ dsExpr (HsLamCase _ matches)
 
 dsExpr e@(HsApp _ fun arg)
   = do { fun' <- dsLExpr fun
-       ; dsWhenNoErrs (dsLExprNoLP arg)
+       ; dsWhenNoErrs (hsExprType e) (dsLExprNoLP arg)
                       (\arg' -> mkCoreAppDs (text "HsApp" <+> ppr e) fun' arg') }
 
 dsExpr e@(HsAppType {}) = dsHsWrapped e
@@ -325,7 +326,7 @@ That 'g' in the 'in' part is an evidence variable, and when
 converting to core it must become a CO.
 -}
 
-dsExpr (ExplicitTuple _ tup_args boxity)
+dsExpr e@(ExplicitTuple _ tup_args boxity)
   = do { let go (lam_vars, args) (Missing (Scaled mult ty))
                     -- For every missing expression, we need
                     -- another lambda in the desugaring.
@@ -337,15 +338,16 @@ dsExpr (ExplicitTuple _ tup_args boxity)
                = do { core_expr <- dsLExprNoLP expr
                     ; return (lam_vars, core_expr : args) }
 
-       ; dsWhenNoErrs (foldM go ([], []) (reverse tup_args))
+       ; dsWhenNoErrs (hsExprType e) (foldM go ([], []) (reverse tup_args))
                 -- The reverse is because foldM goes left-to-right
                       (\(lam_vars, args) ->
                         mkCoreLams lam_vars $
                           mkCoreTupBoxity boxity args) }
                         -- See Note [Don't flatten tuples from HsSyn] in GHC.Core.Make
 
-dsExpr (ExplicitSum types alt arity expr)
-  = dsWhenNoErrs (dsLExprNoLP expr) (mkCoreUbxSum arity alt types)
+dsExpr e@(ExplicitSum types alt arity expr)
+  = dsWhenNoErrs (hsExprType e) (dsLExprNoLP expr)
+      (mkCoreUbxSum arity alt types)
 
 dsExpr (HsPragE _ prag expr) =
   ds_prag_expr prag expr
@@ -796,10 +798,11 @@ dsSyntaxExpr (SyntaxExprTc { syn_expr      = expr
        ; core_arg_wraps <- mapM dsHsWrapper arg_wraps
        ; core_res_wrap  <- dsHsWrapper res_wrap
        ; let wrapped_args = zipWithEqual "dsSyntaxExpr" ($) core_arg_wraps arg_exprs
-       ; dsWhenNoErrs (zipWithM_ dsNoLevPolyExpr wrapped_args [ mk_msg n | n <- [1..] ])
-                      (\_ -> core_res_wrap (mkCoreApps fun wrapped_args)) }
-                      -- Use mkCoreApps instead of mkApps:
-                      -- unboxed types are possible with RebindableSyntax (#19883)
+       ; dsWhenNoErrs (hsExprType expr)
+          (zipWithM_ dsNoLevPolyExpr wrapped_args [ mk_msg n | n <- [1..] ])
+          (\_ -> core_res_wrap (mkCoreApps fun wrapped_args)) }
+          -- Use mkCoreApps instead of mkApps:
+          -- unboxed types are possible with RebindableSyntax (#19883)
   where
     mk_msg n = LevityCheckInSyntaxExpr (DsArgNum n) expr
 dsSyntaxExpr NoSyntaxExprTc _ = panic "dsSyntaxExpr"
