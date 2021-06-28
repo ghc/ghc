@@ -521,6 +521,9 @@ structure of @f@. Furthermore @f@ needs to adhere to the following:
 
 Note, that the second law follows from the free theorem of the type 'fmap' and
 the first law, so you need only check that the former condition holds.
+See <https://www.schoolofhaskell.com/user/edwardk/snippets/fmap> or
+<https://github.com/quchen/articles/blob/master/second_functor_law.md>
+for an explanation.
 -}
 
 class Functor f where
