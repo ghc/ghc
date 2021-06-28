@@ -50,7 +50,7 @@ module GHC.Core.Make (
         rEC_CON_ERROR_ID, rUNTIME_ERROR_ID,
         nON_EXHAUSTIVE_GUARDS_ERROR_ID, nO_METHOD_BINDING_ERROR_ID,
         pAT_ERROR_ID, rEC_SEL_ERROR_ID, aBSENT_ERROR_ID,
-        tYPE_ERROR_ID, aBSENT_SUM_FIELD_ERROR_ID
+        tYPE_ERROR_ID, rEP_POLY_ERROR_ID, aBSENT_SUM_FIELD_ERROR_ID
     ) where
 
 import GHC.Prelude
@@ -773,6 +773,7 @@ errorIds
       aBSENT_ERROR_ID,
       aBSENT_SUM_FIELD_ERROR_ID,
       tYPE_ERROR_ID,   -- Used with Opt_DeferTypeErrors, see #10284
+      rEP_POLY_ERROR_ID,
       rAISE_OVERFLOW_ID,
       rAISE_UNDERFLOW_ID,
       rAISE_DIVZERO_ID
@@ -781,7 +782,7 @@ errorIds
 recSelErrorName, runtimeErrorName, absentErrorName :: Name
 recConErrorName, patErrorName :: Name
 nonExhaustiveGuardsErrorName, noMethodBindingErrorName :: Name
-typeErrorName :: Name
+typeErrorName, repPolyErrorName :: Name
 absentSumFieldErrorName :: Name
 raiseOverflowName, raiseUnderflowName, raiseDivZeroName :: Name
 
@@ -790,6 +791,7 @@ runtimeErrorName    = err_nm "runtimeError"    runtimeErrorIdKey    rUNTIME_ERRO
 recConErrorName     = err_nm "recConError"     recConErrorIdKey     rEC_CON_ERROR_ID
 patErrorName        = err_nm "patError"        patErrorIdKey        pAT_ERROR_ID
 typeErrorName       = err_nm "typeError"       typeErrorIdKey       tYPE_ERROR_ID
+repPolyErrorName    = err_nm "repPolyError"    repPolyErrorIdKey    rEP_POLY_ERROR_ID
 
 noMethodBindingErrorName     = err_nm "noMethodBindingError"
                                   noMethodBindingErrorIdKey nO_METHOD_BINDING_ERROR_ID
@@ -801,7 +803,8 @@ err_nm str uniq id = mkWiredInIdName cONTROL_EXCEPTION_BASE (fsLit str) uniq id
 
 rEC_SEL_ERROR_ID, rUNTIME_ERROR_ID, rEC_CON_ERROR_ID :: Id
 pAT_ERROR_ID, nO_METHOD_BINDING_ERROR_ID, nON_EXHAUSTIVE_GUARDS_ERROR_ID :: Id
-tYPE_ERROR_ID, aBSENT_ERROR_ID, aBSENT_SUM_FIELD_ERROR_ID :: Id
+tYPE_ERROR_ID, rEP_POLY_ERROR_ID :: Id
+aBSENT_ERROR_ID, aBSENT_SUM_FIELD_ERROR_ID :: Id
 rAISE_OVERFLOW_ID, rAISE_UNDERFLOW_ID, rAISE_DIVZERO_ID :: Id
 rEC_SEL_ERROR_ID                = mkRuntimeErrorId recSelErrorName
 rUNTIME_ERROR_ID                = mkRuntimeErrorId runtimeErrorName
@@ -810,6 +813,7 @@ pAT_ERROR_ID                    = mkRuntimeErrorId patErrorName
 nO_METHOD_BINDING_ERROR_ID      = mkRuntimeErrorId noMethodBindingErrorName
 nON_EXHAUSTIVE_GUARDS_ERROR_ID  = mkRuntimeErrorId nonExhaustiveGuardsErrorName
 tYPE_ERROR_ID                   = mkRuntimeErrorId typeErrorName
+rEP_POLY_ERROR_ID               = mkRuntimeErrorId repPolyErrorName
 
 -- Note [aBSENT_SUM_FIELD_ERROR_ID]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
