@@ -134,6 +134,18 @@ several example instances:
       fromListN = Vector.fromListN
       toList = Vector.toList
 
+Users should not, however, provide any instance that overlaps with the first
+instance above. Namely, ``fromList`` and ``toList``, when used on lists,
+should always be the identity function.
+For example, the following instance is disallowed:
+
+::
+
+    instance {-# OVERLAPPING #-} IsList [Int] where
+      type Item [Int] = Int
+      fromList = reverse
+      toList = reverse
+
 Rebindable syntax
 ~~~~~~~~~~~~~~~~~
 

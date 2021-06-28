@@ -1,8 +1,10 @@
 
 {-# LANGUAGE ConstraintKinds     #-}
+{-# LANGUAGE CPP                 #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications    #-}
 {-# LANGUAGE TypeFamilies        #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
@@ -40,7 +42,10 @@ import GHC.Rename.Utils ( HsDocContext(..), bindLocalNamesFV, checkDupNames
                         , bindLocalNames
                         , mapMaybeFvRn, mapFvRn
                         , warnUnusedLocalBinds, typeAppErr
-                        , checkUnusedRecordWildcard )
+                        , checkUnusedRecordWildcard
+                        , wrapGenSpan, genHsIntegralLit, genHsTyLit
+                        , genHsVar, genLHsVar, genHsApp, genHsApps
+                        , genAppType )
 import GHC.Rename.Unbound ( reportUnboundName )
 import GHC.Rename.Splice  ( rnBracket, rnSpliceExpr, checkThLocalName )
 import GHC.Rename.HsType
@@ -63,7 +68,6 @@ import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Outputable as Outputable
 import GHC.Types.SrcLoc
-import GHC.Data.FastString
 import Control.Monad
 import GHC.Builtin.Types ( nilDataConName )
 import qualified GHC.LanguageExtensions as LangExt
@@ -107,7 +111,10 @@ RebindableSyntax:
 This is accomplished by lookupSyntaxName, and it applies to all the
 constructs below.
 
-Here are the constructs that we transform in this way. Some are uniform,
+See also Note [Handling overloaded and rebindable patterns] in GHC.Rename.Pat
+for the story with patterns.
+
+Here are the expressions that we transform in this way. Some are uniform,
 but several have a little bit of special treatment:
 
 * HsIf (if-the-else)
@@ -397,7 +404,7 @@ rnExpr (ExplicitList _ exps)
     do { (from_list_n_name, fvs') <- lookupSyntaxName fromListNName
        ; let rn_list  = ExplicitList noExtField exps'
              lit_n    = mkIntegralLit (length exps)
-             hs_lit   = wrapGenSpan (HsLit noAnn (HsInt noExtField lit_n))
+             hs_lit   = genHsIntegralLit lit_n
              exp_list = genHsApps from_list_n_name [hs_lit, wrapGenSpan rn_list]
        ; return ( mkExpandedExpr rn_list exp_list
                 , fvs `plusFV` fvs') } }
@@ -2146,9 +2153,9 @@ parallel" in an ApplicativeStmt, but doesn't otherwise affect what we
 can do with the rest of the statements in the same "do" expression.
 -}
 
-isStrictPattern :: LPat (GhcPass p) -> Bool
-isStrictPattern lpat =
-  case unLoc lpat of
+isStrictPattern :: forall p. IsPass p => LPat (GhcPass p) -> Bool
+isStrictPattern (L loc pat) =
+  case pat of
     WildPat{}       -> False
     VarPat{}        -> False
     LazyPat{}       -> False
@@ -2165,7 +2172,16 @@ isStrictPattern lpat =
     NPat{}          -> True
     NPlusKPat{}     -> True
     SplicePat{}     -> True
-    XPat{}          -> panic "isStrictPattern: XPat"
+    XPat ext        -> case ghcPass @p of
+#if __GLASGOW_HASKELL__ < 811
+      GhcPs -> noExtCon ext
+#endif
+      GhcRn
+        | HsPatExpanded _ p <- ext
+        -> isStrictPattern (L loc p)
+      GhcTc -> case ext of
+        ExpansionPat _ p -> isStrictPattern (L loc p)
+        CoPat {} -> panic "isStrictPattern: CoPat"
 
 {-
 Note [ApplicativeDo and refutable patterns]
@@ -2559,29 +2575,6 @@ getMonadFailOp ctxt
       See Note [Handling overloaded and rebindable constructs]
 *                                                                      *
 ********************************************************************* -}
-
-genHsApps :: Name -> [LHsExpr GhcRn] -> HsExpr GhcRn
-genHsApps fun args = foldl genHsApp (genHsVar fun) args
-
-genHsApp :: HsExpr GhcRn -> LHsExpr GhcRn -> HsExpr GhcRn
-genHsApp fun arg = HsApp noAnn (wrapGenSpan fun) arg
-
-genLHsVar :: Name -> LHsExpr GhcRn
-genLHsVar nm = wrapGenSpan $ genHsVar nm
-
-genHsVar :: Name -> HsExpr GhcRn
-genHsVar nm = HsVar noExtField $ wrapGenSpan nm
-
-genAppType :: HsExpr GhcRn -> HsType (NoGhcTc GhcRn) -> HsExpr GhcRn
-genAppType expr = HsAppType noExtField (wrapGenSpan expr) . mkEmptyWildCardBndrs . wrapGenSpan
-
-genHsTyLit :: FastString -> HsType GhcRn
-genHsTyLit = HsTyLit noExtField . HsStrTy NoSourceText
-
-wrapGenSpan :: a -> LocatedAn an a
--- Wrap something in a "generatedSrcSpan"
--- See Note [Rebindable syntax and HsExpansion]
-wrapGenSpan x = L (noAnnSrcSpan generatedSrcSpan) x
 
 -- | Build a 'HsExpansion' out of an extension constructor,
 --   and the two components of the expansion: original and

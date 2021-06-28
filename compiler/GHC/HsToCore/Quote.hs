@@ -2039,12 +2039,8 @@ repP (LazyPat _ p)      = do { p1 <- repLP p; repPtilde p1 }
 repP (BangPat _ p)      = do { p1 <- repLP p; repPbang p1 }
 repP (AsPat _ x p)      = do { x' <- lookupNBinder x; p1 <- repLP p
                              ; repPaspat x' p1 }
-repP (ParPat _ _ p _)      = repLP p
-repP (ListPat Nothing ps)  = do { qs <- repLPs ps; repPlist qs }
-repP (ListPat (Just (SyntaxExprRn e)) ps) = do { p <- repP (ListPat Nothing ps)
-                                               ; e' <- repE e
-                                               ; repPview e' p}
-repP (ListPat _ ps) = pprPanic "repP missing SyntaxExprRn" (ppr ps)
+repP (ParPat _ _ p _)   = repLP p
+repP (ListPat _ ps)     = do { qs <- repLPs ps; repPlist qs }
 repP (TuplePat _ ps boxed)
   | isBoxed boxed       = do { qs <- repLPs ps; repPtup qs }
   | otherwise           = do { qs <- repLPs ps; repPunboxedTup qs }

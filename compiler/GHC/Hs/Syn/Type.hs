@@ -50,8 +50,7 @@ hsPatType (LazyPat _ pat)               = hsLPatType pat
 hsPatType (LitPat _ lit)                = hsLitType lit
 hsPatType (AsPat _ var _)               = idType (unLoc var)
 hsPatType (ViewPat ty _ _)              = ty
-hsPatType (ListPat (ListPatTc ty Nothing) _)      = mkListTy ty
-hsPatType (ListPat (ListPatTc _ (Just (ty,_))) _) = ty
+hsPatType (ListPat ty _)                = mkListTy ty
 hsPatType (TuplePat tys _ bx)           = mkTupleTy1 bx tys
                   -- See Note [Don't flatten tuples from HsSyn] in GHC.Core.Make
 hsPatType (SumPat tys _ _ _ )           = mkSumTy tys
@@ -64,7 +63,10 @@ hsPatType (ConPat { pat_con = lcon
 hsPatType (SigPat ty _ _)               = ty
 hsPatType (NPat ty _ _ _)               = ty
 hsPatType (NPlusKPat ty _ _ _ _ _)      = ty
-hsPatType (XPat (CoPat _ _ ty))         = ty
+hsPatType (XPat ext) =
+  case ext of
+    CoPat _ _ ty       -> ty
+    ExpansionPat _ pat -> hsPatType pat
 hsPatType (SplicePat v _)               = dataConCantHappen v
 
 hsLitType :: HsLit (GhcPass p) -> Type

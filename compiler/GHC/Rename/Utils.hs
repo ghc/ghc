@@ -18,6 +18,8 @@ module GHC.Rename.Utils (
         checkUnusedRecordWildcard,
         mkFieldEnv,
         unknownSubordinateErr, badQualBndrErr, typeAppErr,
+        wrapGenSpan, genHsVar, genLHsVar, genHsApp, genHsApps, genAppType,
+        genHsIntegralLit, genHsTyLit,
         HsDocContext(..), pprHsDocContext,
         inHsDocContext, withHsDocContext,
 
@@ -49,6 +51,7 @@ import GHC.Types.Name.Env
 import GHC.Core.DataCon
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.SourceFile
+import GHC.Types.SourceText ( SourceText(..), IntegralLit )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
@@ -646,6 +649,38 @@ checkCTupSize tup_size
                   <+> parens (text "max arity =" <+> int mAX_CTUPLE_SIZE))
                2 (text "Instead, use a nested tuple")
 
+{- *********************************************************************
+*                                                                      *
+              Generating code for HsExpanded
+      See Note [Handling overloaded and rebindable constructs]
+*                                                                      *
+********************************************************************* -}
+
+wrapGenSpan :: a -> LocatedAn an a
+-- Wrap something in a "generatedSrcSpan"
+-- See Note [Rebindable syntax and HsExpansion]
+wrapGenSpan x = L (noAnnSrcSpan generatedSrcSpan) x
+
+genHsApps :: Name -> [LHsExpr GhcRn] -> HsExpr GhcRn
+genHsApps fun args = foldl genHsApp (genHsVar fun) args
+
+genHsApp :: HsExpr GhcRn -> LHsExpr GhcRn -> HsExpr GhcRn
+genHsApp fun arg = HsApp noAnn (wrapGenSpan fun) arg
+
+genLHsVar :: Name -> LHsExpr GhcRn
+genLHsVar nm = wrapGenSpan $ genHsVar nm
+
+genHsVar :: Name -> HsExpr GhcRn
+genHsVar nm = HsVar noExtField $ wrapGenSpan nm
+
+genAppType :: HsExpr GhcRn -> HsType (NoGhcTc GhcRn) -> HsExpr GhcRn
+genAppType expr = HsAppType noExtField (wrapGenSpan expr) . mkEmptyWildCardBndrs . wrapGenSpan
+
+genHsIntegralLit :: IntegralLit -> LocatedAn an (HsExpr GhcRn)
+genHsIntegralLit lit = wrapGenSpan $ HsLit noAnn (HsInt noExtField lit)
+
+genHsTyLit :: FastString -> HsType GhcRn
+genHsTyLit = HsTyLit noExtField . HsStrTy NoSourceText
 
 {-
 ************************************************************************

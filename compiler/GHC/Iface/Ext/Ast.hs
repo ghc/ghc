@@ -1020,14 +1020,14 @@ instance HiePass p => ToHie (PScoped (LocatedA (Pat (GhcPass p)))) where
         ]
       XPat e ->
         case hiePass @p of
-          HieTc ->
-            let CoPat wrap pat _ = e
-              in [ toHie $ L ospan wrap
-                 , toHie $ PS rsp scope pscope $ (L ospan pat)
-                 ]
-#if __GLASGOW_HASKELL__ < 811
-          HieRn -> []
-#endif
+          HieRn -> case e of
+            HsPatExpanded _ p -> [ toHie $ PS rsp scope pscope (L ospan p) ]
+          HieTc -> case e of
+            CoPat wrap pat _ ->
+              [ toHie $ L ospan wrap
+              , toHie $ PS rsp scope pscope $ (L ospan pat)
+              ]
+            ExpansionPat _ p -> [ toHie $ PS rsp scope pscope (L ospan p) ]
     where
       contextify :: a ~ LPat (GhcPass p) => HsConDetails (HsPatSigType (NoGhcTc (GhcPass p))) a (HsRecFields (GhcPass p) a)
                  -> HsConDetails (TScoped (HsPatSigType (NoGhcTc (GhcPass p)))) (PScoped a) (RContext (HsRecFields (GhcPass p) (PScoped a)))
