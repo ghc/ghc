@@ -49,8 +49,9 @@ T16270.hs:24:10: error:
     extension to enable syntax: data T where
 
 T16270.hs:26:12: error:
-    Illegal bang-pattern (use BangPatterns):
+    Illegal bang-pattern
     !i
+    Suggested fix: Perhaps you intended to use BangPatterns
 
 T16270.hs:28:9: error:
     Multi-way if-expressions need MultiWayIf turned on

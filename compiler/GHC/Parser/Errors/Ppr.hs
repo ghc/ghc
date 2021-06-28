@@ -187,7 +187,7 @@ instance Diagnostic PsMessage where
              NumUnderscore_Integral -> "Use NumericUnderscores to allow underscores in integer literals"
              NumUnderscore_Float    -> "Use NumericUnderscores to allow underscores in floating literals"
     PsErrIllegalBangPattern e
-      -> mkSimpleDecorated $ text "Illegal bang-pattern (use BangPatterns):" $$ ppr e
+      -> mkSimpleDecorated $ text "Illegal bang-pattern" $$ ppr e
     PsErrOverloadedRecordDotInvalid
       -> mkSimpleDecorated $
            text "Use of OverloadedRecordDot '.' not valid ('.' isn't allowed when constructing records or in record patterns)"
@@ -679,7 +679,7 @@ instance Diagnostic PsMessage where
     PsErrMultiWayIf{}                             -> noHints
     PsErrOverloadedRecordUpdateNotEnabled{}       -> noHints
     PsErrNumUnderscores{}                         -> noHints
-    PsErrIllegalBangPattern{}                     -> noHints
+    PsErrIllegalBangPattern{}                     -> [SuggestExtension LangExt.BangPatterns]
     PsErrOverloadedRecordDotInvalid{}             -> noHints
     PsErrIllegalPatSynExport                      -> noHints
     PsErrOverloadedRecordUpdateNoQualifiedFields  -> noHints
