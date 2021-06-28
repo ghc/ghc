@@ -9,6 +9,7 @@ module GHC.Parser.Errors.Ppr where
 
 import GHC.Prelude
 import GHC.Driver.Flags
+import GHC.Parser.Errors.Basic
 import GHC.Parser.Errors.Types
 import GHC.Parser.Types
 import GHC.Types.Basic
@@ -57,17 +58,15 @@ instance Diagnostic PsMessage where
                TransLayout_Pipe  -> "`|' at the same depth as implicit layout block"
             )
     PsWarnOperatorWhitespaceExtConflict sym
-      -> let mk_prefix_msg operator_symbol extension_name syntax_meaning =
-                  text "The prefix use of a" <+> quotes (text operator_symbol)
+      -> let mk_prefix_msg extension_name syntax_meaning =
+                  text "The prefix use of a" <+> quotes (pprOperatorWhitespaceSymbol sym)
                     <+> text "would denote" <+> text syntax_meaning
                $$ nest 2 (text "were the" <+> text extension_name <+> text "extension enabled.")
-               $$ text "Suggested fix: add whitespace after the"
-                    <+> quotes (text operator_symbol) <> char '.'
          in mkSimpleDecorated $
          case sym of
-           OperatorWhitespaceSymbol_PrefixPercent -> mk_prefix_msg "%" "LinearTypes" "a multiplicity annotation"
-           OperatorWhitespaceSymbol_PrefixDollar -> mk_prefix_msg "$" "TemplateHaskell" "an untyped splice"
-           OperatorWhitespaceSymbol_PrefixDollarDollar -> mk_prefix_msg "$$" "TemplateHaskell" "a typed splice"
+           OperatorWhitespaceSymbol_PrefixPercent -> mk_prefix_msg "LinearTypes" "a multiplicity annotation"
+           OperatorWhitespaceSymbol_PrefixDollar -> mk_prefix_msg "TemplateHaskell" "an untyped splice"
+           OperatorWhitespaceSymbol_PrefixDollarDollar -> mk_prefix_msg "TemplateHaskell" "a typed splice"
     PsWarnOperatorWhitespace sym occ_type
       -> let mk_msg occ_type_str =
                   text "The" <+> text occ_type_str <+> text "use of a" <+> quotes (ftext sym)
@@ -646,7 +645,7 @@ instance Diagnostic PsMessage where
     PsHeaderMessage  m                            -> psHeaderMessageHints m
     PsWarnTab{}                                   -> [SuggestUseSpaces]
     PsWarnTransitionalLayout{}                    -> noHints
-    PsWarnOperatorWhitespaceExtConflict{}         -> noHints
+    PsWarnOperatorWhitespaceExtConflict sym       -> [SuggestUseWhitespaceAfter sym]
     PsWarnOperatorWhitespace{}                    -> noHints
     PsWarnHaddockInvalidPos                       -> noHints
     PsWarnHaddockIgnoreMulti                      -> noHints
