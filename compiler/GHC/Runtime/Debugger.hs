@@ -9,7 +9,7 @@
 -- else) or below it.
 --
 -----------------------------------------------------------------------------
-
+{-# LANGUAGE CPP #-}
 module GHC.Runtime.Debugger (pprintClosureCommand, showTerm, pprTypeAndContents) where
 
 import GHC.Prelude
@@ -265,6 +265,10 @@ pprTypeAndContents id = do
       docs_term <- case e_term of
                       Right term -> showTerm term
                       Left  exn  -> return (text "*** Exception:" <+>
+#if __GLASGOW_HASKELL__ >= 903
+                                            text (show (exn :: SomeExceptionWithLocation)))
+#else
                                             text (show (exn :: SomeException)))
+#endif
       return $ pprdId <+> equals <+> docs_term
     else return pprdId
