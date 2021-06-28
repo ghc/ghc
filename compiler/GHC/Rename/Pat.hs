@@ -57,7 +57,8 @@ import GHC.Rename.Fixity
 import GHC.Rename.Utils    ( HsDocContext(..), newLocalBndrRn, bindLocalNames
                            , warnUnusedMatches, newLocalBndrRn
                            , checkUnusedRecordWildcard
-                           , checkDupNames, checkDupAndShadowedNames )
+                           , checkDupNames, checkDupAndShadowedNames
+                           , wrapGenSpan, genHsApps, genLHsVar, genHsIntegralLit )
 import GHC.Rename.HsType
 import GHC.Builtin.Names
 import GHC.Types.Avail ( greNameMangledName )
@@ -296,6 +297,85 @@ pattern P x = Just x
 
 See #12615 for some more examples.
 
+Note [Handling overloaded and rebindable patterns]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Overloaded paterns and rebindable patterns are desugared in the renamer
+using the HsPatExpansion mechanism detailed in:
+Note [Rebindable syntax and HsExpansion]
+The approach is similar to that of expressions, which is further detailed
+in Note [Handling overloaded and rebindable constructs] in GHC.Rename.Expr.
+
+Here are the patterns that are currently desugared in this way:
+
+* ListPat (list patterns [p1,p2,p3])
+  When (and only when) OverloadedLists is on, desugar to a view pattern:
+    [p1, p2, p3]
+  ==>
+    toList -> [p1, p2, p3]
+              ^^^^^^^^^^^^ built-in (non-overloaded) list pattern
+  NB: the type checker and desugarer still see ListPat,
+      but to them it always means the built-in list pattern.
+  See Note [Desugaring overloaded list patterns] below for more details.
+
+We expect to add to this list as we deal with more patterns via the expansion
+mechanism.
+
+Note [Desugaring overloaded list patterns]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If OverloadedLists is enabled, we desugar a list pattern to a view pattern:
+
+  [p1, p2, p3]
+==>
+  toList -> [p1, p2, p3]
+
+This happens directly in the renamer, using the HsPatExpansion mechanism
+detailed in Note [Rebindable syntax and HsExpansion].
+
+Note that we emit a special view pattern: we additionally keep track of an
+inverse to the pattern.
+See Note [Invertible view patterns] in GHC.Tc.TyCl.PatSyn for details.
+
+== Wrinkle ==
+
+This is all fine, except in one very specific case:
+  - when RebindableSyntax is off,
+  - and the type being matched on is already a list type.
+
+In this case, it is undesirable to desugar an overloaded list pattern into
+a view pattern. To illustrate, consider the following program:
+
+> {-# LANGUAGE OverloadedLists #-}
+>
+> f []    = True
+> f (_:_) = False
+
+Without any special logic, the pattern `[]` is desugared to `(toList -> [])`,
+whereas `(_:_)` remains a constructor pattern. This implies that the argument
+of `f` is necessarily a list (even though `OverloadedLists` is enabled).
+After desugaring the overloaded list pattern `[]`, and type-checking, we obtain:
+
+> f :: [a] -> Bool
+> f (toList -> []) = True
+> f (_:_)          = False
+
+The pattern match checker then warns that the pattern `[]` is not covered,
+as it isn't able to look through view patterns.
+We can see that this is silly: as we are matching on a list, `toList` doesn't
+actually do anything. So we ignore it, and desugar the pattern to an explicit
+list pattern, instead of a view pattern.
+
+Note however that this is not necessarily sound, because it is possible to have
+a list `l` such that `toList l` is not the same as `l`.
+This can happen with an overlapping instance, such as the following:
+
+instance {-# OVERLAPPING #-} IsList [Int] where
+  type Item [Int] = Int
+  toList = reverse
+  fromList = reverse
+
+We make the assumption that no such instance exists, in order to avoid worsening
+pattern-match warnings (see #14547).
+
 *********************************************************
 *                                                      *
         External entry points
@@ -485,7 +565,10 @@ rnPatAndThen mk p@(ViewPat _ expr pat)
        ; pat' <- rnLPatAndThen mk pat
        -- Note: at this point the PreTcType in ty can only be a placeHolder
        -- ; return (ViewPat expr' pat' ty) }
-       ; return (ViewPat noExtField expr' pat') }
+
+       -- Note: we can't cook up an inverse for an arbitrary view pattern,
+       -- so we pass 'Nothing'.
+       ; return (ViewPat Nothing expr' pat') }
 
 rnPatAndThen mk (ConPat _ con args)
    -- rnConPatAndThen takes care of reconstructing the pattern
@@ -497,12 +580,25 @@ rnPatAndThen mk (ConPat _ con args)
       False   -> rnConPatAndThen mk con args
 
 rnPatAndThen mk (ListPat _ pats)
-  = do { opt_OverloadedLists <- liftCps $ xoptM LangExt.OverloadedLists
+  = do { opt_OverloadedLists  <- liftCps $ xoptM LangExt.OverloadedLists
        ; pats' <- rnLPatsAndThen mk pats
-       ; case opt_OverloadedLists of
-          True -> do { (to_list_name,_) <- liftCps $ lookupSyntax toListName
-                     ; return (ListPat (Just to_list_name) pats')}
-          False -> return (ListPat Nothing pats') }
+       ; if not opt_OverloadedLists
+         then return (ListPat noExtField pats')
+         else
+    -- If OverloadedLists is enabled, desugar to a view pattern.
+    -- See Note [Desugaring overloaded list patterns]
+    do { (to_list_name,_)     <- liftCps $ lookupSyntaxName toListName
+       -- Use 'fromList' as proof of invertibility of the view pattern.
+       -- See Note [Invertible view patterns] in GHC.Tc.TyCl.PatSyn
+       ; (from_list_n_name,_) <- liftCps $ lookupSyntaxName fromListNName
+       ; let
+           lit_n   = mkIntegralLit (length pats)
+           hs_lit  = genHsIntegralLit lit_n
+           inverse = genHsApps from_list_n_name [hs_lit]
+           rn_list_pat  = ListPat noExtField pats'
+           exp_expr     = genLHsVar to_list_name
+           exp_list_pat = ViewPat (Just inverse) exp_expr (wrapGenSpan rn_list_pat)
+       ; return $ mkExpandedPat rn_list_pat exp_list_pat }}
 
 rnPatAndThen mk (TuplePat _ pats boxed)
   = do { pats' <- rnLPatsAndThen mk pats
@@ -613,6 +709,23 @@ rnHsRecPatsAndThen mk (L _ con)
     nested_mk (Just _) mk@(LetMk {})         _  = mk
     nested_mk (Just (unLoc -> n)) (LamMk report_unused) n'
       = LamMk (report_unused && (n' <= n))
+
+
+{- *********************************************************************
+*                                                                      *
+              Generating code for HsPatExpanded
+      See Note [Handling overloaded and rebindable constructs]
+*                                                                      *
+********************************************************************* -}
+
+-- | Build a 'HsPatExpansion' out of an extension constructor,
+--   and the two components of the expansion: original and
+--   desugared patterns
+mkExpandedPat
+  :: Pat GhcRn -- ^ source pattern
+  -> Pat GhcRn -- ^ expanded pattern
+  -> Pat GhcRn -- ^ suitably wrapped 'HsPatExpansion'
+mkExpandedPat a b = XPat (HsPatExpanded a b)
 
 {-
 ************************************************************************
