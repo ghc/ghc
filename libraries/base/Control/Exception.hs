@@ -35,6 +35,7 @@ module Control.Exception (
 
         -- * The Exception type
         SomeException(..),
+        SomeExceptionWithLocation(..),
         Exception(..),          -- class
         IOException,            -- instance Eq, Ord, Show, Typeable, Exception
         ArithException(..),     -- instance Eq, Ord, Show, Typeable, Exception
@@ -166,7 +167,7 @@ Instead, we provide a function 'catches', which would be used thus:
 catches :: IO a -> [Handler a] -> IO a
 catches io handlers = io `catch` catchesHandler handlers
 
-catchesHandler :: [Handler a] -> SomeException -> IO a
+catchesHandler :: [Handler a] -> SomeExceptionWithLocation -> IO a
 catchesHandler handlers e = foldr tryHandler (throw e) handlers
     where tryHandler (Handler handler) res
               = case fromException e of
@@ -355,6 +356,8 @@ The following operations are guaranteed not to be interruptible:
 
 {- $catchall
 
+TODO: Update this paragraph.
+
 It is possible to catch all exceptions, by using the type 'SomeException':
 
 > catch f (\e -> ... (e :: SomeException) ...)
@@ -395,4 +398,3 @@ the screen, and then exit gracefully. For these cases, you can use
 'catch' (or one of the other exception-catching functions) with the
 'SomeException' type.
 -}
-
