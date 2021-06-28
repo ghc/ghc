@@ -33,7 +33,7 @@ import GHC.Prelude
 
 import GHC.Driver.Env
 import GHC.Driver.Session
-import GHC.Driver.Pipeline.Monad
+import GHC.Driver.Pipeline.Phases
 
 import GHC.Hs.Decls
 import GHC.Hs.Binds
@@ -137,7 +137,7 @@ data Hooks = Hooks
   , hscCompileCoreExprHook ::
                !(Maybe (HscEnv -> (SrcSpan, Maybe ModuleNameWithIsBoot) -> CoreExpr -> IO ForeignHValue))
   , ghcPrimIfaceHook       :: !(Maybe ModIface)
-  , runPhaseHook           :: !(Maybe (PhasePlus -> FilePath -> CompPipeline (PhasePlus, FilePath)))
+  , runPhaseHook           :: !(Maybe PhaseHook)
   , runMetaHook            :: !(Maybe (MetaHook TcM))
   , linkHook               :: !(Maybe (GhcLink -> DynFlags -> Bool
                                          -> HomePackageTable -> IO SuccessFlag))
