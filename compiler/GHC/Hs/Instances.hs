@@ -33,6 +33,7 @@ import GHC.Hs.Type
 import GHC.Hs.Pat
 import GHC.Hs.ImpExp
 import GHC.Parser.Annotation
+import Language.Haskell.Syntax
 
 -- ---------------------------------------------------------------------
 -- Data derivations from GHC.Hs-----------------------------------------
@@ -88,6 +89,8 @@ deriving instance Data (HsIPBinds GhcTc)
 deriving instance Data (IPBind GhcPs)
 deriving instance Data (IPBind GhcRn)
 deriving instance Data (IPBind GhcTc)
+
+deriving instance (Data e, Data a) => Data (Annotated a e)
 
 -- deriving instance (DataIdLR p p)   => Data (Sig p)
 deriving instance Data (Sig GhcPs)
