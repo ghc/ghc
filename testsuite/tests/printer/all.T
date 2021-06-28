@@ -68,6 +68,7 @@ test('T14306', ignore_stderr, makefile_test, ['T14306'])
 test('T14343', normal, compile_fail, [''])
 test('T14343b', normal, compile_fail, [''])
 test('T15761', normal, compile_fail, [''])
+test('T17697', normal, compile, [''])
 test('T18052a', normal, compile,
      ['-ddump-simpl -ddump-types -dno-typeable-binds -dsuppress-uniques'])
 test('T18791', normal, compile, ['-ddump-parsed-ast'])
