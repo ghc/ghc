@@ -191,7 +191,7 @@ instance Diagnostic PsMessage where
       -> mkSimpleDecorated $
            text "Use of OverloadedRecordDot '.' not valid ('.' isn't allowed when constructing records or in record patterns)"
     PsErrIllegalPatSynExport
-      -> mkSimpleDecorated $ text "Illegal export form (use PatternSynonyms to enable)"
+      -> mkSimpleDecorated $ text "Illegal export form"
     PsErrOverloadedRecordUpdateNoQualifiedFields
       -> mkSimpleDecorated $ text "Fields cannot be qualified when OverloadedRecordUpdate is enabled"
     PsErrExplicitForall is_unicode
@@ -680,7 +680,7 @@ instance Diagnostic PsMessage where
     PsErrNumUnderscores{}                         -> noHints
     PsErrIllegalBangPattern{}                     -> [SuggestExtension LangExt.BangPatterns]
     PsErrOverloadedRecordDotInvalid{}             -> noHints
-    PsErrIllegalPatSynExport                      -> noHints
+    PsErrIllegalPatSynExport                      -> [SuggestExtension LangExt.PatternSynonyms]
     PsErrOverloadedRecordUpdateNoQualifiedFields  -> noHints
     PsErrExplicitForall{}                         -> noHints
     PsErrIllegalQualifiedDo{}                     -> noHints
