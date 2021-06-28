@@ -187,6 +187,41 @@ defaults
 -- description fields should be legal latex. Descriptions can contain
 -- matched pairs of embedded curly brackets.
 
+-- Note [Levity and representation polymorphic primops]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- In the types of primops in this module,
+-- 
+-- * The names `a,b,c,s` stand for type variables of kind TYPE
+-- 
+-- * The names `v` and `w` stand for levity-polymorphic
+--   type variables.
+--   For example:
+--      op :: v -> w -> Int
+--   really means
+--      op :: forall {l :: Levity} (a :: TYPE (BoxedRep l))
+--                   {k :: Levity} (b :: TYPE (BoxedRep k)).
+--            a -> b -> Int
+--  Two important things to note:
+--     - `v` and `w` have independent levities `l` and `k` (respectively), and
+--       these are inferred (not specified), as seen from the curly brackets.
+--     - `v` and `w` end up written as `a` and `b` (respectively) in types,
+--       which means that one shouldn't write a primop type involving both
+--       `a` and `v`, nor `b` and `w`.
+-- 
+-- * The names `o` and `p` stand for representation-polymorphic
+--   type variables, similarly to `v` and `w` above. For example:
+--      op :: o -> p -> Int
+--   really means
+--      op :: forall {q :: RuntimeRep} (a :: TYPE q)
+--                   {r :: RuntimeRep} (b :: TYPE r)
+--            a -> b -> Int
+--   We note:
+--    - `o` and `p` have independent `RuntimeRep`s `q` and `r`, which are
+--       inferred type variables (like for `v` and `w` above).
+--    - `o` and `p` share textual names with `a` and `b` (respectively).
+--      This means one shouldn't write a type involving both `a` and `o`,
+--      nor `b` and `p`, nor `o` and `v`, etc.
+
 #include "MachDeps.h"
 
 section "The word size story."
@@ -2466,6 +2501,7 @@ primop  RaiseOp "raise#" GenPrimOp
    a -> p
       -- NB: "p" is the same as "b" except it is representation-polymorphic
       -- (we shouldn't use "o" here as that would conflict with "a")
+      -- See Note [Levity and representation polymorphic primops]
    with
    -- In contrast to 'raiseIO#', which throws a *precise* exception,
    -- exceptions thrown by 'raise#' are considered *imprecise*.
@@ -2836,6 +2872,7 @@ section "Weak pointers"
 primtype Weak# b
 
 -- Note: "v" denotes a levity-polymorphic type variable
+-- See Note [Levity and representation polymorphic primops]
 
 primop  MkWeakOp "mkWeak#" GenPrimOp
    v -> b -> (State# RealWorld -> (# State# RealWorld, c #))
@@ -3057,36 +3094,73 @@ section "Unsafe pointer equality"
 --  (#1 Bad Guy: Alastair Reid :)
 ------------------------------------------------------------------------
 
-primop  ReallyUnsafePtrEqualityOp "reallyUnsafePtrEquality#" GenPrimOp
-   a -> a -> Int#
+-- `v` and `w` are levity-polymorphic type variables with independent levities.
+-- See Note [Levity and representation polymorphic primops]
+primop  ReallyUnsafeHetPtrEqualityOp "reallyUnsafeHetPtrEquality#" GenPrimOp
+   v -> w -> Int#
    { Returns {\texttt 1\#} if the given pointers are equal and {\texttt 0\#} otherwise. }
    with
-   can_fail   = True -- See Note [reallyUnsafePtrEquality#]
+   can_fail   = True -- See Note [reallyUnsafeHetPtrEquality# can_fail]
 
-
--- Note [reallyUnsafePtrEquality#]
+-- Note [reallyUnsafeHetPtrEquality#]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- The primop `reallyUnsafeHetPtrEquality#` does a direct pointer
+-- equality between two (boxed) values.  Several things to note:
+-- 
+-- * It is levity-polymorphic. It works for TYPE (BoxedRep Lifted) and
+--   TYPE (BoxedRep Unlifted). But not TYPE IntRep, for example.
+--   This levity-polymorphism comes from the use of the type variables
+--   "v" and "w". See Note [Levity and representation polymorphic primops]
+-- 
+-- * It does not evaluate its arguments. The user of the primop is responsible
+--   for doing so.
+-- 
+-- * It is hetero-typed; you can compare pointers of different types.
+--   This is used in various packages such as containers & unordered-containers.
+-- 
+-- * It is obviously very dangerous, because
+--      let x = f y in reallyUnsafeHetPtrEquality# x x
+--   will probably return True, whereas
+--      reallyUnsafeHetPtrEquality# (f y) (f y)
+--   will probably return False. ("probably", because it's affected
+--   by CSE and inlining).
+-- 
+-- * reallyUnsafeHetPtrEquality# can't fail, but it is marked as such
+--   to prevent it from floating out.
+--   See Note [reallyUnsafeHetPtrEquality# can_fail]
+-- 
+-- The library GHC.Exts provides the slightly less Wild-West function
+--   reallyUnsafePtrEquality# :: a -> a -> Bool
+--   reallyUnsafePtrEquality# = reallyUnsafeHetPtrEquality#
+-- 
+-- which is not levity polymorphic, nor hetero-typed.
+-- It is mainly included for backwards-compatibility,
+-- as `reallyUnsafeHetPtrEquality#` is only available since GHC 9.4.
+
+-- Note [reallyUnsafeHetPtrEquality# can_fail]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
--- reallyUnsafePtrEquality# can't actually fail, per se, but we mark it can_fail
--- anyway. Until 5a9a1738023a, GHC considered primops okay for speculation only
--- when their arguments were known to be forced. This was unnecessarily
--- conservative, but it prevented reallyUnsafePtrEquality# from floating out of
--- places where its arguments were known to be forced. Unfortunately, GHC could
--- sometimes lose track of whether those arguments were forced, leading to let/app
--- invariant failures (see #13027 and the discussion in #11444). Now that
--- ok_for_speculation skips over lifted arguments, we need to explicitly prevent
--- reallyUnsafePtrEquality# from floating out. Imagine if we had
+-- reallyUnsafeHetPtrEquality# can't actually fail, per se, but we mark it
+-- can_fail anyway. Until 5a9a1738023a, GHC considered primops okay for
+-- speculation only when their arguments were known to be forced. This was
+-- unnecessarily conservative, but it prevented reallyUnsafePtrEquality# from
+-- floating out of places where its arguments were known to be forced.
+-- Unfortunately, GHC could sometimes lose track of whether those arguments
+-- were forced, leading to let/app invariant failures (see #13027 and the
+-- discussion in #11444). Now that ok_for_speculation skips over lifted
+-- arguments, we need to explicitly prevent reallyUnsafeHetPtrEquality#
+-- from floating out. Imagine if we had
 --
 --     \x y . case x of x'
 --              DEFAULT ->
 --            case y of y'
 --              DEFAULT ->
---               let eq = reallyUnsafePtrEquality# x' y'
+--               let eq = reallyUnsafeHetPtrEquality# x' y'
 --               in ...
 --
 -- If the let floats out, we'll get
 --
---     \x y . let eq = reallyUnsafePtrEquality# x y
+--     \x y . let eq = reallyUnsafeHetPtrEquality# x y
 --            in case x of ...
 --
 -- The trouble is that pointer equality between thunks is very different
@@ -3136,7 +3210,8 @@ section "Controlling object lifetime"
 
 -- See Note [keepAlive# magic] in GHC.CoreToStg.Prep.
 -- NB: "v" is the same as "a" except levity-polymorphic,
--- and "p" is the same as "b" except representation-polymorphic
+-- and "p" is the same as "b" except representation-polymorphic.
+-- See Note [Levity and representation polymorphic primops]
 primop KeepAliveOp "keepAlive#" GenPrimOp
    v -> State# RealWorld -> (State# RealWorld -> p) -> p
    { \tt{keepAlive# x s k} keeps the value \tt{x} alive during the execution
