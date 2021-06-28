@@ -1,7 +1,9 @@
 
 {-# LANGUAGE MonadComprehensions #-}
 {-# LANGUAGE OverloadedLists #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ViewPatterns #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
@@ -23,7 +25,7 @@ where
 import GHC.Prelude
 import GHC.Platform
 
-import {-#SOURCE#-} GHC.HsToCore.Expr (dsLExpr, dsSyntaxExpr)
+import {-#SOURCE#-} GHC.HsToCore.Expr (dsExpr)
 
 import GHC.Types.Basic ( Origin(..), isGenerated, Boxity(..) )
 import GHC.Types.SourceText
@@ -232,7 +234,6 @@ match (v:vs) ty eqns    -- Eqns *can* be empty
             PgBang    -> matchBangs      vars ty (dropGroup eqns)
             PgCo {}   -> matchCoercion   vars ty (dropGroup eqns)
             PgView {} -> matchView       vars ty (dropGroup eqns)
-            PgOverloadedList -> matchOverloadedList vars ty (dropGroup eqns)
       where eqns' = NEL.toList eqns
             ne l = case NEL.nonEmpty l of
               Just nel -> nel
@@ -289,29 +290,17 @@ matchView (var :| vars) ty (eqns@(eqn1 :| _))
   = do  { -- we could pass in the expr from the PgView,
          -- but this needs to extract the pat anyway
          -- to figure out the type of the fresh variable
-         let ViewPat _ viewExpr (L _ pat) = firstPat eqn1
+         let TcViewPat viewExpr pat = firstPat eqn1
          -- do the rest of the compilation
         ; let pat_ty' = hsPatType pat
         ; var' <- newUniqueId var (idMult var) pat_ty'
         ; match_result <- match (var':vars) ty $ NEL.toList $
             decomposeFirstPat getViewPat <$> eqns
          -- compile the view expressions
-        ; viewExpr' <- dsLExpr viewExpr
+        ; viewExpr' <- dsExpr viewExpr
         ; return (mkViewMatchResult var'
                     (mkCoreAppDs (text "matchView") viewExpr' (Var var))
                     match_result) }
-
-matchOverloadedList :: NonEmpty MatchId -> Type -> NonEmpty EquationInfo -> DsM (MatchResult CoreExpr)
-matchOverloadedList (var :| vars) ty (eqns@(eqn1 :| _))
--- Since overloaded list patterns are treated as view patterns,
--- the code is roughly the same as for matchView
-  = do { let ListPat (ListPatTc elt_ty (Just (_,e))) _ = firstPat eqn1
-       ; var' <- newUniqueId var (idMult var) (mkListTy elt_ty)  -- we construct the overall type by hand
-       ; match_result <- match (var':vars) ty $ NEL.toList $
-           decomposeFirstPat getOLPat <$> eqns -- getOLPat builds the pattern inside as a non-overloaded version of the overloaded list pattern
-       ; e' <- dsSyntaxExpr e [Var var]
-       ; return (mkViewMatchResult var' e' match_result)
-       }
 
 -- decompose the first pattern and leave the rest alone
 decomposeFirstPat :: (Pat GhcTc -> Pat GhcTc) -> EquationInfo -> EquationInfo
@@ -319,16 +308,24 @@ decomposeFirstPat extractpat (eqn@(EqnInfo { eqn_pats = pat : pats }))
         = eqn { eqn_pats = extractpat pat : pats}
 decomposeFirstPat _ _ = panic "decomposeFirstPat"
 
-getCoPat, getBangPat, getViewPat, getOLPat :: Pat GhcTc -> Pat GhcTc
+getCoPat, getBangPat, getViewPat :: Pat GhcTc -> Pat GhcTc
 getCoPat (XPat (CoPat _ pat _)) = pat
 getCoPat _                   = panic "getCoPat"
 getBangPat (BangPat _ pat  ) = unLoc pat
 getBangPat _                 = panic "getBangPat"
-getViewPat (ViewPat _ _ pat) = unLoc pat
+getViewPat (TcViewPat _ pat) = pat
 getViewPat _                 = panic "getViewPat"
-getOLPat (ListPat (ListPatTc ty (Just _)) pats)
-        = ListPat (ListPatTc ty Nothing)  pats
-getOLPat _                   = panic "getOLPat"
+
+-- | Use this pattern synonym to match on a 'ViewPat'.
+--
+-- N.B.: View patterns can occur inside HsExpansions.
+pattern TcViewPat :: HsExpr GhcTc -> Pat GhcTc -> Pat GhcTc
+pattern TcViewPat viewExpr pat <- (getTcViewPat -> (viewExpr, pat))
+
+getTcViewPat :: Pat GhcTc -> (HsExpr GhcTc, Pat GhcTc)
+getTcViewPat (ViewPat _ viewLExpr pat)  = (unLoc viewLExpr, unLoc pat)
+getTcViewPat (XPat (ExpansionPat  _ p)) = getTcViewPat p
+getTcViewPat p = pprPanic "getTcViewPat" (ppr p)
 
 {-
 Note [Empty case alternatives]
@@ -461,7 +458,7 @@ tidy1 v _ (LazyPat _ pat)
         ; let sel_binds =  [NonRec b rhs | (b,rhs) <- sel_prs]
         ; return (mkCoreLets sel_binds, WildPat (idType v)) }
 
-tidy1 _ _ (ListPat (ListPatTc ty Nothing) pats )
+tidy1 _ _ (ListPat ty pats)
   = return (idDsWrapper, unLoc list_ConPat)
   where
     list_ConPat = foldr (\ x y -> mkPrefixConPat consDataCon [x, y] [ty])
@@ -907,7 +904,6 @@ data PatGroup
   | PgView (LHsExpr GhcTc) -- view pattern (e -> p):
                         -- the LHsExpr is the expression e
            Type         -- the Type is the type of p (equivalently, the result type of e)
-  | PgOverloadedList
 
 {- Note [Don't use Literal for PgN]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1173,11 +1169,11 @@ patGroup _ (NPlusKPat _ _ (L _ (OverLit {ol_val=oval})) _ _ _) =
   case oval of
    HsIntegral i -> PgNpK (il_value i)
    _ -> pprPanic "patGroup NPlusKPat" (ppr oval)
-patGroup _ (XPat (CoPat _ p _))         = PgCo  (hsPatType p)
-                                                    -- Type of innelexp pattern
 patGroup _ (ViewPat _ expr p)           = PgView expr (hsPatType (unLoc p))
-patGroup _ (ListPat (ListPatTc _ (Just _)) _) = PgOverloadedList
 patGroup platform (LitPat _ lit)        = PgLit (hsLitKey platform lit)
+patGroup platform (XPat ext) = case ext of
+  CoPat _ p _      -> PgCo (hsPatType p) -- Type of innelexp pattern
+  ExpansionPat _ p -> patGroup platform p
 patGroup _ pat                          = pprPanic "patGroup" (ppr pat)
 
 {-

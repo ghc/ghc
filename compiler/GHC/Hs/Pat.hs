@@ -23,9 +23,9 @@ module GHC.Hs.Pat (
         Pat(..), LPat,
         EpAnnSumPat(..),
         ConPatTc (..),
-        CoPat (..),
-        ListPatTc(..),
         ConLikeP,
+        HsPatExpansion(..),
+        XXPatGhcTc(..),
 
         HsConPatDetails, hsConPatArgs,
         HsRecFields(..), HsFieldBind(..), LHsFieldBind,
@@ -51,7 +51,7 @@ module GHC.Hs.Pat (
 import GHC.Prelude
 
 import Language.Haskell.Syntax.Pat
-import Language.Haskell.Syntax.Expr (SyntaxExpr)
+import Language.Haskell.Syntax.Expr ( HsExpr )
 
 import {-# SOURCE #-} GHC.Hs.Expr (pprLExpr, pprSplice)
 
@@ -85,11 +85,6 @@ import Data.Data
 import Data.Void
 
 
-data ListPatTc
-  = ListPatTc
-      Type                             -- The type of the elements
-      (Maybe (Type, SyntaxExpr GhcTc)) -- For rebindable syntax
-
 type instance XWildPat GhcPs = NoExtField
 type instance XWildPat GhcRn = NoExtField
 type instance XWildPat GhcTc = Type
@@ -110,12 +105,15 @@ type instance XBangPat GhcPs = EpAnn [AddEpAnn] -- For '!'
 type instance XBangPat GhcRn = NoExtField
 type instance XBangPat GhcTc = NoExtField
 
--- Note: XListPat cannot be extended when using GHC 8.0.2 as the bootstrap
--- compiler, as it triggers https://gitlab.haskell.org/ghc/ghc/issues/14396 for
--- `SyntaxExpr`
 type instance XListPat GhcPs = EpAnn AnnList
-type instance XListPat GhcRn = Maybe (SyntaxExpr GhcRn)
-type instance XListPat GhcTc = ListPatTc
+  -- After parsing, ListPat can refer to a built-in Haskell list pattern
+  -- or an overloaded list pattern.
+type instance XListPat GhcRn = NoExtField
+  -- Built-in list patterns only.
+  -- After renaming, overloaded list patterns are expanded to view patterns.
+  -- See Note [Desugaring overloaded list patterns]
+type instance XListPat GhcTc = Type
+  -- List element type, for use in hsPatType.
 
 type instance XTuplePat GhcPs = EpAnn [AddEpAnn]
 type instance XTuplePat GhcRn = NoExtField
@@ -130,8 +128,14 @@ type instance XConPat GhcRn = NoExtField
 type instance XConPat GhcTc = ConPatTc
 
 type instance XViewPat GhcPs = EpAnn [AddEpAnn]
-type instance XViewPat GhcRn = NoExtField
+type instance XViewPat GhcRn = Maybe (HsExpr GhcRn)
+  -- The @HsExpr GhcRn@ gives an inverse to the view function.
+  -- This is used for overloaded lists in particular.
+  -- See Note [Invertible view patterns] in GHC.Tc.TyCl.PatSyn.
+
 type instance XViewPat GhcTc = Type
+  -- Overall type of the pattern
+  -- (= the argument type of the view function), for hsPatType.
 
 type instance XSplicePat GhcPs = NoExtField
 type instance XSplicePat GhcRn = NoExtField
@@ -152,9 +156,13 @@ type instance XSigPat GhcRn = NoExtField
 type instance XSigPat GhcTc = Type
 
 type instance XXPat GhcPs = NoExtCon
-type instance XXPat GhcRn = NoExtCon
-type instance XXPat GhcTc = CoPat
-  -- After typechecking, we add one extra constructor: CoPat
+type instance XXPat GhcRn = HsPatExpansion (Pat GhcRn) (Pat GhcRn)
+  -- Original pattern and its desugaring/expansion.
+  -- See Note [Rebindable syntax and HsExpansion].
+type instance XXPat GhcTc = XXPatGhcTc
+  -- After typechecking, we add extra constructors: CoPat and HsExpansion.
+  -- HsExpansion allows us to handle RebindableSyntax in pattern position:
+  -- see "XXExpr GhcTc" for the counterpart in expressions.
 
 type instance ConLikeP GhcPs = RdrName -- IdP GhcPs
 type instance ConLikeP GhcRn = Name    -- IdP GhcRn
@@ -173,6 +181,35 @@ data EpAnnSumPat = EpAnnSumPat
       } deriving Data
 
 -- ---------------------------------------------------------------------
+
+-- | Extension constructor for Pat, added after typechecking.
+data XXPatGhcTc
+  = -- | Coercion Pattern (translation only)
+    --
+    -- During desugaring a (CoPat co pat) turns into a cast with 'co' on the
+    -- scrutinee, followed by a match on 'pat'.
+    CoPat
+      { -- | Coercion Pattern
+        -- If co :: t1 ~ t2, p :: t2,
+        -- then (CoPat co p) :: t1
+        co_cpt_wrap :: HsWrapper
+
+      , -- | Why not LPat?  Ans: existing locn will do
+        co_pat_inner :: Pat GhcTc
+
+      , -- | Type of whole pattern, t1
+        co_pat_ty :: Type
+      }
+  -- | Pattern expansion: original pattern, and desugared pattern,
+  -- for RebindableSyntax and other overloaded syntax such as OverloadedLists.
+  -- See Note [Rebindable syntax and HsExpansion].
+  | ExpansionPat (Pat GhcRn) (Pat GhcTc)
+
+
+-- See Note [Rebindable syntax and HsExpansion].
+data HsPatExpansion a b
+  = HsPatExpanded a b
+  deriving Data
 
 -- | This is the extension field for ConPat, added after typechecking
 -- It adds quite a few extra fields, to support elaboration of pattern matching.
@@ -202,24 +239,6 @@ data ConPatTc
       cpt_wrap  :: HsWrapper
     }
 
--- | Coercion Pattern (translation only)
---
--- During desugaring a (CoPat co pat) turns into a cast with 'co' on the
--- scrutinee, followed by a match on 'pat'.
-data CoPat
-  = CoPat
-    { -- | Coercion Pattern
-      -- If co :: t1 ~ t2, p :: t2,
-      -- then (CoPat co p) :: t1
-      co_cpt_wrap :: HsWrapper
-
-    , -- | Why not LPat?  Ans: existing locn will do
-      co_pat_inner :: Pat GhcTc
-
-    , -- | Type of whole pattern, t1
-      co_pat_ty :: Type
-    }
-
 hsRecFieldId :: HsRecField GhcTc arg -> Id
 hsRecFieldId = hsRecFieldSel
 
@@ -243,6 +262,10 @@ hsRecUpdFieldOcc = fmap unambiguousFieldOcc . hfbLHS
 
 instance OutputableBndrId p => Outputable (Pat (GhcPass p)) where
     ppr = pprPat
+
+-- See Note [Rebindable syntax and HsExpansion].
+instance (Outputable a, Outputable b) => Outputable (HsPatExpansion a b) where
+  ppr (HsPatExpanded a b) = ifPprDebug (vcat [ppr a, ppr b]) (ppr a)
 
 pprLPat :: (OutputableBndrId p) => LPat (GhcPass p) -> SDoc
 pprLPat (L _ e) = pprPat e
@@ -270,8 +293,7 @@ pprParendPat p pat = sdocOption sdocPrintTypecheckerElaboration $ \ print_tc_ela
   where
     need_parens print_tc_elab pat
       | GhcTc <- ghcPass @p
-      , XPat ext <- pat
-      , CoPat {} <- ext
+      , XPat (CoPat {}) <- pat
       = print_tc_elab
 
       | otherwise
@@ -335,13 +357,16 @@ pprPat (ConPat { pat_con = con
 pprPat (XPat ext) = case ghcPass @p of
 #if __GLASGOW_HASKELL__ < 811
   GhcPs -> noExtCon ext
-  GhcRn -> noExtCon ext
 #endif
-  GhcTc -> pprHsWrapper co $ \parens ->
-      if parens
-      then pprParendPat appPrec pat
-      else pprPat pat
-    where CoPat co pat _ = ext
+  GhcRn -> case ext of
+    HsPatExpanded orig _ -> pprPat orig
+  GhcTc -> case ext of
+    CoPat co pat _ ->
+      pprHsWrapper co $ \parens ->
+        if parens
+        then pprParendPat appPrec pat
+        else pprPat pat
+    ExpansionPat orig _ -> pprPat orig
 
 pprUserCon :: (OutputableBndr con, OutputableBndrId p,
                      Outputable (Anno (IdGhcP p)))
@@ -543,10 +568,12 @@ isIrrefutableHsPat' is_strict = goL
     go (XPat ext)          = case ghcPass @p of
 #if __GLASGOW_HASKELL__ < 811
       GhcPs -> noExtCon ext
-      GhcRn -> noExtCon ext
 #endif
-      GhcTc -> go pat
-        where CoPat _ pat _ = ext
+      GhcRn -> case ext of
+        HsPatExpanded _ pat -> go pat
+      GhcTc -> case ext of
+        CoPat _ pat _ -> go pat
+        ExpansionPat _ pat -> go pat
 
 -- | Is the pattern any of combination of:
 --
@@ -590,22 +617,28 @@ is the only thing that could possibly be matched!
 -- | @'patNeedsParens' p pat@ returns 'True' if the pattern @pat@ needs
 -- parentheses under precedence @p@.
 patNeedsParens :: forall p. IsPass p => PprPrec -> Pat (GhcPass p) -> Bool
-patNeedsParens p = go
+patNeedsParens p = go @p
   where
-    go :: Pat (GhcPass p) -> Bool
+    -- Remark: go needs to be polymorphic, as we call it recursively
+    -- at a different GhcPass (see the case for GhcTc XPat below).
+    go :: forall q. IsPass q => Pat (GhcPass q) -> Bool
     go (NPlusKPat {})    = p > opPrec
     go (SplicePat {})    = False
     go (ConPat { pat_args = ds })
                          = conPatNeedsParens p ds
     go (SigPat {})       = p >= sigPrec
     go (ViewPat {})      = True
-    go (XPat ext)        = case ghcPass @p of
+    go (XPat ext)        = case ghcPass @q of
 #if __GLASGOW_HASKELL__ < 901
       GhcPs -> noExtCon ext
-      GhcRn -> noExtCon ext
 #endif
-      GhcTc -> go inner
-        where CoPat _ inner _ = ext
+      GhcRn -> case ext of
+        HsPatExpanded orig _ -> go orig
+      GhcTc -> case ext of
+        CoPat _ inner _ -> go inner
+        ExpansionPat orig _ -> go orig
+          --                   ^^^^^^^
+          -- NB: recursive call of go at a different GhcPass.
     go (WildPat {})      = False
     go (VarPat {})       = False
     go (LazyPat {})      = False
@@ -679,7 +712,9 @@ collectEvVarsPat pat =
                                    $ map collectEvVarsLPat
                                    $ hsConPatArgs args
     SigPat  _ p _    -> collectEvVarsLPat p
-    XPat (CoPat _ p _) -> collectEvVarsPat  p
+    XPat ext -> case ext of
+      CoPat _ p _      -> collectEvVarsPat p
+      ExpansionPat _ p -> collectEvVarsPat p
     _other_pat       -> emptyBag
 
 {-
