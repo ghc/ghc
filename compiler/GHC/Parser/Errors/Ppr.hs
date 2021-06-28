@@ -171,7 +171,7 @@ instance Diagnostic PsMessage where
                      ]
 
     PsErrLambdaCase
-      -> mkSimpleDecorated $ text "Illegal lambda-case (use LambdaCase)"
+      -> mkSimpleDecorated $ text "Illegal lambda-case"
     PsErrEmptyLambda
        -> mkSimpleDecorated $ text "A lambda requires at least one parameter"
     PsErrLinearFunction
@@ -672,7 +672,7 @@ instance Diagnostic PsMessage where
     PsErrExpectedHyphen                           -> noHints
     PsErrSpaceInSCC                               -> noHints
     PsErrEmptyDoubleQuotes{}                      -> noHints
-    PsErrLambdaCase{}                             -> noHints
+    PsErrLambdaCase{}                             -> [SuggestExtension LangExt.LambdaCase]
     PsErrEmptyLambda{}                            -> noHints
     PsErrLinearFunction{}                         -> noHints
     PsErrMultiWayIf{}                             -> noHints

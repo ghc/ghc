@@ -59,7 +59,9 @@ T16270.hs:28:9: error:
 T16270.hs:30:9: error:
     Multi-way if-expressions need MultiWayIf turned on
 
-T16270.hs:33:6: error: Illegal lambda-case (use LambdaCase)
+T16270.hs:33:6:
+    Illegal lambda-case
+    Suggested fix: Perhaps you intended to use LambdaCase
 
 T16270.hs:36:5: error:
     Use NumericUnderscores to allow underscores in integer literals
