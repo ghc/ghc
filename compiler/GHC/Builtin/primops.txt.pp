@@ -3057,15 +3057,49 @@ section "Unsafe pointer equality"
 --  (#1 Bad Guy: Alastair Reid :)
 ------------------------------------------------------------------------
 
-primop  ReallyUnsafePtrEqualityOp "reallyUnsafePtrEquality#" GenPrimOp
-   a -> a -> Int#
+-- See Note [reallyUnsafePtrEquality# and reallyUnsafeHetPtrEquality#]
+primop  ReallyUnsafeHetPtrEqualityOp "reallyUnsafeHetPtrEquality#" GenPrimOp
+   v -> w -> Int#
    { Returns {\texttt 1\#} if the given pointers are equal and {\texttt 0\#} otherwise. }
    with
    can_fail   = True -- See Note [reallyUnsafePtrEquality#]
 
+-- Note [reallyUnsafePtrEquality# and reallyUnsafeHetPtrEquality#]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- We used to define
+--
+-- > reallyUnsafePtrEquality# :: forall (a :: Type). a -> a -> Int#
+--
+-- With the introduction of BoxedRep, it became possible to generalise
+-- this primop to have type:
+--
+-- > reallyUnsafePtrEquality#
+-- >   :: forall {l :: Levity} (a :: TYPE (BoxedRep l))
+-- >   . a -> a -> Int#
+--
+-- However, changing the type of the primop broke code in the wild such as:
+--
+-- >  hetPtrEq :: a -> b -> Int#
+-- >  hetPtrEq x y = unsafeCoerce# reallyUnsafePtrEquality# x y
+--
+-- This broke because GHC doesn't allow application of a primop to a
+-- primop with representation-polymorphic arguments.
+--
+-- To avoid the breakage in user libraries (e.g. 'containers' & 'unordered-containers'),
+-- we instead directly define the heterogeneous primop:
+--
+-- > reallyUnsafeHetPtrEquality#
+-- >   :: forall {l :: Levity} (a :: TYPE (BoxedRep l))
+-- >             {k :: Levity} (b :: TYPE (BoxedRep k))
+-- >   . a -> b -> Int#
+--
+-- This means users don't need to use `unsafeCoerce#` as above.
+--
+-- We also re-export `reallyUnsafePtrEquality` from 'GHC.Exts', so that libraries that
+-- import `reallyUnsafePtrEquality#` from 'GHC.Exts' continue to work.
 
 -- Note [reallyUnsafePtrEquality#]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
 -- reallyUnsafePtrEquality# can't actually fail, per se, but we mark it can_fail
 -- anyway. Until 5a9a1738023a, GHC considered primops okay for speculation only
