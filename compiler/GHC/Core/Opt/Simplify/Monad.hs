@@ -79,7 +79,9 @@ pattern SM m <- SM' m
 data SimplTopEnv
   = STE { st_flags     :: DynFlags
         , st_logger    :: !Logger
-        , st_module    :: !Module
+        , st_module    :: !Module     -- The module being compiled
+                                      -- (used to decide whether to look at unfoldings
+                                      -- when -O0 is enabled)
         , st_max_ticks :: IntWithInf  -- ^ Max #ticks in this simplifier run
         , st_rules     :: RuleEnv
         , st_fams      :: (FamInstEnv, FamInstEnv)

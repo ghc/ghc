@@ -510,11 +510,10 @@ loadInterface doc_str mod from
         --     If we do loadExport first the wrong info gets into the cache (unless we
         --      explicitly tag each export which seems a bit of a bore)
 
-        ; ignore_prags      <- goptM Opt_IgnoreInterfacePragmas
-        ; new_eps_decls     <- tcIfaceDecls ignore_prags (mi_decls iface)
+        ; new_eps_decls     <- tcIfaceDecls (mi_decls iface)
         ; new_eps_insts     <- mapM tcIfaceInst (mi_insts iface)
         ; new_eps_fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
-        ; new_eps_rules     <- tcIfaceRules ignore_prags (mi_rules iface)
+        ; new_eps_rules     <- tcIfaceRules (mi_rules iface)
         ; new_eps_anns      <- tcIfaceAnnotations (mi_anns iface)
         ; new_eps_complete_matches <- tcIfaceCompleteMatches (mi_complete_matches iface)
 

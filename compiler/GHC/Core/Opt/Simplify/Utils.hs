@@ -882,13 +882,13 @@ simplEnvForGHCi logger dflags
                            , sm_eta_expand = eta_expand_on
                            , sm_case_case  = True
                            , sm_pre_inline = pre_inline_on
-                           , sm_opt_off = opt_off
+                           , sm_cross_inline = cross_inline
                            }
   where
     rules_on      = gopt Opt_EnableRewriteRules   dflags
     eta_expand_on = gopt Opt_DoLambdaEtaExpansion dflags
     pre_inline_on = gopt Opt_SimplPreInlining     dflags
-    opt_off       = gopt Opt_IgnoreInterfacePragmas dflags
+    cross_inline  = gopt Opt_IgnoreInterfacePragmas dflags
     uf_opts       = unfoldingOpts                 dflags
 
 updModeForStableUnfoldings :: Activation -> SimplMode -> SimplMode
@@ -1101,7 +1101,7 @@ getUnfoldingInRuleMatch env cur_mod
   where
     in_scope = seInScope env
     mode = getMode env
-    id_unf id | unf_is_active id = idUnfoldingChecked cur_mod (sm_opt_off mode) id
+    id_unf id | unf_is_active id = idUnfoldingChecked cur_mod (sm_cross_inline mode) id
               | otherwise        = NoUnfolding
     unf_is_active id
      | not (sm_rules mode) = -- active_unfolding_minimal id
@@ -1271,7 +1271,7 @@ preInlineUnconditionally env cur_mod top_lvl bndr rhs rhs_env
   , Just inl <- maybeUnfoldingTemplate unf   = Just $! (extend_subst_with inl)
   | otherwise                                = Nothing
   where
-    unf = idUnfoldingChecked cur_mod (sm_opt_off mode) bndr
+    unf = idUnfoldingChecked cur_mod (sm_cross_inline mode) bndr
     extend_subst_with inl_rhs = extendIdSubst env bndr $! (mkContEx rhs_env inl_rhs)
 
     one_occ IAmDead = True -- Happens in ((\x.1) v)

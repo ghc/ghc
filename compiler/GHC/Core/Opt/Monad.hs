@@ -173,8 +173,7 @@ data SimplMode             -- See comments in GHC.Core.Opt.Simplify.Monad
         , sm_case_case  :: !Bool          -- ^ Whether case-of-case is enabled
         , sm_eta_expand :: !Bool          -- ^ Whether eta-expansion is enabled
         , sm_pre_inline :: !Bool          -- ^ Whether pre-inlining is enabled
-        , sm_opt_off    :: !Bool          -- ^ Whether we are in O0 and should ignore
-                                          --   information in pragmas
+        , sm_cross_inline :: !Bool        -- ^ Whether cross-module inlining is enabled
         , sm_logger     :: !Logger
         , sm_dflags     :: DynFlags
             -- Just for convenient non-monadic access; we don't override these.

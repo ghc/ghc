@@ -2033,7 +2033,7 @@ completeCall env cur_mod var cont
 
   where
     uf_opts    = seUnfoldingOpts env
-    ignore_prags = sm_opt_off (getMode env)
+    ignore_prags = sm_cross_inline (getMode env)
     case_depth = seCaseDepth env
     logger     = seLogger env
     (lone_variable, arg_infos, call_cont) = contArgs cont

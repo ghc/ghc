@@ -183,23 +183,16 @@ typecheckIface :: ModIface      -- Get the decls from here
                -> IfG ModDetails
 typecheckIface iface
   = initIfaceLcl (mi_semantic_module iface) (text "typecheckIface") (mi_boot iface) $ do
-        {       -- Get the right set of decls and rules.  If we are compiling without -O
-                -- we discard pragmas before typechecking, so that we don't "see"
-                -- information that we shouldn't.  From a versioning point of view
-                -- It's not actually *wrong* to do so, but in fact GHCi is unable
-                -- to handle unboxed tuples, so it must not see unfoldings.
-          ignore_prags <- goptM Opt_IgnoreInterfacePragmas
-
-                -- Typecheck the decls.  This is done lazily, so that the knot-tying
+        {       -- Typecheck the decls.  This is done lazily, so that the knot-tying
                 -- within this single module works out right.  It's the callers
                 -- job to make sure the knot is tied.
-        ; names_w_things <- tcIfaceDecls ignore_prags (mi_decls iface)
+        ; names_w_things <- tcIfaceDecls (mi_decls iface)
         ; let type_env = mkNameEnv names_w_things
 
                 -- Now do those rules, instances and annotations
         ; insts     <- mapM tcIfaceInst (mi_insts iface)
         ; fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
-        ; rules     <- tcIfaceRules ignore_prags (mi_rules iface)
+        ; rules     <- tcIfaceRules (mi_rules iface)
         ; anns      <- tcIfaceAnnotations (mi_anns iface)
 
                 -- Exports
@@ -383,7 +376,6 @@ typecheckIfacesForMerging :: Module -> [ModIface] -> IORef TypeEnv -> IfM lcl (T
 typecheckIfacesForMerging mod ifaces tc_env_var =
   -- cannot be boot (False)
   initIfaceLcl mod (text "typecheckIfacesForMerging") NotBoot $ do
-    ignore_prags <- goptM Opt_IgnoreInterfacePragmas
     -- Build the initial environment
     -- NB: Don't include dfuns here, because we don't want to
     -- serialize them out.  See Note [rnIfaceNeverExported] in GHC.Iface.Rename
@@ -399,7 +391,7 @@ typecheckIfacesForMerging mod ifaces tc_env_var =
         decl_env = foldl' mergeIfaceDecls emptyOccEnv decl_envs
                         ::  OccEnv IfaceDecl
     -- TODO: change tcIfaceDecls to accept w/o Fingerprint
-    names_w_things <- tcIfaceDecls ignore_prags (map (\x -> (fingerprint0, x))
+    names_w_things <- tcIfaceDecls (map (\x -> (fingerprint0, x))
                                                   (occEnvElts decl_env))
     let global_type_env = mkNameEnv names_w_things
     writeMutVar tc_env_var global_type_env
@@ -409,14 +401,14 @@ typecheckIfacesForMerging mod ifaces tc_env_var =
         -- See Note [Resolving never-exported Names] in GHC.IfaceToCore
         type_env <- fixM $ \type_env ->
             setImplicitEnvM type_env $ do
-                decls <- tcIfaceDecls ignore_prags (mi_decls iface)
+                decls <- tcIfaceDecls (mi_decls iface)
                 return (mkNameEnv decls)
         -- But note that we use this type_env to typecheck references to DFun
         -- in 'IfaceInst'
         setImplicitEnvM type_env $ do
         insts     <- mapM tcIfaceInst (mi_insts iface)
         fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
-        rules     <- tcIfaceRules ignore_prags (mi_rules iface)
+        rules     <- tcIfaceRules (mi_rules iface)
         anns      <- tcIfaceAnnotations (mi_anns iface)
         exports   <- ifaceExportNames (mi_exports iface)
         complete_matches <- tcIfaceCompleteMatches (mi_complete_matches iface)
@@ -445,17 +437,16 @@ typecheckIfaceForInstantiate nsubst iface =
   initIfaceLclWithSubst (mi_semantic_module iface)
                         (text "typecheckIfaceForInstantiate")
                         (mi_boot iface) nsubst $ do
-    ignore_prags <- goptM Opt_IgnoreInterfacePragmas
     -- See Note [Resolving never-exported Names] in GHC.IfaceToCore
     type_env <- fixM $ \type_env ->
         setImplicitEnvM type_env $ do
-            decls     <- tcIfaceDecls ignore_prags (mi_decls iface)
+            decls     <- tcIfaceDecls (mi_decls iface)
             return (mkNameEnv decls)
     -- See Note [rnIfaceNeverExported]
     setImplicitEnvM type_env $ do
     insts     <- mapM tcIfaceInst (mi_insts iface)
     fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
-    rules     <- tcIfaceRules ignore_prags (mi_rules iface)
+    rules     <- tcIfaceRules (mi_rules iface)
     anns      <- tcIfaceAnnotations (mi_anns iface)
     exports   <- ifaceExportNames (mi_exports iface)
     complete_matches <- tcIfaceCompleteMatches (mi_complete_matches iface)
@@ -664,23 +655,21 @@ What this means is that the implicitTyThings MUST NOT DEPEND on any of
 the forkM stuff.
 -}
 
-tcIfaceDecl :: Bool     -- ^ True <=> discard IdInfo on IfaceId bindings
-            -> IfaceDecl
+tcIfaceDecl :: IfaceDecl
             -> IfL TyThing
 tcIfaceDecl = tc_iface_decl Nothing
 
 tc_iface_decl :: Maybe Class  -- ^ For associated type/data family declarations
-              -> Bool         -- ^ True <=> discard IdInfo on IfaceId bindings
               -> IfaceDecl
               -> IfL TyThing
-tc_iface_decl _ ignore_prags (IfaceId {ifName = name, ifType = iface_type,
+tc_iface_decl _ (IfaceId {ifName = name, ifType = iface_type,
                                        ifIdDetails = details, ifIdInfo = info})
   = do  { ty <- tcIfaceType iface_type
         ; details <- tcIdDetails ty details
-        ; info <- tcIdInfo ignore_prags TopLevel name ty info
+        ; info <- tcIdInfo TopLevel name ty info
         ; return (AnId (mkGlobalId details name ty info)) }
 
-tc_iface_decl _ _ (IfaceData {ifName = tc_name,
+tc_iface_decl _ (IfaceData {ifName = tc_name,
                           ifCType = cType,
                           ifBinders = binders,
                           ifResKind = res_kind,
@@ -712,7 +701,7 @@ tc_iface_decl _ _ (IfaceData {ifName = tc_name,
            ; lhs_tys <- tcIfaceAppArgs arg_tys
            ; return (DataFamInstTyCon ax_unbr fam_tc lhs_tys) }
 
-tc_iface_decl _ _ (IfaceSynonym {ifName = tc_name,
+tc_iface_decl _ (IfaceSynonym {ifName = tc_name,
                                       ifRoles = roles,
                                       ifSynRhs = rhs_ty,
                                       ifBinders = binders,
@@ -726,7 +715,7 @@ tc_iface_decl _ _ (IfaceSynonym {ifName = tc_name,
    where
      mk_doc n = text "Type synonym" <+> ppr n
 
-tc_iface_decl parent _ (IfaceFamily {ifName = tc_name,
+tc_iface_decl parent (IfaceFamily {ifName = tc_name,
                                      ifFamFlav = fam_flav,
                                      ifBinders = binders,
                                      ifResKind = res_kind,
@@ -755,7 +744,7 @@ tc_iface_decl parent _ (IfaceFamily {ifName = tc_name,
          = pprPanic "tc_iface_decl"
                     (text "IfaceBuiltInSynFamTyCon in interface file")
 
-tc_iface_decl _parent _ignore_prags
+tc_iface_decl _parent
             (IfaceClass {ifName = tc_name,
                          ifRoles = roles,
                          ifBinders = binders,
@@ -766,7 +755,7 @@ tc_iface_decl _parent _ignore_prags
     ; cls  <- buildClass tc_name binders' roles fds Nothing
     ; return (ATyCon (classTyCon cls)) }
 
-tc_iface_decl _parent ignore_prags
+tc_iface_decl _parent
             (IfaceClass {ifName = tc_name,
                          ifRoles = roles,
                          ifBinders = binders,
@@ -820,7 +809,7 @@ tc_iface_decl _parent ignore_prags
              ; return (Just (GenericDM (noSrcSpan, ty'))) }
 
    tc_at cls (IfaceAT tc_decl if_def)
-     = do ATyCon tc <- tc_iface_decl (Just cls) ignore_prags tc_decl
+     = do ATyCon tc <- tc_iface_decl (Just cls) tc_decl
           mb_def <- case if_def of
                       Nothing  -> return Nothing
                       Just def -> forkM (mk_at_doc tc)                 $
@@ -836,7 +825,7 @@ tc_iface_decl _parent ignore_prags
    mk_at_doc tc = text "Associated type" <+> ppr tc
    mk_op_doc op_name op_ty = text "Class op" <+> sep [ppr op_name, ppr op_ty]
 
-tc_iface_decl _ _ (IfaceAxiom { ifName = tc_name, ifTyCon = tc
+tc_iface_decl _ (IfaceAxiom { ifName = tc_name, ifTyCon = tc
                               , ifAxBranches = branches, ifRole = role })
   = do { tc_tycon    <- tcIfaceTyCon tc
        -- Must be done lazily, because axioms are forced when checking
@@ -855,7 +844,7 @@ tc_iface_decl _ _ (IfaceAxiom { ifName = tc_name, ifTyCon = tc
                              , co_ax_implicit = False }
        ; return (ACoAxiom axiom) }
 
-tc_iface_decl _ _ (IfacePatSyn{ ifName = name
+tc_iface_decl _ (IfacePatSyn{ ifName = name
                               , ifPatMatcher = if_matcher
                               , ifPatBuilder = if_builder
                               , ifPatIsInfix = is_infix
@@ -887,17 +876,16 @@ tc_iface_decl _ _ (IfacePatSyn{ ifName = name
      tc_pr (nm, b) = do { id <- forkM (ppr nm) (tcIfaceExtId nm)
                         ; return (nm, idType id, b) }
 
-tcIfaceDecls :: Bool
-          -> [(Fingerprint, IfaceDecl)]
+tcIfaceDecls :: [(Fingerprint, IfaceDecl)]
           -> IfL [(Name,TyThing)]
-tcIfaceDecls ignore_prags ver_decls
-   = concatMapM (tc_iface_decl_fingerprint ignore_prags) ver_decls
+tcIfaceDecls ver_decls
+   = concatMapM tc_iface_decl_fingerprint ver_decls
 
-tc_iface_decl_fingerprint :: Bool                    -- Don't load pragmas into the decl pool
-          -> (Fingerprint, IfaceDecl)
+tc_iface_decl_fingerprint
+          :: (Fingerprint, IfaceDecl)
           -> IfL [(Name,TyThing)]   -- The list can be poked eagerly, but the
                                     -- TyThings are forkM'd thunks
-tc_iface_decl_fingerprint ignore_prags (_version, decl)
+tc_iface_decl_fingerprint (_version, decl)
   = do  {       -- Populate the name cache with final versions of all
                 -- the names associated with the decl
           let main_name = ifName decl
@@ -910,7 +898,7 @@ tc_iface_decl_fingerprint ignore_prags (_version, decl)
         -- which includes its nameParent.
 
         ; thing <- forkM doc $ do { bumpDeclStats main_name
-                                  ; tcIfaceDecl ignore_prags decl }
+                                  ; tcIfaceDecl decl }
 
         -- Populate the type environment with the implicitTyThings too.
         --
@@ -1192,12 +1180,9 @@ are in the type environment.  However, remember that typechecking a Rule may
 (as a side effect) augment the type envt, and so we may need to iterate the process.
 -}
 
-tcIfaceRules :: Bool            -- True <=> ignore rules
-             -> [IfaceRule]
+tcIfaceRules :: [IfaceRule]
              -> IfL [CoreRule]
-tcIfaceRules _ignore_prags if_rules
---  | ignore_prags = return []
-  | otherwise    = mapM tcIfaceRule if_rules
+tcIfaceRules if_rules = mapM tcIfaceRule if_rules
 
 tcIfaceRule :: IfaceRule -> IfL CoreRule
 tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bndrs,
@@ -1520,8 +1505,7 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
 tcIfaceExpr (IfaceLet (IfaceNonRec (IfLetBndr fs ty info ji) rhs) body)
   = do  { name    <- newIfaceName (mkVarOccFS fs)
         ; ty'     <- tcIfaceType ty
-        ; id_info <- tcIdInfo False {- Don't ignore prags; we are inside one! -}
-                              NotTopLevel name ty' info
+        ; id_info <- tcIdInfo NotTopLevel name ty' info
         ; let id = mkLocalIdWithInfo name Many ty' id_info
                      `asJoinId_maybe` tcJoinInfo ji
         ; rhs' <- tcIfaceExpr rhs
@@ -1541,8 +1525,7 @@ tcIfaceExpr (IfaceLet (IfaceRec pairs) body)
           ; return (mkLocalId name Many ty' `asJoinId_maybe` tcJoinInfo ji) }
    tc_pair (IfLetBndr _ _ info _, rhs) id
      = do { rhs' <- tcIfaceExpr rhs
-          ; id_info <- tcIdInfo False {- Don't ignore prags; we are inside one! -}
-                                NotTopLevel (idName id) (idType id) info
+          ; id_info <- tcIdInfo NotTopLevel (idName id) (idType id) info
           ; return (setIdInfo id id_info, rhs') }
 
 tcIfaceExpr (IfaceTick tickish expr) = do
@@ -1620,15 +1603,15 @@ tcIdDetails ty IfDFunId
 
 tcIdDetails _ (IfRecSelId tc naughty)
   = do { tc' <- either (fmap RecSelData . tcIfaceTyCon)
-                       (fmap (RecSelPatSyn . tyThingPatSyn) . tcIfaceDecl False)
+                       (fmap (RecSelPatSyn . tyThingPatSyn) . tcIfaceDecl)
                        tc
        ; return (RecSelId { sel_tycon = tc', sel_naughty = naughty }) }
   where
     tyThingPatSyn (AConLike (PatSynCon ps)) = ps
     tyThingPatSyn _ = panic "tcIdDetails: expecting patsyn"
 
-tcIdInfo :: Bool -> TopLevelFlag -> Name -> Type -> IfaceIdInfo -> IfL IdInfo
-tcIdInfo ignore_prags toplvl name ty info = do
+tcIdInfo :: TopLevelFlag -> Name -> Type -> IfaceIdInfo -> IfL IdInfo
+tcIdInfo toplvl name ty info = do
     lcl_env <- getLclEnv
     -- Set the CgInfo to something sensible but uninformative before
     -- we start; default assumption is that it has CAFs
@@ -1636,21 +1619,8 @@ tcIdInfo ignore_prags toplvl name ty info = do
                       then vanillaIdInfo `setUnfoldingInfo` BootUnfolding
                       else vanillaIdInfo
 
-    foldlM tcPrag init_info (needed_prags info)
+    foldlM tcPrag init_info info
   where
-    needed_prags :: [IfaceInfoItem] -> [IfaceInfoItem]
-    needed_prags items
-      | not ignore_prags = items
-      | otherwise        = filter need_prag items
-
-    need_prag :: IfaceInfoItem -> Bool
-      -- Always read in compulsory unfoldings
-      -- See Note [Always expose compulsory unfoldings] in GHC.Iface.Tidy
-    need_prag (HsUnfold _ (IfCompulsory {})) = True
-    need_prag (HsUnfold {}) = True
-    need_prag (HsInline {}) = True
-    need_prag _                              = True
-
     tcPrag :: IdInfo -> IfaceInfoItem -> IfL IdInfo
     tcPrag info HsNoCafRefs        = return (info `setCafInfo`   NoCafRefs)
     tcPrag info (HsArity arity)    = return (info `setArityInfo` arity)

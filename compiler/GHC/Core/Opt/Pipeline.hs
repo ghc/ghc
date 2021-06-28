@@ -144,7 +144,7 @@ getCoreToDo logger dflags
     late_specialise = gopt Opt_LateSpecialise             dflags
     static_args   = gopt Opt_StaticArgumentTransformation dflags
     rules_on      = gopt Opt_EnableRewriteRules           dflags
-    opt_off       = gopt Opt_IgnoreInterfacePragmas       dflags
+    cross_inline  = gopt Opt_IgnoreInterfacePragmas       dflags
     eta_expand_on = gopt Opt_DoLambdaEtaExpansion         dflags
     pre_inline_on = gopt Opt_SimplPreInlining             dflags
     ww_on         = gopt Opt_WorkerWrapper                dflags
@@ -168,7 +168,7 @@ getCoreToDo logger dflags
                           , sm_inline     = True
                           , sm_case_case  = True
                           , sm_pre_inline = pre_inline_on
-                          , sm_opt_off    = opt_off
+                          , sm_cross_inline = cross_inline
                           }
 
     simpl_phase phase name iter

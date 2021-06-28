@@ -90,7 +90,6 @@ import GHC.Iface.Make          ( mkFullIface )
 import GHC.Runtime.Loader      ( initializePlugins )
 
 
-import GHC.Types.Basic       ( SuccessFlag(..) )
 import GHC.Types.Error       ( singleMessage, getMessages )
 import GHC.Types.Name.Env
 import GHC.Types.Target
@@ -120,6 +119,7 @@ import Data.Version
 import Data.Either      ( partitionEithers )
 
 import Data.Time        ( getCurrentTime )
+import GHC.Types.Basic
 
 -- ---------------------------------------------------------------------------
 -- Pre-process
