@@ -448,15 +448,9 @@ instance Diagnostic PsMessage where
          in mkSimpleDecorated $ msg <+> body
     PsErrParseRightOpSectionInPat infixOcc s
       -> mkSimpleDecorated $ parse_error_in_pat <+> pprInfixOcc infixOcc <> ppr s
-    PsErrIllegalRoleName role nearby
+    PsErrIllegalRoleName role _nearby
       -> mkSimpleDecorated $
            text "Illegal role name" <+> quotes (ppr role)
-           $$ case nearby of
-               []  -> empty
-               [r] -> text "Perhaps you meant" <+> quotes (ppr r)
-               -- will this last case ever happen??
-               _   -> hang (text "Perhaps you meant one of these:")
-                           2 (pprWithCommas (quotes . ppr) nearby)
     PsErrInvalidTypeSignature lhs
       -> mkSimpleDecorated $
            text "Invalid type signature:"
@@ -727,7 +721,7 @@ instance Diagnostic PsMessage where
         sug_missingdo (ParseContext _ YesIncompleteDoBlock) = Just SuggestMissingDo
         sug_missingdo _                                     = Nothing
     PsErrParseRightOpSectionInPat{}               -> noHints
-    PsErrIllegalRoleName{}                        -> noHints
+    PsErrIllegalRoleName _ nearby                 -> [SuggestRoles nearby]
     PsErrInvalidTypeSignature lhs                 ->
         if | foreign_RDR `looks_like` lhs
            -> [SuggestExtension LangExt.ForeignFunctionInterface]

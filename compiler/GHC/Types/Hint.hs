@@ -12,7 +12,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import Data.Typeable
 import GHC.Unit.Module (ModuleName, Module)
 import GHC.Hs.Extension (GhcTc)
-import GHC.Types.Var (Var)
+import GHC.Core.Coercion
 import GHC.Types.Basic (Activation, RuleName)
 import GHC.Parser.Errors.Basic
 import {-# SOURCE #-} Language.Haskell.Syntax.Expr
@@ -167,6 +167,15 @@ data GhcHint
 
     -}
   | SuggestThQuotationSyntax
+
+    {-| Suggests alternative roles in case we found an illegal one.
+
+        Triggered by: 'GHC.Parser.Errors.Types.PsErrIllegalRoleName'
+        Example: None
+        Test case(s): roles/should_fail/Roles7.hs
+
+    -}
+  | SuggestRoles [Role]
 
 -- | An 'InstantiationSuggestion' for a '.hsig' file. This is generated
 -- by GHC in case of a 'DriverUnexpectedSignature' and suggests a way

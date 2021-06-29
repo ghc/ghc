@@ -77,6 +77,13 @@ instance Outputable GhcHint where
       -> vcat [ text "Perhaps you intended to use quotation syntax of TemplateHaskell,"
               , text "but the type variable or constructor is missing"
               ]
+    SuggestRoles nearby
+      -> case nearby of
+               []  -> empty
+               [r] -> text "Perhaps you meant" <+> quotes (ppr r)
+               -- will this last case ever happen??
+               _   -> hang (text "Perhaps you meant one of these:")
+                           2 (pprWithCommas (quotes . ppr) nearby)
 
 perhapsAsPat :: SDoc
 perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"
