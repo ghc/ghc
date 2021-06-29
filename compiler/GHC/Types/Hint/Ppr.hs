@@ -9,6 +9,7 @@ module GHC.Types.Hint.Ppr (
 
 import GHC.Prelude
 
+import GHC.Parser.Errors.Basic
 import GHC.Types.Hint
 
 import GHC.Hs.Expr ()   -- instance Outputable
@@ -46,6 +47,11 @@ instance Outputable GhcHint where
                 text "replacing <" <> ppr pi_mod_name <> text "> as necessary."
     SuggestUseSpaces
       -> text "Please use spaces instead."
+    SuggestUseWhitespaceAfter sym
+      -> text "Add whitespace after the"
+           <+> quotes (pprOperatorWhitespaceSymbol sym) <> char '.'
+    SuggestUseWhitespaceAround sym _occurrence
+      -> text "Add whitespace around" <+> quotes (text sym) <> char '.'
     SuggestParentheses
       -> text "Use parentheses."
     SuggestIncreaseMaxPmCheckModels
@@ -61,6 +67,12 @@ instance Outputable GhcHint where
     SuggestAddPhaseToCompetingRule bad_rule
       -> vcat [ text "Add phase [n] or [~n] to the competing rule"
               , whenPprDebug (ppr bad_rule) ]
+    SuggestUseTypeFromDataKind
+      -> text "Use" <+> quotes (text "Type")
+           <+> text "from" <+> quotes (text "Data.Kind") <+> text "instead."
+    SuggestQualifiedAfterModuleName
+      -> text "Place" <+> quotes (text "qualified")
+          <+> text "after the module name."
 
 perhapsAsPat :: SDoc
 perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"
