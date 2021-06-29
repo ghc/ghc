@@ -545,11 +545,11 @@ data DynFlags = DynFlags {
                                   -- used to query the appropriate fields
                                   -- (outputFile/dynOutputFile, ways, etc.)
 
-  -- | This is set by 'GHC.Driver.Pipeline.runPipeline'
+  -- | This is set by 'GHC.Driver.Pipeline.setDumpPrefix'
   --    or 'ghc.GHCi.UI.runStmt' based on where its output is going.
   dumpPrefix            :: Maybe FilePath,
 
-  -- | Override the 'dumpPrefix' set by 'GHC.Driver.Pipeline.runPipeline'
+  -- | Override the 'dumpPrefix' set by 'GHC.Driver.Pipeline.setDumpPrefix'
   --    or 'ghc.GHCi.UI.runStmt'.
   --    Set by @-ddump-file-prefix@
   dumpPrefixForce       :: Maybe FilePath,
