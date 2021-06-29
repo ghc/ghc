@@ -2098,7 +2098,10 @@ rebuildCall env info@(ArgInfo { ai_fun = fun, ai_args = rev_args
     -- so try rewrite rules; see Note [RULEs apply to simplified arguments]
     -- See also Note [Rules for recursive functions]
     do { cur_mod <- getSimplCurMod
-       ; mb_match <- tryRules env cur_mod rules fun (reverse rev_args) cont
+       ; mb_match <-
+          if sm_rules (seMode env)
+             then tryRules env cur_mod rules fun (reverse rev_args) cont
+             else return Nothing
        ; case mb_match of
              Just (env', rhs, cont') -> simplExprF env' rhs cont'
              Nothing                 -> rebuildCall env info' cont }

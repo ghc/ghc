@@ -29,7 +29,7 @@ module GHC.Iface.Binary (
         putSymbolTable,
         BinSymbolTable(..),
         BinDictionary(..)
-    ,refreshBinary) where
+        ) where
 
 import GHC.Prelude
 
@@ -177,13 +177,6 @@ getWithUserData name_cache bh = do
                                                (getDictFastString dict)
     -- Read the interface file
     get bh
-
-refreshBinary :: Binary a => NameCache -> a -> IO a
-refreshBinary name_cache a = do
-  bh <- openBinMem 1024
-  putWithUserData QuietBinIFace bh a
-  resetBinOffset bh
-  getWithUserData name_cache bh
 
 -- | Write an interface file
 writeBinIface :: Profile -> TraceBinIFace -> FilePath -> ModIface -> IO ()

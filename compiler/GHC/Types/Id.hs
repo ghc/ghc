@@ -725,18 +725,18 @@ idUnfolding id = unfoldingInfo (idInfo id)
 -- See Note []
 idUnfoldingChecked :: Module -> Bool -> Id -> Unfolding
 -- Do not expose the unfolding of an imported ID
-idUnfoldingChecked cur_mod ignore id =
+idUnfoldingChecked _cur_mod ignore id =
   let unf =
             idUnfolding id
   in
       if ignore && (not $ isCompulsoryUnfolding unf)
-                && not (isDataConWrapId id) -- Data Con wrappers don't obey IgnorePragmas
-                && not (isDataConWorkId id) -- Evald unfolding info but nothing concrete
-                && not (isClassOpId id) -- newtype class-op id have unfoldings
-                && not (isFCallId id) -- These ones don't have an unfolding anyway
-                && if (isLocalId id /= nameIsLocalOrFrom cur_mod (idName id)) && not (isInteractiveModule cur_mod)
-                    then pprPanic "unf" (ppr (idDetails id) $$ ppr id $$ ppr (isCompulsoryUnfolding unf) $$ ppr (isLocalId id) $$ ppr (nameIsLocalOrFrom cur_mod (idName id)) $$ ppr (isExternalName (idName id)) $$ ppr (nameModule_maybe (idName id)))
-                    else not (nameIsLocalOrFrom cur_mod (idName id))
+                -- && not (isDataConWrapId id) -- Data Con wrappers don't obey IgnorePragmas
+                -- && not (isDataConWorkId id) -- Evald unfolding info but nothing concrete
+                -- && not (isClassOpId id) -- newtype class-op id have unfoldings
+                -- && not (isFCallId id) -- These ones don't have an unfolding anyway
+                -- && if (isLocalId id /= nameIsLocalOrFrom cur_mod (idName id)) && not (isInteractiveModule cur_mod)
+                --    then pprPanic "unf" (ppr (idDetails id) $$ ppr id $$ ppr (isCompulsoryUnfolding unf) $$ ppr (isLocalId id) $$ ppr (nameIsLocalOrFrom cur_mod (idName id)) $$ ppr (isExternalName (idName id)) $$ ppr (nameModule_maybe (idName id)))
+                --    else not (nameIsLocalOrFrom cur_mod (idName id))
           then NoUnfolding
           else unf
 
