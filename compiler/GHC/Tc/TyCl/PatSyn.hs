@@ -60,6 +60,7 @@ import GHC.Tc.TyCl.Utils
 import GHC.Core.ConLike
 import GHC.Types.FieldLabel
 import GHC.Rename.Env
+import GHC.Rename.Utils (wrapGenSpan)
 import GHC.Data.Bag
 import GHC.Utils.Misc
 import GHC.Driver.Session ( getDynFlags, xopt_FieldSelectors )
@@ -1027,10 +1028,9 @@ tcPatToExpr name args pat = go pat
         | otherwise
         = Left (quotes (ppr var) <+> text "is not bound by the LHS of the pattern synonym")
     go1 (ParPat _ lpar pat rpar) = fmap (\e -> HsPar noAnn lpar e rpar) $ go pat
-    go1 p@(ListPat reb pats)
-      | Nothing <- reb = do { exprs <- mapM go pats
-                            ; return $ ExplicitList noExtField exprs }
-      | otherwise                   = notInvertibleListPat p
+    go1 (ListPat _ pats)
+      = do { exprs <- mapM go pats
+           ; return $ ExplicitList noExtField exprs }
     go1 (TuplePat _ pats box)       = do { exprs <- mapM go pats
                                          ; return $ ExplicitTuple noExtField
                                            (map (Present noAnn) exprs) box }
@@ -1047,13 +1047,21 @@ tcPatToExpr name args pat = go pat
     go1 (SplicePat _ (HsSpliced _ _ (HsSplicedPat pat)))
                                     = go1 pat
     go1 (SplicePat _ (HsSpliced{})) = panic "Invalid splice variety"
+    go1 (XPat (HsPatExpanded _ pat))= go1 pat
+
+    -- See Note [Invertible view patterns]
+    go1 p@(ViewPat mbInverse _ pat) = case mbInverse of
+      Nothing      -> notInvertible p
+      Just inverse ->
+        fmap
+          (\ expr -> HsApp noAnn (wrapGenSpan inverse) (wrapGenSpan expr))
+          (go1 (unLoc pat))
 
     -- The following patterns are not invertible.
     go1 p@(BangPat {})                       = notInvertible p -- #14112
     go1 p@(LazyPat {})                       = notInvertible p
     go1 p@(WildPat {})                       = notInvertible p
     go1 p@(AsPat {})                         = notInvertible p
-    go1 p@(ViewPat {})                       = notInvertible p
     go1 p@(NPlusKPat {})                     = notInvertible p
     go1 p@(SplicePat _ (HsTypedSplice {}))   = notInvertible p
     go1 p@(SplicePat _ (HsUntypedSplice {})) = notInvertible p
@@ -1072,27 +1080,23 @@ tcPatToExpr name args pat = go pat
         pp_name = ppr name
         pp_args = hsep (map ppr args)
 
-    -- We should really be able to invert list patterns, even when
-    -- rebindable syntax is on, but doing so involves a bit of
-    -- refactoring; see #14380.  Until then we reject with a
-    -- helpful error message.
-    notInvertibleListPat p
-      = Left (vcat [ not_invertible_msg p
-                   , text "Reason: rebindable syntax is on."
-                   , text "This is fixable: add use-case to #14380" ])
 
 {- Note [Builder for a bidirectional pattern synonym]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-For a bidirectional pattern synonym we need to produce an /expression/
-that matches the supplied /pattern/, given values for the arguments
-of the pattern synonym.  For example
+For a bidirectional pattern synonym, the function 'tcPatToExpr'
+needs to produce an /expression/ that matches the supplied /pattern/,
+given values for the arguments of the pattern synonym. For example:
   pattern F x y = (Just x, [y])
 The 'builder' for F looks like
   $builderF x y = (Just x, [y])
 
 We can't always do this:
- * Some patterns aren't invertible; e.g. view patterns
-      pattern F x = (reverse -> x:_)
+ * Some patterns aren't invertible; e.g. general view patterns
+      pattern F x = (f -> x)
+   as we don't have the ability to write down an expression that matches
+   the view pattern specified by an arbitrary view function `f`.
+   It is however sometimes possible to write down an inverse;
+     see Note [Invertible view patterns].
 
  * The RHS pattern might bind more variables than the pattern
    synonym, so again we can't invert it
@@ -1101,6 +1105,21 @@ We can't always do this:
  * Ditto wildcards
       pattern F x = (x,_)
 
+Note [Invertible view patterns]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For some view patterns, such as those that arise from expansion of overloaded
+patterns (as detailed in Note [Handling overloaded and rebindable patterns]),
+we are able to explicitly write out an inverse (in the sense of the previous
+Note [Builder for a bidirectional pattern synonym]).
+For instance, the inverse to the pattern
+
+  (toList -> [True, False])
+
+is the expression
+
+  (fromListN 2 [True,False])
+
+Keeping track of the inverse for such view patterns fixed #14380.
 
 Note [Redundant constraints for builder]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1214,7 +1233,9 @@ tcCollectEx pat = go pat
                            = merge (cpt_tvs con', cpt_dicts con') $
                               goConDetails $ pat_args con
     go1 (SigPat _ p _)     = go p
-    go1 (XPat (CoPat _ p _)) = go1 p
+    go1 (XPat ext) = case ext of
+      CoPat _ p _      -> go1 p
+      ExpansionPat _ p -> go1 p
     go1 (NPlusKPat _ n k _ geq subtract)
       = pprPanic "TODO: NPlusKPat" $ ppr n $$ ppr k $$ ppr geq $$ ppr subtract
     go1 _                   = empty
