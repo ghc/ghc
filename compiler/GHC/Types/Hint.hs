@@ -149,6 +149,15 @@ data GhcHint
     -}
   | SuggestUseTypeFromDataKind
 
+    {-| Suggests placing the 'qualified' keyword /after/ the module name.
+
+        Triggered by: 'GHC.Parser.Errors.Types.PsWarnImportPreQualified'
+        Example: None
+        Test case(s): module/mod184.hs
+
+    -}
+  | SuggestQualifiedAfterModuleName
+
 -- | An 'InstantiationSuggestion' for a '.hsig' file. This is generated
 -- by GHC in case of a 'DriverUnexpectedSignature' and suggests a way
 -- to instantiate a particular signature, where the first argument is

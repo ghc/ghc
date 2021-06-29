@@ -70,6 +70,9 @@ instance Outputable GhcHint where
     SuggestUseTypeFromDataKind
       -> text "Use" <+> quotes (text "Type")
            <+> text "from" <+> quotes (text "Data.Kind") <+> text "instead."
+    SuggestQualifiedAfterModuleName
+      -> text "Place" <+> quotes (text "qualified")
+          <+> text "after the module name."
 
 perhapsAsPat :: SDoc
 perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"

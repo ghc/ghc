@@ -98,9 +98,6 @@ instance Diagnostic PsMessage where
       -> mkSimpleDecorated $
             text "Found" <+> quotes (text "qualified")
              <+> text "in prepositive position"
-         $$ text "Suggested fix: place " <+> quotes (text "qualified")
-             <+> text "after the module name instead."
-         $$ text "To allow this, enable language extension 'ImportQualifiedPost'"
 
     PsErrLexer err kind
       -> mkSimpleDecorated $ hcat
@@ -250,7 +247,6 @@ instance Diagnostic PsMessage where
       -> mkSimpleDecorated $
            text "Found" <+> quotes (text "qualified")
              <+> text "in postpositive position. "
-           $$ text "To allow this, enable language extension 'ImportQualifiedPost'"
     PsErrImportQualifiedTwice
       -> mkSimpleDecorated $ text "Multiple occurrences of 'qualified'"
     PsErrIllegalImportBundleForm
@@ -623,7 +619,8 @@ instance Diagnostic PsMessage where
     PsWarnStarBinder                              -> noHints
     PsWarnStarIsType                              -> [SuggestUseTypeFromDataKind]
     PsWarnUnrecognisedPragma                      -> noHints
-    PsWarnImportPreQualified                      -> noHints
+    PsWarnImportPreQualified                      -> [ SuggestQualifiedAfterModuleName
+                                                     , SuggestExtension LangExt.ImportQualifiedPost]
     PsErrLexer{}                                  -> noHints
     PsErrCmmLexer                                 -> noHints
     PsErrCmmParser{}                              -> noHints
@@ -664,7 +661,7 @@ instance Diagnostic PsMessage where
     PsErrMultipleNamesInStandaloneKindSignature{} -> noHints
     PsErrIllegalExplicitNamespace                 -> [SuggestExtension LangExt.ExplicitNamespaces]
     PsErrUnallowedPragma{}                        -> noHints
-    PsErrImportPostQualified                      -> noHints
+    PsErrImportPostQualified                      -> [SuggestExtension LangExt.ImportQualifiedPost]
     PsErrImportQualifiedTwice                     -> noHints
     PsErrIllegalImportBundleForm                  -> noHints
     PsErrInvalidRuleActivationMarker              -> noHints
