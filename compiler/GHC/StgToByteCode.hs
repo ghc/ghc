@@ -11,7 +11,7 @@
 --
 
 -- | GHC.StgToByteCode: Generate bytecode from STG
-module GHC.StgToByteCode ( UnlinkedBCO, byteCodeGen, stgExprToBCOs ) where
+module GHC.StgToByteCode ( UnlinkedBCO, byteCodeGen) where
 
 import GHC.Prelude
 
@@ -176,48 +176,6 @@ literals:
    BcM and used when generating code for variable references.
 -}
 
--- -----------------------------------------------------------------------------
--- Generating byte code for an expression
-
--- Returns: the root BCO for this expression
-stgExprToBCOs :: HscEnv
-              -> Module
-              -> Type
-              -> StgRhs
-              -> IO UnlinkedBCO
-stgExprToBCOs hsc_env this_mod expr_ty expr
- = withTiming logger
-              (text "GHC.StgToByteCode"<+>brackets (ppr this_mod))
-              (const ()) $ do
-
-      -- the uniques are needed to generate fresh variables when we introduce new
-      -- let bindings for ticked expressions
-      us <- mkSplitUniqSupply 'y'
-      (BcM_State _dflags _us _this_mod _final_ctr mallocd _ _ _, proto_bco)
-         <- runBc hsc_env us this_mod Nothing emptyVarEnv $ do
-              prepd_expr <- annBindingFreeVars <$>
-                                       bcPrepBind (StgNonRec dummy_id expr)
-              case prepd_expr of
-                (StgNonRec _ cg_expr) -> schemeR [] (idName dummy_id, cg_expr)
-                _                     ->
-                  panic "GHC.StgByteCode.stgExprToBCOs"
-
-      when (notNull mallocd)
-           (panic "GHC.StgToByteCode.stgExprToBCOs: missing final emitBc?")
-
-      putDumpFileMaybe logger Opt_D_dump_BCOs "Proto-BCOs" FormatByteCode
-         (ppr proto_bco)
-
-      assembleOneBCO interp profile proto_bco
-  where dflags  = hsc_dflags hsc_env
-        logger   = hsc_logger hsc_env
-        profile = targetProfile dflags
-        interp  = hscInterp hsc_env
-        -- we need an otherwise unused Id for bytecode generation
-        dummy_id = mkSysLocal (fsLit "BCO_toplevel")
-                              (mkPseudoUniqueE 0)
-                              Many
-                              expr_ty
 {-
   Prepare the STG for bytecode generation:
 
