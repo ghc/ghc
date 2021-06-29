@@ -949,7 +949,7 @@ release-x86_64-linux-deb8:
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-alpine-linux.tar.xz"
     # Can't use ld.gold due to #13958.
     CONFIGURE_ARGS: "--disable-ld-override"
-    HADRIAN_ARGS: "--docs=no-sphinx --integer-simple"
+    HADRIAN_ARGS: "--docs=no-sphinx"
     # encoding004 due to lack of locale support
     # T10458 due to fact that dynamic linker tries to reload libAS
     BROKEN_TESTS: "encoding004 T10458"
@@ -959,9 +959,11 @@ release-x86_64-linux-deb8:
     when: always
     expire_in: 2 week
 
-release-x86_64-linux-alpine:
+release-x86_64-linux-alpine-integer-simple:
   <<: *release
   extends: .build-x86_64-linux-alpine-hadrian
+  variables:
+    HADRIAN_ARGS: "--docs=no-sphinx --integer-simple"
 
 nightly-x86_64-linux-alpine:
   <<: *nightly
