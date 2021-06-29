@@ -177,7 +177,7 @@ instance Diagnostic PsMessage where
     PsErrLinearFunction
       -> mkSimpleDecorated $ text "Illegal use of linear functions"
     PsErrOverloadedRecordUpdateNotEnabled
-      -> mkSimpleDecorated $ text "OverloadedRecordUpdate needs to be enabled"
+      -> mkSimpleDecorated $ text "Illegal overloaded record update"
     PsErrMultiWayIf
       -> mkSimpleDecorated $ text "Illegal multi-way if-expression"
     PsErrNumUnderscores reason
@@ -651,7 +651,7 @@ instance Diagnostic PsMessage where
     PsErrEmptyLambda{}                            -> noHints
     PsErrLinearFunction{}                         -> [SuggestExtension LangExt.LinearTypes]
     PsErrMultiWayIf{}                             -> [SuggestExtension LangExt.MultiWayIf]
-    PsErrOverloadedRecordUpdateNotEnabled{}       -> noHints
+    PsErrOverloadedRecordUpdateNotEnabled{}       -> [SuggestExtension LangExt.OverloadedRecordUpdate]
     PsErrNumUnderscores{}                         -> [SuggestExtension LangExt.NumericUnderscores]
     PsErrIllegalBangPattern{}                     -> [SuggestExtension LangExt.BangPatterns]
     PsErrOverloadedRecordDotInvalid{}             -> noHints
