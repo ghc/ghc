@@ -24,7 +24,6 @@ import GHC.Prelude
 import GHC.Unit
 import GHC.Unit.Env
 import GHC.Unit.Finder.Types
-import GHC.Unit.State
 import GHC.Utils.Outputable as Outputable
 
 

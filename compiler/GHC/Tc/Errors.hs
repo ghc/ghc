@@ -14,68 +14,73 @@ module GHC.Tc.Errors(
 
 import GHC.Prelude
 
+import GHC.Driver.Env (hsc_units)
+import GHC.Driver.Session
+import GHC.Driver.Ppr
+import GHC.Driver.Config.Diagnostic
+
 import GHC.Tc.Types
 import GHC.Tc.Utils.Monad
+import GHC.Tc.Errors.Types
 import GHC.Tc.Types.Constraint
-import GHC.Core.Predicate
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.Env( tcInitTidyEnv )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Unify ( checkTyVarEq )
 import GHC.Tc.Types.Origin
-import GHC.Rename.Unbound ( unknownNameSuggestions, WhatLooking(..) )
-import GHC.Core.Type
-import GHC.Core.Coercion
-import GHC.Core.TyCo.Rep
-import GHC.Core.TyCo.Ppr  ( pprTyVars, pprWithExplicitKindsWhen, pprSourceTyCon, pprWithTYPE )
-import GHC.Core.Unify     ( tcMatchTys, flattenTys )
-import GHC.Unit.Module
-import GHC.Tc.Errors.Types
-import GHC.Tc.Instance.Family
-import GHC.Tc.Utils.Instantiate
-import GHC.Core.InstEnv
-import GHC.Core.TyCon
-import GHC.Core.Class
-import GHC.Core.DataCon
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.EvTerm
-import GHC.Hs.Binds ( PatSynBind(..) )
+import GHC.Tc.Instance.Family
+import GHC.Tc.Utils.Instantiate
+import {-# SOURCE #-} GHC.Tc.Errors.Hole ( findValidHoleFits )
+
 import GHC.Types.Name
 import GHC.Types.Name.Reader ( lookupGRE_Name, GlobalRdrEnv, mkRdrUnqual
                              , emptyLocalRdrEnv, lookupGlobalRdrEnv , lookupLocalRdrOcc )
-import GHC.Builtin.Names ( typeableClassName )
 import GHC.Types.Id
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
-import GHC.Data.Bag
-import GHC.Utils.Error  (diagReasonSeverity,  pprLocMsgEnvelope )
+import GHC.Types.SrcLoc
 import GHC.Types.Basic
 import GHC.Types.Error
+
+import GHC.Rename.Unbound ( unknownNameSuggestions, WhatLooking(..) )
+import GHC.Unit.Module
+import GHC.Hs.Binds ( PatSynBind(..) )
+import GHC.Builtin.Names ( typeableClassName )
+import qualified GHC.LanguageExtensions as LangExt
+
+import GHC.Core.Predicate
+import GHC.Core.Type
+import GHC.Core.Coercion
+import GHC.Core.TyCo.Rep
+import GHC.Core.TyCo.Ppr  ( pprTyVars, pprWithExplicitKindsWhen, pprSourceTyCon, pprWithTYPE )
+import GHC.Core.Unify     ( tcMatchTys, flattenTys )
+import GHC.Core.InstEnv
+import GHC.Core.TyCon
+import GHC.Core.Class
+import GHC.Core.DataCon
 import GHC.Core.ConLike ( ConLike(..))
+
+import GHC.Utils.Error  (diagReasonSeverity,  pprLocMsgEnvelope )
 import GHC.Utils.Misc
-import GHC.Data.FastString
 import GHC.Utils.Outputable as O
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
-import GHC.Types.SrcLoc
-import GHC.Driver.Env (hsc_units)
-import GHC.Driver.Session
-import GHC.Driver.Ppr
+import GHC.Utils.FV ( fvVarList, unionFV )
+
+import GHC.Data.Bag
+import GHC.Data.FastString
 import GHC.Data.List.SetOps ( equivClasses )
 import GHC.Data.Maybe
-import qualified GHC.LanguageExtensions as LangExt
-import GHC.Utils.FV ( fvVarList, unionFV )
 import qualified GHC.Data.Strict as Strict
 
 import Control.Monad    ( unless, when, foldM, forM_ )
 import Data.Foldable    ( toList )
 import Data.List        ( partition, mapAccumL, sortBy, unfoldr )
-
-import {-# SOURCE #-} GHC.Tc.Errors.Hole ( findValidHoleFits )
-
 -- import Data.Semigroup   ( Semigroup )
 import qualified Data.Semigroup as Semigroup
 
@@ -721,8 +726,8 @@ reportHoles :: [Ct]  -- other (tidied) constraints
             -> ReportErrCtxt -> [Hole] -> TcM ()
 reportHoles tidy_cts ctxt holes
   = do
-      df <- getDynFlags
-      let severity = diagReasonSeverity df (cec_type_holes ctxt)
+      diag_opts <- initDiagOpts <$> getDynFlags
+      let severity = diagReasonSeverity diag_opts (cec_type_holes ctxt)
           holes'   = filter (keepThisHole severity) holes
       -- Zonk and tidy all the TcLclEnvs before calling `mkHoleError`
       -- because otherwise types will be zonked and tidied many times over.
