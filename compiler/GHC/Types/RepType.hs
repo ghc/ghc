@@ -12,7 +12,8 @@ module GHC.Types.RepType
 
     -- * Type representation for the code generator
     typePrimRep, typePrimRep1,
-    runtimeRepPrimRep, runtimeRepPrimRep_maybe,
+    runtimeRepPrimRep,
+    runtimeInfoLevity_maybe,
     typePrimRepArgs,
     runtimeInfoPrimRep, 
     PrimRep(..), primRepToType,
@@ -28,6 +29,7 @@ module GHC.Types.RepType
 import GHC.Prelude
 
 import GHC.Types.Basic (Arity, RepArity)
+import GHC.Types.Unique (getUnique)
 import GHC.Core.DataCon
 import GHC.Builtin.Names
 import GHC.Core.Coercion
@@ -528,6 +530,60 @@ runtimeRepPrimRep doc rr_ty
   = p_reps
   | otherwise
   = pprPanic "runtimeRepPrimRep" (doc $$ ppr rr_ty)
+
+getRepArg_maybe :: Type -> Maybe Type
+getRepArg_maybe ty
+    | TyConApp tc [arg] <- ty
+    , tc `hasKey` getRepTyConKey
+    = Just arg
+    | otherwise
+    = Nothing
+
+
+simplifyRep :: Type -> Maybe Type
+simplifyRep rep
+    | Just rinfo <- getRepArg_maybe rep
+    , (TyConApp rinfo [rep', _]) <- rinfo
+    = Just rep'
+    | otherwise
+    = Nothing
+
+runtimeInfoLevity_maybe :: Type -> Maybe Levity
+runtimeInfoLevity_maybe rinfo
+  | TyConApp _ [rep, _conv] <- rinfo
+  = case simplifyRep rep of
+    Just rep' -> repLevity rep'
+    Nothing -> repLevity rep
+  where
+    tc ty
+      | TyConApp tc _ <- ty
+      = tc
+    repLevity rep
+      | (tc rep) `hasKey` liftedRepDataConKey                  
+      = Just Lifted
+      | (getUnique $ tc rep) `elem` unliftedSimpleRepDataConKeys  
+      = Just Unlifted
+      | otherwise
+      = Nothing
+
+  
+
+simplifyConv :: Type -> Maybe Type
+simplifyConv conv
+    | Just rinfo <- getConvArg_maybe conv
+    , (TyConApp rinfo [_rep, conv']) <- rinfo
+    = Just conv'
+    | otherwise
+    = Nothing
+
+
+getConvArg_maybe :: Type -> Maybe Type
+getConvArg_maybe ty
+    | TyConApp tc [arg] <- ty
+    , tc `hasKey` getConvTyConKey
+    = Just arg
+    | otherwise
+    = Nothing
 
 runtimeRepPrimRep_maybe :: HasDebugCallStack => SDoc -> Type -> Maybe [PrimRep]
 runtimeRepPrimRep_maybe doc rr_ty

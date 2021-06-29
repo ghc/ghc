@@ -4,6 +4,7 @@ import GHC.Utils.Misc (HasDebugCallStack)
 import GHC.Utils.Outputable (SDoc)
 import {-# SOURCE #-} GHC.Core.TyCo.Rep (Type)
 import Data.Maybe (Maybe)
-import GHC.Core.TyCon (PrimRep)
+import GHC.Core.TyCon (PrimRep, Levity)
 
-runtimeRepPrimRep_maybe :: HasDebugCallStack => SDoc -> Type -> Maybe [PrimRep]    
+
+runtimeInfoLevity_maybe :: Type -> Maybe Levity

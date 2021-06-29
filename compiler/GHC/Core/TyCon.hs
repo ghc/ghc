@@ -121,6 +121,7 @@ module GHC.Core.TyCon(
         -- * Primitive representations of Types
         PrimRep(..), PrimElemRep(..),
         PrimConv (..), PrimInfo (..),
+        Levity(..),
         isVoidRep, isGcPtrRep,
         primRepSizeB,
         primElemRepSizeB,
@@ -176,7 +177,7 @@ import qualified Data.Data as Data
 import {-# SOURCE #-} GHC.Core.Type (splitTyConApp_maybe)
 -- import {-# SOURCE #-} GHC.Builtin.Types.Prim (mutableByteArrayPrimTyConKey)
 import GHC.Builtin.Names
-
+import GHC.Driver.Ppr (pprTrace)-- temp. remove
 {-
 -----------------------------------------------
         Notes about type families
@@ -1441,6 +1442,8 @@ See Note [RuntimeRep and PrimRep] in GHC.Types.RepType.
 
 -}
 
+data Levity = Lifted | Unlifted
+
 -- | A 'PrimRep' is an abstraction of a type.  It contains information that
 -- the code generator needs in order to pass arguments, return results,
 -- and store values of this type. See also Note [RuntimeRep and PrimRep] in
@@ -2634,6 +2637,7 @@ instance Uniquable TyCon where
 instance Outputable TyCon where
   -- At the moment a promoted TyCon has the same Name as its
   -- corresponding TyCon, so we add the quote to distinguish it here
+  -- ppr tc = pprTrace "here" (ppr tc) $ pprPromotionQuote tc <> ppr (tyConName tc) <> pp_tc
   ppr tc = pprPromotionQuote tc <> ppr (tyConName tc) <> pp_tc
     where
       pp_tc = getPprStyle $ \sty ->

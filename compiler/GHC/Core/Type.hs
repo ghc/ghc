@@ -133,8 +133,6 @@ module GHC.Core.Type (
         dropRuntimeRepArgs,
         dropRuntimeInfoArgs,
         getRuntimeRep,
-        simplifyRep,
-        simplifyConv,
 
         -- * Multiplicity
 
@@ -255,7 +253,7 @@ import GHC.Core.TyCo.Tidy
 import GHC.Core.TyCo.FVs
 
 -- friends:
-import {-# SOURCE #-} GHC.Types.RepType (runtimeRepPrimRep_maybe)
+import {-# SOURCE #-} GHC.Types.RepType (runtimeInfoLevity_maybe)
 import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
@@ -299,6 +297,8 @@ import GHC.Types.Unique ( nonDetCmpUnique )
 import GHC.Data.Maybe   ( orElse, expectJust )
 import Data.Maybe       ( isJust )
 import Control.Monad    ( guard )
+
+import GHC.Driver.Ppr (pprTrace)-- temp. remove
 
 -- $type_classification
 -- #type_classification#
@@ -579,6 +579,7 @@ kindInfo :: HasDebugCallStack => Kind -> Type
 kindInfo k = case kindInfo_maybe k of
               Just r  -> r
               Nothing -> pprPanic "kindInfo" (ppr k)   
+              
 
 
 -- | Given a kind (TYPE rr), extract its RuntimeRep classifier rr.
@@ -599,51 +600,6 @@ getRep' rinfo
   = rep
   | otherwise                    
   = mkTyConApp getRepTyCon [rinfo]
-
-
-
-getRepArg_maybe :: Type -> Maybe Type
-getRepArg_maybe ty
-    | TyConApp tc [arg] <- ty
-    , tc `hasKey` getRepTyConKey
-    = Just arg
-    | otherwise
-    = Nothing
-
-
-simplifyRep :: Type -> Maybe Type
-simplifyRep rep
-    | Just rinfo <- getRepArg_maybe rep
-    , (TyConApp rinfo [rep', _]) <- rinfo
-    = Just rep'
-    | otherwise
-    = Nothing
-
-simplifyConv :: Type -> Maybe Type
-simplifyConv conv
-    | Just rinfo <- getConvArg_maybe conv
-    , (TyConApp rinfo [_rep, conv']) <- rinfo
-    = Just conv'
-    | otherwise
-    = Nothing
-
--- isGetRepTy :: Type -> Bool
--- isGetRepTy ty
---     | TyConApp tc arg <- ty
---     , tc `hasKey` getRepTyConKey
---     = True    
---     | otherwise
---     = False
-
-getConvArg_maybe :: Type -> Maybe Type
-getConvArg_maybe ty
-    | TyConApp tc [arg] <- ty
-    , tc `hasKey` getConvTyConKey
-    = Just arg
-    | otherwise
-    = Nothing
-
-
 
 extractRep :: Type -> Maybe Type
 extractRep rinfo
@@ -718,18 +674,11 @@ isLiftedRuntimeRep rep
   | otherwise                          = False
 
 isLiftedRuntimeInfo :: Type -> Bool
--- isLiftedRuntimeRep is true of LiftedRep :: RuntimeRep
--- False of type variables (a :: RuntimeRep)
---   and of other reps e.g. (IntRep :: RuntimeRep)
-isLiftedRuntimeInfo rinfo
-  | TyConApp rr_tc [rep,conv] <- coreFullView rinfo
-  , rr_tc `hasKey` runtimeInfoDataConKey
-  = isLiftedRuntimeRep rep
-  | TyConApp rr_tc [rep,conv] <- coreFullView rinfo
-  , Just rep' <- simplifyRep rep
-  = isLiftedRuntimeRep rep'
-  | otherwise                            
-  = False 
+isLiftedRuntimeInfo ty
+  | Just Lifted <- runtimeInfoLevity_maybe ty
+    = True
+  | otherwise
+    = False
 
 -- | Returns True if the kind classifies unlifted types and False otherwise.
 -- Note that this returns False for levity-polymorphic kinds, which may
@@ -754,20 +703,14 @@ isUnliftedRuntimeRep rep
   | otherwise {- Variables, applications -}
   = False
 
+  
 isUnliftedRuntimeInfo :: Type -> Bool
-isUnliftedRuntimeInfo rinfo
-  | TyConApp rinfo [rep, conv] <- coreFullView rinfo   -- NB: args might be non-empty
-  , rinfo `hasKey` runtimeInfoDataConKey
-  = isUnliftedRuntimeRep rep
-  | TyConApp rr_tc [rep,conv] <- coreFullView rinfo
-  , Just rep' <- simplifyRep rep
-  = isUnliftedRuntimeRep rep'
-        -- Avoid searching all the unlifted RuntimeRep type cons
-        -- In the RuntimeRep data type, only LiftedRep is lifted
-        -- But be careful of type families (F tys) :: RuntimeRep
-  | otherwise {- Variables, applications -}
-  = False
-
+isUnliftedRuntimeInfo ty
+  | Just Unlifted <- runtimeInfoLevity_maybe ty
+    = True
+  | otherwise
+    = False
+ 
 
 -- | Is this the type 'RuntimeRep'?
 isRuntimeRepTy :: Type -> Bool
@@ -2170,8 +2113,8 @@ buildSynTyCon name binders res_kind roles rhs
 -- levity polymorphic), and panics if the kind does not have the shape
 -- TYPE r.
 isLiftedType_maybe :: HasDebugCallStack => Type -> Maybe Bool
-isLiftedType_maybe ty = case coreFullView (getRuntimeRep ty) of
-  ty' | isLiftedRuntimeRep ty'  -> Just True
+isLiftedType_maybe ty = case coreFullView (getRuntimeInfo ty) of
+  ty' | isLiftedRuntimeInfo ty'  -> Just True
   TyConApp {}                   -> Just False  -- Everything else is unlifted
   _                             -> Nothing     -- levity polymorphic
 
@@ -2468,7 +2411,7 @@ nonDetCmpType (TyConApp tc1 []) (TyConApp tc2 []) | tc1 == tc2
   = EQ
 nonDetCmpType t1 t2
   -- we know k1 and k2 have the same kind, because they both have kind *.
-  = nonDetCmpTypeX rn_env t1 t2
+  = pprTrace "cmp" (ppr t1 $$ ppr t2) nonDetCmpTypeX rn_env t1 t2
   where
     rn_env = mkRnEnv2 (mkInScopeSet (tyCoVarsOfTypes [t1, t2]))
 {-# INLINE nonDetCmpType #-}
@@ -2787,11 +2730,9 @@ tcIsConstraintKind ty
 -- treats them as the same type, see 'isLiftedTypeKind'.
 tcIsLiftedTypeKind :: Kind -> Bool
 tcIsLiftedTypeKind ty
-  | Just (tc, [arg]) <- tcSplitTyConApp_maybe ty    -- Note: tcSplit here
+  | Just kind@(tc, [arg]) <- tcSplitTyConApp_maybe ty    -- Note: tcSplit here
   , tc `hasKey` tYPETyConKey
-  , Just (rinfo, [rep, conv]) <- tcSplitTyConApp_maybe arg
-  , rinfo `hasKey` runtimeInfoDataConKey
-  = isLiftedRuntimeRep rep
+  = isLiftedRuntimeInfo arg
   | otherwise
   = False
 
@@ -3182,6 +3123,13 @@ distinct uniques, they are treated as equal at all times except
 during type inference.
 -}
 
+isRuntimeInfoLevPoly :: Type -> Bool
+isRuntimeInfoLevPoly ty
+  | Nothing <- runtimeInfoLevity_maybe ty
+  = True
+  | otherwise
+  = False
+
 -- | Tests whether the given kind (which should look like @TYPE x@)
 -- is something other than a constructor tree (that is, constructors at every node).
 -- E.g.  True of   TYPE k, TYPE (F Int)
@@ -3195,8 +3143,8 @@ isKindLevPoly k = ASSERT2( isLiftedTypeKind k || _is_type, ppr k )
     go TyVarTy{}         = True
     go AppTy{}           = True  -- it can't be a TyConApp
     go ty@(TyConApp tc tys)
-      | Just rep <- runtimeRepPrimRep_maybe (ppr k) ty
-      =  False
+      | tc `hasKey` runtimeInfoDataConKey
+      = isRuntimeInfoLevPoly ty
       | otherwise
       = isFamilyTyCon tc || any go tys
     go ForAllTy{}        =  True
