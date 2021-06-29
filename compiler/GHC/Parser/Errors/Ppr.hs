@@ -178,7 +178,7 @@ instance Diagnostic PsMessage where
     PsErrOverloadedRecordUpdateNotEnabled
       -> mkSimpleDecorated $ text "OverloadedRecordUpdate needs to be enabled"
     PsErrMultiWayIf
-      -> mkSimpleDecorated $ text "Multi-way if-expressions need MultiWayIf turned on"
+      -> mkSimpleDecorated $ text "Illegal multi-way if-expression"
     PsErrNumUnderscores reason
       -> mkSimpleDecorated $
            text $ case reason of
@@ -674,7 +674,7 @@ instance Diagnostic PsMessage where
     PsErrLambdaCase{}                             -> [SuggestExtension LangExt.LambdaCase]
     PsErrEmptyLambda{}                            -> noHints
     PsErrLinearFunction{}                         -> noHints
-    PsErrMultiWayIf{}                             -> noHints
+    PsErrMultiWayIf{}                             -> [SuggestExtension LangExt.MultiWayIf]
     PsErrOverloadedRecordUpdateNotEnabled{}       -> noHints
     PsErrNumUnderscores{}                         -> noHints
     PsErrIllegalBangPattern{}                     -> [SuggestExtension LangExt.BangPatterns]

@@ -54,10 +54,12 @@ T16270.hs:26:12: error:
     Suggested fix: Perhaps you intended to use BangPatterns
 
 T16270.hs:28:9: error:
-    Multi-way if-expressions need MultiWayIf turned on
+    Illegal multi-way if-expression
+    Suggested fix: Perhaps you intended to use MultiWayIf
 
 T16270.hs:30:9: error:
-    Multi-way if-expressions need MultiWayIf turned on
+    Illegal multi-way if-expression
+    Suggested fix: Perhaps you intended to use MultiWayIf
 
 T16270.hs:33:6:
     Illegal lambda-case
