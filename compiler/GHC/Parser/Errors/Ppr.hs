@@ -402,7 +402,6 @@ instance Diagnostic PsMessage where
       -> mkSimpleDecorated $
            text "Unexpected semi-colons in conditional:"
            $$ nest 4 expr
-           $$ text "Perhaps you meant to use DoAndIfThenElse?"
          where
             pprOptSemi True  = semi
             pprOptSemi False = empty
@@ -716,7 +715,7 @@ instance Diagnostic PsMessage where
     PsErrSuffixAT                                 -> noHints
     PsErrPrecedenceOutOfRange{}                   -> noHints
     PsErrSemiColonsInCondExpr{}                   -> [SuggestExtension LangExt.DoAndIfThenElse]
-    PsErrSemiColonsInCondCmd{}                    -> noHints
+    PsErrSemiColonsInCondCmd{}                    -> [SuggestExtension LangExt.DoAndIfThenElse]
     PsErrAtInPatPos                               -> noHints
     PsErrParseErrorOnInput{}                      -> noHints
     PsErrMalformedDecl{}                          -> noHints
