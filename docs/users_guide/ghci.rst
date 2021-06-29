@@ -585,7 +585,7 @@ multi-line input is terminated with an empty line. For example:
 
     ghci> :set +m
     ghci> let x = 42
-    |
+    ghci|
 
 Further bindings can be added to this ``let`` statement, so GHCi
 indicates that the next line continues the previous one by changing the
