@@ -379,7 +379,7 @@ instance Diagnostic PsMessage where
               ]
     PsErrIllegalDataTypeContext c
       -> mkSimpleDecorated $
-           text "Illegal datatype context (use DatatypeContexts):"
+           text "Illegal datatype context:"
              <+> pprLHsContext (Just c)
     PsErrPrimStringInvalidChar
       -> mkSimpleDecorated $ text "primitive string literal must contain only characters <= \'\\xFF\'"
@@ -712,7 +712,7 @@ instance Diagnostic PsMessage where
     PsErrProcInFunAppExpr{}                       -> suggestParensAndBlockArgs
     PsErrMalformedTyOrClDecl{}                    -> noHints
     PsErrIllegalWhereInDataDecl                   -> noHints
-    PsErrIllegalDataTypeContext{}                 -> noHints
+    PsErrIllegalDataTypeContext{}                 -> [SuggestExtension LangExt.DatatypeContexts]
     PsErrPrimStringInvalidChar                    -> noHints
     PsErrSuffixAT                                 -> noHints
     PsErrPrecedenceOutOfRange{}                   -> noHints
