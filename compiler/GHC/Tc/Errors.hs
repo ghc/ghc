@@ -77,8 +77,7 @@ import Data.List        ( partition, mapAccumL, sortBy, unfoldr )
 
 import {-# SOURCE #-} GHC.Tc.Errors.Hole ( findValidHoleFits )
 
--- import Data.Semigroup   ( Semigroup )
-import qualified Data.Semigroup as Semigroup
+import qualified Data.Semigroup as S
 
 
 {-
@@ -288,7 +287,7 @@ instance Semigroup Report where
 
 instance Monoid Report where
     mempty = Report [] [] []
-    mappend = (Semigroup.<>)
+    mappend = (S.<>)
 
 -- | Put a doc into the important msgs block.
 important :: SDoc -> Report
@@ -1775,7 +1774,7 @@ reportEqErr ctxt report item ty1 ty2
   = mconcat [misMatch, report, eqInfo]
   where
     misMatch = misMatchOrCND False ctxt item ty1 ty2
-    eqInfo   = mkEqInfoMsg item ty1 ty2
+    eqInfo   = mkEqInfoMsg ty1 ty2
 
 mkTyVarEqErr :: ReportErrCtxt -> Report -> ErrorItem
              -> TcTyVar -> TcType -> TcM Report
@@ -1818,7 +1817,7 @@ mkTyVarEqErr' ctxt report item tv1 ty2
     -- We report an "occurs check" even for  a ~ F t a, where F is a type
     -- function; it's not insoluble (because in principle F could reduce)
     -- but we have certainly been unable to solve it
-  = let extra2   = mkEqInfoMsg item ty1 ty2
+  = let extra2   = mkEqInfoMsg ty1 ty2
 
         interesting_tyvars = filter (not . noFreeVarsOfType . tyVarKind) $
                              filter isTyVar $
@@ -1924,21 +1923,24 @@ levelString :: TypeOrKind -> String
 levelString TypeLevel = "type"
 levelString KindLevel = "kind"
 
-mkEqInfoMsg :: ErrorItem -> TcType -> TcType -> Report
+mkEqInfoMsg :: TcType -> TcType -> Report
 -- Report (a) ambiguity if either side is a type function application
 --            e.g. F a0 ~ Int
 --        (b) warning about injectivity if both sides are the same
 --            type function application   F a ~ F b
 --            See Note [Non-injective type functions]
-mkEqInfoMsg item ty1 ty2
+mkEqInfoMsg ty1 ty2
   = important (tyfun_msg $$ ambig_msg)
   where
     mb_fun1 = isTyFun_maybe ty1
     mb_fun2 = isTyFun_maybe ty2
 
-    ambig_msg | isJust mb_fun1 || isJust mb_fun2
-              = snd (mkAmbigMsg False item)
-              | otherwise = empty
+      -- if a type isn't headed by a type function, then any ambiguous
+      -- variables need not be reported as such. e.g.: F a ~ t0 -> t0, where a is a skolem
+    ambig_tkvs1 = maybe mempty (\_ -> getAmbigTkvs ty1) mb_fun1
+    ambig_tkvs2 = maybe mempty (\_ -> getAmbigTkvs ty2) mb_fun2
+
+    (_, ambig_msg) = mkAmbigMsg False (ambig_tkvs1 S.<> ambig_tkvs2)
 
     tyfun_msg | Just tc1 <- mb_fun1
               , Just tc2 <- mb_fun2
@@ -2735,11 +2737,12 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (item, (matches, unifiers, unsafe_ov
       where
         orig = errorItemOrigin item
         -- See Note [Highlighting ambiguous type variables]
-        lead_with_ambig = has_ambig_tvs && not (any isRuntimeUnkSkol ambig_tvs)
+        lead_with_ambig = has_ambig_tvs && not (anyAmbigTkvs isRuntimeUnkSkol ambig_tkvs)
                         && not (null unifiers) && null useful_givens
 
-        (has_ambig_tvs, ambig_msg) = mkAmbigMsg lead_with_ambig item
-        ambig_tvs = uncurry (++) (getAmbigTkvs item)
+        (has_ambig_tvs, ambig_msg) = mkAmbigMsg lead_with_ambig ambig_tkvs
+        ambig_tkvs      = getAmbigTkvs (ei_pred item)
+        ambig_tkvs_list = ambigTkvsVars ambig_tkvs
 
         no_inst_msg
           | lead_with_ambig
@@ -2764,7 +2767,7 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (item, (matches, unifiers, unsafe_ov
         potential_hdr
           = vcat [ ppWhen lead_with_ambig $
                      text "Probable fix: use a type annotation to specify what"
-                     <+> pprQuotedList ambig_tvs <+> text "should be."
+                     <+> pprQuotedList ambig_tkvs_list <+> text "should be."
                  , case unifiers of
                      [_] -> text "This potential instance exists:"
                      _   -> text "These potential instances exist:"
@@ -3156,25 +3159,49 @@ the above error message would instead be displayed as:
 Which makes it clearer that the culprit is the mismatch between `k2` and `k20`.
 -}
 
-mkAmbigMsg :: Bool -- True when message has to be at beginning of sentence
-           -> ErrorItem -> (Bool, SDoc)
-mkAmbigMsg prepend_msg item
-  | null ambig_kvs && null ambig_tvs = (False, empty)
-  | otherwise                        = (True,  msg)
-  where
-    (ambig_kvs, ambig_tvs) = getAmbigTkvs item
+-- | A set of ambiguous kind variables and ambiguous type variables, kept
+-- separate so we can call some "kinds" and others "types"
+data AmbigTkvs = MkAmbigTkvs DTyVarSet   -- ^ kinds
+                             DTyVarSet   -- ^ types
 
-    msg |  any isRuntimeUnkSkol ambig_kvs  -- See Note [Runtime skolems]
-        || any isRuntimeUnkSkol ambig_tvs
+instance Semigroup AmbigTkvs where
+  MkAmbigTkvs kvs1 tvs1 <> MkAmbigTkvs kvs2 tvs2 = MkAmbigTkvs new_kvs new_tvs
+    where
+        -- prefer "type" over "kind": more users know about types than kinds
+      new_tvs = tvs1 `unionDVarSet` tvs2
+      new_kvs = (kvs1 `unionDVarSet` kvs2) `minusDVarSet` new_tvs
+
+instance Monoid AmbigTkvs where
+  mempty = MkAmbigTkvs emptyDVarSet emptyDVarSet
+
+noAmbigTkvs :: AmbigTkvs -> Bool
+noAmbigTkvs (MkAmbigTkvs kvs tvs) = isEmptyDVarSet kvs && isEmptyDVarSet tvs
+
+anyAmbigTkvs :: (Var -> Bool) -> AmbigTkvs -> Bool
+anyAmbigTkvs pred (MkAmbigTkvs kvs tvs) = anyDVarSet pred kvs || anyDVarSet pred tvs
+
+-- | Gets both kind and type variables
+ambigTkvsVars :: AmbigTkvs -> [Var]
+ambigTkvsVars (MkAmbigTkvs kvs tvs) = dVarSetElems kvs ++ dVarSetElems tvs
+
+mkAmbigMsg :: Bool -- True when message has to be at beginning of sentence
+           -> AmbigTkvs   -- create this from e.g. getAmbigTkvs
+           -> (Bool, SDoc)
+mkAmbigMsg prepend_msg ambig_tkvs@(MkAmbigTkvs ambig_kvs ambig_tvs)
+  | noAmbigTkvs ambig_tkvs = (False, empty)
+  | otherwise              = (True,  msg)
+  where
+    msg | anyAmbigTkvs isRuntimeUnkSkol ambig_tkvs  -- See Note [Runtime skolems]
+        , let all_tvs = ambigTkvsVars ambig_tkvs   -- non-determinism is OK in error messages
         = vcat [ text "Cannot resolve unknown runtime type"
-                 <> plural ambig_tvs <+> pprQuotedList ambig_tvs
+                 <> plural all_tvs <+> pprQuotedList all_tvs
                , text "Use :print or :force to determine these types"]
 
-        | not (null ambig_tvs)
-        = pp_ambig (text "type") ambig_tvs
+        | not (isEmptyDVarSet ambig_tvs)
+        = pp_ambig (text "type") (dVarSetElems ambig_tvs)
 
         | otherwise
-        = pp_ambig (text "kind") ambig_kvs
+        = pp_ambig (text "kind") (dVarSetElems ambig_kvs)
 
     pp_ambig what tkvs
       | prepend_msg -- "Ambiguous type variable 't0'"
@@ -3206,13 +3233,14 @@ pprSkols ctxt tvs
     is_or_are _   _       adjective = text "are" <+> text adjective
                                       <+> text "type variables"
 
-getAmbigTkvs :: ErrorItem -> ([Var],[Var])
-getAmbigTkvs item
-  = partition (`elemVarSet` dep_tkv_set) ambig_tkvs
+getAmbigTkvs :: TcType -> AmbigTkvs
+getAmbigTkvs ty
+  = MkAmbigTkvs kvs tvs
   where
-    tkvs       = tyCoVarsOfTypeList (ei_pred item)
-    ambig_tkvs = filter isAmbiguousTyVar tkvs
-    dep_tkv_set = tyCoVarsOfTypes (map tyVarKind tkvs)
+    (kvs, tvs)  = partitionDVarSet (`elemVarSet` dep_tkv_set) ambig_tkvs
+    tkvs        = tyCoVarsOfTypeDSet ty
+    ambig_tkvs  = filterDVarSet isAmbiguousTyVar tkvs
+    dep_tkv_set = tyCoVarsOfTypes (map tyVarKind (dVarSetElems tkvs))
 
 getSkolemInfo :: [Implication] -> [TcTyVar]
               -> [(SkolemInfo, [TcTyVar])]                    -- #14628
@@ -3255,7 +3283,7 @@ relevantBindings want_filtering ctxt item
              -- enclosing *type* equality, because that's more useful for the programmer
        ; let extra_tvs = case tidy_orig of
                              KindEqOrigin t1 t2 _ _ -> tyCoVarsOfTypes [t1,t2]
-                             _                        -> emptyVarSet
+                             _                      -> emptyVarSet
              ct_fvs = tyCoVarsOfType (ei_pred item) `unionVarSet` extra_tvs
 
              -- Put a zonked, tidied CtOrigin into the ErrorItem
