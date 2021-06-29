@@ -67,6 +67,9 @@ instance Outputable GhcHint where
     SuggestAddPhaseToCompetingRule bad_rule
       -> vcat [ text "Add phase [n] or [~n] to the competing rule"
               , whenPprDebug (ppr bad_rule) ]
+    SuggestUseTypeFromDataKind
+      -> text "Use" <+> quotes (text "Type")
+           <+> text "from" <+> quotes (text "Data.Kind") <+> text "instead."
 
 perhapsAsPat :: SDoc
 perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"

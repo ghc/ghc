@@ -138,6 +138,17 @@ data GhcHint
 
   | SuggestAddPhaseToCompetingRule !RuleName
 
+    {-| Suggests to explicitly import 'Type' from the 'Data.Kind' module, because
+        using "*" to mean 'Data.Kind.Type' relies on the StarIsType extension, which
+        will become deprecated in the future.
+
+        Triggered by: 'GHC.Parser.Errors.Types.PsWarnStarIsType'
+        Example: None
+        Test case(s): wcompat-warnings/WCompatWarningsOn.hs
+
+    -}
+  | SuggestUseTypeFromDataKind
+
 -- | An 'InstantiationSuggestion' for a '.hsig' file. This is generated
 -- by GHC in case of a 'DriverUnexpectedSignature' and suggests a way
 -- to instantiate a particular signature, where the first argument is

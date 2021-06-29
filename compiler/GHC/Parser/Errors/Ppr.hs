@@ -92,8 +92,6 @@ instance Diagnostic PsMessage where
              <+> quotes (text "Data.Kind.Type")
           $$ text "relies on the StarIsType extension, which will become"
           $$ text "deprecated in the future."
-          $$ text "Suggested fix: use" <+> quotes (text "Type")
-           <+> text "from" <+> quotes (text "Data.Kind") <+> text "instead."
     PsWarnUnrecognisedPragma
       -> mkSimpleDecorated $ text "Unrecognised pragma"
     PsWarnImportPreQualified
@@ -623,7 +621,7 @@ instance Diagnostic PsMessage where
     PsWarnHaddockInvalidPos                       -> noHints
     PsWarnHaddockIgnoreMulti                      -> noHints
     PsWarnStarBinder                              -> noHints
-    PsWarnStarIsType                              -> noHints
+    PsWarnStarIsType                              -> [SuggestUseTypeFromDataKind]
     PsWarnUnrecognisedPragma                      -> noHints
     PsWarnImportPreQualified                      -> noHints
     PsErrLexer{}                                  -> noHints
