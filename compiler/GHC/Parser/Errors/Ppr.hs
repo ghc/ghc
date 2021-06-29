@@ -1,4 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -241,7 +242,7 @@ instance Diagnostic PsMessage where
                 ]
     PsErrIllegalExplicitNamespace
       -> mkSimpleDecorated $
-           text "Illegal keyword 'type' (use ExplicitNamespaces to enable)"
+           text "Illegal keyword 'type'"
 
     PsErrUnallowedPragma prag
       -> mkSimpleDecorated $
@@ -473,29 +474,6 @@ instance Diagnostic PsMessage where
            text "Invalid type signature:"
            <+> ppr lhs
            <+> text ":: ..."
-           $$ text hint
-         where
-         hint | foreign_RDR `looks_like` lhs
-              = "Perhaps you meant to use ForeignFunctionInterface?"
-              | default_RDR `looks_like` lhs
-              = "Perhaps you meant to use DefaultSignatures?"
-              | pattern_RDR `looks_like` lhs
-              = "Perhaps you meant to use PatternSynonyms?"
-              | otherwise
-              = "Should be of form <variable> :: <type>"
-
-         -- A common error is to forget the ForeignFunctionInterface flag
-         -- so check for that, and suggest.  cf #3805
-         -- Sadly 'foreign import' still barfs 'parse error' because
-         --  'import' is a keyword
-         -- looks_like :: RdrName -> LHsExpr GhcPsErr -> Bool -- AZ
-         looks_like s (L _ (HsVar _ (L _ v))) = v == s
-         looks_like s (L _ (HsApp _ lhs _))   = looks_like s lhs
-         looks_like _ _                       = False
-
-         foreign_RDR = mkUnqual varName (fsLit "foreign")
-         default_RDR = mkUnqual varName (fsLit "default")
-         pattern_RDR = mkUnqual varName (fsLit "pattern")
     PsErrUnexpectedTypeInDecl t what tc tparms equals_or_where
        -> mkSimpleDecorated $
             vcat [ text "Unexpected type" <+> quotes (ppr t)
@@ -688,7 +666,7 @@ instance Diagnostic PsMessage where
     PsErrNoSingleWhereBindInPatSynDecl{}          -> noHints
     PsErrDeclSpliceNotAtTopLevel{}                -> noHints
     PsErrMultipleNamesInStandaloneKindSignature{} -> noHints
-    PsErrIllegalExplicitNamespace                 -> noHints
+    PsErrIllegalExplicitNamespace                 -> [SuggestExtension LangExt.ExplicitNamespaces]
     PsErrUnallowedPragma{}                        -> noHints
     PsErrImportPostQualified                      -> noHints
     PsErrImportQualifiedTwice                     -> noHints
@@ -760,7 +738,28 @@ instance Diagnostic PsMessage where
         sug_missingdo _                                     = Nothing
     PsErrParseRightOpSectionInPat{}               -> noHints
     PsErrIllegalRoleName{}                        -> noHints
-    PsErrInvalidTypeSignature{}                   -> noHints
+    PsErrInvalidTypeSignature lhs                 ->
+        if | foreign_RDR `looks_like` lhs
+           -> [SuggestExtension LangExt.ForeignFunctionInterface]
+           | default_RDR `looks_like` lhs
+           -> [SuggestExtension LangExt.DefaultSignatures]
+           | pattern_RDR `looks_like` lhs
+           -> [SuggestExtension LangExt.PatternSynonyms]
+           | otherwise
+           -> [UnknownHint "Should be of form <variable> :: <type>"]
+      where
+        -- A common error is to forget the ForeignFunctionInterface flag
+        -- so check for that, and suggest.  cf #3805
+        -- Sadly 'foreign import' still barfs 'parse error' because
+        --  'import' is a keyword
+        -- looks_like :: RdrName -> LHsExpr GhcPsErr -> Bool -- AZ
+        looks_like s (L _ (HsVar _ (L _ v))) = v == s
+        looks_like s (L _ (HsApp _ lhs _))   = looks_like s lhs
+        looks_like _ _                       = False
+
+        foreign_RDR = mkUnqual varName (fsLit "foreign")
+        default_RDR = mkUnqual varName (fsLit "default")
+        pattern_RDR = mkUnqual varName (fsLit "pattern")
     PsErrUnexpectedTypeInDecl{}                   -> noHints
     PsErrInvalidPackageName{}                     -> noHints
     PsErrIllegalGadtRecordMultiplicity{}          -> noHints
