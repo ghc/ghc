@@ -9,6 +9,7 @@ module GHC.Parser.Errors.Ppr where
 
 import GHC.Prelude
 import GHC.Driver.Flags
+import GHC.Parser.Errors.Basic
 import GHC.Parser.Errors.Types
 import GHC.Parser.Types
 import GHC.Types.Basic
@@ -57,23 +58,20 @@ instance Diagnostic PsMessage where
                TransLayout_Pipe  -> "`|' at the same depth as implicit layout block"
             )
     PsWarnOperatorWhitespaceExtConflict sym
-      -> let mk_prefix_msg operator_symbol extension_name syntax_meaning =
-                  text "The prefix use of a" <+> quotes (text operator_symbol)
+      -> let mk_prefix_msg extension_name syntax_meaning =
+                  text "The prefix use of a" <+> quotes (pprOperatorWhitespaceSymbol sym)
                     <+> text "would denote" <+> text syntax_meaning
                $$ nest 2 (text "were the" <+> text extension_name <+> text "extension enabled.")
-               $$ text "Suggested fix: add whitespace after the"
-                    <+> quotes (text operator_symbol) <> char '.'
          in mkSimpleDecorated $
          case sym of
-           OperatorWhitespaceSymbol_PrefixPercent -> mk_prefix_msg "%" "LinearTypes" "a multiplicity annotation"
-           OperatorWhitespaceSymbol_PrefixDollar -> mk_prefix_msg "$" "TemplateHaskell" "an untyped splice"
-           OperatorWhitespaceSymbol_PrefixDollarDollar -> mk_prefix_msg "$$" "TemplateHaskell" "a typed splice"
+           OperatorWhitespaceSymbol_PrefixPercent -> mk_prefix_msg "LinearTypes" "a multiplicity annotation"
+           OperatorWhitespaceSymbol_PrefixDollar -> mk_prefix_msg "TemplateHaskell" "an untyped splice"
+           OperatorWhitespaceSymbol_PrefixDollarDollar -> mk_prefix_msg "TemplateHaskell" "a typed splice"
     PsWarnOperatorWhitespace sym occ_type
       -> let mk_msg occ_type_str =
                   text "The" <+> text occ_type_str <+> text "use of a" <+> quotes (ftext sym)
                     <+> text "might be repurposed as special syntax"
                $$ nest 2 (text "by a future language extension.")
-               $$ text "Suggested fix: add whitespace around it."
          in mkSimpleDecorated $
          case occ_type of
            OperatorWhitespaceOccurrence_Prefix -> mk_msg "prefix"
@@ -172,7 +170,7 @@ instance Diagnostic PsMessage where
                      ]
 
     PsErrLambdaCase
-      -> mkSimpleDecorated $ text "Illegal lambda-case (use LambdaCase)"
+      -> mkSimpleDecorated $ text "Illegal lambda-case"
     PsErrEmptyLambda
        -> mkSimpleDecorated $ text "A lambda requires at least one parameter"
     PsErrLinearFunction
@@ -180,19 +178,19 @@ instance Diagnostic PsMessage where
     PsErrOverloadedRecordUpdateNotEnabled
       -> mkSimpleDecorated $ text "OverloadedRecordUpdate needs to be enabled"
     PsErrMultiWayIf
-      -> mkSimpleDecorated $ text "Multi-way if-expressions need MultiWayIf turned on"
+      -> mkSimpleDecorated $ text "Illegal multi-way if-expression"
     PsErrNumUnderscores reason
       -> mkSimpleDecorated $
            text $ case reason of
              NumUnderscore_Integral -> "Use NumericUnderscores to allow underscores in integer literals"
              NumUnderscore_Float    -> "Use NumericUnderscores to allow underscores in floating literals"
     PsErrIllegalBangPattern e
-      -> mkSimpleDecorated $ text "Illegal bang-pattern (use BangPatterns):" $$ ppr e
+      -> mkSimpleDecorated $ text "Illegal bang-pattern" $$ ppr e
     PsErrOverloadedRecordDotInvalid
       -> mkSimpleDecorated $
            text "Use of OverloadedRecordDot '.' not valid ('.' isn't allowed when constructing records or in record patterns)"
     PsErrIllegalPatSynExport
-      -> mkSimpleDecorated $ text "Illegal export form (use PatternSynonyms to enable)"
+      -> mkSimpleDecorated $ text "Illegal export form"
     PsErrOverloadedRecordUpdateNoQualifiedFields
       -> mkSimpleDecorated $ text "Fields cannot be qualified when OverloadedRecordUpdate is enabled"
     PsErrExplicitForall is_unicode
@@ -206,10 +204,8 @@ instance Diagnostic PsMessage where
           forallSym True  = text "∀"
           forallSym False = text "forall"
     PsErrIllegalQualifiedDo qdoDoc
-      -> mkSimpleDecorated $ vcat
-           [ text "Illegal qualified" <+> quotes qdoDoc <+> text "block"
-           , text "Perhaps you intended to use QualifiedDo"
-           ]
+      -> mkSimpleDecorated $
+           text "Illegal qualified" <+> quotes qdoDoc <+> text "block"
     PsErrQualifiedDoInCmd m
       -> mkSimpleDecorated $
            hang (text "Parse error in command:") 2 $
@@ -646,8 +642,8 @@ instance Diagnostic PsMessage where
     PsHeaderMessage  m                            -> psHeaderMessageHints m
     PsWarnTab{}                                   -> [SuggestUseSpaces]
     PsWarnTransitionalLayout{}                    -> noHints
-    PsWarnOperatorWhitespaceExtConflict{}         -> noHints
-    PsWarnOperatorWhitespace{}                    -> noHints
+    PsWarnOperatorWhitespaceExtConflict sym       -> [SuggestUseWhitespaceAfter sym]
+    PsWarnOperatorWhitespace sym occ              -> [SuggestUseWhitespaceAround (unpackFS sym) occ]
     PsWarnHaddockInvalidPos                       -> noHints
     PsWarnHaddockIgnoreMulti                      -> noHints
     PsWarnStarBinder                              -> noHints
@@ -673,18 +669,18 @@ instance Diagnostic PsMessage where
     PsErrExpectedHyphen                           -> noHints
     PsErrSpaceInSCC                               -> noHints
     PsErrEmptyDoubleQuotes{}                      -> noHints
-    PsErrLambdaCase{}                             -> noHints
+    PsErrLambdaCase{}                             -> [SuggestExtension LangExt.LambdaCase]
     PsErrEmptyLambda{}                            -> noHints
     PsErrLinearFunction{}                         -> noHints
-    PsErrMultiWayIf{}                             -> noHints
+    PsErrMultiWayIf{}                             -> [SuggestExtension LangExt.MultiWayIf]
     PsErrOverloadedRecordUpdateNotEnabled{}       -> noHints
     PsErrNumUnderscores{}                         -> noHints
-    PsErrIllegalBangPattern{}                     -> noHints
+    PsErrIllegalBangPattern{}                     -> [SuggestExtension LangExt.BangPatterns]
     PsErrOverloadedRecordDotInvalid{}             -> noHints
-    PsErrIllegalPatSynExport                      -> noHints
+    PsErrIllegalPatSynExport                      -> [SuggestExtension LangExt.PatternSynonyms]
     PsErrOverloadedRecordUpdateNoQualifiedFields  -> noHints
     PsErrExplicitForall{}                         -> noHints
-    PsErrIllegalQualifiedDo{}                     -> noHints
+    PsErrIllegalQualifiedDo{}                     -> [SuggestExtension LangExt.QualifiedDo]
     PsErrQualifiedDoInCmd{}                       -> noHints
     PsErrRecordSyntaxInPatSynDecl{}               -> noHints
     PsErrEmptyWhereInPatSynDecl{}                 -> noHints

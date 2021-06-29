@@ -5,6 +5,8 @@ module GHC.Types.Hint (
   InstantiationSuggestion(..)
   ) where
 
+import GHC.Prelude
+
 import GHC.Utils.Outputable
 import qualified GHC.LanguageExtensions as LangExt
 import Data.Typeable
@@ -12,6 +14,7 @@ import GHC.Unit.Module (ModuleName, Module)
 import GHC.Hs.Extension (GhcTc)
 import GHC.Types.Var (Var)
 import GHC.Types.Basic (Activation, RuleName)
+import GHC.Parser.Errors.Basic
 import {-# SOURCE #-} Language.Haskell.Syntax.Expr
   -- This {-# SOURCE #-} import should be removable once
   -- 'Language.Haskell.Syntax.Bind' no longer depends on 'GHC.Tc.Types.Evidence'.
@@ -83,6 +86,25 @@ data GhcHint
         Test Case(s): None
     -}
   | SuggestUseSpaces
+    {-| Suggests adding a whitespace after the given symbol.
+
+        Examples: None
+        Test Case(s): parser/should_compile/T18834a.hs
+    -}
+  | SuggestUseWhitespaceAfter !OperatorWhitespaceSymbol
+    {-| Suggests adding a whitespace around the given operator symbol,
+        as it might be repurposed as special syntax by a future language extension.
+        The second parameter is how such operator occurred, if in a prefix, suffix
+        or tight infix position.
+
+        Triggered by: 'GHC.Parser.Errors.Types.PsWarnOperatorWhitespace'.
+
+        Example:
+          h a b = a+b -- not OK, no spaces around '+'.
+
+        Test Case(s): parser/should_compile/T18834b.hs
+    -}
+  | SuggestUseWhitespaceAround !String !OperatorWhitespaceOccurrence
     {-| Suggests wrapping an expression in parentheses
 
         Examples: None
