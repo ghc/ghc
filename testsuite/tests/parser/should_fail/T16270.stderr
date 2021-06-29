@@ -66,7 +66,8 @@ T16270.hs:33:6:
     Suggested fix: Perhaps you intended to use LambdaCase
 
 T16270.hs:36:5: error:
-    Use NumericUnderscores to allow underscores in integer literals
+    Illegal underscores in integer literals
+    Suggested fix: Perhaps you intended to use NumericUnderscores
 
 T16270.hs:38:5: error:
     primitive string literal must contain only characters <= '\xFF'

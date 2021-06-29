@@ -182,8 +182,8 @@ instance Diagnostic PsMessage where
     PsErrNumUnderscores reason
       -> mkSimpleDecorated $
            text $ case reason of
-             NumUnderscore_Integral -> "Use NumericUnderscores to allow underscores in integer literals"
-             NumUnderscore_Float    -> "Use NumericUnderscores to allow underscores in floating literals"
+             NumUnderscore_Integral -> "Illegal underscores in integer literals"
+             NumUnderscore_Float    -> "Illegal underscores in floating literals"
     PsErrIllegalBangPattern e
       -> mkSimpleDecorated $ text "Illegal bang-pattern" $$ ppr e
     PsErrOverloadedRecordDotInvalid
@@ -674,7 +674,7 @@ instance Diagnostic PsMessage where
     PsErrLinearFunction{}                         -> noHints
     PsErrMultiWayIf{}                             -> [SuggestExtension LangExt.MultiWayIf]
     PsErrOverloadedRecordUpdateNotEnabled{}       -> noHints
-    PsErrNumUnderscores{}                         -> noHints
+    PsErrNumUnderscores{}                         -> [SuggestExtension LangExt.NumericUnderscores]
     PsErrIllegalBangPattern{}                     -> [SuggestExtension LangExt.BangPatterns]
     PsErrOverloadedRecordDotInvalid{}             -> noHints
     PsErrIllegalPatSynExport                      -> [SuggestExtension LangExt.PatternSynonyms]
