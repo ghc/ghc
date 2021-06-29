@@ -82,9 +82,6 @@ instance Diagnostic PsMessage where
       -> mkSimpleDecorated $
             text "Found binding occurrence of" <+> quotes (text "*")
             <+> text "yet StarIsType is enabled."
-         $$ text "NB. To use (or export) this operator in"
-            <+> text "modules with StarIsType,"
-         $$ text "    including the definition module, you must qualify it."
     PsWarnStarIsType
       -> mkSimpleDecorated $
              text "Using" <+> quotes (text "*")
@@ -606,7 +603,7 @@ instance Diagnostic PsMessage where
     PsWarnOperatorWhitespace sym occ              -> [SuggestUseWhitespaceAround (unpackFS sym) occ]
     PsWarnHaddockInvalidPos                       -> noHints
     PsWarnHaddockIgnoreMulti                      -> noHints
-    PsWarnStarBinder                              -> noHints
+    PsWarnStarBinder                              -> [SuggestQualifyStarOperator]
     PsWarnStarIsType                              -> [SuggestUseTypeFromDataKind]
     PsWarnUnrecognisedPragma                      -> noHints
     PsWarnImportPreQualified                      -> [ SuggestQualifiedAfterModuleName

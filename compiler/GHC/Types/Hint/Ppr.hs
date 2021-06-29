@@ -84,6 +84,10 @@ instance Outputable GhcHint where
                -- will this last case ever happen??
                _   -> hang (text "Perhaps you meant one of these:")
                            2 (pprWithCommas (quotes . ppr) nearby)
+    SuggestQualifyStarOperator
+      -> text "To use (or export) this operator in"
+            <+> text "modules with StarIsType,"
+         $$ text "    including the definition module, you must qualify it."
 
 perhapsAsPat :: SDoc
 perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"
