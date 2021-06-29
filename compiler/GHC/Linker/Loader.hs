@@ -797,13 +797,13 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
 
   ********************************************************************* -}
 
-loadDecls :: Interp -> HscEnv -> (SrcSpan, Maybe ModuleNameWithIsBoot) -> CompiledByteCode -> IO ()
+loadDecls :: Interp -> HscEnv -> (SrcSpan, Maybe ModuleNameWithIsBoot) -> CompiledByteCode -> IO [(Name, ForeignHValue)]
 loadDecls interp hsc_env span cbc@CompiledByteCode{..} = do
     -- Initialise the linker (if it's not been done already)
     initLoaderState interp hsc_env
 
     -- Take lock for the actual work.
-    modifyLoaderState_ interp $ \pls0 -> do
+    modifyLoaderState interp $ \pls0 -> do
       -- Link the packages and modules required
       (pls, ok) <- loadDependencies interp hsc_env pls0 span needed_mods
       if failed ok
@@ -819,7 +819,7 @@ loadDecls interp hsc_env span cbc@CompiledByteCode{..} = do
           nms_fhvs <- makeForeignNamedHValueRefs interp new_bindings
           let pls2 = pls { closure_env = extendClosureEnv ce nms_fhvs
                          , itbl_env    = ie }
-          return pls2
+          return (pls2, nms_fhvs)
   where
     free_names = uniqDSetToList $
       foldr (unionUniqDSets . bcoFreeNames) emptyUniqDSet bc_bcos
