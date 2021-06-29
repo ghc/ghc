@@ -9,7 +9,7 @@ T16270.hs:8:1: warning: [-Wtabs (in -Wdefault)]
 T16270.hs:8:12: error:
     Unexpected semi-colons in conditional:
         if c then False; else True
-    Perhaps you meant to use DoAndIfThenElse?
+    Suggested fix: Perhaps you intended to use DoAndIfThenElse
 
 T16270.hs:13:8: error:
     Unexpected do block in function application:
@@ -43,7 +43,7 @@ T16270.hs:21:6: error:
 T16270.hs:22:8: error:
     Unexpected semi-colons in conditional:
         if True; then (); else ()
-    Perhaps you meant to use DoAndIfThenElse?
+    Suggested fix: Perhaps you intended to use DoAndIfThenElse
 
 T16270.hs:24:10: error:
     Illegal keyword 'where' in data declaration
