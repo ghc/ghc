@@ -1,3 +1,4 @@
 
 readFailTraditionalRecords3.hs:6:7:
-    Illegal record syntax (use TraditionalRecordSyntax): x {i = 3}
+    Illegal record syntax: x {i = 3}
+    Suggested fix: Perhaps you intended to use TraditionalRecordSyntax

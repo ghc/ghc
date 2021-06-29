@@ -435,7 +435,7 @@ instance Diagnostic PsMessage where
       -> mkSimpleDecorated $ text "Inferred type variables are not allowed here"
     PsErrIllegalTraditionalRecordSyntax s
       -> mkSimpleDecorated $
-           text "Illegal record syntax (use TraditionalRecordSyntax):" <+> s
+           text "Illegal record syntax:" <+> s
     PsErrParseErrorInCmd s
       -> mkSimpleDecorated $ hang (text "Parse error in command:") 2 s
     PsErrInPat s details
@@ -746,7 +746,7 @@ instance Diagnostic PsMessage where
     PsErrUnexpectedTypeAppInDecl{}                -> noHints
     PsErrNotADataCon{}                            -> noHints
     PsErrInferredTypeVarNotAllowed                -> noHints
-    PsErrIllegalTraditionalRecordSyntax{}         -> noHints
+    PsErrIllegalTraditionalRecordSyntax{}         -> [SuggestExtension LangExt.TraditionalRecordSyntax]
     PsErrParseErrorInCmd{}                        -> noHints
     PsErrInPat _ details                          -> case details of
       PEIP_RecPattern args YesPatIsRecursive ctx

@@ -26,12 +26,14 @@ T16270.hs:14:8: error:
       Perhaps you intended to use BlockArguments
 
 T16270.hs:18:22: error:
-    Illegal record syntax (use TraditionalRecordSyntax): {fst :: a,
-                                                          snd :: b}
+    Illegal record syntax: {fst :: a,
+                            snd :: b}
+    Suggested fix: Perhaps you intended to use TraditionalRecordSyntax
 
 T16270.hs:19:5: error:
-    Illegal record syntax (use TraditionalRecordSyntax): p {fst = 1,
-                                                            snd = True}
+    Illegal record syntax: p {fst = 1,
+                              snd = True}
+    Suggested fix: Perhaps you intended to use TraditionalRecordSyntax
 
 T16270.hs:21:6: error:
     Illegal symbol ‘forall’ in type
