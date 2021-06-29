@@ -204,10 +204,8 @@ instance Diagnostic PsMessage where
           forallSym True  = text "∀"
           forallSym False = text "forall"
     PsErrIllegalQualifiedDo qdoDoc
-      -> mkSimpleDecorated $ vcat
-           [ text "Illegal qualified" <+> quotes qdoDoc <+> text "block"
-           , text "Perhaps you intended to use QualifiedDo"
-           ]
+      -> mkSimpleDecorated $
+           text "Illegal qualified" <+> quotes qdoDoc <+> text "block"
     PsErrQualifiedDoInCmd m
       -> mkSimpleDecorated $
            hang (text "Parse error in command:") 2 $
@@ -682,7 +680,7 @@ instance Diagnostic PsMessage where
     PsErrIllegalPatSynExport                      -> [SuggestExtension LangExt.PatternSynonyms]
     PsErrOverloadedRecordUpdateNoQualifiedFields  -> noHints
     PsErrExplicitForall{}                         -> noHints
-    PsErrIllegalQualifiedDo{}                     -> noHints
+    PsErrIllegalQualifiedDo{}                     -> [SuggestExtension LangExt.QualifiedDo]
     PsErrQualifiedDoInCmd{}                       -> noHints
     PsErrRecordSyntaxInPatSynDecl{}               -> noHints
     PsErrEmptyWhereInPatSynDecl{}                 -> noHints
