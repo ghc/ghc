@@ -1714,7 +1714,7 @@ instance HiePass p => ToHie (SigContext (LocatedA (Sig (GhcPass p)))) where
           ]
         CompleteMatchSig _ _ (L ispan names) typ ->
           [ locOnly ispan
-          , toHie $ map (C Use) names
+          , toHie $ map (C Use) (unAnnotate names)
           , toHie $ fmap (C Use) typ
           ]
 

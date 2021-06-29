@@ -2562,7 +2562,7 @@ sigdecl :: { LHsDecl GhcPs }
                 {% let (dcolon, tc) = $3
                    in acsA
                        (\cs -> sLL $1 $>
-                         (SigD noExtField (CompleteMatchSig (EpAnn (glR $1) ([ mo $1 ] ++ dcolon ++ [mc $4]) cs) (getCOMPLETE_PRAGs $1) $2 tc))) }
+                         (SigD noExtField (CompleteMatchSig (EpAnn (glR $1) ([ mo $1 ] ++ dcolon ++ [mc $4]) cs) (getCOMPLETE_PRAGs $1) (fmap Annotated $2) tc))) }
 
         -- This rule is for both INLINE and INLINABLE pragmas
         | '{-# INLINE' activation qvarcon '#-}'
