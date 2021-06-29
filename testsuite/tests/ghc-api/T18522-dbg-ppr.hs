@@ -15,6 +15,7 @@ import GHC.Utils.Error
 import GHC.Driver.Ppr
 import GHC.Driver.Env
 import GHC.Driver.Errors
+import GHC.Driver.Config.Diagnostic
 import GHC
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -49,7 +50,8 @@ main = do
       let (warnings, errors) = partitionMessages messages
       case mres of
         Nothing -> do
-          printMessages logger dflags warnings
-          printMessages logger dflags errors
+          let diag_opts = initDiagOpts dflags
+          printMessages logger diag_opts warnings
+          printMessages logger diag_opts errors
         Just (t, _) -> do
           putStrLn $ showSDoc dflags (debugPprType t)
