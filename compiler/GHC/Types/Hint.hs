@@ -158,6 +158,16 @@ data GhcHint
     -}
   | SuggestQualifiedAfterModuleName
 
+    {-| Suggests using TemplateHaskell quotation syntax.
+
+        Triggered by: 'GHC.Parser.Errors.Types.PsErrEmptyDoubleQuotes' only if TemplateHaskell
+                      is enabled.
+        Example: None
+        Test case(s): parser/should_fail/T13450TH.hs
+
+    -}
+  | SuggestThQuotationSyntax
+
 -- | An 'InstantiationSuggestion' for a '.hsig' file. This is generated
 -- by GHC in case of a 'DriverUnexpectedSignature' and suggests a way
 -- to instantiate a particular signature, where the first argument is

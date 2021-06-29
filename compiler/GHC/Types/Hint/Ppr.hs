@@ -73,6 +73,10 @@ instance Outputable GhcHint where
     SuggestQualifiedAfterModuleName
       -> text "Place" <+> quotes (text "qualified")
           <+> text "after the module name."
+    SuggestThQuotationSyntax
+      -> vcat [ text "Perhaps you intended to use quotation syntax of TemplateHaskell,"
+              , text "but the type variable or constructor is missing"
+              ]
 
 perhapsAsPat :: SDoc
 perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"

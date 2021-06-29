@@ -155,16 +155,12 @@ instance Diagnostic PsMessage where
       -> mkSimpleDecorated $ text "Expected a hyphen"
     PsErrSpaceInSCC
       -> mkSimpleDecorated $ text "Spaces are not allowed in SCCs"
-    PsErrEmptyDoubleQuotes th_on
-      -> mkSimpleDecorated $ if th_on then vcat (msg ++ th_msg) else vcat msg
+    PsErrEmptyDoubleQuotes _th_on
+      -> mkSimpleDecorated $ vcat msg
          where
             msg    = [ text "Parser error on `''`"
                      , text "Character literals may not be empty"
                      ]
-            th_msg = [ text "Or perhaps you intended to use quotation syntax of TemplateHaskell,"
-                     , text "but the type variable or constructor is missing"
-                     ]
-
     PsErrLambdaCase
       -> mkSimpleDecorated $ text "Illegal lambda-case"
     PsErrEmptyLambda
@@ -639,7 +635,8 @@ instance Diagnostic PsMessage where
     PsErrInvalidInfixHole                         -> noHints
     PsErrExpectedHyphen                           -> noHints
     PsErrSpaceInSCC                               -> noHints
-    PsErrEmptyDoubleQuotes{}                      -> noHints
+    PsErrEmptyDoubleQuotes th_on | th_on          -> [SuggestThQuotationSyntax]
+                                 | otherwise      -> noHints
     PsErrLambdaCase{}                             -> [SuggestExtension LangExt.LambdaCase]
     PsErrEmptyLambda{}                            -> noHints
     PsErrLinearFunction{}                         -> [SuggestExtension LangExt.LinearTypes]
