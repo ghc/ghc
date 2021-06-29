@@ -40,7 +40,23 @@ module GHC.Exts
         uncheckedShiftL64#, uncheckedShiftRL64#,
         uncheckedIShiftL64#, uncheckedIShiftRA64#,
         isTrue#,
-        Void#,  -- Previously exported by GHC.Prim
+        Void#, -- Previously exported by GHC.Prim
+
+        -- * Pointer comparison operations
+        reallyUnsafePtrEquality,
+        eqStableName#,
+        sameArray#,
+        sameMutableArray#,
+        sameSmallArray#,
+        sameSmallMutableArray#,
+        sameByteArray#,
+        sameMutableByteArray#,
+        sameArrayArray#,
+        sameMutableArrayArray#,
+        sameMVar#,
+        sameMutVar#,
+        sameTVar#,
+        sameIOPort#,
 
         -- * Compat wrapper
         atomicModifyMutVar#,
@@ -349,3 +365,4 @@ resizeSmallMutableArray# arr0 szNew a s0 =
 -- accessible\" by word.
 considerAccessible :: Bool
 considerAccessible = True
+
