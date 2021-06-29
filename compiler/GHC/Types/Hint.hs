@@ -5,6 +5,8 @@ module GHC.Types.Hint (
   InstantiationSuggestion(..)
   ) where
 
+import GHC.Prelude
+
 import GHC.Utils.Outputable
 import qualified GHC.LanguageExtensions as LangExt
 import Data.Typeable
@@ -90,6 +92,19 @@ data GhcHint
         Test Case(s): parser/should_compile/T18834a.hs
     -}
   | SuggestUseWhitespaceAfter !OperatorWhitespaceSymbol
+    {-| Suggests adding a whitespace around the given operator symbol,
+        as it might be repurposed as special syntax by a future language extension.
+        The second parameter is how such operator occurred, if in a prefix, suffix
+        or tight infix position.
+
+        Triggered by: 'GHC.Parser.Errors.Types.PsWarnOperatorWhitespace'.
+
+        Example:
+          h a b = a+b -- not OK, no spaces around '+'.
+
+        Test Case(s): parser/should_compile/T18834b.hs
+    -}
+  | SuggestUseWhitespaceAround !String !OperatorWhitespaceOccurrence
     {-| Suggests wrapping an expression in parentheses
 
         Examples: None

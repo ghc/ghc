@@ -72,7 +72,6 @@ instance Diagnostic PsMessage where
                   text "The" <+> text occ_type_str <+> text "use of a" <+> quotes (ftext sym)
                     <+> text "might be repurposed as special syntax"
                $$ nest 2 (text "by a future language extension.")
-               $$ text "Suggested fix: add whitespace around it."
          in mkSimpleDecorated $
          case occ_type of
            OperatorWhitespaceOccurrence_Prefix -> mk_msg "prefix"
@@ -646,7 +645,7 @@ instance Diagnostic PsMessage where
     PsWarnTab{}                                   -> [SuggestUseSpaces]
     PsWarnTransitionalLayout{}                    -> noHints
     PsWarnOperatorWhitespaceExtConflict sym       -> [SuggestUseWhitespaceAfter sym]
-    PsWarnOperatorWhitespace{}                    -> noHints
+    PsWarnOperatorWhitespace sym occ              -> [SuggestUseWhitespaceAround (unpackFS sym) occ]
     PsWarnHaddockInvalidPos                       -> noHints
     PsWarnHaddockIgnoreMulti                      -> noHints
     PsWarnStarBinder                              -> noHints

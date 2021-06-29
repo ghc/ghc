@@ -50,6 +50,8 @@ instance Outputable GhcHint where
     SuggestUseWhitespaceAfter sym
       -> text "Add whitespace after the"
            <+> quotes (pprOperatorWhitespaceSymbol sym) <> char '.'
+    SuggestUseWhitespaceAround sym _occurrence
+      -> text "Add whitespace around" <+> quotes (text sym) <> char '.'
     SuggestParentheses
       -> text "Use parentheses."
     SuggestIncreaseMaxPmCheckModels

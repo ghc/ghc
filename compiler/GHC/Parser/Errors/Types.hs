@@ -512,12 +512,6 @@ data CmmParserError
    | CmmUnrecognisedSafety  !String     -- ^ Unrecognised safety
    | CmmUnrecognisedHint    !String     -- ^ Unrecognised hint
 
--- | The operator occurrence type in the 'PsOperatorWhitespaceMessage' diagnostic.
-data OperatorWhitespaceOccurrence
-   = OperatorWhitespaceOccurrence_Prefix
-   | OperatorWhitespaceOccurrence_Suffix
-   | OperatorWhitespaceOccurrence_TightInfix
-
 data TransLayoutReason
    = TransLayout_Where -- ^ "`where' clause at the same depth as implicit layout block"
    | TransLayout_Pipe  -- ^ "`|' at the same depth as implicit layout block")
