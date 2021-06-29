@@ -4,7 +4,6 @@ T8227.hs:24:27: error:
                      with: t0 -> t0
       Expected: Scalar (V a)
         Actual: Scalar (V (t0 -> t0)) -> Scalar (V (t0 -> t0))
-      The type variable ‘t0’ is ambiguous
     • In the expression: arcLengthToParam eps eps
       In an equation for ‘absoluteToParam’:
           absoluteToParam eps seg = arcLengthToParam eps eps
