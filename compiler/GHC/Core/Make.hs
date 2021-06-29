@@ -99,12 +99,13 @@ infixl 4 `mkCoreApp`, `mkCoreApps`
 *                                                                      *
 ************************************************************************
 -}
-sortQuantVars :: [Var] -> [Var]
--- Sort the variables, putting type and covars first, in scoped order,
+-- | Sort the variables, putting type and covars first, in scoped order,
 -- and then other Ids
+--
 -- It is a deterministic sort, meaining it doesn't look at the values of
 -- Uniques. For explanation why it's important See Note [Unique Determinism]
 -- in GHC.Types.Unique.
+sortQuantVars :: [Var] -> [Var]
 sortQuantVars vs = sorted_tcvs ++ ids
   where
     (tcvs, ids) = partition (isTyVar <||> isCoVar) vs
@@ -137,9 +138,12 @@ mkCoreConApps con args = mkCoreApps (Var (dataConWorkId con)) args
 
 -- | Construct an expression which represents the application of a number of
 -- expressions to another. The leftmost expression in the list is applied first
+--
 -- Respects the let/app invariant by building a case expression where necessary
 --   See Note [Core let/app invariant] in "GHC.Core"
-mkCoreApps :: CoreExpr -> [CoreExpr] -> CoreExpr
+mkCoreApps :: CoreExpr -- ^ function
+           -> [CoreExpr] -- ^ arguments
+           -> CoreExpr
 mkCoreApps fun args
   = fst $
     foldl' (mkCoreAppTyped doc_string) (fun, fun_ty) args
@@ -149,9 +153,13 @@ mkCoreApps fun args
 
 -- | Construct an expression which represents the application of one expression
 -- to the other
+--
 -- Respects the let/app invariant by building a case expression where necessary
 --   See Note [Core let/app invariant] in "GHC.Core"
-mkCoreApp :: SDoc -> CoreExpr -> CoreExpr -> CoreExpr
+mkCoreApp :: SDoc
+          -> CoreExpr -- ^ function
+          -> CoreExpr -- ^ argument
+          -> CoreExpr
 mkCoreApp s fun arg
   = fst $ mkCoreAppTyped s (fun, exprType fun) arg
 
@@ -159,6 +167,7 @@ mkCoreApp s fun arg
 -- paired with its type to an argument. The result is paired with its type. This
 -- function is not exported and used in the definition of 'mkCoreApp' and
 -- 'mkCoreApps'.
+--
 -- Respects the let/app invariant by building a case expression where necessary
 --   See Note [Core let/app invariant] in "GHC.Core"
 mkCoreAppTyped :: SDoc -> (CoreExpr, Type) -> CoreExpr -> (CoreExpr, Type)
@@ -172,11 +181,11 @@ mkCoreAppTyped d (fun, fun_ty) arg
   where
     (mult, arg_ty, res_ty) = splitFunTy fun_ty
 
-mkValApp :: CoreExpr -> CoreExpr -> Scaled Type -> Type -> CoreExpr
--- Build an application (e1 e2),
+-- | Build an application (e1 e2),
 -- or a strict binding  (case e2 of x -> e1 x)
 -- using the latter when necessary to respect the let/app invariant
 --   See Note [Core let/app invariant] in GHC.Core
+mkValApp :: CoreExpr -> CoreExpr -> Scaled Type -> Type -> CoreExpr
 mkValApp fun arg (Scaled w arg_ty) res_ty
   | not (needsCaseBinding arg_ty arg)
   = App fun arg                -- The vastly common case
@@ -196,20 +205,25 @@ mkWildEvBinder pred = mkWildValBinder Many pred
 -- that you expect to use only at a *binding* site.  Do not use it at
 -- occurrence sites because it has a single, fixed unique, and it's very
 -- easy to get into difficulties with shadowing.  That's why it is used so little.
+--
 -- See Note [WildCard binders] in "GHC.Core.Opt.Simplify.Env"
 mkWildValBinder :: Mult -> Type -> Id
 mkWildValBinder w ty = mkLocalIdOrCoVar wildCardName w ty
   -- "OrCoVar" since a coercion can be a scrutinee with -fdefer-type-errors
   -- (e.g. see test T15695). Ticket #17291 covers fixing this problem.
 
-mkWildCase :: CoreExpr -> Scaled Type -> Type -> [CoreAlt] -> CoreExpr
--- Make a case expression whose case binder is unused
+-- | Make a case expression whose case binder is unused
 -- The alts and res_ty should not have any occurrences of WildId
+mkWildCase :: CoreExpr -- ^ scrutinee
+           -> Scaled Type
+           -> Type -- ^ res_ty
+           -> [CoreAlt] -- ^ alts
+           -> CoreExpr
 mkWildCase scrut (Scaled w scrut_ty) res_ty alts
   = Case scrut (mkWildValBinder w scrut_ty) res_ty alts
 
+-- | Build a strict application (case e2 of x -> e1 x)
 mkStrictApp :: CoreExpr -> CoreExpr -> Scaled Type -> Type -> CoreExpr
--- Build a strict application (case e2 of x -> e1 x)
 mkStrictApp fun arg (Scaled w arg_ty) res_ty
   = Case arg arg_id res_ty [Alt DEFAULT [] (App fun (Var arg_id))]
        -- mkDefaultCase looks attractive here, and would be sound.
@@ -227,7 +241,10 @@ mkStrictApp fun arg (Scaled w arg_ty) res_ty
         -- expression that uses mkWildValBinder, of which there are not
         -- many), and pass a fragment of it as the fun part of a 'mkStrictApp'.
 
-mkIfThenElse :: CoreExpr -> CoreExpr -> CoreExpr -> CoreExpr
+mkIfThenElse :: CoreExpr -- ^ guard
+             -> CoreExpr -- ^ then
+             -> CoreExpr -- ^ else
+             -> CoreExpr
 mkIfThenElse guard then_expr else_expr
 -- Not going to be refining, so okay to take the type of the "then" clause
   = mkWildCase guard (linear boolTy) (exprType then_expr)
