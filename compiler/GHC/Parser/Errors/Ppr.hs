@@ -174,7 +174,7 @@ instance Diagnostic PsMessage where
     PsErrEmptyLambda
        -> mkSimpleDecorated $ text "A lambda requires at least one parameter"
     PsErrLinearFunction
-      -> mkSimpleDecorated $ text "Enable LinearTypes to allow linear functions"
+      -> mkSimpleDecorated $ text "Illegal use of linear functions"
     PsErrOverloadedRecordUpdateNotEnabled
       -> mkSimpleDecorated $ text "OverloadedRecordUpdate needs to be enabled"
     PsErrMultiWayIf
@@ -671,7 +671,7 @@ instance Diagnostic PsMessage where
     PsErrEmptyDoubleQuotes{}                      -> noHints
     PsErrLambdaCase{}                             -> [SuggestExtension LangExt.LambdaCase]
     PsErrEmptyLambda{}                            -> noHints
-    PsErrLinearFunction{}                         -> noHints
+    PsErrLinearFunction{}                         -> [SuggestExtension LangExt.LinearTypes]
     PsErrMultiWayIf{}                             -> [SuggestExtension LangExt.MultiWayIf]
     PsErrOverloadedRecordUpdateNotEnabled{}       -> noHints
     PsErrNumUnderscores{}                         -> [SuggestExtension LangExt.NumericUnderscores]
