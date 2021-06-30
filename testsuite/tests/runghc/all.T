@@ -4,14 +4,7 @@ test('T8601', req_interp, makefile_test, [])
 
 test('T11247', [req_interp, expect_broken(11247)], makefile_test, [])
 
-test('T6132', [
-     when(opsys('darwin') or opsys('freebsd'), expect_broken(6132)),
-     # When using clang as CC, which more recent LLVM toolchains will
-     # require as llc will produce assembly that GAS doesn't like,
-     # we'll end up with the following issue where clang does not
-     # like the shebang.
-     # https://bugs.llvm.org/show_bug.cgi?id=40689
-     omit_ways(llvm_ways)],
+test('T6132', [],
      compile, [''])
 
 test('T17171a',
