@@ -74,6 +74,7 @@ import GHC.Utils.FV ( fvVarList, unionFV )
 
 import GHC.Data.Bag
 import GHC.Data.FastString
+import GHC.Utils.Trace (pprTraceUserWarning)
 import GHC.Data.List.SetOps ( equivClasses )
 import GHC.Data.Maybe
 import qualified GHC.Data.Strict as Strict
@@ -2944,8 +2945,11 @@ pprSkols ctxt tvs
   = vcat (map pp_one (getSkolemInfo (cec_encl ctxt) tvs))
   where
     pp_one (UnkSkol, tvs)
-      = hang (pprQuotedList tvs)
-           2 (is_or_are tvs "an" "unknown")
+      = vcat [ hang (pprQuotedList tvs)
+                 2 (is_or_are tvs "a" "(rigid, skolem)")
+             , nest 2 (text "of unknown origin")
+             , nest 2 (text "bound at" <+> ppr (foldr1 combineSrcSpans (map getSrcSpan tvs)))
+             ]
     pp_one (RuntimeUnkSkol, tvs)
       = hang (pprQuotedList tvs)
            2 (is_or_are tvs "an" "unknown runtime")
@@ -2979,7 +2983,13 @@ getSkolemInfo _ []
 
 getSkolemInfo [] tvs
   | all isRuntimeUnkSkol tvs = [(RuntimeUnkSkol, tvs)]        -- #14628
-  | otherwise = pprPanic "No skolem info:" (ppr tvs)
+  | otherwise = -- See https://gitlab.haskell.org/ghc/ghc/-/issues?label_name[]=No%20skolem%20info
+      pprTraceUserWarning msg [(UnkSkol,tvs)]
+  where
+    msg = text "No skolem info - we could not find the origin of the following variables" <+> ppr tvs
+       $$ text "This should not happen, please report it as a bug following the instructions at:"
+       $$ text "https://gitlab.haskell.org/ghc/ghc/wikis/report-a-bug"
+
 
 getSkolemInfo (implic:implics) tvs
   | null tvs_here =                            getSkolemInfo implics tvs
