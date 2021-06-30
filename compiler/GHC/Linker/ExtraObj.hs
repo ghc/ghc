@@ -25,7 +25,6 @@ import GHC.Platform
 
 import GHC.Unit
 import GHC.Unit.Env
-import GHC.Unit.State
 
 import GHC.Utils.Asm
 import GHC.Utils.Error
