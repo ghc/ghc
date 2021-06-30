@@ -798,6 +798,9 @@ nightly-aarch64-linux-deb10:
   extends: .build-aarch64-linux-deb10
   stage: full-build
   variables:
+  variables:
+    TEST_ENV: "aarch64-linux-deb10-llvm"
+    BIN_DIST_PREP_TAR_COMP: "ghc-aarch64-linux-deb10-llvm.tar.xz"
     BUILD_FLAVOUR: perf-llvm
   tags:
     - aarch64-linux
