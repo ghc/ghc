@@ -283,7 +283,8 @@ $tab          { warnTab }
   ^\# line                              { begin line_prag1 }
   ^\# / { followedByDigit }             { begin line_prag1 }
   ^\# pragma .* \n                      ; -- GCC 3.3 CPP generated, apparently
-  ^\# \! .* \n                          ; -- #!, for scripts
+  ^\# \! .* \n                          ; -- #!, for scripts  -- gcc
+  ^\  \# \! .* \n                       ; --  #!, for scripts -- clang; See #6132
   ()                                    { do_bol }
 }
 
