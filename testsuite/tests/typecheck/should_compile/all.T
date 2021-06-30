@@ -239,7 +239,10 @@ test('tc227', normal, compile, [''])
 test('tc228', normal, compile, [''])
 test('tc229', normal, compile, [''])
 test('tc230', normal, compile, [''])
-test('tc231', normalise_version('base','ghc-prim'), compile, [''])
+
+test('tc231', normalise_version('base','ghc-prim'), compile_fail, [''])
+# Could go either way (see comments in the test itself)
+
 test('tc232', normal, compile, [''])
 test('tc233', normal, compile, [''])
 test('tc234', normal, compile, [''])
