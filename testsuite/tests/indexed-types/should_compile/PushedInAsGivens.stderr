@@ -1,29 +1,23 @@
 
 PushedInAsGivens.hs:10:31: error:
-    • Could not deduce: a1 ~ a
-      from the context: F Int ~ [a1]
-        bound by the type signature for:
-                   foo :: forall a1. (F Int ~ [a1]) => a1 -> Int
-        at PushedInAsGivens.hs:9:13-44
-      ‘a1’ is a rigid type variable bound by
+    • Couldn't match expected type ‘a’ with actual type ‘a0’
+        because type variable ‘a’ would escape its scope
+      This (rigid, skolem) type variable is bound by
         the type signature for:
-          foo :: forall a1. (F Int ~ [a1]) => a1 -> Int
+          foo :: forall a. (F Int ~ [a]) => a -> Int
         at PushedInAsGivens.hs:9:13-44
-      ‘a’ is a rigid type variable bound by
-        the inferred type of bar :: a -> (a, Int)
-        at PushedInAsGivens.hs:(9,1)-(11,20)
     • In the expression: y
       In the first argument of ‘length’, namely ‘[x, y]’
       In the expression: length [x, y]
     • Relevant bindings include
-        x :: a1 (bound at PushedInAsGivens.hs:10:17)
-        foo :: a1 -> Int (bound at PushedInAsGivens.hs:10:13)
-        y :: a (bound at PushedInAsGivens.hs:9:5)
-        bar :: a -> (a, Int) (bound at PushedInAsGivens.hs:9:1)
+        x :: a (bound at PushedInAsGivens.hs:10:17)
+        foo :: a -> Int (bound at PushedInAsGivens.hs:10:13)
+        y :: a0 (bound at PushedInAsGivens.hs:9:5)
+        bar :: a0 -> (a0, Int) (bound at PushedInAsGivens.hs:9:1)
 
 PushedInAsGivens.hs:11:15: error:
     • Couldn't match type: F Int
-                     with: [a]
+                     with: [a0]
         arising from a use of ‘foo’
     • In the expression: foo y
       In the expression: (y, foo y)
@@ -33,5 +27,5 @@ PushedInAsGivens.hs:11:15: error:
           foo x = length [...]
         in (y, foo y)
     • Relevant bindings include
-        y :: a (bound at PushedInAsGivens.hs:9:5)
-        bar :: a -> (a, Int) (bound at PushedInAsGivens.hs:9:1)
+        y :: a0 (bound at PushedInAsGivens.hs:9:5)
+        bar :: a0 -> (a0, Int) (bound at PushedInAsGivens.hs:9:1)

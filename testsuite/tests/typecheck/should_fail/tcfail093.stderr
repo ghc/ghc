@@ -1,0 +1,5 @@
+
+tcfail093.hs:23:10: error:
+    • No instance for (Call (IO Int) h0) arising from a use of ‘call’
+    • In the expression: call primDup
+      In an equation for ‘dup’: dup () = call primDup

@@ -22,7 +22,12 @@ class C a where
 
 instance C Int where
   type forall a b. CT [a] (a,a)     = Float
-  type forall b.   CT _ _           = Maybe b
-
   data forall a b. CD [a] (a,a)     = CD5 Float
+
+instance C Bool where
+  type forall b.   CT _ _           = Maybe b
   data forall b.   CD _ _           = CD6 (Maybe b)
+
+instance C Double where
+  type forall b. CT _ _ = Bool
+  data forall b. CD _ _ = CD7
