@@ -86,7 +86,6 @@ import GHC.Data.BooleanFormula ( isUnsatisfied, pprBooleanFormulaNice )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
-import Data.Tuple
 import GHC.Data.Maybe
 import Data.List( mapAccumL )
 
@@ -491,11 +490,11 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty, cid_binds = binds
              -- NB: tcHsClsInstType does checkValidInstance
 
         ; (subst, skol_tvs) <- tcInstSkolTyVars tyvars
-        ; let tv_skol_prs = [ (tyVarName tv, skol_tv)
-                            | (tv, skol_tv) <- tyvars `zip` skol_tvs ]
+        ; let tv_names    = map tyVarName tyvars
+              tv_skol_prs = zip tv_names skol_tvs
               -- Map from the skolemized Names to the original Names.
               -- See Note [Associated data family instances and di_scoped_tvs].
-              tv_skol_env = mkVarEnv $ map swap tv_skol_prs
+              tv_skol_env = zipVarEnv skol_tvs tv_names
               n_inferred = countWhile ((== Inferred) . binderArgFlag) $
                            fst $ splitForAllTyCoVarBinders dfun_ty
               visible_skol_tvs = drop n_inferred skol_tvs
@@ -505,7 +504,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty, cid_binds = binds
         -- Next, process any associated types.
         ; (datafam_stuff, tyfam_insts)
              <- tcExtendNameTyVarEnv tv_skol_prs $
-                do  { let mini_env   = mkVarEnv (classTyVars clas `zip` substTys subst inst_tys)
+                do  { let mini_env   = zipEqualVarEnv (classTyVars clas) (substTys subst inst_tys)
                           mini_subst = mkTvSubst (mkInScopeSet (mkVarSet skol_tvs)) mini_env
                           mb_info    = InClsInst { ai_class = clas
                                                  , ai_tyvars = visible_skol_tvs

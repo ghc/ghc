@@ -1197,7 +1197,7 @@ specCase env scrut' case_bndr [Alt con args rhs]
              -- to their floated versions.
              mb_sc_flts :: [Maybe DictId]
              mb_sc_flts = map (lookupVarEnv clone_env) args'
-             clone_env  = zipVarEnv sc_args' sc_args_flt
+             clone_env  = zipEqualVarEnv sc_args' sc_args_flt
              subst_prs  = (case_bndr, Var case_bndr_flt)
                         : [ (arg, Var sc_flt)
                           | (arg, Just sc_flt) <- args `zip` mb_sc_flts ]
