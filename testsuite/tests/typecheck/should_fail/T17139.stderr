@@ -1,21 +1,4 @@
 
-T17139.hs:15:10: error:
-    • Couldn't match type ‘f’ with ‘(->) a’
-      Expected: TypeFam f (a -> b)
-        Actual: (a -> a) -> f a -> TypeFam f b0
-      ‘f’ is a rigid type variable bound by
-        the type signature for:
-          lift :: forall a b (f :: * -> *). (a -> b) -> TypeFam f (a -> b)
-        at T17139.hs:14:1-38
-    • The lambda expression ‘\ x -> _ (f <*> x)’
-      has one value argument,
-        but its type ‘TypeFam f (a -> b)’ has none
-      In the expression: \ x -> _ (f <*> x)
-      In an equation for ‘lift’: lift f = \ x -> _ (f <*> x)
-    • Relevant bindings include
-        f :: a -> b (bound at T17139.hs:15:6)
-        lift :: (a -> b) -> TypeFam f (a -> b) (bound at T17139.hs:15:1)
-
 T17139.hs:15:16: error:
     • Found hole: _ :: (a -> b0) -> f a -> TypeFam f b0
       Where: ‘b0’ is an ambiguous type variable

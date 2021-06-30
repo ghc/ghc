@@ -1,13 +1,13 @@
 
-T7748a.hs:16:24: error:
+T7748a.hs:14:24: error:
     • Couldn't match expected type ‘a’
                   with actual type ‘Maybe (Maybe (r -> ()))’
       ‘a’ is a rigid type variable bound by
         the type signature for:
           test :: forall a r. a -> r -> ()
         at T7748a.hs:11:1-20
-    • In the pattern: Just (Just p)
-      In a case alternative: Just (Just p) -> p
+    • In the pattern: Nothing
+      In a case alternative: Nothing -> const ()
       In the expression:
         case zd of
           Nothing -> const ()

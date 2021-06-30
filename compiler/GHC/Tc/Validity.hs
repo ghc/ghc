@@ -217,7 +217,7 @@ checkAmbiguity ctxt ty
        ; allow_ambiguous <- xoptM LangExt.AllowAmbiguousTypes
        ; (_wrap, wanted) <- addErrCtxt (mk_msg allow_ambiguous) $
                             captureConstraints $
-                            tcSubTypeSigma ctxt ty ty
+                            tcSubTypeSigma (AmbiguityCheckOrigin ctxt) ctxt ty ty
        ; simplifyAmbiguityCheck ty wanted
 
        ; traceTc "Done ambiguity check for" (ppr ty) }
@@ -1187,7 +1187,7 @@ check_pred_help under_syn env dflags ctxt pred
               -- is wrong.  For user written signatures, it'll be rejected by kind-checking
               -- well before we get to validity checking.  For inferred types we are careful
               -- to box such constraints in GHC.Tc.Utils.TcType.pickQuantifiablePreds, as described
-              -- in Note [Lift equality constraints when quantifying] in GHC.Tc.Utils.TcType
+              -- in Note [Lift equality constraints when quantifying] in GHC.Tc.Solver
 
       ForAllPred _ theta head -> check_quant_pred env dflags ctxt pred theta head
       IrredPred {}            -> check_irred_pred under_syn env dflags pred

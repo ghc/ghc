@@ -97,7 +97,7 @@ module GHC.Tc.Utils.TcType (
   ---------------------------------
   -- Predicate types
   mkMinimalBySCs, transSuperClasses,
-  pickQuantifiablePreds, pickCapturedPreds,
+  pickCapturedPreds,
   immSuperClasses, boxEqPred,
   isImprovementPred,
 
@@ -1757,71 +1757,7 @@ evVarPred var = varType var
   -- partial signatures, (isEvVarType kappa) will return False. But
   -- nothing is wrong.  So I just removed the ASSERT.
 
-------------------
--- | When inferring types, should we quantify over a given predicate?
--- Generally true of classes; generally false of equality constraints.
--- Equality constraints that mention quantified type variables and
--- implicit variables complicate the story. See Notes
--- [Inheriting implicit parameters] and [Quantifying over equality constraints]
-pickQuantifiablePreds
-  :: TyVarSet           -- Quantifying over these
-  -> TcThetaType        -- Proposed constraints to quantify
-  -> TcThetaType        -- A subset that we can actually quantify
--- This function decides whether a particular constraint should be
--- quantified over, given the type variables that are being quantified
-pickQuantifiablePreds qtvs theta
-  = let flex_ctxt = True in  -- Quantify over non-tyvar constraints, even without
-                             -- -XFlexibleContexts: see #10608, #10351
-         -- flex_ctxt <- xoptM Opt_FlexibleContexts
-    mapMaybe (pick_me flex_ctxt) theta
-  where
-    pick_me flex_ctxt pred
-      = case classifyPredType pred of
-
-          ClassPred cls tys
-            | Just {} <- isCallStackPred cls tys
-              -- NEVER infer a CallStack constraint.  Otherwise we let
-              -- the constraints bubble up to be solved from the outer
-              -- context, or be defaulted when we reach the top-level.
-              -- See Note [Overview of implicit CallStacks]
-            -> Nothing
-
-            | isIPClass cls
-            -> Just pred -- See note [Inheriting implicit parameters]
-
-            | pick_cls_pred flex_ctxt cls tys
-            -> Just pred
-
-          EqPred eq_rel ty1 ty2
-            | quantify_equality eq_rel ty1 ty2
-            , Just (cls, tys) <- boxEqPred eq_rel ty1 ty2
-              -- boxEqPred: See Note [Lift equality constraints when quantifying]
-            , pick_cls_pred flex_ctxt cls tys
-            -> Just (mkClassPred cls tys)
-
-          IrredPred ty
-            | tyCoVarsOfType ty `intersectsVarSet` qtvs
-            -> Just pred
-
-          _ -> Nothing
-
-
-    pick_cls_pred flex_ctxt cls tys
-      = tyCoVarsOfTypes tys `intersectsVarSet` qtvs
-        && (checkValidClsArgs flex_ctxt cls tys)
-           -- Only quantify over predicates that checkValidType
-           -- will pass!  See #10351.
-
-    -- See Note [Quantifying over equality constraints]
-    quantify_equality NomEq  ty1 ty2 = quant_fun ty1 || quant_fun ty2
-    quantify_equality ReprEq _   _   = True
-
-    quant_fun ty
-      = case tcSplitTyConApp_maybe ty of
-          Just (tc, tys) | isTypeFamilyTyCon tc
-                         -> tyCoVarsOfTypes tys `intersectsVarSet` qtvs
-          _ -> False
-
+---------------------------
 boxEqPred :: EqRel -> Type -> Type -> Maybe (Class, [Type])
 -- Given (t1 ~# t2) or (t1 ~R# t2) return the boxed version
 --       (t1 ~ t2)  or (t1 `Coercible` t2)
@@ -1994,71 +1930,6 @@ Notice that
    case for tuples.  Something better would be cool.
 
 See also GHC.Tc.TyCl.Utils.checkClassCycles.
-
-Note [Lift equality constraints when quantifying]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We can't quantify over a constraint (t1 ~# t2) because that isn't a
-predicate type; see Note [Types for coercions, predicates, and evidence]
-in GHC.Core.TyCo.Rep.
-
-So we have to 'lift' it to (t1 ~ t2).  Similarly (~R#) must be lifted
-to Coercible.
-
-This tiresome lifting is the reason that pick_me (in
-pickQuantifiablePreds) returns a Maybe rather than a Bool.
-
-Note [Quantifying over equality constraints]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Should we quantify over an equality constraint (s ~ t)?  In general, we don't.
-Doing so may simply postpone a type error from the function definition site to
-its call site.  (At worst, imagine (Int ~ Bool)).
-
-However, consider this
-         forall a. (F [a] ~ Int) => blah
-Should we quantify over the (F [a] ~ Int)?  Perhaps yes, because at the call
-site we will know 'a', and perhaps we have instance  F [Bool] = Int.
-So we *do* quantify over a type-family equality where the arguments mention
-the quantified variables.
-
-Note [Inheriting implicit parameters]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider this:
-
-        f x = (x::Int) + ?y
-
-where f is *not* a top-level binding.
-From the RHS of f we'll get the constraint (?y::Int).
-There are two types we might infer for f:
-
-        f :: Int -> Int
-
-(so we get ?y from the context of f's definition), or
-
-        f :: (?y::Int) => Int -> Int
-
-At first you might think the first was better, because then
-?y behaves like a free variable of the definition, rather than
-having to be passed at each call site.  But of course, the WHOLE
-IDEA is that ?y should be passed at each call site (that's what
-dynamic binding means) so we'd better infer the second.
-
-BOTTOM LINE: when *inferring types* you must quantify over implicit
-parameters, *even if* they don't mention the bound type variables.
-Reason: because implicit parameters, uniquely, have local instance
-declarations. See pickQuantifiablePreds.
-
-Note [Quantifying over equality constraints]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Should we quantify over an equality constraint (s ~ t)?  In general, we don't.
-Doing so may simply postpone a type error from the function definition site to
-its call site.  (At worst, imagine (Int ~ Bool)).
-
-However, consider this
-         forall a. (F [a] ~ Int) => blah
-Should we quantify over the (F [a] ~ Int).  Perhaps yes, because at the call
-site we will know 'a', and perhaps we have instance  F [Bool] = Int.
-So we *do* quantify over a type-family equality where the arguments mention
-the quantified variables.
 
 ************************************************************************
 *                                                                      *

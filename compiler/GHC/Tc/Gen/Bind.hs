@@ -41,12 +41,15 @@ import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Solver
 import GHC.Tc.Types.Evidence
+import GHC.Tc.Types.Constraint
+import GHC.Core.Predicate
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Gen.Pat
 import GHC.Tc.Utils.TcMType
 import GHC.Core.Multiplicity
 import GHC.Core.FamInstEnv( normaliseType )
 import GHC.Tc.Instance.Family( tcGetFamInstEnvs )
+import GHC.Core.Class   ( Class )
 import GHC.Tc.Utils.TcType
 import GHC.Core.Type (mkStrLitTy, tidyOpenType, mkCastTy)
 import GHC.Builtin.Types ( mkBoxedTupleTy )
@@ -256,47 +259,35 @@ tcLocalBinds (HsIPBinds x (IPBinds _ ip_binds)) thing_inside
         ; (given_ips, ip_binds') <-
             mapAndUnzipM (wrapLocSndMA (tc_ip_bind ipClass)) ip_binds
 
-        -- If the binding binds ?x = E, we  must now
-        -- discharge any ?x constraints in expr_lie
-        -- See Note [Implicit parameter untouchables]
+        -- Add all the IP bindings as givens for the body of the 'let'
         ; (ev_binds, result) <- checkConstraints (IPSkol ips)
                                   [] given_ips thing_inside
 
         ; return (HsIPBinds x (IPBinds ev_binds ip_binds') , result) }
   where
-    ips = [ip | (L _ (IPBind _ (Left (L _ ip)) _)) <- ip_binds]
+    ips = [ip | (L _ (IPBind _ (L _ ip) _)) <- ip_binds]
 
         -- I wonder if we should do these one at a time
         -- Consider     ?x = 4
         --              ?y = ?x + 1
-    tc_ip_bind ipClass (IPBind _ (Left (L _ ip)) expr)
+    tc_ip_bind :: Class -> IPBind GhcRn -> TcM (DictId, IPBind GhcTc)
+    tc_ip_bind ipClass (IPBind _ l_name@(L _ ip) expr)
        = do { ty <- newOpenFlexiTyVarTy
             ; let p = mkStrLitTy $ hsIPNameFS ip
             ; ip_id <- newDict ipClass [ p, ty ]
             ; expr' <- tcCheckMonoExpr expr ty
-            ; let d = toDict ipClass p ty `fmap` expr'
-            ; return (ip_id, (IPBind noAnn (Right ip_id) d)) }
-    tc_ip_bind _ (IPBind _ (Right {}) _) = panic "tc_ip_bind"
+            ; let d = mapLoc (toDict ipClass p ty) expr'
+            ; return (ip_id, (IPBind ip_id l_name d)) }
 
     -- Coerces a `t` into a dictionary for `IP "x" t`.
     -- co : t -> IP "x" t
+    toDict :: Class  -- IP class
+           -> Type   -- type-level string for name of IP
+           -> Type   -- type of IP
+           -> HsExpr GhcTc   -- def'n of IP variable
+           -> HsExpr GhcTc   -- dictionary for IP
     toDict ipClass x ty = mkHsWrap $ mkWpCastR $
                           wrapIP $ mkClassPred ipClass [x,ty]
-
-{- Note [Implicit parameter untouchables]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We add the type variables in the types of the implicit parameters
-as untouchables, not so much because we really must not unify them,
-but rather because we otherwise end up with constraints like this
-    Num alpha, Implic { wanted = alpha ~ Int }
-The constraint solver solves alpha~Int by unification, but then
-doesn't float that solved constraint out (it's not an unsolved
-wanted).  Result disaster: the (Num alpha) is again solved, this
-time by defaulting.  No no no.
-
-However [Oct 10] this is all handled automatically by the
-untouchable-range idea.
--}
 
 tcValBinds :: TopLevelFlag
            -> [(RecFlag, LHsBinds GhcRn)] -> [LSig GhcRn]
@@ -734,12 +725,19 @@ tcPolyInfer rec_tc prag_fn tc_sig_fn mono bind_list
        ; mapM_ (checkOverloadedSig mono) sigs
 
        ; traceTc "simplifyInfer call" (ppr tclvl $$ ppr name_taus $$ ppr wanted)
-       ; (qtvs, givens, ev_binds, insoluble)
-                 <- simplifyInfer tclvl infer_mode sigs name_taus wanted
+       ; ((qtvs, givens, ev_binds, insoluble), residual)
+            <- captureConstraints $ simplifyInfer tclvl infer_mode sigs name_taus wanted
 
        ; let inferred_theta = map evVarPred givens
        ; exports <- checkNoErrs $
-                    mapM (mkExport prag_fn insoluble qtvs inferred_theta) mono_infos
+                    mapM (mkExport prag_fn residual insoluble qtvs inferred_theta) mono_infos
+
+         -- NB: *after* the checkNoErrs call above. This ensures that we don't get an error
+         -- cascade in case mkExport runs into trouble. In particular, this avoids duplicate
+         -- errors when a partial type signature cannot be quantified in chooseInferredQuantifiers.
+         -- See Note [Quantification and partial signatures] in GHC.Tc.Solver, Wrinkle 4.
+         -- Tested in partial-sigs/should_fail/NamedWilcardExplicitForall.
+       ; emitConstraints residual
 
        ; loc <- getSrcSpanM
        ; let poly_ids = map abe_poly exports
@@ -756,6 +754,7 @@ tcPolyInfer rec_tc prag_fn tc_sig_fn mono bind_list
 
 --------------
 mkExport :: TcPragEnv
+         -> WantedConstraints  -- residual constraints, already emitted (for errors only)
          -> Bool                        -- True <=> there was an insoluble type error
                                         --          when typechecking the bindings
          -> [TyVar] -> TcThetaType      -- Both already zonked
@@ -774,12 +773,12 @@ mkExport :: TcPragEnv
 
 -- Pre-condition: the qtvs and theta are already zonked
 
-mkExport prag_fn insoluble qtvs theta
-         mono_info@(MBI { mbi_poly_name = poly_name
-                        , mbi_sig       = mb_sig
-                        , mbi_mono_id   = mono_id })
+mkExport prag_fn residual insoluble qtvs theta
+         (MBI { mbi_poly_name = poly_name
+              , mbi_sig       = mb_sig
+              , mbi_mono_id   = mono_id })
   = do  { mono_ty <- zonkTcType (idType mono_id)
-        ; poly_id <- mkInferredPolyId insoluble qtvs theta poly_name mb_sig mono_ty
+        ; poly_id <- mkInferredPolyId residual insoluble qtvs theta poly_name mb_sig mono_ty
 
         -- NB: poly_id has a zonked type
         ; poly_id <- addInlinePrags poly_id prag_sigs
@@ -798,8 +797,12 @@ mkExport prag_fn insoluble qtvs theta
                   then return idHsWrapper  -- Fast path; also avoids complaint when we infer
                                            -- an ambiguous type and have AllowAmbiguousType
                                            -- e..g infer  x :: forall a. F a -> Int
-                  else addErrCtxtM (mk_impedance_match_msg mono_info sel_poly_ty poly_ty) $
-                       tcSubTypeSigma sig_ctxt sel_poly_ty poly_ty
+                  else tcSubTypeSigma (Shouldn'tHappenOrigin "impedance matching")
+                                      sig_ctxt sel_poly_ty poly_ty
+                       -- as Note [Impedance matching] explains, this should never fail,
+                       -- and thus we'll never see an error message. It *may* do
+                       -- instantiation, but no message will ever be printed to the
+                       -- user, and so we use Shouldn'tHappenOrigin.
 
         ; localSigWarn Opt_WarnMissingLocalSignatures poly_id mb_sig
 
@@ -813,12 +816,13 @@ mkExport prag_fn insoluble qtvs theta
     prag_sigs = lookupPragEnv prag_fn poly_name
     sig_ctxt  = InfSigCtxt poly_name
 
-mkInferredPolyId :: Bool  -- True <=> there was an insoluble error when
+mkInferredPolyId :: WantedConstraints   -- the residual constraints, already emitted
+                 -> Bool  -- True <=> there was an insoluble error when
                           --          checking the binding group for this Id
                  -> [TyVar] -> TcThetaType
                  -> Name -> Maybe TcIdSigInst -> TcType
                  -> TcM TcId
-mkInferredPolyId insoluble qtvs inferred_theta poly_name mb_sig_inst mono_ty
+mkInferredPolyId residual insoluble qtvs inferred_theta poly_name mb_sig_inst mono_ty
   | Just (TISI { sig_inst_sig = sig })  <- mb_sig_inst
   , CompleteSig { sig_bndr = poly_id } <- sig
   = return poly_id
@@ -838,7 +842,7 @@ mkInferredPolyId insoluble qtvs inferred_theta poly_name mb_sig_inst mono_ty
                -- We can discard the coercion _co, because we'll reconstruct
                -- it in the call to tcSubType below
 
-       ; (binders, theta') <- chooseInferredQuantifiers inferred_theta
+       ; (binders, theta') <- chooseInferredQuantifiers residual inferred_theta
                                 (tyCoVarsOfType mono_ty') qtvs mb_sig_inst
 
        ; let inferred_poly_ty = mkInvisForAllTys binders (mkPhiTy theta' mono_ty')
@@ -856,12 +860,13 @@ mkInferredPolyId insoluble qtvs inferred_theta poly_name mb_sig_inst mono_ty
        ; return (mkLocalId poly_name Many inferred_poly_ty) }
 
 
-chooseInferredQuantifiers :: TcThetaType   -- inferred
+chooseInferredQuantifiers :: WantedConstraints  -- residual constraints
+                          -> TcThetaType   -- inferred
                           -> TcTyVarSet    -- tvs free in tau type
                           -> [TcTyVar]     -- inferred quantified tvs
                           -> Maybe TcIdSigInst
                           -> TcM ([InvisTVBinder], TcThetaType)
-chooseInferredQuantifiers inferred_theta tau_tvs qtvs Nothing
+chooseInferredQuantifiers _residual inferred_theta tau_tvs qtvs Nothing
   = -- No type signature (partial or complete) for this binder,
     do { let free_tvs = closeOverKinds (growThetaTyVars inferred_theta tau_tvs)
                         -- Include kind variables!  #7916
@@ -871,11 +876,11 @@ chooseInferredQuantifiers inferred_theta tau_tvs qtvs Nothing
                         , tv `elemVarSet` free_tvs ]
        ; return (binders, my_theta) }
 
-chooseInferredQuantifiers inferred_theta tau_tvs qtvs
-                          (Just (TISI { sig_inst_sig   = sig  -- Always PartialSig
-                                      , sig_inst_wcx   = wcx
-                                      , sig_inst_theta = annotated_theta
-                                      , sig_inst_skols = annotated_tvs }))
+chooseInferredQuantifiers residual inferred_theta tau_tvs qtvs
+  (Just (TISI { sig_inst_sig   = sig@(PartialSig { psig_name = fn_name, psig_hs_ty = hs_ty })
+              , sig_inst_wcx   = wcx
+              , sig_inst_theta = annotated_theta
+              , sig_inst_skols = annotated_tvs }))
   = -- Choose quantifiers for a partial type signature
     do { let (psig_qtv_nms, psig_qtv_bndrs) = unzip annotated_tvs
        ; psig_qtv_bndrs <- mapM zonkInvisTVBinder psig_qtv_bndrs
@@ -893,8 +898,8 @@ chooseInferredQuantifiers inferred_theta tau_tvs qtvs
             -- signature is not actually quantified.  How can that happen?
             -- See Note [Quantification and partial signatures] Wrinkle 4
             --     in GHC.Tc.Solver
-       ; mapM_ report_mono_sig_tv_err [ n | (n,tv) <- psig_qtv_prs
-                                          , not (tv `elem` qtvs) ]
+       ; mapM_ report_mono_sig_tv_err [ pr | pr@(_,tv) <- psig_qtv_prs
+                                           , not (tv `elem` qtvs) ]
 
        ; annotated_theta      <- zonkTcTypes annotated_theta
        ; (free_tvs, my_theta) <- choose_psig_context psig_qtv_set annotated_theta wcx
@@ -910,24 +915,30 @@ chooseInferredQuantifiers inferred_theta tau_tvs qtvs
        ; return (final_qtvs, my_theta) }
   where
     report_dup_tyvar_tv_err (n1,n2)
-      | PartialSig { psig_name = fn_name, psig_hs_ty = hs_ty } <- sig
       = addErrTc (TcRnUnknownMessage $ mkPlainError noHints $
         hang (text "Couldn't match" <+> quotes (ppr n1)
-                        <+> text "with" <+> quotes (ppr n2))
-                     2 (hang (text "both bound by the partial type signature:")
-                           2 (ppr fn_name <+> dcolon <+> ppr hs_ty)))
+             <+> text "with" <+> quotes (ppr n2))
+            2 (hang (text "both bound by the partial type signature:")
+                  2 (ppr fn_name <+> dcolon <+> ppr hs_ty)))
 
-      | otherwise -- Can't happen; by now we know it's a partial sig
-      = pprPanic "report_tyvar_tv_err" (ppr sig)
-
-    report_mono_sig_tv_err n
-      | PartialSig { psig_name = fn_name, psig_hs_ty = hs_ty } <- sig
+    report_mono_sig_tv_err (n,tv)
       = addErrTc (TcRnUnknownMessage $ mkPlainError noHints $
         hang (text "Can't quantify over" <+> quotes (ppr n))
-                     2 (hang (text "bound by the partial type signature:")
-                           2 (ppr fn_name <+> dcolon <+> ppr hs_ty)))
-      | otherwise -- Can't happen; by now we know it's a partial sig
-      = pprPanic "report_mono_sig_tv_err" (ppr sig)
+            2 (vcat [ hang (text "bound by the partial type signature:")
+                         2 (ppr fn_name <+> dcolon <+> ppr hs_ty)
+                    , extra ]))
+      where
+        extra | rhs_ty:_ <- [ rhs
+                               -- recall that residuals are always implications
+                            | residual_implic <- bagToList $ wc_impl residual
+                            , residual_ct <- bagToList $ wc_simple (ic_wanted residual_implic)
+                            , let residual_pred = ctPred residual_ct
+                            , Just (Nominal, lhs, rhs) <- [ getEqPredTys_maybe residual_pred ]
+                            , Just lhs_tv <- [ tcGetTyVar_maybe lhs ]
+                            , lhs_tv == tv ]
+              = sep [ quotes (ppr n), text "should really be", quotes (ppr rhs_ty) ]
+              | otherwise
+              = empty
 
     choose_psig_context :: VarSet -> TcThetaType -> Maybe TcType
                         -> TcM (VarSet, TcThetaType)
@@ -974,25 +985,8 @@ chooseInferredQuantifiers inferred_theta tau_tvs qtvs
        -- Hack alert!  See GHC.Tc.Gen.HsType:
        -- Note [Extra-constraint holes in partial type signatures]
 
-mk_impedance_match_msg :: MonoBindInfo
-                       -> TcType -> TcType
-                       -> TidyEnv -> TcM (TidyEnv, SDoc)
--- This is a rare but rather awkward error messages
-mk_impedance_match_msg (MBI { mbi_poly_name = name, mbi_sig = mb_sig })
-                       inf_ty sig_ty tidy_env
- = do { (tidy_env1, inf_ty) <- zonkTidyTcType tidy_env  inf_ty
-      ; (tidy_env2, sig_ty) <- zonkTidyTcType tidy_env1 sig_ty
-      ; let msg = vcat [ text "When checking that the inferred type"
-                       , nest 2 $ ppr name <+> dcolon <+> ppr inf_ty
-                       , text "is as general as its" <+> what <+> text "signature"
-                       , nest 2 $ ppr name <+> dcolon <+> ppr sig_ty ]
-      ; return (tidy_env2, msg) }
-  where
-    what = case mb_sig of
-             Nothing                     -> text "inferred"
-             Just sig | isPartialSig sig -> text "(partial)"
-                      | otherwise        -> empty
-
+chooseInferredQuantifiers _ _ _ _ (Just (TISI { sig_inst_sig = sig@(CompleteSig {}) }))
+  = pprPanic "chooseInferredQuantifiers" (ppr sig)
 
 mk_inf_msg :: Name -> TcType -> TidyEnv -> TcM (TidyEnv, SDoc)
 mk_inf_msg poly_name poly_ty tidy_env
@@ -1000,7 +994,6 @@ mk_inf_msg poly_name poly_ty tidy_env
       ; let msg = vcat [ text "When checking the inferred type"
                        , nest 2 $ ppr poly_name <+> dcolon <+> ppr poly_ty ]
       ; return (tidy_env1, msg) }
-
 
 -- | Warn the user about polymorphic local binders that lack type signatures.
 localSigWarn :: WarningFlag -> Id -> Maybe TcIdSigInst -> TcM ()
@@ -1123,7 +1116,6 @@ Examples that might fail:
                                 or multi-parameter type classes
  - an inferred type that includes unboxed tuples
 
-
 Note [Impedance matching]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
@@ -1158,13 +1150,10 @@ and the proof is the impedance matcher.
 
 Notice that the impedance matcher may do defaulting.  See #7173.
 
-It also cleverly does an ambiguity check; for example, rejecting
-   f :: F a -> F a
-where F is a non-injective type function.
--}
+If we've gotten the constraints right during inference (and we assume we have),
+this sub-type check should never fail. It's not really a check -- it's more of
+a procedure to produce the right wrapper.
 
-
-{-
 Note [SPECIALISE pragmas]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 There is no point in a SPECIALISE pragma for a non-overloaded function:
