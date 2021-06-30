@@ -1,4 +1,10 @@
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE Haskell2010 #-}
+{-# LANGUAGE
+  FlexibleContexts, 
+  FlexibleInstances,
+  UndecidableInstances,
+  NoMonomorphismRestriction
+#-}
 
 module T19977b where
 
@@ -9,4 +15,7 @@ class D a where
   d :: a
 instance C a => D a where
   d = undefined
-h _ = d   -- argument is to avoid the monomorphism restriction
+h = d 
+
+g :: D a => a
+g = h

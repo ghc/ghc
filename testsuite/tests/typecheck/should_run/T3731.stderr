@@ -1,0 +1,23 @@
+
+T3731.hs:4:15: warning: [-Wdeprecated-flags (in -Wdefault)]
+    -XOverlappingInstances is deprecated: instead use per-instance pragmas OVERLAPPING/OVERLAPPABLE/OVERLAPS
+
+T3731.hs:122:32: error:
+    • Could not deduce (Default a)
+        arising from a superclass required to satisfy ‘Data DefaultD a0’,
+        arising from a use of ‘dataTypeOf’
+      from the context: Data DefaultD a
+        bound by the type signature for:
+                   defaultDefaultValue :: forall a. Data DefaultD a => a
+        at T3731.hs:119:1-43
+      Possible fix:
+        add (Default a) to the context of
+          the type signature for:
+            defaultDefaultValue :: forall a. Data DefaultD a => a
+    • In the second argument of ‘($)’, namely
+        ‘dataTypeOf defaultProxy res’
+      In the expression: datarep $ dataTypeOf defaultProxy res
+      In the expression:
+        case datarep $ dataTypeOf defaultProxy res of
+          AlgRep (c : _) -> fromConstrB defaultProxy (defaultValueD dict) c
+          AlgRep [] -> error "defaultDefaultValue: Bad DataRep"
