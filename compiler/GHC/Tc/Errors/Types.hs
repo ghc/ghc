@@ -162,6 +162,16 @@ data TcRnMessage where
       an associated 'RealSrcSpan'.
   -}
   TcRnModMissingRealSrcSpan :: Module -> TcRnMessage
+  {-| TcRnIdNotExportedFromSig is an error pertaining to backpack that occurs
+      when an identifier required by a signature is not exported by the module
+      or signature that is being used as a substitution for that signature.
+  -}
+  TcRnIdNotExportedFromSig :: Name -> Module -> TcRnMessage
+  {-| TcRnIdNotExportedFromLocalSig is an error pertaining to backpack that
+      occurs when an identifier which is necessary for implementing a module
+      signature is not exported from that signature.
+  -}
+  TcRnIdNotExportedFromLocalSig :: Name -> TcRnMessage
 
 
 -- | Where the levity checking for the input type originated
