@@ -13,6 +13,8 @@
 -- (Note removed in ecddaca17dccbe1d0b56220d838fce8bc4b97884, but you can
 -- find it in the history)
 
+-- June 2021: marking this test as should_fail again.
+-- See https://gitlab.haskell.org/ghc/ghc/-/issues/20064
 
 module ShouldCompile where
 
