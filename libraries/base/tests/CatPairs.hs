@@ -1,4 +1,5 @@
 {-# LANGUAGE PolyKinds, DataKinds #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE MultiParamTypeClasses, TypeFamilies #-}
 module CatPairs where
 
@@ -11,12 +12,16 @@ import Control.Category
 -- Taken from Twan van Laarhoven:
 --   http://twanvl.nl/blog/haskell/categories-over-pairs-of-types
 
-type family Fst (xy :: (Type, Type)) :: Type
-type family Snd (xy :: (Type, Type)) :: Type
-type instance Fst '(x,y) = x
-type instance Snd '(x,y) = y
+type Fst :: (Type, Type) -> Type
+type family Fst xy where
+ Fst '(x, _) = x
+
+type Snd :: (Type, Type) -> Type
+type family Snd xy where
+ Snd '(_, y) = y
 
 -- Ceci n'est pas une pipe
+type Pipe :: Type -> Type -> Type -> (Type -> Type) -> Type -> Type
 data Pipe i o u m r = Pipe { runPipe :: Either i u -> m (Either o r) }
 
 (>+>) :: Monad m
@@ -28,6 +33,7 @@ data Pipe i o u m r = Pipe { runPipe :: Either i u -> m (Either o r) }
 idP :: Monad m => Pipe i i r m r
 idP = Pipe return
 
+type    WrapPipe :: (Type -> Type) -> (Type, Type) -> (Type, Type) -> Type
 newtype WrapPipe m iu or = WrapPipe
     { unWrapPipe :: Pipe (Fst iu) (Fst or) (Snd iu) m (Snd or) }
 

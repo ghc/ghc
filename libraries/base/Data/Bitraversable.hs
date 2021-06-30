@@ -1,5 +1,6 @@
-{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
+{-# LANGUAGE Trustworthy #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -32,6 +33,7 @@ import Data.Bifoldable
 import Data.Coerce
 import Data.Functor.Identity (Identity(..))
 import Data.Functor.Utils (StateL(..), StateR(..))
+import GHC.Base (Type, Constraint)
 import GHC.Generics (K1(..))
 
 -- $setup
@@ -97,6 +99,7 @@ import GHC.Generics (K1(..))
 -- These are available as 'bimapDefault' and 'bifoldMapDefault' respectively.
 --
 -- @since 4.10.0.0
+type  Bitraversable :: (Type -> Type -> Type) -> Constraint
 class (Bifunctor t, Bifoldable t) => Bitraversable t where
   -- | Evaluates the relevant functions at each element in the structure,
   -- running the action, and builds a new structure with the same shape, using
