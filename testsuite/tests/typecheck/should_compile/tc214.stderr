@@ -11,8 +11,9 @@ tc214.hs:19:7: warning: [-Winaccessible-code (in -Wdefault)]
         a pattern with constructor: F2 :: forall a. a -> Foo2 [a],
         in an equation for ‘bar2’
         at tc214.hs:19:7-10
-      Inaccessible code in
+      Unsatisfiable constraint [forall a1. a1] ~ [a] assumed by
         a pattern with constructor: F2 :: forall a. a -> Foo2 [a],
         in an equation for ‘bar2’
+      This will result in inaccessible code.
     • In the pattern: F2 _
       In an equation for ‘bar2’: bar2 (F2 _) = ()
