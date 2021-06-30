@@ -930,6 +930,55 @@ This ensures that the implication constraint we generate, if any,
 has a strictly-increased level compared to the ambient level outside
 the let binding.
 
+Note [Inferring principal types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We don't always infer principal types. For instance, the inferred type for
+
+> f x = show [x]
+
+is
+
+> f :: Show a => a -> String
+
+This is not the most general type if we allow flexible contexts.
+Indeed, if we try to write the following
+
+> g :: Show [a] => a -> String
+> g x = f x
+
+we get the error:
+
+  * Could not deduce (Show a) arising from a use of `f'
+    from the context: Show [a]
+
+Though replacing f x in the right-hand side of g with the definition
+of f x works, the call to f x does not. This is the hallmark of
+unprincip{led,al} types.
+
+Another example:
+
+> class C a
+> class D a where
+>   d :: a
+> instance C a => D a where
+>   d = undefined
+> h _ = d   -- argument is to avoid the monomorphism restriction
+
+The inferred type for h is
+
+> h :: C a => t -> a
+ 
+even though
+
+> h :: D a => t -> a
+  
+is more general.
+
+The fix is easy: don't simplify constraints before inferring a type.
+That is, have the inferred type quantify over all constraints that arise
+in a definition's right-hand side, even if they are simplifiable.
+Unfortunately, this would yield all manner of unwieldy types,
+and so we won't do so.
 -}
 
 -- | How should we choose which constraints to quantify over?
