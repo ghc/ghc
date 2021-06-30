@@ -3222,7 +3222,8 @@ addConsistencyConstraints mb_clsinfo fam_app
                    , Just cls_ty <- [lookupVarEnv inst_env fam_tc_tv] ]
        ; traceTc "addConsistencyConstraints" (ppr eqs)
        ; emitDerivedEqs AssocFamPatOrigin eqs }
-    -- Improve inference
+    -- Improve inference; these equalities will not produce errors.
+    -- See Note [Constraints to ignore] in GHC.Tc.Errors
     -- Any mis-match is reports by checkConsistentFamInst
   | otherwise
   = return ()

@@ -14,7 +14,7 @@
 --
 module GHC.Utils.Misc (
         -- * Miscellaneous higher-order functions
-        applyWhen, nTimes,
+        applyWhen, nTimes, const2,
 
         -- * General list processing
         zipEqual, zipWithEqual, zipWith3Equal, zipWith4Equal,
@@ -175,6 +175,9 @@ nTimes :: Int -> (a -> a) -> (a -> a)
 nTimes 0 _ = id
 nTimes 1 f = f
 nTimes n f = f . nTimes (n-1) f
+
+const2 :: a -> b -> c -> a
+const2 x _ _ = x
 
 fstOf3   :: (a,b,c) -> a
 sndOf3   :: (a,b,c) -> b

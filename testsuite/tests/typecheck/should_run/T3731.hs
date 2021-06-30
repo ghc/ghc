@@ -8,6 +8,9 @@
 
 module Main (main) where
 
+-- June 2021: no longer compiles.
+-- See T3731_simple for a simpler test case which explains the situation.
+
 import Data.Typeable
 
 class Sat a where
