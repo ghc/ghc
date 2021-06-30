@@ -107,7 +107,6 @@ import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.Class
 import GHC.Types.Name
--- import GHC.Types.Name.Set
 import GHC.Types.Var.Env
 import GHC.Builtin.Types
 import GHC.Types.Basic

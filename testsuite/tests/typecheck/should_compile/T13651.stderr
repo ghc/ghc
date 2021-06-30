@@ -1,6 +1,6 @@
 
 T13651.hs:12:8: error:
-    • Could not deduce: F cr (Bar h (Foo u)) ~ Bar h (Bar r u)
+    • Could not deduce: cs ~ Bar (Foo h) (Foo s)
       from the context: (F cr cu ~ Bar h (Bar r u),
                          F cu cs ~ Bar (Foo h) (Bar u s))
         bound by the type signature for:
@@ -8,12 +8,12 @@ T13651.hs:12:8: error:
                           (F cr cu ~ Bar h (Bar r u), F cu cs ~ Bar (Foo h) (Bar u s)) =>
                           Bar h (Bar r u) -> Bar (Foo h) (Bar u s) -> Foo (cr -> cs)
         at T13651.hs:(12,8)-(14,65)
-      Expected: forall cr cu h r u cs s.
-                (F cr cu ~ Bar h (Bar r u), F cu cs ~ Bar (Foo h) (Bar u s)) =>
-                Bar h (Bar r u) -> Bar (Foo h) (Bar u s) -> Foo (cr -> cs)
-        Actual: forall cr cu h r u cs s.
-                (F cr cu ~ Bar h (Bar r u), F cu cs ~ Bar (Foo h) (Bar u s)) =>
-                Bar h (Bar r u) -> Bar (Foo h) (Bar u s) -> Foo (cr -> cs)
+      ‘cs’ is a rigid type variable bound by
+        the type signature for:
+          foo :: forall cr cu h r u cs s.
+                 (F cr cu ~ Bar h (Bar r u), F cu cs ~ Bar (Foo h) (Bar u s)) =>
+                 Bar h (Bar r u) -> Bar (Foo h) (Bar u s) -> Foo (cr -> cs)
+        at T13651.hs:(12,8)-(14,65)
     • In the ambiguity check for ‘foo’
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       In the type signature:

@@ -1,6 +1,6 @@
 
 T8518.hs:14:18: error:
-    • Couldn't match expected type: Z c -> B c -> Maybe (F c)
+    • Couldn't match expected type: Z c -> B c -> t0
                   with actual type: F c
     • The function ‘rpt’ is applied to four value arguments,
         but its type ‘Int -> c -> F c’ has only two
@@ -17,7 +17,7 @@ T8518.hs:14:18: error:
         c :: c (bound at T8518.hs:14:10)
         callCont :: c -> Z c -> B c -> Maybe (F c) (bound at T8518.hs:14:1)
 
-T8518.hs:16:9: error:
+T8518.hs:17:9: error:
     • Couldn't match type: F t1
                      with: Z t1 -> B t1 -> F t1
       Expected: t -> t1 -> F t1
@@ -29,4 +29,4 @@ T8518.hs:16:9: error:
                 rpt 0 c' z' b' = fromJust (fst <$> (continue c' z' b'))
                 rpt i c' z' b' = let ... in rpt (i - 1) c''
     • Relevant bindings include
-        rpt :: t -> t1 -> F t1 (bound at T8518.hs:16:9)
+        rpt :: t -> t1 -> F t1 (bound at T8518.hs:17:9)
