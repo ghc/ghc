@@ -2,7 +2,6 @@
 import Control.Concurrent
 import Control.Exception
 import Data.Array
-import System.Random
 import System.Environment
 import Control.Monad
 import GHC.Conc
