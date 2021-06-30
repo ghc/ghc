@@ -45,6 +45,7 @@ import GHC.Driver.Env
 import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Driver.Config
+import GHC.Driver.Config.Diagnostic
 
 import GHC.Tc.Utils.Monad
 
@@ -1416,12 +1417,12 @@ load_dyn interp hsc_env crash_early dll = do
       if crash_early
         then cmdLineErrorIO err
         else
-          when (wopt Opt_WarnMissedExtraSharedLib dflags)
+          when (diag_wopt Opt_WarnMissedExtraSharedLib diag_opts)
             $ logMsg logger
-                (mkMCDiagnostic dflags $ WarningWithFlag Opt_WarnMissedExtraSharedLib)
+                (mkMCDiagnostic diag_opts $ WarningWithFlag Opt_WarnMissedExtraSharedLib)
                   noSrcSpan $ withPprStyle defaultUserStyle (note err)
   where
-    dflags = hsc_dflags hsc_env
+    diag_opts = initDiagOpts (hsc_dflags hsc_env)
     logger = hsc_logger hsc_env
     note err = vcat $ map text
       [ err
@@ -1509,6 +1510,7 @@ locateLib interp hsc_env is_hs lib_dirs gcc_dirs lib
    where
      dflags = hsc_dflags hsc_env
      logger = hsc_logger hsc_env
+     diag_opts = initDiagOpts dflags
      dirs   = lib_dirs ++ gcc_dirs
      gcc    = False
      user   = True
@@ -1578,7 +1580,7 @@ locateLib interp hsc_env is_hs lib_dirs gcc_dirs lib
       , not loading_dynamic_hs_libs
       , interpreterProfiled interp
       = do
-          let diag = mkMCDiagnostic dflags WarningWithoutFlag
+          let diag = mkMCDiagnostic diag_opts WarningWithoutFlag
           logMsg logger diag noSrcSpan $ withPprStyle defaultErrStyle $
             text "Interpreter failed to load profiled static library" <+> text lib <> char '.' $$
               text " \tTrying dynamic library instead. If this fails try to rebuild" <+>
