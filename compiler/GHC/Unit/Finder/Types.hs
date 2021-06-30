@@ -8,7 +8,6 @@ where
 
 import GHC.Prelude
 import GHC.Unit
-import GHC.Unit.State
 import qualified Data.Map as M
 import GHC.Fingerprint
 
