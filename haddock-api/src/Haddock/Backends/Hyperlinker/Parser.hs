@@ -20,7 +20,7 @@ import GHC.Parser.Errors.Ppr ()
 import qualified GHC.Types.Error as E
 import GHC.Parser.Lexer    as Lexer
                            ( P(..), ParseResult(..), PState(..), Token(..)
-                           , initParserState, lexer, mkParserOpts, getErrorMessages)
+                           , initParserState, lexer, mkParserOpts, getPsErrorMessages)
 import GHC.Data.Bag         ( bagToList )
 import GHC.Utils.Outputable ( text, ($$) )
 import GHC.Utils.Panic      ( panic )
@@ -43,7 +43,7 @@ parse
 parse dflags fpath bs = case unP (go False []) initState of
     POk _ toks -> reverse toks
     PFailed pst ->
-      let err:_ = bagToList (E.getMessages $ getErrorMessages pst) in
+      let err:_ = bagToList (E.getMessages $ getPsErrorMessages pst) in
       panic $ showSDoc dflags $
         text "Hyperlinker parse error:" $$ pprLocMsgEnvelope err
   where
