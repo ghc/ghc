@@ -38,6 +38,7 @@ import GHC.Driver.Main
 import GHC.Driver.Session
 import GHC.Driver.Env
 import GHC.Driver.Hooks
+import GHC.Driver.Config.Diagnostic
 
 import GHC.Hs
 
@@ -995,8 +996,8 @@ runMeta' show_code ppr_hs run_and_convert expr
         -- goes wrong. See Note [Errors in desugaring a splice]. This happens in all
         -- cases.
         ; logger <- getLogger
-        ; dflags <- getDynFlags
-        ; liftIO $ printMessages logger dflags ds_msgs
+        ; diag_opts <- initDiagOpts <$> getDynFlags
+        ; liftIO $ printMessages logger diag_opts ds_msgs
 
         ; ds_expr <- case mb_ds_expr of
             Nothing      -> failM   -- Case (a) from Note [Errors in desugaring a splice]
