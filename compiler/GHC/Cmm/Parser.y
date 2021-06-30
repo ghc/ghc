@@ -1509,7 +1509,7 @@ parseCmmFile dflags this_mod home_unit filename = do
                 -- in there we don't want.
   case unPD cmmParse dflags home_unit init_state of
     PFailed pst -> do
-        let (warnings,errors) = getMessages pst
+        let (warnings,errors) = getPsMessages pst
         return (warnings, errors, Nothing)
     POk pst code -> do
         st <- initC
@@ -1520,7 +1520,7 @@ parseCmmFile dflags this_mod home_unit filename = do
               ((), cmm2) <- getCmm $ mapM_ emitInfoTableProv used_info
               return (cmm ++ cmm2, used_info)
             (cmm, _) = runC dflags no_module st fcode
-            (warnings,errors) = getMessages pst
+            (warnings,errors) = getPsMessages pst
         if not (isEmptyMessages errors)
          then return (warnings, errors, Nothing)
          else return (warnings, errors, Just cmm)

@@ -30,7 +30,7 @@ import ExactPrint
 import Transform
 import Parsers
 
-import GHC.Parser.Lexer hiding (getMessages)
+import GHC.Parser.Lexer
 import GHC.Data.FastString
 import GHC.Types.SrcLoc
 
