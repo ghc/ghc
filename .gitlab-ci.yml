@@ -773,7 +773,7 @@ validate-aarch64-darwin:
   extends: .validate-linux
   stage: full-build
   image: "registry.gitlab.haskell.org/ghc/ci-images/aarch64-linux-deb10:$DOCKER_REV"
-  allow_failure: true
+  allow_failure: false
   variables:
     TEST_ENV: "aarch64-linux-deb10"
     BIN_DIST_PREP_TAR_COMP: "ghc-aarch64-linux-deb10.tar.xz"
