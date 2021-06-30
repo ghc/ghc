@@ -19,7 +19,6 @@ PushedInAsGivens.hs:11:15: error:
     • Couldn't match type: F Int
                      with: [a0]
         arising from a use of ‘foo’
-      The type variable ‘a0’ is ambiguous
     • In the expression: foo y
       In the expression: (y, foo y)
       In the expression:

@@ -2,7 +2,6 @@
 ExtraTcsUntch.hs:25:38: error:
     • Couldn't match expected type: F Int
                   with actual type: [[a0]]
-      The type variable ‘a0’ is ambiguous
     • In the first argument of ‘h’, namely ‘[[undefined]]’
       In the expression: h [[undefined]]
       In the expression: (h [[undefined]], op x [y])
