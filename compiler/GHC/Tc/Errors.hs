@@ -3430,28 +3430,8 @@ Note [Runtime skolems]
 We want to give a reasonably helpful error message for ambiguity
 arising from *runtime* skolems in the debugger.  These
 are created by in GHC.Runtime.Heap.Inspect.zonkRTTIType.
-
-************************************************************************
-*                                                                      *
-                 Error from the canonicaliser
-         These ones are called *during* constraint simplification
-*                                                                      *
-************************************************************************
 -}
 
-solverDepthErrorTcS :: CtLoc -> TcType -> TcM a
-solverDepthErrorTcS loc ty
-  = setCtLocM loc $
-    do { ty <- zonkTcType ty
-       ; env0 <- tcInitTidyEnv
-       ; let tidy_env     = tidyFreeTyCoVars env0 (tyCoVarsOfTypeList ty)
-             tidy_ty      = tidyType tidy_env ty
-             msg = TcRnUnknownMessage $ mkPlainError noHints $
-                 vcat [ text "Reduction stack overflow; size =" <+> ppr depth
-                      , hang (text "When simplifying the following type:")
-                           2 (ppr tidy_ty)
-                      , note ]
-       ; failWithTcM (tidy_env, msg) }
 
 {-
 ************************************************************************

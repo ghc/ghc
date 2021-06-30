@@ -147,8 +147,8 @@ import GHC.Tc.Solver.InertSet
 import GHC.Tc.Types.Evidence
 import GHC.Core.Class
 import GHC.Core.TyCon
-import GHC.Tc.Errors   ( solverDepthErrorTcS )
 import GHC.Tc.Errors.Types
+import GHC.Types.Error ( mkPlainError, noHints )
 
 import GHC.Types.Name
 import GHC.Types.TyThing
@@ -2243,8 +2243,8 @@ solverDepthError loc ty
        ; env0 <- TcM.tcInitTidyEnv
        ; let tidy_env     = tidyFreeTyCoVars env0 (tyCoVarsOfTypeList ty)
              tidy_ty      = tidyType tidy_env ty
-             msg
-               = vcat [ text "Reduction stack overflow; size =" <+> ppr depth
+             msg = TcRnUnknownMessage $ mkPlainError noHints $
+               vcat [ text "Reduction stack overflow; size =" <+> ppr depth
                       , hang (text "When simplifying the following type:")
                            2 (ppr tidy_ty)
                       , note ]

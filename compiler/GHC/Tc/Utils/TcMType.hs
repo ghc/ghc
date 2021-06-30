@@ -2699,7 +2699,7 @@ naughtyQuantification orig_ty tv escapees
                         , text " due to its ill-scoped nature.)"
                         ]
 
-       ; failWithTcM (env, doc) }
+       ; failWithTcM (env, msg) }
 
 {-
 ************************************************************************

@@ -917,15 +917,16 @@ chooseInferredQuantifiers residual inferred_theta tau_tvs qtvs
     report_dup_tyvar_tv_err (n1,n2)
       = addErrTc (TcRnUnknownMessage $ mkPlainError noHints $
         hang (text "Couldn't match" <+> quotes (ppr n1)
-              <+> text "with" <+> quotes (ppr n2))
-           2 (hang (text "both bound by the partial type signature:")
-                 2 (ppr fn_name <+> dcolon <+> ppr hs_ty)))
+             <+> text "with" <+> quotes (ppr n2))
+            2 (hang (text "both bound by the partial type signature:")
+                  2 (ppr fn_name <+> dcolon <+> ppr hs_ty)))
 
     report_mono_sig_tv_err (n,tv)
-      = addErrTc (hang (text "Can't quantify over" <+> quotes (ppr n))
-                     2 (vcat [ hang (text "bound by the partial type signature:")
-                                  2 (ppr fn_name <+> dcolon <+> ppr hs_ty)
-                             , extra ]))
+      = addErrTc (TcRnUnknownMessage $ mkPlainError noHints $
+        hang (text "Can't quantify over" <+> quotes (ppr n))
+            2 (vcat [ hang (text "bound by the partial type signature:")
+                         2 (ppr fn_name <+> dcolon <+> ppr hs_ty)
+                    , extra ]))
       where
         extra | rhs_ty:_ <- [ rhs
                                -- recall that residuals are always implications
