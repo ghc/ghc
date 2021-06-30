@@ -1019,7 +1019,7 @@ foldrM f z0 xs = foldl c return xs z0
 -- Another way of thinking about @foldlM@ is that it amounts to an application
 -- to @z@ of a Kleisli composition:
 --
--- > foldrM f z t =
+-- > foldlM f z t =
 -- >     flip f a >=> flip f b >=> ... >=> flip f x >=> flip f y $ z
 --
 -- The monadic effects of @foldlM@ are sequenced from left to right.
