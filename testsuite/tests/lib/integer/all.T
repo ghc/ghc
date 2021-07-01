@@ -32,3 +32,4 @@ test('integerImportExport', [omit_ways(['ghci'])], compile_and_run, [''])
 #test('integerGmpInternals', [], compile_and_run, [''])
 
 test('T19345', [], compile_and_run, [''])
+test('T20066', [exit_code(1)], compile_and_run, [''])
