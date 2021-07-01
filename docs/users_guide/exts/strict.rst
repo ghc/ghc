@@ -44,10 +44,8 @@ Bang patterns
     Allow use of bang pattern syntax.
 
 GHC supports an extension of pattern matching called *bang patterns*,
-written ``!pat``. Bang patterns are under consideration for Haskell
-Prime. The `Haskell prime feature
-description <https://gitlab.haskell.org/haskell/prime/-/wikis/BangPatterns>`__
-contains more discussion and examples than the material below.
+written ``!pat``. Bang patterns are available by default as a part
+of :extension:`GHC2021`.
 
 The main idea is to add a single new production to the syntax of
 patterns: ::
@@ -61,62 +59,33 @@ Example: ::
     f1 !x = True
 
 This definition makes ``f1`` is strict in ``x``, whereas without the
-bang it would be lazy. Bang patterns can be nested of course: ::
-
-    f2 (!x, y) = [x,y]
-
-Here, ``f2`` is strict in ``x`` but not in ``y``.
+bang it would be lazy.
 
 Note the following points:
 
-- A bang only really has
-  an effect if it precedes a variable or wild-card pattern: ::
+- Bang patterns can be nested: ::
+
+      f2 (!x, y) = [x,y]
+
+  Here, ``f2`` is strict in ``x`` but not in ``y``.
+
+- Bang patterns can be used in ``case`` expressions too: ::
+
+    g1 x = let y = f x in body
+    g2 x = case f x of { y -> body }
+    g3 x = case f x of { !y -> body }
+
+  The functions ``g1`` and ``g2`` mean exactly the same thing. But ``g3``
+  evaluates ``(f x)``, binds ``y`` to the result, and then evaluates
+  ``body``.
+
+- Bang patterns do not have any effect with constructor patterns: ::
 
     f3 !(x,y) = [x,y]
     f4 (x,y)  = [x,y]
 
   Here, ``f3`` and ``f4`` are identical; putting a bang before a pattern
-  that forces evaluation anyway does nothing.
-
-- A bang pattern is allowed in a let or where clause, and makes the binding
-  strict.  For example: ::
-
-    let !x = e in body
-    let !(p,q) = e in body
-
-  In both cases ``e`` is evaluated before starting to evaluate ``body``.
-
-  However, *nested* bangs in a let/where pattern binding behave uniformly with all
-  other forms of pattern matching. For example ::
-
-    let (!x,[y]) = e in b
-
-  is equivalent to this: ::
-
-    let { t = case e of (x,[y]) -> x `seq` (x,y)
-          x = fst t
-          y = snd t }
-    in b
-
-  The binding is lazy, but when either ``x`` or ``y`` is evaluated by
-  ``b`` the entire pattern is matched, including forcing the evaluation of
-  ``x``.
-
-  See :ref:`Semantics of let bindings with bang patterns <recursive-and-polymorphic-let-bindings>` for
-  the detailed semantics.
-
-- A pattern with a bang at the outermost level is not allowed at the top
-  level of a module.
-
-- Bang patterns work in ``case`` expressions too, of course: ::
-
-    g5 x = let y = f x in body
-    g6 x = case f x of { y -> body }
-    g7 x = case f x of { !y -> body }
-
-  The functions ``g5`` and ``g6`` mean exactly the same thing. But ``g7``
-  evaluates ``(f x)``, binds ``y`` to the result, and then evaluates
-  ``body``.
+  that forces evaluation anyway does nothing. However, see the caveat below.
 
 - There is one problem with syntactic ambiguity. Consider: ::
 
@@ -131,6 +100,55 @@ Note the following points:
 
   See `GHC Proposal #229 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0229-whitespace-bang-patterns.rst>`__
   for the precise rules.
+
+Strict bindings
+~~~~~~~~~~~~~~~
+
+The ``BangPatterns`` extension furthermore enables syntax for strict
+``let`` or ``where`` bindings with ``!pat = expr``. For example, ::
+
+    let !x = e in body
+    let !(p,q) = e in body
+
+In both cases ``e`` is evaluated before starting to evaluate ``body``.
+
+Note the following points:
+
+- This form is not the same as a bang pattern:
+  The declarations ``f3 (x,y) = ...`` and ``f4 !(x,y) = ....``
+  are equivalent, but the expressions ``let (p,q) = e in body`` and
+  ``let !(p,q) = e in body`` are different. The former will not evaluate ``e``
+  unless ``p`` or ``q`` is forced in ``body``.
+
+- Only a top-level bang makes the binding strict; otherwise,
+  it is considered a normal bang pattern. For example, ::
+
+      let (!x,[y]) = e in b
+
+  is equivalent to this: ::
+
+    let { t = case e of (x,[y]) -> x `seq` (x,y)
+          x = fst t
+          y = snd t }
+    in b
+
+  The binding is lazy, but when either ``x`` or ``y`` is evaluated by
+  ``b`` the entire pattern is matched, including forcing the evaluation of
+  ``x``.
+
+- For a binding to be strict, the bang must be visible without looking through
+  pattern synonyms. ::
+
+      pattern Bang x <- !x
+      f1 = let Bang x = y in ...
+      f2 = let !x     = y in ...  -- not equivalent to f1
+
+- Strict bindings are not allowed at the top level of a module.
+
+- See :ref:`Semantics of let bindings with bang patterns <recursive-and-polymorphic-let-bindings>` for
+  the detailed semantics, and the `Haskell prime feature
+  description <https://gitlab.haskell.org/haskell/prime/-/wikis/BangPatterns>`__
+  for more discussion and examples.
 
 
 .. _strict-data:
