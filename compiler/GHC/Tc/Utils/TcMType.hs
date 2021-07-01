@@ -98,7 +98,6 @@ module GHC.Tc.Utils.TcMType (
 
 import GHC.Prelude
 
-import GHC.Driver.Session
 import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Tc.Types.Origin
