@@ -1,4 +1,5 @@
-module Settings.Flavours.Validate (validateFlavour, slowValidateFlavour) where
+module Settings.Flavours.Validate (validateFlavour, slowValidateFlavour,
+                                    quickValidateFlavour) where
 
 import Expression
 import Flavour
@@ -49,3 +50,16 @@ slowValidateArgs =
             , hsGhc      = mempty
             }
           ]
+
+quickValidateArgs :: Args
+quickValidateArgs = sourceArgs SourceArgs
+    { hsDefault  = mempty
+    , hsLibrary  = pure [ "-O" ]
+    , hsCompiler = mconcat [ stage0 ? arg "-O2", notStage0 ? arg "-O"]
+    , hsGhc      = pure [ "-O", "-hide-all-packages" ]
+    }
+
+quickValidateFlavour :: Flavour
+quickValidateFlavour = werror $ validateFlavour
+    { name               = "quick-validate"
+    , args               = defaultBuilderArgs <> quickValidateArgs <> defaultPackageArgs }
