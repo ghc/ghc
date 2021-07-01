@@ -124,6 +124,7 @@ import GHC.Parser.CharClass
 
 import GHC.Parser.Annotation
 import GHC.Driver.Flags
+import GHC.Parser.Errors.Basic
 import GHC.Parser.Errors.Types
 import GHC.Parser.Errors.Ppr ()
 }
