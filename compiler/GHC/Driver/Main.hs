@@ -121,7 +121,7 @@ import GHC.Hs.Stats         ( ppSourceStats )
 
 import GHC.HsToCore
 
-import GHC.StgToByteCode    ( byteCodeGen, stgExprToBCOs )
+import GHC.StgToByteCode    ( byteCodeGen )
 
 import GHC.IfaceToCore  ( typecheckIface )
 
@@ -224,7 +224,6 @@ import GHC.Data.Stream (Stream)
 import qualified GHC.SysTools
 
 import Data.Data hiding (Fixity, TyCon)
-import Data.Maybe       ( fromJust )
 import Data.List        ( nub, isPrefixOf, partition )
 import Control.Monad
 import Data.IORef
@@ -236,6 +235,7 @@ import Data.Set (Set)
 import Data.Functor
 import Control.DeepSeq (force)
 import Data.Bifunctor (first)
+import GHC.Data.Maybe
 
 {- **********************************************************************
 %*                                                                      *
@@ -1815,7 +1815,8 @@ doCodeGen hsc_env this_mod denv data_tycons
 
 myCoreToStgExpr :: Logger -> DynFlags -> InteractiveContext
                 -> Module -> ModLocation -> CoreExpr
-                -> IO ( StgRhs
+                -> IO ( Id
+                      , [StgTopBinding]
                       , InfoTableProvMap
                       , CollectedCCs )
 myCoreToStgExpr logger dflags ictxt this_mod ml prepd_expr = do
@@ -1825,14 +1826,14 @@ myCoreToStgExpr logger dflags ictxt this_mod ml prepd_expr = do
                                 (mkPseudoUniqueE 0)
                                 Many
                                 (exprType prepd_expr)
-    ([StgTopLifted (StgNonRec _ stg_expr)], prov_map, collected_ccs) <-
+    (stg_expr, prov_map, collected_ccs) <-
        myCoreToStg logger
                    dflags
                    ictxt
                    this_mod
                    ml
                    [NonRec bco_tmp_id prepd_expr]
-    return (stg_expr, prov_map, collected_ccs)
+    return (bco_tmp_id, stg_expr, prov_map, collected_ccs)
 
 myCoreToStg :: Logger -> DynFlags -> InteractiveContext
             -> Module -> ModLocation -> CoreProgram
@@ -2001,7 +2002,7 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
                                 stg_binds data_tycons mod_breaks
 
     let src_span = srcLocSpan interactiveSrcLoc
-    liftIO $ loadDecls interp hsc_env (src_span, Nothing) cbc
+    _ <- liftIO $ loadDecls interp hsc_env (src_span, Nothing) cbc
 
     {- Load static pointer table entries -}
     liftIO $ hscAddSptEntries hsc_env Nothing (cg_spt_entries tidy_cg)
@@ -2172,7 +2173,7 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr
                                       ml_hie_file  = panic "hscCompileCoreExpr':ml_hie_file" }
 
          ; let ictxt = hsc_IC hsc_env
-         ; (stg_expr, _, _) <-
+         ; (binding_id, stg_expr, _, _) <-
              myCoreToStgExpr (hsc_logger hsc_env)
                              (hsc_dflags hsc_env)
                              ictxt
@@ -2181,13 +2182,16 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr
                              prepd_expr
 
            {- Convert to BCOs -}
-         ; bcos <- stgExprToBCOs hsc_env
+         ; bcos <- byteCodeGen hsc_env
                      (icInteractiveModule ictxt)
-                     (exprType prepd_expr)
                      stg_expr
+                     [] Nothing
 
            {- load it -}
-         ; loadExpr (hscInterp hsc_env) hsc_env srcspan bcos }
+         ; fv_hvs <- loadDecls (hscInterp hsc_env) hsc_env srcspan bcos
+           {- Get the HValue for the root -}
+         ; return (expectJust "hscCompileCoreExpr'"
+              $ lookup (idName binding_id) fv_hvs) }
 
 
 {- **********************************************************************
