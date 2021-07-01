@@ -28,13 +28,17 @@ module GHC.Builtin.Types.Prim(
         runtimeRep1TyVar, runtimeRep2TyVar, runtimeRep3TyVar,
         runtimeRep1TyVarInf, runtimeRep2TyVarInf,
         runtimeRep1Ty, runtimeRep2Ty, runtimeRep3Ty,
-        levity1TyVar, levity1TyVarInf, levity1Ty,
+        levity1TyVar, levity2TyVar,
+        levity1TyVarInf, levity2TyVarInf,
+        levity1Ty, levity2Ty,
 
         openAlphaTyVar, openBetaTyVar, openGammaTyVar,
         openAlphaTyVarSpec, openBetaTyVarSpec, openGammaTyVarSpec,
         openAlphaTy, openBetaTy, openGammaTy,
 
-        levPolyTyVar1, levPolyTyVar1Spec, levPolyTy1,
+        levPolyAlphaTyVar, levPolyBetaTyVar,
+        levPolyAlphaTyVarSpec, levPolyBetaTyVarSpec,
+        levPolyAlphaTy, levPolyBetaTy,
 
         multiplicityTyVar1, multiplicityTyVar2,
 
@@ -416,25 +420,35 @@ openAlphaTy = mkTyVarTy openAlphaTyVar
 openBetaTy  = mkTyVarTy openBetaTyVar
 openGammaTy = mkTyVarTy openGammaTyVar
 
-levity1TyVar :: TyVar
-(levity1TyVar : _)
-  = drop 11 (mkTemplateTyVars (repeat levityTy)) -- selects 'l'
+levity1TyVar, levity2TyVar :: TyVar
+(levity2TyVar : levity1TyVar : _) -- NB: levity2TyVar before levity1TyVar
+  = drop 10 (mkTemplateTyVars (repeat levityTy)) -- selects 'k', 'l'
+-- The ordering of levity2TyVar before levity1TyVar is chosen so that
+-- the more common levity1TyVar uses the levity variable 'l'.
 
-levity1TyVarInf :: TyVarBinder
+levity1TyVarInf, levity2TyVarInf :: TyVarBinder
 levity1TyVarInf = mkTyVarBinder Inferred levity1TyVar
+levity2TyVarInf = mkTyVarBinder Inferred levity2TyVar
 
-levity1Ty :: Type
+levity1Ty, levity2Ty :: Type
 levity1Ty = mkTyVarTy levity1TyVar
+levity2Ty = mkTyVarTy levity2TyVar
 
-levPolyTyVar1 :: TyVar
-[levPolyTyVar1] = mkTemplateTyVars [tYPE (mkTyConApp boxedRepDataConTyCon [levity1Ty])]
--- tv :: TYPE ('BoxedRep l)
+levPolyAlphaTyVar, levPolyBetaTyVar :: TyVar
+[levPolyAlphaTyVar, levPolyBetaTyVar] =
+  mkTemplateTyVars
+    [tYPE (mkTyConApp boxedRepDataConTyCon [levity1Ty])
+    ,tYPE (mkTyConApp boxedRepDataConTyCon [levity2Ty])]
+-- alpha :: TYPE ('BoxedRep l)
+-- beta  :: TYPE ('BoxedRep k)
 
-levPolyTyVar1Spec :: TyVarBinder
-levPolyTyVar1Spec = mkTyVarBinder Specified levPolyTyVar1
+levPolyAlphaTyVarSpec, levPolyBetaTyVarSpec :: TyVarBinder
+levPolyAlphaTyVarSpec = mkTyVarBinder Specified levPolyAlphaTyVar
+levPolyBetaTyVarSpec  = mkTyVarBinder Specified levPolyBetaTyVar
 
-levPolyTy1 :: Type
-levPolyTy1 = mkTyVarTy levPolyTyVar1
+levPolyAlphaTy, levPolyBetaTy :: Type
+levPolyAlphaTy = mkTyVarTy levPolyAlphaTyVar
+levPolyBetaTy  = mkTyVarTy levPolyBetaTyVar
 
 multiplicityTyVar1, multiplicityTyVar2  :: TyVar
 (multiplicityTyVar1 : multiplicityTyVar2 : _)
