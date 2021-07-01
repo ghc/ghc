@@ -121,6 +121,7 @@ GHC.Iface.Syntax
 GHC.Iface.Type
 GHC.Linker.Types
 GHC.Parser.Annotation
+GHC.Parser.Errors.Basic
 GHC.Parser.Errors.Ppr
 GHC.Parser.Errors.Types
 GHC.Parser.Types
