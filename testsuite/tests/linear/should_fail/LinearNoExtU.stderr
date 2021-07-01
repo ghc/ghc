@@ -1,3 +1,4 @@
 
 LinearNoExtU.hs:4:14: error:
-    Enable LinearTypes to allow linear functions
+    Illegal use of linear functions
+    Suggested fix: Perhaps you intended to use LinearTypes

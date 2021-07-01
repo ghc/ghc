@@ -1,10 +1,12 @@
 
 StarBinder.hs:6:14: warning: [-Wstar-binder (in -Wdefault)]
     Found binding occurrence of ‘*’ yet StarIsType is enabled.
-    NB. To use (or export) this operator in modules with StarIsType,
+    Suggested fix:
+      To use (or export) this operator in modules with StarIsType,
         including the definition module, you must qualify it.
 
 StarBinder.hs:6:30: warning: [-Wstar-binder (in -Wdefault)]
     Found binding occurrence of ‘*’ yet StarIsType is enabled.
-    NB. To use (or export) this operator in modules with StarIsType,
+    Suggested fix:
+      To use (or export) this operator in modules with StarIsType,
         including the definition module, you must qualify it.
