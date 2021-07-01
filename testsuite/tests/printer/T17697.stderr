@@ -1,0 +1,7 @@
+
+T17697.hs:6:5: warning: [-Wdeferred-out-of-scope-variables (in -Wdefault)]
+    Variable not in scope: threadDelay :: t0 -> IO a0
+
+T17697.hs:6:5: warning: [-Wunused-do-bind (in -Wall)]
+    A do-notation statement discarded a result of type ‘GHC.Types.Any’
+    Suggested fix: Suppress this warning by saying ‘_ <- threadDelay 1’

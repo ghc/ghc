@@ -756,10 +756,6 @@ strings---this saves space!
 well shouldn't be yanked on, but if one is, then you will get a
 friendly message from @absentErr@ (rather than a totally random
 crash).
-
-@parError@ is a special version of @error@ which the compiler does
-not know to be a bottoming Id.  It is used in the @_par_@ and @_seq_@
-templates, but we don't ever expect to generate code for it.
 -}
 
 errorIds :: [Id]
