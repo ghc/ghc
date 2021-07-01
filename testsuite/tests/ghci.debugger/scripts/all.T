@@ -42,7 +42,6 @@ test('print032', extra_files(['print029.hs']), ghci_script, ['print032.script'])
 test('print033', normal, ghci_script, ['print033.script'])
 test('print034', extra_files(['../GADT.hs', '../Test.hs']), ghci_script, ['print034.script'])
 test('print035', extra_files(['../Unboxed.hs']), ghci_script, ['print035.script'])
-test('print036', expect_broken(9046), ghci_script, ['print036.script'])
 test('print037', when(llvm_build(),
                       fragile_for(16205, ['ghci-ext']))
                , ghci_script
