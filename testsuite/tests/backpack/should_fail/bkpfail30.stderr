@@ -3,4 +3,4 @@
 
 <no location info>: error:
     The identifier T does not exist in the local signature.
-    (Try adding it to the export list of the hsig file.)
+    Suggested fix: Try adding it to the export list of the hsig file.
