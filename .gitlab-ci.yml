@@ -806,6 +806,7 @@ nightly-aarch64-linux-deb10:
     - aarch64-linux
 
 validate-aarch64-linux-deb10-llvm:
+  <<: *nightly
   extends: .build-aarch64-linux-deb10-llvm
   variables:
     CONFIGURE_ARGS: "CC=/opt/llvm/bin/clang"
