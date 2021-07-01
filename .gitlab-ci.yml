@@ -318,7 +318,7 @@ stack-hadrian-build:
 
 validate-x86_64-linux-deb9-hadrian:
   extends: .validate-linux-hadrian
-  stage: quick-build
+  stage: full-build
 
 validate-x86_64-linux-deb9-unreg-hadrian:
   extends: .validate-linux-hadrian
