@@ -15,6 +15,8 @@ module GHC.StgToCmm.Foreign (
   emitLoadThreadState,
   emitSaveRegs,
   emitRestoreRegs,
+  emitPushTupleRegs,
+  emitPopTupleRegs,
   loadThreadState,
   emitOpenNursery,
   emitCloseNursery,
@@ -341,6 +343,63 @@ emitRestoreRegs = do
    let regs    = realArgRegsCover platform
        restore = catAGraphs (map (callerRestoreGlobalReg platform) regs)
    emit restore
+
+-- | Push a subset of STG registers onto the stack, specified by the bitmap
+--
+-- Sometimes, a "live" subset of the STG registers needs to be saved on the
+-- stack, for example when storing an unboxed tuple to be used in the GHCi
+-- bytecode interpreter.
+--
+-- The "live registers" bitmap corresponds to the list of registers given by
+-- 'tupleRegsCover', with the least significant bit indicating liveness of
+-- the first register in the list.
+--
+-- Each register is saved to a stack slot of one or more machine words, even
+-- if the register size itself is smaller.
+--
+-- The resulting Cmm code looks like this, with a line for each real or
+-- virtual register used for returning tuples:
+--
+--    ...
+--    if((mask & 2) != 0) { Sp_adj(-1); Sp(0) = R2; }
+--    if((mask & 1) != 0) { Sp_adj(-1); Sp(0) = R1; }
+--
+-- See Note [GHCi tuple layout]
+
+emitPushTupleRegs :: CmmExpr -> FCode ()
+emitPushTupleRegs regs_live = do
+  platform <- getPlatform
+  let regs = zip (tupleRegsCover platform) [0..]
+      save_arg (reg, n) =
+        let mask     = CmmLit (CmmInt (1 `shiftL` n) (wordWidth platform))
+            live     = cmmAndWord platform regs_live mask
+            cond     = cmmNeWord platform live (zeroExpr platform)
+            reg_ty   = cmmRegType platform (CmmGlobal reg)
+            width    = roundUpToWords platform
+                                      (widthInBytes $ typeWidth reg_ty)
+            adj_sp   = mkAssign spReg
+                                (cmmOffset platform spExpr (negate width))
+            save_reg = mkStore spExpr (CmmReg $ CmmGlobal reg)
+        in mkCmmIfThen cond $ catAGraphs [adj_sp, save_reg]
+  emit . catAGraphs =<< mapM save_arg (reverse regs)
+
+-- | Pop a subset of STG registers from the stack (see 'emitPushTupleRegs')
+emitPopTupleRegs :: CmmExpr -> FCode ()
+emitPopTupleRegs regs_live = do
+  platform <- getPlatform
+  let regs = zip (tupleRegsCover platform) [0..]
+      save_arg (reg, n) =
+        let mask     = CmmLit (CmmInt (1 `shiftL` n) (wordWidth platform))
+            live     = cmmAndWord platform regs_live mask
+            cond     = cmmNeWord platform live (zeroExpr platform)
+            reg_ty   = cmmRegType platform (CmmGlobal reg)
+            width    = roundUpToWords platform
+                                      (widthInBytes $ typeWidth reg_ty)
+            adj_sp   = mkAssign spReg
+                                (cmmOffset platform spExpr width)
+            restore_reg = mkAssign (CmmGlobal reg) (CmmLoad spExpr reg_ty)
+        in mkCmmIfThen cond $ catAGraphs [restore_reg, adj_sp]
+  emit . catAGraphs =<< mapM save_arg regs
 
 
 emitCloseNursery :: FCode ()
