@@ -778,7 +778,8 @@ data Sig pass
        -- synonym definitions.
   | CompleteMatchSig (XCompleteMatchSig pass)
                      SourceText
-                     (XRec pass [LIdP pass])
+                     (XRec pass (Annotated SrcSpan [LIdP pass]))
+                     -- ^ See Note [Explicitly Mark Types with Annotations]
                      (Maybe (LIdP pass))
   | XSig !(XXSig pass)
 
