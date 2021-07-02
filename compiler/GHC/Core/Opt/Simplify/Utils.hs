@@ -1380,6 +1380,8 @@ postInlineUnconditionally env top_lvl bndr occ_info rhs
   | isStableUnfolding unfolding = False -- Note [Stable unfoldings and postInlineUnconditionally]
   | isTopLevel top_lvl          = False -- Note [Top level and postInlineUnconditionally]
   | exprIsTrivial rhs           = True
+  | isJoinId bndr                       -- See point (1) of Note [Duplicating join points]
+  , not (phase == FinalPhase)   = False -- in Simplify.hs
   | otherwise
   = case occ_info of
       OneOcc { occ_in_lam = in_lam, occ_int_cxt = int_cxt, occ_n_br = n_br }
@@ -1434,7 +1436,8 @@ postInlineUnconditionally env top_lvl bndr occ_info rhs
   where
     unfolding = idUnfolding bndr
     uf_opts   = seUnfoldingOpts env
-    active    = isActive (sm_phase (getMode env)) (idInlineActivation bndr)
+    phase     = sm_phase (getMode env)
+    active    = isActive phase (idInlineActivation bndr)
         -- See Note [pre/postInlineUnconditionally in gentle mode]
 
 {- Note [Inline small things to avoid creating a thunk]

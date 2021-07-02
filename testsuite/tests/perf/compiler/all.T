@@ -452,3 +452,7 @@ test ('T9198',
       [ collect_compiler_stats('bytes allocated',10) ],
       compile,
       [''])
+test ('T20049',
+      [ collect_compiler_stats('bytes allocated',2) ],
+      compile,
+      [''])
