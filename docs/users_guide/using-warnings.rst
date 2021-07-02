@@ -229,10 +229,10 @@ it is shown.
     :reverse: -fno-show-warning-groups
     :category:
 
+    :default: off
+
     When showing which flag controls a warning, also show the
     respective warning group flag(s) that warning is contained in.
-
-    This option is off by default.
 
 The full set of warning options is described below. To turn off any
 warning, simply give the corresponding ``-Wno-...`` option on the
@@ -298,10 +298,10 @@ of ``-W(no-)*``.
     :reverse: -Wno-deferred-type-errors
     :category:
 
+    :default: on
+
     Causes a warning to be reported when a type error is deferred until
     runtime. See :ref:`defer-type-errors`
-
-    This warning is on by default.
 
 .. ghc-flag:: -fdefer-type-errors
     :shortdesc: Turn type errors into warnings, :ref:`deferring the error until
@@ -374,13 +374,13 @@ of ``-W(no-)*``.
     :reverse: -Wno-partial-type-signatures
     :category:
 
+    :default: on
+
     Determines whether the compiler reports holes in partial type
     signatures as warnings. Has no effect unless
     :extension:`PartialTypeSignatures` is enabled, which controls whether
     errors should be generated for holes in types or not. See
     :ref:`partial-type-signatures`.
-
-    This warning is on by default.
 
 .. ghc-flag:: -fhelpful-errors
     :shortdesc: Make suggestions for mis-spelled names.
@@ -388,10 +388,10 @@ of ``-W(no-)*``.
     :reverse: -fno-helpful-errors
     :category:
 
+    :default: on
+
     When a name or package is not found in scope, make suggestions for
     the name or package you might have meant instead.
-
-    This option is on by default.
 
 .. ghc-flag:: -Wunrecognised-pragmas
     :shortdesc: warn about uses of pragmas that GHC doesn't recognise
@@ -399,12 +399,12 @@ of ``-W(no-)*``.
     :reverse: -Wno-unrecognised-pragmas
     :category:
 
+    :default: on
+
     Causes a warning to be emitted when a pragma that GHC doesn't
     recognise is used. As well as pragmas that GHC itself uses, GHC also
     recognises pragmas known to be used by other tools, e.g.
     ``OPTIONS_HUGS`` and ``DERIVE``.
-
-    This option is on by default.
 
 .. ghc-flag:: -Wmissed-specialisations
     :shortdesc: warn when specialisation of an imported, overloaded function
@@ -412,6 +412,8 @@ of ``-W(no-)*``.
     :type: dynamic
     :reverse: -Wno-missed-specialisations
     :category:
+
+    :default: off
 
     Emits a warning if GHC cannot specialise an overloaded function, usually
     because the function needs an ``INLINABLE`` pragma. Reports when the
@@ -424,8 +426,6 @@ of ``-W(no-)*``.
 
     Note that this warning will not throw errors if used with
     :ghc-flag:`-Werror`.
-
-    This option is off by default.
 
 .. ghc-flag:: -Wmissed-specializations
     :shortdesc: alias for :ghc-flag:`-Wmissed-specialisations`
@@ -440,14 +440,14 @@ of ``-W(no-)*``.
     :reverse: -Wno-all-missed-specialisations
     :category:
 
+    :default: off
+
     Emits a warning if GHC cannot specialise an overloaded function, usually
     because the function needs an ``INLINABLE`` pragma. Reports
     all such situations.
 
     Note that this warning will not throw errors if used with
     :ghc-flag:`-Werror`.
-
-    This option is off by default.
 
 .. ghc-flag:: -Wall-missed-specializations
     :shortdesc: alias for :ghc-flag:`-Wall-missed-specialisations`
@@ -463,6 +463,8 @@ of ``-W(no-)*``.
     :reverse: -Wno-warnings-deprecations
     :category:
 
+    :default: on
+
     .. index::
        pair: deprecations; warnings
 
@@ -470,14 +472,14 @@ of ``-W(no-)*``.
     a ``WARNING`` or ``DEPRECATED pragma`` is used. See
     :ref:`warning-deprecated-pragma` for more details on the pragmas.
 
-    This option is on by default.
-
 .. ghc-flag:: -Wdeprecations
     :shortdesc: warn about uses of functions & types that have warnings or
         deprecated pragmas. Alias for :ghc-flag:`-Wwarnings-deprecations`
     :type: dynamic
     :reverse: -Wno-deprecations
     :category:
+
+    :default: on
 
     .. index::
        single: deprecations
@@ -487,8 +489,6 @@ of ``-W(no-)*``.
     :ref:`warning-deprecated-pragma` for more details on the pragmas.
     An alias for :ghc-flag:`-Wwarnings-deprecations`.
 
-    This option is on by default.
-
 .. ghc-flag:: -Wnoncanonical-monad-instances
     :shortdesc: warn when ``Applicative`` or ``Monad`` instances have
         noncanonical definitions of ``return``, ``pure``, ``(>>)``,
@@ -497,6 +497,8 @@ of ``-W(no-)*``.
     :type: dynamic
     :reverse: -Wno-noncanonical-monad-instances
     :category:
+
+    :default: off
 
     Warn if noncanonical ``Applicative`` or ``Monad`` instances
     declarations are detected.
@@ -513,8 +515,6 @@ of ``-W(no-)*``.
 
      * Warn if ``pure`` is defined backwards (i.e. ``pure = return``).
      * Warn if ``(*>)`` is defined backwards (i.e. ``(*>) = (>>)``).
-
-    This option is off by default.
 
 .. ghc-flag:: -Wnoncanonical-monadfail-instances
     :shortdesc: *(deprecated)*
@@ -595,13 +595,13 @@ of ``-W(no-)*``.
     :reverse: -Wno-deprecated-flags
     :category:
 
+    :default: on
+
     .. index::
        single: deprecated flags
 
     Causes a warning to be emitted when a deprecated command-line flag
     is used.
-
-    This option is on by default.
 
 .. ghc-flag:: -Wunsupported-calling-conventions
     :shortdesc: warn about use of an unsupported calling convention
@@ -773,6 +773,8 @@ of ``-W(no-)*``.
     :reverse: -Wno-duplicate-exports
     :category:
 
+    :default: on
+
     .. index::
        single: duplicate exports, warning
        single: export lists, duplicates
@@ -781,8 +783,6 @@ of ``-W(no-)*``.
     is useful information if you maintain large export lists, and want
     to avoid the continued export of a definition after you've deleted
     (one) mention of it in the export list.
-
-    This option is on by default.
 
 .. ghc-flag:: -Whi-shadowing
     :shortdesc: *(deprecated)*
@@ -857,6 +857,8 @@ of ``-W(no-)*``.
     :reverse: -Wno-implicit-prelude
     :category:
 
+    :default: off
+
     .. index::
        single: implicit prelude, warning
 
@@ -872,8 +874,6 @@ of ``-W(no-)*``.
     ``Prelude.fromInteger (368::Prelude.Integer)`` (where ``Prelude`` refers
     to the actual Prelude module, regardless of the imports of the module
     being compiled).
-
-    This warning is off by default.
 
 .. ghc-flag:: -Wincomplete-patterns
     :shortdesc: warn when a pattern match could fail
@@ -970,6 +970,7 @@ of ``-W(no-)*``.
     :category:
 
     :since: 8.8.1
+    :default: off
 
     The datatype below derives the ``Eq`` typeclass, but doesn't specify a
     strategy. When :ghc-flag:`-Wmissing-deriving-strategies` is enabled,
@@ -981,8 +982,7 @@ of ``-W(no-)*``.
     The compiler will warn here that the deriving clause doesn't specify a
     strategy. If the warning is enabled, but :extension:`DerivingStrategies` is
     not enabled, the compiler will suggest turning on the
-    :extension:`DerivingStrategies` extension. This option is not on by default,
-    having to be turned on manually or with :ghc-flag:`-Weverything`.
+    :extension:`DerivingStrategies` extension.
 
 .. ghc-flag:: -Wmissing-fields
     :shortdesc: warn when fields of a record are uninitialised
@@ -1058,13 +1058,15 @@ of ``-W(no-)*``.
     :reverse: -Wno-missing-methods
     :category:
 
+    :default: on
+
     .. index::
        single: missing methods, warning
        single: methods, missing
 
-    This option is on by default, and warns you whenever an instance
-    declaration is missing one or more methods, and the corresponding
-    class declaration has no default declaration for them.
+    This option warns you whenever an instance declaration is missing
+    one or more methods, and the corresponding class declaration has no default
+    declaration for them.
 
     The ``MINIMAL`` pragma can be used to change which combination of
     methods will be required for instances of a particular class. See
@@ -1076,13 +1078,14 @@ of ``-W(no-)*``.
     :reverse: -Wno-missing-signatures
     :category:
 
+    :default: off
+
     .. index::
        single: type signatures, missing
 
     If you would like GHC to check that every top-level function/value
     has a type signature, use the :ghc-flag:`-Wmissing-signatures` option.
-    As part of the warning GHC also reports the inferred type. The
-    option is off by default.
+    As part of the warning GHC also reports the inferred type.
 
 .. ghc-flag:: -Wmissing-exported-sigs
     :shortdesc: *(deprecated)*
@@ -1105,6 +1108,8 @@ of ``-W(no-)*``.
     :reverse: -Wno-missing-exported-signatures
     :category:
 
+    :default: off
+
     .. index::
        single: type signatures, missing
 
@@ -1114,7 +1119,7 @@ of ``-W(no-)*``.
     option. If this option is used in conjunction with
     :ghc-flag:`-Wmissing-signatures` then every top-level function/value
     must have a type signature. As part of the warning GHC also
-    reports the inferred type. The option is off by default.
+    reports the inferred type.
 
 .. ghc-flag:: -Wmissing-local-sigs
     :shortdesc: *(deprecated)*
@@ -1149,6 +1154,8 @@ of ``-W(no-)*``.
     :reverse: -Wno-missing-pattern-synonym-signatures
     :category:
 
+    :default: off
+
     .. index::
          single: type signatures, missing, pattern synonyms
 
@@ -1158,7 +1165,7 @@ of ``-W(no-)*``.
     option is used in conjunction with
     :ghc-flag:`-Wmissing-exported-signatures` then only exported pattern
     synonyms must have a type signature. GHC also reports the inferred
-    type. This option is off by default.
+    type.
 
 .. ghc-flag:: -Wmissing-kind-signatures
     :shortdesc: warn when type declarations don't have kind signatures nor CUSKs
@@ -1167,6 +1174,7 @@ of ``-W(no-)*``.
     :category:
 
     :since: 9.2
+    :default: off
 
     .. index::
          single: kind signatures, missing
@@ -1184,14 +1192,14 @@ of ``-W(no-)*``.
     the parent class a standalone kind signature or CUSK is sufficient to fix
     the warning for the class's associated type families as well.
 
-    This option is off by default.
-
 .. ghc-flag:: -Wmissing-exported-pattern-synonym-signatures
     :shortdesc: warn about pattern synonyms without signatures, only if they
         are exported
     :type: dynamic
     :reverse: -Wno-missing-exported-pattern-synonym-signatures
     :category:
+
+    :default: off
 
     .. index::
        single: type signatures, missing, pattern synonyms
@@ -1202,7 +1210,7 @@ of ``-W(no-)*``.
     option is used in conjunction with
     :ghc-flag:`-Wmissing-pattern-synonym-signatures` then every pattern synonym
     must have a type signature. As part of the warning GHC also reports the
-    inferred type. The option is off by default.
+    inferred type.
 
 .. ghc-flag:: -Wname-shadowing
     :shortdesc: warn when names are shadowed
@@ -1398,6 +1406,7 @@ of ``-W(no-)*``.
     :category:
 
     :since: 8.2
+    :default: on
 
     .. index::
        single: simplifiable class constraints, warning
@@ -1413,10 +1422,6 @@ of ``-W(no-)*``.
     insoluble ``Eq a`` constraint.  Best avoided by instead writing: ::
 
        f :: Eq a => a -> a
-
-    This option is on by default. As usual you can suppress it on a
-    per-module basis with :ghc-flag:`-Wno-simplifiable-class-constraints
-    <-Wsimplifiable-class-constraints>`.
 
 .. ghc-flag:: -Wtabs
     :shortdesc: warn if there are tabs in the source file
@@ -1435,6 +1440,8 @@ of ``-W(no-)*``.
     :reverse: -Wno-type-defaults
     :category:
 
+    :default: off
+
     .. index::
        single: defaulting mechanism, warning
 
@@ -1447,13 +1454,13 @@ of ``-W(no-)*``.
     ``Integer``. This may lead to differences in performance and
     behaviour, hence the usefulness of being non-silent about this.
 
-    This warning is off by default.
-
 .. ghc-flag:: -Wmonomorphism-restriction
     :shortdesc: warn when the Monomorphism Restriction is applied
     :type: dynamic
     :reverse: -Wno-monomorphism-restriction
     :category:
+
+    :default: off
 
     .. index::
        single: monomorphism restriction, warning
@@ -1462,8 +1469,6 @@ of ``-W(no-)*``.
     Monomorphism Restriction is applied. If applied silently the MR can
     give rise to unexpected behaviour, so it can be helpful to have an
     explicit warning that it is being applied.
-
-    This warning is off by default.
 
 .. ghc-flag:: -Wunsupported-llvm-version
     :shortdesc: Warn when using :ghc-flag:`-fllvm` with an unsupported
