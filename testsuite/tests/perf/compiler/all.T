@@ -477,3 +477,7 @@ test('T11545',
 test('T15304',
      [ collect_compiler_stats('all', 10) ],
      compile, ['-O'])
+test ('T20049',
+      [ collect_compiler_stats('bytes allocated',2) ],
+      compile,
+      [''])
