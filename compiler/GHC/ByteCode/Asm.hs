@@ -569,9 +569,9 @@ mkTupleInfoSig platform TupleInfo{..}
               text "Use -fobject-code to get around this limit"
              )
   | otherwise
-  = assert (length regs <= 24) {- 24 bits for bitmap -}
-    assert (tupleNativeStackSize < 255) {- 8 bits for stack size -}
-    assert (all (`elem` regs) (regSetToList tupleRegs)) {- all regs accounted for -}
+  = ASSERT(length regs <= 24) {- 24 bits for bitmap -}
+    ASSERT(tupleNativeStackSize < 255) {- 8 bits for stack size -}
+    ASSERT(all (`elem` regs) (regSetToList tupleRegs)) {- all regs accounted for -}
     foldl' reg_bit 0 (zip regs [0..]) .|.
       (fromIntegral tupleNativeStackSize `shiftL` 24)
   where

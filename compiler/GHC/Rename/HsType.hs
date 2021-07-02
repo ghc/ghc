@@ -1389,8 +1389,7 @@ mkOpAppRn ReassociateNegation e1 op1 fix1 e2@(L _ (NegApp {})) -- NegApp can occ
 ---------------------------
 --      Default case
 mkOpAppRn _ e1 op fix e2                  -- Default case, no rearrangment
-  = assertPpr (right_op_ok fix (unLoc e2))
-              (ppr e1 $$ text "---" $$ ppr op $$ text "---" $$ ppr fix $$ text "---" $$ ppr e2) $
+  = ASSERT2(right_op_ok fix (unLoc e2), ppr e1 $$ text "---" $$ ppr op $$ text "---" $$ ppr fix $$ text "---" $$ ppr e2)
     return (OpApp fix e1 op e2)
 
 data NegationHandling = ReassociateNegation | KeepNegationIntact
