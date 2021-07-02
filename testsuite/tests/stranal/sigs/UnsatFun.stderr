@@ -1,9 +1,9 @@
 
 ==================== Strictness signatures ====================
 UnsatFun.$trModule:
-UnsatFun.f: <1P(S)><B>b
-UnsatFun.g: <1P(S)>b
-UnsatFun.g': <MP(L)>
+UnsatFun.f: <1!S><B>b
+UnsatFun.g: <1!S>b
+UnsatFun.g': <ML>
 UnsatFun.g3: <A>
 UnsatFun.h: <1C1(L)>
 UnsatFun.h2: <1L><MCM(L)>
@@ -25,9 +25,9 @@ UnsatFun.h3: 1
 
 ==================== Strictness signatures ====================
 UnsatFun.$trModule:
-UnsatFun.f: <1P(S)><B>b
-UnsatFun.g: <1P(S)>b
-UnsatFun.g': <MP(L)>
+UnsatFun.f: <1!S><B>b
+UnsatFun.g: <1!S>b
+UnsatFun.g': <ML>
 UnsatFun.g3: <A>
 UnsatFun.h: <1C1(L)>
 UnsatFun.h2: <1L><MCM(L)>
