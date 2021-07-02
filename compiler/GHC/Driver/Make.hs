@@ -697,6 +697,7 @@ discardIC hsc_env
 guessOutputFile :: GhcMonad m => m ()
 guessOutputFile = modifySession $ \env ->
     let dflags = hsc_dflags env
+        platform = targetPlatform dflags
         -- Force mod_graph to avoid leaking env
         !mod_graph = hsc_mod_graph env
         mainModuleSrcPath :: Maybe String
@@ -709,7 +710,7 @@ guessOutputFile = modifySession $ \env ->
           -- we must add the .exe extension unconditionally here, otherwise
           -- when name has an extension of its own, the .exe extension will
           -- not be added by GHC.Driver.Pipeline.exeFileName.  See #2248
-          name' <- if isWindowsHost --FIXME: should be the target platform
+          name' <- if platformOS platform == OSMinGW32
                     then fmap (<.> "exe") name
                     else name
           mainModuleSrcPath' <- mainModuleSrcPath
