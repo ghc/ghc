@@ -40,6 +40,7 @@ module GHC.Core.FamInstEnv (
 import GHC.Prelude
 
 import GHC.Core.Unify
+import GHC.Core.TyCo.Subst
 import GHC.Core.Type as Type
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCon
@@ -1330,12 +1331,12 @@ normaliseTcApp env role tc tys
 -- See Note [Normalising types] about the LiftingContext
 normalise_tc_app :: TyCon -> [Type] -> NormM (Coercion, Type)
 normalise_tc_app tc tys
-  | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc tys
+  | Just (tvs, tv_tys, rhs, tys') <- expandSynTyCon_maybe tc tys
   , not (isFamFreeTyCon tc)  -- Expand and try again
   = -- A synonym with type families in the RHS
     -- Expand and try again
     -- See Note [Normalisation and type synonyms]
-    normalise_type (mkAppTys (substTy (mkTvSubstPrs tenv) rhs) tys')
+    normalise_type (mkAppTys (substTy (mkTvSubstZipEqual tvs tv_tys) rhs) tys')
 
   | isFamilyTyCon tc
   = -- A type-family application

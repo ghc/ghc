@@ -5,7 +5,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE TupleSections, ScopedTypeVariables, MultiWayIf #-}
+{-# LANGUAGE ScopedTypeVariables, MultiWayIf #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE LambdaCase #-}
@@ -64,6 +64,7 @@ import GHC.Core.Coercion
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep   -- for checkValidRoles
 import GHC.Core.TyCo.Ppr( pprTyVars )
+import GHC.Core.TyCo.Subst
 import GHC.Core.Class
 import GHC.Core.Coercion.Axiom
 import GHC.Core.TyCon
@@ -4310,7 +4311,8 @@ checkPartialRecordField all_cons fld
 
     con1 = assert (not (null cons_with_field)) $ head cons_with_field
     (univ_tvs, _, eq_spec, _, _, _) = dataConFullSig con1
-    eq_subst = mkTvSubstPrs (map eqSpecPair eq_spec)
+    eq_subst = mkTvSubstZipEqual (map eqSpecTyVar eq_spec)
+                             (map eqSpecType  eq_spec)
     inst_tys = substTyVars eq_subst univ_tvs
 
 checkFieldCompat :: FieldLabelString -> DataCon -> DataCon
@@ -4969,7 +4971,7 @@ checkValidRoles tc
     -- tyConDataCons returns an empty list for data families
   = mapM_ check_dc_roles (tyConDataCons tc)
   | Just rhs <- synTyConRhs_maybe tc
-  = check_ty_roles (zipVarEnv (tyConTyVars tc) (tyConRoles tc)) Representational rhs
+  = check_ty_roles (zipEqualVarEnv (tyConTyVars tc) (tyConRoles tc)) Representational rhs
   | otherwise
   = return ()
   where
@@ -4981,9 +4983,9 @@ checkValidRoles tc
       where
         (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _res_ty)
           = dataConFullSig datacon
-        univ_roles = zipVarEnv univ_tvs (tyConRoles tc)
-              -- zipVarEnv uses zipEqual, but we don't want that for ex_tvs
-        ex_roles   = mkVarEnv (map (, Nominal) ex_tvs)
+        univ_roles = zipEqualVarEnv univ_tvs (tyConRoles tc)
+              -- we don't want zipEqual for ex_tvs
+        ex_roles   = zipVarEnv ex_tvs (repeat Nominal)
         role_env   = univ_roles `plusVarEnv` ex_roles
 
     check_ty_roles env role ty
