@@ -418,3 +418,7 @@ test ('T13253-spj',
       ],
       compile,
       ['-v0 -O'])
+test ('T20049',
+      [ collect_compiler_stats('bytes allocated',2) ],
+      compile,
+      [''])
