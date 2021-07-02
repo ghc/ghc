@@ -222,6 +222,7 @@ import GHC.Num
 import GHC.Real
 import GHC.List
 import GHC.Base
+import GHC.Stack.Types  ( HasCallStack )
 
 -- | The 'isSubsequenceOf' function takes two lists and returns 'True' if all
 -- the elements of the first list occur, in order, in the second. The
@@ -712,8 +713,8 @@ insertBy cmp x ys@(y:ys')
 --
 -- >>> maximumBy (\x y -> compare (length x) (length y)) ["Hello", "World", "!", "Longest", "bar"]
 -- "Longest"
-maximumBy :: (a -> a -> Ordering) -> [a] -> a
-maximumBy cmp = fromMaybe (errorWithoutStackTrace "maximumBy: empty structure")
+maximumBy :: HasCallStack => (a -> a -> Ordering) -> [a] -> a
+maximumBy cmp = fromMaybe (error "maximumBy: empty structure")
   . foldl' max' Nothing
   where
     max' mx y = Just $! case mx of
@@ -732,8 +733,8 @@ maximumBy cmp = fromMaybe (errorWithoutStackTrace "maximumBy: empty structure")
 --
 -- >>> minimumBy (\x y -> compare (length x) (length y)) ["Hello", "World", "!", "Longest", "bar"]
 -- "!"
-minimumBy :: (a -> a -> Ordering) -> [a] -> a
-minimumBy cmp = fromMaybe (errorWithoutStackTrace "minimumBy: empty structure")
+minimumBy :: HasCallStack => (a -> a -> Ordering) -> [a] -> a
+minimumBy cmp = fromMaybe (error "minimumBy: empty structure")
   . foldl' min' Nothing
   where
     min' mx y = Just $! case mx of
