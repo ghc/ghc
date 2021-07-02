@@ -318,7 +318,7 @@ stack-hadrian-build:
 
 validate-x86_64-linux-deb9-hadrian:
   extends: .validate-linux-hadrian
-  stage: quick-build
+  stage: full-build
 
 validate-x86_64-linux-deb9-unreg-hadrian:
   extends: .validate-linux-hadrian
@@ -806,6 +806,7 @@ nightly-aarch64-linux-deb10:
     - aarch64-linux
 
 validate-aarch64-linux-deb10-llvm:
+  <<: *nightly
   extends: .build-aarch64-linux-deb10-llvm
   variables:
     CONFIGURE_ARGS: "CC=/opt/llvm/bin/clang"
