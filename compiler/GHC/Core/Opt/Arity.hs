@@ -866,6 +866,7 @@ data AnalysisMode
                  , am_sigs :: !(IdEnv ArityType) }
   -- ^ Used for regular, fixed-point arity analysis ('findRhsArity').
   --   See Note [Arity analysis] for details about fixed-point iteration.
+  --   INVARIANT: Disjoint with 'ae_joins'.
 
 data ArityEnv
   = AE
@@ -873,6 +874,7 @@ data ArityEnv
   -- ^ The analysis mode. See 'AnalysisMode'.
   , ae_joins  :: !IdSet
   -- ^ In-scope join points. See Note [Eta-expansion and join points]
+  --   INVARIANT: Disjoint with the domain of 'am_sigs' (if present).
   }
 
 -- | The @ArityEnv@ used by 'exprBotStrictness_maybe'. Pedantic about bottoms
@@ -895,14 +897,49 @@ findRhsArityEnv dflags
                                  , am_sigs = emptyVarEnv }
        , ae_joins = emptyVarSet }
 
+-- First some internal functions in snake_case for deleting in certain VarEnvs
+-- of the ArityType. Don't call these; call delInScope* instead!
+
+modifySigEnv :: (IdEnv ArityType -> IdEnv ArityType) -> ArityEnv -> ArityEnv
+modifySigEnv f env@AE { ae_mode = am@FindRhsArity{am_sigs = sigs} } =
+  env { ae_mode = am { am_sigs = f sigs } }
+modifySigEnv _ env = env
+{-# INLINE modifySigEnv #-}
+
+del_sig_env :: Id -> ArityEnv -> ArityEnv -- internal!
+del_sig_env id = modifySigEnv (\sigs -> delVarEnv sigs id)
+{-# INLINE del_sig_env #-}
+
+del_sig_env_list :: [Id] -> ArityEnv -> ArityEnv -- internal!
+del_sig_env_list ids = modifySigEnv (\sigs -> delVarEnvList sigs ids)
+{-# INLINE del_sig_env_list #-}
+
+del_join_env :: JoinId -> ArityEnv -> ArityEnv -- internal!
+del_join_env id env@(AE { ae_joins = joins })
+  = env { ae_joins = delVarSet joins id }
+{-# INLINE del_join_env #-}
+
+del_join_env_list :: [JoinId] -> ArityEnv -> ArityEnv -- internal!
+del_join_env_list ids env@(AE { ae_joins = joins })
+  = env { ae_joins = delVarSetList joins ids }
+{-# INLINE del_join_env_list #-}
+
+-- end of internal deletion functions
+
 extendJoinEnv :: ArityEnv -> [JoinId] -> ArityEnv
 extendJoinEnv env@(AE { ae_joins = joins }) join_ids
-  = env { ae_joins = joins `extendVarSetList` join_ids }
+  = del_sig_env_list join_ids
+  $ env { ae_joins = joins `extendVarSetList` join_ids }
 
 extendSigEnv :: ArityEnv -> Id -> ArityType -> ArityEnv
-extendSigEnv env@AE { ae_mode = am@FindRhsArity{am_sigs = sigs} } id ar_ty =
-  env { ae_mode = am { am_sigs = extendVarEnv sigs id ar_ty } }
-extendSigEnv env _ _ = env
+extendSigEnv env id ar_ty
+  = del_join_env id (modifySigEnv (\sigs -> extendVarEnv sigs id ar_ty) env)
+
+delInScope :: ArityEnv -> Id -> ArityEnv
+delInScope env id = del_join_env id $ del_sig_env id env
+
+delInScopeList :: ArityEnv -> [Id] -> ArityEnv
+delInScopeList env ids = del_join_env_list ids $ del_sig_env_list ids env
 
 lookupSigEnv :: ArityEnv -> Id -> Maybe ArityType
 lookupSigEnv AE{ ae_mode = mode } id = case mode of
@@ -971,8 +1008,10 @@ arityType env (Var v)
 
         -- Lambdas; increase arity
 arityType env (Lam x e)
-  | isId x    = arityLam x (arityType env e)
-  | otherwise = arityType env e
+  | isId x    = arityLam x (arityType env' e)
+  | otherwise = arityType env' e
+  where
+    env' = delInScope env x
 
         -- Applications; decrease arity, except for types
 arityType env (App fun (Type _))
@@ -1000,7 +1039,9 @@ arityType env (Case scrut bndr _ alts)
   | otherwise                  -- In the remaining cases we may not push
   = takeWhileOneShot alts_type -- evaluation of the scrutinee in
   where
-    alts_type = foldr1 andArityType [arityType env rhs | Alt _ _ rhs <- alts]
+    env' = delInScope env bndr
+    arity_type_alt (Alt _con bndrs rhs) = arityType (delInScopeList env' bndrs) rhs
+    alts_type = foldr1 andArityType (map arity_type_alt alts)
 
 arityType env (Let (NonRec j rhs) body)
   | Just join_arity <- isJoinId_maybe j
@@ -1031,9 +1072,10 @@ arityType env (Let (NonRec b r) e)
     env'      = extendSigEnv env b (arityType env r)
 
 arityType env (Let (Rec prs) e)
-  = floatIn (all is_cheap prs) (arityType env e)
+  = floatIn (all is_cheap prs) (arityType env' e)
   where
-    is_cheap (b,e) = myExprIsCheap env e (Just (idType b))
+    env'           = delInScopeList env (map fst prs)
+    is_cheap (b,e) = myExprIsCheap env' e (Just (idType b))
 
 arityType env (Tick t e)
   | not (tickishIsCode t)     = arityType env e
