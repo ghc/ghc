@@ -11,7 +11,7 @@ module GHC.Core.Opt.WorkWrap.Utils
    ( WwOpts(..), initWwOpts, mkWwBodies, mkWWstr, mkWWstr_one, mkWorkerArgs
    , DataConPatContext(..)
    , UnboxingDecision(..), ArgOfInlineableFun(..), wantToUnboxArg
-   , findTypeShape, mkAbsentFiller
+   , findTypeShape, mkAbsentFiller, isRecDataCon
    , isWorkerSmallEnough
    )
 where
@@ -616,9 +616,8 @@ addDataConStrictness con ds
 wantToUnboxResult :: FamInstEnvs -> Type -> Cpr -> UnboxingDecision Cpr
 -- See Note [Which types are unboxed?]
 wantToUnboxResult fam_envs ty cpr
-  | Just (con_tag, _cprs) <- asConCpr cpr
+  | Just (con_tag, arg_cprs) <- asConCpr cpr
   , Just (tc, tc_args, co) <- normSplitTyConApp_maybe fam_envs ty
-  , isDataTyCon tc -- NB: No unboxed sums or tuples
   , Just dcs <- tyConAlgDataCons_maybe tc <|> open_body_ty_warning
   , dcs `lengthAtLeast` con_tag -- This might not be true if we import the
                                 -- type constructor via a .hs-boot file (#8743)
@@ -631,7 +630,7 @@ wantToUnboxResult fam_envs ty cpr
   -- Deactivates CPR worker/wrapper splits on constructors with non-linear
   -- arguments, for the moment, because they require unboxed tuple with variable
   -- multiplicity fields.
-  = Unbox (DataConPatContext dc tc_args co) []
+  = Unbox (DataConPatContext dc tc_args co) arg_cprs
 
   | otherwise
   = StopUnboxing
@@ -1214,6 +1213,18 @@ fragile
 ************************************************************************
 -}
 
+-- | Exactly 'dataConInstArgTys', but lacks the (ASSERT'ed) precondition that
+-- the 'DataCon' may not have existentials. The lack of cloning the existentials
+-- compared to 'dataConInstExAndArgVars' makes this function \"dubious\";
+-- only use it where type variables aren't substituted for!
+dubiousDataConInstArgTys :: DataCon -> [Type] -> [Type]
+dubiousDataConInstArgTys dc tc_args = arg_tys
+  where
+    univ_tvs = dataConUnivTyVars dc
+    ex_tvs   = dataConExTyCoVars dc
+    subst    = extendTCvInScopeList (zipTvSubst univ_tvs tc_args) ex_tvs
+    arg_tys  = map (GHC.Core.Type.substTy subst . scaledThing) (dataConRepArgTys dc)
+
 findTypeShape :: FamInstEnvs -> Type -> TypeShape
 -- Uncover the arrow and product shape of a type
 -- The data type TypeShape is defined in GHC.Types.Demand
@@ -1260,17 +1271,104 @@ findTypeShape fam_envs ty
        | otherwise
        = TsUnk
 
--- | Exactly 'dataConInstArgTys', but lacks the (ASSERT'ed) precondition that
--- the 'DataCon' may not have existentials. The lack of cloning the existentials
--- compared to 'dataConInstExAndArgVars' makes this function \"dubious\";
--- only use it where type variables aren't substituted for!
-dubiousDataConInstArgTys :: DataCon -> [Type] -> [Type]
-dubiousDataConInstArgTys dc tc_args = arg_tys
+-- | @isRecDataCon _ fuel dc@, where @tc = dataConTyCon dc@ returns
+--
+--   * @Just Recursive@ if the analysis found that @tc@ is reachable through one
+--     of @dc@'s fields
+--   * @Just NonRecursive@ if the analysis found that @tc@ is not reachable
+--     through one of @dc@'s fields
+--   * @Nothing@ is only returned iff @fuel /= Infinity@ and @f@ expansions of
+--     nested data TyCons were not enough to prove non-recursivenss, nor arrive
+--     at an occurrence of @tc@ thus proving recursiveness.
+--
+-- If @fuel = 'Infinity'@, the result is never @Nothing@ and the analysis is a
+-- depth-first search. If @fuel = 'Int' f@, then the analysis behaves like a
+-- depth-limited DFS and returns @Nothing@ if the search was inconclusive.
+--
+-- See Note [CPR for recursive data constructors] for which recursive DataCons
+-- we want to flag.
+isRecDataCon :: FamInstEnvs -> IntWithInf -> DataCon -> Maybe RecFlag
+isRecDataCon fam_envs fuel dc
+  | isTupleDataCon dc || isUnboxedSumDataCon dc
+  = Just NonRecursive
+  | otherwise
+  = -- pprTrace "isRecDataCon" (ppr dc <+> ppr fuel <+> ppr answer)
+    answer
   where
-    univ_tvs = dataConUnivTyVars dc
-    ex_tvs   = dataConExTyCoVars dc
-    subst    = extendTCvInScopeList (zipTvSubst univ_tvs tc_args) ex_tvs
-    arg_tys  = map (GHC.Core.Type.substTy subst . scaledThing) (dataConRepArgTys dc)
+    answer = go_dc fuel (setRecTcMaxBound 1 initRecTc) dc
+    (<||>) = combineRecFlag
+
+    go_dc :: IntWithInf -> RecTcChecker -> DataCon -> Maybe RecFlag
+    go_dc fuel rec_tc dc =
+      combineRecFlags [ go_arg_ty fuel rec_tc (scaledThing arg_ty)
+                      | arg_ty <- dataConRepArgTys dc ]
+
+    -- | PRECONDITION: ty has TYPE-kind, otherwise it wouldn't be the arg ty
+    -- of a DataCon. All other kinds aren't inhabited at runtime anyway.
+    go_arg_ty :: IntWithInf -> RecTcChecker -> Type -> Maybe RecFlag
+    go_arg_ty fuel rec_tc ty
+      | Just (_, _arg_ty, _res_ty) <- splitFunTy_maybe ty
+      -- = go_arg_ty fuel rec_tc _arg_ty <||> go_arg_ty fuel rec_tc _res_ty
+          -- Plausible, but unnecessary for CPR.
+          -- See Note [CPR for recursive data constructors], point (1)
+      = Just NonRecursive
+
+      | Just (_tcv, ty') <- splitForAllTyCoVar_maybe ty
+      = go_arg_ty fuel rec_tc ty'
+          -- See Note [CPR for recursive data constructors], point (2)
+
+      | Just (tc, tc_args) <- splitTyConApp_maybe ty
+      = combineRecFlags (map (go_arg_ty fuel rec_tc) tc_args)
+        <||> go_tc_app fuel rec_tc tc tc_args
+
+      | otherwise
+      = Just NonRecursive
+
+    -- | PRECONDITION: tc_args has no recursive occs
+    -- See Note [CPR for recursive data constructors], point (5)
+    go_tc_app :: IntWithInf -> RecTcChecker -> TyCon -> [Type] -> Maybe RecFlag
+    go_tc_app fuel rec_tc tc tc_args
+
+      | tc == dataConTyCon dc
+      = Just Recursive -- loop found!
+
+      | Just (_, rhs, _) <- topReduceTyFamApp_maybe fam_envs tc tc_args
+          -- See Note [CPR for recursive data constructors], point (5)
+      = go_arg_ty fuel rec_tc rhs
+      -- from hereon, we only need the length of tc_args
+      |  isPrimTyCon tc
+      = Just NonRecursive
+
+      | Nothing <- checkRecTc rec_tc tc
+      = Just NonRecursive -- we expanded this TyCon once already, no need to test it multiple times
+
+      | Just (_tvs, rhs, _co) <- unwrapNewTyConEtad_maybe tc
+          -- See Note [CPR for recursive data constructors], points (2) and (3)
+      , Just rec_tc' <- checkRecTc rec_tc tc
+      = go_arg_ty fuel rec_tc' rhs
+
+      | Just dcs <- tyConDataCons_maybe tc
+      , Just rec_tc' <- checkRecTc rec_tc tc
+      = if fuel >= 0
+          -- See Note [CPR for recursive data constructors], point (4)
+          then combineRecFlags (map (\dc -> go_dc (subWithInf fuel 1) rec_tc' dc) dcs)
+          else Nothing -- that's why we track fuel!
+
+      | otherwise
+      = warnPprTrace True (text "isRecDataCon: No idea" $$ ppr tc $$ ppr tc_args) $ Just Recursive
+
+-- | Computes the least upper bound on the total order
+-- @Just Recursive > Nothing > Just NonRecursive@.
+combineRecFlag :: Maybe RecFlag -> Maybe RecFlag -> Maybe RecFlag
+combineRecFlag (Just Recursive)    _                   = Just Recursive
+combineRecFlag _                   (Just Recursive)    = Just Recursive
+combineRecFlag Nothing             _                   = Nothing
+combineRecFlag _                   Nothing             = Nothing
+combineRecFlag (Just NonRecursive) (Just NonRecursive) = Just NonRecursive
+
+combineRecFlags :: [Maybe RecFlag] -> Maybe RecFlag
+combineRecFlags = foldr combineRecFlag (Just NonRecursive)
+{-# INLINE combineRecFlags #-}
 
 {-
 ************************************************************************
