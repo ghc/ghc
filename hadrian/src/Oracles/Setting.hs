@@ -64,6 +64,7 @@ data Setting = BuildArch
              | ProjectName
              | ProjectVersion
              | ProjectVersionInt
+             | ProjectVersionMunged
              | ProjectPatchLevel
              | ProjectPatchLevel1
              | ProjectPatchLevel2
@@ -76,6 +77,7 @@ data Setting = BuildArch
              | TargetArchHaskell
              | TargetOsHaskell
              | TargetArmVersion
+             | TargetWordSize
              | BourneShell
 
 -- TODO: Reduce the variety of similar flags (e.g. CPP and non-CPP versions).
@@ -129,51 +131,53 @@ data SettingsFileSetting
 -- result.
 setting :: Setting -> Action String
 setting key = lookupValueOrError configFile $ case key of
-    BuildArch          -> "build-arch"
-    BuildOs            -> "build-os"
-    BuildPlatform      -> "build-platform"
-    BuildVendor        -> "build-vendor"
-    CursesLibDir       -> "curses-lib-dir"
-    DynamicExtension   -> "dynamic-extension"
-    FfiIncludeDir      -> "ffi-include-dir"
-    FfiLibDir          -> "ffi-lib-dir"
-    GhcMajorVersion    -> "ghc-major-version"
-    GhcMinorVersion    -> "ghc-minor-version"
-    GhcPatchLevel      -> "ghc-patch-level"
-    GhcVersion         -> "ghc-version"
-    GhcSourcePath      -> "ghc-source-path"
-    GmpIncludeDir      -> "gmp-include-dir"
-    GmpLibDir          -> "gmp-lib-dir"
-    HostArch           -> "host-arch"
-    HostOs             -> "host-os"
-    HostPlatform       -> "host-platform"
-    HostVendor         -> "host-vendor"
-    HostArchHaskell    -> "host-arch-haskell"
-    HostOsHaskell      -> "host-os-haskell"
-    IconvIncludeDir    -> "iconv-include-dir"
-    IconvLibDir        -> "iconv-lib-dir"
-    LibdwIncludeDir    -> "libdw-include-dir"
-    LibdwLibDir        -> "libdw-lib-dir"
-    LibnumaIncludeDir  -> "libnuma-include-dir"
-    LibnumaLibDir      -> "libnuma-lib-dir"
-    LlvmTarget         -> "llvm-target"
-    ProjectGitCommitId -> "project-git-commit-id"
-    ProjectName        -> "project-name"
-    ProjectVersion     -> "project-version"
-    ProjectVersionInt  -> "project-version-int"
-    ProjectPatchLevel  -> "project-patch-level"
-    ProjectPatchLevel1 -> "project-patch-level1"
-    ProjectPatchLevel2 -> "project-patch-level2"
-    SystemGhc          -> "system-ghc"
-    TargetArch         -> "target-arch"
-    TargetArmVersion   -> "target-arm-version"
-    TargetOs           -> "target-os"
-    TargetPlatform     -> "target-platform"
-    TargetPlatformFull -> "target-platform-full"
-    TargetVendor       -> "target-vendor"
-    TargetArchHaskell  -> "target-arch-haskell"
-    TargetOsHaskell    -> "target-os-haskell"
-    BourneShell        -> "bourne-shell"
+    BuildArch            -> "build-arch"
+    BuildOs              -> "build-os"
+    BuildPlatform        -> "build-platform"
+    BuildVendor          -> "build-vendor"
+    CursesLibDir         -> "curses-lib-dir"
+    DynamicExtension     -> "dynamic-extension"
+    FfiIncludeDir        -> "ffi-include-dir"
+    FfiLibDir            -> "ffi-lib-dir"
+    GhcMajorVersion      -> "ghc-major-version"
+    GhcMinorVersion      -> "ghc-minor-version"
+    GhcPatchLevel        -> "ghc-patch-level"
+    GhcVersion           -> "ghc-version"
+    GhcSourcePath        -> "ghc-source-path"
+    GmpIncludeDir        -> "gmp-include-dir"
+    GmpLibDir            -> "gmp-lib-dir"
+    HostArch             -> "host-arch"
+    HostOs               -> "host-os"
+    HostPlatform         -> "host-platform"
+    HostVendor           -> "host-vendor"
+    HostArchHaskell      -> "host-arch-haskell"
+    HostOsHaskell        -> "host-os-haskell"
+    IconvIncludeDir      -> "iconv-include-dir"
+    IconvLibDir          -> "iconv-lib-dir"
+    LibdwIncludeDir      -> "libdw-include-dir"
+    LibdwLibDir          -> "libdw-lib-dir"
+    LibnumaIncludeDir    -> "libnuma-include-dir"
+    LibnumaLibDir        -> "libnuma-lib-dir"
+    LlvmTarget           -> "llvm-target"
+    ProjectGitCommitId   -> "project-git-commit-id"
+    ProjectName          -> "project-name"
+    ProjectVersion       -> "project-version"
+    ProjectVersionInt    -> "project-version-int"
+    ProjectVersionMunged -> "project-version-munged"
+    ProjectPatchLevel    -> "project-patch-level"
+    ProjectPatchLevel1   -> "project-patch-level1"
+    ProjectPatchLevel2   -> "project-patch-level2"
+    SystemGhc            -> "system-ghc"
+    TargetArch           -> "target-arch"
+    TargetArmVersion     -> "target-arm-version"
+    TargetOs             -> "target-os"
+    TargetPlatform       -> "target-platform"
+    TargetPlatformFull   -> "target-platform-full"
+    TargetVendor         -> "target-vendor"
+    TargetArchHaskell    -> "target-arch-haskell"
+    TargetOsHaskell      -> "target-os-haskell"
+    TargetWordSize       -> "target-word-size"
+    BourneShell          -> "bourne-shell"
 
 -- | Look up the value of a 'SettingList' in @cfg/system.config@, tracking the
 -- result.
