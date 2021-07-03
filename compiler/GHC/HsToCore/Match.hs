@@ -719,7 +719,7 @@ matchWrapper
                                        --   Nothing for a function definition
                                        --      f p1 q1 = ...  -- No "scrutinee"
                                        --      f p2 q2 = ...  -- in this case
-  -> MatchGroup GhcTc (LHsExpr GhcTc)  -- ^ Matches being desugared
+  -> MatchGroup SrcSpanAnnL SrcSpanAnnA GhcTc (LHsExpr GhcTc)  -- ^ Matches being desugared
   -> DsM ([Id], CoreExpr)              -- ^ Results (usually passed to 'match')
 
 {-
@@ -746,7 +746,7 @@ one pattern, and match simply only accepts one pattern.
 JJQC 30-Nov-1997
 -}
 
-matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
+matchWrapper ctxt mb_scr (MG { mg_alts = L _ (Annotated matches)
                              , mg_ext = MatchGroupTc arg_tys rhs_ty
                              , mg_origin = origin })
   = do  { dflags <- getDynFlags
@@ -776,8 +776,8 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
         ; return (new_vars, result_expr) }
   where
     -- Called once per equation in the match, or alternative in the case
-    mk_eqn_info :: LMatch GhcTc (LHsExpr GhcTc) -> (Nablas, NonEmpty Nablas) -> DsM EquationInfo
-    mk_eqn_info (L _ (Match { m_pats = pats, m_grhss = grhss })) (pat_nablas, rhss_nablas)
+    mk_eqn_info :: LAnnoMatch anno GhcTc (LHsExpr GhcTc) -> (Nablas, NonEmpty Nablas) -> DsM EquationInfo
+    mk_eqn_info (L _ (Annotated Match { m_pats = pats, m_grhss = grhss })) (pat_nablas, rhss_nablas)
       = do { dflags <- getDynFlags
            ; let upats = map (unLoc . decideBangHood dflags) pats
            -- pat_nablas is the covered set *after* matching the pattern, but
@@ -794,9 +794,9 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
                      then discardWarningsDs
                      else id
 
-    initNablasMatches :: [LMatch GhcTc b] -> [(Nablas, NonEmpty Nablas)]
+    initNablasMatches :: [LAnnoMatch anno GhcTc b] -> [(Nablas, NonEmpty Nablas)]
     initNablasMatches ms
-      = map (\(L _ m) -> (initNablas, initNablasGRHSs (m_grhss m))) ms
+      = map (\(L _ (Annotated m)) -> (initNablas, initNablasGRHSs (m_grhss m))) ms
 
     initNablasGRHSs :: GRHSs GhcTc b -> NonEmpty Nablas
     initNablasGRHSs m = expectJust "GRHSs non-empty"

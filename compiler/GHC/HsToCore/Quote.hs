@@ -1490,8 +1490,8 @@ repE (HsRecSel _ (FieldOcc x _)) = repE (HsVar noExtField (noLocA x))
         -- HsOverlit can definitely occur
 repE (HsOverLit _ l) = do { a <- repOverloadedLiteral l; repLit a }
 repE (HsLit _ l)     = do { a <- repLiteral l;           repLit a }
-repE (HsLam _ (MG { mg_alts = (L _ [m]) })) = repLambda m
-repE (HsLamCase _ (MG { mg_alts = (L _ ms) }))
+repE (HsLam _ (MG { mg_alts = (L _ (Annotated [m])) })) = repLambda m
+repE (HsLamCase _ (MG { mg_alts = (L _ (Annotated ms)) }))
                    = do { ms' <- mapM repMatchTup ms
                         ; core_ms <- coreListM matchTyConName ms'
                         ; repLamCase core_ms }
@@ -1512,7 +1512,7 @@ repE (NegApp _ x _)      = do
 repE (HsPar _ _ x _)        = repLE x
 repE (SectionL _ x y)       = do { a <- repLE x; b <- repLE y; repSectionL a b }
 repE (SectionR _ x y)       = do { a <- repLE x; b <- repLE y; repSectionR a b }
-repE (HsCase _ e (MG { mg_alts = (L _ ms) }))
+repE (HsCase _ e (MG { mg_alts = L _ (Annotated ms) }))
                           = do { arg <- repLE e
                                ; ms2 <- mapM repMatchTup ms
                                ; core_ms2 <- coreListM matchTyConName ms2
@@ -1652,8 +1652,8 @@ the choice in HsExpanded, but it seems simpler to consult the flag (again).
 -----------------------------------------------------------------------------
 -- Building representations of auxiliary structures like Match, Clause, Stmt,
 
-repMatchTup ::  LMatch GhcRn (LHsExpr GhcRn) -> MetaM (Core (M TH.Match))
-repMatchTup (L _ (Match { m_pats = [p]
+repMatchTup ::  LAnnoMatch anno GhcRn (LHsExpr GhcRn) -> MetaM (Core (M TH.Match))
+repMatchTup (L _ (Annotated Match { m_pats = [p]
                         , m_grhss = GRHSs _ guards wheres })) =
   do { ss1 <- mkGenSyms (collectPatBinders CollNoDictBinders p)
      ; addBinds ss1 $ do {
@@ -1665,8 +1665,8 @@ repMatchTup (L _ (Match { m_pats = [p]
      ; wrapGenSyms (ss1++ss2) match }}}
 repMatchTup _ = panic "repMatchTup: case alt with more than one arg"
 
-repClauseTup ::  LMatch GhcRn (LHsExpr GhcRn) -> MetaM (Core (M TH.Clause))
-repClauseTup (L _ (Match { m_pats = ps
+repClauseTup ::  LAnnoMatch anno GhcRn (LHsExpr GhcRn) -> MetaM (Core (M TH.Clause))
+repClauseTup (L _ (Annotated Match { m_pats = ps
                          , m_grhss = GRHSs _ guards  wheres })) =
   do { ss1 <- mkGenSyms (collectPatsBinders CollNoDictBinders ps)
      ; addBinds ss1 $ do {
@@ -1862,10 +1862,10 @@ rep_bind :: LHsBind GhcRn -> MetaM (SrcSpan, Core (M TH.Dec))
 rep_bind (L loc (FunBind
                  { fun_id = fn,
                    fun_matches = MG { mg_alts
-                           = (L _ [L _ (Match
+                           = (L _ (Annotated [L _ (Annotated Match
                                    { m_pats = []
                                    , m_grhss = GRHSs _ guards wheres }
-                                      )]) } }))
+                                      )])) } }))
  = do { (ss,wherecore) <- repBinds wheres
         ; guardcore <- addBinds ss (repGuards guards)
         ; fn'  <- lookupNBinder fn
@@ -1875,7 +1875,7 @@ rep_bind (L loc (FunBind
         ; return (locA loc, ans') }
 
 rep_bind (L loc (FunBind { fun_id = fn
-                         , fun_matches = MG { mg_alts = L _ ms } }))
+                         , fun_matches = MG { mg_alts = L _ (Annotated ms) } }))
  =   do { ms1 <- mapM repClauseTup ms
         ; fn' <- lookupNBinder fn
         ; ans <- repFun fn' (nonEmptyCoreList ms1)
@@ -1972,7 +1972,7 @@ repRecordPatSynArgs (MkC sels) = rep2 recordPatSynName [sels]
 repPatSynDir :: HsPatSynDir GhcRn -> MetaM (Core (M TH.PatSynDir))
 repPatSynDir Unidirectional        = rep2 unidirPatSynName []
 repPatSynDir ImplicitBidirectional = rep2 implBidirPatSynName []
-repPatSynDir (ExplicitBidirectional (MG { mg_alts = (L _ clauses) }))
+repPatSynDir (ExplicitBidirectional (MG { mg_alts = (L _ (Annotated clauses)) }))
   = do { clauses' <- mapM repClauseTup clauses
        ; repExplBidirPatSynDir (nonEmptyCoreList clauses') }
 
@@ -2004,8 +2004,8 @@ repExplBidirPatSynDir (MkC cls) = rep2 explBidirPatSynName [cls]
 -- Haskell Template's Meta.Exp type so we punt if it isn't a simple thing like
 -- (\ p1 .. pn -> exp) by causing an error.
 
-repLambda :: LMatch GhcRn (LHsExpr GhcRn) -> MetaM (Core (M TH.Exp))
-repLambda (L _ (Match { m_pats = ps
+repLambda :: LAnnoMatch SrcSpanAnnA GhcRn (LHsExpr GhcRn) -> MetaM (Core (M TH.Exp))
+repLambda (L _ (Annotated Match { m_pats = ps
                       , m_grhss = GRHSs _ [L _ (GRHS _ [] e)]
                                               (EmptyLocalBinds _) } ))
  = do { let bndrs = collectPatsBinders CollNoDictBinders ps ;
@@ -2014,7 +2014,7 @@ repLambda (L _ (Match { m_pats = ps
                 do { xs <- repLPs ps; body <- repLE e; repLam xs body })
       ; wrapGenSyms ss lam }
 
-repLambda (L _ m) = notHandled (ThGuardedLambdas m)
+repLambda (L _ (Annotated m)) = notHandled (ThGuardedLambdas m)
 
 
 -----------------------------------------------------------------------------

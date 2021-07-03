@@ -679,28 +679,28 @@ zonkLTcSpecPrags env ps
 zonkMatchGroup :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ SrcSpan
             => ZonkEnv
             -> (ZonkEnv -> LocatedA (body GhcTc) -> TcM (LocatedA (body GhcTc)))
-            -> MatchGroup GhcTc (LocatedA (body GhcTc))
-            -> TcM (MatchGroup GhcTc (LocatedA (body GhcTc)))
-zonkMatchGroup env zBody (MG { mg_alts = L l ms
+            -> MatchGroup SrcSpanAnnL SrcSpanAnnA GhcTc (LocatedA (body GhcTc))
+            -> TcM (MatchGroup SrcSpanAnnL SrcSpanAnnA GhcTc (LocatedA (body GhcTc)))
+zonkMatchGroup env zBody (MG { mg_alts = L l (Annotated ms)
                              , mg_ext = MatchGroupTc arg_tys res_ty
                              , mg_origin = origin })
   = do  { ms' <- mapM (zonkMatch env zBody) ms
         ; arg_tys' <- zonkScaledTcTypesToTypesX env arg_tys
         ; res_ty'  <- zonkTcTypeToTypeX env res_ty
-        ; return (MG { mg_alts = L l ms'
+        ; return (MG { mg_alts = L l (Annotated ms')
                      , mg_ext = MatchGroupTc arg_tys' res_ty'
                      , mg_origin = origin }) }
 
 zonkMatch :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ SrcSpan
           => ZonkEnv
           -> (ZonkEnv -> LocatedA (body GhcTc) -> TcM (LocatedA (body GhcTc)))
-          -> LMatch GhcTc (LocatedA (body GhcTc))
-          -> TcM (LMatch GhcTc (LocatedA (body GhcTc)))
-zonkMatch env zBody (L loc match@(Match { m_pats = pats
-                                        , m_grhss = grhss }))
+          -> LAnnoMatch SrcSpanAnnA GhcTc (LocatedA (body GhcTc))
+          -> TcM (LAnnoMatch SrcSpanAnnA GhcTc (LocatedA (body GhcTc)))
+zonkMatch env zBody (L loc (Annotated match@(Match { m_pats = pats
+                                        , m_grhss = grhss })))
   = do  { (env1, new_pats) <- zonkPats env pats
         ; new_grhss <- zonkGRHSs env1 zBody grhss
-        ; return (L loc (match { m_pats = new_pats, m_grhss = new_grhss })) }
+        ; return (L loc (Annotated match { m_pats = new_pats, m_grhss = new_grhss })) }
 
 -------------------------------------------------------------------------
 zonkGRHSs :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ SrcSpan

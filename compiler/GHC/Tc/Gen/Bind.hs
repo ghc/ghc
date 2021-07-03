@@ -1349,7 +1349,7 @@ switch to inference when we have no signature for any of the binders.
 -- it; hence the TcMonoBind data type in which the LHS is done but the RHS isn't
 
 data TcMonoBind         -- Half completed; LHS done, RHS not done
-  = TcFunBind  MonoBindInfo  SrcSpan (MatchGroup GhcRn (LHsExpr GhcRn))
+  = TcFunBind  MonoBindInfo  SrcSpan (MatchGroup SrcSpanAnnL SrcSpanAnnA GhcRn (LHsExpr GhcRn))
   | TcPatBind [MonoBindInfo] (LPat GhcTc) (GRHSs GhcRn (LHsExpr GhcRn))
               TcSigmaType
 

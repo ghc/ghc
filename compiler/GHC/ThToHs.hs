@@ -897,13 +897,13 @@ cvtLocalDecs doc ds
         failWith (text "Implicit parameters mixed with other bindings")
 
 cvtClause :: HsMatchContext GhcPs
-          -> TH.Clause -> CvtM (Hs.LMatch GhcPs (LHsExpr GhcPs))
+          -> TH.Clause -> CvtM (Hs.LAnnoMatch SrcSpanAnnA GhcPs (LHsExpr GhcPs))
 cvtClause ctxt (Clause ps body wheres)
   = do  { ps' <- cvtPats ps
         ; let pps = map (parenthesizePat appPrec) ps'
         ; g'  <- cvtGuard body
         ; ds' <- cvtLocalDecs (text "a where clause") wheres
-        ; returnLA $ Hs.Match noAnn ctxt pps (GRHSs noExtField g' ds') }
+        ; returnLA $ Annotated $ Hs.Match noAnn ctxt pps (GRHSs noExtField g' ds') }
 
 cvtImplicitParamBind :: String -> TH.Exp -> CvtM (LIPBind GhcPs)
 cvtImplicitParamBind n e = do
@@ -1204,7 +1204,7 @@ cvtStmt (TH.ParS dss)  = do { dss' <- mapM cvt_one dss
 cvtStmt (TH.RecS ss) = do { ss' <- mapM cvtStmt ss; returnLA (mkRecStmt noAnn (noLocA ss')) }
 
 cvtMatch :: HsMatchContext GhcPs
-         -> TH.Match -> CvtM (Hs.LMatch GhcPs (LHsExpr GhcPs))
+         -> TH.Match -> CvtM (Hs.LAnnoMatch SrcSpanAnnA GhcPs (LHsExpr GhcPs))
 cvtMatch ctxt (TH.Match p body decs)
   = do  { p' <- cvtPat p
         ; let lp = case p' of
@@ -1212,7 +1212,7 @@ cvtMatch ctxt (TH.Match p body decs)
                      _                -> p'
         ; g' <- cvtGuard body
         ; decs' <- cvtLocalDecs (text "a where clause") decs
-        ; returnLA $ Hs.Match noAnn ctxt [lp] (GRHSs noExtField g' decs') }
+        ; returnLA $ Annotated $ Hs.Match noAnn ctxt [lp] (GRHSs noExtField g' decs') }
 
 cvtGuard :: TH.Body -> CvtM [LGRHS GhcPs (LHsExpr GhcPs)]
 cvtGuard (GuardedB pairs) = mapM cvtpair pairs
