@@ -1,3 +1,4 @@
 
 readFailTraditionalRecords1.hs:6:16:
-    Illegal record syntax (use TraditionalRecordSyntax): {i :: Int}
+    Illegal record syntax: {i :: Int}
+    Suggested fix: Perhaps you intended to use TraditionalRecordSyntax
