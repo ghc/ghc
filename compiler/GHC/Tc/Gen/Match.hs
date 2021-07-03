@@ -92,9 +92,9 @@ same number of arguments before using @tcMatches@ to do the work.
 -}
 
 tcMatchesFun :: LocatedN Name
-             -> MatchGroup GhcRn (LHsExpr GhcRn)
+             -> MatchGroup SrcSpanAnnL SrcSpanAnnA GhcRn (LHsExpr GhcRn)
              -> ExpRhoType    -- Expected type of function
-             -> TcM (HsWrapper, MatchGroup GhcTc (LHsExpr GhcTc))
+             -> TcM (HsWrapper, MatchGroup SrcSpanAnnL SrcSpanAnnA GhcTc (LHsExpr GhcTc))
                                 -- Returns type of body
 tcMatchesFun fn@(L _ fun_name) matches exp_ty
   = do  {  -- Check that they all have the same no of arguments
@@ -126,7 +126,7 @@ tcMatchesFun fn@(L _ fun_name) matches exp_ty
     what   = FunRhs { mc_fun = fn, mc_fixity = Prefix, mc_strictness = strictness }
     match_ctxt = MC { mc_what = what, mc_body = tcBody }
     strictness
-      | [L _ match] <- unLoc $ mg_alts matches
+      | [L _ (Annotated match)] <- unAnnotate $ unLoc $ mg_alts matches
       , FunRhs{ mc_strictness = SrcStrict } <- m_ctxt match
       = SrcStrict
       | otherwise
@@ -140,9 +140,9 @@ parser guarantees that each equation has exactly one argument.
 tcMatchesCase :: (AnnoBody body) =>
                 TcMatchCtxt body                         -- Case context
              -> Scaled TcSigmaType                       -- Type of scrutinee
-             -> MatchGroup GhcRn (LocatedA (body GhcRn)) -- The case alternatives
+             -> MatchGroup SrcSpanAnnL SrcSpanAnnA GhcRn (LocatedA (body GhcRn)) -- The case alternatives
              -> ExpRhoType                    -- Type of whole case expressions
-             -> TcM (MatchGroup GhcTc (LocatedA (body GhcTc)))
+             -> TcM (MatchGroup SrcSpanAnnL SrcSpanAnnA GhcTc (LocatedA (body GhcTc)))
                 -- Translated alternatives
                 -- wrapper goes from MatchGroup's ty to expected ty
 
@@ -151,9 +151,9 @@ tcMatchesCase ctxt (Scaled scrut_mult scrut_ty) matches res_ty
 
 tcMatchLambda :: SDoc -- see Note [Herald for matchExpectedFunTys] in GHC.Tc.Utils.Unify
               -> TcMatchCtxt HsExpr
-              -> MatchGroup GhcRn (LHsExpr GhcRn)
+              -> MatchGroup SrcSpanAnnL SrcSpanAnnA GhcRn (LHsExpr GhcRn)
               -> ExpRhoType
-              -> TcM (HsWrapper, MatchGroup GhcTc (LHsExpr GhcTc))
+              -> TcM (HsWrapper, MatchGroup SrcSpanAnnL SrcSpanAnnA GhcTc (LHsExpr GhcTc))
 tcMatchLambda herald match_ctxt match res_ty
   = matchExpectedFunTys herald GenSigCtxt n_pats res_ty $ \ pat_tys rhs_ty ->
     tcMatches match_ctxt pat_tys rhs_ty match
@@ -194,10 +194,6 @@ data TcMatchCtxt body   -- c.f. TcStmtCtxt, also in this module
 
 type AnnoBody body
   = ( Outputable (body GhcRn)
-    , Anno (Match GhcRn (LocatedA (body GhcRn))) ~ SrcSpanAnnA
-    , Anno (Match GhcTc (LocatedA (body GhcTc))) ~ SrcSpanAnnA
-    , Anno [LocatedA (Match GhcRn (LocatedA (body GhcRn)))] ~ SrcSpanAnnL
-    , Anno [LocatedA (Match GhcTc (LocatedA (body GhcTc)))] ~ SrcSpanAnnL
     , Anno (GRHS GhcRn (LocatedA (body GhcRn))) ~ SrcSpan
     , Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ SrcSpan
     , Anno (StmtLR GhcRn GhcRn (LocatedA (body GhcRn))) ~ SrcSpanAnnA
@@ -208,10 +204,10 @@ type AnnoBody body
 tcMatches :: (AnnoBody body ) => TcMatchCtxt body
           -> [Scaled ExpSigmaType]      -- Expected pattern types
           -> ExpRhoType          -- Expected result-type of the Match.
-          -> MatchGroup GhcRn (LocatedA (body GhcRn))
-          -> TcM (MatchGroup GhcTc (LocatedA (body GhcTc)))
+          -> MatchGroup SrcSpanAnnL SrcSpanAnnA GhcRn (LocatedA (body GhcRn))
+          -> TcM (MatchGroup SrcSpanAnnL SrcSpanAnnA GhcTc (LocatedA (body GhcTc)))
 
-tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
+tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l (Annotated matches)
                                   , mg_origin = origin })
   | null matches  -- Deal with case e of {}
     -- Since there are no branches, no one else will fill in rhs_ty
@@ -220,7 +216,7 @@ tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
   = do { tcEmitBindingUsage bottomUE
        ; pat_tys <- mapM scaledExpTypeToType pat_tys
        ; rhs_ty  <- expTypeToType rhs_ty
-       ; return (MG { mg_alts = L l []
+       ; return (MG { mg_alts = L l (Annotated [])
                     , mg_ext = MatchGroupTc pat_tys rhs_ty
                     , mg_origin = origin }) }
 
@@ -230,7 +226,7 @@ tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
        ; tcEmitBindingUsage $ supUEs usages
        ; pat_tys  <- mapM readScaledExpType pat_tys
        ; rhs_ty   <- readExpType rhs_ty
-       ; return (MG { mg_alts   = L l matches'
+       ; return (MG { mg_alts   = L l (Annotated matches')
                     , mg_ext    = MatchGroupTc pat_tys rhs_ty
                     , mg_origin = origin }) }
 
@@ -238,18 +234,18 @@ tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
 tcMatch :: (AnnoBody body) => TcMatchCtxt body
         -> [Scaled ExpSigmaType]        -- Expected pattern types
         -> ExpRhoType            -- Expected result-type of the Match.
-        -> LMatch GhcRn (LocatedA (body GhcRn))
-        -> TcM (LMatch GhcTc (LocatedA (body GhcTc)))
+        -> LAnnoMatch SrcSpanAnnA GhcRn (LocatedA (body GhcRn))
+        -> TcM (LAnnoMatch SrcSpanAnnA GhcTc (LocatedA (body GhcTc)))
 
 tcMatch ctxt pat_tys rhs_ty match
   = wrapLocMA (tc_match ctxt pat_tys rhs_ty) match
   where
     tc_match ctxt pat_tys rhs_ty
-             match@(Match { m_pats = pats, m_grhss = grhss })
+             (Annotated match@(Match { m_pats = pats, m_grhss = grhss }))
       = add_match_ctxt match $
         do { (pats', grhss') <- tcPats (mc_what ctxt) pats pat_tys $
                                 tcGRHSs ctxt grhss rhs_ty
-           ; return (Match { m_ext = noAnn
+           ; return (Annotated Match { m_ext = noAnn
                            , m_ctxt = mc_what ctxt, m_pats = pats'
                            , m_grhss = grhss' }) }
 
@@ -1119,10 +1115,10 @@ number of args are used in each equation.
 -}
 
 checkArgs :: AnnoBody body
-          => Name -> MatchGroup GhcRn (LocatedA (body GhcRn)) -> TcM ()
-checkArgs _ (MG { mg_alts = L _ [] })
+          => Name -> MatchGroup SrcSpanAnnL SrcSpanAnnA GhcRn (LocatedA (body GhcRn)) -> TcM ()
+checkArgs _ (MG { mg_alts = L _ (Annotated []) })
     = return ()
-checkArgs fun (MG { mg_alts = L _ (match1:matches) })
+checkArgs fun (MG { mg_alts = L _ (Annotated (match1:matches)) })
     | null bad_matches
     = return ()
     | otherwise
@@ -1135,5 +1131,5 @@ checkArgs fun (MG { mg_alts = L _ (match1:matches) })
     n_args1 = args_in_match match1
     bad_matches = [m | m <- matches, args_in_match m /= n_args1]
 
-    args_in_match :: (LocatedA (Match GhcRn body1) -> Int)
-    args_in_match (L _ (Match { m_pats = pats })) = length pats
+    args_in_match :: (LocatedA (AnnoMatch anno GhcRn body1) -> Int)
+    args_in_match (L _ (Annotated Match { m_pats = pats })) = length pats

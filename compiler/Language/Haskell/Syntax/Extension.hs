@@ -213,6 +213,9 @@ deriving instance Functor (Annotated a)
 
 type instance Anno (Annotated a e) = a
 
+instance Outputable e => Outputable (Annotated a e) where
+  ppr (Annotated e) = ppr e
+
 -- =====================================================================
 -- Type families for the HsBinds extension points
 

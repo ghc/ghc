@@ -451,7 +451,7 @@ gen_Ord_binds loc tycon tycon_args = do
 
 
     mkOrdOpAlt :: OrdOp -> DataCon
-               -> LMatch GhcPs (LHsExpr GhcPs)
+               -> LAnnoMatch SrcSpanAnnA GhcPs (LHsExpr GhcPs)
     -- Make the alternative  (Ki a1 a2 .. av ->
     mkOrdOpAlt op data_con
       = mkHsCaseAlt (nlConVarPat data_con_RDR as_needed)
@@ -500,7 +500,7 @@ gen_Ord_binds loc tycon tycon_args = do
         tag_lit
              = noLocA (HsLit noComments (HsIntPrim NoSourceText (toInteger tag)))
 
-    mkInnerEqAlt :: OrdOp -> DataCon -> LMatch GhcPs (LHsExpr GhcPs)
+    mkInnerEqAlt :: OrdOp -> DataCon -> LAnnoMatch SrcSpanAnnA GhcPs (LHsExpr GhcPs)
     -- First argument 'a' known to be built with K
     -- Returns a case alternative  Ki b1 b2 ... bv -> compare (a1,a2,...) with (b1,b2,...)
     mkInnerEqAlt op data_con
@@ -2249,7 +2249,7 @@ mkFunBindSE arity loc fun pats_and_exprs
                                emptyLocalBinds
               | (p,e) <-pats_and_exprs]
 
-mkRdrFunBind :: LocatedN RdrName -> [LMatch GhcPs (LHsExpr GhcPs)]
+mkRdrFunBind :: LocatedN RdrName -> [LAnnoMatch SrcSpanAnnA GhcPs (LHsExpr GhcPs)]
              -> LHsBind GhcPs
 mkRdrFunBind fun@(L loc _fun_rdr) matches
   = L (na2la loc) (mkFunBind Generated fun matches)
@@ -2277,7 +2277,7 @@ mkFunBindEC arity loc fun catch_all pats_and_exprs
 mkRdrFunBindEC :: Arity
                -> (LHsExpr GhcPs -> LHsExpr GhcPs)
                -> LocatedN RdrName
-               -> [LMatch GhcPs (LHsExpr GhcPs)]
+               -> [LAnnoMatch SrcSpanAnnA GhcPs (LHsExpr GhcPs)]
                -> LHsBind GhcPs
 mkRdrFunBindEC arity catch_all fun@(L loc _fun_rdr) matches
   = L (na2la loc) (mkFunBind Generated fun matches')
@@ -2302,7 +2302,7 @@ mkRdrFunBindEC arity catch_all fun@(L loc _fun_rdr) matches
 -- a binding with the given arity that produces an error based on the name of
 -- the type of the last argument.
 mkRdrFunBindSE :: Arity -> LocatedN RdrName ->
-                    [LMatch GhcPs (LHsExpr GhcPs)] -> LHsBind GhcPs
+                    [LAnnoMatch SrcSpanAnnA GhcPs (LHsExpr GhcPs)] -> LHsBind GhcPs
 mkRdrFunBindSE arity fun@(L loc fun_rdr) matches
   = L (na2la loc) (mkFunBind Generated fun matches')
  where
