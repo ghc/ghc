@@ -442,6 +442,12 @@ Library
             System.CPUTime.Posix.RUsage
             System.CPUTime.Unsupported
 
+    -- The Ports framework always passes this flag when building software that
+    -- uses iconv to make iconv from Ports compatible with iconv from the base system
+    -- See /usr/ports/Mk/Uses/iconv.mk
+    if os(freebsd)
+        cc-options: -DLIBICONV_PLUG
+
     -- We need to set the unit id to base (without a version number)
     -- as it's magic.
     ghc-options: -this-unit-id base

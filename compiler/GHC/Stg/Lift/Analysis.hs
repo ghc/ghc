@@ -116,9 +116,6 @@ type instance XLet         'LiftLams = Skeleton
 type instance XLetNoEscape 'LiftLams = Skeleton
 type instance XConApp      'LiftLams = ConstructorNumber
 
-freeVarsOfRhs :: (XRhsClosure pass ~ DIdSet) => GenStgRhs pass -> DIdSet
-freeVarsOfRhs (StgRhsCon _ _ _ _ args) = mkDVarSet [ id | StgVarArg id <- args ]
-freeVarsOfRhs (StgRhsClosure fvs _ _ _ _) = fvs
 
 -- | Captures details of the syntax tree relevant to the cost model, such as
 -- closures, multi-shot lambdas and case expressions.

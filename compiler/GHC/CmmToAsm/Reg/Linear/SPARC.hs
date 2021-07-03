@@ -15,7 +15,6 @@ import GHC.Utils.Panic
 import GHC.Platform
 
 import Data.Word
-import Data.Bits
 
 
 --------------------------------------------------------------------------------

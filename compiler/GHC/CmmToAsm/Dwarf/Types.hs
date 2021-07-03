@@ -46,7 +46,6 @@ import GHC.CmmToAsm.Dwarf.Constants
 import qualified Data.ByteString as BS
 import qualified Control.Monad.Trans.State.Strict as S
 import Control.Monad (zipWithM, join)
-import Data.Bits
 import qualified Data.Map as Map
 import Data.Word
 import Data.Char

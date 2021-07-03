@@ -95,7 +95,7 @@ linkBinary' staticLink logger tmpfs dflags unit_env o_files dep_units = do
                                  (l `makeRelativeTo` full_output_fn)
                             else l
                   -- See Note [-Xlinker -rpath vs -Wl,-rpath]
-                  rpath = if gopt Opt_RPath dflags
+                  rpath = if useXLinkerRPath dflags (platformOS platform)
                           then ["-Xlinker", "-rpath", "-Xlinker", libpath]
                           else []
                   -- Solaris 11's linker does not support -rpath-link option. It silently
@@ -111,7 +111,7 @@ linkBinary' staticLink logger tmpfs dflags unit_env o_files dep_units = do
          | osMachOTarget (platformOS platform) &&
            dynLibLoader dflags == SystemDependent &&
            WayDyn `elem` ways dflags &&
-           gopt Opt_RPath dflags
+           useXLinkerRPath dflags (platformOS platform)
             = let libpath = if gopt Opt_RelativeDynlibPaths dflags
                             then "@loader_path" </>
                                  (l `makeRelativeTo` full_output_fn)

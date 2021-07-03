@@ -208,9 +208,11 @@ module GHC.Driver.Session (
         -- * Linker/compiler information
         LinkerInfo(..),
         CompilerInfo(..),
+        useXLinkerRPath,
 
         -- * Include specifications
         IncludeSpecs(..), addGlobalInclude, addQuoteInclude, flattenIncludes,
+        addImplicitQuoteInclude,
 
         -- * SDoc
         initSDocContext, initDefaultSDocContext,
@@ -365,6 +367,8 @@ import qualified GHC.LanguageExtensions as LangExt
 data IncludeSpecs
   = IncludeSpecs { includePathsQuote  :: [String]
                  , includePathsGlobal :: [String]
+                 -- | See note [Implicit include paths]
+                 , includePathsQuoteImplicit :: [String]
                  }
   deriving Show
 
@@ -381,10 +385,37 @@ addQuoteInclude :: IncludeSpecs -> [String] -> IncludeSpecs
 addQuoteInclude spec paths  = let f = includePathsQuote spec
                               in spec { includePathsQuote = f ++ paths }
 
+-- | These includes are not considered while fingerprinting the flags for iface
+-- | See note [Implicit include paths]
+addImplicitQuoteInclude :: IncludeSpecs -> [String] -> IncludeSpecs
+addImplicitQuoteInclude spec paths  = let f = includePathsQuoteImplicit spec
+                              in spec { includePathsQuoteImplicit = f ++ paths }
+
+
 -- | Concatenate and flatten the list of global and quoted includes returning
 -- just a flat list of paths.
 flattenIncludes :: IncludeSpecs -> [String]
-flattenIncludes specs = includePathsQuote specs ++ includePathsGlobal specs
+flattenIncludes specs =
+    includePathsQuote specs ++
+    includePathsQuoteImplicit specs ++
+    includePathsGlobal specs
+
+{- Note [Implicit include paths]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  The compile driver adds the path to the folder containing the source file being
+  compiled to the 'IncludeSpecs', and this change gets recorded in the 'DynFlags'
+  that are used later to compute the interface file. Because of this,
+  the flags fingerprint derived from these 'DynFlags' and recorded in the
+  interface file will end up containing the absolute path to the source folder.
+
+  Build systems with a remote cache like Bazel or Buck (or Shake, see #16956)
+  store the build artifacts produced by a build BA for reuse in subsequent builds.
+
+  Embedding source paths in interface fingerprints will thwart these attemps and
+  lead to unnecessary recompilations when the source paths in BA differ from the
+  source paths in subsequent builds.
+ -}
+
 
 -- | Contains not only a collection of 'GeneralFlag's but also a plethora of
 -- information relating to the compilation of a single file or GHC session
@@ -1158,7 +1189,7 @@ defaultDynFlags mySettings llvmConfig =
         dumpPrefix              = Nothing,
         dumpPrefixForce         = Nothing,
         ldInputs                = [],
-        includePaths            = IncludeSpecs [] [],
+        includePaths            = IncludeSpecs [] [] [],
         libraryPaths            = [],
         frameworkPaths          = [],
         cmdlineFrameworks       = [],
@@ -3636,15 +3667,14 @@ defaultFlags settings
       Opt_ProfCountEntries,
       Opt_SharedImplib,
       Opt_SimplPreInlining,
-      Opt_VersionMacros
+      Opt_VersionMacros,
+      Opt_RPath
     ]
 
     ++ [f | (ns,f) <- optLevelFlags, 0 `elem` ns]
              -- The default -O0 options
 
     ++ default_PIC platform
-
-    ++ default_RPath platform
 
     ++ validHoleFitDefaults
 
@@ -3698,29 +3728,6 @@ default_PIC platform =
                                          -- #10597 for more
                                          -- information.
     _                      -> []
-
-
--- We usually want to use RPath, except on macOS (OSDarwin).  On recent macOS
--- versions the number of load commands we can embed in a dynamic library is
--- restricted.  Hence since b592bd98ff2 we rely on -dead_strip_dylib to only
--- link the needed dylibs instead of linking the full dependency closure.
---
--- If we split the library linking into injecting -rpath and -l @rpath/...
--- components, we will reduce the number of libraries we link, however we will
--- still inject one -rpath entry for each library, independent of their use.
--- That is, we even inject -rpath values for libraries that we dead_strip in
--- the end. As such we can run afoul of the load command size limit simply
--- by polluting the load commands with RPATH entries.
---
--- Thus, we disable Opt_RPath by default on OSDarwin.  The savvy user can always
--- enable it with -use-rpath if they so wish.
---
--- See Note [Dynamic linking on macOS]
-
-default_RPath :: Platform -> [GeneralFlag]
-default_RPath platform | platformOS platform == OSDarwin = []
-default_RPath _                                          = [Opt_RPath]
-
 
 -- General flags that are switched on/off when other general flags are switched
 -- on
@@ -4894,6 +4901,40 @@ data CompilerInfo
    | AppleClang51
    | UnknownCC
    deriving Eq
+
+
+-- | Should we use `-XLinker -rpath` when linking or not?
+-- See Note [-fno-use-rpaths]
+useXLinkerRPath :: DynFlags -> OS -> Bool
+useXLinkerRPath _ OSDarwin = False -- See Note [Dynamic linking on macOS]
+useXLinkerRPath dflags _ = gopt Opt_RPath dflags
+
+{-
+Note [-fno-use-rpaths]
+~~~~~~~~~~~~~~~~~~~~~~
+
+First read, Note [Dynamic linking on macOS] to understand why on darwin we never
+use `-XLinker -rpath`.
+
+The specification of `Opt_RPath` is as follows:
+
+The default case `-fuse-rpaths`:
+* On darwin, never use `-Xlinker -rpath -Xlinker`, always inject the rpath
+  afterwards, see `runInjectRPaths`. There is no way to use `-Xlinker` on darwin
+  as things stand but it wasn't documented in the user guide before this patch how
+  `-fuse-rpaths` should behave and the fact it was always disabled on darwin.
+* Otherwise, use `-Xlinker -rpath -Xlinker` to set the rpath of the executable,
+  this is the normal way you should set the rpath.
+
+The case of `-fno-use-rpaths`
+* Never inject anything into the rpath.
+
+When this was first implemented, `Opt_RPath` was disabled on darwin, but
+the rpath was still always augmented by `runInjectRPaths`, and there was no way to
+stop this. This was problematic because you couldn't build an executable in CI
+with a clean rpath.
+
+-}
 
 -- -----------------------------------------------------------------------------
 -- RTS hooks
