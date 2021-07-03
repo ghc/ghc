@@ -1016,8 +1016,6 @@ hscMaybeWriteIface logger dflags dynamic_too_state is_simple iface old_iface mod
       --
       let no_change = old_iface == Just (mi_iface_hash (mi_final_exts iface))
 
-      dt <- dynamicTooState dflags
-
       when (logHasDumpFlag logger Opt_D_dump_if_trace) $ putMsg logger $
         hang (text "Writing interface(s):") 2 $ vcat
          [ text "Kind:" <+> if is_simple then text "simple" else text "full"

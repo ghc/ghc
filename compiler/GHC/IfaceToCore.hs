@@ -559,9 +559,8 @@ tcHiBootIface hsc_src mod
                                 IsBoot  -- Hi-boot file
 
         ; case read_result of {
-            Succeeded (iface, _path, dt_fail) ->
-                do { updateDynamicTooFailed dt_fail hsc_env
-                   ; tc_iface <- initIfaceTcRn $ typecheckIface iface
+            Succeeded (iface, _path) ->
+                do { tc_iface <- initIfaceTcRn $ typecheckIface iface
                    ; mkSelfBootInfo iface tc_iface } ;
             Failed err               ->
 
