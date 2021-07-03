@@ -42,7 +42,7 @@ But superclass constraints like these are sometimes useful, and the conservative
 check is annoying where no actual recursion is involved.
 
 Moreover genuinely-recursive superclasses are sometimes useful. Here's a real-life
-example (#10318) ::
+example (:ghc-ticket:`10318`) ::
 
      class (Frac (Frac a) ~ Frac a,
             Fractional (Frac a),

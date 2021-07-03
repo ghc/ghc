@@ -1195,9 +1195,11 @@ messages and in GHCi:
     :reverse: -fno-diagnostics-show-caret
     :category: verbosity
 
+    :default: on
+
     Controls whether GHC displays a line of the original source code where the
     error was detected.  This also affects the associated caret symbol that
-    points at the region of code at fault.  The flag is on by default.
+    points at the region of code at fault.
 
 .. ghc-flag:: -ferror-spans
     :shortdesc: Output full span in error messages
