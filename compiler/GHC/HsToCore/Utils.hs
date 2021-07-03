@@ -30,7 +30,7 @@ module GHC.HsToCore.Utils (
         wrapBind, wrapBinds,
 
         mkErrorAppDs, mkCoreAppDs, mkCoreAppsDs, mkCastDs,
-        mkFailExpr,
+        mkFailExpr, dsWhenNoErrs,
 
         seqVar,
 
@@ -981,6 +981,24 @@ mk_fail_msg :: DynFlags -> HsStmtContext GhcRn -> LocatedA e -> String
 mk_fail_msg dflags ctx pat
   = showPpr dflags $ text "Pattern match failure in" <+> pprStmtContext ctx
                    <+> text "at" <+> ppr (getLocA pat)
+
+-- | Runs the thing_inside. If there are no errors, use the provided
+-- function to construct a Core expression, and return it.
+-- Otherwise, return a runtime error, of the given type.
+-- (The function is lazy in the Type argument if there are no errors.)
+-- This is useful for doing a bunch of representation polymorphism checks
+-- and then avoiding making a core App.
+-- (If we make a core App on a representation-polymorphic argument, detecting
+-- how to handle the let/app invariant might call isUnliftedType, which panics
+-- on a representation-polymorphic type.)
+-- See #12709 for an example of why this machinery is necessary.
+dsWhenNoErrs :: Type -> DsM a -> (a -> CoreExpr) -> DsM CoreExpr
+dsWhenNoErrs result_ty thing_inside mk_expr
+  = do { (result, no_errs) <- askNoErrsDs thing_inside
+       ; if no_errs
+         then return $ mk_expr result
+         else mkErrorAppDs rUNTIME_ERROR_ID result_ty
+            (text "dsWhenNoErrs: disallowed representation polymorphism") }
 
 {- *********************************************************************
 *                                                                      *

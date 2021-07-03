@@ -5,7 +5,7 @@
 -- this task, see #12706, #15320, #16804, and #17331.
 module GHC.Hs.Syn.Type (
     -- * Extracting types from HsExpr
-    lhsExprType, hsExprType,
+    lhsExprType, hsExprType, hsWrapperType,
     -- * Extracting types from HsSyn
     hsLitType, hsPatType, hsLPatType
 
