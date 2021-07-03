@@ -601,10 +601,9 @@ mergeSignatures
         let m = mkModule (VirtUnit iuid) mod_name
             im = fst (getModuleInstantiation m)
             ctx = initSDocContext dflags defaultUserStyle
-        (iface0, _path, dt_fail) <- withException ctx
+        (iface0, _path) <- withException ctx
          $ findAndReadIface logger nc fc hooks unit_state home_unit dflags dt
                             (text "mergeSignatures") im m NotBoot
-        updateDynamicTooFailed dt_fail hsc_env
         pure iface0
 
     -- STEP 3: Get the unrenamed exports of all these interfaces,
@@ -1027,15 +1026,8 @@ checkImplements impl_mod req_mod@(Module uid mod_name) = do
                                                (text "checkImplements 2")
                                                isig_mod sig_mod NotBoot
     isig_iface <- case mb_isig_iface of
-<<<<<<< HEAD
         Succeeded (iface, _) -> return iface
         Failed err -> failWithTc $ TcRnUnknownMessage $ mkPlainError noHints $
-=======
-        Succeeded (iface, _, dt_fail) -> do
-            updateDynamicTooFailed dt_fail hsc_env
-            return iface
-        Failed err -> failWithTc $
->>>>>>> b6f8a58131... Move dynamicToo IORef to HscEnv to avoid global state
             hang (text "Could not find hi interface for signature" <+>
                   quotes (ppr isig_mod) <> colon) 4 err
 
