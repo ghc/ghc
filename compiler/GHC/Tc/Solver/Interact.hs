@@ -192,11 +192,11 @@ solveSimples cts
 -- into the main solver.
 runTcPluginsGiven :: TcS [Ct]
 runTcPluginsGiven
-  = do { plugins <- getTcPlugins
-       ; if null plugins then return [] else
+  = do { solvers <- getTcPluginSolvers
+       ; if null solvers then return [] else
     do { givens <- getInertGivens
        ; if null givens then return [] else
-    do { p <- runTcPlugins plugins (givens,[],[])
+    do { p <- runTcPluginSolvers solvers (givens,[],[])
        ; let (solved_givens, _, _) = pluginSolvedCts p
              insols                = pluginBadCts p
        ; updInertCans (removeInertCts solved_givens)
@@ -213,13 +213,13 @@ runTcPluginsWanted wc@(WC { wc_simple = simples1 })
   | isEmptyBag simples1
   = return (False, wc)
   | otherwise
-  = do { plugins <- getTcPlugins
-       ; if null plugins then return (False, wc) else
+  = do { solvers <- getTcPluginSolvers
+       ; if null solvers then return (False, wc) else
 
     do { given <- getInertGivens
        ; simples1 <- zonkSimples simples1    -- Plugin requires zonked inputs
        ; let (wanted, derived) = partition isWantedCt (bagToList simples1)
-       ; p <- runTcPlugins plugins (given, derived, wanted)
+       ; p <- runTcPluginSolvers solvers (given, derived, wanted)
        ; let (_, _,                solved_wanted)   = pluginSolvedCts p
              (_, unsolved_derived, unsolved_wanted) = pluginInputCts p
              new_wanted                             = pluginNewCts p
@@ -260,11 +260,12 @@ data TcPluginProgress = TcPluginProgress
       -- ^ New constraints emitted by plugins
     }
 
-getTcPlugins :: TcS [TcPluginSolver]
-getTcPlugins = do { tcg_env <- getGblEnv; return (tcg_tc_plugins tcg_env) }
+getTcPluginSolvers :: TcS [TcPluginSolver]
+getTcPluginSolvers
+  = do { tcg_env <- getGblEnv; return (tcg_tc_plugin_solvers tcg_env) }
 
 -- | Starting from a triple of (given, derived, wanted) constraints,
--- invoke each of the typechecker plugins in turn and return
+-- invoke each of the typechecker constraint-solving plugins in turn and return
 --
 --  * the remaining unmodified constraints,
 --  * constraints that have been solved,
@@ -276,16 +277,16 @@ getTcPlugins = do { tcg_env <- getGblEnv; return (tcg_tc_plugins tcg_env) }
 -- re-invoked and they will see it later).  There is no check that new
 -- work differs from the original constraints supplied to the plugin:
 -- the plugin itself should perform this check if necessary.
-runTcPlugins :: [TcPluginSolver] -> SplitCts -> TcS TcPluginProgress
-runTcPlugins plugins all_cts
-  = foldM do_plugin initialProgress plugins
+runTcPluginSolvers :: [TcPluginSolver] -> SplitCts -> TcS TcPluginProgress
+runTcPluginSolvers solvers all_cts
+  = foldM do_plugin initialProgress solvers
   where
     do_plugin :: TcPluginProgress -> TcPluginSolver -> TcS TcPluginProgress
     do_plugin p solver = do
         result <- runTcPluginTcS (uncurry3 solver (pluginInputCts p))
         return $ progress p result
 
-    progress :: TcPluginProgress -> TcPluginResult -> TcPluginProgress
+    progress :: TcPluginProgress -> TcPluginSolveResult -> TcPluginProgress
     progress p (TcPluginContradiction bad_cts) =
        p { pluginInputCts = discard bad_cts (pluginInputCts p)
          , pluginBadCts   = bad_cts ++ pluginBadCts p
