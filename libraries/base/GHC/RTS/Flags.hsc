@@ -603,6 +603,7 @@ getProfFlags = do
             <*> (peekCStringOpt =<< #{peek PROFILING_FLAGS, retainerSelector} ptr)
             <*> (peekCStringOpt =<< #{peek PROFILING_FLAGS, bioSelector} ptr)
 
+{-# INLINABLE getTraceFlags #-}
 getTraceFlags :: IO TraceFlags
 getTraceFlags = do
   let ptr = (#ptr RTS_FLAGS, TraceFlags) rtsFlagsPtr
