@@ -553,13 +553,15 @@ tcHiBootIface hsc_src mod
         ; let dflags    = hsc_dflags hsc_env
         ; let logger    = hsc_logger hsc_env
         ; let hooks     = hsc_hooks hsc_env
-        ; read_result <- liftIO $ findAndReadIface logger nc fc hooks units home_unit dflags
+        ; dt <- dynamicTooState hsc_env
+        ; read_result <- liftIO $ findAndReadIface logger nc fc hooks units home_unit dflags dt
                                 need (fst (getModuleInstantiation mod)) mod
                                 IsBoot  -- Hi-boot file
 
         ; case read_result of {
-            Succeeded (iface, _path) -> do { tc_iface <- initIfaceTcRn $ typecheckIface iface
-                                           ; mkSelfBootInfo iface tc_iface } ;
+            Succeeded (iface, _path) ->
+                do { tc_iface <- initIfaceTcRn $ typecheckIface iface
+                   ; mkSelfBootInfo iface tc_iface } ;
             Failed err               ->
 
         -- There was no hi-boot file. But if there is circularity in

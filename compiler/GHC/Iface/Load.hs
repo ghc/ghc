@@ -698,17 +698,19 @@ computeInterface hsc_env doc_str hi_boot_file mod0 = do
   let dflags     = hsc_dflags hsc_env
   let logger     = hsc_logger hsc_env
   let hooks      = hsc_hooks hsc_env
-  let find_iface m = findAndReadIface logger name_cache fc hooks units home_unit dflags doc_str
+  dt <- dynamicTooState hsc_env
+  let find_iface m = findAndReadIface logger name_cache fc hooks units home_unit dflags dt doc_str
                                       m mod0 hi_boot_file
   case getModuleInstantiation mod0 of
       (imod, Just indef) | isHomeUnitIndefinite home_unit ->
         find_iface imod >>= \case
-          Succeeded (iface0, path) ->
+          Succeeded (iface0, path) -> do
             rnModIface hsc_env (instUnitInsts (moduleUnit indef)) Nothing iface0 >>= \case
               Right x   -> return (Succeeded (x, path))
               Left errs -> throwErrors (GhcTcRnMessage <$> errs)
           Failed err -> return (Failed err)
-      (mod, _) -> find_iface mod
+      (mod, _) ->
+        find_iface mod
 
 -- | Compute the signatures which must be compiled in order to
 -- load the interface for a 'Module'.  The output of this function
@@ -752,7 +754,8 @@ moduleFreeHolesPrecise doc_str mod
         let dflags    = hsc_dflags hsc_env
         let logger    = hsc_logger hsc_env
         let hooks     = hsc_hooks hsc_env
-        mb_iface <- liftIO $ findAndReadIface logger nc fc hooks units home_unit dflags
+        dt <- dynamicTooState hsc_env
+        mb_iface <- liftIO $ findAndReadIface logger nc fc hooks units home_unit dflags dt
                                               (text "moduleFreeHolesPrecise" <+> doc_str)
                                               imod mod NotBoot
         case mb_iface of
@@ -851,6 +854,7 @@ findAndReadIface
   -> UnitState
   -> HomeUnit
   -> DynFlags
+  -> DynamicTooState
   -> SDoc            -- ^ Reason for loading the iface (used for tracing)
   -> InstalledModule -- ^ The unique identifier of the on-disk module we're looking for
   -> Module          -- ^ The *actual* module we're looking for.  We use
@@ -858,7 +862,7 @@ findAndReadIface
                      -- module we read out.
   -> IsBootInterface -- ^ Looking for .hi-boot or .hi file
   -> IO (MaybeErr SDoc (ModIface, FilePath))
-findAndReadIface logger name_cache fc hooks unit_state home_unit dflags doc_str mod wanted_mod hi_boot_file = do
+findAndReadIface logger name_cache fc hooks unit_state home_unit dflags dynamic_too_state doc_str mod wanted_mod hi_boot_file = do
   let profile = targetProfile dflags
 
   trace_if logger (sep [hsep [text "Reading",
@@ -896,7 +900,7 @@ findAndReadIface logger name_cache fc hooks unit_state home_unit dflags doc_str 
                             -> return ()
                           Succeeded (iface,fp)
                             -> load_dynamic_too_maybe logger name_cache unit_state
-                                                      dflags wanted_mod
+                                                      dflags dynamic_too_state wanted_mod
                                                       hi_boot_file iface fp
                         return r
               err -> do
@@ -910,11 +914,11 @@ findAndReadIface logger name_cache fc hooks unit_state home_unit dflags doc_str 
                                       err
 
 -- | Check if we need to try the dynamic interface for -dynamic-too
-load_dynamic_too_maybe :: Logger -> NameCache -> UnitState -> DynFlags -> Module -> IsBootInterface -> ModIface -> FilePath -> IO ()
-load_dynamic_too_maybe logger name_cache unit_state dflags wanted_mod is_boot iface file_path
+load_dynamic_too_maybe :: Logger -> NameCache -> UnitState -> DynFlags -> DynamicTooState -> Module -> IsBootInterface -> ModIface -> FilePath -> IO ()
+load_dynamic_too_maybe logger name_cache unit_state dflags dynamic_too_state wanted_mod is_boot iface file_path
   -- Indefinite interfaces are ALWAYS non-dynamic.
   | not (moduleIsDefinite (mi_module iface)) = return ()
-  | otherwise = dynamicTooState dflags  >>= \case
+  | otherwise = case dynamic_too_state of
       DT_Dont   -> return ()
       DT_Failed -> return ()
       DT_Dyn    -> load_dynamic_too logger name_cache unit_state dflags wanted_mod is_boot iface file_path
@@ -930,10 +934,10 @@ load_dynamic_too logger name_cache unit_state dflags wanted_mod is_boot iface fi
      -> return ()
      | otherwise ->
         do trace_if logger (text "Dynamic hash doesn't match")
-           setDynamicTooFailed dflags
+           panic ""
     Failed err ->
         do trace_if logger (text "Failed to load dynamic interface file:" $$ err)
-           setDynamicTooFailed dflags
+           panic ""
 
 read_file :: Logger -> NameCache -> UnitState -> DynFlags -> Module -> FilePath -> IO (MaybeErr SDoc (ModIface, FilePath))
 read_file logger name_cache unit_state dflags wanted_mod file_path = do
