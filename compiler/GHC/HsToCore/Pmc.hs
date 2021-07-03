@@ -147,7 +147,7 @@ pmcGRHSs hs_ctxt guards@(GRHSs _ grhss _) = do
 pmcMatches
   :: DsMatchContext                  -- ^ Match context, for warnings messages
   -> [Id]                            -- ^ Match variables, i.e. x and y above
-  -> [LMatch GhcTc (LHsExpr GhcTc)]  -- ^ List of matches
+  -> [LAnnoMatch SrcSpanAnnA GhcTc (LHsExpr GhcTc)]  -- ^ List of matches
   -> DsM [(Nablas, NonEmpty Nablas)] -- ^ One covered 'Nablas' per Match and
                                      --   GRHS, for long distance info.
 pmcMatches ctxt vars matches = do
