@@ -41,6 +41,7 @@ module GHC.Driver.Make (
     ) where
 
 import GHC.Prelude
+import GHC.Platform
 
 import GHC.Tc.Utils.Backpack
 import GHC.Tc.Utils.Monad  ( initIfaceCheck )
@@ -87,7 +88,6 @@ import GHC.Utils.Error
 import GHC.Utils.Logger
 import GHC.Utils.Fingerprint
 import GHC.Utils.TmpFs
-import GHC.Utils.Constants (isWindowsHost)
 
 import GHC.Types.Basic
 import GHC.Types.Error
@@ -697,6 +697,7 @@ discardIC hsc_env
 guessOutputFile :: GhcMonad m => m ()
 guessOutputFile = modifySession $ \env ->
     let dflags = hsc_dflags env
+        platform = targetPlatform dflags
         -- Force mod_graph to avoid leaking env
         !mod_graph = hsc_mod_graph env
         mainModuleSrcPath :: Maybe String
@@ -709,7 +710,7 @@ guessOutputFile = modifySession $ \env ->
           -- we must add the .exe extension unconditionally here, otherwise
           -- when name has an extension of its own, the .exe extension will
           -- not be added by GHC.Driver.Pipeline.exeFileName.  See #2248
-          name' <- if isWindowsHost --FIXME: should be the target platform
+          name' <- if platformOS platform == OSMinGW32
                     then fmap (<.> "exe") name
                     else name
           mainModuleSrcPath' <- mainModuleSrcPath
