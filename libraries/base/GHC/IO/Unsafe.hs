@@ -117,6 +117,10 @@ monadic use of references.  There is no easy way to make it impossible
 once you use 'unsafePerformIO'.  Indeed, it is
 possible to write @coerce :: a -> b@ with the
 help of 'unsafePerformIO'.  So be careful!
+
+WARNING: If you're looking for "a way to get a 'String' from an 'IO String'",
+then 'unsafePerformIO' is not the way to go.  Learn about do-notation and the
+@<-@ syntax element before you proceed.
 -}
 unsafePerformIO :: IO a -> a
 unsafePerformIO m = unsafeDupablePerformIO (noDuplicate >> m)
