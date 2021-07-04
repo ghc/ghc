@@ -3,7 +3,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE PolyKinds #-}
-{-# LANGUAGE Safe #-}
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -35,6 +35,7 @@ module Data.Type.Ord (
   ) where
 
 import GHC.Show(Show(..))
+import GHC.Types(Constraint)
 import GHC.TypeLits.Internal
 import GHC.TypeNats.Internal
 import Data.Bool
@@ -62,24 +63,36 @@ data OrderingI a b where
 deriving instance Show (OrderingI a b)
 deriving instance Eq   (OrderingI a b)
 
+type family Assert (check :: Bool) (errMsg :: Constraint) :: Constraint where
+  Assert 'True _errMsg = ()
 
 infix 4 <=?, <=, >=?, >=, <?, <, >?, >
 
 -- | Comparison (<=) of comparable types, as a constraint.
 -- @since 4.16.0.0
-type x <= y = (x <=? y) ~ 'True
+type x <= y = (Assert (x <=? y) (LeErrMsg x y), (x <=? y) ~ 'True)
+-- T10183 fails with a "Pattern match(es) are non-exhaustive" warning for head'
+-- without the additional "(x <=? y) ~ True"
+type family LeErrMsg x y where
+  LeErrMsg x y = TypeError ('Text "Cannot satisfy: " ':<>: 'ShowType x ':<>: 'Text " <= " ':<>: 'ShowType y)
 
 -- | Comparison (>=) of comparable types, as a constraint.
 -- @since 4.16.0.0
-type x >= y = (x >=? y) ~ 'True
+type x >= y = (Assert (x >=? y) (GeErrMsg x y), (x >=? y) ~ 'True)
+type family GeErrMsg x y where
+  GeErrMsg x y = TypeError ('Text "Cannot satisfy: " ':<>: 'ShowType x ':<>: 'Text " >= " ':<>: 'ShowType y)
 
 -- | Comparison (<) of comparable types, as a constraint.
 -- @since 4.16.0.0
-type x < y = (x >? y) ~ 'True
+type x < y = (Assert (x <? y) (LtErrMsg x y), (x <? y) ~ 'True)
+type family LtErrMsg x y where
+  LtErrMsg x y = TypeError ('Text "Cannot satisfy: " ':<>: 'ShowType x ':<>: 'Text " < " ':<>: 'ShowType y)
 
 -- | Comparison (>) of comparable types, as a constraint.
 -- @since 4.16.0.0
-type x > y = (x >? y) ~ 'True
+type x > y = (Assert (x >? y) (GtErrMsg x y), (x >? y) ~ 'True)
+type family GtErrMsg x y where
+  GtErrMsg x y = TypeError ('Text "Cannot satisfy: " ':<>: 'ShowType x ':<>: 'Text " > " ':<>: 'ShowType y)
 
 
 -- | Comparison (<=) of comparable types, as a function.
