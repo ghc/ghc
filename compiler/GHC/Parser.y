@@ -2562,7 +2562,7 @@ sigdecl :: { LHsDecl GhcPs }
                 {% let (dcolon, tc) = $3
                    in acsA
                        (\cs -> sLL $1 $>
-                         (SigD noExtField (CompleteMatchSig (EpAnn (glR $1) ([ mo $1 ] ++ dcolon ++ [mc $4]) cs) (getCOMPLETE_PRAGs $1) $2 tc))) }
+                         (SigD noExtField (CompleteMatchSig (EpAnn (glR $1) ([ mo $1 ] ++ dcolon ++ [mc $4]) cs) (getCOMPLETE_PRAGs $1) (fmap Annotated $2) tc))) }
 
         -- This rule is for both INLINE and INLINABLE pragmas
         | '{-# INLINE' activation qvarcon '#-}'
@@ -2788,8 +2788,8 @@ aexp    :: { ECP }
                       unECP $4 >>= \ $4 ->
                       mkHsLamPV (comb2 $1 (reLoc $>)) (\cs -> mkMatchGroup FromSource
                             (reLocA $ sLLlA $1 $>
-                            [reLocA $ sLLlA $1 $>
-                                         $ Match { m_ext = EpAnn (glR $1) [mj AnnLam $1] cs
+                            Annotated [reLocA $ sLLlA $1 $>
+                                         $ Annotated $ Match { m_ext = EpAnn (glR $1) [mj AnnLam $1] cs
                                                  , m_ctxt = LambdaExpr
                                                  , m_pats = $2
                                                  , m_grhss = unguardedGRHSs (comb2 $3 (reLoc $4)) $4 (EpAnn (glR $3) (GrhsAnn Nothing (mu AnnRarrow $3)) emptyComments) }])) }
@@ -3199,7 +3199,7 @@ guardquals1 :: { Located [LStmt GhcPs (LHsExpr GhcPs)] }
 -----------------------------------------------------------------------------
 -- Case alternatives
 
-altslist :: { forall b. DisambECP b => PV (LocatedL [LMatch GhcPs (LocatedA b)]) }
+altslist :: { forall b. DisambECP b => PV (LocatedL [LAnnoMatch SrcSpanAnnA GhcPs (LocatedA b)]) }
         : '{'            alts '}'  { $2 >>= \ $2 -> amsrl
                                      (sLL $1 $> (reverse (snd $ unLoc $2)))
                                                (AnnList (Just $ glR $2) (Just $ moc $1) (Just $ mcc $3) (fst $ unLoc $2) []) }
@@ -3209,14 +3209,14 @@ altslist :: { forall b. DisambECP b => PV (LocatedL [LMatch GhcPs (LocatedA b)])
         | '{'                 '}'    { amsrl (sLL $1 $> []) (AnnList Nothing (Just $ moc $1) (Just $ mcc $2) [] []) }
         |     vocurly          close { return $ noLocA [] }
 
-alts    :: { forall b. DisambECP b => PV (Located ([AddEpAnn],[LMatch GhcPs (LocatedA b)])) }
+alts    :: { forall b. DisambECP b => PV (Located ([AddEpAnn],[LAnnoMatch SrcSpanAnnA GhcPs (LocatedA b)])) }
         : alts1                    { $1 >>= \ $1 -> return $
                                      sL1 $1 (fst $ unLoc $1,snd $ unLoc $1) }
         | ';' alts                 { $2 >>= \ $2 -> return $
                                      sLL $1 $> (((mz AnnSemi $1) ++ (fst $ unLoc $2))
                                                ,snd $ unLoc $2) }
 
-alts1   :: { forall b. DisambECP b => PV (Located ([AddEpAnn],[LMatch GhcPs (LocatedA b)])) }
+alts1   :: { forall b. DisambECP b => PV (Located ([AddEpAnn],[LAnnoMatch SrcSpanAnnA GhcPs (LocatedA b)])) }
         : alts1 ';' alt         { $1 >>= \ $1 ->
                                   $3 >>= \ $3 ->
                                      case snd $ unLoc $1 of
@@ -3234,10 +3234,11 @@ alts1   :: { forall b. DisambECP b => PV (Located ([AddEpAnn],[LMatch GhcPs (Loc
                                          return (sLL $1 $> (fst $ unLoc $1, h' : t)) }
         | alt                   { $1 >>= \ $1 -> return $ sL1 (reLoc $1) ([],[$1]) }
 
-alt     :: { forall b. DisambECP b => PV (LMatch GhcPs (LocatedA b)) }
+alt     :: { forall b. DisambECP b => PV (LAnnoMatch SrcSpanAnnA GhcPs (LocatedA b)) }
            : pat alt_rhs  { $2 >>= \ $2 ->
                             acsA (\cs -> sLL (reLoc $1) $>
-                                           (Match { m_ext = (EpAnn (glAR $1) [] cs)
+                                           (Annotated
+                                            Match { m_ext = (EpAnn (glAR $1) [] cs)
                                                   , m_ctxt = CaseAlt
                                                   , m_pats = [$1]
                                                   , m_grhss = unLoc $2 }))}

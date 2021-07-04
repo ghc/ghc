@@ -541,9 +541,9 @@ exprCtOrigin (HsBinTick _ _ _ e)      = lexprCtOrigin e
 exprCtOrigin (XExpr (HsExpanded a _)) = exprCtOrigin a
 
 -- | Extract a suitable CtOrigin from a MatchGroup
-matchesCtOrigin :: MatchGroup GhcRn (LHsExpr GhcRn) -> CtOrigin
+matchesCtOrigin :: MatchGroup annoL anno GhcRn (LHsExpr GhcRn) -> CtOrigin
 matchesCtOrigin (MG { mg_alts = alts })
-  | L _ [L _ match] <- alts
+  | L _ (Annotated [L _ (Annotated match)]) <- alts
   , Match { m_grhss = grhss } <- match
   = grhssCtOrigin grhss
 
