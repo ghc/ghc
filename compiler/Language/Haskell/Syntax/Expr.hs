@@ -46,6 +46,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Data.FastString
 import GHC.Core.Type
+import GHC.Parser.Annotation
 
 -- libraries:
 import Data.Data hiding (Fixity(..))
@@ -352,7 +353,7 @@ data HsExpr p
               (HsLit p)      -- ^ Simple (non-overloaded) literals
 
   | HsLam     (XLam p)
-              (MatchGroup p (LHsExpr p))
+              (MatchGroup SrcSpanAnnL SrcSpanAnnA p (LHsExpr p))
                        -- ^ Lambda abstraction. Currently always a single match
        --
        -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnLam',
@@ -360,7 +361,7 @@ data HsExpr p
 
        -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
 
-  | HsLamCase (XLamCase p) (MatchGroup p (LHsExpr p)) -- ^ Lambda-case
+  | HsLamCase (XLamCase p) (MatchGroup SrcSpanAnnL SrcSpanAnnA p (LHsExpr p)) -- ^ Lambda-case
        --
        -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnLam',
        --           'GHC.Parser.Annotation.AnnCase','GHC.Parser.Annotation.AnnOpen',
@@ -448,7 +449,7 @@ data HsExpr p
   -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
   | HsCase      (XCase p)
                 (LHsExpr p)
-                (MatchGroup p (LHsExpr p))
+                (MatchGroup SrcSpanAnnL SrcSpanAnnA p (LHsExpr p))
 
   -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnIf',
   --       'GHC.Parser.Annotation.AnnSemi',
@@ -926,7 +927,7 @@ data HsCmd id
                 (LHsExpr id)
 
   | HsCmdLam    (XCmdLam id)
-                (MatchGroup id (LHsCmd id))     -- kappa
+                (MatchGroup SrcSpanAnnL SrcSpanAnnA id (LHsCmd id))     -- kappa
        -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnLam',
        --       'GHC.Parser.Annotation.AnnRarrow',
 
@@ -943,7 +944,7 @@ data HsCmd id
 
   | HsCmdCase   (XCmdCase id)
                 (LHsExpr id)
-                (MatchGroup id (LHsCmd id))     -- bodies are HsCmd's
+                (MatchGroup SrcSpanAnnL SrcSpanAnnA id (LHsCmd id))     -- bodies are HsCmd's
     -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnCase',
     --       'GHC.Parser.Annotation.AnnOf','GHC.Parser.Annotation.AnnOpen' @'{'@,
     --       'GHC.Parser.Annotation.AnnClose' @'}'@
@@ -951,7 +952,7 @@ data HsCmd id
     -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
 
   | HsCmdLamCase (XCmdLamCase id)
-                 (MatchGroup id (LHsCmd id))    -- bodies are HsCmd's
+                 (MatchGroup SrcSpanAnnL SrcSpanAnnA id (LHsCmd id))    -- bodies are HsCmd's
     -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnLam',
     --       'GHC.Parser.Annotation.AnnCase','GHC.Parser.Annotation.AnnOpen' @'{'@,
     --       'GHC.Parser.Annotation.AnnClose' @'}'@
@@ -1047,9 +1048,9 @@ a function defined by pattern matching must have the same number of
 patterns in each equation.
 -}
 
-data MatchGroup p body
+data MatchGroup annoL anno p body
   = MG { mg_ext     :: XMG p body -- Post-typechecker, types of args and result
-       , mg_alts    :: XRec p [LMatch p body]  -- The alternatives
+       , mg_alts    :: XRec p (Annotated annoL [LAnnoMatch anno p body])  -- The alternatives
        , mg_origin  :: Origin }
      -- The type is the type of the entire group
      --      t1 -> ... -> tn -> tr
@@ -1063,9 +1064,14 @@ data MatchGroupTc
        } deriving Data
 
 -- | Located Match
-type LMatch id body = XRec id (Match id body)
+-- type LMatch id body = XRec id (Match id body)
 -- ^ May have 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnSemi' when in a
 --   list
+type LAnnoMatch anno id body = XRec id (Annotated anno (Match id body))
+
+type LExprMatch id = XRec id (Annotated SrcSpanAnnA (Match id (LHsExpr id)))
+
+type AnnoMatch anno id body = Annotated anno (Match id body)
 
 -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
 data Match p body

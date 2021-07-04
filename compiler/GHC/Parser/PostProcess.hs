@@ -537,22 +537,22 @@ getMonoBind :: LHsBind GhcPs -> [LHsDecl GhcPs]
 
 getMonoBind (L loc1 (FunBind { fun_id = fun_id1@(L _ f1)
                              , fun_matches =
-                               MG { mg_alts = (L _ m1@[L _ mtchs1]) } }))
+                               MG { mg_alts = (L _ (Annotated m1@[L _ (Annotated mtchs1)])) } }))
             binds
   | has_args m1
-  = go [L (removeCommentsA loc1) mtchs1] (commentsOnlyA loc1) binds []
+  = go [L (removeCommentsA loc1) (Annotated mtchs1)] (commentsOnlyA loc1) binds []
   where
-    go :: [LMatch GhcPs (LHsExpr GhcPs)] -> SrcSpanAnnA
+    go :: [LAnnoMatch SrcSpanAnnA GhcPs (LHsExpr GhcPs)] -> SrcSpanAnnA
        -> [LHsDecl GhcPs] -> [LHsDecl GhcPs]
        -> (LHsBind GhcPs,[LHsDecl GhcPs]) -- AZ
     go mtchs loc
        ((L loc2 (ValD _ (FunBind { fun_id = (L _ f2)
                                  , fun_matches =
-                                    MG { mg_alts = (L _ [L lm2 mtchs2]) } })))
+                                    MG { mg_alts = (L _ (Annotated [L lm2 (Annotated mtchs2)])) } })))
          : binds) _
         | f1 == f2 =
           let (loc2', lm2') = transferAnnsA loc2 lm2
-          in go (L lm2' mtchs2 : mtchs)
+          in go (L lm2' (Annotated mtchs2) : mtchs)
                         (combineSrcSpansA loc loc2') binds []
     go mtchs loc (doc_decl@(L loc2 (DocD {})) : binds) doc_decls
         = let doc_decls' = doc_decl : doc_decls
@@ -573,9 +573,9 @@ getMonoBindAll (L l (ValD _ b) : ds) =
   in L l' (ValD noExtField b') : getMonoBindAll ds'
 getMonoBindAll (d : ds) = d : getMonoBindAll ds
 
-has_args :: [LMatch GhcPs (LHsExpr GhcPs)] -> Bool
+has_args :: [LAnnoMatch anno GhcPs (LHsExpr GhcPs)] -> Bool
 has_args []                                  = panic "GHC.Parser.PostProcess.has_args"
-has_args (L _ (Match { m_pats = args }) : _) = not (null args)
+has_args (L _ (Annotated (Match { m_pats = args })) : _) = not (null args)
         -- Don't group together FunBinds if they have
         -- no arguments.  This is necessary now that variable bindings
         -- with no arguments are now treated as FunBinds rather
@@ -636,12 +636,17 @@ tyConToDataCon (L loc tc)
 
 mkPatSynMatchGroup :: LocatedN RdrName
                    -> LocatedL (OrdList (LHsDecl GhcPs))
-                   -> P (MatchGroup GhcPs (LHsExpr GhcPs))
+                   -> P (MatchGroup SrcSpanAnnL SrcSpanAnnA GhcPs (LHsExpr GhcPs))
 mkPatSynMatchGroup (L loc patsyn_name) (L ld decls) =
     do { matches <- mapM fromDecl (fromOL decls)
        ; when (null matches) (wrongNumberErr (locA loc))
        ; return $ mkMatchGroup FromSource (L ld matches) }
   where
+    fromDecl :: (GenLocated
+                    (SrcSpanAnn' (EpAnn AnnListItem)) (HsDecl GhcPs)
+                  -> P (GenLocated
+                          (SrcSpanAnn' (EpAnn AnnListItem))
+                          (AnnoMatch SrcSpanAnnA GhcPs (GenLocated SrcSpanAnnA (HsExpr GhcPs)))))
     fromDecl (L loc decl@(ValD _ (PatBind _
                                  -- AZ: where should these anns come from?
                          pat@(L _ (ConPat noAnn ln@(L _ name) details))
@@ -667,7 +672,7 @@ mkPatSynMatchGroup (L loc patsyn_name) (L ld decls) =
                                    , mc_strictness = NoSrcStrict }
 
                RecCon{} -> recordPatSynErr (locA loc) pat
-           ; return $ L loc match }
+           ; return $ L loc $ Annotated match }
     fromDecl (L loc decl) = extraDeclErr (locA loc) decl
 
     extraDeclErr loc decl =
@@ -1234,7 +1239,8 @@ checkFunBind strictness locF ann fun is_infix pats (L _ grhss)
         let match_span = noAnnSrcSpan $ locF
         cs <- getCommentsFor locF
         return (makeFunBind fun (L (noAnnSrcSpan $ locA match_span)
-                 [L match_span (Match { m_ext = EpAnn (spanAsAnchor locF) ann cs
+                 [L match_span $ Annotated
+                               (Match { m_ext = EpAnn (spanAsAnchor locF) ann cs
                                       , m_ctxt = FunRhs
                                           { mc_fun    = fun
                                           , mc_fixity = is_infix
@@ -1248,7 +1254,7 @@ checkFunBind strictness locF ann fun is_infix pats (L _ grhss)
       | Infix <- is_infix = ParseContext (Just $ unLoc fun) NoIncompleteDoBlock
       | otherwise         = noParseContext
 
-makeFunBind :: LocatedN RdrName -> LocatedL [LMatch GhcPs (LHsExpr GhcPs)]
+makeFunBind :: LocatedN RdrName -> LocatedL [LAnnoMatch SrcSpanAnnA GhcPs (LHsExpr GhcPs)]
             -> HsBind GhcPs
 -- Like GHC.Hs.Utils.mkFunBind, but we need to be able to set the fixity too
 makeFunBind fn ms
@@ -1266,7 +1272,7 @@ checkPatBind :: SrcSpan
 checkPatBind loc annsIn (L _ (BangPat (EpAnn _ ans cs) (L _ (VarPat _ v))))
                         (L _match_span grhss)
       = return (makeFunBind v (L (noAnnSrcSpan loc)
-                [L (noAnnSrcSpan loc) (m (EpAnn (spanAsAnchor loc) (ans++annsIn) cs) v)]))
+                [L (noAnnSrcSpan loc) (Annotated (m (EpAnn (spanAsAnchor loc) (ans++annsIn) cs) v))]))
   where
     m a v = Match { m_ext = a
                   , m_ctxt = FunRhs { mc_fun    = v
@@ -1420,8 +1426,6 @@ instance DisambInfixOp RdrName where
 
 type AnnoBody b
   = ( Anno (GRHS GhcPs (LocatedA (Body b GhcPs))) ~ SrcSpan
-    , Anno [LocatedA (Match GhcPs (LocatedA (Body b GhcPs)))] ~ SrcSpanAnnL
-    , Anno (Match GhcPs (LocatedA (Body b GhcPs))) ~ SrcSpanAnnA
     , Anno (StmtLR GhcPs GhcPs (LocatedA (Body (Body b GhcPs) GhcPs))) ~ SrcSpanAnnA
     , Anno [LocatedA (StmtLR GhcPs GhcPs
                        (LocatedA (Body (Body (Body b GhcPs) GhcPs) GhcPs)))] ~ SrcSpanAnnL
@@ -1441,7 +1445,7 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
     -> LocatedA b -> Bool -> [AddEpAnn] -> PV (LHsRecProj GhcPs (LocatedA b))
   -- | Disambiguate "\... -> ..." (lambda)
   mkHsLamPV
-    :: SrcSpan -> (EpAnnComments -> MatchGroup GhcPs (LocatedA b)) -> PV (LocatedA b)
+    :: SrcSpan -> (EpAnnComments -> MatchGroup SrcSpanAnnL SrcSpanAnnA GhcPs (LocatedA b)) -> PV (LocatedA b)
   -- | Disambiguate "let ... in ..."
   mkHsLetPV
     :: SrcSpan -> HsLocalBinds GhcPs -> LocatedA b -> AnnsLet -> PV (LocatedA b)
@@ -1455,9 +1459,9 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
   mkHsOpAppPV :: SrcSpan -> LocatedA b -> LocatedN (InfixOp b) -> LocatedA b
               -> PV (LocatedA b)
   -- | Disambiguate "case ... of ..."
-  mkHsCasePV :: SrcSpan -> LHsExpr GhcPs -> (LocatedL [LMatch GhcPs (LocatedA b)])
+  mkHsCasePV :: SrcSpan -> LHsExpr GhcPs -> (LocatedL [LAnnoMatch SrcSpanAnnA GhcPs (LocatedA b)])
              -> EpAnnHsCase -> PV (LocatedA b)
-  mkHsLamCasePV :: SrcSpan -> (LocatedL [LMatch GhcPs (LocatedA b)])
+  mkHsLamCasePV :: SrcSpan -> (LocatedL [LAnnoMatch SrcSpanAnnA GhcPs (LocatedA b)])
                 -> [AddEpAnn]
                 -> PV (LocatedA b)
   -- | Function argument representation
@@ -1653,8 +1657,8 @@ instance DisambECP (HsCmd GhcPs) where
 cmdFail :: SrcSpan -> SDoc -> PV a
 cmdFail loc e = addFatalError $ mkPlainErrorMsgEnvelope loc $ PsErrParseErrorInCmd e
 
-checkLamMatchGroup :: SrcSpan -> MatchGroup GhcPs (LHsExpr GhcPs) -> PV ()
-checkLamMatchGroup l (MG { mg_alts = (L _ (matches:_))}) = do
+checkLamMatchGroup :: SrcSpan -> MatchGroup SrcSpanAnnL SrcSpanAnnA  GhcPs (LHsExpr GhcPs) -> PV ()
+checkLamMatchGroup l (MG { mg_alts = (L _ (Annotated (matches:_)))}) = do
   when (null (hsLMatchPats matches)) $ addError $ mkPlainErrorMsgEnvelope l PsErrEmptyLambda
 checkLamMatchGroup _ _ = return ()
 

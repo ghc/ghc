@@ -656,20 +656,20 @@ addTickTupArg (Present x e)  = do { e' <- addTickLHsExpr e
 addTickTupArg (Missing ty) = return (Missing ty)
 
 
-addTickMatchGroup :: Bool{-is lambda-} -> MatchGroup GhcTc (LHsExpr GhcTc)
-                  -> TM (MatchGroup GhcTc (LHsExpr GhcTc))
-addTickMatchGroup is_lam mg@(MG { mg_alts = L l matches }) = do
+addTickMatchGroup :: Bool{-is lambda-} -> MatchGroup SrcSpanAnnL SrcSpanAnnA GhcTc (LHsExpr GhcTc)
+                  -> TM (MatchGroup SrcSpanAnnL SrcSpanAnnA GhcTc (LHsExpr GhcTc))
+addTickMatchGroup is_lam mg@(MG { mg_alts = L l (Annotated matches) }) = do
   let isOneOfMany = matchesOneOfMany matches
   matches' <- mapM (liftL (addTickMatch isOneOfMany is_lam)) matches
-  return $ mg { mg_alts = L l matches' }
+  return $ mg { mg_alts = L l (Annotated matches') }
 
-addTickMatch :: Bool -> Bool -> Match GhcTc (LHsExpr GhcTc)
-             -> TM (Match GhcTc (LHsExpr GhcTc))
-addTickMatch isOneOfMany isLambda match@(Match { m_pats = pats
+addTickMatch :: Bool -> Bool -> AnnoMatch SrcSpanAnnA GhcTc (LHsExpr GhcTc)
+             -> TM (AnnoMatch SrcSpanAnnA  GhcTc (LHsExpr GhcTc))
+addTickMatch isOneOfMany isLambda (Annotated match@Match { m_pats = pats
                                                , m_grhss = gRHSs }) =
   bindLocals (collectPatsBinders CollNoDictBinders pats) $ do
     gRHSs' <- addTickGRHSs isOneOfMany isLambda gRHSs
-    return $ match { m_grhss = gRHSs' }
+    return $ Annotated match { m_grhss = gRHSs' }
 
 addTickGRHSs :: Bool -> Bool -> GRHSs GhcTc (LHsExpr GhcTc)
              -> TM (GRHSs GhcTc (LHsExpr GhcTc))
@@ -914,17 +914,17 @@ addTickHsCmd (XCmd (HsWrap w cmd)) =
 -- Others should never happen in a command context.
 --addTickHsCmd e  = pprPanic "addTickHsCmd" (ppr e)
 
-addTickCmdMatchGroup :: MatchGroup GhcTc (LHsCmd GhcTc)
-                     -> TM (MatchGroup GhcTc (LHsCmd GhcTc))
-addTickCmdMatchGroup mg@(MG { mg_alts = (L l matches) }) = do
+addTickCmdMatchGroup :: MatchGroup SrcSpanAnnL SrcSpanAnnA GhcTc (LHsCmd GhcTc)
+                     -> TM (MatchGroup SrcSpanAnnL SrcSpanAnnA GhcTc (LHsCmd GhcTc))
+addTickCmdMatchGroup mg@(MG { mg_alts = (L l (Annotated matches)) }) = do
   matches' <- mapM (liftL addTickCmdMatch) matches
-  return $ mg { mg_alts = L l matches' }
+  return $ mg { mg_alts = L l (Annotated matches') }
 
-addTickCmdMatch :: Match GhcTc (LHsCmd GhcTc) -> TM (Match GhcTc (LHsCmd GhcTc))
-addTickCmdMatch match@(Match { m_pats = pats, m_grhss = gRHSs }) =
+addTickCmdMatch :: AnnoMatch SrcSpanAnnA GhcTc (LHsCmd GhcTc) -> TM (AnnoMatch SrcSpanAnnA GhcTc (LHsCmd GhcTc))
+addTickCmdMatch (Annotated match@(Match { m_pats = pats, m_grhss = gRHSs })) =
   bindLocals (collectPatsBinders CollNoDictBinders pats) $ do
     gRHSs' <- addTickCmdGRHSs gRHSs
-    return $ match { m_grhss = gRHSs' }
+    return $ Annotated match { m_grhss = gRHSs' }
 
 addTickCmdGRHSs :: GRHSs GhcTc (LHsCmd GhcTc) -> TM (GRHSs GhcTc (LHsCmd GhcTc))
 addTickCmdGRHSs (GRHSs x guarded local_binds) =
@@ -1291,11 +1291,11 @@ mkHpcPos _ = panic "bad source span; expected such spans to be filtered out"
 hpcSrcSpan :: SrcSpan
 hpcSrcSpan = mkGeneralSrcSpan (fsLit "Haskell Program Coverage internals")
 
-matchesOneOfMany :: [LMatch GhcTc body] -> Bool
+matchesOneOfMany :: [LAnnoMatch anno GhcTc body] -> Bool
 matchesOneOfMany lmatches = sum (map matchCount lmatches) > 1
   where
-        matchCount :: LMatch GhcTc body -> Int
-        matchCount (L _ (Match { m_grhss = GRHSs _ grhss _ }))
+        matchCount :: LAnnoMatch anno GhcTc body -> Int
+        matchCount (L _ (Annotated (Match { m_grhss = GRHSs _ grhss _ })))
           = length grhss
 
 type MixEntry_ = (SrcSpan, [String], [OccName], BoxLabel)
