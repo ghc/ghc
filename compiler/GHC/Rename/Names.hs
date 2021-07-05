@@ -571,9 +571,9 @@ warnUnqualifiedImport decl iface =
         Just (False, _) -> True
         _               -> False
     bad_import =
-      mod `elemModuleSet` qualifiedMods
-      && not is_qual
+         not is_qual
       && not has_import_list
+      && mod `elemModuleSet` qualifiedMods
 
     warning = vcat
       [ text "To ensure compatibility with future core libraries changes"
