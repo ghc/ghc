@@ -50,7 +50,7 @@ instance Diagnostic TcRnMessage where
       -> mkDecorated [text "Use of plugins makes the module unsafe"]
     TcRnModMissingRealSrcSpan mod
       -> mkDecorated [text "Module does not have a RealSrcSpan:" <+> ppr mod]
-    TcRnIdNotExportedFromSig name mod
+    TcRnIdNotExportedFromModuleSig name mod
       -> mkDecorated [ text "The identifier" <+> ppr (occName name) <+>
                        text "does not exist in the signature for" <+> ppr mod
                      ]
@@ -81,7 +81,7 @@ instance Diagnostic TcRnMessage where
       -> WarningWithoutFlag
     TcRnModMissingRealSrcSpan{}
       -> WarningWithoutFlag
-    TcRnIdNotExportedFromSig{}
+    TcRnIdNotExportedFromModuleSig{}
       -> ErrorWithoutFlag
     TcRnIdNotExportedFromLocalSig{}
       -> ErrorWithoutFlag
@@ -108,10 +108,10 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnModMissingRealSrcSpan{}
       -> noHints
-    TcRnIdNotExportedFromSig _ mod
-      -> [SuggestAddToHSigExportList $ Just mod]
-    TcRnIdNotExportedFromLocalSig{}
-      -> [SuggestAddToHSigExportList Nothing]
+    TcRnIdNotExportedFromModuleSig name mod
+      -> [SuggestAddToHSigExportList name $ Just mod]
+    TcRnIdNotExportedFromLocalSig name
+      -> [SuggestAddToHSigExportList name Nothing]
 
 messageWithInfoDiagnosticMessage :: UnitState
                                  -> ErrInfo

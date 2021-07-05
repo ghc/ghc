@@ -11,6 +11,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import Data.Typeable
 import GHC.Unit.Module (ModuleName, Module)
 import GHC.Hs.Extension (GhcTc)
+import GHC.Types.Name (Name)
 import GHC.Types.Var (Var)
 import GHC.Types.Basic (Activation, RuleName)
 import {-# SOURCE #-} Language.Haskell.Syntax.Expr
@@ -118,7 +119,7 @@ data GhcHint
   | SuggestAddPhaseToCompetingRule !RuleName
     {-| Suggests adding an identifier to the export list of a signature.
     -}
-  | SuggestAddToHSigExportList !(Maybe Module)
+  | SuggestAddToHSigExportList !Name !(Maybe Module)
 
 -- | An 'InstantiationSuggestion' for a '.hsig' file. This is generated
 -- by GHC in case of a 'DriverUnexpectedSignature' and suggests a way
