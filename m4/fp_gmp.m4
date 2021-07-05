@@ -13,7 +13,7 @@ AC_DEFUN([FP_GMP],
 
   AC_ARG_WITH([gmp-libraries],
     [AS_HELP_STRING([--with-gmp-libraries],
-      [directory containing gmp library])],
+      [directory containing gmp library; ineffective for bindists])],
       [GMP_LIB_DIRS=$withval])
 
   AC_ARG_WITH([intree-gmp],
