@@ -343,13 +343,69 @@ pokeOffsetOverlapped lpol offset = do
   #{poke OVERLAPPED, OffsetHigh} lpol offsetHigh
 {-# INLINE pokeOffsetOverlapped #-}
 
+-- | Set the event field in an OVERLAPPED structure.
+pokeEventOverlapped :: LPOVERLAPPED -> HANDLE -> IO ()
+pokeEventOverlapped lpol event = do
+  #{poke OVERLAPPED, hEvent} lpol event
+{-# INLINE pokeEventOverlapped #-}
+
 ------------------------------------------------------------------------
 -- Request management
 
-withRequest :: Word64 -> CompletionData
+-- [Note AsyncHandles]
+-- In `winio` we have designed it to work in asynchronous mode always.
+-- According to the MSDN documentation[1][2], when a handle is not opened
+-- in asynchronous mode then the operation would simply work but operate
+-- synchronously.
+--
+-- This seems to happen as documented for `File` handles, but `pipes` don't
+-- seem to follow this documented behavior and so are a problem.
+-- Under `msys2` your standard handles are actually pipes, not console
+-- handles or files.  As such running under an msys2 console causes a hang
+-- as the pipe read never returns.
+--
+-- [1] https://docs.microsoft.com/en-us/windows/win32/fileio/synchronous-and-asynchronous-i-o
+-- [2] https://docs.microsoft.com/en-us/windows/win32/sync/synchronization-and-overlapped-input-and-output
+--
+-- As such we need to annotate all NativeHandles with a Boolean to indicate
+-- wether it's an asynchronous handle or not.
+-- This allows us to manually wait for the completion instead of relying
+-- on the I/O system to do the right thing.  As we have been using the
+-- buffers in async mode we may not have moved the file pointer on the kernel
+-- object, as such we still need to give an `OVERLAPPED` structure, but we
+-- instead create an event object that we can wait on.
+--
+-- As documented in MSDN this even object must be in manual reset mode.  This
+-- approach gives us the flexibility, with minimum impact to support both
+-- synchronous and asynchronous access.
+--
+-- Additional approaches explored
+--
+-- Normally the I/O system is in full control of all Handles it creates, with
+-- one big exception: inheritance.
+--
+-- For any `HANDLE` we inherit we don't know how it's been open.  A different
+-- solution I have explored was to try to detect the `HANDLE` mode.
+-- But this approach would never work for a few reasons:
+--
+-- 1. The presence of an asynchronous flag does not indicate that we are able
+--    to handle the operation asynchronously.  In particular, just because a
+--    `HANDLE` is open in async mode, it may not be associated with our
+--    completion port.
+-- 2. One can only associate a `HANDLE` to a *single* completion port.  As
+--    such, if the handle is opened in async mode but already registered to a
+--    completion port then we can't use it asynchronously.
+-- 3. You can only associate a completion port once, even if it's the same
+--    port.  This means were we to strap a `HANDLE` of it's `NativeHandle`
+--    wrapper and then wrap it again, we can't retest as the result would be
+--    invalid.  This is an issue because to pass `HANDLE`s we have to pass
+--    the native OS Handle not the Haskell one. i.e. remote-iserv.
+
+-- See [Note AsyncHandles]
+withRequest :: Bool -> Word64 -> CompletionData
             -> (Ptr HASKELL_OVERLAPPED -> Ptr CompletionData -> IO a)
             -> IO a
-withRequest offset cbData f =
+withRequest async offset cbData f =
     -- Create the completion record and store it.
     -- We only need the record when we enqueue a request, however if we
     -- delay creating it then we will run into a race condition where the
@@ -364,8 +420,30 @@ withRequest offset cbData f =
     allocaBytes #{size HASKELL_OVERLAPPED} $ \hs_lpol ->
       with cbData $ \cdData -> do
         zeroOverlapped hs_lpol
-        pokeOffsetOverlapped (castPtr hs_lpol) offset
-        f hs_lpol cdData
+        let lpol = castPtr hs_lpol
+        pokeOffsetOverlapped lpol offset
+        -- If doing a synchronous request then register an event object.
+        -- This event object MUST be manual reset per MSDN.
+        case async of
+          True -> f hs_lpol cdData
+          False -> do
+            event <- failIfNull "withRequest (create)" $
+                       c_CreateEvent nullPtr True False nullPtr
+            debugIO $ "{{ event " ++ show event ++ " for " ++ show hs_lpol
+            pokeEventOverlapped lpol event
+            res <- f hs_lpol cdData
+            -- Once the request has finished, close the object and free it.
+            failIfFalse_ "withRequest (free)" $ c_CloseHandle event
+            return res
+
+
+-- | Create an event object for use when the HANDLE isn't asynchronous
+foreign import WINDOWS_CCONV unsafe "windows.h CreateEventW"
+    c_CreateEvent :: Ptr () -> Bool -> Bool -> LPCWSTR -> IO HANDLE
+
+-- | Close a handle object
+foreign import WINDOWS_CCONV unsafe "windows.h CloseHandle"
+    c_CloseHandle :: HANDLE -> IO Bool
 
 ------------------------------------------------------------------------
 -- Cancel pending I/O

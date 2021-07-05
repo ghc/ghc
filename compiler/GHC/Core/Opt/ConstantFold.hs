@@ -76,7 +76,6 @@ import Control.Applicative ( Alternative(..) )
 
 import Control.Monad
 import Data.Functor (($>))
-import Data.Bits as Bits
 import qualified Data.ByteString as BS
 import Data.Ratio
 import Data.Word
@@ -129,9 +128,9 @@ primOpRules nm = \case
                                     , equalArgs $> Lit zeroI8 ]
    Int8NegOp   -> mkPrimOpRule nm 1 [ unaryLit negOp
                                     , semiInversePrimOp Int8NegOp ]
-   Int8SllOp   -> mkPrimOpRule nm 2 [ shiftRule LitNumInt8 (const Bits.shiftL)
+   Int8SllOp   -> mkPrimOpRule nm 2 [ shiftRule LitNumInt8 (const shiftL)
                                     , rightIdentity zeroI8 ]
-   Int8SraOp   -> mkPrimOpRule nm 2 [ shiftRule LitNumInt8 (const Bits.shiftR)
+   Int8SraOp   -> mkPrimOpRule nm 2 [ shiftRule LitNumInt8 (const shiftR)
                                     , rightIdentity zeroI8 ]
    Int8SrlOp   -> mkPrimOpRule nm 2 [ shiftRule LitNumInt8 $ const $ shiftRightLogical @Word8
                                     , rightIdentity zeroI8 ]
@@ -167,7 +166,7 @@ primOpRules nm = \case
                                     , equalArgs $> Lit zeroW8 ]
    Word8NotOp  -> mkPrimOpRule nm 1 [ unaryLit complementOp
                                     , semiInversePrimOp Word8NotOp ]
-   Word8SllOp  -> mkPrimOpRule nm 2 [ shiftRule LitNumWord (const Bits.shiftL) ]
+   Word8SllOp  -> mkPrimOpRule nm 2 [ shiftRule LitNumWord (const shiftL) ]
    Word8SrlOp  -> mkPrimOpRule nm 2 [ shiftRule LitNumWord $ const $ shiftRightLogical @Word8 ]
 
 
@@ -196,9 +195,9 @@ primOpRules nm = \case
                                     , equalArgs $> Lit zeroI16 ]
    Int16NegOp  -> mkPrimOpRule nm 1 [ unaryLit negOp
                                     , semiInversePrimOp Int16NegOp ]
-   Int16SllOp  -> mkPrimOpRule nm 2 [ shiftRule LitNumInt16 (const Bits.shiftL)
+   Int16SllOp  -> mkPrimOpRule nm 2 [ shiftRule LitNumInt16 (const shiftL)
                                     , rightIdentity zeroI16 ]
-   Int16SraOp  -> mkPrimOpRule nm 2 [ shiftRule LitNumInt16 (const Bits.shiftR)
+   Int16SraOp  -> mkPrimOpRule nm 2 [ shiftRule LitNumInt16 (const shiftR)
                                     , rightIdentity zeroI16 ]
    Int16SrlOp  -> mkPrimOpRule nm 2 [ shiftRule LitNumInt16 $ const $ shiftRightLogical @Word16
                                     , rightIdentity zeroI16 ]
@@ -234,7 +233,7 @@ primOpRules nm = \case
                                     , equalArgs $> Lit zeroW16 ]
    Word16NotOp -> mkPrimOpRule nm 1 [ unaryLit complementOp
                                     , semiInversePrimOp Word16NotOp ]
-   Word16SllOp -> mkPrimOpRule nm 2 [ shiftRule LitNumWord (const Bits.shiftL) ]
+   Word16SllOp -> mkPrimOpRule nm 2 [ shiftRule LitNumWord (const shiftL) ]
    Word16SrlOp -> mkPrimOpRule nm 2 [ shiftRule LitNumWord $ const $ shiftRightLogical @Word16 ]
 
 
@@ -263,9 +262,9 @@ primOpRules nm = \case
                                     , equalArgs $> Lit zeroI32 ]
    Int32NegOp  -> mkPrimOpRule nm 1 [ unaryLit negOp
                                     , semiInversePrimOp Int32NegOp ]
-   Int32SllOp  -> mkPrimOpRule nm 2 [ shiftRule LitNumInt32 (const Bits.shiftL)
+   Int32SllOp  -> mkPrimOpRule nm 2 [ shiftRule LitNumInt32 (const shiftL)
                                     , rightIdentity zeroI32 ]
-   Int32SraOp  -> mkPrimOpRule nm 2 [ shiftRule LitNumInt32 (const Bits.shiftR)
+   Int32SraOp  -> mkPrimOpRule nm 2 [ shiftRule LitNumInt32 (const shiftR)
                                     , rightIdentity zeroI32 ]
    Int32SrlOp  -> mkPrimOpRule nm 2 [ shiftRule LitNumInt32 $ const $ shiftRightLogical @Word32
                                     , rightIdentity zeroI32 ]
@@ -301,7 +300,7 @@ primOpRules nm = \case
                                     , equalArgs $> Lit zeroW32 ]
    Word32NotOp -> mkPrimOpRule nm 1 [ unaryLit complementOp
                                     , semiInversePrimOp Word32NotOp ]
-   Word32SllOp -> mkPrimOpRule nm 2 [ shiftRule LitNumWord (const Bits.shiftL) ]
+   Word32SllOp -> mkPrimOpRule nm 2 [ shiftRule LitNumWord (const shiftL) ]
    Word32SrlOp -> mkPrimOpRule nm 2 [ shiftRule LitNumWord $ const $ shiftRightLogical @Word32 ]
 
 
@@ -346,9 +345,9 @@ primOpRules nm = \case
                                     , semiInversePrimOp IntNotOp ]
    IntNegOp    -> mkPrimOpRule nm 1 [ unaryLit negOp
                                     , semiInversePrimOp IntNegOp ]
-   IntSllOp    -> mkPrimOpRule nm 2 [ shiftRule LitNumInt (const Bits.shiftL)
+   IntSllOp    -> mkPrimOpRule nm 2 [ shiftRule LitNumInt (const shiftL)
                                     , rightIdentityPlatform zeroi ]
-   IntSraOp    -> mkPrimOpRule nm 2 [ shiftRule LitNumInt (const Bits.shiftR)
+   IntSraOp    -> mkPrimOpRule nm 2 [ shiftRule LitNumInt (const shiftR)
                                     , rightIdentityPlatform zeroi ]
    IntSrlOp    -> mkPrimOpRule nm 2 [ shiftRule LitNumInt shiftRightLogicalNative
                                     , rightIdentityPlatform zeroi ]
@@ -389,7 +388,7 @@ primOpRules nm = \case
                                     , equalArgs >> retLit zerow ]
    WordNotOp   -> mkPrimOpRule nm 1 [ unaryLit complementOp
                                     , semiInversePrimOp WordNotOp ]
-   WordSllOp   -> mkPrimOpRule nm 2 [ shiftRule LitNumWord (const Bits.shiftL) ]
+   WordSllOp   -> mkPrimOpRule nm 2 [ shiftRule LitNumWord (const shiftL) ]
    WordSrlOp   -> mkPrimOpRule nm 2 [ shiftRule LitNumWord shiftRightLogicalNative ]
 
    -- coercions

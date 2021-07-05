@@ -61,7 +61,6 @@ import GHC.Utils.Misc
 import Data.Array
 import Data.Array.ST
 import Data.Array.Unsafe
-import Data.Bits
 import Data.Char
 import Data.Word
 import Data.IORef

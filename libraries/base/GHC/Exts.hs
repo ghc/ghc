@@ -90,7 +90,8 @@ module GHC.Exts
         type (~~),
 
         -- * Representation polymorphism
-        GHC.Prim.TYPE, RuntimeRep(..), LiftedRep, Levity(..),
+        GHC.Prim.TYPE, RuntimeRep(..), Levity(..),
+        LiftedRep, UnliftedRep, UnliftedType,
         VecCount(..), VecElem(..),
 
         -- * Transform comprehensions

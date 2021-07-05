@@ -19,7 +19,6 @@ import GHC.Prelude
 import GHC.Platform
 import GHC.Runtime.Heap.Layout
 
-import Data.Bits
 
 {-|
 A bitmap represented by a sequence of 'StgWord's on the /target/

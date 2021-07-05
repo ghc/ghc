@@ -83,7 +83,7 @@ import GHC.Utils.Fingerprint
 import GHC.Types.SrcLoc
 
 import Control.DeepSeq
-import Foreign
+import Foreign hiding (shiftL, shiftR)
 import Data.Array
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Internal as BS

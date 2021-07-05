@@ -551,7 +551,17 @@ relocateSectionAarch64(ObjectCode * oc, Section * section)
                 } else {
                     value = (uint64_t)symbol->addr;    // address of the symbol.
                 }
-                if((value - pc + addend) >> (2 + 26)) {
+                // We've got:
+                // + 2  bits, for alignment
+                // + 26 bits for for the relocation value
+                // - 1  bit for signage.
+                //
+                // Thus we can encode 26 bits for relocation, including the sign
+                // bit. However as branches need to be 4-byte aligned, we only
+                // need 26 bits to address a 28 bit range. Thus discarding the
+                // sign bit, we can encode a range of +/- 27bits.
+                //
+                if((value - pc + addend) >> (2 + 26 - 1)) {
                     /* we need a stub */
                     /* check if we already have that stub */
                     if(findStub(section, (void**)&value, 0)) {
