@@ -193,8 +193,7 @@ import GHC.Types.SourceError
 import GHC.Types.SafeHaskell
 import GHC.Types.ForeignStubs
 import GHC.Types.Var.Env       ( emptyTidyEnv )
-import GHC.Types.Error  hiding ( getMessages )
-import qualified GHC.Types.Error as Error.Types
+import GHC.Types.Error
 import GHC.Types.Fixity.Env
 import GHC.Types.CostCentre
 import GHC.Types.IPE
@@ -413,9 +412,9 @@ hscParse' mod_summary
 
     case unP parseMod (initParserState (initParserOpts dflags) buf loc) of
         PFailed pst ->
-            handleWarningsThrowErrors (getMessages pst)
+            handleWarningsThrowErrors (getPsMessages pst)
         POk pst rdr_module -> do
-            let (warns, errs) = getMessages pst
+            let (warns, errs) = getPsMessages pst
             logDiagnostics (GhcPsMessage <$> warns)
             liftIO $ putDumpFileMaybe logger Opt_D_dump_parsed "Parser"
                         FormatHaskell (ppr rdr_module)
@@ -1478,7 +1477,7 @@ markUnsafeInfer tcg_env whyUnsafe = do
     whyUnsafe' df = vcat [ quotes pprMod <+> text "has been inferred as unsafe!"
                          , text "Reason:"
                          , nest 4 $ (vcat $ badFlags df) $+$
-                                    (vcat $ pprMsgEnvelopeBagWithLoc (Error.Types.getMessages whyUnsafe)) $+$
+                                    (vcat $ pprMsgEnvelopeBagWithLoc (getMessages whyUnsafe)) $+$
                                     (vcat $ badInsts $ tcg_insts tcg_env)
                          ]
     badFlags df   = concatMap (badFlag df) unsafeFlagsForInfer
@@ -2129,9 +2128,9 @@ hscParseThingWithLocation source linenumber parser str = do
 
         case unP parser (initParserState (initParserOpts dflags) buf loc) of
             PFailed pst ->
-                handleWarningsThrowErrors (getMessages pst)
+                handleWarningsThrowErrors (getPsMessages pst)
             POk pst thing -> do
-                logWarningsReportErrors (getMessages pst)
+                logWarningsReportErrors (getPsMessages pst)
                 liftIO $ putDumpFileMaybe logger Opt_D_dump_parsed "Parser"
                             FormatHaskell (ppr thing)
                 liftIO $ putDumpFileMaybe logger Opt_D_dump_parsed_ast "Parser AST"
