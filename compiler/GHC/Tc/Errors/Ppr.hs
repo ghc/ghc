@@ -93,7 +93,7 @@ instance Diagnostic TcRnMessage where
       -> mkSimpleDecorated $
            vcat [ text "Illegal `..' notation for constructor" <+> quotes (ppr con)
                 , nest 2 (text "The constructor has no labelled fields") ]
-    TcRnIdNotExportedFromSig name mod
+    TcRnIdNotExportedFromModuleSig name mod
       -> mkDecorated [ text "The identifier" <+> ppr (occName name) <+>
                        text "does not exist in the signature for" <+> ppr mod
                      ]
@@ -124,7 +124,7 @@ instance Diagnostic TcRnMessage where
       -> WarningWithoutFlag
     TcRnModMissingRealSrcSpan{}
       -> WarningWithoutFlag
-    TcRnIdNotExportedFromSig{}
+    TcRnIdNotExportedFromModuleSig{}
       -> ErrorWithoutFlag
     TcRnIdNotExportedFromLocalSig{}
       -> ErrorWithoutFlag
@@ -195,10 +195,10 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnIllegalWildcardsInConstructor{}
       -> noHints
-    TcRnIdNotExportedFromSig _ mod
-      -> [SuggestAddToHSigExportList $ Just mod]
-    TcRnIdNotExportedFromLocalSig{}
-      -> [SuggestAddToHSigExportList Nothing]
+    TcRnIdNotExportedFromModuleSig name mod
+      -> [SuggestAddToHSigExportList name $ Just mod]
+    TcRnIdNotExportedFromLocalSig name
+      -> [SuggestAddToHSigExportList name Nothing]
 
 messageWithInfoDiagnosticMessage :: UnitState
                                  -> ErrInfo

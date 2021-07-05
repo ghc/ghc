@@ -352,7 +352,7 @@ rnIfaceGlobal n = do
             let nsubst = mkNameShape (moduleName m) (mi_exports iface)
             case maybeSubstNameShape nsubst n of
                 -- NB: report m' because it's more user-friendly
-                Nothing -> failWithRn $ TcRnIdNotExportedFromSig n m'
+                Nothing -> failWithRn $ TcRnIdNotExportedFromModuleSig n m'
                 Just n' -> return n'
 
 -- | Rename an implicit name, e.g., a DFun or coercion axiom.
