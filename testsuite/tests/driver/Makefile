@@ -726,3 +726,10 @@ T14923:
 	"$(TEST_HC)" $(TEST_HC_OPTS) -c Foo.hs;
 	# And this should not
 	"$(TEST_HC)" $(TEST_HC_OPTS) -c Foo.hs;
+
+T20084:
+	# Compile
+	"$(TEST_HC)" $(TEST_HC_OPTS) T20084.hs
+	# Don't compile
+	"$(TEST_HC)" $(TEST_HC_OPTS) T20084.hs
+

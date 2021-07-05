@@ -2538,6 +2538,7 @@ makeNewModSummary hsc_env MakeNewModSummary{..} = do
         , ms_hspp_buf  = Just pi_hspp_buf
         , ms_parsed_mod = Nothing
         , ms_srcimps = pi_srcimps
+        , ms_ghc_prim_import = pi_ghc_prim_import
         , ms_textual_imps =
             pi_theimps ++
             extra_sig_imports ++
@@ -2556,6 +2557,7 @@ data PreprocessedImports
       { pi_local_dflags :: DynFlags
       , pi_srcimps  :: [(Maybe FastString, Located ModuleName)]
       , pi_theimps  :: [(Maybe FastString, Located ModuleName)]
+      , pi_ghc_prim_import :: Bool
       , pi_hspp_fn  :: FilePath
       , pi_hspp_buf :: StringBuffer
       , pi_mod_name_loc :: SrcSpan
@@ -2575,7 +2577,7 @@ getPreprocessedImports hsc_env src_fn mb_phase maybe_buf = do
   (pi_local_dflags, pi_hspp_fn)
       <- ExceptT $ preprocess hsc_env src_fn (fst <$> maybe_buf) mb_phase
   pi_hspp_buf <- liftIO $ hGetStringBuffer pi_hspp_fn
-  (pi_srcimps, pi_theimps, L pi_mod_name_loc pi_mod_name)
+  (pi_srcimps, pi_theimps, pi_ghc_prim_import, L pi_mod_name_loc pi_mod_name)
       <- ExceptT $ do
           let imp_prelude = xopt LangExt.ImplicitPrelude pi_local_dflags
               popts = initParserOpts pi_local_dflags
