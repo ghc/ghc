@@ -37,7 +37,7 @@ typedef struct _counter {
     struct _counter *next;
 } counter;
 
-typedef struct {
+typedef struct _Census {
     double      time;    // the time in MUT time when the census is made
     StgWord64   rtime;   // The eventlog time the census was made. This is used
                          // for the LDV profiling events because they are all
@@ -55,7 +55,6 @@ typedef struct {
     ssize_t    drag_total;
 } Census;
 
-void initLDVCtr(counter *ctr);
-counter* heapInsertNewCounter(Census *census, StgWord identity);
+counter* heapInsertNewCounter(Census *census, const void *identity);
 
 #include "EndPrivate.h"
