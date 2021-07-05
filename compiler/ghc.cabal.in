@@ -406,6 +406,8 @@ Library
         GHC.Driver.Monad
         GHC.Driver.Phases
         GHC.Driver.Pipeline
+        GHC.Driver.Pipeline.Execute
+        GHC.Driver.Pipeline.Phases
         GHC.Driver.Pipeline.Monad
         GHC.Driver.Plugins
         GHC.Driver.Ppr
