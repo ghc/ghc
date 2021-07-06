@@ -36,9 +36,6 @@ module GHC.Rename.Pat (-- main entry points
 
               -- Literals
               rnLit, rnOverLit,
-
-             -- Pattern Error message that is also used elsewhere
-             patSigErr
              ) where
 
 -- ENH: thin imports to only what is necessary for patterns
@@ -1008,16 +1005,3 @@ rnOverLit origLit
                   ; return ((lit' { ol_val = negateOverLitVal val }, Just negate_name)
                                   , fvs1 `plusFV` fvs2) }
           else return ((lit', Nothing), fvs1) }
-
-{-
-************************************************************************
-*                                                                      *
-\subsubsection{Errors}
-*                                                                      *
-************************************************************************
--}
-
-patSigErr :: Outputable a => a -> SDoc
-patSigErr ty
-  =  (text "Illegal signature in pattern:" <+> ppr ty)
-        $$ nest 4 (text "Use ScopedTypeVariables to permit it")
