@@ -185,6 +185,17 @@ data TcRnMessage where
   -}
   TcRnShadowedName :: OccName -> ShadowedNameProvenance -> TcRnMessage
 
+  {-| TcRnDuplicateWarningDecls is an error that occurs whenever
+      a warning is declared twice.
+
+      Examples(s):
+        None.
+
+     Test cases:
+        None.
+  -}
+  TcRnDuplicateWarningDecls :: !(LocatedN RdrName) -> !RdrName -> TcRnMessage
+
 
 -- | Where a shadowed name comes from
 data ShadowedNameProvenance
