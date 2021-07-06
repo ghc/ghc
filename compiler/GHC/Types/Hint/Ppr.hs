@@ -13,6 +13,7 @@ import GHC.Types.Hint
 
 import GHC.Hs.Expr ()   -- instance Outputable
 import GHC.Types.Id
+import GHC.Unit.Types
 import GHC.Utils.Outputable
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -61,6 +62,11 @@ instance Outputable GhcHint where
     SuggestAddPhaseToCompetingRule bad_rule
       -> vcat [ text "Add phase [n] or [~n] to the competing rule"
               , whenPprDebug (ppr bad_rule) ]
+    SuggestAddToHSigExportList _name mb_mod
+      -> let header = text "Try adding it to the export list of"
+         in case mb_mod of
+              Nothing -> header <+> text "the hsig file."
+              Just mod -> header <+> ppr (moduleName mod) <> text "'s hsig file."
 
 perhapsAsPat :: SDoc
 perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"
