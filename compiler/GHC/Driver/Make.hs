@@ -102,7 +102,6 @@ import GHC.Types.Name
 import GHC.Types.Name.Env
 
 import GHC.Unit
-import GHC.Unit.External
 import GHC.Unit.Finder
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Module.ModIface
@@ -124,7 +123,7 @@ import Control.Monad
 import Control.Monad.Trans.Except ( ExceptT(..), runExceptT, throwE )
 import qualified Control.Monad.Catch as MC
 import Data.IORef
-import Data.List (nub, sort, sortBy, partition)
+import Data.List (sortBy, partition)
 import qualified Data.List as List
 import Data.Foldable (toList)
 import Data.Maybe
@@ -338,7 +337,7 @@ load :: GhcMonad m => LoadHowMuch -> m SuccessFlag
 load how_much = do
     (errs, mod_graph) <- depanalE [] False                        -- #17459
     success <- load' how_much (Just batchMsg) mod_graph
-    warnUnusedPackages
+    warnUnusedPackages mod_graph
     if isEmptyMessages errs
       then pure success
       else throwErrors (fmap GhcDriverMessage errs)
@@ -350,24 +349,21 @@ load how_much = do
 -- actually loaded packages. All the packages, specified on command line,
 -- but never loaded, are probably unused dependencies.
 
-warnUnusedPackages :: GhcMonad m => m ()
-warnUnusedPackages = do
+warnUnusedPackages :: GhcMonad m => ModuleGraph -> m ()
+warnUnusedPackages mod_graph = do
     hsc_env <- getSession
-    eps <- liftIO $ hscEPS hsc_env
 
     let dflags = hsc_dflags hsc_env
         state  = hsc_units  hsc_env
-        pit = eps_PIT eps
         diag_opts = initDiagOpts dflags
+        us = hsc_units hsc_env
 
-    let loadedPackages
-          = map (unsafeLookupUnit state)
-          . nub . sort
-          . map moduleUnit
-          . moduleEnvKeys
-          $ pit
+    -- Only need non-source imports here because SOURCE imports are always HPT
+    let loadedPackages = concat $
+          mapMaybe (\(fs, mn) -> lookupModulePackage us (unLoc mn) fs)
+            $ concatMap ms_imps (mgModSummaries mod_graph)
 
-        requestedArgs = mapMaybe packageArg (packageFlags dflags)
+    let requestedArgs = mapMaybe packageArg (packageFlags dflags)
 
         unusedArgs
           = filter (\arg -> not $ any (matching state arg) loadedPackages)

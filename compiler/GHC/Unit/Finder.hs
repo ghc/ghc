@@ -227,7 +227,7 @@ findLookupResult :: FinderCache -> DynFlags -> LookupResult -> IO FindResult
 findLookupResult fc dflags r = case r of
      LookupFound m pkg_conf -> do
        let im = fst (getModuleInstantiation m)
-       r' <- findPackageModule_ fc dflags im pkg_conf
+       r' <- findPackageModule_ fc dflags im (fst pkg_conf)
        case r' of
         -- TODO: ghc -M is unlikely to do the right thing
         -- with just the location of the thing that was
