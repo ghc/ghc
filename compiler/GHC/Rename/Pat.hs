@@ -934,16 +934,7 @@ badDotDotCon con
          , nest 2 (text "The constructor has no labelled fields") ]
 
 dupFieldErr :: HsRecFieldContext -> NE.NonEmpty RdrName -> TcRnMessage
-dupFieldErr ctxt dups
-  = TcRnUnknownMessage $ mkPlainError noHints $
-    hsep [text "duplicate field name",
-          quotes (ppr (NE.head dups)),
-          text "in record", pprRFC ctxt]
-
-pprRFC :: HsRecFieldContext -> SDoc
-pprRFC (HsRecFieldCon {}) = text "construction"
-pprRFC (HsRecFieldPat {}) = text "pattern"
-pprRFC (HsRecFieldUpd {}) = text "update"
+dupFieldErr ctxt = TcRnDuplicateFieldName (toRecordFieldPart ctxt)
 
 toRecordFieldPart :: HsRecFieldContext -> RecordFieldPart
 toRecordFieldPart (HsRecFieldCon n)  = RecordFieldConstructor n
