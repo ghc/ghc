@@ -19,6 +19,8 @@ import Language.Haskell.Syntax.Expr
   , HsSplice
   )
 import GHC.Hs.Extension ( OutputableBndrId, GhcPass )
+import GHC.Parser.Annotation ( SrcSpanAnnA, SrcSpanAnnL )
+
 
 instance (OutputableBndrId p) => Outputable (HsExpr (GhcPass p))
 instance (OutputableBndrId p) => Outputable (HsCmd (GhcPass p))
@@ -37,4 +39,4 @@ pprPatBind :: forall bndr p . (OutputableBndrId bndr,
            => LPat (GhcPass bndr) -> GRHSs (GhcPass p) (LHsExpr (GhcPass p)) -> SDoc
 
 pprFunBind :: (OutputableBndrId idR)
-           => MatchGroup (GhcPass idR) (LHsExpr (GhcPass idR)) -> SDoc
+           => MatchGroup SrcSpanAnnL SrcSpanAnnA (GhcPass idR) (LHsExpr (GhcPass idR)) -> SDoc

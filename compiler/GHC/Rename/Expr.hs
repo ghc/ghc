@@ -870,11 +870,11 @@ methodNamesCmd (HsCmdLamCase _ matches)
    -- The type checker will complain later
 
 ---------------------------------------------------
-methodNamesMatch :: MatchGroup GhcRn (LHsCmd GhcRn) -> FreeVars
-methodNamesMatch (MG { mg_alts = L _ ms })
+methodNamesMatch :: MatchGroup SrcSpanAnnL SrcSpanAnnA GhcRn (LHsCmd GhcRn) -> FreeVars
+methodNamesMatch (MG { mg_alts = L _ (Annotated ms) })
   = plusFVs (map do_one ms)
  where
-    do_one (L _ (Match { m_grhss = grhss })) = methodNamesGRHSs grhss
+    do_one (L _ (Annotated Match { m_grhss = grhss })) = methodNamesGRHSs grhss
 
 -------------------------------------------------
 -- gaw 2004

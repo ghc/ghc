@@ -253,8 +253,9 @@ tc_cmd env cmd@(HsCmdApp x fun arg) (cmd_stk, res_ty)
 -- D;G |-a (\x.cmd) : (t,stk) --> res
 
 tc_cmd env
-       (HsCmdLam x (MG { mg_alts = L l [L mtch_loc
-                                   (match@(Match { m_pats = pats, m_grhss = grhss }))],
+       (HsCmdLam x (MG { mg_alts = L l (Annotated
+                                    [L mtch_loc (Annotated match@(Match { m_pats = pats, m_grhss = grhss }))
+                                    ]),
                          mg_origin = origin }))
        (cmd_stk, res_ty)
   = addErrCtxt (pprMatchInCtxt match)        $
@@ -265,11 +266,11 @@ tc_cmd env
                              tcPats LambdaExpr pats (map (unrestricted . mkCheckExpType) arg_tys) $
                              tc_grhss grhss cmd_stk' (mkCheckExpType res_ty)
 
-        ; let match' = L mtch_loc (Match { m_ext = noAnn
+        ; let match' = L mtch_loc (Annotated Match { m_ext = noAnn
                                          , m_ctxt = LambdaExpr, m_pats = pats'
                                          , m_grhss = grhss' })
               arg_tys = map (unrestricted . hsLPatType) pats'
-              cmd' = HsCmdLam x (MG { mg_alts = L l [match']
+              cmd' = HsCmdLam x (MG { mg_alts = L l (Annotated [match'])
                                     , mg_ext = MatchGroupTc arg_tys res_ty
                                     , mg_origin = origin })
         ; return (mkHsCmdWrap (mkWpCastN co) cmd') }
@@ -346,9 +347,9 @@ tc_cmd _ cmd _
 -- 'HsCmdCase' and 'HsCmdLamCase'.
 tcCmdMatches :: CmdEnv
              -> TcType                           -- ^ type of the scrutinee
-             -> MatchGroup GhcRn (LHsCmd GhcRn)  -- ^ case alternatives
+             -> MatchGroup SrcSpanAnnL SrcSpanAnnA GhcRn (LHsCmd GhcRn)  -- ^ case alternatives
              -> CmdType
-             -> TcM (MatchGroup GhcTc (LHsCmd GhcTc))
+             -> TcM (MatchGroup SrcSpanAnnL SrcSpanAnnA GhcTc (LHsCmd GhcTc))
 tcCmdMatches env scrut_ty matches (stk, res_ty)
   = tcMatchesCase match_ctxt (unrestricted scrut_ty) matches (mkCheckExpType res_ty)
   where

@@ -2,6 +2,7 @@
 {-# LANGUAGE ConstraintKinds         #-}
 {-# LANGUAGE DataKinds               #-}
 {-# LANGUAGE DeriveDataTypeable      #-}
+{-# LANGUAGE DeriveFunctor           #-}
 {-# LANGUAGE EmptyCase               #-}
 {-# LANGUAGE EmptyDataDeriving       #-}
 {-# LANGUAGE StandaloneDeriving      #-}
@@ -154,6 +155,66 @@ class WrapXRec p a where
 type family IdP p
 
 type LIdP p = XRec p (IdP p)
+
+-- =====================================================================
+-- Decorate types with Annotations.
+-- Useful for decorating types in the AST with source span information and similar.
+
+{--
+Note [Explicitly Mark Types with Annotations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+There are a lot of instances of Anno defined for general purpose types,
+like '[..]', 'Maybe ...', '(..,..)', which might be used in many contexts in
+the AST, requiring different annotations for each. These are tied to a single
+context and will always be given a single type of exact-print annotations.
+
+For example, the following instances of Anno are OK, since they are defined
+for a specific kind of AST construct:
+@
+  type instance Anno (RuleBndr (GhcPass p)) = SrcSpan
+  type instance Anno (RuleDecl (GhcPass p)) = SrcSpanAnnA
+  type instance Anno (DerivStrategy (GhcPass p)) = SrcSpan
+@
+
+However, some instances are for more generic types that might be used in
+different contexts:
+@
+  -- For CompleteMatchSig
+  type instance Anno [LocatedN RdrName] = SrcSpan
+  type instance Anno [LocatedN Name]    = SrcSpan
+  type instance Anno [LocatedN Id]      = SrcSpan
+@
+
+'[LocatedN Name]' is a very general purpose type that may occur in multiple
+places in the AST. We can easily imagine some kind of future construct which
+would require a [Located Name] field with a SrcSpanAnnA annotation instead.
+However, Anno implicitly ties it to the usage in CompleteMatchSig, which means
+that this type cannot currently be used anywhere else without significant
+refactoring.
+
+One way to fix this could be to define a newtype wrapper that has a phantom
+ type that determines the type of the annotation:
+@
+  newtype Annotated a x = Annotated { unAnnotate :: x }
+  type instance Anno (Annotated a x) = a
+@
+
+Then we can use 'Annotated SrcSpan [LocatedN Name]' when we don't need
+additional annotations, 'Annotated SrcSpanAnnA [LocatedN Name]' when
+we need '[LocatedN Name]' annotated with list annotations and so on.
+--}
+
+newtype Annotated a e = Annotated
+  { unAnnotate :: e
+  }
+
+deriving instance Functor (Annotated a)
+
+type instance Anno (Annotated a e) = a
+
+instance Outputable e => Outputable (Annotated a e) where
+  ppr (Annotated e) = ppr e
 
 -- =====================================================================
 -- Type families for the HsBinds extension points
