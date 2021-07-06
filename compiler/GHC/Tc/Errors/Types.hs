@@ -226,6 +226,17 @@ data TcRnMessage where
   -}
   TcRnIllegalPatSynDecl :: !(LIdP GhcPs) -> TcRnMessage
 
+  {-| TcRnEmptyRecordUpdate is an error that occurs whenever
+      a record is updated without specifying any field.
+
+      Examples(s):
+
+      $(deriveJSON defaultOptions{} ''Bad) -- not ok, no fields selected for update of defaultOptions
+
+     Test cases: th/T12788
+  -}
+  TcRnEmptyRecordUpdate :: TcRnMessage
+
 
 -- | Where a shadowed name comes from
 data ShadowedNameProvenance

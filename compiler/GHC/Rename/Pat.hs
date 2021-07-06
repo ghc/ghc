@@ -873,7 +873,7 @@ rnHsRecUpdFields flds
 
        -- Check for an empty record update  e {}
        -- NB: don't complain about e { .. }, because rn_dotdot has done that already
-       ; when (null flds) $ addErr emptyUpdateErr
+       ; when (null flds) $ addErr TcRnEmptyRecordUpdate
 
        ; return (flds1, plusFVs fvss) }
   where
@@ -934,9 +934,6 @@ badDotDotCon con
   = TcRnUnknownMessage $ mkPlainError noHints $
     vcat [ text "Illegal `..' notation for constructor" <+> quotes (ppr con)
          , nest 2 (text "The constructor has no labelled fields") ]
-
-emptyUpdateErr :: TcRnMessage
-emptyUpdateErr = TcRnUnknownMessage $ mkPlainError noHints $ text "Empty record update"
 
 badPun :: Located RdrName -> TcRnMessage
 badPun fld = TcRnUnknownMessage $ mkPlainError noHints $
