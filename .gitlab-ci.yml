@@ -586,6 +586,7 @@ validate-x86_64-darwin:
     # Due to #19025
     IGNORE_PERF_FAILURES: "all"
   after_script:
+    - .gitlab/ci.sh save-cache
     - .gitlab/ci.sh clean
 
   # I wish we could just use the nix #! logic, but we can't --run and -i bash
@@ -647,6 +648,11 @@ validate-x86_64-darwin:
   artifacts:
     when: always
     expire_in: 2 week
+  cache:
+    key: "darwin-amd64-$GHC_VERSION"
+    paths:
+      - cabal-cache-amd64
+      - toolchain
 
 validate-aarch64-darwin:
   extends: .validate-hadrian
@@ -672,6 +678,7 @@ validate-aarch64-darwin:
     BIN_DIST_NAME: "ghc-arm64-apple-darwin"
     TEST_ENV: "aarch64-darwin-hadrian"
   after_script:
+    - .gitlab/ci.sh save-cache
     - .gitlab/ci.sh clean
 
   # I wish we could just use the nix #! logic, but we can't --run and -i bash
@@ -731,6 +738,11 @@ validate-aarch64-darwin:
   artifacts:
     when: always
     expire_in: 2 week
+  cache:
+    key: "darwin-arm64-$GHC_VERSION"
+    paths:
+      - cabal-cache-arm64
+      - toolchain
 
 .validate-linux:
   extends: .validate
