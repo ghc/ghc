@@ -62,6 +62,11 @@ instance Diagnostic TcRnMessage where
       -> mkSimpleDecorated $
            vcat [text "Multiple warning declarations for" <+> quotes (ppr rdr_name),
                  text "also at " <+> ppr (getLocA d)]
+    TcRnSimplifierTooManyIterations limit wc
+      -> mkSimpleDecorated $
+           hang (text "solveWanteds: too many iterations"
+                   <+> parens (text "limit =" <+> ppr limit))
+                2 (text "Unsolved:" <+> ppr wc)
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -88,6 +93,8 @@ instance Diagnostic TcRnMessage where
     TcRnShadowedName{}
       -> WarningWithFlag Opt_WarnNameShadowing
     TcRnDuplicateWarningDecls{}
+      -> ErrorWithoutFlag
+    TcRnSimplifierTooManyIterations{}
       -> ErrorWithoutFlag
 
   diagnosticHints = \case
@@ -116,6 +123,8 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnDuplicateWarningDecls{}
       -> noHints
+    TcRnSimplifierTooManyIterations{}
+      -> [SuggestIncreaseSimplifierIterations]
 
 messageWithInfoDiagnosticMessage :: UnitState
                                  -> ErrInfo
