@@ -61,6 +61,8 @@ instance Outputable GhcHint where
     SuggestAddPhaseToCompetingRule bad_rule
       -> vcat [ text "Add phase [n] or [~n] to the competing rule"
               , whenPprDebug (ppr bad_rule) ]
+    SuggestIncreaseSimplifierIterations
+      -> text "Set limit with -fconstraint-solver-iterations=n; n=0 for no limit"
 
 perhapsAsPat :: SDoc
 perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"
