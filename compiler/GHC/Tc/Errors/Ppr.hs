@@ -86,6 +86,8 @@ instance Diagnostic TcRnMessage where
                  text "in record", pprRecordFieldPart fld_part]
     TcRnIllegalViewPattern pat
       -> mkSimpleDecorated $ vcat [text "Illegal view pattern: " <+> ppr pat]
+    TcRnCharLiteralOutOfRange c
+      -> mkSimpleDecorated $ text "character literal out of range: '\\" <> char c  <> char '\''
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -126,6 +128,8 @@ instance Diagnostic TcRnMessage where
     TcRnDuplicateFieldName{}
       -> ErrorWithoutFlag
     TcRnIllegalViewPattern{}
+      -> ErrorWithoutFlag
+    TcRnCharLiteralOutOfRange{}
       -> ErrorWithoutFlag
 
   diagnosticHints = \case
@@ -168,6 +172,8 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnIllegalViewPattern{}
       -> [SuggestExtension LangExt.ViewPatterns]
+    TcRnCharLiteralOutOfRange{}
+      -> noHints
 
 messageWithInfoDiagnosticMessage :: UnitState
                                  -> ErrInfo
