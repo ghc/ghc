@@ -212,6 +212,20 @@ data TcRnMessage where
                                   -> WantedConstraints
                                   -> TcRnMessage
 
+  {-| TcRnIllegalPatSynDecl is an error that occurs whenever
+      there is an illegal pattern synonym declaration.
+
+      Examples(s):
+
+      varWithLocalPatSyn x = case x of
+          P -> ()
+        where
+          pattern P = ()   -- not valid, it can't be local, it must be defined at top-level.
+
+     Test cases: patsyn/should_fail/local
+  -}
+  TcRnIllegalPatSynDecl :: !(LIdP GhcPs) -> TcRnMessage
+
 
 -- | Where a shadowed name comes from
 data ShadowedNameProvenance
