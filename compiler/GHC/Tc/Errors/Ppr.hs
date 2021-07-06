@@ -20,6 +20,7 @@ import GHC.Hs
 import GHC.Utils.Outputable
 import GHC.Unit.State (pprWithUnitState, UnitState)
 import qualified GHC.LanguageExtensions as LangExt
+import qualified Data.List.NonEmpty as NE
 
 
 instance Diagnostic TcRnMessage where
@@ -77,11 +78,12 @@ instance Diagnostic TcRnMessage where
     TcRnIllegalFieldPunning fld
       -> mkSimpleDecorated $ text "Illegal use of punning for field" <+> quotes (ppr fld)
     TcRnIllegalWildcardsInRecord fld_part
-      -> let prt = case fld_part of
-               RecordFieldConstructor{} -> text "construction"
-               RecordFieldPattern{}     -> text "pattern"
-               RecordFieldUpdate        -> text "update"
-         in mkSimpleDecorated $ text "Illegal `..' in record" <+> prt
+      -> mkSimpleDecorated $ text "Illegal `..' in record" <+> pprRecordFieldPart fld_part
+    TcRnDuplicateFieldName fld_part dups
+      -> mkSimpleDecorated $
+           hsep [text "duplicate field name",
+                 quotes (ppr (NE.head dups)),
+                 text "in record", pprRecordFieldPart fld_part]
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -118,6 +120,8 @@ instance Diagnostic TcRnMessage where
     TcRnIllegalFieldPunning{}
       -> ErrorWithoutFlag
     TcRnIllegalWildcardsInRecord{}
+      -> ErrorWithoutFlag
+    TcRnDuplicateFieldName{}
       -> ErrorWithoutFlag
 
   diagnosticHints = \case
@@ -156,6 +160,8 @@ instance Diagnostic TcRnMessage where
       -> [SuggestExtension LangExt.RecordPuns]
     TcRnIllegalWildcardsInRecord{}
       -> [SuggestExtension LangExt.RecordWildCards]
+    TcRnDuplicateFieldName{}
+      -> noHints
 
 messageWithInfoDiagnosticMessage :: UnitState
                                  -> ErrInfo
@@ -220,3 +226,10 @@ pprLevityPolyInType ty prov =
         LevityCheckInValidClass
           -> empty
   in formatLevPolyErr ty $$ extra
+
+
+pprRecordFieldPart :: RecordFieldPart -> SDoc
+pprRecordFieldPart = \case
+  RecordFieldConstructor{} -> text "construction"
+  RecordFieldPattern{}     -> text "pattern"
+  RecordFieldUpdate        -> text "update"

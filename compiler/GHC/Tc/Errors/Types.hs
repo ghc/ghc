@@ -18,10 +18,12 @@ import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
 import GHC.Unit.Types (Module)
 import GHC.Utils.Outputable
-import Data.Typeable
 import GHC.Core.Type (Type, Var)
 import GHC.Unit.State (UnitState)
 import GHC.Types.Basic
+
+import qualified Data.List.NonEmpty as NE
+import           Data.Typeable
 
 {-
 Note [Migrating TcM Messages]
@@ -266,6 +268,15 @@ data TcRnMessage where
      Test cases: parser/should_fail/RecordWildCardsFail
   -}
   TcRnIllegalWildcardsInRecord :: !RecordFieldPart -> TcRnMessage
+
+  {-| TcRnDuplicateFieldName is an error that occurs whenever
+      there are duplicate field names in a record.
+
+      Examples(s): None.
+
+     Test cases: None.
+  -}
+  TcRnDuplicateFieldName :: !RecordFieldPart -> NE.NonEmpty RdrName -> TcRnMessage
 
 -- | Which parts of a record field are affected by a particular error or warning.
 data RecordFieldPart
