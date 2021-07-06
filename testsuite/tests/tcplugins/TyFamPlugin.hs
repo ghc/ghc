@@ -30,29 +30,29 @@ import GHC.Tc.Plugin
   , unsafeTcPluginTcM
   )
 import GHC.Tc.Types
-  ( TcPluginResult(..) )
+  ( TcPluginSolveResult(..) )
 import GHC.Tc.Types.Constraint
   ( Ct(..), CanEqLHS(..)
   , ctPred
   )
 import GHC.Tc.Types.Evidence
-  ( EvTerm(EvExpr), Role(Nominal) )
+  ( EvBindsVar, EvTerm(EvExpr), Role(Nominal) )
 
 -- common
 import Common
   ( PluginDefs(..)
-  , mkPlugin
+  , mkPlugin, don'tRewrite
   )
 
 --------------------------------------------------------------------------------
 
 plugin :: Plugin
-plugin = mkPlugin solver
+plugin = mkPlugin solver don'tRewrite
 
 solver :: [String]
-       -> PluginDefs -> [Ct] -> [Ct] -> [Ct]
-       -> TcPluginM TcPluginResult
-solver _args defs _gs _ds ws = do
+       -> PluginDefs -> EvBindsVar -> [Ct] -> [Ct] -> [Ct]
+       -> TcPluginM TcPluginSolveResult
+solver _args defs _ev _gs _ds ws = do
   solved <- catMaybes <$> traverse ( solveCt defs ) ws
   pure $ TcPluginOk solved []
 
