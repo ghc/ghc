@@ -486,7 +486,7 @@ instance Diagnostic PsMessage where
               | pattern_RDR `looks_like` lhs
               = "Perhaps you meant to use PatternSynonyms?"
               | otherwise
-              = "Should be of form <variable> :: <type>"
+              = "Should be of form <variables> :: <type>"
 
          -- A common error is to forget the ForeignFunctionInterface flag
          -- so check for that, and suggest.  cf #3805
