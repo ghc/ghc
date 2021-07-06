@@ -199,7 +199,11 @@ data Instr
         -- Moves.
         | MOV         Format Operand Operand
         | CMOV   Cond Format Operand Reg
-        | MOVZxL      Format Operand Operand -- format is the size of operand 1
+        | MOVZxL      Format Operand Operand
+              -- ^ The format argument is the size of operand 1 (the number of bits we keep)
+              -- We always zero *all* high bits, even though this isn't how the actual instruction
+              -- works. The code generator also seems to rely on this behaviour and it's faster
+              -- to execute on many cpus as well so for now I'm just documenting the fact.
         | MOVSxL      Format Operand Operand -- format is the size of operand 1
         -- x86_64 note: plain mov into a 32-bit register always zero-extends
         -- into the 64-bit reg, in contrast to the 8 and 16-bit movs which

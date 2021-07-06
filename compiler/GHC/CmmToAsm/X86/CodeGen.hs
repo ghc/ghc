@@ -2476,18 +2476,17 @@ genCCall' config is32Bit (PrimTarget (MO_Pdep width)) dest_regs@[dst]
                 mask_r    <- getNewRegNat format
                 let dst_r = getRegisterReg platform  (CmmLocal dst)
                 return $ code_src src_r `appOL` code_mask mask_r `appOL`
-                    (if width == W8 then
-                         -- The PDEP instruction doesn't take a r/m8
-                         unitOL (MOVZxL II8  (OpReg src_r ) (OpReg src_r )) `appOL`
-                         unitOL (MOVZxL II8  (OpReg mask_r) (OpReg mask_r)) `appOL`
-                         unitOL (PDEP   II16 (OpReg mask_r) (OpReg src_r ) dst_r)
-                     else
-                         unitOL (PDEP format (OpReg mask_r) (OpReg src_r) dst_r)) `appOL`
-                    (if width == W8 || width == W16 then
-                         -- We used a 16-bit destination register above,
-                         -- so zero-extend
-                         unitOL (MOVZxL II16 (OpReg dst_r) (OpReg dst_r))
-                     else nilOL)
+                    -- PDEP only supports > 32 bit args
+                    ( if width == W8 || width == W16 then
+                        toOL
+                          [ MOVZxL format (OpReg src_r ) (OpReg src_r )
+                          , MOVZxL format (OpReg mask_r) (OpReg mask_r)
+                          , PDEP   II32 (OpReg mask_r) (OpReg src_r ) dst_r
+                          , MOVZxL format (OpReg dst_r) (OpReg dst_r) -- Truncate to op width
+                          ]
+                      else
+                        unitOL (PDEP format (OpReg mask_r) (OpReg src_r) dst_r)
+                    )
         else do
             targetExpr <- cmmMakeDynamicReference config
                           CallReference lbl
@@ -2509,18 +2508,17 @@ genCCall' config is32Bit (PrimTarget (MO_Pext width)) dest_regs@[dst]
                 mask_r    <- getNewRegNat format
                 let dst_r = getRegisterReg platform  (CmmLocal dst)
                 return $ code_src src_r `appOL` code_mask mask_r `appOL`
-                    (if width == W8 then
-                         -- The PEXT instruction doesn't take a r/m8
-                         unitOL (MOVZxL II8 (OpReg src_r ) (OpReg src_r )) `appOL`
-                         unitOL (MOVZxL II8 (OpReg mask_r) (OpReg mask_r)) `appOL`
-                         unitOL (PEXT II16 (OpReg mask_r) (OpReg src_r) dst_r)
-                     else
-                         unitOL (PEXT format (OpReg mask_r) (OpReg src_r) dst_r)) `appOL`
                     (if width == W8 || width == W16 then
-                         -- We used a 16-bit destination register above,
-                         -- so zero-extend
-                         unitOL (MOVZxL II16 (OpReg dst_r) (OpReg dst_r))
-                     else nilOL)
+                         -- The PEXT instruction doesn't take a r/m8 or 16
+                        toOL
+                          [ MOVZxL format (OpReg src_r ) (OpReg src_r )
+                          , MOVZxL format (OpReg mask_r) (OpReg mask_r)
+                          , PEXT   II32 (OpReg mask_r) (OpReg src_r ) dst_r
+                          , MOVZxL format (OpReg dst_r) (OpReg dst_r) -- Truncate to op width
+                          ]
+                      else
+                        unitOL (PEXT format (OpReg mask_r) (OpReg src_r) dst_r)
+                    )
         else do
             targetExpr <- cmmMakeDynamicReference config
                           CallReference lbl
