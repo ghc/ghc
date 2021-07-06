@@ -88,6 +88,10 @@ instance Diagnostic TcRnMessage where
       -> mkSimpleDecorated $ vcat [text "Illegal view pattern: " <+> ppr pat]
     TcRnCharLiteralOutOfRange c
       -> mkSimpleDecorated $ text "character literal out of range: '\\" <> char c  <> char '\''
+    TcRnIllegalWildcardsInConstructor con
+      -> mkSimpleDecorated $
+           vcat [ text "Illegal `..' notation for constructor" <+> quotes (ppr con)
+                , nest 2 (text "The constructor has no labelled fields") ]
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -131,6 +135,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnCharLiteralOutOfRange{}
       -> ErrorWithoutFlag
+    TcRnIllegalWildcardsInConstructor{}
+      -> ErrorWithoutFlag
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -173,6 +179,8 @@ instance Diagnostic TcRnMessage where
     TcRnIllegalViewPattern{}
       -> [SuggestExtension LangExt.ViewPatterns]
     TcRnCharLiteralOutOfRange{}
+      -> noHints
+    TcRnIllegalWildcardsInConstructor{}
       -> noHints
 
 messageWithInfoDiagnosticMessage :: UnitState

@@ -303,6 +303,15 @@ data TcRnMessage where
   -}
   TcRnCharLiteralOutOfRange :: !Char -> TcRnMessage
 
+  {-| TcRnIllegalWildcardsInConstructor is an error that occurs whenever
+      the record wildcards '..' are used inside a constructor without labeled fields.
+
+      Examples(s): None
+
+     Test cases: None
+  -}
+  TcRnIllegalWildcardsInConstructor :: !Name -> TcRnMessage
+
 -- | Which parts of a record field are affected by a particular error or warning.
 data RecordFieldPart
   = RecordFieldConstructor !Name
