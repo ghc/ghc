@@ -925,9 +925,7 @@ getFieldUpdLbls :: [LHsRecUpdField GhcPs] -> [RdrName]
 getFieldUpdLbls flds = map (rdrNameAmbiguousFieldOcc . unLoc . hfbLHS . unLoc) flds
 
 needFlagDotDot :: HsRecFieldContext -> TcRnMessage
-needFlagDotDot ctxt = TcRnUnknownMessage $ mkPlainError noHints $
-  vcat [text "Illegal `..' in record" <+> pprRFC ctxt,
-        text "Use RecordWildCards to permit this"]
+needFlagDotDot = TcRnIllegalWildcardsInRecord . toRecordFieldPart
 
 badDotDotCon :: Name -> TcRnMessage
 badDotDotCon con
@@ -946,6 +944,11 @@ pprRFC :: HsRecFieldContext -> SDoc
 pprRFC (HsRecFieldCon {}) = text "construction"
 pprRFC (HsRecFieldPat {}) = text "pattern"
 pprRFC (HsRecFieldUpd {}) = text "update"
+
+toRecordFieldPart :: HsRecFieldContext -> RecordFieldPart
+toRecordFieldPart (HsRecFieldCon n)  = RecordFieldConstructor n
+toRecordFieldPart (HsRecFieldPat n)  = RecordFieldPattern     n
+toRecordFieldPart (HsRecFieldUpd {}) = RecordFieldUpdate
 
 {-
 ************************************************************************

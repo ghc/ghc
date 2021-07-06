@@ -76,6 +76,12 @@ instance Diagnostic TcRnMessage where
       -> mkSimpleDecorated $ text "Empty record update"
     TcRnIllegalFieldPunning fld
       -> mkSimpleDecorated $ text "Illegal use of punning for field" <+> quotes (ppr fld)
+    TcRnIllegalWildcardsInRecord fld_part
+      -> let prt = case fld_part of
+               RecordFieldConstructor{} -> text "construction"
+               RecordFieldPattern{}     -> text "pattern"
+               RecordFieldUpdate        -> text "update"
+         in mkSimpleDecorated $ text "Illegal `..' in record" <+> prt
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -110,6 +116,8 @@ instance Diagnostic TcRnMessage where
     TcRnEmptyRecordUpdate
       -> ErrorWithoutFlag
     TcRnIllegalFieldPunning{}
+      -> ErrorWithoutFlag
+    TcRnIllegalWildcardsInRecord{}
       -> ErrorWithoutFlag
 
   diagnosticHints = \case
@@ -146,6 +154,8 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnIllegalFieldPunning{}
       -> [SuggestExtension LangExt.RecordPuns]
+    TcRnIllegalWildcardsInRecord{}
+      -> [SuggestExtension LangExt.RecordWildCards]
 
 messageWithInfoDiagnosticMessage :: UnitState
                                  -> ErrInfo
