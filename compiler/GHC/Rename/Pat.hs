@@ -782,7 +782,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                               , hfbPun      = pun }))
       = do { sel <- setSrcSpan loc $ lookupRecFieldOcc parent lbl
            ; arg' <- if pun
-                     then do { checkErr pun_ok (badPun (L loc lbl))
+                     then do { checkErr pun_ok (TcRnIllegalFieldPunning (L loc lbl))
                                -- Discard any module qualifier (#11662)
                              ; let arg_rdr = mkRdrUnqual (rdrNameOcc lbl)
                              ; return (L (noAnnSrcSpan loc) (mk_arg loc arg_rdr)) }
@@ -888,7 +888,7 @@ rnHsRecUpdFields flds
                       -- See Note [Disambiguating record fields] in GHC.Tc.Gen.Head
                       lookupRecFieldOcc_update dup_fields_ok lbl
            ; arg' <- if pun
-                     then do { checkErr pun_ok (badPun (L loc lbl))
+                     then do { checkErr pun_ok (TcRnIllegalFieldPunning (L loc lbl))
                                -- Discard any module qualifier (#11662)
                              ; let arg_rdr = mkRdrUnqual (rdrNameOcc lbl)
                              ; return (L (noAnnSrcSpan loc) (HsVar noExtField
@@ -934,11 +934,6 @@ badDotDotCon con
   = TcRnUnknownMessage $ mkPlainError noHints $
     vcat [ text "Illegal `..' notation for constructor" <+> quotes (ppr con)
          , nest 2 (text "The constructor has no labelled fields") ]
-
-badPun :: Located RdrName -> TcRnMessage
-badPun fld = TcRnUnknownMessage $ mkPlainError noHints $
-  vcat [text "Illegal use of punning for field" <+> quotes (ppr fld),
-        text "Use NamedFieldPuns to permit this"]
 
 dupFieldErr :: HsRecFieldContext -> NE.NonEmpty RdrName -> TcRnMessage
 dupFieldErr ctxt dups
