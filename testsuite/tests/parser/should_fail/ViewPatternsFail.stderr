@@ -1,0 +1,4 @@
+
+ViewPatternsFail.hs:7:6: error:
+    Illegal view pattern:  a -> l
+    Suggested fix: Perhaps you intended to use ViewPatterns

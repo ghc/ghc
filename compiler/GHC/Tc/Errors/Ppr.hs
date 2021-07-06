@@ -84,6 +84,8 @@ instance Diagnostic TcRnMessage where
            hsep [text "duplicate field name",
                  quotes (ppr (NE.head dups)),
                  text "in record", pprRecordFieldPart fld_part]
+    TcRnIllegalViewPattern pat
+      -> mkSimpleDecorated $ vcat [text "Illegal view pattern: " <+> ppr pat]
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -122,6 +124,8 @@ instance Diagnostic TcRnMessage where
     TcRnIllegalWildcardsInRecord{}
       -> ErrorWithoutFlag
     TcRnDuplicateFieldName{}
+      -> ErrorWithoutFlag
+    TcRnIllegalViewPattern{}
       -> ErrorWithoutFlag
 
   diagnosticHints = \case
@@ -162,6 +166,8 @@ instance Diagnostic TcRnMessage where
       -> [SuggestExtension LangExt.RecordWildCards]
     TcRnDuplicateFieldName{}
       -> noHints
+    TcRnIllegalViewPattern{}
+      -> [SuggestExtension LangExt.ViewPatterns]
 
 messageWithInfoDiagnosticMessage :: UnitState
                                  -> ErrInfo
