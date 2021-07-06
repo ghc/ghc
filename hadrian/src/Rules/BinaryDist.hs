@@ -1,3 +1,4 @@
+{-# LANGUAGE TupleSections #-}
 module Rules.BinaryDist where
 
 import Hadrian.Haskell.Cabal
@@ -13,6 +14,9 @@ import Settings.Program (programContext)
 import Target
 import Utilities
 import qualified System.Directory.Extra as IO
+import Data.Either
+import Hadrian.Oracles.Cabal
+import Hadrian.Haskell.Cabal.Type
 
 {-
 Note [Binary distributions]
@@ -115,10 +119,11 @@ bindistRules = do
 
     phony "binary-dist-dir" $ do
         -- We 'need' all binaries and libraries
-        targets <- mapM pkgTarget =<< stagePackages Stage1
+        all_pkgs <- stagePackages Stage1
+        (lib_targets, bin_targets) <- partitionEithers <$> mapM pkgTarget all_pkgs
         cross <- flag CrossCompiling
-        need targets
-        unless cross $ needIservBins
+        iserv_targets <- if cross then pure [] else iservBins
+        need (lib_targets ++ (map fst (bin_targets ++ iserv_targets)))
 
         version        <- setting ProjectVersion
         targetPlatform <- setting TargetPlatformFull
@@ -134,7 +139,12 @@ bindistRules = do
         -- We create the bindist directory at <root>/bindist/ghc-X.Y.Z-platform/
         -- and populate it with Stage2 build results
         createDirectory bindistFilesDir
-        copyDirectory (ghcBuildDir -/- "bin") bindistFilesDir
+        createDirectory (bindistFilesDir -/- "bin")
+        createDirectory (bindistFilesDir -/- "lib")
+        -- Also create symlinks with version suffixes (#20074)
+        forM_ (bin_targets ++ iserv_targets) $ \(prog_path, _ver) -> do
+            let install_path = bindistFilesDir -/- "bin" -/- takeFileName prog_path
+            copyFile prog_path install_path
         copyDirectory (ghcBuildDir -/- "lib") bindistFilesDir
         copyDirectory (rtsIncludeDir)         bindistFilesDir
 
@@ -171,10 +181,12 @@ bindistRules = do
         -- other machine.
         need $ map (bindistFilesDir -/-)
                    (["configure", "Makefile"] ++ bindistInstallFiles)
-        need $ map ((bindistFilesDir -/- "wrappers") -/-)
-                   [ "check-ppr", "check-exact", "count-deps", "ghc", "ghc-iserv", "ghc-pkg"
-                   , "ghci-script", "haddock", "hpc", "hp2ps", "hsc2hs"
-                   , "runghc"]
+        wrappers <- fmap concat (sequence [ pkgToWrappers p | p <- all_pkgs, isProgram p])
+        need $ map ((bindistFilesDir -/- "wrappers") -/-) wrappers
+
+
+--            IO.removeFile link_path <|> return ()
+--            IO.createFileLink versioned_exe_name link_path
 
 
     let buildBinDist :: Compressor -> Action ()
@@ -262,10 +274,26 @@ bindistInstallFiles =
 -- for all libraries and programs that are needed for a complete build.
 -- For libraries, it returns the path to the @.conf@ file in the package
 -- database. For programs, it returns the path to the compiled executable.
-pkgTarget :: Package -> Action FilePath
+pkgTarget :: Package -> Action (Either FilePath (FilePath, String))
 pkgTarget pkg
-    | isLibrary pkg = pkgConfFile (vanillaContext Stage1 pkg)
-    | otherwise     = programPath =<< programContext Stage1 pkg
+    | isLibrary pkg = Left <$> pkgConfFile (vanillaContext Stage1 pkg)
+    | otherwise     = do
+        path <- programPath =<< programContext Stage1 pkg
+        version <- version <$> readPackageData pkg
+        return (Right (path, version))
+
+
+-- | Which wrappers point to a specific package
+pkgToWrappers :: Package -> Action [String]
+pkgToWrappers pkg
+  -- ghc also has the ghci script wrapper
+  | pkg == ghc = pure ["ghc", "ghci-script"]
+  -- These are the packages which we want to expose to the user and hence
+  -- there are wrappers installed in the bindist.
+  | pkg `elem` [hpcBin, haddock, hp2ps, hsc2hs, runGhc, ghc, ghcPkg]
+    = (:[]) <$> (programName =<< programContext Stage1 pkg)
+  | otherwise = pure []
+
 
 wrapper :: FilePath -> Action String
 wrapper "ghc"         = ghcWrapper
@@ -334,10 +362,11 @@ ghciScriptWrapper = pure $ unlines
 --   the package to be built, since here we're generating 3 different
 --   executables out of just one package, so we need to specify all 3 contexts
 --   explicitly and 'need' the result of building them.
-needIservBins :: Action ()
-needIservBins = do
+iservBins :: Action [(FilePath, String)]
+iservBins = do
   rtsways <- interpretInContext (vanillaContext Stage1 ghc) getRtsWays
-  need =<< traverse programPath
+  ver <- version <$> readPackageData iserv
+  traverse (fmap (,ver) . programPath)
       [ Context Stage1 iserv w
       | w <- [vanilla, profiling, dynamic]
       , w `elem` rtsways
