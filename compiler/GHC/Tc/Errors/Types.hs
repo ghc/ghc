@@ -7,6 +7,7 @@ module GHC.Tc.Errors.Types (
   , ErrInfo(..)
   , LevityCheckProvenance(..)
   , ShadowedNameProvenance(..)
+  , RecordFieldPart(..)
   ) where
 
 import GHC.Hs
@@ -251,6 +252,26 @@ data TcRnMessage where
   -}
   TcRnIllegalFieldPunning :: !(Located RdrName) -> TcRnMessage
 
+  {-| TcRnIllegalWildcardsInRecord is an error that occurs whenever
+      wildcards (..) are used in a record without the relevant
+      extension being enabled.
+
+      Examples(s):
+
+      data Foo = Foo { a :: Int }
+
+      foo :: Foo -> Int
+      foo Foo{..} = a  -- Not ok, wildcards used without extension.
+
+     Test cases: parser/should_fail/RecordWildCardsFail
+  -}
+  TcRnIllegalWildcardsInRecord :: !RecordFieldPart -> TcRnMessage
+
+-- | Which parts of a record field are affected by a particular error or warning.
+data RecordFieldPart
+  = RecordFieldConstructor !Name
+  | RecordFieldPattern !Name
+  | RecordFieldUpdate
 
 -- | Where a shadowed name comes from
 data ShadowedNameProvenance
