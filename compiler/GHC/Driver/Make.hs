@@ -7,6 +7,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 -- -----------------------------------------------------------------------------
 --
@@ -1558,7 +1559,7 @@ upsweep_mod hsc_env mHscMessage old_hpt summary mod_index nmods
 
             compile_it :: Maybe Linkable -> IO HomeModInfo
             compile_it  mb_linkable =
-                  compileOne' Nothing mHscMessage hsc_env summary mod_index nmods
+                  compileOne' mHscMessage hsc_env summary mod_index nmods
                              mb_old_iface mb_linkable
 
         in
