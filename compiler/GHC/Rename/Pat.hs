@@ -806,7 +806,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
            ; checkErr dd_flag (needFlagDotDot ctxt)
            ; (rdr_env, lcl_env) <- getRdrEnvs
            ; con_fields <- lookupConstructorFields con
-           ; when (null con_fields) (addErr (badDotDotCon con))
+           ; when (null con_fields) (addErr (TcRnIllegalWildcardsInConstructor con))
            ; let present_flds = mkOccSet $ map rdrNameOcc (getFieldLbls flds)
 
                    -- For constructor uses (but not patterns)
@@ -923,12 +923,6 @@ getFieldUpdLbls flds = map (rdrNameAmbiguousFieldOcc . unLoc . hfbLHS . unLoc) f
 
 needFlagDotDot :: HsRecFieldContext -> TcRnMessage
 needFlagDotDot = TcRnIllegalWildcardsInRecord . toRecordFieldPart
-
-badDotDotCon :: Name -> TcRnMessage
-badDotDotCon con
-  = TcRnUnknownMessage $ mkPlainError noHints $
-    vcat [ text "Illegal `..' notation for constructor" <+> quotes (ppr con)
-         , nest 2 (text "The constructor has no labelled fields") ]
 
 dupFieldErr :: HsRecFieldContext -> NE.NonEmpty RdrName -> TcRnMessage
 dupFieldErr ctxt = TcRnDuplicateFieldName (toRecordFieldPart ctxt)
