@@ -278,6 +278,20 @@ data TcRnMessage where
   -}
   TcRnDuplicateFieldName :: !RecordFieldPart -> NE.NonEmpty RdrName -> TcRnMessage
 
+  {-| TcRnIllegalViewPattern is an error that occurs whenever
+      the ViewPatterns syntax is used but the ViewPatterns language extension
+      is not enabled.
+
+      Examples(s):
+      data Foo = Foo { a :: Int }
+
+      foo :: Foo -> Int
+      foo (a -> l) = l -- not OK, the 'ViewPattern' extension is not enabled.
+
+     Test cases: parser/should_fail/ViewPatternsFail
+  -}
+  TcRnIllegalViewPattern :: !(Pat GhcPs) -> TcRnMessage
+
 -- | Which parts of a record field are affected by a particular error or warning.
 data RecordFieldPart
   = RecordFieldConstructor !Name
