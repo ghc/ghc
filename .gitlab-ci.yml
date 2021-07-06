@@ -587,7 +587,6 @@ validate-x86_64-darwin:
     IGNORE_PERF_FAILURES: "all"
     CABAL_CACHE: "cabal-cache-amd64"
   after_script:
-    - cp -Rf $HOME/.cabal cabal-cache-amd64
     - .gitlab/ci.sh clean
 
   # I wish we could just use the nix #! logic, but we can't --run and -i bash
@@ -639,6 +638,9 @@ validate-x86_64-darwin:
     TIME_TEST_DELTA=$(expr $TIME_TEST - $TIME_BUILD)
     echo "Test took $TIME_TEST_DELTA seconds"
 
+    # Important to run this in nix-shell because $HOME is different in there
+    runInNixShell ".gitlab/ci.sh save-cache" 2>&1
+
     echo "=== TIMINGS ==="
     echo "Setup      | $TIME_SETUP_DELTA"
     echo "Configure  | $TIME_CONFIGURE_DELTA"
@@ -650,10 +652,9 @@ validate-x86_64-darwin:
     when: always
     expire_in: 2 week
   cache:
-    key: "darwin-x86_64-$GHC_VERSION"
+    key: "darwin-amd64-$GHC_VERSION"
     paths:
       - cabal-cache-amd64
-      - cabal-cache-arm64
       - toolchain
 
 validate-aarch64-darwin:
@@ -681,7 +682,6 @@ validate-aarch64-darwin:
     TEST_ENV: "aarch64-darwin-hadrian"
     CABAL_CACHE: "cabal-cache-arm64"
   after_script:
-    - cp -Rf $HOME/.cabal cabal-cache-arm64
     - .gitlab/ci.sh clean
 
   # I wish we could just use the nix #! logic, but we can't --run and -i bash
@@ -731,6 +731,9 @@ validate-aarch64-darwin:
     TIME_TEST_DELTA=$(expr $TIME_TEST - $TIME_BUILD)
     echo "Test took $TIME_TEST_DELTA seconds"
 
+    # Important to run this in nix-shell because $HOME is different there
+    runInNixShell ".gitlab/ci.sh save-cache" 2>&1
+
     echo "=== TIMINGS ==="
     echo "Setup      | $TIME_SETUP_DELTA"
     echo "Configure  | $TIME_CONFIGURE_DELTA"
@@ -742,9 +745,8 @@ validate-aarch64-darwin:
     when: always
     expire_in: 2 week
   cache:
-    key: "darwin-aarch64-$GHC_VERSION"
+    key: "darwin-arm64-$GHC_VERSION"
     paths:
-      - cabal-cache-amd64
       - cabal-cache-arm64
       - toolchain
 
