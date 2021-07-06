@@ -10,6 +10,7 @@ module GHC.Tc.Errors.Types (
   ) where
 
 import GHC.Hs
+import GHC.Tc.Types.Constraint
 import GHC.Types.Error
 import GHC.Types.Name (Name, OccName)
 import GHC.Types.Name.Reader
@@ -19,6 +20,7 @@ import GHC.Utils.Outputable
 import Data.Typeable
 import GHC.Core.Type (Type, Var)
 import GHC.Unit.State (UnitState)
+import GHC.Types.Basic
 
 {-
 Note [Migrating TcM Messages]
@@ -195,6 +197,20 @@ data TcRnMessage where
         None.
   -}
   TcRnDuplicateWarningDecls :: !(LocatedN RdrName) -> !RdrName -> TcRnMessage
+
+  {-| TcRnDuplicateWarningDecls is an error that occurs whenever
+      the constraint solver in the simplifier hits the iterations' limit.
+
+      Examples(s):
+        None.
+
+     Test cases:
+        None.
+  -}
+  TcRnSimplifierTooManyIterations :: !IntWithInf
+                                  -- ^ The limit.
+                                  -> WantedConstraints
+                                  -> TcRnMessage
 
 
 -- | Where a shadowed name comes from
