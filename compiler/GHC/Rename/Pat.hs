@@ -954,7 +954,7 @@ are made available.
 -}
 
 rnLit :: HsLit p -> RnM ()
-rnLit (HsChar _ c) = checkErr (inCharRange c) (bogusCharError c)
+rnLit (HsChar _ c) = checkErr (inCharRange c) (TcRnCharLiteralOutOfRange c)
 rnLit _ = return ()
 
 -- | Turn a Fractional-looking literal which happens to be an integer into an
@@ -1021,8 +1021,3 @@ patSigErr :: Outputable a => a -> SDoc
 patSigErr ty
   =  (text "Illegal signature in pattern:" <+> ppr ty)
         $$ nest 4 (text "Use ScopedTypeVariables to permit it")
-
-bogusCharError :: Char -> TcRnMessage
-bogusCharError c
-  = TcRnUnknownMessage $ mkPlainError noHints $
-  text "character literal out of range: '\\" <> char c  <> char '\''

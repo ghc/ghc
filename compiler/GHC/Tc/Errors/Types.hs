@@ -10,6 +10,8 @@ module GHC.Tc.Errors.Types (
   , RecordFieldPart(..)
   ) where
 
+import GHC.Prelude
+
 import GHC.Hs
 import GHC.Tc.Types.Constraint
 import GHC.Types.Error
@@ -291,6 +293,15 @@ data TcRnMessage where
      Test cases: parser/should_fail/ViewPatternsFail
   -}
   TcRnIllegalViewPattern :: !(Pat GhcPs) -> TcRnMessage
+
+  {-| TcRnCharLiteralOutOfRange is an error that occurs whenever
+      a character is out of range.
+
+      Examples(s): None
+
+     Test cases: None
+  -}
+  TcRnCharLiteralOutOfRange :: !Char -> TcRnMessage
 
 -- | Which parts of a record field are affected by a particular error or warning.
 data RecordFieldPart
