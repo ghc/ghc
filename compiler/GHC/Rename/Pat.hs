@@ -558,7 +558,7 @@ rnPatAndThen mk (AsPat _ rdr pat)
 
 rnPatAndThen mk p@(ViewPat _ expr pat)
   = do { liftCps $ do { vp_flag <- xoptM LangExt.ViewPatterns
-                      ; checkErr vp_flag (badViewPat p) }
+                      ; checkErr vp_flag (TcRnIllegalViewPattern p) }
          -- Because of the way we're arranging the recursive calls,
          -- this will be in the right context
        ; expr' <- liftCpsFV $ rnLExpr expr
@@ -1026,8 +1026,3 @@ bogusCharError :: Char -> TcRnMessage
 bogusCharError c
   = TcRnUnknownMessage $ mkPlainError noHints $
   text "character literal out of range: '\\" <> char c  <> char '\''
-
-badViewPat :: Pat GhcPs -> TcRnMessage
-badViewPat pat = TcRnUnknownMessage $ mkPlainError noHints $
-  vcat [text "Illegal view pattern: " <+> ppr pat,
-       text "Use ViewPatterns to enable view patterns"]
