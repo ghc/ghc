@@ -170,7 +170,7 @@ One way to improve this is to either:
 mkPluginUsage :: HscEnv -> ModIface -> IO [Usage]
 mkPluginUsage hsc_env pluginModule
   = case lookupPluginModuleWithSuggestions pkgs pNm Nothing of
-    LookupFound _ pkg -> do
+    LookupFound _ (pkg, _) -> do
     -- The plugin is from an external package:
     -- search for the library files containing the plugin.
       let searchPaths = collectLibraryPaths dflags [pkg]

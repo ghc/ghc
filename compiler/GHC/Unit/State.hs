@@ -1,6 +1,7 @@
 -- (c) The University of Glasgow, 2006
 
 {-# LANGUAGE CPP, ScopedTypeVariables, BangPatterns, FlexibleContexts #-}
+{-# LANGUAGE NamedFieldPuns #-}
 
 -- | Unit manipulation
 module GHC.Unit.State (
@@ -32,6 +33,7 @@ module GHC.Unit.State (
         listVisibleModuleNames,
         lookupModuleInAllUnits,
         lookupModuleWithSuggestions,
+        lookupModulePackage,
         lookupPluginModuleWithSuggestions,
         LookupResult(..),
         ModuleSuggestion(..),
@@ -1918,7 +1920,7 @@ lookupModuleInAllUnits :: UnitState
                           -> [(Module, UnitInfo)]
 lookupModuleInAllUnits pkgs m
   = case lookupModuleWithSuggestions pkgs m Nothing of
-      LookupFound a b -> [(a,b)]
+      LookupFound a b -> [(a,fst b)]
       LookupMultiple rs -> map f rs
         where f (m,_) = (m, expectJust "lookupModule" (lookupUnit pkgs
                                                          (moduleUnit m)))
@@ -1927,7 +1929,7 @@ lookupModuleInAllUnits pkgs m
 -- | The result of performing a lookup
 data LookupResult =
     -- | Found the module uniquely, nothing else to do
-    LookupFound Module UnitInfo
+    LookupFound Module (UnitInfo, ModuleOrigin)
     -- | Multiple modules with the same name in scope
   | LookupMultiple [(Module, ModuleOrigin)]
     -- | No modules found, but there were some hidden ones with
@@ -1950,6 +1952,26 @@ lookupModuleWithSuggestions :: UnitState
 lookupModuleWithSuggestions pkgs
   = lookupModuleWithSuggestions' pkgs (moduleNameProvidersMap pkgs)
 
+-- | The package which the module **appears** to come from, this could be
+-- the one which reexports the module from it's original package. This function
+-- is currently only used for -Wunused-packages
+lookupModulePackage :: UnitState -> ModuleName -> Maybe FastString -> Maybe [UnitInfo]
+lookupModulePackage pkgs mn mfs =
+    case lookupModuleWithSuggestions' pkgs (moduleNameProvidersMap pkgs) mn mfs of
+      LookupFound _ (orig_unit, origin) ->
+        case origin of
+          ModOrigin {fromOrigUnit, fromExposedReexport} ->
+            case fromOrigUnit of
+              -- Just True means, the import is available from its original location
+              Just True ->
+                pure [orig_unit]
+              -- Otherwise, it must be available from a reexport
+              _ -> pure fromExposedReexport
+
+          _ -> Nothing
+
+      _ -> Nothing
+
 lookupPluginModuleWithSuggestions :: UnitState
                                   -> ModuleName
                                   -> Maybe FastString
@@ -1968,7 +1990,7 @@ lookupModuleWithSuggestions' pkgs mod_map m mb_pn
         Just xs ->
           case foldl' classify ([],[],[], []) (Map.toList xs) of
             ([], [], [], []) -> LookupNotFound suggestions
-            (_, _, _, [(m, _)])             -> LookupFound m (mod_unit m)
+            (_, _, _, [(m, o)])             -> LookupFound m (mod_unit m, o)
             (_, _, _, exposed@(_:_))        -> LookupMultiple exposed
             ([], [], unusable@(_:_), [])    -> LookupUnusable unusable
             (hidden_pkg, hidden_mod, _, []) ->

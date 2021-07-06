@@ -196,7 +196,7 @@ findLookupResult :: HscEnv -> LookupResult -> IO FindResult
 findLookupResult hsc_env r = case r of
      LookupFound m pkg_conf -> do
        let im = fst (getModuleInstantiation m)
-       r' <- findPackageModule_ hsc_env im pkg_conf
+       r' <- findPackageModule_ hsc_env im (fst pkg_conf)
        case r' of
         -- TODO: ghc -M is unlikely to do the right thing
         -- with just the location of the thing that was

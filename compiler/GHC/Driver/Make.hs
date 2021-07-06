@@ -72,6 +72,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import GHC.Types.Name.Env
 import GHC.SysTools.FileCleanup
 
+
 import Data.Either ( rights, partitionEithers )
 import qualified Data.Map as Map
 import Data.Map (Map)
@@ -289,7 +290,7 @@ load :: GhcMonad m => LoadHowMuch -> m SuccessFlag
 load how_much = do
     (errs, mod_graph) <- depanalE [] False                        -- #17459
     success <- load' how_much (Just batchMsg) mod_graph
-    warnUnusedPackages
+    warnUnusedPackages mod_graph
     if isEmptyBag errs
       then pure success
       else throwErrors errs
@@ -301,23 +302,19 @@ load how_much = do
 -- actually loaded packages. All the packages, specified on command line,
 -- but never loaded, are probably unused dependencies.
 
-warnUnusedPackages :: GhcMonad m => m ()
-warnUnusedPackages = do
+warnUnusedPackages :: GhcMonad m => ModuleGraph -> m ()
+warnUnusedPackages mod_graph = do
     hsc_env <- getSession
-    eps <- liftIO $ hscEPS hsc_env
 
     let dflags = hsc_dflags hsc_env
         state  = unitState dflags
-        pit = eps_PIT eps
 
-    let loadedPackages
-          = map (unsafeLookupUnit state)
-          . nub . sort
-          . map moduleUnit
-          . moduleEnvKeys
-          $ pit
+    -- Only need non-source imports here because SOURCE imports are always HPT
+    let loadedPackages = concat $
+          mapMaybe (\(fs, mn) -> lookupModulePackage state (unLoc mn) fs)
+            $ concatMap ms_imps (mgModSummaries mod_graph)
 
-        requestedArgs = mapMaybe packageArg (packageFlags dflags)
+    let requestedArgs = mapMaybe packageArg (packageFlags dflags)
 
         unusedArgs
           = filter (\arg -> not $ any (matching state arg) loadedPackages)
