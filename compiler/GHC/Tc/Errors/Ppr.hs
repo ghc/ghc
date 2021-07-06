@@ -19,6 +19,7 @@ import GHC.Driver.Flags
 import GHC.Hs
 import GHC.Utils.Outputable
 import GHC.Unit.State (pprWithUnitState, UnitState)
+import qualified GHC.LanguageExtensions as LangExt
 
 
 instance Diagnostic TcRnMessage where
@@ -73,6 +74,8 @@ instance Diagnostic TcRnMessage where
               2 (text "Pattern synonym declarations are only valid at top level")
     TcRnEmptyRecordUpdate
       -> mkSimpleDecorated $ text "Empty record update"
+    TcRnIllegalFieldPunning fld
+      -> mkSimpleDecorated $ text "Illegal use of punning for field" <+> quotes (ppr fld)
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -105,6 +108,8 @@ instance Diagnostic TcRnMessage where
     TcRnIllegalPatSynDecl{}
       -> ErrorWithoutFlag
     TcRnEmptyRecordUpdate
+      -> ErrorWithoutFlag
+    TcRnIllegalFieldPunning{}
       -> ErrorWithoutFlag
 
   diagnosticHints = \case
@@ -139,6 +144,8 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnEmptyRecordUpdate{}
       -> noHints
+    TcRnIllegalFieldPunning{}
+      -> [SuggestExtension LangExt.RecordPuns]
 
 messageWithInfoDiagnosticMessage :: UnitState
                                  -> ErrInfo

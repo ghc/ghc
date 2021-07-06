@@ -24,6 +24,10 @@ instance Outputable GhcHint where
       -> case ext of
           LangExt.NegativeLiterals
             -> text "If you are trying to write a large negative literal, use NegativeLiterals"
+          -- RecordPuns is now effectively 'NamedFieldPuns', so we have to pretty-print the
+          -- hint to yield the correct suggestion in terms of extension to enable.
+          LangExt.RecordPuns
+            -> text "Perhaps you intended to use NamedFieldPuns"
           _ -> text "Perhaps you intended to use" <+> ppr ext
     SuggestMissingDo
       -> text "Possibly caused by a missing 'do'?"

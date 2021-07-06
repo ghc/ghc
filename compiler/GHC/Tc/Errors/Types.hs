@@ -237,6 +237,20 @@ data TcRnMessage where
   -}
   TcRnEmptyRecordUpdate :: TcRnMessage
 
+  {-| TcRnIllegalFieldPunning is an error that occurs whenever
+      field punning is used without the 'NamedFieldPuns' extension enabled.
+
+      Examples(s):
+
+      data Foo = Foo { a :: Int }
+
+      foo :: Foo -> Int
+      foo Foo{a} = a  -- Not ok, punning used without extension.
+
+     Test cases: parser/should_fail/RecordDotSyntaxFail12
+  -}
+  TcRnIllegalFieldPunning :: !(Located RdrName) -> TcRnMessage
+
 
 -- | Where a shadowed name comes from
 data ShadowedNameProvenance
