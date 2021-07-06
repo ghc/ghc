@@ -58,6 +58,10 @@ instance Diagnostic TcRnMessage where
             sep [text "This binding for" <+> quotes (ppr occ)
              <+> text "shadows the existing binding" <> plural shadowed_locs,
                    nest 2 (vcat shadowed_locs)]
+    TcRnDuplicateWarningDecls d rdr_name
+      -> mkSimpleDecorated $
+           vcat [text "Multiple warning declarations for" <+> quotes (ppr rdr_name),
+                 text "also at " <+> ppr (getLocA d)]
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -83,6 +87,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnShadowedName{}
       -> WarningWithFlag Opt_WarnNameShadowing
+    TcRnDuplicateWarningDecls{}
+      -> ErrorWithoutFlag
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -107,6 +113,8 @@ instance Diagnostic TcRnMessage where
     TcRnModMissingRealSrcSpan{}
       -> noHints
     TcRnShadowedName{}
+      -> noHints
+    TcRnDuplicateWarningDecls{}
       -> noHints
 
 messageWithInfoDiagnosticMessage :: UnitState
