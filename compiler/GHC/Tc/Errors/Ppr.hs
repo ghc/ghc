@@ -67,6 +67,10 @@ instance Diagnostic TcRnMessage where
            hang (text "solveWanteds: too many iterations"
                    <+> parens (text "limit =" <+> ppr limit))
                 2 (text "Unsolved:" <+> ppr wc)
+    TcRnIllegalPatSynDecl rdrname
+      -> mkSimpleDecorated $
+           hang (text "Illegal pattern synonym declaration for" <+> quotes (ppr rdrname))
+              2 (text "Pattern synonym declarations are only valid at top level")
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -95,6 +99,8 @@ instance Diagnostic TcRnMessage where
     TcRnDuplicateWarningDecls{}
       -> ErrorWithoutFlag
     TcRnSimplifierTooManyIterations{}
+      -> ErrorWithoutFlag
+    TcRnIllegalPatSynDecl{}
       -> ErrorWithoutFlag
 
   diagnosticHints = \case
@@ -125,6 +131,8 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnSimplifierTooManyIterations{}
       -> [SuggestIncreaseSimplifierIterations]
+    TcRnIllegalPatSynDecl{}
+      -> noHints
 
 messageWithInfoDiagnosticMessage :: UnitState
                                  -> ErrInfo

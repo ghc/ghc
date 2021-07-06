@@ -455,10 +455,7 @@ rnBindLHS name_maker _ (PatSynBind x psb@PSB{ psb_id = rdrname })
        ; return (PatSynBind x psb{ psb_ext = noAnn, psb_id = name }) }
   where
     localPatternSynonymErr :: TcRnMessage
-    localPatternSynonymErr
-      = TcRnUnknownMessage $ mkPlainError noHints $
-        hang (text "Illegal pattern synonym declaration for" <+> quotes (ppr rdrname))
-           2 (text "Pattern synonym declarations are only valid at top level")
+    localPatternSynonymErr = TcRnIllegalPatSynDecl rdrname
 
 rnBindLHS _ _ b = pprPanic "rnBindHS" (ppr b)
 
