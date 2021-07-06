@@ -71,6 +71,8 @@ instance Diagnostic TcRnMessage where
       -> mkSimpleDecorated $
            hang (text "Illegal pattern synonym declaration for" <+> quotes (ppr rdrname))
               2 (text "Pattern synonym declarations are only valid at top level")
+    TcRnEmptyRecordUpdate
+      -> mkSimpleDecorated $ text "Empty record update"
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -102,6 +104,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnIllegalPatSynDecl{}
       -> ErrorWithoutFlag
+    TcRnEmptyRecordUpdate
+      -> ErrorWithoutFlag
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -132,6 +136,8 @@ instance Diagnostic TcRnMessage where
     TcRnSimplifierTooManyIterations{}
       -> [SuggestIncreaseSimplifierIterations]
     TcRnIllegalPatSynDecl{}
+      -> noHints
+    TcRnEmptyRecordUpdate{}
       -> noHints
 
 messageWithInfoDiagnosticMessage :: UnitState
