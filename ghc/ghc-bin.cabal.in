@@ -49,11 +49,11 @@ Executable ghc
     else
         Build-Depends: unix   >= 2.7 && < 2.9
 
-    C-Sources: hschooks.c
-
     GHC-Options: -Wall
                  -Wnoncanonical-monad-instances
                  -Wnoncanonical-monoid-instances
+                 -rtsopts=all
+                 "-with-rtsopts=-K512M -H -I5 -T"
 
     if flag(internal-interpreter)
         -- NB: this is never built by the bootstrapping GHC+libraries
