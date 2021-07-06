@@ -156,10 +156,14 @@ primOpRules nm = \case
                                     , equalArgs $> Lit zeroW8 ]
    Word8AndOp  -> mkPrimOpRule nm 2 [ binaryLit (word8Op2 (.&.))
                                     , idempotent
-                                    , zeroElem ]
+                                    , zeroElem
+                                    , sameArgIdempotentCommut Word8AndOp
+                                    ]
    Word8OrOp   -> mkPrimOpRule nm 2 [ binaryLit (word8Op2 (.|.))
                                     , idempotent
-                                    , identity zeroW8 ]
+                                    , identity zeroW8
+                                    , sameArgIdempotentCommut Word8OrOp
+                                    ]
    Word8XorOp  -> mkPrimOpRule nm 2 [ binaryLit (word8Op2 xor)
                                     , identity zeroW8
                                     , equalArgs $> Lit zeroW8 ]
@@ -223,10 +227,14 @@ primOpRules nm = \case
                                     , equalArgs $> Lit zeroW16 ]
    Word16AndOp -> mkPrimOpRule nm 2 [ binaryLit (word16Op2 (.&.))
                                     , idempotent
-                                    , zeroElem ]
+                                    , zeroElem
+                                    , sameArgIdempotentCommut Word16AndOp
+                                    ]
    Word16OrOp  -> mkPrimOpRule nm 2 [ binaryLit (word16Op2 (.|.))
                                     , idempotent
-                                    , identity zeroW16 ]
+                                    , identity zeroW16
+                                    , sameArgIdempotentCommut Word16OrOp
+                                    ]
    Word16XorOp -> mkPrimOpRule nm 2 [ binaryLit (word16Op2 xor)
                                     , identity zeroW16
                                     , equalArgs $> Lit zeroW16 ]
@@ -290,10 +298,14 @@ primOpRules nm = \case
                                     , equalArgs $> Lit zeroW32 ]
    Word32AndOp -> mkPrimOpRule nm 2 [ binaryLit (word32Op2 (.&.))
                                     , idempotent
-                                    , zeroElem ]
+                                    , zeroElem
+                                    , sameArgIdempotentCommut Word32AndOp
+                                    ]
    Word32OrOp  -> mkPrimOpRule nm 2 [ binaryLit (word32Op2 (.|.))
                                     , idempotent
-                                    , identity zeroW32 ]
+                                    , identity zeroW32
+                                    , sameArgIdempotentCommut Word32OrOp
+                                    ]
    Word32XorOp -> mkPrimOpRule nm 2 [ binaryLit (word32Op2 xor)
                                     , identity zeroW32
                                     , equalArgs $> Lit zeroW32 ]
@@ -333,10 +345,14 @@ primOpRules nm = \case
                                     , equalArgs >> retLit zeroi ]
    IntAndOp    -> mkPrimOpRule nm 2 [ binaryLit (intOp2 (.&.))
                                     , idempotent
-                                    , zeroElem ]
+                                    , zeroElem
+                                    , sameArgIdempotentCommut IntAndOp
+                                    ]
    IntOrOp     -> mkPrimOpRule nm 2 [ binaryLit (intOp2 (.|.))
                                     , idempotent
-                                    , identityPlatform zeroi ]
+                                    , identityPlatform zeroi
+                                    , sameArgIdempotentCommut IntOrOp
+                                    ]
    IntXorOp    -> mkPrimOpRule nm 2 [ binaryLit (intOp2 xor)
                                     , identityPlatform zeroi
                                     , equalArgs >> retLit zeroi ]
@@ -378,10 +394,14 @@ primOpRules nm = \case
                                     , equalArgs >> retLit zerow ]
    WordAndOp   -> mkPrimOpRule nm 2 [ binaryLit (wordOp2 (.&.))
                                     , idempotent
-                                    , zeroElem ]
+                                    , zeroElem
+                                    , sameArgIdempotentCommut WordAndOp
+                                    ]
    WordOrOp    -> mkPrimOpRule nm 2 [ binaryLit (wordOp2 (.|.))
                                     , idempotent
-                                    , identityPlatform zerow ]
+                                    , identityPlatform zerow
+                                    , sameArgIdempotentCommut WordOrOp
+                                    ]
    WordXorOp   -> mkPrimOpRule nm 2 [ binaryLit (wordOp2 xor)
                                     , identityPlatform zerow
                                     , equalArgs >> retLit zerow ]
@@ -1120,6 +1140,27 @@ idempotent :: RuleM CoreExpr
 idempotent = do [e1, e2] <- getArgs
                 guard $ cheapEqExpr e1 e2
                 return e1
+
+-- | Match
+--       (op (op v e) e)
+--    or (op e (op v e))
+--    or (op (op e v) e)
+--    or (op e (op e v))
+--  and return the innermost (op v e) or (op e v).
+sameArgIdempotentCommut :: PrimOp -> RuleM CoreExpr
+sameArgIdempotentCommut op = do
+  let is_op = \case
+        BinOpApp v op' e | op == op' -> Just (v,e)
+        _                            -> Nothing
+  [a,b] <- getArgs
+  case (a,b) of
+    (is_op -> Just (e1,e2), e3)
+      | cheapEqExpr e2 e3 -> return a
+      | cheapEqExpr e1 e3 -> return a
+    (e3, is_op -> Just (e1,e2))
+      | cheapEqExpr e2 e3 -> return b
+      | cheapEqExpr e1 e3 -> return b
+    _ -> mzero
 
 {-
 Note [Guarding against silly shifts]
