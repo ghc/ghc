@@ -1430,6 +1430,7 @@ AC_CONFIG_FILES(
   driver/ghci/ghci-wrapper.cabal
   utils/iserv/iserv.cabal
   utils/iserv-proxy/iserv-proxy.cabal
+  utils/ghc-pkg/ghc-pkg.cabal
   utils/remote-iserv/remote-iserv.cabal
   utils/gen-dll/gen-dll.cabal
   libraries/ghc-boot/ghc-boot.cabal
