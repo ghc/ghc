@@ -13,6 +13,7 @@ import GHC.Core.TyCo.Ppr (pprWithTYPE)
 import GHC.Core.Type
 import GHC.Tc.Errors.Types
 import GHC.Types.Error
+import GHC.Types.Name.Reader (pprNameProvenance)
 import GHC.Types.Var.Env (emptyTidyEnv)
 import GHC.Driver.Flags
 import GHC.Hs
@@ -49,6 +50,14 @@ instance Diagnostic TcRnMessage where
       -> mkDecorated [text "Use of plugins makes the module unsafe"]
     TcRnModMissingRealSrcSpan mod
       -> mkDecorated [text "Module does not have a RealSrcSpan:" <+> ppr mod]
+    TcRnShadowedName occ provenance
+      -> let shadowed_locs = case provenance of
+               ShadowedNameProvenanceLocal n     -> [text "bound at" <+> ppr n]
+               ShadowedNameProvenanceGlobal gres -> map pprNameProvenance gres
+         in mkSimpleDecorated $
+            sep [text "This binding for" <+> quotes (ppr occ)
+             <+> text "shadows the existing binding" <> plural shadowed_locs,
+                   nest 2 (vcat shadowed_locs)]
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -72,6 +81,8 @@ instance Diagnostic TcRnMessage where
       -> WarningWithoutFlag
     TcRnModMissingRealSrcSpan{}
       -> ErrorWithoutFlag
+    TcRnShadowedName{}
+      -> WarningWithFlag Opt_WarnNameShadowing
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -94,6 +105,8 @@ instance Diagnostic TcRnMessage where
     TcRnUnsafeDueToPlugin{}
       -> noHints
     TcRnModMissingRealSrcSpan{}
+      -> noHints
+    TcRnShadowedName{}
       -> noHints
 
 messageWithInfoDiagnosticMessage :: UnitState

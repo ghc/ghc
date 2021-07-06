@@ -6,12 +6,14 @@ module GHC.Tc.Errors.Types (
   , TcRnMessageDetailed(..)
   , ErrInfo(..)
   , LevityCheckProvenance(..)
+  , ShadowedNameProvenance(..)
   ) where
 
 import GHC.Hs
 import GHC.Types.Error
-import GHC.Types.Name (Name)
+import GHC.Types.Name (Name, OccName)
 import GHC.Types.Name.Reader
+import GHC.Types.SrcLoc
 import GHC.Unit.Types (Module)
 import GHC.Utils.Outputable
 import Data.Typeable
@@ -163,6 +165,33 @@ data TcRnMessage where
   -}
   TcRnModMissingRealSrcSpan :: Module -> TcRnMessage
 
+
+  {-| TcRnShadowedName is a warning (controlled by -Wname-shadowing) that occurs whenever
+      an inner-scope value has the same name as an outer-scope value, i.e. the inner
+      value shadows the outer one. This can catch typographical errors that turn into
+      hard-to-find bugs. The warning is suppressed for names beginning with an underscore.
+
+      Examples(s):
+        f = ... let f = id in ... f ...  -- NOT OK, 'f' is shadowed
+        f x = do { _ignore <- this; _ignore <- that; return (the other) } -- suppressed via underscore
+
+     Test cases: typecheck/should_compile/T10971a
+                 rename/should_compile/rn039
+                 rename/should_compile/rn064
+                 rename/should_compile/T1972
+                 rename/should_fail/T2723
+                 rename/should_compile/T3262
+                 driver/werror
+  -}
+  TcRnShadowedName :: OccName -> ShadowedNameProvenance -> TcRnMessage
+
+
+-- | Where a shadowed name comes from
+data ShadowedNameProvenance
+  = ShadowedNameProvenanceLocal !SrcLoc
+    -- ^ The shadowed name is local to the module
+  | ShadowedNameProvenanceGlobal [GlobalRdrElt]
+    -- ^ The shadowed name is global, typically imported from elsewhere.
 
 -- | Where the levity checking for the input type originated
 data LevityCheckProvenance
