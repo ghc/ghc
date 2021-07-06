@@ -13,11 +13,14 @@ import GHC.Core.TyCo.Ppr (pprWithTYPE)
 import GHC.Core.Type
 import GHC.Tc.Errors.Types
 import GHC.Types.Error
+import GHC.Types.Name.Reader (pprNameProvenance)
 import GHC.Types.Var.Env (emptyTidyEnv)
 import GHC.Driver.Flags
 import GHC.Hs
 import GHC.Utils.Outputable
 import GHC.Unit.State (pprWithUnitState, UnitState)
+import qualified GHC.LanguageExtensions as LangExt
+import qualified Data.List.NonEmpty as NE
 
 
 instance Diagnostic TcRnMessage where
@@ -49,6 +52,38 @@ instance Diagnostic TcRnMessage where
       -> mkDecorated [text "Use of plugins makes the module unsafe"]
     TcRnModMissingRealSrcSpan mod
       -> mkDecorated [text "Module does not have a RealSrcSpan:" <+> ppr mod]
+    TcRnShadowedName occ provenance
+      -> let shadowed_locs = case provenance of
+               ShadowedNameProvenanceLocal n     -> [text "bound at" <+> ppr n]
+               ShadowedNameProvenanceGlobal gres -> map pprNameProvenance gres
+         in mkSimpleDecorated $
+            sep [text "This binding for" <+> quotes (ppr occ)
+             <+> text "shadows the existing binding" <> plural shadowed_locs,
+                   nest 2 (vcat shadowed_locs)]
+    TcRnDuplicateWarningDecls d rdr_name
+      -> mkSimpleDecorated $
+           vcat [text "Multiple warning declarations for" <+> quotes (ppr rdr_name),
+                 text "also at " <+> ppr (getLocA d)]
+    TcRnSimplifierTooManyIterations limit wc
+      -> mkSimpleDecorated $
+           hang (text "solveWanteds: too many iterations"
+                   <+> parens (text "limit =" <+> ppr limit))
+                2 (text "Unsolved:" <+> ppr wc)
+    TcRnIllegalPatSynDecl rdrname
+      -> mkSimpleDecorated $
+           hang (text "Illegal pattern synonym declaration for" <+> quotes (ppr rdrname))
+              2 (text "Pattern synonym declarations are only valid at top level")
+    TcRnEmptyRecordUpdate
+      -> mkSimpleDecorated $ text "Empty record update"
+    TcRnIllegalFieldPunning fld
+      -> mkSimpleDecorated $ text "Illegal use of punning for field" <+> quotes (ppr fld)
+    TcRnIllegalWildcardsInRecord fld_part
+      -> mkSimpleDecorated $ text "Illegal `..' in record" <+> pprRecordFieldPart fld_part
+    TcRnDuplicateFieldName fld_part dups
+      -> mkSimpleDecorated $
+           hsep [text "duplicate field name",
+                 quotes (ppr (NE.head dups)),
+                 text "in record", pprRecordFieldPart fld_part]
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -72,6 +107,22 @@ instance Diagnostic TcRnMessage where
       -> WarningWithoutFlag
     TcRnModMissingRealSrcSpan{}
       -> ErrorWithoutFlag
+    TcRnShadowedName{}
+      -> WarningWithFlag Opt_WarnNameShadowing
+    TcRnDuplicateWarningDecls{}
+      -> ErrorWithoutFlag
+    TcRnSimplifierTooManyIterations{}
+      -> ErrorWithoutFlag
+    TcRnIllegalPatSynDecl{}
+      -> ErrorWithoutFlag
+    TcRnEmptyRecordUpdate
+      -> ErrorWithoutFlag
+    TcRnIllegalFieldPunning{}
+      -> ErrorWithoutFlag
+    TcRnIllegalWildcardsInRecord{}
+      -> ErrorWithoutFlag
+    TcRnDuplicateFieldName{}
+      -> ErrorWithoutFlag
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -94,6 +145,22 @@ instance Diagnostic TcRnMessage where
     TcRnUnsafeDueToPlugin{}
       -> noHints
     TcRnModMissingRealSrcSpan{}
+      -> noHints
+    TcRnShadowedName{}
+      -> noHints
+    TcRnDuplicateWarningDecls{}
+      -> noHints
+    TcRnSimplifierTooManyIterations{}
+      -> [SuggestIncreaseSimplifierIterations]
+    TcRnIllegalPatSynDecl{}
+      -> noHints
+    TcRnEmptyRecordUpdate{}
+      -> noHints
+    TcRnIllegalFieldPunning{}
+      -> [SuggestExtension LangExt.RecordPuns]
+    TcRnIllegalWildcardsInRecord{}
+      -> [SuggestExtension LangExt.RecordWildCards]
+    TcRnDuplicateFieldName{}
       -> noHints
 
 messageWithInfoDiagnosticMessage :: UnitState
@@ -159,3 +226,10 @@ pprLevityPolyInType ty prov =
         LevityCheckInValidClass
           -> empty
   in formatLevPolyErr ty $$ extra
+
+
+pprRecordFieldPart :: RecordFieldPart -> SDoc
+pprRecordFieldPart = \case
+  RecordFieldConstructor{} -> text "construction"
+  RecordFieldPattern{}     -> text "pattern"
+  RecordFieldUpdate        -> text "update"

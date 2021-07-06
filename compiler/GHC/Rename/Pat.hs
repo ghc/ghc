@@ -782,7 +782,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                               , hfbPun      = pun }))
       = do { sel <- setSrcSpan loc $ lookupRecFieldOcc parent lbl
            ; arg' <- if pun
-                     then do { checkErr pun_ok (badPun (L loc lbl))
+                     then do { checkErr pun_ok (TcRnIllegalFieldPunning (L loc lbl))
                                -- Discard any module qualifier (#11662)
                              ; let arg_rdr = mkRdrUnqual (rdrNameOcc lbl)
                              ; return (L (noAnnSrcSpan loc) (mk_arg loc arg_rdr)) }
@@ -873,7 +873,7 @@ rnHsRecUpdFields flds
 
        -- Check for an empty record update  e {}
        -- NB: don't complain about e { .. }, because rn_dotdot has done that already
-       ; when (null flds) $ addErr emptyUpdateErr
+       ; when (null flds) $ addErr TcRnEmptyRecordUpdate
 
        ; return (flds1, plusFVs fvss) }
   where
@@ -888,7 +888,7 @@ rnHsRecUpdFields flds
                       -- See Note [Disambiguating record fields] in GHC.Tc.Gen.Head
                       lookupRecFieldOcc_update dup_fields_ok lbl
            ; arg' <- if pun
-                     then do { checkErr pun_ok (badPun (L loc lbl))
+                     then do { checkErr pun_ok (TcRnIllegalFieldPunning (L loc lbl))
                                -- Discard any module qualifier (#11662)
                              ; let arg_rdr = mkRdrUnqual (rdrNameOcc lbl)
                              ; return (L (noAnnSrcSpan loc) (HsVar noExtField
@@ -925,9 +925,7 @@ getFieldUpdLbls :: [LHsRecUpdField GhcPs] -> [RdrName]
 getFieldUpdLbls flds = map (rdrNameAmbiguousFieldOcc . unLoc . hfbLHS . unLoc) flds
 
 needFlagDotDot :: HsRecFieldContext -> TcRnMessage
-needFlagDotDot ctxt = TcRnUnknownMessage $ mkPlainError noHints $
-  vcat [text "Illegal `..' in record" <+> pprRFC ctxt,
-        text "Use RecordWildCards to permit this"]
+needFlagDotDot = TcRnIllegalWildcardsInRecord . toRecordFieldPart
 
 badDotDotCon :: Name -> TcRnMessage
 badDotDotCon con
@@ -935,25 +933,13 @@ badDotDotCon con
     vcat [ text "Illegal `..' notation for constructor" <+> quotes (ppr con)
          , nest 2 (text "The constructor has no labelled fields") ]
 
-emptyUpdateErr :: TcRnMessage
-emptyUpdateErr = TcRnUnknownMessage $ mkPlainError noHints $ text "Empty record update"
-
-badPun :: Located RdrName -> TcRnMessage
-badPun fld = TcRnUnknownMessage $ mkPlainError noHints $
-  vcat [text "Illegal use of punning for field" <+> quotes (ppr fld),
-        text "Use NamedFieldPuns to permit this"]
-
 dupFieldErr :: HsRecFieldContext -> NE.NonEmpty RdrName -> TcRnMessage
-dupFieldErr ctxt dups
-  = TcRnUnknownMessage $ mkPlainError noHints $
-    hsep [text "duplicate field name",
-          quotes (ppr (NE.head dups)),
-          text "in record", pprRFC ctxt]
+dupFieldErr ctxt = TcRnDuplicateFieldName (toRecordFieldPart ctxt)
 
-pprRFC :: HsRecFieldContext -> SDoc
-pprRFC (HsRecFieldCon {}) = text "construction"
-pprRFC (HsRecFieldPat {}) = text "pattern"
-pprRFC (HsRecFieldUpd {}) = text "update"
+toRecordFieldPart :: HsRecFieldContext -> RecordFieldPart
+toRecordFieldPart (HsRecFieldCon n)  = RecordFieldConstructor n
+toRecordFieldPart (HsRecFieldPat n)  = RecordFieldPattern     n
+toRecordFieldPart (HsRecFieldUpd {}) = RecordFieldUpdate
 
 {-
 ************************************************************************
