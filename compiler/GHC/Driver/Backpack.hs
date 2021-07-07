@@ -769,6 +769,7 @@ summariseRequirement pn mod_name = do
         ms_hie_date = hie_timestamp,
         ms_srcimps = [],
         ms_textual_imps = extra_sig_imports,
+        ms_ghc_prim_import = False,
         ms_parsed_mod = Just (HsParsedModule {
                 hpm_module = L loc (HsModule {
                         hsmodAnn = noAnn,
@@ -854,8 +855,9 @@ hsModuleToModSummary pn hsc_src modname
     let (src_idecls, ord_idecls) = partition ((== IsBoot) . ideclSource . unLoc) imps
 
              -- GHC.Prim doesn't exist physically, so don't go looking for it.
-        ordinary_imps = filter ((/= moduleName gHC_PRIM) . unLoc . ideclName . unLoc)
-                               ord_idecls
+        (ordinary_imps, ghc_prim_import)
+          = partition ((/= moduleName gHC_PRIM) . unLoc . ideclName . unLoc)
+              ord_idecls
 
         implicit_prelude = xopt LangExt.ImplicitPrelude dflags
         implicit_imports = mkPrelImports modname loc
@@ -884,6 +886,7 @@ hsModuleToModSummary pn hsc_src modname
             ms_hspp_opts = dflags,
             ms_hspp_buf = Nothing,
             ms_srcimps = map convImport src_idecls,
+            ms_ghc_prim_import = not (null ghc_prim_import),
             ms_textual_imps = normal_imports
                            -- We have to do something special here:
                            -- due to merging, requirements may end up with
