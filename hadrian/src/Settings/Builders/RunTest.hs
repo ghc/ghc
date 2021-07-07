@@ -190,12 +190,12 @@ getTestArgs = do
                            Just verbosity -> Just $ "--verbose=" ++ verbosity
         wayArgs      = map ("--way=" ++) (testWays args)
         compilerArg  = ["--config", "compiler=" ++ show (compiler)]
-        ghcPkgArg    = ["--config", "ghc_pkg=" ++ show (bindir -/- "ghc-pkg")]
+        ghcPkgArg    = ["--config", "ghc_pkg=" ++ show (bindir -/- "ghc-pkg" <.> exe)]
         haddockArg   = if haveDocs
-          then [ "--config", "haddock=" ++ show (bindir -/- "haddock") ]
+          then [ "--config", "haddock=" ++ show (bindir -/- "haddock" <.> exe) ]
           else [ "--config", "haddock=" ]
-        hp2psArg     = ["--config", "hp2ps=" ++ show (bindir -/- "hp2ps")]
-        hpcArg       = ["--config", "hpc=" ++ show (bindir -/- "hpc")]
+        hp2psArg     = ["--config", "hp2ps=" ++ show (bindir -/- "hp2ps" <.> exe)]
+        hpcArg       = ["--config", "hpc=" ++ show (bindir -/- "hpc" <.> exe)]
         inTreeArg    = [ "-e", "config.in_tree_compiler=" ++
           show (testCompiler args `elem` ["stage1", "stage2", "stage3"]) ]
 
