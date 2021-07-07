@@ -1064,8 +1064,10 @@ AC_CHECK_LIB(m, atan, HaveLibM=YES, HaveLibM=NO)
 if test $HaveLibM = YES
 then
   AC_DEFINE([HAVE_LIBM], [1], [Define to 1 if you need to link with libm])
+  AC_SUBST([UseLibm],[YES])
   AC_SUBST([CabalHaveLibm],[True])
 else
+  AC_SUBST([UseLibm],[NO])
   AC_SUBST([CabalHaveLibm],[False])
 fi
 
@@ -1117,7 +1119,8 @@ AC_ARG_WITH([ffi-libraries],
 
 AC_SUBST(FFILibDir)
 
-AC_SUBST([CabalHaveLibffi],[False])
+HaveLibffi=NO
+
 AS_IF([test "$UseSystemLibFFI" = "YES"], [
  CFLAGS2="$CFLAGS"
  CFLAGS="$LIBFFI_CFLAGS $CFLAGS"
@@ -1135,15 +1138,32 @@ AS_IF([test "$UseSystemLibFFI" = "YES"], [
  AC_CHECK_LIB(ffi, ffi_call,
   [AC_CHECK_HEADERS([ffi.h], [break], [])
    AC_DEFINE([HAVE_LIBFFI], [1], [Define to 1 if you have libffi.])]
-   AC_SUBST([CabalHaveLibffi],[True]),
+   HaveLibffi=YES,
   [AC_MSG_ERROR([Cannot find system libffi])])
  CFLAGS="$CFLAGS2"
  LDFLAGS="$LDFLAGS2"
 ])
 
+if test $HaveLibffi = YES
+then
+  AC_SUBST([UseLibffi],[YES])
+  AC_SUBST([CabalHaveLibffi],[True])
+else
+  AC_SUBST([UseLibffi],[NO])
+  AC_SUBST([CabalHaveLibffi],[False])
+fi
+
 dnl ** check whether we need -ldl to get dlopen()
 AC_CHECK_LIB([dl], [dlopen])
-AC_CHECK_LIB([dl], [dlopen], [AC_SUBST([CabalHaveLibdl], [True])], [AC_SUBST([CabalHaveLibdl], [False])])
+AC_CHECK_LIB([dl], [dlopen], HaveLibdl=YES, HaveLibdl=NO)
+if test $HaveLibdl = YES
+then
+  AC_SUBST([UseLibdl],[YES])
+  AC_SUBST([CabalHaveLibdl],[True])
+else
+  AC_SUBST([UseLibdl],[NO])
+  AC_SUBST([CabalHaveLibdl],[False])
+fi
 dnl ** check whether we have dlinfo
 AC_CHECK_FUNCS([dlinfo])
 
@@ -1171,7 +1191,15 @@ FP_VISIBILITY_HIDDEN
 
 dnl ** check for librt
 AC_CHECK_LIB([rt], [clock_gettime])
-AC_CHECK_LIB([rt], [clock_gettime], [AC_SUBST([CabalHaveLibrt], [True])], [AC_SUBST([CabalHaveLibrt], [False])])
+AC_CHECK_LIB([rt], [clock_gettime], HaveLibrt=YES, HaveLibrt=NO)
+if test $HaveLibrt = YES
+then
+  AC_SUBST([UseLibrt],[YES])
+  AC_SUBST([CabalHaveLibrt],[True])
+else
+  AC_SUBST([UseLibrt],[NO])
+  AC_SUBST([CabalHaveLibrt],[False])
+fi
 AC_CHECK_FUNCS(clock_gettime timer_settime)
 FP_CHECK_TIMER_CREATE
 
@@ -1316,22 +1344,16 @@ dnl doc/users_guide/ghc_config.py.in.
 LIBRARY_VERSION(base)
 LIBRARY_VERSION(Cabal, Cabal/Cabal/Cabal.cabal)
 dnl template-haskell.cabal is generated later
-dnl but the .in file already has the version
-LIBRARY_VERSION(template-haskell, template-haskell/template-haskell.cabal.in)
+dnl but the .tpl file already has the version
+LIBRARY_VERSION(template-haskell, template-haskell/template-haskell.cabal.tpl)
 LIBRARY_VERSION(array)
 LIBRARY_VERSION(ghc-prim)
 LIBRARY_VERSION(ghc-compact)
 LIBRARY_ghc_VERSION="$ProjectVersion"
 AC_SUBST(LIBRARY_ghc_VERSION)
 
-if grep '	' compiler/ghc.cabal.in 2>&1 >/dev/null; then
+if grep '	' compiler/ghc.cabal.tpl 2>&1 >/dev/null; then
    AC_MSG_ERROR([compiler/ghc.cabal.in contains tab characters; please remove them])
-fi
-
-# Create the configuration for the Hadrian build system if it is present
-if test -e hadrian/cfg/system.config.in; then
-    AC_CONFIG_FILES([hadrian/cfg/system.config])
-    AC_CONFIG_FILES([hadrian/ghci-cabal hadrian/ghci-stack])
 fi
 
 # We got caught by
@@ -1357,34 +1379,15 @@ checkMake380() {
 checkMake380 make
 checkMake380 gmake
 
-dnl Things specific to the make build system
 AC_CONFIG_FILES(
 [ mk/config.mk
   mk/install.mk
   mk/project.mk
-])
-
-dnl When adding things to this list be sure to update hadrian's
-dnl Rules.Configure.configureResults list.
-AC_CONFIG_FILES(
-[ rts/rts.cabal
-  compiler/ghc.cabal
-  ghc/ghc-bin.cabal
-  utils/runghc/runghc.cabal
-  driver/ghci/ghci-wrapper.cabal
-  utils/iserv/iserv.cabal
-  utils/iserv-proxy/iserv-proxy.cabal
-  utils/remote-iserv/remote-iserv.cabal
-  utils/gen-dll/gen-dll.cabal
-  libraries/ghc-boot/ghc-boot.cabal
-  libraries/ghc-boot-th/ghc-boot-th.cabal
-  libraries/ghci/ghci.cabal
-  libraries/ghc-heap/ghc-heap.cabal
-  libraries/libiserv/libiserv.cabal
-  libraries/template-haskell/template-haskell.cabal
+  hadrian/cfg/system.config
+  hadrian/ghci-cabal
+  hadrian/ghci-stack
   docs/users_guide/ghc_config.py
   docs/index.html
-  libraries/prologue.txt
   distrib/configure.ac
 ])
 
