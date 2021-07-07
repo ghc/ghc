@@ -1,5 +1,6 @@
 
 mod184.hs:6:8: warning: [-Wprepositive-qualified-module]
     Found ‘qualified’ in prepositive position
-    Suggested fix: place  ‘qualified’ after the module name instead.
-    To allow this, enable language extension 'ImportQualifiedPost'
+    Suggested fixes:
+       Place ‘qualified’ after the module name.
+       Perhaps you intended to use ImportQualifiedPost
