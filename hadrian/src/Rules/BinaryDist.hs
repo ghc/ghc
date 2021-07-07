@@ -325,26 +325,12 @@ hsc2hsWrapper :: Action String
 hsc2hsWrapper = do
   ccArgs <- map ("--cflag=" <>) <$> settingList (ConfCcArgs Stage1)
   ldFlags <- map ("--lflag=" <>) <$> settingList (ConfGccLinkerArgs Stage1)
+  wrapper <- drop 4 . lines <$> liftIO (readFile "utils/hsc2hs/hsc2hs.wrapper")
   return $ unlines
-    [ "HSC2HS_EXTRA=\"" <> unwords ccArgs <> unwords ldFlags <> "\""
-    , "tflag=\"--template=$libdir/template-hsc.h\""
-    , "Iflag=\"-I$includedir/\""
-    , "for arg do"
-    , "    case \"$arg\" in"
-    , "# On OS X, we need to specify -m32 or -m64 in order to get gcc to"
-    , "# build binaries for the right target. We do that by putting it in"
-    , "# HSC2HS_EXTRA. When cabal runs hsc2hs, it passes a flag saying which"
-    , "# gcc to use, so if we set HSC2HS_EXTRA= then we don't get binaries"
-    , "# for the right platform. So for now we just don't set HSC2HS_EXTRA="
-    , "# but we probably want to revisit how this works in the future."
-    , "#        -c*)          HSC2HS_EXTRA=;;"
-    , "#        --cc=*)       HSC2HS_EXTRA=;;"
-    , "        -t*)          tflag=;;"
-    , "        --template=*) tflag=;;"
-    , "        --)           break;;"
-    , "    esac"
-    , "done"
-    , "exec \"$executablename\" ${tflag:+\"$tflag\"} $HSC2HS_EXTRA ${1+\"$@\"} \"$Iflag\"" ]
+    ( "HSC2HS_EXTRA=\"" <> unwords ccArgs <> unwords ldFlags <> "\""
+    : "tflag=\"--template=$libdir/template-hsc.h\""
+    : "Iflag=\"-I$includedir/\""
+    : wrapper )
 
 runGhcWrapper :: Action String
 runGhcWrapper = pure $ "exec \"$executablename\" -f \"$exedir/ghc\" ${1+\"$@\"}\n"
