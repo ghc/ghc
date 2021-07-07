@@ -103,7 +103,7 @@ scavengeTSO (StgTSO *tso)
 {
     bool saved_eager;
 
-    debugTrace(DEBUG_gc,"scavenging thread %d",(int)tso->id);
+    debugTrace(DEBUG_gc,"scavenging thread %" FMT_StgThreadID,tso->id);
 
     // update the pointer from the InCall.
     if (tso->bound != NULL) {
