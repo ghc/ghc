@@ -199,7 +199,7 @@ function set_toolchain_paths() {
 # Extract GHC toolchain
 function setup() {
   if [ -d "${CABAL_CACHE}" ]; then
-      info "Extracting cabal cache..."
+      info "Extracting cabal cache from ${CABAL_CACHE} to $cabal_dir..."
       mkdir -p "$cabal_dir"
       cp -Rf "${CABAL_CACHE}"/* "$cabal_dir"
   fi
@@ -483,6 +483,13 @@ function run_perf_test() {
   OUT=out/Cabal-O2 cabal_test -O2
 }
 
+function save_cache () {
+  if [ -d "${CABAL_CACHE}" ]; then
+      info "Storing cabal cache from $cabal_dir to ${CABAL_CACHE}..."
+      cp -Rf "$cabal_dir" "${CABAL_CACHE}"
+  fi
+}
+
 function clean() {
   rm -R tmp
   run "$MAKE" --quiet clean || true
@@ -519,6 +526,7 @@ setup_locale
 # Determine Cabal data directory
 case "$(uname)" in
   MSYS_*|MINGW*) exe=".exe"; cabal_dir="$APPDATA/cabal" ;;
+  Darwin*) CABAL_DIR="$HOME/.cabal-$(uname -m)"; cabal_dir="$CABAL_DIR" ;;
   *) cabal_dir="$HOME/.cabal"; exe="" ;;
 esac
 
@@ -590,6 +598,7 @@ case $1 in
   perf_test) run_perf_test ;;
   cabal_test) cabal_test ;;
   clean) clean ;;
+  save-cache) save_cache ;;
   shell) shell "$@" ;;
   *) fail "unknown mode $1" ;;
 esac
