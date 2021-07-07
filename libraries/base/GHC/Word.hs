@@ -48,10 +48,6 @@ module GHC.Word (
 
 import Data.Maybe
 
-#if WORD_SIZE_IN_BITS < 64
-import GHC.IntWord64
-#endif
-
 import GHC.Base
 import GHC.Bits
 import GHC.Enum
