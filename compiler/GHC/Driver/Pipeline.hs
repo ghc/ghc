@@ -1230,15 +1230,15 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
         setDynFlags dflags
 
   -- gather the imports and module name
-        (hspp_buf,mod_name,imps,src_imps) <- liftIO $ do
+        (hspp_buf,mod_name,imps,src_imps, ghc_prim_imp) <- liftIO $ do
             buf <- hGetStringBuffer input_fn
             let imp_prelude = xopt LangExt.ImplicitPrelude dflags
                 popts = initParserOpts dflags
             eimps <- getImports popts imp_prelude buf input_fn (basename <.> suff)
             case eimps of
               Left errs -> throwErrors (GhcPsMessage <$> errs)
-              Right (src_imps,imps,L _ mod_name) -> return
-                  (Just buf, mod_name, imps, src_imps)
+              Right (src_imps,imps,ghc_prim_imp,L _ mod_name) -> return
+                  (Just buf, mod_name, imps, src_imps, ghc_prim_imp)
 
   -- Take -o into account if present
   -- Very like -ohi, but we must *only* do this if we aren't linking
@@ -1279,6 +1279,7 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn
                                         ms_parsed_mod   = Nothing,
                                         ms_iface_date   = hi_date,
                                         ms_hie_date     = hie_date,
+                                        ms_ghc_prim_import = ghc_prim_imp,
                                         ms_textual_imps = imps,
                                         ms_srcimps      = src_imps }
 
