@@ -165,17 +165,19 @@ bindistRules = do
           -- shipping it
           removeFile (bindistFilesDir -/- mingwStamp)
 
-        -- We then 'need' all the files necessary to configure and install
-        -- (as in, './configure [...] && make install') this build on some
-        -- other machine.
-        need $ map (bindistFilesDir -/-)
-                   (["configure", "Makefile"] ++ bindistInstallFiles)
-        wrappers <- fmap concat (sequence [ pkgToWrappers p | p <- all_pkgs, isProgram p])
-        need $ map ((bindistFilesDir -/- "wrappers") -/-) wrappers
-
-
---            IO.removeFile link_path <|> return ()
---            IO.createFileLink versioned_exe_name link_path
+        -- These scripts are only necessary in the configure/install
+        -- workflow which is not supported on windows.
+        -- TODO: Instead of guarding against windows, we could offer the
+        -- option to make a relocatable, but not installable bindist on any
+        -- platform.
+        unless windowsHost $ do
+          -- We then 'need' all the files necessary to configure and install
+          -- (as in, './configure [...] && make install') this build on some
+          -- other machine.
+          need $ map (bindistFilesDir -/-)
+                    (["configure", "Makefile"] ++ bindistInstallFiles)
+          wrappers <- fmap concat (sequence [ pkgToWrappers p | p <- all_pkgs, isProgram p])
+          need $ map ((bindistFilesDir -/- "wrappers") -/-) wrappers
 
 
     let buildBinDist :: Compressor -> Action ()
