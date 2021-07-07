@@ -1795,12 +1795,7 @@ maybe_simplify_again n limit unif_happened wc@(WC { wc_simple = simples })
          -- Typically if we blow the limit we are going to report some other error
          -- (an unsolved constraint), and we don't want that error to suppress
          -- the iteration limit warning!
-         addErrTcS $ TcRnUnknownMessage $ mkPlainError noHints $
-           (hang (text "solveWanteds: too many iterations"
-                   <+> parens (text "limit =" <+> ppr limit))
-                2 (vcat [ text "Unsolved:" <+> ppr wc
-                        , text "Set limit with -fconstraint-solver-iterations=n; n=0 for no limit"
-                  ]))
+         addErrTcS $ TcRnSimplifierTooManyIterations limit wc
        ; return wc }
 
   | unif_happened
