@@ -38,10 +38,10 @@ It does so by following the steps below.
   to
     <build root/bindist/ghc-<X>.<Y>.<Z>-<arch>-<os>/bin/xxxx-<VER>
 
-- create symlink (or bash) wrapper to from unversioned to versioned executable:
-    <build root/bindist/ghc-<X>.<Y>.<Z>-<arch>-<os>/bin/xxxx-<VER>
-  points to:
+- create symlink (or bash) wrapper from unversioned to versioned executable:
     <build root/bindist/ghc-<X>.<Y>.<Z>-<arch>-<os>/bin/xxxx
+  points to:
+    <build root/bindist/ghc-<X>.<Y>.<Z>-<arch>-<os>/bin/xxxx-<VER>
 
 - copy the lib directories of the compiler we built:
     <build root>/stage1/lib
@@ -317,6 +317,7 @@ wrapper "runghc"      = runGhcWrapper
 wrapper _             = commonWrapper
 
 -- | Wrapper scripts for different programs. Common is default wrapper.
+-- See Note [Two Types of Wrappers]
 
 ghcWrapper :: Action String
 ghcWrapper = pure $ "exec \"$executablename\" -B\"$libdir\" ${1+\"$@\"}\n"
@@ -371,6 +372,7 @@ iservBins = do
       ]
 
 -- Version wrapper scripts
+-- See Note [Two Types of Wrappers]
 
 -- | Create a wrapper script calls the executable given as first argument
 createVersionWrapper :: String -> FilePath -> Action ()
@@ -382,4 +384,26 @@ createVersionWrapper versioned_exe install_path = do
               , "-no-keep-o-files", "-rtsopts=ignore"
               , "-DEXE_PATH=\"" ++ versioned_exe ++ "\""
               , version_wrapper]
+
+{-
+Note [Two Types of Wrappers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+There are two different types of wrapper scripts.
+
+1. The wrapper scripts installed
+    <build root>/bindist/ghc-<X>.<Y>.<Z>-<arch>-<os>/wrappers/<program>
+2. The version wrapper scripts installed in
+    <build root/bindist/ghc-<X>.<Y>.<Z>-<arch>-<os>/bin/xxxx
+
+The purpose of the wrappers in (1) is to allow the executables to be installed
+into a different @BINDIR@ which is not already adjacent to a libdir. Therefore
+these wrappers pass the libdir and so on explicitliy to the executable so the
+wrappers can be placed anywhere and still work.
+
+The purpose of the wrappers in (2) is to provide both versioned and unversioned
+executables. On windows, these are actual wrapper scripts which just call the executable
+but on linux these wrappers are symlinks.
+
+-}
 
