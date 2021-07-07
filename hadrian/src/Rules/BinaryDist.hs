@@ -367,7 +367,7 @@ iservBins = do
   ver <- version <$> readPackageData iserv
   traverse (fmap (,ver) . programPath)
       [ Context Stage1 iserv w
-      | w <- [vanilla, dynamic]
+      | w <- [vanilla, profiling, dynamic]
       , w `elem` rtsways
       ]
 
