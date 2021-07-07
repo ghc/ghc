@@ -32,10 +32,21 @@ It does so by following the steps below.
 
 - make sure we have a complete stage 2 compiler + haddock
 
-- copy the bin and lib directories of the compiler we built:
-    <build root>/stage1/{bin, lib}
+- copy the specific binaries which should be in the bindist to the
+  bin folder and add the version suffix:
+    <build root>/stage1/bin/xxxx
   to
-    <build root>/bindist/ghc-<X>.<Y>.<Z>-<arch>-<os>/{bin, lib}
+    <build root/bindist/ghc-<X>.<Y>.<Z>-<arch>-<os>/bin/xxxx-<VER>
+
+- create symlink (or bash) wrapper to from unversioned to versioned executable:
+    <build root/bindist/ghc-<X>.<Y>.<Z>-<arch>-<os>/bin/xxxx-<VER>
+  points to:
+    <build root/bindist/ghc-<X>.<Y>.<Z>-<arch>-<os>/bin/xxxx
+
+- copy the lib directories of the compiler we built:
+    <build root>/stage1/lib
+  to
+    <build root>/bindist/ghc-<X>.<Y>.<Z>-<arch>-<os>/lib
 
 - copy the generated docs (user guide, haddocks, etc):
     <build root>/docs/
@@ -136,10 +147,23 @@ bindistRules = do
         createDirectory bindistFilesDir
         createDirectory (bindistFilesDir -/- "bin")
         createDirectory (bindistFilesDir -/- "lib")
-        -- Also create symlinks with version suffixes (#20074)
-        forM_ (bin_targets ++ iserv_targets) $ \(prog_path, _ver) -> do
-            let install_path = bindistFilesDir -/- "bin" -/- takeFileName prog_path
+        -- Also create wrappers with version suffixes (#20074)
+        forM_ (bin_targets ++ iserv_targets) $ \(prog_path, ver) -> do
+            let orig_filename = takeFileName prog_path
+                (name, ext) = splitExtensions orig_filename
+                version_prog = name ++ "-" ++ ver ++ ext
+                -- Install the actual executable with a version suffix
+                install_path = bindistFilesDir -/- "bin" -/- version_prog
+                -- The wrapper doesn't have a version
+                unversioned_install_path = (bindistFilesDir -/- "bin" -/- orig_filename)
+            -- 1. Copy the executable to the versioned executable name in
+            -- the directory
             copyFile prog_path install_path
+            -- 2. Either make a symlink for the unversioned version or
+            -- a wrapper script on platforms (windows) which don't support symlinks.
+            if windowsHost
+              then createVersionWrapper version_prog unversioned_install_path
+              else createFileLink install_path unversioned_install_path
         copyDirectory (ghcBuildDir -/- "lib") bindistFilesDir
         copyDirectory (rtsIncludeDir)         bindistFilesDir
 
@@ -345,3 +369,17 @@ iservBins = do
       | w <- [vanilla, profiling, dynamic]
       , w `elem` rtsways
       ]
+
+-- Version wrapper scripts
+
+-- | Create a wrapper script calls the executable given as first argument
+createVersionWrapper :: String -> FilePath -> Action ()
+createVersionWrapper versioned_exe install_path = do
+  ghcPath <- builderPath (Ghc CompileHs Stage2)
+  top <- topDirectory
+  let version_wrapper = top -/- "hadrian" -/- "bindist" -/- "version-wrapper.hs"
+  cmd ghcPath ["-o", install_path, "-no-keep-hi-files"
+              , "-no-keep-o-files", "-rtsopts=ignore"
+              , "-DEXE_PATH=\"" ++ versioned_exe ++ "\""
+              , version_wrapper]
+
