@@ -601,6 +601,43 @@ section "Int64#"
 
 primtype Int64#
 
+primop Int64ToIntOp "int64ToInt#" GenPrimOp Int64# -> Int#
+primop IntToInt64Op "intToInt64#" GenPrimOp Int# -> Int64#
+
+primop Int64NegOp "negateInt64#" GenPrimOp Int64# -> Int64#
+
+primop Int64AddOp "plusInt64#" GenPrimOp Int64# -> Int64# -> Int64#
+  with
+    commutable = True
+
+primop Int64SubOp "subInt64#" GenPrimOp Int64# -> Int64# -> Int64#
+
+primop Int64MulOp "timesInt64#" GenPrimOp Int64# -> Int64# -> Int64#
+  with
+    commutable = True
+
+primop Int64QuotOp "quotInt64#" GenPrimOp Int64# -> Int64# -> Int64#
+  with
+    can_fail = True
+
+primop Int64RemOp "remInt64#" GenPrimOp Int64# -> Int64# -> Int64#
+  with
+    can_fail = True
+
+primop Int64SllOp "uncheckedIShiftL64#"  GenPrimOp Int64# -> Int# -> Int64#
+primop Int64SraOp "uncheckedIShiftRA64#" GenPrimOp Int64# -> Int# -> Int64#
+primop Int64SrlOp "uncheckedIShiftRL64#" GenPrimOp Int64# -> Int# -> Int64#
+
+primop Int64ToWord64Op "int64ToWord64#" GenPrimOp Int64# -> Word64#
+   with code_size = 0
+
+primop Int64EqOp "eqInt64#" Compare Int64# -> Int64# -> Int#
+primop Int64GeOp "geInt64#" Compare Int64# -> Int64# -> Int#
+primop Int64GtOp "gtInt64#" Compare Int64# -> Int64# -> Int#
+primop Int64LeOp "leInt64#" Compare Int64# -> Int64# -> Int#
+primop Int64LtOp "ltInt64#" Compare Int64# -> Int64# -> Int#
+primop Int64NeOp "neInt64#" Compare Int64# -> Int64# -> Int#
+
 ------------------------------------------------------------------------
 section "Word64#"
         {Operations on 64-bit unsigned words. This type is only used
@@ -609,6 +646,51 @@ section "Word64#"
 ------------------------------------------------------------------------
 
 primtype Word64#
+
+primop Word64ToWordOp "word64ToWord#" GenPrimOp Word64# -> Word#
+primop WordToWord64Op "wordToWord64#" GenPrimOp Word# -> Word64#
+
+primop Word64AddOp "plusWord64#" GenPrimOp Word64# -> Word64# -> Word64#
+  with
+    commutable = True
+
+primop Word64SubOp "subWord64#" GenPrimOp Word64# -> Word64# -> Word64#
+
+primop Word64MulOp "timesWord64#" GenPrimOp Word64# -> Word64# -> Word64#
+  with
+    commutable = True
+
+primop Word64QuotOp "quotWord64#" GenPrimOp Word64# -> Word64# -> Word64#
+  with
+    can_fail = True
+
+primop Word64RemOp "remWord64#" GenPrimOp Word64# -> Word64# -> Word64#
+  with
+    can_fail = True
+
+primop Word64AndOp "and64#" GenPrimOp Word64# -> Word64# -> Word64#
+   with commutable = True
+
+primop Word64OrOp "or64#" GenPrimOp Word64# -> Word64# -> Word64#
+   with commutable = True
+
+primop Word64XorOp "xor64#" GenPrimOp Word64# -> Word64# -> Word64#
+   with commutable = True
+
+primop Word64NotOp "not64#" GenPrimOp Word64# -> Word64#
+
+primop Word64SllOp "uncheckedShiftL64#"  GenPrimOp Word64# -> Int# -> Word64#
+primop Word64SrlOp "uncheckedShiftRL64#" GenPrimOp Word64# -> Int# -> Word64#
+
+primop Word64ToInt64Op "word64ToInt64#" GenPrimOp Word64# -> Int64#
+   with code_size = 0
+
+primop Word64EqOp "eqWord64#" Compare Word64# -> Word64# -> Int#
+primop Word64GeOp "geWord64#" Compare Word64# -> Word64# -> Int#
+primop Word64GtOp "gtWord64#" Compare Word64# -> Word64# -> Int#
+primop Word64LeOp "leWord64#" Compare Word64# -> Word64# -> Int#
+primop Word64LtOp "ltWord64#" Compare Word64# -> Word64# -> Int#
+primop Word64NeOp "neWord64#" Compare Word64# -> Word64# -> Int#
 
 #endif
 

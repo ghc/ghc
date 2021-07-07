@@ -1281,6 +1281,37 @@ genCCall target dest_regs arg_regs bid = do
         MO_F32_Fabs  -> mkCCall "fasbf"
         MO_F32_Sqrt  -> mkCCall "sqrtf"
 
+        -- 64-bit primops
+        MO_I64_ToI   -> mkCCall "hs_int64ToInt"
+        MO_I64_FromI -> mkCCall "hs_intToInt64"
+        MO_W64_ToW   -> mkCCall "hs_word64ToWord"
+        MO_W64_FromW -> mkCCall "hs_wordToWord64"
+        MO_x64_Neg   -> mkCCall "hs_neg64"
+        MO_x64_Add   -> mkCCall "hs_add64"
+        MO_x64_Sub   -> mkCCall "hs_sub64"
+        MO_x64_Mul   -> mkCCall "hs_mul64"
+        MO_I64_Quot  -> mkCCall "hs_quotInt64"
+        MO_I64_Rem   -> mkCCall "hs_remInt64"
+        MO_W64_Quot  -> mkCCall "hs_quotWord64"
+        MO_W64_Rem   -> mkCCall "hs_remWord64"
+        MO_x64_And   -> mkCCall "hs_and64"
+        MO_x64_Or    -> mkCCall "hs_or64"
+        MO_x64_Xor   -> mkCCall "hs_xor64"
+        MO_x64_Not   -> mkCCall "hs_not64"
+        MO_x64_Shl   -> mkCCall "hs_uncheckedShiftL64"
+        MO_I64_Shr   -> mkCCall "hs_uncheckedIShiftRA64"
+        MO_W64_Shr   -> mkCCall "hs_uncheckedShiftRL64"
+        MO_x64_Eq    -> mkCCall "hs_eq64"
+        MO_x64_Ne    -> mkCCall "hs_ne64"
+        MO_I64_Ge    -> mkCCall "hs_geInt64"
+        MO_I64_Gt    -> mkCCall "hs_gtInt64"
+        MO_I64_Le    -> mkCCall "hs_leInt64"
+        MO_I64_Lt    -> mkCCall "hs_ltInt64"
+        MO_W64_Ge    -> mkCCall "hs_geWord64"
+        MO_W64_Gt    -> mkCCall "hs_gtWord64"
+        MO_W64_Le    -> mkCCall "hs_leWord64"
+        MO_W64_Lt    -> mkCCall "hs_ltWord64"
+
         -- Conversion
         MO_UF_Conv w        -> mkCCall (word2FloatLabel w)
 

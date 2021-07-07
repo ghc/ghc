@@ -861,6 +861,35 @@ pprCallishMachOp_for_C mop
         (MO_Prefetch_Data _ ) -> unsupported
         --- we could support prefetch via "__builtin_prefetch"
         --- Not adding it for now
+        MO_I64_ToI   -> unsupported
+        MO_I64_FromI -> unsupported
+        MO_W64_ToW   -> unsupported
+        MO_W64_FromW -> unsupported
+        MO_x64_Neg   -> unsupported
+        MO_x64_Add   -> unsupported
+        MO_x64_Sub   -> unsupported
+        MO_x64_Mul   -> unsupported
+        MO_I64_Quot  -> unsupported
+        MO_I64_Rem   -> unsupported
+        MO_W64_Quot  -> unsupported
+        MO_W64_Rem   -> unsupported
+        MO_x64_And   -> unsupported
+        MO_x64_Or    -> unsupported
+        MO_x64_Xor   -> unsupported
+        MO_x64_Not   -> unsupported
+        MO_x64_Shl   -> unsupported
+        MO_I64_Shr   -> unsupported
+        MO_W64_Shr   -> unsupported
+        MO_x64_Eq    -> unsupported
+        MO_x64_Ne    -> unsupported
+        MO_I64_Ge    -> unsupported
+        MO_I64_Gt    -> unsupported
+        MO_I64_Le    -> unsupported
+        MO_I64_Lt    -> unsupported
+        MO_W64_Ge    -> unsupported
+        MO_W64_Gt    -> unsupported
+        MO_W64_Le    -> unsupported
+        MO_W64_Lt    -> unsupported
     where unsupported = panic ("pprCallishMachOp_for_C: " ++ show mop
                             ++ " not supported!")
 
