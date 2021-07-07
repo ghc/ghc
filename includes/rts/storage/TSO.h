@@ -26,6 +26,8 @@ typedef struct {
  */
 typedef StgWord64 StgThreadID;
 
+#define FMT_StgThreadID FMT_Word64
+
 #define tsoLocked(tso) ((tso)->flags & TSO_LOCKED)
 
 /*

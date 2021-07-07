@@ -2645,7 +2645,7 @@ scheduleWaitThread (StgTSO* tso, /*[out]*/HaskellObj* ret, Capability **pcap)
     appendToRunQueue(cap,tso);
 
     DEBUG_ONLY( id = tso->id );
-    debugTrace(DEBUG_sched, "new bound thread (%lu)", (unsigned long)id);
+    debugTrace(DEBUG_sched, "new bound thread (%" FMT_StgThreadID ")", id);
 
     // As the TSO is bound and on the run queue, schedule() will run the TSO.
     cap = schedule(cap,task);
@@ -2653,7 +2653,7 @@ scheduleWaitThread (StgTSO* tso, /*[out]*/HaskellObj* ret, Capability **pcap)
     ASSERT(task->incall->rstat != NoStatus);
     ASSERT_FULL_CAPABILITY_INVARIANTS(cap,task);
 
-    debugTrace(DEBUG_sched, "bound thread (%lu) finished", (unsigned long)id);
+    debugTrace(DEBUG_sched, "bound thread (%" FMT_StgThreadID ") finished", id);
     *pcap = cap;
 }
 
@@ -3197,7 +3197,7 @@ resurrectThreads (StgTSO *threads)
         tso->global_link = gen->threads;
         gen->threads = tso;
 
-        debugTrace(DEBUG_sched, "resurrecting thread %lu", (unsigned long)tso->id);
+        debugTrace(DEBUG_sched, "resurrecting thread %" FMT_StgThreadID, tso->id);
 
         // Wake up the thread on the Capability it was last on
         cap = tso->cap;
