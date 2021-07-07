@@ -43,6 +43,7 @@ module GHC.Types.Literal
         , litNumWrap
         , litNumCoerce
         , litNumNarrow
+        , litNumBitSize
         , isMinBound
         , isMaxBound
 
@@ -55,8 +56,8 @@ module GHC.Types.Literal
         , isLitValue_maybe
 
         -- ** Coercions
-        , narrowInt8Lit, narrowInt16Lit, narrowInt32Lit
-        , narrowWord8Lit, narrowWord16Lit, narrowWord32Lit
+        , narrowInt8Lit, narrowInt16Lit, narrowInt32Lit, narrowInt64Lit
+        , narrowWord8Lit, narrowWord16Lit, narrowWord32Lit, narrowWord64Lit
         , extendIntLit, extendWordLit
         , charToIntLit, intToCharLit
         , floatToIntLit, intToFloatLit, doubleToIntLit, intToDoubleLit
@@ -194,6 +195,28 @@ litNumIsSigned nt = case nt of
   LitNumWord32  -> False
   LitNumWord64  -> False
 
+-- | Number of bits
+litNumBitSize :: Platform -> LitNumType -> Maybe Word
+litNumBitSize platform nt = case nt of
+  LitNumInteger -> Nothing
+  LitNumNatural -> Nothing
+  LitNumInt     -> Just (fromIntegral (platformWordSizeInBits platform))
+  LitNumInt8    -> Just 8
+  LitNumInt16   -> Just 16
+  LitNumInt32   -> Just 32
+  LitNumInt64   -> Just 64
+  LitNumWord    -> Just (fromIntegral (platformWordSizeInBits platform))
+  LitNumWord8   -> Just 8
+  LitNumWord16  -> Just 16
+  LitNumWord32  -> Just 32
+  LitNumWord64  -> Just 64
+
+instance Binary LitNumType where
+   put_ bh numTyp = putByte bh (fromIntegral (fromEnum numTyp))
+   get bh = do
+      h <- getByte bh
+      return (toEnum (fromIntegral h))
+
 {-
 Note [BigNum literals]
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -224,12 +247,6 @@ to embed the UTF-8 encoded binary blob. See Note [Embedding large binary blobs]
 for more details.
 
 -}
-
-instance Binary LitNumType where
-   put_ bh numTyp = putByte bh (fromIntegral (fromEnum numTyp))
-   get bh = do
-      h <- getByte bh
-      return (toEnum (fromIntegral h))
 
 instance Binary Literal where
     put_ bh (LitChar aa)     = do putByte bh 0; put_ bh aa
@@ -654,14 +671,16 @@ narrowLit' :: forall a. Integral a => LitNumType -> Literal -> Literal
 narrowLit' nt' (LitNumber _ i)  = LitNumber nt' (toInteger (fromInteger i :: a))
 narrowLit' _   l                = pprPanic "narrowLit" (ppr l)
 
-narrowInt8Lit, narrowInt16Lit, narrowInt32Lit,
-  narrowWord8Lit, narrowWord16Lit, narrowWord32Lit :: Literal -> Literal
+narrowInt8Lit, narrowInt16Lit, narrowInt32Lit, narrowInt64Lit,
+  narrowWord8Lit, narrowWord16Lit, narrowWord32Lit, narrowWord64Lit :: Literal -> Literal
 narrowInt8Lit   = narrowLit' @Int8   LitNumInt8
 narrowInt16Lit  = narrowLit' @Int16  LitNumInt16
 narrowInt32Lit  = narrowLit' @Int32  LitNumInt32
+narrowInt64Lit  = narrowLit' @Int64  LitNumInt64
 narrowWord8Lit  = narrowLit' @Word8  LitNumWord8
 narrowWord16Lit = narrowLit' @Word16 LitNumWord16
 narrowWord32Lit = narrowLit' @Word32 LitNumWord32
+narrowWord64Lit = narrowLit' @Word64 LitNumWord64
 
 -- | Extend a fixed-width literal (e.g. 'Int16#') to a word-sized literal (e.g.
 -- 'Int#').

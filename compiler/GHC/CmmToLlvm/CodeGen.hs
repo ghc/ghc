@@ -907,6 +907,37 @@ cmmPrimOpFunctions mop = do
     MO_Cmpxchg _     -> unsupported
     MO_Xchg _        -> unsupported
 
+    MO_I64_ToI       -> fsLit "hs_int64ToInt"
+    MO_I64_FromI     -> fsLit "hs_intToInt64"
+    MO_W64_ToW       -> fsLit "hs_word64ToWord"
+    MO_W64_FromW     -> fsLit "hs_wordToWord64"
+    MO_x64_Neg       -> fsLit "hs_neg64"
+    MO_x64_Add       -> fsLit "hs_add64"
+    MO_x64_Sub       -> fsLit "hs_sub64"
+    MO_x64_Mul       -> fsLit "hs_mul64"
+    MO_I64_Quot      -> fsLit "hs_quotInt64"
+    MO_I64_Rem       -> fsLit "hs_remInt64"
+    MO_W64_Quot      -> fsLit "hs_quotWord64"
+    MO_W64_Rem       -> fsLit "hs_remWord64"
+    MO_x64_And       -> fsLit "hs_and64"
+    MO_x64_Or        -> fsLit "hs_or64"
+    MO_x64_Xor       -> fsLit "hs_xor64"
+    MO_x64_Not       -> fsLit "hs_not64"
+    MO_x64_Shl       -> fsLit "hs_uncheckedShiftL64"
+    MO_I64_Shr       -> fsLit "hs_uncheckedIShiftRA64"
+    MO_W64_Shr       -> fsLit "hs_uncheckedShiftRL64"
+    MO_x64_Eq        -> fsLit "hs_eq64"
+    MO_x64_Ne        -> fsLit "hs_ne64"
+    MO_I64_Ge        -> fsLit "hs_geInt64"
+    MO_I64_Gt        -> fsLit "hs_gtInt64"
+    MO_I64_Le        -> fsLit "hs_leInt64"
+    MO_I64_Lt        -> fsLit "hs_ltInt64"
+    MO_W64_Ge        -> fsLit "hs_geWord64"
+    MO_W64_Gt        -> fsLit "hs_gtWord64"
+    MO_W64_Le        -> fsLit "hs_leWord64"
+    MO_W64_Lt        -> fsLit "hs_ltWord64"
+
+
 -- | Tail function calls
 genJump :: CmmExpr -> [GlobalReg] -> LlvmM StmtData
 

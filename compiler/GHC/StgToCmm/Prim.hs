@@ -17,6 +17,7 @@ module GHC.StgToCmm.Prim (
  ) where
 
 #include "HsVersions.h"
+#include "MachDeps.h"
 
 import GHC.Prelude hiding ((<*>))
 
@@ -1082,6 +1083,10 @@ emitPrimOp dflags primop = case primop of
   Word16ToInt16Op -> \args -> opNop args
   Int32ToWord32Op -> \args -> opNop args
   Word32ToInt32Op -> \args -> opNop args
+#if WORD_SIZE_IN_BITS < 64
+  Int64ToWord64Op -> \args -> opNop args
+  Word64ToInt64Op -> \args -> opNop args
+#endif
   IntToWordOp     -> \args -> opNop args
   WordToIntOp     -> \args -> opNop args
   IntToAddrOp     -> \args -> opNop args
@@ -1333,6 +1338,54 @@ emitPrimOp dflags primop = case primop of
   Word32LeOp     -> \args -> opTranslate args (MO_U_Le W32)
   Word32LtOp     -> \args -> opTranslate args (MO_U_Lt W32)
   Word32NeOp     -> \args -> opTranslate args (MO_Ne W32)
+
+#if WORD_SIZE_IN_BITS < 64
+-- Int64# signed ops
+
+  Int64ToIntOp   -> \args -> opTranslate64 args (\w -> MO_SS_Conv w (wordWidth platform)) MO_I64_ToI
+  IntToInt64Op   -> \args -> opTranslate64 args (\w -> MO_SS_Conv (wordWidth platform) w) MO_I64_FromI
+  Int64NegOp     -> \args -> opTranslate64 args MO_S_Neg  MO_x64_Neg
+  Int64AddOp     -> \args -> opTranslate64 args MO_Add    MO_x64_Add
+  Int64SubOp     -> \args -> opTranslate64 args MO_Sub    MO_x64_Sub
+  Int64MulOp     -> \args -> opTranslate64 args MO_Mul    MO_x64_Mul
+  Int64QuotOp    -> \args -> opTranslate64 args MO_S_Quot MO_I64_Quot
+  Int64RemOp     -> \args -> opTranslate64 args MO_S_Rem  MO_I64_Rem
+
+  Int64SllOp     -> \args -> opTranslate64 args MO_Shl    MO_x64_Shl
+  Int64SraOp     -> \args -> opTranslate64 args MO_S_Shr  MO_I64_Shr
+  Int64SrlOp     -> \args -> opTranslate64 args MO_U_Shr  MO_W64_Shr
+
+  Int64EqOp      -> \args -> opTranslate64 args MO_Eq     MO_x64_Eq
+  Int64GeOp      -> \args -> opTranslate64 args MO_S_Ge   MO_I64_Ge
+  Int64GtOp      -> \args -> opTranslate64 args MO_S_Gt   MO_I64_Gt
+  Int64LeOp      -> \args -> opTranslate64 args MO_S_Le   MO_I64_Le
+  Int64LtOp      -> \args -> opTranslate64 args MO_S_Lt   MO_I64_Lt
+  Int64NeOp      -> \args -> opTranslate64 args MO_Ne     MO_x64_Ne
+
+-- Word64# unsigned ops
+
+  Word64ToWordOp -> \args -> opTranslate64 args (\w -> MO_UU_Conv w (wordWidth platform)) MO_W64_ToW
+  WordToWord64Op -> \args -> opTranslate64 args (\w -> MO_UU_Conv (wordWidth platform) w) MO_W64_FromW
+  Word64AddOp    -> \args -> opTranslate64 args MO_Add    MO_x64_Add
+  Word64SubOp    -> \args -> opTranslate64 args MO_Sub    MO_x64_Sub
+  Word64MulOp    -> \args -> opTranslate64 args MO_Mul    MO_x64_Mul
+  Word64QuotOp   -> \args -> opTranslate64 args MO_U_Quot MO_W64_Quot
+  Word64RemOp    -> \args -> opTranslate64 args MO_U_Rem  MO_W64_Rem
+
+  Word64AndOp    -> \args -> opTranslate64 args MO_And    MO_x64_And
+  Word64OrOp     -> \args -> opTranslate64 args MO_Or     MO_x64_Or
+  Word64XorOp    -> \args -> opTranslate64 args MO_Xor    MO_x64_Xor
+  Word64NotOp    -> \args -> opTranslate64 args MO_Not    MO_x64_Not
+  Word64SllOp    -> \args -> opTranslate64 args MO_Shl    MO_x64_Shl
+  Word64SrlOp    -> \args -> opTranslate64 args MO_U_Shr  MO_W64_Shr
+
+  Word64EqOp     -> \args -> opTranslate64 args MO_Eq     MO_x64_Eq
+  Word64GeOp     -> \args -> opTranslate64 args MO_U_Ge   MO_W64_Ge
+  Word64GtOp     -> \args -> opTranslate64 args MO_U_Gt   MO_W64_Gt
+  Word64LeOp     -> \args -> opTranslate64 args MO_U_Le   MO_W64_Le
+  Word64LtOp     -> \args -> opTranslate64 args MO_U_Lt   MO_W64_Lt
+  Word64NeOp     -> \args -> opTranslate64 args MO_Ne     MO_x64_Ne
+#endif
 
 -- Char# ops
 
@@ -1650,6 +1703,18 @@ emitPrimOp dflags primop = case primop of
   opTranslate args mop = opIntoRegs $ \[res] -> do
     let stmt = mkAssign (CmmLocal res) (CmmMachOp mop args)
     emit stmt
+
+#if WORD_SIZE_IN_BITS < 64
+  opTranslate64
+    :: [CmmExpr]
+    -> (Width -> MachOp)
+    -> CallishMachOp
+    -> PrimopCmmEmit
+  opTranslate64 args mkMop callish =
+    case platformWordSize platform of
+      PW4 -> opCallish args callish
+      PW8 -> opTranslate args $ mkMop W64
+#endif
 
   -- | Basically a "manual" case, rather than one of the common repetitive forms
   -- above. The results are a parameter to the returned function so we know the

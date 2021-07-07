@@ -40,7 +40,7 @@ import Data.Bits
 import Data.Maybe
 
 #if WORD_SIZE_IN_BITS < 64
-import GHC.IntWord64
+import GHC.Prim
 #endif
 
 import GHC.Base
@@ -492,12 +492,6 @@ instance FiniteBits Int16 where
 -- type Int32
 ------------------------------------------------------------------------
 
--- Int32 is represented in the same way as Int.
-#if WORD_SIZE_IN_BITS > 32
--- Operations may assume and must ensure that it holds only values
--- from its logical range.
-#endif
-
 data {-# CTYPE "HsInt32" #-} Int32 = I32# Int32#
 -- ^ 32-bit signed integer type
 
@@ -762,7 +756,7 @@ instance Show Int64 where
 -- | @since 2.01
 instance Num Int64 where
     (I64# x#) + (I64# y#)  = I64# (x# `plusInt64#`  y#)
-    (I64# x#) - (I64# y#)  = I64# (x# `minusInt64#` y#)
+    (I64# x#) - (I64# y#)  = I64# (x# `subInt64#` y#)
     (I64# x#) * (I64# y#)  = I64# (x# `timesInt64#` y#)
     negate (I64# x#)       = I64# (negateInt64# x#)
     abs x | x >= 0         = x
@@ -836,9 +830,9 @@ divInt64#, modInt64# :: Int64# -> Int64# -> Int64#
 -- Define div in terms of quot, being careful to avoid overflow (#7233)
 x# `divInt64#` y#
     | isTrue# (x# `gtInt64#` zero) && isTrue# (y# `ltInt64#` zero)
-        = ((x# `minusInt64#` one) `quotInt64#` y#) `minusInt64#` one
+        = ((x# `subInt64#` one) `quotInt64#` y#) `subInt64#` one
     | isTrue# (x# `ltInt64#` zero) && isTrue# (y# `gtInt64#` zero)
-        = ((x# `plusInt64#` one)  `quotInt64#` y#) `minusInt64#` one
+        = ((x# `plusInt64#` one)  `quotInt64#` y#) `subInt64#` one
     | otherwise
         = x# `quotInt64#` y#
     where
