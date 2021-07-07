@@ -364,14 +364,23 @@ function build_hadrian() {
 
 function test_hadrian() {
   cd _build/bindist/ghc-*/
-  run ./configure --prefix="$TOP"/_build/install
-  run "$MAKE" install
+  case "$(uname)" in
+    MSYS_*|MINGW*)
+      mkdir -p "$TOP"/_build/install
+      cp -a * "$TOP"/_build/install
+      ;;
+    *)
+      run ./configure --prefix="$TOP"/_build/install
+      run "$MAKE" install
+      ;;
+  esac
   cd ../../../
 
   run_hadrian \
     test \
     --summary-junit=./junit.xml \
-    --test-compiler="$TOP"/_build/install/bin/ghc
+    --test-compiler="$TOP/_build/install/bin/ghc$exe" \
+    "runtest.opts+=${RUNTEST_ARGS:-}"
 }
 
 function clean() {
