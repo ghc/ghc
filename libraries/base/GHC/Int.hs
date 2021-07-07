@@ -43,7 +43,7 @@ import Data.Bits
 import Data.Maybe
 
 #if WORD_SIZE_IN_BITS < 64
-import GHC.IntWord64
+import GHC.Prim
 #endif
 
 import GHC.Base
@@ -475,12 +475,6 @@ instance FiniteBits Int16 where
 ------------------------------------------------------------------------
 -- type Int32
 ------------------------------------------------------------------------
-
--- Int32 is represented in the same way as Int.
-#if WORD_SIZE_IN_BITS > 32
--- Operations may assume and must ensure that it holds only values
--- from its logical range.
-#endif
 
 data {-# CTYPE "HsInt32" #-} Int32 = I32# Int32#
 -- ^ 32-bit signed integer type
