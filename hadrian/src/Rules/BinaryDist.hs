@@ -340,10 +340,12 @@ hsc2hsWrapper :: Action String
 hsc2hsWrapper = do
   ccArgs <- map ("--cflag=" <>) <$> settingList (ConfCcArgs Stage1)
   ldFlags <- map ("--lflag=" <>) <$> settingList (ConfGccLinkerArgs Stage1)
-  wrapper <- liftIO (readFile "utils/hsc2hs/hsc2hs.wrapper")
+  wrapper <- drop 4 . lines <$> liftIO (readFile "utils/hsc2hs/hsc2hs.wrapper")
   return $ unlines
-    [ "HSC2HS_EXTRA=\"" <> unwords ccArgs <> unwords ldFlags <> "\""
-    , wrapper ]
+    ( "HSC2HS_EXTRA=\"" <> unwords ccArgs <> unwords ldFlags <> "\""
+    : "tflag=\"--template=$libdir/template-hsc.h\""
+    : "Iflag=\"-I$includedir/\""
+    : wrapper )
 
 runGhcWrapper :: Action String
 runGhcWrapper = pure $ "exec \"$executablename\" -f \"$exedir/ghc\" ${1+\"$@\"}\n"
