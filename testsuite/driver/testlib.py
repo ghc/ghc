@@ -2107,6 +2107,12 @@ def normalise_errmsg(s: str) -> str:
     # collisions, so we need to normalise that to just "ghc"
     s = re.sub('ghc-stage[123]', 'ghc', s)
 
+    # On windows error messages can mention versioned executables
+    s = re.sub('ghc-[0-9.]+', 'ghc', s)
+    s = re.sub('runghc-[0-9.]+', 'runghc', s)
+    s = re.sub('hpc-[0-9.]+', 'hpc', s)
+    s = re.sub('ghc-pkg-[0-9.]+', 'ghc-pkg', s)
+
     # Error messages sometimes contain integer implementation package
     s = re.sub('integer-(gmp|simple)-[0-9.]+', 'integer-<IMPL>-<VERSION>', s)
 
