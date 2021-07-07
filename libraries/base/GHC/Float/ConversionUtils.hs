@@ -23,8 +23,9 @@ module GHC.Float.ConversionUtils ( elimZerosInteger, elimZerosInt# ) where
 
 import GHC.Base
 import GHC.Num.Integer
+
 #if WORD_SIZE_IN_BITS < 64
-import GHC.IntWord64
+import GHC.Prim
 #endif
 
 default ()
