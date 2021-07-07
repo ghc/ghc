@@ -441,9 +441,18 @@ function test_hadrian() {
     return
   fi
 
+
   cd _build/bindist/ghc-*/
-  run ./configure --prefix="$TOP"/_build/install
-  run "$MAKE" install
+  case "$(uname)" in
+    MSYS_*|MINGW*)
+      mkdir -p "$TOP"/_build/install
+      cp -r * "$TOP"/_build/install
+      ;;
+    *)
+      run ./configure --prefix="$TOP"/_build/install
+      run "$MAKE" install
+      ;;
+  esac
   cd ../../../
 
   run_hadrian \
