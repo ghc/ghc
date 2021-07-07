@@ -381,7 +381,7 @@ createVersionWrapper versioned_exe install_path = do
   top <- topDirectory
   let version_wrapper = top -/- "hadrian" -/- "bindist" -/- "version-wrapper.hs"
   cmd ghcPath ["-o", install_path, "-no-keep-hi-files"
-              , "-no-keep-o-files"
+              , "-no-keep-o-files", "-rtsopts=ignore"
               , "-DEXE_PATH=\"" ++ versioned_exe ++ "\""
               , version_wrapper]
 
