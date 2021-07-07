@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wno-noncanonical-monoid-instances #-}
+
 {-# LANGUAGE CPP                        #-}
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveFunctor              #-}
@@ -7,12 +9,15 @@
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE InstanceSigs               #-}
 {-# LANGUAGE MagicHash                  #-}
 {-# LANGUAGE NoImplicitPrelude          #-}
 {-# LANGUAGE PolyKinds                  #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE StandaloneDeriving         #-}
+{-# LANGUAGE StandaloneKindSignatures   #-}
 {-# LANGUAGE Trustworthy                #-}
+{-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeOperators              #-}
 {-# LANGUAGE UndecidableInstances       #-}
@@ -720,17 +725,21 @@ module GHC.Generics  (
   , Meta(..)
 
   -- * Generic type classes
-  , Generic(..), Generic1(..)
+  , Generic(..)
+  , Generic1(..)
 
+  -- * Generic wrapper
+  , Generically(..)
+  , Generically1(..)
   ) where
 
 -- We use some base types
-import Data.Either ( Either (..) )
-import Data.Maybe  ( Maybe(..), fromMaybe )
-import Data.Ord    ( Down(..) )
+import Data.Either     ( Either (..) )
+import Data.Maybe      ( Maybe(..), fromMaybe )
+import Data.Ord        ( Down(..) )
 import GHC.Num.Integer ( Integer, integerToInt )
-import GHC.Prim    ( Addr#, Char#, Double#, Float#, Int#, Word# )
-import GHC.Ptr     ( Ptr )
+import GHC.Prim        ( Addr#, Char#, Double#, Float#, Int#, Word# )
+import GHC.Ptr         ( Ptr )
 import GHC.Types
 
 -- Needed for instances
@@ -1364,6 +1373,147 @@ class Generic1 (f :: k -> Type) where
   from1  :: f a -> (Rep1 f) a
   -- | Convert from the representation to the datatype
   to1    :: (Rep1 f) a -> f a
+
+--------------------------------------------------------------------------------
+-- 'Generic' wrapper
+--------------------------------------------------------------------------------
+
+-- | A datatype whose instances are defined generically, using the
+-- 'Generic' representation. 'Generically1' is a higher-kinded version
+-- of 'Generically' that uses 'Generic1'.
+--
+-- Generic instances can be derived via @'Generically' A@ using
+-- @-XDerivingVia@.
+--
+-- @
+-- {-# LANGUAGE DeriveGeneric      #-}
+-- {-# LANGUAGE DerivingStrategies #-}
+-- {-# LANGUAGE DerivingVia        #-}
+--
+-- import GHC.Generics (Generic)
+--
+-- data V4 a = V4 a a a a
+--   deriving stock Generic
+--
+--   deriving (Semigroup, Monoid)
+--   via Generically (V4 a)
+-- @
+--
+-- This corresponds to 'Semigroup' and 'Monoid' instances defined by
+-- pointwise lifting:
+--
+-- @
+-- instance Semigroup a => Semigroup (V4 a) where
+--   (<>) :: V4 a -> V4 a -> V4 a
+--   V4 a1 b1 c1 d1 <> V4 a2 b2 c2 d2 =
+--     V4 (a1 <> a2) (b1 <> b2) (c1 <> c2) (d1 <> d2)
+--
+-- instance Monoid a => Monoid (V4 a) where
+--   mempty :: V4 a
+--   mempty = V4 mempty mempty mempty mempty
+-- @
+--
+-- Historically this required modifying the type class to include
+-- generic method definitions (@-XDefaultSignatures@) and deriving it
+-- with the @anyclass@ strategy (@-XDeriveAnyClass@). Having a /via
+-- type/ like 'Generically' decouples the instance from the type
+-- class.
+--
+-- @since 4.17.0.0
+newtype Generically a = Generically a
+
+-- | @since 4.17.0.0
+instance (Generic a, Semigroup (Rep a ())) => Semigroup (Generically a) where
+  (<>) :: Generically a -> Generically a -> Generically a
+  Generically a <> Generically b = Generically (to (from a <> from b :: Rep a ()))
+
+-- | @since 4.17.0.0
+instance (Semigroup a, Generic a, Monoid (Rep a ())) => Monoid (Generically a) where
+  mempty :: Generically a
+  mempty = Generically (to (mempty :: Rep a ()))
+
+  mappend :: Generically a -> Generically a -> Generically a
+  mappend = (<>)
+
+-- | A type whose instances are defined generically, using the
+-- 'Generic1' representation. 'Generically1' is a higher-kinded
+-- version of 'Generically' that uses 'Generic'.
+--
+-- Generic instances can be derived for type constructors via
+-- @'Generically1' F@ using @-XDerivingVia@.
+--
+-- @
+-- {-# LANGUAGE DeriveGeneric      #-}
+-- {-# LANGUAGE DerivingStrategies #-}
+-- {-# LANGUAGE DerivingVia        #-}
+--
+-- import GHC.Generics (Generic)
+--
+-- data V4 a = V4 a a a a
+--   deriving stock (Functor, Generic1)
+--
+--   deriving Applicative
+--   via Generically1 V4
+-- @
+--
+-- This corresponds to 'Applicative' instances defined by pointwise
+-- lifting:
+--
+-- @
+-- instance Applicative V4 where
+--   pure :: a -> V4 a
+--   pure a = V4 a a a a
+--
+--   liftA2 :: (a -> b -> c) -> (V4 a -> V4 b -> V4 c)
+--   liftA2 (·) (V4 a1 b1 c1 d1) (V4 a2 b2 c2 d2) =
+--     V4 (a1 · a2) (b1 · b2) (c1 · c2) (d1 · d2)
+-- @
+--
+-- Historically this required modifying the type class to include
+-- generic method definitions (@-XDefaultSignatures@) and deriving it
+-- with the @anyclass@ strategy (@-XDeriveAnyClass@). Having a /via
+-- type/ like 'Generically1' decouples the instance from the type
+-- class.
+--
+-- @since 4.17.0.0
+type    Generically1 :: forall k. (k -> Type) -> (k -> Type)
+newtype Generically1 f a where
+  Generically1 :: forall {k} f a. f a -> Generically1 @k f a
+
+-- | @since 4.17.0.0
+instance (Generic1 f, Functor (Rep1 f)) => Functor (Generically1 f) where
+  fmap :: (a -> a') -> (Generically1 f a -> Generically1 f a')
+  fmap f (Generically1 as) = Generically1
+    (to1 (fmap f (from1 as)))
+
+  (<$) :: a -> Generically1 f b -> Generically1 f a
+  a <$ Generically1 as = Generically1
+    (to1 (a <$ from1 as))
+
+-- | @since 4.17.0.0
+instance (Generic1 f, Applicative (Rep1 f)) => Applicative (Generically1 f) where
+  pure :: a -> Generically1 f a
+  pure a = Generically1
+    (to1 (pure a))
+
+  (<*>) :: Generically1 f (a1 -> a2) -> Generically1 f a1 -> Generically1 f a2
+  Generically1 fs <*> Generically1 as = Generically1
+    (to1 (from1 fs <*> from1 as))
+
+  liftA2 :: (a1 -> a2 -> a3)
+         -> (Generically1 f a1 -> Generically1 f a2 -> Generically1 f a3)
+  liftA2 (·) (Generically1 as) (Generically1 bs) = Generically1
+    (to1 (liftA2 (·) (from1 as) (from1 bs)))
+
+-- | @since 4.17.0.0
+instance (Generic1 f, Alternative (Rep1 f)) => Alternative (Generically1 f) where
+  empty :: Generically1 f a
+  empty = Generically1
+    (to1 empty)
+
+  (<|>) :: Generically1 f a -> Generically1 f a -> Generically1 f a
+  Generically1 as1 <|> Generically1 as2 = Generically1
+    (to1 (from1 as1 <|> from1 as2))
 
 --------------------------------------------------------------------------------
 -- Meta-data
