@@ -170,15 +170,13 @@ just attach 'noSrcSpan' to everything.
 mkHsPar :: LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
 mkHsPar e = L (getLoc e) (gHsPar e)
 
-mkSimpleMatch :: (Anno (Match (GhcPass p) (LocatedA (body (GhcPass p))))
-                        ~ SrcSpanAnnA,
-                  Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
+mkSimpleMatch :: (Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
                         ~ SrcSpan)
               => HsMatchContext (NoGhcTc (GhcPass p))
               -> [LPat (GhcPass p)] -> LocatedA (body (GhcPass p))
-              -> LMatch (GhcPass p) (LocatedA (body (GhcPass p)))
+              -> LAnnoMatch SrcSpanAnnA (GhcPass p) (LocatedA (body (GhcPass p)))
 mkSimpleMatch ctxt pats rhs
-  = L loc $
+  = L loc $ Annotated $
     Match { m_ext = noAnn, m_ctxt = ctxt, m_pats = pats
           , m_grhss = unguardedGRHSs (locA loc) rhs noAnn }
   where
@@ -199,18 +197,12 @@ unguardedRHS :: Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
              -> [LGRHS (GhcPass p) (LocatedA (body (GhcPass p)))]
 unguardedRHS an loc rhs = [L loc (GRHS an [] rhs)]
 
-type AnnoBody p body
-  = ( XMG (GhcPass p) (LocatedA (body (GhcPass p))) ~ NoExtField
-    , Anno [LocatedA (Match (GhcPass p) (LocatedA (body (GhcPass p))))] ~ SrcSpanAnnL
-    , Anno (Match (GhcPass p) (LocatedA (body (GhcPass p)))) ~ SrcSpanAnnA
-    )
-
-mkMatchGroup :: AnnoBody p body
+mkMatchGroup :: (XMG (GhcPass p) (LocatedA (body (GhcPass p))) ~ NoExtField)
              => Origin
-             -> LocatedL [LocatedA (Match (GhcPass p) (LocatedA (body (GhcPass p))))]
-             -> MatchGroup (GhcPass p) (LocatedA (body (GhcPass p)))
+             -> LocatedL [LAnnoMatch SrcSpanAnnA (GhcPass p) (LocatedA (body (GhcPass p)))]
+             -> MatchGroup SrcSpanAnnL SrcSpanAnnA (GhcPass p) (LocatedA (body (GhcPass p)))
 mkMatchGroup origin matches = MG { mg_ext = noExtField
-                                 , mg_alts = matches
+                                 , mg_alts = fmap Annotated matches
                                  , mg_origin = origin }
 
 mkLocatedList :: Semigroup a
@@ -265,11 +257,9 @@ mkHsLams tyvars dicts expr = mkLHsWrap (mkWpTyLams tyvars
 -- |A simple case alternative with a single pattern, no binds, no guards;
 -- pre-typechecking
 mkHsCaseAlt :: (Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
-                     ~ SrcSpan,
-                 Anno (Match (GhcPass p) (LocatedA (body (GhcPass p))))
-                        ~ SrcSpanAnnA)
+                     ~ SrcSpan)
             => LPat (GhcPass p) -> (LocatedA (body (GhcPass p)))
-            -> LMatch (GhcPass p) (LocatedA (body (GhcPass p)))
+            -> LAnnoMatch SrcSpanAnnA (GhcPass p) (LocatedA (body (GhcPass p)))
 mkHsCaseAlt pat expr
   = mkSimpleMatch CaseAlt [pat] expr
 
@@ -582,9 +572,9 @@ nlHsDo ctxt stmts = noLocA (mkHsDo ctxt (noLocA stmts))
 nlHsOpApp :: LHsExpr GhcPs -> IdP GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs
 nlHsOpApp e1 op e2 = noLocA (mkHsOpApp e1 op e2)
 
-nlHsLam  :: LMatch GhcPs (LHsExpr GhcPs) -> LHsExpr GhcPs
+nlHsLam  :: LAnnoMatch SrcSpanAnnA GhcPs (LHsExpr GhcPs) -> LHsExpr GhcPs
 nlHsPar  :: LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
-nlHsCase :: LHsExpr GhcPs -> [LMatch GhcPs (LHsExpr GhcPs)]
+nlHsCase :: LHsExpr GhcPs -> [LAnnoMatch SrcSpanAnnA GhcPs (LHsExpr GhcPs)]
          -> LHsExpr GhcPs
 nlList   :: [LHsExpr GhcPs] -> LHsExpr GhcPs
 
@@ -832,7 +822,7 @@ l
 ************************************************************************
 -}
 
-mkFunBind :: Origin -> LocatedN RdrName -> [LMatch GhcPs (LHsExpr GhcPs)]
+mkFunBind :: Origin -> LocatedN RdrName -> [LExprMatch GhcPs]
           -> HsBind GhcPs
 -- ^ Not infix, with place holders for coercion and free vars
 mkFunBind origin fn ms
@@ -841,7 +831,7 @@ mkFunBind origin fn ms
             , fun_ext = noExtField
             , fun_tick = [] }
 
-mkTopFunBind :: Origin -> LocatedN Name -> [LMatch GhcRn (LHsExpr GhcRn)]
+mkTopFunBind :: Origin -> LocatedN Name -> [LAnnoMatch SrcSpanAnnA GhcRn (LHsExpr GhcRn)]
              -> HsBind GhcRn
 -- ^ In Name-land, with empty bind_fvs
 mkTopFunBind origin fn ms = FunBind { fun_id = fn
@@ -872,7 +862,7 @@ mkPatSynBind name details lpat dir anns = PatSynBind noExtField psb
 -- considered infix.
 isInfixFunBind :: forall id1 id2. UnXRec id2 => HsBindLR id1 id2 -> Bool
 isInfixFunBind (FunBind { fun_matches = MG _ matches _ })
-  = any (isInfixMatch . unXRec @id2) (unXRec @id2 matches)
+  = any (isInfixMatch . unAnnotate . unXRec @id2) (unAnnotate $ unXRec @id2 matches)
 isInfixFunBind _ = False
 
 -- |Return the 'SrcSpan' encompassing the contents of any enclosed binds
@@ -917,12 +907,13 @@ mkMatch :: forall p. IsPass p
         -> [LPat (GhcPass p)]
         -> LHsExpr (GhcPass p)
         -> HsLocalBinds (GhcPass p)
-        -> LMatch (GhcPass p) (LHsExpr (GhcPass p))
+        -> LExprMatch (GhcPass p)
 mkMatch ctxt pats expr binds
-  = noLocA (Match { m_ext   = noAnn
-                  , m_ctxt  = ctxt
-                  , m_pats  = map mkParPat pats
-                  , m_grhss = GRHSs noExtField (unguardedRHS noAnn noSrcSpan expr) binds })
+  = noLocA $ Annotated
+      (Match { m_ext   = noAnn
+             , m_ctxt  = ctxt
+             , m_pats  = map mkParPat pats
+             , m_grhss = GRHSs noExtField (unguardedRHS noAnn noSrcSpan expr) binds })
 
 {-
 ************************************************************************
@@ -1001,7 +992,7 @@ isBangedHsBind :: HsBind GhcTc -> Bool
 isBangedHsBind (AbsBinds { abs_binds = binds })
   = anyBag (isBangedHsBind . unLoc) binds
 isBangedHsBind (FunBind {fun_matches = matches})
-  | [L _ match] <- unLoc $ mg_alts matches
+  | [L _ (Annotated match)] <- unAnnotate $ unLoc $ mg_alts matches
   , FunRhs{mc_strictness = SrcStrict} <- m_ctxt match
   = True
 isBangedHsBind (PatBind {pat_lhs = pat})

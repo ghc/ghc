@@ -603,7 +603,7 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = Left fields
         ; alts <- mapM (mk_alt upd_fld_env) cons_to_upd
         ; ([discrim_var], matching_code)
                 <- matchWrapper RecUpd (Just record_expr) -- See Note [Scrutinee in Record updates]
-                                      (MG { mg_alts = noLocA alts
+                                      (MG { mg_alts = noLocA $ Annotated alts
                                           , mg_ext = MatchGroupTc [unrestricted in_ty] out_ty
                                           , mg_origin = FromSource
                                           })
@@ -1003,7 +1003,8 @@ dsDo ctx stmts
         rets         = map noLocA rec_rets
         mfix_app     = nlHsSyntaxApps mfix_op [mfix_arg]
         mfix_arg     = noLocA $ HsLam noExtField
-                           (MG { mg_alts = noLocA [mkSimpleMatch
+                           (MG { mg_alts = noLocA $ Annotated
+                                              [mkSimpleMatch
                                                     LambdaExpr
                                                     [mfix_pat] body]
                                , mg_ext = MatchGroupTc [unrestricted tup_ty] body_ty

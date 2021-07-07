@@ -323,14 +323,14 @@ desugarEmptyCase :: Id -> DsM PmEmptyCase
 desugarEmptyCase var = pure PmEmptyCase { pe_var = var }
 
 -- | Desugar the non-empty 'Match'es of a 'MatchGroup'.
-desugarMatches :: [Id] -> NonEmpty (LMatch GhcTc (LHsExpr GhcTc))
+desugarMatches :: [Id] -> NonEmpty (LAnnoMatch SrcSpanAnnA GhcTc (LHsExpr GhcTc))
                -> DsM (PmMatchGroup Pre)
 desugarMatches vars matches =
   PmMatchGroup <$> traverse (desugarMatch vars) matches
 
 -- Desugar a single match
-desugarMatch :: [Id] -> LMatch GhcTc (LHsExpr GhcTc) -> DsM (PmMatch Pre)
-desugarMatch vars (L match_loc (Match { m_pats = pats, m_grhss = grhss })) = do
+desugarMatch :: [Id] -> LAnnoMatch SrcSpanAnnA GhcTc (LHsExpr GhcTc) -> DsM (PmMatch Pre)
+desugarMatch vars (L match_loc (Annotated Match { m_pats = pats, m_grhss = grhss })) = do
   pats'  <- concat <$> zipWithM desugarLPat vars pats
   grhss' <- desugarGRHSs (locA match_loc) (sep (map ppr pats)) grhss
   -- tracePm "desugarMatch" (vcat [ppr pats, ppr pats', ppr grhss'])
@@ -383,7 +383,7 @@ desugarLocalBinds (HsValBinds _ (XValBindsLR (NValBinds binds _))) =
     go (L _ FunBind{fun_id = L _ x, fun_matches = mg})
       -- See Note [Long-distance information for HsLocalBinds] for why this
       -- pattern match is so very specific.
-      | L _ [L _ Match{m_pats = [], m_grhss = grhss}] <- mg_alts mg
+      | L _ (Annotated [L _ (Annotated Match{m_pats = [], m_grhss = grhss})]) <- mg_alts mg
       , GRHSs{grhssGRHSs = [L _ (GRHS _ _grds rhs)]} <- grhss = do
           core_rhs <- dsLExpr rhs
           return [PmLet x core_rhs]
