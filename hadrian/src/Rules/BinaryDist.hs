@@ -1,3 +1,4 @@
+{-# LANGUAGE TupleSections #-}
 module Rules.BinaryDist where
 
 import Hadrian.Haskell.Cabal
@@ -13,6 +14,9 @@ import Settings.Program (programContext)
 import Target
 import Utilities
 import qualified System.Directory.Extra as IO
+import Data.Either
+import Hadrian.Oracles.Cabal
+import Hadrian.Haskell.Cabal.Type
 
 {-
 Note [Binary distributions]
@@ -28,20 +32,26 @@ It does so by following the steps below.
 
 - make sure we have a complete stage 2 compiler + haddock
 
-- copy the bin and lib directories of the compiler we built:
-    <build root>/stage1/{bin, lib}
+- copy the specific binaries which should be in the bindist to the
+  bin folder and add the version suffix:
+    <build root>/stage1/bin/xxxx
   to
-    <build root>/bindist/ghc-<X>.<Y>.<Z>-<arch>-<os>/{bin, lib}
+    <build root/bindist/ghc-<X>.<Y>.<Z>-<arch>-<os>/bin/xxxx-<VER>
+
+- create symlink (or bash) wrapper from unversioned to versioned executable:
+    <build root/bindist/ghc-<X>.<Y>.<Z>-<arch>-<os>/bin/xxxx
+  points to:
+    <build root/bindist/ghc-<X>.<Y>.<Z>-<arch>-<os>/bin/xxxx-<VER>
+
+- copy the lib directories of the compiler we built:
+    <build root>/stage1/lib
+  to
+    <build root>/bindist/ghc-<X>.<Y>.<Z>-<arch>-<os>/lib
 
 - copy the generated docs (user guide, haddocks, etc):
     <build root>/docs/
   to
     <build root>/bindist/ghc-<X>.<Y>.<Z>-<arch>-<os>/docs/
-
-- copy haddock (built by our stage2 compiler):
-    <build root>/stage2/bin/haddock
-  to
-    <build root>/bindist/ghc-<X>.<Y>.<Z>-<arch>-<os>/bin/haddock
 
 - use autoreconf to generate a `configure` script from
   aclocal.m4 and distrib/configure.ac, that we move to:
@@ -115,10 +125,11 @@ bindistRules = do
 
     phony "binary-dist-dir" $ do
         -- We 'need' all binaries and libraries
-        targets <- mapM pkgTarget =<< stagePackages Stage1
+        all_pkgs <- stagePackages Stage1
+        (lib_targets, bin_targets) <- partitionEithers <$> mapM pkgTarget all_pkgs
         cross <- flag CrossCompiling
-        need targets
-        unless cross $ needIservBins
+        iserv_targets <- if cross then pure [] else iservBins
+        need (lib_targets ++ (map fst (bin_targets ++ iserv_targets)))
 
         version        <- setting ProjectVersion
         targetPlatform <- setting TargetPlatformFull
@@ -134,7 +145,25 @@ bindistRules = do
         -- We create the bindist directory at <root>/bindist/ghc-X.Y.Z-platform/
         -- and populate it with Stage2 build results
         createDirectory bindistFilesDir
-        copyDirectory (ghcBuildDir -/- "bin") bindistFilesDir
+        createDirectory (bindistFilesDir -/- "bin")
+        createDirectory (bindistFilesDir -/- "lib")
+        -- Also create wrappers with version suffixes (#20074)
+        forM_ (bin_targets ++ iserv_targets) $ \(prog_path, ver) -> do
+            let orig_filename = takeFileName prog_path
+                (name, ext) = splitExtensions orig_filename
+                version_prog = name ++ "-" ++ ver ++ ext
+                -- Install the actual executable with a version suffix
+                install_path = bindistFilesDir -/- "bin" -/- version_prog
+                -- The wrapper doesn't have a version
+                unversioned_install_path = (bindistFilesDir -/- "bin" -/- orig_filename)
+            -- 1. Copy the executable to the versioned executable name in
+            -- the directory
+            copyFile prog_path install_path
+            -- 2. Either make a symlink for the unversioned version or
+            -- a wrapper script on platforms (windows) which don't support symlinks.
+            if windowsHost
+              then createVersionWrapper version_prog unversioned_install_path
+              else createFileLink install_path unversioned_install_path
         copyDirectory (ghcBuildDir -/- "lib") bindistFilesDir
         copyDirectory (rtsIncludeDir)         bindistFilesDir
 
@@ -159,22 +188,17 @@ bindistRules = do
           -- shipping it
           removeFile (bindistFilesDir -/- mingwStamp)
 
-        -- We copy the binary (<build root>/stage1/bin/haddock[.exe]) to
-        -- the bindist's bindir (<build root>/bindist/ghc-.../bin/).
-        unless cross $ do
-          haddockPath <- programPath (vanillaContext Stage1 haddock)
-          copyFile haddockPath
-                   (bindistFilesDir -/- "bin" -/- takeFileName haddockPath)
-
         -- We then 'need' all the files necessary to configure and install
         -- (as in, './configure [...] && make install') this build on some
         -- other machine.
         need $ map (bindistFilesDir -/-)
                    (["configure", "Makefile"] ++ bindistInstallFiles)
-        need $ map ((bindistFilesDir -/- "wrappers") -/-)
-                   [ "check-ppr", "check-exact", "count-deps", "ghc", "ghc-iserv", "ghc-pkg"
-                   , "ghci-script", "haddock", "hpc", "hp2ps", "hsc2hs"
-                   , "runghc"]
+        wrappers <- fmap concat (sequence [ pkgToWrappers p | p <- all_pkgs, isProgram p])
+        need $ map ((bindistFilesDir -/- "wrappers") -/-) wrappers
+
+
+--            IO.removeFile link_path <|> return ()
+--            IO.createFileLink versioned_exe_name link_path
 
 
     let buildBinDist :: Compressor -> Action ()
@@ -262,10 +286,26 @@ bindistInstallFiles =
 -- for all libraries and programs that are needed for a complete build.
 -- For libraries, it returns the path to the @.conf@ file in the package
 -- database. For programs, it returns the path to the compiled executable.
-pkgTarget :: Package -> Action FilePath
+pkgTarget :: Package -> Action (Either FilePath (FilePath, String))
 pkgTarget pkg
-    | isLibrary pkg = pkgConfFile (vanillaContext Stage1 pkg)
-    | otherwise     = programPath =<< programContext Stage1 pkg
+    | isLibrary pkg = Left <$> pkgConfFile (vanillaContext Stage1 pkg)
+    | otherwise     = do
+        path <- programPath =<< programContext Stage1 pkg
+        version <- version <$> readPackageData pkg
+        return (Right (path, version))
+
+
+-- | Which wrappers point to a specific package
+pkgToWrappers :: Package -> Action [String]
+pkgToWrappers pkg
+  -- ghc also has the ghci script wrapper
+  | pkg == ghc = pure ["ghc", "ghci-script"]
+  -- These are the packages which we want to expose to the user and hence
+  -- there are wrappers installed in the bindist.
+  | pkg `elem` [hpcBin, haddock, hp2ps, hsc2hs, runGhc, ghc, ghcPkg]
+    = (:[]) <$> (programName =<< programContext Stage1 pkg)
+  | otherwise = pure []
+
 
 wrapper :: FilePath -> Action String
 wrapper "ghc"         = ghcWrapper
@@ -277,6 +317,7 @@ wrapper "runghc"      = runGhcWrapper
 wrapper _             = commonWrapper
 
 -- | Wrapper scripts for different programs. Common is default wrapper.
+-- See Note [Two Types of Wrappers]
 
 ghcWrapper :: Action String
 ghcWrapper = pure $ "exec \"$executablename\" -B\"$libdir\" ${1+\"$@\"}\n"
@@ -297,26 +338,10 @@ hsc2hsWrapper :: Action String
 hsc2hsWrapper = do
   ccArgs <- map ("--cflag=" <>) <$> settingList (ConfCcArgs Stage1)
   ldFlags <- map ("--lflag=" <>) <$> settingList (ConfGccLinkerArgs Stage1)
+  wrapper <- liftIO (readFile "utils/hsc2hs/hsc2hs.wrapper")
   return $ unlines
     [ "HSC2HS_EXTRA=\"" <> unwords ccArgs <> unwords ldFlags <> "\""
-    , "tflag=\"--template=$libdir/template-hsc.h\""
-    , "Iflag=\"-I$includedir/\""
-    , "for arg do"
-    , "    case \"$arg\" in"
-    , "# On OS X, we need to specify -m32 or -m64 in order to get gcc to"
-    , "# build binaries for the right target. We do that by putting it in"
-    , "# HSC2HS_EXTRA. When cabal runs hsc2hs, it passes a flag saying which"
-    , "# gcc to use, so if we set HSC2HS_EXTRA= then we don't get binaries"
-    , "# for the right platform. So for now we just don't set HSC2HS_EXTRA="
-    , "# but we probably want to revisit how this works in the future."
-    , "#        -c*)          HSC2HS_EXTRA=;;"
-    , "#        --cc=*)       HSC2HS_EXTRA=;;"
-    , "        -t*)          tflag=;;"
-    , "        --template=*) tflag=;;"
-    , "        --)           break;;"
-    , "    esac"
-    , "done"
-    , "exec \"$executablename\" ${tflag:+\"$tflag\"} $HSC2HS_EXTRA ${1+\"$@\"} \"$Iflag\"" ]
+    , wrapper ]
 
 runGhcWrapper :: Action String
 runGhcWrapper = pure $ "exec \"$executablename\" -f \"$exedir/ghc\" ${1+\"$@\"}\n"
@@ -334,11 +359,53 @@ ghciScriptWrapper = pure $ unlines
 --   the package to be built, since here we're generating 3 different
 --   executables out of just one package, so we need to specify all 3 contexts
 --   explicitly and 'need' the result of building them.
-needIservBins :: Action ()
-needIservBins = do
+iservBins :: Action [(FilePath, String)]
+iservBins = do
   rtsways <- interpretInContext (vanillaContext Stage1 ghc) getRtsWays
-  need =<< traverse programPath
+  ver <- version <$> readPackageData iserv
+  traverse (fmap (,ver) . programPath)
       [ Context Stage1 iserv w
-      | w <- [vanilla, profiling, dynamic]
+      | w <- [vanilla, dynamic]
       , w `elem` rtsways
       ]
+
+-- Version wrapper scripts
+-- See Note [Two Types of Wrappers]
+
+-- | The version wrapper is used to provide unversioned executables on
+-- windows. On systems which support symlinks, we just use a symlink
+versionWrapper :: String -> String
+versionWrapper pkg_name =
+  unlines ["#!/bin/sh"
+          ,"exec \"$(dirname \"$0\")\"/" ++ pkg_name ++ " \"$@\""
+          ]
+
+-- | Create a wrapper script calls the executable given as first argument
+createVersionWrapper :: String -> FilePath -> Action ()
+createVersionWrapper versioned_exe install_path =
+  let wrapper = versionWrapper versioned_exe
+  in do
+    writeFile' install_path wrapper
+    makeExecutable install_path
+
+{-
+Note [Two Types of Wrappers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+There are two different types of wrapper scripts.
+
+1. The wrapper scripts installed
+    <build root>/bindist/ghc-<X>.<Y>.<Z>-<arch>-<os>/wrappers/<program>
+2. The version wrapper scripts installed in
+    <build root/bindist/ghc-<X>.<Y>.<Z>-<arch>-<os>/bin/xxxx
+
+The purpose of the wrappers in (1) is to allow the executables to be installed
+into a different @BINDIR@ which is not already adjacent to a libdir. Therefore
+these wrappers pass the libdir and so on explicitliy to the executable so the
+wrappers can be placed anywhere and still work.
+
+The purpose of the wrappers in (2) is to provide both versioned and unversioned
+executables. On windows, these are actual wrapper scripts which just call the executable
+but on linux these wrappers are symlinks.
+
+-}

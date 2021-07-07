@@ -21,6 +21,7 @@ configureResults =
     , "utils/iserv/iserv.cabal"
     , "utils/iserv-proxy/iserv-proxy.cabal"
     , "utils/remote-iserv/remote-iserv.cabal"
+    , "utils/ghc-pkg/ghc-pkg.cabal"
     , "utils/runghc/runghc.cabal"
     , "utils/gen-dll/gen-dll.cabal"
     , "libraries/ghc-boot/ghc-boot.cabal"
