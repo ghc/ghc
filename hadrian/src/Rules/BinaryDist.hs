@@ -42,11 +42,6 @@ It does so by following the steps below.
   to
     <build root>/bindist/ghc-<X>.<Y>.<Z>-<arch>-<os>/docs/
 
-- copy haddock (built by our stage2 compiler):
-    <build root>/stage2/bin/haddock
-  to
-    <build root>/bindist/ghc-<X>.<Y>.<Z>-<arch>-<os>/bin/haddock
-
 - use autoreconf to generate a `configure` script from
   aclocal.m4 and distrib/configure.ac, that we move to:
     <build root>/bindist/ghc-<X>.<Y>.<Z>-<arch>-<os>/configure
@@ -168,13 +163,6 @@ bindistRules = do
           -- as a proxy for the whole mingw toolchain, there's no point in
           -- shipping it
           removeFile (bindistFilesDir -/- mingwStamp)
-
-        -- We copy the binary (<build root>/stage1/bin/haddock[.exe]) to
-        -- the bindist's bindir (<build root>/bindist/ghc-.../bin/).
-        unless cross $ do
-          haddockPath <- programPath (vanillaContext Stage1 haddock)
-          copyFile haddockPath
-                   (bindistFilesDir -/- "bin" -/- takeFileName haddockPath)
 
         -- We then 'need' all the files necessary to configure and install
         -- (as in, './configure [...] && make install') this build on some
