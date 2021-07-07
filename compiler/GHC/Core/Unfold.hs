@@ -64,6 +64,7 @@ import GHC.Types.Tickish
 
 import qualified Data.ByteString as BS
 import Data.List (isPrefixOf)
+import GHC.Unit.Module
 
 
 -- | Unfolding options
@@ -1101,16 +1102,18 @@ instance Outputable CallCtxt where
   ppr RuleArgCtxt = text "RuleArgCtxt"
 
 callSiteInline :: Logger
+               -> Module
                -> UnfoldingOpts
                -> Int                   -- Case depth
                -> Id                    -- The Id
+               -> Bool                  -- True <=> ignore pragmas
                -> Bool                  -- True <=> unfolding is active
                -> Bool                  -- True if there are no arguments at all (incl type args)
                -> [ArgSummary]          -- One for each value arg; True if it is interesting
                -> CallCtxt              -- True <=> continuation is interesting
                -> Maybe CoreExpr        -- Unfolding, if any
-callSiteInline logger opts !case_depth id active_unfolding lone_variable arg_infos cont_info
-  = case idUnfolding id of
+callSiteInline logger cur_mod opts !case_depth id ignore_prags active_unfolding lone_variable arg_infos cont_info
+  = case idUnfoldingChecked cur_mod ignore_prags id of
       -- idUnfolding checks for loop-breakers, returning NoUnfolding
       -- Things with an INLINE pragma may have an unfolding *and*
       -- be a loop breaker  (maybe the knot is not yet untied)
