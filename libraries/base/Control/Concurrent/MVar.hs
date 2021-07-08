@@ -162,7 +162,10 @@ import Control.Exception.Base
 {-|
   Take a value from an 'MVar', put a new value into the 'MVar' and
   return the value taken. This function is atomic only if there are
-  no other producers for this 'MVar'.
+  no other producers for this 'MVar'. In other words, it cannot guarantee
+  that, by the time 'swapMVar' gets the chance to write to the MVar,
+  the value of the MVar has not been altered
+  by a write operation from another thread.
 -}
 swapMVar :: MVar a -> a -> IO a
 swapMVar mvar new =
@@ -213,7 +216,7 @@ withMVarMasked m io =
   the 'MVar' if an exception is raised during the operation.  This
   function is only atomic if there are no other producers for this
   'MVar'. In other words, it cannot guarantee that, by the time
-  'withmMVar' gets the chance to write to the MVar, the value
+  'modifyMVar_' gets the chance to write to the MVar, the value
   of the MVar has not been altered by a write operation from another thread.
 -}
 {-# INLINE modifyMVar_ #-}
