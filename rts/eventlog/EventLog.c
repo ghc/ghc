@@ -277,7 +277,7 @@ static inline void postTimestamp(EventsBuf *eb)
 { postWord64(eb, time_ns()); }
 
 static inline void postThreadID(EventsBuf *eb, EventThreadID id)
-{ postWord32(eb,id); }
+{ postWord64(eb,id); }
 
 static inline void postCapNo(EventsBuf *eb, EventCapNo no)
 { postWord16(eb,no); }
