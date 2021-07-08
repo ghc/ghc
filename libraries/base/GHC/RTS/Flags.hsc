@@ -146,6 +146,7 @@ data GCFlags = GCFlags
     , allocLimitGrace       :: Word
     , numa                  :: Bool
     , numaMask              :: Word
+    , hugePage              :: Bool
     } deriving ( Show -- ^ @since 4.8.0.0
                , Generic -- ^ @since 4.15.0.0
                )
@@ -456,6 +457,8 @@ getGCFlags = do
           <*> (toBool <$>
                 (#{peek GC_FLAGS, numa} ptr :: IO CBool))
           <*> #{peek GC_FLAGS, numaMask} ptr
+          <*> (toBool <$>
+                (#{peek GC_FLAGS, hugePage} ptr :: IO CBool))
 
 getParFlags :: IO ParFlags
 getParFlags = do
