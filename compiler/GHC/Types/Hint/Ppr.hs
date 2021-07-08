@@ -24,6 +24,10 @@ instance Outputable GhcHint where
       -> case ext of
           LangExt.NegativeLiterals
             -> text "If you are trying to write a large negative literal, use NegativeLiterals"
+          -- RecordPuns is now effectively 'NamedFieldPuns', so we have to pretty-print the
+          -- hint to yield the correct suggestion in terms of extension to enable.
+          LangExt.RecordPuns
+            -> text "Perhaps you intended to use NamedFieldPuns"
           _ -> text "Perhaps you intended to use" <+> ppr ext
     SuggestMissingDo
       -> text "Possibly caused by a missing 'do'?"
@@ -61,6 +65,8 @@ instance Outputable GhcHint where
     SuggestAddPhaseToCompetingRule bad_rule
       -> vcat [ text "Add phase [n] or [~n] to the competing rule"
               , whenPprDebug (ppr bad_rule) ]
+    SuggestIncreaseSimplifierIterations
+      -> text "Set limit with -fconstraint-solver-iterations=n; n=0 for no limit"
 
 perhapsAsPat :: SDoc
 perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"
