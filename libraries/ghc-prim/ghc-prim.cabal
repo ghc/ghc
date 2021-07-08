@@ -43,7 +43,6 @@ Library
         GHC.CString
         GHC.Classes
         GHC.Debug
-        GHC.IntWord64
         GHC.Magic
         GHC.Magic.Dict
         GHC.Prim.Ext
