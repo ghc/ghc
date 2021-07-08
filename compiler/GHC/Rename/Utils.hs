@@ -163,9 +163,9 @@ checkShadowedOccs (global_env,local_env) get_loc_occ ns
     check_shadow n
         | startsWithUnderscore occ = return ()  -- Do not report shadowing for "_x"
                                                 -- See #3262
-        | Just n <- mb_local = complain [text "bound at" <+> ppr (nameSrcLoc n)]
+        | Just n <- mb_local = complain (ShadowedNameProvenanceLocal (nameSrcLoc n))
         | otherwise = do { gres' <- filterM is_shadowed_gre gres
-                         ; complain (map pprNameProvenance gres') }
+                         ; when (not . null $ gres') $ complain (ShadowedNameProvenanceGlobal gres') }
         where
           (loc,occ) = get_loc_occ n
           mb_local  = lookupLocalRdrOcc local_env occ
@@ -173,12 +173,7 @@ checkShadowedOccs (global_env,local_env) get_loc_occ ns
                 -- Make an Unqualified RdrName and look that up, so that
                 -- we don't find any GREs that are in scope qualified-only
 
-          complain []      = return ()
-          complain pp_locs = do
-             let msg = TcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag Opt_WarnNameShadowing)
-                                                              noHints
-                                                              (shadowedNameWarn occ pp_locs)
-             addDiagnosticAt loc msg
+          complain provenance = addDiagnosticAt loc (TcRnShadowedName occ provenance)
 
     is_shadowed_gre :: GlobalRdrElt -> RnM Bool
         -- Returns False for record selectors that are shadowed, when
@@ -589,13 +584,6 @@ addNameClashErrRn rdr_name gres
     (flds, non_flds) = NE.partition isRecFldGRE gres
     num_flds     = length flds
     num_non_flds = length non_flds
-
-
-shadowedNameWarn :: OccName -> [SDoc] -> SDoc
-shadowedNameWarn occ shadowed_locs
-  = sep [text "This binding for" <+> quotes (ppr occ)
-            <+> text "shadows the existing binding" <> plural shadowed_locs,
-         nest 2 (vcat shadowed_locs)]
 
 
 unknownSubordinateErr :: SDoc -> RdrName -> SDoc
