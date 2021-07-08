@@ -13,8 +13,8 @@
 
 void    initThreadLabelTable (void);
 void    freeThreadLabelTable (void);
-void *  lookupThreadLabel    (StgWord key);
-void    removeThreadLabel    (StgWord key);
+void *  lookupThreadLabel    (StgThreadID key);
+void    removeThreadLabel    (StgThreadID key);
 void    labelThread          (Capability *cap,
                               StgTSO     *tso,
                               char       *label);

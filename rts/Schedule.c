@@ -1358,7 +1358,7 @@ scheduleHandleThreadFinished (Capability *cap, Task *task, StgTSO *t)
               }
           }
 
-          removeThreadLabel((StgWord)task->incall->tso->id);
+          removeThreadLabel(task->incall->tso->id);
 
           // We no longer consider this thread and task to be bound to
           // each other.  The TSO lives on until it is GC'd, but the
