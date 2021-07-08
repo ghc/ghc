@@ -22,8 +22,6 @@ module GHC.Utils.Panic.Plain
   , cmdLineError, cmdLineErrorIO
   , assertPanic
   , assert, assertM, massert
-
-  , progName
   ) where
 
 import GHC.Settings.Config
@@ -31,7 +29,6 @@ import GHC.Utils.Constants
 import GHC.Utils.Exception as Exception
 import GHC.Stack
 import GHC.Prelude
-import System.Environment
 import System.IO.Unsafe
 
 -- | This type is very similar to 'GHC.Utils.Panic.GhcException', but it omits
@@ -69,14 +66,7 @@ data PlainGhcException
 instance Exception PlainGhcException
 
 instance Show PlainGhcException where
-  showsPrec _ e@(PlainProgramError _) = showPlainGhcException e
-  showsPrec _ e@(PlainCmdLineError _) = showString "<command line>: " . showPlainGhcException e
-  showsPrec _ e = showString progName . showString ": " . showPlainGhcException e
-
--- | The name of this GHC.
-progName :: String
-progName = unsafePerformIO (getProgName)
-{-# NOINLINE progName #-}
+  showsPrec _ e = showPlainGhcException e
 
 -- | Short usage information to display when we are given the wrong cmd line arguments.
 short_usage :: String
