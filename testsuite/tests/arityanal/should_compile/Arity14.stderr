@@ -41,7 +41,7 @@ F14.$wf14
 f14 [InlPrag=[2]] :: forall {t}. (Ord t, Num t) => t -> t -> t -> t
 [GblId,
  Arity=4,
- Str=<1P(A,A,SCS(C1(L)),A,A,A,A,A)><LP(LCL(C1(L)),A,A,A,A,A,L)><L><L>,
+ Str=<1!P(A,A,SCS(C1(L)),A,A,A,A,A)><LP(LCL(C1(L)),A,A,A,A,A,L)><L><L>,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=4,unsat_ok=True,boring_ok=False)
          Tmpl= \ (@t) (w [Occ=Once1!] :: Ord t) (w1 [Occ=Once1] :: Num t) (w2 [Occ=Once1] :: t) (w3 [Occ=Once1] :: t) -> case w of { GHC.Classes.C:Ord _ [Occ=Dead] _ [Occ=Dead] ww2 [Occ=Once1] _ [Occ=Dead] _ [Occ=Dead] _ [Occ=Dead] _ [Occ=Dead] _ [Occ=Dead] -> F14.$wf14 @t ww2 w1 w2 w3 }}]
 f14 = \ (@t) (w :: Ord t) (w1 :: Num t) (w2 :: t) (w3 :: t) -> case w of { GHC.Classes.C:Ord ww ww1 ww2 ww3 ww4 ww5 ww6 ww7 -> F14.$wf14 @t ww2 w1 w2 w3 }
