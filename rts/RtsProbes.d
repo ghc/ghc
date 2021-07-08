@@ -32,7 +32,7 @@
  *
  * typedef uint16_t EventTypeNum;
  * typedef uint64_t EventTimestamp;   // in nanoseconds
- * typedef uint32_t EventThreadID;
+ * typedef uint64_t EventThreadID;
  * typedef uint16_t EventCapNo;
  * typedef uint16_t EventPayloadSize; // variable-size events
  * typedef uint16_t EventThreadStatus;
