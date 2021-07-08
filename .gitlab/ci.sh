@@ -528,6 +528,10 @@ case "$(uname)" in
   *) cabal_dir="$HOME/.cabal"; exe="" ;;
 esac
 
+echo "Cabal_dir is $cabal_dir"
+echo "$(uname -m)"
+echo "${CABAL_CACHE}"
+
 # Platform-specific environment initialization
 MAKE="make"
 TAR="tar"
