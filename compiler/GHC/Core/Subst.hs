@@ -283,11 +283,15 @@ delBndrs (Subst in_scope ids tvs cvs) vs
 --   No left-right shadowing
 --   ie the substitution for   (\x \y. e) a1 a2
 --      so neither x nor y scope over a1 a2
-mkOpenSubst :: InScopeSet -> [(Var,CoreArg)] -> Subst
-mkOpenSubst in_scope pairs = Subst in_scope
-                                   (mkVarEnv [(id,e)  | (id, e) <- pairs, isId id])
-                                   (mkVarEnv [(tv,ty) | (tv, Type ty) <- pairs])
-                                   (mkVarEnv [(v,co)  | (v, Coercion co) <- pairs])
+mkOpenSubst :: InScopeSet -> [Var] -> [CoreArg] -> Subst
+mkOpenSubst in_scope tvs args = Subst in_scope (mkVarEnv ids) (mkVarEnv tys) (mkVarEnv cos)
+  where
+    (ids,tys,cos) = foldr go ([],[],[]) (zipEqual "mkOpenSubst" tvs args)
+    go (v,a) (is,ts,cs)
+      | isId v           = ((v,a):is,ts,cs)
+      | Type ty <- a     = (is,(v,ty):ts,cs)
+      | Coercion co <- a = (is,ts,(v,co):cs)
+      | otherwise        = (is,ts,cs)
 
 ------------------------------
 isInScope :: Var -> Subst -> Bool
