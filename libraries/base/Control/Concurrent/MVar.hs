@@ -6,7 +6,7 @@
 -- Module      :  Control.Concurrent.MVar
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
 -- Portability :  non-portable (concurrency)
@@ -45,7 +45,7 @@
 -- 'withMVar', 'modifyMVar_' and 'modifyMVar') are simply
 -- the composition of a 'takeMVar' followed by a 'putMVar' with
 -- exception safety.
--- These only have atomicity guarantees if all other threads
+-- These have atomicity guarantees only if all other threads
 -- perform a 'takeMVar' before a 'putMVar' as well;  otherwise, they may
 -- block.
 --
@@ -176,7 +176,9 @@ swapMVar mvar new =
   of an 'MVar'.  This operation is exception-safe: it will replace the
   original contents of the 'MVar' if an exception is raised (see
   "Control.Exception").  However, it is only atomic if there are no
-  other producers for this 'MVar'.
+  other producers for this 'MVar'. In other words, it cannot guarantee that
+  the value of the MVar it reads from has not be altered by a concurrent thread
+  writing to it.
 -}
 {-# INLINE withMVar #-}
 -- inlining has been reported to have dramatic effects; see
@@ -209,7 +211,9 @@ withMVarMasked m io =
   Like 'withMVar', 'modifyMVar' will replace the original contents of
   the 'MVar' if an exception is raised during the operation.  This
   function is only atomic if there are no other producers for this
-  'MVar'.
+  'MVar'. In other words, it cannot guarantee that the value of the MVar
+  it reads from has not be altered by a concurrent thread
+  writing to it.
 -}
 {-# INLINE modifyMVar_ #-}
 modifyMVar_ :: MVar a -> (a -> IO a) -> IO ()
