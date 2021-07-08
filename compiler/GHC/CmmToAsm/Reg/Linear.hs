@@ -516,19 +516,18 @@ genRaInsn block_live new_instrs block_id instr r_dying w_dying = do
 --         freeregs <- getFreeRegsR
 --         assig    <- getAssigR
 
---         pprTraceM "genRaInsn"
---                 (          text "block        = " <+> ppr block_id
---                         $$ text "instruction  = " <+> ppr instr
---                         $$ text "r_dying      = " <+> ppr r_dying
---                         $$ text "w_dying      = " <+> ppr w_dying
---                         $$ text "read         = " <+> ppr real_read    <+> ppr virt_read
---                         $$ text "written      = " <+> ppr real_written <+> ppr virt_written
---                         $$ text "freeregs     = " <+> ppr freeregs
---                         $$ text "assign       = " <+> ppr assig)
+    let msg = (    text "block        = " <+> ppr block_id
+                $$ text "instruction  = " <+> ppr instr
+                $$ text "r_dying      = " <+> ppr r_dying
+                $$ text "w_dying      = " <+> ppr w_dying
+                $$ text "read         = " <+> ppr real_read    <+> ppr virt_read
+                $$ text "written      = " <+> ppr real_written <+> ppr virt_written
+                $$ text "freeregs     = " <+> ppr freeregs
+                $$ text "assign       = " <+> ppr assig)
 
     -- (a), (b) allocate real regs for all regs read by this instruction.
     (r_spills, r_allocd) <-
-        allocateRegsAndSpill True{-reading-} virt_read [] [] virt_read
+        allocateRegsAndSpill True{-reading-} virt_read [] [] virt_read msg
 
     -- (c) save any temporaries which will be clobbered by this instruction
     clobber_saves <- saveClobberedTemps real_written r_dying
@@ -556,7 +555,7 @@ genRaInsn block_live new_instrs block_id instr r_dying w_dying = do
 
     -- (g) Allocate registers for temporaries *written* (only)
     (w_spills, w_allocd) <-
-        allocateRegsAndSpill False{-writing-} virt_written [] [] virt_written
+        allocateRegsAndSpill False{-writing-} virt_written [] [] virt_written msg
 
     -- (h) Release registers for temps which are written here and not
     -- used again.
@@ -806,20 +805,21 @@ allocateRegsAndSpill
         -> [instr]              -- spill insns
         -> [RealReg]            -- real registers allocated (accum.)
         -> [VirtualReg]         -- temps to allocate
+        -> SDoc
         -> RegM freeRegs ( [instr] , [RealReg])
 
-allocateRegsAndSpill _       _    spills alloc []
+allocateRegsAndSpill _       _    spills alloc [] _
         = return (spills, reverse alloc)
 
-allocateRegsAndSpill reading keep spills alloc (r:rs)
+allocateRegsAndSpill reading keep spills alloc (r:rs) msg
  = do   assig <- toVRegMap <$> getAssigR
         -- pprTraceM "allocateRegsAndSpill:assig" (ppr (r:rs) $$ ppr assig)
         -- See Note [UniqFM and the register allocator]
-        let doSpill = allocRegsAndSpill_spill reading keep spills alloc r rs assig
+        let doSpill = allocRegsAndSpill_spill reading keep spills alloc r rs assig msg
         case lookupUFM assig r of
                 -- case (1a): already in a register
                 Just (InReg my_reg) ->
-                        allocateRegsAndSpill reading keep spills (my_reg:alloc) rs
+                        allocateRegsAndSpill reading keep spills (my_reg:alloc) rs msg
 
                 -- case (1b): already in a register (and memory)
                 -- NB1. if we're writing this register, update its assignment to be
@@ -828,13 +828,13 @@ allocateRegsAndSpill reading keep spills alloc (r:rs)
                 -- are also read by the same instruction.
                 Just (InBoth my_reg _)
                  -> do  when (not reading) (setAssigR $ toRegMap (addToUFM assig r (InReg my_reg)))
-                        allocateRegsAndSpill reading keep spills (my_reg:alloc) rs
+                        allocateRegsAndSpill reading keep spills (my_reg:alloc) rs msg
 
                 -- Not already in a register, so we need to find a free one...
                 Just (InMem slot) | reading   -> doSpill (ReadMem slot)
                                   | otherwise -> doSpill WriteMem
                 Nothing | reading   ->
-                   pprPanic "allocateRegsAndSpill: Cannot read from uninitialized register" (ppr r)
+                   pprPanic "allocateRegsAndSpill: Cannot read from uninitialized register" (vcat [ppr r,msg])
                    -- NOTE: if the input to the NCG contains some
                    -- unreachable blocks with junk code, this panic
                    -- might be triggered.  Make sure you only feed
@@ -875,8 +875,9 @@ allocRegsAndSpill_spill :: (FR freeRegs, Instruction instr)
                         -> [VirtualReg]
                         -> UniqFM VirtualReg Loc
                         -> SpillLoc
+                        -> SDoc
                         -> RegM freeRegs ([instr], [RealReg])
-allocRegsAndSpill_spill reading keep spills alloc r rs assig spill_loc
+allocRegsAndSpill_spill reading keep spills alloc r rs assig spill_loc msg
  = do   platform <- getPlatform
         freeRegs <- getFreeRegsR
         let freeRegs_thisClass  = frGetFreeRegs platform (classOfVirtualReg r) freeRegs :: [RealReg]
@@ -899,7 +900,7 @@ allocRegsAndSpill_spill reading keep spills alloc r rs assig spill_loc
                           $ (addToUFM assig r $! newLocation spill_loc final_reg)
                 setFreeRegsR $  frAllocateReg platform final_reg freeRegs
 
-                allocateRegsAndSpill reading keep spills' (final_reg : alloc) rs
+                allocateRegsAndSpill reading keep spills' (final_reg : alloc) rs msg
 
 
           -- case (3): we need to push something out to free up a register
@@ -941,7 +942,7 @@ allocRegsAndSpill_spill reading keep spills alloc r rs assig spill_loc
                                 let assig2  = addToUFM assig1 r $! newLocation spill_loc my_reg
 
                                 setAssigR $ toRegMap assig2
-                                allocateRegsAndSpill reading keep spills' (my_reg:alloc) rs
+                                allocateRegsAndSpill reading keep spills' (my_reg:alloc) rs msg
 
                         -- otherwise, we need to spill a temporary that currently
                         -- resides in a register.
@@ -963,7 +964,7 @@ allocRegsAndSpill_spill reading keep spills alloc r rs assig spill_loc
 
                                 allocateRegsAndSpill reading keep
                                         (spill_store ++ spills')
-                                        (my_reg:alloc) rs
+                                        (my_reg:alloc) rs msg
 
 
                         -- there wasn't anything to spill, so we're screwed.
