@@ -31,7 +31,7 @@ module GHC.Exception.Type
        , underflowException
        ) where
 
-import {-# SOURCE #-} GHC.Exception.Backtrace (Backtrace, showBacktraces)
+import GHC.Exception.Backtrace (Backtrace, showBacktraces)
 
 import Data.Maybe
 import Data.Typeable (Typeable, cast, typeOf)
