@@ -163,8 +163,6 @@ instance Diagnostic DsMessage where
              ThWarningAndDeprecationPragmas decl
                -> mkMsg "WARNING and DEPRECATION pragmas" $
                     text "Pragma for declaration of" <+> ppr decl
-             ThDefaultDeclarations decl
-               -> mkMsg "Default declarations" (ppr decl)
              ThSplicesWithinDeclBrackets
                -> mkMsg "Splices within declaration brackets" empty
          where
