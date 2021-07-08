@@ -420,7 +420,7 @@ import Control.Monad.Catch as MC
 
 import GHC.Data.Maybe
 import System.IO.Error  ( isDoesNotExistError )
-import System.Environment ( getEnv )
+import System.Environment ( getEnv, getProgName )
 import System.Directory
 import Data.List (isPrefixOf)
 
@@ -465,9 +465,13 @@ defaultErrorHandler fm (FlushOut flushOut) inner =
             (\ge -> liftIO $ do
                 flushOut
                 case ge of
-                     Signal _ -> exitWith (ExitFailure 1)
-                     _ -> do fm (show ge)
-                             exitWith (ExitFailure 1)
+                  Signal _       -> return ()
+                  ProgramError _ -> fm (show ge)
+                  CmdLineError _ -> fm ("<command line>: " ++ show ge)
+                  _              -> do
+                                    progName <- getProgName
+                                    fm (progName ++ ": " ++ show ge)
+                exitWith (ExitFailure 1)
             ) $
   inner
 
