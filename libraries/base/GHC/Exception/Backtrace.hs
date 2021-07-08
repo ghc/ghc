@@ -26,13 +26,13 @@ module GHC.Exception.Backtrace
 
 import Data.Maybe
 import Data.List
-import GHC.IORef
+import {-# SOURCE #-} GHC.IORef
 import GHC.IO.Unsafe
 import GHC.Ptr
-import GHC.Stack.CCS
-import GHC.Stack
-import GHC.ExecutionStack (getStackTrace, Location)
-import GHC.ExecutionStack.Internal (showStackFrames)
+import {-# SOURCE #-} GHC.Stack.CCS
+import {-# SOURCE #-} GHC.Stack
+import {-# SOURCE #-} GHC.ExecutionStack (getStackTrace, Location)
+import {-# SOURCE #-} GHC.ExecutionStack.Internal (showStackFrames)
 import GHC.Base
 import GHC.Show
 
