@@ -36,9 +36,6 @@ module GHC.Rename.Pat (-- main entry points
 
               -- Literals
               rnLit, rnOverLit,
-
-             -- Pattern Error message that is also used elsewhere
-             patSigErr
              ) where
 
 -- ENH: thin imports to only what is necessary for patterns
@@ -558,7 +555,7 @@ rnPatAndThen mk (AsPat _ rdr pat)
 
 rnPatAndThen mk p@(ViewPat _ expr pat)
   = do { liftCps $ do { vp_flag <- xoptM LangExt.ViewPatterns
-                      ; checkErr vp_flag (badViewPat p) }
+                      ; checkErr vp_flag (TcRnIllegalViewPattern p) }
          -- Because of the way we're arranging the recursive calls,
          -- this will be in the right context
        ; expr' <- liftCpsFV $ rnLExpr expr
@@ -782,7 +779,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                               , hfbPun      = pun }))
       = do { sel <- setSrcSpan loc $ lookupRecFieldOcc parent lbl
            ; arg' <- if pun
-                     then do { checkErr pun_ok (badPun (L loc lbl))
+                     then do { checkErr pun_ok (TcRnIllegalFieldPunning (L loc lbl))
                                -- Discard any module qualifier (#11662)
                              ; let arg_rdr = mkRdrUnqual (rdrNameOcc lbl)
                              ; return (L (noAnnSrcSpan loc) (mk_arg loc arg_rdr)) }
@@ -809,7 +806,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
            ; checkErr dd_flag (needFlagDotDot ctxt)
            ; (rdr_env, lcl_env) <- getRdrEnvs
            ; con_fields <- lookupConstructorFields con
-           ; when (null con_fields) (addErr (badDotDotCon con))
+           ; when (null con_fields) (addErr (TcRnIllegalWildcardsInConstructor con))
            ; let present_flds = mkOccSet $ map rdrNameOcc (getFieldLbls flds)
 
                    -- For constructor uses (but not patterns)
@@ -873,7 +870,7 @@ rnHsRecUpdFields flds
 
        -- Check for an empty record update  e {}
        -- NB: don't complain about e { .. }, because rn_dotdot has done that already
-       ; when (null flds) $ addErr emptyUpdateErr
+       ; when (null flds) $ addErr TcRnEmptyRecordUpdate
 
        ; return (flds1, plusFVs fvss) }
   where
@@ -888,7 +885,7 @@ rnHsRecUpdFields flds
                       -- See Note [Disambiguating record fields] in GHC.Tc.Gen.Head
                       lookupRecFieldOcc_update dup_fields_ok lbl
            ; arg' <- if pun
-                     then do { checkErr pun_ok (badPun (L loc lbl))
+                     then do { checkErr pun_ok (TcRnIllegalFieldPunning (L loc lbl))
                                -- Discard any module qualifier (#11662)
                              ; let arg_rdr = mkRdrUnqual (rdrNameOcc lbl)
                              ; return (L (noAnnSrcSpan loc) (HsVar noExtField
@@ -925,35 +922,15 @@ getFieldUpdLbls :: [LHsRecUpdField GhcPs] -> [RdrName]
 getFieldUpdLbls flds = map (rdrNameAmbiguousFieldOcc . unLoc . hfbLHS . unLoc) flds
 
 needFlagDotDot :: HsRecFieldContext -> TcRnMessage
-needFlagDotDot ctxt = TcRnUnknownMessage $ mkPlainError noHints $
-  vcat [text "Illegal `..' in record" <+> pprRFC ctxt,
-        text "Use RecordWildCards to permit this"]
-
-badDotDotCon :: Name -> TcRnMessage
-badDotDotCon con
-  = TcRnUnknownMessage $ mkPlainError noHints $
-    vcat [ text "Illegal `..' notation for constructor" <+> quotes (ppr con)
-         , nest 2 (text "The constructor has no labelled fields") ]
-
-emptyUpdateErr :: TcRnMessage
-emptyUpdateErr = TcRnUnknownMessage $ mkPlainError noHints $ text "Empty record update"
-
-badPun :: Located RdrName -> TcRnMessage
-badPun fld = TcRnUnknownMessage $ mkPlainError noHints $
-  vcat [text "Illegal use of punning for field" <+> quotes (ppr fld),
-        text "Use NamedFieldPuns to permit this"]
+needFlagDotDot = TcRnIllegalWildcardsInRecord . toRecordFieldPart
 
 dupFieldErr :: HsRecFieldContext -> NE.NonEmpty RdrName -> TcRnMessage
-dupFieldErr ctxt dups
-  = TcRnUnknownMessage $ mkPlainError noHints $
-    hsep [text "duplicate field name",
-          quotes (ppr (NE.head dups)),
-          text "in record", pprRFC ctxt]
+dupFieldErr ctxt = TcRnDuplicateFieldName (toRecordFieldPart ctxt)
 
-pprRFC :: HsRecFieldContext -> SDoc
-pprRFC (HsRecFieldCon {}) = text "construction"
-pprRFC (HsRecFieldPat {}) = text "pattern"
-pprRFC (HsRecFieldUpd {}) = text "update"
+toRecordFieldPart :: HsRecFieldContext -> RecordFieldPart
+toRecordFieldPart (HsRecFieldCon n)  = RecordFieldConstructor n
+toRecordFieldPart (HsRecFieldPat n)  = RecordFieldPattern     n
+toRecordFieldPart (HsRecFieldUpd {}) = RecordFieldUpdate
 
 {-
 ************************************************************************
@@ -968,7 +945,7 @@ are made available.
 -}
 
 rnLit :: HsLit p -> RnM ()
-rnLit (HsChar _ c) = checkErr (inCharRange c) (bogusCharError c)
+rnLit (HsChar _ c) = checkErr (inCharRange c) (TcRnCharLiteralOutOfRange c)
 rnLit _ = return ()
 
 -- | Turn a Fractional-looking literal which happens to be an integer into an
@@ -1022,26 +999,3 @@ rnOverLit origLit
                   ; return ((lit' { ol_val = negateOverLitVal val }, Just negate_name)
                                   , fvs1 `plusFV` fvs2) }
           else return ((lit', Nothing), fvs1) }
-
-{-
-************************************************************************
-*                                                                      *
-\subsubsection{Errors}
-*                                                                      *
-************************************************************************
--}
-
-patSigErr :: Outputable a => a -> SDoc
-patSigErr ty
-  =  (text "Illegal signature in pattern:" <+> ppr ty)
-        $$ nest 4 (text "Use ScopedTypeVariables to permit it")
-
-bogusCharError :: Char -> TcRnMessage
-bogusCharError c
-  = TcRnUnknownMessage $ mkPlainError noHints $
-  text "character literal out of range: '\\" <> char c  <> char '\''
-
-badViewPat :: Pat GhcPs -> TcRnMessage
-badViewPat pat = TcRnUnknownMessage $ mkPlainError noHints $
-  vcat [text "Illegal view pattern: " <+> ppr pat,
-       text "Use ViewPatterns to enable view patterns"]

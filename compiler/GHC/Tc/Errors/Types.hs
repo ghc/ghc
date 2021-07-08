@@ -6,17 +6,26 @@ module GHC.Tc.Errors.Types (
   , TcRnMessageDetailed(..)
   , ErrInfo(..)
   , LevityCheckProvenance(..)
+  , ShadowedNameProvenance(..)
+  , RecordFieldPart(..)
   ) where
 
+import GHC.Prelude
+
 import GHC.Hs
+import GHC.Tc.Types.Constraint
 import GHC.Types.Error
-import GHC.Types.Name (Name)
+import GHC.Types.Name (Name, OccName)
 import GHC.Types.Name.Reader
+import GHC.Types.SrcLoc
 import GHC.Unit.Types (Module)
 import GHC.Utils.Outputable
-import Data.Typeable
 import GHC.Core.Type (Type, Var)
 import GHC.Unit.State (UnitState)
+import GHC.Types.Basic
+
+import qualified Data.List.NonEmpty as NE
+import           Data.Typeable
 
 {-
 Note [Migrating TcM Messages]
@@ -163,6 +172,158 @@ data TcRnMessage where
   -}
   TcRnModMissingRealSrcSpan :: Module -> TcRnMessage
 
+
+  {-| TcRnShadowedName is a warning (controlled by -Wname-shadowing) that occurs whenever
+      an inner-scope value has the same name as an outer-scope value, i.e. the inner
+      value shadows the outer one. This can catch typographical errors that turn into
+      hard-to-find bugs. The warning is suppressed for names beginning with an underscore.
+
+      Examples(s):
+        f = ... let f = id in ... f ...  -- NOT OK, 'f' is shadowed
+        f x = do { _ignore <- this; _ignore <- that; return (the other) } -- suppressed via underscore
+
+     Test cases: typecheck/should_compile/T10971a
+                 rename/should_compile/rn039
+                 rename/should_compile/rn064
+                 rename/should_compile/T1972
+                 rename/should_fail/T2723
+                 rename/should_compile/T3262
+                 driver/werror
+  -}
+  TcRnShadowedName :: OccName -> ShadowedNameProvenance -> TcRnMessage
+
+  {-| TcRnDuplicateWarningDecls is an error that occurs whenever
+      a warning is declared twice.
+
+      Examples(s):
+        None.
+
+     Test cases:
+        None.
+  -}
+  TcRnDuplicateWarningDecls :: !(LocatedN RdrName) -> !RdrName -> TcRnMessage
+
+  {-| TcRnDuplicateWarningDecls is an error that occurs whenever
+      the constraint solver in the simplifier hits the iterations' limit.
+
+      Examples(s):
+        None.
+
+     Test cases:
+        None.
+  -}
+  TcRnSimplifierTooManyIterations :: !IntWithInf
+                                  -- ^ The limit.
+                                  -> WantedConstraints
+                                  -> TcRnMessage
+
+  {-| TcRnIllegalPatSynDecl is an error that occurs whenever
+      there is an illegal pattern synonym declaration.
+
+      Examples(s):
+
+      varWithLocalPatSyn x = case x of
+          P -> ()
+        where
+          pattern P = ()   -- not valid, it can't be local, it must be defined at top-level.
+
+     Test cases: patsyn/should_fail/local
+  -}
+  TcRnIllegalPatSynDecl :: !(LIdP GhcPs) -> TcRnMessage
+
+  {-| TcRnEmptyRecordUpdate is an error that occurs whenever
+      a record is updated without specifying any field.
+
+      Examples(s):
+
+      $(deriveJSON defaultOptions{} ''Bad) -- not ok, no fields selected for update of defaultOptions
+
+     Test cases: th/T12788
+  -}
+  TcRnEmptyRecordUpdate :: TcRnMessage
+
+  {-| TcRnIllegalFieldPunning is an error that occurs whenever
+      field punning is used without the 'NamedFieldPuns' extension enabled.
+
+      Examples(s):
+
+      data Foo = Foo { a :: Int }
+
+      foo :: Foo -> Int
+      foo Foo{a} = a  -- Not ok, punning used without extension.
+
+     Test cases: parser/should_fail/RecordDotSyntaxFail12
+  -}
+  TcRnIllegalFieldPunning :: !(Located RdrName) -> TcRnMessage
+
+  {-| TcRnIllegalWildcardsInRecord is an error that occurs whenever
+      wildcards (..) are used in a record without the relevant
+      extension being enabled.
+
+      Examples(s):
+
+      data Foo = Foo { a :: Int }
+
+      foo :: Foo -> Int
+      foo Foo{..} = a  -- Not ok, wildcards used without extension.
+
+     Test cases: parser/should_fail/RecordWildCardsFail
+  -}
+  TcRnIllegalWildcardsInRecord :: !RecordFieldPart -> TcRnMessage
+
+  {-| TcRnDuplicateFieldName is an error that occurs whenever
+      there are duplicate field names in a record.
+
+      Examples(s): None.
+
+     Test cases: None.
+  -}
+  TcRnDuplicateFieldName :: !RecordFieldPart -> NE.NonEmpty RdrName -> TcRnMessage
+
+  {-| TcRnIllegalViewPattern is an error that occurs whenever
+      the ViewPatterns syntax is used but the ViewPatterns language extension
+      is not enabled.
+
+      Examples(s):
+      data Foo = Foo { a :: Int }
+
+      foo :: Foo -> Int
+      foo (a -> l) = l -- not OK, the 'ViewPattern' extension is not enabled.
+
+     Test cases: parser/should_fail/ViewPatternsFail
+  -}
+  TcRnIllegalViewPattern :: !(Pat GhcPs) -> TcRnMessage
+
+  {-| TcRnCharLiteralOutOfRange is an error that occurs whenever
+      a character is out of range.
+
+      Examples(s): None
+
+     Test cases: None
+  -}
+  TcRnCharLiteralOutOfRange :: !Char -> TcRnMessage
+
+  {-| TcRnIllegalWildcardsInConstructor is an error that occurs whenever
+      the record wildcards '..' are used inside a constructor without labeled fields.
+
+      Examples(s): None
+
+     Test cases: None
+  -}
+  TcRnIllegalWildcardsInConstructor :: !Name -> TcRnMessage
+
+-- | Which parts of a record field are affected by a particular error or warning.
+data RecordFieldPart
+  = RecordFieldConstructor !Name
+  | RecordFieldPattern !Name
+  | RecordFieldUpdate
+
+-- | Where a shadowed name comes from
+data ShadowedNameProvenance
+  = ShadowedNameProvenanceLocal !SrcLoc
+    -- ^ The shadowed name is local to the module
+  | ShadowedNameProvenanceGlobal [GlobalRdrElt]
+    -- ^ The shadowed name is global, typically imported from elsewhere.
 
 -- | Where the levity checking for the input type originated
 data LevityCheckProvenance

@@ -33,7 +33,7 @@ import GHC.Hs
 import GHC.Unit.Module
 import GHC.Builtin.Names
 
-import GHC.Types.Error hiding ( getErrorMessages, getWarningMessages, getMessages )
+import GHC.Types.Error
 import GHC.Types.SrcLoc
 import GHC.Types.SourceError
 import GHC.Types.SourceText
@@ -83,9 +83,9 @@ getImports popts implicit_prelude buf filename source_filename = do
   case unP parseHeader (initParserState popts buf loc) of
     PFailed pst ->
         -- assuming we're not logging warnings here as per below
-      return $ Left $ getErrorMessages pst
+      return $ Left $ getPsErrorMessages pst
     POk pst rdr_module -> fmap Right $ do
-      let (_warns, errs) = getMessages pst
+      let (_warns, errs) = getPsMessages pst
       -- don't log warnings: they'll be reported when we parse the file
       -- for real.  See #2500.
       if not (isEmptyMessages errs)
