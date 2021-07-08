@@ -270,7 +270,7 @@ rnSrcWarnDecls _ []
 rnSrcWarnDecls bndr_set decls'
   = do { -- check for duplicates
        ; mapM_ (\ dups -> let ((L loc rdr) :| (lrdr':_)) = dups
-                          in addErrAt (locA loc) (dupWarnDecl lrdr' rdr))
+                          in addErrAt (locA loc) (TcRnDuplicateWarningDecls lrdr' rdr))
                warn_rdr_dups
        ; pairs_s <- mapM (addLocMA rn_deprec) decls
        ; return (WarnSome ((concat pairs_s))) }
@@ -296,13 +296,6 @@ findDupRdrNames = findDupsEq (\ x -> \ y -> rdrNameOcc (unLoc x) == rdrNameOcc (
 -- look for duplicates among the OccNames;
 -- we check that the names are defined above
 -- invt: the lists returned by findDupsEq always have at least two elements
-
-dupWarnDecl :: LocatedN RdrName -> RdrName -> TcRnMessage
--- Located RdrName -> DeprecDecl RdrName -> SDoc
-dupWarnDecl d rdr_name
-  = TcRnUnknownMessage $ mkPlainError noHints $
-    vcat [text "Multiple warning declarations for" <+> quotes (ppr rdr_name),
-          text "also at " <+> ppr (getLocA d)]
 
 {-
 *********************************************************
