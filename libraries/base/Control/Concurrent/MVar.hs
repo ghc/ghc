@@ -180,7 +180,7 @@ swapMVar mvar new =
   original contents of the 'MVar' if an exception is raised (see
   "Control.Exception").  However, it is only atomic if there are no
   other producers for this 'MVar'. In other words, it cannot guarantee
-  that, by the time 'withmMVar' gets the chance to write to the MVar,
+  that, by the time 'withMVar' gets the chance to write to the MVar,
   the value of the MVar has not been altered
   by a write operation from another thread.
 -}
