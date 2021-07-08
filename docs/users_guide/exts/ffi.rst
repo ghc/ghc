@@ -803,15 +803,33 @@ Foreign imports and multi-threading
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 When you call a ``foreign import``\ ed function that is annotated as
-``safe`` (the default), and the program was linked using :ghc-flag:`-threaded`,
-then the call will run concurrently with other running Haskell threads.
-If the program was linked without :ghc-flag:`-threaded`, then the other Haskell
-threads will be blocked until the call returns.
+``safe`` (the default) in a single-threaded runtime (the program was linked
+without using :ghc-flag:`-threaded`), then other Haskell threads will be blocked
+until the call returns.
+
+In the multi-threaded runtime (the program was linked using :ghc-flag:`-threaded`),
+``foreign import``\ ed functions run concurrently (both ``safe`` and ``unsafe``),
+but a similar effect can happen when you call an ``unsafe`` function, and a global
+garbage collection is triggered in another thread. In this situation, the garbage
+collector cannot proceed, and this can lead to performance issues that often
+appear under high load, as other threads are more active and thus more prone
+to trigger global garbage collection.
 
 This means that if you need to make a foreign call to a function that
-takes a long time or blocks indefinitely, then you should mark it
+takes a long time or potentially blocks, then you should mark it
 ``safe`` and use :ghc-flag:`-threaded`. Some library functions make such calls
 internally; their documentation should indicate when this is the case.
+
+On the other hand, a foreign call to a function that is guaranteed to take a short
+time, and does not call back into Haskell can be marked ``unsafe``.  This works
+both for the single-threaded and the multi-threaded runtime. When considering
+what "a short time" is, a foreign function that does comparable work to what
+Haskell code does between each heap allocation (not very much), is a good
+candidate.
+
+Outside these two clear cases for ``safe`` and ``unsafe`` foreign functions,
+there is a trade-off between whole-program throughput and efficiency of the
+individual foreign function call.
 
 If you are making foreign calls from multiple Haskell threads and using
 :ghc-flag:`-threaded`, make sure that the foreign code you are calling is
