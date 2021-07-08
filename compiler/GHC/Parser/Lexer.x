@@ -62,7 +62,7 @@ module GHC.Parser.Lexer (
    MonadP(..),
    getRealSrcLoc, getPState,
    failMsgP, failLocMsgP, srcParseFail,
-   getErrorMessages, getMessages,
+   getPsErrorMessages, getPsMessages,
    popContext, pushModuleContext, setLastToken, setSrcLoc,
    activeContext, nextIsEOF,
    getLexState, popLexState, pushLexState,
@@ -109,7 +109,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Data.StringBuffer
 import GHC.Data.FastString
-import GHC.Types.Error hiding ( getErrorMessages, getMessages )
+import GHC.Types.Error
 import GHC.Types.Unique.FM
 import GHC.Data.Maybe
 import GHC.Data.OrdList
@@ -2296,7 +2296,7 @@ data LayoutContext
 newtype ParseResult a = PR (# (# PState, a #) | PState #)
 
 -- | The parser has consumed a (possibly empty) prefix of the input and produced
--- a result. Use 'getMessages' to check for accumulated warnings and non-fatal
+-- a result. Use 'getPsMessages' to check for accumulated warnings and non-fatal
 -- errors.
 --
 -- The carried parsing state can be used to resume parsing.
@@ -2306,8 +2306,8 @@ pattern POk s a = PR (# (# s , a #) | #)
 -- | The parser has consumed a (possibly empty) prefix of the input and failed.
 --
 -- The carried parsing state can be used to resume parsing. It is the state
--- right before failure, including the fatal parse error. 'getMessages' and
--- 'getErrorMessages' must return a non-empty bag of errors.
+-- right before failure, including the fatal parse error. 'getPsMessages' and
+-- 'getPsErrorMessages' must return a non-empty bag of errors.
 pattern PFailed :: PState -> ParseResult a
 pattern PFailed s = PR (# | s #)
 
@@ -2922,7 +2922,7 @@ class Monad m => MonadP m where
   addError :: MsgEnvelope PsMessage -> m ()
 
   -- | Add a warning to the accumulator.
-  --   Use 'getMessages' to get the accumulated warnings.
+  --   Use 'getPsMessages' to get the accumulated warnings.
   addWarning :: MsgEnvelope PsMessage -> m ()
 
   -- | Add a fatal error. This will be the last error reported by the parser, and
@@ -3008,13 +3008,13 @@ addTabWarning srcspan
 
 -- | Get a bag of the errors that have been accumulated so far.
 --   Does not take -Werror into account.
-getErrorMessages :: PState -> Messages PsMessage
-getErrorMessages p = errors p
+getPsErrorMessages :: PState -> Messages PsMessage
+getPsErrorMessages p = errors p
 
 -- | Get the warnings and errors accumulated so far.
 --   Does not take -Werror into account.
-getMessages :: PState -> (Messages PsMessage, Messages PsMessage)
-getMessages p =
+getPsMessages :: PState -> (Messages PsMessage, Messages PsMessage)
+getPsMessages p =
   let ws = warnings p
       diag_opts = pDiagOpts (options p)
       -- we add the tabulation warning on the fly because
