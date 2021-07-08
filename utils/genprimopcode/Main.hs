@@ -617,7 +617,7 @@ gen_wrappers (Info _ entries)
    =    "{-# LANGUAGE MagicHash, NoImplicitPrelude, UnboxedTuples #-}\n"
         -- Dependencies on Prelude must be explicit in libraries/base, but we
         -- don't need the Prelude here so we add NoImplicitPrelude.
-     ++ "{-# OPTIONS_GHC -Wno-deprecations -O0 #-}\n"
+     ++ "{-# OPTIONS_GHC -Wno-deprecations -O0 -ddump-cmm -ddump-stg -ddump-asm #-}\n"
         -- No point in optimising this at all.
         -- Performing WW on this module is harmful even, two reasons:
         --   1. Inferred strictness signatures are all bottom, which is a lie
