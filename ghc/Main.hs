@@ -762,11 +762,13 @@ showUsage ghci dflags = do
   let usage_path = if ghci then ghciUsagePath dflags
                            else ghcUsagePath dflags
   usage <- readFile usage_path
-  dump usage
+  progName <- getProgName
+  dump progName usage
   where
-     dump ""          = return ()
-     dump ('$':'$':s) = putStr progName >> dump s
-     dump (c:s)       = putChar c >> dump s
+    dump progName xs = case xs of
+      ""        -> return ()
+      '$':'$':s -> putStr progName >> dump progName s
+      c:s       -> putChar c >> dump progName s
 
 dumpFinalStats :: Logger -> IO ()
 dumpFinalStats logger = do
