@@ -42,6 +42,7 @@ import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Tickish
 import GHC.Types.Var
 import GHC.Types.Fixity
+import GHC.Parser.Annotation (SrcSpanAnnA, SrcSpanAnnL)
 import GHC.Data.Bag
 import GHC.Data.BooleanFormula (LBooleanFormula)
 
@@ -224,7 +225,7 @@ data HsBindLR idL idR
 
         fun_id :: LIdP idL, -- Note [fun_id in Match] in GHC.Hs.Expr
 
-        fun_matches :: MatchGroup idR (LHsExpr idR),  -- ^ The payload
+        fun_matches :: MatchGroup SrcSpanAnnL SrcSpanAnnA idR (LHsExpr idR),  -- ^ The payload
 
         fun_tick :: [CoreTickish] -- ^ Ticks to put on the rhs, if any
     }
@@ -778,7 +779,8 @@ data Sig pass
        -- synonym definitions.
   | CompleteMatchSig (XCompleteMatchSig pass)
                      SourceText
-                     (XRec pass [LIdP pass])
+                     (XRec pass (Annotated SrcSpan [LIdP pass]))
+                     -- ^ See Note [Explicitly Mark Types with Annotations]
                      (Maybe (LIdP pass))
   | XSig !(XXSig pass)
 
@@ -940,4 +942,4 @@ instance Outputable (XRec a RdrName) => Outputable (RecordPatSynField a) where
 data HsPatSynDir id
   = Unidirectional
   | ImplicitBidirectional
-  | ExplicitBidirectional (MatchGroup id (LHsExpr id))
+  | ExplicitBidirectional (MatchGroup SrcSpanAnnL SrcSpanAnnA id (LHsExpr id))

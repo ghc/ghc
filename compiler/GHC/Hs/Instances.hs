@@ -33,6 +33,7 @@ import GHC.Hs.Type
 import GHC.Hs.Pat
 import GHC.Hs.ImpExp
 import GHC.Parser.Annotation
+import Language.Haskell.Syntax
 
 -- ---------------------------------------------------------------------
 -- Data derivations from GHC.Hs-----------------------------------------
@@ -88,6 +89,8 @@ deriving instance Data (HsIPBinds GhcTc)
 deriving instance Data (IPBind GhcPs)
 deriving instance Data (IPBind GhcRn)
 deriving instance Data (IPBind GhcTc)
+
+deriving instance (Data e, Data a) => Data (Annotated a e)
 
 -- deriving instance (DataIdLR p p)   => Data (Sig p)
 deriving instance Data (Sig GhcPs)
@@ -307,13 +310,13 @@ deriving instance Data (HsCmdTop GhcPs)
 deriving instance Data (HsCmdTop GhcRn)
 deriving instance Data (HsCmdTop GhcTc)
 
--- deriving instance (DataIdLR p p,Data body) => Data (MatchGroup p body)
-deriving instance Data (MatchGroup GhcPs (LocatedA (HsExpr GhcPs)))
-deriving instance Data (MatchGroup GhcRn (LocatedA (HsExpr GhcRn)))
-deriving instance Data (MatchGroup GhcTc (LocatedA (HsExpr GhcTc)))
-deriving instance Data (MatchGroup GhcPs (LocatedA (HsCmd GhcPs)))
-deriving instance Data (MatchGroup GhcRn (LocatedA (HsCmd GhcRn)))
-deriving instance Data (MatchGroup GhcTc (LocatedA (HsCmd GhcTc)))
+-- deriving instance (DataIdLR p p,Data body) => Data (MatchGroup anno p body)
+deriving instance (Data annoL, Data anno) => Data (MatchGroup annoL anno GhcPs (LocatedA (HsExpr GhcPs)))
+deriving instance (Data annoL, Data anno) => Data (MatchGroup annoL anno GhcRn (LocatedA (HsExpr GhcRn)))
+deriving instance (Data annoL, Data anno) => Data (MatchGroup annoL anno GhcTc (LocatedA (HsExpr GhcTc)))
+deriving instance (Data annoL, Data anno) => Data (MatchGroup annoL anno GhcPs (LocatedA (HsCmd GhcPs)))
+deriving instance (Data annoL, Data anno) => Data (MatchGroup annoL anno GhcRn (LocatedA (HsCmd GhcRn)))
+deriving instance (Data annoL, Data anno) => Data (MatchGroup annoL anno GhcTc (LocatedA (HsCmd GhcTc)))
 
 -- deriving instance (DataIdLR p p,Data body) => Data (Match      p body)
 deriving instance Data (Match      GhcPs (LocatedA (HsExpr GhcPs)))

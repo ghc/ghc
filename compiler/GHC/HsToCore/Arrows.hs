@@ -443,8 +443,11 @@ dsCmd ids local_vars stack_ty res_ty (HsCmdApp _ cmd arg) env_ids = do
 
 dsCmd ids local_vars stack_ty res_ty
         (HsCmdLam _ (MG { mg_alts
-          = (L _ [L _ (Match { m_pats  = pats
-                             , m_grhss = GRHSs _ [L _ (GRHS _ [] body)] _ })]) }))
+          = (L _ (Annotated
+                    [L _ (Annotated
+                            Match { m_pats  = pats
+                                  , m_grhss = GRHSs _ [L _ (GRHS _ [] body)] _ })
+                    ])) }))
         env_ids
   = dsCmdLam ids local_vars stack_ty res_ty pats body env_ids
 
@@ -528,7 +531,7 @@ case bodies, containing the following fields:
 -}
 
 dsCmd ids local_vars stack_ty res_ty
-      (HsCmdCase _ exp (MG { mg_alts = L l matches
+      (HsCmdCase _ exp (MG { mg_alts = L l (Annotated matches)
                            , mg_ext = MatchGroupTc arg_tys _
                            , mg_origin = origin }))
       env_ids = do
@@ -580,7 +583,7 @@ dsCmd ids local_vars stack_ty res_ty
         in_ty = envStackType env_ids stack_ty
 
     core_body <- dsExpr (HsCase noExtField exp
-                         (MG { mg_alts = L l matches'
+                         (MG { mg_alts = L l (Annotated matches')
                              , mg_ext = MatchGroupTc arg_tys sum_ty
                              , mg_origin = origin }))
         -- Note that we replace the HsCase result type by sum_ty,
@@ -1148,9 +1151,9 @@ matchSimplys _ _ _ _ _ = panic "matchSimplys"
 
 -- List of leaf expressions, with set of variables bound in each
 
-leavesMatch :: LMatch GhcTc (LocatedA (body GhcTc))
+leavesMatch :: LAnnoMatch SrcSpanAnnA GhcTc (LocatedA (body GhcTc))
             -> [(LocatedA (body GhcTc), IdSet)]
-leavesMatch (L _ (Match { m_pats = pats
+leavesMatch (L _ (Annotated Match { m_pats = pats
                         , m_grhss = GRHSs _ grhss binds }))
   = let
         defined_vars = mkVarSet (collectPatsBinders CollWithDictBinders pats)
@@ -1165,24 +1168,22 @@ leavesMatch (L _ (Match { m_pats = pats
 -- Replace the leaf commands in a match
 
 replaceLeavesMatch
-        :: ( Anno (Match GhcTc (LocatedA (body' GhcTc))) ~ Anno (Match GhcTc (LocatedA (body GhcTc)))
-           , Anno (GRHS GhcTc (LocatedA (body' GhcTc))) ~ Anno (GRHS GhcTc (LocatedA (body GhcTc))))
+        :: (Anno (GRHS GhcTc (LocatedA (body' GhcTc))) ~ Anno (GRHS GhcTc (LocatedA (body GhcTc))))
         => Type                                 -- new result type
         -> [LocatedA (body' GhcTc)] -- replacement leaf expressions of that type
-        -> LMatch GhcTc (LocatedA (body GhcTc))  -- the matches of a case command
+        -> LAnnoMatch SrcSpanAnnA GhcTc (LocatedA (body GhcTc))  -- the matches of a case command
         -> ([LocatedA (body' GhcTc)],            -- remaining leaf expressions
-            LMatch GhcTc (LocatedA (body' GhcTc))) -- updated match
+            LAnnoMatch SrcSpanAnnA GhcTc (LocatedA (body' GhcTc))) -- updated match
 replaceLeavesMatch _res_ty leaves
                         (L loc
-                          match@(Match { m_grhss = GRHSs x grhss binds }))
+                          (Annotated match@(Match { m_grhss = GRHSs x grhss binds })))
   = let
         (leaves', grhss') = mapAccumL replaceLeavesGRHS leaves grhss
     in
-    (leaves', L loc (match { m_ext = noAnn, m_grhss = GRHSs x grhss' binds }))
+    (leaves', L loc (Annotated match { m_ext = noAnn, m_grhss = GRHSs x grhss' binds }))
 
 replaceLeavesGRHS
-        :: ( Anno (Match GhcTc (LocatedA (body' GhcTc))) ~ Anno (Match GhcTc (LocatedA (body GhcTc)))
-           , Anno (GRHS GhcTc (LocatedA (body' GhcTc))) ~ Anno (GRHS GhcTc (LocatedA (body GhcTc))))
+        :: (Anno (GRHS GhcTc (LocatedA (body' GhcTc))) ~ Anno (GRHS GhcTc (LocatedA (body GhcTc))))
         => [LocatedA (body' GhcTc)]  -- replacement leaf expressions of that type
         -> LGRHS GhcTc (LocatedA (body GhcTc))     -- rhss of a case command
         -> ([LocatedA (body' GhcTc)],              -- remaining leaf expressions
