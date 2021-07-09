@@ -13,7 +13,7 @@ module GHC.Data.Graph.Directed (
         topologicalSortG,
         verticesG, edgesG, hasVertexG,
         reachableG, reachablesG, transposeG,
-        emptyG,
+        adjacentVerticesG, emptyG,
 
         findCycle,
 
@@ -383,6 +383,10 @@ transposeG graph = Graph (G.transposeG (gr_int_graph graph))
 
 emptyG :: Graph node -> Bool
 emptyG g = graphEmpty (gr_int_graph g)
+
+adjacentVerticesG :: Graph node -> node -> [node]
+adjacentVerticesG graph from = map (gr_vertex_to_node graph) $ (gr_int_graph graph) ! from_vertex
+  where from_vertex = expectJust "adjacentVerticesG" (gr_node_to_vertex graph from)
 
 {-
 ************************************************************************
