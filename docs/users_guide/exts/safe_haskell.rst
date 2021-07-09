@@ -273,8 +273,9 @@ Furthermore, we restrict the following features:
   site. This is a detailed restriction, please refer to :ref:`Safe Overlapping
   Instances <safe-overlapping-instances>` for details.
 
-- :extension:`GeneralisedNewtypeDeriving` — GND is not allowed in the safe
-  language. This is due to the ability of it to violate module boundaries when
+- :extension:`GeneralisedNewtypeDeriving` and :extension:`DerivingVia`
+  — GND and DerivingVia are not allowed in the safe language.
+  This is due to the ability of them to violate module boundaries when
   module authors forget to put nominal role annotations on their types as
   appropriate. For this reason, the ``Data.Coerce`` module is also considered
   unsafe. We are hoping to find a better solution here in the future.
@@ -784,6 +785,7 @@ And five warning flags:
     :category: warnings
 
     :since: 8.10.1
+    :default: off
 
     .. index::
        single: safe haskell imports, warning
@@ -809,7 +811,6 @@ And five warning flags:
     ``B``, it will cause compilation error of ``A``.  When
     :ghc-flag:`-Winferred-safe-imports` is enabled, the compiler will emit a
     warning about this.
-    This option is off by default.
 
 .. ghc-flag:: -Wmissing-safe-haskell-mode
     :shortdesc: warn when the Safe Haskell mode is not explicitly specified.
@@ -818,13 +819,13 @@ And five warning flags:
     :category: warnings
 
     :since: 8.10.1
+    :default: off
 
     .. index::
        single: safe haskell mode, missing
 
     The compiler will warn when none of  :extension:`Safe`,
     :extension:`Trustworthy` or :extension:`Unsafe` is specified.
-    This option is off by default.
 
 .. _safe-compilation:
 
