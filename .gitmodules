@@ -8,7 +8,7 @@
 	ignore = untracked
 [submodule "libraries/Cabal"]
 	path = libraries/Cabal
-	url = https://gitlab.haskell.org/ghc/packages/Cabal.git
+	url = https://gitlab.haskell.org/supersven/Cabal.git
 	ignore = untracked
 [submodule "libraries/containers"]
 	path = libraries/containers
@@ -16,7 +16,7 @@
 	ignore = untracked
 [submodule "libraries/haskeline"]
 	path = libraries/haskeline
-	url = https://gitlab.haskell.org/ghc/packages/haskeline.git
+	url = https://gitlab.haskell.org/supersven/haskeline.git
 	ignore = untracked
 [submodule "libraries/pretty"]
 	path = libraries/pretty
@@ -36,7 +36,7 @@
 	ignore = untracked
 [submodule "libraries/Win32"]
 	path = libraries/Win32
-	url = https://gitlab.haskell.org/ghc/packages/Win32.git
+	url = https://gitlab.haskell.org/supersven/Win32.git
 	ignore = untracked
 [submodule "libraries/time"]
 	path = libraries/time
@@ -52,7 +52,7 @@
 	ignore = untracked
 [submodule "libraries/directory"]
 	path = libraries/directory
-	url = https://gitlab.haskell.org/ghc/packages/directory.git
+	url = https://gitlab.haskell.org/supersven/directory.git
 	ignore = untracked
 [submodule "libraries/filepath"]
 	path = libraries/filepath
@@ -72,11 +72,11 @@
 	ignore = untracked
 [submodule "libraries/mtl"]
 	path = libraries/mtl
-	url = https://gitlab.haskell.org/ghc/packages/mtl.git
+	url = https://gitlab.haskell.org/supersven/mtl.git
 	ignore = untracked
 [submodule "libraries/process"]
 	path = libraries/process
-	url = https://gitlab.haskell.org/ghc/packages/process.git
+	url = https://gitlab.haskell.org/supersven/process.git
 	ignore = untracked
 [submodule "libraries/unix"]
 	path = libraries/unix
@@ -89,7 +89,7 @@
 	ignore = untracked
 [submodule "utils/haddock"]
 	path = utils/haddock
-	url = https://gitlab.haskell.org/ghc/haddock.git
+	url = https://gitlab.haskell.org/supersven/haddock.git
 	ignore = untracked
 	branch = ghc-head
 [submodule "nofib"]
@@ -109,4 +109,4 @@
 	url = https://gitlab.haskell.org/ghc/gmp-tarballs.git
 [submodule "libraries/exceptions"]
 	path = libraries/exceptions
-	url = https://gitlab.haskell.org/ghc/packages/exceptions.git
+	url = https://gitlab.haskell.org/supersven/exceptions.git
