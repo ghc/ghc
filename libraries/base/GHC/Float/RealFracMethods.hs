@@ -61,8 +61,6 @@ import GHC.Num ()
 
 #if WORD_SIZE_IN_BITS < 64
 
-import GHC.IntWord64
-
 #define TO64 integerToInt64#
 #define FROM64 integerFromInt64#
 #define MINUS64 minusInt64#
