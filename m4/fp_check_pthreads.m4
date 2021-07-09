@@ -13,6 +13,7 @@ AC_DEFUN([FP_CHECK_PTHREADS],
       [
           AC_MSG_RESULT(no)
           AC_SUBST([CabalNeedLibpthread],[False])
+          AC_SUBST([UseLibpthread],[NO])
           need_lpthread=0
       ],
       [
@@ -20,10 +21,12 @@ AC_DEFUN([FP_CHECK_PTHREADS],
               [
                   AC_MSG_RESULT(yes)
                   AC_SUBST([CabalNeedLibpthread],[True])
+                  AC_SUBST([UseLibpthread],[YES])
                   need_lpthread=1
               ],
               [
                   AC_SUBST([CabalNeedLibpthread],[False])
+                  AC_SUBST([UseLibpthread],[NO])
                   AC_MSG_RESULT([no pthreads support found.])
                   need_lpthread=0
               ])
