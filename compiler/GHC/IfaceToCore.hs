@@ -158,7 +158,7 @@ a Name for another entity defined in A.hi.  How do we get the
     internal TyCons to MATCH the ones that we just constructed
     during typechecking: the knot is thus tied through if_rec_types.
 
-    2) retypecheckLoop in GHC.Driver.Make: We are retypechecking a
+    2) typecheckLoop in GHC.Driver.Make: We are retypechecking a
     mutually recursive cluster of hi files, in order to ensure
     that all of the references refer to each other correctly.
     In this case, the knot is tied through the HPT passed in,
