@@ -524,13 +524,8 @@ setup_locale
 # Determine Cabal data directory
 case "$(uname)" in
   MSYS_*|MINGW*) exe=".exe"; cabal_dir="$APPDATA/cabal" ;;
-  Darwin*) CABAL_DIR="$HOME/.cabal-$(uname -m)"; cabal_dir="$CABAL_DIR"; exe="" ;;
   *) cabal_dir="$HOME/.cabal"; exe="" ;;
 esac
-
-echo "Cabal_dir is $cabal_dir"
-echo "$(uname -m)"
-echo "${CABAL_CACHE}"
 
 # Platform-specific environment initialization
 MAKE="make"
