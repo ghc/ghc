@@ -45,7 +45,7 @@ test('T4030', normal, compile_and_run, ['-O'])
 # each of these runs for about a second
 test('throwto001', [reqlib('random'), extra_run_opts('1000 2000')],
                    compile_and_run, [''])
-test('throwto002', [reqlib('random')], compile_and_run, [''])
+test('throwto002', normal, compile_and_run, [''])
 test('throwto003', normal, compile_and_run, [''])
 
 test('mask001', normal, compile_and_run, [''])
