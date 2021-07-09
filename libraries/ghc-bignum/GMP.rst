@@ -47,7 +47,7 @@ GMP is linked:
 
   --with-gmp                     enable GMP backend
   --with-gmp-includes            directory containing gmp.h
-  --with-gmp-libraries           directory containing gmp library
+  --with-gmp-libraries           directory containing gmp library; ineffective for bindists
   --with-intree-gmp              force using the in-tree GMP
   --with-gmp-framework-preferred on OSX, prefer the GMP framework to the gmp lib
 
