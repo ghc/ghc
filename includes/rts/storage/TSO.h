@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include "rts/storage/Closures.h"
+
 /*
  * PROFILING info in a TSO
  */
