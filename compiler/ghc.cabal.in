@@ -399,6 +399,7 @@ Library
         GHC.Driver.Errors.Ppr
         GHC.Driver.Errors.Types
         GHC.Driver.Flags
+        GHC.Driver.Graph
         GHC.Driver.Hooks
         GHC.Driver.Main
         GHC.Driver.Make
