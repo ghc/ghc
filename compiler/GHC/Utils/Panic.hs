@@ -19,7 +19,6 @@ module GHC.Utils.Panic
    , throwGhcExceptionIO
    , handleGhcException
 
-   , GHC.Utils.Panic.Plain.progName
    , pgmError
    , panic
    , pprPanic
@@ -124,9 +123,7 @@ instance Exception GhcException where
     | otherwise = Nothing
 
 instance Show GhcException where
-  showsPrec _ e@(ProgramError _) = showGhcExceptionUnsafe e
-  showsPrec _ e@(CmdLineError _) = showString "<command line>: " . showGhcExceptionUnsafe e
-  showsPrec _ e = showString progName . showString ": " . showGhcExceptionUnsafe e
+  showsPrec _ e = showGhcExceptionUnsafe e
 
 -- | Show an exception as a string.
 showException :: Exception e => e -> String
