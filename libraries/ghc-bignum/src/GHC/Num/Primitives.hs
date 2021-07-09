@@ -11,7 +11,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE BinaryLiterals #-}
-{-# OPTIONS_GHC -fexpose-all-unfoldings #-}
+{-# OPTIONS_GHC -fexpose-all-unfoldings -ddump-cmm -ddump-stg -ddump-asm #-}
 
 module GHC.Num.Primitives
    (
