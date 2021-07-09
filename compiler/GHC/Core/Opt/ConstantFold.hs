@@ -992,34 +992,41 @@ wordOpC2 op env (LitNumber LitNumWord w1) (LitNumber LitNumWord w2) =
   wordCResult (roPlatform env) (fromInteger w1 `op` fromInteger w2)
 wordOpC2 _ _ _ _ = Nothing
 
-shiftRule :: LitNumType  -- Type of the result, either LitNumInt or LitNumWord
+shiftRule :: LitNumType
           -> (Platform -> Integer -> Int -> Integer)
           -> RuleM CoreExpr
 -- Shifts take an Int; hence third arg of op is Int
 -- Used for shift primops
 --    IntSllOp, IntSraOp, IntSrlOp :: Int# -> Int# -> Int#
 --    SllOp, SrlOp                 :: Word# -> Int# -> Word#
-shiftRule lit_num_ty shift_op
-  = do { platform <- getPlatform
-       ; [e1, Lit (LitNumber LitNumInt shift_len)] <- getArgs
-       ; case e1 of
-           _ | shift_len == 0
-             -> return e1
-             -- See Note [Guarding against silly shifts]
-             | shift_len < 0 || shift_len > toInteger (platformWordSizeInBits platform)
-             -> return $ Lit $ mkLitNumberWrap platform lit_num_ty 0
-                -- Be sure to use lit_num_ty here, so we get a correctly typed zero
-                -- of type Int# or Word# resp.  See #18589
+shiftRule lit_num_ty shift_op = do
+  platform <- getPlatform
+  [e1, Lit (LitNumber LitNumInt shift_len)] <- getArgs
 
-           -- Do the shift at type Integer, but shift length is Int
-           Lit (LitNumber nt x)
-             | 0 < shift_len
-             , shift_len <= toInteger (platformWordSizeInBits platform)
-             -> let op = shift_op platform
-                    y  = x `op` fromInteger shift_len
-                in  liftMaybe $ Just (Lit (mkLitNumberWrap platform nt y))
+  bit_size <- case litNumBitSize platform lit_num_ty of
+   Nothing -> mzero
+   Just bs -> pure (toInteger bs)
 
-           _ -> mzero }
+  case e1 of
+    _ | shift_len == 0 -> pure e1
+
+      -- See Note [Guarding against silly shifts]
+    _ | shift_len < 0 || shift_len > bit_size
+      -> pure $ Lit $ mkLitNumberWrap platform lit_num_ty 0
+           -- Be sure to use lit_num_ty here, so we get a correctly typed zero.
+           -- See #18589
+
+    Lit (LitNumber nt x)
+       | 0 < shift_len && shift_len <= bit_size
+       -> assert (nt == lit_num_ty) $
+          let op = shift_op platform
+              -- Do the shift at type Integer, but shift length is Int.
+              -- Using host's Int is ok even if target's Int has a different size
+              -- because we test that shift_len <= bit_size (which is at most 64)
+              y  = x `op` fromInteger shift_len
+          in pure $ Lit $ mkLitNumberWrap platform nt y
+
+    _ -> mzero
 
 --------------------------
 floatOp2 :: (Rational -> Rational -> Rational)

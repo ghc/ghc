@@ -42,6 +42,7 @@ module GHC.Types.Literal
         , litNumWrap
         , litNumCoerce
         , litNumNarrow
+        , litNumBitSize
         , isMinBound
         , isMaxBound
 
@@ -189,6 +190,22 @@ litNumIsSigned nt = case nt of
   LitNumWord16  -> False
   LitNumWord32  -> False
   LitNumWord64  -> False
+
+-- | Number of bits
+litNumBitSize :: Platform -> LitNumType -> Maybe Word
+litNumBitSize platform nt = case nt of
+  LitNumInteger -> Nothing
+  LitNumNatural -> Nothing
+  LitNumInt     -> Just (fromIntegral (platformWordSizeInBits platform))
+  LitNumInt8    -> Just 8
+  LitNumInt16   -> Just 16
+  LitNumInt32   -> Just 32
+  LitNumInt64   -> Just 64
+  LitNumWord    -> Just (fromIntegral (platformWordSizeInBits platform))
+  LitNumWord8   -> Just 8
+  LitNumWord16  -> Just 16
+  LitNumWord32  -> Just 32
+  LitNumWord64  -> Just 64
 
 instance Binary LitNumType where
    put_ bh numTyp = putByte bh (fromIntegral (fromEnum numTyp))
