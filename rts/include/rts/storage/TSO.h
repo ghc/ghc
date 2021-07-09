@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include "rts/storage/Closures.h"
+
 /*
  * PROFILING info in a TSO
  */
@@ -23,6 +25,8 @@ typedef struct {
  * Thread IDs are 64 bits.
  */
 typedef StgWord64 StgThreadID;
+
+#define FMT_StgThreadID FMT_Word64
 
 #define tsoLocked(tso) ((tso)->flags & TSO_LOCKED)
 

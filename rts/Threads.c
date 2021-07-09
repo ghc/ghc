@@ -176,7 +176,7 @@ cmp_thread(StgPtr tso1, StgPtr tso2)
  *
  * This is used in the implementation of Show for ThreadIds.
  * ------------------------------------------------------------------------ */
-long
+StgThreadID
 rts_getThreadId(StgPtr tso)
 {
   return ((StgTSO *)tso)->id;
@@ -278,8 +278,8 @@ tryWakeupThread (Capability *cap, StgTSO *tso)
         msg->tso = tso;
         SET_HDR(msg, &stg_MSG_TRY_WAKEUP_info, CCS_SYSTEM);
         sendMessage(cap, tso->cap, (Message*)msg);
-        debugTraceCap(DEBUG_sched, cap, "message: try wakeup thread %ld on cap %d",
-                      (W_)tso->id, tso->cap->no);
+        debugTraceCap(DEBUG_sched, cap, "message: try wakeup thread %"
+                      FMT_StgThreadID " on cap %d", tso->id, tso->cap->no);
         return;
     }
 #endif
@@ -305,8 +305,9 @@ tryWakeupThread (Capability *cap, StgTSO *tso)
         i = lockClosure(tso->block_info.closure);
         unlockClosure(tso->block_info.closure, i);
         if (i != &stg_MSG_NULL_info) {
-            debugTraceCap(DEBUG_sched, cap, "thread %ld still blocked on throwto (%p)",
-                          (W_)tso->id, tso->block_info.throwto->header.info);
+            debugTraceCap(DEBUG_sched, cap, "thread %" FMT_StgThreadID " still "
+                          "blocked on throwto (%p)", tso->id,
+                          tso->block_info.throwto->header.info);
             return;
         }
 
@@ -409,9 +410,8 @@ checkBlockingQueues (Capability *cap, StgTSO *tso)
     StgBlockingQueue *bq, *next;
     StgClosure *p;
 
-    debugTraceCap(DEBUG_sched, cap,
-                  "collision occurred; checking blocking queues for thread %ld",
-                  (W_)tso->id);
+    debugTraceCap(DEBUG_sched, cap, "collision occurred; checking blocking "
+                  "queues for thread %" FMT_StgThreadID, tso->id);
 
     for (bq = tso->bq; bq != (StgBlockingQueue*)END_TSO_QUEUE; bq = next) {
         next = bq->link;
@@ -562,9 +562,9 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
         }
 
         debugTrace(DEBUG_gc,
-                   "threadStackOverflow of TSO %ld (%p): stack too large (now %ld; max is %ld)",
-                   (long)tso->id, tso, (long)tso->stackobj->stack_size,
-                   RtsFlags.GcFlags.maxStkSize);
+                   "threadStackOverflow of TSO %" FMT_StgThreadID " (%p): stack"
+                   " too large (now %ld; max is %ld)", tso->id, tso,
+                   (long)tso->stackobj->stack_size, RtsFlags.GcFlags.maxStkSize);
         IF_DEBUG(gc,
                  /* If we're debugging, just print out the top of the stack */
                  printStackChunk(tso->stackobj->sp,
@@ -914,8 +914,8 @@ printThreadBlockage(StgTSO *tso)
     debugBelch("is blocked on an STM operation");
     break;
   default:
-    barf("printThreadBlockage: strange tso->why_blocked: %d for TSO %ld (%p)",
-         tso->why_blocked, (long)tso->id, tso);
+    barf("printThreadBlockage: strange tso->why_blocked: %d for TSO %"
+         FMT_StgThreadID " (%p)", tso->why_blocked, tso->id, tso);
   }
 }
 

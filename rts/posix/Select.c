@@ -106,8 +106,8 @@ static bool wakeUpSleepingThreads (LowResTime now)
         sleeping_queue = tso->_link;
         tso->why_blocked = NotBlocked;
         tso->_link = END_TSO_QUEUE;
-        IF_DEBUG(scheduler, debugBelch("Waking up sleeping thread %lu\n",
-                                       (unsigned long)tso->id));
+        IF_DEBUG(scheduler, debugBelch("Waking up sleeping thread %"
+                                       FMT_StgThreadID "\n", tso->id));
         // MainCapability: this code is !THREADED_RTS
         pushOnRunQueue(&MainCapability,tso);
         flag = true;
@@ -420,15 +420,15 @@ awaitEvent(bool wait)
                    * pass an IOError to blocked threads (#4934)
                    */
                   IF_DEBUG(scheduler,
-                      debugBelch("Killing blocked thread %lu on bad fd=%i\n",
-                                 (unsigned long)tso->id, fd));
+                      debugBelch("Killing blocked thread %" FMT_StgThreadID
+                                 " on bad fd=%i\n", tso->id, fd));
                   raiseAsync(&MainCapability, tso,
                       (StgClosure *)blockedOnBadFD_closure, false, NULL);
                   break;
               case RTS_FD_IS_READY:
                   IF_DEBUG(scheduler,
-                      debugBelch("Waking up blocked thread %lu\n",
-                                 (unsigned long)tso->id));
+                      debugBelch("Waking up blocked thread %" FMT_StgThreadID "\n",
+                                 tso->id));
                   tso->why_blocked = NotBlocked;
                   tso->_link = END_TSO_QUEUE;
                   pushOnRunQueue(&MainCapability,tso);

@@ -74,8 +74,8 @@ loop:
     if (i == &stg_MSG_TRY_WAKEUP_info)
     {
         StgTSO *tso = ((MessageWakeup *)m)->tso;
-        debugTraceCap(DEBUG_sched, cap, "message: try wakeup thread %ld",
-                      (W_)tso->id);
+        debugTraceCap(DEBUG_sched, cap, "message: try wakeup thread %"
+                      FMT_StgThreadID, tso->id);
         tryWakeupThread(cap, tso);
     }
     else if (i == &stg_MSG_THROWTO_info)
@@ -171,8 +171,8 @@ uint32_t messageBlackHole(Capability *cap, MessageBlackHole *msg)
     StgClosure *bh = UNTAG_CLOSURE(msg->bh);
     StgTSO *owner;
 
-    debugTraceCap(DEBUG_sched, cap, "message: thread %d blocking on "
-                  "blackhole %p", (W_)msg->tso->id, msg->bh);
+    debugTraceCap(DEBUG_sched, cap, "message: thread %" FMT_StgThreadID
+                  " blocking on blackhole %p", msg->tso->id, msg->bh);
 
     info = ACQUIRE_LOAD(&bh->header.info);
 
@@ -268,8 +268,8 @@ loop:
         }
         recordClosureMutated(cap,bh); // bh was mutated
 
-        debugTraceCap(DEBUG_sched, cap, "thread %d blocked on thread %d",
-                      (W_)msg->tso->id, (W_)owner->id);
+        debugTraceCap(DEBUG_sched, cap, "thread %" FMT_StgThreadID " blocked on"
+                      " thread %" FMT_StgThreadID, msg->tso->id, owner->id);
 
         return 1; // blocked
     }
@@ -312,9 +312,9 @@ loop:
         }
 
         debugTraceCap(DEBUG_sched, cap,
-                      "thread %d blocked on existing BLOCKING_QUEUE "
-                      "owned by thread %d",
-                      (W_)msg->tso->id, (W_)owner->id);
+                      "thread %" FMT_StgThreadID " blocked on existing "
+                      "BLOCKING_QUEUE owned by thread %" FMT_StgThreadID,
+                      msg->tso->id, owner->id);
 
         // See above, #3838
         if (owner->why_blocked == NotBlocked && owner->id != msg->tso->id) {
