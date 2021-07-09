@@ -1,0 +1,11 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 9, types: 10, coercions: 0, joins: 0/0}
+
+-- RHS size: {terms: 8, types: 5, coercions: 0, joins: 0/0}
+f = \ @t g x ->
+      case g x of { __DEFAULT -> True }
+
+
+
