@@ -6,13 +6,13 @@ import Control.Exception
 import System.Environment
 import System.IO
 import Debug.Trace (trace)
-import Text.Regex
 import Data.Maybe
+import Data.List (isInfixOf)
 
 main = do
     prog <- getProgName
-    let Just (name:_) = matchRegex (mkRegex ".*(cgrun025)") prog
-    hPutStr stderr (shows name "\n")
+    let True = "cgrun025" `isInfixOf` prog
+    hPutStr stderr (shows prog "\n")
     args <- getArgs
     hPutStr stderr (shows args "\n")
     path <- getEnv "PATH"
