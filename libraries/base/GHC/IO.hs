@@ -447,7 +447,6 @@ Laziness can interact with @catch@-like operations in non-obvious ways (see,
 e.g. GHC #11555 and #13330). For instance, consider these subtly-different
 examples:
 
-TODO: Update example
 > test1 = Control.Exception.catch (error "uh oh") (\(_ :: SomeException) -> putStrLn "it failed")
 >
 > test2 = GHC.IO.catchException (error "uh oh") (\(_ :: SomeException) -> putStrLn "it failed")

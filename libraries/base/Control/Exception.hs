@@ -356,11 +356,12 @@ The following operations are guaranteed not to be interruptible:
 
 {- $catchall
 
-TODO: Update this paragraph.
-
-It is possible to catch all exceptions, by using the type 'SomeException':
+It is possible to catch all exceptions, by using the types
+'SomeException' and 'SomeExceptionWithLocation':
 
 > catch f (\e -> ... (e :: SomeException) ...)
+
+> catch f (\e -> ... (e :: SomeExceptionWithLocation) ...)
 
 HOWEVER, this is normally not what you want to do!
 
