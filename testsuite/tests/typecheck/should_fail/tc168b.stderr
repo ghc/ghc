@@ -1,0 +1,6 @@
+
+tc168b.hs:7:1: error:
+    • Cannot infer an ambiguous type signature.
+    • The type variables ‘v0’, ‘w0’, ‘x0’, ‘y0’, ‘z0’ are ambiguous.
+    • When checking the inferred type
+        g :: forall {a} {u}. C a (u, v0, w0, x0, y0, z0) => a -> u

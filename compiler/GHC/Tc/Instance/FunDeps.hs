@@ -44,6 +44,7 @@ import GHC.Utils.FV
 import GHC.Utils.Error( Validity(..), allValid )
 import GHC.Utils.Misc
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain ( assert )
 
 import GHC.Data.Pair             ( Pair(..) )
 import Data.List        ( nubBy )
@@ -548,14 +549,9 @@ oclose :: [PredType] -> TyCoVarSet -> TyCoVarSet
 -- See Note [The liberal coverage condition]
 oclose preds fixed_tvs
   | null tv_fds = fixed_tvs -- Fast escape hatch for common case.
-  | otherwise   = fixVarSet extend fixed_tvs
+  | otherwise   = assert (closeOverKinds fixed_tvs == fixed_tvs)
+                $ fixVarSet extend fixed_tvs
   where
-    non_ip_preds = filterOut isIPLikePred preds
-      -- implicit params don't really determine a type variable, and
-      -- skipping this causes implicit params to monomorphise too many
-      -- variables; see Note [Inheriting implicit parameters] in
-      -- GHC.Tc.Solver. Skipping causes typecheck/should_compile/tc219
-      -- to fail.
 
     extend fixed_tvs = foldl' add fixed_tvs tv_fds
        where
@@ -567,7 +563,7 @@ oclose preds fixed_tvs
     tv_fds  :: [(TyCoVarSet,TyCoVarSet)]
     tv_fds  = [ (tyCoVarsOfTypes ls, fvVarSet $ injectiveVarsOfTypes True rs)
                   -- See Note [Care with type functions]
-              | pred <- non_ip_preds
+              | pred <- preds
               , pred' <- pred : transSuperClasses pred
                    -- Look for fundeps in superclasses too
               , (ls, rs) <- determined pred' ]

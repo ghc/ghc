@@ -162,6 +162,10 @@ data TcRnMessage where
       an associated 'RealSrcSpan'.
   -}
   TcRnModMissingRealSrcSpan :: Module -> TcRnMessage
+  {-| TcRnAmbiguousMetavariables is an error that occurs when ambiguous metavariables are
+      detected when inferring a type signature.
+  -}
+  TcRnAmbiguousMetavariables :: [Type] -> TcRnMessage
 
 
 -- | Where the levity checking for the input type originated

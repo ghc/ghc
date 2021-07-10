@@ -1,7 +1,12 @@
 
 <interactive>:2:1: error:
-    • Non type-variable argument
-        in the constraint: Num (t2 -> t1 -> t3)
+    • Non type-variable argument in the constraint: Num (t0 -> t1 -> t)
       (Use FlexibleContexts to permit this)
     • When checking the inferred type
-        it :: forall {t1} {t2} {t3}. (Num t1, Num (t2 -> t1 -> t3)) => t3
+        it :: forall {t}. Num (t0 -> t1 -> t) => t
+
+<interactive>:2:1: error:
+    • Cannot infer an ambiguous type signature.
+    • The type variables ‘t0’, ‘t1’ are ambiguous.
+    • When checking the inferred type
+        it :: forall {t}. Num (t0 -> t1 -> t) => t

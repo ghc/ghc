@@ -1465,12 +1465,19 @@ decideMonoTyVars infer_mode name_taus psigs candidates
                -- oclose to find all further variables determined by this root
                -- set.
 
-             mono_tvs2 = oclose candidates mono_tvs1
+             non_ip_candidates = filterOut isIPLikePred candidates
+               -- implicit params don't really determine a type variable, and
+               -- skipping this causes implicit params to monomorphise too many
+               -- variables; see Note [Inheriting implicit parameters] in
+               -- GHC.Tc.Solver. Skipping causes typecheck/should_compile/tc219
+               -- to fail.
+
+             mono_tvs2 = oclose non_ip_candidates mono_tvs1
                -- mono_tvs2 now contains any variable determined by the "root
                -- set" of monomorphic tyvars in mono_tvs1.
 
              constrained_tvs = filterVarSet (isQuantifiableTv tc_lvl) $
-                               (oclose candidates (tyCoVarsOfTypes no_quant)
+                               (oclose non_ip_candidates (tyCoVarsOfTypes no_quant)
                                 `minusVarSet` mono_tvs2)
              -- constrained_tvs: the tyvars that we are not going to
              -- quantify solely because of the monomorphism restriction
