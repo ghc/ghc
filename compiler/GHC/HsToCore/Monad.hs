@@ -49,7 +49,7 @@ module GHC.HsToCore.Monad (
         EquationInfo(..), MatchResult (..), runMatchResult, DsWrapper, idDsWrapper,
 
         -- Representation polymorphism
-        dsNoLevPoly, dsNoLevPolyExpr, dsWhenNoErrs,
+        dsNoLevPoly, dsNoLevPolyExpr,
 
         -- Trace injection
         pprRuntimeTrace
@@ -609,20 +609,6 @@ dsNoLevPolyExpr :: CoreExpr -> LevityExprProvenance -> DsM ()
 dsNoLevPolyExpr e provenance
   | isExprLevPoly e = diagnosticDs (DsLevityPolyInExpr e provenance)
   | otherwise       = return ()
-
--- | Runs the thing_inside. If there are no errors, then returns the expr
--- given. Otherwise, returns unitExpr. This is useful for doing a bunch
--- of representation polymorphism checks and then avoiding making a core App.
--- (If we make a core App on a representation-polymorphic argument, detecting
--- how to handle the let/app invariant might call isUnliftedType, which panics
--- on a representation-polymorphic type.)
--- See #12709 for an example of why this machinery is necessary.
-dsWhenNoErrs :: DsM a -> (a -> CoreExpr) -> DsM CoreExpr
-dsWhenNoErrs thing_inside mk_expr
-  = do { (result, no_errs) <- askNoErrsDs thing_inside
-       ; return $ if no_errs
-                  then mk_expr result
-                  else unitExpr }
 
 -- | Inject a trace message into the compiled program. Whereas
 -- pprTrace prints out information *while compiling*, pprRuntimeTrace
