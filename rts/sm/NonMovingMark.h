@@ -143,6 +143,7 @@ void updateRemembSetPushClosure(Capability *cap, StgClosure *p);
 void updateRemembSetPushThunk(Capability *cap, StgThunk *p);
 void updateRemembSetPushTSO(Capability *cap, StgTSO *tso);
 void updateRemembSetPushStack(Capability *cap, StgStack *stack);
+void updateRemembSetPushMessageThrowTo(Capability *cap, MessageThrowTo *m);
 
 #if defined(THREADED_RTS)
 void nonmovingFlushCapUpdRemSetBlocks(Capability *cap);
