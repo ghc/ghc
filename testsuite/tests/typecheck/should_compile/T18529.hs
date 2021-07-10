@@ -7,8 +7,6 @@ module Bug where
 class C a b where
   op :: a -> b -> ()
 
--- GHC should not infer
+-- GHC should not infer an ambiguous type signature
 -- foo :: (C a b0, Num b0) => a -> ()
--- but instead let b0 default to Integer:
--- foo :: (C a Integer) => a -> ()
 foo x = op x 3

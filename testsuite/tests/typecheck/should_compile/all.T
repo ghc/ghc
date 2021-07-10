@@ -168,7 +168,6 @@ test('tc164', normal, compile, [''])
 test('tc165', normal, compile, [''])
 test('tc166', normal, compile, [''])
 test('tc167', normal, compile, [''])
-test('tc168', normal, compile_fail, [''])
 test('tc169', normal, compile, [''])
 
 test('tc170', [extra_files(['Tc170_Aux.hs'])], makefile_test, [])

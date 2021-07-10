@@ -1,0 +1,3764 @@
+checkFamInstConsistency [Prelude]
+Tc2 (src)
+Tc3
+tcExtendKindEnvList []
+tcExtendKindEnvList []
+---- tcTyClGroup ---- {
+Decls for [Optic]
+tcExtendKindEnv
+  [rgz :-> APromotionErr TyConPE, rgA :-> APromotionErr RecDataConPE]
+---- kcTyClGroup ---- {
+  module T15870
+  data Optic a_agE
+    where (:.:) :: Optic a_agF -> Optic b_agG -> Optic a_agF
+checkInitialKinds { []
+checkInitialKinds done }
+tcExtendKindEnvList []
+solveEqualities { level = 1
+inferInitialKinds { [Optic]
+bindImplicitTKBndrs
+  []
+  []
+tc_extend_local_env []
+tcExtendBinderStack []
+bindExplicTKBndrs [a_agE]
+newMetaKindVar k_aue[tau:1]
+newTyVarTyVar a_agE[tyv:1]
+tc_extend_local_env
+  [(a_agE, Type variable `a_agE' = a_agE[tyv:1] :: k_aue[tau:1])]
+tcExtendBinderStack [a_agE a_agE[tyv:1]]
+kcInferDeclHeader: not-cusk
+  Optic
+  []
+  [a_agE]
+  []
+  [a_agE[tyv:1]]
+  k_aue[tau:1] -> *
+inferInitialKinds done }
+kcTyClGroup: initial kinds Optic :: k_aue[tau:1] -> *
+tcExtendKindEnvList
+  [(Optic, ATcTyCon Optic[tc] :: k_aue[tau:1] -> *)]
+kcTyClDecl { Optic
+newMetaKindVar k_auf[tau:1]
+cloneTyVarTyVar a_aug[tyv:1]
+newMetaKindVar k_auh[tau:1]
+cloneTyVarTyVar b_aui[tyv:1]
+bindImplicitTKBndrs
+  [a_agF, b_agG]
+  [a_aug[tyv:1], b_aui[tyv:1]]
+tc_extend_local_env
+  [(a_agF, Type variable `a_agF' = a_aug[tyv:1] :: k_auf[tau:1]),
+   (b_agG, Type variable `b_agG' = b_aui[tyv:1] :: k_auh[tau:1])]
+tcExtendBinderStack [a_agF a_aug[tyv:1], b_agG b_aui[tyv:1]]
+bindExplicTKBndrs []
+newAnonMetaTyVar t_auj[tau:1]
+lk1 Optic
+tcInferTyApps {
+  Optic
+  [a_agF]
+tcInferTyApps (vis normal app)
+  [vis] k_aue[tau:1]
+  a_agF
+  k_aue[tau:1]
+  [TCvSubst In scope: InScope {k_aue} Type env: [] Co env: []]
+lk1 a_agF
+tcInferTyApps {
+  a_agF
+  []
+tcInferTyApps } a_aug[tyv:1] :: k_auf[tau:1]
+checkExpectedKind
+  a_aug[tyv:1]
+  k_auf[tau:1]
+checkExpectedKindX
+  a_agF
+  act_kind': k_auf[tau:1]
+  exp_kind: k_aue[tau:1]
+u_tys
+  tclvl 1
+  k_auf[tau:1] ~ k_aue[tau:1]
+  arising from a type equality k_auf[tau:1] ~ k_aue[tau:1]
+u_tys
+  tclvl 1
+  * ~ *
+  arising from a kind equality arising from
+    k_auf[tau:1] ~ k_aue[tau:1]
+u_tys
+  tclvl 1
+  'GHC.Types.LiftedRep ~ 'GHC.Types.LiftedRep
+  arising from a kind equality arising from
+    k_auf[tau:1] ~ k_aue[tau:1]
+u_tys yields no coercion
+u_tys yields no coercion
+uUnfilledVar2 ok
+  k_auf[tau:1] :: *
+  k_aue[tau:1] :: *
+  True
+  <*>_N
+writeMetaTyVar k_auf[tau:1] :: * := k_aue[tau:1]
+u_tys yields no coercion
+checkExpectedKind
+  k_auf[tau:1]
+  k_aue[tau:1]
+  <k_aue[tau:1]>_N
+tcInferTyApps (vis normal app) 2 k_aue[tau:1]
+tcInferTyApps } Optic a_aug[tyv:1] :: *
+checkExpectedKind
+  Optic a_aug[tyv:1]
+  *
+checkExpectedKindX
+  Optic a_agF
+  act_kind': *
+  exp_kind: TYPE t_auj[tau:1]
+u_tys
+  tclvl 1
+  * ~ TYPE t_auj[tau:1]
+  arising from a type equality * ~ TYPE t_auj[tau:1]
+u_tys
+  tclvl 1
+  'GHC.Types.LiftedRep ~ t_auj[tau:1]
+  arising from a type equality * ~ TYPE t_auj[tau:1]
+u_tys
+  tclvl 1
+  GHC.Types.RuntimeRep ~ GHC.Types.RuntimeRep
+  arising from a kind equality arising from
+    t_auj[tau:1] ~ 'GHC.Types.LiftedRep
+u_tys yields no coercion
+uUnfilledVar2 ok
+  t_auj[tau:1] :: GHC.Types.RuntimeRep
+  'GHC.Types.LiftedRep :: GHC.Types.RuntimeRep
+  True
+  <GHC.Types.RuntimeRep>_N
+writeMetaTyVar
+  t_auj[tau:1] :: GHC.Types.RuntimeRep := 'GHC.Types.LiftedRep
+u_tys yields no coercion
+u_tys yields no coercion
+checkExpectedKind
+  *
+  TYPE t_auj[tau:1]
+  <*>_N
+lk1 Many
+tcTyVar
+  Many []
+  Nothing
+tcInferTyApps {
+  Many
+  []
+tcInferTyApps } 'Many :: GHC.Types.Multiplicity
+checkExpectedKind
+  'Many
+  GHC.Types.Multiplicity
+checkExpectedKindX
+  Many
+  act_kind': GHC.Types.Multiplicity
+  exp_kind: GHC.Types.Multiplicity
+newAnonMetaTyVar t_auk[tau:1]
+lk1 Optic
+tcInferTyApps {
+  Optic
+  [b_agG]
+tcInferTyApps (vis normal app)
+  [vis] k_aue[tau:1]
+  b_agG
+  k_aue[tau:1]
+  [TCvSubst In scope: InScope {k_aue} Type env: [] Co env: []]
+lk1 b_agG
+tcInferTyApps {
+  b_agG
+  []
+tcInferTyApps } b_aui[tyv:1] :: k_auh[tau:1]
+checkExpectedKind
+  b_aui[tyv:1]
+  k_auh[tau:1]
+checkExpectedKindX
+  b_agG
+  act_kind': k_auh[tau:1]
+  exp_kind: k_aue[tau:1]
+u_tys
+  tclvl 1
+  k_auh[tau:1] ~ k_aue[tau:1]
+  arising from a type equality k_auh[tau:1] ~ k_aue[tau:1]
+u_tys
+  tclvl 1
+  * ~ *
+  arising from a kind equality arising from
+    k_auh[tau:1] ~ k_aue[tau:1]
+u_tys
+  tclvl 1
+  'GHC.Types.LiftedRep ~ 'GHC.Types.LiftedRep
+  arising from a kind equality arising from
+    k_auh[tau:1] ~ k_aue[tau:1]
+u_tys yields no coercion
+u_tys yields no coercion
+uUnfilledVar2 ok
+  k_auh[tau:1] :: *
+  k_aue[tau:1] :: *
+  True
+  <*>_N
+writeMetaTyVar k_auh[tau:1] :: * := k_aue[tau:1]
+u_tys yields no coercion
+checkExpectedKind
+  k_auh[tau:1]
+  k_aue[tau:1]
+  <k_aue[tau:1]>_N
+tcInferTyApps (vis normal app) 2 k_aue[tau:1]
+tcInferTyApps } Optic b_aui[tyv:1] :: *
+checkExpectedKind
+  Optic b_aui[tyv:1]
+  *
+checkExpectedKindX
+  Optic b_agG
+  act_kind': *
+  exp_kind: TYPE t_auk[tau:1]
+u_tys
+  tclvl 1
+  * ~ TYPE t_auk[tau:1]
+  arising from a type equality * ~ TYPE t_auk[tau:1]
+u_tys
+  tclvl 1
+  'GHC.Types.LiftedRep ~ t_auk[tau:1]
+  arising from a type equality * ~ TYPE t_auk[tau:1]
+u_tys
+  tclvl 1
+  GHC.Types.RuntimeRep ~ GHC.Types.RuntimeRep
+  arising from a kind equality arising from
+    t_auk[tau:1] ~ 'GHC.Types.LiftedRep
+u_tys yields no coercion
+uUnfilledVar2 ok
+  t_auk[tau:1] :: GHC.Types.RuntimeRep
+  'GHC.Types.LiftedRep :: GHC.Types.RuntimeRep
+  True
+  <GHC.Types.RuntimeRep>_N
+writeMetaTyVar
+  t_auk[tau:1] :: GHC.Types.RuntimeRep := 'GHC.Types.LiftedRep
+u_tys yields no coercion
+u_tys yields no coercion
+checkExpectedKind
+  *
+  TYPE t_auk[tau:1]
+  <*>_N
+lk1 Many
+tcTyVar
+  Many []
+  Nothing
+tcInferTyApps {
+  Many
+  []
+tcInferTyApps } 'Many :: GHC.Types.Multiplicity
+checkExpectedKind
+  'Many
+  GHC.Types.Multiplicity
+checkExpectedKindX
+  Many
+  act_kind': GHC.Types.Multiplicity
+  exp_kind: GHC.Types.Multiplicity
+newAnonMetaTyVar t_aul[tau:1]
+lk1 Optic
+tcInferTyApps {
+  Optic
+  [a_agF]
+tcInferTyApps (vis normal app)
+  [vis] k_aue[tau:1]
+  a_agF
+  k_aue[tau:1]
+  [TCvSubst In scope: InScope {k_aue} Type env: [] Co env: []]
+lk1 a_agF
+tcInferTyApps {
+  a_agF
+  []
+tcInferTyApps } a_aug[tyv:1] :: k_auf[tau:1]
+checkExpectedKind
+  a_aug[tyv:1]
+  k_auf[tau:1]
+checkExpectedKindX
+  a_agF
+  act_kind': k_auf[tau:1]
+  exp_kind: k_aue[tau:1]
+u_tys
+  tclvl 1
+  k_auf[tau:1] ~ k_aue[tau:1]
+  arising from a type equality k_auf[tau:1] ~ k_aue[tau:1]
+found filled tyvar k_auf[tau:1] :-> k_aue[tau:1]
+u_tys yields no coercion
+checkExpectedKind
+  k_auf[tau:1]
+  k_aue[tau:1]
+  <k_aue[tau:1]>_N
+tcInferTyApps (vis normal app) 2 k_aue[tau:1]
+tcInferTyApps } Optic a_aug[tyv:1] :: *
+checkExpectedKind
+  Optic a_aug[tyv:1]
+  *
+checkExpectedKindX
+  Optic a_agF
+  act_kind': *
+  exp_kind: TYPE t_aul[tau:1]
+u_tys
+  tclvl 1
+  * ~ TYPE t_aul[tau:1]
+  arising from a type equality * ~ TYPE t_aul[tau:1]
+u_tys
+  tclvl 1
+  'GHC.Types.LiftedRep ~ t_aul[tau:1]
+  arising from a type equality * ~ TYPE t_aul[tau:1]
+u_tys
+  tclvl 1
+  GHC.Types.RuntimeRep ~ GHC.Types.RuntimeRep
+  arising from a kind equality arising from
+    t_aul[tau:1] ~ 'GHC.Types.LiftedRep
+u_tys yields no coercion
+uUnfilledVar2 ok
+  t_aul[tau:1] :: GHC.Types.RuntimeRep
+  'GHC.Types.LiftedRep :: GHC.Types.RuntimeRep
+  True
+  <GHC.Types.RuntimeRep>_N
+writeMetaTyVar
+  t_aul[tau:1] :: GHC.Types.RuntimeRep := 'GHC.Types.LiftedRep
+u_tys yields no coercion
+u_tys yields no coercion
+checkExpectedKind
+  *
+  TYPE t_aul[tau:1]
+  <*>_N
+kcTyClDecl done } Optic
+solveEqualities: running solver wanted =  WC {}
+newNoTcEvBinds unique = aum
+solveWanteds {
+  Level = 1
+  WC {}
+solveSimpleWanteds { {}
+solveSimpleWanteds end }
+  iterations = 1
+  residual = WC {}
+solveWanteds }
+  final wc = WC {}
+  current evbinds  = {}
+unflattenGivens []
+End solveEqualities }
+newNoTcEvBinds unique = aun
+Skolemising a_agE[tyv:1] := a_agE[sk:1]
+writeMetaTyVar a_agE[tyv:1] :: k_aue[tau:1] := a_agE[sk:1]
+Skipping swizzleTcTyConBndrs for [Optic[tc]]
+quantifyTyVars 1
+  DV {dv_kvs = {k_aue[tau:1]}, dv_tvs = {}, dv_cvs = {}}
+Skolemising k_aue[tau:1] := k_aue[sk:1]
+writeMetaTyVar k_aue[tau:1] :: * := k_aue[sk:1]
+quantifyTyVars 2
+  nondep:
+  dep: k_aue[tau:1]
+  dep_kvs' k_aue[sk:1]
+  nondep_tvs'
+generaliseTcTyCon: pre zonk
+  tycon = Optic[tc]
+  spec_req_tvs = (a_agE[sk:1] :: k_aue[tau:1])
+  tc_res_kind = *
+  dvs1 = DV {dv_kvs = {k_aue[tau:1]}, dv_tvs = {}, dv_cvs = {}}
+  inferred = k_aue[sk:1]
+generaliseTcTyCon: post zonk
+  tycon = Optic[tc]
+  inferred = k_aue
+  spec_req_tvs = (a_agE[sk:1] :: k_aue[tau:1])
+  sorted_spec_tvs =
+  req_tvs = [a_agE]
+  zonk-env = ZE {ze_tv_env = [agE :-> a_agE, aue :-> k_aue]
+                 ze_id_env = []}
+generaliseTcTyCon done
+  tycon = Optic[tc]
+  tc_res_kind = *
+  dep_fv_set = {k_aue[tau:1]}
+  inferred_tcbs = [inf (@k_aue)]
+  specified_tcbs = []
+  required_tcbs = [anon-vis (@(a_agE :: k_aue))]
+  final_tcbs = [inf (@k_aue), anon-vis (@(a_agE :: k_aue))]
+---- kcTyClGroup end ---- } Optic :: forall {k}. k -> *
+tcTyAndCl generalized kinds
+  (Optic, [inf (@k_aue), anon-vis (@(a_agE :: k_aue))], * True)
+tcExtendKindEnvList
+  [(Optic, ATcTyCon Optic[tc] :: forall {k}. k -> *)]
+---- tcTyClDecl ---- {
+  data Optic a_agE
+    where (:.:) :: Optic a_agF -> Optic b_agG -> Optic a_agF
+bindTyClTyVars
+  Optic [inf (@k_aue), anon-vis (@(a_agE :: k_aue))]
+  [(a_agE, a_agE)]
+tc_extend_local_env
+  [(a_agE, Type variable `a_agE' = a_agE :: k_aue)]
+tcExtendBinderStack [a_agE a_agE]
+checkDataKindSig *
+solveEqualities { level = 1
+solveEqualities: running solver wanted =  WC {}
+newNoTcEvBinds unique = auo
+solveWanteds {
+  Level = 1
+  WC {}
+solveSimpleWanteds { {}
+solveSimpleWanteds end }
+  iterations = 1
+  residual = WC {}
+solveWanteds }
+  final wc = WC {}
+  current evbinds  = {}
+unflattenGivens []
+End solveEqualities }
+newNoTcEvBinds unique = aup
+tcConDecl 1 gadt [:.:]
+solveEqualities { level = 1
+newMetaKindVar k_auq[tau:1]
+newMetaKindVar k_aur[tau:1]
+bindImplicitTKBndrs
+  [a_agF, b_agG]
+  [a_agF[sk:1], b_agG[sk:1]]
+tc_extend_local_env
+  [(a_agF, Type variable `a_agF' = a_agF[sk:1] :: k_auq[tau:1]),
+   (b_agG, Type variable `b_agG' = b_agG[sk:1] :: k_aur[tau:1])]
+tcExtendBinderStack [a_agF a_agF[sk:1], b_agG b_agG[sk:1]]
+bindExplicTKBndrs []
+lk1 Optic
+tcInferTyApps {
+  Optic
+  [a_agF]
+tcInferTyApps (need to instantiate)
+  {k_aue}
+  [TCvSubst In scope: InScope {} Type env: [] Co env: []]
+cloneAnonMetaTyVar k_aus[tau:1] :: *
+tcInferTyApps (vis normal app)
+  [vis] k_aue
+  a_agF
+  k_aue
+  [TCvSubst
+     In scope: InScope {k_aus}
+     Type env: [aue :-> k_aus[tau:1]]
+     Co env: []]
+lk1 a_agF
+tcInferTyApps {
+  a_agF
+  []
+tcInferTyApps } a_agF[sk:1] :: k_auq[tau:1]
+checkExpectedKind
+  a_agF[sk:1]
+  k_auq[tau:1]
+checkExpectedKindX
+  a_agF
+  act_kind': k_auq[tau:1]
+  exp_kind: k_aus[tau:1]
+u_tys
+  tclvl 1
+  k_auq[tau:1] ~ k_aus[tau:1]
+  arising from a type equality k_auq[tau:1] ~ k_aus[tau:1]
+u_tys
+  tclvl 1
+  * ~ *
+  arising from a kind equality arising from
+    k_auq[tau:1] ~ k_aus[tau:1]
+u_tys
+  tclvl 1
+  'GHC.Types.LiftedRep ~ 'GHC.Types.LiftedRep
+  arising from a kind equality arising from
+    k_auq[tau:1] ~ k_aus[tau:1]
+u_tys yields no coercion
+u_tys yields no coercion
+uUnfilledVar2 ok
+  k_auq[tau:1] :: *
+  k_aus[tau:1] :: *
+  True
+  <*>_N
+writeMetaTyVar k_auq[tau:1] :: * := k_aus[tau:1]
+u_tys yields no coercion
+checkExpectedKind
+  k_auq[tau:1]
+  k_aus[tau:1]
+  <k_aus[tau:1]>_N
+tcInferTyApps (vis normal app) 2 k_aus[tau:1]
+tcInferTyApps } Optic a_agF[sk:1] :: *
+tcConArg 1 Optic a_agF
+newAnonMetaTyVar t_aut[tau:1]
+lk1 Optic
+tcInferTyApps {
+  Optic
+  [a_agF]
+tcInferTyApps (need to instantiate)
+  {k_aue}
+  [TCvSubst In scope: InScope {} Type env: [] Co env: []]
+cloneAnonMetaTyVar k_auu[tau:1] :: *
+tcInferTyApps (vis normal app)
+  [vis] k_aue
+  a_agF
+  k_aue
+  [TCvSubst
+     In scope: InScope {k_auu}
+     Type env: [aue :-> k_auu[tau:1]]
+     Co env: []]
+lk1 a_agF
+tcInferTyApps {
+  a_agF
+  []
+tcInferTyApps } a_agF[sk:1] :: k_auq[tau:1]
+checkExpectedKind
+  a_agF[sk:1]
+  k_auq[tau:1]
+checkExpectedKindX
+  a_agF
+  act_kind': k_auq[tau:1]
+  exp_kind: k_auu[tau:1]
+u_tys
+  tclvl 1
+  k_auq[tau:1] ~ k_auu[tau:1]
+  arising from a type equality k_auq[tau:1] ~ k_auu[tau:1]
+found filled tyvar k_auq[tau:1] :-> k_aus[tau:1]
+u_tys
+  tclvl 1
+  * ~ *
+  arising from a kind equality arising from
+    k_aus[tau:1] ~ k_auu[tau:1]
+u_tys
+  tclvl 1
+  'GHC.Types.LiftedRep ~ 'GHC.Types.LiftedRep
+  arising from a kind equality arising from
+    k_aus[tau:1] ~ k_auu[tau:1]
+u_tys yields no coercion
+u_tys yields no coercion
+uUnfilledVar2 ok
+  k_aus[tau:1] :: *
+  k_auu[tau:1] :: *
+  True
+  <*>_N
+writeMetaTyVar k_aus[tau:1] :: * := k_auu[tau:1]
+u_tys yields no coercion
+checkExpectedKind
+  k_auq[tau:1]
+  k_auu[tau:1]
+  <k_auu[tau:1]>_N
+tcInferTyApps (vis normal app) 2 k_auu[tau:1]
+tcInferTyApps } Optic a_agF[sk:1] :: *
+checkExpectedKind
+  Optic a_agF[sk:1]
+  *
+checkExpectedKindX
+  Optic a_agF
+  act_kind': *
+  exp_kind: TYPE t_aut[tau:1]
+u_tys
+  tclvl 1
+  * ~ TYPE t_aut[tau:1]
+  arising from a type equality * ~ TYPE t_aut[tau:1]
+u_tys
+  tclvl 1
+  'GHC.Types.LiftedRep ~ t_aut[tau:1]
+  arising from a type equality * ~ TYPE t_aut[tau:1]
+u_tys
+  tclvl 1
+  GHC.Types.RuntimeRep ~ GHC.Types.RuntimeRep
+  arising from a kind equality arising from
+    t_aut[tau:1] ~ 'GHC.Types.LiftedRep
+u_tys yields no coercion
+uUnfilledVar2 ok
+  t_aut[tau:1] :: GHC.Types.RuntimeRep
+  'GHC.Types.LiftedRep :: GHC.Types.RuntimeRep
+  True
+  <GHC.Types.RuntimeRep>_N
+writeMetaTyVar
+  t_aut[tau:1] :: GHC.Types.RuntimeRep := 'GHC.Types.LiftedRep
+u_tys yields no coercion
+u_tys yields no coercion
+checkExpectedKind
+  *
+  TYPE t_aut[tau:1]
+  <*>_N
+tcConArg 2 Optic a_agF
+tcConArg 1 Optic b_agG
+newAnonMetaTyVar t_auv[tau:1]
+lk1 Optic
+tcInferTyApps {
+  Optic
+  [b_agG]
+tcInferTyApps (need to instantiate)
+  {k_aue}
+  [TCvSubst In scope: InScope {} Type env: [] Co env: []]
+cloneAnonMetaTyVar k_auw[tau:1] :: *
+tcInferTyApps (vis normal app)
+  [vis] k_aue
+  b_agG
+  k_aue
+  [TCvSubst
+     In scope: InScope {k_auw}
+     Type env: [aue :-> k_auw[tau:1]]
+     Co env: []]
+lk1 b_agG
+tcInferTyApps {
+  b_agG
+  []
+tcInferTyApps } b_agG[sk:1] :: k_aur[tau:1]
+checkExpectedKind
+  b_agG[sk:1]
+  k_aur[tau:1]
+checkExpectedKindX
+  b_agG
+  act_kind': k_aur[tau:1]
+  exp_kind: k_auw[tau:1]
+u_tys
+  tclvl 1
+  k_aur[tau:1] ~ k_auw[tau:1]
+  arising from a type equality k_aur[tau:1] ~ k_auw[tau:1]
+u_tys
+  tclvl 1
+  * ~ *
+  arising from a kind equality arising from
+    k_aur[tau:1] ~ k_auw[tau:1]
+u_tys
+  tclvl 1
+  'GHC.Types.LiftedRep ~ 'GHC.Types.LiftedRep
+  arising from a kind equality arising from
+    k_aur[tau:1] ~ k_auw[tau:1]
+u_tys yields no coercion
+u_tys yields no coercion
+uUnfilledVar2 ok
+  k_aur[tau:1] :: *
+  k_auw[tau:1] :: *
+  True
+  <*>_N
+writeMetaTyVar k_aur[tau:1] :: * := k_auw[tau:1]
+u_tys yields no coercion
+checkExpectedKind
+  k_aur[tau:1]
+  k_auw[tau:1]
+  <k_auw[tau:1]>_N
+tcInferTyApps (vis normal app) 2 k_auw[tau:1]
+tcInferTyApps } Optic b_agG[sk:1] :: *
+checkExpectedKind
+  Optic b_agG[sk:1]
+  *
+checkExpectedKindX
+  Optic b_agG
+  act_kind': *
+  exp_kind: TYPE t_auv[tau:1]
+u_tys
+  tclvl 1
+  * ~ TYPE t_auv[tau:1]
+  arising from a type equality * ~ TYPE t_auv[tau:1]
+u_tys
+  tclvl 1
+  'GHC.Types.LiftedRep ~ t_auv[tau:1]
+  arising from a type equality * ~ TYPE t_auv[tau:1]
+u_tys
+  tclvl 1
+  GHC.Types.RuntimeRep ~ GHC.Types.RuntimeRep
+  arising from a kind equality arising from
+    t_auv[tau:1] ~ 'GHC.Types.LiftedRep
+u_tys yields no coercion
+uUnfilledVar2 ok
+  t_auv[tau:1] :: GHC.Types.RuntimeRep
+  'GHC.Types.LiftedRep :: GHC.Types.RuntimeRep
+  True
+  <GHC.Types.RuntimeRep>_N
+writeMetaTyVar
+  t_auv[tau:1] :: GHC.Types.RuntimeRep := 'GHC.Types.LiftedRep
+u_tys yields no coercion
+u_tys yields no coercion
+checkExpectedKind
+  *
+  TYPE t_auv[tau:1]
+  <*>_N
+tcConArg 2 Optic b_agG
+lookupCF
+  :.:
+  Nothing
+  []
+solveEqualities: running solver wanted =  WC {}
+newNoTcEvBinds unique = aux
+solveWanteds {
+  Level = 1
+  WC {}
+solveSimpleWanteds { {}
+solveSimpleWanteds end }
+  iterations = 1
+  residual = WC {}
+solveWanteds }
+  final wc = WC {}
+  current evbinds  = {}
+unflattenGivens []
+End solveEqualities }
+newNoTcEvBinds unique = auy
+kindGeneralizeAll
+kindGeneralizeSome {
+  forall (a :: k_auu[tau:1]) (b :: k_auw[tau:1]).
+  Optic a %1 -> Optic b %1 -> Optic a
+quantifyTyVars 1
+  DV {dv_kvs = {k_auu[tau:1], k_auw[tau:1]}, dv_tvs = {},
+      dv_cvs = {}}
+Skolemising k_auu[tau:1] := k_auu[sk:1]
+writeMetaTyVar k_auu[tau:1] :: * := k_auu[sk:1]
+Skolemising k_auw[tau:1] := k_auw[sk:1]
+writeMetaTyVar k_auw[tau:1] :: * := k_auw[sk:1]
+quantifyTyVars 2
+  nondep:
+  dep: k_auu[tau:1] k_auw[tau:1]
+  dep_kvs' k_auu[sk:1] k_auw[sk:1]
+  nondep_tvs'
+kindGeneralizeSome }
+  Kind or type: forall (a :: k_auu[tau:1]) (b :: k_auw[tau:1]).
+                Optic a %1 -> Optic b %1 -> Optic a
+  dvs: DV {dv_kvs = {k_auu[tau:1], k_auw[tau:1]}, dv_tvs = {},
+           dv_cvs = {}}
+  dvs': DV {dv_kvs = {k_auu[tau:1], k_auw[tau:1]}, dv_tvs = {},
+            dv_cvs = {}}
+  to_promote: {}
+  qkvs: k_auu[sk:1] k_auw[sk:1]
+tcConDecl 2
+  [:.:]
+  []
+tcConDecl 2 [:.:]
+tcDataDefn
+  Optic
+  [inf (@k_aue), anon-vis (@(a_agE :: k_aue))]
+  []
+---- tcTyClDecl end ---- } Optic
+Starting synonym cycle check [Optic]
+Done synonym cycle check [Optic]
+Starting validity check [Optic]
+Starting validity for tycon Optic
+checkValidTyCon
+  Optic
+  Nothing
+cvtc1 Optic
+cvtc2 Optic
+checkValidDataCon
+  :.:
+  Optic
+  [k_aue, a_agE]
+  Optic a_agE :: *
+  Optic a_agF :: *
+checkValidDataCon 2
+  forall {k} {k} (a :: k) (b :: k). Optic a -> Optic b -> Optic a
+checkValidType
+  forall {k} {k} (a :: k) (b :: k).
+  Optic a -> Optic b -> Optic a :: *
+check_type
+  forall {k} {k} (a :: k) (b :: k). Optic a -> Optic b -> Optic a
+  LimitedRank True (MonoType (Perhaps you intended to use RankNTypes))
+done ct
+  forall {k} {k} (a :: k) (b :: k). Optic a -> Optic b -> Optic a
+Ambiguity check for
+  forall {k} {k} (a :: k) (b :: k). Optic a -> Optic b -> Optic a
+tc_sub_type (general case)
+  ty_actual   = forall {k} {k} (a :: k) (b :: k).
+                Optic a -> Optic b -> Optic a
+  ty_expected = forall {k} {k} (a :: k) (b :: k).
+                Optic a -> Optic b -> Optic a
+pushLevelAndCaptureConstraints { 1
+cloneAnonMetaTyVar k_auH[tau:1] :: *
+cloneAnonMetaTyVar k_auI[tau:1] :: *
+cloneAnonMetaTyVar a_auJ[tau:1] :: k_auH[tau:1]
+cloneAnonMetaTyVar b_auK[tau:1] :: k_auI[tau:1]
+Instantiating
+  all tyvars? True
+  origin arising from a type equality forall {k} {k} (a :: k)
+                                             (b :: k).
+                                      Optic a -> Optic b -> Optic a
+                                      ~
+                                      forall {k} {k} (a :: k) (b :: k).
+                                      Optic a -> Optic b -> Optic a
+  type forall {k_auu} {k_X0} @a_agF @b_X1.
+         Optic a_agF -> Optic b_X1 -> Optic a_agF
+  theta []
+  leave_bndrs []
+  with k_auH[tau:1]
+       k_auI[tau:1]
+       a_auJ[tau:1]
+       b_auK[tau:1]
+  theta: []
+u_tys
+  tclvl 1
+  Optic a_auJ[tau:1] -> Optic b_auK[tau:1] -> Optic a_auJ[tau:1]
+  ~
+  Optic a_auF[sk:1] -> Optic b_auG[sk:1] -> Optic a_auF[sk:1]
+  arising from a type equality Optic a_auJ[tau:1]
+                               -> Optic b_auK[tau:1] -> Optic a_auJ[tau:1]
+                               ~
+                               Optic a_auF[sk:1] -> Optic b_auG[sk:1] -> Optic a_auF[sk:1]
+u_tys
+  tclvl 1
+  Optic a_auJ[tau:1] ~ Optic a_auF[sk:1]
+  arising from a type equality Optic a_auJ[tau:1]
+                               -> Optic b_auK[tau:1] -> Optic a_auJ[tau:1]
+                               ~
+                               Optic a_auF[sk:1] -> Optic b_auG[sk:1] -> Optic a_auF[sk:1]
+u_tys
+  tclvl 1
+  k_auH[tau:1] ~ k_auD[sk:1]
+  arising from a type equality Optic a_auJ[tau:1]
+                               -> Optic b_auK[tau:1] -> Optic a_auJ[tau:1]
+                               ~
+                               Optic a_auF[sk:1] -> Optic b_auG[sk:1] -> Optic a_auF[sk:1]
+u_tys
+  tclvl 1
+  * ~ *
+  arising from a kind equality arising from
+    k_auH[tau:1] ~ k_auD[sk:1]
+u_tys
+  tclvl 1
+  'GHC.Types.LiftedRep ~ 'GHC.Types.LiftedRep
+  arising from a kind equality arising from
+    k_auH[tau:1] ~ k_auD[sk:1]
+u_tys yields no coercion
+u_tys yields no coercion
+uUnfilledVar2 ok
+  k_auH[tau:1] :: *
+  k_auD[sk:1] :: *
+  True
+  <*>_N
+writeMetaTyVar k_auH[tau:1] :: * := k_auD[sk:1]
+u_tys yields no coercion
+u_tys
+  tclvl 1
+  a_auJ[tau:1] ~ a_auF[sk:1]
+  arising from a type equality Optic a_auJ[tau:1]
+                               -> Optic b_auK[tau:1] -> Optic a_auJ[tau:1]
+                               ~
+                               Optic a_auF[sk:1] -> Optic b_auG[sk:1] -> Optic a_auF[sk:1]
+u_tys
+  tclvl 1
+  k_auD[sk:1] ~ k_auH[tau:1]
+  arising from a kind equality arising from
+    a_auJ[tau:1] ~ a_auF[sk:1]
+u_tys yields no coercion
+uUnfilledVar2 ok
+  a_auJ[tau:1] :: k_auH[tau:1]
+  a_auF[sk:1] :: k_auD[sk:1]
+  True
+  <k_auD[sk:1]>_N
+writeMetaTyVar a_auJ[tau:1] :: k_auH[tau:1] := a_auF[sk:1]
+u_tys yields no coercion
+u_tys yields no coercion
+u_tys
+  tclvl 1
+  Optic b_auK[tau:1] -> Optic a_auJ[tau:1]
+  ~
+  Optic b_auG[sk:1] -> Optic a_auF[sk:1]
+  arising from a type equality Optic a_auJ[tau:1]
+                               -> Optic b_auK[tau:1] -> Optic a_auJ[tau:1]
+                               ~
+                               Optic a_auF[sk:1] -> Optic b_auG[sk:1] -> Optic a_auF[sk:1]
+u_tys
+  tclvl 1
+  Optic b_auK[tau:1] ~ Optic b_auG[sk:1]
+  arising from a type equality Optic a_auJ[tau:1]
+                               -> Optic b_auK[tau:1] -> Optic a_auJ[tau:1]
+                               ~
+                               Optic a_auF[sk:1] -> Optic b_auG[sk:1] -> Optic a_auF[sk:1]
+u_tys
+  tclvl 1
+  k_auI[tau:1] ~ k_auE[sk:1]
+  arising from a type equality Optic a_auJ[tau:1]
+                               -> Optic b_auK[tau:1] -> Optic a_auJ[tau:1]
+                               ~
+                               Optic a_auF[sk:1] -> Optic b_auG[sk:1] -> Optic a_auF[sk:1]
+u_tys
+  tclvl 1
+  * ~ *
+  arising from a kind equality arising from
+    k_auI[tau:1] ~ k_auE[sk:1]
+u_tys
+  tclvl 1
+  'GHC.Types.LiftedRep ~ 'GHC.Types.LiftedRep
+  arising from a kind equality arising from
+    k_auI[tau:1] ~ k_auE[sk:1]
+u_tys yields no coercion
+u_tys yields no coercion
+uUnfilledVar2 ok
+  k_auI[tau:1] :: *
+  k_auE[sk:1] :: *
+  True
+  <*>_N
+writeMetaTyVar k_auI[tau:1] :: * := k_auE[sk:1]
+u_tys yields no coercion
+u_tys
+  tclvl 1
+  b_auK[tau:1] ~ b_auG[sk:1]
+  arising from a type equality Optic a_auJ[tau:1]
+                               -> Optic b_auK[tau:1] -> Optic a_auJ[tau:1]
+                               ~
+                               Optic a_auF[sk:1] -> Optic b_auG[sk:1] -> Optic a_auF[sk:1]
+u_tys
+  tclvl 1
+  k_auE[sk:1] ~ k_auI[tau:1]
+  arising from a kind equality arising from
+    b_auK[tau:1] ~ b_auG[sk:1]
+u_tys yields no coercion
+uUnfilledVar2 ok
+  b_auK[tau:1] :: k_auI[tau:1]
+  b_auG[sk:1] :: k_auE[sk:1]
+  True
+  <k_auE[sk:1]>_N
+writeMetaTyVar b_auK[tau:1] :: k_auI[tau:1] := b_auG[sk:1]
+u_tys yields no coercion
+u_tys yields no coercion
+u_tys
+  tclvl 1
+  Optic a_auJ[tau:1] ~ Optic a_auF[sk:1]
+  arising from a type equality Optic a_auJ[tau:1]
+                               -> Optic b_auK[tau:1] -> Optic a_auJ[tau:1]
+                               ~
+                               Optic a_auF[sk:1] -> Optic b_auG[sk:1] -> Optic a_auF[sk:1]
+u_tys
+  tclvl 1
+  k_auH[tau:1] ~ k_auD[sk:1]
+  arising from a type equality Optic a_auJ[tau:1]
+                               -> Optic b_auK[tau:1] -> Optic a_auJ[tau:1]
+                               ~
+                               Optic a_auF[sk:1] -> Optic b_auG[sk:1] -> Optic a_auF[sk:1]
+found filled tyvar k_auH[tau:1] :-> k_auD[sk:1]
+u_tys yields no coercion
+u_tys
+  tclvl 1
+  a_auJ[tau:1] ~ a_auF[sk:1]
+  arising from a type equality Optic a_auJ[tau:1]
+                               -> Optic b_auK[tau:1] -> Optic a_auJ[tau:1]
+                               ~
+                               Optic a_auF[sk:1] -> Optic b_auG[sk:1] -> Optic a_auF[sk:1]
+found filled tyvar a_auJ[tau:1] :-> a_auF[sk:1]
+u_tys yields no coercion
+u_tys yields no coercion
+u_tys
+  tclvl 1
+  'Many ~ 'Many
+  arising from a type equality Optic a_auJ[tau:1]
+                               -> Optic b_auK[tau:1] -> Optic a_auJ[tau:1]
+                               ~
+                               Optic a_auF[sk:1] -> Optic b_auG[sk:1] -> Optic a_auF[sk:1]
+u_tys yields no coercion
+u_tys yields no coercion
+u_tys
+  tclvl 1
+  'Many ~ 'Many
+  arising from a type equality Optic a_auJ[tau:1]
+                               -> Optic b_auK[tau:1] -> Optic a_auJ[tau:1]
+                               ~
+                               Optic a_auF[sk:1] -> Optic b_auG[sk:1] -> Optic a_auF[sk:1]
+u_tys yields no coercion
+u_tys yields no coercion
+pushLevelAndCaptureConstraints } 1
+checkConstraints
+  1
+  [k_auD[sk:1], k_auE[sk:1], a_auF[sk:1], b_auG[sk:1]]
+simplifyAmbiguityCheck {
+  type =  forall {k} {k} (a :: k) (b :: k).
+          Optic a -> Optic b -> Optic a
+  wanted =  WC {}
+newTcEvBinds unique = auL
+solveWanteds {
+  Level = 0
+  WC {}
+solveSimpleWanteds { {}
+solveSimpleWanteds end }
+  iterations = 1
+  residual = WC {}
+solveWanteds }
+  final wc = WC {}
+  current evbinds  = {}
+unflattenGivens []
+End simplifyAmbiguityCheck }
+reportUnsolved(ambig) {
+newTcEvBinds unique = auM
+reportUnsolved(ambig) }
+Done ambiguity check for
+  forall {k} {k} (a :: k) (b :: k). Optic a -> Optic b -> Optic a
+checkValidType done
+  forall {k} {k} (a :: k) (b :: k).
+  Optic a -> Optic b -> Optic a :: *
+Done validity of data con
+  :.:
+  Datacon wrapper type: forall {k} {k} (a :: k) (b :: k).
+                        Optic a %1 -> Optic b %1 -> Optic a
+  Datacon rep type: forall {k} {a :: k} {k} {b :: k}.
+                    Optic a %1 -> Optic b %1 -> Optic a
+  Datacon display type: forall {k} {k} (a :: k) (b :: k).
+                        Optic a -> Optic b -> Optic a
+  Rep typcon binders: [inf (@k_aue), anon-vis (@(a_agE :: k_aue))]
+  not family
+Done validity for tycon Optic
+Done validity check [Optic]
+---- end tcTyClGroup ---- }
+tcAddTyCons
+  tycons [Optic]
+  implicits [Data constructor `:.:', Identifier `T15870.:.:',
+             Identifier `T15870.$W:.:']
+tcExtendKindEnvList []
+tc_extend_local_env []
+Adding instances:
+addFamInsts
+tcAddTyCons
+  tycons []
+  implicits []
+tcExtendKindEnvList []
+tc_extend_local_env []
+---- tcTyClGroup ---- {
+Decls for [Gettable]
+tcExtendKindEnv
+  [rgx :-> APromotionErr ClassPE, rgy :-> APromotionErr TyConPE]
+---- kcTyClGroup ---- {
+  module T15870
+  class Gettable a_agC (optic_agD :: Optic a_agC) where
+    type Get a_agC (optic_agD :: Optic a_agC)
+checkInitialKinds { []
+checkInitialKinds done }
+tcExtendKindEnvList []
+solveEqualities { level = 1
+inferInitialKinds { [Gettable]
+bindImplicitTKBndrs
+  []
+  []
+tc_extend_local_env []
+tcExtendBinderStack []
+bindExplicTKBndrs [a_agC, (optic_agD :: Optic a_agC)]
+newMetaKindVar k_auP[tau:1]
+newTyVarTyVar a_agC[tyv:1]
+tc_extend_local_env
+  [(a_agC, Type variable `a_agC' = a_agC[tyv:1] :: k_auP[tau:1])]
+tcExtendBinderStack [a_agC a_agC[tyv:1]]
+solveLocalEqualitiesX { Called from tcLHsKindSig
+lk1 Optic
+tcInferTyApps {
+  Optic
+  [a_agC]
+tcInferTyApps (need to instantiate)
+  {k_aue}
+  [TCvSubst In scope: InScope {} Type env: [] Co env: []]
+cloneAnonMetaTyVar k_auQ[tau:1] :: *
+tcInferTyApps (vis normal app)
+  [vis] k_aue
+  a_agC
+  k_aue
+  [TCvSubst
+     In scope: InScope {k_auQ}
+     Type env: [aue :-> k_auQ[tau:1]]
+     Co env: []]
+lk1 a_agC
+tcInferTyApps {
+  a_agC
+  []
+tcInferTyApps } a_agC[tyv:1] :: k_auP[tau:1]
+checkExpectedKind
+  a_agC[tyv:1]
+  k_auP[tau:1]
+checkExpectedKindX
+  a_agC
+  act_kind': k_auP[tau:1]
+  exp_kind: k_auQ[tau:1]
+u_tys
+  tclvl 1
+  k_auP[tau:1] ~ k_auQ[tau:1]
+  arising from a type equality k_auP[tau:1] ~ k_auQ[tau:1]
+u_tys
+  tclvl 1
+  * ~ *
+  arising from a kind equality arising from
+    k_auP[tau:1] ~ k_auQ[tau:1]
+u_tys
+  tclvl 1
+  'GHC.Types.LiftedRep ~ 'GHC.Types.LiftedRep
+  arising from a kind equality arising from
+    k_auP[tau:1] ~ k_auQ[tau:1]
+u_tys yields no coercion
+u_tys yields no coercion
+uUnfilledVar2 ok
+  k_auP[tau:1] :: *
+  k_auQ[tau:1] :: *
+  True
+  <*>_N
+writeMetaTyVar k_auP[tau:1] :: * := k_auQ[tau:1]
+u_tys yields no coercion
+checkExpectedKind
+  k_auP[tau:1]
+  k_auQ[tau:1]
+  <k_auQ[tau:1]>_N
+tcInferTyApps (vis normal app) 2 k_auQ[tau:1]
+tcInferTyApps } Optic a_agC[tyv:1] :: *
+checkExpectedKind
+  Optic a_agC[tyv:1]
+  *
+checkExpectedKindX
+  Optic a_agC
+  act_kind': *
+  exp_kind: *
+solveLocalEqualities: running solver WC {}
+newNoTcEvBinds unique = auR
+solveWanteds {
+  Level = 1
+  WC {}
+solveSimpleWanteds { {}
+solveSimpleWanteds end }
+  iterations = 1
+  residual = WC {}
+solveWanteds }
+  final wc = WC {}
+  current evbinds  = {}
+unflattenGivens []
+solveLocalEqualitiesX end } residual_wanted = WC {}
+zonkSimples done: {}
+emitFlatConstraints:
+  simples: {}
+  holes:   {}
+emitHoles {}
+tcLHsKindSig
+  Optic a_agC
+  Optic a_agC[tyv:1]
+kindGeneralizeNone
+kindGeneralizeSome { Optic a_agC[tyv:1]
+quantifyTyVars has nothing to quantify
+kindGeneralizeSome }
+  Kind or type: Optic a_agC[tyv:1]
+  dvs: DV {dv_kvs = {}, dv_tvs = {}, dv_cvs = {}}
+  dvs': DV {dv_kvs = {}, dv_tvs = {}, dv_cvs = {}}
+  to_promote: {}
+  qkvs:
+checkValidType Optic a_agC[tyv:1] :: *
+done ct Optic a_agC[tyv:1]
+Ambiguity check for Optic a_agC[tyv:1]
+tc_sub_type (general case)
+  ty_actual   = Optic a_agC[tyv:1]
+  ty_expected = Optic a_agC[tyv:1]
+u_tys
+  tclvl 1
+  Optic a_agC[tyv:1] ~ Optic a_agC[tyv:1]
+  arising from a type equality Optic a_agC[tyv:1]
+                               ~
+                               Optic a_agC[tyv:1]
+u_tys
+  tclvl 1
+  k_auQ[tau:1] ~ k_auQ[tau:1]
+  arising from a type equality Optic a_agC[tyv:1]
+                               ~
+                               Optic a_agC[tyv:1]
+u_tys yields no coercion
+u_tys
+  tclvl 1
+  a_agC[tyv:1] ~ a_agC[tyv:1]
+  arising from a type equality Optic a_agC[tyv:1]
+                               ~
+                               Optic a_agC[tyv:1]
+u_tys yields no coercion
+u_tys yields no coercion
+simplifyAmbiguityCheck {
+  type =  Optic a_agC[tyv:1]
+  wanted =  WC {}
+newTcEvBinds unique = auS
+solveWanteds {
+  Level = 1
+  WC {}
+solveSimpleWanteds { {}
+solveSimpleWanteds end }
+  iterations = 1
+  residual = WC {}
+solveWanteds }
+  final wc = WC {}
+  current evbinds  = {}
+unflattenGivens []
+End simplifyAmbiguityCheck }
+reportUnsolved(ambig) {
+newTcEvBinds unique = auT
+reportUnsolved(ambig) }
+Done ambiguity check for Optic a_agC[tyv:1]
+checkValidType done Optic a_agC[tyv:1] :: *
+tcLHsKindSig2 Optic a_agC[tyv:1]
+newTyVarTyVar optic_agD[tyv:1]
+tc_extend_local_env
+  [(optic_agD,
+    Type variable `optic_agD' = optic_agD[tyv:1] :: Optic
+                                                      a_agC[tyv:1])]
+tcExtendBinderStack [optic_agD optic_agD[tyv:1]]
+kcInferDeclHeader: not-cusk
+  Gettable
+  []
+  [a_agC, (optic_agD :: Optic a_agC)]
+  []
+  [a_agC[tyv:1], optic_agD[tyv:1]]
+  k_auP[tau:1] -> Optic a_agC[tyv:1] -> Constraint
+tc_extend_local_env
+  [(a_agC, Type variable `a_agC' = a_agC[tyv:1] :: k_auP[tau:1]),
+   (optic_agD,
+    Type variable `optic_agD' = optic_agD[tyv:1] :: Optic
+                                                      a_agC[tyv:1])]
+tcExtendBinderStack
+  [a_agC a_agC[tyv:1], optic_agD optic_agD[tyv:1]]
+bindImplicitTKBndrs
+  []
+  []
+tc_extend_local_env []
+tcExtendBinderStack []
+bindExplicTKBndrs [a_agC, (optic_agD :: Optic a_agC)]
+tc_extend_local_env
+  [(a_agC, Type variable `a_agC' = a_agC[tyv:1] :: k_auP[tau:1])]
+tcExtendBinderStack [a_agC a_agC[tyv:1]]
+solveLocalEqualitiesX { Called from tcLHsKindSig
+lk1 Optic
+tcInferTyApps {
+  Optic
+  [a_agC]
+tcInferTyApps (need to instantiate)
+  {k_aue}
+  [TCvSubst In scope: InScope {} Type env: [] Co env: []]
+cloneAnonMetaTyVar k_auU[tau:1] :: *
+tcInferTyApps (vis normal app)
+  [vis] k_aue
+  a_agC
+  k_aue
+  [TCvSubst
+     In scope: InScope {k_auU}
+     Type env: [aue :-> k_auU[tau:1]]
+     Co env: []]
+lk1 a_agC
+tcInferTyApps {
+  a_agC
+  []
+tcInferTyApps } a_agC[tyv:1] :: k_auP[tau:1]
+checkExpectedKind
+  a_agC[tyv:1]
+  k_auP[tau:1]
+checkExpectedKindX
+  a_agC
+  act_kind': k_auP[tau:1]
+  exp_kind: k_auU[tau:1]
+u_tys
+  tclvl 1
+  k_auP[tau:1] ~ k_auU[tau:1]
+  arising from a type equality k_auP[tau:1] ~ k_auU[tau:1]
+found filled tyvar k_auP[tau:1] :-> k_auQ[tau:1]
+u_tys
+  tclvl 1
+  * ~ *
+  arising from a kind equality arising from
+    k_auQ[tau:1] ~ k_auU[tau:1]
+u_tys
+  tclvl 1
+  'GHC.Types.LiftedRep ~ 'GHC.Types.LiftedRep
+  arising from a kind equality arising from
+    k_auQ[tau:1] ~ k_auU[tau:1]
+u_tys yields no coercion
+u_tys yields no coercion
+uUnfilledVar2 ok
+  k_auQ[tau:1] :: *
+  k_auU[tau:1] :: *
+  True
+  <*>_N
+writeMetaTyVar k_auQ[tau:1] :: * := k_auU[tau:1]
+u_tys yields no coercion
+checkExpectedKind
+  k_auP[tau:1]
+  k_auU[tau:1]
+  <k_auU[tau:1]>_N
+tcInferTyApps (vis normal app) 2 k_auU[tau:1]
+tcInferTyApps } Optic a_agC[tyv:1] :: *
+checkExpectedKind
+  Optic a_agC[tyv:1]
+  *
+checkExpectedKindX
+  Optic a_agC
+  act_kind': *
+  exp_kind: *
+solveLocalEqualities: running solver WC {}
+newNoTcEvBinds unique = auV
+solveWanteds {
+  Level = 1
+  WC {}
+solveSimpleWanteds { {}
+solveSimpleWanteds end }
+  iterations = 1
+  residual = WC {}
+solveWanteds }
+  final wc = WC {}
+  current evbinds  = {}
+unflattenGivens []
+solveLocalEqualitiesX end } residual_wanted = WC {}
+zonkSimples done: {}
+emitFlatConstraints:
+  simples: {}
+  holes:   {}
+emitHoles {}
+tcLHsKindSig
+  Optic a_agC
+  Optic a_agC[tyv:1]
+kindGeneralizeNone
+kindGeneralizeSome { Optic a_agC[tyv:1]
+quantifyTyVars has nothing to quantify
+kindGeneralizeSome }
+  Kind or type: Optic a_agC[tyv:1]
+  dvs: DV {dv_kvs = {}, dv_tvs = {}, dv_cvs = {}}
+  dvs': DV {dv_kvs = {}, dv_tvs = {}, dv_cvs = {}}
+  to_promote: {}
+  qkvs:
+checkValidType Optic a_agC[tyv:1] :: *
+done ct Optic a_agC[tyv:1]
+Ambiguity check for Optic a_agC[tyv:1]
+tc_sub_type (general case)
+  ty_actual   = Optic a_agC[tyv:1]
+  ty_expected = Optic a_agC[tyv:1]
+u_tys
+  tclvl 1
+  Optic a_agC[tyv:1] ~ Optic a_agC[tyv:1]
+  arising from a type equality Optic a_agC[tyv:1]
+                               ~
+                               Optic a_agC[tyv:1]
+u_tys
+  tclvl 1
+  k_auU[tau:1] ~ k_auU[tau:1]
+  arising from a type equality Optic a_agC[tyv:1]
+                               ~
+                               Optic a_agC[tyv:1]
+u_tys yields no coercion
+u_tys
+  tclvl 1
+  a_agC[tyv:1] ~ a_agC[tyv:1]
+  arising from a type equality Optic a_agC[tyv:1]
+                               ~
+                               Optic a_agC[tyv:1]
+u_tys yields no coercion
+u_tys yields no coercion
+simplifyAmbiguityCheck {
+  type =  Optic a_agC[tyv:1]
+  wanted =  WC {}
+newTcEvBinds unique = auW
+solveWanteds {
+  Level = 1
+  WC {}
+solveSimpleWanteds { {}
+solveSimpleWanteds end }
+  iterations = 1
+  residual = WC {}
+solveWanteds }
+  final wc = WC {}
+  current evbinds  = {}
+unflattenGivens []
+End simplifyAmbiguityCheck }
+reportUnsolved(ambig) {
+newTcEvBinds unique = auX
+reportUnsolved(ambig) }
+Done ambiguity check for Optic a_agC[tyv:1]
+checkValidType done Optic a_agC[tyv:1] :: *
+tcLHsKindSig2 Optic a_agC[tyv:1]
+u_tys
+  tclvl 1
+  Optic a_agC[tyv:1] ~ Optic a_agC[tyv:1]
+  arising from a type equality Optic a_agC[tyv:1]
+                               ~
+                               Optic a_agC[tyv:1]
+u_tys
+  tclvl 1
+  k_auU[tau:1] ~ k_auQ[tau:1]
+  arising from a type equality Optic a_agC[tyv:1]
+                               ~
+                               Optic a_agC[tyv:1]
+u_tys yields no coercion
+u_tys
+  tclvl 1
+  a_agC[tyv:1] ~ a_agC[tyv:1]
+  arising from a type equality Optic a_agC[tyv:1]
+                               ~
+                               Optic a_agC[tyv:1]
+u_tys yields no coercion
+u_tys yields no coercion
+tc_extend_local_env
+  [(optic_agD,
+    Type variable `optic_agD' = optic_agD[tyv:1] :: Optic
+                                                      a_agC[tyv:1])]
+tcExtendBinderStack [optic_agD optic_agD[tyv:1]]
+kcInferDeclHeader: not-cusk
+  Get
+  []
+  [a_agC, (optic_agD :: Optic a_agC)]
+  []
+  [a_agC[tyv:1], optic_agD[tyv:1]]
+  k_auP[tau:1] -> Optic a_agC[tyv:1] -> *
+inferInitialKinds done }
+kcTyClGroup: initial kinds
+  Gettable :: k_auP[tau:1] -> Optic a_agC[tyv:1] -> Constraint
+  Get :: k_auP[tau:1] -> Optic a_agC[tyv:1] -> *
+tcExtendKindEnvList
+  [(Gettable,
+    ATcTyCon Gettable[tc] :: k_auP[tau:1]
+                             -> Optic a_agC[tyv:1] -> Constraint),
+   (Get, ATcTyCon Get[tc] :: k_auP[tau:1] -> Optic a_agC[tyv:1] -> *)]
+kcTyClDecl { Gettable
+bindTyClTyVars
+  Gettable [anon-vis (@(a_agC[tyv:1] :: k_auP[tau:1])),
+            anon-vis (@(optic_agD[tyv:1] :: Optic a_agC[tyv:1]))]
+  [(a_agC, a_agC[tyv:1]), (optic_agD, optic_agD[tyv:1])]
+tc_extend_local_env
+  [(a_agC, Type variable `a_agC' = a_agC[tyv:1] :: k_auP[tau:1]),
+   (optic_agD,
+    Type variable `optic_agD' = optic_agD[tyv:1] :: Optic
+                                                      a_agC[tyv:1])]
+tcExtendBinderStack
+  [a_agC a_agC[tyv:1], optic_agD optic_agD[tyv:1]]
+kcTyClDecl done } Gettable
+solveEqualities: running solver wanted =  WC {}
+newNoTcEvBinds unique = auY
+solveWanteds {
+  Level = 1
+  WC {}
+solveSimpleWanteds { {}
+solveSimpleWanteds end }
+  iterations = 1
+  residual = WC {}
+solveWanteds }
+  final wc = WC {}
+  current evbinds  = {}
+unflattenGivens []
+End solveEqualities }
+newNoTcEvBinds unique = auZ
+Skolemising a_agC[tyv:1] := a_agC[sk:1]
+writeMetaTyVar a_agC[tyv:1] :: k_auU[tau:1] := a_agC[sk:1]
+Skolemising optic_agD[tyv:1] := optic_agD[sk:1]
+writeMetaTyVar
+  optic_agD[tyv:1] :: Optic a_agC[sk:1] := optic_agD[sk:1]
+Skipping swizzleTcTyConBndrs for [Gettable[tc], Get[tc]]
+quantifyTyVars 1
+  DV {dv_kvs = {k_auU[tau:1]}, dv_tvs = {}, dv_cvs = {}}
+Skolemising k_auU[tau:1] := k_auU[sk:1]
+writeMetaTyVar k_auU[tau:1] :: * := k_auU[sk:1]
+quantifyTyVars 2
+  nondep:
+  dep: k_auU[tau:1]
+  dep_kvs' k_auU[sk:1]
+  nondep_tvs'
+generaliseTcTyCon: pre zonk
+  tycon = Gettable[tc]
+  spec_req_tvs = (a_agC[sk:1] :: k_auU[tau:1])
+                 (optic_agD[sk:1] :: Optic a_agC[sk:1])
+  tc_res_kind = Constraint
+  dvs1 = DV {dv_kvs = {k_auU[tau:1], a_agC[sk:1]}, dv_tvs = {},
+             dv_cvs = {}}
+  inferred = k_auU[sk:1]
+generaliseTcTyCon: post zonk
+  tycon = Gettable[tc]
+  inferred = k_auU
+  spec_req_tvs = (a_agC[sk:1] :: k_auU[tau:1])
+                 (optic_agD[sk:1] :: Optic a_agC[sk:1])
+  sorted_spec_tvs =
+  req_tvs = [a_agC, optic_agD]
+  zonk-env = ZE {ze_tv_env = [agC :-> a_agC, agD :-> optic_agD,
+                              auU :-> k_auU]
+                 ze_id_env = []}
+generaliseTcTyCon done
+  tycon = Gettable[tc]
+  tc_res_kind = Constraint
+  dep_fv_set = {a_agC[sk:1], k_auU[tau:1]}
+  inferred_tcbs = [inf (@k_auU)]
+  specified_tcbs = []
+  required_tcbs = [req (@(a_agC :: k_auU)),
+                   anon-vis (@(optic_agD :: Optic a_agC))]
+  final_tcbs = [inf (@k_auU), req (@(a_agC :: k_auU)),
+                anon-vis (@(optic_agD :: Optic a_agC))]
+quantifyTyVars 1
+  DV {dv_kvs = {k_auU[sk:1]}, dv_tvs = {}, dv_cvs = {}}
+quantifyTyVars 2
+  nondep:
+  dep: k_auU[sk:1]
+  dep_kvs' k_auU[sk:1]
+  nondep_tvs'
+generaliseTcTyCon: pre zonk
+  tycon = Get[tc]
+  spec_req_tvs = (a_agC[sk:1] :: k_auU[tau:1])
+                 (optic_agD[sk:1] :: Optic a_agC[sk:1])
+  tc_res_kind = *
+  dvs1 = DV {dv_kvs = {k_auU[sk:1], a_agC[sk:1]}, dv_tvs = {},
+             dv_cvs = {}}
+  inferred = k_auU[sk:1]
+generaliseTcTyCon: post zonk
+  tycon = Get[tc]
+  inferred = k_auU
+  spec_req_tvs = (a_agC[sk:1] :: k_auU[tau:1])
+                 (optic_agD[sk:1] :: Optic a_agC[sk:1])
+  sorted_spec_tvs =
+  req_tvs = [a_agC, optic_agD]
+  zonk-env = ZE {ze_tv_env = [agC :-> a_agC, agD :-> optic_agD,
+                              auU :-> k_auU]
+                 ze_id_env = []}
+generaliseTcTyCon done
+  tycon = Get[tc]
+  tc_res_kind = *
+  dep_fv_set = {a_agC[sk:1], k_auU[sk:1]}
+  inferred_tcbs = [inf (@k_auU)]
+  specified_tcbs = []
+  required_tcbs = [req (@(a_agC :: k_auU)),
+                   anon-vis (@(optic_agD :: Optic a_agC))]
+  final_tcbs = [inf (@k_auU), req (@(a_agC :: k_auU)),
+                anon-vis (@(optic_agD :: Optic a_agC))]
+---- kcTyClGroup end ---- }
+  Gettable :: forall {k}. forall (a :: k) -> Optic a -> Constraint
+  Get :: forall {k}. forall (a :: k) -> Optic a -> *
+tcTyAndCl generalized kinds
+  (Gettable,
+   [inf (@k_auU), req (@(a_agC :: k_auU)),
+    anon-vis (@(optic_agD :: Optic a_agC))],
+   Constraint
+   True)
+  (Get,
+   [inf (@k_auU), req (@(a_agC :: k_auU)),
+    anon-vis (@(optic_agD :: Optic a_agC))],
+   *
+   True)
+tcExtendKindEnvList
+  [(Gettable,
+    ATcTyCon Gettable[tc] :: forall {k}. forall (a :: k) ->
+                             Optic a -> Constraint),
+   (Get,
+    ATcTyCon Get[tc] :: forall {k}. forall (a :: k) -> Optic a -> *)]
+---- tcTyClDecl ---- {
+  class Gettable a_agC (optic_agD :: Optic a_agC) where
+    type Get a_agC (optic_agD :: Optic a_agC)
+bindTyClTyVars
+  Gettable [inf (@k_auU), req (@(a_agC :: k_auU)),
+            anon-vis (@(optic_agD :: Optic a_agC))]
+  [(a_agC, a_agC), (optic_agD, optic_agD)]
+tc_extend_local_env
+  [(a_agC, Type variable `a_agC' = a_agC :: k_auU),
+   (optic_agD, Type variable `optic_agD' = optic_agD :: Optic a_agC)]
+tcExtendBinderStack [a_agC a_agC, optic_agD optic_agD]
+tcClassDecl 1
+  Gettable
+  [inf (@k_auU), req (@(a_agC :: k_auU)),
+   anon-vis (@(optic_agD :: Optic a_agC))]
+solveEqualities { level = 1
+pushLevelAndCaptureConstraints { 2
+tcClassSigs 1 Gettable
+tcClassSigs 2 Gettable
+bindTyClTyVars
+  Get [inf (@k_auU), req (@(a_agC :: k_auU)),
+       anon-vis (@(optic_agD :: Optic a_agC))]
+  [(a_agC, a_agC), (optic_agD, optic_agD)]
+tc_extend_local_env
+  [(a_agC, Type variable `a_agC' = a_agC :: k_auU),
+   (optic_agD, Type variable `optic_agD' = optic_agD :: Optic a_agC)]
+tcExtendBinderStack [a_agC a_agC, optic_agD optic_agD]
+open type family: Get
+pushLevelAndCaptureConstraints } 2
+solveEqualities: running solver wanted =  WC {}
+newNoTcEvBinds unique = av0
+solveWanteds {
+  Level = 1
+  WC {}
+solveSimpleWanteds { {}
+solveSimpleWanteds end }
+  iterations = 1
+  residual = WC {}
+solveWanteds }
+  final wc = WC {}
+  current evbinds  = {}
+unflattenGivens []
+End solveEqualities }
+newNoTcEvBinds unique = av1
+tcClassDecl
+  []
+  [inf (@k_auU), req (@(a_agC :: k_auU)),
+   anon-vis (@(optic_agD :: Optic a_agC))]
+  []
+---- tcTyClDecl end ---- } Gettable
+Starting synonym cycle check [Gettable]
+Done synonym cycle check [Gettable]
+Starting validity check [Gettable]
+Starting validity for tycon Gettable
+checkValidTyCon
+  Gettable
+  Just Gettable
+Done validity for tycon Gettable
+Done validity check [Gettable]
+---- end tcTyClGroup ---- }
+tcAddTyCons
+  tycons [Gettable]
+  implicits [Type constructor `Get',
+             Data constructor `T15870.C:Gettable',
+             Identifier `T15870.C:Gettable']
+tcExtendKindEnvList []
+tc_extend_local_env []
+tcTopLHsType {
+  forall a_agH b_agI (g1_agJ :: Optic a_agH) (g2_agK :: Optic b_agI).
+  (Gettable a_agH g1_agJ,
+   b_agI ~ Get a_agH g1_agJ,
+   Gettable b_agI g2_agK) =>
+  Gettable a_agH (g1_agJ :.: g2_agK)
+solveEqualities { level = 1
+bindImplicitTKBndrs
+  []
+  []
+tc_extend_local_env []
+tcExtendBinderStack []
+pushLevelAndCaptureConstraints { 2
+bindExplicTKBndrs
+  [a_agH, b_agI, (g1_agJ :: Optic a_agH), (g2_agK :: Optic b_agI)]
+newMetaKindVar k_av7[tau:2]
+tc_extend_local_env
+  [(a_agH, Type variable `a_agH' = a_agH[sk:2] :: k_av7[tau:2])]
+tcExtendBinderStack [a_agH a_agH[sk:2]]
+newMetaKindVar k_av8[tau:2]
+tc_extend_local_env
+  [(b_agI, Type variable `b_agI' = b_agI[sk:2] :: k_av8[tau:2])]
+tcExtendBinderStack [b_agI b_agI[sk:2]]
+solveLocalEqualitiesX { Called from tcLHsKindSig
+lk1 Optic
+tcInferTyApps {
+  Optic
+  [a_agH]
+tcInferTyApps (need to instantiate)
+  {k_aue}
+  [TCvSubst In scope: InScope {} Type env: [] Co env: []]
+cloneAnonMetaTyVar k_av9[tau:2] :: *
+tcInferTyApps (vis normal app)
+  [vis] k_aue
+  a_agH
+  k_aue
+  [TCvSubst
+     In scope: InScope {k_av9}
+     Type env: [aue :-> k_av9[tau:2]]
+     Co env: []]
+lk1 a_agH
+tcInferTyApps {
+  a_agH
+  []
+tcInferTyApps } a_agH[sk:2] :: k_av7[tau:2]
+checkExpectedKind
+  a_agH[sk:2]
+  k_av7[tau:2]
+checkExpectedKindX
+  a_agH
+  act_kind': k_av7[tau:2]
+  exp_kind: k_av9[tau:2]
+u_tys
+  tclvl 2
+  k_av7[tau:2] ~ k_av9[tau:2]
+  arising from a type equality k_av7[tau:2] ~ k_av9[tau:2]
+u_tys
+  tclvl 2
+  * ~ *
+  arising from a kind equality arising from
+    k_av7[tau:2] ~ k_av9[tau:2]
+u_tys
+  tclvl 2
+  'GHC.Types.LiftedRep ~ 'GHC.Types.LiftedRep
+  arising from a kind equality arising from
+    k_av7[tau:2] ~ k_av9[tau:2]
+u_tys yields no coercion
+u_tys yields no coercion
+uUnfilledVar2 ok
+  k_av7[tau:2] :: *
+  k_av9[tau:2] :: *
+  True
+  <*>_N
+writeMetaTyVar k_av7[tau:2] :: * := k_av9[tau:2]
+u_tys yields no coercion
+checkExpectedKind
+  k_av7[tau:2]
+  k_av9[tau:2]
+  <k_av9[tau:2]>_N
+tcInferTyApps (vis normal app) 2 k_av9[tau:2]
+tcInferTyApps } Optic a_agH[sk:2] :: *
+checkExpectedKind
+  Optic a_agH[sk:2]
+  *
+checkExpectedKindX
+  Optic a_agH
+  act_kind': *
+  exp_kind: *
+solveLocalEqualities: running solver WC {}
+newNoTcEvBinds unique = ava
+solveWanteds {
+  Level = 2
+  WC {}
+solveSimpleWanteds { {}
+solveSimpleWanteds end }
+  iterations = 1
+  residual = WC {}
+solveWanteds }
+  final wc = WC {}
+  current evbinds  = {}
+unflattenGivens []
+solveLocalEqualitiesX end } residual_wanted = WC {}
+zonkSimples done: {}
+emitFlatConstraints:
+  simples: {}
+  holes:   {}
+emitHoles {}
+tcLHsKindSig
+  Optic a_agH
+  Optic a_agH[sk:2]
+kindGeneralizeNone
+kindGeneralizeSome { Optic a_agH[sk:2]
+quantifyTyVars has nothing to quantify
+kindGeneralizeSome }
+  Kind or type: Optic a_agH[sk:2]
+  dvs: DV {dv_kvs = {}, dv_tvs = {}, dv_cvs = {}}
+  dvs': DV {dv_kvs = {}, dv_tvs = {}, dv_cvs = {}}
+  to_promote: {}
+  qkvs:
+checkValidType Optic a_agH[sk:2] :: *
+done ct Optic a_agH[sk:2]
+Ambiguity check for Optic a_agH[sk:2]
+tc_sub_type (general case)
+  ty_actual   = Optic a_agH[sk:2]
+  ty_expected = Optic a_agH[sk:2]
+u_tys
+  tclvl 2
+  Optic a_agH[sk:2] ~ Optic a_agH[sk:2]
+  arising from a type equality Optic a_agH[sk:2] ~ Optic a_agH[sk:2]
+u_tys
+  tclvl 2
+  k_av9[tau:2] ~ k_av9[tau:2]
+  arising from a type equality Optic a_agH[sk:2] ~ Optic a_agH[sk:2]
+u_tys yields no coercion
+u_tys
+  tclvl 2
+  a_agH[sk:2] ~ a_agH[sk:2]
+  arising from a type equality Optic a_agH[sk:2] ~ Optic a_agH[sk:2]
+u_tys yields no coercion
+u_tys yields no coercion
+simplifyAmbiguityCheck {
+  type =  Optic a_agH[sk:2]
+  wanted =  WC {}
+newTcEvBinds unique = avb
+solveWanteds {
+  Level = 2
+  WC {}
+solveSimpleWanteds { {}
+solveSimpleWanteds end }
+  iterations = 1
+  residual = WC {}
+solveWanteds }
+  final wc = WC {}
+  current evbinds  = {}
+unflattenGivens []
+End simplifyAmbiguityCheck }
+reportUnsolved(ambig) {
+newTcEvBinds unique = avc
+reportUnsolved(ambig) }
+Done ambiguity check for Optic a_agH[sk:2]
+checkValidType done Optic a_agH[sk:2] :: *
+tcLHsKindSig2 Optic a_agH[sk:2]
+tc_extend_local_env
+  [(g1_agJ,
+    Type variable `g1_agJ' = g1_agJ[sk:2] :: Optic a_agH[sk:2])]
+tcExtendBinderStack [g1_agJ g1_agJ[sk:2]]
+solveLocalEqualitiesX { Called from tcLHsKindSig
+lk1 Optic
+tcInferTyApps {
+  Optic
+  [b_agI]
+tcInferTyApps (need to instantiate)
+  {k_aue}
+  [TCvSubst In scope: InScope {} Type env: [] Co env: []]
+cloneAnonMetaTyVar k_avd[tau:2] :: *
+tcInferTyApps (vis normal app)
+  [vis] k_aue
+  b_agI
+  k_aue
+  [TCvSubst
+     In scope: InScope {k_avd}
+     Type env: [aue :-> k_avd[tau:2]]
+     Co env: []]
+lk1 b_agI
+tcInferTyApps {
+  b_agI
+  []
+tcInferTyApps } b_agI[sk:2] :: k_av8[tau:2]
+checkExpectedKind
+  b_agI[sk:2]
+  k_av8[tau:2]
+checkExpectedKindX
+  b_agI
+  act_kind': k_av8[tau:2]
+  exp_kind: k_avd[tau:2]
+u_tys
+  tclvl 2
+  k_av8[tau:2] ~ k_avd[tau:2]
+  arising from a type equality k_av8[tau:2] ~ k_avd[tau:2]
+u_tys
+  tclvl 2
+  * ~ *
+  arising from a kind equality arising from
+    k_av8[tau:2] ~ k_avd[tau:2]
+u_tys
+  tclvl 2
+  'GHC.Types.LiftedRep ~ 'GHC.Types.LiftedRep
+  arising from a kind equality arising from
+    k_av8[tau:2] ~ k_avd[tau:2]
+u_tys yields no coercion
+u_tys yields no coercion
+uUnfilledVar2 ok
+  k_av8[tau:2] :: *
+  k_avd[tau:2] :: *
+  True
+  <*>_N
+writeMetaTyVar k_av8[tau:2] :: * := k_avd[tau:2]
+u_tys yields no coercion
+checkExpectedKind
+  k_av8[tau:2]
+  k_avd[tau:2]
+  <k_avd[tau:2]>_N
+tcInferTyApps (vis normal app) 2 k_avd[tau:2]
+tcInferTyApps } Optic b_agI[sk:2] :: *
+checkExpectedKind
+  Optic b_agI[sk:2]
+  *
+checkExpectedKindX
+  Optic b_agI
+  act_kind': *
+  exp_kind: *
+solveLocalEqualities: running solver WC {}
+newNoTcEvBinds unique = ave
+solveWanteds {
+  Level = 2
+  WC {}
+solveSimpleWanteds { {}
+solveSimpleWanteds end }
+  iterations = 1
+  residual = WC {}
+solveWanteds }
+  final wc = WC {}
+  current evbinds  = {}
+unflattenGivens []
+solveLocalEqualitiesX end } residual_wanted = WC {}
+zonkSimples done: {}
+emitFlatConstraints:
+  simples: {}
+  holes:   {}
+emitHoles {}
+tcLHsKindSig
+  Optic b_agI
+  Optic b_agI[sk:2]
+kindGeneralizeNone
+kindGeneralizeSome { Optic b_agI[sk:2]
+quantifyTyVars has nothing to quantify
+kindGeneralizeSome }
+  Kind or type: Optic b_agI[sk:2]
+  dvs: DV {dv_kvs = {}, dv_tvs = {}, dv_cvs = {}}
+  dvs': DV {dv_kvs = {}, dv_tvs = {}, dv_cvs = {}}
+  to_promote: {}
+  qkvs:
+checkValidType Optic b_agI[sk:2] :: *
+done ct Optic b_agI[sk:2]
+Ambiguity check for Optic b_agI[sk:2]
+tc_sub_type (general case)
+  ty_actual   = Optic b_agI[sk:2]
+  ty_expected = Optic b_agI[sk:2]
+u_tys
+  tclvl 2
+  Optic b_agI[sk:2] ~ Optic b_agI[sk:2]
+  arising from a type equality Optic b_agI[sk:2] ~ Optic b_agI[sk:2]
+u_tys
+  tclvl 2
+  k_avd[tau:2] ~ k_avd[tau:2]
+  arising from a type equality Optic b_agI[sk:2] ~ Optic b_agI[sk:2]
+u_tys yields no coercion
+u_tys
+  tclvl 2
+  b_agI[sk:2] ~ b_agI[sk:2]
+  arising from a type equality Optic b_agI[sk:2] ~ Optic b_agI[sk:2]
+u_tys yields no coercion
+u_tys yields no coercion
+simplifyAmbiguityCheck {
+  type =  Optic b_agI[sk:2]
+  wanted =  WC {}
+newTcEvBinds unique = avf
+solveWanteds {
+  Level = 2
+  WC {}
+solveSimpleWanteds { {}
+solveSimpleWanteds end }
+  iterations = 1
+  residual = WC {}
+solveWanteds }
+  final wc = WC {}
+  current evbinds  = {}
+unflattenGivens []
+End simplifyAmbiguityCheck }
+reportUnsolved(ambig) {
+newTcEvBinds unique = avg
+reportUnsolved(ambig) }
+Done ambiguity check for Optic b_agI[sk:2]
+checkValidType done Optic b_agI[sk:2] :: *
+tcLHsKindSig2 Optic b_agI[sk:2]
+tc_extend_local_env
+  [(g2_agK,
+    Type variable `g2_agK' = g2_agK[sk:2] :: Optic b_agI[sk:2])]
+tcExtendBinderStack [g2_agK g2_agK[sk:2]]
+lk1 Gettable
+tcInferTyApps {
+  Gettable
+  [a_agH, g1_agJ]
+tcInferTyApps (need to instantiate)
+  {k_auU}
+  [TCvSubst In scope: InScope {} Type env: [] Co env: []]
+cloneAnonMetaTyVar k_avh[tau:2] :: *
+tcInferTyApps (vis normal app)
+  a_agC
+  a_agH
+  k_auU
+  [TCvSubst
+     In scope: InScope {k_avh}
+     Type env: [auU :-> k_avh[tau:2]]
+     Co env: []]
+lk1 a_agH
+tcInferTyApps {
+  a_agH
+  []
+tcInferTyApps } a_agH[sk:2] :: k_av7[tau:2]
+checkExpectedKind
+  a_agH[sk:2]
+  k_av7[tau:2]
+checkExpectedKindX
+  a_agH
+  act_kind': k_av7[tau:2]
+  exp_kind: k_avh[tau:2]
+u_tys
+  tclvl 2
+  k_av7[tau:2] ~ k_avh[tau:2]
+  arising from a type equality k_av7[tau:2] ~ k_avh[tau:2]
+found filled tyvar k_av7[tau:2] :-> k_av9[tau:2]
+u_tys
+  tclvl 2
+  * ~ *
+  arising from a kind equality arising from
+    k_av9[tau:2] ~ k_avh[tau:2]
+u_tys
+  tclvl 2
+  'GHC.Types.LiftedRep ~ 'GHC.Types.LiftedRep
+  arising from a kind equality arising from
+    k_av9[tau:2] ~ k_avh[tau:2]
+u_tys yields no coercion
+u_tys yields no coercion
+uUnfilledVar2 ok
+  k_av9[tau:2] :: *
+  k_avh[tau:2] :: *
+  True
+  <*>_N
+writeMetaTyVar k_av9[tau:2] :: * := k_avh[tau:2]
+u_tys yields no coercion
+checkExpectedKind
+  k_av7[tau:2]
+  k_avh[tau:2]
+  <k_avh[tau:2]>_N
+tcInferTyApps (vis normal app) 2 k_avh[tau:2]
+tcInferTyApps (vis normal app)
+  [vis] Optic a_agC
+  g1_agJ
+  Optic a_agC
+  [TCvSubst
+     In scope: InScope {a_agH k_av7 k_avh}
+     Type env: [agC :-> a_agH[sk:2], auU :-> k_avh[tau:2]]
+     Co env: []]
+lk1 g1_agJ
+tcInferTyApps {
+  g1_agJ
+  []
+tcInferTyApps } g1_agJ[sk:2] :: Optic a_agH[sk:2]
+checkExpectedKind
+  g1_agJ[sk:2]
+  Optic a_agH[sk:2]
+checkExpectedKindX
+  g1_agJ
+  act_kind': Optic a_agH[sk:2]
+  exp_kind: Optic a_agH[sk:2]
+u_tys
+  tclvl 2
+  Optic a_agH[sk:2] ~ Optic a_agH[sk:2]
+  arising from a type equality Optic a_agH[sk:2] ~ Optic a_agH[sk:2]
+u_tys
+  tclvl 2
+  k_av9[tau:2] ~ k_avh[tau:2]
+  arising from a type equality Optic a_agH[sk:2] ~ Optic a_agH[sk:2]
+found filled tyvar k_av9[tau:2] :-> k_avh[tau:2]
+u_tys yields no coercion
+u_tys
+  tclvl 2
+  a_agH[sk:2] ~ a_agH[sk:2]
+  arising from a type equality Optic a_agH[sk:2] ~ Optic a_agH[sk:2]
+u_tys yields no coercion
+u_tys yields no coercion
+checkExpectedKind
+  Optic a_agH[sk:2]
+  Optic a_agH[sk:2]
+  <Optic a_agH[sk:2]>_N
+tcInferTyApps (vis normal app) 2 Optic a_agH[sk:2]
+tcInferTyApps } Gettable a_agH[sk:2] g1_agJ[sk:2] :: Constraint
+checkExpectedKind
+  Gettable a_agH[sk:2] g1_agJ[sk:2]
+  Constraint
+checkExpectedKindX
+  Gettable a_agH g1_agJ
+  act_kind': Constraint
+  exp_kind: Constraint
+lk1 ~
+tcInferTyApps {
+  (~)
+  [b_agI, Get a_agH g1_agJ]
+tcInferTyApps (need to instantiate)
+  @k_10
+  [TCvSubst In scope: InScope {} Type env: [] Co env: []]
+cloneAnonMetaTyVar k_avi[tau:2] :: *
+tcInferTyApps (vis normal app)
+  [vis] k_10
+  b_agI
+  k_10
+  [TCvSubst
+     In scope: InScope {k_avi}
+     Type env: [10 :-> k_avi[tau:2]]
+     Co env: []]
+lk1 b_agI
+tcInferTyApps {
+  b_agI
+  []
+tcInferTyApps } b_agI[sk:2] :: k_av8[tau:2]
+checkExpectedKind
+  b_agI[sk:2]
+  k_av8[tau:2]
+checkExpectedKindX
+  b_agI
+  act_kind': k_av8[tau:2]
+  exp_kind: k_avi[tau:2]
+u_tys
+  tclvl 2
+  k_av8[tau:2] ~ k_avi[tau:2]
+  arising from a type equality k_av8[tau:2] ~ k_avi[tau:2]
+found filled tyvar k_av8[tau:2] :-> k_avd[tau:2]
+u_tys
+  tclvl 2
+  * ~ *
+  arising from a kind equality arising from
+    k_avd[tau:2] ~ k_avi[tau:2]
+u_tys
+  tclvl 2
+  'GHC.Types.LiftedRep ~ 'GHC.Types.LiftedRep
+  arising from a kind equality arising from
+    k_avd[tau:2] ~ k_avi[tau:2]
+u_tys yields no coercion
+u_tys yields no coercion
+uUnfilledVar2 ok
+  k_avd[tau:2] :: *
+  k_avi[tau:2] :: *
+  True
+  <*>_N
+writeMetaTyVar k_avd[tau:2] :: * := k_avi[tau:2]
+u_tys yields no coercion
+checkExpectedKind
+  k_av8[tau:2]
+  k_avi[tau:2]
+  <k_avi[tau:2]>_N
+tcInferTyApps (vis normal app) 2 k_avi[tau:2]
+tcInferTyApps (vis normal app)
+  [vis] k_10
+  Get a_agH g1_agJ
+  k_10
+  [TCvSubst
+     In scope: InScope {k_avi}
+     Type env: [10 :-> k_avi[tau:2]]
+     Co env: []]
+lk1 Get
+tcInferTyApps {
+  Get
+  [a_agH, g1_agJ]
+tcInferTyApps (need to instantiate)
+  {k_auU}
+  [TCvSubst In scope: InScope {} Type env: [] Co env: []]
+cloneAnonMetaTyVar k_avj[tau:2] :: *
+tcInferTyApps (vis normal app)
+  a_agC
+  a_agH
+  k_auU
+  [TCvSubst
+     In scope: InScope {k_avj}
+     Type env: [auU :-> k_avj[tau:2]]
+     Co env: []]
+lk1 a_agH
+tcInferTyApps {
+  a_agH
+  []
+tcInferTyApps } a_agH[sk:2] :: k_av7[tau:2]
+checkExpectedKind
+  a_agH[sk:2]
+  k_av7[tau:2]
+checkExpectedKindX
+  a_agH
+  act_kind': k_av7[tau:2]
+  exp_kind: k_avj[tau:2]
+u_tys
+  tclvl 2
+  k_av7[tau:2] ~ k_avj[tau:2]
+  arising from a type equality k_av7[tau:2] ~ k_avj[tau:2]
+found filled tyvar k_av7[tau:2] :-> k_avh[tau:2]
+u_tys
+  tclvl 2
+  * ~ *
+  arising from a kind equality arising from
+    k_avh[tau:2] ~ k_avj[tau:2]
+u_tys
+  tclvl 2
+  'GHC.Types.LiftedRep ~ 'GHC.Types.LiftedRep
+  arising from a kind equality arising from
+    k_avh[tau:2] ~ k_avj[tau:2]
+u_tys yields no coercion
+u_tys yields no coercion
+uUnfilledVar2 ok
+  k_avh[tau:2] :: *
+  k_avj[tau:2] :: *
+  True
+  <*>_N
+writeMetaTyVar k_avh[tau:2] :: * := k_avj[tau:2]
+u_tys yields no coercion
+checkExpectedKind
+  k_av7[tau:2]
+  k_avj[tau:2]
+  <k_avj[tau:2]>_N
+tcInferTyApps (vis normal app) 2 k_avj[tau:2]
+tcInferTyApps (vis normal app)
+  [vis] Optic a_agC
+  g1_agJ
+  Optic a_agC
+  [TCvSubst
+     In scope: InScope {a_agH k_av7 k_avj}
+     Type env: [agC :-> a_agH[sk:2], auU :-> k_avj[tau:2]]
+     Co env: []]
+lk1 g1_agJ
+tcInferTyApps {
+  g1_agJ
+  []
+tcInferTyApps } g1_agJ[sk:2] :: Optic a_agH[sk:2]
+checkExpectedKind
+  g1_agJ[sk:2]
+  Optic a_agH[sk:2]
+checkExpectedKindX
+  g1_agJ
+  act_kind': Optic a_agH[sk:2]
+  exp_kind: Optic a_agH[sk:2]
+u_tys
+  tclvl 2
+  Optic a_agH[sk:2] ~ Optic a_agH[sk:2]
+  arising from a type equality Optic a_agH[sk:2] ~ Optic a_agH[sk:2]
+u_tys
+  tclvl 2
+  k_av9[tau:2] ~ k_avj[tau:2]
+  arising from a type equality Optic a_agH[sk:2] ~ Optic a_agH[sk:2]
+found filled tyvar k_av9[tau:2] :-> k_avh[tau:2]
+found filled tyvar k_avh[tau:2] :-> k_avj[tau:2]
+u_tys yields no coercion
+u_tys
+  tclvl 2
+  a_agH[sk:2] ~ a_agH[sk:2]
+  arising from a type equality Optic a_agH[sk:2] ~ Optic a_agH[sk:2]
+u_tys yields no coercion
+u_tys yields no coercion
+checkExpectedKind
+  Optic a_agH[sk:2]
+  Optic a_agH[sk:2]
+  <Optic a_agH[sk:2]>_N
+tcInferTyApps (vis normal app) 2 Optic a_agH[sk:2]
+tcInferTyApps } Get a_agH[sk:2] g1_agJ[sk:2] :: *
+checkExpectedKind
+  Get a_agH[sk:2] g1_agJ[sk:2]
+  *
+checkExpectedKindX
+  Get a_agH g1_agJ
+  act_kind': *
+  exp_kind: k_avi[tau:2]
+u_tys
+  tclvl 2
+  * ~ k_avi[tau:2]
+  arising from a type equality * ~ k_avi[tau:2]
+u_tys
+  tclvl 2
+  * ~ *
+  arising from a kind equality arising from k_avi[tau:2] ~ *
+u_tys
+  tclvl 2
+  'GHC.Types.LiftedRep ~ 'GHC.Types.LiftedRep
+  arising from a kind equality arising from k_avi[tau:2] ~ *
+u_tys yields no coercion
+u_tys yields no coercion
+uUnfilledVar2 ok
+  k_avi[tau:2] :: *
+  * :: *
+  True
+  <*>_N
+writeMetaTyVar k_avi[tau:2] :: * := *
+u_tys yields no coercion
+checkExpectedKind
+  *
+  k_avi[tau:2]
+  <*>_N
+tcInferTyApps (vis normal app) 2 k_avi[tau:2]
+tcInferTyApps }
+  b_agI[sk:2] ~ Get a_agH[sk:2] g1_agJ[sk:2] :: Constraint
+checkExpectedKind
+  b_agI[sk:2] ~ Get a_agH[sk:2] g1_agJ[sk:2]
+  Constraint
+checkExpectedKindX
+  b_agI ~ Get a_agH g1_agJ
+  act_kind': Constraint
+  exp_kind: Constraint
+lk1 Gettable
+tcInferTyApps {
+  Gettable
+  [b_agI, g2_agK]
+tcInferTyApps (need to instantiate)
+  {k_auU}
+  [TCvSubst In scope: InScope {} Type env: [] Co env: []]
+cloneAnonMetaTyVar k_avk[tau:2] :: *
+tcInferTyApps (vis normal app)
+  a_agC
+  b_agI
+  k_auU
+  [TCvSubst
+     In scope: InScope {k_avk}
+     Type env: [auU :-> k_avk[tau:2]]
+     Co env: []]
+lk1 b_agI
+tcInferTyApps {
+  b_agI
+  []
+tcInferTyApps } b_agI[sk:2] :: k_av8[tau:2]
+checkExpectedKind
+  b_agI[sk:2]
+  k_av8[tau:2]
+checkExpectedKindX
+  b_agI
+  act_kind': k_av8[tau:2]
+  exp_kind: k_avk[tau:2]
+u_tys
+  tclvl 2
+  k_av8[tau:2] ~ k_avk[tau:2]
+  arising from a type equality k_av8[tau:2] ~ k_avk[tau:2]
+found filled tyvar k_av8[tau:2] :-> k_avd[tau:2]
+found filled tyvar k_avd[tau:2] :-> k_avi[tau:2]
+found filled tyvar k_avi[tau:2] :-> *
+u_tys
+  tclvl 2
+  * ~ *
+  arising from a kind equality arising from k_avk[tau:2] ~ *
+u_tys
+  tclvl 2
+  'GHC.Types.LiftedRep ~ 'GHC.Types.LiftedRep
+  arising from a kind equality arising from k_avk[tau:2] ~ *
+u_tys yields no coercion
+u_tys yields no coercion
+uUnfilledVar2 ok
+  k_avk[tau:2] :: *
+  * :: *
+  True
+  <*>_N
+writeMetaTyVar k_avk[tau:2] :: * := *
+u_tys yields no coercion
+checkExpectedKind
+  k_av8[tau:2]
+  k_avk[tau:2]
+  <*>_N
+tcInferTyApps (vis normal app) 2 k_avk[tau:2]
+tcInferTyApps (vis normal app)
+  [vis] Optic a_agC
+  g2_agK
+  Optic a_agC
+  [TCvSubst
+     In scope: InScope {b_agI k_av8 k_avk}
+     Type env: [agC :-> b_agI[sk:2], auU :-> k_avk[tau:2]]
+     Co env: []]
+lk1 g2_agK
+tcInferTyApps {
+  g2_agK
+  []
+tcInferTyApps } g2_agK[sk:2] :: Optic b_agI[sk:2]
+checkExpectedKind
+  g2_agK[sk:2]
+  Optic b_agI[sk:2]
+checkExpectedKindX
+  g2_agK
+  act_kind': Optic b_agI[sk:2]
+  exp_kind: Optic b_agI[sk:2]
+u_tys
+  tclvl 2
+  Optic b_agI[sk:2] ~ Optic b_agI[sk:2]
+  arising from a type equality Optic b_agI[sk:2] ~ Optic b_agI[sk:2]
+u_tys
+  tclvl 2
+  k_avd[tau:2] ~ k_avk[tau:2]
+  arising from a type equality Optic b_agI[sk:2] ~ Optic b_agI[sk:2]
+found filled tyvar k_avd[tau:2] :-> k_avi[tau:2]
+found filled tyvar k_avi[tau:2] :-> *
+found filled tyvar k_avk[tau:2] :-> *
+u_tys
+  tclvl 2
+  'GHC.Types.LiftedRep ~ 'GHC.Types.LiftedRep
+  arising from a type equality Optic b_agI[sk:2] ~ Optic b_agI[sk:2]
+u_tys yields no coercion
+u_tys yields no coercion
+u_tys
+  tclvl 2
+  b_agI[sk:2] ~ b_agI[sk:2]
+  arising from a type equality Optic b_agI[sk:2] ~ Optic b_agI[sk:2]
+u_tys yields no coercion
+u_tys yields no coercion
+checkExpectedKind
+  Optic b_agI[sk:2]
+  Optic b_agI[sk:2]
+  <Optic b_agI[sk:2]>_N
+tcInferTyApps (vis normal app) 2 Optic b_agI[sk:2]
+tcInferTyApps } Gettable b_agI[sk:2] g2_agK[sk:2] :: Constraint
+checkExpectedKind
+  Gettable b_agI[sk:2] g2_agK[sk:2]
+  Constraint
+checkExpectedKindX
+  Gettable b_agI g2_agK
+  act_kind': Constraint
+  exp_kind: Constraint
+lk1 Gettable
+tcInferTyApps {
+  Gettable
+  [a_agH, (g1_agJ :.: g2_agK)]
+tcInferTyApps (need to instantiate)
+  {k_auU}
+  [TCvSubst In scope: InScope {} Type env: [] Co env: []]
+cloneAnonMetaTyVar k_avl[tau:2] :: *
+tcInferTyApps (vis normal app)
+  a_agC
+  a_agH
+  k_auU
+  [TCvSubst
+     In scope: InScope {k_avl}
+     Type env: [auU :-> k_avl[tau:2]]
+     Co env: []]
+lk1 a_agH
+tcInferTyApps {
+  a_agH
+  []
+tcInferTyApps } a_agH[sk:2] :: k_av7[tau:2]
+checkExpectedKind
+  a_agH[sk:2]
+  k_av7[tau:2]
+checkExpectedKindX
+  a_agH
+  act_kind': k_av7[tau:2]
+  exp_kind: k_avl[tau:2]
+u_tys
+  tclvl 2
+  k_av7[tau:2] ~ k_avl[tau:2]
+  arising from a type equality k_av7[tau:2] ~ k_avl[tau:2]
+found filled tyvar k_av7[tau:2] :-> k_avj[tau:2]
+u_tys
+  tclvl 2
+  * ~ *
+  arising from a kind equality arising from
+    k_avj[tau:2] ~ k_avl[tau:2]
+u_tys
+  tclvl 2
+  'GHC.Types.LiftedRep ~ 'GHC.Types.LiftedRep
+  arising from a kind equality arising from
+    k_avj[tau:2] ~ k_avl[tau:2]
+u_tys yields no coercion
+u_tys yields no coercion
+uUnfilledVar2 ok
+  k_avj[tau:2] :: *
+  k_avl[tau:2] :: *
+  True
+  <*>_N
+writeMetaTyVar k_avj[tau:2] :: * := k_avl[tau:2]
+u_tys yields no coercion
+checkExpectedKind
+  k_av7[tau:2]
+  k_avl[tau:2]
+  <k_avl[tau:2]>_N
+tcInferTyApps (vis normal app) 2 k_avl[tau:2]
+tcInferTyApps (vis normal app)
+  [vis] Optic a_agC
+  (g1_agJ :.: g2_agK)
+  Optic a_agC
+  [TCvSubst
+     In scope: InScope {a_agH k_av7 k_avl}
+     Type env: [agC :-> a_agH[sk:2], auU :-> k_avl[tau:2]]
+     Co env: []]
+lk1 :.:
+tcTyVar
+  :.: []
+  Nothing
+tcInferTyApps {
+  (:.:)
+  [g1_agJ, g2_agK]
+tcInferTyApps (need to instantiate)
+  {k_auu}
+  [TCvSubst In scope: InScope {} Type env: [] Co env: []]
+cloneAnonMetaTyVar k_avm[tau:2] :: *
+tcInferTyApps (need to instantiate)
+  {k_X0}
+  [TCvSubst
+     In scope: InScope {k_avm}
+     Type env: [auu :-> k_avm[tau:2]]
+     Co env: []]
+cloneAnonMetaTyVar k_avn[tau:2] :: *
+tcInferTyApps (need to instantiate)
+  @a_agF
+  [TCvSubst
+     In scope: InScope {k_avm k_avn}
+     Type env: [X0 :-> k_avn[tau:2], auu :-> k_avm[tau:2]]
+     Co env: []]
+cloneAnonMetaTyVar a_avo[tau:2] :: k_avm[tau:2]
+tcInferTyApps (need to instantiate)
+  @b_X1
+  [TCvSubst
+     In scope: InScope {k_avm k_avn a_avo}
+     Type env: [X0 :-> k_avn[tau:2], agF :-> a_avo[tau:2],
+                auu :-> k_avm[tau:2]]
+     Co env: []]
+cloneAnonMetaTyVar b_avp[tau:2] :: k_avn[tau:2]
+tcInferTyApps (vis normal app)
+  [vis] Optic a_agF
+  g1_agJ
+  Optic a_agF
+  [TCvSubst
+     In scope: InScope {k_avm k_avn a_avo b_avp}
+     Type env: [X0 :-> k_avn[tau:2], X1 :-> b_avp[tau:2],
+                agF :-> a_avo[tau:2], auu :-> k_avm[tau:2]]
+     Co env: []]
+lk1 g1_agJ
+tcInferTyApps {
+  g1_agJ
+  []
+tcInferTyApps } g1_agJ[sk:2] :: Optic a_agH[sk:2]
+checkExpectedKind
+  g1_agJ[sk:2]
+  Optic a_agH[sk:2]
+checkExpectedKindX
+  g1_agJ
+  act_kind': Optic a_agH[sk:2]
+  exp_kind: Optic a_avo[tau:2]
+u_tys
+  tclvl 2
+  Optic a_agH[sk:2] ~ Optic a_avo[tau:2]
+  arising from a type equality Optic a_agH[sk:2] ~ Optic a_avo[tau:2]
+u_tys
+  tclvl 2
+  k_av9[tau:2] ~ k_avm[tau:2]
+  arising from a type equality Optic a_agH[sk:2] ~ Optic a_avo[tau:2]
+found filled tyvar k_av9[tau:2] :-> k_avh[tau:2]
+found filled tyvar k_avh[tau:2] :-> k_avj[tau:2]
+found filled tyvar k_avj[tau:2] :-> k_avl[tau:2]
+u_tys
+  tclvl 2
+  * ~ *
+  arising from a kind equality arising from
+    k_avl[tau:2] ~ k_avm[tau:2]
+u_tys
+  tclvl 2
+  'GHC.Types.LiftedRep ~ 'GHC.Types.LiftedRep
+  arising from a kind equality arising from
+    k_avl[tau:2] ~ k_avm[tau:2]
+u_tys yields no coercion
+u_tys yields no coercion
+uUnfilledVar2 ok
+  k_avl[tau:2] :: *
+  k_avm[tau:2] :: *
+  True
+  <*>_N
+writeMetaTyVar k_avl[tau:2] :: * := k_avm[tau:2]
+u_tys yields no coercion
+u_tys
+  tclvl 2
+  a_agH[sk:2] ~ a_avo[tau:2]
+  arising from a type equality Optic a_agH[sk:2] ~ Optic a_avo[tau:2]
+u_tys
+  tclvl 2
+  k_avm[tau:2] ~ k_avm[tau:2]
+  arising from a kind equality arising from
+    a_avo[tau:2] ~ a_agH[sk:2]
+u_tys yields no coercion
+uUnfilledVar2 ok
+  a_avo[tau:2] :: k_avm[tau:2]
+  a_agH[sk:2] :: k_avm[tau:2]
+  True
+  <k_avm[tau:2]>_N
+writeMetaTyVar a_avo[tau:2] :: k_avm[tau:2] := a_agH[sk:2]
+u_tys yields no coercion
+u_tys yields no coercion
+checkExpectedKind
+  Optic a_agH[sk:2]
+  Optic a_avo[tau:2]
+  <Optic a_agH[sk:2]>_N
+tcInferTyApps (vis normal app) 2 Optic a_avo[tau:2]
+tcInferTyApps (vis normal app)
+  [vis] Optic b_X1
+  g2_agK
+  Optic b_X1
+  [TCvSubst
+     In scope: InScope {k_avm k_avn a_avo b_avp}
+     Type env: [X0 :-> k_avn[tau:2], X1 :-> b_avp[tau:2],
+                agF :-> a_avo[tau:2], auu :-> k_avm[tau:2]]
+     Co env: []]
+lk1 g2_agK
+tcInferTyApps {
+  g2_agK
+  []
+tcInferTyApps } g2_agK[sk:2] :: Optic b_agI[sk:2]
+checkExpectedKind
+  g2_agK[sk:2]
+  Optic b_agI[sk:2]
+checkExpectedKindX
+  g2_agK
+  act_kind': Optic b_agI[sk:2]
+  exp_kind: Optic b_avp[tau:2]
+u_tys
+  tclvl 2
+  Optic b_agI[sk:2] ~ Optic b_avp[tau:2]
+  arising from a type equality Optic b_agI[sk:2] ~ Optic b_avp[tau:2]
+u_tys
+  tclvl 2
+  k_avd[tau:2] ~ k_avn[tau:2]
+  arising from a type equality Optic b_agI[sk:2] ~ Optic b_avp[tau:2]
+found filled tyvar k_avd[tau:2] :-> *
+u_tys
+  tclvl 2
+  * ~ *
+  arising from a kind equality arising from k_avn[tau:2] ~ *
+u_tys
+  tclvl 2
+  'GHC.Types.LiftedRep ~ 'GHC.Types.LiftedRep
+  arising from a kind equality arising from k_avn[tau:2] ~ *
+u_tys yields no coercion
+u_tys yields no coercion
+uUnfilledVar2 ok
+  k_avn[tau:2] :: *
+  * :: *
+  True
+  <*>_N
+writeMetaTyVar k_avn[tau:2] :: * := *
+u_tys yields no coercion
+u_tys
+  tclvl 2
+  b_agI[sk:2] ~ b_avp[tau:2]
+  arising from a type equality Optic b_agI[sk:2] ~ Optic b_avp[tau:2]
+u_tys
+  tclvl 2
+  * ~ *
+  arising from a kind equality arising from
+    b_avp[tau:2] ~ b_agI[sk:2]
+u_tys
+  tclvl 2
+  'GHC.Types.LiftedRep ~ 'GHC.Types.LiftedRep
+  arising from a kind equality arising from
+    b_avp[tau:2] ~ b_agI[sk:2]
+u_tys yields no coercion
+u_tys yields no coercion
+uUnfilledVar2 ok
+  b_avp[tau:2] :: *
+  b_agI[sk:2] :: *
+  True
+  <*>_N
+writeMetaTyVar b_avp[tau:2] :: * := b_agI[sk:2]
+u_tys yields no coercion
+u_tys yields no coercion
+checkExpectedKind
+  Optic b_agI[sk:2]
+  Optic b_avp[tau:2]
+  <Optic b_agI[sk:2]>_N
+tcInferTyApps (vis normal app) 2 Optic b_avp[tau:2]
+tcInferTyApps }
+  g1_agJ[sk:2] ':.: g2_agK[sk:2] :: Optic a_avo[tau:2]
+checkExpectedKind
+  g1_agJ[sk:2] ':.: g2_agK[sk:2]
+  Optic a_avo[tau:2]
+checkExpectedKindX
+  g1_agJ :.: g2_agK
+  act_kind': Optic a_avo[tau:2]
+  exp_kind: Optic a_agH[sk:2]
+u_tys
+  tclvl 2
+  Optic a_avo[tau:2] ~ Optic a_agH[sk:2]
+  arising from a type equality Optic a_avo[tau:2] ~ Optic a_agH[sk:2]
+u_tys
+  tclvl 2
+  k_avm[tau:2] ~ k_avl[tau:2]
+  arising from a type equality Optic a_avo[tau:2] ~ Optic a_agH[sk:2]
+u_tys yields no coercion
+u_tys
+  tclvl 2
+  a_avo[tau:2] ~ a_agH[sk:2]
+  arising from a type equality Optic a_avo[tau:2] ~ Optic a_agH[sk:2]
+found filled tyvar a_avo[tau:2] :-> a_agH[sk:2]
+u_tys yields no coercion
+u_tys yields no coercion
+checkExpectedKind
+  Optic a_avo[tau:2]
+  Optic a_agH[sk:2]
+  <Optic a_agH[sk:2]>_N
+tcInferTyApps (vis normal app) 2 Optic a_agH[sk:2]
+tcInferTyApps }
+  Gettable a_agH[sk:2] (g1_agJ[sk:2] ':.: g2_agK[sk:2]) :: Constraint
+checkExpectedKind
+  Gettable a_agH[sk:2] (g1_agJ[sk:2] ':.: g2_agK[sk:2])
+  Constraint
+checkExpectedKindX
+  Gettable a_agH (g1_agJ :.: g2_agK)
+  act_kind': Constraint
+  exp_kind: Constraint
+pushLevelAndCaptureConstraints } 2
+newNoTcEvBinds unique = avq
+solveEqualities: running solver
+  wanted =  WC {wc_impl =
+                  Implic {
+                    TcLevel = 2
+                    Skolems = (a_agH[sk:2] :: k_av7[tau:2])
+                              (b_agI[sk:2] :: k_av8[tau:2])
+                              (g1_agJ[sk:2] :: Optic a_agH[sk:2])
+                              (g2_agK[sk:2] :: Optic b_agI[sk:2])
+                    No-eqs = True
+                    Status = Unsolved
+                    Given =
+                    Wanted = WC {}
+                    Binds = CoEvBindsVar<avq>
+                    `forall a_agH
+                            b_agI
+                            (g1_agJ :: Optic a_agH)
+                            (g2_agK :: Optic b_agI).
+                     (Gettable a_agH g1_agJ,
+                      b_agI ~ Get a_agH g1_agJ,
+                      Gettable b_agI g2_agK) =>
+                     Gettable a_agH (g1_agJ :.: g2_agK)' }}
+newNoTcEvBinds unique = avr
+solveWanteds {
+  Level = 1
+  WC {wc_impl =
+        Implic {
+          TcLevel = 2
+          Skolems = (a_agH[sk:2] :: k_av7[tau:2])
+                    (b_agI[sk:2] :: k_av8[tau:2])
+                    (g1_agJ[sk:2] :: Optic a_agH[sk:2])
+                    (g2_agK[sk:2] :: Optic b_agI[sk:2])
+          No-eqs = True
+          Status = Unsolved
+          Given =
+          Wanted = WC {}
+          Binds = CoEvBindsVar<avq>
+          `forall a_agH
+                  b_agI
+                  (g1_agJ :: Optic a_agH)
+                  (g2_agK :: Optic b_agI).
+           (Gettable a_agH g1_agJ,
+            b_agI ~ Get a_agH g1_agJ,
+            Gettable b_agI g2_agK) =>
+           Gettable a_agH (g1_agJ :.: g2_agK)' }}
+solveSimpleWanteds { {}
+solveSimpleWanteds end }
+  iterations = 1
+  residual = WC {}
+solveNestedImplications starting {
+solveImplication {
+  Implic {
+    TcLevel = 2
+    Skolems = (a_agH[sk:2] :: k_av7[tau:2])
+              (b_agI[sk:2] :: k_av8[tau:2])
+              (g1_agJ[sk:2] :: Optic a_agH[sk:2])
+              (g2_agK[sk:2] :: Optic b_agI[sk:2])
+    No-eqs = True
+    Status = Unsolved
+    Given =
+    Wanted = WC {}
+    Binds = CoEvBindsVar<avq>
+    `forall a_agH
+            b_agI
+            (g1_agJ :: Optic a_agH)
+            (g2_agK :: Optic b_agI).
+     (Gettable a_agH g1_agJ,
+      b_agI ~ Get a_agH g1_agJ,
+      Gettable b_agI g2_agK) =>
+     Gettable a_agH (g1_agJ :.: g2_agK)' }
+  Inerts {Unsolved goals = 0}
+         Inert fsks = []
+solveWanteds {
+  Level = 2
+  WC {}
+solveSimpleWanteds { {}
+solveSimpleWanteds end }
+  iterations = 1
+  residual = WC {}
+solveWanteds }
+  final wc = WC {}
+  current evbinds  = {}
+getNoGivenEqs
+  No given equalities
+  Skols: [a_agH[sk:2], b_agI[sk:2], g1_agJ[sk:2], g2_agK[sk:2]]
+  Inerts: {Unsolved goals = 0}
+  Insols: {}
+unflattenGivens []
+zonkSimples done: {}
+floatEqualities
+  Skols = [a_agH[sk:2], b_agI[sk:2], g1_agJ[sk:2], g2_agK[sk:2]]
+  Extended skols = {a_agH[sk:2], b_agI[sk:2], g1_agJ[sk:2],
+                    g2_agK[sk:2]}
+  Simples = {}
+  Candidate eqs = {}
+  Floated eqs = {}
+solveImplication 2
+  {}
+  WC {}
+setImplicationStatus(all-solved) {
+  Implic {
+    TcLevel = 2
+    Skolems = (a_agH[sk:2] :: k_av7[tau:2])
+              (b_agI[sk:2] :: k_av8[tau:2])
+              (g1_agJ[sk:2] :: Optic a_agH[sk:2])
+              (g2_agK[sk:2] :: Optic b_agI[sk:2])
+    No-eqs = True
+    Status = Unsolved
+    Given =
+    Wanted = WC {}
+    Binds = CoEvBindsVar<avq>
+    `forall a_agH
+            b_agI
+            (g1_agJ :: Optic a_agH)
+            (g2_agK :: Optic b_agI).
+     (Gettable a_agH g1_agJ,
+      b_agI ~ Get a_agH g1_agJ,
+      Gettable b_agI g2_agK) =>
+     Gettable a_agH (g1_agJ :.: g2_agK)' }
+neededEvVars
+  old_needs: {}
+  seeds3: {}
+  tcvs: {}
+  ev_binds: []
+  live_ev_binds: []
+setImplicationStatus(all-solved) }
+  discard: True
+  new_implic: Implic {
+                TcLevel = 2
+                Skolems = (a_agH[sk:2] :: k_av7[tau:2])
+                          (b_agI[sk:2] :: k_av8[tau:2])
+                          (g1_agJ[sk:2] :: Optic a_agH[sk:2])
+                          (g2_agK[sk:2] :: Optic b_agI[sk:2])
+                No-eqs = True
+                Status = Solved {Dead givens = []}
+                Given =
+                Wanted = WC {}
+                Binds = CoEvBindsVar<avq>
+                `forall a_agH
+                        b_agI
+                        (g1_agJ :: Optic a_agH)
+                        (g2_agK :: Optic b_agI).
+                 (Gettable a_agH g1_agJ,
+                  b_agI ~ Get a_agH g1_agJ,
+                  Gettable b_agI g2_agK) =>
+                 Gettable a_agH (g1_agJ :.: g2_agK)' }
+solveImplication end }
+  no_given_eqs = True
+  floated_eqs = {}
+  res_implic = Nothing
+  implication evbinds = {}
+  implication tvcs = {}
+solveNestedImplications end }
+  all floated_eqs = {}
+  unsolved_implics = {Nothing}
+solveWanteds }
+  final wc = WC {}
+  current evbinds  = {}
+unflattenGivens []
+End solveEqualities }
+newNoTcEvBinds unique = avs
+kindGeneralizeAll
+kindGeneralizeSome {
+  forall (a :: k_av7[tau:2]) (b :: k_av8[tau:2]) (g1 :: Optic a)
+         (g2 :: Optic b).
+  (Gettable a g1, b ~ Get a g1, Gettable b g2) =>
+  Gettable a (g1 ':.: g2)
+quantifyTyVars 1
+  DV {dv_kvs = {k_avm[tau:2]}, dv_tvs = {}, dv_cvs = {}}
+Skolemising k_avm[tau:2] := k_avm[sk:2]
+writeMetaTyVar k_avm[tau:2] :: * := k_avm[sk:2]
+quantifyTyVars 2
+  nondep:
+  dep: k_avm[tau:2]
+  dep_kvs' k_avm[sk:2]
+  nondep_tvs'
+kindGeneralizeSome }
+  Kind or type: forall (a :: k_av7[tau:2]) (b :: k_av8[tau:2])
+                       (g1 :: Optic a) (g2 :: Optic b).
+                (Gettable a g1, b ~ Get a g1, Gettable b g2) =>
+                Gettable a (g1 ':.: g2)
+  dvs: DV {dv_kvs = {k_avm[tau:2]}, dv_tvs = {}, dv_cvs = {}}
+  dvs': DV {dv_kvs = {k_avm[tau:2]}, dv_tvs = {}, dv_cvs = {}}
+  to_promote: {}
+  qkvs: k_avm[sk:2]
+End tcTopLHsType }
+  forall a_agH b_agI (g1_agJ :: Optic a_agH) (g2_agK :: Optic b_agI).
+  (Gettable a_agH g1_agJ,
+   b_agI ~ Get a_agH g1_agJ,
+   Gettable b_agI g2_agK) =>
+  Gettable a_agH (g1_agJ :.: g2_agK)
+  forall {k} (a :: k) b (g1 :: Optic a) (g2 :: Optic b).
+  (Gettable a g1, b ~ Get a g1, Gettable b g2) =>
+  Gettable a (g1 ':.: g2)
+checkValidInstance {
+  forall {k} (a :: k) b (g1 :: Optic a) (g2 :: Optic b).
+  (Gettable a g1, b ~ Get a g1, Gettable b g2) =>
+  Gettable a (g1 ':.: g2)
+check_valid_theta
+  [Gettable a_agH g1_agJ, b_agI ~ Get a_agH g1_agJ,
+   Gettable b_agI g2_agK]
+cvi 2
+  forall {k} (a :: k) b (g1 :: Optic a) (g2 :: Optic b).
+  (Gettable a g1, b ~ Get a g1, Gettable b g2) =>
+  Gettable a (g1 ':.: g2)
+End checkValidInstance }
+tcLocalInstDecl 1
+  forall {k} (a :: k) b (g1 :: Optic a) (g2 :: Optic b).
+  (Gettable a g1, b ~ Get a g1, Gettable b g2) =>
+  Gettable a (g1 ':.: g2)
+  8
+  [k_avt[sk:1], a_avu[sk:1], b_avv[sk:1], g1_avw[sk:1], g2_avx[sk:1]]
+tc_extend_local_env
+  [(k_avm, Type variable `k_avm' = k_avt[sk:1] :: *),
+   (a_agH, Type variable `a_agH' = a_avu[sk:1] :: k_avt[sk:1]),
+   (b_agI, Type variable `b_agI' = b_avv[sk:1] :: *),
+   (g1_agJ,
+    Type variable `g1_agJ' = g1_avw[sk:1] :: Optic a_avu[sk:1]),
+   (g2_agK,
+    Type variable `g2_agK' = g2_avx[sk:1] :: Optic b_avv[sk:1])]
+tcExtendBinderStack
+  [k_avm k_avt[sk:1], a_agH a_avu[sk:1], b_agI b_avv[sk:1],
+   g1_agJ g1_avw[sk:1], g2_agK g2_avx[sk:1]]
+tcFamInstDecl Get
+tcTyFamInstEqn
+  Get [a_agH, (g1_agJ :.: g2_agK)]
+  fam tc bndrs k_auU (a_agC :: k_auU) (optic_agD :: Optic a_agC)
+  class Gettable k_auU (a_agC :: k_auU) (optic_agD :: Optic a_agC)
+tcTyFamInstEqnGuts { Get
+solveEqualities { level = 1
+bindImplicitTKBndrs
+  [a_agH, g1_agJ, g2_agK]
+  [a_avu[sk:1], g1_avw[sk:1], g2_avx[sk:1]]
+tc_extend_local_env
+  [(a_agH, Type variable `a_agH' = a_avu[sk:1] :: k_avt[sk:1]),
+   (g1_agJ,
+    Type variable `g1_agJ' = g1_avw[sk:1] :: Optic a_avu[sk:1]),
+   (g2_agK,
+    Type variable `g2_agK' = g2_avx[sk:1] :: Optic b_avv[sk:1])]
+tcExtendBinderStack
+  [a_agH a_avu[sk:1], g1_agJ g1_avw[sk:1], g2_agK g2_avx[sk:1]]
+bindExplicTKBndrs []
+tcFamTyPats {
+  Get
+  arity: 3
+tcInferTyApps {
+  Get
+  [a_agH, (g1_agJ :.: g2_agK)]
+tcInferTyApps (need to instantiate)
+  {k_auU}
+  [TCvSubst In scope: InScope {} Type env: [] Co env: []]
+cloneAnonMetaTyVar k_avy[tau:1] :: *
+tcInferTyApps (vis normal app)
+  a_agC
+  a_agH
+  k_auU
+  [TCvSubst
+     In scope: InScope {k_avy}
+     Type env: [auU :-> k_avy[tau:1]]
+     Co env: []]
+lk1 a_agH
+tcInferTyApps {
+  a_agH
+  []
+tcInferTyApps } a_avu[sk:1] :: k_avt[sk:1]
+checkExpectedKind
+  a_avu[sk:1]
+  k_avt[sk:1]
+checkExpectedKindX
+  a_agH
+  act_kind': k_avt[sk:1]
+  exp_kind: k_avy[tau:1]
+u_tys
+  tclvl 1
+  k_avt[sk:1] ~ k_avy[tau:1]
+  arising from a type equality k_avt[sk:1] ~ k_avy[tau:1]
+u_tys
+  tclvl 1
+  * ~ *
+  arising from a kind equality arising from
+    k_avy[tau:1] ~ k_avt[sk:1]
+u_tys
+  tclvl 1
+  'GHC.Types.LiftedRep ~ 'GHC.Types.LiftedRep
+  arising from a kind equality arising from
+    k_avy[tau:1] ~ k_avt[sk:1]
+u_tys yields no coercion
+u_tys yields no coercion
+uUnfilledVar2 ok
+  k_avy[tau:1] :: *
+  k_avt[sk:1] :: *
+  True
+  <*>_N
+writeMetaTyVar k_avy[tau:1] :: * := k_avt[sk:1]
+u_tys yields no coercion
+checkExpectedKind
+  k_avt[sk:1]
+  k_avy[tau:1]
+  <k_avt[sk:1]>_N
+tcInferTyApps (vis normal app) 2 k_avy[tau:1]
+tcInferTyApps (vis normal app)
+  [vis] Optic a_agC
+  (g1_agJ :.: g2_agK)
+  Optic a_agC
+  [TCvSubst
+     In scope: InScope {k_avt a_avu k_avy}
+     Type env: [agC :-> a_avu[sk:1], auU :-> k_avy[tau:1]]
+     Co env: []]
+lk1 :.:
+tcTyVar
+  :.: []
+  Nothing
+tcInferTyApps {
+  (:.:)
+  [g1_agJ, g2_agK]
+tcInferTyApps (need to instantiate)
+  {k_auu}
+  [TCvSubst In scope: InScope {} Type env: [] Co env: []]
+cloneAnonMetaTyVar k_avz[tau:1] :: *
+tcInferTyApps (need to instantiate)
+  {k_X0}
+  [TCvSubst
+     In scope: InScope {k_avz}
+     Type env: [auu :-> k_avz[tau:1]]
+     Co env: []]
+cloneAnonMetaTyVar k_avA[tau:1] :: *
+tcInferTyApps (need to instantiate)
+  @a_agF
+  [TCvSubst
+     In scope: InScope {k_avz k_avA}
+     Type env: [X0 :-> k_avA[tau:1], auu :-> k_avz[tau:1]]
+     Co env: []]
+cloneAnonMetaTyVar a_avB[tau:1] :: k_avz[tau:1]
+tcInferTyApps (need to instantiate)
+  @b_X1
+  [TCvSubst
+     In scope: InScope {k_avz k_avA a_avB}
+     Type env: [X0 :-> k_avA[tau:1], agF :-> a_avB[tau:1],
+                auu :-> k_avz[tau:1]]
+     Co env: []]
+cloneAnonMetaTyVar b_avC[tau:1] :: k_avA[tau:1]
+tcInferTyApps (vis normal app)
+  [vis] Optic a_agF
+  g1_agJ
+  Optic a_agF
+  [TCvSubst
+     In scope: InScope {k_avz k_avA a_avB b_avC}
+     Type env: [X0 :-> k_avA[tau:1], X1 :-> b_avC[tau:1],
+                agF :-> a_avB[tau:1], auu :-> k_avz[tau:1]]
+     Co env: []]
+lk1 g1_agJ
+tcInferTyApps {
+  g1_agJ
+  []
+tcInferTyApps } g1_avw[sk:1] :: Optic a_avu[sk:1]
+checkExpectedKind
+  g1_avw[sk:1]
+  Optic a_avu[sk:1]
+checkExpectedKindX
+  g1_agJ
+  act_kind': Optic a_avu[sk:1]
+  exp_kind: Optic a_avB[tau:1]
+u_tys
+  tclvl 1
+  Optic a_avu[sk:1] ~ Optic a_avB[tau:1]
+  arising from a type equality Optic a_avu[sk:1] ~ Optic a_avB[tau:1]
+u_tys
+  tclvl 1
+  k_avt[sk:1] ~ k_avz[tau:1]
+  arising from a type equality Optic a_avu[sk:1] ~ Optic a_avB[tau:1]
+u_tys
+  tclvl 1
+  * ~ *
+  arising from a kind equality arising from
+    k_avz[tau:1] ~ k_avt[sk:1]
+u_tys
+  tclvl 1
+  'GHC.Types.LiftedRep ~ 'GHC.Types.LiftedRep
+  arising from a kind equality arising from
+    k_avz[tau:1] ~ k_avt[sk:1]
+u_tys yields no coercion
+u_tys yields no coercion
+uUnfilledVar2 ok
+  k_avz[tau:1] :: *
+  k_avt[sk:1] :: *
+  True
+  <*>_N
+writeMetaTyVar k_avz[tau:1] :: * := k_avt[sk:1]
+u_tys yields no coercion
+u_tys
+  tclvl 1
+  a_avu[sk:1] ~ a_avB[tau:1]
+  arising from a type equality Optic a_avu[sk:1] ~ Optic a_avB[tau:1]
+u_tys
+  tclvl 1
+  k_avt[sk:1] ~ k_avt[sk:1]
+  arising from a kind equality arising from
+    a_avB[tau:1] ~ a_avu[sk:1]
+u_tys yields no coercion
+uUnfilledVar2 ok
+  a_avB[tau:1] :: k_avt[sk:1]
+  a_avu[sk:1] :: k_avt[sk:1]
+  True
+  <k_avt[sk:1]>_N
+writeMetaTyVar a_avB[tau:1] :: k_avt[sk:1] := a_avu[sk:1]
+u_tys yields no coercion
+u_tys yields no coercion
+checkExpectedKind
+  Optic a_avu[sk:1]
+  Optic a_avB[tau:1]
+  <Optic a_avu[sk:1]>_N
+tcInferTyApps (vis normal app) 2 Optic a_avB[tau:1]
+tcInferTyApps (vis normal app)
+  [vis] Optic b_X1
+  g2_agK
+  Optic b_X1
+  [TCvSubst
+     In scope: InScope {k_avz k_avA a_avB b_avC}
+     Type env: [X0 :-> k_avA[tau:1], X1 :-> b_avC[tau:1],
+                agF :-> a_avB[tau:1], auu :-> k_avz[tau:1]]
+     Co env: []]
+lk1 g2_agK
+tcInferTyApps {
+  g2_agK
+  []
+tcInferTyApps } g2_avx[sk:1] :: Optic b_avv[sk:1]
+checkExpectedKind
+  g2_avx[sk:1]
+  Optic b_avv[sk:1]
+checkExpectedKindX
+  g2_agK
+  act_kind': Optic b_avv[sk:1]
+  exp_kind: Optic b_avC[tau:1]
+u_tys
+  tclvl 1
+  Optic b_avv[sk:1] ~ Optic b_avC[tau:1]
+  arising from a type equality Optic b_avv[sk:1] ~ Optic b_avC[tau:1]
+u_tys
+  tclvl 1
+  * ~ k_avA[tau:1]
+  arising from a type equality Optic b_avv[sk:1] ~ Optic b_avC[tau:1]
+u_tys
+  tclvl 1
+  * ~ *
+  arising from a kind equality arising from k_avA[tau:1] ~ *
+u_tys
+  tclvl 1
+  'GHC.Types.LiftedRep ~ 'GHC.Types.LiftedRep
+  arising from a kind equality arising from k_avA[tau:1] ~ *
+u_tys yields no coercion
+u_tys yields no coercion
+uUnfilledVar2 ok
+  k_avA[tau:1] :: *
+  * :: *
+  True
+  <*>_N
+writeMetaTyVar k_avA[tau:1] :: * := *
+u_tys yields no coercion
+u_tys
+  tclvl 1
+  b_avv[sk:1] ~ b_avC[tau:1]
+  arising from a type equality Optic b_avv[sk:1] ~ Optic b_avC[tau:1]
+u_tys
+  tclvl 1
+  * ~ *
+  arising from a kind equality arising from
+    b_avC[tau:1] ~ b_avv[sk:1]
+u_tys
+  tclvl 1
+  'GHC.Types.LiftedRep ~ 'GHC.Types.LiftedRep
+  arising from a kind equality arising from
+    b_avC[tau:1] ~ b_avv[sk:1]
+u_tys yields no coercion
+u_tys yields no coercion
+uUnfilledVar2 ok
+  b_avC[tau:1] :: *
+  b_avv[sk:1] :: *
+  True
+  <*>_N
+writeMetaTyVar b_avC[tau:1] :: * := b_avv[sk:1]
+u_tys yields no coercion
+u_tys yields no coercion
+checkExpectedKind
+  Optic b_avv[sk:1]
+  Optic b_avC[tau:1]
+  <Optic b_avv[sk:1]>_N
+tcInferTyApps (vis normal app) 2 Optic b_avC[tau:1]
+tcInferTyApps }
+  g1_avw[sk:1] ':.: g2_avx[sk:1] :: Optic a_avB[tau:1]
+checkExpectedKind
+  g1_avw[sk:1] ':.: g2_avx[sk:1]
+  Optic a_avB[tau:1]
+checkExpectedKindX
+  g1_agJ :.: g2_agK
+  act_kind': Optic a_avB[tau:1]
+  exp_kind: Optic a_avu[sk:1]
+u_tys
+  tclvl 1
+  Optic a_avB[tau:1] ~ Optic a_avu[sk:1]
+  arising from a type equality Optic a_avB[tau:1] ~ Optic a_avu[sk:1]
+u_tys
+  tclvl 1
+  k_avz[tau:1] ~ k_avy[tau:1]
+  arising from a type equality Optic a_avB[tau:1] ~ Optic a_avu[sk:1]
+found filled tyvar k_avz[tau:1] :-> k_avt[sk:1]
+u_tys yields no coercion
+u_tys
+  tclvl 1
+  a_avB[tau:1] ~ a_avu[sk:1]
+  arising from a type equality Optic a_avB[tau:1] ~ Optic a_avu[sk:1]
+found filled tyvar a_avB[tau:1] :-> a_avu[sk:1]
+u_tys yields no coercion
+u_tys yields no coercion
+checkExpectedKind
+  Optic a_avB[tau:1]
+  Optic a_avu[sk:1]
+  <Optic a_avu[sk:1]>_N
+tcInferTyApps (vis normal app) 2 Optic a_avu[sk:1]
+tcInferTyApps }
+  Get a_avu[sk:1] (g1_avw[sk:1] ':.: g2_avx[sk:1]) :: *
+End tcFamTyPats }
+  Get
+  res_kind: *
+addConsistencyConstraints
+  [(k_avt[sk:1], k_avy[tau:1]), (a_avu[sk:1], a_avu[sk:1]),
+   (g1_avw[sk:1] ':.: g2_avx[sk:1], g1_avw[sk:1] ':.: g2_avx[sk:1])]
+lk1 Get
+tcInferTyApps {
+  Get
+  [a_agH, g2_agK]
+tcInferTyApps (need to instantiate)
+  {k_auU}
+  [TCvSubst In scope: InScope {} Type env: [] Co env: []]
+cloneAnonMetaTyVar k_avD[tau:1] :: *
+tcInferTyApps (vis normal app)
+  a_agC
+  a_agH
+  k_auU
+  [TCvSubst
+     In scope: InScope {k_avD}
+     Type env: [auU :-> k_avD[tau:1]]
+     Co env: []]
+lk1 a_agH
+tcInferTyApps {
+  a_agH
+  []
+tcInferTyApps } a_avu[sk:1] :: k_avt[sk:1]
+checkExpectedKind
+  a_avu[sk:1]
+  k_avt[sk:1]
+checkExpectedKindX
+  a_agH
+  act_kind': k_avt[sk:1]
+  exp_kind: k_avD[tau:1]
+u_tys
+  tclvl 1
+  k_avt[sk:1] ~ k_avD[tau:1]
+  arising from a type equality k_avt[sk:1] ~ k_avD[tau:1]
+u_tys
+  tclvl 1
+  * ~ *
+  arising from a kind equality arising from
+    k_avD[tau:1] ~ k_avt[sk:1]
+u_tys
+  tclvl 1
+  'GHC.Types.LiftedRep ~ 'GHC.Types.LiftedRep
+  arising from a kind equality arising from
+    k_avD[tau:1] ~ k_avt[sk:1]
+u_tys yields no coercion
+u_tys yields no coercion
+uUnfilledVar2 ok
+  k_avD[tau:1] :: *
+  k_avt[sk:1] :: *
+  True
+  <*>_N
+writeMetaTyVar k_avD[tau:1] :: * := k_avt[sk:1]
+u_tys yields no coercion
+checkExpectedKind
+  k_avt[sk:1]
+  k_avD[tau:1]
+  <k_avt[sk:1]>_N
+tcInferTyApps (vis normal app) 2 k_avD[tau:1]
+tcInferTyApps (vis normal app)
+  [vis] Optic a_agC
+  g2_agK
+  Optic a_agC
+  [TCvSubst
+     In scope: InScope {k_avt a_avu k_avD}
+     Type env: [agC :-> a_avu[sk:1], auU :-> k_avD[tau:1]]
+     Co env: []]
+lk1 g2_agK
+tcInferTyApps {
+  g2_agK
+  []
+tcInferTyApps } g2_avx[sk:1] :: Optic b_avv[sk:1]
+checkExpectedKind
+  g2_avx[sk:1]
+  Optic b_avv[sk:1]
+checkExpectedKindX
+  g2_agK
+  act_kind': Optic b_avv[sk:1]
+  exp_kind: Optic a_avu[sk:1]
+u_tys
+  tclvl 1
+  Optic b_avv[sk:1] ~ Optic a_avu[sk:1]
+  arising from a type equality Optic b_avv[sk:1] ~ Optic a_avu[sk:1]
+u_tys
+  tclvl 1
+  * ~ k_avD[tau:1]
+  arising from a type equality Optic b_avv[sk:1] ~ Optic a_avu[sk:1]
+found filled tyvar k_avD[tau:1] :-> k_avt[sk:1]
+uUnfilledVar2 not ok
+  k_avt[sk:1]
+  *
+New coercion hole: co_avE YesBlockSubst
+utype_defer
+  TYPE 'GHC.Types.LiftedRep
+  k_avt[sk:1]
+  arising from a type equality Optic b_avv[sk:1] ~ Optic a_avu[sk:1]
+  In the second argument of `Get', namely `g2_agK'
+  In the type `Get a_agH g2_agK'
+  In the type instance declaration for `Get'
+utype_defer2 {co_avE}
+u_tys yields coercion: {co_avE}
+u_tys
+  tclvl 1
+  b_avv[sk:1] ~ a_avu[sk:1]
+  arising from a type equality Optic b_avv[sk:1] ~ Optic a_avu[sk:1]
+uUnfilledVar2 not ok
+  b_avv[sk:1]
+  a_avu[sk:1]
+New coercion hole: co_avF YesBlockSubst
+utype_defer
+  b_avv[sk:1]
+  a_avu[sk:1]
+  arising from a type equality Optic b_avv[sk:1] ~ Optic a_avu[sk:1]
+  In the second argument of `Get', namely `g2_agK'
+  In the type `Get a_agH g2_agK'
+  In the type instance declaration for `Get'
+utype_defer2 {co_avF}
+u_tys yields coercion: {co_avF}
+u_tys yields coercion: (Optic {co_avE} {co_avF})_N
+checkExpectedKind
+  Optic b_avv[sk:1]
+  Optic a_avu[sk:1]
+  (Optic {co_avE} {co_avF})_N
+tcInferTyApps (vis normal app) 2 Optic a_avu[sk:1]
+tcInferTyApps }
+  Get a_avu[sk:1] (g2_avx[sk:1] |> (Optic {co_avE} {co_avF})_N) :: *
+checkExpectedKind
+  Get a_avu[sk:1] (g2_avx[sk:1] |> (Optic {co_avE} {co_avF})_N)
+  *
+checkExpectedKindX
+  Get a_agH g2_agK
+  act_kind': *
+  exp_kind: *
+solveEqualities: running solver
+  wanted =  WC {wc_simple =
+                  [D] _ {0}:: k_avt[sk:1] GHC.Prim.~# k_avy[tau:1] (CNonCanonical)
+                  [D] _ {0}:: a_avu[sk:1] GHC.Prim.~# a_avu[sk:1] (CNonCanonical)
+                  [D] _ {0}:: (g1_avw[sk:1] ':.: g2_avx[sk:1])
+                              GHC.Prim.~# (g1_avw[sk:1] ':.: g2_avx[sk:1]) (CNonCanonical)
+                  [WD] hole{co_avE} {0}:: * GHC.Prim.~# k_avt[sk:1] (CNonCanonical)
+                  [WD] hole{co_avF} {0}:: b_avv[sk:1]
+                                          GHC.Prim.~# a_avu[sk:1] (CNonCanonical)}
+newNoTcEvBinds unique = avG
+solveWanteds {
+  Level = 1
+  WC {wc_simple =
+        [D] _ {0}:: k_avt[sk:1] GHC.Prim.~# k_avy[tau:1] (CNonCanonical)
+        [D] _ {0}:: a_avu[sk:1] GHC.Prim.~# a_avu[sk:1] (CNonCanonical)
+        [D] _ {0}:: (g1_avw[sk:1] ':.: g2_avx[sk:1])
+                    GHC.Prim.~# (g1_avw[sk:1] ':.: g2_avx[sk:1]) (CNonCanonical)
+        [WD] hole{co_avE} {0}:: * GHC.Prim.~# k_avt[sk:1] (CNonCanonical)
+        [WD] hole{co_avF} {0}:: b_avv[sk:1]
+                                GHC.Prim.~# a_avu[sk:1] (CNonCanonical)}
+solveSimpleWanteds {
+  {[D] _ {0}:: k_avt[sk:1] GHC.Prim.~# k_avy[tau:1] (CNonCanonical),
+   [D] _ {0}:: a_avu[sk:1] GHC.Prim.~# a_avu[sk:1] (CNonCanonical),
+   [D] _ {0}:: (g1_avw[sk:1] ':.: g2_avx[sk:1])
+               GHC.Prim.~# (g1_avw[sk:1] ':.: g2_avx[sk:1]) (CNonCanonical),
+   [WD] hole{co_avE} {0}:: * GHC.Prim.~# k_avt[sk:1] (CNonCanonical),
+   [WD] hole{co_avF} {0}:: b_avv[sk:1]
+                           GHC.Prim.~# a_avu[sk:1] (CNonCanonical)}
+----------------------------- 
+Start solver pipeline {
+  tclevel = 1
+  work item = [D] _ {0}:: k_avt[sk:1]
+                          GHC.Prim.~# k_avy[tau:1] (CNonCanonical)
+  inerts = {Unsolved goals = 0}
+           Inert fsks = []
+  rest of worklist = WL {Eqs = [D] _ {0}:: a_avu[sk:1]
+                                           GHC.Prim.~# a_avu[sk:1] (CNonCanonical)
+                               [D] _ {0}:: (g1_avw[sk:1] ':.: g2_avx[sk:1])
+                                           GHC.Prim.~# (g1_avw[sk:1]
+                                                        ':.: g2_avx[sk:1]) (CNonCanonical)
+                               [WD] hole{co_avE} {0}:: * GHC.Prim.~# k_avt[sk:1] (CNonCanonical)
+                               [WD] hole{co_avF} {0}:: b_avv[sk:1]
+                                                       GHC.Prim.~# a_avu[sk:1] (CNonCanonical)}
+runStage canonicalization {
+  workitem   =  [D] _ {0}:: k_avt[sk:1]
+                            GHC.Prim.~# k_avy[tau:1] (CNonCanonical)
+canEvNC:eq
+  k_avt[sk:1]
+  k_avy[tau:1]
+Following filled tyvar (zonk_eq_types) k_avy[tau:1] = k_avt[sk:1]
+end stage canonicalization }
+End solver pipeline (discharged) }
+----------------------------- 
+Start solver pipeline {
+  tclevel = 1
+  work item = [D] _ {0}:: a_avu[sk:1]
+                          GHC.Prim.~# a_avu[sk:1] (CNonCanonical)
+  inerts = {Unsolved goals = 0}
+           Inert fsks = []
+  rest of worklist = WL {Eqs = [D] _ {0}:: (g1_avw[sk:1]
+                                            ':.: g2_avx[sk:1])
+                                           GHC.Prim.~# (g1_avw[sk:1]
+                                                        ':.: g2_avx[sk:1]) (CNonCanonical)
+                               [WD] hole{co_avE} {0}:: * GHC.Prim.~# k_avt[sk:1] (CNonCanonical)
+                               [WD] hole{co_avF} {0}:: b_avv[sk:1]
+                                                       GHC.Prim.~# a_avu[sk:1] (CNonCanonical)}
+runStage canonicalization {
+  workitem   =  [D] _ {0}:: a_avu[sk:1]
+                            GHC.Prim.~# a_avu[sk:1] (CNonCanonical)
+canEvNC:eq
+  a_avu[sk:1]
+  a_avu[sk:1]
+end stage canonicalization }
+End solver pipeline (discharged) }
+----------------------------- 
+Start solver pipeline {
+  tclevel = 1
+  work item = [D] _ {0}:: (g1_avw[sk:1] ':.: g2_avx[sk:1])
+                          GHC.Prim.~# (g1_avw[sk:1] ':.: g2_avx[sk:1]) (CNonCanonical)
+  inerts = {Unsolved goals = 0}
+           Inert fsks = []
+  rest of worklist = WL {Eqs = [WD] hole{co_avE} {0}:: *
+                                                       GHC.Prim.~# k_avt[sk:1] (CNonCanonical)
+                               [WD] hole{co_avF} {0}:: b_avv[sk:1]
+                                                       GHC.Prim.~# a_avu[sk:1] (CNonCanonical)}
+runStage canonicalization {
+  workitem   =  [D] _ {0}:: (g1_avw[sk:1] ':.: g2_avx[sk:1])
+                            GHC.Prim.~# (g1_avw[sk:1] ':.: g2_avx[sk:1]) (CNonCanonical)
+canEvNC:eq
+  g1_avw[sk:1] ':.: g2_avx[sk:1]
+  g1_avw[sk:1] ':.: g2_avx[sk:1]
+Following filled tyvar (zonk_eq_types) k_avz[tau:1] = k_avt[sk:1]
+Following filled tyvar (zonk_eq_types) k_avA[tau:1] = *
+Following filled tyvar (zonk_eq_types) a_avB[tau:1] = a_avu[sk:1]
+Following filled tyvar (zonk_eq_types) b_avC[tau:1] = b_avv[sk:1]
+end stage canonicalization }
+End solver pipeline (discharged) }
+----------------------------- 
+Start solver pipeline {
+  tclevel = 1
+  work item = [WD] hole{co_avE} {0}:: *
+                                      GHC.Prim.~# k_avt[sk:1] (CNonCanonical)
+  inerts = {Unsolved goals = 0}
+           Inert fsks = []
+  rest of worklist = WL {Eqs = [WD] hole{co_avF} {0}:: b_avv[sk:1]
+                                                       GHC.Prim.~# a_avu[sk:1] (CNonCanonical)}
+runStage canonicalization {
+  workitem   =  [WD] hole{co_avE} {0}:: *
+                                        GHC.Prim.~# k_avt[sk:1] (CNonCanonical)
+canEvNC:eq
+  *
+  k_avt[sk:1]
+can_eq_nc
+  False
+  [WD] hole{co_avE} {0}:: * GHC.Prim.~# k_avt[sk:1]
+  nominal equality
+  *
+  *
+  k_avt[sk:1]
+  k_avt[sk:1]
+flatten { FM_FlattenAll *
+flatten } *
+flatten { FM_FlattenAll k_avt[sk:1]
+Unfilled tyvar k_avt[sk:1]
+flatten } k_avt[sk:1]
+New coercion hole: co_avH YesBlockSubst
+Emitting new coercion hole {co_avH} :: k_avt[sk:1] GHC.Prim.~# *
+Filling coercion hole co_avE := Sym {co_avH}
+rewriteEqEvidence
+  [WD] hole{co_avE} {0}:: * GHC.Prim.~# k_avt[sk:1]
+  k_avt[sk:1]
+  *
+  Sym {co_avH}
+end stage canonicalization }
+runStage interact with inerts {
+  workitem   =  [WD] hole{co_avH} {1}:: k_avt[sk:1]
+                                        GHC.Prim.~# * (CTyEqCan)
+end stage interact with inerts }
+runStage top-level reactions {
+  workitem   =  [WD] hole{co_avH} {1}:: k_avt[sk:1]
+                                        GHC.Prim.~# * (CTyEqCan)
+doTopReact
+  [WD] hole{co_avH} {1}:: k_avt[sk:1] GHC.Prim.~# * (CTyEqCan)
+No local instance for k_avt[sk:1] ~ *
+end stage top-level reactions }
+insertInertCan {
+  Trying to insert new inert item: [WD] hole{co_avH} {1}:: k_avt[sk:1]
+                                                           GHC.Prim.~# * (CTyEqCan)
+addInertCan }
+End solver pipeline (kept as inert) }
+  final_item = [WD] hole{co_avH} {1}:: k_avt[sk:1]
+                                       GHC.Prim.~# * (CTyEqCan)
+----------------------------- 
+Start solver pipeline {
+  tclevel = 1
+  work item = [WD] hole{co_avF} {0}:: b_avv[sk:1]
+                                      GHC.Prim.~# a_avu[sk:1] (CNonCanonical)
+  inerts = {Equalities: [WD] hole{co_avH} {1}:: k_avt[sk:1]
+                                                GHC.Prim.~# * (CTyEqCan)
+            Unsolved goals = 1}
+           Inert fsks = []
+  rest of worklist = WL {}
+runStage canonicalization {
+  workitem   =  [WD] hole{co_avF} {0}:: b_avv[sk:1]
+                                        GHC.Prim.~# a_avu[sk:1] (CNonCanonical)
+canEvNC:eq
+  b_avv[sk:1]
+  a_avu[sk:1]
+can_eq_nc
+  False
+  [WD] hole{co_avF} {0}:: b_avv[sk:1] GHC.Prim.~# a_avu[sk:1]
+  nominal equality
+  b_avv[sk:1]
+  b_avv[sk:1]
+  a_avu[sk:1]
+  a_avu[sk:1]
+flatten { FM_FlattenAll b_avv[sk:1]
+Unfilled tyvar b_avv[sk:1]
+flatten } b_avv[sk:1]
+flatten { FM_FlattenAll a_avu[sk:1]
+Unfilled tyvar (a_avu[sk:1] :: k_avt[sk:1])
+flatten } a_avu[sk:1]
+New coercion hole: co_avI YesBlockSubst
+Emitting new coercion hole {co_avI} :: k_avt[sk:1] GHC.Prim.~# *
+Hetero equality gives rise to kind equality
+  {co_avI} :: k_avt[sk:1] ~# *
+New coercion hole: co_avJ YesBlockSubst
+Emitting new coercion hole
+  {co_avJ} :: b_avv[sk:1] GHC.Prim.~# (a_avu[sk:1] |> {co_avI})
+Filling coercion hole
+  co_avF := {co_avJ} ; Sym (GRefl nominal a_avu[sk:1] {co_avI})
+rewriteEqEvidence
+  [WD] hole{co_avF} {0}:: b_avv[sk:1] GHC.Prim.~# a_avu[sk:1]
+  b_avv[sk:1]
+  (a_avu[sk:1] |> {co_avI})
+  {co_avJ} ; Sym (GRefl nominal a_avu[sk:1] {co_avI})
+canEqTyVar2 can't unify
+  b_avv[sk:1]
+  (a_avu[sk:1] |> {co_avI})
+end stage canonicalization }
+runStage interact with inerts {
+  workitem   =  [WD] hole{co_avJ} {1}:: b_avv[sk:1]
+                                        GHC.Prim.~# (a_avu[sk:1] |> {co_avI}) (CIrredCan(blocked))
+end stage interact with inerts }
+runStage top-level reactions {
+  workitem   =  [WD] hole{co_avJ} {1}:: b_avv[sk:1]
+                                        GHC.Prim.~# (a_avu[sk:1] |> {co_avI}) (CIrredCan(blocked))
+doTopReact
+  [WD] hole{co_avJ} {1}:: b_avv[sk:1]
+                          GHC.Prim.~# (a_avu[sk:1] |> {co_avI}) (CIrredCan(blocked))
+No local instance for b_avv[sk:1] ~ (a_avu[sk:1] |> {co_avI})
+end stage top-level reactions }
+insertInertCan {
+  Trying to insert new inert item: [WD] hole{co_avJ} {1}:: b_avv[sk:1]
+                                                           GHC.Prim.~# (a_avu[sk:1] |> {co_avI}) (CIrredCan(blocked))
+Emit derived shadow
+  [WD] hole{co_avJ} {1}:: b_avv[sk:1]
+                          GHC.Prim.~# (a_avu[sk:1] |> {co_avI}) (CIrredCan(blocked))
+Emitting fresh work
+  [D] _ {1}:: b_avv[sk:1]
+              GHC.Prim.~# (a_avu[sk:1] |> {co_avI}) (CIrredCan(blocked))
+addInertCan }
+End solver pipeline (kept as inert) }
+  final_item = [WD] hole{co_avJ} {1}:: b_avv[sk:1]
+                                       GHC.Prim.~# (a_avu[sk:1] |> {co_avI}) (CIrredCan(blocked))
+----------------------------- 
+Start solver pipeline {
+  tclevel = 1
+  work item = [D] _ {1}:: b_avv[sk:1]
+                          GHC.Prim.~# (a_avu[sk:1] |> {co_avI}) (CIrredCan(blocked))
+  inerts = {Equalities: [WD] hole{co_avH} {1}:: k_avt[sk:1]
+                                                GHC.Prim.~# * (CTyEqCan)
+            Irreds = [W] hole{co_avJ} {1}:: b_avv[sk:1]
+                                            GHC.Prim.~# (a_avu[sk:1] |> {co_avI}) (CIrredCan(blocked))
+            Unsolved goals = 2}
+           Inert fsks = []
+  rest of worklist = WL {Eqs = [WD] hole{co_avI} {0}:: k_avt[sk:1]
+                                                       GHC.Prim.~# * (CNonCanonical)}
+runStage canonicalization {
+  workitem   =  [D] _ {1}:: b_avv[sk:1]
+                            GHC.Prim.~# (a_avu[sk:1] |> {co_avI}) (CIrredCan(blocked))
+can_eq_nc
+  False
+  [D] _ {1}:: b_avv[sk:1] GHC.Prim.~# (a_avu[sk:1] |> {co_avI})
+  nominal equality
+  b_avv[sk:1]
+  b_avv[sk:1]
+  (a_avu[sk:1] |> {co_avI})
+  (a_avu[sk:1] |> {co_avI})
+flatten { FM_FlattenAll b_avv[sk:1]
+Unfilled tyvar b_avv[sk:1]
+flatten } b_avv[sk:1]
+flatten { FM_FlattenAll (a_avu[sk:1] |> {co_avI})
+Unfilled tyvar (a_avu[sk:1] :: k_avt[sk:1])
+flatten } (a_avu[sk:1] |> {co_avI})
+canEqTyVar2 can't unify
+  b_avv[sk:1]
+  (a_avu[sk:1] |> {co_avI})
+end stage canonicalization }
+runStage interact with inerts {
+  workitem   =  [D] _ {1}:: b_avv[sk:1]
+                            GHC.Prim.~# (a_avu[sk:1] |> {co_avI}) (CIrredCan(blocked))
+iteractIrred
+  [D] _ {1}:: b_avv[sk:1]
+              GHC.Prim.~# (a_avu[sk:1] |> {co_avI}) (CIrredCan(blocked))
+  keep inert
+  [W] hole{co_avJ} {1}:: b_avv[sk:1]
+                         GHC.Prim.~# (a_avu[sk:1] |> {co_avI}) (CIrredCan(blocked))
+end stage interact with inerts }
+End solver pipeline (discharged) }
+----------------------------- 
+Start solver pipeline {
+  tclevel = 1
+  work item = [WD] hole{co_avI} {0}:: k_avt[sk:1]
+                                      GHC.Prim.~# * (CNonCanonical)
+  inerts = {Equalities: [WD] hole{co_avH} {1}:: k_avt[sk:1]
+                                                GHC.Prim.~# * (CTyEqCan)
+            Irreds = [W] hole{co_avJ} {1}:: b_avv[sk:1]
+                                            GHC.Prim.~# (a_avu[sk:1] |> {co_avI}) (CIrredCan(blocked))
+            Unsolved goals = 2}
+           Inert fsks = []
+  rest of worklist = WL {}
+runStage canonicalization {
+  workitem   =  [WD] hole{co_avI} {0}:: k_avt[sk:1]
+                                        GHC.Prim.~# * (CNonCanonical)
+canEvNC:eq
+  k_avt[sk:1]
+  *
+can_eq_nc
+  False
+  [WD] hole{co_avI} {0}:: k_avt[sk:1] GHC.Prim.~# *
+  nominal equality
+  k_avt[sk:1]
+  k_avt[sk:1]
+  *
+  *
+flatten { FM_FlattenAll k_avt[sk:1]
+Unfilled tyvar k_avt[sk:1]
+flatten } k_avt[sk:1]
+flatten { FM_FlattenAll *
+flatten } *
+end stage canonicalization }
+runStage interact with inerts {
+  workitem   =  [WD] hole{co_avI} {0}:: k_avt[sk:1]
+                                        GHC.Prim.~# * (CTyEqCan)
+Filling coercion hole co_avI := {co_avH}
+end stage interact with inerts }
+End solver pipeline (discharged) }
+----------------------------- 
+Start solver pipeline {
+  tclevel = 1
+  work item = [W] hole{co_avJ} {1}:: b_avv[sk:1]
+                                     GHC.Prim.~# (a_avu[sk:1] |> {co_avI}) (CIrredCan(blocked))
+  inerts = {Equalities: [WD] hole{co_avH} {1}:: k_avt[sk:1]
+                                                GHC.Prim.~# * (CTyEqCan)
+            Unsolved goals = 2}
+           Inert fsks = []
+  rest of worklist = WL {}
+runStage canonicalization {
+  workitem   =  [W] hole{co_avJ} {1}:: b_avv[sk:1]
+                                       GHC.Prim.~# (a_avu[sk:1] |> {co_avI}) (CIrredCan(blocked))
+can_eq_nc
+  False
+  [W] hole{co_avJ} {1}:: b_avv[sk:1]
+                         GHC.Prim.~# (a_avu[sk:1] |> {co_avI})
+  nominal equality
+  b_avv[sk:1]
+  b_avv[sk:1]
+  (a_avu[sk:1] |> {co_avI})
+  (a_avu[sk:1] |> {co_avI})
+flatten { FM_FlattenAll b_avv[sk:1]
+Unfilled tyvar b_avv[sk:1]
+flatten } b_avv[sk:1]
+flatten { FM_FlattenAll (a_avu[sk:1] |> {co_avI})
+Unfilled tyvar (a_avu[sk:1] :: k_avt[sk:1])
+flatten } (a_avu[sk:1] |> {co_avH})
+canEqTyVar2 can't unify
+  b_avv[sk:1]
+  (a_avu[sk:1] |> {co_avH})
+end stage canonicalization }
+runStage interact with inerts {
+  workitem   =  [W] hole{co_avJ} {1}:: b_avv[sk:1]
+                                       GHC.Prim.~# (a_avu[sk:1] |> {co_avH}) (CIrredCan(blocked))
+end stage interact with inerts }
+runStage top-level reactions {
+  workitem   =  [W] hole{co_avJ} {1}:: b_avv[sk:1]
+                                       GHC.Prim.~# (a_avu[sk:1] |> {co_avH}) (CIrredCan(blocked))
+doTopReact
+  [W] hole{co_avJ} {1}:: b_avv[sk:1]
+                         GHC.Prim.~# (a_avu[sk:1] |> {co_avH}) (CIrredCan(blocked))
+No local instance for b_avv[sk:1] ~ (a_avu[sk:1] |> {co_avH})
+end stage top-level reactions }
+insertInertCan {
+  Trying to insert new inert item: [W] hole{co_avJ} {1}:: b_avv[sk:1]
+                                                          GHC.Prim.~# (a_avu[sk:1] |> {co_avH}) (CIrredCan(blocked))
+addInertCan }
+End solver pipeline (kept as inert) }
+  final_item = [W] hole{co_avJ} {1}:: b_avv[sk:1]
+                                      GHC.Prim.~# (a_avu[sk:1] |> {co_avH}) (CIrredCan(blocked))
+getUnsolvedInerts
+   tv eqs = {[WD] hole{co_avH} {1}:: k_avt[sk:1]
+                                     GHC.Prim.~# * (CTyEqCan)}
+  fun eqs = {}
+  others = {[W] hole{co_avJ} {1}:: b_avv[sk:1]
+                                   GHC.Prim.~# (a_avu[sk:1] |> {co_avH}) (CIrredCan(blocked))}
+  implics = {}
+Unflattening
+  {Funeqs =
+   Tv eqs = [WD] hole{co_avH} {1}:: k_avt[sk:1]
+                                    GHC.Prim.~# * (CTyEqCan)}
+Unflattening 1 {}
+Unflattening 2
+  {[WD] hole{co_avH} {1}:: k_avt[sk:1] GHC.Prim.~# * (CTyEqCan)}
+Unflattening 3 {}
+Unflattening done
+  {[WD] hole{co_avH} {1}:: k_avt[sk:1] GHC.Prim.~# * (CNonCanonical)}
+solveSimpleWanteds end }
+  iterations = 1
+  residual = WC {wc_simple =
+                   [W] hole{co_avJ} {1}:: b_avv[sk:1]
+                                          GHC.Prim.~# (a_avu[sk:1] |> {co_avH}) (CIrredCan(blocked))
+                   [WD] hole{co_avH} {1}:: k_avt[sk:1] GHC.Prim.~# * (CNonCanonical)}
+solveWanteds }
+  final wc = WC {wc_simple =
+                   [W] hole{co_avJ} {1}:: b_avv[sk:1]
+                                          GHC.Prim.~# (a_avu[sk:1] |> {co_avH}) (CIrredCan(blocked))
+                   [WD] hole{co_avH} {1}:: k_avt[sk:1] GHC.Prim.~# * (CNonCanonical)}
+  current evbinds  = {}
+zonkSimples done:
+  {[WD] hole{co_avJ} {1}:: b_avv[sk:1]
+                           GHC.Prim.~# (a_avu[sk:1] |> {co_avH}) (CIrredCan(blocked)),
+   [WD] hole{co_avH} {1}:: k_avt[sk:1] GHC.Prim.~# * (CNonCanonical)}
+applyDefaultingRules {
+  wanteds = WC {wc_simple =
+                  [WD] hole{co_avJ} {1}:: b_avv[sk:1]
+                                          GHC.Prim.~# (a_avu[sk:1] |> {co_avH}) (CIrredCan(blocked))
+                  [WD] hole{co_avH} {1}:: k_avt[sk:1] GHC.Prim.~# * (CNonCanonical)}
+  groups  = []
+  info    = ([Integer, Double], (False, False))
+applyDefaultingRules } []
+unflattenGivens []
+End solveEqualities }
+newNoTcEvBinds unique = axp
+reportUnsolved {
+  type errors: TypeError
+  expr holes: HoleError
+  type holes: HoleError
+  scope holes: HoleError
+reportUnsolved (before zonking and tidying)
+  WC {wc_simple =
+        [WD] hole{co_avJ} {1}:: b_avv[sk:1]
+                                GHC.Prim.~# (a_avu[sk:1] |> {co_avH}) (CIrredCan(blocked))
+        [WD] hole{co_avH} {1}:: k_avt[sk:1] GHC.Prim.~# * (CNonCanonical)}
+zonkSimples done:
+  {[WD] hole{co_avJ} {1}:: b_avv[sk:1]
+                           GHC.Prim.~# (a_avu[sk:1] |> {co_avH}) (CIrredCan(blocked)),
+   [WD] hole{co_avH} {1}:: k_avt[sk:1] GHC.Prim.~# * (CNonCanonical)}
+reportUnsolved (after zonking):
+  Free tyvars: b_avv[sk:1]
+               (a_avu[sk:1] :: k_avt[sk:1])
+               (co_avH :: k_avt[sk:1] GHC.Prim.~# *)
+               k_avt[sk:1]
+  Tidy env: ([ ESf8S :-> 1,  ESf9l :-> 1,  ESfMQ :-> 1,
+               ESgiZ :-> 1],
+             [avt :-> k_avt[sk:1], avu :-> a_avu[sk:1], avv :-> b_avv[sk:1],
+              avH :-> co_avH])
+  Wanted: WC {wc_simple =
+                [WD] hole{co_avJ} {1}:: b_avv[sk:1]
+                                        GHC.Prim.~# (a_avu[sk:1] |> {co_avH}) (CIrredCan(blocked))
+                [WD] hole{co_avH} {1}:: k_avt[sk:1] GHC.Prim.~# * (CNonCanonical)}
+reportWanteds
+  Simples = {[WD] hole{co_avJ} {1}:: b_avv[sk:1]
+                                     GHC.Prim.~# (a_avu[sk:1] |> {co_avH}) (CIrredCan(blocked)),
+             [WD] hole{co_avH} {1}:: k_avt[sk:1] GHC.Prim.~# * (CNonCanonical)}
+  Suppress = False
+  tidy_cts = [[WD] hole{co_avJ} {1}:: b_avv[sk:1]
+                                      GHC.Prim.~# (a_avu[sk:1] |> {co_avH}) (CIrredCan(blocked)),
+              [WD] hole{co_avH} {1}:: k_avt[sk:1] GHC.Prim.~# * (CNonCanonical)]
+  tidy_holes =  []
+tryReporters {
+  [[WD] hole{co_avJ} {1}:: b_avv[sk:1]
+                           GHC.Prim.~# (a_avu[sk:1] |> {co_avH}) (CIrredCan(blocked))]
+  [[WD] hole{co_avH} {1}:: k_avt[sk:1] GHC.Prim.~# * (CNonCanonical)]
+tryReporter{ 
+  skolem eq1 [[WD] hole{co_avH} {1}:: k_avt[sk:1]
+                                      GHC.Prim.~# * (CNonCanonical)]
+relevantBindings
+  [WD] hole{co_avH} {1}:: k_avt[sk:1] GHC.Prim.~# * (CNonCanonical)
+relevant_bindings {k_avt[sk:1]}
+mkEqErr1
+  [WD] hole{co_avH} {1}:: k_avt[sk:1] GHC.Prim.~# * (CNonCanonical)
+  arising from a type equality Optic b_avv[sk:1] ~ Optic a_avu[sk:1]
+mkTyVarEqErr
+  [WD] hole{co_avH} {1}:: k_avt[sk:1] GHC.Prim.~# * (CNonCanonical)
+  k_avt[sk:1]
+  *
+About to maybeReportErr
+  Constraint: [[WD] hole{co_avH} {1}:: k_avt[sk:1]
+                                       GHC.Prim.~# * (CNonCanonical)]
+  cec_suppress = False
+  cec_defer_type_errors = TypeError
+Adding error:
+  testsuite\tests\indexed-types\should_fail\T15870.hs:32:34: error:
+      * Couldn't match kind `k' with `*'
+        Expected kind `Optic a', but `g2' has kind `Optic b'
+      * In the second argument of `Get', namely `g2'
+        In the type `Get a g2'
+        In the type instance declaration for `Get'
+reportGroup
+  [[WD] hole{co_avH} {1}:: k_avt[sk:1] GHC.Prim.~# * (CNonCanonical)]
+tryReporter end } skolem eq1 False True
+tryReporter{ 
+  Blocked eqs [[WD] hole{co_avJ} {1}:: b_avv[sk:1]
+                                       GHC.Prim.~# (a_avu[sk:1] |> {co_avH}) (CIrredCan(blocked))]
+Suppressing errors for
+  [[WD] hole{co_avJ} {1}:: b_avv[sk:1]
+                           GHC.Prim.~# (a_avu[sk:1] |> {co_avH}) (CIrredCan(blocked))]
+tryReporter end } Blocked eqs True False
+tryReporters } []
+tryReporters {
+  []
+  []
+tryReporters } []
+reportUnsolved }
+attemptM recovering with insoluble constraints WC {}
+Adding instances:
+  T15870.$fGettableka:.: :
+    instance forall k (a :: k) b (g1 :: Optic a) (g2 :: Optic b).
+             (Gettable a g1, b ~ Get a g1, Gettable b g2) =>
+             Gettable a (g1 ':.: g2)
+      -- Defined at testsuite\tests\indexed-types\should_fail\T15870.hs:27:10
+addFamInsts
+tcAddTyCons
+  tycons []
+  implicits []
+tcExtendKindEnvList []
+tc_extend_local_env []
+simplifyTop { wanted =  WC {}
+newTcEvBinds unique = axw
+solveWanteds {
+  Level = 0
+  WC {}
+solveSimpleWanteds { {}
+solveSimpleWanteds end }
+  iterations = 1
+  residual = WC {}
+solveWanteds }
+  final wc = WC {}
+  current evbinds  = {}
+unflattenGivens []
+End simplifyTop }
+newTcEvBinds unique = axx
+reportUnsolved (unsafe overlapping) {
+reportUnsolved (unsafe overlapping) }

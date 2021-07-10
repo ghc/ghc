@@ -10,7 +10,11 @@ module GHC.Tc.Errors(
        reportUnsolved, reportAllUnsolved, warnAllUnsolved,
        warnDefaulting,
 
-       ErrorItem(..)  -- used by GHC.Tc.Errors.Hole
+       ErrorItem(..),  -- used by GHC.Tc.Errors.Hole
+
+      -- * Reporting ambiguous kind and type variables
+      AmbigTkvs(..), mkAmbigMsg, getAmbigTkvs
+
   ) where
 
 import GHC.Prelude

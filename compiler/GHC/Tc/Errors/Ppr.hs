@@ -49,6 +49,12 @@ instance Diagnostic TcRnMessage where
       -> mkDecorated [text "Use of plugins makes the module unsafe"]
     TcRnModMissingRealSrcSpan mod
       -> mkDecorated [text "Module does not have a RealSrcSpan:" <+> ppr mod]
+    TcRnAmbiguousMetavariables tvs
+      -> mkDecorated
+           [ text "Cannot infer an ambiguous type signature."
+           , text "The type variable" <> plural tvs <+> pprQuotedList (reverse tvs)
+               <+> isOrAre tvs <+> text "ambiguous."
+           ]
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -72,6 +78,8 @@ instance Diagnostic TcRnMessage where
       -> WarningWithoutFlag
     TcRnModMissingRealSrcSpan{}
       -> ErrorWithoutFlag
+    TcRnAmbiguousMetavariables {}
+      -> ErrorWithoutFlag
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -94,6 +102,8 @@ instance Diagnostic TcRnMessage where
     TcRnUnsafeDueToPlugin{}
       -> noHints
     TcRnModMissingRealSrcSpan{}
+      -> noHints
+    TcRnAmbiguousMetavariables {}
       -> noHints
 
 messageWithInfoDiagnosticMessage :: UnitState

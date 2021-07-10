@@ -1,0 +1,6 @@
+
+tc168.hs:17:1: error:
+    • Cannot infer an ambiguous type signature.
+    • The type variable ‘b0’ is ambiguous.
+    • When checking the inferred type
+        g :: forall {a1} {a2}. C a1 (a2, b0) => a1 -> a2

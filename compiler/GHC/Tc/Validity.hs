@@ -43,6 +43,7 @@ import GHC.Core.TyCon
 import GHC.Core.Predicate
 import GHC.Tc.Types.Origin
 import GHC.Tc.Errors.Types
+import GHC.Types.Error
 
 -- others:
 import GHC.Iface.Type    ( pprIfaceType, pprIfaceTypeApp )
@@ -57,7 +58,7 @@ import GHC.Tc.Instance.Family
 import GHC.Types.Name
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
-import GHC.Types.Var     ( VarBndr(..), mkTyVar )
+import GHC.Types.Var     ( VarBndr(..), mkTyVar, tcTyVarDetails )
 import GHC.Utils.FV
 import GHC.Utils.Error
 import GHC.Driver.Session
@@ -70,9 +71,11 @@ import GHC.Builtin.Uniques  ( mkAlphaTyVarUnique )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
+import Control.Monad.Trans.State.Strict
 import Data.Bifunctor
 import Data.Foldable
 import Data.Function
+import Data.Functor
 import Data.List        ( (\\), nub )
 import qualified Data.List.NonEmpty as NE
 
@@ -706,7 +709,22 @@ check_type :: ValidityEnv -> Type -> TcM ()
 -- Rank is allowed rank for function args
 -- Rank 0 means no for-alls anywhere
 
-check_type _ (TyVarTy _) = return ()
+check_type ve ty@(TyVarTy tv)
+  | isTyVar tv
+  , MetaTv { mtv_tclvl = tv_tclvl } <- tcTyVarDetails tv
+  -- Check that there are no metavariables of too high a TcLevel.
+  -- These are unification variables that were not quantified over by
+  -- decideQuantifiedTyVars, and are thus very ambiguous.
+  -- The user can't refer to them, even with AllowAmbiguousTypes enabled;
+  -- so we emit an error.
+  -- Example test cases: T1897a, tc168, tcfail080
+  = do  { currTcLevel <- getTcLevel
+        ; traceTc "check_type: tv =" (ppr tv $$ ppr currTcLevel $$ ppr tv_tclvl)
+        ; when (tv_tclvl `strictlyDeeperThan` currTcLevel) $
+     do { let (env', ty') = tidyOpenType (ve_tidy_env ve) ty
+        ; addAmbiguousTyVarToErrs env' ty' }}
+  | otherwise
+  = return ()
 
 check_type ve (AppTy ty1 ty2)
   = do  { check_type ve ty1
@@ -768,6 +786,39 @@ check_type (ve@ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
     (arg_rank, res_rank) = funArgResRank rank
 
 check_type _ ty = pprPanic "check_type" (ppr ty)
+
+----------------------------------------
+
+-- | Adds a message saying that the supplied type is ambiguous.
+--
+-- If such an error already exists, this function appends the type to the list
+-- of ambiguous types instead of emitting a new error.
+addAmbiguousTyVarToErrs :: TidyEnv -> Type -> TcM ()
+addAmbiguousTyVarToErrs env tv
+  = do { errsVar <- getErrsVar
+       ; errs <- readTcRef errsVar
+       ; traceTc "addAmbiguousTyVarToErrs" (pprMessages errs)
+       ; go errsVar errs
+       }
+  where
+    -- See tc168b for an example in which we don't want to emit
+    -- too many error messages.
+    go :: TcRef (Messages TcRnMessage) -> Messages TcRnMessage -> TcM ()
+    go errsVar msgs = do
+      let
+        ( msgs', existingAmbigMsg ) = runState (traverse addTyVar msgs) False
+      traceTc "addAmbiguousTyVarToErrs:go" (ppr existingAmbigMsg $$ pprMessages msgs')
+      if existingAmbigMsg
+      then do
+        writeTcRef errsVar msgs'
+      else do
+        addErrTcM (env, TcRnAmbiguousMetavariables [tv])
+    addTyVar :: TcRnMessage -> State Bool TcRnMessage
+    addTyVar (TcRnMessageWithInfo u (TcRnMessageDetailed nfo msg))
+      = TcRnMessageWithInfo u . TcRnMessageDetailed nfo <$> addTyVar msg
+    addTyVar (TcRnAmbiguousMetavariables tvs)
+      = put True $> TcRnAmbiguousMetavariables (tv:tvs)
+    addTyVar msg = pure msg
 
 ----------------------------------------
 check_syn_tc_app :: ValidityEnv
