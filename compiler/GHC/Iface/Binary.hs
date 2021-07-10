@@ -114,7 +114,7 @@ readBinIfaceHeader profile _name_cache checkHiWay traceBinIFace hi_path = do
     check_ver  <- get bh
     let our_ver = show hiVersion
     wantedGot "Version" our_ver check_ver text
-    errorOnMismatch ("mismatched interface file versions " ++ show hi_path) our_ver check_ver
+    errorOnMismatch "mismatched interface file versions " our_ver check_ver
 
     check_tag <- get bh
     let tag = profileBuildTag profile
