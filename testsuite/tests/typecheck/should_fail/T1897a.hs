@@ -7,5 +7,5 @@ class Wob a b where
    from :: b -> a
 
 foo x = [x, to (from x)]
--- Ambiguous type:  Wob a b => b -> [b]
+-- Ambiguous type:  Wob a0 b => b -> [b]
 -- Should be rejected

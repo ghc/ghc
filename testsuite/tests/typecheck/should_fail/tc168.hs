@@ -10,7 +10,7 @@
 -- signature   g :: C a (b,c) => a -> b
 -- would fail
 
-module ShouldCompile where
+module ShouldFail where
 
 class C a b where { op :: a -> b }
 

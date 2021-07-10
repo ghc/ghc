@@ -189,6 +189,9 @@ test('tcfail203a', normal, compile_fail, [''])
 test('tcfail204', normal, compile_fail, [''])
 test('tcfail206', normal, compile_fail, [''])
 
+test('tc168', normal, compile_fail, [''])
+test('tc168b', normal, compile_fail, [''])
+
 test('T1595', normal, compile_fail, [''])
 test('T1899', normal, compile_fail, [''])
 test('T2126', normal, compile_fail, [''])

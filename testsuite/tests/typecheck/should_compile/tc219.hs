@@ -1,4 +1,4 @@
-{-# LANGUAGE ImplicitParams, NoMonomorphismRestriction #-}
+{-# LANGUAGE AllowAmbiguousTypes, ImplicitParams, NoMonomorphismRestriction #-}
 
 module ShouldCompile where
 

@@ -950,7 +950,7 @@ chooseInferredQuantifiers residual inferred_theta tau_tvs qtvs
 
     choose_psig_context psig_qtvs annotated_theta (Just wc_var_ty)
       = do { let free_tvs = oclose inferred_theta (closeOverKinds seed_tvs)
-                            -- growThetaVars just like the no-type-sig case
+                            -- oclose just like the no-type-sig case
                             -- Omitting this caused #12844
                  seed_tvs = tyCoVarsOfTypes annotated_theta  -- These are put there
                             `unionVarSet` tau_tvs            --       by the user
