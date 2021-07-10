@@ -5,6 +5,18 @@ T12709.hs:28:13: error:
       Kind: TYPE rep
     In the type of expression: 1
 
+T12709.hs:28:13: error:
+    A representation-polymorphic type is not allowed here:
+      Type: a
+      Kind: TYPE rep
+    In the type of expression: 1 + 2
+
+T12709.hs:28:13: error:
+    A representation-polymorphic type is not allowed here:
+      Type: a
+      Kind: TYPE rep
+    In the type of expression: 1 + 2 + 3
+
 T12709.hs:28:17: error:
     A representation-polymorphic type is not allowed here:
       Type: a
