@@ -1147,6 +1147,8 @@ So history keeps telling us that the only possibly correct strictness annotation
 for the first argument of 'catch#' is 'lazyApply1Dmd', because 'catch#' really
 is not strict in its argument: Just try this in GHCi
 
+TODO: Update this example?!
+
   :set -XScopedTypeVariables
   import Control.Exception
   catch undefined (\(_ :: SomeException) -> putStrLn "you'll see this")
