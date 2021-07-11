@@ -246,7 +246,7 @@ redirectInterrupts target wait = do
      m <- deRefWeak wtid
      case m of
        Nothing -> wait
-       Just target -> do throwTo target (e :: SomeException); wait
+       Just target -> do throwTo target (e :: SomeExceptionWithLocation); wait
 
 measureAlloc :: IO (EvalResult a) -> IO (EvalStatus a)
 measureAlloc io = do

@@ -1,3 +1,4 @@
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE Trustworthy #-}
@@ -19,11 +20,18 @@
 -----------------------------------------------------------------------------
 
 module GHC.Exception.Type
-       ( Exception(..)    -- Class
-       , SomeException(..), ArithException(..)
+       ( -- * Fundamentals
+         Exception(..)
+       , SomeException(..)
+       , SomeExceptionWithLocation(..)
+       , addBacktrace
+         -- * Concrete exception types
+       , ArithException(..)
        , divZeroException, overflowException, ratioZeroDenomException
        , underflowException
        ) where
+
+import GHC.Exception.Backtrace (Backtrace, showBacktraces)
 
 import Data.Maybe
 import Data.Typeable (Typeable, cast)
@@ -32,15 +40,41 @@ import GHC.Base
 import GHC.Show
 
 {- |
-The @SomeException@ type is the root of the exception type hierarchy.
-When an exception of type @e@ is thrown, behind the scenes it is
-encapsulated in a @SomeException@.
+The @SomeExceptionWithLocation@ type is the root of the exception type hierarchy.
+When an exception of type @e@ is thrown, behind the scenes it is encapsulated in
+a @SomeException@ which is encapsulated in a @SomeExceptionWithLocation@.
+
+This structure was choosen for backwards compatibility, because previously
+@SomeException@ was the root of the exception hierachy.
+
+@since 4.16.0.0
 -}
-data SomeException = forall e . Exception e => SomeException e
+data SomeExceptionWithLocation = SomeExceptionWithLocation [Backtrace] SomeException
+
+-- | Add a 'Backtrace' to the list of backtraces.
+--
+-- @since 4.16.0.0
+addBacktrace :: Backtrace -> SomeExceptionWithLocation -> SomeExceptionWithLocation
+addBacktrace bt (SomeExceptionWithLocation bts e) =
+    SomeExceptionWithLocation (bt : bts) e
+
+{- |
+The @SomeException@ type represents any exception. This used to be the root of
+the exception type hierarchy, although this role is now played by
+'SomeExceptionWithLocation'
+-}
+data SomeException = forall e. Exception e => SomeException e
+
+-- | @since 3.0
+instance Show SomeExceptionWithLocation where
+        -- TODO: Should this obey the usual Show-is-Haskell invariant?
+    showsPrec p (SomeExceptionWithLocation bts e) =
+        showsPrec p e . showString (showBacktraces bts)
 
 -- | @since 3.0
 instance Show SomeException where
     showsPrec p (SomeException e) = showsPrec p e
+
 
 {- |
 Any type that you wish to throw or catch as an exception must be an
@@ -129,11 +163,11 @@ Caught MismatchedParentheses
 
 -}
 class (Typeable e, Show e) => Exception e where
-    toException   :: e -> SomeException
-    fromException :: SomeException -> Maybe e
+    toException   :: e -> SomeExceptionWithLocation
+    toException e = SomeExceptionWithLocation [] $ SomeException e
 
-    toException = SomeException
-    fromException (SomeException e) = cast e
+    fromException :: SomeExceptionWithLocation -> Maybe e
+    fromException (SomeExceptionWithLocation _ (SomeException e)) = cast e
 
     -- | Render this exception value in a human-friendly manner.
     --
@@ -143,10 +177,16 @@ class (Typeable e, Show e) => Exception e where
     displayException :: e -> String
     displayException = show
 
--- | @since 3.0
-instance Exception SomeException where
+-- | @since 4.16.0.0
+instance Exception SomeExceptionWithLocation where
     toException se = se
     fromException = Just
+    displayException (SomeExceptionWithLocation bt (SomeException e)) = displayException e <> showBacktraces bt
+
+-- | @since 3.0
+instance Exception SomeException where
+    toException e = SomeExceptionWithLocation [] e
+    fromException (SomeExceptionWithLocation _ (SomeException e)) = Just (SomeException e)
     displayException (SomeException e) = displayException e
 
 -- |Arithmetic exceptions.
@@ -161,7 +201,7 @@ data ArithException
            , Ord -- ^ @since 3.0
            )
 
-divZeroException, overflowException, ratioZeroDenomException, underflowException  :: SomeException
+divZeroException, overflowException, ratioZeroDenomException, underflowException  :: SomeExceptionWithLocation
 divZeroException        = toException DivideByZero
 overflowException       = toException Overflow
 ratioZeroDenomException = toException RatioZeroDenominator
