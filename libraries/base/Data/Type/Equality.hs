@@ -59,8 +59,9 @@ infix 4 :~:, :~~:
 -- in the body of the pattern-match, the compiler knows that @a ~ b@.
 --
 -- @since 4.7.0.0
+type (:~:) :: forall k. k -> k -> Type
 data a :~: b where  -- See Note [The equality types story] in GHC.Builtin.Types.Prim
-  Refl :: a :~: a
+  Refl :: forall {k} (a :: k). a :~: a
 
 -- with credit to Conal Elliott for 'ty', Erik Hesselink & Martijn van
 -- Steenbergen for 'type-equality', Edward Kmett for 'eq', and Gabor Greif
@@ -122,7 +123,7 @@ deriving instance a ~ b => Bounded (a :~: b)
 -- @since 4.10.0.0
 type (:~~:) :: k1 -> k2 -> Type
 data a :~~: b where
-   HRefl :: a :~~: a
+   HRefl :: forall a. a :~~: a
 
 -- | @since 4.10.0.0
 deriving instance Eq   (a :~~: b)
@@ -147,6 +148,7 @@ deriving instance a ~~ b => Bounded (a :~~: b)
 -- | This class contains types where you can learn the equality of two types
 -- from information contained in /terms/. Typically, only singleton types should
 -- inhabit this class.
+type  TestEquality :: forall {k}. (k -> Type) -> Constraint
 class TestEquality f where
   -- | Conditionally prove the equality of @a@ and @b@.
   testEquality :: f a -> f b -> Maybe (a :~: b)
