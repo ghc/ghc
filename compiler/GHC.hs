@@ -118,7 +118,7 @@ module GHC (
 
         -- ** Inspecting the current context
         getBindings, getInsts, getPrintUnqual,
-        findModule, lookupModule,
+        findModule, listModules, lookupModule,
         isModuleTrusted, moduleTrustReqs,
         getNamesInScope,
         getRdrNamesInScope,
@@ -1681,6 +1681,14 @@ modNotLoadedError dflags m loc = throwGhcExceptionIO $ CmdLineError $ showSDoc d
    text "module is not loaded:" <+>
    quotes (ppr (moduleName m)) <+>
    parens (text (expectJust "modNotLoadedError" (ml_hs_file loc)))
+
+listModules :: GhcMonad m => m [Module]
+listModules = withSession $ \hsc_env ->
+  return $
+       (mi_module . hm_iface)
+       `map`
+       eltsHpt (hsc_HPT hsc_env)
+    ++ listVisibleModules (hsc_units hsc_env)
 
 -- | Like 'findModule', but differs slightly when the module refers to
 -- a source file, and the file has not been loaded via 'load'.  In
