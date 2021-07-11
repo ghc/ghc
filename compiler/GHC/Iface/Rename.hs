@@ -68,14 +68,12 @@ tcRnModExports x y = do
     hsc_env <- getTopEnv
     tcRnMsgMaybe $ rnModExports hsc_env x y
 
-failWithRn :: SDoc -> ShIfM a
-failWithRn doc = do
+failWithRn :: TcRnMessage -> ShIfM a
+failWithRn tcRnMessage = do
     errs_var <- fmap sh_if_errs getGblEnv
     errs <- readTcRef errs_var
     -- TODO: maybe associate this with a source location?
-    let msg = mkPlainErrorMsgEnvelope noSrcSpan $
-              TcRnUnknownMessage $
-              mkPlainError noHints doc
+    let msg = mkPlainErrorMsgEnvelope noSrcSpan tcRnMessage
     writeTcRef errs_var (msg `addMessage` errs)
     failM
 
@@ -329,11 +327,8 @@ rnIfaceGlobal n = do
                         -- TODO: This will give an unpleasant message if n'
                         -- is a constructor; then we'll suggest adding T
                         -- but it won't work.
-                        Nothing -> failWithRn $ vcat [
-                            text "The identifier" <+> ppr (occName n') <+>
-                                text "does not exist in the local signature.",
-                            parens (text "Try adding it to the export list of the hsig file.")
-                            ]
+                        Nothing ->
+                          failWithRn $ TcRnIdNotExportedFromLocalSig n'
                         Just n'' -> return n''
        -- Fastpath: we are renaming p[H=<H>]:A.T, in which case the
        -- export list is irrelevant.
@@ -356,12 +351,8 @@ rnIfaceGlobal n = do
                             $ loadSysInterface (text "rnIfaceGlobal") m''
             let nsubst = mkNameShape (moduleName m) (mi_exports iface)
             case maybeSubstNameShape nsubst n of
-                Nothing -> failWithRn $ vcat [
-                    text "The identifier" <+> ppr (occName n) <+>
-                        -- NB: report m' because it's more user-friendly
-                        text "does not exist in the signature for" <+> ppr m',
-                    parens (text "Try adding it to the export list in that hsig file.")
-                    ]
+                -- NB: report m' because it's more user-friendly
+                Nothing -> failWithRn $ TcRnIdNotExportedFromModuleSig n m'
                 Just n' -> return n'
 
 -- | Rename an implicit name, e.g., a DFun or coercion axiom.
