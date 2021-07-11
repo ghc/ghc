@@ -1,4 +1,4 @@
-
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE PatternSynonyms #-}
 --
@@ -169,14 +169,22 @@ tryM (IOEnv thing) = IOEnv (\ env -> tryIOEnvFailure (thing env))
 tryIOEnvFailure :: IO a -> IO (Either IOEnvFailure a)
 tryIOEnvFailure = try
 
+#if __GLASGOW_HASKELL__ >= 903
+tryAllM :: IOEnv env r -> IOEnv env (Either SomeExceptionWithLocation r)
+#else
 tryAllM :: IOEnv env r -> IOEnv env (Either SomeException r)
+#endif
 -- Catch *all* synchronous exceptions
 -- This is used when running a Template-Haskell splice, when
 -- even a pattern-match failure is a programmer error
 tryAllM (IOEnv thing) = IOEnv (\ env -> safeTry (thing env))
 
 -- | Like 'try', but doesn't catch asynchronous exceptions
+#if __GLASGOW_HASKELL__ >= 903
+safeTry :: IO a -> IO (Either SomeExceptionWithLocation a)
+#else
 safeTry :: IO a -> IO (Either SomeException a)
+#endif
 safeTry act = do
   var <- newEmptyMVar
   -- uninterruptible because we want to mask around 'killThread', which is interruptible.
@@ -184,13 +192,21 @@ safeTry act = do
     -- Fork, so that 'act' is safe from all asynchronous exceptions other than the ones we send it
     t <- forkIO $ try (restore act) >>= putMVar var
     restore (readMVar var)
+#if __GLASGOW_HASKELL__ >= 903
+      `catchException` \(e :: SomeExceptionWithLocation) -> do
+#else
       `catchException` \(e :: SomeException) -> do
+#endif
         -- Control reaches this point only if the parent thread was sent an async exception
         -- In that case, kill the 'act' thread and re-raise the exception
         killThread t
         throwIO e
 
+#if __GLASGOW_HASKELL__ >= 903
+tryMostM :: IOEnv env r -> IOEnv env (Either SomeExceptionWithLocation r)
+#else
 tryMostM :: IOEnv env r -> IOEnv env (Either SomeException r)
+#endif
 tryMostM (IOEnv thing) = IOEnv (\ env -> tryMost (thing env))
 
 ---------------------------
