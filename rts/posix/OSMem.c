@@ -161,6 +161,14 @@ linux_retry_mmap(int operation, W_ size, void *ret, void *addr, int prot, int fl
 static void
 post_mmap_madvise(int operation, W_ size, void *ret)
 {
+#if defined(MADV_HUGEPAGE)
+    if (operation & MEM_COMMIT) {
+    } else {
+        if (RtsFlags.GcFlags.hugePage) {
+            madvise(ret, size, MADV_HUGEPAGE);
+        }
+    }
+# endif
 #if defined(MADV_WILLNEED)
     if (operation & MEM_COMMIT) {
         madvise(ret, size, MADV_WILLNEED);
