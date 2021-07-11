@@ -1,6 +1,6 @@
 + = (_t1::Num a => a -> a -> a)
 print = (_t2::Show a => a -> IO ())
 log = (_t3::Floating a => a -> a)
-head = (_t4::[a] -> a)
-tail = (_t5::[a] -> [a])
+head = (_t4::GHC.Stack.Types.HasCallStack => [a] -> a)
+tail = (_t5::GHC.Stack.Types.HasCallStack => [a] -> [a])
 fst = (_t6::(a, b) -> a)
