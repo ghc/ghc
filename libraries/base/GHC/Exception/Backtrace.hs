@@ -1,94 +1,96 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE NoImplicitPrelude, ExistentialQuantification  #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE ExistentialQuantification #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Exception.Backtrace
--- Copyright   :  (c) The University of Glasgow, 2020-2025
+-- Copyright   :  (c) The GHC Team, 2020-2021
+-- Authors     :  Ben Gamari, David Eichmann, Sven Tennie
 -- License     :  see libraries/base/LICENSE
 --
 -- Maintainer  :  cvs-ghc@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable (GHC extensions)
 --
--- Exception backtraces.
---
+-- Collect Exception backtraces with several mechanisms.
 -----------------------------------------------------------------------------
 
 module GHC.Exception.Backtrace
-       ( Backtrace(..)
-       , setGlobalBacktraceMechanism
-       , getGlobalBacktraceMechanism
-       , showBacktraces
-       , collectBacktrace
-       ) where
+  ( Backtrace (..),
+    setDefaultBacktraceMechanisms,
+    getDefaultBacktraceMechanisms,
+    showBacktraces,
+    collectBacktraces,
+  )
+where
 
-import Data.Maybe
 import Data.List
-import {-# SOURCE #-} GHC.IORef
-import GHC.IO.Unsafe
-import GHC.Ptr
-import {-# SOURCE #-} GHC.Stack.CCS
-import {-# SOURCE #-} GHC.Stack
-import {-# SOURCE #-} GHC.ExecutionStack (getStackTrace, Location)
-import {-# SOURCE #-} GHC.ExecutionStack.Internal (showStackFrames)
+import Data.Maybe
 import GHC.Base
+import {-# SOURCE #-} GHC.ExecutionStack (Location, getStackTrace)
+import {-# SOURCE #-} GHC.ExecutionStack.Internal (showStackFrames)
+import GHC.IO.Unsafe
+import {-# SOURCE #-} GHC.IORef
+import GHC.Ptr
 import GHC.Show
+import {-# SOURCE #-} GHC.Stack
+import {-# SOURCE #-} GHC.Stack.CCS
 
 -- | An exception backtrace.
 --
 -- @since 4.15
 data Backtrace
-    = CostCenterBacktrace (Ptr GHC.Stack.CCS.CostCentreStack)
-      -- ^ a cost center profiler backtrace
-    | HasCallStackBacktrace GHC.Stack.CallStack
-      -- ^ a stack from 'GHC.Stack.HasCallStack'
-    | ExecutionBacktrace [GHC.ExecutionStack.Location]
-      -- ^ a stack unwinding (e.g. DWARF) backtrace
+  = -- | a cost center profiler backtrace
+    CostCenterBacktrace (Ptr GHC.Stack.CCS.CostCentreStack)
+  | -- | a stack from 'GHC.Stack.HasCallStack'
+    HasCallStackBacktrace GHC.Stack.CallStack
+  | -- | a stack unwinding (e.g. DWARF) backtrace
+    ExecutionBacktrace [GHC.ExecutionStack.Location]
 
 -- | @since 4.15
 instance Show Backtrace where
-    -- TODO
-    showsPrec p (CostCenterBacktrace ccs)   = showsPrec p ccs
-    showsPrec p (HasCallStackBacktrace ccs) = showsPrec p ccs
-    showsPrec _ (ExecutionBacktrace ccs)    = showStackFrames ccs
+  -- TODO
+  showsPrec p (CostCenterBacktrace ccs) = showsPrec p ccs
+  showsPrec p (HasCallStackBacktrace ccs) = showsPrec p ccs
+  showsPrec _ (ExecutionBacktrace ccs) = showStackFrames ccs
 
 -- | How to collect a backtrace when an exception is thrown.
 data BacktraceMechanism
-    = CostCenterBacktraceMech
-      -- ^ collect a cost center stacktrace (only available when built with profiling)
-    | ExecutionStackBacktraceMech (Maybe Int)
-      -- ^ use execution stack unwinding with given limit
+  = -- | collect a cost center stacktrace (only available when built with profiling)
+    CostCenterBacktraceMech
+  | -- | use execution stack unwinding with given limit
+    ExecutionStackBacktraceMech (Maybe Int)
 
 showBacktraces :: [Backtrace] -> String
 showBacktraces bts = unlines $ intersperse "" $ map show bts
 
-currentBacktraceMechanism :: IORef [BacktraceMechanism]
-currentBacktraceMechanism = unsafePerformIO $ newIORef []
-{-# NOINLINE currentBacktraceMechanism #-}
+currentBacktraceMechanisms :: IORef [BacktraceMechanism]
+currentBacktraceMechanisms = unsafePerformIO $ newIORef []
+{-# NOINLINE currentBacktraceMechanisms #-}
 
 -- | Set how 'Control.Exception.throwIO', et al. collect backtraces.
-setGlobalBacktraceMechanism :: [BacktraceMechanism] -> IO ()
-setGlobalBacktraceMechanism = writeIORef currentBacktraceMechanism
+setDefaultBacktraceMechanisms :: [BacktraceMechanism] -> IO ()
+setDefaultBacktraceMechanisms = writeIORef currentBacktraceMechanisms
 
 -- | Returns the currently selected 'BacktraceMechanism'.
-getGlobalBacktraceMechanism :: IO [BacktraceMechanism]
-getGlobalBacktraceMechanism = readIORef currentBacktraceMechanism
+getDefaultBacktraceMechanisms :: IO [BacktraceMechanism]
+getDefaultBacktraceMechanisms = readIORef currentBacktraceMechanisms
 
 -- | Collect a 'Backtrace' via the current global 'BacktraceMechanism'. See
--- 'setGlobalBacktraceMechanism'.
-collectBacktrace :: IO [Backtrace]
-collectBacktrace = do
-    mech <- getGlobalBacktraceMechanism
-    catMaybes `fmap` mapM collectBacktrace' mech
+-- 'setDefaultBacktraceMechanisms'.
+collectBacktraces :: IO [Backtrace]
+collectBacktraces = do
+  mech <- getDefaultBacktraceMechanisms
+  catMaybes `fmap` mapM collectBacktraces' mech
 
 -- | Collect a 'Backtrace' via the given 'BacktraceMechanism'.
-collectBacktrace' :: BacktraceMechanism -> IO (Maybe Backtrace)
-collectBacktrace' CostCenterBacktraceMech = do
-    ptr <- getCurrentCCS ()
-    -- TODO: is the unit here safe? Is this dummy argument really needed? Why
-    -- isn't the state token sufficient?
-    return $ if ptr == nullPtr then Nothing else Just (CostCenterBacktrace ptr)
+collectBacktraces' :: BacktraceMechanism -> IO (Maybe Backtrace)
+collectBacktraces' CostCenterBacktraceMech = do
+  ptr <- getCurrentCCS ()
+  -- TODO: is the unit here safe? Is this dummy argument really needed? Why
+  -- isn't the state token sufficient?
+  return $ if ptr == nullPtr then Nothing else Just (CostCenterBacktrace ptr)
 -- TODO: (Ptr GHC.Stack.CCS.CostCentreStack) really not needed here?
-collectBacktrace' (ExecutionStackBacktraceMech _) = fmap ExecutionBacktrace `fmap` getStackTrace
+collectBacktraces' (ExecutionStackBacktraceMech _) = fmap ExecutionBacktrace `fmap` getStackTrace

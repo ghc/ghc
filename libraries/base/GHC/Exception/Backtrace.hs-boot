@@ -3,7 +3,7 @@
 module GHC.Exception.Backtrace
     ( Backtrace
     , showBacktraces
-    , collectBacktrace
+    , collectBacktraces
     ) where
 
 import GHC.Base
@@ -12,4 +12,4 @@ data Backtrace
 
 showBacktraces :: [Backtrace] -> String
 
-collectBacktrace :: IO [Backtrace]
+collectBacktraces :: IO [Backtrace]

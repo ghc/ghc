@@ -46,7 +46,7 @@ module GHC.IO (
 import GHC.Base
 import GHC.ST
 import GHC.Exception
-import {-# SOURCE #-} GHC.Exception.Backtrace (collectBacktrace)
+import {-# SOURCE #-} GHC.Exception.Backtrace (collectBacktraces)
 import GHC.Show
 import GHC.IO.Unsafe
 import Unsafe.Coerce ( unsafeCoerce )
@@ -221,7 +221,7 @@ mplusIO m n = m `catchException` \ (_ :: IOError) -> n
 -- does not.
 throwIO :: Exception e => e -> IO a
 throwIO e = do
-    bts <- collectBacktrace
+    bts <- collectBacktraces
     let e' = foldr addBacktrace (toException e) bts
     IO (raiseIO# e')
 

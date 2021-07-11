@@ -42,7 +42,7 @@ import Data.List (intercalate, reverse) -- TODO: remove import list?
 import GHC.Prim
 import GHC.IO.Unsafe
 import {-# SOURCE #-} GHC.Stack.CCS
-import {-# SOURCE #-} GHC.Exception.Backtrace (collectBacktrace)
+import {-# SOURCE #-} GHC.Exception.Backtrace (collectBacktraces)
 import GHC.Exception.Type
 
 -- | Throw an exception.  Exceptions may be thrown from purely
@@ -50,7 +50,7 @@ import GHC.Exception.Type
 throw :: forall (r :: RuntimeRep). forall (a :: TYPE r). forall e.
          Exception e => e -> a
 throw e = runRW# (\s0 ->
-    case unIO collectBacktrace s0 of
+    case unIO collectBacktraces s0 of
       (# _, bts #) ->
         let e' = foldr addBacktrace (toException e) bts
         in raise# e' )
