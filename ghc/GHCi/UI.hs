@@ -286,18 +286,18 @@ flagWordBreakChars :: String
 flagWordBreakChars = " \t\n"
 
 
-keepGoing :: (String -> GHCi ()) -> (String -> InputT GHCi Bool)
+keepGoing :: (String -> GHCi ()) -> (String -> InputT GHCi CmdExecOutcome)
 keepGoing a str = keepGoing' (lift . a) str
 
-keepGoing' :: Monad m => (String -> m ()) -> String -> m Bool
-keepGoing' a str = a str >> return False
+keepGoing' :: Monad m => (String -> m ()) -> String -> m CmdExecOutcome
+keepGoing' a str = a str >> return CmdSuccess
 
-keepGoingPaths :: ([FilePath] -> InputT GHCi ()) -> (String -> InputT GHCi Bool)
+keepGoingPaths :: ([FilePath] -> InputT GHCi ()) -> (String -> InputT GHCi CmdExecOutcome)
 keepGoingPaths a str
  = do case toArgsNoLoc str of
           Left err -> liftIO $ hPutStrLn stderr err
           Right args -> a args
-      return False
+      return CmdSuccess
 
 defShortHelpText :: String
 defShortHelpText = "use :? for help.\n"
@@ -1104,8 +1104,9 @@ runOneCommand eh gCmd = do
     -- command
     doCommand stmt | stmt'@(':' : cmd) <- removeSpaces stmt = do
       (stats, result) <- runWithStats (const Nothing) $ specialCommand cmd
-      let processResult True = Nothing
-          processResult False = Just True
+      let processResult CleanExit = Nothing
+          processResult CmdSuccess = Just True
+          processResult CmdFailure = Just False
       return $ CommandComplete stmt' (processResult <$> result) stats
 
     -- haskell
@@ -1392,7 +1393,7 @@ printTypeOfName n
 data MaybeCommand = GotCommand Command | BadCommand | NoLastCommand
 
 -- | Entry point for execution a ':<command>' input from user
-specialCommand :: String -> InputT GHCi Bool
+specialCommand :: String -> InputT GHCi CmdExecOutcome
 specialCommand ('!':str) = lift $ shellEscape (dropWhile isSpace str)
 specialCommand str = do
   let (cmd,rest) = break isSpace str
@@ -1403,14 +1404,18 @@ specialCommand str = do
     BadCommand ->
       do liftIO $ hPutStr stdout ("unknown command ':" ++ cmd ++ "'\n"
                            ++ htxt)
-         return False
+         return CmdFailure
     NoLastCommand ->
       do liftIO $ hPutStr stdout ("there is no last command to perform\n"
                            ++ htxt)
-         return False
+         return CmdFailure
 
-shellEscape :: MonadIO m => String -> m Bool
-shellEscape str = liftIO (system str >> return False)
+shellEscape :: MonadIO m => String -> m CmdExecOutcome
+shellEscape str = liftIO $ do
+  exitCode <- system str
+  case exitCode of
+    ExitSuccess -> return CmdSuccess
+    ExitFailure _ -> return CmdFailure
 
 lookupCommand :: GhciMonad m => String -> m (MaybeCommand)
 lookupCommand "" = do
@@ -1771,12 +1776,12 @@ runMacro
   :: GhciMonad m
   => GHC.ForeignHValue  -- String -> IO String
   -> String
-  -> m Bool
+  -> m CmdExecOutcome
 runMacro fun s = do
   interp <- hscInterp <$> GHC.getSession
   str <- liftIO $ evalStringToIOString interp fun s
   enqueueCommands (lines str)
-  return False
+  return CmdSuccess
 
 
 -----------------------------------------------------------------------------
@@ -2401,8 +2406,8 @@ kindOfType norm str = handleSourceError GHC.printException $ do
 -----------------------------------------------------------------------------
 -- :quit
 
-quit :: Monad m => String -> m Bool
-quit _ = return True
+quit :: Monad m => String -> m CmdExecOutcome
+quit _ = return CleanExit
 
 
 -----------------------------------------------------------------------------
