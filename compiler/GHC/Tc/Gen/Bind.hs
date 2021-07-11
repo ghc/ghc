@@ -207,7 +207,7 @@ tcCompleteSigs sigs =
       -- combinations are invalid it will be found so at match sites.
       -- There it is also where we consider if the type of the pattern match is
       -- compatible with the result type constructor 'mb_tc'.
-      doOne (L loc c@(CompleteMatchSig _ext _src_txt (L _ ns) mb_tc_nm))
+      doOne (L loc c@(CompleteMatchSig _ext _src_txt (L _ (Annotated ns)) mb_tc_nm))
         = fmap Just $ setSrcSpanA loc $ addErrCtxt (text "In" <+> ppr c) $ do
             cls   <- mkUniqDSet <$> mapM (addLocMA tcLookupConLike) ns
             mb_tc <- traverse @Maybe tcLookupLocatedTyCon mb_tc_nm
@@ -1355,7 +1355,7 @@ switch to inference when we have no signature for any of the binders.
 -- it; hence the TcMonoBind data type in which the LHS is done but the RHS isn't
 
 data TcMonoBind         -- Half completed; LHS done, RHS not done
-  = TcFunBind  MonoBindInfo  SrcSpan (MatchGroup GhcRn (LHsExpr GhcRn))
+  = TcFunBind  MonoBindInfo  SrcSpan (MatchGroup SrcSpanAnnL SrcSpanAnnA GhcRn (LHsExpr GhcRn))
   | TcPatBind [MonoBindInfo] (LPat GhcTc) (GRHSs GhcRn (LHsExpr GhcRn))
               TcSigmaType
 

@@ -599,7 +599,7 @@ ppr_expr (HsLamCase _ matches)
   = sep [ sep [text "\\case"],
           nest 2 (pprMatches matches) ]
 
-ppr_expr (HsCase _ expr matches@(MG { mg_alts = L _ alts }))
+ppr_expr (HsCase _ expr matches@(MG { mg_alts = L _ (Annotated alts) }))
   = sep [ sep [text "case", nest 4 (ppr expr), text "of"],
           pp_alts ]
   where
@@ -1251,27 +1251,27 @@ instance (OutputableBndrId pr, Outputable body)
             => Outputable (Match (GhcPass pr) body) where
   ppr = pprMatch
 
-isEmptyMatchGroup :: MatchGroup (GhcPass p) body -> Bool
-isEmptyMatchGroup (MG { mg_alts = ms }) = null $ unLoc ms
+isEmptyMatchGroup :: MatchGroup annoL anno (GhcPass p) body -> Bool
+isEmptyMatchGroup (MG { mg_alts = ms }) = null $ unAnnotate $ unLoc ms
 
 -- | Is there only one RHS in this list of matches?
-isSingletonMatchGroup :: [LMatch (GhcPass p) body] -> Bool
+isSingletonMatchGroup :: [LAnnoMatch anno (GhcPass p) body] -> Bool
 isSingletonMatchGroup matches
-  | [L _ match] <- matches
+  | [L _ (Annotated match)] <- matches
   , Match { m_grhss = GRHSs { grhssGRHSs = [_] } } <- match
   = True
   | otherwise
   = False
 
-matchGroupArity :: MatchGroup (GhcPass id) body -> Arity
+matchGroupArity :: MatchGroup annoL SrcSpanAnnA (GhcPass id) body -> Arity
 -- Precondition: MatchGroup is non-empty
 -- This is called before type checking, when mg_arg_tys is not set
 matchGroupArity (MG { mg_alts = alts })
-  | L _ (alt1:_) <- alts = length (hsLMatchPats alt1)
+  | L _ (Annotated (alt1:_)) <- alts = length (hsLMatchPats alt1)
   | otherwise        = panic "matchGroupArity"
 
-hsLMatchPats :: LMatch (GhcPass id) body -> [LPat (GhcPass id)]
-hsLMatchPats (L _ (Match { m_pats = pats })) = pats
+hsLMatchPats :: LAnnoMatch SrcSpanAnnA (GhcPass id) body -> [LPat (GhcPass id)]
+hsLMatchPats (L _ (Annotated (Match { m_pats = pats }))) = pats
 
 type instance XCGRHSs (GhcPass _) _ = NoExtField
 type instance XXGRHSs (GhcPass _) _ = NoExtCon
@@ -1289,14 +1289,14 @@ type instance XCGRHS (GhcPass _) _ = EpAnn GrhsAnn
 type instance XXGRHS (GhcPass _) b = NoExtCon
 
 pprMatches :: (OutputableBndrId idR, Outputable body)
-           => MatchGroup (GhcPass idR) body -> SDoc
+           => MatchGroup annoL anno (GhcPass idR) body -> SDoc
 pprMatches MG { mg_alts = matches }
-    = vcat (map pprMatch (map unLoc (unLoc matches)))
+    = vcat (map pprMatch (map (unAnnotate . unLoc) (unAnnotate $ unLoc matches)))
       -- Don't print the type; it's only a place-holder before typechecking
 
 -- Exported to GHC.Hs.Binds, which can't see the defn of HsMatchContext
 pprFunBind :: (OutputableBndrId idR)
-           => MatchGroup (GhcPass idR) (LHsExpr (GhcPass idR)) -> SDoc
+           => MatchGroup SrcSpanAnnL SrcSpanAnnA (GhcPass idR) (LHsExpr (GhcPass idR)) -> SDoc
 pprFunBind matches = pprMatches matches
 
 -- Exported to GHC.Hs.Binds, which can't see the defn of HsMatchContext
@@ -1908,17 +1908,11 @@ pprStmtInCtxt ctxt stmt
 -}
 
 type instance Anno (HsExpr (GhcPass p)) = SrcSpanAnnA
-type instance Anno [LocatedA ((StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsExpr (GhcPass pr)))))] = SrcSpanAnnL
-type instance Anno [LocatedA ((StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsCmd (GhcPass pr)))))] = SrcSpanAnnL
 
 type instance Anno (HsCmd (GhcPass p)) = SrcSpanAnnA
 
-type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsCmd (GhcPass pr))))]
-  = SrcSpanAnnL
 type instance Anno (HsCmdTop (GhcPass p)) = SrcSpan
-type instance Anno [LocatedA (Match (GhcPass p) (LocatedA (HsExpr (GhcPass p))))] = SrcSpanAnnL
 type instance Anno [LocatedA (Match (GhcPass p) (LocatedA (HsCmd  (GhcPass p))))] = SrcSpanAnnL
-type instance Anno (Match (GhcPass p) (LocatedA (HsExpr (GhcPass p)))) = SrcSpanAnnA
 type instance Anno (Match (GhcPass p) (LocatedA (HsCmd  (GhcPass p)))) = SrcSpanAnnA
 type instance Anno (GRHS (GhcPass p) (LocatedA (HsExpr (GhcPass p)))) = SrcSpan
 type instance Anno (GRHS (GhcPass p) (LocatedA (HsCmd  (GhcPass p)))) = SrcSpan
@@ -1926,9 +1920,6 @@ type instance Anno (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsExpr (GhcPass 
 type instance Anno (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsCmd  (GhcPass pr)))) = SrcSpanAnnA
 
 type instance Anno (HsSplice (GhcPass p)) = SrcSpanAnnA
-
-type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsExpr (GhcPass pr))))] = SrcSpanAnnL
-type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsCmd  (GhcPass pr))))] = SrcSpanAnnL
 
 type instance Anno (FieldLabelStrings (GhcPass p)) = SrcSpan
 type instance Anno (FieldLabelString) = SrcSpan

@@ -1046,7 +1046,7 @@ renameSig ctxt sig@(SCCFunSig _ st v s)
 
 -- COMPLETE Sigs can refer to imported IDs which is why we use
 -- lookupLocatedOccRn rather than lookupSigOccRn
-renameSig _ctxt sig@(CompleteMatchSig _ s (L l bf) mty)
+renameSig _ctxt sig@(CompleteMatchSig _ s (L l (Annotated bf)) mty)
   = do new_bf <- traverse lookupLocatedOccRn bf
        new_mty  <- traverse lookupLocatedOccRn mty
 
@@ -1055,7 +1055,7 @@ renameSig _ctxt sig@(CompleteMatchSig _ s (L l bf) mty)
          -- Why 'any'? See Note [Orphan COMPLETE pragmas]
          addErrCtxt (text "In" <+> ppr sig) $ failWithTc orphanError
 
-       return (CompleteMatchSig noAnn s (L l new_bf) new_mty, emptyFVs)
+       return (CompleteMatchSig noAnn s (L l (Annotated new_bf)) new_mty, emptyFVs)
   where
     orphanError :: TcRnMessage
     orphanError = TcRnUnknownMessage $ mkPlainError noHints $
@@ -1177,20 +1177,16 @@ checkDupMinimalSigs sigs
 -}
 
 type AnnoBody body
-  = ( Anno [LocatedA (Match GhcRn (LocatedA (body GhcRn)))] ~ SrcSpanAnnL
-    , Anno [LocatedA (Match GhcPs (LocatedA (body GhcPs)))] ~ SrcSpanAnnL
-    , Anno (Match GhcRn (LocatedA (body GhcRn))) ~ SrcSpanAnnA
-    , Anno (Match GhcPs (LocatedA (body GhcPs))) ~ SrcSpanAnnA
-    , Anno (GRHS GhcRn (LocatedA (body GhcRn))) ~ SrcSpan
+  = ( Anno (GRHS GhcRn (LocatedA (body GhcRn))) ~ SrcSpan
     , Anno (GRHS GhcPs (LocatedA (body GhcPs))) ~ SrcSpan
     , Outputable (body GhcPs)
     )
 
 rnMatchGroup :: (Outputable (body GhcPs), AnnoBody body) => HsMatchContext GhcRn
              -> (LocatedA (body GhcPs) -> RnM (LocatedA (body GhcRn), FreeVars))
-             -> MatchGroup GhcPs (LocatedA (body GhcPs))
-             -> RnM (MatchGroup GhcRn (LocatedA (body GhcRn)), FreeVars)
-rnMatchGroup ctxt rnBody (MG { mg_alts = L lm ms, mg_origin = origin })
+             -> MatchGroup SrcSpanAnnL SrcSpanAnnA GhcPs (LocatedA (body GhcPs))
+             -> RnM (MatchGroup SrcSpanAnnL SrcSpanAnnA GhcRn (LocatedA (body GhcRn)), FreeVars)
+rnMatchGroup ctxt rnBody (MG { mg_alts = L lm (Annotated ms), mg_origin = origin })
   = do { empty_case_ok <- xoptM LangExt.EmptyCase
        ; when (null ms && not empty_case_ok) (addErr (emptyCaseErr ctxt))
        ; (new_ms, ms_fvs) <- mapFvRn (rnMatch ctxt rnBody) ms
@@ -1199,23 +1195,23 @@ rnMatchGroup ctxt rnBody (MG { mg_alts = L lm ms, mg_origin = origin })
 rnMatch :: AnnoBody body
         => HsMatchContext GhcRn
         -> (LocatedA (body GhcPs) -> RnM (LocatedA (body GhcRn), FreeVars))
-        -> LMatch GhcPs (LocatedA (body GhcPs))
-        -> RnM (LMatch GhcRn (LocatedA (body GhcRn)), FreeVars)
+        -> LAnnoMatch SrcSpanAnnA GhcPs (LocatedA (body GhcPs))
+        -> RnM (LAnnoMatch SrcSpanAnnA GhcRn (LocatedA (body GhcRn)), FreeVars)
 rnMatch ctxt rnBody = wrapLocFstMA (rnMatch' ctxt rnBody)
 
 rnMatch' :: (AnnoBody body)
          => HsMatchContext GhcRn
          -> (LocatedA (body GhcPs) -> RnM (LocatedA (body GhcRn), FreeVars))
-         -> Match GhcPs (LocatedA (body GhcPs))
-         -> RnM (Match GhcRn (LocatedA (body GhcRn)), FreeVars)
-rnMatch' ctxt rnBody (Match { m_ctxt = mf, m_pats = pats, m_grhss = grhss })
+         -> AnnoMatch anno GhcPs (LocatedA (body GhcPs))
+         -> RnM (AnnoMatch anno GhcRn (LocatedA (body GhcRn)), FreeVars)
+rnMatch' ctxt rnBody (Annotated Match { m_ctxt = mf, m_pats = pats, m_grhss = grhss })
   = rnPats ctxt pats $ \ pats' -> do
         { (grhss', grhss_fvs) <- rnGRHSs ctxt rnBody grhss
         ; let mf' = case (ctxt, mf) of
                       (FunRhs { mc_fun = L _ funid }, FunRhs { mc_fun = L lf _ })
                                             -> mf { mc_fun = L lf funid }
                       _                     -> ctxt
-        ; return (Match { m_ext = noAnn, m_ctxt = mf', m_pats = pats'
+        ; return (Annotated Match { m_ext = noAnn, m_ctxt = mf', m_pats = pats'
                         , m_grhss = grhss'}, grhss_fvs ) }
 
 emptyCaseErr :: HsMatchContext GhcRn -> TcRnMessage
