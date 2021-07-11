@@ -247,6 +247,7 @@ test('T13468',
 test('T13543', only_ways(['optasm']), compile, ['-ddump-str-signatures -ddump-cpr-signatures'])
 test('T11272', normal, makefile_test, ['T11272'])
 test('T12600', normal, makefile_test, ['T12600'])
+test('T13157', normal, compile, ['-ddump-simpl -dno-typeable-binds -dsuppress-uniques -dsuppress-all -O'])
 test('T13658', normal, compile, ['-dcore-lint'])
 test('T14779a', normal, compile, ['-dcore-lint'])
 test('T14779b', normal, compile, ['-dcore-lint'])
