@@ -215,17 +215,20 @@ instance Outputable TyLit where
 
 {- Note [Function types]
 ~~~~~~~~~~~~~~~~~~~~~~~~
-FFunTy is the constructor for a function type.  Lots of things to say
-about it!
-
-* FFunTy is the data constructor, meaning "full function type".
+FunTy is the constructor for a function type.  Here are the details:
 
 * The function type constructor (->) has kind
-     (->) :: forall {r1} {r2}. TYPE r1 -> TYPE r2 -> Type LiftedRep
+     (->) :: forall (m :: Multiplicity) ->
+             forall {r1 :: RuntimeRep} {r2 :: RuntimeRep}.
+             TYPE r1 ->
+             TYPE r2 ->
+             Type
   mkTyConApp ensure that we convert a saturated application
-    TyConApp (->) [r1,r2,t1,t2] into FunTy t1 t2
+    TyConApp (->) [m,r1,r2,t1,t2] into FunTy VisArg m t1 t2
   dropping the 'r1' and 'r2' arguments; they are easily recovered
-  from 't1' and 't2'.
+  from 't1' and 't2'. The visibility is always VisArg, because
+  we build constraint arrows (=>) with e.g. mkPhiTy and friends,
+  never `mkTyConApp funTyCon args`.
 
 * For the time being its RuntimeRep quantifiers are left
   inferred. This is to allow for it to evolve.
@@ -239,9 +242,6 @@ about it!
   This visibility info makes no difference in Core; it matters
   only when we regard the type as a Haskell source type.
 
-* FunTy is a (unidirectional) pattern synonym that allows
-  positional pattern matching (FunTy arg res), ignoring the
-  ArgFlag.
 -}
 
 {- -----------------------
