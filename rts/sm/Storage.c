@@ -1819,90 +1819,9 @@ void markExec(W_ bytes, AdjustorWritable writ) {
 void freeWrite(W_ bytes, AdjustorWritable writ) {
     munmap(writ, bytes);
 }
-#endif
+#endif /* RTS_LINKER_USE_MMAP */
 
-#if defined(linux_HOST_OS) || defined(netbsd_HOST_OS)
-
-// On Linux we need to use libffi for allocating executable memory,
-// because it knows how to work around the restrictions put in place
-// by SELinux. The same goes for NetBSD where it is prohibited to
-// mark a page mapping both writable and executable at the same time.
-
-AdjustorWritable allocateExec (W_ bytes, AdjustorExecutable *exec_ret)
-{
-    void **ret, **exec;
-    ACQUIRE_SM_LOCK;
-    ret = ffi_closure_alloc (sizeof(void *) + (size_t)bytes, (void**)&exec);
-    RELEASE_SM_LOCK;
-    if (ret == NULL) return ret;
-    *ret = ret; // save the address of the writable mapping, for freeExec().
-    *exec_ret = exec + 1;
-    return (ret + 1);
-}
-
-// freeExec gets passed the executable address, not the writable address.
-void freeExec (AdjustorExecutable addr)
-{
-    AdjustorWritable writable;
-    writable = *((void**)addr - 1);
-    ACQUIRE_SM_LOCK;
-    ffi_closure_free (writable);
-    RELEASE_SM_LOCK
-}
-
-#elif defined(USE_LIBFFI_FOR_ADJUSTORS) && defined(darwin_HOST_OS)
-
-static HashTable* allocatedExecs;
-
-AdjustorWritable allocateExec(W_ bytes, AdjustorExecutable *exec_ret)
-{
-    AdjustorWritable writ;
-    ffi_closure* cl;
-    // This check is necessary as we can't use allocateExec for anything *but*
-    // ffi_closures on ios/darwin on arm.  libffi does some heavy lifting to
-    // get around the X^W restrictions, and we can't just use this codepath
-    // to allocate generic executable space. For those cases we have to refer
-    // back to allocateWrite/markExec/freeWrite (see above.)
-    if (bytes != sizeof(ffi_closure)) {
-        barf("allocateExec: for ffi_closure only");
-    }
-    ACQUIRE_SM_LOCK;
-    cl = writ = ffi_closure_alloc((size_t)bytes, exec_ret);
-    if (cl != NULL) {
-        if (allocatedExecs == NULL) {
-            allocatedExecs = allocHashTable();
-        }
-        insertHashTable(allocatedExecs, (StgWord)*exec_ret, writ);
-    }
-    RELEASE_SM_LOCK;
-    return writ;
-}
-
-AdjustorWritable execToWritable(AdjustorExecutable exec)
-{
-    AdjustorWritable writ;
-    ACQUIRE_SM_LOCK;
-    if (allocatedExecs == NULL ||
-       (writ = lookupHashTable(allocatedExecs, (StgWord)exec)) == NULL) {
-        RELEASE_SM_LOCK;
-        barf("execToWritable: not found");
-    }
-    RELEASE_SM_LOCK;
-    return writ;
-}
-
-void freeExec(AdjustorExecutable exec)
-{
-    AdjustorWritable writ;
-    ffi_closure* cl;
-    cl = writ = execToWritable(exec);
-    ACQUIRE_SM_LOCK;
-    removeHashTable(allocatedExecs, (StgWord)exec, writ);
-    ffi_closure_free(cl);
-    RELEASE_SM_LOCK
-}
-
-#else
+#if !defined(USE_LIBFFI_FOR_ADJUSTORS)
 
 AdjustorWritable allocateExec (W_ bytes, AdjustorExecutable *exec_ret)
 {
