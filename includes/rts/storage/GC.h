@@ -205,9 +205,6 @@ typedef void* AdjustorExecutable;
 
 AdjustorWritable allocateExec(W_ len, AdjustorExecutable *exec_addr);
 void flushExec(W_ len, AdjustorExecutable exec_addr);
-#if defined(darwin_HOST_OS)
-AdjustorWritable execToWritable(AdjustorExecutable exec);
-#endif
 #if RTS_LINKER_USE_MMAP
 AdjustorWritable allocateWrite(W_ bytes);
 void markExec(W_ bytes, AdjustorWritable writ);

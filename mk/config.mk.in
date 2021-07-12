@@ -181,16 +181,6 @@ else
 GhcWithInterpreter=$(if $(findstring YES,$(DYNAMIC_GHC_PROGRAMS)),YES,NO)
 endif
 
-# Whether to use libffi for adjustors (foreign import "wrapper") or
-# not.  If we have built-in support (rts/Adjustor.c) then we use that,
-# otherwise we fall back on libffi, which is slightly slower.
-ArchHasAdjustorSupport = $(if $(findstring $(TargetArch_CPP),i386 x86_64),YES,NO)
-ifeq "$(ArchHasAdjustorSupport)" "YES"
-UseLibFFIForAdjustors=NO
-else
-UseLibFFIForAdjustors=YES
-endif
-
 # On Windows we normally want to make a relocatable bindist, to we
 # ignore flags like libdir
 ifeq "$(Windows_Host)" "YES"
@@ -332,6 +322,8 @@ UseSystemLibFFI=@UseSystemLibFFI@
 # Flags to go into package.conf for rts
 FFILibDir=@FFILibDir@
 FFIIncludeDir=@FFIIncludeDir@
+
+UseLibffiForAdjustors=@UseLibffiForAdjustors@
 
 UseLibdw=@UseLibdw@
 LibdwLibDir=@LibdwLibDir@
