@@ -1280,6 +1280,60 @@ case ${TargetOS} in
 AC_DEFINE_UNQUOTED([RTS_LINKER_USE_MMAP], [$RtsLinkerUseMmap],
                    [Use mmap in the runtime linker])
 
+
+dnl ** Use libffi for adjustors?
+dnl --------------------------------------------------------------
+
+case ${TargetArch} in
+    i386|x86_64)
+        # We have native adjustor support on these platforms
+        HaveNativeAdjustor=yes
+        ;;
+    *)
+        HaveNativeAdjustor=no
+        ;;
+esac
+
+AC_ARG_ENABLE(libffi-adjustors,
+    [AS_HELP_STRING(
+        [--enable-libffi-adjustors],
+        [Force use of libffi for adjustors, even on platforms which have support for more efficient, native adjustors.])],
+    UseLibffiForAdjustors=$enableval,
+    dnl do nothing
+)
+
+AC_MSG_CHECKING([whether to use libffi for adjustors])
+AC_MSG_RESULT([$UseLibffiForAdjustors])
+if test "$UseLibffiForAdjustors" = "yes" ; then
+    # Use libffi is the user explicitly requested it
+    AdjustorType="libffi"
+elif test "$HaveNativeAdjustor" = "yes"; then
+    # Otherwise if we have a native adjustor implementation use that
+    AdjustorType="native"
+else
+    # If we don't have a native adjustor implementation then default to libffi
+    AdjustorType="libffi"
+fi
+
+case "$AdjustorType" in
+libffi)
+    CabalLibffiAdjustors=True
+    UseLibffiForAdjustors=YES
+    ;;
+native)
+    CabalLibffiAdjustors=False
+    UseLibffiForAdjustors=NO
+    ;;
+*)
+    AC_MSG_ERROR([Internal error: Invalid AdjustorType])
+    exit 1
+esac
+
+AC_SUBST([CabalLibffiAdjustors])
+AC_SUBST([UseLibffiForAdjustors])
+
+dnl ** Other RTS features
+dnl --------------------------------------------------------------
 FP_FIND_LIBDW
 FP_FIND_LIBNUMA
 
