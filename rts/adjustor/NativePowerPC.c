@@ -401,8 +401,5 @@ freeHaskellFunctionPtr(void* ptr)
     freeStablePtr(((AdjustorStub*)ptr)->hptr);
 #endif
 
-    // Can't write to this memory, it is only executable:
-    // *((unsigned char*)ptr) = '\0';
-
     freeExec(ptr);
 }
