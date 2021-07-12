@@ -43,7 +43,7 @@ import Data.Bits
 import Data.Maybe
 
 #if WORD_SIZE_IN_BITS < 64
-import GHC.IntWord64
+import GHC.Prim
 #endif
 
 import GHC.Base
@@ -52,7 +52,6 @@ import GHC.Num
 import GHC.Real
 import GHC.Read
 import GHC.Arr
-import GHC.Word hiding (uncheckedShiftL64#, uncheckedShiftRL64#)
 import GHC.Show
 
 ------------------------------------------------------------------------
@@ -109,6 +108,7 @@ instance Num Int8 where
     signum x | x > 0       = 1
     signum 0               = 0
     signum _               = -1
+    {-# INLINE fromInteger #-}
     fromInteger i          = I8# (intToInt8# (integerToInt# i))
 
 -- | @since 2.01
@@ -169,6 +169,7 @@ instance Integral Int8 where
         | y == (-1) && x == minBound = (overflowError, 0)
         | otherwise                  = case  x# `divModInt8#` y# of
                                        (# d, m #) -> (I8# d, I8# m)
+    {-# INLINE toInteger #-}
     toInteger (I8# x#)               = IS (int8ToInt# x#)
 
 -- | @since 2.01
@@ -231,12 +232,6 @@ instance FiniteBits Int8 where
     finiteBitSize _ = 8
     countLeadingZeros  (I8# x#) = I# (word2Int# (clz8# (int2Word# (int8ToInt# x#))))
     countTrailingZeros (I8# x#) = I# (word2Int# (ctz8# (int2Word# (int8ToInt# x#))))
-
-{-# RULES
-"fromIntegral/Int8->Int8" fromIntegral = id :: Int8 -> Int8
-"fromIntegral/a->Int8"    fromIntegral = \x -> case fromIntegral x of I# x# -> I8# (intToInt8# x#)
-"fromIntegral/Int8->a"    fromIntegral = \(I8# x#) -> fromIntegral (I# (int8ToInt# x#))
-  #-}
 
 {-# RULES
 "properFraction/Float->(Int8,Float)"
@@ -322,6 +317,7 @@ instance Num Int16 where
     signum x | x > 0       = 1
     signum 0               = 0
     signum _               = -1
+    {-# INLINE fromInteger #-}
     fromInteger i          = I16# (intToInt16# (integerToInt# i))
 
 -- | @since 2.01
@@ -382,6 +378,7 @@ instance Integral Int16 where
         | y == (-1) && x == minBound = (overflowError, 0)
         | otherwise                  = case x# `divModInt16#` y# of
                                        (# d, m #) -> (I16# d, I16# m)
+    {-# INLINE toInteger #-}
     toInteger (I16# x#)              = IS (int16ToInt# x#)
 
 -- | @since 2.01
@@ -446,14 +443,6 @@ instance FiniteBits Int16 where
     countTrailingZeros (I16# x#) = I# (word2Int# (ctz16# (int2Word# (int16ToInt# x#))))
 
 {-# RULES
-"fromIntegral/Word8->Int16"  fromIntegral = \(W8# x#) -> I16# (intToInt16# (word2Int# (word8ToWord# x#)))
-"fromIntegral/Int8->Int16"   fromIntegral = \(I8# x#) -> I16# (intToInt16# (int8ToInt# x#))
-"fromIntegral/Int16->Int16"  fromIntegral = id :: Int16 -> Int16
-"fromIntegral/a->Int16"      fromIntegral = \x -> case fromIntegral x of I# x# -> I16# (intToInt16# x#)
-"fromIntegral/Int16->a"      fromIntegral = \(I16# x#) -> fromIntegral (I# (int16ToInt# x#))
-  #-}
-
-{-# RULES
 "properFraction/Float->(Int16,Float)"
     properFraction = \x ->
                       case properFraction x of {
@@ -486,12 +475,6 @@ instance FiniteBits Int16 where
 ------------------------------------------------------------------------
 -- type Int32
 ------------------------------------------------------------------------
-
--- Int32 is represented in the same way as Int.
-#if WORD_SIZE_IN_BITS > 32
--- Operations may assume and must ensure that it holds only values
--- from its logical range.
-#endif
 
 data {-# CTYPE "HsInt32" #-} Int32 = I32# Int32#
 -- ^ 32-bit signed integer type
@@ -540,6 +523,7 @@ instance Num Int32 where
     signum x | x > 0       = 1
     signum 0               = 0
     signum _               = -1
+    {-# INLINE fromInteger #-}
     fromInteger i          = I32# (intToInt32# (integerToInt# i))
 
 -- | @since 2.01
@@ -600,6 +584,7 @@ instance Integral Int32 where
         | y == (-1) && x == minBound = (overflowError, 0)
         | otherwise                  = case x# `divModInt32#` y# of
                                        (# d, m #) -> (I32# d, I32# m)
+    {-# INLINE toInteger #-}
     toInteger (I32# x#)              = IS (int32ToInt# x#)
 
 -- | @since 2.01
@@ -652,16 +637,6 @@ instance FiniteBits Int32 where
     finiteBitSize _ = 32
     countLeadingZeros  (I32# x#) = I# (word2Int# (clz32# (int2Word# (int32ToInt# x#))))
     countTrailingZeros (I32# x#) = I# (word2Int# (ctz32# (int2Word# (int32ToInt# x#))))
-
-{-# RULES
-"fromIntegral/Word8->Int32"  fromIntegral = \(W8# x#) -> I32# (intToInt32# (word2Int# (word8ToWord# x#)))
-"fromIntegral/Word16->Int32" fromIntegral = \(W16# x#) -> I32# (intToInt32# (word2Int# (word16ToWord# x#)))
-"fromIntegral/Int8->Int32"   fromIntegral = \(I8# x#) -> I32# (intToInt32# (int8ToInt# x#))
-"fromIntegral/Int16->Int32"  fromIntegral = \(I16# x#) -> I32# (intToInt32# (int16ToInt# x#))
-"fromIntegral/Int32->Int32"  fromIntegral = id :: Int32 -> Int32
-"fromIntegral/a->Int32"      fromIntegral = \x -> case fromIntegral x of I# x# -> I32# (intToInt32# x#)
-"fromIntegral/Int32->a"      fromIntegral = \(I32# x#) -> fromIntegral (I# (int32ToInt# x#))
-  #-}
 
 {-# RULES
 "properFraction/Float->(Int32,Float)"
@@ -761,6 +736,7 @@ instance Num Int64 where
     signum x | x > 0       = 1
     signum 0               = 0
     signum _               = -1
+    {-# INLINE fromInteger #-}
     fromInteger i          = I64# (integerToInt64# i)
 
 -- | @since 2.01
@@ -819,7 +795,8 @@ instance Integral Int64 where
         | y == (-1) && x == minBound = (overflowError, 0)
         | otherwise                  = (I64# (x# `divInt64#` y#),
                                         I64# (x# `modInt64#` y#))
-    toInteger (I64# x)               = integerFromInt64# x
+    {-# INLINE toInteger #-}
+    toInteger (I64# x#)              = integerFromInt64# x#
 
 
 divInt64#, modInt64# :: Int64# -> Int64# -> Int64#
@@ -903,16 +880,6 @@ a `iShiftRA64#` b | isTrue# (b >=# 64#) = if isTrue# (a `ltInt64#` (intToInt64# 
                                           else intToInt64# 0#
                   | otherwise = a `uncheckedIShiftRA64#` b
 
-{-# RULES
-"fromIntegral/Int->Int64"    fromIntegral = \(I#   x#) -> I64# (intToInt64# x#)
-"fromIntegral/Word->Int64"   fromIntegral = \(W#   x#) -> I64# (word64ToInt64# (wordToWord64# x#))
-"fromIntegral/Word64->Int64" fromIntegral = \(W64# x#) -> I64# (word64ToInt64# x#)
-"fromIntegral/Int64->Int"    fromIntegral = \(I64# x#) -> I#   (int64ToInt# x#)
-"fromIntegral/Int64->Word"   fromIntegral = \(I64# x#) -> W#   (int2Word# (int64ToInt# x#))
-"fromIntegral/Int64->Word64" fromIntegral = \(I64# x#) -> W64# (int64ToWord64# x#)
-"fromIntegral/Int64->Int64"  fromIntegral = id :: Int64 -> Int64
-  #-}
-
 -- No RULES for RealFrac methods if Int is smaller than Int64, we can't
 -- go through Int and whether going through Integer is faster is uncertain.
 #else
@@ -968,6 +935,7 @@ instance Num Int64 where
     signum x | x > 0       = 1
     signum 0               = 0
     signum _               = -1
+    {-# INLINE fromInteger #-}
     fromInteger i          = I64# (integerToInt# i)
 
 -- | @since 2.01
@@ -1023,6 +991,7 @@ instance Integral Int64 where
         | otherwise                  = case x# `divModInt#` y# of
                                        (# d, m #) ->
                                            (I64# d, I64# m)
+    {-# INLINE toInteger #-}
     toInteger (I64# x#)              = IS x#
 
 -- | @since 2.01
@@ -1066,11 +1035,6 @@ instance Bits Int64 where
     popCount (I64# x#)         = I# (word2Int# (popCnt64# (int2Word# x#)))
     bit                        = bitDefault
     testBit                    = testBitDefault
-
-{-# RULES
-"fromIntegral/a->Int64" fromIntegral = \x -> case fromIntegral x of I# x# -> I64# x#
-"fromIntegral/Int64->a" fromIntegral = \(I64# x#) -> fromIntegral (I# x#)
-  #-}
 
 {-# RULES
 "properFraction/Float->(Int64,Float)"
@@ -1138,35 +1102,6 @@ instance Ix Int64 where
     inRange (m,n) i     = m <= i && i <= n
 
 -------------------------------------------------------------------------------
-
-{-# RULES
-"fromIntegral/Natural->Int8"
-    fromIntegral = (fromIntegral :: Int -> Int8)  . fromIntegral . naturalToWord
-"fromIntegral/Natural->Int16"
-    fromIntegral = (fromIntegral :: Int -> Int16) . fromIntegral . naturalToWord
-"fromIntegral/Natural->Int32"
-    fromIntegral = (fromIntegral :: Int -> Int32) . fromIntegral . naturalToWord
-  #-}
-
-{-# RULES
-"fromIntegral/Int8->Natural"
-    fromIntegral = naturalFromWord  . fromIntegral . (fromIntegral :: Int8  -> Int)
-"fromIntegral/Int16->Natural"
-    fromIntegral = naturalFromWord  . fromIntegral . (fromIntegral :: Int16 -> Int)
-"fromIntegral/Int32->Natural"
-    fromIntegral = naturalFromWord  . fromIntegral . (fromIntegral :: Int32 -> Int)
-  #-}
-
-#if WORD_SIZE_IN_BITS == 64
--- these RULES are valid for Word==Word64 & Int==Int64
-{-# RULES
-"fromIntegral/Natural->Int64"
-    fromIntegral = (fromIntegral :: Int -> Int64) . fromIntegral . naturalToWord
-"fromIntegral/Int64->Natural"
-    fromIntegral = naturalFromWord . fromIntegral . (fromIntegral :: Int64 -> Int)
-  #-}
-#endif
-
 
 {- Note [Order of tests]
 ~~~~~~~~~~~~~~~~~~~~~~~~~

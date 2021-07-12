@@ -25,10 +25,6 @@ import GHC.Num.Primitives
 import GHC.Num.WordArray
 import GHC.Num.Backend
 
-#if WORD_SIZE_IN_BITS < 64
-import GHC.IntWord64
-#endif
-
 default ()
 
 -- | A BigNat
