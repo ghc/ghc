@@ -332,8 +332,5 @@ void freeHaskellFunctionPtr(void* ptr)
         return;
     }
 
-    // Can't write to this memory, it is only executable:
-    // *((unsigned char*)ptr) = '\0';
-
     freeExec(ptr);
 }
