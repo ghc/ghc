@@ -586,13 +586,16 @@ library
     else
        c-sources: posix/GetEnv.c
                   posix/GetTime.c
-                  posix/Itimer.c
+                  posix/Ticker.c
                   posix/OSMem.c
                   posix/OSThreads.c
                   posix/Select.c
                   posix/Signals.c
                   posix/TTY.c
-                  -- posix/*.c -- we do not want itimer
+                  -- ticker/*.c
+                  -- We don't want to compile posix/ticker/*.c, these will be #included
+                  -- from Ticker.c
+
 
 -- Note [fd_set_overflow]
 -- ~~~~~~~~~~~~~~~~~~~~~~
