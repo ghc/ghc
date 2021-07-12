@@ -294,8 +294,6 @@ rtsPackageArgs = package rts ? do
                                                     , "-g3"
                                                     , "-O0" ]
 
-          , useLibFFIForAdjustors            ? arg "-DUSE_LIBFFI_FOR_ADJUSTORS"
-
           , inputs ["**/RtsMessages.c", "**/Trace.c"] ?
             arg ("-DProjectVersion=" ++ show projectVersion)
 
@@ -356,10 +354,11 @@ rtsPackageArgs = package rts ? do
     mconcat
         [ builder (Cabal Flags) ? mconcat
           [ any (wayUnit Profiling) rtsWays ? arg "profiling"
-          , any (wayUnit Debug) rtsWays ? arg "debug"
-          , any (wayUnit Logging) rtsWays ? arg "logging"
-          , any (wayUnit Dynamic) rtsWays ? arg "dynamic"
-          , Debug `wayUnit` way           ? arg "find-ptr"
+          , any (wayUnit Debug) rtsWays     ? arg "debug"
+          , any (wayUnit Logging) rtsWays   ? arg "logging"
+          , any (wayUnit Dynamic) rtsWays   ? arg "dynamic"
+          , useLibffiForAdjustors           ? arg "libffi-adjustors"
+          , Debug `wayUnit` way             ? arg "find-ptr"
           ]
         , builder (Cabal Setup) ? mconcat
           [ if not (null libdwLibraryDir) then arg ("--extra-lib-dirs="++libdwLibraryDir) else mempty
