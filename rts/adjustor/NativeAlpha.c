@@ -103,8 +103,5 @@ freeHaskellFunctionPtr(void* ptr)
     /* Free the stable pointer first..*/
     freeStablePtr(*((StgStablePtr*)((unsigned char*)ptr + 0x10)));
 
-    // Can't write to this memory, it is only executable:
-    // *((unsigned char*)ptr) = '\0';
-
     freeExec(ptr);
 }
