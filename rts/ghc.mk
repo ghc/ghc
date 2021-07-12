@@ -54,14 +54,30 @@ rts_CMM_SRCS := $(wildcard rts/*.cmm)
 
 # Don't compile .S files when bootstrapping a new arch
 ifneq "$(PORTING_HOST)" "YES"
-ifneq "$(findstring $(TargetArch_CPP), i386 powerpc powerpc64)" ""
-rts_S_SRCS += rts/AdjustorAsm.S
-endif
-# this matches substrings of powerpc64le, including "powerpc" and "powerpc64"
-ifneq "$(findstring $(TargetArch_CPP), powerpc64le s390x riscv64)" ""
+
 # unregisterised builds use the mini interpreter
 ifneq "$(GhcUnregisterised)" "YES"
 rts_S_SRCS += rts/StgCRunAsm.S
+endif
+
+# select adjustor implementation. This much match the logic in rts.cabal.in.
+ifeq "$(UseLibffiForAdjustors)" "YES"
+rts_C_SRCS += rts/adjustor/LibffiAdjustor.c
+else
+ifneq "$(findstring $(TargetArch_CPP), i386)" ""
+rts_S_SRCS += rts/AdjustorAsm.S
+rts_C_SRCS += rts/adjustor/Nativei386.c
+else
+ifneq "$(findstring $(TargetArch_CPP), x86_64)" ""
+rts_C_SRCS += rts/adjustor/NativeAmd64.c
+else
+ifneq "$(findstring $(TargetArch_CPP), powerpc64le powerpc)" ""
+rts_S_SRCS += rts/AdjustorAsm.S
+rts_C_SRCS += rts/adjustor/NativePowerPC.c
+else
+$(error Target architecture has no native adjustor implementation)
+endif
+endif
 endif
 endif
 endif
@@ -379,10 +395,6 @@ rts_HC_OPTS += $(STANDARD_OPTS) -this-unit-id rts
 ifneq "$(GhcWithSMP)" "YES"
 rts_CC_OPTS += -DNOSMP
 rts_HC_OPTS += -optc-DNOSMP
-endif
-
-ifeq "$(UseLibFFIForAdjustors)" "YES"
-rts_CC_OPTS += -DUSE_LIBFFI_FOR_ADJUSTORS
 endif
 
 # We *want* type-checking of hand-written cmm.

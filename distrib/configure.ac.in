@@ -31,6 +31,9 @@ LibdwLibDir=@LibdwLibDir@
 AC_SUBST(LibdwLibDir)
 AC_SUBST(LibdwIncludeDir)
 
+UseLibffiForAdjustors=@UseLibffiForAdjustors@
+AC_SUBST(UseLibffiForAdjustors)
+
 # We have to run these unconditionally as FPTOOLS_SET_PLATFORM_VARS wants the
 # values it computes.
 AC_CANONICAL_BUILD

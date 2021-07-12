@@ -2,7 +2,7 @@
 
 module Oracles.Flag (
     Flag (..), flag, getFlag, platformSupportsSharedLibs,
-    targetSupportsSMP
+    targetSupportsSMP, useLibffiForAdjustors
     ) where
 
 import Hadrian.Oracles.TextFile
@@ -26,6 +26,7 @@ data Flag = ArSupportsAtFile
           | UseSystemFfi
           | BootstrapThreadedRts
           | SystemDistroMINGW
+          | UseLibffiForAdjustors
 
 -- Note, if a flag is set to empty string we treat it as set to NO. This seems
 -- fragile, but some flags do behave like this.
@@ -47,6 +48,7 @@ flag f = do
             UseSystemFfi         -> "use-system-ffi"
             BootstrapThreadedRts -> "bootstrap-threaded-rts"
             SystemDistroMINGW    -> "system-use-distro-mingw"
+            UseLibffiForAdjustors -> "use-libffi-for-adjustors"
     value <- lookupValueOrError configFile key
     when (value `notElem` ["YES", "NO", ""]) . error $ "Configuration flag "
         ++ quote (key ++ " = " ++ value) ++ " cannot be parsed."
@@ -88,3 +90,6 @@ targetSupportsSMP = do
      , ver < ARMv7          -> return False
      | goodArch             -> return True
      | otherwise            -> return False
+
+useLibffiForAdjustors :: Action Bool
+useLibffiForAdjustors = flag UseLibffiForAdjustors
