@@ -57,6 +57,52 @@ extern void *adjustorCode;
 #endif
 
 #if defined(USE_LIBFFI_FOR_ADJUSTORS)
+
+/* Maps AdjustorExecutable* to AdjustorWritable*. */
+static HashTable* allocatedExecs;
+
+static AdjustorWritable allocate_adjustor(AdjustorExecutable *exec_ret)
+{
+    AdjustorWritable writ;
+    ffi_closure* cl;
+
+    ACQUIRE_SM_LOCK;
+    cl = writ = ffi_closure_alloc(sizeof(ffi_closure), exec_ret);
+    if (cl != NULL) {
+        if (allocatedExecs == NULL) {
+            allocatedExecs = allocHashTable();
+        }
+        insertHashTable(allocatedExecs, (StgWord)*exec_ret, writ);
+    }
+    RELEASE_SM_LOCK;
+    return writ;
+}
+
+static AdjustorWritable exec_to_writable(AdjustorExecutable exec)
+{
+    AdjustorWritable writ;
+    ACQUIRE_SM_LOCK;
+    if (allocatedExecs == NULL ||
+        (writ = lookupHashTable(allocatedExecs, (StgWord)exec)) == NULL) {
+        RELEASE_SM_LOCK;
+        barf("execToWritable: not found");
+    }
+    RELEASE_SM_LOCK;
+    return writ;
+}
+
+static void free_adjustor(AdjustorExecutable exec)
+{
+    AdjustorWritable writ;
+    ffi_closure* cl;
+    cl = writ = execToWritable(exec);
+    ACQUIRE_SM_LOCK;
+    removeHashTable(allocatedExecs, (StgWord)exec, writ);
+    ffi_closure_free(cl);
+    RELEASE_SM_LOCK;
+}
+
+
 /* There are subtle differences between how libffi adjustors work on
  * different platforms, and the situation is a little complex.
  *
@@ -99,15 +145,11 @@ freeHaskellFunctionPtr(void* ptr)
 {
     ffi_closure *cl;
 
-#if defined(ios_HOST_OS) || defined(darwin_HOST_OS)
-    cl = execToWritable(ptr);
-#else
-    cl = (ffi_closure*)ptr;
-#endif
+    cl = exec_to_writable(ptr);
     freeStablePtr(cl->user_data);
     stgFree(cl->cif->arg_types);
     stgFree(cl->cif);
-    freeExec(ptr);
+    free_adjustor(ptr);
 }
 
 static ffi_type * char_to_ffi_type(char c)
@@ -167,7 +209,7 @@ createAdjustor (int cconv,
     r = ffi_prep_cif(cif, abi, n_args, result_type, arg_types);
     if (r != FFI_OK) barf("ffi_prep_cif failed: %d", r);
 
-    cl = allocateExec(sizeof(ffi_closure), &code);
+    cl = allocate_adjustor(&code);
     if (cl == NULL) {
         barf("createAdjustor: failed to allocate memory");
     }
