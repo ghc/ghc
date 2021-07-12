@@ -1,0 +1,11 @@
+
+LevPolyPtrEquality3.hs:11:23: error:
+    Cannot use function with representation-polymorphic arguments:
+      reallyUnsafePtrEquality# :: GHC.Types.Any -> GHC.Types.Any -> Int#
+    (Note that representation-polymorphic primops,
+    such as 'coerce' and unboxed tuples, are eta-expanded
+    internally because they must occur fully saturated.
+    Use -fprint-typechecker-elaboration to display the full expression.)
+    Representation-polymorphic arguments:
+      GHC.Types.Any :: TYPE ('GHC.Types.BoxedRep GHC.Types.Any)
+      GHC.Types.Any :: TYPE ('GHC.Types.BoxedRep GHC.Types.Any)

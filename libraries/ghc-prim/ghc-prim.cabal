@@ -48,6 +48,7 @@ Library
         GHC.Prim.Ext
         GHC.Prim.Panic
         GHC.Prim.Exception
+        GHC.Prim.PtrEq
         GHC.PrimopWrappers
         GHC.Tuple
         GHC.Types

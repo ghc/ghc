@@ -39,6 +39,35 @@
   raise# :: forall (a :: Type) {r :: RuntimeRep} (b :: TYPE r). a -> b
   ```
 
+- `reallyUnsafePtrEquality#` has been made more general, as it is now
+   both levity-polymorphic and heterogeneous:
+
+  ```
+  reallyUnsafePtrEquality#
+    :: forall {l :: Levity} (a :: TYPE (BoxedRep l))
+              {k :: Levity} (b :: TYPE (BoxedRep k))
+    . a -> b -> Int#
+  ```
+
+   This means that `reallyUnsafePtrEquality#` can be used on primitive arrays
+   such as `Array#` and `ByteArray#`. It can also be used on values of
+   different types, without needing to call `unsafeCoerce#`.
+
+- The following functions have been moved from `GHC.Prim` to `GHC.Exts`:
+  - `sameMutableArray#`, `sameSmallMutableArray#`, `sameMutableByteArray#`
+     and `sameMutableArrayArray#`,
+  - `sameMutVar#`, `sameTVar#` and`sameMVar#`,
+  - `sameIOPort#`,
+  - `eqStableName#`.
+
+- The following functions have been added to `GHC.Exts`:
+ 
+  ```
+  sameArray# :: Array# a -> Array# a -> Int#
+  sameSmallArray# :: SmallArray# a -> SmallArray# a -> Int#
+  sameByteArray# :: ByteArray# -> ByteArray# -> Int#
+  sameArrayArray# :: ArrayArray# -> ArrayArray# -> Int#
+  ```
 
 ## 0.8.0 (edit as necessary)
 
