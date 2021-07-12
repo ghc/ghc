@@ -156,7 +156,7 @@ createAdjustor (int cconv,
     case 0: /* stdcall */
         abi = FFI_STDCALL;
         break;
-#endif
+#endif /* defined(mingw32_HOST_OS) && defined(i386_HOST_ARCH) */
     case 1: /* ccall */
         abi = FFI_DEFAULT_ABI;
         break;
@@ -223,12 +223,12 @@ static void GNUC3_ATTRIBUTE(used) obscure_ccall_wrapper(void)
       arg 1-4 spill slots, ro now we have to move it back */
    "movq 0x20(%rsp), %rcx\n"
    "movq %rcx, (%rsp)\n"
-#endif
+#endif /* defined(mingw32_HOST_OS) */
    "ret"
   );
 }
 extern void obscure_ccall_ret_code(void);
-#endif
+#endif /* defined(x86_64_HOST_ARCH) */
 
 #if defined(alpha_HOST_ARCH)
 /* To get the definition of PAL_imb: */
@@ -267,7 +267,7 @@ stgAllocStable(size_t size_in_bytes, StgStablePtr *stable)
   /* and return a ptr to the goods inside the array */
   return(&(arr->payload));
 }
-#endif
+#endif /* defined(ia64_HOST_ARCH) */
 
 #if defined(powerpc_HOST_ARCH) && defined(linux_HOST_OS)
 __asm__("obscure_ccall_ret_code:\n\t"
@@ -276,7 +276,7 @@ __asm__("obscure_ccall_ret_code:\n\t"
         "mtlr 0\n\t"
         "blr");
 extern void obscure_ccall_ret_code(void);
-#endif
+#endif /* defined(powerpc_HOST_ARCH) && defined(linux_HOST_OS) */
 
 #if defined(powerpc_HOST_ARCH) || defined(powerpc64_HOST_ARCH)
 #if !(defined(powerpc_HOST_ARCH) && defined(linux_HOST_OS))
@@ -299,8 +299,8 @@ typedef struct AdjustorStub {
     StgInt          extrawords_plus_one;
 } AdjustorStub;
 
-#endif
-#endif
+#endif /* !(defined(powerpc_HOST_ARCH) && defined(linux_HOST_OS)) */
+#endif /* defined(powerpc_HOST_ARCH) || defined(powerpc64_HOST_ARCH) */
 
 #if defined(i386_HOST_ARCH)
 
@@ -316,7 +316,7 @@ typedef struct AdjustorStub {
     StgInt          frame_size;
     StgInt          argument_size;
 } AdjustorStub;
-#endif
+#endif /* defined(i386_HOST_ARCH) */
 
 #if defined(i386_HOST_ARCH) || defined(powerpc_HOST_ARCH) || defined(powerpc64_HOST_ARCH)
 static int totalArgumentSize(char *typeString)
@@ -345,7 +345,7 @@ static int totalArgumentSize(char *typeString)
     }
     return sz;
 }
-#endif
+#endif /* defined(i386_HOST_ARCH) || defined(powerpc_HOST_ARCH) || defined(powerpc64_HOST_ARCH) */
 
 void*
 createAdjustor(int cconv, StgStablePtr hptr,
@@ -391,7 +391,7 @@ createAdjustor(int cconv, StgStablePtr hptr,
         adj_code[0x0c] = (unsigned char)0xff; /* jmp %eax */
         adj_code[0x0d] = (unsigned char)0xe0;
     }
-#endif
+#endif /* defined(i386_HOST_ARCH) && !defined(darwin_HOST_OS) */
     break;
 
   case 1: /* _ccall */
