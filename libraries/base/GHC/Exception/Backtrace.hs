@@ -1,6 +1,6 @@
+{-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE ExistentialQuantification #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
@@ -19,6 +19,7 @@
 
 module GHC.Exception.Backtrace
   ( Backtrace (..),
+    BacktraceMechanism (..),
     setDefaultBacktraceMechanisms,
     getDefaultBacktraceMechanisms,
     showBacktraces,
@@ -62,6 +63,7 @@ data BacktraceMechanism
     CostCenterBacktraceMech
   | -- | use execution stack unwinding with given limit
     ExecutionStackBacktraceMech (Maybe Int)
+  deriving (Eq, Show)
 
 showBacktraces :: [Backtrace] -> String
 showBacktraces bts = unlines $ intersperse "" $ map show bts
@@ -78,8 +80,8 @@ setDefaultBacktraceMechanisms = writeIORef currentBacktraceMechanisms
 getDefaultBacktraceMechanisms :: IO [BacktraceMechanism]
 getDefaultBacktraceMechanisms = readIORef currentBacktraceMechanisms
 
--- | Collect a 'Backtrace' via the current global 'BacktraceMechanism'. See
--- 'setDefaultBacktraceMechanisms'.
+-- | Collect a list of 'Backtrace' via all current default 'BacktraceMechanism'.
+-- See 'setDefaultBacktraceMechanisms'
 collectBacktraces :: IO [Backtrace]
 collectBacktraces = do
   mech <- getDefaultBacktraceMechanisms
