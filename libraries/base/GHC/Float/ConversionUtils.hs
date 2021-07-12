@@ -23,13 +23,12 @@ module GHC.Float.ConversionUtils ( elimZerosInteger, elimZerosInt# ) where
 
 import GHC.Base
 import GHC.Num.Integer
-#if WORD_SIZE_IN_BITS < 64
-import GHC.IntWord64
-#endif
 
 default ()
 
 #if WORD_SIZE_IN_BITS < 64
+
+import GHC.Prim
 
 #define TO64    integerToInt64#
 
