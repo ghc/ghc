@@ -15,6 +15,9 @@
  *
  * Hence, we often use the old-fashioned @setitimer@ that just about everyone
  * seems to support.  So much for standards.
+ *
+ * If you are looking for Itimer.c then this is the right file. I renamed it
+ * Ticker.c for consistency.
  */
 
 #include "PosixSource.h"
@@ -46,20 +49,15 @@
 #include "Rts.h"
 
 /*
- * timer_create doesn't exist and setitimer doesn't fire on iOS, so we're using
- * a pthreads-based implementation. It may be to do with interference with the
- * signals of the debugger. Revisit. See #7723.
+ * It used to be that timer_create doesn't exist on iOS and setitimer doesn't fire on iOS
+ * during debugging. See #7723. Seems to be an issue with signals.
+ *
+ * We also want to avoid using alarm signals, as these can interrupt system calls (#10840)
+ * or can be overwritten by user code.
+ *
+ * So we are using the pthread based implementation.
  */
-#if defined(ios_HOST_OS)
-#define USE_PTHREAD_FOR_ITIMER
-#endif
-
-/*
- * We want to avoid using the SIGALRM signals whenever possible as these signals
- * interrupt system calls (see #10840) and can be overridden by user code. On
- * Darwin we can use a dedicated thread and usleep.
- */
-#if defined(darwin_HOST_OS)
+#if defined(ios_HOST_OS) || defined(darwin_HOST_OS)
 #define USE_PTHREAD_FOR_ITIMER
 #endif
 
@@ -101,9 +99,11 @@ ghc-stage2: timer_create: Not owner
 
 // Select the variant to use
 #if defined(USE_PTHREAD_FOR_ITIMER)
-#include "itimer/Pthread.c"
+#include "ticker/Pthread.c"
 #elif defined(USE_TIMER_CREATE)
-#include "itimer/TimerCreate.c"
+ //#error TimerCreate
+#include "ticker/TimerCreate.c"
 #else
-#include "itimer/Setitimer.c"
+ //#error Setitimer
+#include "ticker/Setitimer.c"
 #endif
