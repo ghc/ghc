@@ -1,4 +1,5 @@
 
 T17162.hs:7:21: error:
-    Illegal bang-pattern (use BangPatterns):
+    Illegal bang-pattern
     !enc
+    Suggested fix: Perhaps you intended to use BangPatterns
