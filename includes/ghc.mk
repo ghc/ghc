@@ -262,7 +262,7 @@ $(includes_SETTINGS) : includes/Makefile | $$(dir $$@)/.
 	@echo ',("RTS ways", "$(GhcRTSWays)")' >> $@
 	@echo ',("Tables next to code", "$(TablesNextToCode)")' >> $@
 	@echo ',("Leading underscore", "$(LeadingUnderscore)")' >> $@
-	@echo ',("Use LibFFI", "$(UseLibFFIForAdjustors)")' >> $@
+	@echo ',("Use LibFFI", "$(UseLibffiForAdjustors)")' >> $@
 # Note that GhcThreaded just reflects the Makefile variable setting. In
 # particular, the stage1 compiler is never actually compiled with -threaded, but
 # it will nevertheless have cGhcThreaded = True. The "+RTS --info" output will

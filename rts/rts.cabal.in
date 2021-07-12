@@ -12,6 +12,8 @@ flag libdl
   default: @CabalHaveLibdl@
 flag ffi
   default: @CabalHaveLibffi@
+flag libffi-adjustors
+  default: @CabalLibffiAdjustors@
 flag need-pthread
   default: @CabalNeedLibpthread@
 flag libbfd
@@ -415,10 +417,27 @@ library
                  -- AutoApply is generated
                  AutoApply.cmm
 
-    if arch(i386) || arch(powerpc) || arch(powerpc64)
-       asm-sources: AdjustorAsm.S
-    if arch(powerpc) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
-       asm-sources: StgCRunAsm.S
+    -- Adjustor stuff
+    if flag(libffi-adjustors)
+      c-sources: adjustor/LibffiAdjustor.c
+    else
+      -- Use GHC's native adjustors
+      if arch(i386)
+        asm-sources: AdjustorAsm.S
+        c-sources: adjustor/Nativei386.c
+      if arch(x86_64)
+        c-sources: adjustor/NativeAmd64.c
+      if arch(ppc) || arch(ppc64)
+        asm-sources: AdjustorAsm.S
+        c-sources: adjustor/NativePowerPC.c
+      if arch(ia64)
+        c-sources: adjustor/NativeIA64.c
+      if arch(sparc)
+        c-sources: adjustor/NativeSparc.c
+
+    -- Use assembler STG entrypoint on archictures where it is used
+    if arch(ppc) || arch(ppc64) || arch(s390x) || arch(riscv64)
+      asm-sources: StgCRunAsm.S
 
     c-sources: Adjustor.c
                Arena.c

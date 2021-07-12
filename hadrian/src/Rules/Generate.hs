@@ -331,7 +331,7 @@ generateSettings = do
         , ("RTS ways", unwords . map show <$> getRtsWays)
         , ("Tables next to code", expr $ yesNo <$> flag TablesNextToCode)
         , ("Leading underscore", expr $ yesNo <$> flag LeadingUnderscore)
-        , ("Use LibFFI", expr $ yesNo <$> useLibFFIForAdjustors)
+        , ("Use LibFFI", expr $ yesNo <$> useLibffiForAdjustors)
         , ("Use Threads", expr $ yesNo . ghcThreaded <$> flavour)
         , ("Use Debugging", expr $ yesNo . ghcDebugged <$> flavour)
         , ("RTS expects libdw", yesNo <$> getFlag WithLibdw)
