@@ -559,7 +559,8 @@ maybePerformBlockedException (Capability *cap, StgTSO *tso)
 
     if (tso->blocked_exceptions != END_BLOCKED_EXCEPTIONS_QUEUE &&
         (tso->flags & TSO_BLOCKEX) != 0) {
-        debugTraceCap(DEBUG_sched, cap, "throwTo: thread %lu has blocked exceptions but is inside block", (unsigned long)tso->id);
+        debugTraceCap(DEBUG_sched, cap, "throwTo: thread %" FMT_StgThreadID
+                      " has blocked exceptions but is inside block", tso->id);
     }
 
     if (tso->blocked_exceptions != END_BLOCKED_EXCEPTIONS_QUEUE
@@ -782,7 +783,7 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
     StgStack *stack;
 
     debugTraceCap(DEBUG_sched, cap,
-                  "raising exception in thread %ld.", (long)tso->id);
+                  "raising exception in thread %" FMT_StgThreadID ".", tso->id);
 
 #if defined(PROFILING)
     /*

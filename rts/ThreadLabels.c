@@ -50,7 +50,7 @@ freeThreadLabelTable(void)
 }
 
 static void
-updateThreadLabel(StgWord key, void *data)
+updateThreadLabel(StgThreadID key, void *data)
 {
   removeThreadLabel(key);
 
@@ -62,7 +62,7 @@ updateThreadLabel(StgWord key, void *data)
 }
 
 void *
-lookupThreadLabel(StgWord key)
+lookupThreadLabel(StgThreadID key)
 {
   void * result;
   ACQUIRE_LOCK(&threadLabels_mutex);
@@ -75,7 +75,7 @@ lookupThreadLabel(StgWord key)
 }
 
 void
-removeThreadLabel(StgWord key)
+removeThreadLabel(StgThreadID key)
 {
   ACQUIRE_LOCK(&threadLabels_mutex);
 
