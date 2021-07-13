@@ -138,11 +138,11 @@ static void *itimer_thread_func(void *_handle_tick)
                IF_DEBUG(scheduler, debugBelch("read(timerfd) returned 0 with errno=0. This is a known kernel bug. We just ignore it."));
             }
             else if (r != sizeof(nticks) && errno != EINTR) {
-               barf("Itimer: read(timerfd) failed with %s and returned %zd", strerror(errno), r);
+               barf("Ticker: read(timerfd) failed with %s and returned %zd", strerror(errno), r);
             }
         } else {
             if (rtsSleep(itimer_interval) != 0) {
-                sysErrorBelch("ITimer: sleep failed: %s", strerror(errno));
+                sysErrorBelch("Ticker: sleep failed: %s", strerror(errno));
             }
         }
 
@@ -216,7 +216,7 @@ initTicker (Time interval, TickProc handle_tick)
         pthread_setname_np(thread, "%s", "ghc_ticker");
 #endif
     } else {
-        barf("Itimer: Failed to spawn thread: %s", strerror(errno));
+        barf("Ticker: Failed to spawn thread: %s", strerror(errno));
     }
 }
 
@@ -250,7 +250,7 @@ exitTicker (bool wait)
     // wait for ticker to terminate if necessary
     if (wait) {
         if (pthread_join(thread, NULL)) {
-            sysErrorBelch("Itimer: Failed to join: %s", strerror(errno));
+            sysErrorBelch("Ticker: Failed to join: %s", strerror(errno));
         }
         closeMutex(&mutex);
         closeCondition(&start_cond);
