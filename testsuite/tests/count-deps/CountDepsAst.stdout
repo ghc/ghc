@@ -42,6 +42,7 @@ GHC.Core.Opt.OccurAnal
 GHC.Core.PatSyn
 GHC.Core.Ppr
 GHC.Core.Predicate
+GHC.Core.RoughMap
 GHC.Core.Rules
 GHC.Core.Seq
 GHC.Core.SimpleOpt

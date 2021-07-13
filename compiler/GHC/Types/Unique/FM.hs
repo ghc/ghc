@@ -394,12 +394,14 @@ nonDetKeysUFM (UFM m) = map getUnique $ M.keys m
 -- nondeterminism.
 nonDetStrictFoldUFM :: (elt -> a -> a) -> a -> UniqFM key elt -> a
 nonDetStrictFoldUFM k z (UFM m) = M.foldl' (flip k) z m
+{-# INLINE nonDetStrictFoldUFM #-}
 
 -- See Note [Deterministic UniqFM] to learn about nondeterminism.
 -- If you use this please provide a justification why it doesn't introduce
 -- nondeterminism.
 nonDetStrictFoldUFM_Directly:: (Unique -> elt -> a -> a) -> a -> UniqFM key elt -> a
 nonDetStrictFoldUFM_Directly k z (UFM m) = M.foldlWithKey' (\z' i x -> k (getUnique i) x z') z m
+{-# INLINE nonDetStrictFoldUFM_Directly #-}
 
 -- See Note [Deterministic UniqFM] to learn about nondeterminism.
 -- If you use this please provide a justification why it doesn't introduce

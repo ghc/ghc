@@ -192,7 +192,7 @@ mkBootModDetailsTc logger
     final_tcs  = filterOut isWiredIn tcs
                  -- See Note [Drop wired-in things]
     type_env'  = typeEnvFromEntities final_ids final_tcs pat_syns fam_insts
-    insts'     = mkFinalClsInsts type_env' insts
+    insts'     = mkFinalClsInsts type_env' $ mkInstEnv insts
 
     -- Default methods have their export flag set (isExportedId),
     -- but everything else doesn't (yet), because this is
@@ -213,8 +213,8 @@ lookupFinalId type_env id
       Just (AnId id') -> id'
       _ -> pprPanic "lookup_final_id" (ppr id)
 
-mkFinalClsInsts :: TypeEnv -> [ClsInst] -> [ClsInst]
-mkFinalClsInsts env = map (updateClsInstDFun (lookupFinalId env))
+mkFinalClsInsts :: TypeEnv -> InstEnv -> InstEnv
+mkFinalClsInsts env = updateClsInstDFuns (lookupFinalId env)
 
 globaliseAndTidyBootId :: Id -> Id
 -- For a LocalId with an External Name,
@@ -419,7 +419,7 @@ tidyProgram hsc_env  (ModGuts { mg_module           = mod
               ; final_tcs      = filterOut isWiredIn tcs
                                  -- See Note [Drop wired-in things]
               ; tidy_type_env  = typeEnvFromEntities final_ids final_tcs patsyns fam_insts
-              ; tidy_cls_insts = mkFinalClsInsts tidy_type_env cls_insts
+              ; tidy_cls_insts = mkFinalClsInsts tidy_type_env $ mkInstEnv cls_insts
               ; tidy_rules     = tidyRules tidy_env trimmed_rules
 
               ; -- See Note [Injecting implicit bindings]

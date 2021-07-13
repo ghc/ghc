@@ -1,9 +1,9 @@
 type A :: * -> * -> *
 type family A a b
   	-- Defined at T4175.hs:8:1
-type instance A (Maybe a) a = a 	-- Defined at T4175.hs:10:15
-type instance A Int Int = () 	-- Defined at T4175.hs:9:15
 type instance A (B a) b = () 	-- Defined at T4175.hs:11:15
+type instance A Int Int = () 	-- Defined at T4175.hs:9:15
+type instance A (Maybe a) a = a 	-- Defined at T4175.hs:10:15
 type B :: * -> *
 data family B a
   	-- Defined at T4175.hs:13:1
@@ -15,8 +15,8 @@ class C a where
   type D :: * -> * -> *
   type family D a b
   	-- Defined at T4175.hs:17:5
-type instance D () () = Bool 	-- Defined at T4175.hs:23:10
 type instance D Int () = String 	-- Defined at T4175.hs:20:10
+type instance D () () = Bool 	-- Defined at T4175.hs:23:10
 type E :: * -> *
 type family E a where
     E () = Bool
@@ -26,47 +26,47 @@ type () :: *
 data () = ()
   	-- Defined in ‘GHC.Tuple’
 instance [safe] C () -- Defined at T4175.hs:22:10
-instance Eq () -- Defined in ‘GHC.Classes’
 instance Monoid () -- Defined in ‘GHC.Base’
-instance Ord () -- Defined in ‘GHC.Classes’
 instance Semigroup () -- Defined in ‘GHC.Base’
-instance Enum () -- Defined in ‘GHC.Enum’
-instance Show () -- Defined in ‘GHC.Show’
-instance Read () -- Defined in ‘GHC.Read’
 instance Bounded () -- Defined in ‘GHC.Enum’
+instance Enum () -- Defined in ‘GHC.Enum’
+instance Eq () -- Defined in ‘GHC.Classes’
+instance Ord () -- Defined in ‘GHC.Classes’
+instance Read () -- Defined in ‘GHC.Read’
+instance Show () -- Defined in ‘GHC.Show’
 data instance B () = MkB 	-- Defined at T4175.hs:14:15
-type instance D () () = Bool 	-- Defined at T4175.hs:23:10
 type instance D Int () = String 	-- Defined at T4175.hs:20:10
+type instance D () () = Bool 	-- Defined at T4175.hs:23:10
 type Maybe :: * -> *
 data Maybe a = Nothing | Just a
   	-- Defined in ‘GHC.Maybe’
+instance Traversable Maybe -- Defined in ‘Data.Traversable’
+instance Foldable Maybe -- Defined in ‘Data.Foldable’
 instance Applicative Maybe -- Defined in ‘GHC.Base’
-instance Eq a => Eq (Maybe a) -- Defined in ‘GHC.Maybe’
 instance Functor Maybe -- Defined in ‘GHC.Base’
+instance MonadFail Maybe -- Defined in ‘Control.Monad.Fail’
 instance Monad Maybe -- Defined in ‘GHC.Base’
 instance Semigroup a => Monoid (Maybe a) -- Defined in ‘GHC.Base’
-instance Ord a => Ord (Maybe a) -- Defined in ‘GHC.Maybe’
 instance Semigroup a => Semigroup (Maybe a)
   -- Defined in ‘GHC.Base’
-instance Show a => Show (Maybe a) -- Defined in ‘GHC.Show’
-instance MonadFail Maybe -- Defined in ‘Control.Monad.Fail’
+instance Eq a => Eq (Maybe a) -- Defined in ‘GHC.Maybe’
+instance Ord a => Ord (Maybe a) -- Defined in ‘GHC.Maybe’
 instance Read a => Read (Maybe a) -- Defined in ‘GHC.Read’
-instance Foldable Maybe -- Defined in ‘Data.Foldable’
-instance Traversable Maybe -- Defined in ‘Data.Traversable’
+instance Show a => Show (Maybe a) -- Defined in ‘GHC.Show’
 type instance A (Maybe a) a = a 	-- Defined at T4175.hs:10:15
 type Int :: *
 data Int = GHC.Types.I# GHC.Prim.Int#
   	-- Defined in ‘GHC.Types’
 instance [safe] C Int -- Defined at T4175.hs:19:10
-instance Eq Int -- Defined in ‘GHC.Classes’
-instance Ord Int -- Defined in ‘GHC.Classes’
-instance Enum Int -- Defined in ‘GHC.Enum’
+instance Integral Int -- Defined in ‘GHC.Real’
 instance Num Int -- Defined in ‘GHC.Num’
 instance Real Int -- Defined in ‘GHC.Real’
-instance Show Int -- Defined in ‘GHC.Show’
-instance Read Int -- Defined in ‘GHC.Read’
 instance Bounded Int -- Defined in ‘GHC.Enum’
-instance Integral Int -- Defined in ‘GHC.Real’
+instance Enum Int -- Defined in ‘GHC.Enum’
+instance Eq Int -- Defined in ‘GHC.Classes’
+instance Ord Int -- Defined in ‘GHC.Classes’
+instance Read Int -- Defined in ‘GHC.Read’
+instance Show Int -- Defined in ‘GHC.Show’
 type instance A Int Int = () 	-- Defined at T4175.hs:9:15
 type instance D Int () = String 	-- Defined at T4175.hs:20:10
 type Z :: * -> Constraint
