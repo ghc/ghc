@@ -977,9 +977,9 @@
       SymI_HasProto(large_alloc_lim)                                    \
       SymI_HasProto(g0)                                                 \
       SymI_HasProto(allocate)                                           \
-      SymI_HasProto(allocateExec)                                       \
-      SymI_HasProto(flushExec)                                          \
-      SymI_HasProto(freeExec)                                           \
+      SymI_HasProto(allocateExecPage)                                   \
+      SymI_HasProto(freezeExecPage)                                     \
+      SymI_HasProto(freeExecPage)                                       \
       SymI_HasProto(getAllocations)                                     \
       SymI_HasProto(revertCAFs)                                         \
       SymI_HasProto(RtsFlags)                                           \
