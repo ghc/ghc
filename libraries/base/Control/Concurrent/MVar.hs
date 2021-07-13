@@ -6,7 +6,7 @@
 -- Module      :  Control.Concurrent.MVar
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
 -- Portability :  non-portable (concurrency)
@@ -45,7 +45,7 @@
 -- 'withMVar', 'modifyMVar_' and 'modifyMVar') are simply
 -- the composition of a 'takeMVar' followed by a 'putMVar' with
 -- exception safety.
--- These only have atomicity guarantees if all other threads
+-- These have atomicity guarantees only if all other threads
 -- perform a 'takeMVar' before a 'putMVar' as well;  otherwise, they may
 -- block.
 --
@@ -162,7 +162,10 @@ import Control.Exception.Base
 {-|
   Take a value from an 'MVar', put a new value into the 'MVar' and
   return the value taken. This function is atomic only if there are
-  no other producers for this 'MVar'.
+  no other producers for this 'MVar'. In other words, it cannot guarantee
+  that, by the time 'swapMVar' gets the chance to write to the MVar,
+  the value of the MVar has not been altered
+  by a write operation from another thread.
 -}
 swapMVar :: MVar a -> a -> IO a
 swapMVar mvar new =
@@ -176,7 +179,10 @@ swapMVar mvar new =
   of an 'MVar'.  This operation is exception-safe: it will replace the
   original contents of the 'MVar' if an exception is raised (see
   "Control.Exception").  However, it is only atomic if there are no
-  other producers for this 'MVar'.
+  other producers for this 'MVar'. In other words, it cannot guarantee
+  that, by the time 'withMVar' gets the chance to write to the MVar,
+  the value of the MVar has not been altered
+  by a write operation from another thread.
 -}
 {-# INLINE withMVar #-}
 -- inlining has been reported to have dramatic effects; see
@@ -209,7 +215,9 @@ withMVarMasked m io =
   Like 'withMVar', 'modifyMVar' will replace the original contents of
   the 'MVar' if an exception is raised during the operation.  This
   function is only atomic if there are no other producers for this
-  'MVar'.
+  'MVar'. In other words, it cannot guarantee that, by the time
+  'modifyMVar_' gets the chance to write to the MVar, the value
+  of the MVar has not been altered by a write operation from another thread.
 -}
 {-# INLINE modifyMVar_ #-}
 modifyMVar_ :: MVar a -> (a -> IO a) -> IO ()

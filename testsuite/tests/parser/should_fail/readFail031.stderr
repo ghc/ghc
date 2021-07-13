@@ -1,4 +1,5 @@
 
 readFail031.hs:4:3: error:
     Invalid type signature: (:+) :: ...
-    Should be of form <variables> :: <type>
+    Suggested fix:
+      A type signature should be of form <variables> :: <type>

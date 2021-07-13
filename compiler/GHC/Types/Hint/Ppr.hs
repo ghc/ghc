@@ -9,6 +9,7 @@ module GHC.Types.Hint.Ppr (
 
 import GHC.Prelude
 
+import GHC.Parser.Errors.Basic
 import GHC.Types.Hint
 
 import GHC.Hs.Expr ()   -- instance Outputable
@@ -50,6 +51,11 @@ instance Outputable GhcHint where
                 text "replacing <" <> ppr pi_mod_name <> text "> as necessary."
     SuggestUseSpaces
       -> text "Please use spaces instead."
+    SuggestUseWhitespaceAfter sym
+      -> text "Add whitespace after the"
+           <+> quotes (pprOperatorWhitespaceSymbol sym) <> char '.'
+    SuggestUseWhitespaceAround sym _occurrence
+      -> text "Add whitespace around" <+> quotes (text sym) <> char '.'
     SuggestParentheses
       -> text "Use parentheses."
     SuggestIncreaseMaxPmCheckModels
@@ -67,6 +73,29 @@ instance Outputable GhcHint where
               , whenPprDebug (ppr bad_rule) ]
     SuggestIncreaseSimplifierIterations
       -> text "Set limit with -fconstraint-solver-iterations=n; n=0 for no limit"
+    SuggestUseTypeFromDataKind
+      -> text "Use" <+> quotes (text "Type")
+           <+> text "from" <+> quotes (text "Data.Kind") <+> text "instead."
+    SuggestQualifiedAfterModuleName
+      -> text "Place" <+> quotes (text "qualified")
+          <+> text "after the module name."
+    SuggestThQuotationSyntax
+      -> vcat [ text "Perhaps you intended to use quotation syntax of TemplateHaskell,"
+              , text "but the type variable or constructor is missing"
+              ]
+    SuggestRoles nearby
+      -> case nearby of
+               []  -> empty
+               [r] -> text "Perhaps you meant" <+> quotes (ppr r)
+               -- will this last case ever happen??
+               _   -> hang (text "Perhaps you meant one of these:")
+                           2 (pprWithCommas (quotes . ppr) nearby)
+    SuggestQualifyStarOperator
+      -> text "To use (or export) this operator in"
+            <+> text "modules with StarIsType,"
+         $$ text "    including the definition module, you must qualify it."
+    SuggestTypeSignatureForm
+      -> text "A type signature should be of form <variables> :: <type>"
 
 perhapsAsPat :: SDoc
 perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"
