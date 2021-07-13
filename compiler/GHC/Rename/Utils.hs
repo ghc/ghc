@@ -180,7 +180,7 @@ checkShadowedOccs (global_env,local_env) get_loc_occ ns
         -- punning or wild-cards are on (cf #2723)
     is_shadowed_gre gre | isRecFldGRE gre
         = do { dflags <- getDynFlags
-             ; return $ not (xopt LangExt.RecordPuns dflags
+             ; return $ not (xopt LangExt.NamedFieldPuns dflags
                              || xopt LangExt.RecordWildCards dflags) }
     is_shadowed_gre _other = return True
 

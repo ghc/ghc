@@ -448,7 +448,7 @@ rnExpr (RecordUpd { rupd_expr = expr, rupd_flds = rbinds })
                  addErr $ TcRnUnknownMessage $ mkPlainError noHints $
                    text "RebindableSyntax is required if OverloadedRecordUpdate is enabled."
              ; let punnedFields = [fld | (L _ fld) <- flds, hfbPun fld]
-             ; punsEnabled <-xoptM LangExt.RecordPuns
+             ; punsEnabled <-xoptM LangExt.NamedFieldPuns
              ; unless (null punnedFields || punsEnabled) $
                  addErr $ TcRnUnknownMessage $ mkPlainError noHints $
                    text "For this to work enable NamedFieldPuns."

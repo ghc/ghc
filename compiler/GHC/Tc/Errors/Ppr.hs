@@ -171,7 +171,7 @@ instance Diagnostic TcRnMessage where
     TcRnEmptyRecordUpdate{}
       -> noHints
     TcRnIllegalFieldPunning{}
-      -> [SuggestExtension LangExt.RecordPuns]
+      -> [SuggestExtension LangExt.NamedFieldPuns]
     TcRnIllegalWildcardsInRecord{}
       -> [SuggestExtension LangExt.RecordWildCards]
     TcRnDuplicateFieldName{}
