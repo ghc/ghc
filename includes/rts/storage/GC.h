@@ -203,14 +203,7 @@ StgPtr  allocatePinned    ( Capability *cap, W_ n, W_ alignment, W_ align_off);
 typedef void* AdjustorWritable;
 typedef void* AdjustorExecutable;
 
-AdjustorWritable allocateExec(W_ len, AdjustorExecutable *exec_addr);
 void flushExec(W_ len, AdjustorExecutable exec_addr);
-#if RTS_LINKER_USE_MMAP
-AdjustorWritable allocateWrite(W_ bytes);
-void markExec(W_ bytes, AdjustorWritable writ);
-void freeWrite(W_ bytes, AdjustorWritable writ);
-#endif
-void             freeExec (AdjustorExecutable p);
 
 // Used by GC checks in external .cmm code:
 extern W_ large_alloc_lim;
