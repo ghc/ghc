@@ -1908,13 +1908,18 @@ tcIfaceCoAxiom name = do { thing <- tcIfaceImplicit name
 
 
 tcIfaceCoAxiomRule :: IfLclName -> IfL CoAxiomRule
--- Unlike CoAxioms, which arise form user 'type instance' declarations,
--- there are a fixed set of CoAxiomRules,
--- currently enumerated in typeNatCoAxiomRules
+-- Unlike CoAxioms, which arise from user 'type instance' declarations,
+-- there are a fixed set of CoAxiomRules:
+--   - the axiom for "GetRuntimeRep",
+--   - axioms for type-level literals (Nat and Symbol),
+--     enumerated in typeNatCoAxiomRules
 tcIfaceCoAxiomRule n
-  = case lookupUFM typeNatCoAxiomRules n of
-        Just ax -> return ax
-        _  -> pprPanic "tcIfaceCoAxiomRule" (ppr n)
+  | n == fsLit "GetRuntimeRepDef"
+  = pure axGetRuntimeRep
+  | Just ax <- lookupUFM typeNatCoAxiomRules n
+  = return ax
+  | otherwise
+  = pprPanic "tcIfaceCoAxiomRule" (ppr n)
 
 tcIfaceDataCon :: Name -> IfL DataCon
 tcIfaceDataCon name = do { thing <- tcIfaceGlobal name
