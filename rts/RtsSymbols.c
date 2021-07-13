@@ -12,6 +12,7 @@
 #include "Rts.h"
 #include "TopHandler.h"
 #include "HsFFI.h"
+#include "ExecPage.h"
 
 #include "sm/Storage.h"
 #include "sm/NonMovingMark.h"
@@ -548,21 +549,11 @@
 #define RTS_PROF_SYMBOLS /* empty */
 #endif
 
-#if RTS_LINKER_USE_MMAP
-#define RTS_LINKER_USE_MMAP_SYMBOLS \
-      SymI_HasProto(allocateWrite)                                      \
-      SymI_HasProto(freeWrite)                                          \
-      SymI_HasProto(markExec)
-#else
-#define RTS_LINKER_USE_MMAP_SYMBOLS /* empty */
-#endif
-
 #define RTS_SYMBOLS                                                     \
       Maybe_Stable_Names                                                \
       RTS_TICKY_SYMBOLS                                                 \
       RTS_PROF_SYMBOLS                                                  \
       RTS_LIBDW_SYMBOLS                                                 \
-      RTS_LINKER_USE_MMAP_SYMBOLS                                       \
       SymI_HasProto(StgReturn)                                          \
       SymI_HasProto(stg_gc_noregs)                                      \
       SymI_HasProto(stg_ret_v_info)                                     \
@@ -977,9 +968,9 @@
       SymI_HasProto(large_alloc_lim)                                    \
       SymI_HasProto(g0)                                                 \
       SymI_HasProto(allocate)                                           \
-      SymI_HasProto(allocateExec)                                       \
-      SymI_HasProto(flushExec)                                          \
-      SymI_HasProto(freeExec)                                           \
+      SymI_HasProto(allocateExecPage)                                   \
+      SymI_HasProto(freezeExecPage)                                     \
+      SymI_HasProto(freeExecPage)                                       \
       SymI_HasProto(getAllocations)                                     \
       SymI_HasProto(revertCAFs)                                         \
       SymI_HasProto(RtsFlags)                                           \
@@ -1020,7 +1011,6 @@
       SymI_HasProto(registerInfoProvList)                               \
       SymI_HasProto(lookupIPE)                                          \
       RTS_USER_SIGNALS_SYMBOLS                                          \
-      RTS_LINKER_USE_MMAP_SYMBOLS                                       \
       RTS_INTCHAR_SYMBOLS
 
 

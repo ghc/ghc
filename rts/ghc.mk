@@ -17,7 +17,7 @@
 rts_dist_HC = $(GHC_STAGE1)
 
 rts_INSTALL_INFO = rts
-rts_VERSION = 1.0.1
+rts_VERSION = 1.0.2
 
 # Minimum supported Windows version.
 # These numbers can be found at:
@@ -379,10 +379,6 @@ rts_HC_OPTS += $(STANDARD_OPTS) -this-unit-id rts
 ifneq "$(GhcWithSMP)" "YES"
 rts_CC_OPTS += -DNOSMP
 rts_HC_OPTS += -optc-DNOSMP
-endif
-
-ifeq "$(UseLibFFIForAdjustors)" "YES"
-rts_CC_OPTS += -DUSE_LIBFFI_FOR_ADJUSTORS
 endif
 
 # We *want* type-checking of hand-written cmm.
