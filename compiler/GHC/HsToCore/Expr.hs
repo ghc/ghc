@@ -303,6 +303,7 @@ dsExpr (HsLamCase _ matches)
 
 dsExpr e@(HsApp _ fun arg)
   = do { fun' <- dsLExpr fun
+       -- SLD: handled in GHC.Tc.Gen.tcEValArg, test: T12973 (for example)
        -- See Note [Desugaring representation-polymorphic applications]
        --   in GHC.HsToCore.Utils
        ; dsWhenNoErrs (hsExprType e) (dsLExprNoLP arg)
@@ -478,8 +479,10 @@ dsExpr (RecordCon { rcon_con  = L _ con_like
 
              mk_arg (arg_ty, fl)
                = case findField (rec_flds rbinds) (flSelector fl) of
-                   (rhs:rhss) -> assert (null rhss )
+                   (rhs:rhss) -> assert (null rhss)
                                  dsLExprNoLP rhs
+                                   -- SLD: handled in GHC.Tc.Gen.tcRecordField
+                                   -- see test: RepPolyRecordUpdate
                    []         -> mkErrorAppDs rEC_CON_ERROR_ID arg_ty (ppr (flLabel fl))
              unlabelled_bottom arg_ty = mkErrorAppDs rEC_CON_ERROR_ID arg_ty Outputable.empty
 

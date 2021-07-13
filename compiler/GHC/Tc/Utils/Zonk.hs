@@ -388,7 +388,8 @@ zonkIdOccs env ids = map (zonkIdOcc env) ids
 zonkIdBndr :: ZonkEnv -> TcId -> TcM Id
 zonkIdBndr env v
   = do Scaled w' ty' <- zonkScaledTcTypeToTypeX env (idScaledType v)
-       ensureNotLevPoly ty' (LevityCheckInBinder v)
+       ensureNotLevPoly ty' (LevityCheckInBinder v) -- SLD: handled in GHC.Tc.Gen.Binds.tcPolyBinds
+                                                    -- test: LevPolyLet
 
        return (modifyIdInfo (`setLevityInfoWithType` ty') (setIdMult (setIdType v ty') w'))
 
@@ -1349,10 +1350,14 @@ zonk_pat env (ParPat x lpar p rpar)
 zonk_pat env (WildPat ty)
   = do  { ty' <- zonkTcTypeToTypeX env ty
         ; ensureNotLevPoly ty' LevityCheckInWildcardPattern
+           -- SLD: done in GHC.Tc.Gen.Pat.tc_pat
+           -- see RepPolyWildcardPattern
         ; return (env, WildPat ty') }
 
 zonk_pat env (VarPat x (L l v))
   = do  { v' <- zonkIdBndr env v
+            -- SLD: handled in GHC.Tc.Gen.Pat.tc_pat
+            -- test: RepPolyBinder
         ; return (extendIdZonkEnv env v', VarPat x (L l v')) }
 
 zonk_pat env (LazyPat x pat)
@@ -1365,6 +1370,8 @@ zonk_pat env (BangPat x pat)
 
 zonk_pat env (AsPat x (L loc v) pat)
   = do  { v' <- zonkIdBndr env v
+            -- SLD: same as above, handled in GHC.Tc.Gen.Pat.tc_pat
+            -- test: RepPolyBinder
         ; (env', pat') <- zonkPat (extendIdZonkEnv env v') pat
         ; return (env', AsPat x (L loc v') pat') }
 
@@ -1405,6 +1412,7 @@ zonk_pat env p@(ConPat { pat_con = L _ con
           -- an unboxed tuple pattern (but only an unboxed tuple pattern)
           -- might have representation-polymorphic arguments.
           -- Check for this badness.
+          -- SLD: handled by GHC.Tc.Gen.Pat.tc_pat as above
         ; case con of
             RealDataCon dc
               | isUnboxedTupleTyCon (dataConTyCon dc)
@@ -1454,6 +1462,8 @@ zonk_pat env (NPlusKPat ty (L loc n) (L l lit1) lit2 e1 e2)
   = do  { (env1, e1') <- zonkSyntaxExpr env  e1
         ; (env2, e2') <- zonkSyntaxExpr env1 e2
         ; n' <- zonkIdBndr env2 n
+        -- SLD: handled by GHC.Tc.Gen.Pat.tc_pat as above
+        -- See test: RepPolyNPlusK
         ; lit1' <- zonkOverLit env2 lit1
         ; lit2' <- zonkOverLit env2 lit2
         ; ty' <- zonkTcTypeToTypeX env2 ty
