@@ -17,7 +17,7 @@
 rts_dist_HC = $(GHC_STAGE1)
 
 rts_INSTALL_INFO = rts
-rts_VERSION = 1.0.1
+rts_VERSION = 1.0.2
 
 # Minimum supported Windows version.
 # These numbers can be found at:

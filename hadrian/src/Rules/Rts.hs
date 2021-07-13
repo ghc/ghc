@@ -158,7 +158,7 @@ needRtsSymLinks stage rtsWays
 
 prefix, versionlessPrefix :: String
 versionlessPrefix = "libHSrts"
-prefix = versionlessPrefix ++ "-1.0.1"
+prefix = versionlessPrefix ++ "-1.0.2"
 
 -- removeRtsDummyVersion "a/libHSrts-1.0-ghc1.2.3.4.so"
 --                    == "a/libHSrts-ghc1.2.3.4.so"
