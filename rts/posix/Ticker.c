@@ -62,12 +62,12 @@
 #endif
 
 /*
- * On Linux in the threaded RTS we can use timerfd_* (introduced in Linux
+ * On Linux we can use timerfd_* (introduced in Linux
  * 2.6.25) and a thread instead of alarm signals. It avoids the risk of
  * interrupting syscalls (see #10840) and the risk of being accidentally
  * modified in user code using signals.
  */
-#if defined(linux_HOST_OS) && defined(THREADED_RTS) && HAVE_SYS_TIMERFD_H
+#if defined(linux_HOST_OS) && HAVE_SYS_TIMERFD_H
 #define USE_PTHREAD_FOR_ITIMER
 #endif
 
@@ -101,9 +101,7 @@ ghc-stage2: timer_create: Not owner
 #if defined(USE_PTHREAD_FOR_ITIMER)
 #include "ticker/Pthread.c"
 #elif defined(USE_TIMER_CREATE)
- //#error TimerCreate
 #include "ticker/TimerCreate.c"
 #else
- //#error Setitimer
 #include "ticker/Setitimer.c"
 #endif
