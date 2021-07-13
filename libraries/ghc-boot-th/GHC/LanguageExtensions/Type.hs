@@ -8,11 +8,49 @@
 --
 -- A data type defining the language extensions supported by GHC.
 --
-{-# LANGUAGE DeriveGeneric, Safe #-}
-module GHC.LanguageExtensions.Type ( Extension(..) ) where
+{-# LANGUAGE DeriveGeneric, Safe, PatternSynonyms #-}
+module GHC.LanguageExtensions.Type ( Extension(..), pattern RecordPuns ) where
 
 import Prelude -- See note [Why do we import Prelude here?]
 import GHC.Generics
+
+pattern RecordPuns :: Extension
+pattern RecordPuns = NamedFieldPuns
+{-# DEPRECATED RecordPuns "Use NamedFieldPuns" #-}
+{-# COMPLETE RecordPuns, Cpp , OverlappingInstances , UndecidableInstances ,
+   IncoherentInstances , UndecidableSuperClasses , MonomorphismRestriction ,
+   MonoLocalBinds , RelaxedPolyRec , ExtendedDefaultRules ,
+   ForeignFunctionInterface , UnliftedFFITypes , InterruptibleFFI , CApiFFI ,
+   GHCForeignImportPrim , JavaScriptFFI , ParallelArrays , Arrows ,
+   TemplateHaskell , TemplateHaskellQuotes , QualifiedDo , QuasiQuotes ,
+   ImplicitParams , ImplicitPrelude , ScopedTypeVariables , AllowAmbiguousTypes ,
+   UnboxedTuples , UnboxedSums , UnliftedNewtypes , UnliftedDatatypes ,
+   BangPatterns , TypeFamilies , TypeFamilyDependencies , TypeInType ,
+   OverloadedStrings , OverloadedLists , NumDecimals , DisambiguateRecordFields ,
+   RecordWildCards , ViewPatterns , GADTs , GADTSyntax ,
+   NPlusKPatterns , DoAndIfThenElse , BlockArguments , RebindableSyntax ,
+   ConstraintKinds , PolyKinds , DataKinds , InstanceSigs , ApplicativeDo ,
+   LinearTypes , StandaloneDeriving , DeriveDataTypeable , AutoDeriveTypeable ,
+   DeriveFunctor , DeriveTraversable , DeriveFoldable , DeriveGeneric ,
+   DefaultSignatures , DeriveAnyClass , DeriveLift , DerivingStrategies ,
+   DerivingVia , TypeSynonymInstances , FlexibleContexts , FlexibleInstances ,
+   ConstrainedClassMethods , MultiParamTypeClasses , NullaryTypeClasses ,
+   FunctionalDependencies , UnicodeSyntax , ExistentialQuantification ,
+   MagicHash , EmptyDataDecls , KindSignatures , RoleAnnotations ,
+   ParallelListComp , TransformListComp , MonadComprehensions ,
+   GeneralizedNewtypeDeriving , RecursiveDo , PostfixOperators , TupleSections ,
+   PatternGuards , LiberalTypeSynonyms , RankNTypes , ImpredicativeTypes ,
+   TypeOperators , ExplicitNamespaces , PackageImports , ExplicitForAll ,
+   AlternativeLayoutRule , AlternativeLayoutRuleTransitional , DatatypeContexts ,
+   NondecreasingIndentation , RelaxedLayout , TraditionalRecordSyntax ,
+   LambdaCase , MultiWayIf , BinaryLiterals , NegativeLiterals ,
+   HexFloatLiterals , DuplicateRecordFields , OverloadedLabels , EmptyCase ,
+   PatternSynonyms , PartialTypeSignatures , NamedWildCards , StaticPointers ,
+   TypeApplications , Strict , StrictData , EmptyDataDeriving ,
+   NumericUnderscores , QuantifiedConstraints , StarIsType ,
+   ImportQualifiedPost , CUSKs , StandaloneKindSignatures , LexicalNegation ,
+   FieldSelectors , OverloadedRecordDot , OverloadedRecordUpdate
+   #-}
 
 -- | The language extensions known to GHC.
 --
@@ -61,7 +99,7 @@ data Extension
    | NumDecimals
    | DisambiguateRecordFields
    | RecordWildCards
-   | RecordPuns
+   | NamedFieldPuns
    | ViewPatterns
    | GADTs
    | GADTSyntax

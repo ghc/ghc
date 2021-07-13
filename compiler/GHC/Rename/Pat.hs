@@ -754,7 +754,7 @@ rnHsRecFields
 -- This is used for record construction and pattern-matching, but not updates.
 
 rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
-  = do { pun_ok      <- xoptM LangExt.RecordPuns
+  = do { pun_ok      <- xoptM LangExt.NamedFieldPuns
        ; disambig_ok <- xoptM LangExt.DisambiguateRecordFields
        ; let parent = guard disambig_ok >> mb_con
        ; flds1  <- mapM (rn_fld pun_ok parent) flds
@@ -863,7 +863,7 @@ rnHsRecUpdFields
     :: [LHsRecUpdField GhcPs]
     -> RnM ([LHsRecUpdField GhcRn], FreeVars)
 rnHsRecUpdFields flds
-  = do { pun_ok        <- xoptM LangExt.RecordPuns
+  = do { pun_ok        <- xoptM LangExt.NamedFieldPuns
        ; dup_fields_ok <- xopt_DuplicateRecordFields <$> getDynFlags
        ; (flds1, fvss) <- mapAndUnzipM (rn_fld pun_ok dup_fields_ok) flds
        ; mapM_ (addErr . dupFieldErr HsRecFieldUpd) dup_flds
