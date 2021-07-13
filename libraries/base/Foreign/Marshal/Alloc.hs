@@ -37,6 +37,11 @@
 -- aligned for that type. Array allocation routines need to obey the same
 -- alignment constraints for each array element.
 --
+-- The underlying implementation is wrapping the @<stdlib.h>@
+-- @malloc@, @realloc@, and @free@.
+-- In other words it should be safe to allocate using C-@malloc@,
+-- and free memory with 'free' from this module.
+--
 -----------------------------------------------------------------------------
 
 module Foreign.Marshal.Alloc (
