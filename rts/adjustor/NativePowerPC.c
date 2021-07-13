@@ -59,9 +59,6 @@ createAdjustor(int cconv, StgStablePtr hptr,
                char *typeString
     )
 {
-    void *adjustor = NULL;
-    void *code = NULL;
-
     switch (cconv)
     {
     case 1: /* _ccall */
@@ -81,7 +78,6 @@ createAdjustor(int cconv, StgStablePtr hptr,
         int n = strlen(typeString),i;
         int src_locs[n], dst_locs[n];
         int frameSize;
-        unsigned *code;
 
             /* Step 1:
                Calculate where the arguments should go.
@@ -154,8 +150,8 @@ createAdjustor(int cconv, StgStablePtr hptr,
             */
                     // allocate space for at most 4 insns per parameter
                     // plus 14 more instructions.
-        adjustor = allocateExec(4 * (4*n + 14),&code);
-        code = (unsigned*)adjustor;
+        ExecPage *page = allocateExecPage();
+        unsigned *code = adjustor;
 
         *code++ = 0x48000008; // b *+8
             // * Put the hptr in a place where freeHaskellFunctionPtr
@@ -261,6 +257,8 @@ createAdjustor(int cconv, StgStablePtr hptr,
             // bctr
         *code++ = 0x4e800420;
 
+        freezeExecPage(page);
+
         // Flush the Instruction cache:
         {
             unsigned *p = adjustor;
@@ -304,7 +302,8 @@ createAdjustor(int cconv, StgStablePtr hptr,
 #if defined(FUNDESCS)
         adjustorStub = stgMallocBytes(sizeof(AdjustorStub), "createAdjustor");
 #else
-        adjustorStub = allocateExec(sizeof(AdjustorStub),&code);
+        ExecPage *page = allocateExecPage();
+        adjustorStub = (AdjustorStub *) page;
 #endif /* defined(FUNDESCS) */
         adjustor = adjustorStub;
 
@@ -330,6 +329,8 @@ createAdjustor(int cconv, StgStablePtr hptr,
         adjustorStub->mtctr = 0x7c0903a6;
             // bctr
         adjustorStub->bctr = 0x4e800420;
+
+        freezeExecPage(page);
 #else
         barf("adjustor creation not supported on this platform");
 #endif /* defined(powerpc_HOST_ARCH) */
@@ -375,13 +376,13 @@ createAdjustor(int cconv, StgStablePtr hptr,
         adjustorStub->wptr = wptr;
         adjustorStub->negative_framesize = -total_sz;
         adjustorStub->extrawords_plus_one = extra_sz + 1;
+
+        return code;
     }
 
     default:
         barf("createAdjustor: Unsupported calling convention");
     }
-
-    return code;
 }
 
 void
@@ -401,5 +402,5 @@ freeHaskellFunctionPtr(void* ptr)
     freeStablePtr(((AdjustorStub*)ptr)->hptr);
 #endif
 
-    freeExec(ptr);
+    freeExecPage(ptr);
 }

@@ -1,6 +1,6 @@
 cabal-version: 3.0
 name: rts
-version: 1.0.1
+version: 1.0.2
 license: BSD-3-Clause
 maintainer: glasgow-haskell-users@haskell.org
 build-type: Simple
@@ -145,6 +145,7 @@ library
                       DerivedConstants.h ffi.h ffitarget.h
                       -- ^ generated
                       rts/Adjustor.h
+                      rts/ExecPage.h
                       rts/BlockSignals.h
                       rts/Bytecodes.h
                       rts/Config.h
@@ -442,6 +443,7 @@ library
       asm-sources: StgCRunAsm.S
 
     c-sources: Adjustor.c
+               ExecPage.c
                Arena.c
                Capability.c
                CheckUnload.c
