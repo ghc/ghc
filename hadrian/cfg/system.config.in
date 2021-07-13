@@ -47,6 +47,7 @@ hs-cpp-args         = @HaskellCPPArgs@
 solaris-broken-shld  = @SOLARIS_BROKEN_SHLD@
 ghc-unregisterised   = @Unregisterised@
 tables-next-to-code  = @TablesNextToCode@
+use-libffi-for-adjustors = @UseLibffiForAdjustors@
 ghc-source-path      = @hardtop@
 leading-underscore   = @LeadingUnderscore@
 
