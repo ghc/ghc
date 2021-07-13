@@ -278,6 +278,10 @@ ghciCommands = map mkCmd [
 word_break_chars :: String
 word_break_chars = spaces ++ specials ++ symbols
 
+word_break_chars_pred :: Char -> Bool
+word_break_chars_pred '.' = False
+word_break_chars_pred c = c `elem` (spaces ++ specials) || isSymbolChar c
+
 symbols, specials, spaces :: String
 symbols = "!#$%&*+/<=>?@\\^|-~"
 specials = "(),;[]`{}"
@@ -3525,16 +3529,10 @@ completeIdentifier line@(left, _) =
   case left of
     ('.':_)  -> wrapCompleter (specials ++ spaces) complete line
                -- operator or qualification
-    (x:_) | isSymbolChar x -> wrapCompleter (specials ++ spaces)
-                                 complete (takeOpChars line)         -- operator
-    _                      -> wrapIdentCompleter complete (takeIdentChars line)
+    (x:_) | isSymbolChar x -> wrapCompleter' (\c -> c `elem` (specials ++ spaces) || not (isSymbolChar c))
+                                 complete line         -- operator
+    _                      -> wrapIdentCompleter complete line
   where
-    takeOpChars (l, r) = (takeWhile isSymbolChar l, r)               -- #10576
-       -- An operator contains only symbol characters
-    takeIdentChars (l, r) = (takeWhile notOpChar l, r)
-       -- An identifier doesn't contain symbol characters with the
-       -- exception of a dot
-    notOpChar c = (not .isSymbol ) c || c == '.'
     complete w = do
       rdrs <- GHC.getRdrNamesInScope
       dflags <- GHC.getSessionDynFlags
@@ -3610,7 +3608,7 @@ completeBreakpoint = wrapCompleter spaces $ \w -> do          -- #3000
             bids = nub $ declPath <$> ident_decls
         pure $ map (combineModIdent mod_str) bids
 
-completeModule = wrapIdentCompleter $ \w -> do
+completeModule = wrapIdentCompleterMod $ \w -> do
   hsc_env <- GHC.getSession
   let pkg_mods = allVisibleModules (hsc_units hsc_env)
   loaded_mods <- liftM (map GHC.ms_mod_name) getLoadedModules
@@ -3629,7 +3627,7 @@ completeSetModule = wrapIdentCompleterWithModifier "+-" $ \m w -> do
       return $ loaded_mods ++ pkg_mods
   return $ filter (w `isPrefixOf`) $ map (showPpr (hsc_dflags hsc_env)) modules
 
-completeHomeModule = wrapIdentCompleter listHomeModules
+completeHomeModule = wrapIdentCompleterMod listHomeModules
 
 listHomeModules :: GHC.GhcMonad m => String -> m [String]
 listHomeModules w = do
@@ -3669,11 +3667,20 @@ unionComplete f1 f2 line = do
   return (cs1 ++ cs2)
 
 wrapCompleter :: Monad m => String -> (String -> m [String]) -> CompletionFunc m
-wrapCompleter breakChars fun = completeWord Nothing breakChars
+wrapCompleter breakChars = wrapCompleter' (`elem` breakChars)
+
+wrapCompleter' :: Monad m => (Char -> Bool) -> (String -> m [String]) -> CompletionFunc m
+wrapCompleter' breakPred fun = completeWord' Nothing breakPred
     $ fmap (map simpleCompletion . nubSort) . fun
 
 wrapIdentCompleter :: Monad m => (String -> m [String]) -> CompletionFunc m
-wrapIdentCompleter = wrapCompleter word_break_chars
+wrapIdentCompleter = wrapCompleter' word_break_chars_pred
+
+wrapIdentCompleterMod :: Monad m => (String -> m [String]) -> CompletionFunc m
+wrapIdentCompleterMod = wrapCompleter' go
+  where
+    go '.' = False -- Treated specially since it is a seperator for module qualifiers
+    go c = word_break_chars_pred c
 
 wrapIdentCompleterWithModifier
   :: Monad m
