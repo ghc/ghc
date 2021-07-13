@@ -32,10 +32,10 @@ notRule x = x
 {-# INLINE [0] notRule #-}
 {-# RULES "notRule/False" [~0] notRule False = True #-}
 
-f :: T -> () -> Bool
-f (D a) () = notRule a
+f :: () -> T -> Bool
+f () (D a) = notRule a
 {-# INLINE [100] f #-} -- so it isn’t inlined before FloatOut
 
 g :: () -> Bool
-g x = f (D False) x
+g x = f x (D False)
 {-# NOINLINE g #-}
