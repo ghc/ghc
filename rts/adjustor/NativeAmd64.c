@@ -55,9 +55,6 @@ createAdjustor(int cconv, StgStablePtr hptr,
                char *typeString
     )
 {
-    void *adjustor = NULL;
-    void *code = NULL;
-
     switch (cconv)
     {
     case 1: /* _ccall */
@@ -140,8 +137,6 @@ createAdjustor(int cconv, StgStablePtr hptr,
 
     */
     {
-        StgWord8 *adj_code;
-
         // determine whether we have 4 or more integer arguments,
         // and therefore need to flush one to the stack.
         if ((typeString[0] == '\0') ||
@@ -149,8 +144,8 @@ createAdjustor(int cconv, StgStablePtr hptr,
             (typeString[2] == '\0') ||
             (typeString[3] == '\0')) {
 
-            adjustor = allocateExec(0x38,&code);
-            adj_code = (StgWord8*)adjustor;
+            ExecPage *page = allocateExecPage();
+            StgWord8 *adj_code = (StgWord8*) page;
 
             *(StgInt32 *)adj_code        = 0x49c1894d;
             *(StgInt32 *)(adj_code+0x4)  = 0x8948d089;
@@ -164,14 +159,16 @@ createAdjustor(int cconv, StgStablePtr hptr,
             *(StgInt32 *)(adj_code+0x20) = 0x00000000;
             *(StgInt64 *)(adj_code+0x28) = (StgInt64)hptr;
             *(StgInt64 *)(adj_code+0x30) = (StgInt64)wptr;
+
+            freezeExecPage(page);
+            return page;
         }
         else
         {
-            int fourthFloating;
+            bool fourthFloating = (typeString[3] == 'f' || typeString[3] == 'd');
+            ExecPage *page = allocateExecPage();
+            StgWord8 *adj_code = (StgWord8*) page;
 
-            fourthFloating = (typeString[3] == 'f' || typeString[3] == 'd');
-            adjustor = allocateExec(0x58,&code);
-            adj_code = (StgWord8*)adjustor;
             *(StgInt32 *)adj_code        = 0x08ec8348;
             *(StgInt32 *)(adj_code+0x4)  = fourthFloating ? 0x5c110ff2
                                                           : 0x4c894c90;
@@ -192,6 +189,9 @@ createAdjustor(int cconv, StgStablePtr hptr,
             *(StgInt64 *)(adj_code+0x40) = (StgInt64)obscure_ccall_ret_code;
             *(StgInt64 *)(adj_code+0x48) = (StgInt64)hptr;
             *(StgInt64 *)(adj_code+0x50) = (StgInt64)wptr;
+
+            freezeExecPage(page);
+            return page;
         }
     }
 
@@ -256,7 +256,6 @@ createAdjustor(int cconv, StgStablePtr hptr,
     {
         int i = 0;
         char *c;
-        StgWord8 *adj_code;
 
         // determine whether we have 6 or more integer arguments,
         // and therefore need to flush one to the stack.
@@ -266,8 +265,8 @@ createAdjustor(int cconv, StgStablePtr hptr,
         }
 
         if (i < 6) {
-            adjustor = allocateExec(0x30,&code);
-            adj_code = (StgWord8*)adjustor;
+            ExecPage *page = allocateExecPage();
+            StgWord8 *adj_code = (StgWord8*) page;
 
             *(StgInt32 *)adj_code        = 0x49c1894d;
             *(StgInt32 *)(adj_code+0x4)  = 0x8948c889;
@@ -278,11 +277,14 @@ createAdjustor(int cconv, StgStablePtr hptr,
             *(StgInt32 *)(adj_code+0x18) = 0x0000000c;
             *(StgInt64 *)(adj_code+0x20) = (StgInt64)hptr;
             *(StgInt64 *)(adj_code+0x28) = (StgInt64)wptr;
+
+            freezeExecPage(page);
+            return page;
         }
         else
         {
-            adjustor = allocateExec(0x40,&code);
-            adj_code = (StgWord8*)adjustor;
+            ExecPage *page = allocateExecPage();
+            StgWord8 *adj_code = (StgWord8*) page;
 
             *(StgInt32 *)adj_code        = 0x35ff5141;
             *(StgInt32 *)(adj_code+0x4)  = 0x00000020;
@@ -297,6 +299,9 @@ createAdjustor(int cconv, StgStablePtr hptr,
             *(StgInt64 *)(adj_code+0x28) = (StgInt64)obscure_ccall_ret_code;
             *(StgInt64 *)(adj_code+0x30) = (StgInt64)hptr;
             *(StgInt64 *)(adj_code+0x38) = (StgInt64)wptr;
+
+            freezeExecPage(page);
+            return page;
         }
     }
 #endif /* defined(mingw32_HOST_OS) */
@@ -305,8 +310,6 @@ createAdjustor(int cconv, StgStablePtr hptr,
         barf("createAdjustor: Unsupported calling convention");
         break;
     }
-
-    return code;
 }
 
 void freeHaskellFunctionPtr(void* ptr)
@@ -332,5 +335,5 @@ void freeHaskellFunctionPtr(void* ptr)
         return;
     }
 
-    freeExec(ptr);
+    freeExecPage((ExecPage *) ptr);
 }

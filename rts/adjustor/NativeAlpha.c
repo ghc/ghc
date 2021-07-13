@@ -21,9 +21,6 @@ createAdjustor(int cconv, StgStablePtr hptr,
                char *typeString STG_UNUSED
     )
 {
-    void *adjustor = NULL;
-    void *code = NULL;
-
     switch (cconv)
     {
     case 1: /* _ccall */
@@ -67,10 +64,10 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
       4 bytes), we should move the first three instructions above down by
       4 bytes (getting rid of the nop), hence saving memory. [ccshan]
   */
-    ASSERT(((StgWord64)wptr & 3) == 0);
-    adjustor = allocateExec(48,&code);
     {
-        StgWord64 *const code = (StgWord64 *)adjustor;
+        ASSERT(((StgWord64)wptr & 3) == 0);
+        ExecPage *page = allocateExecPage();
+        StgWord64 *const code = (StgWord64 *) page;
 
         code[0] = 0x4610041246520414L;
         code[1] = 0x46730415a61b0020L;
@@ -81,15 +78,15 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
         code[4] = (StgWord64)hptr;
         code[5] = (StgWord64)wptr;
 
+        freezeExecPage(page);
         /* Ensure that instruction cache is consistent with our new code */
         __asm__ volatile("call_pal %0" : : "i" (PAL_imb));
+        return code;
     }
 
     default:
         barf("createAdjustor: Unsupported calling convention");
     }
-
-    return code;
 }
 
 void
@@ -103,5 +100,5 @@ freeHaskellFunctionPtr(void* ptr)
     /* Free the stable pointer first..*/
     freeStablePtr(*((StgStablePtr*)((unsigned char*)ptr + 0x10)));
 
-    freeExec(ptr);
+    freeExecPage((ExecPage *) ptr);
 }

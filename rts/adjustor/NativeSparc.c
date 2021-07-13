@@ -14,9 +14,6 @@ createAdjustor(int cconv, StgStablePtr hptr,
                char *typeString STG_UNUSED
     )
 {
-    void *adjustor = NULL;
-    void *code = NULL;
-
     switch (cconv)
     {
     case 1: /* _ccall */
@@ -49,9 +46,9 @@ createAdjustor(int cconv, StgStablePtr hptr,
      similarly, and local variables should be accessed via %fp, not %sp. In a
      nutshell: This should work! (Famous last words! :-)
   */
-    adjustor = allocateExec(4*(11+1),&code);
     {
-        unsigned long *const adj_code = (unsigned long *)adjustor;
+        ExecPage *page = allocateExecPage();
+        unsigned long *const adj_code = (unsigned long *) page;
 
         adj_code[ 0]  = 0x9C23A008UL;   /* sub   %sp, 8, %sp         */
         adj_code[ 1]  = 0xDA23A060UL;   /* st    %o5, [%sp + 96]     */
@@ -71,6 +68,8 @@ createAdjustor(int cconv, StgStablePtr hptr,
 
         adj_code[11]  = (unsigned long)hptr;
 
+        freezeExecPage(page);
+
         /* flush cache */
         asm("flush %0" : : "r" (adj_code     ));
         asm("flush %0" : : "r" (adj_code +  2));
@@ -83,13 +82,13 @@ createAdjustor(int cconv, StgStablePtr hptr,
         asm("nop");
         asm("nop");
         asm("nop");
+
+        return page;
     }
 
     default:
         barf("createAdjustor: Unsupported calling convention");
     }
-
-    return code;
 }
 
 void
@@ -103,5 +102,5 @@ freeHaskellFunctionPtr(void* ptr)
     /* Free the stable pointer first..*/
     freeStablePtr(*((StgStablePtr*)((unsigned long*)ptr + 11)));
 
-    freeExec(ptr);
+    freeExecPage(ptr);
 }
