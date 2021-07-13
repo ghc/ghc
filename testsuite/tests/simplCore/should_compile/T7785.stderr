@@ -1,8 +1,335 @@
 
-==================== Tidy Core rules ====================
-"SPEC shared @[]"
-    forall ($dMyFunctor :: MyFunctor []) (irred :: Domain [] Int).
-      shared @[] $dMyFunctor irred
-      = bar_$sshared
+==================== Common sub-expression ====================
+Result size of Common sub-expression
+  = {terms: 181, types: 89, coercions: 5, joins: 0/1}
+
+-- RHS size: {terms: 5, types: 10, coercions: 0, joins: 0/0}
+$cmyfmap_aG7
+  :: forall a b. (Domain [] a, Domain [] b) => (a -> b) -> [a] -> [b]
+[LclId,
+ Arity=4,
+ Str=<A><A><U><SU>,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=True)
+         Tmpl= \ (@a_aGa)
+                 (@b_aGb)
+                 _ [Occ=Dead]
+                 _ [Occ=Dead]
+                 (eta_B0 [Occ=Once1, OS=OneShot] :: a_aGa -> b_aGb)
+                 (eta_B1 [Occ=Once1, OS=OneShot] :: [a_aGa]) ->
+                 GHC.Base.build
+                   @b_aGb
+                   (\ (@b1_aHe)
+                      (c_aHf [Occ=Once1, OS=OneShot] :: b_aGb -> b1_aHe -> b1_aHe)
+                      (n_aHg [Occ=Once1, OS=OneShot] :: b1_aHe) ->
+                      GHC.Base.foldr
+                        @a_aGa
+                        @b1_aHe
+                        (GHC.Base.mapFB @b_aGb @b1_aHe @a_aGa c_aHf eta_B0)
+                        n_aHg
+                        eta_B1)}]
+$cmyfmap_aG7
+  = \ (@a_aGa)
+      (@b_aGb)
+      _ [Occ=Dead, Dmd=A]
+      _ [Occ=Dead, Dmd=A, OS=OneShot] ->
+      map @a_aGa @b_aGb
+
+-- RHS size: {terms: 1, types: 0, coercions: 3, joins: 0/0}
+Foo.$fMyFunctor[] [InlPrag=INLINE (sat-args=0)] :: MyFunctor []
+[LclIdX[DFunId(nt)],
+ Arity=4,
+ Str=<A><A><U><SU>,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=False,boring_ok=True)
+         Tmpl= $cmyfmap_aG7
+               `cast` (Sym (Foo.N:MyFunctor[0] <[]>_N)
+                       :: (forall a b.
+                           (Domain [] a, Domain [] b) =>
+                           (a -> b) -> [a] -> [b])
+                          ~R# MyFunctor [])}]
+Foo.$fMyFunctor[]
+  = $cmyfmap_aG7
+    `cast` (Sym (Foo.N:MyFunctor[0] <[]>_N)
+            :: (forall a b.
+                (Domain [] a, Domain [] b) =>
+                (a -> b) -> [a] -> [b])
+               ~R# MyFunctor [])
+
+-- RHS size: {terms: 2, types: 2, coercions: 0, joins: 0/0}
+$sshared_sHD :: [Int] -> [Int]
+[LclId,
+ Arity=1,
+ Str=<SU>,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=False)
+         Tmpl= map @Int @Int GHC.Num.$fNumInt_$cnegate}]
+$sshared_sHD = map @Int @Int GHC.Num.$fNumInt_$cnegate
+
+-- RHS size: {terms: 115, types: 15, coercions: 2, joins: 0/1}
+shared
+  :: forall (f :: * -> *).
+     (MyFunctor f, Domain f Int) =>
+     f Int -> f Int
+[LclIdX,
+ Arity=2,
+ Str=<UC1(CS(CS(U)))><U>,
+ RULES: "SPEC shared @[]"
+            forall ($dMyFunctor_sHz :: MyFunctor [])
+                   (irred_sHA :: Domain [] Int).
+              shared @[] $dMyFunctor_sHz irred_sHA
+              = $sshared_sHD]
+shared
+  = \ (@(f_ayh :: * -> *))
+      ($dMyFunctor_ayi [Dmd=UC1(CS(CS(U)))] :: MyFunctor f_ayh)
+      (irred_ayj :: Domain f_ayh Int) ->
+      let {
+        f_sHy :: f_ayh Int -> f_ayh Int
+        [LclId]
+        f_sHy
+          = ($dMyFunctor_ayi
+             `cast` (Foo.N:MyFunctor[0] <f_ayh>_N
+                     :: MyFunctor f_ayh
+                        ~R# (forall a b.
+                             (Domain f_ayh a, Domain f_ayh b) =>
+                             (a -> b) -> f_ayh a -> f_ayh b)))
+              @Int @Int irred_ayj irred_ayj GHC.Num.$fNumInt_$cnegate } in
+      \ (x_X4N :: f_ayh Int) ->
+        f_sHy
+          (f_sHy
+             (f_sHy
+                (f_sHy
+                   (f_sHy
+                      (f_sHy
+                         (f_sHy
+                            (f_sHy
+                               (f_sHy
+                                  (f_sHy
+                                     (f_sHy
+                                        (f_sHy
+                                           (f_sHy
+                                              (f_sHy
+                                                 (f_sHy
+                                                    (f_sHy
+                                                       (f_sHy
+                                                          (f_sHy
+                                                             (f_sHy
+                                                                (f_sHy
+                                                                   (f_sHy
+                                                                      (f_sHy
+                                                                         (f_sHy
+                                                                            (f_sHy
+                                                                               (f_sHy
+                                                                                  (f_sHy
+                                                                                     (f_sHy
+                                                                                        (f_sHy
+                                                                                           (f_sHy
+                                                                                              (f_sHy
+                                                                                                 (f_sHy
+                                                                                                    (f_sHy
+                                                                                                       (f_sHy
+                                                                                                          (f_sHy
+                                                                                                             (f_sHy
+                                                                                                                (f_sHy
+                                                                                                                   (f_sHy
+                                                                                                                      (f_sHy
+                                                                                                                         (f_sHy
+                                                                                                                            (f_sHy
+                                                                                                                               (f_sHy
+                                                                                                                                  (f_sHy
+                                                                                                                                     (f_sHy
+                                                                                                                                        (f_sHy
+                                                                                                                                           (f_sHy
+                                                                                                                                              (f_sHy
+                                                                                                                                                 (f_sHy
+                                                                                                                                                    (f_sHy
+                                                                                                                                                       (f_sHy
+                                                                                                                                                          (f_sHy
+                                                                                                                                                             (f_sHy
+                                                                                                                                                                (f_sHy
+                                                                                                                                                                   (f_sHy
+                                                                                                                                                                      (f_sHy
+                                                                                                                                                                         (f_sHy
+                                                                                                                                                                            (f_sHy
+                                                                                                                                                                               (f_sHy
+                                                                                                                                                                                  (f_sHy
+                                                                                                                                                                                     (f_sHy
+                                                                                                                                                                                        (f_sHy
+                                                                                                                                                                                           (f_sHy
+                                                                                                                                                                                              (f_sHy
+                                                                                                                                                                                                 (f_sHy
+                                                                                                                                                                                                    (f_sHy
+                                                                                                                                                                                                       (f_sHy
+                                                                                                                                                                                                          (f_sHy
+                                                                                                                                                                                                             (f_sHy
+                                                                                                                                                                                                                (f_sHy
+                                                                                                                                                                                                                   (f_sHy
+                                                                                                                                                                                                                      (f_sHy
+                                                                                                                                                                                                                         (f_sHy
+                                                                                                                                                                                                                            (f_sHy
+                                                                                                                                                                                                                               (f_sHy
+                                                                                                                                                                                                                                  (f_sHy
+                                                                                                                                                                                                                                     (f_sHy
+                                                                                                                                                                                                                                        (f_sHy
+                                                                                                                                                                                                                                           (f_sHy
+                                                                                                                                                                                                                                              (f_sHy
+                                                                                                                                                                                                                                                 (f_sHy
+                                                                                                                                                                                                                                                    (f_sHy
+                                                                                                                                                                                                                                                       (f_sHy
+                                                                                                                                                                                                                                                          (f_sHy
+                                                                                                                                                                                                                                                             (f_sHy
+                                                                                                                                                                                                                                                                (f_sHy
+                                                                                                                                                                                                                                                                   (f_sHy
+                                                                                                                                                                                                                                                                      (f_sHy
+                                                                                                                                                                                                                                                                         (f_sHy
+                                                                                                                                                                                                                                                                            (f_sHy
+                                                                                                                                                                                                                                                                               (f_sHy
+                                                                                                                                                                                                                                                                                  (f_sHy
+                                                                                                                                                                                                                                                                                     (f_sHy
+                                                                                                                                                                                                                                                                                        (f_sHy
+                                                                                                                                                                                                                                                                                           (f_sHy
+                                                                                                                                                                                                                                                                                              (f_sHy
+                                                                                                                                                                                                                                                                                                 (f_sHy
+                                                                                                                                                                                                                                                                                                    (f_sHy
+                                                                                                                                                                                                                                                                                                       (f_sHy
+                                                                                                                                                                                                                                                                                                          (f_sHy
+                                                                                                                                                                                                                                                                                                             (f_sHy
+                                                                                                                                                                                                                                                                                                                (f_sHy
+                                                                                                                                                                                                                                                                                                                   (f_sHy
+                                                                                                                                                                                                                                                                                                                      (f_sHy
+                                                                                                                                                                                                                                                                                                                         (f_sHy
+                                                                                                                                                                                                                                                                                                                            (f_sHy
+                                                                                                                                                                                                                                                                                                                               (f_sHy
+                                                                                                                                                                                                                                                                                                                                  x_X4N))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+lvl_sHI :: Int
+[LclId]
+lvl_sHI = GHC.Types.I# 0#
+
+-- RHS size: {terms: 6, types: 5, coercions: 0, joins: 0/0}
+foo :: [Int] -> [Int]
+[LclIdX,
+ Arity=1,
+ Str=<U>,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (xs_awV [Occ=Once1] :: [Int]) ->
+                 GHC.Base.build
+                   @Int
+                   (\ (@b1_aHe)
+                      (c_aHf [Occ=Once1, OS=OneShot] :: Int -> b1_aHe -> b1_aHe)
+                      (n_aHg [Occ=Once1, OS=OneShot] :: b1_aHe) ->
+                      GHC.Base.foldr
+                        @Int
+                        @b1_aHe
+                        (GHC.Base.mapFB @Int @b1_aHe @Int c_aHf GHC.Num.$fNumInt_$cnegate)
+                        n_aHg
+                        (GHC.Types.: @Int lvl_sHI xs_awV))}]
+foo
+  = \ (xs_awV :: [Int]) ->
+      map
+        @Int
+        @Int
+        GHC.Num.$fNumInt_$cnegate
+        (GHC.Types.: @Int lvl_sHI xs_awV)
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl_sHJ :: Int
+[LclId]
+lvl_sHJ = lvl_sHI
+
+-- RHS size: {terms: 6, types: 5, coercions: 0, joins: 0/0}
+bar :: [Int] -> [Int]
+[LclIdX,
+ Arity=1,
+ Str=<1U>,
+ Cpr=m2,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (xs_awW [Occ=Once1] :: [Int]) ->
+                 GHC.Types.:
+                   @Int
+                   lvl_sHI
+                   (GHC.Base.build
+                      @Int
+                      (\ (@b1_aHe)
+                         (c_aHf [Occ=Once1, OS=OneShot] :: Int -> b1_aHe -> b1_aHe)
+                         (n_aHg [Occ=Once1, OS=OneShot] :: b1_aHe) ->
+                         GHC.Base.foldr
+                           @Int
+                           @b1_aHe
+                           (GHC.Base.mapFB @Int @b1_aHe @Int c_aHf GHC.Num.$fNumInt_$cnegate)
+                           n_aHg
+                           xs_awW))}]
+bar
+  = \ (xs_awW :: [Int]) ->
+      GHC.Types.:
+        @Int lvl_sHI (map @Int @Int GHC.Num.$fNumInt_$cnegate xs_awW)
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule_sHr :: GHC.Prim.Addr#
+[LclId]
+$trModule_sHr = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule_sHs :: GHC.Types.TrName
+[LclId]
+$trModule_sHs = GHC.Types.TrNameS $trModule_sHr
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule_sHt :: GHC.Prim.Addr#
+[LclId]
+$trModule_sHt = "Foo"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule_sHu :: GHC.Types.TrName
+[LclId]
+$trModule_sHu = GHC.Types.TrNameS $trModule_sHt
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+Foo.$trModule :: GHC.Types.Module
+[LclIdX]
+Foo.$trModule = GHC.Types.Module $trModule_sHs $trModule_sHu
+
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+$krep_aGF [InlPrag=[~]] :: GHC.Types.KindRep
+[LclId]
+$krep_aGF
+  = GHC.Types.KindRepTyConApp
+      GHC.Types.$tcConstraint (GHC.Types.[] @GHC.Types.KindRep)
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep_aGE [InlPrag=[~]] :: GHC.Types.KindRep
+[LclId]
+$krep_aGE = GHC.Types.KindRepFun GHC.Types.krep$*Arr* $krep_aGF
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$tcMyFunctor_sHv :: GHC.Prim.Addr#
+[LclId]
+$tcMyFunctor_sHv = "MyFunctor"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$tcMyFunctor_sHw :: GHC.Types.TrName
+[LclId]
+$tcMyFunctor_sHw = GHC.Types.TrNameS $tcMyFunctor_sHv
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+Foo.$tcMyFunctor :: GHC.Types.TyCon
+[LclIdX]
+Foo.$tcMyFunctor
+  = GHC.Types.TyCon
+      12837160846121910345##
+      787075802864859973##
+      Foo.$trModule
+      $tcMyFunctor_sHw
+      0#
+      $krep_aGE
+
 
 
