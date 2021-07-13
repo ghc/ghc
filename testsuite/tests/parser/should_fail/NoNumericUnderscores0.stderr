@@ -1,3 +1,4 @@
 
 NoNumericUnderscores0.hs:11:3: error:
-    Use NumericUnderscores to allow underscores in integer literals
+    Illegal underscores in integer literals
+    Suggested fix: Perhaps you intended to use NumericUnderscores
