@@ -1398,7 +1398,7 @@ languageExtensions (Just GHC2021)
        LangExt.InstanceSigs,
        LangExt.KindSignatures,
        LangExt.MultiParamTypeClasses,
-       LangExt.RecordPuns,
+       LangExt.NamedFieldPuns,
        LangExt.NamedWildCards,
        LangExt.NumericUnderscores,
        LangExt.PolyKinds,
@@ -3594,7 +3594,7 @@ xFlagsDeps = [
   flagSpec "MultiWayIf"                       LangExt.MultiWayIf,
   flagSpec "NumericUnderscores"               LangExt.NumericUnderscores,
   flagSpec "NPlusKPatterns"                   LangExt.NPlusKPatterns,
-  flagSpec "NamedFieldPuns"                   LangExt.RecordPuns,
+  flagSpec "NamedFieldPuns"                   LangExt.NamedFieldPuns,
   flagSpec "NamedWildCards"                   LangExt.NamedWildCards,
   flagSpec "NegativeLiterals"                 LangExt.NegativeLiterals,
   flagSpec "HexFloatLiterals"                 LangExt.HexFloatLiterals,
@@ -3627,7 +3627,7 @@ xFlagsDeps = [
   flagSpec "RebindableSyntax"                 LangExt.RebindableSyntax,
   flagSpec "OverloadedRecordDot"              LangExt.OverloadedRecordDot,
   flagSpec "OverloadedRecordUpdate"           LangExt.OverloadedRecordUpdate,
-  depFlagSpec' "RecordPuns"                   LangExt.RecordPuns
+  depFlagSpec' "RecordPuns"                   LangExt.NamedFieldPuns
     (deprecatedForExtension "NamedFieldPuns"),
   flagSpec "RecordWildCards"                  LangExt.RecordWildCards,
   flagSpec "RecursiveDo"                      LangExt.RecursiveDo,
