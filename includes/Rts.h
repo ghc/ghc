@@ -223,6 +223,7 @@ void _assertFail(const char *filename, unsigned int linenum)
 #include "rts/ForeignExports.h"
 
 /* Other RTS external APIs */
+#include "rts/ExecPage.h"
 #include "rts/Parallel.h"
 #include "rts/Signals.h"
 #include "rts/BlockSignals.h"

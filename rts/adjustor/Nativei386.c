@@ -34,9 +34,6 @@ createAdjustor(int cconv, StgStablePtr hptr,
                char *typeString STG_UNUSED
     )
 {
-    void *adjustor = NULL;
-    void *code = NULL;
-
     switch (cconv)
     {
     case 0: /* _stdcall */
@@ -55,20 +52,23 @@ createAdjustor(int cconv, StgStablePtr hptr,
     */
 
     {
-        unsigned char adj_code[14];
-        adj_code[0x00] = (unsigned char)0x58;  /* popl %eax  */
+        ExecPage *page = allocateExecPage();
+        uint8_t *adj_code = (uint8_t *) page;
+        adj_code[0x00] = 0x58;  /* popl %eax  */
 
-        adj_code[0x01] = (unsigned char)0x68;  /* pushl hptr (which is a dword immediate ) */
+        adj_code[0x01] = 0x68;  /* pushl hptr (which is a dword immediate ) */
         *((StgStablePtr*)(adj_code + 0x02)) = (StgStablePtr)hptr;
 
-        adj_code[0x06] = (unsigned char)0x50; /* pushl %eax */
+        adj_code[0x06] = 0x50; /* pushl %eax */
 
-        adj_code[0x07] = (unsigned char)0xb8; /* movl  $wptr, %eax */
+        adj_code[0x07] = 0xb8; /* movl  $wptr, %eax */
         *((StgFunPtr*)(adj_code + 0x08)) = (StgFunPtr)wptr;
 
-        adj_code[0x0c] = (unsigned char)0xff; /* jmp %eax */
-        adj_code[0x0d] = (unsigned char)0xe0;
-        adjustor = allocateExec(14, &adj_code);
+        adj_code[0x0c] = 0xff; /* jmp %eax */
+        adj_code[0x0d] = 0xe0;
+
+        freezeExecPage(page);
+        return page;
     }
 #endif /* !defined(darwin_HOST_OS) */
 
@@ -82,13 +82,12 @@ createAdjustor(int cconv, StgStablePtr hptr,
 
           We offload most of the work to AdjustorAsm.S.
         */
-        AdjustorStub *adjustorStub = allocateExec(sizeof(AdjustorStub),&code);
-        adjustor = adjustorStub;
-
+        ExecPage *page = allocateExecPage();
+        AdjustorStub *adjustorStub = (AdjustorStub *) page;
         int sz = totalArgumentSize(typeString);
 
         adjustorStub->call[0] = 0xe8;
-        *(long*)&adjustorStub->call[1] = ((char*)&adjustorCode) - ((char*)code + 5);
+        *(long*)&adjustorStub->call[1] = ((char*)&adjustorCode) - ((char*)page + 5);
         adjustorStub->hptr = hptr;
         adjustorStub->wptr = wptr;
 
@@ -107,13 +106,14 @@ createAdjustor(int cconv, StgStablePtr hptr,
             // only count 2.) and 3.) as part of frame_size
         adjustorStub->frame_size -= 12;
         adjustorStub->argument_size = sz;
+
+        freezeExecPage(page);
+        return page;
     }
 
     default:
         barf("createAdjustor: Unsupported calling convention");
     }
-
-    return code;
 }
 
 void
@@ -130,5 +130,5 @@ freeHaskellFunctionPtr(void* ptr)
         freeStablePtr(*((StgStablePtr*)((unsigned char*)ptr + 0x02)));
     }
 
-    freeExec(ptr);
+    freeExecPage((ExecPage *) ptr);
 }

@@ -1879,9 +1879,9 @@ packageHsLibs dflags p = map (mkDynName . addSuffix) (unitLibraries p)
         -- This change elevates the need to add custom hooks
         -- and handling specifically for the `rts` package for
         -- example in ghc-cabal.
-        addSuffix rts@"HSrts"    = rts       ++ (expandTag rts_tag)
-        addSuffix rts@"HSrts-1.0"= rts       ++ (expandTag rts_tag)
-        addSuffix other_lib      = other_lib ++ (expandTag tag)
+        addSuffix rts@"HSrts"      = rts       ++ (expandTag rts_tag)
+        addSuffix rts@"HSrts-1.0.2"= rts       ++ (expandTag rts_tag)
+        addSuffix other_lib        = other_lib ++ (expandTag tag)
 
         expandTag t | null t = ""
                     | otherwise = '_':t

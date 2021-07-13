@@ -35,8 +35,8 @@ mkConInfoTable
    -> Int     -- pointer tag
    -> ByteString  -- con desc
    -> IO (Ptr StgInfoTable)
-      -- resulting info table is allocated with allocateExec(), and
-      -- should be freed with freeExec().
+      -- resulting info table is allocated with allocateExecPage(), and
+      -- should be freed with freeExecPage().
 
 mkConInfoTable tables_next_to_code ptr_words nonptr_words tag ptrtag con_desc = do
   let entry_addr = interpConstrEntry !! ptrtag
@@ -358,28 +358,18 @@ sizeOfEntryCode tables_next_to_code
 
 -- Note: Must return proper pointer for use in a closure
 newExecConItbl :: Bool -> StgInfoTable -> ByteString -> IO (FunPtr ())
-newExecConItbl tables_next_to_code obj con_desc
-#if RTS_LINKER_USE_MMAP && MIN_VERSION_rts(1,0,1)
-   = do
-#else
-   = alloca $ \pcode -> do
-#endif
-        sz0 <- sizeOfEntryCode tables_next_to_code
-        let lcon_desc = BS.length con_desc + 1{- null terminator -}
-            -- SCARY
-            -- This size represents the number of bytes in an StgConInfoTable.
-            sz = fromIntegral $ conInfoTableSizeB + sz0
-               -- Note: we need to allocate the conDesc string next to the info
-               -- table, because on a 64-bit platform we reference this string
-               -- with a 32-bit offset relative to the info table, so if we
-               -- allocated the string separately it might be out of range.
-#if RTS_LINKER_USE_MMAP && MIN_VERSION_rts(1,0,1)
-        wr_ptr <- _allocateWrite (sz + fromIntegral lcon_desc)
-        let ex_ptr = wr_ptr
-#else
-        wr_ptr <- _allocateExec (sz + fromIntegral lcon_desc) pcode
-        ex_ptr <- peek pcode
-#endif
+newExecConItbl tables_next_to_code obj con_desc = do
+    sz0 <- sizeOfEntryCode tables_next_to_code
+    let lcon_desc = BS.length con_desc + 1{- null terminator -}
+        -- SCARY
+        -- This size represents the number of bytes in an StgConInfoTable.
+        sz = fromIntegral $ conInfoTableSizeB + sz0
+            -- Note: we need to allocate the conDesc string next to the info
+            -- table, because on a 64-bit platform we reference this string
+            -- with a 32-bit offset relative to the info table, so if we
+            -- allocated the string separately it might be out of range.
+
+    ex_ptr <- fillExecBuffer (sz + fromIntegral lcon_desc) $ \wr_ptr ex_ptr -> do
         let cinfo = StgConInfoTable { conDesc = ex_ptr `plusPtr` fromIntegral sz
                                     , infoTable = obj }
         pokeConItbl tables_next_to_code wr_ptr ex_ptr cinfo
@@ -387,13 +377,37 @@ newExecConItbl tables_next_to_code obj con_desc
             copyBytes (castPtr wr_ptr `plusPtr` fromIntegral sz) src len
         let null_off = fromIntegral sz + fromIntegral (BS.length con_desc)
         poke (castPtr wr_ptr `plusPtr` null_off) (0 :: Word8)
-        _flushExec sz ex_ptr -- Cache flush (if needed)
-#if RTS_LINKER_USE_MMAP && MIN_VERSION_rts(1,0,1)
-        _markExec (sz + fromIntegral lcon_desc) ex_ptr
-#endif
-        pure $ if tables_next_to_code
-          then castPtrToFunPtr $ ex_ptr `plusPtr` conInfoTableSizeB
-          else castPtrToFunPtr ex_ptr
+
+    pure $ if tables_next_to_code
+      then castPtrToFunPtr $ ex_ptr `plusPtr` conInfoTableSizeB
+      else castPtrToFunPtr ex_ptr
+
+-- | Allocate a buffer of a given size, use the given action to fill it with
+-- data, and mark it as executable. The action is given a writable pointer and
+-- the executable pointer. Returns a pointer to the executable code.
+fillExecBuffer :: CSize -> (Ptr a -> Ptr a -> IO ()) -> IO (Ptr a)
+
+#if MIN_VERSION_rts(1,0,2)
+
+data ExecPage
+
+foreign import ccall unsafe "allocateExecPage"
+  _allocateExecPage :: IO (Ptr ExecPage)
+
+foreign import ccall unsafe "freezeExecPage"
+  _freezeExecPage :: Ptr ExecPage -> IO ()
+
+fillExecBuffer sz cont
+    -- we can only allocate single pages. This assumes a 4k page size which
+    -- isn't strictly correct but is a reasonable conservative lower bound.
+  | sz > 4096 = fail "withExecBuffer: Too large"
+  | otherwise = do
+        pg <- _allocateExecPage
+        cont (castPtr pg) (castPtr pg)
+        _freezeExecPage pg
+        return (castPtr pg)
+
+#else
 
 foreign import ccall unsafe "allocateExec"
   _allocateExec :: CUInt -> Ptr (Ptr a) -> IO (Ptr a)
@@ -401,12 +415,15 @@ foreign import ccall unsafe "allocateExec"
 foreign import ccall unsafe "flushExec"
   _flushExec :: CUInt -> Ptr a -> IO ()
 
-#if RTS_LINKER_USE_MMAP && MIN_VERSION_rts(1,0,1)
-foreign import ccall unsafe "allocateWrite"
-  _allocateWrite :: CUInt -> IO (Ptr a)
-foreign import ccall unsafe "markExec"
-  _markExec :: CUInt -> Ptr a -> IO ()
+fillExecBuffer sz cont = alloca $ \pcode -> do
+    wr_ptr <- _allocateExec (fromIntegral sz) pcode
+    ex_ptr <- peek pcode
+    cont wr_ptr ex_ptr
+    _flushExec (fromIntegral sz) ex_ptr -- Cache flush (if needed)
+    return (ex_ptr)
+
 #endif
+
 -- -----------------------------------------------------------------------------
 -- Constants and config
 
