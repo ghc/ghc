@@ -3524,15 +3524,9 @@ completeIdentifier line@(left, _) =
     ('.':_)  -> wrapCompleter (specials ++ spaces) complete line
                -- operator or qualification
     (x:_) | isSymbolChar x -> wrapCompleter (specials ++ spaces)
-                                 complete (takeOpChars line)         -- operator
-    _                      -> wrapIdentCompleter complete (takeIdentChars line)
+                                 complete line         -- operator
+    _                      -> wrapIdentCompleter complete line
   where
-    takeOpChars (l, r) = (takeWhile isSymbolChar l, r)               -- #10576
-       -- An operator contains only symbol characters
-    takeIdentChars (l, r) = (takeWhile notOpChar l, r)
-       -- An identifier doesn't contain symbol characters with the
-       -- exception of a dot
-    notOpChar c = (not .isSymbol ) c || c == '.'
     complete w = do
       rdrs <- GHC.getRdrNamesInScope
       dflags <- GHC.getSessionDynFlags
