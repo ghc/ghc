@@ -254,7 +254,7 @@ uniqFromMask :: Char -> IO Unique
 uniqFromMask !mask
   = do { uqNum <- genSym
        ; return $! mkUnique mask uqNum }
-
+{-# NOINLINE uniqFromMask #-} -- We'll unbox everything, but we don't want to inline it
 
 splitUniqSupply :: UniqSupply -> (UniqSupply, UniqSupply)
 -- ^ Build two 'UniqSupply' from a single one, each of which
