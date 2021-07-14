@@ -7,6 +7,7 @@
 
 #include "RtsUtils.h"
 #include "StablePtr.h"
+#include "Adjustor.h"
 
 #if defined(_WIN32)
 #include <windows.h>

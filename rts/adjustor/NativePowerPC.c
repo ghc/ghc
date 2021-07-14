@@ -7,6 +7,7 @@
 
 #include "RtsUtils.h"
 #include "StablePtr.h"
+#include "Adjustor.h"
 
 /* Adjustor logic for PowerPC and PowerPC64 */
 
