@@ -167,6 +167,9 @@ bindistRules = do
         copyDirectory (ghcBuildDir -/- "lib") bindistFilesDir
         copyDirectory (rtsIncludeDir)         bindistFilesDir
 
+        -- Recache after copying the lib dir
+        () <- cmd (bindistFilesDir -/- "bin" -/- "ghc-pkg") ["recache"]
+
         unless cross $ need ["docs"]
 
         -- TODO: we should only embed the docs that have been generated
