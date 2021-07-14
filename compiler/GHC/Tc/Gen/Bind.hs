@@ -49,7 +49,7 @@ import GHC.Core.FamInstEnv( normaliseType )
 import GHC.Tc.Instance.Family( tcGetFamInstEnvs )
 import GHC.Tc.Utils.TcType
 import GHC.Core.Type (mkStrLitTy, tidyOpenType, mkCastTy)
-import GHC.Builtin.Types ( mkBoxedTupleTy )
+import GHC.Builtin.Types ( mkBoxedTupleTy, hasFixedRuntimeRep )
 import GHC.Builtin.Types.Prim
 import GHC.Types.SourceText
 import GHC.Types.Id
@@ -78,7 +78,7 @@ import GHC.Types.Unique.Set
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
-import Data.Foldable (find)
+import Data.Foldable (find, for_)
 
 {-
 ************************************************************************
@@ -529,6 +529,12 @@ tcPolyBinds sig_fn prag_fn rec_group rec_tc closed bind_list
          NoGen              -> tcPolyNoGen rec_tc prag_fn sig_fn bind_list
          InferGen mn        -> tcPolyInfer rec_tc prag_fn sig_fn mn bind_list
          CheckGen lbind sig -> tcPolyCheck prag_fn sig lbind
+
+    -- SLD TODO: I think this zip might be wrong
+    ; for_ (zip binder_names poly_ids) $ \ (name, poly_id) -> do
+      void $
+        emitWanted (FixedRuntimeRepOrigin $ FRRBind name) $
+          hasFixedRuntimeRep (idType poly_id)
 
     ; traceTc "} End of bindings for" (vcat [ ppr binder_names, ppr rec_group
                                             , vcat [ppr id <+> ppr (idType id) | id <- poly_ids]

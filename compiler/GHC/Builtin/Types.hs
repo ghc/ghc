@@ -113,14 +113,17 @@ module GHC.Builtin.Types (
         -- * RuntimeRep and friends
         runtimeRepTyCon, levityTyCon, vecCountTyCon, vecElemTyCon,
 
-        boxedRepDataConTyCon,
+        boxedRepDataCon, boxedRepDataConTyCon,
         runtimeRepTy, levityTy, liftedRepTy, unliftedRepTy,
 
+        vecRepDataCon, tupleRepDataCon, sumRepDataCon,
         vecRepDataConTyCon, tupleRepDataConTyCon, sumRepDataConTyCon,
 
+        liftedDataCon, unliftedDataCon,
         liftedDataConTyCon, unliftedDataConTyCon,
         liftedDataConTy, unliftedDataConTy,
 
+        runtimeRepSimpleDataCons,
         intRepDataConTy,
         int8RepDataConTy, int16RepDataConTy, int32RepDataConTy, int64RepDataConTy,
         wordRepDataConTy,
@@ -128,14 +131,22 @@ module GHC.Builtin.Types (
         addrRepDataConTy,
         floatRepDataConTy, doubleRepDataConTy,
 
+        vecCountDataCons,
         vec2DataConTy, vec4DataConTy, vec8DataConTy, vec16DataConTy, vec32DataConTy,
         vec64DataConTy,
 
+        vecElemDataCons,
         int8ElemRepDataConTy, int16ElemRepDataConTy, int32ElemRepDataConTy,
         int64ElemRepDataConTy, word8ElemRepDataConTy, word16ElemRepDataConTy,
         word32ElemRepDataConTy, word64ElemRepDataConTy, floatElemRepDataConTy,
 
         doubleElemRepDataConTy,
+
+        -- ** FixedRuntimeRep
+        fixedRuntimeRepClass, fixedRuntimeRepTyCon,
+        fixedRuntimeRepTyConName, fixedRuntimeRepDataCon,
+        getRuntimeRepTyCon, axGetRuntimeRep,
+        hasFixedRuntimeRep,
 
         -- * Multiplicity and friends
         multiplicityTyConName, oneDataConName, manyDataConName, multiplicityTy,
@@ -187,6 +198,7 @@ import GHC.Types.Basic
 import GHC.Types.ForeignCall
 import GHC.Types.Unique.Set
 import Data.Array
+import GHC.Data.Pair ( Pair(..) )
 import GHC.Data.FastString
 import GHC.Data.BooleanFormula ( mkAnd )
 
@@ -1683,6 +1695,101 @@ liftedRepTy = mkTyConApp boxedRepDataConTyCon [liftedDataConTy]
 -- The type ('BoxedRep 'Unlifted)
 unliftedRepTy :: Type
 unliftedRepTy = mkTyConApp boxedRepDataConTyCon [unliftedDataConTy]
+
+{- *********************************************************************
+*                                                                      *
+                  The FixedRuntimeRep mechanism
+*                                                                      *
+********************************************************************* -}
+
+-- type FixedRuntimeRep :: RuntimeRep -> Constraint
+-- class FixedRuntimeRep rep where {}
+
+fixedRuntimeRepTyConName, fixedRuntimeRepDataConName :: Name
+fixedRuntimeRepTyConName =
+  mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "FixedRuntimeRep")
+    fixedRuntimeRepTyConKey fixedRuntimeRepTyCon
+fixedRuntimeRepDataConName =
+  mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "MkFixedRuntimeRep")
+  fixedRuntimeRepDataConKey fixedRuntimeRepDataCon
+
+fixedRuntimeRepTyCon :: TyCon
+fixedRuntimeRepClass :: Class
+fixedRuntimeRepDataCon :: DataCon
+(fixedRuntimeRepTyCon, fixedRuntimeRepClass, fixedRuntimeRepDataCon)
+  = (tycon, klass, datacon)
+  where
+    tycon     = mkClassTyCon fixedRuntimeRepTyConName binders roles
+                             rhs klass
+                             (mkPrelTyConRepName fixedRuntimeRepTyConName)
+    klass     = mkClass (tyConName tycon) (tyConTyVars tycon)
+                  [] [] [] [] [] (mkAnd []) tycon
+    datacon   = pcDataConW fixedRuntimeRepDataConName
+                  tvs [unrestricted runtimeRepTy] tycon
+
+    -- Kind: RuntimeRep -> Constraint
+    binders   = mkTemplateAnonTyConBinders [runtimeRepTy]
+    tvs       = binderVars binders
+    roles     = [Nominal]
+    rhs       = mkDataTyConRhs [datacon]
+
+-- type GetRuntimeRep :: Type -> RuntimeRep
+-- type family GetRuntimeRep ty = rep | rep -> ty where
+--    GetRuntimeRep (TYPE rep) = rep
+
+getRuntimeRepTyCon :: TyCon
+getRuntimeRepTyCon
+  = mkFamilyTyCon name
+      (mkTemplateTyConBinders [] (\ _ -> [liftedTypeKind]))
+      runtimeRepTy
+      Nothing
+      (BuiltInSynFamTyCon fam)
+      Nothing
+      (Injective [True])
+  where
+    fam =
+      BuiltInSynFamily
+        { sfMatchFam      = matchFamGetRuntimeRep
+        , sfInteractTop   = \ [k] rep ->
+                          [ Pair k (mkTyConApp tYPETyCon [rep]) ]
+        , sfInteractInert = \ _ _ _ _ -> []
+        }
+    name =
+      mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "GetRuntimeRep")
+        getRuntimeRepTyConKey getRuntimeRepTyCon
+
+matchFamGetRuntimeRep :: [Type] -> Maybe (CoAxiomRule, [Type], Type)
+matchFamGetRuntimeRep [k]
+  | Just (tc, [rep]) <- splitTyConApp_maybe k
+  , tc == tYPETyCon
+  = Just ( axGetRuntimeRep, [k], rep)
+matchFamGetRuntimeRep _ = Nothing
+
+axGetRuntimeRep :: CoAxiomRule
+axGetRuntimeRep =
+  CoAxiomRule
+    { coaxrName      = fsLit "GetRuntimeRepDef"
+    , coaxrAsmpRoles = [Nominal]
+    , coaxrRole      = Nominal
+    , coaxrProves    = \ cs -> do
+        [Pair arg1 arg2] <- pure cs
+        rep2 <- case splitTyConApp_maybe arg2 of
+          Just (tc, [rep])
+            | tc == tYPETyCon
+            -> Just rep
+          _ -> Nothing
+        pure $ Pair (mkTyConApp getRuntimeRepTyCon [arg1]) rep2
+        }
+
+-- | Compute the predicate checking that the kind of the provided type
+-- is of the form @TYPE rep@ for a fixed 'RuntimeRep' rep.
+hasFixedRuntimeRep :: Type -> PredType
+hasFixedRuntimeRep ty =
+  mkTyConApp fixedRuntimeRepTyCon
+    [ mkTyConApp getRuntimeRepTyCon [ typeKind ty ] ]
+
+-- SLD TODO: we don't need to emit a Wanted if we are able to immediately
+-- determine that the type has kind TYPE rep for a fixed RuntimeRep rep.
 
 {- *********************************************************************
 *                                                                      *
