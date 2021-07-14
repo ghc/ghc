@@ -14,7 +14,7 @@ module Oracles.Setting (
     isElfTarget,
     ArmVersion(..),
     targetArmVersion,
-    ghcWithInterpreter, useLibFFIForAdjustors
+    ghcWithInterpreter
     ) where
 
 import Hadrian.Expression
@@ -274,10 +274,6 @@ ghcWithInterpreter = do
                               , "sparc64", "arm", "aarch64", "s390x"
                               , "powerpc64", "powerpc64le" ]
     return $ goodOs && goodArch
-
--- | Check to use @libffi@ for adjustors.
-useLibFFIForAdjustors :: Action Bool
-useLibFFIForAdjustors = notM $ anyTargetArch ["i386", "x86_64"]
 
 -- | Variants of the ARM architecture.
 data ArmVersion = ARMv5 | ARMv6 | ARMv7
