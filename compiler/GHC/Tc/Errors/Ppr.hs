@@ -171,13 +171,13 @@ instance Diagnostic TcRnMessage where
     TcRnEmptyRecordUpdate{}
       -> noHints
     TcRnIllegalFieldPunning{}
-      -> [SuggestExtension LangExt.RecordPuns]
+      -> [suggestExtension LangExt.RecordPuns]
     TcRnIllegalWildcardsInRecord{}
-      -> [SuggestExtension LangExt.RecordWildCards]
+      -> [suggestExtension LangExt.RecordWildCards]
     TcRnDuplicateFieldName{}
       -> noHints
     TcRnIllegalViewPattern{}
-      -> [SuggestExtension LangExt.ViewPatterns]
+      -> [suggestExtension LangExt.ViewPatterns]
     TcRnCharLiteralOutOfRange{}
       -> noHints
     TcRnIllegalWildcardsInConstructor{}

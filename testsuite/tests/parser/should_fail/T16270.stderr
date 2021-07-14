@@ -37,8 +37,8 @@ T16270.hs:19:5: error:
 
 T16270.hs:21:6: error:
     Illegal symbol ‘forall’ in type
-    Perhaps you intended to use RankNTypes or a similar language
-    extension to enable explicit-forall syntax: forall <tvs>. <type>
+    Suggested fix: Perhaps you intended to use RankNTypes
+                   or a similar language extension to enable explicit-forall syntax: forall <tvs>. <type>
 
 T16270.hs:22:8: error:
     Unexpected semi-colons in conditional:
@@ -47,8 +47,8 @@ T16270.hs:22:8: error:
 
 T16270.hs:24:10: error:
     Illegal keyword 'where' in data declaration
-    Perhaps you intended to use GADTs or a similar language
-    extension to enable syntax: data T where
+    Suggested fix: Perhaps you intended to use GADTs
+                   or a similar language extension to enable syntax: data T where
 
 T16270.hs:26:12: error:
     Illegal bang-pattern
