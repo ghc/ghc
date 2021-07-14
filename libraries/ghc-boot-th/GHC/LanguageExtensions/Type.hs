@@ -61,7 +61,7 @@ data Extension
    | NumDecimals
    | DisambiguateRecordFields
    | RecordWildCards
-   | RecordPuns
+   | NamedFieldPuns
    | ViewPatterns
    | GADTs
    | GADTSyntax
