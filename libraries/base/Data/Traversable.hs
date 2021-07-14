@@ -499,10 +499,26 @@ foldMapDefault = coerce (traverse @t @(Const m) @a @())
 -- #overview#
 -- Traversable structures support element-wise sequencing of 'Applicative' (or
 -- 'Monad') effects to construct new structures of __the same shape__ as the
--- input. Each slot occupied by an original element of the input structure is
--- filled with a value returned by the effect applied to that element.
--- Multiple output structures may result when an effect produces multiple
--- values. Instances must satisfy the laws listed in the [Laws section](#laws).
+-- input.
+--
+-- The result of 'traverse' is to replace each slot originally occupied by an
+-- element of the input structure with a new value (generally of a different
+-- type) computed from that element.  Multiple output structures may result
+-- when the effect of the computation is to produce multiple values for some of
+-- the input slots. Instances must satisfy the laws listed in the [Laws
+-- section](#laws).
+--
+-- If the input structure is __@[a]@__, the output structures will be lists
+-- __@[b]@__, each of the same length as the input.  If it is a __@Tree a@__,
+-- the output structures __@Tree b@__ will have the same graph of intermediate
+-- nodes and leaves.  If it is a 2-tuple __@(x, a)@__, the output structures
+-- __@(x, b)@__ are similar 2-tuples in which the __@a@__ slots are now
+-- occupied by elements of type __@b@__.
+--
+-- It is possible to decompose a traversable structure __@t a@__ into its shape
+-- (a.k.a. /spine/) of type __@t ()@__ and its element list __@[a]@__.  The
+-- original structure can be faithfully reconstructed from its spine and
+-- element list.
 --
 -- The sequencing of effects in @Traversable@ structures is rather
 -- straightforward, see the [Construction](#construction) section for details.
