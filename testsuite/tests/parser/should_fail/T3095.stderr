@@ -1,8 +1,9 @@
 
 T3095.hs:8:12: error:
     Illegal symbol ‘forall’ in type
-    Perhaps you intended to use RankNTypes or a similar language
-    extension to enable explicit-forall syntax: forall <tvs>. <type>
+    Suggested fix:
+      Perhaps you intended to use RankNTypes
+      or a similar language extension to enable explicit-forall syntax: forall <tvs>. <type>
 
 T3095.hs:8:12: error:
     Unexpected type ‘forall x. x :: Type’

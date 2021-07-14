@@ -33,6 +33,13 @@ module GHC.Types.Error
 
    -- * Hints and refactoring actions
    , GhcHint (..)
+   , LanguageExtensionHint(..)
+   , suggestExtension
+   , suggestExtensionWithInfo
+   , suggestExtensions
+   , suggestExtensionsWithInfo
+   , suggestAnyExtension
+   , suggestAnyExtensionWithInfo
    , noHints
 
     -- * Rendering Messages
