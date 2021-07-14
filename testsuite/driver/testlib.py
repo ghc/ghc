@@ -201,6 +201,11 @@ def req_haddock( name, opts ):
         opts.expect = 'missing-lib'
         opts.skip   = True
 
+def req_haddock_compiled( name, opts ):
+    '''Require the libraries compiled with -haddock)'''
+    if not config.have_haddock_compiled:
+        opts.expect = 'fail'
+
 def req_profiling( name, opts ):
     '''Require the profiling libraries (add 'GhcLibWays += p' to mk/build.mk)'''
     if not config.have_profiling:
