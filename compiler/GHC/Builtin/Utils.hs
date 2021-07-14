@@ -140,6 +140,7 @@ knownKeyNames
       concat [ concatMap wired_tycon_kk_names primTyCons
              , concatMap wired_tycon_kk_names wiredInTyCons
              , concatMap wired_tycon_kk_names typeNatTyCons
+             , wired_tycon_kk_names getRuntimeRepTyCon
              , map idName wiredInIds
              , map (idName . primOpId) allThePrimOps
              , map (idName . primOpWrapperId) allThePrimOps
