@@ -514,8 +514,12 @@ instance (OutputableBndrId l, OutputableBndrId r)
       ppr_rhs = case dir of
           Unidirectional           -> ppr_simple (text "<-")
           ImplicitBidirectional    -> ppr_simple equals
-          ExplicitBidirectional mg -> ppr_simple (text "<-") <+> text "where" $$
-                                      (nest 2 $ pprFunBind mg)
+          ExplicitBidirectional msig mg ->
+            ppr_simple (text "<-") <+> text "where" $$
+              (case msig of
+                 Nothing -> empty
+                 Just sig -> pprPrefixOcc psyn <+> text "::" <+> ppr sig) $$
+              (nest 2 $ pprFunBind mg)
 
 pprTicks :: SDoc -> SDoc -> SDoc
 -- Print stuff about ticks only when -dppr-debug is on, to avoid

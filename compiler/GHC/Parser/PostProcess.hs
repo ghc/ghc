@@ -30,6 +30,7 @@ module GHC.Parser.PostProcess (
         mkTyFamInst,
         mkFamDecl,
         mkInlinePragma,
+        extractPatSynConSig,
         mkPatSynMatchGroup,
         mkRecConstrOrUpdate,
         mkTyClD, mkInstD,
@@ -633,6 +634,27 @@ tyConToDataCon (L loc tc)
   = Left $ mkPlainErrorMsgEnvelope (locA loc) $ (PsErrNotADataCon tc)
   where
     occ = rdrNameOcc tc
+
+-- | Look for and extract an optional type signature for the given name from the list of declarations,
+-- returning the remainder of the declarations. We don't bother to fail here, because any inappropriate
+-- declarations will make their way to mkPatSynMatchGroup, which will then complain about them.
+extractPatSynConSig :: LocatedN RdrName
+                    -> LocatedL (OrdList (LHsDecl GhcPs))
+                    -> ( Maybe (LHsSigWcType GhcPs)
+                       , LocatedL (OrdList (LHsDecl GhcPs))
+                       )
+extractPatSynConSig (L _ patsyn_name) (L ld decls) =
+    let (msig, decls') = pick matchSig (fromOL decls)
+    in (msig, L ld (toOL decls'))
+  where
+    matchSig ldecl = case ldecl of
+      (L _ (SigD _ (TypeSig _ [L _ n] rhs))) | n == patsyn_name -> Just (Just rhs)
+      _ -> Nothing
+    pick _ [] = (Nothing, [])
+    pick f (x:xs) = case f x of
+      Nothing -> let (r, ys) = pick f xs
+                 in (r, x:ys)
+      Just r -> (r, xs)
 
 mkPatSynMatchGroup :: LocatedN RdrName
                    -> LocatedL (OrdList (LHsDecl GhcPs))
@@ -1282,7 +1304,6 @@ checkPatBind loc annsIn lhs (L _ grhss) = do
 checkValSigLhs :: LHsExpr GhcPs -> P (LocatedN RdrName)
 checkValSigLhs (L _ (HsVar _ lrdr@(L _ v)))
   | isUnqual v
-  , not (isDataOcc (rdrNameOcc v))
   = return lrdr
 
 checkValSigLhs lhs@(L l _)

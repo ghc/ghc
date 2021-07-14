@@ -1625,9 +1625,10 @@ pattern_synonym_decl :: { LHsDecl GhcPs }
 
         | 'pattern' pattern_synonym_lhs '<-' pat where_decls
             {% do { let (name, args, as) = $2
-                  ; mg <- mkPatSynMatchGroup name $5
+                  ; let (msig, rest) = extractPatSynConSig name $5
+                  ; mg <- mkPatSynMatchGroup name rest
                   ; acsA (\cs -> sLL $1 (reLoc $>) . ValD noExtField $
-                           mkPatSynBind name args $4 (ExplicitBidirectional mg)
+                           mkPatSynBind name args $4 (ExplicitBidirectional msig mg)
                             (EpAnn (glR $1) (as ++ [mj AnnPattern $1,mu AnnLarrow $3]) cs))
                    }}
 

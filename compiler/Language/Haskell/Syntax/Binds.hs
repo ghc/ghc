@@ -940,4 +940,4 @@ instance Outputable (XRec a RdrName) => Outputable (RecordPatSynField a) where
 data HsPatSynDir id
   = Unidirectional
   | ImplicitBidirectional
-  | ExplicitBidirectional (MatchGroup id (LHsExpr id))
+  | ExplicitBidirectional (Maybe (LHsSigWcType id)) (MatchGroup id (LHsExpr id))

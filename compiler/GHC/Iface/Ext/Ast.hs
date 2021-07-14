@@ -912,7 +912,7 @@ instance HiePass p => ToHie (Located (PatSynBind (GhcPass p) (GhcPass p))) where
 
 instance HiePass p => ToHie (HsPatSynDir (GhcPass p)) where
   toHie dir = case dir of
-    ExplicitBidirectional mg -> toHie mg
+    ExplicitBidirectional _ mg -> toHie mg -- TODO: determine if something needs to be done about the optional type here
     _ -> pure []
 
 instance ( HiePass p
