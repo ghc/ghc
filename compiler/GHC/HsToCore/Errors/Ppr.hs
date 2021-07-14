@@ -282,7 +282,9 @@ instance Diagnostic DsMessage where
       -> case (bounds, usingNegLiterals) of
           (Just (MinBound minB, MaxBound _), NotUsingNegLiterals)
             | minB == -i -- Note [Suggest NegativeLiterals]
-            , i > 0 -> [SuggestExtension LangExt.NegativeLiterals]
+            , i > 0
+            -> [ suggestExtensionWithInfo (text "If you are trying to write a large negative literal")
+                                          LangExt.NegativeLiterals ]
           _ -> noHints
     DsRedundantBangPatterns{}                   -> noHints
     DsOverlappingPatterns{}                     -> noHints
