@@ -88,11 +88,11 @@ import Data.List (mapAccumL)
 --
 -- 2. Note [Substitutions apply only once] in "GHC.Core.TyCo.Subst"
 data Subst
-  = Subst InScopeSet  -- Variables in scope (both Ids and TyVars) /after/
-                      -- applying the substitution
-          IdSubstEnv  -- Substitution from NcIds to CoreExprs
-          TvSubstEnv  -- Substitution from TyVars to Types
-          CvSubstEnv  -- Substitution from CoVars to Coercions
+  = Subst !InScopeSet  -- Variables in scope (both Ids and TyVars) /after/
+                       -- applying the substitution
+          !IdSubstEnv  -- Substitution from NcIds to CoreExprs
+          !TvSubstEnv  -- Substitution from TyVars to Types
+          !CvSubstEnv  -- Substitution from CoVars to Coercions
 
         -- INVARIANT 1: See TyCoSubst Note [The substitution invariant]
         -- This is what lets us deal with name capture properly
