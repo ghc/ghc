@@ -32,6 +32,7 @@ GNUC_ATTR_HOT static enum SweepResult
 nonmovingSweepSegment(struct NonmovingSegment *seg)
 {
     const nonmoving_block_idx blk_cnt = nonmovingSegmentBlockCount(seg);
+    struct VacantBlock *prev_vacant = NULL;
     bool found_free = false;
     bool found_live = false;
 
@@ -39,25 +40,35 @@ nonmovingSweepSegment(struct NonmovingSegment *seg)
     {
         if (seg->bitmap[i] == nonmovingMarkEpoch) {
             found_live = true;
-        } else if (!found_free) {
-            // This is the first free block we've found; set next_free,
-            // next_free_snap, and the scan pointer.
-            found_free = true;
-            seg->next_free = i;
-            nonmovingSegmentInfo(seg)->next_free_snap = i;
-            Bdescr((P_)seg)->u.scan = (P_)nonmovingSegmentGetBlock(seg, i);
-            seg->bitmap[i] = 0;
         } else {
+            void *block = nonmovingSegmentGetBlock(seg, i);
+            if (!found_free) {
+                // This is the first free block we've found; set next_free,
+                // next_free_snap, and the scan pointer.
+                found_free = true;
+                seg->next_free = i;
+                nonmovingSegmentInfo(seg)->next_free_snap = i;
+                Bdescr((P_)seg)->u.scan = (P_)block;
+            } else {
+                // Not the first free block; prev_vacant is guaranteed to
+                // be set.
+                prev_vacant->next_free = i;
+            }
             seg->bitmap[i] = 0;
+            prev_vacant = (struct VacantBlock*)block;
         }
 
         if (found_free && found_live) {
             // zero the remaining dead object's mark bits
-            for (; i < nonmovingSegmentBlockCount(seg); ++i) {
+            for (; i < blk_cnt; ++i) {
                 if (seg->bitmap[i] != nonmovingMarkEpoch) {
                     seg->bitmap[i] = 0;
+                    prev_vacant->next_free = i;
+                    prev_vacant = (struct VacantBlock*)nonmovingSegmentGetBlock(seg, i);
                 }
             }
+            // blk_cnt signals end of blocks
+            prev_vacant->next_free = blk_cnt;
             return SEGMENT_PARTIAL;
         }
     }

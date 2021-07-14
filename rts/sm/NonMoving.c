@@ -602,6 +602,7 @@ static inline unsigned long log2_ceil(unsigned long x)
     return (sizeof(unsigned long)*8) - __builtin_clzl(x-1);
 }
 
+#if defined(FALLBACK_ADVANCED_FREE)
 // Advance a segment's next_free pointer. Returns true if segment if full.
 static bool advance_next_free(struct NonmovingSegment *seg, const unsigned int blk_count)
 {
@@ -628,6 +629,7 @@ static bool advance_next_free(struct NonmovingSegment *seg, const unsigned int b
     }
 #endif
 }
+#endif
 
 static struct NonmovingSegment *pop_active_segment(struct NonmovingAllocator *alloca)
 {
@@ -663,8 +665,20 @@ void *nonmovingAllocate(Capability *cap, StgWord sz)
     void *ret = nonmovingSegmentGetBlock_(current, log_block_size, current->next_free);
     ASSERT(GET_CLOSURE_TAG(ret) == 0); // check alignment
 
+#if !defined(FALLBACK_ADVANCED_FREE)
+    // Bump next_free; fallback to linked block in case the
+    // next block is occupied.
+    nonmoving_block_idx next_free = current->next_free + 1;
+    if (next_free < block_count && current->bitmap[next_free]) {
+        next_free = ((struct VacantBlock*)ret)->next_free;
+    }
+    current->next_free = next_free;
+    bool full = next_free == block_count;
+#else
     // Advance the current segment's next_free or allocate a new segment if full
     bool full = advance_next_free(current, block_count);
+#endif
+
     if (full) {
         // Current segment is full: update live data estimate link it to
         // filled, take an active segment if one exists, otherwise allocate a
