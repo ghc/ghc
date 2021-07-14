@@ -726,11 +726,16 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
         ; (dir', fvs2) <- case dir of
             Unidirectional -> return (Unidirectional, emptyFVs)
             ImplicitBidirectional -> return (ImplicitBidirectional, emptyFVs)
-            ExplicitBidirectional mg ->
-                do { (mg', fvs) <- bindSigTyVarsFV scoped_tvs $
-                                   rnMatchGroup (mkPrefixFunRhs (L l name))
-                                                rnLExpr mg
-                   ; return (ExplicitBidirectional mg', fvs) }
+            ExplicitBidirectional mt mg ->
+                do { (mt', fvs1) <- case mt of
+                       Just t -> do
+                         (t', fvs) <- rnHsSigWcType (GenericCtx (text "a type signature in the where clause of a bidirectional pattern synonym")) t
+                         return (Just t', fvs)
+                       Nothing -> return (Nothing, emptyFVs)
+                   ; (mg', fvs2) <- bindSigTyVarsFV scoped_tvs $
+                                     rnMatchGroup (mkPrefixFunRhs (L l name))
+                                                  rnLExpr mg
+                   ; return (ExplicitBidirectional mt' mg', plusFV fvs1 fvs2) }
 
         ; mod <- getModule
         ; let fvs = fvs1 `plusFV` fvs2
