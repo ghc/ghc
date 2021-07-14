@@ -191,7 +191,6 @@ data ThRejectionReason
   | ThNegativeOverloadedPatterns !(Pat GhcRn)
   | ThHaddockDocumentation
   | ThWarningAndDeprecationPragmas [LIdP GhcRn]
-  | ThDefaultDeclarations !(DefaultDecl GhcRn)
   | ThSplicesWithinDeclBrackets
 
 data NegLiteralExtEnabled
