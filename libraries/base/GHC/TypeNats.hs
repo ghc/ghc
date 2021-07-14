@@ -1,18 +1,19 @@
-{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoStarIsType #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
+{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE NoStarIsType #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE MagicHash #-}
-{-# LANGUAGE PolyKinds #-}
-{-# LANGUAGE TypeApplications #-}
 
 {-| This module is an internal GHC module.  It declares the constants used
 in the implementation of type-level natural numbers.  The programmer interface
@@ -65,7 +66,8 @@ type Nat = Natural
 -- There are instances of the class for every concrete literal: 0, 1, 2, etc.
 --
 -- @since 4.7.0.0
-class KnownNat (n :: Nat) where
+type  KnownNat :: Nat -> Constraint
+class KnownNat n where
   natSing :: SNat n
 
 -- | @since 4.10.0.0
@@ -174,40 +176,47 @@ infixr 8 ^
 -- | Addition of type-level naturals.
 --
 -- @since 4.7.0.0
-type family (m :: Nat) + (n :: Nat) :: Nat
+type (+) :: Nat -> Nat -> Nat
+type family m + n
 
 -- | Multiplication of type-level naturals.
 --
 -- @since 4.7.0.0
-type family (m :: Nat) * (n :: Nat) :: Nat
+type (*) :: Nat -> Nat -> Nat
+type family m * n
 
 -- | Exponentiation of type-level naturals.
 --
 -- @since 4.7.0.0
-type family (m :: Nat) ^ (n :: Nat) :: Nat
+type (^) :: Nat -> Nat -> Nat
+type family m ^ n
 
 -- | Subtraction of type-level naturals.
 --
 -- @since 4.7.0.0
-type family (m :: Nat) - (n :: Nat) :: Nat
+type (-) :: Nat -> Nat -> Nat
+type family m - n
 
 -- | Division (round down) of natural numbers.
 -- @Div x 0@ is undefined (i.e., it cannot be reduced).
 --
 -- @since 4.11.0.0
-type family Div (m :: Nat) (n :: Nat) :: Nat
+type Div :: Nat -> Nat -> Nat
+type family Div m n
 
 -- | Modulus of natural numbers.
 -- @Mod x 0@ is undefined (i.e., it cannot be reduced).
 --
 -- @since 4.11.0.0
-type family Mod (m :: Nat) (n :: Nat) :: Nat
+type Mod :: Nat -> Nat -> Nat
+type family Mod m n
 
 -- | Log base 2 (round down) of natural numbers.
 -- @Log 0@ is undefined (i.e., it cannot be reduced).
 --
 -- @since 4.11.0.0
-type family Log2 (m :: Nat) :: Nat
+type Log2 :: Nat -> Nat
+type family Log2 m
 
 --------------------------------------------------------------------------------
 
@@ -239,7 +248,8 @@ cmpNat x y = case compare (natVal x) (natVal y) of
 --------------------------------------------------------------------------------
 -- PRIVATE:
 
-newtype SNat    (n :: Nat)    = SNat    Natural
+type    SNat :: Nat -> Type
+newtype SNat n = SNat Natural
 
 -- See Note [withDict] in "GHC.HsToCore.Expr" in GHC
 withSNat :: forall a b.
