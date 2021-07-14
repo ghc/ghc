@@ -1839,6 +1839,7 @@ addrPrimTyConKey, arrayPrimTyConKey, arrayArrayPrimTyConKey, boolTyConKey,
     ratioTyConKey, rationalTyConKey, realWorldTyConKey, stablePtrPrimTyConKey,
     stablePtrTyConKey, eqTyConKey, heqTyConKey, ioPortPrimTyConKey,
     smallArrayPrimTyConKey, smallMutableArrayPrimTyConKey,
+    fixedRuntimeRepTyConKey, getRuntimeRepTyConKey,
     stringTyConKey :: Unique
 addrPrimTyConKey                        = mkPreludeTyConUnique  1
 arrayPrimTyConKey                       = mkPreludeTyConUnique  3
@@ -1883,6 +1884,8 @@ eqTyConKey                              = mkPreludeTyConUnique 40
 heqTyConKey                             = mkPreludeTyConUnique 41
 arrayArrayPrimTyConKey                  = mkPreludeTyConUnique 42
 mutableArrayArrayPrimTyConKey           = mkPreludeTyConUnique 43
+fixedRuntimeRepTyConKey                 = mkPreludeTyConUnique 44
+getRuntimeRepTyConKey                   = mkPreludeTyConUnique 45
 
 statePrimTyConKey, stableNamePrimTyConKey, stableNameTyConKey,
     mutVarPrimTyConKey, ioTyConKey,
@@ -2261,6 +2264,9 @@ integerINDataConKey       = mkPreludeDataConUnique 121
 integerIPDataConKey       = mkPreludeDataConUnique 122
 naturalNSDataConKey       = mkPreludeDataConUnique 123
 naturalNBDataConKey       = mkPreludeDataConUnique 124
+
+fixedRuntimeRepDataConKey :: Unique
+fixedRuntimeRepDataConKey = mkPreludeDataConUnique 125
 
 
 ---------------- Template Haskell -------------------

@@ -44,6 +44,7 @@ import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Gen.App
 import GHC.Tc.Gen.Head
 import GHC.Tc.Gen.Bind        ( tcLocalBinds )
+import GHC.Tc.Instance.Class  ( hasFixedRuntimeRep )
 import GHC.Tc.Instance.Family ( tcGetFamInstEnvs )
 import GHC.Core.FamInstEnv    ( FamInstEnvs )
 import GHC.Rename.Env         ( addUsedGRE )
@@ -1385,6 +1386,9 @@ tcRecordField con_like flds_w_tys (L loc (FieldOcc sel_name lbl)) rhs
   | Just field_ty <- assocMaybe flds_w_tys sel_name
       = addErrCtxt (fieldCtxt field_lbl) $
         do { rhs' <- tcCheckPolyExprNC rhs field_ty
+           ; _evTerm <-
+                hasFixedRuntimeRep (FRRRecordUpdate (unLoc lbl) (unLoc rhs))
+                  field_ty
            ; let field_id = mkUserLocal (nameOccName sel_name)
                                         (nameUnique sel_name)
                                         Many field_ty loc
