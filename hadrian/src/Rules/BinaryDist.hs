@@ -150,7 +150,14 @@ bindistRules = do
               else createFileLink install_path unversioned_install_path
         copyDirectory (ghcBuildDir -/- "lib") bindistFilesDir
         copyDirectory (rtsIncludeDir)         bindistFilesDir
+
+        -- Call ghc-pkg recache, after copying so the package.cache is
+        -- accurate, then it's on the distributor to use `cp -a` to install
+        -- a relocatable bindist.
+        cmd_ (bindistFilesDir -/- "bin" -/- "ghc-pkg") ["recache"]
+
         need ["docs"]
+
         -- TODO: we should only embed the docs that have been generated
         -- depending on the current settings (flavours' "ghcDocs" field and
         -- "--docs=.." command-line flag)
