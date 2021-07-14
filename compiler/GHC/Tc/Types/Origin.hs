@@ -18,7 +18,10 @@ module GHC.Tc.Types.Origin (
   -- CtOrigin
   CtOrigin(..), exprCtOrigin, lexprCtOrigin, matchesCtOrigin, grhssCtOrigin,
   isVisibleOrigin, toInvisibleOrigin,
-  pprCtOrigin, isGivenOrigin
+  pprCtOrigin, isGivenOrigin,
+
+  -- FixedRuntimeRep origin
+  FRROrigin(..), pprFRROrigin
 
   ) where
 
@@ -465,6 +468,8 @@ data CtOrigin
   | CycleBreakerOrigin
       CtOrigin   -- origin of the original constraint
       -- See Detail (7) of Note [Type variable cycles] in GHC.Tc.Solver.Canonical
+  | FixedRuntimeRepOrigin
+      FRROrigin
 
 -- An origin is visible if the place where the constraint arises is manifest
 -- in user code. Currently, all origins are visible except for invisible
@@ -635,6 +640,9 @@ pprCtOrigin (InstProvidedOrigin mod cls_inst)
 pprCtOrigin (CycleBreakerOrigin orig)
   = pprCtOrigin orig
 
+pprCtOrigin (FixedRuntimeRepOrigin frrOrig)
+  = pprFRROrigin frrOrig
+
 pprCtOrigin simple_origin
   = ctoHerald <+> pprCtO simple_origin
 
@@ -677,3 +685,32 @@ pprCtO NonLinearPatternOrigin = text "a non-linear pattern"
 pprCtO (UsageEnvironmentOf x) = hsep [text "multiplicity of", quotes (ppr x)]
 pprCtO BracketOrigin         = text "a quotation bracket"
 pprCtO _                     = panic "pprCtOrigin"
+
+data FRROrigin
+  = FRRApp (HsExpr GhcRn)
+  | FRRRecordUpdate RdrName (HsExpr GhcRn)
+  | FRRVarPattern Name
+  | FRRWildcardPattern
+  | FRRNPlusKPattern Name
+  | FRRBind Name
+
+pprFRROrigin :: FRROrigin -> SDoc
+pprFRROrigin (FRRApp arg)
+  = vcat [ text "when checking that the function argument"
+         , ppr arg
+         , text "has a fixed runtime representation"]
+pprFRROrigin (FRRRecordUpdate lbl _arg)
+  = vcat [ text "when checking that the record update at field" <+> quotes (ppr lbl)
+         , text "has a fixed runtime representation"]
+pprFRROrigin (FRRVarPattern varName)
+  = vcat [ text "when checking that the variable" <+> quotes (ppr varName)
+         , text "bound by the pattern has a fixed runtime representation"]
+pprFRROrigin FRRWildcardPattern
+  = vcat [ text "when checking that the wildcard pattern"
+         , text "has a fixed runtime representation"]
+pprFRROrigin (FRRNPlusKPattern varName)
+  = vcat [ text "when checking that the variable" <+> quotes (ppr varName)
+         , text "bound by the n+k pattern has a fixed runtime representation"]
+pprFRROrigin (FRRBind binder)
+  = vcat [ text "when checking that the binder" <+> quotes (ppr binder)
+         , text "has a fixed runtime representation"]
