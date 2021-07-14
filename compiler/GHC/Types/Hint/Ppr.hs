@@ -15,17 +15,23 @@ import GHC.Types.Hint
 import GHC.Hs.Expr ()   -- instance Outputable
 import GHC.Types.Id
 import GHC.Utils.Outputable
-import qualified GHC.LanguageExtensions as LangExt
+
+import Data.List (intersperse)
 
 instance Outputable GhcHint where
   ppr = \case
     UnknownHint m
       -> ppr m
-    SuggestExtension ext
-      -> case ext of
-          LangExt.NegativeLiterals
-            -> text "If you are trying to write a large negative literal, use NegativeLiterals"
-          _ -> text "Perhaps you intended to use" <+> ppr ext
+    SuggestExtension extHint
+      -> case extHint of
+          SuggestSingleExtension extraUserInfo ext ->
+            (text "Perhaps you intended to use" <+> ppr ext) $$ extraUserInfo
+          SuggestAnyExtension extraUserInfo exts ->
+            let header = text "Enable any of the following extensions:"
+            in  header <+> hsep (intersperse (char ',') (map ppr exts)) $$ extraUserInfo
+          SuggestExtensions extraUserInfo exts ->
+            let header = text "Enable all of the following extensions:"
+            in  header <+> hsep (intersperse (char ',') (map ppr exts)) $$ extraUserInfo
     SuggestMissingDo
       -> text "Possibly caused by a missing 'do'?"
     SuggestLetInDo

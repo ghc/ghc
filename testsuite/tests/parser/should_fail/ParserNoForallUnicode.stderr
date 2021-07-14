@@ -1,5 +1,6 @@
 
 ParserNoForallUnicode.hs:6:8: error:
     Illegal symbol ‘∀’ in type
-    Perhaps you intended to use RankNTypes or a similar language
-    extension to enable explicit-forall syntax: ∀ <tvs>. <type>
+    Suggested fix:
+      Perhaps you intended to use RankNTypes
+      or a similar language extension to enable explicit-forall syntax: ∀ <tvs>. <type>
