@@ -35,6 +35,7 @@ import GHC.Rename.Utils
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Zonk
 import GHC.Tc.Gen.Sig( TcPragEnv, lookupPragEnv, addInlinePrags )
+import GHC.Tc.Instance.Class ( hasFixedRuntimeRep )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Instantiate
 import GHC.Types.Error
@@ -364,6 +365,7 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
                               tcExtendIdEnv1 name id thing_inside
             -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
         ; pat_ty <- readExpType (scaledThing pat_ty)
+        ; _evTerm <- hasFixedRuntimeRep (FRRVarPattern name) pat_ty
         ; return (mkHsWrapPat (wrap <.> mult_wrap) (VarPat x (L l id)) pat_ty, res) }
 
   ParPat x lpar pat rpar -> do
@@ -397,6 +399,7 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
             -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
         ; res <- thing_inside
         ; pat_ty <- expTypeToType (scaledThing pat_ty)
+        ; _evTerm <- hasFixedRuntimeRep FRRWildcardPattern pat_ty
         ; return (mkHsWrapPat mult_wrap (WildPat pat_ty) pat_ty, res) }
 
   AsPat x (L nm_loc name) pat -> do
@@ -655,6 +658,9 @@ AST is used for the subtraction operation.
                   ; return (lit2', wrap, bndr_id) }
 
         ; pat_ty <- readExpType pat_exp_ty
+
+        ; _evTerm <- hasFixedRuntimeRep (FRRNPlusKPattern name) pat_ty
+
         -- The Report says that n+k patterns must be in Integral
         -- but it's silly to insist on this in the RebindableSyntax case
         ; unlessM (xoptM LangExt.RebindableSyntax) $
