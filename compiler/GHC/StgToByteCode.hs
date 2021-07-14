@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveFunctor              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RecordWildCards            #-}
+{-# LANGUAGE FlexibleContexts           #-}
 
 {-# OPTIONS_GHC -fprof-auto-top #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
@@ -39,7 +40,7 @@ import GHC.Types.Name
 import GHC.Types.Id.Make
 import GHC.Types.Id
 import GHC.Types.ForeignCall
-import GHC.Core
+import GHC.Core hiding (bindersOf)
 import GHC.Types.Literal
 import GHC.Builtin.PrimOps
 import GHC.Core.Type
@@ -92,14 +93,13 @@ import Data.Either ( partitionEithers )
 
 import qualified GHC.Types.CostCentre as CC
 import GHC.Stg.Syntax
-import GHC.Stg.FVs
 
 -- -----------------------------------------------------------------------------
 -- Generating byte code for a complete module
 
 byteCodeGen :: HscEnv
             -> Module
-            -> [StgTopBinding]
+            -> [CgStgTopBinding]
             -> [TyCon]
             -> Maybe ModBreaks
             -> IO CompiledByteCode
@@ -122,8 +122,7 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks
         (BcM_State{..}, proto_bcos) <-
            runBc hsc_env us this_mod mb_modBreaks (mkVarEnv stringPtrs) $ do
              prepd_binds <- mapM bcPrepBind lifted_binds
-             let flattened_binds =
-                   concatMap (flattenBind . annBindingFreeVars) (reverse prepd_binds)
+             let flattened_binds = concatMap flattenBind (reverse prepd_binds)
              mapM schemeTopBind flattened_binds
 
         when (notNull ffis)
@@ -183,7 +182,7 @@ literals:
 stgExprToBCOs :: HscEnv
               -> Module
               -> Type
-              -> StgRhs
+              -> CgStgRhs
               -> IO UnlinkedBCO
 stgExprToBCOs hsc_env this_mod expr_ty expr
  = withTiming logger
@@ -195,8 +194,7 @@ stgExprToBCOs hsc_env this_mod expr_ty expr
       us <- mkSplitUniqSupply 'y'
       (BcM_State _dflags _us _this_mod _final_ctr mallocd _ _ _, proto_bco)
          <- runBc hsc_env us this_mod Nothing emptyVarEnv $ do
-              prepd_expr <- annBindingFreeVars <$>
-                                       bcPrepBind (StgNonRec dummy_id expr)
+              prepd_expr <- bcPrepBind (StgNonRec dummy_id expr)
               case prepd_expr of
                 (StgNonRec _ cg_expr) -> schemeR [] (idName dummy_id, cg_expr)
                 _                     ->
@@ -230,26 +228,26 @@ stgExprToBCOs hsc_env this_mod expr_ty expr
 
  -}
 
-bcPrepRHS :: StgRhs -> BcM StgRhs
+bcPrepRHS :: CgStgRhs -> BcM CgStgRhs
 -- explicitly match all constructors so we get a warning if we miss any
 bcPrepRHS (StgRhsClosure fvs cc upd args (StgTick bp@Breakpoint{} expr)) = do
   {- If we have a breakpoint directly under an StgRhsClosure we don't
      need to introduce a new binding for it.
    -}
-  expr' <- bcPrepExpr expr
+  expr' <- bcPrepExpr (fvs `extendDVarSetList` args) expr
   pure (StgRhsClosure fvs cc upd args (StgTick bp expr'))
 bcPrepRHS (StgRhsClosure fvs cc upd args expr) =
-  StgRhsClosure fvs cc upd args <$> bcPrepExpr expr
+  StgRhsClosure fvs cc upd args <$> bcPrepExpr (fvs `extendDVarSetList` args) expr
 bcPrepRHS con@StgRhsCon{} = pure con
 
-bcPrepExpr :: StgExpr -> BcM StgExpr
+bcPrepExpr :: DIdSet -> CgStgExpr -> BcM CgStgExpr
 -- explicitly match all constructors so we get a warning if we miss any
-bcPrepExpr (StgTick bp@(Breakpoint tick_ty _ _) rhs)
+bcPrepExpr fvs (StgTick bp@(Breakpoint tick_ty _ _) rhs)
   | isLiftedTypeKind (typeKind tick_ty) = do
       id <- newId tick_ty
-      rhs' <- bcPrepExpr rhs
+      rhs' <- bcPrepExpr fvs rhs
       let expr' = StgTick bp rhs'
-          bnd = StgNonRec id (StgRhsClosure noExtFieldSilent
+          bnd = StgNonRec id (StgRhsClosure fvs
                                             CC.dontCareCCS
                                             ReEntrant
                                             []
@@ -260,41 +258,41 @@ bcPrepExpr (StgTick bp@(Breakpoint tick_ty _ _) rhs)
   | otherwise = do
       id <- newId (mkVisFunTyMany realWorldStatePrimTy tick_ty)
       st <- newId realWorldStatePrimTy
-      rhs' <- bcPrepExpr rhs
+      rhs' <- bcPrepExpr fvs rhs
       let expr' = StgTick bp rhs'
-          bnd = StgNonRec id (StgRhsClosure noExtFieldSilent
+          bnd = StgNonRec id (StgRhsClosure fvs
                                             CC.dontCareCCS
                                             ReEntrant
                                             [voidArgId]
                                             expr'
                              )
       pure $ StgLet noExtFieldSilent bnd (StgApp id [StgVarArg st])
-bcPrepExpr (StgTick tick rhs) =
-  StgTick tick <$> bcPrepExpr rhs
-bcPrepExpr (StgLet xlet bnds expr) =
+bcPrepExpr fvs (StgTick tick rhs) =
+  StgTick tick <$> bcPrepExpr fvs rhs
+bcPrepExpr fvs (StgLet xlet bnds expr) =
   StgLet xlet <$> bcPrepBind bnds
-              <*> bcPrepExpr expr
-bcPrepExpr (StgLetNoEscape xlne bnds expr) =
+              <*> bcPrepExpr (fvs `extendDVarSetList` bindersOf bnds) expr
+bcPrepExpr fvs (StgLetNoEscape xlne bnds expr) =
   StgLet xlne <$> bcPrepBind bnds
-              <*> bcPrepExpr expr
-bcPrepExpr (StgCase expr bndr alt_type alts) =
-  StgCase <$> bcPrepExpr expr
+              <*> bcPrepExpr (fvs `extendDVarSetList` bindersOf bnds) expr
+bcPrepExpr fvs (StgCase expr bndr alt_type alts) =
+  StgCase <$> bcPrepExpr fvs expr
           <*> pure bndr
           <*> pure alt_type
-          <*> mapM bcPrepAlt alts
-bcPrepExpr lit@StgLit{} = pure lit
+          <*> mapM (bcPrepAlt (fvs `extendDVarSetList` [bndr])) alts
+bcPrepExpr _ lit@StgLit{} = pure lit
 -- See Note [Not-necessarily-lifted join points], step 3.
-bcPrepExpr (StgApp x [])
+bcPrepExpr _ (StgApp x [])
   | isNNLJoinPoint x = pure $
       StgApp (protectNNLJoinPointId x) [StgVarArg voidPrimId]
-bcPrepExpr app@StgApp{} = pure app
-bcPrepExpr app@StgConApp{} = pure app
-bcPrepExpr app@StgOpApp{} = pure app
+bcPrepExpr _ app@StgApp{} = pure app
+bcPrepExpr _ app@StgConApp{} = pure app
+bcPrepExpr _ app@StgOpApp{} = pure app
 
-bcPrepAlt :: StgAlt -> BcM StgAlt
-bcPrepAlt (ac, bndrs, expr) = (,,) ac bndrs <$> bcPrepExpr expr
+bcPrepAlt :: DIdSet -> CgStgAlt -> BcM CgStgAlt
+bcPrepAlt fvs (ac, bndrs, expr) = (,,) ac bndrs <$> bcPrepExpr (fvs `extendDVarSetList` bndrs) expr
 
-bcPrepBind :: StgBinding -> BcM StgBinding
+bcPrepBind :: CgStgBinding -> BcM CgStgBinding
 -- explicitly match all constructors so we get a warning if we miss any
 bcPrepBind (StgNonRec bndr rhs) =
   let (bndr', rhs') = bcPrepSingleBind (bndr, rhs)
@@ -303,7 +301,7 @@ bcPrepBind (StgRec bnds) =
   StgRec <$> mapM ((\(b,r) -> (,) b <$> bcPrepRHS r) . bcPrepSingleBind)
                   bnds
 
-bcPrepSingleBind :: (Id, StgRhs) -> (Id, StgRhs)
+bcPrepSingleBind :: (Id, CgStgRhs) -> (Id, CgStgRhs)
 -- If necessary, modify this Id and body to protect not-necessarily-lifted join points.
 -- See Note [Not-necessarily-lifted join points], step 2.
 bcPrepSingleBind (x, StgRhsClosure ext cc upd_flag args body)
