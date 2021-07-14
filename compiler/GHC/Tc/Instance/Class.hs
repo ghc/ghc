@@ -37,7 +37,8 @@ import GHC.Types.Id
 import GHC.Core.Predicate
 import GHC.Core.InstEnv
 import GHC.Core.Type
-import GHC.Core.Make ( mkCharExpr, mkStringExprFS, mkNaturalExpr )
+import GHC.Core.Make ( mkCharExpr, mkStringExprFS, mkNaturalExpr
+                     , mkNilExpr, mkConsExpr, mkCoreConApps )
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.Class
@@ -146,6 +147,8 @@ matchGlobalInst dflags short_cut clas tys
   | clas `hasKey` heqTyConKey         = matchHeteroEquality       tys
   | clas `hasKey` eqTyConKey          = matchHomoEquality         tys
   | clas `hasKey` coercibleTyConKey   = matchCoercible            tys
+  | clas `hasKey` fixedRuntimeRepTyConKey
+                                      = matchFixedRuntimeRep      tys
   | cls_name == hasFieldClassName     = matchHasField dflags short_cut clas tys
   | otherwise                         = matchInstEnv dflags short_cut clas tys
   where
@@ -609,6 +612,86 @@ matchCoercible args@[k, t1, t2]
     args' = [k, k, t1, t2]
 matchCoercible args = pprPanic "matchLiftedCoercible" (ppr args)
 
+
+{- ********************************************************************
+*                                                                     *
+                    The FixedRuntimeRep mechanism
+*                                                                     *
+***********************************************************************-}
+
+matchFixedRuntimeRep :: [Type] -> TcM ClsInstResult
+matchFixedRuntimeRep [ty]
+  | Just rep <- getRuntimeRepExpr ty
+  = return $ OneInst
+      { cir_new_theta = []
+      , cir_mk_ev     = \ _ -> evDataConApp fixedRuntimeRepDataCon [ty] [rep]
+      , cir_what      = BuiltinInstance }
+  | otherwise
+  = return NoInstance
+matchFixedRuntimeRep args = pprPanic "matchFixedRuntimeRep" (ppr args)
+
+getRuntimeRepExpr :: Type -> Maybe EvExpr
+getRuntimeRepExpr ty = case splitTyConApp_maybe ty of
+  Just (tc, args)
+    | tc == boxedRepDataConTyCon
+    , [l] <- args
+    -> ( \ x -> mkCoreConApps boxedRepDataCon [x] )
+        <$> getLevityExpr l
+    | tc == vecRepDataConTyCon
+    , [count, elt] <- args
+    -> ( \ x y -> mkCoreConApps vecRepDataCon [x,y] )
+        <$> getVecCountExpr count
+        <*> getVecElemExpr elt
+    | tc == tupleRepDataConTyCon
+    , [reps] <- args
+    -> ( \ x -> mkCoreConApps tupleRepDataCon [x] )
+        <$> getRuntimeRepsExpr reps
+    | tc == sumRepDataConTyCon
+    , [reps] <- args
+    -> ( \ x -> mkCoreConApps sumRepDataCon [x] )
+        <$> getRuntimeRepExpr reps
+    | otherwise
+    -> lookupInNullaryDataCons tc runtimeRepSimpleDataCons
+  _ -> Nothing
+
+getLevityExpr :: Type -> Maybe EvExpr
+getLevityExpr ty = case splitTyConApp_maybe ty of
+  Just (tc, [])
+    -> lookupInNullaryDataCons tc [liftedDataCon, unliftedDataCon]
+  _ -> Nothing
+
+getVecCountExpr :: Type -> Maybe EvExpr
+getVecCountExpr ty = case splitTyConApp_maybe ty of
+  Just (tc, [])
+    -> lookupInNullaryDataCons tc vecCountDataCons
+  _ -> Nothing
+
+getVecElemExpr :: Type -> Maybe EvExpr
+getVecElemExpr ty = case splitTyConApp_maybe ty of
+  Just (tc, [])
+    -> lookupInNullaryDataCons tc vecElemDataCons
+  _ -> Nothing
+
+getRuntimeRepsExpr :: Type -> Maybe EvExpr
+getRuntimeRepsExpr ty = case splitTyConApp_maybe ty of
+  Just (tc, args)
+    | tc == promotedNilDataCon
+    , [_] <- args
+    -> Just $ mkNilExpr runtimeRepTy
+    | tc == promotedConsDataCon
+    , [_, rep, reps] <- args
+    -> ( \ r rs -> mkConsExpr runtimeRepTy r rs )
+        <$> getRuntimeRepExpr rep
+        <*> getRuntimeRepsExpr reps
+  _ -> Nothing
+
+lookupInNullaryDataCons :: TyCon -> [DataCon] -> Maybe EvExpr
+lookupInNullaryDataCons _ [] = Nothing
+lookupInNullaryDataCons tc (dc:dcs)
+  | tc == promoteDataCon dc
+  = Just $ mkCoreConApps dc []
+  | otherwise
+  = lookupInNullaryDataCons tc dcs
 
 {- ********************************************************************
 *                                                                     *

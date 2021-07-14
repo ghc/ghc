@@ -21,7 +21,7 @@ module GHC.Tc.Gen.App
 
 import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcPolyExpr )
 
-import GHC.Builtin.Types (multiplicityTy)
+import GHC.Builtin.Types (multiplicityTy, hasFixedRuntimeRep)
 import GHC.Tc.Gen.Head
 import GHC.Hs
 import GHC.Tc.Errors.Types
@@ -439,9 +439,12 @@ tcEValArg :: AppCtxt -> EValArg 'TcpInst -> TcSigmaType -> TcM (LHsExpr GhcTc)
 tcEValArg ctxt (ValArg larg@(L arg_loc arg)) exp_arg_sigma
   = addArgCtxt ctxt larg $
     do { arg' <- tcPolyExpr arg (mkCheckExpType exp_arg_sigma)
+       ; _evTerm <-
+          emitWanted (FixedRuntimeRepOrigin $ FRRApp arg) $
+            hasFixedRuntimeRep exp_arg_sigma
        ; return (L arg_loc arg') }
 
-tcEValArg ctxt (ValArgQL { va_expr = larg@(L arg_loc _)
+tcEValArg ctxt (ValArgQL { va_expr = larg@(L arg_loc arg)
                          , va_fun = (inner_fun, fun_ctxt)
                          , va_args = inner_args
                          , va_ty = app_res_rho }) exp_arg_sigma
@@ -449,6 +452,9 @@ tcEValArg ctxt (ValArgQL { va_expr = larg@(L arg_loc _)
     do { traceTc "tcEValArgQL {" (vcat [ ppr inner_fun <+> ppr inner_args ])
        ; tc_args <- tcValArgs True inner_args
        ; co      <- unifyType Nothing app_res_rho exp_arg_sigma
+       ; _evTerm <-
+          emitWanted (FixedRuntimeRepOrigin $ FRRApp arg) $
+            hasFixedRuntimeRep exp_arg_sigma
        ; traceTc "tcEValArg }" empty
        ; return (L arg_loc $ mkHsWrapCo co $
                  rebuildHsApps inner_fun fun_ctxt tc_args) }
