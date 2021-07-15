@@ -33,6 +33,9 @@ import GHC.Hs.Type
 import GHC.Hs.Pat
 import GHC.Hs.ImpExp
 import GHC.Parser.Annotation
+import GHC.Types.SrcLoc (GenLocated(..))
+import GHC.Types.Name.Reader
+import GHC.Types.Name
 
 -- ---------------------------------------------------------------------
 -- Data derivations from GHC.Hs-----------------------------------------
@@ -362,13 +365,13 @@ deriving instance Data (ApplicativeArg GhcPs)
 deriving instance Data (ApplicativeArg GhcRn)
 deriving instance Data (ApplicativeArg GhcTc)
 
-deriving instance Data (HsStmtContext GhcPs)
-deriving instance Data (HsStmtContext GhcRn)
-deriving instance Data (HsStmtContext GhcTc)
+deriving instance Data (HsStmtContext (GenLocated SrcSpanAnnN RdrName))
+deriving instance Data (HsStmtContext (GenLocated SrcSpanAnnN Name))
 
-deriving instance Data (HsMatchContext GhcPs)
-deriving instance Data (HsMatchContext GhcRn)
-deriving instance Data (HsMatchContext GhcTc)
+deriving instance Data HsDoFlavour
+
+deriving instance Data (HsMatchContext (GenLocated SrcSpanAnnN RdrName))
+deriving instance Data (HsMatchContext (GenLocated SrcSpanAnnN Name))
 
 -- deriving instance (DataIdLR p p) => Data (HsSplice p)
 deriving instance Data (HsSplice GhcPs)

@@ -455,7 +455,7 @@ For uniformity, calls to 'error' in both cases are wrapped even if -XLinearTypes
 is disabled.
 -}
 
-mkFailExpr :: HsMatchContext GhcRn -> Type -> DsM CoreExpr
+mkFailExpr :: HsMatchContext (XRec GhcRn (CtxIdP GhcRn)) -> Type -> DsM CoreExpr
 mkFailExpr ctxt ty
   = mkErrorAppDs pAT_ERROR_ID ty (matchContextErrString ctxt)
 
@@ -956,7 +956,7 @@ CPR-friendly.  This matters a lot: if you don't get it right, you lose
 the tail call property.  For example, see #3403.
 -}
 
-dsHandleMonadicFailure :: HsStmtContext GhcRn -> LPat GhcTc -> MatchResult CoreExpr -> FailOperator GhcTc -> DsM CoreExpr
+dsHandleMonadicFailure :: HsStmtContext (XRec GhcRn (CtxIdP GhcRn)) -> LPat GhcTc -> MatchResult CoreExpr -> FailOperator GhcTc -> DsM CoreExpr
     -- In a do expression, pattern-match failure just calls
     -- the monadic 'fail' rather than throwing an exception
 dsHandleMonadicFailure ctx pat match m_fail_op =
@@ -977,7 +977,7 @@ dsHandleMonadicFailure ctx pat match m_fail_op =
       fail_expr <- dsSyntaxExpr fail_op [fail_msg]
       body fail_expr
 
-mk_fail_msg :: DynFlags -> HsStmtContext GhcRn -> LocatedA e -> String
+mk_fail_msg :: DynFlags -> HsStmtContext (XRec GhcRn (CtxIdP GhcRn)) -> LocatedA e -> String
 mk_fail_msg dflags ctx pat
   = showPpr dflags $ text "Pattern match failure in" <+> pprStmtContext ctx
                    <+> text "at" <+> ppr (getLocA pat)

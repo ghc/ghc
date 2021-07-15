@@ -20,7 +20,7 @@ type AnnoBody body
     , Anno (StmtLR GhcRn GhcRn (LocatedA (body GhcRn))) ~ SrcSpanAnnA
     )
 rnStmts :: --forall thing body.
-           AnnoBody body => HsStmtContext GhcRn
+           AnnoBody body => HsStmtContext (XRec GhcRn (CtxIdP GhcRn))
         -> (body GhcPs -> RnM (body GhcRn, FreeVars))
         -> [LStmt GhcPs (LocatedA (body GhcPs))]
         -> ([Name] -> RnM (thing, FreeVars))

@@ -904,10 +904,10 @@ dsCmdStmt ids local_vars out_ids (BindStmt _ pat cmd) env_ids = do
        out_ty = mkBigCoreVarTupTy out_ids
        body_expr = coreCaseTuple uniqs env_id env_ids2 (mkBigCoreVarTup out_ids)
 
-    fail_expr <- mkFailExpr (StmtCtxt (DoExpr Nothing)) out_ty
+    fail_expr <- mkFailExpr (StmtCtxt (HsDoStmt $ DoExpr Nothing)) out_ty
     pat_id    <- selectSimpleMatchVarL Many pat
     match_code
-      <- matchSimply (Var pat_id) (StmtCtxt (DoExpr Nothing)) pat body_expr fail_expr
+      <- matchSimply (Var pat_id) (StmtCtxt (HsDoStmt $ DoExpr Nothing)) pat body_expr fail_expr
     pair_id   <- newSysLocalDs Many after_c_ty
     let
         proj_expr = Lam pair_id (coreCasePair pair_id pat_id env_id match_code)
@@ -1135,7 +1135,7 @@ dsCmdStmts _ _ _ [] _ = panic "dsCmdStmts []"
 -- Match a list of expressions against a list of patterns, left-to-right.
 
 matchSimplys :: [CoreExpr]              -- Scrutinees
-             -> HsMatchContext GhcRn    -- Match kind
+             -> HsMatchContext (XRec GhcRn (CtxIdP GhcRn))    -- Match kind
              -> [LPat GhcTc]            -- Patterns they should match
              -> CoreExpr                -- Return this if they all match
              -> CoreExpr                -- Return this if they don't
