@@ -48,8 +48,7 @@
 --
 
 module GHC.Iface.Tidy.StaticPtrTable
-    ( sptCreateStaticBinds
-    , sptModuleInitCode
+    ( sptModuleInitCode
     ) where
 
 {- Note [Grand plan for static forms]
@@ -126,139 +125,19 @@ Here is a running example:
 import GHC.Prelude
 import GHC.Platform
 
-import GHC.Driver.Session
-import GHC.Driver.Env
 
-import GHC.Core
-import GHC.Core.Utils (collectMakeStaticArgs)
-import GHC.Core.DataCon
-import GHC.Core.Make (mkStringExprFSWith)
-import GHC.Core.Type
 
 import GHC.Cmm.CLabel
 
 import GHC.Unit.Module
 import GHC.Utils.Outputable as Outputable
-import GHC.Utils.Panic
-import GHC.Builtin.Names
-import GHC.Tc.Utils.Env (lookupGlobal)
 
 import GHC.Linker.Types
 
-import GHC.Types.Name
 import GHC.Types.Id
-import GHC.Types.TyThing
 import GHC.Types.ForeignStubs
 
-import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.State.Strict
-import Data.List (intercalate)
-import Data.Maybe
 import GHC.Fingerprint
-import qualified GHC.LanguageExtensions as LangExt
-
--- | Replaces all bindings of the form
---
--- > b = /\ ... -> makeStatic location value
---
---  with
---
--- > b = /\ ... ->
--- >   StaticPtr key (StaticPtrInfo "pkg key" "module" location) value
---
---  where a distinct key is generated for each binding.
---
--- It also yields the C stub that inserts these bindings into the static
--- pointer table.
-sptCreateStaticBinds :: HscEnv -> Module -> CoreProgram
-                     -> IO ([SptEntry], CoreProgram)
-sptCreateStaticBinds hsc_env this_mod binds
-    | not (xopt LangExt.StaticPointers dflags) =
-      return ([], binds)
-    | otherwise = do
-      -- Make sure the required interface files are loaded.
-      _ <- lookupGlobal hsc_env unpackCStringName
-      (fps, binds') <- evalStateT (go [] [] binds) 0
-      return (fps, binds')
-  where
-    go fps bs xs = case xs of
-      []        -> return (reverse fps, reverse bs)
-      bnd : xs' -> do
-        (fps', bnd') <- replaceStaticBind bnd
-        go (reverse fps' ++ fps) (bnd' : bs) xs'
-
-    dflags = hsc_dflags hsc_env
-    platform = targetPlatform dflags
-
-    -- Generates keys and replaces 'makeStatic' with 'StaticPtr'.
-    --
-    -- The 'Int' state is used to produce a different key for each binding.
-    replaceStaticBind :: CoreBind
-                      -> StateT Int IO ([SptEntry], CoreBind)
-    replaceStaticBind (NonRec b e) = do (mfp, (b', e')) <- replaceStatic b e
-                                        return (maybeToList mfp, NonRec b' e')
-    replaceStaticBind (Rec rbs) = do
-      (mfps, rbs') <- unzip <$> mapM (uncurry replaceStatic) rbs
-      return (catMaybes mfps, Rec rbs')
-
-    replaceStatic :: Id -> CoreExpr
-                  -> StateT Int IO (Maybe SptEntry, (Id, CoreExpr))
-    replaceStatic b e@(collectTyBinders -> (tvs, e0)) =
-      case collectMakeStaticArgs e0 of
-        Nothing      -> return (Nothing, (b, e))
-        Just (_, t, info, arg) -> do
-          (fp, e') <- mkStaticBind t info arg
-          return (Just (SptEntry b fp), (b, foldr Lam e' tvs))
-
-    mkStaticBind :: Type -> CoreExpr -> CoreExpr
-                 -> StateT Int IO (Fingerprint, CoreExpr)
-    mkStaticBind t srcLoc e = do
-      i <- get
-      put (i + 1)
-      staticPtrInfoDataCon <-
-        lift $ lookupDataConHscEnv staticPtrInfoDataConName
-      let fp@(Fingerprint w0 w1) = mkStaticPtrFingerprint i
-      info <- mkConApp staticPtrInfoDataCon <$>
-            (++[srcLoc]) <$>
-            mapM (mkStringExprFSWith (lift . lookupIdHscEnv))
-                 [ unitFS $ moduleUnit this_mod
-                 , moduleNameFS $ moduleName this_mod
-                 ]
-
-      -- The module interface of GHC.StaticPtr should be loaded at least
-      -- when looking up 'fromStatic' during type-checking.
-      staticPtrDataCon <- lift $ lookupDataConHscEnv staticPtrDataConName
-      return (fp, mkConApp staticPtrDataCon
-                               [ Type t
-                               , mkWord64LitWordRep platform w0
-                               , mkWord64LitWordRep platform w1
-                               , info
-                               , e ])
-
-    mkStaticPtrFingerprint :: Int -> Fingerprint
-    mkStaticPtrFingerprint n = fingerprintString $ intercalate ":"
-        [ unitString $ moduleUnit this_mod
-        , moduleNameString $ moduleName this_mod
-        , show n
-        ]
-
-    -- Choose either 'Word64#' or 'Word#' to represent the arguments of the
-    -- 'Fingerprint' data constructor.
-    mkWord64LitWordRep platform =
-      case platformWordSize platform of
-        PW4 -> mkWord64LitWord64
-        PW8 -> mkWordLit platform . toInteger
-
-    lookupIdHscEnv :: Name -> IO Id
-    lookupIdHscEnv n = lookupType hsc_env n >>=
-                         maybe (getError n) (return . tyThingId)
-
-    lookupDataConHscEnv :: Name -> IO DataCon
-    lookupDataConHscEnv n = lookupType hsc_env n >>=
-                              maybe (getError n) (return . tyThingDataCon)
-
-    getError n = pprPanic "sptCreateStaticBinds.get: not found" $
-      text "Couldn't find" <+> ppr n
 
 -- | @sptModuleInitCode module fps@ is a C stub to insert the static entries
 -- of @module@ into the static pointer table.

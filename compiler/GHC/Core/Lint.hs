@@ -980,13 +980,6 @@ lintIdOcc var nargs
         ; ensureEqTys occ_ty bndr_ty $
           mkBndrOccTypeMismatchMsg bndr var bndr_ty occ_ty
 
-          -- Check for a nested occurrence of the StaticPtr constructor.
-          -- See Note [Checking StaticPtrs].
-        ; lf <- getLintFlags
-        ; when (nargs /= 0 && lf_check_static_ptrs lf /= AllowAnywhere) $
-            checkL (idName var /= makeStaticName) $
-              text "Found makeStatic nested in an expression"
-
         ; checkDeadIdOcc var
         ; checkJoinOcc var nargs
 

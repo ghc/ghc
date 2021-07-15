@@ -83,7 +83,6 @@ import GHC.Core.Utils   ( exprType, exprIsHNF
                         , exprOkForSpeculation
                         , exprIsTopLevelBindable
                         , isExprLevPoly
-                        , collectMakeStaticArgs
                         , mkLamTypes
                         )
 import GHC.Core.Opt.Arity   ( exprBotStrictness_maybe )
@@ -105,7 +104,7 @@ import GHC.Types.Var.Env
 import GHC.Types.Literal      ( litIsTrivial )
 import GHC.Types.Demand       ( DmdSig, Demand, isStrUsedDmd, splitDmdSig, prependArgsDmdSig )
 import GHC.Types.Cpr          ( mkCprSig, botCpr )
-import GHC.Types.Name         ( getOccName, mkSystemVarName )
+import GHC.Types.Name         ( getOccName )
 import GHC.Types.Name.Occurrence ( occNameString )
 import GHC.Types.Unique       ( hasKey )
 import GHC.Types.Tickish      ( tickishIsCode )
@@ -684,7 +683,7 @@ lvlMFE env strict_ctxt ann_expr
                               join_arity_maybe
                               ann_expr
                   -- Treat the expr just like a right-hand side
-       ; var <- newLvlVar expr1 join_arity_maybe is_mk_static
+       ; var <- newLvlVar expr1 join_arity_maybe
        ; let var2 = annotateBotStr var float_n_lams mb_bot_str
        ; return (Let (NonRec (TB var2 (FloatMe dest_lvl)) expr1)
                      (mkVarApps (Var var2) abs_vars)) }
@@ -706,7 +705,7 @@ lvlMFE env strict_ctxt ann_expr
                          Case expr1 (stayPut l1r ubx_bndr) dc_res_ty
                              [Alt DEFAULT [] (mkConApp dc [Var ubx_bndr])]
 
-       ; var <- newLvlVar float_rhs Nothing is_mk_static
+       ; var <- newLvlVar float_rhs Nothing
        ; let l1u      = incMinorLvlFrom env
              use_expr = Case (mkVarApps (Var var) abs_vars)
                              (stayPut l1u bx_bndr) expr_ty
@@ -743,12 +742,10 @@ lvlMFE env strict_ctxt ann_expr
 
     join_arity_maybe = Nothing
 
-    is_mk_static = isJust (collectMakeStaticArgs expr)
-        -- Yuk: See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable
 
         -- A decision to float entails let-binding this thing, and we only do
         -- that if we'll escape a value lambda, or will go to the top level.
-    float_me = saves_work || saves_alloc || is_mk_static
+    float_me = saves_work || saves_alloc
 
     -- We can save work if we can move a redex outside a value lambda
     -- But if float_is_new_lam is True, then the redex is wrapped in a
@@ -1742,9 +1739,8 @@ newPolyBndrs dest_lvl
 
 newLvlVar :: LevelledExpr        -- The RHS of the new binding
           -> Maybe JoinArity     -- Its join arity, if it is a join point
-          -> Bool                -- True <=> the RHS looks like (makeStatic ...)
           -> LvlM Id
-newLvlVar lvld_rhs join_arity_maybe is_mk_static
+newLvlVar lvld_rhs join_arity_maybe
   = do { uniq <- getUniqueM
        ; return (add_join_info (mk_id uniq rhs_ty))
        }
@@ -1754,11 +1750,6 @@ newLvlVar lvld_rhs join_arity_maybe is_mk_static
     rhs_ty        = exprType de_tagged_rhs
 
     mk_id uniq rhs_ty
-      -- See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable.
-      | is_mk_static
-      = mkExportedVanillaId (mkSystemVarName uniq (mkFastString "static_ptr"))
-                            rhs_ty
-      | otherwise
       = mkSysLocal (mkFastString "lvl") uniq Many rhs_ty
 
 -- | Clone the binders bound by a single-alternative case.

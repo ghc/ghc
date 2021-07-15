@@ -387,18 +387,7 @@ tidyProgram hsc_env  (ModGuts { mg_module           = mod
                  <- tidyTopBinds uf_opts unfold_env tidy_occ_env trimmed_binds
 
           -- See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable.
-        ; (spt_entries, tidy_binds') <-
-             sptCreateStaticBinds hsc_env mod tidy_binds
-        ; let { platform = targetPlatform (hsc_dflags hsc_env)
-              ; spt_init_code = sptModuleInitCode platform mod spt_entries
-              ; add_spt_init_code =
-                  case backend dflags of
-                    -- If we are compiling for the interpreter we will insert
-                    -- any necessary SPT entries dynamically
-                    Interpreter -> id
-                    -- otherwise add a C stub to do so
-                    _              -> (`appendStubC` spt_init_code)
-
+        ; let {
               -- The completed type environment is gotten from
               --      a) the types and classes defined here (plus implicit things)
               --      b) adding Ids with correct IdInfo, including unfoldings,
@@ -423,7 +412,7 @@ tidyProgram hsc_env  (ModGuts { mg_module           = mod
               ; tidy_rules     = tidyRules tidy_env trimmed_rules
 
               ; -- See Note [Injecting implicit bindings]
-                all_tidy_binds = implicit_binds ++ tidy_binds'
+                all_tidy_binds = implicit_binds ++ tidy_binds
 
               -- Get the TyCons to generate code for.  Careful!  We must use
               -- the untidied TyCons here, because we need
@@ -467,12 +456,11 @@ tidyProgram hsc_env  (ModGuts { mg_module           = mod
                            cg_tycons   = alg_tycons,
                            cg_binds    = all_tidy_binds,
                            cg_ccs      = S.toList local_ccs,
-                           cg_foreign  = add_spt_init_code foreign_stubs,
+                           cg_foreign  = foreign_stubs,
                            cg_foreign_files = foreign_files,
                            cg_dep_pkgs = dep_direct_pkgs deps,
                            cg_hpc_info = hpc_info,
-                           cg_modBreaks = modBreaks,
-                           cg_spt_entries = spt_entries },
+                           cg_modBreaks = modBreaks },
 
                    ModDetails { md_types            = tidy_type_env,
                                 md_rules            = tidy_rules,
