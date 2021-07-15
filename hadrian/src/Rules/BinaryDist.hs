@@ -169,6 +169,8 @@ bindistRules = do
 
         -- Recache after copying the lib dir
         () <- cmd (bindistFilesDir -/- "bin" -/- "ghc-pkg") ["recache"]
+        () <- cmd "rm" [bindistFilesDir -/- "lib" -/- "package.conf.d" -/- "package.cache"]
+        () <- cmd "rm" [bindistFilesDir -/- "lib" -/- "package.conf.d" -/- "package.cache.lock"]
 
         unless cross $ need ["docs"]
 
