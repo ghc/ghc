@@ -1,4 +1,4 @@
-Found 275 Language.Haskell.Syntax module dependencies
+Found 276 Language.Haskell.Syntax module dependencies
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
 GHC.Builtin.Types
@@ -88,6 +88,7 @@ GHC.Driver.Config.Diagnostic
 GHC.Driver.Config.Finder
 GHC.Driver.Config.Logger
 GHC.Driver.Env
+GHC.Driver.Env.KnotVars
 GHC.Driver.Env.Types
 GHC.Driver.Errors
 GHC.Driver.Errors.Ppr

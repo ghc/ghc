@@ -12,7 +12,7 @@ module GHC.Data.Graph.Directed (
         stronglyConnCompG,
         topologicalSortG,
         verticesG, edgesG, hasVertexG,
-        reachableG, reachablesG, transposeG,
+        reachableG, reachablesG, transposeG, allReachable, outgoingG,
         emptyG,
 
         findCycle,
@@ -25,7 +25,7 @@ module GHC.Data.Graph.Directed (
 
         -- Simple way to classify edges
         EdgeType(..), classifyEdges
-    ) where
+        ) where
 
 ------------------------------------------------------------------------------
 -- A version of the graph algorithms described in:
@@ -61,6 +61,9 @@ import Data.Graph hiding (Graph, Edge, transposeG, reachable)
 import Data.Tree
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
+import qualified Data.IntMap as IM
+import qualified Data.IntSet as IS
+import qualified Data.Map as M
 
 {-
 ************************************************************************
@@ -359,12 +362,22 @@ reachableG graph from = map (gr_vertex_to_node graph) result
   where from_vertex = expectJust "reachableG" (gr_node_to_vertex graph from)
         result = {-# SCC "Digraph.reachable" #-} reachable (gr_int_graph graph) [from_vertex]
 
+outgoingG :: Graph node -> node -> [node]
+outgoingG graph from = map (gr_vertex_to_node graph) result
+  where from_vertex = expectJust "reachableG" (gr_node_to_vertex graph from)
+        result = gr_int_graph graph ! from_vertex
+
 -- | Given a list of roots return all reachable nodes.
 reachablesG :: Graph node -> [node] -> [node]
 reachablesG graph froms = map (gr_vertex_to_node graph) result
   where result = {-# SCC "Digraph.reachable" #-}
                  reachable (gr_int_graph graph) vs
         vs = [ v | Just v <- map (gr_node_to_vertex graph) froms ]
+
+allReachable :: Ord key => Graph node -> (node -> key) -> M.Map key [key]
+allReachable (Graph g from _) conv =  M.fromList [(conv (from v), IS.foldr (\k vs -> conv (from k) : vs) [] vs) | (v, vs) <- IM.toList int_graph]
+  where
+    int_graph = reachableGraph g
 
 hasVertexG :: Graph node -> node -> Bool
 hasVertexG graph node = isJust $ gr_node_to_vertex graph node
@@ -434,6 +447,12 @@ preorderF ts         = concatMap flatten ts
 -- This generalizes reachable which was found in Data.Graph
 reachable    :: IntGraph -> [Vertex] -> [Vertex]
 reachable g vs = preorderF (dfs g vs)
+
+reachableGraph :: IntGraph -> IM.IntMap IS.IntSet
+reachableGraph g = res
+  where
+    do_one v = IS.unions (IS.fromList (g ! v) : mapMaybe (flip IM.lookup res) (g ! v))
+    res = IM.fromList [(v, do_one v) | v <- vertices g]
 
 {-
 ************************************************************************

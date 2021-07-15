@@ -10,10 +10,12 @@ module GHC.Unit.Home.ModInfo
    , mapHpt
    , delFromHpt
    , addToHpt
+   , addHomeModInfoToHpt
    , addListToHpt
    , lookupHptDirectly
    , lookupHptByModule
    , listToHpt
+   , listHMIToHpt
    , pprHPT
    )
 where
@@ -30,6 +32,8 @@ import GHC.Types.Unique
 import GHC.Types.Unique.DFM
 
 import GHC.Utils.Outputable
+import Data.List
+import Data.Ord
 
 -- | Information about modules in the package being compiled
 data HomeModInfo = HomeModInfo
@@ -93,12 +97,23 @@ delFromHpt = delFromUDFM
 addToHpt :: HomePackageTable -> ModuleName -> HomeModInfo -> HomePackageTable
 addToHpt = addToUDFM
 
+addHomeModInfoToHpt :: HomeModInfo -> HomePackageTable -> HomePackageTable
+addHomeModInfoToHpt hmi hpt = addToHpt hpt (moduleName (mi_module (hm_iface hmi))) hmi
+
 addListToHpt
   :: HomePackageTable -> [(ModuleName, HomeModInfo)] -> HomePackageTable
 addListToHpt = addListToUDFM
 
 listToHpt :: [(ModuleName, HomeModInfo)] -> HomePackageTable
 listToHpt = listToUDFM
+
+listHMIToHpt :: [HomeModInfo] -> HomePackageTable
+listHMIToHpt hmis =
+  listToHpt [(moduleName (mi_module (hm_iface hmi)), hmi) | hmi <- sorted_hmis]
+  where
+    -- Sort to put Non-boot things last, so they overwrite the boot interfaces
+    -- in the HPT, other than that, the order doesn't matter
+    sorted_hmis = sortOn (Down . mi_boot . hm_iface) hmis
 
 lookupHptByModule :: HomePackageTable -> Module -> Maybe HomeModInfo
 -- The HPT is indexed by ModuleName, not Module,

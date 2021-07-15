@@ -133,6 +133,7 @@ module GHC.Tc.Utils.Monad(
   initIfaceLcl,
   initIfaceLclWithSubst,
   initIfaceLoad,
+  initIfaceLoadModule,
   getIfModule,
   failIfM,
   forkM_maybe,
@@ -221,6 +222,7 @@ import GHC.Tc.Errors.Types
 import {-# SOURCE #-} GHC.Tc.Utils.Env    ( tcInitTidyEnv )
 
 import qualified Data.Map as Map
+import GHC.Driver.Env.KnotVars
 
 {-
 ************************************************************************
@@ -249,9 +251,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
         infer_var    <- newIORef True ;
         infer_reasons_var <- newIORef emptyMessages ;
         dfun_n_var   <- newIORef emptyOccSet ;
-        type_env_var <- case hsc_type_env_var hsc_env of {
-                           Just (_mod, te_var) -> return te_var ;
-                           Nothing             -> newIORef emptyNameEnv } ;
+        let { type_env_var = hsc_type_env_vars hsc_env };
 
         dependent_files_var <- newIORef [] ;
         static_wc_var       <- newIORef emptyWC ;
@@ -2063,8 +2063,8 @@ initIfaceTcRn thing_inside
   = do  { tcg_env <- getGblEnv
         ; hsc_env <- getTopEnv
           -- bangs to avoid leaking the envs (#19356)
-        ; let !mod = tcg_semantic_mod tcg_env
-              !home_unit = hsc_home_unit hsc_env
+        ; let !home_unit = hsc_home_unit hsc_env
+              !knot_vars = tcg_type_env_var tcg_env
               -- When we are instantiating a signature, we DEFINITELY
               -- do not want to knot tie.
               is_instantiate = isHomeUnitInstantiating home_unit
@@ -2072,21 +2072,30 @@ initIfaceTcRn thing_inside
                             if_doc = text "initIfaceTcRn",
                             if_rec_types =
                                 if is_instantiate
-                                    then Nothing
-                                    else Just (mod, get_type_env)
+                                    then emptyKnotVars
+                                    else readTcRef <$> knot_vars
+                            }
                          }
-              ; get_type_env = readTcRef (tcg_type_env_var tcg_env) }
         ; setEnvs (if_env, ()) thing_inside }
 
--- Used when sucking in a ModIface into a ModDetails to put in
--- the HPT.  Notably, unlike initIfaceCheck, this does NOT use
--- hsc_type_env_var (since we're not actually going to typecheck,
--- so this variable will never get updated!)
+-- | 'initIfaceLoad' can be used when there's no chance that the action will
+-- call 'typecheckIface' when inside a module loop and hence 'tcIfaceGlobal'.
 initIfaceLoad :: HscEnv -> IfG a -> IO a
 initIfaceLoad hsc_env do_this
  = do let gbl_env = IfGblEnv {
                         if_doc = text "initIfaceLoad",
-                        if_rec_types = Nothing
+                        if_rec_types = emptyKnotVars
+                    }
+      initTcRnIf 'i' hsc_env gbl_env () do_this
+
+-- | This is used when we are doing to call 'typecheckModule' on an 'ModIface',
+-- if it's part of a loop with some other modules then we need to use their
+-- IORef TypeEnv vars when typechecking but crucially not our own.
+initIfaceLoadModule :: HscEnv -> Module -> IfG a -> IO a
+initIfaceLoadModule hsc_env this_mod do_this
+ = do let gbl_env = IfGblEnv {
+                        if_doc = text "initIfaceLoadModule",
+                        if_rec_types = readTcRef <$> knotVarsWithout this_mod (hsc_type_env_vars hsc_env)
                     }
       initTcRnIf 'i' hsc_env gbl_env () do_this
 
@@ -2094,12 +2103,9 @@ initIfaceCheck :: SDoc -> HscEnv -> IfG a -> IO a
 -- Used when checking the up-to-date-ness of the old Iface
 -- Initialise the environment with no useful info at all
 initIfaceCheck doc hsc_env do_this
- = do let rec_types = case hsc_type_env_var hsc_env of
-                         Just (mod,var) -> Just (mod, readTcRef var)
-                         Nothing        -> Nothing
-          gbl_env = IfGblEnv {
+ = do let gbl_env = IfGblEnv {
                         if_doc = text "initIfaceCheck" <+> doc,
-                        if_rec_types = rec_types
+                        if_rec_types = readTcRef <$> hsc_type_env_vars hsc_env
                     }
       initTcRnIf 'i' hsc_env gbl_env () do_this
 

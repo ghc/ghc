@@ -165,6 +165,7 @@ import GHCi.Message
 import GHCi.RemoteTypes
 
 import qualified Language.Haskell.TH as TH
+import GHC.Driver.Env.KnotVars
 
 -- | A 'NameShape' is a substitution on 'Name's that can be used
 -- to refine the identities of a hole while we are renaming interfaces
@@ -308,7 +309,7 @@ data IfGblEnv
         -- We need the module name so we can test when it's appropriate
         -- to look in this env.
         -- See Note [Tying the knot] in GHC.IfaceToCore
-        if_rec_types :: Maybe (Module, IfG TypeEnv)
+        if_rec_types :: !(KnotVars (IfG TypeEnv))
                 -- Allows a read effect, so it can be in a mutable
                 -- variable; c.f. handling the external package type env
                 -- Nothing => interactive stuff, no loops possible
@@ -321,7 +322,7 @@ data IfLclEnv
         -- it means M.f = \x -> x, where M is the if_mod
         -- NB: This is a semantic module, see
         -- Note [Identity versus semantic module]
-        if_mod :: Module,
+        if_mod :: !Module,
 
         -- Whether or not the IfaceDecl came from a boot
         -- file or not; we'll use this to choose between
@@ -443,7 +444,7 @@ data TcGblEnv
           -- NB: for what "things in this module" means, see
           -- Note [The interactive package] in "GHC.Runtime.Context"
 
-        tcg_type_env_var :: TcRef TypeEnv,
+        tcg_type_env_var :: KnotVars (IORef TypeEnv),
                 -- Used only to initialise the interface-file
                 -- typechecker in initIfaceTcRn, so that it can see stuff
                 -- bound in this module when dealing with hi-boot recursions

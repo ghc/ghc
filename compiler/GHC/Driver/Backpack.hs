@@ -734,9 +734,17 @@ hsunitModuleGraph unit = do
             -- Using extendModSummaryNoDeps here is okay because we're making a leaf node
             -- representing a signature that can't depend on any other unit.
 
+    let graph_nodes = (ModuleNode <$> (nodes ++ req_nodes)) ++ (instantiationNodes (hsc_units hsc_env))
+        key_nodes = map mkNodeKey graph_nodes
+    -- This error message is not very good but .bkp mode is just for testing so
+    -- better to be direct rather than pretty.
+    when
+      (length key_nodes /= length (ordNub key_nodes))
+      (pprPanic "Duplicate nodes keys in backpack file" (ppr key_nodes))
+
     -- 3. Return the kaboodle
-    return $ mkModuleGraph' $
-      (ModuleNode <$> (nodes ++ req_nodes)) ++ instantiationNodes (hsc_units hsc_env)
+    return $ mkModuleGraph' $ graph_nodes
+
 
 summariseRequirement :: PackageName -> ModuleName -> BkpM ModSummary
 summariseRequirement pn mod_name = do
@@ -849,8 +857,6 @@ hsModuleToModSummary pn hsc_src modname
                         HsBootFile -> addBootSuffixLocnOut location0
                         _ -> location0
     -- This duplicates a pile of logic in GHC.Driver.Make
-    env <- getBkpEnv
-    src_hash <- liftIO $ getFileHash (bkp_filename env)
     hi_timestamp <- liftIO $ modificationTimeIfExists (ml_hi_file location)
     hie_timestamp <- liftIO $ modificationTimeIfExists (ml_hie_file location)
 
@@ -901,7 +907,10 @@ hsModuleToModSummary pn hsc_src modname
                     hpm_module = hsmod,
                     hpm_src_files = [] -- TODO if we preprocessed it
                 }),
-            ms_hs_hash = src_hash,
+            -- Source hash = fingerprint0, so the recompilation tests do not recompile
+            -- too much. In future, if necessary then could get the hash by just hashing the
+            -- relevant part of the .bkp file.
+            ms_hs_hash = fingerprint0,
             ms_obj_date = Nothing, -- TODO do this, but problem: hi_timestamp is BOGUS
             ms_dyn_obj_date = Nothing, -- TODO do this, but problem: hi_timestamp is BOGUS
             ms_iface_date = hi_timestamp,

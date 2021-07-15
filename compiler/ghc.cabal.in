@@ -94,6 +94,7 @@ Library
                    transformers == 0.5.*,
                    exceptions == 0.10.*,
                    parsec,
+                   stm,
                    ghc-boot   == @ProjectVersionMunged@,
                    ghc-heap   == @ProjectVersionMunged@,
                    ghci == @ProjectVersionMunged@
@@ -418,6 +419,7 @@ Library
         GHC.Driver.Config.Logger
         GHC.Driver.Config.Parser
         GHC.Driver.Env
+        GHC.Driver.Env.KnotVars
         GHC.Driver.Env.Types
         GHC.Driver.Errors
         GHC.Driver.Errors.Ppr
@@ -431,6 +433,7 @@ Library
         GHC.Driver.Phases
         GHC.Driver.Pipeline
         GHC.Driver.Pipeline.Execute
+        GHC.Driver.Pipeline.LogQueue
         GHC.Driver.Pipeline.Phases
         GHC.Driver.Pipeline.Monad
         GHC.Driver.Plugins

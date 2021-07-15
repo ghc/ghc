@@ -4,7 +4,7 @@
 [4 of 5] Compiling M                ( M.hs, M.o )
 [5 of 5] Compiling Top              ( Top.hs, Top.o )
 [1 of 6] Compiling C[boot]          ( C.hs-boot, C.o-boot )
-[3 of 6] Compiling B                ( B.hs, B.o ) [Source file changed]
-[4 of 6] Compiling A                ( A.hs, A.o ) [B changed]
+[2 of 6] Compiling B                ( B.hs, B.o ) [Source file changed]
+[3 of 6] Compiling A                ( A.hs, A.o ) [B changed]
 [5 of 6] Compiling M                ( M.hs, M.o ) [A changed]
 [6 of 6] Compiling Top              ( Top.hs, Top.o ) [M changed]
