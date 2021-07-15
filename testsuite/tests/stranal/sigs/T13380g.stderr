@@ -1,0 +1,24 @@
+
+==================== Strictness signatures ====================
+T13380g.$trModule:
+T13380g.testStr: <MP(L)><1C1(P(L,A))><L>
+T13380g.test_readIORef: <1P(L)><1P(L)><L>
+T13380g.test_writeIORef: <1P(L)><1P(L)><L>
+
+
+
+==================== Cpr signatures ====================
+T13380g.$trModule:
+T13380g.testStr:
+T13380g.test_readIORef:
+T13380g.test_writeIORef:
+
+
+
+==================== Strictness signatures ====================
+T13380g.$trModule:
+T13380g.testStr: <MP(L)><1C1(P(L,A))><L>
+T13380g.test_readIORef: <1P(L)><1P(L)><L>
+T13380g.test_writeIORef: <1P(L)><1P(L)><L>
+
+

@@ -1,0 +1,33 @@
+
+==================== Strictness signatures ====================
+T20111.$tc'R:
+T20111.$tcR:
+T20111.$trModule:
+T20111.f: <1A><L>x
+T20111.field: <1P(1L)>
+T20111.main: <L>x
+T20111.r0:
+
+
+
+==================== Cpr signatures ====================
+T20111.$tc'R:
+T20111.$tcR:
+T20111.$trModule:
+T20111.f: b
+T20111.field:
+T20111.main: b
+T20111.r0:
+
+
+
+==================== Strictness signatures ====================
+T20111.$tc'R:
+T20111.$tcR:
+T20111.$trModule:
+T20111.f: <1A><L>x
+T20111.field: <1P(1L)>
+T20111.main: <L>x
+T20111.r0:
+
+

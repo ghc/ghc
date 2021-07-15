@@ -514,19 +514,38 @@ dmdAnal' env dmd (Let bind body)
 -- exception when evaluated. It's always sound to return 'True'.
 -- See Note [Which scrutinees may throw precise exceptions].
 exprMayThrowPreciseException :: FamInstEnvs -> CoreExpr -> Bool
+exprMayThrowPreciseException _    (Type _) = False
 exprMayThrowPreciseException envs e
   | not (forcesRealWorld envs (exprType e))
   = False -- 1. in the Note
-  | (Var f, _) <- collectArgs e
-  , Just op    <- isPrimOpId_maybe f
-  , op /= RaiseIOOp
+  | exprIsHNF e
   = False -- 2. in the Note
-  | (Var f, _) <- collectArgs e
+  | Var f   <- fn
+  , Just op <- isPrimOpId_maybe f
+  , op /= RaiseIOOp
+  ---, pprTrace "emtpe" (ppr fn $$ ppr args $$ ppr (map primop_arg_may_throw args)) $ True
+  , not $ any primop_arg_may_throw args -- e.g., catch# in the Note
+  = False -- 3. in the Note
+  | Var f      <- fn
   , Just fcall <- isFCallId_maybe f
   , not (isSafeForeignCall fcall)
-  = False -- 3. in the Note
+  = False -- 4. in the Note
   | otherwise
   = True  -- _. in the Note
+  where
+    (fn, args) = collectArgs e
+    -- | Peel off lambdas and recurse into the body expr if it really is the
+    -- result type of the function. Otherwise we can't look at the body expr and
+    -- just perform a result type check with 'forcesRealWorld'
+    primop_arg_may_throw (Type _) = False
+    primop_arg_may_throw arg
+      | (tcbs, body_ty) <- splitPiTys (exprType arg)
+           -- no need to peel newtypes here; primops always return State#
+           -- RealWorld directly
+      , (bs, body)      <- collectBinders arg
+      = if equalLength tcbs bs
+          then exprMayThrowPreciseException envs body
+          else forcesRealWorld envs body_ty
 
 -- | Recognises types that are
 --    * @State# RealWorld@
@@ -629,29 +648,54 @@ Note [Which scrutinees may throw precise exceptions]
 This is the specification of 'exprMayThrowPreciseExceptions',
 which is important for Scenario 2 of
 Note [Precise exceptions and strictness analysis] in GHC.Types.Demand.
+Ideally, we'd discover
 
-For an expression @f a1 ... an :: ty@ we determine that
+For a term-level expression @f a1 ... an :: ty@ we determine that
   1. False  If ty is *not* @State# RealWorld@ or an unboxed tuple thereof.
             This check is done by 'forcesRealWorld'.
             (Why not simply unboxed pairs as above? This is motivated by
             T13380{d,e}.)
-  2. False  If f is a PrimOp, and it is *not* raiseIO#
-  3. False  If f is an unsafe FFI call ('PlayRisky')
+  2. False  If @f a1 ... an@ is an HNF
+  3. False  If f is a PrimOp, and it is *not* raiseIO# or a primop the args of
+            which may throw a precise exception (like catch#, #201111).
+            In practice, that means we will return True for all higher-order
+            primops like catch#, because their higher-order arg will often be
+            floated to top-level and we return True for all such Vars at
+            the moment.
+  4. False  If f is an unsafe FFI call ('PlayRisky')
   _. True   Otherwise "give up".
 
 It is sound to return False in those cases, because
   1. We don't give any guarantees for unsafePerformIO, so no precise exceptions
      from pure code.
-  2. raiseIO# is the only primop that may throw a precise exception.
-  3. Unsafe FFI calls may not interact with the RTS (to throw, for example).
+  2. If the app already is an HNF, it will do nothing when evaluated, certainly
+     not throw an exception.
+  3. raiseIO# is the only primop that may throw a precise exception directly and
+     higher-order primops like 'mask#' may only throw if one of their
+     arguments throw.
+  4. Unsafe FFI calls may not interact with the RTS (to throw, for example).
      See haddock on GHC.Types.ForeignCall.PlayRisky.
 
 We *need* to return False in those cases, because
   1. We would lose too much strictness in pure code, all over the place.
-  2. We would lose strictness for primops like getMaskingState#, which
+  2. We want to return False for an evaluated argument (see (3) why we check
+     arguments) like @s :: State# RealWorld@ and the generalisation to arbitrary
+     HNFs is cheap.
+  3. We would lose strictness for primops like getMaskingState#, which
      introduces a substantial regression in
      GHC.IO.Handle.Internals.wantReadableHandle.
-  3. We would lose strictness for code like GHC.Fingerprint.fingerprintData,
+     We have to check the args of higher-order primops like catch# or
+     atomically# because they might throw precise exceptions when evaluated by
+     the primop. We could simply list all such primops, but that would be hard
+     to maintain.
+     Thus, given @ai :: ti@ and @ti = forall v. t1 -> tbody@, we first look at
+     @ti@ to figure out if its result type @tbody@ 'forcesRealWorld'
+     (NB: splitPiTys is enough to do so, no newtypes in primops).
+     But we can do even better when @ai = /\x. \y. abody@ by recursing into
+     'exprMayThrowPreciseExceptions' on the arg body @abody@, but there have to
+     be 2 manifest lambdas on @ai@. (In general: as many as lambdas as
+     splitPiTys split off binders).
+  4. We would lose strictness for code like GHC.Fingerprint.fingerprintData,
      where an intermittent FFI call to c_MD5Init would otherwise lose
      strictness on the arguments len and buf, leading to regressions in T9203
      (2%) and i386's haddock.base (5%). Tested by T13380f.
@@ -660,6 +704,11 @@ In !3014 we tried a more sophisticated analysis by introducing ConOrDiv (nic)
 to the Divergence lattice, but in practice it turned out to be hard to untaint
 from 'topDiv' to 'conDiv', leading to bugs, performance regressions and
 complexity that didn't justify the single fixed testcase T13380c.
+
+In #20121, track that we ideally want to extend this technique to not only taint
+precise exceptions, but also other externally visible (outside the current
+thread, that is) side-effects like communicating with a different thread through
+MVars. It is an ongoing experiment whether that will regress code in the wild.
 
 Note [Demand on the scrutinee of a product case]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
