@@ -1,3 +1,4 @@
+{-# LANGUAGE NoPolyKinds #-}
 module GHC.Types.Var where
 
 import GHC.Prelude ()
