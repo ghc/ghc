@@ -1593,7 +1593,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
         -------------------
         -- PREPARE FOR CODE GENERATION
         -- Do saturation and convert to A-normal form
-        (prepd_binds, spt_entries) <- {-# SCC "CorePrep" #-}
+        (prepd_binds) <- {-# SCC "CorePrep" #-}
                        corePrepPgm hsc_env this_mod location
                                    core_binds data_tycons
 
@@ -1611,7 +1611,6 @@ hscGenHardCode hsc_env cgguts location output_filename = do
             prof_init
               | sccProfilingEnabled dflags = profilingInitCode platform this_mod cost_centre_info
               | otherwise = mempty
-
 
         ------------------  Code generation ------------------
         -- The back-end is streamed: each top-level function goes
@@ -1663,8 +1662,8 @@ hscInteractive hsc_env cgguts location = do
                cg_binds    = core_binds,
                cg_tycons   = tycons,
                cg_foreign  = foreign_stubs,
-               cg_modBreaks = mod_breaks
-               } = cgguts
+               cg_modBreaks = mod_breaks,
+               cg_spt_entries = spt_entries } = cgguts
 
         data_tycons = filter isDataTyCon tycons
         -- cg_tycons includes newtypes, for the benefit of External Core,
@@ -1673,7 +1672,7 @@ hscInteractive hsc_env cgguts location = do
     -------------------
     -- PREPARE FOR CODE GENERATION
     -- Do saturation and convert to A-normal form
-    (prepd_binds, spt_entries) <- {-# SCC "CorePrep" #-}
+    prepd_binds <- {-# SCC "CorePrep" #-}
                    corePrepPgm hsc_env this_mod location core_binds data_tycons
 
     (stg_binds, _infotable_prov, _caf_ccs__caf_cc_stacks)
@@ -1990,7 +1989,7 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
 
     {- Prepare For Code Generation -}
     -- Do saturation and convert to A-normal form
-    (prepd_binds, spt_entries) <- {-# SCC "CorePrep" #-}
+    prepd_binds <- {-# SCC "CorePrep" #-}
       liftIO $ corePrepPgm hsc_env this_mod iNTERACTIVELoc core_binds data_tycons
 
     (stg_binds, _infotable_prov, _caf_ccs__caf_cc_stacks)
@@ -2010,7 +2009,7 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
     liftIO $ loadDecls interp hsc_env (src_span, Nothing) cbc
 
     {- Load static pointer table entries -}
-    liftIO $ hscAddSptEntries hsc_env Nothing spt_entries
+    liftIO $ hscAddSptEntries hsc_env Nothing (cg_spt_entries tidy_cg)
 
     let tcs = filterOut isImplicitTyCon (mg_tcs simpl_mg)
         patsyns = mg_patsyns simpl_mg
@@ -2167,9 +2166,8 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr
            {- Tidy it (temporary, until coreSat does cloning) -}
          ; let tidy_expr = tidyExpr emptyTidyEnv simpl_expr
 
-         ; let ictxt = hsc_IC hsc_env
            {- Prepare for codegen -}
-         ; prepd_expr <- corePrepExpr hsc_env (icInteractiveModule ictxt) tidy_expr
+         ; prepd_expr <- corePrepExpr hsc_env tidy_expr
 
            {- Lint if necessary -}
          ; lintInteractiveExpr (text "hscCompileExpr") hsc_env prepd_expr
@@ -2178,6 +2176,7 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr
                                       ml_obj_file  = panic "hscCompileCoreExpr':ml_obj_file",
                                       ml_hie_file  = panic "hscCompileCoreExpr':ml_hie_file" }
 
+         ; let ictxt = hsc_IC hsc_env
          ; (stg_expr, _, _) <-
              myCoreToStgExpr (hsc_logger hsc_env)
                              (hsc_dflags hsc_env)

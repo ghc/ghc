@@ -156,11 +156,6 @@ import Data.List (intercalate)
 import Data.Maybe
 import GHC.Fingerprint
 import qualified GHC.LanguageExtensions as LangExt
-import Data.Unique
-import GHC.Types.Name.Cache
-import GHC.Types.Id.Info
-import GHC.Types.SrcLoc
-import Control.Monad.IO.Class
 
 -- | Replaces all bindings of the form
 --
@@ -190,8 +185,7 @@ sptCreateStaticBinds hsc_env this_mod binds
       []        -> return (reverse fps, reverse bs)
       bnd : xs' -> do
         (fps', bnd') <- replaceStaticBind bnd
-        let (spt_entries, alias_binds) = unzip fps'
-        go (reverse spt_entries ++ fps) (alias_binds ++ (bnd' : bs)) xs'
+        go (reverse fps' ++ fps) (bnd' : bs) xs'
 
     dflags = hsc_dflags hsc_env
     platform = targetPlatform dflags
@@ -200,7 +194,7 @@ sptCreateStaticBinds hsc_env this_mod binds
     --
     -- The 'Int' state is used to produce a different key for each binding.
     replaceStaticBind :: CoreBind
-                      -> StateT Int IO ([(SptEntry, CoreBind)], CoreBind)
+                      -> StateT Int IO ([SptEntry], CoreBind)
     replaceStaticBind (NonRec b e) = do (mfp, (b', e')) <- replaceStatic b e
                                         return (maybeToList mfp, NonRec b' e')
     replaceStaticBind (Rec rbs) = do
@@ -208,33 +202,21 @@ sptCreateStaticBinds hsc_env this_mod binds
       return (catMaybes mfps, Rec rbs')
 
     replaceStatic :: Id -> CoreExpr
-                  -> StateT Int IO (Maybe (SptEntry, CoreBind), (Id, CoreExpr))
+                  -> StateT Int IO (Maybe SptEntry, (Id, CoreExpr))
     replaceStatic b e@(collectTyBinders -> (tvs, e0)) =
       case collectMakeStaticArgs e0 of
         Nothing      -> return (Nothing, (b, e))
         Just (_, t, info, arg) -> do
-          (b', alias_bind, fp, e') <- mkStaticBind b t info arg
-          return (Just ((SptEntry b' fp), alias_bind), (b, foldr Lam e' tvs))
+          (fp, e') <- mkStaticBind t info arg
+          return (Just (SptEntry b fp), (b, foldr Lam e' tvs))
 
-    -- Clone the
-    cloneStaticId :: Int -> Id -> IO (Id, CoreBind)
-    cloneStaticId n static_id = do
-      let cloned_occname = mkVarOcc ("$static_key" ++ show n)
-          name_cache = hsc_NC hsc_env
-      unique <-  takeUniqFromNameCache name_cache
-      let cloned_name = mkExternalName unique this_mod cloned_occname noSrcSpan
-          cloned_id   = mkGlobalId VanillaId cloned_name (idType static_id) vanillaIdInfo
-          alias_bind = NonRec cloned_id (Var static_id)
-      return (cloned_id, alias_bind)
-
-    mkStaticBind :: Id -> Type -> CoreExpr -> CoreExpr
-                 -> StateT Int IO (Id, CoreBind, Fingerprint, CoreExpr)
-    mkStaticBind old_id t srcLoc e = do
+    mkStaticBind :: Type -> CoreExpr -> CoreExpr
+                 -> StateT Int IO (Fingerprint, CoreExpr)
+    mkStaticBind t srcLoc e = do
       i <- get
       put (i + 1)
       staticPtrInfoDataCon <-
         lift $ lookupDataConHscEnv staticPtrInfoDataConName
-      (cloned_id, alias_bind) <- liftIO $ cloneStaticId i old_id
       let fp@(Fingerprint w0 w1) = mkStaticPtrFingerprint i
       info <- mkConApp staticPtrInfoDataCon <$>
             (++[srcLoc]) <$>
@@ -246,7 +228,7 @@ sptCreateStaticBinds hsc_env this_mod binds
       -- The module interface of GHC.StaticPtr should be loaded at least
       -- when looking up 'fromStatic' during type-checking.
       staticPtrDataCon <- lift $ lookupDataConHscEnv staticPtrDataConName
-      return (cloned_id, alias_bind, fp, mkConApp staticPtrDataCon
+      return (fp, mkConApp staticPtrDataCon
                                [ Type t
                                , mkWord64LitWordRep platform w0
                                , mkWord64LitWordRep platform w1
@@ -277,7 +259,6 @@ sptCreateStaticBinds hsc_env this_mod binds
 
     getError n = pprPanic "sptCreateStaticBinds.get: not found" $
       text "Couldn't find" <+> ppr n
-
 
 -- | @sptModuleInitCode module fps@ is a C stub to insert the static entries
 -- of @module@ into the static pointer table.
