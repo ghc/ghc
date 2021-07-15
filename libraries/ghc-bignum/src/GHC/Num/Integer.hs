@@ -34,10 +34,6 @@ import GHC.Num.BigNat
 import GHC.Num.Natural
 import qualified GHC.Num.Backend as Backend
 
-#if WORD_SIZE_IN_BITS < 64
-import GHC.IntWord64
-#endif
-
 default ()
 
 -- | Arbitrary precision integers. In contrast with fixed-size integral types
