@@ -267,7 +267,7 @@ rewriteRhs (_id, tagSig) (StgRhsCon ccs con cn ticks args) = {-# SCC rewriteRhs_
             --  * and Dunno as tag signature
             -- Then we return a RhsClosure, otherwise we return a wrapper
             -- which will evaluate the arguments first when applied to an expression.
-            if not (isTaggedSig tagSig) --rewriteFlag == MaybeClosure
+            if not (isTaggedSig tagSig) || True --rewriteFlag == MaybeClosure
                 then do -- Turn the rhs into a closure that evaluates the arguments to the strict fields
                     conExpr <- mkSeqs evalArgs con cn args (panic "mkSeqs should not need to provide types")
                     return $! (StgRhsClosure noExtFieldSilent ccs ReEntrant [] $! conExpr, id)

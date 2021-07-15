@@ -321,14 +321,14 @@ inferTagRhs top grp_ids env (StgRhsCon cc con cn ticks args)
     in case () of
           -- All fields tagged or non-strict
         _ | null strictUntaggedIds -> mkResult TagProper
-          -- Non-recursive local let
-          | null grp_ids
-          , NotTopLevel <- top
-          -> mkResult TagProper
+          -- -- Non-recursive local let
+          -- | null grp_ids
+          -- , NotTopLevel <- top
+          -- -> mkResult TagProper
           -- Recursive local let, no bindings from grp in args
-          | NotTopLevel <- top
-          , mkVarSet grp_ids `disjointVarSet` mkVarSet strictUntaggedIds
-          -> mkResult TagProper
+          -- | NotTopLevel <- top
+          -- , mkVarSet grp_ids `disjointVarSet` mkVarSet strictUntaggedIds
+          -- -> mkResult TagProper
           -- Otherwise we have a top level let with untagged args,
           -- or a recursive group where a bindings of the group is
           -- passed into a strict field
