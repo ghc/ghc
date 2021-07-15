@@ -1,8 +1,15 @@
 {-# LANGUAGE ExistentialQuantification #-}
 
 module GHC.Types.Hint (
-  GhcHint(..),
-  InstantiationSuggestion(..)
+    GhcHint(..)
+  , InstantiationSuggestion(..)
+  , LanguageExtensionHint(..)
+  , suggestExtension
+  , suggestExtensionWithInfo
+  , suggestExtensions
+  , suggestExtensionsWithInfo
+  , suggestAnyExtension
+  , suggestAnyExtensionWithInfo
   ) where
 
 import GHC.Prelude
@@ -18,6 +25,52 @@ import GHC.Parser.Errors.Basic
 import {-# SOURCE #-} Language.Haskell.Syntax.Expr
   -- This {-# SOURCE #-} import should be removable once
   -- 'Language.Haskell.Syntax.Bind' no longer depends on 'GHC.Tc.Types.Evidence'.
+
+
+data LanguageExtensionHint
+  = -- | Suggest to enable the input extension. If the input 'SDoc'
+    -- is not empty, it will contain some extra information about the
+    -- why the extension is required, but it's totally irrelevant/redundant
+    -- for IDEs and other tools.
+     SuggestSingleExtension !SDoc !LangExt.Extension
+    -- | Suggest to enable the input extensions. The list
+    -- is to be intended as /disjuctive/ i.e. the user is
+    -- suggested to enable /any/ of the extensions listed. If
+    -- the input 'SDoc' is not empty, it will contain some extra
+    -- information about the why the extensions are required, but
+    -- it's totally irrelevant/redundant for IDEs and other tools.
+  | SuggestAnyExtension !SDoc [LangExt.Extension]
+    -- | Suggest to enable the input extensions. The list
+    -- is to be intended as /conjunctive/ i.e. the user is
+    -- suggested to enable /all/ the extensions listed. If
+    -- the input 'SDoc' is not empty, it will contain some extra
+    -- information about the why the extensions are required, but
+    -- it's totally irrelevant/redundant for IDEs and other tools.
+  | SuggestExtensions !SDoc [LangExt.Extension]
+
+-- | Suggests a single extension without extra user info.
+suggestExtension :: LangExt.Extension -> GhcHint
+suggestExtension ext = SuggestExtension (SuggestSingleExtension empty ext)
+
+-- | Like 'suggestExtension' but allows supplying extra info for the user.
+suggestExtensionWithInfo :: SDoc -> LangExt.Extension -> GhcHint
+suggestExtensionWithInfo extraInfo ext = SuggestExtension (SuggestSingleExtension extraInfo ext)
+
+-- | Suggests to enable /every/ extension in the list.
+suggestExtensions :: [LangExt.Extension] -> GhcHint
+suggestExtensions exts = SuggestExtension (SuggestExtensions empty exts)
+
+-- | Like 'suggestExtensions' but allows supplying extra info for the user.
+suggestExtensionsWithInfo :: SDoc -> [LangExt.Extension] -> GhcHint
+suggestExtensionsWithInfo extraInfo exts = SuggestExtension (SuggestExtensions extraInfo exts)
+
+-- | Suggests to enable /any/ extension in the list.
+suggestAnyExtension :: [LangExt.Extension] -> GhcHint
+suggestAnyExtension exts = SuggestExtension (SuggestAnyExtension empty exts)
+
+-- | Like 'suggestAnyExtension' but allows supplying extra info for the user.
+suggestAnyExtensionWithInfo :: SDoc -> [LangExt.Extension] -> GhcHint
+suggestAnyExtensionWithInfo extraInfo exts = SuggestExtension (SuggestAnyExtension extraInfo exts)
 
 -- | A type for hints emitted by GHC.
 -- A /hint/ suggests a possible way to deal with a particular warning or error.
@@ -39,7 +92,7 @@ data GhcHint
                       parser/should_fail/T18251e, ... (and many more)
 
     -}
-  | SuggestExtension !LangExt.Extension
+  | SuggestExtension !LanguageExtensionHint
     {-| Suggests that a monadic code block is probably missing a \"do\" keyword.
 
         Example:

@@ -17,19 +17,28 @@ import GHC.Types.Id
 import GHC.Utils.Outputable
 import qualified GHC.LanguageExtensions as LangExt
 
+import Data.List (intersperse)
+
 instance Outputable GhcHint where
   ppr = \case
     UnknownHint m
       -> ppr m
-    SuggestExtension ext
-      -> case ext of
-          LangExt.NegativeLiterals
-            -> text "If you are trying to write a large negative literal, use NegativeLiterals"
-          -- RecordPuns is now effectively 'NamedFieldPuns', so we have to pretty-print the
-          -- hint to yield the correct suggestion in terms of extension to enable.
-          LangExt.RecordPuns
-            -> text "Perhaps you intended to use NamedFieldPuns"
-          _ -> text "Perhaps you intended to use" <+> ppr ext
+    SuggestExtension extHint
+      -> case extHint of
+          SuggestSingleExtension extraUserInfo ext ->
+            let header = case ext of
+                  -- RecordPuns is now effectively 'NamedFieldPuns', so we have to pretty-print the
+                  -- hint to yield the correct suggestion in terms of extension to enable.
+                  LangExt.RecordPuns
+                    -> text "Perhaps you intended to use NamedFieldPuns"
+                  _ -> text "Perhaps you intended to use" <+> ppr ext
+            in header $$ extraUserInfo
+          SuggestAnyExtension extraUserInfo exts ->
+            let header = text "Enable any of the following extensions:"
+            in  header <+> hsep (intersperse (char ',') (map ppr exts)) $$ extraUserInfo
+          SuggestExtensions extraUserInfo exts ->
+            let header = text "Enable all of the following extensions:"
+            in  header <+> hsep (intersperse (char ',') (map ppr exts)) $$ extraUserInfo
     SuggestMissingDo
       -> text "Possibly caused by a missing 'do'?"
     SuggestLetInDo
