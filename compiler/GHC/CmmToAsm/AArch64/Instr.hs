@@ -417,6 +417,18 @@ isMetaInstr instr
     POP_STACK_FRAME -> True
     _           -> False
 
+-- | Is this instruction conditionally executed?
+isConditionalInstr
+    :: Instr
+    -> Bool
+
+isConditionalInstr instr
+ = case instr of
+        CSET{}  -> True
+        CBZ{}   -> True
+        CBNZ{}  -> True
+        _       -> False
+
 -- | Copy the value in a register to another one.
 -- Must work for all register classes.
 mkRegRegMoveInstr :: Reg -> Reg -> Instr

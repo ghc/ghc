@@ -51,6 +51,7 @@ instance Instruction PPC.Instr where
    mkLoadInstr         = PPC.mkLoadInstr
    takeDeltaInstr      = PPC.takeDeltaInstr
    isMetaInstr         = PPC.isMetaInstr
+   isConditionalInstr  = PPC.isConditionalInstr
    mkRegRegMoveInstr _ = PPC.mkRegRegMoveInstr
    takeRegRegMoveInstr = PPC.takeRegRegMoveInstr
    mkJumpInstr         = PPC.mkJumpInstr
