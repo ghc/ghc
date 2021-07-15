@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds            #-}
 {-# LANGUAGE DeriveDataTypeable   #-}
 {-# LANGUAGE FlexibleContexts     #-}
 {-# LANGUAGE FlexibleInstances    #-}
@@ -1967,7 +1968,7 @@ instance ExactPrint (HsExpr GhcPs) where
 
   exact (HsDo an do_or_list_comp stmts) = do
     debugM $ "HsDo"
-    markAnnList True an $ exactDo an do_or_list_comp stmts
+    markAnnList True an $ exactDo an (HsDoStmt do_or_list_comp) stmts
 
   exact (ExplicitList an es) = do
     debugM $ "ExplicitList start"
@@ -2081,12 +2082,12 @@ instance ExactPrint (HsExpr GhcPs) where
 
 exactDo :: (ExactPrint body)
         => EpAnn AnnList -> (HsStmtContext any) -> body -> EPP ()
-exactDo an (DoExpr m)    stmts = exactMdo an m AnnDo             >> markAnnotatedWithLayout stmts
-exactDo an GhciStmtCtxt  stmts = markLocatedAAL an al_rest AnnDo >> markAnnotatedWithLayout stmts
+exactDo an (HsDoStmt (DoExpr m))    stmts = exactMdo an m AnnDo             >> markAnnotatedWithLayout stmts
+exactDo an (HsDoStmt GhciStmtCtxt)  stmts = markLocatedAAL an al_rest AnnDo >> markAnnotatedWithLayout stmts
 exactDo an ArrowExpr     stmts = markLocatedAAL an al_rest AnnDo >> markAnnotatedWithLayout stmts
-exactDo an (MDoExpr m)   stmts = exactMdo an m AnnMdo            >> markAnnotatedWithLayout stmts
-exactDo _  ListComp      stmts = markAnnotatedWithLayout stmts
-exactDo _  MonadComp     stmts = markAnnotatedWithLayout stmts
+exactDo an (HsDoStmt (MDoExpr m))   stmts = exactMdo an m AnnMdo            >> markAnnotatedWithLayout stmts
+exactDo _  (HsDoStmt ListComp)      stmts = markAnnotatedWithLayout stmts
+exactDo _  (HsDoStmt MonadComp)     stmts = markAnnotatedWithLayout stmts
 exactDo _  _             _     = panic "pprDo" -- PatGuard, ParStmtCxt
 
 exactMdo :: EpAnn AnnList -> Maybe ModuleName -> AnnKeywordId -> EPP ()

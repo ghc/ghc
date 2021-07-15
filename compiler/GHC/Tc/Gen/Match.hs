@@ -186,7 +186,7 @@ tcGRHSsPat grhss res_ty
 ********************************************************************* -}
 
 data TcMatchCtxt body   -- c.f. TcStmtCtxt, also in this module
-  = MC { mc_what :: HsMatchContext GhcRn,  -- What kind of thing this is
+  = MC { mc_what :: HsMatchContext (XRec GhcTc (CtxIdP GhcTc)),  -- What kind of thing this is
          mc_body :: LocatedA (body GhcRn)  -- Type checker for a body of
                                            -- an alternative
                  -> ExpRhoType
@@ -299,30 +299,30 @@ tcGRHS ctxt res_ty (GRHS _ guards rhs)
 ************************************************************************
 -}
 
-tcDoStmts :: HsStmtContext GhcRn
+tcDoStmts :: HsStmtContext (XRec GhcTc (CtxIdP GhcTc))
           -> LocatedL [LStmt GhcRn (LHsExpr GhcRn)]
           -> ExpRhoType
           -> TcM (HsExpr GhcTc)          -- Returns a HsDo
-tcDoStmts ListComp (L l stmts) res_ty
+tcDoStmts (HsDoStmt ListComp) (L l stmts) res_ty
   = do  { res_ty <- expTypeToType res_ty
         ; (co, elt_ty) <- matchExpectedListTy res_ty
         ; let list_ty = mkListTy elt_ty
-        ; stmts' <- tcStmts ListComp (tcLcStmt listTyCon) stmts
+        ; stmts' <- tcStmts (HsDoStmt ListComp) (tcLcStmt listTyCon) stmts
                             (mkCheckExpType elt_ty)
         ; return $ mkHsWrapCo co (HsDo list_ty ListComp (L l stmts')) }
 
-tcDoStmts doExpr@(DoExpr _) (L l stmts) res_ty
-  = do  { stmts' <- tcStmts doExpr tcDoStmt stmts res_ty
+tcDoStmts (HsDoStmt doExpr@(DoExpr _)) (L l stmts) res_ty
+  = do  { stmts' <- tcStmts (HsDoStmt doExpr) tcDoStmt stmts res_ty
         ; res_ty <- readExpType res_ty
         ; return (HsDo res_ty doExpr (L l stmts')) }
 
-tcDoStmts mDoExpr@(MDoExpr _) (L l stmts) res_ty
-  = do  { stmts' <- tcStmts mDoExpr tcDoStmt stmts res_ty
+tcDoStmts (HsDoStmt mDoExpr@(MDoExpr _)) (L l stmts) res_ty
+  = do  { stmts' <- tcStmts (HsDoStmt mDoExpr) tcDoStmt stmts res_ty
         ; res_ty <- readExpType res_ty
         ; return (HsDo res_ty mDoExpr (L l stmts')) }
 
-tcDoStmts MonadComp (L l stmts) res_ty
-  = do  { stmts' <- tcStmts MonadComp tcMcStmt stmts res_ty
+tcDoStmts (HsDoStmt MonadComp) (L l stmts) res_ty
+  = do  { stmts' <- tcStmts (HsDoStmt MonadComp) tcMcStmt stmts res_ty
         ; res_ty <- readExpType res_ty
         ; return (HsDo res_ty MonadComp (L l stmts')) }
 
@@ -346,13 +346,13 @@ type TcExprStmtChecker = TcStmtChecker HsExpr ExpRhoType
 type TcCmdStmtChecker  = TcStmtChecker HsCmd  TcRhoType
 
 type TcStmtChecker body rho_type
-  =  forall thing. HsStmtContext GhcRn
+  =  forall thing. HsStmtContext (XRec GhcTc (CtxIdP GhcTc))
                 -> Stmt GhcRn (LocatedA (body GhcRn))
                 -> rho_type                 -- Result type for comprehension
                 -> (rho_type -> TcM thing)  -- Checker for what follows the stmt
                 -> TcM (Stmt GhcTc (LocatedA (body GhcTc)), thing)
 
-tcStmts :: (AnnoBody body) => HsStmtContext GhcRn
+tcStmts :: (AnnoBody body) => HsStmtContext (XRec GhcTc (CtxIdP GhcTc))
         -> TcStmtChecker body rho_type   -- NB: higher-rank type
         -> [LStmt GhcRn (LocatedA (body GhcRn))]
         -> rho_type
@@ -362,7 +362,7 @@ tcStmts ctxt stmt_chk stmts res_ty
                         const (return ())
        ; return stmts' }
 
-tcStmtsAndThen :: (AnnoBody body) => HsStmtContext GhcRn
+tcStmtsAndThen :: (AnnoBody body) => HsStmtContext (XRec GhcTc (CtxIdP GhcTc))
                -> TcStmtChecker body rho_type    -- NB: higher-rank type
                -> [LStmt GhcRn (LocatedA (body GhcRn))]
                -> rho_type
@@ -1000,7 +1000,7 @@ join :: tn -> res_ty
 -}
 
 tcApplicativeStmts
-  :: HsStmtContext GhcRn
+  :: HsStmtContext (XRec GhcTc (CtxIdP GhcTc))
   -> [(SyntaxExpr GhcRn, ApplicativeArg GhcRn)]
   -> ExpRhoType                         -- rhs_ty
   -> (TcRhoType -> TcM t)               -- thing_inside
@@ -1066,8 +1066,9 @@ tcApplicativeStmts ctxt pairs rhs_ty thing_inside
                       , .. }
                     ) }
 
-    goArg _body_ty (ApplicativeArgMany x stmts ret pat ctxt, pat_ty, exp_ty)
-      = do { (stmts', (ret',pat')) <-
+    goArg _body_ty (ApplicativeArgMany x stmts ret pat rn_ctxt, pat_ty, exp_ty)
+      = do { let ctxt = rn_ctxt
+           ; (stmts', (ret',pat')) <-
                 tcStmtsAndThen ctxt tcDoStmt stmts (mkCheckExpType exp_ty) $
                 \res_ty  -> do
                   { ret'      <- tcExpr ret res_ty

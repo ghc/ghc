@@ -186,7 +186,6 @@ data HsWrap hs_syn = HsWrap HsWrapper      -- the wrapper
 
 deriving instance (Data (hs_syn GhcTc), Typeable hs_syn) => Data (HsWrap hs_syn)
 
-type instance HsDoRn (GhcPass _) = GhcRn
 type instance HsBracketRn (GhcPass _) = GhcRn
 type instance PendingRnSplice' (GhcPass _) = PendingRnSplice
 type instance PendingTcSplice' (GhcPass _) = PendingTcSplice
@@ -632,7 +631,7 @@ ppr_expr (HsLet _ binds expr)
   = sep [hang (text "let") 2 (pprBinds binds),
          hang (text "in")  2 (ppr expr)]
 
-ppr_expr (HsDo _ do_or_list_comp (L _ stmts)) = pprDo do_or_list_comp stmts
+ppr_expr (HsDo _ do_or_list_comp (L _ stmts)) = pprDo (HsDoStmt do_or_list_comp) stmts
 
 ppr_expr (ExplicitList _ exprs)
   = brackets (pprDeeperList fsep (punctuate comma (map ppr_lexpr exprs)))
@@ -797,7 +796,7 @@ hsExprNeedsParens prec = go
     go (HsMultiIf{})                  = prec > topPrec
     go (HsLet{})                      = prec > topPrec
     go (HsDo _ sc _)
-      | isComprehensionContext sc     = False
+      | isComprehensionContext (HsDoStmt sc) = False
       | otherwise                     = prec > topPrec
     go (ExplicitList{})               = False
     go (RecordUpd{})                  = False
@@ -1247,8 +1246,8 @@ type instance XXMatchGroup (GhcPass _) b = NoExtCon
 type instance XCMatch (GhcPass _) b = EpAnn [AddEpAnn]
 type instance XXMatch (GhcPass _) b = NoExtCon
 
-instance (OutputableBndrId pr, Outputable body)
-            => Outputable (Match (GhcPass pr) body) where
+instance (OutputableBndrId p, Outputable body)
+            => Outputable (Match (GhcPass p) body) where
   ppr = pprMatch
 
 isEmptyMatchGroup :: MatchGroup (GhcPass p) body -> Bool
@@ -1288,8 +1287,8 @@ type instance XCGRHS (GhcPass _) _ = EpAnn GrhsAnn
 
 type instance XXGRHS (GhcPass _) b = NoExtCon
 
-pprMatches :: (OutputableBndrId idR, Outputable body)
-           => MatchGroup (GhcPass idR) body -> SDoc
+pprMatches :: (OutputableBndrId p, Outputable body)
+           => MatchGroup (GhcPass p) body -> SDoc
 pprMatches MG { mg_alts = matches }
     = vcat (map pprMatch (map unLoc (unLoc matches)))
       -- Don't print the type; it's only a place-holder before typechecking
@@ -1305,10 +1304,10 @@ pprPatBind :: forall bndr p . (OutputableBndrId bndr,
            => LPat (GhcPass bndr) -> GRHSs (GhcPass p) (LHsExpr (GhcPass p)) -> SDoc
 pprPatBind pat grhss
  = sep [ppr pat,
-       nest 2 (pprGRHSs (PatBindRhs :: HsMatchContext (GhcPass p)) grhss)]
+       nest 2 (pprGRHSs (PatBindRhs :: HsMatchContext (XRec (GhcPass p) (CtxIdP (GhcPass p)))) grhss)]
 
-pprMatch :: (OutputableBndrId idR, Outputable body)
-         => Match (GhcPass idR) body -> SDoc
+pprMatch :: (OutputableBndrId p, Outputable body)
+         => Match (GhcPass p) body -> SDoc
 pprMatch (Match { m_pats = pats, m_ctxt = ctxt, m_grhss = grhss })
   = sep [ sep (herald : map (nest 2 . pprParendLPat appPrec) other_pats)
         , nest 2 (pprGRHSs ctxt grhss) ]
@@ -1343,7 +1342,7 @@ pprMatch (Match { m_pats = pats, m_ctxt = ctxt, m_grhss = grhss })
                    _     -> pprPanic "pprMatch" (ppr ctxt $$ ppr pats)
 
 pprGRHSs :: (OutputableBndrId idR, Outputable body)
-         => HsMatchContext passL -> GRHSs (GhcPass idR) body -> SDoc
+         => HsMatchContext name -> GRHSs (GhcPass idR) body -> SDoc
 pprGRHSs ctxt (GRHSs _ grhss binds)
   = vcat (map (pprGRHS ctxt . unLoc) grhss)
   -- Print the "where" even if the contents of the binds is empty. Only
@@ -1352,14 +1351,14 @@ pprGRHSs ctxt (GRHSs _ grhss binds)
       (text "where" $$ nest 4 (pprBinds binds))
 
 pprGRHS :: (OutputableBndrId idR, Outputable body)
-        => HsMatchContext passL -> GRHS (GhcPass idR) body -> SDoc
+        => HsMatchContext name  -> GRHS (GhcPass idR) body -> SDoc
 pprGRHS ctxt (GRHS _ [] body)
  =  pp_rhs ctxt body
 
 pprGRHS ctxt (GRHS _ guards body)
  = sep [vbar <+> interpp'SP guards, pp_rhs ctxt body]
 
-pp_rhs :: Outputable body => HsMatchContext passL -> body -> SDoc
+pp_rhs :: Outputable body => HsMatchContext name -> body -> SDoc
 pp_rhs ctxt rhs = matchSeparator ctxt <+> pprDeeper (ppr rhs)
 
 instance Outputable GrhsAnn where
@@ -1445,8 +1444,6 @@ type instance XApplicativeArgOne GhcTc = FailOperator GhcTc
 
 type instance XApplicativeArgMany (GhcPass _) = NoExtField
 type instance XXApplicativeArg    (GhcPass _) = NoExtCon
-
-type instance ApplicativeArgStmCtxPass _ = GhcRn
 
 instance (Outputable (StmtLR (GhcPass idL) (GhcPass idL) (LHsExpr (GhcPass idL))),
           Outputable (XXParStmtBlock (GhcPass idL) (GhcPass idR)))
@@ -1561,14 +1558,14 @@ pprDo :: (OutputableBndrId p, Outputable body,
                  Anno (StmtLR (GhcPass p) (GhcPass p) body) ~ SrcSpanAnnA
          )
       => HsStmtContext any -> [LStmt (GhcPass p) body] -> SDoc
-pprDo (DoExpr m)    stmts =
+pprDo (HsDoStmt (DoExpr m))    stmts =
   ppr_module_name_prefix m <> text "do"  <+> ppr_do_stmts stmts
-pprDo GhciStmtCtxt  stmts = text "do"  <+> ppr_do_stmts stmts
+pprDo (HsDoStmt GhciStmtCtxt)  stmts = text "do"  <+> ppr_do_stmts stmts
 pprDo ArrowExpr     stmts = text "do"  <+> ppr_do_stmts stmts
-pprDo (MDoExpr m)   stmts =
+pprDo (HsDoStmt (MDoExpr m))   stmts =
   ppr_module_name_prefix m <> text "mdo"  <+> ppr_do_stmts stmts
-pprDo ListComp      stmts = brackets    $ pprComp stmts
-pprDo MonadComp     stmts = brackets    $ pprComp stmts
+pprDo (HsDoStmt ListComp)      stmts = brackets    $ pprComp stmts
+pprDo (HsDoStmt MonadComp)     stmts = brackets    $ pprComp stmts
 pprDo _             _     = panic "pprDo" -- PatGuard, ParStmtCxt
 
 ppr_module_name_prefix :: Maybe ModuleName -> SDoc
@@ -1829,7 +1826,7 @@ pp_dotdot = text " .. "
 ************************************************************************
 -}
 
-instance OutputableBndrId p => Outputable (HsMatchContext (GhcPass p)) where
+instance Outputable n => Outputable (HsMatchContext n) where
   ppr m@(FunRhs{})          = text "FunRhs" <+> ppr (mc_fun m) <+> ppr (mc_fixity m)
   ppr LambdaExpr            = text "LambdaExpr"
   ppr CaseAlt               = text "CaseAlt"
@@ -1845,14 +1842,14 @@ instance OutputableBndrId p => Outputable (HsMatchContext (GhcPass p)) where
 
 -----------------
 
-instance OutputableBndrId p
-      => Outputable (HsStmtContext (GhcPass p)) where
+instance Outputable n
+      => Outputable (HsStmtContext n) where
     ppr = pprStmtContext
 
 -- Used to generate the string for a *runtime* error message
-matchContextErrString :: OutputableBndrId p
-                      => HsMatchContext (GhcPass p) -> SDoc
-matchContextErrString (FunRhs{mc_fun=L _ fun})   = text "function" <+> ppr fun
+matchContextErrString :: Outputable name
+                      => HsMatchContext name -> SDoc
+matchContextErrString (FunRhs{mc_fun=fun})   = text "function" <+> ppr fun
 matchContextErrString CaseAlt                    = text "case"
 matchContextErrString IfAlt                      = text "multi-way if"
 matchContextErrString PatBindRhs                 = text "pattern binding"
@@ -1866,12 +1863,12 @@ matchContextErrString PatSyn                     = panic "matchContextErrString"
 matchContextErrString (StmtCtxt (ParStmtCtxt c))   = matchContextErrString (StmtCtxt c)
 matchContextErrString (StmtCtxt (TransStmtCtxt c)) = matchContextErrString (StmtCtxt c)
 matchContextErrString (StmtCtxt (PatGuard _))      = text "pattern guard"
-matchContextErrString (StmtCtxt GhciStmtCtxt)      = text "interactive GHCi command"
-matchContextErrString (StmtCtxt (DoExpr m))        = prependQualified m (text "'do' block")
+matchContextErrString (StmtCtxt (HsDoStmt GhciStmtCtxt))      = text "interactive GHCi command"
+matchContextErrString (StmtCtxt (HsDoStmt (DoExpr m)))        = prependQualified m (text "'do' block")
 matchContextErrString (StmtCtxt ArrowExpr)         = text "'do' block"
-matchContextErrString (StmtCtxt (MDoExpr m))       = prependQualified m (text "'mdo' block")
-matchContextErrString (StmtCtxt ListComp)          = text "list comprehension"
-matchContextErrString (StmtCtxt MonadComp)         = text "monad comprehension"
+matchContextErrString (StmtCtxt (HsDoStmt (MDoExpr m)))       = prependQualified m (text "'mdo' block")
+matchContextErrString (StmtCtxt (HsDoStmt ListComp))          = text "list comprehension"
+matchContextErrString (StmtCtxt (HsDoStmt MonadComp))         = text "monad comprehension"
 
 pprMatchInCtxt :: (OutputableBndrId idR, Outputable body)
                => Match (GhcPass idR) body -> SDoc
@@ -1881,9 +1878,10 @@ pprMatchInCtxt match  = hang (text "In" <+> pprMatchContext (m_ctxt match)
 
 pprStmtInCtxt :: (OutputableBndrId idL,
                   OutputableBndrId idR,
+                  Outputable name,
                   Outputable body,
                  Anno (StmtLR (GhcPass idL) (GhcPass idR) body) ~ SrcSpanAnnA)
-              => HsStmtContext (GhcPass idL)
+              => HsStmtContext name
               -> StmtLR (GhcPass idL) (GhcPass idR) body
               -> SDoc
 pprStmtInCtxt ctxt (LastStmt _ e _ _)

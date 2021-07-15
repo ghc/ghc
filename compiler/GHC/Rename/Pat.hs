@@ -217,7 +217,7 @@ matchNameMaker ctxt = LamMk report_unused
     -- Do not report unused names in interactive contexts
     -- i.e. when you type 'x <- e' at the GHCi prompt
     report_unused = case ctxt of
-                      StmtCtxt GhciStmtCtxt -> False
+                      StmtCtxt (HsDoStmt GhciStmtCtxt) -> False
                       -- also, don't warn in pattern quotes, as there
                       -- is no RHS where the variables can be used!
                       ThPatQuote            -> False
@@ -401,7 +401,7 @@ There are various entry points to renaming patterns, depending on
 --   * local namemaker
 --   * unused and duplicate checking
 --   * no fixities
-rnPats :: HsMatchContext GhcRn -- for error messages
+rnPats :: HsMatchContext (XRec GhcRn (CtxIdP GhcRn)) -- for error messages
        -> [LPat GhcPs]
        -> ([LPat GhcRn] -> RnM (a, FreeVars))
        -> RnM (a, FreeVars)
@@ -429,7 +429,7 @@ rnPats ctxt pats thing_inside
   where
     doc_pat = text "In" <+> pprMatchContext ctxt
 
-rnPat :: HsMatchContext GhcRn -- for error messages
+rnPat :: HsMatchContext (XRec GhcRn (CtxIdP GhcRn)) -- for error messages
       -> LPat GhcPs
       -> (LPat GhcRn -> RnM (a, FreeVars))
       -> RnM (a, FreeVars)     -- Variables bound by pattern do not
