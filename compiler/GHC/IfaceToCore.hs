@@ -10,6 +10,7 @@ Type checking of type signatures in interface files
 {-# LANGUAGE NondecreasingIndentation #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module GHC.IfaceToCore (
         tcLookupImported_maybe,
@@ -110,6 +111,7 @@ import qualified GHC.Data.BooleanFormula as BF
 
 import Control.Monad
 import GHC.Parser.Annotation
+import GHC.Utils.Trace
 
 {-
 This module takes
@@ -381,8 +383,8 @@ mergeIfaceDecls = plusOccEnv_C mergeIfaceDecl
 -- type synonym.  Perhaps this should be relaxed, where a type synonym
 -- in a signature is considered implemented by a data type declaration
 -- which matches the reference of the type synonym.
-typecheckIfacesForMerging :: Module -> [ModIface] -> IORef TypeEnv -> IfM lcl (TypeEnv, [ModDetails])
-typecheckIfacesForMerging mod ifaces tc_env_var =
+typecheckIfacesForMerging :: Module -> [ModIface] -> ModuleEnv (IORef TypeEnv) -> IfM lcl (TypeEnv, [ModDetails])
+typecheckIfacesForMerging mod ifaces tc_env_vars =
   -- cannot be boot (False)
   initIfaceLcl mod (text "typecheckIfacesForMerging") NotBoot $ do
     ignore_prags <- goptM Opt_IgnoreInterfacePragmas
@@ -404,7 +406,9 @@ typecheckIfacesForMerging mod ifaces tc_env_var =
     names_w_things <- tcIfaceDecls ignore_prags (map (\x -> (fingerprint0, x))
                                                   (occEnvElts decl_env))
     let global_type_env = mkNameEnv names_w_things
-    writeMutVar tc_env_var global_type_env
+    case lookupModuleEnv tc_env_vars mod of
+      Just tc_env_var -> writeMutVar tc_env_var global_type_env
+      Nothing -> return ()
 
     -- OK, now typecheck each ModIface using this environment
     details <- forM ifaces $ \iface -> do
@@ -1775,11 +1779,10 @@ tcPragExpr is_compulsory toplvl name expr
     get_in_scope :: IfL VarSet -- Totally disgusting; but just for linting
     get_in_scope
         = do { (gbl_env, lcl_env) <- getEnvs
-             ; rec_ids <- case if_rec_types gbl_env of
-                            Nothing -> return []
-                            Just (_, get_env) -> do
-                               { type_env <- setLclEnv () get_env
-                               ; return (typeEnvIds type_env) }
+             ; rec_ids <- do
+                let get_type_envs = moduleEnvElts (if_rec_types gbl_env)
+                envs <- traverse (setLclEnv ()) get_type_envs
+                return (concatMap typeEnvIds envs)
              ; return (bindingsVars (if_tv_env lcl_env) `unionVarSet`
                        bindingsVars (if_id_env lcl_env) `unionVarSet`
                        mkVarSet rec_ids) }
@@ -1812,9 +1815,10 @@ tcIfaceGlobal name
 
   | otherwise
   = do  { env <- getGblEnv
-        ; case if_rec_types env of {    -- Note [Tying the knot]
-            Just (mod, get_type_env)
-                | nameIsLocalOrFrom mod name
+        ; cur_mod <- if_mod <$> getLclEnv
+        ; let m = (fromMaybe cur_mod (nameModule_maybe name))
+        ; case lookupModuleEnv (if_rec_types env) (fromMaybe cur_mod (nameModule_maybe name))  of     -- Note [Tying the knot]
+            Just get_type_env
                 -> do           -- It's defined in the module being compiled
                 { type_env <- setLclEnv () get_type_env         -- yuk
                 ; case lookupNameEnv type_env name of
@@ -1823,10 +1827,11 @@ tcIfaceGlobal name
                     Nothing   -> via_external
                 }
 
-          ; _ -> via_external }}
+            _ -> via_external }
   where
     via_external =  do
-        { hsc_env <- getTopEnv
+        { pprTraceM "via_external" (ppr name)
+        ; hsc_env <- getTopEnv
         ; mb_thing <- liftIO (lookupType hsc_env name)
         ; case mb_thing of {
             Just thing -> return thing ;

@@ -272,7 +272,7 @@ data IfGblEnv
         -- We need the module name so we can test when it's appropriate
         -- to look in this env.
         -- See Note [Tying the knot] in GHC.IfaceToCore
-        if_rec_types :: Maybe (Module, IfG TypeEnv)
+        if_rec_types :: (ModuleEnv (IfG TypeEnv))
                 -- Allows a read effect, so it can be in a mutable
                 -- variable; c.f. handling the external package type env
                 -- Nothing => interactive stuff, no loops possible
@@ -407,7 +407,7 @@ data TcGblEnv
           -- NB: for what "things in this module" means, see
           -- Note [The interactive package] in "GHC.Runtime.Context"
 
-        tcg_type_env_var :: TcRef TypeEnv,
+        tcg_type_env_var :: ModuleEnv (IORef TypeEnv),
                 -- Used only to initialise the interface-file
                 -- typechecker in initIfaceTcRn, so that it can see stuff
                 -- bound in this module when dealing with hi-boot recursions

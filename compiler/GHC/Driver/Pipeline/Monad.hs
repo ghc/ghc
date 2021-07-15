@@ -19,6 +19,7 @@ import GHC.Driver.Session
 import GHC.Types.SourceFile
 import GHC.Unit.Module
 import GHC.Unit.Finder
+import Control.Monad.Catch
 
 -- The interface that the pipeline monad must implement.
 type TPipelineClass (f :: K.Type -> K.Type) (m :: K.Type -> K.Type)

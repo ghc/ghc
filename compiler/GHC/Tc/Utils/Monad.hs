@@ -2,6 +2,7 @@
 {-# LANGUAGE ExplicitForAll    #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE TupleSections   #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
@@ -220,6 +221,7 @@ import GHC.Tc.Errors.Types
 import {-# SOURCE #-} GHC.Tc.Utils.Env    ( tcInitTidyEnv )
 
 import qualified Data.Map as Map
+import GHC.Utils.Trace
 
 {-
 ************************************************************************
@@ -248,9 +250,10 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
         infer_var    <- newIORef True ;
         infer_reasons_var <- newIORef emptyMessages ;
         dfun_n_var   <- newIORef emptyOccSet ;
-        type_env_var <- case hsc_type_env_var hsc_env of {
-                           Just (_mod, te_var) -> return te_var ;
-                           Nothing             -> newIORef emptyNameEnv } ;
+        type_env_var <- case lookupModuleEnv (hsc_type_env_vars hsc_env) mod of {
+                           Just {} -> return (hsc_type_env_vars hsc_env) ;
+                           Nothing -> return (hsc_type_env_vars hsc_env) } ;
+                           --Nothing -> pprTrace "miss" (ppr mod) $  mkModuleEnv . (:[]) . (mod,) <$> newIORef emptyNameEnv } ;
 
         dependent_files_var <- newIORef [] ;
         static_wc_var       <- newIORef emptyWC ;
@@ -358,6 +361,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
              } ;
         } ;
 
+        pprTraceM "tcg" (ppr (moduleUnit (tcg_semantic_mod gbl_env)) $$ ppr (moduleUnit (tcg_mod gbl_env)) ) ;
         -- OK, here's the business end!
         initTcWithGbl hsc_env gbl_env loc do_this
     }
@@ -1169,6 +1173,8 @@ addLandmarkErrCtxtM ctxt = pushCtxt (True, ctxt)
 
 pushCtxt :: ErrCtxt -> TcM a -> TcM a
 {-# INLINE pushCtxt #-} -- Note [Inlining addErrCtxt]
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TupleSections #-}
 pushCtxt ctxt = updLclEnv (updCtxt ctxt)
 
 updCtxt :: ErrCtxt -> TcLclEnv -> TcLclEnv
@@ -2058,10 +2064,9 @@ initIfaceTcRn thing_inside
                             if_doc = text "initIfaceTcRn",
                             if_rec_types =
                                 if is_instantiate
-                                    then Nothing
-                                    else Just (mod, get_type_env)
+                                    then emptyModuleEnv
+                                    else mapModuleEnv readTcRef (tcg_type_env_var tcg_env) }
                          }
-              ; get_type_env = readTcRef (tcg_type_env_var tcg_env) }
         ; setEnvs (if_env, ()) thing_inside }
 
 -- Used when sucking in a ModIface into a ModDetails to put in
@@ -2072,7 +2077,7 @@ initIfaceLoad :: HscEnv -> IfG a -> IO a
 initIfaceLoad hsc_env do_this
  = do let gbl_env = IfGblEnv {
                         if_doc = text "initIfaceLoad",
-                        if_rec_types = Nothing
+                        if_rec_types = emptyModuleEnv
                     }
       initTcRnIf 'i' hsc_env gbl_env () do_this
 
@@ -2080,12 +2085,9 @@ initIfaceCheck :: SDoc -> HscEnv -> IfG a -> IO a
 -- Used when checking the up-to-date-ness of the old Iface
 -- Initialise the environment with no useful info at all
 initIfaceCheck doc hsc_env do_this
- = do let rec_types = case hsc_type_env_var hsc_env of
-                         Just (mod,var) -> Just (mod, readTcRef var)
-                         Nothing        -> Nothing
-          gbl_env = IfGblEnv {
+ = do let gbl_env = IfGblEnv {
                         if_doc = text "initIfaceCheck" <+> doc,
-                        if_rec_types = rec_types
+                        if_rec_types = mapModuleEnv readTcRef (hsc_type_env_vars hsc_env)
                     }
       initTcRnIf 'i' hsc_env gbl_env () do_this
 

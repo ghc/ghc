@@ -241,10 +241,10 @@ compileOne' mHscMessage
    status <- hscRecompStatus mHscMessage plugin_hsc_env summary
                 mb_old_iface mb_old_linkable (mod_index, nmods)
    let pipeline = hscPipeline pipe_env (setDumpPrefix pipe_env plugin_hsc_env, summary, status)
-   (iface, old_linkable) <- runPipeline (hsc_hooks hsc_env) pipeline
+   (iface, linkable) <- runPipeline (hsc_hooks hsc_env) pipeline
    -- See Note [ModDetails and --make mode]
    details <- initModDetails plugin_hsc_env summary iface
-   return $! HomeModInfo iface details old_linkable
+   return $! HomeModInfo iface details linkable
 
  where lcl_dflags  = ms_hspp_opts summary
        location    = ms_location summary
@@ -303,6 +303,20 @@ compileOne' mHscMessage
          = (backend dflags, dflags2)
        dflags  = dflags3 { includePaths = addImplicitQuoteInclude old_paths [current_dir] }
        hsc_env = hscSetFlags dflags hsc_env0
+
+-- | Add the entries from a BCO linkable to the SPT table, see
+-- See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable.
+addSptEntries :: HscEnv -> ModuleNameWithIsBoot -> Maybe Linkable -> IO ()
+addSptEntries hsc_env mnwib mlinkable =
+  hscAddSptEntries hsc_env (Just mnwib)
+     [ spt
+     | Just linkable <- [mlinkable]
+     , unlinked <- linkableUnlinked linkable
+     , BCOs _ spts <- pure unlinked
+     , spt <- spts
+     ]
+
+
 
 -- ---------------------------------------------------------------------------
 -- Link

@@ -1,3 +1,4 @@
+{-# LANGUAGE NoPolyKinds #-}
 module GHC.Core.TyCo.Rep where
 
 import GHC.Utils.Outputable ( Outputable )

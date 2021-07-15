@@ -27,6 +27,7 @@ import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State
 import Data.IORef
+import GHC.Unit.Module
 
 -- | The Hsc monad: Passing an environment and diagnostic state
 newtype Hsc a = Hsc (HscEnv -> Messages GhcMessage -> IO (a, Messages GhcMessage))
@@ -76,7 +77,7 @@ data HscEnv
         hsc_FC   :: {-# UNPACK #-} !FinderCache,
                 -- ^ The cached result of performing finding in the file system
 
-        hsc_type_env_var :: Maybe (Module, IORef TypeEnv)
+        hsc_type_env_vars :: ModuleEnv (IORef TypeEnv)
                 -- ^ Used for one-shot compilation only, to initialise
                 -- the 'IfGblEnv'. See 'GHC.Tc.Utils.tcg_type_env_var' for
                 -- 'GHC.Tc.Utils.TcGblEnv'.  See also Note [hsc_type_env_var hack]

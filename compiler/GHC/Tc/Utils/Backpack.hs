@@ -89,6 +89,7 @@ import Control.Monad
 import Data.List (find)
 
 import {-# SOURCE #-} GHC.Tc.Module
+import GHC.Utils.Trace
 
 fixityMisMatch :: TyThing -> Fixity -> Fixity -> TcRnMessage
 fixityMisMatch real_thing real_fixity sig_fixity =
@@ -944,7 +945,8 @@ tcRnInstantiateSignature ::
 tcRnInstantiateSignature hsc_env this_mod real_loc =
    withTiming logger
               (text "Signature instantiation"<+>brackets (ppr this_mod))
-              (const ()) $
+              (const ()) $ do
+   pprTraceM "hsig" (ppr (moduleName this_mod) $$ ppr (moduleUnit this_mod))
    initTc hsc_env HsigFile False this_mod real_loc $ instantiateSignature
   where
    logger = hsc_logger hsc_env
