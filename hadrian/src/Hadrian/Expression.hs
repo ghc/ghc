@@ -8,6 +8,7 @@ module Hadrian.Expression (
 
     -- ** Predicates
     (?), input, inputs, output, outputs, VerboseCommand (..), verboseCommand,
+    ToPredicate(..),
 
     -- ** Evaluation
     interpret, interpretInContext,
