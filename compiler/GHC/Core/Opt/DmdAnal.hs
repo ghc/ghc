@@ -514,12 +514,14 @@ dmdAnal' env dmd (Let bind body)
 -- exception when evaluated. It's always sound to return 'True'.
 -- See Note [Which scrutinees may throw precise exceptions].
 exprMayThrowPreciseException :: FamInstEnvs -> CoreExpr -> Bool
+exprMayThrowPreciseException _    (Type _) = False
 exprMayThrowPreciseException envs e
   | not (forcesRealWorld envs (exprType e))
   = False -- 1. in the Note
-  | (Var f, _) <- collectArgs e
+  | (Var f, args) <- collectArgs e
   , Just op    <- isPrimOpId_maybe f
   , op /= RaiseIOOp
+  , not $ any (exprMayThrowPreciseException envs) args -- catch# in the Note
   = False -- 2. in the Note
   | (Var f, _) <- collectArgs e
   , Just fcall <- isFCallId_maybe f
@@ -630,12 +632,13 @@ This is the specification of 'exprMayThrowPreciseExceptions',
 which is important for Scenario 2 of
 Note [Precise exceptions and strictness analysis] in GHC.Types.Demand.
 
-For an expression @f a1 ... an :: ty@ we determine that
+For a term-level expression @f a1 ... an :: ty@ we determine that
   1. False  If ty is *not* @State# RealWorld@ or an unboxed tuple thereof.
             This check is done by 'forcesRealWorld'.
             (Why not simply unboxed pairs as above? This is motivated by
             T13380{d,e}.)
-  2. False  If f is a PrimOp, and it is *not* raiseIO#
+  2. False  If f is a PrimOp, and it is *not* raiseIO# or a primop the args of
+            which may throw a precise exception (like catch#, #201111).
   3. False  If f is an unsafe FFI call ('PlayRisky')
   _. True   Otherwise "give up".
 
