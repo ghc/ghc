@@ -2,6 +2,7 @@
 {-# LANGUAGE BangPatterns #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+{-# LANGUAGE ViewPatterns #-}
 
 {-
 (c) The University of Glasgow, 1994-2006
@@ -69,16 +70,20 @@ import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Id.Make ( realWorldPrimId, mkPrimOpId )
 import GHC.Types.Basic
-import GHC.Types.Name   ( NamedThing(..), nameSrcSpan, isInternalName )
+import GHC.Types.Name   ( NamedThing(..), nameSrcSpan, isInternalName, Name )
 import GHC.Types.SrcLoc ( SrcSpan(..), realSrcLocSpan, mkRealSrcLoc )
 import GHC.Types.Literal
 import GHC.Types.Tickish
 import GHC.Types.TyThing
 import GHC.Types.Unique.Supply
 
-import Data.List        ( unfoldr )
+import Data.List        ( unfoldr, intercalate )
 import Data.Functor.Identity
 import Control.Monad
+import GHC.Fingerprint.Type
+import GHC.Linker.Types
+import GHC.Utils.Fingerprint
+import Control.Monad.Trans.Writer
 
 {-
 -- ---------------------------------------------------------------------------
@@ -237,42 +242,50 @@ type CpeRhs  = CoreExpr    -- Non-terminal 'rhs'
 ************************************************************************
 -}
 
+type CorePrepM a = WriterT [(SptEntry, CoreBind)] UniqSM a
+
+
 corePrepPgm :: HscEnv -> Module -> ModLocation -> CoreProgram -> [TyCon]
-            -> IO CoreProgram
+            -> IO (CoreProgram, [SptEntry])
 corePrepPgm hsc_env this_mod mod_loc binds data_tycons =
     withTiming logger
                (text "CorePrep"<+>brackets (ppr this_mod))
-               (\a -> a `seqList` ()) $ do
+               (\(a, b) -> a `seqList` b `seqList` ()) $ do
     us <- mkSplitUniqSupply 's'
-    initialCorePrepEnv <- mkInitialCorePrepEnv hsc_env
+    initialCorePrepEnv <- mkInitialCorePrepEnv hsc_env this_mod
 
     let
         implicit_binds = mkDataConWorkers dflags mod_loc data_tycons
             -- NB: we must feed mkImplicitBinds through corePrep too
             -- so that they are suitably cloned and eta-expanded
 
-        binds_out = initUs_ us $ do
+        (binds_out, unzip->(spe_floats, spt_binds))
+                    = initUs_ us $ runWriterT $ do
                       floats1 <- corePrepTopBinds initialCorePrepEnv binds
                       floats2 <- corePrepTopBinds initialCorePrepEnv implicit_binds
                       return (deFloatTop (floats1 `appendFloats` floats2))
 
     endPassIO hsc_env alwaysQualify CorePrep binds_out []
-    return binds_out
+    return (spt_binds ++ binds_out, spe_floats)
   where
     dflags = hsc_dflags hsc_env
     logger = hsc_logger hsc_env
 
-corePrepExpr :: HscEnv -> CoreExpr -> IO CoreExpr
-corePrepExpr hsc_env expr = do
+
+corePrepExpr :: HscEnv -> Module -> CoreExpr -> IO CoreExpr
+corePrepExpr hsc_env this_mod expr = do
     let logger = hsc_logger hsc_env
     withTiming logger (text "CorePrep [expr]") (\e -> e `seq` ()) $ do
       us <- mkSplitUniqSupply 's'
-      initialCorePrepEnv <- mkInitialCorePrepEnv hsc_env
-      let new_expr = initUs_ us (cpeBodyNF initialCorePrepEnv expr)
+      initialCorePrepEnv <- mkInitialCorePrepEnv hsc_env this_mod
+      -- MP: At the moment this code-path is only hit when compiling an expression for TH,
+      -- where static forms are disallowed for some reason. It should probably also
+      -- return the SPT entries which can be loaded into the interpreter.
+      let (new_expr, _) = initUs_ us $ runWriterT (cpeBodyNF initialCorePrepEnv expr)
       putDumpFileMaybe logger Opt_D_dump_prep "CorePrep" FormatCore (ppr new_expr)
       return new_expr
 
-corePrepTopBinds :: CorePrepEnv -> [CoreBind] -> UniqSM Floats
+corePrepTopBinds :: CorePrepEnv -> [CoreBind] -> CorePrepM Floats
 -- Note [Floating out of top level bindings]
 corePrepTopBinds initialCorePrepEnv binds
   = go initialCorePrepEnv binds
@@ -577,7 +590,7 @@ Other related tickets:
 -}
 
 cpeBind :: TopLevelFlag -> CorePrepEnv -> CoreBind
-        -> UniqSM (CorePrepEnv,
+        -> CorePrepM (CorePrepEnv,
                    Floats,         -- Floating value bindings
                    Maybe CoreBind) -- Just bind' <=> returned new bind; no float
                                    -- Nothing <=> added bind' to floats instead
@@ -644,7 +657,7 @@ cpeBind top_lvl env (Rec pairs)
 ---------------
 cpePair :: TopLevelFlag -> RecFlag -> Demand -> Bool
         -> CorePrepEnv -> OutId -> CoreExpr
-        -> UniqSM (Floats, CpeRhs)
+        -> CorePrepM (Floats, CpeRhs)
 -- Used for all bindings
 -- The binder is already cloned, hence an OutId
 cpePair top_lvl is_rec dmd is_unlifted env bndr rhs
@@ -695,7 +708,7 @@ cpePair top_lvl is_rec dmd is_unlifted env bndr rhs
       | otherwise
       = dontFloat floats rhs
 
-dontFloat :: Floats -> CpeRhs -> UniqSM (Floats, CpeBody)
+dontFloat :: Floats -> CpeRhs -> CorePrepM (Floats, CpeBody)
 -- Non-empty floats, but do not want to float from rhs
 -- So wrap the rhs in the floats
 -- But: rhs1 might have lambdas, and we can't
@@ -722,7 +735,7 @@ it seems good for CorePrep to be robust.
 
 ---------------
 cpeJoinPair :: CorePrepEnv -> JoinId -> CoreExpr
-            -> UniqSM (JoinId, CpeRhs)
+            -> CorePrepM (JoinId, CpeRhs)
 -- Used for all join bindings
 -- No eta-expansion: see Note [Do not eta-expand join points] in GHC.Core.Opt.Simplify.Utils
 cpeJoinPair env bndr rhs
@@ -763,7 +776,7 @@ for us to mess with the arity because a join point is never exported.
 --              CpeRhs: produces a result satisfying CpeRhs
 -- ---------------------------------------------------------------------------
 
-cpeRhsE :: CorePrepEnv -> CoreExpr -> UniqSM (Floats, CpeRhs)
+cpeRhsE :: CorePrepEnv -> CoreExpr -> CorePrepM (Floats, CpeRhs)
 -- If
 --      e  ===>  (bs, e')
 -- then
@@ -880,7 +893,7 @@ cpeRhsE env (Case scrut bndr ty alts)
 -- let-bound using 'wrapBinds').  Generally you want this, esp.
 -- when you've reached a binding form (e.g., a lambda) and
 -- floating any further would be incorrect.
-cpeBodyNF :: CorePrepEnv -> CoreExpr -> UniqSM CpeBody
+cpeBodyNF :: CorePrepEnv -> CoreExpr -> CorePrepM CpeBody
 cpeBodyNF env expr
   = do { (floats, body) <- cpeBody env expr
        ; return (wrapBinds floats body) }
@@ -895,14 +908,14 @@ cpeBodyNF env expr
 --      case (let x = y in z) of ...
 --      ==> let x = y in case z of ...
 --
-cpeBody :: CorePrepEnv -> CoreExpr -> UniqSM (Floats, CpeBody)
+cpeBody :: CorePrepEnv -> CoreExpr -> CorePrepM (Floats, CpeBody)
 cpeBody env expr
   = do { (floats1, rhs) <- cpeRhsE env expr
        ; (floats2, body) <- rhsToBody rhs
        ; return (floats1 `appendFloats` floats2, body) }
 
 --------
-rhsToBody :: CpeRhs -> UniqSM (Floats, CpeBody)
+rhsToBody :: CpeRhs -> CorePrepM (Floats, CpeBody)
 -- Remove top level lambdas by let-binding
 
 rhsToBody (Tick t expr)
@@ -946,7 +959,7 @@ instance Outputable ArgInfo where
   ppr (CpeCast co) = text "cast" <+> ppr co
   ppr (CpeTick tick) = text "tick" <+> ppr tick
 
-cpeApp :: CorePrepEnv -> CoreExpr -> UniqSM (Floats, CpeRhs)
+cpeApp :: CorePrepEnv -> CoreExpr -> CorePrepM (Floats, CpeRhs)
 -- May return a CpeRhs because of saturating primops
 cpeApp top_env expr
   = do { let (terminal, args, depth) = collect_args expr
@@ -979,7 +992,7 @@ cpeApp top_env expr
             -> CoreExpr
             -> [ArgInfo]
             -> Int
-            -> UniqSM (Floats, CpeRhs)
+            -> CorePrepM (Floats, CpeRhs)
     cpe_app env (Var f) (CpeApp Type{} : CpeApp arg : args) depth
         | f `hasKey` lazyIdKey          -- Replace (lazy a) with a, and
             -- See Note [lazyId magic] in GHC.Types.Id.Make
@@ -1044,6 +1057,16 @@ cpeApp top_env expr
             Lam s body -> cpe_app (extendCorePrepEnv env s realWorldPrimId) body rest (n-2)
             _          -> cpe_app env arg (CpeApp (Var realWorldPrimId) : rest) (n-1)
              -- TODO: What about casts?
+    cpe_app env (Var f) (CpeApp (Type t1) : CpeApp loc : CpeApp arg : rest) n
+      | makeStaticName == idName f
+      = do
+          (fp, new_expr) <- cpe_mk_static_form env t1 loc arg
+          float_var <- newVar (exprType new_expr)
+          tell ([(SptEntry float_var fp, NonRec float_var new_expr)])
+          cpe_app env (Var float_var) rest n
+
+
+
 
     cpe_app env (Var v) args depth
       = do { v1 <- fiddleCCall v
@@ -1098,7 +1121,7 @@ cpeApp top_env expr
         -> CpeApp
         -> Floats
         -> [Demand]
-        -> UniqSM (CpeApp, Floats)
+        -> CorePrepM (CpeApp, Floats)
     rebuild_app _ [] app floats ss
       = assert (null ss) -- make sure we used all the strictness info
         return (app, floats)
@@ -1373,7 +1396,7 @@ okCpeArg expr    = not (exprIsTrivial expr)
 
 -- This is where we arrange that a non-trivial argument is let-bound
 cpeArg :: CorePrepEnv -> Demand
-       -> CoreArg -> UniqSM (Floats, CpeArg)
+       -> CoreArg -> CorePrepM (Floats, CpeArg)
 cpeArg env dmd arg
   = do { (floats1, arg1) <- cpeRhsE env arg     -- arg1 can be a lambda
        ; let arg_ty      = exprType arg1
@@ -1425,7 +1448,7 @@ applications here as well but due to this fragility (see #16846) we now deal
 with this another way, as described in Note [Primop wrappers] in GHC.Builtin.PrimOps.
 -}
 
-maybeSaturate :: Id -> CpeApp -> Int -> UniqSM CpeRhs
+maybeSaturate :: Id -> CpeApp -> Int -> CorePrepM CpeRhs
 maybeSaturate fn expr n_args
   | hasNoBinding fn        -- There's no binding
   = return sat_expr
@@ -1836,16 +1859,21 @@ data CorePrepEnv
         , cpe_convertNumLit   :: LitNumType -> Integer -> Maybe CoreExpr
         -- ^ Convert some numeric literals (Integer, Natural) into their
         -- final Core form
+        , cpe_mk_static_form :: Type -> CoreExpr -> CoreExpr -> CorePrepM (Fingerprint, CoreExpr)
+        -- ^ Convert some numeric literals (Integer, Natural) into their
+        -- final Core form
     }
 
-mkInitialCorePrepEnv :: HscEnv -> IO CorePrepEnv
-mkInitialCorePrepEnv hsc_env = do
+mkInitialCorePrepEnv :: HscEnv -> Module -> IO CorePrepEnv
+mkInitialCorePrepEnv hsc_env this_mod = do
    convertNumLit <- mkConvertNumLiteral hsc_env
+   mk_static_form <- mkMkStaticForm hsc_env this_mod
    return $ CPE
-      { cpe_dynFlags      = hsc_dflags hsc_env
+      { cpe_dynFlags      =  hsc_dflags hsc_env
       , cpe_env           = emptyVarEnv
       , cpe_tyco_env      = Nothing
       , cpe_convertNumLit = convertNumLit
+      , cpe_mk_static_form = mk_static_form
       }
 
 extendCorePrepEnv :: CorePrepEnv -> Id -> Id -> CorePrepEnv
@@ -1982,10 +2010,10 @@ subst_cv_bndr tce cv
 -- Cloning binders
 -- ---------------------------------------------------------------------------
 
-cpCloneBndrs :: CorePrepEnv -> [InVar] -> UniqSM (CorePrepEnv, [OutVar])
+cpCloneBndrs :: CorePrepEnv -> [InVar] -> CorePrepM (CorePrepEnv, [OutVar])
 cpCloneBndrs env bs = mapAccumLM cpCloneBndr env bs
 
-cpCloneBndr  :: CorePrepEnv -> InVar -> UniqSM (CorePrepEnv, OutVar)
+cpCloneBndr  :: CorePrepEnv -> InVar -> CorePrepM (CorePrepEnv, OutVar)
 cpCloneBndr env bndr
   | isTyVar bndr
   = return (cpSubstTyVarBndr env bndr)
@@ -2041,7 +2069,7 @@ see Note [Preserve evaluatedness] in GHC.Core.Tidy.
 -- to give the code generator a handle to hang it on
 -- ---------------------------------------------------------------------------
 
-fiddleCCall :: Id -> UniqSM Id
+fiddleCCall :: Id -> CorePrepM Id
 fiddleCCall id
   | isFCallId id = (id `setVarUnique`) <$> getUniqueM
   | otherwise    = return id
@@ -2050,7 +2078,7 @@ fiddleCCall id
 -- Generating new binders
 -- ---------------------------------------------------------------------------
 
-newVar :: Type -> UniqSM Id
+newVar :: Type -> CorePrepM Id
 newVar ty
  = seqType ty `seq` do
      uniq <- getUniqueM
@@ -2204,3 +2232,50 @@ mkConvertNumLiteral hsc_env = do
 
    return convertNumLit
 
+-- Static Forms
+
+mkMkStaticForm :: HscEnv -> Module -> IO (Type -> CoreExpr -> CoreExpr -> CorePrepM (Fingerprint, CoreExpr))
+mkMkStaticForm hsc_env this_mod = do
+      staticPtrInfoDataCon <- lookupDataCon staticPtrInfoDataConName
+      staticPtrDataCon <- lookupDataCon staticPtrDataConName
+      fs <- mapM (mkStringExprFSWith lookupId)
+                   [ unitFS $ moduleUnit this_mod
+                   , moduleNameFS $ moduleName this_mod
+                   ]
+      return $ \t srcLoc e -> do
+        key <- getUniqueM
+        let fp@(Fingerprint w0 w1) = mkStaticPtrFingerprint key
+            info = mkConApp staticPtrInfoDataCon (fs ++ [srcLoc])
+
+        -- The module interface of GHC.StaticPtr should be loaded at least
+        -- when looking up 'fromStatic' during type-checking.
+        return (fp, mkConApp staticPtrDataCon
+                                 [ Type t
+                                 , mkWord64LitWordRep platform w0
+                                 , mkWord64LitWordRep platform w1
+                                 , info
+                                 , e ])
+
+  where
+    dflags = hsc_dflags hsc_env
+    platform = targetPlatform dflags
+
+    mkStaticPtrFingerprint :: Unique -> Fingerprint
+    mkStaticPtrFingerprint n = fingerprintString $ intercalate ":"
+        [ unitString $ moduleUnit this_mod
+        , moduleNameString $ moduleName this_mod
+        , show n
+        ]
+
+    -- Choose either 'Word64#' or 'Word#' to represent the arguments of the
+    -- 'Fingerprint' data constructor.
+    mkWord64LitWordRep platform =
+      case platformWordSize platform of
+        PW4 -> mkWord64LitWord64
+        PW8 -> mkWordLit platform . toInteger
+
+    lookupId :: Name -> IO Id
+    lookupId n = tyThingId <$> lookupGlobal hsc_env n
+
+    lookupDataCon :: Name -> IO DataCon
+    lookupDataCon n = tyThingDataCon <$> lookupGlobal hsc_env n

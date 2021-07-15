@@ -45,6 +45,8 @@ import GHC.Exts( Ptr(..), noDuplicate#, oneShot )
 import GHC.Exts( Int(..), word2Int#, fetchAddWordAddr#, plusWord#, readWordOffAddr# )
 #endif
 import Foreign.Storable
+import Control.Monad.Trans.Writer
+import Control.Monad.Trans.Class
 
 #include "Unique.h"
 
@@ -374,6 +376,9 @@ instance MonadUnique UniqSM where
     getUniqueSupplyM = getUs
     getUniqueM  = getUniqueUs
     getUniquesM = getUniquesUs
+
+instance (Monoid w, MonadUnique m) => MonadUnique (WriterT w m)  where
+    getUniqueSupplyM = lift getUniqueSupplyM
 
 getUniqueUs :: UniqSM Unique
 getUniqueUs = mkUniqSM (\us0 -> case takeUniqFromSupply us0 of
