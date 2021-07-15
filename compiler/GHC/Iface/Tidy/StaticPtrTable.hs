@@ -156,6 +156,10 @@ import Data.List (intercalate)
 import Data.Maybe
 import GHC.Fingerprint
 import qualified GHC.LanguageExtensions as LangExt
+import GHC.Types.Name.Cache
+import Control.Monad.IO.Class
+import GHC.Types.SrcLoc
+import GHC.Types.Unique.Supply
 
 -- | Replaces all bindings of the form
 --
@@ -185,7 +189,8 @@ sptCreateStaticBinds hsc_env this_mod binds
       []        -> return (reverse fps, reverse bs)
       bnd : xs' -> do
         (fps', bnd') <- replaceStaticBind bnd
-        go (reverse fps' ++ fps) (bnd' : bs) xs'
+        let (spt_entries, alias_binds) = unzip fps'
+        go (reverse spt_entries ++ fps) (alias_binds ++ (bnd' : bs)) xs'
 
     dflags = hsc_dflags hsc_env
     platform = targetPlatform dflags
@@ -194,7 +199,7 @@ sptCreateStaticBinds hsc_env this_mod binds
     --
     -- The 'Int' state is used to produce a different key for each binding.
     replaceStaticBind :: CoreBind
-                      -> StateT Int IO ([SptEntry], CoreBind)
+                      -> StateT Int IO ([(SptEntry, CoreBind)], CoreBind)
     replaceStaticBind (NonRec b e) = do (mfp, (b', e')) <- replaceStatic b e
                                         return (maybeToList mfp, NonRec b' e')
     replaceStaticBind (Rec rbs) = do
@@ -202,13 +207,29 @@ sptCreateStaticBinds hsc_env this_mod binds
       return (catMaybes mfps, Rec rbs')
 
     replaceStatic :: Id -> CoreExpr
-                  -> StateT Int IO (Maybe SptEntry, (Id, CoreExpr))
+                  -> StateT Int IO (Maybe (SptEntry, CoreBind), (Id, CoreExpr))
     replaceStatic b e@(collectTyBinders -> (tvs, e0)) =
       case collectMakeStaticArgs e0 of
         Nothing      -> return (Nothing, (b, e))
         Just (_, t, info, arg) -> do
           (fp, e') <- mkStaticBind t info arg
-          return (Just (SptEntry b fp), (b, foldr Lam e' tvs))
+          (b', alias_bind) <- liftIO $ cloneStaticId b
+          return (Just ((SptEntry b' fp), alias_bind), (b, foldr Lam e' tvs))
+
+    -- Create an global/exported top-level bind which aliases to the locally
+    -- floated bind. This is to ensure that the identifier is actually exported
+    -- See #16981
+    cloneStaticId :: Id -> IO (Id, CoreBind)
+    cloneStaticId static_id = do
+      uniq <-  uniqFromMask 's'
+      let
+          cloned_occ = mkVarOcc "$static_ptr"
+          cloned_name = mkExternalName uniq this_mod cloned_occ noSrcSpan
+          cloned_id   = mkExportedVanillaId cloned_name (idType static_id)
+          alias_bind = NonRec cloned_id (Var static_id)
+      liftIO $ updateNameCache (hsc_NC hsc_env) this_mod cloned_occ $ \cache -> do
+         let cache' = extendOrigNameCache cache this_mod cloned_occ cloned_name
+         pure (cache', (cloned_id, alias_bind))
 
     mkStaticBind :: Type -> CoreExpr -> CoreExpr
                  -> StateT Int IO (Fingerprint, CoreExpr)
