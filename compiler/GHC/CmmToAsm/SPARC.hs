@@ -65,6 +65,7 @@ instance Instruction SPARC.Instr where
    mkLoadInstr             = SPARC.mkLoadInstr
    takeDeltaInstr          = SPARC.takeDeltaInstr
    isMetaInstr             = SPARC.isMetaInstr
+   isConditionalInstr      = SPARC.isConditionalInstr
    mkRegRegMoveInstr       = SPARC.mkRegRegMoveInstr
    takeRegRegMoveInstr     = SPARC.takeRegRegMoveInstr
    mkJumpInstr             = SPARC.mkJumpInstr
