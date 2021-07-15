@@ -73,8 +73,8 @@ packageArgs = do
               notStage0 ? arg "--ghc-pkg-option=--force" ]
 
           , builder (Cabal Flags) ? mconcat
-            [ ghcWithInterpreter ? notStage0 ? arg "ghci"
-            , cross ? arg "-terminfo"
+            [ andM [expr ghcWithInterpreter, notStage0] `cabalFlag` "ghci"
+            , notM cross `cabalFlag` "terminfo"
             ]
 
           , builder (Haddock BuildPackage) ? arg ("--optghc=-I" ++ path) ]
@@ -84,8 +84,8 @@ packageArgs = do
           [ builder Ghc ? arg ("-I" ++ compilerPath)
 
           , builder (Cabal Flags) ? mconcat
-            [ ghcWithInterpreter ? notStage0 ? arg "ghci"
-            , cross ? arg "-terminfo"
+            [ andM [expr ghcWithInterpreter, notStage0] `cabalFlag` "ghci"
+            , notM cross `cabalFlag` "terminfo"
             -- Note [Linking ghc-bin against threaded stage0 RTS]
             -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             -- We must maintain the invariant that GHCs linked with '-threaded'
@@ -97,20 +97,17 @@ packageArgs = do
             , ifM stage0
                   -- We build a threaded stage 1 if the bootstrapping compiler
                   -- supports it.
-                  (ifM threadedBootstrapper
-                       (arg "threaded")
-                       (arg "-threaded"))
+                  (threadedBootstrapper `cabalFlag` "threaded")
+
                   -- We build a threaded stage N, N>1 if the configuration calls
                   -- for it.
-                  (ifM (ghcThreaded <$> expr flavour)
-                       (arg "threaded")
-                       (arg "-threaded"))
+                  ((ghcThreaded <$> expr flavour) `cabalFlag` "threaded")
             ]
           ]
 
         -------------------------------- ghcPkg --------------------------------
         , package ghcPkg ?
-          builder (Cabal Flags) ? cross ? arg "-terminfo"
+          builder (Cabal Flags) ? notM cross `cabalFlag` "terminfo"
 
         -------------------------------- ghcPrim -------------------------------
         , package ghcPrim ? mconcat
@@ -120,37 +117,33 @@ packageArgs = do
             input "**/cbits/atomic.c"  ? arg "-Wno-sync-nand" ]
 
         --------------------------------- ghci ---------------------------------
-        , package ghci ? mconcat
-          [ notStage0 ? builder (Cabal Flags) ? arg "ghci"
-
-          -- The use case here is that we want to build @ghc-proxy@ for the
-          -- cross compiler. That one needs to be compiled by the bootstrap
-          -- compiler as it needs to run on the host. Hence @libiserv@ needs
-          -- @GHCi.TH@, @GHCi.Message@ and @GHCi.Run@ from @ghci@. And those are
-          -- behind the @-fghci@ flag.
-          --
-          -- But it may not build if we have made some changes to ghci's
-          -- dependencies (see #16051).
-          --
-          -- To fix this properly Hadrian would need to:
-          --   * first build a compiler for the build platform (stage1 is enough)
-          --   * use it as a bootstrap compiler to build the stage1 cross-compiler
-          --
-          -- The issue is that "configure" would have to be executed twice (for
-          -- the build platform and for the cross-platform) and Hadrian would
-          -- need to be fixed to support two different stage1 compilers.
-          --
-          -- The workaround we use is to check if the bootstrap compiler has
-          -- the same version as the one we are building. In this case we can
-          -- avoid the first step above and directly build with `-fghci`.
-          --
-          -- TODO: Note that in that case we also do not need to build most of
-          -- the Stage1 libraries, as we already know that the bootstrap
-          -- compiler comes with the same versions as the one we are building.
-          --
-          , cross ? stage0 ? bootCross ? builder (Cabal Flags) ? arg "ghci"
-
-          ]
+        , package ghci ? builder (Cabal Flags) ? ifM stage0
+            -- The use case here is that we want to build @ghc-proxy@ for the
+            -- cross compiler. That one needs to be compiled by the bootstrap
+            -- compiler as it needs to run on the host. Hence @libiserv@ needs
+            -- @GHCi.TH@, @GHCi.Message@ and @GHCi.Run@ from @ghci@. And those are
+            -- behind the @-fghci@ flag.
+            --
+            -- But it may not build if we have made some changes to ghci's
+            -- dependencies (see #16051).
+            --
+            -- To fix this properly Hadrian would need to:
+            --   * first build a compiler for the build platform (stage1 is enough)
+            --   * use it as a bootstrap compiler to build the stage1 cross-compiler
+            --
+            -- The issue is that "configure" would have to be executed twice (for
+            -- the build platform and for the cross-platform) and Hadrian would
+            -- need to be fixed to support two different stage1 compilers.
+            --
+            -- The workaround we use is to check if the bootstrap compiler has
+            -- the same version as the one we are building. In this case we can
+            -- avoid the first step above and directly build with `-fghci`.
+            --
+            -- TODO: Note that in that case we also do not need to build most of
+            -- the Stage1 libraries, as we already know that the bootstrap
+            -- compiler comes with the same versions as the one we are building.
+            (andM [expr cross, expr bootCross] `cabalFlag` "ghci")
+            (arg "ghci")
 
         --------------------------------- iserv --------------------------------
         -- Add -Wl,--export-dynamic enables GHCi to load dynamic objects that
@@ -178,7 +171,7 @@ packageArgs = do
         -- dependencies.
         -- TODO: Perhaps the user should rather be responsible for this?
         , package haskeline ?
-          builder (Cabal Flags) ? cross ? arg "-terminfo"
+          builder (Cabal Flags) ? notM cross `cabalFlag` "terminfo"
 
         -------------------------------- hsc2hs --------------------------------
         , package hsc2hs ?
@@ -210,7 +203,7 @@ ghcBignumArgs = package ghcBignum ? do
             builder (Cabal Flags) ? arg backend
 
           , -- check the selected backend against native backend
-            builder (Cabal Flags) ? check ? arg "check"
+            builder (Cabal Flags) ? check `cabalFlag` "check"
 
             -- backend specific
           , case backend of
@@ -372,12 +365,12 @@ rtsPackageArgs = package rts ? do
 
     mconcat
         [ builder (Cabal Flags) ? mconcat
-          [ any (wayUnit Profiling) rtsWays ? arg "profiling"
-          , any (wayUnit Debug) rtsWays     ? arg "debug"
-          , any (wayUnit Logging) rtsWays   ? arg "logging"
-          , any (wayUnit Dynamic) rtsWays   ? arg "dynamic"
-          , useLibffiForAdjustors           ? arg "libffi-adjustors"
-          , Debug `wayUnit` way             ? arg "find-ptr"
+          [ any (wayUnit Profiling) rtsWays `cabalFlag` "profiling"
+          , any (wayUnit Debug) rtsWays     `cabalFlag` "debug"
+          , any (wayUnit Logging) rtsWays   `cabalFlag` "logging"
+          , any (wayUnit Dynamic) rtsWays   `cabalFlag` "dynamic"
+          , useLibffiForAdjustors           `cabalFlag` "libffi-adjustors"
+          , Debug `wayUnit` way             `cabalFlag` "find-ptr"
           ]
         , builder (Cabal Setup) ? mconcat
           [ if not (null libdwLibraryDir) then arg ("--extra-lib-dirs="++libdwLibraryDir) else mempty
