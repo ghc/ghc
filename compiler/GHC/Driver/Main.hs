@@ -1612,7 +1612,6 @@ hscGenHardCode hsc_env cgguts location output_filename = do
               | sccProfilingEnabled dflags = profilingInitCode platform this_mod cost_centre_info
               | otherwise = mempty
 
-            spt_init_code = sptModuleInitCode platform this_mod spt_entries
 
         ------------------  Code generation ------------------
         -- The back-end is streamed: each top-level function goes
@@ -1642,7 +1641,6 @@ hscGenHardCode hsc_env cgguts location output_filename = do
 
             let foreign_stubs st = foreign_stubs0 `appendStubC` prof_init
                                                   `appendStubC` cgIPEStub st
-                                                  `appendStubC` spt_init_code
 
             (output_filename, (_stub_h_exists, stub_c_exists), foreign_fps, cg_infos)
                 <- {-# SCC "codeOutput" #-}
