@@ -25,7 +25,7 @@ packageArgs = do
     mconcat
         --------------------------------- base ---------------------------------
         [ package base ? mconcat
-          [ builder (Cabal Flags) ? notStage0 ? arg (pkgName ghcBignum)
+          [ builder (Cabal Flags) ? notStage0 `cabalFlag` (pkgName ghcBignum)
 
           -- This fixes the 'unknown symbol stat' issue.
           -- See: https://github.com/snowleopard/hadrian/issues/259.
@@ -65,8 +65,8 @@ packageArgs = do
               notStage0 ? arg "--ghc-pkg-option=--force" ]
 
           , builder (Cabal Flags) ? mconcat
-            [ ghcWithInterpreter ? notStage0 ? arg "internal-interpreter"
-            , cross ? arg "-terminfo"
+            [ andM [expr ghcWithInterpreter, notStage0] `cabalFlag` "internal-interpreter"
+            , notM cross `cabalFlag` "terminfo"
             ]
 
           , builder (Haddock BuildPackage) ? arg ("--optghc=-I" ++ path) ]
@@ -76,25 +76,22 @@ packageArgs = do
           [ builder Ghc ? arg ("-I" ++ compilerPath)
 
           , builder (Cabal Flags) ? mconcat
-            [ ghcWithInterpreter ? notStage0 ? arg "internal-interpreter"
-            , cross ? arg "-terminfo"
+            [ andM [expr ghcWithInterpreter, notStage0] `cabalFlag` "internal-interpreter"
+            , notM cross `cabalFlag` "terminfo"
             , ifM stage0
                   -- We build a threaded stage 1 if the bootstrapping compiler
                   -- supports it.
-                  (ifM threadedBootstrapper
-                       (arg "threaded")
-                       (arg "-threaded"))
+                  (threadedBootstrapper `cabalFlag` "threaded")
+
                   -- We build a threaded stage N, N>1 if the configuration calls
                   -- for it.
-                  (ifM (ghcThreaded <$> expr flavour)
-                       (arg "threaded")
-                       (arg "-threaded"))
+                  ((ghcThreaded <$> expr flavour) `cabalFlag` "threaded")
             ]
           ]
 
         -------------------------------- ghcPkg --------------------------------
         , package ghcPkg ?
-          builder (Cabal Flags) ? cross ? arg "-terminfo"
+          builder (Cabal Flags) ? notM cross `cabalFlag` "terminfo"
 
         -------------------------------- ghcPrim -------------------------------
         , package ghcPrim ? mconcat
@@ -105,8 +102,7 @@ packageArgs = do
 
         --------------------------------- ghci ---------------------------------
         , package ghci ? mconcat
-          [ notStage0 ? builder (Cabal Flags) ? arg "internal-interpreter"
-
+          [
           -- The use case here is that we want to build @iserv-proxy@ for the
           -- cross compiler. That one needs to be compiled by the bootstrap
           -- compiler as it needs to run on the host. Hence @libiserv@ needs
@@ -133,7 +129,9 @@ packageArgs = do
           -- the Stage1 libraries, as we already know that the bootstrap
           -- compiler comes with the same versions as the one we are building.
           --
-          , cross ? stage0 ? bootCross ? builder (Cabal Flags) ? arg "internal-interpreter"
+            builder (Cabal Flags) ? ifM stage0
+              (andM [cross, bootCross] `cabalFlag` "internal-interpreter")
+              (arg "internal-interpreter")
 
           ]
 
@@ -163,7 +161,7 @@ packageArgs = do
         -- dependencies.
         -- TODO: Perhaps the user should rather be responsible for this?
         , package haskeline ?
-          builder (Cabal Flags) ? cross ? arg "-terminfo"
+          builder (Cabal Flags) ? notM cross `cabalFlag` "terminfo"
 
         -------------------------------- hsc2hs --------------------------------
         , package hsc2hs ?
@@ -195,7 +193,7 @@ ghcBignumArgs = package ghcBignum ? do
             builder (Cabal Flags) ? arg backend
 
           , -- check the selected backend against native backend
-            builder (Cabal Flags) ? check ? arg "check"
+            builder (Cabal Flags) ? check `cabalFlag` "check"
 
             -- backend specific
           , case backend of
@@ -358,12 +356,12 @@ rtsPackageArgs = package rts ? do
 
     mconcat
         [ builder (Cabal Flags) ? mconcat
-          [ any (wayUnit Profiling) rtsWays ? arg "profiling"
-          , any (wayUnit Debug) rtsWays     ? arg "debug"
-          , any (wayUnit Logging) rtsWays   ? arg "logging"
-          , any (wayUnit Dynamic) rtsWays   ? arg "dynamic"
-          , useLibffiForAdjustors           ? arg "libffi-adjustors"
-          , Debug `wayUnit` way             ? arg "find-ptr"
+          [ any (wayUnit Profiling) rtsWays `cabalFlag` "profiling"
+          , any (wayUnit Debug) rtsWays     `cabalFlag` "debug"
+          , any (wayUnit Logging) rtsWays   `cabalFlag` "logging"
+          , any (wayUnit Dynamic) rtsWays   `cabalFlag` "dynamic"
+          , useLibffiForAdjustors           `cabalFlag` "libffi-adjustors"
+          , Debug `wayUnit` way             `cabalFlag` "find-ptr"
           ]
         , builder (Cabal Setup) ? mconcat
           [ if not (null libdwLibraryDir) then arg ("--extra-lib-dirs="++libdwLibraryDir) else mempty
