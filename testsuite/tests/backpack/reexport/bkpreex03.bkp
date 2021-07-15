@@ -5,5 +5,3 @@ unit p where
         data M = M
     signature A(module A, M) where
         import M1
-    signature A(module A, M) where
-        import M2

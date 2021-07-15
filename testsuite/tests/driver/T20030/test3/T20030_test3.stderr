@@ -1,0 +1,7 @@
+[1 of 7] Compiling L[boot]          ( L.hs-boot, L.o-boot )
+[2 of 7] Compiling M[boot]          ( M.hs-boot, M.o-boot )
+[3 of 7] Compiling O[boot]          ( O.hs-boot, O.o-boot )
+[4 of 7] Compiling O                ( O.hs, O.o )
+[5 of 7] Compiling L                ( L.hs, L.o )
+[6 of 7] Compiling M                ( M.hs, M.o )
+[7 of 7] Compiling N                ( N.hs, N.o )

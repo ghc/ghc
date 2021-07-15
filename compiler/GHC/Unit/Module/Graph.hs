@@ -21,7 +21,7 @@ module GHC.Unit.Module.Graph
    , needsTemplateHaskellOrQQ
    , isTemplateHaskellOrQQNonBoot
    , showModMsg
-   )
+   , moduleGraphNodeModule)
 where
 
 import GHC.Prelude
@@ -53,6 +53,10 @@ data ModuleGraphNode
   = InstantiationNode InstantiatedUnit
   -- | There is a module summary node for each module, signature, and boot module being built.
   | ModuleNode ExtendedModSummary
+
+moduleGraphNodeModule :: ModuleGraphNode -> Maybe ExtendedModSummary
+moduleGraphNodeModule (InstantiationNode {}) = Nothing
+moduleGraphNodeModule (ModuleNode ems)    = Just ems
 
 instance Outputable ModuleGraphNode where
   ppr = \case

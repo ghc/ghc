@@ -235,6 +235,7 @@ import Data.Functor
 import Control.DeepSeq (force)
 import Data.Bifunctor (first)
 import GHC.Data.Maybe
+import GHC.Driver.Env.KnotVars
 
 {- **********************************************************************
 %*                                                                      *
@@ -256,7 +257,7 @@ newHscEnv dflags = do
                   ,  hsc_IC             = emptyInteractiveContext dflags
                   ,  hsc_NC             = nc_var
                   ,  hsc_FC             = fc_var
-                  ,  hsc_type_env_var   = Nothing
+                  ,  hsc_type_env_vars  = emptyKnotVars
                   ,  hsc_interp         = Nothing
                   ,  hsc_unit_env       = unit_env
                   ,  hsc_plugins        = []
@@ -1039,12 +1040,28 @@ hscMaybeWriteIface logger dflags is_simple iface old_iface mod_location = do
 -- NoRecomp handlers
 --------------------------------------------------------------
 
--- NB: this must be knot-tied appropriately, see hscIncrementalCompile
+
+-- | genModDetails is used to initialise 'ModDetails' at the end of compilation.
+-- This has two main effects:
+-- 1. Increases memory usage by unloading a lot of the TypeEnv
+-- 2. Globalising certain parts (DFunIds) in the TypeEnv (which used to be achieved using UpdateIdInfos)
+-- For the second part to work, it's critical that we use 'initIfaceLoadModule' here rather than
+-- 'initIfaceCheck' as 'initIfaceLoadModule' removes the module from the KnotVars, otherwise name lookups
+-- succeed by hitting the old TypeEnv, which missing out the critical globalisation step for DFuns.
+
+-- After the DFunIds are globalised, it's critical to overwrite the old TypeEnv with the new
+-- more compact and more correct version. This reduces memory usage whilst compiling the rest of
+-- the module loop.
 genModDetails :: HscEnv -> ModIface -> IO ModDetails
 genModDetails hsc_env old_iface
   = do
+    -- CRITICAL: To use initIfaceLoadModule as that removes the current module from the KnotVars and
+    -- hence properly globalises DFunIds.
     new_details <- {-# SCC "tcRnIface" #-}
-                   initIfaceLoad hsc_env (typecheckIface old_iface)
+                  initIfaceLoadModule hsc_env (mi_module old_iface) (typecheckIface old_iface)
+    case lookupKnotVars (hsc_type_env_vars hsc_env) (mi_module old_iface) of
+      Nothing -> return ()
+      Just te_var -> writeIORef te_var (md_types new_details)
     dumpIfaceStats hsc_env
     return new_details
 

@@ -3,5 +3,3 @@ unit p where
         data T
     signature B where
         data T
-    signature A(module A, T) where
-        import B(T)
