@@ -1,9 +1,11 @@
+{-# LANGUAGE FlexibleContexts #-}
+
 module Expression (
     -- * Expressions
     Expr, Predicate, Args, Ways,
 
     -- ** Construction and modification
-    expr, exprIO, arg, remove,
+    expr, exprIO, arg, remove, cabalFlag,
 
     -- ** Predicates
     (?), stage, stage0, stage1, stage2, notStage0, threadedBootstrapper,
@@ -131,3 +133,11 @@ notPackage = notM . package
 -- | Is a library package currently being built?
 libraryPackage :: Predicate
 libraryPackage = isLibrary <$> getPackage
+
+-- | Either @-flagName@ or @flagName@, depending upon a predicate.
+-- For use in @Cabal Flags@ argument lists.
+cabalFlag :: ToPredicate p Context Builder => p -> String -> Args
+cabalFlag pred flagName = do
+    ifM (toPredicate pred) (arg flagName) (arg $ "-"<>flagName)
+
+infixr 3 `cabalFlag`
