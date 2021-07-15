@@ -258,7 +258,7 @@ $(includes_SETTINGS) : includes/Makefile | $$(dir $$@)/.
 	@echo ',("RTS ways", "$(GhcRTSWays)")' >> $@
 	@echo ',("Tables next to code", "$(TablesNextToCode)")' >> $@
 	@echo ',("Leading underscore", "$(LeadingUnderscore)")' >> $@
-	@echo ',("Use LibFFI", "$(UseLibFFIForAdjustors)")' >> $@
+	@echo ',("Use LibFFI", "$(UseLibffiForAdjustors)")' >> $@
 	@echo ",(\"RTS expects libdw\", \"$(GhcRtsWithLibdw)\")" >> $@
 	@echo "]" >> $@
 
