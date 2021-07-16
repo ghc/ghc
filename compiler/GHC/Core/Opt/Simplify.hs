@@ -425,6 +425,12 @@ simplNonRecX env bndr new_rhs
   | Coercion co <- new_rhs
   = return (emptyFloats env, extendCvSubst env bndr co)
 
+  | exprIsTrivial new_rhs  -- Short-cut for let x = y in ...
+    -- This case would ultimately land in postInlineUnconditionally
+    -- but it seems not uncommon, and avoids a lot of faff to do it here
+  = return (emptyFloats env
+           , extendIdSubst env bndr (DoneEx new_rhs Nothing))
+
   | otherwise
   = do  { (env', bndr') <- simplBinder env bndr
         ; completeNonRecX NotTopLevel env' (isStrictId bndr') bndr bndr' new_rhs }
@@ -2682,6 +2688,27 @@ case b of { b' -> f b' }.
 We could try and be more clever (like maybe wfloats only contain
 let binders, so we could float them). But the need for the
 extra complication is not clear.
+
+Note [Do not duplicate constructor applications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this (#20125)
+   let x = (a,b)
+   in ...(case x of x' -> blah)...x...x...
+
+We want that `case` to vanish (since `x` is bound to a data con) leaving
+   let x = (a,b)
+   in ...(let x'=x in blah)...x..x...
+
+In rebuildCase, `exprIsConApp_maybe` will succeed on the scrutinee `x`,
+since is bound to (a,b).  But in eliminating the case, if the scrutinee
+is trivial, we want to bind the case-binder to the scrutinee, /not/ to
+the constructor application.  Hence the case_bndr_rhs in rebuildCase.
+
+This applies equally to a non-DEFAULT case alternative, say
+   let x = (a,b) in ...(case x of x' { (p,q) -> blah })...
+This variant is handled by bind_case_bndr in knownCon.
+
+We want to bind x' to x, and not to a duplicated (a,b)).
 -}
 
 ---------------------------------------------------------
@@ -2715,19 +2742,21 @@ rebuildCase env scrut case_bndr alts cont
   , let env0 = setInScopeSet env in_scope'
   = do  { tick (KnownBranch case_bndr)
         ; let scaled_wfloats = map scale_float wfloats
+              -- case_bndr_unf: see Note [Do not duplicate constructor applications]
+              case_bndr_rhs | exprIsTrivial scrut = scrut
+                            | otherwise           = con_app
+              con_app = Var (dataConWorkId con) `mkTyApps` ty_args
+                                                `mkApps`   other_args
         ; case findAlt (DataAlt con) alts of
-            Nothing  -> missingAlt env0 case_bndr alts cont
-            Just (Alt DEFAULT bs rhs) -> let con_app = Var (dataConWorkId con)
-                                                 `mkTyApps` ty_args
-                                                 `mkApps`   other_args
-                                         in simple_rhs env0 scaled_wfloats con_app bs rhs
-            Just (Alt _ bs rhs)       -> knownCon env0 scrut scaled_wfloats con ty_args other_args
-                                                  case_bndr bs rhs cont
+            Nothing                   -> missingAlt env0 case_bndr alts cont
+            Just (Alt DEFAULT bs rhs) -> simple_rhs env0 scaled_wfloats case_bndr_rhs bs rhs
+            Just (Alt _       bs rhs) -> knownCon env0 scrut scaled_wfloats con ty_args
+                                                  other_args case_bndr bs rhs cont
         }
   where
-    simple_rhs env wfloats scrut' bs rhs =
+    simple_rhs env wfloats case_bndr_rhs bs rhs =
       assert (null bs) $
-      do { (floats1, env') <- simplNonRecX env case_bndr scrut'
+      do { (floats1, env') <- simplNonRecX env case_bndr case_bndr_rhs
              -- scrut is a constructor application,
              -- hence satisfies let/app invariant
          ; (floats2, expr') <- simplExprF env' rhs cont
@@ -3293,6 +3322,7 @@ knownCon env scrut dc_floats dc dc_ty_args dc_args bndr bs rhs cont
       | isDeadBinder bndr   = return (emptyFloats env, env)
       | exprIsTrivial scrut = return (emptyFloats env
                                      , extendIdSubst env bndr (DoneEx scrut Nothing))
+                              -- See Note [Do not duplicate constructor applications]
       | otherwise           = do { dc_args <- mapM (simplVar env) bs
                                          -- dc_ty_args are already OutTypes,
                                          -- but bs are InBndrs
