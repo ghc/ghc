@@ -9,6 +9,7 @@ module GHC.Unit
    , module GHC.Unit.State
    , module GHC.Unit.Module
    , module GHC.Unit.Home
+   , module GHC.Unit.External.DB
    )
 where
 
@@ -18,6 +19,7 @@ import GHC.Unit.Parser
 import GHC.Unit.Module
 import GHC.Unit.Home
 import GHC.Unit.State
+import GHC.Unit.External.DB
 
 {-
 

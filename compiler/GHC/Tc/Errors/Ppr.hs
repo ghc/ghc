@@ -18,7 +18,8 @@ import GHC.Types.Var.Env (emptyTidyEnv)
 import GHC.Driver.Flags
 import GHC.Hs
 import GHC.Utils.Outputable
-import GHC.Unit.State (pprWithUnitState, UnitState)
+import GHC.Unit.State (pprWithUnitState, UnitState(..))
+import GHC.Unit.External.DB (ExtUnitDB)
 import qualified GHC.LanguageExtensions as LangExt
 import qualified Data.List.NonEmpty as NE
 
@@ -32,7 +33,7 @@ instance Diagnostic TcRnMessage where
     TcRnMessageWithInfo unit_state msg_with_info
       -> case msg_with_info of
            TcRnMessageDetailed err_info msg
-             -> messageWithInfoDiagnosticMessage unit_state err_info (diagnosticMessage msg)
+             -> messageWithInfoDiagnosticMessage (unitDB unit_state) err_info (diagnosticMessage msg)
     TcRnImplicitLift id_or_name ErrInfo{..}
       -> mkDecorated $
            ( text "The variable" <+> quotes (ppr id_or_name) <+>
@@ -183,13 +184,13 @@ instance Diagnostic TcRnMessage where
     TcRnIllegalWildcardsInConstructor{}
       -> noHints
 
-messageWithInfoDiagnosticMessage :: UnitState
+messageWithInfoDiagnosticMessage :: ExtUnitDB
                                  -> ErrInfo
                                  -> DecoratedSDoc
                                  -> DecoratedSDoc
-messageWithInfoDiagnosticMessage unit_state ErrInfo{..} important =
-  let err_info' = map (pprWithUnitState unit_state) [errInfoContext, errInfoSupplementary]
-      in (mapDecoratedSDoc (pprWithUnitState unit_state) important) `unionDecoratedSDoc`
+messageWithInfoDiagnosticMessage extUnitDB ErrInfo{..} important =
+  let err_info' = map (pprWithUnitState extUnitDB) [errInfoContext, errInfoSupplementary]
+      in (mapDecoratedSDoc (pprWithUnitState extUnitDB) important) `unionDecoratedSDoc`
          mkDecorated err_info'
 
 dodgy_msg :: (Outputable a, Outputable b) => SDoc -> a -> b -> SDoc

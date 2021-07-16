@@ -966,10 +966,10 @@ dupInstErr ispec dup_ispec
 
 addClsInstsErr :: SDoc -> [ClsInst] -> TcRn ()
 addClsInstsErr herald ispecs = do
-   unit_state <- hsc_units <$> getTopEnv
+   extUnitDB <- unitDB . hsc_units <$> getTopEnv
    setSrcSpan (getSrcSpan (head sorted)) $
       addErr $ TcRnUnknownMessage $ mkPlainError noHints $
-      pprWithUnitState unit_state $ (hang herald 2 (pprInstances sorted))
+      pprWithUnitState extUnitDB $ (hang herald 2 (pprInstances sorted))
  where
    sorted = sortBy (SrcLoc.leftmost_smallest `on` getSrcSpan) ispecs
    -- The sortBy just arranges that instances are displayed in order

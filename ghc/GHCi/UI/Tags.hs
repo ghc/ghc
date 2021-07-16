@@ -24,6 +24,7 @@ import GHC.Types.Name (nameOccName)
 import GHC.Types.Name.Occurrence (pprOccName)
 import GHC.Core.ConLike
 import GHC.Utils.Monad
+import GHC.Unit.External.DB
 import GHC.Unit.State
 import GHC.Driver.Env
 
@@ -95,13 +96,13 @@ listModuleTags m = do
     Nothing -> return []
     Just mInfo -> do
        dflags <- getDynFlags
-       unit_state <- hsc_units <$> getSession
+       extUnitDB <- unitDB . hsc_units <$> getSession
        mb_print_unqual <- GHC.mkPrintUnqualifiedForModule mInfo
        let unqual = fromMaybe GHC.alwaysQualify mb_print_unqual
        let names = fromMaybe [] $ GHC.modInfoTopLevelScope mInfo
        let localNames = filter ((m==) . nameModule) names
        mbTyThings <- mapM GHC.lookupName localNames
-       return $! [ tagInfo dflags unit_state unqual exported kind name realLoc
+       return $! [ tagInfo dflags extUnitDB unqual exported kind name realLoc
                      | tyThing <- catMaybes mbTyThings
                      , let name = getName tyThing
                      , let exported = GHC.modInfoIsExportedName mInfo name
@@ -130,13 +131,13 @@ data TagInfo = TagInfo
 
 
 -- get tag info, for later translation into Vim or Emacs style
-tagInfo :: DynFlags -> UnitState -> PrintUnqualified
+tagInfo :: DynFlags -> ExtUnitDB -> PrintUnqualified
         -> Bool -> Char -> Name -> RealSrcLoc
         -> TagInfo
-tagInfo dflags unit_state unqual exported kind name loc
+tagInfo dflags extUnitDB unqual exported kind name loc
     = TagInfo exported kind
-        (showSDocForUser dflags unit_state unqual $ pprOccName (nameOccName name))
-        (showSDocForUser dflags unit_state unqual $ ftext (srcLocFile loc))
+        (showSDocForUser dflags extUnitDB unqual $ pprOccName (nameOccName name))
+        (showSDocForUser dflags extUnitDB unqual $ ftext (srcLocFile loc))
         (srcLocLine loc) (srcLocCol loc) Nothing
 
 -- throw an exception when someone tries to overwrite existing source file (fix for #10989)

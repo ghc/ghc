@@ -41,6 +41,7 @@ import           GHC
 import           GHC.Driver.Monad
 import           GHC.Driver.Env
 import           GHC.Driver.Ppr
+import           GHC.Unit.State (UnitState(unitDB))
 import           GHC.Types.Name
 import           GHC.Types.Name.Set
 import           GHC.Utils.Outputable
@@ -264,7 +265,7 @@ collectInfo :: (GhcMonad m) => Map ModuleName ModInfo -> [ModuleName]
                -> m (Map ModuleName ModInfo)
 collectInfo ms loaded = do
     df <- getDynFlags
-    unit_state <- hsc_units <$> getSession
+    extUnitDB <- unitDB . hsc_units <$> getSession
     liftIO (filterM cacheInvalid loaded) >>= \case
         [] -> return ms
         invalidated -> do
@@ -272,13 +273,13 @@ collectInfo ms loaded = do
                               show (length invalidated) ++
                               " module(s) ... "))
 
-            foldM (go df unit_state) ms invalidated
+            foldM (go df extUnitDB) ms invalidated
   where
-    go df unit_state m name = do { info <- getModInfo name; return (M.insert name info m) }
+    go df extUnitDB m name = do { info <- getModInfo name; return (M.insert name info m) }
                    `MC.catch`
                    (\(e :: SomeException) -> do
                          liftIO $ putStrLn
-                                $ showSDocForUser df unit_state alwaysQualify
+                                $ showSDocForUser df extUnitDB alwaysQualify
                                 $ "Error while getting type info from" <+>
                                   ppr name <> ":" <+> text (show e)
                          return m)

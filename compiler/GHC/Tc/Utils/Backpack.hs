@@ -290,7 +290,7 @@ findExtraSigImports' hsc_env HsigFile modname =
     dflags = hsc_dflags hsc_env
     ctx = initSDocContext dflags defaultUserStyle
     unit_state = hsc_units hsc_env
-    reqs = requirementMerges unit_state modname
+    reqs = requirementMerges (unitView unit_state) modname
 
 findExtraSigImports' _ _ _ = return emptyUniqDSet
 
@@ -591,9 +591,9 @@ mergeSignatures
 
     -- STEP 1: Figure out all of the external signature interfaces
     -- we are going to merge in.
-    let reqs = requirementMerges unit_state mod_name
+    let reqs = requirementMerges (unitView unit_state) mod_name
 
-    addErrCtxt (pprWithUnitState unit_state $ merge_msg mod_name reqs) $ do
+    addErrCtxt (pprWithUnitState (unitDB unit_state) $ merge_msg mod_name reqs) $ do
 
     -- STEP 2: Read in the RAW forms of all of these interfaces
     ireq_ifaces0 <- liftIO $ forM reqs $ \(Module iuid mod_name) -> do
@@ -622,7 +622,7 @@ mergeSignatures
             let insts = instUnitInsts iuid
                 isFromSignaturePackage =
                     let inst_uid = instUnitInstanceOf iuid
-                        pkg = unsafeLookupUnitId unit_state (indefUnit inst_uid)
+                        pkg = unsafeLookupUnitId (unitDB unit_state) (indefUnit inst_uid)
                     in null (unitExposedModules pkg)
             -- 3(a). Rename the exports according to how the dependency
             -- was instantiated.  The resulting export list will be accurate
@@ -952,9 +952,9 @@ tcRnInstantiateSignature hsc_env this_mod real_loc =
 exportOccs :: [AvailInfo] -> [OccName]
 exportOccs = concatMap (map occName . availNames)
 
-impl_msg :: UnitState -> Module -> InstantiatedModule -> SDoc
-impl_msg unit_state impl_mod (Module req_uid req_mod_name)
-   = pprWithUnitState unit_state $
+impl_msg :: ExtUnitDB -> Module -> InstantiatedModule -> SDoc
+impl_msg extUnitDB impl_mod (Module req_uid req_mod_name)
+   = pprWithUnitState extUnitDB $
       text "while checking that" <+> ppr impl_mod <+>
       text "implements signature" <+> ppr req_mod_name <+>
       text "in" <+> ppr req_uid
@@ -965,9 +965,9 @@ impl_msg unit_state impl_mod (Module req_uid req_mod_name)
 checkImplements :: Module -> InstantiatedModule -> TcRn TcGblEnv
 checkImplements impl_mod req_mod@(Module uid mod_name) = do
   hsc_env <- getTopEnv
-  let unit_state = hsc_units hsc_env
+  let extUnitDB = unitDB $ hsc_units hsc_env
       home_unit  = hsc_home_unit hsc_env
-  addErrCtxt (impl_msg unit_state impl_mod req_mod) $ do
+  addErrCtxt (impl_msg extUnitDB impl_mod req_mod) $ do
     let insts = instUnitInsts uid
 
     -- STEP 1: Load the implementing interface, and make a RdrEnv
@@ -1036,7 +1036,7 @@ checkImplements impl_mod req_mod@(Module uid mod_name) = do
             [] -> addErr $ TcRnUnknownMessage $ mkPlainError noHints $
                         quotes (ppr occ)
                     <+> text "is exported by the hsig file, but not exported by the implementing module"
-                    <+> quotes (pprWithUnitState unit_state $ ppr impl_mod)
+                    <+> quotes (pprWithUnitState extUnitDB $ ppr impl_mod)
             _ -> return ()
     failIfErrsM
 

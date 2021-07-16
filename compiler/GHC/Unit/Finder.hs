@@ -43,6 +43,7 @@ import GHC.Platform.Ways
 
 import GHC.Builtin.Names ( gHC_PRIM )
 
+import GHC.Unit.External.DB
 import GHC.Unit.Types
 import GHC.Unit.Module
 import GHC.Unit.Home
@@ -169,11 +170,11 @@ findPluginModule fc units home_unit dflags mod_name =
 -- reading the interface for a module mentioned by another interface,
 -- for example (a "system import").
 
-findExactModule :: FinderCache -> DynFlags -> UnitState -> HomeUnit -> InstalledModule -> IO InstalledFindResult
-findExactModule fc dflags unit_state home_unit mod = do
+findExactModule :: FinderCache -> DynFlags -> ExtUnitDB -> HomeUnit -> InstalledModule -> IO InstalledFindResult
+findExactModule fc dflags extUnitDB home_unit mod = do
   if isHomeInstalledModule home_unit mod
     then findInstalledHomeModule fc dflags home_unit (moduleName mod)
-    else findPackageModule fc unit_state dflags mod
+    else findPackageModule fc extUnitDB dflags mod
 
 -- -----------------------------------------------------------------------------
 -- Helpers
@@ -362,10 +363,10 @@ findInstalledHomeModule fc dflags home_unit mod_name = do
 
 
 -- | Search for a module in external packages only.
-findPackageModule :: FinderCache -> UnitState -> DynFlags -> InstalledModule -> IO InstalledFindResult
-findPackageModule fc unit_state dflags mod = do
+findPackageModule :: FinderCache -> ExtUnitDB -> DynFlags -> InstalledModule -> IO InstalledFindResult
+findPackageModule fc extUnitDB dflags mod = do
   let pkg_id = moduleUnit mod
-  case lookupUnitId unit_state pkg_id of
+  case lookupUnitId extUnitDB pkg_id of
      Nothing -> return (InstalledNoPackage pkg_id)
      Just u  -> findPackageModule_ fc dflags mod u
 

@@ -1532,8 +1532,8 @@ info allInfo s  = handleSourceError GHC.printException $ do
     unqual <- GHC.getPrintUnqual
     dflags <- getDynFlags
     sdocs  <- mapM (infoThing allInfo) (words s)
-    unit_state <- hsc_units <$> GHC.getSession
-    mapM_ (liftIO . putStrLn . showSDocForUser dflags unit_state unqual) sdocs
+    extUnitDB <- unitDB . hsc_units <$> GHC.getSession
+    mapM_ (liftIO . putStrLn . showSDocForUser dflags extUnitDB unqual) sdocs
 
 infoThing :: GHC.GhcMonad m => Bool -> String -> m SDoc
 infoThing allInfo str = do
@@ -1862,8 +1862,8 @@ docCmd s  = do
       sdocs' = vcat (intersperse (text "") sdocs)
   unqual <- GHC.getPrintUnqual
   dflags <- getDynFlags
-  unit_state <- hsc_units <$> GHC.getSession
-  (liftIO . putStrLn . showSDocForUser dflags unit_state unqual) sdocs'
+  extUnitDB <- unitDB . hsc_units <$> GHC.getSession
+  (liftIO . putStrLn . showSDocForUser dflags extUnitDB unqual) sdocs'
 
 data DocComponents =
   DocComponents
@@ -2203,7 +2203,7 @@ keepPackageImports = filterM is_pkg_import
 modulesLoadedMsg :: GHC.GhcMonad m => SuccessFlag -> [GHC.ModSummary] -> m ()
 modulesLoadedMsg ok mods = do
   dflags <- getDynFlags
-  unit_state <- hsc_units <$> GHC.getSession
+  extUnitDB <- unitDB . hsc_units <$> GHC.getSession
   unqual <- GHC.getPrintUnqual
 
   msg <- if gopt Opt_ShowLoadedModules dflags
@@ -2218,7 +2218,7 @@ modulesLoadedMsg ok mods = do
                     <+> speakNOf (length mods) (text "module") <+> "loaded."
 
   when (verbosity dflags > 0) $
-     liftIO $ putStrLn $ showSDocForUser dflags unit_state unqual msg
+     liftIO $ putStrLn $ showSDocForUser dflags extUnitDB unqual msg
   where
     status = case ok of
                   Failed    -> text "Failed"
@@ -2241,8 +2241,8 @@ runExceptGhcMonad act = handleSourceError GHC.printException $
   where
     handleErr sdoc = do
         dflags <- getDynFlags
-        unit_state <- hsc_units <$> GHC.getSession
-        liftIO . hPutStrLn stderr . showSDocForUser dflags unit_state alwaysQualify $ sdoc
+        extUnitDB <- unitDB . hsc_units <$> GHC.getSession
+        liftIO . hPutStrLn stderr . showSDocForUser dflags extUnitDB alwaysQualify $ sdoc
 
 -- | Inverse of 'runExceptT' for \"pure\" computations
 -- (c.f. 'except' for 'Except')
@@ -2309,7 +2309,7 @@ allTypesCmd _ = runExceptGhcMonad $ do
         hsc_env <- GHC.getSession
         let tyInfo = unwords . words $
                      showSDocForUser (hsc_dflags hsc_env)
-                                     (hsc_units  hsc_env)
+                                     (unitDB $ hsc_units hsc_env)
                                      alwaysQualify (pprSigmaType ty)
         liftIO . putStrLn $
             showRealSrcSpan (spaninfoSrcSpan span') ++ ": " ++ tyInfo
@@ -2513,9 +2513,9 @@ isSafeModule m = do
 
     tallyPkgs hsc_env deps | not (packageTrustOn dflags) = (S.empty, S.empty)
                           | otherwise = S.partition part deps
-        where part pkg   = unitIsTrusted $ unsafeLookupUnitId unit_state pkg
-              unit_state = hsc_units hsc_env
-              dflags     = hsc_dflags hsc_env
+        where part pkg  = unitIsTrusted $ unsafeLookupUnitId extUnitDB pkg
+              extUnitDB = unitDB $ hsc_units hsc_env
+              dflags    = hsc_dflags hsc_env
 
 -----------------------------------------------------------------------------
 -- :browse
@@ -2621,8 +2621,8 @@ browseModule bang modl exports_only = do
             prettyThings = map pretty things
             prettyThings' | bang      = annotate $ zip modNames prettyThings
                           | otherwise = prettyThings
-        unit_state <- hsc_units <$> GHC.getSession
-        liftIO $ putStrLn $ showSDocForUser dflags unit_state unqual (vcat prettyThings')
+        extUnitDB <- unitDB . hsc_units <$> GHC.getSession
+        liftIO $ putStrLn $ showSDocForUser dflags extUnitDB unqual (vcat prettyThings')
         -- ToDo: modInfoInstances currently throws an exception for
         -- package modules.  When it works, we can do this:
         --        $$ vcat (map GHC.pprInstance (GHC.modInfoInstances mod_info))
@@ -3102,7 +3102,7 @@ newDynFlags interactive_only minus_opts = do
           -- delete targets and all eventually defined breakpoints. (#1620)
           clearAllTargets
           when must_reload $ do
-            let units = preloadUnits (hsc_units hsc_env)
+            let units = preloadUnits $ unitView (hsc_units hsc_env)
             liftIO $ Loader.loadPackages interp hsc_env units
           -- package flags changed, we can't re-use any of the old context
           setContextAfterLoad False []
@@ -3684,7 +3684,7 @@ wrapIdentCompleterWithModifier modifChars fun = completeWordWithPrev Nothing wor
 -- | Return a list of visible module names for autocompletion.
 -- (NB: exposed != visible)
 allVisibleModules :: UnitState -> [ModuleName]
-allVisibleModules unit_state = listVisibleModuleNames unit_state
+allVisibleModules unit_state = listVisibleModuleNames $ unitView unit_state
 
 completeExpression = completeQuotedWord (Just '\\') "\"" listFiles
                         completeIdentifier

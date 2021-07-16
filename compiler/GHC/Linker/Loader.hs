@@ -310,7 +310,7 @@ reallyInitLoaderState interp hsc_env = do
   initObjLinker interp
 
   -- (b) Load packages from the command-line (Note [preload packages])
-  pls <- loadPackages' interp hsc_env (preloadUnits (hsc_units hsc_env)) pls0
+  pls <- loadPackages' interp hsc_env (preloadUnits $ unitView (hsc_units hsc_env)) pls0
 
   -- steps (c), (d) and (e)
   loadCmdLineLibs' interp hsc_env pls
@@ -1259,7 +1259,7 @@ loadPackages' interp hsc_env new_pks pls = do
         | new_pkg `elem` pkgs   -- Already linked
         = return (pkgs, acc_hs, acc_non_hs)
 
-        | Just pkg_cfg <- lookupUnitId (hsc_units hsc_env) new_pkg
+        | Just pkg_cfg <- lookupUnitId (unitDB $ hsc_units hsc_env) new_pkg
         = do {  -- Link dependents first
                (pkgs', hs_cls', extra_cls') <- link pkgs (unitDepends pkg_cfg)
                 -- Now link the package itself

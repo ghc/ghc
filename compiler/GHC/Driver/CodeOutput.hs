@@ -114,7 +114,7 @@ codeOutput logger tmpfs dflags unit_state this_mod filenm location genForeignStu
                  Interpreter -> panic "codeOutput: Interpreter"
                  NoBackend   -> panic "codeOutput: NoBackend"
         ; let stubs = genForeignStubs a
-        ; stubs_exist <- outputForeignStubs logger tmpfs dflags unit_state this_mod location stubs
+        ; stubs_exist <- outputForeignStubs logger tmpfs dflags (unitDB unit_state) this_mod location stubs
         ; return (filenm, stubs_exist, foreign_fps, a)
         }
 
@@ -201,13 +201,13 @@ outputForeignStubs
     :: Logger
     -> TmpFs
     -> DynFlags
-    -> UnitState
+    -> ExtUnitDB
     -> Module
     -> ModLocation
     -> ForeignStubs
     -> IO (Bool,         -- Header file created
            Maybe FilePath) -- C file created
-outputForeignStubs logger tmpfs dflags unit_state mod location stubs
+outputForeignStubs logger tmpfs dflags extUnitDB mod location stubs
  = do
    let stub_h = mkStubPaths dflags (moduleName mod) location
    stub_c <- newTempName logger tmpfs dflags TFL_CurrentModule "c"
@@ -234,7 +234,7 @@ outputForeignStubs logger tmpfs dflags unit_state mod location stubs
 
         -- we need the #includes from the rts package for the stub files
         let rts_includes =
-               let mrts_pkg = lookupUnitId unit_state rtsUnitId
+               let mrts_pkg = lookupUnitId extUnitDB rtsUnitId
                    mk_include i = "#include \"" ++ ST.unpack i ++ "\"\n"
                in case mrts_pkg of
                     Just rts_pkg -> concatMap mk_include (unitIncludes rts_pkg)

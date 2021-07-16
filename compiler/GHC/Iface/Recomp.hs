@@ -432,7 +432,7 @@ checkMergedSignatures hsc_env mod_summary iface = do
     let unit_state = hsc_units hsc_env
     let old_merged = sort [ mod | UsageMergedRequirement{ usg_mod = mod } <- mi_usages iface ]
         new_merged = case Map.lookup (ms_mod_name mod_summary)
-                                     (requirementContext unit_state) of
+                                     (requirementContext $ unitView unit_state) of
                         Nothing -> []
                         Just r -> sort $ map (instModuleToModule unit_state) r
     if old_merged == new_merged
@@ -473,7 +473,7 @@ checkDependencies hsc_env summary iface
    units         = hsc_units hsc_env
    prev_dep_mods = map gwib_mod $ dep_direct_mods (mi_deps iface)
    prev_dep_pkgs = sort (dep_direct_pkgs (mi_deps iface))
-   bkpk_units    = map (("Signature",) . indefUnit . instUnitInstanceOf . moduleUnit) (requirementMerges units (moduleName (mi_module iface)))
+   bkpk_units    = map (("Signature",) . indefUnit . instUnitInstanceOf . moduleUnit) (requirementMerges (unitView units) (moduleName (mi_module iface)))
 
 
    implicit_deps = map ("Implicit",) (implicitPackageDeps dflags)
