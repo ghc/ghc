@@ -38,8 +38,8 @@ module GHC.Core.Utils (
         cheapEqExpr, cheapEqExpr', eqExpr,
         diffExpr, diffBinds,
 
-        -- * Lambdas and eta reduction
-        tryEtaReduce, zapLamBndrs,
+        -- * Lambdas
+        zapLamBndrs,
 
         -- * Manipulating data constructors and types
         exprToType, exprToCoercion_maybe,
@@ -69,11 +69,9 @@ import GHC.Platform
 
 import GHC.Core
 import GHC.Core.Ppr
-import GHC.Core.FVs( exprFreeVars )
 import GHC.Core.DataCon
 import GHC.Core.Type as Type
 import GHC.Core.FamInstEnv
-import GHC.Core.Predicate
 import GHC.Core.TyCo.Rep( TyCoBinder(..), TyBinder )
 import GHC.Core.Coercion
 import GHC.Core.TyCon
@@ -2317,214 +2315,6 @@ locBind loc b1 b2 diffs = map addLoc diffs
         bindLoc | b1 == b2  = ppr b1
                 | otherwise = ppr b1 <> char '/' <> ppr b2
 
-{-
-************************************************************************
-*                                                                      *
-                Eta reduction
-*                                                                      *
-************************************************************************
-
-Note [Eta reduction conditions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We try for eta reduction here, but *only* if we get all the way to an
-trivial expression.  We don't want to remove extra lambdas unless we
-are going to avoid allocating this thing altogether.
-
-There are some particularly delicate points here:
-
-* We want to eta-reduce if doing so leaves a trivial expression,
-  *including* a cast.  For example
-       \x. f |> co  -->  f |> co
-  (provided co doesn't mention x)
-
-* Eta reduction is not valid in general:
-        \x. bot  /=  bot
-  This matters, partly for old-fashioned correctness reasons but,
-  worse, getting it wrong can yield a seg fault. Consider
-        f = \x.f x
-        h y = case (case y of { True -> f `seq` True; False -> False }) of
-                True -> ...; False -> ...
-
-  If we (unsoundly) eta-reduce f to get f=f, the strictness analyser
-  says f=bottom, and replaces the (f `seq` True) with just
-  (f `cast` unsafe-co).  BUT, as thing stand, 'f' got arity 1, and it
-  *keeps* arity 1 (perhaps also wrongly).  So CorePrep eta-expands
-  the definition again, so that it does not terminate after all.
-  Result: seg-fault because the boolean case actually gets a function value.
-  See #1947.
-
-  So it's important to do the right thing.
-
-* With linear types, eta-reduction can break type-checking:
-        f :: A ⊸ B
-        g :: A -> B
-        g = \x. f x
-
-  The above is correct, but eta-reducing g would yield g=f, the linter will
-  complain that g and f don't have the same type.
-
-* Note [Arity care]: we need to be careful if we just look at f's
-  arity. Currently (Dec07), f's arity is visible in its own RHS (see
-  Note [Arity robustness] in GHC.Core.Opt.Simplify.Env) so we must *not* trust the
-  arity when checking that 'f' is a value.  Otherwise we will
-  eta-reduce
-      f = \x. f x
-  to
-      f = f
-  Which might change a terminating program (think (f `seq` e)) to a
-  non-terminating one.  So we check for being a loop breaker first.
-
-  However for GlobalIds we can look at the arity; and for primops we
-  must, since they have no unfolding.
-
-* Regardless of whether 'f' is a value, we always want to
-  reduce (/\a -> f a) to f
-  This came up in a RULE: foldr (build (/\a -> g a))
-  did not match           foldr (build (/\b -> ...something complex...))
-  The type checker can insert these eta-expanded versions,
-  with both type and dictionary lambdas; hence the slightly
-  ad-hoc isDictId
-
-* Never *reduce* arity. For example
-      f = \xy. g x y
-  Then if h has arity 1 we don't want to eta-reduce because then
-  f's arity would decrease, and that is bad
-
-These delicacies are why we don't use exprIsTrivial and exprIsHNF here.
-Alas.
-
-Note [Eta reduction with casted arguments]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
-    (\(x:t3). f (x |> g)) :: t3 -> t2
-  where
-    f :: t1 -> t2
-    g :: t3 ~ t1
-This should be eta-reduced to
-
-    f |> (sym g -> t2)
-
-So we need to accumulate a coercion, pushing it inward (past
-variable arguments only) thus:
-   f (x |> co_arg) |> co  -->  (f |> (sym co_arg -> co)) x
-   f (x:t)         |> co  -->  (f |> (t -> co)) x
-   f @ a           |> co  -->  (f |> (forall a.co)) @ a
-   f @ (g:t1~t2)   |> co  -->  (f |> (t1~t2 => co)) @ (g:t1~t2)
-These are the equations for ok_arg.
-
-It's true that we could also hope to eta reduce these:
-    (\xy. (f x |> g) y)
-    (\xy. (f x y) |> g)
-But the simplifier pushes those casts outwards, so we don't
-need to address that here.
--}
-
--- When updating this function, make sure to update
--- CorePrep.tryEtaReducePrep as well!
-tryEtaReduce :: [Var] -> CoreExpr -> Maybe CoreExpr
-tryEtaReduce bndrs body
-  = go (reverse bndrs) body (mkRepReflCo (exprType body))
-  where
-    incoming_arity = count isId bndrs
-
-    go :: [Var]            -- Binders, innermost first, types [a3,a2,a1]
-       -> CoreExpr         -- Of type tr
-       -> Coercion         -- Of type tr ~ ts
-       -> Maybe CoreExpr   -- Of type a1 -> a2 -> a3 -> ts
-    -- See Note [Eta reduction with casted arguments]
-    -- for why we have an accumulating coercion
-    go [] fun co
-      | ok_fun fun
-      , let used_vars = exprFreeVars fun `unionVarSet` tyCoVarsOfCo co
-      , not (any (`elemVarSet` used_vars) bndrs)
-      = Just (mkCast fun co)   -- Check for any of the binders free in the result
-                               -- including the accumulated coercion
-
-    go bs (Tick t e) co
-      | tickishFloatable t
-      = fmap (Tick t) $ go bs e co
-      -- Float app ticks: \x -> Tick t (e x) ==> Tick t e
-
-    go (b : bs) (App fun arg) co
-      | Just (co', ticks) <- ok_arg b arg co (exprType fun)
-      = fmap (flip (foldr mkTick) ticks) $ go bs fun co'
-            -- Float arg ticks: \x -> e (Tick t x) ==> Tick t e
-
-    go _ _ _  = Nothing         -- Failure!
-
-    ---------------
-    -- Note [Eta reduction conditions]
-    ok_fun (App fun (Type {})) = ok_fun fun
-    ok_fun (Cast fun _)        = ok_fun fun
-    ok_fun (Tick _ expr)       = ok_fun expr
-    ok_fun (Var fun_id)        = ok_fun_id fun_id || all ok_lam bndrs
-    ok_fun _fun                = False
-
-    ---------------
-    ok_fun_id fun = fun_arity fun >= incoming_arity
-
-    ---------------
-    fun_arity fun             -- See Note [Arity care]
-       | isLocalId fun
-       , isStrongLoopBreaker (idOccInfo fun) = 0
-       | arity > 0                           = arity
-       | isEvaldUnfolding (idUnfolding fun)  = 1
-            -- See Note [Eta reduction of an eval'd function]
-       | otherwise                           = 0
-       where
-         arity = idArity fun
-
-    ---------------
-    ok_lam v = isTyVar v || isEvVar v
-
-    ---------------
-    ok_arg :: Var              -- Of type bndr_t
-           -> CoreExpr         -- Of type arg_t
-           -> Coercion         -- Of kind (t1~t2)
-           -> Type             -- Type of the function to which the argument is applied
-           -> Maybe (Coercion  -- Of type (arg_t -> t1 ~  bndr_t -> t2)
-                               --   (and similarly for tyvars, coercion args)
-                    , [CoreTickish])
-    -- See Note [Eta reduction with casted arguments]
-    ok_arg bndr (Type ty) co _
-       | Just tv <- getTyVar_maybe ty
-       , bndr == tv  = Just (mkHomoForAllCos [tv] co, [])
-    ok_arg bndr (Var v) co fun_ty
-       | bndr == v
-       , let mult = idMult bndr
-       , Just (fun_mult, _, _) <- splitFunTy_maybe fun_ty
-       , mult `eqType` fun_mult -- There is no change in multiplicity, otherwise we must abort
-       = let reflCo = mkRepReflCo (idType bndr)
-         in Just (mkFunCo Representational (multToCo mult) reflCo co, [])
-    ok_arg bndr (Cast e co_arg) co fun_ty
-       | (ticks, Var v) <- stripTicksTop tickishFloatable e
-       , Just (fun_mult, _, _) <- splitFunTy_maybe fun_ty
-       , bndr == v
-       , fun_mult `eqType` idMult bndr
-       = Just (mkFunCo Representational (multToCo fun_mult) (mkSymCo co_arg) co, ticks)
-       -- The simplifier combines multiple casts into one,
-       -- so we can have a simple-minded pattern match here
-    ok_arg bndr (Tick t arg) co fun_ty
-       | tickishFloatable t, Just (co', ticks) <- ok_arg bndr arg co fun_ty
-       = Just (co', t:ticks)
-
-    ok_arg _ _ _ _ = Nothing
-
-{-
-Note [Eta reduction of an eval'd function]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In Haskell it is not true that    f = \x. f x
-because f might be bottom, and 'seq' can distinguish them.
-
-But it *is* true that   f = f `seq` \x. f x
-and we'd like to simplify the latter to the former.  This amounts
-to the rule that
-  * when there is just *one* value argument,
-  * f is not bottom
-we can eta-reduce    \x. f x  ===>  f
-
-This turned up in #7542.
--}
 
 {- *********************************************************************
 *                                                                      *
