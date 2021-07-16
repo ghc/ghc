@@ -463,9 +463,9 @@ linkingNeeded logger dflags unit_env staticLink linkables pkg_deps = do
         -- if the modification time on the executable is later than the
         -- modification times on all of the objects and libraries, then omit
         -- linking (unless the -fforce-recomp flag was given).
-  let platform   = ue_platform unit_env
-      unit_state = ue_units unit_env
-      exe_file   = exeFileName platform staticLink (outputFile dflags)
+  let platform  = ue_platform unit_env
+      extUnitDB = unitDB $ ue_units unit_env
+      exe_file  = exeFileName platform staticLink (outputFile dflags)
   e_exe_time <- tryIO $ getModificationUTCTime exe_file
   case e_exe_time of
     Left _  -> return True
@@ -482,7 +482,7 @@ linkingNeeded logger dflags unit_env staticLink linkables pkg_deps = do
         -- next, check libraries. XXX this only checks Haskell libraries,
         -- not extra_libraries or -l things from the command line.
         let pkg_hslibs  = [ (collectLibraryDirs (ways dflags) [c], lib)
-                          | Just c <- map (lookupUnitId unit_state) pkg_deps,
+                          | Just c <- map (lookupUnitId extUnitDB) pkg_deps,
                             lib <- unitHsLibs (ghcNameVersion dflags) (ways dflags) c ]
 
         pkg_libfiles <- mapM (uncurry (findHSLib platform (ways dflags))) pkg_hslibs

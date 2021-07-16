@@ -149,9 +149,9 @@ mkFullIface hsc_env partial_iface mb_cg_infos = do
       addFingerprints hsc_env partial_iface{ mi_decls = decls }
 
     -- Debug printing
-    let unit_state = hsc_units hsc_env
+    let extUnitDB = unitDB $ hsc_units hsc_env
     putDumpFileMaybe (hsc_logger hsc_env) Opt_D_dump_hi "FINAL INTERFACE" FormatText
-      (pprModIface unit_state full_iface)
+      (pprModIface extUnitDB full_iface)
 
     return full_iface
 

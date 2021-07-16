@@ -44,7 +44,7 @@ import GHC.Runtime.Loader   ( loadFrontendPlugin )
 
 import GHC.Unit.Module ( ModuleName, mkModuleName )
 import GHC.Unit.Module.ModIface
-import GHC.Unit.State  ( pprUnits, pprUnitsSimple )
+import GHC.Unit.State  ( pprUnits, pprUnitsSimple, UnitState(unitDB) )
 import GHC.Unit.Finder ( findImportedModule, FindResult(..) )
 import GHC.Unit.Types  ( IsBootInterface(..) )
 
@@ -253,8 +253,8 @@ main' postLoadMode dflags0 args flagWarnings = do
     case postLoadMode of
        ShowInterface f        -> liftIO $ showIface logger
                                                     (hsc_dflags hsc_env)
-                                                    (hsc_units  hsc_env)
-                                                    (hsc_NC     hsc_env)
+                                                    (unitDB $ hsc_units hsc_env)
+                                                    (hsc_NC hsc_env)
                                                     f
        DoMake                 -> doMake srcs
        DoMkDependHS           -> doMkDependHS (map fst srcs)

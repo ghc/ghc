@@ -15,6 +15,7 @@ import GHC.Unit.State
 import GHC.Unit.Home
 import GHC.Unit.Types
 import GHC.Unit.Home.ModInfo
+import GHC.Unit.External.DB
 
 import GHC.Platform
 import GHC.Settings
@@ -121,11 +122,11 @@ preloadUnitsInfo' unit_env ids0 = all_infos
        -- Fixes #14525
        | isHomeUnitIndefinite home_unit -> []
        | otherwise -> map (toUnitId . moduleUnit . snd) (homeUnitInstantiations home_unit)
-    pkg_map = unitInfoMap unit_state
-    preload = preloadUnits unit_state
+    pkg_map = unitInfoMap (unitDB unit_state)
+    preload = preloadUnits (unitView unit_state)
 
     all_pkgs  = closeUnitDeps' pkg_map preload (ids `zip` repeat Nothing)
-    all_infos = map (unsafeLookupUnitId unit_state) <$> all_pkgs
+    all_infos = map (unsafeLookupUnitId (unitDB unit_state)) <$> all_pkgs
 
 
 -- | Lookup 'UnitInfo' for every preload unit from the UnitState and for every

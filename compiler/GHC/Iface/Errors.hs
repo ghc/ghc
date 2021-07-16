@@ -150,7 +150,7 @@ cannotFindModule hsc_env = cannotFindModule'
 
 
 cannotFindModule' :: DynFlags -> UnitEnv -> Profile -> ModuleName -> FindResult -> SDoc
-cannotFindModule' dflags unit_env profile mod res = pprWithUnitState (ue_units unit_env) $
+cannotFindModule' dflags unit_env profile mod res = pprWithUnitState (unitDB $ ue_units unit_env) $
   cantFindErr (checkBuildingCabalPackage dflags)
               cannotFindMsg
               (text "Ambiguous module name")

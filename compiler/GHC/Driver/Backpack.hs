@@ -556,7 +556,7 @@ mkBackpackMsg = do
           logger = hsc_logger hsc_env
           state = hsc_units hsc_env
           showMsg msg reason =
-            backpackProgressMsg level logger $ pprWithUnitState state $
+            backpackProgressMsg level logger $ pprWithUnitState (unitDB state) $
                 showModuleIndex mod_index <>
                 msg <> showModMsg dflags (recompileRequired recomp) node
                     <> reason
@@ -602,7 +602,7 @@ msgUnitId pk = do
     level <- getBkpLevel
     let state = hsc_units hsc_env
     liftIO . backpackProgressMsg level logger
-        $ pprWithUnitState state
+        $ pprWithUnitState (unitDB state)
         $ text "Instantiating "
            <> withPprStyle backpackStyle (ppr pk)
 
@@ -614,7 +614,7 @@ msgInclude (i,n) uid = do
     level <- getBkpLevel
     let state = hsc_units hsc_env
     liftIO . backpackProgressMsg level logger
-        $ pprWithUnitState state
+        $ pprWithUnitState (unitDB state)
         $ showModuleIndex (i, n) <> text "Including "
             <> withPprStyle backpackStyle (ppr uid)
 
@@ -640,7 +640,7 @@ renameHsUnits pkgstate m units = map (fmap renameHsUnit) units
     renamePackageName pn =
         case lookupUFM m pn of
             Nothing ->
-                case lookupPackageName pkgstate pn of
+                case lookupPackageName (unitView pkgstate) pn of
                     Nothing -> error "no package name"
                     Just cid -> HsComponentId pn cid
             Just hscid -> hscid

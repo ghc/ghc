@@ -10,6 +10,7 @@ module GHC.Unit.State (
 
         -- * Reading the package config, and processing cmdline args
         UnitState(..),
+        ExtUnitView(..),
         UnitDatabase (..),
         UnitErr (..),
         emptyUnitState,
@@ -21,7 +22,6 @@ module GHC.Unit.State (
         listUnitInfo,
 
         -- * Querying the package config
-        UnitInfoMap,
         lookupUnit,
         lookupUnit',
         unsafeLookupUnit,
@@ -84,6 +84,7 @@ import GHC.Unit.Ppr
 import GHC.Unit.Types
 import GHC.Unit.Module
 import GHC.Unit.Home
+import GHC.Unit.External.DB
 
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
@@ -397,34 +398,29 @@ type ModuleNameProvidersMap =
     Map ModuleName (Map Module ModuleOrigin)
 
 data UnitState = UnitState {
-  -- | A mapping of 'Unit' to 'UnitInfo'.  This list is adjusted
-  -- so that only valid units are here.  'UnitInfo' reflects
-  -- what was stored *on disk*, except for the 'trusted' flag, which
-  -- is adjusted at runtime.  (In particular, some units in this map
-  -- may have the 'exposed' flag be 'False'.)
-  unitInfoMap :: UnitInfoMap,
+  -- | Consolidated external unit database
+  unitDB :: ExtUnitDB,
 
+  -- | Unit View.
+  unitView :: ExtUnitView,
+
+  -- | Indicate if we can instantiate units on-the-fly.
+  --
+  -- This should only be true when we are type-checking an indefinite unit.
+  -- See Note [About units] in GHC.Unit.
+  allowVirtualUnits :: !Bool
+  }
+
+data ExtUnitView = ExtUnitView {
   -- | The set of transitively reachable units according
   -- to the explicitly provided command line arguments.
   -- A fully instantiated VirtUnit may only be replaced by a RealUnit from
   -- this set.
   -- See Note [VirtUnit to RealUnit improvement]
   preloadClosure :: PreloadUnitClosure,
-
   -- | A mapping of 'PackageName' to 'IndefUnitId'.  This is used when
   -- users refer to packages in Backpack includes.
   packageNameMap            :: UniqFM PackageName IndefUnitId,
-
-  -- | A mapping from database unit keys to wired in unit ids.
-  wireMap :: Map UnitId UnitId,
-
-  -- | A mapping from wired in unit ids to unit keys from the database.
-  unwireMap :: Map UnitId UnitId,
-
-  -- | The units we're going to link in eagerly.  This list
-  -- should be in reverse dependency order; that is, a unit
-  -- is always mentioned before the units it depends on.
-  preloadUnits      :: [UnitId],
 
   -- | Units which we explicitly depend on (from a command line flag).
   -- We'll use this to generate version macros.
@@ -447,25 +443,28 @@ data UnitState = UnitState {
   -- There's an entry in this map for each hole in our home library.
   requirementContext :: Map ModuleName [InstantiatedModule],
 
-  -- | Indicate if we can instantiate units on-the-fly.
-  --
-  -- This should only be true when we are type-checking an indefinite unit.
-  -- See Note [About units] in GHC.Unit.
-  allowVirtualUnits :: !Bool
+  -- | The units we're going to link in eagerly.  This list
+  -- should be in reverse dependency order; that is, a unit
+  -- is always mentioned before the units it depends on.
+  preloadUnits      :: [UnitId]
   }
 
 emptyUnitState :: UnitState
 emptyUnitState = UnitState {
-    unitInfoMap = Map.empty,
-    preloadClosure = emptyUniqSet,
-    packageNameMap = emptyUFM,
-    wireMap   = Map.empty,
-    unwireMap = Map.empty,
-    preloadUnits = [],
-    explicitUnits = [],
-    moduleNameProvidersMap = Map.empty,
-    pluginModuleNameProvidersMap = Map.empty,
-    requirementContext = Map.empty,
+    unitDB = ExtUnitDB {
+      unitInfoMap = Map.empty,
+      unitWiringMap = Map.empty,
+      unitUnwiringMap = Map.empty
+    },
+    unitView = ExtUnitView {
+      requirementContext = Map.empty,
+      packageNameMap = emptyUFM,
+      explicitUnits = [],
+      moduleNameProvidersMap = Map.empty,
+      pluginModuleNameProvidersMap = Map.empty,
+      preloadClosure = emptyUniqSet,
+      preloadUnits = []
+    },
     allowVirtualUnits = False
     }
 
@@ -475,11 +474,9 @@ data UnitDatabase unit = UnitDatabase
    , unitDatabaseUnits :: [GenUnitInfo unit]
    }
 
-type UnitInfoMap = Map UnitId UnitInfo
-
 -- | Find the unit we know about with the given unit, if any
 lookupUnit :: UnitState -> Unit -> Maybe UnitInfo
-lookupUnit pkgs = lookupUnit' (allowVirtualUnits pkgs) (unitInfoMap pkgs) (preloadClosure pkgs)
+lookupUnit pkgs = lookupUnit' (allowVirtualUnits pkgs) (unitInfoMap (unitDB pkgs)) (preloadClosure (unitView pkgs))
 
 -- | A more specialized interface, which doesn't require a 'UnitState' (so it
 -- can be used while we're initializing 'DynFlags')
@@ -507,8 +504,8 @@ lookupUnit' allowOnTheFlyInst pkg_map closure u = case u of
          Map.lookup (virtualUnitId i) pkg_map
 
 -- | Find the unit we know about with the given unit id, if any
-lookupUnitId :: UnitState -> UnitId -> Maybe UnitInfo
-lookupUnitId state uid = lookupUnitId' (unitInfoMap state) uid
+lookupUnitId :: ExtUnitDB -> UnitId -> Maybe UnitInfo
+lookupUnitId extUnitDB uid = lookupUnitId' (unitInfoMap extUnitDB) uid
 
 -- | Find the unit we know about with the given unit id, if any
 lookupUnitId' :: UnitInfoMap -> UnitId -> Maybe UnitInfo
@@ -522,16 +519,16 @@ unsafeLookupUnit state u = case lookupUnit state u of
    Nothing   -> pprPanic "unsafeLookupUnit" (ppr u)
 
 -- | Looks up the given unit id in the unit state, panicing if it is not found
-unsafeLookupUnitId :: HasDebugCallStack => UnitState -> UnitId -> UnitInfo
-unsafeLookupUnitId state uid = case lookupUnitId state uid of
+unsafeLookupUnitId :: HasDebugCallStack => ExtUnitDB -> UnitId -> UnitInfo
+unsafeLookupUnitId extUnitDB uid = case lookupUnitId extUnitDB uid of
    Just info -> info
    Nothing   -> pprPanic "unsafeLookupUnitId" (ppr uid)
 
 
 -- | Find the unit we know about with the given package name (e.g. @foo@), if any
 -- (NB: there might be a locally defined unit name which overrides this)
-lookupPackageName :: UnitState -> PackageName -> Maybe IndefUnitId
-lookupPackageName pkgstate n = lookupUFM (packageNameMap pkgstate) n
+lookupPackageName :: ExtUnitView -> PackageName -> Maybe IndefUnitId
+lookupPackageName extUnitView n = lookupUFM (packageNameMap extUnitView) n
 
 -- | Search for units with a given package ID (e.g. \"foo-0.1\")
 searchPackageId :: UnitState -> PackageId -> [UnitInfo]
@@ -564,7 +561,7 @@ mkUnitInfoMap infos = foldl' add Map.empty infos
 -- does not imply that the exposed-modules of the unit are available
 -- (they may have been thinned or renamed).
 listUnitInfo :: UnitState -> [UnitInfo]
-listUnitInfo state = Map.elems (unitInfoMap state)
+listUnitInfo state = Map.elems (unitInfoMap (unitDB state))
 
 -- ----------------------------------------------------------------------------
 -- Loading the unit db files and building up the unit state
@@ -579,7 +576,7 @@ listUnitInfo state = Map.elems (unitInfoMap state)
 initUnits :: Logger -> DynFlags -> Maybe [UnitDatabase UnitId] -> IO ([UnitDatabase UnitId], UnitState, HomeUnit, Maybe PlatformConstants)
 initUnits logger dflags cached_dbs = do
 
-  let forceUnitInfoMap (state, _) = unitInfoMap state `seq` ()
+  let forceUnitInfoMap (state, _) = unitInfoMap (unitDB state) `seq` ()
 
   (unit_state,dbs) <- withTiming logger (text "initializing unit database")
                    forceUnitInfoMap
@@ -587,7 +584,7 @@ initUnits logger dflags cached_dbs = do
 
   putDumpFileMaybe logger Opt_D_dump_mod_map "Module Map"
     FormatText (updSDocContext (\ctx -> ctx {sdocLineLength = 200})
-                $ pprModuleMap (moduleNameProvidersMap unit_state))
+                $ pprModuleMap (moduleNameProvidersMap $ unitView unit_state))
 
   let home_unit = mkHomeUnit unit_state
                              (homeUnitId_ dflags)
@@ -607,7 +604,7 @@ initUnits logger dflags cached_dbs = do
       -- uncommon) case, e.g. building a C utility program (not depending on the
       -- RTS) before building the RTS. In any case, we will fail later on if we
       -- really need to use the platform constants but they have not been loaded.
-      case lookupUnitId unit_state rtsUnitId of
+      case lookupUnitId (unitDB unit_state) rtsUnitId of
         Nothing   -> return Nothing
         Just info -> lookupPlatformConstants (fmap ST.unpack (unitIncludeDirs info))
 
@@ -623,7 +620,7 @@ mkHomeUnit unit_state hu_id hu_instanceof hu_instantiations_ =
     let
         -- Some wired units can be used to instantiate the home unit. We need to
         -- replace their unit keys with their wired unit ids.
-        wmap              = wireMap unit_state
+        wmap              = unitWiringMap (unitDB unit_state)
         hu_instantiations = map (fmap (upd_wired_in_mod wmap)) hu_instantiations_
     in case (hu_instanceof, hu_instantiations) of
       (Nothing,[]) -> DefiniteHomeUnit hu_id Nothing
@@ -1027,8 +1024,6 @@ pprTrustFlag flag = case flag of
 -- Wired-in units
 --
 -- See Note [Wired-in units] in GHC.Unit.Module
-
-type WiringMap = Map UnitId UnitId
 
 findWiredInUnits
    :: Logger
@@ -1628,18 +1623,26 @@ mkUnitState logger cfg = do
       mod_map2 = mkUnusableModuleNameProvidersMap unusable
       mod_map = Map.union mod_map1 mod_map2
 
+  let ext_db = ExtUnitDB
+        { unitInfoMap     = pkg_db
+        , unitWiringMap   = wired_map
+        , unitUnwiringMap = Map.fromList [ (v,k) | (k,v) <- Map.toList wired_map ]
+        }
+
+      ext_unit_view = ExtUnitView
+        { explicitUnits                = explicit_pkgs
+        , moduleNameProvidersMap       = mod_map
+        , pluginModuleNameProvidersMap = mkModuleNameProvidersMap logger cfg pkg_db emptyUniqSet plugin_vis_map
+        , packageNameMap               = pkgname_map
+        , requirementContext           = req_ctx
+        , preloadUnits                 = dep_preload
+        , preloadClosure               = emptyUniqSet
+        }
+
   -- Force the result to avoid leaking input parameters
   let !state = UnitState
-         { preloadUnits                 = dep_preload
-         , explicitUnits                = explicit_pkgs
-         , unitInfoMap                  = pkg_db
-         , preloadClosure               = emptyUniqSet
-         , moduleNameProvidersMap       = mod_map
-         , pluginModuleNameProvidersMap = mkModuleNameProvidersMap logger cfg pkg_db emptyUniqSet plugin_vis_map
-         , packageNameMap               = pkgname_map
-         , wireMap                      = wired_map
-         , unwireMap                    = Map.fromList [ (v,k) | (k,v) <- Map.toList wired_map ]
-         , requirementContext           = req_ctx
+         { unitDB                       = ext_db
+         , unitView                     = ext_unit_view
          , allowVirtualUnits            = unitConfigAllowVirtual cfg
          }
   return (state, raw_dbs)
@@ -1648,7 +1651,7 @@ mkUnitState logger cfg = do
 -- that it was recorded as in the package database.
 unwireUnit :: UnitState -> Unit -> Unit
 unwireUnit state uid@(RealUnit (Definite def_uid)) =
-    maybe uid (RealUnit . Definite) (Map.lookup def_uid (unwireMap state))
+    maybe uid (RealUnit . Definite) (Map.lookup def_uid (unitUnwiringMap (unitDB state)))
 unwireUnit _ uid = uid
 
 -- -----------------------------------------------------------------------------
@@ -1822,14 +1825,14 @@ lookupModuleWithSuggestions :: UnitState
                             -> Maybe FastString
                             -> LookupResult
 lookupModuleWithSuggestions pkgs
-  = lookupModuleWithSuggestions' pkgs (moduleNameProvidersMap pkgs)
+  = lookupModuleWithSuggestions' pkgs (moduleNameProvidersMap $ unitView pkgs)
 
 -- | The package which the module **appears** to come from, this could be
 -- the one which reexports the module from it's original package. This function
 -- is currently only used for -Wunused-packages
 lookupModulePackage :: UnitState -> ModuleName -> Maybe FastString -> Maybe [UnitInfo]
 lookupModulePackage pkgs mn mfs =
-    case lookupModuleWithSuggestions' pkgs (moduleNameProvidersMap pkgs) mn mfs of
+    case lookupModuleWithSuggestions' pkgs (moduleNameProvidersMap $ unitView pkgs) mn mfs of
       LookupFound _ (orig_unit, origin) ->
         case origin of
           ModOrigin {fromOrigUnit, fromExposedReexport} ->
@@ -1849,7 +1852,7 @@ lookupPluginModuleWithSuggestions :: UnitState
                                   -> Maybe FastString
                                   -> LookupResult
 lookupPluginModuleWithSuggestions pkgs
-  = lookupModuleWithSuggestions' pkgs (pluginModuleNameProvidersMap pkgs)
+  = lookupModuleWithSuggestions' pkgs (pluginModuleNameProvidersMap $ unitView pkgs)
 
 lookupModuleWithSuggestions' :: UnitState
                             -> ModuleNameProvidersMap
@@ -1913,16 +1916,16 @@ lookupModuleWithSuggestions' pkgs mod_map m mb_pn
     all_mods :: [(String, ModuleSuggestion)]     -- All modules
     all_mods = sortBy (comparing fst) $
         [ (moduleNameString m, suggestion)
-        | (m, e) <- Map.toList (moduleNameProvidersMap pkgs)
+        | (m, e) <- Map.toList (moduleNameProvidersMap $ unitView pkgs)
         , suggestion <- map (getSuggestion m) (Map.toList e)
         ]
     getSuggestion name (mod, origin) =
         (if originVisible origin then SuggestVisible else SuggestHidden)
             name mod origin
 
-listVisibleModuleNames :: UnitState -> [ModuleName]
-listVisibleModuleNames state =
-    map fst (filter visible (Map.toList (moduleNameProvidersMap state)))
+listVisibleModuleNames :: ExtUnitView -> [ModuleName]
+listVisibleModuleNames extUnitView =
+    map fst (filter visible (Map.toList (moduleNameProvidersMap extUnitView)))
   where visible (_, ms) = any originVisible (Map.elems ms)
 
 -- | Takes a list of UnitIds (and their "parent" dependency, used for error
@@ -1999,9 +2002,9 @@ instance Outputable UnitErr where
 
 -- | Return this list of requirement interfaces that need to be merged
 -- to form @mod_name@, or @[]@ if this is not a requirement.
-requirementMerges :: UnitState -> ModuleName -> [InstantiatedModule]
-requirementMerges pkgstate mod_name =
-    fmap fixupModule $ fromMaybe [] (Map.lookup mod_name (requirementContext pkgstate))
+requirementMerges :: ExtUnitView -> ModuleName -> [InstantiatedModule]
+requirementMerges extUnitView mod_name =
+    fmap fixupModule $ fromMaybe [] (Map.lookup mod_name (requirementContext extUnitView))
     where
       -- update IndefUnitId ppr info as they may have changed since the
       -- time the IndefUnitId was created
@@ -2026,17 +2029,17 @@ requirementMerges pkgstate mod_name =
 -- Component name is only displayed if it isn't the default library
 --
 -- To do this we need to query a unit database.
-pprUnitIdForUser :: UnitState -> UnitId -> SDoc
-pprUnitIdForUser state uid@(UnitId fs) =
-   case lookupUnitPprInfo state uid of
+pprUnitIdForUser :: ExtUnitDB -> UnitId -> SDoc
+pprUnitIdForUser extUnitDB uid@(UnitId fs) =
+   case lookupUnitPprInfo extUnitDB uid of
       Nothing -> ftext fs -- we didn't find the unit at all
       Just i  -> ppr i
 
 pprUnitInfoForUser :: UnitInfo -> SDoc
 pprUnitInfoForUser info = ppr (mkUnitPprInfo unitIdFS info)
 
-lookupUnitPprInfo :: UnitState -> UnitId -> Maybe UnitPprInfo
-lookupUnitPprInfo state uid = fmap (mkUnitPprInfo unitIdFS) (lookupUnitId state uid)
+lookupUnitPprInfo :: ExtUnitDB -> UnitId -> Maybe UnitPprInfo
+lookupUnitPprInfo extUnitDB uid = fmap (mkUnitPprInfo unitIdFS) (lookupUnitId extUnitDB uid)
 
 -- -----------------------------------------------------------------------------
 -- Displaying packages
@@ -2080,7 +2083,7 @@ fsPackageName info = fs
 -- | Given a fully instantiated 'InstantiatedUnit', improve it into a
 -- 'RealUnit' if we can find it in the package database.
 improveUnit :: UnitState -> Unit -> Unit
-improveUnit state u = improveUnit' (unitInfoMap state) (preloadClosure state) u
+improveUnit state u = improveUnit' (unitInfoMap (unitDB state)) (preloadClosure $ unitView state) u
 
 -- | Given a fully instantiated 'InstantiatedUnit', improve it into a
 -- 'RealUnit' if we can find it in the package database.
@@ -2125,14 +2128,14 @@ type ShHoleSubst = ModuleNameEnv Module
 -- @p[A=\<A>]:B@ maps to @p[A=q():A]:B@ with @A=q():A@;
 -- similarly, @\<A>@ maps to @q():A@.
 renameHoleModule :: UnitState -> ShHoleSubst -> Module -> Module
-renameHoleModule state = renameHoleModule' (unitInfoMap state) (preloadClosure state)
+renameHoleModule state = renameHoleModule' (unitInfoMap (unitDB state)) (preloadClosure $ unitView state)
 
 -- | Substitutes holes in a 'Unit', suitable for renaming when
 -- an include occurs; see Note [Representation of module/name variable].
 --
 -- @p[A=\<A>]@ maps to @p[A=\<B>]@ with @A=\<B>@.
 renameHoleUnit :: UnitState -> ShHoleSubst -> Unit -> Unit
-renameHoleUnit state = renameHoleUnit' (unitInfoMap state) (preloadClosure state)
+renameHoleUnit state = renameHoleUnit' (unitInfoMap (unitDB state)) (preloadClosure $ unitView state)
 
 -- | Like 'renameHoleModule', but requires only 'ClosureUnitInfoMap'
 -- so it can be used by "GHC.Unit.State".
@@ -2172,9 +2175,9 @@ instModuleToModule pkgstate (Module iuid mod_name) =
     mkModule (instUnitToUnit pkgstate iuid) mod_name
 
 -- | Print unit-ids with UnitInfo found in the given UnitState
-pprWithUnitState :: UnitState -> SDoc -> SDoc
-pprWithUnitState state = updSDocContext (\ctx -> ctx
-   { sdocUnitIdForUser = \fs -> pprUnitIdForUser state (UnitId fs)
+pprWithUnitState :: ExtUnitDB -> SDoc -> SDoc
+pprWithUnitState extUnitDB = updSDocContext (\ctx -> ctx
+   { sdocUnitIdForUser = \fs -> pprUnitIdForUser extUnitDB (UnitId fs)
    })
 
 -- | Add package dependencies on the wired-in packages we use

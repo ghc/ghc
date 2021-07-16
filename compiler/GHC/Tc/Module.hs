@@ -2927,13 +2927,13 @@ rnDump rn = dumpOptTcRn Opt_D_dump_rn "Renamer" FormatHaskell (ppr rn)
 
 tcDump :: TcGblEnv -> TcRn ()
 tcDump env
- = do { unit_state <- hsc_units <$> getTopEnv ;
+ = do { extUnitDB <- unitDB . hsc_units <$> getTopEnv ;
         logger <- getLogger ;
 
         -- Dump short output if -ddump-types or -ddump-tc
         when (logHasDumpFlag logger Opt_D_dump_types || logHasDumpFlag logger Opt_D_dump_tc)
           (dumpTcRn True Opt_D_dump_types
-            "" FormatText (pprWithUnitState unit_state short_dump)) ;
+            "" FormatText (pprWithUnitState extUnitDB short_dump)) ;
 
         -- Dump bindings if -ddump-tc
         dumpOptTcRn Opt_D_dump_tc "Typechecker" FormatHaskell full_dump;

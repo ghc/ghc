@@ -12,7 +12,7 @@ where
 import GHC.Prelude
 
 import GHC.Driver.Session
-import GHC.Unit.State
+import GHC.Unit
 
 import GHC.Utils.Outputable
 import GHC.Utils.Ppr       ( Mode(..) )
@@ -27,7 +27,7 @@ showPpr :: Outputable a => DynFlags -> a -> String
 showPpr dflags thing = showSDoc dflags (ppr thing)
 
 -- | Allows caller to specify the PrintUnqualified to use
-showSDocForUser :: DynFlags -> UnitState -> PrintUnqualified -> SDoc -> String
+showSDocForUser :: DynFlags -> ExtUnitDB -> PrintUnqualified -> SDoc -> String
 showSDocForUser dflags unit_state unqual doc = renderWithContext (initSDocContext dflags sty) doc'
    where
       sty  = mkUserStyle unqual AllTheWay

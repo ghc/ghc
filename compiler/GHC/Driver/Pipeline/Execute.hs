@@ -922,7 +922,7 @@ doCpp logger tmpfs dflags unit_env raw input_fn output_fn = do
     let hsSourceCppOpts = [ "-include", ghcVersionH ]
 
     -- MIN_VERSION macros
-    let uids = explicitUnits unit_state
+    let uids = explicitUnits $ unitView unit_state
         pkgs = catMaybes (map (lookupUnit unit_state) uids)
     mb_macro_include <-
         if not (null pkgs) && gopt Opt_VersionMacros dflags

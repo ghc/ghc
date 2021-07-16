@@ -1,0 +1,3 @@
+Error:
+    The following packages are broken because other packages they depend on are missing. These broken packages must be rebuilt before they can be used.
+installed package q-1.0 is broken due to missing package p-noopt

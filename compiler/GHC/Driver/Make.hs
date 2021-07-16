@@ -244,7 +244,7 @@ instantiationNodes unit_state = InstantiationNode <$> iuids_to_check
   where
     iuids_to_check :: [InstantiatedUnit]
     iuids_to_check =
-      nubSort $ concatMap goUnitId (explicitUnits unit_state)
+      nubSort $ concatMap goUnitId (explicitUnits $ unitView unit_state)
      where
       goUnitId uid =
         [ recur

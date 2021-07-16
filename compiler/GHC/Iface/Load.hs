@@ -99,6 +99,7 @@ import GHC.Types.SrcLoc
 import GHC.Types.TyThing
 
 import GHC.Unit.External
+import GHC.Unit.External.DB
 import GHC.Unit.Module
 import GHC.Unit.Module.Warnings
 import GHC.Unit.Module.ModIface
@@ -880,7 +881,7 @@ findAndReadIface logger name_cache fc hooks unit_state home_unit dflags doc_str 
           return (Succeeded (iface, "<built in interface for GHC.Prim>"))
       else do
           -- Look for the file
-          mb_found <- liftIO (findExactModule fc dflags unit_state home_unit mod)
+          mb_found <- liftIO (findExactModule fc dflags (unitDB unit_state) home_unit mod)
           case mb_found of
               InstalledFound loc mod -> do
                   -- Found file, so read it
@@ -1057,8 +1058,8 @@ For some background on this choice see trac #15269.
 -}
 
 -- | Read binary interface, and print it out
-showIface :: Logger -> DynFlags -> UnitState -> NameCache -> FilePath -> IO ()
-showIface logger dflags unit_state name_cache filename = do
+showIface :: Logger -> DynFlags -> ExtUnitDB -> NameCache -> FilePath -> IO ()
+showIface logger dflags extUnitDB name_cache filename = do
    let profile = targetProfile dflags
        printer = logMsg logger MCOutput noSrcSpan . withPprStyle defaultDumpStyle
 
@@ -1075,21 +1076,21 @@ showIface logger dflags unit_state name_cache filename = do
                                    neverQualifyPackages
    logMsg logger MCDump noSrcSpan
       $ withPprStyle (mkDumpStyle print_unqual)
-      $ pprModIface unit_state iface
+      $ pprModIface extUnitDB iface
 
 -- | Show a ModIface but don't display details; suitable for ModIfaces stored in
 -- the EPT.
-pprModIfaceSimple :: UnitState -> ModIface -> SDoc
-pprModIfaceSimple unit_state iface =
+pprModIfaceSimple :: ExtUnitDB -> ModIface -> SDoc
+pprModIfaceSimple extUnitDB iface =
     ppr (mi_module iface)
-    $$ pprDeps unit_state (mi_deps iface)
+    $$ pprDeps extUnitDB (mi_deps iface)
     $$ nest 2 (vcat (map pprExport (mi_exports iface)))
 
 -- | Show a ModIface
 --
 -- The UnitState is used to pretty-print units
-pprModIface :: UnitState -> ModIface -> SDoc
-pprModIface unit_state iface@ModIface{ mi_final_exts = exts }
+pprModIface :: ExtUnitDB -> ModIface -> SDoc
+pprModIface extUnitDB iface@ModIface{ mi_final_exts = exts }
  = vcat [ text "interface"
                 <+> ppr (mi_module iface) <+> pp_hsc_src (mi_hsc_src iface)
                 <+> (if mi_orphan exts then text "[orphan module]" else Outputable.empty)
@@ -1110,7 +1111,7 @@ pprModIface unit_state iface@ModIface{ mi_final_exts = exts }
         , nest 2 (text "where")
         , text "exports:"
         , nest 2 (vcat (map pprExport (mi_exports iface)))
-        , pprDeps unit_state (mi_deps iface)
+        , pprDeps extUnitDB (mi_deps iface)
         , vcat (map pprUsage (mi_usages iface))
         , vcat (map pprIfaceAnnotation (mi_anns iface))
         , pprFixities (mi_fixities iface)
@@ -1178,15 +1179,15 @@ pprUsageImport usage usg_mod'
              | otherwise      = text " -/ "
 
 -- | Pretty-print unit dependencies
-pprDeps :: UnitState -> Dependencies -> SDoc
-pprDeps unit_state (Deps { dep_direct_mods = dmods
+pprDeps :: ExtUnitDB -> Dependencies -> SDoc
+pprDeps extUnitDB (Deps { dep_direct_mods = dmods
                          , dep_boot_mods = bmods
                          , dep_orphs = orphs
                          , dep_direct_pkgs = pkgs
                          , dep_trusted_pkgs = tps
                          , dep_finsts = finsts
                          })
-  = pprWithUnitState unit_state $
+  = pprWithUnitState extUnitDB $
     vcat [text "direct module dependencies:" <+> fsep (map ppr_mod dmods),
           text "boot module dependencies:" <+> fsep (map ppr bmods),
           text "direct package dependencies:" <+> fsep (map ppr_pkg pkgs),

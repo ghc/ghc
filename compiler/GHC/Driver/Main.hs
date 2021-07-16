@@ -1374,7 +1374,7 @@ hscCheckSafe' m l = do
                       $ sep [ ppr (moduleName m)
                                 <> text ": Can't be safely imported!"
                             , text "The package ("
-                                <> (pprWithUnitState state $ ppr (moduleUnit m))
+                                <> (pprWithUnitState (unitDB state) $ ppr (moduleUnit m))
                                 <> text ") the module resides in isn't trusted."
                             ]
                     modTrustErr = singleMessage
@@ -1420,10 +1420,11 @@ hscCheckSafe' m l = do
 checkPkgTrust :: Set UnitId -> Hsc ()
 checkPkgTrust pkgs = do
     hsc_env <- getHscEnv
-    let errors = S.foldr go emptyBag pkgs
-        state  = hsc_units hsc_env
+    let errors    = S.foldr go emptyBag pkgs
+        state     = hsc_units hsc_env
+        extUnitDB = unitDB state
         go pkg acc
-            | unitIsTrusted $ unsafeLookupUnitId state pkg
+            | unitIsTrusted $ unsafeLookupUnitId extUnitDB pkg
             = acc
             | otherwise
             = (`consBag` acc)
@@ -1431,7 +1432,7 @@ checkPkgTrust pkgs = do
                      $ GhcDriverMessage
                      $ DriverUnknownMessage
                      $ mkPlainError noHints
-                     $ pprWithUnitState state
+                     $ pprWithUnitState extUnitDB
                      $ text "The package ("
                         <> ppr pkg
                         <> text ") is required to be trusted but it isn't!"
@@ -1676,7 +1677,7 @@ hscInteractive hsc_env cgguts location = do
     comp_bc <- byteCodeGen hsc_env this_mod stg_binds data_tycons mod_breaks
     ------------------ Create f-x-dynamic C-side stuff -----
     (_istub_h_exists, istub_c_exists)
-        <- outputForeignStubs logger tmpfs dflags (hsc_units hsc_env) this_mod location foreign_stubs
+        <- outputForeignStubs logger tmpfs dflags (unitDB $ hsc_units hsc_env) this_mod location foreign_stubs
     return (istub_c_exists, comp_bc, spt_entries)
 
 ------------------------------
