@@ -53,6 +53,7 @@ INFO_TABLE_RET ( stg_marked_upd_frame, UPDATE_FRAME,
 
     // we know the closure is a BLACKHOLE
     v = StgInd_indirectee(updatee);
+    TSAN_READ_WORD(updatee + SIZEOF_StgHeader + OFFSET_StgInd_indirectee);
 
     if (GETTAG(v) != 0) (likely: False) {
         // updated by someone else: discard our value and use the

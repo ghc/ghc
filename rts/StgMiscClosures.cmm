@@ -510,8 +510,7 @@ retry:
         return (p);
     }
 
-    info = StgHeader_info(p);
-    prim_read_barrier;
+    GET_INFO_ACQUIRE(info, p);
     if (info == stg_IND_info) {
         // This could happen, if e.g. we got a BLOCKING_QUEUE that has
         // just been replaced with an IND by another thread in

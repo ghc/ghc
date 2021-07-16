@@ -363,6 +363,7 @@
 #include "rts/storage/ClosureTypes.h"
 #include "rts/storage/FunTypes.h"
 #include "rts/OSThreads.h"
+#include "rts/TSANUtilsCmm.h"
 
 /*
  * Need MachRegs, because some of the RTS code is conditionally
@@ -592,10 +593,25 @@
 /* The number of words allocated in an array payload */
 #define BYTE_ARR_WDS(arr) ROUNDUP_BYTES_TO_WDS(StgArrBytes_bytes(arr))
 
+/* Ordered Atomic operations. See Note [Heap memory barriers] in SMP.h. */
+#define RELEASE_STORE_WORD(p, value) \
+    prim_write_barrier; \
+    TSAN_RELEASE(p); \
+    W_[p] = value
+
+#define ACQUIRE_LOAD_WORD(out, p) \
+    out = W_[p]; \
+    TSAN_ACQUIRE(p); \
+    prim_read_barrier
+
 /* Getting/setting the info pointer of a closure */
 #define SET_INFO(p,info) StgHeader_info(p) = info
-#define SET_INFO_RELEASE(p,info) prim_write_barrier; StgHeader_info(p) = info
+#define SET_INFO_RELEASE(p,info) \
+    RELEASE_STORE_WORD(p + OFFSET_StgHeader_info, info);
+
 #define GET_INFO(p) StgHeader_info(p)
+#define GET_INFO_ACQUIRE(out, p) \
+    ACQUIRE_LOAD_WORD(out, p + OFFSET_StgHeader_info)
 
 /* Determine the size of an ordinary closure from its info table */
 #define sizeW_fromITBL(itbl) \
