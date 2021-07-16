@@ -800,6 +800,7 @@ class ( IsPass p
       , Data (HsTupArg (GhcPass p))
       , Data (IPBind (GhcPass p))
       , ToHie (Context (Located (IdGhcP p)))
+      , ToHie (Context (GenLocated (Anno (CtxIdP (GhcPass p))) (CtxIdP (GhcPass p))))
       , ToHie (RFContext (Located (AmbiguousFieldOcc (GhcPass p))))
       , ToHie (RFContext (Located (FieldOcc (GhcPass p))))
       , ToHie (TScoped (LHsWcType (GhcPass (NoGhcTcPass p))))
@@ -932,12 +933,12 @@ instance ( HiePass p
         HieTc -> makeNodeA m span
         HieRn -> makeNodeA m span
 
-instance HiePass p => ToHie (HsMatchContext (GhcPass p)) where
+instance ToHie (Context n) => ToHie (HsMatchContext n) where
   toHie (FunRhs{mc_fun=name}) = toHie $ C MatchBind name
   toHie (StmtCtxt a) = toHie a
   toHie _ = pure []
 
-instance HiePass p => ToHie (HsStmtContext (GhcPass p)) where
+instance ToHie (Context n) => ToHie (HsStmtContext n) where
   toHie (PatGuard a) = toHie a
   toHie (ParStmtCtxt a) = toHie a
   toHie (TransStmtCtxt a) = toHie a

@@ -1362,7 +1362,7 @@ addUnpackednessP (L lprag (UnpackednessPragma anns prag unpk)) ty = do
 -- If the flag MonadComprehensions is set, return a 'MonadComp' context,
 -- otherwise use the usual 'ListComp' context
 
-checkMonadComp :: PV (HsStmtContext GhcRn)
+checkMonadComp :: PV HsDoFlavour
 checkMonadComp = do
     monadComprehensions <- getBit MonadComprehensionsBit
     return $ if monadComprehensions

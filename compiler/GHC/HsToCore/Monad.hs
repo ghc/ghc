@@ -124,7 +124,7 @@ import Data.IORef
 -}
 
 data DsMatchContext
-  = DsMatchContext (HsMatchContext GhcRn) SrcSpan
+  = DsMatchContext (HsMatchContext (XRec GhcRn (CtxIdP GhcRn))) SrcSpan
   deriving ()
 
 instance Outputable DsMatchContext where
