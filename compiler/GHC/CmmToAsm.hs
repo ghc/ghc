@@ -108,6 +108,8 @@ import GHC.CmmToAsm.Dwarf
 import GHC.CmmToAsm.Config
 import GHC.CmmToAsm.Types
 import GHC.Cmm.DebugBlock
+import qualified GHC.CmmToAsm.SSA       as SSA
+import qualified GHC.CmmToAsm.SSA.Stats as SSA
 
 import GHC.Cmm.BlockId
 import GHC.StgToCmm.CgUtils ( fixStgRegisters )
@@ -184,6 +186,7 @@ data NativeGenAcc statics instr
              -- required.
         , ngs_colorStats  :: ![[Color.RegAllocStats statics instr]]
         , ngs_linearStats :: ![[Linear.RegAllocStats]]
+        , ngs_ssaStats    :: ![[SSA.SsaStats]]
         , ngs_labels      :: ![Label]
         , ngs_debug       :: ![DebugBlock]
         , ngs_dwarfFiles  :: !DwarfFiles
@@ -232,7 +235,7 @@ nativeCodeGen' logger config modLoc ncgImpl h us cmms
         -- Pretty if it weren't for the fact that we do lots of little
         -- printDocs here (in order to do codegen in constant space).
         bufh <- newBufHandle h
-        let ngs0 = NGS [] [] [] [] [] [] emptyUFM mapEmpty
+        let ngs0 = NGS [] [] [] [] [] [] [] emptyUFM mapEmpty
         (ngs, us', a) <- cmmNativeGenStream logger config modLoc ncgImpl bufh us
                                          cmms ngs0
         _ <- finishNativeGen logger config modLoc bufh us' ngs
@@ -257,6 +260,12 @@ finishNativeGen logger config modLoc bufh@(BufHandle _ _ h) us ngs
                      return us'
         bFlush bufh
 
+        -- SSA transformation stats
+        let ssaStats = concat (ngs_ssaStats ngs)
+        let ssaSdoc  = if null ssaStats
+                        then empty
+                        else SSA.pprSsaStats ssaStats
+
         -- dump global NCG stats for graph coloring allocator
         let stats = concat (ngs_colorStats ngs)
         unless (null stats) $ do
@@ -267,7 +276,7 @@ finishNativeGen logger config modLoc bufh@(BufHandle _ _ h) us ngs
                   $ [ Color.raGraph stat
                           | stat@Color.RegAllocStatsStart{} <- stats]
 
-          dump_stats (Color.pprStats stats graphGlobal)
+          dump_stats $ ssaSdoc $$ (Color.pprStats stats graphGlobal)
 
           let platform = ncgPlatform config
           putDumpFileMaybe logger
@@ -284,7 +293,7 @@ finishNativeGen logger config modLoc bufh@(BufHandle _ _ h) us ngs
         -- dump global NCG stats for linear allocator
         let linearStats = concat (ngs_linearStats ngs)
         unless (null linearStats) $
-          dump_stats (Linear.pprStats (concat (ngs_natives ngs)) linearStats)
+          dump_stats $ ssaSdoc $$ (Linear.pprStats (concat (ngs_natives ngs)) linearStats)
 
         -- write out the imports
         let ctx = ncgAsmContext config
@@ -381,7 +390,7 @@ cmmNativeGens logger config modLoc ncgImpl h dbgMap = go
 
     go us (cmm : cmms) ngs count = do
         let fileIds = ngs_dwarfFiles ngs
-        (us', fileIds', native, imports, colorStats, linearStats, unwinds)
+        (us', fileIds', native, imports, colorStats, linearStats, ssaStats, unwinds)
           <- {-# SCC "cmmNativeGen" #-}
              cmmNativeGen logger modLoc ncgImpl us fileIds dbgMap
                           cmm count
@@ -413,6 +422,7 @@ cmmNativeGens logger config modLoc ncgImpl h dbgMap = go
                       , ngs_natives     = natives'
                       , ngs_colorStats  = colorStats `mCon` ngs_colorStats ngs
                       , ngs_linearStats = linearStats `mCon` ngs_linearStats ngs
+                      , ngs_ssaStats    = ssaStats `mCon` ngs_ssaStats ngs
                       , ngs_labels      = ngs_labels ngs ++ labels'
                       , ngs_dwarfFiles  = fileIds'
                       , ngs_unwinds     = ngs_unwinds ngs `mapUnion` unwinds
@@ -450,6 +460,7 @@ cmmNativeGen
                 , [CLabel]                                  -- things imported by this cmm
                 , Maybe [Color.RegAllocStats statics instr] -- stats for the coloring register allocator
                 , Maybe [Linear.RegAllocStats]              -- stats for the linear register allocators
+                , Maybe [SSA.SsaStats]                      -- stats for SSA transformation
                 , LabelMap [UnwindPoint]                    -- unwinding information for blocks
                 )
 
@@ -499,10 +510,54 @@ cmmNativeGen logger modLoc ncgImpl us fileIds dbgMap cmm count
         let livenessCfg = if backendMaintainsCfg platform
                                 then Just nativeCfgWeights
                                 else Nothing
+
+        (renumberedNative, ppr_ssaStats) <-
+                case (ncgSsaTransform config, livenessCfg) of
+                        (True, Just cfg)
+                                -> do
+                                        -- Optionally gather stats about unique vregs,
+                                        -- then transform into SSA form
+                                        let mPreSsaStats
+                                                = if ncgDumpAsmStats config
+                                                    then Just $ map (SSA.mkPreSsaStats platform) native
+                                                    else Nothing
+
+                                        let ssaNative
+                                                = SSA.cmmSsaTransformAll
+                                                        platform
+                                                        cfg
+                                                        (ncgAsmLinting config)
+                                                        native
+
+                                        putDumpFileMaybe logger
+                                                Opt_D_dump_asm_ssa "SSA Constructed" FormatCMM
+                                                (vcat $ map (SSA.pprSsaCmmDecl platform) ssaNative)
+
+                                        -- Optionally gather stats about Phi functions
+                                        let mSsaPhiStats
+                                                = zipWith SSA.mkSsaPhiNodeStats ssaNative
+                                                <$> mPreSsaStats
+
+                                        -- Transform out of SSA form to renumber vregs
+                                        let ssaDestruct
+                                                = map (SSA.cssaToNatCmmDecl platform) ssaNative
+
+                                        putDumpFileMaybe logger
+                                                Opt_D_dump_asm_out_of_ssa "After SSA Destruction" FormatASM
+                                                (vcat $ map (pprNatCmmDecl ncgImpl) ssaDestruct)
+
+                                        let mPostSsaStats
+                                                = zipWith (SSA.mkPostSsaStats platform) ssaDestruct
+                                                <$> mSsaPhiStats
+
+                                        return (ssaDestruct, mPostSsaStats)
+
+                        _                -> return (native, Nothing)
+
         let (withLiveness, usLive) =
                 {-# SCC "regLiveness" #-}
                 initUs usGen
-                        $ mapM (cmmTopLiveness livenessCfg platform) native
+                        $ mapM (cmmTopLiveness livenessCfg platform) renumberedNative
 
         putDumpFileMaybe logger
                 Opt_D_dump_asm_liveness "Liveness annotations added"
@@ -698,6 +753,7 @@ cmmNativeGen logger modLoc ncgImpl us fileIds dbgMap cmm count
                 , lastMinuteImports ++ imports
                 , ppr_raStatsColor
                 , ppr_raStatsLinear
+                , ppr_ssaStats
                 , unwinds )
 
 maybeDumpCfg :: Logger -> Maybe CFG -> String -> SDoc -> IO ()
