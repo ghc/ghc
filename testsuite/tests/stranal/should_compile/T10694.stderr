@@ -4,17 +4,17 @@ Result size of Tidy Core = {terms: 74, types: 65, coercions: 0, joins: 0/4}
 
 -- RHS size: {terms: 39, types: 25, coercions: 0, joins: 0/4}
 T10694.$wpm [InlPrag=NOINLINE] :: Int -> Int -> (# Int, Int #)
-[GblId, Arity=2, Str=<LP(L)><LP(L)>, Unf=OtherCon []]
+[GblId, Arity=2, Str=<L><L>, Unf=OtherCon []]
 T10694.$wpm
-  = \ (w :: Int) (w1 :: Int) ->
+  = \ (x :: Int) (y :: Int) ->
       let {
         l :: Int
         [LclId]
-        l = case w of { GHC.Types.I# x -> case w1 of { GHC.Types.I# y -> GHC.Types.I# (GHC.Prim.+# x y) } } } in
+        l = case x of { GHC.Types.I# x1 -> case y of { GHC.Types.I# y1 -> GHC.Types.I# (GHC.Prim.+# x1 y1) } } } in
       let {
         l1 :: Int
         [LclId]
-        l1 = case w of { GHC.Types.I# x -> case w1 of { GHC.Types.I# y -> GHC.Types.I# (GHC.Prim.-# x y) } } } in
+        l1 = case x of { GHC.Types.I# x1 -> case y of { GHC.Types.I# y1 -> GHC.Types.I# (GHC.Prim.-# x1 y1) } } } in
       let {
         l2 :: [Int]
         [LclId, Unf=OtherCon []]
@@ -29,23 +29,21 @@ T10694.$wpm
 pm [InlPrag=[final]] :: Int -> Int -> (Int, Int)
 [GblId,
  Arity=2,
- Str=<LP(L)><LP(L)>,
+ Str=<L><L>,
  Cpr=1,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (w [Occ=Once1] :: Int) (w1 [Occ=Once1] :: Int) ->
-                 case T10694.$wpm w w1 of { (# ww1 [Occ=Once1], ww2 [Occ=Once1] #) -> (ww1, ww2) }}]
-pm = \ (w :: Int) (w1 :: Int) -> case T10694.$wpm w w1 of { (# ww1, ww2 #) -> (ww1, ww2) }
+         Tmpl= \ (x [Occ=Once1] :: Int) (y [Occ=Once1] :: Int) ->
+                 case T10694.$wpm x y of { (# ww [Occ=Once1], ww1 [Occ=Once1] #) -> (ww, ww1) }}]
+pm = \ (x :: Int) (y :: Int) -> case T10694.$wpm x y of { (# ww, ww1 #) -> (ww, ww1) }
 
 -- RHS size: {terms: 8, types: 9, coercions: 0, joins: 0/0}
 m :: Int -> Int -> Int
 [GblId,
  Arity=2,
- Str=<LP(L)><LP(L)>,
- Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (x [Occ=Once1] :: Int) (y [Occ=Once1] :: Int) -> case pm x y of { (_ [Occ=Dead], mr [Occ=Once1]) -> mr }}]
-m = \ (x :: Int) (y :: Int) -> case T10694.$wpm x y of { (# ww1, ww2 #) -> ww2 }
+ Str=<L><L>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 0] 40 0}]
+m = \ (x :: Int) (y :: Int) -> case T10694.$wpm x y of { (# ww, ww1 #) -> ww1 }
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T10694.$trModule4 :: GHC.Prim.Addr#
