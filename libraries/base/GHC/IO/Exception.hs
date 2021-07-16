@@ -74,7 +74,7 @@ instance Exception BlockedIndefinitelyOnMVar
 instance Show BlockedIndefinitelyOnMVar where
     showsPrec _ BlockedIndefinitelyOnMVar = showString "thread blocked indefinitely in an MVar operation"
 
-blockedIndefinitelyOnMVar :: SomeException -- for the RTS
+blockedIndefinitelyOnMVar :: SomeExceptionWithLocation -- for the RTS
 blockedIndefinitelyOnMVar = toException BlockedIndefinitelyOnMVar
 
 -----
@@ -90,7 +90,7 @@ instance Exception BlockedIndefinitelyOnSTM
 instance Show BlockedIndefinitelyOnSTM where
     showsPrec _ BlockedIndefinitelyOnSTM = showString "thread blocked indefinitely in an STM transaction"
 
-blockedIndefinitelyOnSTM :: SomeException -- for the RTS
+blockedIndefinitelyOnSTM :: SomeExceptionWithLocation -- for the RTS
 blockedIndefinitelyOnSTM = toException BlockedIndefinitelyOnSTM
 
 -----
@@ -125,7 +125,7 @@ instance Show AllocationLimitExceeded where
     showsPrec _ AllocationLimitExceeded =
       showString "allocation limit exceeded"
 
-allocationLimitExceeded :: SomeException -- for the RTS
+allocationLimitExceeded :: SomeExceptionWithLocation -- for the RTS
 allocationLimitExceeded = toException AllocationLimitExceeded
 
 -----
@@ -145,15 +145,15 @@ instance Show CompactionFailed where
     showsPrec _ (CompactionFailed why) =
       showString ("compaction failed: " ++ why)
 
-cannotCompactFunction :: SomeException -- for the RTS
+cannotCompactFunction :: SomeExceptionWithLocation -- for the RTS
 cannotCompactFunction =
   toException (CompactionFailed "cannot compact functions")
 
-cannotCompactPinned :: SomeException -- for the RTS
+cannotCompactPinned :: SomeExceptionWithLocation -- for the RTS
 cannotCompactPinned =
   toException (CompactionFailed "cannot compact pinned objects")
 
-cannotCompactMutable :: SomeException -- for the RTS
+cannotCompactMutable :: SomeExceptionWithLocation -- for the RTS
 cannotCompactMutable =
   toException (CompactionFailed "cannot compact mutable objects")
 
@@ -184,11 +184,11 @@ instance Show SomeAsyncException where
 instance Exception SomeAsyncException
 
 -- |@since 4.7.0.0
-asyncExceptionToException :: Exception e => e -> SomeException
+asyncExceptionToException :: Exception e => e -> SomeExceptionWithLocation
 asyncExceptionToException = toException . SomeAsyncException
 
 -- |@since 4.7.0.0
-asyncExceptionFromException :: Exception e => SomeException -> Maybe e
+asyncExceptionFromException :: Exception e => SomeExceptionWithLocation -> Maybe e
 asyncExceptionFromException x = do
     SomeAsyncException a <- fromException x
     cast a
@@ -251,7 +251,7 @@ data ArrayException
 instance Exception ArrayException
 
 -- for the RTS
-stackOverflow, heapOverflow :: SomeException
+stackOverflow, heapOverflow :: SomeExceptionWithLocation
 stackOverflow = toException StackOverflow
 heapOverflow  = toException HeapOverflow
 
@@ -471,4 +471,3 @@ untangle coded message
           _         -> (loc, "")
         }
     not_bar c = c /= '|'
-
