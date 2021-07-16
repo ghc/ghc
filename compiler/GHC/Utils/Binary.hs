@@ -71,7 +71,7 @@ module GHC.Utils.Binary
    UserData(..), getUserData, setUserData,
    newReadState, newWriteState,
    putDictionary, getDictionary, putFS,
-  ) where
+  resetBinOffset) where
 
 import GHC.Prelude
 
@@ -230,6 +230,9 @@ seekBin h@(BinMem _ ix_r sz_r _) (BinPtr !p) = do
   if (p >= sz)
         then do expandBin h p; writeFastMutInt ix_r p
         else writeFastMutInt ix_r p
+
+resetBinOffset :: BinHandle -> IO ()
+resetBinOffset (BinMem _ ix_r _ _)  = writeFastMutInt ix_r 0
 
 writeBinMem :: BinHandle -> FilePath -> IO ()
 writeBinMem (BinMem _ ix_r _ arr_r) fn = do

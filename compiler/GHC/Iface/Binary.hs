@@ -29,7 +29,7 @@ module GHC.Iface.Binary (
         putSymbolTable,
         BinSymbolTable(..),
         BinDictionary(..)
-    ) where
+        ) where
 
 import GHC.Prelude
 
@@ -175,7 +175,6 @@ getWithUserData name_cache bh = do
         -- It is only now that we know how to get a Name
         return $ setUserData bh $ newReadState (getSymtabName name_cache dict symtab)
                                                (getDictFastString dict)
-
     -- Read the interface file
     get bh
 
