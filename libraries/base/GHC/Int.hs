@@ -72,8 +72,8 @@ instance Eq Int8 where
     (/=) = neInt8
 
 eqInt8, neInt8 :: Int8 -> Int8 -> Bool
-eqInt8 (I8# x) (I8# y) = isTrue# ((int8ToInt# x) ==# (int8ToInt# y))
-neInt8 (I8# x) (I8# y) = isTrue# ((int8ToInt# x) /=# (int8ToInt# y))
+eqInt8 (I8# x) (I8# y) = isTrue# (x `eqInt8#` y)
+neInt8 (I8# x) (I8# y) = isTrue# (x `neInt8#` y)
 {-# INLINE [1] eqInt8 #-}
 {-# INLINE [1] neInt8 #-}
 
@@ -285,8 +285,8 @@ instance Eq Int16 where
     (/=) = neInt16
 
 eqInt16, neInt16 :: Int16 -> Int16 -> Bool
-eqInt16 (I16# x) (I16# y) = isTrue# ((int16ToInt# x) ==# (int16ToInt# y))
-neInt16 (I16# x) (I16# y) = isTrue# ((int16ToInt# x) /=# (int16ToInt# y))
+eqInt16 (I16# x) (I16# y) = isTrue# (x `eqInt16#` y)
+neInt16 (I16# x) (I16# y) = isTrue# (x `neInt16#` y)
 {-# INLINE [1] eqInt16 #-}
 {-# INLINE [1] neInt16 #-}
 
@@ -497,8 +497,8 @@ instance Eq Int32 where
     (/=) = neInt32
 
 eqInt32, neInt32 :: Int32 -> Int32 -> Bool
-eqInt32 (I32# x) (I32# y) = isTrue# ((int32ToInt# x) ==# (int32ToInt# y))
-neInt32 (I32# x) (I32# y) = isTrue# ((int32ToInt# x) /=# (int32ToInt# y))
+eqInt32 (I32# x) (I32# y) = isTrue# (x `eqInt32#` y)
+neInt32 (I32# x) (I32# y) = isTrue# (x `neInt32#` y)
 {-# INLINE [1] eqInt32 #-}
 {-# INLINE [1] neInt32 #-}
 
