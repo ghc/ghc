@@ -61,8 +61,8 @@
     }                                                           \
     OVERWRITING_CLOSURE(p1);                                    \
     StgInd_indirectee(p1) = p2;                                 \
-    prim_write_barrier;                                         \
-    SET_INFO(p1, stg_BLACKHOLE_info);                           \
+    TSAN_WRITE(p1 + OFFSET_StgInd_indirectee);                  \
+    SET_INFO_RELEASE(p1, stg_BLACKHOLE_info);                   \
     LDV_RECORD_CREATE(p1);                                      \
     and_then;
 
