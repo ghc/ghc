@@ -231,16 +231,16 @@ typedef enum {
 
 #if !defined(EVENTLOG_CONSTANTS_ONLY)
 
-typedef StgWord16 EventTypeNum;
-typedef StgWord64 EventTimestamp; /* in nanoseconds */
-typedef StgWord32 EventThreadID;
-typedef StgWord16 EventCapNo;
-typedef StgWord16 EventPayloadSize; /* variable-size events */
-typedef StgWord16 EventThreadStatus; /* status for EVENT_STOP_THREAD */
-typedef StgWord32 EventCapsetID;
-typedef StgWord16 EventCapsetType;   /* types for EVENT_CAPSET_CREATE */
-typedef StgWord64 EventTaskId;         /* for EVENT_TASK_* */
-typedef StgWord64 EventKernelThreadId; /* for EVENT_TASK_CREATE */
+typedef StgWord16   EventTypeNum;
+typedef StgWord64   EventTimestamp; /* in nanoseconds */
+typedef StgThreadID EventThreadID;
+typedef StgWord16   EventCapNo;
+typedef StgWord16   EventPayloadSize; /* variable-size events */
+typedef StgWord16   EventThreadStatus; /* status for EVENT_STOP_THREAD */
+typedef StgWord32   EventCapsetID;
+typedef StgWord16   EventCapsetType;   /* types for EVENT_CAPSET_CREATE */
+typedef StgWord64   EventTaskId;         /* for EVENT_TASK_* */
+typedef StgWord64   EventKernelThreadId; /* for EVENT_TASK_CREATE */
 
 #define EVENT_PAYLOAD_SIZE_MAX STG_WORD16_MAX
 #endif
