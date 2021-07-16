@@ -365,4 +365,4 @@ test('T19672', normal, compile, ['-O2 -ddump-rules'])
 test('T19780', normal, compile, ['-O2'])
 test('T19794', normal, compile, ['-O'])
 test('T19890',  [ grep_errmsg(r'= T19890.foo1') ], compile, ['-O -ddump-simpl'])
-
+test('T20125',  [ grep_errmsg(r'= T20125.MkT') ], compile, ['-O -ddump-simpl -dsuppress-uniques'])
