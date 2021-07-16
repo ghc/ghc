@@ -18,11 +18,15 @@ module GHC.Tc.Types.Origin (
   -- CtOrigin
   CtOrigin(..), exprCtOrigin, lexprCtOrigin, matchesCtOrigin, grhssCtOrigin,
   isVisibleOrigin, toInvisibleOrigin,
-  pprCtOrigin, isGivenOrigin
+  pprCtOrigin, isGivenOrigin,
+
+  -- CtOrigin and CallStack
+  isPushCallStackOrigin, callStackOriginFS
 
   ) where
 
 import GHC.Prelude
+import GHC.Utils.Misc (HasCallStack)
 
 import GHC.Tc.Utils.TcType
 
@@ -432,7 +436,6 @@ data CtOrigin
   | MCompOrigin         -- Arising from a monad comprehension
   | MCompPatOrigin (LPat GhcRn) -- Arising from a failable pattern in a
                                 -- monad comprehension
-  | IfOrigin            -- Arising from an if statement
   | ProcOrigin          -- Arising from a proc expression
   | AnnOrigin           -- An annotation
 
@@ -450,6 +453,7 @@ data CtOrigin
   | TypeHoleOrigin OccName   -- from a type hole (partial type signature)
   | PatCheckOrigin      -- normalisation of a type during pattern-match checking
   | ListOrigin          -- An overloaded list
+  | IfThenElseOrigin    -- An if-then-else expression
   | BracketOrigin       -- An overloaded quotation bracket
   | StaticOrigin        -- A static form
   | Shouldn'tHappenOrigin String
@@ -521,7 +525,7 @@ exprCtOrigin (SectionR _ _ _)     = SectionOrigin
 exprCtOrigin (ExplicitTuple {})   = Shouldn'tHappenOrigin "explicit tuple"
 exprCtOrigin ExplicitSum{}        = Shouldn'tHappenOrigin "explicit sum"
 exprCtOrigin (HsCase _ _ matches) = matchesCtOrigin matches
-exprCtOrigin (HsIf {})           = Shouldn'tHappenOrigin "if expression"
+exprCtOrigin (HsIf {})           = IfThenElseOrigin
 exprCtOrigin (HsMultiIf _ rhs)   = lGRHSCtOrigin rhs
 exprCtOrigin (HsLet _ _ e)       = lexprCtOrigin e
 exprCtOrigin (HsDo {})           = DoOrigin
@@ -639,7 +643,7 @@ pprCtOrigin simple_origin
   = ctoHerald <+> pprCtO simple_origin
 
 -- | Short one-liners
-pprCtO :: CtOrigin -> SDoc
+pprCtO :: HasCallStack => CtOrigin -> SDoc
 pprCtO (OccurrenceOf name)   = hsep [text "a use of", quotes (ppr name)]
 pprCtO (OccurrenceOfRecSel name) = hsep [text "a use of", quotes (ppr name)]
 pprCtO AppOrigin             = text "an application"
@@ -651,7 +655,6 @@ pprCtO ExprSigOrigin         = text "an expression type signature"
 pprCtO PatSigOrigin          = text "a pattern type signature"
 pprCtO PatOrigin             = text "a pattern"
 pprCtO ViewPatOrigin         = text "a view pattern"
-pprCtO IfOrigin              = text "an if expression"
 pprCtO (LiteralOrigin lit)   = hsep [text "the literal", quotes (ppr lit)]
 pprCtO (ArithSeqOrigin seq)  = hsep [text "the arithmetic sequence", quotes (ppr seq)]
 pprCtO SectionOrigin         = text "an operator section"
@@ -672,8 +675,47 @@ pprCtO (ExprHoleOrigin occ)  = text "a use of" <+> quotes (ppr occ)
 pprCtO (TypeHoleOrigin occ)  = text "a use of wildcard" <+> quotes (ppr occ)
 pprCtO PatCheckOrigin        = text "a pattern-match completeness check"
 pprCtO ListOrigin            = text "an overloaded list"
+pprCtO IfThenElseOrigin      = text "an if-then-else expression"
 pprCtO StaticOrigin          = text "a static form"
 pprCtO NonLinearPatternOrigin = text "a non-linear pattern"
 pprCtO (UsageEnvironmentOf x) = hsep [text "multiplicity of", quotes (ppr x)]
 pprCtO BracketOrigin         = text "a quotation bracket"
-pprCtO _                     = panic "pprCtOrigin"
+
+-- These ones are handled by pprCtOrigin, but we nevertheless sometimes
+-- get here via callStackOriginFS, when doing ambiguity checks
+-- A bit silly, but no great harm
+pprCtO (GivenOrigin {})             = text "a given constraint"
+pprCtO (SpecPragOrigin {})          = text "a SPECIALISE pragma"
+pprCtO (FunDepOrigin1 {})           = text "a functional dependency"
+pprCtO (FunDepOrigin2 {})           = text "a functional dependency"
+pprCtO (TypeEqOrigin {})            = text "a type equality"
+pprCtO (KindEqOrigin {})            = text "a kind equality"
+pprCtO (DerivOriginDC {})           = text "a deriving clause"
+pprCtO (DerivOriginCoerce {})       = text "a derived method"
+pprCtO (DoPatOrigin {})             = text "a do statement"
+pprCtO (MCompPatOrigin {})          = text "a monad comprehension pattern"
+pprCtO (Shouldn'tHappenOrigin note) = text note
+pprCtO (ProvCtxtOrigin {})          = text "a provided constraint"
+pprCtO (InstProvidedOrigin {})      = text "a provided constraint"
+pprCtO (CycleBreakerOrigin orig)    = pprCtO orig
+
+{- *********************************************************************
+*                                                                      *
+             CallStacks and CtOrigin
+
+    See Note [Overview of implicit CallStacks] in GHC.Tc.Types.Evidence
+*                                                                      *
+********************************************************************* -}
+
+isPushCallStackOrigin :: CtOrigin -> Bool
+-- Do we want to solve this IP constraint directly (return False)
+-- or push the call site (return True)
+-- See Note [Overview of implicit CallStacks] in GHc.Tc.Types.Evidence
+isPushCallStackOrigin (IPOccOrigin {}) = False
+isPushCallStackOrigin _                = True
+
+
+callStackOriginFS :: CtOrigin -> FastString
+-- This is the string that appears in the CallStack
+callStackOriginFS (OccurrenceOf fun) = occNameFS (getOccName fun)
+callStackOriginFS orig               = mkFastString (showSDocUnsafe (pprCtO orig))
