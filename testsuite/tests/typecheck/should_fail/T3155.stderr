@@ -1,5 +1,6 @@
 
 T3155.hs:14:9: error:
     Illegal symbol ‘forall’ in type
-    Perhaps you intended to use RankNTypes or a similar language
-    extension to enable explicit-forall syntax: forall <tvs>. <type>
+    Suggested fix:
+      Perhaps you intended to use RankNTypes
+      or a similar language extension to enable explicit-forall syntax: forall <tvs>. <type>

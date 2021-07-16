@@ -183,15 +183,7 @@ instance Diagnostic PsMessage where
     PsErrOverloadedRecordUpdateNoQualifiedFields
       -> mkSimpleDecorated $ text "Fields cannot be qualified when OverloadedRecordUpdate is enabled"
     PsErrExplicitForall is_unicode
-      -> mkSimpleDecorated $ vcat
-           [ text "Illegal symbol" <+> quotes (forallSym is_unicode) <+> text "in type"
-           , text "Perhaps you intended to use RankNTypes or a similar language"
-           , text "extension to enable explicit-forall syntax:" <+>
-             forallSym is_unicode <+> text "<tvs>. <type>"
-           ]
-         where
-          forallSym True  = text "∀"
-          forallSym False = text "forall"
+      -> mkSimpleDecorated $ text "Illegal symbol" <+> quotes (forallSym is_unicode) <+> text "in type"
     PsErrIllegalQualifiedDo qdoDoc
       -> mkSimpleDecorated $
            text "Illegal qualified" <+> quotes qdoDoc <+> text "block"
@@ -358,12 +350,7 @@ instance Diagnostic PsMessage where
       -> mkSimpleDecorated $
            text "Malformed head of type or class declaration:" <+> ppr ty
     PsErrIllegalWhereInDataDecl
-      -> mkSimpleDecorated $
-           vcat
-              [ text "Illegal keyword 'where' in data declaration"
-              , text "Perhaps you intended to use GADTs or a similar language"
-              , text "extension to enable syntax: data T where"
-              ]
+      -> mkSimpleDecorated $ text "Illegal keyword 'where' in data declaration"
     PsErrIllegalDataTypeContext c
       -> mkSimpleDecorated $
            text "Illegal datatype context:"
@@ -607,18 +594,18 @@ instance Diagnostic PsMessage where
     PsWarnStarIsType                              -> [SuggestUseTypeFromDataKind]
     PsWarnUnrecognisedPragma                      -> noHints
     PsWarnImportPreQualified                      -> [ SuggestQualifiedAfterModuleName
-                                                     , SuggestExtension LangExt.ImportQualifiedPost]
+                                                     , suggestExtension LangExt.ImportQualifiedPost]
     PsErrLexer{}                                  -> noHints
     PsErrCmmLexer                                 -> noHints
     PsErrCmmParser{}                              -> noHints
     PsErrParse token PsErrParseDetails{..}        -> case token of
       ""                         -> []
-      "$"  | not ped_th_enabled  -> [SuggestExtension LangExt.TemplateHaskell]   -- #7396
-      "<-" | ped_mdo_in_last_100 -> [SuggestExtension LangExt.RecursiveDo]
+      "$"  | not ped_th_enabled  -> [suggestExtension LangExt.TemplateHaskell]   -- #7396
+      "<-" | ped_mdo_in_last_100 -> [suggestExtension LangExt.RecursiveDo]
            | otherwise           -> [SuggestMissingDo]
       "="  | ped_do_in_last_100  -> [SuggestLetInDo]                             -- #15849
       _    | not ped_pat_syn_enabled
-           , ped_pattern_parsed  -> [SuggestExtension LangExt.PatternSynonyms]   -- #12429
+           , ped_pattern_parsed  -> [suggestExtension LangExt.PatternSynonyms]   -- #12429
            | otherwise           -> []
     PsErrTypeAppWithoutSpace{}                    -> noHints
     PsErrLazyPatWithoutSpace{}                    -> noHints
@@ -628,18 +615,21 @@ instance Diagnostic PsMessage where
     PsErrSpaceInSCC                               -> noHints
     PsErrEmptyDoubleQuotes th_on | th_on          -> [SuggestThQuotationSyntax]
                                  | otherwise      -> noHints
-    PsErrLambdaCase{}                             -> [SuggestExtension LangExt.LambdaCase]
+    PsErrLambdaCase{}                             -> [suggestExtension LangExt.LambdaCase]
     PsErrEmptyLambda{}                            -> noHints
-    PsErrLinearFunction{}                         -> [SuggestExtension LangExt.LinearTypes]
-    PsErrMultiWayIf{}                             -> [SuggestExtension LangExt.MultiWayIf]
-    PsErrOverloadedRecordUpdateNotEnabled{}       -> [SuggestExtension LangExt.OverloadedRecordUpdate]
-    PsErrNumUnderscores{}                         -> [SuggestExtension LangExt.NumericUnderscores]
-    PsErrIllegalBangPattern{}                     -> [SuggestExtension LangExt.BangPatterns]
+    PsErrLinearFunction{}                         -> [suggestExtension LangExt.LinearTypes]
+    PsErrMultiWayIf{}                             -> [suggestExtension LangExt.MultiWayIf]
+    PsErrOverloadedRecordUpdateNotEnabled{}       -> [suggestExtension LangExt.OverloadedRecordUpdate]
+    PsErrNumUnderscores{}                         -> [suggestExtension LangExt.NumericUnderscores]
+    PsErrIllegalBangPattern{}                     -> [suggestExtension LangExt.BangPatterns]
     PsErrOverloadedRecordDotInvalid{}             -> noHints
-    PsErrIllegalPatSynExport                      -> [SuggestExtension LangExt.PatternSynonyms]
+    PsErrIllegalPatSynExport                      -> [suggestExtension LangExt.PatternSynonyms]
     PsErrOverloadedRecordUpdateNoQualifiedFields  -> noHints
-    PsErrExplicitForall{}                         -> noHints
-    PsErrIllegalQualifiedDo{}                     -> [SuggestExtension LangExt.QualifiedDo]
+    PsErrExplicitForall is_unicode                ->
+      let info = text "or a similar language extension to enable explicit-forall syntax:" <+>
+                 forallSym is_unicode <+> text "<tvs>. <type>"
+      in [ suggestExtensionWithInfo info LangExt.RankNTypes ]
+    PsErrIllegalQualifiedDo{}                     -> [suggestExtension LangExt.QualifiedDo]
     PsErrQualifiedDoInCmd{}                       -> noHints
     PsErrRecordSyntaxInPatSynDecl{}               -> noHints
     PsErrEmptyWhereInPatSynDecl{}                 -> noHints
@@ -647,9 +637,9 @@ instance Diagnostic PsMessage where
     PsErrNoSingleWhereBindInPatSynDecl{}          -> noHints
     PsErrDeclSpliceNotAtTopLevel{}                -> noHints
     PsErrMultipleNamesInStandaloneKindSignature{} -> noHints
-    PsErrIllegalExplicitNamespace                 -> [SuggestExtension LangExt.ExplicitNamespaces]
+    PsErrIllegalExplicitNamespace                 -> [suggestExtension LangExt.ExplicitNamespaces]
     PsErrUnallowedPragma{}                        -> noHints
-    PsErrImportPostQualified                      -> [SuggestExtension LangExt.ImportQualifiedPost]
+    PsErrImportPostQualified                      -> [suggestExtension LangExt.ImportQualifiedPost]
     PsErrImportQualifiedTwice                     -> noHints
     PsErrIllegalImportBundleForm                  -> noHints
     PsErrInvalidRuleActivationMarker              -> noHints
@@ -692,20 +682,22 @@ instance Diagnostic PsMessage where
     PsErrIfInFunAppExpr{}                         -> suggestParensAndBlockArgs
     PsErrProcInFunAppExpr{}                       -> suggestParensAndBlockArgs
     PsErrMalformedTyOrClDecl{}                    -> noHints
-    PsErrIllegalWhereInDataDecl                   -> noHints
-    PsErrIllegalDataTypeContext{}                 -> [SuggestExtension LangExt.DatatypeContexts]
+    PsErrIllegalWhereInDataDecl                   ->
+      [ suggestExtensionWithInfo (text "or a similar language extension to enable syntax: data T where")
+                                 LangExt.GADTs ]
+    PsErrIllegalDataTypeContext{}                 -> [suggestExtension LangExt.DatatypeContexts]
     PsErrPrimStringInvalidChar                    -> noHints
     PsErrSuffixAT                                 -> noHints
     PsErrPrecedenceOutOfRange{}                   -> noHints
-    PsErrSemiColonsInCondExpr{}                   -> [SuggestExtension LangExt.DoAndIfThenElse]
-    PsErrSemiColonsInCondCmd{}                    -> [SuggestExtension LangExt.DoAndIfThenElse]
+    PsErrSemiColonsInCondExpr{}                   -> [suggestExtension LangExt.DoAndIfThenElse]
+    PsErrSemiColonsInCondCmd{}                    -> [suggestExtension LangExt.DoAndIfThenElse]
     PsErrAtInPatPos                               -> noHints
     PsErrParseErrorOnInput{}                      -> noHints
     PsErrMalformedDecl{}                          -> noHints
     PsErrUnexpectedTypeAppInDecl{}                -> noHints
     PsErrNotADataCon{}                            -> noHints
     PsErrInferredTypeVarNotAllowed                -> noHints
-    PsErrIllegalTraditionalRecordSyntax{}         -> [SuggestExtension LangExt.TraditionalRecordSyntax]
+    PsErrIllegalTraditionalRecordSyntax{}         -> [suggestExtension LangExt.TraditionalRecordSyntax]
     PsErrParseErrorInCmd{}                        -> noHints
     PsErrInPat _ details                          -> case details of
       PEIP_RecPattern args YesPatIsRecursive ctx
@@ -714,18 +706,18 @@ instance Diagnostic PsMessage where
       PEIP_OtherPatDetails ctx -> catMaybes [sug_missingdo ctx]
       _                        -> []
       where
-        sug_recdo                                           = Just (SuggestExtension LangExt.RecursiveDo)
+        sug_recdo                                           = Just (suggestExtension LangExt.RecursiveDo)
         sug_missingdo (ParseContext _ YesIncompleteDoBlock) = Just SuggestMissingDo
         sug_missingdo _                                     = Nothing
     PsErrParseRightOpSectionInPat{}               -> noHints
     PsErrIllegalRoleName _ nearby                 -> [SuggestRoles nearby]
     PsErrInvalidTypeSignature lhs                 ->
         if | foreign_RDR `looks_like` lhs
-           -> [SuggestExtension LangExt.ForeignFunctionInterface]
+           -> [suggestExtension LangExt.ForeignFunctionInterface]
            | default_RDR `looks_like` lhs
-           -> [SuggestExtension LangExt.DefaultSignatures]
+           -> [suggestExtension LangExt.DefaultSignatures]
            | pattern_RDR `looks_like` lhs
-           -> [SuggestExtension LangExt.PatternSynonyms]
+           -> [suggestExtension LangExt.PatternSynonyms]
            | otherwise
            -> [SuggestTypeSignatureForm]
       where
@@ -782,7 +774,7 @@ psHeaderMessageHints = \case
 
 suggestParensAndBlockArgs :: [GhcHint]
 suggestParensAndBlockArgs =
-  [SuggestParentheses, SuggestExtension LangExt.BlockArguments]
+  [SuggestParentheses, suggestExtension LangExt.BlockArguments]
 
 pp_unexpected_fun_app :: Outputable a => SDoc -> a -> SDoc
 pp_unexpected_fun_app e a =
@@ -791,3 +783,7 @@ pp_unexpected_fun_app e a =
 
 parse_error_in_pat :: SDoc
 parse_error_in_pat = text "Parse error in pattern:"
+
+forallSym :: Bool -> SDoc
+forallSym True  = text "∀"
+forallSym False = text "forall"
