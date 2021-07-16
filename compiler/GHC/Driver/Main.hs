@@ -235,6 +235,7 @@ import Data.Set (Set)
 import Data.Functor
 import Control.DeepSeq (force)
 import Data.Bifunctor (first)
+import GHC.Utils.Trace
 
 {- **********************************************************************
 %*                                                                      *
@@ -256,7 +257,7 @@ newHscEnv dflags = do
                   ,  hsc_IC             = emptyInteractiveContext dflags
                   ,  hsc_NC             = nc_var
                   ,  hsc_FC             = fc_var
-                  ,  hsc_type_env_var   = Nothing
+                  ,  hsc_type_env_vars  = emptyModuleEnv
                   ,  hsc_interp         = Nothing
                   ,  hsc_unit_env       = unit_env
                   ,  hsc_plugins        = []
@@ -546,6 +547,7 @@ hsc_typecheck keep_rn mod_summary mb_rdr_module = do
          do hpm <- case mb_rdr_module of
                     Just hpm -> return hpm
                     Nothing -> hscParse' mod_summary
+            pprTraceM "before_tc_rn" (ppr $ moduleUnit $ ms_mod mod_summary)
             tc_result0 <- tcRnModule' mod_summary keep_rn' hpm
             if hsc_src == HsigFile
                 then do (iface, _, _) <- liftIO $ hscSimpleIface hsc_env tc_result0 mod_summary Nothing
@@ -1056,7 +1058,7 @@ genModDetails :: HscEnv -> ModIface -> IO ModDetails
 genModDetails hsc_env old_iface
   = do
     new_details <- {-# SCC "tcRnIface" #-}
-                   initIfaceLoad hsc_env (typecheckIface old_iface)
+                   initIfaceLoad  hsc_env (typecheckIface old_iface)
     dumpIfaceStats hsc_env
     return new_details
 
