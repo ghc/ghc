@@ -116,11 +116,11 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks
                   StgTopStringLit b str -> [Left (b, str)]
             flattenBind (StgNonRec b e) = [(b,e)]
             flattenBind (StgRec bs)     = bs
-        stringPtrs <- allocateTopStrings interp strings
+        (str_bndrs, str_ptrs) <- allocateTopStrings interp strings
 
         us <- mkSplitUniqSupply 'y'
         (BcM_State{..}, proto_bcos) <-
-           runBc hsc_env us this_mod mb_modBreaks (mkVarEnv stringPtrs) $ do
+           runBc hsc_env us this_mod mb_modBreaks (zipEqualVarEnv str_bndrs str_ptrs) $ do
              prepd_binds <- mapM bcPrepBind lifted_binds
              let flattened_binds =
                    concatMap (flattenBind . annBindingFreeVars) (reverse prepd_binds)
@@ -133,7 +133,7 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks
            "Proto-BCOs" FormatByteCode
            (vcat (intersperse (char ' ') (map ppr proto_bcos)))
 
-        cbc <- assembleBCOs interp profile proto_bcos tycs (map snd stringPtrs)
+        cbc <- assembleBCOs interp profile proto_bcos tycs str_ptrs
           (case modBreaks of
              Nothing -> Nothing
              Just mb -> Just mb{ modBreaks_breakInfo = breakInfo })
@@ -156,11 +156,11 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks
 allocateTopStrings
   :: Interp
   -> [(Id, ByteString)]
-  -> IO [(Var, RemotePtr ())]
+  -> IO ([Var], [RemotePtr ()])
 allocateTopStrings interp topStrings = do
   let !(bndrs, strings) = unzip topStrings
   ptrs <- interpCmd interp $ MallocStrings strings
-  return $ zip bndrs ptrs
+  return (bndrs, ptrs)
 
 {-
 Note [generating code for top-level string literal bindings]
