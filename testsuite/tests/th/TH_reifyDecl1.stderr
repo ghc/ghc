@@ -35,8 +35,8 @@ data family TH_reifyDecl1.DF2 (a_0 :: *) :: *
 data instance TH_reifyDecl1.DF2 GHC.Types.Bool
     = TH_reifyDecl1.DBool
 data family TH_reifyDecl1.DF3 (a_0 :: k_1) :: *
-data instance forall (a_2 :: *). TH_reifyDecl1.DF3 (a_2 :: *)
-    = TH_reifyDecl1.DF3Bool
-data instance forall (b_3 :: * ->
-                             *). TH_reifyDecl1.DF3 (b_3 :: * -> *)
+data instance forall (b_2 :: * ->
+                             *). TH_reifyDecl1.DF3 (b_2 :: * -> *)
     = TH_reifyDecl1.DF3Char
+data instance forall (a_3 :: *). TH_reifyDecl1.DF3 (a_3 :: *)
+    = TH_reifyDecl1.DF3Bool
