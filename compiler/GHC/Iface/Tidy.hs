@@ -34,9 +34,9 @@ import GHC.Core.Stats   (coreBindsStats, CoreStats(..))
 import GHC.Core.Seq     (seqBinds)
 import GHC.Core.Lint
 import GHC.Core.Rules
-import GHC.Core.Opt.Arity   ( exprArity, exprBotStrictness_maybe )
+import GHC.Core.Opt.Arity   ( exprArity, typeArity, exprBotStrictness_maybe )
 import GHC.Core.InstEnv
-import GHC.Core.Type     ( tidyTopType )
+import GHC.Core.Type     ( Type, tidyTopType )
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.Class
@@ -1244,8 +1244,8 @@ tidyTopPair uf_opts show_unfold rhs_tidy_env name' (bndr, rhs)
     details  = idDetails bndr   -- Preserve the IdDetails
     ty'      = tidyTopType (idType bndr)
     rhs1     = tidyExpr rhs_tidy_env rhs
-    idinfo'  = tidyTopIdInfo uf_opts rhs_tidy_env name' rhs rhs1 (idInfo bndr)
-                             show_unfold
+    idinfo'  = tidyTopIdInfo uf_opts rhs_tidy_env name' ty'
+                             rhs rhs1 (idInfo bndr) show_unfold
 
 -- tidyTopIdInfo creates the final IdInfo for top-level
 -- binders.  The delicate piece:
@@ -1254,27 +1254,27 @@ tidyTopPair uf_opts show_unfold rhs_tidy_env name' (bndr, rhs)
 --      Indeed, CorePrep must eta expand where necessary to make
 --      the manifest arity equal to the claimed arity.
 --
-tidyTopIdInfo :: UnfoldingOpts -> TidyEnv -> Name -> CoreExpr -> CoreExpr
-              -> IdInfo -> Bool -> IdInfo
-tidyTopIdInfo uf_opts rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold
+tidyTopIdInfo :: UnfoldingOpts -> TidyEnv -> Name -> Type
+              -> CoreExpr -> CoreExpr -> IdInfo -> Bool -> IdInfo
+tidyTopIdInfo uf_opts rhs_tidy_env name rhs_ty orig_rhs tidy_rhs idinfo show_unfold
   | not is_external     -- For internal Ids (not externally visible)
   = vanillaIdInfo       -- we only need enough info for code generation
                         -- Arity and strictness info are enough;
                         --      c.f. GHC.Core.Tidy.tidyLetBndr
         `setArityInfo`      arity
-        `setDmdSigInfo` final_sig
-        `setCprSigInfo`        final_cpr
+        `setDmdSigInfo`     final_sig
+        `setCprSigInfo`     final_cpr
         `setUnfoldingInfo`  minimal_unfold_info  -- See note [Preserve evaluatedness]
                                                  -- in GHC.Core.Tidy
 
   | otherwise           -- Externally-visible Ids get the whole lot
   = vanillaIdInfo
-        `setArityInfo`         arity
-        `setDmdSigInfo`    final_sig
-        `setCprSigInfo`           final_cpr
-        `setOccInfo`           robust_occ_info
-        `setInlinePragInfo`    (inlinePragInfo idinfo)
-        `setUnfoldingInfo`     unfold_info
+        `setArityInfo`       arity
+        `setDmdSigInfo`      final_sig
+        `setCprSigInfo`      final_cpr
+        `setOccInfo`         robust_occ_info
+        `setInlinePragInfo`  inlinePragInfo idinfo
+        `setUnfoldingInfo`   unfold_info
                 -- NB: we throw away the Rules
                 -- They have already been extracted by findExternalRules
   where
@@ -1337,7 +1337,9 @@ tidyTopIdInfo uf_opts rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold
     -- did was to let-bind a non-atomic argument and then float
     -- it to the top level. So it seems more robust just to
     -- fix it here.
-    arity = exprArity orig_rhs
+    arity = exprArity orig_rhs `min` typeArity rhs_ty
+            -- Using tidy_rhs would make a black hole, since exprArity
+            -- uses the arities of Ids inside the rhs
 
 {-
 ************************************************************************
