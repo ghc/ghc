@@ -1,0 +1,5 @@
+test('T19752', [expect_broken(19752), grep_errmsg('of unknown origin')], compile_fail, [''])
+test('T20063', [expect_broken(20063), grep_errmsg('of unknown origin')], compile_fail, [''])
+test('T19760', [expect_broken(19760), grep_errmsg('of unknown origin')], compile_fail, [''])
+test('T19482', [expect_broken(19482), grep_errmsg('of unknown origin')], compile_fail, [''])
+test('T10946_sk', [expect_broken(10946), grep_errmsg('of unknown origin')], compile_fail, [''])
