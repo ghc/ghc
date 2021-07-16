@@ -111,7 +111,6 @@ import qualified GHC.Data.BooleanFormula as BF
 
 import Control.Monad
 import GHC.Parser.Annotation
-import GHC.Utils.Trace
 
 {-
 This module takes

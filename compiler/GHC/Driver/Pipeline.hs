@@ -304,20 +304,6 @@ compileOne' mHscMessage
        dflags  = dflags3 { includePaths = addImplicitQuoteInclude old_paths [current_dir] }
        hsc_env = hscSetFlags dflags hsc_env0
 
--- | Add the entries from a BCO linkable to the SPT table, see
--- See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable.
-addSptEntries :: HscEnv -> ModuleNameWithIsBoot -> Maybe Linkable -> IO ()
-addSptEntries hsc_env mnwib mlinkable =
-  hscAddSptEntries hsc_env (Just mnwib)
-     [ spt
-     | Just linkable <- [mlinkable]
-     , unlinked <- linkableUnlinked linkable
-     , BCOs _ spts <- pure unlinked
-     , spt <- spts
-     ]
-
-
-
 -- ---------------------------------------------------------------------------
 -- Link
 --

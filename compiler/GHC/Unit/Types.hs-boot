@@ -3,12 +3,13 @@ module GHC.Unit.Types where
 
 import GHC.Prelude ()
 import {-# SOURCE #-} GHC.Utils.Outputable
-import {-# SOURCE #-} GHC.Unit.Module.Name
+import {-# SOURCE #-} GHC.Unit.Module.Name ( ModuleName )
+import Data.Kind (Type)
 
 data UnitId
-data GenModule (unit :: *)
-data GenUnit (uid :: *)
-data Indefinite (unit :: *)
+data GenModule (unit :: Type)
+data GenUnit (uid :: Type)
+data Indefinite (unit :: Type)
 
 type Module      = GenModule  Unit
 type Unit        = GenUnit    UnitId

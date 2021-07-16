@@ -75,6 +75,7 @@ import GHC.Driver.Env
 import GHC.Driver.Errors
 import GHC.Driver.Errors.Types
 import GHC.Driver.Main
+import GHC.Driver.Pipeline.Monad
 
 import GHC.Parser.Header
 
@@ -85,11 +86,11 @@ import GHC.Iface.Recomp    ( RecompileRequired ( MustCompile ) )
 import GHC.Data.Bag        ( listToBag )
 import GHC.Data.Graph.Directed
 import GHC.Data.FastString
-import GHC.Data.Maybe      ( expectJust )
+import GHC.Data.Maybe      ( expectJust, MaybeT (MaybeT, runMaybeT) )
 import GHC.Data.StringBuffer
 import qualified GHC.LanguageExtensions as LangExt
 
-import GHC.Utils.Exception ( AsyncException(..), evaluate, BlockedIndefinitelyOnMVar (BlockedIndefinitelyOnMVar), onException, throwIO )
+import GHC.Utils.Exception ( AsyncException(..), evaluate )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
@@ -98,6 +99,7 @@ import GHC.Utils.Error
 import GHC.Utils.Logger
 import GHC.Utils.Fingerprint
 import GHC.Utils.TmpFs
+import GHC.Utils.Monad.Concurrently
 
 import GHC.Types.Basic
 import GHC.Types.Error
@@ -125,10 +127,9 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified GHC.Data.FiniteMap as Map ( insertListWith )
 
-import Control.Concurrent ( killThread, newChan, Chan, readChan, forkIO )
+import Control.Concurrent ( forkIO )
 import qualified GHC.Conc as CC
 import Control.Concurrent.MVar
-import Control.Concurrent.QSem
 import Control.Monad
 import Control.Monad.Trans.Except ( ExceptT(..), runExceptT, throwE )
 import qualified Control.Monad.Catch as MC
@@ -149,13 +150,10 @@ import Control.Monad.Trans.Reader
 import GHC.Driver.Pipeline.Semaphore
 import GHC.Data.DependentMap
 import qualified Data.Map.Strict as M
-import System.Timeout
 import GHC.Utils.Trace
 import GHC.Types.TypeEnv
 import Control.Monad.Trans.State.Lazy
-import Data.Functor ((<&>))
-import qualified Data.Semigroup as S
-import Control.Applicative
+import Control.Monad.Trans.Class
 
 label_self :: String -> IO ()
 label_self thread_name = do
@@ -925,12 +923,10 @@ unload interp hsc_env
 -}
 
 
-data BuildLoopState = BuildLoopState { buildDep :: M.Map NodeKey (SDoc, WrappedPipeline (Success (Maybe HomeModInfo)))
+data BuildLoopState = BuildLoopState { buildDep :: M.Map NodeKey (SDoc, WrappedMakePipeline (Maybe HomeModInfo))
                                           -- The current way to build a specific TNodeKey, without cycles this just points to
                                           -- the appropiate use (CompileModule ...) or use (TypecheckInstantiate ..) but with
                                           -- cycles there can be additional indirection and can point to `use (TypecheckLoop ...)`
-                                     , buildKnotVar :: M.Map NodeKey (ModuleEnv (IORef TypeEnv))
-                                     , nSCC :: Int
                                      , nNODE :: Int
                                      }
 
@@ -944,28 +940,18 @@ getting the dependencies for an N, look up in the map.
 
 -}
 
-sccId :: BuildM Int
-sccId = do
-  n <- gets nSCC
-  modify (\m -> m { nSCC = n + 1 })
-  return n
-
 nodeId :: BuildM Int
 nodeId = do
   n <- gets nNODE
   modify (\m -> m { nNODE = n + 1 })
   return n
 
-setModulePipeline :: NodeKey -> SDoc -> WrappedPipeline (Success (Maybe HomeModInfo)) -> BuildM ()
+setModulePipeline :: NodeKey -> SDoc -> WrappedMakePipeline (Maybe HomeModInfo) -> BuildM ()
 setModulePipeline mgn doc wrapped_pipeline = do
   modify (\m -> m { buildDep = M.insert mgn (doc, wrapped_pipeline) (buildDep m) })
 
-setModuleKnotVar :: [NodeKey] -> ModuleEnv (IORef TypeEnv) -> BuildM ()
-setModuleKnotVar ms me =
-  modify (\m -> m { buildKnotVar = M.fromList [(nk, me) | nk <- ms] `M.union`  buildKnotVar m })
-
 getBuildMap :: BuildM (M.Map
-                    NodeKey (SDoc, WrappedPipeline (Success (Maybe HomeModInfo))))
+                    NodeKey (SDoc, WrappedMakePipeline (Maybe HomeModInfo)))
 getBuildMap = gets buildDep
 
 -- Only in IO to create IORefs..
@@ -974,8 +960,8 @@ type BuildM a = StateT BuildLoopState IO a
 data NodeBuildInfo = NodeBuildInfo { nk :: (Int, Int)
                                    , build_node_key :: NodeKey
                                    , build_node_var :: Maybe (ModuleEnv (IORef TypeEnv))
-                                   , build_self :: WrappedPipeline (Success (Maybe HomeModInfo))
-                                   , build_deps :: WrappedPipeline (Success [HomeModInfo])
+                                   , build_self :: WrappedMakePipeline (Maybe HomeModInfo)
+                                   , build_deps :: WrappedMakePipeline [HomeModInfo]
                                    , node_log_queue :: LogQueue }
 
 -- | Given the build plan, creates a graph which indicates where each NodeKey should
@@ -984,7 +970,7 @@ data NodeBuildInfo = NodeBuildInfo { nk :: (Int, Int)
 createBuildMap :: M.Map NodeKey [NodeKey]
                -> [BuildPlan]
                -> IO (Maybe [ModuleGraphNode], [NodeBuildInfo])
-createBuildMap deps_map plan = evalStateT (buildLoop plan) (BuildLoopState M.empty M.empty 0 1)
+createBuildMap deps_map plan = evalStateT (buildLoop plan) (BuildLoopState M.empty 1)
 
   where
     n_mods = sum (map countMods plan)
@@ -996,33 +982,14 @@ createBuildMap deps_map plan = evalStateT (buildLoop plan) (BuildLoopState M.emp
       -- 1. Get the transitive dependencies of this module, by looking up in the dependency map
       let trans_deps = expectJust "build_module" $ Map.lookup (mkNodeKey mod) deps_map
       pprTraceM "build mod" (ppr mod $$ ppr trans_deps)
-      {-
-      let pipeline :: (forall p . TPipelineClass MakeAction p => [HomeModInfo] -> p (Maybe a)) -> WrappedPipeline (Maybe a)
-          pipeline k = WrappedPipeline $ do
-            let
-
-          --  pprTraceM "BUILD" (vcat [text "MOD: " <+> ppr mod
-          --                          , text "Transitive Deps:" <+> ppr textual_deps
-          --                          , text "Direct Edges:" <+> ppr (unfilteredEdges False mod)])
-            -- Wait for the all the module's dependencies to finish building.
-            let textual_deps = expectJust "build_module" $ Map.lookup (mkNodeKey mod) deps_map
-            mdep_hmis <- runMaybeT $ process_loop textual_deps
-          --  pprTraceM "mdep_hmis" (ppr mod $$ ppr textual_deps $$ ppr (length <$> mdep_hmis))
-            case mdep_hmis of
-              -- One of the dependencies failed, so propagate the failure upwards
-              Nothing -> return Nothing
-              -- All dependencies succeeded, continue with the returned info
-              Just dep_hmis -> k dep_hmis
-              -}
       -- Set the default way to build this node, not in a loop here
-      let a = useMGN mod
-      setModulePipeline (mkNodeKey mod) (text "N") a
+      let default_action = useMGN mod
+      setModulePipeline (mkNodeKey mod) (text "N") default_action
       -- Get what the deps currently refer to
       let doc_build_deps = catMaybes $ map (flip M.lookup home_mod_map) trans_deps
-          docs = map fst doc_build_deps
           build_deps = map snd doc_build_deps
       lq <- liftIO newLogQueue
-      return $ NodeBuildInfo ((mod_idx, n_mods)) (mkNodeKey mod) knot_var a (process_loop2 build_deps) lq
+      return $ NodeBuildInfo ((mod_idx, n_mods)) (mkNodeKey mod) knot_var default_action (process_deps build_deps) lq
 
 
     tcLoop :: [ModuleGraphNode] ->  BuildM [NodeBuildInfo]
@@ -1031,16 +998,15 @@ createBuildMap deps_map plan = evalStateT (buildLoop plan) (BuildLoopState M.emp
       let ms_mods = mapMaybe (\case InstantiationNode {} -> Nothing; ModuleNode ems -> Just (ms_mod (emsModSummary ems))) ms
       knot_var <- liftIO $ mkModuleEnv <$> mapM (\m -> (m,) <$> newIORef emptyNameEnv) ms_mods
 
-      _scc_n <- sccId
       -- 1. Build all the dependencies in this loop
       nbi <- mapM (buildSingleModule (Just knot_var)) ms
       let
           ms_i = zip3 (mapMaybe (fmap (msKey . emsModSummary) . moduleGraphNodeModule) ms) nbi [0..]
       let p i = do
-            hmis <- use (STypecheckLoop knot_var ms)
-            return (hmis <&> (!! i))
+            hmis <- use (Make_TypecheckLoop knot_var ms)
+            return (hmis !! i)
       let do_one (m, nb, i) = do
-            let pipe = fmap Just <$> p i
+            let pipe = Just <$> p i
             setModulePipeline (NodeKey_Module m) (text "T") pipe
             return $ nb { build_self = pipe }
 
@@ -1104,7 +1070,7 @@ parUpsweep n_jobs hsc_env _mHscMessage old_hpt transitive_deps build_plan = do
 
 
 
-    let completed = [m | SSuccess (Just m) <- res]
+    let completed = [m | Just (Just m) <- res]
     let hsc_env' = hscUpdateHPT (const (listHMIToHpt completed)) hsc_env
 
     -- Handle any cycle in the original compilation graph and return the result
@@ -1115,7 +1081,7 @@ parUpsweep n_jobs hsc_env _mHscMessage old_hpt transitive_deps build_plan = do
           liftIO $ fatalErrorMsg logger (cyclicModuleErr mss)
           return (Failed, hsc_env)
         Nothing  -> do
-          let success_flag = successIf (all isSuccess res)
+          let success_flag = successIf (all isJust res)
           return (success_flag, hsc_env')
 
 
@@ -2337,98 +2303,65 @@ cyclicModuleErr mss
     ppr_ms ms = quotes (ppr (moduleName (ms_mod ms))) <+>
                 (parens (text (msHsFilePath ms)))
 
-data SimpleMakeAction a where
-  STypecheckLoop :: ModuleEnv (IORef TypeEnv)
-                -> [ModuleGraphNode]
-                ->  SimpleMakeAction (Success [HomeModInfo])
-  SCompileModule :: ModSummary  -- ModuleName
-                -> SimpleMakeAction (Success HomeModInfo)
-  STypecheckInstantiatedUnit :: InstantiatedUnit
-                            -> SimpleMakeAction (Success ())
+-- | Nodes in the build graph, the result of each of these nodes is
+-- cached so guaranteed to only build once.
+data MakeAction a where
+  Make_TypecheckLoop :: ModuleEnv (IORef TypeEnv) -> [ModuleGraphNode]
+                 ->  MakeAction [HomeModInfo]
+  Make_CompileModule :: ModSummary -> MakeAction HomeModInfo
+  Make_TypecheckInstantiatedUnit :: InstantiatedUnit
+                             -> MakeAction ()
 
-data Success a = SSuccess a | SFailed deriving Functor
+instance Outputable (MakeAction a) where
+  ppr (Make_TypecheckLoop _knot_var nks) = hcat [text "TC:", ppr (nks)]
+  ppr (Make_CompileModule ms) = hcat [text "Compile:", ppr (ms_mod ms) ]
+  ppr (Make_TypecheckInstantiatedUnit iu) = hcat [text "Inst:", ppr iu]
 
-isSuccess :: Success a -> Bool
-isSuccess (SSuccess {}) = True
-isSuccess SFailed = False
+type WrappedMakePipeline = WrappedPipeline MakeAction
 
--- The different actions which
-instance Outputable (SimpleMakeAction a) where
-  ppr (STypecheckLoop _knot_var nks) = hcat [text "TC:", ppr (nks)]
-  ppr (SCompileModule ms) = hcat [text "Compile:", ppr (ms_mod ms) ]
-  ppr (STypecheckInstantiatedUnit iu) = hcat [text "Inst:", ppr iu]
+data MakeEnv = MakeEnv { hsc_env :: HscEnv
+                       , old_hpt :: HomePackageTable
+                       , mod_map  :: M.Map NodeKey NodeBuildInfo
+                       , actionMap :: MVar (ActionMap MakeAction) }
 
-
-
-newtype WrappedPipeline a = WrappedPipeline { unwrap :: forall p . TPipelineClass SimpleMakeAction p => p a }
-
--- Wrapped instances
-instance MonadIO WrappedPipeline where
-  liftIO io = WrappedPipeline (liftIO io)
-
-instance Monad WrappedPipeline where
-  (WrappedPipeline k) >>= f = WrappedPipeline (k >>= \x -> unwrap (f x))
-
-instance Applicative WrappedPipeline where
-  pure x = WrappedPipeline (pure x)
-  (WrappedPipeline fa) <*> WrappedPipeline a = WrappedPipeline (fa <*> a)
-
-instance Functor WrappedPipeline where
-  fmap f (WrappedPipeline p) = WrappedPipeline (fmap f p)
-
-instance MonadUse SimpleMakeAction WrappedPipeline where
-  use ma = WrappedPipeline (use ma)
-
-
-data SimpleEnv = SimpleEnv { hsc_env :: HscEnv
-                           , old_hpt :: HomePackageTable
-                           , mod_map  :: M.Map NodeKey NodeBuildInfo
-                           , actionMap :: MVar (ActionMap ModKey)
-                           , par_sem  :: QSem }
-
-instance MonadIO m => MonadUse SimpleMakeAction (ReaderT SimpleEnv m) where
+instance MonadIO m => MonadUse MakeAction (ReaderT MakeEnv (MaybeT m)) where
   use fa = cachedInterpret fa
 
-type ModKey = SimpleMakeAction
-
-instance GEq SimpleMakeAction where
+instance GEq MakeAction where
   a `geq` b = (a `gcompare` b) == EQ
 
-instance GOrd SimpleMakeAction where
-  STypecheckLoop _ a `gcompare` STypecheckLoop _ b = map mkNodeKey a `compare` map mkNodeKey b
-  SCompileModule ms `gcompare` SCompileModule ms' = (ms_mnwib ms) `compare` (ms_mnwib ms')
-  STypecheckInstantiatedUnit iu `gcompare` STypecheckInstantiatedUnit iu' = iu `compare` iu'
-  STypecheckLoop {} `gcompare` _ = LT
-  SCompileModule {} `gcompare` STypecheckLoop {} = GT
-  SCompileModule {} `gcompare` _ = LT
-  STypecheckInstantiatedUnit {} `gcompare` _ = GT
+instance GOrd MakeAction where
+  Make_TypecheckLoop _ a `gcompare` Make_TypecheckLoop _ b = map mkNodeKey a `compare` map mkNodeKey b
+  Make_CompileModule ms `gcompare` Make_CompileModule ms' = (ms_mnwib ms) `compare` (ms_mnwib ms')
+  Make_TypecheckInstantiatedUnit iu `gcompare` Make_TypecheckInstantiatedUnit iu' = iu `compare` iu'
+  Make_TypecheckLoop {} `gcompare` _ = LT
+  Make_CompileModule {} `gcompare` Make_TypecheckLoop {} = GT
+  Make_CompileModule {} `gcompare` _ = LT
+  Make_TypecheckInstantiatedUnit {} `gcompare` _ = GT
 
-cachedInterpret :: MonadIO m => SimpleMakeAction a -> ReaderT SimpleEnv m a
+cachedInterpret :: MonadIO m => MakeAction a -> ReaderT MakeEnv (MaybeT m) a
 cachedInterpret fa = do
   am <- asks actionMap
   hsc_env <- asks hsc_env
-  par_sem <- asks par_sem
   se <- ask
-  liftIO $ queueAction am par_sem fa $ do
-    -- 2. Create a thread-local FS so the local files can be cleaned promptly
-    lcl_tmpfs <- liftIO $ forkTmpFsFrom (hsc_tmpfs hsc_env)
+  lift $ MaybeT $ liftIO $ queueAction am fa $ do
+    -- 1. Create a thread-local FS so the local files can be cleaned promptly
+    lcl_tmpfs <- forkTmpFsFrom (hsc_tmpfs hsc_env)
     let local_hsc_env = hsc_env { hsc_tmpfs  = lcl_tmpfs }
-    -- Run the action
-    res <- runReaderT (actionInterpret fa) (se { hsc_env = local_hsc_env })
+    -- 2. Run the action
+    res <- runMaybeT $ runReaderT (actionInterpret fa) (se { hsc_env = local_hsc_env })
 
-    liftIO $ do
-      -- Add remaining files which weren't cleaned up into local tmp fs for
-      -- clean-up later.
-      mergeTmpFsInto lcl_tmpfs (hsc_tmpfs hsc_env)
+    -- 3. Add remaining files which weren't cleaned up into local tmp fs for
+    -- clean-up later.
+    mergeTmpFsInto lcl_tmpfs (hsc_tmpfs hsc_env)
 
     return res
-
 
 addDepsToHscEnv ::  [HomeModInfo] -> HscEnv -> HscEnv
 addDepsToHscEnv deps hsc_env =
   hscUpdateHPT (const $ listHMIToHpt deps) hsc_env
 
-wrapAction :: MonadIO m => HscEnv -> IO a -> m (Success a)
+wrapAction :: MonadIO m => HscEnv -> IO a -> MaybeT m a
 wrapAction hsc_env k = do
               let lcl_logger = hsc_logger hsc_env
                   lcl_dynflags = hsc_dflags hsc_env
@@ -2438,8 +2371,8 @@ wrapAction hsc_env k = do
               -- directly
               mres <-
                 liftIO $ MC.try $ prettyPrintGhcErrors lcl_logger $ k
-              liftIO $ case mres of
-                Right res -> return $ SSuccess res
+              MaybeT $ liftIO $ case mres of
+                Right res -> return $ Just res
                 Left exc -> do
                     case fromException exc of
                       Just (err :: SourceError)
@@ -2451,39 +2384,27 @@ wrapAction hsc_env k = do
                                     -- interrupt, and the user doesn't have to be informed
                                     -- about that.
                                     _ -> errorMsg lcl_logger (text (show exc))
-                    return SFailed
+                    return Nothing
 
-actionInterpret :: SimpleMakeAction a -> ReaderT SimpleEnv IO a
+-- | Actually interpret a MakeAction into, this is the part which is cached.
+actionInterpret :: MakeAction a -> ReaderT MakeEnv (MaybeT IO) a
 actionInterpret fa =
   case fa of
---    STypecheckLoop n knot_var  -> do
---      pprTraceM "TC:LOOP" (ppr n $$ ppr (length hmis))
---      hsc_env <- asks fst
---      let lcl_hsc_env = hsc_env { hsc_type_env_vars = knot_var }
---      liftIO $ fmap (map snd) $ typecheckLoop lcl_hsc_env hmis
-    STypecheckInstantiatedUnit ui -> do
+    Make_TypecheckInstantiatedUnit ui -> do
       m_map <- asks mod_map
---    pprTraceM "INSTANTIATING" (ppr (k, n) $$ ppr ui $$ ppr (map (mi_module . hm_iface) deps))
       let nbi = expectJust "build_module" $ Map.lookup (NodeKey_Unit ui) m_map
           (k, n) = nk nbi
           lq = node_log_queue nbi
-      mdep_hmis <- unwrap (build_deps nbi)
-      --  pprTraceM "mdep_hmis" (ppr mod $$ ppr textual_deps $$ ppr (length <$> mdep_hmis))
-      case mdep_hmis of
-          -- One of the dependencies failed, so propagate the failure upwards
-          SFailed -> return SFailed
-          -- All dependencies succeeded, continue with the returned info
-          SSuccess deps -> do
-            hsc_env <- asks hsc_env
-
-            -- Output of the logger is mediated by a central worker to
-            -- avoid output interleaving
-            let lcl_logger = pushLogHook (const (parLogAction lq)) (hsc_logger hsc_env)
-            let lcl_hsc_env = addDepsToHscEnv deps hsc_env { hsc_logger = lcl_logger }
-            liftIO $ wrapAction lcl_hsc_env $ upsweep_inst lcl_hsc_env (Just batchMsg) k n ui
-              `MC.finally` finishLogQueue lq
-    SCompileModule  mod -> do
-      SimpleEnv{..} <- ask
+      deps <- unwrap (build_deps nbi)
+      hsc_env <- asks hsc_env
+      -- Output of the logger is mediated by a central worker to
+      -- avoid output interleaving
+      let lcl_logger = pushLogHook (const (parLogAction lq)) (hsc_logger hsc_env)
+      let lcl_hsc_env = addDepsToHscEnv deps hsc_env { hsc_logger = lcl_logger }
+      lift $ wrapAction lcl_hsc_env $ upsweep_inst lcl_hsc_env (Just batchMsg) k n ui
+        `MC.finally` finishLogQueue lq
+    Make_CompileModule  mod -> do
+      MakeEnv{..} <- ask
       let node_key = (NodeKey_Module $ mkHomeBuildModule0 mod)
       let nbi = expectJust "build_module" $ Map.lookup node_key mod_map
           (k, n) = nk nbi
@@ -2494,59 +2415,38 @@ actionInterpret fa =
 
       knot_var <- liftIO $ maybe (mkModuleEnv .  (:[]) . (mk_mod ,) <$> newIORef emptyTypeEnv) return (build_node_var nbi)
 
-      pprTraceM "COMPILING" (ppr mod $$ ppr (moduleUnit $ mk_mod))
-      mdep_hmis <- unwrap (build_deps nbi)
-      --  pprTraceM "mdep_hmis" (ppr mod $$ ppr textual_deps $$ ppr (length <$> mdep_hmis))
-      case mdep_hmis of
-          -- One of the dependencies failed, so propagate the failure upwards
-          SFailed -> return SFailed
-          -- All dependencies succeeded, continue with the returned info
-          SSuccess deps -> do
-           -- pprTraceM "COMPILING" (ppr (k, n) $$ ppr (map (mi_module . hm_iface) deps))
-            let -- Use the cached DynFlags which includes OPTIONS_GHC pragmas
-                lcl_dynflags = ms_hspp_opts mod
-                lcl_logger =
-                  -- Apply local log actions to the logger
-                  flip setLogFlags (initLogFlags lcl_dynflags) $
-                  pushLogHook (const (parLogAction lq)) (hsc_logger hsc_env)
-            let lcl_hsc_env =
-                    -- Localise the logger to use the cached flags
-                    addDepsToHscEnv deps $
-                    hsc_env { hsc_logger = lcl_logger
-                            , hsc_dflags = lcl_dynflags
-                            , hsc_type_env_vars = knot_var }
-            liftIO $ wrapAction lcl_hsc_env $ upsweep_mod lcl_hsc_env (Just batchMsg) old_hpt mod k n -- k n
-              `MC.finally` finishLogQueue lq
-    STypecheckLoop knot_var nk -> do
-      pprTraceM "TC:LOOP" (ppr (length nk))
+      deps <- unwrap (build_deps nbi)
+      let -- Use the cached DynFlags which includes OPTIONS_GHC pragmas
+          lcl_dynflags = ms_hspp_opts mod
+          lcl_logger =
+            -- Apply local log actions to the logger
+            flip setLogFlags (initLogFlags lcl_dynflags) $
+            pushLogHook (const (parLogAction lq)) (hsc_logger hsc_env)
+      let lcl_hsc_env =
+              -- Localise the logger to use the cached flags
+              addDepsToHscEnv deps $
+              hsc_env { hsc_logger = lcl_logger
+                      , hsc_dflags = lcl_dynflags
+                      , hsc_type_env_vars = knot_var }
+      lift $ wrapAction lcl_hsc_env $ upsweep_mod lcl_hsc_env (Just batchMsg) old_hpt mod k n -- k n
+        `MC.finally` finishLogQueue lq
+    Make_TypecheckLoop knot_var nk -> do
       hsc_env <- asks hsc_env
-      res <- process_loop2 (map useMGN nk)
-      case res of
-        SFailed -> return SFailed
-        SSuccess hmis ->
-          let lcl_hsc_env = hsc_env { hsc_type_env_vars = knot_var }
-          in liftIO $ fmap (SSuccess . map snd) $ typecheckLoop lcl_hsc_env hmis
+      hmis <- process_deps (map useMGN nk)
+      let lcl_hsc_env = hsc_env { hsc_type_env_vars = knot_var }
+      liftIO $ map snd <$> typecheckLoop lcl_hsc_env hmis
 
-useMGN :: TPipelineClass SimpleMakeAction p => ModuleGraphNode -> p (Success (Maybe HomeModInfo))
-useMGN (InstantiationNode x) = fmap (const Nothing) <$> use (STypecheckInstantiatedUnit x)
-useMGN (ModuleNode ems)      = fmap Just <$> use (SCompileModule (emsModSummary ems))
+useMGN :: TPipelineClass MakeAction p => ModuleGraphNode -> p (Maybe HomeModInfo)
+useMGN (InstantiationNode x) = const Nothing <$> use (Make_TypecheckInstantiatedUnit x)
+useMGN (ModuleNode ems)      = Just <$> use (Make_CompileModule (emsModSummary ems))
 
-
-process_loop2 :: TPipelineClass SimpleMakeAction q => [WrappedPipeline (Success (Maybe HomeModInfo))] -> q (Success [HomeModInfo])
-process_loop2 [] = return (SSuccess [])
-process_loop2 (x:xs) = do
+process_deps :: TPipelineClass MakeAction q => [WrappedMakePipeline (Maybe HomeModInfo)] -> q [HomeModInfo]
+process_deps [] = return []
+process_deps (x:xs) = do
   res <- unwrap x
   case res of
-    -- Didn't produce a HMI
-    SFailed -> return SFailed
-    SSuccess Nothing -> process_loop2 xs
-    SSuccess (Just hmi) -> fmap (hmi:) <$> process_loop2 xs
-
-process_loop :: TPipelineClass SimpleMakeAction q => [NodeBuildInfo] -> q [Success (Maybe HomeModInfo)]
-process_loop [] = return []
-process_loop (x:xs) = do
-  (:) <$> unwrap (build_self x) <*> process_loop xs
-
+    Nothing -> process_deps xs
+    Just hmi -> (hmi:) <$> process_deps xs
 
 logThread :: Logger -> [LogQueue] -> IO (IO ())
 logThread logger all_lqs = do
@@ -2558,23 +2458,27 @@ logThread logger all_lqs = do
     loop finished_var (lq:lqs) = printLogs logger lq *> loop finished_var lqs
 
 
-cachedRunModPipeline :: Int -> HscEnv -> HomePackageTable
-                     -> [NodeBuildInfo] -> IO [Success (Maybe HomeModInfo)]
+-- | Build and run a pipeline
+cachedRunModPipeline :: Int              -- ^ How many capabilities to use
+                     -> HscEnv           -- ^ The basic HscEnv which is augmented with specific info for each module
+                     -> HomePackageTable -- ^ The old HPT which is used as a cache (TODO: The cache should be from the ActionMap)
+                     -> [NodeBuildInfo]  -- ^ The build plan for all the module nodes
+                     -> IO [Maybe (Maybe HomeModInfo)]
 cachedRunModPipeline n_jobs orig_hsc_env old_hpt pipelines = do
 
-  let all_pipelines = process_loop pipelines
+  let all_pipelines = map build_self pipelines
       deps_map = M.fromList [(build_node_key bk, bk) | bk <- pipelines]
 
   liftIO $ label_self "main --make thread"
+
+  -- A variable which stores the actions
   action_map <- newMVar emptyDepMap
-  print (map nk pipelines)
+  -- Thread which coordinates the printing of logs
   wait_log_thread <- logThread (hsc_logger orig_hsc_env) (map node_log_queue pipelines)
-  -- TODO: guard n >= 1
+
+  -- Make the logger thread-safe, in case there is some output which isn't sent via the LogQueue.
   thread_safe_logger <- liftIO $ makeThreadSafe (hsc_logger orig_hsc_env)
   let thread_safe_hsc_env = orig_hsc_env { hsc_logger = thread_safe_logger }
-
-  -- What we use to limit parallelism with.
-  par_sem <- liftIO $ newQSem n_jobs
 
   let updNumCapabilities = liftIO $ do
           n_capabilities <- getNumCapabilities
@@ -2591,88 +2495,9 @@ cachedRunModPipeline n_jobs orig_hsc_env old_hpt pipelines = do
           (readMVar action_map >>= killAllActions)
           wait_log_thread
 
+  let run_pipeline :: WrappedMakePipeline a -> Concurrently (Maybe a)
+      run_pipeline (WrappedPipeline p) =
+        runMaybeT (runReaderT p (MakeEnv thread_safe_hsc_env old_hpt deps_map action_map))
+
   MC.bracket updNumCapabilities resetNumCapabilities $ \_ ->
-      runConcurrently $ runReaderT all_pipelines (SimpleEnv thread_safe_hsc_env old_hpt deps_map action_map par_sem)
-
-
-_simpleRunModPipeline :: Int -> HscEnv -> ReaderT HscEnv IO a -> IO a
-_simpleRunModPipeline _n_jobs orig_hsc_env pipe = runReaderT pipe orig_hsc_env
-
-newtype Concurrently a = Concurrently { runConcurrently :: IO a }
-
-instance Functor Concurrently where
-  fmap f (Concurrently a) = Concurrently $ f <$> a
-
-instance Applicative Concurrently where
-  pure = Concurrently . return
-  Concurrently fs <*> Concurrently as =
-    Concurrently $ (\(f, a) -> f a) <$> concurrently fs as
-instance Monad Concurrently where
-    return = pure
-    x >>= f = Concurrently $ runConcurrently x >>= (runConcurrently . f)
-
-instance MonadIO Concurrently where
-  liftIO m = Concurrently m
-
--- concurrently :: IO a -> IO b -> IO (a,b)
-concurrently :: IO a -> IO b -> IO (a, b)
-concurrently left right = concurrently' left right (collect [])
-  where
-    collect [Left a, Right b] _ = return (a,b)
-    collect [Right b, Left a] _ = return (a,b)
-    collect xs m = do
-        e <- m
-        case e of
-            Left ex -> throwIO ex
-            Right r -> collect (r:xs) m
-
-concurrently' :: IO a -> IO b
-             -> (IO (Either MC.SomeException (Either a b)) -> IO r)
-             -> IO r
-concurrently' left right collect = do
-    done <- newEmptyMVar
-    MC.mask $ \restore -> do
-        -- Note: uninterruptibleMask here is because we must not allow
-        -- the putMVar in the exception handler to be interrupted,
-        -- otherwise the parent thread will deadlock when it waits for
-        -- the thread to terminate.
-        lid <- forkIO $ MC.uninterruptibleMask_ $
-          restore (left >>= putMVar done . Right . Left)
-            `MC.catchAll` (putMVar done . Left)
-        rid <- forkIO $ MC.uninterruptibleMask_ $
-          restore (right >>= putMVar done . Right . Right)
-            `MC.catchAll` (putMVar done . Left)
-
-        count <- newIORef (2 :: Int)
-        let takeDone = do
-                r <- takeMVar done      -- interruptible
-                -- Decrement the counter so we know how many takes are left.
-                -- Since only the parent thread is calling this, we can
-                -- use non-atomic modifications.
-                -- NB. do this *after* takeMVar, because takeMVar might be
-                -- interrupted.
-                modifyIORef count (subtract 1)
-                return r
-
-        let tryAgain f = f `MC.catch` \BlockedIndefinitelyOnMVar -> f
-
-            stop = do
-                -- kill right before left, to match the semantics of
-                -- the version using withAsync. (#27)
-                MC.uninterruptibleMask_ $ do
-                  count' <- readIORef count
-                  -- we only need to use killThread if there are still
-                  -- children alive.  Note: forkIO here is because the
-                  -- child thread could be in an uninterruptible
-                  -- putMVar.
-                  when (count' > 0) $
-                    void $ forkIO $ do
-                      throwTo rid ThreadKilled
-                      throwTo lid ThreadKilled
-                  -- ensure the children are really dead
-                  replicateM_ count' (tryAgain $ takeMVar done)
-
-        r <- collect (tryAgain $ takeDone) `onException` stop
-        stop
-        return r
-
+    runConcurrently $ traverse run_pipeline all_pipelines

@@ -221,7 +221,6 @@ import GHC.Tc.Errors.Types
 import {-# SOURCE #-} GHC.Tc.Utils.Env    ( tcInitTidyEnv )
 
 import qualified Data.Map as Map
-import GHC.Utils.Trace
 
 {-
 ************************************************************************
