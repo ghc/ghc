@@ -152,7 +152,7 @@ instance Show ThreadId where
 showThreadId :: ThreadId -> String
 showThreadId = show
 
-foreign import ccall unsafe "rts_getThreadId" getThreadId :: ThreadId# -> CInt
+foreign import ccall unsafe "rts_getThreadId" getThreadId :: ThreadId# -> CULLong
 
 id2TSO :: ThreadId -> ThreadId#
 id2TSO (ThreadId t) = t

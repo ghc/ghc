@@ -566,8 +566,8 @@ printAllTasks(void)
                 debugBelch("on capability %d, ", task->cap->no);
             }
             if (task->incall->tso) {
-              debugBelch("bound to thread %lu",
-                         (unsigned long)task->incall->tso->id);
+              debugBelch("bound to thread %" FMT_StgThreadID,
+                         task->incall->tso->id);
             } else {
                 debugBelch("worker");
             }
