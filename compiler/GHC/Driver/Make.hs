@@ -125,7 +125,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified GHC.Data.FiniteMap as Map ( insertListWith )
 
-import Control.Concurrent ( killThread, newChan, Chan, readChan, forkIO, writeChan )
+import Control.Concurrent ( killThread, newChan, Chan, readChan, forkIO )
 import qualified GHC.Conc as CC
 import Control.Concurrent.MVar
 import Control.Concurrent.QSem
@@ -156,7 +156,6 @@ import Control.Monad.Trans.State.Lazy
 import Data.Functor ((<&>))
 import qualified Data.Semigroup as S
 import Control.Applicative
-import Control.Monad.Trans.Class
 
 label_self :: String -> IO ()
 label_self thread_name = do
@@ -996,7 +995,7 @@ createBuildMap deps_map plan = evalStateT (buildLoop plan) (BuildLoopState M.emp
       home_mod_map <- getBuildMap
       -- 1. Get the transitive dependencies of this module, by looking up in the dependency map
       let trans_deps = expectJust "build_module" $ Map.lookup (mkNodeKey mod) deps_map
---      pprTraceM "build mod" (ppr mod $$ ppr trans_deps)
+      pprTraceM "build mod" (ppr mod $$ ppr trans_deps)
       {-
       let pipeline :: (forall p . TPipelineClass MakeAction p => [HomeModInfo] -> p (Maybe a)) -> WrappedPipeline (Maybe a)
           pipeline k = WrappedPipeline $ do
@@ -2384,11 +2383,11 @@ instance MonadUse SimpleMakeAction WrappedPipeline where
 data SimpleEnv = SimpleEnv { hsc_env :: HscEnv
                            , old_hpt :: HomePackageTable
                            , mod_map  :: M.Map NodeKey NodeBuildInfo
-                           , thread_pool :: ThreadPool ModKey }
+                           , actionMap :: MVar (ActionMap ModKey)
+                           , par_sem  :: QSem }
 
-
---instance MonadIO m => MonadUse SimpleMakeAction (ReaderT SimpleEnv m) where
---  use fa = cachedInterpret fa
+instance MonadIO m => MonadUse SimpleMakeAction (ReaderT SimpleEnv m) where
+  use fa = cachedInterpret fa
 
 type ModKey = SimpleMakeAction
 
@@ -2404,7 +2403,6 @@ instance GOrd SimpleMakeAction where
   SCompileModule {} `gcompare` _ = LT
   STypecheckInstantiatedUnit {} `gcompare` _ = GT
 
-{-
 cachedInterpret :: MonadIO m => SimpleMakeAction a -> ReaderT SimpleEnv m a
 cachedInterpret fa = do
   am <- asks actionMap
@@ -2424,7 +2422,6 @@ cachedInterpret fa = do
       mergeTmpFsInto lcl_tmpfs (hsc_tmpfs hsc_env)
 
     return res
-    -}
 
 
 addDepsToHscEnv ::  [HomeModInfo] -> HscEnv -> HscEnv
@@ -2456,7 +2453,7 @@ wrapAction hsc_env k = do
                                     _ -> errorMsg lcl_logger (text (show exc))
                     return SFailed
 
-actionInterpret :: TPipelineClass SimpleMakeAction m => SimpleMakeAction a -> ReaderT SimpleEnv m a
+actionInterpret :: SimpleMakeAction a -> ReaderT SimpleEnv IO a
 actionInterpret fa =
   case fa of
 --    STypecheckLoop n knot_var  -> do
@@ -2470,7 +2467,7 @@ actionInterpret fa =
       let nbi = expectJust "build_module" $ Map.lookup (NodeKey_Unit ui) m_map
           (k, n) = nk nbi
           lq = node_log_queue nbi
-      mdep_hmis <- lift $ unwrap (build_deps nbi)
+      mdep_hmis <- unwrap (build_deps nbi)
       --  pprTraceM "mdep_hmis" (ppr mod $$ ppr textual_deps $$ ppr (length <$> mdep_hmis))
       case mdep_hmis of
           -- One of the dependencies failed, so propagate the failure upwards
@@ -2498,7 +2495,7 @@ actionInterpret fa =
       knot_var <- liftIO $ maybe (mkModuleEnv .  (:[]) . (mk_mod ,) <$> newIORef emptyTypeEnv) return (build_node_var nbi)
 
       pprTraceM "COMPILING" (ppr mod $$ ppr (moduleUnit $ mk_mod))
-      mdep_hmis <- lift $ unwrap (build_deps nbi)
+      mdep_hmis <- unwrap (build_deps nbi)
       --  pprTraceM "mdep_hmis" (ppr mod $$ ppr textual_deps $$ ppr (length <$> mdep_hmis))
       case mdep_hmis of
           -- One of the dependencies failed, so propagate the failure upwards
@@ -2523,7 +2520,7 @@ actionInterpret fa =
     STypecheckLoop knot_var nk -> do
       pprTraceM "TC:LOOP" (ppr (length nk))
       hsc_env <- asks hsc_env
-      res <- lift $ process_loop2 (map useMGN nk)
+      res <- process_loop2 (map useMGN nk)
       case res of
         SFailed -> return SFailed
         SSuccess hmis ->
@@ -2576,8 +2573,8 @@ cachedRunModPipeline n_jobs orig_hsc_env old_hpt pipelines = do
   thread_safe_logger <- liftIO $ makeThreadSafe (hsc_logger orig_hsc_env)
   let thread_safe_hsc_env = orig_hsc_env { hsc_logger = thread_safe_logger }
 
-  thread_pool <- newThreadPool n_jobs
-  thread_pool_thread <- forkIO $ startThreadPool thread_pool
+  -- What we use to limit parallelism with.
+  par_sem <- liftIO $ newQSem n_jobs
 
   let updNumCapabilities = liftIO $ do
           n_capabilities <- getNumCapabilities
@@ -2591,22 +2588,11 @@ cachedRunModPipeline n_jobs orig_hsc_env old_hpt pipelines = do
     -- Reset the number of capabilities once the upsweep ends.
   let resetNumCapabilities orig_n = do
           liftIO $ setNumCapabilities orig_n
-          (killAllActions thread_pool)
-          killThread thread_pool_thread
+          (readMVar action_map >>= killAllActions)
           wait_log_thread
 
-
   MC.bracket updNumCapabilities resetNumCapabilities $ \_ ->
-      runReaderT (runFreeM all_pipelines) (SimpleEnv thread_safe_hsc_env old_hpt deps_map thread_pool)
-
-startThreadPool :: ThreadPool ModKey -> IO a
-startThreadPool t = loop
-  where
-    loop = do
-      dequeueAction t
-      print "Loop"
-      loop
-
+      runConcurrently $ runReaderT all_pipelines (SimpleEnv thread_safe_hsc_env old_hpt deps_map action_map par_sem)
 
 
 _simpleRunModPipeline :: Int -> HscEnv -> ReaderT HscEnv IO a -> IO a
@@ -2689,141 +2675,4 @@ concurrently' left right collect = do
         r <- collect (tryAgain $ takeDone) `onException` stop
         stop
         return r
-
-runFreeM :: FreeM SimpleMakeAction a -> ReaderT SimpleEnv IO a
-runFreeM (Bind (Use key) kont) = do
-  -- Check to see if the key has finished
-  pprTraceM "F1" (ppr key)
-  env@SimpleEnv{..} <- ask
-  liftIO $ modifyMVar (threadActionMap thread_pool) $ \am -> flip runReaderT env $ do
-    case lookupDepMap key am of
-      -- The action didn't start yet, start it, and deschedule
-      Nothing -> do
-         am' <- queueRun key am
-         r <- deschedule key (runFreeM . kont)
-         return (am', r)
-      Just ar -> do
-        finished <- liftIO $ checkResult ar
-        case finished of
-          Just v -> (am,) <$> runFreeM (kont v)
-          -- Unfinished, so deschedule and come back once the key has finished.
-          Nothing -> (am,) <$> deschedule key (runFreeM . kont)
-runFreeM (Bind fa kont) =  do
-  pprTraceM "F2" GHC.Utils.Outputable.empty
-  runFreeM fa >>= runFreeM . kont
-runFreeM (Use key) = do
-  pprTraceM "F3-use" GHC.Utils.Outputable.empty
-  env@SimpleEnv{..} <- ask
-  _ $ modifyMVar (threadActionMap thread_pool) $ \am -> flip runReaderT env $ do
-    case lookupDepMap key am of
-      -- The action didn't start yet, start it
-      Nothing -> queueRun key am
-      Just ar -> return (am, waitResult ar)
-
-runFreeM (Ap fab fa) = do
-  pprTraceM "F4-app" GHC.Utils.Outputable.empty
-  env <- ask
-  liftIO $ uncurry ($) <$> concurrently (runReaderT (runFreeM fab) env) (runReaderT (runFreeM fa) env)
-runFreeM (Fmap f fa) = do
-  pprTraceM "F5-fmap" GHC.Utils.Outputable.empty
-  f <$> runFreeM fa
-runFreeM (MIO a) = do
-  pprTraceM "F6" GHC.Utils.Outputable.empty
-  liftIO a
-runFreeM (Pure a) = do
-  pprTraceM "F7-pure" GHC.Utils.Outputable.empty
-  pure a
-
-deschedule :: SimpleMakeAction a1 -> (a1 -> ReaderT SimpleEnv IO a) -> ReaderT SimpleEnv IO a
-deschedule act f = do
-  env@SimpleEnv{..} <- ask
-  let ThreadPool{..} = thread_pool
-  res_var <- liftIO $ newEmptyMVar
-  let delay = K $ \a -> runReaderT (f a) env >>= putMVar res_var
-  liftIO $ delayAction thread_pool act delay
-  liftIO $ readMVar res_var
-
-queueRun :: SimpleMakeAction a -> ActionMap ModKey -> ReaderT SimpleEnv IO (ActionMap ModKey, IO a)
-queueRun key am = do
-  pprTraceM "queueing" (ppr key)
-  env@SimpleEnv{..} <- ask
-  let ThreadPool{..} = thread_pool
-  res_var <- liftIO $ newEmptyMVar
-  let run = runReaderT (runFreeM $ (runReaderT (actionInterpret key) env)) env
-  let ar = ActionResult res_var (ppr key)
-  am <- liftIO $ startRun thread_pool am key ar (run >>= putMVar res_var)
-  return (am, readMVar res_var)
-
-startRun :: ThreadPool SimpleMakeAction -> ActionMap ModKey -> SimpleMakeAction a -> ActionResult a -> IO () -> IO (ActionMap ModKey)
-startRun ThreadPool{..} am fa ar k = do
-    print "start_run"
-    writeChan queued_actions k
-    return $ insertDepMap fa ar am
-
-
-delayAction :: ThreadPool SimpleMakeAction -> SimpleMakeAction a -> K a -> IO ()
-delayAction ThreadPool{..} fa k =
-  modifyMVar_ descheduled_actions $ \dm -> do
-    signalQSem thread_sem
-    return $ insertDepMap fa k dm
-
-dequeueAction :: ThreadPool SimpleMakeAction -> IO ()
-dequeueAction ThreadPool{..} = do
-  print "BLOCKED"
-  act <- readChan queued_actions
-  print "DQ"
-  waitQSem thread_sem
-  modifyMVar_ running_actions $ \run_list -> do
-    print "Starting"
-    tid <- forkIO act
-    return (killThread tid : run_list)
-
-
-
-
-
-
-data FreeM f a where
-  Use :: f a -> FreeM f a
-  Pure :: a -> FreeM f a
-  Bind :: FreeM f a -> (a -> FreeM f b) -> FreeM f b
-  Ap :: FreeM f (a -> b) -> FreeM f a -> FreeM f b
-  Fmap :: (a -> b) -> FreeM f a -> FreeM f b
-  MIO :: IO a -> FreeM f a
-
-instance Monad (FreeM f) where
-  (>>=) = Bind
-
-instance Applicative (FreeM f) where
-  (<*>) = Ap
-  pure = Pure
-
-instance Functor (FreeM f) where
-  fmap = Fmap
-instance MonadIO (FreeM f) where
-  liftIO = MIO
-
-instance MonadUse f (FreeM f) where
-  use = Use
-
-newThreadPool :: Int -> IO (ThreadPool f)
-newThreadPool n_jobs = do
-  -- What we use to limit parallelism with.
-  thread_sem <- liftIO $ newQSem n_jobs
-  threadActionMap <- newMVar emptyDepMap
-  descheduled_actions <- newMVar emptyDepMap
-  queued_actions <- newChan
-  running_actions <- newMVar []
-  return $ ThreadPool{..}
-
-data ThreadPool f = ThreadPool { threadActionMap :: MVar (ActionMap f)
-                               , descheduled_actions :: MVar (DependentMap f K)
-                               , queued_actions :: Chan (IO ())  -- start
-                               , running_actions :: MVar [IO ()] -- kill
-                               , thread_sem :: QSem }
-
-
-killAllActions :: ThreadPool f -> IO ()
-killAllActions =
-  MC.uninterruptibleMask_ . sequence_ <=< readMVar . running_actions
 
