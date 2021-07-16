@@ -1221,7 +1221,38 @@ genCCall (PrimTarget (MO_AtomicRead width)) [dst] [addr]
 
 genCCall (PrimTarget (MO_AtomicWrite width)) [] [addr, val] = do
     code <- assignMem_IntCode (intFormat width) addr val
-    return $ unitOL(HWSYNC) `appOL` code
+    return $ unitOL HWSYNC `appOL` code
+
+genCCall (PrimTarget (MO_Cmpxchg width)) [dst] [addr, old, new]
+  | width == W32 || width == W64
+  = do
+      platform <- getPlatform
+      (old_reg, old_code) <- getSomeReg old
+      (new_reg, new_code) <- getSomeReg new
+      (addr_reg, addr_code) <- getSomeReg addr
+      lbl_retry <- getBlockIdNat
+      lbl_eq    <- getBlockIdNat
+      lbl_end   <- getBlockIdNat
+      let reg_dst   = getRegisterReg platform (CmmLocal dst)
+          code      = toOL
+                      [ HWSYNC
+                      , BCC ALWAYS lbl_retry Nothing
+                      , NEWBLOCK lbl_retry
+                      , LDR format reg_dst (AddrRegReg r0 addr_reg)
+                      , CMP format reg_dst (RIReg old_reg)
+                      , BCC NE lbl_end Nothing
+                      , BCC ALWAYS lbl_eq Nothing
+                      , NEWBLOCK lbl_eq
+                      , STC format new_reg (AddrRegReg r0 addr_reg)
+                      , BCC NE lbl_retry Nothing
+                      , BCC ALWAYS lbl_end Nothing
+                      , NEWBLOCK lbl_end
+                      , ISYNC
+                      ]
+      return $ addr_code `appOL` new_code `appOL` old_code `appOL` code
+  where
+    format = intFormat width
+
 
 genCCall (PrimTarget (MO_Clz width)) [dst] [src]
  = do platform <- getPlatform
