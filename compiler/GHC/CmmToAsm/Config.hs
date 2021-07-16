@@ -25,8 +25,9 @@ data NCGConfig = NCGConfig
    , ncgInlineThresholdMemcpy :: !Word            -- ^ If inlining `memcpy` produces less than this threshold (in pseudo-instruction unit), do it
    , ncgInlineThresholdMemset :: !Word            -- ^ Ditto for `memset`
    , ncgSplitSections         :: !Bool            -- ^ Split sections
-   , ncgRegsIterative         :: !Bool
-   , ncgRegsGraph             :: !Bool
+   , ncgRegsIterative         :: !Bool            -- ^ Iterative coalescing in graph coloring register allocator
+   , ncgRegsGraph             :: !Bool            -- ^ Use graph coloring register allocator
+   , ncgRegsGraphChaitin      :: !Bool            -- ^ Use Chaitin cost function in graph coloring register allocator
    , ncgAsmLinting            :: !Bool            -- ^ Perform ASM linting pass
    , ncgDoConstantFolding     :: !Bool            -- ^ Perform CMM constant folding
    , ncgSseVersion            :: Maybe SseVersion -- ^ (x86) SSE instructions
@@ -45,6 +46,7 @@ data NCGConfig = NCGConfig
    , ncgCmmStaticPred         :: !Bool            -- ^ Enable static control-flow prediction
    , ncgEnableShortcutting    :: !Bool            -- ^ Enable shortcutting (don't jump to blocks only containing a jump)
    , ncgComputeUnwinding      :: !Bool            -- ^ Compute block unwinding tables
+   , ncgSsaTransform          :: !Bool            -- ^ Transform native code into SSA form
    }
 
 -- | Return Word size
