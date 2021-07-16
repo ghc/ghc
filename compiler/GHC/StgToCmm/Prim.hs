@@ -342,6 +342,8 @@ emitPrimOp dflags primop = case primop of
   StableNameToIntOp -> \[arg] -> opIntoRegs $ \[res] ->
     emitAssign (CmmLocal res) (cmmLoadIndexW platform arg (fixedHdrSizeW profile) (bWord platform))
 
+  EqStablePtrOp -> \args -> opTranslate args (mo_wordEq platform)
+
   ReallyUnsafePtrEqualityOp -> \[arg1, arg2] -> opIntoRegs $ \[res] ->
     emitAssign (CmmLocal res) (CmmMachOp (mo_wordEq platform) [arg1,arg2])
 
@@ -1462,20 +1464,6 @@ emitPrimOp dflags primop = case primop of
   FloatToDoubleOp -> \args -> opTranslate args (MO_FF_Conv W32 W64)
   DoubleToFloatOp -> \args -> opTranslate args (MO_FF_Conv W64 W32)
 
--- Word comparisons masquerading as more exotic things.
-
-  SameMutVarOp            -> \args -> opTranslate args (mo_wordEq platform)
-  SameMVarOp              -> \args -> opTranslate args (mo_wordEq platform)
-  SameIOPortOp            -> \args -> opTranslate args (mo_wordEq platform)
-  SameMutableArrayOp      -> \args -> opTranslate args (mo_wordEq platform)
-  SameMutableByteArrayOp  -> \args -> opTranslate args (mo_wordEq platform)
-  SameMutableArrayArrayOp -> \args -> opTranslate args (mo_wordEq platform)
-  SameSmallMutableArrayOp -> \args -> opTranslate args (mo_wordEq platform)
-  SameTVarOp              -> \args -> opTranslate args (mo_wordEq platform)
-  EqStablePtrOp           -> \args -> opTranslate args (mo_wordEq platform)
--- See Note [Comparing stable names]
-  EqStableNameOp          -> \args -> opTranslate args (mo_wordEq platform)
-
   IntQuotRemOp -> \args -> opCallishHandledLater args $
     if ncg && (x86ish || ppc) && not (quotRemCanBeOptimized args)
     then Left (MO_S_QuotRem  (wordWidth platform))
@@ -2091,17 +2079,6 @@ genericFabsOp w [res_r] [aa]
       emit =<< mkCmmIfThenElse (eq aa zero) g1 g4
 
 genericFabsOp _ _ _ = panic "genericFabsOp"
-
--- Note [Comparing stable names]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
--- A StableName# is actually a pointer to a stable name object (SNO)
--- containing an index into the stable name table (SNT). We
--- used to compare StableName#s by following the pointers to the
--- SNOs and checking whether they held the same SNT indices. However,
--- this is not necessary: there is a one-to-one correspondence
--- between SNOs and entries in the SNT, so simple pointer equality
--- does the trick.
 
 ------------------------------------------------------------------------------
 -- Helpers for translating various minor variants of array indexing.

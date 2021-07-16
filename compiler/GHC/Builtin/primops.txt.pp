@@ -187,6 +187,41 @@ defaults
 -- description fields should be legal latex. Descriptions can contain
 -- matched pairs of embedded curly brackets.
 
+-- Note [Levity and representation polymorphic primops]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- In the types of primops in this module,
+-- 
+-- * The names `a,b,c,s` stand for type variables of kind Type
+-- 
+-- * The names `v` and `w` stand for levity-polymorphic
+--   type variables.
+--   For example:
+--      op :: v -> w -> Int
+--   really means
+--      op :: forall {l :: Levity} (a :: TYPE (BoxedRep l))
+--                   {k :: Levity} (b :: TYPE (BoxedRep k)).
+--            a -> b -> Int
+--  Two important things to note:
+--     - `v` and `w` have independent levities `l` and `k` (respectively), and
+--       these are inferred (not specified), as seen from the curly brackets.
+--     - `v` and `w` end up written as `a` and `b` (respectively) in types,
+--       which means that one shouldn't write a primop type involving both
+--       `a` and `v`, nor `b` and `w`.
+-- 
+-- * The names `o` and `p` stand for representation-polymorphic
+--   type variables, similarly to `v` and `w` above. For example:
+--      op :: o -> p -> Int
+--   really means
+--      op :: forall {q :: RuntimeRep} (a :: TYPE q)
+--                   {r :: RuntimeRep} (b :: TYPE r)
+--            a -> b -> Int
+--   We note:
+--    - `o` and `p` have independent `RuntimeRep`s `q` and `r`, which are
+--       inferred type variables (like for `v` and `w` above).
+--    - `o` and `p` share textual names with `a` and `b` (respectively).
+--      This means one shouldn't write a type involving both `a` and `o`,
+--      nor `b` and `p`, nor `o` and `v`, etc.
+
 #include "MachDeps.h"
 
 section "The word size story."
@@ -1360,9 +1395,6 @@ primop  NewArrayOp "newArray#" GenPrimOp
    out_of_line = True
    has_side_effects = True
 
-primop  SameMutableArrayOp "sameMutableArray#" GenPrimOp
-   MutableArray# s a -> MutableArray# s a -> Int#
-
 primop  ReadArrayOp "readArray#" GenPrimOp
    MutableArray# s a -> Int# -> State# s -> (# State# s, a #)
    {Read from specified index of mutable array. Result is not yet evaluated.}
@@ -1537,9 +1569,6 @@ primop  NewSmallArrayOp "newSmallArray#" GenPrimOp
    with
    out_of_line = True
    has_side_effects = True
-
-primop  SameSmallMutableArrayOp "sameSmallMutableArray#" GenPrimOp
-   SmallMutableArray# s a -> SmallMutableArray# s a -> Int#
 
 primop  ShrinkSmallMutableArrayOp_Char "shrinkSmallMutableArray#" GenPrimOp
    SmallMutableArray# s a -> Int# -> State# s -> State# s
@@ -1740,9 +1769,6 @@ primop  ByteArrayContents_Char "byteArrayContents#" GenPrimOp
 primop  MutableByteArrayContents_Char "mutableByteArrayContents#" GenPrimOp
    MutableByteArray# s -> Addr#
    {Intended for use with pinned arrays; otherwise very unsafe!}
-
-primop  SameMutableByteArrayOp "sameMutableByteArray#" GenPrimOp
-   MutableByteArray# s -> MutableByteArray# s -> Int#
 
 primop  ShrinkMutableByteArrayOp_Char "shrinkMutableByteArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> State# s
@@ -1971,9 +1997,6 @@ primop  NewArrayArrayOp "newArrayArray#" GenPrimOp
    with
    out_of_line = True
    has_side_effects = True
-
-primop  SameMutableArrayArrayOp "sameMutableArrayArray#" GenPrimOp
-   MutableArrayArray# s -> MutableArrayArray# s -> Int#
 
 primop  UnsafeFreezeArrayArrayOp "unsafeFreezeArrayArray#" GenPrimOp
    MutableArrayArray# s -> State# s -> (# State# s, ArrayArray# #)
@@ -2469,9 +2492,6 @@ primop  WriteMutVarOp "writeMutVar#"  GenPrimOp
    has_side_effects = True
    code_size = { primOpCodeSizeForeignCall } -- for the write barrier
 
-primop  SameMutVarOp "sameMutVar#" GenPrimOp
-   MutVar# s a -> MutVar# s a -> Int#
-
 -- Note [Why not an unboxed tuple in atomicModifyMutVar2#?]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
@@ -2548,6 +2568,7 @@ primop  RaiseOp "raise#" GenPrimOp
    a -> p
       -- NB: "p" is the same as "b" except it is representation-polymorphic
       -- (we shouldn't use "o" here as that would conflict with "a")
+      -- See Note [Levity and representation polymorphic primops]
    with
    -- In contrast to 'raiseIO#', which throws a *precise* exception,
    -- exceptions thrown by 'raise#' are considered *imprecise*.
@@ -2690,9 +2711,6 @@ primop  WriteTVarOp "writeTVar#" GenPrimOp
    out_of_line      = True
    has_side_effects = True
 
-primop  SameTVarOp "sameTVar#" GenPrimOp
-   TVar# s a -> TVar# s a -> Int#
-
 
 ------------------------------------------------------------------------
 section "Synchronized Mutable Variables"
@@ -2760,9 +2778,6 @@ primop  TryReadMVarOp "tryReadMVar#" GenPrimOp
    out_of_line      = True
    has_side_effects = True
 
-primop  SameMVarOp "sameMVar#" GenPrimOp
-   MVar# s a -> MVar# s a -> Int#
-
 primop  IsEmptyMVarOp "isEmptyMVar#" GenPrimOp
    MVar# s a -> State# s -> (# State# s, Int# #)
    {Return 1 if {\tt MVar\#} is empty; 0 otherwise.}
@@ -2804,10 +2819,6 @@ primop  WriteIOPortOp "writeIOPort#" GenPrimOp
    with
    out_of_line      = True
    has_side_effects = True
-
-primop  SameIOPortOp "sameIOPort#" GenPrimOp
-   IOPort# s a -> IOPort# s a -> Int#
-
 
 ------------------------------------------------------------------------
 section "Delay/wait operations"
@@ -2922,6 +2933,7 @@ section "Weak pointers"
 primtype Weak# b
 
 -- Note: "v" denotes a levity-polymorphic type variable
+-- See Note [Levity and representation polymorphic primops]
 
 primop  MkWeakOp "mkWeak#" GenPrimOp
    v -> b -> (State# RealWorld -> (# State# RealWorld, c #))
@@ -3008,9 +3020,6 @@ primop  MakeStableNameOp "makeStableName#" GenPrimOp
    with
    has_side_effects = True
    out_of_line      = True
-
-primop  EqStableNameOp "eqStableName#" GenPrimOp
-   StableName# a -> StableName# b -> Int#
 
 primop  StableNameToIntOp "stableNameToInt#" GenPrimOp
    StableName# a -> Int#
@@ -3143,25 +3152,74 @@ section "Unsafe pointer equality"
 --  (#1 Bad Guy: Alastair Reid :)
 ------------------------------------------------------------------------
 
+-- `v` and `w` are levity-polymorphic type variables with independent levities.
+-- See Note [Levity and representation polymorphic primops]
 primop  ReallyUnsafePtrEqualityOp "reallyUnsafePtrEquality#" GenPrimOp
-   a -> a -> Int#
+   v -> w -> Int#
    { Returns {\texttt 1\#} if the given pointers are equal and {\texttt 0\#} otherwise. }
    with
-   can_fail   = True -- See Note [reallyUnsafePtrEquality#]
+   can_fail   = True -- See Note [reallyUnsafePtrEquality# can_fail]
 
-
--- Note [reallyUnsafePtrEquality#]
+-- Note [Pointer comparison operations]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- The primop `reallyUnsafePtrEquality#` does a direct pointer
+-- equality between two (boxed) values.  Several things to note:
+-- 
+-- * It is levity-polymorphic. It works for TYPE (BoxedRep Lifted) and
+--   TYPE (BoxedRep Unlifted). But not TYPE IntRep, for example.
+--   This levity-polymorphism comes from the use of the type variables
+--   "v" and "w". See Note [Levity and representation polymorphic primops]
+-- 
+-- * It does not evaluate its arguments. The user of the primop is responsible
+--   for doing so.
+-- 
+-- * It is hetero-typed; you can compare pointers of different types.
+--   This is used in various packages such as containers & unordered-containers.
+-- 
+-- * It is obviously very dangerous, because
+--      let x = f y in reallyUnsafePtrEquality# x x
+--   will probably return True, whereas
+--      reallyUnsafePtrEquality# (f y) (f y)
+--   will probably return False. ("probably", because it's affected
+--   by CSE and inlining).
+-- 
+-- * reallyUnsafePtrEquality# can't fail, but it is marked as such
+--   to prevent it from floating out.
+--   See Note [reallyUnsafePtrEquality# can_fail]
+-- 
+-- The library GHC.Exts provides several less Wild-West functions
+-- for use in specific cases, namely:
 --
--- reallyUnsafePtrEquality# can't actually fail, per se, but we mark it can_fail
--- anyway. Until 5a9a1738023a, GHC considered primops okay for speculation only
--- when their arguments were known to be forced. This was unnecessarily
--- conservative, but it prevented reallyUnsafePtrEquality# from floating out of
--- places where its arguments were known to be forced. Unfortunately, GHC could
--- sometimes lose track of whether those arguments were forced, leading to let/app
--- invariant failures (see #13027 and the discussion in #11444). Now that
--- ok_for_speculation skips over lifted arguments, we need to explicitly prevent
--- reallyUnsafePtrEquality# from floating out. Imagine if we had
+--   reallyUnsafePtrEquality :: a -> a -> Int#  -- not levity-polymorphic, nor hetero-typed
+--   sameArray# :: Array# a -> Array# a -> Int#
+--   sameMutableArray# :: MutableArray# s a -> MutableArray# s a -> Int#
+--   sameSmallArray# :: SmallArray# a -> SmallArray# a -> Int#
+--   sameSmallMutableArray# :: SmallMutableArray# s a -> SmallMutableArray# s a -> Int#
+--   sameByteArray# :: ByteArray# -> ByteArray# -> Int#
+--   sameMutableByteArray# :: MutableByteArray# s -> MutableByteArray# s -> Int#
+--   sameArrayArray# :: ArrayArray# -> ArrayArray# -> Int#
+--   sameMutableArrayArray# :: MutableArrayArray# s -> MutableArrayArray# s -> Int#
+--   sameMutVar# :: MutVar# s a -> MutVar# s a -> Int#
+--   sameTVar# :: TVar# s a -> TVar# s a -> Int#
+--   sameMVar# :: MVar# s a -> MVar# s a -> Int#
+--   sameIOPort# :: IOPort# s a -> IOPort# s a -> Int#
+--   eqStableName# :: StableName# a -> StableName# b -> Int#
+--
+-- These operations are all specialisations of reallyUnsafePtrEquality#.
+
+-- Note [reallyUnsafePtrEquality# can_fail]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- reallyUnsafePtrEquality# can't actually fail, per se, but we mark it
+-- can_fail anyway. Until 5a9a1738023a, GHC considered primops okay for
+-- speculation only when their arguments were known to be forced. This was
+-- unnecessarily conservative, but it prevented reallyUnsafePtrEquality# from
+-- floating out of places where its arguments were known to be forced.
+-- Unfortunately, GHC could sometimes lose track of whether those arguments
+-- were forced, leading to let/app invariant failures (see #13027 and the
+-- discussion in #11444). Now that ok_for_speculation skips over lifted
+-- arguments, we need to explicitly prevent reallyUnsafePtrEquality#
+-- from floating out. Imagine if we had
 --
 --     \x y . case x of x'
 --              DEFAULT ->
@@ -3222,7 +3280,8 @@ section "Controlling object lifetime"
 
 -- See Note [keepAlive# magic] in GHC.CoreToStg.Prep.
 -- NB: "v" is the same as "a" except levity-polymorphic,
--- and "p" is the same as "b" except representation-polymorphic
+-- and "p" is the same as "b" except representation-polymorphic.
+-- See Note [Levity and representation polymorphic primops]
 primop KeepAliveOp "keepAlive#" GenPrimOp
    v -> State# RealWorld -> (State# RealWorld -> p) -> p
    { \tt{keepAlive# x s k} keeps the value \tt{x} alive during the execution

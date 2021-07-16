@@ -38,7 +38,24 @@ module GHC.Exts
         module GHC.Prim.Ext,
         shiftL#, shiftRL#, iShiftL#, iShiftRA#, iShiftRL#,
         isTrue#,
-        Void#,  -- Previously exported by GHC.Prim
+        Void#, -- Previously exported by GHC.Prim
+
+        -- * Pointer comparison operations
+        -- See `Note [Pointer comparison operations]` in primops.txt.pp
+        reallyUnsafePtrEquality,
+        eqStableName#,
+        sameArray#,
+        sameMutableArray#,
+        sameSmallArray#,
+        sameSmallMutableArray#,
+        sameByteArray#,
+        sameMutableByteArray#,
+        sameArrayArray#,
+        sameMutableArrayArray#,
+        sameMVar#,
+        sameMutVar#,
+        sameTVar#,
+        sameIOPort#,
 
         -- * Compat wrapper
         atomicModifyMutVar#,
@@ -345,3 +362,4 @@ resizeSmallMutableArray# arr0 szNew a s0 =
 -- accessible\" by word.
 considerAccessible :: Bool
 considerAccessible = True
+
