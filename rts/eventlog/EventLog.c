@@ -704,7 +704,9 @@ initEventLogging()
 enum EventLogStatus
 eventLogStatus(void)
 {
-    if (eventlog_enabled) {
+    /* This relaxed load is needed as the eventLogStatus is called from
+     * handleTick without holding the eventlog state mutex. */
+    if (RELAXED_LOAD(&eventlog_enabled)) {
         return EVENTLOG_RUNNING;
     } else {
         return EVENTLOG_NOT_CONFIGURED;

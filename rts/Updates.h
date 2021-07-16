@@ -60,9 +60,8 @@
       TICK_UPD_NEW_IND();                                       \
     }                                                           \
     OVERWRITING_CLOSURE(p1);                                    \
-    StgInd_indirectee(p1) = p2;                                 \
-    prim_write_barrier;                                         \
-    SET_INFO(p1, stg_BLACKHOLE_info);                           \
+    RELEASE_STORE_WORD(p1 + SIZEOF_StgHeader + OFFSET_StgInd_indirectee, p2);      \
+    SET_INFO_RELEASE(p1, stg_BLACKHOLE_info);                   \
     LDV_RECORD_CREATE(p1);                                      \
     and_then;
 
