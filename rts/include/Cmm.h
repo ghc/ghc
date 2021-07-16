@@ -594,6 +594,7 @@
 
 /* Getting/setting the info pointer of a closure */
 #define SET_INFO(p,info) StgHeader_info(p) = info
+#define SET_INFO_RELEASE(p,info) prim_write_barrier; StgHeader_info(p) = info
 #define GET_INFO(p) StgHeader_info(p)
 
 /* Determine the size of an ordinary closure from its info table */
