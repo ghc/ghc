@@ -1,9 +1,11 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE FlexibleInstances #-}
 -- | The 'TPipelineClass' and 'MonadUse' classes and associated types
 module GHC.Driver.Pipeline.Monad (
-  TPipelineClass, MonadUse(..)
+  TPipelineClass, MonadUse(..), WrappedPipeline(..)
 
   , PipeEnv(..)
   , PipelineOutput(..)
@@ -27,6 +29,26 @@ type TPipelineClass (f :: K.Type -> K.Type) (m :: K.Type -> K.Type)
 -- | Lift a `f` action into an `m` action.
 class MonadUse f m where
   use :: f a -> m a
+
+-- | Wrapper around TPipelineClass which is more convenient for putting in data structures.
+newtype WrappedPipeline f a = WrappedPipeline { unwrap :: forall p . TPipelineClass f p => p a }
+
+-- Wrapped instances
+instance MonadIO (WrappedPipeline f) where
+  liftIO io = WrappedPipeline (liftIO io)
+
+instance Monad (WrappedPipeline f) where
+  (WrappedPipeline k) >>= f = WrappedPipeline (k >>= \x -> unwrap (f x))
+
+instance Applicative (WrappedPipeline f) where
+  pure x = WrappedPipeline (pure x)
+  (WrappedPipeline fa) <*> WrappedPipeline a = WrappedPipeline (fa <*> a)
+
+instance Functor (WrappedPipeline f) where
+  fmap f (WrappedPipeline p) = WrappedPipeline (fmap f p)
+
+instance MonadUse f (WrappedPipeline f) where
+  use ma = WrappedPipeline (use ma)
 
 -- PipeEnv: invariant information passed down through the pipeline
 data PipeEnv = PipeEnv {
