@@ -352,7 +352,10 @@ threadPaused(Capability *cap, StgTSO *tso)
             OVERWRITING_CLOSURE_SIZE(bh, closure_sizeW_(bh, INFO_PTR_TO_STRUCT(bh_info)));
 
             // The payload of the BLACKHOLE points to the TSO
-            ((StgInd *)bh)->indirectee = (StgClosure *)tso;
+            // N.B. This must be a release store for the reason described in #20128.
+            RELEASE_STORE(&((StgInd *)bh)->indirectee, (StgClosure *)tso);
+
+            // un-WHITEHOLE the thunk, releasing our lock on it
             SET_INFO_RELEASE(bh,&stg_BLACKHOLE_info);
 
             // .. and we need a write barrier, since we just mutated the closure:

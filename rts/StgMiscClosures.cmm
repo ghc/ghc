@@ -504,8 +504,9 @@ INFO_TABLE(stg_BLACKHOLE,1,0,BLACKHOLE,"BLACKHOLE","BLACKHOLE")
     TICK_ENT_DYN_IND(); /* tick */
 
 retry:
-    prim_read_barrier;
-    p = StgInd_indirectee(node);
+    // N.B. This acquire pairs with the releases in lockCAF() and
+    // threadPaused(). See #20129 and #20128.
+    ACQUIRE_LOAD_WORD(p, node + SIZEOF_StgHeader + OFFSET_StgInd_indirectee);
     if (GETTAG(p) != 0) {
         return (p);
     }
