@@ -185,10 +185,10 @@ tc_cmd env (HsCmdIf x fun@(SyntaxExprRn {}) pred b1 b2) res_ty -- Rebindable syn
         ; let r_ty = mkTyVarTy r_tv
         ; checkTc (not (r_tv `elemVarSet` tyCoVarsOfType pred_ty))
                   (TcRnUnknownMessage $ mkPlainError noHints $ text "Predicate type of `ifThenElse' depends on result type")
-        ; (pred', fun')
-            <- tcSyntaxOp IfOrigin fun (map synKnownType [pred_ty, r_ty, r_ty])
-                                       (mkCheckExpType r_ty) $ \ _ _ ->
-               tcCheckMonoExpr pred pred_ty
+        ; (pred', fun') <- tcSyntaxOp IfThenElseOrigin fun
+                              (map synKnownType [pred_ty, r_ty, r_ty])
+                              (mkCheckExpType r_ty) $ \ _ _ ->
+                           tcCheckMonoExpr pred pred_ty
 
         ; b1'   <- tcCmd env b1 res_ty
         ; b2'   <- tcCmd env b2 res_ty
