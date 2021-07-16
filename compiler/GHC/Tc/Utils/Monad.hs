@@ -361,7 +361,6 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
              } ;
         } ;
 
-        pprTraceM "tcg" (ppr (moduleUnit (tcg_semantic_mod gbl_env)) $$ ppr (moduleUnit (tcg_mod gbl_env)) ) ;
         -- OK, here's the business end!
         initTcWithGbl hsc_env gbl_env loc do_this
     }
@@ -2055,8 +2054,7 @@ initIfaceTcRn thing_inside
   = do  { tcg_env <- getGblEnv
         ; hsc_env <- getTopEnv
           -- bangs to avoid leaking the envs (#19356)
-        ; let !mod = tcg_semantic_mod tcg_env
-              !home_unit = hsc_home_unit hsc_env
+        ; let !home_unit = hsc_home_unit hsc_env
               -- When we are instantiating a signature, we DEFINITELY
               -- do not want to knot tie.
               is_instantiate = isHomeUnitInstantiating home_unit

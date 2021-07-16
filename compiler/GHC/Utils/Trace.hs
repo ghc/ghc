@@ -29,7 +29,7 @@ pprTrace str doc x
   | otherwise              = pprDebugAndThen defaultSDocContext trace (text str) doc x
 
 pprTraceM :: Applicative f => String -> SDoc -> f ()
-pprTraceM str doc = pure () -- pprTrace str doc (pure ())
+pprTraceM str doc = pprTrace str doc (pure ())
 
 pprTraceDebug :: String -> SDoc -> a -> a
 pprTraceDebug str doc x

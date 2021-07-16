@@ -17,6 +17,7 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ApplicativeDo #-}
 
 -- -----------------------------------------------------------------------------
 --
@@ -84,12 +85,11 @@ import GHC.Iface.Recomp    ( RecompileRequired ( MustCompile ) )
 import GHC.Data.Bag        ( listToBag )
 import GHC.Data.Graph.Directed
 import GHC.Data.FastString
-import GHC.Data.Maybe      ( expectJust, MaybeT (MaybeT), runMaybeT )
+import GHC.Data.Maybe      ( expectJust )
 import GHC.Data.StringBuffer
 import qualified GHC.LanguageExtensions as LangExt
 
-import GHC.Utils.Exception ( AsyncException(..), evaluate )
-import GHC.Utils.Monad     ( mapMaybeM )
+import GHC.Utils.Exception ( AsyncException(..), evaluate, BlockedIndefinitelyOnMVar (BlockedIndefinitelyOnMVar), onException, throwIO )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
@@ -125,7 +125,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified GHC.Data.FiniteMap as Map ( insertListWith )
 
-import Control.Concurrent ( killThread, newChan, Chan, readChan, forkIO )
+import Control.Concurrent ( killThread, newChan, Chan, readChan, forkIO, writeChan )
 import qualified GHC.Conc as CC
 import Control.Concurrent.MVar
 import Control.Concurrent.QSem
@@ -133,12 +133,12 @@ import Control.Monad
 import Control.Monad.Trans.Except ( ExceptT(..), runExceptT, throwE )
 import qualified Control.Monad.Catch as MC
 import Data.IORef
-import Data.List (nub, sort, inits)
+import Data.List (nub, sort)
 import qualified Data.List as List
 import Data.Foldable (toList)
 import Data.Maybe
 import Data.Time
-import Data.Bifunctor (first, Bifunctor (second))
+import Data.Bifunctor (first)
 import System.Directory
 import System.FilePath
 import System.IO        ( fixIO )
@@ -150,12 +150,13 @@ import GHC.Driver.Pipeline.Semaphore
 import GHC.Data.DependentMap
 import qualified Data.Map.Strict as M
 import System.Timeout
-import qualified GHC.Data.DependentMap as D
 import GHC.Utils.Trace
 import GHC.Types.TypeEnv
 import Control.Monad.Trans.State.Lazy
-import Control.Monad.Trans.Class
 import Data.Functor ((<&>))
+import qualified Data.Semigroup as S
+import Control.Applicative
+import Control.Monad.Trans.Class
 
 label_self :: String -> IO ()
 label_self thread_name = do
@@ -596,7 +597,7 @@ load' how_much mHscMessage mod_graph = do
     n_jobs <- case parMakeCount dflags of
                     Nothing -> liftIO getNumProcessors
                     Just n  -> return n
-    let upsweep_fn | n_jobs >= 1 = parUpsweep n_jobs
+    let upsweep_fn = parUpsweep n_jobs
 
     setSession $ hscUpdateHPT (const emptyHomePackageTable) hsc_env
     (upsweep_ok, hsc_env1) <- withDeferredDiagnostics $
@@ -832,25 +833,6 @@ pruneHomePackageTable hpt summ
 
         ms_map = listToUFM [(ms_mod_name ms, ms) | ms <- summ]
 
-
--- -----------------------------------------------------------------------------
---
--- | Return (names of) all those in modsDone who are part of a cycle as defined
--- by theGraph.
-findPartiallyCompletedCycles :: [Module] -> [SCC ModSummary] -> Set.Set Module
-findPartiallyCompletedCycles modsDone theGraph
-   = Set.unions
-       [mods_in_this_cycle
-       | CyclicSCC vs <- theGraph  -- Acyclic? Not interesting.
-       , let names_in_this_cycle = Set.fromList (map ms_mod vs)
-             mods_in_this_cycle =
-                    Set.intersection (Set.fromList modsDone) names_in_this_cycle
-         -- If size mods_in_this_cycle == size names_in_this_cycle,
-         -- then this cycle has already been completed and we're not
-         -- interested.
-       , Set.size mods_in_this_cycle < Set.size names_in_this_cycle]
-
-
 -- ---------------------------------------------------------------------------
 --
 -- | Unloading
@@ -944,29 +926,6 @@ unload interp hsc_env
 -}
 
 
--- | The graph of modules to compile and their corresponding result 'MVar' and
--- 'LogQueue'.
-type CompilationGraph = [(ModuleGraphNode)]
-
-
-
-
--- also returning the first, if any, encountered module cycle.
-buildCompGraph :: [SCC ModuleGraphNode] -> IO (CompilationGraph, Maybe [ModuleGraphNode])
-buildCompGraph [] = return ([], Nothing)
-buildCompGraph (scc:sccs) = case scc of
-    AcyclicSCC ms -> do
-        mvar <- newEmptyMVar
-        log_queue <- do
-            ref <- newIORef []
-            sem <- newEmptyMVar
-            return (LogQueue ref sem)
-        (rest,cycle) <- buildCompGraph sccs
-        return (ms:rest, cycle)
-    CyclicSCC mss -> return ([], Just mss)
-
-
-
 data BuildLoopState = BuildLoopState { buildDep :: M.Map NodeKey (SDoc, WrappedPipeline (Success (Maybe HomeModInfo)))
                                           -- The current way to build a specific TNodeKey, without cycles this just points to
                                           -- the appropiate use (CompileModule ...) or use (TypecheckInstantiate ..) but with
@@ -1017,7 +976,8 @@ data NodeBuildInfo = NodeBuildInfo { nk :: (Int, Int)
                                    , build_node_key :: NodeKey
                                    , build_node_var :: Maybe (ModuleEnv (IORef TypeEnv))
                                    , build_self :: WrappedPipeline (Success (Maybe HomeModInfo))
-                                   , build_deps :: WrappedPipeline (Success [HomeModInfo])}
+                                   , build_deps :: WrappedPipeline (Success [HomeModInfo])
+                                   , node_log_queue :: LogQueue }
 
 -- | Given the build plan, creates a graph which indicates where each NodeKey should
 -- get its direct dependencies from. This might not be the corresponding build action
@@ -1036,7 +996,7 @@ createBuildMap deps_map plan = evalStateT (buildLoop plan) (BuildLoopState M.emp
       home_mod_map <- getBuildMap
       -- 1. Get the transitive dependencies of this module, by looking up in the dependency map
       let trans_deps = expectJust "build_module" $ Map.lookup (mkNodeKey mod) deps_map
-      pprTraceM "build mod" (ppr mod $$ ppr trans_deps)
+--      pprTraceM "build mod" (ppr mod $$ ppr trans_deps)
       {-
       let pipeline :: (forall p . TPipelineClass MakeAction p => [HomeModInfo] -> p (Maybe a)) -> WrappedPipeline (Maybe a)
           pipeline k = WrappedPipeline $ do
@@ -1062,8 +1022,8 @@ createBuildMap deps_map plan = evalStateT (buildLoop plan) (BuildLoopState M.emp
       let doc_build_deps = catMaybes $ map (flip M.lookup home_mod_map) trans_deps
           docs = map fst doc_build_deps
           build_deps = map snd doc_build_deps
-      pprTraceM "deps" (ppr (mkNodeKey mod) $$ ppr docs)
-      return $ NodeBuildInfo ((mod_idx, n_mods)) (mkNodeKey mod) knot_var a (process_loop2 build_deps)
+      lq <- liftIO newLogQueue
+      return $ NodeBuildInfo ((mod_idx, n_mods)) (mkNodeKey mod) knot_var a (process_loop2 build_deps) lq
 
 
     tcLoop :: [ModuleGraphNode] ->  BuildM [NodeBuildInfo]
@@ -1072,24 +1032,9 @@ createBuildMap deps_map plan = evalStateT (buildLoop plan) (BuildLoopState M.emp
       let ms_mods = mapMaybe (\case InstantiationNode {} -> Nothing; ModuleNode ems -> Just (ms_mod (emsModSummary ems))) ms
       knot_var <- liftIO $ mkModuleEnv <$> mapM (\m -> (m,) <$> newIORef emptyNameEnv) ms_mods
 
-      scc_n <- sccId
+      _scc_n <- sccId
       -- 1. Build all the dependencies in this loop
       nbi <- mapM (buildSingleModule (Just knot_var)) ms
-      -- 2.
-      {-
-      let p n = WrappedPipeline $ do
-                   -- Build all the dependencies in the loop
-                   unwrapped <- mapM (\x -> unwrap x) deps
-                   let mhmis = sequenceA (catMaybes unwrapped)
-                   case mhmis of
-                    Nothing -> return Nothing
-                    Just hmis ->  do
-                      -- Sync on a typecheck loop
-                      hmis' <- use (TypecheckLoop scc_n knot_var hmis)
-                      -- Fanout
-                      return $ Just $ hmis' !! n
-                      -}
-
       let
           ms_i = zip3 (mapMaybe (fmap (msKey . emsModSummary) . moduleGraphNodeModule) ms) nbi [0..]
       let p i = do
@@ -1101,9 +1046,6 @@ createBuildMap deps_map plan = evalStateT (buildLoop plan) (BuildLoopState M.emp
             return $ nb { build_self = pipe }
 
       mapM do_one ms_i
-      -- Old comment: MP: TODO: Think that these NBI should modify self to point to p as well.
-      -- At the moment, if you request to compile module M, which is in a loop, it wil
-      -- compile the loop up to that point but not retypecheck.
 
     buildLoop :: [BuildPlan]
               -> BuildM (Maybe [ModuleGraphNode], [NodeBuildInfo])
@@ -1145,45 +1087,22 @@ parUpsweep
     -> M.Map NodeKey [NodeKey]
     -> [BuildPlan]
     -> IO (SuccessFlag, HscEnv)
-parUpsweep n_jobs hsc_env mHscMessage old_hpt transitive_deps build_plan = do
-    let logger = hsc_logger hsc_env
-
-    -- The bits of shared state we'll be using:
-
-    -- What we use to limit parallelism with.
-    par_sem <- liftIO $ newQSem n_jobs
-
-
-    let updNumCapabilities = liftIO $ do
-            n_capabilities <- getNumCapabilities
-            n_cpus <- getNumProcessors
-            -- Setting number of capabilities more than
-            -- CPU count usually leads to high userspace
-            -- lock contention. #9221
-            let n_caps = min n_jobs n_cpus
-            unless (n_capabilities /= 1) $ setNumCapabilities n_caps
-            return n_capabilities
-    -- Reset the number of capabilities once the upsweep ends.
-    let resetNumCapabilities orig_n = liftIO $ setNumCapabilities orig_n
-
-    MC.bracket updNumCapabilities resetNumCapabilities $ \_ -> do
+parUpsweep n_jobs hsc_env _mHscMessage old_hpt transitive_deps build_plan = do
 
     -- The list of all loops in the compilation graph.
     -- NB: For convenience, the last module of each loop (aka the module that
     -- finishes the loop) is prepended to the beginning of the loop.
 
-    liftIO $ label_self "main --make thread"
 
     -- Make the logger thread_safe: we only make the "log" action thread-safe in
     -- each worker by setting a LogAction hook, so we need to make the logger
     -- thread-safe for other actions (DumpAction, TraceAction).
     (cycle, pipelines) <- createBuildMap transitive_deps build_plan
-    let all_pipelines = process_loop pipelines
-        dep_map = M.fromList [(build_node_key bk, bk) | bk <- pipelines]
---    lifIO $ print "UNCACHED"
 --    res <- simpleRunModPipeline 1 hsc_env (mapM (\x -> unwrap x) pipelines)
 --    liftIO $ print "CACHED"
-    res <- cachedRunModPipeline 1 hsc_env old_hpt dep_map all_pipelines
+    res <- cachedRunModPipeline n_jobs hsc_env old_hpt pipelines
+
+
 
 
     let completed = [m | SSuccess (Just m) <- res]
@@ -1193,84 +1112,12 @@ parUpsweep n_jobs hsc_env mHscMessage old_hpt transitive_deps build_plan = do
     -- of the upsweep.
     case cycle of
         Just mss -> do
+          let logger = hsc_logger hsc_env
           liftIO $ fatalErrorMsg logger (cyclicModuleErr mss)
           return (Failed, hsc_env)
         Nothing  -> do
           let success_flag = successIf (all isSuccess res)
           return (success_flag, hsc_env')
-
-{-
-                  cleanCurrentModuleTempFiles (hsc_logger lcl_hsc_env')
-                                              (hsc_tmpfs  lcl_hsc_env')
-                                              (hsc_dflags lcl_hsc_env')
-                                              -}
-
-
-
-      {-
-      handleSourceError (\err -> do logg err; return Nothing) $ do
-                  -- Have the HscEnv point to our local logger and tmpfs.
-                  let lcl_hsc_env = localize_hsc_env hsc_env
-
-                  -- Re-typecheck the loop
-                  -- This is necessary to make sure the knot is tied when
-                  -- we close a recursive module loop, see bug #12035.
-                  type_env_var <- liftIO $ newIORef emptyNameEnv
-                  let lcl_hsc_env' = lcl_hsc_env { hsc_type_env_var =
-                                      Just (ms_mod mod, type_env_var) }
-                  lcl_hsc_env'' <- case finish_loop of
-                      Nothing   -> return lcl_hsc_env'
-                      -- In the non-parallel case, the retypecheck prior to
-                      -- typechecking the loop closer includes all modules
-                      -- EXCEPT the loop closer.  However, our precomputed
-                      -- SCCs include the loop closer, so we have to filter
-                      -- it out.
-                      Just loop -> setHPTtypecheckLoop lcl_hsc_env' $
-                                   filter (/= moduleName (gwib_mod this_build_mod)) $
-                                   map (moduleName . gwib_mod) loop
-
-                  -- Compile the module.
-                  mod_info <- upsweep_mod lcl_hsc_env'' mHscMessage old_hpt
-                                          mod mod_index num_mods
-                  return (Just mod_info)
-                  -}
- {-
-          case mb_mod_info of
-              Nothing -> return Failed
-              Just mod_info -> do
-                  let this_mod = ms_mod_name mod
-
-                  -- Prune the old HPT unless this is an hs-boot module.
-                  unless (isBootSummary mod == IsBoot) $
-                      atomicModifyIORef' old_hpt_var $ \old_hpt ->
-                          (delFromHpt old_hpt this_mod, ())
-
-                  -- Update and fetch the global HscEnv.
-                  lcl_hsc_env' <- modifyMVar hsc_env_var $ \hsc_env -> do
-                      let hsc_env' = hscUpdateHPT (\hpt -> addToHpt hpt this_mod mod_info)
-                                                  hsc_env
-
-                      -- We've finished typechecking the module, now we must
-                      -- retypecheck the loop AGAIN to ensure unfoldings are
-                      -- updated.  This time, however, we include the loop
-                      -- closer!
-                      hsc_env'' <- case finish_loop of
-                          Nothing   -> return hsc_env'
-                          Just loop -> setHPTtypecheckLoop hsc_env' $
-                                       map (moduleName . gwib_mod) loop
-                      return (hsc_env'', localize_hsc_env hsc_env'')
-
-                  -- Clean up any intermediate files.
-                  return Succeeded
-                  -}
-
-    where
-    {-
-      localize_hsc_env hsc_env
-          = hsc_env { hsc_logger = lcl_logger
-                    , hsc_tmpfs  = lcl_tmpfs
-                    }
-                    -}
 
 
       -- Dealing with module loops
@@ -1480,14 +1327,6 @@ Potential TODOS:
 -- incorrectly regarding non-.hi files as outdated.
 --
 
--- Filter modules in the HPT
-retainInTopLevelEnvs :: [ModuleName] -> HomePackageTable -> HomePackageTable
-retainInTopLevelEnvs keep_these hpt
-   = listToHpt   [ (mod, expectJust "retain" mb_mod_info)
-                 | mod <- keep_these
-                 , let mb_mod_info = lookupHpt hpt mod
-                 , isJust mb_mod_info ]
-
 -- ---------------------------------------------------------------------------
 -- Typecheck module loops
 {-
@@ -1554,21 +1393,6 @@ Following this fix, GHC can compile itself with --make -O2.
 --      Arguably, D.hs should import A.hs, not A.hs-boot, but
 --      a dependency on the boot file is not illegal.
 --
-getModLoop
-  :: ModSummary
-  -> [ModuleGraphNode]
-  -> (Module -> Bool) -- check if a module appears as a boot module in 'graph'
-  -> Maybe [ModuleGraphNode]
-getModLoop ms graph appearsAsBoot
-  | isBootSummary ms == NotBoot
-  , appearsAsBoot this_mod
-  , let mss = reachableBackwards (ms_mod_name ms) graph
-  = Just mss
-  | otherwise
-  = Nothing
- where
-  this_mod = ms_mod ms
-
 setHPTtypecheckLoop :: HscEnv -> [ModuleName] -> IO HscEnv
 setHPTtypecheckLoop hsc_env mns = do
   let hmis    = map (expectJust "typecheckLoop" . lookupHpt (hsc_HPT hsc_env)) mns
@@ -1597,13 +1421,6 @@ typecheckLoop hsc_env hmis = do
   where
     logger  = hsc_logger hsc_env
     old_hpt = hsc_HPT hsc_env
-
-reachableBackwards :: ModuleName -> [ModuleGraphNode] -> [ModuleGraphNode]
-reachableBackwards mod summaries
-  = [ node_payload node | node <- reachableG (transposeG graph) root ]
-  where -- the rest just sets up the graph:
-        (graph, lookup_node) = moduleGraphNodes False summaries
-        root  = expectJust "reachableBackwards" (lookup_node $ NodeKey_Module $ GWIB mod IsBoot)
 
 -- ---------------------------------------------------------------------------
 --
@@ -2464,12 +2281,6 @@ multiRootsErr summs@(summ1:_)
     mod = ms_mod summ1
     files = map (expectJust "checkDup" . ml_hs_file . ms_location) summs
 
-keepGoingPruneErr :: [NodeKey] -> SDoc
-keepGoingPruneErr ms
-  = vcat (( text "-fkeep-going in use, removing the following" <+>
-            text "dependencies and continuing:"):
-          map (nest 6 . pprNodeKey) ms )
-
 cyclicModuleErr :: [ModuleGraphNode] -> SDoc
 -- From a strongly connected component we find
 -- a single cycle to report
@@ -2547,7 +2358,6 @@ instance Outputable (SimpleMakeAction a) where
   ppr (STypecheckLoop _knot_var nks) = hcat [text "TC:", ppr (nks)]
   ppr (SCompileModule ms) = hcat [text "Compile:", ppr (ms_mod ms) ]
   ppr (STypecheckInstantiatedUnit iu) = hcat [text "Inst:", ppr iu]
-  ppr _ = empty
 
 
 
@@ -2574,35 +2384,13 @@ instance MonadUse SimpleMakeAction WrappedPipeline where
 data SimpleEnv = SimpleEnv { hsc_env :: HscEnv
                            , old_hpt :: HomePackageTable
                            , mod_map  :: M.Map NodeKey NodeBuildInfo
-                           , actionMap :: MVar (ActionMap ModKey)
-                           , log_chan :: Chan LogQueue }
+                           , thread_pool :: ThreadPool ModKey }
 
-instance MonadUse SimpleMakeAction (ReaderT SimpleEnv IO) where
-  use fa = cachedInterpret fa
+
+--instance MonadIO m => MonadUse SimpleMakeAction (ReaderT SimpleEnv m) where
+--  use fa = cachedInterpret fa
 
 type ModKey = SimpleMakeAction
-
-data TNodeKey a where
-  TModule :: ModuleNameWithIsBoot -> TNodeKey (Maybe HomeModInfo)
-  TInstantiatedUnit :: InstantiatedUnit -> TNodeKey (Maybe ())
-
-withTNodeKey :: ModuleGraphNode -> (forall a . TNodeKey a -> r) -> r
-withTNodeKey node k =
-  case node of
-    InstantiationNode iud -> k (TInstantiatedUnit iud)
-    ModuleNode ems        -> k (tmodule ems)
-
-instance GEq TNodeKey where
-  geq a1 a2 = (a1 `gcompare` a2) == EQ
-
-instance GOrd TNodeKey where
-  TModule m1 `gcompare` TModule m2 = m1 `compare` m2
-  TInstantiatedUnit iu1 `gcompare` TInstantiatedUnit iu2 = iu1 `compare` iu2
-  TModule {} `gcompare` _ = LT
-  TInstantiatedUnit {} `gcompare` _ = GT
-
-tmodule :: ExtendedModSummary  -> TNodeKey (Maybe HomeModInfo)
-tmodule ems = TModule (msKey (emsModSummary ems))
 
 instance GEq SimpleMakeAction where
   a `geq` b = (a `gcompare` b) == EQ
@@ -2616,21 +2404,17 @@ instance GOrd SimpleMakeAction where
   SCompileModule {} `gcompare` _ = LT
   STypecheckInstantiatedUnit {} `gcompare` _ = GT
 
-cachedInterpret :: SimpleMakeAction a -> ReaderT SimpleEnv IO a
+{-
+cachedInterpret :: MonadIO m => SimpleMakeAction a -> ReaderT SimpleEnv m a
 cachedInterpret fa = do
   am <- asks actionMap
-  q_chan <- asks log_chan
   hsc_env <- asks hsc_env
-  old_hpt <- asks old_hpt
+  par_sem <- asks par_sem
   se <- ask
-  liftIO $ queueAction q_chan am fa $ \lq -> do
-    -- Output of the logger is mediated by a central worker to
-    -- avoid output interleaving
-    let lcl_logger = pushLogHook (const (parLogAction lq)) (hsc_logger hsc_env)
+  liftIO $ queueAction am par_sem fa $ do
     -- 2. Create a thread-local FS so the local files can be cleaned promptly
     lcl_tmpfs <- liftIO $ forkTmpFsFrom (hsc_tmpfs hsc_env)
-    let local_hsc_env = hsc_env { hsc_logger = lcl_logger
-                                , hsc_tmpfs  = lcl_tmpfs }
+    let local_hsc_env = hsc_env { hsc_tmpfs  = lcl_tmpfs }
     -- Run the action
     res <- runReaderT (actionInterpret fa) (se { hsc_env = local_hsc_env })
 
@@ -2638,10 +2422,9 @@ cachedInterpret fa = do
       -- Add remaining files which weren't cleaned up into local tmp fs for
       -- clean-up later.
       mergeTmpFsInto lcl_tmpfs (hsc_tmpfs hsc_env)
-      -- Indicate the log queue is finished
-      finishLogQueue lq
 
     return res
+    -}
 
 
 addDepsToHscEnv ::  [HomeModInfo] -> HscEnv -> HscEnv
@@ -2653,6 +2436,9 @@ wrapAction hsc_env k = do
               let lcl_logger = hsc_logger hsc_env
                   lcl_dynflags = hsc_dflags hsc_env
               let logg err = printMessages lcl_logger (initDiagOpts lcl_dynflags) (srcErrorMessages err)
+              -- MP: It is a bit strange how prettyPrintGhcErrors handles some errors but then we handle
+              -- SourceError and ThreadKilled differently directly below. TODO: Refactor to use `catches`
+              -- directly
               mres <-
                 liftIO $ MC.try $ prettyPrintGhcErrors lcl_logger $ k
               liftIO $ case mres of
@@ -2670,7 +2456,7 @@ wrapAction hsc_env k = do
                                     _ -> errorMsg lcl_logger (text (show exc))
                     return SFailed
 
-actionInterpret :: SimpleMakeAction a -> ReaderT SimpleEnv IO a
+actionInterpret :: TPipelineClass SimpleMakeAction m => SimpleMakeAction a -> ReaderT SimpleEnv m a
 actionInterpret fa =
   case fa of
 --    STypecheckLoop n knot_var  -> do
@@ -2683,7 +2469,8 @@ actionInterpret fa =
 --    pprTraceM "INSTANTIATING" (ppr (k, n) $$ ppr ui $$ ppr (map (mi_module . hm_iface) deps))
       let nbi = expectJust "build_module" $ Map.lookup (NodeKey_Unit ui) m_map
           (k, n) = nk nbi
-      mdep_hmis <- unwrap (build_deps nbi)
+          lq = node_log_queue nbi
+      mdep_hmis <- lift $ unwrap (build_deps nbi)
       --  pprTraceM "mdep_hmis" (ppr mod $$ ppr textual_deps $$ ppr (length <$> mdep_hmis))
       case mdep_hmis of
           -- One of the dependencies failed, so propagate the failure upwards
@@ -2691,13 +2478,19 @@ actionInterpret fa =
           -- All dependencies succeeded, continue with the returned info
           SSuccess deps -> do
             hsc_env <- asks hsc_env
-            let lcl_hsc_env = addDepsToHscEnv deps hsc_env
+
+            -- Output of the logger is mediated by a central worker to
+            -- avoid output interleaving
+            let lcl_logger = pushLogHook (const (parLogAction lq)) (hsc_logger hsc_env)
+            let lcl_hsc_env = addDepsToHscEnv deps hsc_env { hsc_logger = lcl_logger }
             liftIO $ wrapAction lcl_hsc_env $ upsweep_inst lcl_hsc_env (Just batchMsg) k n ui
+              `MC.finally` finishLogQueue lq
     SCompileModule  mod -> do
       SimpleEnv{..} <- ask
       let node_key = (NodeKey_Module $ mkHomeBuildModule0 mod)
       let nbi = expectJust "build_module" $ Map.lookup node_key mod_map
           (k, n) = nk nbi
+          lq = node_log_queue nbi
       let mk_mod = case ms_hsc_src mod of
                       HsigFile  -> homeModuleInstantiation (hsc_home_unit hsc_env) (ms_mod mod)
                       _ -> ms_mod mod
@@ -2705,7 +2498,7 @@ actionInterpret fa =
       knot_var <- liftIO $ maybe (mkModuleEnv .  (:[]) . (mk_mod ,) <$> newIORef emptyTypeEnv) return (build_node_var nbi)
 
       pprTraceM "COMPILING" (ppr mod $$ ppr (moduleUnit $ mk_mod))
-      mdep_hmis <- unwrap (build_deps nbi)
+      mdep_hmis <- lift $ unwrap (build_deps nbi)
       --  pprTraceM "mdep_hmis" (ppr mod $$ ppr textual_deps $$ ppr (length <$> mdep_hmis))
       case mdep_hmis of
           -- One of the dependencies failed, so propagate the failure upwards
@@ -2718,7 +2511,7 @@ actionInterpret fa =
                 lcl_logger =
                   -- Apply local log actions to the logger
                   flip setLogFlags (initLogFlags lcl_dynflags) $
-                  hsc_logger hsc_env
+                  pushLogHook (const (parLogAction lq)) (hsc_logger hsc_env)
             let lcl_hsc_env =
                     -- Localise the logger to use the cached flags
                     addDepsToHscEnv deps $
@@ -2726,10 +2519,11 @@ actionInterpret fa =
                             , hsc_dflags = lcl_dynflags
                             , hsc_type_env_vars = knot_var }
             liftIO $ wrapAction lcl_hsc_env $ upsweep_mod lcl_hsc_env (Just batchMsg) old_hpt mod k n -- k n
+              `MC.finally` finishLogQueue lq
     STypecheckLoop knot_var nk -> do
       pprTraceM "TC:LOOP" (ppr (length nk))
       hsc_env <- asks hsc_env
-      res <- process_loop2 (map useMGN nk)
+      res <- lift $ process_loop2 (map useMGN nk)
       case res of
         SFailed -> return SFailed
         SSuccess hmis ->
@@ -2754,47 +2548,282 @@ process_loop2 (x:xs) = do
 process_loop :: TPipelineClass SimpleMakeAction q => [NodeBuildInfo] -> q [Success (Maybe HomeModInfo)]
 process_loop [] = return []
 process_loop (x:xs) = do
-  pprTraceM "process" (ppr $ build_node_key x)
-  res <- unwrap (build_self x)
-  pprTraceM "process" (ppr (build_node_key x) $$ ppr (isSuccess res))
-  (res:) <$> process_loop xs
+  (:) <$> unwrap (build_self x) <*> process_loop xs
 
 
-logThread :: MVar () -> Logger -> Chan LogQueue -> IO (IO ())
-logThread shutdown logger q_chan = do
-  finish_var <- newEmptyMVar
-  tid <- forkIO $ loop finish_var
-  return (takeMVar finish_var >> killThread tid)
+logThread :: Logger -> [LogQueue] -> IO (IO ())
+logThread logger all_lqs = do
+  finished_var <- newEmptyMVar
+  _ <- forkIO $ loop finished_var all_lqs
+  return (takeMVar finished_var)
   where
-    loop finish_var = do
-      log_queue <- timeout 1000 $ readChan q_chan
-      case log_queue of
-        Nothing -> do
-          shutting_down <- tryTakeMVar shutdown
-          case shutting_down of
-            Just () -> putMVar finish_var ()
-            _ -> loop finish_var
-        Just lq -> printLogs logger lq >> loop finish_var
+    loop finished_var [] = putMVar finished_var ()
+    loop finished_var (lq:lqs) = printLogs logger lq *> loop finished_var lqs
 
 
 cachedRunModPipeline :: Int -> HscEnv -> HomePackageTable
-                     -> M.Map NodeKey NodeBuildInfo
-                     -> ReaderT SimpleEnv IO a -> IO a
-cachedRunModPipeline n_jobs orig_hsc_env old_hpt deps_map pipe = do
+                     -> [NodeBuildInfo] -> IO [Success (Maybe HomeModInfo)]
+cachedRunModPipeline n_jobs orig_hsc_env old_hpt pipelines = do
+
+  let all_pipelines = process_loop pipelines
+      deps_map = M.fromList [(build_node_key bk, bk) | bk <- pipelines]
+
+  liftIO $ label_self "main --make thread"
   action_map <- newMVar emptyDepMap
-  log_chan  <- newChan
-  finished_var <- newEmptyMVar
-  wait_log_thread <- logThread finished_var (hsc_logger orig_hsc_env) log_chan
+  print (map nk pipelines)
+  wait_log_thread <- logThread (hsc_logger orig_hsc_env) (map node_log_queue pipelines)
   -- TODO: guard n >= 1
   thread_safe_logger <- liftIO $ makeThreadSafe (hsc_logger orig_hsc_env)
   let thread_safe_hsc_env = orig_hsc_env { hsc_logger = thread_safe_logger }
 
-  runReaderT pipe (SimpleEnv thread_safe_hsc_env old_hpt deps_map action_map log_chan)
-    `MC.finally` do
-      (readMVar action_map >>= killAllActions)
-      putMVar finished_var ()
-      wait_log_thread
+  thread_pool <- newThreadPool n_jobs
+  thread_pool_thread <- forkIO $ startThreadPool thread_pool
+
+  let updNumCapabilities = liftIO $ do
+          n_capabilities <- getNumCapabilities
+          n_cpus <- getNumProcessors
+          -- Setting number of capabilities more than
+          -- CPU count usually leads to high userspace
+          -- lock contention. #9221
+          let n_caps = min n_jobs n_cpus
+          unless (n_capabilities /= 1) $ setNumCapabilities n_caps
+          return n_capabilities
+    -- Reset the number of capabilities once the upsweep ends.
+  let resetNumCapabilities orig_n = do
+          liftIO $ setNumCapabilities orig_n
+          (killAllActions thread_pool)
+          killThread thread_pool_thread
+          wait_log_thread
 
 
-simpleRunModPipeline :: Int -> HscEnv -> ReaderT HscEnv IO a -> IO a
-simpleRunModPipeline n_jobs orig_hsc_env pipe = runReaderT pipe orig_hsc_env
+  MC.bracket updNumCapabilities resetNumCapabilities $ \_ ->
+      runReaderT (runFreeM all_pipelines) (SimpleEnv thread_safe_hsc_env old_hpt deps_map thread_pool)
+
+startThreadPool :: ThreadPool ModKey -> IO a
+startThreadPool t = loop
+  where
+    loop = do
+      dequeueAction t
+      print "Loop"
+      loop
+
+
+
+_simpleRunModPipeline :: Int -> HscEnv -> ReaderT HscEnv IO a -> IO a
+_simpleRunModPipeline _n_jobs orig_hsc_env pipe = runReaderT pipe orig_hsc_env
+
+newtype Concurrently a = Concurrently { runConcurrently :: IO a }
+
+instance Functor Concurrently where
+  fmap f (Concurrently a) = Concurrently $ f <$> a
+
+instance Applicative Concurrently where
+  pure = Concurrently . return
+  Concurrently fs <*> Concurrently as =
+    Concurrently $ (\(f, a) -> f a) <$> concurrently fs as
+instance Monad Concurrently where
+    return = pure
+    x >>= f = Concurrently $ runConcurrently x >>= (runConcurrently . f)
+
+instance MonadIO Concurrently where
+  liftIO m = Concurrently m
+
+-- concurrently :: IO a -> IO b -> IO (a,b)
+concurrently :: IO a -> IO b -> IO (a, b)
+concurrently left right = concurrently' left right (collect [])
+  where
+    collect [Left a, Right b] _ = return (a,b)
+    collect [Right b, Left a] _ = return (a,b)
+    collect xs m = do
+        e <- m
+        case e of
+            Left ex -> throwIO ex
+            Right r -> collect (r:xs) m
+
+concurrently' :: IO a -> IO b
+             -> (IO (Either MC.SomeException (Either a b)) -> IO r)
+             -> IO r
+concurrently' left right collect = do
+    done <- newEmptyMVar
+    MC.mask $ \restore -> do
+        -- Note: uninterruptibleMask here is because we must not allow
+        -- the putMVar in the exception handler to be interrupted,
+        -- otherwise the parent thread will deadlock when it waits for
+        -- the thread to terminate.
+        lid <- forkIO $ MC.uninterruptibleMask_ $
+          restore (left >>= putMVar done . Right . Left)
+            `MC.catchAll` (putMVar done . Left)
+        rid <- forkIO $ MC.uninterruptibleMask_ $
+          restore (right >>= putMVar done . Right . Right)
+            `MC.catchAll` (putMVar done . Left)
+
+        count <- newIORef (2 :: Int)
+        let takeDone = do
+                r <- takeMVar done      -- interruptible
+                -- Decrement the counter so we know how many takes are left.
+                -- Since only the parent thread is calling this, we can
+                -- use non-atomic modifications.
+                -- NB. do this *after* takeMVar, because takeMVar might be
+                -- interrupted.
+                modifyIORef count (subtract 1)
+                return r
+
+        let tryAgain f = f `MC.catch` \BlockedIndefinitelyOnMVar -> f
+
+            stop = do
+                -- kill right before left, to match the semantics of
+                -- the version using withAsync. (#27)
+                MC.uninterruptibleMask_ $ do
+                  count' <- readIORef count
+                  -- we only need to use killThread if there are still
+                  -- children alive.  Note: forkIO here is because the
+                  -- child thread could be in an uninterruptible
+                  -- putMVar.
+                  when (count' > 0) $
+                    void $ forkIO $ do
+                      throwTo rid ThreadKilled
+                      throwTo lid ThreadKilled
+                  -- ensure the children are really dead
+                  replicateM_ count' (tryAgain $ takeMVar done)
+
+        r <- collect (tryAgain $ takeDone) `onException` stop
+        stop
+        return r
+
+runFreeM :: FreeM SimpleMakeAction a -> ReaderT SimpleEnv IO a
+runFreeM (Bind (Use key) kont) = do
+  -- Check to see if the key has finished
+  pprTraceM "F1" (ppr key)
+  env@SimpleEnv{..} <- ask
+  liftIO $ modifyMVar (threadActionMap thread_pool) $ \am -> flip runReaderT env $ do
+    case lookupDepMap key am of
+      -- The action didn't start yet, start it, and deschedule
+      Nothing -> do
+         am' <- queueRun key am
+         r <- deschedule key (runFreeM . kont)
+         return (am', r)
+      Just ar -> do
+        finished <- liftIO $ checkResult ar
+        case finished of
+          Just v -> (am,) <$> runFreeM (kont v)
+          -- Unfinished, so deschedule and come back once the key has finished.
+          Nothing -> (am,) <$> deschedule key (runFreeM . kont)
+runFreeM (Bind fa kont) =  do
+  pprTraceM "F2" GHC.Utils.Outputable.empty
+  runFreeM fa >>= runFreeM . kont
+runFreeM (Use key) = do
+  pprTraceM "F3-use" GHC.Utils.Outputable.empty
+  env@SimpleEnv{..} <- ask
+  _ $ modifyMVar (threadActionMap thread_pool) $ \am -> flip runReaderT env $ do
+    case lookupDepMap key am of
+      -- The action didn't start yet, start it
+      Nothing -> queueRun key am
+      Just ar -> return (am, waitResult ar)
+
+runFreeM (Ap fab fa) = do
+  pprTraceM "F4-app" GHC.Utils.Outputable.empty
+  env <- ask
+  liftIO $ uncurry ($) <$> concurrently (runReaderT (runFreeM fab) env) (runReaderT (runFreeM fa) env)
+runFreeM (Fmap f fa) = do
+  pprTraceM "F5-fmap" GHC.Utils.Outputable.empty
+  f <$> runFreeM fa
+runFreeM (MIO a) = do
+  pprTraceM "F6" GHC.Utils.Outputable.empty
+  liftIO a
+runFreeM (Pure a) = do
+  pprTraceM "F7-pure" GHC.Utils.Outputable.empty
+  pure a
+
+deschedule :: SimpleMakeAction a1 -> (a1 -> ReaderT SimpleEnv IO a) -> ReaderT SimpleEnv IO a
+deschedule act f = do
+  env@SimpleEnv{..} <- ask
+  let ThreadPool{..} = thread_pool
+  res_var <- liftIO $ newEmptyMVar
+  let delay = K $ \a -> runReaderT (f a) env >>= putMVar res_var
+  liftIO $ delayAction thread_pool act delay
+  liftIO $ readMVar res_var
+
+queueRun :: SimpleMakeAction a -> ActionMap ModKey -> ReaderT SimpleEnv IO (ActionMap ModKey, IO a)
+queueRun key am = do
+  pprTraceM "queueing" (ppr key)
+  env@SimpleEnv{..} <- ask
+  let ThreadPool{..} = thread_pool
+  res_var <- liftIO $ newEmptyMVar
+  let run = runReaderT (runFreeM $ (runReaderT (actionInterpret key) env)) env
+  let ar = ActionResult res_var (ppr key)
+  am <- liftIO $ startRun thread_pool am key ar (run >>= putMVar res_var)
+  return (am, readMVar res_var)
+
+startRun :: ThreadPool SimpleMakeAction -> ActionMap ModKey -> SimpleMakeAction a -> ActionResult a -> IO () -> IO (ActionMap ModKey)
+startRun ThreadPool{..} am fa ar k = do
+    print "start_run"
+    writeChan queued_actions k
+    return $ insertDepMap fa ar am
+
+
+delayAction :: ThreadPool SimpleMakeAction -> SimpleMakeAction a -> K a -> IO ()
+delayAction ThreadPool{..} fa k =
+  modifyMVar_ descheduled_actions $ \dm -> do
+    signalQSem thread_sem
+    return $ insertDepMap fa k dm
+
+dequeueAction :: ThreadPool SimpleMakeAction -> IO ()
+dequeueAction ThreadPool{..} = do
+  print "BLOCKED"
+  act <- readChan queued_actions
+  print "DQ"
+  waitQSem thread_sem
+  modifyMVar_ running_actions $ \run_list -> do
+    print "Starting"
+    tid <- forkIO act
+    return (killThread tid : run_list)
+
+
+
+
+
+
+data FreeM f a where
+  Use :: f a -> FreeM f a
+  Pure :: a -> FreeM f a
+  Bind :: FreeM f a -> (a -> FreeM f b) -> FreeM f b
+  Ap :: FreeM f (a -> b) -> FreeM f a -> FreeM f b
+  Fmap :: (a -> b) -> FreeM f a -> FreeM f b
+  MIO :: IO a -> FreeM f a
+
+instance Monad (FreeM f) where
+  (>>=) = Bind
+
+instance Applicative (FreeM f) where
+  (<*>) = Ap
+  pure = Pure
+
+instance Functor (FreeM f) where
+  fmap = Fmap
+instance MonadIO (FreeM f) where
+  liftIO = MIO
+
+instance MonadUse f (FreeM f) where
+  use = Use
+
+newThreadPool :: Int -> IO (ThreadPool f)
+newThreadPool n_jobs = do
+  -- What we use to limit parallelism with.
+  thread_sem <- liftIO $ newQSem n_jobs
+  threadActionMap <- newMVar emptyDepMap
+  descheduled_actions <- newMVar emptyDepMap
+  queued_actions <- newChan
+  running_actions <- newMVar []
+  return $ ThreadPool{..}
+
+data ThreadPool f = ThreadPool { threadActionMap :: MVar (ActionMap f)
+                               , descheduled_actions :: MVar (DependentMap f K)
+                               , queued_actions :: Chan (IO ())  -- start
+                               , running_actions :: MVar [IO ()] -- kill
+                               , thread_sem :: QSem }
+
+
+killAllActions :: ThreadPool f -> IO ()
+killAllActions =
+  MC.uninterruptibleMask_ . sequence_ <=< readMVar . running_actions
+

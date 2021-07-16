@@ -1816,7 +1816,6 @@ tcIfaceGlobal name
   | otherwise
   = do  { env <- getGblEnv
         ; cur_mod <- if_mod <$> getLclEnv
-        ; let m = (fromMaybe cur_mod (nameModule_maybe name))
         ; case lookupModuleEnv (if_rec_types env) (fromMaybe cur_mod (nameModule_maybe name))  of     -- Note [Tying the knot]
             Just get_type_env
                 -> do           -- It's defined in the module being compiled
@@ -1830,8 +1829,7 @@ tcIfaceGlobal name
             _ -> via_external }
   where
     via_external =  do
-        { pprTraceM "via_external" (ppr name)
-        ; hsc_env <- getTopEnv
+        { hsc_env <- getTopEnv
         ; mb_thing <- liftIO (lookupType hsc_env name)
         ; case mb_thing of {
             Just thing -> return thing ;

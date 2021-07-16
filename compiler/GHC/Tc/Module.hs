@@ -180,7 +180,6 @@ import Data.Data ( Data )
 import qualified Data.Set as S
 import Control.DeepSeq
 import Control.Monad
-import GHC.Utils.Trace
 
 {-
 ************************************************************************
@@ -203,7 +202,6 @@ tcRnModule hsc_env mod_sum save_rn_syntax
  = withTiming logger
               (text "Renamer/typechecker"<+>brackets (ppr this_mod))
               (const ()) $
-   pprTrace "tcRnMod" (ppr $ moduleUnit this_mod) $
    initTc hsc_env hsc_src save_rn_syntax this_mod real_loc $
           withTcPlugins hsc_env $ withHoleFitPlugins hsc_env $
 

@@ -18,7 +18,6 @@ import GHC.Types.TypeEnv
 import GHC.Unit.Finder.Types
 import GHC.Unit.Module.Graph
 import GHC.Unit.Env
-import GHC.Unit.Types
 import GHC.Utils.Logger
 import GHC.Utils.TmpFs
 import {-# SOURCE #-} GHC.Driver.Plugins

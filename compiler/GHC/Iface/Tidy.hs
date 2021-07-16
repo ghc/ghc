@@ -390,6 +390,7 @@ tidyProgram hsc_env  (ModGuts { mg_module           = mod
         ; (spt_entries, tidy_binds') <-
              sptCreateStaticBinds hsc_env mod tidy_binds
         ; let { platform = targetPlatform (hsc_dflags hsc_env)
+              ; spt_init_code = sptModuleInitCode platform mod spt_entries
               ; add_spt_init_code =
                   case backend dflags of
                     -- If we are compiling for the interpreter we will insert

@@ -237,7 +237,6 @@ import Data.Functor
 import Control.DeepSeq (force)
 import Data.Bifunctor (first)
 import GHC.Utils.Trace
-import GHC.Iface.Tidy.StaticPtrTable
 
 {- **********************************************************************
 %*                                                                      *
@@ -1060,7 +1059,7 @@ genModDetails :: HscEnv -> ModIface -> IO ModDetails
 genModDetails hsc_env old_iface
   = do
     new_details <- {-# SCC "tcRnIface" #-}
-                   initIfaceCheck (text "gen_details") hsc_env (typecheckIface old_iface)
+                   initIfaceLoad  hsc_env (typecheckIface old_iface)
     dumpIfaceStats hsc_env
     return new_details
 
@@ -1541,9 +1540,7 @@ hscSimpleIface :: HscEnv
                -> Maybe Fingerprint
                -> IO (ModIface, Maybe Fingerprint, ModDetails)
 hscSimpleIface hsc_env tc_result summary mb_old_iface
-    =
-    pprTrace "hscSimpleIface" (ppr $ moduleUnit $ ms_mod summary)
-     $ runHsc hsc_env $ hscSimpleIface' tc_result summary mb_old_iface
+    = runHsc hsc_env $ hscSimpleIface' tc_result summary mb_old_iface
 
 hscSimpleIface' :: TcGblEnv
                 -> ModSummary
