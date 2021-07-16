@@ -153,7 +153,7 @@ canClassNC ev cls tys
 
   | isWanted ev
   , Just ip_name <- isCallStackPred cls tys
-  , OccurrenceOf func <- ctLocOrigin loc
+  , isPushCallStackOrigin orig
   -- If we're given a CallStack constraint that arose from a function
   -- call, we need to push the current call-site onto the stack instead
   -- of solving it directly from a given.
@@ -170,7 +170,8 @@ canClassNC ev cls tys
 
          -- Then we solve the wanted by pushing the call-site
          -- onto the newly emitted CallStack
-       ; let ev_cs = EvCsPushCall func (ctLocSpan loc) (ctEvExpr new_ev)
+       ; let ev_cs = EvCsPushCall (callStackOriginFS orig)
+                                  (ctLocSpan loc) (ctEvExpr new_ev)
        ; solveCallStack ev ev_cs
 
        ; canClass new_ev cls tys
@@ -184,6 +185,7 @@ canClassNC ev cls tys
   where
     has_scs cls = not (null (classSCTheta cls))
     loc  = ctEvLoc ev
+    orig = ctLocOrigin loc
     pred = ctEvPred ev
     fds  = classHasFds cls
 

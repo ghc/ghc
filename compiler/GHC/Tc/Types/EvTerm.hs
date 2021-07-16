@@ -21,7 +21,6 @@ import GHC.Core.Make
 import GHC.Core.Utils
 
 import GHC.Types.SrcLoc
-import GHC.Types.Name
 import GHC.Types.TyThing
 
 -- Used with Opt_DeferTypeErrors
@@ -71,5 +70,5 @@ evCallStack cs = do
         return (pushCS nameExpr locExpr (Cast tm ip_co))
 
   case cs of
-    EvCsPushCall name loc tm -> mkPush (occNameFS $ getOccName name) loc tm
-    EvCsEmpty -> return emptyCS
+    EvCsPushCall fs loc tm -> mkPush fs loc tm
+    EvCsEmpty              -> return emptyCS

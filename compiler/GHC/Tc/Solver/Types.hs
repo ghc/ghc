@@ -138,7 +138,7 @@ findDict m loc cls tys
   = Nothing
 
   | Just {} <- isCallStackPred cls tys
-  , OccurrenceOf {} <- ctLocOrigin loc
+  , isPushCallStackOrigin (ctLocOrigin loc)
   = Nothing             -- See Note [Solving CallStack constraints]
 
   | otherwise
@@ -219,13 +219,15 @@ constraints, but it seemed more direct to deal with the lookup.
 
 Note [Solving CallStack constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+See also Note [Overview of implicit CallStacks] in GHc.Tc.Types.Evidence.
+
 Suppose f :: HasCallStack => blah.  Then
 
 * Each call to 'f' gives rise to
     [W] s1 :: IP "callStack" CallStack    -- CtOrigin = OccurrenceOf f
   with a CtOrigin that says "OccurrenceOf f".
   Remember that HasCallStack is just shorthand for
-    IP "callStack CallStack
+    IP "callStack" CallStack
   See Note [Overview of implicit CallStacks] in GHC.Tc.Types.Evidence
 
 * We cannonicalise such constraints, in GHC.Tc.Solver.Canonical.canClassNC, by
@@ -239,7 +241,7 @@ Suppose f :: HasCallStack => blah.  Then
 
 So we must be careful /not/ to solve 's1' from the Givens.  Again,
 we ensure this by arranging that findDict always misses when looking
-up souch constraints.
+up such constraints.
 -}
 
 {- *********************************************************************

@@ -1050,13 +1050,15 @@ names 'getField' and 'setField' are whatever in-scope names they are.
 -}
 
 -- See Note [Rebindable syntax and HsExpansion] just above.
-data HsExpansion a b
-  = HsExpanded a b
+data HsExpansion orig expanded
+  = HsExpanded orig expanded
   deriving Data
 
 -- | Just print the original expression (the @a@).
 instance (Outputable a, Outputable b) => Outputable (HsExpansion a b) where
-  ppr (HsExpanded a b) = ifPprDebug (vcat [ppr a, ppr b]) (ppr a)
+  ppr (HsExpanded orig expanded)
+    = ifPprDebug (vcat [ppr orig, braces (text "Expansion:" <+> ppr expanded)])
+                 (ppr orig)
 
 
 {-

@@ -1,0 +1,6 @@
+
+T20126.hs:13:7: error:
+    • No instance for (Wombat ())
+        arising from an if-then-else expression
+    • In the expression: if True then () else ()
+      In an equation for ‘foo’: foo = if True then () else ()
