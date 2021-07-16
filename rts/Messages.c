@@ -165,25 +165,20 @@ loop:
 
 uint32_t messageBlackHole(Capability *cap, MessageBlackHole *msg)
 {
-    const StgInfoTable *info;
-    StgClosure *p;
-    StgBlockingQueue *bq;
-    StgClosure *bh = UNTAG_CLOSURE(msg->bh);
-    StgTSO *owner;
-
     debugTraceCap(DEBUG_sched, cap, "message: thread %" FMT_StgThreadID
                   " blocking on blackhole %p", msg->tso->id, msg->bh);
 
-    info = ACQUIRE_LOAD(&bh->header.info);
+    StgClosure *bh = UNTAG_CLOSURE(msg->bh);
+    const StgInfoTable *const bh_info = ACQUIRE_LOAD(&bh->header.info);
 
     // If we got this message in our inbox, it might be that the
     // BLACKHOLE has already been updated, and GC has shorted out the
     // indirection, so the pointer no longer points to a BLACKHOLE at
     // all.
-    if (info != &stg_BLACKHOLE_info &&
-        info != &stg_CAF_BLACKHOLE_info &&
-        info != &__stg_EAGER_BLACKHOLE_info &&
-        info != &stg_WHITEHOLE_info) {
+    if (bh_info != &stg_BLACKHOLE_info &&
+        bh_info != &stg_CAF_BLACKHOLE_info &&
+        bh_info != &__stg_EAGER_BLACKHOLE_info &&
+        bh_info != &stg_WHITEHOLE_info) {
         // if it is a WHITEHOLE, then a thread is in the process of
         // trying to BLACKHOLE it.  But we know that it was once a
         // BLACKHOLE, so there is at least a valid pointer in the
@@ -193,26 +188,24 @@ uint32_t messageBlackHole(Capability *cap, MessageBlackHole *msg)
 
     // The blackhole must indirect to a TSO, a BLOCKING_QUEUE, an IND,
     // or a value.
-loop:
-    // If we are being called from stg_BLACKHOLE then TSAN won't know about the
-    // previous read barrier that makes the following access safe.
-    TSAN_ANNOTATE_BENIGN_RACE(&((StgInd*)bh)->indirectee, "messageBlackHole");
-    p = UNTAG_CLOSURE(ACQUIRE_LOAD(&((StgInd*)bh)->indirectee));
-    info = RELAXED_LOAD(&p->header.info);
-
-    if (info == &stg_IND_info)
-    {
-        // This could happen, if e.g. we got a BLOCKING_QUEUE that has
+    StgClosure *p;
+    const StgInfoTable *info;
+    do {
+        // If we are being called from stg_BLACKHOLE then TSAN won't know about the
+        // previous read barrier that makes the following access safe.
+        TSAN_ANNOTATE_BENIGN_RACE(&((StgInd*)bh)->indirectee, "messageBlackHole");
+        p = UNTAG_CLOSURE(ACQUIRE_LOAD(&((StgInd*)bh)->indirectee));
+        info = RELAXED_LOAD(&p->header.info);
+    } while (info == &stg_IND_info);
+        // We could encounter an IND, if e.g. we got a BLOCKING_QUEUE that has
         // just been replaced with an IND by another thread in
         // updateThunk().  In which case, if we read the indirectee
         // again we should get the value.
         // See Note [BLACKHOLE pointing to IND] in sm/Evac.c
-        goto loop;
-    }
 
-    else if (info == &stg_TSO_info)
+    if (info == &stg_TSO_info)
     {
-        owner = (StgTSO*)p;
+        StgTSO *owner = (StgTSO*)p;
 
 #if defined(THREADED_RTS)
         if (owner->cap != cap) {
@@ -226,7 +219,7 @@ loop:
         // Capability.  msg->tso is the first thread to block on this
         // BLACKHOLE, so we first create a BLOCKING_QUEUE object.
 
-        bq = (StgBlockingQueue*)allocate(cap, sizeofW(StgBlockingQueue));
+        StgBlockingQueue *bq = (StgBlockingQueue*)allocate(cap, sizeofW(StgBlockingQueue));
 
         // initialise the BLOCKING_QUEUE object
         bq->bh = bh;
@@ -280,7 +273,7 @@ loop:
 
         ASSERT(bq->bh == bh);
 
-        owner = bq->owner;
+        StgTSO *owner = bq->owner;
 
         ASSERT(owner != END_TSO_QUEUE);
 
