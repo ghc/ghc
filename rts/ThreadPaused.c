@@ -230,7 +230,7 @@ threadPaused(Capability *cap, StgTSO *tso)
         case UPDATE_FRAME:
 
             // If we've already marked this frame, then stop here.
-            frame_info = frame->header.info;
+            frame_info = ACQUIRE_LOAD(&frame->header.info);
             if (frame_info == (StgInfoTable *)&stg_marked_upd_frame_info) {
                 if (prev_was_update_frame) {
                     words_to_squeeze += sizeofW(StgUpdateFrame);
@@ -352,7 +352,7 @@ threadPaused(Capability *cap, StgTSO *tso)
             OVERWRITING_CLOSURE_SIZE(bh, closure_sizeW_(bh, INFO_PTR_TO_STRUCT(bh_info)));
 
             // The payload of the BLACKHOLE points to the TSO
-            RELAXED_STORE(&((StgInd *)bh)->indirectee, (StgClosure *)tso);
+            ((StgInd *)bh)->indirectee = (StgClosure *)tso;
             SET_INFO_RELEASE(bh,&stg_BLACKHOLE_info);
 
             // .. and we need a write barrier, since we just mutated the closure:
