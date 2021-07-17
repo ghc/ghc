@@ -118,6 +118,7 @@ Library
         Data.Bitraversable
         Data.Bits
         Data.Bool
+        Data.ByteArray
         Data.Char
         Data.Coerce
         Data.Complex
