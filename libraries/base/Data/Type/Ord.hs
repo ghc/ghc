@@ -35,6 +35,7 @@ module Data.Type.Ord (
   ) where
 
 import GHC.Show(Show(..))
+-- import GHC.Types (Type)
 import GHC.TypeLits.Internal
 import GHC.TypeNats.Internal
 import Data.Bool
@@ -54,6 +55,7 @@ type instance Compare (a :: Char)    b = CmpChar   a b
 
 -- | Ordering data type for type literals that provides proof of their ordering.
 -- @since 4.16.0.0
+-- type OrderingI :: k -> k -> Type
 data OrderingI a b where
   LTI :: Compare a b ~ 'LT => OrderingI a b
   EQI :: Compare a a ~ 'EQ => OrderingI a a
@@ -67,18 +69,22 @@ infix 4 <=?, <=, >=?, >=, <?, <, >?, >
 
 -- | Comparison (<=) of comparable types, as a constraint.
 -- @since 4.16.0.0
+-- type (<=) :: k -> k -> Constraint
 type x <= y = (x <=? y) ~ 'True
 
 -- | Comparison (>=) of comparable types, as a constraint.
 -- @since 4.16.0.0
+-- type (>=) :: k -> k -> Constraint
 type x >= y = (x >=? y) ~ 'True
 
 -- | Comparison (<) of comparable types, as a constraint.
 -- @since 4.16.0.0
+-- type (<) :: k -> k -> Constraint
 type x < y = (x >? y) ~ 'True
 
 -- | Comparison (>) of comparable types, as a constraint.
 -- @since 4.16.0.0
+-- type (>) :: k -> k -> Constraint
 type x > y = (x >? y) ~ 'True
 
 
