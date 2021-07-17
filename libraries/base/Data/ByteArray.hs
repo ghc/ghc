@@ -37,10 +37,9 @@ import GHC.Word (Word8(..))
 -- and use functions from "GHC.Exts".
 --
 -- @since 4.17.0.0
-data ByteArray = ByteArray ByteArray# deriving ( Typeable )
+data ByteArray = ByteArray ByteArray#
 
 data MutableByteArray s = MutableByteArray (MutableByteArray# s)
-                                        deriving( Typeable )
 
 -- | Create a new mutable byte array of the specified size in bytes.
 --
