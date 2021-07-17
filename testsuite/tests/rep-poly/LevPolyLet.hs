@@ -16,4 +16,4 @@ example :: forall (v :: Levity) (a :: TYPE ('BoxedRep v)).
   -> Bool
 example f g =
   let x = f 42
-   in g x
+   in undefined
