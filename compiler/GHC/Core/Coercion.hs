@@ -1635,7 +1635,7 @@ mkCoCast c g
   = mkSymCo g1 `mkTransCo` c `mkTransCo` g2
 
   | otherwise
-  = pprPanic "mkCoCast" (ppr g $$ ppr (coercionKind g))
+  = pprPanic "mkCoCast" (ppr g $$ ppr (coercionKind g) $$ ppr co_list)
   where
     -- g  :: (s1 ~# t1) ~# (s2 ~# t2)
     -- g1 :: s1 ~# s2
