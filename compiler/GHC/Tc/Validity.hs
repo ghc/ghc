@@ -3014,6 +3014,7 @@ isTerminatingClass cls
     || isEqPredClass cls
     || cls `hasKey` typeableClassKey
     || cls `hasKey` coercibleTyConKey
+    || cls `hasKey` fixedRuntimeRepTyConKey
 
 -- | Tidy before printing a type
 ppr_tidy :: TidyEnv -> Type -> SDoc

@@ -16,6 +16,7 @@ import GHC.Tc.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Solver
 import GHC.Tc.Types.Constraint
+import GHC.Builtin.Types ( fixedRuntimeRepTyCon )
 import GHC.Core.Predicate
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcMType
@@ -147,7 +148,16 @@ tcRule (HsRule { rd_ext  = ext
        -- the LHS, lest they otherwise get defaulted to Any; but we do that
        -- during zonking (see GHC.Tc.Utils.Zonk.zonkRule)
 
-       ; let tpl_ids = lhs_evs ++ id_bndrs
+       -- SLD TODO: temporary workaround until I figure out a better approach.
+       ; let notFixedRuntimeRep :: EvVar -> Bool
+             notFixedRuntimeRep v
+               | Just ( tc, _) <- splitTyConApp_maybe $ idType v
+               , tc == fixedRuntimeRepTyCon
+               = False
+               | otherwise
+               = True
+
+             tpl_ids = filter notFixedRuntimeRep $ lhs_evs ++ id_bndrs
 
        -- See Note [Re-quantify type variables in rules]
        ; forall_tkvs <- candidateQTyVarsOfTypes (rule_ty : map idType tpl_ids)

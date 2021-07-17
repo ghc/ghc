@@ -242,9 +242,9 @@ pprLevityPolyInType ty prov =
         LevityCheckInFunUse using
           -> text "In the result of a" <+> quotes (text "using") <+> text "function:" <+> ppr using
         LevityCheckInValidDataCon
-          -> empty
+          -> text "Data constructor fields cannot be representation polymorphic."
         LevityCheckInValidClass
-          -> empty
+          -> text "Class methods cannot be representation polymorphic."
   in formatLevPolyErr ty $$ extra
 
 

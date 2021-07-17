@@ -4582,6 +4582,8 @@ checkValidClass cls
            --   class BoundedX (a :: TYPE r) where minBound :: a
            -- See Note [Representation polymorphism checking] in GHC.HsToCore.Monad
         ; checkForLevPoly LevityCheckInValidClass tau1
+        -- SLD: This issue gets caught beforehand in GHC.Tc.Gen.tcClassSigType,
+        -- so I think this check is redundant.
 
         ; unless constrained_class_methods $
           mapM_ check_constraint (tail (cls_pred:op_theta))
