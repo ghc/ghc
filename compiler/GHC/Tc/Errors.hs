@@ -34,6 +34,7 @@ import GHC.Tc.Instance.Family
 import GHC.Tc.Utils.Instantiate
 import {-# SOURCE #-} GHC.Tc.Errors.Hole ( findValidHoleFits )
 
+import GHC.Builtin.Types
 import GHC.Types.Name
 import GHC.Types.Name.Reader ( lookupGRE_Name, GlobalRdrEnv, mkRdrUnqual
                              , emptyLocalRdrEnv, lookupGlobalRdrEnv , lookupLocalRdrOcc )
@@ -2637,7 +2638,10 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
 ctxtFixes :: Bool -> PredType -> [Implication] -> [SDoc]
 ctxtFixes has_ambig_tvs pred implics
   | not has_ambig_tvs
-  , isTyVarClassPred pred
+  , Just (cl, tys) <- getClassPredTys_maybe pred
+  , all isTyVarTy tys
+  -- Never suggest adding a FixedRuntimeRep context
+  , classTyCon cl /= fixedRuntimeRepTyCon
   , (skol:skols) <- usefulContext implics pred
   , let what | null skols
              , SigSkol (PatSynCtxt {}) _ _ <- skol
