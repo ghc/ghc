@@ -3,7 +3,7 @@
 -- Copyright   : (c) Roman Leshchinskiy 2009-2012
 -- License     : BSD-style
 --
--- Maintainer  : Roman Leshchinskiy <rl@cse.unsw.edu.au>
+-- Maintainer  : libraries@haskell.org
 -- Portability : non-portable
 --
 -- Derived from @primitive@ package.
@@ -27,7 +27,15 @@ import GHC.Exts
 import GHC.ST (ST(..), runST)
 import GHC.Word (Word8(..))
 
--- | Boxed 'ByteArray#'.
+-- | Boxed wrapper for 'ByteArray#'.
+--
+-- Since 'ByteArray#' is an unlifted type and not a member of kind 'Data.Kind.Type',
+-- things like @[ByteArray#]@ or @IO ByteArray#@ are ill-typed. To work around this
+-- inconvenience this module provides a standard boxed wrapper, inhabiting 'Data.Kind.Type'.
+-- Clients are expected to use 'ByteArray' in higher-level APIs,
+-- but wrap and unwrap 'ByteArray' internally as they please
+-- and use functions from 'GHC.Exts'.
+--
 -- @since 4.17.0.0
 data ByteArray = ByteArray ByteArray# deriving ( Typeable )
 
