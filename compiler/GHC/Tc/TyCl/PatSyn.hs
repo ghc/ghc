@@ -28,6 +28,7 @@ import GHC.Core.TyCo.Subst( extendTvSubstWithClone )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Gen.Sig ( TcPragEnv, emptyPragEnv, completeSigFromId, lookupPragEnv, addInlinePrags )
+import GHC.Tc.Gen.HsType ( tcHsSigWcType )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.Zonk
@@ -888,7 +889,7 @@ tcPatSynBuilderBind prag_fn (PSB { psb_id = ps_lname@(L loc ps_name)
               2 why
          , text "RHS pattern:" <+> ppr lpat ]
 
-  | Right match_group <- mb_match_group  -- Bidirectional
+  | Right (mty, match_group) <- mb_match_group  -- Bidirectional
   = do { patsyn <- tcLookupPatSyn ps_name
        ; case patSynBuilder patsyn of {
            Nothing -> return emptyBag ;
@@ -898,9 +899,12 @@ tcPatSynBuilderBind prag_fn (PSB { psb_id = ps_lname@(L loc ps_name)
 
            Just (builder_name, builder_ty, need_dummy_arg) ->  -- Normal case
     do { -- Bidirectional, so patSynBuilder returns Just
-         let pat_ty = patSynResultType patsyn
+         builder_ty' <- case mty of
+           Just hsty -> tcHsSigWcType (PatSynCtxt ps_name) hsty
+           Nothing -> return builder_ty
+       ; let pat_ty = patSynResultType patsyn
              builder_id = modifyIdInfo (`setLevityInfoWithType` pat_ty) $
-                          mkExportedVanillaId builder_name builder_ty
+                          mkExportedVanillaId builder_name builder_ty'
                          -- See Note [Exported LocalIds] in GHC.Types.Id
              prags = lookupPragEnv prag_fn ps_name
              -- See Note [Pragmas for pattern synonyms]
@@ -932,8 +936,8 @@ tcPatSynBuilderBind prag_fn (PSB { psb_id = ps_lname@(L loc ps_name)
   where
     mb_match_group
        = case dir of
-           ExplicitBidirectional explicit_mg -> Right explicit_mg
-           ImplicitBidirectional -> fmap mk_mg (tcPatToExpr ps_name args lpat)
+           ExplicitBidirectional mty explicit_mg -> Right (mty, explicit_mg)
+           ImplicitBidirectional -> fmap ((,) Nothing . mk_mg) (tcPatToExpr ps_name args lpat)
            Unidirectional -> panic "tcPatSynBuilderBind"
 
     mk_mg :: LHsExpr GhcRn -> MatchGroup GhcRn (LHsExpr GhcRn)

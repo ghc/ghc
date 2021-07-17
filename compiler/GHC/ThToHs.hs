@@ -440,7 +440,7 @@ cvtDec (TH.PatSynD nm args dir pat)
     cvtDir n (ExplBidir cls) =
       do { ms <- mapM (cvtClause (mkPrefixFunRhs n)) cls
          ; th_origin <- getOrigin
-         ; return $ ExplicitBidirectional $ mkMatchGroup th_origin (noLocA ms) }
+         ; return $ ExplicitBidirectional Nothing $ mkMatchGroup th_origin (noLocA ms) } -- TODO: TH support for the optional type field of ExplicitBidirectional.
 
 cvtDec (TH.PatSynSigD nm ty)
   = do { nm' <- cNameN nm
