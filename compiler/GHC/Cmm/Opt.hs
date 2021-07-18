@@ -108,10 +108,6 @@ cmmMachOpFoldM platform conv_outer [CmmMachOp conv_inner [x]]
         intconv True  = MO_SS_Conv
         intconv False = MO_UU_Conv
 
--- ToDo: a narrow of a load can be collapsed into a narrow load, right?
--- but what if the architecture only supports word-sized loads, should
--- we do the transformation anyway?
-
 cmmMachOpFoldM platform mop [CmmLit (CmmInt x xrep), CmmLit (CmmInt y _)]
   = case mop of
         -- for comparisons: don't forget to narrow the arguments before
