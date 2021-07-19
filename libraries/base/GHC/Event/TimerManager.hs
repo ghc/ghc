@@ -18,7 +18,7 @@ module GHC.Event.TimerManager
 
       -- * Running
     , finished
-    , loop
+    , timeLoop
     , step
     , shutdown
     , cleanup
@@ -149,8 +149,8 @@ cleanup mgr = do
 --
 -- /Note/: This loop can only be run once per 'TimerManager', as it
 -- closes all of its control resources when it finishes.
-loop :: TimerManager -> IO ()
-loop mgr = do
+timeLoop :: TimerManager -> IO ()
+timeLoop mgr = do
   state <- atomicModifyIORef' (emState mgr) $ \s -> case s of
     Created -> (Running, s)
     _       -> (s, s)
@@ -158,7 +158,7 @@ loop mgr = do
     Created -> go `finally` cleanup mgr
     Dying   -> cleanup mgr
     _       -> do cleanup mgr
-                  errorWithoutStackTrace $ "GHC.Event.Manager.loop: state is already " ++
+                  errorWithoutStackTrace $ "GHC.Event.Manager.timeLoop: state is already " ++
                       show state
  where
   go = do running <- step mgr

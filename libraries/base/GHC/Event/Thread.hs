@@ -301,7 +301,7 @@ startTimerManagerThread = modifyMVar_ timerManagerThreadVar $ \old -> do
         c_setTimerManagerControlFd
           (fromIntegral $ controlWriteFd $ TM.emControl mgr)
         writeIORef timerManager $ Just mgr
-        !t <- forkIO $ TM.loop mgr
+        !t <- forkIO $ TM.timeLoop mgr
         labelThread t "TimerManager"
         return $ Just t
   case old of
