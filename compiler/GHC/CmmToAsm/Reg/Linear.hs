@@ -2,6 +2,7 @@
 {-# LANGUAGE ConstraintKinds #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns -ddump-simpl -ddump-stg -ddump-to-file #-}
 
 -----------------------------------------------------------------------------
 --
@@ -677,29 +678,30 @@ saveClobberedTemps [] _
 saveClobberedTemps clobbered dying
  = do
         assig   <- getAssigR :: RegM freeRegs (UniqFM Reg Loc)
-        -- Unique represents the VirtualReg
-        let to_spill :: [(Unique, RealReg)]
-            to_spill
-                = [ (temp,reg)
-                        | (temp, InReg reg) <- nonDetUFMToList assig
-                        -- This is non-deterministic but we do not
-                        -- currently support deterministic code-generation.
-                        -- See Note [Unique Determinism and code generation]
-                        , any (realRegsAlias reg) clobbered
-                        , temp `notElem` map getUnique dying  ]
-
-        (instrs,assig') <- clobber assig [] to_spill
+        (assig',instrs) <- nonDetStrictFoldUFM_DirectlyM maybe_spill (assig,[]) assig
         setAssigR assig'
         return $ -- mkComment (text "<saveClobberedTemps>") ++
                  instrs
 --              ++ mkComment (text "</saveClobberedTemps>")
    where
-     -- See Note [UniqFM and the register allocator]
-     clobber :: RegMap Loc -> [instr] -> [(Unique,RealReg)] -> RegM freeRegs ([instr], RegMap Loc)
-     clobber assig instrs []
-            = return (instrs, assig)
+     -- Unique represents the VirtualReg
+     -- Here we separate the cases which we do want to spill from these we don't.
+     maybe_spill :: Unique -> (RegMap Loc,[instr]) -> (Loc) -> RegM freeRegs (RegMap Loc,[instr])
+     maybe_spill temp (assig,instrs) (loc) =
+        case loc of
+                -- This is non-deterministic but we do not
+                -- currently support deterministic code-generation.
+                -- See Note [Unique Determinism and code generation]
+                InReg reg
+                    | any (realRegsAlias reg) clobbered
+                    , temp `notElem` map getUnique dying
+                    -> clobber temp (assig,instrs) (reg)
+                _ -> return (assig,instrs)
 
-     clobber assig instrs ((temp, reg) : rest)
+
+     -- See Note [UniqFM and the register allocator]
+     clobber :: Unique -> (RegMap Loc,[instr]) -> (RealReg) -> RegM freeRegs (RegMap Loc,[instr])
+     clobber temp (assig,instrs) (reg)
        = do platform <- getPlatform
 
             freeRegs <- getFreeRegsR
@@ -718,7 +720,7 @@ saveClobberedTemps clobbered dying
                   let instr = mkRegRegMoveInstr platform
                                   (RegReal reg) (RegReal my_reg)
 
-                  clobber new_assign (instr : instrs) rest
+                  return (new_assign,(instr : instrs))
 
               -- (2) no free registers: spill the value
               [] -> do
@@ -729,7 +731,8 @@ saveClobberedTemps clobbered dying
 
                   let new_assign  = addToUFM_Directly assig temp (InBoth reg slot)
 
-                  clobber new_assign (spill ++ instrs) rest
+                  return (new_assign, (spill ++ instrs))
+
 
 
 
