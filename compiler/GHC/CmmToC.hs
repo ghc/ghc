@@ -955,40 +955,43 @@ pprCallishMachOp_for_C mop
         MO_SubIntC    {} -> unsupported
         MO_U_Mul2     {} -> unsupported
         MO_Touch         -> unsupported
+        -- we could support prefetch via "__builtin_prefetch"
+        -- Not adding it for now
         (MO_Prefetch_Data _ ) -> unsupported
-        --- we could support prefetch via "__builtin_prefetch"
-        --- Not adding it for now
-        MO_I64_ToI   -> text "hs_int64ToInt"
-        MO_I64_FromI -> text "hs_intToInt64"
-        MO_W64_ToW   -> text "hs_word64ToWord"
-        MO_W64_FromW -> text "hs_wordToWord64"
-        MO_x64_Neg   -> text "hs_neg64"
-        MO_x64_Add   -> text "hs_add64"
-        MO_x64_Sub   -> text "hs_sub64"
-        MO_x64_Mul   -> text "hs_mul64"
-        MO_I64_Quot  -> text "hs_quotInt64"
-        MO_I64_Rem   -> text "hs_remInt64"
-        MO_W64_Quot  -> text "hs_quotWord64"
-        MO_W64_Rem   -> text "hs_remWord64"
-        MO_x64_And   -> text "hs_and64"
-        MO_x64_Or    -> text "hs_xor64"
-        MO_x64_Xor   -> text "hs_xor64"
-        MO_x64_Not   -> text "hs_not64"
-        MO_x64_Shl   -> text "hs_uncheckedShiftL64"
-        MO_I64_Shr   -> text "hs_uncheckedIShiftRA64"
-        MO_W64_Shr   -> text "hs_uncheckedShiftRL64"
-        MO_x64_Eq    -> text "hs_eq64"
-        MO_x64_Ne    -> text "hs_ne64"
-        MO_I64_Ge    -> text "hs_geInt64"
-        MO_I64_Gt    -> text "hs_gtInt64"
-        MO_I64_Le    -> text "hs_leInt64"
-        MO_I64_Lt    -> text "hs_ltInt64"
-        MO_W64_Ge    -> text "hs_geWord64"
-        MO_W64_Gt    -> text "hs_gtWord64"
-        MO_W64_Le    -> text "hs_leWord64"
-        MO_W64_Lt    -> text "hs_ltWord64"
+
+        MO_I64_ToI   -> dontReach64
+        MO_I64_FromI -> dontReach64
+        MO_W64_ToW   -> dontReach64
+        MO_W64_FromW -> dontReach64
+        MO_x64_Neg   -> dontReach64
+        MO_x64_Add   -> dontReach64
+        MO_x64_Sub   -> dontReach64
+        MO_x64_Mul   -> dontReach64
+        MO_I64_Quot  -> dontReach64
+        MO_I64_Rem   -> dontReach64
+        MO_W64_Quot  -> dontReach64
+        MO_W64_Rem   -> dontReach64
+        MO_x64_And   -> dontReach64
+        MO_x64_Or    -> dontReach64
+        MO_x64_Xor   -> dontReach64
+        MO_x64_Not   -> dontReach64
+        MO_x64_Shl   -> dontReach64
+        MO_I64_Shr   -> dontReach64
+        MO_W64_Shr   -> dontReach64
+        MO_x64_Eq    -> dontReach64
+        MO_x64_Ne    -> dontReach64
+        MO_I64_Ge    -> dontReach64
+        MO_I64_Gt    -> dontReach64
+        MO_I64_Le    -> dontReach64
+        MO_I64_Lt    -> dontReach64
+        MO_W64_Ge    -> dontReach64
+        MO_W64_Gt    -> dontReach64
+        MO_W64_Le    -> dontReach64
+        MO_W64_Lt    -> dontReach64
     where unsupported = panic ("pprCallishMachOp_for_C: " ++ show mop
                             ++ " not supported!")
+          dontReach64 = panic ("pprCallishMachOp_for_C: " ++ show mop
+                            ++ " should be not be encountered because the regular primop for this 64-bit operation is used instead.")
 
 -- ---------------------------------------------------------------------
 -- Useful #defines
