@@ -49,8 +49,8 @@ import Data.Maybe
 
 mkExtraObj :: Logger -> TmpFs -> DynFlags -> UnitState -> Suffix -> String -> IO FilePath
 mkExtraObj logger tmpfs dflags unit_state extn xs
- = do cFile <- newTempName logger tmpfs dflags TFL_CurrentModule extn
-      oFile <- newTempName logger tmpfs dflags TFL_GhcSession "o"
+ = do cFile <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule extn
+      oFile <- newTempName logger tmpfs (tmpDir dflags) TFL_GhcSession "o"
       writeFile cFile xs
       ccInfo <- liftIO $ getCompilerInfo logger dflags
       runCc Nothing logger tmpfs dflags

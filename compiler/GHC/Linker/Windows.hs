@@ -45,9 +45,9 @@ maybeCreateManifest logger tmpfs dflags exe_filename = do
    if not (gopt Opt_EmbedManifest dflags)
       then return []
       else do
-         rc_filename <- newTempName logger tmpfs dflags TFL_CurrentModule "rc"
+         rc_filename <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "rc"
          rc_obj_filename <-
-           newTempName logger tmpfs dflags TFL_GhcSession (objectSuf dflags)
+           newTempName logger tmpfs (tmpDir dflags) TFL_GhcSession (objectSuf dflags)
 
          writeFile rc_filename $
              "1 24 MOVEABLE PURE " ++ show manifest_filename ++ "\n"

@@ -534,8 +534,9 @@ withCleanupSession ghc = ghc `MC.finally` cleanup
       let logger = hsc_logger hsc_env
       let tmpfs  = hsc_tmpfs hsc_env
       liftIO $ do
-          cleanTempFiles logger tmpfs dflags
-          cleanTempDirs logger tmpfs dflags
+          unless (gopt Opt_KeepTmpFiles dflags) $ do
+            cleanTempFiles logger tmpfs
+            cleanTempDirs logger tmpfs
           traverse_ stopInterp (hsc_interp hsc_env)
           --  exceptions will be blocked while we clean the temporary files,
           -- so there shouldn't be any difficulty if we receive further

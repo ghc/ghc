@@ -952,7 +952,7 @@ dynLoadObjs interp hsc_env pls@LoaderState{..} objs = do
     let minus_ls = [ lib | Option ('-':'l':lib) <- ldInputs dflags ]
     let minus_big_ls = [ lib | Option ('-':'L':lib) <- ldInputs dflags ]
     (soFile, libPath , libName) <-
-      newTempLibName logger tmpfs dflags TFL_CurrentModule (platformSOExt platform)
+      newTempLibName logger tmpfs (tmpDir dflags) TFL_CurrentModule (platformSOExt platform)
     let
         dflags2 = dflags {
                       -- We don't want the original ldInputs in

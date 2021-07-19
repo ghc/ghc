@@ -210,7 +210,7 @@ outputForeignStubs
 outputForeignStubs logger tmpfs dflags unit_state mod location stubs
  = do
    let stub_h = mkStubPaths dflags (moduleName mod) location
-   stub_c <- newTempName logger tmpfs dflags TFL_CurrentModule "c"
+   stub_c <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "c"
 
    case stubs of
      NoStubs ->

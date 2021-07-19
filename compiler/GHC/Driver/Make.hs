@@ -80,7 +80,7 @@ import GHC.Data.StringBuffer
 import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Utils.Exception ( AsyncException(..), evaluate )
-import GHC.Utils.Monad     ( allM )
+import GHC.Utils.Monad     ( allM, MonadIO )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
@@ -538,7 +538,7 @@ load' how_much mHscMessage mod_graph = do
 
           -- Clean up after ourselves
           hsc_env1 <- getSession
-          liftIO $ cleanCurrentModuleTempFiles logger (hsc_tmpfs hsc_env1) dflags
+          liftIO $ cleanCurrentModuleTempFilesMaybe logger (hsc_tmpfs hsc_env1) dflags
 
           -- Issue a warning for the confusing case where the user
           -- said '-o foo' but we're not going to do any linking.
@@ -605,7 +605,7 @@ load' how_much mHscMessage mod_graph = do
                 ]
           tmpfs <- hsc_tmpfs <$> getSession
           liftIO $ changeTempFilesLifetime tmpfs TFL_CurrentModule unneeded_temps
-          liftIO $ cleanCurrentModuleTempFiles logger tmpfs dflags
+          liftIO $ cleanCurrentModuleTempFilesMaybe logger tmpfs dflags
 
           let hpt5 = retainInTopLevelEnvs (map ms_mod_name mods_to_keep)
                                           hpt4
@@ -1335,9 +1335,9 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_logger lcl_tmpfs lcl_dflags
                     return (hsc_env'', localize_hsc_env hsc_env'')
 
                 -- Clean up any intermediate files.
-                cleanCurrentModuleTempFiles (hsc_logger lcl_hsc_env')
-                                            (hsc_tmpfs  lcl_hsc_env')
-                                            (hsc_dflags lcl_hsc_env')
+                cleanCurrentModuleTempFilesMaybe (hsc_logger lcl_hsc_env')
+                                                 (hsc_tmpfs  lcl_hsc_env')
+                                                 (hsc_dflags lcl_hsc_env')
                 return Succeeded
 
   where
@@ -1435,9 +1435,9 @@ upsweep mHscMessage old_hpt sccs = do
         hsc_env <- getSession
 
         -- Remove unwanted tmp files between compilations
-        liftIO $ cleanCurrentModuleTempFiles (hsc_logger hsc_env)
-                                             (hsc_tmpfs  hsc_env)
-                                             (hsc_dflags hsc_env)
+        liftIO $ cleanCurrentModuleTempFilesMaybe (hsc_logger hsc_env)
+                                                  (hsc_tmpfs  hsc_env)
+                                                  (hsc_dflags hsc_env)
 
         -- Get ready to tie the knot
         type_env_var <- liftIO $ newIORef emptyNameEnv
@@ -2175,7 +2175,7 @@ enableCodeGenWhen logger tmpfs condition should_modify staticLife dynLife bcknd 
       , ms_mod `Set.member` needs_codegen_set
       = do
         let new_temp_file suf dynsuf = do
-              tn <- newTempName logger tmpfs dflags staticLife suf
+              tn <- newTempName logger tmpfs (tmpDir dflags) staticLife suf
               let dyn_tn = tn -<.> dynsuf
               addFilesToClean tmpfs dynLife [dyn_tn]
               return tn
@@ -2709,3 +2709,9 @@ cyclicModuleErr mss
     ppr_ms :: ModSummary -> SDoc
     ppr_ms ms = quotes (ppr (moduleName (ms_mod ms))) <+>
                 (parens (text (msHsFilePath ms)))
+
+
+cleanCurrentModuleTempFilesMaybe :: MonadIO m => Logger -> TmpFs -> DynFlags -> m ()
+cleanCurrentModuleTempFilesMaybe logger tmpfs dflags =
+  unless (gopt Opt_KeepTmpFiles dflags) $
+    liftIO $ cleanCurrentModuleTempFiles logger tmpfs

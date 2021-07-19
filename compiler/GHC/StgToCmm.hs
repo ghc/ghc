@@ -206,7 +206,7 @@ cgTopBinding logger tmpfs dflags = \case
             (lit,decl) = if not isNCG || asString
               then mkByteStringCLit label str
               else mkFileEmbedLit label $ unsafePerformIO $ do
-                     bFile <- newTempName logger tmpfs dflags TFL_CurrentModule ".dat"
+                     bFile <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule ".dat"
                      BS.writeFile bFile str
                      return bFile
         emitDecl decl

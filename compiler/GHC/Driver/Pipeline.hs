@@ -176,7 +176,7 @@ preprocess hsc_env input_fn mb_input_buf mb_phase =
         Just input_buf -> do
           fn <- newTempName (hsc_logger hsc_env)
                             (hsc_tmpfs hsc_env)
-                            (hsc_dflags hsc_env)
+                            (tmpDir (hsc_dflags hsc_env))
                             TFL_CurrentModule
                             ("buf_" ++ src_suffix pipe_env)
           hdl <- openBinaryFile fn WriteMode
@@ -600,7 +600,7 @@ compileEmptyStub dflags hsc_env basename location mod_name = do
   -- and https://github.com/haskell/cabal/issues/2257
   let logger = hsc_logger hsc_env
   let tmpfs  = hsc_tmpfs hsc_env
-  empty_stub <- newTempName logger tmpfs dflags TFL_CurrentModule "c"
+  empty_stub <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "c"
   let home_unit = hsc_home_unit hsc_env
       src = text "int" <+> ppr (mkHomeModule home_unit mod_name) <+> text "= 0;"
   writeFile empty_stub (showSDoc dflags (pprCode CStyle src))

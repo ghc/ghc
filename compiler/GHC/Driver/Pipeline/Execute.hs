@@ -157,7 +157,10 @@ runMergeForeign _pipe_env hsc_env _location input_fn foreign_os = do
        else do
          -- Work around a binutil < 2.31 bug where you can't merge objects if the output file
          -- is one of the inputs
-         new_o <- newTempName (hsc_logger hsc_env) (hsc_tmpfs hsc_env) (hsc_dflags hsc_env) TFL_CurrentModule "o"
+         new_o <- newTempName (hsc_logger hsc_env)
+                              (hsc_tmpfs hsc_env)
+                              (tmpDir (hsc_dflags hsc_env))
+                              TFL_CurrentModule "o"
          copyFile input_fn new_o
          let dflags = hsc_dflags hsc_env
              logger = hsc_logger hsc_env
@@ -764,8 +767,8 @@ getOutputFilename logger tmpfs stop_phase output basename dflags next_phase mayb
                                            Nothing ->
                                                panic "SpecificFile: No filename"
  | keep_this_output                      = persistent_fn
- | Temporary lifetime <- output          = newTempName logger tmpfs dflags lifetime suffix
- | otherwise                             = newTempName logger tmpfs dflags TFL_CurrentModule
+ | Temporary lifetime <- output          = newTempName logger tmpfs (tmpDir dflags) lifetime suffix
+ | otherwise                             = newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule
    suffix
     where
           hcsuf      = hcSuf dflags
@@ -926,7 +929,7 @@ doCpp logger tmpfs dflags unit_env raw input_fn output_fn = do
         pkgs = catMaybes (map (lookupUnit unit_state) uids)
     mb_macro_include <-
         if not (null pkgs) && gopt Opt_VersionMacros dflags
-            then do macro_stub <- newTempName logger tmpfs dflags TFL_CurrentModule "h"
+            then do macro_stub <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "h"
                     writeFile macro_stub (generatePackageVersionMacros pkgs)
                     -- Include version macros for every *exposed* package.
                     -- Without -hide-all-packages and with a package database
@@ -1069,14 +1072,14 @@ joinObjectFiles logger tmpfs dflags o_files output_fn = do
 
   if ldIsGnuLd
      then do
-          script <- newTempName logger tmpfs dflags TFL_CurrentModule "ldscript"
+          script <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "ldscript"
           cwd <- getCurrentDirectory
           let o_files_abs = map (\x -> "\"" ++ (cwd </> x) ++ "\"") o_files
           writeFile script $ "INPUT(" ++ unwords o_files_abs ++ ")"
           ld_r [GHC.SysTools.FileOption "" script]
      else if toolSettings_ldSupportsFilelist toolSettings'
      then do
-          filelist <- newTempName logger tmpfs dflags TFL_CurrentModule "filelist"
+          filelist <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "filelist"
           writeFile filelist $ unlines o_files
           ld_r [GHC.SysTools.Option "-filelist",
                 GHC.SysTools.FileOption "" filelist]

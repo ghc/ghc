@@ -168,7 +168,7 @@ runSomethingResponseFile logger tmpfs dflags filter_fn phase_name pgm args mb_en
         return (r,())
   where
     getResponseFile args = do
-      fp <- newTempName logger tmpfs dflags TFL_CurrentModule "rsp"
+      fp <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "rsp"
       withFile fp WriteMode $ \h -> do
 #if defined(mingw32_HOST_OS)
           hSetEncoding h latin1

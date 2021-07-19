@@ -437,7 +437,8 @@ hscParse' mod_summary
             --   - filter out the .hs/.lhs source filename if we have one
             --
             let n_hspp  = FilePath.normalise src_filename
-                srcs0 = nub $ filter (not . (tmpDir dflags `isPrefixOf`))
+                TempDir tmp_dir = tmpDir dflags
+                srcs0 = nub $ filter (not . (tmp_dir `isPrefixOf`))
                             $ filter (not . (== n_hspp))
                             $ map FilePath.normalise
                             $ filter (not . isPrefixOf "<")

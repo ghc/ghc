@@ -9,6 +9,7 @@ module GHC.Utils.TmpFs
     , FilesToClean(..)
     , emptyFilesToClean
     , TempFileLifetime(..)
+    , TempDir (..)
     , cleanTempDirs
     , cleanTempFiles
     , cleanCurrentModuleTempFiles
@@ -24,7 +25,6 @@ where
 
 import GHC.Prelude
 
-import GHC.Driver.Session
 import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Logger
@@ -32,7 +32,6 @@ import GHC.Utils.Misc
 import GHC.Utils.Exception as Exception
 import GHC.Driver.Phases
 
-import Control.Monad
 import Data.List (partition)
 import qualified Data.Set as Set
 import Data.Set (Set)
@@ -92,6 +91,7 @@ data TempFileLifetime
   -- runGhc(T)
   deriving (Show)
 
+newtype TempDir = TempDir FilePath
 
 -- | An empty FilesToClean
 emptyFilesToClean :: FilesToClean
@@ -135,19 +135,17 @@ mergeTmpFsInto src dst = do
     src_files <- atomicModifyIORef' (tmp_files_to_clean src) (\s -> (emptyFilesToClean, s))
     atomicModifyIORef' (tmp_files_to_clean dst) (\s -> (mergeFilesToClean src_files s, ()))
 
-cleanTempDirs :: Logger -> TmpFs -> DynFlags -> IO ()
-cleanTempDirs logger tmpfs dflags
-   = unless (gopt Opt_KeepTmpFiles dflags)
-   $ mask_
+cleanTempDirs :: Logger -> TmpFs -> IO ()
+cleanTempDirs logger tmpfs
+   = mask_
    $ do let ref = tmp_dirs_to_clean tmpfs
         ds <- atomicModifyIORef' ref $ \ds -> (Map.empty, ds)
         removeTmpDirs logger (Map.elems ds)
 
 -- | Delete all files in @tmp_files_to_clean@.
-cleanTempFiles :: Logger -> TmpFs -> DynFlags -> IO ()
-cleanTempFiles logger tmpfs dflags
-   = unless (gopt Opt_KeepTmpFiles dflags)
-   $ mask_
+cleanTempFiles :: Logger -> TmpFs -> IO ()
+cleanTempFiles logger tmpfs
+   = mask_
    $ do let ref = tmp_files_to_clean tmpfs
         to_delete <- atomicModifyIORef' ref $
             \FilesToClean
@@ -161,10 +159,9 @@ cleanTempFiles logger tmpfs dflags
 -- TFL_CurrentModule.
 -- If a file must be cleaned eventually, but must survive a
 -- cleanCurrentModuleTempFiles, ensure it has lifetime TFL_GhcSession.
-cleanCurrentModuleTempFiles :: Logger -> TmpFs -> DynFlags -> IO ()
-cleanCurrentModuleTempFiles logger tmpfs dflags
-   = unless (gopt Opt_KeepTmpFiles dflags)
-   $ mask_
+cleanCurrentModuleTempFiles :: Logger -> TmpFs -> IO ()
+cleanCurrentModuleTempFiles logger tmpfs
+   = mask_
    $ do let ref = tmp_files_to_clean tmpfs
         to_delete <- atomicModifyIORef' ref $
             \ftc@FilesToClean{ftcCurrentModule = cm_files} ->
@@ -212,9 +209,9 @@ newTempSuffix tmpfs =
   atomicModifyIORef' (tmp_next_suffix tmpfs) $ \n -> (n+1,n)
 
 -- Find a temporary name that doesn't already exist.
-newTempName :: Logger -> TmpFs -> DynFlags -> TempFileLifetime -> Suffix -> IO FilePath
-newTempName logger tmpfs dflags lifetime extn
-  = do d <- getTempDir logger tmpfs dflags
+newTempName :: Logger -> TmpFs -> TempDir -> TempFileLifetime -> Suffix -> IO FilePath
+newTempName logger tmpfs tmp_dir lifetime extn
+  = do d <- getTempDir logger tmpfs tmp_dir
        findTempName (d </> "ghc_") -- See Note [Deterministic base name]
   where
     findTempName :: FilePath -> IO FilePath
@@ -227,9 +224,9 @@ newTempName logger tmpfs dflags lifetime extn
                         addFilesToClean tmpfs lifetime [filename]
                         return filename
 
-newTempDir :: Logger -> TmpFs -> DynFlags -> IO FilePath
-newTempDir logger tmpfs dflags
-  = do d <- getTempDir logger tmpfs dflags
+newTempDir :: Logger -> TmpFs -> TempDir -> IO FilePath
+newTempDir logger tmpfs tmp_dir
+  = do d <- getTempDir logger tmpfs tmp_dir
        findTempDir (d </> "ghc_")
   where
     findTempDir :: FilePath -> IO FilePath
@@ -242,10 +239,10 @@ newTempDir logger tmpfs dflags
                         -- see mkTempDir below; this is wrong: -> consIORef (tmp_dirs_to_clean tmpfs) filename
                         return filename
 
-newTempLibName :: Logger -> TmpFs -> DynFlags -> TempFileLifetime -> Suffix
+newTempLibName :: Logger -> TmpFs -> TempDir -> TempFileLifetime -> Suffix
   -> IO (FilePath, FilePath, String)
-newTempLibName logger tmpfs dflags lifetime extn
-  = do d <- getTempDir logger tmpfs dflags
+newTempLibName logger tmpfs tmp_dir lifetime extn
+  = do d <- getTempDir logger tmpfs tmp_dir
        findTempName d ("ghc_")
   where
     findTempName :: FilePath -> String -> IO (FilePath, FilePath, String)
@@ -262,8 +259,8 @@ newTempLibName logger tmpfs dflags lifetime extn
 
 -- Return our temporary directory within tmp_dir, creating one if we
 -- don't have one yet.
-getTempDir :: Logger -> TmpFs -> DynFlags -> IO FilePath
-getTempDir logger tmpfs dflags = do
+getTempDir :: Logger -> TmpFs -> TempDir -> IO FilePath
+getTempDir logger tmpfs (TempDir tmp_dir) = do
     mapping <- readIORef dir_ref
     case Map.lookup tmp_dir mapping of
         Nothing -> do
@@ -272,7 +269,6 @@ getTempDir logger tmpfs dflags = do
             mask_ $ mkTempDir prefix
         Just dir -> return dir
   where
-    tmp_dir = tmpDir dflags
     dir_ref = tmp_dirs_to_clean tmpfs
 
     mkTempDir :: FilePath -> IO FilePath

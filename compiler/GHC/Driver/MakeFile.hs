@@ -136,7 +136,7 @@ beginMkDependHS :: Logger -> TmpFs -> DynFlags -> IO MkDepFiles
 beginMkDependHS logger tmpfs dflags = do
         -- open a new temp file in which to stuff the dependency info
         -- as we go along.
-  tmp_file <- newTempName logger tmpfs dflags TFL_CurrentModule "dep"
+  tmp_file <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "dep"
   tmp_hdl <- openFile tmp_file WriteMode
 
         -- open the makefile

@@ -249,6 +249,7 @@ import GHC.Types.SafeHaskell
 import GHC.Types.Basic ( Alignment, alignmentOf, IntWithInf, treatZeroAsInf )
 import qualified GHC.Types.FieldLabel as FieldLabel
 import GHC.Data.FastString
+import GHC.Utils.TmpFs
 import GHC.Utils.Fingerprint
 import GHC.Utils.Outputable
 import GHC.Settings
@@ -791,8 +792,8 @@ toolDir               :: DynFlags -> Maybe FilePath
 toolDir dflags = fileSettings_toolDir $ fileSettings dflags
 topDir                :: DynFlags -> FilePath
 topDir dflags = fileSettings_topDir $ fileSettings dflags
-tmpDir                :: DynFlags -> String
-tmpDir dflags = fileSettings_tmpDir $ fileSettings dflags
+tmpDir                :: DynFlags -> TempDir
+tmpDir dflags = TempDir (fileSettings_tmpDir $ fileSettings dflags)
 extraGccViaCFlags     :: DynFlags -> [String]
 extraGccViaCFlags dflags = toolSettings_extraGccViaCFlags $ toolSettings dflags
 globalPackageDatabasePath   :: DynFlags -> FilePath

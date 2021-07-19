@@ -1211,7 +1211,7 @@ instance TH.Quasi TcM where
     dflags <- getDynFlags
     logger <- getLogger
     tmpfs  <- hsc_tmpfs <$> getTopEnv
-    liftIO $ newTempName logger tmpfs dflags TFL_GhcSession suffix
+    liftIO $ newTempName logger tmpfs (tmpDir dflags) TFL_GhcSession suffix
 
   qAddTopDecls thds = do
       l <- getSrcSpanM
