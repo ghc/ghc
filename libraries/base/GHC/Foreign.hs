@@ -233,13 +233,22 @@ withEncodedCString (TextEncoding { mkTextEncoder = mk_encoder }) null_terminate 
       let go !iteration to_sz_bytes = do
            putDebugMsg ("withEncodedCString: " ++ show iteration)
            allocaBytes to_sz_bytes $ \to_p -> do
-            mb_res <- tryFillBufferAndCall encoder null_terminate from to_p to_sz_bytes act
+            -- See Note [Check *before* fill in withEncodedCString] about why
+            -- this is subtle.
+            mb_res <- tryFillBuffer encoder null_terminate from to_p to_sz_bytes
             case mb_res of
               Nothing  -> go (iteration + 1) (to_sz_bytes * 2)
-              Just res -> return res
+              Just to_buf -> withCStringBuffer to_buf null_terminate act
 
       -- If the input string is ASCII, this value will ensure we only allocate once
       go (0 :: Int) (cCharSize * (sz + 1))
+
+withCStringBuffer :: Buffer Word8 -> Bool -> (CStringLen -> IO r) -> IO r
+withCStringBuffer to_buf null_terminate act = do
+  let bytes = bufferElems to_buf
+  withBuffer to_buf $ \to_ptr -> do
+    when null_terminate $ pokeElemOff to_ptr (bufR to_buf) 0
+    act (castPtr to_ptr, bytes) -- NB: the length information is specified as being in *bytes*
 
 {-# INLINE newEncodedCString #-}
 newEncodedCString :: TextEncoding  -- ^ Encoding of CString to create
@@ -252,13 +261,13 @@ newEncodedCString (TextEncoding { mkTextEncoder = mk_encoder }) null_terminate s
 
       let go !iteration to_p to_sz_bytes = do
            putDebugMsg ("newEncodedCString: " ++ show iteration)
-           mb_res <- tryFillBufferAndCall encoder null_terminate from to_p to_sz_bytes return
+           mb_res <- tryFillBuffer encoder null_terminate from to_p to_sz_bytes
            case mb_res of
              Nothing  -> do
                  let to_sz_bytes' = to_sz_bytes * 2
                  to_p' <- reallocBytes to_p to_sz_bytes'
                  go (iteration + 1) to_p' to_sz_bytes'
-             Just res -> return res
+             Just to_buf -> withCStringBuffer to_buf null_terminate return
 
       -- If the input string is ASCII, this value will ensure we only allocate once
       let to_sz_bytes = cCharSize * (sz + 1)
@@ -266,9 +275,9 @@ newEncodedCString (TextEncoding { mkTextEncoder = mk_encoder }) null_terminate s
       go (0 :: Int) to_p to_sz_bytes
 
 
-tryFillBufferAndCall :: TextEncoder dstate -> Bool -> Buffer Char -> Ptr Word8 -> Int
-                     -> (CStringLen -> IO a) -> IO (Maybe a)
-tryFillBufferAndCall encoder null_terminate from0 to_p to_sz_bytes act = do
+tryFillBuffer :: TextEncoder dstate -> Bool -> Buffer Char -> Ptr Word8 -> Int
+                    ->  IO (Maybe (Buffer Word8))
+tryFillBuffer encoder null_terminate from0 to_p to_sz_bytes = do
     to_fp <- newForeignPtr_ to_p
     go (0 :: Int) (from0, emptyBuffer to_fp to_sz_bytes WriteBuffer)
   where
@@ -278,14 +287,43 @@ tryFillBufferAndCall encoder null_terminate from0 to_p to_sz_bytes act = do
       if isEmptyBuffer from'
        then if null_terminate && bufferAvailable to' == 0
              then return Nothing -- We had enough for the string but not the terminator: ask the caller for more buffer
-             else do
-               -- Awesome, we had enough buffer
-               let bytes = bufferElems to'
-               withBuffer to' $ \to_ptr -> do
-                   when null_terminate $ pokeElemOff to_ptr (bufR to') 0
-                   fmap Just $ act (castPtr to_ptr, bytes) -- NB: the length information is specified as being in *bytes*
+             else return (Just to')
        else case why of -- We didn't consume all of the input
               InputUnderflow  -> recover encoder from' to' >>= go (iteration + 1) -- These conditions are equally bad
               InvalidSequence -> recover encoder from' to' >>= go (iteration + 1) -- since the input was truncated/invalid
               OutputUnderflow -> return Nothing -- Oops, out of buffer during decoding: ask the caller for more
+{-
+Note [Check *before* fill in withEncodedCString]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+It's very important that the size check and readjustment peformed by tryFillBuffer
+happens before the continuation is called. The size check is the part which can
+fail, the call to the continuation never fails and so the caller should respond
+first to the size check failing and *then* call the continuation. Making this evident
+to the compiler avoids historic space leaks.
+
+In a previous interation of this code we had a pattern that, somewhat simplified,
+looked like this:
+
+go :: State -> (State -> IO a) -> IO a
+go state action =
+    case tryFillBufferAndCall state action of
+        Left state' -> go state' action
+        Right result -> result
+
+`tryFillBufferAndCall` performed some checks, and then we either called action,
+or we modified the state and tried again.
+This went wrong because `action` can be a function closure containing a reference to
+a lazy data structure. If we call action directly, without retaining any references
+to action, that is fine. The data structure is consumed as it is produced and we operate
+in constant space.
+
+However the failure branch `go state' action` *does* capture a reference to action.
+This went wrong because the reference to action in the failure branch only becomes
+unreachable *after* action returns. This means we keep alive the function closure
+for `action` until `action` returns. Which in turn keeps alive the *whole* lazy list
+via `action` until the action has fully run.
+This went wrong in #20107, where the continuation kept an entire lazy bytestring alive
+rather than allowing it to be incrementaly consumed and collected.
+-}
 
