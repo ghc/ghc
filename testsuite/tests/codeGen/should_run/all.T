@@ -216,3 +216,8 @@ test('CallConv', [when(unregisterised(), skip),
                   when(arch('x86_64'), extra_hc_opts('CallConv_x86_64.s')),
                   when(arch('aarch64'), extra_hc_opts('CallConv_aarch64.s'))],
      compile_and_run, [''])
+
+test('T16981',
+     [ omit_ways(['ghci'])],
+     multimod_compile_and_run,
+     ['T16981', ''])
