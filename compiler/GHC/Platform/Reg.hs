@@ -3,6 +3,8 @@
 --      by NCGMonad and the register allocators, which are shared
 --      by all architectures.
 --
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns -ddump-simpl -ddump-stg -ddump-to-file -O #-}
+
 module GHC.Platform.Reg (
         RegNo,
         Reg(..),
@@ -35,6 +37,7 @@ import GHC.Types.Unique
 import GHC.Builtin.Uniques
 import GHC.Platform.Reg.Class
 import Data.List (intersect)
+import GHC.Exts
 
 -- | An identifier for a primitive real machine register.
 type RegNo
@@ -173,8 +176,17 @@ regNosOfRealReg rr
 
 
 realRegsAlias :: RealReg -> RealReg -> Bool
-realRegsAlias rr1 rr2
-        = not $ null $ intersect (regNosOfRealReg rr1) (regNosOfRealReg rr2)
+realRegsAlias rr1 rr2 =
+    -- used to be `not $ null $ intersect (regNosOfRealReg rr1) (regNosOfRealReg rr2)`
+    -- but that resulted in some gnarly, gnarly, allocating code. So we manually
+    -- write out all the cases which gives us nice non-allocating code.
+    case rr1 of
+        RealRegSingle r1 ->
+            case rr2 of RealRegPair r2 r3 -> r1 == r2 || r1 == r3
+                        RealRegSingle r2 -> r1 == r2
+        RealRegPair r1 r2 ->
+            case rr2 of RealRegPair r3 r4 -> r1 == r3 || r1 == r4 || r2 == r3 || r2 == r4
+                        RealRegSingle r3 -> r1 == r3 || r2 == r3
 
 --------------------------------------------------------------------------------
 -- | A register, either virtual or real
