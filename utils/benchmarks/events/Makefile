@@ -14,7 +14,7 @@ ifdef ENABLE_EVENTLOG
 	ghc-prof-flags += -eventlog
 endif
 
-INPLACE := ./../../inplace
+INPLACE := ./../../../inplace
 ghc := $(INPLACE)/bin/ghc-stage2
 ghc-opt-flags := -O2
 ghc-base-flags := -funbox-strict-fields -fno-ignore-asserts
