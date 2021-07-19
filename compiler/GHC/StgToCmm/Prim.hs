@@ -1712,6 +1712,8 @@ emitPrimOp dflags primop = case primop of
     -> PrimopCmmEmit
   opTranslate64 args mkMop callish =
     case platformWordSize platform of
+      -- LLVM and C `can handle larger than native size arithmetic natively.
+      _ | not ncg -> opTranslate args $ mkMop W64
       PW4 -> opCallish args callish
       PW8 -> opTranslate args $ mkMop W64
 #endif
