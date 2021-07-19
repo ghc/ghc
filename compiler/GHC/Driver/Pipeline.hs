@@ -252,8 +252,8 @@ compileOne' mHscMessage
        input_fnpp  = ms_hspp_file summary
        mod_graph   = hsc_mod_graph hsc_env0
        needsLinker = needsTemplateHaskellOrQQ mod_graph
-       isDynWay    = any (== WayDyn) (ways lcl_dflags)
-       isProfWay   = any (== WayProf) (ways lcl_dflags)
+       isDynWay    = hasWay (ways lcl_dflags) WayDyn
+       isProfWay   = hasWay (ways lcl_dflags) WayProf
        internalInterpreter = not (gopt Opt_ExternalInterpreter lcl_dflags)
 
        pipelineOutput = case bcknd of
@@ -496,7 +496,7 @@ linkingNeeded logger dflags unit_env staticLink linkables pkg_deps = do
 
 findHSLib :: Platform -> Ways -> [String] -> String -> IO (Maybe FilePath)
 findHSLib platform ws dirs lib = do
-  let batch_lib_file = if WayDyn `notElem` ws
+  let batch_lib_file = if ws `hasNotWay` WayDyn
                       then "lib" ++ lib <.> "a"
                       else platformSOName platform lib
   found <- filterM doesFileExist (map (</> batch_lib_file) dirs)

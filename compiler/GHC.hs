@@ -404,7 +404,6 @@ import GHC.Unit.Home.ModInfo
 import Data.Foldable
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
-import qualified Data.Set as S
 import qualified Data.Sequence as Seq
 import Data.Maybe
 import Data.Typeable    ( Typeable )
@@ -590,10 +589,10 @@ checkBrokenTablesNextToCode logger dflags
 
 checkBrokenTablesNextToCode' :: MonadIO m => Logger -> DynFlags -> m Bool
 checkBrokenTablesNextToCode' logger dflags
-  | not (isARM arch)                 = return False
-  | WayDyn `S.notMember` ways dflags = return False
-  | not tablesNextToCode             = return False
-  | otherwise                        = do
+  | not (isARM arch)               = return False
+  | ways dflags `hasNotWay` WayDyn = return False
+  | not tablesNextToCode           = return False
+  | otherwise                      = do
     linkerInfo <- liftIO $ getLinkerInfo logger dflags
     case linkerInfo of
       GnuLD _  -> return True

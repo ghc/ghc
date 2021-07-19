@@ -61,7 +61,6 @@ import GHC.Utils.Trace
 import Control.Monad (ap)
 import Data.Maybe (fromMaybe)
 import Data.Tuple (swap)
-import qualified Data.Set as Set
 
 -- Note [Live vs free]
 -- ~~~~~~~~~~~~~~~~~~~
@@ -248,7 +247,7 @@ coreToStg dflags this_mod ml pgm
           then collectDebugInformation dflags ml pgm'
           else (pgm', emptyInfoTableProvMap)
 
-    prof = WayProf `Set.member` ways dflags
+    prof = ways dflags `hasWay` WayProf
 
     final_ccs
       | prof && gopt Opt_AutoSccsOnIndividualCafs dflags

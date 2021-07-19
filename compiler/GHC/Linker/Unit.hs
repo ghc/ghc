@@ -50,7 +50,7 @@ collectArchives dflags pc =
 -- | Either the 'unitLibraryDirs' or 'unitLibraryDynDirs' as appropriate for the way.
 libraryDirsForWay :: Ways -> UnitInfo -> [String]
 libraryDirsForWay ws
-  | WayDyn `elem` ws = map ST.unpack . unitLibraryDynDirs
+  | hasWay ws WayDyn = map ST.unpack . unitLibraryDynDirs
   | otherwise        = map ST.unpack . unitLibraryDirs
 
 getLibs :: DynFlags -> UnitEnv -> [UnitId] -> IO [(String,String)]

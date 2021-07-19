@@ -638,8 +638,8 @@ failNonStd dflags srcspan = dieWith dflags srcspan $
   text "      with" <+> compWay <+>
      text "using -osuf to set a different object file suffix."
     where compWay
-            | WayDyn `elem` ways dflags = text "-dynamic"
-            | WayProf `elem` ways dflags = text "-prof"
+            | ways dflags `hasWay` WayDyn  = text "-dynamic"
+            | ways dflags `hasWay` WayProf = text "-prof"
             | otherwise = text "normal"
           ghciWay
             | hostIsDynamic = text "with -dynamic"

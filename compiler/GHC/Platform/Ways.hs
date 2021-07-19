@@ -24,7 +24,9 @@ module GHC.Platform.Ways
    ( Way(..)
    , Ways
    , hasWay
+   , hasNotWay
    , addWay
+   , removeWay
    , allowed_combination
    , wayGeneralFlags
    , wayUnsetGeneralFlags
@@ -72,13 +74,21 @@ data Way
 
 type Ways = Set Way
 
--- | Test if a ways is enabled
+-- | Test if a way is enabled
 hasWay :: Ways -> Way -> Bool
 hasWay ws w = Set.member w ws
+
+-- | Test if a way is not enabled
+hasNotWay :: Ways -> Way -> Bool
+hasNotWay ws w = Set.notMember w ws
 
 -- | Add a way
 addWay :: Way -> Ways -> Ways
 addWay = Set.insert
+
+-- | Remove a way
+removeWay :: Way -> Ways -> Ways
+removeWay = Set.delete
 
 -- | Check if a combination of ways is allowed
 allowed_combination :: Ways -> Bool

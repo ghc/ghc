@@ -4053,7 +4053,7 @@ addWay' w dflags0 =
    in dflags3
 
 removeWayDyn :: DynP ()
-removeWayDyn = upd (\dfs -> dfs { targetWays_ = Set.filter (WayDyn /=) (targetWays_ dfs) })
+removeWayDyn = upd (\dfs -> dfs { targetWays_ = removeWay WayDyn (targetWays_ dfs) })
 
 --------------------------
 setGeneralFlag, unSetGeneralFlag :: GeneralFlag -> DynP ()
@@ -4470,7 +4470,7 @@ picCCOpts dflags = pieOpts ++ picOpts
       -- correctly.  They need to reference data in the Haskell
       -- objects, but can't without -fPIC.  See
       -- https://gitlab.haskell.org/ghc/ghc/wikis/commentary/position-independent-code
-       | gopt Opt_PIC dflags || WayDyn `Set.member` ways dflags ->
+       | gopt Opt_PIC dflags || ways dflags `hasWay` WayDyn ->
           ["-fPIC", "-U__PIC__", "-D__PIC__"]
       -- gcc may be configured to have PIC on by default, let's be
       -- explicit here, see #15847
@@ -4653,7 +4653,7 @@ makeDynFlagsConsistent dflags
  , not (gopt Opt_ExternalInterpreter dflags)
  , hostIsProfiled
  , backendProducesObject (backend dflags)
- , WayProf `Set.notMember` ways dflags
+ , ways dflags `hasNotWay` WayProf
     = loop dflags{targetWays_ = addWay WayProf (targetWays_ dflags)}
          "Enabling -prof, because -fobject-code is enabled and GHCi is profiled"
 

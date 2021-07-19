@@ -437,7 +437,7 @@ tidyProgram hsc_env  (ModGuts { mg_module           = mod
 
 
               ; local_ccs
-                  | WayProf `S.member` ways dflags
+                  | ways dflags `hasWay` WayProf
                         = collectCostCentres mod all_tidy_binds tidy_rules
                   | otherwise
                         = S.empty

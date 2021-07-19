@@ -50,7 +50,6 @@ import GHC.Settings
 import Data.Version
 import Data.Bifunctor
 import Data.List (isPrefixOf, stripPrefix)
-import qualified Data.Set as Set
 
 
 -- | Information about an installed unit
@@ -205,19 +204,19 @@ collectFrameworksDirs ps = map ST.unpack (ordNub (filter (not . ST.null) (concat
 -- | Either the 'unitLibraryDirs' or 'unitLibraryDynDirs' as appropriate for the way.
 libraryDirsForWay :: Ways -> UnitInfo -> [String]
 libraryDirsForWay ws
-  | WayDyn `elem` ws = map ST.unpack . unitLibraryDynDirs
+  | hasWay ws WayDyn = map ST.unpack . unitLibraryDynDirs
   | otherwise        = map ST.unpack . unitLibraryDirs
 
 unitHsLibs :: GhcNameVersion -> Ways -> UnitInfo -> [String]
 unitHsLibs namever ways0 p = map (mkDynName . addSuffix . ST.unpack) (unitLibraries p)
   where
-        ways1 = Set.filter (/= WayDyn) ways0
+        ways1 = removeWay WayDyn ways0
         -- the name of a shared library is libHSfoo-ghc<version>.so
         -- we leave out the _dyn, because it is superfluous
 
         -- debug and profiled RTSs include support for -eventlog
-        ways2 | WayDebug `Set.member` ways1 || WayProf `Set.member` ways1
-              = Set.filter (/= WayTracing) ways1
+        ways2 |  ways1 `hasWay` WayDebug || ways1 `hasWay` WayProf
+              = removeWay WayTracing ways1
               | otherwise
               = ways1
 

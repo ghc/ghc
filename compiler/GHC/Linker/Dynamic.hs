@@ -23,7 +23,6 @@ import GHC.SysTools.Tasks
 import GHC.Utils.Logger
 import GHC.Utils.TmpFs
 
-import qualified Data.Set as Set
 import System.FilePath
 
 linkDynLib :: Logger -> TmpFs -> DynFlags -> UnitEnv -> [String] -> [UnitId] -> IO ()
@@ -55,7 +54,7 @@ linkDynLib logger tmpfs dflags0 unit_env o_files dep_packages
          | osElfTarget os || osMachOTarget os
          , dynLibLoader dflags == SystemDependent
          , -- Only if we want dynamic libraries
-           WayDyn `Set.member` ways dflags
+           ways dflags `hasWay` WayDyn
            -- Only use RPath if we explicitly asked for it
          , useXLinkerRPath dflags os
             = ["-L" ++ l, "-Xlinker", "-rpath", "-Xlinker", l]

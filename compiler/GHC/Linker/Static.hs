@@ -89,7 +89,7 @@ linkBinary' staticLink logger tmpfs dflags unit_env o_files dep_units = do
         get_pkg_lib_path_opts l
          | osElfTarget (platformOS platform) &&
            dynLibLoader dflags == SystemDependent &&
-           WayDyn `elem` ways dflags
+           ways dflags `hasWay` WayDyn
             = let libpath = if gopt Opt_RelativeDynlibPaths dflags
                             then "$ORIGIN" </>
                                  (l `makeRelativeTo` full_output_fn)
@@ -110,7 +110,7 @@ linkBinary' staticLink logger tmpfs dflags unit_env o_files dep_units = do
               in ["-L" ++ l] ++ rpathlink ++ rpath
          | osMachOTarget (platformOS platform) &&
            dynLibLoader dflags == SystemDependent &&
-           WayDyn `elem` ways dflags &&
+           ways dflags `hasWay` WayDyn &&
            useXLinkerRPath dflags (platformOS platform)
             = let libpath = if gopt Opt_RelativeDynlibPaths dflags
                             then "@loader_path" </>

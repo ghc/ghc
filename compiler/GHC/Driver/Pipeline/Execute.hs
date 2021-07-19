@@ -832,10 +832,10 @@ llvmOptions dflags =
         Just (LlvmTarget _ mcpu mattr) = lookup target (llvmTargets $ llvmConfig dflags)
 
         -- Relocation models
-        rmodel | gopt Opt_PIC dflags        = "pic"
-               | positionIndependent dflags = "pic"
-               | WayDyn `elem` ways dflags  = "dynamic-no-pic"
-               | otherwise                  = "static"
+        rmodel | gopt Opt_PIC dflags         = "pic"
+               | positionIndependent dflags  = "pic"
+               | ways dflags `hasWay` WayDyn = "dynamic-no-pic"
+               | otherwise                   = "static"
 
         platform = targetPlatform dflags
 
