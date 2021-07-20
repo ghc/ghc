@@ -243,9 +243,27 @@ These stages can be summarized graphically:
 
 #### Documentation
 
-To build GHC documentation, run `build docs`. Note that finer-grain
-documentation targets (e.g. building only HTML documentation or only the GHC
-User's Guide) are currently not supported.
+To build all GHC documentation, run `build docs`. This includes
+
+* Haddock documentation for all libraries
+* The user guide (PDF and HTML)
+* The man page
+
+In order to only build haddock document there is the `build docs-haddock` target.
+
+Alternatively,
+you can use the `--docs` CLI flag to selectively disable some or
+all of the documentation targets:
+
+- `--docs=none`: don't build any docs
+- `--docs=no-haddocks`: don't build haddocks
+- `--docs=no-sphinx`: don't build any user manual or manpage
+- `--docs=no-sphinx-html`: don't build HTML versions of manuals
+- `--docs=no-sphinx-pdfs`: don't build PDF versions of manuals
+- `--docs=no-sphinx-man`: don't build the manpage
+
+You can pass several `--docs=...` flags, Hadrian will combine
+their effects.
 
 #### Source distribution
 
