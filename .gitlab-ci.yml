@@ -542,7 +542,6 @@ validate-x86_64-darwin:
     BUILD_FLAVOUR: "validate"
     # Due to #19025
     IGNORE_PERF_FAILURES: "all"
-    CABAL_CACHE: "cabal-cache-amd64"
   after_script:
     - .gitlab/ci.sh clean
 
@@ -558,12 +557,16 @@ validate-x86_64-darwin:
         --pure \
         --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR \
         --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --keep PROJECT_DIR \
-        --keep CI_PROJECT_DIR --keep MAKE_ARGS --keep HADRIAN_ARGS --keep CABAL_CACHE \
+        --keep CI_PROJECT_DIR --keep MAKE_ARGS --keep HADRIAN_ARGS --keep HOME \
         --keep LANG --keep CONFIGURE_ARGS --keep TEST_ENV --keep BIN_DIST_NAME \
         --keep MACOSX_DEPLOYMENT_TARGET --keep ac_cv_func_clock_gettime --keep HACKAGE_INDEX_STATE \
         --keep PERF_NOTE_KEY --keep HEAD_HACKAGE_TRIGGER_TOKEN \
         --run "$1" 2>&1
     }
+    # make sure home exists
+    export HOME=$HOME/x86_64-home
+    mkdir -p $HOME
+
     # fix up config.sub in libraries for the time.
     # aarch64-darwin is not supported in older config.sub's
     TIME_START=$(date +%s)
@@ -574,6 +577,9 @@ validate-x86_64-darwin:
     TIME_SETUP_DELTA=$(expr $TIME_SETUP - $TIME_START)
     echo "Setup took $TIME_SETUP_DELTA seconds"
 
+    # make sure $HOME is prisine
+    echo "Deleting $HOME/.cabal"
+    rm -fR $HOME/.cabal
     runInNixShell "cabal update --index=$HACKAGE_INDEX_STATE" 2>&1
 
     runInNixShell ".gitlab/ci.sh configure" 2>&1
@@ -608,11 +614,6 @@ validate-x86_64-darwin:
   artifacts:
     when: always
     expire_in: 2 week
-  cache:
-    key: "darwin-amd64-$GHC_VERSION"
-    paths:
-      - cabal-cache-amd64
-      - toolchain
 
 validate-aarch64-darwin:
   extends: .validate-hadrian
@@ -640,7 +641,6 @@ validate-aarch64-darwin:
     HADRIAN_ARGS: "--docs=no-sphinx"
     BIN_DIST_NAME: "ghc-arm64-apple-darwin"
     TEST_ENV: "aarch64-darwin-hadrian"
-    CABAL_CACHE: "cabal-cache-arm64"
   after_script:
     - .gitlab/ci.sh clean
 
@@ -656,11 +656,15 @@ validate-aarch64-darwin:
         --pure \
         --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR \
         --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --keep PROJECT_DIR \
-        --keep CI_PROJECT_DIR --keep MAKE_ARGS --keep HADRIAN_ARGS --keep CABAL_CACHE  \
+        --keep CI_PROJECT_DIR --keep MAKE_ARGS --keep HADRIAN_ARGS --keep HOME \
         --keep LANG --keep CONFIGURE_ARGS --keep TEST_ENV --keep BIN_DIST_NAME \
         --keep HACKAGE_INDEX_STATE \
         --run "$1" 2>&1
     }
+    export HOME=$HOME/arm64-home
+    # make sure home exists
+    mkdir -p $HOME
+
     # fix up config.sub in libraries for the time.
     # aarch64-darwin is not supported in older config.sub's
     TIME_START=$(date +%s)
@@ -671,6 +675,9 @@ validate-aarch64-darwin:
     TIME_SETUP_DELTA=$(expr $TIME_SETUP - $TIME_START)
     echo "Setup took $TIME_SETUP_DELTA seconds"
 
+    # make sure $HOME is prisine
+    echo "Deleting $HOME/.cabal"
+    rm -fR $HOME/.cabal
     runInNixShell "cabal update --index=$HACKAGE_INDEX_STATE" 2>&1
 
     runInNixShell ".gitlab/ci.sh configure" 2>&1
@@ -704,11 +711,6 @@ validate-aarch64-darwin:
   artifacts:
     when: always
     expire_in: 2 week
-  cache:
-    key: "darwin-arm64-$GHC_VERSION"
-    paths:
-      - cabal-cache-arm64
-      - toolchain
 
 .validate-linux:
   extends: .validate
