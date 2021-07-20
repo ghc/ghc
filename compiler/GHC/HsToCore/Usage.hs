@@ -155,7 +155,7 @@ mkObjectUsage pit hsc_env mnwib = do
         Nothing ->  do
           -- This should only happen for home package things but oneshot puts
           -- home package ifaces in the PIT.
-          let miface = lookupIfaceByModule (hsc_HPT hsc_env) pit m
+          let miface = lookupIfaceByModule (hsc_HUG hsc_env) pit m
           case miface of
             Nothing -> pprPanic "mkObjectUsage" (ppr m)
             Just iface ->
@@ -176,7 +176,7 @@ mk_mod_usage_info :: PackageIfaceTable
 mk_mod_usage_info pit hsc_env this_mod direct_imports used_names
   = mapMaybe mkUsage usage_mods
   where
-    hpt = hsc_HPT hsc_env
+    hpt = hsc_HUG hsc_env
     dflags = hsc_dflags hsc_env
     home_unit = hsc_home_unit hsc_env
 

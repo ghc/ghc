@@ -1,5 +1,5 @@
-[1 of 2] Compiling RecordDotSyntaxA ( RecordDotSyntaxA.hs, RecordDotSyntaxA.o )
- [2 of 2] Compiling Main             ( RecordDotSyntaxFail6.hs, RecordDotSyntaxFail6.o )
+[1 of 3] Compiling RecordDotSyntaxA ( RecordDotSyntaxA.hs, RecordDotSyntaxA.o )
+[2 of 3] Compiling Main             ( RecordDotSyntaxFail6.hs, RecordDotSyntaxFail6.o )
 
-   RecordDotSyntaxFail6.hs:10:17:
+RecordDotSyntaxFail6.hs:10:17: error:
     Fields cannot be qualified when OverloadedRecordUpdate is enabled

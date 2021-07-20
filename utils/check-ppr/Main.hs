@@ -9,10 +9,10 @@ import Control.Monad.IO.Class
 import GHC.Types.SrcLoc
 import GHC hiding (moduleName)
 import GHC.Hs.Dump
+import GHC.Driver.Env
 import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Driver.Make
-import GHC.Unit.Module.ModSummary
 import GHC.Utils.Outputable hiding (space)
 import System.Environment( getArgs )
 import System.Exit
@@ -85,10 +85,10 @@ parseOneFile libdir fileName = do
          let dflags2 = dflags `gopt_set` Opt_KeepRawTokenStream
          _ <- setSessionDynFlags dflags2
          hsc_env <- getSession
-         ms <- liftIO $ summariseFile hsc_env [] fileName Nothing Nothing
-         case ms of
+         mms <- liftIO $ summariseFile hsc_env (hsc_home_unit hsc_env) mempty fileName Nothing Nothing
+         case mms of
            Left _err -> error "parseOneFile"
-           Right ems -> parseModule (emsModSummary ems)
+           Right ms -> parseModule ms
 
 getPragmas :: Located HsModule -> String
 getPragmas (L _ (HsModule { hsmodAnn = anns'})) = pragmaStr

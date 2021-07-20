@@ -14,6 +14,8 @@ import GHC.Fingerprint
 import GHC.Platform.Ways
 
 import Data.IORef
+import GHC.Data.FastString
+import qualified Data.Set as Set
 
 -- | The 'FinderCache' maps modules to the result of
 -- searching for that module. It records the results of searching for
@@ -86,6 +88,10 @@ data FinderOpts = FinderOpts
   , finder_enableSuggestions :: Bool
       -- ^ If we encounter unknown modules, should we suggest modules
       -- that have a similar name.
+  , finder_workingDirectory :: Maybe FilePath
+  , finder_thisPackageName  :: Maybe FastString
+  , finder_hiddenModules    :: Set.Set ModuleName
+  , finder_reexportedModules :: Set.Set ModuleName
   , finder_hieDir :: Maybe FilePath
   , finder_hieSuf :: String
   , finder_hiDir :: Maybe FilePath
@@ -95,4 +101,4 @@ data FinderOpts = FinderOpts
   , finder_objectSuf :: String
   , finder_dynObjectSuf :: String
   , finder_stubDir :: Maybe FilePath
-  }
+  } deriving Show

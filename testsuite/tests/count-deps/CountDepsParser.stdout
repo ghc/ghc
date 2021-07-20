@@ -1,4 +1,4 @@
-Found 282 GHC.Parser module dependencies
+Found 283 GHC.Parser module dependencies
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
 GHC.Builtin.Types
@@ -122,6 +122,7 @@ GHC.Iface.Ext.Fields
 GHC.Iface.Recomp.Binary
 GHC.Iface.Syntax
 GHC.Iface.Type
+GHC.Linker.Static.Utils
 GHC.Linker.Types
 GHC.Parser
 GHC.Parser.Annotation

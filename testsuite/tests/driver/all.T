@@ -302,3 +302,4 @@ test('T20459', normal, multimod_compile_fail,
 test('T20200loop', extra_files(['T20200loop']), multimod_compile,
      ['Datatypes', '-iT20200loop -O -v0'])
 test('T20316', normal, makefile_test, [])
+test('MultiRootsErr', normal, multimod_compile_fail, ['MultiRootsErr', 'MultiRootsErr'])

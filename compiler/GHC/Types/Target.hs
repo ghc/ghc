@@ -55,8 +55,8 @@ type InputFileBuffer = StringBuffer
 
 
 pprTarget :: Target -> SDoc
-pprTarget Target { targetId = id, targetAllowObjCode = obj } =
-    (if obj then empty else char '*') <> pprTargetId id
+pprTarget Target { targetUnitId = uid, targetId = id, targetAllowObjCode = obj } =
+    (if obj then empty else char '*') <> ppr uid <> colon <> pprTargetId id
 
 instance Outputable Target where
     ppr = pprTarget

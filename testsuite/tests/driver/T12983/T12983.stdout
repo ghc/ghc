@@ -1,18 +1,18 @@
 
 Preparing everyting with --make ...
 
-[1 of 3] Compiling Hospital
-[2 of 3] Compiling Types
-[3 of 3] Compiling Main
-Linking src/MetaHandler ...
+[1 of 4] Compiling Hospital
+[2 of 4] Compiling Types
+[3 of 4] Compiling Main
+[4 of 4] Linking src/MetaHandler
 Done with preparations with --make
 
 Building with --make
 
-[1 of 4] Compiling ShortText
-[2 of 4] Compiling Hospital [Source file changed]
-[4 of 4] Compiling Main [Hospital[TH] changed]
-Linking src/MetaHandler ...
+[1 of 5] Compiling ShortText
+[2 of 5] Compiling Hospital [Source file changed]
+[4 of 5] Compiling Main [Hospital[TH] changed]
+[5 of 5] Linking src/MetaHandler [Objects changed]
 
 Preparing everything ...
 src/Hospital.hs

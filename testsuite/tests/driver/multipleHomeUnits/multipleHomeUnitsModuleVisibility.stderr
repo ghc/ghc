@@ -1,0 +1,5 @@
+
+module-visibility-import/MV.hs:5:1: error:
+    Could not load module ‘MV2’
+    it is a hidden module in the package ‘mv’
+    Use -v (or `:set -v` in ghci) to see a list of the files searched for.

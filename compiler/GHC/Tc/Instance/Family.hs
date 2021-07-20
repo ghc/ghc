@@ -61,6 +61,7 @@ import qualified Data.List.NonEmpty as NE
 import Data.Function ( on )
 
 import qualified GHC.LanguageExtensions  as LangExt
+import GHC.Unit.Env (unitEnv_hpts)
 
 {- Note [The type family instance consistency story]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -293,14 +294,14 @@ This is basically the idea from #13092, comment:14.
 -- See Note [The type family instance consistency story].
 checkFamInstConsistency :: [Module] -> TcM ()
 checkFamInstConsistency directlyImpMods
-  = do { (eps, hpt) <- getEpsAndHpt
+  = do { (eps, hug) <- getEpsAndHug
        ; traceTc "checkFamInstConsistency" (ppr directlyImpMods)
        ; let { -- Fetch the iface of a given module.  Must succeed as
                -- all directly imported modules must already have been loaded.
                modIface mod =
-                 case lookupIfaceByModule hpt (eps_PIT eps) mod of
+                 case lookupIfaceByModule hug (eps_PIT eps) mod of
                    Nothing    -> panicDoc "FamInst.checkFamInstConsistency"
-                                          (ppr mod $$ pprHPT hpt)
+                                          (ppr mod $$ ppr hug)
                    Just iface -> iface
 
                -- Which family instance modules were checked for consistency
@@ -318,7 +319,8 @@ checkFamInstConsistency directlyImpMods
              ; hmiFamInstEnv = extendFamInstEnvList emptyFamInstEnv
                                . md_fam_insts . hm_details
              ; hpt_fam_insts = mkModuleEnv [ (hmiModule hmi, hmiFamInstEnv hmi)
-                                           | hmi <- eltsHpt hpt]
+                                           | hpt <- unitEnv_hpts hug
+                                           , hmi <- eltsHpt hpt ]
 
              }
 

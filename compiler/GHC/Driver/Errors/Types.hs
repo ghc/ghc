@@ -128,6 +128,16 @@ data DriverMessage where
   -}
   DriverMissingHomeModules :: [ModuleName] -> !BuildingCabalPackage -> DriverMessage
 
+  {-| DriverUnknown is a warning that arises when a user tries to
+      reexport a module which isn't part of that unit.
+  -}
+  DriverUnknownReexportedModules :: [ModuleName] -> DriverMessage
+
+  {-| DriverUnknownHiddenModules is a warning that arises when a user tries to
+      hide a module which isn't part of that unit.
+  -}
+  DriverUnknownHiddenModules :: [ModuleName] -> DriverMessage
+
   {-| DriverUnusedPackages occurs when when package is requested on command line,
       but was never needed during compilation. Activated by -Wunused-packages.
 
@@ -336,6 +346,10 @@ data DriverMessage where
 
   -}
   DriverCannotImportFromUntrustedPackage :: !UnitState -> !Module -> DriverMessage
+
+  DriverRedirectedNoMain :: !ModuleName -> DriverMessage
+
+  DriverHomePackagesNotClosed :: ![UnitId] -> DriverMessage
 
 -- | Pass to a 'DriverMessage' the information whether or not the
 -- '-fbuilding-cabal-package' flag is set.

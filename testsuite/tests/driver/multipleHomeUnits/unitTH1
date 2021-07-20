@@ -1,0 +1,1 @@
+-i -i. -working-dir=th TH.hs -this-unit-id th -package filepath -package directory

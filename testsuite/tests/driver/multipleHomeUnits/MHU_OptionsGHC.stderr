@@ -1,0 +1,12 @@
+
+MHU_OptionsGHC.hs:1:17: error:
+    Unknown flag in  {-# OPTIONS_GHC #-} pragma: -working-dir=a
+
+MHU_OptionsGHC.hs:2:17: error:
+    Unknown flag in  {-# OPTIONS_GHC #-} pragma: -hidden-module=A
+
+MHU_OptionsGHC.hs:3:17: error:
+    Unknown flag in  {-# OPTIONS_GHC #-} pragma: -reexported-module=A
+
+MHU_OptionsGHC.hs:4:17: error:
+    Unknown flag in  {-# OPTIONS_GHC #-} pragma: -this-package-name=pp

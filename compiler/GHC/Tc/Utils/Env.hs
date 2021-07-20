@@ -106,7 +106,6 @@ import GHC.Core.Class
 import GHC.Unit.Module
 import GHC.Unit.Home
 import GHC.Unit.External
-import GHC.Unit.Env
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -162,7 +161,7 @@ lookupGlobal_maybe :: HscEnv -> Name -> IO (MaybeErr SDoc TyThing)
 lookupGlobal_maybe hsc_env name
   = do  {    -- Try local envt
           let mod = icInteractiveModule (hsc_IC hsc_env)
-              mhome_unit = ue_home_unit (hsc_unit_env hsc_env)
+              mhome_unit = hsc_home_unit_maybe hsc_env
               tcg_semantic_mod = homeModuleInstantiation mhome_unit mod
 
         ; if nameIsLocalOrFrom tcg_semantic_mod name

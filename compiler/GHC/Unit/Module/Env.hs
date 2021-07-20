@@ -28,7 +28,9 @@ module GHC.Unit.Module.Env
    , extendInstalledModuleEnv
    , filterInstalledModuleEnv
    , delInstalledModuleEnv
+   , mergeInstalledModuleEnv
    , plusInstalledModuleEnv
+   , installedModuleEnvElts
    )
 where
 
@@ -49,6 +51,7 @@ import Data.Set (Set)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified GHC.Data.FiniteMap as Map
+import GHC.Utils.Outputable
 
 -- | A map keyed off of 'Module's
 newtype ModuleEnv elt = ModuleEnv (Map NDModule elt)
@@ -209,6 +212,10 @@ type DModuleNameEnv elt = UniqDFM ModuleName elt
 -- | A map keyed off of 'InstalledModule'
 newtype InstalledModuleEnv elt = InstalledModuleEnv (Map InstalledModule elt)
 
+instance Outputable elt => Outputable (InstalledModuleEnv elt) where
+  ppr (InstalledModuleEnv env) = ppr env
+
+
 emptyInstalledModuleEnv :: InstalledModuleEnv a
 emptyInstalledModuleEnv = InstalledModuleEnv Map.empty
 
@@ -225,6 +232,27 @@ filterInstalledModuleEnv f (InstalledModuleEnv e) =
 delInstalledModuleEnv :: InstalledModuleEnv a -> InstalledModule -> InstalledModuleEnv a
 delInstalledModuleEnv (InstalledModuleEnv e) m = InstalledModuleEnv (Map.delete m e)
 
--- | Left-biased
-plusInstalledModuleEnv :: InstalledModuleEnv a -> InstalledModuleEnv a -> InstalledModuleEnv a
-plusInstalledModuleEnv (InstalledModuleEnv a) (InstalledModuleEnv b) = InstalledModuleEnv (a `mappend` b)
+installedModuleEnvElts :: InstalledModuleEnv a -> [(InstalledModule, a)]
+installedModuleEnvElts (InstalledModuleEnv e) = Map.assocs e
+
+mergeInstalledModuleEnv
+  :: (elta -> eltb -> Maybe eltc)
+  -> (InstalledModuleEnv elta -> InstalledModuleEnv eltc)  -- map X
+  -> (InstalledModuleEnv eltb -> InstalledModuleEnv eltc) -- map Y
+  -> InstalledModuleEnv elta
+  -> InstalledModuleEnv eltb
+  -> InstalledModuleEnv eltc
+mergeInstalledModuleEnv f g h (InstalledModuleEnv xm) (InstalledModuleEnv ym)
+  = InstalledModuleEnv $ Map.mergeWithKey
+      (\_ x y -> (x `f` y))
+      (coerce g)
+      (coerce h)
+      xm ym
+
+plusInstalledModuleEnv :: (elt -> elt -> elt)
+  -> InstalledModuleEnv elt
+  -> InstalledModuleEnv elt
+  -> InstalledModuleEnv elt
+plusInstalledModuleEnv f (InstalledModuleEnv xm) (InstalledModuleEnv ym) =
+  InstalledModuleEnv $ Map.unionWith f xm ym
+

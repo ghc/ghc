@@ -740,6 +740,131 @@ search path (see :ref:`search-path`).
     number of processors. Note that compilation of a module may not begin
     until its dependencies have been built.
 
+.. _multi-home-units:
+
+Multiple Home Units
+~~~~~~~~~~~~~~~~~~~
+
+The compiler also has support for building multiple units in a single compiler
+invocation. In modern projects it is common to work on multiple interdependent
+packages at once, using the support for multiple home units you can load all
+these local packages into one ghc session and quickly get feedback about how
+changes affect other dependent packages.
+
+In order to specify multiple units, the `-unit @⟨filename⟩`:ghc-flag: is given multiple times
+with a response file containing the arguments for each unit. The response file contains
+a newline separated list of arguments.
+
+.. code-block:: none
+
+    ghc -unit @unitA -unit @unitB
+
+where the ``unitA`` response file contains the normal arguments that you would
+pass to ``--make`` mode.
+
+.. code-block:: none
+
+    -this-unit-id a-0.1.0.0
+    -i
+    -isrc
+    A1
+    A2
+    ...
+
+Then when the compiler starts in ``--make`` mode it will compile both units ``a`` and ``b``.
+
+There is also very basic support for multple home units in GHCi, at the moment you can start
+a GHCi session with multiple units but only the `:reload`:ghci-cmd: is supported.
+
+.. ghc-flag:: -unit @⟨filename⟩
+    :shortdesc: Specify the options to build a specific unit.
+    :type: dynamic
+    :category: misc
+
+    This option is passed multiple times to inform the compiler about all the
+    home units which it will compile. The options for each unit are supplied
+    in a response file which contains a newline separated list of normal arguments.
+
+There are a few extra flags which have been introduced to make working with multiple
+units easier.
+
+.. ghc-flag:: -working-dir ⟨dir⟩
+    :shortdesc: Specify the directory a unit is expected to be compiled in.
+    :type: dynamic
+    :category:
+
+    It is common to assume that a package is compiled in the directory where its
+    cabal file resides. Thus, all paths used in the compiler are assumed to be relative
+    to this directory. When there are multiple home units the compiler is often
+    not operating in the standard directory and instead where the cabal.project
+    file is located. In this case the `-working-dir` option can be passed which specifies
+    the path from the current directory to the directory the unit assumes to be it's root,
+    normally the directory which contains the cabal file.
+
+    When the flag is passed, any relative paths used by the compiler are offset
+    by the working directory. Notably this includes `-i`:ghc-flag: and `-I⟨dir⟩`:ghc-flag: flags.
+
+
+    This option can also be queried by the ``getPackageRoot`` Template Haskell
+    function. It is intended to be used with helper functions such as ``makeRelativeToProject``
+    which make relative filepaths relative to the compilation directory rather than
+    the directory which contains the .cabal file.
+
+.. ghc-flag:: -this-package-name ⟨unit-id⟩
+    :shortdesc: The name of the package which this module would be part of when installed.
+    :type: dynamic
+    :category:
+
+    This flag papers over the awkward interaction of the `PackageImports`:extension:
+    and multiple home units. When using ``PackageImports`` you can specify the name
+    of the package in an import to disambiguate between modules which appear in multiple
+    packages with the same name.
+
+    This flag allows a home unit to be given a package name so that you can also
+    disambiguate between multiple home units which provide modules with the same name.
+
+.. ghc-flag:: -hidden-module ⟨module name⟩
+    :shortdesc: A module which should not be visible outside its unit.
+    :type: dynamic
+    :category:
+
+    This flag can be supplied multiple times in order to specify which modules
+    in a home unit should not be visible outside of the unit it belongs to.
+
+    The main use of this flag is to be able to recreate the difference between
+    an exposed and hidden module for installed packages.
+
+.. ghc-flag:: -reexported-module ⟨module name⟩
+    :shortdesc: A module which should be reexported from this unit.
+    :type: dynamic
+    :category:
+
+    This flag can be supplied multiple times in order to specify which modules
+    are not defined in a unit but should be reexported. The effect is that other
+    units will see this module as if it was defined in this unit.
+
+    The use of this flag is to be able to replicate the reexported modules
+    feature of packages with multiple home units.
+
+
+
+The home unit closure requirement
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+There is one very important closure property which you must ensure when using
+multiple home units.
+
+  Any external unit must not depend on any home unit.
+
+This closure property is checked by the compiler but it's up to the tool invoking
+GHC to ensure that the supplied list of home units obey this invariant.
+
+For example, if we have three units, ``p``, ``q`` and ``r``, where ``p`` depends on ``q`` and
+``q`` depends on ``r``, then the closure property states that if we load ``p`` and ``r`` as
+home units then we must also load ``q``, because ``q`` depends on the home unit ``r`` and we need
+``q`` because ``p`` depends on it.
+
+
 .. _eval-mode:
 
 Expression evaluation mode

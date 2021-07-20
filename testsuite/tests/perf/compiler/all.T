@@ -293,6 +293,29 @@ test('MultiLayerModulesRecomp',
      multimod_compile,
      ['MultiLayerModules', '-v0'])
 
+
+# A performance test for calculating link dependencies in --make mode.
+test('MultiLayerModulesTH_Make',
+     [ collect_compiler_stats('bytes allocated',3),
+       pre_cmd('$MAKE -s --no-print-directory MultiLayerModulesTH_Make_Prep'),
+       extra_files(['genMultiLayerModulesTH']),
+       unless(have_dynamic(),skip),
+       compile_timeout_multiplier(5)
+     ],
+     multimod_compile_fail,
+     ['MultiLayerModules', '-v0'])
+
+# A performance test for calculating link dependencies in -c mode.
+test('MultiLayerModulesTH_OneShot',
+     [ collect_compiler_stats('bytes allocated',3),
+       pre_cmd('$MAKE -s --no-print-directory MultiLayerModulesTH_OneShot_Prep'),
+       extra_files(['genMultiLayerModulesTH']),
+       unless(have_dynamic(),skip),
+       compile_timeout_multiplier(5)
+     ],
+     compile_fail,
+     ['-v0'])
+
 test('MultiLayerModulesDefsGhci',
      [ collect_compiler_residency(15),
        pre_cmd('./genMultiLayerModulesDefs'),
@@ -318,6 +341,24 @@ test('MultiLayerModulesNoCode',
      ],
      ghci_script,
      ['MultiLayerModulesNoCode.script'])
+
+test('MultiComponentModulesRecomp',
+     [ collect_compiler_stats('bytes allocated', 2),
+       pre_cmd('$MAKE -s --no-print-directory MultiComponentModulesRecomp'),
+       extra_files(['genMultiComp.py']),
+       compile_timeout_multiplier(5)
+     ],
+     multiunit_compile,
+     [['unitp%d' % n for n in range(20)], '-fno-code -fwrite-interface -v0'])
+
+test('MultiComponentModules',
+     [ collect_compiler_stats('bytes allocated', 2),
+       pre_cmd('$PYTHON ./genMultiComp.py'),
+       extra_files(['genMultiComp.py']),
+       compile_timeout_multiplier(5)
+     ],
+     multiunit_compile,
+     [['unitp%d' % n for n in range(20)], '-fno-code -fwrite-interface -v0'])
 
 test('ManyConstructors',
      [ collect_compiler_stats('bytes allocated',2),

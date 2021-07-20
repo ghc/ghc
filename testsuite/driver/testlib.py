@@ -1342,46 +1342,53 @@ def ghci_script( name, way, script):
 # Compile-only tests
 
 def compile( name, way, extra_hc_opts ):
-    return do_compile( name, way, False, None, [], extra_hc_opts )
+    return do_compile( name, way, False, None, [],  [], extra_hc_opts )
 
 def compile_fail( name, way, extra_hc_opts ):
-    return do_compile( name, way, True, None, [], extra_hc_opts )
+    return do_compile( name, way, True, None, [], [], extra_hc_opts )
 
 def backpack_typecheck( name, way, extra_hc_opts ):
-    return do_compile( name, way, False, None, [], "-fno-code -fwrite-interface " + extra_hc_opts, backpack=True )
+    return do_compile( name, way, False, None, [], [], "-fno-code -fwrite-interface " + extra_hc_opts, backpack=True )
 
 def backpack_typecheck_fail( name, way, extra_hc_opts ):
-    return do_compile( name, way, True, None, [], "-fno-code -fwrite-interface " + extra_hc_opts, backpack=True )
+    return do_compile( name, way, True, None, [], [], "-fno-code -fwrite-interface " + extra_hc_opts, backpack=True )
 
 def backpack_compile( name, way, extra_hc_opts ):
-    return do_compile( name, way, False, None, [], extra_hc_opts, backpack=True )
+    return do_compile( name, way, False, None, [], [], extra_hc_opts, backpack=True )
 
 def backpack_compile_fail( name, way, extra_hc_opts ):
-    return do_compile( name, way, True, None, [], extra_hc_opts, backpack=True )
+    return do_compile( name, way, True, None, [], [], extra_hc_opts, backpack=True )
 
 def backpack_run( name, way, extra_hc_opts ):
     return compile_and_run__( name, way, None, [], extra_hc_opts, backpack=True )
 
 def multimod_compile( name, way, top_mod, extra_hc_opts ):
-    return do_compile( name, way, False, top_mod, [], extra_hc_opts )
+    return do_compile( name, way, False, top_mod, [], [], extra_hc_opts )
 
 def multimod_compile_fail( name, way, top_mod, extra_hc_opts ):
-    return do_compile( name, way, True, top_mod, [], extra_hc_opts )
+    return do_compile( name, way, True, top_mod, [], [], extra_hc_opts )
 
 def multimod_compile_filter( name, way, top_mod, extra_hc_opts, filter_with, suppress_stdout=True ):
-    return do_compile( name, way, False, top_mod, [], extra_hc_opts, filter_with=filter_with, suppress_stdout=suppress_stdout )
+    return do_compile( name, way, False, top_mod, [], [], extra_hc_opts, filter_with=filter_with, suppress_stdout=suppress_stdout )
+
+def multiunit_compile( name, way, units, extra_hc_opts ):
+    return do_compile( name, way, False, None, [], units, extra_hc_opts )
+
+def multiunit_compile_fail( name, way, units, extra_hc_opts ):
+    return do_compile( name, way, True, None, [], units, extra_hc_opts )
 
 def multi_compile( name, way, top_mod, extra_mods, extra_hc_opts ):
-    return do_compile( name, way, False, top_mod, extra_mods, extra_hc_opts)
+    return do_compile( name, way, False, top_mod, extra_mods, [], extra_hc_opts)
 
 def multi_compile_fail( name, way, top_mod, extra_mods, extra_hc_opts ):
-    return do_compile( name, way, True, top_mod, extra_mods, extra_hc_opts)
+    return do_compile( name, way, True, top_mod, extra_mods, [], extra_hc_opts)
 
 def do_compile(name: TestName,
                way: WayName,
                should_fail: bool,
                top_mod: Optional[Path],
                extra_mods: List[str],
+               units: List[str],
                extra_hc_opts: str,
                **kwargs
                ) -> PassFail:
@@ -1392,7 +1399,7 @@ def do_compile(name: TestName,
        return result
     extra_hc_opts = result.hc_opts
 
-    result = simple_build(name, way, extra_hc_opts, should_fail, top_mod, False, True, **kwargs)
+    result = simple_build(name, way, extra_hc_opts, should_fail, top_mod, units, False, True, **kwargs)
 
     if badResult(result):
         return result
@@ -1427,7 +1434,7 @@ def compile_cmp_asm(name: TestName,
                     extra_hc_opts: str
                     ) -> PassFail:
     print('Compile only, extra args = ', extra_hc_opts)
-    result = simple_build(name + '.' + ext, way, '-keep-s-files -O ' + extra_hc_opts, False, None, False, False)
+    result = simple_build(name + '.' + ext, way, '-keep-s-files -O ' + extra_hc_opts, False, None, [], False, False)
 
     if badResult(result):
         return result
@@ -1454,7 +1461,7 @@ def compile_grep_asm(name: TestName,
                      extra_hc_opts: str
                      ) -> PassFail:
     print('Compile only, extra args = ', extra_hc_opts)
-    result = simple_build(name + '.' + ext, way, '-keep-s-files -O ' + extra_hc_opts, False, None, False, False)
+    result = simple_build(name + '.' + ext, way, '-keep-s-files -O ' + extra_hc_opts, False, None, [], False, False)
 
     if badResult(result):
         return result
@@ -1475,7 +1482,7 @@ def compile_grep_core(name: TestName,
                       extra_hc_opts: str
                       ) -> PassFail:
     print('Compile only, extra args = ', extra_hc_opts)
-    result = simple_build(name + '.hs', way, '-ddump-to-file -dsuppress-all -ddump-simpl -O ' + extra_hc_opts, False, None, False, False)
+    result = simple_build(name + '.hs', way, '-ddump-to-file -dsuppress-all -ddump-simpl -O ' + extra_hc_opts, False, None, [], False, False)
 
     if badResult(result):
         return result
@@ -1511,7 +1518,7 @@ def compile_and_run__(name: TestName,
     if way.startswith('ghci'): # interpreted...
         return interpreter_run(name, way, extra_hc_opts, top_mod)
     else: # compiled...
-        result = simple_build(name, way, extra_hc_opts, False, top_mod, True, True, backpack = backpack)
+        result = simple_build(name, way, extra_hc_opts, False, top_mod, [], True, True, backpack = backpack)
         if badResult(result):
             return result
 
@@ -1621,7 +1628,7 @@ def check_stats(name: TestName,
 
 def extras_build( way, extra_mods, extra_hc_opts ):
     for mod, opts in extra_mods:
-        result = simple_build(mod, way, opts + ' ' + extra_hc_opts, False, None, False, False)
+        result = simple_build(mod, way, opts + ' ' + extra_hc_opts, False, None, [], False, False)
         if not (mod.endswith('.hs') or mod.endswith('.lhs')):
             extra_hc_opts += ' %s' % Path(mod).with_suffix('.o')
         if badResult(result):
@@ -1634,6 +1641,7 @@ def simple_build(name: Union[TestName, str],
                  extra_hc_opts: str,
                  should_fail: bool,
                  top_mod: Optional[Path],
+                 units: List[str],
                  link: bool,
                  addsuf: bool,
                  backpack: bool = False,
@@ -1667,6 +1675,10 @@ def simple_build(name: Union[TestName, str],
         to_do = to_do + '--backpack '
     elif link:
         to_do = '-o ' + name
+    elif len(units) > 0:
+        to_do = '--make'
+        for u in units:
+            to_do = to_do + ' -unit @%s' % u
     else:
         to_do = '-c' # just compile
 

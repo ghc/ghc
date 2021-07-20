@@ -358,7 +358,7 @@ runCcPhase cc_phase pipe_env hsc_env input_fn = do
   let platform  = ue_platform unit_env
   let hcc       = cc_phase `eqPhase` HCc
 
-  let cmdline_include_paths = includePaths dflags
+  let cmdline_include_paths =  offsetIncludePaths dflags (includePaths dflags)
 
   -- HC files have the dependent packages stamped into them
   pkgs <- if hcc then getHCFilePackages input_fn else return []
@@ -379,10 +379,13 @@ runCcPhase cc_phase pipe_env hsc_env input_fn = do
   -- (#16737). Doing it in this way is simpler and also enable the C
   -- compiler to perform preprocessing and parsing in a single pass,
   -- but it may introduce inconsistency if a different pgm_P is specified.
-  let more_preprocessor_opts = concat
+  let opts = getOpts dflags opt_P
+      aug_imports = augmentImports dflags opts
+
+      more_preprocessor_opts = concat
         [ ["-Xpreprocessor", i]
         | not hcc
-        , i <- getOpts dflags opt_P
+        , i <- aug_imports
         ]
 
   let gcc_extra_viac_flags = extraGccViaCFlags dflags
@@ -935,6 +938,12 @@ llvmOptions dflags =
                 ArchRISCV64 -> "lp64d"
                 _           -> ""
 
+
+-- Note [Filepaths and Multiple Home Units]
+offsetIncludePaths :: DynFlags -> IncludeSpecs -> IncludeSpecs
+offsetIncludePaths dflags (IncludeSpecs incs quotes impl) =
+     let go = map (augmentByWorkingDirectory dflags)
+     in IncludeSpecs (go incs) (go quotes) (go impl)
 -- -----------------------------------------------------------------------------
 -- Running CPP
 
@@ -944,12 +953,21 @@ llvmOptions dflags =
 doCpp :: Logger -> TmpFs -> DynFlags -> UnitEnv -> Bool -> FilePath -> FilePath -> IO ()
 doCpp logger tmpfs dflags unit_env raw input_fn output_fn = do
     let hscpp_opts = picPOpts dflags
-    let cmdline_include_paths = includePaths dflags
+    let cmdline_include_paths = offsetIncludePaths dflags (includePaths dflags)
     let unit_state = ue_units unit_env
     pkg_include_dirs <- mayThrowUnitErr
                         (collectIncludeDirs <$> preloadUnitsInfo unit_env)
+    -- MP: This is not quite right, the headers which are supposed to be installed in
+    -- the package might not be the same as the provided include paths, but it's a close
+    -- enough approximation for things to work. A proper solution would be to have to declare which paths should
+    -- be propagated to dependent packages.
+    let home_pkg_deps =
+         [homeUnitEnv_dflags . ue_findHomeUnitEnv uid $ unit_env | uid <- ue_transitiveHomeDeps (ue_currentUnit unit_env) unit_env]
+        dep_pkg_extra_inputs = [offsetIncludePaths fs (includePaths fs) | fs <- home_pkg_deps]
+
     let include_paths_global = foldr (\ x xs -> ("-I" ++ x) : xs) []
-          (includePathsGlobal cmdline_include_paths ++ pkg_include_dirs)
+          (includePathsGlobal cmdline_include_paths ++ pkg_include_dirs
+                                                    ++ concatMap includePathsGlobal dep_pkg_extra_inputs)
     let include_paths_quote = foldr (\ x xs -> ("-iquote" ++ x) : xs) []
           (includePathsQuote cmdline_include_paths ++
            includePathsQuoteImplicit cmdline_include_paths)

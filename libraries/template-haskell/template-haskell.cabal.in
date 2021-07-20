@@ -58,6 +58,7 @@ Library
         base        >= 4.11 && < 4.17,
         ghc-boot-th == @ProjectVersionMunged@,
         ghc-prim,
+        filepath,
         pretty      == 1.1.*
 
     ghc-options: -Wall

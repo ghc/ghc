@@ -145,6 +145,7 @@ module GHC.Driver.Session (
         defaultFatalMessager,
         defaultFlushOut,
         setOutputFile, setDynOutputFile, setOutputHi, setDynOutputHi,
+        augmentByWorkingDirectory,
 
         getOpts,                        -- DynFlags -> (DynFlags -> [a]) -> [a]
         getVerbFlags,
@@ -514,6 +515,12 @@ data DynFlags = DynFlags {
   homeUnitId_             :: UnitId,                 -- ^ Target home unit-id
   homeUnitInstanceOf_     :: Maybe UnitId,           -- ^ Id of the unit to instantiate
   homeUnitInstantiations_ :: [(ModuleName, Module)], -- ^ Module instantiations
+
+  -- Note [Filepaths and Multiple Home Units]
+  workingDirectory      :: Maybe FilePath,
+  thisPackageName       :: Maybe String, -- ^ What the package is called, use with multiple home units
+  hiddenModules         :: Set.Set ModuleName,
+  reexportedModules     :: Set.Set ModuleName,
 
   -- ways
   targetWays_           :: Ways,         -- ^ Target way flags from the command line
@@ -1135,6 +1142,11 @@ defaultDynFlags mySettings llvmConfig =
         homeUnitId_             = mainUnitId,
         homeUnitInstanceOf_     = Nothing,
         homeUnitInstantiations_ = [],
+
+        workingDirectory        = Nothing,
+        thisPackageName         = Nothing,
+        hiddenModules           = Set.empty,
+        reexportedModules       = Set.empty,
 
         objectDir               = Nothing,
         dylibInstallName        = Nothing,
@@ -2938,6 +2950,12 @@ package_flags_deps = [
   , make_ord_flag defGhcFlag "package-name"       (HasArg $ \name ->
                                       upd (setUnitId name))
   , make_ord_flag defGhcFlag "this-unit-id"       (hasArg setUnitId)
+
+  , make_ord_flag defGhcFlag "working-dir"       (hasArg setWorkingDirectory)
+  , make_ord_flag defGhcFlag "this-package-name"  (hasArg setPackageName)
+  , make_ord_flag defGhcFlag "hidden-module"      (HasArg addHiddenModule)
+  , make_ord_flag defGhcFlag "reexported-module"  (HasArg addReexportedModule)
+
   , make_ord_flag defFlag "package"               (HasArg exposePackage)
   , make_ord_flag defFlag "plugin-package-id"     (HasArg exposePluginPackageId)
   , make_ord_flag defFlag "plugin-package"        (HasArg exposePluginPackage)
@@ -4278,6 +4296,43 @@ parseUnitArg =
 
 setUnitId :: String -> DynFlags -> DynFlags
 setUnitId p d = d { homeUnitId_ = stringToUnitId p }
+
+setWorkingDirectory :: String -> DynFlags -> DynFlags
+setWorkingDirectory p d = d { workingDirectory =  Just p }
+
+{-
+Note [Filepaths and Multiple Home Units]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+It is common to assume that a package is compiled in the directory where its
+cabal file resides. Thus, all paths used in the compiler are assumed to be relative
+to this directory. When there are multiple home units the compiler is often
+not operating in the standard directory and instead where the cabal.project
+file is located. In this case the `-working-dir` option can be passed which specifies
+the path from the current directory to the directory the unit assumes to be it's root,
+normally the directory which contains the cabal file.
+
+When the flag is passed, any relative paths used by the compiler are offset
+by the working directory. Notably this includes `-i`, `-I⟨dir⟩`, `-hidir`, `-odir` etc and
+the location of input files.
+
+-}
+
+augmentByWorkingDirectory :: DynFlags -> FilePath -> FilePath
+augmentByWorkingDirectory dflags fp | isRelative fp, Just offset <- workingDirectory dflags = offset </> fp
+augmentByWorkingDirectory _ fp = fp
+
+setPackageName :: String -> DynFlags -> DynFlags
+setPackageName p d = d { thisPackageName =  Just p }
+
+addHiddenModule :: String -> DynP ()
+addHiddenModule p =
+  upd (\s -> s{ hiddenModules  = Set.insert (mkModuleName p) (hiddenModules s) })
+
+addReexportedModule :: String -> DynP ()
+addReexportedModule p =
+  upd (\s -> s{ reexportedModules  = Set.insert (mkModuleName p) (reexportedModules s) })
+
 
 -- If we're linking a binary, then only backends that produce object
 -- code are allowed (requests for other target types are ignored).

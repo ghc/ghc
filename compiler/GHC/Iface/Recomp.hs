@@ -53,8 +53,6 @@ import GHC.Types.SrcLoc
 import GHC.Types.Unique
 import GHC.Types.Unique.Set
 import GHC.Types.Fixity.Env
-
-import GHC.Unit.Env
 import GHC.Unit.External
 import GHC.Unit.Finder
 import GHC.Unit.State
@@ -78,6 +76,7 @@ import qualified Data.Semigroup
 import GHC.List (uncons)
 import Data.Ord
 import Data.Containers.ListUtils
+import Data.Bifunctor
 
 {-
   -----------------------------------------------
@@ -121,6 +120,11 @@ data RecompileRequired
        -- to force recompilation; the String says what (one-line summary)
    deriving (Eq)
 
+instance Outputable RecompileRequired where
+  ppr UpToDate = text "UpToDate"
+  ppr MustCompile = text "MustCompile"
+  ppr (RecompBecause r) = text "RecompBecause" <+> ppr r
+
 instance Semigroup RecompileRequired where
   UpToDate <> r = r
   mc <> _       = mc
@@ -141,8 +145,8 @@ data RecompReason
   | HieOutdated
   | SigsMergeChanged
   | ModuleChanged ModuleName
-  | ModuleRemoved ModuleName
-  | ModuleAdded ModuleName
+  | ModuleRemoved (UnitId, ModuleName)
+  | ModuleAdded (UnitId, ModuleName)
   | ModuleChangedRaw ModuleName
   | ModuleChangedIface ModuleName
   | FileChanged FilePath
@@ -155,6 +159,8 @@ data RecompReason
   | MissingDynObjectFile
   | MissingDynHiFile
   | MismatchedDynHiFile
+  | ObjectsChanged
+  | LibraryChanged
   deriving (Eq)
 
 instance Outputable RecompReason where
@@ -173,8 +179,8 @@ instance Outputable RecompReason where
     ModuleChanged m          -> ppr m <+> text "changed"
     ModuleChangedRaw m       -> ppr m <+> text "changed (raw)"
     ModuleChangedIface m     -> ppr m <+> text "changed (interface)"
-    ModuleRemoved m          -> ppr m <+> text "removed"
-    ModuleAdded m            -> ppr m <+> text "added"
+    ModuleRemoved (_uid, m)   -> ppr m <+> text "removed"
+    ModuleAdded (_uid, m)     -> ppr m <+> text "added"
     FileChanged fp           -> text fp <+> text "changed"
     CustomReason s           -> text s
     FlagsChanged             -> text "Flags changed"
@@ -185,6 +191,8 @@ instance Outputable RecompReason where
     MissingDynObjectFile     -> text "Missing dynamic object file"
     MissingDynHiFile         -> text "Missing dynamic interface file"
     MismatchedDynHiFile     -> text "Mismatched dynamic interface file"
+    ObjectsChanged          -> text "Objects changed"
+    LibraryChanged          -> text "Library changed"
 
 recompileRequired :: RecompileRequired -> Bool
 recompileRequired UpToDate = False
@@ -526,7 +534,7 @@ checkMergedSignatures hsc_env mod_summary iface = do
 checkDependencies :: HscEnv -> ModSummary -> ModIface -> IfG RecompileRequired
 checkDependencies hsc_env summary iface
  = do
-    res_normal <- classify_import (findImportedModule fc fopts units mhome_unit) (ms_textual_imps summary ++ ms_srcimps summary)
+    res_normal <- classify_import (findImportedModule hsc_env) (ms_textual_imps summary ++ ms_srcimps summary)
     res_plugin <- classify_import (\mod _ -> findPluginModule fc fopts units mhome_unit mod) (ms_plugin_imps summary)
     case sequence (res_normal ++ res_plugin ++ [Right (fake_ghc_prim_import)| ms_ghc_prim_import summary]) of
       Left recomp -> return recomp
@@ -539,6 +547,11 @@ checkDependencies hsc_env summary iface
         return (res1 `mappend` res2)
  where
 
+   classify_import :: (ModuleName -> t -> IO FindResult)
+                      -> [(t, GenLocated l ModuleName)]
+                    -> IfG
+                       [Either
+                          RecompileRequired (Either (UnitId, ModuleName) (String, UnitId))]
    classify_import find_import imports =
     liftIO $ traverse (\(mb_pkg, L _ mod) ->
            let reason = ModuleChanged mod
@@ -548,9 +561,10 @@ checkDependencies hsc_env summary iface
    fopts         = initFinderOpts dflags
    logger        = hsc_logger hsc_env
    fc            = hsc_FC hsc_env
-   mhome_unit    = ue_home_unit (hsc_unit_env hsc_env)
+   mhome_unit    = hsc_home_unit_maybe hsc_env
+   all_home_units = hsc_all_home_unit_ids hsc_env
    units         = hsc_units hsc_env
-   prev_dep_mods = map gwib_mod $ Set.toAscList $ dep_direct_mods (mi_deps iface)
+   prev_dep_mods = map (second gwib_mod) $ Set.toAscList $ dep_direct_mods (mi_deps iface)
    prev_dep_pkgs = Set.toAscList (Set.union (dep_direct_pkgs (mi_deps iface))
                                             (dep_plugin_pkgs (mi_deps iface)))
    bkpk_units    = map (("Signature",) . instUnitInstanceOf . moduleUnit) (requirementMerges units (moduleName (mi_module iface)))
@@ -560,23 +574,26 @@ checkDependencies hsc_env summary iface
    -- GHC.Prim is very special and doesn't appear in ms_textual_imps but
    -- ghc-prim will appear in the package dependencies still. In order to not confuse
    -- the recompilation logic we need to not forget we imported GHC.Prim.
-   fake_ghc_prim_import = if notHomeUnitId mhome_unit primUnitId
-                            then Right ("GHC.Prim", primUnitId)
-                            else Left (mkModuleName "GHC.Prim")
+   fake_ghc_prim_import =  case mhome_unit of
+                              Just home_unit
+                                | homeUnitId home_unit == primUnitId
+                                -> Left (primUnitId, mkModuleName "GHC.Prim")
+                              _ -> Right ("GHC.Prim", primUnitId)
 
 
    classify _ (Found _ mod)
-    | Just home_unit <- mhome_unit
-    , isHomeUnit home_unit (moduleUnit mod) = Right (Left (moduleName mod))
+    | (toUnitId $ moduleUnit mod) `elem` all_home_units = Right (Left ((toUnitId $ moduleUnit mod), moduleName mod))
     | otherwise = Right (Right (moduleNameString (moduleName mod), toUnitId $ moduleUnit mod))
    classify reason _ = Left (RecompBecause reason)
 
+   check_mods :: [(UnitId, ModuleName)] -> [(UnitId, ModuleName)] -> IO RecompileRequired
    check_mods [] [] = return UpToDate
    check_mods [] (old:_) = do
      -- This case can happen when a module is change from HPT to package import
      trace_hi_diffs logger $
-      text "module no longer " <> quotes (ppr old) <>
+      text "module no longer" <+> quotes (ppr old) <+>
         text "in dependencies"
+
      return (RecompBecause (ModuleRemoved old))
    check_mods (new:news) olds
     | Just (old, olds') <- uncons olds
@@ -1255,21 +1272,14 @@ addFingerprints hsc_env iface0
 -- to recompile C and everything else.
 getOrphanHashes :: HscEnv -> [Module] -> IO [Fingerprint]
 getOrphanHashes hsc_env mods = do
-  eps <- hscEPS hsc_env
   let
-    hpt        = hsc_HPT hsc_env
     dflags     = hsc_dflags hsc_env
-    pit        = eps_PIT eps
     ctx        = initSDocContext dflags defaultUserStyle
-    get_orph_hash mod =
-          case lookupIfaceByModule hpt pit mod of
-            Just iface -> return (mi_orphan_hash (mi_final_exts iface))
-            Nothing    -> do -- similar to 'mkHashFun'
-                iface <- initIfaceLoad hsc_env . withException ctx
+    get_orph_hash mod = do
+          iface <- initIfaceLoad hsc_env . withException ctx
                             $ loadInterface (text "getOrphanHashes") mod ImportBySystem
-                return (mi_orphan_hash (mi_final_exts iface))
+          return (mi_orphan_hash (mi_final_exts iface))
 
-  --
   mapM get_orph_hash mods
 
 
@@ -1546,7 +1556,7 @@ mkHashFun hsc_env eps name
   where
       home_unit = hsc_home_unit hsc_env
       dflags = hsc_dflags hsc_env
-      hpt = hsc_HPT hsc_env
+      hpt = hsc_HUG hsc_env
       pit = eps_PIT eps
       ctx = initSDocContext dflags defaultUserStyle
       occ = nameOccName name

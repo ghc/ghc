@@ -1,6 +1,6 @@
-[1 of 3] Compiling SafeLang17_A     ( SafeLang17_A.hs, SafeLang17_A.o )
-[2 of 3] Compiling SafeLang17_B     ( SafeLang17_B.hs, SafeLang17_B.o )
-[3 of 3] Compiling Main             ( SafeLang17.hs, SafeLang17.o )
+[1 of 4] Compiling SafeLang17_A     ( SafeLang17_A.hs, SafeLang17_A.o )
+[2 of 4] Compiling SafeLang17_B     ( SafeLang17_B.hs, SafeLang17_B.o )
+[3 of 4] Compiling Main             ( SafeLang17.hs, SafeLang17.o )
 
 SafeLang17.hs:9:13: error:
     • Unsafe overlapping instances for Pos [Int]

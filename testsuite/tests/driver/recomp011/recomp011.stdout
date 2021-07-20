@@ -1,10 +1,10 @@
-[1 of 1] Compiling Main             ( Main.hs, Main.o )
-Linking Main ...
+[1 of 2] Compiling Main             ( Main.hs, Main.o )
+[2 of 2] Linking Main
 42
-[1 of 1] Compiling Main             ( Main.hs, Main.o ) [B.hsinc changed]
-Linking Main ...
+[1 of 2] Compiling Main             ( Main.hs, Main.o ) [B.hsinc changed]
+[2 of 2] Linking Main [Objects changed]
 43
-[1 of 1] Compiling Main             ( Main.hs, Main.o ) [A.hsinc changed]
-Linking Main ...
+[1 of 2] Compiling Main             ( Main.hs, Main.o ) [A.hsinc changed]
+[2 of 2] Linking Main [Objects changed]
 4343
 4343

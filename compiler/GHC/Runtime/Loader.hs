@@ -270,7 +270,7 @@ lookupRdrNameInModuleForPlugins hsc_env mod_name rdr_name = do
     let fc         = hsc_FC hsc_env
     let unit_env   = hsc_unit_env hsc_env
     let unit_state = ue_units unit_env
-    let mhome_unit = ue_home_unit unit_env
+    let mhome_unit = hsc_home_unit_maybe hsc_env
     -- First find the unit the module resides in by searching exposed units and home modules
     found_module <- findPluginModule fc fopts unit_state mhome_unit mod_name
     case found_module of

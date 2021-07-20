@@ -1,2 +1,2 @@
-[1 of 1] Compiling Main             ( Main.hs, Main.o, Main.dyn_o )
-Linking Main ...
+[1 of 2] Compiling Main             ( Main.hs, Main.o, Main.dyn_o )
+[2 of 2] Linking Main

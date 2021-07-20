@@ -88,6 +88,18 @@ instance Diagnostic DriverMessage where
                      4
                      (sep (map ppr missing))
          in mkSimpleDecorated msg
+    DriverUnknownHiddenModules missing
+      -> let msg = hang
+                     (text "Modules are listened as hidden but not part of the unit: ")
+                     4
+                     (sep (map ppr missing))
+         in mkSimpleDecorated msg
+    DriverUnknownReexportedModules missing
+      -> let msg = hang
+                     (text "Modules are listened as reexported but can't be found in any dependency: ")
+                     4
+                     (sep (map ppr missing))
+         in mkSimpleDecorated msg
     DriverUnusedPackages unusedArgs
       -> let msg = vcat [ text "The following packages were specified" <+>
                           text "via -package or -package-id flags,"
@@ -171,6 +183,16 @@ instance Diagnostic DriverMessage where
                    <> (pprWithUnitState state $ ppr (moduleUnit m))
                    <> text ") the module resides in isn't trusted."
                ]
+    DriverRedirectedNoMain mod_name
+      -> mkSimpleDecorated $ (text
+                       ("Output was redirected with -o, " ++
+                       "but no output will be generated.") $$
+                       (text "There is no module named" <+>
+                       quotes (ppr mod_name) <> text "."))
+    DriverHomePackagesNotClosed needed_unit_ids
+      -> mkSimpleDecorated $ vcat ([text "Home units are not closed."
+                                  , text "It is necessary to also load the following units:" ]
+                                  ++ map (\uid -> text "-" <+> ppr uid) needed_unit_ids)
 
   diagnosticReason = \case
     DriverUnknownMessage m
@@ -179,6 +201,10 @@ instance Diagnostic DriverMessage where
       -> ErrorWithoutFlag
     DriverMissingHomeModules{}
       -> WarningWithFlag Opt_WarnMissingHomeModules
+    DriverUnknownHiddenModules {}
+      -> ErrorWithoutFlag
+    DriverUnknownReexportedModules {}
+      -> ErrorWithoutFlag
     DriverUnusedPackages{}
       -> WarningWithFlag Opt_WarnUnusedPackages
     DriverUnnecessarySourceImports{}
@@ -217,6 +243,10 @@ instance Diagnostic DriverMessage where
       -> ErrorWithoutFlag
     DriverCannotImportFromUntrustedPackage{}
       -> ErrorWithoutFlag
+    DriverRedirectedNoMain {}
+      -> ErrorWithoutFlag
+    DriverHomePackagesNotClosed {}
+      -> ErrorWithoutFlag
 
   diagnosticHints = \case
     DriverUnknownMessage m
@@ -224,6 +254,10 @@ instance Diagnostic DriverMessage where
     DriverPsHeaderMessage psMsg
       -> diagnosticHints psMsg
     DriverMissingHomeModules{}
+      -> noHints
+    DriverUnknownHiddenModules {}
+      -> noHints
+    DriverUnknownReexportedModules {}
       -> noHints
     DriverUnusedPackages{}
       -> noHints
@@ -264,4 +298,8 @@ instance Diagnostic DriverMessage where
     DriverMarkedTrustworthyButInferredSafe{}
       -> noHints
     DriverCannotImportFromUntrustedPackage{}
+      -> noHints
+    DriverRedirectedNoMain {}
+      -> noHints
+    DriverHomePackagesNotClosed {}
       -> noHints

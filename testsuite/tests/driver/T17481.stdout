@@ -1,14 +1,14 @@
 Main.hs is now:
 main = putStrLn "Hello from A"
 Compiling and running Main.hs:
-[1 of 1] Compiling Main             ( Main.hs, Main.o )
-Linking Main ...
+[1 of 2] Compiling Main             ( Main.hs, Main.o )
+[2 of 2] Linking Main
 Hello from A
 Main.hs is now:
 main = putStrLn "Hello from B"
 Compiling and running Main.hs:
-[1 of 1] Compiling Main             ( Main.hs, Main.o ) [Source file changed]
-Linking Main ...
+[1 of 2] Compiling Main             ( Main.hs, Main.o ) [Source file changed]
+[2 of 2] Linking Main [Objects changed]
 Hello from B
 Touching Main.hs
 Compiling and running Main.hs:

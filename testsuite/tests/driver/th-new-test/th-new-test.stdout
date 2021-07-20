@@ -1,17 +1,17 @@
-[1 of 5] Compiling B
-[2 of 5] Compiling A
-[3 of 5] Compiling D
-[4 of 5] Compiling C
-[5 of 5] Compiling Main
-Linking Main ...
-[1 of 5] Compiling B [Source file changed]
-[2 of 5] Compiling A [B[TH] changed]
-Linking Main ...
-[3 of 5] Compiling D [Source file changed]
-[4 of 5] Compiling C [D[TH] changed]
-Linking Main ...
-[1 of 5] Compiling B [Source file changed]
-[2 of 5] Compiling A [B[TH] changed]
-[3 of 5] Compiling D [Source file changed]
-[4 of 5] Compiling C [D[TH] changed]
-Linking Main ...
+[1 of 6] Compiling B
+[2 of 6] Compiling A
+[3 of 6] Compiling D
+[4 of 6] Compiling C
+[5 of 6] Compiling Main
+[6 of 6] Linking Main
+[1 of 6] Compiling B [Source file changed]
+[2 of 6] Compiling A [B[TH] changed]
+[6 of 6] Linking Main [Objects changed]
+[3 of 6] Compiling D [Source file changed]
+[4 of 6] Compiling C [D[TH] changed]
+[6 of 6] Linking Main [Objects changed]
+[1 of 6] Compiling B [Source file changed]
+[2 of 6] Compiling A [B[TH] changed]
+[3 of 6] Compiling D [Source file changed]
+[4 of 6] Compiling C [D[TH] changed]
+[6 of 6] Linking Main [Objects changed]

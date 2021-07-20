@@ -1,8 +1,8 @@
-[1 of 5] Compiling T6018Afail       ( T6018Afail.hs, T6018Afail.o )
-[2 of 5] Compiling T6018Bfail       ( T6018Bfail.hs, T6018Bfail.o )
-[3 of 5] Compiling T6018Cfail       ( T6018Cfail.hs, T6018Cfail.o )
-[4 of 5] Compiling T6018Dfail       ( T6018Dfail.hs, T6018Dfail.o )
-[5 of 5] Compiling T6018fail        ( T6018fail.hs, T6018fail.o )
+[1 of 6] Compiling T6018Afail       ( T6018Afail.hs, T6018Afail.o )
+[2 of 6] Compiling T6018Bfail       ( T6018Bfail.hs, T6018Bfail.o )
+[3 of 6] Compiling T6018Cfail       ( T6018Cfail.hs, T6018Cfail.o )
+[4 of 6] Compiling T6018Dfail       ( T6018Dfail.hs, T6018Dfail.o )
+[5 of 6] Compiling T6018fail        ( T6018fail.hs, T6018fail.o )
 
 T6018fail.hs:15:15: error:
     Type family equation right-hand sides overlap; this violates

@@ -1,7 +1,7 @@
-[1 of 2] Compiling MyInteger        ( MyInteger.hs, MyInteger.o )
-[2 of 2] Compiling Main             ( T16608_2.hs, T16608_2.o )
-Linking T16608_2 ...
+[1 of 3] Compiling MyInteger        ( MyInteger.hs, MyInteger.o )
+[2 of 3] Compiling Main             ( T16608_2.hs, T16608_2.o )
+[3 of 3] Linking T16608_2
 41
-[1 of 2] Compiling MyInteger        ( MyInteger.hs, MyInteger.o ) [Source file changed]
-Linking T16608_2 ...
+[1 of 3] Compiling MyInteger        ( MyInteger.hs, MyInteger.o ) [Source file changed]
+[3 of 3] Linking T16608_2 [Objects changed]
 42

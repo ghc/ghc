@@ -7,6 +7,7 @@ import GHC.Prelude
 
 import GHC.Driver.Session
 import GHC.Unit.Finder.Types
+import GHC.Data.FastString
 
 
 -- | Create a new 'FinderOpts' from DynFlags.
@@ -17,6 +18,10 @@ initFinderOpts flags = FinderOpts
   , finder_bypassHiFileCheck = MkDepend == (ghcMode flags)
   , finder_ways = ways flags
   , finder_enableSuggestions = gopt Opt_HelpfulErrors flags
+  , finder_workingDirectory = workingDirectory flags
+  , finder_thisPackageName  = mkFastString <$> thisPackageName flags
+  , finder_hiddenModules = hiddenModules flags
+  , finder_reexportedModules = reexportedModules flags
   , finder_hieDir = hieDir flags
   , finder_hieSuf = hieSuf flags
   , finder_hiDir = hiDir flags

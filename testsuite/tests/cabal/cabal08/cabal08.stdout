@@ -1,12 +1,12 @@
-[1 of 1] Compiling Main             ( Main.hs, Main.o )
-Linking Main ...
+[1 of 2] Compiling Main             ( Main.hs, Main.o )
+[2 of 2] Linking Main
 p2
-[1 of 1] Compiling Main             ( Main.hs, Main.o )
-Linking Main ...
+[1 of 2] Compiling Main             ( Main.hs, Main.o )
+[2 of 2] Linking Main [Objects changed]
 p1
-[1 of 1] Compiling Main             ( Main.hs, Main.o )
-Linking Main ...
+[1 of 2] Compiling Main             ( Main.hs, Main.o )
+[2 of 2] Linking Main [Objects changed]
 p2
-[1 of 1] Compiling Main             ( Main.hs, Main.o )
-Linking Main ...
+[1 of 2] Compiling Main             ( Main.hs, Main.o )
+[2 of 2] Linking Main [Objects changed]
 p1

@@ -259,6 +259,7 @@ data THMessage a where
   ReifyModule :: TH.Module -> THMessage (THResult TH.ModuleInfo)
   ReifyConStrictness :: TH.Name -> THMessage (THResult [TH.DecidedStrictness])
 
+  GetPackageRoot :: THMessage (THResult FilePath)
   AddDependentFile :: FilePath -> THMessage (THResult ())
   AddTempFile :: String -> THMessage (THResult FilePath)
   AddModFinalizer :: RemoteRef (TH.Q ()) -> THMessage (THResult ())
@@ -311,6 +312,7 @@ getTHMessage = do
     22 -> THMsg <$> ReifyType <$> get
     23 -> THMsg <$> (PutDoc <$> get <*> get)
     24 -> THMsg <$> GetDoc <$> get
+    25 -> THMsg <$> return GetPackageRoot
     n -> error ("getTHMessage: unknown message " ++ show n)
 
 putTHMessage :: THMessage a -> Put
@@ -340,6 +342,7 @@ putTHMessage m = case m of
   ReifyType a                 -> putWord8 22 >> put a
   PutDoc l s                  -> putWord8 23 >> put l >> put s
   GetDoc l                    -> putWord8 24 >> put l
+  GetPackageRoot              -> putWord8 25
 
 
 data EvalOpts = EvalOpts

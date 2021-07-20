@@ -7,7 +7,7 @@ module GHC.Driver.Env.Types
 
 import GHC.Driver.Errors.Types ( GhcMessage )
 import {-# SOURCE #-} GHC.Driver.Hooks
-import GHC.Driver.Session ( DynFlags, ContainsDynFlags(..), HasDynFlags(..) )
+import GHC.Driver.Session ( ContainsDynFlags(..), HasDynFlags(..), DynFlags )
 import GHC.Prelude
 import GHC.Runtime.Context
 import GHC.Runtime.Interpreter.Types ( Interp )

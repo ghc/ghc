@@ -6,8 +6,8 @@
 [2 of 3] Processing sig
   [1 of 2] Compiling B[sig]           ( sig/B.hsig, nothing )
   [2 of 2] Compiling App              ( sig/App.hs, nothing )
-[3 of 3] Processing main
-  Instantiating main
+[3 of 3] Processing top
+  Instantiating top
   [1 of 1] Including sig[B=impl:C]
     Instantiating sig[B=impl:C]
     [1 of 2] Compiling B[sig]           ( sig/B.hsig, bkp42.out/sig/sig-Ko6MwJiRFc509cOdDShPV5/B.o )

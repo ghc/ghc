@@ -1,5 +1,5 @@
-[1 of 2] Compiling HasFieldFail01_A ( HasFieldFail01_A.hs, HasFieldFail01_A.o )
-[2 of 2] Compiling Main             ( hasfieldfail01.hs, hasfieldfail01.o )
+[1 of 3] Compiling HasFieldFail01_A ( HasFieldFail01_A.hs, HasFieldFail01_A.o )
+[2 of 3] Compiling Main             ( hasfieldfail01.hs, hasfieldfail01.o )
 
 hasfieldfail01.hs:9:15: error:
     • No instance for (HasField "foo" T Int)

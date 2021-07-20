@@ -1,4 +1,4 @@
-Found 276 Language.Haskell.Syntax module dependencies
+Found 277 Language.Haskell.Syntax module dependencies
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
 GHC.Builtin.Types
@@ -121,6 +121,7 @@ GHC.Iface.Ext.Fields
 GHC.Iface.Recomp.Binary
 GHC.Iface.Syntax
 GHC.Iface.Type
+GHC.Linker.Static.Utils
 GHC.Linker.Types
 GHC.Parser.Annotation
 GHC.Parser.Errors.Basic

@@ -32,7 +32,7 @@ module GHC.Tc.Utils.Monad(
   getEpsVar,
   getEps,
   updateEps, updateEps_,
-  getHpt, getEpsAndHpt,
+  getHpt, getEpsAndHug,
 
   -- * Arrow scopes
   newArrowScope, escapeArrowScope,
@@ -268,7 +268,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
         let {
              -- bangs to avoid leaking the env (#19356)
              !dflags = hsc_dflags hsc_env ;
-             !mhome_unit = ue_home_unit (hsc_unit_env hsc_env) ;
+             !mhome_unit = hsc_home_unit_maybe hsc_env;
              !logger = hsc_logger hsc_env ;
 
              maybe_rn_syntax :: forall a. a -> Maybe a ;
@@ -597,9 +597,9 @@ updateEps_ upd_fn = updateEps (\eps -> (upd_fn eps, ()))
 getHpt :: TcRnIf gbl lcl HomePackageTable
 getHpt = do { env <- getTopEnv; return (hsc_HPT env) }
 
-getEpsAndHpt :: TcRnIf gbl lcl (ExternalPackageState, HomePackageTable)
-getEpsAndHpt = do { env <- getTopEnv; eps <- liftIO $ hscEPS env
-                  ; return (eps, hsc_HPT env) }
+getEpsAndHug :: TcRnIf gbl lcl (ExternalPackageState, HomeUnitGraph)
+getEpsAndHug = do { env <- getTopEnv; eps <- liftIO $ hscEPS env
+                  ; return (eps, hsc_HUG env) }
 
 -- | A convenient wrapper for taking a @MaybeErr SDoc a@ and throwing
 -- an exception if it is an error.
@@ -2073,7 +2073,7 @@ initIfaceTcRn thing_inside
   = do  { tcg_env <- getGblEnv
         ; hsc_env <- getTopEnv
           -- bangs to avoid leaking the envs (#19356)
-        ; let !mhome_unit = ue_home_unit (hsc_unit_env hsc_env)
+        ; let !mhome_unit = hsc_home_unit_maybe hsc_env
               !knot_vars = tcg_type_env_var tcg_env
               -- When we are instantiating a signature, we DEFINITELY
               -- do not want to knot tie.

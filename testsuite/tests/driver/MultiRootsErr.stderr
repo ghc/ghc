@@ -1,0 +1,4 @@
+
+<no location info>: error:
+    module ‘main:MultiRootsErr’ is defined in multiple files: MultiRootsErr.hs
+                                                              MultiRootsErr.hs

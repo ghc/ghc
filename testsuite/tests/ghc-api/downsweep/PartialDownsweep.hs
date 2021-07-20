@@ -6,10 +6,10 @@
 import GHC
 import GHC.Driver.Make
 import GHC.Driver.Session
-import GHC.Unit.Module.ModSummary (ExtendedModSummary(..))
 import GHC.Utils.Outputable
 import GHC.Utils.Exception (ExceptionMonad)
 import GHC.Data.Bag
+import GHC.Unit.Module.Graph
 
 import Control.Monad
 import Control.Monad.Catch as MC (handle)
@@ -18,6 +18,7 @@ import Control.Exception
 import Data.IORef
 import Data.List (sort, find, stripPrefix, isPrefixOf, isSuffixOf)
 import Data.Either
+import Data.Maybe
 
 import System.Environment
 import System.Exit
@@ -167,11 +168,9 @@ go label mods cnd =
     setTargets [tgt]
 
     hsc_env <- getSession
-    emss <- liftIO $ downsweep hsc_env [] [] False
-    -- liftIO $ hPutStrLn stderr $ showSDoc (hsc_dflags hsc_env) $ ppr $ rights emss
-    -- liftIO $ hPrint stderr $ bagToList $ unionManyBags $ lefts emss
+    (_, nodes) <- liftIO $ downsweep hsc_env [] [] False
 
-    it label $ cnd (map emsModSummary (rights emss))
+    it label $ cnd (mapMaybe moduleGraphNodeModSum nodes)
 
 
 writeMod :: [String] -> IO ()

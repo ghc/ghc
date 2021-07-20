@@ -72,7 +72,7 @@ mkPrintUnqualified unit_env env
       (mkQualPackage unit_state)
   where
   unit_state = ue_units unit_env
-  home_unit  = ue_home_unit unit_env
+  home_unit  = ue_homeUnit unit_env
   qual_name mod occ
         | [gre] <- unqual_gres
         , right_name gre

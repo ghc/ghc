@@ -14,5 +14,5 @@ unit sig where
         import B
         app = print T
 
-unit main where
+unit top where
     dependency sig[B=impl:B]

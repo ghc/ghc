@@ -174,7 +174,7 @@ rnExports explicit_mod exports
                        , tcg_rdr_env = rdr_env
                        , tcg_imports = imports
                        , tcg_src     = hsc_src } = tcg_env
-              default_main | mainModIs hsc_env == this_mod
+              default_main | mainModIs (hsc_HUE hsc_env) == this_mod
                            , Just main_fun <- mainFunIs dflags
                            = mkUnqual varName (fsLit main_fun)
                            | otherwise

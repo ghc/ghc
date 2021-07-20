@@ -485,6 +485,7 @@ Library
         GHC.Linker.Loader
         GHC.Linker.MacOS
         GHC.Linker.Static
+        GHC.Linker.Static.Utils
         GHC.Linker.Types
         GHC.Linker.Unit
         GHC.Linker.Windows

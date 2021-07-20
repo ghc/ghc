@@ -16,3 +16,15 @@ T11068:
 MultiModulesRecomp:
 	./genMultiLayerModules
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 MultiLayerModules.hs
+
+MultiComponentModulesRecomp:
+	'$(PYTHON)' genMultiComp.py
+	TEST_HC='$(TEST_HC)' TEST_HC_OPTS='$(TEST_HC_OPTS)' ./run
+
+MultiLayerModulesTH_Make_Prep:
+	./genMultiLayerModulesTH
+	"$(TEST_HC)" $(TEST_HC_OPTS) MultiLayerModulesPrep -dynamic-too -v0
+
+MultiLayerModulesTH_OneShot_Prep: MultiLayerModulesTH_Make_Prep
+	$(CP) MultiLayerModules.hs MultiLayerModulesTH_OneShot.hs
+

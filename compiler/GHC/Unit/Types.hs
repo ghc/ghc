@@ -14,8 +14,10 @@ module GHC.Unit.Types
      GenModule (..)
    , Module
    , InstalledModule
+   , HomeUnitModule
    , InstantiatedModule
    , mkModule
+   , moduleUnitId
    , pprModule
    , pprInstantiatedModule
    , moduleFreeHoles
@@ -117,9 +119,16 @@ data GenModule unit = Module
 -- | A Module is a pair of a 'Unit' and a 'ModuleName'.
 type Module = GenModule Unit
 
+moduleUnitId :: Module -> UnitId
+moduleUnitId = toUnitId . moduleUnit
+
 -- | A 'InstalledModule' is a 'Module' whose unit is identified with an
 -- 'UnitId'.
 type InstalledModule = GenModule UnitId
+
+-- | A 'HomeUnitModule' is like an 'InstalledModule' but we expect to find it in
+-- one of the home units rather than the package database.
+type HomeUnitModule  = GenModule UnitId
 
 -- | An `InstantiatedModule` is a 'Module' whose unit is identified with an `InstantiatedUnit`.
 type InstantiatedModule = GenModule InstantiatedUnit

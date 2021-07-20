@@ -17,5 +17,5 @@ unit sig where
         app :: T -> IO ()
         app t = print t
 
-unit main where
+unit top where
     dependency sig[B=impl:C]
