@@ -92,14 +92,15 @@ little dance in action; the full Simplifier is a lot more complicated.
 data SimpleOpts = SimpleOpts
    { so_uf_opts :: !UnfoldingOpts   -- ^ Unfolding options
    , so_co_opts :: !OptCoercionOpts -- ^ Coercion optimiser options
+   , so_eta_red :: !Bool            -- ^ Eta reduction on?
    }
 
 -- | Default options for the Simple optimiser.
 defaultSimpleOpts :: SimpleOpts
 defaultSimpleOpts = SimpleOpts
    { so_uf_opts = defaultUnfoldingOpts
-   , so_co_opts = OptCoercionOpts
-      { optCoercionEnabled = False }
+   , so_co_opts = OptCoercionOpts { optCoercionEnabled = False }
+   , so_eta_red = False
    }
 
 simpleOptExpr :: HasDebugCallStack => SimpleOpts -> CoreExpr -> CoreExpr
@@ -182,11 +183,8 @@ simpleOptPgm opts this_mod binds rules =
 type SimpleClo = (SimpleOptEnv, InExpr)
 
 data SimpleOptEnv
-  = SOE { soe_co_opt_opts :: !OptCoercionOpts
-             -- ^ Options for the coercion optimiser
-
-        , soe_uf_opts :: !UnfoldingOpts
-             -- ^ Unfolding options
+  = SOE { soe_opts :: {-# UNPACK #-} ! SimpleOpts
+             -- ^ Simplifier options
 
         , soe_inl   :: IdEnv SimpleClo
              -- ^ Deals with preInlineUnconditionally; things
@@ -204,12 +202,9 @@ instance Outputable SimpleOptEnv where
                    <+> text "}"
 
 emptyEnv :: SimpleOpts -> SimpleOptEnv
-emptyEnv opts = SOE
-   { soe_inl         = emptyVarEnv
-   , soe_subst       = emptySubst
-   , soe_co_opt_opts = so_co_opts opts
-   , soe_uf_opts     = so_uf_opts opts
-   }
+emptyEnv opts = SOE { soe_inl   = emptyVarEnv
+                    , soe_subst = emptySubst
+                    , soe_opts  = opts  }
 
 soeZapSubst :: SimpleOptEnv -> SimpleOptEnv
 soeZapSubst env@(SOE { soe_subst = subst })
@@ -282,7 +277,7 @@ simple_opt_expr env expr
         (env', b') = subst_opt_bndr env b
 
     ----------------------
-    go_co co = optCoercion (soe_co_opt_opts env) (getTCvSubst subst) co
+    go_co co = optCoercion (so_co_opts (soe_opts env)) (getTCvSubst subst) co
 
     ----------------------
     go_alt env (Alt con bndrs rhs)
@@ -297,7 +292,8 @@ simple_opt_expr env expr
        where
          (env', b') = subst_opt_bndr env b
     go_lam env bs' e
-       | Just etad_e <- tryEtaReduce bs e' = etad_e
+       | so_eta_red (soe_opts env)
+       , Just etad_e <- tryEtaReduce bs e' = etad_e
        | otherwise                         = mkLams bs e'
        where
          bs = reverse bs'
@@ -422,7 +418,7 @@ simple_bind_pair env@(SOE { soe_inl = inl_env, soe_subst = subst })
     (env { soe_subst = extendTvSubst subst in_bndr out_ty }, Nothing)
 
   | Coercion co <- in_rhs
-  , let out_co = optCoercion (soe_co_opt_opts env) (getTCvSubst (soe_subst rhs_env)) co
+  , let out_co = optCoercion (so_co_opts (soe_opts env)) (getTCvSubst (soe_subst rhs_env)) co
   = assert (isCoVar in_bndr)
     (env { soe_subst = extendCvSubst subst in_bndr out_co }, Nothing)
 
@@ -654,7 +650,7 @@ add_info env old_bndr top_level new_rhs new_bndr
  | otherwise        = lazySetIdInfo new_bndr new_info
  where
    subst    = soe_subst env
-   uf_opts  = soe_uf_opts env
+   uf_opts  = so_uf_opts (soe_opts env)
    old_info = idInfo old_bndr
 
    -- Add back in the rules and unfolding which were

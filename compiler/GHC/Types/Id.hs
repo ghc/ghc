@@ -564,7 +564,8 @@ hasNoBinding :: Id -> Bool
 -- exception to this is unboxed tuples and sums datacons, which definitely have
 -- no binding
 hasNoBinding id = case Var.idDetails id of
-                        PrimOpId _       -> True    -- See Note [Eta expanding primops] in GHC.Builtin.PrimOps
+--                        PrimOpId _       -> True    -- See Note [Eta expanding primops] in GHC.Builtin.PrimOps
+-- Omit this: #19982
                         FCallId _        -> True
                         DataConWorkId dc -> isUnboxedTupleDataCon dc || isUnboxedSumDataCon dc
                         _                -> isCompulsoryUnfolding (idUnfolding id)

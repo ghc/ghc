@@ -1895,8 +1895,7 @@ This turned up in #7542.
 
 tryEtaReduce :: [Var] -> CoreExpr -> Maybe CoreExpr
 tryEtaReduce bndrs body
-  = let res = go (reverse bndrs) body refl_co
-    in pprTrace "tryEtaReduce" (ppr bndrs $$ ppr body $$ ppr res) res
+  = go (reverse bndrs) body refl_co
   where
     refl_co = mkRepReflCo (exprType body)
     incoming_arity = count isId bndrs
