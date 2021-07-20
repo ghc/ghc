@@ -310,6 +310,7 @@ import GHC.Driver.Errors.Types
 import GHC.Driver.CmdLine
 import GHC.Driver.Session
 import GHC.Driver.Backend
+import GHC.Driver.Config.Finder (initFinderOpts)
 import GHC.Driver.Config.Parser (initParserOpts)
 import GHC.Driver.Config.Logger (initLogFlags)
 import GHC.Driver.Config.Diagnostic
@@ -1659,9 +1660,10 @@ findModule mod_name maybe_pkg = withSession $ \hsc_env -> do
   let home_unit = hsc_home_unit hsc_env
   let units     = hsc_units hsc_env
   let dflags    = hsc_dflags hsc_env
+  let fopts     = initFinderOpts dflags
   case maybe_pkg of
     Just pkg | not (isHomeUnit home_unit (fsToUnit pkg)) && pkg /= fsLit "this" -> liftIO $ do
-      res <- findImportedModule fc units home_unit dflags mod_name maybe_pkg
+      res <- findImportedModule fc fopts units home_unit mod_name maybe_pkg
       case res of
         Found _ m -> return m
         err       -> throwOneError $ noModError hsc_env noSrcSpan mod_name err
@@ -1670,11 +1672,13 @@ findModule mod_name maybe_pkg = withSession $ \hsc_env -> do
       case home of
         Just m  -> return m
         Nothing -> liftIO $ do
-           res <- findImportedModule fc units home_unit dflags mod_name maybe_pkg
+           res <- findImportedModule fc fopts units home_unit mod_name maybe_pkg
            case res of
              Found loc m | not (isHomeModule home_unit m) -> return m
                          | otherwise -> modNotLoadedError dflags m loc
              err -> throwOneError $ noModError hsc_env noSrcSpan mod_name err
+  where
+
 
 modNotLoadedError :: DynFlags -> Module -> ModLocation -> IO a
 modNotLoadedError dflags m loc = throwGhcExceptionIO $ CmdLineError $ showSDoc dflags $
@@ -1699,7 +1703,8 @@ lookupModule mod_name Nothing = withSession $ \hsc_env -> do
       let fc     = hsc_FC hsc_env
       let units  = hsc_units hsc_env
       let dflags = hsc_dflags hsc_env
-      res <- findExposedPackageModule fc units dflags mod_name Nothing
+      let fopts  = initFinderOpts dflags
+      res <- findExposedPackageModule fc fopts units mod_name Nothing
       case res of
         Found _ m -> return m
         err       -> throwOneError $ noModError hsc_env noSrcSpan mod_name err

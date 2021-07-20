@@ -16,6 +16,7 @@ where
 import GHC.Prelude
 
 import qualified GHC
+import GHC.Driver.Config.Finder
 import GHC.Driver.Monad
 import GHC.Driver.Session
 import GHC.Driver.Ppr
@@ -291,9 +292,10 @@ findDependency hsc_env srcloc pkg imp is_boot include_pkg_deps = do
   let home_unit = hsc_home_unit hsc_env
   let units     = hsc_units hsc_env
   let dflags    = hsc_dflags hsc_env
+  let fopts     = initFinderOpts dflags
   -- Find the module; this will be fast because
   -- we've done it once during downsweep
-  r <- findImportedModule fc units home_unit dflags imp pkg
+  r <- findImportedModule fc fopts units home_unit imp pkg
   case r of
     Found loc _
         -- Home package: just depend on the .hi or hi-boot file

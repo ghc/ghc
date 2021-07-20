@@ -27,6 +27,7 @@ import GHC.Cmm              ( RawCmmGroup )
 import GHC.Cmm.CLabel
 
 import GHC.Driver.Session
+import GHC.Driver.Config.Finder (initFinderOpts)
 import GHC.Driver.Config.CmmToAsm (initNCGConfig)
 import GHC.Driver.Ppr
 import GHC.Driver.Backend
@@ -209,7 +210,7 @@ outputForeignStubs
            Maybe FilePath) -- C file created
 outputForeignStubs logger tmpfs dflags unit_state mod location stubs
  = do
-   let stub_h = mkStubPaths dflags (moduleName mod) location
+   let stub_h = mkStubPaths (initFinderOpts dflags) (moduleName mod) location
    stub_c <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "c"
 
    case stubs of

@@ -19,6 +19,8 @@ module GHC.Tc.Utils.Backpack (
 
 import GHC.Prelude
 
+
+import GHC.Driver.Config.Finder
 import GHC.Driver.Env
 import GHC.Driver.Ppr
 import GHC.Driver.Session
@@ -322,7 +324,7 @@ implicitRequirements' :: HscEnv
 implicitRequirements' hsc_env normal_imports
   = fmap concat $
     forM normal_imports $ \(mb_pkg, L _ imp) -> do
-        found <- findImportedModule fc units home_unit dflags imp mb_pkg
+        found <- findImportedModule fc fopts units home_unit imp mb_pkg
         case found of
             Found _ mod | not (isHomeModule home_unit mod) ->
                 return (uniqDSetToList (moduleFreeHoles mod))
@@ -332,6 +334,7 @@ implicitRequirements' hsc_env normal_imports
     home_unit = hsc_home_unit hsc_env
     units     = hsc_units hsc_env
     dflags    = hsc_dflags hsc_env
+    fopts     = initFinderOpts dflags
 
 -- | Like @implicitRequirements'@, but returns either the module name, if it is
 -- a free hole, or the instantiated unit the imported module is from, so that
@@ -347,10 +350,11 @@ implicitRequirementsShallow hsc_env normal_imports = go ([], []) normal_imports
   home_unit = hsc_home_unit hsc_env
   units     = hsc_units hsc_env
   dflags    = hsc_dflags hsc_env
+  fopts        = initFinderOpts dflags
 
   go acc [] = pure acc
   go (accL, accR) ((mb_pkg, L _ imp):imports) = do
-    found <- findImportedModule fc units home_unit dflags imp mb_pkg
+    found <- findImportedModule fc fopts units home_unit imp mb_pkg
     let acc' = case found of
           Found _ mod | not (isHomeModule home_unit mod) ->
               case moduleUnit mod of

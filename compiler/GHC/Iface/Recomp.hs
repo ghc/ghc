@@ -13,6 +13,7 @@ where
 import GHC.Prelude
 
 import GHC.Driver.Backend
+import GHC.Driver.Config.Finder
 import GHC.Driver.Env
 import GHC.Driver.Session
 import GHC.Driver.Ppr
@@ -454,7 +455,7 @@ checkDependencies hsc_env summary iface
  = do
     res <- liftIO $ traverse (\(mb_pkg, L _ mod) ->
               let reason = moduleNameString mod ++ " changed"
-              in classify reason <$> findImportedModule fc units home_unit dflags mod (mb_pkg))
+              in classify reason <$> findImportedModule fc fopts units home_unit mod (mb_pkg))
               (ms_imps summary ++ ms_srcimps summary)
     case sequence (res ++ [Right (fake_ghc_prim_import)| ms_ghc_prim_import summary]) of
       Left recomp -> return recomp
@@ -467,6 +468,7 @@ checkDependencies hsc_env summary iface
         return (res1 `mappend` res2)
  where
    dflags        = hsc_dflags hsc_env
+   fopts         = initFinderOpts dflags
    logger        = hsc_logger hsc_env
    fc            = hsc_FC hsc_env
    home_unit     = hsc_home_unit hsc_env

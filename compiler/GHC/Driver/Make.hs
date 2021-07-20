@@ -53,6 +53,7 @@ import GHC.Linker.Types
 
 import GHC.Runtime.Context
 
+import GHC.Driver.Config.Finder (initFinderOpts)
 import GHC.Driver.Config.Logger (initLogFlags)
 import GHC.Driver.Config.Parser (initParserOpts)
 import GHC.Driver.Config.Diagnostic
@@ -2311,9 +2312,10 @@ summariseFile hsc_env old_summaries src_fn mb_phase maybe_buf
         preimps@PreprocessedImports {..}
             <- getPreprocessedImports hsc_env src_fn mb_phase maybe_buf
 
+        let fopts = initFinderOpts (hsc_dflags hsc_env)
 
         -- Make a ModLocation for this file
-        location <- liftIO $ mkHomeModLocation (hsc_dflags hsc_env) pi_mod_name src_fn
+        location <- liftIO $ mkHomeModLocation fopts pi_mod_name src_fn
 
         -- Tell the Finder cache where it is, so that subsequent calls
         -- to findModule will find it, even if it's not on any search path
@@ -2428,6 +2430,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
   | otherwise  = find_it
   where
     dflags    = hsc_dflags hsc_env
+    fopts        = initFinderOpts dflags
     home_unit = hsc_home_unit hsc_env
     fc        = hsc_FC hsc_env
     units     = hsc_units hsc_env
@@ -2439,7 +2442,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
           old_summary location
 
     find_it = do
-        found <- findImportedModule fc units home_unit dflags wanted_mod Nothing
+        found <- findImportedModule fc fopts units home_unit wanted_mod Nothing
         case found of
              Found location mod
                 | isJust (ml_hs_file location) ->

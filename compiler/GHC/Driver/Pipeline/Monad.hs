@@ -14,6 +14,7 @@ import GHC.Prelude
 import Control.Monad.IO.Class
 import qualified Data.Kind as K
 import GHC.Driver.Phases
+import GHC.Driver.Config.Finder
 import GHC.Utils.TmpFs
 import GHC.Driver.Session
 import GHC.Types.SourceFile
@@ -42,7 +43,7 @@ getLocation :: PipeEnv -> DynFlags -> HscSource -> ModuleName -> IO ModLocation
 getLocation pipe_env dflags src_flavour mod_name = do
     let PipeEnv{ src_basename=basename,
              src_suffix=suff } = pipe_env
-    location1 <- mkHomeModLocation2 dflags mod_name basename suff
+    location1 <- mkHomeModLocation2 fopts mod_name basename suff
 
     -- Boot-ify it if necessary
     let location2
@@ -69,6 +70,8 @@ getLocation pipe_env dflags src_flavour mod_name = do
                   = location3 { ml_obj_file = ofile }
                   | otherwise = location3
     return location4
+    where
+      fopts = initFinderOpts dflags
 
 data PipelineOutput
   = Temporary TempFileLifetime

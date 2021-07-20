@@ -29,6 +29,7 @@ import GHC.Driver.Pipeline  ( oneShot, compileFile )
 import GHC.Driver.MakeFile  ( doMkDependHS )
 import GHC.Driver.Backpack  ( doBackpack )
 import GHC.Driver.Plugins
+import GHC.Driver.Config.Finder (initFinderOpts)
 import GHC.Driver.Config.Logger (initLogFlags)
 import GHC.Driver.Config.Diagnostic
 
@@ -851,12 +852,13 @@ abiHash strs = do
   let home_unit = hsc_home_unit hsc_env
   let units     = hsc_units hsc_env
   let dflags    = hsc_dflags hsc_env
+  let fopts     = initFinderOpts dflags
 
   liftIO $ do
 
   let find_it str = do
          let modname = mkModuleName str
-         r <- findImportedModule fc units home_unit dflags modname Nothing
+         r <- findImportedModule fc fopts units home_unit modname Nothing
          case r of
            Found _ m -> return m
            _error    -> throwGhcException $ CmdLineError $ showSDoc dflags $

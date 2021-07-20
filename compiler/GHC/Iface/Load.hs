@@ -43,6 +43,7 @@ import {-# SOURCE #-} GHC.IfaceToCore
    ( tcIfaceDecls, tcIfaceRules, tcIfaceInst, tcIfaceFamInst
    , tcIfaceAnnotations, tcIfaceCompleteMatches )
 
+import GHC.Driver.Config.Finder
 import GHC.Driver.Env
 import GHC.Driver.Errors.Types
 import GHC.Driver.Session
@@ -318,9 +319,10 @@ loadSrcInterface_maybe doc mod want_boot maybe_pkg
   = do hsc_env <- getTopEnv
        let fc = hsc_FC hsc_env
        let dflags = hsc_dflags hsc_env
+       let fopts = initFinderOpts dflags
        let units = hsc_units hsc_env
        let home_unit = hsc_home_unit hsc_env
-       res <- liftIO $ findImportedModule fc units home_unit dflags mod maybe_pkg
+       res <- liftIO $ findImportedModule fc fopts units home_unit mod maybe_pkg
        case res of
            Found _ mod -> initIfaceTcRn $ loadInterface doc mod (ImportByUser want_boot)
            -- TODO: Make sure this error message is good
@@ -879,8 +881,9 @@ findAndReadIface logger name_cache fc hooks unit_state home_unit dflags doc_str 
                        Just h  -> h
           return (Succeeded (iface, "<built in interface for GHC.Prim>"))
       else do
+          let fopts = initFinderOpts dflags
           -- Look for the file
-          mb_found <- liftIO (findExactModule fc dflags unit_state home_unit mod)
+          mb_found <- liftIO (findExactModule fc fopts unit_state home_unit mod)
           case mb_found of
               InstalledFound loc mod -> do
                   -- Found file, so read it

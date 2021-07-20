@@ -10,6 +10,7 @@
 module GHC.Unit.Finder (
     FindResult(..),
     InstalledFindResult(..),
+    FinderOpts(..),
     FinderCache,
     initFinderCache,
     flushFinderCaches,
@@ -32,12 +33,9 @@ module GHC.Unit.Finder (
 
     -- Hash cache
     lookupFileCache
-
   ) where
 
 import GHC.Prelude
-
-import GHC.Driver.Session
 
 import GHC.Platform.Ways
 
@@ -125,6 +123,38 @@ lookupFileCache (FinderCache _ ref) key = do
 -- -----------------------------------------------------------------------------
 -- The three external entry points
 
+-- | Locations and information the finder cares about.
+--
+-- Should be taken from 'DynFlags' via 'initFinderOpts'.
+data FinderOpts = FinderOpts
+  { finder_importPaths :: [FilePath]
+      -- ^ Where are we allowed to look for Modules and Source files
+  , finder_lookupHomeInterfaces :: Bool
+      -- ^ When looking up a home module:
+      --
+      --    * 'True':  search interface files (e.g. in '-c' mode)
+      --    * 'False': search source files (e.g. in '--make' mode)
+
+  , finder_bypassHiFileCheck :: Bool
+      -- ^ Don't check that an imported interface file actually exists
+      -- if it can only be at one location. The interface will be reported
+      -- as `InstalledFound` even if the file doesn't exist, so this is
+      -- only useful in specific cases (e.g. to generate dependencies
+      -- with `ghc -M`)
+  , finder_ways :: Ways
+  , finder_enableSuggestions :: Bool
+      -- ^ If we encounter unknown modules, should we suggest modules
+      -- that have a similar name.
+  , finder_hieDir :: Maybe FilePath
+  , finder_hieSuf :: String
+  , finder_hiDir :: Maybe FilePath
+  , finder_hiSuf :: String
+  , finder_objectDir :: Maybe FilePath
+  , finder_objectSuf :: String
+  , finder_stubDir :: Maybe FilePath
+  }
+
+
 -- | Locate a module that was imported by the user.  We have the
 -- module's name, and possibly a package name.  Without a package
 -- name, this function will use the search path and the known exposed
@@ -133,35 +163,35 @@ lookupFileCache (FinderCache _ ref) key = do
 
 findImportedModule
   :: FinderCache
+  -> FinderOpts
   -> UnitState
   -> HomeUnit
-  -> DynFlags
   -> ModuleName
   -> Maybe FastString
   -> IO FindResult
-findImportedModule fc units home_unit dflags mod_name mb_pkg =
+findImportedModule fc fopts units home_unit mod_name mb_pkg =
   case mb_pkg of
         Nothing                        -> unqual_import
         Just pkg | pkg == fsLit "this" -> home_import -- "this" is special
                  | otherwise           -> pkg_import
   where
-    home_import   = findHomeModule fc home_unit dflags mod_name
+    home_import   = findHomeModule fc fopts home_unit mod_name
 
-    pkg_import    = findExposedPackageModule fc units dflags mod_name mb_pkg
+    pkg_import    = findExposedPackageModule fc fopts units  mod_name mb_pkg
 
     unqual_import = home_import
                     `orIfNotFound`
-                    findExposedPackageModule fc units dflags mod_name Nothing
+                    findExposedPackageModule fc fopts units mod_name Nothing
 
 -- | Locate a plugin module requested by the user, for a compiler
 -- plugin.  This consults the same set of exposed packages as
 -- 'findImportedModule', unless @-hide-all-plugin-packages@ or
 -- @-plugin-package@ are specified.
-findPluginModule :: FinderCache -> UnitState -> HomeUnit -> DynFlags -> ModuleName -> IO FindResult
-findPluginModule fc units home_unit dflags mod_name =
-  findHomeModule fc home_unit dflags mod_name
+findPluginModule :: FinderCache -> FinderOpts -> UnitState -> HomeUnit -> ModuleName -> IO FindResult
+findPluginModule fc fopts units home_unit mod_name =
+  findHomeModule fc fopts home_unit mod_name
   `orIfNotFound`
-  findExposedPluginPackageModule fc units dflags mod_name
+  findExposedPluginPackageModule fc fopts units mod_name
 
 -- | Locate a specific 'Module'.  The purpose of this function is to
 -- create a 'ModLocation' for a given 'Module', that is to find out
@@ -169,11 +199,11 @@ findPluginModule fc units home_unit dflags mod_name =
 -- reading the interface for a module mentioned by another interface,
 -- for example (a "system import").
 
-findExactModule :: FinderCache -> DynFlags -> UnitState -> HomeUnit -> InstalledModule -> IO InstalledFindResult
-findExactModule fc dflags unit_state home_unit mod = do
+findExactModule :: FinderCache -> FinderOpts -> UnitState -> HomeUnit -> InstalledModule -> IO InstalledFindResult
+findExactModule fc fopts unit_state home_unit mod = do
   if isHomeInstalledModule home_unit mod
-    then findInstalledHomeModule fc dflags home_unit (moduleName mod)
-    else findPackageModule fc unit_state dflags mod
+    then findInstalledHomeModule fc fopts home_unit (moduleName mod)
+    else findPackageModule fc unit_state fopts mod
 
 -- -----------------------------------------------------------------------------
 -- Helpers
@@ -213,21 +243,21 @@ homeSearchCache fc home_unit mod_name do_this = do
   let mod = mkHomeInstalledModule home_unit mod_name
   modLocationCache fc mod do_this
 
-findExposedPackageModule :: FinderCache -> UnitState -> DynFlags -> ModuleName -> Maybe FastString -> IO FindResult
-findExposedPackageModule fc units dflags mod_name mb_pkg =
-  findLookupResult fc dflags
+findExposedPackageModule :: FinderCache -> FinderOpts -> UnitState -> ModuleName -> Maybe FastString -> IO FindResult
+findExposedPackageModule fc fopts units mod_name mb_pkg =
+  findLookupResult fc fopts
     $ lookupModuleWithSuggestions units mod_name mb_pkg
 
-findExposedPluginPackageModule :: FinderCache -> UnitState -> DynFlags -> ModuleName -> IO FindResult
-findExposedPluginPackageModule fc units dflags mod_name =
-  findLookupResult fc dflags
+findExposedPluginPackageModule :: FinderCache -> FinderOpts -> UnitState -> ModuleName -> IO FindResult
+findExposedPluginPackageModule fc fopts units mod_name =
+  findLookupResult fc fopts
     $ lookupPluginModuleWithSuggestions units mod_name Nothing
 
-findLookupResult :: FinderCache -> DynFlags -> LookupResult -> IO FindResult
-findLookupResult fc dflags r = case r of
+findLookupResult :: FinderCache -> FinderOpts -> LookupResult -> IO FindResult
+findLookupResult fc fopts r = case r of
      LookupFound m pkg_conf -> do
        let im = fst (getModuleInstantiation m)
-       r' <- findPackageModule_ fc dflags im (fst pkg_conf)
+       r' <- findPackageModule_ fc fopts im (fst pkg_conf)
        case r' of
         -- TODO: ghc -M is unlikely to do the right thing
         -- with just the location of the thing that was
@@ -260,7 +290,7 @@ findLookupResult fc dflags r = case r of
                           , fr_suggestions = [] })
      LookupNotFound suggest -> do
        let suggest'
-             | gopt Opt_HelpfulErrors dflags = suggest
+             | finder_enableSuggestions fopts = suggest
              | otherwise = []
        return (NotFound{ fr_paths = [], fr_pkg = Nothing
                        , fr_pkgs_hidden = []
@@ -293,10 +323,10 @@ uncacheModule fc home_unit mod_name = do
 -- -----------------------------------------------------------------------------
 --      The internal workers
 
-findHomeModule :: FinderCache -> HomeUnit -> DynFlags -> ModuleName -> IO FindResult
-findHomeModule fc home_unit dflags mod_name = do
+findHomeModule :: FinderCache -> FinderOpts -> HomeUnit -> ModuleName -> IO FindResult
+findHomeModule fc fopts  home_unit mod_name = do
   let uid       = homeUnitAsUnit home_unit
-  r <- findInstalledHomeModule fc dflags home_unit mod_name
+  r <- findInstalledHomeModule fc fopts home_unit mod_name
   return $ case r of
     InstalledFound loc _ -> Found loc (mkHomeModule home_unit mod_name)
     InstalledNoPackage _ -> NoPackage uid -- impossible
@@ -325,32 +355,32 @@ findHomeModule fc home_unit dflags mod_name = do
 --
 --  4. Some special-case code in GHCi (ToDo: Figure out why that needs to
 --  call this.)
-findInstalledHomeModule :: FinderCache -> DynFlags -> HomeUnit -> ModuleName -> IO InstalledFindResult
-findInstalledHomeModule fc dflags home_unit mod_name = do
+findInstalledHomeModule :: FinderCache -> FinderOpts -> HomeUnit -> ModuleName -> IO InstalledFindResult
+findInstalledHomeModule fc fopts home_unit mod_name = do
   homeSearchCache fc home_unit mod_name $
    let
-     home_path = importPaths dflags
-     hisuf = hiSuf dflags
+     home_path = finder_importPaths fopts
+     hisuf = finder_hiSuf fopts
      mod = mkHomeInstalledModule home_unit mod_name
 
      source_exts =
-      [ ("hs",   mkHomeModLocationSearched dflags mod_name "hs")
-      , ("lhs",  mkHomeModLocationSearched dflags mod_name "lhs")
-      , ("hsig",  mkHomeModLocationSearched dflags mod_name "hsig")
-      , ("lhsig",  mkHomeModLocationSearched dflags mod_name "lhsig")
+      [ ("hs",    mkHomeModLocationSearched fopts mod_name "hs")
+      , ("lhs",   mkHomeModLocationSearched fopts mod_name "lhs")
+      , ("hsig",  mkHomeModLocationSearched fopts mod_name "hsig")
+      , ("lhsig", mkHomeModLocationSearched fopts mod_name "lhsig")
       ]
 
      -- we use mkHomeModHiOnlyLocation instead of mkHiOnlyModLocation so that
      -- when hiDir field is set in dflags, we know to look there (see #16500)
-     hi_exts = [ (hisuf,                mkHomeModHiOnlyLocation dflags mod_name)
-               , (addBootSuffix hisuf,  mkHomeModHiOnlyLocation dflags mod_name)
+     hi_exts = [ (hisuf,                mkHomeModHiOnlyLocation fopts mod_name)
+               , (addBootSuffix hisuf,  mkHomeModHiOnlyLocation fopts mod_name)
                ]
 
         -- In compilation manager modes, we look for source files in the home
         -- package because we can compile these automatically.  In one-shot
         -- compilation mode we look for .hi and .hi-boot files only.
-     exts | isOneShot (ghcMode dflags) = hi_exts
-          | otherwise                  = source_exts
+     exts | finder_lookupHomeInterfaces fopts = hi_exts
+          | otherwise                         = source_exts
    in
 
    -- special case for GHC.Prim; we won't find it in the filesystem.
@@ -362,12 +392,12 @@ findInstalledHomeModule fc dflags home_unit mod_name = do
 
 
 -- | Search for a module in external packages only.
-findPackageModule :: FinderCache -> UnitState -> DynFlags -> InstalledModule -> IO InstalledFindResult
-findPackageModule fc unit_state dflags mod = do
+findPackageModule :: FinderCache -> UnitState -> FinderOpts -> InstalledModule -> IO InstalledFindResult
+findPackageModule fc unit_state fopts mod = do
   let pkg_id = moduleUnit mod
   case lookupUnitId unit_state pkg_id of
      Nothing -> return (InstalledNoPackage pkg_id)
-     Just u  -> findPackageModule_ fc dflags mod u
+     Just u  -> findPackageModule_ fc fopts mod u
 
 -- | Look up the interface file associated with module @mod@.  This function
 -- requires a few invariants to be upheld: (1) the 'Module' in question must
@@ -376,8 +406,8 @@ findPackageModule fc unit_state dflags mod = do
 -- the 'UnitInfo' must be consistent with the unit id in the 'Module'.
 -- The redundancy is to avoid an extra lookup in the package state
 -- for the appropriate config.
-findPackageModule_ :: FinderCache -> DynFlags -> InstalledModule -> UnitInfo -> IO InstalledFindResult
-findPackageModule_ fc dflags mod pkg_conf = do
+findPackageModule_ :: FinderCache -> FinderOpts -> InstalledModule -> UnitInfo -> IO InstalledFindResult
+findPackageModule_ fc fopts mod pkg_conf = do
   massertPpr (moduleUnit mod == unitId pkg_conf)
              (ppr (moduleUnit mod) <+> ppr (unitId pkg_conf))
   modLocationCache fc mod $
@@ -388,20 +418,20 @@ findPackageModule_ fc dflags mod pkg_conf = do
           else
 
     let
-       tag = waysBuildTag (ways dflags)
+       tag = waysBuildTag (finder_ways fopts)
 
              -- hi-suffix for packages depends on the build tag.
        package_hisuf | null tag  = "hi"
                      | otherwise = tag ++ "_hi"
 
-       mk_hi_loc = mkHiOnlyModLocation dflags package_hisuf
+       mk_hi_loc = mkHiOnlyModLocation fopts package_hisuf
 
        import_dirs = map ST.unpack $ unitImportDirs pkg_conf
         -- we never look for a .hi-boot file in an external package;
         -- .hi-boot files only make sense for the home package.
     in
     case import_dirs of
-      [one] | MkDepend <- ghcMode dflags -> do
+      [one] | finder_bypassHiFileCheck fopts -> do
             -- there's only one place that this .hi file can be, so
             -- don't bother looking for it.
             let basename = moduleNameSlashes (moduleName mod)
@@ -443,10 +473,10 @@ searchPathExts paths mod exts = search to_search
         then do { loc <- mk_result; return (InstalledFound loc mod) }
         else search rest
 
-mkHomeModLocationSearched :: DynFlags -> ModuleName -> FileExt
+mkHomeModLocationSearched :: FinderOpts -> ModuleName -> FileExt
                           -> FilePath -> BaseName -> IO ModLocation
-mkHomeModLocationSearched dflags mod suff path basename =
-  mkHomeModLocation2 dflags mod (path </> basename) suff
+mkHomeModLocationSearched fopts mod suff path basename =
+  mkHomeModLocation2 fopts mod (path </> basename) suff
 
 -- -----------------------------------------------------------------------------
 -- Constructing a home module location
@@ -481,43 +511,43 @@ mkHomeModLocationSearched dflags mod suff path basename =
 -- ext
 --      The filename extension of the source file (usually "hs" or "lhs").
 
-mkHomeModLocation :: DynFlags -> ModuleName -> FilePath -> IO ModLocation
+mkHomeModLocation :: FinderOpts -> ModuleName -> FilePath -> IO ModLocation
 mkHomeModLocation dflags mod src_filename = do
    let (basename,extension) = splitExtension src_filename
    mkHomeModLocation2 dflags mod basename extension
 
-mkHomeModLocation2 :: DynFlags
+mkHomeModLocation2 :: FinderOpts
                    -> ModuleName
                    -> FilePath  -- Of source module, without suffix
                    -> String    -- Suffix
                    -> IO ModLocation
-mkHomeModLocation2 dflags mod src_basename ext = do
+mkHomeModLocation2 fopts mod src_basename ext = do
    let mod_basename = moduleNameSlashes mod
 
-       obj_fn = mkObjPath  dflags src_basename mod_basename
-       hi_fn  = mkHiPath   dflags src_basename mod_basename
-       hie_fn = mkHiePath  dflags src_basename mod_basename
+       obj_fn = mkObjPath  fopts src_basename mod_basename
+       hi_fn  = mkHiPath   fopts src_basename mod_basename
+       hie_fn = mkHiePath  fopts src_basename mod_basename
 
    return (ModLocation{ ml_hs_file   = Just (src_basename <.> ext),
                         ml_hi_file   = hi_fn,
                         ml_obj_file  = obj_fn,
                         ml_hie_file  = hie_fn })
 
-mkHomeModHiOnlyLocation :: DynFlags
+mkHomeModHiOnlyLocation :: FinderOpts
                         -> ModuleName
                         -> FilePath
                         -> BaseName
                         -> IO ModLocation
-mkHomeModHiOnlyLocation dflags mod path basename = do
-   loc <- mkHomeModLocation2 dflags mod (path </> basename) ""
+mkHomeModHiOnlyLocation fopts mod path basename = do
+   loc <- mkHomeModLocation2 fopts mod (path </> basename) ""
    return loc { ml_hs_file = Nothing }
 
-mkHiOnlyModLocation :: DynFlags -> Suffix -> FilePath -> String
+mkHiOnlyModLocation :: FinderOpts -> Suffix -> FilePath -> String
                     -> IO ModLocation
-mkHiOnlyModLocation dflags hisuf path basename
+mkHiOnlyModLocation fopts hisuf path basename
  = do let full_basename = path </> basename
-          obj_fn = mkObjPath  dflags full_basename basename
-          hie_fn = mkHiePath  dflags full_basename basename
+          obj_fn = mkObjPath fopts full_basename basename
+          hie_fn = mkHiePath fopts full_basename basename
       return ModLocation{    ml_hs_file   = Nothing,
                              ml_hi_file   = full_basename <.> hisuf,
                                 -- Remove the .hi-boot suffix from
@@ -531,14 +561,14 @@ mkHiOnlyModLocation dflags hisuf path basename
 -- | Constructs the filename of a .o file for a given source file.
 -- Does /not/ check whether the .o file exists
 mkObjPath
-  :: DynFlags
+  :: FinderOpts
   -> FilePath           -- the filename of the source file, minus the extension
   -> String             -- the module name with dots replaced by slashes
   -> FilePath
-mkObjPath dflags basename mod_basename = obj_basename <.> osuf
+mkObjPath fopts basename mod_basename = obj_basename <.> osuf
   where
-                odir = objectDir dflags
-                osuf = objectSuf dflags
+                odir = finder_objectDir fopts
+                osuf = finder_objectSuf fopts
 
                 obj_basename | Just dir <- odir = dir </> mod_basename
                              | otherwise        = basename
@@ -547,14 +577,14 @@ mkObjPath dflags basename mod_basename = obj_basename <.> osuf
 -- | Constructs the filename of a .hi file for a given source file.
 -- Does /not/ check whether the .hi file exists
 mkHiPath
-  :: DynFlags
+  :: FinderOpts
   -> FilePath           -- the filename of the source file, minus the extension
   -> String             -- the module name with dots replaced by slashes
   -> FilePath
-mkHiPath dflags basename mod_basename = hi_basename <.> hisuf
+mkHiPath fopts basename mod_basename = hi_basename <.> hisuf
  where
-                hidir = hiDir dflags
-                hisuf = hiSuf dflags
+                hidir = finder_hiDir fopts
+                hisuf = finder_hiSuf fopts
 
                 hi_basename | Just dir <- hidir = dir </> mod_basename
                             | otherwise         = basename
@@ -562,14 +592,14 @@ mkHiPath dflags basename mod_basename = hi_basename <.> hisuf
 -- | Constructs the filename of a .hie file for a given source file.
 -- Does /not/ check whether the .hie file exists
 mkHiePath
-  :: DynFlags
+  :: FinderOpts
   -> FilePath           -- the filename of the source file, minus the extension
   -> String             -- the module name with dots replaced by slashes
   -> FilePath
-mkHiePath dflags basename mod_basename = hie_basename <.> hiesuf
+mkHiePath fopts basename mod_basename = hie_basename <.> hiesuf
  where
-                hiedir = hieDir dflags
-                hiesuf = hieSuf dflags
+                hiedir = finder_hieDir fopts
+                hiesuf = finder_hieSuf fopts
 
                 hie_basename | Just dir <- hiedir = dir </> mod_basename
                              | otherwise          = basename
@@ -583,14 +613,14 @@ mkHiePath dflags basename mod_basename = hie_basename <.> hiesuf
 -- from other available information, and they're only rarely needed.
 
 mkStubPaths
-  :: DynFlags
+  :: FinderOpts
   -> ModuleName
   -> ModLocation
   -> FilePath
 
-mkStubPaths dflags mod location
+mkStubPaths fopts mod location
   = let
-        stubdir = stubDir dflags
+        stubdir = finder_stubDir fopts
 
         mod_basename = moduleNameSlashes mod
         src_basename = dropExtension $ expectJust "mkStubPaths"

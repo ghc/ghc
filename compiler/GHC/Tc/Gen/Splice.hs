@@ -39,6 +39,7 @@ import GHC.Driver.Session
 import GHC.Driver.Env
 import GHC.Driver.Hooks
 import GHC.Driver.Config.Diagnostic
+import GHC.Driver.Config.Finder
 
 import GHC.Hs
 
@@ -1264,7 +1265,8 @@ instance TH.Quasi TcM where
       let fc        = hsc_FC hsc_env
       let home_unit = hsc_home_unit hsc_env
       let dflags    = hsc_dflags hsc_env
-      r <- liftIO $ findHomeModule fc home_unit dflags (mkModuleName plugin)
+      let fopts     = initFinderOpts dflags
+      r <- liftIO $ findHomeModule fc fopts home_unit (mkModuleName plugin)
       let err = hang
             (text "addCorePlugin: invalid plugin module "
                <+> text (show plugin)

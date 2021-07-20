@@ -46,6 +46,7 @@ import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Driver.Config
 import GHC.Driver.Config.Diagnostic
+import GHC.Driver.Config.Finder
 
 import GHC.Tc.Utils.Monad
 
@@ -754,7 +755,8 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
              let fc = hsc_FC hsc_env
              let home_unit = hsc_home_unit hsc_env
              let dflags = hsc_dflags hsc_env
-             mb_stuff <- findHomeModule fc home_unit dflags mod_name
+             let fopts = initFinderOpts dflags
+             mb_stuff <- findHomeModule fc fopts home_unit mod_name
              case mb_stuff of
                   Found loc mod -> found loc mod
                   _ -> no_obj mod_name

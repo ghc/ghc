@@ -391,6 +391,7 @@ Library
         GHC.Driver.Config
         GHC.Driver.Config.CmmToAsm
         GHC.Driver.Config.Diagnostic
+        GHC.Driver.Config.Finder
         GHC.Driver.Config.Logger
         GHC.Driver.Config.Parser
         GHC.Driver.Env

@@ -21,6 +21,7 @@ import GHC.Prelude
 
 -- In a separate module because it hooks into the parser.
 import GHC.Driver.Backpack.Syntax
+import GHC.Driver.Config.Finder (initFinderOpts)
 import GHC.Driver.Config.Parser (initParserOpts)
 import GHC.Driver.Config.Diagnostic
 import GHC.Driver.Monad
@@ -742,9 +743,10 @@ summariseRequirement pn mod_name = do
     hsc_env <- getSession
     let dflags = hsc_dflags hsc_env
     let home_unit = hsc_home_unit hsc_env
+    let fopts = initFinderOpts dflags
 
     let PackageName pn_fs = pn
-    location <- liftIO $ mkHomeModLocation2 dflags mod_name
+    location <- liftIO $ mkHomeModLocation2 fopts mod_name
                  (unpackFS pn_fs </> moduleNameSlashes mod_name) "hsig"
 
     env <- getBkpEnv
@@ -828,13 +830,14 @@ hsModuleToModSummary pn hsc_src modname
     -- Use the PACKAGE NAME to find the location
     let PackageName unit_fs = pn
         dflags = hsc_dflags hsc_env
+        fopts = initFinderOpts dflags
     -- Unfortunately, we have to define a "fake" location in
     -- order to appease the various code which uses the file
     -- name to figure out where to put, e.g. object files.
     -- To add insult to injury, we don't even actually use
     -- these filenames to figure out where the hi files go.
     -- A travesty!
-    location0 <- liftIO $ mkHomeModLocation2 dflags modname
+    location0 <- liftIO $ mkHomeModLocation2 fopts modname
                              (unpackFS unit_fs </>
                               moduleNameSlashes modname)
                               (case hsc_src of

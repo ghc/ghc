@@ -51,6 +51,7 @@ import GHC.Types.Name.Reader   ( RdrName, ImportSpec(..), ImpDeclSpec(..)
                                , greMangledName, mkRdrQual )
 
 import GHC.Unit.Finder         ( findPluginModule, FindResult(..) )
+import GHC.Driver.Config.Finder ( initFinderOpts )
 import GHC.Unit.Module   ( Module, ModuleName )
 import GHC.Unit.Module.ModIface
 
@@ -258,11 +259,12 @@ lookupRdrNameInModuleForPlugins :: HscEnv -> ModuleName -> RdrName
                                 -> IO (Maybe (Name, ModIface))
 lookupRdrNameInModuleForPlugins hsc_env mod_name rdr_name = do
     let dflags    = hsc_dflags hsc_env
+    let fopts     = initFinderOpts dflags
     let fc        = hsc_FC hsc_env
     let units     = hsc_units hsc_env
     let home_unit = hsc_home_unit hsc_env
     -- First find the unit the module resides in by searching exposed units and home modules
-    found_module <- findPluginModule fc units home_unit dflags mod_name
+    found_module <- findPluginModule fc fopts units home_unit mod_name
     case found_module of
         Found _ mod -> do
             -- Find the exports of the module

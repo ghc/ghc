@@ -77,6 +77,7 @@ import GHC.Types.TyThing
 import GHC.Core.TyCon
 import GHC.Core.DataCon
 import GHC.Core.Class
+import GHC.Driver.Config.Finder
 import GHC.Driver.Env
 import GHC.Utils.Outputable
 import GHC.Core.Type
@@ -102,7 +103,8 @@ findImportedModule mod_name mb_pkg = do
     let home_unit = hsc_home_unit hsc_env
     let units     = hsc_units hsc_env
     let dflags    = hsc_dflags hsc_env
-    tcPluginIO $ Finder.findImportedModule fc units home_unit dflags mod_name mb_pkg
+    let fopts     = initFinderOpts dflags
+    tcPluginIO $ Finder.findImportedModule fc fopts units home_unit mod_name mb_pkg
 
 lookupOrig :: Module -> OccName -> TcPluginM Name
 lookupOrig mod = unsafeTcPluginTcM . IfaceEnv.lookupOrig mod
