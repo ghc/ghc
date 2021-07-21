@@ -460,6 +460,12 @@ genCall target res args = runStmtsDecls $ do
         The native code generator only handles StdCall and CCallConv.
     -}
 
+    let arg_type (hint, expr) =
+          case expr of
+            ty@(LMInt n) | n < 64 && lmconv == CC_Ccc && platformCConvNeedsExtension platform
+               -> (ty, if hint == Signed then [SignExt] else [ZeroExt])
+            ty -> (ty, [])
+
     -- call attributes
     let fnAttrs | never_returns = NoReturn : llvmStdFunAttrs
                 | otherwise     = llvmStdFunAttrs
@@ -477,7 +483,7 @@ genCall target res args = runStmtsDecls $ do
 
     let retTyCmm = ret_type_cmm ress_hints
 
-    let argTy = tysToParams $ map (snd . primRepToLlvmTy) args_rep
+    let argTy = map arg_type $ map primRepToLlvmTy args_rep
     let retTy = snd $ primRepToLlvmTy ret_rep
     let funTy = \name -> LMFunction $ LlvmFunctionDecl name ExternallyVisible
                              lmconv retTy FixedArgs argTy (llvmFunAlign dflags)
@@ -524,6 +530,15 @@ genCall target res args = runStmtsDecls $ do
                     v2 <- doExprW ty $ Cast op v1 ty
                     statement $ Store v2 vreg
                     doReturn
+ where
+  -- | For some architectures the C calling convention is that any
+  -- integer shorter than 64 bits is replaced by its 64 bits
+  -- representation using sign or zero extension.
+  platformCConvNeedsExtension :: Platform -> Bool
+  platformCConvNeedsExtension platform = case platformArch platform of
+    ArchPPC_64 _ -> True
+    ArchS390X    -> True
+    _            -> False
 
 -- | Generate a call to an LLVM intrinsic that performs arithmetic operation
 -- with overflow bit (i.e., returns a struct containing the actual result of the

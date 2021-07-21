@@ -268,7 +268,7 @@ ppCall ct fptr args attrs = case fptr of
     where
         ppCall' (LlvmFunctionDecl _ _ cc ret argTy params _) =
             let tc = if ct == TailCall then text "tail " else empty
-                ppValues = hsep $ punctuate comma $ map ppCallMetaExpr args
+                ppValues = ppCallParams (map snd params) args
                 ppArgTy  = (ppCommaJoin $ map fst params) <>
                            (case argTy of
                                VarArgs   -> text ", ..."
@@ -279,10 +279,13 @@ ppCall ct fptr args attrs = case fptr of
                     <> fnty <+> ppName fptr <> lparen <+> ppValues
                     <+> rparen <+> attrDoc
 
-        -- Metadata needs to be marked as having the `metadata` type when used
-        -- in a call argument
-        ppCallMetaExpr (MetaVar v) = ppr v
-        ppCallMetaExpr v           = text "metadata" <+> ppr v
+        ppCallParams :: [[LlvmParamAttr]] -> [MetaExpr] -> SDoc
+        ppCallParams attrs args = hsep $ punctuate comma $ zipWith ppCallMetaExpr attrs args
+         where
+          -- Metadata needs to be marked as having the `metadata` type when used
+          -- in a call argument
+          ppCallMetaExpr attrs (MetaVar v) = ppVar' attrs v
+          ppCallMetaExpr _ v               = text "metadata" <+> ppr v
 
 ppMachOp :: LlvmMachOp -> LlvmVar -> LlvmVar -> SDoc
 ppMachOp op left right =

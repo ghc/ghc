@@ -114,8 +114,12 @@ data LlvmVar
   deriving (Eq)
 
 instance Outputable LlvmVar where
-  ppr (LMLitVar x)  = ppr x
-  ppr (x         )  = ppr (getVarType x) <+> ppName x
+  ppr = ppVar' []
+
+ppVar' :: [LlvmParamAttr] -> LlvmVar -> SDoc
+ppVar' attrs v = case v of
+  LMLitVar x -> ppTypeLit' attrs x
+  x          -> ppr (getVarType x) <+> ppSpaceJoin attrs <+> ppName x
 
 
 -- | Llvm Literal Data.
@@ -135,8 +139,12 @@ data LlvmLit
   deriving (Eq)
 
 instance Outputable LlvmLit where
-  ppr l@(LMVectorLit {}) = ppLit l
-  ppr l                  = ppr (getLitType l) <+> ppLit l
+  ppr = ppTypeLit' []
+
+ppTypeLit' :: [LlvmParamAttr] -> LlvmLit -> SDoc
+ppTypeLit' attrs l = case l of
+  l@(LMVectorLit {}) -> ppLit l
+  _                  -> ppr (getLitType l) <+> ppSpaceJoin attrs <+> ppLit l
 
 
 -- | Llvm Static Data.
