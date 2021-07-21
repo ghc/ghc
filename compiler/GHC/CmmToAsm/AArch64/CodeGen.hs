@@ -1428,6 +1428,32 @@ genCCall target dest_regs arg_regs bid = do
       -- For AArch64 specificies see: https://developer.arm.com/docs/ihi0055/latest/procedure-call-standard-for-the-arm-64-bit-architecture
       --
     -- Still have GP regs, and we want to pass an GP argument.
+
+    -- AArch64-Darwin: stack packing and alignment
+    --
+    -- According to the "Writing ARM64 Code for Apple Platforms" document form
+    -- Apple, specifically the section "Handle Data Types and Data Alignment Properly"
+    -- we need to not only pack, but also align arguments on the stack.
+    --
+    -- Data type   Size (in bytes)   Natural alignment (in bytes)
+    -- BOOL, bool  1                 1
+    -- char        1                 1
+    -- short       2                 2
+    -- int         4                 4
+    -- long        8                 8
+    -- long long   8                 8
+    -- pointer     8                 8
+    -- size_t      8                 8
+    -- NSInteger   8                 8
+    -- CFIndex     8                 8
+    -- fpos_t      8                 8
+    -- off_t       8                 8
+    --
+    -- We can see that types are aligned by their sizes so the easiest way to
+    -- guarantee alignment during packing seems to be to pad to a multiple of the
+    -- size we want to pack. Failure to get this right can result in pretty
+    -- subtle bugs, e.g. #20137.
+
     passArguments pack (gpReg:gpRegs) fpRegs ((r, format, _hint, code_r):args) stackSpace accumRegs accumCode | isIntFormat format = do
       let w = formatToWidth format
       passArguments pack gpRegs fpRegs args stackSpace (gpReg:accumRegs) (accumCode `appOL` code_r `snocOL` (ann (text "Pass gp argument: " <> ppr r) $ MOV (OpReg w gpReg) (OpReg w r)))
@@ -1442,24 +1468,30 @@ genCCall target dest_regs arg_regs bid = do
       let w = formatToWidth format
           bytes = widthInBits w `div` 8
           space = if pack then bytes else 8
-          stackCode = code_r `snocOL` (ann (text "Pass argument (size " <> ppr w <> text ") on the stack: " <> ppr r) $ STR format (OpReg w r) (OpAddr (AddrRegImm (regSingle 31) (ImmInt stackSpace))))
-      passArguments pack [] [] args (stackSpace+space) accumRegs (stackCode `appOL` accumCode)
+          stackSpace' | pack && stackSpace `mod` space /= 0 = stackSpace + space - (stackSpace `mod` space)
+                      | otherwise                           = stackSpace
+          stackCode = code_r `snocOL` (ann (text "Pass argument (size " <> ppr w <> text ") on the stack: " <> ppr r) $ STR format (OpReg w r) (OpAddr (AddrRegImm (regSingle 31) (ImmInt stackSpace'))))
+      passArguments pack [] [] args (stackSpace'+space) accumRegs (stackCode `appOL` accumCode)
 
     -- Still have fpRegs left, but want to pass a GP argument. Must be passed on the stack then.
     passArguments pack [] fpRegs ((r, format, _hint, code_r):args) stackSpace accumRegs accumCode | isIntFormat format = do
       let w = formatToWidth format
           bytes = widthInBits w `div` 8
           space = if pack then bytes else 8
-          stackCode = code_r `snocOL` (ann (text "Pass argument (size " <> ppr w <> text ") on the stack: " <> ppr r) $ STR format (OpReg w r) (OpAddr (AddrRegImm (regSingle 31) (ImmInt stackSpace))))
-      passArguments pack [] fpRegs args (stackSpace+space) accumRegs (stackCode `appOL` accumCode)
+          stackSpace' | pack && stackSpace `mod` space /= 0 = stackSpace + space - (stackSpace `mod` space)
+                      | otherwise                           = stackSpace
+          stackCode = code_r `snocOL` (ann (text "Pass argument (size " <> ppr w <> text ") on the stack: " <> ppr r) $ STR format (OpReg w r) (OpAddr (AddrRegImm (regSingle 31) (ImmInt stackSpace'))))
+      passArguments pack [] fpRegs args (stackSpace'+space) accumRegs (stackCode `appOL` accumCode)
 
     -- Still have gpRegs left, but want to pass a FP argument. Must be passed on the stack then.
     passArguments pack gpRegs [] ((r, format, _hint, code_r):args) stackSpace accumRegs accumCode | isFloatFormat format = do
       let w = formatToWidth format
           bytes = widthInBits w `div` 8
           space = if pack then bytes else 8
-          stackCode = code_r `snocOL` (ann (text "Pass argument (size " <> ppr w <> text ") on the stack: " <> ppr r) $ STR format (OpReg w r) (OpAddr (AddrRegImm (regSingle 31) (ImmInt stackSpace))))
-      passArguments pack gpRegs [] args (stackSpace+space) accumRegs (stackCode `appOL` accumCode)
+          stackSpace' | pack && stackSpace `mod` space /= 0 = stackSpace + space - (stackSpace `mod` space)
+                      | otherwise                           = stackSpace
+          stackCode = code_r `snocOL` (ann (text "Pass argument (size " <> ppr w <> text ") on the stack: " <> ppr r) $ STR format (OpReg w r) (OpAddr (AddrRegImm (regSingle 31) (ImmInt stackSpace'))))
+      passArguments pack gpRegs [] args (stackSpace'+space) accumRegs (stackCode `appOL` accumCode)
 
     passArguments _ _ _ _ _ _ _ = pprPanic "passArguments" (text "invalid state")
 
