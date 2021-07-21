@@ -2194,13 +2194,16 @@ forkProcess(HsStablePtr *entry
         // On Unix, all timers are reset in the child, so we need to start
         // the timer again.
         initTimer();
-        startTimer();
 
         // TODO: need to trace various other things in the child
         // like startup event, capabilities, process info etc
         traceTaskCreate(task, cap);
 
         initIOManagerAfterFork(&cap);
+
+        // start timer after the IOManager is initialized
+        // (the idle GC may wake up the IOManager)
+        startTimer();
 
         // Install toplevel exception handlers, so interruption
         // signal will be sent to the main thread.
