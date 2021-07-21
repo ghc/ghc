@@ -168,7 +168,7 @@ void
 initTicker (Time interval, TickProc handle_tick)
 {
     itimer_interval = interval;
-    stopped = false;
+    stopped = true;
     exited = false;
 #if defined(HAVE_SIGNAL_H)
     sigset_t mask, omask;
