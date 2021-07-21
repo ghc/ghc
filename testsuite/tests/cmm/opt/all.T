@@ -2,3 +2,4 @@
 # to the same target.
 test('T15188', normal, makefile_test, [])
 test('T18141', normal, compile, [''])
+test('T20142', normal, compile, [''])
