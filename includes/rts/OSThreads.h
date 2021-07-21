@@ -44,11 +44,12 @@ typedef pthread_key_t   ThreadLocalKey;
 #endif
 
 /* Always check the result of lock and unlock. */
-#define OS_ACQUIRE_LOCK(mutex) \
+#define OS_ACQUIRE_LOCK(mutex) { \
   LOCK_DEBUG_BELCH("ACQUIRE_LOCK", mutex); \
-  if (pthread_mutex_lock(mutex) == EDEADLK) { \
-    barf("multiple ACQUIRE_LOCK: %s %d", __FILE__,__LINE__); \
-  }
+  int __r = pthread_mutex_lock(mutex); \
+  if (__r != 0) { \
+    barf("ACQUIRE_LOCK failed (%s:%d): %d", __FILE__, __LINE__, __r); \
+  } }
 
 // Returns zero if the lock was acquired.
 EXTERN_INLINE int OS_TRY_ACQUIRE_LOCK(pthread_mutex_t *mutex);
