@@ -100,33 +100,31 @@
 void
 initCondition( Condition* pCond )
 {
-  pthread_cond_init(pCond, NULL);
-  return;
+  CHECK(pthread_cond_init(pCond, NULL) == 0);
 }
 
 void
 closeCondition( Condition* pCond )
 {
-  pthread_cond_destroy(pCond);
-  return;
+  CHECK(pthread_cond_destroy(pCond) == 0);
 }
 
-bool
+void
 broadcastCondition ( Condition* pCond )
 {
-  return (pthread_cond_broadcast(pCond) == 0);
+  CHECK(pthread_cond_broadcast(pCond) == 0);
 }
 
-bool
+void
 signalCondition ( Condition* pCond )
 {
-  return (pthread_cond_signal(pCond) == 0);
+  CHECK(pthread_cond_signal(pCond) == 0);
 }
 
-bool
+void
 waitCondition ( Condition* pCond, Mutex* pMut )
 {
-  return (pthread_cond_wait(pCond,pMut) == 0);
+  CHECK(pthread_cond_wait(pCond,pMut) == 0);
 }
 
 bool
@@ -139,7 +137,15 @@ timedWaitCondition ( Condition* pCond, Mutex* pMut, Time timeout) {
         .tv_nsec = TimeToNS(timeout - SecondsToTime(secs))
     };
 
-    return pthread_cond_timedwait(pCond,pMut, &t) == 0;
+    int ret = pthread_cond_timedwait(pCond,pMut, &t);
+    switch (ret) {
+    case ETIMEDOUT:
+        return false;
+    case 0:
+        return true;
+    default:
+        barf("pthread_cond_timedwait failed");
+    }
 }
 
 void

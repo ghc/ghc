@@ -173,9 +173,10 @@ extern void joinOSThread          ( OSThreadId id );
 //
 extern void initCondition         ( Condition* pCond );
 extern void closeCondition        ( Condition* pCond );
-extern bool broadcastCondition    ( Condition* pCond );
-extern bool signalCondition       ( Condition* pCond );
-extern bool waitCondition         ( Condition* pCond, Mutex* pMut );
+extern void broadcastCondition    ( Condition* pCond );
+extern void signalCondition       ( Condition* pCond );
+extern void waitCondition         ( Condition* pCond, Mutex* pMut );
+// Returns false on timeout, true otherwise.
 extern bool timedWaitCondition    ( Condition* pCond, Mutex* pMut, Time timeout);
 
 //
