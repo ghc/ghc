@@ -52,6 +52,7 @@ flavourTransformers = M.fromList
     , "assertions" =: enableAssertions
     , "debug_ghc" =: debugGhc Stage1
     , "debug_stage1_ghc" =: debugGhc Stage0
+    , "lint" =: enableLinting
     ]
   where (=:) = (,)
 
@@ -128,6 +129,19 @@ enableTickyGhc =
       -- You generally need STG dumps to interpret ticky profiles
       , arg "-ddump-to-file"
       , arg "-ddump-stg-final"
+      ]
+
+-- | Enable Core, STG, and (not C--) linting in all compilations with the stage1 compiler.
+enableLinting :: Flavour -> Flavour
+enableLinting =
+    addArgs $ stage1 ? mconcat
+      [ builder (Ghc CompileHs) ? lint
+      ]
+  where
+    lint = mconcat
+      [ arg "-dcore-lint"
+      , arg "-dstg-lint"
+      -- Should be -dlint but currently -dcmm-lint fails due to #21563
       ]
 
 -- | Transform the input 'Flavour' so as to build with
