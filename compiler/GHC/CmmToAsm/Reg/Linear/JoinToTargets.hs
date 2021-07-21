@@ -87,18 +87,21 @@ joinToTargets' block_live new_blocks block_id instr (dest:dests)
 
         -- adjust the current assignment to remove any vregs that are not live
         -- on entry to the destination block.
-        let Just live_set       = mapLookup dest block_live
+        let Just live_set       = mapLookup dest block_live :: Maybe RegSet
         let still_live uniq _   = uniq `elemUniqSet_Directly` live_set
-        let adjusted_assig      = filterUFM_Directly still_live assig
+        let adjusted_assig      = filterRLM_Directly still_live assig :: RegLocMap
 
         -- and free up those registers which are now free.
         let to_free =
-                [ r     | (reg, loc) <- nonDetUFMToList assig
+                [ r     | (reg, loc) <- nonDetUFMToList (lm_inReg assig) ++ nonDetUFMToList (lm_inBoth assig)
                         -- This is non-deterministic but we do not
                         -- currently support deterministic code-generation.
                         -- See Note [Unique Determinism and code generation]
                         , not (elemUniqSet_Directly reg live_set)
                         , r          <- regsOfLoc loc ]
+        -- TODO: to_free and still_live could be computed better by
+        -- partitioning `assig` I imagine.
+        -- We also could keep it a map.
 
         case mapLookup dest block_assig of
          Nothing
@@ -121,7 +124,7 @@ joinToTargets_first :: (FR freeRegs, Instruction instr)
                     -> BlockId
                     -> [BlockId]
                     -> BlockAssignment freeRegs
-                    -> RegMap Loc
+                    -> RegLocMap
                     -> [RealReg]
                     -> RegM freeRegs ([NatBasicBlock instr], instr)
 joinToTargets_first block_live new_blocks block_id instr dest dests
@@ -149,15 +152,16 @@ joinToTargets_again :: (Instruction instr, FR freeRegs)
                     -> instr
                     -> BlockId
                     -> [BlockId]
-                    -> UniqFM Reg Loc
-                    -> UniqFM Reg Loc
+                    -> RegLocMap
+                    -> RegLocMap
                     -> RegM freeRegs ([NatBasicBlock instr], instr)
 joinToTargets_again
     block_live new_blocks block_id instr dest dests
     src_assig dest_assig
 
         -- the assignments already match, no problem.
-        | nonDetUFMToList dest_assig == nonDetUFMToList src_assig
+        | nonDetEqRLM dest_assig src_assig
+        -- -| nonDetUFMToList dest_assig == nonDetUFMToList src_assig
         -- This is non-deterministic but we do not
         -- currently support deterministic code-generation.
         -- See Note [Unique Determinism and code generation]
@@ -242,14 +246,17 @@ joinToTargets_again
 --      We cut some corners by not handling memory-to-memory moves.
 --      This shouldn't happen because every temporary gets its own stack slot.
 --
-makeRegMovementGraph :: RegMap Loc -> RegMap Loc -> [Node Loc Unique]
+makeRegMovementGraph :: RegLocMap -> RegLocMap -> [Node Loc Unique]
 makeRegMovementGraph adjusted_assig dest_assig
- = [ node       | (vreg, src) <- nonDetUFMToList adjusted_assig
+                -- TODO: We basically are doing unionWith here, so it might be better
+                --       to do so without going through a list. I'll leave that as future
+                --       work.
+ = [ node       | (vreg, src) <- nonDetRLMToList adjusted_assig
                     -- This is non-deterministic but we do not
                     -- currently support deterministic code-generation.
                     -- See Note [Unique Determinism and code generation]
                     -- source reg might not be needed at the dest:
-                , Just loc <- [lookupUFM_Directly dest_assig vreg]
+                , Just loc <- [lookupRLM_Directly dest_assig vreg]
                 , node <- expandNode vreg src loc ]
 
 

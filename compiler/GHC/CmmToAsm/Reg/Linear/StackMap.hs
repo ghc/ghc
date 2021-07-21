@@ -41,7 +41,7 @@ data StackMap
 
 -- | An empty stack map, with all slots available.
 emptyStackMap :: StackMap
-emptyStackMap = StackMap 0 emptyUFM
+emptyStackMap = StackMap 0 mempty
 
 
 -- | If this vreg unique already has a stack assignment then return the slot number,

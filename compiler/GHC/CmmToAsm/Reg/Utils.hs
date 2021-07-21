@@ -56,4 +56,3 @@ toRegMap = unsafeCastUFMKey
 
 toVRegMap :: UniqFM Reg elt -> UniqFM VirtualReg elt
 toVRegMap = unsafeCastUFMKey
-

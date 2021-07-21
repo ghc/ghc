@@ -2,7 +2,6 @@
 {-# LANGUAGE ConstraintKinds #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns -ddump-simpl -ddump-stg -ddump-to-file #-}
 
 -----------------------------------------------------------------------------
 --
@@ -123,7 +122,6 @@ import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.Config
 import GHC.CmmToAsm.Types
 import GHC.Platform.Reg
-import GHC.Platform.Reg.Class (RegClass(..))
 
 import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Collections
@@ -143,6 +141,7 @@ import Data.List (partition, nub)
 import Control.Monad
 import Control.Applicative
 
+-- import GHC.Driver.Ppr
 -- -----------------------------------------------------------------------------
 -- Top level of the register allocator
 
@@ -254,7 +253,7 @@ linearRegAlloc'
 linearRegAlloc' config initFreeRegs entry_ids block_live sccs
  = do   us      <- getUniqueSupplyM
         let !(_, !stack, !stats, !blocks) =
-                runR config mapEmpty initFreeRegs emptyRegMap emptyStackMap us
+                runR config mapEmpty initFreeRegs emptyRegLocMap emptyStackMap us
                     $ linearRA_SCCs entry_ids block_live [] sccs
         return  (blocks, stats, getStackUse stack)
 
@@ -371,7 +370,7 @@ initBlock id block_live
                             setFreeRegsR $ foldl' (flip $ frAllocateReg platform) (frInitFreeRegs platform)
                                                   [ r | RegReal r <- nonDetEltsUniqSet live ]
                             -- See Note [Unique Determinism and code generation]
-                        setAssigR       emptyRegMap
+                        setAssigR       emptyRegLocMap
 
                 -- load info about register assignments leading into this block.
                 Just (freeregs, assig)
@@ -427,7 +426,7 @@ raInsn _     new_instrs _ (LiveInstr ii@(Instr i) Nothing)
 
 raInsn block_live new_instrs id (LiveInstr (Instr instr) (Just live))
  = do
-    assig    <- getAssigR :: RegM freeRegs (UniqFM Reg Loc)
+    assig    <- getAssigR :: RegM freeRegs (RegLocMap)
 
     -- If we have a reg->reg move between virtual registers, where the
     -- src register is not live after this instruction, and the dst
@@ -439,17 +438,18 @@ raInsn block_live new_instrs id (LiveInstr (Instr instr) (Just live))
     case takeRegRegMoveInstr instr of
         Just (src,dst)  | src `elementOfUniqSet` (liveDieRead live),
                           isVirtualReg dst,
-                          not (dst `elemUFM` assig),
+                          -- TODO: Only check InReg/InMem?
+                          not (dst `elemRLM` assig),
                           isRealReg src || isInReg src assig -> do
            case src of
-              (RegReal rr) -> setAssigR (addToUFM assig dst (InReg rr))
+              (RegReal rr) -> setAssigR (addToRLM assig dst (InReg rr))
                 -- if src is a fixed reg, then we just map dest to this
                 -- reg in the assignment.  src must be an allocatable reg,
                 -- otherwise it wouldn't be in r_dying.
-              _virt -> case lookupUFM assig src of
+              _virt -> case lookupRLM assig src of
                          Nothing -> panic "raInsn"
                          Just loc ->
-                           setAssigR (addToUFM (delFromUFM assig src) dst loc)
+                           setAssigR (addToRLM (delFromRLM assig src) dst loc)
 
            -- we have eliminated this instruction
           {-
@@ -461,6 +461,7 @@ raInsn block_live new_instrs id (LiveInstr (Instr instr) (Just live))
            return (new_instrs, [])
 
         _ -> genRaInsn block_live new_instrs id instr
+                        -- TODO: There is zero reason we we couldn't keep these as sets.
                         (nonDetEltsUniqSet $ liveDieRead live)
                         (nonDetEltsUniqSet $ liveDieWrite live)
                         -- See Note [Unique Determinism and code generation]
@@ -482,12 +483,6 @@ raInsn _ _ _ instr
 -- different registers.  Right now we assume the worst, and the
 -- assignment to R1 will clobber x, so we'll spill x into another reg,
 -- generating another reg->reg move.
-
-
-isInReg :: Reg -> RegMap Loc -> Bool
-isInReg src assig | Just (InReg _) <- lookupUFM assig src = True
-                  | otherwise = False
-
 
 genRaInsn :: forall freeRegs instr.
              (OutputableRegConstraint freeRegs instr)
@@ -632,21 +627,25 @@ genRaInsn block_live new_instrs block_id instr r_dying w_dying = do
 -- -----------------------------------------------------------------------------
 -- releaseRegs
 
-releaseRegs :: FR freeRegs => [Reg] -> RegM freeRegs ()
+releaseRegs :: forall freeRegs. FR freeRegs => [Reg] -> RegM freeRegs ()
 releaseRegs regs = do
   platform <- getPlatform
   assig <- getAssigR
   free <- getFreeRegsR
 
-  let loop assig !free [] = do setAssigR assig; setFreeRegsR free; return ()
+  let loop :: RegLocMap -> freeRegs -> [Reg] -> RegM freeRegs ()
+      loop assig !free [] = do setAssigR assig; setFreeRegsR free; return ()
       loop assig !free (RegReal rr : rs) = loop assig (frReleaseReg platform rr free) rs
       loop assig !free (r:rs) =
-         case lookupUFM assig r of
-         Just (InBoth real _) -> loop (delFromUFM assig r)
+         -- TODO: We can do a lot better here with the new RegLocMap
+         case lookupRLM assig r of
+         Just loc -> case loc of
+            InBoth real _ -> loop (delFromRLMLoc assig r loc)
                                       (frReleaseReg platform real free) rs
-         Just (InReg real)    -> loop (delFromUFM assig r)
+            InReg real    -> loop (delFromRLMLoc assig r loc)
                                       (frReleaseReg platform real free) rs
-         _                    -> loop (delFromUFM assig r) free rs
+            InMem _       -> loop (delFromRLMLoc assig r loc) free rs
+         Nothing -> loop assig free rs
   loop assig free regs
 
 
@@ -677,8 +676,9 @@ saveClobberedTemps [] _
 
 saveClobberedTemps clobbered dying
  = do
-        assig   <- getAssigR :: RegM freeRegs (UniqFM Reg Loc)
-        (assig',instrs) <- nonDetStrictFoldUFM_DirectlyM maybe_spill (assig,[]) assig
+        assig   <- getAssigR :: RegM freeRegs (RegLocMap)
+        -- maybe_spill only cares about InReg so no point in folding over the other cases.
+        (assig',instrs) <- nonDetStrictFoldUFM_DirectlyM maybe_spill (assig,[]) (lm_inReg assig)
         setAssigR assig'
         return $ -- mkComment (text "<saveClobberedTemps>") ++
                  instrs
@@ -686,7 +686,7 @@ saveClobberedTemps clobbered dying
    where
      -- Unique represents the VirtualReg
      -- Here we separate the cases which we do want to spill from these we don't.
-     maybe_spill :: Unique -> (RegMap Loc,[instr]) -> (Loc) -> RegM freeRegs (RegMap Loc,[instr])
+     maybe_spill :: Unique -> (RegLocMap,[instr]) -> (Loc) -> RegM freeRegs (RegLocMap,[instr])
      maybe_spill temp (assig,instrs) (loc) =
         case loc of
                 -- This is non-deterministic but we do not
@@ -700,8 +700,8 @@ saveClobberedTemps clobbered dying
 
 
      -- See Note [UniqFM and the register allocator]
-     clobber :: Unique -> (RegMap Loc,[instr]) -> (RealReg) -> RegM freeRegs (RegMap Loc,[instr])
-     clobber temp (assig,instrs) (reg)
+     clobber :: Unique -> (RegLocMap,[instr]) -> RealReg -> RegM freeRegs (RegLocMap,[instr])
+     clobber temp (assig,instrs) reg
        = do platform <- getPlatform
 
             freeRegs <- getFreeRegsR
@@ -716,7 +716,9 @@ saveClobberedTemps clobbered dying
               (my_reg : _) -> do
                   setFreeRegsR (frAllocateReg platform my_reg freeRegs)
 
-                  let new_assign = addToUFM_Directly assig temp (InReg my_reg)
+                  -- Safe, we only fold over InReg mapped vregs, so the vreg must have
+                  -- already been mapped to a reg.
+                  let new_assign = addToRLMUnsafe_Directly assig temp (InReg my_reg)
                   let instr = mkRegRegMoveInstr platform
                                   (RegReal reg) (RegReal my_reg)
 
@@ -729,15 +731,15 @@ saveClobberedTemps clobbered dying
                   -- record why this reg was spilled for profiling
                   recordSpill (SpillClobber temp)
 
-                  let new_assign  = addToUFM_Directly assig temp (InBoth reg slot)
+                  let new_assign  = addToRLMUnsafe_Directly (delFromRLMLoc assig temp (InReg reg)) temp (InBoth reg slot)
 
                   return (new_assign, (spill ++ instrs))
 
 
 
 
--- | Mark all these real regs as allocated,
---      and kick out their vreg assignments.
+-- | Mark all these real regs as clobbered,
+--      and update their vreg assignments.
 --
 clobberRegs :: FR freeRegs => [RealReg] -> RegM freeRegs ()
 clobberRegs []
@@ -747,19 +749,21 @@ clobberRegs clobbered
  = do   platform <- getPlatform
         freeregs <- getFreeRegsR
 
-        let gpRegs  = frGetFreeRegs platform RcInteger freeregs :: [RealReg]
-            fltRegs = frGetFreeRegs platform RcFloat   freeregs :: [RealReg]
-            dblRegs = frGetFreeRegs platform RcDouble  freeregs :: [RealReg]
+        -- let gpRegs  = frGetFreeRegs platform RcInteger freeregs :: [RealReg]
+        --     fltRegs = frGetFreeRegs platform RcFloat   freeregs :: [RealReg]
+        --     dblRegs = frGetFreeRegs platform RcDouble  freeregs :: [RealReg]
 
-        let extra_clobbered = [ r | r <- clobbered
-                                  , r `elem` (gpRegs ++ fltRegs ++ dblRegs) ]
+        -- let extra_clobbered = [ r | r <- clobbered
+        --                           , r `elem` (gpRegs ++ fltRegs ++ dblRegs) ]
 
-        setFreeRegsR $! foldl' (flip $ frAllocateReg platform) freeregs extra_clobbered
+        -- setFreeRegsR $! foldl' (flip $ frAllocateReg platform) freeregs extra_clobbered
 
-        -- setFreeRegsR $! foldl' (flip $ frAllocateReg platform) freeregs clobbered
+        setFreeRegsR $! foldl' (flip $ frAllocateReg platform) freeregs clobbered
 
         assig           <- getAssigR
-        setAssigR $! clobber assig (nonDetUFMToList assig)
+        -- TODO: Avoid intermediate list
+        -- We only deal with the InBoth case here, see clobber below.
+        setAssigR $! clobber assig (nonDetUFMToList (lm_inBoth assig))
           -- This is non-deterministic but we do not
           -- currently support deterministic code-generation.
           -- See Note [Unique Determinism and code generation]
@@ -771,13 +775,14 @@ clobberRegs clobbered
         -- also catches temps which were loaded up during allocation
         -- of read registers, not just those saved in saveClobberedTemps.
 
-        clobber :: RegMap Loc -> [(Unique,Loc)] -> RegMap Loc
+        -- TODO: Make a fold, only fold over inBoth
+        clobber :: RegLocMap -> [(Unique,Loc)] -> RegLocMap
         clobber assig []
                 = assig
 
         clobber assig ((temp, InBoth reg slot) : rest)
                 | any (realRegsAlias reg) clobbered
-                = clobber (addToUFM_Directly assig temp (InMem slot)) rest
+                = clobber (addToRLM_Directly assig temp (InMem slot)) rest
 
         clobber assig (_:rest)
                 = clobber assig rest
@@ -815,11 +820,12 @@ allocateRegsAndSpill _       _    spills alloc []
         = return (spills, reverse alloc)
 
 allocateRegsAndSpill reading keep spills alloc (r:rs)
- = do   assig <- toVRegMap <$> getAssigR
+--  = do   assig <- toVRegMap <$> getAssigR
+ = do   assig <- getAssigR
         -- pprTraceM "allocateRegsAndSpill:assig" (ppr (r:rs) $$ ppr assig)
         -- See Note [UniqFM and the register allocator]
         let doSpill = allocRegsAndSpill_spill reading keep spills alloc r rs assig
-        case lookupUFM assig r of
+        case lookupRLM assig r of
                 -- case (1a): already in a register
                 Just (InReg my_reg) ->
                         allocateRegsAndSpill reading keep spills (my_reg:alloc) rs
@@ -829,8 +835,11 @@ allocateRegsAndSpill reading keep spills alloc (r:rs)
                 -- InReg, because the memory value is no longer valid.
                 -- NB2. This is why we must process written registers here, even if they
                 -- are also read by the same instruction.
-                Just (InBoth my_reg _)
-                 -> do  when (not reading) (setAssigR $ toRegMap (addToUFM assig r (InReg my_reg)))
+                Just loc@(InBoth my_reg _)
+                 -> do  when (not reading) $ do
+                                let !assig1 = delFromRLMLoc assig r loc
+                                    !assig2 = (addToRLMUnsafe assig1 r (InReg my_reg))
+                                (setAssigR assig2)
                         allocateRegsAndSpill reading keep spills (my_reg:alloc) rs
 
                 -- Not already in a register, so we need to find a free one...
@@ -857,18 +866,27 @@ allocateRegsAndSpill reading keep spills alloc (r:rs)
 -- a percent to compile time.
 findPrefRealReg :: VirtualReg -> RegM freeRegs (Maybe RealReg)
 findPrefRealReg vreg = do
-  bassig <- getBlockAssigR :: RegM freeRegs (BlockMap (freeRegs,RegMap Loc))
+  bassig <- getBlockAssigR :: RegM freeRegs (BlockMap (freeRegs,RegLocMap))
   return $ foldr (findVirtRegAssig) Nothing bassig
   where
-    findVirtRegAssig :: (freeRegs,RegMap Loc) -> Maybe RealReg -> Maybe RealReg
+    findVirtRegAssig :: (freeRegs,RegLocMap) -> Maybe RealReg -> Maybe RealReg
     findVirtRegAssig assig z =
-        z <|>   case lookupUFM (toVRegMap $ snd assig) vreg of
+        z <|>   case lookupRLM (snd assig) vreg of
                         Just (InReg real_reg) -> Just real_reg
                         Just (InBoth real_reg _) -> Just real_reg
                         _ -> z
 
 -- reading is redundant with reason, but we keep it around because it's
 -- convenient and it maintains the recursive structure of the allocator. -- EZY
+
+-- Notes on performance
+-- allocRegsAndSpill_spill is called whenever we deal with a vreg which
+-- is not in a register already. This can be the case *very* often especial
+-- for sequences of many consecutive assignments to different vregs.
+-- In these cases we can expect that:
+-- * Most vregs have an assignment, and it's in memory.
+-- * There are very few assignments live in regs.
+-- So we try to avoid touching the assignments living in memory when we can.
 allocRegsAndSpill_spill :: (FR freeRegs, Instruction instr)
                         => Bool
                         -> [VirtualReg]
@@ -876,7 +894,7 @@ allocRegsAndSpill_spill :: (FR freeRegs, Instruction instr)
                         -> [RealReg]
                         -> VirtualReg
                         -> [VirtualReg]
-                        -> UniqFM VirtualReg Loc
+                        -> RegLocMap
                         -> SpillLoc
                         -> RegM freeRegs ([instr], [RealReg])
 allocRegsAndSpill_spill reading keep spills alloc r rs assig spill_loc
@@ -884,13 +902,13 @@ allocRegsAndSpill_spill reading keep spills alloc r rs assig spill_loc
         freeRegs <- getFreeRegsR
         let freeRegs_thisClass  = frGetFreeRegs platform (classOfVirtualReg r) freeRegs :: [RealReg]
 
-        -- Can we put the variable into a register it already was?
-        pref_reg <- findPrefRealReg r
-
         case freeRegs_thisClass of
          -- case (2): we have a free register
          (first_free : _) ->
-           do   let !final_reg
+           do   -- Can we put the variable into a register it already was?
+                pref_reg <- findPrefRealReg r
+
+                let !final_reg
                         | Just reg <- pref_reg
                         , reg `elem` freeRegs_thisClass
                         = reg
@@ -898,8 +916,7 @@ allocRegsAndSpill_spill reading keep spills alloc r rs assig spill_loc
                         = first_free
                 spills'   <- loadTemp r spill_loc final_reg spills
 
-                setAssigR $ toRegMap
-                          $ (addToUFM assig r $! newLocation spill_loc final_reg)
+                setAssigR $ (addToRLM assig r $! newLocation spill_loc final_reg)
                 setFreeRegsR $  frAllocateReg platform final_reg freeRegs
 
                 allocateRegsAndSpill reading keep spills' (final_reg : alloc) rs
@@ -907,43 +924,35 @@ allocRegsAndSpill_spill reading keep spills alloc r rs assig spill_loc
 
           -- case (3): we need to push something out to free up a register
          [] ->
-           do   let inRegOrBoth (InReg _) = True
-                    inRegOrBoth (InBoth _ _) = True
-                    inRegOrBoth _ = False
-                let candidates' :: UniqFM VirtualReg Loc
+           do
+                let candidates' :: RegLocMap
                     candidates' =
-                      flip delListFromUFM keep $
-                      filterUFM inRegOrBoth $
-                      assig
-                      -- This is non-deterministic but we do not
-                      -- currently support deterministic code-generation.
-                      -- See Note [Unique Determinism and code generation]
-                let candidates = nonDetUFMToList candidates'
+                      assig { lm_inMem = mempty }
 
-                -- the vregs we could kick out that are already in a slot
-                let candidates_inBoth :: [(Unique, RealReg, StackSlot)]
-                    candidates_inBoth
-                        = [ (temp, reg, mem)
-                          | (temp, InBoth reg mem) <- candidates
-                          , targetClassOfRealReg platform reg == classOfVirtualReg r ]
+                let !targetClass = classOfVirtualReg r
 
                 -- the vregs we could kick out that are only in a reg
                 --      this would require writing the reg to a new slot before using it.
                 let candidates_inReg
                         = [ (temp, reg)
-                          | (temp, InReg reg) <- candidates
-                          , targetClassOfRealReg platform reg == classOfVirtualReg r ]
+                          | (temp, InReg reg) <- nonDetUFMToList (lm_inReg candidates')
+                          , targetClassOfRealReg platform reg == targetClass
+                          , temp `notElem` (map getUnique keep) ]
 
                 let result
 
                         -- we have a temporary that is in both register and mem,
                         -- just free up its register for use.
-                        | (temp, my_reg, slot) : _      <- candidates_inBoth
+                        | candidates_inBoth <- (nonDetUFMToList (lm_inBoth candidates'))
+                        , ((temp, loc@(InBoth my_reg slot)) : _) <- filter
+                                (\(u,(InBoth reg _)) -> u `notElem` (map getUnique keep) &&
+                                                      targetClassOfRealReg platform reg == targetClass)
+                                candidates_inBoth
                         = do    spills' <- loadTemp r spill_loc my_reg spills
-                                let assig1  = addToUFM_Directly assig temp (InMem slot)
-                                let assig2  = addToUFM assig1 r $! newLocation spill_loc my_reg
+                                let assig1  = addToRLMUnsafe_Directly (delFromRLMLoc assig temp loc) temp (InMem slot)
+                                let assig2  = addToRLMUnsafe (delFromRLMLoc assig1 r (InMem (-1))) r $! newLocation spill_loc my_reg
 
-                                setAssigR $ toRegMap assig2
+                                setAssigR $ assig2
                                 allocateRegsAndSpill reading keep spills' (my_reg:alloc) rs
 
                         -- otherwise, we need to spill a temporary that currently
@@ -957,9 +966,10 @@ allocRegsAndSpill_spill reading keep spills alloc r rs assig spill_loc
                                 recordSpill (SpillAlloc temp_to_push_out)
 
                                 -- update the register assignment
-                                let assig1  = addToUFM_Directly assig temp_to_push_out   (InMem slot)
-                                let assig2  = addToUFM assig1 r                 $! newLocation spill_loc my_reg
-                                setAssigR $ toRegMap assig2
+                                let assig1  = addToRLMUnsafe_Directly (delFromRLMLoc assig temp_to_push_out (InReg my_reg))
+                                                                      temp_to_push_out (InMem slot)
+                                let assig2  = addToRLMUnsafe (delFromRLMLoc assig1 r (InMem (-1))) r $! newLocation spill_loc my_reg
+                                setAssigR $ assig2
 
                                 -- if need be, load up a spilled temp into the reg we've just freed up.
                                 spills' <- loadTemp r spill_loc my_reg spills

@@ -41,7 +41,6 @@ import GHC.Prelude
 import GHC.CmmToAsm.Reg.Linear.Stats
 import GHC.CmmToAsm.Reg.Linear.StackMap
 import GHC.CmmToAsm.Reg.Linear.Base
-import GHC.CmmToAsm.Reg.Liveness
 import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.Config
 import GHC.Platform.Reg
@@ -89,7 +88,7 @@ getPlatform = ncgPlatform <$> getConfig
 runR    :: NCGConfig
         -> BlockAssignment freeRegs
         -> freeRegs
-        -> RegMap Loc
+        -> RegLocMap
         -> StackMap
         -> UniqSupply
         -> RegM freeRegs a
@@ -144,11 +143,11 @@ setFreeRegsR :: freeRegs -> RegM freeRegs ()
 setFreeRegsR regs = mkRegM $ \ s ->
   RA_Result s{ra_freeregs = regs} ()
 
-getAssigR :: RegM freeRegs (RegMap Loc)
+getAssigR :: RegM freeRegs (RegLocMap)
 getAssigR = mkRegM $ \ s@RA_State{ra_assig = assig} ->
   RA_Result s assig
 
-setAssigR :: RegMap Loc -> RegM freeRegs ()
+setAssigR :: RegLocMap -> RegM freeRegs ()
 setAssigR assig = mkRegM $ \ s ->
   RA_Result s{ra_assig=assig} ()
 

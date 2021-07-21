@@ -3,7 +3,6 @@
 --      by NCGMonad and the register allocators, which are shared
 --      by all architectures.
 --
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns -ddump-simpl -ddump-stg -ddump-to-file -O #-}
 
 module GHC.Platform.Reg (
         RegNo,
@@ -36,8 +35,6 @@ import GHC.Utils.Panic
 import GHC.Types.Unique
 import GHC.Builtin.Uniques
 import GHC.Platform.Reg.Class
-import Data.List (intersect)
-import GHC.Exts
 
 -- | An identifier for a primitive real machine register.
 type RegNo

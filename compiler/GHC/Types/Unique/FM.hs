@@ -73,7 +73,7 @@ module GHC.Types.Unique.FM (
         lookupWithDefaultUFM, lookupWithDefaultUFM_Directly,
         nonDetEltsUFM, eltsUFM, nonDetKeysUFM,
         ufmToSet_Directly,
-        nonDetUFMToList, ufmToIntMap, unsafeIntMapToUFM,
+        nonDetUFMToList, nonDetCompareUFM, nonDetminViewWithKeyUFM, ufmToIntMap, unsafeIntMapToUFM,
         unsafeCastUFMKey,
         pprUniqFM, pprUFM, pprUFMWithKeys, pluralUFM
     ) where
@@ -413,6 +413,16 @@ nonDetStrictFoldUFM_DirectlyM f z0 (UFM xs) = M.foldrWithKey c return xs z0
 -- nondeterminism.
 nonDetUFMToList :: UniqFM key elt -> [(Unique, elt)]
 nonDetUFMToList (UFM m) = map (\(k, v) -> (getUnique k, v)) $ M.toList m
+
+nonDetCompareUFM :: Ord elt => UniqFM key elt -> UniqFM key elt -> Ordering
+nonDetCompareUFM (UFM m1) (UFM m2) = compare m1 m2
+
+nonDetminViewWithKeyUFM :: UniqFM key elt -> Maybe ((Unique, elt), UniqFM key elt)
+nonDetminViewWithKeyUFM (UFM m1) =
+  case M.minViewWithKey m1 of
+    Nothing -> Nothing
+    Just ((key,elt),m2) -> Just ((getUnique key,elt), UFM m2)
+
 
 -- | A wrapper around 'UniqFM' with the sole purpose of informing call sites
 -- that the provided 'Foldable' and 'Traversable' instances are

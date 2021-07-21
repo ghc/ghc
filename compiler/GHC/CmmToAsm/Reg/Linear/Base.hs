@@ -1,6 +1,6 @@
+{-# LANGUAGE FlexibleInstances #-}
 
 -- | Put common type definitions here to break recursive module dependencies.
-
 module GHC.CmmToAsm.Reg.Linear.Base (
         BlockAssignment,
 
@@ -13,11 +13,21 @@ module GHC.CmmToAsm.Reg.Linear.Base (
 
         -- the allocator monad
         RA_State(..),
+
+        -- Vreg <-> allocated location mapping
+        RegLocMap(..), addToRLM, addToRLM_Directly, addToRLMUnsafe, addToRLMUnsafe_Directly,
+        delFromRLM, delFromRLM_Directly, delFromRLMLoc, elemRLM, lookupRLM,
+        filterRLM_Directly, lookupRLM_Directly, nonDetRLMToList, nonDetEqRLM,
+        emptyRegLocMap, nonDetStrictFoldRLM_DirectlyM,
+        isInReg, isInRegOrBoth
 )
 
 where
 
 import GHC.Prelude
+
+import Control.Applicative
+import qualified Data.Semigroup as Semi
 
 import GHC.CmmToAsm.Reg.Linear.StackMap
 import GHC.CmmToAsm.Reg.Liveness
@@ -38,7 +48,7 @@ data ReadingOrWriting = Reading | Writing deriving (Eq,Ord)
 --      the register assignments from the different sources match up.
 --
 type BlockAssignment freeRegs
-        = BlockMap (freeRegs, RegMap Loc)
+        = BlockMap (freeRegs, RegLocMap)
 
 
 -- | Where a vreg is currently stored
@@ -68,13 +78,211 @@ data Loc
 instance Outputable Loc where
         ppr l = text (show l)
 
-
 -- | Get the reg numbers stored in this Loc.
 regsOfLoc :: Loc -> [RealReg]
 regsOfLoc (InReg r)    = [r]
 regsOfLoc (InBoth r _) = [r]
 regsOfLoc (InMem _)    = []
 
+-- | Map vregs to locations in a real registor or on the stack
+--
+-- TODO: We could make Loc a GADT, which would allow us to encode which constructor
+--       in stored in the map in the maps type. We could also "unbox" the maps entries
+--       but that turned out worse perf-wise when I tried it because of reboxing.
+data RegLocMap
+        = RegLocMap {
+                lm_inReg :: !(UniqFM VirtualReg Loc), -- ^ vregs mapped to real regs
+                lm_inMem :: !(UniqFM VirtualReg Loc), -- ^ vregs mapped to memory(stack) locations
+                lm_inBoth :: !(UniqFM VirtualReg Loc) -- ^ vregs alive in both e.g. when spilled, but register not yet modified
+                }
+
+instance Semigroup RegLocMap where
+        (<>)    (RegLocMap inReg1 inMem1 inBoth1)
+                (RegLocMap inReg2 inMem2 inBoth2)
+                =
+                RegLocMap (inReg1 Semi.<> inReg2) (inMem1 Semi.<> inMem2) (inBoth1 Semi.<> inBoth2)
+
+instance Monoid RegLocMap where
+        mempty = RegLocMap mempty mempty mempty
+
+instance Outputable RegLocMap where
+        ppr (RegLocMap inReg inMem inBoth) =
+                text "RegLocMap" <> parens (hcat [text "reg:" <> ppr inReg
+                                                , text "mem:" <> ppr inMem
+                                                , text "both:" <> ppr inBoth])
+
+{-# SPECIALIZE elemRLM :: VirtualReg -> RegLocMap -> Bool #-}
+{-# SPECIALIZE elemRLM :: Reg -> RegLocMap -> Bool #-}
+elemRLM :: (IsReg reg) => reg -> RegLocMap -> Bool
+elemRLM !reg (RegLocMap inReg inMem inBoth) =
+        elemUFM_Directly (getUnique reg) inReg ||
+        elemUFM_Directly (getUnique reg) inMem ||
+        elemUFM_Directly (getUnique reg) inBoth
+
+-- Inline this as a way to fore specialization on the reg type if it's known
+{-# INLINE lookupRLM #-}
+lookupRLM :: IsReg reg => RegLocMap -> reg -> Maybe Loc
+lookupRLM assig vreg =
+        let !ureg = getUnique vreg in
+        lookupRLM_Directly assig ureg
+
+lookupRLM_Directly :: RegLocMap -> Unique -> Maybe Loc
+lookupRLM_Directly (RegLocMap inReg inMem inBoth) unique =
+        (lookupUFM_Directly inReg unique) <|>
+        (lookupUFM_Directly inMem unique ) <|>
+        (lookupUFM_Directly inBoth unique)
+
+
+{-# INLINE delFromRLMLoc #-} -- Inlining allows an location given as argument to cancel out with the case
+                             -- making both dead code. Neat.
+delFromRLMLoc :: Uniquable reg => RegLocMap -> reg -> Loc -> RegLocMap
+delFromRLMLoc (RegLocMap inReg inMem inBoth) reg loc =
+        let !ureg = getUnique reg
+        in
+        case loc of
+                InReg {} ->
+                        RegLocMap
+                                (delFromUFM_Directly inReg ureg)
+                                inMem
+                                inBoth
+                InMem {} ->
+                        RegLocMap
+                                inReg
+                                (delFromUFM_Directly inMem ureg)
+                                inBoth
+                InBoth {} ->
+                        RegLocMap
+                                inReg
+                                inMem
+                                (delFromUFM_Directly inBoth ureg)
+
+
+{-# INLINE delFromRLM #-} -- Inlining causes specialization as side effect
+delFromRLM :: IsReg reg => RegLocMap -> reg -> RegLocMap
+delFromRLM assig !reg =
+        delFromRLM_Directly assig (getUnique reg)
+
+delFromRLM_Directly :: RegLocMap -> Unique -> RegLocMap
+delFromRLM_Directly (RegLocMap inReg inMem inBoth) !ureg =
+        RegLocMap
+                (delFromUFM_Directly inReg ureg)
+                (delFromUFM_Directly inMem ureg)
+                (delFromUFM_Directly inBoth ureg)
+
+{-# INLINE isInReg #-} -- Inlining causes specialization as side effect
+isInReg :: (IsReg reg) => reg -> RegLocMap -> Bool
+isInReg !reg (RegLocMap inReg _inMem _inBoth) =
+        elemUFM_Directly (getUnique reg) inReg
+
+{-# INLINE isInRegOrBoth #-} -- Inlining causes specialization as side effect
+isInRegOrBoth :: (IsReg reg) => reg -> RegLocMap -> Bool
+isInRegOrBoth !reg (RegLocMap inReg _inMem inBoth) =
+        elemUFM_Directly (getUnique reg) inReg ||
+        elemUFM_Directly (getUnique reg) inBoth
+
+
+emptyRegLocMap :: RegLocMap
+emptyRegLocMap = RegLocMap mempty mempty mempty
+
+-- Values allowed to represent a register
+class Uniquable r => IsReg r where
+
+instance IsReg Reg
+instance IsReg VirtualReg
+
+
+-- | Not great for performance. But not used in hot code paths.
+nonDetRLMToList :: RegLocMap -> [(Unique,Loc)]
+nonDetRLMToList (RegLocMap inReg inMem inBoth) =
+        (nonDetUFMToList inReg) ++
+        (nonDetUFMToList inMem) ++
+        (nonDetUFMToList inBoth)
+
+filterRLM_Directly :: (Unique -> Loc -> Bool) -> RegLocMap -> RegLocMap
+filterRLM_Directly pred (RegLocMap inReg inMem inBoth) =
+        RegLocMap
+                (filterUFM_Directly pred inReg)
+                (filterUFM_Directly pred inMem)
+                (filterUFM_Directly pred inBoth)
+
+nonDetEqRLM :: RegLocMap -> RegLocMap -> Bool
+nonDetEqRLM (RegLocMap inReg1 inMem1 inBoth1) (RegLocMap inReg2 inMem2 inBoth2) =
+        inReg1 `eqUFM` inReg2 &&
+        inMem1 `eqUFM` inMem2 &&
+        inBoth1 `eqUFM` inBoth2
+        where eqUFM m1 m2 = m1 `nonDetCompareUFM` m2 == EQ
+
+{-Note [Adding elements into a RegLocMap]
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A vreg only has on valid location it's mapped to at
+a time. This means if we want to safely insert a new
+mapping we have to ensure that either the new mapping will overwrite
+the old one, or delete the old mapping first.
+
+Often we know what kind of previous mapping existed. In these
+cases we delete the old mapping explicitly when necessary,
+and then use addToRLMUnsafe* to add the new mapping.
+
+Sometimes we don't know then we use `addToRLM` which will ensure
+any old mapping is removed i
+
+
+
+-}
+-- Add is slightly tricky. For UFM add replaces the current value.
+-- Here it only does if the location is of the same type.
+-- Removing from the other maps on insert seems expensive
+-- but not doing so breaks compatiblity.
+
+-- For now we assume that generally entries added are either the same type already
+-- or they must be removed before adding the new one
+
+addToRLM_Directly :: RegLocMap -> Unique -> Loc -> RegLocMap
+addToRLM_Directly (RegLocMap inReg inMem inBoth) ureg loc  =
+        case loc of
+            InReg {} ->
+                RegLocMap
+                        (addToUFM_Directly inReg ureg loc)
+                        (delFromUFM_Directly inMem ureg)
+                        (delFromUFM_Directly inBoth ureg)
+            InMem {} ->
+                RegLocMap
+                        (delFromUFM_Directly inReg ureg)
+                        (addToUFM_Directly inMem ureg loc)
+                        (delFromUFM_Directly inBoth ureg)
+            InBoth {} ->
+                RegLocMap
+                        (delFromUFM_Directly inReg ureg)
+                        (delFromUFM_Directly inMem ureg)
+                        (addToUFM_Directly inBoth ureg loc)
+
+{-# INLINE addToRLM #-} -- Force specialization on the register type
+addToRLM :: (IsReg vreg) => RegLocMap -> vreg -> Loc -> RegLocMap
+addToRLM assig !reg loc  =
+        let !vreg = getUnique reg
+        in addToRLM_Directly assig vreg loc
+
+-- These unsafe invariants assume the added mapping is not already present in any of the maps.
+addToRLMUnsafe_Directly :: RegLocMap -> Unique -> Loc -> RegLocMap
+addToRLMUnsafe_Directly assig@(RegLocMap inReg inMem inBoth) !ureg loc  =
+        case loc of
+            InReg {} ->
+                assig { lm_inReg = addToUFM_Directly inReg ureg loc  }
+            InMem {} ->
+                assig { lm_inMem = addToUFM_Directly inMem ureg loc  }
+            InBoth {} ->
+                assig { lm_inBoth = addToUFM_Directly inBoth ureg loc }
+
+addToRLMUnsafe :: (IsReg vreg) => RegLocMap -> vreg -> Loc -> RegLocMap
+addToRLMUnsafe assig reg loc  =
+        let !vreg = getUnique reg
+        in addToRLMUnsafe_Directly assig vreg loc
+
+nonDetStrictFoldRLM_DirectlyM :: forall b m. (Monad m) => (Unique -> b -> Loc -> m b) -> b -> RegLocMap -> m b
+nonDetStrictFoldRLM_DirectlyM f r (RegLocMap inReg inMem inBoth) = do
+        r' <- nonDetStrictFoldUFM_DirectlyM f r inReg
+        r'' <- nonDetStrictFoldUFM_DirectlyM f r' inMem
+        nonDetStrictFoldUFM_DirectlyM f r'' inBoth
 
 -- | Reasons why instructions might be inserted by the spiller.
 --      Used when generating stats for -ddrop-asm-stats.
@@ -121,7 +329,7 @@ data RA_State freeRegs
         , ra_freeregs   :: !freeRegs
 
         -- | assignment of temps to locations
-        , ra_assig      :: RegMap Loc
+        , ra_assig      :: RegLocMap
 
         -- | current stack delta
         , ra_delta      :: Int
