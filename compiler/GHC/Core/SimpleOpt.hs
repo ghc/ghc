@@ -665,7 +665,7 @@ add_info env old_bndr top_level new_rhs new_bndr
                               `setUnfoldingInfo` new_unfolding
 
    old_rules = ruleInfo old_info
-   new_rules = substSpec subst new_bndr old_rules
+   new_rules = substRuleInfo subst new_bndr old_rules
 
    old_unfolding = realUnfoldingInfo old_info
    new_unfolding | isStableUnfolding old_unfolding

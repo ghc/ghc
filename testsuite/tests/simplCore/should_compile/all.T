@@ -371,3 +371,4 @@ test('T20125',  [ grep_errmsg(r'= T20125.MkT') ], compile, ['-O -ddump-simpl -ds
 test('T20143',  [ grep_errmsg(r'unsafeEqualityProof') ], compile, ['-O -ddump-simpl -dsuppress-uniques'])
 test('T20174', normal, compile, [''])
 test('T16373', normal, compile, [''])
+test('T20112',  normal, multimod_compile, ['T20112', '-O -v0 -g1'])
