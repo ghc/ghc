@@ -1081,10 +1081,12 @@ AC_ARG_WITH([system-libffi],
 ])
 
 AS_IF([test "x$with_system_libffi" = "xyes"],
-  [UseSystemLibFFI="YES"], [UseSystemLibFFI="NO"]
+  [UseSystemLibFFI="YES"; CabalUseSystemLibFFI="True"],
+  [UseSystemLibFFI="NO"; CabalUseSystemLibFFI="True"]
 )
 
 AC_SUBST(UseSystemLibFFI)
+AC_SUBST(CabalUseSystemLibFFI)
 
 AC_ARG_WITH([ffi-includes],
 [AS_HELP_STRING([--with-ffi-includes=ARG],

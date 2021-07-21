@@ -245,6 +245,7 @@ rtsPackageArgs = package rts ? do
     way            <- getWay
     path           <- getBuildPath
     top            <- expr topDirectory
+    useSystemFfi   <- expr $ flag UseSystemFfi
     libffiName     <- expr libffiLibraryName
     ffiIncludeDir  <- getSetting FfiIncludeDir
     ffiLibraryDir  <- getSetting FfiLibDir
@@ -360,6 +361,7 @@ rtsPackageArgs = package rts ? do
           , any (wayUnit Debug) rtsWays     `cabalFlag` "debug"
           , any (wayUnit Logging) rtsWays   `cabalFlag` "logging"
           , any (wayUnit Dynamic) rtsWays   `cabalFlag` "dynamic"
+          , useSystemFfi                    `cabalFlag` "use-system-libffi"
           , useLibffiForAdjustors           `cabalFlag` "libffi-adjustors"
           , Debug `wayUnit` way             `cabalFlag` "find-ptr"
           ]
