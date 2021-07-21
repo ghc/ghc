@@ -1906,6 +1906,8 @@ exprIsHNFlike is_con is_con_unf = is_hnf_like
         -- We don't look through loop breakers here, which is a bit conservative
         -- but otherwise I worry that if an Id's unfolding is just itself,
         -- we could get an infinite loop
+      || isUnliftedType (idType v)
+        -- Unlifted binders are always evluated
 
     is_hnf_like (Lit l)          = not (isLitRubbish l)
         -- Regarding a LitRubbish as ConLike leads to unproductive inlining in
