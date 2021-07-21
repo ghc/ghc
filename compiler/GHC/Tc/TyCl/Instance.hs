@@ -1981,7 +1981,8 @@ mkMethIds clas tyvars dfun_ev_vars inst_tys sel_id
         ; return (poly_meth_id, local_meth_id) }
   where
     sel_name      = idName sel_id
-    sel_occ       = nameOccName sel_name
+    -- Force so that a thunk doesn't end up in a Name (#19619)
+    !sel_occ      = nameOccName sel_name
     local_meth_ty = instantiateMethod clas sel_id inst_tys
     poly_meth_ty  = mkSpecSigmaTy tyvars theta local_meth_ty
     theta         = map idType dfun_ev_vars

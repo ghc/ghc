@@ -860,9 +860,12 @@ getLocalNonValBinders fixity_env
         ; traceRn "getLocalNonValBinders 2" (ppr avails)
         ; (tcg_env, tcl_env) <- extendGlobalRdrEnvRn avails fixity_env
 
+        -- Force the field access so that tcg_env is not retained. The
+        -- selector thunk optimisation doesn't kick-in, see #20139
+        ; let !old_field_env = tcg_field_env tcg_env
         -- Extend tcg_field_env with new fields (this used to be the
         -- work of extendRecordFieldEnv)
-        ; let field_env = extendNameEnvList (tcg_field_env tcg_env) flds
+              field_env = extendNameEnvList old_field_env flds
               envs      = (tcg_env { tcg_field_env = field_env }, tcl_env)
 
         ; traceRn "getLocalNonValBinders 3" (vcat [ppr flds, ppr field_env])
