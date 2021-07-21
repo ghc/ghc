@@ -68,7 +68,40 @@ StgWord16 hs_bitrev16(StgWord16 x);
 StgWord32 hs_bitrev32(StgWord32 x);
 StgWord64 hs_bitrev64(StgWord64 x);
 
-/* TODO: longlong.c */
+/* libraries/ghc-prim/cbits/longlong.c */
+#if WORD_SIZE_IN_BITS < 64
+StgInt hs_eq64 (StgWord64 a, StgWord64 b);
+StgInt hs_ne64 (StgWord64 a, StgWord64 b);
+StgInt hs_gtWord64 (StgWord64 a, StgWord64 b);
+StgInt hs_geWord64 (StgWord64 a, StgWord64 b);
+StgInt hs_ltWord64 (StgWord64 a, StgWord64 b);
+StgInt hs_leWord64 (StgWord64 a, StgWord64 b);
+StgInt hs_gtInt64 (StgInt64 a, StgInt64 b);
+StgInt hs_geInt64 (StgInt64 a, StgInt64 b);
+StgInt hs_ltInt64 (StgInt64 a, StgInt64 b);
+StgInt hs_leInt64 (StgInt64 a, StgInt64 b);
+StgInt64 hs_neg64       (StgInt64 a);
+StgWord64 hs_add64      (StgWord64 a, StgWord64 b);
+StgWord64 hs_sub64      (StgWord64 a, StgWord64 b);
+StgWord64 hs_mul64      (StgWord64 a, StgWord64 b);
+StgWord64 hs_remWord64  (StgWord64 a, StgWord64 b);
+StgWord64 hs_quotWord64 (StgWord64 a, StgWord64 b);
+StgInt64 hs_remInt64    (StgInt64 a, StgInt64 b);
+StgInt64 hs_quotInt64   (StgInt64 a, StgInt64 b);
+StgWord64 hs_and64      (StgWord64 a, StgWord64 b);
+StgWord64 hs_or64       (StgWord64 a, StgWord64 b);
+StgWord64 hs_xor64      (StgWord64 a, StgWord64 b);
+StgWord64 hs_not64      (StgWord64 a);
+StgWord64 hs_uncheckedShiftL64   (StgWord64 a, StgInt b);
+StgWord64 hs_uncheckedShiftRL64  (StgWord64 a, StgInt b);
+StgInt64  hs_uncheckedIShiftRA64 (StgInt64 a,  StgInt b);
+StgInt64  hs_intToInt64    (StgInt    i);
+StgInt    hs_int64ToInt    (StgInt64  i);
+StgWord64 hs_int64ToWord64 (StgInt64  i);
+StgWord64 hs_wordToWord64  (StgWord   w);
+StgWord   hs_word64ToWord  (StgWord64 w);
+StgInt64  hs_word64ToInt64 (StgWord64 w);
+#endif
 
 /* libraries/ghc-prim/cbits/pdep.c */
 StgWord64 hs_pdep64(StgWord64 src, StgWord64 mask);
