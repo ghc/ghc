@@ -543,25 +543,22 @@ closeCondition( Condition* pCond STG_UNUSED)
   return;
 }
 
-bool
+void
 broadcastCondition ( Condition* pCond )
 {
   WakeAllConditionVariable(pCond);
-  return true;
 }
 
-bool
+void
 signalCondition ( Condition* pCond )
 {
   WakeConditionVariable(pCond);
-  return true;
 }
 
-bool
+void
 waitCondition ( Condition* pCond, Mutex* pMut )
 {
-  SleepConditionVariableSRW(pCond, pMut, INFINITE, 0);
-  return true;
+  CHECK(SleepConditionVariableSRW(pCond, pMut, INFINITE, 0));
 }
 
 bool
@@ -570,8 +567,14 @@ timedWaitCondition ( Condition* pCond, Mutex* pMut, Time timeout )
   // If we pass a timeout of 0 SleepConditionVariableSRW will return immediately
   // https://docs.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-sleepconditionvariablesrw
   DWORD ms = (DWORD)stg_min(1, TimeToMS(timeout));
-  SleepConditionVariableSRW(pCond, pMut, ms, 0);
-  return true;
+  BOOL res = SleepConditionVariableSRW(pCond, pMut, ms, 0);
+  if (res) {
+    return true; // success
+  } else if (GetLastError() == ERROR_TIMEOUT) {
+    return false; // timeout
+  } else {
+    barf("timedWaitCondition: error %" FMT_Word, (StgWord) GetLastError());
+  }
 }
 
 void
