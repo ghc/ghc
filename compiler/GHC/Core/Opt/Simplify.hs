@@ -3939,8 +3939,7 @@ simplLetUnfolding env top_lvl cont_mb id new_rhs rhs_ty arity unf
 mkLetUnfolding :: UnfoldingOpts -> TopLevelFlag -> UnfoldingSource
                -> InId -> OutExpr -> SimplM Unfolding
 mkLetUnfolding !uf_opts top_lvl src id new_rhs
-  = is_bottoming `seq`  -- See Note [Force bottoming field]
-    return (mkUnfolding uf_opts src is_top_lvl is_bottoming new_rhs)
+  = return (mkUnfolding uf_opts src is_top_lvl is_bottoming new_rhs)
             -- We make an  unfolding *even for loop-breakers*.
             -- Reason: (a) It might be useful to know that they are WHNF
             --         (b) In GHC.Iface.Tidy we currently assume that, if we want to
@@ -3948,8 +3947,11 @@ mkLetUnfolding !uf_opts top_lvl src id new_rhs
             --             to expose.  (We could instead use the RHS, but currently
             --             we don't.)  The simple thing is always to have one.
   where
-    is_top_lvl   = isTopLevel top_lvl
-    is_bottoming = isDeadEndId id
+    -- Might as well force this, profiles indicate up to 0.5MB of thunks
+    -- just from this site.
+    !is_top_lvl   = isTopLevel top_lvl
+    -- See Note [Force bottoming field]
+    !is_bottoming = isDeadEndId id
 
 -------------------
 simplStableUnfolding :: SimplEnv -> TopLevelFlag
@@ -3986,11 +3988,17 @@ simplStableUnfolding env top_lvl mb_cont id rhs_ty id_arity unf
                           , ug_boring_ok = boring_ok
                           }
                           -- Happens for INLINE things
-                     -> let guide' =
+                        -- Really important to force new_boring_ok as otherwise
+                        -- `ug_boring_ok` is a thunk chain of
+                        -- inlineBoringExprOk expr0
+                        --  || inlineBoringExprOk expr1 || ...
+                        --  See #20134
+                     -> let !new_boring_ok = boring_ok || inlineBoringOk expr'
+                            guide' =
                               UnfWhen { ug_arity = arity
                                       , ug_unsat_ok = sat_ok
-                                      , ug_boring_ok =
-                                          boring_ok || inlineBoringOk expr'
+                                      , ug_boring_ok = new_boring_ok
+
                                       }
                         -- Refresh the boring-ok flag, in case expr'
                         -- has got small. This happens, notably in the inlinings
@@ -4011,7 +4019,9 @@ simplStableUnfolding env top_lvl mb_cont id rhs_ty id_arity unf
         | otherwise -> return noUnfolding   -- Discard unstable unfoldings
   where
     uf_opts    = seUnfoldingOpts env
-    is_top_lvl = isTopLevel top_lvl
+    -- Forcing this can save about 0.5MB of max residency and the result
+    -- is small and easy to compute so might as well force it.
+    !is_top_lvl = isTopLevel top_lvl
     act        = idInlineActivation id
     unf_env    = updMode (updModeForStableUnfoldings act) env
          -- See Note [Simplifying inside stable unfoldings] in GHC.Core.Opt.Simplify.Utils
@@ -4153,3 +4163,4 @@ for the RHS as well as the LHS, but that seems more conservative
 than necesary.  Allowing some inlining might, for example, eliminate
 a binding.
 -}
+
