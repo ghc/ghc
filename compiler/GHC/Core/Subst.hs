@@ -14,7 +14,7 @@ module GHC.Core.Subst (
         TvSubstEnv, IdSubstEnv, InScopeSet,
 
         -- ** Substituting into expressions and related types
-        deShadowBinds, substSpec, substRulesForImportedIds,
+        deShadowBinds, substRuleInfo, substRulesForImportedIds,
         substTy, substCo, substExpr, substExprSC, substBind, substBindSC,
         substUnfolding, substUnfoldingSC,
         lookupIdSubst, lookupTCvSubst, substIdType, substIdOcc,
@@ -622,7 +622,7 @@ substIdType subst@(Subst _ _ tv_env cv_env) id
 substIdInfo :: Subst -> Id -> IdInfo -> Maybe IdInfo
 substIdInfo subst new_id info
   | nothing_to_do = Nothing
-  | otherwise     = Just (info `setRuleInfo`      substSpec subst new_id old_rules
+  | otherwise     = Just (info `setRuleInfo`      substRuleInfo subst new_id old_rules
                                `setUnfoldingInfo` substUnfolding subst old_unf)
   where
     old_rules     = ruleInfo info
@@ -668,14 +668,13 @@ substIdOcc subst v = case lookupIdSubst subst v of
                         other  -> pprPanic "substIdOcc" (vcat [ppr v <+> ppr other, ppr subst])
 
 ------------------
--- | Substitutes for the 'Id's within the 'WorkerInfo' given the new function 'Id'
-substSpec :: Subst -> Id -> RuleInfo -> RuleInfo
-substSpec subst new_id (RuleInfo rules rhs_fvs)
-  = seqRuleInfo new_spec `seq` new_spec
+-- | Substitutes for the 'Id's within the 'RuleInfo' given the new function 'Id'
+substRuleInfo :: Subst -> Id -> RuleInfo -> RuleInfo
+substRuleInfo subst new_id (RuleInfo rules rhs_fvs)
+  = RuleInfo (map (substRule subst subst_ru_fn) rules)
+                  (substDVarSet subst rhs_fvs)
   where
     subst_ru_fn = const (idName new_id)
-    new_spec = RuleInfo (map (substRule subst subst_ru_fn) rules)
-                        (substDVarSet subst rhs_fvs)
 
 ------------------
 substRulesForImportedIds :: Subst -> [CoreRule] -> [CoreRule]
@@ -737,6 +736,31 @@ looked at the idInfo for 'f'; result <<loop>>.
 
 In any case we don't need to optimise the RHS of rules, or unfoldings,
 because the simplifier will do that.
+
+Another place this went wrong was in `substRuleInfo`, which would immediately force
+the lazy call to substExpr, which led to an infinite loop (as reported by #20112).
+
+This time the call stack looked something like:
+
+* `substRecBndrs`
+* `substIdBndr`
+* `substIdInfo`
+* `substRuleInfo`
+* `substRule`
+* `substExpr`
+* `mkTick`
+* `isSaturatedConApp`
+* Look at `IdInfo` for thing we are currently substituting because the rule is attached to `transpose` and mentions it in the `RHS` of the rule.
+
+and the rule was
+
+{-# RULES
+"transpose/overlays1" forall xs. transpose (overlays1 xs) = overlays1 (fmap transpose xs)
+#-}
+
+This rule was attached to `transpose`, but also mentions itself in the RHS so we have
+to be careful to not force the `IdInfo` for transpose when dealing with the RHS of the rule.
+
 
 
 Note [substTickish]
