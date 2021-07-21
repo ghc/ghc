@@ -276,6 +276,11 @@ The supported transformers are listed below:
         <td>Collects timings while building the stage2+ compiler by adding the
         flags <code>-ddump-to-file -ddump-timings</code>.</td>
     </tr>
+    <tr>
+        <td><code>lint</code></td>
+        <td>Enable Core, STG, and C-- linting in all compilation with the stage1
+        compiler.</td>
+    </tr>
 </table>
 
 ### Static
