@@ -592,7 +592,10 @@ freshenTyCoVarX mk_tcv subst tycovar
   = do { loc  <- getSrcSpanM
        ; uniq <- newUnique
        ; let old_name = tyVarName tycovar
-             new_name = mkInternalName uniq (getOccName old_name) loc
+             -- Force so we don't retain reference to the old name and id
+             -- See (#19619) for more discussion
+             !old_occ_name = getOccName old_name
+             new_name = mkInternalName uniq old_occ_name loc
              new_kind = substTyUnchecked subst (tyVarKind tycovar)
              new_tcv  = mk_tcv new_name new_kind
              subst1   = extendTCvSubstWithClone subst tycovar new_tcv
@@ -850,8 +853,15 @@ tcExtendLocalInstEnv :: [ClsInst] -> TcM a -> TcM a
 tcExtendLocalInstEnv dfuns thing_inside
  = do { traceDFuns dfuns
       ; env <- getGblEnv
+      -- Force the access to the TcgEnv so it isn't retained.
+      -- During auditing it is much easier to observe in -hi profiles if
+      -- there are a very small number of TcGblEnv. Keeping a TcGblEnv
+      -- alive is quite dangerous because it contains reference to many
+      -- large data structures.
+      ; let !init_inst_env = tcg_inst_env env
+            !init_insts = tcg_insts env
       ; (inst_env', cls_insts') <- foldlM addLocalInst
-                                          (tcg_inst_env env, tcg_insts env)
+                                          (init_inst_env, init_insts)
                                           dfuns
       ; let env' = env { tcg_insts    = cls_insts'
                        , tcg_inst_env = inst_env' }
