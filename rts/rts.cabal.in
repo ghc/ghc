@@ -12,6 +12,8 @@ flag libdl
   default: @CabalHaveLibdl@
 flag ffi
   default: @CabalHaveLibffi@
+flag use-system-libffi
+  default: @CabalUseSystemLibFFI@
 flag need-pthread
   default: @CabalNeedLibpthread@
 flag libbfd
@@ -55,10 +57,14 @@ library
     -- expects the unit-id to be
     -- set without version
     ghc-options: -this-unit-id rts
-    if os(windows)
-      extra-bundled-libraries: Cffi-6
-    else
-      extra-bundled-libraries: Cffi
+
+    -- If we are using an in-tree libffi then we must declare it as a bundled
+    -- library to ensure that Cabal installs it.
+    if !flag(use-system-libffi)
+      if os(windows)
+        extra-bundled-libraries: Cffi-6
+      else
+        extra-bundled-libraries: Cffi
 
     -- The make build system does something special in config.mk.in
     -- for generating profiled, debugged, etc builds of those
