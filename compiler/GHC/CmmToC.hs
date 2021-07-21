@@ -958,35 +958,35 @@ pprCallishMachOp_for_C mop
         (MO_Prefetch_Data _ ) -> unsupported
         --- we could support prefetch via "__builtin_prefetch"
         --- Not adding it for now
-        MO_I64_ToI   -> unsupported
-        MO_I64_FromI -> unsupported
-        MO_W64_ToW   -> unsupported
-        MO_W64_FromW -> unsupported
-        MO_x64_Neg   -> unsupported
-        MO_x64_Add   -> unsupported
-        MO_x64_Sub   -> unsupported
-        MO_x64_Mul   -> unsupported
-        MO_I64_Quot  -> unsupported
-        MO_I64_Rem   -> unsupported
-        MO_W64_Quot  -> unsupported
-        MO_W64_Rem   -> unsupported
-        MO_x64_And   -> unsupported
-        MO_x64_Or    -> unsupported
-        MO_x64_Xor   -> unsupported
-        MO_x64_Not   -> unsupported
-        MO_x64_Shl   -> unsupported
-        MO_I64_Shr   -> unsupported
-        MO_W64_Shr   -> unsupported
-        MO_x64_Eq    -> unsupported
-        MO_x64_Ne    -> unsupported
-        MO_I64_Ge    -> unsupported
-        MO_I64_Gt    -> unsupported
-        MO_I64_Le    -> unsupported
-        MO_I64_Lt    -> unsupported
-        MO_W64_Ge    -> unsupported
-        MO_W64_Gt    -> unsupported
-        MO_W64_Le    -> unsupported
-        MO_W64_Lt    -> unsupported
+        MO_I64_ToI   -> text "hs_int64ToInt"
+        MO_I64_FromI -> text "hs_intToInt64"
+        MO_W64_ToW   -> text "hs_word64ToWord"
+        MO_W64_FromW -> text "hs_wordToWord64"
+        MO_x64_Neg   -> text "hs_neg64"
+        MO_x64_Add   -> text "hs_add64"
+        MO_x64_Sub   -> text "hs_sub64"
+        MO_x64_Mul   -> text "hs_mul64"
+        MO_I64_Quot  -> text "hs_quotInt64"
+        MO_I64_Rem   -> text "hs_remInt64"
+        MO_W64_Quot  -> text "hs_quotWord64"
+        MO_W64_Rem   -> text "hs_remWord64"
+        MO_x64_And   -> text "hs_and64"
+        MO_x64_Or    -> text "hs_xor64"
+        MO_x64_Xor   -> text "hs_xor64"
+        MO_x64_Not   -> text "hs_not64"
+        MO_x64_Shl   -> text "hs_uncheckedShiftL64"
+        MO_I64_Shr   -> text "hs_uncheckedIShiftRA64"
+        MO_W64_Shr   -> text "hs_uncheckedShiftRL64"
+        MO_x64_Eq    -> text "hs_eq64"
+        MO_x64_Ne    -> text "hs_ne64"
+        MO_I64_Ge    -> text "hs_geInt64"
+        MO_I64_Gt    -> text "hs_gtInt64"
+        MO_I64_Le    -> text "hs_leInt64"
+        MO_I64_Lt    -> text "hs_ltInt64"
+        MO_W64_Ge    -> text "hs_geWord64"
+        MO_W64_Gt    -> text "hs_gtWord64"
+        MO_W64_Le    -> text "hs_leWord64"
+        MO_W64_Lt    -> text "hs_ltWord64"
     where unsupported = panic ("pprCallishMachOp_for_C: " ++ show mop
                             ++ " not supported!")
 
