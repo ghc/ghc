@@ -79,7 +79,7 @@ import GHC.Core.Coercion
 import GHC.Core.TyCon
 import GHC.Core.Multiplicity
 
-import GHC.Builtin.Names (makeStaticName, unsafeEqualityProofName)
+import GHC.Builtin.Names ( makeStaticName, unsafeEqualityProofIdKey )
 import GHC.Builtin.PrimOps
 
 import GHC.Types.Var
@@ -1661,14 +1661,28 @@ app_ok primop_ok fun args
         -> primop_ok op  -- Check the primop itself
         && and (zipWith primop_arg_ok arg_tys args)  -- Check the arguments
 
-      _other -> isUnliftedType (idType fun)          -- c.f. the Var case of exprIsHNF
-             || idArity fun > n_val_args             -- Partial apps
+      _  -- Unlifted types
+         -- c.f. the Var case of exprIsHNF
+         | isUnliftedType (idType fun)
+         -> assertPpr (n_val_args == 0) (ppr fun $$ ppr args)
+            True  -- Our only unlifted types are Int# etc, so will have
+                  -- no value args.  The assert is just to check this.
+                  -- If we added unlifted function types this would change,
+                  -- and we'd need to actually test n_val_args == 0.
+
+         -- Partial applications
+         | idArity fun > n_val_args -> True
+
+         -- Functions that terminate fast without raising exceptions etc
+         -- See Note [Discarding unnecessary unsafeEqualityProofs]
+         | fun `hasKey` unsafeEqualityProofIdKey -> True
+
+         | otherwise -> False
              -- NB: even in the nullary case, do /not/ check
              --     for evaluated-ness of the fun;
              --     see Note [exprOkForSpeculation and evaluated variables]
-             where
-               n_val_args = valArgCount args
   where
+    n_val_args   = valArgCount args
     (arg_tys, _) = splitPiTys (idType fun)
 
     primop_arg_ok :: TyBinder -> CoreExpr -> Bool
@@ -1840,6 +1854,20 @@ False (always) for DataToTagOp and SeqOp.
 
 Note that exprIsHNF /can/ and does take advantage of evaluated-ness;
 it doesn't have the trickiness of the let/app invariant to worry about.
+
+Note [Discarding unnecessary unsafeEqualityProofs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In #20143 we found
+   case unsafeEqualityProof @t1 @t2 of UnsafeRefl cv[dead] -> blah
+where 'blah' didn't mention 'cv'.  We'd like to discard this
+redundant use of unsafeEqualityProof, via GHC.Core.Opt.Simplify.rebuildCase.
+To do this we need to know
+  (a) that cv is unused (done by OccAnal), and
+  (b) that unsafeEqualityProof terminates rapidly without side effects.
+
+At the moment we check that explicitly here in exprOkForSideEffects,
+but one might imagine a more systematic check in future.
+
 
 ************************************************************************
 *                                                                      *
@@ -2656,6 +2684,6 @@ isUnsafeEqualityProof :: CoreExpr -> Bool
 -- Note [Implementing unsafeCoerce] in base:Unsafe.Coerce
 isUnsafeEqualityProof e
   | Var v `App` Type _ `App` Type _ `App` Type _ <- e
-  = idName v == unsafeEqualityProofName
+  = v `hasKey` unsafeEqualityProofIdKey
   | otherwise
   = False
