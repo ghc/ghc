@@ -37,7 +37,7 @@
 #  define DLLIMPORT
 #endif
 
-/* The view of the ghc/includes/ header files differ ever so
+/* The view of the rts/include/ header files differ ever so
    slightly depending on whether the RTS is being compiled
    or not - so we're forced to distinguish between two.
    [oh, you want details :) : Data symbols defined by the RTS

@@ -21,8 +21,8 @@
 #endif
 
 /* select and supporting types is not Posix */
-/* #include "rts/PosixSource.h" */
-#include "Rts.h"
+/* #include <rts/PosixSource.h> */
+#include <Rts.h>
 #include <limits.h>
 #include <stdbool.h>
 #include "HsBase.h"

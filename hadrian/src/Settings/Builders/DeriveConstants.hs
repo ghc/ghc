@@ -42,7 +42,7 @@ includeCcArgs = do
             , getSettingList $ ConfCcArgs Stage1
             , flag GhcUnregisterised ? arg "-DUSE_MINIINTERPRETER"
             , arg "-Irts"
-            , arg "-Iincludes"
+            , arg "-Irts/include"
             , arg $ "-I" ++ libPath
             , notM targetSupportsSMP ? arg "-DNOSMP"
             , arg "-fcommon" ]

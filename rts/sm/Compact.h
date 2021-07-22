@@ -48,7 +48,7 @@
    where we allocate single-word heap objects (e.g. a non-top-level FUN with
    empty payload) we add one non-pointer field to the payload so that the object
    will have two words. The minimum amount of words in the payload is defined in
-   includes/rts/Constants.h as MIN_PAYLOAD_SIZE.
+   rts/include/rts/Constants.h as MIN_PAYLOAD_SIZE.
 
    (See also !1701 where we discussed lifting this restriction and allocating
    two bits per object)

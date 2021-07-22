@@ -570,7 +570,7 @@ threadStatus (ThreadId t) = IO $ \s ->
    case threadStatus# t s of
     (# s', stat, _cap, _locked #) -> (# s', mk_stat (I# stat) #)
    where
-        -- NB. keep these in sync with includes/rts/Constants.h
+        -- NB. keep these in sync with rts/include/rts/Constants.h
      mk_stat 0  = ThreadRunning
      mk_stat 1  = ThreadBlocked BlockedOnMVar
      mk_stat 2  = ThreadBlocked BlockedOnBlackHole

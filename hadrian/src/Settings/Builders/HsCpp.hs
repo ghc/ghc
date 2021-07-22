@@ -10,7 +10,7 @@ hsCppBuilderArgs = builder HsCpp ? do
     libPath <- expr $ stageLibPath stage
     mconcat [ getSettingList HsCppArgs
             , arg "-P"
-            , arg "-Iincludes"
+            , arg "-Irts/include"
             , arg $ "-I" ++ libPath
             , arg $ "-I" ++ ghcPath
             , arg "-x", arg "c"

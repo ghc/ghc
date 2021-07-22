@@ -13,13 +13,13 @@
 [RTS-like things]
 /rts/                             @bgamari @simonmar @osa1 @Phyx @angerman
 /rts/linker/                      @angerman @Phyx @simonmar
-/includes/                        @bgamari @simonmar @osa1
+/rts/include/                     @bgamari @simonmar @osa1
 
 [RTS heap profiling]
 /docs/users_guide/profiling.rst   @DanielG
-/includes/rts/ProfHeap.h          @DanielG
-/includes/rts/TraverseHeap.h      @DanielG
-/includes/rts/storage/ClosureMacros.h @DanielG
+/rts/include/rts/ProfHeap.h        @DanielG
+/rts/include/rts/TraverseHeap.h    @DanielG
+/rts/include/rts/storage/ClosureMacros.h @DanielG
 /rts/LdvProfile*                  @DanielG
 /rts/ProfHeap*                    @DanielG
 /rts/Retainer*                    @DanielG

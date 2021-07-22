@@ -622,7 +622,7 @@ extern StgWord      CCS_SYSTEM[];
 // scope and must match prototype assumed by
 //    'GHC.StgToCmm.Prof'
 // as opposed to real prototype declared in
-//    'includes/rts/prof/CCS.h'
+//    'rts/include/rts/prof/CCS.h'
 void enterFunCCS (void *reg, void *ccsfn);
 void * pushCostCentre (void *ccs, void *cc);
 

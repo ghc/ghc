@@ -98,7 +98,7 @@ areBoxesEqual (Box a) (Box b) = case reallyUnsafePtrEqualityUpToTag# a b of
 type Closure = GenClosure Box
 
 -- | This is the representation of a Haskell value on the heap. It reflects
--- <https://gitlab.haskell.org/ghc/ghc/blob/master/includes/rts/storage/Closures.h>
+-- <https://gitlab.haskell.org/ghc/ghc/blob/master/rts/include/rts/storage/Closures.h>
 --
 -- The data type is parametrized by `b`: the type to store references in.
 -- Usually this is a 'Box' with the type synonym 'Closure'.

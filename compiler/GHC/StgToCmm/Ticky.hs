@@ -29,12 +29,12 @@ Some of the relevant source files:
   * GHC.Cmm.Parser expands some macros using generators defined in
     this module
 
-  * includes/stg/Ticky.h declares all of the global counters
+  * rts/include/stg/Ticky.h declares all of the global counters
 
-  * includes/rts/Ticky.h declares the C data type for an
+  * rts/include/rts/Ticky.h declares the C data type for an
     STG-declaration's counters
 
-  * some macros defined in includes/Cmm.h (and used within the RTS's
+  * some macros defined in rts/include/Cmm.h (and used within the RTS's
     CMM code) update the global ticky counters
 
   * at the end of execution rts/Ticky.c generates the final report
@@ -247,7 +247,7 @@ emitTickyCounter cloType name args
         ; fun_descr_lit <- newStringCLit $ renderWithContext ctx ppr_for_ticky_name
         ; arg_descr_lit <- newStringCLit $ map (showTypeCategory . idType . fromNonVoid) args
         ; emitDataLits ctr_lbl
-        -- Must match layout of includes/rts/Ticky.h's StgEntCounter
+        -- Must match layout of rts/include/rts/Ticky.h's StgEntCounter
         --
         -- krc: note that all the fields are I32 now; some were I16
         -- before, but the code generator wasn't handling that

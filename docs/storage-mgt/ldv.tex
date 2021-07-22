@@ -100,7 +100,7 @@ all events associated with any closures and update necessary information.
 
 All events associated with closures are handled by one of the three 
 macros defined
-in @includes/StgLdv.h@: @LDV_recordCreate()@, @LDV_recordUse()@, and 
+in @rts/include/StgLdv.h@: @LDV_recordCreate()@, @LDV_recordUse()@, and 
 @LDV_recordDead()@.
 
 \begin{itemize}
@@ -145,10 +145,10 @@ typedef struct {
 \end{code}
 For instance, the LDV word of a closure @c@ can now be accessed with 
 @c->header.prof.hp.ldvw@ (or by @LDVW(c)@ where @LDVW()@ is a macro in 
-@includes/StgLdvProf.h@).
+@rts/include/StgLdvProf.h@).
 
 An LDV word is divided into three fields, whose position is specified
-by three constants in @includes/StgLdvProf.h@:
+by three constants in @rts/include/StgLdvProf.h@:
 \begin{itemize}
 \item{@LDV_STATE_MASK@} corresponds to the state flag. 
 \item{@LDV_CREATE_MASK@} corresponds to the creation time.
@@ -163,7 +163,7 @@ The creation time field and the most recent use time field can be set only by th
 macros @LDV_recordCreate()@ and @LDV_recordUse()@. 
 @LDV_recordCreate()@ must be called whenever a new dynamic closure is created,
 and this is handily accomplished by rewriting the macro @SET_PROF_HDR()@ 
-(in @includes/ClosureMacros.h@) (we do not need to change @SET_STATIC_PROF_HDR()@
+(in @rts/include/ClosureMacros.h@) (we do not need to change @SET_STATIC_PROF_HDR()@
 because static closures are not involved in LDVU profiling at all):
 
 \begin{code}
@@ -388,7 +388,7 @@ There are four cases in which a closure is destroyed:
 
 \begin{enumerate}
 \item A closure is overwritten with a blackhole: 
-  @UPD_BH_UPDATABLE()@ in @includes/StgMacros.h@,
+  @UPD_BH_UPDATABLE()@ in @rts/include/StgMacros.h@,
   @threadLazyBlackHole()@ and @threadSqueezeStack()@ in @GC.c@,
   the entry code for @BLACKHOLE@ closures in @StgMiscClosures.hc@ (a 
   @BLACKHOLE@ closure is changed into a @BLACKHOLE_BQ@ closure).
@@ -500,7 +500,7 @@ size, we invoke @LDV_recordDead_FILL_SLOP_DYNAMIC()@ only from:
 \item @threadLazyBlackHole()@ and @threadSqueezeStack()@ in @GC.c@
 (for lazy blackholing),
 \item @UPD_BH_UPDATABLE()@ in
-@includes/StgMacros.h@ (for eager blackholing, which isn't the
+@rts/include/StgMacros.h@ (for eager blackholing, which isn't the
 default),
 \item @updateWithIndirection()@ and @updateWithPermIndirection()@ 
 in @Storage.h@.\footnote{Actually slop words created in 
@@ -538,7 +538,7 @@ and no assumptions made upon LDVU profiling hold any longer.
 In order to yield correct LDVU profiling results, we must make sure
 that @LDV_recordUse()@ be called on a closure whenever it is used;
 otherwise, most of closures would be reported to be in the void phase.
-@includes/StgLdvProf.h@ provides an entry macro @LDV_ENTER@ which
+@rts/include/StgLdvProf.h@ provides an entry macro @LDV_ENTER@ which
 expands to @LDV_recordUse()@.  The compiler arranges to invoke
 @LDV_ENTER@ in the entry code for every dynamic closure it generates
 code for (constructors, thunks and functions).  We also have to add
@@ -629,10 +629,10 @@ are almost the same, though.
 
 This section gives a summary of changes made to the GHC in 
 implementing LDVU profiling.
-Only three files (@includes/StgLdvProf.h@, @LdvProfile.c@, and 
+Only three files (@rts/include/StgLdvProf.h@, @LdvProfile.c@, and 
 @LdvProfile.h@) are new, and all others exist in the GHC.
 
-@\includes@ directory:
+@\rts\include@ directory:
 
 \begin{description}
 \item[StgLdvProf.h] defines type @LdvGenInfo@, constants, and macros related

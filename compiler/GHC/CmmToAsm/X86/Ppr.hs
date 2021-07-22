@@ -555,7 +555,7 @@ pprDataItem config lit
                   -- to 32-bit offset fields and modify the RTS
                   -- appropriately
                   --
-                  -- See Note [x86-64-relative] in includes/rts/storage/InfoTables.h
+                  -- See Note [x86-64-relative] in rts/include/rts/storage/InfoTables.h
                   --
                   case lit of
                   -- A relative relocation:

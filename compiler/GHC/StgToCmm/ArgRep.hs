@@ -120,11 +120,11 @@ idArgRep platform = toArgRep platform . idPrimRep
 --  * GHC.StgToCmm.Layout.stdPattern maybe to some degree?
 --
 --  * the RTS_RET(stg_ap_*) and RTS_FUN_DECL(stg_ap_*_fast)
---  declarations in includes/stg/MiscClosures.h
+--  declarations in rts/include/stg/MiscClosures.h
 --
---  * the SLOW_CALL_*_ctr declarations in includes/stg/Ticky.h,
+--  * the SLOW_CALL_*_ctr declarations in rts/include/stg/Ticky.h,
 --
---  * the TICK_SLOW_CALL_*() #defines in includes/Cmm.h,
+--  * the TICK_SLOW_CALL_*() #defines in rts/include/Cmm.h,
 --
 --  * the PR_CTR(SLOW_CALL_*_ctr) calls in rts/Ticky.c,
 --

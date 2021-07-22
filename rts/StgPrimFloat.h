@@ -16,6 +16,6 @@ void      __decodeDouble_2Int (I_ *man_sign, W_ *man_high, W_ *man_low, I_ *exp,
 void      __decodeFloat_Int (I_ *man, I_ *exp, StgFloat flt);
 
 // __{int,word}_encode{Float,Double} are public, declared in
-// includes/rts/PrimFloat.h.
+// rts/include/rts/PrimFloat.h.
 
 #include "EndPrivate.h"

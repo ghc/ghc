@@ -4,7 +4,7 @@ include $(TOP)/mk/test.mk
 
 # pass -dead_strip to the linker.
 HCFLAGS = -O2 -fllvm
-HCINC = $(TOP)/../includes
+HCINC = $(TOP)/../rts/include
 
 .PHONY: subsections_via_symbols
 subsections_via_symbols:

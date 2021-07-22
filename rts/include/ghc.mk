@@ -13,24 +13,24 @@
 #
 # Header files built from the configure script's findings
 #
-includes_0_H_CONFIG   = includes/dist/build/ghcautoconf.h
-includes_1_H_CONFIG   = includes/dist-install/build/ghcautoconf.h
+includes_0_H_CONFIG   = rts/include/dist/build/ghcautoconf.h
+includes_1_H_CONFIG   = rts/include/dist-install/build/ghcautoconf.h
 includes_2_H_CONFIG   = $(includes_1_H_CONFIG)
 
-includes_0_H_PLATFORM = includes/dist/build/ghcplatform.h
-includes_1_H_PLATFORM = includes/dist-install/build/ghcplatform.h
+includes_0_H_PLATFORM = rts/include/dist/build/ghcplatform.h
+includes_1_H_PLATFORM = rts/include/dist-install/build/ghcplatform.h
 includes_2_H_PLATFORM = $(includes_1_H_PLATFORM)
 
-includes_0_H_VERSION  = includes/dist/build/ghcversion.h
-includes_1_H_VERSION  = includes/dist-install/build/ghcversion.h
+includes_0_H_VERSION  = rts/include/dist/build/ghcversion.h
+includes_1_H_VERSION  = rts/include/dist-install/build/ghcversion.h
 includes_2_H_VERSION  = $(includes_1_H_VERSION)
 
-BUILD_0_INCLUDE_DIR = includes/dist/build
-BUILD_1_INCLUDE_DIR = includes/dist-install/build
+BUILD_0_INCLUDE_DIR = rts/include/dist/build
+BUILD_1_INCLUDE_DIR = rts/include/dist-install/build
 BUILD_2_INCLUDE_DIR = $(BUILD_1_INCLUDE_DIR)
 
 #
-# All header files are in includes/{one of these subdirectories}
+# All header files are in rts/include/{one of these subdirectories}
 #
 includes_H_SUBDIRS += .
 includes_H_SUBDIRS += rts
@@ -38,7 +38,7 @@ includes_H_SUBDIRS += rts/prof
 includes_H_SUBDIRS += rts/storage
 includes_H_SUBDIRS += stg
 
-includes_H_FILES := $(wildcard $(patsubst %,includes/%/*.h,$(includes_H_SUBDIRS)))
+includes_H_FILES := $(wildcard $(patsubst %,rts/include/%/*.h,$(includes_H_SUBDIRS)))
 # This isn't necessary, but it makes the paths look a little prettier
 includes_H_FILES := $(subst /./,/,$(includes_H_FILES))
 
@@ -100,7 +100,7 @@ ifneq "$(BINDIST)" "YES"
 
 define includesHeaderConfig
 # $1 = stage
-$$(includes_$1_H_CONFIG) : mk/config.h mk/config.mk includes/ghc.mk | $$$$(dir $$$$@)/.
+$$(includes_$1_H_CONFIG) : mk/config.h mk/config.mk rts/include/ghc.mk | $$$$(dir $$$$@)/.
 	$$(call removeFiles,$$@)
 	@echo "Creating $$@..."
 	@echo "#if !defined(__GHCAUTOCONF_H__)"  > $$@
@@ -153,7 +153,7 @@ HostVendor_2_CPP = $(TargetVendor_CPP)
 
 define includesHeaderPlatform
 # $1 = stage
-$$(includes_$1_H_PLATFORM) : includes/ghc.mk includes/Makefile | $$$$(dir $$$$@)/.
+$$(includes_$1_H_PLATFORM) : rts/include/ghc.mk rts/include/Makefile | $$$$(dir $$$$@)/.
 	$$(call removeFiles,$$@)
 	@echo "Creating $$@..."
 	@echo "#if !defined(__GHCPLATFORM_H__)"                      > $$@
@@ -205,9 +205,9 @@ $(eval $(call includesHeaderPlatform,1))
 # rebuilds.
 # See Note [tooldir: How GHC finds mingw on Windows]
 
-includes_SETTINGS = includes/dist/build/settings
+includes_SETTINGS = rts/include/dist/build/settings
 
-$(includes_SETTINGS) : includes/Makefile | $$(dir $$@)/.
+$(includes_SETTINGS) : rts/include/Makefile | $$(dir $$@)/.
 	$(call removeFiles,$@)
 	@echo '[("GCC extra via C opts", "$(GccExtraViaCOpts)")' >> $@
 	@echo ',("C compiler command", "$(SettingsCCompilerCommand)")' >> $@
@@ -266,25 +266,21 @@ $(includes_SETTINGS) : includes/Makefile | $$(dir $$@)/.
 # ---------------------------------------------------------------------------
 # Make DerivedConstants.h for the compiler
 
-includes_DERIVEDCONSTANTS = includes/dist-derivedconstants/header/DerivedConstants.h
-includes_GHCCONSTANTS_HASKELL_TYPE = includes/dist-derivedconstants/header/GHCConstantsHaskellType.hs
+includes_DERIVEDCONSTANTS = rts/include/dist-derivedconstants/header/DerivedConstants.h
 
-DERIVE_CONSTANTS_FLAGS += --gcc-program "$(CC)"
-DERIVE_CONSTANTS_FLAGS += $(addprefix --gcc-flag$(space),$(includes_CC_OPTS) -fcommon)
-DERIVE_CONSTANTS_FLAGS += --nm-program "$(NM)"
+DERIVE_CONSTANTS_FLAGS_FOR_HEADER += --gcc-program "$(CC)"
+DERIVE_CONSTANTS_FLAGS_FOR_HEADER += $(addprefix --gcc-flag$(space),$(includes_CC_OPTS) -fcommon)
+DERIVE_CONSTANTS_FLAGS_FOR_HEADER += --nm-program "$(NM)"
 ifneq "$(OBJDUMP)" ""
-DERIVE_CONSTANTS_FLAGS += --objdump-program "$(OBJDUMP)"
+DERIVE_CONSTANTS_FLAGS_FOR_HEADER += --objdump-program "$(OBJDUMP)"
 endif
-DERIVE_CONSTANTS_FLAGS += --target-os "$(TargetOS_CPP)"
+DERIVE_CONSTANTS_FLAGS_FOR_HEADER += --target-os "$(TargetOS_CPP)"
 
 ifneq "$(BINDIST)" "YES"
 $(includes_DERIVEDCONSTANTS):           $$(includes_H_FILES) $$(rts_H_FILES)
 
 $(includes_DERIVEDCONSTANTS): $(deriveConstants_INPLACE) $(includes_1_H_CONFIG) $(includes_1_H_PLATFORM) | $$(dir $$@)/.
-	$< --gen-header -o $@ --tmpdir $(dir $@) $(DERIVE_CONSTANTS_FLAGS)
-
-$(includes_GHCCONSTANTS_HASKELL_TYPE): $(deriveConstants_INPLACE) | $$(dir $$@)/.
-	$< --gen-haskell-type -o $@ --tmpdir $(dir $@) $(DERIVE_CONSTANTS_FLAGS)
+	$< --gen-header -o $@ --tmpdir $(dir $@) $(DERIVE_CONSTANTS_FLAGS_FOR_HEADER)
 endif
 
 # ---------------------------------------------------------------------------
@@ -297,7 +293,6 @@ $(eval $(call clean-target,includes,,\
 $(eval $(call all-target,includes,\
   $(includes_0_H_CONFIG) $(includes_0_H_PLATFORM) $(includes_0_H_VERSION) \
   $(includes_1_H_CONFIG) $(includes_1_H_PLATFORM) $(includes_1_H_VERSION) \
-  $(includes_GHCCONSTANTS_HASKELL_TYPE) \
   $(includes_DERIVEDCONSTANTS)))
 
 install: install_includes
@@ -307,7 +302,7 @@ install_includes : $(includes_1_H_CONFIG) $(includes_1_H_PLATFORM) $(includes_1_
 	$(INSTALL_DIR) "$(DESTDIR)$(ghcheaderdir)"
 	$(foreach d,$(includes_H_SUBDIRS), \
 	    $(INSTALL_DIR) "$(DESTDIR)$(ghcheaderdir)/$d" && \
-	    $(INSTALL_HEADER) $(INSTALL_OPTS) includes/$d/*.h "$(DESTDIR)$(ghcheaderdir)/$d/" && \
+	    $(INSTALL_HEADER) $(INSTALL_OPTS) rts/include/$d/*.h "$(DESTDIR)$(ghcheaderdir)/$d/" && \
 	) true
 	$(INSTALL_HEADER) $(INSTALL_OPTS) \
 		$(includes_1_H_CONFIG) $(includes_1_H_PLATFORM) $(includes_1_H_VERSION) \

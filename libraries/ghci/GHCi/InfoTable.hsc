@@ -70,7 +70,7 @@ mkJumpToAddr a = case hostPlatformArch of
     ArchSPARC -> pure $
         -- After some consideration, we'll try this, where
         -- 0x55555555 stands in for the address to jump to.
-        -- According to includes/rts/MachRegs.h, %g3 is very
+        -- According to rts/include/rts/MachRegs.h, %g3 is very
         -- likely indeed to be baggable.
         --
         --   0000 07155555              sethi   %hi(0x55555555), %g3

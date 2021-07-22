@@ -10,6 +10,6 @@
 #
 # -----------------------------------------------------------------------------
 
-dir = includes
-TOP = ..
+dir = rts/include
+TOP = ../..
 include $(TOP)/mk/sub-makefile.mk

@@ -187,7 +187,7 @@
 /*
  * Status values for EVENT_STOP_THREAD
  *
- * 1-5 are the StgRun return values (from includes/Constants.h):
+ * 1-5 are the StgRun return values (from rts/include/Constants.h):
  *
  * #define HeapOverflow   1
  * #define StackOverflow  2

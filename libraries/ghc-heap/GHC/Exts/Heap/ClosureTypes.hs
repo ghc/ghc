@@ -12,7 +12,7 @@ import GHC.Generics
 {- ---------------------------------------------
 -- Enum representing closure types
 -- This is a mirror of:
--- includes/rts/storage/ClosureTypes.h
+-- rts/include/rts/storage/ClosureTypes.h
 -- ---------------------------------------------}
 
 data ClosureType

@@ -48,7 +48,7 @@ base :: Action ()
 base = do
   buildDir <- buildRoot
   let stage1Lib    = buildDir </> "stage1/lib"
-  let machDeps     = "includes/MachDeps.h"
+  let machDeps     = "rts/include/MachDeps.h"
   let ghcautoconf  = stage1Lib </> "ghcautoconf.h"
   let ghcplatform  = stage1Lib </> "ghcplatform.h"
   -- ./configure is called here manually because we need to generate
@@ -60,7 +60,7 @@ base = do
   cmd_ (Cwd "libraries/base") "./configure"
   need [ghcautoconf, ghcplatform, machDeps]
   let includeDirs =
-        [ "includes"
+        [ "rts/include"
         , "libraries/base/include"
         , stage1Lib
         ]
@@ -71,14 +71,13 @@ compiler = do
   buildDir <- buildRoot
   let stage1Lib      = buildDir </> "stage1/lib"
   let stage1Compiler = buildDir </> "stage1/compiler/build"
-  let machDeps       = "includes/MachDeps.h"
+  let machDeps       = "rts/include/MachDeps.h"
   let compilerDir    = "compiler"
   let ghcautoconf    = stage1Lib </> "ghcautoconf.h"
   let ghcplatform    = stage1Lib </> "ghcplatform.h"
   need $ mconcat [[ghcautoconf, ghcplatform], hsIncls stage1Compiler, [machDeps]]
   let includeDirs =
-        [ "includes"
-        , stage1Lib
+        [ stage1Lib
         , compilerDir
         , ghcplatform
         , stage1Compiler

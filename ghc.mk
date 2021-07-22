@@ -634,7 +634,7 @@ BUILD_DIRS += driver/ghc
 BUILD_DIRS += driver/haddock
 BUILD_DIRS += libffi
 BUILD_DIRS += utils/deriveConstants
-BUILD_DIRS += includes
+BUILD_DIRS += rts/include
 BUILD_DIRS += rts
 BUILD_DIRS += bindisttest
 BUILD_DIRS += utils/genapply
@@ -1043,7 +1043,7 @@ $(eval $(call bindist-list,.,\
     $(BINDIST_LIBS) \
     $(BINDIST_HI) \
     $(BINDIST_EXTRAS) \
-    includes/Makefile \
+    rts/include/Makefile \
     $(includes_H_FILES) \
     $(includes_1_H_CONFIG) \
     $(includes_1_H_PLATFORM) \
@@ -1331,8 +1331,8 @@ CLEAN_FILES += compiler/ghc.cabal.old
 
 # These are no longer generated, but we still clean them for a while
 # as they may still be in old GHC trees:
-CLEAN_FILES += includes/GHCConstants.h
-CLEAN_FILES += includes/DerivedConstants.h
+CLEAN_FILES += rts/include/GHCConstants.h
+CLEAN_FILES += rts/include/DerivedConstants.h
 $(foreach n,0 1 2, \
     $(foreach h,$(includes_$n_H_CONFIG) $(includes_$n_H_PLATFORM) $(includes_$n_H_VERSION), \
         $(eval CLEAN_FILES += $h)))
@@ -1347,7 +1347,7 @@ clean : clean_files clean_libraries
 clean_files :
 	$(call removeFiles,$(CLEAN_FILES))
 # this is here since CLEAN_FILES can't handle folders
-	$(call removeTrees,includes/dist-derivedconstants)
+	$(call removeTrees,rts/include/dist-derivedconstants)
 	$(call removeTrees,inplace/bin)
 	$(call removeTrees,inplace/lib)
 	$(call removeTrees,libraries/bootstrapping.conf)
@@ -1433,7 +1433,7 @@ distclean : clean
 	$(call removeTrees,bindisttest/a)
 
 # Not sure why this is being cleaned here.
-	$(call removeTrees,includes/dist-derivedconstants)
+	$(call removeTrees,rts/include/dist-derivedconstants)
 
 # Also clean Windows-only inplace directories.
 # Don't delete 'inplace' itself, it contains source files.

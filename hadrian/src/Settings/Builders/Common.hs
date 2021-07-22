@@ -31,7 +31,7 @@ cIncludeArgs = do
     ffiIncludeDir   <- getSetting FfiIncludeDir
     libdwIncludeDir   <- getSetting FfiIncludeDir
     libPath <- expr $ stageLibPath stage
-    mconcat [ notStage0 ||^ package compiler ? arg "-Iincludes"
+    mconcat [ notStage0 ||^ package compiler ? arg "-Irts/include"
             , arg $ "-I" ++ libPath
             , arg $ "-I" ++ path
             , pure . map ("-I"++) . filter (/= "") $ [iconvIncludeDir, gmpIncludeDir]

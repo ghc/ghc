@@ -198,7 +198,7 @@ emitRtsCallGen res lbl args safe
 -- Here we generate the sequence of saves/restores required around a
 -- foreign call instruction.
 
--- TODO: reconcile with includes/Regs.h
+-- TODO: reconcile with rts/include/Regs.h
 --  * Regs.h claims that BaseReg should be saved last and loaded first
 --    * This might not have been tickled before since BaseReg is callee save
 --  * Regs.h saves SparkHd, ParkT1, SparkBase and SparkLim
@@ -206,7 +206,7 @@ emitRtsCallGen res lbl args safe
 -- This code isn't actually used right now, because callerSaves
 -- only ever returns true in the current universe for registers NOT in
 -- system_regs (just do a grep for CALLER_SAVES in
--- includes/stg/MachRegs.h).  It's all one giant no-op, and for
+-- rts/include/stg/MachRegs.h).  It's all one giant no-op, and for
 -- good reason: having to save system registers on every foreign call
 -- would be very expensive, so we avoid assigning them to those
 -- registers when we add support for an architecture.

@@ -50,7 +50,7 @@ import GHC.Utils.Panic
         prepared for any eventuality.
 
         The whole fp-register pairing thing on sparcs is a huge nuisance.  See
-        includes/stg/MachRegs.h for a description of what's going on
+        rts/include/stg/MachRegs.h for a description of what's going on
         here.
 -}
 

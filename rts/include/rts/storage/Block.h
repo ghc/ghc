@@ -11,7 +11,7 @@
 #include "ghcconfig.h"
 
 /* The actual block and megablock-size constants are defined in
- * includes/Constants.h, all constants here are derived from these.
+ * rts/include/Constants.h, all constants here are derived from these.
  */
 
 /* Block related constants (BLOCK_SHIFT is defined in Constants.h) */

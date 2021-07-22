@@ -7,14 +7,14 @@ import Data.Word
 import GHC.Generics
 
 -- | This is a somewhat faithful representation of StgTSOProfInfo. See
--- <https://gitlab.haskell.org/ghc/ghc/blob/master/includes/rts/storage/TSO.h>
+-- <https://gitlab.haskell.org/ghc/ghc/blob/master/rts/include/rts/storage/TSO.h>
 -- for more details on this data structure.
 data StgTSOProfInfo = StgTSOProfInfo {
     cccs :: Maybe CostCentreStack
 } deriving (Show, Generic, Eq, Ord)
 
 -- | This is a somewhat faithful representation of CostCentreStack. See
--- <https://gitlab.haskell.org/ghc/ghc/blob/master/includes/rts/prof/CCS.h>
+-- <https://gitlab.haskell.org/ghc/ghc/blob/master/rts/include/rts/prof/CCS.h>
 -- for more details on this data structure.
 data CostCentreStack = CostCentreStack {
     ccs_ccsID :: Int,
@@ -32,7 +32,7 @@ data CostCentreStack = CostCentreStack {
 } deriving (Show, Generic, Eq, Ord)
 
 -- | This is a somewhat faithful representation of CostCentre. See
--- <https://gitlab.haskell.org/ghc/ghc/blob/master/includes/rts/prof/CCS.h>
+-- <https://gitlab.haskell.org/ghc/ghc/blob/master/rts/include/rts/prof/CCS.h>
 -- for more details on this data structure.
 data CostCentre = CostCentre {
     cc_ccID :: Int,
@@ -46,7 +46,7 @@ data CostCentre = CostCentre {
 } deriving (Show, Generic, Eq, Ord)
 
 -- | This is a somewhat faithful representation of IndexTable. See
--- <https://gitlab.haskell.org/ghc/ghc/blob/master/includes/rts/prof/CCS.h>
+-- <https://gitlab.haskell.org/ghc/ghc/blob/master/rts/include/rts/prof/CCS.h>
 -- for more details on this data structure.
 data IndexTable = IndexTable {
     it_cc :: CostCentre,

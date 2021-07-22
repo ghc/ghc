@@ -620,7 +620,7 @@ objects whose contents can be updated and hence may contain pointers to
 younger generations. 
 Every object in this linked list is a dynamic object residing in the heap 
 and has a structure compatible with @StgMutClosure@.
-The structure @StgMutClosure@ (@includes/Closures.h@) has a field 
+The structure @StgMutClosure@ (@rts/include/Closures.h@) has a field 
 @mut_link@ (called a mutable link field) of type @StgMutClosure *@, which
 points to the next object in this linked list.
 The end mark of this linked list is a pointer to a statically allocated object 
@@ -655,14 +655,14 @@ contain static objects (as opposed to dynamic objects residing in the heap)
 in its list @mut_once_list@. This happens when a static
 thunk, also known as a \emph{constant applicative form} (CAF), is entered.
 When a CAF (corresponding to closure type @THUNK_STATIC@, defined
-in @includes/ClosureTypes.h@) is entered, 
+in @rts/include/ClosureTypes.h@) is entered, 
 it is first put in the list @mut_once_list@ of the oldest generation
 and then overwritten with an appropriate static indirection object 
 (corresponding to closure type @IND_STATIC@).\footnote{Actually a static 
 indirection object does not have a @mut\_link@ field.
 We use its @static\_link@ field as a substitute for @mut\_link@.
 See the structure @StgIndStatic@ in @include/Closures.h@.}\footnote{For
-details of this operation, see the macro @UPD\_CAF()@ in @includes/Updates.h@}
+details of this operation, see the macro @UPD\_CAF()@ in @rts/include/Updates.h@}
 If the CAF is dynamically loaded (e.g., in an interactive environment), it is 
 instead put in a separate linked list @caf_list@ 
 (declared in @Storage.c@). 

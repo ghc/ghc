@@ -253,10 +253,10 @@ INLINE_HEADER void releaseCapability_ (Capability* cap STG_UNUSED,
                                        bool always_wakeup STG_UNUSED) {};
 #endif
 
-// declared in includes/rts/Threads.h:
+// declared in rts/include/rts/Threads.h:
 // extern Capability MainCapability;
 
-// declared in includes/rts/Threads.h:
+// declared in rts/include/rts/Threads.h:
 // extern uint32_t n_capabilities;
 // extern uint32_t enabled_capabilities;
 

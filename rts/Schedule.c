@@ -2621,7 +2621,7 @@ scheduleThreadOn(Capability *cap, StgWord cpu USED_IF_THREADS, StgTSO *tso)
 #endif
 }
 
-// See includes/rts/Threads.h
+// See rts/include/rts/Threads.h
 void
 scheduleWaitThread (StgTSO* tso, /*[out]*/HaskellObj* ret, Capability **pcap)
 {

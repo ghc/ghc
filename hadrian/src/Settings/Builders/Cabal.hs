@@ -113,8 +113,7 @@ configureArgs = do
                            , arg $ "-I" ++ libPath
                            -- See https://github.com/snowleopard/hadrian/issues/523
                            , arg $ "-iquote"
-                           , arg $ top -/- pkgPath pkg
-                           , arg $ "-I" ++ top -/- "includes" ]
+                           , arg $ top -/- pkgPath pkg ]
         ldFlags  = ldArgs  <> (getStagedSettingList ConfGccLinkerArgs)
         cppFlags = cppArgs <> (getStagedSettingList ConfCppArgs)
     cldFlags <- unwords <$> (cFlags <> ldFlags)
