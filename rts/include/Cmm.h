@@ -600,9 +600,9 @@
     W_[p] = value
 
 #define ACQUIRE_LOAD_WORD(out, p) \
-    out = W_[p]; \
+    prim_read_barrier \
     TSAN_ACQUIRE(p); \
-    prim_read_barrier
+    out = W_[p];
 
 /* Getting/setting the info pointer of a closure */
 #define SET_INFO(p,info) StgHeader_info(p) = info
