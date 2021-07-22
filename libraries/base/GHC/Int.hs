@@ -44,9 +44,11 @@ import Data.Maybe
 
 #if WORD_SIZE_IN_BITS < 64
 import GHC.Prim
+import GHC.Base
+#else
+import GHC.Base hiding (uncheckedIShiftL64#, uncheckedIShiftRA64#)
 #endif
 
-import GHC.Base
 import GHC.Enum
 import GHC.Num
 import GHC.Real

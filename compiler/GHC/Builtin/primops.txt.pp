@@ -626,7 +626,6 @@ primop Word32LeOp "leWord32#" Compare Word32# -> Word32# -> Int#
 primop Word32LtOp "ltWord32#" Compare Word32# -> Word32# -> Int#
 primop Word32NeOp "neWord32#" Compare Word32# -> Word32# -> Int#
 
-#if WORD_SIZE_IN_BITS < 64
 ------------------------------------------------------------------------
 section "Int64#"
         {Operations on 64-bit unsigned words. This type is only used
@@ -726,8 +725,6 @@ primop Word64GtOp "gtWord64#" Compare Word64# -> Word64# -> Int#
 primop Word64LeOp "leWord64#" Compare Word64# -> Word64# -> Int#
 primop Word64LtOp "ltWord64#" Compare Word64# -> Word64# -> Int#
 primop Word64NeOp "neWord64#" Compare Word64# -> Word64# -> Int#
-
-#endif
 
 ------------------------------------------------------------------------
 section "Int#"

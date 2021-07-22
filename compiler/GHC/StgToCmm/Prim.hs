@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
@@ -15,8 +14,6 @@ module GHC.StgToCmm.Prim (
    cgOpApp,
    shouldInlinePrimOp
  ) where
-
-#include "MachDeps.h"
 
 import GHC.Prelude hiding ((<*>))
 
@@ -1100,10 +1097,8 @@ emitPrimOp dflags primop = case primop of
   Word16ToInt16Op -> \args -> opNop args
   Int32ToWord32Op -> \args -> opNop args
   Word32ToInt32Op -> \args -> opNop args
-#if WORD_SIZE_IN_BITS < 64
   Int64ToWord64Op -> \args -> opNop args
   Word64ToInt64Op -> \args -> opNop args
-#endif
   IntToWordOp     -> \args -> opNop args
   WordToIntOp     -> \args -> opNop args
   IntToAddrOp     -> \args -> opNop args
@@ -1356,7 +1351,6 @@ emitPrimOp dflags primop = case primop of
   Word32LtOp     -> \args -> opTranslate args (MO_U_Lt W32)
   Word32NeOp     -> \args -> opTranslate args (MO_Ne W32)
 
-#if WORD_SIZE_IN_BITS < 64
 -- Int64# signed ops
 
   Int64ToIntOp   -> \args -> opTranslate64 args (\w -> MO_SS_Conv w (wordWidth platform)) MO_I64_ToI
@@ -1402,7 +1396,6 @@ emitPrimOp dflags primop = case primop of
   Word64LeOp     -> \args -> opTranslate64 args MO_U_Le   MO_W64_Le
   Word64LtOp     -> \args -> opTranslate64 args MO_U_Lt   MO_W64_Lt
   Word64NeOp     -> \args -> opTranslate64 args MO_Ne     MO_x64_Ne
-#endif
 
 -- Char# ops
 
@@ -1707,7 +1700,6 @@ emitPrimOp dflags primop = case primop of
     let stmt = mkAssign (CmmLocal res) (CmmMachOp mop args)
     emit stmt
 
-#if WORD_SIZE_IN_BITS < 64
   opTranslate64
     :: [CmmExpr]
     -> (Width -> MachOp)
@@ -1717,7 +1709,6 @@ emitPrimOp dflags primop = case primop of
     case platformWordSize platform of
       PW4 -> opCallish args callish
       PW8 -> opTranslate args $ mkMop W64
-#endif
 
   -- | Basically a "manual" case, rather than one of the common repetitive forms
   -- above. The results are a parameter to the returned function so we know the

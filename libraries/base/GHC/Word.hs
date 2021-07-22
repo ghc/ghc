@@ -50,9 +50,11 @@ import Data.Maybe
 
 #if WORD_SIZE_IN_BITS < 64
 import GHC.Prim
+import GHC.Base
+#else
+import GHC.Base hiding (uncheckedShiftL64#, uncheckedShiftRL64#)
 #endif
 
-import GHC.Base
 import GHC.Bits
 import GHC.Enum
 import GHC.Num

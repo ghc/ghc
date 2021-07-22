@@ -9,7 +9,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE CPP #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -39,8 +38,6 @@ module GHC.Tc.Deriv.Generate (
 
         getPossibleDataCons, tyConInstArgTys
     ) where
-
-#include "MachDeps.h"
 
 import GHC.Prelude
 

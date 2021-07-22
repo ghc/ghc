@@ -10,7 +10,6 @@ ToDo:
    (i1 + i2) only if it results in a valid Float.
 -}
 
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE LambdaCase #-}
@@ -30,8 +29,6 @@ module GHC.Core.Opt.ConstantFold
    , caseRules
    )
 where
-
-#include "MachDeps.h"
 
 import GHC.Prelude
 
@@ -317,7 +314,6 @@ primOpRules nm = \case
    Word32SllOp -> mkPrimOpRule nm 2 [ shiftRule LitNumWord32 (const shiftL) ]
    Word32SrlOp -> mkPrimOpRule nm 2 [ shiftRule LitNumWord32 $ const $ shiftRightLogical @Word32 ]
 
-#if WORD_SIZE_IN_BITS < 64
    -- Int64 operations
    Int64AddOp  -> mkPrimOpRule nm 2 [ binaryLit (int64Op2 (+))
                                     , identity zeroI64
@@ -387,7 +383,6 @@ primOpRules nm = \case
                                     , semiInversePrimOp Word64NotOp ]
    Word64SllOp -> mkPrimOpRule nm 2 [ shiftRule LitNumWord64 (const shiftL) ]
    Word64SrlOp -> mkPrimOpRule nm 2 [ shiftRule LitNumWord64 $ const $ shiftRightLogical @Word64 ]
-#endif
 
    -- Int operations
    IntAddOp    -> mkPrimOpRule nm 2 [ binaryLit (intOp2 (+))
@@ -489,9 +484,7 @@ primOpRules nm = \case
    Int8ToIntOp    -> mkPrimOpRule nm 1 [ liftLitPlatform extendIntLit ]
    Int16ToIntOp   -> mkPrimOpRule nm 1 [ liftLitPlatform extendIntLit ]
    Int32ToIntOp   -> mkPrimOpRule nm 1 [ liftLitPlatform extendIntLit ]
-#if WORD_SIZE_IN_BITS < 64
    Int64ToIntOp   -> mkPrimOpRule nm 1 [ liftLitPlatform extendIntLit ]
-#endif
    IntToInt8Op    -> mkPrimOpRule nm 1 [ liftLit narrowInt8Lit
                                        , semiInversePrimOp Int8ToIntOp
                                        , narrowSubsumesAnd IntAndOp IntToInt8Op 8 ]
@@ -501,9 +494,7 @@ primOpRules nm = \case
    IntToInt32Op   -> mkPrimOpRule nm 1 [ liftLit narrowInt32Lit
                                        , semiInversePrimOp Int32ToIntOp
                                        , narrowSubsumesAnd IntAndOp IntToInt32Op 32 ]
-#if WORD_SIZE_IN_BITS < 64
    IntToInt64Op   -> mkPrimOpRule nm 1 [ liftLit narrowInt64Lit ]
-#endif
 
    Word8ToWordOp  -> mkPrimOpRule nm 1 [ liftLitPlatform extendWordLit
                                        , extendNarrowPassthrough WordToWord8Op 0xFF
@@ -514,9 +505,7 @@ primOpRules nm = \case
    Word32ToWordOp -> mkPrimOpRule nm 1 [ liftLitPlatform extendWordLit
                                        , extendNarrowPassthrough WordToWord32Op 0xFFFFFFFF
                                        ]
-#if WORD_SIZE_IN_BITS < 64
    Word64ToWordOp -> mkPrimOpRule nm 1 [ liftLitPlatform extendWordLit ]
-#endif
 
    WordToWord8Op  -> mkPrimOpRule nm 1 [ liftLit narrowWord8Lit
                                        , semiInversePrimOp Word8ToWordOp
@@ -527,9 +516,7 @@ primOpRules nm = \case
    WordToWord32Op -> mkPrimOpRule nm 1 [ liftLit narrowWord32Lit
                                        , semiInversePrimOp Word32ToWordOp
                                        , narrowSubsumesAnd WordAndOp WordToWord32Op 32 ]
-#if WORD_SIZE_IN_BITS < 64
    WordToWord64Op -> mkPrimOpRule nm 1 [ liftLit narrowWord64Lit ]
-#endif
 
    Word8ToInt8Op  -> mkPrimOpRule nm 1 [ liftLitPlatform (litNumCoerce LitNumInt8)
                                        , semiInversePrimOp Int8ToWord8Op ]
@@ -543,12 +530,10 @@ primOpRules nm = \case
                                        , semiInversePrimOp Int32ToWord32Op ]
    Int32ToWord32Op-> mkPrimOpRule nm 1 [ liftLitPlatform (litNumCoerce LitNumWord32)
                                        , semiInversePrimOp Word32ToInt32Op ]
-#if WORD_SIZE_IN_BITS < 64
    Word64ToInt64Op-> mkPrimOpRule nm 1 [ liftLitPlatform (litNumCoerce LitNumInt64)
                                        , semiInversePrimOp Int64ToWord64Op ]
    Int64ToWord64Op-> mkPrimOpRule nm 1 [ liftLitPlatform (litNumCoerce LitNumWord64)
                                        , semiInversePrimOp Word64ToInt64Op ]
-#endif
 
    WordToIntOp    -> mkPrimOpRule nm 1 [ liftLitPlatform (litNumCoerce LitNumInt)
                                        , semiInversePrimOp IntToWordOp ]
@@ -817,13 +802,11 @@ oneI32  = mkLitInt32  1
 zeroW32 = mkLitWord32 0
 oneW32  = mkLitWord32 1
 
-#if WORD_SIZE_IN_BITS < 64
 zeroI64, oneI64, zeroW64, oneW64 :: Literal
 zeroI64 = mkLitInt64  0
 oneI64  = mkLitInt64  1
 zeroW64 = mkLitWord64 0
 oneW64  = mkLitWord64 1
-#endif
 
 zerof, onef, twof, zerod, oned, twod :: Literal
 zerof = mkLitFloat 0.0
@@ -890,7 +873,6 @@ int32Op2 op _ (LitNumber LitNumInt32 i1) (LitNumber LitNumInt32 i2) =
   int32Result (fromInteger i1 `op` fromInteger i2)
 int32Op2 _ _ _ _ = Nothing
 
-#if WORD_SIZE_IN_BITS < 64
 int64Op2
   :: (Integral a, Integral b)
   => (a -> b -> Integer)
@@ -898,7 +880,6 @@ int64Op2
 int64Op2 op _ (LitNumber LitNumInt64 i1) (LitNumber LitNumInt64 i2) =
   int64Result (fromInteger i1 `op` fromInteger i2)
 int64Op2 _ _ _ _ = Nothing
-#endif
 
 intOp2 :: (Integral a, Integral b)
        => (a -> b -> Integer)
@@ -968,7 +949,6 @@ word32Op2 op _ (LitNumber LitNumWord32 i1) (LitNumber LitNumWord32 i2) =
   word32Result (fromInteger i1 `op` fromInteger i2)
 word32Op2 _ _ _ _ = Nothing
 
-#if WORD_SIZE_IN_BITS < 64
 word64Op2
   :: (Integral a, Integral b)
   => (a -> b -> Integer)
@@ -976,7 +956,6 @@ word64Op2
 word64Op2 op _ (LitNumber LitNumWord64 i1) (LitNumber LitNumWord64 i2) =
   word64Result (fromInteger i1 `op` fromInteger i2)
 word64Op2 _ _ _ _ = Nothing
-#endif
 
 wordOp2 :: (Integral a, Integral b)
         => (a -> b -> Integer)
@@ -1218,7 +1197,6 @@ wordCResult platform result = Just (mkPair [Lit lit, Lit c])
     (lit, b) = mkLitWordWrapC platform result
     c = if b then onei platform else zeroi platform
 
-#if WORD_SIZE_IN_BITS < 64
 int64Result :: Integer -> Maybe CoreExpr
 int64Result result = Just (int64Result' result)
 
@@ -1230,7 +1208,6 @@ word64Result result = Just (word64Result' result)
 
 word64Result' :: Integer -> CoreExpr
 word64Result' result = Lit (mkLitWord64Wrap result)
-#endif
 
 
 -- | 'ambiant (primop x) = x', but not nececesarily 'primop (ambient x) = x'.
@@ -2118,7 +2095,6 @@ builtinBignumRules =
   , small_passthrough_app "Word# -> Natural -> Double#"
         naturalNSName naturalToDoubleName (mkPrimOpId WordToDoubleOp)
 
-#if WORD_SIZE_IN_BITS < 64
   , small_passthrough_id "Int64# -> Integer -> Int64#"
       integerFromInt64Name integerToInt64Name
   , small_passthrough_id "Word64# -> Integer -> Word64#"
@@ -2150,7 +2126,6 @@ builtinBignumRules =
   , small_passthrough_custom "Int64# -> Integer -> Word#"
         integerFromInt64Name integerToWordName
           (\x -> Var (mkPrimOpId IntToWordOp) `App` (Var (mkPrimOpId Int64ToIntOp) `App` x))
-#endif
 
     -- Bits.bit
   , bignum_bit "integerBit" integerBitName mkLitInteger
@@ -3057,7 +3032,6 @@ word32Ops = NumOps
    , numLitType = LitNumWord32
    }
 
-#if WORD_SIZE_IN_BITS < 64
 int64Ops :: NumOps
 int64Ops = NumOps
    { numAdd     = Int64AddOp
@@ -3073,7 +3047,6 @@ word64Ops = NumOps
    , numMul     = Word64MulOp
    , numLitType = LitNumWord64
    }
-#endif
 
 intOps :: NumOps
 intOps = NumOps
