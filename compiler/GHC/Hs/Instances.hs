@@ -415,6 +415,9 @@ deriving instance Data (HsOverLit GhcPs)
 deriving instance Data (HsOverLit GhcRn)
 deriving instance Data (HsOverLit GhcTc)
 
+deriving instance Data OverLitRn
+deriving instance Data OverLitTc
+
 -- ---------------------------------------------------------------------
 -- Data derivations from GHC.Hs.Pat ------------------------------------
 

@@ -1,5 +1,6 @@
 
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE DisambiguateRecordFields #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
@@ -677,8 +678,8 @@ newNonTrivialOverloadedLit :: HsOverLit GhcRn
                            -> ExpRhoType
                            -> TcM (HsOverLit GhcTc)
 newNonTrivialOverloadedLit
-  lit@(OverLit { ol_val = val, ol_witness = HsVar _ (L _ meth_name)
-               , ol_ext = rebindable }) res_ty
+  lit@(OverLit { ol_val = val, ol_ext = OverLitRn rebindable (L _ meth_name) })
+  res_ty
   = do  { hs_lit <- mkOverLit val
         ; let lit_ty = hsLitType hs_lit
         ; (_, fi') <- tcSyntaxOp orig (mkRnSyntaxExpr meth_name)
@@ -686,13 +687,11 @@ newNonTrivialOverloadedLit
                       \_ _ -> return ()
         ; let L _ witness = nlHsSyntaxApps fi' [nlHsLit hs_lit]
         ; res_ty <- readExpType res_ty
-        ; return (lit { ol_witness = witness
-                      , ol_ext = OverLitTc rebindable res_ty }) }
+        ; return (lit { ol_ext = OverLitTc { ol_rebindable = rebindable
+                                           , ol_witness = witness
+                                           , ol_type = res_ty } }) }
   where
     orig = LiteralOrigin lit
-
-newNonTrivialOverloadedLit lit _
-  = pprPanic "newNonTrivialOverloadedLit" (ppr lit)
 
 ------------
 mkOverLit ::OverLitVal -> TcM (HsLit GhcTc)

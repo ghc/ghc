@@ -20,7 +20,6 @@ module Language.Haskell.Syntax.Lit where
 
 import GHC.Prelude
 
-import {-# SOURCE #-} Language.Haskell.Syntax.Expr ( HsExpr )
 import GHC.Types.Basic (PprPrec(..), topPrec )
 import GHC.Types.SourceText
 import GHC.Core.Type
@@ -100,8 +99,7 @@ instance Eq (HsLit x) where
 data HsOverLit p
   = OverLit {
       ol_ext :: (XOverLit p),
-      ol_val :: OverLitVal,
-      ol_witness :: HsExpr p}         -- Note [Overloaded literal witnesses]
+      ol_val :: OverLitVal}
 
   | XOverLit
       !(XXOverLit p)
@@ -120,28 +118,11 @@ negateOverLitVal (HsIntegral i) = HsIntegral (negateIntegralLit i)
 negateOverLitVal (HsFractional f) = HsFractional (negateFractionalLit f)
 negateOverLitVal _ = panic "negateOverLitVal: argument is not a number"
 
-{-
-Note [Overloaded literal witnesses]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-*Before* type checking, the HsExpr in an HsOverLit is the
-name of the coercion function, 'fromInteger' or 'fromRational'.
-*After* type checking, it is a witness for the literal, such as
-        (fromInteger 3) or lit_78
-This witness should replace the literal.
-
-This dual role is unusual, because we're replacing 'fromInteger' with
-a call to fromInteger.  Reason: it allows commoning up of the fromInteger
-calls, which wouldn't be possible if the desugarer made the application.
-
-The PostTcType in each branch records the type the overload literal is
-found to have.
--}
-
 -- Comparison operations are needed when grouping literals
 -- for compiling pattern-matching (module GHC.HsToCore.Match.Literal)
 instance (Eq (XXOverLit p)) => Eq (HsOverLit p) where
-  (OverLit _ val1 _) == (OverLit _ val2 _) = val1 == val2
-  (XOverLit  val1)   == (XOverLit  val2)   = val1 == val2
+  (OverLit _ val1) == (OverLit _ val2) = val1 == val2
+  (XOverLit  val1) == (XOverLit  val2) = val1 == val2
   _ == _ = panic "Eq HsOverLit"
 
 instance Eq OverLitVal where
@@ -151,8 +132,8 @@ instance Eq OverLitVal where
   _                   == _                   = False
 
 instance (Ord (XXOverLit p)) => Ord (HsOverLit p) where
-  compare (OverLit _ val1 _) (OverLit _ val2 _) = val1 `compare` val2
-  compare (XOverLit  val1)   (XOverLit  val2)   = val1 `compare` val2
+  compare (OverLit _ val1)  (OverLit _ val2) = val1 `compare` val2
+  compare (XOverLit  val1)  (XOverLit  val2) = val1 `compare` val2
   compare _ _ = panic "Ord HsOverLit"
 
 instance Ord OverLitVal where

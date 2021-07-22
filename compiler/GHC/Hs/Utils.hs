@@ -345,9 +345,9 @@ mkRecStmt        :: (Anno [GenLocated
                  -> StmtLR (GhcPass idL) GhcPs bodyR
 
 
-mkHsIntegral     i  = OverLit noExtField (HsIntegral       i) noExpr
-mkHsFractional   f  = OverLit noExtField (HsFractional     f) noExpr
-mkHsIsString src s  = OverLit noExtField (HsIsString   src s) noExpr
+mkHsIntegral     i  = OverLit noExtField (HsIntegral       i)
+mkHsFractional   f  = OverLit noExtField (HsFractional     f)
+mkHsIsString src s  = OverLit noExtField (HsIsString   src s)
 
 mkHsDo     ctxt stmts      = HsDo noAnn ctxt stmts
 mkHsDoAnns ctxt stmts anns = HsDo anns  ctxt stmts

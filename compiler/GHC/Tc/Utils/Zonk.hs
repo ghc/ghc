@@ -122,15 +122,14 @@ to short-cut the process for built-in types.  We can do this in two places;
 -}
 
 tcShortCutLit :: HsOverLit GhcRn -> ExpRhoType -> TcM (Maybe (HsOverLit GhcTc))
-tcShortCutLit lit@(OverLit { ol_val = val, ol_ext = rebindable }) exp_res_ty
+tcShortCutLit lit@(OverLit { ol_val = val, ol_ext = OverLitRn rebindable _}) exp_res_ty
   | not rebindable
   , Just res_ty <- checkingExpType_maybe exp_res_ty
   = do { dflags <- getDynFlags
        ; let platform = targetPlatform dflags
        ; case shortCutLit platform val res_ty of
             Just expr -> return $ Just $
-                         lit { ol_witness = expr
-                             , ol_ext = OverLitTc False res_ty }
+                         lit { ol_ext = OverLitTc False expr res_ty }
             Nothing   -> return Nothing }
   | otherwise
   = return Nothing
@@ -1088,10 +1087,11 @@ zonkCoFn env (WpMultCoercion co) = do { co' <- zonkCoToCo env co
 
 -------------------------------------------------------------------------
 zonkOverLit :: ZonkEnv -> HsOverLit GhcTc -> TcM (HsOverLit GhcTc)
-zonkOverLit env lit@(OverLit {ol_ext = OverLitTc r ty, ol_witness = e })
+zonkOverLit env lit@(OverLit {ol_ext = x@OverLitTc { ol_witness = e, ol_type = ty } })
   = do  { ty' <- zonkTcTypeToTypeX env ty
         ; e' <- zonkExpr env e
-        ; return (lit { ol_witness = e', ol_ext = OverLitTc r ty' }) }
+        ; return (lit { ol_ext = x { ol_witness = e'
+                                   , ol_type = ty' } }) }
 
 -------------------------------------------------------------------------
 zonkArithSeq :: ZonkEnv -> ArithSeqInfo GhcTc -> TcM (ArithSeqInfo GhcTc)

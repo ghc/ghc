@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs             #-}
 {-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE DisambiguateRecordFields #-}
 
 -- | Desugaring step of the
 -- [Lower Your Guards paper](https://dl.acm.org/doi/abs/10.1145/3408989).
@@ -193,7 +194,7 @@ desugarPat x pat = case pat of
     dflags <- getDynFlags
     let platform = targetPlatform dflags
     pm_lit <- case olit of
-      OverLit{ ol_val = val, ol_ext = OverLitTc rebindable _ }
+      OverLit{ ol_val = val, ol_ext = OverLitTc { ol_rebindable = rebindable } }
         | not rebindable
         , Just expr <- shortCutLit platform val ty
         -> coreExprAsPmLit <$> dsExpr expr
