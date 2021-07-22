@@ -1757,6 +1757,7 @@ occAnalUnfolding !env is_rec mb_join_arity unf
           env'            = env `addInScope` bndrs
           (WithUsageDetails usage args') = occAnalList env' args
           final_usage     = markAllManyNonTail (delDetailsList usage bndrs)
+                            `addLamCoVarOccs` bndrs
 
       unf -> WithUsageDetails emptyDetails unf
 
@@ -1777,8 +1778,8 @@ occAnalRules !env mb_join_arity bndr
               | otherwise         = rule { ru_args = args', ru_rhs = rhs' }
 
         (WithUsageDetails lhs_uds args') = occAnalList env' args
-        lhs_uds'         = markAllManyNonTail $
-                           lhs_uds `delDetailsList` bndrs
+        lhs_uds'         = markAllManyNonTail (lhs_uds `delDetailsList` bndrs)
+                           `addLamCoVarOccs` bndrs
 
         (WithUsageDetails rhs_uds rhs') = occAnal env' rhs
                             -- Note [Rules are extra RHSs]
@@ -1902,9 +1903,9 @@ occAnal :: OccEnv
         -> CoreExpr
         -> WithUsageDetails CoreExpr       -- Gives info only about the "interesting" Ids
 
-occAnal !_  expr@(Type _) = WithUsageDetails emptyDetails expr
-occAnal _   expr@(Lit _)  = WithUsageDetails emptyDetails expr
-occAnal env expr@(Var _)  = occAnalApp env (expr, [], [])
+occAnal !_   expr@(Lit _)  = WithUsageDetails emptyDetails expr
+
+occAnal env expr@(Var _) = occAnalApp env (expr, [], [])
     -- At one stage, I gathered the idRuleVars for the variable here too,
     -- which in a way is the right thing to do.
     -- But that went wrong right after specialisation, when
@@ -1912,15 +1913,54 @@ occAnal env expr@(Var _)  = occAnalApp env (expr, [], [])
     -- rules in them, so the *specialised* versions looked as if they
     -- weren't used at all.
 
-occAnal _ (Coercion co)
-  = WithUsageDetails (addManyOccs emptyDetails (coVarsOfCo co)) (Coercion co)
+occAnal _ expr@(Type ty)
+  = WithUsageDetails (addManyOccs emptyDetails (coVarsOfType ty)) expr
+occAnal _ expr@(Coercion co)
+  = WithUsageDetails (addManyOccs emptyDetails (coVarsOfCo co)) expr
         -- See Note [Gather occurrences of coercion variables]
 
-{-
-Note [Gather occurrences of coercion variables]
+{- Note [Gather occurrences of coercion variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We need to gather info about what coercion variables appear, so that
-we can sort them into the right place when doing dependency analysis.
+We need to gather info about what coercion variables appear, for two reasons:
+
+1. So that we can sort them into the right place when doing dependency analysis.
+
+2. So that we know when they are surely dead.
+
+It is useful to know when they a coercion variable is surely dead,
+when we want to discard a case-expression, in GHC.Core.Opt.Simplify.rebuildCase.
+For example (#20143):
+
+  case unsafeEqualityProof @blah of
+     UnsafeRefl cv -> ...no use of cv...
+
+Here we can discard the case, since unsafeEqualityProof always terminates.
+But only if the coercion variable 'cv' is unused.
+
+Another example from #15696: we had something like
+  case eq_sel d of co -> ...(typeError @(...co...) "urk")...
+Then 'd' was substituted by a dictionary, so the expression
+simpified to
+  case (Coercion <blah>) of cv -> ...(typeError @(...cv...) "urk")...
+
+We can only  drop the case altogether if 'cv' is unused, which is not
+the case here.
+
+Conclusion: we need accurate dead-ness info for CoVars.
+We gather CoVar occurrences from:
+
+  * The (Type ty) and (Coercion co) cases of occAnal
+
+  * The type 'ty' of a lambda-binder (\(x:ty). blah)
+    See addLamCoVarOccs
+
+But it is not necessary to gather CoVars from the types of other binders.
+
+* For let-binders, if the type mentions a CoVar, so will the RHS (since
+  it has the same type)
+
+* For case-alt binders, if the type mentions a CoVar, so will the scrutinee
+  (since it has the same type)
 -}
 
 occAnal env (Tick tickish body)
@@ -2000,6 +2040,8 @@ occAnal env expr@(Lam _ _)
       usage1      = markAllNonTail usage
       one_shot_gp = all isOneShotBndr tagged_bndrs
       final_usage = markAllInsideLamIf (not one_shot_gp) usage1
+                    `addLamCoVarOccs` bndrs
+        -- See Note [Gather occurrences of coercion variables]
     in WithUsageDetails final_usage expr'
 
 occAnal env (Case scrut bndr ty alts)
@@ -2828,6 +2870,12 @@ addManyOccs :: UsageDetails -> VarSet -> UsageDetails
 addManyOccs usage id_set = nonDetStrictFoldUniqSet addManyOcc usage id_set
   -- It's OK to use nonDetStrictFoldUniqSet here because addManyOcc commutes
 
+addLamCoVarOccs :: UsageDetails -> [Var] -> UsageDetails
+-- Add any CoVars free in the type of a lambda-binder
+-- See Note [Gather occurrences of coercion variables]
+addLamCoVarOccs uds bndrs
+  = uds `addManyOccs` coVarsOfTypes (map varType bndrs)
+
 delDetails :: UsageDetails -> Id -> UsageDetails
 delDetails ud bndr
   = ud `alterUsageDetails` (`delVarEnv` bndr)
@@ -2870,10 +2918,6 @@ markAllManyNonTailIf False uds = uds
 
 lookupDetails :: UsageDetails -> Id -> OccInfo
 lookupDetails ud id
-  | isCoVar id  -- We do not currently gather occurrence info (from types)
-  = noOccInfo   -- for CoVars, so we must conservatively mark them as used
-                -- See Note [DoO not mark CoVars as dead]
-  | otherwise
   = case lookupVarEnv (ud_env ud) id of
       Just occ -> doZapping ud id occ
       Nothing  -> IAmDead
@@ -2887,25 +2931,6 @@ udFreeVars bndrs ud = restrictFreeVars bndrs (ud_env ud)
 
 restrictFreeVars :: VarSet -> OccInfoEnv -> VarSet
 restrictFreeVars bndrs fvs = restrictUniqSetToUFM bndrs fvs
-
-{- Note [Do not mark CoVars as dead]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-It's obviously wrong to mark CoVars as dead if they are used.
-Currently we don't traverse types to gather usage info for CoVars,
-so we had better treat them as having noOccInfo.
-
-This showed up in #15696 we had something like
-  case eq_sel d of co -> ...(typeError @(...co...) "urk")...
-
-Then 'd' was substituted by a dictionary, so the expression
-simpified to
-  case (Coercion <blah>) of co -> ...(typeError @(...co...) "urk")...
-
-But then the "drop the case altogether" equation of rebuildCase
-thought that 'co' was dead, and discarded the entire case. Urk!
-
-I have no idea how we managed to avoid this pitfall for so long!
--}
 
 -------------------
 -- Auxiliary functions for UsageDetails implementation
@@ -2938,20 +2963,19 @@ doZappingByUnique (UD { ud_z_many = many
     occ2 | uniq `elemVarEnvByKey` no_tail = markNonTail occ1
          | otherwise                      = occ1
 
-alterZappedSets :: UsageDetails -> (ZappedSet -> ZappedSet) -> UsageDetails
-alterZappedSets ud f
-  = ud { ud_z_many    = f (ud_z_many    ud)
+alterUsageDetails :: UsageDetails -> (OccInfoEnv -> OccInfoEnv) -> UsageDetails
+alterUsageDetails !ud f
+  = UD { ud_env       = f (ud_env       ud)
+       , ud_z_many    = f (ud_z_many    ud)
        , ud_z_in_lam  = f (ud_z_in_lam  ud)
        , ud_z_no_tail = f (ud_z_no_tail ud) }
 
-alterUsageDetails :: UsageDetails -> (OccInfoEnv -> OccInfoEnv) -> UsageDetails
-alterUsageDetails ud f
-  = ud { ud_env = f (ud_env ud) } `alterZappedSets` f
-
 flattenUsageDetails :: UsageDetails -> UsageDetails
-flattenUsageDetails ud
-  = ud { ud_env = mapUFM_Directly (doZappingByUnique ud) (ud_env ud) }
-      `alterZappedSets` const emptyVarEnv
+flattenUsageDetails ud@(UD { ud_env = env })
+  = UD { ud_env       = mapUFM_Directly (doZappingByUnique ud) env
+       , ud_z_many    = emptyVarEnv
+       , ud_z_in_lam  = emptyVarEnv
+       , ud_z_no_tail = emptyVarEnv }
 
 -------------------
 -- See Note [Adjusting right-hand sides]
