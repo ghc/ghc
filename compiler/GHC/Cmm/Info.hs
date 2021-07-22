@@ -98,7 +98,7 @@ cmmToRawCmm logger profile cmms
 --      <normal forward rest of StgInfoTable>
 --      <forward variable part>
 --
---      See includes/rts/storage/InfoTables.h
+--      See rts/include/rts/storage/InfoTables.h
 --
 -- For return-points these are as follows
 --
@@ -371,7 +371,7 @@ mkLivenessBits platform liveness
     lits = mkWordCLit platform (fromIntegral n_bits)
          : map (mkStgWordCLit platform) bitmap
       -- The first word is the size.  The structure must match
-      -- StgLargeBitmap in includes/rts/storage/InfoTable.h
+      -- StgLargeBitmap in rts/include/rts/storage/InfoTable.h
 
 -------------------------------------------------------------------------
 --
@@ -381,7 +381,7 @@ mkLivenessBits platform liveness
 
 -- The standard bits of an info table.  This part of the info table
 -- corresponds to the StgInfoTable type defined in
--- includes/rts/storage/InfoTables.h.
+-- rts/include/rts/storage/InfoTables.h.
 --
 -- Its shape varies with ticky/profiling/tables next to code etc
 -- so we can't use constant offsets from Constants

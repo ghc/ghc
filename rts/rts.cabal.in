@@ -51,7 +51,7 @@ flag thread-sanitizer
   description:
     Enable checking for data races using the ThreadSanitizer (TSAN)
     mechanism supported by GCC and Clang. See Note [ThreadSanitizer]
-    in @includes/rts/TSANUtils.h@.
+    in @rts/include/rts/TSANUtils.h@.
   default: False
 
 library
@@ -141,13 +141,13 @@ library
     if !flag(smp)
        cpp-options: -DNOSMP
 
-    include-dirs: build ../includes includes
-                  includes/dist-derivedconstants/header @FFIIncludeDir@
+    include-dirs: build include
+                  include/dist-derivedconstants/header @FFIIncludeDir@
                   @LibdwIncludeDir@
     includes: Stg.h
     install-includes: Cmm.h HsFFI.h MachDeps.h Rts.h RtsAPI.h Stg.h
                       ghcautoconf.h ghcconfig.h ghcplatform.h ghcversion.h
-                      -- ^ from ../includes
+                      -- ^ from include
                       DerivedConstants.h ffi.h ffitarget.h
                       -- ^ generated
                       rts/Adjustor.h
@@ -176,6 +176,7 @@ library
                       rts/PrimFloat.h
                       rts/Profiling.h
                       rts/IPE.h
+                      rts/PosixSource.h
                       rts/Signals.h
                       rts/SpinLock.h
                       rts/StableName.h

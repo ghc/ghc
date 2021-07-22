@@ -100,7 +100,7 @@ make)
   set in `aclocal.m4`. This allows the rest of the build system to have access
   to these and other values determined by configure.
 
-  Based on this file, `includes/ghc.mk` when ran will produce the settings file
+  Based on this file, `rts/include/ghc.mk` when ran will produce the settings file
   by echoing the values into a the final file.  Coincidentally this is also
   where `ghcplatform.h` and `ghcversion.h` generated which contains information
   about the build platform and sets CPP for use by the entire build.
@@ -118,7 +118,7 @@ hadrian)
 
   The last part of this is the `generateSettings` in `src/Rules/Generate.hs`
   which produces the desired settings file out of Hadrian. This is the
-  equivalent to `includes/ghc.mk`.
+  equivalent to `rts/include/ghc.mk`.
 
 --
 

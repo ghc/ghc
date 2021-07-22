@@ -1,5 +1,5 @@
 # ThreadSanitizer suppressions.
-# See Note [ThreadSanitizer] in includes/rts/TSANUtils.h.
+# See Note [ThreadSanitizer] in rts/include/rts/TSANUtils.h.
 
 # This is a known race but is benign
 race:capability_is_busy

@@ -340,7 +340,7 @@ inspectAsm platform long_jumps initial_offset
 --      count (LargeOp _) = largeArg16s platform
 
 -- Bring in all the bci_ bytecode constants.
-#include "rts/Bytecodes.h"
+#include "Bytecodes.h"
 
 largeArgInstr :: Word16 -> Word16
 largeArgInstr bci = bci_FLAG_LARGE_ARGS .|. bci

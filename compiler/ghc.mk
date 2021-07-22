@@ -93,9 +93,8 @@ compiler/stage$1/build/GHC/Settings/Config.hs : mk/config.mk mk/project.mk | $$$
 	@echo 'cStage                = show ($1 :: Int)'                    >> $$@
 	@echo done.
 
-compiler/stage$1/build/GHC/Platform/Constants.hs : $$(includes_GHCCONSTANTS_HASKELL_TYPE) | $$$$(dir $$$$@)/.
-	$$(call removeFiles,$$@)
-	"$$(CP)" $$< $$@
+compiler/stage$1/build/GHC/Platform/Constants.hs : $$(deriveConstants_INPLACE) | $$$$(dir $$$$@)/.
+	$$< --gen-haskell-type -o $$@
 endef
 
 $(eval $(call compilerConfig,0))

@@ -68,11 +68,11 @@ extra-libraries:
 include-dirs:           INCLUDE_DIR FFI_INCLUDE_DIR
 #else /* !INSTALLING */
 include-dirs:           TOP"/rts/dist/build"
-                        TOP"/includes"
-                        TOP"/includes/dist-derivedconstants/header"
+                        TOP"/rts/include"
+                        TOP"/rts/include/dist-derivedconstants/header"
                         FFI_INCLUDE_DIR
                         LIBDW_INCLUDE_DIR
-                        TOP"/includes/dist-install/build"
+                        TOP"/rts/include/dist-install/build"
 #endif
 
 includes:               Stg.h

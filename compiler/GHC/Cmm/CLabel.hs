@@ -307,7 +307,7 @@ isTickyLabel _ = False
 -- label (e.g. "extern StgWordArray(foo)").  The type is fixed to StgWordArray.
 --
 -- Symbols from the RTS don't need "extern" declarations because they are
--- exposed via "includes/Stg.h" with the appropriate type. See 'needsCDecl'.
+-- exposed via "rts/include/Stg.h" with the appropriate type. See 'needsCDecl'.
 --
 -- The fixed StgWordArray type led to "conflicting types" issues with user
 -- provided Cmm files (not in the RTS) that declare data of another type (#15467
@@ -659,7 +659,7 @@ mkCmmDataLabel       pkg ext str = CmmLabel pkg ext  str CmmData
 mkRtsCmmDataLabel    str         = CmmLabel rtsUnitId (NeedExternDecl False)  str CmmData
                                     -- RTS symbols don't need "GHC.CmmToC" to
                                     -- generate \"extern\" declaration (they are
-                                    -- exposed via includes/Stg.h)
+                                    -- exposed via rts/include/Stg.h)
 
 mkLocalBlockLabel :: Unique -> CLabel
 mkLocalBlockLabel u = LocalBlockLabel u
@@ -935,7 +935,7 @@ needsCDecl (CmmLabel pkgId (NeedExternDecl external) _ _)
         | not external                  = False
 
         -- Prototypes for labels defined in the runtime system are imported
-        --      into HC files via includes/Stg.h.
+        --      into HC files via rts/include/Stg.h.
         | pkgId == rtsUnitId            = False
 
         -- For other labels we inline one into the HC file directly.

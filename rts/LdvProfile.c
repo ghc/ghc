@@ -70,7 +70,7 @@ processHeapClosureForDead( const StgClosure *c )
     if (IS_FORWARDING_PTR(info)) {
         // The size of the evacuated closure is currently stored in
         // the LDV field.  See SET_EVACUAEE_FOR_LDV() in
-        // includes/StgLdvProf.h.
+        // rts/include/StgLdvProf.h.
         return LDVW(c);
     }
     info = INFO_PTR_TO_STRUCT(info);

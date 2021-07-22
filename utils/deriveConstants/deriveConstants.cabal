@@ -8,7 +8,7 @@ Maintainer: XXX
 Synopsis: Derive header files containing various constants for the GHC build process
 Description:
     This utility is responsible for generating a number of C header files
-    needed during the GHC build process. See @includes/ghc.mk@ in the GHC
+    needed during the GHC build process. See @rts/include/ghc.mk@ in the GHC
     build system for details.
 Category: Development
 build-type: Simple

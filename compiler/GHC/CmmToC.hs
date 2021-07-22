@@ -905,7 +905,7 @@ mkJMP_ i = text "JMP_" <> parens i
 mkFN_  i = text "FN_"  <> parens i -- externally visible function
 mkIF_  i = text "IF_"  <> parens i -- locally visible
 
--- from includes/Stg.h
+-- from rts/include/Stg.h
 --
 mkC_,mkW_,mkP_ :: SDoc
 

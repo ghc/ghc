@@ -880,7 +880,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
            those regs not used in Thumb mode. Hard to judge if this is
            needed, but certainly Haskell code is using them for
            placing GHC's virtual registers there. See
-           includes/stg/MachRegs.h Please note that Haskell code is
+           rts/include/stg/MachRegs.h Please note that Haskell code is
            compiled by GHC/LLVM into ARM code (not Thumb!), at least
            as of February 2012 */
       : "%r4", "%r5", "%r6", "%r8", "%r9", "%r10", "%11", "%ip", "%lr"

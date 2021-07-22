@@ -541,7 +541,7 @@ mkVirtConstrSizes profile field_reps
 -------------------------------------------------------------------------
 
 -- bring in ARG_P, ARG_N, etc.
-#include "../includes/rts/storage/FunTypes.h"
+#include "FunTypes.h"
 
 mkArgDescr :: Platform -> [Id] -> ArgDescr
 mkArgDescr platform args

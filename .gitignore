@@ -75,14 +75,14 @@ _darcs/
 /driver/ghc/dist/
 /driver/haddock/dist/
 /driver/ghci/dist/
-/includes/dist/
-/includes/dist-*/
 /libffi/dist-install/
 /libraries/*/dist-boot/
 /libraries/*/dist-install/
 /libraries/*/dist-newstyle/
 /libraries/dist-haddock/
 /rts/dist/
+/rts/include/dist/
+/rts/include/dist-*/
 /utils/*/dist*/
 /compiler/stage1/
 /compiler/stage2/
@@ -104,6 +104,11 @@ _darcs/
 /ch01.html
 /ch02.html
 /compiler/dist/
+/compiler/Bytecodes.h
+/compiler/ClosureTypes.h
+/compiler/FunTypes.h
+/compiler/MachDeps.h
+/compiler/MachRegs.h
 /compiler/ghc.cabal
 /compiler/ghc.cabal.old
 /distrib/configure.ac
@@ -139,7 +144,6 @@ _darcs/
 /settings
 /ghc.spec
 /ghc/ghc-bin.cabal
-/includes/dist/
 /index.html
 /inplace/
 /libffi/build/
@@ -184,6 +188,7 @@ _darcs/
 /mk/project.mk
 /mk/project.mk.old
 /mk/validate.mk
+/rts/include/dist/
 /rts/rts.cabal
 /rts/package.conf.inplace
 /rts/package.conf.inplace.raw

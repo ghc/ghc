@@ -73,7 +73,7 @@ data Platform = Platform
    , platformTablesNextToCode         :: !Bool
       -- ^ Determines whether we will be compiling info tables that reside just
       --   before the entry code, or with an indirection to the entry code. See
-      --   TABLES_NEXT_TO_CODE in includes/rts/storage/InfoTables.h.
+      --   TABLES_NEXT_TO_CODE in rts/include/rts/storage/InfoTables.h.
    , platform_constants               :: !(Maybe PlatformConstants)
       -- ^ Constants such as structure offsets, type sizes, etc.
    }

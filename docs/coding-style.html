@@ -11,7 +11,7 @@
 <h2>Comments</h2>
 
 <p>These coding style guidelines are mainly intended for use in
-<tt>ghc/rts</tt> and <tt>ghc/includes</tt>.
+<tt>rts</tt>.
 
 <p>NB These are just suggestions.  They're not set in stone.  Some of
 them are probably misguided.  If you disagree with them, feel free to
@@ -207,7 +207,7 @@ the RTS is currently enabled with the <tt>-DS</tt> RTS flag.
 sanity checking in various parts of the system when <tt>DEBUG</tt> is
 defined.  For example, to get the scheduler to be verbose about what
 it is doing, you would say <tt>+RTS -Ds -RTS</tt>.  See
-<tt>includes/RtsFlags.h</tt> and <tt>rts/RtsFlags.c</tt> for the full
+<tt>rts/include/RtsFlags.h</tt> and <tt>rts/RtsFlags.c</tt> for the full
 set of debugging flags.  To check one of these flags in the code,
 write:
 

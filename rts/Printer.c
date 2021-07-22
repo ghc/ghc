@@ -996,7 +996,7 @@ void printObj( StgClosure *obj )
    Closure types
 
    NOTE: must be kept in sync with the closure types in
-   includes/rts/storage/ClosureTypes.h
+   rts/include/rts/storage/ClosureTypes.h
    -------------------------------------------------------------------------- */
 
 const char *closure_type_names[] = {

@@ -23,6 +23,19 @@ Category: Development
 Build-Type: Simple
 Cabal-Version: >=1.10
 
+extra-source-files:
+    Unique.h
+    CodeGen.Platform.h
+    -- Shared with rts via hard-link at configure time. This is safer
+    -- for Windows, where symlinks don't work out of the box, so we
+    -- can't just commit some in git.
+    Bytecodes.h
+    ClosureTypes.h
+    FunTypes.h
+    MachRegs.h
+    -- Target sensative, should not be used.
+    MachDeps.h
+
 Flag internal-interpreter
     Description: Build with internal interpreter support.
     Default: False
@@ -56,6 +69,15 @@ Flag dynamic-system-linker
 Library
     Default-Language: Haskell2010
     Exposed: False
+    Includes: Unique.h
+              -- CodeGen.Platform.h -- invalid as C, skip
+              -- shared with rts via symlink
+              Bytecodes.h
+              ClosureTypes.h
+              FunTypes.h
+              -- MachRegs.h -- hits #error, skip
+              -- target sensative, should not be used
+              MachDeps.h
 
     Build-Depends: base       >= 4.11 && < 4.17,
                    deepseq    >= 1.4 && < 1.5,

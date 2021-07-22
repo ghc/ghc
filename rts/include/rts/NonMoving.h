@@ -33,7 +33,7 @@ EF_(stg_copyArray_barrier);
 // the barrier is eliminated in the non-threaded RTS.
 extern StgWord DLL_IMPORT_DATA_VAR(nonmoving_write_barrier_enabled);
 
-// A similar macro is defined in includes/Cmm.h for C-- code.
+// A similar macro is defined in rts/include/Cmm.h for C-- code.
 #if defined(THREADED_RTS)
 #define IF_NONMOVING_WRITE_BARRIER_ENABLED \
     if (RTS_UNLIKELY(nonmoving_write_barrier_enabled))

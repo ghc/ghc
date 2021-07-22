@@ -40,7 +40,7 @@ import GHC.Utils.Panic
 --      TODO: Is that still true? Could we use allocatableRegsInClass
 --      without losing performance now?
 --
---      Look at includes/stg/MachRegs.h to get the numbers.
+--      Look at rts/include/stg/MachRegs.h to get the numbers.
 --
 
 

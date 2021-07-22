@@ -770,6 +770,18 @@ dnl --------------------------------------------------------------
 dnl End of configure script option section
 dnl --------------------------------------------------------------
 
+dnl ** Copy headers shared by the RTS and compiler
+dnl --------------------------------------------------------------
+dnl We can't commit symlinks without breaking Windows in the default
+dnl configuration.
+AC_MSG_NOTICE([Creating links for headers shared by the RTS and compiler])
+ln -f rts/include/rts/Bytecodes.h compiler/
+ln -f rts/include/rts/storage/ClosureTypes.h compiler/
+ln -f rts/include/rts/storage/FunTypes.h compiler/
+ln -f rts/include/MachDeps.h compiler/
+ln -f rts/include/stg/MachRegs.h compiler/
+AC_MSG_NOTICE([done.])
+
 dnl ** Copy the files from the "fs" utility into the right folders.
 dnl --------------------------------------------------------------
 AC_MSG_NOTICE([Creating links for in-tree file handling routines])
@@ -1222,7 +1234,7 @@ AC_COMPILE_IFELSE(
    AC_DEFINE([CC_SUPPORTS_TLS],[0],[Define to 1 if __thread is supported])
   ])
 
-dnl large address space support (see includes/rts/storage/MBlock.h)
+dnl large address space support (see rts/include/rts/storage/MBlock.h)
 dnl
 dnl Darwin has vm_allocate/vm_protect
 dnl Linux has mmap(MAP_NORESERVE)/madv(MADV_DONTNEED)

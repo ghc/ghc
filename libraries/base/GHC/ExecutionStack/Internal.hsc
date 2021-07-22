@@ -41,7 +41,7 @@ import Foreign.Marshal.Alloc (allocaBytes)
 import Foreign.Storable (Storable(..))
 import System.IO.Unsafe (unsafePerformIO, unsafeInterleaveIO)
 
--- N.B. See includes/rts/Libdw.h for notes on stack representation.
+-- N.B. See rts/include/rts/Libdw.h for notes on stack representation.
 
 -- | A location in the original program source.
 data SrcLoc = SrcLoc { sourceFile   :: String

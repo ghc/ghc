@@ -181,7 +181,7 @@ data SMRep
 type IsStatic = Bool
 
 -- From an SMRep you can get to the closure type defined in
--- includes/rts/storage/ClosureTypes.h. Described by the function
+-- rts/include/rts/storage/ClosureTypes.h. Described by the function
 -- rtsClosureType below.
 
 data ClosureTypeInfo
@@ -404,8 +404,8 @@ cardTableSizeW platform elems =
 -----------------------------------------------------------------------------
 -- deriving the RTS closure type from an SMRep
 
-#include "../includes/rts/storage/ClosureTypes.h"
-#include "../includes/rts/storage/FunTypes.h"
+#include "ClosureTypes.h"
+#include "FunTypes.h"
 -- Defines CONSTR, CONSTR_1_0 etc
 
 -- | Derives the RTS closure type from an 'SMRep'

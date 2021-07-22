@@ -154,7 +154,7 @@ endif
 GhcUnregisterised=@Unregisterised@
 
 # ArchSupportsSMP should be set iff there is support for that arch in
-# includes/stg/SMP.h
+# rts/include/stg/SMP.h
 ifeq "$(TargetArch_CPP)" "arm"
 # We don't support load/store barriers pre-ARMv7. See #10433.
 ArchSupportsSMP=$(if $(filter $(ARM_ISA),ARMv5 ARMv6),NO,YES)

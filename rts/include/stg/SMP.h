@@ -35,7 +35,7 @@ void arm_atomic_spin_unlock(void);
  * pointed to by p with the value w, returning the old value.
  *
  * Used for locking closures during updates (see lockClosure()
- * in includes/rts/storage/SMPClosureOps.h) and the MVar primops.
+ * in rts/include/rts/storage/SMPClosureOps.h) and the MVar primops.
  */
 EXTERN_INLINE StgWord xchg(StgPtr p, StgWord w);
 

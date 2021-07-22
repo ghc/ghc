@@ -397,7 +397,7 @@
 #endif
 
 /* Modules compiled with -ticky may mention ticky counters */
-/* This list should marry up with the one in $(TOP)/includes/stg/Ticky.h */
+/* This list should marry up with the one in $(TOP)/rts/include/stg/Ticky.h */
 #define RTS_TICKY_SYMBOLS                               \
       SymI_NeedsDataProto(ticky_entry_ctrs)             \
       SymI_NeedsDataProto(top_ct)                       \
