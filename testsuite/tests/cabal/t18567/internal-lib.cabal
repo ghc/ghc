@@ -1,0 +1,26 @@
+cabal-version: 2.0
+name:                internal-lib
+version:             0.1.0.0
+license:             BSD3
+build-type:          Simple
+cabal-version:       >=2.0
+
+library
+  hs-source-dirs:      src
+  exposed-modules:     TestLib
+  build-depends:       base, sublib, sublib-unused
+  default-language:    Haskell2010
+  ghc-options: -Wunused-packages
+
+library sublib-unused
+  hs-source-dirs: sublib-unused
+  exposed-modules: SublibUnused
+  build-depends:       base
+  default-language:    Haskell2010
+library sublib
+  hs-source-dirs: sublib
+  exposed-modules: Sublib
+  build-depends:       base
+  default-language:    Haskell2010
+
+
