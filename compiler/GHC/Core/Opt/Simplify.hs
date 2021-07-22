@@ -61,7 +61,7 @@ import GHC.Builtin.PrimOps ( PrimOp (SeqOp) )
 import GHC.Builtin.Types.Prim( realWorldStatePrimTy )
 import GHC.Builtin.Names( runRWKey )
 
-import GHC.Data.Maybe   ( isNothing, orElse )
+import GHC.Data.Maybe   ( isNothing, orElse, isJust )
 import GHC.Data.FastString
 import GHC.Unit.Module ( moduleName, pprModuleName )
 import GHC.Utils.Outputable
@@ -73,6 +73,8 @@ import GHC.Utils.Monad  ( mapAccumLM, liftIO )
 import GHC.Utils.Logger
 
 import Control.Monad
+import GHC.LanguageExtensions
+import GHC.Stack.Types
 
 
 {-
@@ -666,7 +668,7 @@ tryCastWorkerWrapper env top_lvl old_bndr occ_info bndr (Cast rhs co)
            _ -> mkLetUnfolding (sm_uf_opts mode) top_lvl InlineRhs work_id work_rhs
 
 tryCastWorkerWrapper env _ _ _ bndr rhs  -- All other bindings
-  = return (mkFloatBind env (NonRec bndr rhs))
+  = (mkFloatBind env (NonRec bndr rhs))
 
 mkCastWrapperInlinePrag :: InlinePragma -> InlinePragma
 -- See Note [Cast worker/wrapper]
@@ -806,15 +808,20 @@ makeTrivialBinding :: SimplMode -> TopLevelFlag
                    -> OutType     -- Type of the expression
                    -> SimplM (LetFloats, OutId)
 makeTrivialBinding mode top_lvl occ_fs info expr expr_ty
-  = do  { (floats, expr1) <- prepareRhs mode top_lvl occ_fs expr
+  = do  { dflags <- getDynFlags
+        ; let is_static = xopt StaticPointers dflags && isJust (collectMakeStaticArgs expr)
+        ; (floats, expr1) <- prepareRhs mode top_lvl occ_fs expr
         ; uniq <- getUniqueM
-        ; let name = mkSystemVarName uniq occ_fs
-              var  = mkLocalIdWithInfo name Many expr_ty info
+        ; let var
+                | is_static = mkExportedVanillaId (mkSystemVarName uniq (mkFastString "static_ptr"))
+                                expr_ty
+                | otherwise = mkLocalIdWithInfo (mkSystemVarName uniq occ_fs) Many expr_ty info
 
         -- Now something very like completeBind,
         -- but without the postInlineUnconditionally part
         ; (arity_type, expr2) <- tryEtaExpandRhs mode var expr1
         ; unf <- mkLetUnfolding (sm_uf_opts mode) top_lvl InlineRhs var expr2
+        ; pprTraceM "makeTrivial" (ppr floats $$ ppr expr2 $$ ppr expr1 $$ ppr expr $$ ppr is_static)
 
         ; let final_id = addLetBndrInfo var arity_type unf
               bind     = NonRec final_id expr2
@@ -896,7 +903,7 @@ completeBind env top_lvl mb_cont old_bndr new_bndr new_rhs
  | isCoVar old_bndr
  = case new_rhs of
      Coercion co -> return (emptyFloats env, extendCvSubst env old_bndr co)
-     _           -> return (mkFloatBind env (NonRec new_bndr new_rhs))
+     _           -> (mkFloatBind env (NonRec new_bndr new_rhs))
 
  | otherwise
  = assert (isId new_bndr) $

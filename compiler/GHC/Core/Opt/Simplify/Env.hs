@@ -57,7 +57,7 @@ import GHC.Types.Var.Set
 import GHC.Data.OrdList
 import GHC.Types.Id as Id
 import GHC.Core.Make            ( mkWildValBinder )
-import GHC.Driver.Session       ( DynFlags )
+import GHC.Driver.Session       ( DynFlags, xopt )
 import GHC.Builtin.Types
 import GHC.Core.TyCo.Rep        ( TyCoBinder(..) )
 import qualified GHC.Core.Type as Type
@@ -74,6 +74,11 @@ import GHC.Utils.Logger
 import GHC.Types.Unique.FM      ( pprUniqFM )
 
 import Data.List (mapAccumL)
+import GHC.Utils.Trace
+import GHC.LanguageExtensions
+import Data.Maybe (isJust)
+import GHC.Types.Name
+import GHC.Data.FastString
 
 {-
 ************************************************************************
@@ -533,13 +538,26 @@ unitJoinFloat :: OutBind -> JoinFloats
 unitJoinFloat bind = assert (all isJoinId (bindersOf bind)) $
                      unitOL bind
 
-mkFloatBind :: SimplEnv -> OutBind -> (SimplFloats, SimplEnv)
+mkFloatBind :: HasCallStack => SimplEnv -> OutBind -> SimplM (SimplFloats, SimplEnv)
 -- Make a singleton SimplFloats, and
 -- extend the incoming SimplEnv's in-scope set with its binders
 -- These binders may already be in the in-scope set,
 -- but may have by now been augmented with more IdInfo
 mkFloatBind env bind
-  = (floats, env { seInScope = in_scope' })
+  | Just (b, expr) <- checkStaticId bind = do
+      uniq <- getUniqueM
+      let new_id = mkExportedVanillaId (mkSystemVarName uniq (mkFastString "static_ptr")) (idType b)
+          new_bind = NonRec new_id expr
+          !in_scope' = seInScope env `extendInScopeSetBind` new_bind
+          new_floats = SimplFloats { sfLetFloats  = unitLetFloat new_bind
+                      , sfJoinFloats = emptyJoinFloats
+                      , sfInScope    = in_scope' }
+
+          id_subst_env = extendIdSubst env b $
+                            DoneEx (Var new_id) Nothing
+      return (new_floats, id_subst_env { seInScope = in_scope' })
+
+  | otherwise = return (floats, env { seInScope = in_scope' })
   where
     floats
       | isJoinBind bind
@@ -552,6 +570,10 @@ mkFloatBind env bind
                     , sfInScope    = in_scope' }
     -- See Note [Bangs in the Simplifier]
     !in_scope' = seInScope env `extendInScopeSetBind` bind
+
+    checkStaticId (NonRec b expr)
+      | xopt StaticPointers (seDynFlags env) && isJust (collectMakeStaticArgs expr) = Just (b, expr)
+    checkStaticId _ = Nothing
 
 extendFloats :: SimplFloats -> OutBind -> SimplFloats
 -- Add this binding to the floats, and extend the in-scope env too
