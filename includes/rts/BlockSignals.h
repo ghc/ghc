@@ -2,7 +2,7 @@
  *
  * (c) The GHC Team, 1998-2009
  *
- * RTS signal handling 
+ * RTS signal handling
  *
  * Do not #include this file directly: #include "Rts.h" instead.
  *
@@ -22,7 +22,7 @@
  * Temporarily block the delivery of further console events. Needed to
  * avoid race conditions when GCing the queue of outstanding handlers or
  * when emptying the queue by running the handlers.
- * 
+ *
  */
 void blockUserSignals(void);
 

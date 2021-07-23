@@ -31,9 +31,9 @@ extern W_ top_ct[];
 #endif
 
 /* The rest are not explicitly declared in rts/Ticky.c.  Instead
-   we use the same trick as in the former StgTicky.h: recycle the 
+   we use the same trick as in the former StgTicky.h: recycle the
    same declarations for both extern decls (which are included everywhere)
-   and initializations (which only happen once) 
+   and initializations (which only happen once)
    TICKY_C is defined only in rts/Ticky.c */
 #if defined(TICKY_C)
 #define INIT(ializer) = ializer
@@ -193,7 +193,7 @@ EXTERN StgInt RET_UNBOXED_TUP_hst[TICKY_BIN_COUNT] INIT({0});
    We got rid of StgTicky.h, which was previously
    defining these macros for the benefit of C code
    so, we define them here instead (to be no-ops).
-   (since those macros are only defined in Cmm.h) 
+   (since those macros are only defined in Cmm.h)
 
    Note that these macros must be defined whether
    TICKY_TICKY is defined or not. */

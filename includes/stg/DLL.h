@@ -43,7 +43,7 @@
    [oh, you want details :) : Data symbols defined by the RTS
     have to be accessed through an extra level of indirection
     when compiling generated .hc code compared to when the RTS
-    sources are being processed. This is only the case when 
+    sources are being processed. This is only the case when
     using Win32 DLLs. ]
 */
 #if defined(COMPILING_RTS)

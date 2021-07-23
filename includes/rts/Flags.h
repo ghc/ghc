@@ -31,7 +31,7 @@
 typedef struct _GC_FLAGS {
     FILE   *statsFile;
     uint32_t  giveStats;
-#define NO_GC_STATS	 0
+#define NO_GC_STATS         0
 #define COLLECT_GC_STATS 1
 #define ONELINE_GC_STATS 2
 #define SUMMARY_GC_STATS 3
@@ -59,10 +59,10 @@ typedef struct _GC_FLAGS {
     uint32_t     generations;
     bool squeezeUpdFrames;
 
-    bool compact;		/* True <=> "compact all the time" */
+    bool compact;               /* True <=> "compact all the time" */
     double  compactThreshold;
 
-    bool sweep;		/* use "mostly mark-sweep" instead of copying
+    bool sweep;                 /* use "mostly mark-sweep" instead of copying
                                  * for the oldest generation */
     bool ringBell;
 
@@ -120,20 +120,20 @@ typedef struct _DEBUG_FLAGS {
 typedef struct _COST_CENTRE_FLAGS {
     uint32_t    doCostCentres;
 # define COST_CENTRES_NONE      0
-# define COST_CENTRES_SUMMARY	1
-# define COST_CENTRES_VERBOSE	2 /* incl. serial time profile */
-# define COST_CENTRES_ALL	3
+# define COST_CENTRES_SUMMARY   1
+# define COST_CENTRES_VERBOSE   2 /* incl. serial time profile */
+# define COST_CENTRES_ALL       3
 # define COST_CENTRES_JSON      4
 
-    int	    profilerTicks;   /* derived */
-    int	    msecsPerTick;    /* derived */
+    int profilerTicks;   /* derived */
+    int msecsPerTick;    /* derived */
     char const *outputFileNameStem;
 } COST_CENTRE_FLAGS;
 
 /* See Note [Synchronization of flags and base APIs] */
 typedef struct _PROFILING_FLAGS {
     uint32_t doHeapProfile;
-# define NO_HEAP_PROFILING      0	/* N.B. Used as indexes into arrays */
+# define NO_HEAP_PROFILING      0 /* N.B. Used as indexes into arrays */
 # define HEAP_BY_CCS            1
 # define HEAP_BY_MOD            2
 # define HEAP_BY_DESCR          4
@@ -149,7 +149,7 @@ typedef struct _PROFILING_FLAGS {
     bool        startHeapProfileAtStartup; /* true if we start profiling from program startup */
 
 
-    bool		showCCSOnException;
+    bool        showCCSOnException;
 
     uint32_t    maxRetainerSetSize;
 
@@ -278,15 +278,15 @@ typedef struct _TICKY_FLAGS {
 /* See Note [Synchronization of flags and base APIs] */
 typedef struct _RTS_FLAGS {
     /* The first portion of RTS_FLAGS is invariant. */
-    GC_FLAGS	      GcFlags;
+    GC_FLAGS          GcFlags;
     CONCURRENT_FLAGS  ConcFlags;
     MISC_FLAGS        MiscFlags;
-    DEBUG_FLAGS	      DebugFlags;
+    DEBUG_FLAGS       DebugFlags;
     COST_CENTRE_FLAGS CcFlags;
     PROFILING_FLAGS   ProfFlags;
     TRACE_FLAGS       TraceFlags;
-    TICKY_FLAGS	      TickyFlags;
-    PAR_FLAGS	      ParFlags;
+    TICKY_FLAGS       TickyFlags;
+    PAR_FLAGS         ParFlags;
 } RTS_FLAGS;
 
 #if defined(COMPILING_RTS_MAIN)
@@ -308,18 +308,18 @@ extern RTS_FLAGS RtsFlags;
  * chars, please!
  */
 
-#define STATS_FILENAME_MAXLEN	128
+#define STATS_FILENAME_MAXLEN 128
 
-#define GR_FILENAME_FMT		"%0.124s.gr"
-#define HP_FILENAME_FMT		"%0.124s.hp"
-#define LIFE_FILENAME_FMT	"%0.122s.life"
-#define PROF_FILENAME_FMT	"%0.122s.prof"
-#define PROF_FILENAME_FMT_GUM	"%0.118s.%03d.prof"
-#define QP_FILENAME_FMT		"%0.124s.qp"
-#define STAT_FILENAME_FMT	"%0.122s.stat"
-#define TICKY_FILENAME_FMT	"%0.121s.ticky"
-#define TIME_FILENAME_FMT	"%0.122s.time"
-#define TIME_FILENAME_FMT_GUM	"%0.118s.%03d.time"
+#define GR_FILENAME_FMT         "%0.124s.gr"
+#define HP_FILENAME_FMT         "%0.124s.hp"
+#define LIFE_FILENAME_FMT       "%0.122s.life"
+#define PROF_FILENAME_FMT       "%0.122s.prof"
+#define PROF_FILENAME_FMT_GUM   "%0.118s.%03d.prof"
+#define QP_FILENAME_FMT         "%0.124s.qp"
+#define STAT_FILENAME_FMT       "%0.122s.stat"
+#define TICKY_FILENAME_FMT      "%0.121s.ticky"
+#define TIME_FILENAME_FMT       "%0.122s.time"
+#define TIME_FILENAME_FMT_GUM   "%0.118s.%03d.time"
 
 /* an "int" so as to match normal "argc" */
 /* Now defined in Stg.h (lib/std/cbits need these too.)
