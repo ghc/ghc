@@ -1,6 +1,6 @@
 
 ==================== Strictness signatures ====================
-Foo.f: <MP(A,1C1(L),A)><L>
+Foo.f: <LP(A,SCS(L),A)><L>
 Foo.foogle: <L><L>
 
 

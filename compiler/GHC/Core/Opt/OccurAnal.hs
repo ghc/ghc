@@ -28,7 +28,7 @@ import GHC.Core
 import GHC.Core.FVs
 import GHC.Core.Utils   ( exprIsTrivial, isDefaultAlt, isExpandableApp,
                           stripTicksTopE, mkTicks )
-import GHC.Core.Opt.Arity   ( joinRhsArity )
+import GHC.Core.Opt.Arity   ( joinRhsArity, isOneShotBndr )
 import GHC.Core.Coercion
 import GHC.Core.Type
 import GHC.Core.TyCo.FVs( tyCoVarsOfMCo )
@@ -1755,7 +1755,7 @@ lambda and casts, e.g.
 
 * Why do we take care to account for intervening casts? Answer:
   currently we don't do eta-expansion and cast-swizzling in a stable
-  unfolding (see Note [Eta-expansion in stable unfoldings]).
+  unfolding (see Historical-note [Eta-expansion in stable unfoldings]).
   So we can get
     f = \x. ((\y. ...x...y...) |> co)
   Now, since the lambdas aren't together, the occurrence analyser will

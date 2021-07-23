@@ -62,9 +62,10 @@ module GHC.Types.Demand (
     keepAliveDmdType,
 
     -- * Demand signatures
-    DmdSig(..), mkDmdSigForArity, mkClosedDmdSig,
+    DmdSig(..), mkDmdSigForArity, mkClosedDmdSig, mkVanillaDmdSig,
     splitDmdSig, dmdSigDmdEnv, hasDemandEnvSig,
-    nopSig, botSig, isTopSig, isDeadEndSig, isDeadEndAppSig, trimBoxityDmdSig,
+    nopSig, botSig, isNopSig, isDeadEndSig, isDeadEndAppSig, trimBoxityDmdSig,
+
     -- ** Handling arity adjustments
     prependArgsDmdSig, etaConvertDmdSig,
 
@@ -1831,8 +1832,8 @@ botDmdType = DmdType emptyDmdEnv [] botDiv
 nopDmdType :: DmdType
 nopDmdType = DmdType emptyDmdEnv [] topDiv
 
-isTopDmdType :: DmdType -> Bool
-isTopDmdType (DmdType env args div)
+isNopDmdType :: DmdType -> Bool
+isNopDmdType (DmdType env args div)
   = div == topDiv && null args && isEmptyVarEnv env
 
 -- | The demand type of an unspecified expression that is guaranteed to
@@ -2158,6 +2159,9 @@ mkDmdSigForArity arity dmd_ty@(DmdType fvs args div)
 mkClosedDmdSig :: [Demand] -> Divergence -> DmdSig
 mkClosedDmdSig ds res = mkDmdSigForArity (length ds) (DmdType emptyDmdEnv ds res)
 
+mkVanillaDmdSig :: Arity -> Divergence -> DmdSig
+mkVanillaDmdSig ar div = mkClosedDmdSig (replicate ar topDmd) div
+
 splitDmdSig :: DmdSig -> ([Demand], Divergence)
 splitDmdSig (DmdSig (DmdType _ dmds res)) = (dmds, res)
 
@@ -2173,8 +2177,8 @@ botSig = DmdSig botDmdType
 nopSig :: DmdSig
 nopSig = DmdSig nopDmdType
 
-isTopSig :: DmdSig -> Bool
-isTopSig (DmdSig ty) = isTopDmdType ty
+isNopSig :: DmdSig -> Bool
+isNopSig (DmdSig ty) = isNopDmdType ty
 
 -- | True if the signature diverges or throws an exception in a saturated call.
 -- See Note [Dead ends].
@@ -2219,7 +2223,7 @@ prependArgsDmdSig :: Int -> DmdSig -> DmdSig
 -- demands. This is used by FloatOut.
 prependArgsDmdSig new_args sig@(DmdSig dmd_ty@(DmdType env dmds res))
   | new_args == 0       = sig
-  | isTopDmdType dmd_ty = sig
+  | isNopDmdType dmd_ty = sig
   | new_args < 0        = pprPanic "prependArgsDmdSig: negative new_args"
                                    (ppr new_args $$ ppr sig)
   | otherwise           = DmdSig (DmdType env dmds' res)

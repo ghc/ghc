@@ -75,7 +75,7 @@ import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Tickish
-import GHC.Types.Demand ( isTopSig )
+import GHC.Types.Demand ( isNopSig )
 import GHC.Types.Cpr ( topCprSig )
 
 import GHC.Utils.Outputable
@@ -476,7 +476,7 @@ toIfaceIdInfo id_info
     ------------  Strictness  --------------
         -- No point in explicitly exporting TopSig
     sig_info = dmdSigInfo id_info
-    strict_hsinfo | not (isTopSig sig_info) = Just (HsDmdSig sig_info)
+    strict_hsinfo | not (isNopSig sig_info) = Just (HsDmdSig sig_info)
                   | otherwise               = Nothing
 
     ------------  CPR --------------

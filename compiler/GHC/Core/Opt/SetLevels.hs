@@ -85,7 +85,7 @@ import GHC.Core.Utils   ( exprType, exprIsHNF
                         , collectMakeStaticArgs
                         , mkLamTypes
                         )
-import GHC.Core.Opt.Arity   ( exprBotStrictness_maybe )
+import GHC.Core.Opt.Arity   ( exprBotStrictness_maybe, isOneShotBndr )
 import GHC.Core.FVs     -- all of it
 import GHC.Core.Subst
 import GHC.Core.Make    ( sortQuantVars )
@@ -1384,9 +1384,11 @@ lvlLamBndrs env lvl bndrs
     new_lvl | any is_major bndrs = incMajorLvl lvl
             | otherwise          = incMinorLvl lvl
 
-    is_major bndr = isId bndr && not (isProbablyOneShotLambda bndr)
-       -- The "probably" part says "don't float things out of a
-       -- probable one-shot lambda"
+    is_major bndr = not (isOneShotBndr bndr)
+       -- Only non-one-shot lambdas bump a major level, which in
+       -- turn triggers floating.  NB: isOneShotBndr is always
+       -- true of a type variable -- there is no point in floating
+       -- out of a big lambda.
        -- See Note [Computing one-shot info] in GHC.Types.Demand
 
 lvlJoinBndrs :: LevelEnv -> Level -> RecFlag -> [OutVar]

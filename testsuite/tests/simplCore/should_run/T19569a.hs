@@ -3,6 +3,11 @@
 -- so I added it to testsuite to catch such regressions in the future.
 
 -- It might be acceptable for this test to fail if you make changes to the simplifier. But generally such a failure shouldn't be accepted without good reason.
+--
+-- For example, one of the numerical instabilities was/is caused by a rewrite rule
+-- in GHC.Real which rewrites powers with small exponents. See !8082, changes in the
+-- simplifier caused this rewrite rule to trigger (or not) which then produced different
+-- results.
 
 -- The excessive whitespace is the result of running the original benchmark which was a .lhs file through unlit.
 
