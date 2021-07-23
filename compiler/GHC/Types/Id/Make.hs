@@ -86,7 +86,7 @@ import GHC.Data.List.SetOps
 import GHC.Types.Var (VarBndr(Bndr))
 import qualified GHC.LanguageExtensions as LangExt
 
-import Data.Maybe       ( maybeToList )
+import Data.Maybe       ( isJust, maybeToList )
 
 {-
 ************************************************************************
@@ -1298,12 +1298,12 @@ mkPrimOpId prim_op
     name = mkWiredInName gHC_PRIM (primOpOcc prim_op)
                          (mkPrimOpIdUnique (primOpTag prim_op))
                          (AnId id) UserSyntax
-    id   = mkGlobalId (PrimOpId prim_op) name ty info
+    id   = mkGlobalId (PrimOpId prim_op lev_poly) name ty info
+    lev_poly = not (argsHaveFixedRuntimeRep ty)
 
     -- PrimOps don't ever construct a product, but we want to preserve bottoms
-    cpr
-      | isDeadEndDiv (snd (splitDmdSig strict_sig)) = botCpr
-      | otherwise                                   = topCpr
+    cpr | isDeadEndDiv (snd (splitDmdSig strict_sig)) = botCpr
+        | otherwise                                   = topCpr
 
     info = noCafIdInfo
            `setRuleInfo`           mkRuleInfo (maybeToList $ primOpRules name prim_op)

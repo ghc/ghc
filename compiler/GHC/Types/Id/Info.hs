@@ -159,7 +159,10 @@ data IdDetails
   | ClassOpId Class             -- ^ The 'Id' is a superclass selector,
                                 -- or class operation of a class
 
-  | PrimOpId PrimOp             -- ^ The 'Id' is for a primitive operator
+  | PrimOpId PrimOp Bool        -- ^ The 'Id' is for a primitive operator
+                                -- True <=> is representation-polymorphic,
+                                --          and hence has no binding
+
   | FCallId ForeignCall         -- ^ The 'Id' is for a foreign call.
                                 -- Type will be simple: no type families, newtypes, etc
 
@@ -213,7 +216,7 @@ pprIdDetails other     = brackets (pp other)
    pp (DataConWorkId _)       = text "DataCon"
    pp (DataConWrapId _)       = text "DataConWrapper"
    pp (ClassOpId {})          = text "ClassOp"
-   pp (PrimOpId _)            = text "PrimOp"
+   pp (PrimOpId {})           = text "PrimOp"
    pp (FCallId _)             = text "ForeignCall"
    pp (TickBoxOpId _)         = text "TickBoxOp"
    pp (DFunId nt)             = text "DFunId" <> ppWhen nt (text "(nt)")

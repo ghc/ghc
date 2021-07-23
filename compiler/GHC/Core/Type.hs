@@ -145,7 +145,8 @@ module GHC.Core.Type (
         Kind,
 
         -- ** Finding the kind of a type
-        typeKind, tcTypeKind, typeHasFixedRuntimeRep, resultHasFixedRuntimeRep,
+        typeKind, tcTypeKind, typeHasFixedRuntimeRep,
+        resultHasFixedRuntimeRep, argsHaveFixedRuntimeRep,
         tcIsLiftedTypeKind, tcIsConstraintKind, tcReturnsConstraintKind,
         tcIsBoxedTypeKind, tcIsRuntimeTypeKind,
 
@@ -285,8 +286,7 @@ import GHC.Data.Pair
 import GHC.Data.List.SetOps
 import GHC.Types.Unique ( nonDetCmpUnique )
 
-import GHC.Data.Maybe   ( orElse, expectJust )
-import Data.Maybe       ( isJust )
+import GHC.Data.Maybe   ( orElse, expectJust, isJust )
 import Control.Monad    ( guard )
 -- import GHC.Utils.Trace
 
@@ -3108,6 +3108,19 @@ typeHasFixedRuntimeRep = go
 --   * True for @(forall r1 r2 (a :: TYPE r1) (b :: TYPE r2). a -> b -> Type)@
 resultHasFixedRuntimeRep :: Type -> Bool
 resultHasFixedRuntimeRep = typeHasFixedRuntimeRep . snd . splitPiTys
+
+argsHaveFixedRuntimeRep :: Type -> Bool
+-- ^ True if the argument types of this function type
+-- all have a fixed-runtime-rep
+argsHaveFixedRuntimeRep ty
+  = all ok bndrs
+  where
+    ok :: TyCoBinder -> Bool
+    ok (Anon _ ty) = typeHasFixedRuntimeRep (scaledThing ty)
+    ok _           = True
+
+    bndrs :: [TyCoBinder]
+    (bndrs, _) = splitPiTys ty
 
 {- **********************************************************************
 *                                                                       *

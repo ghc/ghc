@@ -1407,7 +1407,7 @@ isCheapApp fn n_val_args
       DataConWorkId {} -> True  -- Actually handled by isWorkFreeApp
       RecSelId {}      -> n_val_args == 1  -- See Note [Record selection]
       ClassOpId {}     -> n_val_args == 1
-      PrimOpId op      -> primOpIsCheap op
+      PrimOpId op _    -> primOpIsCheap op
       _                -> False
         -- In principle we should worry about primops
         -- that return a type variable, since the result
@@ -1612,7 +1612,7 @@ app_ok primop_ok fun args
                 -- been expressed by its "wrapper", so we don't need
                 -- to take the arguments into account
 
-      PrimOpId op
+      PrimOpId op _
         | primOpIsDiv op
         , [arg1, Lit lit] <- args
         -> not (isZeroLit lit) && expr_ok primop_ok arg1

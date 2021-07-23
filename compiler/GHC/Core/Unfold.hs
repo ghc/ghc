@@ -526,9 +526,9 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
           is_inline_scrut scrut
               | (Var f, _) <- collectArgs scrut
                 = case idDetails f of
-                    FCallId fc  -> not (isSafeForeignCall fc)
-                    PrimOpId op -> not (primOpOutOfLine op)
-                    _other      -> False
+                    FCallId fc    -> not (isSafeForeignCall fc)
+                    PrimOpId op _ -> not (primOpOutOfLine op)
+                    _other        -> False
               | otherwise
                 = False
 
@@ -562,7 +562,7 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
        = case idDetails fun of
            FCallId _        -> sizeN (callSize (length val_args) voids)
            DataConWorkId dc -> conSize    dc (length val_args)
-           PrimOpId op      -> primOpSize op (length val_args)
+           PrimOpId op _    -> primOpSize op (length val_args)
            ClassOpId _      -> classOpSize opts top_args val_args
            _                -> funSize opts top_args fun (length val_args) voids
 
