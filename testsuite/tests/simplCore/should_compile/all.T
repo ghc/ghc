@@ -363,6 +363,7 @@ test('T13873',  [ grep_errmsg(r'SPEC') ], compile, ['-O -ddump-rules'])
 # Look for a specialisation rule for wimwam
 test('T19672', normal, compile, ['-O2 -ddump-rules'])
 
+test('T20103',  [ grep_errmsg(r'Arity') ], compile, ['-O -ddump-simpl -dsuppress-uniques'])
 test('T19780', normal, compile, ['-O2'])
 test('T19794', normal, compile, ['-O'])
 test('T19890',  [ grep_errmsg(r'= T19890.foo1') ], compile, ['-O -ddump-simpl'])

@@ -39,7 +39,7 @@ import GHC.Core.Utils
 import GHC.Core.DataCon
 import GHC.Core.TyCon     ( tyConArity )
 import GHC.Core.TyCon.RecWalk     ( initRecTc, checkRecTc )
-import GHC.Core.Predicate ( isDictTy )
+import GHC.Core.Predicate ( isDictTy, isCallStackPredTy )
 import GHC.Core.Multiplicity
 
 -- We have two sorts of substitution:
@@ -835,6 +835,17 @@ topDiv.
 
 Historical note: long ago, we unconditionally switched to topDiv when we
 encountered a cast, but that is far too conservative: see #5475
+
+Note [Eta expanding through CallStacks]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Just as it's good to eta-expand through dictionaries, so it is good to
+do so through CallStacks.  #20103 is a case in point, where we got
+  foo :: HasCallStack => Int -> Int
+  foo = \(d::CallStack). let d2 = pushCallStack blah d in
+        \(x:Int). blah
+
+We really want to eta-expand this!  #20103 is quite convincing!
+We do this regardless of -fdicts-cheap; it's not really a dictionary.
 -}
 
 ---------------------------
@@ -963,7 +974,13 @@ myExprIsCheap AE{ae_mode = mode} e mb_ty = case mode of
   BotStrictness -> False
   _             -> cheap_dict || cheap_fun e
     where
-      cheap_dict = am_dicts_cheap mode && fmap isDictTy mb_ty == Just True
+      cheap_dict = case mb_ty of
+                     Nothing -> False
+                     Just ty -> (am_dicts_cheap mode && isDictTy ty)
+                                || isCallStackPredTy ty
+        -- See Note [Eta expanding through dictionaries]
+        -- See Note [Eta expanding through CallStacks]
+
       cheap_fun e = case mode of
 #if __GLASGOW_HASKELL__ <= 900
         BotStrictness                -> panic "impossible"

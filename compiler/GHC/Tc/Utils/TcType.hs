@@ -80,7 +80,7 @@ module GHC.Tc.Utils.TcType (
   isSigmaTy, isRhoTy, isRhoExpTy, isOverloadedTy,
   isFloatingTy, isDoubleTy, isFloatTy, isIntTy, isWordTy, isStringTy,
   isIntegerTy, isNaturalTy,
-  isBoolTy, isUnitTy, isCharTy, isCallStackTy, isCallStackPred,
+  isBoolTy, isUnitTy, isCharTy,
   isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy,
   isPredTy, isTyVarClassPred,
   checkValidClsArgs, hasTyVarHead,
@@ -228,7 +228,6 @@ import GHC.Data.List.SetOps ( getNth, findDupsEq )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
-import GHC.Data.FastString
 import GHC.Utils.Error( Validity(..), isValid )
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -2119,26 +2118,6 @@ isStringTy ty
   = case tcSplitTyConApp_maybe ty of
       Just (tc, [arg_ty]) -> tc == listTyCon && isCharTy arg_ty
       _                   -> False
-
--- | Is a type a 'CallStack'?
-isCallStackTy :: Type -> Bool
-isCallStackTy ty
-  | Just tc <- tyConAppTyCon_maybe ty
-  = tc `hasKey` callStackTyConKey
-  | otherwise
-  = False
-
--- | Is a 'PredType' a 'CallStack' implicit parameter?
---
--- If so, return the name of the parameter.
-isCallStackPred :: Class -> [Type] -> Maybe FastString
-isCallStackPred cls tys
-  | [ty1, ty2] <- tys
-  , isIPClass cls
-  , isCallStackTy ty2
-  = isStrLitTy ty1
-  | otherwise
-  = Nothing
 
 is_tc :: Unique -> Type -> Bool
 -- Newtypes are opaque to this

@@ -24,6 +24,7 @@ module GHC.Core.Predicate (
 
   -- Implicit parameters
   isIPLikePred, hasIPSuperClasses, isIPTyCon, isIPClass,
+  isCallStackTy, isCallStackPred, isCallStackPredTy,
 
   -- Evidence variables
   DictId, isEvVar, isDictId
@@ -44,6 +45,7 @@ import GHC.Builtin.Names
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
+import GHC.Data.FastString( FastString )
 
 
 -- | A predicate in the solver. The solver tries to prove Wanted predicates
@@ -256,6 +258,39 @@ has_ip_super_classes rec_clss cls tys
 
 initIPRecTc :: RecTcChecker
 initIPRecTc = setRecTcMaxBound 1 initRecTc
+
+-- --------------------- CallStack predicates ---------------------------------
+
+isCallStackPredTy :: Type -> Bool
+-- True of HasCallStack, or IP "blah" CallStack
+isCallStackPredTy ty
+  | Just (tc, tys) <- splitTyConApp_maybe ty
+  , Just cls <- tyConClass_maybe tc
+  , Just {} <- isCallStackPred cls tys
+  = True
+  | otherwise
+  = False
+
+-- | Is a 'PredType' a 'CallStack' implicit parameter?
+--
+-- If so, return the name of the parameter.
+isCallStackPred :: Class -> [Type] -> Maybe FastString
+isCallStackPred cls tys
+  | [ty1, ty2] <- tys
+  , isIPClass cls
+  , isCallStackTy ty2
+  = isStrLitTy ty1
+  | otherwise
+  = Nothing
+
+-- | Is a type a 'CallStack'?
+isCallStackTy :: Type -> Bool
+isCallStackTy ty
+  | Just tc <- tyConAppTyCon_maybe ty
+  = tc `hasKey` callStackTyConKey
+  | otherwise
+  = False
+
 
 {- Note [Local implicit parameters]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
