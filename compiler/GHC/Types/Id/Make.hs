@@ -81,7 +81,6 @@ import GHC.Utils.Panic.Plain
 import GHC.Data.FastString
 import GHC.Data.List.SetOps
 
-
 {-
 ************************************************************************
 *                                                                      *
