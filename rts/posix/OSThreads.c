@@ -7,9 +7,9 @@
  *
  * --------------------------------------------------------------------------*/
 
-#include "PosixSource.h"
+#include "rts/PosixSource.h"
 
-/* We've defined _POSIX_SOURCE via "PosixSource.h", and yet still use
+/* We've defined _POSIX_SOURCE via "rts/PosixSource.h", and yet still use
    some non-POSIX features.  With _POSIX_SOURCE defined, visibility of
    non-POSIX extension prototypes requires _DARWIN_C_SOURCE on Mac OS X,
    __BSD_VISIBLE on FreeBSD and DragonflyBSD, and _NETBSD_SOURCE on
@@ -19,7 +19,7 @@
    system headers are included via "Rts.h".
 
    An alternative approach could be to write portable wrappers or stubs for all
-   the non-posix functions in a C-module that does not include "PosixSource.h",
+   the non-posix functions in a C-module that does not include "rts/PosixSource.h",
    and then use only POSIX features and the portable wrapper functions in all
    other C-modules. */
 #include "ghcconfig.h"

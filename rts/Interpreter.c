@@ -5,7 +5,7 @@
  * ---------------------------------------------------------------------------*/
 
 
-#include "PosixSource.h"
+#include "rts/PosixSource.h"
 #include "Rts.h"
 #include "RtsAPI.h"
 #include "rts/Bytecodes.h"

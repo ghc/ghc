@@ -104,7 +104,7 @@ Std 1003.1) interfaces and APIs.  We used to define
 <code>POSIX_SOURCE</code> by default, but found that this caused more
 problems than it solved, so now we require any code that is
 POSIX-compliant to explicitly say so by having <code>#include
-"PosixSource.h"</code> at the top.  Try to do this whenever possible.
+"rts/PosixSource.h"</code> at the top.  Try to do this whenever possible.
 
 <p><li> Some architectures have memory alignment constraints.  Others
 don't have any constraints but go faster if you align things.  These

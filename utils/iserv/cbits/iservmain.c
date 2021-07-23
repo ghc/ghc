@@ -1,7 +1,18 @@
-#include "../rts/PosixSource.h"
-#include "Rts.h"
+#if GHC_STAGE > 1
+#  include <rts/PosixSource.h>
+#else // PosixSource.h not yet exposed, hacky inline for now.
+#  include <ghcplatform.h>
+#  if defined(solaris2_HOST_OS)
+#  define _POSIX_C_SOURCE 200112L
+#  define _XOPEN_SOURCE   600
+#  else
+#  define _POSIX_C_SOURCE 200809L
+#  define _XOPEN_SOURCE   700
+#  endif
+#endif
+#include <Rts.h>
 
-#include "HsFFI.h"
+#include <HsFFI.h>
 
 int main (int argc, char *argv[])
 {

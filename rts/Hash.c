@@ -8,7 +8,7 @@
  * pp. 446 -- 457.
  * -------------------------------------------------------------------------- */
 
-#include "PosixSource.h"
+#include "rts/PosixSource.h"
 #include "Rts.h"
 
 #include "Hash.h"

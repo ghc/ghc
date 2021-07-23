@@ -1,7 +1,7 @@
-#include "../rts/PosixSource.h"
-#include "Rts.h"
+#include <rts/PosixSource.h>
+#include <Rts.h>
 
-#include "HsFFI.h"
+#include <HsFFI.h>
 
 int main (int argc, char *argv[])
 {

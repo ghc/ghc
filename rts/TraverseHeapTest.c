@@ -1,7 +1,7 @@
 
 #if defined(PROFILING) && defined(DEBUG)
 
-#include "PosixSource.h"
+#include "rts/PosixSource.h"
 #include <string.h>
 #include <Rts.h>
 #include <rts/storage/Closures.h>
