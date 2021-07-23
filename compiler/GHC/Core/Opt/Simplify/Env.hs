@@ -20,7 +20,7 @@ module GHC.Core.Opt.Simplify.Env (
         getSimplRules,
 
         -- * Substitution results
-        SimplSR(..), mkContEx, substId, lookupRecBndr, refineFromInScope,
+        SimplSR(..), mkContEx, substId, lookupRecBndr,
 
         -- * Simplifying 'Id' binders
         simplNonRecBndr, simplNonRecJoinBndr, simplRecBndrs, simplRecJoinBndrs,
@@ -32,6 +32,7 @@ module GHC.Core.Opt.Simplify.Env (
         SimplFloats(..), emptyFloats, isEmptyFloats, mkRecFloats,
         mkFloatBind, addLetFloats, addJoinFloats, addFloats,
         extendFloats, wrapFloats,
+        isEmptyJoinFloats, isEmptyLetFloats,
         doFloatFromRhs, getTopFloatBinds,
 
         -- * LetFloats
@@ -519,10 +520,16 @@ so we must take the 'or' of the two.
 emptyLetFloats :: LetFloats
 emptyLetFloats = LetFloats nilOL FltLifted
 
+isEmptyLetFloats :: LetFloats -> Bool
+isEmptyLetFloats (LetFloats fs _) = isNilOL fs
+
 emptyJoinFloats :: JoinFloats
 emptyJoinFloats = nilOL
 
-unitLetFloat :: HasDebugCallStack => OutBind -> LetFloats
+isEmptyJoinFloats :: JoinFloats -> Bool
+isEmptyJoinFloats = isNilOL
+
+unitLetFloat :: OutBind -> LetFloats
 -- This key function constructs a singleton float with the right form
 unitLetFloat bind = assert (all (not . isJoinId) (bindersOf bind)) $
                     LetFloats (unitOL bind) (flag bind)
@@ -801,7 +808,6 @@ simplRecBndrs env@(SimplEnv {}) ids
     do  { let (!env1, ids1) = mapAccumL substIdBndr env ids
         ; seqIds ids1 `seq` return env1 }
 
-
 ---------------
 substIdBndr :: SimplEnv -> InBndr -> (SimplEnv, OutBndr)
 -- Might be a coercion variable
@@ -1028,7 +1034,7 @@ getTCvSubst (SimplEnv { seInScope = in_scope, seTvSubst = tv_env
                       , seCvSubst = cv_env })
   = mkTCvSubst in_scope (tv_env, cv_env)
 
-substTy :: SimplEnv -> Type -> Type
+substTy :: HasDebugCallStack => SimplEnv -> Type -> Type
 substTy env ty = Type.substTy (getTCvSubst env) ty
 
 substTyVar :: SimplEnv -> TyVar -> Type

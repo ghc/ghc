@@ -43,6 +43,7 @@ import GHC.Builtin.Types
 import GHC.Builtin.Names
 
 import GHC.Core
+import GHC.Core.Opt.Arity( typeOneShot )
 import GHC.Core.Type
 import GHC.Core.Multiplicity
 import GHC.Core.TyCo.Rep
@@ -1318,7 +1319,7 @@ mkFCallId uniq fcall ty
 
     (bndrs, _) = tcSplitPiTys ty
     arity      = count isAnonTyCoBinder bndrs
-    strict_sig = mkClosedDmdSig (replicate arity topDmd) topDiv
+    strict_sig = mkVanillaDmdSig arity topDiv
     -- the call does not claim to be strict in its arguments, since they
     -- may be lifted (foreign import prim) and the called code doesn't
     -- necessarily force them. See #11076.
@@ -1771,9 +1772,11 @@ inlined.
 -}
 
 realWorldPrimId :: Id   -- :: State# RealWorld
-realWorldPrimId = pcMiscPrelId realWorldName realWorldStatePrimTy
+realWorldPrimId = pcMiscPrelId realWorldName id_ty
                      (noCafIdInfo `setUnfoldingInfo` evaldUnfolding    -- Note [evaldUnfoldings]
-                                  `setOneShotInfo`   stateHackOneShot)
+                                  `setOneShotInfo`   typeOneShot id_ty)
+   where
+     id_ty = realWorldStatePrimTy
 
 voidPrimId :: Id     -- Global constant :: Void#
                      -- The type Void# is now the same as (# #) (ticket #18441),

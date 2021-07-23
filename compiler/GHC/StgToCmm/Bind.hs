@@ -16,6 +16,7 @@ module GHC.StgToCmm.Bind (
 import GHC.Prelude hiding ((<*>))
 
 import GHC.Core          ( AltCon(..) )
+import GHC.Core.Opt.Arity( isOneShotBndr )
 import GHC.Runtime.Heap.Layout
 import GHC.Unit.Module
 

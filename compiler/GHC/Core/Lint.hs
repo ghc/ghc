@@ -667,8 +667,8 @@ lintLetBind top_lvl rec_flag binder rhs rhs_ty
        -- exceeds idArity, but that is an unnecessary complication, see
        -- Note [idArity varies independently of dmdTypeDepth] in GHC.Core.Opt.DmdAnal
 
-       -- Check that the binder's arity is within the bounds imposed by
-       -- the type and the strictness signature. See Note [exprArity invariant]
+       -- Check that the binder's arity is within the bounds imposed by the type
+       -- and the strictness signature. See Note [Arity invariants for bindings]
        -- and Note [Trimming arity]
 
        ; checkL (typeArity (idType binder) >= idArity binder)
@@ -677,6 +677,7 @@ lintLetBind top_lvl rec_flag binder rhs rhs_ty
            ppr (typeArity (idType binder)) <> colon <+>
            ppr binder)
 
+       -- See Note [Check arity on bottoming functions]
        ; case splitDmdSig (idDmdSig binder) of
            (demands, result_info) | isDeadEndDiv result_info ->
              checkL (demands `lengthAtLeast` idArity binder)
@@ -761,6 +762,12 @@ lintIdUnfolding  _ _ _
                     -- to exponential behaviour; c.f. GHC.Core.FVs.idUnfoldingVars
 
 {-
+Note [Check arity on bottoming functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If a function has a strictness signature like [S]b, it claims to
+return bottom when applied to one argument.  So its arity should not
+be greater than 1!  We check this claim in Lint.
+
 Note [Checking for INLINE loop breakers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It's very suspicious if a strong loop breaker is marked INLINE.

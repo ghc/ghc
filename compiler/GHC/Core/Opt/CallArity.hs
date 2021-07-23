@@ -17,7 +17,7 @@ import GHC.Types.Var.Env
 import GHC.Types.Basic
 import GHC.Core
 import GHC.Types.Id
-import GHC.Core.Opt.Arity ( typeArity, typeOneShots )
+import GHC.Core.Opt.Arity ( typeArity )
 import GHC.Core.Utils ( exprIsCheap, exprIsTrivial )
 import GHC.Data.Graph.UnVar
 import GHC.Types.Demand
@@ -377,15 +377,14 @@ a body representing “all external calls”, which returns a pessimistic
 CallArityRes (the co-call graph is the complete graph, all arityies 0).
 
 Note [Trimming arity]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+~~~~~~~~~~~~~~~~~~~~~
 In the Call Arity papers, we are working on an untyped lambda calculus with no
 other id annotations, where eta-expansion is always possible. But this is not
 the case for Core!
  1. We need to ensure the invariant
       callArity e <= typeArity (exprType e)
     for the same reasons that exprArity needs this invariant (see Note
-    [exprArity invariant] in GHC.Core.Opt.Arity).
+    [typeArity invariants] in GHC.Core.Opt.Arity).
 
     If we are not doing that, a too-high arity annotation will be stored with
     the id, confusing the simplifier later on.
@@ -544,7 +543,7 @@ callArityAnal arity int (Let bind e)
 -- Which bindings should we look at?
 -- See Note [Which variables are interesting]
 isInteresting :: Var -> Bool
-isInteresting v = not $ null $ typeOneShots $ idType v
+isInteresting v = typeArity (idType v) > 0
 
 interestingBinds :: CoreBind -> [Var]
 interestingBinds = filter isInteresting . bindersOf

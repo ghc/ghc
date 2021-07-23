@@ -84,3 +84,4 @@ test('T21150', [ grep_errmsg(r'( t\d? :: Int)') ], compile, ['-dsuppress-uniques
 # T21128: Check that y is not reboxed in $wtheresCrud
 test('T21128', [ grep_errmsg(r'let { y = I\#') ], multimod_compile, ['T21128', '-v0 -dsuppress-uniques -dsuppress-all -ddump-simpl'])
 test('T21265', normal, compile, [''])
+test('EtaExpansion', normal, compile, [''])

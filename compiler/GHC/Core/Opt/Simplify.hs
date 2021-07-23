@@ -38,9 +38,9 @@ import GHC.Core.Ppr     ( pprCoreExpr )
 import GHC.Core.Unfold
 import GHC.Core.Unfold.Make
 import GHC.Core.Utils
-import GHC.Core.Opt.Arity ( ArityType(..), typeArity
+import GHC.Core.Opt.Arity ( ArityType, exprArity, getBotArity
                           , pushCoTyArg, pushCoValArg
-                          , etaExpandAT )
+                          , typeArity, arityTypeArity, etaExpandAT )
 import GHC.Core.SimpleOpt ( exprIsConApp_maybe, joinPointBinding_maybe, joinPointBindings_maybe )
 import GHC.Core.FVs     ( mkRuleInfo )
 import GHC.Core.Rules   ( lookupRule, getRules, initRuleOpts )
@@ -352,7 +352,8 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
                 -- See Note [Floating and type abstraction] in GHC.Core.Opt.Simplify.Utils
 
         -- Simplify the RHS
-        ; let rhs_cont = mkRhsStop (substTy body_env (exprType body)) (idDemandInfo bndr)
+        ; let rhs_cont = mkRhsStop (substTy body_env (exprType body))
+                                   is_rec (idDemandInfo bndr)
         ; (body_floats0, body0) <- {-#SCC "simplExprF" #-} simplExprF body_env body rhs_cont
 
         -- ANF-ise a constructor or PAP rhs
@@ -375,11 +376,11 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
                      {-#SCC "simplLazyBind-type-abstraction-first" #-}
                      do { (poly_binds, body3) <- abstractFloats (seUnfoldingOpts env) top_lvl
                                                                 tvs' body_floats2 body2
-                        ; let floats = foldl' extendFloats (emptyFloats env) poly_binds
-                        ; return (floats, body3) }
+                        ; let poly_floats = foldl' extendFloats (emptyFloats env) poly_binds
+                        ; return (poly_floats, body3) }
 
         ; let env' = env `setInScopeFromF` rhs_floats
-        ; rhs' <- mkLam env' tvs' body3 rhs_cont
+        ; rhs' <- rebuildLam env' tvs' body3 rhs_cont
         ; (bind_float, env2) <- completeBind env' (BC_Let top_lvl is_rec) bndr bndr1 rhs'
         ; return (rhs_floats `addFloats` bind_float, env2) }
 
@@ -598,7 +599,7 @@ tryCastWorkerWrapper env bind_cxt old_bndr occ_info bndr (Cast rhs co)
                         --            a DFunUnfolding in mk_worker_unfolding
   , not (exprIsTrivial rhs)        -- Not x = y |> co; Wrinkle 1
   , not (hasInlineUnfolding info)  -- Not INLINE things: Wrinkle 4
-  , isConcrete (typeKind rhs_ty)   -- Don't peel off a cast if doing so would
+  , isConcrete (typeKind work_ty)  -- Don't peel off a cast if doing so would
                                    -- lose the underlying runtime representation.
                                    -- See Note [Preserve RuntimeRep info in cast w/w]
   , not (isOpaquePragma (idInlinePragma old_bndr)) -- Not for OPAQUE bindings
@@ -661,7 +662,9 @@ tryCastWorkerWrapper env bind_cxt old_bndr occ_info bndr (Cast rhs co)
            _ -> mkLetUnfolding (sm_uf_opts mode) top_lvl InlineRhs work_id work_rhs
 
 tryCastWorkerWrapper env _ _ _ bndr rhs  -- All other bindings
-  = return (mkFloatBind env (NonRec bndr rhs))
+  = do { traceSmpl "tcww:no" (vcat [ text "bndr:" <+> ppr bndr
+                                   , text "rhs:" <+> ppr rhs ])
+        ; return (mkFloatBind env (NonRec bndr rhs)) }
 
 mkCastWrapperInlinePrag :: InlinePragma -> InlinePragma
 -- See Note [Cast worker/wrapper]
@@ -699,6 +702,7 @@ prepareBinding :: SimplEnv -> TopLevelFlag -> RecFlag -> Bool
 --    bndr = K a a tmp
 -- That's what prepareBinding does
 -- Precondition: binder is not a JoinId
+-- Postcondition: the returned SimplFloats contains only let-floats
 prepareBinding env top_lvl is_rec strict_bind bndr rhs_floats rhs
   = do { -- Never float join-floats out of a non-join let-binding (which this is)
          -- So wrap the body in the join-floats right now
@@ -822,30 +826,15 @@ makeTrivial env top_lvl dmd occ_fs expr
   = do { (floats, triv_expr) <- makeTrivial env top_lvl dmd occ_fs expr'
        ; return (floats, Cast triv_expr co) }
 
-  | otherwise
-  = do { (floats, new_id) <- makeTrivialBinding env top_lvl occ_fs
-                                                id_info expr expr_ty
-       ; return (floats, Var new_id) }
-  where
-    id_info = vanillaIdInfo `setDemandInfo` dmd
-    expr_ty = exprType expr
-
-makeTrivialBinding :: HasDebugCallStack
-                   => SimplEnv -> TopLevelFlag
-                   -> FastString  -- ^ a "friendly name" to build the new binder from
-                   -> IdInfo
-                   -> OutExpr
-                   -> OutType     -- Type of the expression
-                   -> SimplM (LetFloats, OutId)
-makeTrivialBinding env top_lvl occ_fs info expr expr_ty
+  | otherwise -- 'expr' is not of form (Cast e co)
   = do  { (floats, expr1) <- prepareRhs env top_lvl occ_fs expr
         ; uniq <- getUniqueM
         ; let name = mkSystemVarName uniq occ_fs
-              var  = mkLocalIdWithInfo name Many expr_ty info
+              var  = mkLocalIdWithInfo name Many expr_ty id_info
 
         -- Now something very like completeBind,
         -- but without the postInlineUnconditionally part
-        ; (arity_type, expr2) <- tryEtaExpandRhs env NonRecursive var expr1
+        ; (arity_type, expr2) <- tryEtaExpandRhs env (BC_Let top_lvl NonRecursive) var expr1
           -- Technically we should extend the in-scope set in 'env' with
           -- the 'floats' from prepareRHS; but they are all fresh, so there is
           -- no danger of introducing name shadowig in eta expansion
@@ -855,9 +844,12 @@ makeTrivialBinding env top_lvl occ_fs info expr expr_ty
         ; let final_id = addLetBndrInfo var arity_type unf
               bind     = NonRec final_id expr2
 
-        ; return ( floats `addLetFlts` unitLetFloat bind, final_id ) }
+        ; traceSmpl "makeTrivial" (vcat [text "final_id" <+> ppr final_id, text "rhs" <+> ppr expr2 ])
+        ; return ( floats `addLetFlts` unitLetFloat bind, Var final_id ) }
   where
-    mode = getMode env
+    id_info = vanillaIdInfo `setDemandInfo` dmd
+    expr_ty = exprType expr
+    mode    = getMode env
 
 bindingOk :: TopLevelFlag -> CoreExpr -> Type -> Bool
 -- True iff we can have a binding of this expression at this level
@@ -945,7 +937,7 @@ completeBind env bind_cxt old_bndr new_bndr new_rhs
 
          -- Do eta-expansion on the RHS of the binding
          -- See Note [Eta-expanding at let bindings] in GHC.Core.Opt.Simplify.Utils
-      ; (new_arity, eta_rhs) <- tryEtaExpandRhs env is_rec new_bndr new_rhs
+      ; (new_arity, eta_rhs) <- tryEtaExpandRhs env bind_cxt new_bndr new_rhs
 
         -- Simplify the unfolding
       ; new_unfolding <- simplLetUnfolding env bind_cxt old_bndr
@@ -975,9 +967,7 @@ addLetBndrInfo :: OutId -> ArityType -> Unfolding -> OutId
 addLetBndrInfo new_bndr new_arity_type new_unf
   = new_bndr `setIdInfo` info5
   where
-    AT oss div = new_arity_type
-    new_arity  = length oss
-
+    new_arity = arityTypeArity new_arity_type
     info1 = idInfo new_bndr `setArityInfo` new_arity
 
     -- Unfolding info: Note [Setting the new unfolding]
@@ -990,12 +980,11 @@ addLetBndrInfo new_bndr new_arity_type new_unf
           = info2
 
     -- Bottoming bindings: see Note [Bottoming bindings]
-    info4 | isDeadEndDiv div = info3 `setDmdSigInfo` bot_sig
-                                     `setCprSigInfo`        bot_cpr
-          | otherwise        = info3
-
-    bot_sig = mkClosedDmdSig (replicate new_arity topDmd) div
-    bot_cpr = mkCprSig new_arity botCpr
+    info4 = case getBotArity new_arity_type of
+        Nothing -> info3
+        Just ar -> assert (ar == new_arity) $
+                   info3 `setDmdSigInfo` mkVanillaDmdSig new_arity botDiv
+                         `setCprSigInfo` mkCprSig new_arity botCpr
 
      -- Zap call arity info. We have used it by now (via
      -- `tryEtaExpandRhs`), and the simplifier can invalidate this
@@ -1009,12 +998,12 @@ Suppose we have
    let x = error "urk"
    in ...(case x of <alts>)...
 or
-   let f = \x. error (x ++ "urk")
+   let f = \y. error (y ++ "urk")
    in ...(case f "foo" of <alts>)...
 
 Then we'd like to drop the dead <alts> immediately.  So it's good to
-propagate the info that x's RHS is bottom to x's IdInfo as rapidly as
-possible.
+propagate the info that x's (or f's) RHS is bottom to x's (or f's)
+IdInfo as rapidly as possible.
 
 We use tryEtaExpandRhs on every binding, and it turns out that the
 arity computation it performs (via GHC.Core.Opt.Arity.findRhsArity) already
@@ -1022,6 +1011,21 @@ does a simple bottoming-expression analysis.  So all we need to do
 is propagate that info to the binder's IdInfo.
 
 This showed up in #12150; see comment:16.
+
+There is a second reason for settting  the strictness signature. Consider
+   let -- f :: <[S]b>
+       f = \x. error "urk"
+   in ...(f a b c)...
+Then, in GHC.Core.Opt.Arity.findRhsArity we'll use the demand-info on `f`
+to eta-expand to
+   let f = \x y z. error "urk"
+   in ...(f a b c)...
+
+But now f's strictness signature has too short an arity; see
+GHC.Core.Lint Note [Check arity on bottoming functions].
+Fortuitously, the same strictness-signature-fixup code gives the
+function a new strictness signature with the right number of
+arguments.  Example in stranal/should_compile/EtaExpansion.
 
 Note [Setting the demand info]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1689,7 +1693,7 @@ simpl_lam env bndr body cont
   = do  { let (inner_bndrs, inner_body) = collectBinders body
         ; (env', bndrs') <- simplLamBndrs env (bndr:inner_bndrs)
         ; body'   <- simplExpr env' inner_body
-        ; new_lam <- mkLam env' bndrs' body' cont
+        ; new_lam <- rebuildLam env' bndrs' body' cont
         ; rebuild env' new_lam cont }
 
 -------------
@@ -3552,8 +3556,8 @@ mkDupableContWithDmds env dmds
         --              let a = ...arg...
         --              in [...hole...] a
         -- NB: sc_dup /= OkToDup; that is caught earlier by contIsDupable
-    do  { let (dmd:_) = dmds   -- Never fails
-        ; (floats1, cont') <- mkDupableContWithDmds env dmds cont
+    do  { let (dmd:cont_dmds) = dmds   -- Never fails
+        ; (floats1, cont') <- mkDupableContWithDmds env cont_dmds cont
         ; let env' = env `setInScopeFromF` floats1
         ; (_, se', arg') <- simplArg env' dup se arg
         ; (let_floats2, arg'') <- makeTrivial env NotTopLevel dmd (fsLit "karg") arg'
@@ -4086,12 +4090,14 @@ simplStableUnfolding env bind_cxt id rhs_ty id_arity unf
       CoreUnfolding { uf_tmpl = expr, uf_src = src, uf_guidance = guide }
         | isStableSource src
         -> do { expr' <- case bind_cxt of
-                           BC_Join cont -> -- Binder is a join point
-                                           -- See Note [Rules and unfolding for join points]
-                                           simplJoinRhs unf_env id expr cont
-                           BC_Let {} -> -- Binder is not a join point
-                                        do { expr' <- simplExprC unf_env expr (mkBoringStop rhs_ty)
-                                           ; return (eta_expand expr') }
+                  BC_Join cont    -> -- Binder is a join point
+                                     -- See Note [Rules and unfolding for join points]
+                                     simplJoinRhs unf_env id expr cont
+                  BC_Let _ is_rec -> -- Binder is not a join point
+                                     do { let cont = mkRhsStop rhs_ty is_rec topDmd
+                                           -- mkRhsStop: switch off eta-expansion at the top level
+                                        ; expr' <- simplExprC unf_env expr cont
+                                        ; return (eta_expand expr') }
               ; case guide of
                   UnfWhen { ug_arity = arity
                           , ug_unsat_ok = sat_ok
@@ -4138,11 +4144,13 @@ simplStableUnfolding env bind_cxt id rhs_ty id_arity unf
          -- See Note [Simplifying inside stable unfoldings] in GHC.Core.Opt.Simplify.Utils
 
     -- See Note [Eta-expand stable unfoldings]
-    eta_expand expr
-      | not eta_on         = expr
-      | exprIsTrivial expr = expr
-      | otherwise          = etaExpandAT (getInScope env) id_arity expr
-    eta_on = sm_eta_expand (getMode env)
+    -- Use the arity from the main Id (in id_arity), rather than computing it from rhs
+    eta_expand expr | sm_eta_expand (getMode env)
+                    , exprArity expr < arityTypeArity id_arity
+                    , wantEtaExpansion expr
+                    = etaExpandAT (getInScope env) id_arity expr
+                    | otherwise
+                    = expr
 
 {- Note [Eta-expand stable unfoldings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -4166,7 +4174,7 @@ eta-expand the stable unfolding to arity N too. Simple and consistent.
 
 Wrinkles
 
-* See Note [Eta-expansion in stable unfoldings] in
+* See Historical-note [Eta-expansion in stable unfoldings] in
   GHC.Core.Opt.Simplify.Utils
 
 * Don't eta-expand a trivial expr, else each pass will eta-reduce it,

@@ -93,7 +93,7 @@ test('T5314', [extra_ways(extra_prof_ways)], compile_and_run, [''])
 test('T680', [], compile_and_run,
      ['-fno-full-laziness']) # Note [consistent stacks]
 
-test('T2552', [expect_broken_for_10037], compile_and_run, [''])
+test('T2552', [], compile_and_run, [''])
 
 test('T949', [extra_ways(extra_prof_ways)], compile_and_run, [''])
 
@@ -101,7 +101,7 @@ test('T949', [extra_ways(extra_prof_ways)], compile_and_run, [''])
 # We care more about getting the optimised results right, so ignoring
 # this for now.
 test('ioprof',
-     [expect_broken_for_10037,
+     [normal,
       exit_code(1),
       omit_ways(['ghci-ext-prof']), # doesn't work with exit_code(1)
       ignore_stderr

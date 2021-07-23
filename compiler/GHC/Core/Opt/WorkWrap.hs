@@ -679,10 +679,11 @@ is there only to generate used-once info for single-entry thunks.
 
 Note [Don't eta expand in w/w]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A binding where the manifestArity of the RHS is less than idArity of the binder
-means GHC.Core.Opt.Arity didn't eta expand that binding. When this happens, it does so
-for a reason (see Note [exprArity invariant] in GHC.Core.Opt.Arity) and we probably have
-a PAP, cast or trivial expression as RHS.
+A binding where the manifestArity of the RHS is less than idArity of
+the binder means GHC.Core.Opt.Arity didn't eta expand that binding
+When this happens, it does so for a reason (see Note [Arity invariants for bindings]
+in GHC.Core.Opt.Arity) and we probably have a PAP, cast or trivial expression
+as RHS.
 
 Below is a historical account of what happened when w/w still did eta expansion.
 Nowadays, it doesn't do that, but will simply w/w for the wrong arity, unleashing

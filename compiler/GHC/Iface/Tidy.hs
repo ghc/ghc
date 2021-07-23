@@ -28,7 +28,7 @@ import GHC.Core.Unfold.Make
 import GHC.Core.FVs
 import GHC.Core.Tidy
 import GHC.Core.Seq     (seqBinds)
-import GHC.Core.Opt.Arity   ( exprArity, typeArity,, exprBotStrictness_maybe )
+import GHC.Core.Opt.Arity   ( exprArity, typeArity, exprBotStrictness_maybe )
 import GHC.Core.InstEnv
 import GHC.Core.Type     ( Type, tidyTopType )
 import GHC.Core.DataCon
@@ -52,7 +52,7 @@ import GHC.Types.Var
 import GHC.Types.Id
 import GHC.Types.Id.Make ( mkDictSelRhs )
 import GHC.Types.Id.Info
-import GHC.Types.Demand  ( isDeadEndAppSig, isTopSig, isDeadEndSig )
+import GHC.Types.Demand  ( isDeadEndAppSig, isNopSig, nopSig, isDeadEndSig )
 import GHC.Types.Cpr     ( mkCprSig, botCpr )
 import GHC.Types.Basic
 import GHC.Types.Name hiding (varName)
@@ -1263,11 +1263,16 @@ tidyTopIdInfo uf_opts rhs_tidy_env name rhs_ty orig_rhs tidy_rhs idinfo show_unf
     mb_bot_str = exprBotStrictness_maybe orig_rhs
 
     sig = dmdSigInfo idinfo
-    final_sig | not $ isTopSig sig
+    final_sig | not (isNopSig sig)
               = warnPprTrace (_bottom_hidden sig) "tidyTopIdInfo" (ppr name) sig
-              -- try a cheap-and-cheerful bottom analyser
-              | Just (_, nsig) <- mb_bot_str = nsig
-              | otherwise                    = sig
+
+              -- No demand signature, so try a
+              -- cheap-and-cheerful bottom analyser
+              | Just (_, nsig) <- mb_bot_str
+              = nsig
+
+              -- No stricness info
+              | otherwise = nopSig
 
     cpr = cprSigInfo idinfo
     final_cpr | Just _ <- mb_bot_str
@@ -1314,7 +1319,7 @@ tidyTopIdInfo uf_opts rhs_tidy_env name rhs_ty orig_rhs tidy_rhs idinfo show_unf
     arity = exprArity orig_rhs `min` typeArity rhs_ty
             -- orig_rhs: using tidy_rhs would make a black hole, since
             --           exprArity uses the arities of Ids inside the rhs
-            -- typeArity: see Note [typeArity invariants]
+            -- typeArity: see Note [Arity invariants for bindings]
             --            in GHC.Core.Opt.Arity
 
 {-
@@ -1419,4 +1424,4 @@ mustExposeTyCon no_trim_types exports tc
     exported_con con = any (`elemNameSet` exports)
                            (dataConName con : dataConFieldLabels con)
 -}
->>>>>>> Do arity trimming at bindings, rather than in exprArity
+
