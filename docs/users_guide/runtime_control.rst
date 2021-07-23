@@ -1,7 +1,7 @@
 .. _runtime-control:
 
-Running a compiled program
-==========================
+Runtime system (RTS) options
+============================
 
 .. index::
    single: runtime control of Haskell programs
@@ -9,7 +9,7 @@ Running a compiled program
    single: RTS options
 
 To make an executable program, the GHC system compiles your code and
-then links it with a non-trivial runtime system (RTS), which handles
+then links it with a non-trivial runtime system, which handles
 storage management, thread scheduling, profiling, and so on.
 
 The RTS has a lot of options to control its behaviour. For example, you
