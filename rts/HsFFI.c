@@ -6,7 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#include "PosixSource.h"
+#include "rts/PosixSource.h"
 #include "HsFFI.h"
 #include "Rts.h"
 

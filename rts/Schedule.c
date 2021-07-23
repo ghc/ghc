@@ -6,7 +6,7 @@
  *
  * --------------------------------------------------------------------------*/
 
-#include "PosixSource.h"
+#include "rts/PosixSource.h"
 #define KEEP_LOCKCLOSURE
 #include "Rts.h"
 

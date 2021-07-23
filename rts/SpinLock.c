@@ -19,7 +19,7 @@
  *
  * -------------------------------------------------------------------------- */
 
-#include "PosixSource.h"
+#include "rts/PosixSource.h"
 #include "Rts.h"
 
 #if defined(THREADED_RTS)

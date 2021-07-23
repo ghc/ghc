@@ -26,7 +26,7 @@
  *
  * -------------------------------------------------------------------------- */
 
-#include "PosixSource.h"
+#include "rts/PosixSource.h"
 #include "ghcconfig.h"
 
 // Enable DWARF Call-Frame Information (used for stack unwinding) on Linux.

@@ -2,7 +2,7 @@
 // compiled for real here, just in case the definition was not inlined
 // at some call site:
 #define KEEP_INLINES
-#include "PosixSource.h"
+#include "rts/PosixSource.h"
 #include "Rts.h"
 #include "Schedule.h"
 #include "Capability.h"

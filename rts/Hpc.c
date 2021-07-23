@@ -2,7 +2,7 @@
  * (c)2006 Galois Connections, Inc.
  */
 
-#include "PosixSource.h"
+#include "rts/PosixSource.h"
 #include "Rts.h"
 
 #include "Trace.h"

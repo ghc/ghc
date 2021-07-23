@@ -2,7 +2,7 @@
  * AMD64 architecture adjustor thunk logic.
  * ---------------------------------------------------------------------------*/
 
-#include "PosixSource.h"
+#include "rts/PosixSource.h"
 #include "Rts.h"
 
 #include "RtsUtils.h"

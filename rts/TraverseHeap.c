@@ -10,7 +10,7 @@
 #if defined(PROFILING)
 
 #include <string.h>
-#include "PosixSource.h"
+#include "rts/PosixSource.h"
 #include "Rts.h"
 #include "sm/Storage.h"
 

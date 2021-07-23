@@ -35,7 +35,7 @@
  * etc.).
  */
 
-#include "PosixSource.h"
+#include "rts/PosixSource.h"
 #include "Rts.h"
 
 #include "Ticker.h"
@@ -187,8 +187,8 @@ initTicker (Time interval, TickProc handle_tick)
      * On FreeBSD 12.2 pthread_set_name_np() is unconditionally declared in
      * <pthread_np.h>, while pthread_setname_np() is conditionally declared in
      * <pthread.h> when _POSIX_SOURCE is not defined, but we're including
-     * <PosixSource.h>, so must use pthread_set_name_np() instead.  See similar
-     * code in "rts/posix/OSThreads.c".
+     * <rts/PosixSource.h>, so must use pthread_set_name_np() instead.  See
+     * similar code in "rts/posix/OSThreads.c".
      *
      * Create the thread with all blockable signals blocked, leaving signal
      * handling to the main and/or other threads.  This is especially useful in

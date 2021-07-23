@@ -13,7 +13,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#include "PosixSource.h"
+#include "rts/PosixSource.h"
 #include "Rts.h"
 
 #if defined(DEBUG)                                                   /* whole file */

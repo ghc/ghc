@@ -42,7 +42,7 @@
    - scavenge_one() scavenges only stack frame SRTs
    ------------------------------------------------------------------------- */
 
-#include "PosixSource.h"
+#include "rts/PosixSource.h"
 #include "Rts.h"
 
 #include "Storage.h"
