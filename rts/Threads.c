@@ -423,7 +423,18 @@ checkBlockingQueues (Capability *cap, StgTSO *tso)
             continue;
         }
 
-        p = bq->bh;
+        // We need to always ensure we untag bh.  While it might seem a
+        // sensible assumption that bh will never be tagged, the GC could
+        // shortcut the indirection and put a tagged pointer into the
+        // indirection.
+        //
+        // This blew up on aarch64-darwin with misaligned access.  bh pointing
+        // to an address that always ended in 0xa.  Thus on architectures that
+        // are a little less strict about alignment, this would have read a
+        // garbage pinfo, which very, very unlikely would have been equal to
+        // stg_BLACKHOLE_info.  Thus while the code would have done the wrong
+        // thing the result would be the same in almost all cases. See #20093.
+        p = UNTAG_CLOSURE(bq->bh);
         const StgInfoTable *pinfo = ACQUIRE_LOAD(&p->header.info);
         if (pinfo != &stg_BLACKHOLE_info ||
             ((StgInd *)p)->indirectee != (StgClosure*)bq)
