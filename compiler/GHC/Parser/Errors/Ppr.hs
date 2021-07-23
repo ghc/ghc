@@ -601,6 +601,7 @@ instance Diagnostic PsMessage where
     PsErrParse token PsErrParseDetails{..}        -> case token of
       ""                         -> []
       "$"  | not ped_th_enabled  -> [suggestExtension LangExt.TemplateHaskell]   -- #7396
+      "$$" | not ped_th_enabled  -> [suggestExtension LangExt.TemplateHaskell]   -- #20157
       "<-" | ped_mdo_in_last_100 -> [suggestExtension LangExt.RecursiveDo]
            | otherwise           -> [SuggestMissingDo]
       "="  | ped_do_in_last_100  -> [SuggestLetInDo]                             -- #15849
