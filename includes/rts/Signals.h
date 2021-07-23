@@ -2,7 +2,7 @@
  *
  * (c) The GHC Team, 1998-2009
  *
- * RTS signal handling 
+ * RTS signal handling
  *
  * Do not #include this file directly: #include "Rts.h" instead.
  *

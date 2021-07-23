@@ -9,7 +9,7 @@
 #pragma once
 
 /* generic - function comes with a small bitmap */
-#define ARG_GEN      0   
+#define ARG_GEN      0
 
 /* generic - function comes with a large bitmap */
 #define ARG_GEN_BIG  1
@@ -26,16 +26,16 @@
  *       - utils/genapply/Main.hs: stackApplyTypes
  *       - GHC.StgToCmm.Layout: stdPattern
  */
-#define ARG_NONE     3 
-#define ARG_N        4  
-#define ARG_P        5 
-#define ARG_F        6 
-#define ARG_D        7 
-#define ARG_L        8 
-#define ARG_V16      9 
+#define ARG_NONE     3
+#define ARG_N        4
+#define ARG_P        5
+#define ARG_F        6
+#define ARG_D        7
+#define ARG_L        8
+#define ARG_V16      9
 #define ARG_V32      10
 #define ARG_V64      11
-#define ARG_NN       12 
+#define ARG_NN       12
 #define ARG_NP       13
 #define ARG_PN       14
 #define ARG_PP       15

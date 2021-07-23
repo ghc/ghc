@@ -5,7 +5,7 @@
  * Rts settings.
  *
  * NOTE: assumes #include "ghcconfig.h"
- * 
+ *
  * NB: THIS FILE IS INCLUDED IN NON-C CODE AND DATA!  #defines only please.
  *
  * To understand the structure of the RTS headers, see the wiki:
