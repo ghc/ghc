@@ -1,38 +1,425 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 12, types: 18, coercions: 0, joins: 0/0}
+  = {terms: 196, types: 204, coercions: 0, joins: 0/0}
 
 Rec {
--- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
-f [Occ=LoopBreaker] :: [Int] -> [Int]
-[GblId, Arity=1, Str=<B>b, Cpr=b, Unf=OtherCon []]
-f = \ (x :: [Int]) -> f x
+-- RHS size: {terms: 55, types: 53, coercions: 0, joins: 0/0}
+T19969.f_$sf [Occ=LoopBreaker] :: Int -> [Int] -> [Int]
+[GblId, Arity=2, Str=<B><B>b, Unf=OtherCon []]
+T19969.f_$sf
+  = \ (sc :: Int) (sc1 :: [Int]) ->
+      GHC.List.reverse1
+        @Int
+        (GHC.List.reverse1
+           @Int
+           (GHC.List.reverse1
+              @Int
+              (GHC.List.reverse1
+                 @Int
+                 (GHC.List.reverse1
+                    @Int
+                    (GHC.List.reverse1
+                       @Int
+                       (GHC.List.reverse1
+                          @Int
+                          (GHC.List.reverse1
+                             @Int
+                             (GHC.List.reverse1
+                                @Int
+                                (GHC.List.reverse1
+                                   @Int
+                                   (GHC.List.reverse1
+                                      @Int
+                                      (GHC.List.reverse1
+                                         @Int
+                                         (GHC.List.reverse1
+                                            @Int
+                                            (GHC.List.reverse1
+                                               @Int
+                                               (GHC.List.reverse1
+                                                  @Int
+                                                  (GHC.List.reverse1
+                                                     @Int
+                                                     (GHC.List.reverse1
+                                                        @Int
+                                                        (GHC.List.reverse1
+                                                           @Int
+                                                           (GHC.List.reverse1
+                                                              @Int
+                                                              (GHC.List.reverse1
+                                                                 @Int
+                                                                 (GHC.List.reverse1
+                                                                    @Int
+                                                                    (GHC.List.reverse1
+                                                                       @Int
+                                                                       (GHC.List.reverse1
+                                                                          @Int
+                                                                          (GHC.List.reverse1
+                                                                             @Int
+                                                                             (GHC.List.reverse1
+                                                                                @Int
+                                                                                (T19969.f_$sf
+                                                                                   sc sc1)
+                                                                                (GHC.Types.[] @Int))
+                                                                             (GHC.Types.[] @Int))
+                                                                          (GHC.Types.[] @Int))
+                                                                       (GHC.Types.[] @Int))
+                                                                    (GHC.Types.[] @Int))
+                                                                 (GHC.Types.[] @Int))
+                                                              (GHC.Types.[] @Int))
+                                                           (GHC.Types.[] @Int))
+                                                        (GHC.Types.[] @Int))
+                                                     (GHC.Types.[] @Int))
+                                                  (GHC.Types.[] @Int))
+                                               (GHC.Types.[] @Int))
+                                            (GHC.Types.[] @Int))
+                                         (GHC.Types.[] @Int))
+                                      (GHC.Types.[] @Int))
+                                   (GHC.Types.[] @Int))
+                                (GHC.Types.[] @Int))
+                             (GHC.Types.[] @Int))
+                          (GHC.Types.[] @Int))
+                       (GHC.Types.[] @Int))
+                    (GHC.Types.[] @Int))
+                 (GHC.Types.[] @Int))
+              (GHC.Types.[] @Int))
+           (GHC.Types.[] @Int))
+        (GHC.Types.[] @Int)
 end Rec }
 
--- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
-g [InlPrag=INLINE (sat-args=1)] :: [Int] -> [Int]
-[GblId,
- Arity=1,
- Str=<B>b,
- Cpr=b,
- Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True,
-         Guidance=ALWAYS_IF(arity=1,unsat_ok=False,boring_ok=True)
-         Tmpl= \ (x [Occ=Once1] :: [Int]) -> f x}]
-g = \ (x :: [Int]) -> f x
+-- RHS size: {terms: 59, types: 58, coercions: 0, joins: 0/0}
+f :: [Int] -> [Int]
+[GblId, Arity=1, Str=<1L>, Unf=OtherCon []]
+f = \ (ds :: [Int]) ->
+      case ds of {
+        [] -> GHC.Types.[] @Int;
+        : ipv ipv1 ->
+          GHC.List.reverse1
+            @Int
+            (GHC.List.reverse1
+               @Int
+               (GHC.List.reverse1
+                  @Int
+                  (GHC.List.reverse1
+                     @Int
+                     (GHC.List.reverse1
+                        @Int
+                        (GHC.List.reverse1
+                           @Int
+                           (GHC.List.reverse1
+                              @Int
+                              (GHC.List.reverse1
+                                 @Int
+                                 (GHC.List.reverse1
+                                    @Int
+                                    (GHC.List.reverse1
+                                       @Int
+                                       (GHC.List.reverse1
+                                          @Int
+                                          (GHC.List.reverse1
+                                             @Int
+                                             (GHC.List.reverse1
+                                                @Int
+                                                (GHC.List.reverse1
+                                                   @Int
+                                                   (GHC.List.reverse1
+                                                      @Int
+                                                      (GHC.List.reverse1
+                                                         @Int
+                                                         (GHC.List.reverse1
+                                                            @Int
+                                                            (GHC.List.reverse1
+                                                               @Int
+                                                               (GHC.List.reverse1
+                                                                  @Int
+                                                                  (GHC.List.reverse1
+                                                                     @Int
+                                                                     (GHC.List.reverse1
+                                                                        @Int
+                                                                        (GHC.List.reverse1
+                                                                           @Int
+                                                                           (GHC.List.reverse1
+                                                                              @Int
+                                                                              (GHC.List.reverse1
+                                                                                 @Int
+                                                                                 (GHC.List.reverse1
+                                                                                    @Int
+                                                                                    (T19969.f_$sf
+                                                                                       ipv ipv1)
+                                                                                    (GHC.Types.[]
+                                                                                       @Int))
+                                                                                 (GHC.Types.[]
+                                                                                    @Int))
+                                                                              (GHC.Types.[] @Int))
+                                                                           (GHC.Types.[] @Int))
+                                                                        (GHC.Types.[] @Int))
+                                                                     (GHC.Types.[] @Int))
+                                                                  (GHC.Types.[] @Int))
+                                                               (GHC.Types.[] @Int))
+                                                            (GHC.Types.[] @Int))
+                                                         (GHC.Types.[] @Int))
+                                                      (GHC.Types.[] @Int))
+                                                   (GHC.Types.[] @Int))
+                                                (GHC.Types.[] @Int))
+                                             (GHC.Types.[] @Int))
+                                          (GHC.Types.[] @Int))
+                                       (GHC.Types.[] @Int))
+                                    (GHC.Types.[] @Int))
+                                 (GHC.Types.[] @Int))
+                              (GHC.Types.[] @Int))
+                           (GHC.Types.[] @Int))
+                        (GHC.Types.[] @Int))
+                     (GHC.Types.[] @Int))
+                  (GHC.Types.[] @Int))
+               (GHC.Types.[] @Int))
+            (GHC.Types.[] @Int)
+      }
 
--- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 27, types: 26, coercions: 0, joins: 0/0}
 h [InlPrag=INLINE (sat-args=1)] :: [Int] -> [Int]
 [GblId,
  Arity=1,
- Str=<B>b,
- Cpr=b,
+ Str=<1L>,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
-         Guidance=ALWAYS_IF(arity=1,unsat_ok=False,boring_ok=True)
-         Tmpl= \ (x [Occ=Once1] :: [Int]) -> f x}]
-h = \ (x :: [Int]) -> f x
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=False,boring_ok=False)
+         Tmpl= \ (x [Occ=Once1] :: [Int]) ->
+                 GHC.List.reverse1
+                   @Int
+                   (GHC.List.reverse1
+                      @Int
+                      (GHC.List.reverse1
+                         @Int
+                         (GHC.List.reverse1
+                            @Int
+                            (GHC.List.reverse1
+                               @Int
+                               (GHC.List.reverse1
+                                  @Int
+                                  (GHC.List.reverse1
+                                     @Int
+                                     (GHC.List.reverse1
+                                        @Int
+                                        (GHC.List.reverse1
+                                           @Int
+                                           (GHC.List.reverse1
+                                              @Int
+                                              (GHC.List.reverse1
+                                                 @Int
+                                                 (GHC.List.reverse1 @Int (f x) (GHC.Types.[] @Int))
+                                                 (GHC.Types.[] @Int))
+                                              (GHC.Types.[] @Int))
+                                           (GHC.Types.[] @Int))
+                                        (GHC.Types.[] @Int))
+                                     (GHC.Types.[] @Int))
+                                  (GHC.Types.[] @Int))
+                               (GHC.Types.[] @Int))
+                            (GHC.Types.[] @Int))
+                         (GHC.Types.[] @Int))
+                      (GHC.Types.[] @Int))
+                   (GHC.Types.[] @Int)}]
+h = \ (x :: [Int]) ->
+      GHC.List.reverse1
+        @Int
+        (GHC.List.reverse1
+           @Int
+           (GHC.List.reverse1
+              @Int
+              (GHC.List.reverse1
+                 @Int
+                 (GHC.List.reverse1
+                    @Int
+                    (GHC.List.reverse1
+                       @Int
+                       (GHC.List.reverse1
+                          @Int
+                          (GHC.List.reverse1
+                             @Int
+                             (GHC.List.reverse1
+                                @Int
+                                (GHC.List.reverse1
+                                   @Int
+                                   (GHC.List.reverse1
+                                      @Int
+                                      (GHC.List.reverse1 @Int (f x) (GHC.Types.[] @Int))
+                                      (GHC.Types.[] @Int))
+                                   (GHC.Types.[] @Int))
+                                (GHC.Types.[] @Int))
+                             (GHC.Types.[] @Int))
+                          (GHC.Types.[] @Int))
+                       (GHC.Types.[] @Int))
+                    (GHC.Types.[] @Int))
+                 (GHC.Types.[] @Int))
+              (GHC.Types.[] @Int))
+           (GHC.Types.[] @Int))
+        (GHC.Types.[] @Int)
 
+-- RHS size: {terms: 51, types: 50, coercions: 0, joins: 0/0}
+g [InlPrag=INLINE (sat-args=1)] :: [Int] -> [Int]
+[GblId,
+ Arity=1,
+ Str=<1L>,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=False,boring_ok=False)
+         Tmpl= \ (x [Occ=Once1] :: [Int]) ->
+                 GHC.List.reverse1
+                   @Int
+                   (GHC.List.reverse1
+                      @Int
+                      (GHC.List.reverse1
+                         @Int
+                         (GHC.List.reverse1
+                            @Int
+                            (GHC.List.reverse1
+                               @Int
+                               (GHC.List.reverse1
+                                  @Int
+                                  (GHC.List.reverse1
+                                     @Int
+                                     (GHC.List.reverse1
+                                        @Int
+                                        (GHC.List.reverse1
+                                           @Int
+                                           (GHC.List.reverse1
+                                              @Int
+                                              (GHC.List.reverse1
+                                                 @Int
+                                                 (GHC.List.reverse1
+                                                    @Int
+                                                    (GHC.List.reverse1
+                                                       @Int
+                                                       (GHC.List.reverse1
+                                                          @Int
+                                                          (GHC.List.reverse1
+                                                             @Int
+                                                             (GHC.List.reverse1
+                                                                @Int
+                                                                (GHC.List.reverse1
+                                                                   @Int
+                                                                   (GHC.List.reverse1
+                                                                      @Int
+                                                                      (GHC.List.reverse1
+                                                                         @Int
+                                                                         (GHC.List.reverse1
+                                                                            @Int
+                                                                            (GHC.List.reverse1
+                                                                               @Int
+                                                                               (GHC.List.reverse1
+                                                                                  @Int
+                                                                                  (GHC.List.reverse1
+                                                                                     @Int
+                                                                                     (GHC.List.reverse1
+                                                                                        @Int
+                                                                                        (f x)
+                                                                                        (GHC.Types.[]
+                                                                                           @Int))
+                                                                                     (GHC.Types.[]
+                                                                                        @Int))
+                                                                                  (GHC.Types.[]
+                                                                                     @Int))
+                                                                               (GHC.Types.[] @Int))
+                                                                            (GHC.Types.[] @Int))
+                                                                         (GHC.Types.[] @Int))
+                                                                      (GHC.Types.[] @Int))
+                                                                   (GHC.Types.[] @Int))
+                                                                (GHC.Types.[] @Int))
+                                                             (GHC.Types.[] @Int))
+                                                          (GHC.Types.[] @Int))
+                                                       (GHC.Types.[] @Int))
+                                                    (GHC.Types.[] @Int))
+                                                 (GHC.Types.[] @Int))
+                                              (GHC.Types.[] @Int))
+                                           (GHC.Types.[] @Int))
+                                        (GHC.Types.[] @Int))
+                                     (GHC.Types.[] @Int))
+                                  (GHC.Types.[] @Int))
+                               (GHC.Types.[] @Int))
+                            (GHC.Types.[] @Int))
+                         (GHC.Types.[] @Int))
+                      (GHC.Types.[] @Int))
+                   (GHC.Types.[] @Int)}]
+g = \ (x :: [Int]) ->
+      GHC.List.reverse1
+        @Int
+        (GHC.List.reverse1
+           @Int
+           (GHC.List.reverse1
+              @Int
+              (GHC.List.reverse1
+                 @Int
+                 (GHC.List.reverse1
+                    @Int
+                    (GHC.List.reverse1
+                       @Int
+                       (GHC.List.reverse1
+                          @Int
+                          (GHC.List.reverse1
+                             @Int
+                             (GHC.List.reverse1
+                                @Int
+                                (GHC.List.reverse1
+                                   @Int
+                                   (GHC.List.reverse1
+                                      @Int
+                                      (GHC.List.reverse1
+                                         @Int
+                                         (GHC.List.reverse1
+                                            @Int
+                                            (GHC.List.reverse1
+                                               @Int
+                                               (GHC.List.reverse1
+                                                  @Int
+                                                  (GHC.List.reverse1
+                                                     @Int
+                                                     (GHC.List.reverse1
+                                                        @Int
+                                                        (GHC.List.reverse1
+                                                           @Int
+                                                           (GHC.List.reverse1
+                                                              @Int
+                                                              (GHC.List.reverse1
+                                                                 @Int
+                                                                 (GHC.List.reverse1
+                                                                    @Int
+                                                                    (GHC.List.reverse1
+                                                                       @Int
+                                                                       (GHC.List.reverse1
+                                                                          @Int
+                                                                          (GHC.List.reverse1
+                                                                             @Int
+                                                                             (f x)
+                                                                             (GHC.Types.[] @Int))
+                                                                          (GHC.Types.[] @Int))
+                                                                       (GHC.Types.[] @Int))
+                                                                    (GHC.Types.[] @Int))
+                                                                 (GHC.Types.[] @Int))
+                                                              (GHC.Types.[] @Int))
+                                                           (GHC.Types.[] @Int))
+                                                        (GHC.Types.[] @Int))
+                                                     (GHC.Types.[] @Int))
+                                                  (GHC.Types.[] @Int))
+                                               (GHC.Types.[] @Int))
+                                            (GHC.Types.[] @Int))
+                                         (GHC.Types.[] @Int))
+                                      (GHC.Types.[] @Int))
+                                   (GHC.Types.[] @Int))
+                                (GHC.Types.[] @Int))
+                             (GHC.Types.[] @Int))
+                          (GHC.Types.[] @Int))
+                       (GHC.Types.[] @Int))
+                    (GHC.Types.[] @Int))
+                 (GHC.Types.[] @Int))
+              (GHC.Types.[] @Int))
+           (GHC.Types.[] @Int))
+        (GHC.Types.[] @Int)
+
+
+------ Local rules for imported ids --------
+"SC:f0"
+    forall (sc :: Int) (sc1 :: [Int]).
+      f (GHC.Types.: @Int sc sc1)
+      = T19969.f_$sf sc sc1
 
 

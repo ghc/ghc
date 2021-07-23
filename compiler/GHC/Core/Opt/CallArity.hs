@@ -17,7 +17,7 @@ import GHC.Types.Var.Env
 import GHC.Types.Basic
 import GHC.Core
 import GHC.Types.Id
-import GHC.Core.Opt.Arity ( typeArity, typeOneShots )
+import GHC.Core.Opt.Arity ( typeArity )
 import GHC.Core.Utils ( exprIsCheap, exprIsTrivial )
 import GHC.Data.Graph.UnVar
 import GHC.Types.Demand
@@ -544,7 +544,7 @@ callArityAnal arity int (Let bind e)
 -- Which bindings should we look at?
 -- See Note [Which variables are interesting]
 isInteresting :: Var -> Bool
-isInteresting v = not $ null $ typeOneShots $ idType v
+isInteresting v = typeArity (idType v) > 0
 
 interestingBinds :: CoreBind -> [Var]
 interestingBinds = filter isInteresting . bindersOf

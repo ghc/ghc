@@ -86,10 +86,8 @@ module GHC.Types.Id (
         idInlineActivation, setInlineActivation, idRuleMatchInfo,
 
         -- ** One-shot lambdas
-        isOneShotBndr, isProbablyOneShotLambda,
         setOneShotLambda, clearOneShotLambda,
         updOneShotInfo, setIdOneShotInfo,
-        isStateHackType, stateHackOneShot, typeOneShot,
 
         -- ** Reading 'IdInfo' fields
         idArity,
@@ -97,7 +95,7 @@ module GHC.Types.Id (
         idUnfolding, realIdUnfolding,
         idSpecialisation, idCoreRules, idHasRules,
         idCafInfo, idLFInfo_maybe,
-        idOneShotInfo, idStateHackOneShotInfo,
+        idOneShotInfo,
         idOccInfo,
         isNeverRepPolyId,
 
@@ -140,7 +138,6 @@ import qualified GHC.Types.Var as Var
 
 import GHC.Core.Type
 import GHC.Types.RepType
-import GHC.Builtin.Types.Prim
 import GHC.Core.DataCon
 import GHC.Types.Demand
 import GHC.Types.Cpr
@@ -161,7 +158,6 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
-import GHC.Utils.GlobalVars
 import GHC.Utils.Trace
 
 -- infixl so you can say (id `set` a `set` b)
@@ -805,64 +801,6 @@ isConLikeId id = isConLike (idRuleMatchInfo id)
 
 idOneShotInfo :: Id -> OneShotInfo
 idOneShotInfo id = oneShotInfo (idInfo id)
-
--- | Like 'idOneShotInfo', but taking the Horrible State Hack in to account
--- See Note [The state-transformer hack] in "GHC.Core.Opt.Arity"
-idStateHackOneShotInfo :: Id -> OneShotInfo
-idStateHackOneShotInfo id
-    | isStateHackType (idType id) = stateHackOneShot
-    | otherwise                   = idOneShotInfo id
-
--- | Returns whether the lambda associated with the 'Id' is certainly applied at most once
--- This one is the "business end", called externally.
--- It works on type variables as well as Ids, returning True
--- Its main purpose is to encapsulate the Horrible State Hack
--- See Note [The state-transformer hack] in "GHC.Core.Opt.Arity"
-isOneShotBndr :: Var -> Bool
-isOneShotBndr var
-  | isTyVar var                              = True
-  | OneShotLam <- idStateHackOneShotInfo var = True
-  | otherwise                                = False
-
--- | Should we apply the state hack to values of this 'Type'?
-stateHackOneShot :: OneShotInfo
-stateHackOneShot = OneShotLam
-
-typeOneShot :: Type -> OneShotInfo
-typeOneShot ty
-   | isStateHackType ty = stateHackOneShot
-   | otherwise          = NoOneShotInfo
-
-isStateHackType :: Type -> Bool
-isStateHackType ty
-  | unsafeHasNoStateHack
-  = False
-  | otherwise
-  = case tyConAppTyCon_maybe ty of
-        Just tycon -> tycon == statePrimTyCon
-        _          -> False
-        -- This is a gross hack.  It claims that
-        -- every function over realWorldStatePrimTy is a one-shot
-        -- function.  This is pretty true in practice, and makes a big
-        -- difference.  For example, consider
-        --      a `thenST` \ r -> ...E...
-        -- The early full laziness pass, if it doesn't know that r is one-shot
-        -- will pull out E (let's say it doesn't mention r) to give
-        --      let lvl = E in a `thenST` \ r -> ...lvl...
-        -- When `thenST` gets inlined, we end up with
-        --      let lvl = E in \s -> case a s of (r, s') -> ...lvl...
-        -- and we don't re-inline E.
-        --
-        -- It would be better to spot that r was one-shot to start with, but
-        -- I don't want to rely on that.
-        --
-        -- Another good example is in fill_in in PrelPack.hs.  We should be able to
-        -- spot that fill_in has arity 2 (and when Keith is done, we will) but we can't yet.
-
-isProbablyOneShotLambda :: Id -> Bool
-isProbablyOneShotLambda id = case idStateHackOneShotInfo id of
-                               OneShotLam    -> True
-                               NoOneShotInfo -> False
 
 setOneShotLambda :: Id -> Id
 setOneShotLambda id = modifyIdInfo (`setOneShotInfo` OneShotLam) id

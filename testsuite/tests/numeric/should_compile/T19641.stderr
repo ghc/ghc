@@ -4,15 +4,15 @@ Result size of Tidy Core
   = {terms: 22, types: 20, coercions: 0, joins: 0/0}
 
 natural_to_word
-  = \ x ->
-      case x of {
+  = \ eta ->
+      case eta of {
         NS x1 -> Just (W# x1);
         NB ds -> Nothing
       }
 
 integer_to_int
-  = \ x ->
-      case x of {
+  = \ eta ->
+      case eta of {
         IS ipv -> Just (I# ipv);
         IP x1 -> Nothing;
         IN ds -> Nothing

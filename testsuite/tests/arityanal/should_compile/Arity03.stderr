@@ -18,20 +18,15 @@ end Rec }
 fac [InlPrag=[2]] :: Int -> Int
 [GblId,
  Arity=1,
- Str=<1P(1L)>,
- Cpr=m1,
+ Str=<1!P(1L)>,
+ Cpr=1,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (w [Occ=Once1!] :: Int) -> case w of { GHC.Types.I# ww1 [Occ=Once1] -> case F3.$wfac ww1 of ww2 [Occ=Once1] { __DEFAULT -> GHC.Types.I# ww2 } }}]
-fac = \ (w :: Int) -> case w of { GHC.Types.I# ww1 -> case F3.$wfac ww1 of ww2 { __DEFAULT -> GHC.Types.I# ww2 } }
+         Tmpl= \ (x [Occ=Once1!] :: Int) -> case x of { GHC.Types.I# ww [Occ=Once1] -> case F3.$wfac ww of ww1 [Occ=Once1] { __DEFAULT -> GHC.Types.I# ww1 } }}]
+fac = \ (x :: Int) -> case x of { GHC.Types.I# ww -> case F3.$wfac ww of ww1 { __DEFAULT -> GHC.Types.I# ww1 } }
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 f3 :: Int -> Int
-[GblId,
- Arity=1,
- Str=<1P(1L)>,
- Cpr=m1,
- Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)
-         Tmpl= fac}]
+[GblId, Arity=1, Str=<1!P(1L)>, Cpr=1, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
 f3 = fac
 
 

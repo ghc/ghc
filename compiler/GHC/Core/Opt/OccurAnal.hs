@@ -24,7 +24,7 @@ import GHC.Core
 import GHC.Core.FVs
 import GHC.Core.Utils   ( exprIsTrivial, isDefaultAlt, isExpandableApp,
                           stripTicksTopE, mkTicks )
-import GHC.Core.Opt.Arity   ( joinRhsArity )
+import GHC.Core.Opt.Arity   ( joinRhsArity, isOneShotBndr )
 import GHC.Core.Coercion
 import GHC.Core.Type
 import GHC.Core.TyCo.FVs( tyCoVarsOfMCo )

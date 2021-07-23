@@ -124,4 +124,7 @@ f11 :: (Integer, Integer)
 f11 = (F11.f4, F11.f1)
 
 
+------ Local rules for imported ids --------
+"SPEC fib @Integer @Integer" forall ($dEq :: Eq Integer) ($dNum :: Num Integer) ($dNum1 :: Num Integer). fib @Integer @Integer $dEq $dNum $dNum1 = F11.f11_fib
+
 

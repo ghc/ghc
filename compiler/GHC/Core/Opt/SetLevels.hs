@@ -85,7 +85,7 @@ import GHC.Core.Utils   ( exprType, exprIsHNF
                         , collectMakeStaticArgs
                         , mkLamTypes
                         )
-import GHC.Core.Opt.Arity   ( exprBotStrictness_maybe )
+import GHC.Core.Opt.Arity   ( exprBotStrictness_maybe, isProbablyOneShotLambda )
 import GHC.Core.FVs     -- all of it
 import GHC.Core.Subst
 import GHC.Core.Make    ( sortQuantVars )

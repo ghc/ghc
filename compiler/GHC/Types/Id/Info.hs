@@ -162,6 +162,7 @@ data IdDetails
   | PrimOpId PrimOp Bool        -- ^ The 'Id' is for a primitive operator
                                 -- True <=> is representation-polymorphic,
                                 --          and hence has no binding
+                                -- This lev-poly flag is used only in GHC.Types.Id.hasNoBinding
 
   | FCallId ForeignCall         -- ^ The 'Id' is for a foreign call.
                                 -- Type will be simple: no type families, newtypes, etc

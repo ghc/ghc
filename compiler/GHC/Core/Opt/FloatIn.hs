@@ -22,13 +22,14 @@ import GHC.Prelude
 import GHC.Platform
 
 import GHC.Core
+import GHC.Core.Opt.Arity( isOneShotBndr )
 import GHC.Core.Make hiding ( wrapFloats )
 import GHC.Core.Utils
 import GHC.Core.FVs
 import GHC.Core.Type
 
 import GHC.Types.Basic      ( RecFlag(..), isRec )
-import GHC.Types.Id         ( isOneShotBndr, idType, isJoinId, isJoinId_maybe )
+import GHC.Types.Id         ( idType, isJoinId, isJoinId_maybe )
 import GHC.Types.Tickish
 import GHC.Types.Var
 import GHC.Types.Var.Set

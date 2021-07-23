@@ -1445,4 +1445,4 @@ mustExposeTyCon no_trim_types exports tc
     exported_con con = any (`elemNameSet` exports)
                            (dataConName con : dataConFieldLabels con)
 -}
->>>>>>> Do arity trimming at bindings, rather than in exprArity
+

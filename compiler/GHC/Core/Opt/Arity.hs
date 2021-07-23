@@ -11,15 +11,29 @@
 
 -- | Arity and eta expansion
 module GHC.Core.Opt.Arity
-   ( manifestArity, joinRhsArity, exprArity
-   , typeArity, typeOneShots
-   , exprEtaExpandArity, findRhsArity
-   , etaExpand, etaExpandAT
-   , exprBotStrictness_maybe
+   ( -- Finding arity
+     manifestArity, joinRhsArity, exprArity
+   , findRhsArity, exprBotStrictness_maybe
+
+   -- ** Eta expansion
+   , exprEtaExpandArity, etaExpand, etaExpandAT
+
+   -- ** Eta reduction
+   , tryEtaReduce
 
    -- ** ArityType
-   , ArityType(..), mkBotArityType, mkTopArityType, expandableArityType
-   , arityTypeArity, maxWithArity, minWithArity, idArityType
+   , ArityType, mkBotArityType, mkManifestArityType
+   , expandableArityType
+   , arityTypeArity, arityTypeArityDiv, idArityType
+
+   -- ** typeArity and the state hack
+   , typeArity, typeOneShots, typeOneShot
+   , isOneShotBndr, isProbablyOneShotLambda
+   , isStateHackType
+
+   -- * Lambdas
+   , zapLamBndrs
+
 
    -- ** Join points
    , etaExpandToJoinPoint, etaExpandToJoinPointRule
@@ -40,7 +54,7 @@ import GHC.Core.Utils
 import GHC.Core.DataCon
 import GHC.Core.TyCon     ( tyConArity )
 import GHC.Core.TyCon.RecWalk     ( initRecTc, checkRecTc )
-import GHC.Core.Predicate ( isDictTy, isCallStackPredTy )
+import GHC.Core.Predicate ( isDictTy, isEvVar, isCallStackPredTy )
 import GHC.Core.Multiplicity
 
 -- We have two sorts of substitution:
@@ -51,17 +65,19 @@ import GHC.Core.Type     as Type
 import GHC.Core.Coercion as Type
 
 import GHC.Types.Demand
-import GHC.Types.Var
-import GHC.Types.Var.Env
 import GHC.Types.Id
+import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Basic
 import GHC.Types.Tickish
 
+import GHC.Builtin.Types.Prim
 import GHC.Builtin.Uniques
+
 import GHC.Data.FastString
 import GHC.Data.Pair
 
+import GHC.Utils.GlobalVars( unsafeHasNoStateHack )
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -140,6 +156,41 @@ exprArity e = go e
     go _                           = 0
 
 ---------------
+exprBotStrictness_maybe :: CoreExpr -> Maybe (Arity, DmdSig)
+-- A cheap and cheerful function that identifies bottoming functions
+-- and gives them a suitable strictness signatures.  It's used during
+-- float-out
+exprBotStrictness_maybe e
+  = case getBotArity (arityType botStrictnessArityEnv e) of
+        Nothing -> Nothing
+        Just ar -> Just (ar, sig ar)
+  where
+    sig ar = mkClosedDmdSig (replicate ar topDmd) botDiv
+
+
+{- Note [exprArity for applications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we come to an application we check that the arg is trivial.
+   eg  f (fac x) does not have arity 2,
+                 even if f has arity 3!
+
+* We require that is trivial rather merely cheap.  Suppose f has arity 2.
+  Then    f (Just y)
+  has arity 0, because if we gave it arity 1 and then inlined f we'd get
+          let v = Just y in \w. <f-body>
+  which has arity 0.  And we try to maintain the invariant that we don't
+  have arity decreases.
+
+*  The `max 0` is important!  (\x y -> f x) has arity 2, even if f is
+   unknown, hence arity 0
+
+
+************************************************************************
+*                                                                      *
+              typeArity and the "state hack"
+*                                                                      *
+********************************************************************* -}
+
 typeArity :: Type -> Arity
 typeArity = length . typeOneShots
 
@@ -175,21 +226,68 @@ typeOneShots ty
       | otherwise
       = []
 
----------------
-exprBotStrictness_maybe :: CoreExpr -> Maybe (Arity, DmdSig)
--- A cheap and cheerful function that identifies bottoming functions
--- and gives them a suitable strictness signatures.  It's used during
--- float-out
-exprBotStrictness_maybe e
-  = case getBotArity (arityType botStrictnessArityEnv e) of
-        Nothing -> Nothing
-        Just ar -> Just (ar, sig ar)
-  where
-    sig ar = mkClosedDmdSig (replicate ar topDmd) botDiv
+typeOneShot :: Type -> OneShotInfo
+typeOneShot ty
+   | isStateHackType ty = OneShotLam
+   | otherwise          = NoOneShotInfo
 
-{-
-Note [typeArity invariants]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- | Like 'idOneShotInfo', but taking the Horrible State Hack in to account
+-- See Note [The state-transformer hack] in "GHC.Core.Opt.Arity"
+idStateHackOneShotInfo :: Id -> OneShotInfo
+idStateHackOneShotInfo id
+    | isStateHackType (idType id) = OneShotLam
+    | otherwise                   = idOneShotInfo id
+
+-- | Returns whether the lambda associated with the 'Id' is certainly applied at most once
+-- This one is the "business end", called externally.
+-- It works on type variables as well as Ids, returning True
+-- Its main purpose is to encapsulate the Horrible State Hack
+-- See Note [The state-transformer hack] in "GHC.Core.Opt.Arity"
+isOneShotBndr :: Var -> Bool
+isOneShotBndr var
+  | isTyVar var                              = True
+  | OneShotLam <- idStateHackOneShotInfo var = True
+  | otherwise                                = False
+
+isStateHackType :: Type -> Bool
+isStateHackType ty
+  | unsafeHasNoStateHack   -- Switch off with -fno-state-hack
+  = False
+  | otherwise
+  = case tyConAppTyCon_maybe ty of
+        Just tycon -> tycon == statePrimTyCon
+        _          -> False
+        -- This is a gross hack.  It claims that
+        -- every function over realWorldStatePrimTy is a one-shot
+        -- function.  This is pretty true in practice, and makes a big
+        -- difference.  For example, consider
+        --      a `thenST` \ r -> ...E...
+        -- The early full laziness pass, if it doesn't know that r is one-shot
+        -- will pull out E (let's say it doesn't mention r) to give
+        --      let lvl = E in a `thenST` \ r -> ...lvl...
+        -- When `thenST` gets inlined, we end up with
+        --      let lvl = E in \s -> case a s of (r, s') -> ...lvl...
+        -- and we don't re-inline E.
+        --
+        -- It would be better to spot that r was one-shot to start with, but
+        -- I don't want to rely on that.
+        --
+        -- Another good example is in fill_in in PrelPack.hs.  We should be able to
+        -- spot that fill_in has arity 2 (and when Keith is done, we will) but we can't yet.
+
+isProbablyOneShotLambda :: Id -> Bool
+isProbablyOneShotLambda id = case idStateHackOneShotInfo id of
+                               OneShotLam    -> True
+                               NoOneShotInfo -> False
+
+
+{- Note [typeArity invariants]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+(typeArity ty) says how many arrows GHC can expose in 'ty', after
+looking through newtypes.  More generally, (typeOneShots ty) returns
+ty's [OneShotInfo], based only on the type itself, using typeOneShot
+on the argument type to access the "state hack".
+
 We have the following invariants around typeArity
 
   (1) In any binding x = e,
@@ -215,12 +313,13 @@ Suppose we have
    f x y = x+y    -- Arity 2
 
    g :: F Int
-   g = case x of { True  -> f |> co1
-                 ; False -> g |> co2 }
+   g = case <cond> of { True  -> f |> co1
+                      ; False -> g |> co2 }
 
-Now, we can't eta-expand g to have arity 2, because etaExpand, which works
-off the /type/ of the expression, doesn't know how to make an eta-expanded
-binding
+where F is a type family.  Now, we can't eta-expand g to have arity 2,
+because etaExpand, which works off the /type/ of the expression
+(albeit looking through newtypes), doesn't know how to make an
+eta-expanded binding
    g = (\a b. case x of ...) |> co
 because can't make up `co` or the types of `a` and `b`.
 
@@ -230,7 +329,7 @@ and handle what typeArity says.
 
 Note [Arity trimming]
 ~~~~~~~~~~~~~~~~~~~~~
-Arity trimming, implemented by minWithArity, directly implements
+Arity trimming, implemented by trimArityType, directly implements
 invariant (1) of Note [typeArity invariants]. Failing to do so, and
 hence breaking invariant (1) led to #5441.
 
@@ -294,26 +393,34 @@ trying to *make* it hold, but it's tricky and I gave up.
 
 The test simplCore/should_compile/T3722 is an excellent example.
 -------- End of old out of date comments, just for interest -----------
+-}
+
+{- ********************************************************************
+*                                                                      *
+                  Zapping lambda binders
+*                                                                      *
+********************************************************************* -}
+
+zapLamBndrs :: FullArgCount -> [Var] -> [Var]
+-- If (\xyz. t) appears under-applied to only two arguments,
+-- we must zap the occ-info on x,y, because they appear under the \x
+-- See Note [Occurrence analysis for lambda binders] in GHc.Core.Opt.OccurAnal
+--
+-- NB: both `arg_count` and `bndrs` include both type and value args/bndrs
+zapLamBndrs arg_count bndrs
+  | no_need_to_zap = bndrs
+  | otherwise      = zap_em arg_count bndrs
+  where
+    no_need_to_zap = all isOneShotBndr (drop arg_count bndrs)
+
+    zap_em :: FullArgCount -> [Var] -> [Var]
+    zap_em 0 bs = bs
+    zap_em _ [] = []
+    zap_em n (b:bs) | isTyVar b = b              : zap_em (n-1) bs
+                    | otherwise = zapLamIdInfo b : zap_em (n-1) bs
 
 
-Note [exprArity for applications]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When we come to an application we check that the arg is trivial.
-   eg  f (fac x) does not have arity 2,
-                 even if f has arity 3!
-
-* We require that is trivial rather merely cheap.  Suppose f has arity 2.
-  Then    f (Just y)
-  has arity 0, because if we gave it arity 1 and then inlined f we'd get
-          let v = Just y in \w. <f-body>
-  which has arity 0.  And we try to maintain the invariant that we don't
-  have arity decreases.
-
-*  The `max 0` is important!  (\x y -> f x) has arity 2, even if f is
-   unknown, hence arity 0
-
-
-************************************************************************
+{- *********************************************************************
 *                                                                      *
            Computing the "arity" of an expression
 *                                                                      *
@@ -488,18 +595,59 @@ but not to introduce a new lambda.
 
 Note [ArityType]
 ~~~~~~~~~~~~~~~~
+ArityType can be thought of as an abstraction of an expression.
+The ArityType
+   AT [ (IsCheap,     NoOneShotInfo)
+      , (IsExpensive, OneShotLam)
+      , (IsCheap,     OneShotLam) ] Dunno)
+
+abstracts an expression like
+   \x. let <expensive> in
+       \y{os}.
+       \z{os}. blah
+
+In general we have (AT prs div).  Then
+* In prs :: [(Cost,OneShotInfo)]
+  * The Cost flag describes the part of the expression down
+    to the first (value) lambda.
+  * The OneShotInfo flag gives the one-shot info on that lambda.
+
+* If 'div' is dead-ending ('isDeadEndDiv'), then application to
+  'length prs' arguments will surely diverge, similar to the situation
+  with 'DmdType'.
+
 ArityType is the result of a compositional analysis on expressions,
 from which we can decide the real arity of the expression (extracted
 with function exprEtaExpandArity).
 
 We use the following notation:
-  at  ::= \o1..on.div
+  at  ::= \p1..pn.div
   div ::= T | x | ⊥
-  o   ::= ? | 1
+  p   ::= (c o)
+  c   ::= X | C    -- Expensive or Cheap
+  o   ::= ? | 1    -- NotOneShot or OneShotLam
+
 And omit the \. if n = 0. Examples:
-  \?11.T stands for @AT [NoOneShotInfo,OneShotLam,OneShotLam] topDiv@
-  ⊥      stands for @AT [] botDiv@
+  \(C?)(X1)(C1).T
+stands for
+  @AT [(IsCheap,NoOneShotInfo),(IsExpensive,OneShotLam),(IsCheap,OneShotLam)] topDiv@
+
+And ⊥ stands for @AT [] botDiv@
 See the 'Outputable' instance for more information. It's pretty simple.
+
+Example:
+      f = \x\y. let v = <expensive> in
+          \s(one-shot) \t(one-shot). blah
+      'f' has arity type \(C?)(C?)(X1)(C1).T
+      The one-shot-ness means we can, in effect, push that
+      'let' inside the \st, and expand to arity 4
+
+
+Suppose f = \xy. x+y
+Then  f             :: \(C?)(C?).T
+      f v           :: \(C?).T
+      f <expensive> :: \(X?).T
+
 
 Here is what the fields mean. If an arbitrary expression 'f' has
 ArityType 'at', then
@@ -513,9 +661,9 @@ ArityType 'at', then
        let x = <expensive> in \y. error (g x y)
        ==> \y. let x = <expensive> in error (g x y)
 
- * If @at = AT [o1,..,on] topDiv@ (notation: \o1..on.T), then expanding 'f'
-   to @\x1..xn. f x1..xn@ loses no sharing, assuming the calls of f respect
-   the one-shot-ness o1..on of its definition.
+ * If `f` has ArityType `at` we can eta-expand `f` by (aritTypeOneShots at)
+   arguments without losing sharing. This function checks that the either
+   there are no expensive expressions, or the lambdas are one-shots.
 
    NB 'f' is an arbitrary expression, eg @f = g e1 e2@.  This 'f' can have
    arity type @AT oss _@, with @length oss > 0@, only if e1 e2 are themselves
@@ -528,18 +676,6 @@ ArityType 'at', then
    So eta expansion is dynamically ok; see Note [State hack and
    bottoming functions], the part about catch#
 
-Example:
-      f = \x\y. let v = <expensive> in
-          \s(one-shot) \t(one-shot). blah
-      'f' has arity type \??11.T
-      The one-shot-ness means we can, in effect, push that
-      'let' inside the \st.
-
-
-Suppose f = \xy. x+y
-Then  f             :: \??.T
-      f v           :: \?.T
-      f <expensive> :: T
 -}
 
 
@@ -572,8 +708,8 @@ Then  f             :: \??.T
 --
 -- We rely on this lattice structure for fixed-point iteration in
 -- 'findRhsArity'. For the semantics of 'ArityType', see Note [ArityType].
-data ArityType
-  = AT ![OneShotInfo] !Divergence
+data ArityType  -- See Note [ArityType]
+  = AT ![(Cost,OneShotInfo)] !Divergence
   -- ^ @AT oss div@ means this value can safely be eta-expanded @length oss@
   -- times, provided use sites respect the 'OneShotInfo's in @oss@.
   -- A 'OneShotLam' annotation can come from two sources:
@@ -587,6 +723,16 @@ data ArityType
   -- @length os@ arguments will surely diverge, similar to the situation
   -- with 'DmdType'.
   deriving Eq
+
+data Cost = IsCheap | IsExpensive
+          deriving( Eq )
+
+allCosts :: (a -> Cost) -> [a] -> Cost
+allCosts f xs = foldr (addCost . f) IsCheap xs
+
+addCost :: Cost -> Cost -> Cost
+addCost IsCheap IsCheap = IsCheap
+addCost _       _       = IsExpensive
 
 -- | This is the BNF of the generated output:
 --
@@ -606,57 +752,60 @@ instance Outputable ArityType where
       pp_div Diverges = char '⊥'
       pp_div ExnOrDiv = char 'x'
       pp_div Dunno    = char 'T'
-      pp_os OneShotLam    = char '1'
-      pp_os NoOneShotInfo = char '?'
+      pp_os (IsCheap,     OneShotLam)    = text "(C1)"
+      pp_os (IsExpensive, OneShotLam)    = text "(X1)"
+      pp_os (IsCheap,     NoOneShotInfo) = text "(C?)"
+      pp_os (IsExpensive, NoOneShotInfo) = text "(X?)"
 
 mkBotArityType :: [OneShotInfo] -> ArityType
-mkBotArityType oss = AT oss botDiv
+mkBotArityType oss = AT [(IsCheap,os) | os <- oss] botDiv
 
 botArityType :: ArityType
 botArityType = mkBotArityType []
 
-mkTopArityType :: [OneShotInfo] -> ArityType
-mkTopArityType oss = AT oss topDiv
+mkManifestArityType :: [OneShotInfo] -> ArityType
+mkManifestArityType oss = AT [(IsCheap,os) | os <- oss] topDiv
 
 topArityType :: ArityType
-topArityType = mkTopArityType []
+topArityType = AT [] topDiv
 
 -- | The number of value args for the arity type
 arityTypeArity :: ArityType -> Arity
-arityTypeArity (AT oss _) = length oss
+arityTypeArity at = length (arityTypeOneShots at)
+
+arityTypeArityDiv :: ArityType -> (Arity, Divergence)
+arityTypeArityDiv at@(AT oss div)
+  = (length oss', div')
+  where
+    oss' = arityTypeOneShots at
+    div' | oss `equalLength` oss' = div
+         | otherwise              = topDiv
+
+arityTypeOneShots :: ArityType -> [OneShotInfo]
+-- Returns a list only as long as the arity should be
+arityTypeOneShots (AT prs _)
+  = go IsCheap prs
+  where
+    go :: Cost -> [(Cost,OneShotInfo)] -> [OneShotInfo]
+    go _ [] = []
+    go ch1 ((ch2,os):prs)
+       = case (ch1 `addCost` ch2, os) of
+           (IsExpensive, NoOneShotInfo) -> []
+           (ch,          _)             -> os : go ch prs
 
 -- | True <=> eta-expansion will add at least one lambda
 expandableArityType :: ArityType -> Bool
-expandableArityType at = arityTypeArity at > 0
+expandableArityType at = not (null (arityTypeOneShots at))
 
--- | See Note [Dead ends] in "GHC.Types.Demand".
--- Bottom implies a dead end.
-isDeadEndArityType :: ArityType -> Bool
-isDeadEndArityType (AT _ div) = isDeadEndDiv div
-
------------------------
-infixl 2 `maxWithArity`, `minWithArity`
-
--- | Expand a non-bottoming arity type so that it has at least the given arity.
-maxWithArity :: ArityType -> Arity -> ArityType
-maxWithArity at@(AT oss div) !ar
-  | isDeadEndArityType at    = at
-  | oss `lengthAtLeast` ar   = at
-  | otherwise                = AT (take ar $ oss ++ repeat NoOneShotInfo) div
+infixl 2 `trimArityType`
 
 -- | Trim an arity type so that it has at most the given arity.
 -- Any excess 'OneShotInfo's are truncated to 'topDiv', even if they end in
 -- 'ABot'.  See Note [Arity trimming]
-minWithArity :: ArityType -> Arity -> ArityType
-minWithArity at@(AT oss _) ar
+trimArityType :: ArityType -> Arity -> ArityType
+trimArityType at@(AT oss _) ar
   | oss `lengthAtMost` ar = at
   | otherwise             = AT (take ar oss) topDiv
-
-----------------------
-takeWhileOneShot :: ArityType -> ArityType
-takeWhileOneShot (AT oss div)
-  | isDeadEndDiv div = AT (takeWhile isOneShotInfo oss) topDiv
-  | otherwise        = AT (takeWhile isOneShotInfo oss) div
 
 -- | The Arity returned is the number of value args the
 -- expression can be applied to without doing much work
@@ -672,7 +821,13 @@ getBotArity (AT oss div)
   | isDeadEndDiv div = Just $ length oss
   | otherwise        = Nothing
 
-----------------------
+
+{- *********************************************************************
+*                                                                      *
+                   findRhsArity
+*                                                                      *
+********************************************************************* -}
+
 findRhsArity :: DynFlags -> RecFlag -> Id -> CoreExpr -> Arity -> ArityType
 -- This implements the fixpoint loop for arity analysis
 -- See Note [Arity analysis]
@@ -680,17 +835,37 @@ findRhsArity :: DynFlags -> RecFlag -> Id -> CoreExpr -> Arity -> ArityType
 --  (a) any application of e to <n arguments will not do much work,
 --      so it is safe to expand e  ==>  (\x1..xn. e x1 .. xn)
 --  (b) if is_bot=True, then e applied to n args is guaranteed bottom
-
-findRhsArity dflags NonRecursive _ rhs _
-  = arityType (findRhsArityEnv dflags) rhs
-
-findRhsArity dflags Recursive bndr rhs old_arity
-  = go 0 botArityType
-      -- We always do one step, but usually that produces a result equal to
-      -- old_arity, and then we stop right away, because old_arity is assumed
-      -- to be sound. In other words, arities should never decrease.
-      -- Result: the common case is that there is just one iteration
+--
+-- Returns an ArityType that is guaranteed trimmed to typeArity of 'bndr'
+-- See Note [Arity trimming]
+--
+findRhsArity dflags is_rec bndr rhs old_arity
+  = case is_rec of
+      Recursive    -> go 0 botArityType
+      NonRecursive -> step init_env
   where
+    init_env :: ArityEnv
+    init_env = findRhsArityEnv dflags
+
+    ty_arity     = typeArity (idType bndr)
+    id_one_shots = idDemandOneShots bndr
+
+    step :: ArityEnv -> ArityType
+    step env = arityType env rhs
+               `combineWithDemandOneShots` id_one_shots
+               `trimArityType`             ty_arity
+               -- See Note [Trim arity inside the loop]
+       -- combineWithDemandOneShots: take account of the demand on the
+       -- binder.  Perhaps it is always called with 2 args
+       --   let f = \x. blah in (f 3 4, f 1 9)
+       -- f's demand-info says how many args it is called with
+
+    -- The fixpoint iteration (go), done for recursive bindings. We
+    -- always do one step, but usually that produces a result equal
+    -- to old_arity, and then we stop right away, because old_arity
+    -- is assumed to be sound. In other words, arities should never
+    -- decrease.  Result: the common case is that there is just one
+    -- iteration
     go :: Int -> ArityType -> ArityType
     go !n cur_at@(AT oss div)
       | not (isDeadEndDiv div)           -- the "stop right away" case
@@ -703,20 +878,46 @@ findRhsArity dflags Recursive bndr rhs old_arity
               ( ppr bndr <+> ppr cur_at <+> ppr next_at $$ ppr rhs)) $
             go (n+1) next_at
       where
-        next_at = step cur_at
+        next_at = step (extendSigEnv init_env bndr cur_at)
 
-    step :: ArityType -> ArityType
-    step at = -- pprTrace "step" (vcat [ ppr bndr <+> ppr at <+> ppr (arityType env rhs)
-              --                      , ppr (idType bndr)
-              --                      , ppr (typeArity (idType bndr)) ]) $
-              arityType env rhs
-      where
-        env = extendSigEnv (findRhsArityEnv dflags) bndr at
+infixl 2 `combineWithDemandOneShots`
 
+combineWithDemandOneShots :: ArityType -> [OneShotInfo] -> ArityType
+-- See Note [Combining arity type with demand info]
+combineWithDemandOneShots (AT prs div) oss
+  = AT (zip_prs prs oss) div
+  where
+    zip_prs prs [] = prs
+    zip_prs [] oss = [(IsExpensive,os) | os <- oss]
+    zip_prs ((ch,os1):prs) (os2:oss)
+      = (ch, os1 `bestOneShot` os2) : zip_prs prs oss
 
-{-
-Note [Arity analysis]
-~~~~~~~~~~~~~~~~~~~~~
+idDemandOneShots :: Id -> [OneShotInfo]
+idDemandOneShots bndr
+  = call_arity_one_shots `zip_oss` dmd_one_shots
+  where
+    call_arity_one_shots :: [OneShotInfo]
+    call_arity_one_shots
+      | call_arity == 0 = []
+      | otherwise       = NoOneShotInfo : replicate (call_arity-1) OneShotLam
+    -- Call Arity analysis says the function is always called
+    -- applied to this many arguments.  The first NoOneShotInfo is because
+    -- if Call Arity says "always applied to 3 args" then the one-shot info
+    -- we get is [NoOneShotInfo, OneShotLam, OneShotLam]
+    call_arity = idCallArity bndr
+
+    dmd_one_shots :: [OneShotInfo]
+    -- If the demand info is Cx(C1(C1(.))) then we know that an
+    -- application to one arg is also an application to three
+    dmd_one_shots = argOneShots (idDemandInfo bndr)
+
+    -- Take the *longer* list
+    zip_oss (os1:oss1) (os2:oss2) = (os1 `bestOneShot` os2) : zip_oss oss1 oss2
+    zip_oss []         oss2       = oss2
+    zip_oss oss1       []         = oss1
+
+{- Note [Arity analysis]
+~~~~~~~~~~~~~~~~~~~~~~~~
 The motivating example for arity analysis is this:
 
   f = \x. let g = f (x+1)
@@ -778,57 +979,95 @@ to floatIn the non-cheap let-binding.  Which is all perfectly benign, but
 means we do two iterations (well, actually 3 'step's to detect we are stable)
 and don't want to emit the warning.
 
-Note [Eta expanding through dictionaries]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If the experimental -fdicts-cheap flag is on, we eta-expand through
-dictionary bindings.  This improves arities. Thereby, it also
-means that full laziness is less prone to floating out the
-application of a function to its dictionary arguments, which
-can thereby lose opportunities for fusion.  Example:
-        foo :: Ord a => a -> ...
-     foo = /\a \(d:Ord a). let d' = ...d... in \(x:a). ....
-        -- So foo has arity 1
+Note [Trim arity inside the loop]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Here's an example (from gadt/nbe.hs) which caused trouble.
+  data Exp g t where
+     Lam :: Ty a -> Exp (g,a) b -> Exp g (a->b)
 
-     f = \x. foo dInt $ bar x
+  eval :: Exp g t -> g -> t
+  eval (Lam _ e) g = \a -> eval e (g,a)
 
-The (foo DInt) is floated out, and makes ineffective a RULE
-     foo (bar x) = ...
+The danger is that we get arity 3 from analysing this; and the
+next time arity 4, and so on for ever.  Solution: use trimArityType
+on each iteration.
 
-One could go further and make exprIsCheap reply True to any
-dictionary-typed expression, but that's more work.
+Note [Combining arity type with demand info]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+   let f = \x. let y = <expensive> in \p \q{os}. blah
+   in ...(f a b)...(f c d)...
+
+* From the RHS we get an ArityType like
+    AT [ (True,?), (False,?), (True,OneShotLam) ] Dunno
+  where "?" means NoOneShotInfo
+
+* From the body, the demand analyser, or Call Arity, will tell us
+  that the function is always applied to at least two arguments.
+
+Combining these two pieces of info, we can get the final ArityType
+    AT [ (True,?), (False,OneShotLam), (True,OneShotLam) ] Dunno
+result: arity=3, which is better than we could do from either
+source alone.
+
+The "combining" part is done by combineWithDemandOneShots.  It
+uses info from both Call Arity and demand analysis.
 -}
 
-arityLam :: Id -> ArityType -> ArityType
-arityLam id (AT oss div) = AT (idStateHackOneShotInfo id : oss) div
 
-floatIn :: Bool -> ArityType -> ArityType
+{- *********************************************************************
+*                                                                      *
+                   arityType
+*                                                                      *
+********************************************************************* -}
+
+arityLam :: Id -> ArityType -> ArityType
+arityLam id (AT oss div)
+  = AT ((IsCheap, idStateHackOneShotInfo id) : oss) div
+
+floatIn :: Cost -> ArityType -> ArityType
 -- We have something like (let x = E in b),
 -- where b has the given arity type.
-floatIn cheap at
-  | isDeadEndArityType at || cheap = at
-  -- If E is not cheap, keep arity only for one-shots
-  | otherwise                      = takeWhileOneShot at
+floatIn IsCheap     at = at
+floatIn IsExpensive at = addWork at
 
-arityApp :: ArityType -> Bool -> ArityType
+addWork :: ArityType -> ArityType
+addWork at@(AT prs div)
+  = case prs of
+      []      -> at
+      pr:prs' -> AT (add_work pr : prs') div
+  where
+    add_work (_,os) = (IsExpensive,os)
+
+arityApp :: ArityType -> Cost -> ArityType
 -- Processing (fun arg) where at is the ArityType of fun,
 -- Knock off an argument and behave like 'let'
-arityApp (AT (_:oss) div) cheap = floatIn cheap (AT oss div)
-arityApp at               _     = at
+arityApp (AT ((ch1,_):oss) div) ch2 = floatIn (ch1 `addCost` ch2) (AT oss div)
+arityApp at                     _   = at
 
 -- | Least upper bound in the 'ArityType' lattice.
 -- See the haddocks on 'ArityType' for the lattice.
 --
 -- Used for branches of a @case@.
 andArityType :: ArityType -> ArityType -> ArityType
-andArityType (AT (os1:oss1) div1) (AT (os2:oss2) div2)
-  | AT oss' div' <- andArityType (AT oss1 div1) (AT oss2 div2)
-  = AT ((os1 `bestOneShot` os2) : oss') div' -- See Note [Combining case branches]
-andArityType (AT []         div1) at2
-  | isDeadEndDiv div1 = at2                  -- Note [ABot branches: max arity wins]
-  | otherwise         = takeWhileOneShot at2 -- See Note [Combining case branches]
-andArityType at1                  (AT []         div2)
-  | isDeadEndDiv div2 = at1                  -- Note [ABot branches: max arity wins]
-  | otherwise         = takeWhileOneShot at1 -- See Note [Combining case branches]
+andArityType (AT (pr1:prs1) div1) (AT (pr2:prs2) div2)
+  | AT prs' div' <- andArityType (AT prs1 div1) (AT prs2 div2)
+  = AT ((pr1 `and_pr` pr2) : prs') div' -- See Note [Combining case branches]
+  where
+    (ch1,os1) `and_pr` (ch2,os2)
+      = ( ch1 `addCost` ch2, os1 `bestOneShot` os2)
+
+andArityType (AT [] div1) at2 = andWithTail div1 at2
+andArityType at1 (AT [] div2) = andWithTail div2 at1
+
+andWithTail :: Divergence -> ArityType -> ArityType
+andWithTail div1 at2@(AT oss2 _)
+  | isDeadEndDiv div1     -- case x of { T -> error; F -> \y.e }
+  = at2
+  | otherwise  -- case x of { T -> plusInt <expensive>; F -> \y.e }
+  = addWork (AT oss2 topDiv)   -- We know div1 = topDiv
+        -- Note [ABot branches: max arity wins]
+        -- See Note [Combining case branches]
 
 {- Note [ABot branches: max arity wins]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -860,29 +1099,6 @@ basis that if we know one branch is one-shot, then they all must be.
 Surprisingly, this means that the one-shot arity type is effectively the top
 element of the lattice.
 
-Note [Arity trimming]
-~~~~~~~~~~~~~~~~~~~~~
-Consider ((\x y. blah) |> co), where co :: (Int->Int->Int) ~ (Int -> F a) , and
-F is some type family.
-
-Because of Note [exprArity invariant], item (2), we must return with arity at
-most 1, because typeArity (Int -> F a) = 1.  So we have to trim the result of
-calling arityType on (\x y. blah).  Failing to do so, and hence breaking the
-exprArity invariant, led to #5441.
-
-How to trim?  If we end in topDiv, it's easy.  But we must take great care with
-dead ends (i.e. botDiv). Suppose the expression was (\x y. error "urk"),
-we'll get \??.⊥.  We absolutely must not trim that to \?.⊥, because that
-claims that ((\x y. error "urk") |> co) diverges when given one argument,
-which it absolutely does not. And Bad Things happen if we think something
-returns bottom when it doesn't (#16066).
-
-So, if we need to trim a dead-ending arity type, switch (conservatively) to
-topDiv.
-
-Historical note: long ago, we unconditionally switched to topDiv when we
-encountered a cast, but that is far too conservative: see #5475
-
 Note [Eta expanding through CallStacks]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Just as it's good to eta-expand through dictionaries, so it is good to
@@ -893,6 +1109,25 @@ do so through CallStacks.  #20103 is a case in point, where we got
 
 We really want to eta-expand this!  #20103 is quite convincing!
 We do this regardless of -fdicts-cheap; it's not really a dictionary.
+
+Note [Eta expanding through dictionaries]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If the experimental -fdicts-cheap flag is on, we eta-expand through
+dictionary bindings.  This improves arities. Thereby, it also
+means that full laziness is less prone to floating out the
+application of a function to its dictionary arguments, which
+can thereby lose opportunities for fusion.  Example:
+        foo :: Ord a => a -> ...
+     foo = /\a \(d:Ord a). let d' = ...d... in \(x:a). ....
+        -- So foo has arity 1
+
+     f = \x. foo dInt $ bar x
+
+The (foo DInt) is floated out, and makes ineffective a RULE
+     foo (bar x) = ...
+
+One could go further and make exprIsCheap reply True to any
+dictionary-typed expression, but that's more work.
 -}
 
 ---------------------------
@@ -925,6 +1160,7 @@ data AnalysisMode
   -- ^ Used for regular, fixed-point arity analysis ('findRhsArity').
   --   See Note [Arity analysis] for details about fixed-point iteration.
   --   INVARIANT: Disjoint with 'ae_joins'.
+  -- am_dicts_cheap: see Note [Eta expanding through dictionaries]
 
 data ArityEnv
   = AE
@@ -1013,6 +1249,11 @@ pedanticBottoms AE{ ae_mode = mode } = case mode of
   EtaExpandArity{ am_ped_bot = ped_bot } -> ped_bot
   FindRhsArity{ am_ped_bot = ped_bot }   -> ped_bot
 
+exprCost :: ArityEnv -> CoreExpr -> Maybe Type -> Cost
+exprCost env e mb_ty
+  | myExprIsCheap env e mb_ty = IsCheap
+  | otherwise                 = IsExpensive
+
 -- | A version of 'exprIsCheap' that considers results from arity analysis
 -- and optionally the expression's type.
 -- Under 'exprBotStrictness_maybe', no expressions are cheap.
@@ -1040,15 +1281,18 @@ myExprIsCheap AE{ae_mode = mode} e mb_ty = case mode of
 -- it's important.
 myIsCheapApp :: IdEnv ArityType -> CheapAppFun
 myIsCheapApp sigs fn n_val_args = case lookupVarEnv sigs fn of
+
   -- Nothing means not a local function, fall back to regular
   -- 'GHC.Core.Utils.isCheapApp'
-  Nothing         -> isCheapApp fn n_val_args
+  Nothing -> isCheapApp fn n_val_args
+
   -- @Just at@ means local function with @at@ as current ArityType.
   -- Roughly approximate what 'isCheapApp' is doing.
   Just (AT oss div)
     | isDeadEndDiv div -> True -- See Note [isCheapApp: bottoming functions] in GHC.Core.Utils
-    | n_val_args < length oss -> True -- Essentially isWorkFreeApp
-    | otherwise -> False
+    | n_val_args == 0         -> True -- Essentially
+    | n_val_args < length oss -> True -- isWorkFreeApp
+    | otherwise               -> False
 
 ----------------
 arityType :: ArityEnv -> CoreExpr -> ArityType
@@ -1075,7 +1319,10 @@ arityType env (Lam x e)
 arityType env (App fun (Type _))
    = arityType env fun
 arityType env (App fun arg )
-   = arityApp (arityType env fun) (myExprIsCheap env arg Nothing)
+   = arityApp fun_at arg_cost
+   where
+     fun_at   = arityType env fun
+     arg_cost = exprCost env arg Nothing
 
         -- Case/Let; keep arity if either the expression is cheap
         -- or it's a 1-shot lambda
@@ -1096,9 +1343,8 @@ arityType env (Case scrut bndr _ alts)
   | exprOkForSpeculation scrut
   = alts_type
 
-  | otherwise                  -- In the remaining cases we may not push
-  = takeWhileOneShot alts_type -- evaluation of the scrutinee in
-
+  | otherwise            -- In the remaining cases we may not push
+  = addWork alts_type -- evaluation of the scrutinee in
   where
     env' = delInScope env bndr
     arity_type_alt (Alt _con bndrs rhs) = arityType (delInScopeList env' bndrs) rhs
@@ -1127,16 +1373,16 @@ arityType env (Let (Rec pairs) body)
       = pprPanic "arityType:joinrec" (ppr pairs)
 
 arityType env (Let (NonRec b r) e)
-  = floatIn cheap_rhs (arityType env' e)
+  = floatIn rhs_cost (arityType env' e)
   where
-    cheap_rhs = myExprIsCheap env r (Just (idType b))
-    env'      = extendSigEnv env b (arityType env r)
+    rhs_cost = exprCost env r (Just (idType b))
+    env'     = extendSigEnv env b (arityType env r)
 
 arityType env (Let (Rec prs) e)
-  = floatIn (all is_cheap prs) (arityType env' e)
+  = floatIn (allCosts bind_cost prs) (arityType env' e)
   where
-    env'           = delInScopeList env (map fst prs)
-    is_cheap (b,e) = myExprIsCheap env' e (Just (idType b))
+    env'            = delInScopeList env (map fst prs)
+    bind_cost (b,e) = exprCost env' e (Just (idType b))
 
 arityType env (Tick t e)
   | not (tickishIsCode t)     = arityType env e
@@ -1207,8 +1453,8 @@ idArityType v
   | otherwise
   = AT (take (idArity v) one_shots) topDiv
   where
-    one_shots :: [OneShotInfo]  -- One-shot-ness derived from the type
-    one_shots = typeOneShots (idType v)
+    one_shots :: [(Cost,OneShotInfo)]  -- One-shot-ness derived from the type
+    one_shots = repeat IsCheap `zip` typeOneShots (idType v)
 
 {-
 %************************************************************************
@@ -1317,7 +1563,7 @@ Consider
 We'll get an ArityType for foo of \?1.T.
 
 Then we want to eta-expand to
-  foo = (\x. \eta{os}. (case x of ...as before...) eta)) |> some_co
+  foo = (\x. \eta{os}. (case x of ...as before...) eta) |> some_co
 
 That 'eta' binder is fresh, and we really want it to have the
 one-shot flag from the inner \s{os}.  By expanding with the
@@ -1351,8 +1597,8 @@ etaExpandAT :: InScopeSet -> ArityType -> CoreExpr -> CoreExpr
 -- We pass in the InScopeSet from the simplifier to avoid recomputing
 -- it here, which can be jolly expensive if the casts are big
 -- In #18223 it took 10% of compile time just to do the exprFreeVars!
-etaExpandAT in_scope (AT oss _) orig_expr
-  = eta_expand in_scope oss orig_expr
+etaExpandAT in_scope at orig_expr
+  = eta_expand in_scope (arityTypeOneShots at) orig_expr
 
 -- etaExpand arity e = res
 -- Then 'res' has at least 'arity' lambdas at the top
@@ -1367,7 +1613,11 @@ etaExpandAT in_scope (AT oss _) orig_expr
 
 eta_expand :: InScopeSet -> [OneShotInfo] -> CoreExpr -> CoreExpr
 eta_expand in_scope one_shots (Cast expr co)
-  = Cast (eta_expand in_scope one_shots expr) co
+  = mkCast (eta_expand in_scope one_shots expr) co
+    -- This mkCast is important, because eta_expand might return an
+    -- expression with a cast at the outside; and tryCastWorkerWrapper
+    -- asssumes that we don't have nested casts. Makes a difference
+    -- in compile-time for T18223
 
 eta_expand in_scope one_shots orig_expr
   = go in_scope one_shots [] orig_expr
@@ -1438,7 +1688,7 @@ casts complicate the question.  If we have
 and
    e :: N (N Int)
 then the eta-expansion should look like
-   (\(x::S) (y::S) -> e |> co x y) |> sym co
+   (\(x::S) (y::S) -> (e |> co) x y) |> sym co
 where
   co :: N (N Int) ~ S -> S -> Int
   co = axN @(N Int) ; (S -> axN @Int)
@@ -1673,6 +1923,279 @@ mkEtaWW orig_oss ppr_orig_expr in_scope orig_ty
         -- So we simply decline to eta-expand.  Otherwise we'd end up
         -- with an explicit lambda having a non-function type
 
+
+{-
+************************************************************************
+*                                                                      *
+                Eta reduction
+*                                                                      *
+************************************************************************
+
+Note [Eta reduction conditions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Given (\x. <fun> x), what condition on <stuff> allows us to eta-reduce?
+This test is implemented by 'ok_fun' in tryEtaReduce.
+
+There are some particularly delicate points here:
+
+* Clearly <fun> must not mention x!
+
+* We want to eta-reduce if doing so leaves
+         a trivial expression,
+  *including* a cast.  For example
+       \x. (f |> co) x  -->  f |> co
+  (provided co doesn't mention x)
+
+  c.f. Note [Which RHSs do we eta-expand?] in GHC.Core.Opt.Simplify.Utils.
+  If we eta-reduce to 'e', we don't want to eta-expand 'e'!
+
+* Note that we only eta-reduce if the result is /trivial/,
+  not if it is a PAP.  See Note [Do not eta reduce PAPs]
+
+* Eta reduction is not valid in general:
+        \x. bot  /=  bot
+  This matters, partly for old-fashioned correctness reasons but,
+  worse, getting it wrong can yield a seg fault. Consider
+        f = \x.f x
+        h y = case (case y of { True -> f `seq` True; False -> False }) of
+                True -> ...; False -> ...
+
+  If we (unsoundly) eta-reduce f to get f=f, the strictness analyser
+  says f=bottom, and replaces the (f `seq` True) with just
+  (f `cast` unsafe-co).  BUT, as thing stand, 'f' got arity 1, and it
+  *keeps* arity 1 (perhaps also wrongly).  So CorePrep eta-expands
+  the definition again, so that it does not terminate after all.
+  Result: seg-fault because the boolean case actually gets a function value.
+  See #1947.
+
+  So it's important to do the right thing.
+
+* With linear types, eta-reduction can break type-checking:
+        f :: A ⊸ B
+        g :: A -> B
+        g = \x. f x
+
+  The above is correct, but eta-reducing g would yield g=f, the linter will
+  complain that g and f don't have the same type.
+
+* Note [Arity care]: we need to be careful if we just look at f's
+  arity. Currently (Dec07), f's arity is visible in its own RHS (see
+  Note [Arity robustness] in GHC.Core.Opt.Simplify.Env) so we must *not* trust the
+  arity when checking that 'f' is a value.  Otherwise we will
+  eta-reduce
+      f = \x. f x
+  to
+      f = f
+  Which might change a terminating program (think (f `seq` e)) to a
+  non-terminating one.  So we check for being a loop breaker first.
+
+  However for GlobalIds we can look at the arity.
+
+* Type and dictionary abstraction.
+  Regardless of whether 'f' is a value, we always want to reduce
+        (/\a -> f a)  -->   f
+  This came up in a RULE: foldr (build (/\a -> g a))
+  did not match           foldr (build (/\b -> ...something complex...))
+  The type checker can insert these eta-expanded versions,
+  with both type and dictionary lambdas; hence the slightly
+  ad-hoc (all ok_lam bndrs)
+
+* Never *reduce* arity. For example
+      f = \xy. g x y
+  Then if g has arity 1 we don't want to eta-reduce because then
+  f's arity would decrease, and that is bad
+
+These delicacies are why we don't use exprIsTrivial and exprIsHNF here.
+Alas.
+
+Note [Do not eta reduce PAPs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+I considered eta-reducing if the result is a PAP:
+   \x. f e1 e2 x  ==>   f e1 e2
+
+This reduces clutter, sometimes a lot. See Note [Do not eta-expand PAPs]
+in GHC.Core.Opt.Simplify.Utils, where we are careful not to eta-expand
+a PAP.  If eta-expanding is bad, then eta-reducing is good!
+
+Also the code generator likes eta-reduced PAPs; see GHC.CoreToStg.Prep
+Note [No eta reduction needed in rhsToBody].
+
+But note that we don't want to eta-reduce
+     \x y.  f <expensive> x y
+to
+     f <expensive>
+The former has arity 2, and repeats <expensive> for every call of the
+function; the latter has arity 0, and shares <expensive>.  We don't want
+to change behaviour.  Hence the call to exprIsCheap in ok_fun.
+
+I noticed this when examining #18993 and, although it is delicate,
+eta-reducing to a PAP happens to fix the regression in #18993.
+
+HOWEVER, if we transform
+   \x. f y x   ==>   f y
+that might mean that f isn't saturated any more, and does not inline.
+This led to some other regressions.
+
+TL;DR currrently we do /not/ eta reduce if the result is a PAP.
+
+Note [Eta reduction with casted arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+    (\(x:t3). f (x |> g)) :: t3 -> t2
+  where
+    f :: t1 -> t2
+    g :: t3 ~ t1
+This should be eta-reduced to
+
+    f |> (sym g -> t2)
+
+So we need to accumulate a coercion, pushing it inward (past
+variable arguments only) thus:
+   f (x |> co_arg) |> co  -->  (f |> (sym co_arg -> co)) x
+   f (x:t)         |> co  -->  (f |> (t -> co)) x
+   f @ a           |> co  -->  (f |> (forall a.co)) @ a
+   f @ (g:t1~t2)   |> co  -->  (f |> (t1~t2 => co)) @ (g:t1~t2)
+These are the equations for ok_arg.
+
+Note [Eta reduction with casted function]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Since we are pushing a coercion inwards, it is easy to accommodate
+    (\xy. (f x |> g) y)
+    (\xy. (f x y) |> g)
+
+See the `(Cast e co)` equation for `go` in `tryEtaReduce`.  The
+eta-expander pushes those casts outwards, so you might think we won't
+ever see a cast here, but if we have
+  \xy. (f x y |> g)
+we will call tryEtaReduce [x,y] (f x y |> g), and we'd like that to
+work.  This happens in GHC.Core.Opt.Simplify.Utils.rebuildLam, where
+eta-expansion may be turned off (by sm_eta_expand).
+
+Note [Eta reduction of an eval'd function]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In Haskell it is not true that    f = \x. f x
+because f might be bottom, and 'seq' can distinguish them.
+
+But it *is* true that   f = f `seq` \x. f x
+and we'd like to simplify the latter to the former.  This amounts
+to the rule that
+  * when there is just *one* value argument,
+  * f is not bottom
+we can eta-reduce    \x. f x  ===>  f
+
+This turned up in #7542.
+-}
+
+tryEtaReduce :: [Var] -> CoreExpr -> Maybe CoreExpr
+-- Return an expression equal to (\bndrs. body)
+tryEtaReduce bndrs body
+  = go (reverse bndrs) body refl_co
+  where
+    refl_co = mkRepReflCo (exprType body)
+    incoming_arity = count isId bndrs
+
+    go :: [Var]            -- Binders, innermost first, types [a3,a2,a1]
+       -> CoreExpr         -- Of type tr
+       -> Coercion         -- Of type tr ~ ts
+       -> Maybe CoreExpr   -- Of type a1 -> a2 -> a3 -> ts
+    -- See Note [Eta reduction with casted arguments]
+    -- for why we have an accumulating coercion
+    --
+    -- Invariant: (go bs body co) returns an expression
+    --            equivalent to (\(reverse bs). body |> co)
+    -- See Note [Eta reduction with casted function]
+    go bs (Cast e co1) co2
+      = go bs e (co1 `mkTransCo` co2)
+
+    go bs@(_ : _) (Tick t e) co
+      | tickishFloatable t
+      = fmap (Tick t) $ go bs e co
+      -- Float app ticks: \x -> Tick t (e x) ==> Tick t e
+
+    go (b : bs) (App fun arg) co
+      | Just (co', ticks) <- ok_arg b arg co (exprType fun)
+      = fmap (flip (foldr mkTick) ticks) $ go bs fun co'
+            -- Float arg ticks: \x -> e (Tick t x) ==> Tick t e
+
+    go remaining_bndrs fun co
+      | all isTyVar remaining_bndrs
+        -- We might have  /\a \b. f [a] b, and we want to
+        -- eta-reduce to  /\a. f [a]
+        -- See #20040
+      , remaining_bndrs `ltLength` bndrs
+        -- Only reply Just if /something/ has happened
+      , all ok_lam bndrs || ok_fun fun
+      , let etad_expr = mkLams (reverse remaining_bndrs) (mkCast fun co)
+            used_vars = exprFreeVars etad_expr
+      , not (any (`elemVarSet` used_vars) bndrs)
+      = Just etad_expr
+
+    go _ _ _  = Nothing         -- Failure!
+
+    ---------------
+    -- Note [Eta reduction conditions]
+    ok_fun (App fun (Type {})) = ok_fun fun
+    ok_fun (Cast fun _)        = ok_fun fun
+    ok_fun (Tick _ expr)       = ok_fun expr
+    ok_fun (Var fun_id)        = ok_fun_id fun_id || all ok_lam bndrs
+    ok_fun _fun                = False
+
+    ---------------
+    ok_fun_id fun = -- There are arguments to reduce
+                    fun_arity fun >= incoming_arity &&
+                    -- We always want args for join points so
+                    -- we should never eta-reduce to a trivial expression.
+                    -- See Note [Invariants on join points] in GHC.Core, and #20599
+                    not (isJoinId fun)
+
+    ---------------
+    fun_arity fun             -- See Note [Arity care]
+--       | isLocalId fun
+--       , isStrongLoopBreaker (idOccInfo fun) = 0
+       | arity > 0                           = arity
+       | isEvaldUnfolding (idUnfolding fun)  = 1
+            -- See Note [Eta reduction of an eval'd function]
+       | otherwise                           = 0
+       where
+         arity = idArity fun
+
+    ---------------
+    ok_lam v = isTyVar v || isEvVar v
+    -- See Note [Eta reduction conditions]:
+    -- bullet on Type and dictionary abstractions
+
+    ---------------
+    ok_arg :: Var              -- Of type bndr_t
+           -> CoreExpr         -- Of type arg_t
+           -> Coercion         -- Of kind (t1~t2)
+           -> Type             -- Type (arg_t -> t1) of the function
+                               --      to which the argument is supplied
+           -> Maybe (Coercion  -- Of type (arg_t -> t1 ~  bndr_t -> t2)
+                               --   (and similarly for tyvars, coercion args)
+                    , [CoreTickish])
+    -- See Note [Eta reduction with casted arguments]
+    ok_arg bndr (Type ty) co _
+       | Just tv <- getTyVar_maybe ty
+       , bndr == tv  = Just (mkHomoForAllCos [tv] co, [])
+    ok_arg bndr (Var v) co fun_ty
+       | bndr == v
+       , let mult = idMult bndr
+       , Just (fun_mult, _, _) <- splitFunTy_maybe fun_ty
+       , mult `eqType` fun_mult -- There is no change in multiplicity, otherwise we must abort
+       = Just (mkFunResCo Representational (idScaledType bndr) co, [])
+    ok_arg bndr (Cast e co_arg) co fun_ty
+       | (ticks, Var v) <- stripTicksTop tickishFloatable e
+       , Just (fun_mult, _, _) <- splitFunTy_maybe fun_ty
+       , bndr == v
+       , fun_mult `eqType` idMult bndr
+       = Just (mkFunCo Representational (multToCo fun_mult) (mkSymCo co_arg) co, ticks)
+       -- The simplifier combines multiple casts into one,
+       -- so we can have a simple-minded pattern match here
+    ok_arg bndr (Tick t arg) co fun_ty
+       | tickishFloatable t, Just (co', ticks) <- ok_arg bndr arg co fun_ty
+       = Just (co', t:ticks)
+
+    ok_arg _ _ _ _ = Nothing
 
 {- *********************************************************************
 *                                                                      *

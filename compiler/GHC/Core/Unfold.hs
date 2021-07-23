@@ -47,7 +47,7 @@ import GHC.Core.DataCon
 import GHC.Types.Literal
 import GHC.Builtin.PrimOps
 import GHC.Types.Id.Info
-import GHC.Types.Basic  ( Arity )
+import GHC.Types.Basic  ( Arity, RecFlag(..) )
 import GHC.Core.Type
 import GHC.Builtin.Names
 import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
@@ -998,7 +998,7 @@ nonTriv _       = True
 
 data CallCtxt
   = BoringCtxt
-  | RhsCtxt             -- Rhs of a let-binding; see Note [RHS of lets]
+  | RhsCtxt RecFlag     -- Rhs of a let-binding; see Note [RHS of lets]
   | DiscArgCtxt         -- Argument of a function with non-zero arg discount
   | RuleArgCtxt         -- We are somewhere in the argument of a function with rules
 
@@ -1013,7 +1013,7 @@ instance Outputable CallCtxt where
   ppr CaseCtxt    = text "CaseCtxt"
   ppr ValAppCtxt  = text "ValAppCtxt"
   ppr BoringCtxt  = text "BoringCtxt"
-  ppr RhsCtxt     = text "RhsCtxt"
+  ppr (RhsCtxt ir)= text "RhsCtxt" <> parens (ppr ir)
   ppr DiscArgCtxt = text "DiscArgCtxt"
   ppr RuleArgCtxt = text "RuleArgCtxt"
 
@@ -1241,7 +1241,8 @@ tryUnfolding logger opts !case_depth id lone_variable
               ValAppCtxt -> True                           -- Note [Cast then apply]
               RuleArgCtxt -> uf_arity > 0  -- See Note [Unfold info lazy contexts]
               DiscArgCtxt -> uf_arity > 0  -- Note [Inlining in ArgCtxt]
-              RhsCtxt     -> uf_arity > 0  --
+              RhsCtxt NonRecursive
+                          -> uf_arity > 0  -- See Note [RHS of lets]
               _other      -> False         -- See Note [Nested functions]
 
 
@@ -1249,7 +1250,7 @@ tryUnfolding logger opts !case_depth id lone_variable
 Note [Unfold into lazy contexts], Note [RHS of lets]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When the call is the argument of a function with a RULE, or the RHS of a let,
-we are a little bit keener to inline.  For example
+we are a little bit keener to inline (in tryUnfolding).  For example
      f y = (y,y,y)
      g y = let x = f y in ...(case x of (a,b,c) -> ...) ...
 We'd inline 'f' if the call was in a case context, and it kind-of-is,
@@ -1258,7 +1259,10 @@ only we can't see it.  Also
 could be expensive whereas
      x = case v of (a,b) -> a
 is patently cheap and may allow more eta expansion.
-So we treat the RHS of a let as not-totally-boring.
+
+So we treat the RHS of a /non-recursive/ let as not-totally-boring.
+A /recursive/ let isn't going be inlined so there is much less point.
+Hence the RecFlag in RhsCtxt
 
 Note [Unsaturated applications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

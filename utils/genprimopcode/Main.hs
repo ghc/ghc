@@ -612,18 +612,40 @@ gen_latex_doc (Info defaults entries)
            latex_encode ('\\':cs) = "$\\backslash$" ++ (latex_encode cs)
            latex_encode (c:cs) = c:(latex_encode cs)
 
+{- Note [OPTIONS_GHC in GHC.PrimopWrappers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In PrimopWrappers we set some crucial GHC options
+
+* Eta reduction: -fno-do-eta-reduction
+  In PrimopWrappers we builds a wrapper for each primop, thus
+      plusInt# = \a b. plusInt# a b
+  That's a pretty odd definition, becaues it looks recursive. What
+  actually happens is that it makes a curried, top-level bindings for
+  `plusInt#`.  When we compile PrimopWrappers, the code generator spots
+  (plusInt# a b) and generates an add instruction.
+
+  Its very important that we don't eta-reduce this to
+      plusInt# = plusInt#
+  because then the special rule in the code generator doesn't fire.
+
+* Worker-wrapper: performing WW on this module is harmful even, two reasons:
+  1. Inferred strictness signatures are all bottom (because of the apparent
+     recursion), which is a lie
+  2. Doing the worker/wrapper split based on that information will
+     introduce references to absentError, which isn't available at
+     this point.
+
+  We prevent strictness analyis and w/w by simply doing -O0.  It's
+  a very simple module and there is no optimisation to be done
+-}
+
 gen_wrappers :: Info -> String
 gen_wrappers (Info _ entries)
    =    "{-# LANGUAGE MagicHash, NoImplicitPrelude, UnboxedTuples #-}\n"
         -- Dependencies on Prelude must be explicit in libraries/base, but we
         -- don't need the Prelude here so we add NoImplicitPrelude.
-     ++ "{-# OPTIONS_GHC -Wno-deprecations -O0 #-}\n"
-        -- No point in optimising this at all.
-        -- Performing WW on this module is harmful even, two reasons:
-        --   1. Inferred strictness signatures are all bottom, which is a lie
-        --   2. Doing the worker/wrapper split based on that information will
-        --      introduce references to absentError,
-        --      which isn't available at this point.
+     ++ "{-# OPTIONS_GHC -Wno-deprecations -O0 -fno-do-eta-reduction #-}\n"
+        -- Very important OPTIONS_GHC!  See Note [OPTIONS_GHC in GHC.PrimopWrappers]
      ++ "module GHC.PrimopWrappers where\n"
      ++ "import qualified GHC.Prim\n"
      ++ "import GHC.Tuple ()\n"
