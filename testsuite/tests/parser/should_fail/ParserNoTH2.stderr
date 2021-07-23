@@ -1,0 +1,9 @@
+
+ParserNoTH2.hs:1:5: warning: [-Woperator-whitespace-ext-conflict (in -Wdefault)]
+    The prefix use of a ‘$$’ would denote a typed splice
+      were the TemplateHaskell extension enabled.
+    Suggested fix: Add whitespace after the ‘$$’.
+
+ParserNoTH2.hs:1:5: error:
+    parse error on input ‘$$’
+    Suggested fix: Perhaps you intended to use TemplateHaskell
