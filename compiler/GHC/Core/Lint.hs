@@ -1905,7 +1905,6 @@ try to trim the forall'd binder list.
 
 Note [Rules for join points]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 A join point cannot be partially applied. However, the left-hand side of a rule
 for a join point is effectively a *pattern*, not a piece of code, so there's an
 argument to be made for allowing a situation like this:
