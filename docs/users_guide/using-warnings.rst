@@ -992,7 +992,7 @@ of ``-W(no-)*``.
     :reverse: -Wno-missing-deriving-strategies
     :category:
 
-    :since: 8.8.1
+    :since: 8.8
 
     The datatype below derives the ``Eq`` typeclass, but doesn't specify a
     strategy. When :ghc-flag:`-Wmissing-deriving-strategies` is enabled,
@@ -1030,7 +1030,7 @@ of ``-W(no-)*``.
     :reverse: -Wno-missing-export-lists
     :category:
 
-    :since: 8.4.1
+    :since: 8.4
 
     .. index::
        single: missing export lists, warning
@@ -1732,7 +1732,7 @@ of ``-W(no-)*``.
     :reverse: -Wno-unused-record-wildcards
     :category:
 
-    :since: 8.10.1
+    :since: 8.10
 
     .. index::
        single: unused, warning, record wildcards
@@ -1754,7 +1754,7 @@ of ``-W(no-)*``.
     :reverse: -Wno-redundant-bang-patterns
     :category:
 
-    :since: 9.2.1
+    :since: 9.2
 
     .. index::
        single: redundant, warning, bang patterns
@@ -1795,7 +1795,7 @@ of ``-W(no-)*``.
     :reverse: -Wno-redundant-record-wildcards
     :category:
 
-    :since: 8.10.1
+    :since: 8.10
 
     .. index::
        single: unused, warning, record wildcards
