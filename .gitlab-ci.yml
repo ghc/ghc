@@ -21,6 +21,9 @@ variables:
 
   HACKAGE_INDEX_STATE: "2020-12-21T14:48:20Z"
 
+  # Makes ci.sh isolate CABAL_DIR
+  HERMETIC: "YES"
+
   # Reduce XZ compression level for regular jobs (it is bumped to 9 for releases
   # and nightly jobs). In my experiments I've got the following bindist size in
   # the given time for each compression level (with the quick flavour):
