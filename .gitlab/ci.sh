@@ -65,6 +65,7 @@ Environment variables affecting both build systems:
   IGNORE_PERF_FAILURES
                     Whether to ignore perf failures (one of "increases",
                     "decreases", or "all")
+  HERMETIC          Take measures to avoid looking at anything in \$HOME
 
 Environment variables determining build configuration of Make system:
 
@@ -160,7 +161,7 @@ toolchain="$TOP/toolchain"
 mkdir -p "$toolchain/bin"
 PATH="$toolchain/bin:$PATH"
 
-export METRICS_FILE="$CI_PROJECT_DIR/performance-metrics.tsv"
+export METRICS_FILE="$TOP/performance-metrics.tsv"
 
 cores="$(mk/detect-cpu-count.sh)"
 
@@ -213,10 +214,10 @@ function set_toolchain_paths() {
 
 # Extract GHC toolchain
 function setup() {
-  if [ -d "${CABAL_CACHE}" ]; then
-      info "Extracting cabal cache from ${CABAL_CACHE} to $cabal_dir..."
-      mkdir -p "$cabal_dir"
-      cp -Rf "${CABAL_CACHE}"/* "$cabal_dir"
+  if [ -d "$CABAL_CACHE" ]; then
+      info "Extracting cabal cache from $CABAL_CACHE to $CABAL_DIR..."
+      mkdir -p "$CABAL_DIR"
+      cp -Rf "$CABAL_CACHE"/* "$CABAL_DIR"
   fi
 
   if [[ "$needs_toolchain" = "1" ]]; then
@@ -508,8 +509,8 @@ function run_perf_test() {
 }
 
 function save_cache () {
-  info "Storing cabal cache from $cabal_dir to ${CABAL_CACHE}..."
-  cp -Rf "$cabal_dir" "${CABAL_CACHE}"
+  info "Storing cabal cache from $CABAL_DIR to $CABAL_CACHE..."
+  cp -Rf "$CABAL_DIR" "$CABAL_CACHE"
 }
 
 function clean() {
@@ -545,17 +546,23 @@ function shell() {
 
 setup_locale
 
-# Determine Cabal data directory
+# Platform-specific environment initialization
+if [ -n "${HERMETIC:-}" ]; then
+  export CABAL_DIR="$TOP/cabal"
+  export HOME="/nonexistent"
+else
+  BIN_DIST_NAME="${BIN_DIST_NAME:-}"
+  case "$(uname)" in
+    MSYS_*|MINGW*) CABAL_DIR="$APPDATA/cabal" ;;
+    *) CABAL_DIR="$HOME/.cabal" ;;
+  esac
+fi
+
 case "$(uname)" in
-  MSYS_*|MINGW*) exe=".exe"; cabal_dir="$APPDATA/cabal" ;;
-  *) cabal_dir="$HOME/.cabal"; exe="" ;;
+  MSYS_*|MINGW*) exe=".exe" ;;
+  *) exe="" ;;
 esac
 
-echo "Cabal_dir is $cabal_dir"
-echo "$(uname -m)"
-echo "${CABAL_CACHE}"
-
-# Platform-specific environment initialization
 MAKE="make"
 TAR="tar"
 case "$(uname)" in
