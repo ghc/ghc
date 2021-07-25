@@ -4,9 +4,10 @@ variables:
   # Commit of ghc/ci-images repository from which to pull Docker images
   DOCKER_REV: 853f348f9caf38b08740b280296fbd34e09abb3a
 
-  # Sequential version number capturing the versions of all tools fetched by
-  # .gitlab/ci.sh. Used for invalidation of GitLab CI cache.
-  WINDOWS_TOOLCHAIN_VERSION: 4
+
+  # Sequential version number of all cached things.
+  # Bump to invalidate GitLab CI cache.
+  CACHE_REV: 4
 
   # Disable shallow clones; they break our linting rules
   GIT_DEPTH: 0
@@ -276,7 +277,7 @@ lint-release-changelogs:
     - .gitlab/ci.sh build_hadrian
     - .gitlab/ci.sh test_hadrian
   cache:
-    key: hadrian
+    key: hadrian-$CACHE_REV
     paths:
       - cabal-cache
   dependencies: []
@@ -380,7 +381,7 @@ hadrian-ghc-in-ghci:
     - .gitlab/ci.sh save_cache
     - cat ci-timings
   cache:
-    key: hadrian-ghci
+    key: hadrian-ghci-$CACHE_REV
     paths:
       - cabal-cache
 
@@ -408,7 +409,7 @@ hadrian-ghc-in-ghci:
   variables:
     GHC_FLAGS: -Werror
   cache:
-    key: lint
+    key: lint-$CACHE_REV
     paths:
       - cabal-cache
 
@@ -479,7 +480,7 @@ lint-libs:
     when: always
     expire_in: 2 week
   cache:
-    key: "freebsd-$GHC_VERSION"
+    key: "freebsd-$GHC_VERSION-$CACHE_REV"
     paths:
       - cabal-cache
       - toolchain
@@ -519,7 +520,7 @@ release-x86_64-freebsd:
     when: always
     expire_in: 2 week
   cache:
-    key: "freebsd-$GHC_VERSION"
+    key: "freebsd-$GHC_VERSION-$CACHE_REV"
     paths:
       - cabal-cache
       - toolchain
@@ -665,7 +666,7 @@ validate-aarch64-darwin:
     - cp -Rf $HOME/.cabal cabal-cache
     - cat ci-timings
   cache:
-    key: linux
+    key: linux-$CACHE_REV
     paths:
       - cabal-cache
       - toolchain
@@ -683,7 +684,7 @@ validate-aarch64-darwin:
     TEST_ENV: "aarch64-linux-deb10"
     BIN_DIST_PREP_TAR_COMP: "ghc-aarch64-linux-deb10.tar.xz"
   cache:
-    key: linux-aarch64-deb10
+    key: linux-aarch64-deb10-$CACHE_REV
   tags:
     - aarch64-linux
 
@@ -748,7 +749,7 @@ validate-aarch64-linux-deb10-llvm:
     LD: "ld.gold"
     GccUseLdOpt: "-fuse-ld=gold"
   cache:
-    key: linux-armv7-deb10
+    key: linux-armv7-deb10-$CACHE_REV
   tags:
     - armv7-linux
 
@@ -777,7 +778,7 @@ nightly-armv7-linux-deb10:
     TEST_ENV: "i386-linux-deb9"
     BIN_DIST_PREP_TAR_COMP: "ghc-i386-deb9-linux.tar.xz"
   cache:
-    key: linux-i386-deb9
+    key: linux-i386-deb9-$CACHE_REV
 
 validate-i386-linux-deb9:
   extends: .build-i386-linux-deb9
@@ -804,7 +805,7 @@ nightly-i386-linux-deb9:
     TEST_ENV: "x86_64-linux-deb9"
     BIN_DIST_PREP_TAR_COMP: "./ghc-x86_64-deb9-linux.tar.xz"
   cache:
-    key: linux-x86_64-deb9
+    key: linux-x86_64-deb9-$CACHE_REV
 
 # Disabled to reduce CI load
 .validate-x86_64-linux-deb9:
@@ -905,7 +906,7 @@ validate-x86_64-linux-deb9-dwarf:
     TEST_ENV: "x86_64-linux-deb10"
     BIN_DIST_PREP_TAR_COMP: "./ghc-x86_64-deb10-linux.tar.xz"
   cache:
-    key: linux-x86_64-deb10
+    key: linux-x86_64-deb10-$CACHE_REV
 
 # Disabled to alleviate CI load
 .validate-x86_64-linux-deb10:
@@ -964,7 +965,7 @@ nightly-x86_64-linux-deb10-llvm:
     TEST_ENV: "x86_64-linux-ubuntu2004"
     BIN_DIST_PREP_TAR_COMP: "./ghc-x86_64-ubuntu2004-linux.tar.xz"
   cache:
-    key: linux-x86_64-ubuntu2004
+    key: linux-x86_64-ubuntu2004-$CACHE_REV
 
 # Disabled to alleviate CI load
 .validate-x86_64-linux-ubuntu2004:
@@ -1001,7 +1002,7 @@ release-x86_64-linux-ubuntu2004:
     # T10458 due to fact that dynamic linker tries to reload libAS
     BROKEN_TESTS: "encoding004 T10458"
   cache:
-    key: linux-x86_64-alpine
+    key: linux-x86_64-alpine-$CACHE_REV
   artifacts:
     when: always
     expire_in: 2 week
@@ -1042,7 +1043,7 @@ nightly-x86_64-linux-alpine:
     # CentOS seems to default to ascii
     LANG: "en_US.UTF-8"
   cache:
-    key: linux-x86_64-centos7
+    key: linux-x86_64-centos7-$CACHE_REV
 
 release-x86_64-linux-centos7:
   <<: *release
@@ -1062,7 +1063,7 @@ release-x86_64-linux-centos7:
     OPT: /bin/false
     TEST_ENV: "x86_64-linux-fedora27"
   cache:
-    key: linux-x86_64-fedora27
+    key: linux-x86_64-fedora27-$CACHE_REV
   artifacts:
     when: always
     # These are used for head.hackage jobs therefore we keep them around for
@@ -1146,7 +1147,7 @@ release-x86_64-linux-fedora27-dwarf:
     TEST_ENV: "x86_64-windows"
     BIN_DIST_NAME: "ghc-x86_64-unknown-mingw32"
   cache:
-    key: "x86_64-windows-$WINDOWS_TOOLCHAIN_VERSION"
+    key: "x86_64-windows-$CACHE_REV"
 
 validate-x86_64-windows-hadrian:
   extends: .build-x86_64-windows-hadrian
@@ -1181,7 +1182,7 @@ validate-x86_64-windows-hadrian:
     MSYSTEM: MINGW64
     TEST_ENV: "x86_64-windows"
   cache:
-    key: "x86_64-windows-$WINDOWS_TOOLCHAIN_VERSION"
+    key: "x86_64-windows-$CACHE_REV"
 
 nightly-x86_64-windows:
   <<: *nightly
