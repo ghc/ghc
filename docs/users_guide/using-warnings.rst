@@ -14,39 +14,46 @@ of warnings.
 To turn off an individual warning ``-W<wflag>``, use ``-Wno-<wflag>``.
 To reverse ``-Werror``, which makes all warnings into errors, use ``-Wwarn``.
 
-By default, you get a standard set of warnings which are
-generally likely to indicate bugs in your program. These are:
 
-.. hlist::
-    :columns: 3
+.. ghc-flag:: -Wdefault
+    :shortdesc: enable default flags
+    :type: dynamic
+    :category:
 
-    * :ghc-flag:`-Woverlapping-patterns`
-    * :ghc-flag:`-Wwarnings-deprecations`
-    * :ghc-flag:`-Wdeprecations`
-    * :ghc-flag:`-Wdeprecated-flags`
-    * :ghc-flag:`-Wunrecognised-pragmas`
-    * :ghc-flag:`-Wduplicate-exports`
-    * :ghc-flag:`-Wderiving-defaults`
-    * :ghc-flag:`-Woverflowed-literals`
-    * :ghc-flag:`-Wempty-enumerations`
-    * :ghc-flag:`-Wmissing-fields`
-    * :ghc-flag:`-Wmissing-methods`
-    * :ghc-flag:`-Wwrong-do-bind`
-    * :ghc-flag:`-Wsimplifiable-class-constraints`
-    * :ghc-flag:`-Wtyped-holes`
-    * :ghc-flag:`-Wdeferred-type-errors`
-    * :ghc-flag:`-Wpartial-type-signatures`
-    * :ghc-flag:`-Wunsupported-calling-conventions`
-    * :ghc-flag:`-Wdodgy-foreign-imports`
-    * :ghc-flag:`-Winline-rule-shadowing`
-    * :ghc-flag:`-Wunsupported-llvm-version`
-    * :ghc-flag:`-Wmissed-extra-shared-lib`
-    * :ghc-flag:`-Wtabs`
-    * :ghc-flag:`-Wunrecognised-warning-flags`
-    * :ghc-flag:`-Winaccessible-code`
-    * :ghc-flag:`-Wstar-is-type`
-    * :ghc-flag:`-Wstar-binder`
-    * :ghc-flag:`-Wspace-after-bang`
+    By default, you get a standard set of warnings which are
+    generally likely to indicate bugs in your program. These are:
+
+
+    .. hlist::
+        :columns: 3
+
+        * :ghc-flag:`-Woverlapping-patterns`
+        * :ghc-flag:`-Wwarnings-deprecations`
+        * :ghc-flag:`-Wdeprecations`
+        * :ghc-flag:`-Wdeprecated-flags`
+        * :ghc-flag:`-Wunrecognised-pragmas`
+        * :ghc-flag:`-Wduplicate-exports`
+        * :ghc-flag:`-Wderiving-defaults`
+        * :ghc-flag:`-Woverflowed-literals`
+        * :ghc-flag:`-Wempty-enumerations`
+        * :ghc-flag:`-Wmissing-fields`
+        * :ghc-flag:`-Wmissing-methods`
+        * :ghc-flag:`-Wwrong-do-bind`
+        * :ghc-flag:`-Wsimplifiable-class-constraints`
+        * :ghc-flag:`-Wtyped-holes`
+        * :ghc-flag:`-Wdeferred-type-errors`
+        * :ghc-flag:`-Wpartial-type-signatures`
+        * :ghc-flag:`-Wunsupported-calling-conventions`
+        * :ghc-flag:`-Wdodgy-foreign-imports`
+        * :ghc-flag:`-Winline-rule-shadowing`
+        * :ghc-flag:`-Wunsupported-llvm-version`
+        * :ghc-flag:`-Wmissed-extra-shared-lib`
+        * :ghc-flag:`-Wtabs`
+        * :ghc-flag:`-Wunrecognised-warning-flags`
+        * :ghc-flag:`-Winaccessible-code`
+        * :ghc-flag:`-Wstar-is-type`
+        * :ghc-flag:`-Wstar-binder`
+        * :ghc-flag:`-Wspace-after-bang`
 
 The following flags are simple ways to select standard "packages" of warnings:
 
@@ -102,6 +109,8 @@ The following flags are simple ways to select standard "packages" of warnings:
     :type: dynamic
     :category:
 
+    :since: 8.0
+
     Turns on every single warning supported by the compiler.
 
 .. ghc-flag:: -Wcompat
@@ -110,6 +119,8 @@ The following flags are simple ways to select standard "packages" of warnings:
     :type: dynamic
     :reverse: -Wno-compat
     :category:
+
+    :since: 8.0
 
     Turns on warnings that will be enabled by default in the future, but remain
     off in normal compilations for the time being. This allows library authors
@@ -151,6 +162,8 @@ to abort.
     :type: dynamic
     :reverse: -Wwarn
     :category:
+
+    :since: 6.8 (``-Wwarn``)
 
     Makes any warning into a fatal error. Useful so that you don't miss
     warnings when doing batch compilation. To reverse ``-Werror`` and stop
@@ -223,6 +236,8 @@ of ``-W(no-)*``.
     :reverse: -Wno-unrecognised-warning-flags
     :category:
 
+    :since: 8.0
+
     :default: on
 
     Enables warnings when the compiler encounters a ``-W...`` flag that is not
@@ -234,6 +249,8 @@ of ``-W(no-)*``.
     :type: dynamic
     :reverse: -Wno-compat-unqualified-imports
     :category:
+
+    :since: 8.10
 
     Warns on qualified imports of core library modules which are subject to
     change in future GHC releases. Currently the following modules are covered
@@ -256,6 +273,8 @@ of ``-W(no-)*``.
     :reverse: -Wno-typed-holes
     :category:
 
+    :since: 7.8
+
     :default: on
 
     Determines whether the compiler reports typed holes warnings. Has no
@@ -269,6 +288,8 @@ of ``-W(no-)*``.
     :type: dynamic
     :reverse: -Wno-deferred-type-errors
     :category:
+
+    :since: 8.4
 
     Causes a warning to be reported when a type error is deferred until
     runtime. See :ref:`defer-type-errors`
@@ -319,6 +340,8 @@ of ``-W(no-)*``.
     :reverse: -fno-defer-out-of-scope-variables
     :category:
 
+    :since: 8.0
+
     Defer variable out-of-scope errors (errors about names without a leading underscore)
     until runtime. This will turn variable-out-of-scope errors into warnings.
     Using a value that depends on an out-of-scope variable produces a runtime error,
@@ -346,6 +369,8 @@ of ``-W(no-)*``.
     :reverse: -Wno-partial-type-signatures
     :category:
 
+    :since: 7.10
+
     Determines whether the compiler reports holes in partial type
     signatures as warnings. Has no effect unless
     :extension:`PartialTypeSignatures` is enabled, which controls whether
@@ -371,6 +396,8 @@ of ``-W(no-)*``.
     :reverse: -Wno-unrecognised-pragmas
     :category:
 
+    :since: 6.10
+
     Causes a warning to be emitted when a pragma that GHC doesn't
     recognise is used. As well as pragmas that GHC itself uses, GHC also
     recognises pragmas known to be used by other tools, e.g.
@@ -384,6 +411,8 @@ of ``-W(no-)*``.
     :type: dynamic
     :reverse: -Wno-missed-specialisations
     :category:
+
+    :since: 8.0
 
     Emits a warning if GHC cannot specialise an overloaded function, usually
     because the function needs an ``INLINABLE`` pragma. Reports when the
@@ -405,6 +434,8 @@ of ``-W(no-)*``.
     :reverse: -Wno-all-missed-specialisations
     :category:
 
+    :since: 8.0
+
     Emits a warning if GHC cannot specialise an overloaded function, usually
     because the function needs an ``INLINABLE`` pragma. Reports
     all such situations.
@@ -420,6 +451,8 @@ of ``-W(no-)*``.
     :type: dynamic
     :reverse: -Wno-warnings-deprecations
     :category:
+
+    :since: 6.10
 
     .. index::
        pair: deprecations; warnings
@@ -456,6 +489,8 @@ of ``-W(no-)*``.
     :reverse: -Wno-noncanonical-monad-instances
     :category:
 
+    :since: 8.0
+
     Warn if noncanonical ``Applicative`` or ``Monad`` instances
     declarations are detected.
 
@@ -475,32 +510,21 @@ of ``-W(no-)*``.
     This option is off by default.
 
 .. ghc-flag:: -Wnoncanonical-monadfail-instances
-    :shortdesc: warn when ``Monad`` or ``MonadFail`` instances have
+    :shortdesc: *(deprecated)*
+        warn when ``Monad`` or ``MonadFail`` instances have
         noncanonical definitions of ``fail``.
         See flag description in :ref:`options-sanity` for more details.
     :type: dynamic
     :reverse: -Wno-noncanonical-monadfail-instances
     :category:
 
-    Warn if noncanonical ``Monad`` or ``MonadFail`` instances
-    declarations are detected.
+    :since: 8.0
 
-    When this warning is enabled, the following conditions are verified:
-
-    In ``Monad`` instances declarations warn if any of the following
-    conditions does not hold:
-
-     * If ``fail`` is defined it must be canonical
-       (i.e. ``fail = Control.Monad.Fail.fail``).
-
-    Moreover, in ``MonadFail`` instance declarations:
-
-     * Warn if ``fail`` is defined backwards
-       (i.e. ``fail = Control.Monad.fail``).
-
-    See also :ghc-flag:`-Wmissing-monadfail-instances`.
-
-    This option is off by default.
+    This warning is deprecated. It no longer has any effect since GHC 8.8.
+    It was used during the transition period of the MonadFail proposal,
+    to detect when an instance of the ``Monad`` class was not defined
+    via ``MonadFail``, or when a ``MonadFail`` instance was defined
+    backwards, using the method in ``Monad``.
 
 .. ghc-flag:: -Wnoncanonical-monoid-instances
     :shortdesc: warn when ``Semigroup`` or ``Monoid`` instances have
@@ -509,6 +533,8 @@ of ``-W(no-)*``.
     :type: dynamic
     :reverse: -Wno-noncanonical-monoid-instances
     :category:
+
+    :since: 8.0
 
     Warn if noncanonical ``Semigroup`` or ``Monoid`` instances
     declarations are detected.
@@ -529,7 +555,8 @@ of ``-W(no-)*``.
     :ghc-flag:`-Wcompat` option group.
 
 .. ghc-flag:: -Wmissing-monadfail-instances
-    :shortdesc: Warn when a failable pattern is used in a do-block that does
+    :shortdesc: *(deprecated)*
+        Warn when a failable pattern is used in a do-block that does
         not have a ``MonadFail`` instance.
     :type: dynamic
     :reverse: -Wno-missing-monadfail-instances
@@ -539,15 +566,12 @@ of ``-W(no-)*``.
        single: MFP
        single: MonadFail Proposal
 
-    Warn when a failable pattern is used in a do-block that does not have a
-    ``MonadFail`` instance.
+    :since: 8.0
 
-    See also :ghc-flag:`-Wnoncanonical-monadfail-instances`.
-
-    Being part of the :ghc-flag:`-Wcompat` option group, this warning is off by
-    default, but will be switched on in a future GHC release, as part of
-    the `MonadFail Proposal (MFP)
-    <https://prime.haskell.org/wiki/Libraries/Proposals/MonadFail>`__.
+    This warning is deprecated. It no longer has any effect since GHC 8.8.
+    It was used during the transition period of the MonadFail proposal,
+    to warn when a failable pattern is used in a do-block that does not have
+    a ``MonadFail`` instance.
 
 .. ghc-flag:: -Wsemigroup
     :shortdesc: warn when a ``Monoid`` is not ``Semigroup``, and on non-
@@ -555,6 +579,8 @@ of ``-W(no-)*``.
     :type: dynamic
     :reverse: -Wno-semigroup
     :category:
+
+    :since: 8.0
 
     .. index::
        single: semigroup; warning
@@ -575,6 +601,8 @@ of ``-W(no-)*``.
     :reverse: -Wno-deprecated-flags
     :category:
 
+    :since: 6.10
+
     .. index::
        single: deprecated flags
 
@@ -589,6 +617,8 @@ of ``-W(no-)*``.
     :reverse: -Wno-unsupported-calling-conventions
     :category:
 
+    :since: 7.6
+
     Causes a warning to be emitted for foreign declarations that use
     unsupported calling conventions. In particular, if the ``stdcall``
     calling convention is used on an architecture other than i386 then
@@ -599,6 +629,8 @@ of ``-W(no-)*``.
     :type: dynamic
     :reverse: -Wno-dodgy-foreign-import
     :category:
+
+    :since: 6.10
 
     Causes a warning to be emitted for foreign imports of the following
     form: ::
@@ -622,6 +654,8 @@ of ``-W(no-)*``.
     :reverse: -Wno-dodgy-exports
     :category:
 
+    :since: 6.12
+
     Causes a warning to be emitted when a datatype ``T`` is exported
     with all constructors, i.e. ``T(..)``, but is it just a type
     synonym.
@@ -634,6 +668,8 @@ of ``-W(no-)*``.
     :type: dynamic
     :reverse: -Wno-dodgy-imports
     :category:
+
+    :since: 6.8
 
     Causes a warning to be emitted in the following cases:
 
@@ -649,6 +685,8 @@ of ``-W(no-)*``.
     :reverse: -Wno-overflowed-literals
     :category:
 
+    :since: 7.8
+
     Causes a warning to be emitted if a literal will overflow, e.g.
     ``300 :: Word8``.
 
@@ -657,6 +695,8 @@ of ``-W(no-)*``.
     :type: dynamic
     :reverse: -Wno-empty-enumerations
     :category:
+
+    :since: 7.8
 
     Causes a warning to be emitted if an enumeration is empty, e.g.
     ``[5 .. 3]``.
@@ -683,6 +723,8 @@ of ``-W(no-)*``.
     :type: dynamic
     :reverse: -Wno-duplicate-constraints
     :category:
+
+    :since: 7.8
 
     .. index::
        single: duplicate constraints, warning
@@ -788,13 +830,15 @@ of ``-W(no-)*``.
     :reverse: -Wno-identities
     :category:
 
+    :since: 7.2
+
     Causes the compiler to emit a warning when a Prelude numeric
     conversion converts a type ``T`` to the same type ``T``; such calls are
     probably no-ops and can be omitted. The functions checked for are:
     ``toInteger``, ``toRational``, ``fromIntegral``, and ``realToFrac``.
 
 .. ghc-flag:: -Wimplicit-kind-vars
-    :shortdesc: warn when kind variables are implicitly quantified over.
+    :shortdesc: *(deprecated)* warn when kind variables are implicitly quantified over.
     :type: dynamic
     :reverse: -Wno-implicit-kind-vars
     :category:
@@ -802,7 +846,10 @@ of ``-W(no-)*``.
     .. index::
        single: implicit prelude, warning
 
-    Have the compiler warn if a kind variable is not explicitly quantified
+    :since: 8.6
+
+    This warning is deprecated. It no longer has any effect since GHC 8.10.
+    It was used to detect if a kind variable is not explicitly quantified
     over. For instance, the following would produce a warning: ::
 
         f :: forall (a :: k). Proxy a
@@ -816,6 +863,8 @@ of ``-W(no-)*``.
     :type: dynamic
     :reverse: -Wno-implicit-prelude
     :category:
+
+    :since: 6.8
 
     .. index::
        single: implicit prelude, warning
@@ -841,6 +890,8 @@ of ``-W(no-)*``.
     :reverse: -Wno-incomplete-patterns
     :category:
 
+    :since: 5.04
+
     .. index::
        single: incomplete patterns, warning
        single: patterns, incomplete
@@ -864,6 +915,8 @@ of ``-W(no-)*``.
     :type: dynamic
     :reverse: -Wno-incomplete-uni-patterns
     :category:
+
+    :since: 7.2
 
     The flag :ghc-flag:`-Wincomplete-uni-patterns` is similar to
     :ghc-flag:`-Wincomplete-patterns`, except that it applies only to
@@ -901,6 +954,8 @@ of ``-W(no-)*``.
     :type: dynamic
     :reverse: -Wno-incomplete-record-updates
     :category:
+
+    :since: 6.4
 
     .. index::
        single: incomplete record updates, warning
@@ -988,6 +1043,8 @@ of ``-W(no-)*``.
     :reverse: -fnowarn-missing-import-lists
     :category:
 
+    :since: 7.0
+
     .. index::
        single: missing import lists, warning
        single: import lists, missing
@@ -1048,6 +1105,8 @@ of ``-W(no-)*``.
     :reverse: -Wno-missing-exported-sigs
     :category:
 
+    :since: 7.10
+
     .. index::
        single: type signatures, missing
 
@@ -1060,6 +1119,8 @@ of ``-W(no-)*``.
     :type: dynamic
     :reverse: -Wno-missing-exported-signatures
     :category:
+
+    :since: 8.0
 
     .. index::
        single: type signatures, missing
@@ -1078,6 +1139,8 @@ of ``-W(no-)*``.
     :reverse: -Wno-missing-local-sigs
     :category:
 
+    :since: 7.0
+
     .. index::
        single: type signatures, missing
 
@@ -1089,6 +1152,8 @@ of ``-W(no-)*``.
     :type: dynamic
     :reverse: -Wno-missing-local-signatures
     :category:
+
+    :since: 8.0
 
     .. index::
        single: type signatures, missing
@@ -1103,6 +1168,8 @@ of ``-W(no-)*``.
     :type: dynamic
     :reverse: -Wno-missing-pattern-synonym-signatures
     :category:
+
+    :since: 8.0
 
     .. index::
          single: type signatures, missing, pattern synonyms
@@ -1142,6 +1209,8 @@ of ``-W(no-)*``.
     :type: dynamic
     :reverse: -Wno-orphans
     :category:
+
+    :since: 6.4
 
     .. index::
        single: orphan instances, warning
@@ -1190,6 +1259,8 @@ of ``-W(no-)*``.
     :type: dynamic
     :reverse: -Wno-inaccessible-code
     :category:
+
+    :since: 8.6
 
     .. index::
        single: inaccessible code, warning
@@ -1248,6 +1319,8 @@ of ``-W(no-)*``.
          :extension:`StarIsType`
      :type: dynamic
      :reverse: -Wno-star-binder
+
+     :since: 8.6
 
      Under :extension:`StarIsType`, a ``*`` in types is not an operator nor
      even a name, it is special syntax that stands for ``Data.Kind.Type``. This
@@ -1313,6 +1386,8 @@ of ``-W(no-)*``.
     :reverse: -Wno-tabs
     :category:
 
+    :since: 6.8
+
     .. index::
        single: tabs, warning
 
@@ -1344,6 +1419,8 @@ of ``-W(no-)*``.
     :reverse: -Wno-monomorphism-restriction
     :category:
 
+    :since: 6.8
+
     .. index::
        single: monomorphism restriction, warning
 
@@ -1361,6 +1438,8 @@ of ``-W(no-)*``.
     :reverse: -Wno-monomorphism-restriction
     :category:
 
+    :since: 7.8
+
     Warn when using :ghc-flag:`-fllvm` with an unsupported version of LLVM.
 
 .. ghc-flag:: -Wmissed-extra-shared-lib
@@ -1368,6 +1447,8 @@ of ``-W(no-)*``.
     :type: dynamic
     :reverse: -Wno-missed-extra-shared-lib
     :category:
+
+    :since: 8.8
 
     Warn when GHCi can't load a shared lib it deduced it should load
     when loading a package and analyzing the extra-libraries stanza
@@ -1378,6 +1459,8 @@ of ``-W(no-)*``.
     :type: dynamic
     :reverse: -Wno-unticked-promoted-constructors
     :category:
+
+    :since: 7.10
 
     .. index::
        single: promoted constructor, warning
@@ -1423,6 +1506,8 @@ of ``-W(no-)*``.
     :reverse: -Wno-unused-top-binds
     :category:
 
+    :since: 8.0
+
     .. index::
        single: unused binds, warning
        single: binds, unused
@@ -1457,6 +1542,8 @@ of ``-W(no-)*``.
     :reverse: -Wno-unused-local-binds
     :category:
 
+    :since: 8.0
+
     .. index::
        single: unused binds, warning
        single: binds, unused
@@ -1472,6 +1559,8 @@ of ``-W(no-)*``.
     :type: dynamic
     :reverse: -Wno-unused-pattern-binds
     :category:
+
+    :since: 8.0
 
     .. index::
        single: unused binds, warning
@@ -1537,6 +1626,8 @@ of ``-W(no-)*``.
     :reverse: -Wno-unused-do-bind
     :category:
 
+    :since: 6.12
+
     .. index::
        single: unused do binding, warning
        single: do binding, unused
@@ -1562,6 +1653,8 @@ of ``-W(no-)*``.
     :type: dynamic
     :reverse: -Wno-unused-type-patterns
     :category:
+
+    :since: 8.0
 
     .. index::
        single: unused type patterns, warning
@@ -1597,6 +1690,8 @@ of ``-W(no-)*``.
     :type: dynamic
     :reverse: -Wno-unused-foralls
     :category:
+
+    :since: 8.0
 
     .. index::
        single: unused foralls, warning
@@ -1662,6 +1757,8 @@ of ``-W(no-)*``.
     :reverse: -Wno-wrong-do-bind
     :category:
 
+    :since: 6.12
+
     .. index::
        single: apparently erroneous do binding, warning
        single: do binding, apparently erroneous
@@ -1691,6 +1788,8 @@ of ``-W(no-)*``.
     :reverse: -Wno-inline-rule-shadowing
     :category:
 
+    :since: 7.8
+
     Warn if a rewrite RULE might fail to fire because the function might
     be inlined before the rule has a chance to fire. See
     :ref:`rules-inline`.
@@ -1712,6 +1811,8 @@ of ``-W(no-)*``.
     :type: dynamic
     :reverse: -Wno-unbanged-strict-patterns
     :category:
+
+    :since: 8.2
 
     This flag warns whenever you write a pattern that binds a variable whose
     type is unlifted, and yet the pattern is not a bang pattern nor a bare variable.
@@ -1766,6 +1867,36 @@ of ``-W(no-)*``.
 
     You may want to enable this warning on a clean build or enable :ghc-flag:`-fforce-recomp`
     in order to get reliable results.
+
+.. ghc-flag:: -Wauto-orphans
+    :shortdesc: *(deprecated)* Does nothing
+    :type: dynamic
+
+    :since: 7.4
+
+    Does nothing.
+
+.. ghc-flag:: -Wmissing-space-after-bang
+    :shortdesc: *(deprecated)* Does nothing
+    :type: dynamic
+
+    :since: 8.8
+
+    Does nothing.
+
+.. ghc-flag:: -Wderiving-typeable
+    :shortdesc: warn when Typeable is derived
+    :type: dynamic
+    :reverse: -Wno-deriving-typeable
+    :category:
+
+    :since: 7.10
+
+    This flag warns when ``Typeable`` is listed in a deriving clause
+    or derived with :extension:`StandaloneDeriving`.
+
+    Since GHC 7.10, ``Typeable`` is automatically derived for all types.
+    Thus, deriving ``Typeable`` yourself is redundant.
 
 If you're feeling really paranoid, the :ghc-flag:`-dcore-lint` option is a good choice.
 It turns on heavyweight intra-pass sanity-checking within GHC. (It checks GHC's
