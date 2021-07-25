@@ -24,4 +24,4 @@ StgWord heap_view_closureSize(StgClosure *closure);
  * The caller must ensure that `closure` is not modified (or moved by the GC)
  * for the duration of the call to `collect_pointers`.
  */
-StgWord collect_pointers(StgClosure *closure, StgWord size, StgClosure *ptrs[]);
+StgWord collect_pointers(StgClosure *closure, StgWord size, StgClosure *ptrs[size]);
