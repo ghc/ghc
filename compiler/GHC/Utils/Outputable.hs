@@ -44,7 +44,7 @@ module GHC.Utils.Outputable (
         fsep, fcat,
         hang, hangNotEmpty, punctuate, ppWhen, ppUnless,
         ppWhenOption, ppUnlessOption,
-        speakNth, speakN, speakNOf, plural, isOrAre, doOrDoes, itsOrTheir,
+        speakNth, speakN, speakNOf, plural, singular, isOrAre, doOrDoes, itsOrTheir, thisOrThese,
         unicodeSyntax,
 
         coloured, keyword,
@@ -1425,6 +1425,15 @@ plural :: [a] -> SDoc
 plural [_] = empty  -- a bit frightening, but there you are
 plural _   = char 's'
 
+-- | Determines the singular verb suffix appropriate for the length of a list:
+--
+-- > singular [] = empty
+-- > singular["Hello"] = char 's'
+-- > singular ["Hello", "World"] = empty
+singular :: [a] -> SDoc
+singular [_] = char 's'
+singular _   = empty
+
 -- | Determines the form of to be appropriate for the length of a list:
 --
 -- > isOrAre [] = text "are"
@@ -1451,3 +1460,13 @@ doOrDoes _   = text "do"
 itsOrTheir :: [a] -> SDoc
 itsOrTheir [_] = text "its"
 itsOrTheir _   = text "their"
+
+
+-- | Determines the form of subject appropriate for the length of a list:
+--
+-- > thisOrThese [x]   = text "This"
+-- > thisOrThese [x,y] = text "These"
+-- > thisOrThese []    = text "These"  -- probably avoid this
+thisOrThese :: [a] -> SDoc
+thisOrThese [_] = text "This"
+thisOrThese _   = text "These"
