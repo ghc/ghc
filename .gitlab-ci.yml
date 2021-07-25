@@ -299,7 +299,7 @@ lint-release-changelogs:
     - git checkout .gitmodules
     - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
   after_script:
-    - cp -Rf $HOME/.cabal cabal-cache
+    - .gitlab/ci.sh save_cache
     - .gitlab/ci.sh clean
   tags:
     - x86_64-linux
@@ -373,7 +373,7 @@ hadrian-ghc-in-ghci:
     # Load ghc-in-ghci then immediately exit and check the modules loaded
     - echo ":q" | hadrian/ghci -j`mk/detect-cpu-count.sh`| tail -n2 | grep "Ok,"
   after_script:
-    - cp -Rf $HOME/.cabal cabal-cache
+    - .gitlab/ci.sh save_cache
   cache:
     key: hadrian-ghci
     paths:
@@ -398,7 +398,7 @@ hadrian-ghc-in-ghci:
     - git checkout .gitmodules
     - .gitlab/ci.sh setup
   after_script:
-    - cp -Rf $HOME/.cabal cabal-cache
+    - .gitlab/ci.sh save_cache
   variables:
     GHC_FLAGS: -Werror
   cache:
@@ -492,7 +492,7 @@ lint-libs:
     TEST_ENV: "x86_64-freebsd"
     BUILD_FLAVOUR: "validate"
   after_script:
-    - cp -Rf $HOME/.cabal cabal-cache
+    - .gitlab/ci.sh save_cache
     - .gitlab/ci.sh clean
   artifacts:
     when: always
@@ -531,7 +531,7 @@ release-x86_64-freebsd:
     TEST_ENV: "x86_64-freebsd-hadrian"
     BUILD_FLAVOUR: "validate"
   after_script:
-    - cp -Rf $HOME/.cabal cabal-cache
+    - .gitlab/ci.sh save_cache
     - .gitlab/ci.sh clean
   artifacts:
     when: always
@@ -644,7 +644,7 @@ validate-x86_64-darwin:
     echo "Test took $TIME_TEST_DELTA seconds"
 
     # Important to run this in nix-shell because $HOME is different in there
-    runInNixShell ".gitlab/ci.sh save-cache" 2>&1
+    runInNixShell ".gitlab/ci.sh save_cache" 2>&1
 
     echo "=== TIMINGS ==="
     echo "Setup      | $TIME_SETUP_DELTA"
@@ -740,7 +740,7 @@ validate-aarch64-darwin:
     echo "Test took $TIME_TEST_DELTA seconds"
 
     # Important to run this in nix-shell because $HOME is different there
-    runInNixShell ".gitlab/ci.sh save-cache" 2>&1
+    runInNixShell ".gitlab/ci.sh save_cache" 2>&1
 
     echo "=== TIMINGS ==="
     echo "Setup      | $TIME_SETUP_DELTA"
@@ -1200,8 +1200,7 @@ release-x86_64-linux-fedora27-dwarf:
     # Setup toolchain
     - bash .gitlab/ci.sh setup
   after_script:
-    - |
-      Copy-Item -Recurse -Path $Env:APPDATA\cabal -Destination cabal-cache
+    - bash .gitlab/ci.sh save_cache
     - bash .gitlab/ci.sh clean
   dependencies: []
   variables:
