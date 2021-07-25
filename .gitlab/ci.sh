@@ -20,6 +20,20 @@ CABAL_CACHE="$TOP/${CABAL_CACHE:-cabal-cache}"
 
 source "$TOP/.gitlab/common.sh"
 
+function time_it() {
+  local name="$1"
+  shift
+  local start=$(date +%s)
+  local res=0
+  $@ || res=$?
+  local end=$(date +%s)
+  local delta=$(expr $end - $start)
+
+  echo "$name took $delta seconds"
+  printf "%15s | $delta" > ci-timings
+  return $res
+}
+
 function usage() {
   cat <<EOF
 $0 - GHC continuous integration driver
@@ -31,6 +45,7 @@ Common Modes:
   configure     Run ./configure.
   clean         Clean the tree
   shell         Run an interactive shell with a configured build environment.
+  save_cache    Preserve the cabal cache
 
 Make build system:
 
@@ -597,7 +612,7 @@ case $1 in
   run_hadrian) shift; run_hadrian "$@" ;;
   perf_test) run_perf_test ;;
   clean) clean ;;
-  save-cache) save_cache ;;
+  save_cache) save_cache ;;
   shell) shell "$@" ;;
   *) fail "unknown mode $1" ;;
 esac
