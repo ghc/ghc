@@ -1625,7 +1625,7 @@ of ``-W(no-)*``.
     are used. For instance: ::
 
 
-	data P = P { x :: Int, y :: Int }
+        data P = P { x :: Int, y :: Int }
 
         f1 :: P -> Int
         f1 P{..} = 1 + 3
@@ -1647,7 +1647,7 @@ of ``-W(no-)*``.
     For instance: ::
 
 
-	data P = P { x :: Int, y :: Int }
+        data P = P { x :: Int, y :: Int }
 
         f1 :: P -> Int
         f1 P{x,y,..} = x + y
