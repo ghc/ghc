@@ -165,6 +165,10 @@ dnl May need to use gcc to find platform details.
 dnl --------------------------------------------------------------
 FPTOOLS_SET_HASKELL_PLATFORM_VARS
 
+dnl ** See whether cc supports --target=<triple> and set
+dnl CONF_CC_OPTS_STAGE[12] accordingly.
+FP_CC_SUPPORTS_TARGET
+
 dnl TargetWordSize for settings file
 AC_CHECK_SIZEOF(void *, 4)
 if test "x$ac_cv_sizeof_void_p" = "x0"; then
