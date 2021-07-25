@@ -180,17 +180,14 @@ function show_tool() {
 function set_toolchain_paths() {
   needs_toolchain="1"
   case "$(uname -m)-$(uname)" in
+    # Linux toolchains are included in the Docker image
     *-Linux) needs_toolchain="" ;;
+    # Darwin toolchains are provided via .gitlab/darwin/toolchain.nix
+    *-Darwin) needs_toolchain="" ;;
     *) ;;
   esac
 
-  if [[ -n "${IN_NIX_SHELL:-}" ]]; then
-      needs_toolchain=""
-      GHC="$(which ghc)"
-      CABAL="$(which cabal)"
-      HAPPY="$(which happy)"
-      ALEX="$(which alex)"
-  elif [[ -n "$needs_toolchain" ]]; then
+  if [[ -n "$needs_toolchain" ]]; then
       # These are populated by setup_toolchain
       GHC="$toolchain/bin/ghc$exe"
       CABAL="$toolchain/bin/cabal$exe"
