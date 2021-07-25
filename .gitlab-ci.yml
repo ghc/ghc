@@ -224,7 +224,6 @@ lint-release-changelogs:
     BUILD_FLAVOUR: "validate"
   script:
     - .gitlab/ci.sh setup
-    - "cabal update --index=$HACKAGE_INDEX_STATE"
     - .gitlab/ci.sh configure
     - .gitlab/ci.sh build_hadrian
     - .gitlab/ci.sh test_hadrian
@@ -323,7 +322,6 @@ hadrian-ghc-in-ghci:
   script:
     - git clean -xdf && git submodule foreach git clean -xdf
     - .gitlab/ci.sh setup
-    - "cabal update --index=$HACKAGE_INDEX_STATE"
     - .gitlab/ci.sh configure
     - cd hadrian; cabal new-build -j`../mk/detect-cpu-count.sh` --with-compiler=$GHC --project-file=ci.project; cd ..
     # Load ghc-in-ghci then immediately exit and check the modules loaded
@@ -353,7 +351,6 @@ hadrian-ghc-in-ghci:
     - git submodule update --init --recursive
     - git checkout .gitmodules
     - .gitlab/ci.sh setup
-    - "cabal update --index=$HACKAGE_INDEX_STATE"
     - cd hadrian; cabal new-build -j`../mk/detect-cpu-count.sh` --with-compiler=$GHC --project-file=ci.project; cd ..
   after_script:
     - cp -Rf $HOME/.cabal cabal-cache

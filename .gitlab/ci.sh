@@ -208,6 +208,8 @@ function setup() {
     setup_toolchain
   fi
 
+  cabal update --index="$HACKAGE_INDEX_STATE"
+
   # Make sure that git works
   git config user.email "ghc-ci@gitlab-haskell.org"
   git config user.name "GHC GitLab CI"
@@ -309,8 +311,6 @@ function setup_toolchain() {
     MSYS_*|MINGW*) cabal_install="$cabal_install --install-method=copy" ;;
     *) ;;
   esac
-
-  cabal update --index="$HACKAGE_INDEX_STATE"
 
   info "Building happy..."
   $cabal_install happy --constraint="happy>=$MIN_HAPPY_VERSION"
