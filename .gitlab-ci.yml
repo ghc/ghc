@@ -259,6 +259,7 @@ lint-release-changelogs:
   after_script:
     - .gitlab/ci.sh save_cache
     - .gitlab/ci.sh clean
+    - cat ci-timings
   tags:
     - x86_64-linux
 
@@ -331,6 +332,7 @@ hadrian-ghc-in-ghci:
     - echo ":q" | hadrian/ghci -j`mk/detect-cpu-count.sh`| tail -n2 | grep "Ok,"
   after_script:
     - .gitlab/ci.sh save_cache
+    - cat ci-timings
   cache:
     key: hadrian-ghci
     paths:
@@ -357,6 +359,7 @@ hadrian-ghc-in-ghci:
     - cd hadrian; cabal new-build -j`../mk/detect-cpu-count.sh` --with-compiler=$GHC --project-file=ci.project; cd ..
   after_script:
     - .gitlab/ci.sh save_cache
+    - cat ci-timings
   variables:
     GHC_FLAGS: -Werror
   cache:
@@ -387,36 +390,10 @@ lint-base:
     if [[ "$RELEASE_JOB" = "yes" ]]; then
       HADDOCK_HYPERLINKED_SOURCES=1
     fi
-    TIME_START=$(date +%s)
-    time .gitlab/ci.sh setup 2>&1
-    TIME_SETUP=$(date +%s)
-    TIME_SETUP_DELTA=$(expr $TIME_SETUP - $TIME_START)
-    echo "Setup took $TIME_SETUP_DELTA seconds"
-
-    time .gitlab/ci.sh configure 2>&1
-    TIME_CONFIGURE=$(date +%s)
-    TIME_CONFIGURE_DELTA=$(expr $TIME_CONFIGURE - $TIME_SETUP)
-    echo "Configure took $TIME_CONFIGURE_DELTA seconds"
-
-    time .gitlab/ci.sh build_make 2>&1
-    TIME_BUILD=$(date +%s)
-    TIME_BUILD_DELTA=$(expr $TIME_BUILD - $TIME_CONFIGURE)
-    echo "Build took $TIME_BUILD_DELTA seconds"
-
-    set +e
-    time .gitlab/ci.sh test_make 2>&1
-    status=$?
-    set -e
-    TIME_TEST=$(date +%s)
-    TIME_TEST_DELTA=$(expr $TIME_TEST - $TIME_BUILD)
-    echo "Test took $TIME_TEST_DELTA seconds"
-
-    echo "=== TIMINGS ==="
-    echo "Setup      | $TIME_SETUP_DELTA"
-    echo "Configure  | $TIME_CONFIGURE_DELTA"
-    echo "Build      | $TIME_BUILD_DELTA"
-    echo "Test       | $TIME_TEST_DELTA"
-    exit $status
+    .gitlab/ci.sh setup
+    .gitlab/ci.sh configure
+    .gitlab/ci.sh build_make
+    .gitlab/ci.sh test_make
 
   dependencies: []
   artifacts:
@@ -452,6 +429,7 @@ lint-base:
   after_script:
     - .gitlab/ci.sh save_cache
     - .gitlab/ci.sh clean
+    - cat ci-timings
   artifacts:
     when: always
     expire_in: 2 week
@@ -491,6 +469,7 @@ release-x86_64-freebsd:
   after_script:
     - .gitlab/ci.sh save_cache
     - .gitlab/ci.sh clean
+    - cat ci-timings
   artifacts:
     when: always
     expire_in: 2 week
@@ -544,6 +523,7 @@ validate-x86_64-darwin:
     IGNORE_PERF_FAILURES: "all"
   after_script:
     - .gitlab/ci.sh clean
+    - cat ci-timings
 
   # I wish we could just use the nix #! logic, but we can't --run and -i bash
   # behave very differently. -i bash does not pass any nix related env vars
@@ -569,47 +549,20 @@ validate-x86_64-darwin:
 
     # fix up config.sub in libraries for the time.
     # aarch64-darwin is not supported in older config.sub's
-    TIME_START=$(date +%s)
     find libraries -name config.sub -exec cp config.sub {} \;
 
-    runInNixShell ".gitlab/ci.sh setup" 2>&1
-    TIME_SETUP=$(date +%s)
-    TIME_SETUP_DELTA=$(expr $TIME_SETUP - $TIME_START)
-    echo "Setup took $TIME_SETUP_DELTA seconds"
+    runInNixShell ".gitlab/ci.sh setup"
 
     # make sure $HOME is prisine
     echo "Deleting $HOME/.cabal"
     rm -fR $HOME/.cabal
-    runInNixShell "cabal update --index=$HACKAGE_INDEX_STATE" 2>&1
-
-    runInNixShell ".gitlab/ci.sh configure" 2>&1
-    TIME_CONFIGURE=$(date +%s)
-    TIME_CONFIGURE_DELTA=$(expr $TIME_CONFIGURE - $TIME_SETUP)
-    echo "Configure took $TIME_CONFIGURE_DELTA seconds"
-
-    runInNixShell ".gitlab/ci.sh build_hadrian" 2>&1
-    TIME_BUILD=$(date +%s)
-    TIME_BUILD_DELTA=$(expr $TIME_BUILD - $TIME_CONFIGURE)
-    echo "Build took $TIME_BUILD_DELTA seconds"
-
-    set +e
-    runInNixShell ".gitlab/ci.sh test_hadrian" 2>&1
-    status=$?
-    set -e
-
-    TIME_TEST=$(date +%s)
-    TIME_TEST_DELTA=$(expr $TIME_TEST - $TIME_BUILD)
-    echo "Test took $TIME_TEST_DELTA seconds"
+    runInNixShell "cabal update --index=$HACKAGE_INDEX_STATE"
+    runInNixShell ".gitlab/ci.sh configure"
+    runInNixShell ".gitlab/ci.sh build_hadrian"
+    runInNixShell ".gitlab/ci.sh test_hadrian"
 
     # Important to run this in nix-shell because $HOME is different in there
-    runInNixShell ".gitlab/ci.sh save_cache" 2>&1
-
-    echo "=== TIMINGS ==="
-    echo "Setup      | $TIME_SETUP_DELTA"
-    echo "Configure  | $TIME_CONFIGURE_DELTA"
-    echo "Build      | $TIME_BUILD_DELTA"
-    echo "Test       | $TIME_TEST_DELTA"
-    exit $status
+    runInNixShell ".gitlab/ci.sh save_cache"
 
   artifacts:
     when: always
@@ -643,6 +596,7 @@ validate-aarch64-darwin:
     TEST_ENV: "aarch64-darwin-hadrian"
   after_script:
     - .gitlab/ci.sh clean
+    - cat ci-timings
 
   # I wish we could just use the nix #! logic, but we can't --run and -i bash
   # behave very differently. -i bash does not pass any nix related env vars
@@ -667,46 +621,20 @@ validate-aarch64-darwin:
 
     # fix up config.sub in libraries for the time.
     # aarch64-darwin is not supported in older config.sub's
-    TIME_START=$(date +%s)
     find libraries -name config.sub -exec cp config.sub {} \;
 
-    time runInNixShell ".gitlab/ci.sh setup" 2>&1
-    TIME_SETUP=$(date +%s)
-    TIME_SETUP_DELTA=$(expr $TIME_SETUP - $TIME_START)
-    echo "Setup took $TIME_SETUP_DELTA seconds"
+    runInNixShell ".gitlab/ci.sh setup"
 
     # make sure $HOME is prisine
     echo "Deleting $HOME/.cabal"
     rm -fR $HOME/.cabal
-    runInNixShell "cabal update --index=$HACKAGE_INDEX_STATE" 2>&1
-
-    runInNixShell ".gitlab/ci.sh configure" 2>&1
-    TIME_CONFIGURE=$(date +%s)
-    TIME_CONFIGURE_DELTA=$(expr $TIME_CONFIGURE - $TIME_SETUP)
-    echo "Setup took $TIME_CONFIGURE_DELTA seconds"
-
-    runInNixShell ".gitlab/ci.sh build_hadrian" 2>&1
-    TIME_BUILD=$(date +%s)
-    TIME_BUILD_DELTA=$(expr $TIME_BUILD - $TIME_CONFIGURE)
-    echo "Build took $TIME_BUILD_DELTA seconds"
-
-    set +e
-    runInNixShell ".gitlab/ci.sh test_hadrian" 2>&1
-    status=$?
-    set -e
-    TIME_TEST=$(date +%s)
-    TIME_TEST_DELTA=$(expr $TIME_TEST - $TIME_BUILD)
-    echo "Test took $TIME_TEST_DELTA seconds"
+    runInNixShell "cabal update --index=$HACKAGE_INDEX_STATE"
+    runInNixShell ".gitlab/ci.sh configure"
+    runInNixShell ".gitlab/ci.sh build_hadrian"
+    runInNixShell ".gitlab/ci.sh test_hadrian"
 
     # Important to run this in nix-shell because $HOME is different there
-    runInNixShell ".gitlab/ci.sh save_cache" 2>&1
-
-    echo "=== TIMINGS ==="
-    echo "Setup      | $TIME_SETUP_DELTA"
-    echo "Configure  | $TIME_CONFIGURE_DELTA"
-    echo "Build      | $TIME_BUILD_DELTA"
-    echo "Test       | $TIME_TEST_DELTA"
-    exit $status
+    runInNixShell ".gitlab/ci.sh save_cache"
 
   artifacts:
     when: always
@@ -723,6 +651,7 @@ validate-aarch64-darwin:
     - sudo chown ghc:ghc -R .
   after_script:
     - cp -Rf $HOME/.cabal cabal-cache
+    - cat ci-timings
   cache:
     key: linux
     paths:
@@ -1144,6 +1073,7 @@ release-x86_64-linux-fedora27-dwarf:
   after_script:
     - bash .gitlab/ci.sh save_cache
     - bash .gitlab/ci.sh clean
+    - type ci-timings
   dependencies: []
   variables:
     #FORCE_SYMLINKS: 1

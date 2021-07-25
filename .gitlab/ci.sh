@@ -214,6 +214,8 @@ function set_toolchain_paths() {
 
 # Extract GHC toolchain
 function setup() {
+  echo "=== TIMINGS ===" > ci-timings
+
   if [ -d "$CABAL_CACHE" ]; then
       info "Extracting cabal cache from $CABAL_CACHE to $CABAL_DIR..."
       mkdir -p "$CABAL_DIR"
@@ -221,7 +223,7 @@ function setup() {
   fi
 
   if [[ "$needs_toolchain" = "1" ]]; then
-    setup_toolchain
+    time_it "setup" setup_toolchain
   fi
 
   cabal update --index="$HACKAGE_INDEX_STATE"
@@ -598,22 +600,22 @@ set_toolchain_paths
 case $1 in
   usage) usage ;;
   setup) setup && cleanup_submodules ;;
-  configure) configure ;;
-  build_make) build_make ;;
+  configure) time_it "configure" configure ;;
+  build_make) time_it "build" build_make ;;
   test_make)
     fetch_perf_notes
     res=0
-    test_make || res=$?
+    time_it "test" test_make || res=$?
     push_perf_notes
     exit $res ;;
-  build_hadrian) build_hadrian ;;
+  build_hadrian) time_it "build" build_hadrian ;;
   # N.B. Always push notes, even if the build fails. This is okay to do as the
   # testsuite driver doesn't record notes for tests that fail due to
   # correctness.
   test_hadrian)
     fetch_perf_notes
     res=0
-    test_hadrian || res=$?
+    time_it "test" test_hadrian || res=$?
     push_perf_notes
     exit $res ;;
   run_hadrian) shift; run_hadrian "$@" ;;
