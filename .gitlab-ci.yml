@@ -559,7 +559,7 @@ validate-x86_64-darwin:
     CPUS: 8
     LANG: "en_US.UTF-8"
     # WARNING: this is overridden in the shell.nix, see shell.nix!
-    CONFIGURE_ARGS: "--with-intree-gmp"
+    CONFIGURE_ARGS: "--with-intree-gmp --with-system-libffi"
     HADRIAN_ARGS: "--docs=no-sphinx"
     TEST_ENV: "x86_64-darwin-hadrian"
     BIN_DIST_NAME: "ghc-amd64-apple-darwin"
@@ -570,44 +570,23 @@ validate-x86_64-darwin:
     - .gitlab/ci.sh clean
     - cat ci-timings
 
-  # I wish we could just use the nix #! logic, but we can't --run and -i bash
-  # behave very differently. -i bash does not pass any nix related env vars
-  # the whole $stdenv/setup part seems to be missing.
   script: |
-    set -Eeuo pipefail
-    function runInNixShell() {
-      time nix-shell .gitlab/shell.nix \
-        -I nixpkgs=https://github.com/angerman/nixpkgs/archive/75f7281738b.tar.gz \
-        --argstr system "x86_64-darwin" \
-        --pure \
-        --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR \
-        --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --keep PROJECT_DIR \
-        --keep CI_PROJECT_DIR --keep MAKE_ARGS --keep HADRIAN_ARGS --keep HOME \
-        --keep LANG --keep CONFIGURE_ARGS --keep TEST_ENV --keep BIN_DIST_NAME \
-        --keep MACOSX_DEPLOYMENT_TARGET --keep ac_cv_func_clock_gettime --keep HACKAGE_INDEX_STATE \
-        --keep PERF_NOTE_KEY --keep HEAD_HACKAGE_TRIGGER_TOKEN \
-        --run "$1" 2>&1
-    }
-    # make sure home exists
-    export HOME=$HOME/x86_64-home
-    mkdir -p $HOME
+    nix build -f .gitlab/darwin/toolchain.nix --argstr system x86_64-darwin -o toolchain.sh
+    source toolchain.sh
+    cat toolchain.sh
+
+    sdk_path="$(xcrun --sdk macosx --show-sdk-path)"
+    CONFIGURE_ARGS="$CONFIGURE_ARGS --with-ffi-libraries=$sdk_path/usr/lib --with-ffi-includes=$sdk_path/usr/include/ffi"
 
     # fix up config.sub in libraries for the time.
     # aarch64-darwin is not supported in older config.sub's
     find libraries -name config.sub -exec cp config.sub {} \;
 
-    runInNixShell ".gitlab/ci.sh setup"
-
-    # make sure $HOME is prisine
-    echo "Deleting $HOME/.cabal"
-    rm -fR $HOME/.cabal
-    runInNixShell "cabal update --index=$HACKAGE_INDEX_STATE"
-    runInNixShell ".gitlab/ci.sh configure"
-    runInNixShell ".gitlab/ci.sh build_hadrian"
-    runInNixShell ".gitlab/ci.sh test_hadrian"
-
-    # Important to run this in nix-shell because $HOME is different in there
-    runInNixShell ".gitlab/ci.sh save_cache"
+    .gitlab/ci.sh setup
+    .gitlab/ci.sh configure
+    .gitlab/ci.sh build_hadrian
+    .gitlab/ci.sh test_hadrian
+    .gitlab/ci.sh save_cache
 
   artifacts:
     when: always
@@ -634,10 +613,12 @@ validate-aarch64-darwin:
     CPUS: 8
     LANG: "en_US.UTF-8"
     # WARNING: this is overridden in the shell.nix, see shell.nix!
-    CONFIGURE_ARGS: "--with-intree-gmp"
+    CONFIGURE_ARGS: "--with-intree-gmp --with-system-libffi"
     HADRIAN_ARGS: "--docs=no-sphinx"
     BIN_DIST_NAME: "ghc-arm64-apple-darwin"
     TEST_ENV: "aarch64-darwin-hadrian"
+    # Capi_Ctype_001 Capi_Ctype_002 T12010 T20199: Due to #TODO
+    BROKEN_TESTS: "Capi_Ctype_001 Capi_Ctype_002 T12010 T20199"
   after_script:
     - .gitlab/ci.sh clean
     - cat ci-timings
@@ -646,39 +627,22 @@ validate-aarch64-darwin:
   # behave very differently. -i bash does not pass any nix related env vars
   # the whole $stdenv/setup part seems to be missing.
   script: |
-    set -Eeuo pipefail
-    function runInNixShell() {
-      time nix-shell .gitlab/shell.nix \
-        -I nixpkgs=https://github.com/angerman/nixpkgs/archive/75f7281738b.tar.gz \
-        --argstr system "aarch64-darwin" \
-        --pure \
-        --keep GHC_VERSION --keep CABAL_INSTALL_VERSION --keep BUILD_FLAVOUR \
-        --keep BIN_DIST_PREP_TAR_COMP --keep CPUS --keep PROJECT_DIR \
-        --keep CI_PROJECT_DIR --keep MAKE_ARGS --keep HADRIAN_ARGS --keep HOME \
-        --keep LANG --keep CONFIGURE_ARGS --keep TEST_ENV --keep BIN_DIST_NAME \
-        --keep HACKAGE_INDEX_STATE \
-        --run "$1" 2>&1
-    }
-    export HOME=$HOME/arm64-home
-    # make sure home exists
-    mkdir -p $HOME
+    nix build -f .gitlab/darwin/toolchain.nix --argstr system aarch64-darwin -o toolchain.sh
+    source toolchain.sh
+    cat toolchain.sh
+
+    sdk_path="$(xcrun --sdk macosx --show-sdk-path)"
+    CONFIGURE_ARGS="$CONFIGURE_ARGS --with-ffi-libraries=$sdk_path/usr/lib --with-ffi-includes=$sdk_path/usr/include/ffi"
 
     # fix up config.sub in libraries for the time.
     # aarch64-darwin is not supported in older config.sub's
     find libraries -name config.sub -exec cp config.sub {} \;
 
-    runInNixShell ".gitlab/ci.sh setup"
-
-    # make sure $HOME is prisine
-    echo "Deleting $HOME/.cabal"
-    rm -fR $HOME/.cabal
-    runInNixShell "cabal update --index=$HACKAGE_INDEX_STATE"
-    runInNixShell ".gitlab/ci.sh configure"
-    runInNixShell ".gitlab/ci.sh build_hadrian"
-    runInNixShell ".gitlab/ci.sh test_hadrian"
-
-    # Important to run this in nix-shell because $HOME is different there
-    runInNixShell ".gitlab/ci.sh save_cache"
+    .gitlab/ci.sh setup
+    .gitlab/ci.sh configure
+    .gitlab/ci.sh build_hadrian
+    .gitlab/ci.sh test_hadrian
+    .gitlab/ci.sh save_cache
 
   artifacts:
     when: always
