@@ -785,7 +785,7 @@ dnl     If gcc, make sure it's at least 4.7
 dnl
 FP_GCC_VERSION
 
-dnl ** See whether gcc supports -no-pie
+dnl ** See whether cc supports -no-pie
 FP_GCC_SUPPORTS_NO_PIE
 
 dnl ** Used to determine how to compile ghc-prim's atomics.c, used by
@@ -808,6 +808,10 @@ FPTOOLS_SET_C_LD_FLAGS([build],[CONF_CC_OPTS_STAGE0],[CONF_GCC_LINKER_OPTS_STAGE
 FPTOOLS_SET_C_LD_FLAGS([target],[CONF_CC_OPTS_STAGE1],[CONF_GCC_LINKER_OPTS_STAGE1],[CONF_LD_LINKER_OPTS_STAGE1],[CONF_CPP_OPTS_STAGE1])
 FPTOOLS_SET_C_LD_FLAGS([target],[CONF_CC_OPTS_STAGE2],[CONF_GCC_LINKER_OPTS_STAGE2],[CONF_LD_LINKER_OPTS_STAGE2],[CONF_CPP_OPTS_STAGE2])
 # Stage 3 won't be supported by cross-compilation
+
+dnl ** See whether cc supports --target=<triple> and set
+dnl CONF_CC_OPTS_STAGE[12] accordingly.
+FP_CC_SUPPORTS_TARGET
 
 # See rules/distdir-way-opts.mk for details.
 # Flags passed to the C compiler
