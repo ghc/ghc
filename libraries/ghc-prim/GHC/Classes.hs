@@ -598,8 +598,8 @@ x# `divInt32#` y# = ((x# `plusInt32#` bias#) `quotInt32#` y#) `subInt32#` hard#
       !bias# = c0# `subInt32#` c1#
       !hard# = c0# `orInt32#` c1#
 
--- See Note [divInt# implementation]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Note [divInt# implementation]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
 -- divInt# (truncated toward zero) is implemented with quotInt# (truncated
 -- toward negative infinity). They differ when inputs x and y have different signs:
