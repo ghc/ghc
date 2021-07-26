@@ -115,4 +115,6 @@ AC_DEFUN([FP_CHECK_PTHREADS],
     ],
     AC_MSG_RESULT(no)
   )
+
+  AC_CHECK_FUNCS_ONCE([pthread_condattr_setclock])
 ])

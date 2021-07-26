@@ -91,6 +91,9 @@
 #include <numa.h>
 #endif
 
+// For gettimeofday()
+#include <sys/time.h>
+
 // TODO does this need configure magic?
 #include <time.h>
 
@@ -104,44 +107,62 @@
 void
 initCondition( Condition* pCond )
 {
-  CHECK(pthread_cond_init(pCond, NULL) == 0);
+  pthread_condattr_t attr;
+  CHECK(pthread_condattr_init(&attr) == 0);
+#if defined(HAVE_CLOCK_GETTIME) && defined(HAVE_PTHREAD_CONDATTR_SETCLOCK)
+  pCond->timeout_clk = CLOCK_REALTIME;
+  if (pthread_condattr_setclock(&attr, CLOCK_MONOTONIC) == 0) {
+      pCond->timeout_clk = CLOCK_MONOTONIC;
+  }
+#endif
+  CHECK(pthread_cond_init(&pCond->cond, &attr) == 0);
+  CHECK(pthread_condattr_destroy(&attr) == 0);
 }
 
 void
 closeCondition( Condition* pCond )
 {
-  CHECK(pthread_cond_destroy(pCond) == 0);
+  CHECK(pthread_cond_destroy(&pCond->cond) == 0);
 }
 
 void
 broadcastCondition ( Condition* pCond )
 {
-  CHECK(pthread_cond_broadcast(pCond) == 0);
+  CHECK(pthread_cond_broadcast(&pCond->cond) == 0);
 }
 
 void
 signalCondition ( Condition* pCond )
 {
-  CHECK(pthread_cond_signal(pCond) == 0);
+  CHECK(pthread_cond_signal(&pCond->cond) == 0);
 }
 
 void
 waitCondition ( Condition* pCond, Mutex* pMut )
 {
-  CHECK(pthread_cond_wait(pCond,pMut) == 0);
+  CHECK(pthread_cond_wait(&pCond->cond, pMut) == 0);
 }
 
 bool
 timedWaitCondition ( Condition* pCond, Mutex* pMut, Time timeout) {
-    timeout += getMonotonicNSec();
-    uint64_t secs = TimeToSeconds(timeout);
+    struct timespec ts;
 
-    const struct timespec t = (struct timespec) {
-        .tv_sec = secs,
-        .tv_nsec = TimeToNS(timeout - SecondsToTime(secs))
-    };
+#if defined(HAVE_CLOCK_GETTIME) && defined(HAVE_PTHREAD_CONDATTR_SETCLOCK)
+    CHECK(clock_gettime(pCond->timeout_clk, &ts) == 0);
+#else
+    struct timeval tv;
+    CHECK(gettimeofday(&tv, NULL) == 0);
+    ts.tv_sec = tv.tv_sec;
+    ts.tv_nsec = 1000 * tv.tv_usec;
+#endif
 
-    int ret = pthread_cond_timedwait(pCond,pMut, &t);
+    uint64_t sec = TimeToSeconds(timeout);
+    ts.tv_sec += sec;
+    ts.tv_nsec += TimeToNS(timeout - SecondsToTime(sec));
+    ts.tv_sec += ts.tv_nsec / 1000000000;
+    ts.tv_nsec %= 1000000000;
+
+    int ret = pthread_cond_timedwait(&pCond->cond, pMut, &ts);
     switch (ret) {
     case ETIMEDOUT:
         return false;
