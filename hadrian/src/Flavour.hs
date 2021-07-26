@@ -178,7 +178,9 @@ disableDynamicGhcPrograms flavour = flavour { dynamicGhcPrograms = pure False }
 -- | Don't build libraries in profiled 'Way's.
 disableProfiledLibs :: Flavour -> Flavour
 disableProfiledLibs flavour =
-    flavour { libraryWays = filter (not . wayUnit Profiling) <$> libraryWays flavour }
+    flavour { libraryWays = filter (not . wayUnit Profiling) <$> libraryWays flavour
+            , rtsWays     = filter (not . wayUnit Profiling) <$> rtsWays flavour
+            }
 
 -- | Build stage2 compiler with -fomit-interface-pragmas to reduce
 -- recompilation.
