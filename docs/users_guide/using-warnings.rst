@@ -1447,6 +1447,7 @@ of ``-W(no-)*``.
          :extension:`StarIsType`
      :type: dynamic
      :reverse: -Wno-star-binder
+
      :since: 8.6
 
      Under :extension:`StarIsType`, a ``*`` in types is not an operator nor
@@ -2103,6 +2104,7 @@ of ``-W(no-)*``.
 .. ghc-flag:: -Wauto-orphans
     :shortdesc: *(deprecated)* Does nothing
     :type: dynamic
+
     :since: 7.4
 
     Does nothing.
@@ -2110,6 +2112,7 @@ of ``-W(no-)*``.
 .. ghc-flag:: -Wmissing-space-after-bang
     :shortdesc: *(deprecated)* Does nothing
     :type: dynamic
+
     :since: 8.8
 
     Does nothing.
