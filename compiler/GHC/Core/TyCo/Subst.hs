@@ -552,7 +552,7 @@ substitution.
 -}
 
 -- | Type substitution, see 'zipTvSubst'
-substTyWith :: HasCallStack => [TyVar] -> [Type] -> Type -> Type
+substTyWith :: HasDebugCallStack => [TyVar] -> [Type] -> Type -> Type
 -- Works only if the domain of the substitution is a
 -- superset of the type being substituted into
 substTyWith tvs tys = {-#SCC "substTyWith" #-}
@@ -580,7 +580,7 @@ substTyWithInScope in_scope tvs tys ty =
   where tenv = zipTyEnv tvs tys
 
 -- | Coercion substitution, see 'zipTvSubst'
-substCoWith :: HasCallStack => [TyVar] -> [Type] -> Coercion -> Coercion
+substCoWith :: HasDebugCallStack => [TyVar] -> [Type] -> Coercion -> Coercion
 substCoWith tvs tys = assert (tvs `equalLength` tys )
                       substCo (zipTvSubst tvs tys)
 
@@ -632,7 +632,7 @@ isValidTCvSubst (TCvSubst in_scope tenv cenv) =
 
 -- | This checks if the substitution satisfies the invariant from
 -- Note [The substitution invariant].
-checkValidSubst :: HasCallStack => TCvSubst -> [Type] -> [Coercion] -> a -> a
+checkValidSubst :: HasDebugCallStack => TCvSubst -> [Type] -> [Coercion] -> a -> a
 checkValidSubst subst@(TCvSubst in_scope tenv cenv) tys cos a
   = assertPpr (isValidTCvSubst subst)
               (text "in_scope" <+> ppr in_scope $$
@@ -663,7 +663,7 @@ checkValidSubst subst@(TCvSubst in_scope tenv cenv) tys cos a
 -- | Substitute within a 'Type'
 -- The substitution has to satisfy the invariants described in
 -- Note [The substitution invariant].
-substTy :: HasCallStack => TCvSubst -> Type  -> Type
+substTy :: HasDebugCallStack => TCvSubst -> Type  -> Type
 substTy subst ty
   | isEmptyTCvSubst subst = ty
   | otherwise             = checkValidSubst subst [ty] [] $
@@ -679,21 +679,21 @@ substTyUnchecked subst ty
                  | isEmptyTCvSubst subst = ty
                  | otherwise             = subst_ty subst ty
 
-substScaledTy :: HasCallStack => TCvSubst -> Scaled Type -> Scaled Type
+substScaledTy :: HasDebugCallStack => TCvSubst -> Scaled Type -> Scaled Type
 substScaledTy subst scaled_ty = mapScaledType (substTy subst) scaled_ty
 
-substScaledTyUnchecked :: HasCallStack => TCvSubst -> Scaled Type -> Scaled Type
+substScaledTyUnchecked :: HasDebugCallStack => TCvSubst -> Scaled Type -> Scaled Type
 substScaledTyUnchecked subst scaled_ty = mapScaledType (substTyUnchecked subst) scaled_ty
 
 -- | Substitute within several 'Type's
 -- The substitution has to satisfy the invariants described in
 -- Note [The substitution invariant].
-substTys :: HasCallStack => TCvSubst -> [Type] -> [Type]
+substTys :: HasDebugCallStack => TCvSubst -> [Type] -> [Type]
 substTys subst tys
   | isEmptyTCvSubst subst = tys
   | otherwise = checkValidSubst subst tys [] $ map (subst_ty subst) tys
 
-substScaledTys :: HasCallStack => TCvSubst -> [Scaled Type] -> [Scaled Type]
+substScaledTys :: HasDebugCallStack => TCvSubst -> [Scaled Type] -> [Scaled Type]
 substScaledTys subst scaled_tys
   | isEmptyTCvSubst subst = scaled_tys
   | otherwise = checkValidSubst subst (map scaledMult scaled_tys ++ map scaledThing scaled_tys) [] $
@@ -717,7 +717,7 @@ substScaledTysUnchecked subst tys
 -- | Substitute within a 'ThetaType'
 -- The substitution has to satisfy the invariants described in
 -- Note [The substitution invariant].
-substTheta :: HasCallStack => TCvSubst -> ThetaType -> ThetaType
+substTheta :: HasDebugCallStack => TCvSubst -> ThetaType -> ThetaType
 substTheta = substTys
 
 -- | Substitute within a 'ThetaType' disabling the sanity checks.
@@ -789,7 +789,7 @@ lookupTyVar (TCvSubst _ tenv _) tv
 -- | Substitute within a 'Coercion'
 -- The substitution has to satisfy the invariants described in
 -- Note [The substitution invariant].
-substCo :: HasCallStack => TCvSubst -> Coercion -> Coercion
+substCo :: HasDebugCallStack => TCvSubst -> Coercion -> Coercion
 substCo subst co
   | isEmptyTCvSubst subst = co
   | otherwise = checkValidSubst subst [] [co] $ subst_co subst co
@@ -807,7 +807,7 @@ substCoUnchecked subst co
 -- | Substitute within several 'Coercion's
 -- The substitution has to satisfy the invariants described in
 -- Note [The substitution invariant].
-substCos :: HasCallStack => TCvSubst -> [Coercion] -> [Coercion]
+substCos :: HasDebugCallStack => TCvSubst -> [Coercion] -> [Coercion]
 substCos subst cos
   | isEmptyTCvSubst subst = cos
   | otherwise = checkValidSubst subst [] cos $ map (subst_co subst) cos
@@ -947,19 +947,19 @@ substCoVars subst cvs = map (substCoVar subst) cvs
 lookupCoVar :: TCvSubst -> Var -> Maybe Coercion
 lookupCoVar (TCvSubst _ _ cenv) v = lookupVarEnv cenv v
 
-substTyVarBndr :: HasCallStack => TCvSubst -> TyVar -> (TCvSubst, TyVar)
+substTyVarBndr :: HasDebugCallStack => TCvSubst -> TyVar -> (TCvSubst, TyVar)
 substTyVarBndr = substTyVarBndrUsing substTy
 
-substTyVarBndrs :: HasCallStack => TCvSubst -> [TyVar] -> (TCvSubst, [TyVar])
+substTyVarBndrs :: HasDebugCallStack => TCvSubst -> [TyVar] -> (TCvSubst, [TyVar])
 substTyVarBndrs = mapAccumL substTyVarBndr
 
-substVarBndr :: HasCallStack => TCvSubst -> TyCoVar -> (TCvSubst, TyCoVar)
+substVarBndr :: HasDebugCallStack => TCvSubst -> TyCoVar -> (TCvSubst, TyCoVar)
 substVarBndr = substVarBndrUsing substTy
 
-substVarBndrs :: HasCallStack => TCvSubst -> [TyCoVar] -> (TCvSubst, [TyCoVar])
+substVarBndrs :: HasDebugCallStack => TCvSubst -> [TyCoVar] -> (TCvSubst, [TyCoVar])
 substVarBndrs = mapAccumL substVarBndr
 
-substCoVarBndr :: HasCallStack => TCvSubst -> CoVar -> (TCvSubst, CoVar)
+substCoVarBndr :: HasDebugCallStack => TCvSubst -> CoVar -> (TCvSubst, CoVar)
 substCoVarBndr = substCoVarBndrUsing substTy
 
 -- | Like 'substVarBndr', but disables sanity checks.
