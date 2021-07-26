@@ -38,6 +38,7 @@ module GHC.Types.Literal
         , literalType
         , pprLiteral
         , litNumIsSigned
+        , litNumRange
         , litNumCheckRange
         , litNumWrap
         , litNumCoerce
@@ -369,19 +370,31 @@ litNumNarrow _ _ l = pprPanic "litNumNarrow: invalid literal" (ppr l)
 
 -- | Check that a given number is in the range of a numeric literal
 litNumCheckRange :: Platform -> LitNumType -> Integer -> Bool
-litNumCheckRange platform nt i = case nt of
-     LitNumInt     -> platformInIntRange platform i
-     LitNumWord    -> platformInWordRange platform i
-     LitNumInt8    -> inBoundedRange @Int8 i
-     LitNumInt16   -> inBoundedRange @Int16 i
-     LitNumInt32   -> inBoundedRange @Int32 i
-     LitNumInt64   -> inBoundedRange @Int64 i
-     LitNumWord8   -> inBoundedRange @Word8 i
-     LitNumWord16  -> inBoundedRange @Word16 i
-     LitNumWord32  -> inBoundedRange @Word32 i
-     LitNumWord64  -> inBoundedRange @Word64 i
-     LitNumNatural -> i >= 0
-     LitNumInteger -> True
+litNumCheckRange platform nt i =
+    maybe True (i >=) m_lower &&
+    maybe True (i <=) m_upper
+  where
+    (m_lower, m_upper) = litNumRange platform nt
+
+-- | Get the literal range
+litNumRange :: Platform -> LitNumType -> (Maybe Integer, Maybe Integer)
+litNumRange platform nt = case nt of
+     LitNumInt     -> (Just (platformMinInt platform), Just (platformMaxInt platform))
+     LitNumWord    -> (Just 0, Just (platformMaxWord platform))
+     LitNumInt8    -> bounded_range @Int8
+     LitNumInt16   -> bounded_range @Int16
+     LitNumInt32   -> bounded_range @Int32
+     LitNumInt64   -> bounded_range @Int64
+     LitNumWord8   -> bounded_range @Word8
+     LitNumWord16  -> bounded_range @Word16
+     LitNumWord32  -> bounded_range @Word32
+     LitNumWord64  -> bounded_range @Word64
+     LitNumNatural -> (Just 0, Nothing)
+     LitNumInteger -> (Nothing, Nothing)
+  where
+    bounded_range :: forall a . (Integral a, Bounded a) => (Maybe Integer,Maybe Integer)
+    bounded_range = case boundedRange @a of
+      (mi,ma) -> (Just mi, Just ma)
 
 -- | Create a numeric 'Literal' of the given type
 mkLitNumber :: Platform -> LitNumType -> Integer -> Literal
@@ -576,6 +589,9 @@ inNaturalRange x = x >= 0
 inBoundedRange :: forall a. (Bounded a, Integral a) => Integer -> Bool
 inBoundedRange x  = x >= toInteger (minBound :: a) &&
                     x <= toInteger (maxBound :: a)
+
+boundedRange :: forall a. (Bounded a, Integral a) => (Integer,Integer)
+boundedRange = (toInteger (minBound :: a), toInteger (maxBound :: a))
 
 isMinBound :: Platform -> Literal -> Bool
 isMinBound _        (LitChar c)        = c == minBound

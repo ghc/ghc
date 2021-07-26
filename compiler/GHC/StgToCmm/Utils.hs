@@ -454,12 +454,19 @@ emitCmmLitSwitch scrut  branches deflt = do
         rep = typeWidth cmm_ty
 
     -- We find the necessary type information in the literals in the branches
-    let signed = case head branches of
-                    (LitNumber nt _, _) -> litNumIsSigned nt
-                    _ -> False
-
-    let range | signed    = (platformMinInt platform, platformMaxInt platform)
-              | otherwise = (0, platformMaxWord platform)
+    let (signed,range) = case head branches of
+          (LitNumber nt _, _) -> (signed,range)
+            where
+              signed = litNumIsSigned nt
+              range  = case litNumRange platform nt of
+                        (Just mi, Just ma) -> (mi,ma)
+                                              -- unbounded literals (Natural and
+                                              -- Integer) must have been
+                                              -- lowered at this point
+                        partial_bounds     -> pprPanic "Unexpected unbounded literal range"
+                                                       (ppr partial_bounds)
+               -- assuming native word range
+          _ -> (False, (0, platformMaxWord platform))
 
     if isFloatType cmm_ty
     then emit =<< mk_float_switch rep scrut' deflt_lbl noBound branches_lbls
