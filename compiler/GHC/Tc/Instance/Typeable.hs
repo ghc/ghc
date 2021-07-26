@@ -103,6 +103,15 @@ There are many wrinkles:
   able to lookup Module and TyCon in the type environment and we may be
   currently compiling GHC.Types (where they are defined).
 
+* The Typeable bindings for the primitive types defined in GHC.Prim live in
+  GHC.Types since Module, et al. are defined in GHC.Types which GHC.Prim cannot
+  depend upon.
+
+  In principle this special case could be avoided by moving TrName and Module
+  from GHC.Types into GHC.Prim but this would require wiring them in, which
+  would be somewhat tiresome. See Note [The GHC.Prim Story] in
+  utils/genprimopcode/Main.hs.
+
 * GHC.Prim doesn't have any associated object code, so we need to put the
   representations for types defined in this module elsewhere. We chose this
   place to be GHC.Types. GHC.Tc.Instance.Typeable.mkPrimTypeableBinds is responsible for

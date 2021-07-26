@@ -275,7 +275,7 @@ instance Outputable BCInstr where
    ppr (PUSH16_W offset)     = text "PUSH16_W  " <+> ppr offset
    ppr (PUSH32_W offset)     = text "PUSH32_W  " <+> ppr offset
    ppr (PUSH_G nm)           = text "PUSH_G  " <+> ppr nm
-   ppr (PUSH_PRIMOP op)      = text "PUSH_G  " <+> text "GHC.PrimopWrappers."
+   ppr (PUSH_PRIMOP op)      = text "PUSH_G  " <+> text "GHC.Prim."
                                                <> ppr op
    ppr (PUSH_BCO bco)        = hang (text "PUSH_BCO") 2 (ppr bco)
 

@@ -153,6 +153,7 @@ import GHC.Types.Name
 import GHC.Unit.Module
 import GHC.Core.Class
 import {-# SOURCE #-} GHC.Builtin.PrimOps (PrimOp)
+import {-# SOURCE #-} GHC.Types.TyThing (tyThingId)
 import GHC.Types.ForeignCall
 import GHC.Data.Maybe
 import GHC.Types.SrcLoc
@@ -306,6 +307,7 @@ mkVanillaGlobalWithInfo = mkGlobalId VanillaId
 
 -- | For an explanation of global vs. local 'Id's, see "GHC.Types.Var#globalvslocal"
 mkLocalId :: HasDebugCallStack => Name -> Mult -> Type -> Id
+mkLocalId name _ _ | Just thing <- wiredInNameTyThing_maybe name = tyThingId thing
 mkLocalId name w ty = mkLocalIdWithInfo name w (assert (not (isCoVarType ty)) ty) vanillaIdInfo
 
 -- | Make a local CoVar
@@ -583,11 +585,7 @@ hasNoBinding :: Id -> Bool
 -- exception to this is unboxed tuples and sums datacons, which definitely have
 -- no binding
 hasNoBinding id = case Var.idDetails id of
-
--- TEMPORARILY make all primops hasNoBinding, to avoid #20155
--- The goal is to understand #20155 and revert to the commented out version
-                        PrimOpId _ _ -> True    -- See Note [Eta expanding primops] in GHC.Builtin.PrimOps
---                        PrimOpId _ lev_poly -> lev_poly    -- TEMPORARILY commented out
+                        PrimOpId _ lev_poly -> lev_poly
 
                         FCallId _        -> True
                         DataConWorkId dc -> isUnboxedTupleDataCon dc || isUnboxedSumDataCon dc

@@ -11,7 +11,6 @@ Description:
     (@primops.txt.pp@) and produces a number of outputs. These include,
     .
     * the @GHC.Prim@ module included in the @ghc-prim@ package.
-    * the @GHC.PrimopWrappers@ module included in the @ghc-prim@ package.
     * an LaTeX document describing the primitive operations.
 Category: Development
 build-type: Simple

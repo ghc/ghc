@@ -24,7 +24,6 @@ import GHCi.RemoteTypes
 import GHCi.ResolvedBCO
 
 import GHC.Builtin.PrimOps
-import GHC.Builtin.Names
 
 import GHC.Unit.Types
 
@@ -184,11 +183,7 @@ nameToCLabel :: Name -> String -> FastString
 nameToCLabel n suffix = mkFastString label
   where
     encodeZ = zString . zEncodeFS
-    (Module pkgKey modName) = assert (isExternalName n) $ case nameModule n of
-        -- Primops are exported from GHC.Prim, their HValues live in GHC.PrimopWrappers
-        -- See Note [Primop wrappers] in GHC.Builtin.PrimOps.
-        mod | mod == gHC_PRIM -> gHC_PRIMOPWRAPPERS
-        mod -> mod
+    (Module pkgKey modName) = assert (isExternalName n) (nameModule n)
     packagePart = encodeZ (unitFS pkgKey)
     modulePart  = encodeZ (moduleNameFS modName)
     occPart     = encodeZ $ occNameMangledFS (nameOccName n)
@@ -204,7 +199,7 @@ nameToCLabel n suffix = mkFastString label
 -- See Note [Primop wrappers] in GHC.Builtin.PrimOps
 primopToCLabel :: PrimOp -> String -> String
 primopToCLabel primop suffix = concat
-    [ "ghczmprim_GHCziPrimopWrappers_"
+    [ "ghczmprim_GHCziPrim_"
     , zString (zEncodeFS (occNameFS (primOpOcc primop)))
     , '_':suffix
     ]

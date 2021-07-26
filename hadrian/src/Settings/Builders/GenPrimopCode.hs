@@ -4,8 +4,7 @@ import Settings.Builders.Common
 
 genPrimopCodeBuilderArgs :: Args
 genPrimopCodeBuilderArgs = builder GenPrimopCode ? mconcat
-    [ output "//PrimopWrappers.hs"                 ? arg "--make-haskell-wrappers"
-    , output "//Prim.hs"                           ? arg "--make-haskell-source"
+    [ output "//Prim.hs"                           ? arg "--make-haskell-source"
     , output "//primop-data-decl.hs-incl"          ? arg "--data-decl"
     , output "//primop-tag.hs-incl"                ? arg "--primop-tag"
     , output "//primop-list.hs-incl"               ? arg "--primop-list"

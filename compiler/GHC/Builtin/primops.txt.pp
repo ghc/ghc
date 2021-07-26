@@ -39,7 +39,6 @@
 --
 -- * The primitives (primtypes, primops, pseudoops) cannot be defined in
 --   source Haskell.
---   There is no GHC/Prim.hs file with definitions.
 --   Instead, we support importing GHC.Prim by manually defining its
 --   ModIface (see Iface.Load.ghcPrimIface).
 --
@@ -71,12 +70,12 @@
 --      Additionally, we pattern match on PrimOp when generating Cmm in
 --      GHC/StgToCmm/Prim.hs.
 --
---   2. The dummy Prim.hs file, which is used for Haddock and
+--   2. The Prim.hs file, which is used for Haddock and
 --      contains descriptions taken from primops.txt.pp.
 --      All definitions are replaced by placeholders.
 --      See Note [GHC.Prim Docs] in genprimopcode.
 --
---   3. The module PrimopWrappers.hs, which wraps every call for GHCi;
+--   3. The module Prim.hs also wraps every call for GHCi;
 --      see Note [Primop wrappers] in GHC.Builtin.Primops for details.
 --
 -- * This file does not list internal-only equality types

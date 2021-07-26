@@ -384,7 +384,7 @@ import GHC.Data.FastString (FastString, mkFastString, fsLit)
 import GHC.Types.Id
 import GHC.Types.Literal
 import GHC.Core.Make (aBSENT_SUM_FIELD_ERROR_ID)
-import GHC.Types.Id.Make (voidPrimId, voidArgId)
+import GHC.Types.Id.Make (voidArgId)
 import GHC.Utils.Monad (mapAccumLM)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -1126,7 +1126,7 @@ tagTy :: Type
 tagTy = intPrimTy
 
 voidArg :: StgArg
-voidArg = StgVarArg voidPrimId
+voidArg = StgVarArg (dataConWorkId unboxedUnitDataCon)
 
 mkDefaultLitAlt :: [StgAlt] -> [StgAlt]
 -- We have an exhauseive list of literal alternatives

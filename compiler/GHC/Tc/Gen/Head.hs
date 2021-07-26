@@ -1042,6 +1042,9 @@ tcInferId :: Name -> TcM (HsExpr GhcTc, TcSigmaType)
 -- Look up an occurrence of an Id
 -- Do not instantiate its type
 tcInferId id_name
+  -- TODO: Note
+  | Just (AnId id) <- wiredInNameTyThing_maybe id_name = do
+      return (HsVar noExtField (noLocA id), idType id)
   | id_name `hasKey` assertIdKey
   = do { dflags <- getDynFlags
        ; if gopt Opt_IgnoreAsserts dflags

@@ -76,7 +76,6 @@ getImports :: ParserOpts   -- ^ Parser options
                (Messages PsMessage)
                ([(RawPkgQual, Located ModuleName)],
                 [(RawPkgQual, Located ModuleName)],
-                Bool, -- Is GHC.Prim imported or not
                 Located ModuleName))
               -- ^ The source imports and normal imports (with optional package
               -- names from -XPackageImports), and the module name.
@@ -101,19 +100,12 @@ getImports popts implicit_prelude buf filename source_filename = do
                 mod = mb_mod `orElse` L (noAnnSrcSpan main_loc) mAIN_NAME
                 (src_idecls, ord_idecls) = partition ((== IsBoot) . ideclSource . unLoc) imps
 
-               -- GHC.Prim doesn't exist physically, so don't go looking for it.
-                (ordinary_imps, ghc_prim_import)
-                  = partition ((/= moduleName gHC_PRIM) . unLoc
-                                  . ideclName . unLoc)
-                                 ord_idecls
-
                 implicit_imports = mkPrelImports (unLoc mod) main_loc
                                                  implicit_prelude imps
                 convImport (L _ i) = (ideclPkgQual i, reLoc $ ideclName i)
               in
               return (map convImport src_idecls
-                     , map convImport (implicit_imports ++ ordinary_imps)
-                     , not (null ghc_prim_import)
+                     , map convImport (implicit_imports ++ ord_idecls)
                      , reLoc mod)
 
 mkPrelImports :: ModuleName

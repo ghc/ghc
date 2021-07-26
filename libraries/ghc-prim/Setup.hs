@@ -64,15 +64,10 @@ build_primitive_sources f pd lbi uhs x
               primops = joinPath ["..", "..", "compiler", "prelude",
                                   "primops.txt"]
               primhs = joinPath ["GHC", "Prim.hs"]
-              primopwrappers = joinPath ["GHC", "PrimopWrappers.hs"]
               primhs_tmp = addExtension primhs "tmp"
-              primopwrappers_tmp = addExtension primopwrappers "tmp"
           maybeExit $ system (genprimopcode ++ " --make-haskell-source < "
                            ++ primops ++ " > " ++ primhs_tmp)
           maybeUpdateFile primhs_tmp primhs
-          maybeExit $ system (genprimopcode ++ " --make-haskell-wrappers < "
-                           ++ primops ++ " > " ++ primopwrappers_tmp)
-          maybeUpdateFile primopwrappers_tmp primopwrappers
       f pd lbi uhs x
 
 -- Replace a file only if the new version is different from the old.
