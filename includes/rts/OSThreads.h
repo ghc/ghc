@@ -27,7 +27,17 @@
 #include <pthread.h>
 #include <errno.h>
 
-typedef pthread_cond_t  Condition;
+typedef struct {
+    pthread_cond_t cond;
+
+    // Which clock are pthread_cond_timedwait calls referenced against?
+    // N.B. Some older Darwin releases don't support clock_gettime. However, we
+    // do want to reference to CLOCK_MONOTONIC whenever possible as it is more
+    // robust against system time changes and is likely cheaper to query.
+#if defined(HAVE_CLOCK_GETTIME) && defined(HAVE_PTHREAD_CONDATTR_SETCLOCK)
+    clockid_t timeout_clk;
+#endif
+} Condition;
 typedef pthread_mutex_t Mutex;
 typedef pthread_t       OSThreadId;
 typedef pthread_key_t   ThreadLocalKey;
