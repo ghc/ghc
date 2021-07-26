@@ -50,7 +50,6 @@ import GHC.Driver.Config.Finder
 import GHC.Driver.Env
 import GHC.Driver.Errors.Types
 import GHC.Driver.DynFlags
-import GHC.Driver.Hooks
 import GHC.Driver.Plugins
 
 import GHC.Iface.Syntax
@@ -861,7 +860,6 @@ findAndReadIface hsc_env doc_str mod wanted_mod hi_boot_file = do
       mhome_unit  = hsc_home_unit_maybe hsc_env
       dflags     = hsc_dflags hsc_env
       logger     = hsc_logger hsc_env
-      hooks      = hsc_hooks hsc_env
       other_fopts = initFinderOpts . homeUnitEnv_dflags <$> (hsc_HUG hsc_env)
 
 
@@ -877,11 +875,7 @@ findAndReadIface hsc_env doc_str mod wanted_mod hi_boot_file = do
   -- See Note [GHC.Prim] in primops.txt.pp.
   -- TODO: make this check a function
   if mod `installedModuleEq` gHC_PRIM
-      then do
-          let iface = case ghcPrimIfaceHook hooks of
-                       Nothing -> ghcPrimIface
-                       Just h  -> h
-          return (Succeeded (iface, "<built in interface for GHC.Prim>"))
+      then return (Succeeded (ghcPrimIface, "<built in interface for GHC.Prim>"))
       else do
           let fopts = initFinderOpts dflags
           -- Look for the file

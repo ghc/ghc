@@ -17,7 +17,6 @@ module GHC.Driver.Hooks
    , tcForeignExportsHook
    , hscFrontendHook
    , hscCompileCoreExprHook
-   , ghcPrimIfaceHook
    , runPhaseHook
    , runMetaHook
    , linkHook
@@ -93,7 +92,6 @@ emptyHooks = Hooks
   , tcForeignExportsHook   = Nothing
   , hscFrontendHook        = Nothing
   , hscCompileCoreExprHook = Nothing
-  , ghcPrimIfaceHook       = Nothing
   , runPhaseHook           = Nothing
   , runMetaHook            = Nothing
   , linkHook               = Nothing
@@ -139,7 +137,6 @@ data Hooks = Hooks
             -> TcM (LHsBinds GhcTc, [LForeignDecl GhcTc], Bag GlobalRdrElt)))
   , hscFrontendHook        :: !(Maybe (ModSummary -> Hsc FrontendResult))
   , hscCompileCoreExprHook :: !(Maybe (HscEnv -> SrcSpan -> CoreExpr -> IO (ForeignHValue, [Linkable], PkgsLoaded)))
-  , ghcPrimIfaceHook       :: !(Maybe ModIface)
   , runPhaseHook           :: !(Maybe PhaseHook)
   , runMetaHook            :: !(Maybe (MetaHook TcM))
   , linkHook               :: !(Maybe (GhcLink -> DynFlags -> Bool
