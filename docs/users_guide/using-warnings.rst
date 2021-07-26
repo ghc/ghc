@@ -1339,6 +1339,7 @@ of ``-W(no-)*``.
          :extension:`StarIsType`
      :type: dynamic
      :reverse: -Wno-star-binder
+
      :since: 8.6
 
      Under :extension:`StarIsType`, a ``*`` in types is not an operator nor
@@ -1900,6 +1901,22 @@ of ``-W(no-)*``.
 
     This warning informs you about discarded documentation comments.
     It has no effect when :ghc-flag:`-haddock` is disabled.
+
+.. ghc-flag:: -Wauto-orphans
+    :shortdesc: *(deprecated)* Does nothing
+    :type: dynamic
+
+    :since: 7.4
+
+    Does nothing.
+
+.. ghc-flag:: -Wmissing-space-after-bang
+    :shortdesc: *(deprecated)* Does nothing
+    :type: dynamic
+
+    :since: 8.8
+
+    Does nothing.
 
 .. ghc-flag:: -Wderiving-typeable
     :shortdesc: warn when Typeable is derived
