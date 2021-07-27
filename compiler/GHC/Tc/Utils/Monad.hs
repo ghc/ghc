@@ -1142,7 +1142,7 @@ reportDiagnostic msg
 -----------------------
 checkNoErrs :: TcM r -> TcM r
 -- (checkNoErrs m) succeeds iff m succeeds and generates no errors
--- If m fails then (checkNoErrsTc m) fails.
+-- If m fails then (checkNoErrs m) fails.
 -- If m succeeds, it checks whether m generated any errors messages
 --      (it might have recovered internally)
 --      If so, it fails too.

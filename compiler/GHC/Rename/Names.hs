@@ -690,7 +690,8 @@ extendGlobalRdrEnvRn :: [AvailInfo]
 -- see Note [Top-level Names in Template Haskell decl quotes]
 
 extendGlobalRdrEnvRn avails new_fixities
-  = do  { (gbl_env, lcl_env) <- getEnvs
+  = checkNoErrs $  -- See Note [Fail fast on duplicate definitions]
+    do  { (gbl_env, lcl_env) <- getEnvs
         ; stage <- getStage
         ; isGHCi <- getIsGHCi
         ; let rdr_env  = tcg_rdr_env gbl_env
@@ -767,7 +768,19 @@ extendGlobalRdrEnvRn avails new_fixities
               (False, True)  -> isNoFieldSelectorGRE gre'
               (False, False) -> False
 
-{-
+{- Note [Fail fast on duplicate definitions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If there are duplicate bindings for the same thing, we want to fail
+fast. Having two bindings for the same thing can cause follow-on errors.
+Example (test T9975a):
+   data Test = Test { x :: Int }
+   pattern Test wat = Test { x = wat }
+This defines 'Test' twice.  The second defn has no field-names; and then
+we get an error from Test { x=wat }, saying "Test has no field 'x'".
+
+Easiest thing is to bale out fast on duplicate definitions, which
+we do via `checkNoErrs` on `extendGlobalRdrEnvRn`.
+
 Note [Reporting duplicate local declarations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In general, a single module may not define the same OccName multiple times. This
