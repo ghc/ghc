@@ -565,15 +565,13 @@ tcRnModule' sum save_rn_syntax mod = do
     hsc_env <- getHscEnv
     dflags  <- getDynFlags
 
-    let reason = WarningWithFlag Opt_WarnMissingSafeHaskellMode
     let diag_opts = initDiagOpts dflags
     -- -Wmissing-safe-haskell-mode
     when (not (safeHaskellModeEnabled dflags)
           && wopt Opt_WarnMissingSafeHaskellMode dflags) $
         logDiagnostics $ singleMessage $
         mkPlainMsgEnvelope diag_opts (getLoc (hpm_module mod)) $
-        GhcDriverMessage $ DriverUnknownMessage $
-        mkPlainDiagnostic reason noHints warnMissingSafeHaskellMode
+        GhcDriverMessage $ DriverMissingSafeHaskellMode (ms_mod sum)
 
     tcg_res <- {-# SCC "Typecheck-Rename" #-}
                ioMsgMaybe $ hoistTcRnMessage $
@@ -602,25 +600,14 @@ tcRnModule' sum save_rn_syntax mod = do
                 | safeHaskell dflags == Sf_Safe -> return ()
                 | otherwise -> (logDiagnostics $ singleMessage $
                        mkPlainMsgEnvelope diag_opts (warnSafeOnLoc dflags) $
-                       GhcDriverMessage $ DriverUnknownMessage $
-                       mkPlainDiagnostic (WarningWithFlag Opt_WarnSafe) noHints $
-                       errSafe tcg_res')
+                       GhcDriverMessage $ DriverInferredSafeModule (tcg_mod tcg_res'))
               False | safeHaskell dflags == Sf_Trustworthy &&
                       wopt Opt_WarnTrustworthySafe dflags ->
                       (logDiagnostics $ singleMessage $
                        mkPlainMsgEnvelope diag_opts (trustworthyOnLoc dflags) $
-                       GhcDriverMessage $ DriverUnknownMessage $
-                       mkPlainDiagnostic (WarningWithFlag Opt_WarnTrustworthySafe) noHints $
-                       errTwthySafe tcg_res')
+                       GhcDriverMessage $ DriverMarkedTrustworthyButInferredSafe (tcg_mod tcg_res'))
               False -> return ()
           return tcg_res'
-  where
-    pprMod t  = ppr $ moduleName $ tcg_mod t
-    errSafe t = quotes (pprMod t) <+> text "has been inferred as safe!"
-    errTwthySafe t = quotes (pprMod t)
-      <+> text "is marked as Trustworthy but has been inferred as safe!"
-    warnMissingSafeHaskellMode = ppr (moduleName (ms_mod sum))
-      <+> text "is missing Safe Haskell mode"
 
 -- | Convert a typechecked module to Core
 hscDesugar :: HscEnv -> ModSummary -> TcGblEnv -> IO ModGuts
@@ -1175,12 +1162,8 @@ hscCheckSafeImports tcg_env = do
     warns diag_opts rules = mkMessages $ listToBag $ map (warnRules diag_opts) rules
 
     warnRules :: DiagOpts -> LRuleDecl GhcTc -> MsgEnvelope DriverMessage
-    warnRules diag_opts (L loc (HsRule { rd_name = n })) =
-        mkPlainMsgEnvelope diag_opts (locA loc) $
-        DriverUnknownMessage $
-        mkPlainDiagnostic WarningWithoutFlag noHints $
-            text "Rule \"" <> ftext (snd $ unLoc n) <> text "\" ignored" $+$
-            text "User defined rules are disabled under Safe Haskell"
+    warnRules diag_opts (L loc rule) =
+        mkPlainMsgEnvelope diag_opts (locA loc) $ DriverUserDefinedRuleIgnored rule
 
 -- | Validate that safe imported modules are actually safe.  For modules in the
 -- HomePackage (the package the module we are compiling in resides) this just
@@ -1256,9 +1239,7 @@ checkSafeImports tcg_env
         | imv_is_safe v1 /= imv_is_safe v2
         = throwOneError $
             mkPlainErrorMsgEnvelope (imv_span v1) $
-            GhcDriverMessage $ DriverUnknownMessage $ mkPlainError noHints $
-              text "Module" <+> ppr (imv_name v1) <+>
-               (text $ "is imported both as a safe and unsafe import!")
+            GhcDriverMessage $ DriverMixedSafetyImport (imv_name v1)
         | otherwise
         = return v1
 
@@ -1327,9 +1308,7 @@ hscCheckSafe' m l = do
             -- can't load iface to check trust!
             Nothing -> throwOneError $
                          mkPlainErrorMsgEnvelope l $
-                         GhcDriverMessage $ DriverUnknownMessage $ mkPlainError noHints $
-                           text "Can't load the interface file for" <+> ppr m
-                             <> text ", to check that it can be safely imported"
+                         GhcDriverMessage $ DriverCannotLoadInterfaceFile m
 
             -- got iface, check trust
             Just iface' ->
@@ -1361,30 +1340,13 @@ hscCheckSafe' m l = do
                     state = hsc_units hsc_env
                     inferredImportWarn diag_opts = singleMessage
                         $ mkMsgEnvelope diag_opts l (pkgQual state)
-                        $ GhcDriverMessage $ DriverUnknownMessage
-                        $ mkPlainDiagnostic (WarningWithFlag Opt_WarnInferredSafeImports) noHints
-                        $ sep
-                            [ text "Importing Safe-Inferred module "
-                                <> ppr (moduleName m)
-                                <> text " from explicitly Safe module"
-                            ]
+                        $ GhcDriverMessage $ DriverInferredSafeImport m
                     pkgTrustErr = singleMessage
                       $ mkErrorMsgEnvelope l (pkgQual state)
-                      $ GhcDriverMessage $ DriverUnknownMessage
-                      $ mkPlainError noHints
-                      $ sep [ ppr (moduleName m)
-                                <> text ": Can't be safely imported!"
-                            , text "The package ("
-                                <> (pprWithUnitState state $ ppr (moduleUnit m))
-                                <> text ") the module resides in isn't trusted."
-                            ]
+                      $ GhcDriverMessage $ DriverCannotImportFromUntrustedPackage state m
                     modTrustErr = singleMessage
                       $ mkErrorMsgEnvelope l (pkgQual state)
-                      $ GhcDriverMessage $ DriverUnknownMessage
-                      $ mkPlainError noHints
-                      $ sep [ ppr (moduleName m)
-                                <> text ": Can't be safely imported!"
-                            , text "The module itself isn't safe." ]
+                      $ GhcDriverMessage $ DriverCannotImportUnsafeModule m
 
     -- | Check the package a module resides in is trusted. Safe compiled
     -- modules are trusted without requiring that their package is trusted. For
@@ -1430,12 +1392,7 @@ checkPkgTrust pkgs = do
             = (`consBag` acc)
                      $ mkErrorMsgEnvelope noSrcSpan (pkgQual state)
                      $ GhcDriverMessage
-                     $ DriverUnknownMessage
-                     $ mkPlainError noHints
-                     $ pprWithUnitState state
-                     $ text "The package ("
-                        <> ppr pkg
-                        <> text ") is required to be trusted but it isn't!"
+                     $ DriverPackageNotTrusted state pkg
     if isEmptyBag errors
       then return ()
       else liftIO $ throwErrors $ mkMessages errors
