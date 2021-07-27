@@ -472,7 +472,7 @@ instance Diagnostic PsMessage where
 
   diagnosticReason  = \case
     PsUnknownMessage m                            -> diagnosticReason m
-    PsHeaderMessage  _                            -> ErrorWithoutFlag
+    PsHeaderMessage  m                            -> psHeaderMessageReason m
     PsWarnTab{}                                   -> WarningWithFlag Opt_WarnTabs
     PsWarnTransitionalLayout{}                    -> WarningWithFlag Opt_WarnAlternativeLayoutRuleTransitional
     PsWarnOperatorWhitespaceExtConflict{}         -> WarningWithFlag Opt_WarnOperatorWhitespaceExtConflict
@@ -753,6 +753,19 @@ psHeaderMessageDiagnostic = \case
               , text "Expecting whitespace-separated list of GHC options."
               , text "  E.g. {-# OPTIONS_GHC -Wall -O2 #-}"
               , text ("Input was: " ++ show str) ]
+  PsErrUnknownOptionsPragma flag
+    -> mkSimpleDecorated $ text "Unknown flag in  {-# OPTIONS_GHC #-} pragma:" <+> text flag
+
+psHeaderMessageReason :: PsHeaderMessage -> DiagnosticReason
+psHeaderMessageReason = \case
+  PsErrParseLanguagePragma
+    -> ErrorWithoutFlag
+  PsErrUnsupportedExt{}
+    -> ErrorWithoutFlag
+  PsErrParseOptionsPragma{}
+    -> ErrorWithoutFlag
+  PsErrUnknownOptionsPragma{}
+    -> ErrorWithoutFlag
 
 psHeaderMessageHints :: PsHeaderMessage -> [GhcHint]
 psHeaderMessageHints = \case
@@ -769,6 +782,8 @@ psHeaderMessageHints = \case
          suggestions :: [String]
          suggestions = fuzzyMatch unsup supported
   PsErrParseOptionsPragma{}
+    -> noHints
+  PsErrUnknownOptionsPragma{}
     -> noHints
 
 

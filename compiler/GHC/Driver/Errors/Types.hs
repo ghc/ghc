@@ -23,10 +23,14 @@ import Data.Typeable
 import GHC.Driver.Session
 import GHC.Types.Error
 import GHC.Unit.Module
+import GHC.Unit.State
 
 import GHC.Parser.Errors.Types ( PsMessage(PsHeaderMessage) )
 import GHC.Tc.Errors.Types     ( TcRnMessage )
 import GHC.HsToCore.Errors.Types ( DsMessage )
+import GHC.Hs.Extension          (GhcTc)
+
+import Language.Haskell.Syntax.Decls (RuleDecl)
 
 -- | A collection of warning messages.
 -- /INVARIANT/: Each 'GhcMessage' in the collection should have 'SevWarning' severity.
@@ -198,6 +202,140 @@ data DriverMessage where
      Test cases: -
   -}
   DriverBackpackModuleNotFound :: !ModuleName -> DriverMessage
+
+  {-| DriverUserDefinedRuleIgnored is a warning that occurs when user-defined rules
+      are ignored. This typically happens when Safe Haskell.
+
+     Test cases:
+
+       tests/safeHaskell/safeInfered/UnsafeWarn05
+       tests/safeHaskell/safeInfered/UnsafeWarn06
+       tests/safeHaskell/safeInfered/UnsafeWarn07
+       tests/safeHaskell/safeInfered/UnsafeInfered11
+       tests/safeHaskell/safeLanguage/SafeLang03
+  -}
+  DriverUserDefinedRuleIgnored :: !(RuleDecl GhcTc) -> DriverMessage
+
+  {-| DriverMixedSafetyImport is an error that occurs when a module is imported
+      both as safe and unsafe.
+
+    Test cases:
+
+      tests/safeHaskell/safeInfered/Mixed03
+      tests/safeHaskell/safeInfered/Mixed02
+
+  -}
+  DriverMixedSafetyImport :: !ModuleName -> DriverMessage
+
+  {-| DriverCannotLoadInterfaceFile is an error that occurs when we cannot load the interface
+      file for a particular module. This can happen for example in the context of Safe Haskell,
+      when we have to load a module to check if it can be safely imported.
+
+    Test cases: None.
+
+  -}
+  DriverCannotLoadInterfaceFile :: !Module -> DriverMessage
+
+  {-| DriverInferredSafeImport is a warning (controlled by the Opt_WarnSafe flag)
+      that occurs when a module is inferred safe.
+
+    Test cases: None.
+
+  -}
+  DriverInferredSafeModule :: !Module -> DriverMessage
+
+  {-| DriverMarkedTrustworthyButInferredSafe is a warning (controlled by the Opt_WarnTrustworthySafe flag)
+      that occurs when a module is marked trustworthy in SafeHaskell but it has been inferred safe.
+
+    Test cases:
+      tests/safeHaskell/safeInfered/TrustworthySafe02
+      tests/safeHaskell/safeInfered/TrustworthySafe03
+
+  -}
+  DriverMarkedTrustworthyButInferredSafe :: !Module -> DriverMessage
+
+  {-| DriverInferredSafeImport is a warning (controlled by the Opt_WarnInferredSafeImports flag)
+      that occurs when a safe-inferred module is imported from a safe module.
+
+    Test cases: None.
+
+  -}
+  DriverInferredSafeImport :: !Module -> DriverMessage
+
+  {-| DriverCannotImportUnsafeModule is an error that occurs when an usafe module
+      is being imported from a safe one.
+
+    Test cases: None.
+
+  -}
+  DriverCannotImportUnsafeModule :: !Module -> DriverMessage
+
+  {-| DriverMissingSafeHaskellMode is a warning (controlled by the Opt_WarnMissingSafeHaskellMode flag)
+      that occurs when a module is using SafeHaskell features but SafeHaskell mode is not enabled.
+
+    Test cases: None.
+
+  -}
+  DriverMissingSafeHaskellMode :: !Module -> DriverMessage
+
+  {-| DriverPackageNotTrusted is an error that occurs when a package is required to be trusted
+      but it isn't.
+
+    Test cases:
+      tests/safeHaskell/check/Check01
+      tests/safeHaskell/check/Check08
+      tests/safeHaskell/check/Check06
+      tests/safeHaskell/check/pkg01/ImpSafeOnly09
+      tests/safeHaskell/check/pkg01/ImpSafe03
+      tests/safeHaskell/check/pkg01/ImpSafeOnly07
+      tests/safeHaskell/check/pkg01/ImpSafeOnly08
+
+  -}
+  DriverPackageNotTrusted :: !UnitState -> !UnitId -> DriverMessage
+
+  {-| DriverCannotImportFromUntrustedPackage is an error that occurs in the context of
+      Safe Haskell when trying to import a module coming from an untrusted package.
+
+    Test cases:
+      tests/safeHaskell/check/Check09
+      tests/safeHaskell/check/pkg01/ImpSafe01
+      tests/safeHaskell/check/pkg01/ImpSafe04
+      tests/safeHaskell/check/pkg01/ImpSafeOnly03
+      tests/safeHaskell/check/pkg01/ImpSafeOnly05
+      tests/safeHaskell/flags/SafeFlags17
+      tests/safeHaskell/flags/SafeFlags22
+      tests/safeHaskell/flags/SafeFlags23
+      tests/safeHaskell/ghci/p11
+      tests/safeHaskell/ghci/p12
+      tests/safeHaskell/ghci/p17
+      tests/safeHaskell/ghci/p3
+      tests/safeHaskell/safeInfered/UnsafeInfered01
+      tests/safeHaskell/safeInfered/UnsafeInfered02
+      tests/safeHaskell/safeInfered/UnsafeInfered02
+      tests/safeHaskell/safeInfered/UnsafeInfered03
+      tests/safeHaskell/safeInfered/UnsafeInfered05
+      tests/safeHaskell/safeInfered/UnsafeInfered06
+      tests/safeHaskell/safeInfered/UnsafeInfered09
+      tests/safeHaskell/safeInfered/UnsafeInfered10
+      tests/safeHaskell/safeInfered/UnsafeInfered11
+      tests/safeHaskell/safeInfered/UnsafeWarn01
+      tests/safeHaskell/safeInfered/UnsafeWarn03
+      tests/safeHaskell/safeInfered/UnsafeWarn04
+      tests/safeHaskell/safeInfered/UnsafeWarn05
+      tests/safeHaskell/unsafeLibs/BadImport01
+      tests/safeHaskell/unsafeLibs/BadImport06
+      tests/safeHaskell/unsafeLibs/BadImport07
+      tests/safeHaskell/unsafeLibs/BadImport08
+      tests/safeHaskell/unsafeLibs/BadImport09
+      tests/safeHaskell/unsafeLibs/Dep05
+      tests/safeHaskell/unsafeLibs/Dep06
+      tests/safeHaskell/unsafeLibs/Dep07
+      tests/safeHaskell/unsafeLibs/Dep08
+      tests/safeHaskell/unsafeLibs/Dep09
+      tests/safeHaskell/unsafeLibs/Dep10
+
+  -}
+  DriverCannotImportFromUntrustedPackage :: !UnitState -> !Module -> DriverMessage
 
 -- | Pass to a 'DriverMessage' the information whether or not the
 -- '-fbuilding-cabal-package' flag is set.

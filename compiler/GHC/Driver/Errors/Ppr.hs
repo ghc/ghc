@@ -16,7 +16,11 @@ import GHC.Types.Error
 import GHC.Unit.Types
 import GHC.Utils.Outputable
 import GHC.Unit.Module
+import GHC.Unit.State
 import GHC.Types.Hint
+import GHC.Types.SrcLoc
+
+import Language.Haskell.Syntax.Decls (RuleDecl(..))
 
 --
 -- Suggestions
@@ -121,6 +125,52 @@ instance Diagnostic DriverMessage where
       -> mkSimpleDecorated (text "StaticPointers is not supported in GHCi interactive expressions.")
     DriverBackpackModuleNotFound modname
       -> mkSimpleDecorated (text "module" <+> ppr modname <+> text "was not found")
+    DriverUserDefinedRuleIgnored (HsRule { rd_name = n })
+      -> mkSimpleDecorated $
+            text "Rule \"" <> ftext (snd $ unLoc n) <> text "\" ignored" $+$
+            text "User defined rules are disabled under Safe Haskell"
+    DriverMixedSafetyImport modName
+      -> mkSimpleDecorated $
+           text "Module" <+> ppr modName <+> text ("is imported both as a safe and unsafe import!")
+    DriverCannotLoadInterfaceFile m
+      -> mkSimpleDecorated $
+           text "Can't load the interface file for" <+> ppr m
+           <> text ", to check that it can be safely imported"
+    DriverInferredSafeModule m
+      -> mkSimpleDecorated $
+           quotes (ppr $ moduleName m) <+> text "has been inferred as safe!"
+    DriverInferredSafeImport m
+      -> mkSimpleDecorated $
+           sep
+             [ text "Importing Safe-Inferred module "
+                 <> ppr (moduleName m)
+                 <> text " from explicitly Safe module"
+             ]
+    DriverMarkedTrustworthyButInferredSafe m
+      -> mkSimpleDecorated $
+           quotes (ppr $ moduleName m) <+> text "is marked as Trustworthy but has been inferred as safe!"
+    DriverCannotImportUnsafeModule m
+      -> mkSimpleDecorated $
+           sep [ ppr (moduleName m)
+                   <> text ": Can't be safely imported!"
+               , text "The module itself isn't safe." ]
+    DriverMissingSafeHaskellMode modName
+      -> mkSimpleDecorated $
+           ppr modName <+> text "is missing Safe Haskell mode"
+    DriverPackageNotTrusted state pkg
+      -> mkSimpleDecorated $
+           pprWithUnitState state
+             $ text "The package ("
+                <> ppr pkg
+                <> text ") is required to be trusted but it isn't!"
+    DriverCannotImportFromUntrustedPackage state m
+      -> mkSimpleDecorated $
+           sep [ ppr (moduleName m)
+                   <> text ": Can't be safely imported!"
+               , text "The package ("
+                   <> (pprWithUnitState state $ ppr (moduleUnit m))
+                   <> text ") the module resides in isn't trusted."
+               ]
 
   diagnosticReason = \case
     DriverUnknownMessage m
@@ -146,6 +196,26 @@ instance Diagnostic DriverMessage where
     DriverStaticPointersNotSupported
       -> WarningWithoutFlag
     DriverBackpackModuleNotFound{}
+      -> ErrorWithoutFlag
+    DriverUserDefinedRuleIgnored{}
+      -> WarningWithoutFlag
+    DriverMixedSafetyImport{}
+      -> ErrorWithoutFlag
+    DriverCannotLoadInterfaceFile{}
+      -> ErrorWithoutFlag
+    DriverInferredSafeModule{}
+      -> WarningWithFlag Opt_WarnSafe
+    DriverMarkedTrustworthyButInferredSafe{}
+      ->WarningWithFlag Opt_WarnTrustworthySafe
+    DriverInferredSafeImport{}
+      -> WarningWithFlag Opt_WarnInferredSafeImports
+    DriverCannotImportUnsafeModule{}
+      -> ErrorWithoutFlag
+    DriverMissingSafeHaskellMode{}
+      -> WarningWithFlag Opt_WarnMissingSafeHaskellMode
+    DriverPackageNotTrusted{}
+      -> ErrorWithoutFlag
+    DriverCannotImportFromUntrustedPackage{}
       -> ErrorWithoutFlag
 
   diagnosticHints = \case
@@ -174,4 +244,24 @@ instance Diagnostic DriverMessage where
     DriverStaticPointersNotSupported
       -> noHints
     DriverBackpackModuleNotFound{}
+      -> noHints
+    DriverUserDefinedRuleIgnored{}
+      -> noHints
+    DriverMixedSafetyImport{}
+      -> noHints
+    DriverCannotLoadInterfaceFile{}
+      -> noHints
+    DriverInferredSafeModule{}
+      -> noHints
+    DriverInferredSafeImport{}
+      -> noHints
+    DriverCannotImportUnsafeModule{}
+      -> noHints
+    DriverMissingSafeHaskellMode{}
+      -> noHints
+    DriverPackageNotTrusted{}
+      -> noHints
+    DriverMarkedTrustworthyButInferredSafe{}
+      -> noHints
+    DriverCannotImportFromUntrustedPackage{}
       -> noHints

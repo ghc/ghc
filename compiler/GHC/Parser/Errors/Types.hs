@@ -40,6 +40,24 @@ data PsHeaderMessage
   | PsErrUnsupportedExt !String ![String]
   | PsErrParseOptionsPragma !String
 
+  {-| PsErrUnsupportedOptionsPragma is an error that occurs when an unknown
+      OPTIONS_GHC pragma is supplied is found.
+
+      Example(s):
+        {-# OPTIONS_GHC foo #-}
+
+      Test case(s):
+
+        tests/safeHaskell/flags/SafeFlags28
+        tests/safeHaskell/flags/SafeFlags19
+        tests/safeHaskell/flags/SafeFlags29
+        tests/parser/should_fail/T19923c
+        tests/parser/should_fail/T19923b
+        tests/parser/should_fail/readFail044
+        tests/driver/T2499
+  -}
+  | PsErrUnknownOptionsPragma !String
+
 
 data PsMessage
   =

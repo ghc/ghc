@@ -39,7 +39,6 @@ import GHC.Types.SourceError
 import GHC.Types.SourceText
 
 import GHC.Utils.Misc
-import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Monad
 import GHC.Utils.Error
@@ -422,9 +421,7 @@ checkProcessArgsResult flags
       liftIO $ throwErrors $ foldMap (singleMessage . mkMsg) flags
     where mkMsg (L loc flag)
               = mkPlainErrorMsgEnvelope loc $
-                GhcDriverMessage $ DriverUnknownMessage $ mkPlainError noHints $
-                  text "unknown flag in  {-# OPTIONS_GHC #-} pragma:" <+>
-                  text flag
+                GhcPsMessage $ PsHeaderMessage $ PsErrUnknownOptionsPragma flag
 
 -----------------------------------------------------------------------------
 
