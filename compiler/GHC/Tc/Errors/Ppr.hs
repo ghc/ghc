@@ -73,6 +73,9 @@ instance Diagnostic TcRnMessage where
       -> mkSimpleDecorated $
            hang (text "Illegal pattern synonym declaration for" <+> quotes (ppr rdrname))
               2 (text "Pattern synonym declarations are only valid at top level")
+    TcRnLinearPatSyn ty
+      -> mkSimpleDecorated $
+           hang (text "Pattern synonyms do not support linear fields (GHC #18806):") 2 (ppr ty)
     TcRnEmptyRecordUpdate
       -> mkSimpleDecorated $ text "Empty record update"
     TcRnIllegalFieldPunning fld
@@ -123,6 +126,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnIllegalPatSynDecl{}
       -> ErrorWithoutFlag
+    TcRnLinearPatSyn{}
+      -> ErrorWithoutFlag
     TcRnEmptyRecordUpdate
       -> ErrorWithoutFlag
     TcRnIllegalFieldPunning{}
@@ -167,6 +172,8 @@ instance Diagnostic TcRnMessage where
     TcRnSimplifierTooManyIterations{}
       -> [SuggestIncreaseSimplifierIterations]
     TcRnIllegalPatSynDecl{}
+      -> noHints
+    TcRnLinearPatSyn{}
       -> noHints
     TcRnEmptyRecordUpdate{}
       -> noHints
