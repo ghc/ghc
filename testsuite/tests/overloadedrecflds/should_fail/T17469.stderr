@@ -1,0 +1,5 @@
+[1 of 3] Compiling T17469A          ( T17469A.hs, T17469A.o )
+[2 of 3] Compiling Main             ( T17469.hs, T17469.o )
+
+T17469.hs:6:32: error:
+    Constructor ‘MkFoo’ does not have field ‘bar’
