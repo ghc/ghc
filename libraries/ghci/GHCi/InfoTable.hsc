@@ -392,7 +392,7 @@ fillExecBuffer sz cont = alloca $ \pcode -> do
 
 #else
 
-#error hi
+#error Sorry, rts versions <= 1.0 are not supported
 
 #endif
 
