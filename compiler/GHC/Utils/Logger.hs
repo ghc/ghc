@@ -577,10 +577,19 @@ putDumpFileMaybe'
     -> SDoc
     -> IO ()
 putDumpFileMaybe' logger printer flag hdr fmt doc
-  = when (logHasDumpFlag logger flag) $ do
-      let sty = mkDumpStyle printer
-      logDumpFile logger sty flag hdr fmt doc
+  = when (logHasDumpFlag logger flag) $
+    logDumpFile' logger printer flag hdr fmt doc
 {-# INLINE putDumpFileMaybe' #-}  -- see Note [INLINE conditional tracing utilities]
+
+
+logDumpFile' :: Logger -> PrintUnqualified -> DumpFlag
+             -> String -> DumpFormat -> SDoc -> IO ()
+{-# NOINLINE logDumpFile' #-}
+-- NOINLINE: Now we are past the conditional, into the "cold" path,
+--           don't inline, to reduce code size at the call site
+-- See Note [INLINE conditional tracing utilities]
+logDumpFile' logger printer flag hdr fmt doc
+  = logDumpFile logger (mkDumpStyle printer) flag hdr fmt doc
 
 -- | Ensure that a dump file is created even if it stays empty
 touchDumpFile :: Logger -> DumpFlag -> IO ()

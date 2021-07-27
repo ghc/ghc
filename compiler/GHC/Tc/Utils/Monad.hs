@@ -711,29 +711,41 @@ updTcRef ref fn = liftIO $ modifyIORef' ref fn
 ************************************************************************
 -}
 
--- Note [INLINE conditional tracing utilities]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~
--- In general we want to optimise for the case where tracing is not enabled.
--- To ensure this happens, we ensure that traceTc and friends are inlined; this
--- ensures that the allocation of the document can be pushed into the tracing
--- path, keeping the non-traced path free of this extraneous work. For
--- instance, instead of
---
---     let thunk = ...
---     in if doTracing
---          then emitTraceMsg thunk
---          else return ()
---
--- where the conditional is buried in a non-inlined utility function (e.g.
--- traceTc), we would rather have:
---
---     if doTracing
---       then let thunk = ...
---            in emitTraceMsg thunk
---       else return ()
---
--- See #18168.
---
+{- Note [INLINE conditional tracing utilities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In general we want to optimise for the case where tracing is not enabled.
+To ensure this happens, we ensure that traceTc and friends are inlined; this
+ensures that the allocation of the document can be pushed into the tracing
+path, keeping the non-traced path free of this extraneous work. For
+instance, if we don't inline traceTc, we'll get
+
+    let stuff_to_print = ...
+    in traceTc "wombat" stuff_to_print
+
+and the stuff_to_print thunk will be allocated in the "hot path", regardless
+of tracing.  But if we INLINE traceTc we get
+
+    let stuff_to_print = ...
+    in if doTracing
+         then emitTraceMsg "wombat" stuff_to_print
+         else return ()
+
+and then we float in:
+
+    if doTracing
+      then let stuff_to_print = ...
+           in emitTraceMsg "wombat" stuff_to_print
+      else return ()
+
+Now stuff_to_print is allocated only in the "cold path".
+
+Moreover, on the "cold" path, after the conditional, we want to inline
+as /little/ as possible.  Performance doesn't matter here, and we'd like
+to bloat the caller's code as little as possible.  So we put a NOINLINE
+on 'emitTraceMsg'
+
+See #18168.
+-}
 
 -- Typechecker trace
 traceTc :: String -> SDoc -> TcRn ()
