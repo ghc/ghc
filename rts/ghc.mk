@@ -61,6 +61,9 @@ rts_S_SRCS += rts/StgCRunAsm.S
 endif
 
 # select adjustor implementation. This much match the logic in rts.cabal.in.
+ifneq "$(CLEANING)" "YES"
+# N.B. we don't source config.mk when CLEANING=YES so none of the below
+# variables will be set. See #20166.
 ifeq "$(UseLibffiForAdjustors)" "YES"
 rts_C_SRCS += rts/adjustor/LibffiAdjustor.c
 else
@@ -76,6 +79,7 @@ rts_S_SRCS += rts/AdjustorAsm.S
 rts_C_SRCS += rts/adjustor/NativePowerPC.c
 else
 $(error Target architecture has no native adjustor implementation)
+endif
 endif
 endif
 endif
