@@ -792,7 +792,7 @@ solved to check whether they are trivial or not. Plus there is precedent for
 type errors during desuraging (such as the representation polymorphism
 restriction). An alternative would be to have a kind of constraint which can
 only produce trivial evidence, then this check would happen in the constraint
-solver.
+solver (#18756).
 -}
 
 tcSubMult :: CtOrigin -> Mult -> Mult -> TcM HsWrapper
