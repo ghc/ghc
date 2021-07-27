@@ -18,7 +18,6 @@ module GHC.Tc.Gen.Bind
    , tcHsBootSigs
    , tcPolyCheck
    , chooseInferredQuantifiers
-   , badBootDeclErr
    )
 where
 
@@ -224,7 +223,7 @@ tcHsBootSigs :: [(RecFlag, LHsBinds GhcRn)] -> [LSig GhcRn] -> TcM [Id]
 -- A hs-boot file has only one BindGroup, and it only has type
 -- signatures in it.  The renamer checked all this
 tcHsBootSigs binds sigs
-  = do  { checkTc (null binds) badBootDeclErr
+  = do  { checkTc (null binds) TcRnIllegalHsBootFileDecl
         ; concatMapM (addLocMA tc_boot_sig) (filter isTypeLSig sigs) }
   where
     tc_boot_sig (TypeSig _ lnames hs_ty) = mapM f lnames
@@ -234,10 +233,6 @@ tcHsBootSigs binds sigs
                ; return (mkVanillaGlobal name sigma_ty) }
         -- Notice that we make GlobalIds, not LocalIds
     tc_boot_sig s = pprPanic "tcHsBootSigs/tc_boot_sig" (ppr s)
-
-badBootDeclErr :: TcRnMessage
-badBootDeclErr = TcRnUnknownMessage $ mkPlainError noHints $
-  text "Illegal declarations in an hs-boot file"
 
 ------------------------
 tcLocalBinds :: HsLocalBinds GhcRn -> TcM thing
@@ -432,20 +427,13 @@ tc_group top_lvl sig_fn prag_fn (Recursive, binds) closed thing_inside
     tc_sub_group rec_tc binds =
       tcPolyBinds sig_fn prag_fn Recursive rec_tc closed binds
 
-recursivePatSynErr ::
-     (OutputableBndrId p, CollectPass (GhcPass p))
-  => SrcSpan -- ^ The location of the first pattern synonym binding
+recursivePatSynErr
+  :: SrcSpan -- ^ The location of the first pattern synonym binding
              --   (for error reporting)
-  -> LHsBinds (GhcPass p)
+  -> LHsBinds GhcRn
   -> TcM a
 recursivePatSynErr loc binds
-  = failAt loc $ TcRnUnknownMessage $ mkPlainError noHints $
-    hang (text "Recursive pattern synonym definition with following bindings:")
-       2 (vcat $ map pprLBind . bagToList $ binds)
-  where
-    pprLoc loc  = parens (text "defined at" <+> ppr loc)
-    pprLBind (L loc bind) = pprWithCommas ppr (collectHsBindBinders CollNoDictBinders bind)
-                                <+> pprLoc (locA loc)
+  = failAt loc $ TcRnRecursivePatternSynonym binds
 
 tc_single :: forall thing.
             TopLevelFlag -> TcSigFun -> TcPragEnv
@@ -802,7 +790,7 @@ mkExport prag_fn insoluble qtvs theta
                   else addErrCtxtM (mk_impedance_match_msg mono_info sel_poly_ty poly_ty) $
                        tcSubTypeSigma sig_ctxt sel_poly_ty poly_ty
 
-        ; localSigWarn Opt_WarnMissingLocalSignatures poly_id mb_sig
+        ; localSigWarn poly_id mb_sig
 
         ; return (ABE { abe_ext = noExtField
                       , abe_wrap = wrap
@@ -912,21 +900,13 @@ chooseInferredQuantifiers inferred_theta tau_tvs qtvs
   where
     report_dup_tyvar_tv_err (n1,n2)
       | PartialSig { psig_name = fn_name, psig_hs_ty = hs_ty } <- sig
-      = addErrTc (TcRnUnknownMessage $ mkPlainError noHints $
-        hang (text "Couldn't match" <+> quotes (ppr n1)
-                        <+> text "with" <+> quotes (ppr n2))
-                     2 (hang (text "both bound by the partial type signature:")
-                           2 (ppr fn_name <+> dcolon <+> ppr hs_ty)))
-
+      = addErrTc (TcRnPartialTypeSigTyVarMismatch n1 n2 fn_name hs_ty)
       | otherwise -- Can't happen; by now we know it's a partial sig
       = pprPanic "report_tyvar_tv_err" (ppr sig)
 
     report_mono_sig_tv_err n
       | PartialSig { psig_name = fn_name, psig_hs_ty = hs_ty } <- sig
-      = addErrTc (TcRnUnknownMessage $ mkPlainError noHints $
-        hang (text "Can't quantify over" <+> quotes (ppr n))
-                     2 (hang (text "bound by the partial type signature:")
-                           2 (ppr fn_name <+> dcolon <+> ppr hs_ty)))
+      = addErrTc (TcRnPartialTypeSigBadQuantifier n fn_name hs_ty)
       | otherwise -- Can't happen; by now we know it's a partial sig
       = pprPanic "report_mono_sig_tv_err" (ppr sig)
 
@@ -1004,23 +984,18 @@ mk_inf_msg poly_name poly_ty tidy_env
 
 
 -- | Warn the user about polymorphic local binders that lack type signatures.
-localSigWarn :: WarningFlag -> Id -> Maybe TcIdSigInst -> TcM ()
-localSigWarn flag id mb_sig
+localSigWarn :: Id -> Maybe TcIdSigInst -> TcM ()
+localSigWarn id mb_sig
   | Just _ <- mb_sig               = return ()
   | not (isSigmaTy (idType id))    = return ()
-  | otherwise                      = warnMissingSignatures flag msg id
-  where
-    msg = text "Polymorphic local binding with no type signature:"
+  | otherwise                      = warnMissingSignatures id
 
-warnMissingSignatures :: WarningFlag -> SDoc -> Id -> TcM ()
-warnMissingSignatures flag msg id
+warnMissingSignatures :: Id -> TcM ()
+warnMissingSignatures id
   = do  { env0 <- tcInitTidyEnv
         ; let (env1, tidy_ty) = tidyOpenType env0 (idType id)
-        ; let dia = TcRnUnknownMessage $
-                mkPlainDiagnostic (WarningWithFlag flag) noHints (mk_msg tidy_ty)
+        ; let dia = TcRnPolymorphicBinderMissingSig (idName id) tidy_ty
         ; addDiagnosticTcM (env1, dia) }
-  where
-    mk_msg ty = sep [ msg, nest 2 $ pprPrefixName (idName id) <+> dcolon <+> ppr ty ]
 
 checkOverloadedSig :: Bool -> TcIdSigInst -> TcM ()
 -- Example:
@@ -1034,9 +1009,7 @@ checkOverloadedSig monomorphism_restriction_applies sig
   , monomorphism_restriction_applies
   , let orig_sig = sig_inst_sig sig
   = setSrcSpan (sig_loc orig_sig) $
-    failWith $ TcRnUnknownMessage $ mkPlainError noHints $
-    hang (text "Overloaded signature conflicts with monomorphism restriction")
-       2 (ppr orig_sig)
+    failWith $ TcRnOverloadedSig orig_sig
   | otherwise
   = return ()
 

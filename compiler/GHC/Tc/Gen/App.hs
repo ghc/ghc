@@ -40,7 +40,6 @@ import GHC.Core.TyCo.Subst (substTyWithInScope)
 import GHC.Core.TyCo.FVs( shallowTyCoVarsOfType )
 import GHC.Core.Type
 import GHC.Tc.Types.Evidence
-import GHC.Types.Error
 import GHC.Types.Var.Set
 import GHC.Builtin.PrimOps( tagToEnumKey )
 import GHC.Builtin.Names
@@ -695,9 +694,7 @@ tcVTA fun_ty hs_ty
 
   | otherwise
   = do { (_, fun_ty) <- zonkTidyTcType emptyTidyEnv fun_ty
-       ; failWith $ TcRnUnknownMessage $ mkPlainError noHints $
-         text "Cannot apply expression of type" <+> quotes (ppr fun_ty) $$
-         text "to a visible type argument" <+> quotes (ppr hs_ty) }
+       ; failWith $ TcRnInvalidTypeApplication fun_ty hs_ty }
 
 {- Note [Required quantifiers in the type of a term]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1157,7 +1154,7 @@ tcTagToEnum tc_fun fun_ctxt tc_args res_ty
 
        -- Check that the type is algebraic
        ; case tcSplitTyConApp_maybe res_ty of {
-           Nothing -> do { addErrTc (mk_error res_ty doc1)
+           Nothing -> do { addErrTc (TcRnTagToEnumUnspecifiedResTy res_ty)
                          ; vanilla_result } ;
            Just (tc, tc_args) ->
 
@@ -1177,26 +1174,14 @@ tcTagToEnum tc_fun fun_ctxt tc_args res_ty
        ; return (mkHsWrap df_wrap tc_expr) }}}}}
 
   | otherwise
-  = failWithTc $ TcRnUnknownMessage $ mkPlainError noHints $
-    (text "tagToEnum# must appear applied to one value argument")
+  = failWithTc TcRnTagToEnumMissingValArg
 
   where
     vanilla_result = return (rebuildHsApps tc_fun fun_ctxt tc_args)
 
     check_enumeration ty' tc
       | isEnumerationTyCon tc = return ()
-      | otherwise             = addErrTc (mk_error ty' doc2)
-
-    doc1 = vcat [ text "Specify the type by giving a type signature"
-               , text "e.g. (tagToEnum# x) :: Bool" ]
-    doc2 = text "Result type must be an enumeration type"
-
-    mk_error :: TcType -> SDoc -> TcRnMessage
-    mk_error ty what
-      = TcRnUnknownMessage $ mkPlainError noHints $
-        hang (text "Bad call to tagToEnum#"
-               <+> text "at type" <+> ppr ty)
-           2 what
+      | otherwise             = addErrTc (TcRnTagToEnumResTyNotAnEnum ty')
 
 
 {- *********************************************************************

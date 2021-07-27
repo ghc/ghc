@@ -1,5 +1,4 @@
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE FlexibleContexts #-}
 module GHC.Tc.Errors.Types (
   -- * Main types
     TcRnMessage(..)
@@ -13,6 +12,7 @@ module GHC.Tc.Errors.Types (
 import GHC.Prelude
 
 import GHC.Hs
+import {-# SOURCE #-} GHC.Tc.Types (TcIdSigInfo)
 import GHC.Tc.Types.Constraint
 import GHC.Types.Error
 import GHC.Types.Name (Name, OccName)
@@ -165,10 +165,14 @@ data TcRnMessage where
       with a plugin, the TcRnUnsafeDueToPlugin warning (controlled by -Wunsafe) is used as the
       reason the module was inferred to be unsafe. This warning is not raised if the
       -fplugin-trustworthy flag is passed.
+
+     Test cases: plugins/T19926
   -}
   TcRnUnsafeDueToPlugin :: TcRnMessage
   {-| TcRnModMissingRealSrcSpan is an error that occurrs when compiling a module that lacks
       an associated 'RealSrcSpan'.
+
+     Test cases: None
   -}
   TcRnModMissingRealSrcSpan :: Module -> TcRnMessage
 
@@ -320,6 +324,171 @@ data TcRnMessage where
      Test cases: None
   -}
   TcRnIllegalWildcardsInConstructor :: !Name -> TcRnMessage
+
+  {-| TcRnIgnoringAnnotations is a warning that occurs when the source code
+      contains annotation pragmas but the platform in use does not support an
+      external interpreter such as GHCi and therefore the annotations are ignored.
+
+      Example(s): None
+
+     Test cases: None
+  -}
+  TcRnIgnoringAnnotations :: [LAnnDecl GhcRn] -> TcRnMessage
+
+  {-| TcRnAnnotationInSafeHaskell is an error that occurs if annotation pragmas
+      are used in conjunction with Safe Haskell.
+
+      Example(s): None
+
+     Test cases: annotations/should_fail/T10826
+  -}
+  TcRnAnnotationInSafeHaskell :: TcRnMessage
+
+  {-| TcRnInvalidTypeApplication is an error that occurs when a visible type application
+      is used with an expression that does not accept "specified" type arguments.
+
+      Example(s):
+      foo :: forall {a}. a -> a
+      foo x = x
+      bar :: ()
+      bar = let x = foo @Int 42
+            in ()
+
+     Test cases: overloadedrecflds/should_fail/overloadedlabelsfail03
+                 typecheck/should_fail/ExplicitSpecificity1
+                 typecheck/should_fail/ExplicitSpecificity10
+                 typecheck/should_fail/ExplicitSpecificity2
+                 typecheck/should_fail/T17173
+                 typecheck/should_fail/VtaFail
+  -}
+  TcRnInvalidTypeApplication :: Type -> LHsWcType GhcRn -> TcRnMessage
+
+  {-| TcRnTagToEnumMissingValArg is an error that occurs when the 'tagToEnum#'
+      function is not applied to a single value argument.
+
+      Example(s):
+      tagToEnum# 1 2
+
+     Test cases: None
+  -}
+  TcRnTagToEnumMissingValArg :: TcRnMessage
+
+  {-| TcRnTagToEnumUnspecifiedResTy is an error that occurs when the 'tagToEnum#'
+      function is not given a concrete result type.
+
+      Example(s):
+      foo :: forall a. a
+      foo = tagToEnum# 0#
+
+     Test cases: typecheck/should_fail/tcfail164
+  -}
+  TcRnTagToEnumUnspecifiedResTy :: Type -> TcRnMessage
+
+  {-| TcRnTagToEnumResTyNotAnEnum is an error that occurs when the 'tagToEnum#'
+      function is given a result type that is not an enumeration type.
+
+      Example(s):
+      foo :: Int -- not an enumeration TyCon
+      foo = tagToEnum# 0#
+
+     Test cases: typecheck/should_fail/tcfail164
+  -}
+  TcRnTagToEnumResTyNotAnEnum :: Type -> TcRnMessage
+
+  {-| TcRnArrowIfThenElsePredDependsOnResultTy is an error that occurs when the
+      predicate type of an ifThenElse expression in arrow notation depends on
+      the type of the result.
+
+      Example(s): None
+
+     Test cases: None
+  -}
+  TcRnArrowIfThenElsePredDependsOnResultTy :: TcRnMessage
+
+  {-| TcRnArrowCommandExpected is an error that occurs if a non-arrow command
+      is used where an arrow command is expected.
+
+      Example(s): None
+
+     Test cases: None
+  -}
+  TcRnArrowCommandExpected :: HsCmd GhcRn -> TcRnMessage
+
+  {-| TcRnIllegalHsBootFileDecl is an error that occurs when an hs-boot file
+      contains declarations that are not allowed, such as bindings.
+
+      Example(s): None
+
+     Test cases: None
+  -}
+  TcRnIllegalHsBootFileDecl :: TcRnMessage
+
+  {-| TcRnRecursivePatternSynonym is an error that occurs when a pattern synonym
+      is defined in terms of itself, either directly or indirectly.
+
+      Example(s):
+      pattern A = B
+      pattern B = A
+
+     Test cases: patsyn/should_fail/T16900
+  -}
+  TcRnRecursivePatternSynonym :: LHsBinds GhcRn -> TcRnMessage
+
+  {-| TcRnPartialTypeSigTyVarMismatch is an error that occurs when a partial type signature
+      attempts to unify two different types.
+
+      Example(s):
+      f :: a -> b -> _
+      f x y = [x, y]
+
+     Test cases: partial-sigs/should_fail/T14449
+  -}
+  TcRnPartialTypeSigTyVarMismatch
+    :: Name -- ^ first type variable
+    -> Name -- ^ second type variable
+    -> Name -- ^ function name
+    -> LHsSigWcType GhcRn -> TcRnMessage
+
+  {-| TcRnPartialTypeSigBadQuantifier is an error that occurs when a type variable
+      being quantified over in the partial type signature of a function gets unified
+      with a type that is free in that function's context.
+
+      Example(s):
+      foo :: Num a => a -> a
+      foo xxx = g xxx
+        where
+          g :: forall b. Num b => _ -> b
+          g y = xxx + y
+
+     Test cases: partial-sig/should_fail/T14479
+  -}
+  TcRnPartialTypeSigBadQuantifier
+    :: Name -- ^ type variable being quantified
+    -> Name -- ^ function name
+    -> LHsSigWcType GhcRn -> TcRnMessage
+
+  {-| TcRnPolymorphicBinderMissingSig is a warning controlled by -Wmissing-local-signatures
+      that occurs when a local polymorphic binding lacks a type signature.
+
+      Example(s):
+      id a = a
+
+     Test cases: warnings/should_compile/T12574
+  -}
+  TcRnPolymorphicBinderMissingSig :: Name -> Type -> TcRnMessage
+
+  {-| TcRnOverloadedSig is an error that occurs when a binding group conflicts
+      with the monomorphism restriction.
+
+      Example(s):
+      data T a = T a
+      mono = ... where
+        x :: Applicative f => f a
+        T x = ...
+
+     Test cases: typecheck/should_compile/T11339
+  -}
+  TcRnOverloadedSig :: TcIdSigInfo -> TcRnMessage
 
 -- | Which parts of a record field are affected by a particular error or warning.
 data RecordFieldPart

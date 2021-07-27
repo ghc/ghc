@@ -184,7 +184,7 @@ tc_cmd env (HsCmdIf x fun@(SyntaxExprRn {}) pred b1 b2) res_ty -- Rebindable syn
         ; (_, [r_tv]) <- tcInstSkolTyVars [alphaTyVar]
         ; let r_ty = mkTyVarTy r_tv
         ; checkTc (not (r_tv `elemVarSet` tyCoVarsOfType pred_ty))
-                  (TcRnUnknownMessage $ mkPlainError noHints $ text "Predicate type of `ifThenElse' depends on result type")
+                  TcRnArrowIfThenElsePredDependsOnResultTy
         ; (pred', fun') <- tcSyntaxOp IfThenElseOrigin fun
                               (map synKnownType [pred_ty, r_ty, r_ty])
                               (mkCheckExpType r_ty) $ \ _ _ ->
@@ -338,9 +338,7 @@ tc_cmd env cmd@(HsCmdArrForm x expr f fixity cmd_args) (cmd_stk, res_ty)
 -- This is where expressions that aren't commands get rejected
 
 tc_cmd _ cmd _
-  = failWithTc (TcRnUnknownMessage $ mkPlainError noHints $
-       vcat [text "The expression", nest 2 (ppr cmd),
-             text "was found where an arrow command was expected"])
+  = failWithTc (TcRnArrowCommandExpected cmd)
 
 -- | Typechecking for case command alternatives. Used for both
 -- 'HsCmdCase' and 'HsCmdLamCase'.

@@ -11,9 +11,12 @@ import GHC.Prelude
 
 import GHC.Core.TyCo.Ppr (pprWithTYPE)
 import GHC.Core.Type
+import GHC.Data.Bag
 import GHC.Tc.Errors.Types
 import GHC.Types.Error
+import GHC.Types.Name (pprPrefixName)
 import GHC.Types.Name.Reader (pprNameProvenance)
+import GHC.Types.SrcLoc (GenLocated(..))
 import GHC.Types.Var.Env (emptyTidyEnv)
 import GHC.Driver.Flags
 import GHC.Hs
@@ -95,6 +98,68 @@ instance Diagnostic TcRnMessage where
       -> mkSimpleDecorated $
            vcat [ text "Illegal `..' notation for constructor" <+> quotes (ppr con)
                 , nest 2 (text "The constructor has no labelled fields") ]
+    TcRnIgnoringAnnotations anns
+      -> mkSimpleDecorated $
+           text "Ignoring ANN annotation" <> plural anns <> comma
+           <+> text "because this is a stage-1 compiler without -fexternal-interpreter or doesn't support GHCi"
+    TcRnAnnotationInSafeHaskell
+      -> mkSimpleDecorated $
+           vcat [ text "Annotations are not compatible with Safe Haskell."
+                , text "See https://gitlab.haskell.org/ghc/ghc/issues/10826" ]
+    TcRnInvalidTypeApplication fun_ty hs_ty
+      -> mkSimpleDecorated $
+           text "Cannot apply expression of type" <+> quotes (ppr fun_ty) $$
+           text "to a visible type argument" <+> quotes (ppr hs_ty)
+    TcRnTagToEnumMissingValArg
+      -> mkSimpleDecorated $
+           text "tagToEnum# must appear applied to one value argument"
+    TcRnTagToEnumUnspecifiedResTy ty
+      -> mkSimpleDecorated $
+           hang (text "Bad call to tagToEnum# at type" <+> ppr ty)
+              2 (vcat [ text "Specify the type by giving a type signature"
+                      , text "e.g. (tagToEnum# x) :: Bool" ])
+    TcRnTagToEnumResTyNotAnEnum ty
+      -> mkSimpleDecorated $
+           hang (text "Bad call to tagToEnum# at type" <+> ppr ty)
+              2 (text "Result type must be an enumeration type")
+    TcRnArrowIfThenElsePredDependsOnResultTy
+      -> mkSimpleDecorated $
+           text "Predicate type of `ifThenElse' depends on result type"
+    TcRnArrowCommandExpected cmd
+      -> mkSimpleDecorated $
+           vcat [text "The expression", nest 2 (ppr cmd),
+                 text "was found where an arrow command was expected"]
+    TcRnIllegalHsBootFileDecl
+      -> mkSimpleDecorated $
+           text "Illegal declarations in an hs-boot file"
+    TcRnRecursivePatternSynonym binds
+      -> mkSimpleDecorated $
+            hang (text "Recursive pattern synonym definition with following bindings:")
+               2 (vcat $ map pprLBind . bagToList $ binds)
+          where
+            pprLoc loc = parens (text "defined at" <+> ppr loc)
+            pprLBind :: GenLocated (SrcSpanAnn' a) (HsBindLR GhcRn idR) -> SDoc
+            pprLBind (L loc bind) = pprWithCommas ppr (collectHsBindBinders CollNoDictBinders bind)
+                                        <+> pprLoc (locA loc)
+    TcRnPartialTypeSigTyVarMismatch n1 n2 fn_name hs_ty
+      -> mkSimpleDecorated $
+           hang (text "Couldn't match" <+> quotes (ppr n1)
+                   <+> text "with" <+> quotes (ppr n2))
+                2 (hang (text "both bound by the partial type signature:")
+                        2 (ppr fn_name <+> dcolon <+> ppr hs_ty))
+    TcRnPartialTypeSigBadQuantifier n fn_name hs_ty
+      -> mkSimpleDecorated $
+           hang (text "Can't quantify over" <+> quotes (ppr n))
+                2 (hang (text "bound by the partial type signature:")
+                        2 (ppr fn_name <+> dcolon <+> ppr hs_ty))
+    TcRnPolymorphicBinderMissingSig n ty
+      -> mkSimpleDecorated $
+           sep [ text "Polymorphic local binding with no type signature:"
+               , nest 2 $ pprPrefixName n <+> dcolon <+> ppr ty ]
+    TcRnOverloadedSig sig
+      -> mkSimpleDecorated $
+           hang (text "Overloaded signature conflicts with monomorphism restriction")
+              2 (ppr sig)
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -142,6 +207,34 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnIllegalWildcardsInConstructor{}
       -> ErrorWithoutFlag
+    TcRnIgnoringAnnotations{}
+      -> WarningWithoutFlag
+    TcRnAnnotationInSafeHaskell
+      -> ErrorWithoutFlag
+    TcRnInvalidTypeApplication{}
+      -> ErrorWithoutFlag
+    TcRnTagToEnumMissingValArg
+      -> ErrorWithoutFlag
+    TcRnTagToEnumUnspecifiedResTy{}
+      -> ErrorWithoutFlag
+    TcRnTagToEnumResTyNotAnEnum{}
+      -> ErrorWithoutFlag
+    TcRnArrowIfThenElsePredDependsOnResultTy
+      -> ErrorWithoutFlag
+    TcRnArrowCommandExpected{}
+      -> ErrorWithoutFlag
+    TcRnIllegalHsBootFileDecl
+      -> ErrorWithoutFlag
+    TcRnRecursivePatternSynonym{}
+      -> ErrorWithoutFlag
+    TcRnPartialTypeSigTyVarMismatch{}
+      -> ErrorWithoutFlag
+    TcRnPartialTypeSigBadQuantifier{}
+      -> ErrorWithoutFlag
+    TcRnPolymorphicBinderMissingSig{}
+      -> WarningWithFlag Opt_WarnMissingLocalSignatures
+    TcRnOverloadedSig{}
+      -> ErrorWithoutFlag
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -188,6 +281,34 @@ instance Diagnostic TcRnMessage where
     TcRnCharLiteralOutOfRange{}
       -> noHints
     TcRnIllegalWildcardsInConstructor{}
+      -> noHints
+    TcRnIgnoringAnnotations{}
+      -> noHints
+    TcRnAnnotationInSafeHaskell
+      -> noHints
+    TcRnInvalidTypeApplication{}
+      -> noHints
+    TcRnTagToEnumMissingValArg
+      -> noHints
+    TcRnTagToEnumUnspecifiedResTy{}
+      -> noHints
+    TcRnTagToEnumResTyNotAnEnum{}
+      -> noHints
+    TcRnArrowIfThenElsePredDependsOnResultTy
+      -> noHints
+    TcRnArrowCommandExpected{}
+      -> noHints
+    TcRnIllegalHsBootFileDecl
+      -> noHints
+    TcRnRecursivePatternSynonym{}
+      -> noHints
+    TcRnPartialTypeSigTyVarMismatch{}
+      -> noHints
+    TcRnPartialTypeSigBadQuantifier{}
+      -> noHints
+    TcRnPolymorphicBinderMissingSig{}
+      -> noHints
+    TcRnOverloadedSig{}
       -> noHints
 
 messageWithInfoDiagnosticMessage :: UnitState

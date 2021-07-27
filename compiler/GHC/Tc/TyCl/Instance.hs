@@ -553,7 +553,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty, cid_binds = binds
          -- In hs-boot files there should be no bindings
         ; let no_binds = isEmptyLHsBinds binds && null uprags
         ; is_boot <- tcIsHsBootOrSig
-        ; failIfTc (is_boot && not no_binds) badBootDeclErr
+        ; failIfTc (is_boot && not no_binds) TcRnIllegalHsBootFileDecl
 
         ; return ( [inst_info], all_insts, deriv_infos ) }
   where
