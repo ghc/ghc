@@ -52,7 +52,6 @@ import GHC.Tc.Utils.Env
 import GHC.Tc.Gen.Arrow
 import GHC.Tc.Gen.Match
 import GHC.Tc.Gen.HsType
-import GHC.Tc.Gen.Pat
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType as TcType
@@ -1399,7 +1398,7 @@ tcRecordField con_like flds_w_tys (L loc (FieldOcc sel_name lbl)) rhs
                 --          (so the desugarer knows the type of local binder to make)
            ; return (Just (L loc (FieldOcc field_id lbl), rhs')) }
       | otherwise
-      = do { addErrTc (badFieldCon con_like field_lbl)
+      = do { addErrTc (badFieldConErr (getName con_like) field_lbl)
            ; return Nothing }
   where
         field_lbl = occNameFS $ rdrNameOcc (unLoc lbl)

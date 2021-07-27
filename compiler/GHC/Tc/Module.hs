@@ -452,7 +452,7 @@ tcRnSrcDecls :: Bool  -- False => no 'module M(..) where' header at all
              -> TcM TcGblEnv
 tcRnSrcDecls explicit_mod_hdr export_ies decls
  = do { -- Do all the declarations
-      ; (tcg_env, tcl_env, lie) <- tc_rn_src_decls decls
+      ; (tcg_env, tcl_env, lie) <- checkNoErrs $ tc_rn_src_decls decls
 
       ------ Simplify constraints ---------
       --

@@ -18,7 +18,7 @@ module GHC.Rename.Utils (
         warnForallIdentifier,
         checkUnusedRecordWildcard,
         mkFieldEnv,
-        badQualBndrErr, typeAppErr,
+        badQualBndrErr, typeAppErr, badFieldConErr,
         wrapGenSpan, genHsVar, genLHsVar, genHsApp, genHsApps, genAppType,
         genHsIntegralLit, genHsTyLit,
         HsDocContext(..), pprHsDocContext,
@@ -93,15 +93,14 @@ newLocalBndrsRn :: [LocatedN RdrName] -> RnM [Name]
 newLocalBndrsRn = mapM newLocalBndrRn
 
 bindLocalNames :: [Name] -> RnM a -> RnM a
-bindLocalNames names enclosed_scope
-  = do { lcl_env <- getLclEnv
-       ; let th_level  = thLevel (tcl_th_ctxt lcl_env)
-             th_bndrs' = extendNameEnvList (tcl_th_bndrs lcl_env)
+bindLocalNames names
+  = updLclEnv $ \ lcl_env ->
+    let th_level  = thLevel (tcl_th_ctxt lcl_env)
+        th_bndrs' = extendNameEnvList (tcl_th_bndrs lcl_env)
                            [ (n, (NotTopLevel, th_level)) | n <- names ]
-             rdr_env'  = extendLocalRdrEnvList (tcl_rdr lcl_env) names
-       ; setLclEnv (lcl_env { tcl_th_bndrs = th_bndrs'
-                            , tcl_rdr      = rdr_env' })
-                    enclosed_scope }
+        rdr_env'  = extendLocalRdrEnvList (tcl_rdr lcl_env) names
+    in lcl_env { tcl_th_bndrs = th_bndrs'
+               , tcl_rdr      = rdr_env' }
 
 bindLocalNamesFV :: [Name] -> RnM (a, FreeVars) -> RnM (a, FreeVars)
 bindLocalNamesFV names enclosed_scope
@@ -616,6 +615,12 @@ typeAppErr what (L _ k)
     hang (text "Illegal visible" <+> text what <+> text "application"
             <+> quotes (char '@' <> ppr k))
        2 (text "Perhaps you intended to use TypeApplications")
+
+badFieldConErr :: Name -> FieldLabelString -> TcRnMessage
+badFieldConErr con field
+  = TcRnUnknownMessage $ mkPlainError noHints $
+    hsep [text "Constructor" <+> quotes (ppr con),
+          text "does not have field", quotes (ppr field)]
 
 -- | Ensure that a boxed or unboxed tuple has arity no larger than
 -- 'mAX_TUPLE_SIZE'.
