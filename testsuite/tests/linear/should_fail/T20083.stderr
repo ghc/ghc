@@ -1,0 +1,18 @@
+
+T20083.hs:6:6: error:
+    • Couldn't match type ‘m’ with ‘'Many’
+        arising from multiplicity of ‘x’
+      ‘m’ is a rigid type variable bound by
+        the type signature for:
+          ap :: forall a b (m :: GHC.Types.Multiplicity).
+                (a -> b) -> a %m -> b
+        at T20083.hs:5:1-27
+    • In an equation for ‘ap’: ap f x = f x
+    • Relevant bindings include
+        ap :: (a -> b) -> a %m -> b (bound at T20083.hs:6:1)
+
+T20083.hs:9:5: error:
+    • Couldn't match type ‘'Many’ with ‘'One’
+        arising from a non-linear pattern
+    • In the pattern: _
+      In an equation for ‘ap2’: ap2 _ = ()

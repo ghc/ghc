@@ -88,7 +88,7 @@ instance Diagnostic DsMessage where
       -> mkSimpleDecorated $
           text "Ignoring useless SPECIALISE pragma for NOINLINE function:" <+> quotes (ppr poly_id)
     DsMultiplicityCoercionsNotSupported
-      -> mkSimpleDecorated $ text "Multiplicity coercions are currently not supported (see GHC #19517)"
+      -> mkSimpleDecorated $ text "GHC bug #19517: GHC currently does not support programs using GADTs or type families to witness equality of multiplicities"
     DsOrphanRule rule
       -> mkSimpleDecorated $ text "Orphan rule:" <+> ppr rule
     DsRuleLhsTooComplicated orig_lhs lhs2

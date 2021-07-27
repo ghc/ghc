@@ -926,10 +926,18 @@ suppressGroup mk_err ctxt cts
       ; traceTc "Suppressing errors for" (ppr cts)
       ; mapM_ (addDeferredBinding ctxt err) cts }
 
+-- See Note [No deferring for multiplicity errors]
+nonDeferrableOrigin :: CtOrigin -> Bool
+nonDeferrableOrigin NonLinearPatternOrigin = True
+nonDeferrableOrigin (UsageEnvironmentOf _) = True
+nonDeferrableOrigin _                      = False
+
 maybeReportError :: ReportErrCtxt -> Ct -> Report -> TcM ()
 maybeReportError ctxt ct report
   = unless (cec_suppress ctxt) $ -- Some worse error has occurred, so suppress this diagnostic
-    do let reason = cec_defer_type_errors ctxt
+    do let reason | nonDeferrableOrigin (ctOrigin ct) = ErrorWithoutFlag
+                  | otherwise                         = cec_defer_type_errors ctxt
+                  -- See Note [No deferring for multiplicity errors]
        msg <- mkErrorReport reason ctxt (ctLocEnv (ctLoc ct)) report
        reportDiagnostic msg
 
@@ -1086,6 +1094,27 @@ location in mkGroupReporter, when -fdefer-type-errors is on.  But that
 is perhaps a bit *over*-consistent!
 
 With #10283, you can now opt out of deferred type error warnings.
+
+Note [No deferring for multiplicity errors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+As explained in Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify,
+linear types do not support casts and any nontrivial coercion will raise
+an error during desugaring.
+
+This means that even if we defer a multiplicity mismatch during typechecking,
+the desugarer will refuse to compile anyway. Worse: the error raised
+by the desugarer would shadow the type mismatch warnings (#20083).
+As a solution, we refuse to defer submultiplicity constraints. Test: T20083.
+
+To determine whether a constraint arose from a submultiplicity check, we
+look at the CtOrigin. All calls to tcSubMult use one of two origins,
+UsageEnvironmentOf and NonLinearPatternOrigin. Those origins are not
+used outside of linear types.
+
+In the future, we should compile 'WpMultCoercion' to a runtime error with
+-fdefer-type-errors, but the current implementation does not always
+place the wrapper in the right place and the resulting program can fail Lint.
+This plan is tracked in #20083.
 
 Note [Deferred errors for coercion holes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

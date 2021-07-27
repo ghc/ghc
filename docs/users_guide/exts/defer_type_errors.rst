@@ -125,3 +125,8 @@ In a few cases, equality constraints cannot be deferred.  Specifically:
 - Kind errors in a ``default`` declaration.  e.g. ::
 
     default( Double, Int Int )
+
+- Errors involving linear types (c.f. :ghc-ticket:`20083`). e.g. ::
+
+    f :: a %1 -> a
+    f _  = ()
