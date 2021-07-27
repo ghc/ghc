@@ -231,6 +231,15 @@ data TcRnMessage where
   -}
   TcRnIllegalPatSynDecl :: !(LIdP GhcPs) -> TcRnMessage
 
+  {-| TcRnLinearPatSyn is an error that occurs whenever a pattern
+      synonym signature uses a field that is not unrestricted.
+
+      Example(s): None
+
+     Test cases: linear/should_fail/LinearPatSyn2
+  -}
+  TcRnLinearPatSyn :: !Type -> TcRnMessage
+
   {-| TcRnEmptyRecordUpdate is an error that occurs whenever
       a record is updated without specifying any field.
 

@@ -1,5 +1,5 @@
 
-LinearPatSyn.hs:14:4: error:
+LinearPatSyn.hs:13:4: error:
     • Couldn't match type ‘'Many’ with ‘'One’
         arising from a non-linear pattern
     • In the pattern: P y x

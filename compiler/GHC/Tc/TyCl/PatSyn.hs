@@ -23,7 +23,7 @@ import GHC.Prelude
 import GHC.Hs
 import GHC.Tc.Gen.Pat
 import GHC.Core.Multiplicity
-import GHC.Core.Type ( tidyTyCoVarBinders, tidyTypes, tidyType )
+import GHC.Core.Type ( tidyTyCoVarBinders, tidyTypes, tidyType, isManyDataConTy )
 import GHC.Core.TyCo.Subst( extendTvSubstWithClone )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
@@ -389,6 +389,10 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
              univ_tvs   = binderVars univ_bndrs
              ex_tvs     = binderVars ex_bndrs
 
+         -- Pattern synonyms currently cannot be linear (#18806)
+       ; checkTc (all (isManyDataConTy . scaledMult) arg_tys) $
+           TcRnLinearPatSyn sig_body_ty
+
          -- Skolemise the quantified type variables. This is necessary
          -- in order to check the actual pattern type against the
          -- expected type. Even though the tyvars in the type are
@@ -513,8 +517,8 @@ Hence a special-purpose skolemiseTvBndrX here, similar to
 GHC.Tc.Utils.Instantiate.tcInstSkolTyVarsX except that the latter
 does cloning.
 
-[Pattern synonyms and higher rank types]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Pattern synonyms and higher rank types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
   data T = MkT (forall a. a->a)
 
