@@ -13,6 +13,8 @@ module GHC.Stg.InferTags ( inferTags ) where
 import GHC.Prelude
 
 import GHC.Core.DataCon
+import GHC.Core.TyCon
+import GHC.Core.Type
 import GHC.Types.Id
 import GHC.Stg.Syntax
 import GHC.Types.Basic ( Arity, TopLevelFlag(..), RecFlag(..) )
@@ -148,6 +150,11 @@ seemed more efficient.
 *                                                                      *
 ********************************************************************* -}
 
+type OutputableInferPass p = (Outputable (TagEnv p)
+                              , Outputable (GenStgExpr p)
+                              , Outputable (BinderP p)
+                              , Outputable (GenStgRhs p))
+
 inferTags :: [GenStgTopBinding 'Vanilla] -> [GenStgTopBinding 'InferTaggedBinders]
 inferTags binds =
   -- pprTrace "Binds" (pprGenStgTopBindings shortStgPprOpts $ binds) $
@@ -165,7 +172,7 @@ inferTagTopBind env (StgTopLifted bind)
 
 
 -----------------------
-inferTagExpr :: Outputable (TagEnv p)
+inferTagExpr :: OutputableInferPass p
   => TagEnv p -> GenStgExpr p -> (TagInfo, GenStgExpr 'InferTaggedBinders)
 inferTagExpr env (StgApp _ext fun args)
   = (info, StgApp noEnterInfo fun args)
@@ -174,7 +181,8 @@ inferTagExpr env (StgApp _ext fun args)
          , arity == length args  -- Saturated
          = res_info
          | otherwise
-         = TagDunno
+         = --pprTrace "inferAppUnknown" (ppr fun) $
+           TagDunno
 
 inferTagExpr env (StgConApp con cn args tys)
   = (info, StgConApp con cn args tys)
@@ -214,27 +222,47 @@ inferTagExpr env (StgLetNoEscape ext bind body)
 inferTagExpr env (StgCase scrut bndr ty alts)
   | [(DataAlt con, bndrs, rhs)] <- alts
   , isUnboxedTupleDataCon con
-  , TagTuple infos <- scrut_info
+  , Just infos <- scrut_infos bndrs
+  -- , pprTrace "scrut info:" (ppr infos $$ ppr scrut $$ ppr bndrs) True
   , let bndrs' = zipWithEqual "inferTagExpr" mk_bndr bndrs infos
-        mk_bndr bndr info = (getBinderId env bndr, TagSig 0 info)
+        mk_bndr bndr info =
+            --  pprTrace "mk_ubx_bndr_info" ( ppr bndr <+> ppr info ) $
+            (getBinderId env bndr, TagSig 0 info)
+        -- no case binder in alt_env here, unboxed tuple binders are dead after unarise
         alt_env = extendSigEnv env bndrs'
         (info, rhs') = inferTagExpr alt_env rhs
-  = (info, StgCase scrut' (noSig env bndr) ty [(DataAlt con, bndrs', rhs')])
+  = -- pprTrace "inferCase1" (ppr scrut $$ ppr bndr $$ ppr infos $$ ppr bndrs') $
+    (info, StgCase scrut' (noSig env bndr) ty [(DataAlt con, bndrs', rhs')])
+
   | null alts -- Empty case, but I might just be paranoid.
-  = (TagDunno, StgCase scrut' bndr' ty [])
+  = -- pprTrace "inferCase2" empty $
+    (TagDunno, StgCase scrut' bndr' ty [])
+  -- More than one alternative OR non-tuple single alternative.
   | otherwise
-  = ( foldr combineAltInfo TagProper infos
+  = -- pprTrace "inferCase3" empty $
+    let
+        alt_env = extendSigEnv env [bndr']
+        (infos, alts')
+          = unzip [ (info, (con, bndrs', rhs'))
+                  | (con, bndrs, rhs) <- alts
+                  , let (info, rhs') = inferTagExpr alt_env rhs
+                        bndrs' = addAltBndrInfo env con bndrs ]
+        alt_info = foldr combineAltInfo TagTagged infos
+    in -- pprTrace "combine alts:" (ppr alt_info $$ ppr infos)
+    ( foldr combineAltInfo TagTagged infos
     , StgCase scrut' bndr' ty alts')
   where
+    -- Single unboxed tuple alternative
+    scrut_infos bndrs = case scrut_info of
+      TagTagged -> Just $ replicate (length bndrs) TagProper
+      TagTuple infos -> Just infos
+      _ -> Nothing
     (scrut_info, scrut') = inferTagExpr env scrut
     bndr' = (getBinderId env bndr, TagSig 0 TagProper)
-    alt_env = extendSigEnv env [bndr']
-    (infos, alts')
-       = unzip [ (info, (con, bndrs', rhs'))
-               | (con, bndrs, rhs) <- alts
-               , let (info, rhs') = inferTagExpr alt_env rhs
-                     bndrs' = addAltBndrInfo env con bndrs ]
 
+
+
+-- Not used if we have tuple info about the scrutinee
 addAltBndrInfo :: TagEnv p -> AltCon -> [BinderP p] -> [BinderP 'InferTaggedBinders]
 addAltBndrInfo env (DataAlt con) bndrs
   = zipWithEqual "inferTagAlt" mk_bndr bndrs marks
@@ -249,14 +277,14 @@ addAltBndrInfo env (DataAlt con) bndrs
 addAltBndrInfo env _ bndrs = map (noSig env) bndrs
 
 -----------------------------
-inferTagBind :: Outputable (TagEnv p)
+inferTagBind :: OutputableInferPass p
   => TopLevelFlag -> TagEnv p -> GenStgBinding p -> (TagEnv p, GenStgBinding 'InferTaggedBinders)
 inferTagBind top env (StgNonRec bndr rhs)
   = (env', StgNonRec (id, sig) rhs')
   where
     id   = getBinderId env bndr
     env' = extendSigEnv env [(id, sig)]
-    (sig,rhs') = inferTagRhs top [] env rhs
+    (sig,rhs') = inferTagRhs top [id] env rhs
 
 inferTagBind top env (StgRec pairs)
   = (env { te_env = sig_env }, StgRec pairs')
@@ -266,7 +294,7 @@ inferTagBind top env (StgRec pairs)
     init_sigs         = map initSig rhss
     (sig_env, pairs') = go env init_sigs rhss
 
-    go :: forall q. TagEnv q -> [TagSig] -> [GenStgRhs q]
+    go :: forall q. OutputableInferPass q => TagEnv q -> [TagSig] -> [GenStgRhs q]
                  -> (TagSigEnv, [((Id,TagSig), GenStgRhs 'InferTaggedBinders)])
     go env sigs rhss
       --  | pprTrace "go" (ppr ids $$ ppr sigs $$ ppr sigs') False
@@ -281,11 +309,11 @@ inferTagBind top env (StgRec pairs)
 
 initSig :: GenStgRhs p -> TagSig
 -- Initial signature for the fixpoint loop
-initSig StgRhsCon {}                = TagSig 0              TagProper
-initSig (StgRhsClosure _ _ _ bndrs _) = TagSig (length bndrs) TagProper
+initSig (StgRhsCon {})                = TagSig 0              TagProper
+initSig (StgRhsClosure _ _ _ bndrs _) = TagSig (length bndrs) TagTagged
 
 -----------------------------
-inferTagRhs :: Outputable (TagEnv p)
+inferTagRhs :: OutputableInferPass p
   => TopLevelFlag -- ^
   -> [Id] -- ^ List of ids in the recursive group, or [] otherwise
   -> TagEnv p -- ^
@@ -307,29 +335,27 @@ inferTagRhs _top _grp_ids env (StgRhsClosure ext cc upd bndrs body)
       | otherwise  = info
     bndrs' = map (noSig env) bndrs
 
-inferTagRhs top grp_ids env (StgRhsCon cc con cn ticks args)
+inferTagRhs _top _grp_ids env rhs@(StgRhsCon cc con cn ticks args)
 -- Top level constructors, which have untagged arguments to strict fields
 -- become thunks. Same goes for rhs which are part of a recursive group.
 -- We encode this by giving changing RhsCon nodes the info TagDunno
   = --pprTrace "inferTagRhsCon" (ppr grp_ids) $
     let
         strictArgs = zipEqual "inferTagRhs" args (dataConRuntimeRepStrictness con)
+        -- argInfo = [(lookupInfo env (StgVarArg v)) | StgVarArg v <- args ]
         strictUntaggedIds = [v | (StgVarArg v, MarkedStrict) <- strictArgs
-                            , lookupInfo env (StgVarArg v) /= TagProper] :: [Id]
+                            , not (isTaggedInfo (lookupInfo env (StgVarArg v))) ] :: [Id]
 
-        mkResult x = (TagSig 0 x, StgRhsCon cc con cn ticks args)
+        mkResult x =
+          -- pprTrace "inferTagRhsCon"
+          --   ( ppr _grp_ids <+> ppr x <+> ppr rhs $$
+          --     ppr strictArgs $$
+          --     ppr strictUntaggedIds $$
+          --     ppr argInfo $$
+          --     text "con:" <> ppr con
+          --     ) $
+            (TagSig 0 x, StgRhsCon cc con cn ticks args)
     in case () of
           -- All fields tagged or non-strict
         _ | null strictUntaggedIds -> mkResult TagProper
-          -- -- Non-recursive local let
-          -- | null grp_ids
-          -- , NotTopLevel <- top
-          -- -> mkResult TagProper
-          -- Recursive local let, no bindings from grp in args
-          -- | NotTopLevel <- top
-          -- , mkVarSet grp_ids `disjointVarSet` mkVarSet strictUntaggedIds
-          -- -> mkResult TagProper
-          -- Otherwise we have a top level let with untagged args,
-          -- or a recursive group where a bindings of the group is
-          -- passed into a strict field
           | otherwise -> mkResult TagDunno

@@ -158,6 +158,7 @@ isTagged v = do
                         case info of
                             TagDunno -> False
                             TagProper -> True
+                            TagTagged -> True
                             TagTuple _ -> True -- Consider unboxed tuples tagged
         False -- Imported
             | Just con <- (isDataConWorkId_maybe v)
@@ -214,26 +215,27 @@ rewriteTop (StgTopStringLit v s) = return $! (StgTopStringLit v s)
 rewriteTop (StgTopLifted bind)   = do
     -- Top level bindings can, and must remain in scope
     addBind bind
-    (StgTopLifted . fst) <$!> (rewriteBinds bind)
+    (StgTopLifted) <$!> (rewriteBinds bind)
 
 -- For top level binds, the wrapper is guaranteed to be `id`
-rewriteBinds :: InferStgBinding -> RM (TgStgBinding, TgStgExpr -> TgStgExpr)
+rewriteBinds :: InferStgBinding -> RM (TgStgBinding)
 rewriteBinds (StgNonRec v rhs) = do
-        (!rhs, wrapper) <-  rewriteRhs v rhs
-        return $! (StgNonRec (fst v) rhs, wrapper)
+        (!rhs) <-  rewriteRhs v rhs
+        return $! (StgNonRec (fst v) rhs)
 rewriteBinds b@(StgRec binds) =
     -- Bring sigs of binds into scope for all rhss
     withBind b $ do
-        (rhss, wrappers) <- unzip <$> mapM (uncurry rewriteRhs) binds
-        let wrapper = foldl1 (.) wrappers
-        return $! (mkRec rhss, wrapper)
+        (rhss) <- mapM (uncurry rewriteRhs) binds
+        return $! (mkRec rhss)
         where
             mkRec :: [TgStgRhs] -> TgStgBinding
             mkRec rhss = StgRec (zip (map (fst . fst) binds) rhss)
 
 -- Rewrite a RHS, the rewriteFlag tells us weither or not the RHS is in a context in which
 -- we can avoid turning the RhsCon into a closure. (e.g. for top level bindings)
-rewriteRhs :: (Id,TagSig) -> InferStgRhs -> RM (TgStgRhs, TgStgExpr -> TgStgExpr)
+rewriteRhs :: (Id,TagSig) -> InferStgRhs
+           -> RM (-- Bool, -- Should we turn it into an updateable closure
+                TgStgRhs)
 rewriteRhs (_id, tagSig) (StgRhsCon ccs con cn ticks args) = {-# SCC rewriteRhs_ #-} do
     -- pprTraceM "rewriteRhs" (ppr _id)
 
@@ -250,35 +252,24 @@ rewriteRhs (_id, tagSig) (StgRhsCon ccs con cn ticks args) = {-# SCC rewriteRhs_
     let evalArgs = [v | StgVarArg v <- needsEval] :: [Id]
 
     if (null evalArgs)
-        then return $! (StgRhsCon ccs con cn ticks args, id)
+        then return $! (StgRhsCon ccs con cn ticks args)
         else do
+            --assert not (isTaggedSig tagSig)
             -- pprTraceM "CreatingSeqs for " $ ppr _id <+> ppr node_id
 
-            evaldArgs <- mapM mkLocalArgId evalArgs -- Create case binders
-            let varMap = zip evalArgs evaldArgs -- Match them up with original ids
-            let updateArg (StgLitArg lit) = (StgLitArg lit)
-                updateArg (StgVarArg v)
-                    | Just v' <- lookup v varMap
-                    = StgVarArg v'
-                    | otherwise = StgVarArg v
-            let evaldConArgs = map updateArg args
             -- At this point iff we have:
             --  * possibly untagged arguments to strict fields
-            --  * and Dunno as tag signature
-            -- Then we return a RhsClosure, otherwise we return a wrapper
+            --  * then inference marked the binder as tag Dunno
+            -- So we convert it into a RhsClosure.
             -- which will evaluate the arguments first when applied to an expression.
-            if not (isTaggedSig tagSig) || True --rewriteFlag == MaybeClosure
-                then do -- Turn the rhs into a closure that evaluates the arguments to the strict fields
-                    conExpr <- mkSeqs evalArgs con cn args (panic "mkSeqs should not need to provide types")
-                    return $! (StgRhsClosure noExtFieldSilent ccs ReEntrant [] $! conExpr, id)
-                else do -- Return a case expression that will evaluate the arguments.
-                    let evalExpr expr = foldr (\(v, vEvald) e -> mkSeq v vEvald e) expr varMap
-                    return $! ((StgRhsCon ccs con cn ticks evaldConArgs), evalExpr)
+            -- Turn the rhs into a closure that evaluates the arguments to the strict fields
+            conExpr <- mkSeqs evalArgs con cn args (panic "mkSeqs should not need to provide types")
+            return $! (StgRhsClosure noExtFieldSilent ccs Updatable [] $! conExpr)
 rewriteRhs _binding (StgRhsClosure ext ccs flag args body) = do
     -- mapM_ addBinder  args
     withBinders args $ do
         closure <- StgRhsClosure ext ccs flag (map fst args) <$> rewriteExpr False body
-        return (closure, id)
+        return (closure)
 
 type IsScrut = Bool
 
@@ -312,18 +303,18 @@ rewriteAlt (altCon, bndrs, rhs) = do
 
 rewriteLet :: InferStgExpr -> RM TgStgExpr
 rewriteLet (StgLet xt bind expr) = do
-    (!bind', !wrapper) <- rewriteBinds bind
+    (!bind') <- rewriteBinds bind
     withBind bind $ do
         !expr' <- rewriteExpr False expr
-        return $! wrapper (StgLet xt bind' expr')
+        return $! (StgLet xt bind' expr')
 rewriteLet _ = panic "Impossible"
 
 rewriteLetNoEscape :: InferStgExpr -> RM TgStgExpr
 rewriteLetNoEscape (StgLetNoEscape xt bind expr) = do
-    (!bind', wrapper) <- rewriteBinds bind
+    (!bind') <- rewriteBinds bind
     withBind bind $ do
         !expr' <- rewriteExpr False expr
-        return $! wrapper (StgLetNoEscape xt bind' expr')
+        return $! (StgLetNoEscape xt bind' expr')
 rewriteLetNoEscape _ = panic "Impossible"
 
 rewriteConApp :: InferStgExpr -> RM TgStgExpr
@@ -373,7 +364,7 @@ mkSeqs :: [Id] -> DataCon -> ConstructorNumber -> [StgArg] -> [Type] -> RM TgStg
 mkSeqs untaggedIds con cn args tys = do
     argMap <- mapM (\arg -> (arg,) <$> mkLocalArgId arg ) untaggedIds :: RM [(InId, OutId)]
     -- mapM_ (pprTraceM "Forcing strict args before allocation:" . ppr) argMap
-    let taggedArgs
+    let taggedArgs :: [StgArg]
             = map   (\v -> case v of
                         StgVarArg v' -> StgVarArg $ fromMaybe v' $ lookup v' argMap
                         lit -> lit)

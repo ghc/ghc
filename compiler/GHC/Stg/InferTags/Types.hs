@@ -22,6 +22,9 @@ import GHC.Types.Var.Env
 import GHC.Utils.Outputable
 import GHC.Utils.Misc( zipWithEqual )
 
+import GHC.StgToCmm.Types ( LambdaFormInfo(..) )
+import GHC.Utils.Panic
+
 {- *********************************************************************
 *                                                                      *
                          Supporting data types
@@ -48,20 +51,24 @@ data TagInfo
   = TagDunno
   | TagTuple [TagInfo]  -- Unboxed tuple
   | TagProper           -- Heap pointer to properly-tagged value
-                        -- Bottom of the domain
+  | TagTagged           -- Bottom of the domain.
   deriving( Eq )
 
 instance Outputable TagInfo where
+  ppr TagTagged      = text "TagTagged"
   ppr TagDunno       = text "TagDunno"
   ppr TagProper      = text "TagProper"
   ppr (TagTuple tis) = text "TagTuple" <> brackets (pprWithCommas ppr tis)
 
 combineAltInfo :: TagInfo -> TagInfo -> TagInfo
 combineAltInfo TagDunno         _              = TagDunno
-combineAltInfo TagProper        ti             = ti
-combineAltInfo (TagTuple {})    TagDunno       = TagDunno
-combineAltInfo ti@(TagTuple {}) TagProper      = ti
-combineAltInfo (TagTuple is1)   (TagTuple is2) = TagTuple (zipWithEqual "combineAltInfo" combineAltInfo is1 is2)
+combineAltInfo _                TagDunno       = TagDunno
+combineAltInfo (TagTuple {})    TagProper      = panic "Combining unboxed tuple with non-tuple result"
+combineAltInfo TagProper       (TagTuple {})   = panic "Combining unboxed tuple with non-tuple result"
+combineAltInfo TagProper        TagProper      = TagProper
+combineAltInfo (TagTuple is1)  (TagTuple is2)  = TagTuple (zipWithEqual "combineAltInfo" combineAltInfo is1 is2)
+combineAltInfo (TagTagged)      ti             = ti
+combineAltInfo ti               TagTagged      = ti
 
 type TagSigEnv = IdEnv TagSig
 data TagEnv p = TE { te_env :: TagSigEnv
@@ -120,6 +127,24 @@ lookupInfo env (StgVarArg var)
   | Just (TagSig 0 info) <- lookupVarEnv (te_env env) var
   = info
 
+  -- | Just lf_info <- idLFInfo_maybe var
+  -- =   case lf_info of
+  --         -- Function, tagged (with arity)
+  --         LFReEntrant {}
+  --             -> TagProper
+  --         -- Thunks need to be entered.
+  --         LFThunk {}
+  --             -> TagDunno
+  --         -- Constructors, already tagged.
+  --         LFCon {}
+  --             -> TagProper
+  --         LFUnknown {}
+  --             -> TagDunno
+  --         LFUnlifted {}
+  --             -> TagProper
+  --         -- Shouldn't be possible. I don't think we can export letNoEscapes
+  --         LFLetNoEscape {} -> panic "LFLetNoEscape exported"
+
   | otherwise
   = TagDunno
 
@@ -130,10 +155,17 @@ isDunnoSig :: TagSig -> Bool
 isDunnoSig (TagSig _ TagDunno) = True
 isDunnoSig (TagSig _ TagProper) = False
 isDunnoSig (TagSig _ TagTuple{}) = False
+isDunnoSig (TagSig _ TagTagged{}) = False
 
 isTaggedSig :: TagSig -> Bool
 isTaggedSig (TagSig _ TagProper) = True
+isTaggedSig (TagSig _ TagTagged) = True
 isTaggedSig _ = False
+
+isTaggedInfo :: TagInfo -> Bool
+isTaggedInfo TagProper = True
+isTaggedInfo TagTagged = True
+isTaggedInfo _         = False
 
 extendSigEnv :: TagEnv p -> [(Id,TagSig)] -> TagEnv p
 extendSigEnv env@(TE { te_env = sig_env }) bndrs

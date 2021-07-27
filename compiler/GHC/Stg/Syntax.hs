@@ -755,6 +755,9 @@ pprGenStgBinding opts b = case b of
                              = hang (hsep [pprBndr LetBind bndr, equals])
                                     4 (pprStgRhs opts expr <> semi)
 
+instance OutputablePass pass => Outputable  (GenStgBinding pass) where
+  ppr = pprGenStgBinding panicStgPprOpts
+
 pprGenStgTopBindings :: (OutputablePass pass) => StgPprOpts -> [GenStgTopBinding pass] -> SDoc
 pprGenStgTopBindings opts binds
   = vcat $ intersperse blankLine (map (pprGenStgTopBinding opts) binds)
@@ -774,6 +777,9 @@ instance Outputable StgArg where
 pprStgArg :: StgArg -> SDoc
 pprStgArg (StgVarArg var) = ppr var
 pprStgArg (StgLitArg con) = ppr con
+
+instance OutputablePass pass => Outputable  (GenStgExpr pass) where
+  ppr = pprStgExpr panicStgPprOpts
 
 pprStgExpr :: OutputablePass pass => StgPprOpts -> GenStgExpr pass -> SDoc
 pprStgExpr opts e = case e of
@@ -891,3 +897,6 @@ pprStgRhs opts rhs = case rhs of
                   NoNumber -> empty
                   Numbered n -> hcat [ppr n, space]
               , ppr con, text "! ", brackets (sep (map pprStgArg args))]
+
+instance OutputablePass pass => Outputable  (GenStgRhs pass) where
+  ppr = pprStgRhs panicStgPprOpts
