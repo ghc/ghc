@@ -8,7 +8,6 @@
 --
 -- Basically, the things need to be in class 'Uniquable'.
 
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 
 module GHC.Types.Unique.DSet (
@@ -46,14 +45,13 @@ import GHC.Types.Unique
 
 import Data.Coerce
 import Data.Data
-import qualified Data.Semigroup as Semi
 
 -- See Note [UniqSet invariant] in GHC.Types.Unique.Set for why we want a newtype here.
 -- Beyond preserving invariants, we may also want to 'override' typeclass
 -- instances.
 
 newtype UniqDSet a = UniqDSet {getUniqDSet' :: UniqDFM a a}
-                   deriving (Data, Semi.Semigroup, Monoid)
+                   deriving (Data)
 
 emptyUniqDSet :: UniqDSet a
 emptyUniqDSet = UniqDSet emptyUDFM
