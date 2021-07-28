@@ -31,8 +31,14 @@ ghcBuilderArgs = mconcat
 
 toolArgs :: Args
 toolArgs = do
+  -- N.B. OpenBSD does not support getExecutablePath, precluding base directory
+  -- inference. See Note [topdir: How GHC finds its files] in
+  -- GHC.SysTools.BaseDir.
+  stage <- getStage
+  libPath <- expr (stageLibPath stage)
   builder (Ghc ToolArgs) ? mconcat
-              [ packageGhcArgs
+              [ arg $ "-B" ++ libPath
+              , packageGhcArgs
               , includeGhcArgs
               , map ("-optc" ++) <$> getStagedSettingList ConfCcArgs
               , map ("-optP" ++) <$> getStagedSettingList ConfCppArgs
