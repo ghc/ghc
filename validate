@@ -378,11 +378,13 @@ fi
 
 # We need to be quite picky on Windows about which Python interpreter we use
 # (#12554, #12661). Allow the user to override it.
-if [ "z$PYTHON" != "z" ]; then
-    PYTHON_ARG="PYTHONPATH=$PYTHON"
-else
-    PYTHON_ARG="PYTHONPATH=$(which python)"
+if [ "z$PYTHON" == "z" ]; then
+    PYTHON="$(which python3)"
 fi
+if [ "z$PYTHON" == "z" ]; then
+    PYTHON="$(which python)"
+fi
+PYTHON_ARG="PYTHONPATH=$PYTHON"
 
 if [ "$ignore_perf_all" = "YES" ]; then
     test_perf_args="runtest.opts +=--ignore-perf-failures=all"
