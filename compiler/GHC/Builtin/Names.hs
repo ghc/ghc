@@ -322,6 +322,7 @@ basicKnownKeyNames
 
         -- Strings and lists
         unpackCStringName, unpackCStringUtf8Name,
+        unpackCStringAppendName, unpackCStringAppendUtf8Name,
         unpackCStringFoldrName, unpackCStringFoldrUtf8Name,
         cstringLengthName,
 
@@ -752,14 +753,6 @@ integerMul_RDR          = nameRdrName integerMulName
 ioDataCon_RDR :: RdrName
 ioDataCon_RDR           = nameRdrName ioDataConName
 
-eqString_RDR, unpackCString_RDR, unpackCStringFoldr_RDR,
-    unpackCStringFoldrUtf8_RDR, unpackCStringUtf8_RDR :: RdrName
-eqString_RDR            = nameRdrName eqStringName
-unpackCString_RDR       = nameRdrName unpackCStringName
-unpackCStringFoldr_RDR  = nameRdrName unpackCStringFoldrName
-unpackCStringUtf8_RDR   = nameRdrName unpackCStringUtf8Name
-unpackCStringFoldrUtf8_RDR  = nameRdrName unpackCStringFoldrUtf8Name
-
 newStablePtr_RDR :: RdrName
 newStablePtr_RDR        = nameRdrName newStablePtrName
 
@@ -1049,13 +1042,19 @@ modIntName = varQual gHC_CLASSES (fsLit "modInt#") modIntIdKey
 -- Base strings Strings
 unpackCStringName, unpackCStringFoldrName,
     unpackCStringUtf8Name, unpackCStringFoldrUtf8Name,
+    unpackCStringAppendName, unpackCStringAppendUtf8Name,
     eqStringName, cstringLengthName :: Name
-unpackCStringName       = varQual gHC_CSTRING (fsLit "unpackCString#") unpackCStringIdKey
-unpackCStringFoldrName  = varQual gHC_CSTRING (fsLit "unpackFoldrCString#") unpackCStringFoldrIdKey
-unpackCStringUtf8Name   = varQual gHC_CSTRING (fsLit "unpackCStringUtf8#") unpackCStringUtf8IdKey
 cstringLengthName       = varQual gHC_CSTRING (fsLit "cstringLength#") cstringLengthIdKey
 eqStringName            = varQual gHC_BASE (fsLit "eqString")  eqStringIdKey
+
+unpackCStringName       = varQual gHC_CSTRING (fsLit "unpackCString#") unpackCStringIdKey
+unpackCStringAppendName = varQual gHC_CSTRING (fsLit "unpackAppendCString#") unpackCStringAppendIdKey
+unpackCStringFoldrName  = varQual gHC_CSTRING (fsLit "unpackFoldrCString#") unpackCStringFoldrIdKey
+
+unpackCStringUtf8Name       = varQual gHC_CSTRING (fsLit "unpackCStringUtf8#") unpackCStringUtf8IdKey
+unpackCStringAppendUtf8Name = varQual gHC_CSTRING (fsLit "unpackAppendCStringUtf8#") unpackCStringAppendUtf8IdKey
 unpackCStringFoldrUtf8Name  = varQual gHC_CSTRING (fsLit "unpackFoldrCStringUtf8#") unpackCStringFoldrUtf8IdKey
+
 
 -- The 'inline' function
 inlineIdName :: Name
@@ -2272,9 +2271,8 @@ wildCardKey, absentErrorIdKey, augmentIdKey, appendIdKey,
     noMethodBindingErrorIdKey, nonExhaustiveGuardsErrorIdKey,
     runtimeErrorIdKey, patErrorIdKey, voidPrimIdKey,
     realWorldPrimIdKey, recConErrorIdKey,
-    unpackCStringUtf8IdKey, unpackCStringAppendIdKey,
-    unpackCStringFoldrIdKey, unpackCStringFoldrUtf8IdKey,
-    unpackCStringIdKey,
+    unpackCStringUtf8IdKey, unpackCStringAppendUtf8IdKey, unpackCStringFoldrUtf8IdKey,
+    unpackCStringIdKey, unpackCStringAppendIdKey, unpackCStringFoldrIdKey,
     typeErrorIdKey, divIntIdKey, modIntIdKey,
     absentSumFieldErrorIdKey, cstringLengthIdKey,
     raiseOverflowIdKey, raiseUnderflowIdKey, raiseDivZeroIdKey
@@ -2296,20 +2294,23 @@ runtimeErrorIdKey             = mkPreludeMiscIdUnique 13
 patErrorIdKey                 = mkPreludeMiscIdUnique 14
 realWorldPrimIdKey            = mkPreludeMiscIdUnique 15
 recConErrorIdKey              = mkPreludeMiscIdUnique 16
+
 unpackCStringUtf8IdKey        = mkPreludeMiscIdUnique 17
-unpackCStringAppendIdKey      = mkPreludeMiscIdUnique 18
-unpackCStringFoldrIdKey       = mkPreludeMiscIdUnique 19
+unpackCStringAppendUtf8IdKey  = mkPreludeMiscIdUnique 18
+unpackCStringFoldrUtf8IdKey   = mkPreludeMiscIdUnique 19
 
 unpackCStringIdKey            = mkPreludeMiscIdUnique 20
-unpackCStringFoldrUtf8IdKey   = mkPreludeMiscIdUnique 21
-voidPrimIdKey                 = mkPreludeMiscIdUnique 22
-typeErrorIdKey                = mkPreludeMiscIdUnique 23
-divIntIdKey                   = mkPreludeMiscIdUnique 24
-modIntIdKey                   = mkPreludeMiscIdUnique 25
-cstringLengthIdKey            = mkPreludeMiscIdUnique 26
-raiseOverflowIdKey            = mkPreludeMiscIdUnique 27
-raiseUnderflowIdKey           = mkPreludeMiscIdUnique 28
-raiseDivZeroIdKey             = mkPreludeMiscIdUnique 29
+unpackCStringAppendIdKey      = mkPreludeMiscIdUnique 21
+unpackCStringFoldrIdKey       = mkPreludeMiscIdUnique 22
+
+voidPrimIdKey                 = mkPreludeMiscIdUnique 23
+typeErrorIdKey                = mkPreludeMiscIdUnique 24
+divIntIdKey                   = mkPreludeMiscIdUnique 25
+modIntIdKey                   = mkPreludeMiscIdUnique 26
+cstringLengthIdKey            = mkPreludeMiscIdUnique 27
+raiseOverflowIdKey            = mkPreludeMiscIdUnique 28
+raiseUnderflowIdKey           = mkPreludeMiscIdUnique 29
+raiseDivZeroIdKey             = mkPreludeMiscIdUnique 30
 
 concatIdKey, filterIdKey, zipIdKey,
     bindIOIdKey, returnIOIdKey, newStablePtrIdKey,

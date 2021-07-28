@@ -1696,10 +1696,12 @@ a `iShiftRL#` b | isTrue# (b >=# WORD_SIZE_IN_BITS#) = 0#
 "unpack"       [~1] forall a   . unpackCString# a             = build (unpackFoldrCString# a)
 "unpack-list"  [1]  forall a   . unpackFoldrCString# a (:) [] = unpackCString# a
 "unpack-append"     forall a n . unpackFoldrCString# a (:) n  = unpackAppendCString# a n
+"unpack-append-nil" forall a   . unpackAppendCString# a []    = unpackCString# a
 
 "unpack-utf8"       [~1] forall a   . unpackCStringUtf8# a             = build (unpackFoldrCStringUtf8# a)
 "unpack-list-utf8"  [1]  forall a   . unpackFoldrCStringUtf8# a (:) [] = unpackCStringUtf8# a
 "unpack-append-utf8"     forall a n . unpackFoldrCStringUtf8# a (:) n  = unpackAppendCStringUtf8# a n
+"unpack-append-nil-utf8" forall a   . unpackAppendCStringUtf8# a []    = unpackCStringUtf8# a
 
 -- There's a built-in rule (in GHC.Core.Op.ConstantFold) for
 --      unpackFoldr "foo" c (unpackFoldr "baz" c n)  =  unpackFoldr "foobaz" c n

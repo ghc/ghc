@@ -1910,12 +1910,18 @@ is fine.
 builtinRules :: [CoreRule]
 -- Rules for non-primops that can't be expressed using a RULE pragma
 builtinRules
-  = [BuiltinRule { ru_name = fsLit "AppendLitString",
+  = [BuiltinRule { ru_name = fsLit "CStringFoldrLit",
                    ru_fn = unpackCStringFoldrName,
-                   ru_nargs = 4, ru_try = match_append_lit_C },
-     BuiltinRule { ru_name = fsLit "AppendLitStringUtf8",
+                   ru_nargs = 4, ru_try = match_cstring_foldr_lit_C },
+     BuiltinRule { ru_name = fsLit "CStringFoldrLitUtf8",
                    ru_fn = unpackCStringFoldrUtf8Name,
-                   ru_nargs = 4, ru_try = match_append_lit_utf8 },
+                   ru_nargs = 4, ru_try = match_cstring_foldr_lit_utf8 },
+     BuiltinRule { ru_name = fsLit "CStringAppendLit",
+                   ru_fn = unpackCStringAppendName,
+                   ru_nargs = 2, ru_try = match_cstring_append_lit_C },
+     BuiltinRule { ru_name = fsLit "CStringAppendLitUtf8",
+                   ru_fn = unpackCStringAppendUtf8Name,
+                   ru_nargs = 2, ru_try = match_cstring_append_lit_utf8 },
      BuiltinRule { ru_name = fsLit "EqString", ru_fn = eqStringName,
                    ru_nargs = 2, ru_try = match_eq_string },
      BuiltinRule { ru_name = fsLit "CStringLength", ru_fn = cstringLengthName,
@@ -2345,6 +2351,41 @@ builtinBignumRules =
       pure $ mk_lit (fromRational (n % d))
 
 
+---------------------------------------------------
+-- The rules are:
+--      unpackAppendCString*# "foo"# (unpackCString*# "baz"#)
+--      =  unpackCString*# "foobaz"#
+--
+--      unpackAppendCString*# "foo"# (unpackAppendCString*# "baz"# e)
+--      =  unpackAppendCString*# "foobaz"# e
+--
+
+-- CString version
+match_cstring_append_lit_C :: RuleFun
+match_cstring_append_lit_C = match_cstring_append_lit unpackCStringAppendIdKey unpackCStringIdKey
+
+-- CStringUTF8 version
+match_cstring_append_lit_utf8 :: RuleFun
+match_cstring_append_lit_utf8 = match_cstring_append_lit unpackCStringAppendUtf8IdKey unpackCStringUtf8IdKey
+
+{-# INLINE match_cstring_append_lit #-}
+match_cstring_append_lit :: Unique -> Unique -> RuleFun
+match_cstring_append_lit append_key unpack_key _ env _ [lit1, e2]
+  | Just (LitString s1) <- exprIsLiteral_maybe env lit1
+  , (strTicks, Var unpk `App` lit2) <- stripStrTopTicks env e2
+  , unpk `hasKey` unpack_key
+  , Just (LitString s2) <- exprIsLiteral_maybe env lit2
+  = Just $ mkTicks strTicks
+         $ Var unpk `App` Lit (LitString (s1 `BS.append` s2))
+
+  | Just (LitString s1) <- exprIsLiteral_maybe env lit1
+  , (strTicks, Var appnd `App` lit2 `App` e) <- stripStrTopTicks env e2
+  , appnd `hasKey` append_key
+  , Just (LitString s2) <- exprIsLiteral_maybe env lit2
+  = Just $ mkTicks strTicks
+         $ Var appnd `App` Lit (LitString (s1 `BS.append` s2)) `App` e
+
+match_cstring_append_lit _ _ _ _ _ _ = Nothing
 
 ---------------------------------------------------
 -- The rule is this:
@@ -2354,35 +2395,32 @@ builtinBignumRules =
 -- See also Note [String literals in GHC] in CString.hs
 
 -- CString version
-match_append_lit_C :: RuleFun
-match_append_lit_C = match_append_lit unpackCStringFoldrIdKey
+match_cstring_foldr_lit_C :: RuleFun
+match_cstring_foldr_lit_C = match_cstring_foldr_lit unpackCStringFoldrIdKey
 
 -- CStringUTF8 version
-match_append_lit_utf8 :: RuleFun
-match_append_lit_utf8 = match_append_lit unpackCStringFoldrUtf8IdKey
+match_cstring_foldr_lit_utf8 :: RuleFun
+match_cstring_foldr_lit_utf8 = match_cstring_foldr_lit unpackCStringFoldrUtf8IdKey
 
-{-# INLINE match_append_lit #-}
-match_append_lit :: Unique -> RuleFun
-match_append_lit foldVariant _ id_unf _
+{-# INLINE match_cstring_foldr_lit #-}
+match_cstring_foldr_lit :: Unique -> RuleFun
+match_cstring_foldr_lit foldVariant _ env _
         [ Type ty1
         , lit1
         , c1
         , e2
         ]
-  -- N.B. Ensure that we strip off any ticks (e.g. source notes) from the
-  -- `lit` and `c` arguments, lest this may fail to fire when building with
-  -- -g3. See #16740.
   | (strTicks, Var unpk `App` Type ty2
                         `App` lit2
                         `App` c2
-                        `App` n) <- stripTicksTop tickishFloatable e2
+                        `App` n) <- stripStrTopTicks env e2
   , unpk `hasKey` foldVariant
-  , Just (LitString s1) <- exprIsLiteral_maybe id_unf lit1
-  , Just (LitString s2) <- exprIsLiteral_maybe id_unf lit2
+  , Just (LitString s1) <- exprIsLiteral_maybe env lit1
+  , Just (LitString s2) <- exprIsLiteral_maybe env lit2
   , let freeVars = (mkInScopeSet (exprFreeVars c1 `unionVarSet` exprFreeVars c2))
     in eqExpr freeVars c1 c2
-  , (c1Ticks, c1') <- stripTicksTop tickishFloatable c1
-  , c2Ticks <- stripTicksTopT tickishFloatable c2
+  , (c1Ticks, c1') <- stripStrTopTicks env c1
+  , c2Ticks <- stripStrTopTicksT c2
   = assert (ty1 `eqType` ty2) $
     Just $ mkTicks strTicks
          $ Var unpk `App` Type ty1
@@ -2390,7 +2428,23 @@ match_append_lit foldVariant _ id_unf _
                     `App` mkTicks (c1Ticks ++ c2Ticks) c1'
                     `App` n
 
-match_append_lit _ _ _ _ _ = Nothing
+match_cstring_foldr_lit _ _ _ _ _ = Nothing
+
+
+-- N.B. Ensure that we strip off any ticks (e.g. source notes) from the
+-- argument, lest this may fail to fire when building with -g3. See #16740.
+--
+-- Also, look into variable's unfolding just in case the expression we look for
+-- is in a top-level thunk.
+stripStrTopTicks :: InScopeEnv -> CoreExpr -> ([CoreTickish], CoreExpr)
+stripStrTopTicks (_,id_unf) e = case e of
+  Var v
+    | Just rhs <- expandUnfolding_maybe (id_unf v)
+    -> stripTicksTop tickishFloatable rhs
+  _ -> stripTicksTop tickishFloatable e
+
+stripStrTopTicksT :: CoreExpr -> [CoreTickish]
+stripStrTopTicksT e = stripTicksTopT tickishFloatable e
 
 ---------------------------------------------------
 -- The rule is this:
@@ -2429,13 +2483,13 @@ match_eq_string _ _ _ _ = Nothing
 -- function computing the length of such ByteStrings can often be constant
 -- folded.
 match_cstring_length :: RuleFun
-match_cstring_length env id_unf _ [lit1]
-  | Just (LitString str) <- exprIsLiteral_maybe id_unf lit1
+match_cstring_length rule_env env _ [lit1]
+  | Just (LitString str) <- exprIsLiteral_maybe env lit1
     -- If elemIndex returns Just, it has the index of the first embedded NUL
     -- in the string. If no NUL bytes are present (the common case) then use
     -- full length of the byte string.
   = let len = fromMaybe (BS.length str) (BS.elemIndex 0 str)
-     in Just (Lit (mkLitInt (roPlatform env) (fromIntegral len)))
+     in Just (Lit (mkLitInt (roPlatform rule_env) (fromIntegral len)))
 match_cstring_length _ _ _ _ = Nothing
 
 ---------------------------------------------------
