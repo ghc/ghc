@@ -15,16 +15,15 @@ import Control.Monad
 import Data.Maybe
 import Development.Shake
 import Distribution.Simple.GHC
-import Distribution.Simple.Program.Builtin
-import Distribution.Simple.Program.Db
+import Distribution.Simple.Program
+import Distribution.Simple.Program.Types
 import Distribution.Verbosity
 
+import Base
 import Builder
 import Context
 import Hadrian.Haskell.Cabal.Parse
 import Hadrian.Oracles.Cabal.Type
-import Hadrian.Package
-import Hadrian.Utilities
 
 -- | These oracle rules are used to cache and track answers to the following
 -- queries, which are implemented via the Cabal library:
@@ -58,8 +57,15 @@ cabalOracle = do
         putVerbose $ "| PackageConfiguration oracle: configuring "
                ++ quote (pkgName pkg) ++ " (" ++ show stage ++ ")..."
         -- Configure the package with the GHC corresponding to the given stage
+        libPath <- stageLibPath stage
         hcPath <- builderPath (Ghc CompileHs stage)
         hcPkgPath <- builderPath (GhcPkg undefined stage)
+
+        -- Probe versions
+        let verbosity = silent
+        hcVer <- liftIO $ programFindVersion ghcProgram verbosity (hcPath)
+        hcPkgVer <- liftIO $ programFindVersion ghcPkgProgram verbosity (hcPkgPath)
+
         -- N.B. the hcPath parameter of `configure` is broken when given an
         -- empty ProgramDb. To work around this we manually construct an
         -- appropriate ProgramDb.
@@ -67,13 +73,24 @@ cabalOracle = do
         -- We also need to pass the path to ghc-pkg, because Cabal cannot
         -- guess it (from ghc's path) when it's for a cross-compiler (e.g.,
         -- _build/stage0/bin/aarch64-linux-gnu-ghc-pkg).
-        let progDb = userSpecifyPath "ghc" hcPath
-                     $ addKnownProgram ghcProgram
-                     $ userSpecifyPath "ghc-pkg" hcPkgPath
-                     $ addKnownProgram ghcPkgProgram
+        let addLibPath cp
+              | Stage0 <- stage = cp
+              | otherwise       = cp { programDefaultArgs = [ "-B"++libPath ] }
+            setVersion version cp = cp { programVersion = version }
+
+            hcProg = setVersion hcVer
+                $ addLibPath
+                $ simpleConfiguredProgram "ghc" (UserSpecified hcPath)
+            hcPkgProg =
+                setVersion hcPkgVer
+                $ addLibPath
+                $ simpleConfiguredProgram "ghc-pkg" (UserSpecified hcPkgPath)
+        let progDb = updateProgram hcProg
+                     $ updateProgram hcPkgProg
                      $ emptyProgramDb
+
         (compiler, maybePlatform, _pkgdb) <- liftIO $
-            configure silent Nothing Nothing progDb
+            configure verbosity Nothing Nothing progDb
         let platform = fromMaybe (error msg) maybePlatform
             msg      = "PackageConfiguration oracle: cannot detect platform"
         return $ PackageConfiguration (compiler, platform)
