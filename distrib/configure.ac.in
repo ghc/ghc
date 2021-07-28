@@ -13,8 +13,6 @@ dnl--------------------------------------------------------------------
 dnl * Deal with arguments telling us gmp is somewhere odd
 dnl--------------------------------------------------------------------
 
-FP_GMP
-
 dnl Various things from the source distribution configure
 bootstrap_target=@TargetPlatform@
 
