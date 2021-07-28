@@ -1036,7 +1036,7 @@ repSplitAppTy_maybe :: HasDebugCallStack => Type -> Maybe (Type,Type)
 -- ^ Does the AppTy split as in 'splitAppTy_maybe', but assumes that
 -- any Core view stuff is already done
 repSplitAppTy_maybe (FunTy _ w ty1 ty2)
-  = Just (TyConApp funTyCon [w, rep1, rep2, ty1], ty2)
+  = Just (TyConApp funTyCon [w, rep1, rep2, ty1], ty2)  -- can't use FunTyConArgs - the last argument is removed
   where
     rep1 = getRuntimeRep ty1
     rep2 = getRuntimeRep ty2
@@ -1061,7 +1061,7 @@ tcRepSplitAppTy_maybe (FunTy { ft_af = af, ft_mult = w, ft_arg = ty1, ft_res = t
   | InvisArg <- af
   = Nothing  -- See Note [Decomposing fat arrow c=>t]
   | otherwise
-  = Just (TyConApp funTyCon [w, rep1, rep2, ty1], ty2)
+  = Just (TyConApp funTyCon [w, rep1, rep2, ty1], ty2) -- can't use FunTyConArgs - the last argument is removed
   where
     rep1 = getRuntimeRep ty1
     rep2 = getRuntimeRep ty2
@@ -1099,7 +1099,7 @@ splitAppTys ty = split ty ty []
         (TyConApp tc tc_args1, tc_args2 ++ args)
     split _   (FunTy _ w ty1 ty2) args
       = assert (null args )
-        (TyConApp funTyCon [], [w, rep1, rep2, ty1, ty2])
+        (TyConApp funTyCon [], FunTyConArgs w rep1 rep2 ty1 ty2)
       where
         rep1 = getRuntimeRep ty1
         rep2 = getRuntimeRep ty2
@@ -1119,7 +1119,7 @@ repSplitAppTys ty = split ty []
         (TyConApp tc tc_args1, tc_args2 ++ args)
     split (FunTy _ w ty1 ty2) args
       = assert (null args )
-        (TyConApp funTyCon [], [w, rep1, rep2, ty1, ty2])
+        (TyConApp funTyCon [], FunTyConArgs w rep1 rep2 ty1 ty2)
       where
         rep1 = getRuntimeRep ty1
         rep2 = getRuntimeRep ty2
@@ -1433,7 +1433,7 @@ tyConAppArgs_maybe ty = case coreFullView ty of
   FunTy _ w arg res
     | Just rep1 <- getRuntimeRep_maybe arg
     , Just rep2 <- getRuntimeRep_maybe res
-    -> Just [w, rep1, rep2, arg, res]
+    -> Just (FunTyConArgs w rep1 rep2 arg res)
   _ -> Nothing
 
 tyConAppArgs :: Type -> [Type]
@@ -1494,7 +1494,7 @@ repSplitTyConApp_maybe (TyConApp tc tys) = Just (tc, tys)
 repSplitTyConApp_maybe (FunTy _ w arg res)
   | Just arg_rep <- getRuntimeRep_maybe arg
   , Just res_rep <- getRuntimeRep_maybe res
-  = Just (funTyCon, [w, arg_rep, res_rep, arg, res])
+  = Just (funTyCon, FunTyConArgs w arg_rep res_rep arg res)
 repSplitTyConApp_maybe _ = Nothing
 
 -------------------
@@ -1608,7 +1608,7 @@ mkTyConApp tycon tys
   = mkTyConTy tycon
 
   | isFunTyCon tycon
-  , [w, _rep1,_rep2,ty1,ty2] <- tys
+  , FunTyConArgs w _rep1 _rep2 ty1 ty2 <- tys
   -- The FunTyCon (->) is always a visible one
   = FunTy { ft_af = VisArg, ft_mult = w, ft_arg = ty1, ft_res = ty2 }
 

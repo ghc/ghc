@@ -1023,8 +1023,8 @@ can_eq_nc' _rewritten _rdr_env _envs ev eq_rel
   , Just ty2a_rep <- getRuntimeRep_maybe ty2a
   , Just ty2b_rep <- getRuntimeRep_maybe ty2b
   = canDecomposableTyConAppOK ev eq_rel funTyCon
-                              [am1, ty1a_rep, ty1b_rep, ty1a, ty1b]
-                              [am2, ty2a_rep, ty2b_rep, ty2a, ty2b]
+                              (FunTyConArgs am1 ty1a_rep ty1b_rep ty1a ty1b)
+                              (FunTyConArgs am2 ty2a_rep ty2b_rep ty2a ty2b)
 
 -- Decompose type constructor applications
 -- NB: we have expanded type synonyms already

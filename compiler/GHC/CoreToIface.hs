@@ -302,8 +302,8 @@ toIfaceCoercionX fr co
                                           (toIfaceTypeX fr t2)
     go (TyConAppCo r tc cos)
       | tc `hasKey` funTyConKey
-      , [_,_,_,_, _] <- cos         = panic "toIfaceCoercion"
-      | otherwise                =
+      , FunTyConArgs _ _ _ _ _  <- cos = panic "toIfaceCoercion"
+      | otherwise                      =
         IfaceTyConAppCo r (toIfaceTyCon tc) (map go cos)
     go (FunCo r w co1 co2)   = IfaceFunCo r (go w) (go co1) (go co2)
 

@@ -11,6 +11,8 @@
 The @TyCon@ datatype
 -}
 
+{-# LANGUAGE PatternSynonyms #-}
+
 module GHC.Core.TyCon(
         -- * Main TyCon data types
         TyCon,
@@ -29,6 +31,13 @@ module GHC.Core.TyCon(
 
         -- ** Field labels
         tyConFieldLabels, lookupTyConFieldLabel,
+
+        pattern FunTyConArgs,
+        funTyConMulArgNo,
+        funTyConArgRRArgNo,
+        funTyConResRRArgNo,
+        funTyConArgArgNo,
+        funTyConResArgNo,
 
         -- ** Constructing TyCons
         mkAlgTyCon,
@@ -1705,6 +1714,24 @@ module mutual-recursion.  And they aren't called from many places.
 So we compromise, and move their Kind calculation to the call site.
 -}
 
+-- | This pattern synonym signifies arguments to the FUN type,
+-- allowing easier grepping (#18750).
+-- If it cannot be used in some place, you should leave a comment
+-- mentioning FunTyConArgs.
+-- The same construct is used for FunCos, see Note [Function coercions]
+-- in GHC.Core.Coercion.
+pattern FunTyConArgs :: a -> a -> a -> a -> a -> [a]
+pattern FunTyConArgs mul r1 r2 arg res = [mul, r1, r2, arg, res]
+
+-- Integers denoting positions of arguments to FunTy.
+funTyConMulArgNo, funTyConArgRRArgNo, funTyConResRRArgNo, funTyConArgArgNo,
+  funTyConResArgNo :: Int
+funTyConMulArgNo   = 0
+funTyConArgRRArgNo = 1
+funTyConResRRArgNo = 2
+funTyConArgArgNo   = 3
+funTyConResArgNo   = 4
+
 -- | Given the name of the function type constructor and it's kind, create the
 -- corresponding 'TyCon'. It is recommended to use 'GHC.Core.TyCo.Rep.funTyCon' if you want
 -- this functionality
@@ -2516,7 +2543,7 @@ tyConRoles :: TyCon -> [Role]
 -- See also Note [TyCon Role signatures]
 tyConRoles tc
   = case tc of
-    { FunTyCon {}                         -> [Nominal, Nominal, Nominal, Representational, Representational]
+    { FunTyCon {}                         -> FunTyConArgs Nominal Nominal Nominal Representational Representational
     ; AlgTyCon { tcRoles = roles }        -> roles
     ; SynonymTyCon { tcRoles = roles }    -> roles
     ; FamilyTyCon {}                      -> const_role Nominal

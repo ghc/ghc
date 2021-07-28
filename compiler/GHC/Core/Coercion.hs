@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE MultiWayIf          #-}
 
 {-
 (c) The University of Glasgow 2006
@@ -393,14 +394,15 @@ isReflMCo _     = False
 Note [Function coercions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 Remember that
-  (->) :: forall {r1} {r2}. TYPE r1 -> TYPE r2 -> TYPE LiftedRep
+  FUN :: forall (m :: Multiplicity) ->
+         forall {r1} {r2}. TYPE r1 -> TYPE r2 -> TYPE LiftedRep
 whose `RuntimeRep' arguments are intentionally marked inferred to
 avoid type application.
 
 Hence
-  FunCo r mult co1 co2 :: (s1->t1) ~r (s2->t2)
+  FunCo r co_mult co1 co2 :: (s1%m1->t1) ~r (s2%m2->t2)
 is short for
-  TyConAppCo (->) mult co_rep1 co_rep2 co1 co2
+  TyConAppCo FUN co_mult co_rep1 co_rep2 co1 co2
 where co_rep1, co_rep2 are the coercions on the representations.
 -}
 
@@ -430,7 +432,9 @@ decomposeFunCo _ (FunCo _ w co1 co2) = (w, co1, co2)
    -- Short-circuits the calls to mkNthCo
 
 decomposeFunCo r co = assertPpr all_ok (ppr co)
-                      (mkNthCo Nominal 0 co, mkNthCo r 3 co, mkNthCo r 4 co)
+                      (mkNthCo Nominal funTyConMulArgNo co,
+                       mkNthCo r       funTyConArgArgNo co,
+                       mkNthCo r       funTyConResArgNo co)
   where
     Pair s1t1 s2t2 = coercionKind co
     all_ok = isFunTy s1t1 && isFunTy s2t2
@@ -536,8 +540,8 @@ splitTyConAppCo_maybe co
        ; let args = zipWith mkReflCo (tyConRolesX r tc) tys
        ; return (tc, args) }
 splitTyConAppCo_maybe (TyConAppCo _ tc cos) = Just (tc, cos)
-splitTyConAppCo_maybe (FunCo _ w arg res)     = Just (funTyCon, cos)
-  where cos = [w, mkRuntimeRepCo arg, mkRuntimeRepCo res, arg, res]
+splitTyConAppCo_maybe (FunCo _ m arg res)     = Just (funTyCon, cos)
+  where cos = FunTyConArgs m (mkRuntimeRepCo arg) (mkRuntimeRepCo res) arg res
 splitTyConAppCo_maybe _                     = Nothing
 
 multToCo :: Mult -> Coercion
@@ -775,6 +779,7 @@ mkNomReflCo = Refl
 mkTyConAppCo :: HasDebugCallStack => Role -> TyCon -> [Coercion] -> Coercion
 mkTyConAppCo r tc cos
   | [w, _rep1, _rep2, co1, co2] <- cos   -- See Note [Function coercions]
+    -- We should use FunTyConArgs here, but this causes perf problems (#20165)
   , isFunTyCon tc
   = -- (a :: TYPE ra) -> (b :: TYPE rb)  ~  (c :: TYPE rc) -> (d :: TYPE rd)
     -- rep1 :: ra  ~  rc        rep2 :: rb  ~  rd
@@ -1175,21 +1180,21 @@ mkNthCoFunCo :: Int         -- ^ "n"
              -> Coercion    -- ^ result coercion
              -> Coercion    -- ^ nth coercion from a FunCo
 -- See Note [Function coercions]
--- If FunCo _ mult arg_co res_co ::   (s1:TYPE sk1 :mult-> s2:TYPE sk2)
---                                  ~ (t1:TYPE tk1 :mult-> t2:TYPE tk2)
+-- If FunCo _ mult_co arg_co res_co ::   (s1:TYPE sk1 %mult1-> s2:TYPE sk2)
+--                                     ~ (t1:TYPE tk1 %mult2-> t2:TYPE tk2)
 -- Then we want to behave as if co was
---    TyConAppCo mult argk_co resk_co arg_co res_co
+--    TyConAppCo mult_co argk_co resk_co arg_co res_co
 -- where
 --    argk_co :: sk1 ~ tk1  =  mkNthCo 0 (mkKindCo arg_co)
 --    resk_co :: sk2 ~ tk2  =  mkNthCo 0 (mkKindCo res_co)
 --                             i.e. mkRuntimeRepCo
-mkNthCoFunCo n w co1 co2 = case n of
-  0 -> w
-  1 -> mkRuntimeRepCo co1
-  2 -> mkRuntimeRepCo co2
-  3 -> co1
-  4 -> co2
-  _ -> pprPanic "mkNthCo(FunCo)" (ppr n $$ ppr w $$ ppr co1 $$ ppr co2)
+mkNthCoFunCo n com co1 co2 =
+  if | n == funTyConMulArgNo   -> com
+     | n == funTyConArgRRArgNo -> mkRuntimeRepCo co1
+     | n == funTyConResRRArgNo -> mkRuntimeRepCo co2
+     | n == funTyConArgArgNo   -> co1
+     | n == funTyConResArgNo   -> co2
+     | otherwise -> pprPanic "mkNthCo(FunCo)" (ppr n $$ ppr com $$ ppr co1 $$ ppr co2)
 
 -- | If you're about to call @mkNthCo r n co@, then @r@ should be
 -- whatever @nthCoRole n co@ returns.
@@ -1557,7 +1562,7 @@ instCoercion (Pair lty rty) g w
   | isFunTy lty && isFunTy rty
     -- g :: (t1 -> t2) ~ (t3 -> t4)
     -- returns t2 ~ t4
-  = Just $ mkNthCo Nominal 4 g -- extract result type, which is the 5th argument to (->)
+  = Just $ mkNthCo Nominal funTyConResArgNo g -- extract result type
   | otherwise -- one forall, one funty...
   = Nothing
 

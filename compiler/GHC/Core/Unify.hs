@@ -1611,7 +1611,7 @@ ty_co_match menv subst (FunTy _ w ty1 ty2) co _lkco _rkco
     -- runtime rep, a multiplicity and two types), we shouldn't need to
     -- explicitly unify the runtime reps here; unifying the types themselves
     -- should be sufficient.  See Note [Representation of function types].
-  | Just (tc, [co_mult, _,_,co1,co2]) <- splitTyConAppCo_maybe co
+  | Just (tc, FunTyConArgs co_mult _ _ co1 co2) <- splitTyConAppCo_maybe co
   , tc == funTyCon
   = let Pair lkcos rkcos = traverse (fmap mkNomReflCo . coercionKind) [co_mult,co1,co2]
     in ty_co_match_args menv subst [w, ty1, ty2] [co_mult, co1, co2] lkcos rkcos
@@ -1718,11 +1718,12 @@ pushRefl co =
   case (isReflCo_maybe co) of
     Just (AppTy ty1 ty2, Nominal)
       -> Just (AppCo (mkReflCo Nominal ty1) (mkNomReflCo ty2))
-    Just (FunTy _ w ty1 ty2, r)
+    Just (FunTy _ m ty1 ty2, r)
       | Just rep1 <- getRuntimeRep_maybe ty1
       , Just rep2 <- getRuntimeRep_maybe ty2
-      ->  Just (TyConAppCo r funTyCon [ multToCo w, mkReflCo r rep1, mkReflCo r rep2
-                                       , mkReflCo r ty1,  mkReflCo r ty2 ])
+      ->  Just (TyConAppCo r funTyCon (FunTyConArgs (multToCo m)
+                                                    (mkReflCo r rep1) (mkReflCo r rep2)
+                                                    (mkReflCo r ty1)  (mkReflCo r ty2)))
     Just (TyConApp tc tys, r)
       -> Just (TyConAppCo r tc (zipWith mkReflCo (tyConRolesX r tc) tys))
     Just (ForAllTy (Bndr tv _) ty, r)

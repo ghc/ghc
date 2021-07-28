@@ -1658,7 +1658,7 @@ tc_eq_type keep_syns vis_only orig_ty1 orig_ty2
 
     orig_env = mkRnEnv2 $ mkInScopeSet $ tyCoVarsOfTypes [orig_ty1, orig_ty2]
 
-    -- @eqFunTy w arg res ty@ is True when @ty@ equals @FunTy w arg res@. This is
+    -- @eqFunTy m arg res ty@ is True when @ty@ equals @FunTy m arg res@. This is
     -- sometimes hard to know directly because @ty@ might have some casts
     -- obscuring the FunTy. And 'splitAppTy' is difficult because we can't
     -- always extract a RuntimeRep (see Note [xyz]) if the kind of the arg or
@@ -1666,15 +1666,15 @@ tc_eq_type keep_syns vis_only orig_ty1 orig_ty2
     -- corner case.
     eqFunTy :: RnEnv2 -> Mult -> Type -> Type -> Type -> Bool
                -- Last arg is /not/ FunTy
-    eqFunTy env w arg res ty@(AppTy{}) = get_args ty []
+    eqFunTy env m arg res ty@(AppTy{}) = get_args ty []
       where
         get_args :: Type -> [Type] -> Bool
         get_args (AppTy f x)       args = get_args f (x:args)
         get_args (CastTy t _)      args = get_args t args
         get_args (TyConApp tc tys) args
           | tc == funTyCon
-          , [w', _, _, arg', res'] <- tys ++ args
-          = go env w w' && go env arg arg' && go env res res'
+          , FunTyConArgs m' _ _ arg' res' <- tys ++ args
+          = go env m m' && go env arg arg' && go env res res'
         get_args _ _    = False
     eqFunTy _ _ _ _ _   = False
 {-# INLINE tc_eq_type #-} -- See Note [Specialising tc_eq_type].
