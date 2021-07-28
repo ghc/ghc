@@ -2452,18 +2452,20 @@ stripStrTopTicksT e = stripTicksTopT tickishFloatable e
 -- Also  matches unpackCStringUtf8#
 
 match_eq_string :: RuleFun
-match_eq_string _ id_unf _
-        [Var unpk1 `App` lit1, Var unpk2 `App` lit2]
-  | unpk_key1 <- getUnique unpk1
+match_eq_string _ env _ [e1, e2]
+  | (ticks1, Var unpk1 `App` lit1) <- stripStrTopTicks env e1
+  , (ticks2, Var unpk2 `App` lit2) <- stripStrTopTicks env e2
+  , unpk_key1 <- getUnique unpk1
   , unpk_key2 <- getUnique unpk2
   , unpk_key1 == unpk_key2
   -- For now we insist the literals have to agree in their encoding
   -- to keep the rule simple. But we could check if the decoded strings
   -- compare equal in here as well.
   , unpk_key1 `elem` [unpackCStringUtf8IdKey, unpackCStringIdKey]
-  , Just (LitString s1) <- exprIsLiteral_maybe id_unf lit1
-  , Just (LitString s2) <- exprIsLiteral_maybe id_unf lit2
-  = Just (if s1 == s2 then trueValBool else falseValBool)
+  , Just (LitString s1) <- exprIsLiteral_maybe env lit1
+  , Just (LitString s2) <- exprIsLiteral_maybe env lit2
+  = Just $ mkTicks (ticks1 ++ ticks2)
+         $ (if s1 == s2 then trueValBool else falseValBool)
 
 match_eq_string _ _ _ _ = Nothing
 
