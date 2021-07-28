@@ -1,6 +1,6 @@
 module CommandLine (
     optDescrs, cmdLineArgsMap, cmdFlavour, lookupFreeze1, lookupFreeze2, lookupSkipDepends,
-    cmdBignum, cmdBignumCheck, cmdProgressInfo, cmdConfigure, cmdCompleteSetting,
+    cmdBignum, cmdBignumCheck, cmdProgressInfo, cmdCompleteSetting,
     cmdDocsArgs, lookupBuildRoot, TestArgs(..), TestSpeed(..), defaultTestArgs,
     cmdPrefix
     ) where
@@ -95,7 +95,7 @@ defaultTestArgs = TestArgs
     , testAccept     = False }
 
 readConfigure :: Either String (CommandLineArgs -> CommandLineArgs)
-readConfigure = Right $ \flags -> flags { configure = True }
+readConfigure = Left "hadrian --configure has been deprecated (see #20167). Please run ./boot; ./configure manually"
 
 readFlavour :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readFlavour ms = Right $ \flags -> flags { flavour = lower <$> ms }
@@ -250,7 +250,7 @@ readDocsArg ms = maybe (Left "Cannot parse docs argument") (Right . set) (go =<<
 optDescrs :: [OptDescr (Either String (CommandLineArgs -> CommandLineArgs))]
 optDescrs =
     [ Option ['c'] ["configure"] (NoArg readConfigure)
-      "Run the boot and configure scripts (if you do not want to run them manually)."
+      "Deprecated: Run the boot and configure scripts."
     , Option ['o'] ["build-root"] (OptArg readBuildRoot "BUILD_ROOT")
       "Where to store build artifacts. (Default _build)."
     , Option [] ["flavour"] (OptArg readFlavour "FLAVOUR")
@@ -344,9 +344,6 @@ cmdLineArgsMap = do
 
 cmdLineArgs :: Action CommandLineArgs
 cmdLineArgs = userSetting defaultCommandLineArgs
-
-cmdConfigure :: Action Bool
-cmdConfigure = configure <$> cmdLineArgs
 
 cmdFlavour :: Action (Maybe String)
 cmdFlavour = flavour <$> cmdLineArgs

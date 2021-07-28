@@ -13,7 +13,6 @@ import qualified Oracles.ModuleFiles
 import Packages
 import qualified Rules.BinaryDist
 import qualified Rules.Compile
-import qualified Rules.Configure
 import qualified Rules.Dependencies
 import qualified Rules.Documentation
 import qualified Rules.Generate
@@ -130,7 +129,6 @@ packageRules = do
 buildRules :: Rules ()
 buildRules = do
     Rules.BinaryDist.bindistRules
-    Rules.Configure.configureRules
     Rules.Generate.copyRules
     Rules.Generate.generateRules
     Rules.Gmp.gmpRules

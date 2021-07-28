@@ -67,7 +67,6 @@ executable hadrian
                        , Rules.BinaryDist
                        , Rules.Clean
                        , Rules.Compile
-                       , Rules.Configure
                        , Rules.Dependencies
                        , Rules.Docspec
                        , Rules.Documentation
