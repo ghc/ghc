@@ -2664,6 +2664,7 @@ repH98DataCon con details
              arg_tys <- repPrefixConArgs ps
              rep2 normalCName [unC con', unC arg_tys]
            InfixCon st1 st2 -> do
+             verifyLinearConstructors [st1, st2]
              arg1 <- repBangTy (hsScaledThing st1)
              arg2 <- repBangTy (hsScaledThing st2)
              rep2 infixCName [unC arg1, unC con', unC arg2]
@@ -2688,10 +2689,26 @@ repGadtDataCons cons details res_ty
              rep2 recGadtCName [unC (nonEmptyCoreList cons'), unC arg_vtys,
                                 unC res_ty']
 
+-- TH currently only supports linear constructors.
+-- We also accept the (->) arrow when -XLinearTypes is off, because this
+-- denotes a linear field.
+-- This check is not performed in repRecConArgs, since the GADT record
+-- syntax currently does not have a way to mark fields as nonlinear.
+verifyLinearConstructors :: [HsScaled GhcRn (LHsType GhcRn)] -> MetaM ()
+verifyLinearConstructors ps = do
+  linear <- lift $ xoptM LangExt.LinearTypes
+  let allGood = all (\st -> case hsMult st of
+                              HsUnrestrictedArrow _ -> not linear
+                              HsLinearArrow _       -> True
+                              _                     -> False) ps
+  unless allGood $ notHandled ThNonLinearDataCon
+
 -- Desugar the arguments in a data constructor declared with prefix syntax.
 repPrefixConArgs :: [HsScaled GhcRn (LHsType GhcRn)]
                  -> MetaM (Core [M TH.BangType])
-repPrefixConArgs ps = repListM bangTypeTyConName repBangTy (map hsScaledThing ps)
+repPrefixConArgs ps = do
+  verifyLinearConstructors ps
+  repListM bangTypeTyConName repBangTy (map hsScaledThing ps)
 
 -- Desugar the arguments in a data constructor declared with record syntax.
 repRecConArgs :: LocatedL [LConDeclField GhcRn]

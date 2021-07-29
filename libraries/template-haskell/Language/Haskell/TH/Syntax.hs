@@ -2545,6 +2545,10 @@ data DecidedStrictness = DecidedLazy
 --   @
 --
 --   In @MkBar@, 'ForallC' will quantify @a@, @b@, and @c@.
+--
+-- Multiplicity annotations for data types are currently not supported
+-- in Template Haskell (i.e. all fields represented by Template Haskell
+-- will be linear).
 data Con = NormalC Name [BangType]       -- ^ @C Int a@
          | RecC Name [VarBangType]       -- ^ @C { v :: Int, w :: a }@
          | InfixC BangType Name BangType -- ^ @Int :+ a@
