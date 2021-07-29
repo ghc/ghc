@@ -192,6 +192,7 @@ data ThRejectionReason
   | ThHaddockDocumentation
   | ThWarningAndDeprecationPragmas [LIdP GhcRn]
   | ThSplicesWithinDeclBrackets
+  | ThNonLinearDataCon
 
 data NegLiteralExtEnabled
   = YesUsingNegLiterals

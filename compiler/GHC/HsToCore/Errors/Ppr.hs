@@ -165,6 +165,8 @@ instance Diagnostic DsMessage where
                     text "Pragma for declaration of" <+> ppr decl
              ThSplicesWithinDeclBrackets
                -> mkMsg "Splices within declaration brackets" empty
+             ThNonLinearDataCon
+               -> mkMsg "Non-linear fields in data constructors" empty
          where
            mkMsg what doc =
              mkSimpleDecorated $

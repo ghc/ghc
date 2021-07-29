@@ -1,0 +1,3 @@
+
+LinearTHFail3.hs:7:3: error:
+    Non-linear fields in data constructors not (yet) handled by Template Haskell
