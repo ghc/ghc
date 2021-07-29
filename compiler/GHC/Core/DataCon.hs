@@ -1357,7 +1357,7 @@ MkT :: a %1 -> T a (with -XLinearTypes)
 or
 MkT :: a  -> T a (with -XNoLinearTypes)
 
-There are two different methods to retrieve a type of a datacon.
+There are three different methods to retrieve a type of a datacon.
 They differ in how linear fields are handled.
 
 1. dataConWrapperType:
@@ -1369,7 +1369,7 @@ The type of the constructor, with linear arrows replaced by unrestricted ones.
 Used when we don't want to introduce linear types to user (in holes
 and in types in hie used by haddock).
 
-3. dataConDisplayType (take a boolean indicating if -XLinearTypes is enabled):
+3. dataConDisplayType (takes a boolean indicating if -XLinearTypes is enabled):
 The type we'd like to show in error messages, :info and -ddump-types.
 Ideally, it should reflect the type written by the user;
 the function returns a type with arrows that would be required

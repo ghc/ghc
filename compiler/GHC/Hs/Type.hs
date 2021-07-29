@@ -26,6 +26,7 @@ module GHC.Hs.Type (
         HsArrow(..), arrowToHsType,
         HsLinearArrowTokens(..),
         hsLinear, hsUnrestricted, isUnrestricted,
+        pprHsArrow,
 
         HsType(..), HsCoreTy, LHsType, HsKind, LHsKind,
         HsForAllTelescope(..), EpAnnForallTy, HsTyVarBndr(..), LHsTyVarBndr,
