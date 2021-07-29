@@ -241,7 +241,7 @@ wantAmbiguityCheck ctxt
       StandaloneKindSigCtxt{} -> False
       _            -> True
 
-checkUserTypeError :: Type -> TcM ()
+checkUserTypeError :: UserTypeCtxt -> Type -> TcM ()
 -- Check to see if the type signature mentions "TypeError blah"
 -- anywhere in it, and fail if so.
 --
@@ -250,7 +250,12 @@ checkUserTypeError :: Type -> TcM ()
 -- user-supplied one.  This is really only a half-baked fix;
 -- the other errors in checkValidType don't do tidying, and so
 -- may give bad error messages when given an inferred type.
-checkUserTypeError = check
+checkUserTypeError ctxt ty
+  | TySynCtxt {} <- ctxt  -- Do not complain about TypeError on the
+  = return ()             -- RHS of type synonyms. See #20181
+
+  | otherwise
+  = check ty
   where
   check ty
     | Just msg     <- userTypeError_maybe ty      = fail_with msg
@@ -393,7 +398,7 @@ checkValidType ctxt ty
        -- (and more complicated) errors in checkAmbiguity
        ; checkNoErrs $
          do { check_type ve ty
-            ; checkUserTypeError ty
+            ; checkUserTypeError ctxt ty
             ; traceTc "done ct" (ppr ty) }
 
        -- Check for ambiguous types.  See Note [When to call checkAmbiguity]

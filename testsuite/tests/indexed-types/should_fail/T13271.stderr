@@ -1,4 +1,22 @@
 
-T13271.hs:9:1: error:
-    • You can't do that!
-    • In the type synonym declaration for ‘T2’
+T13271.hs:12:3: error:
+    • Type family equation right-hand sides overlap; this violates
+      the family's injectivity annotation:
+        X 1 = T1 -- Defined at T13271.hs:12:3
+        X 2 = T2 -- Defined at T13271.hs:13:3
+    • In the equations for closed type family ‘X’
+      In the type family declaration for ‘X’
+
+T13271.hs:13:3: error:
+    • Type family equation violates the family's injectivity annotation.
+      RHS of injective type family equation cannot be a type family:
+        X 2 = T2 -- Defined at T13271.hs:13:3
+    • In the equations for closed type family ‘X’
+      In the type family declaration for ‘X’
+
+T13271.hs:13:3: error:
+    • The type family application ‘(TypeError ...)’
+        is no smaller than the instance head ‘X 2’
+      (Use UndecidableInstances to permit this)
+    • In the equations for closed type family ‘X’
+      In the type family declaration for ‘X’
