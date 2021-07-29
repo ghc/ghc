@@ -186,7 +186,6 @@ data HsWrap hs_syn = HsWrap HsWrapper      -- the wrapper
 
 deriving instance (Data (hs_syn GhcTc), Typeable hs_syn) => Data (HsWrap hs_syn)
 
-type instance HsDoRn (GhcPass _) = GhcRn
 type instance HsBracketRn (GhcPass _) = GhcRn
 type instance PendingRnSplice' (GhcPass _) = PendingRnSplice
 type instance PendingTcSplice' (GhcPass _) = PendingTcSplice
@@ -797,7 +796,7 @@ hsExprNeedsParens prec = go
     go (HsMultiIf{})                  = prec > topPrec
     go (HsLet{})                      = prec > topPrec
     go (HsDo _ sc _)
-      | isComprehensionContext sc     = False
+      | isDoComprehensionContext sc   = False
       | otherwise                     = prec > topPrec
     go (ExplicitList{})               = False
     go (RecordUpd{})                  = False
@@ -1185,7 +1184,7 @@ ppr_cmd (HsCmdLet _ binds cmd)
   = sep [hang (text "let") 2 (pprBinds binds),
          hang (text "in")  2 (ppr cmd)]
 
-ppr_cmd (HsCmdDo _ (L _ stmts))  = pprDo ArrowExpr stmts
+ppr_cmd (HsCmdDo _ (L _ stmts))  = pprArrowExpr stmts
 
 ppr_cmd (HsCmdArrApp _ arrow arg HsFirstOrderApp True)
   = hsep [ppr_lexpr arrow, larrowt, ppr_lexpr arg]
@@ -1448,8 +1447,6 @@ type instance XApplicativeArgOne GhcTc = FailOperator GhcTc
 type instance XApplicativeArgMany (GhcPass _) = NoExtField
 type instance XXApplicativeArg    (GhcPass _) = NoExtCon
 
-type instance ApplicativeArgStmCtxPass _ = GhcRn
-
 instance (Outputable (StmtLR (GhcPass idL) (GhcPass idL) (LHsExpr (GhcPass idL))),
           Outputable (XXParStmtBlock (GhcPass idL) (GhcPass idR)))
         => Outputable (ParStmtBlock (GhcPass idL) (GhcPass idR)) where
@@ -1562,16 +1559,20 @@ pprBy (Just e) = text "by" <+> ppr e
 pprDo :: (OutputableBndrId p, Outputable body,
                  Anno (StmtLR (GhcPass p) (GhcPass p) body) ~ SrcSpanAnnA
          )
-      => HsStmtContext any -> [LStmt (GhcPass p) body] -> SDoc
+      => HsDoFlavour -> [LStmt (GhcPass p) body] -> SDoc
 pprDo (DoExpr m)    stmts =
   ppr_module_name_prefix m <> text "do"  <+> ppr_do_stmts stmts
 pprDo GhciStmtCtxt  stmts = text "do"  <+> ppr_do_stmts stmts
-pprDo ArrowExpr     stmts = text "do"  <+> ppr_do_stmts stmts
 pprDo (MDoExpr m)   stmts =
   ppr_module_name_prefix m <> text "mdo"  <+> ppr_do_stmts stmts
 pprDo ListComp      stmts = brackets    $ pprComp stmts
 pprDo MonadComp     stmts = brackets    $ pprComp stmts
-pprDo _             _     = panic "pprDo" -- PatGuard, ParStmtCxt
+
+pprArrowExpr :: (OutputableBndrId p, Outputable body,
+                 Anno (StmtLR (GhcPass p) (GhcPass p) body) ~ SrcSpanAnnA
+         )
+      => [LStmt (GhcPass p) body] -> SDoc
+pprArrowExpr stmts = text "do"  <+> ppr_do_stmts stmts
 
 ppr_module_name_prefix :: Maybe ModuleName -> SDoc
 ppr_module_name_prefix = \case
@@ -1868,12 +1869,15 @@ matchContextErrString PatSyn                     = panic "matchContextErrString"
 matchContextErrString (StmtCtxt (ParStmtCtxt c))   = matchContextErrString (StmtCtxt c)
 matchContextErrString (StmtCtxt (TransStmtCtxt c)) = matchContextErrString (StmtCtxt c)
 matchContextErrString (StmtCtxt (PatGuard _))      = text "pattern guard"
-matchContextErrString (StmtCtxt GhciStmtCtxt)      = text "interactive GHCi command"
-matchContextErrString (StmtCtxt (DoExpr m))        = prependQualified m (text "'do' block")
-matchContextErrString (StmtCtxt ArrowExpr)         = text "'do' block"
-matchContextErrString (StmtCtxt (MDoExpr m))       = prependQualified m (text "'mdo' block")
-matchContextErrString (StmtCtxt ListComp)          = text "list comprehension"
-matchContextErrString (StmtCtxt MonadComp)         = text "monad comprehension"
+matchContextErrString (StmtCtxt (ArrowExpr))  = text "'do' block"
+matchContextErrString (StmtCtxt (HsDoStmt flavour)) = matchDoContextErrString flavour
+
+matchDoContextErrString :: HsDoFlavour -> SDoc
+matchDoContextErrString GhciStmtCtxt = text "interactive GHCi command"
+matchDoContextErrString (DoExpr m)   = prependQualified m (text "'do' block")
+matchDoContextErrString (MDoExpr m)  = prependQualified m (text "'mdo' block")
+matchDoContextErrString ListComp     = text "list comprehension"
+matchDoContextErrString MonadComp    = text "monad comprehension"
 
 pprMatchInCtxt :: (OutputableBndrId idR, Outputable body)
                => Match (GhcPass idR) body -> SDoc

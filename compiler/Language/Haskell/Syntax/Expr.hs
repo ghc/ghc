@@ -488,10 +488,7 @@ data HsExpr p
 
   -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
   | HsDo        (XDo p)                  -- Type of the whole expression
-                (HsStmtContext (HsDoRn p))
-                -- The parameterisation of the above is unimportant
-                -- because in this context we never use
-                -- the PatGuard or ParStmt variant
+                HsDoFlavour
                 (XRec p [ExprLStmt p])   -- "do":one or more stmts
 
   -- | Syntactic list: [a,b,c,...]
@@ -665,7 +662,6 @@ data HsExpr p
 
 -- | The AST used to hard-refer to GhcPass, which was a layer violation. For now,
 -- we paper it over with this new extension point.
-type family HsDoRn p
 type family HsBracketRn p
 type family PendingRnSplice' p
 type family PendingTcSplice' p
@@ -1371,12 +1367,10 @@ data ApplicativeArg idL
     , app_stmts         :: [ExprLStmt idL] -- stmts
     , final_expr        :: HsExpr idL    -- return (v1,..,vn), or just (v1,..,vn)
     , bv_pattern        :: LPat idL      -- (v1,...,vn)
-    , stmt_context      :: HsStmtContext (ApplicativeArgStmCtxPass idL)
+    , stmt_context      :: HsDoFlavour
       -- ^ context of the do expression, used in pprArg
     }
   | XApplicativeArg !(XXApplicativeArg idL)
-
-type family ApplicativeArgStmCtxPass idL
 
 {-
 Note [The type of bind in Stmts]
@@ -1720,45 +1714,68 @@ isPatSynCtxt ctxt =
 
 -- | Haskell Statement Context.
 data HsStmtContext p
-  = ListComp
-  | MonadComp
-
-  | DoExpr (Maybe ModuleName)        -- ^[ModuleName.]do { ... }
-  | MDoExpr (Maybe ModuleName)       -- ^[ModuleName.]mdo { ... }  ie recursive do-expression
-  | ArrowExpr                        -- ^do-notation in an arrow-command context
-
-  | GhciStmtCtxt                     -- ^A command-line Stmt in GHCi pat <- rhs
+  = HsDoStmt HsDoFlavour             -- ^Context for HsDo (do-notation and comprehensions)
   | PatGuard (HsMatchContext p)      -- ^Pattern guard for specified thing
   | ParStmtCtxt (HsStmtContext p)    -- ^A branch of a parallel stmt
   | TransStmtCtxt (HsStmtContext p)  -- ^A branch of a transform stmt
+  | ArrowExpr                        -- ^do-notation in an arrow-command context
+
+data HsDoFlavour
+  = DoExpr (Maybe ModuleName)        -- ^[ModuleName.]do { ... }
+  | MDoExpr (Maybe ModuleName)       -- ^[ModuleName.]mdo { ... }  ie recursive do-expression
+  | GhciStmtCtxt                     -- ^A command-line Stmt in GHCi pat <- rhs
+  | ListComp
+  | MonadComp
 
 qualifiedDoModuleName_maybe :: HsStmtContext p -> Maybe ModuleName
 qualifiedDoModuleName_maybe ctxt = case ctxt of
-  DoExpr m -> m
-  MDoExpr m -> m
+  HsDoStmt (DoExpr m) -> m
+  HsDoStmt (MDoExpr m) -> m
   _ -> Nothing
 
 isComprehensionContext :: HsStmtContext id -> Bool
 -- Uses comprehension syntax [ e | quals ]
-isComprehensionContext ListComp          = True
-isComprehensionContext MonadComp         = True
 isComprehensionContext (ParStmtCtxt c)   = isComprehensionContext c
 isComprehensionContext (TransStmtCtxt c) = isComprehensionContext c
-isComprehensionContext _ = False
+isComprehensionContext ArrowExpr = False
+isComprehensionContext (PatGuard _) = False
+isComprehensionContext (HsDoStmt flavour) = isDoComprehensionContext flavour
+
+isDoComprehensionContext :: HsDoFlavour -> Bool
+isDoComprehensionContext GhciStmtCtxt = False
+isDoComprehensionContext (DoExpr _) = False
+isDoComprehensionContext (MDoExpr _) = False
+isDoComprehensionContext ListComp = True
+isDoComprehensionContext MonadComp = True
 
 -- | Is this a monadic context?
 isMonadStmtContext :: HsStmtContext id -> Bool
-isMonadStmtContext MonadComp            = True
-isMonadStmtContext DoExpr{}             = True
-isMonadStmtContext MDoExpr{}            = True
-isMonadStmtContext GhciStmtCtxt         = True
 isMonadStmtContext (ParStmtCtxt ctxt)   = isMonadStmtContext ctxt
 isMonadStmtContext (TransStmtCtxt ctxt) = isMonadStmtContext ctxt
-isMonadStmtContext _ = False -- ListComp, PatGuard, ArrowExpr
+isMonadStmtContext (HsDoStmt flavour) = isMonadDoStmtContext flavour
+isMonadStmtContext (PatGuard _) = False
+isMonadStmtContext ArrowExpr = False
+
+isMonadDoStmtContext :: HsDoFlavour -> Bool
+isMonadDoStmtContext ListComp     = False
+isMonadDoStmtContext MonadComp    = True
+isMonadDoStmtContext DoExpr{}     = True
+isMonadDoStmtContext MDoExpr{}    = True
+isMonadDoStmtContext GhciStmtCtxt = True
 
 isMonadCompContext :: HsStmtContext id -> Bool
-isMonadCompContext MonadComp = True
-isMonadCompContext _         = False
+isMonadCompContext (HsDoStmt flavour)   = isMonadDoCompContext flavour
+isMonadCompContext (ParStmtCtxt _)   = False
+isMonadCompContext (TransStmtCtxt _) = False
+isMonadCompContext (PatGuard _)      = False
+isMonadCompContext ArrowExpr         = False
+
+isMonadDoCompContext :: HsDoFlavour -> Bool
+isMonadDoCompContext MonadComp    = True
+isMonadDoCompContext ListComp     = False
+isMonadDoCompContext GhciStmtCtxt = False
+isMonadDoCompContext (DoExpr _)   = False
+isMonadDoCompContext (MDoExpr _)  = False
 
 matchSeparator :: HsMatchContext p -> SDoc
 matchSeparator (FunRhs {})   = text "="
@@ -1806,24 +1823,13 @@ pprMatchContextNoun PatSyn          = text "pattern synonym declaration"
 -----------------
 pprAStmtContext, pprStmtContext :: (Outputable (IdP p), UnXRec p)
                                 => HsStmtContext p -> SDoc
-pprAStmtContext ctxt = article <+> pprStmtContext ctxt
-  where
-    pp_an = text "an"
-    pp_a  = text "a"
-    article = case ctxt of
-                  MDoExpr Nothing -> pp_an
-                  GhciStmtCtxt  -> pp_an
-                  _             -> pp_a
-
+pprAStmtContext (HsDoStmt flavour) = pprAHsDoFlavour flavour
+pprAStmtContext ctxt = text "a" <+> pprStmtContext ctxt
 
 -----------------
-pprStmtContext GhciStmtCtxt    = text "interactive GHCi command"
-pprStmtContext (DoExpr m)      = prependQualified m (text "'do' block")
-pprStmtContext (MDoExpr m)     = prependQualified m (text "'mdo' block")
-pprStmtContext ArrowExpr       = text "'do' block in an arrow command"
-pprStmtContext ListComp        = text "list comprehension"
-pprStmtContext MonadComp       = text "monad comprehension"
+pprStmtContext (HsDoStmt flavour) = pprHsDoFlavour flavour
 pprStmtContext (PatGuard ctxt) = text "pattern guard for" $$ pprMatchContext ctxt
+pprStmtContext ArrowExpr       = text "'do' block in an arrow command"
 
 -- Drop the inner contexts when reporting errors, else we get
 --     Unexpected transform statement
@@ -1836,6 +1842,21 @@ pprStmtContext (ParStmtCtxt c) =
 pprStmtContext (TransStmtCtxt c) =
   ifPprDebug (sep [text "transformed branch of", pprAStmtContext c])
              (pprStmtContext c)
+
+pprAHsDoFlavour, pprHsDoFlavour :: HsDoFlavour -> SDoc
+pprAHsDoFlavour flavour = article <+> pprHsDoFlavour flavour
+  where
+    pp_an = text "an"
+    pp_a  = text "a"
+    article = case flavour of
+                  MDoExpr Nothing -> pp_an
+                  GhciStmtCtxt  -> pp_an
+                  _             -> pp_a
+pprHsDoFlavour (DoExpr m)      = prependQualified m (text "'do' block")
+pprHsDoFlavour (MDoExpr m)     = prependQualified m (text "'mdo' block")
+pprHsDoFlavour ListComp        = text "list comprehension"
+pprHsDoFlavour MonadComp       = text "monad comprehension"
+pprHsDoFlavour GhciStmtCtxt    = text "interactive GHCi command"
 
 prependQualified :: Maybe ModuleName -> SDoc -> SDoc
 prependQualified Nothing  t = t

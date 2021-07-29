@@ -2080,14 +2080,12 @@ instance ExactPrint (HsExpr GhcPs) where
 -- ---------------------------------------------------------------------
 
 exactDo :: (ExactPrint body)
-        => EpAnn AnnList -> (HsStmtContext any) -> body -> EPP ()
+        => EpAnn AnnList -> HsDoFlavour -> body -> EPP ()
 exactDo an (DoExpr m)    stmts = exactMdo an m AnnDo             >> markAnnotatedWithLayout stmts
 exactDo an GhciStmtCtxt  stmts = markLocatedAAL an al_rest AnnDo >> markAnnotatedWithLayout stmts
-exactDo an ArrowExpr     stmts = markLocatedAAL an al_rest AnnDo >> markAnnotatedWithLayout stmts
 exactDo an (MDoExpr m)   stmts = exactMdo an m AnnMdo            >> markAnnotatedWithLayout stmts
 exactDo _  ListComp      stmts = markAnnotatedWithLayout stmts
 exactDo _  MonadComp     stmts = markAnnotatedWithLayout stmts
-exactDo _  _             _     = panic "pprDo" -- PatGuard, ParStmtCxt
 
 exactMdo :: EpAnn AnnList -> Maybe ModuleName -> AnnKeywordId -> EPP ()
 exactMdo an Nothing            kw = markLocatedAAL  an al_rest kw

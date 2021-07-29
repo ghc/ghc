@@ -299,7 +299,7 @@ tcGRHS ctxt res_ty (GRHS _ guards rhs)
 ************************************************************************
 -}
 
-tcDoStmts :: HsStmtContext GhcRn
+tcDoStmts :: HsDoFlavour
           -> LocatedL [LStmt GhcRn (LHsExpr GhcRn)]
           -> ExpRhoType
           -> TcM (HsExpr GhcTc)          -- Returns a HsDo
@@ -307,26 +307,25 @@ tcDoStmts ListComp (L l stmts) res_ty
   = do  { res_ty <- expTypeToType res_ty
         ; (co, elt_ty) <- matchExpectedListTy res_ty
         ; let list_ty = mkListTy elt_ty
-        ; stmts' <- tcStmts ListComp (tcLcStmt listTyCon) stmts
+        ; stmts' <- tcStmts (HsDoStmt ListComp) (tcLcStmt listTyCon) stmts
                             (mkCheckExpType elt_ty)
         ; return $ mkHsWrapCo co (HsDo list_ty ListComp (L l stmts')) }
 
 tcDoStmts doExpr@(DoExpr _) (L l stmts) res_ty
-  = do  { stmts' <- tcStmts doExpr tcDoStmt stmts res_ty
+  = do  { stmts' <- tcStmts (HsDoStmt doExpr) tcDoStmt stmts res_ty
         ; res_ty <- readExpType res_ty
         ; return (HsDo res_ty doExpr (L l stmts')) }
 
 tcDoStmts mDoExpr@(MDoExpr _) (L l stmts) res_ty
-  = do  { stmts' <- tcStmts mDoExpr tcDoStmt stmts res_ty
+  = do  { stmts' <- tcStmts (HsDoStmt mDoExpr) tcDoStmt stmts res_ty
         ; res_ty <- readExpType res_ty
         ; return (HsDo res_ty mDoExpr (L l stmts')) }
 
 tcDoStmts MonadComp (L l stmts) res_ty
-  = do  { stmts' <- tcStmts MonadComp tcMcStmt stmts res_ty
+  = do  { stmts' <- tcStmts (HsDoStmt MonadComp) tcMcStmt stmts res_ty
         ; res_ty <- readExpType res_ty
         ; return (HsDo res_ty MonadComp (L l stmts')) }
-
-tcDoStmts ctxt _ _ = pprPanic "tcDoStmts" (pprStmtContext ctxt)
+tcDoStmts ctxt@GhciStmtCtxt _ _ = pprPanic "tcDoStmts" (pprHsDoFlavour ctxt)
 
 tcBody :: LHsExpr GhcRn -> ExpRhoType -> TcM (LHsExpr GhcTc)
 tcBody body res_ty
@@ -1068,10 +1067,10 @@ tcApplicativeStmts ctxt pairs rhs_ty thing_inside
 
     goArg _body_ty (ApplicativeArgMany x stmts ret pat ctxt, pat_ty, exp_ty)
       = do { (stmts', (ret',pat')) <-
-                tcStmtsAndThen ctxt tcDoStmt stmts (mkCheckExpType exp_ty) $
+                tcStmtsAndThen (HsDoStmt ctxt) tcDoStmt stmts (mkCheckExpType exp_ty) $
                 \res_ty  -> do
                   { ret'      <- tcExpr ret res_ty
-                  ; (pat', _) <- tcCheckPat (StmtCtxt ctxt) pat (unrestricted pat_ty) $
+                  ; (pat', _) <- tcCheckPat (StmtCtxt (HsDoStmt ctxt)) pat (unrestricted pat_ty) $
                                  return ()
                   ; return (ret', pat')
                   }

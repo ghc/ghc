@@ -207,19 +207,8 @@ orderByKey keys order
 
 -- ---------------------------------------------------------------------
 
-isListComp :: HsStmtContext name -> Bool
-isListComp cts = case cts of
-          ListComp  -> True
-          MonadComp -> True
-
-          DoExpr {}    -> False
-          MDoExpr {}   -> False
-          ArrowExpr    -> False
-          GhciStmtCtxt -> False
-
-          PatGuard {}      -> False
-          ParStmtCtxt {}   -> False
-          TransStmtCtxt {} -> False
+isListComp :: HsDoFlavour -> Bool
+isListComp = isDoComprehensionContext
 
 -- ---------------------------------------------------------------------
 

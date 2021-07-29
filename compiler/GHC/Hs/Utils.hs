@@ -299,11 +299,11 @@ nlParPat p = noLocA (gParPat p)
 mkHsIntegral   :: IntegralLit -> HsOverLit GhcPs
 mkHsFractional :: FractionalLit -> HsOverLit GhcPs
 mkHsIsString   :: SourceText -> FastString -> HsOverLit GhcPs
-mkHsDo         :: HsStmtContext GhcRn -> LocatedL [ExprLStmt GhcPs] -> HsExpr GhcPs
-mkHsDoAnns     :: HsStmtContext GhcRn -> LocatedL [ExprLStmt GhcPs] -> EpAnn AnnList -> HsExpr GhcPs
-mkHsComp       :: HsStmtContext GhcRn -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
+mkHsDo         :: HsDoFlavour -> LocatedL [ExprLStmt GhcPs] -> HsExpr GhcPs
+mkHsDoAnns     :: HsDoFlavour -> LocatedL [ExprLStmt GhcPs] -> EpAnn AnnList -> HsExpr GhcPs
+mkHsComp       :: HsDoFlavour -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
                -> HsExpr GhcPs
-mkHsCompAnns   :: HsStmtContext GhcRn -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
+mkHsCompAnns   :: HsDoFlavour -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
                -> EpAnn AnnList
                -> HsExpr GhcPs
 
@@ -575,7 +575,7 @@ nlWildPat  = noLocA (WildPat noExtField )
 nlWildPatName :: LPat GhcRn
 nlWildPatName  = noLocA (WildPat noExtField )
 
-nlHsDo :: HsStmtContext GhcRn -> [LStmt GhcPs (LHsExpr GhcPs)]
+nlHsDo :: HsDoFlavour -> [LStmt GhcPs (LHsExpr GhcPs)]
        -> LHsExpr GhcPs
 nlHsDo ctxt stmts = noLocA (mkHsDo ctxt (noLocA stmts))
 

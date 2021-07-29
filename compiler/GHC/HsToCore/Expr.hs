@@ -778,8 +778,6 @@ dsExpr (OpApp x _ _ _)   = dataConCantHappen x
 dsExpr (SectionL x _ _)  = dataConCantHappen x
 dsExpr (SectionR x _ _)  = dataConCantHappen x
 dsExpr (HsBracket x _)   = dataConCantHappen x
--- HsSyn constructs that just shouldn't be here:
-dsExpr (HsDo        {}) = panic "dsExpr:HsDo"
 
 ds_prag_expr :: HsPragE GhcTc -> LHsExpr GhcTc -> DsM CoreExpr
 ds_prag_expr (HsPragSCC _ _ cc) expr = do
@@ -936,7 +934,7 @@ handled in GHC.HsToCore.ListComp).  Basically does the translation given in the
 Haskell 98 report:
 -}
 
-dsDo :: HsStmtContext GhcRn -> [ExprLStmt GhcTc] -> DsM CoreExpr
+dsDo :: HsDoFlavour -> [ExprLStmt GhcTc] -> DsM CoreExpr
 dsDo ctx stmts
   = goL stmts
   where
@@ -961,7 +959,7 @@ dsDo ctx stmts
       = do  { body     <- goL stmts
             ; rhs'     <- dsLExpr rhs
             ; var   <- selectSimpleMatchVarL (xbstc_boundResultMult xbs) pat
-            ; match <- matchSinglePatVar var Nothing (StmtCtxt ctx) pat
+            ; match <- matchSinglePatVar var Nothing (StmtCtxt (HsDoStmt ctx)) pat
                          (xbstc_boundResultType xbs) (cantFailMatchResult body)
             ; match_code <- dsHandleMonadicFailure ctx pat match (xbstc_failOp xbs)
             ; dsSyntaxExpr (xbstc_bindOp xbs) [rhs', Lam var match_code] }
@@ -982,7 +980,7 @@ dsDo ctx stmts
 
            ; let match_args (pat, fail_op) (vs,body)
                    = do { var   <- selectSimpleMatchVarL Many pat
-                        ; match <- matchSinglePatVar var Nothing (StmtCtxt ctx) pat
+                        ; match <- matchSinglePatVar var Nothing (StmtCtxt (HsDoStmt ctx)) pat
                                    body_ty (cantFailMatchResult body)
                         ; match_code <- dsHandleMonadicFailure ctx pat match fail_op
                         ; return (var:vs, match_code)

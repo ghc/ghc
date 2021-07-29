@@ -1177,7 +1177,7 @@ cvtOpApp x op y
 --      Do notation and statements
 -------------------------------------
 
-cvtHsDo :: HsStmtContext GhcRn -> [TH.Stmt] -> CvtM (HsExpr GhcPs)
+cvtHsDo :: HsDoFlavour -> [TH.Stmt] -> CvtM (HsExpr GhcPs)
 cvtHsDo do_or_lc stmts
   | null stmts = failWith (text "Empty stmt list in do-block")
   | otherwise
@@ -1191,7 +1191,7 @@ cvtHsDo do_or_lc stmts
 
         ; return $ HsDo noAnn do_or_lc (noLocA (stmts'' ++ [last''])) }
   where
-    bad_last stmt = vcat [ text "Illegal last statement of" <+> pprAStmtContext do_or_lc <> colon
+    bad_last stmt = vcat [ text "Illegal last statement of" <+> pprAHsDoFlavour do_or_lc <> colon
                          , nest 2 $ Outputable.ppr stmt
                          , text "(It should be an expression.)" ]
 
