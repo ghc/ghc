@@ -705,13 +705,16 @@ pprConDecl (ConDeclGADT { con_names = cons, con_bndrs = L _ outer_bndrs
                         , con_res_ty = res_ty, con_doc = doc })
   = ppr_mbDoc doc <+> ppr_con_names cons <+> dcolon
     <+> (sep [pprHsOuterSigTyVarBndrs outer_bndrs <+> pprLHsContext mcxt,
-              ppr_arrow_chain (get_args args ++ [ppr res_ty]) ])
+              sep (ppr_args args ++ [ppr res_ty]) ])
   where
-    get_args (PrefixConGADT args) = map ppr args
-    get_args (RecConGADT fields _) = [pprConDeclFields (unLoc fields)]
+    ppr_args (PrefixConGADT args) = map (\(HsScaled arr t) -> ppr t <+> ppr_arr arr) args
+    ppr_args (RecConGADT fields _) = [pprConDeclFields (unLoc fields) <+> arrow]
 
-    ppr_arrow_chain (a:as) = sep (a : map (arrow <+>) as)
-    ppr_arrow_chain []     = empty
+    -- Display linear arrows as unrestricted with -XNoLinearTypes
+    -- (cf. dataConDisplayType in Note [Displaying linear fields] in GHC.Core.DataCon)
+    ppr_arr (HsLinearArrow _) = sdocOption sdocLinearTypes $ \show_linear_types ->
+                                  if show_linear_types then lollipop else arrow
+    ppr_arr arr = pprHsArrow arr
 
 ppr_con_names :: (OutputableBndr a) => [GenLocated l a] -> SDoc
 ppr_con_names = pprWithCommas (pprPrefixOcc . unLoc)

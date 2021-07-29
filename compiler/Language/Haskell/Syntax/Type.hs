@@ -938,10 +938,6 @@ hsMult (HsScaled m _) = m
 hsScaledThing :: HsScaled pass a -> a
 hsScaledThing (HsScaled _ t) = t
 
-instance Outputable a => Outputable (HsScaled pass a) where
-   ppr (HsScaled _cnt t) = -- ppr cnt <> ppr t
-                            ppr t
-
 {-
 Note [Unit tuples]
 ~~~~~~~~~~~~~~~~~~
