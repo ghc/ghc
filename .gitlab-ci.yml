@@ -319,6 +319,8 @@ stack-hadrian-build:
 validate-x86_64-linux-deb9-hadrian:
   extends: .validate-linux-hadrian
   stage: full-build
+  rules:
+    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
 
 validate-x86_64-linux-deb9-unreg-hadrian:
   extends: .validate-linux-hadrian
@@ -657,6 +659,8 @@ validate-x86_64-darwin:
   artifacts:
     when: always
     expire_in: 2 week
+  rules:
+    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
 
 validate-aarch64-darwin:
   extends: .validate-hadrian
@@ -751,6 +755,8 @@ validate-aarch64-darwin:
   artifacts:
     when: always
     expire_in: 2 week
+  rules:
+    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
 
 .validate-linux:
   extends: .validate
@@ -791,6 +797,8 @@ validate-aarch64-linux-deb10:
   artifacts:
     when: always
     expire_in: 2 week
+  rules:
+    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
 
 nightly-aarch64-linux-deb10:
   <<: *nightly
@@ -881,6 +889,8 @@ validate-i386-linux-deb9:
   artifacts:
     when: always
     expire_in: 2 week
+  rules:
+    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
 
 nightly-i386-linux-deb9:
   <<: *nightly
@@ -946,6 +956,8 @@ validate-x86_64-linux-deb9-integer-simple:
     BIGNUM_BACKEND: native
     TEST_ENV: "x86_64-linux-deb9-integer-simple-validate"
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-deb9-linux-integer-simple.tar.xz"
+  rules:
+    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
 
 nightly-x86_64-linux-deb9-integer-simple:
   <<: *nightly
@@ -983,6 +995,8 @@ validate-x86_64-linux-deb9-dwarf:
     BUILD_FLAVOUR: dwarf
     TEST_ENV: "x86_64-linux-deb9-dwarf"
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-deb9-linux-dwarf.tar.xz"
+  rules:
+    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
 
 #################################
 # x86_64-linux-deb10
@@ -1164,6 +1178,8 @@ validate-x86_64-linux-fedora27:
   extends: .build-x86_64-linux-fedora27
   variables:
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-fedora27-linux.tar.xz"
+  rules:
+    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
 
 release-x86_64-linux-fedora27-dwarf:
   <<: *release
@@ -1443,6 +1459,8 @@ perf-nofib:
     when: always
     paths:
       - nofib.log
+  rules:
+    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
 
 ############################################################
 # Ad-hoc performance testing
@@ -1478,6 +1496,8 @@ perf:
     when: always
     paths:
       - out
+  rules:
+    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
 
 
 ############################################################
