@@ -1664,6 +1664,7 @@ varsym_prefix = sym $ \span exts s ->
 varsym_suffix :: Action
 varsym_suffix = sym $ \span _ s ->
   if | s == fsLit "@" -> failMsgP (\srcLoc -> mkPlainErrorMsgEnvelope srcLoc $ PsErrSuffixAT)
+     | s == fsLit "." -> return ITdot
      | otherwise ->
          do { addPsMessage
                 (mkSrcSpanPs span)
