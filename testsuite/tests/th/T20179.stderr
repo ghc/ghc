@@ -1,0 +1,10 @@
+
+T20179.hs:4:18: error:
+    • Expecting one more argument to ‘Maybe’
+      Expected a type, but ‘Maybe’ has kind ‘* -> *’
+    • In the type signature: slurmp :: [Maybe]
+      In the expression:
+        let
+          slurmp :: [Maybe]
+          slurmp = []
+        in pure []
