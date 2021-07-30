@@ -754,11 +754,17 @@ tcTopSpliceExpr isTypedSplice tc_action
                    -- is expected (#7276)
     setStage (Splice isTypedSplice) $
     do {    -- Typecheck the expression
-         (expr', wanted) <- captureConstraints tc_action
-       ; const_binds     <- simplifyTop wanted
+         (mb_expr', wanted) <- tryCaptureConstraints tc_action
+             -- If tc_action fails (perhaps because of insoluble constraints)
+             -- we want to capture and report those constraints, else we may
+             -- just get a silent failure (#20179). Hence the 'try' part.
 
-          -- Zonk it and tie the knot of dictionary bindings
-       ; return $ mkHsDictLet (EvBinds const_binds) expr' }
+       ; const_binds <- simplifyTop wanted
+
+       ; case mb_expr' of
+            Nothing    -> failM   -- In this case simplifyTop should have
+                                  -- reported some errors
+            Just expr' -> return $ mkHsDictLet (EvBinds const_binds) expr' }
 
 {-
 ************************************************************************
