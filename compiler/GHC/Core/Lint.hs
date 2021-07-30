@@ -1430,10 +1430,10 @@ lintCoreAlt case_bndr scrut_ty _scrut_mult alt_ty alt@(Alt (DataAlt con) args rh
         -- We've already check
       lintL (tycon == dataConTyCon con) (mkBadConMsg tycon con)
     ; let { con_payload_ty = piResultTys (dataConRepType con) tycon_arg_tys
-          ; ex_tvs_n = length (dataConExTyCoVars con)
-          -- See Note [Alt arg multiplicities]
-          ; multiplicities = replicate ex_tvs_n Many ++
-                             map scaledMult (dataConRepArgTys con) }
+          ; binderMult (Named _)   = Many
+          ; binderMult (Anon _ st) = scaledMult st
+          -- See Note [Validating multiplicities in a case]
+          ; multiplicities = map binderMult $ fst $ splitPiTys con_payload_ty }
 
         -- And now bring the new binders into scope
     ; lintBinders CasePatBind args $ \ args' -> do
@@ -1447,6 +1447,18 @@ lintCoreAlt case_bndr scrut_ty _scrut_mult alt_ty alt@(Alt (DataAlt con) args rh
   | otherwise   -- Scrut-ty is wrong shape
   = zeroUE <$ addErrL (mkBadAltMsg scrut_ty alt)
 
+{-
+Note [Validating multiplicities in a case]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose 'MkT :: a %m -> T m a'.
+If we are validating 'case (x :: T Many a) of MkT y -> ...',
+we have to substitute m := Many in the type of MkT - in particular,
+y can be used Many times and that expression would still be linear in x.
+Testcase MultConstructor checks for this scenario.
+The binders can include existential tyvars (which are always multiplicity Many),
+testcase: GADT1.
+-}
+
 lintLinearBinder :: SDoc -> Mult -> Mult -> LintM ()
 lintLinearBinder doc actual_usage described_usage
   = ensureSubMult actual_usage described_usage err_msg
@@ -1455,16 +1467,6 @@ lintLinearBinder doc actual_usage described_usage
                 $$ doc
                 $$ ppr actual_usage
                 $$ text "Annotation:" <+> ppr described_usage)
-
-{-
-Note [Alt arg multiplicities]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-It is necessary to use `dataConRepArgTys` so you get the arg tys from
-the wrapper if there is one.
-
-You also need to add the existential ty vars as they are passed are arguments
-but not returned by `dataConRepArgTys`. Without this the test `GADT1` fails.
--}
 
 {-
 ************************************************************************
