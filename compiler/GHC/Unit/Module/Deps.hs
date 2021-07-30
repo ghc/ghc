@@ -110,7 +110,7 @@ data Usage
         usg_mod      :: Module,
            -- ^ External package module depended on
         usg_mod_hash :: Fingerprint,
-            -- ^ Cached module fingerprint
+            -- ^ Cached module ABI fingerprint (corresponds to mi_mod_hash)
         usg_safe :: IsSafeImport
             -- ^ Was this module imported as a safe import
     }
@@ -119,7 +119,10 @@ data Usage
         usg_mod_name :: ModuleName,
             -- ^ Name of the module
         usg_mod_hash :: Fingerprint,
-            -- ^ Cached module fingerprint
+            -- ^ Cached module ABI fingerprint (corresponds to mi_mod_hash).
+            -- This may be out dated after recompilation was avoided, but is
+            -- still used as a fast initial check for change during
+            -- recompilation avoidance.
         usg_entities :: [(OccName,Fingerprint)],
             -- ^ Entities we depend on, sorted by occurrence name and fingerprinted.
             -- NB: usages are for parent names only, e.g. type constructors
