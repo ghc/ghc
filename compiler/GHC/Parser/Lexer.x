@@ -1648,6 +1648,7 @@ varsym_prefix = sym $ \span exts s ->
 varsym_suffix :: Action
 varsym_suffix = sym $ \span _ s ->
   if | s == fsLit "@" -> failMsgP (PsError PsErrSuffixAT [])
+     | s == fsLit "." -> return ITdot
      | otherwise ->
          do { addWarning Opt_WarnOperatorWhitespace $
                 PsWarnOperatorWhitespace (mkSrcSpanPs span) s
