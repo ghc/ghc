@@ -48,6 +48,7 @@ import GHC.Tc.Utils.Env
 import GHC.Tc.Instance.Family
 import GHC.Core.FamInstEnv
 import GHC.Core.Coercion
+import GHC.Core.Reduction
 import GHC.Core.Type
 import GHC.Core.Multiplicity
 import GHC.Types.ForeignCall
@@ -70,7 +71,11 @@ import GHC.Data.Bag
 import GHC.Driver.Hooks
 import qualified GHC.LanguageExtensions as LangExt
 
-import Control.Monad
+import Control.Monad ( zipWithM )
+import Control.Monad.Trans.Writer.CPS
+  ( WriterT, runWriterT, tell )
+import Control.Monad.Trans.Class
+  ( lift )
 
 -- Defines a binding
 isForeignImport :: forall name. UnXRec name => LForeignDecl name -> Bool
@@ -107,15 +112,15 @@ an AppTy will be marshalable.
 -- we are only allowed to look through newtypes if the constructor is
 -- in scope.  We return a bag of all the newtype constructors thus found.
 -- Always returns a Representational coercion
-normaliseFfiType :: Type -> TcM (Coercion, Type, Bag GlobalRdrElt)
+normaliseFfiType :: Type -> TcM (Reduction, Bag GlobalRdrElt)
 normaliseFfiType ty
     = do fam_envs <- tcGetFamInstEnvs
          normaliseFfiType' fam_envs ty
 
-normaliseFfiType' :: FamInstEnvs -> Type -> TcM (Coercion, Type, Bag GlobalRdrElt)
-normaliseFfiType' env ty0 = go Representational initRecTc ty0
+normaliseFfiType' :: FamInstEnvs -> Type -> TcM (Reduction, Bag GlobalRdrElt)
+normaliseFfiType' env ty0 = runWriterT $ go Representational initRecTc ty0
   where
-    go :: Role -> RecTcChecker -> Type -> TcM (Coercion, Type, Bag GlobalRdrElt)
+    go :: Role -> RecTcChecker -> Type -> WriterT (Bag GlobalRdrElt) TcM Reduction
     go role rec_nts ty
       | Just ty' <- tcView ty     -- Expand synonyms
       = go role rec_nts ty'
@@ -125,15 +130,14 @@ normaliseFfiType' env ty0 = go Representational initRecTc ty0
 
       | (bndrs, inner_ty) <- splitForAllTyCoVarBinders ty
       , not (null bndrs)
-      = do (coi, nty1, gres1) <- go role rec_nts inner_ty
-           return ( mkHomoForAllCos (binderVars bndrs) coi
-                  , mkForAllTys bndrs nty1, gres1 )
+      = do redn <- go role rec_nts inner_ty
+           return $ mkHomoForAllRedn bndrs redn
 
       | otherwise -- see Note [Don't recur in normaliseFfiType']
-      = return (mkReflCo role ty, ty, emptyBag)
+      = return $ mkReflRedn role ty
 
     go_tc_app :: Role -> RecTcChecker -> TyCon -> [Type]
-              -> TcM (Coercion, Type, Bag GlobalRdrElt)
+              -> WriterT (Bag GlobalRdrElt) TcM Reduction
     go_tc_app role rec_nts tc tys
         -- We don't want to look through the IO newtype, even if it is
         -- in scope, so we have a special case for it:
@@ -148,32 +152,34 @@ normaliseFfiType' env ty0 = go Representational initRecTc ty0
                    --   Here, we don't reject the type for being recursive.
                    -- If this is a recursive newtype then it will normally
                    -- be rejected later as not being a valid FFI type.
-        = do { rdr_env <- getGlobalRdrEnv
+        = do { rdr_env <- lift $ getGlobalRdrEnv
              ; case checkNewtypeFFI rdr_env tc of
                  Nothing  -> nothing
-                 Just gre -> do { (co', ty', gres) <- go role rec_nts' nt_rhs
-                                ; return (mkTransCo nt_co co', ty', gre `consBag` gres) } }
+                 Just gre ->
+                   do { redn <- go role rec_nts' nt_rhs
+                      ; tell (unitBag gre)
+                      ; return $ nt_co `mkTransRedn` redn } }
 
         | isFamilyTyCon tc              -- Expand open tycons
-        , (co, ty) <- normaliseTcApp env role tc tys
+        , Reduction co ty <- normaliseTcApp env role tc tys
         , not (isReflexiveCo co)
-        = do (co', ty', gres) <- go role rec_nts ty
-             return (mkTransCo co co', ty', gres)
+        = do redn <- go role rec_nts ty
+             return $ co `mkTransRedn` redn
 
         | otherwise
         = nothing -- see Note [Don't recur in normaliseFfiType']
         where
           tc_key = getUnique tc
           children_only
-            = do xs <- zipWithM (\ty r -> go r rec_nts ty) tys (tyConRolesX role tc)
-                 let (cos, tys', gres) = unzip3 xs
-                 return ( mkTyConAppCo role tc cos
-                        , mkTyConApp tc tys', unionManyBags gres)
+            = do { args <- unzipRedns <$>
+                            zipWithM ( \ ty r -> go r rec_nts ty )
+                                     tys (tyConRolesX role tc)
+                 ; return $ mkTyConAppRedn role tc args }
           nt_co  = mkUnbranchedAxInstCo role (newTyConCo tc) tys []
           nt_rhs = newTyConInstRhs tc tys
 
           ty      = mkTyConApp tc tys
-          nothing = return (mkReflCo role ty, ty, emptyBag)
+          nothing = return $ mkReflRedn role ty
 
 checkNewtypeFFI :: GlobalRdrEnv -> TyCon -> Maybe GlobalRdrElt
 checkNewtypeFFI rdr_env tc
@@ -236,7 +242,7 @@ tcFImport (L dloc fo@(ForeignImport { fd_name = L nloc nm, fd_sig_ty = hs_ty
                                     , fd_fi = imp_decl }))
   = setSrcSpanA dloc $ addErrCtxt (foreignDeclCtxt fo)  $
     do { sig_ty <- tcHsSigType (ForSigCtxt nm) hs_ty
-       ; (norm_co, norm_sig_ty, gres) <- normaliseFfiType sig_ty
+       ; (Reduction norm_co norm_sig_ty, gres) <- normaliseFfiType sig_ty
        ; let
            -- Drop the foralls before inspecting the
            -- structure of the foreign type.
@@ -389,7 +395,7 @@ tcFExport fo@(ForeignExport { fd_name = L loc nm, fd_sig_ty = hs_ty, fd_fe = spe
     sig_ty <- tcHsSigType (ForSigCtxt nm) hs_ty
     rhs <- tcCheckPolyExpr (nlHsVar nm) sig_ty
 
-    (norm_co, norm_sig_ty, gres) <- normaliseFfiType sig_ty
+    (Reduction norm_co norm_sig_ty, gres) <- normaliseFfiType sig_ty
 
     spec' <- tcCheckFEType norm_sig_ty spec
 
@@ -406,7 +412,8 @@ tcFExport fo@(ForeignExport { fd_name = L loc nm, fd_sig_ty = hs_ty, fd_fe = spe
     return ( mkVarBind id rhs
            , ForeignExport { fd_name = L loc id
                            , fd_sig_ty = undefined
-                           , fd_e_ext = norm_co, fd_fe = spec' }
+                           , fd_e_ext = norm_co
+                           , fd_fe = spec' }
            , gres)
 tcFExport d = pprPanic "tcFExport" (ppr d)
 

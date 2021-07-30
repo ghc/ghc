@@ -67,13 +67,14 @@ import GHC.Tc.Utils.Monad      ( TcGblEnv, TcLclEnv, TcPluginM
 import GHC.Tc.Types.Constraint ( Ct, CtLoc, CtEvidence(..), ctLocOrigin )
 import GHC.Tc.Utils.TcMType    ( TcTyVar, TcType )
 import GHC.Tc.Utils.Env        ( TcTyThing )
-import GHC.Tc.Types.Evidence   ( TcCoercion, CoercionHole, EvTerm(..)
+import GHC.Tc.Types.Evidence   ( CoercionHole, EvTerm(..)
                                , EvExpr, EvBind, mkGivenEvBind )
 import GHC.Types.Var           ( EvVar )
 
 import GHC.Unit.Module
 import GHC.Types.Name
 import GHC.Types.TyThing
+import GHC.Core.Reduction ( Reduction )
 import GHC.Core.TyCon
 import GHC.Core.DataCon
 import GHC.Core.Class
@@ -142,7 +143,7 @@ getFamInstEnvs :: TcPluginM (FamInstEnv, FamInstEnv)
 getFamInstEnvs = unsafeTcPluginTcM TcM.tcGetFamInstEnvs
 
 matchFam :: TyCon -> [Type]
-         -> TcPluginM (Maybe (TcCoercion, TcType))
+         -> TcPluginM (Maybe Reduction)
 matchFam tycon args = unsafeTcPluginTcM $ TcS.matchFamTcM tycon args
 
 newUnique :: TcPluginM Unique

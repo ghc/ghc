@@ -76,6 +76,7 @@ import GHC.Core.FamInstEnv
 import GHC.Core.Predicate
 import GHC.Core.TyCo.Rep( TyCoBinder(..), TyBinder )
 import GHC.Core.Coercion
+import GHC.Core.Reduction
 import GHC.Core.TyCon
 import GHC.Core.Multiplicity
 
@@ -2632,8 +2633,8 @@ isEmptyTy ty
 -- coercions via 'topNormaliseType_maybe'. Hence the \"norm\" prefix.
 normSplitTyConApp_maybe :: FamInstEnvs -> Type -> Maybe (TyCon, [Type], Coercion)
 normSplitTyConApp_maybe fam_envs ty
-  | let (co, ty1) = topNormaliseType_maybe fam_envs ty
-                    `orElse` (mkRepReflCo ty, ty)
+  | let Reduction co ty1 = topNormaliseType_maybe fam_envs ty
+                           `orElse` (mkReflRedn Representational ty)
   , Just (tc, tc_args) <- splitTyConApp_maybe ty1
   = Just (tc, tc_args, co)
 normSplitTyConApp_maybe _ _ = Nothing

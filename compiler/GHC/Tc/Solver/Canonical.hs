@@ -29,6 +29,7 @@ import GHC.Core.Multiplicity
 import GHC.Core.TyCo.Rep   -- cleverly decomposes types, good for completeness checking
 import GHC.Core.Coercion
 import GHC.Core.Coercion.Axiom
+import GHC.Core.Reduction
 import GHC.Core
 import GHC.Types.Id( mkTemplateLocals )
 import GHC.Core.FamInstEnv ( FamInstEnvs )
@@ -209,15 +210,15 @@ canClass :: CtEvidence
 canClass ev cls tys pend_sc fds
   =   -- all classes do *nominal* matching
     assertPpr (ctEvRole ev == Nominal) (ppr ev $$ ppr cls $$ ppr tys) $
-    do { (xis, cos) <- rewriteArgsNom ev cls_tc tys
-       ; let co = mkTcTyConAppCo Nominal cls_tc cos
-             xi = mkClassPred cls xis
+    do { redns@(Reductions _ xis) <- rewriteArgsNom ev cls_tc tys
+       ; let redn@(Reduction _ xi) = mkClassPredRedn cls redns
              mk_ct new_ev = CDictCan { cc_ev = new_ev
                                      , cc_tyargs = xis
                                      , cc_class = cls
                                      , cc_pend_sc = pend_sc
                                      , cc_fundeps = fds }
-       ; mb <- rewriteEvidence ev xi co
+       ; mb <- rewriteEvidence ev redn
+
        ; traceTcS "canClass" (vcat [ ppr ev
                                    , ppr xi, ppr mb ])
        ; return (fmap mk_ct mb) }
@@ -709,8 +710,8 @@ canIrred :: CtEvidence -> TcS (StopOrContinue Ct)
 canIrred ev
   = do { let pred = ctEvPred ev
        ; traceTcS "can_pred" (text "IrredPred = " <+> ppr pred)
-       ; (xi,co) <- rewrite ev pred -- co :: xi ~ pred
-       ; rewriteEvidence ev xi co `andWhenContinue` \ new_ev ->
+       ; redn <- rewrite ev pred
+       ; rewriteEvidence ev redn `andWhenContinue` \ new_ev ->
 
     do { -- Re-classify, in case rewriting has improved its shape
          -- Code is like the canNC, except
@@ -824,8 +825,8 @@ canForAll :: CtEvidence -> Bool -> TcS (StopOrContinue Ct)
 canForAll ev pend_sc
   = do { -- First rewrite it to apply the current substitution
          let pred = ctEvPred ev
-       ; (xi,co) <- rewrite ev pred -- co :: xi ~ pred
-       ; rewriteEvidence ev xi co `andWhenContinue` \ new_ev ->
+       ; redn <- rewrite ev pred
+       ; rewriteEvidence ev redn `andWhenContinue` \ new_ev ->
 
     do { -- Now decompose into its pieces and solve it
          -- (It takes a lot less code to rewrite before decomposing.)
@@ -1058,9 +1059,9 @@ can_eq_nc' True _rdr_env _envs ev NomEq ty1 _ ty2 _
 
 -- No similarity in type structure detected. Rewrite and try again.
 can_eq_nc' False rdr_env envs ev eq_rel _ ps_ty1 _ ps_ty2
-  = do { (xi1, co1) <- rewrite ev ps_ty1
-       ; (xi2, co2) <- rewrite ev ps_ty2
-       ; new_ev <- rewriteEqEvidence ev NotSwapped xi1 xi2 co1 co2
+  = do { redn1@(Reduction _ xi1) <- rewrite ev ps_ty1
+       ; redn2@(Reduction _ xi2) <- rewrite ev ps_ty2
+       ; new_ev <- rewriteEqEvidence ev NotSwapped redn1 redn2
        ; can_eq_nc' True rdr_env envs new_ev eq_rel xi1 xi1 xi2 xi2 }
 
 ----------------------------
@@ -1459,9 +1460,9 @@ can_eq_newtype_nc :: CtEvidence           -- ^ :: ty1 ~ ty2
                   -> TcType               -- ^ ty2
                   -> TcType               -- ^ ty2, with type synonyms
                   -> TcS (StopOrContinue Ct)
-can_eq_newtype_nc ev swapped ty1 ((gres, co), ty1') ty2 ps_ty2
+can_eq_newtype_nc ev swapped ty1 ((gres, co1), ty1') ty2 ps_ty2
   = do { traceTcS "can_eq_newtype_nc" $
-         vcat [ ppr ev, ppr swapped, ppr co, ppr gres, ppr ty1', ppr ty2 ]
+         vcat [ ppr ev, ppr swapped, ppr co1, ppr gres, ppr ty1', ppr ty2 ]
 
          -- check for blowing our stack:
          -- See Note [Newtypes can blow the stack]
@@ -1477,8 +1478,11 @@ can_eq_newtype_nc ev swapped ty1 ((gres, co), ty1') ty2 ps_ty2
          -- module, don't warn about it being unused.
          -- See Note [Tracking unused binding and imports] in GHC.Tc.Utils.
 
-       ; new_ev <- rewriteEqEvidence ev swapped ty1' ps_ty2
-                                     (mkTcSymCo co) (mkTcReflCo Representational ps_ty2)
+       ; let redn1 = mkReduction co1 ty1'
+
+       ; new_ev <- rewriteEqEvidence ev swapped
+                     redn1
+                     (mkReflRedn Representational ps_ty2)
        ; can_eq_nc False new_ev ReprEq ty1' ty1' ty2 ps_ty2 }
   where
     gre_list = bagToList gres
@@ -1553,9 +1557,9 @@ canEqCast rewritten ev eq_rel swapped ty1 co1 ty2 ps_ty2
   = do { traceTcS "Decomposing cast" (vcat [ ppr ev
                                            , ppr ty1 <+> text "|>" <+> ppr co1
                                            , ppr ps_ty2 ])
-       ; new_ev <- rewriteEqEvidence ev swapped ty1 ps_ty2
-                                     (mkTcGReflRightCo role ty1 co1)
-                                     (mkTcReflCo role ps_ty2)
+       ; new_ev <- rewriteEqEvidence ev swapped
+                      (mkGReflLeftRedn role ty1 co1)
+                      (mkReflRedn role ps_ty2)
        ; can_eq_nc rewritten new_ev eq_rel ty1 ty1 ty2 ps_ty2 }
   where
     role = eqRelRole eq_rel
@@ -1912,14 +1916,14 @@ canEqFailure :: CtEvidence -> EqRel
 canEqFailure ev NomEq ty1 ty2
   = canEqHardFailure ev ty1 ty2
 canEqFailure ev ReprEq ty1 ty2
-  = do { (xi1, co1) <- rewrite ev ty1
-       ; (xi2, co2) <- rewrite ev ty2
+  = do { redn1 <- rewrite ev ty1
+       ; redn2 <- rewrite ev ty2
             -- We must rewrite the types before putting them in the
             -- inert set, so that we are sure to kick them out when
             -- new equalities become available
        ; traceTcS "canEqFailure with ReprEq" $
-         vcat [ ppr ev, ppr ty1, ppr ty2, ppr xi1, ppr xi2 ]
-       ; new_ev <- rewriteEqEvidence ev NotSwapped xi1 xi2 co1 co2
+         vcat [ ppr ev, ppr redn1, ppr redn2 ]
+       ; new_ev <- rewriteEqEvidence ev NotSwapped redn1 redn2
        ; continueWith (mkIrredCt ReprEqReason new_ev) }
 
 -- | Call when canonicalizing an equality fails with utterly no hope.
@@ -1928,9 +1932,9 @@ canEqHardFailure :: CtEvidence
 -- See Note [Make sure that insolubles are fully rewritten]
 canEqHardFailure ev ty1 ty2
   = do { traceTcS "canEqHardFailure" (ppr ty1 $$ ppr ty2)
-       ; (s1, co1) <- rewrite ev ty1
-       ; (s2, co2) <- rewrite ev ty2
-       ; new_ev <- rewriteEqEvidence ev NotSwapped s1 s2 co1 co2
+       ; redn1 <- rewrite ev ty1
+       ; redn2 <- rewrite ev ty2
+       ; new_ev <- rewriteEqEvidence ev NotSwapped redn1 redn2
        ; continueWith (mkIrredCt ShapeMismatchReason new_ev) }
 
 {-
@@ -2067,7 +2071,7 @@ Ticket #12526 is another good example of this in action.
 -}
 
 ---------------------
-canEqCanLHS :: CtEvidence          -- ev :: lhs ~ rhs
+canEqCanLHS :: CtEvidence            -- ev :: lhs ~ rhs
             -> EqRel -> SwapFlag
             -> CanEqLHS              -- lhs (or, if swapped, rhs)
             -> TcType                -- lhs: pretty lhs, already rewritten
@@ -2097,16 +2101,15 @@ canEqCanLHSHetero ev eq_rel swapped lhs1 ps_xi1 ki1 xi2 ps_xi2 ki2
 
        ; let  -- kind_co :: (ki2 :: *) ~N (ki1 :: *)   (whether swapped or not)
               -- co1     :: kind(tv1) ~N ki1
-             rhs'    = xi2    `mkCastTy` kind_co   -- :: ki1
              ps_rhs' = ps_xi2 `mkCastTy` kind_co   -- :: ki1
-             rhs_co  = mkTcGReflLeftCo role xi2 kind_co
-               -- rhs_co :: (xi2 |> kind_co) ~ xi2
 
-             lhs_co = mkTcReflCo role xi1
+             lhs_redn = mkReflRedn role xi1
+             rhs_redn@(Reduction _ rhs')
+               = mkGReflRightRedn role xi2 kind_co
 
        ; traceTcS "Hetero equality gives rise to kind equality"
            (ppr kind_co <+> dcolon <+> sep [ ppr ki2, text "~#", ppr ki1 ])
-       ; type_ev <- rewriteEqEvidence ev swapped xi1 rhs' lhs_co rhs_co
+       ; type_ev <- rewriteEqEvidence ev swapped lhs_redn rhs_redn
 
           -- rewriteEqEvidence carries out the swap, so we're NotSwapped any more
        ; canEqCanLHSHomo type_ev eq_rel NotSwapped lhs1 ps_xi1 rhs' ps_rhs' }
@@ -2305,8 +2308,8 @@ canEqTyVarFunEq ev eq_rel swapped tv1 ps_xi1 fun_tc2 fun_args2 ps_xi2 mco
 -- want to rewrite the LHS to (as per e.g. swapOverTyVars)
 canEqCanLHSFinish :: CtEvidence
                   -> EqRel -> SwapFlag
-                  -> CanEqLHS              -- lhs (or, if swapped, rhs)
-                  -> TcType          -- rhs, pretty rhs
+                  -> CanEqLHS             -- lhs (or, if swapped, rhs)
+                  -> TcType               -- rhs (or, if swapped, lhs)
                   -> TcS (StopOrContinue Ct)
 canEqCanLHSFinish ev eq_rel swapped lhs rhs
 -- RHS is fully rewritten, but with type synonyms
@@ -2315,7 +2318,9 @@ canEqCanLHSFinish ev eq_rel swapped lhs rhs
 -- (TyEq:N) is checked in can_eq_nc', and (TyEq:TV) is handled in canEqCanLHS2
 
   = do { dflags <- getDynFlags
-       ; new_ev <- rewriteEqEvidence ev swapped lhs_ty rhs rewrite_co1 rewrite_co2
+       ; new_ev <- rewriteEqEvidence ev swapped
+                     (mkReflRedn role lhs_ty)
+                     (mkReflRedn role rhs)
 
      -- by now, (TyEq:K) is already satisfied
        ; massert (canEqLHSKind lhs `eqType` tcTypeKind rhs)
@@ -2356,7 +2361,7 @@ canEqCanLHSFinish ev eq_rel swapped lhs rhs
                          do { traceTcS "canEqCanLHSFinish can't make a canonical"
                                        (ppr lhs $$ ppr rhs)
                             ; continueWith (mkIrredCt reason new_ev) }
-                     ; Just (lhs_tv, co, new_rhs) ->
+                     ; Just (lhs_tv, rhs_redn@(Reduction _ new_rhs)) ->
               do { traceTcS "canEqCanLHSFinish breaking a cycle" $
                             ppr lhs $$ ppr rhs
                  ; traceTcS "new RHS:" (ppr new_rhs)
@@ -2370,8 +2375,8 @@ canEqCanLHSFinish ev eq_rel swapped lhs rhs
 
                    else do { -- See Detail (6) of Note [Type variable cycles]
                              new_new_ev <- rewriteEqEvidence new_ev NotSwapped
-                                             lhs_ty new_rhs
-                                             (mkTcNomReflCo lhs_ty) co
+                                             (mkReflRedn Nominal lhs_ty)
+                                             rhs_redn
 
                            ; continueWith (CEqCan { cc_ev = new_new_ev
                                                   , cc_lhs = lhs
@@ -2381,9 +2386,6 @@ canEqCanLHSFinish ev eq_rel swapped lhs rhs
     role = eqRelRole eq_rel
 
     lhs_ty = canEqLHSType lhs
-
-    rewrite_co1  = mkTcReflCo role lhs_ty
-    rewrite_co2  = mkTcReflCo role rhs
 
     -- This is about (TyEq:N)
     bad_newtype | ReprEq <- eq_rel
@@ -2410,13 +2412,10 @@ rewriteCastedEquality :: CtEvidence     -- :: lhs ~ (rhs |> mco), or (rhs |> mco
                       -> TcS CtEvidence -- :: (lhs |> sym mco) ~ rhs
                                         -- result is independent of SwapFlag
 rewriteCastedEquality ev eq_rel swapped lhs rhs mco
-  = rewriteEqEvidence ev swapped new_lhs new_rhs lhs_co rhs_co
+  = rewriteEqEvidence ev swapped lhs_redn rhs_redn
   where
-    new_lhs = lhs `mkCastTyMCo` sym_mco
-    lhs_co  = mkTcGReflLeftMCo role lhs sym_mco
-
-    new_rhs = rhs
-    rhs_co  = mkTcGReflRightMCo role rhs mco
+    lhs_redn = mkGReflRightMRedn role lhs sym_mco
+    rhs_redn = mkGReflLeftMRedn  role rhs mco
 
     sym_mco = mkTcSymMCo mco
     role    = eqRelRole eq_rel
@@ -2945,9 +2944,8 @@ andWhenContinue tcs1 tcs2
            ContinueWith ct -> tcs2 ct }
 infixr 0 `andWhenContinue`    -- allow chaining with ($)
 
-rewriteEvidence :: CtEvidence   -- old evidence
-                -> TcPredType   -- new predicate
-                -> TcCoercion   -- Of type :: new predicate ~ <type of old evidence>
+rewriteEvidence :: CtEvidence   -- ^ old evidence
+                -> Reduction    -- ^ new predicate + coercion, of type <type of old evidence> ~ new predicate
                 -> TcS (StopOrContinue CtEvidence)
 -- Returns Just new_ev iff either (i)  'co' is reflexivity
 --                             or (ii) 'co' is not reflexivity, and 'new_pred' not cached
@@ -2983,7 +2981,7 @@ as well as in old_pred; that is important for good error messages.
  -}
 
 
-rewriteEvidence old_ev@(CtDerived {}) new_pred _co
+rewriteEvidence old_ev@(CtDerived {}) (Reduction _co new_pred)
   = -- If derived, don't even look at the coercion.
     -- This is very important, DO NOT re-order the equations for
     -- rewriteEvidence to put the isTcReflCo test first!
@@ -2993,30 +2991,28 @@ rewriteEvidence old_ev@(CtDerived {}) new_pred _co
     -- (Getting this wrong caused #7384.)
     continueWith (old_ev { ctev_pred = new_pred })
 
-rewriteEvidence old_ev new_pred co
+rewriteEvidence old_ev (Reduction co new_pred)
   | isTcReflCo co -- See Note [Rewriting with Refl]
   = continueWith (old_ev { ctev_pred = new_pred })
 
-rewriteEvidence ev@(CtGiven { ctev_evar = old_evar, ctev_loc = loc }) new_pred co
+rewriteEvidence ev@(CtGiven { ctev_evar = old_evar, ctev_loc = loc }) (Reduction co new_pred)
   = do { new_ev <- newGivenEvVar loc (new_pred, new_tm)
        ; continueWith new_ev }
   where
     -- mkEvCast optimises ReflCo
-    new_tm = mkEvCast (evId old_evar) (tcDowngradeRole Representational
-                                                       (ctEvRole ev)
-                                                       (mkTcSymCo co))
+    new_tm = mkEvCast (evId old_evar)
+                (tcDowngradeRole Representational (ctEvRole ev) co)
 
 rewriteEvidence ev@(CtWanted { ctev_dest = dest
                              , ctev_nosh = si
-                             , ctev_loc = loc }) new_pred co
+                             , ctev_loc = loc }) (Reduction co new_pred)
   = do { mb_new_ev <- newWanted_SI si loc new_pred
                -- The "_SI" variant ensures that we make a new Wanted
-               -- with the same shadow-info as the existing one
                -- with the same shadow-info as the existing one (#16735)
        ; massert (tcCoercionRole co == ctEvRole ev)
        ; setWantedEvTerm dest
             (mkEvCast (getEvExpr mb_new_ev)
-                      (tcDowngradeRole Representational (ctEvRole ev) co))
+                      (tcDowngradeRole Representational (ctEvRole ev) (mkSymCo co)))
        ; case mb_new_ev of
             Fresh  new_ev -> continueWith new_ev
             Cached _      -> stopWith ev "Cached wanted" }
@@ -3025,26 +3021,25 @@ rewriteEvidence ev@(CtWanted { ctev_dest = dest
 rewriteEqEvidence :: CtEvidence         -- Old evidence :: olhs ~ orhs (not swapped)
                                         --              or orhs ~ olhs (swapped)
                   -> SwapFlag
-                  -> TcType -> TcType   -- New predicate  nlhs ~ nrhs
-                  -> TcCoercion         -- lhs_co, of type :: nlhs ~ olhs
-                  -> TcCoercion         -- rhs_co, of type :: nrhs ~ orhs
+                  -> Reduction          -- lhs_co :: olhs ~ nlhs
+                  -> Reduction          -- rhs_co :: orhs ~ nrhs
                   -> TcS CtEvidence     -- Of type nlhs ~ nrhs
--- For (rewriteEqEvidence (Given g olhs orhs) False nlhs nrhs lhs_co rhs_co)
--- we generate
+-- With reductions (Reduction lhs_co nlhs) (Reduction rhs_co nrhs),
+-- rewriteEqEvidence yields, for a given equality (Given g olhs orhs):
 -- If not swapped
---      g1 : nlhs ~ nrhs = lhs_co ; g ; sym rhs_co
--- If 'swapped'
---      g1 : nlhs ~ nrhs = lhs_co ; Sym g ; sym rhs_co
+--      g1 : nlhs ~ nrhs = sym lhs_co ; g ; rhs_co
+-- If swapped
+--      g1 : nlhs ~ nrhs = sym lhs_co ; Sym g ; rhs_co
 --
--- For (Wanted w) we do the dual thing.
+-- For a wanted equality (Wanted w), we do the dual thing:
 -- New  w1 : nlhs ~ nrhs
 -- If not swapped
---      w : olhs ~ orhs = sym lhs_co ; w1 ; rhs_co
+--      w : olhs ~ orhs = lhs_co ; w1 ; sym rhs_co
 -- If swapped
---      w : orhs ~ olhs = sym rhs_co ; sym w1 ; lhs_co
+--      w : orhs ~ olhs = rhs_co ; sym w1 ; sym lhs_co
 --
--- It's all a form of rewwriteEvidence, specialised for equalities
-rewriteEqEvidence old_ev swapped nlhs nrhs lhs_co rhs_co
+-- It's all a form of rewriteEvidence, specialised for equalities
+rewriteEqEvidence old_ev swapped (Reduction lhs_co nlhs) (Reduction rhs_co nrhs)
   | CtDerived {} <- old_ev  -- Don't force the evidence for a Derived
   = return (old_ev { ctev_pred = new_pred })
 
@@ -3054,9 +3049,9 @@ rewriteEqEvidence old_ev swapped nlhs nrhs lhs_co rhs_co
   = return (old_ev { ctev_pred = new_pred })
 
   | CtGiven { ctev_evar = old_evar } <- old_ev
-  = do { let new_tm = evCoercion (lhs_co
+  = do { let new_tm = evCoercion ( mkTcSymCo lhs_co
                                   `mkTcTransCo` maybeTcSymCo swapped (mkTcCoVarCo old_evar)
-                                  `mkTcTransCo` mkTcSymCo rhs_co)
+                                  `mkTcTransCo` rhs_co)
        ; newGivenEvVar loc' (new_pred, new_tm) }
 
   | CtWanted { ctev_dest = dest, ctev_nosh = si } <- old_ev
@@ -3065,9 +3060,9 @@ rewriteEqEvidence old_ev swapped nlhs nrhs lhs_co rhs_co
                -- The "_SI" variant ensures that we make a new Wanted
                -- with the same shadow-info as the existing one (#16735)
        ; let co = maybeTcSymCo swapped $
-                  mkSymCo lhs_co
+                  lhs_co
                   `mkTransCo` hole_co
-                  `mkTransCo` rhs_co
+                  `mkTransCo` mkTcSymCo rhs_co
        ; setWantedEq dest co
        ; traceTcS "rewriteEqEvidence" (vcat [ppr old_ev, ppr nlhs, ppr nrhs, ppr co])
        ; return new_ev }

@@ -45,6 +45,7 @@ import GHC.Core.TyCo.Rep
 import GHC.Core.TyCon
 import GHC.Core.Coercion
 import GHC.Core.Coercion.Axiom
+import GHC.Core.Reduction
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Name
@@ -1099,7 +1100,7 @@ but we also need to handle closed ones when normalising a type:
 reduceTyFamApp_maybe :: FamInstEnvs
                      -> Role              -- Desired role of result coercion
                      -> TyCon -> [Type]
-                     -> Maybe (Coercion, Type)
+                     -> Maybe Reduction
 -- Attempt to do a *one-step* reduction of a type-family application
 --    but *not* newtypes
 -- Works on type-synonym families always; data-families only if
@@ -1130,20 +1131,18 @@ reduceTyFamApp_maybe envs role tc tys
       -- NB: Allow multiple matches because of compatible overlap
 
   = let co = mkUnbranchedAxInstCo role ax inst_tys inst_cos
-        ty = coercionRKind co
-    in Just (co, ty)
+    in Just $ coercionRedn co
 
   | Just ax <- isClosedSynFamilyTyConWithAxiom_maybe tc
   , Just (ind, inst_tys, inst_cos) <- chooseBranch ax tys
   = let co = mkAxInstCo role ax ind inst_tys inst_cos
-        ty = coercionRKind co
-    in Just (co, ty)
+    in Just $ coercionRedn co
 
   | Just ax           <- isBuiltInSynFamTyCon_maybe tc
   , Just (coax,ts,ty) <- sfMatchFam ax tys
   , role == coaxrRole coax
   = let co = mkAxiomRuleCo coax (zipWith mkReflCo (coaxrAsmpRoles coax) ts)
-    in Just (co, ty)
+    in Just $ mkReduction co ty
 
   | otherwise
   = Nothing
@@ -1274,11 +1273,12 @@ case by that route too, but it hasn't happened in practice yet!
 -}
 
 topNormaliseType :: FamInstEnvs -> Type -> Type
-topNormaliseType env ty = case topNormaliseType_maybe env ty of
-                            Just (_co, ty') -> ty'
-                            Nothing         -> ty
+topNormaliseType env ty
+  = case topNormaliseType_maybe env ty of
+      Just redn -> reductionReducedType redn
+      Nothing   -> ty
 
-topNormaliseType_maybe :: FamInstEnvs -> Type -> Maybe (Coercion, Type)
+topNormaliseType_maybe :: FamInstEnvs -> Type -> Maybe Reduction
 
 -- ^ Get rid of *outermost* (or toplevel)
 --      * type function redex
@@ -1297,12 +1297,8 @@ topNormaliseType_maybe :: FamInstEnvs -> Type -> Maybe (Coercion, Type)
 -- original type, and the returned coercion is always homogeneous.
 topNormaliseType_maybe env ty
   = do { ((co, mkind_co), nty) <- topNormaliseTypeX stepper combine ty
-       ; return $ case mkind_co of
-           MRefl       -> (co, nty)
-           MCo kind_co -> let nty_casted = nty `mkCastTy` mkSymCo kind_co
-                              final_co   = mkCoherenceRightCo Representational nty
-                                                              (mkSymCo kind_co) co
-                          in (final_co, nty_casted) }
+       ; let hredn = mkHetReduction (mkReduction co nty) mkind_co
+       ; return $ homogeniseHetRedn Representational hredn }
   where
     stepper = unwrapNewTypeStepper' `composeSteppers` tyFamStepper
 
@@ -1317,18 +1313,19 @@ topNormaliseType_maybe env ty
     tyFamStepper :: NormaliseStepper (Coercion, MCoercionN)
     tyFamStepper rec_nts tc tys  -- Try to step a type/data family
       = case topReduceTyFamApp_maybe env tc tys of
-          Just (co, rhs, res_co) -> NS_Step rec_nts rhs (co, res_co)
-          _                      -> NS_Done
+          Just (HetReduction (Reduction co rhs) res_co)
+            -> NS_Step rec_nts rhs (co, res_co)
+          _ -> NS_Done
 
 ---------------
-normaliseTcApp :: FamInstEnvs -> Role -> TyCon -> [Type] -> (Coercion, Type)
+normaliseTcApp :: FamInstEnvs -> Role -> TyCon -> [Type] -> Reduction
 -- See comments on normaliseType for the arguments of this function
 normaliseTcApp env role tc tys
   = initNormM env role (tyCoVarsOfTypes tys) $
     normalise_tc_app tc tys
 
 -- See Note [Normalising types] about the LiftingContext
-normalise_tc_app :: TyCon -> [Type] -> NormM (Coercion, Type)
+normalise_tc_app :: TyCon -> [Type] -> NormM Reduction
 normalise_tc_app tc tys
   | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc tys
   , not (isFamFreeTyCon tc)  -- Expand and try again
@@ -1341,76 +1338,70 @@ normalise_tc_app tc tys
   = -- A type-family application
     do { env <- getEnv
        ; role <- getRole
-       ; (args_co, ntys, res_co) <- normalise_tc_args tc tys
+       ; ArgsReductions redns@(Reductions args_cos ntys) res_co <- normalise_tc_args tc tys
        ; case reduceTyFamApp_maybe env role tc ntys of
-           Just (first_co, ty')
-             -> do { (rest_co,nty) <- normalise_type ty'
-                   ; return (assemble_result role nty
-                                             (args_co `mkTransCo` first_co `mkTransCo` rest_co)
-                                             res_co) }
+           Just redn1
+             -> do { redn2 <- normalise_reduction redn1
+                   ; let redn3 = mkTyConAppCo role tc args_cos `mkTransRedn` redn2
+                   ; return $ assemble_result role redn3 res_co }
            _ -> -- No unique matching family instance exists;
                 -- we do not do anything
-                return (assemble_result role (mkTyConApp tc ntys) args_co res_co) }
+                return $
+                  assemble_result role (mkTyConAppRedn role tc redns) res_co }
 
   | otherwise
   = -- A synonym with no type families in the RHS; or data type etc
     -- Just normalise the arguments and rebuild
-    do { (args_co, ntys, res_co) <- normalise_tc_args tc tys
+    do { ArgsReductions redns res_co <- normalise_tc_args tc tys
        ; role <- getRole
-       ; return (assemble_result role (mkTyConApp tc ntys) args_co res_co) }
+       ; return $
+            assemble_result role (mkTyConAppRedn role tc redns) res_co }
 
   where
     assemble_result :: Role       -- r, ambient role in NormM monad
-                    -> Type       -- nty, result type, possibly of changed kind
-                    -> Coercion   -- orig_ty ~r nty, possibly heterogeneous
+                    -> Reduction  -- orig_ty ~r nty, possibly heterogeneous (nty possibly of changed kind)
                     -> MCoercionN -- typeKind(orig_ty) ~N typeKind(nty)
-                    -> (Coercion, Type)   -- (co :: orig_ty ~r nty_casted, nty_casted)
-                                          -- where nty_casted has same kind as orig_ty
-    assemble_result r nty orig_to_nty kind_co
-      = ( final_co, nty_old_kind )
-      where
-        nty_old_kind = nty `mkCastTyMCo` mkSymMCo kind_co
-        final_co     = mkCoherenceRightMCo r nty (mkSymMCo kind_co) orig_to_nty
+                    -> Reduction  -- orig_ty ~r nty_casted
+                                  -- where nty_casted has same kind as orig_ty
+    assemble_result r redn kind_co
+      = mkCoherenceRightMRedn r redn (mkSymMCo kind_co)
 
 ---------------
 -- | Try to simplify a type-family application, by *one* step
--- If topReduceTyFamApp_maybe env r F tys = Just (co, rhs, res_co)
+-- If topReduceTyFamApp_maybe env r F tys = Just (HetReduction (Reduction co rhs) res_co)
 -- then    co     :: F tys ~R# rhs
 --         res_co :: typeKind(F tys) ~ typeKind(rhs)
 -- Type families and data families; always Representational role
 topReduceTyFamApp_maybe :: FamInstEnvs -> TyCon -> [Type]
-                        -> Maybe (Coercion, Type, MCoercion)
+                        -> Maybe HetReduction
 topReduceTyFamApp_maybe envs fam_tc arg_tys
   | isFamilyTyCon fam_tc   -- type families and data families
-  , Just (co, rhs) <- reduceTyFamApp_maybe envs role fam_tc ntys
-  = Just (args_co `mkTransCo` co, rhs, res_co)
+  , Just redn <- reduceTyFamApp_maybe envs role fam_tc ntys
+  = Just $
+      mkHetReduction
+        (mkTyConAppCo role fam_tc args_cos `mkTransRedn` redn)
+        res_co
   | otherwise
   = Nothing
   where
     role = Representational
-    (args_co, ntys, res_co) = initNormM envs role (tyCoVarsOfTypes arg_tys) $
-                              normalise_tc_args fam_tc arg_tys
+    ArgsReductions (Reductions args_cos ntys) res_co
+      = initNormM envs role (tyCoVarsOfTypes arg_tys)
+      $ normalise_tc_args fam_tc arg_tys
 
-normalise_tc_args :: TyCon -> [Type]             -- tc tys
-                  -> NormM (Coercion, [Type], MCoercionN)
-                  -- (co, new_tys), where
-                  -- co :: tc tys ~ tc new_tys; might not be homogeneous
-                  -- res_co :: typeKind(tc tys) ~N typeKind(tc new_tys)
+normalise_tc_args :: TyCon -> [Type] -> NormM ArgsReductions
 normalise_tc_args tc tys
   = do { role <- getRole
-       ; (args_cos, nargs, res_co) <- normalise_args (tyConKind tc) (tyConRolesX role tc) tys
-       ; return (mkTyConAppCo role tc args_cos, nargs, res_co) }
+       ; normalise_args (tyConKind tc) (tyConRolesX role tc) tys }
 
 ---------------
 normaliseType :: FamInstEnvs
               -> Role  -- desired role of coercion
-              -> Type -> (Coercion, Type)
+              -> Type -> Reduction
 normaliseType env role ty
   = initNormM env role (tyCoVarsOfType ty) $ normalise_type ty
 
-normalise_type :: Type                     -- old type
-               -> NormM (Coercion, Type)   -- (coercion, new type), where
-                                           -- co :: old-type ~ new_type
+normalise_type :: Type -> NormM Reduction
 -- Normalise the input type, by eliminating *all* type-function redexes
 -- but *not* newtypes (which are visible to the programmer)
 -- Returns with Refl if nothing happens
@@ -1422,106 +1413,105 @@ normalise_type :: Type                     -- old type
 normalise_type ty
   = go ty
   where
+    go :: Type -> NormM Reduction
     go (TyConApp tc tys) = normalise_tc_app tc tys
-    go ty@(LitTy {})     = do { r <- getRole
-                              ; return (mkReflCo r ty, ty) }
+    go ty@(LitTy {})
+      = do { r <- getRole
+           ; return $ mkReflRedn r ty }
     go (AppTy ty1 ty2) = go_app_tys ty1 [ty2]
 
-    go ty@(FunTy { ft_mult = w, ft_arg = ty1, ft_res = ty2 })
-      = do { (co1, nty1) <- go ty1
-           ; (co2, nty2) <- go ty2
-           ; (wco, wty) <- withRole Nominal $ go w
+    go (FunTy { ft_af = vis, ft_mult = w, ft_arg = ty1, ft_res = ty2 })
+      = do { arg_redn <- go ty1
+           ; res_redn <- go ty2
+           ; w_redn <- withRole Nominal $ go w
            ; r <- getRole
-           ; return (mkFunCo r wco co1 co2, ty { ft_mult = wty, ft_arg = nty1, ft_res = nty2 }) }
+           ; return $ mkFunRedn r vis w_redn arg_redn res_redn }
     go (ForAllTy (Bndr tcvar vis) ty)
-      = do { (lc', tv', h, ki') <- normalise_var_bndr tcvar
-           ; (co, nty)          <- withLC lc' $ normalise_type ty
-           ; let tv2 = setTyVarKind tv' ki'
-           ; return (mkForAllCo tv' h co, ForAllTy (Bndr tv2 vis) nty) }
+      = do { (lc', tv', k_redn) <- normalise_var_bndr tcvar
+           ; redn <- withLC lc' $ normalise_type ty
+           ; return $ mkForAllRedn vis tv' k_redn redn }
     go (TyVarTy tv)    = normalise_tyvar tv
     go (CastTy ty co)
-      = do { (nco, nty) <- go ty
+      = do { redn <- go ty
            ; lc <- getLC
            ; let co' = substRightCo lc co
-           ; return (castCoercionKind2 nco Nominal ty nty co co'
-                    , mkCastTy nty co') }
+           ; return $ mkCastRedn2 Nominal ty co redn co'
+             --       ^^^^^^^^^^^ uses castCoercionKind2
+           }
     go (CoercionTy co)
       = do { lc <- getLC
            ; r <- getRole
-           ; let right_co = substRightCo lc co
-           ; return ( mkProofIrrelCo r
-                         (liftCoSubst Nominal lc (coercionType co))
-                         co right_co
-                    , mkCoercionTy right_co ) }
+           ; let kco = liftCoSubst Nominal lc (coercionType co)
+                 co' = substRightCo lc co
+           ; return $ mkProofIrrelRedn r kco co co' }
 
     go_app_tys :: Type   -- function
                -> [Type] -- args
-               -> NormM (Coercion, Type)
+               -> NormM Reduction
     -- cf. GHC.Tc.Solver.Rewrite.rewrite_app_ty_args
     go_app_tys (AppTy ty1 ty2) tys = go_app_tys ty1 (ty2 : tys)
     go_app_tys fun_ty arg_tys
-      = do { (fun_co, nfun) <- go fun_ty
+      = do { fun_redn@(Reduction fun_co nfun) <- go fun_ty
            ; case tcSplitTyConApp_maybe nfun of
                Just (tc, xis) ->
-                 do { (second_co, nty) <- go (mkTyConApp tc (xis ++ arg_tys))
+                 do { redn <- go (mkTyConApp tc (xis ++ arg_tys))
                    -- rewrite_app_ty_args avoids redundantly processing the xis,
                    -- but that's a much more performance-sensitive function.
                    -- This type normalisation is not called in a loop.
-                    ; return (mkAppCos fun_co (map mkNomReflCo arg_tys) `mkTransCo` second_co, nty) }
+                    ; return $
+                        mkAppCos fun_co (map mkNomReflCo arg_tys) `mkTransRedn` redn }
                Nothing ->
-                 do { (args_cos, nargs, res_co) <- normalise_args (typeKind nfun)
-                                                                  (repeat Nominal)
-                                                                  arg_tys
+                 do { ArgsReductions redns res_co
+                        <- normalise_args (typeKind nfun)
+                                          (repeat Nominal)
+                                          arg_tys
                     ; role <- getRole
-                    ; let nty = mkAppTys nfun nargs
-                          nco = mkAppCos fun_co args_cos
-                          nty_casted = nty `mkCastTyMCo` mkSymMCo res_co
-                          final_co = mkCoherenceRightMCo role nty (mkSymMCo res_co) nco
-                    ; return (final_co, nty_casted) } }
+                    ; return $
+                        mkCoherenceRightMRedn role
+                          (mkAppRedns fun_redn redns)
+                          (mkSymMCo res_co) } }
 
 normalise_args :: Kind    -- of the function
                -> [Role]  -- roles at which to normalise args
                -> [Type]  -- args
-               -> NormM ([Coercion], [Type], MCoercion)
--- returns (cos, xis, res_co), where each xi is the normalised
--- version of the corresponding type, each co is orig_arg ~ xi,
--- and the res_co :: kind(f orig_args) ~ kind(f xis)
+               -> NormM ArgsReductions
+-- returns ArgsReductions (Reductions cos xis) res_co,
+-- where each xi is the normalised version of the corresponding type,
+-- each co is orig_arg ~ xi, and res_co :: kind(f orig_args) ~ kind(f xis).
 -- NB: The xis might *not* have the same kinds as the input types,
 -- but the resulting application *will* be well-kinded
 -- cf. GHC.Tc.Solver.Rewrite.rewrite_args_slow
 normalise_args fun_ki roles args
   = do { normed_args <- zipWithM normalise1 roles args
-       ; let (xis, cos, res_co) = simplifyArgsWorker ki_binders inner_ki fvs roles normed_args
-       ; return (map mkSymCo cos, xis, mkSymMCo res_co) }
+       ; return $ simplifyArgsWorker ki_binders inner_ki fvs roles normed_args }
   where
     (ki_binders, inner_ki) = splitPiTys fun_ki
     fvs = tyCoVarsOfTypes args
 
-    -- rewriter conventions are different from ours
-    impedance_match :: NormM (Coercion, Type) -> NormM (Type, Coercion)
-    impedance_match action = do { (co, ty) <- action
-                                ; return (ty, mkSymCo co) }
-
     normalise1 role ty
-      = impedance_match $ withRole role $ normalise_type ty
+      = withRole role $ normalise_type ty
 
-normalise_tyvar :: TyVar -> NormM (Coercion, Type)
+normalise_tyvar :: TyVar -> NormM Reduction
 normalise_tyvar tv
   = assert (isTyVar tv) $
     do { lc <- getLC
        ; r  <- getRole
        ; return $ case liftCoSubstTyVar lc r tv of
-           Just co -> (co, coercionRKind co)
-           Nothing -> (mkReflCo r ty, ty) }
-  where ty = mkTyVarTy tv
+           Just co -> coercionRedn co
+           Nothing -> mkReflRedn r (mkTyVarTy tv) }
 
-normalise_var_bndr :: TyCoVar -> NormM (LiftingContext, TyCoVar, Coercion, Kind)
+normalise_reduction :: Reduction -> NormM Reduction
+normalise_reduction (Reduction co ty)
+  = do { redn' <- normalise_type ty
+       ; return $ co `mkTransRedn` redn' }
+
+normalise_var_bndr :: TyCoVar -> NormM (LiftingContext, TyCoVar, Reduction)
 normalise_var_bndr tcvar
   -- works for both tvar and covar
   = do { lc1 <- getLC
        ; env <- getEnv
        ; let callback lc ki = runNormM (normalise_type ki) env lc Nominal
-       ; return $ liftCoSubstVarBndrUsing callback lc1 tcvar }
+       ; return $ liftCoSubstVarBndrUsing reductionCoercion callback lc1 tcvar }
 
 -- | a monad for the normalisation functions, reading 'FamInstEnvs',
 -- a 'LiftingContext', and a 'Role'.

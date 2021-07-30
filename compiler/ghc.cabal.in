@@ -335,6 +335,7 @@ Library
         GHC.Core.Ppr
         GHC.Types.TyThing.Ppr
         GHC.Core.Predicate
+        GHC.Core.Reduction
         GHC.Core.Rules
         GHC.Core.Seq
         GHC.Core.SimpleOpt

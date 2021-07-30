@@ -122,8 +122,6 @@ module GHC.Core.Coercion (
 
         multToCo,
 
-        simplifyArgsWorker,
-
         hasCoercionHoleTy, hasCoercionHoleCo,
         HoleSet, coercionHolesOfType, coercionHolesOfCo
        ) where
@@ -1069,7 +1067,7 @@ mkTransCo co1 co2 | isReflCo co1 = co2
                   | isReflCo co2 = co1
 mkTransCo (GRefl r t1 (MCo co1)) (GRefl _ _ (MCo co2))
   = GRefl r t1 (MCo $ mkTransCo co1 co2)
-mkTransCo co1 co2                 = TransCo co1 co2
+mkTransCo co1 co2                = TransCo co1 co2
 
 mkNthCo :: HasDebugCallStack
         => Role  -- The role of the coercion you're creating
@@ -1323,7 +1321,7 @@ mkAxiomRuleCo = AxiomRuleCo
 
 -- | Make a "coercion between coercions".
 mkProofIrrelCo :: Role       -- ^ role of the created coercion, "r"
-               -> Coercion   -- ^ :: phi1 ~N phi2
+               -> CoercionN  -- ^ :: phi1 ~N phi2
                -> Coercion   -- ^ g1 :: phi1
                -> Coercion   -- ^ g2 :: phi2
                -> Coercion   -- ^ :: g1 ~r g2
@@ -1790,7 +1788,8 @@ unwrapNewTypeStepper rec_nts tc tys
 -- then ty ~ev1~ t1 ~ev2~ t2 ... ~evn~ ty'
 -- and ev = ev1 `plus` ev2 `plus` ... `plus` evn
 -- If it returns Nothing then no newtype unwrapping could happen
-topNormaliseTypeX :: NormaliseStepper ev -> (ev -> ev -> ev)
+topNormaliseTypeX :: NormaliseStepper ev
+                  -> (ev -> ev -> ev)
                   -> Type -> Maybe (ev, Type)
 topNormaliseTypeX stepper plus ty
  | Just (tc, tys) <- splitTyConApp_maybe ty
@@ -2114,11 +2113,20 @@ liftCoSubstTyVar (LC subst env) r v
 {- Note [liftCoSubstVarBndr]
 
 callback:
-  We want 'liftCoSubstVarBndrUsing' to be general enough to be reused in
-  FamInstEnv, therefore the input arg 'fun' returns a pair with polymorphic type
-  in snd.
-  However in 'liftCoSubstVarBndr', we don't need the snd, so we use unit and
-  ignore the fourth component of the return value.
+  'liftCoSubstVarBndrUsing' needs to be general enough to work in two
+  situations:
+
+    - in this module, which manipulates 'Coercion's, and
+    - in GHC.Core.FamInstEnv, where we work with 'Reduction's, which contain
+      a coercion as well as a type.
+
+  To achieve this, we require that the return type of the 'callback' function
+  contain a coercion within it. This is witnessed by the first argument
+  to 'liftCoSubstVarBndrUsing': a getter, which allows us to retrieve
+  the coercion inside the return type. Thus:
+
+    - in this module, we simply pass 'id' as the getter,
+    - in GHC.Core.FamInstEnv, we pass 'reductionCoercion' as the getter.
 
 liftCoSubstTyVarBndrUsing:
   Given
@@ -2152,52 +2160,56 @@ liftCoSubstCoVarBndrUsing:
 liftCoSubstVarBndr :: LiftingContext -> TyCoVar
                    -> (LiftingContext, TyCoVar, Coercion)
 liftCoSubstVarBndr lc tv
-  = let (lc', tv', h, _) = liftCoSubstVarBndrUsing callback lc tv in
-    (lc', tv', h)
+  = liftCoSubstVarBndrUsing id callback lc tv
   where
-    callback lc' ty' = (ty_co_subst lc' Nominal ty', ())
+    callback lc' ty' = ty_co_subst lc' Nominal ty'
 
 -- the callback must produce a nominal coercion
-liftCoSubstVarBndrUsing :: (LiftingContext -> Type -> (CoercionN, a))
-                           -> LiftingContext -> TyCoVar
-                           -> (LiftingContext, TyCoVar, CoercionN, a)
-liftCoSubstVarBndrUsing fun lc old_var
+liftCoSubstVarBndrUsing :: (r -> CoercionN)              -- ^ coercion getter
+                        -> (LiftingContext -> Type -> r) -- ^ callback
+                        -> LiftingContext -> TyCoVar
+                        -> (LiftingContext, TyCoVar, r)
+liftCoSubstVarBndrUsing view_co fun lc old_var
   | isTyVar old_var
-  = liftCoSubstTyVarBndrUsing fun lc old_var
+  = liftCoSubstTyVarBndrUsing view_co fun lc old_var
   | otherwise
-  = liftCoSubstCoVarBndrUsing fun lc old_var
+  = liftCoSubstCoVarBndrUsing view_co fun lc old_var
 
 -- Works for tyvar binder
-liftCoSubstTyVarBndrUsing :: (LiftingContext -> Type -> (CoercionN, a))
-                           -> LiftingContext -> TyVar
-                           -> (LiftingContext, TyVar, CoercionN, a)
-liftCoSubstTyVarBndrUsing fun lc@(LC subst cenv) old_var
+liftCoSubstTyVarBndrUsing :: (r -> CoercionN)              -- ^ coercion getter
+                          -> (LiftingContext -> Type -> r) -- ^ callback
+                          -> LiftingContext -> TyVar
+                          -> (LiftingContext, TyVar, r)
+liftCoSubstTyVarBndrUsing view_co fun lc@(LC subst cenv) old_var
   = assert (isTyVar old_var) $
     ( LC (subst `extendTCvInScope` new_var) new_cenv
-    , new_var, eta, stuff )
+    , new_var, stuff )
   where
-    old_kind     = tyVarKind old_var
-    (eta, stuff) = fun lc old_kind
-    k1           = coercionLKind eta
-    new_var      = uniqAway (getTCvInScope subst) (setVarType old_var k1)
+    old_kind = tyVarKind old_var
+    stuff    = fun lc old_kind
+    eta      = view_co stuff
+    k1       = coercionLKind eta
+    new_var  = uniqAway (getTCvInScope subst) (setVarType old_var k1)
 
     lifted   = mkGReflRightCo Nominal (TyVarTy new_var) eta
                -- :: new_var ~ new_var |> eta
     new_cenv = extendVarEnv cenv old_var lifted
 
 -- Works for covar binder
-liftCoSubstCoVarBndrUsing :: (LiftingContext -> Type -> (CoercionN, a))
-                           -> LiftingContext -> CoVar
-                           -> (LiftingContext, CoVar, CoercionN, a)
-liftCoSubstCoVarBndrUsing fun lc@(LC subst cenv) old_var
+liftCoSubstCoVarBndrUsing :: (r -> CoercionN)              -- ^ coercion getter
+                          -> (LiftingContext -> Type -> r) -- ^ callback
+                          -> LiftingContext -> CoVar
+                          -> (LiftingContext, CoVar, r)
+liftCoSubstCoVarBndrUsing view_co fun lc@(LC subst cenv) old_var
   = assert (isCoVar old_var) $
     ( LC (subst `extendTCvInScope` new_var) new_cenv
-    , new_var, kind_co, stuff )
+    , new_var, stuff )
   where
-    old_kind     = coVarKind old_var
-    (eta, stuff) = fun lc old_kind
-    k1           = coercionLKind eta
-    new_var      = uniqAway (getTCvInScope subst) (setVarType old_var k1)
+    old_kind = coVarKind old_var
+    stuff    = fun lc old_kind
+    eta      = view_co stuff
+    k1       = coercionLKind eta
+    new_var  = uniqAway (getTCvInScope subst) (setVarType old_var k1)
 
     -- old_var :: s1  ~r s2
     -- eta     :: (s1' ~r s2') ~N (t1 ~r t2)
@@ -2205,7 +2217,6 @@ liftCoSubstCoVarBndrUsing fun lc@(LC subst cenv) old_var
     -- eta2    :: s2' ~r t2
     -- co1     :: s1' ~r s2'
     -- co2     :: t1  ~r t2
-    -- kind_co :: (s1' ~r s2') ~N (t1 ~r t2)
     -- lifted  :: co1 ~N co2
 
     role   = coVarRole old_var
@@ -2215,10 +2226,7 @@ liftCoSubstCoVarBndrUsing fun lc@(LC subst cenv) old_var
 
     co1     = mkCoVarCo new_var
     co2     = mkSymCo eta1 `mkTransCo` co1 `mkTransCo` eta2
-    kind_co = mkTyConAppCo Nominal (equalityTyCon role)
-                           [ mkKindCo co1, mkKindCo co2
-                           , co1         , co2          ]
-    lifted  = mkProofIrrelCo Nominal kind_co co1 co2
+    lifted  = mkProofIrrelCo Nominal eta co1 co2
 
     new_cenv = extendVarEnv cenv old_var lifted
 
@@ -2697,401 +2705,6 @@ buildCoercion orig_ty1 orig_ty2 = go orig_ty1 orig_ty2
       = pprPanic "buildKindCoercion" (vcat [ ppr orig_ty1, ppr orig_ty2
                                            , ppr ty1, ppr ty2 ])
 
-{-
-%************************************************************************
-%*                                                                      *
-       Simplifying types
-%*                                                                      *
-%************************************************************************
-
-The function below morally belongs in GHC.Tc.Solver.Rewrite, but it is used also in
-FamInstEnv, and so lives here.
-
-Note [simplifyArgsWorker]
-~~~~~~~~~~~~~~~~~~~~~~~~~
-Invariant (F2) of Note [Rewriting] in GHC.Tc.Solver.Rewrite says that
-rewriting is homogeneous.
-This causes some trouble when rewriting a function applied to a telescope
-of arguments, perhaps with dependency. For example, suppose
-
-  type family F :: forall (j :: Type) (k :: Type). Maybe j -> Either j k -> Bool -> [k]
-
-and we wish to rewrite the args of (with kind applications explicit)
-
-  F a b (Just a c) (Right a b d) False
-
-where all variables are skolems and
-
-  a :: Type
-  b :: Type
-  c :: a
-  d :: k
-
-  [G] aco :: a ~ fa
-  [G] bco :: b ~ fb
-  [G] cco :: c ~ fc
-  [G] dco :: d ~ fd
-
-The first step is to rewrite all the arguments. This is done before calling
-simplifyArgsWorker. We start from
-
-  a
-  b
-  Just a c
-  Right a b d
-  False
-
-and get
-
-  (fa,                             co1 :: fa ~ a)
-  (fb,                             co2 :: fb ~ b)
-  (Just fa (fc |> aco) |> co6,     co3 :: (Just fa (fc |> aco) |> co6) ~ (Just a c))
-  (Right fa fb (fd |> bco) |> co7, co4 :: (Right fa fb (fd |> bco) |> co7) ~ (Right a b d))
-  (False,                          co5 :: False ~ False)
-
-where
-  co6 :: Maybe fa ~ Maybe a
-  co7 :: Either fa fb ~ Either a b
-
-We now process the rewritten args in left-to-right order. The first two args
-need no further processing. But now consider the third argument. Let f3 = the rewritten
-result, Just fa (fc |> aco) |> co6.
-This f3 rewritten argument has kind (Maybe a), due to
-(F2). And yet, when we build the application (F fa fb ...), we need this
-argument to have kind (Maybe fa), not (Maybe a). We must cast this argument.
-The coercion to use is
-determined by the kind of F: we see in F's kind that the third argument has
-kind Maybe j. Critically, we also know that the argument corresponding to j
-(in our example, a) rewrote with a coercion co1. We can thus know the
-coercion needed for the 3rd argument is (Maybe (sym co1)), thus building
-(f3 |> Maybe (sym co1))
-
-More generally, we must use the Lifting Lemma, as implemented in
-Coercion.liftCoSubst. As we work left-to-right, any variable that is a
-dependent parameter (j and k, in our example) gets mapped in a lifting context
-to the coercion that is output from rewriting the corresponding argument (co1
-and co2, in our example). Then, after rewriting later arguments, we lift the
-kind of these arguments in the lifting context that we've be building up.
-This coercion is then used to keep the result of rewriting well-kinded.
-
-Working through our example, this is what happens:
-
-  1. Extend the (empty) LC with [j |-> co1]. No new casting must be done,
-     because the binder associated with the first argument has a closed type (no
-     variables).
-
-  2. Extend the LC with [k |-> co2]. No casting to do.
-
-  3. Lifting the kind (Maybe j) with our LC
-     yields co8 :: Maybe fa ~ Maybe a. Use (f3 |> sym co8) as the argument to
-     F.
-
-  4. Lifting the kind (Either j k) with our LC
-     yields co9 :: Either fa fb ~ Either a b. Use (f4 |> sym co9) as the 4th
-     argument to F, where f4 is the rewritten form of argument 4, written above.
-
-  5. We lift Bool with our LC, getting <Bool>;
-     casting has no effect.
-
-We're now almost done, but the new application (F fa fb (f3 |> sym co8) (f4 > sym co9) False)
-has the wrong kind. Its kind is [fb], instead of the original [b].
-So we must use our LC one last time to lift the result kind [k],
-getting res_co :: [fb] ~ [b], and we cast our result.
-
-Accordingly, the final result is
-
-  F fa fb (Just fa (fc |> aco) |> Maybe (sym aco) |> sym (Maybe (sym aco)))
-          (Right fa fb (fd |> bco) |> Either (sym aco) (sym bco) |> sym (Either (sym aco) (sym bco)))
-          False
-            |> [sym bco]
-
-The res_co (in this case, [sym bco])
-is returned as the third return value from simplifyArgsWorker.
-
-Note [Last case in simplifyArgsWorker]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In writing simplifyArgsWorker's `go`, we know here that args cannot be empty,
-because that case is first. We've run out of
-binders. But perhaps inner_ki is a tyvar that has been instantiated with a
-Π-type.
-
-Here is an example.
-
-  a :: forall (k :: Type). k -> k
-  type family Star
-  Proxy :: forall j. j -> Type
-  axStar :: Star ~ Type
-  type family NoWay :: Bool
-  axNoWay :: NoWay ~ False
-  bo :: Type
-  [G] bc :: bo ~ Bool   (in inert set)
-
-  co :: (forall j. j -> Type) ~ (forall (j :: Star). (j |> axStar) -> Star)
-  co = forall (j :: sym axStar). (<j> -> sym axStar)
-
-  We are rewriting:
-  a (forall (j :: Star). (j |> axStar) -> Star)   -- 1
-    (Proxy |> co)                                 -- 2
-    (bo |> sym axStar)                            -- 3
-    (NoWay |> sym bc)                             -- 4
-      :: Star
-
-First, we rewrite all the arguments (before simplifyArgsWorker), like so:
-
-    (forall j. j -> Type, co1 :: (forall j. j -> Type) ~
-                                 (forall (j :: Star). (j |> axStar) -> Star))  -- 1
-    (Proxy |> co,         co2 :: (Proxy |> co) ~ (Proxy |> co))                -- 2
-    (Bool |> sym axStar,  co3 :: (Bool |> sym axStar) ~ (bo |> sym axStar))    -- 3
-    (False |> sym bc,     co4 :: (False |> sym bc) ~ (NoWay |> sym bc))        -- 4
-
-Then we do the process described in Note [simplifyArgsWorker].
-
-1. Lifting Type (the kind of the first arg) gives us a reflexive coercion, so we
-   don't use it. But we do build a lifting context [k -> co1] (where co1 is a
-   result of rewriting an argument, written above).
-
-2. Lifting k gives us co1, so the second argument becomes (Proxy |> co |> sym co1).
-   This is not a dependent argument, so we don't extend the lifting context.
-
-Now we need to deal with argument (3).
-The way we normally proceed is to lift the kind of the binder, to see whether
-it's dependent.
-But here, the remainder of the kind of `a` that we're left with
-after processing two arguments is just `k`.
-
-The way forward is look up k in the lifting context, getting co1. If we're at
-all well-typed, co1 will be a coercion between Π-types, with at least one binder.
-So, let's
-decompose co1 with decomposePiCos. This decomposition needs arguments to use
-to instantiate any kind parameters. Look at the type of co1. If we just
-decomposed it, we would end up with coercions whose types include j, which is
-out of scope here. Accordingly, decomposePiCos takes a list of types whose
-kinds are the *right-hand* types in the decomposed coercion. (See comments on
-decomposePiCos.) Because the rewritten types have unrewritten kinds (because
-rewriting is homogeneous), passing the list of rewritten types to decomposePiCos
-just won't do: later arguments' kinds won't be as expected. So we need to get
-the *unrewritten* types to pass to decomposePiCos. We can do this easily enough
-by taking the kind of the argument coercions, passed in originally.
-
-(Alternative 1: We could re-engineer decomposePiCos to deal with this situation.
-But that function is already gnarly, and taking the right-hand types is correct
-at its other call sites, which are much more common than this one.)
-
-(Alternative 2: We could avoid calling decomposePiCos entirely, integrating its
-behavior into simplifyArgsWorker. This would work, I think, but then all of the
-complication of decomposePiCos would end up layered on top of all the complication
-here. Please, no.)
-
-(Alternative 3: We could pass the unrewritten arguments into simplifyArgsWorker
-so that we don't have to recreate them. But that would complicate the interface
-of this function to handle a very dark, dark corner case. Better to keep our
-demons to ourselves here instead of exposing them to callers. This decision is
-easily reversed if there is ever any performance trouble due to the call of
-coercionKind.)
-
-So we now call
-
-  decomposePiCos co1
-                 (Pair (forall j. j -> Type) (forall (j :: Star). (j |> axStar) -> Star))
-                 [bo |> sym axStar, NoWay |> sym bc]
-
-to get
-
-  co5 :: Star ~ Type
-  co6 :: (j |> axStar) ~ (j |> co5), substituted to
-                              (bo |> sym axStar |> axStar) ~ (bo |> sym axStar |> co5)
-                           == bo ~ bo
-  res_co :: Type ~ Star
-
-We then use these casts on (the rewritten) (3) and (4) to get
-
-  (Bool |> sym axStar |> co5 :: Type)   -- (C3)
-  (False |> sym bc |> co6    :: bo)     -- (C4)
-
-We can simplify to
-
-  Bool                        -- (C3)
-  (False |> sym bc :: bo)     -- (C4)
-
-Of course, we still must do the processing in Note [simplifyArgsWorker] to finish
-the job. We thus want to recur. Our new function kind is the left-hand type of
-co1 (gotten, recall, by lifting the variable k that was the return kind of the
-original function). Why the left-hand type (as opposed to the right-hand type)?
-Because we have casted all the arguments according to decomposePiCos, which gets
-us from the right-hand type to the left-hand one. We thus recur with that new
-function kind, zapping our lifting context, because we have essentially applied
-it.
-
-This recursive call returns ([Bool, False], [...], Refl). The Bool and False
-are the correct arguments we wish to return. But we must be careful about the
-result coercion: our new, rewritten application will have kind Type, but we
-want to make sure that the result coercion casts this back to Star. (Why?
-Because we started with an application of kind Star, and rewriting is homogeneous.)
-
-So, we have to twiddle the result coercion appropriately.
-
-Let's check whether this is well-typed. We know
-
-  a :: forall (k :: Type). k -> k
-
-  a (forall j. j -> Type) :: (forall j. j -> Type) -> forall j. j -> Type
-
-  a (forall j. j -> Type)
-    Proxy
-      :: forall j. j -> Type
-
-  a (forall j. j -> Type)
-    Proxy
-    Bool
-      :: Bool -> Type
-
-  a (forall j. j -> Type)
-    Proxy
-    Bool
-    False
-      :: Type
-
-  a (forall j. j -> Type)
-    Proxy
-    Bool
-    False
-     |> res_co
-     :: Star
-
-as desired.
-
-Whew.
-
-Historical note: I (Richard E) once thought that the final part of the kind
-had to be a variable k (as in the example above). But it might not be: it could
-be an application of a variable. Here is the example:
-
-  let f :: forall (a :: Type) (b :: a -> Type). b (Any @a)
-      k :: Type
-      x :: k
-
-  rewrite (f @Type @((->) k) x)
-
-After instantiating [a |-> Type, b |-> ((->) k)], we see that `b (Any @a)`
-is `k -> Any @a`, and thus the third argument of `x :: k` is well-kinded.
-
--}
-
-
--- This is shared between the rewriter and the normaliser in GHC.Core.FamInstEnv.
--- See Note [simplifyArgsWorker]
-{-# INLINE simplifyArgsWorker #-}
-simplifyArgsWorker :: [TyCoBinder] -> Kind
-                       -- the binders & result kind (not a Π-type) of the function applied to the args
-                       -- list of binders can be shorter or longer than the list of args
-                   -> TyCoVarSet   -- free vars of the args
-                   -> [Role]   -- list of roles, r
-                   -> [(Type, Coercion)] -- rewritten type arguments, arg
-                                         -- each comes with the coercion used to rewrite it,
-                                         -- with co :: rewritten_type ~ original_type
-                   -> ([Type], [Coercion], MCoercionN)
--- Returns (xis, cos, res_co), where each co :: xi ~ arg,
--- and res_co :: kind (f xis) ~ kind (f tys), where f is the function applied to the args
--- Precondition: if f :: forall bndrs. inner_ki (where bndrs and inner_ki are passed in),
--- then (f orig_tys) is well kinded. Note that (f rewritten_tys) might *not* be well-kinded.
--- Massaging the rewritten_tys in order to make (f rewritten_tys) well-kinded is what this
--- function is all about. That is, (f xis), where xis are the returned arguments, *is*
--- well kinded.
-simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
-                   orig_roles orig_simplified_args
-  = go [] [] orig_lc orig_ki_binders orig_inner_ki orig_roles orig_simplified_args
-  where
-    orig_lc = emptyLiftingContext $ mkInScopeSet $ orig_fvs
-
-    go :: [Type]      -- Xis accumulator, in reverse order
-       -> [Coercion]  -- Coercions accumulator, in reverse order
-                      -- These are in 1-to-1 correspondence
-       -> LiftingContext  -- mapping from tyvars to rewriting coercions
-       -> [TyCoBinder]    -- Unsubsted binders of function's kind
-       -> Kind        -- Unsubsted result kind of function (not a Pi-type)
-       -> [Role]      -- Roles at which to rewrite these ...
-       -> [(Type, Coercion)]  -- rewritten arguments, with their rewriting coercions
-       -> ([Type], [Coercion], MCoercionN)
-    go acc_xis acc_cos !lc binders inner_ki _ []
-        -- The !lc makes the function strict in the lifting context
-        -- which means GHC can unbox that pair.  A modest win.
-      = (reverse acc_xis, reverse acc_cos, kind_co)
-      where
-        final_kind = mkPiTys binders inner_ki
-        kind_co | noFreeVarsOfType final_kind = MRefl
-                | otherwise                   = MCo $ liftCoSubst Nominal lc final_kind
-
-    go acc_xis acc_cos lc (binder:binders) inner_ki (role:roles) ((xi,co):args)
-      = -- By Note [Rewriting] in GHC.Tc.Solver.Rewrite invariant (F2),
-         -- tcTypeKind(xi) = tcTypeKind(ty). But, it's possible that xi will be
-         -- used as an argument to a function whose kind is different, if
-         -- earlier arguments have been rewritten to new types. We thus
-         -- need a coercion (kind_co :: old_kind ~ new_kind).
-         --
-         -- The bangs here have been observed to improve performance
-         -- significantly in optimized builds; see #18502
-         let !kind_co = mkSymCo $
-                        liftCoSubst Nominal lc (tyCoBinderType binder)
-             !casted_xi = xi `mkCastTy` kind_co
-             casted_co =  mkCoherenceLeftCo role xi kind_co co
-
-         -- now, extend the lifting context with the new binding
-             !new_lc | Just tv <- tyCoBinderVar_maybe binder
-                     = extendLiftingContextAndInScope lc tv casted_co
-                     | otherwise
-                     = lc
-         in
-         go (casted_xi : acc_xis)
-            (casted_co : acc_cos)
-            new_lc
-            binders
-            inner_ki
-            roles
-            args
-
-
-      -- See Note [Last case in simplifyArgsWorker]
-    go acc_xis acc_cos lc [] inner_ki roles args
-      = let co1 = liftCoSubst Nominal lc inner_ki
-            co1_kind              = coercionKind co1
-            unrewritten_tys       = map (coercionRKind . snd) args
-            (arg_cos, res_co)     = decomposePiCos co1 co1_kind unrewritten_tys
-            casted_args           = assertPpr (equalLength args arg_cos)
-                                              (ppr args $$ ppr arg_cos)
-                                    [ (casted_xi, casted_co)
-                                    | ((xi, co), arg_co, role) <- zip3 args arg_cos roles
-                                    , let casted_xi = xi `mkCastTy` arg_co
-                                          casted_co = mkCoherenceLeftCo role xi arg_co co ]
-               -- In general decomposePiCos can return fewer cos than tys,
-               -- but not here; because we're well typed, there will be enough
-               -- binders. Note that decomposePiCos does substitutions, so even
-               -- if the original substitution results in something ending with
-               -- ... -> k, that k will be substituted to perhaps reveal more
-               -- binders.
-            zapped_lc             = zapLiftingContext lc
-            Pair rewritten_kind _ = co1_kind
-            (bndrs, new_inner)    = splitPiTys rewritten_kind
-
-            (xis_out, cos_out, res_co_out)
-              = go acc_xis acc_cos zapped_lc bndrs new_inner roles casted_args
-        in
-        (xis_out, cos_out, res_co_out `mkTransMCoL` res_co)
-
-    go _ _ _ _ _ _ _ = panic
-        "simplifyArgsWorker wandered into deeper water than usual"
-           -- This debug information is commented out because leaving it in
-           -- causes a ~2% increase in allocations in T9872d.
-           -- That's independent of the analogous case in rewrite_args_fast
-           -- in GHC.Tc.Solver.Rewrite:
-           -- each of these causes a 2% increase on its own, so commenting them
-           -- both out gives a 4% decrease in T9872d.
-           {-
-
-             (vcat [ppr orig_binders,
-                    ppr orig_inner_ki,
-                    ppr (take 10 orig_roles), -- often infinite!
-                    ppr orig_tys])
-           -}
 
 {-
 %************************************************************************

@@ -48,6 +48,7 @@ import GHC.Core.Multiplicity
 import GHC.Core.TyCo.Rep
 import GHC.Core.FamInstEnv
 import GHC.Core.Coercion
+import GHC.Core.Reduction
 import GHC.Tc.Utils.TcType as TcType
 import GHC.Core.Make
 import GHC.Core.FVs     ( mkRuleInfo )
@@ -1031,7 +1032,9 @@ dataConSrcToImplBang dflags fam_envs arg_ty
           -- we use -fomit-iface-pragmas as the indication
   , let mb_co   = topNormaliseType_maybe fam_envs (scaledThing arg_ty)
                      -- Unwrap type families and newtypes
-        arg_ty' = case mb_co of { Just (_,ty) -> scaledSet arg_ty ty; Nothing -> arg_ty }
+        arg_ty' = case mb_co of
+                    { Just redn -> scaledSet arg_ty (reductionReducedType redn)
+                    ; Nothing   -> arg_ty }
   , isUnpackableType dflags fam_envs (scaledThing arg_ty')
   , (rep_tys, _) <- dataConArgUnpack arg_ty'
   , case unpk_prag of
@@ -1041,8 +1044,8 @@ dataConSrcToImplBang dflags fam_envs arg_ty
                 && rep_tys `lengthAtMost` 1) -- See Note [Unpack one-wide fields]
       srcUnpack -> isSrcUnpacked srcUnpack
   = case mb_co of
-      Nothing     -> HsUnpack Nothing
-      Just (co,_) -> HsUnpack (Just co)
+      Nothing   -> HsUnpack Nothing
+      Just redn -> HsUnpack (Just $ reductionCoercion redn)
 
   | otherwise -- Record the strict-but-no-unpack decision
   = HsStrict

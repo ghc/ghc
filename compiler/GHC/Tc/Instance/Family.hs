@@ -534,7 +534,7 @@ tcLookupDataFamInst_maybe fam_inst_envs tc tc_args
 -- It does not look through type families.
 -- It does not normalise arguments to a tycon.
 --
--- If the result is Just (rep_ty, (co, gres), rep_ty), then
+-- If the result is Just ((gres, co), rep_ty), then
 --    co : ty ~R rep_ty
 --    gres are the GREs for the data constructors that
 --                          had to be in scope

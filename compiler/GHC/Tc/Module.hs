@@ -119,6 +119,7 @@ import GHC.Core.DataCon
 import GHC.Core.Type
 import GHC.Core.Class
 import GHC.Core.Coercion.Axiom
+import GHC.Core.Reduction ( Reduction(..) )
 import GHC.Core.Unify( RoughMatchTc(..) )
 import GHC.Core.FamInstEnv
    ( FamInst, pprFamInst, famInstsRepTyCons
@@ -2589,7 +2590,7 @@ tcRnExpr hsc_env mode rdr_expr
     fam_envs <- tcGetFamInstEnvs ;
     -- normaliseType returns a coercion which we discard, so the Role is
     -- irrelevant
-    return (snd (normaliseType fam_envs Nominal ty))
+    return (reductionReducedType (normaliseType fam_envs Nominal ty))
     }
   where
     -- Optionally instantiate the type of the expression
@@ -2676,7 +2677,7 @@ tcRnType hsc_env flexi normalise rdr_type
        --   normaliseType: expand type-family applications
        --   expandTypeSynonyms: expand type synonyms (#18828)
        ; fam_envs <- tcGetFamInstEnvs
-       ; let ty' | normalise = expandTypeSynonyms $ snd $
+       ; let ty' | normalise = expandTypeSynonyms $ reductionReducedType $
                                normaliseType fam_envs Nominal ty
                  | otherwise = ty
 

@@ -138,6 +138,7 @@ import GHC.Driver.Session
 import GHC.Core.Type
 import qualified GHC.Core.TyCo.Rep as Rep  -- this needs to be used only very locally
 import GHC.Core.Coercion
+import GHC.Core.Reduction
 
 import GHC.Tc.Solver.Types
 import GHC.Tc.Solver.InertSet
@@ -175,7 +176,6 @@ import Data.IORef
 import GHC.Exts (oneShot)
 import Data.List ( mapAccumL, partition )
 import Data.List.NonEmpty ( NonEmpty(..) )
-import Control.Arrow ( first )
 
 #if defined(DEBUG)
 import GHC.Data.Graph.Directed
@@ -1072,9 +1072,8 @@ removeInertCt is ct =
     CIrredCan {}     -> panic "removeInertCt: CIrredEvCan"
     CNonCanonical {} -> panic "removeInertCt: CNonCanonical"
 
--- | Looks up a family application in the inerts; returned coercion
--- is oriented input ~ output
-lookupFamAppInert :: TyCon -> [Type] -> TcS (Maybe (TcCoercion, TcType, CtFlavourRole))
+-- | Looks up a family application in the inerts.
+lookupFamAppInert :: TyCon -> [Type] -> TcS (Maybe (Reduction, CtFlavourRole))
 lookupFamAppInert fam_tc tys
   = do { IS { inert_cans = IC { inert_funeqs = inert_funeqs } } <- getTcSInerts
        ; return (lookup_inerts inert_funeqs) }
@@ -1082,7 +1081,8 @@ lookupFamAppInert fam_tc tys
     lookup_inerts inert_funeqs
       | Just (EqualCtList (CEqCan { cc_ev = ctev, cc_rhs = rhs } :| _))
           <- findFunEq inert_funeqs fam_tc tys
-      = Just (ctEvCoercion ctev, rhs, ctEvFlavourRole ctev)
+      = Just (mkReduction (ctEvCoercion ctev) rhs
+             ,ctEvFlavourRole ctev)
       | otherwise = Nothing
 
 lookupInInerts :: CtLoc -> TcPredType -> TcS (Maybe CtEvidence)
@@ -1111,20 +1111,19 @@ lookupSolvedDict (IS { inert_solved_dicts = solved }) loc cls tys
       _       -> Nothing
 
 ---------------------------
-lookupFamAppCache :: TyCon -> [Type] -> TcS (Maybe (TcCoercion, TcType))
+lookupFamAppCache :: TyCon -> [Type] -> TcS (Maybe Reduction)
 lookupFamAppCache fam_tc tys
   = do { IS { inert_famapp_cache = famapp_cache } <- getTcSInerts
        ; case findFunEq famapp_cache fam_tc tys of
-           result@(Just (co, ty)) ->
+           result@(Just redn) ->
              do { traceTcS "famapp_cache hit" (vcat [ ppr (mkTyConApp fam_tc tys)
-                                                    , ppr ty
-                                                    , ppr co ])
+                                                    , ppr redn ])
                 ; return result }
            Nothing -> return Nothing }
 
-extendFamAppCache :: TyCon -> [Type] -> (TcCoercion, TcType) -> TcS ()
+extendFamAppCache :: TyCon -> [Type] -> Reduction -> TcS ()
 -- NB: co :: rhs ~ F tys, to match expectations of rewriter
-extendFamAppCache tc xi_args stuff@(_, ty)
+extendFamAppCache tc xi_args stuff@(Reduction _ ty)
   = do { dflags <- getDynFlags
        ; when (gopt Opt_FamAppCache dflags) $
     do { traceTcS "extendFamAppCache" (vcat [ ppr tc <+> ppr xi_args
@@ -1141,8 +1140,9 @@ dropFromFamAppCache varset
        ; let filtered = filterTcAppMap check famapp_cache
        ; setTcSInerts $ inerts { inert_famapp_cache = filtered } }
   where
-    check :: (TcCoercion, TcType) -> Bool
-    check (co, _) = not (anyFreeVarsOfCo (`elemVarSet` varset) co)
+    check :: Reduction -> Bool
+    check redn
+      = not (anyFreeVarsOfCo (`elemVarSet` varset) $ reductionCoercion redn)
 
 {- *********************************************************************
 *                                                                      *
@@ -2190,11 +2190,10 @@ checkReductionDepth loc ty
          wrapErrTcS $
          solverDepthErrorTcS loc ty }
 
-matchFam :: TyCon -> [Type] -> TcS (Maybe (CoercionN, TcType))
--- Given (F tys) return (ty, co), where co :: ty ~N F tys
-matchFam tycon args = fmap (fmap (first mkTcSymCo)) $ wrapTcS $ matchFamTcM tycon args
+matchFam :: TyCon -> [Type] -> TcS (Maybe ReductionN)
+matchFam tycon args = wrapTcS $ matchFamTcM tycon args
 
-matchFamTcM :: TyCon -> [Type] -> TcM (Maybe (CoercionN, TcType))
+matchFamTcM :: TyCon -> [Type] -> TcM (Maybe ReductionN)
 -- Given (F tys) return (ty, co), where co :: F tys ~N ty
 matchFamTcM tycon args
   = do { fam_envs <- FamInst.tcGetFamInstEnvs
@@ -2205,10 +2204,11 @@ matchFamTcM tycon args
               , ppr_res match_fam_result ]
        ; return match_fam_result }
   where
-    ppr_res Nothing        = text "Match failed"
-    ppr_res (Just (co,ty)) = hang (text "Match succeeded:")
-                                2 (vcat [ text "Rewrites to:" <+> ppr ty
-                                        , text "Coercion:" <+> ppr co ])
+    ppr_res Nothing = text "Match failed"
+    ppr_res (Just (Reduction co ty))
+      = hang (text "Match succeeded:")
+          2 (vcat [ text "Rewrites to:" <+> ppr ty
+                  , text "Coercion:" <+> ppr co ])
 
 {-
 ************************************************************************
@@ -2227,9 +2227,8 @@ breakTyVarCycle_maybe :: CtEvidence
                       -> CheckTyEqResult   -- result of checkTypeEq
                       -> CanEqLHS
                       -> TcType     -- RHS
-                      -> TcS (Maybe (TcTyVar, CoercionN, TcType))
+                      -> TcS (Maybe (TcTyVar, ReductionN))
                          -- new RHS that doesn't have any type families
-                         -- co :: new type ~N old type
                          -- TcTyVar is the LHS tv; convenient for the caller
 breakTyVarCycle_maybe (ctLocOrigin . ctEvLoc -> CycleBreakerOrigin _) _ _ _
   -- see Detail (7) of Note
@@ -2243,8 +2242,8 @@ breakTyVarCycle_maybe ev cte_result (TyVarLHS lhs_tv) rhs
      -- See Detail (8) of the Note.
 
   = do { should_break <- final_check
-       ; if should_break then do { (co, new_rhs) <- go rhs
-                                 ; return (Just (lhs_tv, co, new_rhs)) }
+       ; if should_break then do { redn <- go rhs
+                                 ; return (Just (lhs_tv, redn)) }
                          else return Nothing }
   where
     flavour = ctEvFlavour ev
@@ -2262,7 +2261,7 @@ breakTyVarCycle_maybe ev cte_result (TyVarLHS lhs_tv) rhs
       = return False
 
     -- This could be considerably more efficient. See Detail (5) of Note.
-    go :: TcType -> TcS (CoercionN, TcType)
+    go :: TcType -> TcS ReductionN
     go ty | Just ty' <- rewriterView ty = go ty'
     go (Rep.TyConApp tc tys)
       | isTypeFamilyTyCon tc  -- worried about whether this type family is not actually
@@ -2270,41 +2269,32 @@ breakTyVarCycle_maybe ev cte_result (TyVarLHS lhs_tv) rhs
       = do { let (fun_args, extra_args) = splitAt (tyConArity tc) tys
                  fun_app                = mkTyConApp tc fun_args
                  fun_app_kind           = tcTypeKind fun_app
-           ; (co, new_ty) <- emit_work fun_app_kind fun_app
-           ; (extra_args_cos, extra_args') <- mapAndUnzipM go extra_args
-           ; return (mkAppCos co extra_args_cos, mkAppTys new_ty extra_args') }
+           ; fun_redn <- emit_work fun_app_kind fun_app
+           ; arg_redns <- unzipRedns <$> mapM go extra_args
+           ; return $ mkAppRedns fun_redn arg_redns }
               -- Worried that this substitution will change kinds?
               -- See Detail (3) of Note
 
       | otherwise
-      = do { (cos, tys) <- mapAndUnzipM go tys
-           ; return (mkTyConAppCo Nominal tc cos, mkTyConApp tc tys) }
+      = do { arg_redns <- unzipRedns <$> mapM go tys
+           ; return $ mkTyConAppRedn Nominal tc arg_redns }
 
     go (Rep.AppTy ty1 ty2)
-      = do { (co1, ty1') <- go ty1
-           ; (co2, ty2') <- go ty2
-           ; return (mkAppCo co1 co2, mkAppTy ty1' ty2') }
+      = mkAppRedn <$> go ty1 <*> go ty2
     go (Rep.FunTy vis w arg res)
-      = do { (co_w, w') <- go w
-           ; (co_arg, arg') <- go arg
-           ; (co_res, res') <- go res
-           ; return (mkFunCo Nominal co_w co_arg co_res, mkFunTy vis w' arg' res') }
+      = mkFunRedn Nominal vis <$> go w <*> go arg <*> go res
     go (Rep.CastTy ty cast_co)
-      = do { (co, ty') <- go ty
-             -- co :: ty' ~N ty
-             -- return_co :: (ty' |> cast_co) ~ (ty |> cast_co)
-           ; return (castCoercionKind1 co Nominal ty' ty cast_co, mkCastTy ty' cast_co) }
-
+      = mkCastRedn1 Nominal ty cast_co <$> go ty
     go ty@(Rep.TyVarTy {})    = skip ty
     go ty@(Rep.LitTy {})      = skip ty
     go ty@(Rep.ForAllTy {})   = skip ty  -- See Detail (1) of Note
     go ty@(Rep.CoercionTy {}) = skip ty  -- See Detail (2) of Note
 
-    skip ty = return (mkNomReflCo ty, ty)
+    skip ty = return $ mkReflRedn Nominal ty
 
-    emit_work :: TcKind                   -- of the function application
-              -> TcType                   -- original function application
-              -> TcS (CoercionN, TcType)  -- rewritten type (the fresh tyvar)
+    emit_work :: TcKind         -- of the function application
+              -> TcType         -- original function application
+              -> TcS ReductionN -- rewritten type (the fresh tyvar)
     emit_work fun_app_kind fun_app = case flavour of
       Given ->
         do { new_tv <- wrapTcS (TcM.newCycleBreakerTyVar fun_app_kind)
@@ -2318,14 +2308,14 @@ breakTyVarCycle_maybe ev cte_result (TyVarLHS lhs_tv) rhs
            ; updInertTcS $ \is ->
                is { inert_cycle_breakers = (new_tv, fun_app) :
                                            inert_cycle_breakers is }
-           ; return (mkNomReflCo new_ty, new_ty) }
+           ; return $ mkReflRedn Nominal new_ty }
                 -- Why reflexive? See Detail (4) of the Note
 
       _derived_or_wd ->
         do { new_tv <- wrapTcS (TcM.newFlexiTyVar fun_app_kind)
            ; let new_ty = mkTyVarTy new_tv
            ; co <- emitNewWantedEq new_loc Nominal new_ty fun_app
-           ; return (co, new_ty) }
+           ; return $ mkReduction (mkSymCo co) new_ty }
 
       -- See Detail (7) of the Note
     new_loc = updateCtLocOrigin (ctEvLoc ev) CycleBreakerOrigin

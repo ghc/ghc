@@ -30,6 +30,7 @@ import GHC.Core.Type
 import GHC.Core.Multiplicity
 import GHC.Core.Predicate ( isClassPred )
 import GHC.Core.Coercion
+import GHC.Core.Reduction
 import GHC.Core.FamInstEnv
 import GHC.Core.TyCon
 import GHC.Core.TyCon.RecWalk
@@ -1239,7 +1240,7 @@ findTypeShape fam_envs ty
        = TsUnk
 
     go_tc rec_tc tc tc_args
-       | Just (_, rhs, _) <- topReduceTyFamApp_maybe fam_envs tc tc_args
+       | Just (HetReduction (Reduction _ rhs) _) <- topReduceTyFamApp_maybe fam_envs tc tc_args
        = go rec_tc rhs
 
        | Just con <- tyConSingleAlgDataCon_maybe tc

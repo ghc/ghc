@@ -78,6 +78,7 @@ import GHC.Core.Type
 import GHC.Tc.Solver   (tcNormalise, tcCheckGivens, tcCheckWanteds)
 import GHC.Core.Unify    (tcMatchTy)
 import GHC.Core.Coercion
+import GHC.Core.Reduction
 import GHC.HsToCore.Monad hiding (foldlM)
 import GHC.Tc.Instance.Family
 import GHC.Core.FamInstEnv
@@ -376,8 +377,9 @@ pmTopNormaliseType (TySt _ inert) typ
     tyFamStepper :: FamInstEnvs -> NormaliseStepper ([Type] -> [Type], a -> a)
     tyFamStepper env rec_nts tc tys  -- Try to step a type/data family
       = case topReduceTyFamApp_maybe env tc tys of
-          Just (_, rhs, _) -> NS_Step rec_nts rhs ((rhs:), id)
-          _                -> NS_Done
+          Just (HetReduction (Reduction _ rhs) _)
+            -> NS_Step rec_nts rhs ((rhs:), id)
+          _ -> NS_Done
 
 -- | Returns 'True' if the argument 'Type' is a fully saturated application of
 -- a closed type constructor.

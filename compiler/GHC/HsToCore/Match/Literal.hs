@@ -41,6 +41,7 @@ import GHC.Types.SourceText
 import GHC.Core
 import GHC.Core.Make
 import GHC.Core.TyCon
+import GHC.Core.Reduction ( Reduction(..) )
 import GHC.Core.DataCon
 import GHC.Tc.Utils.Zonk ( shortCutLit )
 import GHC.Tc.Utils.TcType
@@ -466,7 +467,9 @@ getNormalisedTyconName fam_envs (i,ty)
     | otherwise = Nothing
   where
     normaliseNominal :: FamInstEnvs -> Type -> Type
-    normaliseNominal fam_envs ty = snd $ normaliseType fam_envs Nominal ty
+    normaliseNominal fam_envs ty
+      = reductionReducedType
+      $ normaliseType fam_envs Nominal ty
 
 -- | Convert a pair (Integer, Type) to (Integer, Name) without normalising
 -- the type
