@@ -9,6 +9,7 @@ copyright:           Andrey Mokhov 2014-2017
 category:            Development
 build-type:          Simple
 cabal-version:       >=1.10
+extra-doc-files:     README.md
 
 source-repository head
     type:     git
