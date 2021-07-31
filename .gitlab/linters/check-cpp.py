@@ -27,6 +27,8 @@ for l in linters:
     l.add_path_filter(lambda path: path != Path('docs', 'users_guide', 'utils.rst'))
     # Don't lint vendored code
     l.add_path_filter(lambda path: not path.name == 'config.guess')
+    # Don't lint files from external xxhash projects
+    l.add_path_filter(lambda path: path != Path('rts', 'xxhash.h')),
     # Don't lint font files
     l.add_path_filter(lambda path: not path.parent == Path('docs','users_guide',
         'rtd-theme', 'static', 'fonts'))

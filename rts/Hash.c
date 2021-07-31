@@ -18,13 +18,15 @@
    since we compile these things these days with cabal we can no longer
    specify optimization per file.  So we have to resort to pragmas.  */
 #if defined(__GNUC__) || defined(__GNUG__)
+#if !defined(DEBUG)
 #pragma GCC push_options
 #pragma GCC optimize ("O3")
+#endif
 #endif
 
 #define XXH_NAMESPACE __rts_
 #define XXH_STATIC_LINKING_ONLY   /* access advanced declarations */
-#define XXH_PRIVATE_API
+#define XXH_IMPLEMENTATION   /* access definitions */
 
 #include "xxhash.h"
 
@@ -96,7 +98,7 @@ hashStr(const HashTable *table, StgWord w)
 {
     const char *key = (char*) w;
 #if defined(x86_64_HOST_ARCH)
-    StgWord h = XXH64 (key, strlen(key), 1048583);
+    StgWord h = XXH3_64bits_withSeed (key, strlen(key), 1048583);
 #else
     StgWord h = XXH32 (key, strlen(key), 1048583);
 #endif
@@ -560,3 +562,10 @@ int keyCountHashTable (HashTable *table)
 {
     return table->kcount;
 }
+
+
+#if defined(__GNUC__) || defined(__GNUG__)
+#if !defined(DEBUG)
+#pragma GCC pop_options
+#endif
+#endif
