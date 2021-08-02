@@ -36,6 +36,7 @@ import Control.Monad
 import Control.Applicative ((<|>))
 import Data.List (nub, intercalate, isPrefixOf, isSuffixOf)
 import Data.Maybe
+import Data.Char (isSpace)
 import System.IO
 import System.Directory (setCurrentDirectory, getCurrentDirectory, doesFileExist)
 import System.Environment
@@ -455,12 +456,12 @@ generate directory distdir config_args
                 variablePrefix ++ "_DATA_FILES = "    ++ unwords (dataFiles pd),
                 -- XXX This includes things it shouldn't, like:
                 -- -odir dist-bootstrapping/build
-                variablePrefix ++ "_HC_OPTS = " ++ escape (unwords
+                variablePrefix ++ "_HC_OPTS = " ++ escapeArgs
                        (   programDefaultArgs ghcProg
                         ++ hcOptions GHC bi
                         ++ languageToFlags (compiler lbi) (defaultLanguage bi)
                         ++ extensionsToFlags (compiler lbi) (usedExtensions bi)
-                        ++ programOverrideArgs ghcProg)),
+                        ++ programOverrideArgs ghcProg),
                 variablePrefix ++ "_CC_OPTS = "                        ++ unwords (ccOptions bi),
                 variablePrefix ++ "_CPP_OPTS = "                       ++ unwords (cppOptions bi),
                 variablePrefix ++ "_LD_OPTS = "                        ++ unwords (ldOptions bi),
@@ -482,7 +483,6 @@ generate directory distdir config_args
           if null (fromShortText $ description pd) then synopsis pd
                                                    else description pd
   where
-     escape = foldr (\c xs -> if c == '#' then '\\':'#':xs else c:xs) []
      wrap = mapM wrap1
      wrap1 s
       | null s        = die ["Wrapping empty value"]
@@ -501,3 +501,17 @@ generate directory distdir config_args
      writeFileUtf8 f txt = withFile f WriteMode $ \hdl -> do
          hSetEncoding hdl utf8
          hPutStr hdl txt
+
+-- | Like GHC.ResponseFile.escapeArgs but uses spaces instead of newlines to seperate arguments
+escapeArgs :: [String] -> String
+escapeArgs = unwords . map escapeArg
+
+escapeArg :: String -> String
+escapeArg = foldr escape ""
+
+escape :: Char -> String -> String
+escape c cs
+  | isSpace c || c `elem` ['\\','\'','#','"']
+    = '\\':c:cs
+  | otherwise
+    = c:cs
