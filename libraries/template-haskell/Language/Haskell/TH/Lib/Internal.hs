@@ -366,6 +366,14 @@ labelE s = pure (LabelE s)
 implicitParamVarE :: Quote m => String -> m Exp
 implicitParamVarE n = pure (ImplicitParamVarE n)
 
+getFieldE :: Quote m => m Exp -> String -> m Exp
+getFieldE e f = do
+  e' <- e
+  pure (GetFieldE e' f)
+
+projectionE :: Quote m => [String] -> m Exp
+projectionE xs = pure (ProjectionE xs)
+
 -- ** 'arithSeqE' Shortcuts
 fromE :: Quote m => m Exp -> m Exp
 fromE x = do { a <- x; pure (ArithSeqE (FromR a)) }

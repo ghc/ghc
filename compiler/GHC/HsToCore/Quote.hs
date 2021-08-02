@@ -1496,6 +1496,7 @@ repE (HsRecSel _ (FieldOcc x _)) = repE (HsVar noExtField (noLocA x))
 repE (HsOverLit _ l) = do { a <- repOverloadedLiteral l; repLit a }
 repE (HsLit _ l)     = do { a <- repLiteral l;           repLit a }
 repE (HsLam _ (MG { mg_alts = (L _ [m]) })) = repLambda m
+repE e@(HsLam _ (MG { mg_alts = (L _ _) })) = pprPanic "repE: HsLam with multiple alternatives" (ppr e)
 repE (HsLamCase _ (MG { mg_alts = (L _ ms) }))
                    = do { ms' <- mapM repMatchTup ms
                         ; core_ms <- coreListM matchTyConName ms'
@@ -1622,14 +1623,22 @@ repE (HsUnboundVar _ uv)   = do
                                occ   <- occNameLit uv
                                sname <- repNameS occ
                                repUnboundVar sname
+repE (HsGetField _ e (L _ (DotFieldOcc _ (L _ f)))) = do
+  e1 <- repLE e
+  repGetField e1 f
+repE (HsProjection _ xs) = repProjection (map (unLoc . dfoLabel . unLoc) xs)
 repE (XExpr (HsExpanded orig_expr ds_expr))
   = do { rebindable_on <- lift $ xoptM LangExt.RebindableSyntax
        ; if rebindable_on  -- See Note [Quotation and rebindable syntax]
          then repE ds_expr
          else repE orig_expr }
-
 repE e@(HsPragE _ (HsPragSCC {}) _) = notHandled (ThCostCentres e)
-repE e                              = notHandled (ThExpressionForm e)
+repE e@(HsBracket{}) = notHandled (ThExpressionForm e)
+repE e@(HsRnBracketOut{}) = notHandled (ThExpressionForm e)
+repE e@(HsTcBracketOut{}) = notHandled (ThExpressionForm e)
+repE e@(HsProc{}) = notHandled (ThExpressionForm e)
+repE e@(HsTick{}) = notHandled (ThExpressionForm e)
+repE e@(HsBinTick{}) = notHandled (ThExpressionForm e)
 
 {- Note [Quotation and rebindable syntax]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2921,6 +2930,15 @@ repOverLabel fs = do
                     (MkC s) <- coreStringLit $ unpackFS fs
                     rep2 labelEName [s]
 
+repGetField :: Core (M TH.Exp) -> FastString -> MetaM (Core (M TH.Exp))
+repGetField (MkC exp) fs = do
+  MkC s <- coreStringLit $ unpackFS fs
+  rep2 getFieldEName [exp,s]
+
+repProjection :: [FastString] -> MetaM (Core (M TH.Exp))
+repProjection fs = do
+  MkC xs <- coreList' stringTy <$> mapM (coreStringLit . unpackFS) fs
+  rep2 projectionEName [xs]
 
 ------------ Lists -------------------
 -- turn a list of patterns into a single pattern matching a list
