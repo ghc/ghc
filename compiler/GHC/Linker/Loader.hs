@@ -1189,7 +1189,7 @@ unload_wkr interp keep_linkables pls@LoaderState{..}  = do
   where
     unloadObjs :: Linkable -> IO ()
     unloadObjs lnk
-      | hostIsDynamic = return ()
+      | interpreterDynamic interp = return ()
         -- We don't do any cleanup when linking objects with the
         -- dynamic linker.  Doing so introduces extra complexity for
         -- not much benefit.
