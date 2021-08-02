@@ -85,7 +85,6 @@
 -fversion-macros
 -fvia-c
 -haddock-opts
--hpcdir
 -instantiated-with
 -keep-hi-file
 -keep-o-file

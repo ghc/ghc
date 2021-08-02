@@ -1471,6 +1471,18 @@ Options for instrumenting code for coverage
     :ghc-flag:`-fhpc`, and the :command:`hpc` tool will only show information about
     those modules.
 
+.. ghc-flag:: -hpcdir⟨dir⟩
+    :shortdesc: Set the directory where GHC places ``.mix`` files.
+    :type: dynamic
+    :category: coverage
+
+    :default: .hpc
+
+    Override the directory where GHC places the HPC index
+    (``.mix``) files used by ``hpc`` to understand program
+    structure.
+
+
 The hpc toolkit
 ~~~~~~~~~~~~~~~
 
