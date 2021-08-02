@@ -1,5 +1,9 @@
 # Changelog for [`template-haskell` package](http://hackage.haskell.org/package/template-haskell)
 
+## 2.19.0.0
+
+  * Add `DefaultD` constructor to support Haskell `default` declarations.
+
 ## 2.18.0.0
   * The types of `ConP` and `conP` have been changed to allow for an additional list
     of type applications preceding the argument patterns.
@@ -13,6 +17,13 @@
     are several combinators that can be used with `Dec`s directly, including
     `withDecDoc`/`withDecsDoc` as well as `_doc` counterparts to many of the
     `Dec` helper functions.
+
+  * Add `newDeclarationGroup` to document the effect of visibility while
+    reifying types and instances.
+
+  * Add support for Overloaded Record Dot. 
+    Introduces `getFieldE :: Quote m => m Exp -> String -> m Exp` and
+    `projectionE :: Quote m => [String] -> m Exp`.
 
 ## 2.17.0.0
   * Typed Quotations now return a value of type `Code m a` (GHC Proposal #195).
