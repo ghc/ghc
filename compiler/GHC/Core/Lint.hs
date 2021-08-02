@@ -980,9 +980,16 @@ lintIdOcc var nargs
         ; ensureEqTys occ_ty bndr_ty $
           mkBndrOccTypeMismatchMsg bndr var bndr_ty occ_ty
 
+        ; lf <- getLintFlags
+        ; let occ_mult  = varMult var
+              bndr_mult = varMult bndr
+          -- TODO: check if it can be enabled for all passes
+        ; when (lf_check_linearity lf) $
+          ensureEqTys occ_mult bndr_mult $
+          mkBndrOccMultMismatchMsg bndr var bndr_mult occ_mult
+
           -- Check for a nested occurrence of the StaticPtr constructor.
           -- See Note [Checking StaticPtrs].
-        ; lf <- getLintFlags
         ; when (nargs /= 0 && lf_check_static_ptrs lf /= AllowAnywhere) $
             checkL (idName var /= makeStaticName) $
               text "Found makeStatic nested in an expression"
@@ -3255,6 +3262,13 @@ mkBndrOccTypeMismatchMsg bndr var bndr_ty var_ty
          , text "Binder:" <+> ppr bndr <+> dcolon <+> ppr bndr_ty
          , text "Occurrence:" <+> ppr var <+> dcolon <+> ppr var_ty
          , text "  Before subst:" <+> ppr (idType var) ]
+
+mkBndrOccMultMismatchMsg :: Var -> Var -> LintedType -> LintedType -> SDoc
+mkBndrOccMultMismatchMsg bndr var bndr_mult var_mult
+  = vcat [ text "Mismatch in multiplicity between binder and occurrence"
+         , text "Binder:" <+> ppr bndr <+> text "%" <+> ppr bndr_mult
+         , text "Occurrence:" <+> ppr var <+> text "%" <+> ppr var_mult
+         , text "  Before subst:" <+> ppr (idMult var) ]
 
 mkBadJoinPointRuleMsg :: JoinId -> JoinArity -> CoreRule -> SDoc
 mkBadJoinPointRuleMsg bndr join_arity rule

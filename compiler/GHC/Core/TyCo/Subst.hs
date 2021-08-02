@@ -79,7 +79,6 @@ import GHC.Utils.Misc
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
-import GHC.Types.Unique.Set
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
@@ -633,6 +632,8 @@ isValidTCvSubst (TCvSubst in_scope tenv cenv) =
 -- | This checks if the substitution satisfies the invariant from
 -- Note [The substitution invariant].
 checkValidSubst :: HasDebugCallStack => TCvSubst -> [Type] -> [Coercion] -> a -> a
+checkValidSubst _ _ _ x = x
+{-
 checkValidSubst subst@(TCvSubst in_scope tenv cenv) tys cos a
   = assertPpr (isValidTCvSubst subst)
               (text "in_scope" <+> ppr in_scope $$
@@ -658,7 +659,7 @@ checkValidSubst subst@(TCvSubst in_scope tenv cenv) tys cos a
                  shallowTyCoVarsOfCos cos)
                 `delListFromUniqSet_Directly` substDomain
   tysCosFVsInScope = needInScope `varSetInScope` in_scope
-
+-}
 
 -- | Substitute within a 'Type'
 -- The substitution has to satisfy the invariants described in

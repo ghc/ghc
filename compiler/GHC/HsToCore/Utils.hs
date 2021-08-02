@@ -65,6 +65,7 @@ import GHC.Core.TyCon
 import GHC.Core.DataCon
 import GHC.Core.PatSyn
 import GHC.Core.Type
+import GHC.Core.Subst
 import GHC.Core.Coercion
 import GHC.Builtin.Types
 import GHC.Types.Basic
@@ -377,7 +378,8 @@ mkDataConCase var ty alts@(alt1 :| _)
               -- Upholds the invariant that the binders of a case expression
               -- must be scaled by the case multiplicity. See Note [Case
               -- expression invariants] in CoreSyn.
-            return (Alt (DataAlt con) rep_ids' (mkLets binds body))
+                updateMults = substExpr (extendInScopeList emptySubst rep_ids')
+            return $ Alt (DataAlt con) rep_ids' (updateMults $ mkLets binds body)
 
     mk_default :: MatchResult (Maybe CoreAlt)
     mk_default
