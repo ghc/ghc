@@ -223,6 +223,8 @@ pprExp i (StaticE e) = parensIf (i >= appPrec) $
 pprExp _ (UnboundVarE v) = pprName' Applied v
 pprExp _ (LabelE s) = text "#" <> text s
 pprExp _ (ImplicitParamVarE n) = text ('?' : n)
+pprExp _ (GetFieldE e f) = pprExp appPrec e <> text ('.': f)
+pprExp _ (ProjectionE xs) = parens $ hcat $ map ((char '.'<>) . text) xs
 
 pprFields :: [(Name,Exp)] -> Doc
 pprFields = sep . punctuate comma . map (\(s,e) -> pprName' Applied s <+> equals <+> ppr e)

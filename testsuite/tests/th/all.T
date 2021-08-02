@@ -18,6 +18,7 @@ if config.have_ext_interp :
 
 test('TH_mkName', normal, compile, ['-v0'])
 test('TH_overloadedlabels', normal, compile, ['-v0'])
+test('T20185', extra_files(['T20185a.hs']), multimod_compile_and_run, ['T20185', '-v0 ' + config.ghc_th_way_flags])
 test('TH_1tuple', normal, compile_fail, ['-v0'])
 
 test('TH_repE2', normal, compile_and_run, [''])
