@@ -372,3 +372,4 @@ test('T20143',  [ grep_errmsg(r'unsafeEqualityProof') ], compile, ['-O -ddump-si
 test('T20174', normal, compile, [''])
 test('T16373', normal, compile, [''])
 test('T20112',  normal, multimod_compile, ['T20112', '-O -v0 -g1'])
+test('T20200', normal, compile, [''])
