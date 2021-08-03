@@ -14,6 +14,7 @@ import Utilities
 import Data.Either
 import Hadrian.Oracles.Cabal
 import Hadrian.Haskell.Cabal.Type
+import qualified System.Directory.Extra as IO
 
 {-
 Note [Binary distributions]
@@ -147,7 +148,11 @@ bindistRules = do
             -- a wrapper script on platforms (windows) which don't support symlinks.
             if windowsHost
               then createVersionWrapper version_prog unversioned_install_path
-              else createFileLink install_path unversioned_install_path
+              else liftIO $ do
+                -- Use the IO versions rather than createFileLink because
+                -- we need to create a relative symlink.
+                IO.removeFile unversioned_install_path <|> return ()
+                IO.createFileLink version_prog unversioned_install_path
         copyDirectory (ghcBuildDir -/- "lib") bindistFilesDir
         copyDirectory (rtsIncludeDir)         bindistFilesDir
 
