@@ -240,7 +240,7 @@ builderPredicate = builderSetting <&> (\(wstg, wpkg, builderMode) ->
        BM_Ghc ghcMode -> wildcard (builder Ghc) (builder . Ghc) ghcMode
        BM_Cc  ccMode  -> wildcard (builder Cc) (builder . Cc) ccMode
        BM_CabalConfigure -> builder (Cabal Setup)
-       BM_RunTest     -> builder RunTest
+       BM_RunTest     -> builder Testsuite
     )
   )
 
