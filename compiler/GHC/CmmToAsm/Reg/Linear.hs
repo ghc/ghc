@@ -763,7 +763,7 @@ clobberRegs clobbered
         assig           <- getAssigR
         -- TODO: Avoid intermediate list
         -- We only deal with the InBoth case here, see clobber below.
-        setAssigR $! clobber assig (nonDetUFMToList (lm_inBoth assig))
+        setAssigR $! clobber assig (nonDetUFMToList (lm_inReg assig))
           -- This is non-deterministic but we do not
           -- currently support deterministic code-generation.
           -- See Note [Unique Determinism and code generation]
@@ -943,7 +943,7 @@ allocRegsAndSpill_spill reading keep spills alloc r rs assig spill_loc
 
                         -- we have a temporary that is in both register and mem,
                         -- just free up its register for use.
-                        | candidates_inBoth <- (nonDetUFMToList (lm_inBoth candidates'))
+                        | candidates_inBoth <- filter (isBoth . snd) (nonDetUFMToList (lm_inReg candidates'))
                         , ((temp, loc@(InBoth my_reg slot)) : _) <- filter
                                 (\(u,(InBoth reg _)) -> u `notElem` (map getUnique keep) &&
                                                       targetClassOfRealReg platform reg == targetClass)

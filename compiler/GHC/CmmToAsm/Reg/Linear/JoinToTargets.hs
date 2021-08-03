@@ -93,7 +93,7 @@ joinToTargets' block_live new_blocks block_id instr (dest:dests)
 
         -- and free up those registers which are now free.
         let to_free =
-                [ r     | (reg, loc) <- nonDetUFMToList (lm_inReg assig) ++ nonDetUFMToList (lm_inBoth assig)
+                [ r     | (reg, loc) <- nonDetUFMToList (lm_inReg assig)
                         -- This is non-deterministic but we do not
                         -- currently support deterministic code-generation.
                         -- See Note [Unique Determinism and code generation]
