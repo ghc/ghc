@@ -39,8 +39,6 @@ module GHC.Core.Subst (
 
 import GHC.Prelude
 
-import GHC.Driver.Ppr
-
 import GHC.Core
 import GHC.Core.FVs
 import GHC.Core.Seq
@@ -256,9 +254,9 @@ lookupIdSubst (Subst in_scope ids _ _) v
   | Just e  <- lookupVarEnv ids       v = e
   | Just v' <- lookupInScope in_scope v = Var v'
         -- Vital! See Note [Extending the Subst]
-  | otherwise = WARN( True, text "GHC.Core.Subst.lookupIdSubst" <+> ppr v
-                            $$ ppr in_scope)
-                Var v
+        -- If v isn't in the InScopeSet, we panic, because
+        -- it's a bad bug and we reallly want to know
+  | otherwise = pprPanic "lookupIdSubst" (ppr v $$ ppr in_scope)
 
 -- | Find the substitution for a 'TyVar' in the 'Subst'
 lookupTCvSubst :: Subst -> TyVar -> Type

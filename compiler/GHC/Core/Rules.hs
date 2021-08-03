@@ -777,6 +777,8 @@ match renv subst e1 (Let bind e2)
           (subst { rs_binds = rs_binds subst . Let bind'
                  , rs_bndrs = extendVarSetList (rs_bndrs subst) new_bndrs })
           e1 e2
+  | otherwise
+  = Nothing
   where
     flt_subst = addInScopeSet (rv_fltR renv) (rs_bndrs subst)
     (flt_subst', bind') = substBind flt_subst bind
@@ -926,12 +928,19 @@ match_var renv@(RV { rv_tmpls = tmpls, rv_lcl = rn_env, rv_fltR = flt_env })
 
   | otherwise   -- v1' is not a template variable; check for an exact match with e2
   = case e2 of  -- Remember, envR of rn_env is disjoint from rv_fltR
-       Var v2 | v1' == rnOccR rn_env v2
-              -> Just subst
+       Var v2 | Just v2' <- rnOccR_maybe rn_env v2
+              -> -- v2 was bound by a nested lambda or case
+                 if v1' == v2' then Just subst
+                               else Nothing
 
+              -- v2 is not bound nestedly; it is free
+              -- in the whole expression being matched
+              -- So it will be in the InScopeSet for flt_env (#20200)
               | Var v2' <- lookupIdSubst flt_env v2
               , v1' == v2'
               -> Just subst
+              | otherwise
+              -> Nothing
 
        _ -> Nothing
 
@@ -1081,14 +1090,14 @@ There are a couple of tricky points.
 Our cunning plan is this:
   * Along with the growing substitution for template variables
     we maintain a growing set of floated let-bindings (rs_binds)
-    plus the set of variables thus bound.
+    plus the set of variables thus bound (rs_bndrs).
 
   * The RnEnv2 in the MatchEnv binds only the local binders
-    in the term (lambdas, case)
+    in the term (lambdas, case), not the floated let-bndrs.
 
-  * When we encounter a let in the term to be matched, we
-    check that does not mention any locally bound (lambda, case)
-    variables.  If so we fail
+  * When we encounter a let in the term to be matched, we use
+    okToFloat check that does not mention any locally bound (lambda,
+    case) variables.  If so we fail.
 
   * We use GHC.Core.Subst.substBind to freshen the binding, using an
     in-scope set that is the original in-scope variables plus the
