@@ -834,6 +834,7 @@ validate-x86_64-linux-deb9-debug:
     TEST_TYPE: slowtest
     TEST_ENV: "x86_64-linux-deb9-debug"
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-deb9-linux-debug.tar.xz"
+    HADDOCK_HYPERLINKED_SOURCES: "yes"
   artifacts:
     when: always
     expire_in: 2 week
