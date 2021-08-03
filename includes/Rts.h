@@ -138,7 +138,7 @@ void _assertFail(const char *filename, unsigned int linenum)
 #undef ASSERTS_ENABLED
 #endif
 
-#if ASSERTS_ENABLED
+#if defined(ASSERTS_ENABLED)
 #define ASSERT(predicate)                       \
     do { CHECK(predicate); } while(0)
 #define ASSERTM(predicate,msg,...)              \

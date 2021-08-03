@@ -217,7 +217,7 @@
 #undef ASSERTS_ENABLED
 #endif
 
-#if ASSERTS_ENABLED
+#if defined(ASSERTS_ENABLED)
 #define ASSERT(predicate)                       \
         if (predicate) {                        \
             /*null*/;                           \

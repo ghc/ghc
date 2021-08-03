@@ -223,7 +223,7 @@ osThreadIsAlive(OSThreadId id STG_UNUSED)
 void
 initMutex(Mutex* pMut)
 {
-#if ASSERTS_ENABLED
+#if defined(ASSERTS_ENABLED)
     pthread_mutexattr_t attr;
     pthread_mutexattr_init(&attr);
     pthread_mutexattr_settype(&attr,PTHREAD_MUTEX_ERRORCHECK);
