@@ -18,6 +18,7 @@ module GHC.Core.Subst (
         substTy, substCo, substExpr, substExprSC, substBind, substBindSC,
         substUnfolding, substUnfoldingSC,
         lookupIdSubst, lookupTCvSubst, substIdType, substIdOcc,
+        lookupIdSubstUnchecked,
         substTickish, substDVarSet, substIdInfo,
 
         -- ** Operations on substitutions
@@ -250,8 +251,17 @@ extendSubstList subst []              = subst
 extendSubstList subst ((var,rhs):prs) = extendSubstList (extendSubst subst var rhs) prs
 
 -- | Find the substitution for an 'Id' in the 'Subst'
-lookupIdSubst :: HasDebugCallStack => Subst -> Id -> CoreExpr
+lookupIdSubst :: HasCallStack => Subst -> Id -> CoreExpr
 lookupIdSubst (Subst in_scope ids _ _) v
+  | not (isLocalId v) = Var v
+  | Just e  <- lookupVarEnv ids       v = e
+  | Just v' <- lookupInScope in_scope v = Var v'
+        -- Vital! See Note [Extending the Subst]
+  | otherwise = pprPanic "lookupIdSubst" (ppr v $$ ppr in_scope)
+
+-- | Find the substitution for an 'Id' in the 'Subst'
+lookupIdSubstUnchecked :: HasDebugCallStack => Subst -> Id -> CoreExpr
+lookupIdSubstUnchecked (Subst in_scope ids _ _) v
   | not (isLocalId v) = Var v
   | Just e  <- lookupVarEnv ids       v = e
   | Just v' <- lookupInScope in_scope v = Var v'

@@ -933,7 +933,7 @@ match_var renv@(RV { rv_tmpls = tmpls, rv_lcl = rn_env, rv_fltR = flt_env })
        Var v2 | v1' == rnOccR rn_env v2
               -> Just subst
 
-              | Var v2' <- lookupIdSubst flt_env v2
+              | Var v2' <- lookupIdSubstUnchecked flt_env v2
               , v1' == v2'
               -> Just subst
 

@@ -114,7 +114,6 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
-import GHC.Utils.Trace
 
 import Data.Data hiding (TyCon)
 import Data.Int
@@ -1595,9 +1594,7 @@ cmpAltCon (DataAlt _)  DEFAULT      = GT
 cmpAltCon (LitAlt  l1) (LitAlt  l2) = l1 `compare` l2
 cmpAltCon (LitAlt _)   DEFAULT      = GT
 
-cmpAltCon con1 con2 = warnPprTrace True (text "Comparing incomparable AltCons" <+>
-                                  ppr con1 <+> ppr con2) $
-                      LT
+cmpAltCon con1 con2 = pprPanic "cmpAltCon" (text "Incomparable AltCons" $$ ppr con1 $$ ppr con2)
 
 {-
 ************************************************************************
