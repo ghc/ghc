@@ -19,6 +19,7 @@ import GHC.Stg.Lint     ( lintStgTopBindings )
 import GHC.Stg.Stats    ( showStgStats )
 import GHC.Stg.DepAnal  ( depSortStgPgm )
 import GHC.Stg.Unarise  ( unarise )
+import GHC.Stg.BcPrep   ( bcPrep )
 import GHC.Stg.CSE      ( stgCse )
 import GHC.Stg.Lift     ( stgLiftLams )
 import GHC.Unit.Module ( Module )
@@ -48,15 +49,16 @@ runStgM mask (StgM m) = runReaderT m mask
 stg2stg :: Logger
         -> DynFlags                  -- includes spec of what stg-to-stg passes to do
         -> InteractiveContext
+        -> Bool                      -- prepare for bytecode?
         -> Module                    -- module being compiled
         -> [StgTopBinding]           -- input program
         -> IO [StgTopBinding]        -- output program
-stg2stg logger dflags ictxt this_mod binds
+stg2stg logger dflags ictxt for_bytecode this_mod binds
   = do  { dump_when Opt_D_dump_stg_from_core "Initial STG:" binds
         ; showPass logger "Stg2Stg"
         -- Do the main business!
         ; binds' <- runStgM 'g' $
-            foldM do_stg_pass binds (getStgToDo dflags)
+            foldM do_stg_pass binds (getStgToDo for_bytecode dflags)
 
           -- Dependency sort the program as last thing. The program needs to be
           -- in dependency order for the SRT algorithm to work (see
@@ -96,6 +98,11 @@ stg2stg logger dflags ictxt this_mod binds
             let binds' = {-# SCC "StgLiftLams" #-} stgLiftLams dflags us binds
             end_pass "StgLiftLams" binds'
 
+          StgBcPrep -> do
+            us <- getUniqueSupplyM
+            let binds' = {-# SCC "StgBcPrep" #-} bcPrep us binds
+            end_pass "StgBcPrep" binds'
+
           StgUnarise -> do
             us <- getUniqueSupplyM
             liftIO (stg_linter False "Pre-unarise" binds)
@@ -128,19 +135,22 @@ data StgToDo
   | StgStats
   | StgUnarise
   -- ^ Mandatory unarise pass, desugaring unboxed tuple and sum binders
+  | StgBcPrep
+  -- ^ Mandatory when compiling to bytecode
   | StgDoNothing
   -- ^ Useful for building up 'getStgToDo'
   deriving Eq
 
 -- | Which Stg-to-Stg passes to run. Depends on flags, ways etc.
-getStgToDo :: DynFlags -> [StgToDo]
-getStgToDo dflags =
+getStgToDo :: Bool -> DynFlags -> [StgToDo]
+getStgToDo for_bytecode dflags =
   filter (/= StgDoNothing)
     [ mandatory StgUnarise
     -- Important that unarisation comes first
     -- See Note [StgCse after unarisation] in GHC.Stg.CSE
     , optional Opt_StgCSE StgCSE
     , optional Opt_StgLiftLams StgLiftLams
+    , runWhen for_bytecode StgBcPrep
     , optional Opt_StgStats StgStats
     ] where
       optional opt = runWhen (gopt opt dflags)

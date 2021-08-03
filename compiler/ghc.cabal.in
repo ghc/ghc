@@ -544,6 +544,7 @@ Library
         GHC.Settings.Config
         GHC.Settings.Constants
         GHC.Settings.IO
+        GHC.Stg.BcPrep
         GHC.Stg.CSE
         GHC.Stg.Debug
         GHC.Stg.DepAnal

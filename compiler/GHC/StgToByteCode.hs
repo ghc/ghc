@@ -36,7 +36,6 @@ import GHCi.RemoteTypes
 import GHC.Types.Basic
 import GHC.Utils.Outputable
 import GHC.Types.Name
-import GHC.Types.Id.Make
 import GHC.Types.Id
 import GHC.Types.ForeignCall
 import GHC.Core
@@ -49,7 +48,6 @@ import GHC.Core.TyCon
 import GHC.Utils.Misc
 import GHC.Utils.Logger
 import GHC.Types.Var.Set
-import GHC.Builtin.Types ( unboxedUnitTy )
 import GHC.Builtin.Types.Prim
 import GHC.Core.TyCo.Ppr ( pprType )
 import GHC.Utils.Error
@@ -75,7 +73,6 @@ import Foreign hiding (shiftL, shiftR)
 import Control.Monad
 import Data.Char
 
-import GHC.Types.Unique.Supply
 import GHC.Unit.Module
 
 import Data.Array
@@ -90,7 +87,6 @@ import Data.Ord
 import GHC.Stack.CCS
 import Data.Either ( partitionEithers )
 
-import qualified GHC.Types.CostCentre as CC
 import GHC.Stg.Syntax
 import GHC.Stg.FVs
 
@@ -118,12 +114,10 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks
             flattenBind (StgRec bs)     = bs
         stringPtrs <- allocateTopStrings interp strings
 
-        us <- mkSplitUniqSupply 'y'
         (BcM_State{..}, proto_bcos) <-
-           runBc hsc_env us this_mod mb_modBreaks (mkVarEnv stringPtrs) $ do
-             prepd_binds <- mapM bcPrepBind lifted_binds
+           runBc hsc_env this_mod mb_modBreaks (mkVarEnv stringPtrs) $ do
              let flattened_binds =
-                   concatMap (flattenBind . annBindingFreeVars) (reverse prepd_binds)
+                   concatMap (flattenBind . annBindingFreeVars) (reverse lifted_binds)
              mapM schemeTopBind flattened_binds
 
         when (notNull ffis)
@@ -175,100 +169,6 @@ literals:
 3. The mapping from binders to allocated strings (topStrings) are maintained in
    BcM and used when generating code for variable references.
 -}
-
-{-
-  Prepare the STG for bytecode generation:
-
-   - Ensure that all breakpoints are directly under
-        a let-binding, introducing a new binding for
-        those that aren't already.
-
-   - Protect Not-necessarily lifted join points, see
-        Note [Not-necessarily-lifted join points]
-
- -}
-
-bcPrepRHS :: StgRhs -> BcM StgRhs
--- explicitly match all constructors so we get a warning if we miss any
-bcPrepRHS (StgRhsClosure fvs cc upd args (StgTick bp@Breakpoint{} expr)) = do
-  {- If we have a breakpoint directly under an StgRhsClosure we don't
-     need to introduce a new binding for it.
-   -}
-  expr' <- bcPrepExpr expr
-  pure (StgRhsClosure fvs cc upd args (StgTick bp expr'))
-bcPrepRHS (StgRhsClosure fvs cc upd args expr) =
-  StgRhsClosure fvs cc upd args <$> bcPrepExpr expr
-bcPrepRHS con@StgRhsCon{} = pure con
-
-bcPrepExpr :: StgExpr -> BcM StgExpr
--- explicitly match all constructors so we get a warning if we miss any
-bcPrepExpr (StgTick bp@(Breakpoint tick_ty _ _) rhs)
-  | isLiftedTypeKind (typeKind tick_ty) = do
-      id <- newId tick_ty
-      rhs' <- bcPrepExpr rhs
-      let expr' = StgTick bp rhs'
-          bnd = StgNonRec id (StgRhsClosure noExtFieldSilent
-                                            CC.dontCareCCS
-                                            ReEntrant
-                                            []
-                                            expr'
-                             )
-          letExp = StgLet noExtFieldSilent bnd (StgApp id [])
-      pure letExp
-  | otherwise = do
-      id <- newId (mkVisFunTyMany realWorldStatePrimTy tick_ty)
-      st <- newId realWorldStatePrimTy
-      rhs' <- bcPrepExpr rhs
-      let expr' = StgTick bp rhs'
-          bnd = StgNonRec id (StgRhsClosure noExtFieldSilent
-                                            CC.dontCareCCS
-                                            ReEntrant
-                                            [voidArgId]
-                                            expr'
-                             )
-      pure $ StgLet noExtFieldSilent bnd (StgApp id [StgVarArg st])
-bcPrepExpr (StgTick tick rhs) =
-  StgTick tick <$> bcPrepExpr rhs
-bcPrepExpr (StgLet xlet bnds expr) =
-  StgLet xlet <$> bcPrepBind bnds
-              <*> bcPrepExpr expr
-bcPrepExpr (StgLetNoEscape xlne bnds expr) =
-  StgLet xlne <$> bcPrepBind bnds
-              <*> bcPrepExpr expr
-bcPrepExpr (StgCase expr bndr alt_type alts) =
-  StgCase <$> bcPrepExpr expr
-          <*> pure bndr
-          <*> pure alt_type
-          <*> mapM bcPrepAlt alts
-bcPrepExpr lit@StgLit{} = pure lit
--- See Note [Not-necessarily-lifted join points], step 3.
-bcPrepExpr (StgApp x [])
-  | isNNLJoinPoint x = pure $
-      StgApp (protectNNLJoinPointId x) [StgVarArg voidPrimId]
-bcPrepExpr app@StgApp{} = pure app
-bcPrepExpr app@StgConApp{} = pure app
-bcPrepExpr app@StgOpApp{} = pure app
-
-bcPrepAlt :: StgAlt -> BcM StgAlt
-bcPrepAlt (ac, bndrs, expr) = (,,) ac bndrs <$> bcPrepExpr expr
-
-bcPrepBind :: StgBinding -> BcM StgBinding
--- explicitly match all constructors so we get a warning if we miss any
-bcPrepBind (StgNonRec bndr rhs) =
-  let (bndr', rhs') = bcPrepSingleBind (bndr, rhs)
-  in  StgNonRec bndr' <$> bcPrepRHS rhs'
-bcPrepBind (StgRec bnds) =
-  StgRec <$> mapM ((\(b,r) -> (,) b <$> bcPrepRHS r) . bcPrepSingleBind)
-                  bnds
-
-bcPrepSingleBind :: (Id, StgRhs) -> (Id, StgRhs)
--- If necessary, modify this Id and body to protect not-necessarily-lifted join points.
--- See Note [Not-necessarily-lifted join points], step 2.
-bcPrepSingleBind (x, StgRhsClosure ext cc upd_flag args body)
-  | isNNLJoinPoint x
-  = ( protectNNLJoinPointId x
-    , StgRhsClosure ext cc upd_flag (args ++ [voidArgId]) body)
-bcPrepSingleBind bnd = bnd
 
 -- -----------------------------------------------------------------------------
 -- Compilation schema for the bytecode generator
@@ -707,19 +607,6 @@ schemeE d s p (StgCase scrut _ _ []) = schemeE d s p scrut
 schemeE d s p (StgCase scrut bndr _ alts)
    = doCase d s p scrut bndr alts
 
--- Is this Id a not-necessarily-lifted join point?
--- See Note [Not-necessarily-lifted join points], step 1
-isNNLJoinPoint :: Id -> Bool
-isNNLJoinPoint x = isJoinId x &&
-                   Just True /= isLiftedType_maybe (idType x)
-
--- Update an Id's type to take a Void# argument.
--- Precondition: the Id is a not-necessarily-lifted join point.
--- See Note [Not-necessarily-lifted join points]
-protectNNLJoinPointId :: Id -> Id
-protectNNLJoinPointId x
-  = assert (isNNLJoinPoint x )
-    updateIdTypeButNotMult (unboxedUnitTy `mkVisFunTyMany`) x
 
 {-
    Ticked Expressions
@@ -728,66 +615,6 @@ protectNNLJoinPointId x
   The idea is that the "breakpoint<n,fvs> E" is really just an annotation on
   the code. When we find such a thing, we pull out the useful information,
   and then compile the code as if it was just the expression E.
-
-Note [Not-necessarily-lifted join points]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A join point variable is essentially a goto-label: it is, for example,
-never used as an argument to another function, and it is called only
-in tail position. See Note [Join points] and Note [Invariants on join points],
-both in GHC.Core. Because join points do not compile to true, red-blooded
-variables (with, e.g., registers allocated to them), they are allowed
-to be representation-polymorphic.
-(See invariant #6 in Note [Invariants on join points] in GHC.Core.)
-
-However, in this byte-code generator, join points *are* treated just as
-ordinary variables. There is no check whether a binding is for a join point
-or not; they are all treated uniformly. (Perhaps there is a missed optimization
-opportunity here, but that is beyond the scope of my (Richard E's) Thursday.)
-
-We thus must have *some* strategy for dealing with representation-polymorphic
-and unlifted join points. Representation-polymorphic variables are generally
-not allowed (though representation -polymorphic join points *are*; see
-Note [Invariants on join points] in GHC.Core, point 6), and we don't wish to
-evaluate unlifted join points eagerly.
-The questionable join points are *not-necessarily-lifted join points*
-(NNLJPs). (Not having such a strategy led to #16509, which panicked in the
-isUnliftedType check in the AnnVar case of schemeE.) Here is the strategy:
-
-1. Detect NNLJPs. This is done in isNNLJoinPoint.
-
-2. When binding an NNLJP, add a `\ (_ :: (# #)) ->` to its RHS, and modify the
-   type to tack on a `(# #) ->`.
-   Note that functions are never representation-polymorphic, so this
-   transformation changes an NNLJP to a non-representation-polymorphic
-   join point. This is done in bcPrepSingleBind.
-
-3. At an occurrence of an NNLJP, add an application to void# (called voidPrimId),
-   being careful to note the new type of the NNLJP. This is done in the AnnVar
-   case of schemeE, with help from protectNNLJoinPointId.
-
-Here is an example. Suppose we have
-
-  f = \(r :: RuntimeRep) (a :: TYPE r) (x :: T).
-      join j :: a
-           j = error @r @a "bloop"
-      in case x of
-           A -> j
-           B -> j
-           C -> error @r @a "blurp"
-
-Our plan is to behave is if the code was
-
-  f = \(r :: RuntimeRep) (a :: TYPE r) (x :: T).
-      let j :: (Void# -> a)
-          j = \ _ -> error @r @a "bloop"
-      in case x of
-           A -> j void#
-           B -> j void#
-           C -> error @r @a "blurp"
-
-It's a bit hacky, but it works well in practice and is local. I suspect the
-Right Fix is to take advantage of join points as goto-labels.
-
 -}
 
 -- Compile code to do a tail call.  Specifically, push the fn,
@@ -2160,7 +1987,6 @@ typeArgReps platform = map (toArgRep platform) . typePrimRepArgs
 data BcM_State
    = BcM_State
         { bcm_hsc_env :: HscEnv
-        , uniqSupply  :: UniqSupply      -- for generating fresh variable names
         , thisModule  :: Module          -- current module (for breakpoints)
         , nextlabel   :: Word32          -- for generating local labels
         , ffis        :: [FFIInfo]       -- ffi info blocks, to free later
@@ -2178,12 +2004,12 @@ ioToBc io = BcM $ \st -> do
   x <- io
   return (st, x)
 
-runBc :: HscEnv -> UniqSupply -> Module -> Maybe ModBreaks
+runBc :: HscEnv -> Module -> Maybe ModBreaks
       -> IdEnv (RemotePtr ())
       -> BcM r
       -> IO (BcM_State, r)
-runBc hsc_env us this_mod modBreaks topStrings (BcM m)
-   = m (BcM_State hsc_env us this_mod 0 [] modBreaks IntMap.empty topStrings)
+runBc hsc_env this_mod modBreaks topStrings (BcM m)
+   = m (BcM_State hsc_env this_mod 0 [] modBreaks IntMap.empty topStrings)
 
 thenBc :: BcM a -> (a -> BcM b) -> BcM b
 thenBc (BcM expr) cont = BcM $ \st0 -> do
@@ -2249,22 +2075,11 @@ newBreakInfo :: BreakIndex -> CgBreakInfo -> BcM ()
 newBreakInfo ix info = BcM $ \st ->
   return (st{breakInfo = IntMap.insert ix info (breakInfo st)}, ())
 
-newUnique :: BcM Unique
-newUnique = BcM $
-   \st -> case takeUniqFromSupply (uniqSupply st) of
-             (uniq, us) -> let newState = st { uniqSupply = us }
-                           in  return (newState, uniq)
-
 getCurrentModule :: BcM Module
 getCurrentModule = BcM $ \st -> return (st, thisModule st)
 
 getTopStrings :: BcM (IdEnv (RemotePtr ()))
 getTopStrings = BcM $ \st -> return (st, topStrings st)
-
-newId :: Type -> BcM Id
-newId ty = do
-    uniq <- newUnique
-    return $ mkSysLocal tickFS uniq Many ty
 
 tickFS :: FastString
 tickFS = fsLit "ticked"
