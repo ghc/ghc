@@ -1,0 +1,52 @@
+# symbols that the RTS depends on, these are always linked, even if the program
+# does not directly refer to them
+
+base:
+  GHC.Conc.Sync:          reportError
+  Control.Exception.Base: nonTermination
+  GHC.Exception.Type:     SomeException
+  GHC.TopHandler:
+    - runMainIO
+    - topHandler
+  GHC.Base:
+    - $fMonadIO
+  GHC.Maybe:
+    - Nothing
+    - Just
+  GHC.Ptr:
+    - Ptr
+ghc-prim:
+  GHC.Types:
+    - ":"
+    - "[]"
+  GHC.Tuple:
+    - "(,)"
+    - "(,,)"
+    - "(,,,)"
+    - "(,,,,)"
+    - "(,,,,,)"
+    - "(,,,,,,)"
+    - "(,,,,,,,)"
+    - "(,,,,,,,,)"
+    - "(,,,,,,,,,)"
+integer-wired-in:
+  GHC.Integer.Type:
+    - "S#"
+    - "Jp#"
+    - "Jn#"
+ghcjs-prim:
+  GHCJS.Prim:
+    - JSVal
+    - JSException
+    - $fShowJSException
+    - $fExceptionJSException
+    - resolve
+    - resolveIO
+    - toIO
+  GHCJS.Prim.Internal:
+    - wouldBlock
+    - blockedIndefinitelyOnMVar
+    - blockedIndefinitelyOnSTM
+    - ignoreException
+    - setCurrentThreadResultException
+    - setCurrentThreadResultValue

@@ -234,6 +234,9 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
         hppa|hppa1_1|ia64|m68k|nios2|riscv32|riscv64|rs6000|s390|sh4|vax)
             test -z "[$]2" || eval "[$]2=ArchUnknown"
             ;;
+        asmjs|js)
+            test -z "[$]2" || eval "[$]2=ArchJavaScript"
+            ;;
         *)
             echo "Unknown arch [$]1"
             exit 1
@@ -294,6 +297,9 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
             ;;
         gnu)
             test -z "[$]2" || eval "[$]2=OSHurd"
+            ;;
+        js|ghcjs)
+            test -z "[$]2" || eval "[$]2=OSJavaScript"
             ;;
         *)
             echo "Unknown OS '[$]1'"
@@ -2037,6 +2043,9 @@ case "$1" in
   vax)
     $2="vax"
     ;;
+  js|asmjs)
+    $2="js"
+    ;;
   x86_64|amd64)
     $2="x86_64"
     ;;
@@ -2159,6 +2168,9 @@ AC_DEFUN([GHC_CONVERT_OS],[
         ;;
       nto-qnx*)
         $3="nto-qnx"
+        ;;
+      ghcjs)
+        $3="ghcjs"
         ;;
       *)
         echo "Unknown OS $1"

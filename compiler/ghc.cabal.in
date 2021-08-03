@@ -77,6 +77,27 @@ Library
                    template-haskell == 2.16.*,
                    hpc        == 0.6.*,
                    transformers == 0.5.*,
+
+                   text,
+                   wl-pprint-text,
+                   unordered-containers,
+                   vector,
+                   aeson,
+                   safe,
+                   hashable,
+                   mtl,
+                   parsec,
+                   syb,
+                   split,
+                   parallel,
+                   cryptohash,
+                   stringsearch,
+                   base16-bytestring,
+                   base64-bytestring,
+                   Cabal,
+                   optparse-applicative,
+                   ghc-prim,
+
                    ghc-boot   == @ProjectVersionMunged@,
                    ghc-boot-th == @ProjectVersionMunged@,
                    ghc-heap   == @ProjectVersionMunged@,
@@ -192,6 +213,9 @@ Library
         types
         utils
         hieFile
+        ghcjs
+        ghcjs-th
+        ghcjs-libs
 
     -- we use an explicit Prelude
     Default-Extensions:
@@ -676,3 +700,57 @@ Library
             Linker
             RtClosureInspect
             GHCi
+
+    Exposed-Modules:
+                     Gen2.Generator,
+                     Gen2.Profiling,
+                     Gen2.Floater,
+                     Gen2.Prim,
+                     Gen2.Rts,
+                     Gen2.RtsApply,
+                     Gen2.RtsTypes,
+                     Gen2.RtsAlloc,
+                     Gen2.Utils,
+                     Gen2.StgAst,
+                     Gen2.Optimizer,
+                     Gen2.Dataflow,
+                     Gen2.Deps,
+                     Gen2.Printer,
+                     Gen2.Linker,
+                     Gen2.Shim,
+                     Gen2.Compactor,
+                     Gen2.Object,
+                     Gen2.Archive,
+                     Gen2.ClosureInfo,
+                     Gen2.Foreign,
+                     Gen2.Sinker,
+                     Gen2.TH,
+                     Gen2.Base,
+                     Gen2.Cache,
+                     Gen2.DynamicLinking,
+                     Gen2.GHC.Digraph,
+                     Gen2.GHC.DsForeign,
+                     Compiler.Compat,
+                     Compiler.GhcjsHooks,
+                     Compiler.GhcjsPlatform,
+                     Compiler.Info,
+                     Compiler.Plugins,
+                     Compiler.Program,
+                     Compiler.GhcjsProgram,
+                     Compiler.Platform,
+                     Compiler.Settings,
+                     Compiler.Utils,
+                     Compiler.Variants,
+                     Compiler.JMacro,
+                     Compiler.JMacro.Base,
+                     Compiler.JMacro.Lens,
+                     Compiler.JMacro.QQ,
+                     Compiler.JMacro.Util,
+                     Compiler.JMacro.Combinators,
+                     Compiler.JMacro.Symbols,
+                     GHCJS
+
+    -- from ghcjs-th package
+    Exposed-Modules:
+                     GHCJS.Prim.TH.Eval
+                     GHCJS.Prim.TH.Types

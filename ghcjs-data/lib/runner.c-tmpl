@@ -1,0 +1,142 @@
+/*
+ * GHCJS program runner for Windows
+ *
+ * This just calls node.js with a hardcoded source value
+ */
+#include <stdio.h>
+#include <stdlib.h>
+#include <process.h>
+#include <windows.h>
+
+unsigned char* js  = {{js}};
+DWORD jsSize       = {{jsSize}};
+char* node         = {{node}};
+
+int main(argc, argv) {
+  return runNode();
+}
+
+void printErr(char* err) {
+  DWORD msgSize;
+  char* msg = NULL;
+  fprintf(stderr, "GHCJS JavaScript runner: %s\n", err);
+  msgSize = FormatMessage( FORMAT_MESSAGE_ALLOCATE_BUFFER |
+                            FORMAT_MESSAGE_FROM_SYSTEM |
+			    FORMAT_MESSAGE_ARGUMENT_ARRAY,
+                           NULL,
+			   GetLastError(),
+			   LANG_NEUTRAL,
+			   (LPSTR)&msg,
+			   0,
+			   NULL);
+  if(!msgSize || msg == NULL) {
+    fputs("GHCJS JavaScript runner: could not format error message", stderr);
+    return;
+  }
+  fputs(msg, stderr);
+  fprintf(stderr, "using node: %s\n", node);
+  LocalFree(msg);
+}
+
+char* skipProgramName(char* cmdLine) {
+  int inQuote = FALSE, skipNext = FALSE;
+  char c;
+  if(cmdLine[0] == '"') {
+    inQuote = TRUE;
+    cmdLine++;
+  }
+  while(1) {
+    c = *(cmdLine++);
+    if(c == 0) return cmdLine-1;
+    if(skipNext) { skipNext = FALSE; continue; }
+    if(c == ' ' && !inQuote) break;
+    if(c == '"' && inQuote) break;
+    if(c == '\\') skipNext = TRUE;
+  }
+  while(*cmdLine && *cmdLine <= 32) cmdLine++;
+  return cmdLine;
+}
+
+// expects escaped to be at least MAX_PATH in size
+void escapeCommandLineArg(char* escaped, char* orig) {
+  char* e = escaped;
+  *e++ ='"';
+  while(*orig && e - escaped < MAX_PATH - 2) {
+    if(*orig == '"') *e++ = '\\';
+    *e++ = *orig++;
+  }
+  *e++ = '"';
+  *e++ = '\0';
+}
+
+int runNode() {
+  HANDLE hFile = INVALID_HANDLE_VALUE;
+  DWORD dwRet;
+  UINT  uRet;
+  STARTUPINFO sInfo;
+  PROCESS_INFORMATION pInfo;
+  DWORD written, writtenResult;
+  DWORD dwFlags = 0;
+  LPTSTR cmd, errMsg;
+  TCHAR tempName[MAX_PATH], tempNameEscaped[MAX_PATH];
+  TCHAR nodeEscaped[MAX_PATH], tempPath[MAX_PATH];
+  TCHAR newCmd[32768];
+  
+  sInfo.cb = sizeof(sInfo);
+  sInfo.dwFlags = STARTF_USESTDHANDLES;
+  cmd = skipProgramName(GetCommandLine());
+  ZeroMemory(&sInfo, sizeof(sInfo));
+  dwRet = GetTempPath(MAX_PATH, tempPath);
+  if(dwRet > MAX_PATH || dwRet == 0) {
+    errMsg = "Could not get temp directory";
+    goto err;
+  }
+  uRet = GetTempFileName(tempPath, TEXT("GHCJSRUN"), 0, tempName);
+  if(uRet == 0) {
+    errMsg = "Could not create temp file";
+    goto err;
+  }
+  hFile = CreateFile( tempName
+		    , GENERIC_WRITE
+                    , FILE_SHARE_READ
+                    , NULL
+		    , TRUNCATE_EXISTING
+	            , FILE_ATTRIBUTE_NORMAL | FILE_FLAG_DELETE_ON_CLOSE
+                    , NULL);
+  if(hFile == INVALID_HANDLE_VALUE) {
+    errMsg = "Could not open temp file";
+    goto err;
+  }
+  written = 0;
+  while(written < jsSize) {
+    if(!WriteFile(hFile, js + written, jsSize - written, &writtenResult, NULL)) {
+      errMsg = "Could not write to JavaScript file";
+      goto err;
+    }
+    written += writtenResult;
+  }
+  escapeCommandLineArg(tempNameEscaped, tempName);
+  escapeCommandLineArg(nodeEscaped, node);
+  snprintf(newCmd, 32768, "%s %s %s", nodeEscaped, tempNameEscaped, cmd);
+  if(!CreateProcess(NULL, newCmd, NULL, NULL, FALSE, dwFlags, NULL, NULL, &sInfo, &pInfo)) {
+    errMsg = "Could not start node.js";
+    goto err;
+  }
+  CloseHandle(pInfo.hThread);
+  if(WaitForSingleObject((HANDLE) pInfo.hProcess, INFINITE) == WAIT_OBJECT_0) {
+    CloseHandle(hFile);
+    if(GetExitCodeProcess((HANDLE) pInfo.hProcess, &dwRet) == 0) {
+      errMsg = "Could not get node.js exit code";
+      return -1;
+    }
+    return dwRet;
+  }
+  errMsg = "Problem waiting for node.js process";
+
+  err:
+  printErr(errMsg);
+  if(hFile != INVALID_HANDLE_VALUE) CloseHandle(hFile);
+  return -1;
+}
+
+

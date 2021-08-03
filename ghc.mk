@@ -414,7 +414,7 @@ else # CLEANING
 # programs such as GHC and ghc-pkg, that we do not assume the stage0
 # compiler already has installed (or up-to-date enough).
 
-PACKAGES_STAGE0 = binary transformers mtl hpc ghc-boot-th ghc-boot template-haskell text parsec Cabal/Cabal ghc-heap ghci
+PACKAGES_STAGE0 = syb base16-bytestring base64-bytestring colour ansi-terminal ansi-wl-pprint transformers-compat optparse-applicative primitive vector split hashable unordered-containers stringsearch byteable basement memory cryptonite cryptohash integer-logarithms data-fix dlist scientific base-orphans th-abstraction tagged indexed-traversable distributive comonad bifunctors assoc these strict time-compat splitmix random uuid-types attoparsec base-compat base-compat-batteries safe parallel aeson wl-pprint-text  binary transformers mtl hpc ghc-boot-th ghc-boot template-haskell text parsec Cabal/Cabal ghc-heap ghci
 ifeq "$(Windows_Host)" "NO"
 PACKAGES_STAGE0 += terminfo
 endif
@@ -470,6 +470,50 @@ PACKAGES_STAGE1 += stm
 PACKAGES_STAGE1 += exceptions
 PACKAGES_STAGE1 += haskeline
 PACKAGES_STAGE1 += ghci
+PACKAGES_STAGE1 += syb
+PACKAGES_STAGE1 += base16-bytestring
+PACKAGES_STAGE1 += base64-bytestring
+PACKAGES_STAGE1 += colour
+PACKAGES_STAGE1 += ansi-terminal
+PACKAGES_STAGE1 += ansi-wl-pprint
+PACKAGES_STAGE1 += transformers-compat
+PACKAGES_STAGE1 += optparse-applicative
+PACKAGES_STAGE1 += primitive
+PACKAGES_STAGE1 += vector
+PACKAGES_STAGE1 += split
+PACKAGES_STAGE1 += hashable
+PACKAGES_STAGE1 += unordered-containers
+PACKAGES_STAGE1 += stringsearch
+PACKAGES_STAGE1 += byteable
+PACKAGES_STAGE1 += basement
+PACKAGES_STAGE1 += memory
+PACKAGES_STAGE1 += cryptonite
+PACKAGES_STAGE1 += cryptohash
+PACKAGES_STAGE1 += integer-logarithms
+PACKAGES_STAGE1 += data-fix
+PACKAGES_STAGE1 += dlist
+PACKAGES_STAGE1 += scientific
+PACKAGES_STAGE1 += base-orphans
+PACKAGES_STAGE1 += th-abstraction
+PACKAGES_STAGE1 += tagged
+PACKAGES_STAGE1 += indexed-traversable
+PACKAGES_STAGE1 += distributive
+PACKAGES_STAGE1 += comonad
+PACKAGES_STAGE1 += bifunctors
+PACKAGES_STAGE1 += assoc
+PACKAGES_STAGE1 += these
+PACKAGES_STAGE1 += strict
+PACKAGES_STAGE1 += time-compat
+PACKAGES_STAGE1 += splitmix
+PACKAGES_STAGE1 += random
+PACKAGES_STAGE1 += uuid-types
+PACKAGES_STAGE1 += attoparsec
+PACKAGES_STAGE1 += base-compat
+PACKAGES_STAGE1 += base-compat-batteries
+PACKAGES_STAGE1 += safe
+PACKAGES_STAGE1 += parallel
+PACKAGES_STAGE1 += aeson
+PACKAGES_STAGE1 += wl-pprint-text
 PACKAGES_STAGE1 += libiserv
 
 # See Note [No stage2 packages when CrossCompiling or Stage1Only].

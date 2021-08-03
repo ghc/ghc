@@ -1,7 +1,8 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE NondecreasingIndentation #-}
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE CPP, NondecreasingIndentation, TupleSections, LambdaCase #-}
+-- GHC frontend ( ghc/Main.hs ) adapted for GHCJS
+#undef GHCI
+#undef HAVE_INTERNAL_INTERPRETER
+
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
@@ -13,6 +14,15 @@
 -----------------------------------------------------------------------------
 
 module Main (main) where
+
+import qualified Compiler.GhcjsProgram  as Ghcjs
+import qualified Compiler.GhcjsPlatform as Ghcjs
+import qualified Compiler.GhcjsHooks    as Ghcjs
+import qualified Compiler.Info          as Ghcjs
+import qualified Compiler.Settings      as Ghcjs
+import qualified Compiler.Utils         as Ghcjs
+import           Data.IORef
+import Prelude
 
 -- The official GHC API
 import qualified GHC
@@ -27,7 +37,6 @@ import LoadIface        ( showIface )
 import HscMain          ( newHscEnv )
 import DriverPipeline   ( oneShot, compileFile )
 import DriverMkDepend   ( doMkDependHS )
-import DriverBkp   ( doBackpack )
 #if defined(HAVE_INTERNAL_INTERPRETER)
 import GHCi.UI          ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings )
 #endif
@@ -56,12 +65,12 @@ import ErrUtils
 import FastString
 import Outputable
 import SysTools.BaseDir
-import SysTools.Settings
 import SrcLoc
 import Util
 import Panic
 import UniqSupply
 import MonadUtils       ( liftIO )
+import SysTools.Settings
 
 -- Imports for --abi-hash
 import LoadIface           ( loadUserInterface )
@@ -73,7 +82,6 @@ import BinFingerprint      ( fingerprintBinMem )
 
 -- Standard Haskell libraries
 import System.IO
-import System.Environment
 import System.Exit
 import System.FilePath
 import Control.Monad
@@ -82,7 +90,6 @@ import Control.Monad.Trans.Except (throwE, runExceptT)
 import Data.Char
 import Data.List ( isPrefixOf, partition, intercalate )
 import Data.Maybe
-import Prelude
 
 -----------------------------------------------------------------------------
 -- ToDo:
@@ -103,15 +110,22 @@ main = do
    hSetBuffering stderr LineBuffering
 
    configureHandleEncoding
-   GHC.defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
+
+   Ghcjs.ghcjsErrorHandler defaultFatalMessager defaultFlushOut $ do
     -- 1. extract the -B flag from the args
-    argv0 <- getArgs
+    (argv0, _booting, booting_stage1) <- Ghcjs.getWrappedArgs
 
     let (minusB_args, argv1) = partition ("-B" `isPrefixOf`) argv0
         mbMinusB | null minusB_args = Nothing
                  | otherwise = Just (drop 2 (last minusB_args))
+        argv1' = map (mkGeneralLocated "on the commandline") argv1
+    when (any (== "--run") argv1) (Ghcjs.runJsProgram mbMinusB argv1)
 
-    let argv2 = map (mkGeneralLocated "on the commandline") argv1
+    (argv2, ghcjsSettings) <- Ghcjs.getGhcjsSettings argv1'
+
+    -- fall back to native GHC if we're booting (we can't build Setup.hs with GHCJS yet)
+    when (booting_stage1 && Ghcjs.gsBuildRunner ghcjsSettings)
+      Ghcjs.bootstrapFallback
 
     -- 2. Parse the "mode" flags (--make, --interactive etc.)
     (mode, argv3, flagWarnings) <- parseModeFlags argv2
@@ -128,10 +142,13 @@ main = do
         Left preStartupMode ->
             do case preStartupMode of
                    ShowSupportedExtensions   -> showSupportedExtensions mbMinusB
-                   ShowVersion               -> showVersion
-                   ShowNumVersion            -> putStrLn cProjectVersion
+                   ShowVersion               -> Ghcjs.printVersion
+                   ShowNumVersion            -> Ghcjs.printNumericVersion
+                   ShowNumGhcVersion         -> putStrLn cProjectVersion
                    ShowOptions isInteractive -> showOptions isInteractive
-        Right postStartupMode ->
+
+        Right postStartupMode -> do
+
             -- start our GHC session
             GHC.runGhc mbMinusB $ do
 
@@ -141,16 +158,18 @@ main = do
                 Left preLoadMode ->
                     liftIO $ do
                         case preLoadMode of
-                            ShowInfo               -> showInfo dflags
+                            ShowInfo               -> showInfo ghcjsSettings dflags
                             ShowGhcUsage           -> showGhcUsage  dflags
                             ShowGhciUsage          -> showGhciUsage dflags
-                            PrintWithDynFlags f    -> putStrLn (f dflags)
+                            PrintWithDynFlags f    -> putStrLn (f ghcjsSettings dflags)
                 Right postLoadMode ->
-                    main' postLoadMode dflags argv3 flagWarnings
+                    main' postLoadMode dflags argv3 flagWarnings ghcjsSettings False
 
 main' :: PostLoadMode -> DynFlags -> [Located String] -> [Warn]
+      -> Ghcjs.GhcjsSettings
+      -> Bool
       -> Ghc ()
-main' postLoadMode dflags0 args flagWarnings = do
+main' postLoadMode dflags0 args flagWarnings ghcjsSettings native = do
   -- set the default GhcMode, HscTarget and GhcLink.  The HscTarget
   -- can be further adjusted on a module by module basis, using only
   -- the -fvia-C and -fasm flags.  If the default HscTarget is not
@@ -161,12 +180,23 @@ main' postLoadMode dflags0 args flagWarnings = do
                DoInteractive   -> (CompManager, HscInterpreted, LinkInMemory)
                DoEval _        -> (CompManager, HscInterpreted, LinkInMemory)
                DoMake          -> (CompManager, dflt_target,    LinkBinary)
-               DoBackpack      -> (CompManager, dflt_target,    LinkBinary)
                DoMkDependHS    -> (MkDepend,    dflt_target,    LinkBinary)
                DoAbiHash       -> (OneShot,     dflt_target,    LinkBinary)
                _               -> (OneShot,     dflt_target,    LinkBinary)
-
-  let dflags1 = dflags0{ ghcMode   = mode,
+  let dflags1 = case lang of
+                HscInterpreted ->
+                    let platform = targetPlatform dflags0
+                        dflags0a = updateWays $ dflags0 { ways = interpWays }
+                        dflags0b = foldl gopt_set dflags0a
+                                 $ concatMap (wayGeneralFlags platform)
+                                             interpWays
+                        dflags0c = foldl gopt_unset dflags0b
+                                 $ concatMap (wayUnsetGeneralFlags platform)
+                                             interpWays
+                    in dflags0c
+                _ ->
+                    dflags0
+      dflags1a = dflags1{ ghcMode   = mode,
                          hscTarget = lang,
                          ghcLink   = link,
                          verbosity = case postLoadMode of
@@ -184,7 +214,7 @@ main' postLoadMode dflags0 args flagWarnings = do
       -- a great story for the moment.
       dflags2  | DoInteractive <- postLoadMode = def_ghci_flags
                | DoEval _      <- postLoadMode = def_ghci_flags
-               | otherwise                     = dflags1
+               | otherwise                     = dflags1a
         where def_ghci_flags = dflags1 `gopt_set` Opt_ImplicitImportQualified
                                        `gopt_set` Opt_IgnoreOptimChanges
                                        `gopt_set` Opt_IgnoreHpcChanges
@@ -217,36 +247,39 @@ main' postLoadMode dflags0 args flagWarnings = do
        liftIO $ exitWith (ExitFailure 1)) $ do
          liftIO $ handleFlagWarnings dflags4 flagWarnings'
 
+  jsEnv <- liftIO Ghcjs.newGhcjsEnv
+
+        -- make sure we clean up after ourselves
+  Ghcjs.ghcjsCleanupHandler dflags4 jsEnv $ do
+
   liftIO $ showBanner postLoadMode dflags4
 
   let
      -- To simplify the handling of filepaths, we normalise all filepaths right
-     -- away. Note the asymmetry of FilePath.normalise:
-     --    Linux:   p/q -> p/q; p\q -> p\q
-     --    Windows: p/q -> p\q; p\q -> p\q
-     -- #12674: Filenames starting with a hypen get normalised from ./-foo.hs
-     -- to -foo.hs. We have to re-prepend the current directory.
-    normalise_hyp fp
-        | strt_dot_sl && "-" `isPrefixOf` nfp = cur_dir ++ nfp
-        | otherwise                           = nfp
-        where
-#if defined(mingw32_HOST_OS)
-          strt_dot_sl = "./" `isPrefixOf` fp || ".\\" `isPrefixOf` fp
-#else
-          strt_dot_sl = "./" `isPrefixOf` fp
-#endif
-          cur_dir = '.' : [pathSeparator]
-          nfp = normalise fp
-    normal_fileish_paths = map (normalise_hyp . unLoc) fileish_args
-    (srcs, objs)         = partition_args normal_fileish_paths [] []
+     -- away - e.g., for win32 platforms, backslashes are converted
+     -- into forward slashes.
+    normal_fileish_paths = map (normalise . unLoc) fileish_args
+    (srcs, js_objs, objs)         = partition_args_js normal_fileish_paths [] []
 
-    dflags5 = dflags4 { ldInputs = map (FileOption "") objs
-                                   ++ ldInputs dflags4 }
 
+  -- add GHCJS configuration
+  let baseDir = Ghcjs.getLibDir dflags4
+  dflags4b <- if native
+                then return (Ghcjs.setNativePlatform jsEnv ghcjsSettings baseDir dflags4)
+                else return $
+                       Ghcjs.setGhcjsPlatform ghcjsSettings jsEnv js_objs baseDir $
+                       -- updateWays $ addWay' (WayCustom "js") $
+                       -- Ghcjs.setGhcjsSuffixes {- oneshot -} False
+                       dflags4 -- fixme value of oneshot?
+
+  let dflags5 = dflags4b { ldInputs = map (FileOption "") objs
+                                   ++ ldInputs dflags4b }
   -- we've finished manipulating the DynFlags, update the session
   _ <- GHC.setSessionDynFlags dflags5
   dflags6 <- GHC.getSessionDynFlags
   hsc_env <- GHC.getSession
+
+  liftIO (writeIORef (canGenerateDynamicToo dflags6) True) -- fixme is this still necessary for GHCJS?
 
         ---------------- Display configuration -----------
   case verbosity dflags6 of
@@ -256,43 +289,49 @@ main' postLoadMode dflags0 args flagWarnings = do
 
   liftIO $ initUniqSupply (initialUnique dflags6) (uniqueIncrement dflags6)
         ---------------- Final sanity checking -----------
-  liftIO $ checkOptions postLoadMode dflags6 srcs objs
+  liftIO $ checkOptions ghcjsSettings postLoadMode dflags6 srcs objs (js_objs ++ Ghcjs.gsJsLibSrcs ghcjsSettings)
 
   ---------------- Do the business -----------
   handleSourceError (\e -> do
        GHC.printException e
        liftIO $ exitWith (ExitFailure 1)) $ do
     case postLoadMode of
-       ShowInterface f        -> liftIO $ doShowIface dflags6 f
-       DoMake                 -> doMake srcs
+       ShowInterface f        -> liftIO (doShowIface dflags6 f)
+       DoMake                 -> doMake jsEnv ghcjsSettings native srcs
        DoMkDependHS           -> doMkDependHS (map fst srcs)
-       StopBefore p           -> liftIO (oneShot hsc_env p srcs)
-       DoInteractive          -> ghciUI hsc_env dflags6 srcs Nothing
-       DoEval exprs           -> ghciUI hsc_env dflags6 srcs $ Just $
-                                   reverse exprs
+       StopBefore p           -> liftIO (Ghcjs.ghcjsOneShot jsEnv ghcjsSettings native hsc_env p srcs)
+       DoInteractive          -> ghciUI srcs Nothing
+       DoEval exprs           -> (ghciUI srcs $ Just $ reverse exprs)
        DoAbiHash              -> abiHash (map fst srcs)
        ShowPackages           -> liftIO $ showPackages dflags6
-       DoFrontend f           -> doFrontend f srcs
-       DoBackpack             -> doBackpack (map fst srcs)
+       DoGenerateLib          -> Ghcjs.generateLib ghcjsSettings
+       DoPrintRts             -> liftIO (Ghcjs.printRts dflags6)
+       DoInstallExecutable    -> liftIO (Ghcjs.installExecutable dflags6 ghcjsSettings normal_fileish_paths)
+       DoPrintObj obj         -> liftIO (Ghcjs.printObj obj)
+       DoPrintDeps obj        -> liftIO (Ghcjs.printDeps obj)
+       DoBuildJsLibrary       -> liftIO (Ghcjs.buildJsLibrary dflags6 (map fst srcs) js_objs objs)
 
   liftIO $ dumpFinalStats dflags6
+  return ()
 
-ghciUI :: HscEnv -> DynFlags -> [(FilePath, Maybe Phase)] -> Maybe [String]
-       -> Ghc ()
+ghciUI :: [(FilePath, Maybe Phase)] -> Maybe [String] -> Ghc ()
 #if !defined(HAVE_INTERNAL_INTERPRETER)
-ghciUI _ _ _ _ =
-  throwGhcException (CmdLineError "not built for interactive use")
+ghciUI _ _ = throwGhcException (CmdLineError "not built for interactive use")
 #else
-ghciUI hsc_env dflags0 srcs maybe_expr = do
-  dflags1 <- liftIO (initializePlugins hsc_env dflags0)
-  _ <- GHC.setSessionDynFlags dflags1
-  interactiveUI defaultGhciSettings srcs maybe_expr
+ghciUI     = interactiveUI defaultGhciSettings
 #endif
 
 -- -----------------------------------------------------------------------------
 -- Splitting arguments into source files and object files.  This is where we
 -- interpret the -x <suffix> option, and attach a (Maybe Phase) to each source
 -- file indicating the phase specified by the -x option in force, if any.
+
+partition_args_js :: [String] -> [(String, Maybe Phase)] -> [String]
+                  -> ([(String, Maybe Phase)], [String], [String])
+partition_args_js args srcs objs =
+  let (srcs', objs') = partition_args args srcs objs
+      (js_objs, nonjs_objs) = partition Ghcjs.isJsFile objs'
+  in (srcs', js_objs, nonjs_objs)
 
 partition_args :: [String] -> [(String, Maybe Phase)] -> [String]
                -> ([(String, Maybe Phase)], [String])
@@ -323,7 +362,7 @@ partition_args (arg:args) srcs objs
          the flag parser, and we want them to generate errors later in
          checkOptions, so we class them as source files (#5921)
 
-       - and finally we consider everything without an extension to be
+       - and finally we consider everything not containing a '.' to be
          a comp manager input, as shorthand for a .hs or .lhs filename.
 
       Everything else is considered to be a linker object, and passed
@@ -333,7 +372,7 @@ looks_like_an_input :: String -> Bool
 looks_like_an_input m =  isSourceFilename m
                       || looksLikeModuleName m
                       || "-" `isPrefixOf` m
-                      || not (hasExtension m)
+                      || '.' `notElem` m
 
 -- -----------------------------------------------------------------------------
 -- Option sanity checks
@@ -341,9 +380,9 @@ looks_like_an_input m =  isSourceFilename m
 -- | Ensure sanity of options.
 --
 -- Throws 'UsageError' or 'CmdLineError' if not.
-checkOptions :: PostLoadMode -> DynFlags -> [(String,Maybe Phase)] -> [String] -> IO ()
+checkOptions :: Ghcjs.GhcjsSettings -> PostLoadMode -> DynFlags -> [(String,Maybe Phase)] -> [String] -> [String] -> IO ()
      -- Final sanity checking before kicking off a compilation (pipeline).
-checkOptions mode dflags srcs objs = do
+checkOptions settings mode dflags srcs objs js_objs = do
      -- Complain about any unknown flags
    let unknown_opts = [ f | (f@('-':_), _) <- srcs ]
    when (notNull unknown_opts) (unknownFlagsErr unknown_opts)
@@ -352,12 +391,15 @@ checkOptions mode dflags srcs objs = do
          && isInterpretiveMode mode) $
         hPutStrLn stderr ("Warning: -debug, -threaded and -ticky are ignored by GHCi")
 
+   when (isInterpretiveMode mode) $
+      do throwGhcException (UsageError
+                   "--interactive is not yet supported.")
+
         -- -prof and --interactive are not a good combination
    when ((filter (not . wayRTSOnly) (ways dflags) /= interpWays)
-         && isInterpretiveMode mode
-         && not (gopt Opt_ExternalInterpreter dflags)) $
+         && isInterpretiveMode mode) $
       do throwGhcException (UsageError
-              "-fexternal-interpreter is required when using --interactive with a non-standard way (-prof, -static, or -dynamic).")
+                   "--interactive can't be used with -prof or -static.")
         -- -ohi sanity check
    if (isJust (outputHi dflags) &&
       (isCompManagerMode mode || srcs `lengthExceeds` 1))
@@ -377,7 +419,7 @@ checkOptions mode dflags srcs objs = do
 
         -- Check that there are some input files
         -- (except in the interactive case)
-   if null srcs && (null objs || not_linking) && needsInputsMode mode
+   if null srcs && isNothing (Ghcjs.gsLinkJsLib settings) && (null (objs++js_objs) || not_linking) && needsInputsMode mode
         then throwGhcException (UsageError "no input files")
         else do
 
@@ -396,6 +438,8 @@ checkOptions mode dflags srcs objs = do
 
 -- Compiler output options
 
+-- called to verify that the output files & directories
+-- point somewhere valid.
 -- Called to verify that the output files point somewhere valid.
 --
 -- The assumption is that the directory portion of these output
@@ -433,6 +477,12 @@ data PreStartupMode
   | ShowNumVersion                       -- ghc --numeric-version
   | ShowSupportedExtensions              -- ghc --supported-extensions
   | ShowOptions Bool {- isInteractive -} -- ghc --show-options
+-- GHCJS pre-startup modes
+  | ShowNumGhcVersion       -- ghcjs --numeric-ghc-version
+
+showNumGhcVersionMode :: Mode
+showNumGhcVersionMode = mkPreStartupMode ShowNumGhcVersion
+-- end GHCJS pre-startup modes
 
 showVersionMode, showNumVersionMode, showSupportedExtensionsMode, showOptionsMode :: Mode
 showVersionMode             = mkPreStartupMode ShowVersion
@@ -451,11 +501,15 @@ isShowNumVersionMode :: Mode -> Bool
 isShowNumVersionMode (Left ShowNumVersion) = True
 isShowNumVersionMode _ = False
 
+isShowNumGhcVersionMode :: Mode -> Bool
+isShowNumGhcVersionMode (Left ShowNumGhcVersion) = True
+isShowNumGhcVersionMode _ = False
+
 data PreLoadMode
-  = ShowGhcUsage                           -- ghc -?
-  | ShowGhciUsage                          -- ghci -?
-  | ShowInfo                               -- ghc --info
-  | PrintWithDynFlags (DynFlags -> String) -- ghc --print-foo
+  = ShowGhcUsage                                                  -- ghcjs -?
+  | ShowGhciUsage                                                 -- ghci -?
+  | ShowInfo                                                      -- ghcjs --info
+  | PrintWithDynFlags (Ghcjs.GhcjsSettings -> DynFlags -> String) -- ghcjs --print-foo
 
 showGhcUsageMode, showGhciUsageMode, showInfoMode :: Mode
 showGhcUsageMode = mkPreLoadMode ShowGhcUsage
@@ -464,8 +518,8 @@ showInfoMode = mkPreLoadMode ShowInfo
 
 printSetting :: String -> Mode
 printSetting k = mkPreLoadMode (PrintWithDynFlags f)
-    where f dflags = fromMaybe (panic ("Setting not found: " ++ show k))
-                   $ lookup k (compilerInfo dflags)
+    where f _settings dflags = fromMaybe (panic ("Setting not found: " ++ show k))
+                             $ lookup k (Ghcjs.compilerInfo dflags)
 
 mkPreLoadMode :: PreLoadMode -> Mode
 mkPreLoadMode = Right . Left
@@ -484,19 +538,41 @@ data PostLoadMode
   | StopBefore Phase        -- ghc -E | -C | -S
                             -- StopBefore StopLn is the default
   | DoMake                  -- ghc --make
-  | DoBackpack              -- ghc --backpack foo.bkp
   | DoInteractive           -- ghc --interactive
   | DoEval [String]         -- ghc -e foo -e bar => DoEval ["bar", "foo"]
   | DoAbiHash               -- ghc --abi-hash
   | ShowPackages            -- ghc --show-packages
-  | DoFrontend ModuleName   -- ghc --frontend Plugin.Module
 
-doMkDependHSMode, doMakeMode, doInteractiveMode,
-  doAbiHashMode, showPackagesMode :: Mode
+-- GHCJS modes
+  | DoGenerateLib                         -- ghcjs --generate-lib
+  | DoPrintRts                            -- ghcjs --print-rts
+  | DoInstallExecutable                   -- ghcjs --install-executable ? -o ?
+  | DoPrintObj FilePath                   -- ghcjs --print-obj file
+  | DoPrintDeps FilePath                  -- ghcjs --print-deps file
+  | DoBuildJsLibrary                      -- ghcjs --build-js-library
+
+doGenerateLib, doPrintRts, doBuildJsLibrary :: Mode
+doGenerateLib = mkPostLoadMode DoGenerateLib
+doPrintRts = mkPostLoadMode DoPrintRts
+doBuildJsLibrary = mkPostLoadMode DoBuildJsLibrary
+
+doInstallExecutable :: Mode
+doInstallExecutable = mkPostLoadMode DoInstallExecutable
+
+doPrintObj :: FilePath -> Mode
+doPrintObj file = mkPostLoadMode (DoPrintObj file)
+
+doPrintDeps :: FilePath -> Mode
+doPrintDeps file = mkPostLoadMode (DoPrintDeps file)
+---- end GHCJS modes
+
+doMkDependHSMode, doMakeMode, doInteractiveMode, doAbiHashMode :: Mode
 doMkDependHSMode = mkPostLoadMode DoMkDependHS
 doMakeMode = mkPostLoadMode DoMake
 doInteractiveMode = mkPostLoadMode DoInteractive
 doAbiHashMode = mkPostLoadMode DoAbiHash
+
+showPackagesMode :: Mode
 showPackagesMode = mkPostLoadMode ShowPackages
 
 showInterfaceMode :: FilePath -> Mode
@@ -507,12 +583,6 @@ stopBeforeMode phase = mkPostLoadMode (StopBefore phase)
 
 doEvalMode :: String -> Mode
 doEvalMode str = mkPostLoadMode (DoEval [str])
-
-doFrontendMode :: String -> Mode
-doFrontendMode str = mkPostLoadMode (DoFrontend (mkModuleName str))
-
-doBackpackMode :: Mode
-doBackpackMode = mkPostLoadMode DoBackpack
 
 mkPostLoadMode :: PostLoadMode -> Mode
 mkPostLoadMode = Right . Right
@@ -607,7 +677,6 @@ mode_flags =
   ] ++
   [ defFlag k'                      (PassFlag (setMode (printSetting k)))
   | k <- ["Project version",
-          "Project Git commit id",
           "Booter version",
           "Stage",
           "Build platform",
@@ -625,8 +694,9 @@ mode_flags =
           "LibDir",
           "Global Package DB",
           "C compiler flags",
-          "C compiler link flags",
-          "ld flags"],
+          "Gcc Linker flags",
+          "Ld Linker flags",
+          "Native Too"],
     let k' = "-print-" ++ map (replaceSpace . toLower) k
         replaceSpace ' ' = '-'
         replaceSpace c   = c
@@ -643,11 +713,19 @@ mode_flags =
   , defFlag "C"            (PassFlag (setMode (stopBeforeMode HCc)))
   , defFlag "S"            (PassFlag (setMode (stopBeforeMode (As False))))
   , defFlag "-make"        (PassFlag (setMode doMakeMode))
-  , defFlag "-backpack"    (PassFlag (setMode doBackpackMode))
   , defFlag "-interactive" (PassFlag (setMode doInteractiveMode))
   , defFlag "-abi-hash"    (PassFlag (setMode doAbiHashMode))
   , defFlag "e"            (SepArg   (\s -> setMode (doEvalMode s) "-e"))
-  , defFlag "-frontend"    (SepArg   (\s -> setMode (doFrontendMode s) "-frontend"))
+
+      ------- GHCJS modes ------------------------------------------------
+  , defFlag "-generate-lib"           (PassFlag (setMode doGenerateLib))
+  , defFlag "-install-executable"     (PassFlag (setMode doInstallExecutable))
+  , defFlag "-print-obj"              (HasArg (\f -> setMode (doPrintObj f) "--print-obj"))
+  , defFlag "-print-deps"             (HasArg (\f -> setMode (doPrintDeps f) "--print-deps"))
+  , defFlag "-print-rts"              (PassFlag (setMode doPrintRts))
+  , defFlag "-numeric-ghc-version"    (PassFlag (setMode (showNumGhcVersionMode)))
+  , defFlag "-numeric-ghcjs-version"  (PassFlag (setMode (showNumVersionMode)))
+  , defFlag "-build-js-library"       (PassFlag (setMode doBuildJsLibrary))
   ]
 
 setMode :: Mode -> String -> EwM ModeM ()
@@ -705,7 +783,8 @@ setMode newMode newFlag = liftEwM $ do
   where isDominantFlag f = isShowGhcUsageMode   f ||
                            isShowGhciUsageMode  f ||
                            isShowVersionMode    f ||
-                           isShowNumVersionMode f
+                           isShowNumVersionMode f ||
+                           isShowNumGhcVersionMode f
 
 flagMismatchErr :: String -> String -> String
 flagMismatchErr oldFlag newFlag
@@ -720,9 +799,14 @@ addFlag s flag = liftEwM $ do
 -- ----------------------------------------------------------------------------
 -- Run --make mode
 
-doMake :: [(String,Maybe Phase)] -> Ghc ()
-doMake srcs  = do
-    let (hs_srcs, non_hs_srcs) = partition isHaskellishTarget srcs
+doMake :: Ghcjs.GhcjsEnv -> Ghcjs.GhcjsSettings -> Bool -> [(String,Maybe Phase)] -> Ghc ()
+doMake jsEnv settings native srcs  = do
+    let (hs_srcs, non_hs_srcs) = partition haskellish srcs
+
+        haskellish (f,Nothing) =
+          looksLikeModuleName f || isHaskellUserSrcFilename f || '.' `notElem` f
+        haskellish (_,Just phase) =
+          phase `notElem` [As False, As True, Cc, Cobjc, Cobjcxx, CmmCpp, Cmm, StopLn]
 
     hsc_env <- GHC.getSession
 
@@ -731,7 +815,7 @@ doMake srcs  = do
     -- This means that "ghc Foo.o Bar.o -o baz" links the program as
     -- we expect.
     if (null hs_srcs)
-       then liftIO (oneShot hsc_env StopLn srcs)
+       then liftIO (Ghcjs.ghcjsOneShot jsEnv settings native hsc_env StopLn srcs)
        else do
 
     o_files <- mapM (\x -> liftIO $ compileFile hsc_env StopLn x)
@@ -771,7 +855,7 @@ showBanner _postLoadMode dflags = do
 
    -- Display details of the configuration in verbose mode
    when (verb >= 2) $
-    do hPutStr stderr "Glasgow Haskell Compiler, Version "
+    do hPutStr stderr "Glasgow Haskell Compiler for JavaScript, Version "
        hPutStr stderr cProjectVersion
        hPutStr stderr ", stage "
        hPutStr stderr cStage
@@ -780,12 +864,11 @@ showBanner _postLoadMode dflags = do
 
 -- We print out a Read-friendly string, but a prettier one than the
 -- Show instance gives us
-showInfo :: DynFlags -> IO ()
-showInfo dflags = do
+showInfo :: Ghcjs.GhcjsSettings -> DynFlags -> IO ()
+showInfo _settings dflags = do
         let sq x = " [" ++ x ++ "\n ]"
-        putStrLn $ sq $ intercalate "\n ," $ map show $ compilerInfo dflags
+        putStrLn $ sq $ intercalate "\n ," $ map show $ Ghcjs.compilerInfo dflags
 
--- TODO use ErrUtils once that is disentangled from all the other GhcMonad stuff?
 showSupportedExtensions :: Maybe String -> IO ()
 showSupportedExtensions m_top_dir = do
   res <- runExceptT $ do
@@ -970,18 +1053,8 @@ people since we're linking GHC dynamically, but most things themselves
 link statically.
 -}
 
--- If GHC_LOADED_INTO_GHCI is not set when GHC is loaded into GHCi, then
--- running it causes an error like this:
---
--- Loading temp shared object failed:
--- /tmp/ghc13836_0/libghc_1872.so: undefined symbol: initGCStatistics
---
--- Skipping the foreign call fixes this problem, and the outer GHCi
--- should have already made this call anyway.
-#if defined(GHC_LOADED_INTO_GHCI)
+-- foreign import ccall safe "initGCStatistics"
+--  initGCStatistics :: IO ()
+
 initGCStatistics :: IO ()
-initGCStatistics = return ()
-#else
-foreign import ccall safe "initGCStatistics"
-  initGCStatistics :: IO ()
-#endif
+initGCStatistics = pure ()

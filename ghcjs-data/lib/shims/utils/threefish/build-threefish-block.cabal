@@ -1,0 +1,18 @@
+name:                build-threefish-block
+version:             0.1.0.0
+synopsis:            generate JS source code for Threefish block update
+license:             BSD3
+license-file:        LICENSE
+author:              Luite Stegeman
+maintainer:          stegeman@gmail.com
+build-type:          Simple
+extra-source-files:  ChangeLog.md
+cabal-version:       >=1.10
+
+executable build-threefish-block
+  main-is:             Main.hs
+  build-depends:       base >=4.10 && <4.11,
+                       jmacro,
+                       wl-pprint-text,
+                       process
+  default-language:    Haskell2010
