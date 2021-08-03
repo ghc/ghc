@@ -7,6 +7,8 @@ import CommandLine
 import Oracles.TestSettings
 import Packages
 import Settings.Builders.Common
+import qualified Data.Set    as Set
+import Flavour
 
 getTestSetting :: TestSetting -> Expr String
 getTestSetting key = expr $ testSetting key
@@ -51,7 +53,13 @@ runTestGhcFlags = do
 -- Command line arguments for invoking the @runtest.py@ script. A lot of this
 -- mirrors @testsuite/mk/test.mk@.
 runTestBuilderArgs :: Args
-runTestBuilderArgs = builder RunTest ? do
+runTestBuilderArgs =
+  mconcat [ runTestNormalArgs
+          , builder (Testsuite GetExtraDeps) ? arg "--only-report-hadrian-deps"
+          ]
+
+runTestNormalArgs :: Args
+runTestNormalArgs = builder Testsuite ? do
     pkgs     <- expr $ stagePackages Stage1
     libTests <- expr $ filterM doesDirectoryExist $ concat
             [ [ pkgPath pkg -/- "tests", pkgPath pkg -/- "tests-ghc" ]
@@ -159,7 +167,13 @@ getTestArgs = do
     bindir          <- expr $ getBinaryDirectory (testCompiler args)
     compiler        <- expr $ getCompilerPath (testCompiler args)
     globalVerbosity <- shakeVerbosity <$> expr getShakeOptions
-    haveDocs        <- areDocsPresent
+    -- the testsuite driver will itself tell us if we need to generate the docs target
+    -- So we always pass the haddock path if the hadrian configuration allows us to build
+    -- docs
+    -- If the configuration doesn't allow us to build docs, then we don't pass the haddock
+    -- option, and the testsuite driver will not subsequently ask us to build haddocks
+    -- for the required tests
+    haveDocs        <- willDocsBeBuilt
     let configFileArg= ["--config-file=" ++ (testConfigFile args)]
         testOnlyArg  =  map ("--only=" ++) (testOnly args ++ testEnvTargets)
         onlyPerfArg  = if testOnlyPerf args
@@ -208,16 +222,10 @@ getTestArgs = do
          ++ haddockArg ++ hp2psArg ++ hpcArg ++ inTreeArg
          ++ brokenTestArgs
 
-  where areDocsPresent = expr $ do
-          root <- buildRoot
-          and <$> traverse doesFileExist (docFiles root)
+  where willDocsBeBuilt = expr $ do
+          doctargets <- ghcDocs =<< flavour
+          pure $ Haddocks `Set.member` doctargets
 
-        docFiles root =
-          [ root -/- "docs" -/- "html" -/- "libraries" -/- p -/- (p ++ ".haddock")
-          -- list of packages from
-          -- utils/haddock/haddock-test/src/Test/Haddock/Config.hs
-          | p <- [ "array", "base", "ghc-prim", "process", "template-haskell" ]
-          ]
 
 -- | Set speed for test
 setTestSpeed :: TestSpeed -> String

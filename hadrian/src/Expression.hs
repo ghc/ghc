@@ -86,6 +86,13 @@ instance BuilderPredicate a => BuilderPredicate (FilePath -> a) where
             Configure path -> builder (f path)
             _              -> return False
 
+instance BuilderPredicate a => BuilderPredicate (TestMode -> a) where
+    builder f = do
+        b <- getBuilder
+        case b of
+            Testsuite mode -> builder (f mode)
+            _              -> return False
+
 -- | Is the current build 'Way' equal to a certain value?
 way :: Way -> Predicate
 way w = (w ==) <$> getWay

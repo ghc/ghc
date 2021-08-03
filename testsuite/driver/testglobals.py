@@ -210,6 +210,13 @@ class TestConfig:
         # I have no idea what this does
         self.package_conf_cache_file = None # type: Optional[Path]
 
+        # The extra hadrian dependencies we need for all configured tests
+        self.hadrian_deps = set() # type: Set[str]
+
+        # Are we only reporting hadrian dependencies?
+        self.only_report_hadrian_deps = False # type: bool
+
+
     def validate(self) -> None:
         """ Check the TestConfig for self-consistency """
         def assert_implies(a: bool, b: bool):
@@ -437,6 +444,9 @@ class TestOptions:
 
        # Should we copy the files of symlink the files for the test?
        self.copy_files = False
+
+       # The extra hadrian dependencies we need for this particular test
+       self.hadrian_deps = set() # type: Set[str]
 
 # The default set of options
 global default_testopts

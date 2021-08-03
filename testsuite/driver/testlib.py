@@ -196,7 +196,17 @@ def _reqlib( name, opts, lib ):
         for db in config.test_package_db:
             opts.extra_hc_opts = opts.extra_hc_opts + ' -package-db=' + db + ' '
 
+def _req_hadrian_deps(name,opts,deps):
+    opts.hadrian_deps.update(deps)
+
+def req_hadrian_deps(deps):
+    return lambda name, opts: _req_hadrian_deps(name,opts,deps)
+
+# We want the 'docs-haddock' dependency and not just the
+# haddock executable since the haddock tests need documentation
+# for the boot libraries
 def req_haddock( name, opts ):
+    _req_hadrian_deps(name,opts,["docs-haddock"])
     if not config.haddock:
         opts.expect = 'missing-lib'
         opts.skip   = True
@@ -1078,6 +1088,12 @@ def test_common_work(watcher: testutil.Watcher,
 
             else:
                 framework_fail(name, None, 'extra_file is empty string')
+
+        # If we are only reporting hadrian dependencies, then skip the test
+        # and add its dependencies to the global set
+        if do_ways and config.only_report_hadrian_deps:
+            do_ways = []
+            config.hadrian_deps |= getTestOpts().hadrian_deps
 
         # Run the required tests...
         for way in do_ways:

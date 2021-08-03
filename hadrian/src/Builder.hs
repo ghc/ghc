@@ -2,7 +2,7 @@
 module Builder (
     -- * Data types
     ArMode (..), CcMode (..), ConfigurationInfo (..), DependencyType (..),
-    GhcMode (..), GhcPkgMode (..), HaddockMode (..), SphinxMode (..),
+    GhcMode (..), GhcPkgMode (..), HaddockMode (..), TestMode(..), SphinxMode (..),
     TarMode (..), Builder (..),
 
     -- * Builder properties
@@ -114,6 +114,15 @@ instance Binary   HaddockMode
 instance Hashable HaddockMode
 instance NFData   HaddockMode
 
+-- | The testsuite driver can be called in two different modes:
+-- * Actually run the tests
+-- * Get all the hadrian targets needed for the current test configuration
+data TestMode = RunTest | GetExtraDeps deriving (Eq, Generic, Show)
+
+instance Binary   TestMode
+instance Hashable TestMode
+instance NFData   TestMode
+
 -- | A 'Builder' is a (usually external) command invoked in a separate process
 -- via 'cmd'. Here are some examples:
 -- * 'Alex' is a lexical analyser generator that builds @Lexer.hs@ from @Lexer.x@.
@@ -148,7 +157,7 @@ data Builder = Alex
              | Patch
              | Python
              | Ranlib
-             | RunTest
+             | Testsuite TestMode
              | Sphinx SphinxMode
              | Tar TarMode
              | Unlit
@@ -225,7 +234,8 @@ instance H.Builder Builder where
     -- contrast this with runBuilderWith, which returns @Action ()@
     -- this returns the @stdout@ from running the builder.
     -- For now this only implements asking @ghc-pkg@ about package
-    -- dependencies.
+    -- dependencies and asking the testsuite driver about hadrian
+    -- dependencies for tests.
     askBuilderWith :: Builder -> BuildInfo -> Action String
     askBuilderWith builder BuildInfo {..} = case builder of
         GhcPkg Dependencies _ -> do
@@ -241,6 +251,13 @@ instance H.Builder Builder where
                 need [path]
             Stdout stdout <- cmd' [path] ["--no-user-package-db", "field", input, "depends"]
             return stdout
+        Testsuite GetExtraDeps -> do
+          path <- builderPath builder
+          withResources buildResources $ do
+              -- The testsuite driver reports the dependencies on stderr
+              -- buildArgs should include --only-report-hadrian-deps at this point
+              Stderr stderr <- cmd' [path] buildArgs
+              return stderr
         _ -> error $ "Builder " ++ show builder ++ " can not be asked!"
 
     runBuilderWith :: Builder -> BuildInfo -> Action ()
@@ -322,7 +339,7 @@ instance H.Builder Builder where
 
                 -- RunTest produces a very large amount of (colorised) output;
                 -- Don't attempt to capture it.
-                RunTest -> do
+                Testsuite RunTest -> do
                   Exit code <- cmd echo [path] buildArgs
                   when (code /= ExitSuccess) $ do
                     fail "tests failed"
@@ -371,7 +388,7 @@ systemBuilderPath builder = case builder of
     Patch           -> fromKey "patch"
     Python          -> fromKey "python"
     Ranlib          -> fromKey "ranlib"
-    RunTest         -> fromKey "python"
+    Testsuite _     -> fromKey "python"
     Sphinx _        -> fromKey "sphinx-build"
     Tar _           -> fromKey "tar"
     Xelatex         -> fromKey "xelatex"

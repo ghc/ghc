@@ -170,11 +170,19 @@ testRules = do
             -- which is in turn included by all test 'Makefile's.
             setEnv "ghc_config_mk" (top -/- root -/- ghcConfigPath)
 
+        let test_target tt = target (vanillaContext Stage2 compiler) (Testsuite tt) [] []
+
+        -- We need to ask the testsuite if it needs any extra hadrian dependencies for the
+        -- tests it is going to run,
+        -- for example "docs_haddock"
+        -- We then need to go and build these dependencies
+        extra_targets <- words <$> askWithResources [] (test_target GetExtraDeps)
+        need extra_targets
+
         -- Execute the test target.
         -- We override the verbosity setting to make sure the user can see
         -- the test output: https://gitlab.haskell.org/ghc/ghc/issues/15951.
-        withVerbosity Diagnostic $ buildWithCmdOptions env $
-            target (vanillaContext Stage2 compiler) RunTest [] []
+        withVerbosity Diagnostic $ buildWithCmdOptions env $ test_target RunTest
 
 -- | Build the timeout program.
 -- See: https://github.com/ghc/ghc/blob/master/testsuite/timeout/Makefile#L23
