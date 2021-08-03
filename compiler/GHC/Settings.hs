@@ -16,7 +16,6 @@ module GHC.Settings
   , sGhciUsagePath
   , sToolDir
   , sTopDir
-  , sTmpDir
   , sGlobalPackageDatabasePath
   , sLdSupportsCompactUnwind
   , sLdSupportsBuildId
@@ -151,7 +150,6 @@ data FileSettings = FileSettings
   , fileSettings_ghciUsagePath         :: FilePath       -- ditto
   , fileSettings_toolDir               :: Maybe FilePath -- ditto
   , fileSettings_topDir                :: FilePath       -- ditto
-  , fileSettings_tmpDir                :: String      -- no trailing '/'
   , fileSettings_globalPackageDatabase :: FilePath
   }
 
@@ -182,8 +180,6 @@ sToolDir             :: Settings -> Maybe FilePath
 sToolDir = fileSettings_toolDir . sFileSettings
 sTopDir              :: Settings -> FilePath
 sTopDir = fileSettings_topDir . sFileSettings
-sTmpDir              :: Settings -> String
-sTmpDir = fileSettings_tmpDir . sFileSettings
 sGlobalPackageDatabasePath :: Settings -> FilePath
 sGlobalPackageDatabasePath = fileSettings_globalPackageDatabase . sFileSettings
 

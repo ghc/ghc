@@ -83,7 +83,6 @@ module GHC.Driver.Session (
         sGhciUsagePath,
         sToolDir,
         sTopDir,
-        sTmpDir,
         sGlobalPackageDatabasePath,
         sLdSupportsCompactUnwind,
         sLdSupportsBuildId,
@@ -133,7 +132,7 @@ module GHC.Driver.Session (
         PlatformMisc(..),
         settings,
         programName, projectVersion,
-        ghcUsagePath, ghciUsagePath, topDir, tmpDir,
+        ghcUsagePath, ghciUsagePath, topDir,
         versionedAppDir, versionedFilePath,
         extraGccViaCFlags, globalPackageDatabasePath,
         pgm_L, pgm_P, pgm_F, pgm_c, pgm_a, pgm_l, pgm_lm, pgm_dll, pgm_T,
@@ -444,6 +443,7 @@ data DynFlags = DynFlags {
   toolSettings      :: {-# UNPACK #-} !ToolSettings,
   platformMisc      :: {-# UNPACK #-} !PlatformMisc,
   rawSettings       :: [(String, String)],
+  tmpDir            :: TempDir,
 
   llvmConfig            :: LlvmConfig,
     -- ^ N.B. It's important that this field is lazy since we load the LLVM
@@ -792,8 +792,6 @@ toolDir               :: DynFlags -> Maybe FilePath
 toolDir dflags = fileSettings_toolDir $ fileSettings dflags
 topDir                :: DynFlags -> FilePath
 topDir dflags = fileSettings_topDir $ fileSettings dflags
-tmpDir                :: DynFlags -> TempDir
-tmpDir dflags = TempDir (fileSettings_tmpDir $ fileSettings dflags)
 extraGccViaCFlags     :: DynFlags -> [String]
 extraGccViaCFlags dflags = toolSettings_extraGccViaCFlags $ toolSettings dflags
 globalPackageDatabasePath   :: DynFlags -> FilePath
@@ -1096,6 +1094,7 @@ initDynFlags dflags = do
  let (useColor', colScheme') =
        (adjustCols maybeGhcColoursEnv . adjustCols maybeGhcColorsEnv)
        (useColor dflags, colScheme dflags)
+ tmp_dir <- normalise <$> getTemporaryDirectory
  return dflags{
         dynamicTooFailed = refDynamicTooFailed,
         useUnicode    = useUnicode',
@@ -1104,7 +1103,8 @@ initDynFlags dflags = do
         colScheme     = colScheme',
         rtldInfo      = refRtldInfo,
         rtccInfo      = refRtccInfo,
-        rtasmInfo     = refRtasmInfo
+        rtasmInfo     = refRtasmInfo,
+        tmpDir        = TempDir tmp_dir
         }
 
 -- | The normal 'DynFlags'. Note that they are not suitable for use in this form
@@ -1211,6 +1211,8 @@ defaultDynFlags mySettings llvmConfig =
         targetPlatform = sTargetPlatform mySettings,
         platformMisc = sPlatformMisc mySettings,
         rawSettings = sRawSettings mySettings,
+
+        tmpDir                  = panic "defaultDynFlags: uninitialized tmpDir",
 
         -- See Note [LLVM configuration].
         llvmConfig              = llvmConfig,
@@ -4117,8 +4119,6 @@ unSetExtensionFlag' f dflags = xopt_unset dflags f
    --      (except for -fno-glasgow-exts, which is treated specially)
 
 --------------------------
-alterFileSettings :: (FileSettings -> FileSettings) -> DynFlags -> DynFlags
-alterFileSettings f dynFlags = dynFlags { fileSettings = f (fileSettings dynFlags) }
 
 alterToolSettings :: (ToolSettings -> ToolSettings) -> DynFlags -> DynFlags
 alterToolSettings f dynFlags = dynFlags { toolSettings = f (toolSettings dynFlags) }
@@ -4412,7 +4412,7 @@ splitPathList s = filter notNull (splitUp s)
 -- tmpDir, where we store temporary files.
 
 setTmpDir :: FilePath -> DynFlags -> DynFlags
-setTmpDir dir = alterFileSettings $ \s -> s { fileSettings_tmpDir = normalise dir }
+setTmpDir dir d = d { tmpDir = TempDir (normalise dir) }
   -- we used to fix /cygdrive/c/.. on Windows, but this doesn't
   -- seem necessary now --SDM 7/2/2008
 

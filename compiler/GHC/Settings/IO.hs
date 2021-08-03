@@ -111,10 +111,6 @@ initSettings top_dir = do
   install_name_tool_path <- getToolSetting "install_name_tool command"
   ranlib_path <- getToolSetting "ranlib command"
 
-  -- TODO this side-effect doesn't belong here. Reading and parsing the settings
-  -- should be idempotent and accumulate no resources.
-  tmpdir <- liftIO $ getTemporaryDirectory
-
   touch_path <- getToolSetting "touch command"
 
   mkdll_prog <- getToolSetting "dllwrap command"
@@ -156,8 +152,7 @@ initSettings top_dir = do
       }
 
     , sFileSettings = FileSettings
-      { fileSettings_tmpDir         = normalise tmpdir
-      , fileSettings_ghcUsagePath   = ghc_usage_msg_path
+      { fileSettings_ghcUsagePath   = ghc_usage_msg_path
       , fileSettings_ghciUsagePath  = ghci_usage_msg_path
       , fileSettings_toolDir        = mtool_dir
       , fileSettings_topDir         = top_dir
