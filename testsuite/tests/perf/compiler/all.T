@@ -277,6 +277,15 @@ test('MultiLayerModules',
      multimod_compile,
      ['MultiLayerModules', '-v0'])
 
+test('MultiLayerModulesPar',
+     [ collect_compiler_stats('bytes allocated',3),
+       pre_cmd('./genMultiLayerModules'),
+       extra_files(['genMultiLayerModules']),
+       compile_timeout_multiplier(5)
+     ],
+     multimod_compile,
+     ['MultiLayerModules', '-j2 -v0'])
+
 # MultiLayerModules flip flops by 2.5%, depending on the
 # number of modules within GHC (#19293). Just widen the
 # acceptance window until we figured out how to fix it.
