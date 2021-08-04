@@ -1581,9 +1581,6 @@ primop  SmallArrayOfOp "smallArrayOf#" GenPrimOp
    with
    has_side_effects = True
 
-primop  SameSmallMutableArrayOp "sameSmallMutableArray#" GenPrimOp
-   SmallMutableArray# s a -> SmallMutableArray# s a -> Int#
-
 primop  ShrinkSmallMutableArrayOp_Char "shrinkSmallMutableArray#" GenPrimOp
    SmallMutableArray# s a -> Int# -> State# s -> State# s
    {Shrink mutable array to new specified size, in
