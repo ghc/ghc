@@ -77,7 +77,7 @@ void heap_view_closure_ptrs_in_pap_payload(StgClosure *ptrs[], StgWord *nptrs
 }
 
 // See Heap.h
-StgWord collect_pointers(StgClosure *closure, StgWord size, StgClosure *ptrs[size]) {
+StgWord collect_pointers(StgClosure *closure, StgClosure *ptrs[]) {
     StgClosure **end;
     const StgInfoTable *info = get_itbl(closure);
     StgWord nptrs = 0;
@@ -250,7 +250,7 @@ StgMutArrPtrs *heap_view_closurePtrs(Capability *cap, StgClosure *closure) {
     // the closure and then we can allocate space on the heap and copy them
     // there
     StgClosure *ptrs[size];
-    StgWord nptrs = collect_pointers(closure, size, ptrs);
+    StgWord nptrs = collect_pointers(closure, ptrs);
 
     size = nptrs + mutArrPtrsCardTableSize(nptrs);
     StgMutArrPtrs *arr =
