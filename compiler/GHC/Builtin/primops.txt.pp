@@ -1580,7 +1580,7 @@ primop SmallArrayOfOp "smallArrayOf#" GenPrimOp
    {\tt smallArrayOf# (# 1, 2, 3 #) \#}.}
    with
    has_side_effects = True
-{}
+
 primop  SameSmallMutableArrayOp "sameSmallMutableArray#" GenPrimOp
    SmallMutableArray# s a -> SmallMutableArray# s a -> Int#
 
