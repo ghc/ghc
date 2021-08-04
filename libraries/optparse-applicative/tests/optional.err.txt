@@ -1,0 +1,6 @@
+Usage: optional [--a A --b B]
+
+Available options:
+  --a A                    value a
+  --b B                    value b
+  -h,--help                Show this help text

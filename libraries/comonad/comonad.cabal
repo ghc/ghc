@@ -1,0 +1,124 @@
+name:          comonad
+category:      Control, Comonads
+version:       5.0.8
+license:       BSD3
+cabal-version: >= 1.10
+license-file:  LICENSE
+author:        Edward A. Kmett
+maintainer:    Edward A. Kmett <ekmett@gmail.com>
+stability:     provisional
+homepage:      http://github.com/ekmett/comonad/
+bug-reports:   http://github.com/ekmett/comonad/issues
+copyright:     Copyright (C) 2008-2014 Edward A. Kmett,
+               Copyright (C) 2004-2008 Dave Menendez
+synopsis:      Comonads
+description:   Comonads.
+build-type:    Simple
+tested-with:   GHC == 7.0.4
+             , GHC == 7.2.2
+             , GHC == 7.4.2
+             , GHC == 7.6.3
+             , GHC == 7.8.4
+             , GHC == 7.10.3
+             , GHC == 8.0.2
+             , GHC == 8.2.2
+             , GHC == 8.4.4
+             , GHC == 8.6.5
+             , GHC == 8.8.3
+             , GHC == 8.10.1
+extra-source-files:
+  .gitignore
+  .hlint.yaml
+  .vim.custom
+  coq/Store.v
+  README.markdown
+  CHANGELOG.markdown
+  examples/History.hs
+
+flag containers
+  description:
+    You can disable the use of the `containers` package using `-f-containers`.
+    .
+    Disabing this is an unsupported configuration, but it may be useful for accelerating builds in sandboxes for expert users.
+  default: True
+  manual: True
+
+flag distributive
+  description:
+    You can disable the use of the `distributive` package using `-f-distributive`.
+    .
+    Disabling this is an unsupported configuration, but it may be useful for accelerating builds in sandboxes for expert users.
+    .
+    If disabled we will not supply instances of `Distributive`
+    .
+  default: True
+  manual: True
+
+flag indexed-traversable
+  description:
+    You can disable the use of the `indexed-traversable` package using `-f-indexed-traversable`.
+    .
+    Disabling this is an unsupported configuration, but it may be useful for accelerating builds in sandboxes for expert users.
+    .
+    If disabled we will not supply instances of `FunctorWithIndex`
+    .
+  default: True
+  manual: True
+
+
+source-repository head
+  type: git
+  location: git://github.com/ekmett/comonad.git
+
+library
+  hs-source-dirs: src
+  default-language: Haskell2010
+  ghc-options: -Wall
+
+  build-depends:
+    base                >= 4   && < 5,
+    tagged              >= 0.8.6.1 && < 1,
+    transformers        >= 0.3 && < 0.6,
+    transformers-compat >= 0.5 && < 1
+
+  if !impl(ghc >= 8.0)
+    build-depends: semigroups >= 0.18.5 && < 1
+
+  if flag(containers)
+    build-depends: containers >= 0.3 && < 0.7
+
+  if flag(distributive)
+    build-depends: distributive >= 0.5.2 && < 1
+
+  if flag(indexed-traversable)
+    build-depends: indexed-traversable >= 0.1.1 && < 0.2
+
+  if impl(ghc >= 9.0)
+    -- these flags may abort compilation with GHC-8.10
+    -- https://gitlab.haskell.org/ghc/ghc/-/merge_requests/3295
+    ghc-options: -Winferred-safe-imports -Wmissing-safe-haskell-mode
+
+  exposed-modules:
+    Control.Comonad
+    Control.Comonad.Env
+    Control.Comonad.Env.Class
+    Control.Comonad.Hoist.Class
+    Control.Comonad.Identity
+    Control.Comonad.Store
+    Control.Comonad.Store.Class
+    Control.Comonad.Traced
+    Control.Comonad.Traced.Class
+    Control.Comonad.Trans.Class
+    Control.Comonad.Trans.Env
+    Control.Comonad.Trans.Identity
+    Control.Comonad.Trans.Store
+    Control.Comonad.Trans.Traced
+    Data.Functor.Composition
+
+  other-extensions:
+    CPP
+    RankNTypes
+    MultiParamTypeClasses
+    FunctionalDependencies
+    FlexibleInstances
+    UndecidableInstances

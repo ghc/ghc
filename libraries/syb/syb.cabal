@@ -1,0 +1,104 @@
+name:                 syb
+version:              0.7.2.1
+license:              BSD3
+license-file:         LICENSE
+author:               Ralf Lammel, Simon Peyton Jones, Jose Pedro Magalhaes
+maintainer:           Sergey Vinokurov <serg.foo@gmail.com>
+homepage:             http://www.cs.uu.nl/wiki/GenericProgramming/SYB
+bug-reports:          https://github.com/dreixel/syb/issues
+synopsis:             Scrap Your Boilerplate
+description:
+    This package contains the generics system described in the
+    /Scrap Your Boilerplate/ papers (see
+    <http://www.cs.uu.nl/wiki/GenericProgramming/SYB>).
+    It defines the @Data@ class of types permitting folding and unfolding
+    of constructor applications, instances of this class for primitive
+    types, and a variety of traversals.
+
+category:               Generics
+stability:              provisional
+build-type:             Simple
+cabal-version:          >= 1.10
+tested-with:            GHC==8.10.3, GHC==8.8.4, GHC==8.6.5, GHC==8.4.4, GHC==8.2.2, GHC==8.0.2, GHC==7.10.3, GHC==7.8.4, GHC==7.6.3, GHC==7.4.2, GHC==7.2.2, GHC==7.0.4
+
+extra-source-files:     README.md,
+                        ChangeLog
+
+source-repository head
+  type:                 git
+  location:             https://github.com/dreixel/syb
+
+Library
+  hs-source-dirs:         src
+  default-language:       Haskell98
+  build-depends:          base >= 4.0 && < 5.0
+  exposed-modules:        Data.Generics,
+                          Data.Generics.Basics,
+                          Data.Generics.Instances,
+                          Data.Generics.Aliases,
+                          Data.Generics.Schemes,
+                          Data.Generics.Text,
+                          Data.Generics.Twins,
+                          Data.Generics.Builders,
+
+                          Generics.SYB,
+                          Generics.SYB.Basics,
+                          Generics.SYB.Instances,
+                          Generics.SYB.Aliases,
+                          Generics.SYB.Schemes,
+                          Generics.SYB.Text,
+                          Generics.SYB.Twins,
+                          Generics.SYB.Builders
+
+  if impl(ghc < 6.12)
+    ghc-options:          -package-name syb
+
+  ghc-options:            -Wall
+
+test-suite unit-tests
+  type:                   exitcode-stdio-1.0
+  hs-source-dirs:         tests
+  default-language:       Haskell98
+  main-is:                Main.hs
+  build-depends:          base
+                        , syb
+                        , tasty
+                        , tasty-hunit
+                        , containers
+                        , mtl
+  other-modules:          Bits
+                          Builders
+                          CompanyDatatypes
+                          Datatype
+                          Encode
+                          Ext
+                          Ext1
+                          Ext2
+                          FoldTree
+                          FreeNames
+                          GEq
+                          GMapQAssoc
+                          GRead
+                          GRead2
+                          GShow
+                          GShow2
+                          GZip
+                          GenUpTo
+                          GetC
+                          HList
+                          HOPat
+                          Labels
+                          LocalQuantors
+                          NestedDatatypes
+                          Newtype
+                          Paradise
+                          Perm
+                          Polymatch
+                          Reify
+                          Strings
+                          Tree
+                          Twin
+                          Typecase1
+                          Typecase2
+                          Where
+                          XML

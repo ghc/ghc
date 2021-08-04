@@ -1,0 +1,298 @@
+0.3.7.0
+
+	* Make division (/) on Scientifics slightly more efficient.
+
+	* Fix the Show instance to surround negative numbers with parentheses when
+	necessary.
+
+	* Add (Template Haskell) Lift Scientific instance
+
+	* Mark modules as Safe or Trustworthy (Safe Haskell).
+
+0.3.6.2
+	* Due to a regression introduced in 0.3.4.14 the RealFrac methods
+	and floatingOrInteger became vulnerable to a space blowup when
+	applied to scientifics with huge exponents. This has now been
+	fixed again.
+
+0.3.6.1
+	* Fix build on GHC < 8.
+
+0.3.6.0
+	* Make the methods of the Hashable, Eq and Ord instances safe to
+	use when applied to scientific numbers coming from untrusted
+	sources. Previously these methods first converted their arguments
+	to Rational before applying the operation. This is unsafe because
+	converting a Scientific to a Rational could fill up all space and
+	crash your program when the Scientific has a huge base10Exponent.
+
+	Do note that the hash computation of the Hashable Scientific
+	instance has been changed because of this improvement!
+
+	Thanks to Tom Sydney Kerckhove (@NorfairKing) for pushing me to
+	fix this.
+
+	* fromRational :: Rational -> Scientific now throws an error
+	instead of diverging when applied to a repeating decimal. This
+	does mean it will consume space linear in the number of digits of
+	the resulting scientific. This makes "fromRational" and the other
+	Fractional methods "recip" and "/" a bit safer to use.
+
+	* To get the old unsafe but more efficient behaviour the following
+	function was added: unsafeFromRational :: Rational -> Scientific.
+
+	* Add alternatives for fromRationalRepetend:
+
+	  fromRationalRepetendLimited
+	      :: Int -- ^ limit
+	      -> Rational
+	      -> Either (Scientific, Rational)
+		        (Scientific, Maybe Int)
+
+	  and:
+
+	  fromRationalRepetendUnlimited
+	      :: Rational -> (Scientific, Maybe Int)
+
+	  Thanks to Ian Jeffries (@seagreen) for the idea.
+
+0.3.5.3
+	* Dropped upper version bounds of dependencies
+	  because it's to much work to maintain.
+
+0.3.5.2
+	* Remove unused ghc-prim dependency.
+	* Added unit tests for read and scientificP
+
+0.3.5.1
+	* Replace use of Vector from vector with Array from primitive.
+
+0.3.5.0
+	* Export scientificP :: ReadP Scientific
+	  (Courtesy of Shlok Datye @shlok)
+
+0.3.4.15
+	* Fix build for base < 4.8.
+
+0.3.4.14
+	* Some minor performance improvements.
+
+0.3.4.13
+	* Support criterion-1.2
+
+0.3.4.12
+	* Support base-4.10
+
+0.3.4.11
+	* Support tasty-ant-xml-1.1.0
+
+0.3.4.10
+	* Tighten lower bound on vector from 0.5 to 0.7 because building with
+	  vector < 0.7 results in a build error.
+
+	* Move the internal modules Math.NumberTheory.Logarithms and
+	  GHC.Integer.Logarithms.Compat to their own package integer-logarithms so
+	  other people can share that code.
+
+0.3.4.9
+	* Support QuickCheck-2.9.
+
+0.3.4.8
+	* Make bytestring-builder's installation conditional based on a Cabal flag.
+
+0.3.4.7
+	* Unconditionally export Data.ByteString.Builder.Scientific.
+	  The bytestring-builder cabal flag has been removed.
+	  Depend on bytestring-builder for backwards compatibility for GHC < 7.8.
+
+0.3.4.6
+	* Made toDecimalDigits more similar to floatToDigits
+
+	  Previously:
+
+	    toDecimalDigits 0 == ([0],1)
+
+	  Now:
+
+	    toDecimalDigits 0 == ([0],0)
+
+	  Because:
+
+	    Numeric.floatToDigits 10 (0 :: Double) == ([0],0)
+
+
+	* Introduce a special case for 0 in fromFloatDigits
+
+	    fromFloatDigits 0 = 0
+
+	  This should fix https://github.com/bos/aeson/issues/369
+
+0.3.4.5
+	The following are all a courtesy of Oleg Grenrus (phadej):
+
+	* Support GHC-8.0.1
+	* Support binary-0.8
+	* Enable Travis continuous integration
+
+0.3.4.4
+	* Improved performance of toDecimalDigits by 13%.
+
+0.3.4.3
+	* Fix build with integer-simple.
+
+0.3.4.2
+	* Fix build on GHC-7.4.
+	  Courtesy of Adam Bergmark..
+
+0.3.4.1
+	* Fix build on GHC-7.0.4
+
+0.3.4.0
+	* Added fromRationalRepetend & toRationalRepetend
+	  for safely converting from and to rationals
+	  which have a repeating decimal representation like:
+	  1 % 28 = 0.03(571428).
+	* Added a Binary instance.
+	* Various performance improvements.
+	* Support vector-0.11
+	* Support tasty-0.11
+	* Support criterion-1.1.0.0
+
+0.3.3.8
+	* Support QuickCheck-2.8.
+
+0.3.3.7
+	* Fixed both the
+
+            Prelude Data.Scientific> reads "0.0" :: [(Data.Scientific.Scientific,String)]
+            [(0.0,".0"),(0.0,"")]
+
+          problem and the
+
+            read " 8" :: Scientific fails, while read " 8" :: Double succeeds
+
+	  problem.
+
+	  Courtesy of neongreen.
+
+0.3.3.6
+	* Fixed bug in the x / y method for Scientific. Since I was using
+	  the default implementation: `x * recip y` the operation would
+	  diverge when `recip y` had an infinite decimal output.
+	  This shouldn't happen when the result of / is finite again.
+	  For example: 0.6 / 0.3 should yield 2.0.
+
+	  This is now fixed by using the following implementation:
+
+	  `x / y = fromRational $ toRational x / toRational y`
+
+0.3.3.5
+	* Fixed bug when converting the Scientific:
+	  `scientific 0 someBigExponent` to a bounded Integral using toBoundedInteger
+	  or to a bounded RealFloat using toBoundedRealFloat.
+	  If someBigExponent was big enough to trigger the big-exponent protection
+	  the beforementioned functions didn't return 0.
+
+	  This is fixed by explicitly handling a coefficient of 0.
+
+0.3.3.4
+	* Relax upper version bounds of base and deepseq
+	  for the test suite and benchmarks.
+
+0.3.3.3
+	* Add support for `deepseq-1.4`.
+
+0.3.3.2
+	* Fix parsing of empty digit string (#21).
+
+0.3.3.1
+	* Allow newer tasty, tasty-hunit and criterion.
+
+0.3.3.0
+	* Add the isFloating or isInteger predicates.
+	  Courtesy of Zejun Wu (@watashi).
+	* Add the toRealFloat' and toBoundedInteger functions.
+	  Courtesy of Fujimura Daisuke (@fujimura).
+
+0.3.2.2
+	* Enable package to link with integer-simple instead of
+	  integer-gmp using the -finteger-simple cabal flag.
+	  Courtesy of @k0ral.
+
+0.3.2.1
+
+	* Parameterize inclusion of the Data.ByteString.Builder.Scientific
+	  module using the bytestring-builder flag. Disabling this flag
+	  allows building on GHC-7.0.4 which has bytestring-0.9 installed
+	  by default.
+
+0.3.2.0
+
+	* Add the floatingOrInteger function
+	* Fix build on GHC-7.0.4
+	* More efficient and better behaving magnitude computation
+	* Lower the number of cached magnitudes to 324 (same as GHC.Float)
+
+0.3.1.0
+
+	* Don't normalize on construction but do it when pretty-printing
+	  instead. Also provide a manual normalize function.
+	* Improve efficiency of toRealFloat
+	* Added note about caching magnitudes
+	* Dropped dependency on arithmoi
+	* Make benchmark easier to build
+	* Add junit XML output support (for Jenkins)
+
+0.3.0.2
+
+	* Lower the minimal QuickCheck version.
+	* Make sure sized exponents are generated in the QuickCheck tests.
+
+0.3.0.1
+
+	* Fix build for bytestring-0.10.0.*
+
+0.3.0.0
+
+	* Fix a DoS vulnerability that allowed an attacker to crash the
+	  process by sending a scientific with a huge exponent like
+	  1e1000000000.
+	* Fix various RealFrac methods.
+	* Cache some powers of 10 to speed up the magnitude computation.
+	* Normalize scientific numbers on construction.
+	* Move the Text Builder to its own module &
+	  provide a ByteString builder
+	* Added more documentation
+
+0.2.0.2
+
+        * Widen the dreaded pointlessly tight upper bounds
+
+0.2.0.1
+
+	* Support the latest versions of smallcheck and tasty
+
+0.2.0.0
+
+	* added deriving data
+
+0.1.0.1
+
+	* Loosen upper bounds on package versions
+
+0.1.0.0
+
+	* Fixed bugs & Changed API
+
+0.0.0.2
+
+	* Support building the library on GHC >= 7.0.1
+
+0.0.0.1
+
+	* Simplification in the Show instance
+	* Optimization in fromRealFloat
+
+0.0.0.0
+
+	* Initial commit

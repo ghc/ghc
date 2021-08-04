@@ -1,0 +1,95 @@
+cabal-version:      >=1.10
+name:               these
+version:            1.1.1.1
+x-revision:         1
+synopsis:           An either-or-both data type.
+homepage:           https://github.com/isomorphism/these
+license:            BSD3
+license-file:       LICENSE
+author:             C. McCann, Oleg Grenrus
+maintainer:         Oleg Grenrus <oleg.grenrus@iki.fi>
+category:           Data, These
+build-type:         Simple
+extra-source-files: CHANGELOG.md
+description:
+  This package provides a data type @These a b@ which can hold a value of either
+  type or values of each type. This is usually thought of as an "inclusive or"
+  type (contrasting @Either a b@ as "exclusive or") or as an "outer join" type
+  (contrasting @(a, b)@ as "inner join").
+  .
+  @
+  data These a b = This a | That b | These a b
+  @
+  .
+  Since version 1, this package was split into parts:
+  .
+  * <https://hackage.haskell.org/package/semialign semialign> For @Align@ and @Zip@ type-classes.
+  .
+  * <https://hackage.haskell.org/package/semialign-indexed semialign-indexed> For @SemialignWithIndex@ class, providing @ialignWith@ and @izipWith@.
+  .
+  * <https://hackage.haskell.org/package/these-lens these-lens> For lens combinators.
+  .
+  * <http://hackage.haskell.org/package/monad-chronicle monad-chronicle> For transformers variant of @These@.
+
+tested-with:
+    GHC ==7.4.2
+     || ==7.6.3
+     || ==7.8.4
+     || ==7.10.3
+     || ==8.0.2
+     || ==8.2.2
+     || ==8.4.4
+     || ==8.6.5
+     || ==8.8.3
+     || ==8.10.1
+  , GHCJS ==8.4
+
+source-repository head
+  type:     git
+  location: https://github.com/isomorphism/these.git
+
+flag assoc
+  description: Build with assoc dependency
+  manual:      True
+  default:     True
+
+library
+  default-language: Haskell2010
+  ghc-options:      -Wall
+
+  if impl(ghc >=8.0)
+    ghc-options: -Wno-trustworthy-safe
+
+  hs-source-dirs:   src
+  exposed-modules:
+    Data.Functor.These
+    Data.These
+    Data.These.Combinators
+
+  -- ghc boot libs
+  build-depends:
+      base     >=4.5.1.0 && <4.16
+    , binary   >=0.5.1.0 && <0.10
+    , deepseq  >=1.3.0.0 && <1.5
+
+  -- other dependencies
+  build-depends:    hashable >=1.2.7.0 && <1.4
+
+  if impl(ghc <7.5)
+    build-depends: ghc-prim
+
+  if !impl(ghc >=8.2)
+    build-depends: bifunctors >=5.5.4 && <5.6
+
+  if !impl(ghc >=8.0)
+    build-depends:
+        semigroups           >=0.18.5  && <0.20
+      , transformers         >=0.3.0.0 && <0.6
+      , transformers-compat  >=0.6.5   && <0.7
+
+    -- Ensure Data.Functor.Classes is always available
+    if impl(ghc >=7.10)
+      build-depends: transformers >=0.4.2.0
+
+  if flag(assoc)
+    build-depends: assoc >=1 && <1.1

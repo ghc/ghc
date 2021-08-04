@@ -1,0 +1,56 @@
+name:          transformers-compat-tests
+category:      Compatibility
+version:       0.1
+license:       BSD3
+cabal-version: >= 1.10
+license-file:  LICENSE
+author:        Edward A. Kmett
+maintainer:    Edward A. Kmett <ekmett@gmail.com>
+stability:     provisional
+homepage:      http://github.com/ekmett/transformers-compat/
+bug-reports:   http://github.com/ekmett/transformers-compat/issues
+copyright:     Copyright (C) 2012-2015 Edward A. Kmett
+synopsis:      transformers-compat tests
+description:   @transformers-copmat@ tests
+build-type:    Simple
+tested-with:   GHC == 7.0.4
+             , GHC == 7.2.2
+             , GHC == 7.4.2
+             , GHC == 7.6.3
+             , GHC == 7.8.4
+             , GHC == 7.10.3
+             , GHC == 8.0.2
+             , GHC == 8.2.2
+             , GHC == 8.4.4
+             , GHC == 8.6.5
+             , GHC == 8.8.3
+             , GHC == 8.10.1
+
+source-repository head
+  type: git
+  location: git://github.com/ekmett/transformers-compat.git
+
+flag tests
+  default: True
+  description: Enable the tests.
+
+test-suite spec
+  if !flag(tests)
+    buildable:          False
+
+  type:                 exitcode-stdio-1.0
+  main-is:              Spec.hs
+  other-modules:        GenericsSpec
+                        GenericsTypes
+  build-depends:        base             >= 4.3   && < 5
+                      , deriving-compat  >= 0.4   && < 1
+                      , generic-deriving >= 1.10  && < 2
+                      , hspec            >= 2     && < 3
+                      , QuickCheck       >= 2     && < 3
+                      , tagged           >= 0.7   && < 1
+                      , transformers     >= 0.2   && < 0.6
+                      , transformers-compat
+  build-tool-depends:   hspec-discover:hspec-discover >= 2 && < 3
+  hs-source-dirs:       .
+  ghc-options:          -Wall -threaded -rtsopts
+  default-language:     Haskell2010

@@ -1,0 +1,11 @@
+resolver: nightly-2019-10-14
+packages:
+- '.'
+- attoparsec-iso8601
+flags:
+  aeson:
+    fast: true
+  attoparsec-iso8601:
+    fast: true
+extra-deps:
+- generic-deriving-1.12.4

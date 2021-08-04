@@ -1,0 +1,32 @@
+
+Data.List.Split provides a wide range of strategies and a unified
+combinator framework for splitting lists with respect to some sort of
+delimiter.
+
+------------------------------------------------------------------------
+
+Dependencies:
+
+  There are no dependencies other than the base package.
+  Data.List.Split has been tested with versions of GHC from 6.8.3 up
+  through 8.0.1.  It is completely Haskell2010 (probably also
+  Haskell98) compliant, so it probably builds with other compilers as
+  well.
+
+  The Properties.hs file depends on QuickCheck >= 2.4, but you don't
+  need it in order to build the library itself, only to run the tests.
+
+Build with Cabal:
+
+    cabal install
+
+Building Haddock documentation (recommended):
+
+    cabal haddock
+
+  Once the documentation has been built, you can access it by 
+  pointing your browser to dist/doc/html/split/index.html.
+
+Running the tests:
+
+  cabal configure --enable-tests && cabal build && cabal test

@@ -1,0 +1,253 @@
+name:             base-compat-batteries
+version:          0.11.2
+license:          MIT
+license-file:     LICENSE
+copyright:        (c) 2012-2018 Simon Hengel,
+                  (c) 2014-2018 João Cristóvão,
+                  (c) 2015-2018 Ryan Scott
+author:           Simon Hengel <sol@typeful.net>,
+                  João Cristóvão <jmacristovao@gmail.com>,
+                  Ryan Scott <ryan.gl.scott@gmail.com>
+maintainer:       Simon Hengel <sol@typeful.net>,
+                  João Cristóvão <jmacristovao@gmail.com>,
+                  Ryan Scott <ryan.gl.scott@gmail.com>
+build-type:       Simple
+cabal-version:    >= 1.10
+category:         Compatibility
+synopsis:         base-compat with extra batteries
+description:      Provides functions available in later versions of @base@ to
+                  a wider range of compilers, without requiring you to use CPP
+                  pragmas in your code.
+                  .
+                  This package provides the same API as the
+                  @<http://hackage.haskell.org/package/base-compat base-compat>@
+                  library, but depends on compatibility packages
+                  (such as @semigroups@) to offer a wider support window than
+                  @base-compat@, which has no dependencies. Most of the modules
+                  in this library have the same names as in @base-compat@
+                  to make it easier to switch between the two. There also exist
+                  versions of each module with the suffix @.Repl.Batteries@,
+                  which are distinct from anything in @base-compat@, to allow
+                  for easier use in GHCi.
+                  .
+                  See
+                  @<https://github.com/haskell-compat/base-compat/blob/master/base-compat/README.markdown#dependencies here>@
+                  for a more comprehensive list of differences between
+                  @base-compat@ and @base-compat-batteries@.
+tested-with:        GHC == 7.0.4
+                  , GHC == 7.2.2
+                  , GHC == 7.4.2
+                  , GHC == 7.6.3
+                  , GHC == 7.8.4
+                  , GHC == 7.10.3
+                  , GHC == 8.0.2
+                  , GHC == 8.2.2
+                  , GHC == 8.4.4
+                  , GHC == 8.6.5
+                  , GHC == 8.8.3
+                  , GHC == 8.10.1
+extra-source-files: CHANGES.markdown, README.markdown
+
+source-repository head
+  type: git
+  location: https://github.com/haskell-compat/base-compat
+  subdir: base-compat-batteries
+
+library
+  ghc-options:
+      -Wall
+  default-language:
+      Haskell2010
+  build-depends:
+      base        >= 4.3 && < 5,
+      base-compat == 0.11.2
+  if !impl(ghc >= 7.8)
+    build-depends:
+      tagged >= 0.8.5 && < 0.9
+  if !impl(ghc >= 7.10)
+    build-depends:
+      nats >= 1.1.2 && < 1.2,
+      void >= 0.7.2 && < 0.8
+  if !impl(ghc >= 8.0)
+    build-depends:
+      fail                >= 4.9.0.0 && < 4.10,
+      semigroups          >= 0.18.4  && < 0.20,
+      transformers        >= 0.2     && < 0.6,
+      transformers-compat >= 0.6     && < 0.7
+  if !impl(ghc >= 8.2)
+    build-depends:
+      bifunctors           >= 5.5.2 && < 5.6,
+      type-equality        >= 1     && < 1.1
+  if !impl(ghc >= 8.6)
+    build-depends:
+      contravariant >= 1.5 && < 1.6
+  ghc-options:
+      -fno-warn-duplicate-exports
+  if impl(ghc >= 7.10)
+    ghc-options: -fno-warn-trustworthy-safe
+
+  hs-source-dirs:
+      src
+
+  exposed-modules:
+      Control.Concurrent.Compat
+      Control.Concurrent.MVar.Compat
+      Control.Exception.Compat
+      Control.Monad.Compat
+      Control.Monad.Fail.Compat
+      Control.Monad.IO.Class.Compat
+      Control.Monad.ST.Lazy.Unsafe.Compat
+      Control.Monad.ST.Unsafe.Compat
+      Data.Bifoldable.Compat
+      Data.Bifunctor.Compat
+      Data.Bitraversable.Compat
+      Data.Bits.Compat
+      Data.Bool.Compat
+      Data.Complex.Compat
+      Data.Either.Compat
+      Data.Foldable.Compat
+      Data.Function.Compat
+      Data.Functor.Compat
+      Data.Functor.Compose.Compat
+      Data.Functor.Const.Compat
+      Data.Functor.Contravariant.Compat
+      Data.Functor.Identity.Compat
+      Data.Functor.Product.Compat
+      Data.Functor.Sum.Compat
+      Data.IORef.Compat
+      Data.List.Compat
+      Data.List.NonEmpty.Compat
+      Data.Monoid.Compat
+      Data.Proxy.Compat
+      Data.Ratio.Compat
+      Data.Semigroup.Compat
+      Data.STRef.Compat
+      Data.String.Compat
+      Data.Type.Coercion.Compat
+      Data.Type.Equality.Compat
+      Data.Version.Compat
+      Data.Void.Compat
+      Data.Word.Compat
+      Debug.Trace.Compat
+      Foreign.Compat
+      Foreign.ForeignPtr.Compat
+      Foreign.ForeignPtr.Safe.Compat
+      Foreign.ForeignPtr.Unsafe.Compat
+      Foreign.Marshal.Alloc.Compat
+      Foreign.Marshal.Array.Compat
+      Foreign.Marshal.Compat
+      Foreign.Marshal.Safe.Compat
+      Foreign.Marshal.Unsafe.Compat
+      Foreign.Marshal.Utils.Compat
+      Numeric.Compat
+      Numeric.Natural.Compat
+      Prelude.Compat
+      System.Environment.Compat
+      System.Exit.Compat
+      System.IO.Compat
+      System.IO.Error.Compat
+      System.IO.Unsafe.Compat
+      Text.Read.Compat
+      Type.Reflection.Compat
+
+      Control.Concurrent.Compat.Repl.Batteries
+      Control.Concurrent.MVar.Compat.Repl.Batteries
+      Control.Exception.Compat.Repl.Batteries
+      Control.Monad.Compat.Repl.Batteries
+      Control.Monad.Fail.Compat.Repl.Batteries
+      Control.Monad.IO.Class.Compat.Repl.Batteries
+      Control.Monad.ST.Lazy.Unsafe.Compat.Repl.Batteries
+      Control.Monad.ST.Unsafe.Compat.Repl.Batteries
+      Data.Bifoldable.Compat.Repl.Batteries
+      Data.Bifunctor.Compat.Repl.Batteries
+      Data.Bitraversable.Compat.Repl.Batteries
+      Data.Bits.Compat.Repl.Batteries
+      Data.Bool.Compat.Repl.Batteries
+      Data.Complex.Compat.Repl.Batteries
+      Data.Either.Compat.Repl.Batteries
+      Data.Foldable.Compat.Repl.Batteries
+      Data.Function.Compat.Repl.Batteries
+      Data.Functor.Compat.Repl.Batteries
+      Data.Functor.Compose.Compat.Repl.Batteries
+      Data.Functor.Const.Compat.Repl.Batteries
+      Data.Functor.Identity.Compat.Repl.Batteries
+      Data.Functor.Contravariant.Compat.Repl.Batteries
+      Data.Functor.Product.Compat.Repl.Batteries
+      Data.Functor.Sum.Compat.Repl.Batteries
+      Data.IORef.Compat.Repl.Batteries
+      Data.List.Compat.Repl.Batteries
+      Data.List.NonEmpty.Compat.Repl.Batteries
+      Data.Monoid.Compat.Repl.Batteries
+      Data.Proxy.Compat.Repl.Batteries
+      Data.Ratio.Compat.Repl.Batteries
+      Data.Semigroup.Compat.Repl.Batteries
+      Data.STRef.Compat.Repl.Batteries
+      Data.String.Compat.Repl.Batteries
+      Data.Type.Coercion.Compat.Repl.Batteries
+      Data.Type.Equality.Compat.Repl.Batteries
+      Data.Version.Compat.Repl.Batteries
+      Data.Void.Compat.Repl.Batteries
+      Data.Word.Compat.Repl.Batteries
+      Debug.Trace.Compat.Repl.Batteries
+      Foreign.Compat.Repl.Batteries
+      Foreign.ForeignPtr.Compat.Repl.Batteries
+      Foreign.ForeignPtr.Safe.Compat.Repl.Batteries
+      Foreign.ForeignPtr.Unsafe.Compat.Repl.Batteries
+      Foreign.Marshal.Alloc.Compat.Repl.Batteries
+      Foreign.Marshal.Array.Compat.Repl.Batteries
+      Foreign.Marshal.Compat.Repl.Batteries
+      Foreign.Marshal.Safe.Compat.Repl.Batteries
+      Foreign.Marshal.Unsafe.Compat.Repl.Batteries
+      Foreign.Marshal.Utils.Compat.Repl.Batteries
+      Numeric.Compat.Repl.Batteries
+      Numeric.Natural.Compat.Repl.Batteries
+      Prelude.Compat.Repl.Batteries
+      System.Environment.Compat.Repl.Batteries
+      System.Exit.Compat.Repl.Batteries
+      System.IO.Compat.Repl.Batteries
+      System.IO.Error.Compat.Repl.Batteries
+      System.IO.Unsafe.Compat.Repl.Batteries
+      Text.Read.Compat.Repl.Batteries
+      Type.Reflection.Compat.Repl.Batteries
+test-suite spec
+  type:
+      exitcode-stdio-1.0
+  ghc-options:
+      -Wall
+  default-language:
+      Haskell2010
+  hs-source-dirs:
+      test
+  main-is:
+      Spec.hs
+  other-modules:
+      Control.Monad.CompatSpec
+      Data.Bits.CompatSpec
+      Data.Bool.CompatSpec
+      Data.Either.CompatSpec
+      Data.Foldable.CompatSpec
+      Data.Function.CompatSpec
+      Data.Functor.CompatSpec
+      Data.IORef.CompatSpec
+      Data.List.CompatSpec
+      Data.Monoid.CompatSpec
+      Data.STRef.CompatSpec
+      Data.Version.CompatSpec
+      Data.Word.CompatSpec
+      Foreign.Marshal.Alloc.CompatSpec
+      Foreign.Marshal.Utils.CompatSpec
+      Numeric.CompatSpec
+      Prelude.CompatSpec
+      System.Environment.CompatSpec
+      Text.Read.CompatSpec
+
+      -- Other tests
+      SafeHaskellSpec
+      TestHspecTrustworthy
+  build-depends:
+      base >= 4.3 && < 5
+    , base-compat-batteries
+    , hspec >= 1.8
+    , QuickCheck
+  build-tool-depends:
+      hspec-discover:hspec-discover >= 1.8

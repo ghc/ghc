@@ -1,0 +1,8 @@
+Usage: subparsers COMMAND COMMAND
+
+Available options:
+  -h,--help                Show this help text
+
+Available commands:
+  add                      Add a file to the repository
+  commit                   Record changes to the repository

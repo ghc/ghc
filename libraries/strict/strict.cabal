@@ -1,0 +1,113 @@
+Name:           strict
+Version:        0.4.0.1
+Synopsis:       Strict data types and String IO.
+Category:       Data, System
+Description:
+    This package provides strict versions of some standard Haskell data
+    types (pairs, Maybe and Either). It also contains strict IO operations.
+    .
+    It is common knowledge that lazy datastructures can lead to space-leaks.
+    This problem is particularly prominent, when using lazy datastructures to
+    store the state of a long-running application in memory. One common
+    solution to this problem is to use @seq@ and its variants in every piece of
+    code that updates your state. However a much easier solution is to use
+    fully strict types to store such state values. By \"fully strict types\" we
+    mean types for whose values it holds that, if they are in weak-head normal
+    form, then they are also in normal form. Intuitively, this means that
+    values of fully strict types cannot contain unevaluated thunks.
+    .
+    To define a fully strict datatype, one typically uses the following recipe.
+    .
+    1. Make all fields of every constructor strict; i.e., add a bang to
+    all fields.
+    .
+    2. Use only strict types for the fields of the constructors.
+    .
+    The second requirement is problematic as it rules out the use of
+    the standard Haskell 'Maybe', 'Either', and pair types. This library
+    solves this problem by providing strict variants of these types and their
+    corresponding standard support functions and type-class instances.
+    .
+    Note that this library does currently not provide fully strict lists.
+    They can be added if they are really required. However, in many cases one
+    probably wants to use unboxed or strict boxed vectors from the 'vector'
+    library (<http://hackage.haskell.org/package/vector>) instead of strict
+    lists.  Moreover, instead of @String@s one probably wants to use strict
+    @Text@ values from the @text@ library
+    (<http://hackage.haskell.org/package/text>).
+    .
+    This library comes with batteries included; i.e., mirror functions and
+    instances of the lazy versions in @base@. It also includes instances for
+    type-classes from the @deepseq@, @binary@, and @hashable@ packages.
+License:        BSD3
+License-File:   LICENSE
+Author:         Roman Leshchinskiy <rl@cse.unsw.edu.au>
+                Simon Meier <iridcode@gmail.com>
+Maintainer:     Don Stewart <dons@galois.com>,
+                Bas van Dijk <v.dijk.bas@gmail.com>,
+                Oleg Grenrus <oleg.grenrus@iki.fi>,
+                Simon Meier <iridcode@gmail.com>,
+                Ximin Luo <infinity0@pwned.gg>
+Copyright:      (c) 2006-2008 by Roman Leshchinskiy
+                (c) 2013-2014 by Simon Meier
+Homepage:       https://github.com/haskell-strict/strict
+Cabal-Version: >= 1.10
+Build-type:     Simple
+extra-source-files: CHANGELOG.md
+tested-with:
+  GHC ==7.4.2
+   || ==7.6.3
+   || ==7.8.4
+   || ==7.10.3
+   || ==8.0.2
+   || ==8.2.2
+   || ==8.4.4
+   || ==8.6.5
+   || ==8.8.3
+   || ==8.10.1
+
+flag assoc
+  description: Build with assoc dependency
+  manual:      True
+  default:     True
+
+library
+  default-language: Haskell2010
+  hs-source-dirs:   src
+  ghc-options:      -Wall
+
+  build-depends:
+      base         >= 4.5.0.0 && < 5
+    , binary       >= 0.5.1.0 && < 0.9
+    , bytestring   >= 0.9.2.1 && < 0.12
+    , deepseq      >= 1.3.0.0 && < 1.5
+    , hashable     >= 1.2.7.0 && < 1.4
+    , text         >= 1.2.3.0 && < 1.3
+    , these        >= 1.1.1.1 && < 1.2
+    , transformers >= 0.3.0.0 && < 0.6
+    , ghc-prim
+
+  if !impl(ghc >= 8.0)
+    build-depends:
+        semigroups           >= 0.18.5  && < 0.20
+      , transformers-compat  >= 0.6.5   && < 0.7
+
+    -- Ensure Data.Functor.Classes is always available
+    if impl(ghc >= 7.10)
+      build-depends: transformers >= 0.4.2.0
+
+  if !impl(ghc >= 8.2)
+    build-depends:
+      bifunctors >= 5.5.2 && < 5.6
+
+  if flag(assoc)
+    build-depends: assoc >= 1.0.1 && < 1.1
+
+  exposed-modules:
+    Data.Strict
+    Data.Strict.Classes
+    Data.Strict.These
+    Data.Strict.Tuple
+    Data.Strict.Maybe
+    Data.Strict.Either
+    System.IO.Strict

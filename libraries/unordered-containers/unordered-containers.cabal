@@ -1,0 +1,213 @@
+name:           unordered-containers
+version:        0.2.14.0
+synopsis:       Efficient hashing-based container types
+description:
+  Efficient hashing-based container types.  The containers have been
+  optimized for performance critical use, both in terms of large data
+  quantities and high speed.
+  .
+  The declared cost of each operation is either worst-case or
+  amortized, but remains valid even if structures are shared.
+license:        BSD3
+license-file:   LICENSE
+author:         Johan Tibell
+maintainer:     johan.tibell@gmail.com, David.Feuer@gmail.com
+Homepage:       https://github.com/haskell-unordered-containers/unordered-containers
+bug-reports:    https://github.com/haskell-unordered-containers/unordered-containers/issues
+copyright:      2010-2014 Johan Tibell
+                2010 Edward Z. Yang
+category:       Data
+build-type:     Simple
+cabal-version:  >=1.10
+extra-source-files: CHANGES.md
+
+tested-with:
+  GHC ==9.0.1
+   || ==8.10.4
+   || ==8.8.4
+   || ==8.6.5
+   || ==8.4.4
+   || ==8.2.2
+   || ==8.0.2
+   || ==7.10.3
+   || ==7.8.4
+
+flag debug
+  description:  Enable debug support
+  default:      False
+
+library
+  exposed-modules:
+    Data.HashMap.Internal
+    Data.HashMap.Internal.Array
+    Data.HashMap.Internal.List
+    Data.HashMap.Internal.Strict
+    Data.HashMap.Internal.Unsafe
+    Data.HashMap.Lazy
+    Data.HashMap.Strict
+    Data.HashSet
+    Data.HashSet.Internal
+
+  build-depends:
+    base >= 4.7 && < 5,
+    deepseq >= 1.1,
+    hashable >= 1.0.1.1 && < 1.4
+
+  default-language: Haskell2010
+
+  other-extensions:
+    RoleAnnotations,
+    UnboxedTuples,
+    ScopedTypeVariables,
+    MagicHash,
+    BangPatterns
+
+  ghc-options: -Wall -O2 -fwarn-tabs -ferror-spans
+
+  if impl (ghc < 8.2)
+    -- This is absolutely necessary (but not sufficient) for correctness due to
+    -- the referential-transparency-breaking mutability in unsafeInsertWith. See
+    -- #147 and GHC #13615 for details. The bug was fixed in GHC 8.2.
+    ghc-options: -feager-blackholing
+  if flag(debug)
+    cpp-options: -DASSERTS
+
+test-suite hashmap-lazy-properties
+  hs-source-dirs: tests
+  main-is: HashMapProperties.hs
+  type: exitcode-stdio-1.0
+
+  build-depends:
+    base,
+    containers >= 0.5.8,
+    hashable >= 1.0.1.1,
+    QuickCheck >= 2.4.0.1,
+    test-framework >= 0.3.3,
+    test-framework-quickcheck2 >= 0.2.9,
+    unordered-containers
+
+  default-language: Haskell2010
+  ghc-options: -Wall
+  cpp-options: -DASSERTS
+
+test-suite hashmap-strict-properties
+  hs-source-dirs: tests
+  main-is: HashMapProperties.hs
+  type: exitcode-stdio-1.0
+
+  build-depends:
+    base,
+    containers >= 0.5.8,
+    hashable >= 1.0.1.1,
+    QuickCheck >= 2.4.0.1,
+    test-framework >= 0.3.3,
+    test-framework-quickcheck2 >= 0.2.9,
+    unordered-containers
+
+  default-language: Haskell2010
+  ghc-options: -Wall
+  cpp-options: -DASSERTS -DSTRICT
+
+test-suite hashset-properties
+  hs-source-dirs: tests
+  main-is: HashSetProperties.hs
+  type: exitcode-stdio-1.0
+
+  build-depends:
+    base,
+    containers >= 0.4,
+    hashable >= 1.0.1.1,
+    QuickCheck >= 2.4.0.1,
+    test-framework >= 0.3.3,
+    test-framework-quickcheck2 >= 0.2.9,
+    unordered-containers
+
+  default-language: Haskell2010
+  ghc-options: -Wall
+  cpp-options: -DASSERTS
+
+test-suite list-tests
+  hs-source-dirs: tests .
+  main-is: List.hs
+  other-modules:
+    Data.HashMap.Internal.List
+  type: exitcode-stdio-1.0
+
+  build-depends:
+    base,
+    containers >= 0.4,
+    QuickCheck >= 2.4.0.1,
+    test-framework >= 0.3.3,
+    test-framework-quickcheck2 >= 0.2.9
+
+  default-language: Haskell2010
+  ghc-options: -Wall
+  cpp-options: -DASSERTS
+
+test-suite regressions
+  hs-source-dirs: tests
+  main-is: Regressions.hs
+  type: exitcode-stdio-1.0
+
+  build-depends:
+    base,
+    hashable >= 1.0.1.1,
+    HUnit,
+    QuickCheck >= 2.4.0.1,
+    random,
+    test-framework >= 0.3.3,
+    test-framework-hunit,
+    test-framework-quickcheck2,
+    unordered-containers
+
+  default-language: Haskell2010
+  ghc-options: -Wall
+  cpp-options: -DASSERTS
+
+test-suite strictness-properties
+  hs-source-dirs: tests
+  main-is: Strictness.hs
+  type: exitcode-stdio-1.0
+
+  build-depends:
+    base,
+    ChasingBottoms,
+    containers >= 0.4.2,
+    hashable >= 1.0.1.1,
+    QuickCheck >= 2.4.0.1,
+    test-framework >= 0.3.3,
+    test-framework-quickcheck2 >= 0.2.9,
+    unordered-containers
+
+  default-language: Haskell2010
+  ghc-options: -Wall
+  cpp-options: -DASSERTS
+
+benchmark benchmarks
+  hs-source-dirs: benchmarks
+  main-is: Benchmarks.hs
+  type: exitcode-stdio-1.0
+
+  other-modules:
+    Util.ByteString
+    Util.String
+    Util.Int
+
+  build-depends:
+    base >= 4.8.0,
+    bytestring,
+    containers,
+    gauge >= 0.2.5 && < 0.3,
+    deepseq >= 1.4,
+    hashable >= 1.0.1.1,
+    hashmap,
+    mtl,
+    random,
+    unordered-containers
+
+  default-language: Haskell2010
+  ghc-options: -Wall -O2 -rtsopts -fwarn-tabs -ferror-spans
+
+source-repository head
+  type:     git
+  location: https://github.com/haskell-unordered-containers/unordered-containers.git

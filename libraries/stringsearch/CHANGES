@@ -1,0 +1,30 @@
+0.3.6.6:
+- Add FlexibleContexts to allow compiling with 7.10.1
+0.3.6.2:
+- move some INLINE pragmas to make it compile with 7.2.1
+0.3.6.1:
+- fix error in docs
+0.3.6:
+- fix typos in haddocks
+0.3.5:
+- set up public repo at bitbucket
+0.3.4:
+- split implementation of Boyer-Moore between strict and lazy targets
+- set spec-constr-count to 4 for ghc-7
+0.3.3:
+- updated email address
+0.3.2:
+- relaxed constraint on containers package (no incompatible API changes)
+0.3.1:
+- fix spaceleak in split due to pairs holding on to first component
+- fix docs for splitKeepFront
+0.3.0:
+- improved performance of old KMP searching functions (minor)
+- changed behaviour for empty patterns
+- changed return type to [Int] for KMP matching in strict BS
+- improved performance of old BM searching functions
+- (minor speedup for ordinary searches, major improvement for worst case)
+- added new functionality,
+- breaking, splitting and replacing
+- new algorithm (DFA)
+- simultaneous search for multiple patterns (KarpRabin)

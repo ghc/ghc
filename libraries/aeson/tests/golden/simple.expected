@@ -1,0 +1,22 @@
+Int
+Error in $: parsing Int failed, expected Number, but encountered String
+Error in $: parsing Int failed, expected Number, but encountered Array
+Error in $: parsing Int failed, expected Number, but encountered Object
+Error in $: parsing Int failed, expected Number, but encountered Null
+Integer
+Error in $: parsing Integer failed, unexpected floating number 44.44
+Natural
+Error in $: parsing Natural failed, unexpected floating number 44.44
+Error in $: parsing Natural failed, unexpected negative number -50
+String
+Error in $: expected String, but encountered Number
+Error in $: expected String, but encountered Array
+Error in $: expected String, but encountered Object
+Error in $: expected String, but encountered Null
+HashMap
+Error in $: parsing HashMap failed, expected Object, but encountered String
+Error in $: parsing HashMap failed, expected Object, but encountered Array
+Either
+Error in $[1].Left[1]: expected Bool, but encountered Number
+Seq
+Error in $[2]: parsing Int failed, expected Number, but encountered Boolean

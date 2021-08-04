@@ -1,0 +1,59 @@
+Name:                colour
+Version:             2.3.6
+Cabal-Version:       >= 1.10
+License:             MIT
+License-file:        LICENSE
+Author:              Russell O'Connor
+Maintainer:          Russell O'Connor <roconnor@theorem.ca>
+Homepage:            http://www.haskell.org/haskellwiki/Colour
+Build-Type:          Simple
+Category:            data, graphics
+Synopsis:            A model for human colour/color perception
+Description:         This package provides a data type for colours and transparency.
+                     Colours can be blended and composed.
+                     Various colour spaces are supported.
+                     A module of colour names ("Data.Colour.Names") is provided.
+Tested-with:         GHC == 8.8.4
+data-files:          README CHANGELOG
+
+Library
+  default-language:  Haskell98
+  Build-Depends:     base >= 4.13 && < 5
+  Exposed-Modules:   Data.Colour
+                     Data.Colour.SRGB
+                     Data.Colour.SRGB.Linear
+                     Data.Colour.CIE
+                     Data.Colour.CIE.Illuminant
+                     Data.Colour.RGBSpace
+                     Data.Colour.RGBSpace.HSL
+                     Data.Colour.RGBSpace.HSV
+                     Data.Colour.Names
+  Other-Modules:     Data.Colour.Internal
+                     Data.Colour.Chan
+                     Data.Colour.RGB
+                     Data.Colour.Matrix
+                     Data.Colour.CIE.Chromaticity
+test-suite test-colour
+  default-language:  Haskell98
+  type:              exitcode-stdio-1.0
+  main-is:           Tests.hs
+  build-depends: base >= 4.13 && < 5,
+                 colour,
+                 QuickCheck >= 2.5 && < 2.15,
+                 random >= 1.0 && < 1.2,
+                 test-framework >= 0.8 && < 0.9,
+                 test-framework-quickcheck2 >= 0.3 && < 0.4
+  Other-Modules:   Data.Colour
+                   Data.Colour.SRGB
+                   Data.Colour.SRGB.Linear
+                   Data.Colour.CIE
+                   Data.Colour.CIE.Illuminant
+                   Data.Colour.RGBSpace
+                   Data.Colour.RGBSpace.HSL
+                   Data.Colour.RGBSpace.HSV
+                   Data.Colour.Names
+                   Data.Colour.Internal
+                   Data.Colour.Chan
+                   Data.Colour.RGB
+                   Data.Colour.Matrix
+                   Data.Colour.CIE.Chromaticity

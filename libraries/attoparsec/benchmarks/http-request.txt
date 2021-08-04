@@ -1,0 +1,9 @@
+GET / HTTP/1.1
+Host: twitter.com
+Accept: text/html, application/xhtml+xml, application/xml; q=0.9, image/webp, */*; q=0.8
+Accept-Encoding: gzip,deflate,sdch
+Accept-Language: en-GB,en-US;q=0.8,en;q=0.6
+Cache-Control: max-age=0
+Cookie: guest_id=v1%3A139; _twitter_sess=BAh7CSIKZmxhc2hJQz-e1e1; __utma=43838368.452555194.1399611824.1; __utmb=43838368; __utmc=43838368; __utmz=1399611824.1.1.utmcsr=(direct)|utmcmd=(none)
+User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_8_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.86 Safari/537.36
+

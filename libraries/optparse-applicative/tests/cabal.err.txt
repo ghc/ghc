@@ -1,0 +1,11 @@
+Usage: cabal configure [--enable-tests] [-f|--flags FLAGS]
+  Prepare to build the package
+
+Available options:
+  --enable-tests           Enable compilation of test suites
+  -f,--flags FLAGS         Enable the given flag
+  -h,--help                Show this help text
+
+Global options:
+  -v,--verbose LEVEL       Set verbosity to LEVEL
+  --version                Print version information

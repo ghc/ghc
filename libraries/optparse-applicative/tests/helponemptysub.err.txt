@@ -1,0 +1,4 @@
+Usage: helponemptysub c -a A
+
+Available options:
+  -a A                     both commands require this

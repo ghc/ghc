@@ -1,0 +1,162 @@
+name:                basement
+version:             0.0.12
+x-revision: 1
+synopsis:            Foundation scrap box of array & string
+description:         Foundation most basic primitives without any dependencies
+license:             BSD3
+license-file:        LICENSE
+copyright:           2015-2017 Vincent Hanquez <vincent@snarc.org>
+                   , 2017-2018 Foundation Maintainers
+maintainer:          vincent@snarc.org
+category:            Web
+build-type:          Simple
+homepage:            https://github.com/haskell-foundation/foundation#readme
+bug-reports:         https://github.com/haskell-foundation/foundation/issues
+cabal-version:       1.18
+extra-source-files:  cbits/*.h cbits/basement_rts.c
+
+source-repository head
+  type: git
+  location: https://github.com/haskell-foundation/foundation
+  subdir: basement
+
+library
+  hs-source-dirs:    .
+  exposed-modules:
+                     Basement.Imports
+
+                     Basement.Base16
+                     Basement.Bindings.Memory
+                     Basement.Endianness
+                     Basement.Environment
+                     Basement.PrimType
+
+                     Basement.Exception
+                     Basement.Cast
+                     Basement.From
+
+                     Basement.Types.Char7
+                     Basement.Types.CharUTF8
+                     Basement.Types.OffsetSize
+                     Basement.Types.Ptr
+                     Basement.Types.AsciiString
+                     Basement.Types.Word128
+                     Basement.Types.Word256
+                     Basement.Monad
+                     Basement.MutableBuilder
+                     Basement.FinalPtr
+
+                     Basement.Nat
+
+                     -- Extended Types
+                     Basement.BoxedArray
+                     Basement.Block
+                     Basement.Block.Mutable
+                     Basement.Block.Builder
+                     Basement.UArray
+                     Basement.UArray.Mutable
+                     Basement.String
+                     Basement.String.Builder
+                     Basement.NonEmpty
+
+                     -- Extended Types with explicit type level size
+                     Basement.Sized.Block
+                     Basement.Sized.UVect
+                     Basement.Sized.Vect
+                     Basement.Sized.List
+                     Basement.BlockN
+
+                     -- Utils
+                     Basement.NormalForm
+                     Basement.These
+
+                     -- Terminal
+                     Basement.Terminal
+                     Basement.Terminal.ANSI
+
+                     -- numeric stuff
+                     Basement.IntegralConv
+                     Basement.Floating
+                     Basement.Numerical.Number
+                     Basement.Numerical.Additive
+                     Basement.Numerical.Subtractive
+                     Basement.Numerical.Multiplicative
+                     Basement.Bounded
+
+                     -- exported algorithms
+                     Basement.Alg.XorShift
+
+                     -- compat / base redefinition
+                     Basement.Compat.AMP
+                     Basement.Compat.Base
+                     Basement.Compat.Bifunctor
+                     Basement.Compat.CallStack
+                     Basement.Compat.C.Types
+                     Basement.Compat.ExtList
+                     Basement.Compat.IsList
+                     Basement.Compat.Identity
+                     Basement.Compat.Primitive
+                     Basement.Compat.PrimTypes
+                     Basement.Compat.MonadTrans
+                     Basement.Compat.Semigroup
+                     Basement.Compat.Natural
+                     Basement.Compat.NumLiteral
+                     Basement.Compat.Typeable
+
+                     Basement.Bits
+
+  other-modules:
+                     Basement.Error
+                     Basement.Show
+                     Basement.Runtime
+
+                     Basement.Alg.Class
+                     Basement.Alg.Mutable
+                     Basement.Alg.PrimArray
+
+                     Basement.Alg.UTF8
+                     Basement.Alg.String
+
+                     Basement.Numerical.Conversion
+
+                     Basement.Block.Base
+
+                     Basement.UTF8.Base
+                     Basement.UTF8.Helper
+                     Basement.UTF8.Table
+                     Basement.UTF8.Types
+
+                     Basement.UArray.Base
+
+                     Basement.String.CaseMapping
+                     Basement.String.Encoding.Encoding
+                     Basement.String.Encoding.UTF16
+                     Basement.String.Encoding.UTF32
+                     Basement.String.Encoding.ASCII7
+                     Basement.String.Encoding.ISO_8859_1
+
+                     Basement.Terminal.Size
+
+  -- support and dependencies
+  if impl(ghc < 8.0)
+    buildable: False
+  else
+    build-depends:     base >=4.9 && <4.16
+                     , ghc-prim
+    if os(windows)
+      build-depends:   Win32
+
+  default-language:    Haskell2010
+  default-extensions: NoImplicitPrelude
+                      RebindableSyntax
+                      TypeFamilies
+                      BangPatterns
+                      DeriveDataTypeable
+  if (arch(i386) || arch(x86_64))
+    cpp-options: -DARCH_IS_LITTLE_ENDIAN
+  else
+    cpp-options: -DARCH_IS_UNKNOWN_ENDIAN
+  include-dirs:      cbits
+  c-sources:         cbits/foundation_mem.c
+  if impl(ghc < 8.2)
+    c-sources:       cbits/basement_rts.c

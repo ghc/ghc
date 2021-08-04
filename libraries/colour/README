@@ -1,0 +1,14 @@
+I hope for this library to become the standard colour library for Haskell.
+Most software does not properly blend colours because they fail to
+gamma-correct the colours before blending.  Hopefully by using this library,
+Haskell programs dealing with colour blending will avoid this problem.
+
+There are some optimizing RULES pragmas that could be added to improve
+preformance.  If you are having performace issues with colour, please
+let me know, and we will test some of these pragmas.
+
+Bug reports and any patches are also welcome.  Be warned, I haven't
+extensively tested this library yet.
+
+-- 
+Russell O'Connor <roconnor@theorem.ca>

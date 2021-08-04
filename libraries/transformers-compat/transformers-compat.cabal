@@ -1,0 +1,190 @@
+name:          transformers-compat
+category:      Compatibility
+version:       0.6.6
+license:       BSD3
+cabal-version: >= 1.10
+license-file:  LICENSE
+author:        Edward A. Kmett
+maintainer:    Edward A. Kmett <ekmett@gmail.com>
+stability:     provisional
+homepage:      http://github.com/ekmett/transformers-compat/
+bug-reports:   http://github.com/ekmett/transformers-compat/issues
+copyright:     Copyright (C) 2012-2015 Edward A. Kmett
+synopsis:      A small compatibility shim for the transformers library
+description:
+  This package includes backported versions of types that were added
+  to transformers in transformers 0.3, 0.4, and 0.5 for users who need strict
+  transformers 0.2 or 0.3 compatibility to run on old versions of the
+  platform, but also need those types.
+  .
+  Those users should be able to just depend on @transformers >= 0.2@
+  and @transformers-compat >= 0.3@.
+  .
+  Note: missing methods are not supplied, but this at least permits the types to be used.
+
+build-type:    Simple
+tested-with:   GHC == 7.0.4
+             , GHC == 7.2.2
+             , GHC == 7.4.2
+             , GHC == 7.6.3
+             , GHC == 7.8.4
+             , GHC == 7.10.3
+             , GHC == 8.0.2
+             , GHC == 8.2.2
+             , GHC == 8.4.4
+             , GHC == 8.6.5
+             , GHC == 8.8.3
+             , GHC == 8.10.1
+extra-source-files:
+  .travis.yml
+  .ghci
+  .gitignore
+  .hlint.yaml
+  .vim.custom
+  config
+  tests/*.hs
+  tests/LICENSE
+  tests/transformers-compat-tests.cabal
+  README.markdown
+  CHANGELOG.markdown
+
+source-repository head
+  type: git
+  location: git://github.com/ekmett/transformers-compat.git
+
+flag two
+  default: False
+  description: Use transformers 0.2. This will be selected by cabal picking the appropriate version.
+  manual: False
+
+flag three
+  default: False
+  manual: False
+  description: Use transformers 0.3. This will be selected by cabal picking the appropriate version.
+
+flag four
+  default: False
+  manual: False
+  description: Use transformers 0.4. This will be selected by cabal picking the appropriate version.
+
+flag five
+  default: False
+  manual: False
+  description: Use transformers 0.5 up until (but not including) 0.5.3. This will be selected by cabal picking the appropriate version.
+
+flag five-three
+  default: False
+  manual: False
+  description: Use transformers 0.5.3. This will be selected by cabal picking the appropriate version.
+
+flag mtl
+  default: True
+  manual: True
+  description: -f-mtl Disables support for mtl for transformers 0.2 and 0.3. That is an unsupported configuration, and results in missing instances for `ExceptT`.
+
+flag generic-deriving
+  default: True
+  manual: True
+  description: -f-generic-deriving prevents generic-deriving from being built as a dependency.
+               This disables certain aspects of generics for older versions of GHC. In particular,
+               Generic(1) instances will not be backported prior to GHC 7.2, and generic operations
+               over unlifted types will not be backported prior to GHC 8.0. This is an unsupported
+               configuration.
+
+library
+  build-depends:
+    base >= 4.3 && < 5,
+    -- These are all transformers versions we support.
+    -- each flag below splits this interval into two parts.
+    -- flag-true parts are mutually exclusive, so at least one have to be on.
+    transformers >= 0.2 && <0.6
+  if !impl(ghc >= 8.0)
+    build-depends: fail == 4.9.*
+
+  hs-source-dirs:
+    src
+
+  exposed-modules:
+    Control.Monad.Trans.Instances
+
+  other-modules:
+    Paths_transformers_compat
+
+  default-language:
+    Haskell2010
+
+  -- automatic flags
+  if flag(five-three)
+    build-depends: transformers >= 0.5.3
+  else
+    build-depends: transformers < 0.5.3
+
+  if flag(five)
+    hs-source-dirs: 0.5
+    build-depends: transformers >= 0.5 && < 0.5.3
+  else
+    build-depends: transformers < 0.5 || >= 0.5.3
+
+  if flag(four)
+    cpp-options: -DTRANSFORMERS_FOUR
+    hs-source-dirs: 0.5
+    -- Don't allow transformers-0.4.0.0
+    -- See https://github.com/ekmett/transformers-compat/issues/35
+    build-depends: transformers >= 0.4.1 && < 0.5
+  else
+    build-depends: transformers < 0.4 || >= 0.5
+
+  if flag(three)
+    hs-source-dirs: 0.3 0.5
+    build-depends: transformers >= 0.3 && < 0.4
+    if flag(mtl)
+      build-depends: mtl >= 2.1 && < 2.2
+  else
+    build-depends: transformers < 0.3 || >= 0.4
+
+  if flag(two)
+    hs-source-dirs: 0.2 0.3 0.5
+    build-depends: transformers >= 0.2 && < 0.3
+    if flag(mtl)
+      build-depends: mtl >= 2.0 && < 2.1
+  else
+    build-depends: transformers >= 0.3
+
+  -- other flags
+  if impl(ghc >= 7.2) || flag(generic-deriving)
+    hs-source-dirs: generics
+    build-depends: ghc-prim
+
+  if flag(mtl)
+    cpp-options: -DMTL
+
+  if flag(generic-deriving)
+    if impl(ghc < 8.0) && flag(generic-deriving)
+      cpp-options: -DGENERIC_DERIVING
+      build-depends: generic-deriving >= 1.10 && < 2
+
+  if !flag(mtl) && !flag(generic-deriving)
+    cpp-options: -DHASKELL98
+
+  if flag(two)
+    exposed-modules:
+      Control.Applicative.Backwards
+      Control.Applicative.Lift
+      Data.Functor.Reverse
+
+  if flag(two) || flag(three)
+    exposed-modules:
+      Control.Monad.Trans.Except
+      Control.Monad.Signatures
+      Data.Functor.Classes
+      Data.Functor.Sum
+
+  if flag(two) || flag(three) || flag(four) || flag(five)
+    exposed-modules:
+      Control.Monad.Trans.Accum
+      Control.Monad.Trans.Select
+
+  if impl(ghc >= 7.2) || flag(generic-deriving)
+    exposed-modules:
+      Data.Functor.Classes.Generic
+      Data.Functor.Classes.Generic.Internal

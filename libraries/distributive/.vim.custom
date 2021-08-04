@@ -1,0 +1,31 @@
+" Add the following to your .vimrc to automatically load this on startup
+
+" if filereadable(".vim.custom")
+"     so .vim.custom
+" endif
+
+function StripTrailingWhitespace()
+  let myline=line(".")
+  let mycolumn = col(".")
+  silent %s/  *$//
+  call cursor(myline, mycolumn)
+endfunction
+
+" enable syntax highlighting
+syntax on
+
+" search for the tags file anywhere between here and /
+set tags=TAGS;/
+
+" highlight tabs and trailing spaces
+set listchars=tab:‗‗,trail:‗
+set list
+
+" f2 runs hasktags
+map <F2> :exec ":!hasktags -x -c --ignore src"<CR><CR>
+
+" strip trailing whitespace before saving
+" au BufWritePre *.hs,*.markdown silent! cal StripTrailingWhitespace()
+
+" rebuild hasktags after saving
+au BufWritePost *.hs silent! :exec ":!hasktags -x -c --ignore src"

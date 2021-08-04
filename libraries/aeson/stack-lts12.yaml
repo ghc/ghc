@@ -1,0 +1,15 @@
+resolver: lts-12.26
+packages:
+- '.'
+- attoparsec-iso8601
+flags:
+  aeson:
+    fast: true
+    cffi: true
+extra-deps:
+- base-orphans-0.8.1
+- hashable-time-0.2.0.1
+- QuickCheck-2.13.1
+- quickcheck-instances-0.3.21
+- splitmix-0.0.2
+- time-compat-1.9.2.2

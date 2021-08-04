@@ -1,0 +1,7 @@
+Usage: nested_optional (-a|--a A) [--b0 B0 [--b1 B1]]
+
+Available options:
+  -a,--a A                 value a
+  --b0 B0                  value b0
+  --b1 B1                  value b1
+  -h,--help                Show this help text

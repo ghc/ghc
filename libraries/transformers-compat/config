@@ -1,0 +1,16 @@
+-- This provides a custom ~/.cabal/config file for use when hackage is down that should work on unix
+--
+-- This is particularly useful for travis-ci to get it to stop complaining
+-- about a broken build when everything is still correct on our end.
+--
+-- This uses Luite Stegeman's mirror of hackage provided by his 'hdiff' site instead
+--
+-- To enable this, uncomment the before_script in .travis.yml
+
+remote-repo: hdiff.luite.com:http://hdiff.luite.com/packages/archive
+remote-repo-cache: ~/.cabal/packages
+world-file: ~/.cabal/world
+build-summary: ~/.cabal/logs/build.log
+remote-build-reporting: anonymous
+install-dirs user
+install-dirs global

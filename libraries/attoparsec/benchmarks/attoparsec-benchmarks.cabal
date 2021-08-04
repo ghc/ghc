@@ -1,0 +1,41 @@
+-- These benchmarks are not intended to be installed.
+-- So don't install 'em.
+
+name: attoparsec-benchmarks
+version: 0
+cabal-version: >=1.6
+build-type: Simple
+
+executable attoparsec-benchmarks
+  main-is: Benchmarks.hs
+  other-modules:
+    Common
+    HeadersByteString
+    HeadersByteString.Atto
+    HeadersText
+    Links
+    Numbers
+    Network.Wai.Handler.Warp.ReadInt
+    Sets
+    TextFastSet
+    Warp
+  hs-source-dirs: .. . warp-3.0.1.1
+  ghc-options: -O2 -Wall -rtsopts
+  build-depends:
+    array,
+    base == 4.*,
+    bytestring >= 0.10.4.0,
+    case-insensitive,
+    containers,
+    criterion >= 1.0,
+    deepseq >= 1.1,
+    directory,
+    filepath,
+    ghc-prim,
+    http-types,
+    parsec >= 3.1.2,
+    scientific >= 0.3.1,
+    text >= 1.1.1.0,
+    transformers,
+    unordered-containers,
+    vector

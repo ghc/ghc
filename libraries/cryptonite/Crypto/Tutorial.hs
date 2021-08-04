@@ -1,0 +1,195 @@
+-- | Examples of how to use @cryptonite@.
+module Crypto.Tutorial
+    ( -- * API design
+      -- $api_design
+
+      -- * Hash algorithms
+      -- $hash_algorithms
+
+      -- * Symmetric block ciphers
+      -- $symmetric_block_ciphers
+
+      -- * Combining primitives
+      -- $combining_primitives
+    ) where
+
+-- $api_design
+--
+-- APIs in cryptonite are often based on type classes from package
+-- <https://hackage.haskell.org/package/memory memory>, notably
+-- 'Data.ByteArray.ByteArrayAccess' and 'Data.ByteArray.ByteArray'.
+-- Module "Data.ByteArray" provides many primitives that are useful to
+-- work with cryptonite types.  For example function 'Data.ByteArray.convert'
+-- can transform one 'Data.ByteArray.ByteArrayAccess' concrete type like
+-- 'Crypto.Hash.Digest' to a 'Data.ByteString.ByteString'.
+--
+-- Algorithms and functions needing random bytes are based on type class
+-- 'Crypto.Random.Types.MonadRandom'.  Implementation 'IO' uses a system source
+-- of entropy.  It is also possible to use a 'Crypto.Random.Types.DRG' with
+-- 'Crypto.Random.Types.MonadPseudoRandom'
+--
+-- Error conditions are returned with data type 'Crypto.Error.CryptoFailable'.
+-- Functions in module "Crypto.Error" can convert those values to runtime
+-- exceptions, 'Maybe' or 'Either' values.
+
+-- $hash_algorithms
+--
+-- Hashing a complete message:
+--
+-- > import Crypto.Hash
+-- >
+-- > import Data.ByteString (ByteString)
+-- >
+-- > exampleHashWith :: ByteString -> IO ()
+-- > exampleHashWith msg = do
+-- >     putStrLn $ "  sha1(" ++ show msg ++ ") = " ++ show (hashWith SHA1   msg)
+-- >     putStrLn $ "sha256(" ++ show msg ++ ") = " ++ show (hashWith SHA256 msg)
+--
+-- Hashing incrementally, with intermediate context allocations:
+--
+-- > {-# LANGUAGE OverloadedStrings #-}
+-- >
+-- > import Crypto.Hash
+-- >
+-- > import Data.ByteString (ByteString)
+-- >
+-- > exampleIncrWithAllocs :: IO ()
+-- > exampleIncrWithAllocs = do
+-- >     let ctx0 = hashInitWith SHA3_512
+-- >         ctx1 = hashUpdate ctx0 ("The "   :: ByteString)
+-- >         ctx2 = hashUpdate ctx1 ("quick " :: ByteString)
+-- >         ctx3 = hashUpdate ctx2 ("brown " :: ByteString)
+-- >         ctx4 = hashUpdate ctx3 ("fox "   :: ByteString)
+-- >         ctx5 = hashUpdate ctx4 ("jumps " :: ByteString)
+-- >         ctx6 = hashUpdate ctx5 ("over "  :: ByteString)
+-- >         ctx7 = hashUpdate ctx6 ("the "   :: ByteString)
+-- >         ctx8 = hashUpdate ctx7 ("lazy "  :: ByteString)
+-- >         ctx9 = hashUpdate ctx8 ("dog"    :: ByteString)
+-- >     print (hashFinalize ctx9)
+--
+-- Hashing incrementally, updating context in place:
+--
+-- > {-# LANGUAGE OverloadedStrings #-}
+-- >
+-- > import Crypto.Hash.Algorithms
+-- > import Crypto.Hash.IO
+-- >
+-- > import Data.ByteString (ByteString)
+-- >
+-- > exampleIncrInPlace :: IO ()
+-- > exampleIncrInPlace = do
+-- >     ctx <- hashMutableInitWith SHA3_512
+-- >     hashMutableUpdate ctx ("The "   :: ByteString)
+-- >     hashMutableUpdate ctx ("quick " :: ByteString)
+-- >     hashMutableUpdate ctx ("brown " :: ByteString)
+-- >     hashMutableUpdate ctx ("fox "   :: ByteString)
+-- >     hashMutableUpdate ctx ("jumps " :: ByteString)
+-- >     hashMutableUpdate ctx ("over "  :: ByteString)
+-- >     hashMutableUpdate ctx ("the "   :: ByteString)
+-- >     hashMutableUpdate ctx ("lazy "  :: ByteString)
+-- >     hashMutableUpdate ctx ("dog"    :: ByteString)
+-- >     hashMutableFinalize ctx >>= print
+
+-- $symmetric_block_ciphers
+--
+-- > {-# LANGUAGE OverloadedStrings #-}
+-- > {-# LANGUAGE ScopedTypeVariables #-}
+-- > {-# LANGUAGE GADTs #-}
+-- >
+-- > import           Crypto.Cipher.AES (AES256)
+-- > import           Crypto.Cipher.Types (BlockCipher(..), Cipher(..), nullIV, KeySizeSpecifier(..), IV, makeIV)
+-- > import           Crypto.Error (CryptoFailable(..), CryptoError(..))
+-- >
+-- > import qualified Crypto.Random.Types as CRT
+-- >
+-- > import           Data.ByteArray (ByteArray)
+-- > import           Data.ByteString (ByteString)
+-- >
+-- > -- | Not required, but most general implementation
+-- > data Key c a where
+-- >   Key :: (BlockCipher c, ByteArray a) => a -> Key c a
+-- >
+-- > -- | Generates a string of bytes (key) of a specific length for a given block cipher
+-- > genSecretKey :: forall m c a. (CRT.MonadRandom m, BlockCipher c, ByteArray a) => c -> Int -> m (Key c a)
+-- > genSecretKey _ = fmap Key . CRT.getRandomBytes
+-- >
+-- > -- | Generate a random initialization vector for a given block cipher
+-- > genRandomIV :: forall m c. (CRT.MonadRandom m, BlockCipher c) => c -> m (Maybe (IV c))
+-- > genRandomIV _ = do
+-- >   bytes :: ByteString <- CRT.getRandomBytes $ blockSize (undefined :: c)
+-- >   return $ makeIV bytes
+-- >
+-- > -- | Initialize a block cipher
+-- > initCipher :: (BlockCipher c, ByteArray a) => Key c a -> Either CryptoError c
+-- > initCipher (Key k) = case cipherInit k of
+-- >   CryptoFailed e -> Left e
+-- >   CryptoPassed a -> Right a
+-- >
+-- > encrypt :: (BlockCipher c, ByteArray a) => Key c a -> IV c -> a -> Either CryptoError a
+-- > encrypt secretKey initIV msg =
+-- >   case initCipher secretKey of
+-- >     Left e -> Left e
+-- >     Right c -> Right $ ctrCombine c initIV msg
+-- >
+-- > decrypt :: (BlockCipher c, ByteArray a) => Key c a -> IV c -> a -> Either CryptoError a
+-- > decrypt = encrypt
+-- >
+-- > exampleAES256 :: ByteString -> IO ()
+-- > exampleAES256 msg = do
+-- >   -- secret key needs 256 bits (32 * 8)
+-- >   secretKey <- genSecretKey (undefined :: AES256) 32
+-- >   mInitIV <- genRandomIV (undefined :: AES256)
+-- >   case mInitIV of
+-- >     Nothing -> error "Failed to generate and initialization vector."
+-- >     Just initIV -> do
+-- >       let encryptedMsg = encrypt secretKey initIV msg
+-- >           decryptedMsg = decrypt secretKey initIV =<< encryptedMsg
+-- >       case (,) <$> encryptedMsg <*> decryptedMsg of
+-- >         Left err -> error $ show err
+-- >         Right (eMsg, dMsg) -> do
+-- >           putStrLn $ "Original Message: " ++ show msg
+-- >           putStrLn $ "Message after encryption: " ++ show eMsg
+-- >           putStrLn $ "Message after decryption: " ++ show dMsg
+
+-- $combining_primitives
+--
+-- This example shows how to use Curve25519, XSalsa and Poly1305 primitives to
+-- emulate NaCl's @crypto_box@ construct.
+--
+-- > import qualified Data.ByteArray as BA
+-- > import           Data.ByteString (ByteString)
+-- > import qualified Data.ByteString as B
+-- >
+-- > import qualified Crypto.Cipher.XSalsa as XSalsa
+-- > import qualified Crypto.MAC.Poly1305 as Poly1305
+-- > import qualified Crypto.PubKey.Curve25519 as X25519
+-- >
+-- > -- | Build a @crypto_box@ packet encrypting the specified content with a
+-- > -- 192-bit nonce, receiver public key and sender private key.
+-- > crypto_box content nonce pk sk = BA.convert tag `B.append` c
+-- >   where
+-- >     zero         = B.replicate 16 0
+-- >     shared       = X25519.dh pk sk
+-- >     (iv0, iv1)   = B.splitAt 8 nonce
+-- >     state0       = XSalsa.initialize 20 shared (zero `B.append` iv0)
+-- >     state1       = XSalsa.derive state0 iv1
+-- >     (rs, state2) = XSalsa.generate state1 32
+-- >     (c, _)       = XSalsa.combine state2 content
+-- >     tag          = Poly1305.auth (rs :: ByteString) c
+-- >
+-- > -- | Try to open a @crypto_box@ packet and recover the content using the
+-- > -- 192-bit nonce, sender public key and receiver private key.
+-- > crypto_box_open packet nonce pk sk
+-- >     | B.length packet < 16 = Nothing
+-- >     | BA.constEq tag' tag  = Just content
+-- >     | otherwise            = Nothing
+-- >   where
+-- >     (tag', c)    = B.splitAt 16 packet
+-- >     zero         = B.replicate 16 0
+-- >     shared       = X25519.dh pk sk
+-- >     (iv0, iv1)   = B.splitAt 8 nonce
+-- >     state0       = XSalsa.initialize 20 shared (zero `B.append` iv0)
+-- >     state1       = XSalsa.derive state0 iv1
+-- >     (rs, state2) = XSalsa.generate state1 32
+-- >     (content, _) = XSalsa.combine state2 c
+-- >     tag          = Poly1305.auth (rs :: ByteString) c

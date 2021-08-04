@@ -1,0 +1,85 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.34.2.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: 3f7729521eafb32086f9ec5393064162845096085d8c2302ff44044aecc88db3
+
+name:                base-orphans
+version:             0.8.4
+synopsis:            Backwards-compatible orphan instances for base
+description:         @base-orphans@ defines orphan instances that mimic instances available in
+                     later versions of @base@ to a wider (older) range of compilers.
+                     @base-orphans@ does not export anything except the orphan instances
+                     themselves and complements @<http://hackage.haskell.org/package/base-compat
+                     base-compat>@.
+                     .
+                     See the README for what instances are covered:
+                     <https://github.com/haskell-compat/base-orphans#readme>.
+                     See also the
+                     <https://github.com/haskell-compat/base-orphans#what-is-not-covered what is not covered>
+                     section.
+category:            Compatibility
+homepage:            https://github.com/haskell-compat/base-orphans#readme
+bug-reports:         https://github.com/haskell-compat/base-orphans/issues
+author:              Simon Hengel <sol@typeful.net>,
+                     João Cristóvão <jmacristovao@gmail.com>,
+                     Ryan Scott <ryan.gl.scott@gmail.com>
+maintainer:          Simon Hengel <sol@typeful.net>,
+                     João Cristóvão <jmacristovao@gmail.com>,
+                     Ryan Scott <ryan.gl.scott@gmail.com>
+copyright:           (c) 2012-2017 Simon Hengel,
+                     (c) 2014-2017 João Cristóvão,
+                     (c) 2015-2017 Ryan Scott
+license:             MIT
+license-file:        LICENSE
+build-type:          Simple
+tested-with:         GHC == 7.0.4 , GHC == 7.2.2 , GHC == 7.4.2 , GHC == 7.6.3 , GHC == 7.8.4 , GHC == 7.10.3 , GHC == 8.0.2 , GHC == 8.2.2 , GHC == 8.4.4 , GHC == 8.6.5 , GHC == 8.8.3 , GHC == 8.10.1
+extra-source-files:
+    CHANGES.markdown
+    README.markdown
+
+source-repository head
+  type: git
+  location: https://github.com/haskell-compat/base-orphans
+
+library
+  hs-source-dirs:
+      src
+  ghc-options: -Wall
+  build-depends:
+      base >=4.3 && <5
+    , ghc-prim
+  exposed-modules:
+      Data.Orphans
+  other-modules:
+      Data.Orphans.Prelude
+  default-language: Haskell2010
+
+test-suite spec
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  hs-source-dirs:
+      test
+  ghc-options: -Wall
+  build-depends:
+      QuickCheck
+    , base >=4.3 && <5
+    , base-orphans
+    , hspec ==2.*
+  build-tool-depends: hspec-discover:hspec-discover == 2.*
+  other-modules:
+      Control.Applicative.OrphansSpec
+      Control.Exception.OrphansSpec
+      Data.Bits.OrphansSpec
+      Data.Foldable.OrphansSpec
+      Data.Monoid.OrphansSpec
+      Data.Traversable.OrphansSpec
+      Data.Version.OrphansSpec
+      Foreign.Storable.OrphansSpec
+      GHC.Fingerprint.OrphansSpec
+      System.Posix.Types.IntWord
+      System.Posix.Types.OrphansSpec
+      Paths_base_orphans
+  default-language: Haskell2010

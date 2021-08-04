@@ -1,0 +1,48 @@
+OneConstructor
+Error in $: parsing Types.OneConstructor(OneConstructor) failed, expected Array, but encountered String
+Error in $: parsing Types.OneConstructor(OneConstructor) failed, expected an empty Array, but encountered an Array of length 1
+Nullary
+Error in $: parsing Types.Nullary failed, expected one of the tags ["C1","C2","C3"], but found tag "X"
+Error in $: parsing Types.Nullary failed, expected String, but encountered Array
+SomeType (tagged)
+Error in $.contents: parsing Int failed, expected Number, but encountered Boolean
+Error in $: parsing Types.SomeType(Unary) failed, key "contents" not found
+Error in $: parsing Types.SomeType(Record) failed, key "testone" not found
+Error in $.testone: parsing Double failed, unexpected Boolean
+Error in $.tag: parsing Types.SomeType failed, expected tag field to be one of ["nullary","unary","product","record","list"], but found tag "X"
+Error in $: parsing Types.SomeType failed, expected Object with key "tag" containing one of ["nullary","unary","product","record","list"], key "tag" not found
+Error in $: parsing Types.SomeType failed, expected Object, but encountered Array
+SomeType (single-field)
+Error in $.unary: parsing Int failed, expected Number, but encountered Object
+Error in $.unary: parsing Int failed, expected Number, but encountered Array
+Error in $: parsing Types.SomeType failed, expected an Object with a single pair where the tag is one of ["nullary","unary","product","record","list"], but found tag "X"
+Error in $: parsing Types.SomeType failed, expected an Object with a single pair, but found 2 pairs
+Error in $: parsing Types.SomeType failed, expected an Object with a single pair, but found 0 pairs
+Error in $: parsing Types.SomeType failed, expected Object, but encountered Array
+Error in $: not enough input. Expecting ':'
+Error in $: not enough input. Expecting object value
+Error in $: not enough input. Expecting ',' or '}'
+SomeType (two-element array)
+Error in $[1]: parsing Int failed, expected Number, but encountered Boolean
+Error in $[1]: parsing Types.SomeType(Record) failed, expected Object, but encountered Null
+Error in $[0]: parsing Types.SomeType failed, expected tag of the 2-element Array to be one of ["nullary","unary","product","record","list"], but found tag "X"
+Error in $[0]: parsing Types.SomeType failed, tag element is not a String
+Error in $: parsing Types.SomeType failed, expected a 2-element Array, but encountered an Array of length 0
+Error in $: parsing Types.SomeType failed, expected Array, but encountered Object
+Error in $: not enough input. Expecting ',' or ']'
+Error in $: not enough input. Expecting json list value
+SomeType (reject unknown fields)
+Error in $: parsing Types.SomeType(Record) failed, unknown fields: ["testZero"]
+Error in $: parsing Types.SomeType failed, expected Object with key "tag" containing one of ["nullary","unary","product","record","list"], key "tag" not found
+Error in $.testone: parsing Double failed, unexpected Boolean
+Foo (reject unknown fields)
+Error in $: parsing Types.Foo(Foo) failed, unknown fields: ["tag"]
+Foo (reject unknown fields, tagged single)
+Error in $: parsing Types.Foo(Foo) failed, unknown fields: ["unknownField"]
+EitherTextInt
+Error in $: parsing Types.EitherTextInt(NoneNullary) failed, expected tag "nonenullary", but found tag "X"
+Error in $: parsing Types.EitherTextInt(NoneNullary) failed, expected String, but encountered Array
+Product2 Int Bool
+Error in $[1]: expected Bool, but encountered Null
+Error in $: parsing Types.Product2(Product2) failed, expected an Array of length 2, but encountered an Array of length 0
+Error in $: parsing Types.Product2(Product2) failed, expected Array, but encountered Object

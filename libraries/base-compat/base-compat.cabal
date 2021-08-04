@@ -1,0 +1,201 @@
+name:             base-compat
+version:          0.11.2
+license:          MIT
+license-file:     LICENSE
+copyright:        (c) 2012-2018 Simon Hengel,
+                  (c) 2014-2018 João Cristóvão,
+                  (c) 2015-2018 Ryan Scott
+author:           Simon Hengel <sol@typeful.net>,
+                  João Cristóvão <jmacristovao@gmail.com>,
+                  Ryan Scott <ryan.gl.scott@gmail.com>
+maintainer:       Simon Hengel <sol@typeful.net>,
+                  João Cristóvão <jmacristovao@gmail.com>,
+                  Ryan Scott <ryan.gl.scott@gmail.com>
+build-type:       Simple
+cabal-version:    >= 1.10
+category:         Compatibility
+synopsis:         A compatibility layer for base
+description:      Provides functions available in later versions of @base@ to
+                  a wider range of compilers, without requiring you to use CPP
+                  pragmas in your code.  See the
+                  <https://github.com/haskell-compat/base-compat/blob/master/base-compat/README.markdown README>
+                  for what is covered. Also see the
+                  <https://github.com/haskell-compat/base-compat/blob/master/base-compat/CHANGES.markdown changelog>
+                  for recent changes.
+                  .
+                  Note that @base-compat@ does not add any orphan instances.
+                  There is a separate package,
+                  @<http://hackage.haskell.org/package/base-orphans base-orphans>@,
+                  for that.
+                  .
+                  In addition, @base-compat@ does not backport any data types
+                  or type classes. See
+                  @<https://github.com/haskell-compat/base-compat/blob/master/base-compat/README.markdown#data-types-and-type-classes this section of the README>@
+                  for more info.
+                  .
+                  @base-compat@ is designed to have zero dependencies. For a
+                  version of @base-compat@ that depends on compatibility
+                  libraries for a wider support window, see the
+                  @<http://hackage.haskell.org/package/base-compat-batteries base-compat-batteries>@
+                  package. Most of the modules in this library have the same
+                  names as in @base-compat-batteries@ to make it easier to
+                  switch between the two. There also exist versions of each
+                  module with the suffix @.Repl@, which are distinct from
+                  anything in @base-compat-batteries@, to allow for easier
+                  use in GHCi.
+tested-with:        GHC == 7.0.4
+                  , GHC == 7.2.2
+                  , GHC == 7.4.2
+                  , GHC == 7.6.3
+                  , GHC == 7.8.4
+                  , GHC == 7.10.3
+                  , GHC == 8.0.2
+                  , GHC == 8.2.2
+                  , GHC == 8.4.4
+                  , GHC == 8.6.5
+                  , GHC == 8.8.3
+                  , GHC == 8.10.1
+extra-source-files: CHANGES.markdown, README.markdown
+
+source-repository head
+  type: git
+  location: https://github.com/haskell-compat/base-compat
+  subdir: base-compat
+
+library
+  ghc-options:
+      -Wall
+  default-language:
+      Haskell2010
+  build-depends:
+      base >= 4.3 && < 5
+  if !os(windows) && !os(halvm)
+      build-depends: unix
+  ghc-options:
+      -fno-warn-duplicate-exports
+  if impl(ghc >= 7.10)
+    ghc-options: -fno-warn-trustworthy-safe
+
+  hs-source-dirs:
+      src
+
+  exposed-modules:
+      Control.Concurrent.Compat
+      Control.Concurrent.MVar.Compat
+      Control.Exception.Compat
+      Control.Monad.Compat
+      Control.Monad.Fail.Compat
+      Control.Monad.IO.Class.Compat
+      Control.Monad.ST.Lazy.Unsafe.Compat
+      Control.Monad.ST.Unsafe.Compat
+      Data.Bifoldable.Compat
+      Data.Bifunctor.Compat
+      Data.Bitraversable.Compat
+      Data.Bits.Compat
+      Data.Bool.Compat
+      Data.Complex.Compat
+      Data.Either.Compat
+      Data.Foldable.Compat
+      Data.Function.Compat
+      Data.Functor.Compat
+      Data.Functor.Compose.Compat
+      Data.Functor.Const.Compat
+      Data.Functor.Contravariant.Compat
+      Data.Functor.Identity.Compat
+      Data.Functor.Product.Compat
+      Data.Functor.Sum.Compat
+      Data.IORef.Compat
+      Data.List.Compat
+      Data.List.NonEmpty.Compat
+      Data.Monoid.Compat
+      Data.Proxy.Compat
+      Data.Ratio.Compat
+      Data.Semigroup.Compat
+      Data.STRef.Compat
+      Data.String.Compat
+      Data.Type.Coercion.Compat
+      Data.Type.Equality.Compat
+      Data.Version.Compat
+      Data.Void.Compat
+      Data.Word.Compat
+      Debug.Trace.Compat
+      Foreign.Compat
+      Foreign.ForeignPtr.Compat
+      Foreign.ForeignPtr.Safe.Compat
+      Foreign.ForeignPtr.Unsafe.Compat
+      Foreign.Marshal.Alloc.Compat
+      Foreign.Marshal.Array.Compat
+      Foreign.Marshal.Compat
+      Foreign.Marshal.Safe.Compat
+      Foreign.Marshal.Unsafe.Compat
+      Foreign.Marshal.Utils.Compat
+      Numeric.Compat
+      Numeric.Natural.Compat
+      Prelude.Compat
+      System.Environment.Compat
+      System.Exit.Compat
+      System.IO.Compat
+      System.IO.Error.Compat
+      System.IO.Unsafe.Compat
+      Text.Read.Compat
+      Type.Reflection.Compat
+
+      Control.Concurrent.Compat.Repl
+      Control.Concurrent.MVar.Compat.Repl
+      Control.Exception.Compat.Repl
+      Control.Monad.Compat.Repl
+      Control.Monad.Fail.Compat.Repl
+      Control.Monad.IO.Class.Compat.Repl
+      Control.Monad.ST.Lazy.Unsafe.Compat.Repl
+      Control.Monad.ST.Unsafe.Compat.Repl
+      Data.Bifoldable.Compat.Repl
+      Data.Bifunctor.Compat.Repl
+      Data.Bitraversable.Compat.Repl
+      Data.Bits.Compat.Repl
+      Data.Bool.Compat.Repl
+      Data.Complex.Compat.Repl
+      Data.Either.Compat.Repl
+      Data.Foldable.Compat.Repl
+      Data.Function.Compat.Repl
+      Data.Functor.Compat.Repl
+      Data.Functor.Compose.Compat.Repl
+      Data.Functor.Const.Compat.Repl
+      Data.Functor.Contravariant.Compat.Repl
+      Data.Functor.Identity.Compat.Repl
+      Data.Functor.Product.Compat.Repl
+      Data.Functor.Sum.Compat.Repl
+      Data.IORef.Compat.Repl
+      Data.List.Compat.Repl
+      Data.List.NonEmpty.Compat.Repl
+      Data.Monoid.Compat.Repl
+      Data.Proxy.Compat.Repl
+      Data.Ratio.Compat.Repl
+      Data.Semigroup.Compat.Repl
+      Data.STRef.Compat.Repl
+      Data.String.Compat.Repl
+      Data.Type.Coercion.Compat.Repl
+      Data.Type.Equality.Compat.Repl
+      Data.Version.Compat.Repl
+      Data.Void.Compat.Repl
+      Data.Word.Compat.Repl
+      Debug.Trace.Compat.Repl
+      Foreign.Compat.Repl
+      Foreign.ForeignPtr.Compat.Repl
+      Foreign.ForeignPtr.Safe.Compat.Repl
+      Foreign.ForeignPtr.Unsafe.Compat.Repl
+      Foreign.Marshal.Alloc.Compat.Repl
+      Foreign.Marshal.Array.Compat.Repl
+      Foreign.Marshal.Compat.Repl
+      Foreign.Marshal.Safe.Compat.Repl
+      Foreign.Marshal.Unsafe.Compat.Repl
+      Foreign.Marshal.Utils.Compat.Repl
+      Numeric.Compat.Repl
+      Numeric.Natural.Compat.Repl
+      Prelude.Compat.Repl
+      System.Environment.Compat.Repl
+      System.Exit.Compat.Repl
+      System.IO.Compat.Repl
+      System.IO.Error.Compat.Repl
+      System.IO.Unsafe.Compat.Repl
+      Text.Read.Compat.Repl
+      Type.Reflection.Compat.Repl

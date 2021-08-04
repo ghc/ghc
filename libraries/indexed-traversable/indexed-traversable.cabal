@@ -1,0 +1,90 @@
+cabal-version:      1.12
+name:               indexed-traversable
+version:            0.1.1
+build-type:         Simple
+license:            BSD2
+license-file:       LICENSE
+category:           Data
+maintainer:         Oleg Grenrus <oleg.grenrus@iki.fi>
+author:             Edward Kmett
+synopsis:           FunctorWithIndex, FoldableWithIndex, TraversableWithIndex
+description:
+  This package provides three useful generalizations:
+  .
+  @
+  class Functor f => FunctorWithIndex i f | f -> i where
+  \  imap :: (i -> a -> b) -> f a -> f b
+  @
+  .
+  @
+  class Foldable f => FoldableWithIndex i f | f -> i where
+  \  ifoldMap :: Monoid m => (i -> a -> m) -> f a -> m
+  @
+  .
+  @
+  class (FunctorWithIndex i t, FoldableWithIndex i t, Traversable t) => TraversableWithIndex i t | t -> i where
+  \  itraverse :: Applicative f => (i -> a -> f b) -> t a -> f (t b)
+  @
+  .
+  This package contains instances for types in GHC boot libraries.
+  For some additional instances see [indexed-traversable-instances](https://hackage.haskell.org/package/indexed-traversable-instances).
+  .
+  The [keys](https://hackage.haskell.org/package/keys) package provides similar functionality,
+  but uses (associated) @TypeFamilies@ instead of @FunctionalDependencies@.
+
+extra-source-files: Changelog.md
+tested-with:
+  GHC ==7.0.4
+   || ==7.2.2
+   || ==7.4.2
+   || ==7.6.3
+   || ==7.8.4
+   || ==7.10.3
+   || ==8.0.2
+   || ==8.2.2
+   || ==8.4.4
+   || ==8.6.5
+   || ==8.8.4
+   || ==8.10.2
+
+source-repository head
+  type:     git
+  location: https://github.com/haskellari/indexed-traversable
+  subdir:   indexed-traversable
+
+library
+  default-language: Haskell2010
+  ghc-options:      -Wall
+  hs-source-dirs:   src
+  other-modules:
+    GhcExts
+    WithIndex
+
+  exposed-modules:
+    Data.Foldable.WithIndex
+    Data.Functor.WithIndex
+    Data.Traversable.WithIndex
+
+  build-depends:
+      array         >=0.3.0.2 && <0.6
+    , base          >=4.3     && <4.16
+    , containers    >=0.4.0.0 && <0.7
+    , transformers  >=0.3.0.0 && <0.6
+
+  if !impl(ghc >=7.8)
+    build-depends: tagged >=0.8.5 && <0.9
+
+  if !impl(ghc >=7.10)
+    build-depends: void >=0.7.2 && <0.8
+
+  if !impl(ghc >=8.0)
+    build-depends:
+        base-orphans         >=0.8.3  && <0.9
+      , semigroups           >=0.18.4 && <0.20
+      , transformers-compat  >=0.6.6  && <0.7
+
+  if (impl(ghc >=7.0) && impl(ghc <7.6))
+    build-depends: ghc-prim
+
+  if (impl(ghc >=7.0) && impl(ghc <7.2))
+    build-depends: generic-deriving ==1.14.*

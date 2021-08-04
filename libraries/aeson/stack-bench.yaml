@@ -1,0 +1,12 @@
+resolver: nightly-2019-09-21
+# We use aeson in the snapshot to
+# - avoid recompilation of criterion
+# - compare against it
+# - '.'
+#
+# Also we use separate working directory to avoid "unregistering aeson"
+# caused recompilations
+work-dir: .stack-work-bench
+packages:
+- benchmarks
+extra-deps: []

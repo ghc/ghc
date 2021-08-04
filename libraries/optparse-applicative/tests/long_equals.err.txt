@@ -1,0 +1,6 @@
+Usage: long_equals (-i|-j|--intval|--intval2=ARG)
+
+Available options:
+  -i,-j,--intval,--intval2=ARG
+                           integer value
+  -h,--help                Show this help text

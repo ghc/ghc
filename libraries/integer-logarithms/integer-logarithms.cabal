@@ -1,0 +1,132 @@
+name:               integer-logarithms
+version:            1.0.3.1
+cabal-version:      >=1.10
+author:             Daniel Fischer
+copyright:
+  (c) 2011 Daniel Fischer, 2017-2020 Oleg Grenrus, Andrew Lelechenko
+
+license:            MIT
+license-file:       LICENSE
+maintainer:         Oleg Grenrus <oleg.grenrus@iki.fi>
+build-type:         Simple
+stability:          Provisional
+homepage:           https://github.com/haskellari/integer-logarithms
+bug-reports:        https://github.com/haskellari/integer-logarithms/issues
+synopsis:           Integer logarithms.
+description:
+  "Math.NumberTheory.Logarithms" and "Math.NumberTheory.Powers.Integer"
+  from the arithmoi package.
+  .
+  Also provides "GHC.Integer.Logarithms.Compat" and
+  "Math.NumberTheory.Power.Natural" modules, as well as some
+  additional functions in migrated modules.
+
+category:           Math, Algorithms, Number Theory
+tested-with:
+    GHC ==7.0.4
+     || ==7.2.2
+     || ==7.4.2
+     || ==7.6.3
+     || ==7.8.4
+     || ==7.10.3
+     || ==8.0.2
+     || ==8.2.2
+     || ==8.4.4
+     || ==8.6.4
+     || ==8.8.4
+     || ==8.10.2
+  , GHCJS ==8.4
+
+extra-source-files:
+  changelog.md
+  readme.md
+
+flag integer-gmp
+  description: integer-gmp or integer-simple
+  default:     True
+  manual:      False
+
+flag check-bounds
+  description: Replace unsafe array operations with safe ones
+  default:     False
+  manual:      True
+
+library
+  default-language: Haskell2010
+  hs-source-dirs:   src
+  build-depends:
+      array     >=0.3 && <0.6
+    , base      >=4.3 && <4.16
+    , ghc-prim  >=0   && <0.8
+
+  if !impl(ghc >=7.10)
+    build-depends: nats >=1.1.2 && <1.2
+
+  if impl(ghc >=9.0)
+    build-depends:
+        base        >=4.15
+      , ghc-bignum  >=1.0  && <1.1
+
+    if !flag(integer-gmp)
+      build-depends: invalid-cabal-flag-settings <0
+
+  else
+    build-depends: base <4.15
+
+    if flag(integer-gmp)
+      build-depends: integer-gmp <1.1
+
+    else
+      build-depends: integer-simple
+
+  exposed-modules:
+    Math.NumberTheory.Logarithms
+    Math.NumberTheory.Powers.Integer
+    Math.NumberTheory.Powers.Natural
+
+  -- compat module
+  exposed-modules:  GHC.Integer.Logarithms.Compat
+  other-extensions:
+    BangPatterns
+    CPP
+    MagicHash
+
+  ghc-options:      -O2 -Wall
+
+  if flag(check-bounds)
+    cpp-options: -DCheckBounds
+
+source-repository head
+  type:     git
+  location: https://github.com/haskellari/integer-logarithms
+
+test-suite spec
+  type:             exitcode-stdio-1.0
+  hs-source-dirs:   test-suite
+  ghc-options:      -Wall
+  main-is:          Test.hs
+  default-language: Haskell2010
+  other-extensions:
+    FlexibleContexts
+    FlexibleInstances
+    GeneralizedNewtypeDeriving
+    MultiParamTypeClasses
+    StandaloneDeriving
+
+  build-depends:
+      base
+    , integer-logarithms
+    , QuickCheck          >=2.14.1 && <2.15
+    , smallcheck          >=1.2    && <1.3
+    , tasty               >=0.10   && <1.4
+    , tasty-hunit         >=0.9    && <0.11
+    , tasty-quickcheck    >=0.8    && <0.11
+    , tasty-smallcheck    >=0.8    && <0.9
+
+  if !impl(ghc >=7.10)
+    build-depends: nats ==1.1.*
+
+  other-modules:
+    Math.NumberTheory.LogarithmsTests
+    Math.NumberTheory.TestUtils
+    Orphans

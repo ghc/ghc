@@ -1,0 +1,38 @@
+New in version 2.3.6:
+- Minimum base of 4.13.
+- Locked down non-colour imports.
+- Made semigroup instances canonical.
+- Updated dependencies (for testing).
+
+New in version 2.3.5:
+- Support for MonadFail Proposal.
+- Documentation updates.
+
+New in version 2.3.4:
+
+- Support for Semigroup (as superclass of) Monoid Proposal.
+- Add test-suite to cabal file.
+
+New in version 2.3.3:
+
+- Support for GHC 7.4 from Eugene Kirpichov.
+
+New in version 2.3.2:
+
+- Support for GHC 7.4.1 from Brent Yorgey.
+
+- Documentation fixes.
+
+New in version 2.3.1:
+
+- Fixed Data.Colour.Names colour documenation.
+
+New in version 2.3:
+
+- black exported by Data.Colour
+
+- CIELAB conversion functions
+
+New in version 2.2.1:
+
+- Additional Documenation

@@ -1,0 +1,6 @@
+Usage: alt (--virtual-machine VM | --cloud-service CS | --dry-run)
+
+Available options:
+  --virtual-machine VM     Virtual machine name
+  --cloud-service CS       Cloud service name
+  -h,--help                Show this help text
