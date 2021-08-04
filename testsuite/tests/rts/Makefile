@@ -130,3 +130,8 @@ EventlogOutput2:
 	"$(TEST_HC)" -eventlog -v0 EventlogOutput.hs
 	./EventlogOutput +RTS -l
 	ls EventlogOutput.eventlog >/dev/null
+
+.PHONY: T20199
+T20199:
+	"$(TEST_HC)" -no-hs-main -v0 T20199.cpp -o T20199
+	./T20199
