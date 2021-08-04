@@ -17,7 +17,7 @@ void unpack_closure
     StgWord closureSizeW = heap_view_closureSize(inClosure);
     int closureSizeB = sizeof(StgWord) * closureSizeW;
     StgClosure ** pointers = malloc(closureSizeB);
-    *outPointersSize = collect_pointers(inClosure, closureSizeW, pointers);
+    *outPointersSize = collect_pointers(inClosure, pointers);
     *outPointers = pointers;
 
     // Copy the heap rep.
