@@ -1570,7 +1570,7 @@ primop  NewSmallArrayOp "newSmallArray#" GenPrimOp
    out_of_line = True
    has_side_effects = True
 
-primop SmallArrayOfOp "smallArrayOf#" GenPrimOp
+primop  SmallArrayOfOp "smallArrayOf#" GenPrimOp
    o -> SmallArray# b
    {Create a new immutable array from the elements passed in an arbitrarily
    nested homogeneous (i.e. after flattening all elements must be of the same

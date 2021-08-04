@@ -226,7 +226,7 @@ emitPrimOp dflags primop = case primop of
         (replicate (fromIntegral n) init)
     _ -> PrimopCmmEmit_External
 
-  op@SmallArrayOfOp -> \elems -> opAllDone $ \[res] -> do
+  op@SmallArrayOfOp -> \elems -> opIntoRegs $ \[res] -> do
     let n = length elems
     case allStatic elems of
       Just known -> do
@@ -239,7 +239,7 @@ emitPrimOp dflags primop = case primop of
         (smallArrPtrsRep (fromIntegral n))
         mkSMAP_FROZEN_DIRTY_infoLabel
         [ ( mkIntExpr platform n
-          , fixedHdrSize dflags + oFFSET_StgSmallMutArrPtrs_ptrs dflags ) ]
+          , fixedHdrSize profile + pc_OFFSET_StgSmallMutArrPtrs_ptrs (platformConstants platform) ) ]
         elems
       where
         -- todo: comment
