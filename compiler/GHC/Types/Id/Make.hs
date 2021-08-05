@@ -841,8 +841,7 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
 
 dataConWrapperInlinePragma :: InlinePragma
 -- See Note [DataCon wrappers are conlike]
-dataConWrapperInlinePragma = alwaysInlinePragma { inl_rule = ConLike
-                                                , inl_inline = Inline }
+dataConWrapperInlinePragma =  alwaysInlineConLikePragma
 
 {- Note [Activation for data constructor wrappers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -609,14 +609,14 @@ ppr_sig (ClassOpSig _ is_deflt vars ty)
 ppr_sig (IdSig _ id)         = pprVarSig [id] (ppr (varType id))
 ppr_sig (FixSig _ fix_sig)   = ppr fix_sig
 ppr_sig (SpecSig _ var ty inl@(InlinePragma { inl_inline = spec }))
-  = pragSrcBrackets (inl_src inl) pragmaSrc (pprSpec (unLoc var)
+  = pragSrcBrackets (inlinePragmaSource inl) pragmaSrc (pprSpec (unLoc var)
                                              (interpp'SP ty) inl)
     where
       pragmaSrc = case spec of
-        NoUserInlinePrag -> "{-# SPECIALISE"
-        _                -> "{-# SPECIALISE_INLINE"
+        NoUserInlinePrag -> "{-# " ++ extractSpecPragName (inl_src inl)
+        _                -> "{-# " ++ extractSpecPragName (inl_src inl)  ++ "_INLINE"
 ppr_sig (InlineSig _ var inl)
-  = pragSrcBrackets (inl_src inl) "{-# INLINE"  (pprInline inl
+  = pragSrcBrackets (inlinePragmaSource inl) "{-# INLINE"  (pprInline inl
                                    <+> pprPrefixOcc (unLoc var))
 ppr_sig (SpecInstSig _ src ty)
   = pragSrcBrackets src "{-# pragma" (text "instance" <+> ppr ty)
@@ -674,7 +674,7 @@ pprTcSpecPrags (SpecPrags ps)  = vcat (map (ppr . unLoc) ps)
 
 instance Outputable TcSpecPrag where
   ppr (SpecPrag var _ inl)
-    = text "SPECIALIZE" <+> pprSpec var (text "<type>") inl
+    = ppr (extractSpecPragName $ inl_src inl) <+> pprSpec var (text "<type>") inl
 
 pprMinimalSig :: (OutputableBndr name)
               => LBooleanFormula (GenLocated l name) -> SDoc

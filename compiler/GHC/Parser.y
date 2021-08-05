@@ -3888,8 +3888,8 @@ getPRIMWORD     (L _ (ITprimword _ x)) = x
 getPRIMFLOAT    (L _ (ITprimfloat x)) = x
 getPRIMDOUBLE   (L _ (ITprimdouble x)) = x
 getINLINE       (L _ (ITinline_prag _ inl conl)) = (inl,conl)
-getSPEC_INLINE  (L _ (ITspec_inline_prag _ True))  = (Inline,  FunLike)
-getSPEC_INLINE  (L _ (ITspec_inline_prag _ False)) = (NoInline,FunLike)
+getSPEC_INLINE  (L _ (ITspec_inline_prag src True))  = (Inline src,FunLike)
+getSPEC_INLINE  (L _ (ITspec_inline_prag src False)) = (NoInline src,FunLike)
 getCOMPLETE_PRAGs (L _ (ITcomplete_prag x)) = x
 getVOCURLY      (L (RealSrcSpan l _) ITvocurly) = srcSpanStartCol l
 
@@ -3902,7 +3902,7 @@ getPRIMINTEGERs (L _ (ITprimint    src _)) = src
 getPRIMWORDs    (L _ (ITprimword   src _)) = src
 
 -- See Note [Pragma source text] in "GHC.Types.Basic" for the following
-getINLINE_PRAGs       (L _ (ITinline_prag       src _ _)) = src
+getINLINE_PRAGs       (L _ (ITinline_prag       _ inl _)) = inlineSpecSource inl
 getSPEC_PRAGs         (L _ (ITspec_prag         src))     = src
 getSPEC_INLINE_PRAGs  (L _ (ITspec_inline_prag  src _))   = src
 getSOURCE_PRAGs       (L _ (ITsource_prag       src)) = src

@@ -745,8 +745,8 @@ mkWWBindPair ww_opts fn_id fn_info fn_args fn_body work_uniq div cpr
 
     work_rhs = work_fn (mkLams fn_args fn_body)
     work_act = case fn_inline_spec of  -- See Note [Worker activation]
-                   NoInline -> inl_act fn_inl_prag
-                   _        -> inl_act wrap_prag
+                   NoInline _  -> inl_act fn_inl_prag
+                   _           -> inl_act wrap_prag
 
     work_prag = InlinePragma { inl_src = SourceText "{-# INLINE"
                              , inl_inline = fn_inline_spec

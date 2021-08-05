@@ -581,7 +581,7 @@ mkPragEnv sigs binds
     get_sig _ = Nothing
 
     add_arity n inl_prag   -- Adjust inl_sat field to match visible arity of function
-      | Inline <- inl_inline inl_prag
+      | isInlinePragma inl_prag
         -- add arity only for real INLINE pragmas, not INLINABLE
       = case lookupNameEnv ar_env n of
           Just ar -> inl_prag { inl_sat = Just ar }
