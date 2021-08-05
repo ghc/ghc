@@ -1,5 +1,13 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
+## 4.14.3.0 *August 2021*
+
+  * Bundled with GHC 8.10.5
+ 
+  * Check the buffer size *before* calling the continuation in withEncodedCString (#20107)
+
+  * Pass -DLIBICONV_PLUG when building base library on FreeBSD (#19958)
+
 ## 4.14.2.0 *June 2021*
 
   * Bundled with GHC 8.10.5
