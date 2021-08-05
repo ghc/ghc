@@ -560,8 +560,14 @@ else
 fi
 
 case "$(uname)" in
-  MSYS_*|MINGW*) exe=".exe" ;;
-  *) exe="" ;;
+  MSYS_*|MINGW*)
+    exe=".exe"
+    # N.B. cabal-install expects CABAL_DIR to be a Windows path
+    CABAL_DIR="$(cygpath -w "$CABAL_DIR")"
+    ;;
+  *)
+    exe=""
+    ;;
 esac
 
 MAKE="make"
