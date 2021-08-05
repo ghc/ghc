@@ -1,6 +1,10 @@
 {-# Language DataKinds #-}
 {-# Language NoImplicitPrelude #-}
 {-# Language RebindableSyntax #-}
+{-# Language GADTs #-}
+{-# Language RankNTypes #-}
+{-# Language KindSignatures #-}
+{-# Language PolyKinds #-}
 
 module T19883 where
 
