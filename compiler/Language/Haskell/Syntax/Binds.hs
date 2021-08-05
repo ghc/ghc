@@ -46,6 +46,7 @@ import GHC.Data.Bag
 import GHC.Data.BooleanFormula (LBooleanFormula)
 
 import GHC.Utils.Outputable
+import GHC.Utils.Panic (pprPanic)
 
 import Data.Data hiding ( Fixity )
 import Data.Void
@@ -872,16 +873,28 @@ hsSigDoc (ClassOpSig _ is_deflt _ _)
  | is_deflt                     = text "default type signature"
  | otherwise                    = text "class method signature"
 hsSigDoc (IdSig {})             = text "id signature"
-hsSigDoc (SpecSig _ _ _ inl)
-                                = ppr inl <+> text "pragma"
-hsSigDoc (InlineSig _ _ prag)   = ppr (inlinePragmaSpec prag) <+> text "pragma"
-hsSigDoc (SpecInstSig _ src _)
-                                = pprWithSourceText src empty <+> text "instance pragma"
+hsSigDoc (SpecSig _ _ _ inl)    = (inlinePragmaName . inl_inline $ inl) <+> text "pragma"
+hsSigDoc (InlineSig _ _ prag)   = (inlinePragmaName . inl_inline $ prag) <+> text "pragma"
+-- Using the 'inlinePragmaName' function ensures that the pragma name for any
+-- one of the INLINE/INLINABLE/NOINLINE pragmas are printed after being extracted
+-- from the InlineSpec field of the pragma.
+hsSigDoc (SpecInstSig _ src _)  = text (extractSpecPragName src) <+> text "instance pragma"
 hsSigDoc (FixSig {})            = text "fixity declaration"
 hsSigDoc (MinimalSig {})        = text "MINIMAL pragma"
 hsSigDoc (SCCFunSig {})         = text "SCC pragma"
 hsSigDoc (CompleteMatchSig {})  = text "COMPLETE pragma"
 hsSigDoc (XSig {})              = text "XSIG TTG extension"
+
+-- | Extracts the name for a SPECIALIZE instance pragma. In 'hsSigDoc', the src
+-- field of 'SpecInstSig' signature contains the SourceText for a SPECIALIZE
+-- instance pragma of the form: "SourceText {-# SPECIALIZE"
+--
+-- Extraction ensures that all variants of the pragma name (with a 'Z' or an
+-- 'S') are output exactly as used in the pragma.
+extractSpecPragName :: SourceText -> String
+extractSpecPragName srcTxt =  case (words $ show srcTxt) of
+     (_:_:pragName:_) -> filter (/= '\"') pragName
+     _                -> pprPanic "hsSigDoc: Misformed SPECIALISE instance pragma:" (ppr srcTxt)
 
 {-
 ************************************************************************

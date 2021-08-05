@@ -50,7 +50,7 @@ import GHC.Core.DataCon
 import GHC.Types.Literal
 import GHC.Builtin.PrimOps
 import GHC.Types.Id.Info
-import GHC.Types.Basic  ( Arity, InlineSpec(..), inlinePragmaSpec )
+import GHC.Types.Basic  ( Arity, isNoInlinePragma )
 import GHC.Core.Type
 import GHC.Builtin.Names
 import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
@@ -970,7 +970,7 @@ certainlyWillInline :: UnfoldingOpts -> IdInfo -> Maybe Unfolding
 certainlyWillInline opts fn_info
   = case fn_unf of
       CoreUnfolding { uf_tmpl = expr, uf_guidance = guidance, uf_src = src }
-        | noinline     -> Nothing       -- See Note [Worker/wrapper for NOINLINE functions]
+        | noinline -> Nothing       -- See Note [Worker/wrapper for NOINLINE functions]
         | otherwise
         -> case guidance of
              UnfNever   -> Nothing
@@ -991,8 +991,8 @@ certainlyWillInline opts fn_info
       _other_unf       -> Nothing
 
   where
-    noinline     = inlinePragmaSpec (inlinePragInfo fn_info) == NoInline
-    fn_unf       = unfoldingInfo fn_info -- NB: loop-breakers never inline
+    noinline = isNoInlinePragma (inlinePragInfo fn_info)
+    fn_unf   = unfoldingInfo fn_info -- NB: loop-breakers never inline
 
         -- The UnfIfGoodArgs case seems important.  If we w/w small functions
         -- binary sizes go up by 10%!  (This is with SplitObjs.)

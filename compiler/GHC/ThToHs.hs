@@ -778,11 +778,13 @@ cvtPragmaD (InlineP nm inline rm phases)
        ; let src TH.NoInline  = "{-# NOINLINE"
              src TH.Inline    = "{-# INLINE"
              src TH.Inlinable = "{-# INLINABLE"
-       ; let ip   = InlinePragma { inl_src    = SourceText $ src inline
-                                 , inl_inline = cvtInline inline
+       ; let ip   = InlinePragma { inl_src    = toSrcTxt inline
+                                 , inl_inline = cvtInline inline (toSrcTxt inline)
                                  , inl_rule   = cvtRuleMatch rm
                                  , inl_act    = cvtPhases phases dflt
                                  , inl_sat    = Nothing }
+                    where
+                     toSrcTxt a = SourceText $ src a
        ; returnJustLA $ Hs.SigD noExtField $ InlineSig noAnn nm' ip }
 
 cvtPragmaD (SpecialiseP nm ty inline phases)
@@ -791,12 +793,14 @@ cvtPragmaD (SpecialiseP nm ty inline phases)
        ; let src TH.NoInline  = "{-# SPECIALISE NOINLINE"
              src TH.Inline    = "{-# SPECIALISE INLINE"
              src TH.Inlinable = "{-# SPECIALISE INLINE"
-       ; let (inline', dflt,srcText) = case inline of
-               Just inline1 -> (cvtInline inline1, dfltActivation inline1,
-                                src inline1)
+       ; let (inline', dflt, srcText) = case inline of
+               Just inline1 -> (cvtInline inline1 (toSrcTxt inline1), dfltActivation inline1,
+                                toSrcTxt inline1)
                Nothing      -> (NoUserInlinePrag,   AlwaysActive,
-                                "{-# SPECIALISE")
-       ; let ip = InlinePragma { inl_src    = SourceText srcText
+                                SourceText "{-# SPECIALISE")
+               where
+                toSrcTxt a = SourceText $ src a
+       ; let ip = InlinePragma { inl_src    = srcText
                                , inl_inline = inline'
                                , inl_rule   = Hs.FunLike
                                , inl_act    = cvtPhases phases dflt
@@ -857,10 +861,10 @@ dfltActivation :: TH.Inline -> Activation
 dfltActivation TH.NoInline = NeverActive
 dfltActivation _           = AlwaysActive
 
-cvtInline :: TH.Inline -> Hs.InlineSpec
-cvtInline TH.NoInline  = Hs.NoInline
-cvtInline TH.Inline    = Hs.Inline
-cvtInline TH.Inlinable = Hs.Inlinable
+cvtInline :: TH.Inline  -> SourceText -> Hs.InlineSpec
+cvtInline TH.NoInline   srcText  = Hs.NoInline  srcText
+cvtInline TH.Inline     srcText  = Hs.Inline    srcText
+cvtInline TH.Inlinable  srcText  = Hs.Inlinable srcText
 
 cvtRuleMatch :: TH.RuleMatch -> RuleMatchInfo
 cvtRuleMatch TH.ConLike = Hs.ConLike
