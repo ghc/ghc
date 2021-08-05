@@ -144,6 +144,9 @@ Language
 Compiler
 ~~~~~~~~
 
+- GHC now has an ARMv8 native code generator, significantly improving compilation
+  performance for ARM targets and eliminating a dependency on LLVM.
+
 - Performance of the compiler in :ghc-flag:`--make` mode with
    :ghc-flag:`-j[⟨n⟩]` is significantly improved by improvements to the parallel
   garbage collector noted below.
