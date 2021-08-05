@@ -1,0 +1,18 @@
+ghcs_nix="https://gitlab.haskell.org/bgamari/ghcs-nix/-/archive/master/ghcs-nix-master.tar.gz"
+
+run() {
+  local ver="$1"
+  local drv="ghc-$ver"
+  echo "$ver"
+  nix build -f "$ghcs_nix" $drv
+  (cd ../; rm -r dist-newstyle; cabal configure hadrian -w bootstrap/result/bin/ghc)
+  cp ../dist-newstyle/cache/plan.json "plan-$ver.json"
+  cabal run -v0 hadrian-bootstrap-gen -- "plan-$ver.json" | tee "plan-bootstrap-$ver.json"
+}
+
+run "8_10_1"
+# run "8_10_2" Broken
+run "8_10_3"
+run "8_10_4"
+run "8_10_5"
+run "9_0_1"
