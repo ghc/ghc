@@ -26,11 +26,9 @@ import GHC.Utils.Panic
 import GHC.Core.ConLike
 import GHC.Core.PatSyn
 import GHC.Data.Maybe
-import GHC.Utils.Misc (capitalise)
 import GHC.Data.FastString (fsLit)
 import GHC.Driver.Env
 
-import GHC.Types.TyThing( tyThingCategory )
 import GHC.Types.Unique.Set
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Name
@@ -238,7 +236,7 @@ exports_from_avail Nothing rdr_env _imports _this_mod
    -- when a data instance is exported.
   = do {
     ; addDiagnostic
-        (missingModuleExportWarn $ moduleName _this_mod)
+        (TcRnMissingExportList $ moduleName _this_mod)
     ; let avails =
             map fix_faminst . gresToAvailInfo
               . filter isLocalGRE . globalRdrEnvElts $ rdr_env
@@ -283,7 +281,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
     exports_from_item (ExportAccum occs earlier_mods)
                       (L loc ie@(IEModuleContents _ lmod@(L _ mod)))
         | mod `elementOfUniqSet` earlier_mods    -- Duplicate export of M
-        = do { addDiagnostic (dupModuleExport mod) ;
+        = do { addDiagnostic (TcRnDupeModuleExport mod) ;
                return Nothing }
 
         | otherwise
@@ -297,8 +295,8 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                    ; mods        = addOneToUniqSet earlier_mods mod
                    }
 
-             ; checkErr exportValid (moduleNotImported mod)
-             ; warnIf (exportValid && null gre_prs) (nullModuleExport mod)
+             ; checkErr exportValid (TcRnExportedModNotImported mod)
+             ; warnIf (exportValid && null gre_prs) (TcRnNullExportedModule mod)
 
              ; traceRn "efa" (ppr mod $$ ppr all_gres)
              ; addUsedGREs all_gres
@@ -394,7 +392,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                   then addTcRnDiagnostic (TcRnDodgyExports name)
                   else -- This occurs when you export T(..), but
                        -- only import T abstractly, or T is a synonym.
-                       addErr (exportItemErr ie)
+                       addErr (TcRnExportHiddenComponents ie)
              return (L (locA l) name, non_flds, flds)
 
     -------------
@@ -607,10 +605,6 @@ checkPatSynParent parent NoParent gname
     psErr  = exportErrCtxt "pattern synonym"
     selErr = exportErrCtxt "pattern synonym record selector"
 
-    assocClassErr :: TcRnMessage
-    assocClassErr = TcRnUnknownMessage $ mkPlainError noHints $
-      text "Pattern synonyms can be bundled only with datatypes."
-
     handle_pat_syn :: SDoc
                    -> TyCon      -- ^ Parent TyCon
                    -> PatSyn     -- ^ Corresponding bundled PatSyn
@@ -620,7 +614,7 @@ checkPatSynParent parent NoParent gname
 
       -- 2. See note [Types of TyCon]
       | not $ isTyConWithSrcDataCons ty_con
-      = addErrCtxt doc $ failWithTc assocClassErr
+      = addErrCtxt doc $ failWithTc TcRnPatSynBundledWithNonDataCon
 
       -- 3. Is the head a type variable?
       | Nothing <- mtycon
@@ -628,7 +622,8 @@ checkPatSynParent parent NoParent gname
       -- 4. Ok. Check they are actually the same type constructor.
 
       | Just p_ty_con <- mtycon, p_ty_con /= ty_con
-      = addErrCtxt doc $ failWithTc typeMismatchError
+      = addErrCtxt doc $ failWithTc
+          (TcRnPatSynBundledWithWrongType expected_res_ty res_ty)
 
       -- 5. We passed!
       | otherwise
@@ -638,13 +633,6 @@ checkPatSynParent parent NoParent gname
         expected_res_ty = mkTyConApp ty_con (mkTyVarTys (tyConTyVars ty_con))
         (_, _, _, _, _, res_ty) = patSynSig pat_syn
         mtycon = fst <$> tcSplitTyConApp_maybe res_ty
-        typeMismatchError :: TcRnMessage
-        typeMismatchError = TcRnUnknownMessage $ mkPlainError noHints $
-          text "Pattern synonyms can only be bundled with matching type constructors"
-              $$ text "Couldn't match expected type of"
-              <+> quotes (ppr expected_res_ty)
-              <+> text "with actual type of"
-              <+> quotes (ppr res_ty)
 
 
 {-===========================================================================-}
@@ -667,7 +655,7 @@ check_occs ie occs avails
             | greNameMangledName child == greNameMangledName child'   -- Duplicate export
             -- But we don't want to warn if the same thing is exported
             -- by two different module exports. See ticket #4478.
-            -> do { warnIf (not (dupExport_ok child ie ie')) (dupExportWarn child ie ie')
+            -> do { warnIf (not (dupExport_ok child ie ie')) (TcRnDuplicateExport child ie ie')
                   ; return occs }
 
             | otherwise    -- Same occ name but different names: an error
@@ -729,35 +717,6 @@ dupExport_ok child ie1 ie2
     single _               = False
 
 
-dupModuleExport :: ModuleName -> TcRnMessage
-dupModuleExport mod
-  = TcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag Opt_WarnDuplicateExports) noHints $
-  hsep [text "Duplicate",
-          quotes (text "Module" <+> ppr mod),
-          text "in export list"]
-
-moduleNotImported :: ModuleName -> TcRnMessage
-moduleNotImported mod
-  = TcRnUnknownMessage $ mkPlainError noHints $
-    hsep [text "The export item",
-          quotes (text "module" <+> ppr mod),
-          text "is not imported"]
-
-nullModuleExport :: ModuleName -> TcRnMessage
-nullModuleExport mod
-  = TcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag Opt_WarnDodgyExports) noHints $
-  hsep [text "The export item",
-        quotes (text "module" <+> ppr mod),
-        text "exports nothing"]
-
-missingModuleExportWarn :: ModuleName -> TcRnMessage
-missingModuleExportWarn mod
-  = TcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag Opt_WarnMissingExportList) noHints $
-  hsep [text "The export item",
-          quotes (text "module" <+> ppr mod),
-          text "is missing an export list"]
-
-
 exportErrCtxt :: Outputable o => String -> o -> SDoc
 exportErrCtxt herald exp =
   text "In the" <+> text (herald ++ ":") <+> ppr exp
@@ -769,42 +728,11 @@ addExportErrCtxt ie = addErrCtxt exportCtxt
   where
     exportCtxt = text "In the export:" <+> ppr ie
 
-exportItemErr :: IE GhcPs -> TcRnMessage
-exportItemErr export_item
-  = TcRnUnknownMessage $ mkPlainError noHints $
-    sep [ text "The export item" <+> quotes (ppr export_item),
-          text "attempts to export constructors or class methods that are not visible here" ]
-
-
-dupExportWarn :: GreName -> IE GhcPs -> IE GhcPs -> TcRnMessage
-dupExportWarn child ie1 ie2
-  = TcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag Opt_WarnDuplicateExports) noHints $
-  hsep [quotes (ppr child),
-        text "is exported by", quotes (ppr ie1),
-        text "and",            quotes (ppr ie2)]
-
-dcErrMsg :: Name -> String -> SDoc -> [SDoc] -> TcRnMessage
-dcErrMsg ty_con what_is thing parents = TcRnUnknownMessage $ mkPlainError noHints $
-          text "The type constructor" <+> quotes (ppr ty_con)
-                <+> text "is not the parent of the" <+> text what_is
-                <+> quotes thing <> char '.'
-                $$ text (capitalise what_is)
-                   <> text "s can only be exported with their parent type constructor."
-                $$ (case parents of
-                      [] -> empty
-                      [_] -> text "Parent:"
-                      _  -> text "Parents:") <+> fsep (punctuate comma parents)
 
 failWithDcErr :: Name -> GreName -> [Name] -> TcM a
 failWithDcErr parent child parents = do
   ty_thing <- tcLookupGlobal (greNameMangledName child)
-  failWithTc $ dcErrMsg parent (pp_category ty_thing)
-                        (ppr child) (map ppr parents)
-  where
-    pp_category :: TyThing -> String
-    pp_category (AnId i)
-      | isRecordSelector i = "record selector"
-    pp_category i = tyThingCategory i
+  failWithTc $ TcRnExportedParentChildMismatch parent ty_thing child parents
 
 
 exportClashErr :: GlobalRdrEnv
@@ -812,25 +740,9 @@ exportClashErr :: GlobalRdrEnv
                -> IE GhcPs -> IE GhcPs
                -> TcRnMessage
 exportClashErr global_env child1 child2 ie1 ie2
-  = TcRnUnknownMessage $ mkPlainError noHints $
-    vcat [ text "Conflicting exports for" <+> quotes (ppr occ) <> colon
-         , ppr_export child1' gre1' ie1'
-         , ppr_export child2' gre2' ie2'
-         ]
+  = TcRnConflictingExports occ child1' gre1' ie1' child2' gre2' ie2'
   where
     occ = occName child1
-
-    ppr_export child gre ie = nest 3 (hang (quotes (ppr ie) <+> text "exports" <+>
-                                            quotes (ppr_name child))
-                                        2 (pprNameProvenance gre))
-
-    -- DuplicateRecordFields means that nameOccName might be a mangled
-    -- $sel-prefixed thing, in which case show the correct OccName alone
-    -- (but otherwise show the Name so it will have a module qualifier)
-    ppr_name (FieldGreName fl) | flIsOverloaded fl = ppr fl
-                               | otherwise         = ppr (flSelector fl)
-    ppr_name (NormalGreName name) = ppr name
-
     -- get_gre finds a GRE for the Name, so that we can show its provenance
     gre1 = get_gre child1
     gre2 = get_gre child2

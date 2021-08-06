@@ -81,7 +81,7 @@ tc_default_ty deflt_clss hs_ty
 
         -- Check that the type is an instance of at least one of the deflt_clss
         ; oks <- mapM (check_instance ty) deflt_clss
-        ; checkTc (or oks) (badDefaultTy ty deflt_clss)
+        ; checkTc (or oks) (TcRnBadDefaultType ty deflt_clss)
         ; return ty }
 
 check_instance :: Type -> Class -> TcM Bool
@@ -105,17 +105,5 @@ defaultDeclCtxt = text "When checking the types in a default declaration"
 
 dupDefaultDeclErr :: [LDefaultDecl GhcRn] -> TcRnMessage
 dupDefaultDeclErr (L _ (DefaultDecl _ _) : dup_things)
-  = TcRnUnknownMessage $ mkPlainError noHints $
-    hang (text "Multiple default declarations")
-       2 (vcat (map pp dup_things))
-  where
-    pp :: LDefaultDecl GhcRn -> SDoc
-    pp (L locn (DefaultDecl _ _))
-      = text "here was another default declaration" <+> ppr (locA locn)
+  = TcRnMultipleDefaultDeclarations dup_things
 dupDefaultDeclErr [] = panic "dupDefaultDeclErr []"
-
-badDefaultTy :: Type -> [Class] -> TcRnMessage
-badDefaultTy ty deflt_clss
-  = TcRnUnknownMessage $ mkPlainError noHints $
-    hang (text "The default type" <+> quotes (ppr ty) <+> text "is not an instance of")
-       2 (foldr1 (\a b -> a <+> text "or" <+> b) (map (quotes. ppr) deflt_clss))

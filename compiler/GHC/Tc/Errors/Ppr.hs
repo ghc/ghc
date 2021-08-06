@@ -21,14 +21,18 @@ import GHC.Tc.Errors.Types
 import GHC.Tc.Types.Rank (Rank(..))
 import GHC.Tc.Utils.TcType (tcSplitForAllTyVars)
 import GHC.Types.Error
+import GHC.Types.FieldLabel (flIsOverloaded, flSelector)
+import GHC.Types.Id (isRecordSelector)
 import GHC.Types.Name
-import GHC.Types.Name.Reader (pprNameProvenance)
+import GHC.Types.Name.Reader (GreName(..), pprNameProvenance)
 import GHC.Types.SrcLoc (GenLocated(..))
+import GHC.Types.TyThing
 import GHC.Types.Var.Env (emptyTidyEnv)
 import GHC.Types.Var.Set (pprVarSet, pluralVarSet)
 import GHC.Driver.Flags
 import GHC.Hs
 import GHC.Utils.Outputable
+import GHC.Utils.Misc (capitalise)
 import GHC.Unit.State (pprWithUnitState, UnitState)
 import qualified GHC.LanguageExtensions as LangExt
 import qualified Data.List.NonEmpty as NE
@@ -306,6 +310,94 @@ instance Diagnostic TcRnMessage where
     TcRnBangOnUnliftedType ty
       -> mkSimpleDecorated $
            text "Strictness flag has no effect on unlifted type" <+> quotes (ppr ty)
+    TcRnMultipleDefaultDeclarations dup_things
+      -> mkSimpleDecorated $
+           hang (text "Multiple default declarations")
+              2 (vcat (map pp dup_things))
+         where
+           pp :: LDefaultDecl GhcRn -> SDoc
+           pp (L locn (DefaultDecl _ _))
+             = text "here was another default declaration" <+> ppr (locA locn)
+    TcRnBadDefaultType ty deflt_clss
+      -> mkSimpleDecorated $
+           hang (text "The default type" <+> quotes (ppr ty) <+> text "is not an instance of")
+              2 (foldr1 (\a b -> a <+> text "or" <+> b) (map (quotes. ppr) deflt_clss))
+    TcRnPatSynBundledWithNonDataCon
+      -> mkSimpleDecorated $
+           text "Pattern synonyms can be bundled only with datatypes."
+    TcRnPatSynBundledWithWrongType expected_res_ty res_ty
+      -> mkSimpleDecorated $
+           text "Pattern synonyms can only be bundled with matching type constructors"
+               $$ text "Couldn't match expected type of"
+               <+> quotes (ppr expected_res_ty)
+               <+> text "with actual type of"
+               <+> quotes (ppr res_ty)
+    TcRnDupeModuleExport mod
+      -> mkSimpleDecorated $
+           hsep [ text "Duplicate"
+                , quotes (text "Module" <+> ppr mod)
+                , text "in export list" ]
+    TcRnExportedModNotImported mod
+      -> mkSimpleDecorated
+       $ formatExportItemError
+           (text "module" <+> ppr mod)
+           "is not imported"
+    TcRnNullExportedModule mod
+      -> mkSimpleDecorated
+       $ formatExportItemError
+           (text "module" <+> ppr mod)
+           "exports nothing"
+    TcRnMissingExportList mod
+      -> mkSimpleDecorated
+       $ formatExportItemError
+           (text "module" <+> ppr mod)
+           "is missing an export list"
+    TcRnExportHiddenComponents export_item
+      -> mkSimpleDecorated
+       $ formatExportItemError
+           (ppr export_item)
+           "attempts to export constructors or class methods that are not visible here"
+    TcRnDuplicateExport child ie1 ie2
+      -> mkSimpleDecorated $
+           hsep [ quotes (ppr child)
+                , text "is exported by", quotes (ppr ie1)
+                , text "and",            quotes (ppr ie2) ]
+    TcRnExportedParentChildMismatch parent_name ty_thing child parent_names
+      -> mkSimpleDecorated $
+           text "The type constructor" <+> quotes (ppr parent_name)
+                 <+> text "is not the parent of the" <+> text what_is
+                 <+> quotes thing <> char '.'
+                 $$ text (capitalise what_is)
+                    <> text "s can only be exported with their parent type constructor."
+                 $$ (case parents of
+                       [] -> empty
+                       [_] -> text "Parent:"
+                       _  -> text "Parents:") <+> fsep (punctuate comma parents)
+      where
+        pp_category :: TyThing -> String
+        pp_category (AnId i)
+          | isRecordSelector i = "record selector"
+        pp_category i = tyThingCategory i
+        what_is = pp_category ty_thing
+        thing = ppr child
+        parents = map ppr parent_names
+    TcRnConflictingExports occ child1 gre1 ie1 child2 gre2 ie2
+      -> mkSimpleDecorated $
+           vcat [ text "Conflicting exports for" <+> quotes (ppr occ) <> colon
+                , ppr_export child1 gre1 ie1
+                , ppr_export child2 gre2 ie2
+                ]
+      where
+        ppr_export child gre ie = nest 3 (hang (quotes (ppr ie) <+> text "exports" <+>
+                                                quotes (ppr_name child))
+                                            2 (pprNameProvenance gre))
+
+        -- DuplicateRecordFields means that nameOccName might be a mangled
+        -- $sel-prefixed thing, in which case show the correct OccName alone
+        -- (but otherwise show the Name so it will have a module qualifier)
+        ppr_name (FieldGreName fl) | flIsOverloaded fl = ppr fl
+                                   | otherwise         = ppr (flSelector fl)
+        ppr_name (NormalGreName name) = ppr name
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -437,6 +529,30 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnBangOnUnliftedType{}
       -> WarningWithFlag Opt_WarnRedundantStrictnessFlags
+    TcRnMultipleDefaultDeclarations{}
+      -> ErrorWithoutFlag
+    TcRnBadDefaultType{}
+      -> ErrorWithoutFlag
+    TcRnPatSynBundledWithNonDataCon{}
+      -> ErrorWithoutFlag
+    TcRnPatSynBundledWithWrongType{}
+      -> ErrorWithoutFlag
+    TcRnDupeModuleExport{}
+      -> WarningWithFlag Opt_WarnDuplicateExports
+    TcRnExportedModNotImported{}
+      -> ErrorWithoutFlag
+    TcRnNullExportedModule{}
+      -> WarningWithFlag Opt_WarnDodgyExports
+    TcRnMissingExportList{}
+      -> WarningWithFlag Opt_WarnMissingExportList
+    TcRnExportHiddenComponents{}
+      -> ErrorWithoutFlag
+    TcRnDuplicateExport{}
+      -> WarningWithFlag Opt_WarnDuplicateExports
+    TcRnExportedParentChildMismatch{}
+      -> ErrorWithoutFlag
+    TcRnConflictingExports{}
+      -> ErrorWithoutFlag
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -584,6 +700,30 @@ instance Diagnostic TcRnMessage where
              -> noHints
     TcRnBangOnUnliftedType{}
       -> noHints
+    TcRnMultipleDefaultDeclarations{}
+      -> noHints
+    TcRnBadDefaultType{}
+      -> noHints
+    TcRnPatSynBundledWithNonDataCon{}
+      -> noHints
+    TcRnPatSynBundledWithWrongType{}
+      -> noHints
+    TcRnDupeModuleExport{}
+      -> noHints
+    TcRnExportedModNotImported{}
+      -> noHints
+    TcRnNullExportedModule{}
+      -> noHints
+    TcRnMissingExportList{}
+      -> noHints
+    TcRnExportHiddenComponents{}
+      -> noHints
+    TcRnDuplicateExport{}
+      -> noHints
+    TcRnExportedParentChildMismatch{}
+      -> noHints
+    TcRnConflictingExports{}
+      -> noHints
 
 messageWithInfoDiagnosticMessage :: UnitState
                                  -> ErrInfo
@@ -662,3 +802,9 @@ pprBindings = pprWithCommas (quotes . ppr)
 injectivityErrorHerald :: SDoc
 injectivityErrorHerald =
   text "Type family equation violates the family's injectivity annotation."
+
+formatExportItemError :: SDoc -> String -> SDoc
+formatExportItemError exportedThing reason =
+  hsep [ text "The export item"
+       , quotes exportedThing
+       , text reason ]

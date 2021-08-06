@@ -24,6 +24,7 @@ import GHC.Types.Error
 import GHC.Types.Name (Name, OccName)
 import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
+import GHC.Types.TyThing (TyThing)
 import GHC.Unit.Types (Module)
 import GHC.Utils.Outputable
 import GHC.Core.Class (Class)
@@ -33,6 +34,7 @@ import GHC.Core.InstEnv (ClsInst)
 import GHC.Core.TyCon (TyCon, TyConFlavour)
 import GHC.Core.Type (Kind, Type, Var)
 import GHC.Unit.State (UnitState)
+import GHC.Unit.Module.Name (ModuleName)
 import GHC.Types.Basic
 import GHC.Types.Var.Set (TyVarSet)
 
@@ -926,6 +928,174 @@ data TcRnMessage where
                  typecheck/should_compile/T20187b
   -}
   TcRnBangOnUnliftedType :: !Type -> TcRnMessage
+
+  {-| TcRnMultipleDefaultDeclarations is an error that occurs when a module has
+      more than one default declaration.
+
+      Example:
+      default (Integer, Int)
+      default (Double, Float) -- 2nd default declaration not allowed
+
+     Text cases: module/mod58
+  -}
+  TcRnMultipleDefaultDeclarations :: [LDefaultDecl GhcRn] -> TcRnMessage
+
+  {-| TcRnBadDefaultType is an error that occurs when a type used in a default
+      declaration does not have an instance for any of the applicable classes.
+
+      Example(s):
+      data Foo
+      default (Foo)
+
+     Test cases: typecheck/should_fail/T11974b
+  -}
+  TcRnBadDefaultType :: Type -> [Class] -> TcRnMessage
+
+  {-| TcRnPatSynBundledWithNonDataCon is an error that occurs when a module's
+      export list bundles a pattern synonym with a type that is not a proper
+      `data` or `newtype` construction.
+
+      Example(s):
+      module Foo (MyClass(.., P)) where
+      pattern P = Nothing
+      class MyClass a where
+        foo :: a -> Int
+
+     Test cases: patsyn/should_fail/export-class
+  -}
+  TcRnPatSynBundledWithNonDataCon :: TcRnMessage
+
+  {-| TcRnPatSynBundledWithWrongType is an error that occurs when the export list
+      of a module has a pattern synonym bundled with a type that does not match
+      the type of the pattern synonym.
+
+      Example(s):
+      module Foo (R(P,x)) where
+      data Q = Q Int
+      data R = R
+      pattern P{x} = Q x
+
+     Text cases: patsyn/should_fail/export-ps-rec-sel
+                 patsyn/should_fail/export-type-synonym
+                 patsyn/should_fail/export-type
+  -}
+  TcRnPatSynBundledWithWrongType :: Type -> Type -> TcRnMessage
+
+  {-| TcRnDupeModuleExport is a warning controlled by @-Wduplicate-exports@ that
+      occurs when a module appears more than once in an export list.
+
+      Example(s):
+      module Foo (module Bar, module Bar)
+      import Bar
+
+     Text cases: None
+  -}
+  TcRnDupeModuleExport :: ModuleName -> TcRnMessage
+
+  {-| TcRnExportedModNotImported is an error that occurs when an export list
+      contains a module that is not imported.
+
+      Example(s): None
+
+     Text cases: module/mod135
+                 module/mod8
+                 rename/should_fail/rnfail028
+                 backpack/should_fail/bkpfail48
+  -}
+  TcRnExportedModNotImported :: ModuleName -> TcRnMessage
+
+  {-| TcRnNullExportedModule is a warning controlled by -Wdodgy-exports that occurs
+      when an export list contains a module that has no exports.
+
+      Example(s):
+      module Foo (module Bar) where
+      import Bar ()
+
+     Test cases: None
+  -}
+  TcRnNullExportedModule :: ModuleName -> TcRnMessage
+
+  {-| TcRnMissingExportList is a warning controlled by -Wmissing-export-lists that
+      occurs when a module does not have an explicit export list.
+
+      Example(s): None
+
+     Test cases: typecheck/should_fail/MissingExportList03
+  -}
+  TcRnMissingExportList :: ModuleName -> TcRnMessage
+
+  {-| TcRnExportHiddenComponents is an error that occurs when an export contains
+      constructor or class methods that are not visible.
+
+      Example(s): None
+
+     Test cases: None
+  -}
+  TcRnExportHiddenComponents :: IE GhcPs -> TcRnMessage
+
+  {-| TcRnDuplicateExport is a warning (controlled by -Wduplicate-exports) that occurs
+      when an identifier appears in an export list more than once.
+
+      Example(s): None
+
+     Test cases: module/MultiExport
+                 module/mod128
+                 module/mod14
+                 module/mod5
+                 overloadedrecflds/should_fail/DuplicateExports
+                 patsyn/should_compile/T11959
+  -}
+  TcRnDuplicateExport :: GreName -> IE GhcPs -> IE GhcPs -> TcRnMessage
+
+  {-| TcRnExportedParentChildMismatch is an error that occurs when an export is
+      bundled with a parent that it does not belong to
+
+      Example(s):
+      module Foo (T(a)) where
+      data T
+      a = True
+
+     Test cases: module/T11970
+                 module/T11970B
+                 module/mod17
+                 module/mod3
+                 overloadedrecflds/should_fail/NoParent
+  -}
+  TcRnExportedParentChildMismatch :: Name -> TyThing -> GreName -> [Name] -> TcRnMessage
+
+  {-| TcRnConflictingExports is an error that occurs when different identifiers that
+      have the same name are being exported by a module.
+
+      Example(s):
+      module Foo (Bar.f, module Baz) where
+      import qualified Bar (f)
+      import Baz (f)
+
+     Test cases: module/mod131
+                 module/mod142
+                 module/mod143
+                 module/mod144
+                 module/mod145
+                 module/mod146
+                 module/mod150
+                 module/mod155
+                 overloadedrecflds/should_fail/T14953
+                 overloadedrecflds/should_fail/overloadedrecfldsfail10
+                 rename/should_fail/rnfail029
+                 rename/should_fail/rnfail040
+                 typecheck/should_fail/T16453E2
+                 typecheck/should_fail/tcfail025
+                 typecheck/should_fail/tcfail026
+  -}
+  TcRnConflictingExports
+    :: OccName -- ^ Occurrence name shared by both exports
+    -> GreName -- ^ Name of first export
+    -> GlobalRdrElt -- ^ Provenance for definition site of first export
+    -> IE GhcPs -- ^ Export decl of first export
+    -> GreName -- ^ Name of second export
+    -> GlobalRdrElt -- ^ Provenance for definition site of second export
+    -> IE GhcPs -- ^ Export decl of second export
+    -> TcRnMessage
 
 -- | Which parts of a record field are affected by a particular error or warning.
 data RecordFieldPart
