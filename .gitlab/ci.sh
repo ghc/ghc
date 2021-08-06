@@ -223,7 +223,7 @@ function setup() {
     time_it "setup" setup_toolchain
   fi
 
-  cabal update --index="$HACKAGE_INDEX_STATE"
+  "$CABAL" update --index="$HACKAGE_INDEX_STATE"
 
   # Make sure that git works
   git config user.email "ghc-ci@gitlab-haskell.org"
