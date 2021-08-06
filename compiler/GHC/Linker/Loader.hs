@@ -723,7 +723,6 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
           let
             pkg = moduleUnit mod
             deps  = mi_deps iface
-            home_unit = hsc_home_unit hsc_env
 
             pkg_deps = dep_direct_pkgs deps
             (boot_deps, mod_deps) = flip partitionWith (Set.toList (dep_direct_mods deps)) $
@@ -735,10 +734,11 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
             acc_mods'  = addListToUniqDSet acc_mods (moduleName mod : mod_deps)
             acc_pkgs'  = addListToUniqDSet acc_pkgs (Set.toList pkg_deps)
           --
-          if not (isHomeUnit home_unit pkg)
-             then follow_deps mods acc_mods (addOneToUniqDSet acc_pkgs' (toUnitId pkg))
-             else follow_deps (map (mkHomeModule home_unit) mod_deps' ++ mods)
-                              acc_mods' acc_pkgs'
+          case ue_home_unit (hsc_unit_env hsc_env) of
+            Just home_unit
+              | isHomeUnit home_unit pkg
+              -> follow_deps (map (mkHomeModule home_unit) mod_deps' ++ mods) acc_mods' acc_pkgs'
+            _ -> follow_deps mods acc_mods (addOneToUniqDSet acc_pkgs' (toUnitId pkg))
         where
             msg = text "need to link module" <+> ppr mod <+>
                   text "due to use of Template Haskell"
@@ -765,12 +765,14 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
         | otherwise
         = do    -- It's not in the HPT because we are in one shot mode,
                 -- so use the Finder to get a ModLocation...
-             let fc = hsc_FC hsc_env
-             let home_unit = hsc_home_unit hsc_env
-             let dflags = hsc_dflags hsc_env
-             let fopts = initFinderOpts dflags
-             mb_stuff <- findHomeModule fc fopts home_unit mod_name
-             case mb_stuff of
+             case ue_home_unit (hsc_unit_env hsc_env) of
+              Nothing -> no_obj mod_name
+              Just home_unit -> do
+                let fc = hsc_FC hsc_env
+                let dflags = hsc_dflags hsc_env
+                let fopts = initFinderOpts dflags
+                mb_stuff <- findHomeModule fc fopts home_unit mod_name
+                case mb_stuff of
                   Found loc mod -> found loc mod
                   _ -> no_obj mod_name
         where

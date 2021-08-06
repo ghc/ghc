@@ -67,7 +67,7 @@ homeModError mod location
 -- -----------------------------------------------------------------------------
 -- Error messages
 
-cannotFindInterface :: UnitState -> HomeUnit -> Profile -> ([FilePath] -> SDoc) -> ModuleName -> InstalledFindResult -> SDoc
+cannotFindInterface :: UnitState -> Maybe HomeUnit -> Profile -> ([FilePath] -> SDoc) -> ModuleName -> InstalledFindResult -> SDoc
 cannotFindInterface = cantFindInstalledErr (text "Failed to load interface for")
                                            (text "Ambiguous interface for")
 
@@ -75,13 +75,13 @@ cantFindInstalledErr
     :: SDoc
     -> SDoc
     -> UnitState
-    -> HomeUnit
+    -> Maybe HomeUnit
     -> Profile
     -> ([FilePath] -> SDoc)
     -> ModuleName
     -> InstalledFindResult
     -> SDoc
-cantFindInstalledErr cannot_find _ unit_state home_unit profile tried_these mod_name find_result
+cantFindInstalledErr cannot_find _ unit_state mhome_unit profile tried_these mod_name find_result
   = cannot_find <+> quotes (ppr mod_name)
     $$ more_info
   where
@@ -94,7 +94,8 @@ cantFindInstalledErr cannot_find _ unit_state home_unit profile tried_these mod_
                    text "was found" $$ looks_like_srcpkgid pkg
 
             InstalledNotFound files mb_pkg
-                | Just pkg <- mb_pkg, not (isHomeUnitId home_unit pkg)
+                | Just pkg <- mb_pkg
+                , notHomeUnitId mhome_unit pkg
                 -> not_found_in_package pkg files
 
                 | null files

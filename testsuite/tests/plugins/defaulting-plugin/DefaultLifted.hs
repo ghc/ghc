@@ -52,7 +52,7 @@ lookupModule mod_nm = do
   let units     = hsc_units hsc_env
   let home_unit = hsc_home_unit hsc_env
   -- found_module <- findPluginModule fc fopts units home_unit mod_name
-  found_module <- tcPluginIO $ findPluginModule fc fopts units home_unit mod_nm
+  found_module <- tcPluginIO $ findPluginModule fc fopts units (Just home_unit) mod_nm
   case found_module of
     FoundModule h -> return (fr_mod h)
     _          -> do

@@ -18,6 +18,7 @@ module GHC.Unit.Home
    , isHomeUnitInstanceOf
    , isHomeModule
    , isHomeInstalledModule
+   , notHomeUnitId
    , notHomeModule
    , notHomeModuleMaybe
    , notHomeInstalledModule
@@ -142,6 +143,11 @@ isHomeUnit hu u = u == homeUnitAsUnit hu
 isHomeUnitId :: GenHomeUnit u -> UnitId -> Bool
 isHomeUnitId hu uid = uid == homeUnitId hu
 
+-- | Test if the unit-id is not the home unit-id
+notHomeUnitId :: Maybe (GenHomeUnit u) -> UnitId -> Bool
+notHomeUnitId Nothing   _   = True
+notHomeUnitId (Just hu) uid = not (isHomeUnitId hu uid)
+
 -- | Test if the home unit is an instance of the given unit-id
 isHomeUnitInstanceOf :: HomeUnit -> UnitId -> Bool
 isHomeUnitInstanceOf hu u = homeUnitInstanceOf hu == u
@@ -204,8 +210,9 @@ homeModuleNameInstantiation hu mod_name =
 --       the instantiating module of @r:A@ in @p[A=q[]:B]@ is @r:A@.
 --       the instantiating module of @p:A@ in @p@ is @p:A@.
 --       the instantiating module of @r:A@ in @p@ is @r:A@.
-homeModuleInstantiation :: HomeUnit -> Module -> Module
-homeModuleInstantiation hu mod
-   | isHomeModule hu mod = homeModuleNameInstantiation hu (moduleName mod)
+homeModuleInstantiation :: Maybe HomeUnit -> Module -> Module
+homeModuleInstantiation mhu mod
+   | Just hu <- mhu
+   , isHomeModule hu mod = homeModuleNameInstantiation hu (moduleName mod)
    | otherwise           = mod
 

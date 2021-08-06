@@ -111,6 +111,7 @@ import GHC.Types.Name.Env
 import GHC.Types.PkgQual
 
 import GHC.Unit
+import GHC.Unit.Env
 import GHC.Unit.Finder
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Module.ModIface
@@ -1815,11 +1816,11 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
 
   | otherwise  = find_it
   where
-    dflags    = hsc_dflags hsc_env
-    fopts     = initFinderOpts dflags
-    home_unit = hsc_home_unit hsc_env
-    fc        = hsc_FC hsc_env
-    units     = hsc_units hsc_env
+    dflags     = hsc_dflags hsc_env
+    fopts      = initFinderOpts dflags
+    mhome_unit = ue_home_unit (hsc_unit_env hsc_env)
+    fc         = hsc_FC hsc_env
+    units      = hsc_units hsc_env
 
     check_hash old_summary location src_fn =
         checkSummaryHash
@@ -1828,7 +1829,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
           old_summary location
 
     find_it = do
-        found <- findImportedModule fc fopts units home_unit wanted_mod NoPkgQual
+        found <- findImportedModule fc fopts units mhome_unit wanted_mod NoPkgQual
         case found of
              Found location mod
                 | isJust (ml_hs_file location) ->
@@ -1876,10 +1877,10 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
                 throwE $ singleMessage $ mkPlainErrorMsgEnvelope pi_mod_name_loc
                        $ DriverFileModuleNameMismatch pi_mod_name wanted_mod
 
-        when (hsc_src == HsigFile && isNothing (lookup pi_mod_name (homeUnitInstantiations home_unit))) $
-            let instantiations = homeUnitInstantiations home_unit
-            in throwE $ singleMessage $ mkPlainErrorMsgEnvelope pi_mod_name_loc
-                      $ DriverUnexpectedSignature pi_mod_name (checkBuildingCabalPackage dflags) instantiations
+        let instantiations = fromMaybe [] (homeUnitInstantiations <$> mhome_unit)
+        when (hsc_src == HsigFile && isNothing (lookup pi_mod_name instantiations)) $
+            throwE $ singleMessage $ mkPlainErrorMsgEnvelope pi_mod_name_loc
+                   $ DriverUnexpectedSignature pi_mod_name (checkBuildingCabalPackage dflags) instantiations
 
         liftIO $ makeNewModSummary hsc_env $ MakeNewModSummary
             { nms_src_fn = src_fn
@@ -2186,12 +2187,13 @@ executeCompileNode :: Int
 executeCompileNode k n !old_hmi wait_deps mknot_var mod = do
    MakeEnv{..} <- ask
    let mk_mod = case ms_hsc_src mod of
-                     HsigFile ->
+                     HsigFile -> do
                        -- MP: It is probably a bit of a misimplementation in backpack that
                        -- compiling a signature requires an knot_var for that unit.
                        -- If you remove this then a lot of backpack tests fail.
-                       let mod_name = homeModuleInstantiation (hsc_home_unit hsc_env) (ms_mod mod)
-                       in mkModuleEnv . (:[]) . (mod_name,) <$> newIORef emptyTypeEnv
+                       let unit_env = hsc_unit_env hsc_env
+                       let mod_name = homeModuleInstantiation (ue_home_unit unit_env) (ms_mod mod)
+                       mkModuleEnv . (:[]) . (mod_name,) <$> newIORef emptyTypeEnv
                      _ -> return emptyModuleEnv
    knot_var <- liftIO $ maybe mk_mod return mknot_var
    deps <- wait_deps

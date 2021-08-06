@@ -41,6 +41,7 @@ import GHC.Types.Name.Shape
 import GHC.Types.PkgQual
 
 import GHC.Unit
+import GHC.Unit.Env
 import GHC.Unit.Finder
 import GHC.Unit.Module.Warnings
 import GHC.Unit.Module.ModIface
@@ -306,17 +307,17 @@ implicitRequirements :: HscEnv
 implicitRequirements hsc_env normal_imports
   = fmap concat $
     forM normal_imports $ \(mb_pkg, L _ imp) -> do
-        found <- findImportedModule fc fopts units home_unit imp mb_pkg
+        found <- findImportedModule fc fopts units mhome_unit imp mb_pkg
         case found of
-            Found _ mod | not (isHomeModule home_unit mod) ->
+            Found _ mod | notHomeModuleMaybe mhome_unit mod ->
                 return (uniqDSetToList (moduleFreeHoles mod))
             _ -> return []
   where
-    fc        = hsc_FC hsc_env
-    home_unit = hsc_home_unit hsc_env
-    units     = hsc_units hsc_env
-    dflags    = hsc_dflags hsc_env
-    fopts     = initFinderOpts dflags
+    fc         = hsc_FC hsc_env
+    mhome_unit = ue_home_unit (hsc_unit_env hsc_env)
+    units      = hsc_units hsc_env
+    dflags     = hsc_dflags hsc_env
+    fopts      = initFinderOpts dflags
 
 -- | Like @implicitRequirements'@, but returns either the module name, if it is
 -- a free hole, or the instantiated unit the imported module is from, so that
@@ -328,17 +329,17 @@ implicitRequirementsShallow
   -> IO ([ModuleName], [InstantiatedUnit])
 implicitRequirementsShallow hsc_env normal_imports = go ([], []) normal_imports
  where
-  fc        = hsc_FC hsc_env
-  home_unit = hsc_home_unit hsc_env
-  units     = hsc_units hsc_env
-  dflags    = hsc_dflags hsc_env
-  fopts        = initFinderOpts dflags
+  fc         = hsc_FC hsc_env
+  mhome_unit = ue_home_unit (hsc_unit_env hsc_env)
+  units      = hsc_units hsc_env
+  dflags     = hsc_dflags hsc_env
+  fopts      = initFinderOpts dflags
 
   go acc [] = pure acc
   go (accL, accR) ((mb_pkg, L _ imp):imports) = do
-    found <- findImportedModule fc fopts units home_unit imp mb_pkg
+    found <- findImportedModule fc fopts units mhome_unit imp mb_pkg
     let acc' = case found of
-          Found _ mod | not (isHomeModule home_unit mod) ->
+          Found _ mod | notHomeModuleMaybe mhome_unit mod ->
               case moduleUnit mod of
                   HoleUnit -> (moduleName mod : accL, accR)
                   RealUnit _ -> (accL, accR)
@@ -570,7 +571,7 @@ mergeSignatures
     let unit_state = hsc_units hsc_env
     let fc         = hsc_FC hsc_env
     let nc         = hsc_NC hsc_env
-    let home_unit  = hsc_home_unit hsc_env
+    let mhome_unit = ue_home_unit (hsc_unit_env hsc_env)
     let dflags     = hsc_dflags hsc_env
     let logger     = hsc_logger hsc_env
     let hooks      = hsc_hooks hsc_env
@@ -588,7 +589,7 @@ mergeSignatures
             ctx = initSDocContext dflags defaultUserStyle
         fmap fst
          . withException ctx
-         $ findAndReadIface logger nc fc hooks unit_state home_unit dflags
+         $ findAndReadIface logger nc fc hooks unit_state mhome_unit dflags
                             (text "mergeSignatures") im m NotBoot
 
     -- STEP 3: Get the unrenamed exports of all these interfaces,
@@ -767,6 +768,8 @@ mergeSignatures
     -- Save the exports
     setGblEnv tcg_env { tcg_rn_exports = mb_lies } $ do
     tcg_env <- getGblEnv
+
+    let home_unit = hsc_home_unit hsc_env
 
     -- STEP 4: Rename the interfaces
     ext_ifaces <- forM thinned_ifaces $ \((Module iuid _), ireq_iface) ->
@@ -1001,12 +1004,12 @@ checkImplements impl_mod req_mod@(Module uid mod_name) = do
     hsc_env <- getTopEnv
     let nc        = hsc_NC hsc_env
     let fc        = hsc_FC hsc_env
-    let home_unit = hsc_home_unit hsc_env
+    let mhome_unit = ue_home_unit (hsc_unit_env hsc_env)
     let units     = hsc_units hsc_env
     let dflags    = hsc_dflags hsc_env
     let logger    = hsc_logger hsc_env
     let hooks     = hsc_hooks hsc_env
-    mb_isig_iface <- liftIO $ findAndReadIface logger nc fc hooks units home_unit dflags
+    mb_isig_iface <- liftIO $ findAndReadIface logger nc fc hooks units mhome_unit dflags
                                                (text "checkImplements 2")
                                                isig_mod sig_mod NotBoot
     isig_iface <- case mb_isig_iface of

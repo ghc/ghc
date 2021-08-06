@@ -2041,7 +2041,7 @@ addModule files = do
       let dflags    = hsc_dflags hsc_env
       let fopts     = initFinderOpts dflags
       result <- liftIO $
-        Finder.findImportedModule fc fopts units home_unit m (ThisPkg (homeUnitId home_unit))
+        Finder.findImportedModule fc fopts units (Just home_unit) m (ThisPkg (homeUnitId home_unit))
       case result of
         Found _ _ -> return True
         _ -> (liftIO $ putStrLn $

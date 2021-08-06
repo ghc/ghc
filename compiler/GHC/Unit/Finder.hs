@@ -134,18 +134,24 @@ findImportedModule
   :: FinderCache
   -> FinderOpts
   -> UnitState
-  -> HomeUnit
+  -> Maybe HomeUnit
   -> ModuleName
   -> PkgQual
   -> IO FindResult
-findImportedModule fc fopts units home_unit mod_name mb_pkg =
+findImportedModule fc fopts units mhome_unit mod_name mb_pkg =
   case mb_pkg of
     NoPkgQual  -> unqual_import
     ThisPkg _  -> home_import
     OtherPkg _ -> pkg_import
   where
-    home_import   = findHomeModule fc fopts home_unit mod_name
+    home_import
+      | Just home_unit <- mhome_unit
+      = findHomeModule fc fopts home_unit mod_name
+      | otherwise
+      = pure $ NoPackage (panic "findImportedModule: no home-unit")
+
     pkg_import    = findExposedPackageModule fc fopts units mod_name mb_pkg
+
     unqual_import = home_import
                     `orIfNotFound`
                     findExposedPackageModule fc fopts units mod_name NoPkgQual
@@ -154,10 +160,12 @@ findImportedModule fc fopts units home_unit mod_name mb_pkg =
 -- plugin.  This consults the same set of exposed packages as
 -- 'findImportedModule', unless @-hide-all-plugin-packages@ or
 -- @-plugin-package@ are specified.
-findPluginModule :: FinderCache -> FinderOpts -> UnitState -> HomeUnit -> ModuleName -> IO FindResult
-findPluginModule fc fopts units home_unit mod_name =
+findPluginModule :: FinderCache -> FinderOpts -> UnitState -> Maybe HomeUnit -> ModuleName -> IO FindResult
+findPluginModule fc fopts units (Just home_unit) mod_name =
   findHomeModule fc fopts home_unit mod_name
   `orIfNotFound`
+  findExposedPluginPackageModule fc fopts units mod_name
+findPluginModule fc fopts units Nothing mod_name =
   findExposedPluginPackageModule fc fopts units mod_name
 
 -- | Locate a specific 'Module'.  The purpose of this function is to
@@ -166,11 +174,13 @@ findPluginModule fc fopts units home_unit mod_name =
 -- reading the interface for a module mentioned by another interface,
 -- for example (a "system import").
 
-findExactModule :: FinderCache -> FinderOpts -> UnitState -> HomeUnit -> InstalledModule -> IO InstalledFindResult
-findExactModule fc fopts unit_state home_unit mod = do
-  if isHomeInstalledModule home_unit mod
-    then findInstalledHomeModule fc fopts home_unit (moduleName mod)
-    else findPackageModule fc unit_state fopts mod
+findExactModule :: FinderCache -> FinderOpts -> UnitState -> Maybe HomeUnit -> InstalledModule -> IO InstalledFindResult
+findExactModule fc fopts unit_state mhome_unit mod = do
+  case mhome_unit of
+    Just home_unit
+      | isHomeInstalledModule home_unit mod
+      -> findInstalledHomeModule fc fopts home_unit (moduleName mod)
+    _ -> findPackageModule fc unit_state fopts mod
 
 -- -----------------------------------------------------------------------------
 -- Helpers

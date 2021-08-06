@@ -36,6 +36,7 @@ import GHC.Utils.TmpFs
 
 import GHC.Iface.Load (cannotFindModule)
 
+import GHC.Unit.Env
 import GHC.Unit.Module
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Module.Graph
@@ -290,14 +291,14 @@ findDependency  :: HscEnv
                 -> Bool                 -- Record dependency on package modules
                 -> IO (Maybe FilePath)  -- Interface file
 findDependency hsc_env srcloc pkg imp is_boot include_pkg_deps = do
-  let fc        = hsc_FC hsc_env
-  let home_unit = hsc_home_unit hsc_env
-  let units     = hsc_units hsc_env
-  let dflags    = hsc_dflags hsc_env
-  let fopts     = initFinderOpts dflags
+  let fc         = hsc_FC hsc_env
+  let mhome_unit = ue_home_unit (hsc_unit_env hsc_env)
+  let units      = hsc_units hsc_env
+  let dflags     = hsc_dflags hsc_env
+  let fopts      = initFinderOpts dflags
   -- Find the module; this will be fast because
   -- we've done it once during downsweep
-  r <- findImportedModule fc fopts units home_unit imp pkg
+  r <- findImportedModule fc fopts units mhome_unit imp pkg
   case r of
     Found loc _
         -- Home package: just depend on the .hi or hi-boot file

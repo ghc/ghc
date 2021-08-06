@@ -1643,25 +1643,25 @@ findModule mod_name maybe_pkg = do
 
 findQualifiedModule :: GhcMonad m => PkgQual -> ModuleName -> m Module
 findQualifiedModule pkgqual mod_name = withSession $ \hsc_env -> do
-  let fc        = hsc_FC hsc_env
-  let home_unit = hsc_home_unit hsc_env
-  let units     = hsc_units hsc_env
-  let dflags    = hsc_dflags hsc_env
-  let fopts     = initFinderOpts dflags
+  let fc         = hsc_FC hsc_env
+  let mhome_unit = ue_home_unit (hsc_unit_env hsc_env)
+  let units      = hsc_units hsc_env
+  let dflags     = hsc_dflags hsc_env
+  let fopts      = initFinderOpts dflags
   case pkgqual of
     ThisPkg _ -> do
       home <- lookupLoadedHomeModule mod_name
       case home of
         Just m  -> return m
         Nothing -> liftIO $ do
-           res <- findImportedModule fc fopts units home_unit mod_name pkgqual
+           res <- findImportedModule fc fopts units mhome_unit mod_name pkgqual
            case res of
-             Found loc m | not (isHomeModule home_unit m) -> return m
+             Found loc m | notHomeModuleMaybe mhome_unit m -> return m
                          | otherwise -> modNotLoadedError dflags m loc
              err -> throwOneError $ noModError hsc_env noSrcSpan mod_name err
 
     _ -> liftIO $ do
-      res <- findImportedModule fc fopts units home_unit mod_name pkgqual
+      res <- findImportedModule fc fopts units mhome_unit mod_name pkgqual
       case res of
         Found _ m -> return m
         err       -> throwOneError $ noModError hsc_env noSrcSpan mod_name err

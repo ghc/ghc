@@ -43,6 +43,7 @@ import GHCi.UI              ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings
 
 import GHC.Runtime.Loader   ( loadFrontendPlugin )
 
+import GHC.Unit.Env
 import GHC.Unit.Module ( ModuleName, mkModuleName )
 import GHC.Unit.Module.ModIface
 import GHC.Unit.State  ( pprUnits, pprUnitsSimple )
@@ -872,17 +873,17 @@ abiHash :: [String] -- ^ List of module names
         -> Ghc ()
 abiHash strs = do
   hsc_env <- getSession
-  let fc        = hsc_FC hsc_env
-  let home_unit = hsc_home_unit hsc_env
-  let units     = hsc_units hsc_env
-  let dflags    = hsc_dflags hsc_env
-  let fopts     = initFinderOpts dflags
+  let fc         = hsc_FC hsc_env
+  let mhome_unit = ue_home_unit (hsc_unit_env hsc_env)
+  let units      = hsc_units hsc_env
+  let dflags     = hsc_dflags hsc_env
+  let fopts      = initFinderOpts dflags
 
   liftIO $ do
 
   let find_it str = do
          let modname = mkModuleName str
-         r <- findImportedModule fc fopts units home_unit modname NoPkgQual
+         r <- findImportedModule fc fopts units mhome_unit modname NoPkgQual
          case r of
            Found _ m -> return m
            _error    -> throwGhcException $ CmdLineError $ showSDoc dflags $

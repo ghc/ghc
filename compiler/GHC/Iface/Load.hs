@@ -109,7 +109,7 @@ import GHC.Unit.State
 import GHC.Unit.Home
 import GHC.Unit.Home.ModInfo
 import GHC.Unit.Finder
-import GHC.Unit.Env ( ue_hpt )
+import GHC.Unit.Env
 
 import GHC.Data.Maybe
 
@@ -322,8 +322,8 @@ loadSrcInterface_maybe doc mod want_boot maybe_pkg
        let dflags = hsc_dflags hsc_env
        let fopts = initFinderOpts dflags
        let units = hsc_units hsc_env
-       let home_unit = hsc_home_unit hsc_env
-       res <- liftIO $ findImportedModule fc fopts units home_unit mod maybe_pkg
+       let mhome_unit = ue_home_unit (hsc_unit_env hsc_env)
+       res <- liftIO $ findImportedModule fc fopts units mhome_unit mod maybe_pkg
        case res of
            Found _ mod -> initIfaceTcRn $ loadInterface doc mod (ImportByUser want_boot)
            -- TODO: Make sure this error message is good
@@ -456,7 +456,7 @@ loadInterface doc_str mod from
 
                 -- Check whether we have the interface already
         ; hsc_env <- getTopEnv
-        ; let home_unit = hsc_home_unit hsc_env
+        ; let mhome_unit = ue_home_unit (hsc_unit_env hsc_env)
         ; case lookupIfaceByModule hpt (eps_PIT eps) mod of {
             Just iface
                 -> return (Succeeded iface) ;   -- Already loaded
@@ -466,7 +466,7 @@ loadInterface doc_str mod from
             _ -> do {
 
         -- READ THE MODULE IN
-        ; read_result <- case (wantHiBootFile home_unit eps mod from) of
+        ; read_result <- case wantHiBootFile mhome_unit eps mod from of
                            Failed err             -> return (Failed err)
                            Succeeded hi_boot_file -> do
                              hsc_env <- getTopEnv
@@ -540,7 +540,7 @@ loadInterface doc_str mod from
 
         ; warnPprTrace bad_boot (ppr mod) $
           updateEps_  $ \ eps ->
-           if elemModuleEnv mod (eps_PIT eps) || is_external_sig home_unit iface
+           if elemModuleEnv mod (eps_PIT eps) || is_external_sig mhome_unit iface
                 then eps
            else if bad_boot
                 -- See Note [Loading your own hi-boot file]
@@ -680,12 +680,12 @@ dontLeakTheHPT thing_inside = do
 -- | Returns @True@ if a 'ModIface' comes from an external package.
 -- In this case, we should NOT load it into the EPS; the entities
 -- should instead come from the local merged signature interface.
-is_external_sig :: HomeUnit -> ModIface -> Bool
-is_external_sig home_unit iface =
+is_external_sig :: Maybe HomeUnit -> ModIface -> Bool
+is_external_sig mhome_unit iface =
     -- It's a signature iface...
     mi_semantic_module iface /= mi_module iface &&
     -- and it's not from the local package
-    not (isHomeModule home_unit (mi_module iface))
+    notHomeModuleMaybe mhome_unit (mi_module iface)
 
 -- | This is an improved version of 'findAndReadIface' which can also
 -- handle the case when a user requests @p[A=<B>]:M@ but we only
@@ -711,21 +711,23 @@ computeInterface hsc_env doc_str hi_boot_file mod0 = do
   massert (not (isHoleModule mod0))
   let name_cache = hsc_NC hsc_env
   let fc         = hsc_FC hsc_env
-  let home_unit  = hsc_home_unit hsc_env
+  let mhome_unit = ue_home_unit (hsc_unit_env hsc_env)
   let units      = hsc_units hsc_env
   let dflags     = hsc_dflags hsc_env
   let logger     = hsc_logger hsc_env
   let hooks      = hsc_hooks hsc_env
-  let find_iface m = findAndReadIface logger name_cache fc hooks units home_unit dflags doc_str
+  let find_iface m = findAndReadIface logger name_cache fc hooks units mhome_unit dflags doc_str
                                       m mod0 hi_boot_file
   case getModuleInstantiation mod0 of
-      (imod, Just indef) | isHomeUnitIndefinite home_unit ->
-        find_iface imod >>= \case
-          Succeeded (iface0, path) ->
-            rnModIface hsc_env (instUnitInsts (moduleUnit indef)) Nothing iface0 >>= \case
-              Right x   -> return (Succeeded (x, path))
-              Left errs -> throwErrors (GhcTcRnMessage <$> errs)
-          Failed err -> return (Failed err)
+      (imod, Just indef)
+        | Just home_unit <- mhome_unit
+        , isHomeUnitIndefinite home_unit ->
+          find_iface imod >>= \case
+            Succeeded (iface0, path) ->
+              rnModIface hsc_env (instUnitInsts (moduleUnit indef)) Nothing iface0 >>= \case
+                Right x   -> return (Succeeded (x, path))
+                Left errs -> throwErrors (GhcTcRnMessage <$> errs)
+            Failed err -> return (Failed err)
       (mod, _) -> find_iface mod
 
 -- | Compute the signatures which must be compiled in order to
@@ -765,12 +767,12 @@ moduleFreeHolesPrecise doc_str mod
         hsc_env <- getTopEnv
         let nc        = hsc_NC hsc_env
         let fc        = hsc_FC hsc_env
-        let home_unit = hsc_home_unit hsc_env
         let units     = hsc_units hsc_env
         let dflags    = hsc_dflags hsc_env
         let logger    = hsc_logger hsc_env
         let hooks     = hsc_hooks hsc_env
-        mb_iface <- liftIO $ findAndReadIface logger nc fc hooks units home_unit dflags
+        let mhome_unit = ue_home_unit (hsc_unit_env hsc_env)
+        mb_iface <- liftIO $ findAndReadIface logger nc fc hooks units mhome_unit dflags
                                               (text "moduleFreeHolesPrecise" <+> doc_str)
                                               imod mod NotBoot
         case mb_iface of
@@ -782,13 +784,13 @@ moduleFreeHolesPrecise doc_str mod
                 return (Succeeded (renameFreeHoles ifhs insts))
             Failed err -> return (Failed err)
 
-wantHiBootFile :: HomeUnit -> ExternalPackageState -> Module -> WhereFrom
+wantHiBootFile :: Maybe HomeUnit -> ExternalPackageState -> Module -> WhereFrom
                -> MaybeErr SDoc IsBootInterface
 -- Figure out whether we want Foo.hi or Foo.hi-boot
-wantHiBootFile home_unit eps mod from
+wantHiBootFile mhome_unit eps mod from
   = case from of
        ImportByUser usr_boot
-          | usr_boot == IsBoot && notHomeModule home_unit mod
+          | usr_boot == IsBoot && notHomeModuleMaybe mhome_unit mod
           -> Failed (badSourceImport mod)
           | otherwise -> Succeeded usr_boot
 
@@ -796,7 +798,7 @@ wantHiBootFile home_unit eps mod from
           -> Succeeded NotBoot
 
        ImportBySystem
-          | notHomeModule home_unit mod
+          | notHomeModuleMaybe mhome_unit mod
           -> Succeeded NotBoot
              -- If the module to be imported is not from this package
              -- don't look it up in eps_is_boot, because that is keyed
@@ -867,7 +869,7 @@ findAndReadIface
   -> FinderCache
   -> Hooks
   -> UnitState
-  -> HomeUnit
+  -> Maybe HomeUnit
   -> DynFlags
   -> SDoc            -- ^ Reason for loading the iface (used for tracing)
   -> InstalledModule -- ^ The unique identifier of the on-disk module we're looking for
@@ -876,7 +878,7 @@ findAndReadIface
                      -- module we read out.
   -> IsBootInterface -- ^ Looking for .hi-boot or .hi file
   -> IO (MaybeErr SDoc (ModIface, FilePath))
-findAndReadIface logger name_cache fc hooks unit_state home_unit dflags doc_str mod wanted_mod hi_boot_file = do
+findAndReadIface logger name_cache fc hooks unit_state mhome_unit dflags doc_str mod wanted_mod hi_boot_file = do
   let profile = targetProfile dflags
 
   trace_if logger (sep [hsep [text "Reading",
@@ -899,14 +901,16 @@ findAndReadIface logger name_cache fc hooks unit_state home_unit dflags doc_str 
       else do
           let fopts = initFinderOpts dflags
           -- Look for the file
-          mb_found <- liftIO (findExactModule fc fopts unit_state home_unit mod)
+          mb_found <- liftIO (findExactModule fc fopts unit_state mhome_unit mod)
           case mb_found of
               InstalledFound (addBootSuffixLocn_maybe hi_boot_file -> loc) mod -> do
                   -- See Note [Home module load error]
-                  if isHomeInstalledModule home_unit mod &&
-                     not (isOneShot (ghcMode dflags))
-                      then return (Failed (homeModError mod loc))
-                      else do
+                  case mhome_unit of
+                    Just home_unit
+                      | isHomeInstalledModule home_unit mod
+                      , not (isOneShot (ghcMode dflags))
+                      -> return (Failed (homeModError mod loc))
+                    _ -> do
                         r <- read_file logger name_cache unit_state dflags wanted_mod (ml_hi_file loc)
                         case r of
                           Failed _
@@ -923,7 +927,7 @@ findAndReadIface logger name_cache fc hooks unit_state home_unit dflags doc_str 
                   trace_if logger (text "...not found")
                   return $ Failed $ cannotFindInterface
                                       unit_state
-                                      home_unit
+                                      mhome_unit
                                       profile
                                       (Iface_Errors.mayShowLocations dflags)
                                       (moduleName mod)

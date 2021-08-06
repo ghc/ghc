@@ -54,6 +54,7 @@ import GHC.Types.Unique
 import GHC.Types.Unique.Set
 import GHC.Types.Fixity.Env
 
+import GHC.Unit.Env
 import GHC.Unit.External
 import GHC.Unit.Finder
 import GHC.Unit.State
@@ -526,8 +527,8 @@ checkMergedSignatures hsc_env mod_summary iface = do
 checkDependencies :: HscEnv -> ModSummary -> ModIface -> IfG RecompileRequired
 checkDependencies hsc_env summary iface
  = do
-    res_normal <- classify_import (findImportedModule fc fopts units home_unit) (ms_textual_imps summary ++ ms_srcimps summary)
-    res_plugin <- classify_import (\mod _ -> findPluginModule fc fopts units home_unit mod) (ms_plugin_imps summary)
+    res_normal <- classify_import (findImportedModule fc fopts units mhome_unit) (ms_textual_imps summary ++ ms_srcimps summary)
+    res_plugin <- classify_import (\mod _ -> findPluginModule fc fopts units mhome_unit mod) (ms_plugin_imps summary)
     case sequence (res_normal ++ res_plugin ++ [Right (fake_ghc_prim_import)| ms_ghc_prim_import summary]) of
       Left recomp -> return recomp
       Right es -> do
@@ -548,7 +549,7 @@ checkDependencies hsc_env summary iface
    fopts         = initFinderOpts dflags
    logger        = hsc_logger hsc_env
    fc            = hsc_FC hsc_env
-   home_unit     = hsc_home_unit hsc_env
+   mhome_unit    = ue_home_unit (hsc_unit_env hsc_env)
    units         = hsc_units hsc_env
    prev_dep_mods = map gwib_mod $ Set.toAscList $ dep_direct_mods (mi_deps iface)
    prev_dep_pkgs = Set.toAscList (Set.union (dep_direct_pkgs (mi_deps iface))
@@ -560,13 +561,14 @@ checkDependencies hsc_env summary iface
    -- GHC.Prim is very special and doesn't appear in ms_textual_imps but
    -- ghc-prim will appear in the package dependencies still. In order to not confuse
    -- the recompilation logic we need to not forget we imported GHC.Prim.
-   fake_ghc_prim_import = if homeUnitId home_unit == primUnitId
-                            then Left (mkModuleName "GHC.Prim")
-                            else Right ("GHC.Prim", primUnitId)
+   fake_ghc_prim_import = if notHomeUnitId mhome_unit primUnitId
+                            then Right ("GHC.Prim", primUnitId)
+                            else Left (mkModuleName "GHC.Prim")
 
 
    classify _ (Found _ mod)
-    | isHomeUnit home_unit (moduleUnit mod) = Right (Left (moduleName mod))
+    | Just home_unit <- mhome_unit
+    , isHomeUnit home_unit (moduleUnit mod) = Right (Left (moduleName mod))
     | otherwise = Right (Right (moduleNameString (moduleName mod), toUnitId $ moduleUnit mod))
    classify reason _ = Left (RecompBecause reason)
 

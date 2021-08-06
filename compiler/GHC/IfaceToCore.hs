@@ -65,6 +65,7 @@ import GHC.Core.DataCon
 import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
 import GHC.Core.Ppr
 
+import GHC.Unit.Env
 import GHC.Unit.External
 import GHC.Unit.Module
 import GHC.Unit.Module.ModDetails
@@ -552,12 +553,12 @@ tcHiBootIface hsc_src mod
         { hsc_env <- getTopEnv
         ; let nc        = hsc_NC hsc_env
         ; let fc        = hsc_FC hsc_env
-        ; let home_unit = hsc_home_unit hsc_env
+        ; let mhome_unit = ue_home_unit (hsc_unit_env hsc_env)
         ; let units     = hsc_units hsc_env
         ; let dflags    = hsc_dflags hsc_env
         ; let logger    = hsc_logger hsc_env
         ; let hooks     = hsc_hooks hsc_env
-        ; read_result <- liftIO $ findAndReadIface logger nc fc hooks units home_unit dflags
+        ; read_result <- liftIO $ findAndReadIface logger nc fc hooks units mhome_unit dflags
                                 need (fst (getModuleInstantiation mod)) mod
                                 IsBoot  -- Hi-boot file
 
