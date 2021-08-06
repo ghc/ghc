@@ -53,6 +53,8 @@ Packaging fixes
 
 - Bump ``base`` to 4.14.3.0
 
+- Bump ``haskeline`` to 0.8.2
+
 - Bump ``Win32`` to 2.6.2.0 (:ghc-ticket:`20202`)
 
 Portability fixes
