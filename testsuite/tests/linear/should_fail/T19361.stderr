@@ -1,0 +1,10 @@
+
+T19361.hs:6:3: error:
+    • Couldn't match type ‘m’ with ‘'Many’
+        arising from multiplicity of ‘x’
+      ‘m’ is a rigid type variable bound by
+        the type signature for:
+          f :: forall a. a -> a
+        at T19361.hs:5:1-14
+    • In an equation for ‘f’: f x = g x
+    • Relevant bindings include f :: a %m -> a (bound at T19361.hs:6:1)
