@@ -18,4 +18,5 @@ data Specificity
 type TyVar = Var
 type Id    = Var
 type TyCoVar = Id
+type TcTyVar = Var
 type InvisTVBinder = VarBndr TyVar Specificity
