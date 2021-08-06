@@ -1,6 +1,8 @@
-T15883e.hs:16:1:
-     Can't make a derived instance of
+
+T15883e.hs:16:1: error:
+    • Can't make a derived instance of
         ‘Data (Foo ('BoxedRep 'Lifted))’ with the stock strategy:
-        Don't know how to derive ‘Data’ for type ‘forall a. a’
-     In the stand-alone deriving instance for
+        Don't know how to derive ‘Data’
+          for type ‘forall (a :: TYPE rep). a’
+    • In the stand-alone deriving instance for
         ‘Data (Foo (BoxedRep Lifted))’

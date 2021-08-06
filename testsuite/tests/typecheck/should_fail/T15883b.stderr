@@ -1,6 +1,7 @@
-T15883b.hs:14:1:
-     Can't make a derived instance of
+
+T15883b.hs:14:1: error:
+    • Can't make a derived instance of
         ‘Eq (Foo ('BoxedRep 'Lifted))’ with the stock strategy:
-        Don't know how to derive ‘Eq’ for type ‘forall a. a’
-     In the stand-alone deriving instance for
+        Don't know how to derive ‘Eq’ for type ‘forall (a :: TYPE rep). a’
+    • In the stand-alone deriving instance for
         ‘Eq (Foo (BoxedRep Lifted))’

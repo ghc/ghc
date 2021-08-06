@@ -89,6 +89,7 @@ import GHC.Utils.Outputable
 import GHC.Data.FastString
 import GHC.Utils.Misc
 import GHC.Utils.Panic
+import {-# SOURCE #-} GHC.Tc.Utils.TcType ( isMetaTyVar, isTyConableTyVar )
 
 import Data.Maybe( isJust )
 import qualified Data.Semigroup as Semi
@@ -1006,18 +1007,25 @@ This is done in a pass right before pretty-printing
 
 This applies to /quantified/ variables like 'w' above.  What about
 variables that are /free/ in the type being printed, which certainly
-happens in error messages.  Suppose (#16074) we are reporting a
-mismatch between two skolems
+happens in error messages.  Suppose (#16074, #19361) we are reporting a
+mismatch between skolems
           (a :: RuntimeRep) ~ (b :: RuntimeRep)
-We certainly don't want to say "Can't match LiftedRep ~ LiftedRep"!
+        or
+          (m :: Multiplicity) ~ Many
+We certainly don't want to say "Can't match LiftedRep with LiftedRep" or
+"Can't match Many with Many"!
 
 But if we are printing the type
-    (forall (a :: TYPE r). blah
+    (forall (a :: TYPE r). blah)
 we do want to turn that (free) r into LiftedRep, so it prints as
     (forall a. blah)
 
-Conclusion: keep track of whether we are in the kind of a
-binder; only if so, convert free RuntimeRep variables to LiftedRep.
+We use isMetaTyVar to distinguish between those two situations:
+metavariables are converted, skolem variables are not.
+
+There's one exception though: TyVarTv metavariables should not be defaulted,
+as they appear during kind-checking of "newtype T :: TYPE r where..."
+(test T18357a). Therefore, we additionally test for isTyConableTyVar.
 -}
 
 -- | Default 'RuntimeRep' variables to 'LiftedRep', and 'Multiplicity'
@@ -1039,65 +1047,68 @@ binder; only if so, convert free RuntimeRep variables to LiftedRep.
 -- type signatures (e.g. ($)). See Note [Defaulting RuntimeRep variables]
 -- and #11549 for further discussion.
 defaultNonStandardVars :: Bool -> Bool -> IfaceType -> IfaceType
-defaultNonStandardVars do_runtimereps do_multiplicities ty = go False emptyFsEnv ty
+defaultNonStandardVars do_runtimereps do_multiplicities ty = go emptyFsEnv ty
   where
-    go :: Bool              -- True <=> Inside the kind of a binder
-       -> FastStringEnv IfaceType -- Set of enclosing forall-ed RuntimeRep/Multiplicity variables
+    go :: FastStringEnv IfaceType -- Set of enclosing forall-ed RuntimeRep/Multiplicity variables
        -> IfaceType
        -> IfaceType
-    go ink subs (IfaceForAllTy (Bndr (IfaceTvBndr (var, var_kind)) argf) ty)
+    go subs (IfaceForAllTy (Bndr (IfaceTvBndr (var, var_kind)) argf) ty)
      | isInvisibleArgFlag argf  -- Don't default *visible* quantification
                                 -- or we get the mess in #13963
      , Just substituted_ty <- check_substitution var_kind
       = let subs' = extendFsEnv subs var substituted_ty
             -- Record that we should replace it with LiftedRep,
             -- and recurse, discarding the forall
-        in go ink subs' ty
+        in go subs' ty
 
-    go ink subs (IfaceForAllTy bndr ty)
-      = IfaceForAllTy (go_ifacebndr subs bndr) (go ink subs ty)
+    go subs (IfaceForAllTy bndr ty)
+      = IfaceForAllTy (go_ifacebndr subs bndr) (go subs ty)
 
-    go _ subs ty@(IfaceTyVar tv) = case lookupFsEnv subs tv of
+    go subs ty@(IfaceTyVar tv) = case lookupFsEnv subs tv of
       Just s -> s
       Nothing -> ty
 
-    go in_kind _ ty@(IfaceFreeTyVar tv)
+    go _ ty@(IfaceFreeTyVar tv)
       -- See Note [Defaulting RuntimeRep variables], about free vars
-      | in_kind && do_runtimereps && GHC.Core.Type.isRuntimeRepTy (tyVarKind tv)
+      | do_runtimereps && GHC.Core.Type.isRuntimeRepTy (tyVarKind tv)
+      , isMetaTyVar tv
+      , isTyConableTyVar tv
       = liftedRep_ty
       | do_multiplicities && GHC.Core.Type.isMultiplicityTy (tyVarKind tv)
+      , isMetaTyVar tv
+      , isTyConableTyVar tv
       = many_ty
       | otherwise
       = ty
 
-    go ink subs (IfaceTyConApp tc tc_args)
-      = IfaceTyConApp tc (go_args ink subs tc_args)
+    go subs (IfaceTyConApp tc tc_args)
+      = IfaceTyConApp tc (go_args subs tc_args)
 
-    go ink subs (IfaceTupleTy sort is_prom tc_args)
-      = IfaceTupleTy sort is_prom (go_args ink subs tc_args)
+    go subs (IfaceTupleTy sort is_prom tc_args)
+      = IfaceTupleTy sort is_prom (go_args subs tc_args)
 
-    go ink subs (IfaceFunTy af w arg res)
-      = IfaceFunTy af (go ink subs w) (go ink subs arg) (go ink subs res)
+    go subs (IfaceFunTy af w arg res)
+      = IfaceFunTy af (go subs w) (go subs arg) (go subs res)
 
-    go ink subs (IfaceAppTy t ts)
-      = IfaceAppTy (go ink subs t) (go_args ink subs ts)
+    go subs (IfaceAppTy t ts)
+      = IfaceAppTy (go subs t) (go_args subs ts)
 
-    go ink subs (IfaceCastTy x co)
-      = IfaceCastTy (go ink subs x) co
+    go subs (IfaceCastTy x co)
+      = IfaceCastTy (go subs x) co
 
-    go _ _ ty@(IfaceLitTy {}) = ty
-    go _ _ ty@(IfaceCoercionTy {}) = ty
+    go _ ty@(IfaceLitTy {}) = ty
+    go _ ty@(IfaceCoercionTy {}) = ty
 
     go_ifacebndr :: FastStringEnv IfaceType -> IfaceForAllBndr -> IfaceForAllBndr
     go_ifacebndr subs (Bndr (IfaceIdBndr (w, n, t)) argf)
-      = Bndr (IfaceIdBndr (w, n, go True subs t)) argf
+      = Bndr (IfaceIdBndr (w, n, go subs t)) argf
     go_ifacebndr subs (Bndr (IfaceTvBndr (n, t)) argf)
-      = Bndr (IfaceTvBndr (n, go True subs t)) argf
+      = Bndr (IfaceTvBndr (n, go subs t)) argf
 
-    go_args :: Bool -> FastStringEnv IfaceType -> IfaceAppArgs -> IfaceAppArgs
-    go_args _ _ IA_Nil = IA_Nil
-    go_args ink subs (IA_Arg ty argf args)
-      = IA_Arg (go ink subs ty) argf (go_args ink subs args)
+    go_args :: FastStringEnv IfaceType -> IfaceAppArgs -> IfaceAppArgs
+    go_args _ IA_Nil = IA_Nil
+    go_args subs (IA_Arg ty argf args)
+      = IA_Arg (go subs ty) argf (go_args subs args)
 
     check_substitution :: IfaceType -> Maybe IfaceType
     check_substitution (IfaceTyConApp tc _)
