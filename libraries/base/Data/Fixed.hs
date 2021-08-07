@@ -103,7 +103,7 @@ withResolution foo = withType (foo . resolution)
 -- resolution @10^-3@ of @type Milli = Fixed E3@,
 --
 -- @
---   succ (0.000 :: Milli) == 1.001
+--   succ (0.000 :: Milli) == 0.001
 -- @
 --
 --
