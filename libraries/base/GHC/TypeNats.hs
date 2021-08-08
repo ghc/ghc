@@ -55,8 +55,10 @@ import GHC.TypeNats.Internal(CmpNat)
 
 -- | A type synonym for 'Natural'.
 --
--- Prevously, this was an opaque data type, but it was changed to a type synonym
--- @since @base-4.15.0.0@.
+-- Prevously, this was an opaque data type, but it was changed to a type
+-- synonym.
+--
+-- @since 4.15.0.0
 
 type Nat = Natural
 --------------------------------------------------------------------------------
@@ -223,6 +225,7 @@ sameNat x y
 
 -- | Like 'sameNat', but if the numbers aren't equal, this additionally
 -- provides proof of LT or GT.
+--
 -- @since 4.16.0.0
 cmpNat :: forall a b proxy1 proxy2. (KnownNat a, KnownNat b)
        => proxy1 a -> proxy2 b -> OrderingI a b
