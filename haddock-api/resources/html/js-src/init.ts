@@ -17,6 +17,11 @@ function onDomReady(callback: () => void) {
 onDomReady(() => {
   document.body.classList.add('js-enabled');
   styleMenu.init();
-  quickJump.init();
   detailsHelper.init();
+  let head = document.getElementById('head');
+  let baseURL = ".";
+  if (head !== null) {
+    baseURL = head.getAttribute('data-base-url') || '.';
+  }
+  quickJump.init(baseURL);
 });

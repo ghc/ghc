@@ -12,6 +12,8 @@
 -----------------------------------------------------------------------------
 module Haddock.Backends.Xhtml.Types (
   SourceURLs, WikiURLs,
+  BaseURL,
+  withBaseURL,
   LinksInfo,
   Splice,
   Unicode,
@@ -20,12 +22,21 @@ module Haddock.Backends.Xhtml.Types (
 
 import Data.Map
 import GHC
+import qualified System.FilePath as FilePath
 
 
 -- the base, module and entity URLs for the source code and wiki links.
 type SourceURLs = (Maybe FilePath, Maybe FilePath, Map Unit FilePath, Map Unit FilePath)
 type WikiURLs = (Maybe FilePath, Maybe FilePath, Maybe FilePath)
 
+-- | base url for loading js, json, css resources.  The default is "."
+--
+type BaseURL = Maybe String
+
+-- TODO: we shouldn't use 'FilePath.</>'
+withBaseURL :: BaseURL -> String -> String
+withBaseURL Nothing        uri = uri
+withBaseURL (Just baseUrl) uri = baseUrl FilePath.</> uri
 
 -- The URL for source and wiki links
 type LinksInfo = (SourceURLs, WikiURLs)

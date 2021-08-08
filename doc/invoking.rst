@@ -223,6 +223,13 @@ The following options are available:
     Reserved for future use (output documentation in DocBook XML
     format).
 
+.. option:: --base-url=<url>
+
+    Base url for static assets (eg. css, javascript, json files etc.).
+    When present, static assets are not copied.  This option is useful
+    when creating documentation for multiple packages, it allows to have
+    a single copy of static assets served from the given url.
+
 .. option:: --source-base=<url>
             --source-module=<url>
             --source-entity=<url>
