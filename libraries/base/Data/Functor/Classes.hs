@@ -296,6 +296,7 @@ compare2 = liftCompare2 compare compare
 -- @
 --
 -- For more information, refer to the documentation for the 'Read' class.
+--
 -- @since 4.9.0.0
 class Read2 f where
     {-# MINIMAL liftReadsPrec2 | liftReadPrec2 #-}

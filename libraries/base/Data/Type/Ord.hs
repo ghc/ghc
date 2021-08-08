@@ -44,6 +44,7 @@ import Data.Ord
 
 -- | 'Compare' branches on the kind of its arguments to either compare by
 -- 'Symbol' or 'Nat'.
+--
 -- @since 4.16.0.0
 type Compare :: k -> k -> Ordering
 type family Compare a b
@@ -53,6 +54,7 @@ type instance Compare (a :: Symbol)  b = CmpSymbol a b
 type instance Compare (a :: Char)    b = CmpChar   a b
 
 -- | Ordering data type for type literals that provides proof of their ordering.
+--
 -- @since 4.16.0.0
 data OrderingI a b where
   LTI :: Compare a b ~ 'LT => OrderingI a b
@@ -66,49 +68,59 @@ deriving instance Eq   (OrderingI a b)
 infix 4 <=?, <=, >=?, >=, <?, <, >?, >
 
 -- | Comparison (<=) of comparable types, as a constraint.
+--
 -- @since 4.16.0.0
 type x <= y = (x <=? y) ~ 'True
 
 -- | Comparison (>=) of comparable types, as a constraint.
+--
 -- @since 4.16.0.0
 type x >= y = (x >=? y) ~ 'True
 
 -- | Comparison (<) of comparable types, as a constraint.
+--
 -- @since 4.16.0.0
 type x < y = (x >? y) ~ 'True
 
 -- | Comparison (>) of comparable types, as a constraint.
+--
 -- @since 4.16.0.0
 type x > y = (x >? y) ~ 'True
 
 
 -- | Comparison (<=) of comparable types, as a function.
+--
 -- @since 4.16.0.0
 type (<=?) :: k -> k -> Bool
 type m <=? n = OrdCond (Compare m n) 'True 'True 'False
 
 -- | Comparison (>=) of comparable types, as a function.
+--
 -- @since 4.16.0.0
 type (>=?) :: k -> k -> Bool
 type m >=? n = OrdCond (Compare m n) 'False 'True 'True
 
 -- | Comparison (<) of comparable types, as a function.
+--
 -- @since 4.16.0.0
 type (<?) :: k -> k -> Bool
 type m <? n = OrdCond (Compare m n) 'True 'False 'False
 
 -- | Comparison (>) of comparable types, as a function.
+--
 -- @since 4.16.0.0
 type (>?) :: k -> k -> Bool
 type m >? n = OrdCond (Compare m n) 'False 'False 'True
 
 
 -- | Maximum between two comparable types.
+--
 -- @since 4.16.0.0
 type Max :: k -> k -> k
 type Max m n = OrdCond (Compare m n) n n m
 
 -- | Minimum between two comparable types.
+--
 -- @since 4.16.0.0
 type Min :: k -> k -> k
 type Min m n = OrdCond (Compare m n) m m n
@@ -117,6 +129,7 @@ type Min m n = OrdCond (Compare m n) m m n
 -- | A case statement on `Ordering`.
 -- `Ordering c l e g` is `l` when `c ~ LT`, `e` when `c ~ EQ`, and `g` when
 -- `c ~ GT`.
+--
 -- @since 4.16.0.0
 type OrdCond :: Ordering -> k -> k -> k -> k
 type family OrdCond o lt eq gt where

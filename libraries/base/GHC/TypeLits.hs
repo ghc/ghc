@@ -156,7 +156,7 @@ instance Read SomeSymbol where
 
 -- | Convert a character into an unknown type-level char.
 --
--- | @since 4.16.0.0
+-- @since 4.16.0.0
 someCharVal :: Char -> SomeChar
 someCharVal n   = withSChar SomeChar (SChar n) Proxy
 {-# NOINLINE someCharVal #-}
@@ -276,6 +276,7 @@ sameChar x y
 
 -- | Like 'sameSymbol', but if the symbols aren't equal, this additionally
 -- provides proof of LT or GT.
+--
 -- @since 4.16.0.0
 cmpSymbol :: forall a b proxy1 proxy2. (KnownSymbol a, KnownSymbol b)
           => proxy1 a -> proxy2 b -> OrderingI a b
@@ -289,6 +290,7 @@ cmpSymbol x y = case compare (symbolVal x) (symbolVal y) of
 
 -- | Like 'sameChar', but if the Chars aren't equal, this additionally
 -- provides proof of LT or GT.
+--
 -- @since 4.16.0.0
 cmpChar :: forall a b proxy1 proxy2. (KnownChar a, KnownChar b)
         => proxy1 a -> proxy2 b -> OrderingI a b
