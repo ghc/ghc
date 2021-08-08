@@ -2,7 +2,7 @@
 
 ## 4.14.3.0 *August 2021*
 
-  * Bundled with GHC 8.10.5
+  * Bundled with GHC 8.10.6
  
   * Check the buffer size *before* calling the continuation in withEncodedCString (#20107)
 
