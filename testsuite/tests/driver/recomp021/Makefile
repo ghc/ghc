@@ -13,4 +13,4 @@ recomp021: clean
 	cp *.hs src2
 	'$(TEST_HC)' $(TEST_HC_OPTS) -S src1/A.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS) -S src2/A.hs
-	! diff src1/A.hi src2/A.hi
+	! LANG=C diff src1/A.hi src2/A.hi
