@@ -18,6 +18,8 @@ import GHC.Platform
 import Util
 
 import Data.List
+import Data.Char
+import Data.Maybe
 
 import System.IO
 import System.Process
@@ -28,9 +30,10 @@ import LlvmCodeGen.Base (LlvmVersion, llvmVersionStr, supportedLlvmVersionLowerB
 import SysTools.Process
 import SysTools.Info
 
-import Control.Monad (join, forM, filterM)
+import Control.Monad (join, forM, filterM, void)
 import System.Directory (doesFileExist)
 import System.FilePath ((</>))
+import Text.ParserCombinators.ReadP as Parser
 
 {-
 ************************************************************************
@@ -267,10 +270,9 @@ runInjectRPaths dflags lib_paths dylib = do
   -- filter the output for only the libraries. And then drop the @rpath prefix.
   let libs = fmap (drop 7) $ filter (isPrefixOf "@rpath") $ fmap (head.words) $ info
   -- find any pre-existing LC_PATH items
-  info <- fmap words.lines <$> askOtool dflags Nothing [Option "-l", Option dylib]
-  let paths = concatMap f info
-        where f ("path":p:_) = [p]
-              f _            = []
+  info <- lines <$> askOtool dflags Nothing [Option "-l", Option dylib]
+
+  let paths = mapMaybe get_rpath info
       lib_paths' = [ p | p <- lib_paths, not (p `elem` paths) ]
   -- only find those rpaths, that aren't already in the library.
   rpaths <- nub.sort.join <$> forM libs (\f -> filterM (\l -> doesFileExist (l </> f)) lib_paths')
@@ -279,6 +281,24 @@ runInjectRPaths dflags lib_paths dylib = do
     [] -> return ()
     _  -> runInstallNameTool dflags $ map Option $ "-add_rpath":(intersperse "-add_rpath" rpaths) ++ [dylib]
 
+get_rpath :: String -> Maybe FilePath
+get_rpath l = case readP_to_S rpath_parser l of
+                [(rpath, "")] -> Just rpath
+                _ -> Nothing
+
+
+rpath_parser :: ReadP FilePath
+rpath_parser = do
+  skipSpaces
+  void $ string "path"
+  void $ many1 (satisfy isSpace)
+  rpath <- many get
+  void $ many1 (satisfy isSpace)
+  void $ string "(offset "
+  void $ munch1 isDigit
+  void $ Parser.char ')'
+  skipSpaces
+  return rpath
 
 runLink :: DynFlags -> [Option] -> IO ()
 runLink dflags args = traceToolCommand dflags "linker" $ do
