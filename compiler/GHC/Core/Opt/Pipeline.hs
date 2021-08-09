@@ -21,6 +21,7 @@ import GHC.Core.Rules   ( mkRuleBase, unionRuleBase,
                           extendRuleBaseList, ruleCheckProgram, addRuleInfo,
                           getRules, initRuleOpts )
 import GHC.Core.Ppr     ( pprCoreBindings, pprCoreExpr )
+import GHC.Core.FreshenUniques ( freshenUniques )
 import GHC.Core.Opt.OccurAnal ( occurAnalysePgm, occurAnalyseExpr )
 import GHC.Core.Stats   ( coreBindsSize, coreBindsStats, exprSize )
 import GHC.Core.Utils   ( mkTicks, stripTicksTop, dumpIdInfoOfProgram )
@@ -158,7 +159,8 @@ getCoreToDo logger dflags
     maybe_rule_check phase = runMaybe rule_check (CoreDoRuleCheck phase)
 
     maybe_strictness_before (Phase phase)
-      | phase `elem` strictnessBefore dflags = CoreDoDemand
+      | phase `elem` strictnessBefore dflags
+      = CoreDoPasses [CoreFreshenUniques, CoreDoDemand]
     maybe_strictness_before _
       = CoreDoNothing
 
@@ -198,8 +200,8 @@ getCoreToDo logger dflags
                           -- Don't do case-of-case transformations.
                           -- This makes full laziness work better
 
-    dmd_cpr_ww = if ww_on then [CoreDoDemand,CoreDoCpr,CoreDoWorkerWrapper]
-                          else [CoreDoDemand,CoreDoCpr]
+    dmd_cpr_ww = if ww_on then [CoreFreshenUniques,CoreDoDemand,CoreDoCpr,CoreDoWorkerWrapper]
+                          else [CoreFreshenUniques,CoreDoDemand,CoreDoCpr]
 
 
     demand_analyser = (CoreDoPasses (
@@ -364,7 +366,8 @@ getCoreToDo logger dflags
         -- has run at all. See Note [Final Demand Analyser run] in GHC.Core.Opt.DmdAnal
         -- It is EXTREMELY IMPORTANT to run this pass, otherwise execution
         -- can become /exponentially/ more expensive. See #11731, #12996.
-        runWhen (strictness || late_dmd_anal) CoreDoDemand,
+        runWhen (strictness || late_dmd_anal) $ CoreDoPasses
+           [ CoreFreshenUniques, CoreDoDemand ],
 
         maybe_rule_check FinalPhase,
 
@@ -521,6 +524,9 @@ doCorePass pass guts = do
 
     CoreAddCallerCcs          -> {-# SCC "AddCallerCcs" #-}
                                  addCallerCostCentres guts
+
+    CoreFreshenUniques        -> {-# SCC "FreshenUniques" #-}
+                                 updateBinds freshenUniques
 
     CoreDoPrintCore           -> {-# SCC "PrintCore" #-}
                                  liftIO $ printCore logger (mg_binds guts) >> return guts

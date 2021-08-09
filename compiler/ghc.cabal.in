@@ -297,6 +297,7 @@ Library
         GHC.Core.ConLike
         GHC.Core.DataCon
         GHC.Core.FamInstEnv
+        GHC.Core.FreshenUniques
         GHC.Core.FVs
         GHC.Core.InstEnv
         GHC.Core.Lint

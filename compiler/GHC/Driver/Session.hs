@@ -2473,6 +2473,8 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_call_arity)
   , make_ord_flag defGhcFlag "ddump-exitify"
         (setDumpFlag Opt_D_dump_exitify)
+  , make_ord_flag defGhcFlag "ddump-freshen"
+        (setDumpFlag Opt_D_dump_freshen)
   , make_dep_flag defGhcFlag "ddump-stranal"
         (setDumpFlag Opt_D_dump_dmdanal)
         "Use `-ddump-dmdanal` instead"

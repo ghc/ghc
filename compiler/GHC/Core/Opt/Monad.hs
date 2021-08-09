@@ -131,6 +131,7 @@ data CoreToDo           -- These are diff core-to-core passes,
   | CorePrep
   | CoreAddCallerCcs
   | CoreOccurAnal
+  | CoreFreshenUniques
 
 instance Outputable CoreToDo where
   ppr (CoreDoSimplify _ _)     = text "Simplifier"
@@ -157,6 +158,7 @@ instance Outputable CoreToDo where
   ppr (CoreDoRuleCheck {})     = text "Rule check"
   ppr CoreDoNothing            = text "CoreDoNothing"
   ppr (CoreDoPasses passes)    = text "CoreDoPasses" <+> ppr passes
+  ppr CoreFreshenUniques       = text "CoreFreshenUniques"
 
 pprPassDetails :: CoreToDo -> SDoc
 pprPassDetails (CoreDoSimplify n md) = vcat [ text "Max iterations =" <+> int n

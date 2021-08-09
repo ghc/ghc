@@ -374,6 +374,13 @@ subexpression elimination pass.
     performed. This output includes various information that the simplifier uses
     to determine whether the inlining is beneficial.
 
+.. ghc-flag:: -ddump-freshen
+    :shortdesc: Dump output after freshening uniques
+    :type: dynamic
+
+    Dump the Core after each run of FreshenUniques, which makes sure that each
+    binder's Unique is indeed globally unique.
+
 .. ghc-flag:: -ddump-dmdanal
     :shortdesc: Dump demand analysis output
     :type: dynamic

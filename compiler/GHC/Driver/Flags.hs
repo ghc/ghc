@@ -96,6 +96,7 @@ data DumpFlag
    | Opt_D_dump_stg_final     -- ^ Final STG (after stg2stg)
    | Opt_D_dump_call_arity
    | Opt_D_dump_exitify
+   | Opt_D_dump_freshen -- ^ FreshenUniques
    | Opt_D_dump_dmdanal
    | Opt_D_dump_dmd_signatures
    | Opt_D_dump_cpranal
