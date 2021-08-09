@@ -17,6 +17,7 @@ import Settings.Builders.RunTest
 import Settings.Program (programContext)
 import Target
 import Utilities
+import qualified System.Directory as IO
 
 ghcConfigHsPath :: FilePath
 ghcConfigHsPath = "testsuite/mk/ghc-config.hs"
@@ -68,7 +69,8 @@ testRules = do
               then do
                 let stg = stageOf testGhc
                 prog_path <- programPath =<< programContext stg progPkg
-                createFileLink prog_path path
+                abs_prog_path <- liftIO (IO.canonicalizePath prog_path)
+                createFileLink abs_prog_path path
             -- otherwise, build it by directly invoking ghc
               else do
                 bindir <- getBinaryDirectory testGhc
