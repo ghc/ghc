@@ -83,6 +83,7 @@ coreDumpFlag CoreLiberateCase         = Just Opt_D_dump_liberate_case
 coreDumpFlag CoreDoStaticArgs         = Just Opt_D_dump_static_argument_transformation
 coreDumpFlag CoreDoCallArity          = Just Opt_D_dump_call_arity
 coreDumpFlag CoreDoExitify            = Just Opt_D_dump_exitify
+coreDumpFlag CoreFreshenUniques       = Just Opt_D_dump_freshen
 coreDumpFlag (CoreDoDemand {})        = Just Opt_D_dump_dmdanal
 coreDumpFlag CoreDoCpr                = Just Opt_D_dump_cpranal
 coreDumpFlag CoreDoWorkerWrapper      = Just Opt_D_dump_worker_wrapper

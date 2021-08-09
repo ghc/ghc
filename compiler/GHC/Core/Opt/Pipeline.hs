@@ -24,6 +24,7 @@ import GHC.Core
 import GHC.Core.Opt.CSE  ( cseProgram )
 import GHC.Core.Rules   ( RuleBase, mkRuleBase, ruleCheckProgram, getRules )
 import GHC.Core.Ppr     ( pprCoreBindings )
+import GHC.Core.FreshenUniques ( freshenUniques )
 import GHC.Core.Utils   ( dumpIdInfoOfProgram )
 import GHC.Core.Lint    ( lintAnnots )
 import GHC.Core.Lint.Interactive ( interactiveInScope )
@@ -148,7 +149,8 @@ getCoreToDo dflags hpt_rule_base extra_vars
     maybe_rule_check phase = runMaybe rule_check (CoreDoRuleCheck phase)
 
     maybe_strictness_before (Phase phase)
-      | phase `elem` strictnessBefore dflags = CoreDoDemand False
+      | phase `elem` strictnessBefore dflags
+      = CoreDoPasses [CoreFreshenUniques, CoreDoDemand False]
     maybe_strictness_before _
       = CoreDoNothing
 
@@ -169,8 +171,8 @@ getCoreToDo dflags hpt_rule_base extra_vars
     simpl_gently = CoreDoSimplify $ initSimplifyOpts dflags extra_vars max_iter
                                     (initGentleSimplMode dflags) hpt_rule_base
 
-    dmd_cpr_ww = if ww_on then [CoreDoDemand True,CoreDoCpr,CoreDoWorkerWrapper]
-                          else [CoreDoDemand False] -- NB: No CPR! See Note [Don't change boxity without worker/wrapper]
+    dmd_cpr_ww = if ww_on then [CoreFreshenUniques,CoreDoDemand True,CoreDoCpr,CoreDoWorkerWrapper]
+                          else [CoreFreshenUniques,CoreDoDemand False] -- NB: No CPR! See Note [Don't change boxity without worker/wrapper]
 
 
     demand_analyser = (CoreDoPasses (
@@ -338,7 +340,8 @@ getCoreToDo dflags hpt_rule_base extra_vars
         -- has run at all. See Note [Final Demand Analyser run] in GHC.Core.Opt.DmdAnal
         -- It is EXTREMELY IMPORTANT to run this pass, otherwise execution
         -- can become /exponentially/ more expensive. See #11731, #12996.
-        runWhen (strictness || late_dmd_anal) (CoreDoDemand False),
+        runWhen (strictness || late_dmd_anal) $ CoreDoPasses
+           [ CoreFreshenUniques, CoreDoDemand False ],
 
         maybe_rule_check FinalPhase,
 
@@ -516,6 +519,9 @@ doCorePass pass guts = do
 
     CoreAddLateCcs            -> {-# SCC "AddLateCcs" #-}
                                  addLateCostCentresMG guts
+
+    CoreFreshenUniques        -> {-# SCC "FreshenUniques" #-}
+                                 updateBinds freshenUniques
 
     CoreDoPrintCore           -> {-# SCC "PrintCore" #-}
                                  liftIO $ printCore logger (mg_binds guts) >> return guts
