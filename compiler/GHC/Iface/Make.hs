@@ -199,9 +199,10 @@ mkIfaceTc hsc_env safe_mode mod_details mod_summary
           let used_names = mkUsedNames tc_result
           let pluginModules = map lpModule (hsc_plugins hsc_env)
           let home_unit = hsc_home_unit hsc_env
-          deps <- mkDependencies (homeUnitId home_unit)
-                                 (map mi_module pluginModules)
-                                 tc_result
+          let deps = mkDependencies home_unit
+                                    (tcg_mod tc_result)
+                                    (tcg_imports tc_result)
+                                    (map mi_module pluginModules)
           let hpc_info = emptyHpcInfo other_hpc_info
           used_th <- readIORef tc_splice_used
           dep_files <- (readIORef dependent_files)

@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TupleSections, RecordWildCards #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE LambdaCase #-}
 
 --
 --  (c) The University of Glasgow 2002-2006
@@ -99,7 +100,6 @@ import Control.Monad
 
 import qualified Data.Set as Set
 import Data.Char (isSpace)
-import Data.Function ((&))
 import Data.IORef
 import Data.List (intercalate, isPrefixOf, isSuffixOf, nub, partition, find)
 import Data.Maybe
@@ -712,15 +712,14 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
             home_unit = hsc_home_unit hsc_env
 
             pkg_deps = dep_direct_pkgs deps
-            (boot_deps, mod_deps) = flip partitionWith (dep_direct_mods deps) $
-              \ (GWIB { gwib_mod = m, gwib_isBoot = is_boot }) ->
-                m & case is_boot of
-                  IsBoot -> Left
-                  NotBoot -> Right
+            (boot_deps, mod_deps) = flip partitionWith (Set.toList (dep_direct_mods deps)) $
+              \case
+                GWIB m IsBoot  -> Left m
+                GWIB m NotBoot -> Right m
 
             mod_deps' = filter (not . (`elementOfUniqDSet` acc_mods)) (boot_deps ++ mod_deps)
             acc_mods'  = addListToUniqDSet acc_mods (moduleName mod : mod_deps)
-            acc_pkgs'  = addListToUniqDSet acc_pkgs pkg_deps
+            acc_pkgs'  = addListToUniqDSet acc_pkgs (Set.toList pkg_deps)
           --
           if not (isHomeUnit home_unit pkg)
              then follow_deps mods acc_mods (addOneToUniqDSet acc_pkgs' (toUnitId pkg))

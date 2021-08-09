@@ -197,8 +197,10 @@ deSugar hsc_env
         ; let used_names = mkUsedNames tcg_env
               pluginModules = map lpModule (hsc_plugins hsc_env)
               home_unit = hsc_home_unit hsc_env
-        ; deps <- mkDependencies (homeUnitId home_unit)
-                                 (map mi_module pluginModules) tcg_env
+        ; let deps = mkDependencies home_unit
+                                    (tcg_mod tcg_env)
+                                    (tcg_imports tcg_env)
+                                    (map mi_module pluginModules)
 
         ; used_th <- readIORef tc_splice_used
         ; dep_files <- readIORef dependent_files

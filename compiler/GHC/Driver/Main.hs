@@ -1319,7 +1319,7 @@ hscCheckSafe' m l = do
                     -- check package is trusted
                     safeP = packageTrusted dflags (hsc_units hsc_env) home_unit trust trust_own_pkg m
                     -- pkg trust reqs
-                    pkgRs = S.fromList (dep_trusted_pkgs $ mi_deps iface')
+                    pkgRs = dep_trusted_pkgs $ mi_deps iface'
                     -- warn if Safe module imports Safe-Inferred module.
                     warns = if wopt Opt_WarnInferredSafeImports dflags
                                 && safeLanguageOn dflags
@@ -1683,7 +1683,7 @@ hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
               in NoStubs `appendStubC` ip_init
 
         (_output_filename, (_stub_h_exists, stub_c_exists), _foreign_fps, _caf_infos)
-          <- codeOutput logger tmpfs dflags (hsc_units hsc_env) cmm_mod output_filename no_loc foreign_stubs [] []
+          <- codeOutput logger tmpfs dflags (hsc_units hsc_env) cmm_mod output_filename no_loc foreign_stubs [] S.empty
              rawCmms
         return stub_c_exists
   where

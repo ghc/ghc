@@ -31,7 +31,6 @@ import GHC.Hs
 
 import GHC.Data.Graph.Directed
 import GHC.Data.Maybe
-import GHC.Data.FastString
 
 import GHC.Utils.Error
 import GHC.Utils.Panic
@@ -64,9 +63,9 @@ import GHC.Unit.Module.Warnings
 import GHC.Unit.Module.Deps
 
 import Control.Monad
-import Data.Function
 import Data.List (sortBy, sort)
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 import Data.Word (Word64)
 import Data.Either
 
@@ -272,7 +271,7 @@ checkVersions hsc_env mod_summary iface
        -- case we'll compile the module from scratch anyhow).
 
        when (isOneShot (ghcMode (hsc_dflags hsc_env))) $ do {
-          ; updateEps_ $ \eps  -> eps { eps_is_boot = mkModDeps $ (dep_boot_mods (mi_deps iface)) }
+          ; updateEps_ $ \eps  -> eps { eps_is_boot = mkModDeps $ dep_boot_mods (mi_deps iface) }
        }
        ; recomp <- checkList [checkModUsage (hsc_FC hsc_env) (homeUnitAsUnit home_unit) u
                              | u <- mi_usages iface]
@@ -473,8 +472,8 @@ checkDependencies hsc_env summary iface
    fc            = hsc_FC hsc_env
    home_unit     = hsc_home_unit hsc_env
    units         = hsc_units hsc_env
-   prev_dep_mods = map gwib_mod $ dep_direct_mods (mi_deps iface)
-   prev_dep_pkgs = sort (dep_direct_pkgs (mi_deps iface))
+   prev_dep_mods = map gwib_mod $ Set.toAscList $ dep_direct_mods (mi_deps iface)
+   prev_dep_pkgs = Set.toAscList (dep_direct_pkgs (mi_deps iface))
    bkpk_units    = map (("Signature",) . indefUnit . instUnitInstanceOf . moduleUnit) (requirementMerges units (moduleName (mi_module iface)))
 
    implicit_deps = map ("Implicit",) (implicitPackageDeps dflags)
@@ -1196,11 +1195,11 @@ getOrphanHashes hsc_env mods = do
 
 sortDependencies :: Dependencies -> Dependencies
 sortDependencies d
- = Deps { dep_direct_mods = sortBy (lexicalCompareFS `on` (moduleNameFS . gwib_mod)) (dep_direct_mods d),
-          dep_direct_pkgs   = sort (dep_direct_pkgs d),
-          dep_sig_mods      = sort (dep_sig_mods d),
-          dep_trusted_pkgs  = sort (dep_trusted_pkgs d),
-          dep_boot_mods   = sort (dep_boot_mods d),
+ = Deps { dep_direct_mods  = dep_direct_mods d,
+          dep_direct_pkgs  = dep_direct_pkgs d,
+          dep_sig_mods     = sort (dep_sig_mods d),
+          dep_trusted_pkgs = dep_trusted_pkgs d,
+          dep_boot_mods    = dep_boot_mods d,
           dep_orphs  = sortBy stableModuleCmp (dep_orphs d),
           dep_finsts = sortBy stableModuleCmp (dep_finsts d) }
 

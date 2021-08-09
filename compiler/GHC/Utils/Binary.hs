@@ -96,6 +96,8 @@ import Data.IORef
 import Data.Char                ( ord, chr )
 import Data.Time
 import Data.List (unfoldr)
+import Data.Set (Set)
+import qualified Data.Set as Set
 import Control.Monad            ( when, (<$!>), unless, forM_ )
 import System.IO as IO
 import System.IO.Unsafe         ( unsafeInterleaveIO )
@@ -636,6 +638,10 @@ instance Binary a => Binary [a] where
         let loop 0 = return []
             loop n = do a <- get bh; as <- loop (n-1); return (a:as)
         loop len
+
+instance Binary a => Binary (Set a) where
+    put_ bh a = put_ bh (Set.toAscList a)
+    get bh    = Set.fromDistinctAscList <$> get bh
 
 instance (Ix a, Binary a, Binary b) => Binary (Array a b) where
     put_ bh arr = do

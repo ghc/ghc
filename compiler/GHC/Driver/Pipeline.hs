@@ -62,6 +62,7 @@ import GHC.Driver.Errors.Types
 import GHC.Driver.Pipeline.Monad
 import GHC.Driver.Config.Diagnostic
 import GHC.Driver.Phases
+import GHC.Driver.Pipeline.Execute
 import GHC.Driver.Pipeline.Phases
 import GHC.Driver.Session
 import GHC.Driver.Backend
@@ -118,9 +119,9 @@ import Control.Monad
 import qualified Control.Monad.Catch as MC (handle)
 import Data.Maybe
 import Data.Either      ( partitionEithers )
+import qualified Data.Set as Set
 
 import Data.Time        ( getCurrentTime )
-import GHC.Driver.Pipeline.Execute
 
 -- Simpler type synonym for actions in the pipeline monad
 type P m = TPipelineClass TPhase m
@@ -412,7 +413,10 @@ link' logger tmpfs dflags unit_env batch_attempt_linking hpt
             home_mod_infos = eltsHpt hpt
 
             -- the packages we depend on
-            pkg_deps  = concatMap (dep_direct_pkgs . mi_deps . hm_iface) home_mod_infos
+            pkg_deps  = Set.toList
+                          $ Set.unions
+                          $ fmap (dep_direct_pkgs . mi_deps . hm_iface)
+                          $ home_mod_infos
 
             -- the linkables to link
             linkables = map (expectJust "link".hm_linkable) home_mod_infos

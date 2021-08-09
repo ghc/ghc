@@ -486,7 +486,7 @@ calculateAvails home_unit iface mod_safe' want_boot imported_by =
              | otherwise  = dep_finsts deps
 
       -- Trusted packages are a lot like orphans.
-      trusted_pkgs | mod_safe' = S.fromList (dep_trusted_pkgs deps)
+      trusted_pkgs | mod_safe' = dep_trusted_pkgs deps
                    | otherwise = S.empty
 
 
@@ -502,11 +502,11 @@ calculateAvails home_unit iface mod_safe' want_boot imported_by =
 
       dependent_pkgs = if isHomeUnit home_unit pkg
                         then S.empty
-                        else S.fromList [ipkg]
+                        else S.singleton ipkg
 
       direct_mods = mkModDeps $ if isHomeUnit home_unit pkg
-                      then [GWIB (moduleName imp_mod) want_boot]
-                      else []
+                      then S.singleton (GWIB (moduleName imp_mod) want_boot)
+                      else S.empty
 
       dep_boot_mods_map = mkModDeps (dep_boot_mods deps)
 

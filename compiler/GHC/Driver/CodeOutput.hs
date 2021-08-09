@@ -57,6 +57,8 @@ import GHC.Types.Unique.Supply ( mkSplitUniqSupply )
 import System.Directory
 import System.FilePath
 import System.IO
+import Data.Set (Set)
+import qualified Data.Set as Set
 
 {-
 ************************************************************************
@@ -77,7 +79,7 @@ codeOutput
     -> (a -> ForeignStubs)
     -> [(ForeignSrcLang, FilePath)]
     -- ^ additional files to be compiled with the C compiler
-    -> [UnitId]
+    -> Set UnitId -- ^ Dependencies
     -> Stream IO RawCmmGroup a                       -- Compiled C--
     -> IO (FilePath,
            (Bool{-stub_h_exists-}, Maybe FilePath{-stub_c_exists-}),
@@ -134,11 +136,11 @@ outputC :: Logger
         -> DynFlags
         -> FilePath
         -> Stream IO RawCmmGroup a
-        -> [UnitId]
+        -> Set UnitId
         -> IO a
-outputC logger dflags filenm cmm_stream packages =
+outputC logger dflags filenm cmm_stream unit_deps =
   withTiming logger (text "C codegen") (\a -> seq a () {- FIXME -}) $ do
-    let pkg_names = map unitIdString packages
+    let pkg_names = map unitIdString (Set.toAscList unit_deps)
     doOutput filenm $ \ h -> do
       hPutStr h ("/* GHC_PACKAGES " ++ unwords pkg_names ++ "\n*/\n")
       hPutStr h "#include \"Stg.h\"\n"

@@ -1,4 +1,4 @@
-
+{-# LANGUAGE LambdaCase #-}
 
 module GHC.Driver.Env
    ( Hsc(..)
@@ -61,7 +61,6 @@ import GHC.Types.Error ( emptyMessages, Messages )
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.TyThing
-import GHC.Types.Unique.FM
 
 import GHC.Builtin.Names ( gHC_PRIM )
 
@@ -77,6 +76,7 @@ import GHC.Utils.Trace
 
 import Data.IORef
 import qualified Data.Set as Set
+import Data.Set (Set)
 
 runHsc :: HscEnv -> Hsc a -> IO a
 runHsc hsc_env (Hsc hsc) = do
@@ -202,7 +202,7 @@ hptAllInstances hsc_env
     in (concat insts, concat famInsts)
 
 -- | Find instances visible from the given set of imports
-hptInstancesBelow :: HscEnv -> ModuleName -> [ModuleNameWithIsBoot] -> ([ClsInst], [FamInst])
+hptInstancesBelow :: HscEnv -> ModuleName -> Set ModuleNameWithIsBoot -> ([ClsInst], [FamInst])
 hptInstancesBelow hsc_env mn mns =
   let (insts, famInsts) =
         unzip $ hptSomeThingsBelowUs (\mod_info ->
@@ -217,53 +217,67 @@ hptInstancesBelow hsc_env mn mns =
   in (concat insts, concat famInsts)
 
 -- | Get rules from modules "below" this one (in the dependency sense)
-hptRules :: HscEnv -> [ModuleNameWithIsBoot] -> [CoreRule]
+hptRules :: HscEnv -> Set ModuleNameWithIsBoot -> [CoreRule]
 hptRules = hptSomeThingsBelowUs (md_rules . hm_details) False
 
 
 -- | Get annotations from modules "below" this one (in the dependency sense)
-hptAnns :: HscEnv -> Maybe [ModuleNameWithIsBoot] -> [Annotation]
+hptAnns :: HscEnv -> Maybe (Set ModuleNameWithIsBoot) -> [Annotation]
 hptAnns hsc_env (Just deps) = hptSomeThingsBelowUs (md_anns . hm_details) False hsc_env deps
 hptAnns hsc_env Nothing = hptAllThings (md_anns . hm_details) hsc_env
 
 hptAllThings :: (HomeModInfo -> [a]) -> HscEnv -> [a]
 hptAllThings extract hsc_env = concatMap extract (eltsHpt (hsc_HPT hsc_env))
 
-hptModulesBelow :: HscEnv -> [ModuleNameWithIsBoot] -> Set.Set ModuleNameWithIsBoot
-hptModulesBelow hsc_env mn = Set.fromList (map fst (eltsUFM $ go mn emptyUFM))
+-- | This function returns all the modules belonging to the home-unit that can
+-- be reached by following the given dependencies. Additionally, if both the
+-- boot module and the non-boot module can be reached, it only returns the
+-- non-boot one.
+hptModulesBelow :: HscEnv -> Set ModuleNameWithIsBoot -> Set ModuleNameWithIsBoot
+hptModulesBelow hsc_env mn = filtered_mods $ dep_mods mn Set.empty
   where
-    hpt = hsc_HPT hsc_env
+    !hpt = hsc_HPT hsc_env
 
-    go [] seen = seen
-    go (mn:mns) seen
-      | Just (mn', both) <- lookupUFM seen (gwib_mod mn)
-        -- Already seen the module before
-      , gwib_isBoot mn' == gwib_isBoot mn
-        || both = go mns seen
-      | otherwise =
-          case lookupHpt hpt (gwib_mod mn) of
-              -- Not a home module
-              Nothing -> go mns seen
-              Just hmi ->
-                let
-                  -- The bool indicates if we have seen *both* the
-                  -- NotBoot and IsBoot versions
-                  comb :: (GenWithIsBoot ModuleName, Bool)
-                       -> (GenWithIsBoot ModuleName, Bool)
-                       -> (GenWithIsBoot ModuleName, Bool)
-                  comb (o@(GWIB { gwib_isBoot = NotBoot }), b) _ =
-                    (o, IsBoot == gwib_isBoot mn || b)
-                  comb ((GWIB { gwib_isBoot = IsBoot }, _)) (new_gwib, _)  =
-                    (new_gwib, NotBoot == gwib_isBoot mn)
-                in
-                  go (dep_direct_mods (mi_deps (hm_iface hmi)) ++ mns)
-                     (addToUFM_C comb seen (gwib_mod mn) (mn, False))
+    -- get all the dependent modules without filtering boot/non-boot
+    dep_mods !deps !seen -- invariant: intersection of deps and seen is null
+      | Set.null deps = seen
+      | otherwise     = dep_mods deps' seen'
+          where
+            get_deps d@(GWIB mod _is_boot) (home_deps,all_deps) = case lookupHpt hpt mod of
+              Nothing  -> (home_deps,all_deps) -- not a home-module
+              Just hmi -> let
+                            !home_deps' = Set.insert d home_deps
+                            !all_deps'  = Set.union all_deps (dep_direct_mods (mi_deps (hm_iface hmi)))
+                          in (home_deps', all_deps')
+
+            -- all the non-transitive deps from our deps
+            (seen',new_deps) = Set.foldr' get_deps (seen,Set.empty) deps
+
+            -- maintain the invariant that deps haven't already been seen
+            deps'    = Set.difference new_deps seen'
+
+    -- remove boot modules when there is also a non-boot one
+    filtered_mods mods = Set.fromDistinctAscList $ filter_mods $ Set.toAscList mods
+
+    -- IsBoot and NotBoot modules are necessarily consecutive in the sorted list
+    -- (cf Ord instance of GenWithIsBoot). Hence we only have to perform a
+    -- linear sweep with a window of size 2 to remove boot modules for which we
+    -- have the corresponding non-boot.
+    filter_mods = \case
+      (r1@(GWIB m1 b1) : r2@(GWIB m2 _) : rs)
+        | m1 == m2  -> let !r' = case b1 of
+                                  NotBoot -> r1
+                                  IsBoot  -> r2
+                       in r' : filter_mods rs
+        | otherwise -> r1 : filter_mods (r2:rs)
+      rs -> rs
+
 
 
 -- | Get things from modules "below" this one (in the dependency sense)
 -- C.f Inst.hptInstances
-hptSomeThingsBelowUs :: (HomeModInfo -> [a]) -> Bool -> HscEnv -> [ModuleNameWithIsBoot] -> [a]
-hptSomeThingsBelowUs extract include_hi_boot hsc_env mod
+hptSomeThingsBelowUs :: (HomeModInfo -> [a]) -> Bool -> HscEnv -> Set ModuleNameWithIsBoot -> [a]
+hptSomeThingsBelowUs extract include_hi_boot hsc_env deps
   | isOneShot (ghcMode (hsc_dflags hsc_env)) = []
 
   | otherwise
@@ -271,7 +285,7 @@ hptSomeThingsBelowUs extract include_hi_boot hsc_env mod
     in
     [ thing
     |   -- Find each non-hi-boot module below me
-      GWIB { gwib_mod = mod, gwib_isBoot = is_boot } <- Set.toList (hptModulesBelow hsc_env mod)
+      GWIB { gwib_mod = mod, gwib_isBoot = is_boot } <- Set.toList (hptModulesBelow hsc_env deps)
     , include_hi_boot || (is_boot == NotBoot)
 
         -- unsavoury: when compiling the base package with --make, we

@@ -660,6 +660,9 @@ data GenWithIsBoot mod = GWIB
   } deriving ( Eq, Ord, Show
              , Functor, Foldable, Traversable
              )
+  -- the Ord instance must ensure that we first sort by Module and then by
+  -- IsBootInterface: this is assumed to perform filtering of non-boot modules,
+  -- e.g. in GHC.Driver.Env.hptModulesBelow
 
 type ModuleNameWithIsBoot = GenWithIsBoot ModuleName
 

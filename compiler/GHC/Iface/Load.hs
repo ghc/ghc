@@ -115,6 +115,8 @@ import GHC.Data.FastString
 
 import Control.Monad
 import Data.Map ( toList )
+import qualified Data.Set as Set
+import Data.Set (Set)
 import System.FilePath
 import System.Directory
 
@@ -1190,20 +1192,21 @@ pprDeps unit_state (Deps { dep_direct_mods = dmods
                          , dep_finsts = finsts
                          })
   = pprWithUnitState unit_state $
-    vcat [text "direct module dependencies:" <+> fsep (map ppr_mod dmods),
-          text "boot module dependencies:" <+> fsep (map ppr bmods),
-          text "direct package dependencies:" <+> fsep (map ppr_pkg pkgs),
+    vcat [text "direct module dependencies:"  <+> ppr_set ppr_mod dmods,
+          text "boot module dependencies:"    <+> ppr_set ppr bmods,
+          text "direct package dependencies:" <+> ppr_set ppr pkgs,
           if null tps
             then empty
-            else text "trusted package dependencies:" <+> fsep (map ppr_pkg tps),
+            else text "trusted package dependencies:" <+> ppr_set ppr tps,
           text "orphans:" <+> fsep (map ppr orphs),
           text "family instance modules:" <+> fsep (map ppr finsts)
         ]
   where
-    ppr_mod (GWIB { gwib_mod = mod_name, gwib_isBoot = boot }) = ppr mod_name <+> ppr_boot boot
-    ppr_pkg pkg  = ppr pkg
-    ppr_boot IsBoot  = text "[boot]"
-    ppr_boot NotBoot = Outputable.empty
+    ppr_mod (GWIB mod IsBoot)  = ppr mod <+> text "[boot]"
+    ppr_mod (GWIB mod NotBoot) = ppr mod
+
+    ppr_set :: Outputable a => (a -> SDoc) -> Set a -> SDoc
+    ppr_set w = fsep . fmap w . Set.toAscList
 
 pprFixities :: [(OccName, Fixity)] -> SDoc
 pprFixities []    = Outputable.empty

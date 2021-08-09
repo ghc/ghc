@@ -64,54 +64,49 @@ its dep_orphs. This was the cause of #14128.
 -- | Extract information from the rename and typecheck phases to produce
 -- a dependencies information for the module being compiled.
 --
--- The second argument is additional dependencies from plugins
-mkDependencies :: UnitId -> [Module] -> TcGblEnv -> IO Dependencies
-mkDependencies iuid pluginModules
-          (TcGblEnv{ tcg_mod = mod,
-                    tcg_imports = imports
-                  })
- = do
+-- The fourth argument is a list of plugin modules.
+mkDependencies :: HomeUnit -> Module -> ImportAvails -> [Module] -> Dependencies
+mkDependencies home_unit mod imports plugin_mods =
+  let (home_plugins, external_plugins) = partition (isHomeUnit home_unit . moduleUnit) plugin_mods
+      plugin_units = map (toUnitId . moduleUnit) external_plugins
+      all_direct_mods = foldr (\mn m -> addToUFM m mn (GWIB mn NotBoot))
+                              (imp_direct_dep_mods imports)
+                              (map moduleName home_plugins)
 
-      let (home_plugins, package_plugins) = partition ((== iuid) . toUnitId . moduleUnit) pluginModules
-          plugin_dep_pkgs =  map (toUnitId . moduleUnit) package_plugins
-          all_direct_mods = foldr (\mn m -> addToUFM m mn (GWIB mn NotBoot)) (imp_direct_dep_mods imports) (map moduleName home_plugins)
+      direct_mods = modDepsElts (delFromUFM all_direct_mods (moduleName mod))
+            -- M.hi-boot can be in the imp_dep_mods, but we must remove
+            -- it before recording the modules on which this one depends!
+            -- (We want to retain M.hi-boot in imp_dep_mods so that
+            --  loadHiBootInterface can see if M's direct imports depend
+            --  on M.hi-boot, and hence that we should do the hi-boot consistency
+            --  check.)
 
-          direct_mods = modDepsElts (delFromUFM all_direct_mods (moduleName mod))
-                -- M.hi-boot can be in the imp_dep_mods, but we must remove
-                -- it before recording the modules on which this one depends!
-                -- (We want to retain M.hi-boot in imp_dep_mods so that
-                --  loadHiBootInterface can see if M's direct imports depend
-                --  on M.hi-boot, and hence that we should do the hi-boot consistency
-                --  check.)
+      dep_orphs = filter (/= mod) (imp_orphs imports)
+            -- We must also remove self-references from imp_orphs. See
+            -- Note [Module self-dependency]
 
-          dep_orphs = filter (/= mod) (imp_orphs imports)
-                -- We must also remove self-references from imp_orphs. See
-                -- Note [Module self-dependency]
+      direct_pkgs = foldr Set.insert (imp_dep_direct_pkgs imports) plugin_units
 
-          direct_pkgs_0 = foldr Set.insert (imp_dep_direct_pkgs imports) plugin_dep_pkgs
+      -- Set the packages required to be Safe according to Safe Haskell.
+      -- See Note [Tracking Trust Transitively] in GHC.Rename.Names
+      trust_pkgs  = imp_trust_pkgs imports
 
-          direct_pkgs = direct_pkgs_0
+      -- If there's a non-boot import, then it shadows the boot import
+      -- coming from the dependencies
+      source_mods = modDepsElts (imp_boot_mods imports)
 
-          -- Set the packages required to be Safe according to Safe Haskell.
-          -- See Note [Tracking Trust Transitively] in GHC.Rename.Names
-          sorted_direct_pkgs = sort (Set.toList direct_pkgs)
-          trust_pkgs  = imp_trust_pkgs imports
-          -- If there's a non-boot import, then it shadows the boot import
-          -- coming from the dependencies
-          source_mods =
-            modDepsElts $ (imp_boot_mods imports)
+      sig_mods = filter (/= (moduleName mod)) $ imp_sig_mods imports
 
-          sig_mods = filter (/= (moduleName mod)) $ imp_sig_mods imports
-
-      return Deps { dep_direct_mods = direct_mods,
-                    dep_direct_pkgs = sorted_direct_pkgs,
-                    dep_sig_mods = sort sig_mods,
-                    dep_trusted_pkgs = sort (Set.toList trust_pkgs),
-                    dep_boot_mods  = sort source_mods,
-                    dep_orphs  = dep_orphs,
-                    dep_finsts = sortBy stableModuleCmp (imp_finsts imports) }
-                    -- sort to get into canonical order
-                    -- NB. remember to use lexicographic ordering
+  in Deps { dep_direct_mods  = direct_mods
+          , dep_direct_pkgs  = direct_pkgs
+          , dep_sig_mods     = sort sig_mods
+          , dep_trusted_pkgs = trust_pkgs
+          , dep_boot_mods    = source_mods
+          , dep_orphs        = dep_orphs
+          , dep_finsts       = sortBy stableModuleCmp (imp_finsts imports)
+            -- sort to get into canonical order
+            -- NB. remember to use lexicographic ordering
+          }
 
 mkUsedNames :: TcGblEnv -> NameSet
 mkUsedNames TcGblEnv{ tcg_dus = dus } = allUses dus
