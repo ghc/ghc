@@ -481,6 +481,13 @@ subexpression elimination pass.
 
     Dump static argument transformation pass output (see :ghc-flag:`-fstatic-argument-transformation`)
 
+.. ghc-flag:: -ddump-freshen
+    :shortdesc: Dump output after freshening uniques
+    :type: dynamic
+
+    Dump the Core after each run of FreshenUniques, which makes sure that each
+    binder's Unique is indeed globally unique.
+
 .. ghc-flag:: -ddump-worker-wrapper
     :shortdesc: Dump worker-wrapper output
     :type: dynamic

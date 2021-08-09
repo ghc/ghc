@@ -529,7 +529,8 @@ cprAnalBind env id rhs
 isDataStructure :: Id -> Bool
 -- See Note [CPR for data structures]
 isDataStructure id =
-  not (isJoinId id) && idArity id == 0 && isEvaldUnfolding (idUnfolding id)
+  not (isJoinId id) && idArity id == 0 && isEvaldUnfolding unf && hasCoreUnfolding unf
+  where unf = idUnfolding id
 
 -- | Returns an expandable unfolding
 -- (See Note [exprIsExpandable] in "GHC.Core.Utils") that has
@@ -892,6 +893,7 @@ What do we mean by "data structure binding"? Answer:
   (2) is eval'd          (otherwise it's a thunk, Note [CPR for thunks] applies)
   (3) not (isJoinId id)  (otherwise it's a function and its more efficient to
                           analyse it just once rather than at each call site)
+  (4) has Core unfolding (otherwise, for OtherCon we can't reconstruct Cpr)
 
 But (S1) leads to a new Problem P2: We can't just stop giving DataCon application
 bindings the CPR *property*, for example the factorial function after FloatOut
