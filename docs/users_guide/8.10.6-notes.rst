@@ -55,6 +55,8 @@ Packaging fixes
 
 - Bump ``haskeline`` to 0.8.2
 
+- Bump ``process`` to 1.6.13.2 (:ghc-ticket:`19994`)
+
 - Bump ``Win32`` to 2.6.2.0 (:ghc-ticket:`20202`)
 
 Portability fixes
