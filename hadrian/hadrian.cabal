@@ -1,3 +1,4 @@
+cabal-version:       1.18
 name:                hadrian
 version:             0.1.0.0
 synopsis:            GHC build system
@@ -8,7 +9,6 @@ maintainer:          Andrey Mokhov <andrey.mokhov@gmail.com>, github: @snowleopa
 copyright:           Andrey Mokhov 2014-2017
 category:            Development
 build-type:          Simple
-cabal-version:       >=1.10
 extra-doc-files:     README.md
 
 source-repository head
