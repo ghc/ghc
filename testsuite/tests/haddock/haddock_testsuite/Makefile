@@ -25,8 +25,8 @@ htmlTest:
 		$(TOP)/../utils/haddock/html-test/Main.hs
 	./html-test \
 		$(ACCEPT) \
-		--ghc-path=$(TEST_HC) \
-		--haddock-path=$(HADDOCK) \
+		--ghc-path='$(TEST_HC)' \
+		--haddock-path='$(HADDOCK)' \
 		--haddock-stdout=haddock-out.log
 
 # Corresponds to the `latex-test` testsuite
@@ -41,8 +41,8 @@ latexTest:
 		$(TOP)/../utils/haddock/latex-test/Main.hs
 	./latex-test \
 		$(ACCEPT) \
-		--ghc-path=$(TEST_HC) \
-		--haddock-path=$(HADDOCK) \
+		--ghc-path='$(TEST_HC)' \
+		--haddock-path='$(HADDOCK)' \
 		--haddock-stdout=haddock-out.log
 
 # Corresponds to the `hoogle-test` testsuite
@@ -57,8 +57,8 @@ hoogleTest:
 		$(TOP)/../utils/haddock/hoogle-test/Main.hs
 	./hoogle-test \
 		$(ACCEPT) \
-		--ghc-path=$(TEST_HC) \
-		--haddock-path=$(HADDOCK) \
+		--ghc-path='$(TEST_HC)' \
+		--haddock-path='$(HADDOCK)' \
 		--haddock-stdout=haddock-out.log
 
 # Corresponds to the `hypsrc-test` testsuite
@@ -73,6 +73,6 @@ hypsrcTest:
 		$(TOP)/../utils/haddock/hypsrc-test/Main.hs
 	./hypsrc-test \
 		$(ACCEPT) \
-		--ghc-path=$(TEST_HC) \
-		--haddock-path=$(HADDOCK) \
+		--ghc-path='$(TEST_HC)' \
+		--haddock-path='$(HADDOCK)' \
 		--haddock-stdout=haddock-out.log
