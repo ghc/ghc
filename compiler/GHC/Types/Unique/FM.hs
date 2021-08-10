@@ -100,6 +100,10 @@ import qualified Data.Semigroup as Semi
 import Data.Functor.Classes (Eq1 (..))
 import Data.Bits
 
+-- for UNIQUE_TAG_BITS. @mix@ will silently fail if this isn't included and
+-- you'll get panics.
+#include "Unique.h"
+
 -- | A finite map from @uniques@ of one type to
 -- elements in another type.
 --
