@@ -235,6 +235,9 @@ import Data.Functor
 import Control.DeepSeq (force)
 import Data.Bifunctor (first)
 import GHC.Data.Maybe
+import GHC.LanguageExtensions
+import GHC.Iface.Tidy.StaticPtrTable
+import GHC.Utils.Trace
 
 {- **********************************************************************
 %*                                                                      *
@@ -1550,16 +1553,20 @@ hscGenHardCode hsc_env cgguts location output_filename = do
                                    core_binds data_tycons
 
         -----------------  Convert to STG ------------------
-        (stg_binds, denv, (caf_ccs, caf_cc_stacks))
+        (stg_binds, spt_entries, denv, (caf_ccs, caf_cc_stacks))
             <- {-# SCC "CoreToStg" #-}
                withTiming logger
                    (text "CoreToStg"<+>brackets (ppr this_mod))
-                   (\(a, b, (c,d)) -> a `seqList` b `seq` c `seqList` d `seqList` ())
+                   (\(a, b, c, (d,e)) -> a `seqList` b `seqList` c `seq` d `seqList` e `seqList` ())
                    (myCoreToStg logger dflags (hsc_IC hsc_env) False this_mod location prepd_binds)
-
+        pprTraceM "main" (ppr spt_entries)
         let cost_centre_info =
               (local_ccs ++ caf_ccs, caf_cc_stacks)
             platform = targetPlatform dflags
+
+            spt_init_code
+              | xopt StaticPointers dflags = sptModuleInitCode platform this_mod spt_entries
+              | otherwise = mempty
             prof_init
               | sccProfilingEnabled dflags = profilingInitCode platform this_mod cost_centre_info
               | otherwise = mempty
@@ -1592,6 +1599,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
 
             let foreign_stubs st = foreign_stubs0 `appendStubC` prof_init
                                                   `appendStubC` cgIPEStub st
+                                                  `appendStubC` spt_init_code
 
             (output_filename, (_stub_h_exists, stub_c_exists), foreign_fps, cg_infos)
                 <- {-# SCC "codeOutput" #-}
@@ -1614,8 +1622,8 @@ hscInteractive hsc_env cgguts location = do
                cg_binds    = core_binds,
                cg_tycons   = tycons,
                cg_foreign  = foreign_stubs,
-               cg_modBreaks = mod_breaks,
-               cg_spt_entries = spt_entries } = cgguts
+               cg_modBreaks = mod_breaks
+               } = cgguts
 
         data_tycons = filter isDataTyCon tycons
         -- cg_tycons includes newtypes, for the benefit of External Core,
@@ -1627,7 +1635,7 @@ hscInteractive hsc_env cgguts location = do
     prepd_binds <- {-# SCC "CorePrep" #-}
                    corePrepPgm hsc_env this_mod location core_binds data_tycons
 
-    (stg_binds, _infotable_prov, _caf_ccs__caf_cc_stacks)
+    (stg_binds, spt_entries, _infotable_prov, _caf_ccs__caf_cc_stacks)
       <- {-# SCC "CoreToStg" #-}
           myCoreToStg logger dflags (hsc_IC hsc_env) True this_mod location prepd_binds
     -----------------  Generate byte code ------------------
@@ -1784,7 +1792,7 @@ myCoreToStgExpr logger dflags ictxt for_bytecode this_mod ml prepd_expr = do
                                 (mkPseudoUniqueE 0)
                                 Many
                                 (exprType prepd_expr)
-    (stg_binds, prov_map, collected_ccs) <-
+    (stg_binds, _spt_entries, prov_map, collected_ccs) <-
        myCoreToStg logger
                    dflags
                    ictxt
@@ -1798,6 +1806,7 @@ myCoreToStg :: Logger -> DynFlags -> InteractiveContext
             -> Bool
             -> Module -> ModLocation -> CoreProgram
             -> IO ( [StgTopBinding] -- output program
+                  , [SptEntry]
                   , InfoTableProvMap
                   , CollectedCCs )  -- CAF cost centre info (declared and used)
 myCoreToStg logger dflags ictxt for_bytecode this_mod ml prepd_binds = do
@@ -1805,11 +1814,11 @@ myCoreToStg logger dflags ictxt for_bytecode this_mod ml prepd_binds = do
          = {-# SCC "Core2Stg" #-}
            coreToStg dflags this_mod ml prepd_binds
 
-    stg_binds2
+    (stg_binds2, spt_entries)
         <- {-# SCC "Stg2Stg" #-}
            stg2stg logger dflags ictxt for_bytecode this_mod stg_binds
 
-    return (stg_binds2, denv, cost_centre_info)
+    return (stg_binds2, spt_entries, denv, cost_centre_info)
 
 {- **********************************************************************
 %*                                                                      *
@@ -1948,7 +1957,7 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
     prepd_binds <- {-# SCC "CorePrep" #-}
       liftIO $ corePrepPgm hsc_env this_mod iNTERACTIVELoc core_binds data_tycons
 
-    (stg_binds, _infotable_prov, _caf_ccs__caf_cc_stacks)
+    (stg_binds, spt_entries, _infotable_prov, _caf_ccs__caf_cc_stacks)
         <- {-# SCC "CoreToStg" #-}
            liftIO $ myCoreToStg (hsc_logger hsc_env)
                                 (hsc_dflags hsc_env)
@@ -1966,7 +1975,7 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
     _ <- liftIO $ loadDecls interp hsc_env (src_span, Nothing) cbc
 
     {- Load static pointer table entries -}
-    liftIO $ hscAddSptEntries hsc_env Nothing (cg_spt_entries tidy_cg)
+    liftIO $ hscAddSptEntries hsc_env Nothing spt_entries
 
     let tcs = filterOut isImplicitTyCon (mg_tcs simpl_mg)
         patsyns = mg_patsyns simpl_mg

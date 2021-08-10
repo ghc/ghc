@@ -13,7 +13,7 @@ module GHC.Stg.Lift.Monad (
     -- * Transformation monad
     LiftM, runLiftM,
     -- ** Adding bindings
-    startBindingGroup, endBindingGroup, addTopStringLit, addLiftedBinding,
+    startBindingGroup, endBindingGroup, addTopStringLit, addLiftedBinding, addStaticPtrBinding,
     -- ** Substitution and binders
     withSubstBndr, withSubstBndrs, withLiftedBndr, withLiftedBndrs,
     -- ** Occurrences
@@ -46,6 +46,19 @@ import Control.Monad.Trans.RWS.Strict ( RWST, runRWST )
 import qualified Control.Monad.Trans.RWS.Strict as RWS
 import Control.Monad.Trans.Cont ( ContT (..) )
 import Data.ByteString ( ByteString )
+import GHC.Core.TyCo.Rep
+import GHC.Core.Type
+import GHC.Builtin.Types
+import GHC.Linker.Types
+import GHC.Types.Unique
+import GHC.Fingerprint
+import GHC.Unit.Module
+import Data.List (intercalate)
+import GHC.Types.Literal
+import GHC.Platform
+import Data.Maybe
+import GHC.LanguageExtensions
+import GHC.Types.SrcLoc
 
 -- | @uncurry 'mkStgBinding' . 'decomposeStgBinding' = id@
 decomposeStgBinding :: GenStgBinding pass -> (RecFlag, [(BinderP pass, GenStgRhs pass)])
@@ -80,10 +93,11 @@ data Env
   -- 'InId's to 'OutId's.
   --
   -- Invariant: 'Id's not present in this map won't be substituted.
+  , e_mod :: !Module
   }
 
-emptyEnv :: DynFlags -> Env
-emptyEnv dflags = Env dflags emptySubst emptyVarEnv
+emptyEnv :: Module -> DynFlags -> Env
+emptyEnv this_mod dflags = Env dflags emptySubst emptyVarEnv this_mod
 
 
 -- Note [Handling floats]
@@ -145,6 +159,7 @@ data FloatLang
   | EndBindingGroup
   | PlainTopBinding OutStgTopBinding
   | LiftedBinding OutStgBinding
+  | LiftedStaticBinding SptEntry Id StgRhs
 
 instance Outputable FloatLang where
   ppr StartBindingGroup = char '('
@@ -154,10 +169,11 @@ instance Outputable FloatLang where
   ppr (LiftedBinding bind) = (if isRec rec then char 'r' else char 'n') <+> ppr (map fst pairs)
     where
       (rec, pairs) = decomposeStgBinding bind
+  ppr (LiftedStaticBinding _spt binder _bind) = ppr binder
 
 -- | Flattens an expression in @['FloatLang']@ into an STG program, see "GHC.Stg.Lift.Monad#floats".
--- Important pre-conditions: The nesting of opening 'StartBindinGroup's and
--- closing 'EndBindinGroup's is balanced. Also, it is crucial that every binding
+-- Important pre-conditions: The nesting of opening 'StartBindingGroup's and
+-- closing 'EndBindingGroup's is balanced. Also, it is crucial that every binding
 -- group has at least one recursive binding inside. Otherwise there's no point
 -- in announcing the binding group in the first place and an @ASSERT@ will
 -- trigger.
@@ -178,6 +194,9 @@ collectFloats = go (0 :: Int) []
       LiftedBinding bind
         | n == 0 -> StgTopLifted (rm_cccs bind) : go n binds rest
         | otherwise -> go n (bind:binds) rest
+      LiftedStaticBinding _ binder bind
+        | n == 0 -> StgTopLifted (StgNonRec binder bind) : go n binds rest
+        | otherwise -> go n (StgNonRec binder bind : binds) rest
 
     map_rhss f = uncurry mkStgBinding . second (map (second f)) . decomposeStgBinding
     rm_cccs = map_rhss removeRhsCCCS
@@ -185,6 +204,12 @@ collectFloats = go (0 :: Int) []
                         StgRec (concatMap (snd . decomposeStgBinding . rm_cccs) binds)
     is_rec StgRec{} = True
     is_rec _ = False
+
+collectSPTEntries :: [FloatLang] -> [SptEntry]
+collectSPTEntries = mapMaybe go
+  where
+    go (LiftedStaticBinding spt_entry _ _) = Just spt_entry
+    go _ = Nothing
 
 -- | Omitting this makes for strange closure allocation schemes that crash the
 -- GC.
@@ -222,10 +247,14 @@ instance MonadUnique LiftM where
   getUniqueM = LiftM (lift getUniqueM)
   getUniquesM = LiftM (lift getUniquesM)
 
-runLiftM :: DynFlags -> UniqSupply -> LiftM () -> [OutStgTopBinding]
-runLiftM dflags us (LiftM m) = collectFloats (fromOL floats)
+runLiftM :: Module -> DynFlags -> UniqSupply -> LiftM () -> ([OutStgTopBinding], [SptEntry])
+runLiftM this_mod dflags us (LiftM m) = (collectFloats (fromOL floats), spt_entries)
   where
-    (_, _, floats) = initUs_ us (runRWST m (emptyEnv dflags) ())
+    spt_entries
+      | xopt StaticPointers dflags = collectSPTEntries final_floats
+      | otherwise = []
+    final_floats = fromOL floats
+    (_, _, floats) = initUs_ us (runRWST m (emptyEnv this_mod dflags) ())
 
 -- | Writes a plain 'StgTopStringLit' to the output.
 addTopStringLit :: OutId -> ByteString -> LiftM ()
@@ -244,6 +273,61 @@ endBindingGroup = LiftM $ RWS.tell $ unitOL $ EndBindingGroup
 -- an existing recursive top-level binding group.
 addLiftedBinding :: OutStgBinding -> LiftM ()
 addLiftedBinding = LiftM . RWS.tell . unitOL . LiftedBinding
+
+addLiftedStaticPtrBinding :: SptEntry -> Id -> StgRhs -> LiftM ()
+addLiftedStaticPtrBinding spt_entry binder bind =
+  LiftM . RWS.tell . unitOL $ LiftedStaticBinding spt_entry binder bind
+
+newStaticPtrBndr :: Unique -> Module -> Type -> Id
+newStaticPtrBndr uniq this_mod ty =
+  let str = "$static_ptr" ++ show uniq
+  in mkVanillaGlobal
+        -- This makes and external name but *doesn't* add it to the name cache,
+        -- this is safe because the name is only, and can only be, referenced from the
+        -- SPT init stub.
+        (mkExternalName uniq this_mod (mkVarOcc str) noSrcSpan)
+        (mkTyConApp staticPtrTyCon [ty])
+
+addStaticPtrBinding :: StgArg -> StgArg -> LiftM StgExpr
+addStaticPtrBinding loc payload = do
+  uniq <- getUniqueM
+  uniq_info <- getUniqueM
+  this_mod <- LiftM $ RWS.asks e_mod
+  platform <- targetPlatform <$> (LiftM $ RWS.asks e_dflags)
+  let binder_ptr = newStaticPtrBndr uniq this_mod (stgArgType payload)
+      binder_info = mkSysLocal (mkFastString "$static_ptr_info") uniq_info Many (mkTyConTy staticPtrInfoTyCon)
+      fp@(Fingerprint w0 w1) = mkStaticPtrFingerprint this_mod uniq
+      unit_lit = LitString (bytesFS $ unitFS $ moduleUnit this_mod)
+      mod_name_lit = LitString (bytesFS $ moduleNameFS $ moduleName this_mod)
+
+      info = StgRhsCon dontCareCCS staticPtrInfoDataCon NoNumber [] [StgLitArg unit_lit, StgLitArg mod_name_lit, loc]
+
+      ptr = StgRhsCon dontCareCCS staticPtrDataCon NoNumber []
+              [ StgLitArg (mkWord64LitWordRep platform (toInteger w0))
+              , StgLitArg (mkWord64LitWordRep platform (toInteger w1))
+              , StgVarArg binder_info
+              , payload]
+
+      spt_entry = SptEntry binder_ptr fp
+  addLiftedBinding (StgNonRec binder_info info)
+  addLiftedStaticPtrBinding spt_entry binder_ptr ptr
+  return (StgApp binder_ptr [])
+
+  where
+    mkStaticPtrFingerprint :: Module -> Unique -> Fingerprint
+    mkStaticPtrFingerprint this_mod n = fingerprintString $ intercalate ":"
+        [ unitString $ moduleUnit this_mod
+        , moduleNameString $ moduleName this_mod
+        , show n
+        ]
+
+    -- Choose either 'Word64#' or 'Word#' to represent the arguments of the
+    -- 'Fingerprint' data constructor.
+    mkWord64LitWordRep :: Platform -> Integer -> Literal
+    mkWord64LitWordRep platform =
+      case platformWordSize platform of
+        PW4 -> mkLitWord64
+        PW8 -> mkLitWord platform . toInteger
 
 -- | Takes a binder and a continuation which is called with the substituted
 -- binder. The continuation will be evaluated in a 'LiftM' context in which that
@@ -282,6 +366,8 @@ withLiftedBndr abs_ids bndr inner = do
       , e_expansions = extendVarEnv (e_expansions e) bndr abs_ids
       })
     (unwrapLiftM (inner bndr'))
+
+-- | Create a new exported vanilla id for the static pointer
 
 -- | See 'withLiftedBndr'.
 withLiftedBndrs :: Traversable f => DIdSet -> f Id -> (f Id -> LiftM a) -> LiftM a

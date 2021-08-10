@@ -5,8 +5,11 @@ Wired-in knowledge about {\em non-primitive} types
 -}
 
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE CPP #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
+#include "MachDeps.h"
 
 -- | This module is about types that can be defined in Haskell, but which
 --   must be wired into the compiler nonetheless.  C.f module "GHC.Builtin.Types.Prim"
@@ -152,7 +155,11 @@ module GHC.Builtin.Types (
         integerINDataCon, integerINDataConName,
         naturalTy, naturalTyCon, naturalTyConName,
         naturalNSDataCon, naturalNSDataConName,
-        naturalNBDataCon, naturalNBDataConName
+        naturalNBDataCon, naturalNBDataConName,
+
+        -- * Static Pointers
+        staticPtrInfoTyCon, staticPtrInfoDataCon,
+        staticPtrDataCon, staticPtrTyCon
 
     ) where
 
@@ -2171,3 +2178,31 @@ filterCTuple (Exact n)
   | Just arity <- cTupleTyConNameArity_maybe n
   = Exact $ tupleTyConName BoxedTuple arity
 filterCTuple rdr = rdr
+
+staticPtrInfoDataCon :: DataCon
+staticPtrInfoDataCon = pcDataCon staticPtrInfoDataConName [] [stringTy, stringTy, mkBoxedTupleTy [intTy, intTy] ] staticPtrInfoTyCon
+
+staticPtrInfoTyCon :: TyCon
+staticPtrInfoTyCon = pcTyCon staticPtrInfoTyConName Nothing [] [staticPtrInfoDataCon]
+
+
+staticPtrDataCon :: DataCon
+
+staticPtrDataCon = pcDataCon staticPtrDataConName alpha_tyvar
+                      [ static_ptr_word_type
+                      , static_ptr_word_type
+                      , alphaTy
+                      , mkTyConTy staticPtrInfoTyCon]
+                      staticPtrTyCon
+  where
+    static_ptr_word_type =
+#if WORD_SIZE_IN_BITS < 64
+        word64PrimTy
+#else
+        wordPrimTy
+#endif
+
+
+
+staticPtrTyCon :: TyCon
+staticPtrTyCon = pcTyCon staticPtrTyConName Nothing [alphaTyVar] [staticPtrDataCon]

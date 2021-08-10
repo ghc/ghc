@@ -715,6 +715,7 @@ lintRhs _bndr rhs = fmap lf_check_static_ptrs getLintFlags >>= go
     go AllowAtTopLevel
       | (binders0, rhs') <- collectTyBinders rhs
       , Just (fun, t, info, e) <- collectMakeStaticArgs rhs'
+      , False
       = markAllJoinsBad $
         foldr
         -- imitate @lintCoreExpr (Lam ...)@
@@ -983,7 +984,7 @@ lintIdOcc var nargs
           -- Check for a nested occurrence of the StaticPtr constructor.
           -- See Note [Checking StaticPtrs].
         ; lf <- getLintFlags
-        ; when (nargs /= 0 && lf_check_static_ptrs lf /= AllowAnywhere) $
+        ; when (False && nargs /= 0 && lf_check_static_ptrs lf /= AllowAnywhere) $
             checkL (idName var /= makeStaticName) $
               text "Found makeStatic nested in an expression"
 

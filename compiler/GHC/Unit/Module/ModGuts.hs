@@ -22,8 +22,6 @@ import GHC.Core         ( CoreProgram, CoreRule )
 import GHC.Core.TyCon
 import GHC.Core.PatSyn
 
-import GHC.Linker.Types ( SptEntry(..) )
-
 import GHC.Types.Annotations ( Annotation )
 import GHC.Types.Avail
 import GHC.Types.CompleteMatch
@@ -138,9 +136,5 @@ data CgGuts
         cg_dep_pkgs  :: ![UnitId], -- ^ Dependent packages, used to
                                             -- generate #includes for C code gen
         cg_hpc_info  :: !HpcInfo,           -- ^ Program coverage tick box information
-        cg_modBreaks :: !(Maybe ModBreaks), -- ^ Module breakpoints
-        cg_spt_entries :: [SptEntry]
-                -- ^ Static pointer table entries for static forms defined in
-                -- the module.
-                -- See Note [Grand plan for static forms] in "GHC.Iface.Tidy.StaticPtrTable"
+        cg_modBreaks :: !(Maybe ModBreaks)  -- ^ Module breakpoints
     }

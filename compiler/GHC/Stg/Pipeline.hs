@@ -33,6 +33,10 @@ import GHC.Utils.Logger
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader
+import GHC.Utils.Trace
+import GHC.Linker.Types
+import Data.IORef
+import GHC.LanguageExtensions
 
 newtype StgM a = StgM { _unStgM :: ReaderT Char IO a }
   deriving (Functor, Applicative, Monad, MonadIO)
@@ -52,13 +56,14 @@ stg2stg :: Logger
         -> Bool                      -- prepare for bytecode?
         -> Module                    -- module being compiled
         -> [StgTopBinding]           -- input program
-        -> IO [StgTopBinding]        -- output program
+        -> IO ([StgTopBinding], [SptEntry])        -- output program
 stg2stg logger dflags ictxt for_bytecode this_mod binds
   = do  { dump_when Opt_D_dump_stg_from_core "Initial STG:" binds
         ; showPass logger "Stg2Stg"
+        ; spt_entries_var <- newIORef []
         -- Do the main business!
         ; binds' <- runStgM 'g' $
-            foldM do_stg_pass binds (getStgToDo for_bytecode dflags)
+            foldM (do_stg_pass spt_entries_var) binds (getStgToDo for_bytecode dflags)
 
           -- Dependency sort the program as last thing. The program needs to be
           -- in dependency order for the SRT algorithm to work (see
@@ -69,7 +74,8 @@ stg2stg logger dflags ictxt for_bytecode this_mod binds
           -- preserve the order or only create minimal recursive groups, so a
           -- sorting pass is necessary.
         ; let binds_sorted = depSortStgPgm this_mod binds'
-        ; return binds_sorted
+        ; spt_entries <- readIORef spt_entries_var
+        ; return (binds_sorted, spt_entries)
    }
 
   where
@@ -80,8 +86,8 @@ stg2stg logger dflags ictxt for_bytecode this_mod binds
       = \ _whodunnit _binds -> return ()
 
     -------------------------------------------
-    do_stg_pass :: [StgTopBinding] -> StgToDo -> StgM [StgTopBinding]
-    do_stg_pass binds to_do
+    do_stg_pass :: IORef [SptEntry] -> [StgTopBinding] -> StgToDo -> StgM [StgTopBinding]
+    do_stg_pass spt_result binds to_do
       = case to_do of
           StgDoNothing ->
             return binds
@@ -94,8 +100,11 @@ stg2stg logger dflags ictxt for_bytecode this_mod binds
             end_pass "StgCse" binds'
 
           StgLiftLams -> do
+            pprTraceM "running lift" empty
             us <- getUniqueSupplyM
-            let binds' = {-# SCC "StgLiftLams" #-} stgLiftLams dflags us binds
+            let (binds', spt_entries) = {-# SCC "StgLiftLams" #-} stgLiftLams this_mod dflags us binds
+            pprTraceM "spt_entries" (ppr spt_entries)
+            liftIO $ writeIORef spt_result spt_entries
             end_pass "StgLiftLams" binds'
 
           StgBcPrep -> do
@@ -149,11 +158,15 @@ getStgToDo for_bytecode dflags =
     -- Important that unarisation comes first
     -- See Note [StgCse after unarisation] in GHC.Stg.CSE
     , optional Opt_StgCSE StgCSE
-    , optional Opt_StgLiftLams StgLiftLams
+    , runWhen run_lift StgLiftLams
     , runWhen for_bytecode StgBcPrep
     , optional Opt_StgStats StgStats
     ] where
       optional opt = runWhen (gopt opt dflags)
+      -- The LiftLams pass lifts static forms to the top-level, this is necessary
+      -- for correctness so the pass is always run when StaticPointers is enabled.
+      -- See [Grand plan for static forms]
+      run_lift = gopt Opt_StgLiftLams dflags || xopt StaticPointers dflags
       mandatory = id
 
 runWhen :: Bool -> StgToDo -> StgToDo

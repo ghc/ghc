@@ -1315,7 +1315,7 @@ piResultTy_maybe ty arg = case coreFullView ty of
 -- so we pay attention to efficiency, especially in the special case
 -- where there are no for-alls so we are just dropping arrows from
 -- a function type/kind.
-piResultTys :: HasDebugCallStack => Type -> [Type] -> Type
+piResultTys :: HasCallStack => Type -> [Type] -> Type
 piResultTys ty [] = ty
 piResultTys ty orig_args@(arg:args)
   | FunTy { ft_res = res } <- ty
@@ -2245,7 +2245,7 @@ buildSynTyCon name binders res_kind roles rhs
 -- if it is surely unlifted, Nothing if we can't be sure (i.e., it is
 -- representation-polymorphic), and panics if the kind does not have the shape
 -- TYPE r.
-isLiftedType_maybe :: HasDebugCallStack => Type -> Maybe Bool
+isLiftedType_maybe :: HasCallStack => Type -> Maybe Bool
 isLiftedType_maybe ty = case coreFullView (getRuntimeRep ty) of
   ty' | isLiftedRuntimeRep ty'  -> Just True
   TyConApp {}                   -> Just False  -- Everything else is unlifted
@@ -2255,7 +2255,7 @@ isLiftedType_maybe ty = case coreFullView (getRuntimeRep ty) of
 -- Panics on representation-polymorphic types; See 'mightBeUnliftedType' for
 -- a more approximate predicate that behaves better in the presence of
 -- representation polymorphism.
-isUnliftedType :: HasDebugCallStack => Type -> Bool
+isUnliftedType :: HasCallStack => Type -> Bool
         -- isUnliftedType returns True for forall'd unlifted types:
         --      x :: forall a. Int#
         -- I found bindings like these were getting floated to the top level.
@@ -2299,13 +2299,13 @@ dropRuntimeRepArgs = dropWhile isRuntimeRepKindedTy
 -- | Extract the RuntimeRep classifier of a type. For instance,
 -- @getRuntimeRep_maybe Int = LiftedRep@. Returns 'Nothing' if this is not
 -- possible.
-getRuntimeRep_maybe :: HasDebugCallStack
+getRuntimeRep_maybe :: HasCallStack
                     => Type -> Maybe Type
 getRuntimeRep_maybe = kindRep_maybe . typeKind
 
 -- | Extract the RuntimeRep classifier of a type. For instance,
 -- @getRuntimeRep_maybe Int = LiftedRep@. Panics if this is not possible.
-getRuntimeRep :: HasDebugCallStack => Type -> Type
+getRuntimeRep :: HasCallStack => Type -> Type
 getRuntimeRep ty
   = case getRuntimeRep_maybe ty of
       Just r  -> r
@@ -2771,7 +2771,7 @@ See #14939.
 -}
 
 -----------------------------
-typeKind :: HasDebugCallStack => Type -> Kind
+typeKind :: HasCallStack => Type -> Kind
 -- No need to expand synonyms
 typeKind (TyConApp tc tys) = piResultTys (tyConKind tc) tys
 typeKind (LitTy l)         = typeLiteralKind l

@@ -38,6 +38,7 @@ import GHC.Utils.Misc
 import GHC.Types.Var.Set
 
 import Data.Maybe ( mapMaybe )
+import GHC.Utils.Trace
 
 -- Note [When to lift]
 -- ~~~~~~~~~~~~~~~~~~~
@@ -107,8 +108,8 @@ import Data.Maybe ( mapMaybe )
 -- <https://gitlab.haskell.org/ghc/ghc/wikis/late-lam-lift wiki page>.
 
 llTrace :: String -> SDoc -> a -> a
-llTrace _ _ c = c
--- llTrace a b c = pprTrace a b c
+--llTrace _ _ c = c
+llTrace a b c = pprTrace a b c
 
 type instance BinderP      'LiftLams = BinderInfo
 type instance XRhsClosure  'LiftLams = DIdSet
@@ -466,6 +467,11 @@ goodToLift dflags top_lvl rec_flag expander pairs scope = decide
         . flip dVarSetMinusVarSet bndrs_set
         $ freeVarsOfRhs rhs
       clo_growth = closureGrowth expander (idClosureFootprint platform) bndrs_set abs_ids scope
+
+
+      is_static_rhs = case rhss of
+                        [StgRhsClosure _ _ _ binders body] -> pprTrace "is_static" (ppr binders $$ pprStgExpr shortStgPprOpts body) False
+                        _ -> pprTrace "rhs" (vcat (map (pprStgRhs shortStgPprOpts) rhss)) False
 
 rhsLambdaBndrs :: LlStgRhs -> [Id]
 rhsLambdaBndrs StgRhsCon{} = []

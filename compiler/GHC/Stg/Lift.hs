@@ -30,6 +30,10 @@ import GHC.Utils.Panic
 import GHC.Types.Var.Set
 import Control.Monad ( when )
 import Data.Maybe ( isNothing )
+import GHC.Utils.Trace
+import GHC.Builtin.Names
+import GHC.Unit.Module
+import GHC.Linker.Types
 
 -- Note [Late lambda lifting in STG]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -124,8 +128,8 @@ import Data.Maybe ( isNothing )
 --
 -- (Mostly) textbook instance of the lambda lifting transformation, selecting
 -- which bindings to lambda lift by consulting 'goodToLift'.
-stgLiftLams :: DynFlags -> UniqSupply -> [InStgTopBinding] -> [OutStgTopBinding]
-stgLiftLams dflags us = runLiftM dflags us . foldr liftTopLvl (pure ())
+stgLiftLams :: Module -> DynFlags -> UniqSupply -> [InStgTopBinding] -> ([OutStgTopBinding], [SptEntry])
+stgLiftLams this_mod dflags us = runLiftM this_mod dflags us . foldr liftTopLvl (pure ())
 
 liftTopLvl :: InStgTopBinding -> LiftM () -> LiftM ()
 liftTopLvl (StgTopStringLit bndr lit) rest = withSubstBndr bndr $ \bndr' -> do
@@ -180,6 +184,7 @@ withLiftedBindPairs top rec pairs scope k = do
       when (isRec rec) startBindingGroup
       rhss' <- traverse (liftRhs (Just abs_ids)) rhss
       let pairs' = zip bndrs' rhss'
+      pprTraceM "LIFTING" (ppr bndrs)
       addLiftedBinding (mkStgBinding rec pairs')
       when (isRec rec) endBindingGroup
       k Nothing
@@ -220,6 +225,12 @@ liftArgs (StgVarArg occ) = do
 liftExpr :: LlStgExpr -> LiftM OutStgExpr
 liftExpr (StgLit lit) = pure (StgLit lit)
 liftExpr (StgTick t e) = StgTick t <$> liftExpr e
+liftExpr (StgApp f args)
+  | idName f == makeStaticName
+  , [cc_info, payload] <- args = do
+  cc_info' <- liftArgs cc_info
+  payload' <- liftArgs payload
+  addStaticPtrBinding cc_info' payload'
 liftExpr (StgApp f args) = do
   f' <- substOcc f
   args' <- traverse liftArgs args
