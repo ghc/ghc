@@ -1193,7 +1193,9 @@ pprDeps unit_state (Deps { dep_direct_mods = dmods
     vcat [text "direct module dependencies:" <+> fsep (map ppr_mod dmods),
           text "boot module dependencies:" <+> fsep (map ppr bmods),
           text "direct package dependencies:" <+> fsep (map ppr_pkg pkgs),
-          if null tps then empty else text "trusted package dependencies:" <+> fsep (map ppr_pkg pkgs),
+          if null tps
+            then empty
+            else text "trusted package dependencies:" <+> fsep (map ppr_pkg tps),
           text "orphans:" <+> fsep (map ppr orphs),
           text "family instance modules:" <+> fsep (map ppr finsts)
         ]

@@ -38,7 +38,7 @@ trusted: safe
 require own pkg trusted: False
 
 M_SafePkg8
-trusted package dependencies: base-4.16.0.0 bytestring-0.11.1.0
+trusted package dependencies: bytestring-0.11.1.0
 trusted: trustworthy
 require own pkg trusted: False
 
