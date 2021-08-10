@@ -183,6 +183,7 @@ data OS
         | OSQNXNTO
         | OSAIX
         | OSHurd
+        | OSJavaScript
         deriving (Read, Show, Eq)
 
 -- | See Note [Platform Syntax].
@@ -202,6 +203,7 @@ stringEncodeOS = \case
   OSQNXNTO -> "nto-qnx"
   OSAIX -> "aix"
   OSHurd -> "hurd"
+  OSJavaScript -> "js"
 
 -- | ARM Instruction Set Architecture, Extensions and ABI
 --
@@ -255,6 +257,7 @@ osElfTarget OSQNXNTO    = False
 osElfTarget OSAIX       = False
 osElfTarget OSHurd      = True
 osElfTarget OSUnknown   = False
+osElfTarget OSJavaScript = False
  -- Defaulting to False is safe; it means don't rely on any
  -- ELF-specific functionality.  It is important to have a default for
  -- portability, otherwise we have to answer this question for every
