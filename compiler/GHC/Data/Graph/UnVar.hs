@@ -42,14 +42,14 @@ import qualified GHC.Data.Word64Set as S
 -- We need a type for sets of variables (UnVarSet).
 -- We do not use VarSet, because for that we need to have the actual variable
 -- at hand, and we do not have that when we turn the domain of a VarEnv into a UnVarSet.
--- Therefore, use a IntSet directly (which is likely also a bit more efficient).
+-- Therefore, use a Word64Set directly (which is likely also a bit more efficient).
 
 -- Set of uniques, i.e. for adjacent nodes
 newtype UnVarSet = UnVarSet S.Word64Set
     deriving Eq
 
 k :: Var -> Word64
-k v = getKey (getUnique v)
+k v = getMixedKey (getUnique v)
 
 domUFMUnVarSet :: UniqFM key elt -> UnVarSet
 domUFMUnVarSet ae = UnVarSet $ ufmToSet_Directly ae
@@ -93,7 +93,7 @@ unionUnVarSets = foldl' (flip unionUnVarSet) emptyUnVarSet
 
 instance Outputable UnVarSet where
     ppr (UnVarSet s) = braces $
-        hcat $ punctuate comma [ ppr (mkUniqueGrimily i) | i <- S.toList s]
+        hcat $ punctuate comma [ ppr (getUnmixedUnique i) | i <- S.toList s]
 
 data UnVarGraph = CBPG  !UnVarSet !UnVarSet -- ^ complete bipartite graph
                 | CG    !UnVarSet           -- ^ complete graph
