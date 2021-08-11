@@ -156,7 +156,7 @@ readShimsArchive :: DynFlags -> FilePath -> IO B.ByteString
 readShimsArchive dflags archive = do
   -- 
   -- meta <- Ar.readMeta archive
-  Ar.Archive entries <- Ar.loadAr file
+  Ar.Archive entries <- Ar.loadAr archive
   -- srcs <- Ar.readAllSources archive
   let s       = toolSettings dflags
       s1      = s { toolSettings_pgm_P = 
@@ -166,14 +166,14 @@ readShimsArchive dflags archive = do
                   }
       dflags1 = dflags { toolSettings = s1 }
   srcs' <- forM entries $ \e ->
-    if needsCpp filename
+    if needsCpp (Ar.filename e)
     then do
       infile  <- FileCleanup.newTempName dflags FileCleanup.TFL_CurrentModule "jspp"
       outfile <- FileCleanup.newTempName dflags FileCleanup.TFL_CurrentModule "jspp"
-      BL.writeFile infile b
+      B.writeFile infile (Ar.filedata e)
       Utils.doCpp dflags1 True infile outfile
       B.readFile outfile
-    else pure (BL.toStrict b)
+    else pure (Ar.filedata e)
   return (mconcat srcs')
 
 readShim :: FilePath -> (Pkg, Version) -> IO (Maybe Shim)
